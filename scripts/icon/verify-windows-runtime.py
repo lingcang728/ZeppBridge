@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import io
 import struct
@@ -12,7 +13,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 ROOT = Path(__file__).resolve().parents[2]
-EXE = Path(r"G:\build_cache\cargo-target\release\ZeppBridge.exe")
+EXE_DEFAULT = ROOT / "src-tauri" / "target" / "release" / "ZeppBridge.exe"
 ICO = ROOT / "src-tauri" / "icons" / "icon.ico"
 OUT = ROOT / "docs" / "design" / "windows-runtime-icon-check.png"
 
@@ -26,7 +27,13 @@ def resource_icon_frames(path: Path) -> dict[int, bytes]:
     pe = pefile.PE(str(path), fast_load=False)
     group_type = pefile.RESOURCE_TYPE["RT_GROUP_ICON"]
     icon_type = pefile.RESOURCE_TYPE["RT_ICON"]
-    group = next(entry for entry in pe.DIRECTORY_ENTRY_RESOURCE.entries if entry.id == group_type)
+    group = None
+    for entry in pe.DIRECTORY_ENTRY_RESOURCE.entries:
+        if entry.id == group_type:
+            group = entry
+            break
+    if group is None:
+        raise AssertionError("PE contains no RT_GROUP_ICON resource")
     group_lang = group.directory.entries[0].directory.entries[0]
     group_bytes = pe.get_data(group_lang.data.struct.OffsetToData, group_lang.data.struct.Size)
     reserved, kind, count = struct.unpack_from("<HHH", group_bytes, 0)
@@ -35,7 +42,13 @@ def resource_icon_frames(path: Path) -> dict[int, bytes]:
 
     icons: dict[int, bytes] = {}
     resource_by_id: dict[int, bytes] = {}
-    icon_entry = next(entry for entry in pe.DIRECTORY_ENTRY_RESOURCE.entries if entry.id == icon_type)
+    icon_entry = None
+    for entry in pe.DIRECTORY_ENTRY_RESOURCE.entries:
+        if entry.id == icon_type:
+            icon_entry = entry
+            break
+    if icon_entry is None:
+        raise AssertionError("PE contains no RT_ICON resource")
     for icon in icon_entry.directory.entries:
         language = icon.directory.entries[0]
         resource_by_id[icon.id] = pe.get_data(language.data.struct.OffsetToData, language.data.struct.Size)
@@ -76,9 +89,18 @@ def render_png(data: bytes, size: int) -> Image.Image:
 
 
 def main() -> int:
-    if not EXE.exists():
-        raise FileNotFoundError(EXE)
-    embedded = resource_icon_frames(EXE)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--exe",
+        type=Path,
+        default=EXE_DEFAULT,
+        help="path to the built ZeppBridge.exe",
+    )
+    args = parser.parse_args()
+    exe = args.exe
+    if not exe.exists():
+        raise FileNotFoundError(exe)
+    embedded = resource_icon_frames(exe)
     source = ico_frames(ICO)
     required = (16, 32, 48, 256)
     missing = [size for size in required if size not in embedded]
@@ -116,7 +138,7 @@ def main() -> int:
     OUT.parent.mkdir(parents=True, exist_ok=True)
     canvas.save(OUT, optimize=True)
 
-    print(f"EXE: {EXE}")
+    print(f"EXE: {exe}")
     print(f"Embedded RT_ICON frames: {', '.join(f'{size}px' for size in sorted(embedded))}")
     for size in required:
         print(f"{size}px: embedded PNG decodes {decoded[size].size}; ICO payload match={matches[size]}")

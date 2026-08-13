@@ -159,10 +159,14 @@ def main() -> int:
         page.goto(PORT + "/", wait_until="networkidle")
         page.evaluate("document.documentElement.setAttribute('data-theme', 'dark')")
         page.wait_for_timeout(250)
-        nav_raw = extract(page, ".desktop-nav svg")
-        nav_raw += extract(page, ".connection-chip svg") + extract(page, ".sync-chip svg") + extract(page, ".sync-button svg")
         nav_labels = ["overview", "ai", "settings", "link", "cloud", "sync"]
-        nav_icons = list(zip(nav_labels, nav_raw[: len(nav_labels)]))
+        nav_raw = (
+            extract(page, ".desktop-nav svg")
+            + extract(page, ".connection-chip svg")
+            + extract(page, ".sync-chip svg")[:1]  # cloud icon only
+            + extract(page, ".sync-button svg")  # refresh/sync icon
+        )
+        nav_icons = list(zip(nav_labels, nav_raw))
         page.goto(PORT + "/ai", wait_until="networkidle")
         page.evaluate("document.documentElement.setAttribute('data-theme', 'dark')")
         page.wait_for_timeout(300)

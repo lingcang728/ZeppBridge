@@ -1,4 +1,7 @@
-"""Verify the generated Tauri icon family without adding a Python dependency."""
+"""Verify the generated Tauri icon family.
+
+Requires Pillow (`pip install pillow`).
+"""
 
 from __future__ import annotations
 
@@ -96,5 +99,14 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except AssertionError as error:
+        print(f"Icon verification failed: {error}", file=sys.stderr)
+        raise SystemExit(1)
+    except ImportError as error:
+        print(
+            f"Icon verification requires Pillow ({error}). Install with: pip install pillow",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+    except OSError as error:
         print(f"Icon verification failed: {error}", file=sys.stderr)
         raise SystemExit(1)

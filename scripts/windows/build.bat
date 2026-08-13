@@ -93,8 +93,20 @@ if defined MSI_INSTALLER echo MSI 安装包：%MSI_INSTALLER%
 
 set "RELEASE_DIR=%~dp0..\..\release"
 if not exist "%RELEASE_DIR%\." mkdir "%RELEASE_DIR%"
-if defined NSIS_INSTALLER copy /Y "%NSIS_INSTALLER%" "%RELEASE_DIR%\" >nul
-if defined MSI_INSTALLER copy /Y "%MSI_INSTALLER%" "%RELEASE_DIR%\" >nul
+if defined NSIS_INSTALLER (
+  copy /Y "%NSIS_INSTALLER%" "%RELEASE_DIR%\" >nul
+  if errorlevel 1 (
+    echo [错误] 复制 NSIS 安装包到 release 失败，请检查目录权限或磁盘空间。
+    exit /b 1
+  )
+)
+if defined MSI_INSTALLER (
+  copy /Y "%MSI_INSTALLER%" "%RELEASE_DIR%\" >nul
+  if errorlevel 1 (
+    echo [错误] 复制 MSI 安装包到 release 失败，请检查目录权限或磁盘空间。
+    exit /b 1
+  )
+)
 echo 已复制到项目 release：
 echo        %RELEASE_DIR%
 

@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "icons:generate": "node scripts/icon/generate-icons.mjs",
-    "icons:verify": "py -3 scripts/icon/verify-icons.py"
+    "icons:verify": "python scripts/icon/verify-icons.py || py -3 scripts/icon/verify-icons.py"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

@@ -41,6 +41,11 @@ jobs:
       - name: Build frontend
         run: npm run build
 
+      - name: Verify icon consistency
+        run: |
+          python -m pip install --upgrade pillow
+          npm run icons:verify
+
       - name: Check Rust formatting
         run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
 
