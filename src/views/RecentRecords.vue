@@ -215,7 +215,7 @@ function formatDateHint(value: string): string {
   background: var(--surface);
   border: 1px solid var(--line);
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   font-style: normal;
   font-weight: 400;
 }

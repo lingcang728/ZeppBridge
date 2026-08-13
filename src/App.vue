@@ -577,13 +577,13 @@ a { color: inherit; }
   .preview-banner, .route-notice { padding-inline: 16px; }
   .main-content { padding-bottom: 64px; }
   .bottom-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); height: 60px; padding: 5px 8px calc(5px + env(safe-area-inset-bottom)); background: var(--canvas); border-top: 1px solid var(--line); }
-  .bottom-nav-link { display: flex; min-width: 0; min-height: 44px; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-radius: var(--radius-sm); color: var(--muted); font-size: 10px; text-decoration: none; }
+  .bottom-nav-link { display: flex; min-width: 0; min-height: 44px; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-radius: var(--radius-sm); color: var(--muted); font-size: 11px; text-decoration: none; }
   .bottom-nav-link.is-active { color: var(--accent); background: var(--accent-soft); }
 }
 
 .page { width: 100%; max-width: none; min-width: 0; margin: 0; padding: 16px 24px 20px; }
 .page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 14px; min-width: 0; }
-.eyebrow { margin: 0 0 6px; color: var(--muted); font-size: 11px; letter-spacing: .06em; }
+.eyebrow { margin: 0 0 6px; color: var(--muted); font-size: 12px; letter-spacing: .06em; }
 h1, h2, p { margin-top: 0; }
 .page h1 { margin-bottom: 6px; font-size: 22px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; }
 .page-intro { margin-bottom: 0; color: var(--muted); font-size: 12px; }

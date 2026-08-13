@@ -418,7 +418,7 @@ function dayHint(value: string): string {
   border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 .hr-reading {
   display: flex;

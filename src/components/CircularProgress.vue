@@ -76,8 +76,8 @@ const label = computed(() => `${Math.round(clamped.value)}${props.unit}`);
 }
 .progress-label {
   fill: var(--ink);
-  font-family: var(--font-mono);
-  font-weight: 500;
+  font-family: 'Inter', var(--font-sans);
+  font-weight: 600;
 }
 .progress-slot {
   position: absolute;

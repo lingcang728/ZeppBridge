@@ -97,7 +97,7 @@ watch([dataRevision, sleepId], () => void loadDetail());
 
 <template>
   <section class="page sleep-page" aria-labelledby="sleep-detail-title">
-    <RouterLink class="back-link" to="/"><Icon name="arrow-left" :size="14" />返回概览</RouterLink>
+    <RouterLink class="back-link" to="/recent"><Icon name="arrow-left" :size="14" />返回最近记录</RouterLink>
     <header class="page-heading">
       <h1 id="sleep-detail-title">睡眠记录详情</h1>
       <p v-if="session">{{ formatDate(session.start_time, 'long') }}</p>
@@ -209,24 +209,24 @@ watch([dataRevision, sleepId], () => void loadDetail());
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 18px;
+  margin-bottom: 8px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
   text-decoration: none;
 }
 .back-link svg { transform: rotate(180deg); }
-.page-heading { margin-bottom: 18px; }
+.page-heading { margin-bottom: 12px; }
 .page-heading h1 {
   margin: 0;
   color: var(--ink);
   font-size: 22px;
-  font-weight: 650;
-  letter-spacing: -0.04em;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 .page-heading p {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 .muted-line { color: var(--muted); }
 .sleep-hero {
@@ -236,12 +236,12 @@ watch([dataRevision, sleepId], () => void loadDetail());
   gap: 0;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--sleep-wash);
+  border-radius: var(--radius-md);
+  background: var(--surface);
 }
-.score-title { margin: 12px 0 0; font-size: 14px; }
-.score-body { margin: 6px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
-.hero-duration, .hero-score { min-width: 0; padding: 22px 24px 20px; }
+.score-title { margin: 10px 0 0; font-size: 13px; font-weight: 700; }
+.score-body { margin: 4px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.hero-duration, .hero-score { min-width: 0; padding: 18px 20px 16px; }
 .hero-score {
   border-left: 1px solid var(--line);
   background: var(--surface-raised);
@@ -252,7 +252,7 @@ watch([dataRevision, sleepId], () => void loadDetail());
   gap: 8px;
   margin: 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 .mark {
   display: grid;
@@ -261,49 +261,49 @@ watch([dataRevision, sleepId], () => void loadDetail());
   place-items: center;
   border-radius: 999px;
   color: var(--sleep);
-  background: var(--surface-raised);
+  background: var(--sleep-wash);
 }
 .value {
-  margin: 18px 0 0;
+  margin: 12px 0 0;
   color: var(--ink);
-  font-family: var(--font-mono);
-  font-size: clamp(32px, 4.4vw, 44px);
+  font-family: 'Inter', var(--font-sans);
+  font-size: clamp(32px, 4vw, 42px);
   font-variant-numeric: tabular-nums;
-  font-weight: 500;
-  letter-spacing: -0.04em;
+  font-weight: 600;
+  letter-spacing: -0.03em;
   line-height: 1.1;
 }
 .meta {
-  margin: 12px 0 0;
+  margin: 8px 0 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 .score-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 16px;
+  margin-top: 12px;
 }
 .score-empty {
   color: var(--ink);
-  font-family: var(--font-mono);
+  font-family: 'Inter', var(--font-sans);
   font-size: 36px;
-  font-weight: 500;
+  font-weight: 600;
 }
 .score-row small {
   color: var(--muted);
-  font-family: var(--font-mono);
+  font-family: 'Inter', var(--font-sans);
   font-size: 13px;
 }
-.stage-card { margin-top: 12px; padding: 18px 20px 20px; background: var(--surface); border-color: var(--line); }
+.stage-card { margin-top: 12px; padding: 14px 16px 16px; background: var(--surface); border-color: var(--line); }
 .stage-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
-.stage-head h2 { margin: 0; color: var(--ink); font-size: 16px; }
+.stage-head h2 { margin: 0; color: var(--ink); font-size: 15px; font-weight: 700; }
 .stage-head p { margin: 0; color: var(--muted); font-size: 12px; }
 .stage-actions { display: flex; align-items: center; gap: 10px; }
 .stage-help-button {
@@ -322,20 +322,21 @@ watch([dataRevision, sleepId], () => void loadDetail());
   gap: 12px;
   margin-top: 12px;
 }
-.meta-card { padding: 16px 18px 18px; background: var(--surface); border-color: var(--line); }
+.meta-card { padding: 12px 14px 14px; background: var(--surface); border-color: var(--line); }
 .meta-title {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 0 12px;
+  margin: 0 0 10px;
   color: var(--ink);
   font-size: 13px;
+  font-weight: 700;
 }
 .meta-title svg { color: var(--sleep); }
-.meta-card dl { display: grid; gap: 10px; margin: 0; }
+.meta-card dl { display: grid; gap: 8px; margin: 0; }
 .meta-card dt { color: var(--muted); font-size: 12px; }
 .meta-card dd {
-  margin: 4px 0 0;
+  margin: 3px 0 0;
   color: var(--ink);
   overflow-wrap: anywhere;
   font-size: 13px;

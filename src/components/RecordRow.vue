@@ -37,11 +37,11 @@ withDefaults(defineProps<{
 .record-row {
   display: grid;
   min-width: 0;
-  min-height: 72px;
+  min-height: 64px;
   grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
+  padding: 10px 16px;
   border-bottom: 1px solid var(--line);
   color: inherit;
   text-decoration: none;
@@ -65,12 +65,12 @@ withDefaults(defineProps<{
 }
 .record-copy small, .record-fact small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 .record-copy strong {
   overflow: hidden;
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -86,21 +86,21 @@ withDefaults(defineProps<{
   align-items: flex-end;
 }
 .record-fact strong {
-  font-family: var(--font-mono);
+  font-family: 'Inter', var(--font-sans);
   font-size: 14px;
   font-variant-numeric: tabular-nums;
-  font-weight: 500;
+  font-weight: 600;
 }
 .record-row > svg { color: var(--subtle); }
 .record-row.compact {
-  min-height: 48px;
+  min-height: 44px;
   grid-template-columns: auto minmax(0, 1.2fr) minmax(0, 1fr) auto;
   gap: 10px;
-  padding: 10px 16px;
+  padding: 8px 14px;
 }
 .record-row.compact .record-copy strong {
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 400;
 }
 .record-row.compact.tone-sleep .record-fact strong {
   min-width: 36px;

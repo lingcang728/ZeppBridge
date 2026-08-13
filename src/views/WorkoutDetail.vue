@@ -158,7 +158,7 @@ watch([dataRevision, workoutId], () => void loadDetail());
 <template>
   <section class="page workout-page" aria-labelledby="workout-detail-title">
     <div class="title-row">
-      <RouterLink class="back-link" to="/"><Icon name="arrow-left" :size="14" />返回概览</RouterLink>
+      <RouterLink class="back-link" to="/recent"><Icon name="arrow-left" :size="14" />返回最近记录</RouterLink>
       <div class="title-actions">
         <button v-if="workout" class="button button-secondary" type="button" @click="exportRecord"><Icon name="export" :size="14" />导出记录</button>
         <p v-if="actionError" class="muted-line" role="status">{{ actionError }}</p>
@@ -258,19 +258,19 @@ watch([dataRevision, workoutId], () => void loadDetail());
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 18px;
+  margin-bottom: 8px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
   text-decoration: none;
 }
 .back-link svg { transform: rotate(180deg); }
-.page-heading { margin-bottom: 18px; }
+.page-heading { margin-bottom: 12px; }
 .page-heading h1 {
   margin: 0;
   color: var(--ink);
   font-size: 22px;
-  font-weight: 650;
-  letter-spacing: -0.04em;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 .muted-line { color: var(--muted); }
 .title-row {
@@ -290,10 +290,10 @@ watch([dataRevision, workoutId], () => void loadDetail());
   align-items: center;
   gap: 16px;
   min-width: 0;
-  padding: 22px 24px;
+  padding: 18px 20px;
   border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--activity-wash);
+  border-radius: var(--radius-md);
+  background: var(--surface);
 }
 .hero-mark {
   display: grid;
@@ -302,19 +302,19 @@ watch([dataRevision, workoutId], () => void loadDetail());
   flex: 0 0 52px;
   place-items: center;
   border-radius: 999px;
-  color: var(--accent);
-  background: var(--accent-soft);
+  color: var(--activity);
+  background: var(--activity-wash);
 }
 .hero-copy { min-width: 0; flex: 1; }
-.kicker { margin: 0; color: var(--muted); font-size: 13px; }
+.kicker { margin: 0; color: var(--muted); font-size: 12px; }
 .value {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   color: var(--ink);
-  font-family: var(--font-mono);
+  font-family: 'Inter', var(--font-sans);
   font-size: clamp(36px, 5vw, 52px);
   font-variant-numeric: tabular-nums;
-  font-weight: 500;
-  letter-spacing: -0.05em;
+  font-weight: 600;
+  letter-spacing: -0.04em;
   line-height: 1;
 }
 .value span {
@@ -323,14 +323,14 @@ watch([dataRevision, workoutId], () => void loadDetail());
   font-size: 16px;
   letter-spacing: 0;
 }
-.meta { margin: 10px 0 0; color: var(--muted); font-size: 13px; }
+.meta { margin: 8px 0 0; color: var(--muted); font-size: 12px; }
 .type-badge {
   flex: 0 0 auto;
-  padding: 6px 12px;
+  padding: 5px 12px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  color: var(--accent);
-  background: var(--accent-soft);
+  color: var(--activity);
+  background: var(--activity-wash);
   font-size: 12px;
 }
 .metric-list {
@@ -345,8 +345,8 @@ watch([dataRevision, workoutId], () => void loadDetail());
 }
 .metric-list > div {
   min-width: 0;
-  min-height: 96px;
-  padding: 16px 18px;
+  min-height: 84px;
+  padding: 12px 14px;
   background: var(--surface);
 }
 .metric-label {
@@ -364,14 +364,14 @@ watch([dataRevision, workoutId], () => void loadDetail());
   display: flex;
   align-items: baseline;
   gap: 6px;
-  margin: 10px 0 0;
+  margin: 8px 0 0;
 }
 .metric-value strong {
   color: var(--ink);
-  font-family: var(--font-mono);
+  font-family: 'Inter', var(--font-sans);
   font-size: 22px;
   font-variant-numeric: tabular-nums;
-  font-weight: 500;
+  font-weight: 600;
 }
 .metric-value span { color: var(--muted); font-size: 12px; }
 .lower {
@@ -385,7 +385,7 @@ watch([dataRevision, workoutId], () => void loadDetail());
   align-items: flex-start;
   gap: 12px;
   min-width: 0;
-  padding: 18px 20px;
+  padding: 14px 16px;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--surface);
@@ -400,23 +400,24 @@ watch([dataRevision, workoutId], () => void loadDetail());
   color: var(--muted);
   background: var(--surface-raised);
 }
-.empty-track h2 { margin: 2px 0 8px; color: var(--ink); font-size: 15px; }
-.empty-track p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+.empty-track h2 { margin: 2px 0 6px; color: var(--ink); font-size: 14px; font-weight: 700; }
+.empty-track p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
 .side { display: grid; gap: 12px; min-width: 0; }
-.meta-card { padding: 16px 18px 18px; background: var(--surface); border-color: var(--line); }
+.meta-card { padding: 12px 14px 14px; background: var(--surface); border-color: var(--line); }
 .meta-title {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 0 12px;
+  margin: 0 0 10px;
   color: var(--ink);
   font-size: 13px;
+  font-weight: 700;
 }
-.meta-title svg { color: var(--accent); }
-.meta-card dl { display: grid; gap: 10px; margin: 0; }
+.meta-title svg { color: var(--activity); }
+.meta-card dl { display: grid; gap: 8px; margin: 0; }
 .meta-card dt { color: var(--muted); font-size: 12px; }
 .meta-card dd {
-  margin: 4px 0 0;
+  margin: 3px 0 0;
   color: var(--ink);
   overflow-wrap: anywhere;
   font-size: 13px;

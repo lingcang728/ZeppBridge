@@ -129,19 +129,19 @@ const segmentStyle = (stage: BarSegment): Record<string, string> => {
   gap: 12px;
   margin-top: 8px;
   color: var(--muted);
-  font-family: var(--font-mono);
-  font-size: 11px;
+  font-family: 'Inter', var(--font-sans);
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 .stage-list {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
-  margin-top: 14px;
+  margin-top: 12px;
 }
 .stage-list > div {
   min-width: 0;
-  padding: 14px 16px;
+  padding: 12px 14px;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--surface);
@@ -156,12 +156,12 @@ const segmentStyle = (stage: BarSegment): Record<string, string> => {
   border-radius: 50%;
 }
 .stage-list strong {
-  margin-top: 8px;
+  margin-top: 6px;
   color: var(--ink);
-  font-family: var(--font-mono);
+  font-family: 'Inter', var(--font-sans);
   font-size: 15px;
   font-variant-numeric: tabular-nums;
-  font-weight: 500;
+  font-weight: 600;
 }
 .stage-list small { margin-top: 4px; color: var(--muted); font-size: 12px; }
 @media (max-width: 760px) {
