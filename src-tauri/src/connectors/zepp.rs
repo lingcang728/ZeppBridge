@@ -1,7 +1,8 @@
 use crate::models::{error::*, AuthInfo};
 use reqwest::{header, Client, Url};
 use serde_json::Value;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 const MAX_ATTEMPTS: usize = 3;
@@ -108,10 +109,16 @@ pub struct ZeppConnector {
     client: Client,
     auth: AuthInfo,
     base_url: Url,
+    cancel: Arc<AtomicBool>,
 }
 
 impl ZeppConnector {
     pub fn new(auth: AuthInfo) -> Result<Self> {
+        Self::with_cancel(auth, Arc::new(AtomicBool::new(false)))
+    }
+
+    /// Construct a connector whose requests abort early when `cancel` is set.
+    pub fn with_cancel(auth: AuthInfo, cancel: Arc<AtomicBool>) -> Result<Self> {
         let base = validate_region_host(&auth.region_host)?;
         if auth.user_id.trim().is_empty()
             || !auth
@@ -127,10 +134,14 @@ impl ZeppConnector {
             header::USER_AGENT,
             header::HeaderValue::from_static("ZeppBridge/0.2.1"),
         );
+        // Redirects are disabled so a 3xx can never forward the custom
+        // `apptoken` header to a host outside the validated region. Manual,
+        // same-origin redirect handling lives in `get_json`.
         let client = Client::builder()
             .default_headers(defaults)
             .timeout(Duration::from_secs(30))
             .cookie_store(true)
+            .redirect(reqwest::redirect::Policy::none())
             .build()?;
         let base_url = Url::parse(&base)
             .map_err(|_| ZeppBridgeError::InvalidHost("主机 URL 无法解析".into()))?;
@@ -138,6 +149,7 @@ impl ZeppConnector {
             client,
             auth,
             base_url,
+            cancel,
         };
         // Validate the token as a header value during construction, rather than
         // panicking later when the first request is made.
@@ -166,6 +178,7 @@ impl ZeppConnector {
             auth,
             base_url: Url::parse(&base)
                 .map_err(|_| ZeppBridgeError::InvalidHost("主机 URL 无法解析".into()))?,
+            cancel: Arc::new(AtomicBool::new(false)),
         };
         connector.build_headers()?;
         Ok(connector)
@@ -212,7 +225,7 @@ impl ZeppConnector {
     }
 
     async fn get_json(&self, path: &str, params: Vec<(&str, String)>) -> Result<Value> {
-        let url = self.path_url(path)?;
+        let mut url = self.path_url(path)?;
         let headers = self.build_headers()?;
         let mut last_retry_status = None;
 
@@ -223,27 +236,75 @@ impl ZeppConnector {
             .take(MAX_ATTEMPTS)
             .enumerate()
         {
+            if self.cancel.load(Ordering::SeqCst) {
+                return Err(ZeppBridgeError::Cancelled);
+            }
             let mut query = params.clone();
             query.push(("r", Self::request_id()));
-            let response = match self
-                .client
-                .get(url.clone())
-                .headers(headers.clone())
-                .query(&query)
-                .send()
-                .await
+            let response = match tokio::time::timeout(
+                Duration::from_secs(35),
+                self.client
+                    .get(url.clone())
+                    .headers(headers.clone())
+                    .query(&query)
+                    .send(),
+            )
+            .await
             {
-                Ok(response) => response,
-                Err(error) => {
+                Ok(Ok(response)) => response,
+                Ok(Err(error)) => {
                     if attempt + 1 < MAX_ATTEMPTS {
                         tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
                         continue;
                     }
                     return Err(ZeppBridgeError::NetworkError(error));
                 }
+                Err(_elapsed) => {
+                    if attempt + 1 < MAX_ATTEMPTS {
+                        tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
+                        continue;
+                    }
+                    return Err(ZeppBridgeError::RetryExhausted {
+                        status: 504,
+                        message: "请求超时".into(),
+                    });
+                }
             };
 
             let status = response.status().as_u16();
+            // Redirects are disabled at the client level so the custom
+            // `apptoken` header is never forwarded cross-origin by reqwest.
+            // Follow a 3xx manually only when the target stays on the same
+            // HTTPS host as the validated regional base URL.
+            if (300..=399).contains(&status) {
+                let location = response
+                    .headers()
+                    .get(reqwest::header::LOCATION)
+                    .and_then(|value| value.to_str().ok());
+                match location {
+                    Some(location) => match url.join(location) {
+                        Ok(next)
+                            if next.scheme() == "https"
+                                && next.host_str() == self.base_url.host_str() =>
+                        {
+                            url = next;
+                            continue;
+                        }
+                        _ => {
+                            return Err(ZeppBridgeError::HttpStatus {
+                                status,
+                                message: "重定向目标不在允许的区域内".into(),
+                            })
+                        }
+                    },
+                    None => {
+                        return Err(ZeppBridgeError::HttpStatus {
+                            status,
+                            message: "重定向缺少目标地址".into(),
+                        })
+                    }
+                }
+            }
             match classify_status(status) {
                 None => {
                     return response.json::<Value>().await.map_err(|error| {

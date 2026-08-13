@@ -19,6 +19,11 @@ pub enum ZeppBridgeError {
     #[error("数据不可用: {0}")]
     Unavailable(String),
 
+    /// The user cancelled the in-flight sync. Kept distinct from a generic
+    /// failure so callers can record a `cancelled` outcome instead of `failed`.
+    #[error("同步已取消")]
+    Cancelled,
+
     /// A retryable response remained retryable after the bounded retry budget.
     #[error("暂时无法访问 Zepp 服务 (HTTP {status}): {message}")]
     RetryExhausted { status: u16, message: String },
@@ -62,6 +67,10 @@ impl ZeppBridgeError {
         matches!(self, Self::Unavailable(_) | Self::DataUnavailable(_))
     }
 
+    pub fn is_cancelled(&self) -> bool {
+        matches!(self, Self::Cancelled)
+    }
+
     #[allow(dead_code)]
     pub fn is_retryable(&self) -> bool {
         matches!(self, Self::RetryExhausted { .. } | Self::NetworkError(_))
@@ -81,6 +90,7 @@ impl ZeppBridgeError {
             Self::HttpStatus { status, .. } => {
                 format!("Zepp 服务返回 HTTP {status}，请稍后重试")
             }
+            Self::Cancelled => "同步已取消".into(),
             Self::AuthError(message) | Self::InvalidHost(message) | Self::ConfigError(message) => {
                 sanitize_user_text(message)
             }

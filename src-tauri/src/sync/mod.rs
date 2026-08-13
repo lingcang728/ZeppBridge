@@ -55,12 +55,14 @@ struct PersistResult {
 }
 
 impl SyncManager {
-    pub fn new(fetcher: DataFetcher, db: Database) -> Self {
+    /// The `cancel` flag is shared with the underlying connector so an
+    /// in-flight HTTP retry loop aborts as soon as cancellation is requested.
+    pub fn new(fetcher: DataFetcher, db: Database, cancel: Arc<AtomicBool>) -> Self {
         Self {
             fetcher: Arc::new(fetcher),
             db: Arc::new(Mutex::new(db)),
             run_lock: Arc::new(Mutex::new(())),
-            cancel: Arc::new(AtomicBool::new(false)),
+            cancel,
         }
     }
 
@@ -178,18 +180,21 @@ impl SyncManager {
         check()?;
         match self.fetcher.fetch_heart_rate_records(window).await {
             Ok(records) => streams.push(self.persist_records("heart_rate", records).await?),
+            Err(error) if error.is_cancelled() => return Err(error),
             Err(error) => streams.push(self.failure_report("heart_rate", &error).await?),
         }
         emit("daily_summary", 2, 5, "正在同步每日概览");
         check()?;
         match self.fetcher.fetch_daily_statistics_records(window).await {
             Ok(records) => streams.push(self.persist_records("daily_summary", records).await?),
+            Err(error) if error.is_cancelled() => return Err(error),
             Err(error) => streams.push(self.failure_report("daily_summary", &error).await?),
         }
         emit("workouts", 3, 5, "正在同步运动");
         check()?;
         match self.fetcher.fetch_workout_records(window).await {
             Ok(records) => streams.push(self.persist_records("workouts", records).await?),
+            Err(error) if error.is_cancelled() => return Err(error),
             Err(error) if error.is_unavailable() => {
                 streams.push(self.unavailable_report("workouts", &error).await?)
             }
@@ -202,6 +207,7 @@ impl SyncManager {
         check()?;
         match self.fetcher.fetch_sleep_records(window).await {
             Ok(records) => streams.push(self.persist_records("sleep", records).await?),
+            Err(error) if error.is_cancelled() => return Err(error),
             Err(error) if error.is_unavailable() => {
                 streams.push(self.unavailable_report("sleep", &error).await?)
             }
@@ -211,6 +217,7 @@ impl SyncManager {
         check()?;
         match self.fetcher.fetch_hrv_records(window).await {
             Ok(records) => streams.push(self.persist_records("hrv", records).await?),
+            Err(error) if error.is_cancelled() => return Err(error),
             Err(error) if error.is_unavailable() => {
                 streams.push(self.unavailable_report("hrv", &error).await?)
             }
@@ -341,10 +348,11 @@ impl SyncManager {
     }
 
     async fn failure_report(&self, stream: &str, error: &ZeppBridgeError) -> Result<StreamReport> {
+        let previous = self.previous_records_written(stream).await?;
         let report = StreamReport {
             stream: stream.into(),
             status: StreamStatus::Failed,
-            records_written: 0,
+            records_written: previous,
             raw_records: 0,
             capability: CapabilityStatus::Unavailable,
             needs_reauth: error.needs_reauth(),
@@ -357,7 +365,7 @@ impl SyncManager {
             "failed",
             report.message.as_deref(),
             report.needs_reauth,
-            0,
+            previous,
             CapabilityStatus::Unavailable,
             report.message.clone(),
         )?;
@@ -369,10 +377,11 @@ impl SyncManager {
         stream: &str,
         error: &ZeppBridgeError,
     ) -> Result<StreamReport> {
+        let previous = self.previous_records_written(stream).await?;
         let report = StreamReport {
             stream: stream.into(),
             status: StreamStatus::Unavailable,
-            records_written: 0,
+            records_written: previous,
             raw_records: 0,
             capability: CapabilityStatus::Unavailable,
             needs_reauth: error.needs_reauth(),
@@ -385,11 +394,22 @@ impl SyncManager {
             "unavailable",
             report.message.as_deref(),
             report.needs_reauth,
-            0,
+            previous,
             CapabilityStatus::Unavailable,
             report.message.clone(),
         )?;
         Ok(report)
+    }
+
+    /// A failed or unavailable stream must not reset its persisted
+    /// `records_written` counter; the UI reads that value as "已同步 N 条",
+    /// so a transient failure would otherwise make the stored data look wiped.
+    async fn previous_records_written(&self, stream: &str) -> Result<i64> {
+        let db = self.db.lock().await;
+        Ok(db
+            .get_sync_state(stream)?
+            .map(|state| state.records_written)
+            .unwrap_or(0))
     }
 
     #[allow(dead_code)]
@@ -411,10 +431,60 @@ fn status_name(status: &StreamStatus) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::connectors::ZeppConnector;
+    use crate::fetcher::DataFetcher;
+    use crate::models::{AuthInfo, CapabilityStatus};
+    use crate::storage::Database;
+    use std::sync::atomic::AtomicBool;
 
     #[test]
     fn status_names_are_not_success_for_optional_states() {
         assert_eq!(status_name(&StreamStatus::Unavailable), "unavailable");
         assert_eq!(status_name(&StreamStatus::Unverified), "unverified");
+    }
+
+    #[tokio::test]
+    async fn failure_report_preserves_records_written() {
+        let dir = std::env::temp_dir().join(format!(
+            "zeppbridge-sync-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = Database::new(dir.join("test.db")).unwrap();
+        db.update_sync_state_details(
+            "heart_rate",
+            None,
+            "success",
+            None,
+            false,
+            500,
+            CapabilityStatus::Verified,
+            None,
+        )
+        .unwrap();
+
+        let auth = AuthInfo {
+            app_token: "test-token".into(),
+            user_id: "user-1".into(),
+            region_host: "https://api-mifit.zepp.com".into(),
+        };
+        let connector = ZeppConnector::new(auth).unwrap();
+        let fetcher = DataFetcher::new(connector);
+        let manager = SyncManager::new(fetcher, db, Arc::new(AtomicBool::new(false)));
+
+        let error = ZeppBridgeError::HttpStatus {
+            status: 500,
+            message: "boom".into(),
+        };
+        let report = manager.failure_report("heart_rate", &error).await.unwrap();
+        assert_eq!(report.records_written, 500);
+        let unavailable = manager.unavailable_report("heart_rate", &error).await.unwrap();
+        assert_eq!(unavailable.records_written, 500);
+
+        let _ = std::fs::remove_dir_all(dir);
     }
 }

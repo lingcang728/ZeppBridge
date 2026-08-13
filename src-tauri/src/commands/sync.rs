@@ -100,6 +100,27 @@ async fn run_sync(
     let finished_at = Utc::now().to_rfc3339();
     let report = match report_result {
         Ok(report) => report,
+        Err(error) if error.is_cancelled() => {
+            // A user-initiated cancellation is a deliberate terminal outcome,
+            // not a failure: report it as `cancelled` so the UI can show a
+            // neutral banner instead of a red error.
+            let database = state.db.lock().await;
+            database
+                .record_cloud_sync(&finished_at, "cancelled")
+                .map_err(|record_error| record_error.to_string())?;
+            return Ok(ui_sync_report(
+                SyncReport {
+                    success: false,
+                    streams: Vec::new(),
+                    records_written: 0,
+                    message: Some("同步已取消".into()),
+                },
+                started_at,
+                finished_at,
+                "cancelled".to_string(),
+                &BTreeMap::new(),
+            ));
+        }
         Err(error) => {
             let database = state.db.lock().await;
             database

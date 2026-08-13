@@ -221,8 +221,16 @@ impl Database {
         self.conn.execute_batch(
             "CREATE UNIQUE INDEX IF NOT EXISTS uq_metric_sample_key
                  ON metric_samples(metric, timestamp, unit, source_scope, COALESCE(device_id, ''));
-             CREATE UNIQUE INDEX IF NOT EXISTS uq_daily_metric_key
-                 ON daily_metrics(date, metric, unit, source_scope, COALESCE(device_id, ''));
+              -- Daily metrics are account-level facts: the same (date, metric,
+              -- unit, scope) written by two endpoints with different device ids
+              -- must collapse to one row.  Drop legacy duplicates first, then
+              -- rebuild the canonical key without the device-id dimension.
+              DELETE FROM daily_metrics WHERE id NOT IN (
+                  SELECT MIN(id) FROM daily_metrics
+                  GROUP BY date, metric, unit, source_scope);
+              DROP INDEX IF EXISTS uq_daily_metric_key;
+              CREATE UNIQUE INDEX uq_daily_metric_key
+                 ON daily_metrics(date, metric, unit, source_scope);
              CREATE TABLE IF NOT EXISTS app_meta (
                  key TEXT PRIMARY KEY,
                  value TEXT NOT NULL,

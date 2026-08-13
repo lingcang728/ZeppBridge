@@ -1080,6 +1080,16 @@ fn parse_timestamp(value: &Value) -> Option<DateTime<Utc>> {
     if !number.is_finite() {
         return None;
     }
+    // Zepp event payloads sometimes carry the calendar day as a compact
+    // integer (`dayId: 20260812`).  Guard against interpreting such values
+    // as epoch seconds, which would silently produce dates in 1970.
+    let compact = number as i64;
+    if (19000101..=21001231).contains(&compact) {
+        return NaiveDate::parse_from_str(&format!("{compact}"), "%Y%m%d")
+            .ok()
+            .and_then(|date| date.and_hms_opt(0, 0, 0))
+            .map(|naive| DateTime::<Utc>::from_naive_utc_and_offset(naive, Utc));
+    }
     if number.abs() >= 10_000_000_000.0 {
         DateTime::from_timestamp_millis(number as i64)
     } else {
@@ -1136,6 +1146,19 @@ fn device_id(object: &Map<String, Value>) -> Option<String> {
         object,
         &["device_id", "deviceId", "deviceid", "sourceDeviceId"],
     )
+    .map(|value| sanitize_device_id(&value))
+}
+
+/// Zepp payloads occasionally carry a placeholder device id such as "1,"
+/// (trailing punctuation).  Trim surrounding whitespace and stray commas so
+/// the stored id stays comparable across endpoints and devices.
+fn sanitize_device_id(value: &str) -> String {
+    let mut cleaned = value.trim().to_string();
+    while cleaned.ends_with(',') || cleaned.ends_with(';') {
+        cleaned.pop();
+        cleaned = cleaned.trim_end().to_string();
+    }
+    cleaned
 }
 
 fn source_scope(object: Option<&Map<String, Value>>, device_id: Option<&str>) -> SourceScope {
@@ -1177,6 +1200,33 @@ mod tests {
     fn empty_or_wrong_shape_is_not_success() {
         assert!(Normalizer::normalize_heart_rate(&json!({"items": []})).is_err());
         assert!(Normalizer::normalize_sleep(&json!({"data": "H4sI..."})).is_err());
+    }
+
+    #[test]
+    fn device_id_placeholder_punctuation_is_trimmed() {
+        let placeholder = json!({"deviceId": "1,"});
+        assert_eq!(
+            device_id(placeholder.as_object().unwrap()).as_deref(),
+            Some("1")
+        );
+        let real = json!({"sourceDeviceId": "23229501001311"});
+        assert_eq!(
+            device_id(real.as_object().unwrap()).as_deref(),
+            Some("23229501001311")
+        );
+    }
+
+    #[test]
+    fn parse_timestamp_handles_compact_calendar_days() {
+        // yyyyMMdd integers are calendar days, never epoch seconds.
+        let date = parse_timestamp(&json!(20260812)).unwrap();
+        assert_eq!(date.format("%Y-%m-%d").to_string(), "2026-08-12");
+        // Epoch seconds keep working (2024-01-01T00:00:00Z).
+        let epoch = parse_timestamp(&json!(1704067200)).unwrap();
+        assert_eq!(epoch.format("%Y-%m-%d").to_string(), "2024-01-01");
+        // Epoch milliseconds keep working.
+        let millis = parse_timestamp(&json!(1704067200000i64)).unwrap();
+        assert_eq!(millis.format("%Y-%m-%d").to_string(), "2024-01-01");
     }
 
     #[test]

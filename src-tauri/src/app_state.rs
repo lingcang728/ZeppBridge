@@ -98,10 +98,11 @@ impl AppState {
 
     /// Build a synchronizer with its own SQLite connection.
     pub(crate) fn build_sync_manager(auth: AuthInfo, data_dir: &Path) -> Result<Arc<SyncManager>> {
-        let connector = ZeppConnector::new(auth)?;
+        let cancel = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let connector = ZeppConnector::with_cancel(auth, cancel.clone())?;
         let fetcher = DataFetcher::new(connector);
         let db = Database::new(data_dir.join("zepp.db"))?;
-        Ok(Arc::new(SyncManager::new(fetcher, db)))
+        Ok(Arc::new(SyncManager::new(fetcher, db, cancel)))
     }
 }
 

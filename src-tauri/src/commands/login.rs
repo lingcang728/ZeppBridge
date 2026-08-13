@@ -520,9 +520,10 @@ fn is_allowed_login_url(url: &str) -> bool {
     let Ok(parsed) = reqwest::Url::parse(url) else {
         return false;
     };
-    if matches!(parsed.scheme(), "about" | "data" | "blob") {
-        return true;
-    }
+    // Only HTTPS navigation to the known Zepp/Huami login domains is allowed.
+    // `data:`, `blob:` and `about:` URLs are deliberately rejected: page
+    // scripts must never be able to steer the credential-collecting webview
+    // onto attacker-controlled inline content.
     if parsed.scheme() != "https" {
         return false;
     }
@@ -679,7 +680,8 @@ mod tests {
         assert!(is_allowed_login_url(
             "https://user.huami.com/privacy2/index.html"
         ));
-        assert!(is_allowed_login_url("about:blank"));
+        assert!(!is_allowed_login_url("about:blank"));
+        assert!(!is_allowed_login_url("data:text/html,<script>alert(1)</script>"));
         assert!(!is_allowed_login_url("https://example.com/"));
         assert!(!is_allowed_login_url("http://watchface.zepp.com/"));
     }

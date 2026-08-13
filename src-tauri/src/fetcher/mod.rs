@@ -59,6 +59,76 @@ pub struct FetchedRecord {
     pub raw: RawRecord,
 }
 
+/// The heartRate endpoint's per-request sample cap.
+const HEART_RATE_PAGE_LIMIT: i64 = 1000;
+
+/// Collect the sample items out of a heartRate payload, mirroring the
+/// normalizer's accepted shapes. Pure so pagination logic is unit-testable.
+fn heart_rate_items(payload: &Value) -> Vec<Value> {
+    if let Some(array) = payload.as_array() {
+        return array.iter().cloned().collect();
+    }
+    let Some(object) = payload.as_object() else {
+        return Vec::new();
+    };
+    for key in ["items", "records", "results", "list"] {
+        if let Some(array) = object.get(key).and_then(Value::as_array) {
+            return array.iter().cloned().collect();
+        }
+    }
+    if let Some(data) = object.get("data") {
+        if let Some(array) = data.as_array() {
+            return array.iter().cloned().collect();
+        }
+        if let Some(data_object) = data.as_object() {
+            for key in ["items", "records", "results", "list"] {
+                if let Some(array) = data_object.get(key).and_then(Value::as_array) {
+                    return array.iter().cloned().collect();
+                }
+            }
+        }
+    }
+    Vec::new()
+}
+
+/// Compute the next pagination cursor from merged heart-rate items: the max
+/// sample timestamp plus one second. Timestamps may be epoch seconds or
+/// milliseconds; malformed items are skipped.
+fn heart_rate_cursor(items: &[Value]) -> Option<i64> {
+    let mut max_ts: Option<i64> = None;
+    for item in items {
+        let Some(object) = item.as_object() else {
+            continue;
+        };
+        let mut item_ts: Option<i64> = None;
+        for key in ["timestamp", "time", "timeStamp", "startTime"] {
+            let Some(value) = object.get(key) else {
+                continue;
+            };
+            let parsed = match value {
+                Value::Number(number) => number.as_i64(),
+                Value::String(text) => text.trim().parse::<i64>().ok(),
+                _ => None,
+            };
+            if let Some(parsed) = parsed {
+                item_ts = Some(parsed);
+                break;
+            }
+        }
+        if let Some(ts) = item_ts {
+            max_ts = Some(max_ts.map_or(ts, |current: i64| current.max(ts)));
+        }
+    }
+    // Advance one second: +1 for epoch-seconds, +1000 for epoch-millis.
+    max_ts.map(|ts| {
+        if ts >= 10_000_000_000 {
+            ts.saturating_add(1000)
+        } else {
+            ts.saturating_add(1)
+        }
+    })
+}
+
 pub struct DataFetcher {
     connector: ZeppConnector,
 }
@@ -104,11 +174,40 @@ impl DataFetcher {
         Ok(records)
     }
 
+    /// Defensive pagination for the heartRate endpoint.
+    ///
+    /// Real captures show the endpoint can return more than one page worth of
+    /// samples for a 7-day window, so a page that comes back full is followed
+    /// up with a cursor request instead of silently truncating the window.
     pub async fn fetch_heart_rate_record(&self, window: FetchWindow) -> Result<FetchedRecord> {
-        let payload = self
-            .connector
-            .fetch_heart_rate(window.start_utc.timestamp(), window.end_utc.timestamp())
-            .await?;
+        let end = window.end_utc.timestamp();
+        let mut cursor = window.start_utc.timestamp();
+        let mut merged: Vec<Value> = Vec::new();
+        loop {
+            let payload = self
+                .connector
+                .fetch_heart_rate_with_options(cursor, end, HEART_RATE_PAGE_LIMIT, 2)
+                .await?;
+            let items = heart_rate_items(&payload);
+            let page_len = items.len();
+            merged.extend(items);
+            if page_len < HEART_RATE_PAGE_LIMIT as usize {
+                break;
+            }
+            match heart_rate_cursor(&merged) {
+                Some(next) if next > cursor => cursor = next,
+                _ => break, // no progress: avoid an infinite loop
+            }
+        }
+        let payload = if merged.is_empty() {
+            // Keep the original payload so downstream normalization can
+            // surface the endpoint's own "no records" shape.
+            self.connector
+                .fetch_heart_rate(window.start_utc.timestamp(), window.end_utc.timestamp())
+                .await?
+        } else {
+            json!({ "items": merged })
+        };
         Ok(FetchedRecord {
             raw: RawRecord {
                 stream: "heart_rate".into(),
@@ -472,6 +571,31 @@ mod tests {
         let window = FetchWindow::days(1).unwrap();
         assert!(window.end_utc > window.start_utc);
         assert_eq!(FetchWindow::days(30).unwrap().chunks(7).len(), 5);
+    }
+
+    #[test]
+    fn heart_rate_items_accepts_known_payload_shapes() {
+        let direct = json!({ "items": [{"timestamp": 1}, {"timestamp": 2}] });
+        assert_eq!(heart_rate_items(&direct).len(), 2);
+        let nested = json!({ "data": { "items": [{"timestamp": 3}] } });
+        assert_eq!(heart_rate_items(&nested).len(), 1);
+        let array = json!([{"timestamp": 4}]);
+        assert_eq!(heart_rate_items(&array).len(), 1);
+        assert!(heart_rate_items(&json!({ "other": true })).is_empty());
+    }
+
+    #[test]
+    fn heart_rate_cursor_advances_past_max_timestamp() {
+        let items = vec![
+            json!({ "timestamp": 1_700_000_000i64, "value": 72 }),
+            json!({ "time": "1700003600", "value": 80 }),
+            json!({ "timeStamp": 1700007200000i64, "value": 88 }),
+            json!({ "value": 99 }), // malformed: skipped
+            json!("not an object"), // malformed: skipped
+        ];
+        // max is 1700007200000 ms, cursor advances one second
+        assert_eq!(heart_rate_cursor(&items), Some(1700007201000i64));
+        assert_eq!(heart_rate_cursor(&[]), None);
     }
 
     #[test]

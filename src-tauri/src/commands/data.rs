@@ -197,6 +197,11 @@ async fn write_export(
         db.build_ai_export(&selection)
             .map_err(|error| error.to_string())?
     };
+    // A zero-record export must not leave a misleading empty file on disk:
+    // report an error before anything is written.
+    if record_count == 0 {
+        return Err("这段时间没有可导出的记录".to_string());
+    }
     let generated_at = Utc::now();
     let path = if let Some(path) = selected_path {
         path
