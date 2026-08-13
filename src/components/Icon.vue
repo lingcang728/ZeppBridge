@@ -51,7 +51,7 @@ export type IconName =
 
 const props = withDefaults(defineProps<{ name: IconName; size?: number; stroke?: number }>(), {
   size: 18,
-  stroke: 1.75,
+  stroke: 1.5,
 });
 
 const iconLabel = computed(() => `icon-${props.name}`);
