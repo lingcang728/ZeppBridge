@@ -61,6 +61,12 @@ auth.json
 *.credentials
 *.cookie
 cookies*.json
+service-account*.json
+client_secret*.json
+credentials*.json
+secrets*.json
+.npmrc
+!.npmrc.example
 
 # Network captures and sensitive traces
 *.har
