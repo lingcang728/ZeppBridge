@@ -89,7 +89,7 @@ export interface SyncStreamResult {
   newest_sample_at?: string;
 }
 
-export type SyncOutcome = 'updated' | 'no_new_data' | 'partial' | 'failed';
+export type SyncOutcome = 'updated' | 'no_new_data' | 'partial' | 'failed' | 'cancelled';
 
 export interface SyncReport {
   success: boolean;

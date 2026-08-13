@@ -52,6 +52,7 @@ const statusLabel = computed(() => {
 const statusTone = computed(() => {
   if (appStatus.value?.connection_state === 'needs_reauth' || syncState.value === 'failed') return 'danger';
   if (syncState.value === 'partial') return 'warning';
+  if (syncState.value === 'cancelled') return 'neutral';
   if (appStatus.value?.connection_state === 'connected') return 'success';
   return 'neutral';
 });
@@ -531,6 +532,7 @@ a { color: inherit; }
 .sync-feedback.tone-updated { color: var(--accent); }
 .sync-feedback.tone-partial { color: var(--warning); }
 .sync-feedback.tone-no_new_data { color: var(--muted); }
+.sync-feedback.tone-cancelled { color: var(--muted); }
 .sync-feedback.tone-failed { color: var(--danger); }
 .sync-feedback a { color: inherit; }
 .spinning { animation: spin 900ms linear infinite; }

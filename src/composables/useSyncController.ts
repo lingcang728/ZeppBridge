@@ -47,26 +47,28 @@ const messageForReport = (report: SyncReport): string => {
   if (report.outcome === 'updated') return latest ? `已同步到新数据 · 最新心率 ${formatTime(latest)}` : '已同步到新数据';
   if (report.outcome === 'no_new_data') return latest ? `云端暂无新数据 · 最新心率仍为 ${formatTime(latest)}` : '同步完成，云端暂无新数据';
   if (report.outcome === 'partial') return failed.length ? `部分同步失败：${failed.join('、')}` : '同步已完成，但部分数据流失败';
+  if (report.outcome === 'cancelled') return '同步已取消';
   return '同步失败，请检查连接后重试';
 };
+
+const lastOutcomeLabel = computed(() => {
+  const outcome = appStatus.value?.last_cloud_sync_outcome;
+  if (!outcome) return null;
+  const latest = latestHeartRateAt();
+  if (outcome === 'no_new_data' && latest) return `云端暂无新数据 · 最新心率仍为 ${formatTime(latest)}`;
+  return `上次云端同步 ${formatTime(appStatus.value?.last_cloud_sync_at)}`;
+});
 
 const applyLoginStatus = (status: LoginStatus) => {
   loginStatus.value = status;
   if (status.state === 'connected') void refreshStatus();
 };
 
-const refreshStatus = async (): Promise<AppStatus | null> => {
+const refreshStatus = async (opts?: { preserveError?: boolean }): Promise<AppStatus | null> => {
   if (!isDesktop()) return null;
   try {
-    statusError.value = null;
+    if (!opts?.preserveError) statusError.value = null;
     appStatus.value = await backend.getAppStatus();
-    if (syncState.value === 'idle' && appStatus.value.last_cloud_sync_outcome) {
-      syncState.value = appStatus.value.last_cloud_sync_outcome;
-      const latest = latestHeartRateAt();
-      syncMessage.value = appStatus.value.last_cloud_sync_outcome === 'no_new_data' && latest
-        ? `云端暂无新数据 · 最新心率仍为 ${formatTime(latest)}`
-        : `上次云端同步 ${formatTime(appStatus.value.last_cloud_sync_at)}`;
-    }
     return appStatus.value;
   } catch (error) {
     statusError.value = toUserMessage(error, '连接状态暂时不可用');
@@ -74,8 +76,18 @@ const refreshStatus = async (): Promise<AppStatus | null> => {
   }
 };
 
-const runSync = (mode: 'incremental' | 'initial' | 'history' = 'incremental', days?: number): Promise<SyncReport | null> => {
-  if (runningSync) return runningSync;
+const runSync = (
+  mode: 'incremental' | 'initial' | 'history' = 'incremental',
+  days?: number,
+  opts?: { silent?: boolean },
+): Promise<SyncReport | null> => {
+  if (runningSync) {
+    if (!opts?.silent) {
+      syncMessage.value = '已有同步进行中，请稍后再试';
+      return Promise.resolve(null);
+    }
+    return runningSync;
+  }
   const promise = (async () => {
     if (!isDesktop()) {
       statusError.value = '请使用桌面应用';
@@ -115,7 +127,7 @@ const runSync = (mode: 'incremental' | 'initial' | 'history' = 'incremental', da
       syncState.value = 'failed';
       syncMessage.value = toUserMessage(error, '云端同步未完成');
       statusError.value = syncMessage.value;
-      await refreshStatus();
+      await refreshStatus({ preserveError: true });
       return null;
     } finally {
       syncProgress.value = null;
@@ -160,6 +172,11 @@ const initialize = async () => {
     } catch {
       // Login status is optional at startup.
     }
+    window.setInterval(() => {
+      if (autoSyncEnabled.value && appStatus.value?.connection_state === 'connected') {
+        void runSync('incremental', undefined, { silent: true });
+      }
+    }, AUTO_SYNC_INTERVAL_MS);
   }
   let status = await refreshStatus();
   if (status?.connection_state === 'configured' && isDesktop()) {
@@ -170,12 +187,7 @@ const initialize = async () => {
       await refreshStatus();
     }
   }
-  if (autoSyncEnabled.value && status?.connection_state === 'connected') void runSync('incremental');
-  if (typeof window !== 'undefined') {
-    window.setInterval(() => {
-      if (autoSyncEnabled.value) void runSync('incremental');
-    }, AUTO_SYNC_INTERVAL_MS);
-  }
+  if (autoSyncEnabled.value && status?.connection_state === 'connected') void runSync('incremental', undefined, { silent: true });
 };
 
 const markDataChanged = () => {
@@ -198,6 +210,7 @@ export const useSyncController = () => ({
     const clock = formatClock(appStatus.value?.last_cloud_sync_at);
     return clock ? `云端同步时间 ${clock}` : '云端同步时间 —';
   }),
+  lastOutcomeLabel,
   initialize,
   refreshStatus,
   runSync,

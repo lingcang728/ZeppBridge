@@ -15,6 +15,7 @@ const workout = ref<Workout | null>(null);
 const device = ref<DeviceProfile>({});
 const loading = ref(true);
 const error = ref<string | null>(null);
+const actionError = ref<string | null>(null);
 const workoutId = computed(() => String(route.params.workoutId || ''));
 
 const durationMinutes = computed(() => {
@@ -132,10 +133,11 @@ const loadDetail = async () => {
 
 const exportRecord = async () => {
   if (!workout.value) return;
+  actionError.value = null;
   try {
     await navigator.clipboard.writeText(JSON.stringify(workout.value, null, 2));
   } catch {
-    error.value = '复制这条记录失败';
+    actionError.value = '复制这条记录失败';
   }
 };
 
@@ -147,7 +149,10 @@ watch([dataRevision, workoutId], () => void loadDetail());
   <section class="page workout-page" aria-labelledby="workout-detail-title">
     <div class="title-row">
       <RouterLink class="back-link" to="/"><Icon name="arrow-left" :size="14" />返回概览</RouterLink>
-      <button v-if="workout" class="button button-secondary" type="button" @click="exportRecord"><Icon name="export" :size="14" />导出记录</button>
+      <div class="title-actions">
+        <button v-if="workout" class="button button-secondary" type="button" @click="exportRecord"><Icon name="export" :size="14" />导出记录</button>
+        <p v-if="actionError" class="muted-line" role="status">{{ actionError }}</p>
+      </div>
     </div>
     <header class="page-heading">
       <h1 id="workout-detail-title">运动详情</h1>
@@ -263,6 +268,12 @@ watch([dataRevision, workoutId], () => void loadDetail());
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+.title-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
 }
 .workout-hero {
   display: flex;

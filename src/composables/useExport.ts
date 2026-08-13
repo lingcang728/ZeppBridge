@@ -96,10 +96,6 @@ export const useExport = () => {
       });
       if (!path) return;
       exportResult.value = await tauriApi.saveJsonExport(selection, path);
-      if (!exportResult.value.record_count) {
-        exportError.value = '这段时间没有可导出的记录。';
-        return;
-      }
       exportMessage.value = `已保存 ${exportResult.value.record_count} 条记录。`;
     } catch (error) {
       exportError.value = toUserMessage(error, '保存 JSON 失败');

@@ -22,6 +22,7 @@ const recentWorkouts = ref<Workout[]>([]);
 const heartSeries = ref<HeartRatePoint[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
+const partialWarning = ref<string | null>(null);
 const { dataRevision, appStatus, isSyncing, syncState } = useSyncController();
 
 const lastHeartSample = computed(() => {
@@ -82,6 +83,7 @@ const freshness = computed(() => {
   if (isSyncing.value) return { title: '正在同步', detail: '完成后会刷新本页' };
   if (syncState.value === 'updated') return { title: '数据已更新', detail: '本机数据已更新' };
   if (syncState.value === 'no_new_data') return { title: '本机已是最新', detail: '云端暂无新数据' };
+  if (syncState.value === 'cancelled') return { title: '同步已取消', detail: '可随时重新同步' };
   if (overview.value?.last_updated) return { title: '本机数据已更新', detail: formatDateTime(overview.value.last_updated) };
   return null;
 });
@@ -110,8 +112,15 @@ const sparkView = computed(() => {
 
   const end = Math.max(samples[samples.length - 1].t, Date.now());
   const start = end - 24 * 60 * 60 * 1000;
-  const used = samples.filter((point) => point.t >= start && point.t <= end);
-  const series = used.length >= 2 ? used : samples;
+  let used = samples.filter((point) => point.t >= start && point.t <= end);
+  let axisStart = start;
+  let axisEnd = end;
+  if (used.length < 2) {
+    axisEnd = samples[samples.length - 1].t;
+    axisStart = Math.min(samples[0].t, axisEnd - 24 * 60 * 60 * 1000);
+    used = samples.filter((point) => point.t >= axisStart && point.t <= axisEnd);
+  }
+  const series = used;
   if (series.length < 2) return null;
 
   const rawMin = Math.min(...series.map((point) => point.v));
@@ -122,8 +131,8 @@ const sparkView = computed(() => {
 
   const innerW = SPARK.w - SPARK.l - SPARK.r;
   const innerH = SPARK.h - SPARK.t - SPARK.b;
-  const span = Math.max(1, end - start);
-  const xOf = (t: number) => SPARK.l + ((t - start) / span) * innerW;
+  const span = Math.max(1, axisEnd - axisStart);
+  const xOf = (t: number) => Math.max(SPARK.l, Math.min(SPARK.w - SPARK.r, SPARK.l + ((t - axisStart) / span) * innerW));
   const yOf = (v: number) => SPARK.t + (1 - (v - yMin) / (yMax - yMin)) * innerH;
 
   const pts = series.map((point) => ({ x: xOf(point.t), y: yOf(point.v) }));
@@ -133,7 +142,7 @@ const sparkView = computed(() => {
   const area = `${line} L${last.x.toFixed(1)} ${baseline.toFixed(1)} L${pts[0].x.toFixed(1)} ${baseline.toFixed(1)} Z`;
   const ticks = [yMin, Math.round((yMin + yMax) / 2), yMax].map((value) => ({ value, y: yOf(value) }));
   const hours = [0, 6, 12, 18, 24].map((hour) => {
-    const t = start + (hour / 24) * span;
+    const t = axisStart + (hour / 24) * span;
     return {
       x: xOf(t),
       label: new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(t)),
@@ -146,6 +155,7 @@ const sparkView = computed(() => {
 const loadOverview = async () => {
   loading.value = true;
   error.value = null;
+  partialWarning.value = null;
   if (!isTauri()) {
     loading.value = false;
     overview.value = null;
@@ -154,22 +164,24 @@ const loadOverview = async () => {
     heartSeries.value = [];
     return;
   }
-  try {
-    const [health, sleep, workouts, heart] = await Promise.all([
-      tauriApi.getHealthOverview(),
-      tauriApi.getRecentSleep(3),
-      tauriApi.getRecentWorkouts(3),
-      tauriApi.getHeartRateSeries(24),
-    ]);
-    overview.value = health;
-    recentSleep.value = sleep;
-    recentWorkouts.value = workouts;
-    heartSeries.value = heart;
-  } catch (cause) {
-    error.value = toUserMessage(cause, '概览数据暂时不可用');
-  } finally {
-    loading.value = false;
+  const [health, sleep, workouts, heart] = await Promise.allSettled([
+    tauriApi.getHealthOverview(),
+    tauriApi.getRecentSleep(3),
+    tauriApi.getRecentWorkouts(3),
+    tauriApi.getHeartRateSeries(24),
+  ]);
+  overview.value = health.status === 'fulfilled' ? health.value : null;
+  recentSleep.value = sleep.status === 'fulfilled' ? sleep.value : [];
+  recentWorkouts.value = workouts.status === 'fulfilled' ? workouts.value : [];
+  heartSeries.value = heart.status === 'fulfilled' ? heart.value : [];
+  const rejected = [health, sleep, workouts, heart].filter((result) => result.status === 'rejected');
+  if (rejected.length) {
+    partialWarning.value = toUserMessage(rejected[0].reason, '部分数据暂时不可用');
   }
+  if (health.status === 'rejected') {
+    error.value = toUserMessage(health.reason, '概览数据暂时不可用');
+  }
+  loading.value = false;
 };
 
 const workoutFact = (workout: Workout): { fact: string; label: string } => {
@@ -232,6 +244,11 @@ function listDate(value: string): string {
         </span>
       </div>
     </PageHeader>
+
+    <div v-if="partialWarning" class="partial-warning" role="status">
+      <Icon name="info" :size="15" />
+      <span>{{ partialWarning }}</span>
+    </div>
 
     <div v-if="loading" class="overview-skeleton" aria-label="正在加载概览" aria-live="polite">
       <div class="hero-grid">
@@ -508,6 +525,19 @@ function listDate(value: string): string {
 }
 .freshness strong { font-weight: 650; }
 .freshness small { color: var(--muted); font-size: 11px; }
+.partial-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--warning);
+  font-size: 12px;
+}
+.partial-warning svg { color: var(--warning); }
 .panel {
   min-width: 0;
   min-height: 248px;

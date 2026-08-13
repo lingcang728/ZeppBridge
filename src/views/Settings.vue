@@ -227,6 +227,10 @@ const savePrefs = async () => {
   }
 };
 const confirmHistorySync = async () => {
+  if (isSyncing.value) {
+    dataError.value = '当前有同步进行中，请稍后再补拉';
+    return;
+  }
   const days = clampDays(Number(historyDays.value));
   historyDays.value = days;
   if (days >= 90) {
@@ -268,7 +272,7 @@ onUnmounted(() => {
       </div>
     </header>
 
-    <div v-if="statusError" class="alert danger" role="alert"><Icon name="warning" :size="15" />{{ statusError }}<button type="button" @click="refreshStatus">重试</button></div>
+    <div v-if="statusError" class="alert danger" role="alert"><Icon name="warning" :size="15" />{{ statusError }}<button type="button" @click="() => refreshStatus()">重试</button></div>
 
     <section class="settings-section cloud-card" aria-labelledby="connection-title">
       <div class="section-heading">
