@@ -235,21 +235,24 @@ onUnmounted(() => {
 <style>
 :root {
   color-scheme: dark;
-  --bg: #0b0d0e;
-  --canvas: #111416;
-  --surface: #171a1d;
-  --surface-raised: #1c2023;
-  --ink: #f4f7f5;
-  --muted: #949b98;
-  --subtle: #6f7773;
-  --line: rgba(255, 255, 255, 0.09);
-  --line-strong: rgba(255, 255, 255, 0.16);
-  --accent: #63ad84;
-  --accent-strong: #8bc6a1;
-  --accent-ink: #09120d;
-  --danger: #d48282;
-  --warning: #d6aa6e;
-  --focus: #9ed6b7;
+  --bg: #000000;
+  --canvas: #1c1c1e;
+  --surface: #2c2c2e;
+  --surface-raised: #3a3a3c;
+  --ink: #ffffff;
+  --muted: #98989d;
+  --subtle: #636366;
+  --line: rgba(255, 255, 255, 0.12);
+  --line-strong: rgba(255, 255, 255, 0.2);
+  --accent: #0A84FF;
+  --accent-strong: #409CFF;
+  --accent-ink: #000000;
+  --heart: #FF453A;
+  --sleep: #5E5CE6;
+  --activity: #FF9F0A;
+  --danger: #FF453A;
+  --warning: #FFD60A;
+  --focus: #0A84FF;
   --font-sans: 'Segoe UI Variable', 'Segoe UI', Geist, system-ui, -apple-system, sans-serif;
   --font-mono: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
   --space-1: 4px;
@@ -267,41 +270,47 @@ onUnmounted(() => {
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
     color-scheme: light;
-    --bg: #f2f5f2;
-    --canvas: #fafcfb;
+    --bg: #f2f2f7;
+    --canvas: #f2f2f7;
     --surface: #ffffff;
-    --surface-raised: #f6f9f7;
-    --ink: #171b19;
-    --muted: #68716c;
-    --subtle: #7d8681;
-    --line: rgba(23, 27, 25, 0.12);
-    --line-strong: rgba(23, 27, 25, 0.2);
-    --accent: #2f7956;
-    --accent-strong: #235d43;
-    --accent-ink: #f3fbf6;
-    --danger: #b55353;
-    --warning: #926a2e;
-    --focus: #2f7956;
+    --surface-raised: #f6f6fa;
+    --ink: #1c1c1e;
+    --muted: #6c6c70;
+    --subtle: #8e8e93;
+    --line: rgba(28, 28, 30, 0.1);
+    --line-strong: rgba(28, 28, 30, 0.18);
+    --accent: #007AFF;
+    --accent-strong: #0051D5;
+    --accent-ink: #ffffff;
+    --heart: #FF3B30;
+    --sleep: #5E5CE6;
+    --activity: #FF9500;
+    --danger: #FF3B30;
+    --warning: #FF9500;
+    --focus: #007AFF;
   }
 }
 
 :root[data-theme='light'] {
   color-scheme: light;
-  --bg: #f2f5f2;
-  --canvas: #fafcfb;
+  --bg: #f2f2f7;
+  --canvas: #f2f2f7;
   --surface: #ffffff;
-  --surface-raised: #f6f9f7;
-  --ink: #171b19;
-  --muted: #68716c;
-  --subtle: #7d8681;
-  --line: rgba(23, 27, 25, 0.12);
-  --line-strong: rgba(23, 27, 25, 0.2);
-  --accent: #2f7956;
-  --accent-strong: #235d43;
-  --accent-ink: #f3fbf6;
-  --danger: #b55353;
-  --warning: #926a2e;
-  --focus: #2f7956;
+  --surface-raised: #f6f6fa;
+  --ink: #1c1c1e;
+  --muted: #6c6c70;
+  --subtle: #8e8e93;
+  --line: rgba(28, 28, 30, 0.1);
+  --line-strong: rgba(28, 28, 30, 0.18);
+  --accent: #007AFF;
+  --accent-strong: #0051D5;
+  --accent-ink: #ffffff;
+  --heart: #FF3B30;
+  --sleep: #5E5CE6;
+  --activity: #FF9500;
+  --danger: #FF3B30;
+  --warning: #FF9500;
+  --focus: #007AFF;
 }
 
 * { box-sizing: border-box; }
