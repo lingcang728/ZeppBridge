@@ -4,7 +4,6 @@ import { RouterLink } from 'vue-router';
 import VChart from 'vue-echarts';
 import Icon from '../components/Icon.vue';
 import CircularProgress from '../components/CircularProgress.vue';
-import RecordRow from '../components/RecordRow.vue';
 import EmptyState from '../components/EmptyState.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
@@ -230,15 +229,6 @@ function dayHint(value: string): string {
   if (diff === 1) return date.getHours() >= 18 ? '昨晚' : '昨天';
   return formatDate(value);
 }
-
-function listDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '日期未知';
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  const weekday = new Intl.DateTimeFormat('zh-CN', { weekday: 'short' }).format(date);
-  return `${month}月${day}日（${weekday}）`;
-}
 </script>
 
 <template>
@@ -263,11 +253,7 @@ function listDate(value: string): string {
         </div>
         <SkeletonBlock height="200px" />
       </div>
-      <SkeletonBlock height="48px" />
-      <div class="list-grid">
-        <SkeletonBlock height="170px" />
-        <SkeletonBlock height="170px" />
-      </div>
+      <SkeletonBlock height="84px" />
     </div>
 
     <EmptyState
@@ -368,60 +354,14 @@ function listDate(value: string): string {
         </article>
       </div>
 
-      <RouterLink class="ai-slim" to="/ai">
-        <span class="ai-mark" aria-hidden="true"><Icon name="spark" :size="16" /></span>
-        <strong>交给 AI，发现更多可能</strong>
-        <span class="ai-copy">复制或导出 JSON，分析请带到你自己的 AI</span>
-        <span class="ai-go">前往 <Icon name="arrow-right" :size="13" /></span>
+      <RouterLink class="ai-entry" to="/ai">
+        <span class="ai-mark" aria-hidden="true"><Icon name="spark" :size="20" /></span>
+        <span class="ai-body">
+          <strong>交给 AI，发现更多可能</strong>
+          <span>复制或导出 JSON，把分析带到你自己的 AI</span>
+        </span>
+        <span class="ai-go">前往「交给 AI」<Icon name="arrow-right" :size="14" /></span>
       </RouterLink>
-
-      <div class="list-grid">
-        <section class="record-group" aria-labelledby="sleep-group-title">
-          <div class="group-head">
-            <h2 id="sleep-group-title" class="section-label">
-              <Icon name="moon" :size="14" />最近睡眠
-            </h2>
-            <RouterLink class="see-all" to="/sleep">查看全部<Icon name="arrow-right" :size="13" /></RouterLink>
-          </div>
-          <div class="surface-card list-card">
-            <RecordRow
-              v-for="session in recentSleep"
-              :key="session.sleep_id"
-              compact
-              :to="{ name: 'SleepDetail', params: { sleepId: session.sleep_id } }"
-              category="sleep"
-              icon="moon"
-              :kicker="listDate(session.start_time)"
-              :title="formatDuration(session.duration_minutes)"
-              :fact="isFiniteNumber(session.score) ? String(Math.round(session.score)) : '—'"
-            />
-            <div v-if="!recentSleep.length" class="empty-row">暂无睡眠记录</div>
-          </div>
-        </section>
-
-        <section class="record-group" aria-labelledby="workout-group-title">
-          <div class="group-head">
-            <h2 id="workout-group-title" class="section-label">
-              <Icon name="run" :size="14" />最近运动
-            </h2>
-            <RouterLink class="see-all" to="/workouts">查看全部<Icon name="arrow-right" :size="13" /></RouterLink>
-          </div>
-          <div class="surface-card list-card">
-            <RecordRow
-              v-for="workout in recentWorkouts"
-              :key="workout.workout_id"
-              compact
-              :to="{ name: 'WorkoutDetail', params: { workoutId: workout.workout_id } }"
-              category="activity"
-              icon="run"
-              :kicker="listDate(workout.start_time)"
-              :title="workoutLabel(workout.workout_type)"
-              :fact="workoutFact(workout).fact"
-            />
-            <div v-if="!recentWorkouts.length" class="empty-row">暂无运动记录</div>
-          </div>
-        </section>
-      </div>
     </template>
   </section>
 </template>
@@ -636,31 +576,37 @@ function listDate(value: string): string {
   font-size: 12px;
 }
 
-/* AI 横条（单行紧凑） */
-.ai-slim {
+/* AI 入口（放大版横条） */
+.ai-entry {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: 16px;
+  padding: 18px 20px;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--surface);
   color: inherit;
   text-decoration: none;
 }
-.ai-slim:hover { border-color: var(--line-strong); }
+.ai-entry:hover { border-color: var(--accent-soft); background: var(--surface-raised); }
 .ai-mark {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
-  flex: 0 0 32px;
-  border-radius: 9px;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 12px;
   color: var(--accent);
   background: var(--accent-soft);
 }
-.ai-slim strong { font-size: 13px; }
-.ai-copy {
+.ai-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.ai-body strong { font-size: 15px; }
+.ai-body span {
   color: var(--muted);
   font-size: 12px;
 }
@@ -668,51 +614,14 @@ function listDate(value: string): string {
   margin-left: auto;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 12px;
+  gap: 6px;
+  min-height: 34px;
+  padding: 6px 16px;
   border-radius: 999px;
   background: var(--accent);
   color: var(--accent-ink);
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-/* 列表区 */
-.list-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-.record-group { min-width: 0; }
-.group-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-.section-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
-}
-.section-label svg { color: var(--sleep); }
-.record-group:last-child .section-label svg { color: var(--activity); }
-.see-all {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--muted);
-  font-size: 12px;
-  text-decoration: none;
-}
-.see-all:hover { color: var(--accent); }
-.list-card { padding: 4px; }
-.empty-row {
-  padding: 18px 16px;
-  color: var(--muted);
   font-size: 13px;
+  white-space: nowrap;
 }
 
 @media (max-width: 980px) {
@@ -722,12 +631,9 @@ function listDate(value: string): string {
   .hr-mini { grid-column: 1 / -1; flex-direction: row; gap: 24px; border-left: 0; border-top: 1px solid var(--line); padding: 12px 0 0; }
   .mid-grid { grid-template-columns: minmax(0, 1fr); }
 }
-@media (max-width: 860px) {
-  .list-grid { grid-template-columns: minmax(0, 1fr); }
-}
 @media (max-width: 760px) {
   .tiles { grid-template-columns: minmax(0, 1fr); }
-  .ai-slim { flex-wrap: wrap; }
+  .ai-entry { flex-wrap: wrap; }
   .ai-go { margin-left: auto; }
 }
 </style>

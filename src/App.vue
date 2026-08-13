@@ -38,6 +38,7 @@ const { initializeScale, bumpScale, resetScale } = useUiScale();
 
 const navigation = [
   { to: '/', label: '概览', icon: 'grid' as const },
+  { to: '/recent', label: '最近记录', icon: 'clock' as const },
   { to: '/ai', label: '交给 AI', icon: 'spark' as const },
   { to: '/settings', label: '设置', icon: 'gear' as const },
 ];
@@ -48,6 +49,7 @@ const themeOptions: { value: ThemeMode; label: string; icon: 'monitor' | 'sun' |
 ];
 
 const pageTitle = computed(() => {
+  if (route.path === '/recent') return '最近记录';
   if (route.path === '/sleep') return '睡眠';
   if (route.path === '/workouts') return '运动';
   if (route.path.startsWith('/sleep/')) return '睡眠详情';
@@ -574,7 +576,7 @@ a { color: inherit; }
   .mobile-menu-links { display: grid; gap: 3px; }
   .preview-banner, .route-notice { padding-inline: 16px; }
   .main-content { padding-bottom: 64px; }
-  .bottom-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); height: 60px; padding: 5px 8px calc(5px + env(safe-area-inset-bottom)); background: var(--canvas); border-top: 1px solid var(--line); }
+  .bottom-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); height: 60px; padding: 5px 8px calc(5px + env(safe-area-inset-bottom)); background: var(--canvas); border-top: 1px solid var(--line); }
   .bottom-nav-link { display: flex; min-width: 0; min-height: 44px; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-radius: var(--radius-sm); color: var(--muted); font-size: 10px; text-decoration: none; }
   .bottom-nav-link.is-active { color: var(--accent); background: var(--accent-soft); }
 }
