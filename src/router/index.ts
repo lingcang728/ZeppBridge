@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import Overview from '../views/Overview.vue';
+import RecentRecords from '../views/RecentRecords.vue';
 import AiExport from '../views/AiExport.vue';
 import SleepList from '../views/SleepList.vue';
 import WorkoutList from '../views/WorkoutList.vue';
@@ -12,6 +13,11 @@ const routes = [
     path: '/',
     name: 'Overview',
     component: Overview,
+  },
+  {
+    path: '/recent',
+    name: 'RecentRecords',
+    component: RecentRecords,
   },
   {
     path: '/ai',

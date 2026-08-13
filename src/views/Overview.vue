@@ -1,20 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
+import VChart from 'vue-echarts';
 import Icon from '../components/Icon.vue';
-import PageHeader from '../components/PageHeader.vue';
 import CircularProgress from '../components/CircularProgress.vue';
-import RecordRow from '../components/RecordRow.vue';
 import EmptyState from '../components/EmptyState.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { useSyncController } from '../composables/useSyncController';
+import { useTheme } from '../composables/useTheme';
 import { workoutLabel } from '../lib/labels';
-import { formatDate, formatDateTime, formatDuration, formatTime, formatMetric, isFiniteNumber } from '../lib/format';
+import { formatDate, formatDuration, formatTime, formatMetric, isFiniteNumber } from '../lib/format';
 import type { HealthOverview, HeartRatePoint, SleepSession, Workout } from '../types';
 
 const STEP_GOAL = 10000;
-const SPARK = { w: 640, h: 156, l: 4, r: 42, t: 10, b: 26 };
 
 const overview = ref<HealthOverview | null>(null);
 const recentSleep = ref<SleepSession[]>([]);
@@ -24,7 +23,10 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 const partialWarning = ref<string | null>(null);
 const now = ref(Date.now());
-const { dataRevision, appStatus, isSyncing, syncState } = useSyncController();
+const { dataRevision } = useSyncController();
+const { theme } = useTheme();
+
+const chartTheme = computed(() => (theme.value === 'light' ? 'zeppbridge-light' : 'zeppbridge-dark'));
 
 const lastHeartSample = computed(() => {
   const samples = heartSeries.value
@@ -67,28 +69,6 @@ const heartRateDetail = computed(() => {
   return `测于 ${new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date)}`;
 });
 
-const cloudSyncLabel = computed(() => {
-  const raw = appStatus.value?.last_cloud_sync_at || overview.value?.last_updated;
-  if (!raw) return '暂无云端同步时间';
-  const date = new Date(raw);
-  if (Number.isNaN(date.getTime())) return '云端同步时间未知';
-  const today = new Date();
-  const sameDay = date.getFullYear() === today.getFullYear()
-    && date.getMonth() === today.getMonth()
-    && date.getDate() === today.getDate();
-  const time = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(date);
-  return sameDay ? `云端同步时间 ${time}` : `云端同步时间 ${formatDateTime(raw)}`;
-});
-
-const freshness = computed(() => {
-  if (isSyncing.value) return { title: '正在同步', detail: '完成后会刷新本页' };
-  if (syncState.value === 'updated') return { title: '数据已更新', detail: '本机数据已更新' };
-  if (syncState.value === 'no_new_data') return { title: '本机已是最新', detail: '云端暂无新数据' };
-  if (syncState.value === 'cancelled') return { title: '同步已取消', detail: '可随时重新同步' };
-  if (overview.value?.last_updated) return { title: '本机数据已更新', detail: formatDateTime(overview.value.last_updated) };
-  return null;
-});
-
 const stepsToday = computed(() => overview.value?.steps_today);
 const stepsPercent = computed(() => {
   if (!isFiniteNumber(stepsToday.value)) return 0;
@@ -104,53 +84,78 @@ const sleepWindow = computed(() => {
   return `${dayHint(session.start_time)} ${formatTime(session.start_time)} – ${formatTime(session.end_time)}`;
 });
 
-const sparkView = computed(() => {
+/* 近 24 小时心率：真实样本不足 2 个时不画曲线（数据真实性红线） */
+const hrChart = computed(() => {
   const samples = heartSeries.value
     .map((point) => ({ t: new Date(point.timestamp).getTime(), v: point.value }))
     .filter((point) => Number.isFinite(point.t) && isFiniteNumber(point.v))
     .sort((a, b) => a.t - b.t);
   if (samples.length < 2) return null;
-
   const end = Math.max(samples[samples.length - 1].t, Date.now());
   const start = end - 24 * 60 * 60 * 1000;
-  let used = samples.filter((point) => point.t >= start && point.t <= end);
-  let axisStart = start;
-  let axisEnd = end;
-  if (used.length < 2) {
-    axisEnd = samples[samples.length - 1].t;
-    axisStart = Math.min(samples[0].t, axisEnd - 24 * 60 * 60 * 1000);
-    used = samples.filter((point) => point.t >= axisStart && point.t <= axisEnd);
-  }
-  const series = used;
-  if (series.length < 2) return null;
+  const used = samples.filter((point) => point.t >= start && point.t <= end);
+  if (used.length < 2) return null;
+  const values = used.map((point) => point.v);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const avg = values.reduce((sum, value) => sum + value, 0) / values.length;
+  return { pts: used, min, max, avg };
+});
 
-  const rawMin = Math.min(...series.map((point) => point.v));
-  const rawMax = Math.max(...series.map((point) => point.v));
-  let yMin = Math.max(0, Math.floor((rawMin - 8) / 20) * 20);
-  let yMax = Math.ceil((rawMax + 8) / 20) * 20;
-  if (yMax <= yMin) yMax = yMin + 40;
-
-  const innerW = SPARK.w - SPARK.l - SPARK.r;
-  const innerH = SPARK.h - SPARK.t - SPARK.b;
-  const span = Math.max(1, axisEnd - axisStart);
-  const xOf = (t: number) => Math.max(SPARK.l, Math.min(SPARK.w - SPARK.r, SPARK.l + ((t - axisStart) / span) * innerW));
-  const yOf = (v: number) => SPARK.t + (1 - (v - yMin) / (yMax - yMin)) * innerH;
-
-  const pts = series.map((point) => ({ x: xOf(point.t), y: yOf(point.v) }));
-  const line = pts.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' ');
-  const last = pts[pts.length - 1];
-  const baseline = SPARK.h - SPARK.b;
-  const area = `${line} L${last.x.toFixed(1)} ${baseline.toFixed(1)} L${pts[0].x.toFixed(1)} ${baseline.toFixed(1)} Z`;
-  const ticks = [yMin, Math.round((yMin + yMax) / 2), yMax].map((value) => ({ value, y: yOf(value) }));
-  const hours = [0, 6, 12, 18, 24].map((hour) => {
-    const t = axisStart + (hour / 24) * span;
-    return {
-      x: xOf(t),
-      label: new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(t)),
-    };
-  });
-
-  return { line, area, last, ticks, hours };
+const hrOption = computed<any>(() => {
+  const chart = hrChart.value;
+  if (!chart) return null;
+  const isLight = theme.value === 'light';
+  const heart = isLight ? '#C45F64' : '#EF6E6E';
+  const gridLine = isLight ? 'rgba(20,23,28,0.06)' : 'rgba(255,255,255,0.05)';
+  const areaTop = isLight ? 'rgba(196,95,100,0.18)' : 'rgba(239,110,110,0.28)';
+  return {
+    animation: false,
+    grid: { left: 8, right: 8, top: 10, bottom: 6, containLabel: false },
+    xAxis: {
+      type: 'time',
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { show: false },
+      splitLine: { show: false },
+    },
+    yAxis: {
+      type: 'value',
+      scale: true,
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { show: false },
+      splitLine: { show: true, lineStyle: { color: gridLine, type: 'dashed' } },
+    },
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params: Array<{ value: [number, number] }>) => {
+        const point = Array.isArray(params) ? params[0] : params;
+        if (!point) return '';
+        const time = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(point.value[0]));
+        return `${time}　<b>${point.value[1]}</b> BPM`;
+      },
+    },
+    series: [
+      {
+        type: 'line',
+        data: chart.pts.map((point) => [point.t, point.v]),
+        smooth: 0.25,
+        showSymbol: false,
+        lineStyle: { width: 2.5, color: heart },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: areaTop },
+              { offset: 1, color: 'rgba(0,0,0,0)' },
+            ],
+          },
+        },
+      },
+    ],
+  };
 });
 
 const loadOverview = async () => {
@@ -220,40 +225,19 @@ function formatDistanceZh(meters?: number): string {
 function dayHint(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return formatDate(value);
-  const now = new Date();
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const nowDate = new Date();
+  const startOfToday = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate()).getTime();
   const startOfThat = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
   const diff = Math.round((startOfToday - startOfThat) / 86400000);
   if (diff === 0) return '今天';
   if (diff === 1) return date.getHours() >= 18 ? '昨晚' : '昨天';
   return formatDate(value);
 }
-
-function listDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '日期未知';
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  const weekday = new Intl.DateTimeFormat('zh-CN', { weekday: 'short' }).format(date);
-  return `${month}月${day}日（${weekday}）`;
-}
 </script>
 
 <template>
   <section class="page overview-page" aria-labelledby="overview-title">
-    <PageHeader
-      title-id="overview-title"
-      title="概览"
-      :intro="cloudSyncLabel"
-    >
-      <div v-if="freshness" class="freshness" role="status">
-        <Icon name="circle-check" :size="15" />
-        <span>
-          <strong>{{ freshness.title }}</strong>
-          <small>{{ freshness.detail }}</small>
-        </span>
-      </div>
-    </PageHeader>
+    <h1 id="overview-title" class="sr-only">概览</h1>
 
     <div v-if="partialWarning" class="partial-warning" role="status">
       <Icon name="info" :size="15" />
@@ -261,20 +245,19 @@ function listDate(value: string): string {
     </div>
 
     <div v-if="loading" class="overview-skeleton" aria-label="正在加载概览" aria-live="polite">
-      <div class="hero-grid">
-        <SkeletonBlock height="280px" />
-        <SkeletonBlock height="280px" />
+      <SkeletonBlock height="168px" />
+      <div class="mid-grid">
+        <div class="tiles">
+          <SkeletonBlock height="76px" />
+          <SkeletonBlock height="76px" />
+          <SkeletonBlock height="76px" />
+          <SkeletonBlock height="76px" />
+          <SkeletonBlock height="76px" />
+          <SkeletonBlock height="76px" />
+        </div>
+        <SkeletonBlock height="200px" />
       </div>
-      <div class="metric-grid">
-        <SkeletonBlock height="120px" />
-        <SkeletonBlock height="120px" />
-        <SkeletonBlock height="120px" />
-      </div>
-      <SkeletonBlock height="88px" />
-      <div class="list-grid">
-        <SkeletonBlock height="180px" />
-        <SkeletonBlock height="180px" />
-      </div>
+      <SkeletonBlock height="84px" />
     </div>
 
     <EmptyState
@@ -288,211 +271,101 @@ function listDate(value: string): string {
     </EmptyState>
 
     <template v-else>
-      <div class="hero-grid">
-        <article class="panel hr-panel" aria-labelledby="hr-heading">
-          <div class="panel-head">
-            <span id="hr-heading" class="panel-kicker tone-heart">
-              <Icon name="heart" :size="15" />心率
-            </span>
+      <article class="panel hr-wide" aria-labelledby="hr-heading">
+        <div class="hr-left">
+          <div class="panel-kicker">
+            <Icon name="heart" :size="15" /><span id="hr-heading">心率</span>
             <span class="range-chip">24 小时</span>
           </div>
           <div class="hr-reading">
             <strong>{{ formatMetric(displayHr) }}</strong>
             <span>BPM</span>
           </div>
-          <p class="panel-detail">{{ heartRateDetail }}</p>
-          <div class="spark-wrap">
-            <svg
-              v-if="sparkView"
-              class="spark"
-              :viewBox="`0 0 ${SPARK.w} ${SPARK.h}`"
-              role="img"
-              aria-label="近 24 小时心率折线"
-            >
-              <defs>
-                <linearGradient id="hr-fill" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%" stop-color="var(--heart)" stop-opacity="0.38" />
-                  <stop offset="100%" stop-color="var(--heart)" stop-opacity="0" />
-                </linearGradient>
-              </defs>
-              <line
-                v-for="tick in sparkView.ticks"
-                :key="tick.value"
-                :x1="SPARK.l"
-                :x2="SPARK.w - SPARK.r"
-                :y1="tick.y"
-                :y2="tick.y"
-                stroke="var(--line)"
-                stroke-dasharray="3 5"
-              />
-              <path :d="sparkView.area" fill="url(#hr-fill)" />
-              <path :d="sparkView.line" fill="none" stroke="var(--heart)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-              <circle :cx="sparkView.last.x" :cy="sparkView.last.y" r="4" fill="var(--heart)" stroke="var(--heart-wash)" stroke-width="2" />
-              <text
-                v-for="tick in sparkView.ticks"
-                :key="`y-${tick.value}`"
-                :x="SPARK.w - 6"
-                :y="tick.y + 4"
-                text-anchor="end"
-                class="spark-axis"
-              >{{ tick.value }}</text>
-              <text
-                v-for="hour in sparkView.hours"
-                :key="hour.label + hour.x"
-                :x="hour.x"
-                :y="SPARK.h - 4"
-                text-anchor="middle"
-                class="spark-axis"
-              >{{ hour.label }}</text>
-            </svg>
-            <p v-else class="spark-empty">近 24 小时没有足够心率样本，因此不画曲线。</p>
-          </div>
-        </article>
+          <p class="hr-detail">{{ heartRateDetail }}</p>
+        </div>
+        <VChart
+          v-if="hrOption"
+          class="hr-chart"
+          :option="hrOption"
+          :theme="chartTheme"
+          autoresize
+          aria-label="近 24 小时心率折线"
+          role="img"
+        />
+        <p v-else class="spark-empty">近 24 小时没有足够心率样本，因此不画曲线。</p>
+        <div v-if="hrChart" class="hr-mini">
+          <div><span>最高</span><b>{{ Math.round(hrChart.max) }}</b></div>
+          <div><span>最低</span><b>{{ Math.round(hrChart.min) }}</b></div>
+          <div><span>平均</span><b>{{ Math.round(hrChart.avg) }}</b></div>
+        </div>
+      </article>
+
+      <div class="mid-grid">
+        <div class="tiles">
+          <article class="tile" aria-label="今日步数">
+            <div class="lab"><Icon name="steps" :size="14" />今日步数</div>
+            <div class="val">{{ formatMetric(stepsToday) }} <small>步</small></div>
+            <div class="sub">目标 {{ STEP_GOAL.toLocaleString('zh-CN') }}</div>
+          </article>
+          <article class="tile" aria-label="静息心率">
+            <div class="lab"><Icon name="heart-rest" :size="14" />静息心率</div>
+            <div class="val">{{ formatMetric(overview?.resting_hr) }} <small>BPM</small></div>
+            <div class="sub" :class="{ good: isFiniteNumber(overview?.resting_hr) && (overview?.resting_hr ?? 99) <= 55 }">
+              {{ isFiniteNumber(overview?.resting_hr) ? ((overview?.resting_hr ?? 99) <= 55 ? '优' : '来自健康概览') : '暂无记录' }}
+            </div>
+          </article>
+          <article class="tile" aria-label="最近睡眠">
+            <div class="lab"><Icon name="moon" :size="14" />最近睡眠</div>
+            <div class="val">{{ lastSleep ? formatDuration(lastSleep.duration_minutes) : '—' }}</div>
+            <div class="sub">{{ sleepWindow }}</div>
+          </article>
+          <article class="tile" aria-label="最近运动">
+            <div class="lab"><Icon name="run" :size="14" />最近运动</div>
+            <div class="val">{{ lastWorkout ? workoutFact(lastWorkout).fact : '—' }}</div>
+            <div class="sub">{{ lastWorkout ? `${dayHint(lastWorkout.start_time)} ${formatTime(lastWorkout.start_time)} · ${workoutLabel(lastWorkout.workout_type)}` : '暂无记录' }}</div>
+          </article>
+          <article class="tile" aria-label="训练负荷">
+            <div class="lab"><Icon name="training-load" :size="14" />训练负荷</div>
+            <div class="val">{{ formatMetric(overview?.training_load) }}</div>
+            <div class="sub">近 7 天</div>
+          </article>
+          <article class="tile" aria-label="最大摄氧量">
+            <div class="lab"><Icon name="vo2" :size="14" />VO₂max</div>
+            <div class="val">{{ formatMetric(overview?.vo2max) }}</div>
+            <div class="sub">来自最近运动</div>
+          </article>
+        </div>
 
         <article class="panel steps-panel" aria-labelledby="steps-heading">
-          <div class="panel-head">
-            <span id="steps-heading" class="panel-kicker tone-activity">
-              <Icon name="steps" :size="15" />今日步数
-            </span>
+          <div class="panel-kicker">
+            <Icon name="steps" :size="15" /><span id="steps-heading">今日步数</span>
           </div>
-          <div class="steps-ring">
-            <CircularProgress
-              :value="stepsPercent"
-              :size="196"
-              :stroke-width="12"
-              color="var(--icon-mint)"
-              track-color="var(--line)"
-              :show-label="false"
-            >
-              <div class="steps-center">
-                <strong>{{ formatMetric(stepsToday) }}</strong>
-                <span>步</span>
-                <small>目标 {{ STEP_GOAL.toLocaleString('zh-CN') }}</small>
-                <em v-if="isFiniteNumber(stepsToday)">{{ Math.round(stepsPercent) }}%</em>
-              </div>
-            </CircularProgress>
-          </div>
-        </article>
-      </div>
-
-      <div class="metric-grid">
-        <article class="metric-card tone-sleep">
-          <div class="metric-copy">
-            <div class="card-heading">
-              <Icon name="moon" :size="16" />
-              <span>最近睡眠</span>
+          <CircularProgress
+            :value="stepsPercent"
+            :size="130"
+            :stroke-width="10"
+            color="var(--activity)"
+            track-color="var(--line)"
+            :show-label="false"
+          >
+            <div class="steps-center">
+              <strong>{{ formatMetric(stepsToday) }}</strong>
+              <span>步</span>
             </div>
-            <div class="card-value">
-              {{ lastSleep ? formatDuration(lastSleep.duration_minutes) : '—' }}
-            </div>
-            <div class="card-detail">{{ sleepWindow }}</div>
-          </div>
-          <div v-if="lastSleep && isFiniteNumber(lastSleep.score)" class="score-ring">
-            <CircularProgress
-              :value="lastSleep.score"
-              :size="72"
-              :stroke-width="6"
-              color="var(--sleep)"
-              track-color="var(--line)"
-              :show-label="false"
-            >
-              <strong>{{ Math.round(lastSleep.score) }}</strong>
-            </CircularProgress>
-            <span>睡眠评分</span>
-          </div>
-        </article>
-
-        <article class="metric-card tone-heart">
-          <div class="metric-copy">
-            <div class="card-heading">
-              <Icon name="heart-rest" :size="16" />
-              <span>静息心率</span>
-            </div>
-            <div class="card-value">
-              {{ formatMetric(overview?.resting_hr) }} <small>BPM</small>
-            </div>
-            <div class="card-detail">
-              {{ isFiniteNumber(overview?.resting_hr) ? '来自健康概览' : '暂无记录' }}
-            </div>
-          </div>
-          <span v-if="isFiniteNumber(overview?.resting_hr) && (overview?.resting_hr ?? 99) <= 55" class="badge tone-ok">优</span>
-        </article>
-
-        <article class="metric-card tone-activity">
-          <div class="metric-copy">
-            <div class="card-heading">
-              <Icon name="run" :size="16" />
-              <span>最近运动</span>
-            </div>
-            <div class="card-value">
-              {{ lastWorkout ? workoutFact(lastWorkout).fact : '—' }}
-            </div>
-            <div class="card-detail">
-              {{ lastWorkout ? `${dayHint(lastWorkout.start_time)} ${formatTime(lastWorkout.start_time)} · ${workoutLabel(lastWorkout.workout_type)}` : '暂无记录' }}
-            </div>
-          </div>
-          <span v-if="lastWorkout" class="badge tone-good">良好</span>
+          </CircularProgress>
+          <div class="steps-bar"><i :style="{ width: `${Math.min(100, stepsPercent)}%` }" /></div>
+          <p class="steps-hint">目标 {{ STEP_GOAL.toLocaleString('zh-CN') }} · {{ Math.round(stepsPercent) }}%</p>
         </article>
       </div>
 
       <RouterLink class="ai-entry" to="/ai">
-        <span class="ai-mark" aria-hidden="true"><Icon name="spark" :size="18" /></span>
-        <span class="ai-copy">
+        <span class="ai-mark" aria-hidden="true"><Icon name="spark" :size="20" /></span>
+        <span class="ai-body">
           <strong>交给 AI，发现更多可能</strong>
-          <span>复制或导出 JSON，分析请带到你自己的 AI</span>
-          <small>你的数据只在本机处理，你可以自由选择信任的 AI 工具。</small>
+          <span>复制或导出 JSON，把分析带到你自己的 AI</span>
         </span>
         <span class="ai-go">前往「交给 AI」<Icon name="arrow-right" :size="14" /></span>
       </RouterLink>
-
-      <div class="list-grid">
-        <section class="record-group" aria-labelledby="sleep-group-title">
-          <div class="group-head">
-            <h2 id="sleep-group-title" class="section-label">
-              <Icon name="moon" :size="14" />最近睡眠
-            </h2>
-            <RouterLink class="see-all" to="/sleep">查看全部<Icon name="arrow-right" :size="13" /></RouterLink>
-          </div>
-          <div class="surface-card">
-            <RecordRow
-              v-for="session in recentSleep"
-              :key="session.sleep_id"
-              compact
-              :to="{ name: 'SleepDetail', params: { sleepId: session.sleep_id } }"
-              category="sleep"
-              icon="moon"
-              :kicker="listDate(session.start_time)"
-              :title="formatDuration(session.duration_minutes)"
-              :fact="isFiniteNumber(session.score) ? String(Math.round(session.score)) : '—'"
-            />
-            <div v-if="!recentSleep.length" class="empty-row">暂无睡眠记录</div>
-          </div>
-        </section>
-
-        <section class="record-group" aria-labelledby="workout-group-title">
-          <div class="group-head">
-            <h2 id="workout-group-title" class="section-label">
-              <Icon name="run" :size="14" />最近运动
-            </h2>
-            <RouterLink class="see-all" to="/workouts">查看全部<Icon name="arrow-right" :size="13" /></RouterLink>
-          </div>
-          <div class="surface-card">
-            <RecordRow
-              v-for="workout in recentWorkouts"
-              :key="workout.workout_id"
-              compact
-              :to="{ name: 'WorkoutDetail', params: { workoutId: workout.workout_id } }"
-              category="activity"
-              icon="run"
-              :kicker="listDate(workout.start_time)"
-              :title="workoutLabel(workout.workout_type)"
-              :fact="workoutFact(workout).fact"
-            />
-            <div v-if="!recentWorkouts.length" class="empty-row">暂无运动记录</div>
-          </div>
-        </section>
-      </div>
-
     </template>
   </section>
 </template>
@@ -500,46 +373,24 @@ function listDate(value: string): string {
 <style scoped>
 .overview-page.page {
   width: 100%;
-}
-.overview-skeleton,
-.hero-grid,
-.metric-grid,
-.list-grid {
   display: grid;
+  gap: 16px;
+}
+.overview-skeleton {
+  display: grid;
+  gap: 16px;
+}
+.panel {
   min-width: 0;
-  align-items: start;
-  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
 }
-.hero-grid {
-  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.85fr);
-  margin-bottom: 12px;
-}
-.metric-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-bottom: 14px;
-}
-.list-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-.freshness {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--icon-mint);
-  font-size: 12px;
-}
-.freshness span {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.freshness strong { font-weight: 650; }
-.freshness small { color: var(--muted); font-size: 11px; }
 .partial-warning {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 0 12px;
   padding: 9px 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
@@ -548,263 +399,244 @@ function listDate(value: string): string {
   font-size: 12px;
 }
 .partial-warning svg { color: var(--warning); }
-.panel {
-  min-width: 0;
-  min-height: 248px;
-  padding: 14px 16px 12px;
-  border-radius: var(--radius-md);
-  display: flex;
-  flex-direction: column;
-}
-.hr-panel {
-  background: var(--heart-wash);
-  border: 1px solid var(--line);
-}
-.steps-panel {
-  background: var(--activity-wash);
-  border: 1px solid var(--line);
-}
-.panel-head {
-  display: flex;
+
+/* 心率全宽卡 */
+.hr-wide {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 20px;
+  min-height: 168px;
 }
+.hr-left { min-width: 0; }
 .panel-kicker {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--muted);
+  color: var(--heart);
   font-size: 13px;
-  font-weight: 650;
 }
-.panel-kicker.tone-heart { color: var(--heart); }
-.panel-kicker.tone-activity { color: var(--icon-mint); }
 .range-chip {
-  padding: 4px 10px;
+  margin-left: 4px;
+  padding: 2px 9px;
   border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 .hr-reading {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 10px;
 }
 .hr-reading strong {
-  font-family: var(--font-mono);
-  font-size: clamp(36px, 4vw, 48px);
+  font-family: 'Inter', var(--font-sans);
+  font-size: 44px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  font-weight: 500;
-  letter-spacing: -0.05em;
-  line-height: 0.95;
+  letter-spacing: -.03em;
+  line-height: 1;
 }
 .hr-reading span {
   color: var(--heart);
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 600;
 }
-.panel-detail {
-  margin: 6px 0 10px;
+.hr-detail {
+  margin: 8px 0 0;
   color: var(--muted);
   font-size: 12px;
 }
-.spark-wrap { min-width: 0; margin-top: auto; }
-.spark { display: block; width: 100%; height: 132px; }
-.spark-axis {
-  fill: var(--subtle);
-  font-family: var(--font-mono);
-  font-size: 11px;
+.hr-chart {
+  width: 100%;
+  height: 96px;
+  min-width: 0;
 }
 .spark-empty {
-  margin: 18px 0 8px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+.hr-mini {
+  display: grid;
+  gap: 6px;
+  border-left: 1px solid var(--line);
+  padding-left: 20px;
+  min-width: 96px;
+}
+.hr-mini div {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.hr-mini b {
+  font-family: 'Inter', var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+/* 中段：瓷砖 + 步数环 */
+.mid-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+  gap: 16px;
+  align-items: stretch;
+}
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+.tile {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.tile .lab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: var(--muted);
   font-size: 12px;
 }
-.steps-ring {
-  display: grid;
-  flex: 1;
-  place-items: center;
-  padding: 8px 0 4px;
+.tile .lab svg { color: var(--subtle); }
+.tile .val {
+  margin-top: 8px;
+  font-family: 'Inter', var(--font-sans);
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+  line-height: 1.1;
+}
+.tile .val small {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 400;
+}
+.tile .sub {
+  margin-top: 4px;
+  color: var(--subtle);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tile .sub.good { color: var(--activity); }
+.steps-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.steps-panel .panel-kicker {
+  align-self: flex-start;
+  color: var(--activity);
 }
 .steps-center {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 1px;
 }
 .steps-center strong {
-  font-family: var(--font-mono);
-  font-size: 32px;
+  font-family: 'Inter', var(--font-sans);
+  font-size: 24px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  font-weight: 500;
-  letter-spacing: -0.04em;
+  letter-spacing: -.02em;
   line-height: 1;
 }
-.steps-center span { color: var(--muted); font-size: 12px; }
-.steps-center small { color: var(--muted); font-size: 11px; }
-.steps-center em {
-  color: var(--icon-mint);
-  font-style: normal;
+.steps-center span {
+  color: var(--muted);
   font-size: 12px;
-  font-weight: 650;
 }
-.metric-card {
-  min-width: 0;
-  min-height: 112px;
-  padding: 12px 14px;
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.metric-copy { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-.badge {
-  align-self: flex-start;
-  padding: 3px 8px;
+.steps-bar {
+  width: 70%;
+  height: 4px;
   border-radius: 999px;
-  font-size: 11px;
-  font-weight: 650;
+  background: var(--line);
+  overflow: hidden;
 }
-.badge.tone-ok { background: var(--heart-wash); color: var(--heart); }
-.badge.tone-good { background: var(--activity-wash); color: var(--icon-mint); }
-.metric-card.tone-heart {
-  background: var(--heart-wash);
-  border: 1px solid var(--line);
+.steps-bar i {
+  display: block;
+  height: 100%;
+  background: var(--activity);
+  border-radius: 999px;
 }
-.metric-card.tone-sleep {
-  background: var(--sleep-wash);
-  border: 1px solid var(--line);
-}
-.metric-card.tone-activity {
-  background: var(--activity-wash);
-  border: 1px solid var(--line);
-}
-.card-heading {
-  display: flex;
-  align-items: center;
-  gap: 7px;
+.steps-hint {
+  margin: 0;
   color: var(--muted);
   font-size: 12px;
 }
-.tone-heart .card-heading { color: var(--heart); }
-.tone-sleep .card-heading { color: var(--sleep); }
-.tone-activity .card-heading { color: var(--icon-mint); }
-.card-value {
-  font-family: var(--font-mono);
-  font-size: 24px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 500;
-  letter-spacing: -0.03em;
-}
-.card-value small {
-  font-size: 12px;
-  color: var(--muted);
-  margin-left: 4px;
-}
-.card-detail {
-  color: var(--muted);
-  font-size: 11px;
-}
-.score-ring {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 10px;
-}
-.score-ring strong {
-  font-family: var(--font-mono);
-  font-size: 18px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 500;
-  color: var(--sleep);
-}
+
+/* AI 入口（放大版横条） */
 .ai-entry {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin: 2px 0 14px;
-  padding: 12px 16px;
+  gap: 16px;
+  padding: 18px 20px;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: var(--activity-wash);
+  background: var(--surface);
   color: inherit;
   text-decoration: none;
 }
-.ai-entry:hover { border-color: var(--icon-mint); }
+.ai-entry:hover { border-color: var(--accent-soft); background: var(--surface-raised); }
 .ai-mark {
   display: grid;
-  width: 36px;
-  height: 36px;
-  flex: 0 0 36px;
   place-items: center;
-  border-radius: 10px;
-  color: var(--icon-mint);
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 12px;
+  color: var(--accent);
   background: var(--accent-soft);
 }
-.ai-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
-.ai-copy strong { font-size: 15px; }
-.ai-copy span, .ai-copy small { color: var(--muted); font-size: 12px; }
+.ai-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.ai-body strong { font-size: 15px; }
+.ai-body span {
+  color: var(--muted);
+  font-size: 12px;
+}
 .ai-go {
+  margin-left: auto;
   display: inline-flex;
-  min-height: 36px;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
+  min-height: 34px;
+  padding: 6px 16px;
   border-radius: 999px;
-  background: var(--icon-mint);
+  background: var(--accent);
   color: var(--accent-ink);
-  font-size: 12px;
-  font-weight: 650;
+  font-size: 13px;
   white-space: nowrap;
 }
-.group-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-.section-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
-}
-.see-all {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--muted);
-  font-size: 12px;
-  text-decoration: none;
-}
-.see-all:hover { color: var(--icon-mint); }
-.empty-row { padding: 18px 16px; color: var(--muted); font-size: 13px; }
-.footnote {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 16px 0 0;
-  color: var(--muted);
-  font-size: 11px;
-}
-.footnote svg { color: var(--icon-mint); }
-@media (max-width: 860px) {
-  .hero-grid,
-  .list-grid {
-    grid-template-columns: minmax(0, 1fr);
+
+@media (max-width: 980px) {
+  .hr-wide {
+    grid-template-columns: auto minmax(0, 1fr);
   }
+  .hr-mini { grid-column: 1 / -1; flex-direction: row; gap: 24px; border-left: 0; border-top: 1px solid var(--line); padding: 12px 0 0; }
+  .mid-grid { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 760px) {
-  .metric-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
+  .tiles { grid-template-columns: minmax(0, 1fr); }
   .ai-entry { flex-wrap: wrap; }
   .ai-go { margin-left: auto; }
 }

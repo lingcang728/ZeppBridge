@@ -59,7 +59,7 @@ watch(dataRevision, () => void loadList());
 
 <template>
   <section class="page list-page" aria-labelledby="workout-list-title">
-    <RouterLink class="back-link" to="/"><Icon name="arrow-left" :size="14" />返回概览</RouterLink>
+    <RouterLink class="back-link" to="/recent"><Icon name="arrow-left" :size="14" />返回最近记录</RouterLink>
     <PageHeader title-id="workout-list-title" title="运动" intro="本机已同步的运动记录。没有轨迹时不画地图。" />
 
     <div v-if="loading" class="surface-card" aria-live="polite">
@@ -94,9 +94,9 @@ watch(dataRevision, () => void loadList());
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
   text-decoration: none;
 }
 .back-link svg { transform: rotate(180deg); }

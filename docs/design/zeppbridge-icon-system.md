@@ -18,7 +18,7 @@ The master is [`src-tauri/icons/icon-source.svg`](../../src-tauri/icons/icon-sou
 
 ## UI icon family
 
-UI icons use a 24 × 24 viewBox, an optical boundary near 3–21, `stroke-width=1.75` by default, and round caps and joins. The family includes navigation, sync, theme, back, export, copy, database, file, folder, device, cloud, information, warning, link, and utility marks. The direction convention is intentional:
+UI icons use a 24 × 24 viewBox, an optical boundary near 3–21, `stroke-width=1.5` by default, and round caps and joins. The family includes navigation, sync, theme, back, export, copy, database, file, folder, device, cloud, information, warning, link, and utility marks. The direction convention is intentional:
 
 - `arrow-left` means return/back and is used by every “返回概览” link;
 - `arrow-right` means continue, open, or drill in;
