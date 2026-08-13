@@ -11,7 +11,7 @@ import { backend, isDesktop } from './lib/bridge';
 
 // 桌面端从 Tauri 运行时读取版本（与 tauri.conf.json 单一来源），
 // 浏览器预览环境回退到下面的常量（与 package.json 保持同步）。
-const FALLBACK_APP_VERSION = '0.6.0';
+const FALLBACK_APP_VERSION = '0.7.0';
 const APP_VERSION = ref(FALLBACK_APP_VERSION);
 if (isDesktop()) {
   void getVersion()

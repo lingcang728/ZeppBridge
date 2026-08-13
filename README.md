@@ -7,7 +7,7 @@
   [![CI](https://github.com/lingcang728/ZeppBridge/actions/workflows/ci.yml/badge.svg)](https://github.com/lingcang728/ZeppBridge/actions/workflows/ci.yml)
   [![License: MIT](https://img.shields.io/github/license/lingcang728/ZeppBridge?color=69b48b)](LICENSE)
   [![Tauri 2](https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white)](https://tauri.app/)
-  [![Windows](https://img.shields.io/badge/platform-Windows-0078D4?logo=windows11&logoColor=white)](#系统要求)
+  [![Windows](https://img.shields.io/badge/platform-Windows-0078D4?logo=windows11&logoColor=white)](#下载与安装)
 </div>
 
 > [!IMPORTANT]
@@ -23,12 +23,15 @@ Zepp 手机 App 把数据放在区域云端。ZeppBridge 在电脑上登录你�
 - **分析外置**：应用不做解读。到「交给 AI」复制或保存标准化 JSON。
 - **关窗口不停**：主窗口关掉后留在托盘，自动同步可以继续。
 
-## 0.4.0 这一版
+## 界面一览
 
-- 删掉旧的手机证书 / 局域网代理捕获。
-- 应用内打开 `watchface.zepp.com` 官方登录，抽出账号后再同步。
-- 界面按桌面参考图重做：概览、交给 AI、设置、睡眠/运动详情与列表。
-- 同步时尝试读取绑定设备（名称、固件、序列号），详情页如实展示。
+- **概览**：近 24 小时心率曲线、今日步数圆环、睡眠 / 静息心率 / 最近运动 / 训练负荷 / VO₂max 一览
+- **最近记录**：睡眠与运动记录合并查看，一键进入详情
+- **睡眠详情**：时长、评分、阶段构成与来源、设备信息，如实展示
+- **运动详情**：距离、时长、消耗、心率、配速、训练负荷等指标矩阵；没有轨迹时不画假地图
+- **交给 AI**：选时间范围与 9 类数据，复制或保存标准化 JSON
+- **外观**：深色 / 浅色 / 跟随系统；界面缩放 80%–125%（Ctrl + / Ctrl - / Ctrl 0）
+- **设置**：连接、自动同步、保留天数、历史补拉与本地数据维护
 
 ## 当前能力
 
@@ -37,7 +40,7 @@ Zepp 手机 App 把数据放在区域云端。ZeppBridge 在电脑上登录你�
 | 连接 | 官方网页登录；token 过期后再点一次「连接」 |
 | 同步 | 增量约 7 天；历史补拉 1–365 天（默认 30）；托盘驻留时约 15 分钟检查；可取消 |
 | 数据 | 心率、静息心率、HRV、睡眠、步数、运动、训练负荷、VO₂max 等已识别字段 |
-| 界面 | 概览仪表盘、睡眠/运动列表与详情、交给 AI（9 种类型勾选）、设置 |
+| 界面 | 概览、最近记录、睡眠/运动列表与详情、交给 AI（9 种类型勾选）、设置；深色 / 浅色 / 跟随系统；UI 缩放 80%–125% |
 | 导出 | 复制 JSON、保存文件、更新本机 `exports/zeppbridge-ai-feed.json` |
 | 保留 | 本地 1–365 天（默认 365）；可清理过期记录、重解析、打开数据文件夹 |
 
@@ -55,29 +58,11 @@ Zepp 手机 App 把数据放在区域云端。ZeppBridge 在电脑上登录你�
 
 手表仍由官方 App 同步到云。电脑只读云，不依赖手机一直开着代理。
 
-## 系统要求
+## 下载与安装
 
-- Windows 10 或 Windows 11（x64）
-- 能在网页上登录的 Zepp 账号
-- 开发构建：Node.js 20+、Rust stable、WebView2
-
-## 安装
-
-安装包尚未签名。正式签名前建议从源码构建：
-
-```powershell
-git clone git@github.com:lingcang728/ZeppBridge.git
-cd ZeppBridge
-npm ci
-npm run tauri build
-```
-
-构建出的安装包会复制到仓库里的 `release\`。日常开发用：
-
-```powershell
-npm ci
-npm run tauri dev
-```
+1. 在 [Releases](https://github.com/lingcang728/ZeppBridge/releases) 页面下载最新版安装包：`ZeppBridge_<版本>_x64-setup.exe` 或 `.msi`。
+2. 安装包尚未签名，Windows 可能提示「未知发布者」，选择「仍要运行」即可。
+3. 直接覆盖安装即可升级，本地数据会保留。
 
 ## 第一次连接
 
@@ -92,33 +77,10 @@ npm run tauri dev
 
 - 同步时会访问你授权的 Zepp 区域服务，所以这不是离线软件。
 - `auth.json` 只留用户 ID、区域主机等元数据，不含 token。
-- 健康库目前是本机明文 SQLite。共用电脑请用独立 Windows 账户。
-- Issue 里不要贴 token、数据库、原始响应或未脱敏日志。
+- 健康库目前是本机明文 SQLite。共用电脑请使用独立的 Windows 账户。
+- 应用没有自建云、没有产品遥测，数据只保存在你的电脑上。
 
 更多见 [安全与隐私](docs/reference/security-and-privacy.md)。安全问题请走 GitHub 私密漏洞报告。
-
-## 开发
-
-```powershell
-npm ci
-npm run build
-npm run tauri dev
-
-cargo test --manifest-path src-tauri/Cargo.toml --locked --jobs 1
-```
-
-```text
-src/                 Vue 界面、路由、本机/桌面适配
-src-tauri/src/       登录、同步、标准化、SQLite
-docs/                连接、架构、安全、开发说明
-```
-
-- [连接指南](docs/guides/connection.md)
-- [架构摘要](docs/reference/architecture.md)
-- [安全与隐私](docs/reference/security-and-privacy.md)
-- [开发与门禁](docs/development/development.md)
-
-涉及 Zepp 响应的测试数据必须脱敏或改成合成 fixture。不要提交真实 token、用户 ID 或完整健康记录。
 
 ## 许可证
 
