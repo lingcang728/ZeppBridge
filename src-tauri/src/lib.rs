@@ -1,0 +1,115 @@
+mod app_state;
+mod auth;
+mod commands;
+mod connectors;
+mod fetcher;
+mod ipc_types;
+mod models;
+mod normalizer;
+mod proxy;
+mod storage;
+mod sync;
+
+use app_state::AppState;
+use commands::{
+    cancel_sync, cleanup_old_data, clear_auth, complete_capture_user_id, get_app_status,
+    get_capture_status, get_export_json, get_health_overview, get_heart_rate_series,
+    get_recent_sleep, get_recent_workouts, get_sleep_detail, get_storage_estimate,
+    get_training_load_series, get_workout_detail, open_data_folder, publish_ai_export,
+    reprocess_local_data, save_auth, save_json_export, set_user_prefs, start_capture,
+    start_history_sync, start_incremental_sync, start_initial_sync, stop_capture, verify_auth,
+};
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::TrayIconBuilder;
+use tauri::{Emitter, Manager};
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .setup(|app| {
+            let data_dir = app
+                .path()
+                .app_data_dir()
+                .map_err(|error| anyhow::anyhow!("无法获取应用数据目录: {error}"))?;
+            let state = AppState::new(data_dir)
+                .map_err(|error| anyhow::anyhow!("无法初始化应用状态: {error}"))?;
+            app.manage(state);
+
+            if let Some(window) = app.get_webview_window("main") {
+                if let Ok(Some(monitor)) = window.current_monitor() {
+                    let work = monitor.work_area();
+                    let scale = monitor.scale_factor();
+                    let max_height = (work.size.height as f64 / scale) - 32.0;
+                    let height = 640.0_f64.min(max_height).max(560.0);
+                    let _ = window.set_size(tauri::LogicalSize::new(1100.0, height));
+                }
+                let hidden = window.clone();
+                window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = hidden.hide();
+                        let _ = hidden.app_handle().emit("app://hidden-to-tray", ());
+                    }
+                });
+            }
+
+            let show = MenuItem::with_id(app, "show", "打开窗口", true, None::<&str>)?;
+            let sync = MenuItem::with_id(app, "sync", "立即同步", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show, &sync, &quit])?;
+            let mut tray = TrayIconBuilder::new()
+                .menu(&menu)
+                .tooltip("ZeppBridge")
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "show" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                    "sync" => {
+                        let _ = app.emit("tray://sync", ());
+                    }
+                    "quit" => app.exit(0),
+                    _ => {}
+                });
+            if let Some(icon) = app.default_window_icon() {
+                tray = tray.icon(icon.clone());
+            }
+            tray.build(app)?;
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            save_auth,
+            verify_auth,
+            clear_auth,
+            start_capture,
+            get_capture_status,
+            complete_capture_user_id,
+            stop_capture,
+            start_initial_sync,
+            start_history_sync,
+            start_incremental_sync,
+            cancel_sync,
+            get_app_status,
+            get_health_overview,
+            get_heart_rate_series,
+            get_training_load_series,
+            get_recent_sleep,
+            get_recent_workouts,
+            get_sleep_detail,
+            get_workout_detail,
+            reprocess_local_data,
+            get_export_json,
+            save_json_export,
+            publish_ai_export,
+            set_user_prefs,
+            get_storage_estimate,
+            cleanup_old_data,
+            open_data_folder,
+        ])
+        .run(tauri::generate_context!())
+        .unwrap_or_else(|error| eprintln!("Tauri application exited with an error: {error}"));
+}

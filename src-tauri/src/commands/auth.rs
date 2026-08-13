@@ -1,0 +1,263 @@
+use super::status::build_app_status;
+use crate::app_state::AppState;
+use crate::connectors::ZeppConnector;
+use crate::ipc_types::AppStatus;
+use crate::models::{error::ZeppBridgeError, AuthInfo};
+use chrono::{Duration, Utc};
+use serde_json::Value;
+
+/// Save authentication metadata and install a ready-to-use synchronizer.
+///
+/// The credential itself is accepted only by `AuthManager`; this command
+/// never includes it in a status value or an error message.  Building the
+/// synchronizer opens a separate database connection, so the command-side
+/// database lock is not held while doing setup.
+#[tauri::command]
+pub async fn save_auth(
+    state: tauri::State<'_, AppState>,
+    app_token: String,
+    user_id: String,
+    region_host: String,
+) -> std::result::Result<AppStatus, String> {
+    let auth = AuthInfo {
+        app_token,
+        user_id,
+        region_host,
+    };
+
+    state
+        .auth
+        .save_auth(&auth)
+        .map_err(|error| error.to_string())?;
+
+    let manager = match AppState::build_sync_manager(auth, &state.data_dir) {
+        Ok(manager) => manager,
+        Err(error) => {
+            // Metadata and the credential store must not be left configured
+            // when the connector/database cannot be initialized.  Clearing is
+            // deliberately best effort; the original setup error is the
+            // actionable result returned to the caller.
+            let message = error.to_string();
+            let _ = state.auth.clear_auth();
+            {
+                let mut sync = state.sync.write().await;
+                *sync = None;
+            }
+            {
+                let mut auth_state = state.auth_state.write().await;
+                *auth_state = "unconfigured".to_string();
+            }
+            {
+                let mut warning = state.startup_warning.write().await;
+                *warning = Some(format!("无法初始化同步，请检查认证区域后重试：{message}"));
+            }
+            return Err(message);
+        }
+    };
+
+    {
+        let mut sync = state.sync.write().await;
+        *sync = Some(manager);
+    }
+    {
+        let mut auth_state = state.auth_state.write().await;
+        *auth_state = "configured".to_string();
+    }
+    {
+        let mut warning = state.startup_warning.write().await;
+        *warning = None;
+    }
+
+    build_app_status(&state).await
+}
+
+/// Verify the saved credential with a real, bounded recent heart-rate query.
+///
+/// A structured empty response is still a successful authentication check:
+/// the account may simply have no heart-rate samples in the two-hour window.
+/// Scalars, malformed payloads, and explicit non-success response codes are
+/// rejected so that an HTML/error body cannot be reported as verified.
+#[tauri::command]
+pub async fn verify_auth(
+    state: tauri::State<'_, AppState>,
+) -> std::result::Result<AppStatus, String> {
+    let auth = match state.auth.load_auth() {
+        Ok(Some(auth)) => auth,
+        Ok(None) => {
+            return verify_failure(
+                &state,
+                ZeppBridgeError::AuthError("尚未配置认证信息".to_string()),
+            )
+            .await
+        }
+        Err(error) => return verify_failure(&state, error).await,
+    };
+
+    let connector = match ZeppConnector::new(auth.clone()) {
+        Ok(connector) => connector,
+        Err(error) => return verify_failure(&state, error).await,
+    };
+
+    // The request is intentionally made without holding any application state
+    // lock.  Zepp's heart-rate endpoint uses Unix timestamps in seconds,
+    // matching the fetcher pipeline's existing request contract.
+    let end = Utc::now();
+    let start = end - Duration::hours(2);
+    let payload = match connector
+        .fetch_heart_rate(start.timestamp(), end.timestamp())
+        .await
+    {
+        Ok(payload) => payload,
+        Err(error) => return verify_failure(&state, error).await,
+    };
+
+    if let Err(error) = validate_verify_payload(&payload) {
+        return verify_failure(&state, error).await;
+    }
+
+    let manager = match AppState::build_sync_manager(auth, &state.data_dir) {
+        Ok(manager) => manager,
+        Err(error) => return verify_failure(&state, error).await,
+    };
+
+    {
+        let mut sync = state.sync.write().await;
+        *sync = Some(manager);
+    }
+    {
+        let mut auth_state = state.auth_state.write().await;
+        *auth_state = "verified".to_string();
+    }
+    {
+        let mut warning = state.startup_warning.write().await;
+        *warning = None;
+    }
+
+    build_app_status(&state).await
+}
+
+/// Stop the local capture proxy, remove credentials, and reset only the
+/// in-memory authentication/sync state.  The SQLite database is intentionally
+/// retained so clearing an account cannot erase historical health data.
+#[tauri::command]
+pub async fn clear_auth(
+    state: tauri::State<'_, AppState>,
+) -> std::result::Result<AppStatus, String> {
+    // Clone the proxy handle before awaiting stop so the RwLock guard never
+    // spans the asynchronous shutdown operation.
+    let proxy = { state.proxy.read().await.clone() };
+    proxy
+        .stop()
+        .await
+        .map_err(|error| format!("清理认证前停止代理失败：{error}"))?;
+
+    state.auth.clear_auth().map_err(|error| error.to_string())?;
+
+    {
+        let mut sync = state.sync.write().await;
+        *sync = None;
+    }
+    {
+        let mut auth_state = state.auth_state.write().await;
+        *auth_state = "unconfigured".to_string();
+    }
+    {
+        let mut warning = state.startup_warning.write().await;
+        *warning = None;
+    }
+
+    build_app_status(&state).await
+}
+
+/// Validate only the response shape needed to establish authentication.  An
+/// object/array may legitimately be empty (no recent samples), while an
+/// object carrying a response code must explicitly report a known success
+/// value.
+fn validate_verify_payload(value: &Value) -> std::result::Result<(), ZeppBridgeError> {
+    let object = match value {
+        Value::Array(_) => return Ok(()),
+        Value::Object(object) => object,
+        _ => {
+            return Err(ZeppBridgeError::ParseError(
+                "认证验证返回了空或无效的 JSON 结构".to_string(),
+            ))
+        }
+    };
+
+    let Some(code) = object.get("code") else {
+        return Ok(());
+    };
+
+    let success = match code {
+        Value::Number(number) => matches!(number.as_i64(), Some(0) | Some(1) | Some(200)),
+        // Some regional API versions serialize numeric response codes as
+        // strings.  Accept only the same three exact success values.
+        Value::String(code) => matches!(code.trim(), "0" | "1" | "200"),
+        _ => false,
+    };
+
+    if success {
+        Ok(())
+    } else {
+        Err(ZeppBridgeError::ParseError(
+            "认证验证返回了失败的响应代码".to_string(),
+        ))
+    }
+}
+
+/// Record a verification warning and return a Chinese, token-free error.
+/// Only an explicit `NeedsReauth` error changes the auth state; transient
+/// transport/format failures leave the saved configuration available for a
+/// retry while still surfacing the warning in the status stream.
+async fn verify_failure(
+    state: &AppState,
+    error: ZeppBridgeError,
+) -> std::result::Result<AppStatus, String> {
+    let message = user_facing_verify_error(&error);
+    if error.needs_reauth() {
+        let mut auth_state = state.auth_state.write().await;
+        *auth_state = "needs_reauth".to_string();
+    }
+    {
+        let mut warning = state.startup_warning.write().await;
+        *warning = Some(message.clone());
+    }
+    Err(message)
+}
+
+fn user_facing_verify_error(error: &ZeppBridgeError) -> String {
+    match error {
+        ZeppBridgeError::NetworkError(_) => {
+            "认证验证失败：无法连接 Zepp 服务，请检查网络后重试".to_string()
+        }
+        ZeppBridgeError::NeedsReauth(_) => {
+            "认证验证失败：认证已失效，请重新保存认证信息".to_string()
+        }
+        _ => format!("认证验证失败：{error}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn verify_payload_accepts_empty_structured_success() {
+        for value in [
+            json!([]),
+            json!({}),
+            json!({"code": 0}),
+            json!({"code": "200"}),
+        ] {
+            assert!(validate_verify_payload(&value).is_ok(), "rejected {value}");
+        }
+    }
+
+    #[test]
+    fn verify_payload_rejects_scalars_and_failure_codes() {
+        for value in [json!(null), json!("ok"), json!(42), json!({"code": 500})] {
+            assert!(validate_verify_payload(&value).is_err(), "accepted {value}");
+        }
+    }
+}

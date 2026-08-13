@@ -1,0 +1,1090 @@
+use crate::models::{error::*, *};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
+use chrono::{DateTime, Duration, NaiveDate, Utc};
+use serde_json::{Map, Value};
+use std::collections::BTreeMap;
+
+/// Normalization output with diagnostics and an explicit capability state.
+/// The compatibility helpers below return only `records`, but never turn an
+/// empty or unrecognised response into a successful empty result.
+#[derive(Debug, Clone)]
+pub struct NormalizedBatch<T> {
+    pub records: Vec<T>,
+    pub diagnostics: Vec<String>,
+    pub capability: CapabilityStatus,
+}
+
+#[derive(Debug, Clone)]
+pub struct BandNormalizedData {
+    pub sleep_sessions: Vec<SleepSession>,
+    pub heart_rate_samples: Vec<MetricSample>,
+    pub daily_metrics: Vec<DailyMetric>,
+    pub diagnostics: Vec<String>,
+    pub capability: CapabilityStatus,
+}
+
+impl<T> NormalizedBatch<T> {
+    fn into_result(self, stream: &str) -> Result<Vec<T>> {
+        let NormalizedBatch {
+            records,
+            diagnostics,
+            capability,
+        } = self;
+        let _capability = capability;
+        if records.is_empty() {
+            let detail = if diagnostics.is_empty() {
+                "响应没有可识别记录".to_owned()
+            } else {
+                diagnostics.join("; ")
+            };
+            return Err(ZeppBridgeError::DataUnavailable(format!(
+                "{stream}: {detail}"
+            )));
+        }
+        Ok(records)
+    }
+}
+
+pub struct Normalizer;
+
+impl Normalizer {
+    pub fn normalize_heart_rate(raw: &Value) -> Result<Vec<MetricSample>> {
+        Self::normalize_heart_rate_with_diagnostics(raw)?.into_result("heart_rate")
+    }
+
+    pub fn normalize_heart_rate_with_diagnostics(
+        raw: &Value,
+    ) -> Result<NormalizedBatch<MetricSample>> {
+        let items = extract_items(raw)?;
+        let mut records = Vec::new();
+        let mut diagnostics = Vec::new();
+        for (index, item) in items.iter().enumerate() {
+            let object = item_object(item);
+            let timestamp = object
+                .and_then(|o| first_value(o, &["timestamp", "time", "timeStamp", "startTime"]))
+                .and_then(parse_timestamp);
+            let value = object
+                .and_then(|o| first_value(o, &["value", "heartRate", "heart_rate", "hr"]))
+                .and_then(parse_number);
+            let (Some(timestamp), Some(value)) = (timestamp, value) else {
+                diagnostics.push(format!("item {index}: 缺少 timestamp/value"));
+                continue;
+            };
+            if !value.is_finite() || !(0.0..=300.0).contains(&value) {
+                diagnostics.push(format!("item {index}: heart rate 数值无效"));
+                continue;
+            }
+            let device_id = object.and_then(device_id);
+            records.push(MetricSample {
+                metric: "heart_rate".into(),
+                timestamp,
+                value,
+                unit: "bpm".into(),
+                source_scope: source_scope(object, device_id.as_deref()),
+                device_id,
+            });
+        }
+        Ok(NormalizedBatch {
+            records,
+            diagnostics,
+            capability: CapabilityStatus::Verified,
+        })
+    }
+
+    #[allow(dead_code)]
+    pub fn normalize_sleep(raw: &Value) -> Result<Vec<SleepSession>> {
+        Self::normalize_sleep_with_diagnostics(raw)?.into_result("sleep")
+    }
+
+    #[allow(dead_code)]
+    pub fn normalize_sleep_with_diagnostics(raw: &Value) -> Result<NormalizedBatch<SleepSession>> {
+        let band = Self::normalize_band_data(raw)?;
+        Ok(NormalizedBatch {
+            records: band.sleep_sessions,
+            diagnostics: band.diagnostics,
+            capability: band.capability,
+        })
+    }
+
+    pub fn normalize_band_data(raw: &Value) -> Result<BandNormalizedData> {
+        let items = extract_items(raw)?;
+        let mut sleep_sessions = Vec::new();
+        let mut heart_rate_samples = Vec::new();
+        let mut daily_metrics = Vec::new();
+        let mut diagnostics = Vec::new();
+
+        for (index, item) in items.iter().enumerate() {
+            let Some(object) = item.as_object() else {
+                diagnostics.push(format!("item {index}: 不是对象"));
+                continue;
+            };
+            let source_device = device_id(object);
+            let source_scope = if source_device.is_some() {
+                SourceScope::Device
+            } else {
+                SourceScope::Unknown
+            };
+
+            let decoded_summary =
+                object
+                    .get("summary")
+                    .and_then(Value::as_str)
+                    .and_then(|encoded| match decode_base64_json(encoded) {
+                        Ok(value) => Some(value),
+                        Err(error) => {
+                            diagnostics.push(format!("item {index}: summary 解码失败: {error}"));
+                            None
+                        }
+                    });
+
+            if let Some(summary) = decoded_summary.as_ref().and_then(Value::as_object) {
+                if let Some(sleep) = summary.get("slp").and_then(Value::as_object) {
+                    match sleep_from_band_item(object, summary, sleep, source_scope.clone()) {
+                        Ok(session) => sleep_sessions.push(session),
+                        Err(message) => diagnostics.push(format!("item {index}: {message}")),
+                    }
+                }
+                daily_metrics.extend(daily_metrics_from_band_summary(
+                    object,
+                    summary,
+                    source_scope.clone(),
+                ));
+            } else if let Some(session) = sleep_from_flat_object(object) {
+                sleep_sessions.push(session);
+            }
+
+            match heart_rate_from_band_item(object, decoded_summary.as_ref()) {
+                Ok(samples) => heart_rate_samples.extend(samples),
+                Err(message) => diagnostics.push(format!("item {index}: {message}")),
+            }
+        }
+
+        let capability = if sleep_sessions.is_empty()
+            && heart_rate_samples.is_empty()
+            && daily_metrics.is_empty()
+        {
+            CapabilityStatus::Unverified
+        } else {
+            CapabilityStatus::Verified
+        };
+
+        Ok(BandNormalizedData {
+            sleep_sessions,
+            heart_rate_samples,
+            daily_metrics,
+            diagnostics,
+            capability,
+        })
+    }
+
+    #[allow(dead_code)]
+    pub fn normalize_workouts(raw: &Value) -> Result<Vec<Workout>> {
+        Self::normalize_workouts_with_sport(raw, None)
+    }
+
+    pub fn normalize_workouts_with_sport(raw: &Value, sport: Option<&str>) -> Result<Vec<Workout>> {
+        Self::normalize_workouts_with_diagnostics_and_sport(raw, sport)?.into_result("workouts")
+    }
+
+    #[allow(dead_code)]
+    pub fn normalize_workouts_with_diagnostics(raw: &Value) -> Result<NormalizedBatch<Workout>> {
+        Self::normalize_workouts_with_diagnostics_and_sport(raw, None)
+    }
+
+    fn normalize_workouts_with_diagnostics_and_sport(
+        raw: &Value,
+        sport: Option<&str>,
+    ) -> Result<NormalizedBatch<Workout>> {
+        let items = extract_items(raw)?;
+        let mut records = Vec::new();
+        let mut diagnostics = Vec::new();
+        for (index, item) in items.iter().enumerate() {
+            let Some(object) = item_object(item) else {
+                diagnostics.push(format!("item {index}: 不是对象"));
+                continue;
+            };
+            let start = first_value(object, &["start_time", "startTime", "beginTime", "trackid"])
+                .and_then(parse_timestamp);
+            let end = first_value(object, &["end_time", "endTime", "finishTime"])
+                .and_then(parse_timestamp);
+            let (Some(start_time), Some(end_time)) = (start, end) else {
+                diagnostics.push(format!("item {index}: 缺少 workout start/end"));
+                continue;
+            };
+            if end_time <= start_time {
+                diagnostics.push(format!("item {index}: workout end 不晚于 start"));
+                continue;
+            }
+            let workout_type = first_string(
+                object,
+                &["workout_type", "sportType", "sport", "sport_title"],
+            )
+            .or_else(|| sport.map(str::to_owned))
+            .or_else(|| first_string(object, &["type", "sport_mode"]))
+            .unwrap_or_else(|| "unknown".into());
+            let workout_id = first_string(
+                object,
+                &["workout_id", "workoutId", "trackId", "trackid", "id"],
+            )
+            .unwrap_or_else(|| {
+                // Stable fallback for responses that omit an official id.
+                format!(
+                    "{workout_type}:{}:{}",
+                    start_time.timestamp(),
+                    end_time.timestamp()
+                )
+            });
+            let source_device = device_id(object);
+            records.push(Workout {
+                workout_id,
+                workout_type,
+                start_time,
+                end_time,
+                distance_meters: first_number(
+                    object,
+                    &["distance_meters", "distanceMeters", "distance", "dis"],
+                ),
+                calories: first_number(object, &["calories", "calorie"]).map(|v| v as i32),
+                avg_hr: first_number(
+                    object,
+                    &["avg_hr", "avgHr", "averageHeartRate", "avg_heart_rate"],
+                )
+                .map(|v| v as i32),
+                max_hr: first_number(
+                    object,
+                    &["max_hr", "maxHr", "maximumHeartRate", "max_heart_rate"],
+                )
+                .map(|v| v as i32),
+                training_load: first_number(
+                    object,
+                    &[
+                        "training_load",
+                        "trainingLoad",
+                        "trainLoad",
+                        "exercise_load",
+                    ],
+                ),
+                vo2max: first_number(object, &["vo2max", "vo2Max", "VO2_MAX", "VO2_max"]),
+                source_scope: source_scope(Some(object), source_device.as_deref()),
+                device_id: source_device,
+            });
+        }
+        Ok(NormalizedBatch {
+            records,
+            diagnostics,
+            capability: CapabilityStatus::Verified,
+        })
+    }
+
+    pub fn normalize_hrv(raw: &Value) -> Result<Vec<MetricSample>> {
+        Self::normalize_hrv_with_diagnostics(raw)?.into_result("hrv")
+    }
+
+    pub fn normalize_hrv_with_diagnostics(raw: &Value) -> Result<NormalizedBatch<MetricSample>> {
+        let items = extract_items(raw)?;
+        let mut records = Vec::new();
+        let mut diagnostics = Vec::new();
+        for (index, item) in items.iter().enumerate() {
+            let Some(object) = item_object(item) else {
+                diagnostics.push(format!("item {index}: 不是对象"));
+                continue;
+            };
+            if let Some(event_value) = object.get("value").and_then(Value::as_object) {
+                if let Some(samples) = event_value.get("samples").and_then(Value::as_array) {
+                    let base = first_value(event_value, &["startTime", "start_time"])
+                        .and_then(parse_timestamp);
+                    let source_device = device_id(event_value).or_else(|| device_id(object));
+                    for (sample_index, sample) in samples.iter().enumerate() {
+                        let Some(sample) = sample.as_object() else {
+                            diagnostics
+                                .push(format!("item {index} sample {sample_index}: 不是对象"));
+                            continue;
+                        };
+                        let timestamp = first_value(sample, &["timestamp", "time"])
+                            .and_then(parse_timestamp)
+                            .or_else(|| {
+                                let offset_ms = first_number(sample, &["s", "offset"])? as i64;
+                                base.map(|value| value + Duration::milliseconds(offset_ms))
+                            });
+                        let hrv = first_value(sample, &["sdnn", "rmssd", "hrv", "value"])
+                            .and_then(parse_number);
+                        let (Some(timestamp), Some(sample_value)) = (timestamp, hrv) else {
+                            diagnostics.push(format!(
+                                "item {index} sample {sample_index}: 缺少 HRV timestamp/value"
+                            ));
+                            continue;
+                        };
+                        if sample_value.is_finite() && sample_value >= 0.0 {
+                            records.push(MetricSample {
+                                metric: "hrv".into(),
+                                timestamp,
+                                value: sample_value,
+                                unit: "ms".into(),
+                                source_scope: source_scope(
+                                    Some(event_value),
+                                    source_device.as_deref(),
+                                ),
+                                device_id: source_device.clone(),
+                            });
+                        }
+                    }
+                    continue;
+                }
+            }
+            let timestamp = first_value(object, &["timestamp", "time", "date", "dayId"])
+                .and_then(parse_timestamp_or_date);
+            let value =
+                first_value(object, &["value", "hrv", "sdnn", "rmssd"]).and_then(parse_number);
+            let (Some(timestamp), Some(value)) = (timestamp, value) else {
+                diagnostics.push(format!("item {index}: 缺少 HRV timestamp/value"));
+                continue;
+            };
+            if !value.is_finite() || value < 0.0 {
+                diagnostics.push(format!("item {index}: HRV 数值无效"));
+                continue;
+            }
+            let source_device = device_id(object);
+            records.push(MetricSample {
+                metric: "hrv".into(),
+                timestamp,
+                value,
+                unit: "ms".into(),
+                source_scope: source_scope(Some(object), source_device.as_deref()),
+                device_id: source_device,
+            });
+        }
+        Ok(NormalizedBatch {
+            records,
+            diagnostics,
+            capability: CapabilityStatus::Verified,
+        })
+    }
+
+    pub fn normalize_daily_summary(raw: &Value) -> Result<Vec<DailyMetric>> {
+        Self::normalize_daily_summary_with_diagnostics(raw)?.into_result("daily_summary")
+    }
+
+    pub fn normalize_daily_summary_with_diagnostics(
+        raw: &Value,
+    ) -> Result<NormalizedBatch<DailyMetric>> {
+        let items = extract_items(raw)?;
+        let mut indexed_items = items.iter().enumerate().collect::<Vec<_>>();
+        indexed_items.sort_by_key(|(_, item)| {
+            item.as_object()
+                .and_then(|object| first_number(object, &["timestamp", "time", "startTime"]))
+                .map(|value| value.round() as i64)
+                .unwrap_or(0)
+        });
+        let mut records = Vec::new();
+        let mut diagnostics = Vec::new();
+        for (index, item) in indexed_items {
+            let Some(object) = item.as_object() else {
+                diagnostics.push(format!("item {index}: 不是对象"));
+                continue;
+            };
+            let event_value = object.get("value").and_then(Value::as_object);
+            let mut item_count = 0usize;
+            let event_type = first_string(object, &["eventType"]);
+            if event_type.as_deref() == Some("Charge") {
+                if let Some(value) = event_value {
+                    item_count += collect_charge_metrics(object, value, &mut records);
+                }
+            } else if let Some(samples) = event_value
+                .and_then(|value| value.get("samples"))
+                .and_then(Value::as_array)
+            {
+                let parent_device = event_value
+                    .and_then(device_id)
+                    .or_else(|| device_id(object));
+                for sample in samples {
+                    let Some(sample) = sample.as_object() else {
+                        continue;
+                    };
+                    item_count += collect_daily_metrics(
+                        sample,
+                        Some(object),
+                        parent_device.clone(),
+                        &mut records,
+                    );
+                }
+            } else {
+                item_count += collect_daily_metrics(
+                    object,
+                    event_value,
+                    event_value
+                        .and_then(device_id)
+                        .or_else(|| device_id(object)),
+                    &mut records,
+                );
+            }
+            if item_count == 0 {
+                diagnostics.push(format!("item {index}: 没有已知 daily metric 字段"));
+            }
+        }
+        let mut canonical = BTreeMap::new();
+        for record in records {
+            let key = (
+                record.date.clone(),
+                record.metric.clone(),
+                record.source_scope.as_str().to_string(),
+                record.device_id.clone().unwrap_or_default(),
+            );
+            canonical.insert(key, record);
+        }
+        Ok(NormalizedBatch {
+            records: canonical.into_values().collect(),
+            diagnostics,
+            capability: CapabilityStatus::Verified,
+        })
+    }
+
+    pub fn band_capability(raw: &Value) -> CapabilityStatus {
+        Self::normalize_band_data(raw)
+            .map(|result| result.capability)
+            .unwrap_or(CapabilityStatus::Unverified)
+    }
+}
+
+fn sleep_from_band_item(
+    item: &Map<String, Value>,
+    summary: &Map<String, Value>,
+    sleep: &Map<String, Value>,
+    scope: SourceScope,
+) -> std::result::Result<SleepSession, String> {
+    let start_time = first_value(sleep, &["st", "startTime", "start_time"])
+        .and_then(parse_timestamp)
+        .ok_or_else(|| "睡眠 summary 缺少开始时间".to_string())?;
+    let end_time = first_value(sleep, &["ed", "endTime", "end_time"])
+        .and_then(parse_timestamp)
+        .ok_or_else(|| "睡眠 summary 缺少结束时间".to_string())?;
+    if end_time <= start_time {
+        return Err("睡眠结束时间不晚于开始时间".to_string());
+    }
+
+    let deep_minutes = first_number(sleep, &["dp", "deepMinutes"])
+        .map(|value| value.round() as i32)
+        .unwrap_or_else(|| band_stage_minutes(sleep, 5));
+    let light_minutes = first_number(sleep, &["lt", "lightMinutes"])
+        .map(|value| value.round() as i32)
+        .unwrap_or_else(|| band_stage_minutes(sleep, 4));
+    let awake_minutes = first_number(sleep, &["wk", "awakeMinutes"])
+        .map(|value| value.round() as i32)
+        .unwrap_or_else(|| band_stage_minutes(sleep, 7));
+    let rem_from_field = first_number(sleep, &["rm", "remMinutes", "rem"])
+        .map(|value| value.round() as i32)
+        .filter(|value| *value >= 0);
+    let rem_from_stages = band_stage_minutes(sleep, 8);
+    let in_bed_minutes = (end_time - start_time).num_minutes().max(0) as i32;
+    let rem_minutes = rem_from_field.or_else(|| (rem_from_stages > 0).then_some(rem_from_stages));
+    let duration_minutes = (in_bed_minutes - awake_minutes).max(0);
+    let source_device = device_id(item)
+        .or_else(|| first_string(summary, &["sn"]))
+        .filter(|value| !value.is_empty());
+    let sleep_id = first_string(item, &["sleep_id", "sleepId", "id"]).unwrap_or_else(|| {
+        format!(
+            "band:{}:{}:{}",
+            source_device.as_deref().unwrap_or("unknown"),
+            start_time.timestamp(),
+            end_time.timestamp()
+        )
+    });
+
+    Ok(SleepSession {
+        sleep_id,
+        start_time,
+        end_time,
+        score: first_number(sleep, &["ss", "score", "sleepScore"])
+            .map(|value| value.round() as i32)
+            .filter(|value| (0..=100).contains(value)),
+        duration_minutes,
+        deep_minutes,
+        light_minutes,
+        rem_minutes,
+        awake_minutes,
+        source_scope: scope,
+        device_id: source_device,
+    })
+}
+
+fn sleep_from_flat_object(object: &Map<String, Value>) -> Option<SleepSession> {
+    let sleep_id = first_string(object, &["sleep_id", "sleepId", "id", "sessionId"])?;
+    let start_time =
+        first_value(object, &["start_time", "startTime", "beginTime"]).and_then(parse_timestamp)?;
+    let end_time =
+        first_value(object, &["end_time", "endTime", "finishTime"]).and_then(parse_timestamp)?;
+    if end_time <= start_time {
+        return None;
+    }
+    let awake_minutes = first_number(object, &["awake_minutes", "awakeMinutes", "awake"])
+        .map(duration_to_minutes)
+        .unwrap_or(0);
+    let source_device = device_id(object);
+    Some(SleepSession {
+        sleep_id,
+        start_time,
+        end_time,
+        score: first_number(object, &["score", "sleepScore"]).map(|value| value as i32),
+        duration_minutes: first_number(
+            object,
+            &["duration_minutes", "durationMinutes", "duration"],
+        )
+        .map(duration_to_minutes)
+        .unwrap_or_else(|| ((end_time - start_time).num_minutes() as i32 - awake_minutes).max(0)),
+        deep_minutes: first_number(object, &["deep_minutes", "deepMinutes", "deep"])
+            .map(duration_to_minutes)
+            .unwrap_or(0),
+        light_minutes: first_number(object, &["light_minutes", "lightMinutes", "light"])
+            .map(duration_to_minutes)
+            .unwrap_or(0),
+        rem_minutes: first_number(object, &["rem_minutes", "remMinutes", "rem"])
+            .map(duration_to_minutes),
+        awake_minutes,
+        source_scope: source_scope(Some(object), source_device.as_deref()),
+        device_id: source_device,
+    })
+}
+
+fn band_stage_minutes(sleep: &Map<String, Value>, expected_mode: i64) -> i32 {
+    sleep
+        .get("stage")
+        .and_then(Value::as_array)
+        .map(|stages| {
+            stages
+                .iter()
+                .filter_map(Value::as_object)
+                .filter(|stage| {
+                    first_number(stage, &["mode"])
+                        .map(|value| value.round() as i64 == expected_mode)
+                        .unwrap_or(false)
+                })
+                .filter_map(|stage| {
+                    let start = first_number(stage, &["start"])? as i64;
+                    let stop = first_number(stage, &["stop"])? as i64;
+                    (stop >= start).then_some((stop - start + 1) as i32)
+                })
+                .sum()
+        })
+        .unwrap_or(0)
+}
+
+fn heart_rate_from_band_item(
+    item: &Map<String, Value>,
+    decoded_summary: Option<&Value>,
+) -> std::result::Result<Vec<MetricSample>, String> {
+    let Some(encoded) = item.get("data_hr").and_then(Value::as_str) else {
+        return Ok(Vec::new());
+    };
+    let day = first_string(item, &["date_time", "date", "dayId"])
+        .and_then(|value| NaiveDate::parse_from_str(&value, "%Y-%m-%d").ok())
+        .ok_or_else(|| "data_hr 缺少有效日期".to_string())?;
+    let bytes = STANDARD
+        .decode(encoded.trim())
+        .map_err(|error| format!("data_hr Base64 无效: {error}"))?;
+    let timezone_offset = decoded_summary
+        .and_then(Value::as_object)
+        .and_then(|summary| first_number(summary, &["tz"]))
+        .map(|value| value.round() as i64)
+        .unwrap_or(0)
+        .clamp(-18 * 3600, 18 * 3600);
+    let local_midnight = day
+        .and_hms_opt(0, 0, 0)
+        .ok_or_else(|| "data_hr 日期无法构造".to_string())?;
+    let utc_midnight = DateTime::<Utc>::from_naive_utc_and_offset(
+        local_midnight - Duration::seconds(timezone_offset),
+        Utc,
+    );
+    let source_device = device_id(item);
+    Ok(bytes
+        .into_iter()
+        .take(1440)
+        .enumerate()
+        .filter(|(_, value)| (20..=240).contains(value))
+        .map(|(minute, value)| MetricSample {
+            metric: "heart_rate".into(),
+            timestamp: utc_midnight + Duration::minutes(minute as i64),
+            value: f64::from(value),
+            unit: "bpm".into(),
+            source_scope: SourceScope::Device,
+            device_id: source_device.clone(),
+        })
+        .collect())
+}
+
+fn daily_metrics_from_band_summary(
+    item: &Map<String, Value>,
+    summary: &Map<String, Value>,
+    scope: SourceScope,
+) -> Vec<DailyMetric> {
+    let Some(date) = first_string(item, &["date_time", "date", "dayId"])
+        .and_then(|value| NaiveDate::parse_from_str(&value, "%Y-%m-%d").ok())
+        .map(|value| value.format("%Y-%m-%d").to_string())
+    else {
+        return Vec::new();
+    };
+    let source_device = device_id(item);
+    let mut metrics = Vec::new();
+    if let Some(sleep) = summary.get("slp").and_then(Value::as_object) {
+        if let Some(value) =
+            first_number(sleep, &["rhr"]).filter(|value| (20.0..=250.0).contains(value))
+        {
+            metrics.push(DailyMetric {
+                date: date.clone(),
+                metric: "resting_hr".into(),
+                value,
+                unit: "bpm".into(),
+                source_scope: scope.clone(),
+                device_id: source_device.clone(),
+            });
+        }
+    }
+    if let Some(activity) = summary.get("stp").and_then(Value::as_object) {
+        for (metric, names, unit) in [
+            ("steps", &["ttl"][..], "steps"),
+            ("active_calories", &["cal"][..], "kcal"),
+            ("distance", &["dis"][..], "m"),
+        ] {
+            if let Some(value) = first_number(activity, names).filter(|value| *value >= 0.0) {
+                metrics.push(DailyMetric {
+                    date: date.clone(),
+                    metric: metric.into(),
+                    value,
+                    unit: unit.into(),
+                    source_scope: scope.clone(),
+                    device_id: source_device.clone(),
+                });
+            }
+        }
+    }
+    metrics
+}
+
+fn collect_charge_metrics(
+    event: &Map<String, Value>,
+    value: &Map<String, Value>,
+    records: &mut Vec<DailyMetric>,
+) -> usize {
+    let Some(date) = summary_date(event, Some(value)) else {
+        return 0;
+    };
+    let Some(samples) = value.get("samples").and_then(Value::as_array) else {
+        return 0;
+    };
+    let latest = samples
+        .iter()
+        .filter_map(Value::as_object)
+        .filter(|sample| {
+            first_number(sample, &["total"])
+                .map(|score| (0.0..=100.0).contains(&score))
+                .unwrap_or(false)
+        })
+        .max_by_key(|sample| {
+            first_number(sample, &["s", "offset"])
+                .map(|offset| offset.round() as i64)
+                .unwrap_or(0)
+        });
+    let Some(sample) = latest else {
+        return 0;
+    };
+    let source_device = device_id(value).or_else(|| device_id(event));
+    let scope = source_scope(Some(value), source_device.as_deref());
+    let mut count = 0;
+    for (metric, field) in [
+        ("hybrid_charge", "total"),
+        ("physical_charge", "physical"),
+        ("mental_charge", "mental"),
+    ] {
+        if let Some(score) = first_number(sample, &[field])
+            .filter(|score| score.is_finite() && (0.0..=100.0).contains(score))
+        {
+            records.push(DailyMetric {
+                date: date.clone(),
+                metric: metric.into(),
+                value: score,
+                unit: "score".into(),
+                source_scope: scope.clone(),
+                device_id: source_device.clone(),
+            });
+            count += 1;
+        }
+    }
+    count
+}
+
+fn collect_daily_metrics(
+    object: &Map<String, Value>,
+    parent: Option<&Map<String, Value>>,
+    source_device: Option<String>,
+    records: &mut Vec<DailyMetric>,
+) -> usize {
+    let Some(date) = summary_date(object, parent) else {
+        return 0;
+    };
+    let scope_source = parent.unwrap_or(object);
+    let scope = source_scope(Some(scope_source), source_device.as_deref());
+    let metric_fields: [(&str, &[&str], &str); 21] = [
+        (
+            "steps",
+            &["steps", "step", "stepCount", "totalSteps"],
+            "steps",
+        ),
+        (
+            "calories",
+            &["calories", "calorie", "totalCalories"],
+            "kcal",
+        ),
+        (
+            "active_minutes",
+            &["activeMinutes", "totalBurningDuration"],
+            "min",
+        ),
+        ("distance", &["distance", "totalDistance"], "m"),
+        (
+            "resting_hr",
+            &["resting_hr", "restingHr", "restingHeartRate", "rhr"],
+            "bpm",
+        ),
+        (
+            "readiness",
+            &["readiness", "readinessScore", "watchScore", "rdnsScore"],
+            "score",
+        ),
+        ("physical_readiness", &["phyScore"], "score"),
+        ("mental_readiness", &["mentScore"], "score"),
+        ("hrv_readiness", &["hrvScore"], "score"),
+        ("rhr_readiness", &["rhrScore"], "score"),
+        ("skin_temp_readiness", &["skinTempScore"], "score"),
+        ("afib_readiness", &["afibScore"], "score"),
+        ("ahi_readiness", &["ahiScore"], "score"),
+        (
+            "bio_charge",
+            &["bio_charge", "bioCharge", "bodyBattery", "chargeScore"],
+            "score",
+        ),
+        (
+            "hybrid_charge",
+            &["hybrid_charge", "hybridCharge", "hybridChargeScore"],
+            "score",
+        ),
+        (
+            "training_load",
+            &[
+                "training_load",
+                "trainingLoad",
+                "wtlSum",
+                "currnetDayTrainLoad",
+            ],
+            "load",
+        ),
+        (
+            "vo2max",
+            &[
+                "vo2max",
+                "vo2Max",
+                "VO2_MAX",
+                "VO2_max",
+                "vo2_max_run",
+                "vo2_max_walking",
+            ],
+            "ml/kg/min",
+        ),
+        ("stress", &["stress", "stressScore"], "score"),
+        ("spo2", &["spo2", "bloodOxygen", "blood_oxygen"], "%"),
+        ("running_distance", &["totalRunningDistance"], "m"),
+        ("cycling_distance", &["totalCyclingDistance"], "m"),
+    ];
+    let mut count = 0;
+    for (metric, names, unit) in metric_fields {
+        if let Some(value) =
+            first_number_from(object, parent, names).filter(|value| value.is_finite())
+        {
+            records.push(DailyMetric {
+                date: date.clone(),
+                metric: metric.into(),
+                value,
+                unit: unit.into(),
+                source_scope: scope.clone(),
+                device_id: source_device.clone(),
+            });
+            count += 1;
+        }
+    }
+
+    let event_type = parent
+        .and_then(|value| first_string(value, &["eventType"]))
+        .or_else(|| first_string(object, &["eventType"]));
+    if count == 0 {
+        let mapped_metric = match event_type.as_deref() {
+            Some("Charge") => Some(("bio_charge", "score")),
+            Some("readiness") => Some(("readiness", "score")),
+            _ => None,
+        };
+        if let Some((metric, unit)) = mapped_metric {
+            if let Some(value) = first_value(object, &["value", "score", "charge"])
+                .and_then(parse_number)
+                .filter(|value| value.is_finite())
+            {
+                records.push(DailyMetric {
+                    date,
+                    metric: metric.into(),
+                    value,
+                    unit: unit.into(),
+                    source_scope: scope,
+                    device_id: source_device,
+                });
+                count += 1;
+            }
+        }
+    }
+    count
+}
+
+fn decode_base64_json(encoded: &str) -> Result<Value> {
+    let bytes = STANDARD
+        .decode(encoded.trim())
+        .map_err(|error| ZeppBridgeError::ParseError(format!("Base64 无效: {error}")))?;
+    serde_json::from_slice(&bytes)
+        .map_err(|error| ZeppBridgeError::ParseError(format!("Base64 内容不是 JSON: {error}")))
+}
+
+fn extract_items(raw: &Value) -> Result<Vec<&Value>> {
+    if let Some(items) = raw.as_array() {
+        if items.is_empty() {
+            return Err(ZeppBridgeError::DataUnavailable("响应 items 为空".into()));
+        }
+        return Ok(items.iter().collect());
+    }
+    let Some(object) = raw.as_object() else {
+        return Err(ZeppBridgeError::ParseError(
+            "响应必须是 object 或 array".into(),
+        ));
+    };
+    for key in ["items", "records", "results", "list"] {
+        if let Some(array) = object.get(key).and_then(Value::as_array) {
+            if array.is_empty() {
+                return Err(ZeppBridgeError::DataUnavailable(format!("响应 {key} 为空")));
+            }
+            return Ok(array.iter().collect());
+        }
+    }
+    if let Some(data) = object.get("data") {
+        if let Some(array) = data.as_array() {
+            if array.is_empty() {
+                return Err(ZeppBridgeError::DataUnavailable("响应 data 为空".into()));
+            }
+            return Ok(array.iter().collect());
+        }
+        if let Some(data_object) = data.as_object() {
+            for key in ["items", "records", "results", "list", "summary"] {
+                if let Some(array) = data_object.get(key).and_then(Value::as_array) {
+                    if array.is_empty() {
+                        return Err(ZeppBridgeError::DataUnavailable(format!(
+                            "响应 data.{key} 为空"
+                        )));
+                    }
+                    return Ok(array.iter().collect());
+                }
+            }
+        }
+        if data.is_string() {
+            return Err(ZeppBridgeError::DataUnavailable(
+                "响应 data 是编码字符串，无法安全完整解码".into(),
+            ));
+        }
+    }
+    Err(ZeppBridgeError::ParseError(format!(
+        "响应缺少 items/data 数组，可用字段: {}",
+        object.keys().cloned().collect::<Vec<_>>().join(", ")
+    )))
+}
+
+fn item_object(value: &Value) -> Option<&Map<String, Value>> {
+    let object = value.as_object()?;
+    object
+        .get("value")
+        .and_then(Value::as_object)
+        .filter(|nested| {
+            nested.keys().any(|key| {
+                matches!(
+                    key.as_str(),
+                    "timestamp" | "time" | "value" | "heartRate" | "steps" | "date"
+                )
+            })
+        })
+        .unwrap_or(object)
+        .into()
+}
+
+fn first_value<'a>(object: &'a Map<String, Value>, names: &[&str]) -> Option<&'a Value> {
+    names.iter().find_map(|name| object.get(*name))
+}
+
+fn first_value_from<'a>(
+    object: &'a Map<String, Value>,
+    nested: Option<&'a Map<String, Value>>,
+    names: &[&str],
+) -> Option<&'a Value> {
+    first_value(object, names).or_else(|| nested.and_then(|value| first_value(value, names)))
+}
+
+fn first_string(object: &Map<String, Value>, names: &[&str]) -> Option<String> {
+    first_value(object, names).and_then(|value| match value {
+        Value::String(value) if !value.trim().is_empty() => Some(value.clone()),
+        Value::Number(value) => Some(value.to_string()),
+        _ => None,
+    })
+}
+
+fn first_number(object: &Map<String, Value>, names: &[&str]) -> Option<f64> {
+    first_value(object, names).and_then(parse_number)
+}
+
+fn first_number_from(
+    object: &Map<String, Value>,
+    nested: Option<&Map<String, Value>>,
+    names: &[&str],
+) -> Option<f64> {
+    first_value_from(object, nested, names).and_then(parse_number)
+}
+
+fn parse_number(value: &Value) -> Option<f64> {
+    match value {
+        Value::Number(number) => number.as_f64(),
+        Value::String(text) => text.trim().parse::<f64>().ok(),
+        _ => None,
+    }
+}
+
+fn parse_timestamp(value: &Value) -> Option<DateTime<Utc>> {
+    let number = parse_number(value)?;
+    if !number.is_finite() {
+        return None;
+    }
+    if number.abs() >= 10_000_000_000.0 {
+        DateTime::from_timestamp_millis(number as i64)
+    } else {
+        DateTime::from_timestamp(number as i64, 0)
+    }
+}
+
+fn parse_timestamp_or_date(value: &Value) -> Option<DateTime<Utc>> {
+    parse_timestamp(value).or_else(|| {
+        let date = value.as_str()?;
+        let date = NaiveDate::parse_from_str(date, "%Y-%m-%d").ok()?;
+        Some(DateTime::<Utc>::from_naive_utc_and_offset(
+            date.and_hms_opt(0, 0, 0)?,
+            Utc,
+        ))
+    })
+}
+
+fn parse_date(value: &Value) -> Option<String> {
+    if let Some(text) = value.as_str() {
+        if NaiveDate::parse_from_str(text, "%Y-%m-%d").is_ok() {
+            return Some(text.to_owned());
+        }
+        return DateTime::parse_from_rfc3339(text)
+            .ok()
+            .map(|dt| dt.with_timezone(&Utc).format("%Y-%m-%d").to_string());
+    }
+    parse_timestamp(value).map(|dt| dt.format("%Y-%m-%d").to_string())
+}
+
+fn summary_date(
+    object: &Map<String, Value>,
+    nested: Option<&Map<String, Value>>,
+) -> Option<String> {
+    first_value_from(
+        object,
+        nested,
+        &[
+            "date",
+            "day",
+            "dayId",
+            "dateString",
+            "localDate",
+            "timestamp",
+            "time",
+            "startTime",
+        ],
+    )
+    .and_then(parse_date)
+}
+
+fn device_id(object: &Map<String, Value>) -> Option<String> {
+    first_string(
+        object,
+        &[
+            "device_id",
+            "deviceId",
+            "deviceid",
+            "sourceDeviceId",
+            "bind_device",
+        ],
+    )
+}
+
+fn source_scope(object: Option<&Map<String, Value>>, device_id: Option<&str>) -> SourceScope {
+    if let Some(object) = object {
+        if first_value(object, &["is_fused", "isFused"])
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+            || first_string(object, &["source_scope", "sourceScope"])
+                .map(|scope| scope.eq_ignore_ascii_case("user_fused"))
+                .unwrap_or(false)
+        {
+            return SourceScope::UserFused;
+        }
+    }
+    if device_id.is_some() {
+        SourceScope::Device
+    } else {
+        SourceScope::Unknown
+    }
+}
+
+fn duration_to_minutes(value: f64) -> i32 {
+    // Zepp variants use either minutes or seconds for stage durations. Values
+    // above one day in minutes are unambiguously seconds.
+    if value > 24.0 * 60.0 {
+        (value / 60.0).round() as i32
+    } else {
+        value.round() as i32
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use base64::engine::general_purpose::STANDARD;
+    use serde_json::json;
+
+    #[test]
+    fn empty_or_wrong_shape_is_not_success() {
+        assert!(Normalizer::normalize_heart_rate(&json!({"items": []})).is_err());
+        assert!(Normalizer::normalize_sleep(&json!({"data": "H4sI..."})).is_err());
+    }
+
+    #[test]
+    fn missing_rem_is_not_invented_from_in_bed_subtraction() {
+        let summary = json!({
+            "slp": {
+                "st": 1_700_000_000i64,
+                "ed": 1_700_021_600i64,
+                "ss": 70,
+                "stage": [
+                    {"mode": 5, "start": 0, "stop": 60},
+                    {"mode": 4, "start": 61, "stop": 200}
+                ]
+            }
+        });
+        let result = Normalizer::normalize_band_data(&json!({
+            "data": [{
+                "uuid": "sleep-no-rem",
+                "date_time": "2026-08-12",
+                "summary": STANDARD.encode(serde_json::to_vec(&summary).unwrap())
+            }]
+        }))
+        .unwrap();
+        assert_eq!(result.sleep_sessions[0].rem_minutes, None);
+    }
+}

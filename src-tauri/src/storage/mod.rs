@@ -1,0 +1,1887 @@
+use crate::models::{error::*, *};
+use crate::normalizer::Normalizer;
+use chrono::{DateTime, Local, NaiveDate, Utc};
+use rusqlite::{params, Connection, OptionalExtension};
+use sha2::{Digest, Sha256};
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::PathBuf;
+
+const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v3";
+const LAST_CLOUD_SYNC_AT_KEY: &str = "last_cloud_sync_at";
+const LAST_CLOUD_SYNC_OUTCOME_KEY: &str = "last_cloud_sync_outcome";
+const LAST_LOCAL_REPROCESS_AT_KEY: &str = "last_local_reprocess_at";
+const RETENTION_DAYS_KEY: &str = "retention_days";
+const HISTORY_SYNC_DAYS_KEY: &str = "history_sync_days";
+const BYTES_PER_HISTORY_DAY: u64 = 800_000;
+
+pub struct Database {
+    conn: Connection,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct NormalizationCounts {
+    pub primary_records: i64,
+    pub band_heart_rate_records: i64,
+    pub supplemental_daily_records: i64,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct StreamFreshness {
+    pub last_cloud_sync_at: Option<String>,
+    pub newest_sample_at: Option<String>,
+}
+
+impl Database {
+    pub fn new(db_path: PathBuf) -> Result<Self> {
+        let conn = Connection::open(db_path)?;
+        Self::from_connection(conn)
+    }
+
+    #[cfg(test)]
+    pub fn in_memory() -> Result<Self> {
+        Self::from_connection(Connection::open_in_memory()?)
+    }
+
+    fn from_connection(conn: Connection) -> Result<Self> {
+        // These pragmas are set for every connection, including test databases.
+        conn.execute_batch(
+            "PRAGMA foreign_keys = ON;
+             PRAGMA busy_timeout = 5000;
+             PRAGMA journal_mode = WAL;",
+        )?;
+        let db = Self { conn };
+        db.migrate()?;
+        Ok(db)
+    }
+
+    fn migrate(&self) -> Result<()> {
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS schema_migrations (
+                version INTEGER PRIMARY KEY,
+                applied_at TEXT NOT NULL
+            );",
+        )?;
+        let version: i64 = self
+            .conn
+            .query_row("PRAGMA user_version", [], |row| row.get(0))?;
+
+        if version < 1 {
+            self.conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS source_accounts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    source_type TEXT NOT NULL,
+                    region_host TEXT NOT NULL,
+                    external_user_hash TEXT NOT NULL,
+                    auth_state TEXT NOT NULL,
+                    capabilities TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS raw_records (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    stream TEXT NOT NULL,
+                    source_key TEXT NOT NULL,
+                    source_scope TEXT NOT NULL,
+                    device_id TEXT,
+                    start_utc TEXT NOT NULL,
+                    end_utc TEXT,
+                    payload TEXT NOT NULL,
+                    payload_hash TEXT NOT NULL,
+                    fetched_at TEXT NOT NULL,
+                    UNIQUE(stream, source_key)
+                );
+                CREATE TABLE IF NOT EXISTS metric_samples (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    metric TEXT NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    value REAL NOT NULL,
+                    unit TEXT NOT NULL,
+                    source_scope TEXT NOT NULL,
+                    device_id TEXT,
+                    raw_record_id INTEGER,
+                    FOREIGN KEY(raw_record_id) REFERENCES raw_records(id)
+                );
+                CREATE TABLE IF NOT EXISTS daily_metrics (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    date TEXT NOT NULL,
+                    metric TEXT NOT NULL,
+                    value REAL NOT NULL,
+                    unit TEXT NOT NULL,
+                    source_scope TEXT NOT NULL,
+                    device_id TEXT,
+                    raw_record_id INTEGER,
+                    FOREIGN KEY(raw_record_id) REFERENCES raw_records(id)
+                );
+                CREATE TABLE IF NOT EXISTS sleep_sessions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    sleep_id TEXT NOT NULL UNIQUE,
+                    start_time TEXT NOT NULL,
+                    end_time TEXT NOT NULL,
+                    score INTEGER,
+                    duration_minutes INTEGER NOT NULL,
+                    deep_minutes INTEGER NOT NULL,
+                    light_minutes INTEGER NOT NULL,
+                    rem_minutes INTEGER NOT NULL,
+                    awake_minutes INTEGER NOT NULL,
+                    source_scope TEXT NOT NULL,
+                    device_id TEXT,
+                    raw_record_id INTEGER,
+                    FOREIGN KEY(raw_record_id) REFERENCES raw_records(id)
+                );
+                CREATE TABLE IF NOT EXISTS workouts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    workout_id TEXT NOT NULL UNIQUE,
+                    workout_type TEXT NOT NULL,
+                    start_time TEXT NOT NULL,
+                    end_time TEXT NOT NULL,
+                    distance_meters REAL,
+                    calories INTEGER,
+                    avg_hr INTEGER,
+                    max_hr INTEGER,
+                    training_load REAL,
+                    vo2max REAL,
+                    source_scope TEXT NOT NULL,
+                    device_id TEXT,
+                    raw_record_id INTEGER,
+                    FOREIGN KEY(raw_record_id) REFERENCES raw_records(id)
+                );
+                CREATE TABLE IF NOT EXISTS sleep_stages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    sleep_id TEXT NOT NULL,
+                    stage TEXT NOT NULL,
+                    start_time TEXT NOT NULL,
+                    end_time TEXT NOT NULL,
+                    FOREIGN KEY(sleep_id) REFERENCES sleep_sessions(sleep_id) ON DELETE CASCADE
+                );
+                CREATE TABLE IF NOT EXISTS workout_samples (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    workout_id TEXT NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    heart_rate INTEGER,
+                    pace REAL,
+                    speed REAL,
+                    cadence REAL,
+                    altitude REAL,
+                    FOREIGN KEY(workout_id) REFERENCES workouts(workout_id) ON DELETE CASCADE
+                );
+                CREATE TABLE IF NOT EXISTS route_points (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    workout_id TEXT NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    latitude REAL NOT NULL,
+                    longitude REAL NOT NULL,
+                    altitude REAL,
+                    FOREIGN KEY(workout_id) REFERENCES workouts(workout_id) ON DELETE CASCADE
+                );
+                CREATE TABLE IF NOT EXISTS sync_state (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    stream TEXT NOT NULL UNIQUE,
+                    last_sync TEXT,
+                    cursor TEXT,
+                    status TEXT NOT NULL,
+                    error TEXT,
+                    needs_reauth INTEGER NOT NULL DEFAULT 0,
+                    records_written INTEGER NOT NULL DEFAULT 0,
+                    capability TEXT NOT NULL DEFAULT 'verified',
+                    message TEXT,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_metric_samples_metric_timestamp
+                    ON metric_samples(metric, timestamp);
+                CREATE INDEX IF NOT EXISTS idx_daily_metrics_date_metric
+                    ON daily_metrics(date, metric);
+                CREATE INDEX IF NOT EXISTS idx_raw_records_fetched_at
+                    ON raw_records(fetched_at);
+                PRAGMA user_version = 1;",
+            )?;
+            self.conn.execute(
+                "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(1, ?1)",
+                [Utc::now().to_rfc3339()],
+            )?;
+        } else {
+            // Databases created by the initial MVP may have the core tables but
+            // lack the richer sync columns.  Add only missing columns so the
+            // migration remains idempotent.
+            self.ensure_table_columns(
+                "sync_state",
+                &[
+                    ("cursor", "TEXT"),
+                    ("needs_reauth", "INTEGER NOT NULL DEFAULT 0"),
+                    ("records_written", "INTEGER NOT NULL DEFAULT 0"),
+                    ("capability", "TEXT NOT NULL DEFAULT 'verified'"),
+                    ("message", "TEXT"),
+                ],
+            )?;
+            self.ensure_table_columns("raw_records", &[("payload_hash", "TEXT")])?;
+        }
+
+        // Expression indexes are needed because SQLite treats NULLs as distinct
+        // in ordinary UNIQUE constraints.  COALESCE makes a missing device id a
+        // deterministic part of the canonical key.
+        self.conn.execute_batch(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_metric_sample_key
+                 ON metric_samples(metric, timestamp, unit, source_scope, COALESCE(device_id, ''));
+             CREATE UNIQUE INDEX IF NOT EXISTS uq_daily_metric_key
+                 ON daily_metrics(date, metric, unit, source_scope, COALESCE(device_id, ''));
+             CREATE TABLE IF NOT EXISTS app_meta (
+                 key TEXT PRIMARY KEY,
+                 value TEXT NOT NULL,
+                 updated_at TEXT NOT NULL
+             );
+             PRAGMA user_version = 4;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(2, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(3, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        self.ensure_table_columns(
+            "sleep_sessions",
+            &[("rem_available", "INTEGER NOT NULL DEFAULT 1")],
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(4, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        self.ensure_cloud_sync_metadata()?;
+        Ok(())
+    }
+
+    fn ensure_cloud_sync_metadata(&self) -> Result<()> {
+        if self.get_app_meta(LAST_CLOUD_SYNC_AT_KEY)?.is_some() {
+            return Ok(());
+        }
+        let latest_fetch =
+            self.conn
+                .query_row("SELECT MAX(fetched_at) FROM raw_records", [], |row| {
+                    row.get::<_, Option<String>>(0)
+                })?;
+        if let Some(timestamp) = latest_fetch {
+            self.set_app_meta(LAST_CLOUD_SYNC_AT_KEY, &timestamp)?;
+            self.set_app_meta(LAST_CLOUD_SYNC_OUTCOME_KEY, "updated")?;
+        }
+        Ok(())
+    }
+
+    fn set_app_meta(&self, key: &str, value: &str) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO app_meta(key, value, updated_at)
+             VALUES(?1, ?2, ?3)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+            params![key, value, Utc::now().to_rfc3339()],
+        )?;
+        Ok(())
+    }
+
+    fn get_app_meta(&self, key: &str) -> Result<Option<String>> {
+        self.conn
+            .query_row("SELECT value FROM app_meta WHERE key = ?1", [key], |row| {
+                row.get(0)
+            })
+            .optional()
+            .map_err(Into::into)
+    }
+
+    pub fn cloud_sync_metadata(&self) -> Result<(Option<String>, Option<String>)> {
+        Ok((
+            self.get_app_meta(LAST_CLOUD_SYNC_AT_KEY)?,
+            self.get_app_meta(LAST_CLOUD_SYNC_OUTCOME_KEY)?,
+        ))
+    }
+
+    pub fn record_cloud_sync(&self, finished_at: &str, outcome: &str) -> Result<()> {
+        self.set_app_meta(LAST_CLOUD_SYNC_AT_KEY, finished_at)?;
+        self.set_app_meta(LAST_CLOUD_SYNC_OUTCOME_KEY, outcome)
+    }
+
+    pub fn user_prefs(&self) -> Result<UserPrefs> {
+        Ok(UserPrefs {
+            retention_days: self
+                .read_pref_days(RETENTION_DAYS_KEY, UserPrefs::DEFAULT_RETENTION_DAYS)?,
+            history_sync_days: self
+                .read_pref_days(HISTORY_SYNC_DAYS_KEY, UserPrefs::DEFAULT_HISTORY_SYNC_DAYS)?,
+        })
+    }
+
+    pub fn set_user_prefs(&self, prefs: &UserPrefs) -> Result<UserPrefs> {
+        let retention_days =
+            UserPrefs::clamp_days(prefs.retention_days).map_err(ZeppBridgeError::ConfigError)?;
+        let history_sync_days =
+            UserPrefs::clamp_days(prefs.history_sync_days).map_err(ZeppBridgeError::ConfigError)?;
+        self.set_app_meta(RETENTION_DAYS_KEY, &retention_days.to_string())?;
+        self.set_app_meta(HISTORY_SYNC_DAYS_KEY, &history_sync_days.to_string())?;
+        Ok(UserPrefs {
+            retention_days,
+            history_sync_days,
+        })
+    }
+
+    fn read_pref_days(&self, key: &str, default: i64) -> Result<i64> {
+        match self.get_app_meta(key)? {
+            Some(value) => Ok(value
+                .parse::<i64>()
+                .ok()
+                .and_then(|days| UserPrefs::clamp_days(days).ok())
+                .unwrap_or(default)),
+            None => Ok(default),
+        }
+    }
+
+    pub fn storage_estimate(
+        &self,
+        days: i64,
+        data_dir: &std::path::Path,
+    ) -> Result<StorageEstimate> {
+        let days = UserPrefs::clamp_days(days).map_err(ZeppBridgeError::ConfigError)?;
+        let database_bytes = std::fs::metadata(data_dir.join("zepp.db"))
+            .map(|meta| meta.len())
+            .unwrap_or(0);
+        let estimated_add_bytes = (days as u64).saturating_mul(BYTES_PER_HISTORY_DAY);
+        let free_bytes = disk_free_bytes(data_dir).unwrap_or(0);
+        let warn_tight_space =
+            free_bytes < 1_073_741_824 || (free_bytes > 0 && estimated_add_bytes > free_bytes / 5);
+        let allow_long_history = !(free_bytes > 0 && free_bytes < 300 * 1024 * 1024 && days >= 90);
+        let message = if free_bytes == 0 {
+            "未能读取磁盘剩余空间，补拉前请确认本机还有足够空间。".into()
+        } else if !allow_long_history {
+            "磁盘剩余不足 300 MB，不能补拉 90 天以上的历史。".into()
+        } else if warn_tight_space {
+            "磁盘空间较紧，建议先只补拉 30 天。".into()
+        } else {
+            format!(
+                "本盘大约剩余 {}，这次补拉大约占用 {}。",
+                format_bytes(free_bytes),
+                format_bytes(estimated_add_bytes)
+            )
+        };
+        Ok(StorageEstimate {
+            free_bytes,
+            estimated_add_bytes,
+            database_bytes,
+            allow_long_history,
+            warn_tight_space,
+            message,
+        })
+    }
+
+    pub fn heart_rate_series(&self, hours: i64) -> Result<Vec<HeartRatePoint>> {
+        let hours = hours.clamp(1, 24 * 14);
+        let cutoff = (Utc::now() - chrono::Duration::hours(hours)).to_rfc3339();
+        let mut stmt = self.conn.prepare(
+            "SELECT timestamp, value FROM metric_samples
+             WHERE metric = 'heart_rate' AND timestamp >= ?1
+             ORDER BY timestamp ASC",
+        )?;
+        let rows = stmt.query_map([cutoff], |row| {
+            Ok(HeartRatePoint {
+                timestamp: row.get(0)?,
+                value: row.get(1)?,
+            })
+        })?;
+        rows.collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(Into::into)
+    }
+
+    pub fn training_load_series(&self, days: i64) -> Result<Vec<DailyPoint>> {
+        let days = days.clamp(1, 365);
+        let cutoff = (Utc::now() - chrono::Duration::days(days))
+            .date_naive()
+            .format("%Y-%m-%d")
+            .to_string();
+        let mut stmt = self.conn.prepare(
+            "SELECT date, value FROM daily_metrics
+             WHERE metric = 'training_load' AND date >= ?1
+             ORDER BY date ASC",
+        )?;
+        let rows = stmt.query_map([cutoff], |row| {
+            Ok(DailyPoint {
+                date: row.get(0)?,
+                value: row.get(1)?,
+            })
+        })?;
+        rows.collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(Into::into)
+    }
+
+    pub fn stream_freshness(&self) -> Result<BTreeMap<String, StreamFreshness>> {
+        let mut freshness = BTreeMap::<String, StreamFreshness>::new();
+        let mut stmt = self.conn.prepare(
+            "SELECT stream, MAX(fetched_at) FROM raw_records GROUP BY stream ORDER BY stream",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?))
+        })?;
+        for row in rows {
+            let (stream, timestamp) = row?;
+            freshness.entry(stream).or_default().last_cloud_sync_at = timestamp;
+        }
+
+        // Heart-rate can legitimately fall back to minute samples decoded from
+        // band_data, so the sleep fetch is also a heart-rate cloud source.
+        let sleep_fetch = freshness
+            .get("sleep")
+            .and_then(|value| value.last_cloud_sync_at.clone());
+        if let Some(sleep_fetch) = sleep_fetch {
+            let heart_rate = freshness.entry("heart_rate".into()).or_default();
+            if heart_rate.last_cloud_sync_at.as_deref() < Some(sleep_fetch.as_str()) {
+                heart_rate.last_cloud_sync_at = Some(sleep_fetch);
+            }
+        }
+
+        for (stream, query) in [
+            (
+                "heart_rate",
+                "SELECT MAX(timestamp) FROM metric_samples WHERE metric = 'heart_rate'",
+            ),
+            (
+                "hrv",
+                "SELECT MAX(timestamp) FROM metric_samples WHERE metric = 'hrv'",
+            ),
+            ("daily_summary", "SELECT MAX(date) FROM daily_metrics"),
+            ("sleep", "SELECT MAX(end_time) FROM sleep_sessions"),
+            ("workouts", "SELECT MAX(end_time) FROM workouts"),
+        ] {
+            let timestamp = self
+                .conn
+                .query_row(query, [], |row| row.get::<_, Option<String>>(0))?;
+            freshness.entry(stream.into()).or_default().newest_sample_at = timestamp;
+        }
+        Ok(freshness)
+    }
+
+    pub fn newest_samples(&self) -> Result<BTreeMap<String, Option<String>>> {
+        Ok(self
+            .stream_freshness()?
+            .into_iter()
+            .map(|(stream, value)| (stream, value.newest_sample_at))
+            .collect())
+    }
+
+    fn ensure_table_columns(&self, table: &str, columns: &[(&str, &str)]) -> Result<()> {
+        let mut stmt = self.conn.prepare(&format!("PRAGMA table_info({table})"))?;
+        let existing = stmt
+            .query_map([], |row| row.get::<_, String>(1))?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        for (name, definition) in columns {
+            if !existing.iter().any(|value| value == name) {
+                self.conn.execute(
+                    &format!("ALTER TABLE {table} ADD COLUMN {name} {definition}"),
+                    [],
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn insert_raw_record(&self, record: &RawRecord) -> Result<i64> {
+        let payload = serde_json::to_string(&record.payload)
+            .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
+        let mut hasher = Sha256::new();
+        hasher.update(payload.as_bytes());
+        let payload_hash = hex::encode(hasher.finalize());
+        let fetched_at = Utc::now().to_rfc3339();
+        self.conn.execute(
+            "INSERT INTO raw_records
+                (stream, source_key, source_scope, device_id, start_utc, end_utc,
+                 payload, payload_hash, fetched_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+             ON CONFLICT(stream, source_key) DO UPDATE SET
+                source_scope = excluded.source_scope,
+                device_id = excluded.device_id,
+                start_utc = excluded.start_utc,
+                end_utc = excluded.end_utc,
+                payload = excluded.payload,
+                payload_hash = excluded.payload_hash,
+                fetched_at = excluded.fetched_at",
+            params![
+                record.stream,
+                record.source_key,
+                record.source_scope.as_str(),
+                record.device_id,
+                record.start_utc.to_rfc3339(),
+                record.end_utc.map(|value| value.to_rfc3339()),
+                payload,
+                payload_hash,
+                fetched_at,
+            ],
+        )?;
+        self.conn
+            .query_row(
+                "SELECT id FROM raw_records WHERE stream = ?1 AND source_key = ?2",
+                params![record.stream, record.source_key],
+                |row| row.get(0),
+            )
+            .map_err(Into::into)
+    }
+
+    pub fn normalize_and_persist_raw(
+        &self,
+        raw_record_id: i64,
+        stream: &str,
+        source_key: &str,
+        payload: &serde_json::Value,
+    ) -> Result<NormalizationCounts> {
+        let mut counts = NormalizationCounts::default();
+        match stream {
+            "heart_rate" => {
+                let rows = Normalizer::normalize_heart_rate(payload)?;
+                counts.primary_records = rows.len() as i64;
+                self.clear_normalized_for_raw(raw_record_id, stream)?;
+                for row in rows {
+                    self.insert_metric_sample_with_raw(&row, Some(raw_record_id))?;
+                }
+            }
+            "hrv" => {
+                let rows = Normalizer::normalize_hrv(payload)?;
+                counts.primary_records = rows.len() as i64;
+                self.clear_normalized_for_raw(raw_record_id, stream)?;
+                for row in rows {
+                    self.insert_metric_sample_with_raw(&row, Some(raw_record_id))?;
+                }
+            }
+            "daily_summary" => {
+                let rows = Normalizer::normalize_daily_summary(payload)?;
+                counts.primary_records = rows.len() as i64;
+                self.clear_normalized_for_raw(raw_record_id, stream)?;
+                for row in rows {
+                    self.insert_daily_metric_with_raw(&row, Some(raw_record_id))?;
+                }
+            }
+            "sleep" => {
+                let band = Normalizer::normalize_band_data(payload)?;
+                if band.sleep_sessions.is_empty()
+                    && band.heart_rate_samples.is_empty()
+                    && band.daily_metrics.is_empty()
+                {
+                    let detail = if band.diagnostics.is_empty() {
+                        "band_data 没有可识别记录".to_string()
+                    } else {
+                        band.diagnostics.join("; ")
+                    };
+                    return Err(ZeppBridgeError::DataUnavailable(detail));
+                }
+                counts.primary_records = band.sleep_sessions.len() as i64;
+                counts.band_heart_rate_records = band.heart_rate_samples.len() as i64;
+                counts.supplemental_daily_records = band.daily_metrics.len() as i64;
+                self.clear_normalized_for_raw(raw_record_id, stream)?;
+                for row in band.sleep_sessions {
+                    self.insert_sleep_session_with_raw(&row, Some(raw_record_id))?;
+                }
+                for row in band.heart_rate_samples {
+                    self.insert_metric_sample_with_raw(&row, Some(raw_record_id))?;
+                }
+                for row in band.daily_metrics {
+                    self.insert_daily_metric_with_raw(&row, Some(raw_record_id))?;
+                }
+            }
+            "workouts" => {
+                let sport = source_key
+                    .strip_prefix("sport_history:")
+                    .and_then(|value| value.split(':').next());
+                let rows = Normalizer::normalize_workouts_with_sport(payload, sport)?;
+                counts.primary_records = rows.len() as i64;
+                self.clear_normalized_for_raw(raw_record_id, stream)?;
+                for row in rows {
+                    self.insert_workout_with_raw(&row, Some(raw_record_id))?;
+                }
+            }
+            other => return Err(ZeppBridgeError::ConfigError(format!("未知同步流: {other}"))),
+        }
+        Ok(counts)
+    }
+
+    fn clear_normalized_for_raw(&self, raw_record_id: i64, stream: &str) -> Result<()> {
+        match stream {
+            "heart_rate" | "hrv" => {
+                self.conn.execute(
+                    "DELETE FROM metric_samples WHERE raw_record_id = ?1",
+                    [raw_record_id],
+                )?;
+            }
+            "daily_summary" => {
+                self.conn.execute(
+                    "DELETE FROM daily_metrics WHERE raw_record_id = ?1",
+                    [raw_record_id],
+                )?;
+            }
+            "sleep" => {
+                self.conn.execute(
+                    "DELETE FROM metric_samples WHERE raw_record_id = ?1",
+                    [raw_record_id],
+                )?;
+                self.conn.execute(
+                    "DELETE FROM daily_metrics WHERE raw_record_id = ?1",
+                    [raw_record_id],
+                )?;
+                self.conn.execute(
+                    "DELETE FROM sleep_sessions WHERE raw_record_id = ?1",
+                    [raw_record_id],
+                )?;
+            }
+            "workouts" => {
+                self.conn.execute(
+                    "DELETE FROM workouts WHERE raw_record_id = ?1",
+                    [raw_record_id],
+                )?;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    pub fn reprocess_raw_records_if_needed(&self) -> Result<Option<BTreeMap<String, i64>>> {
+        let current = self
+            .conn
+            .query_row(
+                "SELECT value FROM app_meta WHERE key = 'normalizer_revision'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+        if current.as_deref() == Some(NORMALIZER_REVISION) {
+            return Ok(None);
+        }
+        self.reprocess_raw_records().map(Some)
+    }
+
+    pub fn reprocess_raw_records(&self) -> Result<BTreeMap<String, i64>> {
+        let raw_records = {
+            let mut stmt = self
+                .conn
+                .prepare("SELECT id, stream, source_key, payload FROM raw_records ORDER BY id")?;
+            let rows = stmt.query_map([], |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                ))
+            })?;
+            rows.collect::<std::result::Result<Vec<_>, _>>()?
+        };
+
+        let mut counts = BTreeMap::<String, i64>::new();
+        let mut band_heart_rate = 0i64;
+        for (id, stream, source_key, encoded_payload) in raw_records {
+            let payload: serde_json::Value = serde_json::from_str(&encoded_payload)
+                .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
+            if let Ok(result) = self.normalize_and_persist_raw(id, &stream, &source_key, &payload) {
+                *counts.entry(stream.clone()).or_default() += result.primary_records;
+                band_heart_rate += result.band_heart_rate_records;
+            }
+        }
+        if band_heart_rate > 0 {
+            counts.insert("heart_rate".to_string(), band_heart_rate);
+        }
+
+        for stream in counts.keys().cloned().collect::<Vec<_>>() {
+            counts.insert(stream.clone(), self.normalized_stream_count(&stream)?);
+        }
+
+        self.conn.execute(
+            "INSERT INTO app_meta(key, value, updated_at)
+             VALUES('normalizer_revision', ?1, ?2)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+            params![NORMALIZER_REVISION, Utc::now().to_rfc3339()],
+        )?;
+        self.set_app_meta(LAST_LOCAL_REPROCESS_AT_KEY, &Utc::now().to_rfc3339())?;
+        Ok(counts)
+    }
+
+    fn normalized_stream_count(&self, stream: &str) -> Result<i64> {
+        let (query, parameter): (&str, Option<&str>) = match stream {
+            "heart_rate" => (
+                "SELECT COUNT(*) FROM metric_samples WHERE metric = ?1",
+                Some("heart_rate"),
+            ),
+            "hrv" => (
+                "SELECT COUNT(*) FROM metric_samples WHERE metric = ?1",
+                Some("hrv"),
+            ),
+            "daily_summary" => ("SELECT COUNT(*) FROM daily_metrics", None),
+            "sleep" => ("SELECT COUNT(*) FROM sleep_sessions", None),
+            "workouts" => ("SELECT COUNT(*) FROM workouts", None),
+            _ => return Ok(0),
+        };
+        if let Some(parameter) = parameter {
+            self.conn
+                .query_row(query, [parameter], |row| row.get(0))
+                .map_err(Into::into)
+        } else {
+            self.conn
+                .query_row(query, [], |row| row.get(0))
+                .map_err(Into::into)
+        }
+    }
+
+    #[cfg(test)]
+    pub fn insert_metric_sample(&self, sample: &MetricSample) -> Result<()> {
+        self.insert_metric_sample_with_raw(sample, None)
+    }
+
+    pub fn insert_metric_sample_with_raw(
+        &self,
+        sample: &MetricSample,
+        raw_record_id: Option<i64>,
+    ) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO metric_samples
+                (metric, timestamp, value, unit, source_scope, device_id, raw_record_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+             ON CONFLICT DO UPDATE SET
+                value = excluded.value,
+                source_scope = excluded.source_scope,
+                raw_record_id = COALESCE(excluded.raw_record_id, metric_samples.raw_record_id)",
+            params![
+                sample.metric,
+                sample.timestamp.to_rfc3339(),
+                sample.value,
+                sample.unit,
+                sample.source_scope.as_str(),
+                sample.device_id,
+                raw_record_id,
+            ],
+        )?;
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    #[allow(dead_code)]
+    pub fn insert_daily_metric(&self, metric: &DailyMetric) -> Result<()> {
+        self.insert_daily_metric_with_raw(metric, None)
+    }
+
+    pub fn insert_daily_metric_with_raw(
+        &self,
+        metric: &DailyMetric,
+        raw_record_id: Option<i64>,
+    ) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO daily_metrics
+                (date, metric, value, unit, source_scope, device_id, raw_record_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+             ON CONFLICT DO UPDATE SET
+                value = excluded.value,
+                source_scope = excluded.source_scope,
+                raw_record_id = COALESCE(excluded.raw_record_id, daily_metrics.raw_record_id)",
+            params![
+                metric.date,
+                metric.metric,
+                metric.value,
+                metric.unit,
+                metric.source_scope.as_str(),
+                metric.device_id,
+                raw_record_id,
+            ],
+        )?;
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    pub fn insert_sleep_session(&self, sleep: &SleepSession) -> Result<()> {
+        self.insert_sleep_session_with_raw(sleep, None)
+    }
+
+    pub fn insert_sleep_session_with_raw(
+        &self,
+        sleep: &SleepSession,
+        raw_record_id: Option<i64>,
+    ) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO sleep_sessions
+                (sleep_id, start_time, end_time, score, duration_minutes,
+                 deep_minutes, light_minutes, rem_minutes, rem_available, awake_minutes,
+                 source_scope, device_id, raw_record_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+             ON CONFLICT(sleep_id) DO UPDATE SET
+                start_time = excluded.start_time,
+                end_time = excluded.end_time,
+                score = excluded.score,
+                duration_minutes = excluded.duration_minutes,
+                deep_minutes = excluded.deep_minutes,
+                light_minutes = excluded.light_minutes,
+                rem_minutes = excluded.rem_minutes,
+                rem_available = excluded.rem_available,
+                awake_minutes = excluded.awake_minutes,
+                source_scope = excluded.source_scope,
+                device_id = excluded.device_id,
+                raw_record_id = COALESCE(excluded.raw_record_id, sleep_sessions.raw_record_id)",
+            params![
+                sleep.sleep_id,
+                sleep.start_time.to_rfc3339(),
+                sleep.end_time.to_rfc3339(),
+                sleep.score,
+                sleep.duration_minutes,
+                sleep.deep_minutes,
+                sleep.light_minutes,
+                sleep.rem_minutes.unwrap_or(0),
+                i64::from(sleep.rem_minutes.is_some()),
+                sleep.awake_minutes,
+                sleep.source_scope.as_str(),
+                sleep.device_id,
+                raw_record_id,
+            ],
+        )?;
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    pub fn insert_workout(&self, workout: &Workout) -> Result<()> {
+        self.insert_workout_with_raw(workout, None)
+    }
+
+    pub fn insert_workout_with_raw(
+        &self,
+        workout: &Workout,
+        raw_record_id: Option<i64>,
+    ) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO workouts
+                (workout_id, workout_type, start_time, end_time, distance_meters,
+                 calories, avg_hr, max_hr, training_load, vo2max,
+                 source_scope, device_id, raw_record_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+             ON CONFLICT(workout_id) DO UPDATE SET
+                workout_type = excluded.workout_type,
+                start_time = excluded.start_time,
+                end_time = excluded.end_time,
+                distance_meters = excluded.distance_meters,
+                calories = excluded.calories,
+                avg_hr = excluded.avg_hr,
+                max_hr = excluded.max_hr,
+                training_load = excluded.training_load,
+                vo2max = excluded.vo2max,
+                source_scope = excluded.source_scope,
+                device_id = excluded.device_id,
+                raw_record_id = COALESCE(excluded.raw_record_id, workouts.raw_record_id)",
+            params![
+                workout.workout_id,
+                workout.workout_type,
+                workout.start_time.to_rfc3339(),
+                workout.end_time.to_rfc3339(),
+                workout.distance_meters,
+                workout.calories,
+                workout.avg_hr,
+                workout.max_hr,
+                workout.training_load,
+                workout.vo2max,
+                workout.source_scope.as_str(),
+                workout.device_id,
+                raw_record_id,
+            ],
+        )?;
+        Ok(())
+    }
+
+    fn get_latest_heart_rate_sample(&self) -> Result<Option<(i32, String)>> {
+        let value: Option<(f64, String)> = self
+            .conn
+            .query_row(
+                "SELECT value, timestamp FROM metric_samples
+                 WHERE metric = 'heart_rate'
+                 ORDER BY timestamp DESC,
+                    CASE source_scope WHEN 'user_fused' THEN 0 WHEN 'device' THEN 1 ELSE 2 END,
+                    id DESC LIMIT 1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?;
+        Ok(value.map(|(value, timestamp)| (value.round() as i32, timestamp)))
+    }
+
+    pub fn get_recent_sleep_sessions(&self, limit: usize) -> Result<Vec<SleepSession>> {
+        let limit = i64::try_from(limit).unwrap_or(i64::MAX).max(0);
+        let mut stmt = self.conn.prepare(
+            "SELECT sleep_id, start_time, end_time, score, duration_minutes,
+                    deep_minutes, light_minutes, rem_minutes, rem_available, awake_minutes,
+                    source_scope, device_id
+             FROM sleep_sessions ORDER BY start_time DESC LIMIT ?1",
+        )?;
+        let rows = stmt.query_map([limit], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, Option<i32>>(3)?,
+                row.get::<_, i32>(4)?,
+                row.get::<_, i32>(5)?,
+                row.get::<_, i32>(6)?,
+                row.get::<_, i32>(7)?,
+                row.get::<_, i64>(8)?,
+                row.get::<_, i32>(9)?,
+                row.get::<_, String>(10)?,
+                row.get::<_, Option<String>>(11)?,
+            ))
+        })?;
+        let mut sessions = Vec::new();
+        for row in rows {
+            let (
+                sleep_id,
+                start,
+                end,
+                score,
+                duration_minutes,
+                deep_minutes,
+                light_minutes,
+                rem_minutes,
+                rem_available,
+                awake_minutes,
+                scope,
+                device_id,
+            ) = row?;
+            sessions.push(SleepSession {
+                sleep_id,
+                start_time: parse_datetime(&start, "sleep.start_time")?,
+                end_time: parse_datetime(&end, "sleep.end_time")?,
+                score,
+                duration_minutes,
+                deep_minutes,
+                light_minutes,
+                rem_minutes: (rem_available != 0).then_some(rem_minutes),
+                awake_minutes,
+                source_scope: parse_scope(&scope)?,
+                device_id,
+            });
+        }
+        Ok(sessions)
+    }
+
+    pub fn get_sleep_detail(&self, sleep_id: &str) -> Result<Option<SleepSession>> {
+        let row = self
+            .conn
+            .query_row(
+                "SELECT sleep_id, start_time, end_time, score, duration_minutes,
+                        deep_minutes, light_minutes, rem_minutes, rem_available, awake_minutes,
+                        source_scope, device_id
+                 FROM sleep_sessions WHERE sleep_id = ?1 LIMIT 1",
+                [sleep_id],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, Option<i32>>(3)?,
+                        row.get::<_, i32>(4)?,
+                        row.get::<_, i32>(5)?,
+                        row.get::<_, i32>(6)?,
+                        row.get::<_, i32>(7)?,
+                        row.get::<_, i64>(8)?,
+                        row.get::<_, i32>(9)?,
+                        row.get::<_, String>(10)?,
+                        row.get::<_, Option<String>>(11)?,
+                    ))
+                },
+            )
+            .optional()?;
+        let Some((
+            sleep_id,
+            start,
+            end,
+            score,
+            duration_minutes,
+            deep_minutes,
+            light_minutes,
+            rem_minutes,
+            rem_available,
+            awake_minutes,
+            scope,
+            device_id,
+        )) = row
+        else {
+            return Ok(None);
+        };
+        Ok(Some(SleepSession {
+            sleep_id,
+            start_time: parse_datetime(&start, "sleep.start_time")?,
+            end_time: parse_datetime(&end, "sleep.end_time")?,
+            score,
+            duration_minutes,
+            deep_minutes,
+            light_minutes,
+            rem_minutes: (rem_available != 0).then_some(rem_minutes),
+            awake_minutes,
+            source_scope: parse_scope(&scope)?,
+            device_id,
+        }))
+    }
+
+    pub fn get_recent_workouts(&self, limit: usize) -> Result<Vec<Workout>> {
+        let limit = i64::try_from(limit).unwrap_or(i64::MAX).max(0);
+        let mut stmt = self.conn.prepare(
+            "SELECT workout_id, workout_type, start_time, end_time,
+                    distance_meters, calories, avg_hr, max_hr,
+                    training_load, vo2max, source_scope, device_id
+             FROM workouts ORDER BY start_time DESC LIMIT ?1",
+        )?;
+        let rows = stmt.query_map([limit], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, Option<f64>>(4)?,
+                row.get::<_, Option<i32>>(5)?,
+                row.get::<_, Option<i32>>(6)?,
+                row.get::<_, Option<i32>>(7)?,
+                row.get::<_, Option<f64>>(8)?,
+                row.get::<_, Option<f64>>(9)?,
+                row.get::<_, String>(10)?,
+                row.get::<_, Option<String>>(11)?,
+            ))
+        })?;
+        let mut workouts = Vec::new();
+        for row in rows {
+            let (
+                workout_id,
+                workout_type,
+                start,
+                end,
+                distance_meters,
+                calories,
+                avg_hr,
+                max_hr,
+                training_load,
+                vo2max,
+                scope,
+                device_id,
+            ) = row?;
+            workouts.push(Workout {
+                workout_id,
+                workout_type,
+                start_time: parse_datetime(&start, "workout.start_time")?,
+                end_time: parse_datetime(&end, "workout.end_time")?,
+                distance_meters,
+                calories,
+                avg_hr,
+                max_hr,
+                training_load,
+                vo2max,
+                source_scope: parse_scope(&scope)?,
+                device_id,
+            });
+        }
+        Ok(workouts)
+    }
+
+    pub fn get_workout_detail(&self, workout_id: &str) -> Result<Option<Workout>> {
+        let row = self
+            .conn
+            .query_row(
+                "SELECT workout_id, workout_type, start_time, end_time,
+                        distance_meters, calories, avg_hr, max_hr,
+                        training_load, vo2max, source_scope, device_id
+                 FROM workouts WHERE workout_id = ?1 LIMIT 1",
+                [workout_id],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, String>(3)?,
+                        row.get::<_, Option<f64>>(4)?,
+                        row.get::<_, Option<i32>>(5)?,
+                        row.get::<_, Option<i32>>(6)?,
+                        row.get::<_, Option<i32>>(7)?,
+                        row.get::<_, Option<f64>>(8)?,
+                        row.get::<_, Option<f64>>(9)?,
+                        row.get::<_, String>(10)?,
+                        row.get::<_, Option<String>>(11)?,
+                    ))
+                },
+            )
+            .optional()?;
+        let Some((
+            workout_id,
+            workout_type,
+            start,
+            end,
+            distance_meters,
+            calories,
+            avg_hr,
+            max_hr,
+            training_load,
+            vo2max,
+            scope,
+            device_id,
+        )) = row
+        else {
+            return Ok(None);
+        };
+        Ok(Some(Workout {
+            workout_id,
+            workout_type,
+            start_time: parse_datetime(&start, "workout.start_time")?,
+            end_time: parse_datetime(&end, "workout.end_time")?,
+            distance_meters,
+            calories,
+            avg_hr,
+            max_hr,
+            training_load,
+            vo2max,
+            source_scope: parse_scope(&scope)?,
+            device_id,
+        }))
+    }
+
+    pub fn get_health_overview(&self) -> Result<HealthOverview> {
+        let latest_heart_rate = self.get_latest_heart_rate_sample()?;
+        let current_hr = latest_heart_rate.as_ref().map(|(value, _)| *value);
+        let latest_heart_rate_at = latest_heart_rate.map(|(_, timestamp)| timestamp);
+        let resting_hr = self.latest_daily_i32("resting_hr")?;
+        let hrv = self.latest_metric_f64("hrv")?;
+        let (last_updated, coverage, source_scope) = self.overview_metadata()?;
+        let last_sleep_score = self
+            .get_recent_sleep_sessions(1)?
+            .into_iter()
+            .next()
+            .and_then(|sleep| sleep.score);
+        Ok(HealthOverview {
+            current_hr,
+            resting_hr,
+            hrv,
+            last_sleep_score,
+            readiness: self.latest_daily_f64("readiness")?,
+            bio_charge: self.latest_daily_f64("bio_charge")?,
+            hybrid_charge: self.latest_daily_f64("hybrid_charge")?,
+            training_load: self.latest_daily_f64("training_load")?,
+            vo2max: self.latest_daily_f64("vo2max")?,
+            steps_today: self.latest_daily_i32_for_date("steps", Local::now().date_naive())?,
+            active_calories_today: self
+                .latest_daily_i32_for_date("active_calories", Local::now().date_naive())?
+                .or(self.latest_daily_i32_for_date("calories", Local::now().date_naive())?),
+            latest_heart_rate_at,
+            last_updated,
+            coverage,
+            source_scope,
+        })
+    }
+
+    fn overview_metadata(&self) -> Result<(Option<String>, Option<Coverage>, Option<String>)> {
+        let last_updated = self.get_app_meta(LAST_CLOUD_SYNC_AT_KEY)?;
+        let (start, end, stream_count, scope_count, only_scope) = self.conn.query_row(
+            "SELECT MIN(day), MAX(day), COUNT(DISTINCT stream),
+                    COUNT(DISTINCT source_scope), MIN(source_scope)
+             FROM (
+                 SELECT date(timestamp, 'localtime') AS day, metric AS stream, source_scope
+                 FROM metric_samples
+                 UNION ALL
+                 SELECT date AS day, 'daily_summary' AS stream, source_scope FROM daily_metrics
+                 UNION ALL
+                 SELECT date(start_time, 'localtime') AS day, 'sleep' AS stream, source_scope
+                 FROM sleep_sessions
+                 UNION ALL
+                 SELECT date(start_time, 'localtime') AS day, 'workouts' AS stream, source_scope
+                 FROM workouts
+             ) WHERE day IS NOT NULL",
+            [],
+            |row| {
+                Ok((
+                    row.get::<_, Option<String>>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, i64>(3)?,
+                    row.get::<_, Option<String>>(4)?,
+                ))
+            },
+        )?;
+        let coverage = match (start, end) {
+            (Some(start), Some(end)) => {
+                let start_date = NaiveDate::parse_from_str(&start, "%Y-%m-%d")
+                    .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
+                let end_date = NaiveDate::parse_from_str(&end, "%Y-%m-%d")
+                    .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
+                Some(Coverage {
+                    start,
+                    end,
+                    days: (end_date - start_date).num_days() + 1,
+                    streams: stream_count,
+                })
+            }
+            _ => None,
+        };
+        let source_scope = match scope_count {
+            0 => None,
+            1 => only_scope,
+            _ => Some("mixed".to_string()),
+        };
+        Ok((last_updated, coverage, source_scope))
+    }
+
+    pub fn build_ai_export(&self, selection: &ExportSelection) -> Result<(String, usize)> {
+        let start = NaiveDate::parse_from_str(&selection.start_date, "%Y-%m-%d")
+            .map_err(|_| ZeppBridgeError::ConfigError("导出开始日期无效".into()))?;
+        let end = NaiveDate::parse_from_str(&selection.end_date, "%Y-%m-%d")
+            .map_err(|_| ZeppBridgeError::ConfigError("导出结束日期无效".into()))?;
+        if end < start {
+            return Err(ZeppBridgeError::ConfigError(
+                "导出结束日期不能早于开始日期".into(),
+            ));
+        }
+        if (end - start).num_days() > 365 {
+            return Err(ZeppBridgeError::ConfigError(
+                "单次导出范围不能超过 366 天".into(),
+            ));
+        }
+        let allowed: BTreeSet<&str> = [
+            "heart_rate",
+            "hrv",
+            "daily_activity",
+            "sleep",
+            "workouts",
+            "recovery",
+        ]
+        .into_iter()
+        .collect();
+        let selected: BTreeSet<String> = selection
+            .data_types
+            .iter()
+            .map(|value| value.trim().to_ascii_lowercase())
+            .filter(|value| allowed.contains(value.as_str()))
+            .collect();
+        if selected.is_empty() {
+            return Err(ZeppBridgeError::ConfigError(
+                "请至少选择一种导出数据".into(),
+            ));
+        }
+        let start_text = start.format("%Y-%m-%d").to_string();
+        let end_text = end.format("%Y-%m-%d").to_string();
+
+        let mut metric_samples = Vec::new();
+        if selected.contains("heart_rate") || selected.contains("hrv") {
+            let mut stmt = self.conn.prepare(
+                "SELECT metric, timestamp, value, unit, source_scope, device_id
+                 FROM metric_samples
+                 WHERE date(timestamp, 'localtime') BETWEEN ?1 AND ?2
+                 ORDER BY timestamp",
+            )?;
+            let rows = stmt.query_map(params![start_text, end_text], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, f64>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, Option<String>>(5)?,
+                ))
+            })?;
+            for row in rows {
+                let (metric, timestamp, value, unit, source_scope, device_id) = row?;
+                if selected.contains(&metric) {
+                    metric_samples.push(serde_json::json!({
+                        "metric": metric,
+                        "timestamp": timestamp,
+                        "value": value,
+                        "unit": unit,
+                        "source_scope": source_scope,
+                        "device_id": device_id,
+                    }));
+                }
+            }
+        }
+
+        let recovery_metrics: BTreeSet<&str> = [
+            "resting_hr",
+            "readiness",
+            "bio_charge",
+            "hybrid_charge",
+            "physical_charge",
+            "mental_charge",
+            "physical_readiness",
+            "mental_readiness",
+            "hrv_readiness",
+            "rhr_readiness",
+            "skin_temp_readiness",
+            "afib_readiness",
+            "ahi_readiness",
+            "training_load",
+            "vo2max",
+        ]
+        .into_iter()
+        .collect();
+        let mut daily_metrics = Vec::new();
+        if selected.contains("daily_activity") || selected.contains("recovery") {
+            let mut stmt = self.conn.prepare(
+                "SELECT date, metric, value, unit, source_scope, device_id
+                 FROM daily_metrics WHERE date BETWEEN ?1 AND ?2
+                 ORDER BY date, metric",
+            )?;
+            let rows = stmt.query_map(params![start_text, end_text], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, f64>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, Option<String>>(5)?,
+                ))
+            })?;
+            for row in rows {
+                let (date, metric, value, unit, source_scope, device_id) = row?;
+                let is_recovery = recovery_metrics.contains(metric.as_str());
+                if (is_recovery && selected.contains("recovery"))
+                    || (!is_recovery && selected.contains("daily_activity"))
+                {
+                    daily_metrics.push(serde_json::json!({
+                        "date": date,
+                        "metric": metric,
+                        "value": value,
+                        "unit": unit,
+                        "source_scope": source_scope,
+                        "device_id": device_id,
+                    }));
+                }
+            }
+        }
+
+        let mut sleep_sessions = Vec::new();
+        if selected.contains("sleep") {
+            let mut stmt = self.conn.prepare(
+                "SELECT sleep_id, start_time, end_time, score, duration_minutes,
+                        deep_minutes, light_minutes, rem_minutes, rem_available, awake_minutes,
+                        source_scope, device_id
+                 FROM sleep_sessions
+                 WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2
+                 ORDER BY start_time",
+            )?;
+            let rows = stmt.query_map(params![start_text, end_text], |row| {
+                let rem_minutes = row.get::<_, i32>(7)?;
+                let rem_available = row.get::<_, i64>(8)?;
+                Ok(serde_json::json!({
+                    "sleep_id": row.get::<_, String>(0)?,
+                    "start_time": row.get::<_, String>(1)?,
+                    "end_time": row.get::<_, String>(2)?,
+                    "score": row.get::<_, Option<i32>>(3)?,
+                    "duration_minutes": row.get::<_, i32>(4)?,
+                    "deep_minutes": row.get::<_, i32>(5)?,
+                    "light_minutes": row.get::<_, i32>(6)?,
+                    "rem_minutes": (rem_available != 0).then_some(rem_minutes),
+                    "awake_minutes": row.get::<_, i32>(9)?,
+                    "source_scope": row.get::<_, String>(10)?,
+                    "device_id": row.get::<_, Option<String>>(11)?,
+                }))
+            })?;
+            sleep_sessions = rows.collect::<std::result::Result<Vec<_>, _>>()?;
+        }
+
+        let mut workouts = Vec::new();
+        if selected.contains("workouts") {
+            let mut stmt = self.conn.prepare(
+                "SELECT workout_id, workout_type, start_time, end_time,
+                        distance_meters, calories, avg_hr, max_hr,
+                        training_load, vo2max, source_scope, device_id
+                 FROM workouts
+                 WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2
+                 ORDER BY start_time",
+            )?;
+            let rows = stmt.query_map(params![start_text, end_text], |row| {
+                Ok(serde_json::json!({
+                    "workout_id": row.get::<_, String>(0)?,
+                    "workout_type": row.get::<_, String>(1)?,
+                    "start_time": row.get::<_, String>(2)?,
+                    "end_time": row.get::<_, String>(3)?,
+                    "distance_meters": row.get::<_, Option<f64>>(4)?,
+                    "calories": row.get::<_, Option<i32>>(5)?,
+                    "avg_hr": row.get::<_, Option<i32>>(6)?,
+                    "max_hr": row.get::<_, Option<i32>>(7)?,
+                    "training_load": row.get::<_, Option<f64>>(8)?,
+                    "vo2max": row.get::<_, Option<f64>>(9)?,
+                    "source_scope": row.get::<_, String>(10)?,
+                    "device_id": row.get::<_, Option<String>>(11)?,
+                }))
+            })?;
+            workouts = rows.collect::<std::result::Result<Vec<_>, _>>()?;
+        }
+
+        let record_count =
+            metric_samples.len() + daily_metrics.len() + sleep_sessions.len() + workouts.len();
+        let export = serde_json::json!({
+            "schema_version": "zeppbridge.ai.v1",
+            "generated_at": Utc::now().to_rfc3339(),
+            "date_range": { "start": start_text, "end": end_text, "timezone": "system_local" },
+            "selected_types": selected,
+            "record_count": record_count,
+            "provenance": {
+                "source": "ZeppBridge local SQLite",
+                "normalized": true,
+                "raw_payloads_included": false,
+                "note": "Missing fields are omitted or null; values are never fabricated. source_scope preserves user_fused, device, or unknown provenance."
+            },
+            "data": {
+                "metric_samples": metric_samples,
+                "daily_metrics": daily_metrics,
+                "sleep_sessions": sleep_sessions,
+                "workouts": workouts,
+            }
+        });
+        let encoded = serde_json::to_string_pretty(&export)
+            .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
+        Ok((encoded, record_count))
+    }
+
+    fn latest_metric_f64(&self, metric: &str) -> Result<Option<f64>> {
+        self.conn
+            .query_row(
+                "SELECT value FROM metric_samples WHERE metric = ?1
+                 ORDER BY timestamp DESC,
+                    CASE source_scope WHEN 'user_fused' THEN 0 WHEN 'device' THEN 1 ELSE 2 END,
+                    id DESC LIMIT 1",
+                [metric],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(Into::into)
+    }
+
+    fn latest_daily_f64(&self, metric: &str) -> Result<Option<f64>> {
+        self.conn
+            .query_row(
+                "SELECT value FROM daily_metrics WHERE metric = ?1
+                 ORDER BY date DESC,
+                    CASE source_scope WHEN 'user_fused' THEN 0 WHEN 'device' THEN 1 ELSE 2 END,
+                    id DESC LIMIT 1",
+                [metric],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(Into::into)
+    }
+
+    fn latest_daily_i32(&self, metric: &str) -> Result<Option<i32>> {
+        Ok(self
+            .latest_daily_f64(metric)?
+            .map(|value| value.round() as i32))
+    }
+
+    fn latest_daily_i32_for_date(&self, metric: &str, date: NaiveDate) -> Result<Option<i32>> {
+        self.conn
+            .query_row(
+                "SELECT value FROM daily_metrics WHERE metric = ?1 AND date = ?2
+                 ORDER BY CASE source_scope WHEN 'user_fused' THEN 0 WHEN 'device' THEN 1 ELSE 2 END,
+                          id DESC LIMIT 1",
+                params![metric, date.format("%Y-%m-%d").to_string()],
+                |row| row.get::<_, f64>(0),
+            )
+            .optional()
+            .map(|value| value.map(|value| value.round() as i32))
+            .map_err(Into::into)
+    }
+
+    pub fn list_data_status(&self) -> Result<Vec<DataStatus>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT stream, status, last_sync, records_written, capability,
+                    needs_reauth, message FROM sync_state ORDER BY stream",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, Option<String>>(2)?,
+                row.get::<_, i64>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, i64>(5)?,
+                row.get::<_, Option<String>>(6)?,
+            ))
+        })?;
+        let mut statuses = Vec::new();
+        for row in rows {
+            let (stream, status, last_sync, records_written, capability, needs_reauth, message) =
+                row?;
+            statuses.push(DataStatus {
+                stream,
+                status,
+                last_sync: last_sync
+                    .as_deref()
+                    .map(|value| parse_datetime(value, "sync_state.last_sync"))
+                    .transpose()?,
+                records_written,
+                capability,
+                needs_reauth: needs_reauth != 0,
+                message,
+            });
+        }
+        Ok(statuses)
+    }
+
+    #[cfg(test)]
+    #[allow(dead_code)]
+    pub fn get_recent_data(&self, limit: usize) -> Result<RecentData> {
+        Ok(RecentData {
+            metric_samples: self.get_recent_metric_samples(limit)?,
+            sleep_sessions: self.get_recent_sleep_sessions(limit)?,
+            workouts: self.get_recent_workouts(limit)?,
+        })
+    }
+
+    #[cfg(test)]
+    #[allow(dead_code)]
+    fn get_recent_metric_samples(&self, limit: usize) -> Result<Vec<MetricSample>> {
+        let limit = i64::try_from(limit).unwrap_or(i64::MAX).max(0);
+        let mut stmt = self.conn.prepare(
+            "SELECT metric, timestamp, value, unit, source_scope, device_id
+             FROM metric_samples ORDER BY timestamp DESC LIMIT ?1",
+        )?;
+        let rows = stmt.query_map([limit], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, f64>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, Option<String>>(5)?,
+            ))
+        })?;
+        let mut samples = Vec::new();
+        for row in rows {
+            let (metric, timestamp, value, unit, scope, device_id) = row?;
+            samples.push(MetricSample {
+                metric,
+                timestamp: parse_datetime(&timestamp, "metric_samples.timestamp")?,
+                value,
+                unit,
+                source_scope: parse_scope(&scope)?,
+                device_id,
+            });
+        }
+        Ok(samples)
+    }
+
+    /// Backwards-compatible status update. New sync code should use the richer
+    /// method below so cursor/capability information is not discarded.
+    #[allow(dead_code)]
+    pub fn update_sync_state(&self, stream: &str, status: &str, error: Option<&str>) -> Result<()> {
+        self.update_sync_state_details(
+            stream,
+            None,
+            status,
+            error,
+            error.is_some(),
+            0,
+            if error.is_some() {
+                CapabilityStatus::Unavailable
+            } else {
+                CapabilityStatus::Verified
+            },
+            error.map(str::to_owned),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn update_sync_state_details(
+        &self,
+        stream: &str,
+        cursor: Option<&str>,
+        status: &str,
+        error: Option<&str>,
+        needs_reauth: bool,
+        records_written: i64,
+        capability: CapabilityStatus,
+        message: Option<String>,
+    ) -> Result<()> {
+        let now = Utc::now().to_rfc3339();
+        self.conn.execute(
+            "INSERT INTO sync_state
+                (stream, last_sync, cursor, status, error, needs_reauth,
+                 records_written, capability, message, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?2)
+             ON CONFLICT(stream) DO UPDATE SET
+                last_sync = excluded.last_sync,
+                cursor = excluded.cursor,
+                status = excluded.status,
+                error = excluded.error,
+                needs_reauth = excluded.needs_reauth,
+                records_written = excluded.records_written,
+                capability = excluded.capability,
+                message = excluded.message,
+                updated_at = excluded.updated_at",
+            params![
+                stream,
+                now,
+                cursor,
+                status,
+                error,
+                if needs_reauth { 1 } else { 0 },
+                records_written,
+                capability.as_str(),
+                message,
+            ],
+        )?;
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    pub fn get_sync_state(&self, stream: &str) -> Result<Option<SyncStateInfo>> {
+        let row = self
+            .conn
+            .query_row(
+                "SELECT stream, last_sync, cursor, status, error, needs_reauth,
+                        records_written, capability, message, updated_at
+                 FROM sync_state WHERE stream = ?1",
+                [stream],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, Option<String>>(1)?,
+                        row.get::<_, Option<String>>(2)?,
+                        row.get::<_, String>(3)?,
+                        row.get::<_, Option<String>>(4)?,
+                        row.get::<_, i64>(5)?,
+                        row.get::<_, i64>(6)?,
+                        row.get::<_, String>(7)?,
+                        row.get::<_, Option<String>>(8)?,
+                        row.get::<_, String>(9)?,
+                    ))
+                },
+            )
+            .optional()?;
+        row.map(
+            |(
+                stream,
+                last_sync,
+                cursor,
+                status,
+                error,
+                needs_reauth,
+                records_written,
+                capability,
+                message,
+                updated_at,
+            )| {
+                Ok(SyncStateInfo {
+                    stream,
+                    last_sync: last_sync
+                        .as_deref()
+                        .map(|value| parse_datetime(value, "sync_state.last_sync"))
+                        .transpose()?,
+                    cursor,
+                    status,
+                    error,
+                    needs_reauth: needs_reauth != 0,
+                    records_written,
+                    capability,
+                    message,
+                    updated_at: parse_datetime(&updated_at, "sync_state.updated_at")?,
+                })
+            },
+        )
+        .transpose()
+    }
+
+    pub fn cleanup_old_data(&self, days: i64) -> Result<()> {
+        if !(1..=365).contains(&days) {
+            return Err(ZeppBridgeError::ConfigError(
+                "retention 天数必须在 1..=365".into(),
+            ));
+        }
+        let cutoff = Utc::now() - chrono::Duration::days(days);
+        let cutoff_timestamp = cutoff.to_rfc3339();
+        let cutoff_date = cutoff.date_naive().format("%Y-%m-%d").to_string();
+        self.conn.execute(
+            "DELETE FROM metric_samples WHERE timestamp < ?1",
+            [&cutoff_timestamp],
+        )?;
+        self.conn
+            .execute("DELETE FROM daily_metrics WHERE date < ?1", [&cutoff_date])?;
+        self.conn.execute(
+            "DELETE FROM sleep_sessions WHERE start_time < ?1",
+            [&cutoff_timestamp],
+        )?;
+        self.conn.execute(
+            "DELETE FROM workouts WHERE start_time < ?1",
+            [&cutoff_timestamp],
+        )?;
+        self.conn.execute(
+            "DELETE FROM workout_samples WHERE timestamp < ?1",
+            [&cutoff_timestamp],
+        )?;
+        self.conn.execute(
+            "DELETE FROM route_points WHERE timestamp < ?1",
+            [&cutoff_timestamp],
+        )?;
+        // Raw responses are retained from their fetch time, not their query
+        // window start. A 30-day request naturally starts near the retention
+        // cutoff and must not be deleted seconds after it is fetched.
+        self.conn.execute(
+            "DELETE FROM raw_records
+             WHERE fetched_at < ?1
+               AND NOT EXISTS (SELECT 1 FROM metric_samples m WHERE m.raw_record_id = raw_records.id)
+               AND NOT EXISTS (SELECT 1 FROM daily_metrics d WHERE d.raw_record_id = raw_records.id)
+               AND NOT EXISTS (SELECT 1 FROM sleep_sessions s WHERE s.raw_record_id = raw_records.id)
+               AND NOT EXISTS (SELECT 1 FROM workouts w WHERE w.raw_record_id = raw_records.id)",
+            [&cutoff_timestamp],
+        )?;
+        self.conn
+            .execute_batch("PRAGMA wal_checkpoint(TRUNCATE); PRAGMA incremental_vacuum;")?;
+        Ok(())
+    }
+
+    pub fn persist_fetched_record(&self, record: &RawRecord) -> Result<(i64, NormalizationCounts)> {
+        self.conn.execute("BEGIN IMMEDIATE", [])?;
+        let outcome = (|| {
+            let raw_id = self.insert_raw_record(record)?;
+            let counts = self.normalize_and_persist_raw(
+                raw_id,
+                &record.stream,
+                &record.source_key,
+                &record.payload,
+            )?;
+            Ok((raw_id, counts))
+        })();
+        match outcome {
+            Ok(value) => {
+                self.conn.execute("COMMIT", [])?;
+                Ok(value)
+            }
+            Err(error) => {
+                let _ = self.conn.execute("ROLLBACK", []);
+                Err(error)
+            }
+        }
+    }
+
+    #[cfg(test)]
+    pub fn count_metric_samples(&self) -> Result<i64> {
+        self.conn
+            .query_row("SELECT COUNT(*) FROM metric_samples", [], |row| row.get(0))
+            .map_err(Into::into)
+    }
+
+    #[cfg(test)]
+    #[allow(dead_code)]
+    pub fn count_raw_records(&self) -> Result<i64> {
+        self.conn
+            .query_row("SELECT COUNT(*) FROM raw_records", [], |row| row.get(0))
+            .map_err(Into::into)
+    }
+}
+
+fn parse_datetime(value: &str, field: &str) -> Result<DateTime<Utc>> {
+    DateTime::parse_from_rfc3339(value)
+        .map(|dt| dt.with_timezone(&Utc))
+        .map_err(|error| ZeppBridgeError::ParseError(format!("{field} 无效: {error}")))
+}
+
+fn parse_scope(value: &str) -> Result<SourceScope> {
+    match value.trim_matches('"') {
+        "user_fused" | "UserFused" => Ok(SourceScope::UserFused),
+        "device" | "Device" => Ok(SourceScope::Device),
+        "unknown" | "Unknown" => Ok(SourceScope::Unknown),
+        other => serde_json::from_str::<SourceScope>(value)
+            .map_err(|_| ZeppBridgeError::ParseError(format!("source_scope 无效: {other}"))),
+    }
+}
+
+fn format_bytes(bytes: u64) -> String {
+    if bytes >= 1_073_741_824 {
+        format!("{:.1} GB", bytes as f64 / 1_073_741_824.0)
+    } else if bytes >= 1_048_576 {
+        format!("{:.0} MB", bytes as f64 / 1_048_576.0)
+    } else {
+        format!("{bytes} B")
+    }
+}
+
+fn disk_free_bytes(path: &std::path::Path) -> Option<u64> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::ffi::OsStrExt;
+        #[link(name = "kernel32")]
+        extern "system" {
+            fn GetDiskFreeSpaceExW(
+                directory: *const u16,
+                free_bytes_available: *mut u64,
+                total_bytes: *mut u64,
+                total_free_bytes: *mut u64,
+            ) -> i32;
+        }
+        let mut wide: Vec<u16> = path.as_os_str().encode_wide().collect();
+        wide.push(0);
+        let mut free = 0u64;
+        let ok = unsafe {
+            GetDiskFreeSpaceExW(
+                wide.as_ptr(),
+                &mut free,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+            )
+        };
+        (ok != 0).then_some(free)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = path;
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ts() -> DateTime<Utc> {
+        DateTime::from_timestamp(1_700_000_000, 0).unwrap()
+    }
+
+    #[test]
+    fn prefs_default_to_365_and_30_without_writing_old_30_day_retention() {
+        let db = Database::in_memory().unwrap();
+        let prefs = db.user_prefs().unwrap();
+        assert_eq!(prefs.retention_days, 365);
+        assert_eq!(prefs.history_sync_days, 30);
+        assert!(db.get_app_meta("retention_days").unwrap().is_none());
+    }
+
+    #[test]
+    fn missing_rem_is_stored_as_unavailable() {
+        let db = Database::in_memory().unwrap();
+        db.insert_sleep_session(&SleepSession {
+            sleep_id: "sleep-no-rem".into(),
+            start_time: ts(),
+            end_time: ts() + chrono::Duration::minutes(400),
+            score: Some(70),
+            duration_minutes: 400,
+            deep_minutes: 80,
+            light_minutes: 200,
+            rem_minutes: None,
+            awake_minutes: 20,
+            source_scope: SourceScope::Device,
+            device_id: None,
+        })
+        .unwrap();
+        assert_eq!(
+            db.get_sleep_detail("sleep-no-rem")
+                .unwrap()
+                .unwrap()
+                .rem_minutes,
+            None
+        );
+    }
+
+    #[test]
+    fn retention_rejects_unsafe_ranges() {
+        let db = Database::in_memory().unwrap();
+        assert!(db.cleanup_old_data(0).is_err());
+        assert!(db.cleanup_old_data(366).is_err());
+    }
+
+    #[test]
+    fn null_device_metric_key_deduplicates() {
+        let db = Database::in_memory().unwrap();
+        let sample = MetricSample {
+            metric: "heart_rate".into(),
+            timestamp: ts(),
+            value: 70.0,
+            unit: "bpm".into(),
+            source_scope: SourceScope::Unknown,
+            device_id: None,
+        };
+        db.insert_metric_sample(&sample).unwrap();
+        let mut revised = sample.clone();
+        revised.value = 71.0;
+        db.insert_metric_sample(&revised).unwrap();
+        assert_eq!(db.count_metric_samples().unwrap(), 1);
+        assert_eq!(db.get_health_overview().unwrap().current_hr, Some(71));
+    }
+}

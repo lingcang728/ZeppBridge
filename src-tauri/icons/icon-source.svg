@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">ZeppBridge</title>
+  <desc id="desc">An abstract Z-shaped data bridge on a dark rounded square.</desc>
+  <rect width="1024" height="1024" rx="224" fill="#101613"/>
+  <path
+    d="M 278 306 H 696 C 750 306 776 370 736 405 L 330 761 C 290 796 316 860 370 860 H 746"
+    fill="none"
+    stroke="#70BC91"
+    stroke-width="128"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <circle cx="278" cy="306" r="30" fill="#D3F3DF"/>
+  <circle cx="746" cy="860" r="30" fill="#D3F3DF"/>
+</svg>

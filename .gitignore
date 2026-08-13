@@ -1,0 +1,83 @@
+# Dependencies and frontend output
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Logs and tool state
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Tauri and native build output
+src-tauri/target/
+src-tauri/gen/
+target/
+.tauri/
+*.exe
+*.msi
+*.msix
+*.dmg
+*.app/
+*.AppImage
+*.deb
+*.rpm
+*.nsis.zip
+*.msi.zip
+
+# Local data and database files
+data/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.sqlite3-*
+
+# Credentials and local configuration
+.env
+.env.*
+!.env.example
+auth.json
+*.token
+*.secret
+*.credentials
+*.cookie
+cookies*.json
+
+# Network captures and sensitive traces
+*.har
+*.chlsj
+*.saz
+*.flow
+*.mitm
+*.pcap
+*.pcapng
+*.cap
+*.trace
+
+# Private keys and keystores (public .crt/.cer/.pub files remain trackable)
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# OS
+Thumbs.db

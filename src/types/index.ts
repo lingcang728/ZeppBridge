@@ -1,0 +1,215 @@
+export interface AuthInfo {
+  appToken: string;
+  userId: string;
+  regionHost: string;
+}
+
+export type SourceScope = 'user_fused' | 'device' | 'unknown' | string;
+
+export interface StreamStatus {
+  stream: string;
+  status: string;
+  records?: number;
+  last_sync?: string;
+  last_cloud_sync_at?: string;
+  newest_sample_at?: string;
+  message?: string;
+  needs_reauth?: boolean;
+}
+
+export interface CapabilityStatus {
+  capability: string;
+  available: boolean;
+  reason?: string;
+}
+
+export interface AppStatus {
+  configured: boolean;
+  auth_state: string;
+  connection_state: 'unconfigured' | 'configured' | 'connected' | 'needs_reauth' | string;
+  masked_user_id?: string;
+  region_host?: string;
+  last_sync?: string;
+  last_cloud_sync_at?: string;
+  last_cloud_sync_outcome?: SyncOutcome;
+  streams: StreamStatus[];
+  capabilities: CapabilityStatus[];
+  database_path?: string;
+  retention_days: number;
+  history_sync_days?: number;
+  storage?: StorageEstimate;
+}
+
+export interface StorageEstimate {
+  free_bytes: number;
+  estimated_add_bytes: number;
+  database_bytes: number;
+  allow_long_history: boolean;
+  warn_tight_space: boolean;
+  message: string;
+}
+
+export interface UserPrefs {
+  retention_days: number;
+  history_sync_days: number;
+}
+
+export interface HeartRatePoint {
+  timestamp: string;
+  value: number;
+}
+
+export interface DailyPoint {
+  date: string;
+  value: number;
+}
+
+export interface SyncProgress {
+  stream: string;
+  current: number;
+  total: number;
+  message: string;
+}
+
+export interface CaptureSession {
+  state: string;
+  lan_ip: string;
+  lan_ips?: string[];
+  port: number;
+  certificate_path: string;
+  certificate_url: string;
+  started_at?: string;
+  message?: string;
+}
+
+export interface CaptureDiagnostics {
+  stage: string;
+  guidance: string;
+  phone_connect_count: number;
+  zepp_connect_count: number;
+  zepp_tls_hello_count: number;
+  zepp_http_request_count: number;
+  token_seen: boolean;
+  user_id_seen: boolean;
+  last_zepp_host?: string;
+  last_activity_at?: string;
+}
+
+export interface CaptureStatus {
+  state: string;
+  session?: CaptureSession;
+  captured?: {
+    user_id: string;
+    region_host: string;
+  };
+  /** Optional only for compatibility with an older installed backend during rollout. */
+  diagnostics?: CaptureDiagnostics;
+  message?: string;
+  error?: string;
+}
+
+export interface SyncStreamResult {
+  stream: string;
+  status: string;
+  records_written: number;
+  message?: string;
+  needs_reauth?: boolean;
+  last_cloud_sync_at?: string;
+  newest_sample_at?: string;
+}
+
+export type SyncOutcome = 'updated' | 'no_new_data' | 'partial' | 'failed';
+
+export interface SyncReport {
+  success: boolean;
+  outcome: SyncOutcome;
+  started_at: string;
+  finished_at: string;
+  last_cloud_sync_at: string;
+  total_records: number;
+  streams: SyncStreamResult[];
+  message?: string;
+}
+
+export interface Coverage {
+  start?: string;
+  end?: string;
+  days?: number;
+  streams?: number;
+}
+
+export interface HealthOverview {
+  current_hr?: number;
+  resting_hr?: number;
+  hrv?: number;
+  last_sleep_score?: number;
+  readiness?: number;
+  bio_charge?: number;
+  hybrid_charge?: number;
+  training_load?: number;
+  vo2max?: number;
+  steps_today?: number;
+  active_calories_today?: number;
+  latest_heart_rate_at?: string;
+  last_updated?: string;
+  coverage?: Coverage;
+  source_scope?: SourceScope;
+}
+
+export interface SleepSession {
+  sleep_id: string;
+  start_time: string;
+  end_time: string;
+  score?: number;
+  duration_minutes: number;
+  deep_minutes: number;
+  light_minutes: number;
+  rem_minutes?: number | null;
+  awake_minutes: number;
+  source_scope: SourceScope;
+  device_id?: string;
+}
+
+export interface Workout {
+  workout_id: string;
+  workout_type: string;
+  start_time: string;
+  end_time: string;
+  distance_meters?: number;
+  calories?: number;
+  avg_hr?: number;
+  max_hr?: number;
+  training_load?: number;
+  vo2max?: number;
+  gps_available?: boolean;
+  sample_count?: number;
+  source_scope: SourceScope;
+  device_id?: string;
+}
+
+export type ExportDataType =
+  | 'heart_rate'
+  | 'hrv'
+  | 'daily_activity'
+  | 'sleep'
+  | 'workouts'
+  | 'recovery';
+
+export interface ExportSelection {
+  startDate: string;
+  endDate: string;
+  dataTypes: ExportDataType[];
+}
+
+export interface ExportResult {
+  path: string;
+  record_count: number;
+  bytes: number;
+  generated_at: string;
+}
+
+export interface ReprocessResult {
+  total_records: number;
+  streams: Record<string, number>;
+  message: string;
+}
