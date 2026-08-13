@@ -253,6 +253,10 @@ onUnmounted(() => {
   --danger: #FF453A;
   --warning: #FFD60A;
   --focus: #0A84FF;
+  --sleep-deep: #5856D6;
+  --sleep-light: #5E5CE6;
+  --sleep-rem: #AF52DE;
+  --sleep-awake: #FF9F0A;
   --font-sans: 'Segoe UI Variable', 'Segoe UI', Geist, system-ui, -apple-system, sans-serif;
   --font-mono: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
   --space-1: 4px;
@@ -288,6 +292,10 @@ onUnmounted(() => {
     --danger: #FF3B30;
     --warning: #FF9500;
     --focus: #007AFF;
+    --sleep-deep: #5856D6;
+    --sleep-light: #5E5CE6;
+    --sleep-rem: #AF52DE;
+    --sleep-awake: #FF9500;
   }
 }
 
@@ -311,6 +319,10 @@ onUnmounted(() => {
   --danger: #FF3B30;
   --warning: #FF9500;
   --focus: #007AFF;
+  --sleep-deep: #5856D6;
+  --sleep-light: #5E5CE6;
+  --sleep-rem: #AF52DE;
+  --sleep-awake: #FF9500;
 }
 
 * { box-sizing: border-box; }
