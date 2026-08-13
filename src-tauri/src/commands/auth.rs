@@ -125,7 +125,10 @@ pub async fn verify_auth(
 pub async fn clear_auth(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<AppStatus, String> {
-    state.login.epoch.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    state
+        .login
+        .epoch
+        .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     {
         let mut login = state.login.status.write().await;
         *login = crate::ipc_types::LoginStatus::idle();

@@ -79,10 +79,11 @@ pub async fn get_login_status(
     Ok(state.login.status.read().await.clone())
 }
 
-fn build_login_window(app: &AppHandle, page_url: &str) -> std::result::Result<WebviewWindow, String> {
-    let url = page_url
-        .parse()
-        .map_err(|_| "登录地址无效".to_string())?;
+fn build_login_window(
+    app: &AppHandle,
+    page_url: &str,
+) -> std::result::Result<WebviewWindow, String> {
+    let url = page_url.parse().map_err(|_| "登录地址无效".to_string())?;
     WebviewWindowBuilder::new(app, LOGIN_WINDOW_LABEL, WebviewUrl::External(url))
         .title("登录 Zepp")
         .inner_size(920.0, 760.0)
@@ -103,13 +104,7 @@ fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow) {
                 return;
             }
             if started.elapsed() >= SESSION_TIMEOUT {
-                finish_failed(
-                    &app,
-                    epoch,
-                    "登录超时，请重试",
-                    current_page_url(&window),
-                )
-                .await;
+                finish_failed(&app, epoch, "登录超时，请重试", current_page_url(&window)).await;
                 close_login_window(&app);
                 return;
             }
@@ -138,8 +133,14 @@ fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow) {
 
             let cookies = collect_cookies(&window).await;
             if let Some(extracted) = parse_login_cookies(&cookies) {
-                emit_progress(&app, epoch, "extracting", "已读取登录凭据，正在确认区域", &page_url)
-                    .await;
+                emit_progress(
+                    &app,
+                    epoch,
+                    "extracting",
+                    "已读取登录凭据，正在确认区域",
+                    &page_url,
+                )
+                .await;
                 emit_progress(&app, epoch, "verifying", "正在验证账号", &page_url).await;
 
                 match persist_extracted_login(&app, epoch, &extracted).await {
@@ -147,7 +148,8 @@ fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow) {
                         if !epoch_active(&app, epoch) {
                             return;
                         }
-                        emit_progress(&app, epoch, "connected", "已连接 Zepp 账号", &page_url).await;
+                        emit_progress(&app, epoch, "connected", "已连接 Zepp 账号", &page_url)
+                            .await;
                         close_login_window(&app);
                         return;
                     }
@@ -221,11 +223,7 @@ async fn persist_extracted_login(
     Ok(())
 }
 
-async fn probe_region_hosts(
-    user_id: &str,
-    app_token: &str,
-    hosts: &[String],
-) -> Option<AuthInfo> {
+async fn probe_region_hosts(user_id: &str, app_token: &str, hosts: &[String]) -> Option<AuthInfo> {
     let (tx, mut rx) = tokio::sync::mpsc::channel::<AuthInfo>(1);
     let mut handles = Vec::new();
     for host in hosts {
@@ -355,8 +353,7 @@ async fn document_cookie(window: &WebviewWindow) -> Option<String> {
 }
 
 fn decode_eval_string(raw: &str) -> String {
-    serde_json::from_str::<String>(raw)
-        .unwrap_or_else(|_| raw.trim_matches('"').to_string())
+    serde_json::from_str::<String>(raw).unwrap_or_else(|_| raw.trim_matches('"').to_string())
 }
 
 /// Parse `document.cookie` / Cookie header text into name/value pairs.
@@ -407,8 +404,11 @@ fn extract_from_login_info(raw: &str) -> Option<ExtractedLogin> {
 
     let user_id = json_string(&token_info, &["user_id", "userid", "userId"])
         .and_then(|value| sanitize_user_id(&value))?;
-    let app_token = json_string(&token_info, &["app_token", "apptoken", "appToken", "app-token"])
-        .and_then(|value| sanitize_app_token(&value))?;
+    let app_token = json_string(
+        &token_info,
+        &["app_token", "apptoken", "appToken", "app-token"],
+    )
+    .and_then(|value| sanitize_app_token(&value))?;
     let region_hint = json_string(
         &token_info,
         &["region", "region_host", "host", "domain", "api_host"],
@@ -470,7 +470,10 @@ fn decode_possibly_encoded(raw: &str) -> String {
 }
 
 fn percent_decode(value: &str) -> String {
-    let replaced = value.replace("+", " ").replace("%2C", ",").replace("%2c", ",");
+    let replaced = value
+        .replace("+", " ")
+        .replace("%2C", ",")
+        .replace("%2c", ",");
     let bytes = replaced.as_bytes();
     let mut output = Vec::with_capacity(bytes.len());
     let mut index = 0;
@@ -523,21 +526,17 @@ fn is_allowed_login_url(url: &str) -> bool {
     if parsed.scheme() != "https" {
         return false;
     }
-    parsed
-        .host_str()
-        .is_some_and(|host| {
-            let host = host.to_ascii_lowercase();
-            host == "zepp.com"
-                || host.ends_with(".zepp.com")
-                || host == "huami.com"
-                || host.ends_with(".huami.com")
-        })
+    parsed.host_str().is_some_and(|host| {
+        let host = host.to_ascii_lowercase();
+        host == "zepp.com"
+            || host.ends_with(".zepp.com")
+            || host == "huami.com"
+            || host.ends_with(".huami.com")
+    })
 }
 
 fn should_use_fallback(elapsed: Duration, fallback_used: bool, page_url: &str) -> bool {
-    !fallback_used
-        && elapsed >= FALLBACK_AFTER
-        && !page_url.starts_with("https://user.huami.com/")
+    !fallback_used && elapsed >= FALLBACK_AFTER && !page_url.starts_with("https://user.huami.com/")
 }
 
 fn current_page_url(window: &WebviewWindow) -> String {
@@ -566,19 +565,20 @@ async fn publish_status(app: &AppHandle, state: &AppState, status: LoginStatus) 
     let _ = app.emit(LOGIN_EVENT, status);
 }
 
-async fn emit_progress(app: &AppHandle, epoch: u64, state_name: &str, message: &str, page_url: &str) {
+async fn emit_progress(
+    app: &AppHandle,
+    epoch: u64,
+    state_name: &str,
+    message: &str,
+    page_url: &str,
+) {
     if !epoch_active(app, epoch) {
         return;
     }
     let Some(state) = app.try_state::<AppState>() else {
         return;
     };
-    publish_status(
-        app,
-        &state,
-        LoginStatus::new(state_name, message, page_url),
-    )
-    .await;
+    publish_status(app, &state, LoginStatus::new(state_name, message, page_url)).await;
 }
 
 async fn finish_failed(app: &AppHandle, epoch: u64, message: &str, page_url: String) {
@@ -655,9 +655,10 @@ mod tests {
             ("apptoken".into(), "tok".into()),
         ])
         .is_none());
-        assert!(parse_login_cookies(&[
-            ("hm-user-login-info".into(), r#"{"token_info":{"login_token":"nope"}}"#.into()),
-        ])
+        assert!(parse_login_cookies(&[(
+            "hm-user-login-info".into(),
+            r#"{"token_info":{"login_token":"nope"}}"#.into()
+        ),])
         .is_none());
     }
 
@@ -675,7 +676,9 @@ mod tests {
     #[test]
     fn login_navigation_allow_list() {
         assert!(is_allowed_login_url("https://watchface.zepp.com/"));
-        assert!(is_allowed_login_url("https://user.huami.com/privacy2/index.html"));
+        assert!(is_allowed_login_url(
+            "https://user.huami.com/privacy2/index.html"
+        ));
         assert!(is_allowed_login_url("about:blank"));
         assert!(!is_allowed_login_url("https://example.com/"));
         assert!(!is_allowed_login_url("http://watchface.zepp.com/"));

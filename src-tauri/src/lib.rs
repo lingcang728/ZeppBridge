@@ -11,12 +11,12 @@ mod sync;
 
 use app_state::AppState;
 use commands::{
-    cancel_sync, cancel_web_login, cleanup_old_data, clear_auth, get_app_status, get_export_json,
-    get_health_overview, get_heart_rate_series, get_login_status, get_recent_sleep,
-    get_recent_workouts, get_sleep_detail, get_storage_estimate, get_training_load_series,
-    get_device_profile, get_workout_detail, open_data_folder, publish_ai_export, reprocess_local_data, save_auth,
-    save_json_export, set_user_prefs, start_history_sync, start_incremental_sync,
-    start_initial_sync, start_web_login, verify_auth,
+    cancel_sync, cancel_web_login, cleanup_old_data, clear_auth, get_app_status,
+    get_device_profile, get_export_json, get_health_overview, get_heart_rate_series,
+    get_login_status, get_recent_sleep, get_recent_workouts, get_sleep_detail,
+    get_storage_estimate, get_training_load_series, get_workout_detail, open_data_folder,
+    publish_ai_export, reprocess_local_data, save_auth, save_json_export, set_user_prefs,
+    start_history_sync, start_incremental_sync, start_initial_sync, start_web_login, verify_auth,
 };
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;

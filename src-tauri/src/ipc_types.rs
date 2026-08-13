@@ -261,7 +261,11 @@ mod tests {
 
     #[test]
     fn login_status_serializes_required_fields() {
-        let status = LoginStatus::new("waiting", "请在弹出窗口完成登录", "https://watchface.zepp.com/");
+        let status = LoginStatus::new(
+            "waiting",
+            "请在弹出窗口完成登录",
+            "https://watchface.zepp.com/",
+        );
         let value = serde_json::to_value(&status).unwrap();
         assert_eq!(value["state"], "waiting");
         assert_eq!(value["message"], "请在弹出窗口完成登录");

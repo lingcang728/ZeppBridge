@@ -1,6 +1,6 @@
 use crate::app_state::AppState;
-use crate::ipc_types::CleanupResult;
 use crate::connectors::ZeppConnector;
+use crate::ipc_types::CleanupResult;
 use crate::models::{
     DailyPoint, DeviceProfile, ExportResult, ExportSelection, HealthOverview, HeartRatePoint,
     SleepSession, StorageEstimate, UserPrefs, Workout,
@@ -274,14 +274,25 @@ pub(crate) fn parse_device_profile(value: &serde_json::Value) -> DeviceProfile {
         None => item.clone(),
     };
     DeviceProfile {
-        name: first_string(&item, &["displayName", "deviceName", "productName", "model"])
-            .or_else(|| first_string(&extra, &["displayName", "deviceName", "productName"])),
+        name: first_string(
+            &item,
+            &["displayName", "deviceName", "productName", "model"],
+        )
+        .or_else(|| first_string(&extra, &["displayName", "deviceName", "productName"])),
         firmware: first_string(
             &extra,
-            &["productVersion", "firmwareVersion", "hardwareVersion", "fwVersion"],
+            &[
+                "productVersion",
+                "firmwareVersion",
+                "hardwareVersion",
+                "fwVersion",
+            ],
         ),
         serial: first_string(&extra, &["sn", "serial", "serialNumber"]),
-        device_id: first_string(&item, &["deviceId", "device_id", "deviceSource", "macAddress"]),
+        device_id: first_string(
+            &item,
+            &["deviceId", "device_id", "deviceSource", "macAddress"],
+        ),
         timezone: first_string(&extra, &["bind_timezone", "timezone", "tz"]),
     }
 }
