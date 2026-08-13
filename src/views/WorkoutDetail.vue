@@ -60,7 +60,10 @@ const metrics = computed(() => {
   if (!workout.value) return [];
   const numberValue = (value: number | undefined, digits = 0): string => {
     if (!isFiniteNumber(value)) return '未记录';
-    return digits && !Number.isInteger(value) ? value.toFixed(digits) : String(Math.round(value));
+    return value.toLocaleString('zh-CN', {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    });
   };
   const pace = formatPaceLocal(workout.value.distance_meters, durationMinutes.value);
   return [
@@ -108,7 +111,10 @@ const syncTimeLabel = computed(() => {
   return '同步时间未提供';
 });
 
+let detailSeq = 0;
+
 const loadDetail = async () => {
+  const seq = ++detailSeq;
   loading.value = true;
   error.value = null;
   if (!isTauri()) {
@@ -117,17 +123,21 @@ const loadDetail = async () => {
   }
   try {
     const detail = await tauriApi.getWorkoutDetail(workoutId.value);
-    workout.value = detail;
-    device.value = detail
+    if (seq !== detailSeq) return;
+    const profile = detail
       ? await tauriApi.getDeviceProfile({
           deviceId: detail.device_id,
           sourceScope: detail.source_scope,
         }).catch(() => ({ name: '设备未确定' }))
       : {};
+    if (seq !== detailSeq) return;
+    workout.value = detail;
+    device.value = profile;
   } catch (cause) {
+    if (seq !== detailSeq) return;
     error.value = toUserMessage(cause, '运动详情暂时不可用');
   } finally {
-    loading.value = false;
+    if (seq === detailSeq) loading.value = false;
   }
 };
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import Icon from '../components/Icon.vue';
 import PageHeader from '../components/PageHeader.vue';
@@ -23,6 +23,7 @@ const heartSeries = ref<HeartRatePoint[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
 const partialWarning = ref<string | null>(null);
+const now = ref(Date.now());
 const { dataRevision, appStatus, isSyncing, syncState } = useSyncController();
 
 const lastHeartSample = computed(() => {
@@ -50,7 +51,7 @@ const heartMeasuredAt = computed(() => {
 const heartRateAgeMinutes = computed(() => {
   const measuredAt = heartMeasuredAt.value;
   if (measuredAt === null) return null;
-  return Math.max(0, Math.round((Date.now() - measuredAt) / 60000));
+  return Math.max(0, Math.round((now.value - measuredAt) / 60000));
 });
 
 const heartRateDetail = computed(() => {
@@ -192,7 +193,16 @@ const workoutFact = (workout: Workout): { fact: string; label: string } => {
   return { fact: formatDuration(minutes), label: '时长' };
 };
 
-onMounted(() => void loadOverview());
+let clockTimer = 0;
+onMounted(() => {
+  void loadOverview();
+  clockTimer = window.setInterval(() => {
+    now.value = Date.now();
+  }, 60_000);
+});
+onUnmounted(() => {
+  window.clearInterval(clockTimer);
+});
 watch(dataRevision, () => void loadOverview());
 
 function durationMinutes(start: string, end: string): number | null {

@@ -61,7 +61,10 @@ const syncTimeLabel = computed(() => {
 
 const timezoneLabel = computed(() => device.value.timezone || '未提供');
 
+let detailSeq = 0;
+
 const loadDetail = async () => {
+  const seq = ++detailSeq;
   loading.value = true;
   error.value = null;
   if (!isTauri()) {
@@ -70,17 +73,21 @@ const loadDetail = async () => {
   }
   try {
     const detail = await tauriApi.getSleepDetail(sleepId.value);
-    session.value = detail;
-    device.value = detail
+    if (seq !== detailSeq) return;
+    const profile = detail
       ? await tauriApi.getDeviceProfile({
           deviceId: detail.device_id,
           sourceScope: detail.source_scope,
         }).catch(() => ({ name: '设备未确定' }))
       : {};
+    if (seq !== detailSeq) return;
+    session.value = detail;
+    device.value = profile;
   } catch (cause) {
+    if (seq !== detailSeq) return;
     error.value = toUserMessage(cause, '睡眠详情暂时不可用');
   } finally {
-    loading.value = false;
+    if (seq === detailSeq) loading.value = false;
   }
 };
 

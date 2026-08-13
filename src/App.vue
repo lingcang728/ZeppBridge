@@ -86,6 +86,8 @@ const onDocumentPointerDown = (event: PointerEvent) => {
   if (!themeControl.value?.contains(event.target as Node)) themeMenuOpen.value = false;
 };
 const onDocumentKeydown = (event: KeyboardEvent) => {
+  const target = event.target as HTMLElement | null;
+  if (target && target.closest('input, textarea, select, [contenteditable]')) return;
   if (event.key === 'Escape') themeMenuOpen.value = false;
   if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
   if (event.key === '=' || event.key === '+' || event.code === 'NumpadAdd') {

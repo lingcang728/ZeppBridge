@@ -75,6 +75,10 @@ export const useExport = () => {
         exportError.value = '这段时间没有可导出的记录。';
         return;
       }
+      if (encoded.length > 1_000_000) {
+        exportError.value = 'JSON 过大（超过 1 MB），请改用「保存文件」';
+        return;
+      }
       await navigator.clipboard.writeText(encoded);
       exportMessage.value = `已复制 ${count} 条标准化记录。`;
     } catch (error) {

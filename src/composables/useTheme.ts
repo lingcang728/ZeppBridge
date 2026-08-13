@@ -4,7 +4,6 @@ export type ThemeMode = 'system' | 'light' | 'dark';
 
 const theme = ref<ThemeMode>('system');
 let initialized = false;
-let mediaQuery: MediaQueryList | undefined;
 
 const readTheme = (): ThemeMode => {
   if (typeof window === 'undefined') return 'system';
@@ -31,12 +30,9 @@ const initializeTheme = () => {
   initialized = true;
   theme.value = readTheme();
   applyTheme(theme.value);
-  if (typeof window !== 'undefined' && window.matchMedia) {
-    mediaQuery = window.matchMedia('(prefers-color-scheme: light)');
-    mediaQuery.addEventListener?.('change', () => {
-      if (theme.value === 'system') applyTheme('system');
-    });
-  }
+  // No matchMedia listener needed: in 'system' mode applyTheme leaves no
+  // data-theme attribute, so the CSS @media (prefers-color-scheme) rules
+  // respond to OS changes automatically.
 };
 
 export const useTheme = () => ({

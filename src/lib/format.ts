@@ -85,6 +85,8 @@ export const formatPace = (
 
 export const formatMetric = (value: number | undefined, digits = 0): string => {
   if (!isFiniteNumber(value)) return '—';
-  if (digits > 0 && !Number.isInteger(value)) return value.toFixed(digits);
-  return Math.round(value).toLocaleString('zh-CN');
+  return value.toLocaleString('zh-CN', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
 };

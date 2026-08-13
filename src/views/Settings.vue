@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import Icon from '../components/Icon.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { useTheme, type ThemeMode } from '../composables/useTheme';
+import { AUTO_SYNC_INTERVALS } from '../lib/autoSync';
 import { UI_SCALES, useUiScale, type UiScale } from '../composables/useUiScale';
 import { backend, toUserMessage } from '../lib/bridge';
 import type { LoginStatus } from '../types';
@@ -15,6 +16,8 @@ const {
   syncReport,
   isSyncing,
   autoSyncEnabled,
+  autoSyncInterval,
+  setAutoSyncInterval,
   refreshStatus,
   runSync,
   setAutoSyncEnabled,
@@ -192,6 +195,7 @@ const cleanupData = async () => {
   try {
     await backend.cleanupOldData(retentionDays.value);
     dataMessage.value = `已清理 ${retentionDays.value} 天以前的数据。`;
+    storageEstimate.value = await backend.getStorageEstimate(retentionDays.value).catch(() => null);
     markDataChanged();
   } catch (error) {
     dataError.value = toUserMessage(error, '清理旧数据失败');
@@ -217,7 +221,11 @@ const savePrefs = async () => {
     const prefs = await backend.setUserPrefs(retention, history);
     retentionDays.value = prefs.retention_days;
     historyDays.value = prefs.history_sync_days;
-    storageEstimate.value = await backend.getStorageEstimate(history);
+    try {
+      storageEstimate.value = await backend.getStorageEstimate(history);
+    } catch {
+      dataError.value = '设置已保存，但磁盘空间估算暂时不可用';
+    }
     dataMessage.value = '已保存本地保留与历史补拉设置。';
     await refreshStatus();
   } catch (error) {
@@ -313,9 +321,20 @@ onUnmounted(() => {
         <div class="setting-row">
           <div>
             <h2 id="automatic-title">自动同步</h2>
-            <p>应用打开期间每 15 分钟自动同步。关窗口会留在托盘，点托盘「退出」才停止。</p>
+            <p>应用打开期间每 {{ autoSyncInterval }} 分钟自动同步。关窗口会留在托盘，点托盘「退出」才停止。</p>
           </div>
           <button class="switch" type="button" role="switch" :aria-checked="autoSyncEnabled" @click="setAutoSyncEnabled(!autoSyncEnabled)"><span></span></button>
+        </div>
+        <div class="interval-options" role="radiogroup" aria-label="自动同步间隔" :class="{ 'is-disabled': !autoSyncEnabled }">
+          <button
+            v-for="minutes in AUTO_SYNC_INTERVALS"
+            :key="minutes"
+            type="button"
+            role="radio"
+            :aria-checked="autoSyncInterval === minutes"
+            :disabled="!autoSyncEnabled"
+            @click="setAutoSyncInterval(minutes)"
+          >{{ minutes }} 分钟</button>
         </div>
       </section>
 
@@ -457,6 +476,11 @@ h3 { margin-bottom: 6px; font-size: 14px; }
 .switch span { display: block; width: 17px; height: 17px; border-radius: 50%; background: var(--muted); transition: transform 150ms ease, background-color 150ms ease; }
 .switch[aria-checked='true'] { border-color: var(--accent); background: var(--accent-soft); }
 .switch[aria-checked='true'] span { transform: translateX(19px); background: var(--accent); }
+.interval-options { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.interval-options button { min-width: 64px; min-height: 30px; padding: 4px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: transparent; color: var(--ink); font-size: 12px; cursor: pointer; }
+.interval-options button[aria-checked='true'] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.interval-options.is-disabled { opacity: .5; }
+.interval-options.is-disabled button { cursor: not-allowed; }
 .theme-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin-top: 12px; }
 .theme-options button { display: flex; min-height: 38px; min-width: 0; align-items: center; gap: 8px; padding: 7px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: transparent; color: var(--muted); cursor: pointer; }
 .scale-options { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }

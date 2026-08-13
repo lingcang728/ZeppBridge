@@ -9,6 +9,13 @@ export interface StageItem {
   tone: 'deep' | 'light' | 'rem' | 'awake';
 }
 
+interface BarSegment {
+  tone: StageItem['tone'];
+  minutes: number;
+  start?: number;
+  end?: number;
+}
+
 const props = defineProps<{
   stages: StageItem[];
   slices?: SleepStageSlice[] | null;
@@ -16,7 +23,7 @@ const props = defineProps<{
   rangeEnd?: string;
 }>();
 
-const timeline = computed(() => {
+const timeline = computed<BarSegment[]>(() => {
   const slices = (props.slices ?? [])
     .map((slice) => {
       const start = new Date(slice.start_time).getTime();
@@ -25,41 +32,66 @@ const timeline = computed(() => {
         ? slice.stage
         : null;
       if (!tone || !Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
-      return { tone, minutes: (end - start) / 60_000 };
+      return { tone, minutes: (end - start) / 60_000, start, end };
     })
-    .filter((slice): slice is { tone: StageItem['tone']; minutes: number } => slice !== null);
+    .filter((slice): slice is { tone: StageItem['tone']; minutes: number; start: number; end: number } => slice !== null);
   return slices.length >= 2 ? slices : [];
 });
 
-const barSegments = computed(() => {
+const range = computed<{ from: number; span: number } | null>(() => {
+  const toMs = (value?: string): number | null => {
+    if (!value) return null;
+    const time = new Date(value).getTime();
+    return Number.isFinite(time) ? time : null;
+  };
+  const from = toMs(props.rangeStart);
+  const to = toMs(props.rangeEnd);
+  if (from !== null && to !== null && to > from) return { from, span: to - from };
+  // rangeStart/rangeEnd may be display-only strings (e.g. "23:40"); fall back
+  // to the slice bounds so absolute positioning still matches real time.
+  if (!timeline.value.length) return null;
+  const first = Math.min(...timeline.value.map((slice) => slice.start as number));
+  const last = Math.max(...timeline.value.map((slice) => slice.end as number));
+  return last > first ? { from: first, span: last - first } : null;
+});
+
+const isTimeline = computed(() => timeline.value.length > 0 && range.value !== null);
+
+const barSegments = computed<BarSegment[]>(() => {
   if (timeline.value.length) return timeline.value;
   return props.stages
     .filter((stage) => isFiniteNumber(stage.minutes) && stage.minutes > 0)
     .map((stage) => ({ tone: stage.tone, minutes: stage.minutes as number }));
 });
 
-const total = computed(() =>
-  props.stages.reduce((sum, stage) => sum + (isFiniteNumber(stage.minutes) ? stage.minutes : 0), 0),
-);
 const barTotal = computed(() => barSegments.value.reduce((sum, stage) => sum + stage.minutes, 0));
 const percent = (minutes?: number | null): number =>
-  total.value > 0 && isFiniteNumber(minutes) ? Math.max(0, (minutes / total.value) * 100) : 0;
+  barTotal.value > 0 && isFiniteNumber(minutes) ? Math.max(0, (minutes / barTotal.value) * 100) : 0;
 const barPercent = (minutes: number): number =>
   barTotal.value > 0 ? Math.max(0, (minutes / barTotal.value) * 100) : 0;
 const labelFor = (minutes?: number | null): string => {
   if (!isFiniteNumber(minutes)) return '未提供';
   return formatDuration(minutes, '0 分钟');
 };
+const segmentStyle = (stage: BarSegment): Record<string, string> => {
+  const current = range.value;
+  if (isTimeline.value && current && typeof stage.start === 'number' && typeof stage.end === 'number') {
+    const left = Math.max(0, Math.min(100, ((stage.start - current.from) / current.span) * 100));
+    const width = Math.max(0, Math.min(100 - left, ((stage.end - stage.start) / current.span) * 100));
+    return { left: left + '%', width: width + '%' };
+  }
+  return { width: barPercent(stage.minutes) + '%' };
+};
 </script>
 
 <template>
   <div class="stage-block">
-    <div class="stage-bar" :aria-label="timeline.length ? '睡眠阶段时间轴' : '睡眠阶段汇总比例'">
+    <div class="stage-bar" :class="{ 'is-timeline': isTimeline }" :aria-label="timeline.length ? '睡眠阶段时间轴' : '睡眠阶段汇总比例'">
       <span
         v-for="(stage, index) in barSegments"
         :key="`${stage.tone}-${index}`"
         :class="stage.tone"
-        :style="{ width: `${barPercent(stage.minutes)}%` }"
+        :style="segmentStyle(stage)"
       />
     </div>
     <div v-if="rangeStart || rangeEnd" class="stage-axis">
@@ -78,6 +110,7 @@ const labelFor = (minutes?: number | null): string => {
 
 <style scoped>
 .stage-bar {
+  position: relative;
   display: flex;
   height: 10px;
   overflow: hidden;
@@ -85,6 +118,7 @@ const labelFor = (minutes?: number | null): string => {
   background: var(--surface-raised);
 }
 .stage-bar span { display: block; min-width: 0; }
+.stage-bar.is-timeline span { position: absolute; top: 0; bottom: 0; }
 .deep, i.deep { background: var(--sleep-deep); }
 .light, i.light { background: var(--sleep-light); }
 .rem, i.rem { background: var(--sleep-rem); }

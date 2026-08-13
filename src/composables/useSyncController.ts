@@ -5,7 +5,6 @@ import type { AppStatus, LoginStatus, SyncOutcome, SyncProgress, SyncReport } fr
 
 export type SyncUiState = 'idle' | 'syncing' | SyncOutcome;
 
-const AUTO_SYNC_INTERVAL_MS = 15 * 60_000;
 const appStatus = ref<AppStatus | null>(null);
 const statusError = ref<string | null>(null);
 const syncState = ref<SyncUiState>('idle');
@@ -15,8 +14,11 @@ const syncProgress = ref<SyncProgress | null>(null);
 const loginStatus = ref<LoginStatus>({ state: 'idle', message: '', page_url: '' });
 const dataRevision = ref(0);
 const autoSyncEnabled = ref(readAutoSyncSettings().enabled);
+const autoSyncInterval = ref(readAutoSyncSettings().intervalMinutes);
 let initialized = false;
 let runningSync: Promise<SyncReport | null> | null = null;
+let autoSyncTickCount = 0;
+const unlisteners: Array<() => void> = [];
 
 const formatTime = (value?: string): string => {
   if (!value) return '未知时间';
@@ -42,7 +44,9 @@ const latestHeartRateAt = (report?: SyncReport | null): string | undefined =>
   ?? appStatus.value?.streams.find((stream) => stream.stream === 'heart_rate')?.newest_sample_at;
 
 const messageForReport = (report: SyncReport): string => {
-  const failed = report.streams.filter((stream) => /fail|error/i.test(stream.status)).map((stream) => stream.stream);
+  const failed = report.streams
+    .filter((stream) => ['failed', 'unavailable', 'unverified'].includes(stream.status))
+    .map((stream) => stream.stream);
   const latest = latestHeartRateAt(report);
   if (report.outcome === 'updated') return latest ? `已同步到新数据 · 最新心率 ${formatTime(latest)}` : '已同步到新数据';
   if (report.outcome === 'no_new_data') return latest ? `云端暂无新数据 · 最新心率仍为 ${formatTime(latest)}` : '同步完成，云端暂无新数据';
@@ -152,31 +156,49 @@ const cancelSync = async () => {
 
 const setAutoSyncEnabled = (enabled: boolean) => {
   autoSyncEnabled.value = Boolean(enabled);
-  writeAutoSyncSettings({ enabled: autoSyncEnabled.value, intervalMinutes: 15 });
+  writeAutoSyncSettings({ enabled: autoSyncEnabled.value, intervalMinutes: autoSyncInterval.value });
+};
+
+const setAutoSyncInterval = (minutes: number) => {
+  autoSyncInterval.value = minutes;
+  writeAutoSyncSettings({ enabled: autoSyncEnabled.value, intervalMinutes: minutes });
 };
 
 const initialize = async () => {
-  if (initialized) return;
+  if (initialized) {
+    // Re-entry: tear down previously registered listeners before re-registering.
+    for (const unlisten of unlisteners.splice(0)) unlisten();
+  }
   initialized = true;
   if (isDesktop()) {
-    await backend.listen<SyncProgress>('sync://progress', (payload) => {
+    const unlistenProgress = await backend.listen<SyncProgress>('sync://progress', (payload) => {
       syncProgress.value = payload;
       syncMessage.value = payload.message;
     });
-    await backend.listen('tray://sync', () => {
+    if (typeof unlistenProgress === 'function') unlisteners.push(unlistenProgress);
+    const unlistenTray = await backend.listen('tray://sync', () => {
       void runSync('incremental');
     });
-    await backend.listen<LoginStatus>('login://status', applyLoginStatus);
+    if (typeof unlistenTray === 'function') unlisteners.push(unlistenTray);
+    const unlistenLogin = await backend.listen<LoginStatus>('login://status', applyLoginStatus);
+    if (typeof unlistenLogin === 'function') unlisteners.push(unlistenLogin);
     try {
       applyLoginStatus(await backend.getLoginStatus());
     } catch {
       // Login status is optional at startup.
     }
+    // Fixed 1-minute tick; interval changes take effect without rebuilding the timer.
     window.setInterval(() => {
+      autoSyncTickCount += 1;
       if (autoSyncEnabled.value && appStatus.value?.connection_state === 'connected') {
-        void runSync('incremental', undefined, { silent: true });
+        if (autoSyncTickCount >= autoSyncInterval.value) {
+          autoSyncTickCount = 0;
+          void runSync('incremental', undefined, { silent: true });
+        }
+      } else {
+        autoSyncTickCount = 0;
       }
-    }, AUTO_SYNC_INTERVAL_MS);
+    }, 60_000);
   }
   let status = await refreshStatus();
   if (status?.connection_state === 'configured' && isDesktop()) {
@@ -204,6 +226,7 @@ export const useSyncController = () => ({
   loginStatus: readonly(loginStatus),
   dataRevision: readonly(dataRevision),
   autoSyncEnabled: readonly(autoSyncEnabled),
+  autoSyncInterval: readonly(autoSyncInterval),
   isSyncing: computed(() => syncState.value === 'syncing'),
   canIncrementalSync: computed(() => appStatus.value?.connection_state === 'connected'),
   lastCloudSyncLabel: computed(() => {
@@ -216,5 +239,6 @@ export const useSyncController = () => ({
   runSync,
   cancelSync,
   setAutoSyncEnabled,
+  setAutoSyncInterval,
   markDataChanged,
 });

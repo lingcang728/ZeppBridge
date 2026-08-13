@@ -65,7 +65,7 @@ watch(dataRevision, () => void loadList());
         :compact="false"
       />
     </div>
-    <p v-if="sessions.length" class="footnote">{{ sessions.length }} 条记录 · {{ formatTime(sessions[0].start_time) }} 起</p>
+    <p v-if="sessions.length" class="footnote">{{ sessions.length }} 条记录 · {{ formatTime(sessions[sessions.length - 1].start_time) }} 起</p>
   </section>
 </template>
 
