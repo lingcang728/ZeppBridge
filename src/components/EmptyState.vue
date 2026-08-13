@@ -44,10 +44,10 @@ defineProps<{
   place-items: center;
   border-radius: 10px;
   color: var(--activity);
-  background: color-mix(in srgb, var(--activity) 12%, transparent);
+  background: var(--accent-soft);
 }
 .error-panel .state-mark {
   color: var(--warning);
-  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  background: var(--surface-raised);
 }
 </style>

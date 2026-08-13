@@ -1,6 +1,6 @@
 [package]
 name = "zeppbridge"
-version = "0.3.0"
+version = "0.4.0"
 description = "本地优先的 Zepp 健康数据桥"
 authors = ["ZeppBridge"]
 edition = "2021"
@@ -29,8 +29,6 @@ anyhow = "1.0"
 sha2 = "0.10"
 hex = "0.4"
 directories = "5.0"
-hudsucker = { version = "0.25.0", default-features = false, features = ["decoder", "rcgen-ca", "rustls-client"] }
-local-ip-address = "0.6.13"
 tracing = "0.1"
 base64 = "0.22"
 

@@ -71,41 +71,12 @@ export interface SyncProgress {
   message: string;
 }
 
-export interface CaptureSession {
-  state: string;
-  lan_ip: string;
-  lan_ips?: string[];
-  port: number;
-  certificate_path: string;
-  certificate_url: string;
-  started_at?: string;
-  message?: string;
-}
+export type LoginState = 'idle' | 'waiting' | 'extracting' | 'verifying' | 'connected' | 'failed';
 
-export interface CaptureDiagnostics {
-  stage: string;
-  guidance: string;
-  phone_connect_count: number;
-  zepp_connect_count: number;
-  zepp_tls_hello_count: number;
-  zepp_http_request_count: number;
-  token_seen: boolean;
-  user_id_seen: boolean;
-  last_zepp_host?: string;
-  last_activity_at?: string;
-}
-
-export interface CaptureStatus {
-  state: string;
-  session?: CaptureSession;
-  captured?: {
-    user_id: string;
-    region_host: string;
-  };
-  /** Optional only for compatibility with an older installed backend during rollout. */
-  diagnostics?: CaptureDiagnostics;
-  message?: string;
-  error?: string;
+export interface LoginStatus {
+  state: LoginState | string;
+  message: string;
+  page_url: string;
 }
 
 export interface SyncStreamResult {
@@ -189,11 +160,24 @@ export interface Workout {
 
 export type ExportDataType =
   | 'heart_rate'
-  | 'hrv'
-  | 'daily_activity'
   | 'sleep'
   | 'workouts'
+  | 'steps'
+  | 'spo2'
+  | 'stress'
+  | 'hrv'
+  | 'training_load'
+  | 'vo2max'
+  | 'daily_activity'
   | 'recovery';
+
+export interface DeviceProfile {
+  name?: string;
+  firmware?: string;
+  serial?: string;
+  device_id?: string;
+  timezone?: string;
+}
 
 export interface ExportSelection {
   startDate: string;

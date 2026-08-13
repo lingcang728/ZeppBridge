@@ -1,4 +1,4 @@
-use crate::{models, proxy, storage::StreamFreshness, sync};
+use crate::{models, storage::StreamFreshness, sync};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -42,53 +42,30 @@ pub struct AppStatus {
     pub storage: Option<crate::models::StorageEstimate>,
 }
 
-/// Details needed by a phone to connect to the local capture proxy.
+/// Web-login progress exposed to the frontend and the `login://status` event.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct CaptureSession {
+pub struct LoginStatus {
     pub state: String,
-    pub lan_ip: String,
-    pub lan_ips: Vec<String>,
-    pub port: u16,
-    pub certificate_path: String,
-    pub certificate_url: String,
-    pub started_at: Option<String>,
-    pub message: Option<String>,
+    pub message: String,
+    pub page_url: String,
 }
 
-/// Public capture status.  `CapturedSummary` deliberately contains no token.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct CaptureStatus {
-    pub state: String,
-    pub session: Option<CaptureSession>,
-    pub captured: Option<CapturedSummary>,
-    pub diagnostics: CaptureDiagnostics,
-    pub message: Option<String>,
-    pub error: Option<String>,
-}
+impl LoginStatus {
+    pub fn idle() -> Self {
+        Self {
+            state: "idle".to_string(),
+            message: String::new(),
+            page_url: String::new(),
+        }
+    }
 
-/// Safe, redacted progress information for the local capture proxy.
-///
-/// This deliberately contains only aggregate counters, booleans, and a
-/// hostname/timestamp.  It never contains a token, user identifier, client
-/// address, request path/query, headers, or body data.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct CaptureDiagnostics {
-    pub phone_connect_count: u64,
-    pub zepp_connect_count: u64,
-    pub zepp_tls_hello_count: u64,
-    pub zepp_http_request_count: u64,
-    pub token_seen: bool,
-    pub user_id_seen: bool,
-    pub last_zepp_host: Option<String>,
-    pub last_activity_at: Option<String>,
-    pub stage: String,
-    pub guidance: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct CapturedSummary {
-    pub user_id: String,
-    pub region_host: String,
+    pub fn new(state: &str, message: impl Into<String>, page_url: impl Into<String>) -> Self {
+        Self {
+            state: state.to_string(),
+            message: message.into(),
+            page_url: page_url.into(),
+        }
+    }
 }
 
 /// A stream result shaped for the TypeScript sync-report contract.
@@ -120,86 +97,6 @@ pub struct UiSyncReport {
 pub struct CleanupResult {
     pub days: i64,
     pub message: Option<String>,
-}
-
-/// Convert a proxy status into the values required to configure a phone.
-///
-/// A session is only returned when all required connection details are
-/// present.  `certificate_path` is the public `.cer` export; the private key
-/// and PEM path are intentionally not exposed through this view.
-pub fn capture_session_from(status: &proxy::ProxyStatus) -> Option<CaptureSession> {
-    Some(CaptureSession {
-        state: proxy_lifecycle_name(status.lifecycle).to_string(),
-        lan_ip: status.local_ipv4.first()?.clone(),
-        lan_ips: status.local_ipv4.clone(),
-        port: status.port?,
-        certificate_path: status.certificate_path.clone()?,
-        certificate_url: status.certificate_url.clone()?,
-        started_at: non_empty(status.updated_at.clone()),
-        message: status.error.clone(),
-    })
-}
-
-/// Convert internal proxy counters into safe, user-facing capture guidance.
-///
-/// The order is intentional: a complete capture wins first, followed by the
-/// earliest missing transport stage.  This keeps contradictory or stale
-/// token/user flags from exposing a later stage before its prerequisite
-/// connection evidence exists.
-pub fn capture_diagnostics_from(status: &proxy::ProxyStatus) -> CaptureDiagnostics {
-    let (stage, guidance) = if status.captured {
-        ("complete", "已捕获")
-    } else if status.phone_connect_count == 0 {
-        ("waiting_for_phone", "尚未收到手机代理连接")
-    } else if status.zepp_connect_count == 0 {
-        (
-            "waiting_for_zepp_api",
-            "手机已连接代理，但尚未出现 api-mifit 健康 API，请彻底关闭重开 Zepp 并打开首页/睡眠/运动刷新",
-        )
-    } else if status.zepp_tls_hello_count == 0 {
-        (
-            "tls_not_started",
-            "已看到 Zepp 目标域名，但 TLS 未进入握手，可能连接被提前关闭",
-        )
-    } else if status.zepp_http_request_count == 0 {
-        (
-            "tls_not_trusted",
-            "已看到 Zepp TLS 握手但无可解密请求，最常见是 Android 用户 CA 不被应用信任、iOS 未开启完全信任或证书固定",
-        )
-    } else if !status.token_seen {
-        (
-            "waiting_for_token",
-            "已解密 Zepp 请求但未见 apptoken，请切换健康页面刷新",
-        )
-    } else if !status.user_id_seen {
-        (
-            "waiting_for_user_id",
-            "已发现 token 但未识别用户 ID。只需在本页补填 Zepp 用户 ID（个人资料顶部，或 个人资料 → 反馈 / User Feedback），不要切到手动方式重填 token",
-        )
-    } else {
-        ("collecting", "正在收集 Zepp 数据")
-    };
-
-    CaptureDiagnostics {
-        phone_connect_count: status.phone_connect_count,
-        zepp_connect_count: status.zepp_connect_count,
-        zepp_tls_hello_count: status.zepp_tls_hello_count,
-        zepp_http_request_count: status.zepp_http_request_count,
-        token_seen: status.token_seen,
-        user_id_seen: status.user_id_seen,
-        last_zepp_host: status.last_zepp_host.clone(),
-        last_activity_at: status.last_activity_at.clone(),
-        stage: stage.to_string(),
-        guidance: guidance.to_string(),
-    }
-}
-
-/// Return a stable diagnostic payload for a completed stop operation.
-pub fn stopped_capture_diagnostics_from(status: &proxy::ProxyStatus) -> CaptureDiagnostics {
-    let mut diagnostics = capture_diagnostics_from(status);
-    diagnostics.stage = "stopped".to_string();
-    diagnostics.guidance = "捕获已停止".to_string();
-    diagnostics
 }
 
 /// Convert an internal sync report to the frontend report shape.
@@ -349,16 +246,6 @@ fn capability_reason(status: &models::DataStatus, capability_state: &str) -> Str
     }
 }
 
-fn proxy_lifecycle_name(lifecycle: proxy::ProxyLifecycle) -> &'static str {
-    match lifecycle {
-        proxy::ProxyLifecycle::Stopped => "stopped",
-        proxy::ProxyLifecycle::Starting => "starting",
-        proxy::ProxyLifecycle::Running => "running",
-        proxy::ProxyLifecycle::Stopping => "stopping",
-        proxy::ProxyLifecycle::Error => "error",
-    }
-}
-
 fn stream_status_name(status: sync::StreamStatus) -> &'static str {
     match status {
         sync::StreamStatus::Success => "success",
@@ -368,40 +255,16 @@ fn stream_status_name(status: sync::StreamStatus) -> &'static str {
     }
 }
 
-fn non_empty(value: String) -> Option<String> {
-    (!value.is_empty()).then_some(value)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn waiting_for_user_id_guidance_stays_on_this_page() {
-        let diagnostics = capture_diagnostics_from(&crate::proxy::ProxyStatus {
-            lifecycle: crate::proxy::ProxyLifecycle::Running,
-            running: true,
-            listen_address: None,
-            port: Some(8888),
-            local_ipv4: vec!["192.168.1.10".into()],
-            certificate_path: None,
-            certificate_pem_path: None,
-            certificate_url: None,
-            captured: false,
-            phone_connect_count: 1,
-            zepp_connect_count: 1,
-            zepp_tls_hello_count: 1,
-            zepp_http_request_count: 1,
-            token_seen: true,
-            user_id_seen: false,
-            last_zepp_host: None,
-            last_activity_at: None,
-            error: None,
-            firewall_warning: None,
-            certificate_trust_warning: None,
-            updated_at: String::new(),
-        });
-        assert_eq!(diagnostics.stage, "waiting_for_user_id");
-        assert!(diagnostics.guidance.contains("不要切到手动"));
+    fn login_status_serializes_required_fields() {
+        let status = LoginStatus::new("waiting", "请在弹出窗口完成登录", "https://watchface.zepp.com/");
+        let value = serde_json::to_value(&status).unwrap();
+        assert_eq!(value["state"], "waiting");
+        assert_eq!(value["message"], "请在弹出窗口完成登录");
+        assert_eq!(value["page_url"], "https://watchface.zepp.com/");
     }
 }

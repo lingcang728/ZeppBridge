@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
-import { listen } from '@tauri-apps/api/event';
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router';
+import BrandMark from './components/BrandMark.vue';
 import Icon from './components/Icon.vue';
 import { useSyncController } from './composables/useSyncController';
 import { useTheme, type ThemeMode } from './composables/useTheme';
-import { isTauri } from './composables/useTauriApi';
+import { backend, isDesktop } from './lib/bridge';
+
+const APP_VERSION = '0.4.0';
 
 const route = useRoute();
 const router = useRouter();
@@ -15,28 +17,30 @@ const themeControl = ref<HTMLElement | null>(null);
 const trayHint = ref(false);
 const {
   appStatus, statusError, syncState, syncMessage, syncProgress, isSyncing, canIncrementalSync,
-  captureActive, proxyRestored, initialize, runSync, cancelSync,
+  lastCloudSyncLabel, initialize, runSync, cancelSync,
 } = useSyncController();
 const { theme, themeLabel, initializeTheme, setTheme } = useTheme();
 
 const navigation = [
-  { to: '/', label: '概览', icon: 'activity' as const },
+  { to: '/', label: '概览', icon: 'grid' as const },
   { to: '/ai', label: '交给 AI', icon: 'spark' as const },
-  { to: '/settings', label: '设置', icon: 'sliders' as const },
+  { to: '/settings', label: '设置', icon: 'gear' as const },
 ];
-const themeOptions: { value: ThemeMode; label: string; icon: 'spark' | 'sun' | 'moon' }[] = [
-  { value: 'system', label: '跟随系统', icon: 'spark' },
+const themeOptions: { value: ThemeMode; label: string; icon: 'monitor' | 'sun' | 'moon' }[] = [
+  { value: 'system', label: '跟随系统', icon: 'monitor' },
   { value: 'light', label: '浅色', icon: 'sun' },
   { value: 'dark', label: '深色', icon: 'moon' },
 ];
 
 const pageTitle = computed(() => {
+  if (route.path === '/sleep') return '睡眠';
+  if (route.path === '/workouts') return '运动';
   if (route.path.startsWith('/sleep/')) return '睡眠详情';
   if (route.path.startsWith('/workouts/')) return '运动详情';
   return navigation.find((item) => item.to === route.path)?.label ?? '概览';
 });
 const statusLabel = computed(() => {
-  if (!isTauri()) return '浏览器预览';
+  if (!isDesktop()) return '请使用桌面应用';
   if (!appStatus.value) return '检查连接';
   if (appStatus.value.connection_state === 'needs_reauth') return '需要重新连接';
   if (appStatus.value.connection_state === 'connected') return '已连接';
@@ -49,7 +53,7 @@ const statusTone = computed(() => {
   if (appStatus.value?.connection_state === 'connected') return 'success';
   return 'neutral';
 });
-const browserPreview = computed(() => !isTauri());
+const browserPreview = computed(() => !isDesktop());
 const routeNotice = computed(() => route.query.notice === 'not-found');
 
 const chooseTheme = (mode: ThemeMode) => {
@@ -95,8 +99,8 @@ onMounted(() => {
       void router.replace({ path: route.path, query });
     }, 8000);
   }
-  if (isTauri()) {
-    void listen('app://hidden-to-tray', () => {
+  if (isDesktop()) {
+    void backend.listen('app://hidden-to-tray', () => {
       if (window.localStorage.getItem('zeppbridge-tray-hint') === '1') return;
       window.localStorage.setItem('zeppbridge-tray-hint', '1');
       trayHint.value = true;
@@ -116,15 +120,11 @@ onUnmounted(() => {
   <div class="app-shell">
     <aside class="sidebar" aria-label="主导航">
       <div class="brand-lockup">
-        <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
-        <div>
-          <span class="brand-name">ZeppBridge</span>
-          <span class="brand-version">本地数据桥梁</span>
-        </div>
+        <BrandMark />
+        <span class="brand-name">ZeppBridge</span>
       </div>
 
       <nav class="desktop-nav" aria-label="主导航">
-        <span class="nav-heading">工作区</span>
         <RouterLink
           v-for="item in navigation"
           :key="item.to"
@@ -140,9 +140,10 @@ onUnmounted(() => {
       </nav>
 
       <div class="sidebar-footer">
-        <div class="sidebar-rule"></div>
         <div class="local-note"><Icon name="shield" :size="15" /><span>数据只保存在本机</span></div>
-        <span class="app-version">v0.3.0 · 桌面版</span>
+        <p class="local-copy">ZeppBridge 不上云、不存储、不分析你的数据。所有数据仅保存在你的电脑上。</p>
+        <RouterLink class="more-link" to="/settings">了解更多 <Icon name="arrow-right" :size="12" /></RouterLink>
+        <span class="app-version">v{{ APP_VERSION }}</span>
       </div>
     </aside>
 
@@ -158,7 +159,10 @@ onUnmounted(() => {
         <div class="topbar-actions">
           <span v-if="statusError" class="sr-only" role="status">{{ statusError }}</span>
           <span :class="['connection-chip', `tone-${statusTone}`]" title="Zepp 云端连接状态" aria-live="polite">
-            <span class="status-dot" aria-hidden="true"></span>{{ statusLabel }}
+            <Icon name="link" :size="13" /><span>{{ statusLabel }}</span>
+          </span>
+          <span class="sync-chip" :title="lastCloudSyncLabel">
+            <Icon name="cloud" :size="13" /><span>{{ lastCloudSyncLabel }}</span><Icon name="info" :size="12" />
           </span>
           <button class="sync-button" type="button" :disabled="isSyncing || !canIncrementalSync" :title="canIncrementalSync ? syncMessage : '请先完成连接验证'" @click="runSync('incremental')">
             <Icon name="sync" :size="15" :class="{ spinning: isSyncing }" />
@@ -167,7 +171,7 @@ onUnmounted(() => {
           <button v-if="isSyncing" class="theme-trigger" type="button" @click="cancelSync">取消</button>
           <div ref="themeControl" class="theme-control">
             <button class="theme-trigger" type="button" aria-haspopup="menu" :aria-expanded="themeMenuOpen" @click="toggleThemeMenu">
-              <Icon :name="theme === 'dark' ? 'moon' : theme === 'light' ? 'sun' : 'spark'" :size="15" />
+              <Icon :name="theme === 'dark' ? 'moon' : theme === 'light' ? 'sun' : 'monitor'" :size="15" />
               <span>{{ themeLabel }}</span>
               <Icon name="chevron-down" :size="13" />
             </button>
@@ -188,14 +192,6 @@ onUnmounted(() => {
         <Icon :name="syncState === 'failed' ? 'warning' : syncState === 'updated' ? 'circle-check' : 'info'" :size="14" :class="{ spinning: isSyncing }" />
         <span>{{ syncMessage }}</span>
       </div>
-      <div v-if="captureActive && !route.path.startsWith('/settings')" class="sync-feedback tone-partial" role="status">
-        <Icon name="wifi" :size="14" />
-        <RouterLink to="/settings">正在连接手机 · 返回设置继续</RouterLink>
-      </div>
-      <div v-if="!proxyRestored && appStatus?.connection_state === 'connected'" class="sync-feedback tone-failed" role="alert">
-        <Icon name="warning" :size="14" />
-        <RouterLink to="/settings">请先把手机 Wi‑Fi 代理改回「无」</RouterLink>
-      </div>
       <div v-if="trayHint" class="sync-feedback" role="status">关闭窗口后 ZeppBridge 仍在托盘运行，可继续自动同步。</div>
 
       <div v-if="mobileMenuOpen" class="mobile-menu" aria-label="移动导航">
@@ -208,7 +204,7 @@ onUnmounted(() => {
 
       <div v-if="browserPreview" class="preview-banner" role="status">
         <Icon name="terminal" :size="16" />
-        <span>请从 ZeppBridge 桌面应用打开，浏览器预览不会读取账户数据。</span>
+        <span>请使用桌面应用。浏览器预览不会读取账户数据。</span>
       </div>
       <div v-if="routeNotice" class="route-notice" role="status">
         <Icon name="info" :size="16" />页面不存在，已返回概览。
@@ -220,6 +216,10 @@ onUnmounted(() => {
             <component :is="Component" />
           </Transition>
         </RouterView>
+        <footer class="content-footer">
+          <p><Icon name="shield" :size="13" />所有展示的数据均来自 Zepp 云端，已安全同步并仅保存在你的本机设备中。</p>
+          <RouterLink to="/settings">数据与隐私说明 <Icon name="arrow-right" :size="12" /></RouterLink>
+        </footer>
       </main>
 
       <nav class="bottom-nav" aria-label="移动主导航">
@@ -234,28 +234,34 @@ onUnmounted(() => {
 <style>
 :root {
   color-scheme: dark;
-  --bg: #000000;
-  --canvas: #1c1c1e;
-  --surface: #2c2c2e;
-  --surface-raised: #3a3a3c;
-  --ink: #ffffff;
-  --muted: #98989d;
-  --subtle: #636366;
-  --line: rgba(255, 255, 255, 0.12);
-  --line-strong: rgba(255, 255, 255, 0.2);
-  --accent: #0A84FF;
-  --accent-strong: #409CFF;
-  --accent-ink: #000000;
-  --heart: #FF453A;
-  --sleep: #5E5CE6;
-  --activity: #FF9F0A;
-  --danger: #FF453A;
-  --warning: #FFD60A;
-  --focus: #0A84FF;
-  --sleep-deep: #5856D6;
-  --sleep-light: #5E5CE6;
-  --sleep-rem: #AF52DE;
-  --sleep-awake: #FF9F0A;
+  --bg: #101214;
+  --sidebar: #0C0E11;
+  --canvas: #121418;
+  --surface: #181B21;
+  --surface-raised: #1C2027;
+  --ink: #E8EAED;
+  --muted: #8B919A;
+  --subtle: #5C636C;
+  --line: #2A2E36;
+  --line-strong: #3A4048;
+  --accent: #7DCEA0;
+  --accent-strong: #6BBF8E;
+  --accent-ink: #0C0E11;
+  --accent-soft: #163024;
+  --icon-mint: #A8E6C3;
+  --heart: #E88A8E;
+  --heart-wash: #2A1618;
+  --sleep: #9AA0E8;
+  --sleep-wash: #1A1C2E;
+  --activity: #8FCB9B;
+  --activity-wash: #15241C;
+  --danger: #E88A8E;
+  --warning: #D4A05A;
+  --focus: #7DCEA0;
+  --sleep-deep: #6B6FD4;
+  --sleep-light: #7E8AE8;
+  --sleep-rem: #B07AD4;
+  --sleep-awake: #D4A05A;
   --font-sans: 'Segoe UI Variable', 'Segoe UI', Geist, system-ui, -apple-system, sans-serif;
   --font-mono: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
   --space-1: 4px;
@@ -273,55 +279,66 @@ onUnmounted(() => {
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
     color-scheme: light;
-    --bg: #f2f2f7;
-    --canvas: #f2f2f7;
-    --surface: #ffffff;
-    --surface-raised: #f6f6fa;
-    --ink: #1c1c1e;
-    --muted: #6c6c70;
-    --subtle: #8e8e93;
-    --line: rgba(28, 28, 30, 0.1);
-    --line-strong: rgba(28, 28, 30, 0.18);
-    --accent: #007AFF;
-    --accent-strong: #0051D5;
-    --accent-ink: #ffffff;
-    --heart: #FF3B30;
-    --sleep: #5E5CE6;
-    --activity: #FF9500;
-    --danger: #FF3B30;
-    --warning: #FF9500;
-    --focus: #007AFF;
+    --bg: #F2F4F6;
+    --canvas: #F7F8FA;
+    --surface: #FFFFFF;
+    --surface-raised: #ECEFF2;
+    --ink: #14171C;
+    --muted: #5C636C;
+    --subtle: #8A9098;
+    --line: #D8DCE1;
+    --line-strong: #C5CBD2;
+    --accent: #5EAF82;
+    --accent-strong: #4E9A70;
+    --accent-ink: #0C0E11;
+    --accent-soft: #D7F6E5;
+    --icon-mint: #3E8A5E;
+    --heart: #C45F64;
+    --heart-wash: #F6E6E7;
+    --sleep: #6B72C8;
+    --sleep-wash: #E8E9F6;
+    --activity: #4E9A70;
+    --activity-wash: #E4F3EA;
+    --danger: #C45F64;
+    --warning: #B8842A;
+    --focus: #4E9A70;
     --sleep-deep: #5856D6;
     --sleep-light: #5E5CE6;
     --sleep-rem: #AF52DE;
-    --sleep-awake: #FF9500;
+    --sleep-awake: #C48A12;
   }
 }
 
 :root[data-theme='light'] {
   color-scheme: light;
-  --bg: #f2f2f7;
-  --canvas: #f2f2f7;
-  --surface: #ffffff;
-  --surface-raised: #f6f6fa;
-  --ink: #1c1c1e;
-  --muted: #6c6c70;
-  --subtle: #8e8e93;
-  --line: rgba(28, 28, 30, 0.1);
-  --line-strong: rgba(28, 28, 30, 0.18);
-  --accent: #007AFF;
-  --accent-strong: #0051D5;
-  --accent-ink: #ffffff;
-  --heart: #FF3B30;
-  --sleep: #5E5CE6;
-  --activity: #FF9500;
-  --danger: #FF3B30;
-  --warning: #FF9500;
-  --focus: #007AFF;
+  --bg: #F2F4F6;
+  --sidebar: #EEF0F3;
+  --canvas: #F7F8FA;
+  --surface: #FFFFFF;
+  --surface-raised: #ECEFF2;
+  --ink: #14171C;
+  --muted: #5C636C;
+  --subtle: #8A9098;
+  --line: #D8DCE1;
+  --line-strong: #C5CBD2;
+  --accent: #5EAF82;
+  --accent-strong: #4E9A70;
+  --accent-ink: #0C0E11;
+  --accent-soft: #D7F6E5;
+  --icon-mint: #3E8A5E;
+  --heart: #C45F64;
+  --heart-wash: #F6E6E7;
+  --sleep: #6B72C8;
+  --sleep-wash: #E8E9F6;
+  --activity: #4E9A70;
+  --activity-wash: #E4F3EA;
+  --danger: #C45F64;
+  --warning: #B8842A;
+  --focus: #4E9A70;
   --sleep-deep: #5856D6;
   --sleep-light: #5E5CE6;
   --sleep-rem: #AF52DE;
-  --sleep-awake: #FF9500;
+  --sleep-awake: #C48A12;
 }
 
 * { box-sizing: border-box; }
@@ -365,83 +382,135 @@ a { color: inherit; }
   transition: transform 150ms ease;
 }
 .skip-link:focus { transform: translateY(0); }
-.app-shell { display: flex; min-height: 100vh; background: var(--bg); }
+.app-shell { display: flex; min-height: 100vh; min-width: 0; background: var(--bg); }
+.app-shell > * { min-width: 0; }
 .sidebar {
-  width: 216px;
-  flex: 0 0 216px;
+  width: 228px;
+  flex: 0 0 228px;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  padding: 24px 12px 16px;
-  background: var(--bg);
+  min-width: 0;
+  padding: 24px 14px 18px;
+  background: var(--sidebar);
   border-right: 1px solid var(--line);
 }
-.brand-lockup { display: flex; align-items: center; gap: 10px; padding: 0 10px 28px; }
-.brand-mark { display: grid; grid-template-columns: repeat(3, 4px); align-items: end; gap: 2px; height: 18px; }
-.brand-mark span { display: block; width: 4px; border-radius: 2px; }
-.brand-mark span:nth-child(1) { height: 9px; background: var(--heart); opacity: .8; }
-.brand-mark span:nth-child(2) { height: 14px; background: var(--activity); }
-.brand-mark span:nth-child(3) { height: 18px; background: var(--sleep); opacity: .9; }
-.brand-name { display: block; font-size: 13px; font-weight: 700; letter-spacing: .02em; }
-.brand-version { display: block; margin-top: 1px; color: var(--muted); font-size: 10px; }
-.desktop-nav { display: grid; gap: 3px; }
-.nav-heading { padding: 0 12px 8px; color: var(--subtle); font-size: 10px; font-weight: 700; letter-spacing: .12em; }
+.brand-lockup { display: flex; align-items: center; gap: 10px; padding: 0 10px 28px; min-width: 0; }
+.brand-name { display: block; font-size: 15px; font-weight: 700; letter-spacing: .01em; }
+.more-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+  color: var(--icon-mint);
+  font-size: 12px;
+  text-decoration: none;
+}
+.desktop-nav { display: grid; gap: 4px; min-width: 0; }
 .nav-link {
   display: flex;
   min-height: 44px;
+  min-width: 0;
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  border-radius: 10px;
   color: var(--muted);
   font-size: 13px;
   text-decoration: none;
   transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
 }
-.nav-link:hover { color: var(--ink); background: var(--surface-raised); border-color: var(--line); }
+.nav-link:hover { color: var(--ink); background: var(--surface-raised); }
 .nav-link:active { transform: translateY(1px); }
+.nav-link svg { color: var(--subtle); }
 .nav-link.is-active {
-  color: var(--ink);
-  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
-  border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
-  box-shadow: inset 3px 0 0 var(--accent);
+  color: var(--icon-mint);
+  background: var(--accent-soft);
+  border-color: transparent;
 }
-.nav-link.is-active svg { color: var(--accent); }
-.sidebar-footer { margin-top: auto; padding: 0 10px; }
-.sidebar-rule { height: 1px; margin: 14px 0; background: var(--line); }
-.local-note { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; }
-.app-version { display: block; margin-top: 8px; color: var(--subtle); font-family: var(--font-mono); font-size: 10px; }
+.nav-link.is-active svg { color: var(--icon-mint); }
+.sidebar-footer { margin-top: auto; padding: 0 10px; min-width: 0; }
+.local-note { display: flex; align-items: center; gap: 7px; color: var(--accent); font-size: 12px; font-weight: 650; }
+.local-copy { margin: 8px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+.app-version { display: block; margin-top: 14px; color: var(--subtle); font-family: var(--font-mono); font-size: 11px; }
 .app-body { display: flex; min-width: 0; flex: 1; flex-direction: column; }
 .topbar {
   display: flex;
   height: 64px;
+  min-width: 0;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding: 0 28px;
   background: var(--canvas);
   border-bottom: 1px solid var(--line);
 }
-.topbar-leading, .topbar-actions { display: flex; align-items: center; gap: 12px; }
-.topbar-context { color: var(--muted); font-size: 13px; }
+.topbar-leading, .topbar-actions { display: flex; min-width: 0; align-items: center; gap: 10px; }
+.topbar-actions { flex-wrap: wrap; justify-content: flex-end; }
+.topbar-context { color: var(--ink); font-size: 15px; font-weight: 650; }
 .mobile-brand, .mobile-menu-button { display: none; }
-.connection-chip { display: inline-flex; min-height: 30px; align-items: center; gap: 7px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 12px; white-space: nowrap; }
-.connection-chip.tone-success { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
+.connection-chip, .sync-chip {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.connection-chip.tone-success { color: var(--icon-mint); border-color: #2A4B39; background: #141A16; }
+.content-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: min(100%, 1120px);
+  margin: 0 auto;
+  padding: 8px 32px 28px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.content-footer p { display: flex; align-items: center; gap: 6px; margin: 0; }
+.content-footer a { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); text-decoration: none; }
+.content-footer svg { color: var(--icon-mint); }
 .connection-chip.tone-warning { color: var(--warning); }
 .connection-chip.tone-danger { color: var(--danger); }
-.status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.sync-button, .theme-trigger { display: inline-flex; min-height: 38px; align-items: center; justify-content: center; gap: 7px; padding: 7px 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: transparent; color: var(--ink); font-size: 12px; cursor: pointer; }
-.sync-button { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); color: var(--accent); }
-.sync-button:hover:not(:disabled), .theme-trigger:hover { background: var(--surface); border-color: var(--line-strong); }
-.sync-button:disabled { color: var(--subtle); cursor: not-allowed; opacity: .65; }
+.sync-button, .theme-trigger {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12px;
+  cursor: pointer;
+}
+.sync-button {
+  border: 0;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+.sync-button:hover:not(:disabled) { background: var(--accent-strong); }
+.theme-trigger:hover { background: var(--surface-raised); border-color: var(--line-strong); }
+.sync-button:disabled { color: var(--subtle); background: var(--surface-raised); cursor: not-allowed; opacity: .7; }
 .theme-control { position: relative; display: inline-flex; color: var(--muted); }
 .theme-trigger { min-width: 112px; justify-content: flex-start; color: var(--muted); }
 .theme-trigger span { flex: 1; color: var(--ink); text-align: left; }
-.theme-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 40; width: 156px; padding: 5px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); box-shadow: 0 14px 35px rgba(0, 0, 0, .26); }
+.theme-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 40; width: 156px; padding: 5px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); box-shadow: 0 14px 35px #00000042; }
 .theme-menu button { display: flex; width: 100%; min-height: 38px; align-items: center; gap: 9px; padding: 7px 9px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 12px; text-align: left; cursor: pointer; }
 .theme-menu button span { flex: 1; color: var(--ink); }
-.theme-menu button:hover, .theme-menu button[aria-checked='true'] { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); color: var(--accent); }
-.sync-feedback { display: flex; min-height: 34px; align-items: center; gap: 7px; padding: 7px 28px; border-bottom: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 11px; }
+.theme-menu button:hover, .theme-menu button[aria-checked='true'] { background: var(--accent-soft); color: var(--accent); }
+.sync-feedback { display: flex; min-height: 34px; min-width: 0; align-items: center; gap: 7px; padding: 7px 28px; border-bottom: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 11px; }
 .sync-feedback.tone-updated { color: var(--accent); }
 .sync-feedback.tone-partial { color: var(--warning); }
 .sync-feedback.tone-no_new_data { color: var(--muted); }
@@ -450,9 +519,9 @@ a { color: inherit; }
 .spinning { animation: spin 900ms linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .preview-banner, .route-notice { display: flex; align-items: center; gap: 8px; padding: 9px 28px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
-.preview-banner { background: color-mix(in srgb, var(--accent) 7%, var(--canvas)); }
+.preview-banner { background: var(--accent-soft); }
 .preview-banner svg { color: var(--accent); }
-.route-notice { background: color-mix(in srgb, var(--warning) 7%, var(--canvas)); color: var(--warning); }
+.route-notice { background: var(--surface); color: var(--warning); }
 .main-content { width: 100%; min-width: 0; flex: 1; background: var(--canvas); }
 .bottom-nav, .mobile-menu { display: none; }
 .page-enter-active, .page-leave-active { transition: opacity 150ms ease, transform 150ms ease; }
@@ -469,9 +538,8 @@ a { color: inherit; }
   .mobile-brand { display: inline; font-size: 13px; font-weight: 700; }
   .topbar-context { padding-left: 4px; border-left: 1px solid var(--line); font-size: 12px; }
   .topbar-actions { gap: 6px; }
-  .connection-chip { padding-inline: 8px; }
-  .connection-chip { font-size: 0; }
-  .connection-chip .status-dot { width: 7px; height: 7px; }
+  .connection-chip, .sync-chip { padding-inline: 8px; }
+  .connection-chip span, .sync-chip span { display: none; }
   .sync-button, .theme-trigger { width: 38px; min-width: 38px; padding: 0; }
   .sync-button span, .theme-trigger span, .theme-trigger > svg:last-child { display: none; }
   .theme-menu { right: 0; }
@@ -482,24 +550,24 @@ a { color: inherit; }
   .mobile-menu-links { display: grid; gap: 3px; }
   .preview-banner, .route-notice { padding-inline: 16px; }
   .main-content { padding-bottom: 64px; }
-  .bottom-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: grid; grid-template-columns: repeat(3, 1fr); height: 60px; padding: 5px 8px calc(5px + env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--canvas) 94%, transparent); border-top: 1px solid var(--line); backdrop-filter: blur(12px); }
-  .bottom-nav-link { display: flex; min-width: 44px; min-height: 44px; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-radius: var(--radius-sm); color: var(--muted); font-size: 10px; text-decoration: none; }
-  .bottom-nav-link.is-active { color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .bottom-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); height: 60px; padding: 5px 8px calc(5px + env(safe-area-inset-bottom)); background: var(--canvas); border-top: 1px solid var(--line); }
+  .bottom-nav-link { display: flex; min-width: 0; min-height: 44px; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-radius: var(--radius-sm); color: var(--muted); font-size: 10px; text-decoration: none; }
+  .bottom-nav-link.is-active { color: var(--accent); background: var(--accent-soft); }
 }
 
-.page { width: min(100%, 840px); margin: 0 auto; padding: 32px 32px 64px; }
-.page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 22px; }
+.page { width: min(100%, 1120px); min-width: 0; margin: 0 auto; padding: 24px 32px 20px; }
+.page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 22px; min-width: 0; }
 .eyebrow { margin: 0 0 6px; color: var(--muted); font-size: 11px; font-weight: 650; letter-spacing: .06em; }
 h1, h2, p { margin-top: 0; }
-.page h1 { margin-bottom: 8px; font-size: clamp(28px, 4vw, 36px); font-weight: 650; letter-spacing: -.04em; line-height: 1.12; }
+.page h1 { margin-bottom: 8px; font-size: clamp(24px, 3vw, 30px); font-weight: 650; letter-spacing: -.04em; line-height: 1.12; }
 .page-intro { max-width: 56ch; margin-bottom: 0; color: var(--muted); font-size: 14px; }
 .button { display: inline-flex; min-height: 40px; align-items: center; justify-content: center; gap: 7px; padding: 8px 13px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; font-size: 13px; font-weight: 650; text-decoration: none; cursor: pointer; }
 .button:disabled { opacity: .5; cursor: not-allowed; }
 .button-primary, .button.primary { background: var(--accent); color: var(--accent-ink); }
 .button-secondary, .button.secondary, .button-quiet, .button.quiet { border-color: var(--line); color: var(--muted); }
 .button-secondary:hover:not(:disabled), .button.secondary:hover:not(:disabled), .button-quiet:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-.button-danger, .button.danger-button { border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); color: var(--danger); }
-.surface-card { border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); overflow: hidden; }
+.button-danger, .button.danger-button { border-color: #7A3034; color: var(--danger); }
+.surface-card { border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); overflow: hidden; min-width: 0; }
 .section-label { margin: 0 0 8px; padding: 0 2px; color: var(--muted); font-size: 13px; font-weight: 650; }
 @media (max-width: 760px) {
   .page { padding: 24px 16px 38px; }

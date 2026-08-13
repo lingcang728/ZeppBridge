@@ -1,11 +1,12 @@
 {
   "name": "zeppbridge",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
+    "build:web": "vite build",
     "preview": "vite preview",
     "tauri": "tauri"
   },
@@ -14,7 +15,6 @@
     "@tauri-apps/plugin-dialog": "^2.7.2",
     "@tauri-apps/plugin-opener": "^2",
     "echarts": "^5.5.1",
-    "qrcode.vue": "^3.10.0",
     "vue": "^3.5.13",
     "vue-echarts": "^7.0.3",
     "vue-router": "^4.5.0"

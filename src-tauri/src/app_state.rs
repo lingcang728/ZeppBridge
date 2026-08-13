@@ -1,14 +1,30 @@
 use crate::auth::AuthManager;
 use crate::connectors::ZeppConnector;
 use crate::fetcher::DataFetcher;
+use crate::ipc_types::LoginStatus;
 use crate::models::{error::Result, AuthInfo, ZeppBridgeError};
-use crate::proxy::{ProxyServer, DEFAULT_PROXY_PORT};
 use crate::storage::Database;
 use crate::sync::SyncManager;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
+
+/// In-process web-login session.  The epoch is incremented to cancel a
+/// running poll without holding a task join handle across commands.
+pub(crate) struct LoginSession {
+    pub(crate) status: Arc<RwLock<LoginStatus>>,
+    pub(crate) epoch: Arc<AtomicU64>,
+}
+
+impl LoginSession {
+    fn new() -> Self {
+        Self {
+            status: Arc::new(RwLock::new(LoginStatus::idle())),
+            epoch: Arc::new(AtomicU64::new(0)),
+        }
+    }
+}
 
 const LEGACY_SQLITE_FILES: [&str; 3] = ["zepp.db", "zepp.db-wal", "zepp.db-shm"];
 const AUTH_FILE: &str = "auth.json";
@@ -25,7 +41,7 @@ pub struct AppState {
     pub(crate) auth: Arc<AuthManager>,
     pub(crate) sync: Arc<RwLock<Option<Arc<SyncManager>>>>,
     pub(crate) sync_command_lock: Arc<Mutex<()>>,
-    pub(crate) proxy: Arc<RwLock<Arc<ProxyServer>>>,
+    pub(crate) login: LoginSession,
     pub(crate) auth_state: Arc<RwLock<String>>,
     pub(crate) startup_warning: Arc<RwLock<Option<String>>>,
 }
@@ -68,15 +84,13 @@ impl AppState {
             auth_warning,
         );
 
-        let proxy = ProxyServer::with_data_dir(DEFAULT_PROXY_PORT, data_dir.clone());
-
         Ok(Self {
             data_dir,
             db: Arc::new(Mutex::new(db)),
             auth,
             sync: Arc::new(RwLock::new(sync_manager)),
             sync_command_lock: Arc::new(Mutex::new(())),
-            proxy: Arc::new(RwLock::new(Arc::new(proxy))),
+            login: LoginSession::new(),
             auth_state: Arc::new(RwLock::new(auth_state)),
             startup_warning: Arc::new(RwLock::new(startup_warning)),
         })

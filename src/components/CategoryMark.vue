@@ -4,7 +4,7 @@ import type { HealthCategory } from '../lib/format';
 
 withDefaults(defineProps<{
   category: HealthCategory;
-  icon: 'heart' | 'moon' | 'steps' | 'spark' | 'activity';
+  icon: 'heart' | 'moon' | 'steps' | 'spark' | 'activity' | 'run';
   size?: number;
 }>(), { size: 18 });
 </script>

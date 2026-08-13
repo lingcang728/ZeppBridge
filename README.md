@@ -1,8 +1,8 @@
 <div align="center">
-  <img src="src-tauri/icons/icon.png" width="112" height="112" alt="ZeppBridge icon">
+  <img src="src-tauri/icons/icon.png" width="96" height="96" alt="ZeppBridge">
   <h1>ZeppBridge</h1>
-  <p><strong>把你的 Zepp 穿戴设备健康数据，同步到你自己的 Windows 电脑。</strong></p>
-  <p>Local-first desktop bridge for syncing, exploring, and exporting Zepp wearable health data.</p>
+  <p><strong>把 Zepp 穿戴设备的健康数据，同步到你自己的 Windows 电脑。</strong></p>
+  <p>Local-first desktop bridge for Zepp / Amazfit health data.</p>
 
   [![CI](https://github.com/lingcang728/ZeppBridge/actions/workflows/ci.yml/badge.svg)](https://github.com/lingcang728/ZeppBridge/actions/workflows/ci.yml)
   [![License: MIT](https://img.shields.io/github/license/lingcang728/ZeppBridge?color=69b48b)](LICENSE)
@@ -11,55 +11,59 @@
 </div>
 
 > [!IMPORTANT]
-> ZeppBridge 是独立的非官方开源项目，与 Zepp Health、Huami、Amazfit 无隶属或背书关系。它只应用于你本人有权访问的账号和数据。
+> ZeppBridge 是独立的非官方开源项目，与 Zepp Health、Huami、Amazfit 无隶属或背书关系。只用于你本人有权访问的账号和数据。
 
-## 为什么做 ZeppBridge
+## 它做什么
 
-Zepp App 擅长在手机上展示健康数据，但个人很难长期保留、统一查看或交给本地工具进一步分析。ZeppBridge 提供一条透明的本地数据链路：从用户授权的 Zepp 区域服务读取数据，标准化后保存到本机 SQLite，再通过桌面界面和 JSON 导出使用。
+Zepp 手机 App 把数据放在区域云端。ZeppBridge 在电脑上登录你的账号，把心率、睡眠、运动等记录拉到本机 SQLite，用桌面界面核对，再按需导出 JSON 交给你自己的 AI 或备份工具。
 
-- **本地优先**：健康数据库保存在你的电脑，不上传到 ZeppBridge 自建服务器。
-- **同步状态可信**：云端拉取时间与健康样本时间分开显示；没有新样本时不会伪装成“数据已更新”。
-- **概览核对 + 交给 AI**：概览确认数据已到本机；分析请到「交给 AI」复制或导出 JSON。睡眠和运动单条详情仍可从最近记录进入。
-- **来源不造假**：保留 `user_fused`、`device`、`unknown` 来源，不擅自合并多设备记录。
-- **可导出**：按日期和类型导出结构化 JSON，便于备份或交给你选择的本地 AI 工具。
-- **关窗口不停**：关闭主窗口会留在托盘，自动同步继续；托盘菜单可打开、立即同步或退出。
+- **电脑直接读云**：设置里点「连接」，在弹出的官方登录页登入。不装证书，不改 Wi-Fi 代理。
+- **数据只在本机**：没有 ZeppBridge 自建云，也没有产品遥测。token 进 Windows Credential Manager。
+- **不编造**：没有样本就不画曲线；没有设备信息就写「未提供」；云端拉取时间和健康样本时间分开显示。
+- **分析外置**：应用不做解读。到「交给 AI」复制或保存标准化 JSON。
+- **关窗口不停**：主窗口关掉后留在托盘，自动同步可以继续。
+
+## 0.4.0 这一版
+
+- 删掉旧的手机证书 / 局域网代理捕获。
+- 应用内打开 `watchface.zepp.com` 官方登录，抽出账号后再同步。
+- 界面按桌面参考图重做：概览、交给 AI、设置、睡眠/运动详情与列表。
+- 同步时尝试读取绑定设备（名称、固件、序列号），详情页如实展示。
 
 ## 当前能力
 
-| 领域 | 已支持 |
+| 领域 | 说明 |
 | --- | --- |
-| 同步 | 日常增量 7 天；历史补拉 1–365 天（默认 30，上限一年）；启动同步；托盘驻留时每 15 分钟检查；可取消 |
-| 健康数据 | 心率、静息心率、HRV、睡眠、血氧、压力、步数、运动、训练负荷、VO₂max 等已识别字段 |
-| 详情 | 概览最近记录可进睡眠/运动详情；阶段比例、距离、热量、心率等只展示已同步字段 |
-| 数据管理 | SQLite 去重、来源追踪、用户自选 1–365 天保留（默认 365）、旧数据清理、本地重新解析 |
-| 隐私 | Windows Credential Manager 保存 token；前端状态与导出不返回 token；无产品遥测 |
-| 外观 | 跟随系统、浅色、深色；概览 / 交给 AI / 设置三栏；键盘可操作；760px 起的桌面响应式布局 |
+| 连接 | 官方网页登录；token 过期后再点一次「连接」 |
+| 同步 | 增量约 7 天；历史补拉 1–365 天（默认 30）；托盘驻留时约 15 分钟检查；可取消 |
+| 数据 | 心率、静息心率、HRV、睡眠、步数、运动、训练负荷、VO₂max 等已识别字段 |
+| 界面 | 概览仪表盘、睡眠/运动列表与详情、交给 AI（9 种类型勾选）、设置 |
+| 导出 | 复制 JSON、保存文件、更新本机 `exports/zeppbridge-ai-feed.json` |
+| 保留 | 本地 1–365 天（默认 365）；可清理过期记录、重解析、打开数据文件夹 |
 
-没有真实逐点采样、路线或完整阶段时间轴时，ZeppBridge 不绘制模拟曲线、估算地图或虚构健康值。
+没有真实逐点采样或 GPS 时，不画模拟地图和空曲线。
 
-## 工作方式
+## 怎么工作
 
-```mermaid
-flowchart LR
-    A["Zepp 设备与手机"] --> B["Zepp 区域云端"]
-    B --> C["Rust 同步与标准化"]
-    C --> D["本机 SQLite"]
-    D --> E["Vue 桌面界面"]
-    D --> F["JSON 导出"]
+```text
+手表  →  官方 Zepp App  →  Zepp 区域云
+                              ↓
+                    ZeppBridge 桌面应用
+                              ↓
+                    本机 SQLite + 界面 + JSON
 ```
 
-手机代理只用于首次取得你自己的认证信息。认证保存成功后，日常同步由电脑直接访问所配置的 Zepp 区域服务，不需要每次重新验证，也不需要长期保持手机代理。
+手表仍由官方 App 同步到云。电脑只读云，不依赖手机一直开着代理。
 
 ## 系统要求
 
 - Windows 10 或 Windows 11（x64）
-- 一个可正常登录的 Zepp 账号
-- 首次连接时，手机与电脑处于同一可信局域网
-- 开发构建需要 Node.js 20+、Rust stable 与 WebView2
+- 能在网页上登录的 Zepp 账号
+- 开发构建：Node.js 20+、Rust stable、WebView2
 
 ## 安装
 
-项目目前处于早期公开阶段，安装包尚未签名。为避免让用户习惯性忽略 SmartScreen 警告，正式签名发布前建议从源码构建：
+安装包尚未签名。正式签名前建议从源码构建：
 
 ```powershell
 git clone git@github.com:lingcang728/ZeppBridge.git
@@ -68,27 +72,30 @@ npm ci
 npm run tauri build
 ```
 
-编译缓存仍在本机 Cargo target（当前是 `G:\build_cache\cargo-target`）。给你用的安装包会复制到项目里的 `release\`，删这个文件夹即可清掉安装包。详细环境和门禁见 [开发文档](docs/development/development.md)。
+构建出的安装包会复制到仓库里的 `release\`。日常开发用：
+
+```powershell
+npm ci
+npm run tauri dev
+```
 
 ## 第一次连接
 
-1. 启动 ZeppBridge，进入“设置”。
-2. 让手机和电脑连接同一个可信 Wi-Fi，点击“开始捕获”。
-3. 按页面提示在手机安装临时 CA、设置 Wi-Fi HTTP 代理，然后打开 Zepp 刷新一次数据。
-4. 捕获并验证成功后恢复手机为“无代理”，在电脑端停止捕获。
-5. 以后直接点击顶栏“立即同步”，不需要重复认证。
+1. 打开 ZeppBridge，进入「设置」。
+2. 点「连接」，在弹出窗口登录 Zepp 账号。
+3. 显示「已连接」后窗口会关。本机没有数据时会自动同步一次。
+4. 之后用顶栏「立即同步」即可。
 
-Android、厂商 ROM 或 Zepp 的证书固定策略可能拒绝用户 CA；内置捕获不是兼容性保证。请勿通过 root、破解或 patch 绕过系统或应用的安全机制。完整步骤与回退边界见 [连接指南](docs/guides/connection.md)。
+不要把登录窗截图、token 或完整请求发到公开渠道。细节见 [连接指南](docs/guides/connection.md)。
 
-## 隐私与安全
+## 隐私
 
-- ZeppBridge 不收集产品遥测，也没有自建健康数据云端。
-- 同步时仍会连接你授权的 Zepp 区域服务，因此它不是离线应用。
-- token 保存在 Windows Credential Manager；`auth.json` 只保存用户 ID、区域主机与更新时间等元数据。
-- 健康数据库目前是本机明文 SQLite。共享电脑上请使用独立 Windows 账户，并妥善保护设备。
-- 不要把 token、数据库、原始响应、证书私钥或未脱敏日志提交到 issue。
+- 同步时会访问你授权的 Zepp 区域服务，所以这不是离线软件。
+- `auth.json` 只留用户 ID、区域主机等元数据，不含 token。
+- 健康库目前是本机明文 SQLite。共用电脑请用独立 Windows 账户。
+- Issue 里不要贴 token、数据库、原始响应或未脱敏日志。
 
-更完整的数据流、证书生命周期与清理范围见 [安全与隐私](docs/reference/security-and-privacy.md)。如发现安全问题，请优先使用 GitHub 的私密漏洞报告，不要公开披露凭据或个人健康数据。
+更多见 [安全与隐私](docs/reference/security-and-privacy.md)。安全问题请走 GitHub 私密漏洞报告。
 
 ## 开发
 
@@ -97,43 +104,22 @@ npm ci
 npm run build
 npm run tauri dev
 
-cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
-cargo check --manifest-path src-tauri/Cargo.toml --locked --all-targets
-cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml --locked --jobs 1
 ```
 
-项目结构：
-
 ```text
-src/                         Vue 3 页面、路由和同步控制器
-src-tauri/src/               Rust 认证、连接器、同步、标准化与存储
-src-tauri/icons/             图标母版与平台图标
-src-tauri/tauri.conf.json    Tauri 窗口、安全和打包配置
-docs/                        使用、架构、安全与开发文档
-scripts/windows/             Windows 开发和打包辅助脚本
+src/                 Vue 界面、路由、本机/桌面适配
+src-tauri/src/       登录、同步、标准化、SQLite
+docs/                连接、架构、安全、开发说明
 ```
-
-长期维护文档按用途放在 `docs/`：
 
 - [连接指南](docs/guides/connection.md)
 - [架构摘要](docs/reference/architecture.md)
 - [安全与隐私](docs/reference/security-and-privacy.md)
 - [开发与门禁](docs/development/development.md)
-- [UI 设计约束](docs/development/ui-guidelines.md)
 
-贡献前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。涉及 Zepp 响应的测试数据必须先脱敏并尽量缩减为合成 fixture；不要提交真实 token、用户 ID、设备 ID 或完整健康记录。
-
-## 路线图
-
-- [ ] 更多账号、区域和设备的脱敏兼容性测试
-- [ ] 真实 GPS/逐点训练数据的可选详情展示
-- [ ] 数据库加密与更完善的本地备份体验
-- [ ] 代码签名、SBOM、自动更新与可验证的公开安装包
-- [ ] 在稳定的数据契约之上评估本地 REST / MCP 接口
-
-路线图描述方向，不构成完成承诺。当前实现状态以代码、测试和公开 CI 为准。
+涉及 Zepp 响应的测试数据必须脱敏或改成合成 fixture。不要提交真实 token、用户 ID 或完整健康记录。
 
 ## 许可证
 
-ZeppBridge 使用 [MIT License](LICENSE)。名称 Zepp、Amazfit 及相关商标属于各自权利人。
+[MIT License](LICENSE)。Zepp、Amazfit 及相关商标属于各自权利人。

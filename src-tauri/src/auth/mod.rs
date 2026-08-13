@@ -227,6 +227,17 @@ impl AuthManager {
         }))
     }
 
+    /// Look up a previously stored token by user id.  The token is never
+    /// logged and the caller must not send it to the frontend.
+    #[allow(dead_code)]
+    pub fn token_for_user(&self, user_id: &str) -> Result<Option<String>> {
+        let user_id = validate_user_id(user_id)?;
+        match self.credentials.get(&user_id).map_err(credential_error)? {
+            Some(value) => Ok(Some(validate_token(&value)?)),
+            None => Ok(None),
+        }
+    }
+
     /// Returns status without exposing the token.  The optional masked value
     /// is deliberately short and suitable for a settings screen.
     pub fn status(&self) -> Result<AuthStatus> {
@@ -514,6 +525,11 @@ mod tests {
         assert_eq!(loaded.app_token, "secret-token");
         assert_eq!(loaded.region_host, "https://api-mifit.zepp.com");
         assert_eq!(manager.masked_token().unwrap().as_deref(), Some("se…en"));
+        assert_eq!(
+            manager.token_for_user("user-1").unwrap().as_deref(),
+            Some("secret-token")
+        );
+        assert_eq!(manager.token_for_user("other-user").unwrap(), None);
 
         manager.clear_auth().unwrap();
         assert!(!dir.join("auth.json").exists());

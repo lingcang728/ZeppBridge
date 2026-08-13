@@ -93,25 +93,7 @@ pub async fn verify_auth(
         Err(error) => return verify_failure(&state, error).await,
     };
 
-    let connector = match ZeppConnector::new(auth.clone()) {
-        Ok(connector) => connector,
-        Err(error) => return verify_failure(&state, error).await,
-    };
-
-    // The request is intentionally made without holding any application state
-    // lock.  Zepp's heart-rate endpoint uses Unix timestamps in seconds,
-    // matching the fetcher pipeline's existing request contract.
-    let end = Utc::now();
-    let start = end - Duration::hours(2);
-    let payload = match connector
-        .fetch_heart_rate(start.timestamp(), end.timestamp())
-        .await
-    {
-        Ok(payload) => payload,
-        Err(error) => return verify_failure(&state, error).await,
-    };
-
-    if let Err(error) = validate_verify_payload(&payload) {
+    if let Err(error) = verify_recent_heart_rate(&auth).await {
         return verify_failure(&state, error).await;
     }
 
@@ -136,20 +118,18 @@ pub async fn verify_auth(
     build_app_status(&state).await
 }
 
-/// Stop the local capture proxy, remove credentials, and reset only the
-/// in-memory authentication/sync state.  The SQLite database is intentionally
-/// retained so clearing an account cannot erase historical health data.
+/// Remove credentials and reset only the in-memory authentication/sync
+/// state.  The SQLite database is intentionally retained so clearing an
+/// account cannot erase historical health data.
 #[tauri::command]
 pub async fn clear_auth(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<AppStatus, String> {
-    // Clone the proxy handle before awaiting stop so the RwLock guard never
-    // spans the asynchronous shutdown operation.
-    let proxy = { state.proxy.read().await.clone() };
-    proxy
-        .stop()
-        .await
-        .map_err(|error| format!("清理认证前停止代理失败：{error}"))?;
+    state.login.epoch.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    {
+        let mut login = state.login.status.write().await;
+        *login = crate::ipc_types::LoginStatus::idle();
+    }
 
     state.auth.clear_auth().map_err(|error| error.to_string())?;
 
@@ -169,11 +149,25 @@ pub async fn clear_auth(
     build_app_status(&state).await
 }
 
+/// Verify a credential with the same bounded recent heart-rate query used by
+/// `verify_auth`.  The request is made without holding application locks.
+pub(crate) async fn verify_recent_heart_rate(
+    auth: &AuthInfo,
+) -> std::result::Result<(), ZeppBridgeError> {
+    let connector = ZeppConnector::new(auth.clone())?;
+    let end = Utc::now();
+    let start = end - Duration::hours(2);
+    let payload = connector
+        .fetch_heart_rate(start.timestamp(), end.timestamp())
+        .await?;
+    validate_verify_payload(&payload)
+}
+
 /// Validate only the response shape needed to establish authentication.  An
 /// object/array may legitimately be empty (no recent samples), while an
 /// object carrying a response code must explicitly report a known success
 /// value.
-fn validate_verify_payload(value: &Value) -> std::result::Result<(), ZeppBridgeError> {
+pub(crate) fn validate_verify_payload(value: &Value) -> std::result::Result<(), ZeppBridgeError> {
     let object = match value {
         Value::Array(_) => return Ok(()),
         Value::Object(object) => object,

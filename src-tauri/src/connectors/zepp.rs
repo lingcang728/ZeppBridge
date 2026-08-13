@@ -277,6 +277,18 @@ impl ZeppConnector {
         })
     }
 
+    pub async fn fetch_devices(&self) -> Result<Value> {
+        let path = format!("/users/{}/devices", self.auth.user_id);
+        self.get_json(
+            &path,
+            vec![
+                ("enableMultiDevice", "true".into()),
+                ("device_type", "android_phone".into()),
+            ],
+        )
+        .await
+    }
+
     /// Real Zepp endpoint: `/users/{id}/heartRate`.
     pub async fn fetch_heart_rate(
         &self,

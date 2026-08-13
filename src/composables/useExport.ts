@@ -6,14 +6,15 @@ import type { ExportDataType, ExportResult, ExportSelection } from '../types';
 
 export const exportTypeOptions: { value: ExportDataType; label: string }[] = [
   { value: 'heart_rate', label: '心率' },
-  { value: 'hrv', label: 'HRV' },
-  { value: 'daily_activity', label: '日常活动' },
   { value: 'sleep', label: '睡眠' },
   { value: 'workouts', label: '运动' },
-  { value: 'recovery', label: '恢复指标' },
+  { value: 'steps', label: '步数' },
+  { value: 'spo2', label: '血氧' },
+  { value: 'stress', label: '压力' },
+  { value: 'hrv', label: 'HRV' },
+  { value: 'training_load', label: '训练负荷' },
+  { value: 'vo2max', label: 'VO₂max' },
 ];
-
-const allTypes = exportTypeOptions.map((option) => option.value);
 
 const rangeFromToday = (days: number): { start: string; end: string } => {
   const end = new Date();
@@ -26,7 +27,13 @@ export const useExport = () => {
   const initial = rangeFromToday(7);
   const exportStartDate = ref(initial.start);
   const exportEndDate = ref(initial.end);
-  const exportDataTypes = ref<ExportDataType[]>([...allTypes]);
+  const exportDataTypes = ref<ExportDataType[]>([
+    'heart_rate',
+    'sleep',
+    'workouts',
+    'steps',
+    'spo2',
+  ]);
   const exportBusy = ref<'copy' | 'save' | 'publish' | null>(null);
   const exportError = ref<string | null>(null);
   const exportMessage = ref<string | null>(null);

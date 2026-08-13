@@ -1,8 +1,9 @@
 use crate::app_state::AppState;
 use crate::ipc_types::CleanupResult;
+use crate::connectors::ZeppConnector;
 use crate::models::{
-    DailyPoint, ExportResult, ExportSelection, HealthOverview, HeartRatePoint, SleepSession,
-    StorageEstimate, UserPrefs, Workout,
+    DailyPoint, DeviceProfile, ExportResult, ExportSelection, HealthOverview, HeartRatePoint,
+    SleepSession, StorageEstimate, UserPrefs, Workout,
 };
 use chrono::Utc;
 use std::path::PathBuf;
@@ -225,6 +226,80 @@ async fn write_export(
     })
 }
 
+#[tauri::command]
+pub async fn get_device_profile(
+    state: tauri::State<'_, AppState>,
+) -> std::result::Result<DeviceProfile, String> {
+    Ok(read_device_profile(&state.data_dir))
+}
+
+pub(crate) async fn refresh_device_profile(state: &AppState) {
+    let Ok(Some(auth)) = state.auth.load_auth() else {
+        return;
+    };
+    let Ok(connector) = ZeppConnector::new(auth) else {
+        return;
+    };
+    let Ok(payload) = connector.fetch_devices().await else {
+        return;
+    };
+    let profile = parse_device_profile(&payload);
+    if profile == DeviceProfile::default() {
+        return;
+    }
+    let path = state.data_dir.join("device.json");
+    if let Ok(encoded) = serde_json::to_string_pretty(&profile) {
+        let _ = std::fs::write(path, encoded);
+    }
+}
+
+fn read_device_profile(data_dir: &std::path::Path) -> DeviceProfile {
+    let path = data_dir.join("device.json");
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|raw| serde_json::from_str(&raw).ok())
+        .unwrap_or_default()
+}
+
+pub(crate) fn parse_device_profile(value: &serde_json::Value) -> DeviceProfile {
+    let item = value
+        .get("items")
+        .and_then(|items| items.as_array())
+        .and_then(|items| items.first())
+        .cloned()
+        .unwrap_or_else(|| value.clone());
+    let extra = match item.get("additionalInfo") {
+        Some(serde_json::Value::String(raw)) => serde_json::from_str(raw).unwrap_or(item.clone()),
+        Some(value) => value.clone(),
+        None => item.clone(),
+    };
+    DeviceProfile {
+        name: first_string(&item, &["displayName", "deviceName", "productName", "model"])
+            .or_else(|| first_string(&extra, &["displayName", "deviceName", "productName"])),
+        firmware: first_string(
+            &extra,
+            &["productVersion", "firmwareVersion", "hardwareVersion", "fwVersion"],
+        ),
+        serial: first_string(&extra, &["sn", "serial", "serialNumber"]),
+        device_id: first_string(&item, &["deviceId", "device_id", "deviceSource", "macAddress"]),
+        timezone: first_string(&extra, &["bind_timezone", "timezone", "tz"]),
+    }
+}
+
+fn first_string(value: &serde_json::Value, keys: &[&str]) -> Option<String> {
+    let object = value.as_object()?;
+    for key in keys {
+        match object.get(*key) {
+            Some(serde_json::Value::String(text)) if !text.trim().is_empty() => {
+                return Some(text.trim().to_string());
+            }
+            Some(serde_json::Value::Number(number)) => return Some(number.to_string()),
+            _ => {}
+        }
+    }
+    None
+}
+
 fn validate_json_export_path(value: &str) -> std::result::Result<PathBuf, String> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -255,7 +330,27 @@ fn validate_json_export_path(value: &str) -> std::result::Result<PathBuf, String
 
 #[cfg(test)]
 mod tests {
-    use super::validate_json_export_path;
+    use super::{parse_device_profile, validate_json_export_path};
+    use serde_json::json;
+
+    #[test]
+    fn parse_device_profile_reads_additional_info() {
+        let value = json!({
+            "items": [{
+                "deviceId": "A194",
+                "displayName": "Amazfit GTR 4",
+                "additionalInfo": {
+                    "productVersion": "3.9.1.2",
+                    "sn": "2143123A1B23456"
+                }
+            }]
+        });
+        let profile = parse_device_profile(&value);
+        assert_eq!(profile.name.as_deref(), Some("Amazfit GTR 4"));
+        assert_eq!(profile.firmware.as_deref(), Some("3.9.1.2"));
+        assert_eq!(profile.serial.as_deref(), Some("2143123A1B23456"));
+        assert_eq!(profile.device_id.as_deref(), Some("A194"));
+    }
 
     #[test]
     fn export_path_requires_absolute_json_in_existing_folder() {

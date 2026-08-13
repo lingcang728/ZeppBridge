@@ -4,35 +4,39 @@ import CategoryMark from './CategoryMark.vue';
 import Icon from './Icon.vue';
 import type { HealthCategory } from '../lib/format';
 
-defineProps<{
+withDefaults(defineProps<{
   to: object | string;
   category: HealthCategory;
-  icon: 'heart' | 'moon' | 'steps';
+  icon: 'heart' | 'moon' | 'steps' | 'run';
   kicker: string;
   title: string;
   fact: string;
   factLabel?: string;
-}>();
+  compact?: boolean;
+}>(), { compact: false });
 </script>
 
 <template>
-  <RouterLink class="record-row" :to="to">
-    <CategoryMark :category="category" :icon="icon" :size="16" />
+  <RouterLink :class="['record-row', `tone-${category}`, { compact }]" :to="to">
+    <span v-if="compact" class="record-dot" aria-hidden="true"></span>
+    <CategoryMark v-else :category="category" :icon="icon" :size="16" />
     <span class="record-copy">
-      <small>{{ kicker }}</small>
-      <strong>{{ title }}</strong>
+      <small v-if="!compact">{{ kicker }}</small>
+      <strong :class="{ date: compact }">{{ compact ? kicker : title }}</strong>
     </span>
+    <span v-if="compact" class="record-mid">{{ title }}</span>
     <span class="record-fact">
       <strong>{{ fact }}</strong>
-      <small v-if="factLabel">{{ factLabel }}</small>
+      <small v-if="!compact && factLabel">{{ factLabel }}</small>
     </span>
-    <Icon name="arrow-right" :size="15" />
+    <Icon v-if="!compact" name="arrow-right" :size="15" />
   </RouterLink>
 </template>
 
 <style scoped>
 .record-row {
   display: grid;
+  min-width: 0;
   min-height: 72px;
   grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
@@ -44,6 +48,15 @@ defineProps<{
 }
 .record-row:last-child { border-bottom: 0; }
 .record-row:hover { background: var(--surface-raised); }
+.record-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.tone-sleep .record-dot { color: var(--sleep); }
+.tone-activity .record-dot { color: var(--activity); }
+.tone-heart .record-dot { color: var(--heart); }
 .record-copy, .record-fact {
   display: flex;
   min-width: 0;
@@ -61,6 +74,13 @@ defineProps<{
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.record-mid {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .record-fact {
   min-width: 72px;
   align-items: flex-end;
@@ -72,8 +92,35 @@ defineProps<{
   font-weight: 500;
 }
 .record-row > svg { color: var(--subtle); }
-@media (max-width: 480px) {
+.record-row.compact {
+  min-height: 48px;
+  grid-template-columns: auto minmax(0, 1.2fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 10px 16px;
+}
+.record-row.compact .record-copy strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+.record-row.compact.tone-sleep .record-fact strong {
+  min-width: 36px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  color: var(--sleep);
+  font-size: 12px;
+  text-align: center;
+}
+.record-row.compact.tone-activity .record-fact strong {
+  color: var(--activity);
+  font-size: 13px;
+}
+@media (max-width: 520px) {
   .record-row { grid-template-columns: auto minmax(0, 1fr) auto; }
-  .record-fact { display: none; }
+  .record-row:not(.compact) .record-fact { display: none; }
+  .record-row.compact {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .record-row.compact .record-mid { display: none; }
 }
 </style>

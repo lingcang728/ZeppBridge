@@ -14,8 +14,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 # Editor directories and files
-.vscode/*
-!.vscode/extensions.json
+.vscode/
 .idea/
 .DS_Store
 *.suo
@@ -81,6 +80,12 @@ cookies*.json
 *.pfx
 *.jks
 *.keystore
+
+# Local agent / design scratch (do not publish)
+.claude/
+.grok/
+.omo/
+design_picture/
 
 # OS
 Thumbs.db

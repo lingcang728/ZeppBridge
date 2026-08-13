@@ -246,3 +246,12 @@ pub struct ExportResult {
     pub bytes: usize,
     pub generated_at: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct DeviceProfile {
+    pub name: Option<String>,
+    pub firmware: Option<String>,
+    pub serial: Option<String>,
+    pub device_id: Option<String>,
+    pub timezone: Option<String>,
+}

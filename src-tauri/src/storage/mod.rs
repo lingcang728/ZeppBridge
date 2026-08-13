@@ -1232,6 +1232,11 @@ impl Database {
             "sleep",
             "workouts",
             "recovery",
+            "steps",
+            "spo2",
+            "stress",
+            "training_load",
+            "vo2max",
         ]
         .into_iter()
         .collect();
@@ -1250,7 +1255,11 @@ impl Database {
         let end_text = end.format("%Y-%m-%d").to_string();
 
         let mut metric_samples = Vec::new();
-        if selected.contains("heart_rate") || selected.contains("hrv") {
+        if selected.contains("heart_rate")
+            || selected.contains("hrv")
+            || selected.contains("spo2")
+            || selected.contains("stress")
+        {
             let mut stmt = self.conn.prepare(
                 "SELECT metric, timestamp, value, unit, source_scope, device_id
                  FROM metric_samples
@@ -1269,7 +1278,10 @@ impl Database {
             })?;
             for row in rows {
                 let (metric, timestamp, value, unit, source_scope, device_id) = row?;
-                if selected.contains(&metric) {
+                if selected.contains(&metric)
+                    || (metric.contains("spo2") && selected.contains("spo2"))
+                    || (metric.contains("stress") && selected.contains("stress"))
+                {
                     metric_samples.push(serde_json::json!({
                         "metric": metric,
                         "timestamp": timestamp,
@@ -1302,7 +1314,14 @@ impl Database {
         .into_iter()
         .collect();
         let mut daily_metrics = Vec::new();
-        if selected.contains("daily_activity") || selected.contains("recovery") {
+        if selected.contains("daily_activity")
+            || selected.contains("recovery")
+            || selected.contains("steps")
+            || selected.contains("spo2")
+            || selected.contains("stress")
+            || selected.contains("training_load")
+            || selected.contains("vo2max")
+        {
             let mut stmt = self.conn.prepare(
                 "SELECT date, metric, value, unit, source_scope, device_id
                  FROM daily_metrics WHERE date BETWEEN ?1 AND ?2
@@ -1321,9 +1340,15 @@ impl Database {
             for row in rows {
                 let (date, metric, value, unit, source_scope, device_id) = row?;
                 let is_recovery = recovery_metrics.contains(metric.as_str());
-                if (is_recovery && selected.contains("recovery"))
+                let want = (is_recovery && selected.contains("recovery"))
                     || (!is_recovery && selected.contains("daily_activity"))
-                {
+                    || (metric == "steps" && selected.contains("steps"))
+                    || ((metric.contains("spo2") || metric == "blood_oxygen")
+                        && selected.contains("spo2"))
+                    || (metric.contains("stress") && selected.contains("stress"))
+                    || (metric == "training_load" && selected.contains("training_load"))
+                    || (metric == "vo2max" && selected.contains("vo2max"));
+                if want {
                     daily_metrics.push(serde_json::json!({
                         "date": date,
                         "metric": metric,

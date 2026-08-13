@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window",
-  "windows": ["main"],
+  "description": "Capability for the main and Zepp login windows",
+  "windows": ["main", "zepp-login"],
   "permissions": [
     "core:default",
     "dialog:allow-save"

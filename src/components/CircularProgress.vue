@@ -8,14 +8,16 @@ interface Props {
   color?: string;
   trackColor?: string;
   showLabel?: boolean;
+  unit?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   size: 120,
   strokeWidth: 8,
-  color: 'var(--accent)',
+  color: '#A8E6C3',
   trackColor: 'var(--line)',
   showLabel: true,
+  unit: '%',
 });
 
 const radius = computed(() => (props.size - props.strokeWidth) / 2);
@@ -23,6 +25,8 @@ const circumference = computed(() => 2 * Math.PI * radius.value);
 const clamped = computed(() => Math.max(0, Math.min(100, props.value)));
 const offset = computed(() => circumference.value * (1 - clamped.value / 100));
 const center = computed(() => props.size / 2);
+const fontSize = computed(() => Math.max(16, Math.round(props.size * 0.28)));
+const label = computed(() => `${Math.round(clamped.value)}${props.unit}`);
 </script>
 
 <template>
@@ -49,26 +53,38 @@ const center = computed(() => props.size / 2);
         :transform="`rotate(-90 ${center} ${center})`"
       />
       <text
-        v-if="showLabel"
+        v-if="showLabel && !$slots.default"
         :x="center"
         :y="center"
         text-anchor="middle"
         dominant-baseline="central"
         class="progress-label"
-      >{{ Math.round(clamped) }}%</text>
+        :font-size="fontSize"
+      >{{ label }}</text>
     </svg>
+    <div v-if="$slots.default" class="progress-slot">
+      <slot />
+    </div>
   </div>
 </template>
 
 <style scoped>
 .circular-progress {
-  display: inline-block;
+  display: inline-grid;
   position: relative;
+  place-items: center;
 }
 .progress-label {
   fill: var(--ink);
   font-family: var(--font-mono);
-  font-size: clamp(18px, 4vw, 28px);
   font-weight: 500;
+}
+.progress-slot {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  text-align: center;
 }
 </style>

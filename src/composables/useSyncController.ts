@@ -1,8 +1,7 @@
 import { computed, readonly, ref } from 'vue';
-import { listen } from '@tauri-apps/api/event';
-import { isTauri, tauriApi, toUserMessage } from './useTauriApi';
+import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { readAutoSyncSettings, writeAutoSyncSettings } from '../lib/autoSync';
-import type { AppStatus, CaptureSession, CaptureStatus, SyncOutcome, SyncProgress, SyncReport } from '../types';
+import type { AppStatus, LoginStatus, SyncOutcome, SyncProgress, SyncReport } from '../types';
 
 export type SyncUiState = 'idle' | 'syncing' | SyncOutcome;
 
@@ -13,12 +12,9 @@ const syncState = ref<SyncUiState>('idle');
 const syncMessage = ref('尚未同步');
 const syncReport = ref<SyncReport | null>(null);
 const syncProgress = ref<SyncProgress | null>(null);
+const loginStatus = ref<LoginStatus>({ state: 'idle', message: '', page_url: '' });
 const dataRevision = ref(0);
 const autoSyncEnabled = ref(readAutoSyncSettings().enabled);
-const captureSession = ref<CaptureSession | null>(null);
-const captureStatus = ref<CaptureStatus | null>(null);
-const captureActive = ref(false);
-const proxyRestored = ref(true);
 let initialized = false;
 let runningSync: Promise<SyncReport | null> | null = null;
 
@@ -34,6 +30,13 @@ const formatTime = (value?: string): string => {
   }).format(date);
 };
 
+const formatClock = (value?: string): string | null => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(date);
+};
+
 const latestHeartRateAt = (report?: SyncReport | null): string | undefined =>
   report?.streams.find((stream) => stream.stream === 'heart_rate')?.newest_sample_at
   ?? appStatus.value?.streams.find((stream) => stream.stream === 'heart_rate')?.newest_sample_at;
@@ -47,11 +50,16 @@ const messageForReport = (report: SyncReport): string => {
   return '同步失败，请检查连接后重试';
 };
 
+const applyLoginStatus = (status: LoginStatus) => {
+  loginStatus.value = status;
+  if (status.state === 'connected') void refreshStatus();
+};
+
 const refreshStatus = async (): Promise<AppStatus | null> => {
-  if (!isTauri()) return null;
+  if (!isDesktop()) return null;
   try {
     statusError.value = null;
-    appStatus.value = await tauriApi.getAppStatus();
+    appStatus.value = await backend.getAppStatus();
     if (syncState.value === 'idle' && appStatus.value.last_cloud_sync_outcome) {
       syncState.value = appStatus.value.last_cloud_sync_outcome;
       const latest = latestHeartRateAt();
@@ -69,8 +77,8 @@ const refreshStatus = async (): Promise<AppStatus | null> => {
 const runSync = (mode: 'incremental' | 'initial' | 'history' = 'incremental', days?: number): Promise<SyncReport | null> => {
   if (runningSync) return runningSync;
   const promise = (async () => {
-    if (!isTauri()) {
-      statusError.value = '请从 ZeppBridge 桌面应用打开后同步';
+    if (!isDesktop()) {
+      statusError.value = '请使用桌面应用';
       return null;
     }
     const status = appStatus.value ?? await refreshStatus();
@@ -95,8 +103,8 @@ const runSync = (mode: 'incremental' | 'initial' | 'history' = 'incremental', da
     statusError.value = null;
     try {
       const report = mode === 'incremental'
-        ? await tauriApi.startIncrementalSync()
-        : await tauriApi.startHistorySync(days ?? status?.history_sync_days ?? 30);
+        ? await backend.startIncrementalSync()
+        : await backend.startHistorySync(days ?? status?.history_sync_days ?? 30);
       syncReport.value = report;
       syncState.value = report.outcome;
       syncMessage.value = messageForReport(report);
@@ -121,9 +129,9 @@ const runSync = (mode: 'incremental' | 'initial' | 'history' = 'incremental', da
 };
 
 const cancelSync = async () => {
-  if (!isTauri()) return;
+  if (!isDesktop()) return;
   try {
-    await tauriApi.cancelSync();
+    await backend.cancelSync();
     syncMessage.value = '正在取消同步…';
   } catch (error) {
     statusError.value = toUserMessage(error, '无法取消同步');
@@ -135,33 +143,28 @@ const setAutoSyncEnabled = (enabled: boolean) => {
   writeAutoSyncSettings({ enabled: autoSyncEnabled.value, intervalMinutes: 15 });
 };
 
-const setCaptureSession = (session: CaptureSession | null, status: CaptureStatus | null = null) => {
-  captureSession.value = session;
-  captureStatus.value = status;
-  captureActive.value = Boolean(session);
-};
-
-const markProxyRestored = () => {
-  proxyRestored.value = true;
-  captureActive.value = false;
-};
-
 const initialize = async () => {
   if (initialized) return;
   initialized = true;
-  if (isTauri()) {
-    await listen<SyncProgress>('sync://progress', (event) => {
-      syncProgress.value = event.payload;
-      syncMessage.value = event.payload.message;
+  if (isDesktop()) {
+    await backend.listen<SyncProgress>('sync://progress', (payload) => {
+      syncProgress.value = payload;
+      syncMessage.value = payload.message;
     });
-    await listen('tray://sync', () => {
+    await backend.listen('tray://sync', () => {
       void runSync('incremental');
     });
+    await backend.listen<LoginStatus>('login://status', applyLoginStatus);
+    try {
+      applyLoginStatus(await backend.getLoginStatus());
+    } catch {
+      // Login status is optional at startup.
+    }
   }
   let status = await refreshStatus();
-  if (status?.connection_state === 'configured' && isTauri()) {
+  if (status?.connection_state === 'configured' && isDesktop()) {
     try {
-      await tauriApi.verifyAuth();
+      await backend.verifyAuth();
       status = await refreshStatus();
     } catch {
       await refreshStatus();
@@ -186,20 +189,19 @@ export const useSyncController = () => ({
   syncMessage: readonly(syncMessage),
   syncReport: readonly(syncReport),
   syncProgress: readonly(syncProgress),
+  loginStatus: readonly(loginStatus),
   dataRevision: readonly(dataRevision),
   autoSyncEnabled: readonly(autoSyncEnabled),
-  captureSession: readonly(captureSession),
-  captureStatus,
-  captureActive: readonly(captureActive),
-  proxyRestored,
   isSyncing: computed(() => syncState.value === 'syncing'),
   canIncrementalSync: computed(() => appStatus.value?.connection_state === 'connected'),
+  lastCloudSyncLabel: computed(() => {
+    const clock = formatClock(appStatus.value?.last_cloud_sync_at);
+    return clock ? `云端同步时间 ${clock}` : '云端同步时间 —';
+  }),
   initialize,
   refreshStatus,
   runSync,
   cancelSync,
   setAutoSyncEnabled,
-  setCaptureSession,
-  markProxyRestored,
   markDataChanged,
 });

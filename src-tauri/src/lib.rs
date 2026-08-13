@@ -6,18 +6,17 @@ mod fetcher;
 mod ipc_types;
 mod models;
 mod normalizer;
-mod proxy;
 mod storage;
 mod sync;
 
 use app_state::AppState;
 use commands::{
-    cancel_sync, cleanup_old_data, clear_auth, complete_capture_user_id, get_app_status,
-    get_capture_status, get_export_json, get_health_overview, get_heart_rate_series,
-    get_recent_sleep, get_recent_workouts, get_sleep_detail, get_storage_estimate,
-    get_training_load_series, get_workout_detail, open_data_folder, publish_ai_export,
-    reprocess_local_data, save_auth, save_json_export, set_user_prefs, start_capture,
-    start_history_sync, start_incremental_sync, start_initial_sync, stop_capture, verify_auth,
+    cancel_sync, cancel_web_login, cleanup_old_data, clear_auth, get_app_status, get_export_json,
+    get_health_overview, get_heart_rate_series, get_login_status, get_recent_sleep,
+    get_recent_workouts, get_sleep_detail, get_storage_estimate, get_training_load_series,
+    get_device_profile, get_workout_detail, open_data_folder, publish_ai_export, reprocess_local_data, save_auth,
+    save_json_export, set_user_prefs, start_history_sync, start_incremental_sync,
+    start_initial_sync, start_web_login, verify_auth,
 };
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
@@ -42,8 +41,8 @@ pub fn run() {
                     let work = monitor.work_area();
                     let scale = monitor.scale_factor();
                     let max_height = (work.size.height as f64 / scale) - 32.0;
-                    let height = 640.0_f64.min(max_height).max(560.0);
-                    let _ = window.set_size(tauri::LogicalSize::new(1100.0, height));
+                    let height = 800.0_f64.min(max_height).max(560.0);
+                    let _ = window.set_size(tauri::LogicalSize::new(1280.0, height));
                 }
                 let hidden = window.clone();
                 window.on_window_event(move |event| {
@@ -85,10 +84,9 @@ pub fn run() {
             save_auth,
             verify_auth,
             clear_auth,
-            start_capture,
-            get_capture_status,
-            complete_capture_user_id,
-            stop_capture,
+            start_web_login,
+            cancel_web_login,
+            get_login_status,
             start_initial_sync,
             start_history_sync,
             start_incremental_sync,
@@ -101,6 +99,7 @@ pub fn run() {
             get_recent_workouts,
             get_sleep_detail,
             get_workout_detail,
+            get_device_profile,
             reprocess_local_data,
             get_export_json,
             save_json_export,
