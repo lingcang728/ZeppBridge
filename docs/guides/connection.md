@@ -88,4 +88,4 @@
 - 设置页可选择本地保留 1–365 天（默认 365）。成功同步后按该天数清理；手动「清理旧数据」用同一个天数，不可撤销。
 - 需要完整删除时，先在设置页清除认证，再使用“打开数据文件夹”确认应用数据目录；请先备份后手动删除数据库和公开证书文件。
 
-更多边界见 [SECURITY_PRIVACY.md](SECURITY_PRIVACY.md)，缺陷与验证证据见 [REPAIR_AUDIT.md](REPAIR_AUDIT.md)。
+更多边界见 [安全与隐私](../reference/security-and-privacy.md)。

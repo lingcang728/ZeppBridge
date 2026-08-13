@@ -74,4 +74,4 @@ REST/MCP 尚未实现，也没有默认开启的本地 API 监听器。
 - 没有真实账号、实体手机、不同区域/账号和证书固定兼容性证据；
 - 真实睡眠阶段、GPS/路线、训练详情和 HybridCharge 尚未有脱敏 fixture 验证。
 
-对应缺陷 disposition 和最终门禁见 [REPAIR_AUDIT.md](REPAIR_AUDIT.md) 与 [COMPLETION_REPORT.md](COMPLETION_REPORT.md)。
+工程门禁与发布前检查见 [开发文档](../development/development.md)。

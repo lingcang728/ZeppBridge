@@ -1,6 +1,6 @@
 # ZeppBridge 开发与门禁
 
-本文面向需要修改代码、运行测试或生成 Windows 安装包的人。产品入口请先看 [README.md](README.md)；连接流程请看 [AUTH_GUIDE.md](AUTH_GUIDE.md)。
+本文面向需要修改代码、运行测试或生成 Windows 安装包的人。产品入口请先看项目 [README](../../README.md)；连接流程请看 [连接指南](../guides/connection.md)。
 
 ## 环境与目录
 
@@ -42,11 +42,11 @@ npm run preview   # 预览 dist（不会连接账户数据）
 ```powershell
 npm run tauri dev
 npm run tauri build
-.\start-dev.bat
-.\build.bat
+.\scripts\windows\start-dev.bat
+.\scripts\windows\build.bat
 ```
 
-`build.bat` 会先执行 `cargo metadata --manifest-path src-tauri\Cargo.toml --format-version 1 --no-deps`，从结果读取 `target_directory`，然后检查 `release\bundle` 下的 NSIS `.exe` 或 MSI `.msi`。不要把产物路径写死为某个仓库子目录，以脚本打印为准。
+`scripts\windows\build.bat` 会先执行 `cargo metadata --manifest-path src-tauri\Cargo.toml --format-version 1 --no-deps`，从结果读取 `target_directory`，然后检查 `release\bundle` 下的 NSIS `.exe` 或 MSI `.msi`。不要把产物路径写死为某个仓库子目录，以脚本打印为准。
 
 安装包当前在 `src-tauri/tauri.conf.json` 声明目标 `nsis` 和 `msi`。配置存在不等于已签名发布；当前没有签名、自动更新或干净 Windows VM 的验收声明。
 
@@ -108,16 +108,16 @@ Tauri command 在 `src-tauri/src/lib.rs` 注册，前端封装在 `src/composabl
 3. `cargo check --manifest-path src-tauri/Cargo.toml --locked --all-targets`
 4. `cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings`
 5. `cargo test --manifest-path src-tauri/Cargo.toml --locked --jobs 1`
-6. `cmd.exe /d /c build.bat`，记录 Cargo metadata 给出的实际 bundle 目录和 NSIS/MSI 文件。
+6. `cmd.exe /d /c scripts\windows\build.bat`，记录 Cargo metadata 给出的实际 bundle 目录和 NSIS/MSI 文件。
 7. 安装一个实际生成的包，启动窗口，确认产品名/标识、首次启动恢复、设置页 command 和停止捕获清理行为。
 
-第 6–7 步是用户真正会打开的交付面，不能以源码检查替代。实体手机 CA/代理捕获以及多区域、多设备数据仍需按环境分别验证。以 [COMPLETION_REPORT.md](COMPLETION_REPORT.md) 的记录为准。
+第 6–7 步是用户真正会打开的交付面，不能以源码检查替代。实体手机 CA/代理捕获以及多区域、多设备数据仍需按环境分别验证。
 
 ## 变更边界
 
-- REST/MCP 属于 plan 的 Phase 3，尚未实现；不要在文档或 UI 中把它们写成现有 command。
-- 应用打开期间由前端在启动后同步一次，并每 15 分钟检查；没有系统级后台服务，应用退出后不会继续同步。
+- REST/MCP 尚未实现；不要在文档或 UI 中把它们写成现有 command。
+- 应用启动后同步一次；关闭主窗口后进程留在托盘，并每 15 分钟检查。只有从托盘退出或结束进程后同步才会停止；当前没有系统级后台服务。
 - GPS/路线、逐点训练样本及未覆盖的专有指标，仍需取得合法、脱敏的真实响应后再从 `unverified` 提升。
 - 不要把 token、完整请求头、HAR、精确 GPS 或健康 raw payload 写入日志、测试输出或提交。
 
-缺陷 disposition 和每条门禁证据见 [REPAIR_AUDIT.md](REPAIR_AUDIT.md)；架构阶段记录见 [plan.txt](plan.txt)。
+架构边界见 [架构摘要](../reference/architecture.md)，安全边界见 [安全与隐私](../reference/security-and-privacy.md)。

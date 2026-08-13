@@ -1,6 +1,6 @@
 @echo off
 setlocal EnableExtensions
-cd /d "%~dp0"
+cd /d "%~dp0\..\.."
 if errorlevel 1 (
   echo [错误] 无法进入 ZeppBridge 项目目录。
   exit /b 1

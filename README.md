@@ -68,7 +68,7 @@ npm ci
 npm run tauri build
 ```
 
-构建产物目录以 `cargo metadata` 返回的 `target_directory` 为准，随后进入 `release\bundle` 查找 NSIS 或 MSI 安装包。详细环境和门禁见 [DEVELOPMENT.md](DEVELOPMENT.md)。
+构建产物目录以 `cargo metadata` 返回的 `target_directory` 为准，随后进入 `release\bundle` 查找 NSIS 或 MSI 安装包。详细环境和门禁见 [开发文档](docs/development/development.md)。
 
 ## 第一次连接
 
@@ -78,7 +78,7 @@ npm run tauri build
 4. 捕获并验证成功后恢复手机为“无代理”，在电脑端停止捕获。
 5. 以后直接点击顶栏“立即同步”，不需要重复认证。
 
-Android、厂商 ROM 或 Zepp 的证书固定策略可能拒绝用户 CA；内置捕获不是兼容性保证。请勿通过 root、破解或 patch 绕过系统或应用的安全机制。完整步骤与回退边界见 [AUTH_GUIDE.md](AUTH_GUIDE.md)。
+Android、厂商 ROM 或 Zepp 的证书固定策略可能拒绝用户 CA；内置捕获不是兼容性保证。请勿通过 root、破解或 patch 绕过系统或应用的安全机制。完整步骤与回退边界见 [连接指南](docs/guides/connection.md)。
 
 ## 隐私与安全
 
@@ -88,7 +88,7 @@ Android、厂商 ROM 或 Zepp 的证书固定策略可能拒绝用户 CA；内�
 - 健康数据库目前是本机明文 SQLite。共享电脑上请使用独立 Windows 账户，并妥善保护设备。
 - 不要把 token、数据库、原始响应、证书私钥或未脱敏日志提交到 issue。
 
-更完整的数据流、证书生命周期与清理范围见 [SECURITY_PRIVACY.md](SECURITY_PRIVACY.md)。如发现安全问题，请优先使用 GitHub 的私密漏洞报告，不要公开披露凭据或个人健康数据。
+更完整的数据流、证书生命周期与清理范围见 [安全与隐私](docs/reference/security-and-privacy.md)。如发现安全问题，请优先使用 GitHub 的私密漏洞报告，不要公开披露凭据或个人健康数据。
 
 ## 开发
 
@@ -110,7 +110,17 @@ src/                         Vue 3 页面、路由和同步控制器
 src-tauri/src/               Rust 认证、连接器、同步、标准化与存储
 src-tauri/icons/             图标母版与平台图标
 src-tauri/tauri.conf.json    Tauri 窗口、安全和打包配置
+docs/                        使用、架构、安全与开发文档
+scripts/windows/             Windows 开发和打包辅助脚本
 ```
+
+长期维护文档按用途放在 `docs/`：
+
+- [连接指南](docs/guides/connection.md)
+- [架构摘要](docs/reference/architecture.md)
+- [安全与隐私](docs/reference/security-and-privacy.md)
+- [开发与门禁](docs/development/development.md)
+- [UI 设计约束](docs/development/ui-guidelines.md)
 
 贡献前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。涉及 Zepp 响应的测试数据必须先脱敏并尽量缩减为合成 fixture；不要提交真实 token、用户 ID、设备 ID 或完整健康记录。
 
@@ -122,9 +132,8 @@ src-tauri/tauri.conf.json    Tauri 窗口、安全和打包配置
 - [ ] 代码签名、SBOM、自动更新与可验证的公开安装包
 - [ ] 在稳定的数据契约之上评估本地 REST / MCP 接口
 
-路线图描述方向，不构成完成承诺。当前实现状态以代码、测试和 [REPAIR_AUDIT.md](REPAIR_AUDIT.md) 为准。
+路线图描述方向，不构成完成承诺。当前实现状态以代码、测试和公开 CI 为准。
 
 ## 许可证
 
 ZeppBridge 使用 [MIT License](LICENSE)。名称 Zepp、Amazfit 及相关商标属于各自权利人。
-
