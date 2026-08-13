@@ -46,7 +46,7 @@ npm run tauri build
 .\scripts\windows\build.bat
 ```
 
-`scripts\windows\build.bat` 会先执行 `cargo metadata --manifest-path src-tauri\Cargo.toml --format-version 1 --no-deps`，从结果读取 `target_directory`，然后检查 `release\bundle` 下的 NSIS `.exe` 或 MSI `.msi`。不要把产物路径写死为某个仓库子目录，以脚本打印为准。
+`scripts\windows\build.bat` 会先执行 `cargo metadata` 读取 `target_directory`（本机当前是 `G:\build_cache\cargo-target`），检查那里的 NSIS/MSI，再复制到项目根目录的 `release\`。日常只认 `release\`；Rust 中间产物仍留在全局 Cargo 缓存，不要删各项目自己的 `target/`。
 
 安装包当前在 `src-tauri/tauri.conf.json` 声明目标 `nsis` 和 `msi`。配置存在不等于已签名发布；当前没有签名、自动更新或干净 Windows VM 的验收声明。
 

@@ -68,7 +68,7 @@ REST/MCP 尚未实现，也没有默认开启的本地 API 监听器。
 
 ## 发布前余留风险
 
-- 安装包 Authenticode `NotSigned`，Windows 可能显示 SmartScreen 提示；这是公开发布阻碍；
+- 本机安装包可用本地自签证书 `CN=ZeppBridge Local` 做 Authenticode 签名，便于识别发布者；证书链不在 Windows 受信任根里，SmartScreen 仍可能提示。这不是 EV/OV 代码签名，不能当公开发布门槛；
 - 健康 DB 默认明文；
 - 没有后台定时调度、自动更新、SBOM 或干净 VM 证据；
 - 没有真实账号、实体手机、不同区域/账号和证书固定兼容性证据；

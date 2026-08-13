@@ -24,6 +24,9 @@ lerna-debug.log*
 *.sln
 *.sw?
 
+# User-facing installers copied here after tauri build
+/release/
+
 # Tauri and native build output
 src-tauri/target/
 src-tauri/gen/

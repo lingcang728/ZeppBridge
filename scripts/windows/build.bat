@@ -90,5 +90,12 @@ if not defined NSIS_INSTALLER if not defined MSI_INSTALLER (
 if defined NSIS_INSTALLER echo NSIS 安装包：%NSIS_INSTALLER%
 if defined MSI_INSTALLER echo MSI 安装包：%MSI_INSTALLER%
 
+set "RELEASE_DIR=%~dp0..\..\release"
+if not exist "%RELEASE_DIR%\." mkdir "%RELEASE_DIR%"
+if defined NSIS_INSTALLER copy /Y "%NSIS_INSTALLER%" "%RELEASE_DIR%\" >nul
+if defined MSI_INSTALLER copy /Y "%MSI_INSTALLER%" "%RELEASE_DIR%\" >nul
+echo 已复制到项目 release：
+echo        %RELEASE_DIR%
+
 if /I "%~1"=="pause" pause
 exit /b 0

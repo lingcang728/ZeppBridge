@@ -1,8 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import Overview from '../views/Overview.vue';
-import Sleep from '../views/Sleep.vue';
+import AiExport from '../views/AiExport.vue';
 import SleepDetail from '../views/SleepDetail.vue';
-import Workouts from '../views/Workouts.vue';
 import WorkoutDetail from '../views/WorkoutDetail.vue';
 import Settings from '../views/Settings.vue';
 
@@ -13,19 +12,14 @@ const routes = [
     component: Overview,
   },
   {
-    path: '/sleep',
-    name: 'Sleep',
-    component: Sleep,
+    path: '/ai',
+    name: 'AiExport',
+    component: AiExport,
   },
   {
     path: '/sleep/:sleepId',
     name: 'SleepDetail',
     component: SleepDetail,
-  },
-  {
-    path: '/workouts',
-    name: 'Workouts',
-    component: Workouts,
   },
   {
     path: '/workouts/:workoutId',
@@ -36,6 +30,14 @@ const routes = [
     path: '/settings',
     name: 'Settings',
     component: Settings,
+  },
+  {
+    path: '/sleep',
+    redirect: '/',
+  },
+  {
+    path: '/workouts',
+    redirect: '/',
   },
   {
     path: '/:pathMatch(.*)*',

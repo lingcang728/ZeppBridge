@@ -21,8 +21,7 @@ const { theme, themeLabel, initializeTheme, setTheme } = useTheme();
 
 const navigation = [
   { to: '/', label: '概览', icon: 'activity' as const },
-  { to: '/sleep', label: '睡眠', icon: 'moon' as const },
-  { to: '/workouts', label: '运动', icon: 'steps' as const },
+  { to: '/ai', label: '交给 AI', icon: 'spark' as const },
   { to: '/settings', label: '设置', icon: 'sliders' as const },
 ];
 const themeOptions: { value: ThemeMode; label: string; icon: 'spark' | 'sun' | 'moon' }[] = [
@@ -120,7 +119,7 @@ onUnmounted(() => {
         <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
         <div>
           <span class="brand-name">ZeppBridge</span>
-          <span class="brand-version">本地健康数据</span>
+          <span class="brand-version">本地数据桥梁</span>
         </div>
       </div>
 
@@ -143,7 +142,7 @@ onUnmounted(() => {
       <div class="sidebar-footer">
         <div class="sidebar-rule"></div>
         <div class="local-note"><Icon name="shield" :size="15" /><span>数据只保存在本机</span></div>
-        <span class="app-version">v0.2.2 · 桌面版</span>
+        <span class="app-version">v0.3.0 · 桌面版</span>
       </div>
     </aside>
 
@@ -483,8 +482,26 @@ a { color: inherit; }
   .mobile-menu-links { display: grid; gap: 3px; }
   .preview-banner, .route-notice { padding-inline: 16px; }
   .main-content { padding-bottom: 64px; }
-  .bottom-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: grid; grid-template-columns: repeat(4, 1fr); height: 60px; padding: 5px 8px calc(5px + env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--canvas) 94%, transparent); border-top: 1px solid var(--line); backdrop-filter: blur(12px); }
+  .bottom-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: grid; grid-template-columns: repeat(3, 1fr); height: 60px; padding: 5px 8px calc(5px + env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--canvas) 94%, transparent); border-top: 1px solid var(--line); backdrop-filter: blur(12px); }
   .bottom-nav-link { display: flex; min-width: 44px; min-height: 44px; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-radius: var(--radius-sm); color: var(--muted); font-size: 10px; text-decoration: none; }
   .bottom-nav-link.is-active { color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+}
+
+.page { width: min(100%, 840px); margin: 0 auto; padding: 32px 32px 64px; }
+.page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 22px; }
+.eyebrow { margin: 0 0 6px; color: var(--muted); font-size: 11px; font-weight: 650; letter-spacing: .06em; }
+h1, h2, p { margin-top: 0; }
+.page h1 { margin-bottom: 8px; font-size: clamp(28px, 4vw, 36px); font-weight: 650; letter-spacing: -.04em; line-height: 1.12; }
+.page-intro { max-width: 56ch; margin-bottom: 0; color: var(--muted); font-size: 14px; }
+.button { display: inline-flex; min-height: 40px; align-items: center; justify-content: center; gap: 7px; padding: 8px 13px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; font-size: 13px; font-weight: 650; text-decoration: none; cursor: pointer; }
+.button:disabled { opacity: .5; cursor: not-allowed; }
+.button-primary, .button.primary { background: var(--accent); color: var(--accent-ink); }
+.button-secondary, .button.secondary, .button-quiet, .button.quiet { border-color: var(--line); color: var(--muted); }
+.button-secondary:hover:not(:disabled), .button.secondary:hover:not(:disabled), .button-quiet:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.button-danger, .button.danger-button { border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); color: var(--danger); }
+.surface-card { border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); overflow: hidden; }
+.section-label { margin: 0 0 8px; padding: 0 2px; color: var(--muted); font-size: 13px; font-weight: 650; }
+@media (max-width: 760px) {
+  .page { padding: 24px 16px 38px; }
 }
 </style>

@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { save as showSaveDialog } from '@tauri-apps/plugin-dialog';
 import QrcodeVue from 'qrcode.vue';
 import Icon from '../components/Icon.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { useTheme, type ThemeMode } from '../composables/useTheme';
 import { tauriApi, toUserMessage } from '../composables/useTauriApi';
-import type { CaptureStatus, ExportDataType, ExportResult, ExportSelection } from '../types';
+import type { CaptureStatus } from '../types';
 
 type ConnectMode = 'capture' | 'manual';
 type CapturePhase = 'idle' | 'starting' | 'waiting' | 'finishing' | 'done' | 'error';
@@ -51,28 +50,6 @@ const dataBusy = ref<string | null>(null);
 const dataMessage = ref<string | null>(null);
 const dataError = ref<string | null>(null);
 
-const localDateString = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-const today = localDateString(new Date());
-const exportStartDate = ref(today);
-const exportEndDate = ref(today);
-const exportDataTypes = ref<ExportDataType[]>(['heart_rate', 'hrv', 'daily_activity', 'sleep', 'workouts', 'recovery']);
-const exportBusy = ref<'copy' | 'save' | 'publish' | null>(null);
-const exportError = ref<string | null>(null);
-const exportMessage = ref<string | null>(null);
-const exportResult = ref<ExportResult | null>(null);
-const exportTypeOptions: { value: ExportDataType; label: string }[] = [
-  { value: 'heart_rate', label: '心率' },
-  { value: 'hrv', label: 'HRV' },
-  { value: 'daily_activity', label: '日常活动' },
-  { value: 'sleep', label: '睡眠' },
-  { value: 'workouts', label: '运动' },
-  { value: 'recovery', label: '恢复指标' },
-];
 const themeOptions: { value: ThemeMode; label: string; icon: 'spark' | 'sun' | 'moon' }[] = [
   { value: 'system', label: '跟随系统', icon: 'spark' },
   { value: 'light', label: '浅色', icon: 'sun' },
@@ -318,66 +295,6 @@ const openDataFolder = async () => {
   catch (error) { dataError.value = toUserMessage(error, '无法打开数据文件夹'); }
 };
 
-const applyExportRange = (days: number) => {
-  const end = new Date();
-  const start = new Date(end);
-  start.setDate(start.getDate() - Math.max(0, days - 1));
-  exportStartDate.value = localDateString(start);
-  exportEndDate.value = localDateString(end);
-};
-const exportSelection = (): ExportSelection | null => {
-  exportError.value = null;
-  exportMessage.value = null;
-  if (!exportStartDate.value || !exportEndDate.value || exportStartDate.value > exportEndDate.value) {
-    exportError.value = '请选择有效的开始和结束日期。';
-    return null;
-  }
-  if (!exportDataTypes.value.length) {
-    exportError.value = '请至少选择一种数据类型。';
-    return null;
-  }
-  return { startDate: exportStartDate.value, endDate: exportEndDate.value, dataTypes: [...exportDataTypes.value] };
-};
-const copyText = async (value: string) => navigator.clipboard.writeText(value);
-const copyExportJson = async () => {
-  const selection = exportSelection();
-  if (!selection) return;
-  exportBusy.value = 'copy';
-  try {
-    const encoded = await tauriApi.getExportJson(selection);
-    await copyText(encoded);
-    const count = (JSON.parse(encoded) as { record_count?: number }).record_count ?? 0;
-    exportMessage.value = `已复制 ${count} 条标准化记录。`;
-  } catch (error) { exportError.value = toUserMessage(error, '复制 JSON 失败'); }
-  finally { exportBusy.value = null; }
-};
-const saveExportFile = async () => {
-  const selection = exportSelection();
-  if (!selection) return;
-  exportBusy.value = 'save';
-  try {
-    const path = await showSaveDialog({
-      title: '另存 ZeppBridge JSON',
-      defaultPath: `zeppbridge-${selection.startDate}-${selection.endDate}.json`,
-      filters: [{ name: 'JSON 文件', extensions: ['json'] }],
-    });
-    if (!path) return;
-    exportResult.value = await tauriApi.saveJsonExport(selection, path);
-    exportMessage.value = `已保存 ${exportResult.value.record_count} 条记录。`;
-  } catch (error) { exportError.value = toUserMessage(error, '保存 JSON 失败'); }
-  finally { exportBusy.value = null; }
-};
-const publishAiFeed = async () => {
-  const selection = exportSelection();
-  if (!selection) return;
-  exportBusy.value = 'publish';
-  try {
-    exportResult.value = await tauriApi.publishAiExport(selection);
-    exportMessage.value = `本地 AI 数据源已更新，共 ${exportResult.value.record_count} 条记录。`;
-  } catch (error) { exportError.value = toUserMessage(error, '更新本地 AI 数据源失败'); }
-  finally { exportBusy.value = null; }
-};
-
 const savePrefs = async () => {
   const retention = Number(retentionDays.value);
   const history = Number(historyDays.value);
@@ -560,16 +477,6 @@ onUnmounted(() => {
         </section>
 
         <section class="advanced-block">
-          <h3>AI 与 JSON 导出</h3>
-          <div class="quick-ranges"><button type="button" @click="applyExportRange(1)">今天</button><button type="button" @click="applyExportRange(7)">7 天</button><button type="button" @click="applyExportRange(30)">30 天</button></div>
-          <div class="date-grid"><label><span>开始</span><input v-model="exportStartDate" type="date" /></label><label><span>结束</span><input v-model="exportEndDate" type="date" /></label></div>
-          <div class="export-types"><label v-for="option in exportTypeOptions" :key="option.value"><input v-model="exportDataTypes" type="checkbox" :value="option.value" />{{ option.label }}</label></div>
-          <div class="button-row"><button class="button secondary" type="button" :disabled="Boolean(exportBusy)" @click="copyExportJson">复制 JSON</button><button class="button secondary" type="button" :disabled="Boolean(exportBusy)" @click="saveExportFile">保存文件</button><button class="button secondary" type="button" :disabled="Boolean(exportBusy)" @click="publishAiFeed">更新 AI 数据源</button></div>
-          <div v-if="exportMessage" class="alert success">{{ exportMessage }}</div><div v-if="exportError" class="alert danger" role="alert">{{ exportError }}</div>
-          <code v-if="exportResult?.path" class="path-value">{{ exportResult.path }}</code>
-        </section>
-
-        <section class="advanced-block">
           <h3>本地数据与隐私</h3>
           <p>数据库位于：<code>{{ appStatus?.database_path || '应用数据目录' }}</code>。当前保留 {{ retentionDays }} 天。</p>
           <div class="button-row"><button class="button secondary" type="button" @click="openDataFolder"><Icon name="folder" :size="15" />打开数据文件夹</button><button class="button secondary" type="button" :disabled="Boolean(dataBusy)" @click="reprocessLocalData">{{ dataBusy === 'reprocess' ? '正在解析…' : '重新解析本地数据' }}</button><button class="button danger-button" type="button" :disabled="Boolean(dataBusy)" @click="cleanupData">清理旧数据</button><button class="button danger-button" type="button" @click="clearAuth">清除认证</button></div>
@@ -598,7 +505,7 @@ h3 { margin-bottom: 7px; font-size: 15px; }
 .button { display: inline-flex; min-height: 40px; align-items: center; justify-content: center; gap: 7px; padding: 8px 13px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; font-size: 12px; font-weight: 650; cursor: pointer; }
 .button:disabled { opacity: .5; cursor: not-allowed; }.button.primary { background: var(--accent); color: var(--accent-ink); }.button.secondary, .button.quiet { border-color: var(--line); color: var(--muted); }.button.secondary:hover, .button.quiet:hover { border-color: var(--accent); color: var(--accent); }.danger-button { border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); color: var(--danger); }
 .sync-result { display: flex; align-items: flex-start; gap: 9px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); }.sync-result.updated { color: var(--accent); }.sync-result.partial { color: var(--warning); }.sync-result.no_new_data { color: var(--muted); }.sync-result.failed { color: var(--danger); }.sync-result strong, .sync-result span { display: block; }.sync-result span { margin-top: 3px; color: var(--muted); font-size: 10px; }
-.connection-guide { position: relative; margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }.mode-tabs { display: inline-flex; gap: 3px; padding: 3px; border-radius: var(--radius-sm); background: var(--surface-raised); }.mode-tabs button, .quick-ranges button { min-height: 34px; padding: 6px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 11px; cursor: pointer; }.mode-tabs button[aria-selected='true'] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--line); }.cancel-reconnect { position: absolute; top: 22px; right: 0; }.text-button { border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+.connection-guide { position: relative; margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }.mode-tabs { display: inline-flex; gap: 3px; padding: 3px; border-radius: var(--radius-sm); background: var(--surface-raised); }.mode-tabs button { min-height: 34px; padding: 6px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 11px; cursor: pointer; }.mode-tabs button[aria-selected='true'] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--line); }.cancel-reconnect { position: absolute; top: 22px; right: 0; }.text-button { border: 0; background: transparent; color: var(--muted); cursor: pointer; }
 .guide-content { margin-top: 16px; }.guide-content > p { color: var(--muted); }
 .step-list { margin: 0 0 14px; padding-left: 18px; color: var(--muted); font-size: 12px; line-height: 1.55; }
 .step-list li { margin-bottom: 6px; }
@@ -609,9 +516,9 @@ select { width: 100%; min-height: 40px; padding: 8px 10px; border: 1px solid var
 .theme-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-top: 15px; }.theme-options button { display: flex; min-height: 44px; align-items: center; gap: 8px; padding: 9px 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: transparent; color: var(--muted); cursor: pointer; }.theme-options button span { flex: 1; color: var(--ink); text-align: left; }.theme-options button[aria-checked='true'] { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
 .advanced > summary { display: flex; align-items: center; justify-content: space-between; cursor: pointer; list-style: none; }.advanced > summary::-webkit-details-marker { display: none; }.advanced > summary strong { font-size: 17px; }.advanced[open] > summary > svg { transform: rotate(180deg); }.advanced-content { margin-top: 18px; border-top: 1px solid var(--line); }.advanced-block { padding: 20px 0; border-bottom: 1px solid var(--line); }.advanced-block:last-child { border-bottom: 0; padding-bottom: 0; }
 .stream-list { margin-top: 14px; border-top: 1px solid var(--line); }.stream-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 18px; padding: 13px 0; border-bottom: 1px solid var(--line); }.stream-main { display: flex; flex-wrap: wrap; gap: 5px 14px; }.stream-main strong { min-width: 90px; }.stream-main span { color: var(--muted); font-size: 10px; }.stream-state { font-size: 11px; }.stream-row details { grid-column: 1 / -1; }.stream-row details summary, .capability-details summary { color: var(--muted); font-size: 10px; cursor: pointer; }.stream-row details p { margin: 7px 0 0; font-family: var(--font-mono); font-size: 10px; }.capability-details { margin-top: 13px; }.capability-details ul { margin: 8px 0 0; padding: 0; list-style: none; }.capability-details li { display: flex; justify-content: space-between; gap: 15px; padding: 7px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 10px; }.capability-details strong { max-width: 65%; color: var(--ink); text-align: right; }.technical-note { margin-top: 10px; color: var(--muted); font-family: var(--font-mono); font-size: 10px; }
-.quick-ranges { display: flex; gap: 4px; margin: 12px 0 10px; }.quick-ranges button { border: 1px solid var(--line); }.date-grid { grid-template-columns: 1fr 1fr; }.export-types { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-top: 12px; }.export-types label { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; }.export-types input { width: 15px; min-height: 15px; accent-color: var(--accent); }
+.date-grid { grid-template-columns: 1fr 1fr; }
 .alert { display: flex; align-items: flex-start; gap: 7px; margin-top: 12px; padding: 10px 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--muted); font-size: 11px; }.alert.success { color: var(--accent); }.alert.danger { color: var(--danger); }.alert button { margin-left: auto; border: 0; background: transparent; color: inherit; cursor: pointer; }
 code { color: var(--muted); font-family: var(--font-mono); font-size: 10px; }
-@media (max-width: 760px) { .page { padding: 24px 16px 38px; }.settings-section { padding: 17px 16px; }.section-heading, .setting-row, .block-heading { align-items: flex-start; }.block-heading { flex-direction: column; }.theme-options, .export-types { grid-template-columns: 1fr; }.inline-form, .date-grid { grid-template-columns: 1fr; }.cancel-reconnect { position: static; display: block; margin-top: 8px; }.stream-main { display: grid; }.capture-diagnostics { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .page { padding: 24px 16px 38px; }.settings-section { padding: 17px 16px; }.section-heading, .setting-row, .block-heading { align-items: flex-start; }.block-heading { flex-direction: column; }.theme-options { grid-template-columns: 1fr; }.inline-form, .date-grid { grid-template-columns: 1fr; }.cancel-reconnect { position: static; display: block; margin-top: 8px; }.stream-main { display: grid; }.capture-diagnostics { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .switch span { transition: none; } }
 </style>
