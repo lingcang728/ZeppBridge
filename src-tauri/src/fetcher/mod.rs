@@ -66,24 +66,24 @@ const HEART_RATE_PAGE_LIMIT: i64 = 1000;
 /// normalizer's accepted shapes. Pure so pagination logic is unit-testable.
 fn heart_rate_items(payload: &Value) -> Vec<Value> {
     if let Some(array) = payload.as_array() {
-        return array.iter().cloned().collect();
+        return array.to_vec();
     }
     let Some(object) = payload.as_object() else {
         return Vec::new();
     };
     for key in ["items", "records", "results", "list"] {
         if let Some(array) = object.get(key).and_then(Value::as_array) {
-            return array.iter().cloned().collect();
+            return array.to_vec();
         }
     }
     if let Some(data) = object.get("data") {
         if let Some(array) = data.as_array() {
-            return array.iter().cloned().collect();
+            return array.to_vec();
         }
         if let Some(data_object) = data.as_object() {
             for key in ["items", "records", "results", "list"] {
                 if let Some(array) = data_object.get(key).and_then(Value::as_array) {
-                    return array.iter().cloned().collect();
+                    return array.to_vec();
                 }
             }
         }

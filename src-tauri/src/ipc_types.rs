@@ -126,11 +126,21 @@ pub fn ui_sync_report(
 
     let total_records = streams.iter().map(|stream| stream.records_written).sum();
 
+    // The report-level "last cloud sync at" must reflect the newest cloud
+    // timestamp the streams actually carried, not the local completion time
+    // (which is always >= the cloud data time).  Fall back to the finished
+    // time only when no stream carries cloud freshness.
+    let last_cloud_sync_at = freshness
+        .values()
+        .filter_map(|stream| stream.last_cloud_sync_at.clone())
+        .max()
+        .unwrap_or_else(|| finished_at.clone());
+
     UiSyncReport {
         success: report.success,
         outcome,
         started_at,
-        last_cloud_sync_at: finished_at.clone(),
+        last_cloud_sync_at,
         finished_at,
         total_records,
         streams,

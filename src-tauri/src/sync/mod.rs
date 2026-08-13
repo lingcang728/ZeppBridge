@@ -482,7 +482,10 @@ mod tests {
         };
         let report = manager.failure_report("heart_rate", &error).await.unwrap();
         assert_eq!(report.records_written, 500);
-        let unavailable = manager.unavailable_report("heart_rate", &error).await.unwrap();
+        let unavailable = manager
+            .unavailable_report("heart_rate", &error)
+            .await
+            .unwrap();
         assert_eq!(unavailable.records_written, 500);
 
         let _ = std::fs::remove_dir_all(dir);

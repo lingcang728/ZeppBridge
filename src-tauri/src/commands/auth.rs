@@ -48,7 +48,7 @@ pub async fn save_auth(
                 *auth_state = "unconfigured".to_string();
             }
             {
-                let mut warning = state.startup_warning.write().await;
+                let mut warning = state.auth_warning.write().await;
                 *warning = Some(format!("无法初始化同步，请检查认证区域后重试：{message}"));
             }
             return Err(message);
@@ -65,6 +65,10 @@ pub async fn save_auth(
     }
     {
         let mut warning = state.startup_warning.write().await;
+        *warning = None;
+    }
+    {
+        let mut warning = state.auth_warning.write().await;
         *warning = None;
     }
 
@@ -112,6 +116,10 @@ pub async fn verify_auth(
     }
     {
         let mut warning = state.startup_warning.write().await;
+        *warning = None;
+    }
+    {
+        let mut warning = state.auth_warning.write().await;
         *warning = None;
     }
 
@@ -216,7 +224,7 @@ async fn verify_failure(
         *auth_state = "needs_reauth".to_string();
     }
     {
-        let mut warning = state.startup_warning.write().await;
+        let mut warning = state.auth_warning.write().await;
         *warning = Some(message.clone());
     }
     Err(message)

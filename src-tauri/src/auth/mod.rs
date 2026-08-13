@@ -106,6 +106,10 @@ pub struct AuthStatus {
 /// Authentication metadata and credential-store access.
 pub struct AuthManager {
     auth_file: PathBuf,
+    /// Best-effort copy of the user id kept beside `auth.json` so
+    /// `clear_auth` can still remove the credential-store entry when the
+    /// metadata file itself is unreadable/corrupt.
+    user_id_file: PathBuf,
     credentials: Arc<dyn CredentialBackend>,
 }
 
@@ -131,6 +135,7 @@ impl AuthManager {
     ) -> Self {
         Self {
             auth_file: data_dir.join("auth.json"),
+            user_id_file: data_dir.join("auth.user-id"),
             credentials,
         }
     }
@@ -168,6 +173,11 @@ impl AuthManager {
             }
             return Err(error);
         }
+
+        // The user-id hint is best-effort: a failure here must not roll back
+        // an otherwise successful save, it only degrades the clear_auth
+        // fallback path.
+        let _ = self.write_user_id_hint(&user_id);
 
         Ok(())
     }
@@ -277,12 +287,15 @@ impl AuthManager {
     }
 
     /// Removes both metadata and the corresponding credential-store entry.
+    /// A corrupt `auth.json` no longer leaves the credential behind: the
+    /// best-effort user-id hint file is consulted as a fallback.
     pub fn clear_auth(&self) -> Result<()> {
         let user_id = if self.auth_file.exists() {
             self.read_stored()
                 .ok()
                 .map(|(stored, _)| stored.user_id)
                 .filter(|value| !value.trim().is_empty())
+                .or_else(|| self.read_user_id_hint())
         } else {
             None
         };
@@ -296,7 +309,47 @@ impl AuthManager {
         if self.auth_file.exists() {
             fs::remove_file(&self.auth_file)?;
         }
+        if self.user_id_file.exists() {
+            let _ = fs::remove_file(&self.user_id_file);
+        }
         Ok(())
+    }
+
+    fn write_user_id_hint(&self, user_id: &str) -> Result<()> {
+        let parent = self
+            .user_id_file
+            .parent()
+            .ok_or_else(|| ZeppBridgeError::ConfigError("认证目录无效".into()))?;
+        fs::create_dir_all(parent)?;
+        let temp_path = parent.join(format!(
+            ".auth.user-id.tmp-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        let result = (|| -> io::Result<()> {
+            let mut file = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(&temp_path)?;
+            file.write_all(user_id.as_bytes())?;
+            file.sync_all()?;
+            drop(file);
+            replace_file(&temp_path, &self.user_id_file)
+        })();
+        if result.is_err() {
+            let _ = fs::remove_file(&temp_path);
+        }
+        result.map_err(ZeppBridgeError::IoError)
+    }
+
+    fn read_user_id_hint(&self) -> Option<String> {
+        let content = fs::read_to_string(&self.user_id_file).ok()?;
+        let trimmed = content.trim().to_string();
+        (!trimmed.is_empty()).then_some(trimmed)
     }
 
     fn read_stored(&self) -> Result<(StoredAuth, Option<String>)> {

@@ -30,6 +30,7 @@ pub(crate) async fn build_app_status(state: &AppState) -> std::result::Result<Ap
 
     let auth_state = state.auth_state.read().await.clone();
     let startup_warning = state.startup_warning.read().await.clone();
+    let auth_warning = state.auth_warning.read().await.clone();
 
     let connection_state = if !auth_status.configured {
         "unconfigured"
@@ -46,6 +47,18 @@ pub(crate) async fn build_app_status(state: &AppState) -> std::result::Result<Ap
     if let Some(warning) = startup_warning {
         streams.push(StreamStatusView {
             stream: "startup".to_string(),
+            status: "error".to_string(),
+            records: None,
+            last_sync: None,
+            last_cloud_sync_at: None,
+            newest_sample_at: None,
+            message: Some(warning),
+            needs_reauth: Some(connection_state == "needs_reauth"),
+        });
+    }
+    if let Some(warning) = auth_warning {
+        streams.push(StreamStatusView {
+            stream: "auth".to_string(),
             status: "error".to_string(),
             records: None,
             last_sync: None,

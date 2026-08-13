@@ -200,7 +200,7 @@ async fn persist_extracted_login(
                 *auth_state = "unconfigured".to_string();
             }
             {
-                let mut warning = state.startup_warning.write().await;
+                let mut warning = state.auth_warning.write().await;
                 *warning = Some(format!("无法初始化同步，请检查认证区域后重试：{message}"));
             }
             return Err(message);
@@ -217,6 +217,10 @@ async fn persist_extracted_login(
     }
     {
         let mut warning = state.startup_warning.write().await;
+        *warning = None;
+    }
+    {
+        let mut warning = state.auth_warning.write().await;
         *warning = None;
     }
     super::data::refresh_device_profile(&state).await;
@@ -681,7 +685,9 @@ mod tests {
             "https://user.huami.com/privacy2/index.html"
         ));
         assert!(!is_allowed_login_url("about:blank"));
-        assert!(!is_allowed_login_url("data:text/html,<script>alert(1)</script>"));
+        assert!(!is_allowed_login_url(
+            "data:text/html,<script>alert(1)</script>"
+        ));
         assert!(!is_allowed_login_url("https://example.com/"));
         assert!(!is_allowed_login_url("http://watchface.zepp.com/"));
     }

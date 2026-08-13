@@ -37,6 +37,20 @@ impl Database {
         Self::from_connection(conn)
     }
 
+    /// Open a connection that assumes the schema was already migrated by the
+    /// primary connection (`AppState::new`).  Sync workers use this so a
+    /// long-running background sync never competes with command paths over
+    /// DDL locks (SQLITE_BUSY on ALTER/CREATE INDEX while writing).
+    pub fn open_without_migration(db_path: PathBuf) -> Result<Self> {
+        let conn = Connection::open(db_path)?;
+        conn.execute_batch(
+            "PRAGMA foreign_keys = ON;
+             PRAGMA busy_timeout = 5000;
+             PRAGMA journal_mode = WAL;",
+        )?;
+        Ok(Self { conn })
+    }
+
     #[cfg(test)]
     pub fn in_memory() -> Result<Self> {
         Self::from_connection(Connection::open_in_memory()?)
@@ -421,10 +435,22 @@ impl Database {
     pub fn heart_rate_series(&self, hours: i64) -> Result<Vec<HeartRatePoint>> {
         let hours = hours.clamp(1, 24 * 14);
         let cutoff = (Utc::now() - chrono::Duration::hours(hours)).to_rfc3339();
+        // Two sources (band_data device rows, heartRate API user_fused
+        // rows) can hold the same minute; collapse to one row per timestamp
+        // preferring user_fused so charts never draw duplicate points.
         let mut stmt = self.conn.prepare(
-            "SELECT timestamp, value FROM metric_samples
-             WHERE metric = 'heart_rate' AND timestamp >= ?1
-             ORDER BY timestamp ASC",
+            "SELECT m.timestamp, m.value
+             FROM metric_samples m
+             WHERE m.metric = 'heart_rate' AND m.timestamp >= ?1
+               AND m.id = (
+                   SELECT id FROM metric_samples
+                   WHERE metric = 'heart_rate' AND timestamp = m.timestamp
+                   ORDER BY CASE source_scope
+                       WHEN 'user_fused' THEN 0
+                       WHEN 'device' THEN 1
+                       ELSE 2 END, id
+                   LIMIT 1)
+             ORDER BY m.timestamp ASC",
         )?;
         let rows = stmt.query_map([cutoff], |row| {
             Ok(HeartRatePoint {

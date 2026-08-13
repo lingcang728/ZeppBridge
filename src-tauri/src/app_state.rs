@@ -43,7 +43,13 @@ pub struct AppState {
     pub(crate) sync_command_lock: Arc<Mutex<()>>,
     pub(crate) login: LoginSession,
     pub(crate) auth_state: Arc<RwLock<String>>,
+    /// One-time warnings produced while restoring state at startup (legacy
+    /// migration, raw-record replay, initial auth restore).
     pub(crate) startup_warning: Arc<RwLock<Option<String>>>,
+    /// Runtime auth warnings (verify/save failures).  Kept separate from
+    /// `startup_warning` so a successful sync can clear the transient auth
+    /// warning without erasing one-time startup notices.
+    pub(crate) auth_warning: Arc<RwLock<Option<String>>>,
 }
 
 impl AppState {
@@ -93,6 +99,7 @@ impl AppState {
             login: LoginSession::new(),
             auth_state: Arc::new(RwLock::new(auth_state)),
             startup_warning: Arc::new(RwLock::new(startup_warning)),
+            auth_warning: Arc::new(RwLock::new(None)),
         })
     }
 
@@ -101,7 +108,9 @@ impl AppState {
         let cancel = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let connector = ZeppConnector::with_cancel(auth, cancel.clone())?;
         let fetcher = DataFetcher::new(connector);
-        let db = Database::new(data_dir.join("zepp.db"))?;
+        // The primary connection in `AppState::new` already migrated the
+        // schema; re-running DDL here could collide with an active sync.
+        let db = Database::open_without_migration(data_dir.join("zepp.db"))?;
         Ok(Arc::new(SyncManager::new(fetcher, db, cancel)))
     }
 }

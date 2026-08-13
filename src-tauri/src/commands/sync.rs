@@ -155,6 +155,10 @@ async fn run_sync(
         *state.auth_state.write().await = "needs_reauth".to_string();
     } else if report.success {
         *state.auth_state.write().await = "verified".to_string();
+        // A successful sync proves the credential works: clear the transient
+        // verify/auth warning so the UI never shows "已连接" next to a stale
+        // red error banner (startup migration notices are intentionally kept).
+        *state.auth_warning.write().await = None;
     }
 
     Ok(ui_sync_report(

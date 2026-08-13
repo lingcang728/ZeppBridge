@@ -6,7 +6,8 @@ use crate::models::{
     SleepSession, StorageEstimate, UserPrefs, Workout,
 };
 use chrono::Utc;
-use std::path::PathBuf;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 
 /// Return the latest health metrics persisted in the local database.
 #[tauri::command]
@@ -186,6 +187,47 @@ pub async fn publish_ai_export(
     write_export(&state, selection, None, true).await
 }
 
+/// Write via a same-directory temporary file + rename so an interrupted
+/// export (crash, disk full) never leaves a truncated JSON at the target
+/// path — in particular the stable AI feed file that is overwritten in place.
+fn write_file_atomically(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let parent = path
+        .parent()
+        .filter(|value| !value.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("export.json");
+    let temp_path = parent.join(format!(
+        ".{file_name}.tmp-{}-{}",
+        std::process::id(),
+        chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
+    ));
+    let result = (|| {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&temp_path)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        drop(file);
+        // Windows cannot rename over an existing file.
+        #[cfg(windows)]
+        {
+            if path.exists() {
+                std::fs::remove_file(path)?;
+            }
+        }
+        std::fs::rename(&temp_path, path)
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temp_path);
+    }
+    result
+}
+
 async fn write_export(
     state: &AppState,
     selection: ExportSelection,
@@ -221,7 +263,7 @@ async fn write_export(
         };
         export_dir.join(file_name)
     };
-    std::fs::write(&path, encoded.as_bytes())
+    write_file_atomically(&path, encoded.as_bytes())
         .map_err(|error| format!("写入 JSON 导出失败: {error}"))?;
     Ok(ExportResult {
         path: path.to_string_lossy().into_owned(),
