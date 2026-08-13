@@ -105,6 +105,10 @@ const hrChart = computed(() => {
 const hrOption = computed<any>(() => {
   const chart = hrChart.value;
   if (!chart) return null;
+  const isLight = theme.value === 'light';
+  const heart = isLight ? '#C45F64' : '#EF6E6E';
+  const gridLine = isLight ? 'rgba(20,23,28,0.06)' : 'rgba(255,255,255,0.05)';
+  const areaTop = isLight ? 'rgba(196,95,100,0.18)' : 'rgba(239,110,110,0.28)';
   return {
     animation: false,
     grid: { left: 8, right: 8, top: 10, bottom: 6, containLabel: false },
@@ -121,7 +125,7 @@ const hrOption = computed<any>(() => {
       axisLine: { show: false },
       axisTick: { show: false },
       axisLabel: { show: false },
-      splitLine: { show: true, lineStyle: { color: 'rgba(255,255,255,0.05)', type: 'dashed' } },
+      splitLine: { show: true, lineStyle: { color: gridLine, type: 'dashed' } },
     },
     tooltip: {
       trigger: 'axis',
@@ -138,14 +142,14 @@ const hrOption = computed<any>(() => {
         data: chart.pts.map((point) => [point.t, point.v]),
         smooth: 0.25,
         showSymbol: false,
-        lineStyle: { width: 2.5, color: '#EF6E6E' },
+        lineStyle: { width: 2.5, color: heart },
         areaStyle: {
           color: {
             type: 'linear',
             x: 0, y: 0, x2: 0, y2: 1,
             colorStops: [
-              { offset: 0, color: 'rgba(239,110,110,0.28)' },
-              { offset: 1, color: 'rgba(239,110,110,0)' },
+              { offset: 0, color: areaTop },
+              { offset: 1, color: 'rgba(0,0,0,0)' },
             ],
           },
         },
