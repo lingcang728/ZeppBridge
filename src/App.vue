@@ -379,10 +379,10 @@ a { color: inherit; }
 }
 .brand-lockup { display: flex; align-items: center; gap: 10px; padding: 0 10px 28px; }
 .brand-mark { display: grid; grid-template-columns: repeat(3, 4px); align-items: end; gap: 2px; height: 18px; }
-.brand-mark span { display: block; width: 4px; border-radius: 2px; background: var(--accent); }
-.brand-mark span:nth-child(1) { height: 9px; opacity: .65; }
-.brand-mark span:nth-child(2) { height: 14px; }
-.brand-mark span:nth-child(3) { height: 18px; opacity: .8; }
+.brand-mark span { display: block; width: 4px; border-radius: 2px; }
+.brand-mark span:nth-child(1) { height: 9px; background: var(--heart); opacity: .8; }
+.brand-mark span:nth-child(2) { height: 14px; background: var(--activity); }
+.brand-mark span:nth-child(3) { height: 18px; background: var(--sleep); opacity: .9; }
 .brand-name { display: block; font-size: 13px; font-weight: 700; letter-spacing: .02em; }
 .brand-version { display: block; margin-top: 1px; color: var(--muted); font-size: 10px; }
 .desktop-nav { display: grid; gap: 3px; }
@@ -392,7 +392,7 @@ a { color: inherit; }
   min-height: 44px;
   align-items: center;
   gap: 10px;
-  padding: 9px 12px;
+  padding: 10px 14px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   color: var(--muted);
@@ -400,9 +400,14 @@ a { color: inherit; }
   text-decoration: none;
   transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
 }
-.nav-link:hover { color: var(--ink); background: var(--surface); border-color: var(--line); }
+.nav-link:hover { color: var(--ink); background: var(--surface-raised); border-color: var(--line); }
 .nav-link:active { transform: translateY(1px); }
-.nav-link.is-active { color: var(--ink); background: var(--surface); border-color: var(--line-strong); box-shadow: inset 2px 0 0 var(--accent); }
+.nav-link.is-active {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
+  box-shadow: inset 3px 0 0 var(--accent);
+}
 .nav-link.is-active svg { color: var(--accent); }
 .sidebar-footer { margin-top: auto; padding: 0 10px; }
 .sidebar-rule { height: 1px; margin: 14px 0; background: var(--line); }
