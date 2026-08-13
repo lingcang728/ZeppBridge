@@ -1,16 +1,22 @@
+<script setup lang="ts">
+import masterSource from '../../src-tauri/icons/icon-source.svg?raw';
+
+// Extract the master symbol at build time; external SVG fragments are not
+// reliable for Vite data URLs in Chromium.
+const brandMark = masterSource.match(/<symbol\s+id="brand-mark"[^>]*>([\s\S]*?)<\/symbol>/)?.[1] ?? '';
+if (!brandMark) throw new Error('icon-source.svg is missing the brand-mark symbol');
+</script>
+
 <template>
   <svg
     class="brand-mark"
-    viewBox="0 0 28 28"
+    viewBox="0 0 24 24"
     width="28"
     height="28"
     aria-hidden="true"
     focusable="false"
   >
-    <rect x="1.2" y="2" width="5.2" height="24" rx="2.6" fill="currentColor" />
-    <rect x="8" y="7.2" width="5.2" height="13.6" rx="2.6" fill="currentColor" />
-    <rect x="14.8" y="7.2" width="5.2" height="13.6" rx="2.6" fill="currentColor" />
-    <rect x="21.6" y="2" width="5.2" height="24" rx="2.6" fill="currentColor" />
+    <g v-html="brandMark" />
   </svg>
 </template>
 
@@ -19,5 +25,6 @@
   display: block;
   flex: 0 0 auto;
   color: var(--icon-mint);
+  overflow: visible;
 }
 </style>

@@ -127,6 +127,14 @@ export interface HealthOverview {
   source_scope?: SourceScope;
 }
 
+export type SleepStageName = 'deep' | 'light' | 'rem' | 'awake' | string;
+
+export interface SleepStageSlice {
+  stage: SleepStageName;
+  start_time: string;
+  end_time: string;
+}
+
 export interface SleepSession {
   sleep_id: string;
   start_time: string;
@@ -139,6 +147,9 @@ export interface SleepSession {
   awake_minutes: number;
   source_scope: SourceScope;
   device_id?: string;
+  synced_at?: string | null;
+  time_in_bed_minutes?: number | null;
+  stages?: SleepStageSlice[];
 }
 
 export interface Workout {
@@ -156,6 +167,7 @@ export interface Workout {
   sample_count?: number;
   source_scope: SourceScope;
   device_id?: string;
+  synced_at?: string | null;
 }
 
 export type ExportDataType =

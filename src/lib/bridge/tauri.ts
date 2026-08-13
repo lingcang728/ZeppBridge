@@ -118,8 +118,11 @@ export const tauriBackend: BridgeBackend = {
     return call<Workout | null>('get_workout_detail', { workoutId });
   },
 
-  getDeviceProfile() {
-    return call<DeviceProfile>('get_device_profile');
+  getDeviceProfile(query?: { deviceId?: string; sourceScope?: string }) {
+    return call<DeviceProfile>('get_device_profile', {
+      deviceId: query?.deviceId,
+      sourceScope: query?.sourceScope,
+    });
   },
 
   reprocessLocalData() {

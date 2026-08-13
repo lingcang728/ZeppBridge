@@ -3,8 +3,10 @@ import { computed } from 'vue';
 
 export type IconName =
   | 'activity'
+  | 'arrow-left'
   | 'arrow-right'
   | 'bars'
+  | 'training-load'
   | 'check'
   | 'chevron-down'
   | 'circle-check'
@@ -20,6 +22,7 @@ export type IconName =
   | 'gear'
   | 'grid'
   | 'heart'
+  | 'heart-rest'
   | 'heart-max'
   | 'hrv'
   | 'info'
@@ -48,7 +51,7 @@ export type IconName =
 
 const props = withDefaults(defineProps<{ name: IconName; size?: number; stroke?: number }>(), {
   size: 18,
-  stroke: 1.5,
+  stroke: 1.75,
 });
 
 const iconLabel = computed(() => `icon-${props.name}`);
@@ -65,9 +68,18 @@ const iconLabel = computed(() => `icon-${props.name}`);
     aria-hidden="true"
     focusable="false"
   >
-    <path v-if="name === 'activity' || name === 'run'" d="M13.5 5.2a1.8 1.8 0 1 0-1.7 0L8.2 9.4 5 8.6l-.7 1.7 3.8 1 2.6 5.2h2l-1.5-4.2 2.4-2.4 1.8 1.6V18h2v-7.2l-3.1-2.6 1.2-3Z" :stroke-width="stroke" />
+    <g v-if="name === 'activity' || name === 'run'" fill="currentColor" stroke="none">
+      <circle cx="15.8" cy="4.7" r="1.8" />
+      <path d="M11.3 7.3c.4-.7 1.3-1 2-.6l3.1 1.8 2.2-.3c.9-.1 1.6.5 1.7 1.3.1.8-.5 1.6-1.3 1.7l-2.8.4-1.5-.8 1.3 2.1 2.3 2.8c.5.6.4 1.5-.2 2-.6.5-1.5.4-2-.2l-2.5-3-1.2 2.4 2.2 3.1c.5.7.3 1.6-.4 2.1-.7.5-1.6.3-2.1-.4l-2.7-3.9c-.3-.5-.3-1.1 0-1.6l2.1-4.3-1.6.8-1.1 2.3c-.4.8-1.3 1.1-2.1.7-.8-.4-1.1-1.3-.7-2.1l1.6-3.4c.1-.2.3-.4.5-.5l3.5-2.1Z" />
+    </g>
+    <path v-else-if="name === 'arrow-left'" d="M19 12H5m6-6-6 6 6 6" :stroke-width="stroke" />
     <path v-else-if="name === 'arrow-right'" d="M5 12h14m-6-6 6 6-6 6" :stroke-width="stroke" />
-    <path v-else-if="name === 'bars'" d="M5 18V10m7 8V6m7 12v-7" :stroke-width="stroke" />
+    <g v-else-if="name === 'bars' || name === 'training-load'" fill="currentColor" stroke="none">
+      <rect x="4" y="13" width="4" height="7" rx="1" />
+      <rect x="10" y="9" width="4" height="11" rx="1" />
+      <rect x="16" y="5" width="4" height="15" rx="1" />
+      <path d="m4.6 10.8 3.5-2.7 3 1.5 5.8-5" fill="none" stroke="currentColor" :stroke-width="stroke" />
+    </g>
     <path v-else-if="name === 'check'" d="m5 12 4 4L19 6" :stroke-width="stroke" />
     <path v-else-if="name === 'chevron-down'" d="m6 9 6 6 6-6" :stroke-width="stroke" />
     <g v-else-if="name === 'circle-check'">
@@ -87,7 +99,7 @@ const iconLabel = computed(() => `icon-${props.name}`);
     <path v-else-if="name === 'export'" d="M12 15V4m0 0 4 4M12 4 8 8M5 16v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3" :stroke-width="stroke" />
     <path v-else-if="name === 'external'" d="M14 5h5v5m0-5-8 8M17 13v4a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4" :stroke-width="stroke" />
     <path v-else-if="name === 'file'" d="M6 3.5h8l4 4V20H6V3.5Zm8 0v4h4M9 12h6m-6 3h6" :stroke-width="stroke" />
-    <path v-else-if="name === 'flame'" d="M12 3s5 5.2 5 9.2A5 5 0 0 1 7 12c0-2.2 1.5-4.2 3-5.6-.2 1.8.4 3-1 4.2 2.4-.2 4.6-2 3-7.6Z" :stroke-width="stroke" />
+    <path v-else-if="name === 'flame'" d="M12 3s5 5.2 5 9.2A5 5 0 0 1 7 12c0-2.2 1.5-4.2 3-5.6-.2 1.8.4 3-1 4.2 2.4-.2 4.6-2 3-7.6Z" fill="currentColor" stroke="none" />
     <path v-else-if="name === 'folder'" d="M3.5 7.5h6l1.6 2h9.4v7.8a2.2 2.2 0 0 1-2.2 2.2H5.7a2.2 2.2 0 0 1-2.2-2.2V7.5Zm0 2h17" :stroke-width="stroke" />
     <g v-else-if="name === 'gear'">
       <circle cx="12" cy="12" r="3" :stroke-width="stroke" />
@@ -95,10 +107,10 @@ const iconLabel = computed(() => `icon-${props.name}`);
     </g>
     <path v-else-if="name === 'sliders'" d="M4 6h16M4 12h16M4 18h16M8 4v4M15 10v4M10 16v4" :stroke-width="stroke" />
     <path v-else-if="name === 'grid'" d="M4.5 4.5h6v6h-6Zm9 0h6v6h-6Zm-9 9h6v6h-6Zm9 0h6v6h-6Z" :stroke-width="stroke" />
-    <path v-else-if="name === 'heart'" d="M20.6 8.8c0 5-8.6 10-8.6 10s-8.6-5-8.6-10A4.6 4.6 0 0 1 12 6.3a4.6 4.6 0 0 1 8.6 2.5Z" :stroke-width="stroke" />
-    <g v-else-if="name === 'heart-max'">
-      <path d="M11 9.1c0 3.4-5.6 6.8-5.6 6.8S.2 12.5.2 9.1A3 3 0 0 1 5.6 7.4 3 3 0 0 1 11 9.1Z" transform="translate(1.2 1.2)" :stroke-width="stroke" />
-      <path d="M20.6 8.8c0 5-8.6 10-8.6 10s-8.6-5-8.6-10A4.6 4.6 0 0 1 12 6.3a4.6 4.6 0 0 1 8.6 2.5Z" :stroke-width="stroke" />
+    <path v-else-if="name === 'heart' || name === 'heart-rest'" d="M20.6 8.8c0 5-8.6 10-8.6 10s-8.6-5-8.6-10A4.6 4.6 0 0 1 12 6.3a4.6 4.6 0 0 1 8.6 2.5Z" fill="currentColor" stroke="none" />
+    <g v-else-if="name === 'heart-max'" stroke="none">
+      <path d="M20.6 8.8c0 5-8.6 10-8.6 10s-8.6-5-8.6-10A4.6 4.6 0 0 1 12 6.3a4.6 4.6 0 0 1 8.6 2.5Z" fill="currentColor" />
+      <path d="M17.4 3.8v4.4m-2.2-2.2h4.4" fill="none" stroke="currentColor" :stroke-width="stroke" />
     </g>
     <path v-else-if="name === 'hrv'" d="M3 13h3l2-5 3 10 2.5-6H21" :stroke-width="stroke" />
     <g v-else-if="name === 'info'">
@@ -114,7 +126,7 @@ const iconLabel = computed(() => `icon-${props.name}`);
       <rect x="3.5" y="5" width="17" height="11" rx="2" :stroke-width="stroke" />
       <path d="M8 20h8M12 16v4" :stroke-width="stroke" />
     </g>
-    <path v-else-if="name === 'moon'" d="M19.5 14.5A7.5 7.5 0 0 1 9.5 4.5a7.5 7.5 0 1 0 10 10Z" :stroke-width="stroke" />
+    <path v-else-if="name === 'moon'" d="M19.5 14.5A7.5 7.5 0 0 1 9.5 4.5a7.5 7.5 0 1 0 10 10Z" fill="currentColor" stroke="none" />
     <g v-else-if="name === 'pace'">
       <circle cx="12" cy="13" r="7.2" :stroke-width="stroke" />
       <path d="M12 13 8.8 8.4M12 6V4" :stroke-width="stroke" />
@@ -122,12 +134,18 @@ const iconLabel = computed(() => `icon-${props.name}`);
     <path v-else-if="name === 'refresh'" d="M20 11a8 8 0 0 0-13.7-4.9L4 8.4M4 4v4.4h4.4M4 13a8 8 0 0 0 13.7 4.9l2.3-2.3m0 4.4v-4.4h-4.4" :stroke-width="stroke" />
     <path v-else-if="name === 'shield'" d="M12 3.5 19 6v5.3c0 4.2-2.8 7.8-7 9.2-4.2-1.4-7-5-7-9.2V6l7-2.5Z" :stroke-width="stroke" />
     <path v-else-if="name === 'spark'" d="m12 3 1.2 5.8L19 10l-5.8 1.2L12 17l-1.2-5.8L5 10l5.8-1.2L12 3Zm6 13 .5 2.5L21 19l-2.5.5L18 22l-.5-2.5L15 19l2.5-.5L18 16Z" :stroke-width="stroke" />
-    <g v-else-if="name === 'spo2'">
-      <path d="M12 20s-7-4.4-7-9.2A4.4 4.4 0 0 1 12 7.2a4.4 4.4 0 0 1 7 3.6C19 15.6 12 20 12 20Z" :stroke-width="stroke" />
-      <path d="M9.5 11.2h5" :stroke-width="stroke" />
+    <g v-else-if="name === 'spo2'" stroke="none">
+      <path d="M12 3.8c1.8 2.7 5.4 6.1 5.4 9.6a5.4 5.4 0 1 1-10.8 0c0-3.5 3.6-6.9 5.4-9.6Z" fill="currentColor" />
+      <path d="M9.3 14.2c1.3 1.1 4.1 1.1 5.4 0" fill="none" stroke="currentColor" :stroke-width="stroke" />
     </g>
-    <path v-else-if="name === 'steps'" d="M6 19v-4h4v4m4 0v-7h4v7M8 15v-4h4v4m4-7V4h4v4" :stroke-width="stroke" />
-    <path v-else-if="name === 'stress'" d="M8 16a4 4 0 0 0 8 0c0-3-4-4.2-4-8 0 3.8-4 5-4 8Z" :stroke-width="stroke" />
+    <g v-else-if="name === 'steps'" fill="currentColor" stroke="none">
+      <path d="M6.2 4.1c1.8.3 3.4 1.4 4.5 3l2.1 3.1 2.5 1.8c1 .7 2.1 1 3.4 1.1l.9.1c.9.1 1.5.8 1.4 1.7-.1.7-.5 1.3-1.2 1.7l-3.9-.6c-2-.3-3.7-1.3-4.9-2.9l-1.8-2.3-2.3 5.7c-.5 1.3-1.8 2-3.2 1.7l-1-.2c-.7-.2-1.1-.9-.9-1.6l2.6-9.9c.2-.8.9-1.3 1.6-1.2Z" />
+      <path d="M5.2 19.8h10.2c.8 0 1.4-.5 1.7-1.2l.4-1.2-11.4-1.8-.9 2.2c-.3.9-.1 1.6 0 2Z" opacity=".7" />
+    </g>
+    <g v-else-if="name === 'stress'" fill="currentColor" stroke="none">
+      <circle cx="12" cy="7" r="2.2" />
+      <path d="M5.8 19c.4-3.9 2.5-6.1 6.2-6.1s5.8 2.2 6.2 6.1H5.8Z" />
+    </g>
     <g v-else-if="name === 'sun'">
       <circle cx="12" cy="12" r="3.5" :stroke-width="stroke" />
       <path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" :stroke-width="stroke" />
@@ -136,8 +154,8 @@ const iconLabel = computed(() => `icon-${props.name}`);
     <path v-else-if="name === 'terminal'" d="m5 7 5 5-5 5m7 0h7" :stroke-width="stroke" />
     <path v-else-if="name === 'trash'" d="M5 7h14m-9 4v5m4-5v5M9 7V4h6v3m-9 0 1 13h10l1-13" :stroke-width="stroke" />
     <g v-else-if="name === 'vo2'">
-      <circle cx="12" cy="12" r="8.2" :stroke-width="stroke" />
-      <path d="M8.2 14.4 10.4 9h1.4l2.2 5.4M9 12.6h3.2" :stroke-width="stroke" />
+      <path d="M3.8 7.1h2l2.1 8.2L10 7.1h2l-3 10H6.8l-3-10Z" fill="currentColor" stroke="none" />
+      <circle cx="16.7" cy="13.8" r="3.1" :stroke-width="stroke" />
     </g>
     <path v-else-if="name === 'warning'" d="m12 3 9 16H3L12 3Zm0 6v4m0 3v.1" :stroke-width="stroke" />
     <g v-else-if="name === 'watch'">
@@ -153,6 +171,7 @@ const iconLabel = computed(() => `icon-${props.name}`);
 svg {
   display: block;
   flex: 0 0 auto;
+  overflow: visible;
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;

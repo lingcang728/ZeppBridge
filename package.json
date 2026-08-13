@@ -1,14 +1,16 @@
 {
   "name": "zeppbridge",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.5.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "build:web": "vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "icons:generate": "node scripts/icon/generate-icons.mjs",
+    "icons:verify": "py -3 scripts/icon/verify-icons.py"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

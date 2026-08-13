@@ -52,6 +52,15 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
+  scrollBehavior() {
+    return { top: 0 };
+  },
+});
+
+router.afterEach(() => {
+  const main = document.getElementById('main-content');
+  if (main) main.scrollTo({ top: 0 });
+  else window.scrollTo({ top: 0 });
 });
 
 export default router;

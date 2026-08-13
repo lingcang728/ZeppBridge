@@ -5,12 +5,12 @@ import Icon from '../components/Icon.vue';
 import EmptyState from '../components/EmptyState.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
-import { sourceLabel, workoutLabel } from '../lib/labels';
-import { formatDate, formatTime, isFiniteNumber } from '../lib/format';
+import { dataProviderLabel, dataScopeLabel, workoutLabel } from '../lib/labels';
+import { formatDate, formatDateTime, formatTime, isFiniteNumber } from '../lib/format';
 import type { DeviceProfile, Workout } from '../types';
 
 const route = useRoute();
-const { dataRevision } = useSyncController();
+const { appStatus, dataRevision } = useSyncController();
 const workout = ref<Workout | null>(null);
 const device = ref<DeviceProfile>({});
 const loading = ref(true);
@@ -75,6 +75,12 @@ const metrics = computed(() => {
 
 const trackCopy = computed(() => {
   if (!workout.value) return { title: '未同步轨迹或逐点样本', body: '本次未同步轨迹或逐点样本，因此不展示地图、配速曲线、心率曲线等图表。' };
+  if (workout.value.gps_available === false && !workout.value.sample_count) {
+    return {
+      title: '未提供 GPS 轨迹',
+      body: '本次记录没有可绘制的轨迹点或逐点样本，因此不画路线，也不用空图画布占位。',
+    };
+  }
   if (workout.value.gps_available === false) {
     return {
       title: '未提供 GPS 轨迹',
@@ -93,6 +99,14 @@ const trackCopy = computed(() => {
   };
 });
 
+const syncTimeLabel = computed(() => {
+  if (workout.value?.synced_at) return `${formatDate(workout.value.synced_at, 'long')} ${formatTime(workout.value.synced_at)}`;
+  if (appStatus.value?.last_cloud_sync_at) {
+    return `最近云端同步 ${formatDateTime(appStatus.value.last_cloud_sync_at, '同步时间未提供')}`;
+  }
+  return '同步时间未提供';
+});
+
 const loadDetail = async () => {
   loading.value = true;
   error.value = null;
@@ -101,12 +115,14 @@ const loadDetail = async () => {
     return;
   }
   try {
-    const [detail, profile] = await Promise.all([
-      tauriApi.getWorkoutDetail(workoutId.value),
-      tauriApi.getDeviceProfile().catch(() => ({})),
-    ]);
+    const detail = await tauriApi.getWorkoutDetail(workoutId.value);
     workout.value = detail;
-    device.value = profile;
+    device.value = detail
+      ? await tauriApi.getDeviceProfile({
+          deviceId: detail.device_id,
+          sourceScope: detail.source_scope,
+        }).catch(() => ({ name: '设备未确定' }))
+      : {};
   } catch (cause) {
     error.value = toUserMessage(cause, '运动详情暂时不可用');
   } finally {
@@ -130,7 +146,7 @@ watch([dataRevision, workoutId], () => void loadDetail());
 <template>
   <section class="page workout-page" aria-labelledby="workout-detail-title">
     <div class="title-row">
-      <RouterLink class="back-link" to="/"><Icon name="arrow-right" :size="14" />返回概览</RouterLink>
+      <RouterLink class="back-link" to="/"><Icon name="arrow-left" :size="14" />返回概览</RouterLink>
       <button v-if="workout" class="button button-secondary" type="button" @click="exportRecord"><Icon name="export" :size="14" />导出记录</button>
     </div>
     <header class="page-heading">
@@ -178,11 +194,15 @@ watch([dataRevision, workoutId], () => void loadDetail());
             <dl>
               <div>
                 <dt>数据来源</dt>
-                <dd>{{ sourceLabel(workout.source_scope) }}</dd>
+                <dd>{{ dataProviderLabel() }}</dd>
+              </div>
+              <div>
+                <dt>数据范围</dt>
+                <dd>{{ dataScopeLabel(workout.source_scope) }}</dd>
               </div>
               <div>
                 <dt>同步时间</dt>
-                <dd>{{ formatDate(workout.end_time, 'long') }} {{ formatTime(workout.end_time) }}</dd>
+                <dd>{{ syncTimeLabel }}</dd>
               </div>
               <div>
                 <dt>记录 ID</dt>
@@ -207,7 +227,7 @@ watch([dataRevision, workoutId], () => void loadDetail());
               </div>
               <div>
                 <dt>设备时钟</dt>
-                <dd>与手机时间一致</dd>
+                <dd>{{ device.timezone || '未提供' }}</dd>
               </div>
             </dl>
           </article>
@@ -218,7 +238,7 @@ watch([dataRevision, workoutId], () => void loadDetail());
 </template>
 
 <style scoped>
-.workout-page { width: min(100%, 980px); }
+.workout-page { width: 100%; }
 .back-link {
   display: inline-flex;
   align-items: center;
@@ -233,7 +253,7 @@ watch([dataRevision, workoutId], () => void loadDetail());
 .page-heading h1 {
   margin: 0;
   color: var(--ink);
-  font-size: clamp(26px, 3.4vw, 32px);
+  font-size: 22px;
   font-weight: 650;
   letter-spacing: -0.04em;
 }

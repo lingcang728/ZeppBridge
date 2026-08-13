@@ -56,6 +56,7 @@ if not defined TARGET_DIR (
 set "BUNDLE_DIR=%TARGET_DIR%\release\bundle"
 
 echo 正在构建 ZeppBridge Windows 安装包...
+echo   - 图标：src-tauri/icons/icon-source.svg（tauri beforeBuildCommand）
 echo   - 前端：Vite production build
 echo   - 后端：Rust release build
 echo   - 安装包：NSIS 与 MSI

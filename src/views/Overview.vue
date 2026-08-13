@@ -284,8 +284,8 @@ function listDate(value: string): string {
             >
               <defs>
                 <linearGradient id="hr-fill" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%" stop-color="#FF4B55" stop-opacity="0.38" />
-                  <stop offset="100%" stop-color="#FF4B55" stop-opacity="0" />
+                  <stop offset="0%" stop-color="var(--heart)" stop-opacity="0.38" />
+                  <stop offset="100%" stop-color="var(--heart)" stop-opacity="0" />
                 </linearGradient>
               </defs>
               <line
@@ -295,12 +295,12 @@ function listDate(value: string): string {
                 :x2="SPARK.w - SPARK.r"
                 :y1="tick.y"
                 :y2="tick.y"
-                stroke="#3A2226"
+                stroke="var(--line)"
                 stroke-dasharray="3 5"
               />
               <path :d="sparkView.area" fill="url(#hr-fill)" />
-              <path :d="sparkView.line" fill="none" stroke="#FF4B55" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-              <circle :cx="sparkView.last.x" :cy="sparkView.last.y" r="4" fill="#FF4B55" stroke="#1A1014" stroke-width="2" />
+              <path :d="sparkView.line" fill="none" stroke="var(--heart)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              <circle :cx="sparkView.last.x" :cy="sparkView.last.y" r="4" fill="var(--heart)" stroke="var(--heart-wash)" stroke-width="2" />
               <text
                 v-for="tick in sparkView.ticks"
                 :key="`y-${tick.value}`"
@@ -334,7 +334,7 @@ function listDate(value: string): string {
               :size="196"
               :stroke-width="12"
               color="var(--icon-mint)"
-              track-color="#1E3328"
+              track-color="var(--line)"
               :show-label="false"
             >
               <div class="steps-center">
@@ -365,8 +365,8 @@ function listDate(value: string): string {
               :value="lastSleep.score"
               :size="72"
               :stroke-width="6"
-              color="#6E72FF"
-              track-color="#2A2C4A"
+              color="var(--sleep)"
+              track-color="var(--line)"
               :show-label="false"
             >
               <strong>{{ Math.round(lastSleep.score) }}</strong>
@@ -378,7 +378,7 @@ function listDate(value: string): string {
         <article class="metric-card tone-heart">
           <div class="metric-copy">
             <div class="card-heading">
-              <Icon name="heart" :size="16" />
+              <Icon name="heart-rest" :size="16" />
               <span>静息心率</span>
             </div>
             <div class="card-value">
@@ -472,7 +472,7 @@ function listDate(value: string): string {
 
 <style scoped>
 .overview-page.page {
-  width: min(100%, 1120px);
+  width: 100%;
 }
 .overview-skeleton,
 .hero-grid,
@@ -510,19 +510,19 @@ function listDate(value: string): string {
 .freshness small { color: var(--muted); font-size: 11px; }
 .panel {
   min-width: 0;
-  min-height: 280px;
-  padding: 18px 18px 14px;
-  border-radius: 16px;
+  min-height: 248px;
+  padding: 14px 16px 12px;
+  border-radius: var(--radius-md);
   display: flex;
   flex-direction: column;
 }
 .hr-panel {
-  background: #1A1014;
-  border: 1px solid #3A2228;
+  background: var(--heart-wash);
+  border: 1px solid var(--line);
 }
 .steps-panel {
-  background: #121816;
-  border: 1px solid #1E3328;
+  background: var(--activity-wash);
+  border: 1px solid var(--line);
 }
 .panel-head {
   display: flex;
@@ -538,11 +538,11 @@ function listDate(value: string): string {
   font-size: 13px;
   font-weight: 650;
 }
-.panel-kicker.tone-heart { color: #FF8A90; }
+.panel-kicker.tone-heart { color: var(--heart); }
 .panel-kicker.tone-activity { color: var(--icon-mint); }
 .range-chip {
   padding: 4px 10px;
-  border: 1px solid #3A2228;
+  border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--muted);
   font-size: 11px;
@@ -555,14 +555,14 @@ function listDate(value: string): string {
 }
 .hr-reading strong {
   font-family: var(--font-mono);
-  font-size: clamp(40px, 5vw, 56px);
+  font-size: clamp(36px, 4vw, 48px);
   font-variant-numeric: tabular-nums;
   font-weight: 500;
   letter-spacing: -0.05em;
   line-height: 0.95;
 }
 .hr-reading span {
-  color: #FF8A90;
+  color: var(--heart);
   font-size: 13px;
   font-weight: 650;
 }
@@ -572,9 +572,9 @@ function listDate(value: string): string {
   font-size: 12px;
 }
 .spark-wrap { min-width: 0; margin-top: auto; }
-.spark { display: block; width: 100%; height: 148px; }
+.spark { display: block; width: 100%; height: 132px; }
 .spark-axis {
-  fill: #8A7A7C;
+  fill: var(--subtle);
   font-family: var(--font-mono);
   font-size: 11px;
 }
@@ -613,9 +613,9 @@ function listDate(value: string): string {
 }
 .metric-card {
   min-width: 0;
-  min-height: 132px;
-  padding: 16px 16px 14px;
-  border-radius: 16px;
+  min-height: 112px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -629,19 +629,19 @@ function listDate(value: string): string {
   font-size: 11px;
   font-weight: 650;
 }
-.badge.tone-ok { background: #3A2430; color: #E8A0B0; }
-.badge.tone-good { background: #2A3A24; color: var(--icon-mint); }
+.badge.tone-ok { background: var(--heart-wash); color: var(--heart); }
+.badge.tone-good { background: var(--activity-wash); color: var(--icon-mint); }
 .metric-card.tone-heart {
-  background: #1A1114;
-  border: 1px solid #3A2228;
+  background: var(--heart-wash);
+  border: 1px solid var(--line);
 }
 .metric-card.tone-sleep {
-  background: #141624;
-  border: 1px solid #2A2C4A;
+  background: var(--sleep-wash);
+  border: 1px solid var(--line);
 }
 .metric-card.tone-activity {
-  background: #121816;
-  border: 1px solid #1E3328;
+  background: var(--activity-wash);
+  border: 1px solid var(--line);
 }
 .card-heading {
   display: flex;
@@ -650,8 +650,8 @@ function listDate(value: string): string {
   color: var(--muted);
   font-size: 12px;
 }
-.tone-heart .card-heading { color: #FF8A90; }
-.tone-sleep .card-heading { color: #A7AAFF; }
+.tone-heart .card-heading { color: var(--heart); }
+.tone-sleep .card-heading { color: var(--sleep); }
 .tone-activity .card-heading { color: var(--icon-mint); }
 .card-value {
   font-family: var(--font-mono);
@@ -682,30 +682,30 @@ function listDate(value: string): string {
   font-size: 18px;
   font-variant-numeric: tabular-nums;
   font-weight: 500;
-  color: #D4D6FF;
+  color: var(--sleep);
 }
 .ai-entry {
   display: flex;
   align-items: center;
   gap: 14px;
-  margin: 2px 0 16px;
-  padding: 16px 18px;
-  border: 1px solid #1E3328;
-  border-radius: 16px;
-  background: #132018;
+  margin: 2px 0 14px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--activity-wash);
   color: inherit;
   text-decoration: none;
 }
 .ai-entry:hover { border-color: var(--icon-mint); }
 .ai-mark {
   display: grid;
-  width: 40px;
-  height: 40px;
-  flex: 0 0 40px;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
   place-items: center;
-  border-radius: 12px;
+  border-radius: 10px;
   color: var(--icon-mint);
-  background: #1C3326;
+  background: var(--accent-soft);
 }
 .ai-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
 .ai-copy strong { font-size: 15px; }
@@ -718,7 +718,7 @@ function listDate(value: string): string {
   padding: 6px 12px;
   border-radius: 999px;
   background: var(--icon-mint);
-  color: #082012;
+  color: var(--accent-ink);
   font-size: 12px;
   font-weight: 650;
   white-space: nowrap;

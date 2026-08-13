@@ -20,9 +20,15 @@ export const workoutLabel = (value: string): string => {
   return labels[value.trim().toLowerCase()] || value || '运动';
 };
 
-export const sourceLabel = (scope?: string): string => {
-  if (scope === 'user_fused') return 'Zepp 汇总';
+export const sourceLabel = (scope?: string): string => dataScopeLabel(scope);
+
+/** 数据提供方。ZeppBridge 只从 Zepp 云端拉取，不用范围冒充来源。 */
+export const dataProviderLabel = (): string => 'Zepp 云端';
+
+/** 数据作用范围 / 融合范围，不是数据提供方。 */
+export const dataScopeLabel = (scope?: string): string => {
+  if (scope === 'user_fused') return '用户融合';
   if (scope === 'device') return '单设备';
   if (scope === 'mixed') return '多来源';
-  return '来源未确认';
+  return '范围未确认';
 };

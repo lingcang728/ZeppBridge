@@ -39,7 +39,7 @@ watch(dataRevision, () => void loadList());
 
 <template>
   <section class="page list-page" aria-labelledby="sleep-list-title">
-    <RouterLink class="back-link" to="/"><Icon name="arrow-right" :size="14" />返回概览</RouterLink>
+    <RouterLink class="back-link" to="/"><Icon name="arrow-left" :size="14" />返回概览</RouterLink>
     <PageHeader title-id="sleep-list-title" title="睡眠" intro="本机已同步的睡眠记录。没有完整时间轴时，只展示汇总。" />
 
     <div v-if="loading" class="surface-card" aria-live="polite">
@@ -70,7 +70,7 @@ watch(dataRevision, () => void loadList());
 </template>
 
 <style scoped>
-.list-page { width: min(100%, 840px); }
+.list-page { width: 100%; }
 .back-link {
   display: inline-flex;
   align-items: center;

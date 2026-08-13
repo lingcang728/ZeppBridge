@@ -229,8 +229,10 @@ async fn write_export(
 #[tauri::command]
 pub async fn get_device_profile(
     state: tauri::State<'_, AppState>,
+    device_id: Option<String>,
+    source_scope: Option<String>,
 ) -> std::result::Result<DeviceProfile, String> {
-    Ok(read_device_profile(&state.data_dir))
+    resolve_device_profile(&state, device_id.as_deref(), source_scope.as_deref()).await
 }
 
 pub(crate) async fn refresh_device_profile(state: &AppState) {
@@ -243,58 +245,161 @@ pub(crate) async fn refresh_device_profile(state: &AppState) {
     let Ok(payload) = connector.fetch_devices().await else {
         return;
     };
-    let profile = parse_device_profile(&payload);
-    if profile == DeviceProfile::default() {
+    let profiles = parse_device_profiles(&payload);
+    if profiles.is_empty() {
         return;
     }
-    let path = state.data_dir.join("device.json");
-    if let Ok(encoded) = serde_json::to_string_pretty(&profile) {
+    {
+        let db = state.db.lock().await;
+        for hint in profiles.iter().map(device_hint_from_profile) {
+            let _ = db.upsert_device_identity(&hint);
+        }
+    }
+    let path = state.data_dir.join("devices.json");
+    if let Ok(encoded) = serde_json::to_string_pretty(&profiles) {
         let _ = std::fs::write(path, encoded);
     }
 }
 
-fn read_device_profile(data_dir: &std::path::Path) -> DeviceProfile {
-    let path = data_dir.join("device.json");
-    std::fs::read_to_string(path)
+async fn resolve_device_profile(
+    state: &AppState,
+    device_id: Option<&str>,
+    source_scope: Option<&str>,
+) -> std::result::Result<DeviceProfile, String> {
+    if source_scope
+        .map(|scope| scope.eq_ignore_ascii_case("user_fused"))
+        .unwrap_or(false)
+    {
+        return Ok(DeviceProfile {
+            name: Some("融合来源".into()),
+            ..DeviceProfile::default()
+        });
+    }
+    let Some(device_id) = device_id.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(DeviceProfile {
+            name: Some("设备未确定".into()),
+            ..DeviceProfile::default()
+        });
+    };
+    let from_db = {
+        let db = state.db.lock().await;
+        db.lookup_device_profile(device_id)
+            .map_err(|error| error.to_string())?
+    };
+    if let Some(profile) = from_db {
+        return Ok(profile);
+    }
+    if let Some(profile) = read_device_profiles(&state.data_dir)
+        .into_iter()
+        .find(|profile| profile_matches(profile, device_id))
+    {
+        return Ok(profile);
+    }
+    Ok(DeviceProfile {
+        name: Some("设备未确定".into()),
+        device_id: Some(device_id.to_string()),
+        ..DeviceProfile::default()
+    })
+}
+
+fn read_device_profiles(data_dir: &std::path::Path) -> Vec<DeviceProfile> {
+    let path = data_dir.join("devices.json");
+    let raw = std::fs::read_to_string(path).ok();
+    if let Some(raw) = raw {
+        if let Ok(list) = serde_json::from_str::<Vec<DeviceProfile>>(&raw) {
+            return list;
+        }
+        if let Ok(single) = serde_json::from_str::<DeviceProfile>(&raw) {
+            return vec![single];
+        }
+    }
+    let legacy = data_dir.join("device.json");
+    std::fs::read_to_string(legacy)
         .ok()
         .and_then(|raw| serde_json::from_str(&raw).ok())
+        .map(|profile| vec![profile])
         .unwrap_or_default()
 }
 
+fn profile_matches(profile: &DeviceProfile, needle: &str) -> bool {
+    [&profile.device_id, &profile.serial]
+        .into_iter()
+        .flatten()
+        .any(|value| value.eq_ignore_ascii_case(needle))
+}
+
+fn device_hint_from_profile(profile: &DeviceProfile) -> crate::models::DeviceIdentityHint {
+    let mut aliases = Vec::new();
+    if let Some(device_id) = &profile.device_id {
+        aliases.push(device_id.clone());
+    }
+    if let Some(serial) = &profile.serial {
+        aliases.push(serial.clone());
+    }
+    crate::models::DeviceIdentityHint {
+        aliases,
+        name: profile.name.clone(),
+        firmware: profile.firmware.clone(),
+        serial: profile.serial.clone(),
+        device_id: profile.device_id.clone(),
+        timezone: profile.timezone.clone(),
+    }
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn parse_device_profile(value: &serde_json::Value) -> DeviceProfile {
-    let item = value
+    parse_device_profiles(value)
+        .into_iter()
+        .next()
+        .unwrap_or_default()
+}
+
+pub(crate) fn parse_device_profiles(value: &serde_json::Value) -> Vec<DeviceProfile> {
+    let items = value
         .get("items")
         .and_then(|items| items.as_array())
-        .and_then(|items| items.first())
         .cloned()
-        .unwrap_or_else(|| value.clone());
-    let extra = match item.get("additionalInfo") {
-        Some(serde_json::Value::String(raw)) => serde_json::from_str(raw).unwrap_or(item.clone()),
-        Some(value) => value.clone(),
-        None => item.clone(),
-    };
-    DeviceProfile {
-        name: first_string(
-            &item,
-            &["displayName", "deviceName", "productName", "model"],
-        )
-        .or_else(|| first_string(&extra, &["displayName", "deviceName", "productName"])),
-        firmware: first_string(
-            &extra,
-            &[
-                "productVersion",
-                "firmwareVersion",
-                "hardwareVersion",
-                "fwVersion",
-            ],
-        ),
-        serial: first_string(&extra, &["sn", "serial", "serialNumber"]),
-        device_id: first_string(
-            &item,
-            &["deviceId", "device_id", "deviceSource", "macAddress"],
-        ),
-        timezone: first_string(&extra, &["bind_timezone", "timezone", "tz"]),
-    }
+        .unwrap_or_else(|| vec![value.clone()]);
+    items
+        .into_iter()
+        .map(|item| {
+            let extra = match item.get("additionalInfo") {
+                Some(serde_json::Value::String(raw)) => {
+                    serde_json::from_str(raw).unwrap_or(item.clone())
+                }
+                Some(value) => value.clone(),
+                None => item.clone(),
+            };
+            DeviceProfile {
+                name: first_string(
+                    &item,
+                    &["displayName", "deviceName", "productName", "model"],
+                )
+                .or_else(|| first_string(&extra, &["displayName", "deviceName", "productName"])),
+                firmware: first_string(
+                    &extra,
+                    &[
+                        "productVersion",
+                        "firmwareVersion",
+                        "hardwareVersion",
+                        "fwVersion",
+                    ],
+                ),
+                serial: first_string(&extra, &["sn", "serial", "serialNumber"]),
+                device_id: first_string(
+                    &item,
+                    &["deviceId", "device_id", "deviceSource", "macAddress"],
+                )
+                .or_else(|| first_string(&extra, &["deviceId", "device_id", "macAddress"])),
+                timezone: first_string(&extra, &["bind_timezone", "timezone", "tz"]).filter(
+                    |value| value.contains('/') || value.chars().any(|ch| ch.is_ascii_alphabetic()),
+                ),
+            }
+        })
+        .filter(|profile| {
+            profile.device_id.is_some() || profile.serial.is_some() || profile.name.is_some()
+        })
+        .collect()
 }
 
 fn first_string(value: &serde_json::Value, keys: &[&str]) -> Option<String> {
@@ -341,7 +446,7 @@ fn validate_json_export_path(value: &str) -> std::result::Result<PathBuf, String
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_device_profile, validate_json_export_path};
+    use super::{parse_device_profile, parse_device_profiles, validate_json_export_path};
     use serde_json::json;
 
     #[test]
@@ -361,6 +466,29 @@ mod tests {
         assert_eq!(profile.firmware.as_deref(), Some("3.9.1.2"));
         assert_eq!(profile.serial.as_deref(), Some("2143123A1B23456"));
         assert_eq!(profile.device_id.as_deref(), Some("A194"));
+    }
+
+    #[test]
+    fn parse_device_profiles_keeps_every_device() {
+        let value = json!({
+            "items": [
+                {
+                    "deviceId": "MAC-ONE",
+                    "displayName": "Watch One",
+                    "additionalInfo": { "sn": "SN-ONE", "productVersion": "1.0.0" }
+                },
+                {
+                    "deviceId": "MAC-TWO",
+                    "displayName": "Watch Two",
+                    "additionalInfo": { "sn": "SN-TWO", "productVersion": "2.0.0" }
+                }
+            ]
+        });
+        let profiles = parse_device_profiles(&value);
+        assert_eq!(profiles.len(), 2);
+        assert_eq!(profiles[0].serial.as_deref(), Some("SN-ONE"));
+        assert_eq!(profiles[1].device_id.as_deref(), Some("MAC-TWO"));
+        assert_ne!(profiles[0].device_id, profiles[1].device_id);
     }
 
     #[test]

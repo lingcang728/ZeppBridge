@@ -6,17 +6,18 @@ import CircularProgress from '../components/CircularProgress.vue';
 import StageBar from '../components/StageBar.vue';
 import EmptyState from '../components/EmptyState.vue';
 import { useSyncController } from '../composables/useSyncController';
-import { sourceLabel } from '../lib/labels';
+import { dataProviderLabel, dataScopeLabel } from '../lib/labels';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { formatDate, formatDateTime, formatDuration, formatTime, isFiniteNumber } from '../lib/format';
 import type { DeviceProfile, SleepSession } from '../types';
 
 const route = useRoute();
-const { dataRevision } = useSyncController();
+const { appStatus, dataRevision } = useSyncController();
 const session = ref<SleepSession | null>(null);
 const device = ref<DeviceProfile>({});
 const loading = ref(true);
 const error = ref<string | null>(null);
+const stageHelpOpen = ref(false);
 const sleepId = computed(() => String(route.params.sleepId || ''));
 
 const stages = computed(() => session.value ? [
@@ -45,16 +46,20 @@ const scoreComment = computed(() => {
   return { title: '有待改善', body: '时长或阶段比例偏低。仅展示设备给出的评分。' };
 });
 
-const timezoneLabel = computed(() => {
-  try {
-    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const offset = -new Date().getTimezoneOffset() / 60;
-    const sign = offset >= 0 ? '+' : '';
-    return `${zone} (UTC${sign}${offset}:00)`;
-  } catch {
-    return '未提供';
-  }
+const timeInBedLabel = computed(() => {
+  const minutes = session.value?.time_in_bed_minutes;
+  return isFiniteNumber(minutes) ? formatDuration(minutes, '未提供') : '未提供';
 });
+
+const syncTimeLabel = computed(() => {
+  if (session.value?.synced_at) return formatDateTime(session.value.synced_at, '同步时间未提供');
+  if (appStatus.value?.last_cloud_sync_at) {
+    return `最近云端同步 ${formatDateTime(appStatus.value.last_cloud_sync_at, '同步时间未提供')}`;
+  }
+  return '同步时间未提供';
+});
+
+const timezoneLabel = computed(() => device.value.timezone || '未提供');
 
 const loadDetail = async () => {
   loading.value = true;
@@ -64,12 +69,14 @@ const loadDetail = async () => {
     return;
   }
   try {
-    const [detail, profile] = await Promise.all([
-      tauriApi.getSleepDetail(sleepId.value),
-      tauriApi.getDeviceProfile().catch(() => ({})),
-    ]);
+    const detail = await tauriApi.getSleepDetail(sleepId.value);
     session.value = detail;
-    device.value = profile;
+    device.value = detail
+      ? await tauriApi.getDeviceProfile({
+          deviceId: detail.device_id,
+          sourceScope: detail.source_scope,
+        }).catch(() => ({ name: '设备未确定' }))
+      : {};
   } catch (cause) {
     error.value = toUserMessage(cause, '睡眠详情暂时不可用');
   } finally {
@@ -83,7 +90,7 @@ watch([dataRevision, sleepId], () => void loadDetail());
 
 <template>
   <section class="page sleep-page" aria-labelledby="sleep-detail-title">
-    <RouterLink class="back-link" to="/"><Icon name="arrow-right" :size="14" />返回概览</RouterLink>
+    <RouterLink class="back-link" to="/"><Icon name="arrow-left" :size="14" />返回概览</RouterLink>
     <header class="page-heading">
       <h1 id="sleep-detail-title">睡眠记录详情</h1>
       <p v-if="session">{{ formatDate(session.start_time, 'long') }}</p>
@@ -101,7 +108,7 @@ watch([dataRevision, sleepId], () => void loadDetail());
           <p class="kicker"><span class="mark"><Icon name="moon" :size="16" /></span>睡眠时长</p>
           <p class="value">{{ formatDuration(session.duration_minutes, '—') }}</p>
           <p class="meta">{{ formatTime(session.start_time) }} 入睡 · {{ formatTime(session.end_time) }} 醒来</p>
-          <p class="meta">在床时长 未提供</p>
+          <p class="meta">在床时长 {{ timeInBedLabel }}</p>
         </div>
         <div class="hero-score">
           <p class="kicker">睡眠评分</p>
@@ -128,10 +135,17 @@ watch([dataRevision, sleepId], () => void loadDetail());
       <section class="surface-card stage-card" aria-label="睡眠阶段">
         <div class="stage-head">
           <h2>睡眠阶段</h2>
-          <p>{{ formatTime(session.start_time) }} – {{ formatTime(session.end_time) }}</p>
+          <div class="stage-actions">
+            <p>{{ formatTime(session.start_time) }} – {{ formatTime(session.end_time) }}</p>
+            <button class="stage-help-button" type="button" @click="stageHelpOpen = !stageHelpOpen">阶段说明</button>
+          </div>
         </div>
+        <p v-if="stageHelpOpen" class="stage-help">
+          深睡：恢复体力的深度睡眠。浅睡：占比较高的过渡阶段。REM：快速眼动期，多与记忆和梦境有关。清醒：夜间醒来或清醒片段。以上为阶段含义说明，不是健康诊断。
+        </p>
         <StageBar
           :stages="stages"
+          :slices="session.stages"
           :range-start="formatTime(session.start_time)"
           :range-end="formatTime(session.end_time)"
         />
@@ -143,15 +157,19 @@ watch([dataRevision, sleepId], () => void loadDetail());
           <dl>
             <div>
               <dt>数据来源</dt>
-              <dd>{{ sourceLabel(session.source_scope) }}</dd>
+              <dd>{{ dataProviderLabel() }}</dd>
+            </div>
+            <div>
+              <dt>数据范围</dt>
+              <dd>{{ dataScopeLabel(session.source_scope) }}</dd>
             </div>
             <div>
               <dt>同步时间</dt>
-              <dd>{{ formatDateTime(session.end_time) }}</dd>
+              <dd>{{ syncTimeLabel }}</dd>
             </div>
             <div>
               <dt>时区</dt>
-              <dd>{{ device.timezone || timezoneLabel }}</dd>
+              <dd>{{ timezoneLabel }}</dd>
             </div>
           </dl>
         </article>
@@ -168,7 +186,7 @@ watch([dataRevision, sleepId], () => void loadDetail());
             </div>
             <div>
               <dt>设备 ID</dt>
-              <dd>{{ session.device_id || device.device_id || '未提供' }}</dd>
+              <dd>{{ device.device_id || session.device_id || '未提供' }}</dd>
             </div>
           </dl>
         </article>
@@ -179,7 +197,7 @@ watch([dataRevision, sleepId], () => void loadDetail());
 </template>
 
 <style scoped>
-.sleep-page { width: min(100%, 980px); }
+.sleep-page { width: 100%; }
 .back-link {
   display: inline-flex;
   align-items: center;
@@ -194,7 +212,7 @@ watch([dataRevision, sleepId], () => void loadDetail());
 .page-heading h1 {
   margin: 0;
   color: var(--ink);
-  font-size: clamp(26px, 3.4vw, 32px);
+  font-size: 22px;
   font-weight: 650;
   letter-spacing: -0.04em;
 }
@@ -280,6 +298,17 @@ watch([dataRevision, sleepId], () => void loadDetail());
 }
 .stage-head h2 { margin: 0; color: var(--ink); font-size: 16px; }
 .stage-head p { margin: 0; color: var(--muted); font-size: 12px; }
+.stage-actions { display: flex; align-items: center; gap: 10px; }
+.stage-help-button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.stage-help { margin: 0 0 12px; color: var(--muted); font-size: 12px; line-height: 1.55; }
 .meta-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

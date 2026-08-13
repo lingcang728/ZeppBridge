@@ -40,9 +40,11 @@ pub fn run() {
                 if let Ok(Some(monitor)) = window.current_monitor() {
                     let work = monitor.work_area();
                     let scale = monitor.scale_factor();
-                    let max_height = (work.size.height as f64 / scale) - 32.0;
-                    let height = 800.0_f64.min(max_height).max(560.0);
-                    let _ = window.set_size(tauri::LogicalSize::new(1280.0, height));
+                    let work_w = (work.size.width as f64 / scale) - 24.0;
+                    let work_h = (work.size.height as f64 / scale) - 32.0;
+                    let width = (work_w * 0.88).max(1280.0_f64.min(work_w));
+                    let height = (work_h * 0.88).max(800.0_f64.min(work_h));
+                    let _ = window.set_size(tauri::LogicalSize::new(width, height));
                 }
                 let hidden = window.clone();
                 window.on_window_event(move |event| {

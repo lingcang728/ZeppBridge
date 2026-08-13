@@ -1,15 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
   <title id="title">ZeppBridge</title>
-  <desc id="desc">An abstract Z-shaped data bridge on a dark rounded square.</desc>
-  <rect width="1024" height="1024" rx="224" fill="#101613"/>
-  <path
-    d="M 278 306 H 696 C 750 306 776 370 736 405 L 330 761 C 290 796 316 860 370 860 H 746"
-    fill="none"
-    stroke="#70BC91"
-    stroke-width="128"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-  />
-  <circle cx="278" cy="306" r="30" fill="#D3F3DF"/>
-  <circle cx="746" cy="860" r="30" fill="#D3F3DF"/>
+  <desc id="desc">A continuous rounded Z bridge with a curved connection and two inner data points on a dark rounded square.</desc>
+
+  <!-- Single 24x24 master geometry; UI and platform assets derive from it. -->
+  <defs>
+    <symbol id="brand-mark" viewBox="0 0 24 24">
+      <path
+        d="M4.7 5.5H19.3
+           C19.2 7.2 18.3 8.3 16.7 9.3
+           C14.8 10.4 10.1 10.9 7 12.6
+           C5.1 13.7 4.7 15.2 4.7 18.5
+           H19.3"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="3.6"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+      <!-- Exactly two inner connection points: one under the upper turn, one above the lower turn. -->
+      <circle cx="8.2" cy="9.1" r="1.35" fill="currentColor" />
+      <circle cx="14.8" cy="16.1" r="1.35" fill="currentColor" />
+    </symbol>
+  </defs>
+
+  <rect width="1024" height="1024" rx="225" fill="#0F1512" />
+  <!-- 800px symbol box leaves the required optical quiet margin. -->
+  <use href="#brand-mark" x="112" y="112" width="800" height="800" color="#72C994" />
 </svg>

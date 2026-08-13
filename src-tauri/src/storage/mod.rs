@@ -6,7 +6,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
-const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v3";
+const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v5";
 const LAST_CLOUD_SYNC_AT_KEY: &str = "last_cloud_sync_at";
 const LAST_CLOUD_SYNC_OUTCOME_KEY: &str = "last_cloud_sync_outcome";
 const LAST_LOCAL_REPROCESS_AT_KEY: &str = "last_local_reprocess_at";
@@ -246,6 +246,49 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(4, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        self.ensure_table_columns("sleep_sessions", &[("synced_at", "TEXT")])?;
+        self.ensure_table_columns(
+            "workouts",
+            &[
+                ("synced_at", "TEXT"),
+                ("gps_available", "INTEGER NOT NULL DEFAULT 0"),
+                ("sample_count", "INTEGER NOT NULL DEFAULT 0"),
+            ],
+        )?;
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS device_identities (
+                alias TEXT PRIMARY KEY,
+                name TEXT,
+                firmware TEXT,
+                serial TEXT,
+                device_id TEXT,
+                timezone TEXT,
+                updated_at TEXT NOT NULL
+            );",
+        )?;
+        self.conn.execute(
+            "UPDATE sleep_sessions
+             SET synced_at = (
+                 SELECT fetched_at FROM raw_records
+                 WHERE raw_records.id = sleep_sessions.raw_record_id
+             )
+             WHERE synced_at IS NULL",
+            [],
+        )?;
+        self.conn.execute(
+            "UPDATE workouts
+             SET synced_at = (
+                 SELECT fetched_at FROM raw_records
+                 WHERE raw_records.id = workouts.raw_record_id
+             )
+             WHERE synced_at IS NULL",
+            [],
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(5, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        self.conn.execute_batch("PRAGMA user_version = 5;")?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }
@@ -576,6 +619,7 @@ impl Database {
                 for row in band.daily_metrics {
                     self.insert_daily_metric_with_raw(&row, Some(raw_record_id))?;
                 }
+                self.harvest_device_identities(payload)?;
             }
             "workouts" => {
                 let sport = source_key
@@ -587,6 +631,7 @@ impl Database {
                 for row in rows {
                     self.insert_workout_with_raw(&row, Some(raw_record_id))?;
                 }
+                self.harvest_device_identities(payload)?;
             }
             other => return Err(ZeppBridgeError::ConfigError(format!("未知同步流: {other}"))),
         }
@@ -790,12 +835,16 @@ impl Database {
         sleep: &SleepSession,
         raw_record_id: Option<i64>,
     ) -> Result<()> {
+        let synced_at = sleep
+            .synced_at
+            .or_else(|| self.fetched_at_for_raw(raw_record_id))
+            .unwrap_or_else(Utc::now);
         self.conn.execute(
             "INSERT INTO sleep_sessions
                 (sleep_id, start_time, end_time, score, duration_minutes,
                  deep_minutes, light_minutes, rem_minutes, rem_available, awake_minutes,
-                 source_scope, device_id, raw_record_id)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+                 source_scope, device_id, raw_record_id, synced_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
              ON CONFLICT(sleep_id) DO UPDATE SET
                 start_time = excluded.start_time,
                 end_time = excluded.end_time,
@@ -808,7 +857,8 @@ impl Database {
                 awake_minutes = excluded.awake_minutes,
                 source_scope = excluded.source_scope,
                 device_id = excluded.device_id,
-                raw_record_id = COALESCE(excluded.raw_record_id, sleep_sessions.raw_record_id)",
+                raw_record_id = COALESCE(excluded.raw_record_id, sleep_sessions.raw_record_id),
+                synced_at = COALESCE(sleep_sessions.synced_at, excluded.synced_at)",
             params![
                 sleep.sleep_id,
                 sleep.start_time.to_rfc3339(),
@@ -823,8 +873,10 @@ impl Database {
                 sleep.source_scope.as_str(),
                 sleep.device_id,
                 raw_record_id,
+                synced_at.to_rfc3339(),
             ],
         )?;
+        self.replace_sleep_stages(&sleep.sleep_id, &sleep.stages)?;
         Ok(())
     }
 
@@ -838,12 +890,17 @@ impl Database {
         workout: &Workout,
         raw_record_id: Option<i64>,
     ) -> Result<()> {
+        let synced_at = workout
+            .synced_at
+            .or_else(|| self.fetched_at_for_raw(raw_record_id))
+            .unwrap_or_else(Utc::now);
         self.conn.execute(
             "INSERT INTO workouts
                 (workout_id, workout_type, start_time, end_time, distance_meters,
                  calories, avg_hr, max_hr, training_load, vo2max,
-                 source_scope, device_id, raw_record_id)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+                 source_scope, device_id, raw_record_id, synced_at,
+                 gps_available, sample_count)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
              ON CONFLICT(workout_id) DO UPDATE SET
                 workout_type = excluded.workout_type,
                 start_time = excluded.start_time,
@@ -856,7 +913,10 @@ impl Database {
                 vo2max = excluded.vo2max,
                 source_scope = excluded.source_scope,
                 device_id = excluded.device_id,
-                raw_record_id = COALESCE(excluded.raw_record_id, workouts.raw_record_id)",
+                raw_record_id = COALESCE(excluded.raw_record_id, workouts.raw_record_id),
+                synced_at = COALESCE(workouts.synced_at, excluded.synced_at),
+                gps_available = excluded.gps_available,
+                sample_count = excluded.sample_count",
             params![
                 workout.workout_id,
                 workout.workout_type,
@@ -871,8 +931,137 @@ impl Database {
                 workout.source_scope.as_str(),
                 workout.device_id,
                 raw_record_id,
+                synced_at.to_rfc3339(),
+                i64::from(workout.gps_available),
+                workout.sample_count,
             ],
         )?;
+        Ok(())
+    }
+
+    fn fetched_at_for_raw(&self, raw_record_id: Option<i64>) -> Option<DateTime<Utc>> {
+        let raw_record_id = raw_record_id?;
+        let timestamp: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT fetched_at FROM raw_records WHERE id = ?1",
+                [raw_record_id],
+                |row| row.get(0),
+            )
+            .optional()
+            .ok()
+            .flatten();
+        timestamp.and_then(|value| parse_datetime(&value, "raw_records.fetched_at").ok())
+    }
+
+    fn replace_sleep_stages(&self, sleep_id: &str, stages: &[SleepStageSlice]) -> Result<()> {
+        self.conn
+            .execute("DELETE FROM sleep_stages WHERE sleep_id = ?1", [sleep_id])?;
+        for stage in stages {
+            self.conn.execute(
+                "INSERT INTO sleep_stages (sleep_id, stage, start_time, end_time)
+                 VALUES (?1, ?2, ?3, ?4)",
+                params![
+                    sleep_id,
+                    stage.stage,
+                    stage.start_time.to_rfc3339(),
+                    stage.end_time.to_rfc3339(),
+                ],
+            )?;
+        }
+        Ok(())
+    }
+
+    fn load_sleep_stages(&self, sleep_id: &str) -> Result<Vec<SleepStageSlice>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT stage, start_time, end_time FROM sleep_stages
+             WHERE sleep_id = ?1 ORDER BY start_time, id",
+        )?;
+        let rows = stmt.query_map([sleep_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        })?;
+        let mut stages = Vec::new();
+        for row in rows {
+            let (stage, start, end) = row?;
+            stages.push(SleepStageSlice {
+                stage,
+                start_time: parse_datetime(&start, "sleep_stages.start_time")?,
+                end_time: parse_datetime(&end, "sleep_stages.end_time")?,
+            });
+        }
+        Ok(stages)
+    }
+
+    pub fn upsert_device_identity(&self, hint: &DeviceIdentityHint) -> Result<()> {
+        let updated_at = Utc::now().to_rfc3339();
+        let mut aliases = hint.aliases.clone();
+        if let Some(device_id) = hint.device_id.as_ref() {
+            aliases.push(device_id.clone());
+        }
+        if let Some(serial) = hint.serial.as_ref() {
+            aliases.push(serial.clone());
+        }
+        aliases.retain(|value| !value.trim().is_empty());
+        aliases.sort();
+        aliases.dedup();
+        for alias in aliases {
+            self.conn.execute(
+                "INSERT INTO device_identities
+                    (alias, name, firmware, serial, device_id, timezone, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                 ON CONFLICT(alias) DO UPDATE SET
+                    name = COALESCE(excluded.name, device_identities.name),
+                    firmware = COALESCE(excluded.firmware, device_identities.firmware),
+                    serial = COALESCE(excluded.serial, device_identities.serial),
+                    device_id = COALESCE(excluded.device_id, device_identities.device_id),
+                    timezone = COALESCE(excluded.timezone, device_identities.timezone),
+                    updated_at = excluded.updated_at",
+                params![
+                    alias,
+                    hint.name,
+                    hint.firmware,
+                    hint.serial,
+                    hint.device_id,
+                    hint.timezone,
+                    updated_at,
+                ],
+            )?;
+        }
+        Ok(())
+    }
+
+    pub fn lookup_device_profile(&self, device_id: &str) -> Result<Option<DeviceProfile>> {
+        let trimmed = device_id.trim();
+        if trimmed.is_empty() {
+            return Ok(None);
+        }
+        self.conn
+            .query_row(
+                "SELECT name, firmware, serial, device_id, timezone
+                 FROM device_identities WHERE lower(alias) = lower(?1) LIMIT 1",
+                [trimmed],
+                |row| {
+                    Ok(DeviceProfile {
+                        name: row.get(0)?,
+                        firmware: row.get(1)?,
+                        serial: row.get(2)?,
+                        device_id: row.get(3)?,
+                        timezone: row.get(4)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(Into::into)
+    }
+
+    fn harvest_device_identities(&self, payload: &serde_json::Value) -> Result<()> {
+        for hint in device_identity_hints(payload) {
+            self.upsert_device_identity(&hint)?;
+        }
         Ok(())
     }
 
@@ -897,7 +1086,7 @@ impl Database {
         let mut stmt = self.conn.prepare(
             "SELECT sleep_id, start_time, end_time, score, duration_minutes,
                     deep_minutes, light_minutes, rem_minutes, rem_available, awake_minutes,
-                    source_scope, device_id
+                    source_scope, device_id, synced_at
              FROM sleep_sessions ORDER BY start_time DESC LIMIT ?1",
         )?;
         let rows = stmt.query_map([limit], |row| {
@@ -914,6 +1103,7 @@ impl Database {
                 row.get::<_, i32>(9)?,
                 row.get::<_, String>(10)?,
                 row.get::<_, Option<String>>(11)?,
+                row.get::<_, Option<String>>(12)?,
             ))
         })?;
         let mut sessions = Vec::new();
@@ -931,6 +1121,7 @@ impl Database {
                 awake_minutes,
                 scope,
                 device_id,
+                synced_at,
             ) = row?;
             sessions.push(SleepSession {
                 sleep_id,
@@ -944,6 +1135,12 @@ impl Database {
                 awake_minutes,
                 source_scope: parse_scope(&scope)?,
                 device_id,
+                synced_at: synced_at
+                    .as_deref()
+                    .map(|value| parse_datetime(value, "sleep.synced_at"))
+                    .transpose()?,
+                time_in_bed_minutes: None,
+                stages: Vec::new(),
             });
         }
         Ok(sessions)
@@ -955,7 +1152,7 @@ impl Database {
             .query_row(
                 "SELECT sleep_id, start_time, end_time, score, duration_minutes,
                         deep_minutes, light_minutes, rem_minutes, rem_available, awake_minutes,
-                        source_scope, device_id
+                        source_scope, device_id, synced_at
                  FROM sleep_sessions WHERE sleep_id = ?1 LIMIT 1",
                 [sleep_id],
                 |row| {
@@ -972,6 +1169,7 @@ impl Database {
                         row.get::<_, i32>(9)?,
                         row.get::<_, String>(10)?,
                         row.get::<_, Option<String>>(11)?,
+                        row.get::<_, Option<String>>(12)?,
                     ))
                 },
             )
@@ -989,10 +1187,12 @@ impl Database {
             awake_minutes,
             scope,
             device_id,
+            synced_at,
         )) = row
         else {
             return Ok(None);
         };
+        let stages = self.load_sleep_stages(&sleep_id)?;
         Ok(Some(SleepSession {
             sleep_id,
             start_time: parse_datetime(&start, "sleep.start_time")?,
@@ -1005,6 +1205,12 @@ impl Database {
             awake_minutes,
             source_scope: parse_scope(&scope)?,
             device_id,
+            synced_at: synced_at
+                .as_deref()
+                .map(|value| parse_datetime(value, "sleep.synced_at"))
+                .transpose()?,
+            time_in_bed_minutes: None,
+            stages,
         }))
     }
 
@@ -1013,7 +1219,8 @@ impl Database {
         let mut stmt = self.conn.prepare(
             "SELECT workout_id, workout_type, start_time, end_time,
                     distance_meters, calories, avg_hr, max_hr,
-                    training_load, vo2max, source_scope, device_id
+                    training_load, vo2max, source_scope, device_id,
+                    synced_at, gps_available, sample_count
              FROM workouts ORDER BY start_time DESC LIMIT ?1",
         )?;
         let rows = stmt.query_map([limit], |row| {
@@ -1030,6 +1237,9 @@ impl Database {
                 row.get::<_, Option<f64>>(9)?,
                 row.get::<_, String>(10)?,
                 row.get::<_, Option<String>>(11)?,
+                row.get::<_, Option<String>>(12)?,
+                row.get::<_, i64>(13)?,
+                row.get::<_, i64>(14)?,
             ))
         })?;
         let mut workouts = Vec::new();
@@ -1047,6 +1257,9 @@ impl Database {
                 vo2max,
                 scope,
                 device_id,
+                synced_at,
+                gps_available,
+                sample_count,
             ) = row?;
             workouts.push(Workout {
                 workout_id,
@@ -1061,6 +1274,12 @@ impl Database {
                 vo2max,
                 source_scope: parse_scope(&scope)?,
                 device_id,
+                synced_at: synced_at
+                    .as_deref()
+                    .map(|value| parse_datetime(value, "workout.synced_at"))
+                    .transpose()?,
+                gps_available: gps_available != 0,
+                sample_count,
             });
         }
         Ok(workouts)
@@ -1072,7 +1291,8 @@ impl Database {
             .query_row(
                 "SELECT workout_id, workout_type, start_time, end_time,
                         distance_meters, calories, avg_hr, max_hr,
-                        training_load, vo2max, source_scope, device_id
+                        training_load, vo2max, source_scope, device_id,
+                        synced_at, gps_available, sample_count
                  FROM workouts WHERE workout_id = ?1 LIMIT 1",
                 [workout_id],
                 |row| {
@@ -1089,6 +1309,9 @@ impl Database {
                         row.get::<_, Option<f64>>(9)?,
                         row.get::<_, String>(10)?,
                         row.get::<_, Option<String>>(11)?,
+                        row.get::<_, Option<String>>(12)?,
+                        row.get::<_, i64>(13)?,
+                        row.get::<_, i64>(14)?,
                     ))
                 },
             )
@@ -1106,10 +1329,23 @@ impl Database {
             vo2max,
             scope,
             device_id,
+            synced_at,
+            gps_available,
+            sample_count,
         )) = row
         else {
             return Ok(None);
         };
+        let route_points: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM route_points WHERE workout_id = ?1",
+            [&workout_id],
+            |row| row.get(0),
+        )?;
+        let stored_samples: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM workout_samples WHERE workout_id = ?1",
+            [&workout_id],
+            |row| row.get(0),
+        )?;
         Ok(Some(Workout {
             workout_id,
             workout_type,
@@ -1123,6 +1359,12 @@ impl Database {
             vo2max,
             source_scope: parse_scope(&scope)?,
             device_id,
+            synced_at: synced_at
+                .as_deref()
+                .map(|value| parse_datetime(value, "workout.synced_at"))
+                .transpose()?,
+            gps_available: gps_available != 0 || route_points > 0,
+            sample_count: sample_count.max(stored_samples),
         }))
     }
 
@@ -1782,6 +2024,88 @@ impl Database {
     }
 }
 
+fn push_alias(aliases: &mut Vec<String>, value: Option<String>) {
+    if let Some(value) = value {
+        let trimmed = value.trim();
+        if !trimmed.is_empty() && !aliases.iter().any(|existing| existing == trimmed) {
+            aliases.push(trimmed.to_string());
+        }
+    }
+}
+
+fn string_field(value: &serde_json::Value, keys: &[&str]) -> Option<String> {
+    let object = value.as_object()?;
+    for key in keys {
+        match object.get(*key) {
+            Some(serde_json::Value::String(text)) if !text.trim().is_empty() => {
+                return Some(text.trim().to_string());
+            }
+            Some(serde_json::Value::Number(number)) => return Some(number.to_string()),
+            _ => {}
+        }
+    }
+    None
+}
+
+fn firmware_from_bind_device(raw: &str) -> Option<String> {
+    raw.split(':')
+        .next_back()
+        .map(str::trim)
+        .filter(|value| value.chars().any(|ch| ch.is_ascii_digit()) && value.contains('.'))
+        .map(str::to_string)
+}
+
+fn collect_objects<'a>(value: &'a serde_json::Value, out: &mut Vec<&'a serde_json::Value>) {
+    match value {
+        serde_json::Value::Array(items) => {
+            for item in items {
+                collect_objects(item, out);
+            }
+        }
+        serde_json::Value::Object(object) => {
+            out.push(value);
+            for key in ["data", "items", "records", "results", "list", "summary"] {
+                if let Some(child) = object.get(key) {
+                    collect_objects(child, out);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+fn device_identity_hints(payload: &serde_json::Value) -> Vec<DeviceIdentityHint> {
+    let mut objects = Vec::new();
+    collect_objects(payload, &mut objects);
+    let mut hints = Vec::new();
+    for object in objects {
+        let mut aliases = Vec::new();
+        push_alias(
+            &mut aliases,
+            string_field(object, &["device_id", "deviceId", "deviceid"]),
+        );
+        push_alias(
+            &mut aliases,
+            string_field(object, &["sn", "serial", "serialNumber"]),
+        );
+        if aliases.is_empty() {
+            continue;
+        }
+        let bind = string_field(object, &["bind_device", "bindDevice"]);
+        hints.push(DeviceIdentityHint {
+            device_id: string_field(object, &["device_id", "deviceId", "deviceid"]),
+            serial: string_field(object, &["sn", "serial", "serialNumber"]),
+            firmware: bind.as_deref().and_then(firmware_from_bind_device),
+            timezone: string_field(object, &["syncedTimezone", "timezone", "tz"]).filter(|value| {
+                value.contains('/') || value.chars().any(|ch| ch.is_ascii_alphabetic())
+            }),
+            name: string_field(object, &["displayName", "deviceName", "productName"]),
+            aliases,
+        });
+    }
+    hints
+}
+
 fn parse_datetime(value: &str, field: &str) -> Result<DateTime<Utc>> {
     DateTime::parse_from_rfc3339(value)
         .map(|dt| dt.with_timezone(&Utc))
@@ -1873,6 +2197,9 @@ mod tests {
             awake_minutes: 20,
             source_scope: SourceScope::Device,
             device_id: None,
+            synced_at: None,
+            time_in_bed_minutes: None,
+            stages: Vec::new(),
         })
         .unwrap();
         assert_eq!(
@@ -1908,5 +2235,70 @@ mod tests {
         db.insert_metric_sample(&revised).unwrap();
         assert_eq!(db.count_metric_samples().unwrap(), 1);
         assert_eq!(db.get_health_overview().unwrap().current_hr, Some(71));
+    }
+
+    #[test]
+    fn device_lookup_does_not_fall_back_to_first_device() {
+        let db = Database::in_memory().unwrap();
+        db.upsert_device_identity(&DeviceIdentityHint {
+            aliases: vec!["SN-ONE".into(), "MAC-ONE".into()],
+            name: Some("Watch One".into()),
+            firmware: Some("1.0.0".into()),
+            serial: Some("SN-ONE".into()),
+            device_id: Some("MAC-ONE".into()),
+            timezone: None,
+        })
+        .unwrap();
+        db.upsert_device_identity(&DeviceIdentityHint {
+            aliases: vec!["SN-TWO".into(), "MAC-TWO".into()],
+            name: Some("Watch Two".into()),
+            firmware: Some("2.0.0".into()),
+            serial: Some("SN-TWO".into()),
+            device_id: Some("MAC-TWO".into()),
+            timezone: None,
+        })
+        .unwrap();
+        let one = db.lookup_device_profile("SN-ONE").unwrap().unwrap();
+        let two = db.lookup_device_profile("MAC-TWO").unwrap().unwrap();
+        assert_eq!(one.name.as_deref(), Some("Watch One"));
+        assert_eq!(two.name.as_deref(), Some("Watch Two"));
+        assert!(db.lookup_device_profile("UNKNOWN").unwrap().is_none());
+    }
+
+    #[test]
+    fn sleep_stages_round_trip_and_synced_at_is_not_end_time() {
+        let db = Database::in_memory().unwrap();
+        let start = ts();
+        let end = start + chrono::Duration::minutes(400);
+        db.insert_sleep_session(&SleepSession {
+            sleep_id: "sleep-stages".into(),
+            start_time: start,
+            end_time: end,
+            score: Some(80),
+            duration_minutes: 380,
+            deep_minutes: 80,
+            light_minutes: 240,
+            rem_minutes: Some(40),
+            awake_minutes: 20,
+            source_scope: SourceScope::Device,
+            device_id: Some("SN-ONE".into()),
+            synced_at: Some(start + chrono::Duration::hours(10)),
+            time_in_bed_minutes: None,
+            stages: vec![SleepStageSlice {
+                stage: "deep".into(),
+                start_time: start,
+                end_time: start + chrono::Duration::minutes(80),
+            }],
+        })
+        .unwrap();
+        let detail = db.get_sleep_detail("sleep-stages").unwrap().unwrap();
+        assert_eq!(detail.stages.len(), 1);
+        assert_eq!(detail.stages[0].stage, "deep");
+        assert_eq!(detail.time_in_bed_minutes, None);
+        assert_eq!(
+            detail.synced_at.unwrap(),
+            start + chrono::Duration::hours(10)
+        );
+        assert_ne!(detail.synced_at.unwrap(), detail.end_time);
     }
 }

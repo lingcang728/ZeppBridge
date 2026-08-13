@@ -50,6 +50,14 @@ pub struct DailyMetric {
     pub device_id: Option<String>,
 }
 
+/// 真实睡眠阶段时间片。顺序必须来自云端 `stage[]`，禁止按总量拼接。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SleepStageSlice {
+    pub stage: String,
+    pub start_time: DateTime<Utc>,
+    pub end_time: DateTime<Utc>,
+}
+
 /// 睡眠会话
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SleepSession {
@@ -64,6 +72,13 @@ pub struct SleepSession {
     pub awake_minutes: i32,
     pub source_scope: SourceScope,
     pub device_id: Option<String>,
+    #[serde(default)]
+    pub synced_at: Option<DateTime<Utc>>,
+    /// 仅当云端提供独立在床字段时才有值。当前 Zepp `ebt`/`obt` 不可靠，恒为 None。
+    #[serde(default)]
+    pub time_in_bed_minutes: Option<i32>,
+    #[serde(default)]
+    pub stages: Vec<SleepStageSlice>,
 }
 
 /// 运动记录
@@ -81,6 +96,12 @@ pub struct Workout {
     pub vo2max: Option<f64>,
     pub source_scope: SourceScope,
     pub device_id: Option<String>,
+    #[serde(default)]
+    pub synced_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub gps_available: bool,
+    #[serde(default)]
+    pub sample_count: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -249,6 +270,16 @@ pub struct ExportResult {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct DeviceProfile {
+    pub name: Option<String>,
+    pub firmware: Option<String>,
+    pub serial: Option<String>,
+    pub device_id: Option<String>,
+    pub timezone: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DeviceIdentityHint {
+    pub aliases: Vec<String>,
     pub name: Option<String>,
     pub firmware: Option<String>,
     pub serial: Option<String>,

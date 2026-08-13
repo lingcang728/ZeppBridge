@@ -5,9 +5,10 @@ import BrandMark from './components/BrandMark.vue';
 import Icon from './components/Icon.vue';
 import { useSyncController } from './composables/useSyncController';
 import { useTheme, type ThemeMode } from './composables/useTheme';
+import { useUiScale } from './composables/useUiScale';
 import { backend, isDesktop } from './lib/bridge';
 
-const APP_VERSION = '0.4.0';
+const APP_VERSION = '0.5.0';
 
 const route = useRoute();
 const router = useRouter();
@@ -20,6 +21,7 @@ const {
   lastCloudSyncLabel, initialize, runSync, cancelSync,
 } = useSyncController();
 const { theme, themeLabel, initializeTheme, setTheme } = useTheme();
+const { initializeScale, bumpScale, resetScale } = useUiScale();
 
 const navigation = [
   { to: '/', label: '概览', icon: 'grid' as const },
@@ -84,11 +86,23 @@ const onDocumentPointerDown = (event: PointerEvent) => {
 };
 const onDocumentKeydown = (event: KeyboardEvent) => {
   if (event.key === 'Escape') themeMenuOpen.value = false;
+  if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+  if (event.key === '=' || event.key === '+' || event.code === 'NumpadAdd') {
+    event.preventDefault();
+    bumpScale(1);
+  } else if (event.key === '-' || event.code === 'NumpadSubtract') {
+    event.preventDefault();
+    bumpScale(-1);
+  } else if (event.key === '0' || event.code === 'Numpad0') {
+    event.preventDefault();
+    resetScale();
+  }
 };
 const closeMobileMenu = () => { mobileMenuOpen.value = false; };
 
 onMounted(() => {
   initializeTheme();
+  initializeScale();
   void initialize();
   document.addEventListener('pointerdown', onDocumentPointerDown);
   document.addEventListener('keydown', onDocumentKeydown);
@@ -244,11 +258,11 @@ onUnmounted(() => {
   --subtle: #5C636C;
   --line: #2A2E36;
   --line-strong: #3A4048;
-  --accent: #7DCEA0;
-  --accent-strong: #6BBF8E;
+  --accent: #72C994;
+  --accent-strong: #5FB882;
   --accent-ink: #0C0E11;
   --accent-soft: #163024;
-  --icon-mint: #A8E6C3;
+  --icon-mint: #72C994;
   --heart: #E88A8E;
   --heart-wash: #2A1618;
   --sleep: #9AA0E8;
@@ -280,6 +294,7 @@ onUnmounted(() => {
   :root:not([data-theme]) {
     color-scheme: light;
     --bg: #F2F4F6;
+    --sidebar: #EEF0F3;
     --canvas: #F7F8FA;
     --surface: #FFFFFF;
     --surface-raised: #ECEFF2;
@@ -288,9 +303,9 @@ onUnmounted(() => {
     --subtle: #8A9098;
     --line: #D8DCE1;
     --line-strong: #C5CBD2;
-    --accent: #5EAF82;
-    --accent-strong: #4E9A70;
-    --accent-ink: #0C0E11;
+    --accent: #3E8A5E;
+    --accent-strong: #347852;
+    --accent-ink: #FFFFFF;
     --accent-soft: #D7F6E5;
     --icon-mint: #3E8A5E;
     --heart: #C45F64;
@@ -321,9 +336,9 @@ onUnmounted(() => {
   --subtle: #8A9098;
   --line: #D8DCE1;
   --line-strong: #C5CBD2;
-  --accent: #5EAF82;
-  --accent-strong: #4E9A70;
-  --accent-ink: #0C0E11;
+  --accent: #3E8A5E;
+  --accent-strong: #347852;
+  --accent-ink: #FFFFFF;
   --accent-soft: #D7F6E5;
   --icon-mint: #3E8A5E;
   --heart: #C45F64;
@@ -342,7 +357,7 @@ onUnmounted(() => {
 }
 
 * { box-sizing: border-box; }
-html, body, #app { min-height: 100%; margin: 0; }
+html, body, #app { height: 100%; min-height: 100%; margin: 0; overflow: hidden; }
 body {
   min-width: 320px;
   background: var(--bg);
@@ -382,15 +397,17 @@ a { color: inherit; }
   transition: transform 150ms ease;
 }
 .skip-link:focus { transform: translateY(0); }
-.app-shell { display: flex; min-height: 100vh; min-width: 0; background: var(--bg); }
+.app-shell { display: flex; height: 100%; min-height: 0; min-width: 0; overflow: hidden; background: var(--bg); }
 .app-shell > * { min-width: 0; }
 .sidebar {
   width: 228px;
   flex: 0 0 228px;
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100%;
+  min-height: 0;
   min-width: 0;
+  overflow: hidden;
   padding: 24px 14px 18px;
   background: var(--sidebar);
   border-right: 1px solid var(--line);
@@ -434,7 +451,7 @@ a { color: inherit; }
 .local-note { display: flex; align-items: center; gap: 7px; color: var(--accent); font-size: 12px; font-weight: 650; }
 .local-copy { margin: 8px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
 .app-version { display: block; margin-top: 14px; color: var(--subtle); font-family: var(--font-mono); font-size: 11px; }
-.app-body { display: flex; min-width: 0; flex: 1; flex-direction: column; }
+.app-body { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; height: 100%; overflow: hidden; }
 .topbar {
   display: flex;
   height: 64px;
@@ -463,15 +480,15 @@ a { color: inherit; }
   font-size: 12px;
   white-space: nowrap;
 }
-.connection-chip.tone-success { color: var(--icon-mint); border-color: #2A4B39; background: #141A16; }
+.connection-chip.tone-success { color: var(--icon-mint); border-color: var(--accent-soft); background: var(--accent-soft); }
 .content-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  width: min(100%, 1120px);
-  margin: 0 auto;
-  padding: 8px 32px 28px;
+  width: 100%;
+  margin: 0;
+  padding: 8px 24px 20px;
   color: var(--muted);
   font-size: 12px;
 }
@@ -522,7 +539,7 @@ a { color: inherit; }
 .preview-banner { background: var(--accent-soft); }
 .preview-banner svg { color: var(--accent); }
 .route-notice { background: var(--surface); color: var(--warning); }
-.main-content { width: 100%; min-width: 0; flex: 1; background: var(--canvas); }
+.main-content { width: 100%; min-width: 0; min-height: 0; flex: 1; overflow: auto; background: var(--canvas); }
 .bottom-nav, .mobile-menu { display: none; }
 .page-enter-active, .page-leave-active { transition: opacity 150ms ease, transform 150ms ease; }
 .page-enter-from, .page-leave-to { opacity: 0; transform: translateY(4px); }
@@ -555,12 +572,12 @@ a { color: inherit; }
   .bottom-nav-link.is-active { color: var(--accent); background: var(--accent-soft); }
 }
 
-.page { width: min(100%, 1120px); min-width: 0; margin: 0 auto; padding: 24px 32px 20px; }
-.page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 22px; min-width: 0; }
+.page { width: 100%; max-width: none; min-width: 0; margin: 0; padding: 18px 24px 16px; }
+.page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 16px; min-width: 0; }
 .eyebrow { margin: 0 0 6px; color: var(--muted); font-size: 11px; font-weight: 650; letter-spacing: .06em; }
 h1, h2, p { margin-top: 0; }
-.page h1 { margin-bottom: 8px; font-size: clamp(24px, 3vw, 30px); font-weight: 650; letter-spacing: -.04em; line-height: 1.12; }
-.page-intro { max-width: 56ch; margin-bottom: 0; color: var(--muted); font-size: 14px; }
+.page h1 { margin-bottom: 6px; font-size: 22px; font-weight: 650; letter-spacing: -.03em; line-height: 1.2; }
+.page-intro { margin-bottom: 0; color: var(--muted); font-size: 13px; }
 .button { display: inline-flex; min-height: 40px; align-items: center; justify-content: center; gap: 7px; padding: 8px 13px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; font-size: 13px; font-weight: 650; text-decoration: none; cursor: pointer; }
 .button:disabled { opacity: .5; cursor: not-allowed; }
 .button-primary, .button.primary { background: var(--accent); color: var(--accent-ink); }

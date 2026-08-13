@@ -267,6 +267,10 @@ impl Normalizer {
                 vo2max: first_number(object, &["vo2max", "vo2Max", "VO2_MAX", "VO2_max"]),
                 source_scope: source_scope(Some(object), source_device.as_deref()),
                 device_id: source_device,
+                synced_at: None,
+                // geohash `location` 不是轨迹。history 摘要没有 lat/lon 点。
+                gps_available: workout_has_track_geometry(object),
+                sample_count: workout_sample_count(object),
             });
         }
         Ok(NormalizedBatch {
@@ -474,9 +478,9 @@ fn sleep_from_band_item(
         .map(|value| value.round() as i32)
         .filter(|value| *value >= 0);
     let rem_from_stages = band_stage_minutes(sleep, 8);
-    let in_bed_minutes = (end_time - start_time).num_minutes().max(0) as i32;
+    let span_minutes = (end_time - start_time).num_minutes().max(0) as i32;
     let rem_minutes = rem_from_field.or_else(|| (rem_from_stages > 0).then_some(rem_from_stages));
-    let duration_minutes = (in_bed_minutes - awake_minutes).max(0);
+    let duration_minutes = (span_minutes - awake_minutes).max(0);
     let source_device = device_id(item)
         .or_else(|| first_string(summary, &["sn"]))
         .filter(|value| !value.is_empty());
@@ -488,6 +492,7 @@ fn sleep_from_band_item(
             end_time.timestamp()
         )
     });
+    let stages = sleep_stages_from_band(item, summary, sleep);
 
     Ok(SleepSession {
         sleep_id,
@@ -503,6 +508,9 @@ fn sleep_from_band_item(
         awake_minutes,
         source_scope: scope,
         device_id: source_device,
+        synced_at: None,
+        time_in_bed_minutes: None,
+        stages,
     })
 }
 
@@ -541,7 +549,120 @@ fn sleep_from_flat_object(object: &Map<String, Value>) -> Option<SleepSession> {
         awake_minutes,
         source_scope: source_scope(Some(object), source_device.as_deref()),
         device_id: source_device,
+        synced_at: None,
+        time_in_bed_minutes: None,
+        stages: Vec::new(),
     })
+}
+
+fn sleep_stage_name(mode: i64) -> Option<&'static str> {
+    match mode {
+        5 => Some("deep"),
+        4 => Some("light"),
+        8 => Some("rem"),
+        7 => Some("awake"),
+        _ => None,
+    }
+}
+
+fn sleep_stages_from_band(
+    item: &Map<String, Value>,
+    summary: &Map<String, Value>,
+    sleep: &Map<String, Value>,
+) -> Vec<SleepStageSlice> {
+    let Some(date) = first_string(item, &["date_time", "date", "dayId"])
+        .and_then(|value| NaiveDate::parse_from_str(&value, "%Y-%m-%d").ok())
+    else {
+        return Vec::new();
+    };
+    let timezone_offset = first_number(summary, &["tz"])
+        .map(|value| value.round() as i64)
+        .unwrap_or(0)
+        .clamp(-18 * 3600, 18 * 3600);
+    let Some(local_midnight) = date.and_hms_opt(0, 0, 0) else {
+        return Vec::new();
+    };
+    let utc_midnight = DateTime::<Utc>::from_naive_utc_and_offset(
+        local_midnight - Duration::seconds(timezone_offset),
+        Utc,
+    );
+    let Some(stages) = sleep.get("stage").and_then(Value::as_array) else {
+        return Vec::new();
+    };
+    stages
+        .iter()
+        .filter_map(Value::as_object)
+        .filter_map(|stage| {
+            let mode = first_number(stage, &["mode"])?.round() as i64;
+            let name = sleep_stage_name(mode)?;
+            let start = first_number(stage, &["start"])? as i64;
+            let stop = first_number(stage, &["stop"])? as i64;
+            if stop < start {
+                return None;
+            }
+            let start_time = utc_midnight + Duration::minutes(start);
+            let end_time = utc_midnight + Duration::minutes(stop + 1);
+            if end_time <= start_time {
+                return None;
+            }
+            Some(SleepStageSlice {
+                stage: name.to_string(),
+                start_time,
+                end_time,
+            })
+        })
+        .collect()
+}
+
+fn workout_has_track_geometry(object: &Map<String, Value>) -> bool {
+    for key in [
+        "latitude",
+        "longitude",
+        "lat",
+        "lon",
+        "lng",
+        "track_points",
+        "trackPoints",
+        "gps_points",
+        "gpsPoints",
+        "route",
+        "polyline",
+    ] {
+        match object.get(key) {
+            Some(Value::Array(items)) if !items.is_empty() => return true,
+            Some(Value::Number(number)) if number.as_f64().is_some_and(|value| value != 0.0) => {
+                return true;
+            }
+            Some(Value::String(text))
+                if !text.trim().is_empty() && key != "location" && !text.starts_with("ws") =>
+            {
+                return true;
+            }
+            _ => {}
+        }
+    }
+    false
+}
+
+fn workout_sample_count(object: &Map<String, Value>) -> i64 {
+    for key in [
+        "sample_count",
+        "sampleCount",
+        "hr_samples",
+        "heartRateSamples",
+        "samples",
+    ] {
+        match object.get(key) {
+            Some(Value::Array(items)) => return items.len() as i64,
+            Some(Value::Number(number)) => {
+                if let Some(value) = number.as_i64().filter(|value| *value > 0) {
+                    return value;
+                }
+            }
+            _ => {}
+        }
+    }
+    0
 }
 
 fn band_stage_minutes(sleep: &Map<String, Value>, expected_mode: i64) -> i32 {
@@ -1013,13 +1134,7 @@ fn summary_date(
 fn device_id(object: &Map<String, Value>) -> Option<String> {
     first_string(
         object,
-        &[
-            "device_id",
-            "deviceId",
-            "deviceid",
-            "sourceDeviceId",
-            "bind_device",
-        ],
+        &["device_id", "deviceId", "deviceid", "sourceDeviceId"],
     )
 }
 
@@ -1086,5 +1201,58 @@ mod tests {
         }))
         .unwrap();
         assert_eq!(result.sleep_sessions[0].rem_minutes, None);
+        assert_eq!(result.sleep_sessions[0].time_in_bed_minutes, None);
+        assert_eq!(result.sleep_sessions[0].stages.len(), 2);
+        assert_eq!(result.sleep_sessions[0].stages[0].stage, "deep");
+        assert_eq!(result.sleep_sessions[0].stages[1].stage, "light");
+    }
+
+    #[test]
+    fn ebt_obt_are_not_treated_as_time_in_bed() {
+        let summary = json!({
+            "tz": 28800,
+            "slp": {
+                "st": 1_700_000_000i64,
+                "ed": 1_700_021_600i64,
+                "ss": 70,
+                "ebt": 452,
+                "obt": -31,
+                "wk": 10,
+                "dp": 80,
+                "lt": 200
+            }
+        });
+        let result = Normalizer::normalize_band_data(&json!({
+            "data": [{
+                "uuid": "sleep-ebt",
+                "date_time": "2026-08-12",
+                "device_id": "SN123",
+                "summary": STANDARD.encode(serde_json::to_vec(&summary).unwrap())
+            }]
+        }))
+        .unwrap();
+        assert_eq!(result.sleep_sessions[0].time_in_bed_minutes, None);
+        assert!(result.sleep_sessions[0].stages.is_empty());
+    }
+
+    #[test]
+    fn workout_geohash_location_is_not_gps_track() {
+        let result = Normalizer::normalize_workouts(&json!({
+            "data": {
+                "summary": [{
+                    "trackid": 1_700_000_000i64,
+                    "end_time": 1_700_003_600i64,
+                    "sport": "run",
+                    "dis": 5000,
+                    "location": "ws0fsyhekz4d",
+                    "deviceid": "AABBCCDDEEFF",
+                    "sn": "23229501001311"
+                }]
+            }
+        }))
+        .unwrap();
+        assert!(!result[0].gps_available);
+        assert_eq!(result[0].sample_count, 0);
+        assert_eq!(result[0].device_id.as_deref(), Some("AABBCCDDEEFF"));
     }
 }

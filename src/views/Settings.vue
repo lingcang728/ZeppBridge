@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import Icon from '../components/Icon.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { useTheme, type ThemeMode } from '../composables/useTheme';
+import { UI_SCALES, useUiScale, type UiScale } from '../composables/useUiScale';
 import { backend, toUserMessage } from '../lib/bridge';
 import type { LoginStatus } from '../types';
 
@@ -20,6 +21,7 @@ const {
   markDataChanged,
 } = useSyncController();
 const { theme, setTheme } = useTheme();
+const { scale, setScale } = useUiScale();
 
 const reconnecting = ref(false);
 const loginStatus = ref<LoginStatus>({ state: 'idle', message: '', page_url: '' });
@@ -346,6 +348,17 @@ onUnmounted(() => {
             <Icon :name="option.icon" :size="16" /><span>{{ option.label }}</span><Icon v-if="theme === option.value" name="check" :size="14" />
           </button>
         </div>
+        <p class="section-description tight">界面缩放。100% 为设计基准，也可用 Ctrl + / Ctrl - / Ctrl 0。</p>
+        <div class="scale-options" role="radiogroup" aria-label="界面缩放">
+          <button
+            v-for="option in UI_SCALES"
+            :key="option"
+            type="button"
+            role="radio"
+            :aria-checked="scale === option"
+            @click="setScale(option as UiScale)"
+          >{{ option }}%</button>
+        </div>
       </section>
     </div>
 
@@ -395,17 +408,17 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.page { width: min(100%, 920px); min-width: 0; margin: 0 auto; padding: 36px 32px 64px; }
-.page-header { margin-bottom: 22px; min-width: 0; }
+.page { width: 100%; min-width: 0; margin: 0; padding: 18px 24px 24px; }
+.page-header { margin-bottom: 16px; min-width: 0; }
 h1, h2, h3, p { margin-top: 0; }
-h1 { margin-bottom: 8px; font-size: clamp(32px, 4vw, 40px); font-weight: 650; letter-spacing: -.045em; line-height: 1.08; }
-h2 { margin-bottom: 6px; font-size: 17px; font-weight: 650; letter-spacing: -.02em; }
-h3 { margin-bottom: 7px; font-size: 15px; }
+h1 { margin-bottom: 6px; font-size: 22px; font-weight: 650; letter-spacing: -.03em; line-height: 1.2; }
+h2 { margin-bottom: 4px; font-size: 15px; font-weight: 650; letter-spacing: -.02em; }
+h3 { margin-bottom: 6px; font-size: 14px; }
 .page-intro, .section-description, .setting-row p, .advanced-block p { margin-bottom: 0; color: var(--muted); }
 .section-description.tight { margin-top: 8px; }
 .settings-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; min-width: 0; }
 .settings-grid > * { min-width: 0; }
-.settings-section { margin-top: 12px; padding: 20px 22px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); min-width: 0; }
+.settings-section { margin-top: 10px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); min-width: 0; }
 .settings-grid .settings-section { margin-top: 0; }
 .section-heading, .setting-row, .block-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; min-width: 0; }
 .cloud-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
@@ -417,7 +430,7 @@ h3 { margin-bottom: 7px; font-size: 15px; }
 .meta-row { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 14px; color: var(--muted); font-size: 12px; }
 .meta-row span { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .connection-actions, .button-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
-.button { display: inline-flex; min-height: 40px; align-items: center; justify-content: center; gap: 7px; padding: 8px 13px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; font-size: 12px; font-weight: 650; cursor: pointer; }
+.button { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; gap: 7px; padding: 6px 12px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; font-size: 12px; font-weight: 650; cursor: pointer; }
 .button:disabled { opacity: .5; cursor: not-allowed; }
 .button.primary { background: var(--accent); color: var(--accent-ink); }
 .button.secondary, .button.quiet { border-color: var(--line); color: var(--muted); }
@@ -440,8 +453,11 @@ h3 { margin-bottom: 7px; font-size: 15px; }
 .switch span { display: block; width: 17px; height: 17px; border-radius: 50%; background: var(--muted); transition: transform 150ms ease, background-color 150ms ease; }
 .switch[aria-checked='true'] { border-color: var(--accent); background: var(--accent-soft); }
 .switch[aria-checked='true'] span { transform: translateX(19px); background: var(--accent); }
-.theme-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin-top: 15px; }
-.theme-options button { display: flex; min-height: 44px; min-width: 0; align-items: center; gap: 8px; padding: 9px 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: transparent; color: var(--muted); cursor: pointer; }
+.theme-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin-top: 12px; }
+.theme-options button { display: flex; min-height: 38px; min-width: 0; align-items: center; gap: 8px; padding: 7px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: transparent; color: var(--muted); cursor: pointer; }
+.scale-options { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.scale-options button { min-width: 52px; min-height: 32px; padding: 4px 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: transparent; color: var(--ink); font-variant-numeric: tabular-nums; cursor: pointer; }
+.scale-options button[aria-checked='true'] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 .theme-options button span { flex: 1; color: var(--ink); text-align: left; }
 .theme-options button[aria-checked='true'] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 .advanced > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; list-style: none; }

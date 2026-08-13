@@ -43,7 +43,7 @@ export interface BridgeBackend {
   getSleepDetail(sleepId: string): Promise<SleepSession | null>;
   getRecentWorkouts(limit?: number): Promise<Workout[]>;
   getWorkoutDetail(workoutId: string): Promise<Workout | null>;
-  getDeviceProfile(): Promise<DeviceProfile>;
+  getDeviceProfile(query?: { deviceId?: string; sourceScope?: string }): Promise<DeviceProfile>;
 
   reprocessLocalData(): Promise<ReprocessResult>;
   getExportJson(selection: ExportSelection): Promise<string>;
