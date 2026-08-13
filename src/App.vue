@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getVersion } from '@tauri-apps/api/app';
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router';
 import BrandMark from './components/BrandMark.vue';
@@ -8,7 +9,19 @@ import { useTheme, type ThemeMode } from './composables/useTheme';
 import { useUiScale } from './composables/useUiScale';
 import { backend, isDesktop } from './lib/bridge';
 
-const APP_VERSION = '0.5.0';
+// 桌面端从 Tauri 运行时读取版本（与 tauri.conf.json 单一来源），
+// 浏览器预览环境回退到下面的常量（与 package.json 保持同步）。
+const FALLBACK_APP_VERSION = '0.6.0';
+const APP_VERSION = ref(FALLBACK_APP_VERSION);
+if (isDesktop()) {
+  void getVersion()
+    .then((version) => {
+      APP_VERSION.value = version;
+    })
+    .catch(() => {
+      // Keep the fallback when the runtime version is unavailable.
+    });
+}
 
 const route = useRoute();
 const router = useRouter();
