@@ -93,5 +93,8 @@ secrets*.json
 .omo/
 design_picture/
 
+# Cloned reference repos / dev scratch
+temp/
+
 # OS
 Thumbs.db
