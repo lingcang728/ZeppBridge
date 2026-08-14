@@ -3,7 +3,7 @@ use crate::connectors::ZeppConnector;
 use crate::ipc_types::CleanupResult;
 use crate::models::{
     DailyPoint, DeviceProfile, ExportResult, ExportSelection, HealthOverview, HeartRatePoint,
-    SleepSession, StorageEstimate, UserPrefs, Workout,
+    SleepSession, StorageEstimate, UserPrefs, Workout, WorkoutSeries,
 };
 use chrono::Utc;
 use std::io::Write;
@@ -70,6 +70,16 @@ pub async fn get_workout_detail(
 ) -> std::result::Result<Option<Workout>, String> {
     let db = state.db.lock().await;
     db.get_workout_detail(&workout_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn get_workout_series(
+    state: tauri::State<'_, AppState>,
+    workout_id: String,
+) -> std::result::Result<WorkoutSeries, String> {
+    let db = state.db.lock().await;
+    db.get_workout_series(&workout_id)
         .map_err(|error| error.to_string())
 }
 

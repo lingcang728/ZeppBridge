@@ -63,10 +63,10 @@ impl AppState {
 
         let migration_warning = migrate_legacy_data(&data_dir);
         let db = Database::new(data_dir.join("zepp.db"))?;
-        let replay_warning = db
-            .reprocess_raw_records_if_needed()
-            .err()
-            .map(|error| format!("本地原始数据重新解析未完全成功：{error}"));
+        // Do not replay every raw payload during startup. A full reprocess of a
+        // large local library blocks window creation and looks like a hang.
+        // Settings still has an explicit reprocess action; the next cloud sync
+        // also refreshes workout source/type fields.
         let auth = Arc::new(AuthManager::new(data_dir.clone()));
 
         let (sync_manager, auth_state, auth_warning) = match auth.load_auth() {
@@ -85,10 +85,7 @@ impl AppState {
                 Some(startup_warning(error)),
             ),
         };
-        let startup_warning = merge_startup_warnings(
-            merge_startup_warnings(migration_warning, replay_warning),
-            auth_warning,
-        );
+        let startup_warning = merge_startup_warnings(migration_warning, auth_warning);
 
         Ok(Self {
             data_dir,

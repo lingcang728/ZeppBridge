@@ -1,3 +1,4 @@
+use crate::decoder::{decode_workout_detail, DecodedWorkout};
 use crate::models::{error::*, *};
 use crate::normalizer::Normalizer;
 use chrono::{DateTime, Local, NaiveDate, Utc};
@@ -6,7 +7,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
-const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v5";
+const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v6";
 const LAST_CLOUD_SYNC_AT_KEY: &str = "last_cloud_sync_at";
 const LAST_CLOUD_SYNC_OUTCOME_KEY: &str = "last_cloud_sync_outcome";
 const LAST_LOCAL_REPROCESS_AT_KEY: &str = "last_local_reprocess_at";
@@ -311,6 +312,30 @@ impl Database {
             [Utc::now().to_rfc3339()],
         )?;
         self.conn.execute_batch("PRAGMA user_version = 5;")?;
+        self.ensure_table_columns(
+            "workouts",
+            &[("zepp_source", "TEXT"), ("zepp_type", "INTEGER")],
+        )?;
+        self.ensure_table_columns("workout_samples", &[("stride", "REAL")])?;
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS workout_pauses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                workout_id TEXT NOT NULL,
+                start_time TEXT NOT NULL,
+                end_time TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                FOREIGN KEY(workout_id) REFERENCES workouts(workout_id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_workout_samples_workout
+                ON workout_samples(workout_id, timestamp);
+            CREATE INDEX IF NOT EXISTS idx_route_points_workout
+                ON route_points(workout_id, timestamp);
+            PRAGMA user_version = 6;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(6, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }
@@ -667,6 +692,21 @@ impl Database {
                 }
                 self.harvest_device_identities(payload)?;
             }
+            "workout_detail" => {
+                let workout_id = workout_id_from_detail_key(source_key).ok_or_else(|| {
+                    ZeppBridgeError::ConfigError("workout_detail source_key 无效".into())
+                })?;
+                if !self.workout_exists(&workout_id)? {
+                    return Err(ZeppBridgeError::DataUnavailable(
+                        "detail 对应的训练摘要还不存在".into(),
+                    ));
+                }
+                let summary_end = self.workout_end_time(&workout_id)?;
+                let decoded = decode_workout_detail(payload, summary_end)?;
+                self.replace_workout_series(&workout_id, &decoded)?;
+                counts.primary_records =
+                    (decoded.samples.len() + decoded.route.len() + decoded.pauses.len()) as i64;
+            }
             other => return Err(ZeppBridgeError::ConfigError(format!("未知同步流: {other}"))),
         }
         Ok(counts)
@@ -706,11 +746,13 @@ impl Database {
                     [raw_record_id],
                 )?;
             }
+            "workout_detail" => {}
             _ => {}
         }
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn reprocess_raw_records_if_needed(&self) -> Result<Option<BTreeMap<String, i64>>> {
         let current = self
             .conn
@@ -783,6 +825,7 @@ impl Database {
             "daily_summary" => ("SELECT COUNT(*) FROM daily_metrics", None),
             "sleep" => ("SELECT COUNT(*) FROM sleep_sessions", None),
             "workouts" => ("SELECT COUNT(*) FROM workouts", None),
+            "workout_detail" => ("SELECT COUNT(*) FROM workout_samples", None),
             _ => return Ok(0),
         };
         if let Some(parameter) = parameter {
@@ -933,8 +976,8 @@ impl Database {
                 (workout_id, workout_type, start_time, end_time, distance_meters,
                  calories, avg_hr, max_hr, training_load, vo2max,
                  source_scope, device_id, raw_record_id, synced_at,
-                 gps_available, sample_count)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+                 gps_available, sample_count, zepp_source, zepp_type)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
              ON CONFLICT(workout_id) DO UPDATE SET
                 workout_type = excluded.workout_type,
                 start_time = excluded.start_time,
@@ -949,8 +992,16 @@ impl Database {
                 device_id = excluded.device_id,
                 raw_record_id = COALESCE(excluded.raw_record_id, workouts.raw_record_id),
                 synced_at = COALESCE(workouts.synced_at, excluded.synced_at),
-                gps_available = excluded.gps_available,
-                sample_count = excluded.sample_count",
+                gps_available = CASE
+                    WHEN excluded.gps_available > workouts.gps_available THEN excluded.gps_available
+                    ELSE workouts.gps_available
+                END,
+                sample_count = CASE
+                    WHEN excluded.sample_count > workouts.sample_count THEN excluded.sample_count
+                    ELSE workouts.sample_count
+                END,
+                zepp_source = COALESCE(excluded.zepp_source, workouts.zepp_source),
+                zepp_type = COALESCE(excluded.zepp_type, workouts.zepp_type)",
             params![
                 workout.workout_id,
                 workout.workout_type,
@@ -968,9 +1019,195 @@ impl Database {
                 synced_at.to_rfc3339(),
                 i64::from(workout.gps_available),
                 workout.sample_count,
+                workout.zepp_source,
+                workout.zepp_type,
             ],
         )?;
         Ok(())
+    }
+
+    fn workout_exists(&self, workout_id: &str) -> Result<bool> {
+        let count: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM workouts WHERE workout_id = ?1",
+            [workout_id],
+            |row| row.get(0),
+        )?;
+        Ok(count > 0)
+    }
+
+    fn workout_end_time(&self, workout_id: &str) -> Result<Option<DateTime<Utc>>> {
+        let value: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT end_time FROM workouts WHERE workout_id = ?1",
+                [workout_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        value
+            .map(|text| parse_datetime(&text, "workouts.end_time"))
+            .transpose()
+    }
+
+    pub fn pending_running_details(&self) -> Result<Vec<PendingWorkoutDetail>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT workout_id, zepp_source FROM workouts
+             WHERE zepp_type = 1
+               AND zepp_source IS NOT NULL
+               AND TRIM(zepp_source) != ''
+               AND NOT EXISTS (
+                   SELECT 1 FROM raw_records
+                   WHERE stream = 'workout_detail'
+                     AND source_key = 'workout_detail:' || workouts.workout_id || ':' || workouts.zepp_source
+               )
+             ORDER BY start_time DESC",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(PendingWorkoutDetail {
+                workout_id: row.get(0)?,
+                source: row.get(1)?,
+            })
+        })?;
+        rows.collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(Into::into)
+    }
+
+    pub fn replace_workout_series(&self, workout_id: &str, decoded: &DecodedWorkout) -> Result<()> {
+        self.conn.execute(
+            "DELETE FROM workout_samples WHERE workout_id = ?1",
+            [workout_id],
+        )?;
+        self.conn.execute(
+            "DELETE FROM route_points WHERE workout_id = ?1",
+            [workout_id],
+        )?;
+        self.conn.execute(
+            "DELETE FROM workout_pauses WHERE workout_id = ?1",
+            [workout_id],
+        )?;
+
+        {
+            let mut insert = self.conn.prepare(
+                "INSERT INTO workout_samples
+                    (workout_id, timestamp, heart_rate, pace, speed, cadence, altitude, stride)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            )?;
+            for sample in &decoded.samples {
+                insert.execute(params![
+                    workout_id,
+                    sample.timestamp.to_rfc3339(),
+                    sample.heart_rate,
+                    sample.pace,
+                    sample.speed,
+                    sample.cadence,
+                    sample.altitude_m,
+                    sample.stride_cm,
+                ])?;
+            }
+        }
+        {
+            let mut insert = self.conn.prepare(
+                "INSERT INTO route_points
+                    (workout_id, timestamp, latitude, longitude, altitude)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+            )?;
+            for point in &decoded.route {
+                insert.execute(params![
+                    workout_id,
+                    point.timestamp.to_rfc3339(),
+                    point.latitude,
+                    point.longitude,
+                    point.altitude_m,
+                ])?;
+            }
+        }
+        {
+            let mut insert = self.conn.prepare(
+                "INSERT INTO workout_pauses
+                    (workout_id, start_time, end_time, kind)
+                 VALUES (?1, ?2, ?3, ?4)",
+            )?;
+            for pause in &decoded.pauses {
+                insert.execute(params![
+                    workout_id,
+                    pause.start_time.to_rfc3339(),
+                    pause.end_time.to_rfc3339(),
+                    pause.kind,
+                ])?;
+            }
+        }
+
+        self.conn.execute(
+            "UPDATE workouts
+             SET gps_available = CASE WHEN ?2 > 0 THEN 1 ELSE gps_available END,
+                 sample_count = ?3
+             WHERE workout_id = ?1",
+            params![
+                workout_id,
+                decoded.route.len() as i64,
+                decoded.samples.len() as i64,
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_workout_series(&self, workout_id: &str) -> Result<WorkoutSeries> {
+        let samples = {
+            let mut stmt = self.conn.prepare(
+                "SELECT timestamp, heart_rate, pace, speed, cadence, altitude, stride
+                 FROM workout_samples WHERE workout_id = ?1 ORDER BY timestamp",
+            )?;
+            let rows = stmt.query_map([workout_id], |row| {
+                Ok(WorkoutSeriesSample {
+                    timestamp: row.get(0)?,
+                    heart_rate: row.get(1)?,
+                    pace: row.get(2)?,
+                    speed: row.get(3)?,
+                    cadence: row.get(4)?,
+                    altitude_m: row.get(5)?,
+                    stride_cm: row.get(6)?,
+                })
+            })?;
+            rows.collect::<std::result::Result<Vec<_>, _>>()?
+        };
+
+        let route = {
+            let mut stmt = self.conn.prepare(
+                "SELECT timestamp, latitude, longitude, altitude
+                 FROM route_points WHERE workout_id = ?1 ORDER BY timestamp",
+            )?;
+            let rows = stmt.query_map([workout_id], |row| {
+                Ok(WorkoutRoutePoint {
+                    timestamp: row.get(0)?,
+                    latitude: row.get(1)?,
+                    longitude: row.get(2)?,
+                    altitude_m: row.get(3)?,
+                })
+            })?;
+            rows.collect::<std::result::Result<Vec<_>, _>>()?
+        };
+
+        let pauses = {
+            let mut stmt = self.conn.prepare(
+                "SELECT start_time, end_time, kind
+                 FROM workout_pauses WHERE workout_id = ?1 ORDER BY start_time",
+            )?;
+            let rows = stmt.query_map([workout_id], |row| {
+                Ok(WorkoutPause {
+                    start_time: row.get(0)?,
+                    end_time: row.get(1)?,
+                    kind: row.get(2)?,
+                })
+            })?;
+            rows.collect::<std::result::Result<Vec<_>, _>>()?
+        };
+
+        Ok(WorkoutSeries {
+            workout_id: workout_id.to_owned(),
+            samples,
+            route,
+            pauses,
+        })
     }
 
     fn fetched_at_for_raw(&self, raw_record_id: Option<i64>) -> Option<DateTime<Utc>> {
@@ -1314,6 +1551,8 @@ impl Database {
                     .transpose()?,
                 gps_available: gps_available != 0,
                 sample_count,
+                zepp_source: None,
+                zepp_type: None,
             });
         }
         Ok(workouts)
@@ -1399,6 +1638,8 @@ impl Database {
                 .transpose()?,
             gps_available: gps_available != 0 || route_points > 0,
             sample_count: sample_count.max(stored_samples),
+            zepp_source: None,
+            zepp_type: None,
         }))
     }
 
@@ -1678,22 +1919,55 @@ impl Database {
                  ORDER BY start_time",
             )?;
             let rows = stmt.query_map(params![start_text, end_text], |row| {
-                Ok(serde_json::json!({
-                    "workout_id": row.get::<_, String>(0)?,
-                    "workout_type": row.get::<_, String>(1)?,
-                    "start_time": row.get::<_, String>(2)?,
-                    "end_time": row.get::<_, String>(3)?,
-                    "distance_meters": row.get::<_, Option<f64>>(4)?,
-                    "calories": row.get::<_, Option<i32>>(5)?,
-                    "avg_hr": row.get::<_, Option<i32>>(6)?,
-                    "max_hr": row.get::<_, Option<i32>>(7)?,
-                    "training_load": row.get::<_, Option<f64>>(8)?,
-                    "vo2max": row.get::<_, Option<f64>>(9)?,
-                    "source_scope": row.get::<_, String>(10)?,
-                    "device_id": row.get::<_, Option<String>>(11)?,
-                }))
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, Option<f64>>(4)?,
+                    row.get::<_, Option<i32>>(5)?,
+                    row.get::<_, Option<i32>>(6)?,
+                    row.get::<_, Option<i32>>(7)?,
+                    row.get::<_, Option<f64>>(8)?,
+                    row.get::<_, Option<f64>>(9)?,
+                    row.get::<_, String>(10)?,
+                    row.get::<_, Option<String>>(11)?,
+                ))
             })?;
-            workouts = rows.collect::<std::result::Result<Vec<_>, _>>()?;
+            for row in rows {
+                let (
+                    workout_id,
+                    workout_type,
+                    start_time,
+                    end_time,
+                    distance_meters,
+                    calories,
+                    avg_hr,
+                    max_hr,
+                    training_load,
+                    vo2max,
+                    source_scope,
+                    device_id,
+                ) = row?;
+                let series = self.get_workout_series(&workout_id)?;
+                workouts.push(serde_json::json!({
+                    "workout_id": workout_id,
+                    "workout_type": workout_type,
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "distance_meters": distance_meters,
+                    "calories": calories,
+                    "avg_hr": avg_hr,
+                    "max_hr": max_hr,
+                    "training_load": training_load,
+                    "vo2max": vo2max,
+                    "source_scope": source_scope,
+                    "device_id": device_id,
+                    "samples": series.samples,
+                    "route": series.route,
+                    "pauses": series.pauses,
+                }));
+            }
         }
 
         let record_count =
@@ -2001,6 +2275,10 @@ impl Database {
             "DELETE FROM route_points WHERE timestamp < ?1",
             [&cutoff_timestamp],
         )?;
+        self.conn.execute(
+            "DELETE FROM workout_pauses WHERE start_time < ?1",
+            [&cutoff_timestamp],
+        )?;
         // Raw responses are retained from their fetch time, not their query
         // window start. A 30-day request naturally starts near the retention
         // cutoff and must not be deleted seconds after it is fetched.
@@ -2199,6 +2477,16 @@ fn disk_free_bytes(path: &std::path::Path) -> Option<u64> {
     }
 }
 
+fn workout_id_from_detail_key(source_key: &str) -> Option<String> {
+    let rest = source_key.strip_prefix("workout_detail:")?;
+    let (workout_id, _) = rest.split_once(':')?;
+    if workout_id.is_empty() {
+        None
+    } else {
+        Some(workout_id.to_owned())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2334,5 +2622,76 @@ mod tests {
             start + chrono::Duration::hours(10)
         );
         assert_ne!(detail.synced_at.unwrap(), detail.end_time);
+    }
+
+    #[test]
+    fn workout_detail_persists_series_and_does_not_duplicate() {
+        let db = Database::in_memory().unwrap();
+        db.insert_workout(&Workout {
+            workout_id: "1700000000".into(),
+            workout_type: "run".into(),
+            start_time: ts(),
+            end_time: ts() + chrono::Duration::minutes(10),
+            distance_meters: Some(1000.0),
+            calories: Some(80),
+            avg_hr: Some(140),
+            max_hr: Some(160),
+            training_load: None,
+            vo2max: None,
+            source_scope: SourceScope::Device,
+            device_id: None,
+            synced_at: None,
+            gps_available: false,
+            sample_count: 0,
+            zepp_source: Some("run.gps".into()),
+            zepp_type: Some(1),
+        })
+        .unwrap();
+        let payload = serde_json::json!({
+            "trackid": 1_700_000_000i64,
+            "source": "run.gps",
+            "time": "0;1;",
+            "longitude_latitude": "4004663552,11629333504;16403,8392;",
+            "heart_rate": "1,80;1,2;"
+        });
+        assert_eq!(db.pending_running_details().unwrap().len(), 1);
+        db.normalize_and_persist_raw(
+            1,
+            "workout_detail",
+            "workout_detail:1700000000:run.gps",
+            &payload,
+        )
+        .unwrap();
+        db.normalize_and_persist_raw(
+            1,
+            "workout_detail",
+            "workout_detail:1700000000:run.gps",
+            &payload,
+        )
+        .unwrap();
+        let series = db.get_workout_series("1700000000").unwrap();
+        assert_eq!(series.route.len(), 2);
+        assert!(!series.samples.is_empty());
+        let sample_count: i64 = db
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM workout_samples WHERE workout_id = '1700000000'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(sample_count, series.samples.len() as i64);
+        db.insert_raw_record(&RawRecord {
+            stream: "workout_detail".into(),
+            source_key: "workout_detail:1700000000:run.gps".into(),
+            source_scope: SourceScope::Device,
+            device_id: None,
+            start_utc: ts(),
+            end_utc: None,
+            payload,
+            capability: CapabilityStatus::Verified,
+        })
+        .unwrap();
+        assert!(db.pending_running_details().unwrap().is_empty());
     }
 }

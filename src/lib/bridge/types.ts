@@ -14,6 +14,7 @@ import type {
   SyncReport,
   UserPrefs,
   Workout,
+  WorkoutSeries,
 } from '../../types';
 
 export type UnlistenFn = () => void;
@@ -23,6 +24,8 @@ export interface BridgeBackend {
   saveAuth(auth: AuthInfo): Promise<AppStatus>;
   verifyAuth(): Promise<AppStatus>;
   clearAuth(): Promise<AppStatus>;
+  importFromHar(harPath: string): Promise<AppStatus>;
+  manualAuth(appToken: string, userId: string, regionHost: string): Promise<AppStatus>;
 
   startWebLogin(): Promise<LoginStatus>;
   cancelWebLogin(): Promise<LoginStatus>;
@@ -43,6 +46,7 @@ export interface BridgeBackend {
   getSleepDetail(sleepId: string): Promise<SleepSession | null>;
   getRecentWorkouts(limit?: number): Promise<Workout[]>;
   getWorkoutDetail(workoutId: string): Promise<Workout | null>;
+  getWorkoutSeries(workoutId: string): Promise<WorkoutSeries>;
   getDeviceProfile(query?: { deviceId?: string; sourceScope?: string }): Promise<DeviceProfile>;
 
   reprocessLocalData(): Promise<ReprocessResult>;

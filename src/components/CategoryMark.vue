@@ -6,11 +6,17 @@ withDefaults(defineProps<{
   category: HealthCategory;
   icon: IconName;
   size?: number;
+  /** 可选：直接指定背景色（HEX/RGB），设置后覆盖 tone-* 样式 */
+  bg?: string;
 }>(), { size: 18 });
 </script>
 
 <template>
-  <span :class="['category-mark', `tone-${category}`]" aria-hidden="true">
+  <span
+    :class="['category-mark', bg ? 'tone-custom' : `tone-${category}`]"
+    :style="bg ? { background: bg, borderColor: bg, color: 'white' } : {}"
+    aria-hidden="true"
+  >
     <Icon :name="icon" :size="size" />
   </span>
 </template>
@@ -30,6 +36,7 @@ withDefaults(defineProps<{
 .tone-heart { color: var(--heart); }
 .tone-sleep { color: var(--sleep); }
 .tone-activity { color: var(--activity); }
+.tone-custom { border-radius: 50%; }
 @supports not (background: color-mix(in srgb, white 10%, transparent)) {
   .tone-heart { background: var(--heart-wash); }
   .tone-sleep { background: var(--sleep-wash); }

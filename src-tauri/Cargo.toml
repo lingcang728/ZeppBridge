@@ -1,6 +1,6 @@
 [package]
 name = "zeppbridge"
-version = "0.7.0"
+version = "0.8.0"
 description = "本地优先的 Zepp 健康数据桥"
 authors = ["ZeppBridge"]
 edition = "2021"
@@ -31,6 +31,8 @@ hex = "0.4"
 directories = "5.0"
 tracing = "0.1"
 base64 = "0.22"
+regex = "1.10"
+url = "2.5"
 
 [target.'cfg(windows)'.dependencies]
 keyring = { version = "3.6.3", default-features = false, features = ["windows-native"] }

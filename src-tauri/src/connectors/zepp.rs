@@ -436,6 +436,18 @@ impl ZeppConnector {
         .await
     }
 
+    /// Single-workout delta payload. Path is always `/run/detail.json`
+    /// regardless of sport; `trackid` + `source` come from history.
+    pub async fn fetch_sport_detail(&self, track_id: &str, source: &str) -> Result<Value> {
+        let track_id = validate_track_id(track_id)?;
+        let source = validate_detail_source(source)?;
+        self.get_json(
+            "/v1/sport/run/detail.json",
+            vec![("trackid", track_id), ("source", source)],
+        )
+        .await
+    }
+
     pub async fn fetch_watch_statistics(
         &self,
         statistic: &str,
@@ -544,6 +556,27 @@ impl ZeppConnector {
     }
 }
 
+pub fn validate_track_id(input: &str) -> Result<String> {
+    let trimmed = input.trim();
+    if trimmed.is_empty() || trimmed.len() > 32 || !trimmed.chars().all(|c| c.is_ascii_digit()) {
+        return Err(ZeppBridgeError::ConfigError("trackid 无效".into()));
+    }
+    Ok(trimmed.to_owned())
+}
+
+pub fn validate_detail_source(input: &str) -> Result<String> {
+    let trimmed = input.trim();
+    if trimmed.is_empty()
+        || trimmed.len() > 64
+        || !trimmed
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
+    {
+        return Err(ZeppBridgeError::ConfigError("source 无效".into()));
+    }
+    Ok(trimmed.to_owned())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -590,5 +623,13 @@ mod tests {
             Some(ZeppBridgeError::RetryExhausted { .. })
         ));
         assert!(classify_status(204).is_none());
+    }
+
+    #[test]
+    fn detail_params_reject_injection() {
+        assert!(validate_track_id("1700000000").is_ok());
+        assert!(validate_track_id("../x").is_err());
+        assert!(validate_detail_source("run.gps").is_ok());
+        assert!(validate_detail_source("a/b").is_err());
     }
 }

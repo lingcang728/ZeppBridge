@@ -30,6 +30,7 @@ Zepp 区域云端 → ZeppConnector → Raw provenance → Normalizer → SQLite
 ### SQLite 与数据语义
 
 - SQLite 启用 migration、WAL、foreign keys 和 busy timeout；raw payload 具备 hash、source key 与 canonical `raw_record_id` 回指。
+- 跑步（Zepp `type=1`）在 history 摘要之后按 `trackid` + `source` 拉 `/v1/sport/run/detail.json`，差分解码后写入 `workout_samples` / `route_points` / `workout_pauses`。没有点就不画轨迹或曲线。
 - metric/daily 唯一索引对空设备 ID 使用 `COALESCE`，避免 `NULL` 重复。
 - retention 可由用户在 1–365 天内选择，默认 365 天；清理由健康记录时间决定，并回收无引用 raw。
 - `user_fused`、`device`、`unknown` 来源继续保留。来源不明确时不做静默融合。
@@ -40,7 +41,7 @@ Zepp 区域云端 → ZeppConnector → Raw provenance → Normalizer → SQLite
 - 主导航为概览、交给 AI、设置。顶栏提供连接状态、全局同步和自定义三态主题菜单。
 - 概览按「最新心率 → 交给 AI 入口 → 最近睡眠/运动」组织；同步时间与心率样本时间明确分开。不在概览做恢复或训练分析。
 - 睡眠与运动不进主导航。概览「查看全部」进入 `/sleep`、`/workouts`；单条详情为 `/sleep/:sleepId`、`/workouts/:workoutId`。
-- 睡眠详情显示真实总时长、评分和四阶段比例；运动详情显示距离、热量、平均/最高心率、训练负荷与 VO₂max，只在距离和时长均有效时计算配速。
+- 睡眠详情显示真实总时长、评分和四阶段比例；运动详情显示距离、热量、平均/最高心率、训练负荷与 VO₂max，只在距离和时长均有效时计算配速。跑步若已解码出轨迹或心率点则画折线，否则仍显示「未提供」。
 - JSON 导出在 `/ai`：复制、保存文件、更新本机 AI 数据源。设置页默认只显示连接、自动同步、保留/补拉和外观；诊断和数据维护收进「高级与隐私」。
 - 浅色、深色、跟随系统均持久化；状态色含义为绿色成功、灰色中性、黄色需关注、红色失败。分类色只用于心率、睡眠、运动标记。强调色为低饱和绿 `#3DDC84`，不是系统蓝。
 
@@ -52,7 +53,8 @@ Zepp 区域云端 → ZeppConnector → Raw provenance → Normalizer → SQLite
 
 - 所有 Zepp 区域、账号、设备与固件均兼容；
 - 任意浏览器会话都能稳定给出可解析 cookie（需在真实账号上验证）；
-- 当前不存在的运动采样、GPS 路线或睡眠完整时间轴可用；
+- 跑步 detail 在所有区域/固件上都能返回可解码差分串；
+- 走路、骑行等非 `type=1` 运动已有逐点采样；
 - 安装包已签名、数据库已整库加密，或已达到公开发布门槛。
 
 ## 后续阶段

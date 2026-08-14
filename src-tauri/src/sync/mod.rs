@@ -1,6 +1,7 @@
 use crate::fetcher::{DataFetcher, FetchWindow, FetchedRecord};
 use crate::models::{error::*, *};
 use crate::storage::Database;
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -176,21 +177,21 @@ impl SyncManager {
             Ok(())
         };
 
-        emit("heart_rate", 1, 5, "正在同步心率");
+        emit("heart_rate", 1, 6, "正在同步心率");
         check()?;
         match self.fetcher.fetch_heart_rate_records(window).await {
             Ok(records) => streams.push(self.persist_records("heart_rate", records).await?),
             Err(error) if error.is_cancelled() => return Err(error),
             Err(error) => streams.push(self.failure_report("heart_rate", &error).await?),
         }
-        emit("daily_summary", 2, 5, "正在同步每日概览");
+        emit("daily_summary", 2, 6, "正在同步每日概览");
         check()?;
         match self.fetcher.fetch_daily_statistics_records(window).await {
             Ok(records) => streams.push(self.persist_records("daily_summary", records).await?),
             Err(error) if error.is_cancelled() => return Err(error),
             Err(error) => streams.push(self.failure_report("daily_summary", &error).await?),
         }
-        emit("workouts", 3, 5, "正在同步运动");
+        emit("workouts", 3, 6, "正在同步运动");
         check()?;
         match self.fetcher.fetch_workout_records(window).await {
             Ok(records) => streams.push(self.persist_records("workouts", records).await?),
@@ -200,10 +201,31 @@ impl SyncManager {
             }
             Err(error) => streams.push(self.failure_report("workouts", &error).await?),
         }
+        emit("workout_detail", 4, 6, "正在同步跑步明细");
+        check()?;
+        match self.fetch_pending_running_details().await {
+            Ok(records) if records.is_empty() => {
+                streams.push(StreamReport {
+                    stream: "workout_detail".into(),
+                    status: StreamStatus::Success,
+                    records_written: 0,
+                    raw_records: 0,
+                    capability: CapabilityStatus::Verified,
+                    needs_reauth: false,
+                    message: Some("没有待拉取的跑步明细".into()),
+                });
+            }
+            Ok(records) => streams.push(self.persist_records("workout_detail", records).await?),
+            Err(error) if error.is_cancelled() => return Err(error),
+            Err(error) if error.is_unavailable() => {
+                streams.push(self.unavailable_report("workout_detail", &error).await?)
+            }
+            Err(error) => streams.push(self.failure_report("workout_detail", &error).await?),
+        }
 
         // Optional streams are retained and reported, never promoted to a
         // verified empty success.
-        emit("sleep", 4, 5, "正在同步睡眠");
+        emit("sleep", 5, 6, "正在同步睡眠");
         check()?;
         match self.fetcher.fetch_sleep_records(window).await {
             Ok(records) => streams.push(self.persist_records("sleep", records).await?),
@@ -213,7 +235,7 @@ impl SyncManager {
             }
             Err(error) => streams.push(self.failure_report("sleep", &error).await?),
         }
-        emit("hrv", 5, 5, "正在同步心率变异性");
+        emit("hrv", 6, 6, "正在同步心率变异性");
         check()?;
         match self.fetcher.fetch_hrv_records(window).await {
             Ok(records) => streams.push(self.persist_records("hrv", records).await?),
@@ -247,6 +269,37 @@ impl SyncManager {
                 None
             },
         })
+    }
+
+    async fn fetch_pending_running_details(&self) -> Result<Vec<FetchedRecord>> {
+        let pending = {
+            let db = self.db.lock().await;
+            db.pending_running_details()?
+        };
+        let mut records = Vec::new();
+        let mut last_error = None;
+        for item in pending {
+            if self.cancel.load(Ordering::SeqCst) {
+                return Err(ZeppBridgeError::Cancelled);
+            }
+            match self
+                .fetcher
+                .fetch_sport_detail_record(&item.workout_id, &item.source, Utc::now(), None)
+                .await
+            {
+                Ok(record) => records.push(record),
+                Err(error) if error.is_cancelled() => return Err(error),
+                Err(error) if error.needs_reauth() => return Err(error),
+                Err(error) if error.is_unavailable() => last_error = Some(error),
+                Err(error) => last_error = Some(error),
+            }
+        }
+        if records.is_empty() {
+            if let Some(error) = last_error {
+                return Err(error);
+            }
+        }
+        Ok(records)
     }
 
     async fn persist_records(

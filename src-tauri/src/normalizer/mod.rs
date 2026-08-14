@@ -271,6 +271,8 @@ impl Normalizer {
                 // geohash `location` 不是轨迹。history 摘要没有 lat/lon 点。
                 gps_available: workout_has_track_geometry(object),
                 sample_count: workout_sample_count(object),
+                zepp_source: first_string(object, &["source"]),
+                zepp_type: first_number(object, &["type", "sport_mode"]).map(|value| value as i32),
             });
         }
         Ok(NormalizedBatch {

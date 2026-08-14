@@ -1,0 +1,9 @@
+ZeppBridge
+Copyright 2026 ZeppBridge contributors
+
+This product includes workout-detail delta decoding derived from
+zepp-fit-extractor (https://github.com/H3llK33p3r/zepp-fit-extractor),
+Copyright the zepp-fit-extractor authors, licensed under the Apache
+License, Version 2.0. Field comments for `/v1/sport/run/detail.json`
+were also used as a reference. A copy of the Apache License is
+available at https://www.apache.org/licenses/LICENSE-2.0

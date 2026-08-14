@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import Overview from '../views/Overview.vue';
 import RecentRecords from '../views/RecentRecords.vue';
-import AiExport from '../views/AiExport.vue';
+import Explore from '../views/Explore.vue';
 import SleepList from '../views/SleepList.vue';
 import WorkoutList from '../views/WorkoutList.vue';
 import SleepDetail from '../views/SleepDetail.vue';
@@ -20,9 +20,9 @@ const routes = [
     component: RecentRecords,
   },
   {
-    path: '/ai',
-    name: 'AiExport',
-    component: AiExport,
+    path: '/explore',
+    name: 'Explore',
+    component: Explore,
   },
   {
     path: '/sleep',

@@ -170,6 +170,36 @@ export interface Workout {
   synced_at?: string | null;
 }
 
+export interface WorkoutRoutePoint {
+  timestamp: string;
+  latitude: number;
+  longitude: number;
+  altitude_m?: number | null;
+}
+
+export interface WorkoutSeriesSample {
+  timestamp: string;
+  heart_rate?: number | null;
+  speed?: number | null;
+  pace?: number | null;
+  cadence?: number | null;
+  stride_cm?: number | null;
+  altitude_m?: number | null;
+}
+
+export interface WorkoutPause {
+  start_time: string;
+  end_time: string;
+  kind: string;
+}
+
+export interface WorkoutSeries {
+  workout_id: string;
+  samples: WorkoutSeriesSample[];
+  route: WorkoutRoutePoint[];
+  pauses: WorkoutPause[];
+}
+
 export type ExportDataType =
   | 'heart_rate'
   | 'sleep'

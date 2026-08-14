@@ -102,6 +102,52 @@ pub struct Workout {
     pub gps_available: bool,
     #[serde(default)]
     pub sample_count: i64,
+    /// History `source` query value required by `/v1/sport/run/detail.json`.
+    #[serde(default)]
+    pub zepp_source: Option<String>,
+    /// Zepp history `type` integer. Running is `1`.
+    #[serde(default)]
+    pub zepp_type: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct WorkoutRoutePoint {
+    pub timestamp: String,
+    pub latitude: f64,
+    pub longitude: f64,
+    pub altitude_m: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct WorkoutSeriesSample {
+    pub timestamp: String,
+    pub heart_rate: Option<i32>,
+    pub speed: Option<f64>,
+    pub pace: Option<f64>,
+    pub cadence: Option<f64>,
+    pub stride_cm: Option<f64>,
+    pub altitude_m: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct WorkoutPause {
+    pub start_time: String,
+    pub end_time: String,
+    pub kind: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct WorkoutSeries {
+    pub workout_id: String,
+    pub samples: Vec<WorkoutSeriesSample>,
+    pub route: Vec<WorkoutRoutePoint>,
+    pub pauses: Vec<WorkoutPause>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PendingWorkoutDetail {
+    pub workout_id: String,
+    pub source: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

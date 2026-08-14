@@ -1,3 +1,5 @@
+pub mod har;
+
 use crate::models::{error::Result, AuthInfo, ZeppBridgeError};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -9,6 +11,8 @@ use std::{
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
+
+pub use har::extract_from_har;
 
 /// The single service name used for the app token in the platform credential
 /// store.  The user id is used as the credential account name so that an

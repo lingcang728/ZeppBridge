@@ -253,6 +253,31 @@ impl DataFetcher {
             .await
     }
 
+    pub async fn fetch_sport_detail_record(
+        &self,
+        workout_id: &str,
+        source: &str,
+        start_utc: DateTime<Utc>,
+        end_utc: Option<DateTime<Utc>>,
+    ) -> Result<FetchedRecord> {
+        let payload = self
+            .connector
+            .fetch_sport_detail(workout_id, source)
+            .await?;
+        Ok(FetchedRecord {
+            raw: RawRecord {
+                stream: "workout_detail".into(),
+                source_key: format!("workout_detail:{workout_id}:{source}"),
+                source_scope: SourceScope::Device,
+                device_id: None,
+                start_utc,
+                end_utc,
+                payload,
+                capability: CapabilityStatus::Verified,
+            },
+        })
+    }
+
     #[allow(dead_code)]
     pub async fn fetch_watch_statistics(
         &self,

@@ -15,6 +15,7 @@ import type {
   SyncReport,
   UserPrefs,
   Workout,
+  WorkoutSeries,
 } from '../../types';
 
 type UnknownRecord = Record<string, unknown>;
@@ -52,6 +53,14 @@ export const tauriBackend: BridgeBackend = {
 
   clearAuth() {
     return call<AppStatus>('clear_auth');
+  },
+
+  importFromHar(harPath: string) {
+    return call<AppStatus>('import_from_har', { harPath });
+  },
+
+  manualAuth(appToken: string, userId: string, regionHost: string) {
+    return call<AppStatus>('manual_auth', { appToken, userId, regionHost });
   },
 
   startWebLogin() {
@@ -116,6 +125,10 @@ export const tauriBackend: BridgeBackend = {
 
   getWorkoutDetail(workoutId: string) {
     return call<Workout | null>('get_workout_detail', { workoutId });
+  },
+
+  getWorkoutSeries(workoutId: string) {
+    return call<WorkoutSeries>('get_workout_series', { workoutId });
   },
 
   getDeviceProfile(query?: { deviceId?: string; sourceScope?: string }) {

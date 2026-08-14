@@ -1,10 +1,12 @@
 use super::status::build_app_status;
 use crate::app_state::AppState;
+use crate::auth::extract_from_har;
 use crate::connectors::ZeppConnector;
 use crate::ipc_types::AppStatus;
 use crate::models::{error::ZeppBridgeError, AuthInfo};
 use chrono::{Duration, Utc};
 use serde_json::Value;
+use std::path::PathBuf;
 
 /// Save authentication metadata and install a ready-to-use synchronizer.
 ///
@@ -265,4 +267,40 @@ mod tests {
             assert!(validate_verify_payload(&value).is_err(), "accepted {value}");
         }
     }
+}
+
+/// Import authentication credentials from a HAR (HTTP Archive) file.
+///
+/// Parses a HAR file exported from mitmproxy/Charles/browser devtools,
+/// extracts `app_token`, `user_id`, and `region_host`, and saves them
+/// using the same flow as `save_auth`.
+///
+/// The HAR file must contain at least one request to an `api-mifit*` host
+/// with the `apptoken` header present.
+#[tauri::command]
+pub async fn import_from_har(
+    state: tauri::State<'_, AppState>,
+    har_path: String,
+) -> std::result::Result<AppStatus, String> {
+    let path = PathBuf::from(&har_path);
+
+    let auth = extract_from_har(&path).map_err(|e| e.to_string())?;
+
+    // Use the same save flow as manual entry
+    save_auth(state, auth.app_token, auth.user_id, auth.region_host).await
+}
+
+/// Manually enter authentication credentials.
+///
+/// This is a convenience wrapper around `save_auth` that accepts the same
+/// three parameters. The frontend can use this for a manual entry form or
+/// call `save_auth` directly.
+#[tauri::command]
+pub async fn manual_auth(
+    state: tauri::State<'_, AppState>,
+    app_token: String,
+    user_id: String,
+    region_host: String,
+) -> std::result::Result<AppStatus, String> {
+    save_auth(state, app_token, user_id, region_host).await
 }

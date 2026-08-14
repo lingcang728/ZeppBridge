@@ -13,13 +13,15 @@ withDefaults(defineProps<{
   fact: string;
   factLabel?: string;
   compact?: boolean;
+  /** 可选：直接指定图标背景色，传入后覆盖 category 默认色 */
+  iconBg?: string;
 }>(), { compact: false });
 </script>
 
 <template>
   <RouterLink :class="['record-row', `tone-${category}`, { compact }]" :to="to">
     <span v-if="compact" class="record-dot" aria-hidden="true"></span>
-    <CategoryMark v-else :category="category" :icon="icon" :size="16" />
+    <CategoryMark v-else :category="category" :icon="icon" :size="16" :bg="iconBg" />
     <span class="record-copy">
       <small v-if="!compact">{{ kicker }}</small>
       <strong :class="{ date: compact }">{{ compact ? kicker : title }}</strong>
