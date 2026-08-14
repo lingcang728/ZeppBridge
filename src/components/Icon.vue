@@ -6,12 +6,31 @@ export type IconName =
   | 'arrow-left'
   | 'arrow-right'
   | 'bars'
+  | 'bell'
+  | 'box'
+  | 'braces'
+  | 'dots'
+  | 'edit'
+  | 'globe'
+  | 'help'
+  | 'key'
+  | 'map'
+  | 'mountain'
+  | 'pin'
+  | 'plus'
+  | 'ring'
+  | 'search'
+  | 'send'
+  | 'star'
+  | 'table'
+  | 'user'
   | 'training-load'
   | 'check'
   | 'chevron-down'
   | 'circle-check'
   | 'clock'
   | 'cloud'
+  | 'compass'
   | 'copy'
   | 'database'
   | 'export'
@@ -91,6 +110,11 @@ const iconLabel = computed(() => `icon-${props.name}`);
       <path d="M12 7.5V12l3.2 2" :stroke-width="stroke" />
     </g>
     <path v-else-if="name === 'cloud'" d="M7.1 18h9.5a4.4 4.4 0 0 0 .6-8.76A5.5 5.5 0 0 0 6.6 8.5 4.75 4.75 0 0 0 7.1 18Z" :stroke-width="stroke" />
+    <g v-else-if="name === 'compass'">
+      <circle cx="12" cy="12" r="8.5" :stroke-width="stroke" />
+      <path d="m15.5 8.5-5 2-2 5 5-2 2-5Z" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+    </g>
     <g v-else-if="name === 'copy'">
       <rect x="8" y="8" width="11" height="11" rx="2" :stroke-width="stroke" />
       <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" :stroke-width="stroke" />
@@ -164,6 +188,55 @@ const iconLabel = computed(() => `icon-${props.name}`);
     </g>
     <path v-else-if="name === 'wifi'" d="M3.5 8.8a13.4 13.4 0 0 1 17 0M6.5 12a8.6 8.6 0 0 1 11 0M9.4 15.2a4 4 0 0 1 5.2 0M12 18.7v.1" :stroke-width="stroke" />
     <path v-else-if="name === 'x'" d="m6 6 12 12M18 6 6 18" :stroke-width="stroke" />
+    <path v-else-if="name === 'bell'" d="M18 9a6 6 0 1 0-12 0c0 5-2 6-2 6h16s-2-1-2-6Zm-8 9a2.2 2.2 0 0 0 4 0" :stroke-width="stroke" />
+    <g v-else-if="name === 'help'">
+      <circle cx="12" cy="12" r="8.5" :stroke-width="stroke" />
+      <path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.8c0 1.6-2.4 2-2.4 3.4m0 2.9v.1" :stroke-width="stroke" />
+    </g>
+    <g v-else-if="name === 'user'">
+      <circle cx="12" cy="8.4" r="3.4" :stroke-width="stroke" />
+      <path d="M5.2 19.6c.7-3.5 3.3-5.4 6.8-5.4s6.1 1.9 6.8 5.4" :stroke-width="stroke" />
+    </g>
+    <path v-else-if="name === 'plus'" d="M12 5v14M5 12h14" :stroke-width="stroke" />
+    <g v-else-if="name === 'globe'">
+      <circle cx="12" cy="12" r="8.5" :stroke-width="stroke" />
+      <path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.2 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.2-3.6-8.5s1.2-6.2 3.6-8.5Z" :stroke-width="stroke" />
+    </g>
+    <g v-else-if="name === 'edit'">
+      <path d="M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5" :stroke-width="stroke" />
+      <path d="M17.7 3.9a2 2 0 0 1 2.8 2.8L12 15.2l-3.7.9.9-3.7 8.5-8.5Z" :stroke-width="stroke" />
+    </g>
+    <g v-else-if="name === 'key'">
+      <circle cx="8" cy="15" r="4" :stroke-width="stroke" />
+      <path d="m11 12 8.5-8.5M16 6l2.5 2.5M13.5 8.5 16 11" :stroke-width="stroke" />
+    </g>
+    <g v-else-if="name === 'search'">
+      <circle cx="11" cy="11" r="6.5" :stroke-width="stroke" />
+      <path d="m20 20-4.4-4.4" :stroke-width="stroke" />
+    </g>
+    <path v-else-if="name === 'star'" d="m12 3.5 2.5 5.3 5.8.7-4.3 4 1.1 5.7L12 16.4l-5.1 2.8 1.1-5.7-4.3-4 5.8-.7L12 3.5Z" :stroke-width="stroke" />
+    <path v-else-if="name === 'send'" d="m4.5 11 15-6.5-4.5 15-3.4-6.1L4.5 11Zm7.1 2.4 7.9-8.9" :stroke-width="stroke" />
+    <path v-else-if="name === 'dots'" d="M6 12h.1m5.9 0h.1m5.9 0h.1" stroke-width="2.6" />
+    <path v-else-if="name === 'braces'" d="M8.5 4.5C7 4.5 6.5 5.5 6.5 7v2.5c0 1.2-.7 2-2 2.5 1.3.5 2 1.3 2 2.5V17c0 1.5.5 2.5 2 2.5m7-15c1.5 0 2 1 2 2.5v2.5c0 1.2.7 2 2 2.5-1.3.5-2 1.3-2 2.5V17c0 1.5-.5 2.5-2 2.5" :stroke-width="stroke" />
+    <g v-else-if="name === 'table'">
+      <rect x="4" y="5" width="16" height="14" rx="2" :stroke-width="stroke" />
+      <path d="M4 10h16M10 10v9" :stroke-width="stroke" />
+    </g>
+    <g v-else-if="name === 'map'">
+      <path d="m9 4.5-5 2v13l5-2 6 2 5-2v-13l-5 2-6-2Zm0 0v13m6-11v13" :stroke-width="stroke" />
+    </g>
+    <g v-else-if="name === 'pin'">
+      <path d="M12 21s6.5-5.3 6.5-10.5a6.5 6.5 0 1 0-13 0C5.5 15.7 12 21 12 21Z" :stroke-width="stroke" />
+      <circle cx="12" cy="10.3" r="2.3" :stroke-width="stroke" />
+    </g>
+    <path v-else-if="name === 'mountain'" d="m3.5 18.5 5.5-9.5 3.2 5.4 2.3-3.4 6 7.5h-17Z" :stroke-width="stroke" />
+    <g v-else-if="name === 'ring'">
+      <circle cx="12" cy="12" r="8" :stroke-width="stroke" />
+      <circle cx="12" cy="12" r="4.4" :stroke-width="stroke" />
+    </g>
+    <g v-else-if="name === 'box'">
+      <path d="M12 3.3 20 7.5v9L12 20.7 4 16.5v-9L12 3.3Zm-8 4.2 8 4.2 8-4.2M12 11.7v9" :stroke-width="stroke" />
+    </g>
   </svg>
 </template>
 

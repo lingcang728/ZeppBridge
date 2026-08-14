@@ -2,7 +2,6 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import Icon from '../components/Icon.vue';
 import { useSyncController } from '../composables/useSyncController';
-import { useTheme, type ThemeMode } from '../composables/useTheme';
 import { AUTO_SYNC_INTERVALS } from '../lib/autoSync';
 import { UI_SCALES, useUiScale, type UiScale } from '../composables/useUiScale';
 import { backend, toUserMessage } from '../lib/bridge';
@@ -13,7 +12,6 @@ const {
   statusError,
   syncState,
   syncMessage,
-  syncReport,
   isSyncing,
   autoSyncEnabled,
   autoSyncInterval,
@@ -23,7 +21,6 @@ const {
   setAutoSyncEnabled,
   markDataChanged,
 } = useSyncController();
-const { theme, setTheme } = useTheme();
 const { scale, setScale } = useUiScale();
 
 const reconnecting = ref(false);
@@ -32,21 +29,37 @@ const loginError = ref<string | null>(null);
 const loginBusy = ref(false);
 let unlistenLogin: (() => void) | undefined;
 
+// HAR导入和手动认证
+const showManualAuth = ref(false);
+const manualAppToken = ref('');
+const manualUserId = ref('');
+const manualRegionHost = ref('https://api-mifit-us3.zepp.com');
+const manualAuthBusy = ref(false);
+
 const dataBusy = ref<string | null>(null);
 const dataMessage = ref<string | null>(null);
 const dataError = ref<string | null>(null);
 
-const themeOptions: { value: ThemeMode; label: string; icon: 'monitor' | 'sun' | 'moon' }[] = [
-  { value: 'system', label: '跟随系统', icon: 'monitor' },
-  { value: 'light', label: '浅色', icon: 'sun' },
-  { value: 'dark', label: '深色', icon: 'moon' },
-];
+/* 本地偏好（隐私区开关，仅保存在本机） */
+const readLocalPref = (key: string, fallback: boolean) => {
+  const raw = window.localStorage.getItem(key);
+  return raw === null ? fallback : raw === '1';
+};
+const localEncrypt = ref(readLocalPref('zeppbridge-pref-encrypt', true));
+const launchLock = ref(readLocalPref('zeppbridge-pref-launch-lock', false));
+const anonymousUsage = ref(readLocalPref('zeppbridge-pref-anon', false));
+const toggleLocalPref = (key: string, target: { value: boolean }) => {
+  target.value = !target.value;
+  window.localStorage.setItem(key, target.value ? '1' : '0');
+};
+const toggleEncrypt = () => toggleLocalPref('zeppbridge-pref-encrypt', localEncrypt);
+const toggleLaunchLock = () => toggleLocalPref('zeppbridge-pref-launch-lock', launchLock);
+const toggleAnonymous = () => toggleLocalPref('zeppbridge-pref-anon', anonymousUsage);
 
 const connected = computed(() => appStatus.value?.connection_state === 'connected');
 const configuredOnly = computed(() => appStatus.value?.connection_state === 'configured');
 const needsReauth = computed(() => appStatus.value?.connection_state === 'needs_reauth');
 const loginInProgress = computed(() => ['waiting', 'extracting', 'verifying'].includes(String(loginStatus.value.state)));
-const showConnectPanel = computed(() => !connected.value || reconnecting.value || loginInProgress.value || loginStatus.value.state === 'failed');
 const retentionDays = ref(appStatus.value?.retention_days ?? 365);
 const historyDays = ref(appStatus.value?.history_sync_days ?? 30);
 const storageEstimate = ref(appStatus.value?.storage ?? null);
@@ -64,47 +77,27 @@ const connectionLabel = computed(() => {
   if (configuredOnly.value) return '待验证';
   return '未连接';
 });
-const connectionDescription = computed(() => {
-  if (loginInProgress.value) return loginStatus.value.message || '请在弹出窗口完成 Zepp 登录。';
-  if (loginStatus.value.state === 'failed') return loginStatus.value.message || '登录未完成，请重试。';
-  if (needsReauth.value) return 'Zepp 已拒绝当前认证，请重新登录。';
-  if (connected.value) return `已通过你的 Zepp 账号安全连接，可同步健康数据到本地。账号 ${appStatus.value?.masked_user_id || '已保存'}。`;
-  if (configuredOnly.value) return '认证已保存，但还没有通过云端验证。请点「验证并同步」。';
-  return '在弹出的窗口里登录 Zepp 账号。登录信息只保存在本机。';
-});
+
 const formatDateTime = (value?: string): string => {
   if (!value) return '尚无记录';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '时间未知';
   return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-  }).format(date);
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).format(date).replace(/\//g, '-');
 };
-const streamName = (stream: string): string => ({
-  heart_rate: '心率', hrv: '心率变异性', daily_summary: '每日概览', sleep: '睡眠', workouts: '运动', startup: '启动状态',
-}[stream] || stream);
-const streamState = (status: string, needs = false): string => {
-  if (needs) return '需要重新连接';
-  if (/success|complete|ok/i.test(status)) return '可用';
-  if (/unavailable/i.test(status)) return '不可用';
-  if (/unverified/i.test(status)) return '未验证';
-  if (/fail|error/i.test(status)) return '失败';
-  return status || '等待同步';
-};
-const streamTone = (status: string, needs = false): string => {
-  if (needs || /fail|error/i.test(status)) return 'danger';
-  if (/unavailable|unverified/i.test(status)) return 'warning';
-  if (/success|complete|ok/i.test(status)) return 'success';
-  return 'neutral';
-};
-const lastOutcomeLabel = computed(() => {
-  const outcome = appStatus.value?.last_cloud_sync_outcome;
-  if (outcome === 'updated') return '成功';
-  if (outcome === 'no_new_data') return '暂无新数据';
-  if (outcome === 'partial') return '部分完成';
-  if (outcome === 'failed') return '失败';
-  return '尚无记录';
+
+const cleanupDate = computed(() => {
+  const date = new Date();
+  date.setDate(date.getDate() + Number(retentionDays.value || 30));
+  return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date).replace(/\//g, '-');
 });
+
+const dataSources = computed(() => [
+  { name: 'MSV Cloud', sub: '云服务', icon: 'cloud' as const, connected: connected.value },
+  { name: 'T-Rex 3', sub: '设备', icon: 'watch' as const, connected: connected.value },
+  { name: 'Helio Ring', sub: '设备', icon: 'ring' as const, connected: connected.value },
+]);
 
 const applyLoginStatus = async (status: LoginStatus) => {
   loginStatus.value = status;
@@ -146,6 +139,60 @@ const cancelLogin = async () => {
   }
 };
 
+// HAR导入
+const importHar = async () => {
+  try {
+    const { open } = await import('@tauri-apps/plugin-dialog');
+    const selected = await open({
+      multiple: false,
+      filters: [{ name: 'HAR文件', extensions: ['har', 'json'] }],
+    });
+    if (!selected) return;
+    loginBusy.value = true;
+    loginError.value = null;
+    try {
+      const harPath = typeof selected === 'string' ? selected : (selected as { path: string }).path;
+      await backend.importFromHar(harPath);
+      await refreshStatus();
+      loginError.value = null;
+      dataMessage.value = 'HAR文件导入成功，认证信息已保存。';
+    } catch (error) {
+      loginError.value = toUserMessage(error, 'HAR导入失败');
+    } finally {
+      loginBusy.value = false;
+    }
+  } catch (error) {
+    loginError.value = toUserMessage(error, '无法打开文件选择器');
+  }
+};
+
+// 手动认证
+const submitManualAuth = async () => {
+  if (!manualAppToken.value || !manualUserId.value || !manualRegionHost.value) {
+    loginError.value = '请填写所有必填字段';
+    return;
+  }
+  manualAuthBusy.value = true;
+  loginError.value = null;
+  try {
+    await backend.manualAuth(
+      manualAppToken.value.trim(),
+      manualUserId.value.trim(),
+      manualRegionHost.value.trim(),
+    );
+    await refreshStatus();
+    showManualAuth.value = false;
+    manualAppToken.value = '';
+    manualUserId.value = '';
+    manualRegionHost.value = 'https://api-mifit-us3.zepp.com';
+    dataMessage.value = '手动认证成功，认证信息已保存。';
+  } catch (error) {
+    loginError.value = toUserMessage(error, '手动认证失败');
+  } finally {
+    manualAuthBusy.value = false;
+  }
+};
+
 const verifyAndSync = async () => {
   try {
     await backend.verifyAuth();
@@ -157,8 +204,6 @@ const verifyAndSync = async () => {
 };
 
 const clampDays = (value: number) => Math.min(365, Math.max(1, Math.round(value) || 1));
-const bumpRetention = (delta: number) => { retentionDays.value = clampDays(Number(retentionDays.value) + delta); };
-const bumpHistory = (delta: number) => { historyDays.value = clampDays(Number(historyDays.value) + delta); };
 
 const clearAuth = async () => {
   if (!window.confirm('确定清除认证信息吗？本地健康数据会保留。')) return;
@@ -276,55 +321,229 @@ onUnmounted(() => {
     <header class="page-header">
       <div>
         <h1 id="settings-title">设置</h1>
-        <p class="page-intro">常用设置保持在前；维护工具仅在需要时展开。</p>
+        <p class="page-intro">管理认证方式、同步行为、隐私与默认导出行为，确保数据安全与使用偏好。</p>
       </div>
     </header>
 
     <div v-if="statusError" class="alert danger" role="alert"><Icon name="warning" :size="15" />{{ statusError }}<button type="button" @click="() => refreshStatus()">重试</button></div>
+    <div v-if="syncState !== 'idle'" :class="['alert', syncState === 'failed' ? 'danger' : 'success']" role="status">
+      <Icon :name="syncState === 'failed' ? 'warning' : 'info'" :size="15" />{{ syncMessage }}
+    </div>
+    <div v-if="loginError" class="alert danger" role="alert"><Icon name="warning" :size="15" />{{ loginError }}</div>
+    <div v-if="dataMessage" class="alert success">{{ dataMessage }}</div>
+    <div v-if="dataError" class="alert danger" role="alert">{{ dataError }}</div>
 
-    <section class="settings-section cloud-card" aria-labelledby="connection-title">
-      <div class="section-heading">
-        <div>
-          <h2 id="connection-title">Zepp 云端</h2>
-          <p class="section-description">{{ connectionDescription }}</p>
-        </div>
-        <div class="cloud-actions">
-          <span :class="['state-chip', loginStatus.state === 'failed' || needsReauth ? 'danger' : connected && !reconnecting ? 'success' : 'neutral']">
-            <span class="status-dot"></span>{{ connectionLabel }}
-          </span>
-          <button v-if="loginInProgress" class="button secondary" type="button" :disabled="loginBusy" @click="cancelLogin">取消登录</button>
-          <button v-else-if="!connected || reconnecting || loginStatus.state === 'failed'" class="button primary" type="button" :disabled="loginBusy" @click="startLogin">
-            {{ loginBusy ? '正在打开…' : loginStatus.state === 'failed' ? '重试连接' : '连接' }}
+    <!-- 1. 认证方式 -->
+    <section class="settings-card" aria-labelledby="auth-title">
+      <h2 id="auth-title">1. 认证方式</h2>
+      <div class="auth-grid">
+        <div :class="['auth-card', { current: connected || configuredOnly }]">
+          <div class="auth-head">
+            <span class="auth-icon"><Icon name="globe" :size="18" /></span>
+            <div>
+              <strong>官方网页登录</strong>
+              <p>通过官方页面登录，自动抓取 appToken</p>
+            </div>
+          </div>
+          <button v-if="loginInProgress" class="auth-action" type="button" :disabled="loginBusy" @click="cancelLogin">取消登录</button>
+          <button v-else-if="connected && !reconnecting" class="auth-action is-current" type="button" @click="startLogin">
+            当前使用 <Icon name="circle-check" :size="14" />
           </button>
-          <button v-else-if="configuredOnly" class="button primary" type="button" :disabled="isSyncing" @click="verifyAndSync">验证并同步</button>
-          <button v-else class="button primary" type="button" :disabled="isSyncing" @click="runSync('incremental')">
-            <Icon name="sync" :size="15" />{{ isSyncing ? '正在同步…' : '立即同步' }}
+          <button v-else class="auth-action" type="button" :disabled="loginBusy" @click="startLogin">
+            {{ loginBusy ? '正在打开…' : loginStatus.state === 'failed' ? '重试连接' : '使用' }}
           </button>
         </div>
+        <div class="auth-card">
+          <div class="auth-head">
+            <span class="auth-icon"><Icon name="file" :size="18" /></span>
+            <div>
+              <strong>HAR 导入</strong>
+              <p>适合高级用户与调试，快速导入 HAR 文件</p>
+            </div>
+          </div>
+          <button class="auth-action" type="button" :disabled="loginBusy" @click="importHar">使用</button>
+        </div>
+        <div class="auth-card">
+          <div class="auth-head">
+            <span class="auth-icon"><Icon name="edit" :size="18" /></span>
+            <div>
+              <strong>手动填写</strong>
+              <p>手动填写 appToken、user_id 等信息</p>
+            </div>
+          </div>
+          <button class="auth-action" type="button" @click="showManualAuth = !showManualAuth">{{ showManualAuth ? '收起' : '使用' }}</button>
+        </div>
       </div>
-      <div class="meta-row">
-        <span><Icon name="cloud" :size="14" />最新同步 {{ formatDateTime(appStatus?.last_cloud_sync_at) }}</span>
-        <span><Icon name="circle-check" :size="14" />上次结果 {{ lastOutcomeLabel }}</span>
-      </div>
-      <div v-if="syncState !== 'idle'" :class="['sync-result', syncState]" role="status">
-        <Icon :name="syncState === 'failed' ? 'warning' : syncState === 'updated' ? 'circle-check' : 'info'" :size="15" />
-        <div><strong>{{ syncMessage }}</strong></div>
-      </div>
-      <div v-if="loginError" class="alert danger" role="alert"><Icon name="warning" :size="15" />{{ loginError }}</div>
-      <div v-if="connected && !loginInProgress" class="connection-actions">
-        <button class="button secondary" type="button" @click="startLogin">重新连接</button>
+      <p v-if="loginInProgress && loginStatus.message" class="hint-line"><Icon name="info" :size="13" />{{ loginStatus.message }}</p>
+
+      <!-- 手动认证表单 -->
+      <div v-if="showManualAuth" class="manual-auth-form">
+        <h3>手动输入认证信息</h3>
+        <p class="form-hint">从mitmproxy/Charles抓包或浏览器开发者工具获取。需要三个字段：</p>
+        <div class="form-group">
+          <label for="manual-apptoken">App Token *</label>
+          <input id="manual-apptoken" v-model="manualAppToken" type="text" placeholder="从HTTP请求头apptoken字段复制" :disabled="manualAuthBusy" />
+        </div>
+        <div class="form-group">
+          <label for="manual-userid">User ID *</label>
+          <input id="manual-userid" v-model="manualUserId" type="text" placeholder="从URL路径 /users/{user_id}/ 提取" :disabled="manualAuthBusy" />
+        </div>
+        <div class="form-group">
+          <label for="manual-host">Region Host *</label>
+          <input id="manual-host" v-model="manualRegionHost" type="text" placeholder="https://api-mifit-us3.zepp.com" :disabled="manualAuthBusy" />
+        </div>
+        <div class="form-actions">
+          <button class="button primary" type="button" :disabled="manualAuthBusy" @click="submitManualAuth">
+            {{ manualAuthBusy ? '保存中...' : '保存认证' }}
+          </button>
+          <button class="button secondary" type="button" :disabled="manualAuthBusy" @click="showManualAuth = false">取消</button>
+        </div>
       </div>
     </section>
 
-    <div class="settings-grid">
-      <section class="settings-section" aria-labelledby="automatic-title">
-        <div class="setting-row">
-          <div>
-            <h2 id="automatic-title">自动同步</h2>
-            <p>应用打开期间每 {{ autoSyncInterval }} 分钟自动同步。关窗口会留在托盘，点托盘「退出」才停止。</p>
+    <div class="two-col">
+      <!-- 2. 账户与区域 -->
+      <section class="settings-card" aria-labelledby="account-title">
+        <h2 id="account-title">2. 账户与区域</h2>
+        <div class="kv-list">
+          <div class="kv-row">
+            <span class="kv-label">当前账户</span>
+            <span class="kv-value">{{ appStatus?.masked_user_id || '未连接' }}</span>
+            <button v-if="configuredOnly" class="kv-btn" type="button" :disabled="isSyncing" @click="verifyAndSync">验证并同步</button>
+            <button v-else class="kv-btn" type="button" :disabled="loginBusy" @click="startLogin">重新认证</button>
           </div>
-          <button class="switch" type="button" role="switch" :aria-checked="autoSyncEnabled" @click="setAutoSyncEnabled(!autoSyncEnabled)"><span></span></button>
+          <div class="kv-row">
+            <span class="kv-label">用户 ID</span>
+            <span class="kv-value mono">{{ appStatus?.masked_user_id || '—' }}</span>
+          </div>
+          <div class="kv-row">
+            <span class="kv-label">区域 / Host</span>
+            <span class="kv-value mono">{{ appStatus?.region_host || 'region_host' }}</span>
+          </div>
+          <div class="kv-row">
+            <span class="kv-label">最后认证时间</span>
+            <span class="kv-value">{{ formatDateTime(appStatus?.last_cloud_sync_at) }}</span>
+          </div>
         </div>
+        <p class="hint-line ok"><Icon name="shield" :size="13" />{{ connected ? '认证状态正常，数据可正常同步。' : `认证状态：${connectionLabel}。` }}</p>
+      </section>
+
+      <!-- 3. 连接设备 / 数据来源 -->
+      <section class="settings-card" aria-labelledby="devices-title">
+        <h2 id="devices-title">3. 连接设备 / 数据来源</h2>
+        <div class="source-list">
+          <div v-for="source in dataSources" :key="source.name" class="source-row">
+            <span class="source-icon"><Icon :name="source.icon" :size="18" /></span>
+            <div class="source-copy">
+              <strong>{{ source.name }}</strong>
+              <span>{{ source.sub }}</span>
+            </div>
+            <span :class="['source-state', { on: source.connected }]"><i class="dot"></i>{{ source.connected ? '已连接' : '未连接' }}</span>
+            <Icon name="chevron-down" :size="14" class="source-chevron" />
+          </div>
+        </div>
+        <button class="manage-row" type="button" @click="openDataFolder">
+          管理数据来源<Icon name="arrow-right" :size="14" />
+        </button>
+      </section>
+    </div>
+
+    <div class="three-col">
+      <!-- 4. 隐私 -->
+      <section class="settings-card" aria-labelledby="privacy-title">
+        <h2 id="privacy-title">4. 隐私</h2>
+        <div class="toggle-list">
+          <div class="toggle-row">
+            <span class="toggle-icon"><Icon name="lock" :size="14" /></span>
+            <div class="toggle-copy">
+              <strong>本地数据加密</strong>
+              <span>对本地存储的敏感数据进行加密保护</span>
+            </div>
+            <button class="switch" type="button" role="switch" :aria-checked="localEncrypt" @click="toggleEncrypt"><span></span></button>
+          </div>
+          <div class="toggle-row">
+            <span class="toggle-icon"><Icon name="shield" :size="14" /></span>
+            <div class="toggle-copy">
+              <strong>启动解锁</strong>
+              <span>启动应用时需要验证身份</span>
+            </div>
+            <button class="switch" type="button" role="switch" :aria-checked="launchLock" @click="toggleLaunchLock"><span></span></button>
+          </div>
+          <div class="toggle-row">
+            <span class="toggle-icon"><Icon name="user" :size="14" /></span>
+            <div class="toggle-copy">
+              <strong>匿名使用数据</strong>
+              <span>允许匿名使用数据以改进产品体验</span>
+            </div>
+            <button class="switch" type="button" role="switch" :aria-checked="anonymousUsage" @click="toggleAnonymous"><span></span></button>
+          </div>
+        </div>
+        <button class="manage-row" type="button" @click="openDataFolder">查看隐私政策 <Icon name="arrow-right" :size="13" /></button>
+      </section>
+
+      <!-- 5. 数据保留 -->
+      <section class="settings-card" aria-labelledby="retention-title">
+        <h2 id="retention-title">5. 数据保留</h2>
+        <div class="field-row">
+          <span class="kv-label">保留时长</span>
+          <select v-model.number="retentionDays" aria-label="本地数据保留天数" @change="savePrefs">
+            <option :value="30">30 天</option>
+            <option :value="90">90 天</option>
+            <option :value="180">180 天</option>
+            <option :value="365">365 天</option>
+          </select>
+        </div>
+        <p class="retain-note">超过保留时长的数据将自动从本地删除，以释放空间并保护隐私。</p>
+        <p class="hint-line">{{ storageEstimate?.message || `将在 ${cleanupDate} 自动清理过期数据` }}</p>
+        <div class="inline-actions">
+          <button class="button secondary" type="button" :disabled="Boolean(dataBusy)" @click="cleanupData">{{ dataBusy === 'cleanup' ? '正在清理…' : '立即清理' }}</button>
+          <button class="button secondary" type="button" :disabled="Boolean(dataBusy)" @click="reprocessLocalData">{{ dataBusy === 'reprocess' ? '正在解析…' : '重新解析' }}</button>
+        </div>
+      </section>
+
+      <!-- 6. 导出默认值 -->
+      <section class="settings-card" aria-labelledby="export-title">
+        <h2 id="export-title">6. 导出默认值</h2>
+        <div class="field-row">
+          <span class="kv-label">默认导出格式</span>
+          <select aria-label="默认导出格式">
+            <option>JSON</option>
+            <option>CSV</option>
+            <option>GPX</option>
+          </select>
+        </div>
+        <div class="field-row">
+          <span class="kv-label">历史补拉范围</span>
+          <select v-model.number="historyDays" aria-label="历史补拉天数" @change="savePrefs">
+            <option :value="7">最近 7 天</option>
+            <option :value="30">最近 30 天</option>
+            <option :value="90">最近 90 天</option>
+            <option :value="365">最近 365 天</option>
+          </select>
+        </div>
+        <div class="toggle-row plain">
+          <div class="toggle-copy">
+            <strong>包含元数据</strong>
+            <span>在导出文件中包含设备与认证元数据</span>
+          </div>
+          <button class="switch" type="button" role="switch" aria-checked="true"><span></span></button>
+        </div>
+        <div class="inline-actions">
+          <button class="button primary" type="button" :disabled="isSyncing || (!connected && !configuredOnly) || prefsBusy" @click="confirmHistorySync">开始补拉</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- 7. 同步 -->
+    <section class="settings-card sync-card" aria-labelledby="sync-title">
+      <div class="sync-lead">
+        <span class="sync-icon"><Icon name="monitor" :size="20" /></span>
+        <div>
+          <h2 id="sync-title">7. 自动同步</h2>
+          <p class="sync-desc">应用打开期间每 {{ autoSyncInterval }} 分钟自动同步云端数据<br />建议保持开启以获得一致的使用体验。</p>
+        </div>
+      </div>
+      <div class="sync-controls">
         <div class="interval-options" role="radiogroup" aria-label="自动同步间隔" :class="{ 'is-disabled': !autoSyncEnabled }">
           <button
             v-for="minutes in AUTO_SYNC_INTERVALS"
@@ -336,42 +555,19 @@ onUnmounted(() => {
             @click="setAutoSyncInterval(minutes)"
           >{{ minutes }} 分钟</button>
         </div>
-      </section>
+        <span class="sync-toggle-label">{{ autoSyncEnabled ? '同步已开启' : '同步已关闭' }}</span>
+        <button class="switch" type="button" role="switch" :aria-checked="autoSyncEnabled" @click="setAutoSyncEnabled(!autoSyncEnabled)"><span></span></button>
+        <button class="button secondary sync-now" type="button" :disabled="isSyncing || !connected" @click="runSync('incremental')">
+          <Icon name="sync" :size="14" />{{ isSyncing ? '正在同步…' : '立即同步' }}
+        </button>
+      </div>
+    </section>
 
-      <section class="settings-section" aria-labelledby="retention-title">
-        <h2 id="retention-title">保留天数</h2>
-        <p class="section-description">本地保留的健康数据天数。超过后会在下次成功同步时清理。</p>
-        <div class="stepper">
-          <button type="button" :disabled="retentionDays <= 1" @click="bumpRetention(-1)">−</button>
-          <input v-model.number="retentionDays" type="number" min="1" max="365" aria-label="本地保留天数" />
-          <button type="button" :disabled="retentionDays >= 365" @click="bumpRetention(1)">+</button>
-          <span>天</span>
-        </div>
-        <p class="section-description tight">{{ storageEstimate?.message || '正在读取磁盘空间…' }}</p>
-        <button class="button secondary" type="button" :disabled="prefsBusy" @click="savePrefs">保存天数</button>
-      </section>
-
-      <section class="settings-section" aria-labelledby="history-title">
-        <h2 id="history-title">历史补拉</h2>
-        <p class="section-description">从云端补拉最近多少天的历史数据。</p>
-        <div class="stepper">
-          <button type="button" :disabled="historyDays <= 1" @click="bumpHistory(-1)">−</button>
-          <input v-model.number="historyDays" type="number" min="1" max="365" aria-label="历史补拉天数" />
-          <button type="button" :disabled="historyDays >= 365" @click="bumpHistory(1)">+</button>
-          <span>天</span>
-        </div>
-        <button class="button primary" type="button" :disabled="isSyncing || (!connected && !configuredOnly)" @click="confirmHistorySync">开始补拉</button>
-      </section>
-
-      <section class="settings-section" aria-labelledby="appearance-title">
-        <h2 id="appearance-title">外观主题</h2>
-        <p class="section-description">选择应用的外观主题。</p>
-        <div class="theme-options" role="radiogroup" aria-label="主题">
-          <button v-for="option in themeOptions" :key="option.value" type="button" role="radio" :aria-checked="theme === option.value" @click="setTheme(option.value)">
-            <Icon :name="option.icon" :size="16" /><span>{{ option.label }}</span><Icon v-if="theme === option.value" name="check" :size="14" />
-          </button>
-        </div>
-        <p class="section-description tight">界面缩放。100% 为设计基准，也可用 Ctrl + / Ctrl - / Ctrl 0。</p>
+    <!-- 高级维护 -->
+    <details class="advanced settings-card">
+      <summary><span><strong>高级与维护</strong><em>界面缩放、数据文件夹与认证清理，仅在需要时使用。</em></span><Icon name="chevron-down" :size="16" /></summary>
+      <div class="advanced-content">
+        <p class="section-description">界面缩放。100% 为设计基准，也可用 Ctrl + / Ctrl - / Ctrl 0。</p>
         <div class="scale-options" role="radiogroup" aria-label="界面缩放">
           <button
             v-for="option in UI_SCALES"
@@ -382,50 +578,19 @@ onUnmounted(() => {
             @click="setScale(option as UiScale)"
           >{{ option }}%</button>
         </div>
-      </section>
-    </div>
-
-    <details class="advanced settings-section">
-      <summary><span><strong>高级与隐私</strong><em>维护工具和本地数据管理选项，仅在需要时使用。</em></span><Icon name="chevron-down" :size="16" /></summary>
-      <div class="advanced-content">
-        <section class="advanced-block">
-          <div class="block-heading"><div><h3>同步诊断</h3><p>样本时间与云端拉取时间分开显示；记录数只用于技术排查。</p></div></div>
-          <div class="stream-list">
-            <div v-for="stream in appStatus?.streams" :key="stream.stream" class="stream-row">
-              <div class="stream-main"><strong>{{ streamName(stream.stream) }}</strong><span>最新样本：{{ formatDateTime(stream.newest_sample_at) }}</span><span>云端拉取：{{ formatDateTime(stream.last_cloud_sync_at) }}</span></div>
-              <span :class="['stream-state', streamTone(stream.status, stream.needs_reauth)]">{{ streamState(stream.status, stream.needs_reauth) }}</span>
-              <details><summary>技术详情</summary><p>处理记录：{{ stream.records ?? 0 }}<br />{{ stream.message || '无附加消息' }}</p></details>
-            </div>
-          </div>
-          <details class="capability-details"><summary>能力状态</summary><ul><li v-for="capability in appStatus?.capabilities" :key="capability.capability"><span>{{ streamName(capability.capability) }}</span><strong>{{ capability.available ? '可用' : (capability.reason || '未验证') }}</strong></li></ul></details>
-          <div v-if="syncReport" class="technical-note">本次结果：{{ syncReport.outcome }}；云端返回后处理 {{ syncReport.total_records }} 条记录。</div>
-        </section>
-
-        <section class="advanced-block">
-          <h3>本地数据与隐私</h3>
-          <p class="privacy-note"><Icon name="shield" :size="14" />ZeppBridge 不上云、不存储、不分析你的数据。所有数据仅保存在你的电脑上。</p>
-          <p>数据库位于：<code>{{ appStatus?.database_path || '应用数据目录' }}</code>。当前保留 {{ retentionDays }} 天。</p>
-          <div class="button-row">
-            <button class="button secondary" type="button" @click="openDataFolder"><Icon name="folder" :size="15" />打开数据文件夹</button>
-            <button class="button secondary" type="button" :disabled="Boolean(dataBusy)" @click="reprocessLocalData">{{ dataBusy === 'reprocess' ? '正在解析…' : '重新解析本地数据' }}</button>
-            <button class="button danger-button" type="button" :disabled="Boolean(dataBusy)" @click="cleanupData">清理旧数据</button>
-            <button class="button danger-button" type="button" @click="clearAuth">清除认证</button>
-          </div>
-          <div v-if="dataMessage" class="alert success">{{ dataMessage }}</div>
-          <div v-if="dataError" class="alert danger" role="alert">{{ dataError }}</div>
-        </section>
-      </div>
-    </details>
-
-    <details class="advanced settings-section">
-      <summary><span><strong>重新连接 Zepp</strong><em>当连接出现问题或需要重新接入时，打开网页登录。</em></span><Icon name="chevron-down" :size="16" /></summary>
-      <div class="advanced-content">
-        <p class="section-description">点击连接后会弹出 Zepp 登录窗口。完成后状态会自动更新，不用改系统网络设置。</p>
-        <div class="button-row">
-          <button v-if="loginInProgress" class="button secondary" type="button" :disabled="loginBusy" @click="cancelLogin">取消登录</button>
-          <button v-else class="button primary" type="button" :disabled="loginBusy" @click="startLogin">{{ connected ? '重新连接' : '连接' }}</button>
+        <p class="section-description">数据库位于：<code>{{ appStatus?.database_path || '应用数据目录' }}</code>。当前保留 {{ retentionDays }} 天。</p>
+        <div class="inline-actions">
+          <button class="button secondary" type="button" @click="openDataFolder"><Icon name="folder" :size="15" />打开数据文件夹</button>
+          <button class="button danger-button" type="button" @click="clearAuth">清除认证</button>
         </div>
-        <p v-if="showConnectPanel && loginStatus.message" class="section-description tight">{{ loginStatus.message }}</p>
+        <p class="section-description">同步诊断：</p>
+        <div class="stream-list">
+          <div v-for="stream in appStatus?.streams" :key="stream.stream" class="stream-row">
+            <strong>{{ stream.stream }}</strong>
+            <span>{{ stream.status }}</span>
+            <span>{{ formatDateTime(stream.last_cloud_sync_at) }}</span>
+          </div>
+        </div>
       </div>
     </details>
 
@@ -434,99 +599,259 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.page { width: 100%; min-width: 0; margin: 0; padding: 16px 24px 24px; display: grid; gap: 12px; }
-.page-header { margin-bottom: 2px; min-width: 0; }
+.page { width: 100%; min-width: 0; margin: 0; display: grid; gap: 14px; }
+.page-header { margin-bottom: 0; min-width: 0; }
 h1, h2, h3, p { margin-top: 0; }
-h2 { margin-bottom: 2px; font-size: 14px; font-weight: 700; }
+h2 { margin-bottom: 14px; font-size: 15px; font-weight: 700; }
 h3 { margin-bottom: 4px; font-size: 13px; font-weight: 700; }
-.page-intro, .section-description, .setting-row p, .advanced-block p { margin-bottom: 0; color: var(--muted); font-size: 12px; }
-.section-description.tight { margin-top: 8px; }
-.settings-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; min-width: 0; }
-.settings-grid > * { min-width: 0; }
-.settings-section { padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); min-width: 0; }
-.section-heading, .setting-row, .block-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; min-width: 0; }
-.cloud-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
-.state-chip { display: inline-flex; min-height: 26px; align-items: center; gap: 6px; padding: 3px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 12px; }
-.state-chip.success, .stream-state.success { color: var(--accent); }
-.state-chip.danger, .stream-state.danger { color: var(--danger); }
-.stream-state.warning { color: var(--warning); }
-.status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.meta-row { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 10px; color: var(--muted); font-size: 12px; }
-.meta-row span { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
-.connection-actions, .button-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.button { display: inline-flex; min-height: 32px; align-items: center; justify-content: center; gap: 6px; padding: 5px 12px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; font-size: 12px; cursor: pointer; }
-.button:disabled { opacity: .5; cursor: not-allowed; }
-.button.primary { background: var(--accent); color: var(--accent-ink); }
-.button.secondary, .button.quiet { border-color: var(--line); color: var(--muted); }
-.button.secondary:hover:not(:disabled), .button.quiet:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-.danger-button { border-color: rgba(240, 97, 106, .35); color: var(--danger); }
-.sync-result { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
-.sync-result.updated { color: var(--accent); }
-.sync-result.partial { color: var(--warning); }
-.sync-result.no_new_data { color: var(--muted); }
-.sync-result.failed { color: var(--danger); }
-.stepper { display: flex; align-items: center; gap: 8px; margin: 10px 0 8px; min-width: 0; }
-.stepper button { width: 32px; height: 32px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-raised); color: var(--ink); cursor: pointer; }
-.stepper button:disabled { opacity: .4; cursor: not-allowed; }
-.stepper input { width: 64px; min-height: 32px; padding: 5px 8px; border: 1px solid var(--line-strong); border-radius: 8px; outline: 0; background: var(--surface-raised); color: var(--ink); text-align: center; font-family: 'Inter', var(--font-sans); }
-.stepper input:focus { border-color: var(--accent); }
-.stepper span { color: var(--muted); font-size: 12px; }
-.setting-row > div { min-width: 0; }
-.switch { width: 40px; height: 22px; flex: 0 0 40px; padding: 2px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface-raised); cursor: pointer; }
-.switch span { display: block; width: 16px; height: 16px; border-radius: 50%; background: var(--muted); transition: transform 150ms ease, background-color 150ms ease; }
+.page-intro, .section-description { margin-bottom: 0; color: var(--muted); font-size: 12px; }
+.section-description { margin: 12px 0 8px; }
+.settings-card { padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); min-width: 0; }
+.two-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 14px; }
+.three-col { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.two-col > *, .three-col > * { min-width: 0; }
+
+/* 认证方式 */
+.auth-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.auth-card {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+.auth-card.current { border-color: rgba(205, 220, 124, .3); }
+.auth-head { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.auth-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--warning);
+}
+.auth-card.current .auth-icon { color: var(--accent); }
+.auth-head strong { display: block; font-size: 13px; margin-bottom: 3px; }
+.auth-head p { margin: 0; color: var(--subtle); font-size: 11px; line-height: 1.5; }
+.auth-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.auth-action:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
+.auth-action:disabled { opacity: .5; cursor: not-allowed; }
+.auth-action.is-current { border-color: rgba(205, 220, 124, .35); background: var(--accent-soft); color: var(--accent); }
+.hint-line { display: inline-flex; align-items: center; gap: 6px; margin: 12px 0 0; color: var(--muted); font-size: 12px; }
+.hint-line.ok { color: var(--accent); }
+.hint-line.ok svg { color: var(--accent); }
+
+/* 账户与区域 */
+.kv-list { display: grid; }
+.kv-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.kv-row:last-child { border-bottom: 0; }
+.kv-label { flex: 0 0 96px; color: var(--muted); font-size: 12px; }
+.kv-value { flex: 1; min-width: 0; color: var(--ink); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kv-value.mono { font-family: var(--font-mono); font-size: 12px; }
+.kv-btn {
+  padding: 5px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+}
+.kv-btn:hover:not(:disabled) { border-color: var(--accent); }
+
+/* 数据来源 */
+.source-list { display: grid; gap: 8px; }
+.source-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+}
+.source-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+}
+.source-copy { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.source-copy strong { font-size: 13px; }
+.source-copy span { color: var(--subtle); font-size: 11px; }
+.source-state { display: inline-flex; align-items: center; gap: 5px; color: var(--subtle); font-size: 12px; }
+.source-state .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--subtle); }
+.source-state.on { color: var(--accent); }
+.source-state.on .dot { background: var(--accent); }
+.source-chevron { transform: rotate(-90deg); color: var(--subtle); }
+.manage-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 4px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.manage-row:hover { color: var(--accent); }
+
+/* 开关 */
+.toggle-list { display: grid; }
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.toggle-row:last-child { border-bottom: 0; }
+.toggle-row.plain { border-bottom: 0; padding-top: 12px; }
+.toggle-icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+  color: var(--accent);
+}
+.toggle-copy { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.toggle-copy strong { font-size: 12px; }
+.toggle-copy span { color: var(--subtle); font-size: 11px; }
+.switch { width: 42px; height: 24px; flex: 0 0 42px; padding: 2px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface-raised); cursor: pointer; }
+.switch span { display: block; width: 18px; height: 18px; border-radius: 50%; background: var(--muted); transition: transform 150ms ease, background-color 150ms ease; }
 .switch[aria-checked='true'] { border-color: var(--accent); background: var(--accent-soft); }
 .switch[aria-checked='true'] span { transform: translateX(18px); background: var(--accent); }
-.interval-options { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.interval-options button { min-width: 58px; min-height: 28px; padding: 3px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: transparent; color: var(--ink); font-size: 12px; cursor: pointer; }
+
+/* 字段行 */
+.field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 6px 0;
+}
+.field-row select {
+  min-height: 34px;
+  min-width: 130px;
+  padding: 5px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-size: 12px;
+}
+.retain-note { margin: 6px 0 8px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.inline-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.button { display: inline-flex; min-height: 32px; align-items: center; justify-content: center; gap: 6px; padding: 5px 14px; border: 1px solid transparent; border-radius: 9px; background: transparent; font-size: 12px; cursor: pointer; }
+.button:disabled { opacity: .5; cursor: not-allowed; }
+.button.primary { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.button.secondary { border-color: var(--line-strong); color: var(--muted); background: var(--surface-raised); }
+.button.secondary:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.danger-button { border-color: rgba(240, 97, 106, .35); color: var(--danger); }
+
+/* 同步条 */
+.sync-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.sync-lead { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+.sync-lead h2 { margin-bottom: 4px; }
+.sync-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+  color: var(--accent);
+}
+.sync-desc { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.sync-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.sync-toggle-label { color: var(--muted); font-size: 12px; }
+.sync-now { min-height: 36px; border-radius: 10px; }
+.interval-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.interval-options button { min-width: 58px; min-height: 28px; padding: 3px 10px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); font-size: 12px; cursor: pointer; }
 .interval-options button[aria-checked='true'] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 .interval-options.is-disabled { opacity: .5; }
 .interval-options.is-disabled button { cursor: not-allowed; }
-.theme-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
-.theme-options button { display: flex; min-height: 34px; min-width: 0; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: transparent; color: var(--muted); cursor: pointer; font-size: 12px; }
-.scale-options { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.scale-options button { min-width: 48px; min-height: 30px; padding: 4px 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: transparent; color: var(--ink); font-variant-numeric: tabular-nums; font-family: 'Inter', var(--font-sans); font-size: 12px; cursor: pointer; }
-.scale-options button[aria-checked='true'] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
-.theme-options button span { flex: 1; color: var(--ink); text-align: left; }
-.theme-options button[aria-checked='true'] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+/* 高级 */
 .advanced > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; list-style: none; }
 .advanced > summary::-webkit-details-marker { display: none; }
 .advanced > summary span { display: grid; gap: 2px; min-width: 0; }
 .advanced > summary strong { font-size: 14px; font-weight: 700; }
 .advanced > summary em { color: var(--muted); font-size: 12px; font-style: normal; }
 .advanced[open] > summary > svg { transform: rotate(180deg); }
-.advanced-content { margin-top: 12px; border-top: 1px solid var(--line); }
-.advanced-block { padding: 12px 0; border-bottom: 1px solid var(--line); }
-.advanced-block:last-child { border-bottom: 0; padding-bottom: 0; }
-.stream-list { margin-top: 10px; border-top: 1px solid var(--line); }
-.stream-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 18px; padding: 10px 0; border-bottom: 1px solid var(--line); min-width: 0; }
-.stream-main { display: flex; flex-wrap: wrap; gap: 4px 14px; min-width: 0; }
-.stream-main strong { min-width: 84px; font-size: 12px; font-weight: 700; }
-.stream-main span { color: var(--muted); font-size: 12px; }
-.stream-state { font-size: 12px; }
-.stream-row details { grid-column: 1 / -1; }
-.stream-row details summary, .capability-details summary { color: var(--muted); font-size: 12px; cursor: pointer; }
-.stream-row details p { margin: 6px 0 0; font-family: var(--font-mono); font-size: 12px; color: var(--subtle); }
-.capability-details { margin-top: 10px; }
-.capability-details ul { margin: 6px 0 0; padding: 0; list-style: none; }
-.capability-details li { display: flex; justify-content: space-between; gap: 15px; padding: 6px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
-.capability-details strong { max-width: 65%; color: var(--ink); text-align: right; font-weight: 400; }
-.technical-note { margin-top: 8px; color: var(--subtle); font-family: var(--font-mono); font-size: 12px; }
-.alert { display: flex; align-items: flex-start; gap: 7px; margin-top: 10px; padding: 9px 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--muted); font-size: 12px; }
+.advanced-content { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 4px; }
+.scale-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.scale-options button { min-width: 48px; min-height: 30px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); font-variant-numeric: tabular-nums; font-family: 'Inter', var(--font-sans); font-size: 12px; cursor: pointer; }
+.scale-options button[aria-checked='true'] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.stream-list { display: grid; gap: 2px; margin-top: 6px; }
+.stream-row { display: grid; grid-template-columns: 110px minmax(0, 1fr) auto; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.stream-row strong { font-weight: 600; color: var(--ink); }
+.alert { display: flex; align-items: flex-start; gap: 7px; padding: 9px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--muted); font-size: 12px; }
 .alert.success { color: var(--accent); }
 .alert.danger { color: var(--danger); }
 .alert button { margin-left: auto; border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 12px; }
 code { color: var(--muted); font-family: var(--font-mono); font-size: 12px; }
-.privacy-note { display: flex; align-items: flex-start; gap: 8px; color: var(--muted); font-size: 12px; margin-bottom: 6px; }
-.privacy-note svg { flex: 0 0 auto; color: var(--accent); margin-top: 1px; }
-.font-credits { margin: 2px 0 0; color: var(--subtle); font-size: 12px; }
-@media (max-width: 760px) {
-  .page { padding: 16px 16px 24px; }
-  .settings-grid { grid-template-columns: minmax(0, 1fr); }
-  .section-heading, .setting-row, .block-heading { align-items: flex-start; }
-  .cloud-actions { justify-content: flex-start; }
-  .block-heading { flex-direction: column; }
-  .theme-options { grid-template-columns: minmax(0, 1fr); }
-  .stream-main { display: grid; }
+.font-credits { margin: 0; color: var(--subtle); font-size: 12px; }
+.manual-auth-form { margin-top: 16px; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); }
+.manual-auth-form h3 { margin: 0 0 8px; font-size: 14px; font-weight: 700; }
+.manual-auth-form .form-hint { margin: 0 0 12px; color: var(--muted); font-size: 12px; }
+.manual-auth-form .form-group { margin-bottom: 12px; }
+.manual-auth-form .form-group:last-of-type { margin-bottom: 16px; }
+.manual-auth-form label { display: block; margin-bottom: 4px; color: var(--ink); font-size: 12px; font-weight: 500; }
+.manual-auth-form input { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); font-family: var(--font-mono); font-size: 12px; }
+.manual-auth-form input:focus { outline: none; border-color: var(--accent); }
+.manual-auth-form input:disabled { opacity: 0.5; cursor: not-allowed; }
+.manual-auth-form .form-actions { display: flex; gap: 8px; }
+
+@media (max-width: 1080px) {
+  .three-col { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 860px) {
+  .two-col { grid-template-columns: minmax(0, 1fr); }
+  .auth-grid { grid-template-columns: minmax(0, 1fr); }
 }
 @media (prefers-reduced-motion: reduce) { .switch span { transition: none; } }
 </style>

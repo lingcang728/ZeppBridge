@@ -1,17 +1,16 @@
 <script setup lang="ts">
 import { getVersion } from '@tauri-apps/api/app';
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router';
 import BrandMark from './components/BrandMark.vue';
 import Icon from './components/Icon.vue';
 import { useSyncController } from './composables/useSyncController';
-import { useTheme, type ThemeMode } from './composables/useTheme';
 import { useUiScale } from './composables/useUiScale';
 import { backend, isDesktop } from './lib/bridge';
 
 // 桌面端从 Tauri 运行时读取版本（与 tauri.conf.json 单一来源），
 // 浏览器预览环境回退到下面的常量（与 package.json 保持同步）。
-const FALLBACK_APP_VERSION = '0.7.0';
+const FALLBACK_APP_VERSION = '0.8.0';
 const APP_VERSION = ref(FALLBACK_APP_VERSION);
 if (isDesktop()) {
   void getVersion()
@@ -26,38 +25,32 @@ if (isDesktop()) {
 const route = useRoute();
 const router = useRouter();
 const mobileMenuOpen = ref(false);
-const themeMenuOpen = ref(false);
-const themeControl = ref<HTMLElement | null>(null);
 const trayHint = ref(false);
+const userMenuOpen = ref(false);
+const userControl = ref<HTMLElement | null>(null);
 const {
   appStatus, statusError, syncState, syncMessage, syncProgress, isSyncing, canIncrementalSync,
-  lastCloudSyncLabel, initialize, runSync, cancelSync,
+  initialize, runSync, cancelSync,
 } = useSyncController();
-const { theme, themeLabel, initializeTheme, setTheme } = useTheme();
 const { initializeScale, bumpScale, resetScale } = useUiScale();
 
 const navigation = [
-  { to: '/', label: '概览', icon: 'grid' as const },
-  { to: '/recent', label: '最近记录', icon: 'clock' as const },
-  { to: '/ai', label: '交给 AI', icon: 'spark' as const },
+  { to: '/', label: '探索', icon: 'compass' as const },
+  { to: '/explore', label: '导出与提示词', icon: 'edit' as const },
+  { to: '/recent', label: '历史记录', icon: 'clock' as const },
   { to: '/settings', label: '设置', icon: 'gear' as const },
 ];
-const themeOptions: { value: ThemeMode; label: string; icon: 'monitor' | 'sun' | 'moon' }[] = [
-  { value: 'system', label: '跟随系统', icon: 'monitor' },
-  { value: 'light', label: '浅色', icon: 'sun' },
-  { value: 'dark', label: '深色', icon: 'moon' },
-];
 
-const pageTitle = computed(() => {
-  if (route.path === '/recent') return '最近记录';
-  if (route.path === '/sleep') return '睡眠';
-  if (route.path === '/workouts') return '运动';
-  if (route.path.startsWith('/sleep/')) return '睡眠详情';
-  if (route.path.startsWith('/workouts/')) return '运动详情';
-  return navigation.find((item) => item.to === route.path)?.label ?? '概览';
-});
+const connected = computed(() => appStatus.value?.connection_state === 'connected');
+
+const dataSources = computed(() => [
+  { name: 'T-Rex 3', icon: 'watch' as const, connected: connected.value },
+  { name: 'Helio Ring', icon: 'ring' as const, connected: connected.value },
+  { name: 'MSV Cloud', icon: 'cloud' as const, connected: connected.value },
+]);
+
 const statusLabel = computed(() => {
-  if (!isDesktop()) return '请使用桌面应用';
+  if (!isDesktop()) return '桌面预览';
   if (!appStatus.value) return '检查连接';
   if (appStatus.value.connection_state === 'needs_reauth') return '需要重新连接';
   if (appStatus.value.connection_state === 'connected') return '已连接';
@@ -67,43 +60,29 @@ const statusLabel = computed(() => {
 const statusTone = computed(() => {
   if (appStatus.value?.connection_state === 'needs_reauth' || syncState.value === 'failed') return 'danger';
   if (syncState.value === 'partial') return 'warning';
-  if (syncState.value === 'cancelled') return 'neutral';
   if (appStatus.value?.connection_state === 'connected') return 'success';
   return 'neutral';
 });
+const lastSyncClock = computed(() => {
+  const raw = appStatus.value?.last_cloud_sync_at;
+  if (!raw) return '—';
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(date).replace(/\//g, '-');
+});
+const accountLabel = computed(() => appStatus.value?.masked_user_id || 'user@example.com');
 const browserPreview = computed(() => !isDesktop());
 const routeNotice = computed(() => route.query.notice === 'not-found');
 
-const chooseTheme = (mode: ThemeMode) => {
-  setTheme(mode);
-  themeMenuOpen.value = false;
-};
-const toggleThemeMenu = async () => {
-  themeMenuOpen.value = !themeMenuOpen.value;
-  if (themeMenuOpen.value) {
-    await nextTick();
-    themeControl.value?.querySelector<HTMLElement>('[role="menuitemradio"][aria-checked="true"]')?.focus();
-  }
-};
-const onThemeMenuKeydown = (event: KeyboardEvent) => {
-  const items = Array.from(themeControl.value?.querySelectorAll<HTMLElement>('[role="menuitemradio"]') ?? []);
-  const current = items.indexOf(document.activeElement as HTMLElement);
-  let next = current;
-  if (event.key === 'ArrowDown') next = (current + 1) % items.length;
-  else if (event.key === 'ArrowUp') next = (current - 1 + items.length) % items.length;
-  else if (event.key === 'Home') next = 0;
-  else if (event.key === 'End') next = items.length - 1;
-  else return;
-  event.preventDefault();
-  items[next]?.focus();
-};
 const onDocumentPointerDown = (event: PointerEvent) => {
-  if (!themeControl.value?.contains(event.target as Node)) themeMenuOpen.value = false;
+  if (!userControl.value?.contains(event.target as Node)) userMenuOpen.value = false;
 };
 const onDocumentKeydown = (event: KeyboardEvent) => {
   const target = event.target as HTMLElement | null;
   if (target && target.closest('input, textarea, select, [contenteditable]')) return;
-  if (event.key === 'Escape') themeMenuOpen.value = false;
+  if (event.key === 'Escape') userMenuOpen.value = false;
   if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
   if (event.key === '=' || event.key === '+' || event.code === 'NumpadAdd') {
     event.preventDefault();
@@ -119,7 +98,6 @@ const onDocumentKeydown = (event: KeyboardEvent) => {
 const closeMobileMenu = () => { mobileMenuOpen.value = false; };
 
 onMounted(() => {
-  initializeTheme();
   initializeScale();
   void initialize();
   document.addEventListener('pointerdown', onDocumentPointerDown);
@@ -152,8 +130,11 @@ onUnmounted(() => {
   <div class="app-shell">
     <aside class="sidebar" aria-label="主导航">
       <div class="brand-lockup">
-        <BrandMark />
-        <span class="brand-name">ZeppBridge</span>
+        <span class="brand-badge"><BrandMark /></span>
+        <span class="brand-text">
+          <span class="brand-name">Z-Bridge</span>
+          <span class="brand-sub">Amazfit Data Bridge</span>
+        </span>
       </div>
 
       <nav class="desktop-nav" aria-label="主导航">
@@ -171,9 +152,40 @@ onUnmounted(() => {
         </RouterLink>
       </nav>
 
+      <div class="sources">
+        <div class="sources-head">
+          <span>数据来源</span>
+          <button type="button" aria-label="添加数据来源" title="添加数据来源"><Icon name="plus" :size="14" /></button>
+        </div>
+        <RouterLink v-for="source in dataSources" :key="source.name" class="source-card" to="/settings">
+          <span class="source-icon"><Icon :name="source.icon" :size="22" /></span>
+          <span class="source-copy">
+            <strong>{{ source.name }}</strong>
+            <span :class="['source-state', { on: source.connected }]">
+              <i class="dot"></i>{{ source.connected ? '已连接' : '未连接' }}
+            </span>
+          </span>
+          <Icon name="chevron-down" :size="14" class="source-chevron" />
+        </RouterLink>
+      </div>
+
       <div class="sidebar-footer">
-        <div class="local-note"><Icon name="shield" :size="13" /><span>数据只保存在本机</span></div>
-        <span class="app-version">v{{ APP_VERSION }}</span>
+        <div class="cloud-card">
+          <div class="cloud-row">
+            <Icon name="cloud" :size="16" />
+            <span>{{ connected ? '云服务已连接' : '云服务未连接' }}</span>
+            <Icon name="circle-check" :size="15" :class="['cloud-check', { on: connected }]" />
+          </div>
+          <div class="cloud-account">
+            <span>账户：{{ accountLabel }}</span>
+            <RouterLink to="/settings" class="manage-btn">管理</RouterLink>
+          </div>
+        </div>
+        <div class="version-row">
+          <span class="version-brand"><BrandMark /></span>
+          <span>Z-Bridge　v{{ APP_VERSION }}</span>
+          <Icon name="shield" :size="14" />
+        </div>
       </div>
     </aside>
 
@@ -183,32 +195,38 @@ onUnmounted(() => {
           <button class="mobile-menu-button" type="button" aria-label="打开导航" :aria-expanded="mobileMenuOpen" @click="mobileMenuOpen = !mobileMenuOpen">
             <Icon :name="mobileMenuOpen ? 'x' : 'sliders'" :size="19" />
           </button>
-          <span class="mobile-brand">ZeppBridge</span>
-          <span class="topbar-context">{{ pageTitle }}</span>
+          <span v-if="statusError" class="sr-only" role="status">{{ statusError }}</span>
+          <span :class="['connection-chip', `tone-${statusTone}`]" title="云端连接状态" aria-live="polite">
+            <Icon name="circle-check" :size="14" /><span>{{ statusLabel }}</span>
+          </span>
+          <span class="sync-time">上次同步：{{ lastSyncClock }}</span>
+          <button
+            class="refresh-btn"
+            type="button"
+            :disabled="isSyncing || !canIncrementalSync"
+            :title="canIncrementalSync ? '立即同步' : '请先完成连接验证'"
+            aria-label="立即同步"
+            @click="runSync('incremental')"
+          >
+            <Icon name="sync" :size="15" :class="{ spinning: isSyncing }" />
+          </button>
+          <span v-if="isSyncing" class="sync-progress-text">
+            {{ syncProgress ? `${syncProgress.current}/${syncProgress.total}` : '同步中…' }}
+            <button class="cancel-link" type="button" @click="cancelSync">取消</button>
+          </span>
         </div>
         <div class="topbar-actions">
-          <span v-if="statusError" class="sr-only" role="status">{{ statusError }}</span>
-          <span :class="['connection-chip', `tone-${statusTone}`]" title="Zepp 云端连接状态" aria-live="polite">
-            <Icon name="link" :size="13" /><span>{{ statusLabel }}</span>
-          </span>
-          <span class="sync-chip" :title="lastCloudSyncLabel">
-            <Icon name="cloud" :size="13" /><span>{{ lastCloudSyncLabel }}</span><Icon name="info" :size="12" />
-          </span>
-          <button class="sync-button" type="button" :disabled="isSyncing || !canIncrementalSync" :title="canIncrementalSync ? syncMessage : '请先完成连接验证'" @click="runSync('incremental')">
-            <Icon name="sync" :size="15" :class="{ spinning: isSyncing }" />
-            <span>{{ isSyncing ? (syncProgress ? `${syncProgress.current}/${syncProgress.total}` : '同步中') : '立即同步' }}</span>
-          </button>
-          <button v-if="isSyncing" class="theme-trigger" type="button" @click="cancelSync">取消</button>
-          <div ref="themeControl" class="theme-control">
-            <button class="theme-trigger" type="button" aria-haspopup="menu" :aria-expanded="themeMenuOpen" @click="toggleThemeMenu">
-              <Icon :name="theme === 'dark' ? 'moon' : theme === 'light' ? 'sun' : 'monitor'" :size="15" />
-              <span>{{ themeLabel }}</span>
-              <Icon name="chevron-down" :size="13" />
+          <button class="icon-round" type="button" aria-label="通知"><Icon name="bell" :size="17" /></button>
+          <button class="icon-round" type="button" aria-label="帮助"><Icon name="help" :size="17" /></button>
+          <div ref="userControl" class="user-control">
+            <button class="user-trigger" type="button" aria-haspopup="menu" :aria-expanded="userMenuOpen" @click="userMenuOpen = !userMenuOpen">
+              <span class="avatar">U</span>
+              <span class="user-name">User</span>
+              <Icon name="chevron-down" :size="14" />
             </button>
-            <div v-if="themeMenuOpen" class="theme-menu" role="menu" aria-label="选择主题" @keydown="onThemeMenuKeydown">
-              <button v-for="option in themeOptions" :key="option.value" type="button" role="menuitemradio" :aria-checked="theme === option.value" @click="chooseTheme(option.value)">
-                <Icon :name="option.icon" :size="15" /><span>{{ option.label }}</span><Icon v-if="theme === option.value" name="check" :size="14" />
-              </button>
+            <div v-if="userMenuOpen" class="user-menu" role="menu" aria-label="用户菜单">
+              <RouterLink to="/settings" role="menuitem" @click="userMenuOpen = false"><Icon name="gear" :size="15" /><span>设置</span></RouterLink>
+              <RouterLink to="/settings" role="menuitem" @click="userMenuOpen = false"><Icon name="user" :size="15" /><span>账户与区域</span></RouterLink>
             </div>
           </div>
         </div>
@@ -222,7 +240,7 @@ onUnmounted(() => {
         <Icon :name="syncState === 'failed' ? 'warning' : syncState === 'updated' ? 'circle-check' : 'info'" :size="14" :class="{ spinning: isSyncing }" />
         <span>{{ syncMessage }}</span>
       </div>
-      <div v-if="trayHint" class="sync-feedback" role="status">关闭窗口后 ZeppBridge 仍在托盘运行，可继续自动同步。</div>
+      <div v-if="trayHint" class="sync-feedback" role="status">关闭窗口后 Z-Bridge 仍在托盘运行，可继续自动同步。</div>
 
       <div v-if="mobileMenuOpen" class="mobile-menu" aria-label="移动导航">
         <nav class="mobile-menu-links">
@@ -237,7 +255,7 @@ onUnmounted(() => {
         <span>请使用桌面应用。浏览器预览不会读取账户数据。</span>
       </div>
       <div v-if="routeNotice" class="route-notice" role="status">
-        <Icon name="info" :size="16" />页面不存在，已返回概览。
+        <Icon name="info" :size="16" />页面不存在，已返回探索。
       </div>
 
       <main id="main-content" class="main-content" tabindex="-1">
@@ -246,10 +264,6 @@ onUnmounted(() => {
             <component :is="Component" />
           </Transition>
         </RouterView>
-        <footer class="content-footer">
-          <p><Icon name="shield" :size="13" />所有展示的数据均来自 Zepp 云端，已安全同步并仅保存在你的本机设备中。</p>
-          <RouterLink to="/settings">数据与隐私说明 <Icon name="arrow-right" :size="12" /></RouterLink>
-        </footer>
       </main>
 
       <nav class="bottom-nav" aria-label="移动主导航">
@@ -264,35 +278,35 @@ onUnmounted(() => {
 <style>
 :root {
   color-scheme: dark;
-  --bg: #0E0F11;
-  --sidebar: #0B0C0E;
-  --canvas: #0E0F11;
-  --surface: #15161A;
-  --surface-raised: #1C1E22;
-  --surface-hover: #232529;
-  --ink: #EDEFF2;
-  --muted: #A0A6AE;
-  --subtle: #6E757E;
-  --faint: #525862;
-  --line: rgba(255, 255, 255, .07);
-  --line-strong: rgba(255, 255, 255, .12);
-  --accent: #72C994;
-  --accent-hover: #8FD9AC;
-  --accent-strong: #5CB37E;
-  --accent-ink: #0A1F12;
-  --accent-soft: rgba(114, 201, 148, .12);
-  --icon-mint: #72C994;
+  --bg: #14160C;
+  --sidebar: #101207;
+  --canvas: #14160C;
+  --surface: #1C1F11;
+  --surface-raised: #242819;
+  --surface-hover: #2B3020;
+  --ink: #EEF0E1;
+  --muted: #A9AD92;
+  --subtle: #7C8166;
+  --faint: #5C6148;
+  --line: rgba(226, 232, 180, .09);
+  --line-strong: rgba(226, 232, 180, .16);
+  --accent: #CDDC7C;
+  --accent-hover: #DCE896;
+  --accent-strong: #B9C964;
+  --accent-ink: #171A0A;
+  --accent-soft: rgba(205, 220, 124, .12);
+  --icon-mint: #CDDC7C;
   --heart: #EF6E6E;
   --heart-wash: rgba(239, 110, 110, .10);
   --sleep: #9BA3F5;
   --sleep-wash: rgba(155, 163, 245, .10);
-  --activity: #8FCB9B;
-  --activity-wash: rgba(143, 203, 155, .10);
+  --activity: #A4CB8F;
+  --activity-wash: rgba(164, 203, 143, .10);
   --calories: #EF9F27;
-  --distance: #378ADD;
+  --distance: #64A8E8;
   --danger: #F0616A;
   --warning: #D9A556;
-  --focus: #72C994;
+  --focus: #CDDC7C;
   --sleep-deep: #6B6FD4;
   --sleep-light: #7E8AE8;
   --sleep-rem: #B07AD4;
@@ -305,84 +319,9 @@ onUnmounted(() => {
   --space-4: 16px;
   --space-6: 24px;
   --space-8: 32px;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-}
-
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme]) {
-    color-scheme: light;
-    --bg: #F4F5F7;
-    --sidebar: #ECEEF1;
-    --canvas: #F4F5F7;
-    --surface: #FFFFFF;
-    --surface-raised: #EEF1F4;
-    --surface-hover: #E4E8EC;
-    --ink: #14171C;
-    --muted: #5C636C;
-    --subtle: #8A9098;
-    --faint: #A6ACB4;
-    --line: rgba(20, 23, 28, .08);
-    --line-strong: rgba(20, 23, 28, .14);
-    --accent: #3E8A5E;
-    --accent-hover: #357A52;
-    --accent-strong: #347852;
-    --accent-ink: #FFFFFF;
-    --accent-soft: rgba(62, 138, 94, .12);
-    --icon-mint: #3E8A5E;
-    --heart: #C45F64;
-    --heart-wash: rgba(196, 95, 100, .10);
-    --sleep: #6B72C8;
-    --sleep-wash: rgba(107, 114, 200, .10);
-    --activity: #4E9A70;
-    --activity-wash: rgba(78, 154, 112, .10);
-    --calories: #B8842A;
-    --distance: #2B6FA3;
-    --danger: #C45F64;
-    --warning: #B8842A;
-    --focus: #3E8A5E;
-    --sleep-deep: #5856D6;
-    --sleep-light: #5E5CE6;
-    --sleep-rem: #AF52DE;
-    --sleep-awake: #C48A12;
-  }
-}
-
-:root[data-theme='light'] {
-  color-scheme: light;
-  --bg: #F4F5F7;
-  --sidebar: #ECEEF1;
-  --canvas: #F4F5F7;
-  --surface: #FFFFFF;
-  --surface-raised: #EEF1F4;
-  --surface-hover: #E4E8EC;
-  --ink: #14171C;
-  --muted: #5C636C;
-  --subtle: #8A9098;
-  --faint: #A6ACB4;
-  --line: rgba(20, 23, 28, .08);
-  --line-strong: rgba(20, 23, 28, .14);
-  --accent: #3E8A5E;
-  --accent-hover: #357A52;
-  --accent-strong: #347852;
-  --accent-ink: #FFFFFF;
-  --accent-soft: rgba(62, 138, 94, .12);
-  --icon-mint: #3E8A5E;
-  --heart: #C45F64;
-  --heart-wash: rgba(196, 95, 100, .10);
-  --sleep: #6B72C8;
-  --sleep-wash: rgba(107, 114, 200, .10);
-  --activity: #4E9A70;
-  --activity-wash: rgba(78, 154, 112, .10);
-  --calories: #B8842A;
-  --distance: #2B6FA3;
-  --danger: #C45F64;
-  --warning: #B8842A;
-  --focus: #3E8A5E;
-  --sleep-deep: #5856D6;
-  --sleep-light: #5E5CE6;
-  --sleep-rem: #AF52DE;
-  --sleep-awake: #C48A12;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
 }
 
 * { box-sizing: border-box; }
@@ -397,7 +336,7 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
-button, input, select { font: inherit; }
+button, input, select, textarea { font: inherit; }
 button, select, a { -webkit-tap-highlight-color: transparent; }
 button { color: inherit; }
 a { color: inherit; }
@@ -428,21 +367,36 @@ a { color: inherit; }
 .skip-link:focus { transform: translateY(0); }
 .app-shell { display: flex; height: 100%; min-height: 0; min-width: 0; overflow: hidden; background: var(--bg); }
 .app-shell > * { min-width: 0; }
+
+/* ── 侧边栏 ─────────────────────────────── */
 .sidebar {
-  width: 224px;
-  flex: 0 0 224px;
+  width: 236px;
+  flex: 0 0 236px;
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
   min-width: 0;
-  overflow: hidden;
-  padding: 20px 12px 16px;
+  overflow: hidden auto;
+  padding: 20px 12px 14px;
   background: var(--sidebar);
   border-right: 1px solid var(--line);
 }
-.brand-lockup { display: flex; align-items: center; gap: 9px; padding: 0 8px 24px; min-width: 0; }
-.brand-name { display: block; font-size: 15px; font-weight: 700; letter-spacing: .01em; }
+.brand-lockup { display: flex; align-items: center; gap: 10px; padding: 0 6px 22px; min-width: 0; }
+.brand-badge {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border-radius: 12px;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  color: var(--accent);
+}
+.brand-text { display: grid; gap: 1px; min-width: 0; }
+.brand-name { font-size: 16px; font-weight: 700; letter-spacing: .01em; }
+.brand-sub { color: var(--subtle); font-size: 11px; }
 .desktop-nav { display: grid; gap: 4px; min-width: 0; }
 .nav-link {
   display: flex;
@@ -452,7 +406,7 @@ a { color: inherit; }
   gap: 10px;
   padding: 8px 12px;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: 11px;
   color: var(--muted);
   font-size: 13px;
   text-decoration: none;
@@ -462,36 +416,134 @@ a { color: inherit; }
 .nav-link:active { transform: translateY(1px); }
 .nav-link svg { color: var(--subtle); }
 .nav-link.is-active {
-  color: var(--icon-mint);
+  color: var(--accent);
   background: var(--accent-soft);
-  border-color: transparent;
+  border-color: rgba(205, 220, 124, .18);
 }
-.nav-link.is-active svg { color: var(--icon-mint); }
-.sidebar-footer { margin-top: auto; padding: 0 8px; min-width: 0; display: grid; gap: 8px; }
-.local-note { display: flex; align-items: center; gap: 6px; color: var(--accent); font-size: 12px; }
-.app-version { display: block; color: var(--subtle); font-family: var(--font-mono); font-size: 11px; }
+.nav-link.is-active svg { color: var(--accent); }
+
+.sources { margin-top: 20px; min-width: 0; display: grid; gap: 8px; }
+.sources-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px;
+  color: var(--subtle);
+  font-size: 12px;
+}
+.sources-head button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--subtle);
+  cursor: pointer;
+}
+.sources-head button:hover { background: var(--surface-hover); color: var(--ink); }
+.source-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  text-decoration: none;
+  color: inherit;
+}
+.source-card:hover { background: var(--surface-raised); border-color: var(--line-strong); }
+.source-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: 10px;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+.source-copy { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.source-copy strong { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.source-state { display: inline-flex; align-items: center; gap: 5px; color: var(--subtle); font-size: 11px; }
+.source-state .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--subtle); }
+.source-state.on { color: var(--accent); }
+.source-state.on .dot { background: var(--accent); }
+.source-chevron { transform: rotate(-90deg); color: var(--subtle); }
+
+.sidebar-footer { margin-top: auto; padding-top: 16px; min-width: 0; display: grid; gap: 12px; }
+.cloud-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+}
+.cloud-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink); }
+.cloud-row svg:first-child { color: var(--muted); }
+.cloud-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cloud-check { color: var(--faint); }
+.cloud-check.on { color: var(--accent); }
+.cloud-account {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  color: var(--subtle);
+  font-size: 11px;
+}
+.cloud-account span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.manage-btn {
+  flex: 0 0 auto;
+  padding: 2px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--muted);
+  font-size: 11px;
+  text-decoration: none;
+}
+.manage-btn:hover { color: var(--accent); border-color: var(--accent); }
+.version-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 6px;
+  color: var(--subtle);
+  font-size: 11px;
+}
+.version-row span:nth-child(2) { flex: 1; }
+.version-brand { display: grid; place-items: center; width: 18px; height: 18px; opacity: .8; }
+.version-brand svg { width: 18px; height: 18px; }
+
+/* ── 顶栏 ───────────────────────────────── */
 .app-body { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; height: 100%; overflow: hidden; }
 .topbar {
   display: flex;
-  height: 56px;
+  height: 60px;
   min-width: 0;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 0 24px;
+  padding: 0 28px;
   background: var(--canvas);
   border-bottom: 1px solid var(--line);
 }
-.topbar-leading, .topbar-actions { display: flex; min-width: 0; align-items: center; gap: 8px; }
+.topbar-leading, .topbar-actions { display: flex; min-width: 0; align-items: center; gap: 10px; }
 .topbar-actions { flex-wrap: wrap; justify-content: flex-end; }
-.topbar-context { color: var(--ink); font-size: 14px; font-weight: 700; }
-.mobile-brand, .mobile-menu-button { display: none; }
-.connection-chip, .sync-chip {
+.mobile-menu-button { display: none; }
+.connection-chip {
   display: inline-flex;
   min-height: 30px;
   align-items: center;
   gap: 6px;
-  padding: 4px 12px;
+  padding: 4px 13px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--surface);
@@ -499,53 +551,90 @@ a { color: inherit; }
   font-size: 12px;
   white-space: nowrap;
 }
-.connection-chip.tone-success { color: var(--icon-mint); border-color: var(--accent-soft); background: var(--accent-soft); }
-.content-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  width: 100%;
-  margin: 0;
-  padding: 8px 24px 20px;
-  color: var(--muted);
-  font-size: 12px;
-}
-.content-footer p { display: flex; align-items: center; gap: 6px; margin: 0; }
-.content-footer a { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); text-decoration: none; }
-.content-footer svg { color: var(--icon-mint); }
+.connection-chip.tone-success { color: var(--accent); border-color: rgba(205, 220, 124, .25); background: var(--accent-soft); }
 .connection-chip.tone-warning { color: var(--warning); }
 .connection-chip.tone-danger { color: var(--danger); }
-.sync-button, .theme-trigger {
-  display: inline-flex;
-  min-height: 32px;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 5px 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--ink);
-  font-size: 12px;
+.sync-time { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.refresh-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
   cursor: pointer;
 }
-.sync-button {
+.refresh-btn:hover:not(:disabled) { background: var(--surface-hover); color: var(--ink); }
+.refresh-btn:disabled { opacity: .5; cursor: not-allowed; }
+.sync-progress-text { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+.cancel-link { border: 0; background: transparent; color: var(--accent); font-size: 12px; cursor: pointer; padding: 0; }
+.icon-round {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
   border: 0;
-  background: var(--accent);
-  color: var(--accent-ink);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
 }
-.sync-button:hover:not(:disabled) { background: var(--accent-hover); }
-.theme-trigger:hover { background: var(--surface-hover); border-color: var(--line-strong); }
-.sync-button:disabled { color: var(--subtle); background: var(--surface-raised); cursor: not-allowed; opacity: .7; }
-.theme-control { position: relative; display: inline-flex; color: var(--muted); }
-.theme-trigger { min-width: 108px; justify-content: flex-start; color: var(--muted); }
-.theme-trigger span { flex: 1; color: var(--ink); text-align: left; }
-.theme-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 40; width: 156px; padding: 5px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-raised); }
-.theme-menu button { display: flex; width: 100%; min-height: 36px; align-items: center; gap: 9px; padding: 7px 9px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 12px; text-align: left; cursor: pointer; }
-.theme-menu button span { flex: 1; color: var(--ink); }
-.theme-menu button:hover, .theme-menu button[aria-checked='true'] { background: var(--accent-soft); color: var(--accent); }
-.sync-feedback { display: flex; min-height: 32px; min-width: 0; align-items: center; gap: 7px; padding: 6px 24px; border-bottom: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 12px; }
+.icon-round:hover { background: var(--surface-hover); color: var(--ink); }
+.user-control { position: relative; }
+.user-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 3px 6px 3px 3px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.user-trigger:hover { background: var(--surface-hover); }
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--surface-raised);
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.user-name { color: var(--ink); font-size: 13px; }
+.user-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  width: 168px;
+  padding: 5px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+}
+.user-menu a {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 36px;
+  padding: 7px 9px;
+  border-radius: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: none;
+}
+.user-menu a span { color: var(--ink); }
+.user-menu a:hover { background: var(--accent-soft); color: var(--accent); }
+
+.sync-feedback { display: flex; min-height: 32px; min-width: 0; align-items: center; gap: 7px; padding: 6px 28px; border-bottom: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 12px; }
 .sync-feedback.tone-updated { color: var(--accent); }
 .sync-feedback.tone-partial { color: var(--warning); }
 .sync-feedback.tone-no_new_data { color: var(--muted); }
@@ -571,16 +660,11 @@ a { color: inherit; }
   .sidebar { display: none; }
   .topbar { height: 56px; padding: 0 16px; }
   .mobile-menu-button { display: inline-flex; width: 44px; height: 44px; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: var(--radius-sm); background: transparent; cursor: pointer; }
-  .mobile-brand { display: inline; font-size: 13px; font-weight: 700; }
-  .topbar-context { padding-left: 4px; border-left: 1px solid var(--line); font-size: 12px; }
+  .sync-time { display: none; }
   .topbar-actions { gap: 6px; }
-  .connection-chip, .sync-chip { padding-inline: 8px; }
-  .connection-chip span, .sync-chip span { display: none; }
-  .sync-button, .theme-trigger { width: 38px; min-width: 38px; padding: 0; }
-  .sync-button span, .theme-trigger span, .theme-trigger > svg:last-child { display: none; }
-  .theme-menu { right: 0; }
-  .theme-menu button { width: 100%; min-width: 0; padding-inline: 9px; }
-  .theme-menu button span { display: block; }
+  .connection-chip { padding-inline: 8px; }
+  .connection-chip span { display: none; }
+  .user-name { display: none; }
   .sync-feedback { padding-inline: 16px; }
   .mobile-menu { display: block; padding: 8px 12px 12px; background: var(--bg); border-bottom: 1px solid var(--line); }
   .mobile-menu-links { display: grid; gap: 3px; }
@@ -591,16 +675,18 @@ a { color: inherit; }
   .bottom-nav-link.is-active { color: var(--accent); background: var(--accent-soft); }
 }
 
-.page { width: 100%; max-width: none; min-width: 0; margin: 0; padding: 16px 24px 20px; }
-.page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 14px; min-width: 0; }
+/* ── 页面通用 ───────────────────────────── */
+.page { width: 100%; max-width: none; min-width: 0; margin: 0; padding: 20px 28px 24px; }
+.page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 16px; min-width: 0; }
 .eyebrow { margin: 0 0 6px; color: var(--muted); font-size: 12px; letter-spacing: .06em; }
 h1, h2, p { margin-top: 0; }
-.page h1 { margin-bottom: 6px; font-size: 22px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; }
-.page-intro { margin-bottom: 0; color: var(--muted); font-size: 12px; }
-.button { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; gap: 6px; padding: 6px 12px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; font-size: 12px; text-decoration: none; cursor: pointer; }
+.page h1 { margin-bottom: 6px; font-size: 26px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; }
+.page-intro { margin-bottom: 0; color: var(--muted); font-size: 13px; }
+.button { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; gap: 6px; padding: 6px 14px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; font-size: 12px; text-decoration: none; cursor: pointer; }
 .button:disabled { opacity: .5; cursor: not-allowed; }
-.button-primary, .button.primary { background: var(--accent); color: var(--accent-ink); }
-.button-secondary, .button.secondary, .button-quiet, .button.quiet { border-color: var(--line); color: var(--muted); }
+.button-primary, .button.primary { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.button-primary:hover:not(:disabled), .button.primary:hover:not(:disabled) { background: var(--accent-hover); }
+.button-secondary, .button.secondary, .button-quiet, .button.quiet { border-color: var(--line-strong); color: var(--muted); background: var(--surface-raised); }
 .button-secondary:hover:not(:disabled), .button.secondary:hover:not(:disabled), .button-quiet:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .button-danger, .button.danger-button { border-color: rgba(240, 97, 106, .35); color: var(--danger); }
 .surface-card { border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); overflow: hidden; min-width: 0; }

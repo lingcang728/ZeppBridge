@@ -17,6 +17,22 @@ const workouts = ref<Workout[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
 
+// 运动类型颜色映射（workout_type 为标准化字符串）
+function workoutTypeBg(type: string): string {
+  const map: Record<string, string> = {
+    run: '#ef4444',
+    running: '#ef4444',
+    walk: '#10b981',
+    walking: '#10b981',
+    treadmill: '#f59e0b',
+    indoor_run: '#f59e0b',
+    ride: '#3b82f6',
+    cycling: '#3b82f6',
+    swimming: '#06b6d4',
+  };
+  return map[type?.trim().toLowerCase()] ?? '#8b5cf6';
+}
+
 const durationMinutes = (start: string, end: string): number | null => {
   const from = new Date(start).getTime();
   const to = new Date(end).getTime();
@@ -77,7 +93,8 @@ watch(dataRevision, () => void loadList());
         :key="workout.workout_id"
         :to="{ name: 'WorkoutDetail', params: { workoutId: workout.workout_id } }"
         category="activity"
-        icon="steps"
+        icon="run"
+        :icon-bg="workoutTypeBg(workout.workout_type)"
         :kicker="formatDate(workout.start_time)"
         :title="workoutLabel(workout.workout_type)"
         :fact="workoutFact(workout).fact"

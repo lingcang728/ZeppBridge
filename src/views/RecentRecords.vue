@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import Icon from '../components/Icon.vue';
 import PageHeader from '../components/PageHeader.vue';
@@ -19,6 +19,46 @@ const recentSleep = ref<SleepSession[]>([]);
 const recentWorkouts = ref<Workout[]>([]);
 const { dataRevision } = useSyncController();
 
+// 运动类型筛选
+const activeFilter = ref('all');
+
+const WORKOUT_TYPE_MAP: Record<string, string[]> = {
+  run: ['run', 'running', 'trail', 'treadmill', 'indoor_run'],
+  cycle: ['ride', 'cycling'],
+  walk: ['walk', 'walking', 'hiking'],
+};
+
+const filterTabs = [
+  { label: '全部', value: 'all', icon: 'grid' as const },
+  { label: '跑步', value: 'run', icon: 'run' as const },
+  { label: '骑行', value: 'cycle', icon: 'activity' as const },
+  { label: '步行', value: 'walk', icon: 'steps' as const },
+];
+
+const filteredWorkouts = computed(() => {
+  if (activeFilter.value === 'all') return recentWorkouts.value;
+  const targetTypes = WORKOUT_TYPE_MAP[activeFilter.value];
+  return targetTypes
+    ? recentWorkouts.value.filter(w => targetTypes.includes(w.workout_type?.trim().toLowerCase()))
+    : recentWorkouts.value;
+});
+
+// 运动类型颜色映射（workout_type 为标准化字符串）
+function workoutTypeBg(type: string): string {
+  const map: Record<string, string> = {
+    run: '#ef4444',
+    running: '#ef4444',
+    walk: '#10b981',
+    walking: '#10b981',
+    treadmill: '#f59e0b',
+    indoor_run: '#f59e0b',
+    ride: '#3b82f6',
+    cycling: '#3b82f6',
+    swimming: '#06b6d4',
+  };
+  return map[type?.trim().toLowerCase()] ?? '#8b5cf6';
+}
+
 const loadRecent = async () => {
   loading.value = true;
   error.value = null;
@@ -31,7 +71,7 @@ const loadRecent = async () => {
   }
   const [sleep, workouts] = await Promise.allSettled([
     tauriApi.getRecentSleep(10),
-    tauriApi.getRecentWorkouts(10),
+    tauriApi.getRecentWorkouts(50),
   ]);
   recentSleep.value = sleep.status === 'fulfilled' ? sleep.value : [];
   recentWorkouts.value = workouts.status === 'fulfilled' ? workouts.value : [];
@@ -150,19 +190,32 @@ function formatDateHint(value: string): string {
           </h2>
           <RouterLink class="see-all" to="/workouts">查看全部<Icon name="arrow-right" :size="13" /></RouterLink>
         </div>
+        <div class="filter-tabs">
+          <button
+            v-for="tab in filterTabs"
+            :key="tab.value"
+            :class="['tab-button', { active: activeFilter === tab.value }]"
+            type="button"
+            @click="activeFilter = tab.value"
+          >
+            <Icon :name="tab.icon" :size="14" />
+            <span>{{ tab.label }}</span>
+          </button>
+        </div>
         <div class="surface-card list-card">
           <RecordRow
-            v-for="workout in recentWorkouts"
+            v-for="workout in filteredWorkouts"
             :key="workout.workout_id"
             compact
             :to="{ name: 'WorkoutDetail', params: { workoutId: workout.workout_id } }"
             category="activity"
             icon="run"
+            :icon-bg="workoutTypeBg(workout.workout_type)"
             :kicker="formatDateHint(workout.start_time)"
             :title="workoutLabel(workout.workout_type)"
             :fact="workoutFact(workout)"
           />
-          <div v-if="!recentWorkouts.length" class="empty-row">暂无运动记录</div>
+          <div v-if="!filteredWorkouts.length" class="empty-row">{{ activeFilter === 'all' ? '暂无运动记录' : '暂无此类运动记录' }}</div>
         </div>
       </section>
     </div>
@@ -252,6 +305,35 @@ function formatDateHint(value: string): string {
   font-size: 12px;
 }
 .partial-warning svg { color: var(--warning); }
+.filter-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 4px;
+  background: var(--surface-raised);
+  border-radius: var(--radius-sm);
+}
+.tab-button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.tab-button:hover {
+  background: var(--surface);
+  color: var(--ink);
+}
+.tab-button.active {
+  background: var(--accent);
+  color: white;
+}
 @media (max-width: 860px) {
   .recent-grid { grid-template-columns: minmax(0, 1fr); }
 }
