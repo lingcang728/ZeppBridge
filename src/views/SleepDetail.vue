@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
+import VChart from 'vue-echarts';
 import Icon from '../components/Icon.vue';
 import CircularProgress from '../components/CircularProgress.vue';
 import StageBar from '../components/StageBar.vue';
@@ -10,12 +11,14 @@ import { useDevices } from '../composables/useDevices';
 import { dataProviderLabel, dataScopeLabel } from '../lib/labels';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { formatDate, formatDateTime, formatDuration, formatTime, isFiniteNumber } from '../lib/format';
+import { zeppSemanticColors } from '../lib/echartsTheme';
 import type { DeviceProfile, SleepSession } from '../types';
 
 const route = useRoute();
 const { appStatus, dataRevision } = useSyncController();
 const { maskIdentifier } = useDevices();
 const session = ref<SleepSession | null>(null);
+const weekSessions = ref<SleepSession[]>([]);
 const device = ref<DeviceProfile>({});
 const loading = ref(true);
 const error = ref<string | null>(null);
@@ -50,6 +53,112 @@ const syncTimeLabel = computed(() => {
 const timezoneLabel = computed(() => device.value.timezone || '未提供');
 const deviceIdentifier = computed(() => maskIdentifier(device.value.device_id || session.value?.device_id));
 
+// 周睡眠堆叠柱状图
+const weeklyChartOption = computed(() => {
+  if (!weekSessions.value.length) return null;
+  const sorted = [...weekSessions.value].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+  
+  const dates = sorted.map((s) => {
+    const d = new Date(s.start_time);
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+  });
+
+  const toHours = (mins?: number | null) => (isFiniteNumber(mins) && mins > 0 ? Math.round((mins / 60) * 10) / 10 : 0);
+
+  const deepData = sorted.map((s) => toHours(s.deep_minutes));
+  const lightData = sorted.map((s) => toHours(s.light_minutes));
+  const remData = sorted.map((s) => toHours(s.rem_minutes));
+  const awakeData = sorted.map((s) => toHours(s.awake_minutes));
+
+  // 标出当前日高亮
+  const currentIndex = sorted.findIndex((s) => s.sleep_id === sleepId.value);
+
+  return {
+    animation: false,
+    grid: { left: 34, right: 12, top: 24, bottom: 24, containLabel: false },
+    legend: {
+      data: ['深睡', '浅睡', 'REM', '清醒'],
+      top: 0,
+      right: 0,
+      textStyle: { color: '#7E856D', fontSize: 11 },
+      itemWidth: 8,
+      itemHeight: 8,
+      icon: 'circle',
+    },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: '#22261A',
+      borderColor: 'rgba(228, 235, 208, 0.16)',
+      borderWidth: 1,
+      textStyle: { color: '#F3F4EC', fontSize: 12 },
+      formatter: (params: Array<{ seriesName: string; value: number; name: string }>) => {
+        if (!params || !params.length) return '';
+        const name = params[0].name;
+        const total = params.reduce((sum, p) => sum + (Number(p.value) || 0), 0);
+        let text = `<b>${name} 睡眠合计：${total.toFixed(1)} 小时</b><br/>`;
+        params.forEach((p) => {
+          text += `${p.seriesName}: ${p.value} 小时<br/>`;
+        });
+        return text;
+      },
+    },
+    xAxis: {
+      type: 'category',
+      data: dates,
+      axisLine: { lineStyle: { color: 'rgba(228, 235, 208, 0.1)' } },
+      axisTick: { show: false },
+      axisLabel: {
+        color: (_val: string, index: number) => index === currentIndex ? '#CDDC7C' : '#7E856D',
+        fontSize: 11,
+        fontWeight: (_val: string, index: number) => index === currentIndex ? 'bold' : 'normal',
+      },
+    },
+    yAxis: {
+      type: 'value',
+      name: '小时',
+      nameTextStyle: { color: '#7E856D', fontSize: 10, align: 'right' },
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: '#7E856D', fontSize: 10 },
+      splitLine: { show: true, lineStyle: { color: 'rgba(228, 235, 208, 0.08)', type: 'dashed' } },
+    },
+    series: [
+      {
+        name: '深睡',
+        type: 'bar',
+        stack: 'sleep',
+        data: deepData,
+        itemStyle: { color: zeppSemanticColors.sleep.deep },
+        barWidth: 20,
+      },
+      {
+        name: '浅睡',
+        type: 'bar',
+        stack: 'sleep',
+        data: lightData,
+        itemStyle: { color: zeppSemanticColors.sleep.light },
+      },
+      {
+        name: 'REM',
+        type: 'bar',
+        stack: 'sleep',
+        data: remData,
+        itemStyle: { color: zeppSemanticColors.sleep.rem },
+      },
+      {
+        name: '清醒',
+        type: 'bar',
+        stack: 'sleep',
+        data: awakeData,
+        itemStyle: {
+          color: zeppSemanticColors.sleep.awake,
+          borderRadius: [4, 4, 0, 0],
+        },
+      },
+    ],
+  };
+});
+
 let detailSeq = 0;
 
 const loadDetail = async () => {
@@ -61,7 +170,10 @@ const loadDetail = async () => {
     return;
   }
   try {
-    const detail = await tauriApi.getSleepDetail(sleepId.value);
+    const [detail, recent] = await Promise.all([
+      tauriApi.getSleepDetail(sleepId.value),
+      tauriApi.getRecentSleep(7).catch(() => []),
+    ]);
     if (seq !== detailSeq) return;
     const profile = detail
       ? await tauriApi.getDeviceProfile({
@@ -71,6 +183,7 @@ const loadDetail = async () => {
       : {};
     if (seq !== detailSeq) return;
     session.value = detail;
+    weekSessions.value = recent;
     device.value = profile;
   } catch (cause) {
     if (seq !== detailSeq) return;
@@ -125,6 +238,7 @@ watch([dataRevision, sleepId], () => void loadDetail());
         </div>
       </article>
 
+      <!-- 睡眠阶段 -->
       <section class="surface-card stage-card" aria-label="睡眠阶段">
         <div class="stage-head">
           <h2>睡眠阶段</h2>
@@ -139,11 +253,21 @@ watch([dataRevision, sleepId], () => void loadDetail());
         <StageBar
           :stages="stages"
           :slices="session.stages"
-            :range-start="session.start_time"
-            :range-end="session.end_time"
+          :range-start="session.start_time"
+          :range-end="session.end_time"
         />
       </section>
 
+      <!-- 睡眠时长周堆叠图 -->
+      <section v-if="weeklyChartOption" class="surface-card chart-card" aria-label="近7天睡眠趋势">
+        <div class="stage-head">
+          <h2>近 7 天睡眠结构</h2>
+          <p>每日分期堆叠</p>
+        </div>
+        <VChart class="weekly-sleep-chart" :option="weeklyChartOption" autoresize role="img" aria-label="近7天睡眠结构柱状图" />
+      </section>
+
+      <!-- 元数据与设备 -->
       <section class="meta-grid" aria-label="来源与设备">
         <article class="surface-card meta-card">
           <p class="meta-title"><Icon name="cloud" :size="15" />来源</p>
@@ -200,7 +324,7 @@ watch([dataRevision, sleepId], () => void loadDetail());
   font-size: 12px;
   text-decoration: none;
 }
-.back-link svg { transform: rotate(180deg); }
+.back-link:hover { color: var(--accent); }
 .page-heading { margin-bottom: 12px; }
 .page-heading h1 {
   margin: 0;
@@ -280,7 +404,8 @@ watch([dataRevision, sleepId], () => void loadDetail());
   font-family: 'Inter', var(--font-sans);
   font-size: 13px;
 }
-.stage-card { margin-top: 12px; padding: 14px 16px 16px; background: var(--surface); border-color: var(--line); }
+.stage-card, .chart-card { margin-top: 12px; padding: 14px 16px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.weekly-sleep-chart { width: 100%; height: 180px; }
 .stage-head {
   display: flex;
   align-items: baseline;
@@ -307,7 +432,7 @@ watch([dataRevision, sleepId], () => void loadDetail());
   gap: 12px;
   margin-top: 12px;
 }
-.meta-card { padding: 12px 14px 14px; background: var(--surface); border-color: var(--line); }
+.meta-card { padding: 12px 14px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
 .meta-title {
   display: flex;
   align-items: center;

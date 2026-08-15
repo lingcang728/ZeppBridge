@@ -6,23 +6,23 @@ const fonts = "'MiSans','Segoe UI','Microsoft YaHei UI',sans-serif";
 
 /** Stable metric colors shared by charts, legends, and data exports. */
 export const zeppSemanticColors = {
-  brand: '#D8FF52',
-  heart: '#FF777A',
-  pace: '#6ED8F5',
-  distance: '#6ED8F5',
-  calories: '#FFB866',
-  power: '#FFB866',
-  altitude: '#76E5BF',
-  cadence: '#6ED8F5',
-  stride: '#76E5BF',
-  training: '#D8FF52',
-  vo2: '#D8FF52',
-  readiness: '#76E5BF',
+  brand: '#CDDC7C',
+  heart: '#F0616A',
+  pace: '#4AA8E8',
+  distance: '#4AA8E8',
+  calories: '#F5860B',
+  power: '#F5860B',
+  altitude: '#F5C33B',
+  cadence: '#4AA8E8',
+  stride: '#2BB3C0',
+  training: '#3DD84C',
+  vo2: '#3DD84C',
+  readiness: '#3DD84C',
   sleep: {
-    deep: '#8078E8',
-    light: '#8FA8FF',
-    rem: '#55D7B1',
-    awake: '#FF777A',
+    deep: '#7B4FB3',
+    light: '#7C8FF0',
+    rem: '#2FA96B',
+    awake: '#E84C3D',
   },
 } as const;
 
@@ -45,8 +45,8 @@ const healthSeriesPalette = [
 const darkAxis = {
   axisLine: { show: false },
   axisTick: { show: false },
-  axisLabel: { color: '#8A969D', fontSize: 11, fontFamily: fonts },
-  splitLine: { show: true, lineStyle: { color: 'rgba(224,235,240,0.08)', type: 'dashed' as const } },
+  axisLabel: { color: '#A9AF97', fontSize: 11, fontFamily: fonts },
+  splitLine: { show: true, lineStyle: { color: 'rgba(228,235,208,0.08)', type: 'dashed' as const } },
 };
 
 const lightAxis = {
@@ -59,17 +59,17 @@ const lightAxis = {
 export const zeppThemeDark = {
   color: healthSeriesPalette,
   backgroundColor: 'transparent',
-  textStyle: { fontFamily: fonts, color: '#A0A6AE' },
+  textStyle: { fontFamily: fonts, color: '#A9AF97' },
   categoryAxis: { ...darkAxis },
   valueAxis: { ...darkAxis },
   timeAxis: { ...darkAxis },
   logAxis: { ...darkAxis },
   tooltip: {
-    backgroundColor: '#20262B',
-    borderColor: 'rgba(224,235,240,0.16)',
+    backgroundColor: '#22261A',
+    borderColor: 'rgba(228,235,208,0.16)',
     borderWidth: 1,
     padding: [8, 12],
-    textStyle: { color: '#EDEFF2', fontSize: 12, fontFamily: fonts },
+    textStyle: { color: '#F3F4EC', fontSize: 12, fontFamily: fonts },
     extraCssText: 'border-radius:8px;box-shadow:none;',
   },
   line: {
@@ -82,8 +82,6 @@ export const zeppThemeDark = {
 
 export const zeppThemeLight = {
   color: healthSeriesPalette,
-  backgroundColor: 'transparent',
-  textStyle: { fontFamily: fonts, color: '#5C636C' },
   categoryAxis: { ...lightAxis },
   valueAxis: { ...lightAxis },
   timeAxis: { ...lightAxis },

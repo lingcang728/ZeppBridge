@@ -1052,8 +1052,7 @@ impl Database {
     pub fn pending_running_details(&self) -> Result<Vec<PendingWorkoutDetail>> {
         let mut stmt = self.conn.prepare(
             "SELECT workout_id, zepp_source FROM workouts
-             WHERE zepp_type = 1
-               AND zepp_source IS NOT NULL
+             WHERE zepp_source IS NOT NULL
                AND TRIM(zepp_source) != ''
                AND NOT EXISTS (
                    SELECT 1 FROM raw_records

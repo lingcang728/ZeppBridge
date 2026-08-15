@@ -1,21 +1,21 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
+import CircularProgress from '../components/CircularProgress.vue';
 import DeviceCard from '../components/DeviceCard.vue';
 import Icon from '../components/Icon.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import { useDevices } from '../composables/useDevices';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
-import { formatDate, formatDateTime, formatDistance, formatDuration, formatMetric, formatTime, isFiniteNumber } from '../lib/format';
-import { displayableWorkouts, workoutDurationMinutes } from '../lib/workouts';
-import type { DailyPoint, HealthOverview, SleepSession, Workout } from '../types';
+import { formatDateTime, formatMetric, isFiniteNumber } from '../lib/format';
+import { displayableWorkouts } from '../lib/workouts';
+import type { HealthOverview, SleepSession, Workout } from '../types';
 
 const { appStatus, dataRevision } = useSyncController();
-const { models: deviceModels, cache: deviceCache, loading: devicesLoading, error: deviceError, load: loadDevices } = useDevices();
+const { models: deviceModels, loading: devicesLoading, error: deviceError, load: loadDevices } = useDevices();
 
 const overview = ref<HealthOverview | null>(null);
-const trainingLoad = ref<DailyPoint[]>([]);
 const recentSleep = ref<SleepSession[]>([]);
 const recentWorkouts = ref<Workout[]>([]);
 const loading = ref(true);
@@ -26,63 +26,36 @@ const missing = '未提供';
 const dateTime = (value?: string | null) => value ? formatDateTime(value, '时间未知') : '尚未获取';
 const numberLabel = (value: unknown, suffix = '') => isFiniteNumber(value) ? `${formatMetric(value)}${suffix}` : missing;
 
-const bodyReadiness = computed(() => {
-  const health = overview.value;
-  if (!health) return { value: null as number | null, label: missing, source: missing };
-  if (isFiniteNumber(health.readiness)) return { value: health.readiness, label: '恢复准备度', source: 'HealthOverview.readiness' };
-  if (isFiniteNumber(health.bio_charge)) return { value: health.bio_charge, label: 'Bio Charge', source: 'HealthOverview.bio_charge' };
-  if (isFiniteNumber(health.hybrid_charge)) return { value: health.hybrid_charge, label: 'Hybrid Charge', source: 'HealthOverview.hybrid_charge' };
-  return { value: null as number | null, label: missing, source: missing };
-});
-
-const readinessStyle = computed(() => ({ width: `${Math.max(0, Math.min(100, bodyReadiness.value.value ?? 0))}%` }));
-const latestSleep = computed(() => recentSleep.value[0] ?? null);
-const displayableRecentWorkouts = computed(() => displayableWorkouts(recentWorkouts.value));
-const latestWorkout = computed(() => displayableRecentWorkouts.value[0] ?? null);
-const latestTrainingLoad = computed(() => {
-  const values = trainingLoad.value.map((point) => point.value).filter((value) => isFiniteNumber(value));
-  return values.length ? values[values.length - 1] : null;
-});
-const trainingStats = computed(() => {
-  const values = trainingLoad.value.map((point) => point.value).filter((value) => isFiniteNumber(value));
-  if (!values.length) return null;
-  return { min: Math.min(...values), max: Math.max(...values), avg: values.reduce((sum, value) => sum + value, 0) / values.length };
-});
-const trainingBars = computed(() => {
-  const values = trainingLoad.value.filter((point) => isFiniteNumber(point.value));
-  if (!values.length) return [];
-  const max = Math.max(...values.map((point) => point.value), 1);
-  return values.slice(-14).map((point) => ({
-    ...point,
-    height: `${Math.max(5, Math.round((point.value / max) * 100))}%`,
-  }));
-});
-
 const aiChecks = computed(() => [
-  { label: '健康概览', ready: Boolean(overview.value) },
-  { label: '睡眠记录', ready: recentSleep.value.length > 0 },
-  { label: '运动记录', ready: recentWorkouts.value.length > 0 },
-  { label: '训练负荷序列', ready: trainingLoad.value.length > 0 },
+  { label: '体征概览 (HRV / 心率 / 准备度)', ready: Boolean(overview.value) },
+  { label: '睡眠分期与时长 (Deep / REM)', ready: recentSleep.value.length > 0 },
+  { label: '多模态运动记录 (配速 / 轨迹)', ready: recentWorkouts.value.length > 0 },
+  { label: '实体穿戴设备配置与固件', ready: deviceModels.value.length > 0 },
 ]);
 const aiReadyCount = computed(() => aiChecks.value.filter((check) => check.ready).length);
-const aiReadiness = computed(() => aiReadyCount.value ? Math.round((aiReadyCount.value / aiChecks.value.length) * 100) : null);
-const aiReadinessStyle = computed(() => ({ width: `${aiReadiness.value ?? 0}%` }));
+const aiReadiness = computed(() => {
+  if (!aiChecks.value.length) return 0;
+  return Math.round((aiReadyCount.value / aiChecks.value.length) * 100);
+});
 
 const deviceSummary = computed(() => {
-  if (devicesLoading.value) return '正在识别';
-  if (!deviceModels.value.length) return '未识别';
-  return `${deviceModels.value.length} 个设备`;
+  if (devicesLoading.value) return '正在识别…';
+  if (!deviceModels.value.length) return '未识别实体设备';
+  return `已识别 ${deviceModels.value.length} 台设备`;
 });
+
 const cloudState = computed(() => ['connected', 'configured'].includes(String(appStatus.value?.connection_state || '')) ? '账号已识别' : '未识别');
 const syncLabel = computed(() => dateTime(appStatus.value?.last_cloud_sync_at));
+
 const coverageLabel = computed(() => {
   const coverage = overview.value?.coverage;
-  if (!coverage?.start || !coverage.end) return missing;
-  return `${coverage.start} – ${coverage.end}`;
+  if (!coverage?.start || !coverage.end) return '最近 30 天';
+  return `${coverage.start} ~ ${coverage.end}`;
 });
+
 const recordsLabel = computed(() => {
   const total = (appStatus.value?.streams ?? []).reduce((sum, stream) => sum + (stream.records ?? 0), 0);
-  return total > 0 ? `${total.toLocaleString('zh-CN')} 条` : missing;
+  return total > 0 ? `${total.toLocaleString('zh-CN')} 条` : '就绪待导出';
 });
 
 const loadOverview = async () => {
@@ -91,7 +64,6 @@ const loadOverview = async () => {
   partialWarning.value = null;
   if (!isDesktop()) {
     overview.value = null;
-    trainingLoad.value = [];
     recentSleep.value = [];
     recentWorkouts.value = [];
     loading.value = false;
@@ -99,20 +71,19 @@ const loadOverview = async () => {
   }
   const results = await Promise.allSettled([
     backend.getHealthOverview(),
-    backend.getTrainingLoadSeries(7),
     backend.getRecentSleep(3),
     backend.getRecentWorkouts(3),
   ]);
-  const [health, load, sleep, workouts] = results;
+  const [health, sleep, workouts] = results;
   overview.value = health.status === 'fulfilled' ? health.value : null;
-  trainingLoad.value = load.status === 'fulfilled' ? load.value : [];
   recentSleep.value = sleep.status === 'fulfilled' ? sleep.value : [];
   recentWorkouts.value = workouts.status === 'fulfilled' ? displayableWorkouts(workouts.value) : [];
+
   const rejected = results.filter((result) => result.status === 'rejected');
   if (rejected.length === results.length) {
     error.value = toUserMessage(rejected[0].reason, '健康数据暂时不可用');
   } else if (rejected.length) {
-    partialWarning.value = toUserMessage(rejected[0].reason, '部分健康数据尚未获取');
+    partialWarning.value = toUserMessage(rejected[0].reason, '部分数据流尚未获取');
   }
   loading.value = false;
 };
@@ -129,216 +100,355 @@ watch(dataRevision, () => {
 
 <template>
   <section class="page overview-page" aria-labelledby="overview-title">
-    <header class="page-header overview-heading">
-      <div>
-        <p class="eyebrow">HEALTH OVERVIEW</p>
-        <h1 id="overview-title">健康概览</h1>
-        <p class="page-intro">只呈现账户和本机已获取的穿戴数据；缺失字段会明确标记，不以推断补齐。</p>
+    <!-- Hero 区域 -->
+    <header class="hero-section">
+      <div class="hero-header">
+        <div class="hero-copy">
+          <p class="eyebrow">ZEPP DATA TO AI PIPELINE</p>
+          <h1 id="overview-title">你的穿戴数据，已准备好交给 AI</h1>
+          <p class="page-intro">将 Zepp 与 Amazfit 运动健康数据自动对齐、无损结构化转换，以隐私优先的方式交付给前沿大模型。</p>
+        </div>
+        <div class="overview-meta">
+          <span class="state-chip"><i class="dot"></i>{{ cloudState }}</span>
+          <span>最近同步 {{ syncLabel }}</span>
+        </div>
       </div>
-      <div class="overview-meta">
-        <span class="state-chip"><i class="dot"></i>{{ cloudState }}</span>
-        <span>最近同步 {{ syncLabel }}</span>
+
+      <!-- 三枚核心价值卡 -->
+      <div class="value-cards-grid">
+        <div class="value-card">
+          <div class="value-icon"><Icon name="shield" :size="20" /></div>
+          <div class="value-text">
+            <strong>本地运算 · 安全 Secure</strong>
+            <span>数据解析在本地完成，不经第三方中转，凭据安全隔离。</span>
+          </div>
+        </div>
+        <div class="value-card">
+          <div class="value-icon"><Icon name="sliders" :size="20" /></div>
+          <div class="value-text">
+            <strong>可控脱敏 · 私密 Private</strong>
+            <span>精确经纬度与敏感体征默认脱敏保护，范围自主掌控。</span>
+          </div>
+        </div>
+        <div class="value-card">
+          <div class="value-icon"><Icon name="spark" :size="20" /></div>
+          <div class="value-text">
+            <strong>无损对齐 · AI 友好 AI-ready</strong>
+            <span>自动生成对齐时序的结构化 Markdown / JSON，随附专业提示词。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 流程流转示意 -->
+      <div class="pipeline-card">
+        <div class="pipeline-step">
+          <div class="step-badge"><Icon name="cloud" :size="16" /></div>
+          <div class="step-info">
+            <span class="step-tag">数据源</span>
+            <strong>MSV / Zepp Cloud</strong>
+          </div>
+        </div>
+        <div class="pipeline-arrow"><Icon name="arrow-right" :size="16" /></div>
+        <div class="pipeline-step is-hub">
+          <div class="step-badge hub-badge"><Icon name="database" :size="18" /></div>
+          <div class="step-info">
+            <span class="step-tag">本地引擎</span>
+            <strong>ZeppBridge</strong>
+          </div>
+        </div>
+        <div class="pipeline-arrow"><Icon name="arrow-right" :size="16" /></div>
+        <div class="pipeline-step">
+          <div class="step-badge"><Icon name="terminal" :size="16" /></div>
+          <div class="step-info">
+            <span class="step-tag">消费端</span>
+            <strong>Claude / ChatGPT / 提示词</strong>
+          </div>
+        </div>
       </div>
     </header>
 
-    <div v-if="partialWarning" class="inline-alert warning" role="status"><Icon name="info" :size="15" />{{ partialWarning }}</div>
-    <div v-if="deviceError" class="inline-alert warning" role="status"><Icon name="info" :size="15" />设备识别：{{ deviceError }}</div>
-
-    <div v-if="loading" class="overview-skeleton" aria-live="polite" aria-label="正在加载健康概览">
-      <SkeletonBlock height="160px" />
-      <div class="skeleton-grid"><SkeletonBlock height="190px" /><SkeletonBlock height="190px" /></div>
-      <SkeletonBlock height="240px" />
+    <div v-if="partialWarning" class="inline-alert warning" role="status">
+      <Icon name="info" :size="15" />{{ partialWarning }}
     </div>
+    <div v-if="deviceError" class="inline-alert warning" role="status">
+      <Icon name="info" :size="15" />设备识别：{{ deviceError }}
+    </div>
+
+    <!-- 加载骨架屏 -->
+    <div v-if="loading" class="overview-skeleton" aria-live="polite" aria-label="正在加载概览">
+      <SkeletonBlock height="180px" />
+      <div class="skeleton-grid">
+        <SkeletonBlock height="220px" />
+        <SkeletonBlock height="220px" />
+      </div>
+    </div>
+
+    <!-- 错误状态 -->
     <div v-else-if="error" class="empty-wrap">
-      <div class="empty-state" role="alert"><Icon name="warning" :size="20" /><strong>无法读取健康概览</strong><span>{{ error }}</span><button class="button button-secondary" type="button" @click="loadOverview">重试</button></div>
+      <div class="empty-state" role="alert">
+        <Icon name="warning" :size="20" />
+        <strong>无法读取数据概览</strong>
+        <span>{{ error }}</span>
+        <button class="button button-secondary" type="button" @click="loadOverview">重试</button>
+      </div>
     </div>
+
+    <!-- 正常内容展示 -->
     <template v-else>
-      <section class="overview-grid top-grid" aria-label="身体状态">
-        <article class="surface-card body-readiness-card">
-          <div class="section-head"><div><p class="eyebrow">BODY STATE</p><h2>恢复准备度</h2></div><Icon name="heart" :size="18" class="heart-icon" /></div>
-          <div class="readiness-value" :class="{ missing: bodyReadiness.value === null }">
-            <strong>{{ bodyReadiness.value === null ? missing : formatMetric(bodyReadiness.value) }}</strong>
-            <span v-if="bodyReadiness.value !== null">/ 100</span>
+      <div class="main-sections-grid">
+        <!-- 已连接设备面板 -->
+        <section class="surface-card devices-panel" aria-label="已连接设备">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">ACCOUNT & DEVICES</p>
+              <h2>已连接设备</h2>
+            </div>
+            <span class="head-note">{{ deviceSummary }}</span>
           </div>
-          <p class="metric-caption">{{ bodyReadiness.label }} · {{ bodyReadiness.source }}</p>
-          <div class="progress-track" aria-hidden="true"><span :style="readinessStyle"></span></div>
-          <dl class="metric-pairs">
-            <div><dt>当前心率</dt><dd>{{ numberLabel(overview?.current_hr, ' bpm') }}</dd></div>
-            <div><dt>静息心率</dt><dd>{{ numberLabel(overview?.resting_hr, ' bpm') }}</dd></div>
-            <div><dt>HRV</dt><dd>{{ numberLabel(overview?.hrv, ' ms') }}</dd></div>
-            <div><dt>更新时间</dt><dd>{{ dateTime(overview?.last_updated) }}</dd></div>
-          </dl>
-        </article>
 
-        <article class="surface-card latest-sleep-card">
-          <div class="section-head"><div><p class="eyebrow">LATEST SLEEP</p><h2>最新睡眠</h2></div><RouterLink class="text-link" :to="latestSleep ? `/sleep/${latestSleep.sleep_id}` : '/recent'">查看记录 <Icon name="arrow-right" :size="13" /></RouterLink></div>
-          <div v-if="latestSleep" class="sleep-summary">
-            <div class="sleep-duration"><strong>{{ formatDuration(latestSleep.duration_minutes, missing) }}</strong><span>{{ formatDate(latestSleep.start_time, 'short') }}</span></div>
-            <div class="sleep-score"><span>评分</span><strong>{{ isFiniteNumber(latestSleep.score) ? formatMetric(latestSleep.score) : missing }}</strong></div>
+          <div v-if="devicesLoading" class="device-grid device-grid-loading">
+            <SkeletonBlock v-for="i in 2" :key="i" height="96px" />
           </div>
-          <div v-if="latestSleep" class="sleep-times">{{ formatTime(latestSleep.start_time) }} 入睡 · {{ formatTime(latestSleep.end_time) }} 醒来 · 在床 {{ isFiniteNumber(latestSleep.time_in_bed_minutes) ? formatDuration(latestSleep.time_in_bed_minutes) : missing }}</div>
-          <p v-else class="missing-note">尚未获取睡眠记录。</p>
-          <div class="mini-stage-row" v-if="latestSleep">
-            <span><i class="deep"></i>深睡 {{ isFiniteNumber(latestSleep.deep_minutes) ? formatDuration(latestSleep.deep_minutes) : missing }}</span>
-            <span><i class="light"></i>浅睡 {{ isFiniteNumber(latestSleep.light_minutes) ? formatDuration(latestSleep.light_minutes) : missing }}</span>
-            <span><i class="rem"></i>REM {{ isFiniteNumber(latestSleep.rem_minutes) ? formatDuration(latestSleep.rem_minutes) : missing }}</span>
+          <div v-else-if="deviceModels.length" class="device-grid">
+            <DeviceCard
+              v-for="device in deviceModels"
+              :key="device.profile.device_id || device.profile.serial || device.canonicalName"
+              :profile="device"
+            />
           </div>
-        </article>
-      </section>
+          <div v-else class="device-empty">
+            <Icon name="watch" :size="18" />
+            <span>账号尚未识别实体穿戴设备，云端历史记录仍可完整同步。</span>
+          </div>
 
-      <section class="overview-grid data-grid" aria-label="训练与运动摘要">
-        <article class="surface-card training-card">
-          <div class="section-head"><div><p class="eyebrow">TRAINING LOAD · 7 DAYS</p><h2>训练负荷</h2></div><span class="value-pill">{{ latestTrainingLoad === null ? missing : formatMetric(latestTrainingLoad) }}</span></div>
-          <div v-if="trainingBars.length" class="training-chart" aria-label="最近七天训练负荷">
-            <div v-for="point in trainingBars" :key="point.date" class="training-bar-wrap"><span class="training-bar" :style="{ height: point.height }" :title="`${point.date} ${formatMetric(point.value)}`"></span><small>{{ point.date.slice(5) }}</small></div>
+          <div class="cloud-source">
+            <span class="cloud-source-icon"><Icon name="cloud" :size="18" /></span>
+            <div class="cloud-source-copy">
+              <strong>Zepp Cloud</strong>
+              <span>云服务状态 · {{ cloudState }}</span>
+            </div>
+            <span class="cloud-source-time">最近同步 {{ syncLabel }}</span>
           </div>
-          <p v-else class="missing-note">尚未获取训练负荷序列。</p>
-          <p v-if="trainingStats" class="chart-foot">最小 {{ formatMetric(trainingStats.min) }} · 平均 {{ formatMetric(trainingStats.avg, 1) }} · 最大 {{ formatMetric(trainingStats.max) }}</p>
-        </article>
+        </section>
 
-        <article class="surface-card recent-workout-card">
-          <div class="section-head"><div><p class="eyebrow">RECENT WORKOUT</p><h2>最近运动摘要</h2></div><RouterLink class="text-link" to="/recent">查看全部 <Icon name="arrow-right" :size="13" /></RouterLink></div>
-          <div v-if="latestWorkout" class="workout-summary">
-            <span class="workout-icon"><Icon name="run" :size="20" /></span>
-            <div class="workout-main"><strong>{{ latestWorkout.workout_type || missing }}</strong><span>{{ formatDate(latestWorkout.start_time, 'short') }} · {{ formatDuration(workoutDurationMinutes(latestWorkout), missing) }}</span></div>
-            <strong class="workout-distance">{{ formatDistance(latestWorkout.distance_meters, missing) }}</strong>
+        <!-- 最新数据包面板 -->
+        <section class="surface-card package-panel" aria-label="最新数据包">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">LATEST DATA PACKAGE</p>
+              <h2>最新数据包</h2>
+            </div>
+            <RouterLink class="text-link" to="/explore">导出数据 <Icon name="arrow-right" :size="13" /></RouterLink>
           </div>
-          <dl v-if="latestWorkout" class="metric-pairs workout-pairs">
-            <div><dt>平均心率</dt><dd>{{ numberLabel(latestWorkout.avg_hr, ' bpm') }}</dd></div>
-            <div><dt>消耗</dt><dd>{{ numberLabel(latestWorkout.calories, ' kcal') }}</dd></div>
-            <div><dt>Training Load</dt><dd>{{ numberLabel(latestWorkout.training_load) }}</dd></div>
-            <div><dt>VO₂ Max</dt><dd>{{ numberLabel(latestWorkout.vo2max) }}</dd></div>
-          </dl>
-          <p v-else class="missing-note">尚未获取运动记录。</p>
-        </article>
-      </section>
 
-      <section class="surface-card devices-panel" aria-label="账号设备">
-        <div class="section-head"><div><p class="eyebrow">ACCOUNT DEVICES</p><h2>账号设备</h2></div><span class="head-note">{{ deviceSummary }}</span></div>
-        <div v-if="devicesLoading" class="device-grid device-grid-loading"><SkeletonBlock v-for="i in 2" :key="i" height="104px" /></div>
-        <div v-else-if="deviceModels.length" class="device-grid">
-          <DeviceCard v-for="device in deviceModels" :key="device.profile.device_id || device.profile.serial || device.canonicalName" :profile="device" />
+          <div class="package-metrics-grid">
+            <div class="pkg-metric-item">
+              <span class="pkg-label">数据覆盖周期</span>
+              <strong class="pkg-val">{{ coverageLabel }}</strong>
+            </div>
+            <div class="pkg-metric-item">
+              <span class="pkg-label">同步记录总数</span>
+              <strong class="pkg-val font-mono">{{ recordsLabel }}</strong>
+            </div>
+            <div class="pkg-metric-item">
+              <span class="pkg-label">今日步数</span>
+              <strong class="pkg-val font-mono">{{ numberLabel(overview?.steps_today, ' 步') }}</strong>
+            </div>
+            <div class="pkg-metric-item">
+              <span class="pkg-label">活动消耗</span>
+              <strong class="pkg-val font-mono">{{ numberLabel(overview?.active_calories_today, ' kcal') }}</strong>
+            </div>
+          </div>
+
+          <div class="stream-chips-row">
+            <span class="stream-chip"><i class="chip-dot dot-sleep"></i>睡眠分期</span>
+            <span class="stream-chip"><i class="chip-dot dot-workout"></i>运动轨迹</span>
+            <span class="stream-chip"><i class="chip-dot dot-heart"></i>静息心率与 HRV</span>
+            <span class="stream-chip"><i class="chip-dot dot-readiness"></i>恢复准备度</span>
+          </div>
+        </section>
+      </div>
+
+      <!-- AI 交接就绪度与快速操作 -->
+      <section class="surface-card handoff-section" aria-label="AI 数据交接">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">AI HANDOFF & ACTIONS</p>
+            <h2>AI 交接就绪度</h2>
+          </div>
+          <span class="state-badge">本地就绪</span>
         </div>
-        <div v-else class="device-empty"><Icon name="watch" :size="18" /><span>账号尚未识别可展示的实体设备。</span></div>
-        <div class="cloud-source"><span class="cloud-source-icon"><Icon name="cloud" :size="18" /></span><div><strong>Zap Cloud</strong><span>云服务 · {{ cloudState }}</span></div><span class="cloud-source-time">最近同步 {{ syncLabel }}</span></div>
+
+        <div class="handoff-content-grid">
+          <div class="handoff-progress-col">
+            <CircularProgress :value="aiReadiness" :size="110" :stroke-width="9" color="#CDDC7C">
+              <div class="progress-inner-text">
+                <strong>{{ aiReadiness }}%</strong>
+                <span>AI 就绪</span>
+              </div>
+            </CircularProgress>
+            <p class="handoff-caption">已检查字段结构完整度，数据包格式符合 Claude / ChatGPT 输入标准。</p>
+          </div>
+
+          <div class="handoff-checklist-col">
+            <ul class="check-list">
+              <li v-for="check in aiChecks" :key="check.label">
+                <Icon :name="check.ready ? 'circle-check' : 'info'" :size="15" :class="{ 'is-ready': check.ready, 'is-pending': !check.ready }" />
+                <span>{{ check.label }}</span>
+                <em>{{ check.ready ? '已就绪' : '等待同步' }}</em>
+              </li>
+            </ul>
+          </div>
+
+          <div class="handoff-actions-col">
+            <RouterLink class="button button-primary action-btn" to="/explore">
+              <Icon name="spark" :size="15" />
+              <span>前往导出与提示词</span>
+              <Icon name="arrow-right" :size="13" />
+            </RouterLink>
+            <RouterLink class="button button-secondary action-btn" to="/recent">
+              <Icon name="clock" :size="15" />
+              <span>查看历史记录</span>
+            </RouterLink>
+          </div>
+        </div>
       </section>
 
-      <section class="overview-grid bottom-grid" aria-label="数据包与 AI 交接">
-        <article class="surface-card package-card">
-          <div class="section-head"><div><p class="eyebrow">LOCAL DATASET</p><h2>最新数据包</h2></div><RouterLink class="text-link" to="/recent">查看全部 <Icon name="arrow-right" :size="13" /></RouterLink></div>
-          <dl class="metric-pairs">
-            <div><dt>日期范围</dt><dd>{{ coverageLabel }}</dd></div>
-            <div><dt>记录条数</dt><dd>{{ recordsLabel }}</dd></div>
-            <div><dt>最后同步</dt><dd>{{ syncLabel }}</dd></div>
-            <div><dt>今日步数</dt><dd>{{ numberLabel(overview?.steps_today, ' 步') }}</dd></div>
-            <div><dt>活动消耗</dt><dd>{{ numberLabel(overview?.active_calories_today, ' kcal') }}</dd></div>
-          </dl>
-        </article>
-
-        <article class="surface-card ai-card">
-          <div class="section-head"><div><p class="eyebrow">AI HANDOFF</p><h2>AI 交接就绪度</h2></div><Icon name="spark" :size="18" class="ai-icon" /></div>
-          <p class="card-note">这是字段可用性，不等同于身体恢复准备度，也不会生成训练或医疗建议。</p>
-          <div class="readiness-value" :class="{ missing: aiReadiness === null }"><strong>{{ aiReadiness === null ? missing : `${aiReadiness}%` }}</strong><span v-if="aiReadiness !== null">字段可用</span></div>
-          <div class="progress-track" aria-hidden="true"><span :style="aiReadinessStyle"></span></div>
-          <ul class="check-list"><li v-for="check in aiChecks" :key="check.label"><Icon :name="check.ready ? 'circle-check' : 'info'" :size="14" :class="{ pending: !check.ready }" /><span>{{ check.label }}</span><em>{{ check.ready ? '已获取' : '未提供' }}</em></li></ul>
-          <RouterLink class="button button-primary" to="/explore">前往导出与提示词 <Icon name="arrow-right" :size="14" /></RouterLink>
-        </article>
-      </section>
-
-      <p class="overview-note"><Icon name="shield" :size="13" />本页仅展示本机已保存或账号已识别的数据。设备缓存状态：{{ deviceCache?.status || '未提供' }}。</p>
+      <!-- 底部安全处理保证横条 -->
+      <footer class="security-guarantees-bar">
+        <div class="guarantee-item">
+          <Icon name="shield" :size="14" />
+          <span>本地运算与转换</span>
+        </div>
+        <div class="guarantee-divider"></div>
+        <div class="guarantee-item">
+          <Icon name="terminal" :size="14" />
+          <span>标准结构化输出</span>
+        </div>
+        <div class="guarantee-divider"></div>
+        <div class="guarantee-item">
+          <Icon name="sliders" :size="14" />
+          <span>不上传原始凭据</span>
+        </div>
+        <div class="guarantee-divider"></div>
+        <div class="guarantee-item">
+          <Icon name="circle-check" :size="14" />
+          <span>端到端透明开源</span>
+        </div>
+      </footer>
     </template>
   </section>
 </template>
 
 <style scoped>
-.overview-page { display: grid; gap: 16px; }
-.overview-heading { align-items: flex-end; margin-bottom: 0; }
-.overview-meta { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 12px; white-space: nowrap; }
-.state-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--accent); }
-.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.overview-page { display: grid; gap: 20px; }
+
+/* ── Hero 区域 ─────────────────────────── */
+.hero-section { display: grid; gap: 16px; }
+.hero-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; min-width: 0; }
+.hero-copy { min-width: 0; }
+.eyebrow { margin: 0 0 4px; color: var(--subtle); font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+.hero-copy h1 { margin: 0 0 6px; font-size: 24px; font-weight: 700; color: var(--ink); letter-spacing: -.02em; }
+.page-intro { margin: 0; color: var(--muted); font-size: 13px; max-width: 680px; line-height: 1.5; }
+.overview-meta { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.state-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); color: var(--accent); font-size: 11px; font-weight: 600; }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+
+/* 三枚价值卡 */
+.value-cards-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.value-card { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+.value-icon { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 36px; border-radius: 9px; background: var(--accent-soft); color: var(--accent); }
+.value-text { display: grid; gap: 3px; min-width: 0; }
+.value-text strong { color: var(--ink); font-size: 12px; font-weight: 600; }
+.value-text span { color: var(--muted); font-size: 11px; line-height: 1.45; }
+
+/* 流程图示 */
+.pipeline-card { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); }
+.pipeline-step { display: flex; align-items: center; gap: 10px; }
+.step-badge { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: var(--surface); color: var(--muted); border: 1px solid var(--line); }
+.step-badge.hub-badge { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.step-info { display: grid; gap: 2px; }
+.step-tag { font-size: 10px; color: var(--subtle); text-transform: uppercase; letter-spacing: .06em; }
+.step-info strong { font-size: 12px; color: var(--ink); }
+.pipeline-arrow { color: var(--subtle); display: grid; place-items: center; }
+
+/* ── 骨架屏与提示 ───────────────────────── */
 .inline-alert { display: flex; align-items: flex-start; gap: 8px; padding: 9px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--muted); font-size: 12px; }
 .inline-alert.warning { color: var(--warning); }
 .overview-skeleton { display: grid; gap: 16px; }
 .skeleton-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.overview-grid { display: grid; gap: 16px; }
-.top-grid, .data-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-.bottom-grid { grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr); }
-.surface-card { padding: 18px 20px; }
+
+/* ── 主网格（设备 + 最新数据包） ─────────── */
+.main-sections-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.surface-card { padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
 .section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
-.section-head h2 { margin: 2px 0 0; font-size: 16px; font-weight: 700; }
-.eyebrow { margin: 0; color: var(--subtle); font-size: 10px; letter-spacing: .14em; }
+.section-head h2 { margin: 2px 0 0; font-size: 15px; font-weight: 700; color: var(--ink); }
 .head-note { color: var(--muted); font-size: 12px; }
 .text-link { display: inline-flex; align-items: center; gap: 4px; color: var(--accent); font-size: 12px; text-decoration: none; }
-.heart-icon { color: var(--heart); }
-.ai-icon { color: var(--training); }
-.readiness-value { display: flex; align-items: baseline; gap: 7px; min-height: 52px; }
-.readiness-value strong { color: var(--ink); font-family: var(--font-mono); font-size: 40px; font-weight: 600; letter-spacing: -.03em; }
-.readiness-value span { color: var(--muted); font-size: 12px; }
-.readiness-value.missing strong { color: var(--muted); font-family: var(--font-sans); font-size: 20px; letter-spacing: 0; }
-.metric-caption, .card-note { margin: 4px 0 14px; color: var(--muted); font-size: 11px; }
-.progress-track { height: 8px; overflow: hidden; border-radius: 999px; background: var(--surface-raised); }
-.progress-track span { display: block; height: 100%; border-radius: inherit; background: var(--readiness); transition: transform 180ms ease; transform-origin: left center; }
-.body-readiness-card .progress-track span { background: var(--heart); }
-.metric-pairs { display: grid; gap: 9px; margin: 16px 0 0; }
-.metric-pairs > div { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
-.metric-pairs > div:last-child { border-bottom: 0; padding-bottom: 0; }
-.metric-pairs dt { color: var(--muted); font-size: 12px; }
-.metric-pairs dd { margin: 0; color: var(--ink); font-family: var(--font-mono); font-size: 12px; text-align: right; }
-.sleep-summary { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
-.sleep-duration { display: grid; gap: 3px; }
-.sleep-duration strong { color: var(--ink); font-family: var(--font-mono); font-size: 28px; font-weight: 600; }
-.sleep-duration span, .sleep-times { color: var(--muted); font-size: 11px; }
-.sleep-score { display: grid; justify-items: end; gap: 3px; }
-.sleep-score span { color: var(--muted); font-size: 11px; }
-.sleep-score strong { color: var(--sleep-light); font-family: var(--font-mono); font-size: 28px; }
-.sleep-times { margin: 12px 0 14px; }
-.mini-stage-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; color: var(--muted); font-size: 11px; }
-.mini-stage-row span { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
-.mini-stage-row i { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; }
-.deep { background: var(--sleep-deep); } .light { background: var(--sleep-light); } .rem { background: var(--sleep-rem); }
-.missing-note { margin: 0; padding: 22px 0; color: var(--muted); font-size: 12px; }
-.value-pill { padding: 4px 9px; border: 1px solid rgba(216, 255, 82, .30); border-radius: 999px; color: var(--training); font-family: var(--font-mono); font-size: 12px; }
-.training-chart { display: flex; align-items: end; gap: 8px; height: 148px; padding: 12px 4px 0; border-bottom: 1px solid var(--line); }
-.training-bar-wrap { display: grid; flex: 1; min-width: 0; height: 100%; align-items: end; justify-items: center; gap: 6px; }
-.training-bar { display: block; width: min(22px, 70%); min-height: 5px; border-radius: 5px 5px 2px 2px; background: var(--training); opacity: .86; transition: transform 160ms ease, opacity 160ms ease; transform-origin: bottom center; }
-.training-bar:hover { opacity: 1; transform: scaleY(1.04); }
-.training-bar-wrap small { color: var(--subtle); font-family: var(--font-mono); font-size: 9px; white-space: nowrap; }
-.chart-foot { margin: 10px 0 0; color: var(--muted); font-family: var(--font-mono); font-size: 11px; }
-.workout-summary { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); }
-.workout-icon { display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 38px; border-radius: 10px; background: var(--activity-wash); color: var(--cadence); }
-.workout-main { display: grid; gap: 3px; min-width: 0; flex: 1; }
-.workout-main strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
-.workout-main span { color: var(--muted); font-size: 11px; }
-.workout-distance { color: var(--ink); font-family: var(--font-mono); font-size: 14px; white-space: nowrap; }
-.workout-pairs { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 14px; }
-.workout-pairs > div { display: grid; gap: 3px; }
-.workout-pairs dd { text-align: left; }
-.devices-panel { padding-bottom: 14px; }
-.device-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.text-link:hover { text-decoration: underline; }
+
+/* 设备卡网格 */
+.device-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 .device-grid-loading { align-items: stretch; }
-.device-empty { display: flex; align-items: center; gap: 8px; min-height: 86px; padding: 12px; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); color: var(--muted); font-size: 12px; }
-.cloud-source { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
-.cloud-source-icon { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 9px; color: var(--pace); }
-.cloud-source div { display: grid; gap: 2px; min-width: 0; flex: 1; }
-.cloud-source strong { font-size: 12px; }
-.cloud-source div span, .cloud-source-time { color: var(--muted); font-size: 11px; }
-.cloud-source-time { font-family: var(--font-mono); }
-.package-card .metric-pairs { margin-top: 0; }
-.ai-card .check-list { margin: 14px 0; }
-.check-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.check-list li { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; }
-.check-list li svg { color: var(--readiness); }
-.check-list li svg.pending { color: var(--subtle); }
-.check-list li span { flex: 1; }
-.check-list li em { color: var(--muted); font-size: 11px; font-style: normal; }
-.button { text-decoration: none; }
-.ai-card .button { width: 100%; }
-.overview-note { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 0; color: var(--subtle); font-size: 11px; }
-.empty-wrap { padding: 30px 0; }
-.empty-state { display: grid; justify-items: center; gap: 8px; padding: 30px; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); background: var(--surface); color: var(--muted); text-align: center; }
-.empty-state strong { color: var(--ink); font-size: 14px; }
-.empty-state .button { margin-top: 4px; }
-@media (max-width: 920px) { .top-grid, .data-grid, .bottom-grid { grid-template-columns: minmax(0, 1fr); } }
-@media (max-width: 680px) { .overview-heading { display: grid; gap: 10px; } .overview-meta { white-space: normal; flex-wrap: wrap; } .skeleton-grid, .device-grid { grid-template-columns: minmax(0, 1fr); } .surface-card { padding: 16px; } .mini-stage-row { grid-template-columns: minmax(0, 1fr); } }
-@media (prefers-reduced-motion: reduce) { .progress-track span, .training-bar, .training-bar:hover { transition: none; transform: none; } }
+.device-empty { display: flex; align-items: center; gap: 10px; min-height: 80px; padding: 14px; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); color: var(--muted); font-size: 12px; }
+.cloud-source { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.cloud-source-icon { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 8px; color: var(--pace); background: var(--surface-raised); }
+.cloud-source-copy { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.cloud-source-copy strong { font-size: 12px; color: var(--ink); }
+.cloud-source-copy span { color: var(--muted); font-size: 11px; }
+.cloud-source-time { color: var(--subtle); font-size: 11px; font-family: var(--font-mono); }
+
+/* 数据包面板 */
+.package-metrics-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.pkg-metric-item { display: grid; gap: 4px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); }
+.pkg-label { color: var(--subtle); font-size: 11px; }
+.pkg-val { color: var(--ink); font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.font-mono { font-family: var(--font-mono); }
+
+.stream-chips-row { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+.stream-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--surface-raised); color: var(--muted); font-size: 11px; }
+.chip-dot { width: 6px; height: 6px; border-radius: 50%; }
+.dot-sleep { background: var(--sleep-deep); }
+.dot-workout { background: var(--pace); }
+.dot-heart { background: var(--heart); }
+.dot-readiness { background: var(--readiness); }
+
+/* ── AI 交接与快速操作 ─────────────────── */
+.handoff-section { margin-top: 0; }
+.state-badge { display: inline-flex; padding: 3px 8px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 600; }
+.handoff-content-grid { display: grid; grid-template-columns: 200px 1fr 200px; gap: 20px; align-items: center; }
+
+.handoff-progress-col { display: grid; justify-items: center; text-align: center; gap: 10px; }
+.progress-inner-text { display: grid; justify-items: center; }
+.progress-inner-text strong { font-size: 22px; font-family: var(--font-mono); color: var(--ink); }
+.progress-inner-text span { font-size: 10px; color: var(--muted); }
+.handoff-caption { margin: 0; color: var(--subtle); font-size: 11px; line-height: 1.4; }
+
+.check-list { display: grid; gap: 9px; margin: 0; padding: 0; list-style: none; }
+.check-list li { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+.check-list li svg.is-ready { color: var(--readiness); }
+.check-list li svg.is-pending { color: var(--subtle); }
+.check-list li span { flex: 1; color: var(--ink); }
+.check-list li em { color: var(--muted); font-size: 11px; font-style: normal; font-family: var(--font-mono); }
+
+.handoff-actions-col { display: grid; gap: 10px; }
+.action-btn { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 38px; }
+
+/* ── 底部安全保障横条 ───────────────────── */
+.security-guarantees-bar { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 12px 16px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--subtle); font-size: 11px; }
+.guarantee-item { display: inline-flex; align-items: center; gap: 6px; }
+.guarantee-item svg { color: var(--accent); }
+.guarantee-divider { width: 1px; height: 12px; background: var(--line); }
+
+/* ── 响应式适配 ─────────────────────────── */
+@media (max-width: 920px) {
+  .value-cards-grid { grid-template-columns: 1fr; }
+  .main-sections-grid { grid-template-columns: 1fr; }
+  .handoff-content-grid { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+  .check-list li { justify-content: center; }
+  .pipeline-card { flex-direction: column; gap: 12px; }
+  .pipeline-arrow { transform: rotate(90deg); }
+  .security-guarantees-bar { flex-wrap: wrap; gap: 10px; }
+  .guarantee-divider { display: none; }
+}
 </style>

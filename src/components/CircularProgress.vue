@@ -14,7 +14,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   size: 120,
   strokeWidth: 8,
-  color: '#A8E6C3',
+  color: '#CDDC7C',
   trackColor: 'var(--line)',
   showLabel: true,
   unit: '%',

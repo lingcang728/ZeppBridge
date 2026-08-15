@@ -242,14 +242,16 @@ pub async fn prepare_ai_handoff(
             None,
         )
     } else {
-        let export_dir = state.data_dir.join("exports");
-        std::fs::create_dir_all(&export_dir)
-            .map_err(|error| format!("创建 AI 交接目录失败: {error}"))?;
-        let path = export_dir.join("zeppbridge-ai-handoff.json");
+        let target_dir = directories::UserDirs::new()
+            .and_then(|u| u.desktop_dir().map(|p| p.to_path_buf()))
+            .unwrap_or_else(|| state.data_dir.join("exports"));
+        std::fs::create_dir_all(&target_dir)
+            .map_err(|error| format!("创建数据包导出目录失败: {error}"))?;
+        let path = target_dir.join("zeppbridge-ai-handoff.json");
         write_file_atomically(&path, redacted.as_bytes())
-            .map_err(|error| format!("写入脱敏 AI 数据失败: {error}"))?;
+            .map_err(|error| format!("写入脱敏 AI 数据到桌面失败: {error}"))?;
         (
-            format!("{prompt}\n\n数据包超过 2 MiB，已生成脱敏文件，请上传已生成文件到目标 AI。"),
+            format!("{prompt}\n\n数据包已导出到桌面（zeppbridge-ai-handoff.json），拖入 AI 对话框即可。"),
             Some(path.to_string_lossy().into_owned()),
         )
     };

@@ -61,7 +61,7 @@ const dataSources = computed(() => [
   })),
   {
     kind: 'cloud' as const,
-    name: 'Zap Cloud',
+    name: 'Zepp Cloud',
     state: accountRecognized.value ? '账号已识别' : '未识别',
   },
 ]);
@@ -156,7 +156,7 @@ onUnmounted(() => {
       <div class="brand-lockup">
         <span class="brand-badge"><BrandMark /></span>
         <span class="brand-text">
-          <span class="brand-name">Z-Bridge</span>
+          <span class="brand-name">ZeppBridge</span>
           <span class="brand-sub">Amazfit Data Bridge</span>
         </span>
       </div>
@@ -179,7 +179,6 @@ onUnmounted(() => {
       <div class="sources">
         <div class="sources-head">
           <span>数据来源</span>
-          <button type="button" aria-label="添加数据来源" title="添加数据来源"><Icon name="plus" :size="14" /></button>
         </div>
         <div v-if="devicesLoading" class="sources-feedback" role="status">正在识别实体设备…</div>
         <div v-else-if="devicesError" class="sources-feedback error" role="alert">设备识别暂不可用：{{ devicesError }}</div>
@@ -203,7 +202,7 @@ onUnmounted(() => {
         <div class="cloud-card">
           <div class="cloud-row">
             <Icon name="cloud" :size="16" />
-            <span>Zap Cloud · {{ accountRecognized ? '账号已识别' : '未识别' }}</span>
+            <span>Zepp Cloud · {{ accountRecognized ? '账号已识别' : '未识别' }}</span>
             <Icon name="circle-check" :size="15" :class="['cloud-check', { on: connected }]" />
           </div>
           <div class="cloud-account">
@@ -213,8 +212,10 @@ onUnmounted(() => {
         </div>
         <div class="version-row">
           <span class="version-brand"><BrandMark /></span>
-          <span>Z-Bridge　v{{ APP_VERSION }}</span>
-          <Icon name="shield" :size="14" />
+          <span>ZeppBridge　v{{ APP_VERSION }}</span>
+          <RouterLink :to="{ path: '/settings', hash: '#privacy-section' }" class="shield-link" title="安全与隐私设置">
+            <Icon name="shield" :size="14" />
+          </RouterLink>
         </div>
       </div>
     </aside>
@@ -272,7 +273,7 @@ onUnmounted(() => {
         <Icon :name="syncState === 'failed' ? 'warning' : syncState === 'updated' ? 'circle-check' : 'info'" :size="14" :class="{ spinning: isSyncing }" />
         <span>{{ syncMessage }}</span>
       </div>
-      <div v-if="trayHint" class="sync-feedback" role="status">关闭窗口后 Z-Bridge 仍在托盘运行，可继续自动同步。</div>
+      <div v-if="trayHint" class="sync-feedback" role="status">关闭窗口后 ZeppBridge 仍在托盘运行，可继续自动同步。</div>
 
       <div v-if="mobileMenuOpen" class="mobile-menu" aria-label="移动导航">
         <nav class="mobile-menu-links">
@@ -310,52 +311,53 @@ onUnmounted(() => {
 <style>
 :root {
   color-scheme: dark;
-  --bg: #0E1113;
-  --sidebar: #0B0D0F;
-  --canvas: #111518;
-  --surface: #181D21;
-  --surface-raised: #20262B;
-  --surface-hover: #2A3137;
-  --ink: #F3F7F8;
-  --muted: #A8B2B8;
-  --subtle: #7B878E;
-  --faint: #59646C;
-  --line: rgba(224, 235, 240, .10);
-  --line-strong: rgba(224, 235, 240, .18);
-  --brand: #D8FF52;
+  --bg: #12140D;
+  --sidebar: #0D0F0A;
+  --canvas: #14160C;
+  --surface: #1B1E12;
+  --surface-raised: #22261A;
+  --surface-hover: #2B3120;
+  --ink: #F3F4EC;
+  --muted: #A9AF97;
+  --subtle: #7E856D;
+  --faint: #59614B;
+  --line: rgba(228, 235, 208, .08);
+  --line-strong: rgba(228, 235, 208, .16);
+  --brand: #CDDC7C;
   --accent: var(--brand);
-  --accent-hover: #E6FF7A;
-  --accent-strong: #BFE640;
-  --accent-ink: #12170B;
-  --accent-soft: rgba(216, 255, 82, .14);
-  --icon-mint: #76E5BF;
-  --heart: #FF777A;
-  --heart-wash: rgba(255, 119, 122, .12);
-  --pace: #6ED8F5;
-  --pace-wash: rgba(110, 216, 245, .12);
-  --calories: #FFB866;
-  --calories-wash: rgba(255, 184, 102, .12);
-  --altitude: #76E5BF;
-  --cadence: #6ED8F5;
-  --training: #D8FF52;
-  --readiness: #76E5BF;
-  --sleep-deep: #8078E8;
-  --sleep-light: #8FA8FF;
-  --sleep-rem: #55D7B1;
-  --sleep-awake: #FF777A;
+  --accent-hover: #DCEA96;
+  --accent-strong: #CDDC7C;
+  --accent-ink: #181B0E;
+  --accent-soft: rgba(205, 220, 124, .12);
+  --icon-mint: #2FA96B;
+  --heart: #F0616A;
+  --heart-wash: rgba(240, 97, 106, .12);
+  --pace: #4AA8E8;
+  --pace-wash: rgba(74, 168, 232, .12);
+  --calories: #F5860B;
+  --calories-wash: rgba(245, 134, 11, .12);
+  --altitude: #F5C33B;
+  --altitude-wash: rgba(245, 195, 59, .12);
+  --cadence: #4AA8E8;
+  --training: #3DD84C;
+  --readiness: #3DD84C;
+  --sleep-deep: #7B4FB3;
+  --sleep-light: #7C8FF0;
+  --sleep-rem: #2FA96B;
+  --sleep-awake: #E84C3D;
   --sleep: var(--sleep-light);
-  --sleep-wash: rgba(143, 168, 255, .12);
-  --activity: var(--cadence);
-  --activity-wash: rgba(110, 216, 245, .12);
+  --sleep-wash: rgba(124, 143, 240, .12);
+  --activity: #2BB3C0;
+  --activity-wash: rgba(43, 179, 192, .12);
   --distance: var(--pace);
   --danger: #F0616A;
-  --warning: #FFB866;
-  --focus: #D8FF52;
-  --route-neutral: #AAB5BB;
-  --route-mint: #76E5BF;
-  --route-cyan: #6ED8F5;
-  --route-amber: #FFB866;
-  --route-coral: #FF777A;
+  --warning: #F5C33B;
+  --focus: #CDDC7C;
+  --route-neutral: #A9AF97;
+  --route-mint: #2FA96B;
+  --route-cyan: #4AA8E8;
+  --route-amber: #F5C33B;
+  --route-coral: #F0616A;
   --font-sans: 'MiSans', 'Segoe UI', 'Microsoft YaHei UI', sans-serif;
   --font-mono: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
   --space-1: 4px;
@@ -367,6 +369,29 @@ onUnmounted(() => {
   --radius-sm: 10px;
   --radius-md: 14px;
   --radius-lg: 18px;
+}
+
+/* ── 全局自定义细滚动条（覆盖原生灰条） ─────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--surface-hover);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--subtle);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-hover) transparent;
 }
 
 * { box-sizing: border-box; }
@@ -570,6 +595,14 @@ a { color: inherit; }
 .version-row span:nth-child(2) { flex: 1; }
 .version-brand { display: grid; place-items: center; width: 18px; height: 18px; opacity: .8; }
 .version-brand svg { width: 18px; height: 18px; }
+.shield-link {
+  display: inline-flex;
+  align-items: center;
+  color: var(--subtle);
+  text-decoration: none;
+  transition: color 150ms ease;
+}
+.shield-link:hover { color: var(--accent); }
 
 /* ── 顶栏 ───────────────────────────────── */
 .app-body { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; height: 100%; overflow: hidden; }

@@ -9,6 +9,7 @@ import { useSyncController } from '../composables/useSyncController';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { dataProviderLabel, dataScopeLabel, workoutLabel } from '../lib/labels';
 import { formatDate, formatDistance, formatTime, isFiniteNumber } from '../lib/format';
+import { zeppSemanticColors } from '../lib/echartsTheme';
 import type { DeviceProfile, Workout, WorkoutSeries, WorkoutSeriesSample, WorkoutRoutePoint } from '../types';
 
 type WorkoutMetrics = Workout & {
@@ -233,13 +234,31 @@ const cadencePoints = computed(() => sampleSeries('cadence'));
 
 const lineOption = (points: { t: number; v: number }[], color: string, unit: string) => {
   if (points.length < 2) return null;
+  const avg = points.reduce((sum, p) => sum + p.v, 0) / points.length;
   return {
     animation: false,
-    grid: { left: 34, right: 8, top: 10, bottom: 20, containLabel: false },
-    xAxis: { type: 'time', axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#8A969D', fontSize: 10 }, splitLine: { show: false } },
-    yAxis: { type: 'value', scale: true, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#8A969D', fontSize: 10 }, splitLine: { show: true, lineStyle: { color: 'rgba(224,235,240,0.08)', type: 'dashed' } } },
+    grid: { left: 36, right: 12, top: 12, bottom: 22, containLabel: false },
+    xAxis: {
+      type: 'time',
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: '#7E856D', fontSize: 10 },
+      splitLine: { show: false },
+    },
+    yAxis: {
+      type: 'value',
+      scale: true,
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: '#7E856D', fontSize: 10 },
+      splitLine: { show: true, lineStyle: { color: 'rgba(228, 235, 208, 0.08)', type: 'dashed' } },
+    },
     tooltip: {
       trigger: 'axis',
+      backgroundColor: '#22261A',
+      borderColor: 'rgba(228, 235, 208, 0.16)',
+      borderWidth: 1,
+      textStyle: { color: '#F3F4EC', fontSize: 12 },
       formatter: (params: Array<{ value: [number, number] }>) => {
         const point = Array.isArray(params) ? params[0] : params;
         if (!point) return '';
@@ -248,17 +267,49 @@ const lineOption = (points: { t: number; v: number }[], color: string, unit: str
       },
     },
     series: [{
-      type: 'line', data: points.map((point) => [point.t, point.v]), smooth: 0.15, showSymbol: false,
-      lineStyle: { width: 1.6, color },
-      areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: `${color}38` }, { offset: 1, color: 'rgba(17,21,24,0)' }] } },
+      type: 'line',
+      data: points.map((point) => [point.t, point.v]),
+      smooth: 0.2,
+      showSymbol: false,
+      lineStyle: { width: 2, color },
+      areaStyle: {
+        color: {
+          type: 'linear',
+          x: 0,
+          y: 0,
+          x2: 0,
+          y2: 1,
+          colorStops: [
+            { offset: 0, color: `${color}40` },
+            { offset: 1, color: `${color}00` },
+          ],
+        },
+      },
+      markLine: {
+        silent: true,
+        symbol: 'none',
+        lineStyle: {
+          type: 'dashed',
+          color: 'rgba(243, 244, 236, 0.4)',
+          width: 1.2,
+        },
+        data: [{ yAxis: Math.round(avg * 10) / 10, name: '均值' }],
+        label: {
+          show: true,
+          position: 'insideEndTop',
+          formatter: `均值 ${Math.round(avg * 10) / 10}`,
+          color: '#A9AF97',
+          fontSize: 10,
+        },
+      },
     }],
   };
 };
 
-const heartOption = computed(() => lineOption(heartPoints.value, '#FF777A', 'bpm'));
-const paceOption = computed(() => lineOption(pacePoints.value, '#6ED8F5', 'min/km'));
-const altitudeOption = computed(() => lineOption(altitudePoints.value, '#76E5BF', 'm'));
-const cadenceOption = computed(() => lineOption(cadencePoints.value, '#FFB866', 'spm'));
+const heartOption = computed(() => lineOption(heartPoints.value, zeppSemanticColors.heart, 'bpm'));
+const paceOption = computed(() => lineOption(pacePoints.value, zeppSemanticColors.pace, 'min/km'));
+const altitudeOption = computed(() => lineOption(altitudePoints.value, zeppSemanticColors.altitude, 'm'));
+const cadenceOption = computed(() => lineOption(cadencePoints.value, zeppSemanticColors.cadence, 'spm'));
 
 const statSummary = (points: { v: number }[], mode: 'normal' | 'pace' = 'normal'): string | null => {
   if (points.length < 2) return null;

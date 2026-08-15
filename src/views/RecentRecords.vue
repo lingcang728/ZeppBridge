@@ -23,6 +23,10 @@ const { dataRevision } = useSyncController();
 const activeFilter = ref('all');
 
 const displayableRecentWorkouts = computed(() => displayableWorkouts(recentWorkouts.value));
+const hiddenWorkoutsCount = computed(() => {
+  return Math.max(0, recentWorkouts.value.length - displayableRecentWorkouts.value.length);
+});
+
 const workoutFilters = computed(() => {
   const seen = new Set<string>();
   const types = displayableRecentWorkouts.value
@@ -42,7 +46,6 @@ const filteredWorkouts = computed(() => activeFilter.value === 'all'
   ? displayableRecentWorkouts.value
   : displayableRecentWorkouts.value.filter((workout) => workoutTypeKey(workout) === activeFilter.value));
 
-// 运动类型颜色映射（workout_type 为标准化字符串）
 function workoutTypeBg(type: string): string {
   const map: Record<string, string> = {
     run: 'var(--route-mint)',
@@ -75,7 +78,7 @@ const loadRecent = async () => {
     tauriApi.getRecentWorkouts(),
   ]);
   recentSleep.value = sleep.status === 'fulfilled' ? sleep.value : [];
-  recentWorkouts.value = workouts.status === 'fulfilled' ? displayableWorkouts(workouts.value) : [];
+  recentWorkouts.value = workouts.status === 'fulfilled' ? workouts.value : [];
   const rejected = [sleep, workouts].filter((result) => result.status === 'rejected');
   if (rejected.length) {
     partialWarning.value = toUserMessage(rejected[0].reason, '部分数据暂时不可用');
@@ -155,11 +158,12 @@ function formatDateHint(value: string): string {
     </EmptyState>
 
     <div v-else class="recent-grid">
+      <!-- 睡眠列 -->
       <section class="recent-col" aria-labelledby="recent-sleep-title">
         <div class="group-head">
           <h2 id="recent-sleep-title" class="col-label">
             <Icon name="moon" :size="15" /><span>最近睡眠</span>
-            <em v-if="recentSleep.length">{{ recentSleep.length }} 条</em>
+            <em v-if="recentSleep.length">共 {{ recentSleep.length }} 条</em>
           </h2>
           <RouterLink class="see-all" to="/sleep">查看全部<Icon name="arrow-right" :size="13" /></RouterLink>
         </div>
@@ -179,11 +183,12 @@ function formatDateHint(value: string): string {
         </div>
       </section>
 
+      <!-- 运动列 -->
       <section class="recent-col" aria-labelledby="recent-workout-title">
         <div class="group-head">
           <h2 id="recent-workout-title" class="col-label">
             <Icon name="run" :size="15" /><span>最近运动</span>
-            <em v-if="displayableRecentWorkouts.length">{{ displayableRecentWorkouts.length }} 条可展示</em>
+            <em v-if="displayableRecentWorkouts.length">共 {{ displayableRecentWorkouts.length }} 条</em>
           </h2>
           <RouterLink class="see-all" to="/workouts">查看全部<Icon name="arrow-right" :size="13" /></RouterLink>
         </div>
@@ -200,6 +205,10 @@ function formatDateHint(value: string): string {
           </button>
         </div>
         <div class="surface-card list-card">
+          <div v-if="hiddenWorkoutsCount > 0" class="filter-note">
+            <Icon name="info" :size="12" />
+            <span>{{ hiddenWorkoutsCount }} 条数据不完整已隐藏</span>
+          </div>
           <RecordRow
             v-for="workout in filteredWorkouts"
             :key="workout.workout_id"
@@ -212,7 +221,7 @@ function formatDateHint(value: string): string {
             :title="workoutLabel(workout.workout_type)"
             :fact="workoutFact(workout)"
           />
-          <div v-if="!filteredWorkouts.length" class="empty-row">{{ activeFilter === 'all' ? '没有可展示的运动记录。需要类型、时间及至少一项有效指标。' : '该运动类型没有可展示记录。' }}</div>
+          <div v-if="!filteredWorkouts.length" class="empty-row">{{ activeFilter === 'all' ? '没有可展示的运动记录。' : '该运动类型没有可展示记录。' }}</div>
         </div>
       </section>
     </div>
@@ -256,6 +265,7 @@ function formatDateHint(value: string): string {
   margin: 0;
   font-size: 13px;
   font-weight: 700;
+  color: var(--ink);
 }
 .col-label svg { color: var(--sleep); }
 .recent-col:last-child .col-label svg { color: var(--activity); }
@@ -265,9 +275,10 @@ function formatDateHint(value: string): string {
   background: var(--surface);
   border: 1px solid var(--line);
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   font-style: normal;
   font-weight: 400;
+  font-family: var(--font-mono);
 }
 .see-all {
   display: inline-flex;
@@ -282,7 +293,21 @@ function formatDateHint(value: string): string {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 4px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+.filter-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  margin-bottom: 4px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--subtle);
+  font-size: 11px;
 }
 .empty-row {
   padding: 18px 16px;
@@ -329,7 +354,8 @@ function formatDateHint(value: string): string {
 }
 .tab-button.active {
   background: var(--accent);
-  color: white;
+  color: var(--accent-ink);
+  font-weight: 600;
 }
 @media (max-width: 860px) {
   .recent-grid { grid-template-columns: minmax(0, 1fr); }

@@ -19,7 +19,6 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 const displayableList = computed(() => displayableWorkouts(workouts.value));
 
-// 运动类型颜色映射（workout_type 为标准化字符串）
 function workoutTypeBg(type: string): string {
   const map: Record<string, string> = {
     run: 'var(--route-mint)',
@@ -113,7 +112,7 @@ watch(dataRevision, () => void loadList());
   font-size: 12px;
   text-decoration: none;
 }
-.back-link svg { transform: rotate(180deg); }
+.back-link:hover { color: var(--accent); }
 .footnote {
   margin: 12px 0 0;
   color: var(--muted);

@@ -24,7 +24,7 @@ const {
 
 const { dataRevision } = useSyncController();
 
-/* ── 模板 ─────────────────────────────── */
+/* ── 模板定义 ─────────────────────────── */
 interface PromptTemplate {
   id: string;
   name: string;
@@ -44,7 +44,7 @@ const templates: PromptTemplate[] = [
     icon: 'bars',
     types: ['heart_rate', 'sleep', 'workouts', 'steps', 'hrv', 'training_load'],
     prompt: `你是一位专业的运动健康分析师，擅长将可穿戴设备数据转化为易懂的洞察。
-基于以下来自 Z-Bridge 的多源数据（已按时间顺序整理），
+基于以下来自 ZeppBridge 的多源数据（已按时间顺序整理），
 为我生成一份结构清晰、重点突出的整体表现总结。
 请包含总体概览、关键趋势、亮点表现、潜在风险与可执行建议。
 若数据不足，请如实说明并给出改进数据采集的建议。
@@ -60,7 +60,7 @@ const templates: PromptTemplate[] = [
     icon: 'activity',
     types: ['workouts', 'heart_rate', 'training_load', 'vo2max'],
     prompt: `你是一位经验丰富的耐力训练教练。
-基于以下来自 Z-Bridge 的训练数据（含心率、训练负荷与 VO₂max），
+基于以下来自 ZeppBridge 的训练数据（含心率、训练负荷与 VO₂max），
 分析我的训练结构、强度分布与负荷趋势，
 指出训练安排中的问题，并给出下一周期的调整建议。
 
@@ -74,7 +74,7 @@ const templates: PromptTemplate[] = [
     icon: 'heart',
     types: ['hrv', 'heart_rate', 'sleep', 'stress'],
     prompt: `你是一位专注于运动恢复的生理学专家。
-基于以下来自 Z-Bridge 的 HRV、静息心率、睡眠与压力数据，
+基于以下来自 ZeppBridge 的 HRV、静息心率、睡眠与压力数据，
 评估我的恢复状况与训练准备度，
 识别疲劳积累的信号，并给出恢复优化建议。
 
@@ -88,7 +88,7 @@ const templates: PromptTemplate[] = [
     icon: 'moon',
     types: ['sleep', 'heart_rate', 'hrv'],
     prompt: `你是一位睡眠健康顾问。
-基于以下来自 Z-Bridge 的睡眠分期、时长与心率数据，
+基于以下来自 ZeppBridge 的睡眠分期、时长与心率数据，
 分析我的睡眠质量、规律性与影响因素，
 并给出具体、可执行的睡眠改善建议。
 
@@ -102,7 +102,7 @@ const templates: PromptTemplate[] = [
     icon: 'steps',
     types: ['steps', 'workouts', 'heart_rate'],
     prompt: `你是一位健康生活方式顾问。
-基于以下来自 Z-Bridge 的步数、运动与心率数据，
+基于以下来自 ZeppBridge 的步数、运动与心率数据，
 概览我的日常活动水平与变化趋势，
 并给出提升日常活动量的实用建议。
 
@@ -116,7 +116,7 @@ const templates: PromptTemplate[] = [
     icon: 'clock',
     types: ['heart_rate', 'sleep', 'workouts', 'steps', 'hrv', 'training_load'],
     prompt: `你是一位私人健康教练，每周为我做一次数据复盘。
-基于以下来自 Z-Bridge 的本周数据，
+基于以下来自 ZeppBridge 的本周数据，
 对比一般健康人群基准，总结本周表现，
 指出做得好的地方与需要注意的地方，并给出下周行动清单。
 
@@ -168,14 +168,12 @@ const providerIconFailed = ref<Partial<Record<AiProviderId, boolean>>>({});
 const markProviderIconFailed = (id: AiProviderId) => {
   providerIconFailed.value[id] = true;
 };
-const privacyNoticeAccepted = ref(false);
-const includePreciseRoute = ref(false);
+
 const { handoffState, handoffError, preparedProvider, prepareAndCopy, retryOpen } = useAiHandoff();
 
-/* ── 数据感知摘要 / 预览 ───────────────── */
+/* ── 数据感知摘要 ─────────────────────── */
 const previewBusy = ref(false);
 const previewError = ref<string | null>(null);
-const previewJson = ref('');
 const previewCount = ref<number | null>(null);
 const previewBytes = ref<number | null>(null);
 const sendState = ref<'idle' | 'copied' | 'failed'>('idle');
@@ -208,17 +206,10 @@ const formatBytes = (bytes: number | null) => {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 };
 
-const previewLines = computed(() => {
-  if (!previewJson.value) return [] as string[];
-  const lines = previewJson.value.split('\n');
-  return lines.length > 60 ? [...lines.slice(0, 60), '…'] : lines;
-});
-
 const loadPreview = async () => {
   const seq = ++previewSeq;
   previewError.value = null;
   if (!datesValid.value || !exportDataTypes.value.length) {
-    previewJson.value = '';
     previewCount.value = null;
     previewBytes.value = null;
     previewBusy.value = false;
@@ -226,11 +217,10 @@ const loadPreview = async () => {
     return;
   }
   if (!isTauri()) {
-    previewJson.value = '';
     previewCount.value = null;
     previewBytes.value = null;
     previewBusy.value = false;
-    previewError.value = '请从 Z-Bridge 桌面应用打开，预览需要本机已同步的记录。';
+    previewError.value = '请从 ZeppBridge 桌面应用打开，数据感知需要读取本地记录。';
     return;
   }
   previewBusy.value = true;
@@ -242,15 +232,13 @@ const loadPreview = async () => {
     });
     if (seq !== previewSeq) return;
     const parsed = JSON.parse(encoded) as { record_count?: number; records?: unknown[] };
-    previewJson.value = encoded;
     previewCount.value = parsed.record_count ?? parsed.records?.length ?? 0;
     previewBytes.value = new TextEncoder().encode(encoded).length;
   } catch (error) {
     if (seq !== previewSeq) return;
-    previewJson.value = '';
     previewCount.value = null;
     previewBytes.value = null;
-    previewError.value = toUserMessage(error, '无法读取本机导出预览');
+    previewError.value = toUserMessage(error, '无法读取本机导出感知数据');
   } finally {
     if (seq === previewSeq) previewBusy.value = false;
   }
@@ -275,6 +263,68 @@ const activeRangeDays = computed(() => {
   return null;
 });
 
+/* ── 自定义日期选择器弹层逻辑 ─────────────── */
+const datePickerOpen = ref<'start' | 'end' | null>(null);
+const pickerYear = ref(new Date().getFullYear());
+const pickerMonth = ref(new Date().getMonth()); // 0-indexed
+
+const openDatePicker = (target: 'start' | 'end') => {
+  const currentVal = target === 'start' ? exportStartDate.value : exportEndDate.value;
+  const d = currentVal ? new Date(currentVal) : new Date();
+  pickerYear.value = d.getFullYear();
+  pickerMonth.value = d.getMonth();
+  datePickerOpen.value = target;
+};
+
+const closeDatePicker = () => {
+  datePickerOpen.value = null;
+};
+
+const prevMonth = () => {
+  if (pickerMonth.value === 0) {
+    pickerMonth.value = 11;
+    pickerYear.value -= 1;
+  } else {
+    pickerMonth.value -= 1;
+  }
+};
+
+const nextMonth = () => {
+  if (pickerMonth.value === 11) {
+    pickerMonth.value = 0;
+    pickerYear.value += 1;
+  } else {
+    pickerMonth.value += 1;
+  }
+};
+
+const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+
+const calendarDays = computed(() => {
+  const firstDay = new Date(pickerYear.value, pickerMonth.value, 1).getDay();
+  const daysInMonth = new Date(pickerYear.value, pickerMonth.value + 1, 0).getDate();
+  const days = [];
+  // 空白占位
+  for (let i = 0; i < firstDay; i++) {
+    days.push({ day: null, dateStr: '' });
+  }
+  for (let i = 1; i <= daysInMonth; i++) {
+    const dateStr = `${pickerYear.value}-${String(pickerMonth.value + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+    days.push({ day: i, dateStr });
+  }
+  return days;
+});
+
+const selectCalendarDay = (dateStr: string) => {
+  if (!dateStr) return;
+  if (datePickerOpen.value === 'start') {
+    exportStartDate.value = dateStr;
+  } else if (datePickerOpen.value === 'end') {
+    exportEndDate.value = dateStr;
+  }
+  closeDatePicker();
+};
+
 const copyPrompt = async () => {
   try {
     await navigator.clipboard.writeText(editedPrompt.value);
@@ -289,10 +339,6 @@ const handoffNotice = ref<string | null>(null);
 
 const sendToAi = async () => {
   handoffNotice.value = null;
-  if (!privacyNoticeAccepted.value) {
-    handoffNotice.value = '请先阅读隐私说明并勾选确认，再发送到 AI。';
-    return;
-  }
   if (!isTauri()) {
     handoffNotice.value = 'AI 交接需要桌面应用环境；当前网页预览不会打开外部网站。';
     return;
@@ -309,15 +355,6 @@ const sendToAi = async () => {
     handoffNotice.value = '当前范围没有可交接的已同步记录。';
     return;
   }
-  if (includePreciseRoute.value) {
-    const confirmed = window.confirm(
-      '精确 GPS 路线可能暴露你的活动地点。仅在确认愿意把精确路线交给目标 AI 时继续吗？',
-    );
-    if (!confirmed) {
-      handoffNotice.value = '已取消精确 GPS 交接；仍可发送默认脱敏数据。';
-      return;
-    }
-  }
 
   const selection: ExportSelection = {
     startDate: exportStartDate.value,
@@ -329,32 +366,30 @@ const sendToAi = async () => {
       activeProvider.value,
       selection,
       editedPrompt.value,
-      includePreciseRoute.value,
+      false, // includePreciseRoute: 默认 false 隐私优先
     );
     const browserOpened = handoffState.value !== 'copied_only';
     if (result.mode === 'attachment') {
-      const uploadNotice = result.filePath
-        ? `数据包已写入本机文件：${result.filePath}。剪贴板仅包含提示词，请在目标 AI 页面手动上传该文件。`
-        : '数据包超过 2 MiB；请在目标 AI 页面手动上传本机文件。';
+      const uploadNotice = '数据包已导出到桌面（zeppbridge-ai-handoff.json），拖入 AI 对话框即可。提示词已复制到剪贴板。';
       handoffNotice.value = browserOpened
-        ? uploadNotice
-        : `${uploadNotice} 未能打开 ${activeProvider.value.label}，可点击下方按钮重试。`;
+        ? `${uploadNotice} 已打开 ${activeProvider.value.label}。`
+        : `${uploadNotice} 可在浏览器中打开 ${activeProvider.value.label} 进行分析。`;
     } else {
       handoffNotice.value = browserOpened
-        ? `已复制脱敏数据并打开 ${activeProvider.value.label}，请在网站内自行确认后提交。`
-        : `已复制脱敏数据，但未能打开 ${activeProvider.value.label}；可点击下方按钮重试。`;
+        ? `已复制脱敏数据并打开 ${activeProvider.value.label}，粘贴即可开始分析。`
+        : `已复制脱敏数据，可手动打开 ${activeProvider.value.label} 进行粘贴。`;
     }
   } catch {
-    // useAiHandoff exposes a token-free user-facing error and state.
+    // Error handled via handoffError state
   }
 };
 
 const retryOpenAi = async () => {
   try {
     await retryOpen();
-    handoffNotice.value = `已打开 ${preparedProvider.value?.label ?? activeProvider.value.label}，请在网站内自行确认后提交。`;
+    handoffNotice.value = `已打开 ${preparedProvider.value?.label ?? activeProvider.value.label}，请在网站内粘贴提交。`;
   } catch {
-    // Error is rendered from handoffError; copied content remains intact.
+    // Error rendered from handoffError
   }
 };
 
@@ -372,11 +407,11 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
   <section class="page export-page" aria-labelledby="export-title">
     <header class="page-head">
       <h1 id="export-title">导出与提示词</h1>
-      <p class="page-intro">选择模板、检查摘要并导出数据，一步发送到任意 AI 工具。</p>
+      <p class="page-intro">选择模板、检查感知摘要并导出数据，一键将穿戴洞察发送到前沿 AI 工具。</p>
     </header>
 
     <div class="export-layout">
-      <!-- 左列：模板 -->
+      <!-- 左列：模板列表 -->
       <aside class="col-templates">
         <section class="surface-card pad">
           <p class="col-title">模板分类</p>
@@ -422,7 +457,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
         </section>
       </aside>
 
-      <!-- 中列：编辑与预览 -->
+      <!-- 中列：提示词编辑与数据感知摘要 -->
       <div class="col-editor">
         <section class="surface-card pad current-template">
           <div class="current-head">
@@ -431,21 +466,24 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
               <h2 class="tpl-name">{{ activeTemplate.name }} <Icon name="edit" :size="15" /></h2>
               <p class="tpl-desc">{{ activeTemplate.sub }}。</p>
             </div>
-            <button class="mini-btn" type="button" @click="copyPrompt"><Icon name="star" :size="13" />设为默认模板</button>
+            <button class="mini-btn" type="button" @click="copyPrompt" title="复制提示词文本到剪贴板">
+              <Icon name="copy" :size="13" />复制提示词
+            </button>
           </div>
 
           <div class="prompt-editor">
             <div class="editor-head">
-              <span>提示词编辑<em>（数据已感知）</em></span>
+              <span>提示词编辑<em>（数据已自动对齐）</em></span>
               <span class="injected"><Icon name="database" :size="13" />已注入 {{ exportDataTypes.length }} 类数据源</span>
             </div>
             <textarea v-model="editedPrompt" rows="9" spellcheck="false" aria-label="提示词编辑"></textarea>
           </div>
 
+          <!-- 数据感知摘要（四格卡片） -->
           <div class="summary-block">
             <div class="summary-head">
               <span>数据感知摘要 <Icon name="info" :size="13" /></span>
-              <span class="see-more">查看详情 <Icon name="arrow-right" :size="12" /></span>
+              <span class="see-more">按需精准注入</span>
             </div>
             <div class="summary-grid">
               <div class="summary-cell">
@@ -455,22 +493,24 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
               </div>
               <div class="summary-cell">
                 <span class="cell-label"><Icon name="file" :size="13" />记录条数</span>
-                <strong class="cell-value">{{ previewBusy ? '…' : (previewCount === null ? '—' : previewCount.toLocaleString('zh-CN')) }}</strong>
+                <strong class="cell-value font-mono">{{ previewBusy ? '…' : (previewCount === null ? '—' : previewCount.toLocaleString('zh-CN')) }}</strong>
                 <span class="cell-sub">已同步记录</span>
               </div>
               <div class="summary-cell">
                 <span class="cell-label"><Icon name="sliders" :size="13" />数据类型</span>
-                <strong class="cell-value">{{ exportDataTypes.length }} 类</strong>
+                <strong class="cell-value font-mono">{{ exportDataTypes.length }} 类</strong>
                 <span class="cell-sub">已选入数据包</span>
               </div>
               <div class="summary-cell">
                 <span class="cell-label"><Icon name="database" :size="13" />数据体积</span>
-                <strong class="cell-value">{{ previewBusy ? '…' : formatBytes(previewBytes) }}</strong>
+                <strong class="cell-value font-mono">{{ previewBusy ? '…' : formatBytes(previewBytes) }}</strong>
                 <span class="cell-sub">预估大小</span>
               </div>
             </div>
+
+            <!-- 范围选择与自定义日期选择器 -->
             <div class="range-row">
-              <span>快捷范围：</span>
+              <span class="range-label">快捷范围：</span>
               <button
                 v-for="range in ranges"
                 :key="range.days"
@@ -478,32 +518,63 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
                 :class="['range-pill', { 'is-on': activeRangeDays === range.days }]"
                 @click="applyExportRange(range.days)"
               >{{ range.label }}</button>
-              <label class="date-input"><input v-model="exportStartDate" type="date" aria-label="开始日期" /></label>
-              <span>~</span>
-              <label class="date-input"><input v-model="exportEndDate" type="date" aria-label="结束日期" /></label>
-            </div>
-          </div>
 
-          <div class="preview-block">
-            <div class="preview-head">
-              <span>结构化数据预览</span>
-              <span class="format-tag">JSON <Icon name="chevron-down" :size="12" /></span>
+              <div class="custom-date-picker-wrap">
+                <button
+                  type="button"
+                  class="date-trigger-btn"
+                  :class="{ 'is-open': datePickerOpen === 'start' }"
+                  @click="datePickerOpen === 'start' ? closeDatePicker() : openDatePicker('start')"
+                >
+                  <Icon name="clock" :size="12" />
+                  <span>{{ exportStartDate || '起始日期' }}</span>
+                </button>
+                <span>~</span>
+                <button
+                  type="button"
+                  class="date-trigger-btn"
+                  :class="{ 'is-open': datePickerOpen === 'end' }"
+                  @click="datePickerOpen === 'end' ? closeDatePicker() : openDatePicker('end')"
+                >
+                  <Icon name="clock" :size="12" />
+                  <span>{{ exportEndDate || '结束日期' }}</span>
+                </button>
+
+                <!-- 自定义深橄榄底日历弹层 -->
+                <div v-if="datePickerOpen" class="calendar-popover" role="dialog" aria-label="日期选择">
+                  <div class="cal-header">
+                    <button type="button" class="cal-nav-btn" @click="prevMonth"><Icon name="arrow-left" :size="12" /></button>
+                    <span class="cal-title">{{ pickerYear }}年 {{ monthNames[pickerMonth] }}</span>
+                    <button type="button" class="cal-nav-btn" @click="nextMonth"><Icon name="arrow-right" :size="12" /></button>
+                  </div>
+                  <div class="cal-weekdays">
+                    <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+                  </div>
+                  <div class="cal-grid">
+                    <button
+                      v-for="(item, idx) in calendarDays"
+                      :key="idx"
+                      type="button"
+                      :disabled="!item.day"
+                      :class="['cal-day', {
+                        'is-empty': !item.day,
+                        'is-selected': item.dateStr === (datePickerOpen === 'start' ? exportStartDate : exportEndDate)
+                      }]"
+                      @click="selectCalendarDay(item.dateStr)"
+                    >
+                      {{ item.day || '' }}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div v-if="previewBusy" class="preview-empty">正在读取本机记录…</div>
-            <div v-else-if="previewError" class="preview-empty">{{ previewError }}</div>
-            <div v-else-if="!previewJson" class="preview-empty">还没有可预览的 JSON。</div>
-            <pre v-else class="json-view" tabindex="0" aria-readonly="true"><span
-              v-for="(line, index) in previewLines"
-              :key="index"
-              class="json-line"
-            ><span class="ln">{{ line === '…' ? '' : index + 1 }}</span><span class="lx">{{ line }}</span></span></pre>
           </div>
         </section>
 
         <footer class="editor-footer surface-card">
           <p class="secure-note">
             <Icon name="shield" :size="14" />
-            数据已通过本地加密处理，仅在本地生成提示词与导出包。
+            已采用本地脱敏隔离，仅在本地生成结构化数据与提示词。
             <span class="secure-ok"><Icon name="circle-check" :size="13" />安全可靠</span>
           </p>
           <div class="footer-actions">
@@ -518,6 +589,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
             </button>
           </div>
         </footer>
+
         <p v-if="sendState === 'copied'" class="action-note ok" role="status"><Icon name="circle-check" :size="13" />提示词已复制到剪贴板。</p>
         <p v-else-if="sendState === 'failed'" class="action-note bad" role="alert"><Icon name="warning" :size="13" />复制失败，请重试。</p>
         <p v-if="handoffNotice" class="action-note" :class="handoffState === 'failed' ? 'bad' : 'ok'" role="status">{{ handoffNotice }}</p>
@@ -532,11 +604,11 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
         <p v-if="exportError" class="action-note bad" role="alert"><Icon name="warning" :size="13" />{{ exportError }}</p>
       </div>
 
-      <!-- 右列：打包与发送 -->
+      <!-- 右列：打包选项与目标 AI -->
       <aside class="col-send">
         <section class="surface-card pad">
           <p class="col-title big">打包与发送</p>
-          <p class="col-sub">选择导出内容与目标 AI。</p>
+          <p class="col-sub">选择导出格式与目标 AI 工具。</p>
 
           <p class="group-label">导出格式</p>
           <div class="format-grid" role="radiogroup" aria-label="导出格式">
@@ -557,8 +629,8 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
           </div>
 
           <div class="group-row">
-            <p class="group-label">打包内容</p>
-            <span class="see-more">查看全部 <Icon name="arrow-right" :size="11" /></span>
+            <p class="group-label">已选数据流</p>
+            <span class="see-more">{{ packageContents.length }} 项</span>
           </div>
           <ul class="content-list">
             <li v-for="item in packageContents" :key="item.type">
@@ -570,8 +642,8 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
           </ul>
 
           <div class="size-row">
-            <span>数据包大小（预估）</span>
-            <strong>{{ previewBusy ? '…' : formatBytes(previewBytes) }}</strong>
+            <span>数据包预估体积</span>
+            <strong class="font-mono">{{ previewBusy ? '…' : formatBytes(previewBytes) }}</strong>
           </div>
 
           <p class="group-label">目标 AI 工具</p>
@@ -598,16 +670,11 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
               <span>{{ tool.label }}</span>
             </button>
           </div>
-          <div class="privacy-box" role="note">
-            <strong><Icon name="shield" :size="13" />首次发送前请确认隐私边界</strong>
-            <p>仅发送当前选择范围的脱敏摘要；不会自动登录、注入或提交。认证信息、用户/设备标识始终移除。</p>
-            <label><input v-model="privacyNoticeAccepted" type="checkbox" />我已阅读并同意由 {{ activeProvider.label }} 接收这份脱敏数据</label>
-          </div>
-          <label class="route-toggle">
-            <input v-model="includePreciseRoute" type="checkbox" />
-            <span><strong>包含精确 GPS 路线</strong><small>默认关闭；发送前还会再次确认，认证与标识字段仍会移除。</small></span>
-          </label>
-          <p class="send-hint"><Icon name="info" :size="13" />≤ 2 MiB 会复制到剪贴板；更大的脱敏文件需在目标 AI 页面手动上传。</p>
+
+          <p class="send-hint">
+            <Icon name="info" :size="13" />
+            ≤ 2 MiB 自动随提示词复制到剪贴板；> 2 MiB 会直接导出 JSON 到桌面，拖入对话即可。
+          </p>
         </section>
       </aside>
     </div>
@@ -616,11 +683,11 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 
 <style scoped>
 .export-page.page { display: grid; gap: 16px; }
-.page-head h1 { margin-bottom: 6px; }
+.page-head h1 { margin-bottom: 6px; font-size: 24px; font-weight: 700; color: var(--ink); }
 
 .export-layout {
   display: grid;
-  grid-template-columns: 250px minmax(0, 1fr) 300px;
+  grid-template-columns: 240px minmax(0, 1fr) 290px;
   gap: 16px;
   align-items: start;
 }
@@ -628,7 +695,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 .col-editor { display: grid; gap: 12px; min-width: 0; }
 .pad { padding: 16px; }
 .col-title { margin: 0 0 10px; color: var(--ink); font-size: 13px; font-weight: 700; }
-.col-title.big { font-size: 16px; margin-bottom: 4px; }
+.col-title.big { font-size: 15px; margin-bottom: 4px; }
 .col-sub { margin: 0 0 14px; color: var(--muted); font-size: 12px; }
 
 /* 模板分类 */
@@ -646,11 +713,12 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
   font-size: 13px;
   text-align: left;
   cursor: pointer;
+  transition: all 140ms ease;
 }
 .category-item:hover { background: var(--surface-hover); color: var(--ink); }
-.category-item.is-on { background: var(--accent-soft); border-color: rgba(205, 220, 124, .2); color: var(--accent); }
+.category-item.is-on { background: var(--accent-soft); border-color: rgba(205, 220, 124, .2); color: var(--accent); font-weight: 600; }
 .category-item span { flex: 1; }
-.category-item em { font-style: normal; font-size: 12px; color: var(--subtle); font-variant-numeric: tabular-nums; }
+.category-item em { font-style: normal; font-size: 11px; color: var(--subtle); font-family: var(--font-mono); }
 .category-item.is-on em { color: var(--accent); }
 
 /* 模板列表 */
@@ -678,6 +746,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
   background: var(--surface-raised);
   text-align: left;
   cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease;
 }
 .template-item:hover { border-color: var(--line-strong); }
 .template-item.is-on { border-color: rgba(205, 220, 124, .4); background: var(--accent-soft); }
@@ -694,29 +763,30 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 }
 .template-item.is-on .tpl-icon { color: var(--accent); }
 .tpl-copy { display: grid; gap: 1px; min-width: 0; flex: 1; }
-.tpl-copy strong { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tpl-copy strong { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
 .tpl-copy span { color: var(--subtle); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tpl-star { color: var(--accent); }
 .empty-note { margin: 4px 0; color: var(--subtle); font-size: 12px; }
 
-/* 当前模板 */
+/* 当前模板与编辑器 */
 .current-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .current-head .col-title { margin-bottom: 2px; color: var(--muted); font-weight: 400; font-size: 12px; }
-.tpl-name { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 4px; color: var(--accent); font-size: 22px; font-weight: 700; }
+.tpl-name { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 4px; color: var(--accent); font-size: 20px; font-weight: 700; }
 .tpl-name svg { color: var(--subtle); }
 .tpl-desc { margin: 0; color: var(--muted); font-size: 12px; }
 .mini-btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   flex: 0 0 auto;
   padding: 6px 12px;
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: 8px;
   background: var(--surface-raised);
   color: var(--muted);
   font-size: 12px;
   cursor: pointer;
+  transition: all 140ms ease;
 }
 .mini-btn:hover { color: var(--accent); border-color: var(--accent); }
 
@@ -733,7 +803,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
   font-weight: 600;
 }
 .editor-head em { color: var(--subtle); font-weight: 400; font-style: normal; }
-.injected { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); font-weight: 400; }
+.injected { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); font-weight: 400; font-size: 11px; }
 .prompt-editor textarea {
   display: block;
   width: 100%;
@@ -742,71 +812,90 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
   resize: vertical;
   padding: 12px 14px;
   background: transparent;
-  color: var(--muted);
+  color: var(--ink);
   font-family: var(--font-sans);
   font-size: 12.5px;
-  line-height: 1.9;
+  line-height: 1.8;
 }
 
-/* 数据感知摘要 */
-.summary-block { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 14px; background: var(--surface-raised); }
-.summary-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: 12px; font-weight: 600; }
+/* 数据感知摘要（四格卡片） */
+.summary-block { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 0; background: var(--surface-raised); position: relative; }
+.summary-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: 12px; font-weight: 600; color: var(--ink); }
 .summary-head span:first-child { display: inline-flex; align-items: center; gap: 5px; }
-.see-more { display: inline-flex; align-items: center; gap: 3px; color: var(--subtle); font-size: 11px; font-weight: 400; cursor: default; }
+.see-more { color: var(--subtle); font-size: 11px; font-weight: 400; }
 .summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; background: var(--line); }
 .summary-cell { display: grid; gap: 3px; padding: 10px 12px; background: var(--surface); min-width: 0; }
 .cell-label { display: inline-flex; align-items: center; gap: 5px; color: var(--subtle); font-size: 11px; }
-.cell-value { font-family: 'Inter', var(--font-sans); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cell-value { color: var(--ink); font-size: 15px; font-weight: 600; }
 .cell-value.small { font-size: 12px; }
 .cell-sub { color: var(--subtle); font-size: 11px; }
-.range-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; color: var(--subtle); font-size: 12px; }
+.font-mono { font-family: var(--font-mono); }
+
+/* 快捷范围与深色日期选择器 */
+.range-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; color: var(--subtle); font-size: 12px; position: relative; }
+.range-label { color: var(--subtle); font-size: 11px; }
 .range-pill {
-  padding: 3px 12px;
+  padding: 3px 10px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: transparent;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   cursor: pointer;
 }
 .range-pill.is-on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
-.date-input input {
-  min-height: 28px;
-  padding: 3px 8px;
+
+.custom-date-picker-wrap { display: inline-flex; align-items: center; gap: 6px; position: relative; }
+.date-trigger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
   border: 1px solid var(--line);
   border-radius: 7px;
   background: var(--surface);
   color: var(--ink);
-  font-size: 12px;
-}
-
-/* JSON 预览 */
-.preview-block { border: 1px solid var(--line); border-radius: var(--radius-sm); background: #101207; overflow: hidden; }
-.preview-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 9px 12px;
-  border-bottom: 1px solid var(--line);
-  color: var(--ink);
-  font-size: 12px;
-  font-weight: 600;
-}
-.format-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 11px; font-weight: 400; }
-.preview-empty { padding: 16px 14px; color: var(--subtle); font-size: 12px; }
-.json-view {
-  max-height: 250px;
-  margin: 0;
-  padding: 10px 12px;
-  overflow: auto;
+  font-size: 11px;
   font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 1.65;
-  color: var(--accent);
+  cursor: pointer;
 }
-.json-line { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; }
-.ln { color: var(--faint); text-align: right; user-select: none; }
-.lx { min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.date-trigger-btn.is-open { border-color: var(--accent); }
+.date-trigger-btn:hover { border-color: var(--line-strong); }
+
+/* 自绘日历弹层 */
+.calendar-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  width: 220px;
+  padding: 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .4);
+}
+.cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.cal-title { font-size: 12px; font-weight: 600; color: var(--ink); }
+.cal-nav-btn { display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 4px; background: var(--surface-raised); color: var(--muted); cursor: pointer; }
+.cal-nav-btn:hover { color: var(--accent); }
+.cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 10px; color: var(--subtle); margin-bottom: 4px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cal-day {
+  display: grid;
+  place-items: center;
+  height: 24px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+.cal-day:hover:not(:disabled) { background: var(--surface-hover); }
+.cal-day.is-selected { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.cal-day.is-empty { cursor: default; }
 
 /* 底部操作条 */
 .editor-footer {
@@ -836,33 +925,36 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
   display: grid;
   justify-items: center;
   gap: 4px;
-  padding: 14px 6px 10px;
+  padding: 12px 6px 10px;
   border: 1px solid var(--line);
   border-radius: 11px;
   background: var(--surface-raised);
   color: var(--muted);
   font-size: 11px;
   cursor: pointer;
+  transition: all 140ms ease;
 }
 .format-card strong { color: var(--ink); font-size: 12px; }
-.format-card span { color: var(--subtle); }
+.format-card span { color: var(--subtle); font-size: 10px; }
 .format-card.is-on { border-color: var(--accent); background: var(--accent-soft); }
 .format-card.is-on svg, .format-card.is-on strong { color: var(--accent); }
 .format-check { position: absolute; top: 6px; right: 6px; }
-.content-list { display: grid; gap: 2px; margin: 8px 0 0; padding: 0; list-style: none; }
+
+.content-list { display: grid; gap: 4px; margin: 8px 0 0; padding: 0; list-style: none; }
 .content-list li {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 32px;
+  min-height: 30px;
   padding: 5px 10px;
   border-radius: 8px;
   background: var(--surface-raised);
-  color: var(--muted);
+  color: var(--ink);
   font-size: 12px;
 }
 .content-list li span { flex: 1; }
 .content-check { color: var(--accent); }
+
 .size-row {
   display: flex;
   align-items: center;
@@ -875,21 +967,23 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
   color: var(--muted);
   font-size: 12px;
 }
-.size-row strong { color: var(--accent); font-family: 'Inter', var(--font-sans); font-variant-numeric: tabular-nums; }
+.size-row strong { color: var(--accent); font-variant-numeric: tabular-nums; }
+
 .tool-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .tool-card {
   position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 44px;
-  padding: 8px 12px;
+  min-height: 42px;
+  padding: 8px 10px;
   border: 1px solid var(--line);
-  border-radius: 11px;
+  border-radius: 10px;
   background: var(--surface-raised);
   color: var(--ink);
   font-size: 12px;
   cursor: pointer;
+  transition: border-color 140ms ease;
 }
 .tool-card.is-on { border-color: var(--accent); background: var(--accent-soft); }
 .tool-logo {
@@ -907,31 +1001,13 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 .tool-fallback { color: var(--muted); font-size: 12px; font-weight: 700; line-height: 1; }
 .tool-card.is-on .tool-logo { color: var(--accent); }
 .tool-check { position: absolute; top: 5px; right: 6px; color: var(--accent); }
-.privacy-box {
-  display: grid;
-  gap: 7px;
-  margin-top: 14px;
-  padding: 10px 11px;
-  border: 1px solid rgba(205, 220, 124, .25);
-  border-radius: 9px;
-  background: var(--accent-soft);
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.5;
-}
-.privacy-box strong { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); font-size: 12px; }
-.privacy-box p { margin: 0; }
-.privacy-box label { display: flex; align-items: flex-start; gap: 6px; color: var(--ink); }
-.privacy-box input, .route-toggle input { margin-top: 2px; accent-color: var(--accent); }
-.route-toggle { display: flex; align-items: flex-start; gap: 7px; margin-top: 12px; color: var(--muted); font-size: 11px; line-height: 1.45; }
-.route-toggle span { display: grid; gap: 2px; }
-.route-toggle strong { color: var(--ink); font-size: 12px; }
-.route-toggle small { color: var(--subtle); }
-.send-hint { display: flex; align-items: flex-start; gap: 6px; margin: 14px 0 0; color: var(--subtle); font-size: 11px; }
+
+.send-hint { display: flex; align-items: flex-start; gap: 6px; margin: 14px 0 0; color: var(--subtle); font-size: 11px; line-height: 1.45; }
 .retry-open { width: fit-content; margin-top: 2px; }
 
+/* 响应式 */
 @media (max-width: 1180px) {
-  .export-layout { grid-template-columns: 230px minmax(0, 1fr); }
+  .export-layout { grid-template-columns: 220px minmax(0, 1fr); }
   .col-send { grid-column: 1 / -1; }
   .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

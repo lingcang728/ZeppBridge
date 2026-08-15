@@ -80,7 +80,7 @@ watch(dataRevision, () => void loadList());
   font-size: 12px;
   text-decoration: none;
 }
-.back-link svg { transform: rotate(180deg); }
+.back-link:hover { color: var(--accent); }
 .footnote {
   margin: 12px 0 0;
   color: var(--muted);

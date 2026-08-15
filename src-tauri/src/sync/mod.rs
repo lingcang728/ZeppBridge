@@ -122,7 +122,7 @@ impl SyncManager {
     }
 
     pub async fn incremental_sync_report(&self) -> Result<SyncReport> {
-        self.sync_report(7, None).await
+        self.sync_report(30, None).await
     }
 
     pub async fn incremental_sync_report_with_progress<F>(
@@ -132,7 +132,7 @@ impl SyncManager {
     where
         F: Fn(SyncProgress) + Send + Sync,
     {
-        self.sync_report(7, Some(&on_progress)).await
+        self.sync_report(30, Some(&on_progress)).await
     }
 
     async fn sync_report(
@@ -290,13 +290,17 @@ impl SyncManager {
                 Ok(record) => records.push(record),
                 Err(error) if error.is_cancelled() => return Err(error),
                 Err(error) if error.needs_reauth() => return Err(error),
-                Err(error) if error.is_unavailable() => last_error = Some(error),
-                Err(error) => last_error = Some(error),
+                Err(error) => {
+                    tracing::warn!("拉取运动明细 {} 失败: {}", item.workout_id, error);
+                    last_error = Some(error);
+                }
             }
         }
         if records.is_empty() {
             if let Some(error) = last_error {
-                return Err(error);
+                if error.is_unavailable() {
+                    return Err(error);
+                }
             }
         }
         Ok(records)
