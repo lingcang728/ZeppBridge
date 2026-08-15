@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import DeviceVisual from '../components/DeviceVisual.vue';
 import Icon from '../components/Icon.vue';
+import { useDevices } from '../composables/useDevices';
 import { useSyncController } from '../composables/useSyncController';
 import { AUTO_SYNC_INTERVALS } from '../lib/autoSync';
 import { UI_SCALES, useUiScale, type UiScale } from '../composables/useUiScale';
@@ -22,6 +24,14 @@ const {
   markDataChanged,
 } = useSyncController();
 const { scale, setScale } = useUiScale();
+const {
+  models: deviceModels,
+  cache: deviceCache,
+  loading: devicesLoading,
+  error: deviceError,
+  load: loadDevices,
+  maskIdentifier,
+} = useDevices();
 
 const reconnecting = ref(false);
 const loginStatus = ref<LoginStatus>({ state: 'idle', message: '', page_url: '' });
@@ -39,6 +49,9 @@ const manualAuthBusy = ref(false);
 const dataBusy = ref<string | null>(null);
 const dataMessage = ref<string | null>(null);
 const dataError = ref<string | null>(null);
+const deviceRefreshBusy = ref(false);
+const deviceRefreshMessage = ref<string | null>(null);
+const deviceRefreshError = ref<string | null>(null);
 
 /* 本地偏好（隐私区开关，仅保存在本机） */
 const readLocalPref = (key: string, fallback: boolean) => {
@@ -58,7 +71,7 @@ const toggleAnonymous = () => toggleLocalPref('zeppbridge-pref-anon', anonymousU
 
 const connected = computed(() => appStatus.value?.connection_state === 'connected');
 const configuredOnly = computed(() => appStatus.value?.connection_state === 'configured');
-const needsReauth = computed(() => appStatus.value?.connection_state === 'needs_reauth');
+const accountRecognized = computed(() => connected.value || configuredOnly.value);
 const loginInProgress = computed(() => ['waiting', 'extracting', 'verifying'].includes(String(loginStatus.value.state)));
 const retentionDays = ref(appStatus.value?.retention_days ?? 365);
 const historyDays = ref(appStatus.value?.history_sync_days ?? 30);
@@ -72,10 +85,8 @@ const connectionLabel = computed(() => {
     return '等待登录';
   }
   if (loginStatus.value.state === 'failed') return '登录失败';
-  if (needsReauth.value) return '需要重新连接';
-  if (connected.value) return '已连接';
-  if (configuredOnly.value) return '待验证';
-  return '未连接';
+  if (connected.value || configuredOnly.value) return '账号已识别';
+  return '未识别';
 });
 
 const formatDateTime = (value?: string): string => {
@@ -94,10 +105,40 @@ const cleanupDate = computed(() => {
 });
 
 const dataSources = computed(() => [
-  { name: 'MSV Cloud', sub: '云服务', icon: 'cloud' as const, connected: connected.value },
-  { name: 'T-Rex 3', sub: '设备', icon: 'watch' as const, connected: connected.value },
-  { name: 'Helio Ring', sub: '设备', icon: 'ring' as const, connected: connected.value },
+  {
+    kind: 'cloud' as const,
+    name: 'Zap Cloud',
+    sub: '云服务',
+    icon: 'cloud' as const,
+    state: accountRecognized.value ? '账号已识别' : '未识别',
+  },
+  ...deviceModels.value.map((model) => ({
+    kind: 'device' as const,
+    name: model.canonicalName,
+    sub: model.displayName,
+    model,
+    state: model.state,
+  })),
 ]);
+
+const refreshDevices = async () => {
+  deviceRefreshBusy.value = true;
+  deviceRefreshMessage.value = null;
+  deviceRefreshError.value = null;
+  try {
+    await loadDevices(true);
+    const refreshError = deviceCache.value?.refresh_error || deviceError.value;
+    if (refreshError || deviceCache.value?.status === 'refresh_failed') {
+      deviceRefreshError.value = `重新识别失败，已回退到本机缓存${refreshError ? `：${refreshError}` : '。'}`;
+    } else if (deviceCache.value?.refreshed) {
+      deviceRefreshMessage.value = `设备识别完成，共发现 ${deviceModels.value.length} 个实体设备。`;
+    } else {
+      deviceRefreshMessage.value = '未获得新的设备列表，当前显示本机缓存。';
+    }
+  } finally {
+    deviceRefreshBusy.value = false;
+  }
+};
 
 const applyLoginStatus = async (status: LoginStatus) => {
   loginStatus.value = status;
@@ -300,6 +341,7 @@ const confirmHistorySync = async () => {
 };
 
 onMounted(async () => {
+  void loadDevices();
   const status = await refreshStatus();
   retentionDays.value = status?.retention_days ?? 365;
   historyDays.value = status?.history_sync_days ?? 30;
@@ -403,18 +445,18 @@ onUnmounted(() => {
 
     <div class="two-col">
       <!-- 2. 账户与区域 -->
-      <section class="settings-card" aria-labelledby="account-title">
+      <section id="account-section" class="settings-card" aria-labelledby="account-title">
         <h2 id="account-title">2. 账户与区域</h2>
         <div class="kv-list">
           <div class="kv-row">
             <span class="kv-label">当前账户</span>
-            <span class="kv-value">{{ appStatus?.masked_user_id || '未连接' }}</span>
+            <span class="kv-value">{{ appStatus?.masked_user_id || '未识别' }}</span>
             <button v-if="configuredOnly" class="kv-btn" type="button" :disabled="isSyncing" @click="verifyAndSync">验证并同步</button>
             <button v-else class="kv-btn" type="button" :disabled="loginBusy" @click="startLogin">重新认证</button>
           </div>
           <div class="kv-row">
             <span class="kv-label">用户 ID</span>
-            <span class="kv-value mono">{{ appStatus?.masked_user_id || '—' }}</span>
+            <span class="kv-value mono">{{ appStatus?.masked_user_id || '未提供' }}</span>
           </div>
           <div class="kv-row">
             <span class="kv-label">区域 / Host</span>
@@ -430,18 +472,34 @@ onUnmounted(() => {
 
       <!-- 3. 连接设备 / 数据来源 -->
       <section class="settings-card" aria-labelledby="devices-title">
-        <h2 id="devices-title">3. 连接设备 / 数据来源</h2>
-        <div class="source-list">
+        <div class="section-heading-row">
+          <h2 id="devices-title">3. 连接设备 / 数据来源</h2>
+          <button class="button secondary identify-button" type="button" :disabled="deviceRefreshBusy" @click="refreshDevices">
+            <Icon name="sync" :size="14" :class="{ spinning: deviceRefreshBusy }" />{{ deviceRefreshBusy ? '正在识别…' : '重新识别设备' }}
+          </button>
+        </div>
+        <div v-if="deviceRefreshError" class="alert danger device-alert" role="alert"><Icon name="warning" :size="14" />{{ deviceRefreshError }}</div>
+        <div v-if="deviceRefreshMessage" class="alert success device-alert" role="status"><Icon name="circle-check" :size="14" />{{ deviceRefreshMessage }}</div>
+        <div v-if="deviceError && !deviceRefreshError" class="alert warning device-alert" role="status"><Icon name="info" :size="14" />设备识别：{{ deviceError }}</div>
+        <div v-if="devicesLoading" class="source-list source-list-loading"><div class="source-row skeleton-row"></div><div class="source-row skeleton-row"></div></div>
+        <div v-else class="source-list">
+          <div v-if="!deviceModels.length" class="device-empty"><Icon name="watch" :size="16" />尚未识别实体设备；Zap Cloud 仍可作为云服务使用。</div>
           <div v-for="source in dataSources" :key="source.name" class="source-row">
-            <span class="source-icon"><Icon :name="source.icon" :size="18" /></span>
+            <span class="source-icon">
+              <DeviceVisual v-if="source.kind === 'device'" :src="source.model.image" :alt="source.name" :kind="source.model.kind" compact />
+              <Icon v-else name="cloud" :size="18" />
+            </span>
             <div class="source-copy">
               <strong>{{ source.name }}</strong>
               <span>{{ source.sub }}</span>
+              <span v-if="source.kind === 'device'">固件 {{ source.model.firmware }} · 最近数据 {{ source.model.lastData }}</span>
+              <span v-if="source.kind === 'device'">设备 ID {{ maskIdentifier(source.model.profile.device_id || source.model.profile.serial) }}</span>
             </div>
-            <span :class="['source-state', { on: source.connected }]"><i class="dot"></i>{{ source.connected ? '已连接' : '未连接' }}</span>
+            <span :class="['source-state', { on: source.state !== '未识别' }]"><i class="dot"></i>{{ source.state }}</span>
             <Icon name="chevron-down" :size="14" class="source-chevron" />
           </div>
         </div>
+        <p class="device-cache-note">设备缓存：{{ deviceCache?.status || '未提供' }}。普通界面不展示完整设备 ID；需要核对时仅显示掩码。</p>
         <button class="manage-row" type="button" @click="openDataFolder">
           管理数据来源<Icon name="arrow-right" :size="14" />
         </button>
@@ -607,6 +665,12 @@ h3 { margin-bottom: 4px; font-size: 13px; font-weight: 700; }
 .page-intro, .section-description { margin-bottom: 0; color: var(--muted); font-size: 12px; }
 .section-description { margin: 12px 0 8px; }
 .settings-card { padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); min-width: 0; }
+.section-heading-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.section-heading-row h2 { margin-bottom: 14px; }
+.identify-button { flex: 0 0 auto; }
+.device-alert { margin: 0 0 10px; }
+.device-cache-note { margin: 10px 0 0; color: var(--subtle); font-size: 11px; }
+.device-empty { display: flex; align-items: center; gap: 7px; min-height: 60px; padding: 10px; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); color: var(--muted); font-size: 12px; }
 .two-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 14px; }
 .three-col { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .two-col > *, .three-col > * { min-width: 0; }
@@ -622,7 +686,7 @@ h3 { margin-bottom: 4px; font-size: 13px; font-weight: 700; }
   border-radius: var(--radius-md);
   background: var(--surface-raised);
 }
-.auth-card.current { border-color: rgba(205, 220, 124, .3); }
+.auth-card.current { border-color: rgba(216, 255, 82, .30); }
 .auth-head { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
 .auth-icon {
   display: grid;
@@ -653,7 +717,7 @@ h3 { margin-bottom: 4px; font-size: 13px; font-weight: 700; }
 }
 .auth-action:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
 .auth-action:disabled { opacity: .5; cursor: not-allowed; }
-.auth-action.is-current { border-color: rgba(205, 220, 124, .35); background: var(--accent-soft); color: var(--accent); }
+.auth-action.is-current { border-color: rgba(216, 255, 82, .35); background: var(--accent-soft); color: var(--accent); }
 .hint-line { display: inline-flex; align-items: center; gap: 6px; margin: 12px 0 0; color: var(--muted); font-size: 12px; }
 .hint-line.ok { color: var(--accent); }
 .hint-line.ok svg { color: var(--accent); }
@@ -706,13 +770,19 @@ h3 { margin-bottom: 4px; font-size: 13px; font-weight: 700; }
   background: var(--surface);
   color: var(--muted);
 }
+.source-icon :deep(.device-visual) { width: 36px; max-width: 100%; height: 36px; max-height: 100%; min-width: 0; min-height: 0; flex: 0 0 36px; border: 0; border-radius: 9px; background: transparent; }
+.source-icon :deep(.device-visual img) { padding: 3px; }
 .source-copy { flex: 1; min-width: 0; display: grid; gap: 1px; }
 .source-copy strong { font-size: 13px; }
 .source-copy span { color: var(--subtle); font-size: 11px; }
+.source-copy span + span { font-family: var(--font-mono); font-size: 10px; }
 .source-state { display: inline-flex; align-items: center; gap: 5px; color: var(--subtle); font-size: 12px; }
 .source-state .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--subtle); }
 .source-state.on { color: var(--accent); }
 .source-state.on .dot { background: var(--accent); }
+.source-list-loading { opacity: .65; }
+.skeleton-row { min-height: 58px; background: linear-gradient(90deg, var(--surface-raised), var(--surface-hover), var(--surface-raised)); background-size: 200% 100%; animation: device-shimmer 1.4s ease-in-out infinite; }
+@keyframes device-shimmer { from { background-position: 0 0; } to { background-position: -200% 0; } }
 .source-chevron { transform: rotate(-90deg); color: var(--subtle); }
 .manage-row {
   display: flex;
@@ -853,5 +923,5 @@ code { color: var(--muted); font-family: var(--font-mono); font-size: 12px; }
   .two-col { grid-template-columns: minmax(0, 1fr); }
   .auth-grid { grid-template-columns: minmax(0, 1fr); }
 }
-@media (prefers-reduced-motion: reduce) { .switch span { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .switch span { transition: none; } .skeleton-row { animation: none; } }
 </style>

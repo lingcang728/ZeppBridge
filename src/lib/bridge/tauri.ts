@@ -4,8 +4,10 @@ import { DesktopUnavailableError } from './errors';
 import type { BridgeBackend, UnlistenFn } from './types';
 import type {
   AppStatus,
+  AiHandoffResult,
   AuthInfo,
   DeviceProfile,
+  DeviceProfilesResult,
   ExportResult,
   ExportSelection,
   HealthOverview,
@@ -138,6 +140,10 @@ export const tauriBackend: BridgeBackend = {
     });
   },
 
+  getDeviceProfiles(refresh = false) {
+    return call<DeviceProfilesResult>('get_device_profiles', { refresh });
+  },
+
   reprocessLocalData() {
     return call<ReprocessResult>('reprocess_local_data');
   },
@@ -152,6 +158,14 @@ export const tauriBackend: BridgeBackend = {
 
   publishAiExport(selection: ExportSelection) {
     return call<ExportResult>('publish_ai_export', { selection });
+  },
+
+  prepareAiHandoff(selection: ExportSelection, prompt: string, includePreciseRoute = false) {
+    return call<AiHandoffResult>('prepare_ai_handoff', {
+      selection,
+      prompt,
+      includePreciseRoute,
+    });
   },
 
   cleanupOldData(days: number) {

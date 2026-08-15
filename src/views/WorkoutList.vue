@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import Icon from '../components/Icon.vue';
 import PageHeader from '../components/PageHeader.vue';
@@ -10,35 +10,32 @@ import { useSyncController } from '../composables/useSyncController';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { workoutLabel } from '../lib/labels';
 import { formatDate, formatDuration, isFiniteNumber } from '../lib/format';
+import { displayableWorkouts, workoutDurationMinutes } from '../lib/workouts';
 import type { Workout } from '../types';
 
 const { dataRevision } = useSyncController();
 const workouts = ref<Workout[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
+const displayableList = computed(() => displayableWorkouts(workouts.value));
 
 // 运动类型颜色映射（workout_type 为标准化字符串）
 function workoutTypeBg(type: string): string {
   const map: Record<string, string> = {
-    run: '#ef4444',
-    running: '#ef4444',
-    walk: '#10b981',
-    walking: '#10b981',
-    treadmill: '#f59e0b',
-    indoor_run: '#f59e0b',
-    ride: '#3b82f6',
-    cycling: '#3b82f6',
-    swimming: '#06b6d4',
+    run: 'var(--route-mint)',
+    running: 'var(--route-mint)',
+    trail: 'var(--route-mint)',
+    walk: 'var(--route-cyan)',
+    walking: 'var(--route-cyan)',
+    hiking: 'var(--route-cyan)',
+    treadmill: 'var(--route-amber)',
+    indoor_run: 'var(--route-amber)',
+    ride: 'var(--route-cyan)',
+    cycling: 'var(--route-cyan)',
+    swimming: 'var(--route-cyan)',
   };
-  return map[type?.trim().toLowerCase()] ?? '#8b5cf6';
+  return map[type?.trim().toLowerCase()] ?? 'var(--route-mint)';
 }
-
-const durationMinutes = (start: string, end: string): number | null => {
-  const from = new Date(start).getTime();
-  const to = new Date(end).getTime();
-  if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from) return null;
-  return (to - from) / 60000;
-};
 
 const workoutFact = (workout: Workout): { fact: string; label: string } => {
   const meters = workout.distance_meters;
@@ -49,7 +46,7 @@ const workoutFact = (workout: Workout): { fact: string; label: string } => {
     };
   }
   if (isFiniteNumber(workout.calories)) return { fact: `${Math.round(workout.calories)} kcal`, label: '消耗' };
-  return { fact: formatDuration(durationMinutes(workout.start_time, workout.end_time)), label: '时长' };
+  return { fact: formatDuration(workoutDurationMinutes(workout), '未提供'), label: '时长' };
 };
 
 const loadList = async () => {
@@ -61,7 +58,7 @@ const loadList = async () => {
     return;
   }
   try {
-    workouts.value = await tauriApi.getRecentWorkouts(60);
+    workouts.value = displayableWorkouts(await tauriApi.getRecentWorkouts());
   } catch (cause) {
     error.value = toUserMessage(cause, '运动列表暂时不可用');
   } finally {
@@ -86,10 +83,10 @@ watch(dataRevision, () => void loadList());
     <EmptyState v-else-if="error" tone="error" icon="warning" title="无法读取运动记录" :message="error">
       <button class="button button-secondary" type="button" @click="loadList">重试</button>
     </EmptyState>
-    <EmptyState v-else-if="!workouts.length" icon="steps" title="还没有运动记录" message="同步后会显示在这里。没有 GPS 或逐点样本时不会画空图。" />
+    <EmptyState v-else-if="!displayableList.length" icon="steps" title="没有可展示的运动记录" message="同步后，只有包含类型、时间和至少一项有效指标的记录会显示在这里。没有 GPS 或逐点样本时不会画空图。" />
     <div v-else class="surface-card">
       <RecordRow
-        v-for="workout in workouts"
+        v-for="workout in displayableList"
         :key="workout.workout_id"
         :to="{ name: 'WorkoutDetail', params: { workoutId: workout.workout_id } }"
         category="activity"
@@ -101,7 +98,7 @@ watch(dataRevision, () => void loadList());
         :fact-label="workoutFact(workout).label"
       />
     </div>
-    <p v-if="workouts.length" class="footnote">{{ workouts.length }} 条记录</p>
+    <p v-if="displayableList.length" class="footnote">{{ displayableList.length }} 条可展示记录</p>
   </section>
 </template>
 

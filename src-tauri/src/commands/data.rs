@@ -1,13 +1,21 @@
 use crate::app_state::AppState;
 use crate::connectors::ZeppConnector;
+use crate::device_catalog::{match_catalog, CatalogMatchInput, CatalogMatchStatus};
 use crate::ipc_types::CleanupResult;
 use crate::models::{
-    DailyPoint, DeviceProfile, ExportResult, ExportSelection, HealthOverview, HeartRatePoint,
-    SleepSession, StorageEstimate, UserPrefs, Workout, WorkoutSeries,
+    AiHandoffMetadata, AiHandoffResult, DailyPoint, DeviceCacheMetadata, DeviceMatchStatus,
+    DeviceProfile, DeviceProfilesResult, ExportResult, ExportSelection, HealthOverview,
+    HeartRatePoint, SleepSession, StorageEstimate, UserPrefs, Workout, WorkoutSeries,
 };
-use chrono::Utc;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
+use std::collections::BTreeSet;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+
+const DEVICE_CACHE_MAX_AGE_SECONDS: i64 = 24 * 60 * 60;
+pub(crate) const AI_HANDOFF_INLINE_LIMIT_BYTES: usize = 2 * 1024 * 1024;
 
 /// Return the latest health metrics persisted in the local database.
 #[tauri::command]
@@ -197,6 +205,355 @@ pub async fn publish_ai_export(
     write_export(&state, selection, None, true).await
 }
 
+/// Prepare a privacy-preserving payload for an external AI provider.
+///
+/// This deliberately calls the same database export builder as the normal
+/// local export paths, then applies a second, recursive redaction pass. The
+/// existing `get_export_json`, `save_json_export`, and `publish_ai_export`
+/// commands remain unchanged so local exports retain their current semantics.
+#[tauri::command]
+pub async fn prepare_ai_handoff(
+    state: tauri::State<'_, AppState>,
+    selection: ExportSelection,
+    prompt: String,
+    include_precise_route: Option<bool>,
+) -> std::result::Result<AiHandoffResult, String> {
+    let prompt = sanitize_clipboard_text(prompt.trim());
+    if prompt.is_empty() {
+        return Err("请先填写提示词".to_string());
+    }
+
+    let (encoded, record_count) = {
+        let db = state.db.lock().await;
+        db.build_ai_export(&selection)
+            .map_err(|error| error.to_string())?
+    };
+    if record_count == 0 {
+        return Err("这段时间没有可交接的记录".to_string());
+    }
+
+    let include_precise_route = include_precise_route.unwrap_or(false);
+    let (redacted, redactions) = redact_ai_export(&encoded, include_precise_route)?;
+    let bytes = redacted.len();
+    let mode = ai_handoff_mode_for_bytes(bytes);
+    let (clipboard_text, file_path) = if mode == "inline" {
+        (
+            format!("{prompt}\n\n以下是已脱敏的健康数据（JSON）：\n{redacted}"),
+            None,
+        )
+    } else {
+        let export_dir = state.data_dir.join("exports");
+        std::fs::create_dir_all(&export_dir)
+            .map_err(|error| format!("创建 AI 交接目录失败: {error}"))?;
+        let path = export_dir.join("zeppbridge-ai-handoff.json");
+        write_file_atomically(&path, redacted.as_bytes())
+            .map_err(|error| format!("写入脱敏 AI 数据失败: {error}"))?;
+        (
+            format!("{prompt}\n\n数据包超过 2 MiB，已生成脱敏文件，请上传已生成文件到目标 AI。"),
+            Some(path.to_string_lossy().into_owned()),
+        )
+    };
+
+    Ok(AiHandoffResult {
+        mode: mode.to_string(),
+        clipboard_text,
+        file_path,
+        bytes,
+        records: record_count,
+        redactions,
+        metadata: AiHandoffMetadata {
+            precise_route_included: include_precise_route,
+            authentication_fields_removed: true,
+            identity_fields_removed: true,
+        },
+    })
+}
+
+pub(crate) fn ai_handoff_mode_for_bytes(bytes: usize) -> &'static str {
+    if bytes <= AI_HANDOFF_INLINE_LIMIT_BYTES {
+        "inline"
+    } else {
+        "attachment"
+    }
+}
+
+/// Recursively remove authentication, account/device identifiers, and (by
+/// default) all precise route coordinates from an export JSON document.
+///
+/// The redaction list is policy-oriented rather than a list of user values;
+/// it can therefore be safely returned to the UI and included in metadata.
+pub(crate) fn redact_ai_export(
+    encoded: &str,
+    include_precise_route: bool,
+) -> std::result::Result<(String, Vec<String>), String> {
+    let mut value: Value = serde_json::from_str(encoded)
+        .map_err(|error| format!("解析 AI 导出 JSON 失败: {error}"))?;
+    let mut redactions = BTreeSet::from([
+        "authentication_fields".to_string(),
+        "identity_fields".to_string(),
+    ]);
+    if !include_precise_route {
+        redactions.insert("precise_route".to_string());
+    }
+    redact_value(&mut value, include_precise_route, &mut redactions);
+
+    if let Some(root) = value.as_object_mut() {
+        let redaction_values = redactions
+            .iter()
+            .cloned()
+            .map(Value::String)
+            .collect::<Vec<_>>();
+        root.insert("redactions".to_string(), Value::Array(redaction_values));
+        root.insert(
+            "metadata".to_string(),
+            serde_json::json!({
+                "ai_handoff": true,
+                "precise_route_included": include_precise_route,
+                "authentication_fields_removed": true,
+                "identity_fields_removed": true,
+            }),
+        );
+    }
+
+    let encoded = serde_json::to_string_pretty(&value)
+        .map_err(|error| format!("编码脱敏 AI 导出失败: {error}"))?;
+    Ok((encoded, redactions.into_iter().collect()))
+}
+
+fn redact_value(value: &mut Value, include_precise_route: bool, redactions: &mut BTreeSet<String>) {
+    match value {
+        Value::Object(object) => redact_object(object, include_precise_route, redactions),
+        Value::Array(items) => {
+            for item in items {
+                redact_value(item, include_precise_route, redactions);
+            }
+        }
+        Value::String(text) => {
+            let sanitized = sanitize_clipboard_text(text);
+            if sanitized != *text {
+                *text = sanitized;
+                redactions.insert("local_paths".to_string());
+            }
+        }
+        _ => {}
+    }
+}
+
+fn redact_object(
+    object: &mut Map<String, Value>,
+    include_precise_route: bool,
+    redactions: &mut BTreeSet<String>,
+) {
+    let keys = object.keys().cloned().collect::<Vec<_>>();
+    for key in keys {
+        let normalized = normalize_json_key(&key);
+        let remove_auth = is_authentication_key(&normalized);
+        let remove_identity = is_identity_key(&normalized);
+        let remove_route = !include_precise_route && is_precise_route_key(&normalized);
+        let remove_path = is_local_path_key(&normalized);
+        if remove_auth || remove_identity || remove_route || remove_path {
+            object.remove(&key);
+            if remove_auth {
+                redactions.insert("authentication_fields".to_string());
+            } else if remove_identity {
+                redactions.insert("identity_fields".to_string());
+            } else if remove_route {
+                redactions.insert("precise_route".to_string());
+            } else {
+                redactions.insert("local_paths".to_string());
+            }
+            continue;
+        }
+        if let Some(child) = object.get_mut(&key) {
+            redact_value(child, include_precise_route, redactions);
+        }
+    }
+}
+
+fn normalize_json_key(key: &str) -> String {
+    key.chars()
+        .filter(|character| character.is_ascii_alphanumeric())
+        .flat_map(|character| character.to_lowercase())
+        .collect()
+}
+
+fn is_authentication_key(key: &str) -> bool {
+    key.contains("token")
+        || key.contains("auth")
+        || key.contains("credential")
+        || key.contains("secret")
+        || key.contains("password")
+        || key == "cookie"
+        || key == "cookies"
+        || key == "apikey"
+        || key == "authorization"
+}
+
+fn is_identity_key(key: &str) -> bool {
+    matches!(
+        key,
+        "user"
+            | "username"
+            | "userid"
+            | "useraccount"
+            | "account"
+            | "accountid"
+            | "accountname"
+            | "serial"
+            | "serialnumber"
+            | "device"
+            | "deviceid"
+            | "record"
+            | "workoutid"
+            | "workout"
+            | "sleepid"
+            | "sleep"
+            | "sessionid"
+            | "recordid"
+            | "sampleid"
+            | "metricid"
+            | "dailyid"
+            | "sourceid"
+            | "rawid"
+            | "id"
+            | "useridentifier"
+            | "accountidentifier"
+            | "deviceidentifier"
+            | "serialidentifier"
+            | "recordidentifier"
+            | "workoutidentifier"
+            | "sleepidentifier"
+            | "sessionidentifier"
+            | "useremail"
+            | "accountemail"
+            | "userphone"
+            | "accountphone"
+            | "email"
+            | "phone"
+            | "phonenumber"
+            | "uuid"
+            | "guid"
+            | "identifier"
+    ) || (key.ends_with("id")
+        && [
+            "user", "account", "device", "record", "workout", "sleep", "session", "sample",
+            "metric", "daily", "source", "raw",
+        ]
+        .iter()
+        .any(|prefix| key.starts_with(prefix)))
+        || ([
+            "user", "account", "device", "record", "workout", "sleep", "session", "serial",
+        ]
+        .iter()
+        .any(|prefix| key.starts_with(prefix))
+            && ["identifier", "uuid", "guid", "key", "number"]
+                .iter()
+                .any(|suffix| key.ends_with(suffix)))
+        || key.contains("serial")
+}
+
+fn is_precise_route_key(key: &str) -> bool {
+    matches!(
+        key,
+        "route"
+            | "routepoints"
+            | "routepoint"
+            | "gps"
+            | "location"
+            | "locations"
+            | "geolocation"
+            | "geo"
+            | "track"
+            | "trackpoints"
+            | "latitude"
+            | "longitude"
+            | "lat"
+            | "lng"
+            | "lon"
+            | "coordinates"
+            | "polyline"
+    ) || key.contains("latitude")
+        || key.contains("longitude")
+        || key.contains("coordinate")
+        || (key.starts_with("lat")
+            && key
+                .chars()
+                .skip(3)
+                .all(|character| character.is_ascii_digit() || character == 'e'))
+        || (key.starts_with("lng")
+            && key
+                .chars()
+                .skip(3)
+                .all(|character| character.is_ascii_digit() || character == 'e'))
+        || (key.starts_with("lon")
+            && key
+                .chars()
+                .skip(3)
+                .all(|character| character.is_ascii_digit() || character == 'e'))
+        || key.contains("routepoint")
+        || key.contains("trackpoint")
+        || key == "latlng"
+        || (key.starts_with("gps")
+            && (key.contains("route")
+                || key.contains("point")
+                || key.contains("coord")
+                || key.contains("track")))
+}
+
+fn is_local_path_key(key: &str) -> bool {
+    matches!(
+        key,
+        "path"
+            | "filepath"
+            | "filename"
+            | "file"
+            | "sourcepath"
+            | "databasepath"
+            | "localpath"
+            | "exportpath"
+            | "directory"
+            | "dirname"
+    ) || key.ends_with("filepath")
+        || key.ends_with("pathname")
+}
+
+fn sanitize_clipboard_text(text: &str) -> String {
+    let mut output = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    while let Some(character) = chars.next() {
+        let previous = output.chars().last();
+        let at_boundary = previous.is_none()
+            || previous.is_some_and(|value| {
+                value.is_whitespace() || matches!(value, '"' | '\'' | '(' | '[' | '{' | '=')
+            });
+        let is_windows_drive = at_boundary
+            && character.is_ascii_alphabetic()
+            && chars.peek() == Some(&':')
+            && chars
+                .clone()
+                .nth(1)
+                .is_some_and(|next| next == '\\' || next == '/');
+        let is_unc = at_boundary && character == '\\' && chars.peek() == Some(&'\\');
+        let is_unix =
+            at_boundary && character == '/' && chars.peek().is_some_and(|next| *next != ' ');
+        if is_windows_drive || is_unc || is_unix {
+            output.push_str("[本地路径已移除]");
+            if is_windows_drive {
+                let _ = chars.next();
+            }
+            while let Some(next) = chars.peek() {
+                if next.is_whitespace() || *next == '"' || *next == '\'' || *next == ')' {
+                    break;
+                }
+                let _ = chars.next();
+            }
+        } else {
+            output.push(character);
+        }
+    }
+    output
+}
+
 /// Write via a same-directory temporary file + rename so an interrupted
 /// export (crash, disk full) never leaves a truncated JSON at the target
 /// path — in particular the stable AI feed file that is overwritten in place.
@@ -292,30 +649,107 @@ pub async fn get_device_profile(
     resolve_device_profile(&state, device_id.as_deref(), source_scope.as_deref()).await
 }
 
+/// Return every device bound to the current account. The command is
+/// cache-first; a caller opts into the bounded network refresh explicitly so
+/// an offline account can still inspect its last known device list.
+#[tauri::command]
+pub async fn get_device_profiles(
+    state: tauri::State<'_, AppState>,
+    refresh: Option<bool>,
+) -> std::result::Result<DeviceProfilesResult, String> {
+    let cached = read_device_profile_cache(&state.data_dir);
+    let mut profiles = cached.profiles;
+    let mut cached_at = cached.cached_at;
+    let mut refreshed = false;
+    let mut refresh_error = None;
+
+    if refresh.unwrap_or(false) {
+        match refresh_device_profiles_from_cloud(&state).await {
+            Ok((remote_profiles, fetched_at)) => {
+                profiles = remote_profiles;
+                cached_at = Some(fetched_at);
+                refreshed = true;
+            }
+            Err(error) => {
+                // Keep the last good cache and expose a safe, non-secret error
+                // string for the settings surface.
+                refresh_error = Some(error);
+            }
+        }
+    }
+
+    profiles = enrich_profiles_with_local_data(&state, profiles).await?;
+    let now = Utc::now();
+    let age_seconds = cached_at.map(|value| (now - value).num_seconds().max(0));
+    let status = if refreshed {
+        "fresh"
+    } else if refresh_error.is_some() {
+        if cached_at.is_some() {
+            "refresh_failed"
+        } else {
+            "unavailable"
+        }
+    } else if cached_at.is_none() {
+        "missing"
+    } else if age_seconds.unwrap_or(i64::MAX) > DEVICE_CACHE_MAX_AGE_SECONDS {
+        "stale"
+    } else {
+        "fresh"
+    };
+
+    Ok(DeviceProfilesResult {
+        profiles,
+        cache: DeviceCacheMetadata {
+            status: status.to_string(),
+            cached_at,
+            age_seconds,
+            refreshed,
+            refresh_error,
+        },
+    })
+}
+
 pub(crate) async fn refresh_device_profile(state: &AppState) {
-    let Ok(Some(auth)) = state.auth.load_auth() else {
-        return;
-    };
-    let Ok(connector) = ZeppConnector::new(auth) else {
-        return;
-    };
-    let Ok(payload) = connector.fetch_devices().await else {
-        return;
-    };
+    let _ = refresh_device_profiles_from_cloud(state).await;
+}
+
+async fn refresh_device_profiles_from_cloud(
+    state: &AppState,
+) -> std::result::Result<(Vec<DeviceProfile>, DateTime<Utc>), String> {
+    let auth = state
+        .auth
+        .load_auth()
+        .map_err(|_| "当前认证不可用".to_string())?
+        .ok_or_else(|| "尚未配置 Zepp 认证".to_string())?;
+    let connector = ZeppConnector::new(auth).map_err(|_| "无法建立 Zepp 连接".to_string())?;
+    let payload = connector
+        .fetch_devices()
+        .await
+        .map_err(|_| "设备目录刷新失败".to_string())?;
     let profiles = parse_device_profiles(&payload);
     if profiles.is_empty() {
-        return;
+        return Err("Zepp 未返回设备".to_string());
     }
+
     {
         let db = state.db.lock().await;
         for hint in profiles.iter().map(device_hint_from_profile) {
-            let _ = db.upsert_device_identity(&hint);
+            db.upsert_device_identity(&hint)
+                .map_err(|_| "本地设备索引写入失败".to_string())?;
         }
     }
-    let path = state.data_dir.join("devices.json");
-    if let Ok(encoded) = serde_json::to_string_pretty(&profiles) {
-        let _ = std::fs::write(path, encoded);
-    }
+
+    let cached_at = Utc::now();
+    let cache_file = DeviceProfilesFile {
+        version: 1,
+        cached_at,
+        profiles: profiles.clone(),
+    };
+    let encoded =
+        serde_json::to_vec_pretty(&cache_file).map_err(|_| "设备目录缓存编码失败".to_string())?;
+    write_file_atomically(&state.data_dir.join("devices.json"), &encoded)
+        .map_err(|_| "设备目录缓存写入失败".to_string())?;
+    Ok((profiles, cached_at))
 }
 
 async fn resolve_device_profile(
@@ -329,12 +763,24 @@ async fn resolve_device_profile(
     {
         return Ok(DeviceProfile {
             name: Some("融合来源".into()),
+            display_name: Some("融合来源".into()),
+            match_status: DeviceMatchStatus::Unknown,
             ..DeviceProfile::default()
         });
+    }
+    if source_scope
+        .map(|scope| scope.eq_ignore_ascii_case("unknown"))
+        .unwrap_or(false)
+    {
+        return Ok(device_id
+            .map(unknown_device_profile)
+            .unwrap_or_else(|| unknown_device_profile("")));
     }
     let Some(device_id) = device_id.map(str::trim).filter(|value| !value.is_empty()) else {
         return Ok(DeviceProfile {
             name: Some("设备未确定".into()),
+            display_name: Some("设备未确定".into()),
+            match_status: DeviceMatchStatus::Unknown,
             ..DeviceProfile::default()
         });
     };
@@ -343,39 +789,79 @@ async fn resolve_device_profile(
         db.lookup_device_profile(device_id)
             .map_err(|error| error.to_string())?
     };
-    if let Some(profile) = from_db {
-        return Ok(profile);
-    }
-    if let Some(profile) = read_device_profiles(&state.data_dir)
+    let cached_profile = read_device_profile_cache(&state.data_dir)
+        .profiles
         .into_iter()
-        .find(|profile| profile_matches(profile, device_id))
-    {
-        return Ok(profile);
+        .find(|profile| profile_matches(profile, device_id));
+    if let Some(profile) = from_db {
+        let profile = if let Some(cached) = cached_profile {
+            merge_cached_device_profile(profile, cached)
+        } else {
+            profile
+        };
+        return enrich_profile_with_local_data(state, profile, Some(device_id)).await;
     }
-    Ok(DeviceProfile {
-        name: Some("设备未确定".into()),
-        device_id: Some(device_id.to_string()),
-        ..DeviceProfile::default()
-    })
+    if let Some(profile) = cached_profile {
+        return enrich_profile_with_local_data(state, profile, Some(device_id)).await;
+    }
+    Ok(unknown_device_profile(device_id))
 }
 
-fn read_device_profiles(data_dir: &std::path::Path) -> Vec<DeviceProfile> {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct DeviceProfilesFile {
+    #[serde(default = "default_device_cache_version")]
+    version: u32,
+    cached_at: DateTime<Utc>,
+    profiles: Vec<DeviceProfile>,
+}
+
+fn default_device_cache_version() -> u32 {
+    1
+}
+
+#[derive(Debug, Default)]
+struct CachedDeviceProfiles {
+    profiles: Vec<DeviceProfile>,
+    cached_at: Option<DateTime<Utc>>,
+}
+
+fn read_device_profile_cache(data_dir: &std::path::Path) -> CachedDeviceProfiles {
     let path = data_dir.join("devices.json");
     let raw = std::fs::read_to_string(path).ok();
     if let Some(raw) = raw {
+        if let Ok(file) = serde_json::from_str::<DeviceProfilesFile>(&raw) {
+            return CachedDeviceProfiles {
+                profiles: file.profiles,
+                cached_at: Some(file.cached_at),
+            };
+        }
         if let Ok(list) = serde_json::from_str::<Vec<DeviceProfile>>(&raw) {
-            return list;
+            return CachedDeviceProfiles {
+                profiles: list,
+                cached_at: modified_at(&data_dir.join("devices.json")),
+            };
         }
         if let Ok(single) = serde_json::from_str::<DeviceProfile>(&raw) {
-            return vec![single];
+            return CachedDeviceProfiles {
+                profiles: vec![single],
+                cached_at: modified_at(&data_dir.join("devices.json")),
+            };
         }
     }
     let legacy = data_dir.join("device.json");
-    std::fs::read_to_string(legacy)
+    std::fs::read_to_string(&legacy)
         .ok()
-        .and_then(|raw| serde_json::from_str(&raw).ok())
-        .map(|profile| vec![profile])
+        .and_then(|raw| serde_json::from_str::<DeviceProfile>(&raw).ok())
+        .map(|profile| CachedDeviceProfiles {
+            profiles: vec![profile],
+            cached_at: modified_at(&legacy),
+        })
         .unwrap_or_default()
+}
+
+fn modified_at(path: &Path) -> Option<DateTime<Utc>> {
+    let modified = std::fs::metadata(path).ok()?.modified().ok()?;
+    Some(DateTime::<Utc>::from(modified))
 }
 
 fn profile_matches(profile: &DeviceProfile, needle: &str) -> bool {
@@ -383,6 +869,44 @@ fn profile_matches(profile: &DeviceProfile, needle: &str) -> bool {
         .into_iter()
         .flatten()
         .any(|value| value.eq_ignore_ascii_case(needle))
+}
+
+/// SQLite's identity index intentionally stores only stable lookup fields and
+/// the user-facing name. Keep that nickname as the primary value while
+/// recovering the versioned catalog fields from the richer devices.json cache
+/// after an application restart.
+fn merge_cached_device_profile(mut indexed: DeviceProfile, cached: DeviceProfile) -> DeviceProfile {
+    if indexed.display_name.is_none() {
+        indexed.display_name = cached.display_name;
+    }
+    if indexed.canonical_name.is_none() {
+        indexed.canonical_name = cached.canonical_name;
+    }
+    if indexed.catalog_id.is_none() {
+        indexed.catalog_id = cached.catalog_id;
+    }
+    if indexed.kind.is_none() {
+        indexed.kind = cached.kind;
+    }
+    if indexed.image_key.is_none() {
+        indexed.image_key = cached.image_key;
+    }
+    if indexed.match_status == DeviceMatchStatus::Unknown {
+        indexed.match_status = cached.match_status;
+    }
+    if indexed.firmware.is_none() {
+        indexed.firmware = cached.firmware;
+    }
+    if indexed.serial.is_none() {
+        indexed.serial = cached.serial;
+    }
+    if indexed.device_id.is_none() {
+        indexed.device_id = cached.device_id;
+    }
+    if indexed.timezone.is_none() {
+        indexed.timezone = cached.timezone;
+    }
+    indexed
 }
 
 fn device_hint_from_profile(profile: &DeviceProfile) -> crate::models::DeviceIdentityHint {
@@ -403,6 +927,94 @@ fn device_hint_from_profile(profile: &DeviceProfile) -> crate::models::DeviceIde
     }
 }
 
+fn unknown_device_profile(device_id: &str) -> DeviceProfile {
+    let device_id = device_id.trim();
+    DeviceProfile {
+        name: Some("设备未确定".into()),
+        display_name: Some("设备未确定".into()),
+        device_id: (!device_id.is_empty()).then(|| device_id.to_string()),
+        match_status: DeviceMatchStatus::Unknown,
+        ..DeviceProfile::default()
+    }
+}
+
+async fn enrich_profiles_with_local_data(
+    state: &AppState,
+    profiles: Vec<DeviceProfile>,
+) -> std::result::Result<Vec<DeviceProfile>, String> {
+    let mut enriched = Vec::with_capacity(profiles.len());
+    for profile in profiles {
+        enriched.push(enrich_profile_with_local_data(state, profile, None).await?);
+    }
+    Ok(enriched)
+}
+
+async fn enrich_profile_with_local_data(
+    state: &AppState,
+    mut profile: DeviceProfile,
+    requested_device_id: Option<&str>,
+) -> std::result::Result<DeviceProfile, String> {
+    if profile.display_name.is_none() {
+        profile.display_name = profile.name.clone();
+    }
+    if profile.match_status == DeviceMatchStatus::Unknown {
+        let model_codes = profile.device_id.as_deref().into_iter().collect::<Vec<_>>();
+        let names = profile.name.as_deref().into_iter().collect::<Vec<_>>();
+        let display_name = profile.display_name.as_deref();
+        if let Some(matched) = match_catalog(&CatalogMatchInput {
+            model_codes,
+            product_names: names.clone(),
+            device_names: names,
+            display_name,
+        }) {
+            apply_catalog_match(&mut profile, matched.entry, matched.status);
+        }
+    }
+    let aliases = [
+        requested_device_id,
+        profile.device_id.as_deref(),
+        profile.serial.as_deref(),
+    ]
+    .into_iter()
+    .flatten()
+    .map(str::to_string)
+    .collect::<Vec<_>>();
+    let (has_local_data, last_data_at) = {
+        let db = state.db.lock().await;
+        db.device_data_summary(&aliases)
+            .map_err(|error| error.to_string())?
+    };
+    profile.has_local_data = has_local_data;
+    profile.last_data_at = last_data_at;
+    Ok(profile)
+}
+
+fn apply_catalog_match(
+    profile: &mut DeviceProfile,
+    entry: &crate::device_catalog::CatalogEntry,
+    status: CatalogMatchStatus,
+) {
+    profile.canonical_name = Some(entry.canonical_name.clone());
+    profile.catalog_id = Some(
+        entry
+            .canonical_device_key
+            .clone()
+            .unwrap_or_else(|| entry.catalog_id.clone()),
+    );
+    profile.kind = Some(entry.kind.clone());
+    profile.image_key = entry.image_key.clone();
+    profile.match_status = match status {
+        CatalogMatchStatus::Exact => DeviceMatchStatus::Exact,
+        CatalogMatchStatus::Alias => DeviceMatchStatus::Alias,
+    };
+    if profile.display_name.is_none() {
+        profile.display_name = profile
+            .name
+            .clone()
+            .or_else(|| Some(entry.canonical_name.clone()));
+    }
+}
+
 #[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn parse_device_profile(value: &serde_json::Value) -> DeviceProfile {
     parse_device_profiles(value)
@@ -412,11 +1024,7 @@ pub(crate) fn parse_device_profile(value: &serde_json::Value) -> DeviceProfile {
 }
 
 pub(crate) fn parse_device_profiles(value: &serde_json::Value) -> Vec<DeviceProfile> {
-    let items = value
-        .get("items")
-        .and_then(|items| items.as_array())
-        .cloned()
-        .unwrap_or_else(|| vec![value.clone()]);
+    let items = device_items(value);
     items
         .into_iter()
         .map(|item| {
@@ -427,12 +1035,69 @@ pub(crate) fn parse_device_profiles(value: &serde_json::Value) -> Vec<DeviceProf
                 Some(value) => value.clone(),
                 None => item.clone(),
             };
-            DeviceProfile {
-                name: first_string(
-                    &item,
-                    &["displayName", "deviceName", "productName", "model"],
-                )
-                .or_else(|| first_string(&extra, &["displayName", "deviceName", "productName"])),
+            let display_name =
+                first_string(&item, &["displayName", "deviceName", "nickname", "name"]).or_else(
+                    || first_string(&extra, &["displayName", "deviceName", "nickname", "name"]),
+                );
+            let product_names = merged_string_values(
+                &item,
+                &extra,
+                &["productName", "product_name", "modelName", "model"],
+            );
+            let mut model_codes = string_values(
+                &item,
+                &[
+                    "modelCode",
+                    "model_code",
+                    "modelNumber",
+                    "hardwareModel",
+                    "productCode",
+                ],
+            );
+            model_codes.extend(string_values(
+                &extra,
+                &[
+                    "modelCode",
+                    "model_code",
+                    "modelNumber",
+                    "hardwareModel",
+                    "productCode",
+                ],
+            ));
+            let device_names = merged_string_values(&item, &extra, &["deviceName", "deviceType"]);
+            let device_id = first_string(
+                &item,
+                &["deviceId", "device_id", "deviceSource", "macAddress"],
+            )
+            .or_else(|| first_string(&extra, &["deviceId", "device_id", "macAddress"]));
+            if let Some(device_id) = device_id.as_deref() {
+                if device_id.starts_with('A')
+                    && device_id.chars().skip(1).all(|c| c.is_ascii_digit())
+                {
+                    model_codes.push(device_id.to_string());
+                }
+            }
+            let names = product_names.iter().map(String::as_str).collect::<Vec<_>>();
+            let device_name_refs = device_names.iter().map(String::as_str).collect::<Vec<_>>();
+            let model_code_refs = model_codes.iter().map(String::as_str).collect::<Vec<_>>();
+            let matched = match_catalog(&CatalogMatchInput {
+                model_codes: model_code_refs,
+                product_names: names,
+                device_names: device_name_refs,
+                display_name: display_name.as_deref(),
+            });
+            let mut profile = DeviceProfile {
+                name: display_name
+                    .clone()
+                    .or_else(|| product_names.first().cloned()),
+                display_name,
+                canonical_name: None,
+                catalog_id: None,
+                kind: None,
+                image_key: None,
+                match_status: DeviceMatchStatus::Unknown,
+                has_local_data: false,
+                last_data_at: None,
                 firmware: first_string(
                     &extra,
                     &[
@@ -443,20 +1108,77 @@ pub(crate) fn parse_device_profiles(value: &serde_json::Value) -> Vec<DeviceProf
                     ],
                 ),
                 serial: first_string(&extra, &["sn", "serial", "serialNumber"]),
-                device_id: first_string(
-                    &item,
-                    &["deviceId", "device_id", "deviceSource", "macAddress"],
-                )
-                .or_else(|| first_string(&extra, &["deviceId", "device_id", "macAddress"])),
+                device_id,
                 timezone: first_string(&extra, &["bind_timezone", "timezone", "tz"]).filter(
                     |value| value.contains('/') || value.chars().any(|ch| ch.is_ascii_alphabetic()),
                 ),
+            };
+            if let Some(matched) = matched {
+                apply_catalog_match(&mut profile, matched.entry, matched.status);
             }
+            profile
         })
         .filter(|profile| {
             profile.device_id.is_some() || profile.serial.is_some() || profile.name.is_some()
         })
         .collect()
+}
+
+fn device_items(value: &serde_json::Value) -> Vec<serde_json::Value> {
+    if let Some(array) = value.as_array() {
+        return array.clone();
+    }
+    if let Some(object) = value.as_object() {
+        for key in ["items", "devices", "list", "results", "data"] {
+            if let Some(child) = object.get(key) {
+                let items = device_items(child);
+                if !items.is_empty() {
+                    return items;
+                }
+            }
+        }
+    }
+    vec![value.clone()]
+}
+
+fn string_values(value: &serde_json::Value, keys: &[&str]) -> Vec<String> {
+    let Some(object) = value.as_object() else {
+        return Vec::new();
+    };
+    let mut values = Vec::new();
+    for key in keys {
+        match object.get(*key) {
+            Some(serde_json::Value::String(text)) if !text.trim().is_empty() => {
+                values.push(text.trim().to_string());
+            }
+            Some(serde_json::Value::Number(number)) => values.push(number.to_string()),
+            Some(serde_json::Value::Array(items)) => {
+                values.extend(items.iter().filter_map(|item| match item {
+                    serde_json::Value::String(text) if !text.trim().is_empty() => {
+                        Some(text.trim().to_string())
+                    }
+                    serde_json::Value::Number(number) => Some(number.to_string()),
+                    _ => None,
+                }));
+            }
+            _ => {}
+        }
+    }
+    values.sort();
+    values.dedup();
+    values
+}
+
+fn merged_string_values(
+    primary: &serde_json::Value,
+    secondary: &serde_json::Value,
+    keys: &[&str],
+) -> Vec<String> {
+    let mut values = string_values(primary, keys);
+    values.extend(string_values(secondary, keys));
+    values.sort();
+    values.dedup();
+    values
 }
 
 fn first_string(value: &serde_json::Value, keys: &[&str]) -> Option<String> {
@@ -503,8 +1225,15 @@ fn validate_json_export_path(value: &str) -> std::result::Result<PathBuf, String
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_device_profile, parse_device_profiles, validate_json_export_path};
+    use super::{
+        ai_handoff_mode_for_bytes, merge_cached_device_profile, parse_device_profile,
+        parse_device_profiles, read_device_profile_cache, redact_ai_export, unknown_device_profile,
+        validate_json_export_path, AI_HANDOFF_INLINE_LIMIT_BYTES,
+    };
+    use crate::models::DeviceMatchStatus;
     use serde_json::json;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn parse_device_profile_reads_additional_info() {
@@ -523,6 +1252,28 @@ mod tests {
         assert_eq!(profile.firmware.as_deref(), Some("3.9.1.2"));
         assert_eq!(profile.serial.as_deref(), Some("2143123A1B23456"));
         assert_eq!(profile.device_id.as_deref(), Some("A194"));
+    }
+
+    #[test]
+    fn parse_device_profiles_reads_model_names_from_additional_info() {
+        let value = json!({
+            "items": [{
+                "deviceId": "device-pro",
+                "displayName": "我的 Pro 表",
+                "additionalInfo": {
+                    "productName": "Amazfit T-Rex 3 Pro",
+                    "deviceName": "T-Rex 3 Pro 48mm",
+                    "model": "T-Rex 3 Pro"
+                }
+            }]
+        });
+        let profile = parse_device_profile(&value);
+        assert_eq!(profile.name.as_deref(), Some("我的 Pro 表"));
+        assert_eq!(
+            profile.canonical_name.as_deref(),
+            Some("Amazfit T-Rex 3 Pro 48mm/44mm")
+        );
+        assert_eq!(profile.match_status, DeviceMatchStatus::Alias);
     }
 
     #[test]
@@ -549,6 +1300,117 @@ mod tests {
     }
 
     #[test]
+    fn catalog_matching_preserves_nickname_and_covers_real_devices() {
+        let value = json!({
+            "items": [
+                {
+                    "deviceId": "A2323",
+                    "displayName": "我的户外表",
+                    "productName": "Amazfit T-Rex 3"
+                },
+                {
+                    "deviceId": "strap-1",
+                    "displayName": "训练带",
+                    "productName": "Helio Strap"
+                },
+                {
+                    "deviceId": "A2321",
+                    "displayName": "夜间戒指",
+                    "productName": "Amazfit Helio Ring"
+                },
+                {
+                    "deviceId": "unknown-1",
+                    "displayName": "未知设备"
+                }
+            ]
+        });
+        let profiles = parse_device_profiles(&value);
+        assert_eq!(profiles.len(), 4);
+        assert_eq!(profiles[0].name.as_deref(), Some("我的户外表"));
+        assert_eq!(
+            profiles[0].canonical_name.as_deref(),
+            Some("Amazfit T-Rex 3 48mm")
+        );
+        assert_eq!(profiles[0].catalog_id.as_deref(), Some("amazfit-t-rex-3"));
+        assert_eq!(profiles[0].match_status, DeviceMatchStatus::Exact);
+        assert_eq!(
+            profiles[1].catalog_id.as_deref(),
+            Some("amazfit-helio-strap")
+        );
+        assert_eq!(profiles[1].match_status, DeviceMatchStatus::Alias);
+        assert_eq!(
+            profiles[2].catalog_id.as_deref(),
+            Some("amazfit-helio-ring")
+        );
+        assert_eq!(profiles[2].match_status, DeviceMatchStatus::Exact);
+        assert_eq!(profiles[3].match_status, DeviceMatchStatus::Unknown);
+        assert!(profiles[3].catalog_id.is_none());
+    }
+
+    #[test]
+    fn indexed_identity_keeps_nickname_and_recovers_cached_catalog_fields() {
+        let indexed = super::DeviceProfile {
+            name: Some("我的户外表".into()),
+            device_id: Some("A2323".into()),
+            match_status: DeviceMatchStatus::Unknown,
+            ..Default::default()
+        };
+        let cached = super::DeviceProfile {
+            name: Some("我的户外表".into()),
+            display_name: Some("我的户外表".into()),
+            canonical_name: Some("Amazfit T-Rex 3 48mm".into()),
+            catalog_id: Some("amazfit-t-rex-3".into()),
+            kind: Some("watch".into()),
+            image_key: Some("amazfit-t-rex-3".into()),
+            match_status: DeviceMatchStatus::Exact,
+            device_id: Some("A2323".into()),
+            ..Default::default()
+        };
+        let merged = merge_cached_device_profile(indexed, cached);
+        assert_eq!(merged.name.as_deref(), Some("我的户外表"));
+        assert_eq!(
+            merged.canonical_name.as_deref(),
+            Some("Amazfit T-Rex 3 48mm")
+        );
+        assert_eq!(merged.catalog_id.as_deref(), Some("amazfit-t-rex-3"));
+        assert_eq!(merged.match_status, DeviceMatchStatus::Exact);
+    }
+
+    #[test]
+    fn legacy_devices_json_is_read_with_new_defaults() {
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("zeppbridge-device-cache-{suffix}"));
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(
+            dir.join("devices.json"),
+            r#"[{"name":"Legacy T-Rex","device_id":"SN-LEGACY"}]"#,
+        )
+        .unwrap();
+        let cache = read_device_profile_cache(&dir);
+        assert_eq!(cache.profiles.len(), 1);
+        assert_eq!(cache.profiles[0].name.as_deref(), Some("Legacy T-Rex"));
+        assert_eq!(cache.profiles[0].match_status, DeviceMatchStatus::Unknown);
+        assert!(cache.cached_at.is_some());
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn fused_and_unknown_profiles_never_claim_a_catalog_device() {
+        let fused = super::DeviceProfile {
+            name: Some("融合来源".to_string()),
+            match_status: DeviceMatchStatus::Unknown,
+            ..Default::default()
+        };
+        assert!(fused.catalog_id.is_none());
+        let unknown = unknown_device_profile("mystery");
+        assert_eq!(unknown.match_status, DeviceMatchStatus::Unknown);
+        assert!(unknown.catalog_id.is_none());
+    }
+
+    #[test]
     fn export_path_requires_absolute_json_in_existing_folder() {
         let temp = std::env::temp_dir();
         let valid = temp.join("zeppbridge-export.JSON");
@@ -567,6 +1429,127 @@ mod tests {
                 .as_ref()
         )
         .is_err());
+    }
+
+    #[test]
+    fn ai_handoff_redacts_nested_identifiers_and_precise_route_by_default() {
+        let source = json!({
+            "user": { "id": "user-secret", "name": "private" },
+            "token": "token-secret",
+            "user_identifier": "user-identifier-secret",
+            "device_uuid": "device-uuid-secret",
+            "email": "private@example.com",
+            "uuid": "generic-uuid-secret",
+            "lat_e7": 312000000,
+            "lng_e7": 1215000000,
+            "file_path": "C:\\Users\\private\\secret.json",
+            "nested": [{
+                "device_id": "device-secret",
+                "serial_number": "serial-secret",
+                "record_id": "record-secret",
+                "workout_id": "workout-secret",
+                "sleep_id": "sleep-secret",
+                "gps_route": [{ "lat_e7": 312000000, "lng_e7": 1215000000 }],
+                "route": [{ "latitude": 31.2, "longitude": 121.5 }],
+                "value": 42
+            }]
+        });
+        let (redacted, redactions) = redact_ai_export(&source.to_string(), false).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&redacted).unwrap();
+        assert!(value.get("user").is_none());
+        assert!(value.get("token").is_none());
+        assert!(value.get("user_identifier").is_none());
+        assert!(value.get("device_uuid").is_none());
+        assert!(value.get("email").is_none());
+        assert!(value.get("uuid").is_none());
+        assert!(value.get("lat_e7").is_none());
+        assert!(value.get("lng_e7").is_none());
+        assert!(value.get("file_path").is_none());
+        assert!(value["nested"][0].get("device_id").is_none());
+        assert!(value["nested"][0].get("serial_number").is_none());
+        assert!(value["nested"][0].get("record_id").is_none());
+        assert!(value["nested"][0].get("workout_id").is_none());
+        assert!(value["nested"][0].get("sleep_id").is_none());
+        assert!(value["nested"][0].get("gps_route").is_none());
+        assert!(value["nested"][0].get("route").is_none());
+        assert!(!value.to_string().contains("secret"));
+        assert!(redactions
+            .iter()
+            .any(|item| item == "authentication_fields"));
+        assert!(redactions.iter().any(|item| item == "identity_fields"));
+        assert!(redactions.iter().any(|item| item == "precise_route"));
+        assert!(redactions.iter().any(|item| item == "local_paths"));
+        assert!(!redacted.contains("C:\\Users\\private"));
+    }
+
+    #[test]
+    fn ai_handoff_precise_route_requires_explicit_opt_in_but_keeps_identifiers_removed() {
+        let source = json!({
+            "device_id": "device-secret",
+            "route": [{ "latitude": 31.2, "longitude": 121.5 }],
+            "coordinates": { "lat": 31.2, "lon": 121.5 }
+        });
+        let (redacted, redactions) = redact_ai_export(&source.to_string(), true).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&redacted).unwrap();
+        assert!(value.get("device_id").is_none());
+        assert!(value.get("route").is_some());
+        assert!(value.get("coordinates").is_some());
+        assert!(!redactions.iter().any(|item| item == "precise_route"));
+        assert!(value.to_string().contains("31.2"));
+    }
+
+    #[test]
+    fn ai_handoff_clipboard_sanitizes_local_paths_without_touching_urls() {
+        let source = json!({
+            "note": "C:\\Users\\private\\data.json /tmp/private/data.json https://example.com/path"
+        });
+        let (redacted, redactions) = redact_ai_export(&source.to_string(), false).unwrap();
+        assert!(!redacted.contains("C:\\Users\\private"));
+        assert!(!redacted.contains("/tmp/private"));
+        assert!(redacted.contains("https://example.com/path"));
+        assert!(redactions.iter().any(|item| item == "local_paths"));
+    }
+
+    #[test]
+    fn ai_handoff_inline_limit_includes_exact_two_mib_boundary() {
+        assert_eq!(
+            ai_handoff_mode_for_bytes(AI_HANDOFF_INLINE_LIMIT_BYTES),
+            "inline"
+        );
+        assert_eq!(
+            ai_handoff_mode_for_bytes(AI_HANDOFF_INLINE_LIMIT_BYTES + 1),
+            "attachment"
+        );
+    }
+
+    #[test]
+    fn ai_provider_opener_allowlist_has_exactly_seven_https_destinations() {
+        let capability: serde_json::Value =
+            serde_json::from_str(include_str!("../../capabilities/default.json")).unwrap();
+        let permissions = capability["permissions"].as_array().unwrap();
+        let opener = permissions
+            .iter()
+            .find(|permission| permission["identifier"] == "opener:allow-open-url")
+            .expect("opener allowlist");
+        let urls = opener["allow"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| entry["url"].as_str().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            urls,
+            vec![
+                "https://chatgpt.com/",
+                "https://claude.ai/",
+                "https://gemini.google.com/app",
+                "https://www.kimi.com/",
+                "https://www.doubao.com/chat/",
+                "https://chat.deepseek.com/",
+                "https://grok.com/",
+            ]
+        );
+        assert!(urls.iter().all(|url| url.starts_with("https://")));
     }
 }
 

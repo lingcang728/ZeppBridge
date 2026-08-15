@@ -1,44 +1,66 @@
 # ZeppBridge icon system
 
-ZeppBridge uses one quiet, legible icon language for the desktop shell, health summaries, and exported app assets. The system is designed for dark surfaces first, with the same geometry remaining clear on light surfaces.
+ZeppBridge uses one compact angular mark and one local SVG icon family. The
+same geometry is used by the transparent UI mark, the Windows shell assets,
+and the public app icon so that the identity remains recognizable at a glance
+and at small sizes.
 
 ## Brand mark
 
-The master is [`src-tauri/icons/icon-source.svg`](../../src-tauri/icons/icon-source.svg). Its `brand-mark` symbol is a continuous, rounded Z on a 24 × 24 optical grid. The curved connection and exactly two inner connection points are non-negotiable recognition features:
+[`src-tauri/icons/icon-source.svg`](../../src-tauri/icons/icon-source.svg) is
+the only brand geometry source. Its `brand-mark` symbol is a 24 × 24 optical
+grid tagged `data-shape="angular-double-rail-z"` and is made from two parallel
+folded rails:
 
-- optical bounds: x 4.7–19.3 and y 5.5–18.5;
-- continuous top beam, visibly curved central bridge, and bottom beam; no font-like straight diagonal, ECG, heart, watch, or extra node network;
-- exactly two inner points, one near the upper-left inside turn and one near the lower-right inside turn; each is 2.7/24 diameter and kept separate from the main stroke;
-- `stroke-width="3.6"`, round cap, round join; this scales to about 2.4 px at 16 px;
-- transparent UI marks keep at least 3/24 quiet space around the symbol;
-- app composition uses an 800/1024 symbol box on a `#0F1512` rounded square (`rx=225`, approximately 22%); the visible mark remains about 20% inside the board edge;
-- brand green is `#72C994`. It is a flat fill: recognition does not depend on a glow, neon edge, or shadow.
+```text
+rail A: M3.8 5 H16.2 L4 19
+rail B: M20.2 5 L8 19 H20.2
+```
 
-`BrandMark.vue` extracts the same `brand-mark` symbol from the master with Vite's `?raw` loader. The component owns no second brand path. This avoids external SVG fragment behavior differences while retaining a single editable geometry source. The review board checks the actual transparent component at 28 px and 48 px, plus generated platform assets at 16/20/24/32/48/128/256 px.
+Both rails use `stroke-width="3.1"`, `stroke-linecap="round"`, and
+`stroke-linejoin="round"`. The folds stay straight and angular; there are no
+curves, arcs, or connection-point circles. The open gap between the diagonals
+is intentional and keeps the double-rail Z readable at 16, 20, and 24 px.
+
+The platform composition is a `#0F1512` rounded square (`rx="225"`) with an
+800 × 800 symbol box positioned at (112, 112) in the 1024 × 1024 canvas. The
+mark uses the quiet lime brand color `#CDDC7C`; recognition does not depend on
+an outer glow or a shadow.
+
+`BrandMark.vue` extracts the same symbol with Vite's `?raw` loader. It owns no
+second path, so UI and platform assets cannot drift apart. The component keeps
+the transparent mark suitable for navigation, tray, and status surfaces.
 
 ## UI icon family
 
-UI icons use a 24 × 24 viewBox, an optical boundary near 3–21, `stroke-width=1.5` by default, and round caps and joins. The family includes navigation, sync, theme, back, export, copy, database, file, folder, device, cloud, information, warning, link, and utility marks. The direction convention is intentional:
+`Icon.vue` keeps the existing `IconName` API and draws every icon locally in a
+24 × 24 viewBox. The default outline is 1.6 px and the public `stroke` prop is
+normalized to the 1.5–1.75 px family range. All outline paths use round caps
+and joins; dots are filled circles rather than an oversized stroke. Filled
+health symbols remain solid silhouettes so they survive at 16 px without
+mixing outline and fill treatments in the same semantic group. No third-party
+icon package is used.
 
-- `arrow-left` means return/back and is used by every “返回概览” link;
-- `arrow-right` means continue, open, or drill in;
-- no third-party icon package is used.
+## Semantic chart colors
 
-Filled health symbols use a single confident silhouette plus only the minimum detail that survives at 16 px. Current health names are `heart`, `heart-rest`, `heart-max`, `moon`, `run`/`activity`, `steps`, `spo2`, `stress`, `hrv`, `bars`/`training-load`, `vo2`, and `flame`. The step symbol is a solid shoe/footprint silhouette rather than a bar chart. SpO₂ is a blood drop; stress is a simple head-and-shoulders meditation form, so neither reads as a heart or water droplet at small sizes.
+The `zeppSemanticColors` map in `src/lib/echartsTheme.ts` is the source of
+truth for ECharts metric colors. Brand is deliberately not part of the generic
+health series palette.
 
-`CategoryMark.vue` pairs a semantic foreground with a same-color wash badge. It never uses a solid color tile with a white hairline icon. Semantic colors are stable: heart red (`--heart`), sleep violet (`--sleep`), activity green (`--activity`); the wash is derived from the same color.
+| Semantic role | Color |
+| --- | --- |
+| Brand | `#CDDC7C` |
+| Heart | `#FF6B6B` |
+| Pace / distance | `#5B8FF9` |
+| Calories / power | `#FF9F43` |
+| Altitude | `#E4C95A` |
+| Cadence / stride | `#54CFA2` |
+| Training / VO2 | `#9B7BFF` |
+| Readiness | `#75D584` |
+| Sleep deep / light / REM / awake | `#6657D9` / `#8E9BFF` / `#49CDA2` / `#FF6B6B` |
 
-## Colors and surfaces
-
-| Role | Dark value | Light value |
-| --- | --- | --- |
-| Brand mark | `#72C994` | `#3E8A5E` |
-| App board | `#0F1512` | `#0F1512` |
-| Heart | `#E88A8E` | `#C45F64` |
-| Sleep | `#9AA0E8` | `#6B72C8` |
-| Activity | `#8FCB9B` | `#4E9A70` |
-
-The app board is a source-level platform composition only. UI icons inherit `currentColor` from their state or category; they do not add a glow or an icon-specific shadow.
+Both dark and light ECharts themes use the same semantic values. Surface,
+axis, and tooltip tokens may change with the theme; metric meaning does not.
 
 ## Master and derivation chain
 
@@ -55,9 +77,12 @@ src-tauri/icons/icon-source.svg (master brand-mark + app composition)
              └─ public/zeppbridge-icon.png (byte-identical copy of icon.png)
 ```
 
-`src-tauri/tauri.conf.json` points its bundle icon list at the generated 32 px, 128 px, 256 px, ICNS, and ICO resources. Tauri's runtime default window icon is used by the tray builder, so the window, taskbar, tray, NSIS, MSI, shortcut, and Start menu path all resolve to the same generated family.
+The generator removes unused Android/iOS output directories after the Tauri
+CLI finishes. `src-tauri/tauri.conf.json` consumes the generated Windows
+bundle family, while the default window/tray path resolves to the same icon
+resources.
 
-## Asset size and acceptance matrix
+## Asset and verification matrix
 
 | Asset | Dimensions / frames |
 | --- | --- |
@@ -67,12 +92,19 @@ src-tauri/icons/icon-source.svg (master brand-mark + app composition)
 | `128x128@2x.png` | 256 × 256 RGBA |
 | `icon.png` | 512 × 512 RGBA (Tauri CLI output) |
 | `icon.ico` | 16, 24, 32, 48, 64, and 256 px frames |
-| `icon.icns` | generated by Tauri CLI |
+| `icon.icns` | generated by the Tauri CLI |
 | Windows Store/Square assets | 30, 44, 50, 71, 89, 107, 142, 150, 284, 310 px |
-| UI marks | 16, 20, 24, and 32 px browser-rendered checks |
+| small previews | 16, 20, and 24 px downsample checks |
 
-Run `npm run icons:generate` to regenerate all platform assets and `npm run icons:verify` to check dimensions, alpha, ICO frames, master presence, and the public-resource hash. Run `npm run build` after changing the source or components.
+Run `npm run icons:generate` after changing the master. Run
+`npm run icons:verify` to check every PNG dimension and alpha channel, the
+angular double-rail source (including the absence of legacy curves/points),
+ICO frames, the byte-identical public hash, and the 16/20/24 px previews. Run
+`npm run build` after changing the source or Vue components.
 
 ## Visual review
 
-[`zeppbridge-icon-review.png`](./zeppbridge-icon-review.png) is the review board. It combines a crop from the provided reference, the real Vite-rendered dark UI, the transparent sidebar mark, the generated Windows app icon at 16/20/24/32/48/128/256, and browser captures of the implemented navigation and health/data-type icon groups at 16/20/24/32. It is an inspection artifact, not a second source of geometry.
+[`zeppbridge-icon-review.png`](./zeppbridge-icon-review.png) is a review board
+for the actual generated assets and Vite-rendered SVGs. It is an inspection
+artifact, not a second source of geometry. The board should be regenerated
+with `python scripts/icon/build-review.py` when a visual comparison is needed.

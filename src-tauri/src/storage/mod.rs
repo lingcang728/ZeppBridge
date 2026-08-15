@@ -1322,11 +1322,60 @@ impl Database {
                         serial: row.get(2)?,
                         device_id: row.get(3)?,
                         timezone: row.get(4)?,
+                        ..DeviceProfile::default()
                     })
                 },
             )
             .optional()
             .map_err(Into::into)
+    }
+
+    /// Derive local-data presence from normalized records without introducing
+    /// a product-specific table. User-level fused records are deliberately
+    /// excluded: they cannot be attributed to one physical device.
+    pub fn device_data_summary(&self, aliases: &[String]) -> Result<(bool, Option<String>)> {
+        let mut normalized_aliases = Vec::new();
+        for alias in aliases {
+            let trimmed = alias.trim();
+            if trimmed.is_empty()
+                || normalized_aliases
+                    .iter()
+                    .any(|existing: &String| existing.eq_ignore_ascii_case(trimmed))
+            {
+                continue;
+            }
+            normalized_aliases.push(trimmed.to_string());
+        }
+        if normalized_aliases.is_empty() {
+            return Ok((false, None));
+        }
+
+        let mut latest: Option<String> = None;
+        for alias in &normalized_aliases {
+            for (table, column) in [
+                ("metric_samples", "timestamp"),
+                ("daily_metrics", "date"),
+                ("sleep_sessions", "start_time"),
+                ("workouts", "start_time"),
+            ] {
+                let sql = format!(
+                    "SELECT MAX({column}) FROM {table}
+                     WHERE lower(device_id) = lower(?1)
+                       AND lower(source_scope) = 'device'"
+                );
+                let value: Option<String> = self.conn.query_row(&sql, [alias], |row| row.get(0))?;
+                if let Some(value) = value {
+                    if latest
+                        .as_ref()
+                        .map(|current| value.as_str() > current.as_str())
+                        .unwrap_or(true)
+                    {
+                        latest = Some(value);
+                    }
+                }
+            }
+        }
+        Ok((latest.is_some(), latest))
     }
 
     fn harvest_device_identities(&self, payload: &serde_json::Value) -> Result<()> {
@@ -2585,6 +2634,37 @@ mod tests {
         assert_eq!(one.name.as_deref(), Some("Watch One"));
         assert_eq!(two.name.as_deref(), Some("Watch Two"));
         assert!(db.lookup_device_profile("UNKNOWN").unwrap().is_none());
+    }
+
+    #[test]
+    fn device_data_summary_excludes_fused_records_and_keeps_identity_aliases() {
+        let db = Database::in_memory().unwrap();
+        let timestamp = ts();
+        db.insert_metric_sample(&MetricSample {
+            metric: "heart_rate".into(),
+            timestamp,
+            value: 72.0,
+            unit: "bpm".into(),
+            source_scope: SourceScope::Device,
+            device_id: Some("SN-HELIO".into()),
+        })
+        .unwrap();
+        db.insert_metric_sample(&MetricSample {
+            metric: "heart_rate".into(),
+            timestamp: timestamp + chrono::Duration::minutes(2),
+            value: 80.0,
+            unit: "bpm".into(),
+            source_scope: SourceScope::UserFused,
+            device_id: Some("SN-HELIO".into()),
+        })
+        .unwrap();
+        let (has_data, latest) = db.device_data_summary(&["sn-helio".to_string()]).unwrap();
+        assert!(has_data);
+        assert_eq!(latest.as_deref(), Some("2023-11-14T22:13:20+00:00"));
+        let (has_unknown, _) = db
+            .device_data_summary(&["missing-device".to_string()])
+            .unwrap();
+        assert!(!has_unknown);
     }
 
     #[test]

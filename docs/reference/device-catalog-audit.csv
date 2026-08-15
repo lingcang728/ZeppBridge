@@ -1,0 +1,49 @@
+﻿card_order,row,column,display_name,variant,merge_relation,catalog_id,canonical_device_key,asset_key,asset_source,source_capture
+1,1,1,Amazfit Balance 3,standard,独立可识别型号,amazfit-balance-3,amazfit-balance-3,amazfit-balance-3,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144308.png
+2,1,2,Amazfit Balance Ultra,standard,独立可识别型号,amazfit-balance-ultra,amazfit-balance-ultra,amazfit-balance-ultra,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144308.png
+3,1,3,Amazfit Cheetah 2 Pro,standard,独立可识别型号,amazfit-cheetah-2-pro,amazfit-cheetah-2-pro,amazfit-cheetah-2-pro,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144308.png
+4,1,4,Amazfit Cheetah 2 Ultra,standard,独立可识别型号,amazfit-cheetah-2-ultra,amazfit-cheetah-2-ultra,amazfit-cheetah-2-ultra,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144308.png
+5,2,1,Amazfit Bip Max,standard,独立可识别型号,amazfit-bip-max,amazfit-bip-max,amazfit-bip-max,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144316.png
+6,2,2,Amazfit Active 3 Premium,standard,独立可识别型号,amazfit-active-3-premium,amazfit-active-3-premium,amazfit-active-3-premium,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144316.png
+7,2,3,Amazfit T-Rex Ultra 2,standard,独立可识别型号,amazfit-t-rex-ultra-2,amazfit-t-rex-ultra-2,amazfit-t-rex-ultra-2,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144316.png
+8,2,4,Amazfit Active MAX,standard,独立可识别型号,amazfit-active-max,amazfit-active-max,amazfit-active-max,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144316.png
+9,3,1,Amazfit T-Rex 3 Pro 48mm/44mm,48mm/44mm,独立可识别型号,amazfit-t-rex-3-pro-48-44mm,amazfit-t-rex-3-pro-48-44mm,amazfit-t-rex-3-pro-48-44mm,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144326.png
+10,3,2,Amazfit Balance 2,standard,独立可识别型号,amazfit-balance-2,amazfit-balance-2,amazfit-balance-2,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144326.png
+11,3,3,Amazfit Active 2 Square,square,独立可识别型号,amazfit-active-2-square,amazfit-active-2-square,amazfit-active-2-square,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144326.png
+12,3,4,Amazfit Active 2 44mm,round 44mm,独立可识别型号,amazfit-active-2-44mm,amazfit-active-2-round,amazfit-active-2-44mm,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144326.png
+13,4,1,Amazfit Bip 6,standard,独立可识别型号,amazfit-bip-6,amazfit-bip-6,amazfit-bip-6,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144333.png
+14,4,2,Amazfit T-Rex 3 48mm,standard,独立可识别型号,amazfit-t-rex-3,amazfit-t-rex-3,amazfit-t-rex-3,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144333.png
+15,4,3,Amazfit Helio Strap,standard,独立可识别型号,amazfit-helio-strap,amazfit-helio-strap,amazfit-helio-strap,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144333.png
+16,4,4,Amazfit Balance 46mm,46mm,独立可识别型号,amazfit-balance-46mm,amazfit-balance,amazfit-balance-46mm,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144333.png
+17,5,1,Amazfit Active Edge 46mm,standard,独立可识别型号,amazfit-active-edge-46mm,amazfit-active-edge-46mm,amazfit-active-edge-46mm,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144343.png
+18,5,2,Amazfit UP,standard,独立可识别型号,amazfit-up,amazfit-up,amazfit-up,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144343.png
+19,5,3,Amazfit Bip 5 Unity 46mm,standard,独立可识别型号,amazfit-bip-5-unity-46mm,amazfit-bip-5-unity-46mm,amazfit-bip-5-unity-46mm,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144343.png
+20,5,4,Amazfit Active 42mm,42mm,独立可识别型号,amazfit-active-42mm,amazfit-active,amazfit-active-42mm,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144343.png
+21,6,1,Amazfit Bip 5 46mm,46mm,独立可识别型号,amazfit-bip-5-46mm,amazfit-bip-5,amazfit-bip-5-46mm,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144351.png
+22,6,2,Amazfit Cheetah Pro 47mm,47mm,独立可识别型号,amazfit-cheetah-pro-47mm,amazfit-cheetah-pro,amazfit-cheetah-pro-47mm,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144351.png
+23,6,3,Amazfit Cheetah 47mm,47mm,独立可识别型号,amazfit-cheetah-47mm,amazfit-cheetah-47mm,amazfit-cheetah-47mm,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144351.png
+24,6,4,Amazfit Falcon 49mm,49mm,独立可识别型号,amazfit-falcon-49mm,amazfit-falcon,amazfit-falcon-49mm,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144351.png
+25,7,1,Amazfit T-Rex Ultra 47mm,47mm,独立可识别型号,amazfit-t-rex-ultra-47mm,amazfit-t-rex-ultra,amazfit-t-rex-ultra-47mm,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144359.png
+26,7,2,Amazfit GTR Mini 43mm,43mm,独立可识别型号,amazfit-gtr-mini-43mm,amazfit-gtr-mini-43mm,amazfit-gtr-mini-43mm,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144359.png
+27,7,3,Amazfit Bip 3,standard,独立可识别型号,amazfit-bip-3,amazfit-bip-3,amazfit-bip-3,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144359.png
+28,7,4,Amazfit GTS 4 43mm,43mm,独立可识别型号,amazfit-gts-4-43mm,amazfit-gts-4-43mm,amazfit-gts-4-43mm,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144359.png
+29,8,1,Amazfit GTR 4 46mm,46mm,独立可识别型号,amazfit-gtr-4-46mm,amazfit-gtr-4-46mm,amazfit-gtr-4-46mm,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144405.png
+30,8,2,Amazfit Band 7,standard,独立可识别型号,amazfit-band-7,amazfit-band-7,amazfit-band-7,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144405.png
+31,8,3,Amazfit GTS 4 Mini,online exclusive,独立可识别型号,amazfit-gts-4-mini,amazfit-gts-4-mini,amazfit-gts-4-mini,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144405.png
+32,8,4,Amazfit Bip 3 Pro,standard,独立可识别型号,amazfit-bip-3-pro,amazfit-bip-3-pro,amazfit-bip-3-pro,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144405.png
+33,9,1,Amazfit GTS 2 new 43mm,new 43mm,独立可识别型号,amazfit-gts-2-new-43mm,amazfit-gts-2-new-43mm,amazfit-gts-2-new-43mm,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144411.png
+34,9,2,Amazfit GTR 4 46mm Black,black colour,同一 GTR 4 46mm 规范型号的颜色变体；与第 29 卡共享素材，不计为新增 canonical 型号,amazfit-gtr-4-46mm-black,amazfit-gtr-4-46mm,amazfit-gtr-4-46mm,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144411.png
+35,9,3,Amazfit T-Rex 2 47mm,47mm,独立可识别型号,amazfit-t-rex-2-47mm,amazfit-t-rex-2-47mm,amazfit-t-rex-2-47mm,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144411.png
+36,9,4,Amazfit GTR 2 new 46mm,new 46mm,独立可识别型号,amazfit-gtr-2-new-46mm,amazfit-gtr-2-new-46mm,amazfit-gtr-2-new-46mm,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144411.png
+37,10,1,Amazfit GTS 3 42mm,42mm,独立可识别型号,amazfit-gts-3-42mm,amazfit-gts-3-42mm,amazfit-gts-3-42mm,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144418.png
+38,10,2,Amazfit GTR 3 46mm,46mm,独立可识别型号,amazfit-gtr-3-46mm,amazfit-gtr-3-46mm,amazfit-gtr-3-46mm,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144418.png
+39,10,3,Amazfit GTR 3 Pro 46mm,46mm,独立可识别型号,amazfit-gtr-3-pro-46mm,amazfit-gtr-3-pro-46mm,amazfit-gtr-3-pro-46mm,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144418.png
+40,10,4,Amazfit GTR 2e,standard,独立可识别型号,amazfit-gtr-2e,amazfit-gtr-2e,amazfit-gtr-2e,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144418.png
+41,11,1,Amazfit GTS 2e,standard,独立可识别型号,amazfit-gts-2e,amazfit-gts-2e,amazfit-gts-2e,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144424.png
+42,11,2,Amazfit T-Rex Pro,standard,独立可识别型号,amazfit-t-rex-pro,amazfit-t-rex-pro,amazfit-t-rex-pro,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144424.png
+43,11,3,Amazfit Bip U series,standard,独立可识别型号,amazfit-bip-u-series,amazfit-bip-u-series,amazfit-bip-u-series,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144424.png
+44,11,4,Amazfit GTS,standard,独立可识别型号,amazfit-gts,amazfit-gts,amazfit-gts,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144424.png
+45,12,1,Amazfit GTS 2,standard,独立可识别型号,amazfit-gts-2,amazfit-gts-2,amazfit-gts-2,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144430.png
+46,12,2,Amazfit GTS 2 mini,standard,独立可识别型号,amazfit-gts-2-mini,amazfit-gts-2-mini,amazfit-gts-2-mini,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144430.png
+47,12,3,Amazfit GTR 42mm,42mm,独立可识别型号,amazfit-gtr-42mm,amazfit-gtr-42mm,amazfit-gtr-42mm,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144430.png
+48,12,4,Amazfit Band 5,standard,独立可识别型号,amazfit-band-5,amazfit-band-5,amazfit-band-5,screenshot-derived,design_picture/Product/屏幕截图 2026-08-15 144430.png

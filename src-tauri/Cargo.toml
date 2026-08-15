@@ -1,6 +1,6 @@
 [package]
 name = "zeppbridge"
-version = "0.8.0"
+version = "0.8.1"
 description = "本地优先的 Zepp 健康数据桥"
 authors = ["ZeppBridge"]
 edition = "2021"

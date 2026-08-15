@@ -5,8 +5,10 @@ import type { IconName } from '../components/Icon.vue';
 import { useExport } from '../composables/useExport';
 import { useSyncController } from '../composables/useSyncController';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
+import { useAiHandoff } from '../composables/useAiHandoff';
 import { localDateString } from '../lib/format';
-import type { ExportDataType } from '../types';
+import { AI_PROVIDERS, AI_PROVIDER_BY_ID, type AiProviderId } from '../lib/aiProviders';
+import type { ExportDataType, ExportSelection } from '../types';
 
 const {
   exportStartDate,
@@ -160,8 +162,15 @@ const formats = [
 ];
 const activeFormat = ref('json');
 
-const aiTools = ['ChatGPT', 'Claude', 'Gemini', 'Kimi', '豆包', 'DeepSeek'];
-const activeTool = ref('ChatGPT');
+const activeProviderId = ref<AiProviderId>('chatgpt');
+const activeProvider = computed(() => AI_PROVIDER_BY_ID[activeProviderId.value]);
+const providerIconFailed = ref<Partial<Record<AiProviderId, boolean>>>({});
+const markProviderIconFailed = (id: AiProviderId) => {
+  providerIconFailed.value[id] = true;
+};
+const privacyNoticeAccepted = ref(false);
+const includePreciseRoute = ref(false);
+const { handoffState, handoffError, preparedProvider, prepareAndCopy, retryOpen } = useAiHandoff();
 
 /* ── 数据感知摘要 / 预览 ───────────────── */
 const previewBusy = ref(false);
@@ -276,16 +285,76 @@ const copyPrompt = async () => {
   }
 };
 
+const handoffNotice = ref<string | null>(null);
+
 const sendToAi = async () => {
+  handoffNotice.value = null;
+  if (!privacyNoticeAccepted.value) {
+    handoffNotice.value = '请先阅读隐私说明并勾选确认，再发送到 AI。';
+    return;
+  }
+  if (!isTauri()) {
+    handoffNotice.value = 'AI 交接需要桌面应用环境；当前网页预览不会打开外部网站。';
+    return;
+  }
+  if (!datesValid.value || !exportDataTypes.value.length) {
+    handoffNotice.value = '请先选择有效日期范围和至少一种数据类型。';
+    return;
+  }
+  if (previewBusy.value || previewCount.value === null) {
+    handoffNotice.value = '正在读取本机记录，请稍候再试。';
+    return;
+  }
+  if (previewCount.value <= 0) {
+    handoffNotice.value = '当前范围没有可交接的已同步记录。';
+    return;
+  }
+  if (includePreciseRoute.value) {
+    const confirmed = window.confirm(
+      '精确 GPS 路线可能暴露你的活动地点。仅在确认愿意把精确路线交给目标 AI 时继续吗？',
+    );
+    if (!confirmed) {
+      handoffNotice.value = '已取消精确 GPS 交接；仍可发送默认脱敏数据。';
+      return;
+    }
+  }
+
+  const selection: ExportSelection = {
+    startDate: exportStartDate.value,
+    endDate: exportEndDate.value,
+    dataTypes: [...exportDataTypes.value],
+  };
   try {
-    const payload = previewJson.value
-      ? `${editedPrompt.value}\n\n以下是我的数据（JSON）：\n${previewJson.value}`
-      : editedPrompt.value;
-    await navigator.clipboard.writeText(payload);
-    sendState.value = 'copied';
-    window.setTimeout(() => { sendState.value = 'idle'; }, 2500);
+    const result = await prepareAndCopy(
+      activeProvider.value,
+      selection,
+      editedPrompt.value,
+      includePreciseRoute.value,
+    );
+    const browserOpened = handoffState.value !== 'copied_only';
+    if (result.mode === 'attachment') {
+      const uploadNotice = result.filePath
+        ? `数据包已写入本机文件：${result.filePath}。剪贴板仅包含提示词，请在目标 AI 页面手动上传该文件。`
+        : '数据包超过 2 MiB；请在目标 AI 页面手动上传本机文件。';
+      handoffNotice.value = browserOpened
+        ? uploadNotice
+        : `${uploadNotice} 未能打开 ${activeProvider.value.label}，可点击下方按钮重试。`;
+    } else {
+      handoffNotice.value = browserOpened
+        ? `已复制脱敏数据并打开 ${activeProvider.value.label}，请在网站内自行确认后提交。`
+        : `已复制脱敏数据，但未能打开 ${activeProvider.value.label}；可点击下方按钮重试。`;
+    }
   } catch {
-    sendState.value = 'failed';
+    // useAiHandoff exposes a token-free user-facing error and state.
+  }
+};
+
+const retryOpenAi = async () => {
+  try {
+    await retryOpen();
+    handoffNotice.value = `已打开 ${preparedProvider.value?.label ?? activeProvider.value.label}，请在网站内自行确认后提交。`;
+  } catch {
+    // Error is rendered from handoffError; copied content remains intact.
   }
 };
 
@@ -444,13 +513,21 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
             <button class="button button-secondary" type="button" @click="copyPrompt">
               <Icon name="copy" :size="14" />复制提示词
             </button>
-            <button class="button button-primary send-btn" type="button" @click="sendToAi">
-              <Icon name="send" :size="14" />发送到 AI
+            <button class="button button-primary send-btn" type="button" :disabled="handoffState === 'preparing'" @click="sendToAi">
+              <Icon :name="handoffState === 'preparing' ? 'clock' : 'send'" :size="14" />{{ handoffState === 'preparing' ? '正在准备…' : '发送到 AI' }}
             </button>
           </div>
         </footer>
-        <p v-if="sendState === 'copied'" class="action-note ok" role="status"><Icon name="circle-check" :size="13" />已复制到剪贴板，可直接粘贴到 {{ activeTool }}。</p>
+        <p v-if="sendState === 'copied'" class="action-note ok" role="status"><Icon name="circle-check" :size="13" />提示词已复制到剪贴板。</p>
         <p v-else-if="sendState === 'failed'" class="action-note bad" role="alert"><Icon name="warning" :size="13" />复制失败，请重试。</p>
+        <p v-if="handoffNotice" class="action-note" :class="handoffState === 'failed' ? 'bad' : 'ok'" role="status">{{ handoffNotice }}</p>
+        <p v-if="handoffError" class="action-note bad" role="alert"><Icon name="warning" :size="13" />{{ handoffError }}</p>
+        <button
+          v-if="handoffState === 'copied_only'"
+          class="button button-secondary retry-open"
+          type="button"
+          @click="retryOpenAi"
+        ><Icon name="external" :size="14" />重试打开 {{ preparedProvider?.label ?? activeProvider.label }}</button>
         <p v-if="exportMessage" class="action-note ok" role="status"><Icon name="circle-check" :size="13" />{{ exportMessage }}</p>
         <p v-if="exportError" class="action-note bad" role="alert"><Icon name="warning" :size="13" />{{ exportError }}</p>
       </div>
@@ -500,20 +577,37 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
           <p class="group-label">目标 AI 工具</p>
           <div class="tool-grid" role="radiogroup" aria-label="目标 AI 工具">
             <button
-              v-for="tool in aiTools"
-              :key="tool"
+              v-for="tool in AI_PROVIDERS"
+              :key="tool.id"
               type="button"
               role="radio"
-              :aria-checked="activeTool === tool"
-              :class="['tool-card', { 'is-on': activeTool === tool }]"
-              @click="activeTool = tool"
+              :aria-checked="activeProviderId === tool.id"
+              :class="['tool-card', { 'is-on': activeProviderId === tool.id }]"
+              @click="activeProviderId = tool.id"
             >
-              <Icon v-if="activeTool === tool" name="circle-check" :size="13" class="tool-check" />
-              <span class="tool-logo"><Icon name="spark" :size="14" /></span>
-              <span>{{ tool }}</span>
+              <Icon v-if="activeProviderId === tool.id" name="circle-check" :size="13" class="tool-check" />
+              <span class="tool-logo">
+                <img
+                  v-if="!providerIconFailed[tool.id]"
+                  :src="tool.localIcon"
+                  :alt="`${tool.label} 图标`"
+                  @error="markProviderIconFailed(tool.id)"
+                />
+                <span v-else class="tool-fallback" aria-hidden="true">{{ tool.fallback }}</span>
+              </span>
+              <span>{{ tool.label }}</span>
             </button>
           </div>
-          <p class="send-hint"><Icon name="info" :size="13" />发送后将自动附加所选提示词与数据包。</p>
+          <div class="privacy-box" role="note">
+            <strong><Icon name="shield" :size="13" />首次发送前请确认隐私边界</strong>
+            <p>仅发送当前选择范围的脱敏摘要；不会自动登录、注入或提交。认证信息、用户/设备标识始终移除。</p>
+            <label><input v-model="privacyNoticeAccepted" type="checkbox" />我已阅读并同意由 {{ activeProvider.label }} 接收这份脱敏数据</label>
+          </div>
+          <label class="route-toggle">
+            <input v-model="includePreciseRoute" type="checkbox" />
+            <span><strong>包含精确 GPS 路线</strong><small>默认关闭；发送前还会再次确认，认证与标识字段仍会移除。</small></span>
+          </label>
+          <p class="send-hint"><Icon name="info" :size="13" />≤ 2 MiB 会复制到剪贴板；更大的脱敏文件需在目标 AI 页面手动上传。</p>
         </section>
       </aside>
     </div>
@@ -809,9 +903,32 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
   background: var(--surface);
   color: var(--muted);
 }
+.tool-logo img { width: 16px; height: 16px; object-fit: contain; }
+.tool-fallback { color: var(--muted); font-size: 12px; font-weight: 700; line-height: 1; }
 .tool-card.is-on .tool-logo { color: var(--accent); }
 .tool-check { position: absolute; top: 5px; right: 6px; color: var(--accent); }
+.privacy-box {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+  padding: 10px 11px;
+  border: 1px solid rgba(205, 220, 124, .25);
+  border-radius: 9px;
+  background: var(--accent-soft);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.privacy-box strong { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); font-size: 12px; }
+.privacy-box p { margin: 0; }
+.privacy-box label { display: flex; align-items: flex-start; gap: 6px; color: var(--ink); }
+.privacy-box input, .route-toggle input { margin-top: 2px; accent-color: var(--accent); }
+.route-toggle { display: flex; align-items: flex-start; gap: 7px; margin-top: 12px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.route-toggle span { display: grid; gap: 2px; }
+.route-toggle strong { color: var(--ink); font-size: 12px; }
+.route-toggle small { color: var(--subtle); }
 .send-hint { display: flex; align-items: flex-start; gap: 6px; margin: 14px 0 0; color: var(--subtle); font-size: 11px; }
+.retry-open { width: fit-content; margin-top: 2px; }
 
 @media (max-width: 1180px) {
   .export-layout { grid-template-columns: 230px minmax(0, 1fr); }

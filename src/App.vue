@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { getVersion } from '@tauri-apps/api/app';
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router';
 import BrandMark from './components/BrandMark.vue';
+import DeviceVisual from './components/DeviceVisual.vue';
 import Icon from './components/Icon.vue';
 import { useSyncController } from './composables/useSyncController';
+import { useDevices } from './composables/useDevices';
 import { useUiScale } from './composables/useUiScale';
 import { backend, isDesktop } from './lib/bridge';
 
 // 桌面端从 Tauri 运行时读取版本（与 tauri.conf.json 单一来源），
 // 浏览器预览环境回退到下面的常量（与 package.json 保持同步）。
-const FALLBACK_APP_VERSION = '0.8.0';
+const FALLBACK_APP_VERSION = '0.8.1';
 const APP_VERSION = ref(FALLBACK_APP_VERSION);
 if (isDesktop()) {
   void getVersion()
@@ -30,9 +32,15 @@ const userMenuOpen = ref(false);
 const userControl = ref<HTMLElement | null>(null);
 const {
   appStatus, statusError, syncState, syncMessage, syncProgress, isSyncing, canIncrementalSync,
-  initialize, runSync, cancelSync,
+  dataRevision, initialize, runSync, cancelSync,
 } = useSyncController();
 const { initializeScale, bumpScale, resetScale } = useUiScale();
+const {
+  models: deviceModels,
+  loading: devicesLoading,
+  error: devicesError,
+  load: loadDevices,
+} = useDevices();
 
 const navigation = [
   { to: '/', label: '探索', icon: 'compass' as const },
@@ -42,37 +50,51 @@ const navigation = [
 ];
 
 const connected = computed(() => appStatus.value?.connection_state === 'connected');
+const accountRecognized = computed(() => ['connected', 'configured'].includes(String(appStatus.value?.connection_state || '')));
 
 const dataSources = computed(() => [
-  { name: 'T-Rex 3', icon: 'watch' as const, connected: connected.value },
-  { name: 'Helio Ring', icon: 'ring' as const, connected: connected.value },
-  { name: 'MSV Cloud', icon: 'cloud' as const, connected: connected.value },
+  ...deviceModels.value.map((model) => ({
+    kind: 'device' as const,
+    name: model.canonicalName,
+    model,
+    state: model.state,
+  })),
+  {
+    kind: 'cloud' as const,
+    name: 'Zap Cloud',
+    state: accountRecognized.value ? '账号已识别' : '未识别',
+  },
 ]);
 
 const statusLabel = computed(() => {
-  if (!isDesktop()) return '桌面预览';
-  if (!appStatus.value) return '检查连接';
-  if (appStatus.value.connection_state === 'needs_reauth') return '需要重新连接';
-  if (appStatus.value.connection_state === 'connected') return '已连接';
-  if (appStatus.value.connection_state === 'configured') return '待验证';
-  return '未连接';
+  // Keep the chip within the same four account/device states used elsewhere.
+  // The browser-preview banner separately explains that no account data is read.
+  if (!isDesktop()) return '未识别';
+  if (!appStatus.value) return '未识别';
+  if (appStatus.value.connection_state === 'connected' || appStatus.value.connection_state === 'configured') return '账号已识别';
+  return '未识别';
 });
 const statusTone = computed(() => {
   if (appStatus.value?.connection_state === 'needs_reauth' || syncState.value === 'failed') return 'danger';
   if (syncState.value === 'partial') return 'warning';
-  if (appStatus.value?.connection_state === 'connected') return 'success';
+  if (accountRecognized.value) return 'success';
   return 'neutral';
 });
 const lastSyncClock = computed(() => {
   const raw = appStatus.value?.last_cloud_sync_at;
-  if (!raw) return '—';
+  if (!raw) return '尚未获取';
   const date = new Date(raw);
-  if (Number.isNaN(date.getTime())) return '—';
+  if (Number.isNaN(date.getTime())) return '时间未知';
   return new Intl.DateTimeFormat('zh-CN', {
     year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(date).replace(/\//g, '-');
 });
-const accountLabel = computed(() => appStatus.value?.masked_user_id || 'user@example.com');
+const accountLabel = computed(() => appStatus.value?.masked_user_id || '未识别账户');
+const accountInitial = computed(() => {
+  const first = accountLabel.value.match(/[A-Za-z0-9]/)?.[0];
+  return first ? first.toUpperCase() : '未';
+});
+const regionLabel = computed(() => appStatus.value?.region_host || '未提供');
 const browserPreview = computed(() => !isDesktop());
 const routeNotice = computed(() => route.query.notice === 'not-found');
 
@@ -100,6 +122,7 @@ const closeMobileMenu = () => { mobileMenuOpen.value = false; };
 onMounted(() => {
   initializeScale();
   void initialize();
+  void loadDevices();
   document.addEventListener('pointerdown', onDocumentPointerDown);
   document.addEventListener('keydown', onDocumentKeydown);
   if (route.query.notice === 'not-found') {
@@ -118,6 +141,7 @@ onMounted(() => {
     });
   }
 });
+watch(dataRevision, () => void loadDevices());
 onUnmounted(() => {
   document.removeEventListener('pointerdown', onDocumentPointerDown);
   document.removeEventListener('keydown', onDocumentKeydown);
@@ -157,12 +181,18 @@ onUnmounted(() => {
           <span>数据来源</span>
           <button type="button" aria-label="添加数据来源" title="添加数据来源"><Icon name="plus" :size="14" /></button>
         </div>
+        <div v-if="devicesLoading" class="sources-feedback" role="status">正在识别实体设备…</div>
+        <div v-else-if="devicesError" class="sources-feedback error" role="alert">设备识别暂不可用：{{ devicesError }}</div>
+        <div v-else-if="!deviceModels.length" class="sources-feedback" role="status">尚未识别实体设备。</div>
         <RouterLink v-for="source in dataSources" :key="source.name" class="source-card" to="/settings">
-          <span class="source-icon"><Icon :name="source.icon" :size="22" /></span>
+          <span class="source-icon">
+            <DeviceVisual v-if="source.kind === 'device'" :src="source.model.image" :alt="source.name" :kind="source.model.kind" compact />
+            <Icon v-else name="cloud" :size="22" />
+          </span>
           <span class="source-copy">
             <strong>{{ source.name }}</strong>
-            <span :class="['source-state', { on: source.connected }]">
-              <i class="dot"></i>{{ source.connected ? '已连接' : '未连接' }}
+            <span :class="['source-state', { on: source.state !== '未识别' }]">
+              <i class="dot"></i>{{ source.state }}
             </span>
           </span>
           <Icon name="chevron-down" :size="14" class="source-chevron" />
@@ -173,7 +203,7 @@ onUnmounted(() => {
         <div class="cloud-card">
           <div class="cloud-row">
             <Icon name="cloud" :size="16" />
-            <span>{{ connected ? '云服务已连接' : '云服务未连接' }}</span>
+            <span>Zap Cloud · {{ accountRecognized ? '账号已识别' : '未识别' }}</span>
             <Icon name="circle-check" :size="15" :class="['cloud-check', { on: connected }]" />
           </div>
           <div class="cloud-account">
@@ -216,17 +246,19 @@ onUnmounted(() => {
           </span>
         </div>
         <div class="topbar-actions">
-          <button class="icon-round" type="button" aria-label="通知"><Icon name="bell" :size="17" /></button>
-          <button class="icon-round" type="button" aria-label="帮助"><Icon name="help" :size="17" /></button>
           <div ref="userControl" class="user-control">
-            <button class="user-trigger" type="button" aria-haspopup="menu" :aria-expanded="userMenuOpen" @click="userMenuOpen = !userMenuOpen">
-              <span class="avatar">U</span>
-              <span class="user-name">User</span>
+            <button class="user-trigger" type="button" aria-haspopup="menu" :aria-expanded="userMenuOpen" :aria-label="`账户 ${accountLabel}`" @click="userMenuOpen = !userMenuOpen">
+              <span class="avatar">{{ accountInitial }}</span>
+              <span class="user-name">{{ accountLabel }}</span>
               <Icon name="chevron-down" :size="14" />
             </button>
             <div v-if="userMenuOpen" class="user-menu" role="menu" aria-label="用户菜单">
-              <RouterLink to="/settings" role="menuitem" @click="userMenuOpen = false"><Icon name="gear" :size="15" /><span>设置</span></RouterLink>
-              <RouterLink to="/settings" role="menuitem" @click="userMenuOpen = false"><Icon name="user" :size="15" /><span>账户与区域</span></RouterLink>
+              <div class="user-menu-summary">
+                <span>当前账户</span>
+                <strong>{{ accountLabel }}</strong>
+                <span>区域 / Host：{{ regionLabel }}</span>
+              </div>
+              <RouterLink :to="{ path: '/settings', hash: '#account-section' }" role="menuitem" @click="userMenuOpen = false"><Icon name="user" :size="15" /><span>账户与区域</span></RouterLink>
             </div>
           </div>
         </div>
@@ -278,40 +310,53 @@ onUnmounted(() => {
 <style>
 :root {
   color-scheme: dark;
-  --bg: #14160C;
-  --sidebar: #101207;
-  --canvas: #14160C;
-  --surface: #1C1F11;
-  --surface-raised: #242819;
-  --surface-hover: #2B3020;
-  --ink: #EEF0E1;
-  --muted: #A9AD92;
-  --subtle: #7C8166;
-  --faint: #5C6148;
-  --line: rgba(226, 232, 180, .09);
-  --line-strong: rgba(226, 232, 180, .16);
-  --accent: #CDDC7C;
-  --accent-hover: #DCE896;
-  --accent-strong: #B9C964;
-  --accent-ink: #171A0A;
-  --accent-soft: rgba(205, 220, 124, .12);
-  --icon-mint: #CDDC7C;
-  --heart: #EF6E6E;
-  --heart-wash: rgba(239, 110, 110, .10);
-  --sleep: #9BA3F5;
-  --sleep-wash: rgba(155, 163, 245, .10);
-  --activity: #A4CB8F;
-  --activity-wash: rgba(164, 203, 143, .10);
-  --calories: #EF9F27;
-  --distance: #64A8E8;
+  --bg: #0E1113;
+  --sidebar: #0B0D0F;
+  --canvas: #111518;
+  --surface: #181D21;
+  --surface-raised: #20262B;
+  --surface-hover: #2A3137;
+  --ink: #F3F7F8;
+  --muted: #A8B2B8;
+  --subtle: #7B878E;
+  --faint: #59646C;
+  --line: rgba(224, 235, 240, .10);
+  --line-strong: rgba(224, 235, 240, .18);
+  --brand: #D8FF52;
+  --accent: var(--brand);
+  --accent-hover: #E6FF7A;
+  --accent-strong: #BFE640;
+  --accent-ink: #12170B;
+  --accent-soft: rgba(216, 255, 82, .14);
+  --icon-mint: #76E5BF;
+  --heart: #FF777A;
+  --heart-wash: rgba(255, 119, 122, .12);
+  --pace: #6ED8F5;
+  --pace-wash: rgba(110, 216, 245, .12);
+  --calories: #FFB866;
+  --calories-wash: rgba(255, 184, 102, .12);
+  --altitude: #76E5BF;
+  --cadence: #6ED8F5;
+  --training: #D8FF52;
+  --readiness: #76E5BF;
+  --sleep-deep: #8078E8;
+  --sleep-light: #8FA8FF;
+  --sleep-rem: #55D7B1;
+  --sleep-awake: #FF777A;
+  --sleep: var(--sleep-light);
+  --sleep-wash: rgba(143, 168, 255, .12);
+  --activity: var(--cadence);
+  --activity-wash: rgba(110, 216, 245, .12);
+  --distance: var(--pace);
   --danger: #F0616A;
-  --warning: #D9A556;
-  --focus: #CDDC7C;
-  --sleep-deep: #6B6FD4;
-  --sleep-light: #7E8AE8;
-  --sleep-rem: #B07AD4;
-  --sleep-awake: #D9A556;
-  --font-sans: 'Inter', 'MiSans', 'Segoe UI', 'Microsoft YaHei UI', sans-serif;
+  --warning: #FFB866;
+  --focus: #D8FF52;
+  --route-neutral: #AAB5BB;
+  --route-mint: #76E5BF;
+  --route-cyan: #6ED8F5;
+  --route-amber: #FFB866;
+  --route-coral: #FF777A;
+  --font-sans: 'MiSans', 'Segoe UI', 'Microsoft YaHei UI', sans-serif;
   --font-mono: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
   --space-1: 4px;
   --space-2: 8px;
@@ -418,11 +463,13 @@ a { color: inherit; }
 .nav-link.is-active {
   color: var(--accent);
   background: var(--accent-soft);
-  border-color: rgba(205, 220, 124, .18);
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
 }
 .nav-link.is-active svg { color: var(--accent); }
 
 .sources { margin-top: 20px; min-width: 0; display: grid; gap: 8px; }
+.sources-feedback { padding: 8px 10px; border: 1px dashed var(--line-strong); border-radius: 9px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.sources-feedback.error { color: var(--danger); border-color: rgba(240, 97, 106, .28); }
 .sources-head {
   display: flex;
   align-items: center;
@@ -467,6 +514,8 @@ a { color: inherit; }
   border: 1px solid var(--line);
   color: var(--muted);
 }
+.source-icon :deep(.device-visual) { width: 38px; max-width: 100%; height: 38px; max-height: 100%; min-width: 0; min-height: 0; flex: 0 0 38px; border: 0; border-radius: 10px; background: transparent; }
+.source-icon :deep(.device-visual img) { padding: 3px; }
 .source-copy { display: grid; gap: 2px; min-width: 0; flex: 1; }
 .source-copy strong { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .source-state { display: inline-flex; align-items: center; gap: 5px; color: var(--subtle); font-size: 11px; }
@@ -551,7 +600,7 @@ a { color: inherit; }
   font-size: 12px;
   white-space: nowrap;
 }
-.connection-chip.tone-success { color: var(--accent); border-color: rgba(205, 220, 124, .25); background: var(--accent-soft); }
+.connection-chip.tone-success { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 34%, transparent); background: var(--accent-soft); }
 .connection-chip.tone-warning { color: var(--warning); }
 .connection-chip.tone-danger { color: var(--danger); }
 .sync-time { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -608,18 +657,20 @@ a { color: inherit; }
   font-size: 13px;
   font-weight: 600;
 }
-.user-name { color: var(--ink); font-size: 13px; }
+.user-name { max-width: 180px; overflow: hidden; color: var(--ink); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .user-menu {
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
   z-index: 40;
-  width: 168px;
+  width: min(260px, calc(100vw - 24px));
   padding: 5px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
   background: var(--surface-raised);
 }
+.user-menu-summary { display: grid; gap: 2px; padding: 8px 9px 9px; border-bottom: 1px solid var(--line); color: var(--subtle); font-size: 11px; line-height: 1.45; }
+.user-menu-summary strong { overflow: hidden; color: var(--ink); font-family: var(--font-mono); font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .user-menu a {
   display: flex;
   align-items: center;

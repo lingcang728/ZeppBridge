@@ -6,6 +6,7 @@ import CircularProgress from '../components/CircularProgress.vue';
 import StageBar from '../components/StageBar.vue';
 import EmptyState from '../components/EmptyState.vue';
 import { useSyncController } from '../composables/useSyncController';
+import { useDevices } from '../composables/useDevices';
 import { dataProviderLabel, dataScopeLabel } from '../lib/labels';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { formatDate, formatDateTime, formatDuration, formatTime, isFiniteNumber } from '../lib/format';
@@ -13,6 +14,7 @@ import type { DeviceProfile, SleepSession } from '../types';
 
 const route = useRoute();
 const { appStatus, dataRevision } = useSyncController();
+const { maskIdentifier } = useDevices();
 const session = ref<SleepSession | null>(null);
 const device = ref<DeviceProfile>({});
 const loading = ref(true);
@@ -32,20 +34,6 @@ const score = computed(() => {
   return isFiniteNumber(value) ? value : null;
 });
 
-const scoreComment = computed(() => {
-  if (score.value === null) return null;
-  if (score.value >= 80) {
-    return {
-      title: '睡得不错',
-      body: '睡眠时长充足，深睡比例良好，维持规律有助于进一步提升恢复效果。',
-    };
-  }
-  if (score.value >= 60) {
-    return { title: '还可以', body: '整体尚可。规律作息有助于改善恢复。' };
-  }
-  return { title: '有待改善', body: '时长或阶段比例偏低。仅展示设备给出的评分。' };
-});
-
 const timeInBedLabel = computed(() => {
   const minutes = session.value?.time_in_bed_minutes;
   return isFiniteNumber(minutes) ? formatDuration(minutes, '未提供') : '未提供';
@@ -60,6 +48,7 @@ const syncTimeLabel = computed(() => {
 });
 
 const timezoneLabel = computed(() => device.value.timezone || '未提供');
+const deviceIdentifier = computed(() => maskIdentifier(device.value.device_id || session.value?.device_id));
 
 let detailSeq = 0;
 
@@ -113,7 +102,7 @@ watch([dataRevision, sleepId], () => void loadDetail());
       <article class="sleep-hero" aria-label="睡眠时长与评分">
         <div class="hero-duration">
           <p class="kicker"><span class="mark"><Icon name="moon" :size="16" /></span>睡眠时长</p>
-          <p class="value">{{ formatDuration(session.duration_minutes, '—') }}</p>
+          <p class="value">{{ formatDuration(session.duration_minutes, '未提供') }}</p>
           <p class="meta">{{ formatTime(session.start_time) }} 入睡 · {{ formatTime(session.end_time) }} 醒来</p>
           <p class="meta">在床时长 {{ timeInBedLabel }}</p>
         </div>
@@ -129,13 +118,10 @@ watch([dataRevision, sleepId], () => void loadDetail());
               track-color="var(--line)"
               unit=""
             />
-            <strong v-else class="score-empty">—</strong>
+            <strong v-else class="score-empty">未提供</strong>
             <small>/ 100</small>
           </div>
-          <template v-if="scoreComment">
-            <p class="score-title">{{ scoreComment.title }}</p>
-            <p class="score-body">{{ scoreComment.body }}</p>
-          </template>
+          <p v-if="score !== null" class="score-note">设备提供的评分，仅作记录展示。</p>
         </div>
       </article>
 
@@ -153,8 +139,8 @@ watch([dataRevision, sleepId], () => void loadDetail());
         <StageBar
           :stages="stages"
           :slices="session.stages"
-          :range-start="formatTime(session.start_time)"
-          :range-end="formatTime(session.end_time)"
+            :range-start="session.start_time"
+            :range-end="session.end_time"
         />
       </section>
 
@@ -193,7 +179,7 @@ watch([dataRevision, sleepId], () => void loadDetail());
             </div>
             <div>
               <dt>设备 ID</dt>
-              <dd>{{ device.device_id || session.device_id || '未提供' }}</dd>
+              <dd>{{ deviceIdentifier }}</dd>
             </div>
           </dl>
         </article>
@@ -239,8 +225,7 @@ watch([dataRevision, sleepId], () => void loadDetail());
   border-radius: var(--radius-md);
   background: var(--surface);
 }
-.score-title { margin: 10px 0 0; font-size: 13px; font-weight: 700; }
-.score-body { margin: 4px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.score-note { margin: 10px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
 .hero-duration, .hero-score { min-width: 0; padding: 18px 20px 16px; }
 .hero-score {
   border-left: 1px solid var(--line);

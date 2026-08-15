@@ -6,6 +6,7 @@ Requires Pillow (`pip install pillow`).
 from __future__ import annotations
 
 import hashlib
+import re
 import struct
 import sys
 from pathlib import Path
@@ -47,6 +48,48 @@ def assert_alpha(path: Path) -> None:
         raise AssertionError(f"{path.name}: no alpha channel variation")
 
 
+def assert_small_preview(path: Path, size: int) -> tuple[tuple[int, int], int]:
+    """Downsample the real generated icon and check its small-size signal."""
+
+    image = Image.open(path).convert("RGBA").resize((size, size), Image.Resampling.LANCZOS)
+    if image.size != (size, size):
+        raise AssertionError(f"{path.name}: {size}px preview has wrong dimensions {image.size}")
+    alpha = image.getchannel("A")
+    if alpha.getextrema()[1] == 0:
+        raise AssertionError(f"{path.name}: {size}px preview is fully transparent")
+
+    # The dark board is intentionally quiet; the angular rails must still
+    # contribute a high-luminance signal at every requested UI size.
+    rail_pixels = sum(
+        1
+        for red, green, blue, pixel_alpha in image.getdata()
+        if pixel_alpha >= 160 and red + green + blue >= 300
+    )
+    minimum = max(2, size // 2)
+    if rail_pixels < minimum:
+        raise AssertionError(f"{path.name}: {size}px preview lost the angular rails ({rail_pixels} bright pixels)")
+    return alpha.getextrema(), rail_pixels
+
+
+def assert_angular_double_rail(source: str) -> None:
+    symbol_match = re.search(r'<symbol\s+id="brand-mark"[^>]*>([\s\S]*?)</symbol>', source)
+    if not symbol_match:
+        raise AssertionError("icon-source.svg is missing the brand-mark symbol")
+    symbol = symbol_match.group(1)
+    if 'data-shape="angular-double-rail-z"' not in source:
+        raise AssertionError("icon-source.svg is missing the angular double-rail marker")
+    if symbol.count("<path") != 2:
+        raise AssertionError("brand-mark must contain exactly two rail paths")
+    if "<circle" in symbol:
+        raise AssertionError("brand-mark must not contain legacy connection points")
+    path_data = re.findall(r'<path\b[^>]*\bd="([^"]+)"', symbol)
+    if len(path_data) != 2 or any(re.search(r"[CQSAcqsa]", data) for data in path_data):
+        raise AssertionError("brand-mark rails must use angular M/H/L commands only")
+    widths = [float(width) for width in re.findall(r'stroke-width="([0-9.]+)"', symbol)]
+    if widths != [3.1, 3.1]:
+        raise AssertionError(f"brand-mark rails must share stroke-width 3.1, got {widths}")
+
+
 def main() -> int:
     expected = {
         "32x32.png": (32, 32),
@@ -75,23 +118,28 @@ def main() -> int:
         assert_alpha(path)
 
     frames = ico_frames(ICONS / "icon.ico")
-    required_frames = {(16, 16), (24, 24), (32, 32), (48, 48), (256, 256)}
+    required_frames = {(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (256, 256)}
     missing = required_frames.difference(frames)
     if missing:
         raise AssertionError(f"icon.ico missing frames {sorted(missing)}; found {frames}")
 
+    if not PUBLIC.exists():
+        raise AssertionError(f"missing generated public icon: {PUBLIC}")
     if hashlib.sha256((ICONS / "icon.png").read_bytes()).digest() != hashlib.sha256(PUBLIC.read_bytes()).digest():
         raise AssertionError("public/zeppbridge-icon.png is not the generated icon.png")
     source = (ICONS / "icon-source.svg").read_text(encoding="utf-8")
-    if 'id="brand-mark"' not in source or "stroke-width=\"3.6\"" not in source:
-        raise AssertionError("icon-source.svg does not contain the expected curved master brand symbol")
-    if source.count("<circle") != 2:
-        raise AssertionError("icon-source.svg must contain exactly two brand connection points")
+    assert_angular_double_rail(source)
+    previews = {size: assert_small_preview(ICONS / "icon.png", size) for size in (16, 20, 24)}
 
     print("Icon verification passed")
     print(f"PNG sizes: {', '.join(f'{w}x{h}' for w, h in sorted(set(expected.values())))}")
     print(f"ICO frames: {', '.join(f'{w}x{h}' for w, h in frames)}")
     print("Alpha: verified on every generated PNG")
+    print(
+        "Small previews: "
+        + ", ".join(f"{size}px ({rails} rail pixels)" for size, (_alpha, rails) in previews.items())
+    )
+    print("Master: angular double-rail Z verified; legacy curves and points absent")
     return 0
 
 

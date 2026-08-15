@@ -5,6 +5,18 @@
   "windows": ["main", "zepp-login"],
   "permissions": [
     "core:default",
-    "dialog:allow-save"
+    "dialog:allow-save",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        { "url": "https://chatgpt.com/" },
+        { "url": "https://claude.ai/" },
+        { "url": "https://gemini.google.com/app" },
+        { "url": "https://www.kimi.com/" },
+        { "url": "https://www.doubao.com/chat/" },
+        { "url": "https://chat.deepseek.com/" },
+        { "url": "https://grok.com/" }
+      ]
+    }
   ]
 }

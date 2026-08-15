@@ -215,10 +215,31 @@ export type ExportDataType =
 
 export interface DeviceProfile {
   name?: string;
+  canonical_name?: string;
+  display_name?: string;
+  catalog_id?: string;
+  kind?: 'watch' | 'strap' | 'ring' | 'band' | 'scale' | 'unknown' | string;
+  image_key?: string | null;
+  match_status?: 'exact' | 'alias' | 'unknown';
+  has_local_data?: boolean;
+  last_data_at?: string | null;
   firmware?: string;
   serial?: string;
   device_id?: string;
   timezone?: string;
+}
+
+export interface DeviceCacheMetadata {
+  status: 'fresh' | 'stale' | 'missing' | 'refresh_failed' | 'unavailable' | string;
+  cached_at?: string | null;
+  age_seconds?: number | null;
+  refreshed: boolean;
+  refresh_error?: string | null;
+}
+
+export interface DeviceProfilesResult {
+  profiles: DeviceProfile[];
+  cache: DeviceCacheMetadata;
 }
 
 export interface ExportSelection {
@@ -232,6 +253,24 @@ export interface ExportResult {
   record_count: number;
   bytes: number;
   generated_at: string;
+}
+
+export type AiHandoffMode = 'inline' | 'attachment';
+
+export interface AiHandoffMetadata {
+  preciseRouteIncluded: boolean;
+  authenticationFieldsRemoved: boolean;
+  identityFieldsRemoved: boolean;
+}
+
+export interface AiHandoffResult {
+  mode: AiHandoffMode;
+  clipboardText: string;
+  filePath?: string;
+  bytes: number;
+  records: number;
+  redactions: string[];
+  metadata: AiHandoffMetadata;
 }
 
 export interface ReprocessResult {

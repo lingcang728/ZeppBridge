@@ -10,6 +10,7 @@ import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { useSyncController } from '../composables/useSyncController';
 import { workoutLabel } from '../lib/labels';
 import { formatDate, formatDuration, isFiniteNumber } from '../lib/format';
+import { displayableWorkouts, workoutDurationMinutes, workoutTypeKey } from '../lib/workouts';
 import type { SleepSession, Workout } from '../types';
 
 const loading = ref(true);
@@ -19,44 +20,44 @@ const recentSleep = ref<SleepSession[]>([]);
 const recentWorkouts = ref<Workout[]>([]);
 const { dataRevision } = useSyncController();
 
-// 运动类型筛选
 const activeFilter = ref('all');
 
-const WORKOUT_TYPE_MAP: Record<string, string[]> = {
-  run: ['run', 'running', 'trail', 'treadmill', 'indoor_run'],
-  cycle: ['ride', 'cycling'],
-  walk: ['walk', 'walking', 'hiking'],
-};
-
-const filterTabs = [
-  { label: '全部', value: 'all', icon: 'grid' as const },
-  { label: '跑步', value: 'run', icon: 'run' as const },
-  { label: '骑行', value: 'cycle', icon: 'activity' as const },
-  { label: '步行', value: 'walk', icon: 'steps' as const },
-];
-
-const filteredWorkouts = computed(() => {
-  if (activeFilter.value === 'all') return recentWorkouts.value;
-  const targetTypes = WORKOUT_TYPE_MAP[activeFilter.value];
-  return targetTypes
-    ? recentWorkouts.value.filter(w => targetTypes.includes(w.workout_type?.trim().toLowerCase()))
-    : recentWorkouts.value;
+const displayableRecentWorkouts = computed(() => displayableWorkouts(recentWorkouts.value));
+const workoutFilters = computed(() => {
+  const seen = new Set<string>();
+  const types = displayableRecentWorkouts.value
+    .map(workoutTypeKey)
+    .filter((type) => {
+      if (!type || seen.has(type)) return false;
+      seen.add(type);
+      return true;
+    });
+  return [
+    { label: '全部', value: 'all', icon: 'grid' as const },
+    ...types.map((type) => ({ label: workoutLabel(type), value: type, icon: 'run' as const })),
+  ];
 });
+
+const filteredWorkouts = computed(() => activeFilter.value === 'all'
+  ? displayableRecentWorkouts.value
+  : displayableRecentWorkouts.value.filter((workout) => workoutTypeKey(workout) === activeFilter.value));
 
 // 运动类型颜色映射（workout_type 为标准化字符串）
 function workoutTypeBg(type: string): string {
   const map: Record<string, string> = {
-    run: '#ef4444',
-    running: '#ef4444',
-    walk: '#10b981',
-    walking: '#10b981',
-    treadmill: '#f59e0b',
-    indoor_run: '#f59e0b',
-    ride: '#3b82f6',
-    cycling: '#3b82f6',
-    swimming: '#06b6d4',
+    run: 'var(--route-mint)',
+    running: 'var(--route-mint)',
+    trail: 'var(--route-mint)',
+    walk: 'var(--route-cyan)',
+    walking: 'var(--route-cyan)',
+    hiking: 'var(--route-cyan)',
+    treadmill: 'var(--route-amber)',
+    indoor_run: 'var(--route-amber)',
+    ride: 'var(--route-cyan)',
+    cycling: 'var(--route-cyan)',
+    swimming: 'var(--route-cyan)',
   };
-  return map[type?.trim().toLowerCase()] ?? '#8b5cf6';
+  return map[type?.trim().toLowerCase()] ?? 'var(--route-mint)';
 }
 
 const loadRecent = async () => {
@@ -71,10 +72,10 @@ const loadRecent = async () => {
   }
   const [sleep, workouts] = await Promise.allSettled([
     tauriApi.getRecentSleep(10),
-    tauriApi.getRecentWorkouts(50),
+    tauriApi.getRecentWorkouts(),
   ]);
   recentSleep.value = sleep.status === 'fulfilled' ? sleep.value : [];
-  recentWorkouts.value = workouts.status === 'fulfilled' ? workouts.value : [];
+  recentWorkouts.value = workouts.status === 'fulfilled' ? displayableWorkouts(workouts.value) : [];
   const rejected = [sleep, workouts].filter((result) => result.status === 'rejected');
   if (rejected.length) {
     partialWarning.value = toUserMessage(rejected[0].reason, '部分数据暂时不可用');
@@ -84,13 +85,16 @@ const loadRecent = async () => {
 
 onMounted(() => void loadRecent());
 watch(dataRevision, () => void loadRecent());
+watch(workoutFilters, (filters) => {
+  if (!filters.some((filter) => filter.value === activeFilter.value)) activeFilter.value = 'all';
+});
 
 const workoutFact = (workout: Workout): string => {
   const distance = formatDistanceZh(workout.distance_meters);
   if (distance) return distance;
   if (isFiniteNumber(workout.calories)) return `${Math.round(workout.calories)} kcal`;
-  const minutes = durationMinutes(workout.start_time, workout.end_time);
-  return formatDuration(minutes);
+  const minutes = workoutDurationMinutes(workout);
+  return formatDuration(minutes, '未提供');
 };
 
 function listDate(value: string): string {
@@ -105,13 +109,6 @@ function listDate(value: string): string {
 function formatDistanceZh(meters?: number): string {
   if (!isFiniteNumber(meters) || meters <= 0) return '';
   return meters >= 1000 ? `${(meters / 1000).toFixed(2)} 公里` : `${Math.round(meters)} 米`;
-}
-
-function durationMinutes(start: string, end: string): number | null {
-  const from = new Date(start).getTime();
-  const to = new Date(end).getTime();
-  if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from) return null;
-  return (to - from) / 60000;
 }
 
 function formatDateHint(value: string): string {
@@ -176,7 +173,7 @@ function formatDateHint(value: string): string {
             icon="moon"
             :kicker="formatDateHint(session.start_time)"
             :title="formatDuration(session.duration_minutes)"
-            :fact="isFiniteNumber(session.score) ? String(Math.round(session.score)) : '—'"
+            :fact="isFiniteNumber(session.score) ? String(Math.round(session.score)) : '未提供'"
           />
           <div v-if="!recentSleep.length" class="empty-row">暂无睡眠记录</div>
         </div>
@@ -186,13 +183,13 @@ function formatDateHint(value: string): string {
         <div class="group-head">
           <h2 id="recent-workout-title" class="col-label">
             <Icon name="run" :size="15" /><span>最近运动</span>
-            <em v-if="recentWorkouts.length">{{ recentWorkouts.length }} 条</em>
+            <em v-if="displayableRecentWorkouts.length">{{ displayableRecentWorkouts.length }} 条可展示</em>
           </h2>
           <RouterLink class="see-all" to="/workouts">查看全部<Icon name="arrow-right" :size="13" /></RouterLink>
         </div>
         <div class="filter-tabs">
           <button
-            v-for="tab in filterTabs"
+            v-for="tab in workoutFilters"
             :key="tab.value"
             :class="['tab-button', { active: activeFilter === tab.value }]"
             type="button"
@@ -215,7 +212,7 @@ function formatDateHint(value: string): string {
             :title="workoutLabel(workout.workout_type)"
             :fact="workoutFact(workout)"
           />
-          <div v-if="!filteredWorkouts.length" class="empty-row">{{ activeFilter === 'all' ? '暂无运动记录' : '暂无此类运动记录' }}</div>
+          <div v-if="!filteredWorkouts.length" class="empty-row">{{ activeFilter === 'all' ? '没有可展示的运动记录。需要类型、时间及至少一项有效指标。' : '该运动类型没有可展示记录。' }}</div>
         </div>
       </section>
     </div>

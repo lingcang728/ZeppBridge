@@ -1,5 +1,6 @@
 import type {
   AppStatus,
+  AiHandoffResult,
   AuthInfo,
   ExportResult,
   ExportSelection,
@@ -9,6 +10,7 @@ import type {
   LoginStatus,
   ReprocessResult,
   DeviceProfile,
+  DeviceProfilesResult,
   SleepSession,
   StorageEstimate,
   SyncReport,
@@ -48,11 +50,17 @@ export interface BridgeBackend {
   getWorkoutDetail(workoutId: string): Promise<Workout | null>;
   getWorkoutSeries(workoutId: string): Promise<WorkoutSeries>;
   getDeviceProfile(query?: { deviceId?: string; sourceScope?: string }): Promise<DeviceProfile>;
+  getDeviceProfiles(refresh?: boolean): Promise<DeviceProfilesResult>;
 
   reprocessLocalData(): Promise<ReprocessResult>;
   getExportJson(selection: ExportSelection): Promise<string>;
   saveJsonExport(selection: ExportSelection, path: string): Promise<ExportResult>;
   publishAiExport(selection: ExportSelection): Promise<ExportResult>;
+  prepareAiHandoff(
+    selection: ExportSelection,
+    prompt: string,
+    includePreciseRoute?: boolean,
+  ): Promise<AiHandoffResult>;
   cleanupOldData(days: number): Promise<Record<string, unknown>>;
   openDataFolder(): Promise<void>;
 

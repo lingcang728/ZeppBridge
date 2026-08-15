@@ -30,10 +30,12 @@ export const webBackend: BridgeBackend = {
   getWorkoutDetail: unavailable,
   getWorkoutSeries: unavailable,
   getDeviceProfile: unavailable,
+  getDeviceProfiles: unavailable,
   reprocessLocalData: unavailable,
   getExportJson: unavailable,
   saveJsonExport: unavailable,
   publishAiExport: unavailable,
+  prepareAiHandoff: unavailable,
   cleanupOldData: unavailable,
   openDataFolder: unavailable,
   listen<T>(_event: string, _handler: (payload: T) => void): Promise<UnlistenFn> {

@@ -3,6 +3,7 @@ mod auth;
 mod commands;
 mod connectors;
 mod decoder;
+mod device_catalog;
 mod fetcher;
 mod ipc_types;
 mod models;
@@ -13,12 +14,12 @@ mod sync;
 use app_state::AppState;
 use commands::{
     cancel_sync, cancel_web_login, cleanup_old_data, clear_auth, get_app_status,
-    get_device_profile, get_export_json, get_health_overview, get_heart_rate_series,
-    get_login_status, get_recent_sleep, get_recent_workouts, get_sleep_detail,
-    get_storage_estimate, get_training_load_series, get_workout_detail, get_workout_series,
-    import_from_har, manual_auth, open_data_folder, publish_ai_export, reprocess_local_data,
-    save_auth, save_json_export, set_user_prefs, start_history_sync, start_incremental_sync,
-    start_initial_sync, start_web_login, verify_auth,
+    get_device_profile, get_device_profiles, get_export_json, get_health_overview,
+    get_heart_rate_series, get_login_status, get_recent_sleep, get_recent_workouts,
+    get_sleep_detail, get_storage_estimate, get_training_load_series, get_workout_detail,
+    get_workout_series, import_from_har, manual_auth, open_data_folder, prepare_ai_handoff,
+    publish_ai_export, reprocess_local_data, save_auth, save_json_export, set_user_prefs,
+    start_history_sync, start_incremental_sync, start_initial_sync, start_web_login, verify_auth,
 };
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
@@ -119,10 +120,12 @@ pub fn run() {
             get_workout_detail,
             get_workout_series,
             get_device_profile,
+            get_device_profiles,
             reprocess_local_data,
             get_export_json,
             save_json_export,
             publish_ai_export,
+            prepare_ai_handoff,
             set_user_prefs,
             get_storage_estimate,
             cleanup_old_data,

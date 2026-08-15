@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { formatDuration, isFiniteNumber } from '../lib/format';
+import { formatDuration, formatTime, isFiniteNumber } from '../lib/format';
 import type { SleepStageSlice } from '../types';
 
 export interface StageItem {
@@ -56,6 +56,10 @@ const range = computed<{ from: number; span: number } | null>(() => {
 });
 
 const isTimeline = computed(() => timeline.value.length > 0 && range.value !== null);
+const axisLabels = computed(() => ({
+  start: props.rangeStart ? formatTime(props.rangeStart) : '',
+  end: props.rangeEnd ? formatTime(props.rangeEnd) : '',
+}));
 
 const barSegments = computed<BarSegment[]>(() => {
   if (timeline.value.length) return timeline.value;
@@ -95,8 +99,8 @@ const segmentStyle = (stage: BarSegment): Record<string, string> => {
       />
     </div>
     <div v-if="rangeStart || rangeEnd" class="stage-axis">
-      <span>{{ rangeStart || '' }}</span>
-      <span>{{ rangeEnd || '' }}</span>
+      <span>{{ axisLabels.start }}</span>
+      <span>{{ axisLabels.end }}</span>
     </div>
     <div class="stage-list">
       <div v-for="stage in stages" :key="stage.label">

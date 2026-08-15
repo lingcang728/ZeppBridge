@@ -1,25 +1,63 @@
-/* ZeppBridge ECharts 统一主题（设计系统 v2）
+/* ZeppBridge ECharts 统一主题（设计系统 v3）
    暗色 `zeppbridge-dark` 为 P1 基准；`zeppbridge-light` 供 P3 使用。
-   数据分类色与全局 token 一致：heart/sleep/activity/calories/distance。 */
+   语义色集中定义；品牌色不进入健康数据的默认序列调色板。 */
 
-const fonts = "'Inter','MiSans','Segoe UI','Microsoft YaHei UI',sans-serif";
+const fonts = "'MiSans','Segoe UI','Microsoft YaHei UI',sans-serif";
+
+/** Stable metric colors shared by charts, legends, and data exports. */
+export const zeppSemanticColors = {
+  brand: '#D8FF52',
+  heart: '#FF777A',
+  pace: '#6ED8F5',
+  distance: '#6ED8F5',
+  calories: '#FFB866',
+  power: '#FFB866',
+  altitude: '#76E5BF',
+  cadence: '#6ED8F5',
+  stride: '#76E5BF',
+  training: '#D8FF52',
+  vo2: '#D8FF52',
+  readiness: '#76E5BF',
+  sleep: {
+    deep: '#8078E8',
+    light: '#8FA8FF',
+    rem: '#55D7B1',
+    awake: '#FF777A',
+  },
+} as const;
+
+// The generic ECharts series palette intentionally excludes `brand`: a chart
+// should never make a health measurement look like a product action.
+const healthSeriesPalette = [
+  zeppSemanticColors.heart,
+  zeppSemanticColors.pace,
+  zeppSemanticColors.calories,
+  zeppSemanticColors.altitude,
+  zeppSemanticColors.cadence,
+  zeppSemanticColors.training,
+  zeppSemanticColors.readiness,
+  zeppSemanticColors.sleep.deep,
+  zeppSemanticColors.sleep.light,
+  zeppSemanticColors.sleep.rem,
+  zeppSemanticColors.sleep.awake,
+];
 
 const darkAxis = {
   axisLine: { show: false },
   axisTick: { show: false },
-  axisLabel: { color: '#6E757E', fontSize: 11, fontFamily: fonts },
-  splitLine: { show: true, lineStyle: { color: 'rgba(255,255,255,0.05)', type: 'dashed' as const } },
+  axisLabel: { color: '#8A969D', fontSize: 11, fontFamily: fonts },
+  splitLine: { show: true, lineStyle: { color: 'rgba(224,235,240,0.08)', type: 'dashed' as const } },
 };
 
 const lightAxis = {
   axisLine: { show: false },
   axisTick: { show: false },
-  axisLabel: { color: '#8A9098', fontSize: 11, fontFamily: fonts },
-  splitLine: { show: true, lineStyle: { color: 'rgba(20,23,28,0.06)', type: 'dashed' as const } },
+  axisLabel: { color: '#66727A', fontSize: 11, fontFamily: fonts },
+  splitLine: { show: true, lineStyle: { color: 'rgba(14,17,19,0.10)', type: 'dashed' as const } },
 };
 
 export const zeppThemeDark = {
-  color: ['#EF6E6E', '#9BA3F5', '#8FCB9B', '#EF9F27', '#378ADD', '#72C994'],
+  color: healthSeriesPalette,
   backgroundColor: 'transparent',
   textStyle: { fontFamily: fonts, color: '#A0A6AE' },
   categoryAxis: { ...darkAxis },
@@ -27,8 +65,8 @@ export const zeppThemeDark = {
   timeAxis: { ...darkAxis },
   logAxis: { ...darkAxis },
   tooltip: {
-    backgroundColor: '#1C1E22',
-    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: '#20262B',
+    borderColor: 'rgba(224,235,240,0.16)',
     borderWidth: 1,
     padding: [8, 12],
     textStyle: { color: '#EDEFF2', fontSize: 12, fontFamily: fonts },
@@ -43,7 +81,7 @@ export const zeppThemeDark = {
 };
 
 export const zeppThemeLight = {
-  color: ['#C45F64', '#6B72C8', '#4E9A70', '#B8842A', '#2B6FA3', '#3E8A5E'],
+  color: healthSeriesPalette,
   backgroundColor: 'transparent',
   textStyle: { fontFamily: fonts, color: '#5C636C' },
   categoryAxis: { ...lightAxis },

@@ -70,10 +70,13 @@ export type IconName =
 
 const props = withDefaults(defineProps<{ name: IconName; size?: number; stroke?: number }>(), {
   size: 18,
-  stroke: 1.5,
+  stroke: 1.6,
 });
 
 const iconLabel = computed(() => `icon-${props.name}`);
+// Keep the local icon family optically consistent while retaining the public
+// `stroke` prop for callers that need a slightly lighter/heavier outline.
+const stroke = computed(() => Math.min(1.75, Math.max(1.5, props.stroke)));
 </script>
 
 <template>
@@ -216,7 +219,11 @@ const iconLabel = computed(() => `icon-${props.name}`);
     </g>
     <path v-else-if="name === 'star'" d="m12 3.5 2.5 5.3 5.8.7-4.3 4 1.1 5.7L12 16.4l-5.1 2.8 1.1-5.7-4.3-4 5.8-.7L12 3.5Z" :stroke-width="stroke" />
     <path v-else-if="name === 'send'" d="m4.5 11 15-6.5-4.5 15-3.4-6.1L4.5 11Zm7.1 2.4 7.9-8.9" :stroke-width="stroke" />
-    <path v-else-if="name === 'dots'" d="M6 12h.1m5.9 0h.1m5.9 0h.1" stroke-width="2.6" />
+    <g v-else-if="name === 'dots'" fill="currentColor" stroke="none">
+      <circle cx="6" cy="12" r="1.15" />
+      <circle cx="12" cy="12" r="1.15" />
+      <circle cx="18" cy="12" r="1.15" />
+    </g>
     <path v-else-if="name === 'braces'" d="M8.5 4.5C7 4.5 6.5 5.5 6.5 7v2.5c0 1.2-.7 2-2 2.5 1.3.5 2 1.3 2 2.5V17c0 1.5.5 2.5 2 2.5m7-15c1.5 0 2 1 2 2.5v2.5c0 1.2.7 2 2 2.5-1.3.5-2 1.3-2 2.5V17c0 1.5-.5 2.5-2 2.5" :stroke-width="stroke" />
     <g v-else-if="name === 'table'">
       <rect x="4" y="5" width="16" height="14" rx="2" :stroke-width="stroke" />

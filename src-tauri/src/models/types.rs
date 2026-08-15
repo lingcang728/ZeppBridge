@@ -314,13 +314,80 @@ pub struct ExportResult {
     pub generated_at: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiHandoffMetadata {
+    pub precise_route_included: bool,
+    pub authentication_fields_removed: bool,
+    pub identity_fields_removed: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiHandoffResult {
+    pub mode: String,
+    pub clipboard_text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_path: Option<String>,
+    pub bytes: usize,
+    pub records: usize,
+    pub redactions: Vec<String>,
+    pub metadata: AiHandoffMetadata,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum DeviceMatchStatus {
+    Exact,
+    Alias,
+    #[default]
+    Unknown,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct DeviceProfile {
+    /// Existing display name is retained for backwards compatibility. It may
+    /// be a user nickname; `canonical_name` is the official catalog value.
     pub name: Option<String>,
+    #[serde(default)]
+    pub canonical_name: Option<String>,
+    #[serde(default)]
+    pub display_name: Option<String>,
+    #[serde(default)]
+    pub catalog_id: Option<String>,
+    #[serde(default)]
+    pub kind: Option<String>,
+    #[serde(default)]
+    pub image_key: Option<String>,
+    #[serde(default)]
+    pub match_status: DeviceMatchStatus,
+    #[serde(default)]
+    pub has_local_data: bool,
+    #[serde(default)]
+    pub last_data_at: Option<String>,
     pub firmware: Option<String>,
     pub serial: Option<String>,
     pub device_id: Option<String>,
     pub timezone: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DeviceCacheMetadata {
+    pub status: String,
+    #[serde(default)]
+    pub cached_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub age_seconds: Option<i64>,
+    #[serde(default)]
+    pub refreshed: bool,
+    #[serde(default)]
+    pub refresh_error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DeviceProfilesResult {
+    pub profiles: Vec<DeviceProfile>,
+    pub cache: DeviceCacheMetadata,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
