@@ -22,11 +22,28 @@ use commands::{
 };
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::{Emitter, Manager};
+use tauri::{AppHandle, Emitter, Manager};
+
+fn show_main_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        // A second launch is the foreground process on Windows; briefly raise
+        // z-order so the existing hidden-to-tray window can steal focus.
+        let _ = window.set_always_on_top(true);
+        let _ = window.set_focus();
+        let _ = window.set_always_on_top(false);
+    }
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Single-instance must be registered first so a second launch never
+        // reaches tray setup and creates a duplicate icon.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            show_main_window(app);
+        }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
@@ -66,12 +83,7 @@ pub fn run() {
                 .menu(&menu)
                 .tooltip("ZeppBridge")
                 .on_menu_event(|app, event| match event.id.as_ref() {
-                    "show" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
-                    }
+                    "show" => show_main_window(app),
                     "sync" => {
                         let _ = app.emit("tray://sync", ());
                     }
