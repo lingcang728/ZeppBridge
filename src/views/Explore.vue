@@ -406,7 +406,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 <template>
   <section class="page export-page" aria-labelledby="export-title">
     <header class="page-head">
-      <h1 id="export-title">导出与提示词</h1>
+      <h1 id="export-title">交给 AI</h1>
       <p class="page-intro">选择模板、检查感知摘要并导出数据，一键将穿戴洞察发送到前沿 AI 工具。</p>
     </header>
 

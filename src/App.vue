@@ -12,7 +12,7 @@ import { backend, isDesktop } from './lib/bridge';
 
 // 桌面端从 Tauri 运行时读取版本（与 tauri.conf.json 单一来源），
 // 浏览器预览环境回退到下面的常量（与 package.json 保持同步）。
-const FALLBACK_APP_VERSION = '0.8.1';
+const FALLBACK_APP_VERSION = '0.8.3';
 const APP_VERSION = ref(FALLBACK_APP_VERSION);
 if (isDesktop()) {
   void getVersion()
@@ -43,9 +43,8 @@ const {
 } = useDevices();
 
 const navigation = [
-  { to: '/', label: '探索', icon: 'compass' as const },
-  { to: '/explore', label: '导出与提示词', icon: 'edit' as const },
-  { to: '/recent', label: '历史记录', icon: 'clock' as const },
+  { to: '/', label: '概览', icon: 'grid' as const },
+  { to: '/explore', label: '交给 AI', icon: 'send' as const },
   { to: '/settings', label: '设置', icon: 'gear' as const },
 ];
 
@@ -236,10 +235,9 @@ onUnmounted(() => {
             type="button"
             :disabled="isSyncing || !canIncrementalSync"
             :title="canIncrementalSync ? '立即同步' : '请先完成连接验证'"
-            aria-label="立即同步"
             @click="runSync('incremental')"
           >
-            <Icon name="sync" :size="15" :class="{ spinning: isSyncing }" />
+            <Icon name="sync" :size="14" :class="{ spinning: isSyncing }" /><span>立即同步</span>
           </button>
           <span v-if="isSyncing" class="sync-progress-text">
             {{ syncProgress ? `${syncProgress.current}/${syncProgress.total}` : '同步中…' }}
@@ -288,7 +286,7 @@ onUnmounted(() => {
         <span>请使用桌面应用。浏览器预览不会读取账户数据。</span>
       </div>
       <div v-if="routeNotice" class="route-notice" role="status">
-        <Icon name="info" :size="16" />页面不存在，已返回探索。
+        <Icon name="info" :size="16" />页面不存在，已返回概览。
       </div>
 
       <main id="main-content" class="main-content" tabindex="-1">
@@ -311,24 +309,26 @@ onUnmounted(() => {
 <style>
 :root {
   color-scheme: dark;
-  --bg: #12140D;
-  --sidebar: #0D0F0A;
-  --canvas: #14160C;
-  --surface: #1B1E12;
-  --surface-raised: #22261A;
-  --surface-hover: #2B3120;
-  --ink: #F3F4EC;
-  --muted: #A9AF97;
-  --subtle: #7E856D;
-  --faint: #59614B;
-  --line: rgba(228, 235, 208, .08);
-  --line-strong: rgba(228, 235, 208, .16);
-  --brand: #CDDC7C;
+  --bg: #131519;
+  --sidebar: #0F1114;
+  --canvas: #14161A;
+  --surface: #1D2026;
+  --surface-raised: #24272F;
+  --surface-hover: #2C3039;
+  --ink: #F2F4EE;
+  --muted: #9AA1A9;
+  --subtle: #6E757D;
+  --faint: #4B5158;
+  --line: rgba(226, 234, 242, .07);
+  --line-strong: rgba(226, 234, 242, .14);
+  --brand: #A6E22E;
   --accent: var(--brand);
-  --accent-hover: #DCEA96;
-  --accent-strong: #CDDC7C;
-  --accent-ink: #181B0E;
-  --accent-soft: rgba(205, 220, 124, .12);
+  --accent-hover: #BCF04F;
+  --accent-strong: #A6E22E;
+  --accent-ink: #161B08;
+  --accent-soft: rgba(166, 226, 46, .12);
+  --action-green: #6E9334;
+  --action-green-hover: #7FA73E;
   --icon-mint: #2FA96B;
   --heart: #F0616A;
   --heart-wash: rgba(240, 97, 106, .12);
@@ -341,10 +341,10 @@ onUnmounted(() => {
   --cadence: #4AA8E8;
   --training: #3DD84C;
   --readiness: #3DD84C;
-  --sleep-deep: #7B4FB3;
+  --sleep-deep: #4458B8;
   --sleep-light: #7C8FF0;
-  --sleep-rem: #2FA96B;
-  --sleep-awake: #E84C3D;
+  --sleep-rem: #8B5CF6;
+  --sleep-awake: #E8833A;
   --sleep: var(--sleep-light);
   --sleep-wash: rgba(124, 143, 240, .12);
   --activity: #2BB3C0;
@@ -352,8 +352,8 @@ onUnmounted(() => {
   --distance: var(--pace);
   --danger: #F0616A;
   --warning: #F5C33B;
-  --focus: #CDDC7C;
-  --route-neutral: #A9AF97;
+  --focus: #A6E22E;
+  --route-neutral: #9AA1A9;
   --route-mint: #2FA96B;
   --route-cyan: #4AA8E8;
   --route-amber: #F5C33B;
@@ -638,17 +638,20 @@ a { color: inherit; }
 .connection-chip.tone-danger { color: var(--danger); }
 .sync-time { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .refresh-btn {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 4px 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
   color: var(--muted);
+  font-size: 12px;
   cursor: pointer;
+  white-space: nowrap;
 }
-.refresh-btn:hover:not(:disabled) { background: var(--surface-hover); color: var(--ink); }
+.refresh-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .refresh-btn:disabled { opacity: .5; cursor: not-allowed; }
 .sync-progress-text { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
 .cancel-link { border: 0; background: transparent; color: var(--accent); font-size: 12px; cursor: pointer; padding: 0; }
@@ -754,7 +757,7 @@ a { color: inherit; }
   .mobile-menu-links { display: grid; gap: 3px; }
   .preview-banner, .route-notice { padding-inline: 16px; }
   .main-content { padding-bottom: 64px; }
-  .bottom-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); height: 60px; padding: 5px 8px calc(5px + env(safe-area-inset-bottom)); background: var(--canvas); border-top: 1px solid var(--line); }
+  .bottom-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); height: 60px; padding: 5px 8px calc(5px + env(safe-area-inset-bottom)); background: var(--canvas); border-top: 1px solid var(--line); }
   .bottom-nav-link { display: flex; min-width: 0; min-height: 44px; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-radius: var(--radius-sm); color: var(--muted); font-size: 11px; text-decoration: none; }
   .bottom-nav-link.is-active { color: var(--accent); background: var(--accent-soft); }
 }

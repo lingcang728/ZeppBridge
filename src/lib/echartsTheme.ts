@@ -1,12 +1,13 @@
-/* ZeppBridge ECharts 统一主题（设计系统 v3）
+/* ZeppBridge ECharts 统一主题（设计系统 v4）
    暗色 `zeppbridge-dark` 为 P1 基准；`zeppbridge-light` 供 P3 使用。
-   语义色集中定义；品牌色不进入健康数据的默认序列调色板。 */
+   语义色集中定义；品牌色不进入健康数据的默认序列调色板。
+   v4 配色与概览参考图对齐：冷调深灰底 + 明亮青柠绿主色。 */
 
 const fonts = "'MiSans','Segoe UI','Microsoft YaHei UI',sans-serif";
 
 /** Stable metric colors shared by charts, legends, and data exports. */
 export const zeppSemanticColors = {
-  brand: '#CDDC7C',
+  brand: '#A6E22E',
   heart: '#F0616A',
   pace: '#4AA8E8',
   distance: '#4AA8E8',
@@ -19,10 +20,10 @@ export const zeppSemanticColors = {
   vo2: '#3DD84C',
   readiness: '#3DD84C',
   sleep: {
-    deep: '#7B4FB3',
+    deep: '#4458B8',
     light: '#7C8FF0',
-    rem: '#2FA96B',
-    awake: '#E84C3D',
+    rem: '#8B5CF6',
+    awake: '#E8833A',
   },
 } as const;
 
@@ -45,8 +46,8 @@ const healthSeriesPalette = [
 const darkAxis = {
   axisLine: { show: false },
   axisTick: { show: false },
-  axisLabel: { color: '#A9AF97', fontSize: 11, fontFamily: fonts },
-  splitLine: { show: true, lineStyle: { color: 'rgba(228,235,208,0.08)', type: 'dashed' as const } },
+  axisLabel: { color: '#9AA1A9', fontSize: 11, fontFamily: fonts },
+  splitLine: { show: true, lineStyle: { color: 'rgba(226,234,242,0.07)', type: 'dashed' as const } },
 };
 
 const lightAxis = {
@@ -59,17 +60,17 @@ const lightAxis = {
 export const zeppThemeDark = {
   color: healthSeriesPalette,
   backgroundColor: 'transparent',
-  textStyle: { fontFamily: fonts, color: '#A9AF97' },
+  textStyle: { fontFamily: fonts, color: '#9AA1A9' },
   categoryAxis: { ...darkAxis },
   valueAxis: { ...darkAxis },
   timeAxis: { ...darkAxis },
   logAxis: { ...darkAxis },
   tooltip: {
-    backgroundColor: '#22261A',
-    borderColor: 'rgba(228,235,208,0.16)',
+    backgroundColor: '#24272F',
+    borderColor: 'rgba(226,234,242,0.14)',
     borderWidth: 1,
     padding: [8, 12],
-    textStyle: { color: '#F3F4EC', fontSize: 12, fontFamily: fonts },
+    textStyle: { color: '#F2F4EE', fontSize: 12, fontFamily: fonts },
     extraCssText: 'border-radius:8px;box-shadow:none;',
   },
   line: {

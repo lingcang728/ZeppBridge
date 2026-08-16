@@ -609,7 +609,7 @@ onUnmounted(() => {
             <option :value="365">最近 365 天</option>
           </select>
         </div>
-        <p class="retain-note">设置导出与提示词页面的默认格式与云端补拉窗口。</p>
+        <p class="retain-note">设置「交给 AI」页面的默认格式与云端补拉窗口。</p>
         <div class="inline-actions">
           <button class="button primary" type="button" :disabled="isSyncing || (!connected && !configuredOnly) || prefsBusy" @click="confirmHistorySync">
             开始历史补拉
