@@ -9,6 +9,8 @@
     "build:web": "vite build",
     "preview": "vite preview",
     "tauri": "tauri",
+    "package:release": "cmd.exe /d /c scripts\\windows\\build.bat",
+    "publish:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/publish-local.ps1 -UserEntryOnly",
     "icons:generate": "node scripts/icon/generate-icons.mjs",
     "icons:verify": "python scripts/icon/verify-icons.py || py -3 scripts/icon/verify-icons.py"
   },

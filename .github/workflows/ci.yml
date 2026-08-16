@@ -93,13 +93,17 @@ jobs:
         # beforeBuildCommand (icons:generate + vite build) runs as part of this.
         run: npm run tauri build
 
+      - name: Collect installers into release/
+        shell: pwsh
+        run: ./scripts/windows/publish-local.ps1 -SkipShortcuts -SkipStaleInstall
+
       - name: Upload installers
         uses: actions/upload-artifact@v4
         with:
           name: zeppbridge-installers
           path: |
-            src-tauri/target/release/bundle/nsis/*.exe
-            src-tauri/target/release/bundle/msi/*.msi
+            release/ZeppBridge_*-setup.exe
+            release/ZeppBridge_*.msi
           if-no-files-found: error
           retention-days: 14
 
@@ -115,7 +119,7 @@ jobs:
             exit 0
           fi
           gh release create "${GITHUB_REF_NAME}" \
-            src-tauri/target/release/bundle/nsis/*.exe \
-            src-tauri/target/release/bundle/msi/*.msi \
+            release/ZeppBridge_*-setup.exe \
+            release/ZeppBridge_*.msi \
             --title "ZeppBridge ${GITHUB_REF_NAME#v}" \
             --generate-notes

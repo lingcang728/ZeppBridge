@@ -47,7 +47,13 @@ npm run tauri build
 .\scripts\windows\build.bat
 ```
 
-`scripts\windows\build.bat` 会先执行 `cargo metadata` 读取 `target_directory`，检查生成的 NSIS/MSI，再复制到项目根目录的 `release\`。日常只认 `release\`；不要删除仓库里的 `src-tauri/target/` 以外、仅作本机缓存的 Cargo 目录。
+`scripts\windows\build.bat`（`npm run package:release`）会跑完整 `tauri build`，再调用 `scripts\windows\publish-local.ps1`：
+
+- 把独立 exe、当前版本 NSIS / MSI 收集到项目根目录的 `release\`
+- 删掉 `release\` 以及 Cargo bundle 目录里**上一版本**的安装包，只留当前版本
+- 把桌面和「开始」菜单快捷方式、`App Paths` 指到 `release\ZeppBridge.exe`
+
+日常只认 `release\ZeppBridge.exe`。不要跑 NSIS / MSI 往 `LocalAppData` 再装一份，否则 Windows 搜索会打开旧入口。若快捷方式被安装包改走了，跑 `npm run publish:local` 即可拨回。不要删除仓库里的 `src-tauri/target/` 以外、仅作本机缓存的 Cargo 目录。
 
 安装包当前在 `src-tauri/tauri.conf.json` 声明目标 `nsis` 和 `msi`。配置存在不等于已签名发布；当前没有签名、自动更新或干净 Windows VM 的验收声明。
 
@@ -115,8 +121,8 @@ Tauri command 在 `src-tauri/src/lib.rs` 注册，前端封装在 `src/lib/bridg
 3. `cargo check --manifest-path src-tauri/Cargo.toml --locked --all-targets`
 4. `cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings`
 5. `cargo test --manifest-path src-tauri/Cargo.toml --locked --jobs 1`
-6. `cmd.exe /d /c scripts\windows\build.bat`，记录 Cargo metadata 给出的实际 bundle 目录和 NSIS/MSI 文件。
-7. 安装一个实际生成的包，启动窗口，确认产品名/标识、首次启动恢复、设置页网页登录 command。
+6. `npm run package:release`（或 `cmd.exe /d /c scripts\windows\build.bat`），确认 `release\ZeppBridge.exe` 和当前版本 NSIS/MSI 已更新，旧版本安装包已被删掉。
+7. 双击桌面或开始菜单的 ZeppBridge 快捷方式，确认打开的是 `release\ZeppBridge.exe`；再确认产品名/标识、首次启动恢复、设置页网页登录 command。
 
 第 6–7 步是用户真正会打开的交付面，不能以源码检查替代。真实 Zepp 网页登录以及多区域、多设备数据仍需按环境分别验证。
 
