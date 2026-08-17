@@ -52,9 +52,26 @@ pub fn run() {
                 .path()
                 .app_data_dir()
                 .map_err(|error| anyhow::anyhow!("无法获取应用数据目录: {error}"))?;
-            let state = AppState::new(data_dir)
+            let state = AppState::new(data_dir.clone())
                 .map_err(|error| anyhow::anyhow!("无法初始化应用状态: {error}"))?;
             app.manage(state);
+
+            // 解析器修订号变化后，后台一次性重放本地原始报文以纠正派生数据
+            // （运动类型、睡眠阶段等）。独立连接 + 后台线程，不阻塞窗口创建。
+            std::thread::spawn(move || {
+                let Ok(db) = storage::Database::open_without_migration(data_dir.join("zepp.db"))
+                else {
+                    return;
+                };
+                match db.reprocess_raw_records_if_needed() {
+                    Ok(Some(counts)) => {
+                        let total: i64 = counts.values().sum();
+                        eprintln!("normalizer 升级，已重放本地原始报文（{total} 条派生记录）");
+                    }
+                    Ok(None) => {}
+                    Err(error) => eprintln!("本地报文重放失败: {error}"),
+                }
+            });
 
             if let Some(window) = app.get_webview_window("main") {
                 if let Ok(Some(monitor)) = window.current_monitor() {

@@ -396,25 +396,46 @@ impl DataFetcher {
         ];
         let mut last_optional_error = None;
         for sport in sports {
-            match self
-                .connector
-                .fetch_sport_history(sport, start, end, 1)
-                .await
-            {
-                Ok(payload) => records.push(FetchedRecord {
-                    raw: RawRecord {
-                        stream: "workouts".into(),
-                        source_key: format!("sport_history:{sport}:{start}:{end}"),
-                        source_scope: SourceScope::Device,
-                        device_id: None,
-                        start_utc: window.start_utc,
-                        end_utc: Some(window.end_utc),
-                        payload,
-                        capability: CapabilityStatus::Verified,
-                    },
-                }),
-                Err(error) if error.is_unavailable() => last_optional_error = Some(error),
-                Err(error) => return Err(error),
+            // Zepp 单页记录数有上限；响应 data.next 是下一页的 stopTrackId
+            // 游标（-1/0/缺失 = 没有更多）。不翻页会丢掉窗口内较早的记录。
+            let mut stop_track_id = end;
+            loop {
+                match self
+                    .connector
+                    .fetch_sport_history(sport, start, stop_track_id, 1)
+                    .await
+                {
+                    Ok(payload) => {
+                        let next = payload
+                            .pointer("/data/next")
+                            .and_then(Value::as_i64)
+                            .unwrap_or(-1);
+                        records.push(FetchedRecord {
+                            raw: RawRecord {
+                                stream: "workouts".into(),
+                                source_key: format!(
+                                    "sport_history:{sport}:{start}:{stop_track_id}"
+                                ),
+                                source_scope: SourceScope::Device,
+                                device_id: None,
+                                start_utc: window.start_utc,
+                                end_utc: Some(window.end_utc),
+                                payload,
+                                capability: CapabilityStatus::Verified,
+                            },
+                        });
+                        // 游标不再向窗口起点推进时停止，防止服务端异常造成死循环
+                        if next <= 0 || next >= stop_track_id || next <= start {
+                            break;
+                        }
+                        stop_track_id = next;
+                    }
+                    Err(error) if error.is_unavailable() => {
+                        last_optional_error = Some(error);
+                        break;
+                    }
+                    Err(error) => return Err(error),
+                }
             }
         }
         if records.is_empty() {

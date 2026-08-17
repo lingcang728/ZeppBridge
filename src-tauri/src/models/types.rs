@@ -170,7 +170,7 @@ pub struct UserPrefs {
 
 impl UserPrefs {
     pub const DEFAULT_RETENTION_DAYS: i64 = 365;
-    pub const DEFAULT_HISTORY_SYNC_DAYS: i64 = 30;
+    pub const DEFAULT_HISTORY_SYNC_DAYS: i64 = 180;
 
     pub fn clamp_days(value: i64) -> std::result::Result<i64, String> {
         if (1..=365).contains(&value) {

@@ -1,13 +1,13 @@
 /* ZeppBridge ECharts 统一主题（设计系统 v4）
    暗色 `zeppbridge-dark` 为 P1 基准；`zeppbridge-light` 供 P3 使用。
    语义色集中定义；品牌色不进入健康数据的默认序列调色板。
-   v4 配色与概览参考图对齐：冷调深灰底 + 明亮青柠绿主色。 */
+   v4 配色：冷调深灰底 + 橄榄军绿主色。 */
 
 const fonts = "'MiSans','Segoe UI','Microsoft YaHei UI',sans-serif";
 
 /** Stable metric colors shared by charts, legends, and data exports. */
 export const zeppSemanticColors = {
-  brand: '#A6E22E',
+  brand: '#7DA33E',
   heart: '#F0616A',
   pace: '#4AA8E8',
   distance: '#4AA8E8',

@@ -108,7 +108,7 @@ const weeklyChartOption = computed(() => {
       axisLine: { lineStyle: { color: 'rgba(228, 235, 208, 0.1)' } },
       axisTick: { show: false },
       axisLabel: {
-        color: (_val: string, index: number) => index === currentIndex ? '#CDDC7C' : '#7E856D',
+        color: (_val: string, index: number) => index === currentIndex ? '#7DA33E' : '#7E856D',
         fontSize: 11,
         fontWeight: (_val: string, index: number) => index === currentIndex ? 'bold' : 'normal',
       },
@@ -216,25 +216,24 @@ watch([dataRevision, sleepId], () => void loadDetail());
         <div class="hero-duration">
           <p class="kicker"><span class="mark"><Icon name="moon" :size="16" /></span>睡眠时长</p>
           <p class="value">{{ formatDuration(session.duration_minutes, '未提供') }}</p>
-          <p class="meta">{{ formatTime(session.start_time) }} 入睡 · {{ formatTime(session.end_time) }} 醒来</p>
-          <p class="meta">在床时长 {{ timeInBedLabel }}</p>
+          <p class="meta">{{ formatTime(session.start_time) }} 入睡 · {{ formatTime(session.end_time) }} 醒来 · 在床 {{ timeInBedLabel }}</p>
         </div>
         <div class="hero-score">
-          <p class="kicker">睡眠评分</p>
-          <div class="score-row">
-            <CircularProgress
-              v-if="score !== null"
-              :value="score"
-              :size="92"
-              :stroke-width="7"
-              color="var(--sleep)"
-              track-color="var(--line)"
-              unit=""
-            />
-            <strong v-else class="score-empty">未提供</strong>
-            <small>/ 100</small>
+          <CircularProgress
+            v-if="score !== null"
+            :value="score"
+            :size="88"
+            :stroke-width="7"
+            color="var(--sleep)"
+            track-color="var(--line)"
+            unit=""
+          />
+          <strong v-else class="score-empty">—</strong>
+          <div class="score-copy">
+            <p class="kicker">睡眠评分</p>
+            <p class="score-num">{{ score !== null ? score : '未提供' }}<small v-if="score !== null"> / 100</small></p>
+            <p v-if="score !== null" class="score-note">设备提供的评分，仅作记录展示。</p>
           </div>
-          <p v-if="score !== null" class="score-note">设备提供的评分，仅作记录展示。</p>
         </div>
       </article>
 
@@ -314,18 +313,17 @@ watch([dataRevision, sleepId], () => void loadDetail());
 </template>
 
 <style scoped>
-.sleep-page { width: 100%; }
+.sleep-page { width: 100%; display: grid; gap: 16px; align-content: start; }
 .back-link {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 8px;
   color: var(--muted);
   font-size: 12px;
   text-decoration: none;
 }
 .back-link:hover { color: var(--accent); }
-.page-heading { margin-bottom: 12px; }
+.page-heading { margin: 0; }
 .page-heading h1 {
   margin: 0;
   color: var(--ink);
@@ -341,20 +339,32 @@ watch([dataRevision, sleepId], () => void loadDetail());
 .muted-line { color: var(--muted); }
 .sleep-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(220px, 0.8fr);
-  align-items: start;
-  gap: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+  min-width: 0;
+  padding: 18px 20px;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--surface);
 }
-.score-note { margin: 10px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
-.hero-duration, .hero-score { min-width: 0; padding: 18px 20px 16px; }
+.hero-duration, .hero-score { min-width: 0; }
 .hero-score {
-  border-left: 1px solid var(--line);
-  background: var(--surface-raised);
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
+.score-copy { display: grid; gap: 2px; min-width: 0; }
+.score-num {
+  margin: 0;
+  color: var(--ink);
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.score-num small { color: var(--muted); font-size: 13px; font-weight: 500; }
+.score-note { margin: 2px 0 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
 .kicker {
   display: flex;
   align-items: center;
@@ -373,9 +383,8 @@ watch([dataRevision, sleepId], () => void loadDetail());
   background: var(--sleep-wash);
 }
 .value {
-  margin: 12px 0 0;
+  margin: 10px 0 0;
   color: var(--ink);
-  font-family: 'Inter', var(--font-sans);
   font-size: clamp(32px, 4vw, 42px);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
@@ -387,24 +396,12 @@ watch([dataRevision, sleepId], () => void loadDetail());
   color: var(--muted);
   font-size: 12px;
 }
-.score-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 12px;
-}
 .score-empty {
   color: var(--ink);
-  font-family: 'Inter', var(--font-sans);
-  font-size: 36px;
+  font-size: 28px;
   font-weight: 600;
 }
-.score-row small {
-  color: var(--muted);
-  font-family: 'Inter', var(--font-sans);
-  font-size: 13px;
-}
-.stage-card, .chart-card { margin-top: 12px; padding: 14px 16px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.stage-card, .chart-card { margin: 0; padding: 16px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
 .weekly-sleep-chart { width: 100%; height: 180px; }
 .stage-head {
   display: flex;
@@ -429,10 +426,10 @@ watch([dataRevision, sleepId], () => void loadDetail());
 .meta-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 12px;
+  gap: 16px;
+  margin: 0;
 }
-.meta-card { padding: 12px 14px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.meta-card { padding: 16px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
 .meta-title {
   display: flex;
   align-items: center;
@@ -451,9 +448,9 @@ watch([dataRevision, sleepId], () => void loadDetail());
   overflow-wrap: anywhere;
   font-size: 13px;
 }
-.note { margin: 12px 0 0; color: var(--muted); font-size: 12px; }
+.note { margin: 0; color: var(--muted); font-size: 12px; }
 @media (max-width: 760px) {
   .sleep-hero, .meta-grid { grid-template-columns: 1fr; }
-  .hero-score { border-left: 0; border-top: 1px solid var(--line); }
+  .hero-score { justify-content: flex-start; }
 }
 </style>

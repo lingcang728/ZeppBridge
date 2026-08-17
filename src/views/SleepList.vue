@@ -25,7 +25,7 @@ const loadList = async () => {
     return;
   }
   try {
-    sessions.value = await tauriApi.getRecentSleep(60);
+    sessions.value = await tauriApi.getRecentSleep(500);
   } catch (cause) {
     error.value = toUserMessage(cause, '睡眠列表暂时不可用');
   } finally {

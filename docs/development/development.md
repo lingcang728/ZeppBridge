@@ -47,13 +47,14 @@ npm run tauri build
 .\scripts\windows\build.bat
 ```
 
-`scripts\windows\build.bat`（`npm run package:release`）会跑完整 `tauri build`，再调用 `scripts\windows\publish-local.ps1`：
+`npm run package:release` 会跑完整 `tauri build`，成功后再调用 `scripts\windows\publish-local.ps1`：
 
-- 把独立 exe、当前版本 NSIS / MSI 收集到项目根目录的 `release\`
+- 编译缓存在 `G:\build_cache\cargo-target`（`~/.cargo/config.toml` 的 `target-dir`），**不是**用户入口
+- 把独立 exe、当前版本 NSIS / MSI **覆盖**到项目根目录的 `release\`（本盘给用户双击/分发的安装包）
 - 删掉 `release\` 以及 Cargo bundle 目录里**上一版本**的安装包，只留当前版本
 - 把桌面和「开始」菜单快捷方式、`App Paths` 指到 `release\ZeppBridge.exe`
 
-日常只认 `release\ZeppBridge.exe`。不要跑 NSIS / MSI 往 `LocalAppData` 再装一份，否则 Windows 搜索会打开旧入口。若快捷方式被安装包改走了，跑 `npm run publish:local` 即可拨回。不要删除仓库里的 `src-tauri/target/` 以外、仅作本机缓存的 Cargo 目录。
+日常只认 `release\ZeppBridge.exe`。不要跑 NSIS / MSI 往 `LocalAppData` 再装一份，否则 Windows 搜索会打开旧入口。若快捷方式被安装包改走了，跑 `npm run publish:local` 即可拨回。不要删除仅作本机缓存的 `G:\build_cache\cargo-target`。
 
 安装包当前在 `src-tauri/tauri.conf.json` 声明目标 `nsis` 和 `msi`。配置存在不等于已签名发布；当前没有签名、自动更新或干净 Windows VM 的验收声明。
 

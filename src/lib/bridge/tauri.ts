@@ -113,7 +113,7 @@ export const tauriBackend: BridgeBackend = {
     return call<UserPrefs>('set_user_prefs', { retentionDays, historySyncDays });
   },
 
-  getRecentSleep(limit = 30) {
+  getRecentSleep(limit = 500) {
     return call<SleepSession[]>('get_recent_sleep', { limit });
   },
 
@@ -121,7 +121,7 @@ export const tauriBackend: BridgeBackend = {
     return call<SleepSession | null>('get_sleep_detail', { sleepId });
   },
 
-  getRecentWorkouts(limit = 30) {
+  getRecentWorkouts(limit = 500) {
     return call<Workout[]>('get_recent_workouts', { limit });
   },
 

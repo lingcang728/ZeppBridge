@@ -57,7 +57,7 @@ const loadList = async () => {
     return;
   }
   try {
-    workouts.value = displayableWorkouts(await tauriApi.getRecentWorkouts());
+    workouts.value = displayableWorkouts(await tauriApi.getRecentWorkouts(500));
   } catch (cause) {
     error.value = toUserMessage(cause, '运动列表暂时不可用');
   } finally {

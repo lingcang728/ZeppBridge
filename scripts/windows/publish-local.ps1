@@ -376,4 +376,5 @@ if ($leftover.Count -gt 0) {
 
 Write-Host "用户入口：$portableDest"
 Write-Host "release 目录：$ReleaseDir"
+Write-Host "已覆盖本盘安装包：独立 exe + 当前版本 NSIS/MSI（编译缓存仍在 Cargo target-dir，不给用户双击）"
 exit 0

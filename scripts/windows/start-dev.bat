@@ -29,7 +29,7 @@ if not exist "node_modules\" (
 echo 正在启动 ZeppBridge 开发模式（Vite + Tauri）...
 echo 按 Ctrl+C 停止开发服务器。
 echo.
-npm.cmd run tauri dev
+call npm.cmd run tauri dev
 set "DEV_EXIT=%ERRORLEVEL%"
 if not "%DEV_EXIT%"=="0" (
   echo.

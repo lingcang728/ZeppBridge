@@ -3,7 +3,6 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import { graphic } from 'echarts/core';
 import VChart from 'vue-echarts';
-import { openUrl } from '@tauri-apps/plugin-opener';
 import CircularProgress from '../components/CircularProgress.vue';
 import DeviceVisual from '../components/DeviceVisual.vue';
 import Icon from '../components/Icon.vue';
@@ -11,28 +10,14 @@ import RecordRow from '../components/RecordRow.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import { useDevices } from '../composables/useDevices';
 import { useSyncController } from '../composables/useSyncController';
-import { exportTypeOptions, useExport } from '../composables/useExport';
-import { backend, isDesktop, isTauri, toUserMessage } from '../lib/bridge';
-import { AI_PROVIDERS, isFixedAiProviderUrl, type AiProvider, type AiProviderId } from '../lib/aiProviders';
-import { formatDistance, formatDuration, formatMetric, formatTime, isFiniteNumber, localDateString } from '../lib/format';
+import { backend, isDesktop, toUserMessage } from '../lib/bridge';
+import { formatDistance, formatDuration, formatMetric, formatTime, isFiniteNumber } from '../lib/format';
 import { workoutLabel } from '../lib/labels';
 import { displayableWorkouts, workoutDurationMinutes } from '../lib/workouts';
-import type { ExportDataType, HealthOverview, HeartRatePoint, SleepSession, Workout } from '../types';
+import type { HealthOverview, HeartRatePoint, SleepSession, Workout } from '../types';
 
 const { dataRevision } = useSyncController();
 const { models: deviceModels, error: deviceError, load: loadDevices } = useDevices();
-const {
-  exportStartDate,
-  exportEndDate,
-  exportDataTypes,
-  exportBusy,
-  exportError,
-  exportMessage,
-  applyExportRange,
-  copyExportJson,
-  saveExportFile,
-  publishAiFeed,
-} = useExport();
 
 const overview = ref<HealthOverview | null>(null);
 const heartRateSeries = ref<HeartRatePoint[]>([]);
@@ -105,11 +90,11 @@ const hrChartOption = computed(() => {
         data,
         smooth: 0.25,
         showSymbol: false,
-        lineStyle: { width: 2.5, color: '#A6E22E' },
+        lineStyle: { width: 2.5, color: '#7DA33E' },
         areaStyle: {
           color: new graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(166, 226, 46, .26)' },
-            { offset: 1, color: 'rgba(166, 226, 46, 0)' },
+            { offset: 0, color: 'rgba(125, 163, 62, .26)' },
+            { offset: 1, color: 'rgba(125, 163, 62, 0)' },
           ]),
         },
       },
@@ -119,7 +104,7 @@ const hrChartOption = computed(() => {
         data: last ? [last] : [],
         symbol: 'circle',
         symbolSize: 8,
-        itemStyle: { color: '#A6E22E', borderColor: '#161B08', borderWidth: 2 },
+        itemStyle: { color: '#7DA33E', borderColor: '#12170A', borderWidth: 2 },
         lineStyle: { opacity: 0 },
         tooltip: { show: false },
         z: 5,
@@ -225,54 +210,6 @@ const recentItems = computed<RecentItem[]>(() => {
   return items.sort((a, b) => b.time - a.time).slice(0, 5);
 });
 
-/* ── 交给 AI 面板 ────────────────────────── */
-const rangePresets = [
-  { days: 1, label: '今天' },
-  { days: 7, label: '7 天' },
-  { days: 30, label: '30 天' },
-];
-const activeRangeDays = computed(() => {
-  for (const preset of rangePresets) {
-    const end = new Date();
-    const start = new Date(end);
-    start.setDate(start.getDate() - Math.max(0, preset.days - 1));
-    if (localDateString(start) === exportStartDate.value && localDateString(end) === exportEndDate.value) return preset.days;
-  }
-  return null;
-});
-const isTypeSelected = (type: ExportDataType) => exportDataTypes.value.includes(type);
-const toggleType = (type: ExportDataType) => {
-  const index = exportDataTypes.value.indexOf(type);
-  if (index >= 0) exportDataTypes.value.splice(index, 1);
-  else exportDataTypes.value.push(type);
-};
-const allTypesSelected = computed(() => exportDataTypes.value.length === exportTypeOptions.length);
-const toggleAllTypes = () => {
-  exportDataTypes.value = allTypesSelected.value ? [] : exportTypeOptions.map((option) => option.value);
-};
-
-const providerNotice = ref<string | null>(null);
-const providerIconFailed = ref<Partial<Record<AiProviderId, boolean>>>({});
-const markProviderIconFailed = (id: AiProviderId) => {
-  providerIconFailed.value[id] = true;
-};
-const openProvider = async (provider: AiProvider) => {
-  providerNotice.value = null;
-  if (!isTauri()) {
-    providerNotice.value = '浏览器预览不会打开外部 AI 站点，请在桌面应用中使用。';
-    return;
-  }
-  if (!isFixedAiProviderUrl(provider.url)) {
-    providerNotice.value = '目标 AI 地址不在允许列表中。';
-    return;
-  }
-  try {
-    await openUrl(provider.url);
-  } catch {
-    providerNotice.value = `无法打开 ${provider.label}，请稍后重试。`;
-  }
-};
-
 /* ── 数据加载 ───────────────────────────── */
 const loadOverview = async () => {
   loading.value = true;
@@ -358,15 +295,13 @@ watch(dataRevision, () => {
           <path class="flow-head" d="M108 49l14 5-14 5z" />
         </svg>
         <div class="hv-brain">
-          <svg viewBox="0 0 48 48" fill="none" class="brain-svg">
-            <path d="M24 13v22" />
-            <path d="M24 15c-4-5-12-4-12 2-3 1-4 6-1 8-2 4 3 8 7 6 .8 2.7 4.5 3.6 6 1.5" />
-            <path d="M24 15c4-5 12-4 12 2 3 1 4 6 1 8 2 4-3 8-7 6-.8 2.7-4.5 3.6-6 1.5" />
-            <path d="M14 21H9m5 7H9m30-7h5m-5 7h5" />
-            <circle cx="8" cy="21" r="1.5" class="brain-dot" />
-            <circle cx="8" cy="28" r="1.5" class="brain-dot" />
-            <circle cx="40" cy="21" r="1.5" class="brain-dot" />
-            <circle cx="40" cy="28" r="1.5" class="brain-dot" />
+          <svg viewBox="0 0 48 48" fill="none" class="brain-svg" aria-hidden="true">
+            <rect x="12" y="12" width="24" height="24" rx="5" />
+            <path d="M17 12V8m7 4V8m7 4V8M17 36v4m7-4v4m7-4v4M12 17H8m4 7H8m4 7H8M36 17h4m-4 7h4m-4 7h4" />
+            <circle cx="20" cy="22" r="2" class="brain-dot" />
+            <circle cx="28" cy="22" r="2" class="brain-dot" />
+            <circle cx="24" cy="29" r="2" class="brain-dot" />
+            <path d="M20 22h8M20 22l4 7M28 22l-4 7" />
           </svg>
           <span class="hv-brain-label">AI</span>
         </div>
@@ -410,31 +345,35 @@ watch(dataRevision, () => {
               <span class="stat-label">24 小时心率</span>
               <span class="hr-latest">最新 <strong>{{ num(hrLatest) }}</strong> 次/分</span>
             </div>
-            <VChart
-              v-if="hrPoints.length > 1"
-              class="hr-chart"
-              :option="hrChartOption"
-              autoresize
-              role="img"
-              aria-label="24 小时心率曲线"
-            />
-            <div v-else class="stat-empty">
-              <Icon name="info" :size="15" />完成一次同步后展示 24 小时心率曲线。
+            <div class="stat-slot">
+              <VChart
+                v-if="hrPoints.length > 1"
+                class="hr-chart"
+                :option="hrChartOption"
+                autoresize
+                role="img"
+                aria-label="24 小时心率曲线"
+              />
+              <div v-else class="stat-empty">
+                <Icon name="info" :size="15" />完成一次同步后展示 24 小时心率曲线。
+              </div>
             </div>
           </section>
 
           <!-- 今日步数 -->
           <section class="surface-card stat-card steps-card" aria-label="今日步数">
             <div class="stat-head"><span class="stat-label">今日步数</span></div>
-            <div class="steps-ring">
-              <CircularProgress :value="stepsPercent" :size="104" :stroke-width="9" color="#A6E22E" track-color="rgba(226, 234, 242, .1)">
-                <div class="steps-center">
-                  <strong>{{ num(stepsToday) }}</strong>
-                  <span>步</span>
-                </div>
-              </CircularProgress>
+            <div class="stat-slot">
+              <div class="steps-ring">
+                <CircularProgress :value="stepsPercent" :size="104" :stroke-width="9" color="#7DA33E" track-color="rgba(226, 234, 242, .1)">
+                  <div class="steps-center">
+                    <strong>{{ num(stepsToday) }}</strong>
+                    <span>步</span>
+                  </div>
+                </CircularProgress>
+              </div>
+              <p class="stat-foot">目标 {{ formatMetric(STEP_GOAL) }} · {{ stepsPercent }}%</p>
             </div>
-            <p class="stat-foot">目标 {{ formatMetric(STEP_GOAL) }} · {{ stepsPercent }}%</p>
           </section>
 
           <!-- 昨晚睡眠 -->
@@ -443,22 +382,24 @@ watch(dataRevision, () => {
               <span class="stat-label">昨晚睡眠</span>
               <span v-if="lastSleep && isFiniteNumber(lastSleep.score)" class="sleep-score">{{ lastSleep.score }}</span>
             </div>
-            <template v-if="lastSleep">
-              <p class="sleep-main">
-                <Icon name="moon" :size="16" class="sleep-moon" />
-                <strong>{{ hm(lastSleep.duration_minutes) }}</strong>
-              </p>
-              <p class="sleep-sub">睡眠评分 <em>{{ isFiniteNumber(lastSleep.score) ? lastSleep.score : '—' }}</em></p>
-              <ul class="sleep-stages">
-                <li v-for="stage in sleepStages" :key="stage.key">
-                  <i class="stage-dot" :style="{ background: stage.color }"></i>
-                  <span>{{ stage.label }}</span>
-                  <em>{{ hm(stage.minutes) }}</em>
-                </li>
-              </ul>
-            </template>
-            <div v-else class="stat-empty">
-              <Icon name="info" :size="15" />完成一次同步后展示昨晚睡眠。
+            <div class="stat-slot">
+              <template v-if="lastSleep">
+                <p class="sleep-main">
+                  <Icon name="moon" :size="16" class="sleep-moon" />
+                  <strong>{{ hm(lastSleep.duration_minutes) }}</strong>
+                </p>
+                <p class="sleep-sub">睡眠评分 <em>{{ isFiniteNumber(lastSleep.score) ? lastSleep.score : '—' }}</em></p>
+                <ul class="sleep-stages">
+                  <li v-for="stage in sleepStages" :key="stage.key">
+                    <i class="stage-dot" :style="{ background: stage.color }"></i>
+                    <span>{{ stage.label }}</span>
+                    <em>{{ hm(stage.minutes) }}</em>
+                  </li>
+                </ul>
+              </template>
+              <div v-else class="stat-empty">
+                <Icon name="info" :size="15" />完成一次同步后展示昨晚睡眠。
+              </div>
             </div>
           </section>
         </div>
@@ -532,95 +473,6 @@ watch(dataRevision, () => {
           <div class="guarantee-item"><Icon name="spark" :size="14" /><span>AI-ready</span></div>
         </footer>
       </div>
-
-      <!-- 交给 AI 面板 -->
-      <aside class="surface-card ai-panel" aria-label="交给 AI">
-        <div class="stat-head">
-          <span class="stat-label ai-title"><Icon name="send" :size="14" />交给 AI</span>
-          <RouterLink class="text-link" to="/explore">工作台 <Icon name="arrow-right" :size="12" /></RouterLink>
-        </div>
-
-        <div class="range-pills" role="group" aria-label="快捷时间范围">
-          <button
-            v-for="preset in rangePresets"
-            :key="preset.days"
-            type="button"
-            :class="['range-pill', { 'is-on': activeRangeDays === preset.days }]"
-            @click="applyExportRange(preset.days)"
-          >{{ preset.label }}</button>
-        </div>
-
-        <div class="date-range-row">
-          <span class="date-field">
-            <small>开始</small>
-            <span class="date-box"><Icon name="clock" :size="12" />{{ exportStartDate }}</span>
-          </span>
-          <span class="range-sep">–</span>
-          <span class="date-field">
-            <small>结束</small>
-            <span class="date-box"><Icon name="clock" :size="12" />{{ exportEndDate }}</span>
-          </span>
-        </div>
-
-        <div class="type-head">
-          <span class="group-label">数据类型</span>
-          <button class="select-all" type="button" @click="toggleAllTypes">{{ allTypesSelected ? '清空' : '全选' }}</button>
-        </div>
-        <div class="type-grid" role="group" aria-label="数据类型">
-          <button
-            v-for="option in exportTypeOptions"
-            :key="option.value"
-            type="button"
-            :class="['type-item', { 'is-on': isTypeSelected(option.value) }]"
-            :aria-pressed="isTypeSelected(option.value)"
-            @click="toggleType(option.value)"
-          >
-            <span class="type-box"><Icon v-if="isTypeSelected(option.value)" name="check" :size="11" /></span>
-            <span>{{ option.label }}</span>
-          </button>
-        </div>
-
-        <div class="ai-actions">
-          <button class="ai-btn ghost" type="button" :disabled="exportBusy !== null" @click="copyExportJson">
-            <Icon name="copy" :size="14" />{{ exportBusy === 'copy' ? '复制中…' : '复制 JSON' }}
-          </button>
-          <button class="ai-btn solid" type="button" :disabled="exportBusy !== null" @click="saveExportFile">
-            <Icon name="export" :size="14" />{{ exportBusy === 'save' ? '保存中…' : '保存文件' }}
-          </button>
-          <button class="ai-btn solid wide" type="button" :disabled="exportBusy !== null" @click="publishAiFeed">
-            <Icon name="database" :size="14" />{{ exportBusy === 'publish' ? '更新中…' : '更新本机 AI 数据源' }}
-          </button>
-        </div>
-
-        <p v-if="exportMessage" class="ai-note ok" role="status"><Icon name="circle-check" :size="13" />{{ exportMessage }}</p>
-        <p v-if="exportError" class="ai-note bad" role="alert"><Icon name="warning" :size="13" />{{ exportError }}</p>
-        <p v-if="providerNotice" class="ai-note" role="status"><Icon name="info" :size="13" />{{ providerNotice }}</p>
-
-        <div class="ai-targets">
-          <span class="group-label">目标 AI 工具</span>
-          <div class="tool-grid">
-            <button
-              v-for="tool in AI_PROVIDERS"
-              :key="tool.id"
-              type="button"
-              class="tool-pill"
-              :title="`打开 ${tool.label}`"
-              @click="openProvider(tool)"
-            >
-              <img
-                v-if="!providerIconFailed[tool.id]"
-                :src="tool.localIcon"
-                :alt="`${tool.label} 图标`"
-                @error="markProviderIconFailed(tool.id)"
-              />
-              <span v-else class="tool-fallback" aria-hidden="true">{{ tool.fallback }}</span>
-              <span>{{ tool.label }}</span>
-            </button>
-          </div>
-        </div>
-
-        <p class="ai-footnote"><Icon name="info" :size="12" />导出的 JSON 结构化，便于 AI 理解与分析。</p>
-      </aside>
     </div>
   </section>
 </template>
@@ -684,7 +536,7 @@ watch(dataRevision, () => {
   border-radius: 18px;
   background: var(--accent-soft);
   color: var(--accent);
-  box-shadow: 0 0 24px rgba(166, 226, 46, .16);
+  box-shadow: 0 0 24px rgba(125, 163, 62, .16);
 }
 .brain-svg { width: 38px; height: 38px; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .brain-dot { fill: currentColor; stroke: none; }
@@ -703,20 +555,22 @@ watch(dataRevision, () => {
 /* ── 仪表盘网格 ─────────────────────────── */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 316px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   align-items: start;
   min-width: 0;
 }
 .dash-main { display: grid; gap: 16px; min-width: 0; align-content: start; }
-.stat-row { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, .72fr) minmax(0, 1.05fr); gap: 16px; }
-.trio-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.stat-row,
+.trio-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
 
-.stat-card { display: grid; gap: 10px; align-content: start; padding: 16px 18px; min-width: 0; }
+.stat-card { display: grid; grid-template-rows: auto 1fr; gap: 10px; align-content: stretch; padding: 16px 18px; min-width: 0; min-height: 236px; }
+.trio-row .stat-card { min-height: 148px; grid-template-rows: auto 1fr auto; }
+.stat-slot { min-height: 148px; min-width: 0; display: grid; align-content: center; }
 .stat-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
 .stat-label { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 600; }
 .stat-foot { margin: 0; color: var(--subtle); font-size: 11px; text-align: center; font-variant-numeric: tabular-nums; }
-.stat-empty { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 96px; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); color: var(--subtle); font-size: 12px; text-align: center; padding: 12px; }
+.stat-empty { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 148px; height: 100%; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); color: var(--subtle); font-size: 12px; text-align: center; padding: 12px; }
 .num { font-variant-numeric: tabular-nums; }
 
 /* 24 小时心率 */
@@ -771,55 +625,7 @@ watch(dataRevision, () => {
 .guarantee-item svg { color: var(--accent); }
 .guarantee-divider { width: 1px; height: 12px; background: var(--line); }
 
-/* ── 交给 AI 面板 ────────────────────────── */
-.ai-panel { display: grid; gap: 12px; align-content: start; padding: 16px 18px; }
-.ai-title { color: var(--ink); font-size: 14px; }
-.ai-title svg { color: var(--accent); }
-.range-pills { display: flex; gap: 8px; }
-.range-pill { flex: 1; min-height: 30px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-raised); color: var(--muted); font-size: 12px; cursor: pointer; transition: all 140ms ease; }
-.range-pill:hover { border-color: var(--line-strong); color: var(--ink); }
-.range-pill.is-on { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
-.date-range-row { display: flex; align-items: flex-end; gap: 8px; }
-.date-field { display: grid; gap: 4px; flex: 1; min-width: 0; }
-.date-field small { color: var(--subtle); font-size: 11px; }
-.date-box { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-raised); color: var(--ink); font-size: 11px; font-family: var(--font-mono); white-space: nowrap; }
-.date-box svg { color: var(--subtle); }
-.range-sep { padding-bottom: 8px; color: var(--subtle); }
-.group-label { color: var(--ink); font-size: 12px; font-weight: 700; }
-.type-head { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
-.select-all { border: 0; background: transparent; color: var(--accent); font-size: 11px; cursor: pointer; padding: 2px 4px; }
-.select-all:hover { text-decoration: underline; }
-.type-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-.type-item { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-raised); color: var(--muted); font-size: 12px; cursor: pointer; text-align: left; transition: all 140ms ease; }
-.type-item:hover { border-color: var(--line-strong); color: var(--ink); }
-.type-item.is-on { border-color: color-mix(in srgb, var(--accent) 40%, transparent); color: var(--ink); }
-.type-box { display: grid; place-items: center; width: 15px; height: 15px; flex: 0 0 15px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface); color: var(--accent-ink); }
-.type-item.is-on .type-box { border-color: var(--accent); background: var(--accent); }
-.ai-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.ai-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; padding: 6px 10px; border: 1px solid transparent; border-radius: 9px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 140ms ease; }
-.ai-btn:disabled { opacity: .55; cursor: not-allowed; }
-.ai-btn.ghost { border-color: var(--line-strong); background: transparent; color: var(--muted); }
-.ai-btn.ghost:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-.ai-btn.solid { background: var(--action-green); color: #F2F8E8; }
-.ai-btn.solid:hover:not(:disabled) { background: var(--action-green-hover); }
-.ai-btn.wide { grid-column: 1 / -1; }
-.ai-note { display: flex; align-items: flex-start; gap: 6px; margin: 0; font-size: 11px; line-height: 1.5; color: var(--muted); }
-.ai-note.ok { color: var(--accent); }
-.ai-note.bad { color: var(--danger); }
-.ai-targets { display: grid; gap: 8px; padding-top: 4px; border-top: 1px solid var(--line); }
-.tool-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(66px, 1fr)); gap: 6px; }
-.tool-pill { display: flex; flex-direction: column; align-items: center; gap: 5px; min-height: 56px; padding: 8px 4px 6px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-raised); color: var(--muted); font-size: 11px; cursor: pointer; transition: all 140ms ease; }
-.tool-pill:hover { border-color: var(--accent); color: var(--ink); }
-.tool-pill img { width: 18px; height: 18px; object-fit: contain; }
-.tool-fallback { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--surface); color: var(--muted); font-size: 10px; }
-.ai-footnote { display: flex; align-items: flex-start; gap: 6px; margin: 0; color: var(--subtle); font-size: 11px; line-height: 1.5; }
-.ai-footnote svg { flex: 0 0 auto; margin-top: 1px; }
-
 /* ── 响应式 ─────────────────────────────── */
-@media (max-width: 1120px) {
-  .dashboard-grid { grid-template-columns: 1fr; }
-  .ai-panel { order: -1; }
-}
 @media (max-width: 920px) {
   .hero-card { grid-template-columns: 1fr; }
   .hero-visual { max-width: 420px; }

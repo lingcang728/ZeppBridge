@@ -33,7 +33,9 @@ echo   - 后端：Rust release build
 echo   - 安装包：NSIS 与 MSI
 echo   - 用户入口：项目 release\ZeppBridge.exe（桌面/开始菜单快捷方式会改指向这里）
 echo.
-npm.cmd run tauri build
+REM npm.cmd 本身是 bat。不加 call 的话，父脚本会在 tauri build 结束后直接退出，
+REM 后面的 publish-local（覆盖 release\ 安装包）永远跑不到。
+call npm.cmd run tauri build
 set "BUILD_EXIT=%ERRORLEVEL%"
 if not "%BUILD_EXIT%"=="0" (
   echo.

@@ -74,8 +74,8 @@ const loadRecent = async () => {
     return;
   }
   const [sleep, workouts] = await Promise.allSettled([
-    tauriApi.getRecentSleep(10),
-    tauriApi.getRecentWorkouts(),
+    tauriApi.getRecentSleep(500),
+    tauriApi.getRecentWorkouts(500),
   ]);
   recentSleep.value = sleep.status === 'fulfilled' ? sleep.value : [];
   recentWorkouts.value = workouts.status === 'fulfilled' ? workouts.value : [];

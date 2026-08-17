@@ -153,7 +153,11 @@ const stroke = computed(() => Math.min(1.75, Math.max(1.5, props.stroke)));
       <rect x="3.5" y="5" width="17" height="11" rx="2" :stroke-width="stroke" />
       <path d="M8 20h8M12 16v4" :stroke-width="stroke" />
     </g>
-    <path v-else-if="name === 'moon'" d="M19.5 14.5A7.5 7.5 0 0 1 9.5 4.5a7.5 7.5 0 1 0 10 10Z" fill="currentColor" stroke="none" />
+    <g v-else-if="name === 'moon'">
+      <path d="M16.8 13.6A6.4 6.4 0 0 1 8.6 5.2a6.8 6.8 0 1 0 9.4 9.6 6.2 6.2 0 0 1-1.2-1.2Z" fill="currentColor" stroke="none" />
+      <path d="M16.4 5.2l.55 1.35L18.3 7.1l-1.35.55-.55 1.35-.55-1.35-1.35-.55 1.35-.55L16.4 5.2Z" fill="currentColor" stroke="none" />
+      <path d="M20.2 9.1l.35.85.85.35-.85.35-.35.85-.35-.85-.85-.35.85-.35.35-.85Z" fill="currentColor" stroke="none" />
+    </g>
     <g v-else-if="name === 'pace'">
       <circle cx="12" cy="13" r="7.2" :stroke-width="stroke" />
       <path d="M12 13 8.8 8.4M12 6V4" :stroke-width="stroke" />

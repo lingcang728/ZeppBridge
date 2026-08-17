@@ -7,7 +7,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
-const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v6";
+const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v8";
 const LAST_CLOUD_SYNC_AT_KEY: &str = "last_cloud_sync_at";
 const LAST_CLOUD_SYNC_OUTCOME_KEY: &str = "last_cloud_sync_outcome";
 const LAST_LOCAL_REPROCESS_AT_KEY: &str = "last_local_reprocess_at";
@@ -752,7 +752,6 @@ impl Database {
         Ok(())
     }
 
-    #[allow(dead_code)]
     pub fn reprocess_raw_records_if_needed(&self) -> Result<Option<BTreeMap<String, i64>>> {
         let current = self
             .conn
@@ -2544,11 +2543,11 @@ mod tests {
     }
 
     #[test]
-    fn prefs_default_to_365_and_30_without_writing_old_30_day_retention() {
+    fn prefs_default_to_365_and_180_without_writing_old_30_day_retention() {
         let db = Database::in_memory().unwrap();
         let prefs = db.user_prefs().unwrap();
         assert_eq!(prefs.retention_days, 365);
-        assert_eq!(prefs.history_sync_days, 30);
+        assert_eq!(prefs.history_sync_days, 180);
         assert!(db.get_app_meta("retention_days").unwrap().is_none());
     }
 

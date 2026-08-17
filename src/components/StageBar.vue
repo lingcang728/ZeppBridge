@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import VChart from 'vue-echarts';
 import { formatDuration, formatTime, isFiniteNumber } from '../lib/format';
+import { zeppSemanticColors } from '../lib/echartsTheme';
 import type { SleepStageSlice } from '../types';
 
 export interface StageItem {
@@ -16,6 +18,20 @@ interface BarSegment {
   end?: number;
 }
 
+const STAGE_LEVEL: Record<StageItem['tone'], number> = {
+  deep: 0,
+  light: 1,
+  rem: 2,
+  awake: 3,
+};
+const STAGE_LABELS = ['深睡', '浅睡', 'REM', '清醒'];
+const STAGE_COLORS = {
+  deep: zeppSemanticColors.sleep.deep,
+  light: zeppSemanticColors.sleep.light,
+  rem: zeppSemanticColors.sleep.rem,
+  awake: zeppSemanticColors.sleep.awake,
+} as const;
+
 const props = defineProps<{
   stages: StageItem[];
   slices?: SleepStageSlice[] | null;
@@ -23,8 +39,16 @@ const props = defineProps<{
   rangeEnd?: string;
 }>();
 
+const toMs = (value?: string): number | null => {
+  if (!value) return null;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : null;
+};
+
 const timeline = computed<BarSegment[]>(() => {
-  const slices = (props.slices ?? [])
+  const rangeFrom = toMs(props.rangeStart);
+  const rangeTo = toMs(props.rangeEnd);
+  return (props.slices ?? [])
     .map((slice) => {
       const start = new Date(slice.start_time).getTime();
       const end = new Date(slice.end_time).getTime();
@@ -32,30 +56,28 @@ const timeline = computed<BarSegment[]>(() => {
         ? slice.stage
         : null;
       if (!tone || !Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
+      if (rangeFrom !== null && rangeTo !== null) {
+        const overlapStart = Math.max(start, rangeFrom);
+        const overlapEnd = Math.min(end, rangeTo);
+        if (overlapEnd <= overlapStart) return null;
+        return { tone, minutes: (overlapEnd - overlapStart) / 60_000, start: overlapStart, end: overlapEnd };
+      }
       return { tone, minutes: (end - start) / 60_000, start, end };
     })
     .filter((slice): slice is { tone: StageItem['tone']; minutes: number; start: number; end: number } => slice !== null);
-  return slices.length >= 2 ? slices : [];
 });
 
 const range = computed<{ from: number; span: number } | null>(() => {
-  const toMs = (value?: string): number | null => {
-    if (!value) return null;
-    const time = new Date(value).getTime();
-    return Number.isFinite(time) ? time : null;
-  };
   const from = toMs(props.rangeStart);
   const to = toMs(props.rangeEnd);
   if (from !== null && to !== null && to > from) return { from, span: to - from };
-  // rangeStart/rangeEnd may be display-only strings (e.g. "23:40"); fall back
-  // to the slice bounds so absolute positioning still matches real time.
   if (!timeline.value.length) return null;
   const first = Math.min(...timeline.value.map((slice) => slice.start as number));
   const last = Math.max(...timeline.value.map((slice) => slice.end as number));
   return last > first ? { from: first, span: last - first } : null;
 });
 
-const isTimeline = computed(() => timeline.value.length > 0 && range.value !== null);
+const isHypnogram = computed(() => timeline.value.length > 0 && range.value !== null);
 const axisLabels = computed(() => ({
   start: props.rangeStart ? formatTime(props.rangeStart) : '',
   end: props.rangeEnd ? formatTime(props.rangeEnd) : '',
@@ -78,30 +100,111 @@ const labelFor = (minutes?: number | null): string => {
   return formatDuration(minutes, '0 分钟');
 };
 const segmentStyle = (stage: BarSegment): Record<string, string> => {
-  const current = range.value;
-  if (isTimeline.value && current && typeof stage.start === 'number' && typeof stage.end === 'number') {
-    const left = Math.max(0, Math.min(100, ((stage.start - current.from) / current.span) * 100));
-    const width = Math.max(0, Math.min(100 - left, ((stage.end - stage.start) / current.span) * 100));
-    return { left: left + '%', width: width + '%' };
-  }
   return { width: barPercent(stage.minutes) + '%' };
 };
+
+const clock = (value: number) => {
+  const date = new Date(value);
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+};
+
+const hypnogramOption = computed(() => {
+  const current = range.value;
+  if (!current || !timeline.value.length) return null;
+  const points: [number, number][] = [];
+  for (const slice of timeline.value) {
+    if (typeof slice.start !== 'number') continue;
+    points.push([slice.start, STAGE_LEVEL[slice.tone]]);
+  }
+  const last = timeline.value[timeline.value.length - 1];
+  if (last && typeof last.end === 'number') {
+    points.push([last.end, STAGE_LEVEL[last.tone]]);
+  }
+  if (points.length < 2) return null;
+  return {
+    animation: false,
+    grid: { left: 44, right: 12, top: 12, bottom: 24 },
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params: Array<{ value: [number, number] }>) => {
+        const point = params?.[0]?.value;
+        if (!point) return '';
+        return `${clock(point[0])}  ${STAGE_LABELS[point[1]] ?? ''}`;
+      },
+    },
+    xAxis: {
+      type: 'time',
+      min: current.from,
+      max: current.from + current.span,
+      axisLabel: { formatter: clock, hideOverlap: true, color: '#7E856D', fontSize: 11 },
+      axisTick: { show: false },
+      axisLine: { lineStyle: { color: 'rgba(226, 234, 242, .12)' } },
+      splitLine: { show: false },
+    },
+    yAxis: {
+      type: 'value',
+      min: -0.45,
+      max: 3.45,
+      interval: 1,
+      axisLabel: {
+        formatter: (value: number) => STAGE_LABELS[value] ?? '',
+        color: '#7E856D',
+        fontSize: 11,
+      },
+      axisTick: { show: false },
+      axisLine: { show: false },
+      splitLine: { lineStyle: { color: 'rgba(226, 234, 242, .08)', type: 'dashed' } },
+    },
+    visualMap: {
+      show: false,
+      type: 'piecewise',
+      dimension: 1,
+      pieces: [
+        { min: -0.5, max: 0.5, color: STAGE_COLORS.deep },
+        { min: 0.5, max: 1.5, color: STAGE_COLORS.light },
+        { min: 1.5, max: 2.5, color: STAGE_COLORS.rem },
+        { min: 2.5, max: 3.5, color: STAGE_COLORS.awake },
+      ],
+    },
+    series: [
+      {
+        type: 'line',
+        step: 'end',
+        data: points,
+        showSymbol: false,
+        lineStyle: { width: 2.4 },
+        areaStyle: { opacity: 0.16 },
+      },
+    ],
+  };
+});
 </script>
 
 <template>
   <div class="stage-block">
-    <div class="stage-bar" :class="{ 'is-timeline': isTimeline }" :aria-label="timeline.length ? '睡眠阶段时间轴' : '睡眠阶段汇总比例'">
-      <span
-        v-for="(stage, index) in barSegments"
-        :key="`${stage.tone}-${index}`"
-        :class="stage.tone"
-        :style="segmentStyle(stage)"
+    <template v-if="isHypnogram && hypnogramOption">
+      <VChart
+        class="hypnogram"
+        :option="hypnogramOption"
+        autoresize
+        role="img"
+        aria-label="睡眠阶段阶梯图"
       />
-    </div>
-    <div v-if="rangeStart || rangeEnd" class="stage-axis">
-      <span>{{ axisLabels.start }}</span>
-      <span>{{ axisLabels.end }}</span>
-    </div>
+    </template>
+    <template v-else>
+      <div class="stage-bar" aria-label="睡眠阶段汇总比例">
+        <span
+          v-for="(stage, index) in barSegments"
+          :key="`${stage.tone}-${index}`"
+          :class="stage.tone"
+          :style="segmentStyle(stage)"
+        />
+      </div>
+      <div v-if="rangeStart || rangeEnd" class="stage-axis">
+        <span>{{ axisLabels.start }}</span>
+        <span>{{ axisLabels.end }}</span>
+      </div>
+    </template>
     <div class="stage-list">
       <div v-for="stage in stages" :key="stage.label">
         <span><i :class="stage.tone"></i>{{ stage.label }}</span>
@@ -113,6 +216,8 @@ const segmentStyle = (stage: BarSegment): Record<string, string> => {
 </template>
 
 <style scoped>
+.stage-block { min-width: 0; }
+.hypnogram { width: 100%; height: 180px; }
 .stage-bar {
   position: relative;
   display: flex;
@@ -122,7 +227,6 @@ const segmentStyle = (stage: BarSegment): Record<string, string> => {
   background: var(--surface-raised);
 }
 .stage-bar span { display: block; min-width: 0; }
-.stage-bar.is-timeline span { position: absolute; top: 0; bottom: 0; }
 .deep, i.deep { background: var(--sleep-deep); }
 .light, i.light { background: var(--sleep-light); }
 .rem, i.rem { background: var(--sleep-rem); }
@@ -133,7 +237,6 @@ const segmentStyle = (stage: BarSegment): Record<string, string> => {
   gap: 12px;
   margin-top: 8px;
   color: var(--muted);
-  font-family: 'Inter', var(--font-sans);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
@@ -162,7 +265,6 @@ const segmentStyle = (stage: BarSegment): Record<string, string> => {
 .stage-list strong {
   margin-top: 6px;
   color: var(--ink);
-  font-family: 'Inter', var(--font-sans);
   font-size: 15px;
   font-variant-numeric: tabular-nums;
   font-weight: 600;

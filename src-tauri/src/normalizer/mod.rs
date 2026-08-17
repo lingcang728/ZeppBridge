@@ -215,13 +215,20 @@ impl Normalizer {
                 diagnostics.push(format!("item {index}: workout end 不晚于 start"));
                 continue;
             }
-            let workout_type = first_string(
-                object,
-                &["workout_type", "sportType", "sport", "sport_title"],
-            )
-            .or_else(|| sport.map(str::to_owned))
-            .or_else(|| first_string(object, &["type", "sport_mode"]))
-            .unwrap_or_else(|| "unknown".into());
+            // 类型以记录自带的数字 `type` 为准（1=跑步/6=健走/9=骑行…）。
+            // 接口路径名（如 run）只能兜底：/v1/sport/run/history.json 不带过滤时
+            // 会返回全部运动类型，先用路径名会把骑行/健走/AI 活动全部错标成跑步。
+            let workout_type = first_number(object, &["type", "sport_mode"])
+                .and_then(|value| zepp_sport_type_name(value.round() as i64))
+                .map(str::to_owned)
+                .or_else(|| {
+                    first_string(
+                        object,
+                        &["workout_type", "sportType", "sport", "sport_title"],
+                    )
+                })
+                .or_else(|| sport.map(str::to_owned))
+                .unwrap_or_else(|| "unknown".into());
             let workout_id = first_string(
                 object,
                 &["workout_id", "workoutId", "trackId", "trackid", "id"],
@@ -451,6 +458,33 @@ impl Normalizer {
     }
 }
 
+/// Zepp 运动摘要的数字 `type` → 规范运动名。
+/// 1/6/9/223 已与 Zepp APP 真实记录逐一核对（跑步/健走/骑行/AI 活动）；
+/// 8/10/14/23/92 来自社区参考实现；13/22/192 按本地记录动态特征
+/// （步频/步幅/配速/心率）推断，新设备编码出现时可再校正。
+fn zepp_sport_type_name(type_id: i64) -> Option<&'static str> {
+    match type_id {
+        1 => Some("run"),
+        6 => Some("walking"),
+        8 => Some("treadmill"),
+        9 => Some("ride"),
+        10 => Some("indoor_cycling"),
+        // 步频 ~99spm、配速 ~3.5km/h，步行特征（13 的语义待 Zepp 官方确认）
+        13 => Some("walking"),
+        14 => Some("swimming"),
+        16 => Some("activity"),
+        // 10-15km、~3.6km/h 长时户外带 GPS，徒步特征
+        22 => Some("hiking"),
+        23 => Some("rowing"),
+        92 => Some("badminton"),
+        // 步频 ~166spm、步幅 ~105cm，明确跑步步态（新固件编码）
+        192 => Some("run"),
+        // AI 活动：仅卡路里 + 心率，无距离
+        223 => Some("activity"),
+        _ => None,
+    }
+}
+
 fn sleep_from_band_item(
     item: &Map<String, Value>,
     summary: &Map<String, Value>,
@@ -479,7 +513,7 @@ fn sleep_from_band_item(
     let rem_from_field = first_number(sleep, &["rm", "remMinutes", "rem"])
         .map(|value| value.round() as i32)
         .filter(|value| *value >= 0);
-    let rem_from_stages = band_stage_minutes(sleep, 8);
+    let rem_from_stages = band_stage_minutes(sleep, 8) + band_stage_minutes(sleep, 11);
     let span_minutes = (end_time - start_time).num_minutes().max(0) as i32;
     let rem_minutes = rem_from_field.or_else(|| (rem_from_stages > 0).then_some(rem_from_stages));
     let duration_minutes = (span_minutes - awake_minutes).max(0);
@@ -561,9 +595,11 @@ fn sleep_stage_name(mode: i64) -> Option<&'static str> {
     match mode {
         5 => Some("deep"),
         4 => Some("light"),
-        8 => Some("rem"),
+        // 新固件 REM 也会编码为 11
+        8 | 11 => Some("rem"),
         7 => Some("awake"),
-        _ => None,
+        // 未知模式归为清醒，避免阶段条出现空洞
+        _ => Some("awake"),
     }
 }
 
@@ -591,29 +627,63 @@ fn sleep_stages_from_band(
     let Some(stages) = sleep.get("stage").and_then(Value::as_array) else {
         return Vec::new();
     };
-    stages
-        .iter()
-        .filter_map(Value::as_object)
-        .filter_map(|stage| {
-            let mode = first_number(stage, &["mode"])?.round() as i64;
-            let name = sleep_stage_name(mode)?;
-            let start = first_number(stage, &["start"])? as i64;
-            let stop = first_number(stage, &["stop"])? as i64;
-            if stop < start {
-                return None;
-            }
-            let start_time = utc_midnight + Duration::minutes(start);
-            let end_time = utc_midnight + Duration::minutes(stop + 1);
-            if end_time <= start_time {
-                return None;
-            }
-            Some(SleepStageSlice {
-                stage: name.to_string(),
-                start_time,
-                end_time,
+
+    let build = |anchor: DateTime<Utc>| -> Vec<SleepStageSlice> {
+        stages
+            .iter()
+            .filter_map(Value::as_object)
+            .filter_map(|stage| {
+                let mode = first_number(stage, &["mode"])?.round() as i64;
+                let name = sleep_stage_name(mode)?;
+                let start = first_number(stage, &["start"])? as i64;
+                let stop = first_number(stage, &["stop"])? as i64;
+                if stop < start {
+                    return None;
+                }
+                let start_time = anchor + Duration::minutes(start);
+                let end_time = anchor + Duration::minutes(stop + 1);
+                if end_time <= start_time {
+                    return None;
+                }
+                Some(SleepStageSlice {
+                    stage: name.to_string(),
+                    start_time,
+                    end_time,
+                })
             })
-        })
-        .collect()
+            .collect()
+    };
+
+    // stage.start/stop 是「入睡当夜」本地零点起的分钟数，跨午夜会 >= 1440；
+    // 而 date_time 是醒来日。夜间睡眠必须锚到 date_time 前一日的零点，
+    // 否则所有阶段整体 +24h（实测数据如此：stage 1460 分 = 醒来日 00:20）。
+    // 午睡等按当日零点编码的片段，用与 [st, ed] 的重叠量自动选出当日锚点。
+    let session_start =
+        first_value(sleep, &["st", "startTime", "start_time"]).and_then(parse_timestamp);
+    let session_end =
+        first_value(sleep, &["ed", "endTime", "end_time"]).and_then(parse_timestamp);
+    let prev_day = build(utc_midnight - Duration::days(1));
+    match (session_start, session_end) {
+        (Some(start), Some(end)) => {
+            let same_day = build(utc_midnight);
+            let overlap = |slices: &[SleepStageSlice]| -> i64 {
+                slices
+                    .iter()
+                    .map(|slice| {
+                        let from = slice.start_time.max(start);
+                        let to = slice.end_time.min(end);
+                        (to - from).num_seconds().max(0)
+                    })
+                    .sum()
+            };
+            if overlap(&same_day) > overlap(&prev_day) {
+                same_day
+            } else {
+                prev_day
+            }
+        }
+        _ => prev_day,
+    }
 }
 
 fn workout_has_track_geometry(object: &Map<String, Value>) -> bool {
@@ -1285,6 +1355,63 @@ mod tests {
         .unwrap();
         assert_eq!(result.sleep_sessions[0].time_in_bed_minutes, None);
         assert!(result.sleep_sessions[0].stages.is_empty());
+    }
+
+    #[test]
+    fn workout_numeric_type_wins_over_endpoint_sport_name() {
+        // /v1/sport/run/history.json 不带过滤会返回全部运动类型；
+        // 记录自带的数字 type 必须优先于接口路径名，否则骑行/健走/AI 活动
+        // 全部被错标成户外跑步。
+        let result = Normalizer::normalize_workouts_with_sport(
+            &json!({
+                "data": {
+                    "summary": [
+                        {"trackid": 1_700_000_000i64, "end_time": 1_700_003_600i64, "type": 9, "dis": "50010.0"},
+                        {"trackid": 1_700_100_000i64, "end_time": 1_700_103_600i64, "type": 223, "calorie": "40.0"},
+                        {"trackid": 1_700_200_000i64, "end_time": 1_700_203_600i64, "type": 1, "dis": "15210.0"}
+                    ]
+                }
+            }),
+            Some("run"),
+        )
+        .unwrap();
+        assert_eq!(result[0].workout_type, "ride");
+        assert_eq!(result[0].zepp_type, Some(9));
+        assert_eq!(result[1].workout_type, "activity");
+        assert_eq!(result[2].workout_type, "run");
+    }
+
+    #[test]
+    fn night_sleep_stages_anchor_to_previous_day_midnight() {
+        // 真实报文形态：date_time 是醒来日，stage 分钟数从入睡前夜本地零点
+        // 起算（跨午夜 >= 1440）。锚错到当晚会整段 +24h，阶段条渲染为空。
+        let summary = json!({
+            "tz": 28800,
+            "slp": {
+                "st": 1_786_897_200i64,   // 2026-08-17 00:20 +08
+                "ed": 1_786_930_620i64,   // 2026-08-17 09:37 +08
+                "ss": 80,
+                "stage": [
+                    {"mode": 4, "start": 1460, "stop": 1471},
+                    {"mode": 5, "start": 1472, "stop": 1484},
+                    {"mode": 11, "start": 1485, "stop": 1492}
+                ]
+            }
+        });
+        let result = Normalizer::normalize_band_data(&json!({
+            "data": [{
+                "uuid": "sleep-night",
+                "date_time": "2026-08-17",
+                "summary": STANDARD.encode(serde_json::to_vec(&summary).unwrap())
+            }]
+        }))
+        .unwrap();
+        let session = &result.sleep_sessions[0];
+        assert_eq!(session.stages.len(), 3);
+        assert_eq!(session.stages[0].start_time, session.start_time);
+        // 新固件 REM 编码 mode=11 也要识别
+        assert_eq!(session.stages[2].stage, "rem");
+        assert_eq!(session.rem_minutes, Some(8));
     }
 
     #[test]

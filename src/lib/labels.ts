@@ -2,10 +2,11 @@ export const workoutLabel = (value: string): string => {
   const labels: Record<string, string> = {
     run: '户外跑步',
     running: '跑步',
-    walking: '步行',
+    walking: '健走',
     walk: '步行',
-    ride: '骑行',
-    cycling: '骑行',
+    ride: '户外骑行',
+    cycling: '户外骑行',
+    indoor_cycling: '室内骑行',
     swimming: '游泳',
     treadmill: '室内跑步',
     indoor_run: '室内跑步',
@@ -16,6 +17,9 @@ export const workoutLabel = (value: string): string => {
     rowing: '划船',
     yoga: '瑜伽',
     climb: '攀爬',
+    badminton: '羽毛球',
+    activity: '活动',
+    unknown: '运动',
   };
   return labels[value.trim().toLowerCase()] || value || '运动';
 };
