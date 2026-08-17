@@ -32,6 +32,86 @@ pub struct StreamFreshness {
     pub newest_sample_at: Option<String>,
 }
 
+fn average_finite(values: impl Iterator<Item = f64>) -> Option<f64> {
+    let values: Vec<f64> = values.filter(|value| value.is_finite()).collect();
+    if values.is_empty() {
+        None
+    } else {
+        Some(values.iter().sum::<f64>() / values.len() as f64)
+    }
+}
+
+/// Zepp detail payloads encode speed as metres per second and the companion
+/// `pace` field as its reciprocal (seconds per metre).  The frontend contract
+/// uses the conventional running unit minutes per kilometre.
+fn pace_minutes_per_kilometre(pace: Option<f64>, speed: Option<f64>) -> Option<f64> {
+    let from_speed = speed
+        .filter(|value| value.is_finite() && *value > 0.0)
+        .map(|value| 1_000.0 / (value * 60.0));
+    let converted = from_speed.or_else(|| {
+        pace.filter(|value| value.is_finite() && *value > 0.0)
+            .map(|value| value * 1_000.0 / 60.0)
+    });
+    converted.filter(|value| *value >= 1.0 && *value < 60.0)
+}
+
+fn workout_series_summary(samples: &[WorkoutSeriesSample]) -> WorkoutSeriesSummary {
+    let average_pace = average_finite(
+        samples
+            .iter()
+            .filter_map(|sample| sample.pace)
+            .filter(|value| *value > 0.0 && *value < 60.0),
+    );
+    let cadences: Vec<f64> = samples
+        .iter()
+        .filter_map(|sample| sample.cadence)
+        .filter(|value| value.is_finite() && *value > 0.0 && *value < 300.0)
+        .collect();
+    let average_cadence = average_finite(cadences.iter().copied());
+    let max_cadence = cadences.iter().copied().reduce(f64::max);
+    let average_stride_cm = average_finite(
+        samples
+            .iter()
+            .filter_map(|sample| sample.stride_cm)
+            .filter(|value| *value > 0.0 && *value < 300.0),
+    );
+
+    // Ignore single-sample altitude jumps over 50 m. They are normally GPS or
+    // pressure-sensor discontinuities and must not inflate cumulative climb.
+    let altitudes: Vec<f64> = samples
+        .iter()
+        .filter_map(|sample| sample.altitude_m)
+        .filter(|value| value.is_finite() && (-500.0..=10_000.0).contains(value))
+        .collect();
+    let (elevation_gain_m, elevation_loss_m) = if altitudes.len() < 2 {
+        (None, None)
+    } else {
+        let mut gain = 0.0;
+        let mut loss = 0.0;
+        for pair in altitudes.windows(2) {
+            let delta = pair[1] - pair[0];
+            if delta.abs() > 50.0 {
+                continue;
+            }
+            if delta > 0.0 {
+                gain += delta;
+            } else {
+                loss += -delta;
+            }
+        }
+        (Some(gain), Some(loss))
+    };
+
+    WorkoutSeriesSummary {
+        average_pace,
+        average_cadence,
+        max_cadence,
+        average_stride_cm,
+        elevation_gain_m,
+        elevation_loss_m,
+    }
+}
+
 impl Database {
     pub fn new(db_path: PathBuf) -> Result<Self> {
         let conn = Connection::open(db_path)?;
@@ -1150,7 +1230,7 @@ impl Database {
     }
 
     pub fn get_workout_series(&self, workout_id: &str) -> Result<WorkoutSeries> {
-        let samples = {
+        let mut samples = {
             let mut stmt = self.conn.prepare(
                 "SELECT timestamp, heart_rate, pace, speed, cadence, altitude, stride
                  FROM workout_samples WHERE workout_id = ?1 ORDER BY timestamp",
@@ -1168,6 +1248,9 @@ impl Database {
             })?;
             rows.collect::<std::result::Result<Vec<_>, _>>()?
         };
+        for sample in &mut samples {
+            sample.pace = pace_minutes_per_kilometre(sample.pace, sample.speed);
+        }
 
         let route = {
             let mut stmt = self.conn.prepare(
@@ -1200,11 +1283,14 @@ impl Database {
             rows.collect::<std::result::Result<Vec<_>, _>>()?
         };
 
+        let summary = workout_series_summary(&samples);
+
         Ok(WorkoutSeries {
             workout_id: workout_id.to_owned(),
             samples,
             route,
             pauses,
+            summary,
         })
     }
 
@@ -2540,6 +2626,55 @@ mod tests {
 
     fn ts() -> DateTime<Utc> {
         DateTime::from_timestamp(1_700_000_000, 0).unwrap()
+    }
+
+    #[test]
+    fn zepp_pace_is_remapped_to_minutes_per_kilometre() {
+        let from_speed = pace_minutes_per_kilometre(Some(0.4), Some(2.5)).unwrap();
+        let from_reciprocal = pace_minutes_per_kilometre(Some(0.4), None).unwrap();
+        assert!((from_speed - 6.666_666_666).abs() < 0.000_001);
+        assert!((from_reciprocal - 6.666_666_666).abs() < 0.000_001);
+        assert_eq!(pace_minutes_per_kilometre(Some(0.0), Some(0.0)), None);
+    }
+
+    #[test]
+    fn workout_summary_uses_valid_samples_and_ignores_altitude_jumps() {
+        let samples = vec![
+            WorkoutSeriesSample {
+                timestamp: "1".into(),
+                heart_rate: None,
+                speed: None,
+                pace: Some(6.0),
+                cadence: Some(160.0),
+                stride_cm: Some(98.0),
+                altitude_m: Some(10.0),
+            },
+            WorkoutSeriesSample {
+                timestamp: "2".into(),
+                heart_rate: None,
+                speed: None,
+                pace: Some(7.0),
+                cadence: Some(170.0),
+                stride_cm: Some(102.0),
+                altitude_m: Some(14.0),
+            },
+            WorkoutSeriesSample {
+                timestamp: "3".into(),
+                heart_rate: None,
+                speed: None,
+                pace: Some(0.0),
+                cadence: Some(0.0),
+                stride_cm: None,
+                altitude_m: Some(100.0),
+            },
+        ];
+        let summary = workout_series_summary(&samples);
+        assert_eq!(summary.average_pace, Some(6.5));
+        assert_eq!(summary.average_cadence, Some(165.0));
+        assert_eq!(summary.max_cadence, Some(170.0));
+        assert_eq!(summary.average_stride_cm, Some(100.0));
+        assert_eq!(summary.elevation_gain_m, Some(4.0));
+        assert_eq!(summary.elevation_loss_m, Some(0.0));
     }
 
     #[test]

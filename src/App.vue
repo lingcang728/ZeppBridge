@@ -3,8 +3,10 @@ import { getVersion } from '@tauri-apps/api/app';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router';
 import BrandMark from './components/BrandMark.vue';
+import DesignIcon, { type DesignIconName } from './components/DesignIcon.vue';
 import DeviceVisual from './components/DeviceVisual.vue';
 import Icon from './components/Icon.vue';
+import LandingPage from './views/LandingPage.vue';
 import { useSyncController } from './composables/useSyncController';
 import { useDevices } from './composables/useDevices';
 import { useUiScale } from './composables/useUiScale';
@@ -14,7 +16,9 @@ import { backend, isDesktop } from './lib/bridge';
 // 浏览器预览环境回退到下面的常量（与 package.json 保持同步）。
 const FALLBACK_APP_VERSION = '0.8.3';
 const APP_VERSION = ref(FALLBACK_APP_VERSION);
-if (isDesktop()) {
+const desktopRuntime = isDesktop();
+const showLanding = !desktopRuntime && !new URLSearchParams(window.location.search).has('app-preview');
+if (desktopRuntime) {
   void getVersion()
     .then((version) => {
       APP_VERSION.value = version;
@@ -43,9 +47,9 @@ const {
 } = useDevices();
 
 const navigation = [
-  { to: '/', label: '概览', icon: 'grid' as const },
-  { to: '/explore', label: '交给 AI', icon: 'send' as const },
-  { to: '/settings', label: '设置', icon: 'gear' as const },
+  { to: '/', label: '概览', icon: 'overview' as DesignIconName },
+  { to: '/explore', label: '交给 AI', icon: 'handoff' as DesignIconName },
+  { to: '/settings', label: '设置', icon: 'settings' as DesignIconName },
 ];
 
 const connected = computed(() => appStatus.value?.connection_state === 'connected');
@@ -94,7 +98,7 @@ const accountInitial = computed(() => {
   return first ? first.toUpperCase() : '未';
 });
 const regionLabel = computed(() => appStatus.value?.region_host || '未提供');
-const browserPreview = computed(() => !isDesktop());
+const browserPreview = computed(() => !desktopRuntime);
 const routeNotice = computed(() => route.query.notice === 'not-found');
 
 const onDocumentPointerDown = (event: PointerEvent) => {
@@ -119,6 +123,7 @@ const onDocumentKeydown = (event: KeyboardEvent) => {
 const closeMobileMenu = () => { mobileMenuOpen.value = false; };
 
 onMounted(() => {
+  if (showLanding) return;
   initializeScale();
   void initialize();
   void loadDevices();
@@ -131,7 +136,7 @@ onMounted(() => {
       void router.replace({ path: route.path, query });
     }, 8000);
   }
-  if (isDesktop()) {
+  if (desktopRuntime) {
     void backend.listen('app://hidden-to-tray', () => {
       if (window.localStorage.getItem('zeppbridge-tray-hint') === '1') return;
       window.localStorage.setItem('zeppbridge-tray-hint', '1');
@@ -140,7 +145,9 @@ onMounted(() => {
     });
   }
 });
-watch(dataRevision, () => void loadDevices());
+watch(dataRevision, () => {
+  if (!showLanding) void loadDevices();
+});
 onUnmounted(() => {
   document.removeEventListener('pointerdown', onDocumentPointerDown);
   document.removeEventListener('keydown', onDocumentKeydown);
@@ -148,9 +155,11 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <a class="skip-link" href="#main-content">跳到主要内容</a>
+  <LandingPage v-if="showLanding" />
+  <template v-else>
+    <a class="skip-link" href="#main-content">跳到主要内容</a>
 
-  <div class="app-shell">
+    <div class="app-shell">
     <aside class="sidebar" aria-label="主导航">
       <div class="brand-lockup">
         <span class="brand-badge"><BrandMark /></span>
@@ -170,7 +179,7 @@ onUnmounted(() => {
           exact-active-class="is-active"
           @click="closeMobileMenu"
         >
-          <Icon :name="item.icon" :size="17" />
+          <DesignIcon :name="item.icon" :size="25" />
           <span>{{ item.label }}</span>
         </RouterLink>
       </nav>
@@ -185,7 +194,7 @@ onUnmounted(() => {
         <RouterLink v-for="source in dataSources" :key="source.name" class="source-card" to="/settings">
           <span class="source-icon">
             <DeviceVisual v-if="source.kind === 'device'" :src="source.model.image" :alt="source.name" :kind="source.model.kind" compact />
-            <Icon v-else name="cloud" :size="22" />
+            <DesignIcon v-else name="zepp-cloud" :size="38" />
           </span>
           <span class="source-copy">
             <strong>{{ source.name }}</strong>
@@ -200,7 +209,7 @@ onUnmounted(() => {
       <div class="sidebar-footer">
         <div class="cloud-card">
           <div class="cloud-row">
-            <Icon name="cloud" :size="16" />
+            <DesignIcon name="zepp-cloud" :size="24" />
             <span>Zepp Cloud · {{ accountRecognized ? '账号已识别' : '未识别' }}</span>
             <Icon name="circle-check" :size="15" :class="['cloud-check', { on: connected }]" />
           </div>
@@ -210,10 +219,10 @@ onUnmounted(() => {
           </div>
         </div>
         <div class="version-row">
-          <span class="version-brand"><BrandMark /></span>
+          <span class="version-brand"><BrandMark :size="20" /></span>
           <span>ZeppBridge　v{{ APP_VERSION }}</span>
           <RouterLink :to="{ path: '/settings', hash: '#privacy-section' }" class="shield-link" title="安全与隐私设置">
-            <Icon name="shield" :size="14" />
+            <DesignIcon name="secure" :size="20" />
           </RouterLink>
         </div>
       </div>
@@ -237,7 +246,7 @@ onUnmounted(() => {
             :title="canIncrementalSync ? '立即同步' : '请先完成连接验证'"
             @click="runSync('incremental')"
           >
-            <Icon name="sync" :size="14" :class="{ spinning: isSyncing }" /><span>立即同步</span>
+            <DesignIcon name="sync" :size="20" :class="{ spinning: isSyncing }" /><span>立即同步</span>
           </button>
           <span v-if="isSyncing" class="sync-progress-text">
             {{ syncProgress ? `${syncProgress.current}/${syncProgress.total}` : '同步中…' }}
@@ -276,7 +285,7 @@ onUnmounted(() => {
       <div v-if="mobileMenuOpen" class="mobile-menu" aria-label="移动导航">
         <nav class="mobile-menu-links">
           <RouterLink v-for="item in navigation" :key="item.to" :to="item.to" class="nav-link" active-class="is-active" exact-active-class="is-active" @click="closeMobileMenu">
-            <Icon :name="item.icon" :size="17" /><span>{{ item.label }}</span>
+            <DesignIcon :name="item.icon" :size="25" /><span>{{ item.label }}</span>
           </RouterLink>
         </nav>
       </div>
@@ -299,11 +308,12 @@ onUnmounted(() => {
 
       <nav class="bottom-nav" aria-label="移动主导航">
         <RouterLink v-for="item in navigation" :key="item.to" :to="item.to" class="bottom-nav-link" active-class="is-active" exact-active-class="is-active">
-          <Icon :name="item.icon" :size="18" /><span>{{ item.label }}</span>
+          <DesignIcon :name="item.icon" :size="26" /><span>{{ item.label }}</span>
         </RouterLink>
       </nav>
     </div>
-  </div>
+    </div>
+  </template>
 </template>
 
 <style>
@@ -460,8 +470,8 @@ a { color: inherit; }
   height: 40px;
   flex: 0 0 40px;
   border-radius: 12px;
-  background: var(--surface-raised);
-  border: 1px solid var(--line);
+  background: transparent;
+  border: 0;
   color: var(--accent);
 }
 .brand-text { display: grid; gap: 1px; min-width: 0; }
@@ -485,12 +495,15 @@ a { color: inherit; }
 .nav-link:hover { color: var(--ink); background: var(--surface-hover); }
 .nav-link:active { transform: translateY(1px); }
 .nav-link svg { color: var(--subtle); }
+.nav-link .design-icon { opacity: .7; filter: saturate(.78); transition: opacity 220ms ease, filter 220ms ease, transform 220ms cubic-bezier(.16, 1, .3, 1); }
+.nav-link:hover .design-icon { opacity: .94; transform: translateY(-1px) scale(1.04); }
 .nav-link.is-active {
   color: var(--accent);
   background: var(--accent-soft);
   border-color: color-mix(in srgb, var(--accent) 28%, transparent);
 }
 .nav-link.is-active svg { color: var(--accent); }
+.nav-link.is-active .design-icon { opacity: 1; filter: saturate(1.05); }
 
 .sources { margin-top: 20px; min-width: 0; display: grid; gap: 8px; }
 .sources-feedback { padding: 8px 10px; border: 1px dashed var(--line-strong); border-radius: 9px; color: var(--muted); font-size: 11px; line-height: 1.45; }

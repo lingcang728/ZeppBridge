@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router';
 import CategoryMark from './CategoryMark.vue';
+import DesignIcon, { type DesignIconName } from './DesignIcon.vue';
 import Icon from './Icon.vue';
 import type { HealthCategory } from '../lib/format';
 
@@ -15,13 +16,17 @@ withDefaults(defineProps<{
   compact?: boolean;
   /** 可选：直接指定图标背景色，传入后覆盖 category 默认色 */
   iconBg?: string;
+  designIcon?: DesignIconName;
 }>(), { compact: false });
 </script>
 
 <template>
   <RouterLink :class="['record-row', `tone-${category}`, { compact }]" :to="to">
     <span v-if="compact" class="record-dot" aria-hidden="true"></span>
-    <CategoryMark v-else :category="category" :icon="icon" :size="16" :bg="iconBg" />
+    <span v-if="!compact && designIcon" :class="['record-art', `tone-${category}`]" aria-hidden="true">
+      <DesignIcon :name="designIcon" :size="48" />
+    </span>
+    <CategoryMark v-else-if="!compact" :category="category" :icon="icon" :size="16" :bg="iconBg" />
     <span class="record-copy">
       <small v-if="!compact">{{ kicker }}</small>
       <strong :class="{ date: compact }">{{ compact ? kicker : title }}</strong>
@@ -50,6 +55,21 @@ withDefaults(defineProps<{
 }
 .record-row:last-child { border-bottom: 0; }
 .record-row:hover { background: var(--surface-raised); }
+.record-art {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, currentColor 10%, var(--surface-raised));
+}
+.record-art .design-icon { transform: scale(1.18); }
+.record-art.tone-sleep { color: var(--sleep); }
+.record-art.tone-activity { color: var(--activity); }
+.record-art.tone-heart { color: var(--heart); }
 .record-dot {
   width: 8px;
   height: 8px;

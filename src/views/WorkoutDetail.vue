@@ -2,6 +2,8 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import VChart from 'vue-echarts';
+import DesignIcon, { type DesignIconName } from '../components/DesignIcon.vue';
+import DeviceVisual from '../components/DeviceVisual.vue';
 import EmptyState from '../components/EmptyState.vue';
 import Icon from '../components/Icon.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
@@ -10,6 +12,7 @@ import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { dataProviderLabel, dataScopeLabel, workoutLabel } from '../lib/labels';
 import { formatDate, formatDistance, formatTime, isFiniteNumber } from '../lib/format';
 import { zeppSemanticColors } from '../lib/echartsTheme';
+import trexFallback from '../assets/devices/amazfit-t-rex-3.webp';
 import type { DeviceProfile, Workout, WorkoutSeries, WorkoutSeriesSample, WorkoutRoutePoint } from '../types';
 
 type WorkoutMetrics = Workout & {
@@ -81,18 +84,26 @@ const numberValue = (value: unknown, digits = 0): string => isFiniteNumber(value
   ? value.toLocaleString('zh-CN', { minimumFractionDigits: digits, maximumFractionDigits: digits })
   : '未提供';
 
+const workoutArt = computed<DesignIconName>(() => {
+  const raw = `${workout.value?.workout_type ?? ''} ${workoutLabel(workout.value?.workout_type ?? '')}`.toLowerCase();
+  return /cycle|cycling|bike|骑/.test(raw) ? 'outdoor-cycling' : 'outdoor-run';
+});
+const deviceName = computed(() => device.value.canonical_name || device.value.name || '设备名称未提供');
+
 const heroMetrics = computed(() => {
   const item = workout.value;
   if (!item) return [];
-  const metrics: Array<{ label: string; value: string; unit?: string; tone: string }> = [];
-  if (isFiniteNumber(item.distance_meters) && item.distance_meters > 0) metrics.push({ label: '距离', value: distanceLabel.value, unit: '', tone: 'distance' });
-  if (durationMinutes.value !== null) metrics.push({ label: '运动时间', value: formatClock(durationMinutes.value), unit: '', tone: 'training' });
-  if (paceLabel.value !== '未提供') metrics.push({ label: '平均配速', value: paceLabel.value, unit: '', tone: 'pace' });
-  if (isFiniteNumber(item.avg_hr)) metrics.push({ label: '平均心率', value: numberValue(item.avg_hr), unit: 'bpm', tone: 'heart' });
-  if (isFiniteNumber(item.calories)) metrics.push({ label: '消耗', value: numberValue(item.calories), unit: 'kcal', tone: 'calories' });
-  if (isFiniteNumber(item.training_load)) metrics.push({ label: 'Training Load', value: numberValue(item.training_load), tone: 'training' });
-  if (isFiniteNumber(item.vo2max)) metrics.push({ label: 'VO₂ Max', value: numberValue(item.vo2max), tone: 'training' });
-  return metrics;
+  const summary = series.value?.summary;
+  const resolvedPace = paceLabel.value !== '未提供' ? paceLabel.value : paceText(summary?.average_pace);
+  return [
+    { label: '距离', value: distanceLabel.value, tone: 'distance', icon: 'outdoor-run' as DesignIconName },
+    { label: '运动时间', value: formatClock(durationMinutes.value), tone: 'training', icon: 'auto-sync' as DesignIconName },
+    { label: '平均心率', value: numberValue(item.avg_hr), unit: isFiniteNumber(item.avg_hr) ? 'bpm' : undefined, tone: 'heart', icon: 'heart-rate' as DesignIconName },
+    { label: '平均配速', value: resolvedPace, tone: 'pace', icon: 'body-activity' as DesignIconName },
+    { label: '累计爬升', value: isFiniteNumber(summary?.elevation_gain_m) ? numberValue(summary?.elevation_gain_m) : '未提供', unit: isFiniteNumber(summary?.elevation_gain_m) ? 'm' : undefined, tone: 'altitude', icon: 'health-watch' as DesignIconName },
+    { label: 'VO₂ Max', value: numberValue(item.vo2max), tone: 'vo2', icon: 'vo2-max' as DesignIconName },
+    { label: '训练负荷', value: numberValue(item.training_load), tone: 'training', icon: 'training-load' as DesignIconName },
+  ];
 });
 
 const downsample = <T,>(items: T[], max = 800): T[] => {
@@ -225,7 +236,13 @@ const routeCanvas = computed(() => {
 const sampleSeries = (key: keyof Pick<WorkoutSeriesSample, 'heart_rate' | 'pace' | 'altitude_m' | 'cadence'>) => downsample(
   (series.value?.samples ?? [])
     .map((sample) => ({ t: new Date(sample.timestamp).getTime(), v: sample[key] }))
-    .filter((point): point is { t: number; v: number } => Number.isFinite(point.t) && isFiniteNumber(point.v)),
+    .filter((point): point is { t: number; v: number } => {
+      if (!Number.isFinite(point.t) || !isFiniteNumber(point.v)) return false;
+      if (key === 'heart_rate') return point.v >= 20 && point.v <= 250;
+      if (key === 'pace') return point.v >= 1 && point.v < 60;
+      if (key === 'cadence') return point.v > 0 && point.v < 300;
+      return point.v >= -500 && point.v <= 10_000;
+    }),
 );
 const heartPoints = computed(() => sampleSeries('heart_rate'));
 const pacePoints = computed(() => sampleSeries('pace'));
@@ -322,11 +339,28 @@ const statSummary = (points: { v: number }[], mode: 'normal' | 'pace' = 'normal'
 };
 
 const chartCards = computed(() => [
-  { key: 'heart', title: '心率', unit: '(bpm)', option: heartOption.value, stats: statSummary(heartPoints.value) },
-  { key: 'pace', title: '配速', unit: '(min/km)', option: paceOption.value, stats: statSummary(pacePoints.value, 'pace') },
-  { key: 'altitude', title: '海拔', unit: '(m)', option: altitudeOption.value, stats: statSummary(altitudePoints.value) },
-  { key: 'cadence', title: '步频', unit: '(spm)', option: cadenceOption.value, stats: statSummary(cadencePoints.value) },
+  { key: 'heart', title: '心率', unit: '(bpm)', option: heartOption.value, stats: statSummary(heartPoints.value), icon: 'heart-rate' as DesignIconName, tone: 'heart' },
+  { key: 'pace', title: '配速', unit: '(min/km)', option: paceOption.value, stats: statSummary(pacePoints.value, 'pace'), icon: 'body-activity' as DesignIconName, tone: 'pace' },
+  { key: 'altitude', title: '海拔', unit: '(m)', option: altitudeOption.value, stats: statSummary(altitudePoints.value), icon: 'health-watch' as DesignIconName, tone: 'altitude' },
+  { key: 'cadence', title: '步频', unit: '(spm)', option: cadenceOption.value, stats: statSummary(cadencePoints.value), icon: 'steps' as DesignIconName, tone: 'cadence' },
 ].filter((card): card is typeof card & { option: NonNullable<typeof card.option> } => card.option !== null));
+
+const decodedMetrics = computed(() => {
+  const item = workout.value;
+  const detail = series.value;
+  if (!item || !detail) return [];
+  const summary = detail.summary;
+  return [
+    { label: 'GPS 轨迹点', value: detail.route.length ? numberValue(detail.route.length) : '未提供', icon: 'outdoor-run' as DesignIconName },
+    { label: '时序样本', value: detail.samples.length ? numberValue(detail.samples.length) : '未提供', icon: 'structured-data' as DesignIconName },
+    { label: '暂停区间', value: detail.pauses.length ? numberValue(detail.pauses.length) : '未提供', icon: 'auto-sync' as DesignIconName },
+    { label: '平均步频', value: isFiniteNumber(summary.average_cadence) ? `${numberValue(summary.average_cadence)} spm` : '未提供', icon: 'steps' as DesignIconName },
+    { label: '最高步频', value: isFiniteNumber(summary.max_cadence) ? `${numberValue(summary.max_cadence)} spm` : '未提供', icon: 'training-load' as DesignIconName },
+    { label: '平均步幅', value: isFiniteNumber(summary.average_stride_cm) ? `${numberValue(summary.average_stride_cm)} cm` : '未提供', icon: 'body-activity' as DesignIconName },
+    { label: '累计下降', value: isFiniteNumber(summary.elevation_loss_m) ? `${numberValue(summary.elevation_loss_m)} m` : '未提供', icon: 'health-watch' as DesignIconName },
+    { label: '最大心率', value: isFiniteNumber(item.max_hr) ? `${numberValue(item.max_hr)} bpm` : '未提供', icon: 'resting-heart-rate' as DesignIconName },
+  ];
+});
 
 const syncBadge = computed(() => {
   const raw = appStatus.value?.last_cloud_sync_at;
@@ -346,7 +380,7 @@ const loadDetail = async () => {
     if (seq !== detailSeq) return;
     const [profile, workoutSeries] = await Promise.all([
       detail ? tauriApi.getDeviceProfile({ deviceId: detail.device_id, sourceScope: detail.source_scope }).catch(() => ({})) : Promise.resolve({}),
-      detail ? tauriApi.getWorkoutSeries(workoutId.value).catch(() => ({ workout_id: workoutId.value, samples: [], route: [], pauses: [] })) : Promise.resolve(null),
+      detail ? tauriApi.getWorkoutSeries(workoutId.value).catch(() => ({ workout_id: workoutId.value, samples: [], route: [], pauses: [], summary: {} })) : Promise.resolve(null),
     ]);
     if (seq !== detailSeq) return;
     workout.value = detail as WorkoutMetrics | null;
@@ -364,7 +398,16 @@ const exportRecord = async () => {
   actionError.value = null;
   exportedNote.value = null;
   try {
-    const payload = activeFormat.value === 'json' ? JSON.stringify({ workout: workout.value, series: series.value }, null, 2) : JSON.stringify(workout.value, null, 2);
+    const csvCell = (value: unknown): string => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const csv = () => {
+      const fields: Array<keyof WorkoutSeriesSample> = ['timestamp', 'heart_rate', 'speed', 'pace', 'cadence', 'stride_cm', 'altitude_m'];
+      return [fields.join(','), ...(series.value?.samples ?? []).map((sample) => fields.map((field) => csvCell(sample[field])).join(','))].join('\r\n');
+    };
+    const xmlEscape = (value: unknown): string => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[character] ?? character);
+    const gpx = () => `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="ZeppBridge" xmlns="http://www.topografix.com/GPX/1/1"><metadata><name>${xmlEscape(workoutLabel(workout.value?.workout_type ?? ''))}</name></metadata><trk><name>${xmlEscape(workout.value?.workout_id)}</name><trkseg>${(series.value?.route ?? []).map((point) => `<trkpt lat="${point.latitude}" lon="${point.longitude}">${isFiniteNumber(point.altitude_m) ? `<ele>${point.altitude_m}</ele>` : ''}<time>${xmlEscape(point.timestamp)}</time></trkpt>`).join('')}</trkseg></trk></gpx>`;
+    const payload = activeFormat.value === 'json'
+      ? JSON.stringify({ workout: workout.value, series: series.value }, null, 2)
+      : activeFormat.value === 'csv' ? csv() : gpx();
     await navigator.clipboard.writeText(payload);
     exportedNote.value = `已复制 ${activeFormat.value.toUpperCase()} 数据到剪贴板。`;
   } catch { actionError.value = '复制这条记录失败'; }
@@ -376,24 +419,56 @@ watch([dataRevision, workoutId], () => void loadDetail());
 
 <template>
   <section class="page workout-page" aria-labelledby="workout-detail-title">
-    <RouterLink class="back-link" to="/recent"><Icon name="arrow-left" :size="14" />返回数据包列表</RouterLink>
-    <div class="title-row"><h1 id="workout-detail-title">训练数据包详情</h1></div>
+    <div class="page-toolbar">
+      <RouterLink class="back-link" to="/recent"><Icon name="arrow-left" :size="14" />返回最近记录</RouterLink>
+      <RouterLink v-if="workout" class="ai-action" :to="{ path: '/explore', query: { workout: workoutId } }">
+        <DesignIcon name="handoff" :size="25" />
+        <span>交给 AI 分析</span>
+        <DesignIcon name="chevron-right" :size="18" />
+      </RouterLink>
+    </div>
 
     <div v-if="loading" class="detail-loading" aria-live="polite"><SkeletonBlock height="118px" /><SkeletonBlock height="280px" /></div>
     <EmptyState v-else-if="error" tone="error" icon="warning" title="无法读取这条运动" :message="error"><button class="button button-secondary" type="button" @click="loadDetail">重试</button></EmptyState>
     <EmptyState v-else-if="!workout" icon="steps" title="找不到这条运动记录" message="它可能已被清理，或尚未同步到本机。" />
 
     <template v-else>
-      <div class="source-row"><span class="source-chip"><Icon name="watch" :size="13" />来自 {{ device.canonical_name || device.name || '未提供' }}</span></div>
-      <div class="sport-line"><span class="sport-icon"><Icon name="run" :size="18" /></span><strong>{{ workoutLabel(workout.workout_type) }}</strong><strong class="sport-distance">{{ distanceLabel }}</strong></div>
-      <p class="sport-time">{{ formatDate(workout.start_time, 'short') }} {{ formatTime(workout.start_time) }} <Icon name="clock" :size="13" /> {{ formatClock(durationMinutes) }}</p>
+      <section class="workout-hero" aria-label="训练概览">
+        <div class="hero-copy">
+          <div class="hero-device">
+            <DeviceVisual :src="trexFallback" :alt="deviceName" kind="watch" />
+            <span class="device-live"><i></i>{{ deviceName }}</span>
+          </div>
+          <div class="hero-title-group">
+            <span class="source-chip"><DesignIcon name="verified" :size="20" />本地已解码 · {{ dataScopeLabel(workout.source_scope) }}</span>
+            <div class="sport-line">
+              <DesignIcon :name="workoutArt" :size="64" />
+              <div>
+                <p class="hero-kicker">WORKOUT DETAIL</p>
+                <h1 id="workout-detail-title">{{ workoutLabel(workout.workout_type) }}</h1>
+              </div>
+            </div>
+            <p class="sport-time"><Icon name="clock" :size="14" />{{ formatDate(workout.start_time, 'short') }} {{ formatTime(workout.start_time) }} · {{ formatClock(durationMinutes) }}</p>
+          </div>
+        </div>
+        <div class="hero-signal" aria-hidden="true"><DesignIcon name="health-watch" :size="124" /></div>
 
-      <div class="metric-list" aria-label="运动表现总结"><div v-for="metric in heroMetrics" :key="metric.label" :class="`tone-${metric.tone}`"><p class="metric-label">{{ metric.label }}</p><p class="metric-value"><strong>{{ metric.value }}</strong><span v-if="metric.unit">{{ metric.unit }}</span></p></div></div>
+        <div class="metric-list" aria-label="运动表现总结">
+          <div v-for="metric in heroMetrics" :key="metric.label" :class="['metric-tile', `tone-${metric.tone}`]">
+            <DesignIcon :name="metric.icon" :size="36" />
+            <div><p class="metric-label">{{ metric.label }}</p><p class="metric-value"><strong>{{ metric.value }}</strong><span v-if="metric.unit">{{ metric.unit }}</span></p></div>
+          </div>
+        </div>
+      </section>
 
       <div class="lower">
         <div class="main-col">
           <section class="surface-card series-card" aria-label="GPS 全轨迹">
-            <div class="chart-head"><p class="card-title">GPS 全轨迹</p><span class="route-note">本地画布 · 不请求地图瓦片</span></div>
+            <div class="section-head">
+              <span class="section-icon route-tone"><DesignIcon name="outdoor-run" :size="34" /></span>
+              <div><p class="section-eyebrow">ROUTE</p><h2>GPS 全轨迹</h2></div>
+              <span class="route-note">本地画布 · 不请求地图瓦片</span>
+            </div>
             <div v-if="routeCanvas" class="route-wrap">
               <div class="route-canvas-texture" aria-hidden="true"></div>
               <svg class="route-svg" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="按时间与最近配速样本着色的本地 GPS 轨迹">
@@ -405,55 +480,96 @@ watch([dataRevision, workoutId], () => void loadDetail());
               <span v-for="(marker, index) in routeCanvas.pauseMarkers" :key="`pause-${index}`" class="pause-marker" :style="{ left: `${marker.x}%`, top: `${marker.y}%` }">Ⅱ</span>
               <div class="route-legend"><span><i class="neutral-dot"></i>{{ routeCanvas.enoughPace ? `有效配速 ${routeCanvas.validPaceCount} 点 · P10–P90` : '有效配速不足 3 个 · 未按速度着色' }}</span><template v-if="routeCanvas.enoughPace"><span><i class="fast-dot"></i>快</span><span><i class="steady-dot"></i>稳定</span><span><i class="warm-dot"></i>偏慢</span><span><i class="slow-dot"></i>慢</span></template></div>
             </div>
-            <div v-else class="route-empty"><Icon name="map" :size="20" /><p>本次记录没有足够的轨迹点，因此不画路线。</p></div>
+            <div v-else class="route-empty"><DesignIcon name="outdoor-run" :size="58" /><strong>没有可用轨迹</strong><p>本次记录没有足够的 GPS 点，因此不画路线。</p></div>
           </section>
 
-          <div class="chart-grid"><section v-for="card in chartCards" :key="card.key" class="surface-card chart-card" :aria-label="card.title"><div class="chart-head"><p class="card-title">{{ card.title }} <em>{{ card.unit }}</em></p><span v-if="card.stats" class="chart-stats">{{ card.stats }}</span></div><VChart class="series-chart" :option="card.option" autoresize role="img" :aria-label="`${card.title}曲线`" /></section></div>
-          <section v-if="!chartCards.length" class="surface-card chart-empty"><Icon name="info" :size="16" /><p>本次未同步逐点样本，因此不展示心率、配速、海拔、步频等曲线。</p></section>
+          <div class="chart-grid">
+            <section v-for="card in chartCards" :key="card.key" :class="['surface-card', 'chart-card', `chart-${card.tone}`]" :aria-label="card.title">
+              <div class="chart-head">
+                <span class="chart-icon"><DesignIcon :name="card.icon" :size="34" /></span>
+                <p class="card-title">{{ card.title }} <em>{{ card.unit }}</em></p>
+                <span v-if="card.stats" class="chart-stats">{{ card.stats }}</span>
+              </div>
+              <VChart class="series-chart" :option="card.option" autoresize role="img" :aria-label="`${card.title}曲线`" />
+            </section>
+          </div>
+          <section v-if="!chartCards.length" class="surface-card chart-empty"><DesignIcon name="structured-data" :size="42" /><div><strong>暂无逐点曲线</strong><p>本次未同步心率、配速、海拔或步频序列。</p></div></section>
         </div>
 
         <div class="side-col">
-          <section class="surface-card side-card" aria-label="导出与分享"><p class="card-title">导出与分享</p><p class="card-sub">复制本地解码后的结构化数据，不访问地图服务。</p><div class="format-row" role="radiogroup" aria-label="导出格式"><button v-for="format in (['json', 'csv', 'gpx'] as const)" :key="format" type="button" role="radio" :aria-checked="activeFormat === format" :class="['format-pill', { 'is-on': activeFormat === format }]" @click="activeFormat = format">{{ format === 'gpx' ? 'GPX（轨迹）' : format.toUpperCase() }}</button><button class="format-pill export-go" type="button" @click="exportRecord">复制数据</button></div><p v-if="exportedNote" class="action-note ok" role="status"><Icon name="circle-check" :size="13" />{{ exportedNote }}</p><p v-if="actionError" class="action-note bad" role="alert"><Icon name="warning" :size="13" />{{ actionError }}</p></section>
-          <section class="surface-card side-card meta-card" aria-label="来源信息"><p class="card-title">来源信息</p><dl><div><dt>数据来源</dt><dd>{{ dataProviderLabel() }}</dd></div><div><dt>数据范围</dt><dd>{{ dataScopeLabel(workout.source_scope) }}</dd></div><div><dt>最近同步</dt><dd>{{ syncBadge }}</dd></div><div><dt>记录 ID</dt><dd>{{ workout.workout_id }}</dd></div><div><dt>设备</dt><dd>{{ device.canonical_name || device.name || '未提供' }}</dd></div></dl></section>
+          <section class="surface-card side-card decoded-card" aria-label="已解码参数">
+            <div class="section-head compact"><span class="section-icon data-tone"><DesignIcon name="structured-data" :size="32" /></span><div><p class="section-eyebrow">DECODED</p><h2>已解码参数</h2></div></div>
+            <div class="decoded-list">
+              <div v-for="metric in decodedMetrics" :key="metric.label"><DesignIcon :name="metric.icon" :size="29" /><span>{{ metric.label }}</span><strong>{{ metric.value }}</strong></div>
+            </div>
+            <p class="mapping-note"><DesignIcon name="verified" :size="20" />摘要只从本条记录的有效样本计算，异常跳点会被忽略。</p>
+          </section>
+
+          <section class="surface-card side-card" aria-label="导出与分享">
+            <div class="section-head compact"><span class="section-icon export-tone"><DesignIcon name="document" :size="32" /></span><div><p class="section-eyebrow">EXPORT</p><h2>导出与分享</h2></div></div>
+            <p class="card-sub">复制本地解码后的结构化数据，不访问地图服务。</p>
+            <div class="format-row" role="radiogroup" aria-label="导出格式"><button v-for="format in (['json', 'csv', 'gpx'] as const)" :key="format" type="button" role="radio" :aria-checked="activeFormat === format" :class="['format-pill', { 'is-on': activeFormat === format }]" @click="activeFormat = format">{{ format === 'gpx' ? 'GPX' : format.toUpperCase() }}</button></div>
+            <button class="export-go" type="button" @click="exportRecord"><DesignIcon name="cloud-output" :size="27" />复制 {{ activeFormat.toUpperCase() }} 数据</button>
+            <p v-if="exportedNote" class="action-note ok" role="status"><Icon name="circle-check" :size="13" />{{ exportedNote }}</p><p v-if="actionError" class="action-note bad" role="alert"><Icon name="warning" :size="13" />{{ actionError }}</p>
+          </section>
+
+          <section class="surface-card side-card meta-card" aria-label="来源信息">
+            <div class="section-head compact"><span class="section-icon source-tone"><DesignIcon name="database" :size="32" /></span><div><p class="section-eyebrow">PROVENANCE</p><h2>来源信息</h2></div></div>
+            <dl><div><dt>数据来源</dt><dd>{{ dataProviderLabel() }}</dd></div><div><dt>数据范围</dt><dd>{{ dataScopeLabel(workout.source_scope) }}</dd></div><div><dt>最近同步</dt><dd>{{ syncBadge }}</dd></div><div><dt>记录 ID</dt><dd>{{ workout.workout_id }}</dd></div><div><dt>设备</dt><dd>{{ deviceName }}</dd></div></dl>
+          </section>
         </div>
       </div>
-      <p class="page-foot"><Icon name="shield" :size="13" />数据已本地解码；路线使用本地画布。</p>
+      <p class="page-foot"><DesignIcon name="secure" :size="20" />数据在本机解码；轨迹使用本地画布，不会发送给地图服务。</p>
     </template>
   </section>
 </template>
 
 <style scoped>
-.workout-page { width: 100%; display: grid; gap: 10px; align-content: start; }
+.workout-page { width: 100%; display: grid; gap: 16px; align-content: start; }
 .detail-loading { display: grid; gap: 12px; }
+.page-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 38px; }
 .back-link { display: inline-flex; align-items: center; gap: 6px; justify-self: start; color: var(--muted); font-size: 12px; text-decoration: none; }
 .back-link:hover { color: var(--accent); }
-.title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.title-row h1 { margin: 0; }
-.source-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.source-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--muted); font-size: 12px; }
-.source-chip :deep(.device-visual) { width: 20px; height: 20px; flex-basis: 20px; border: 0; border-radius: 50%; background: transparent; }
-.source-chip :deep(.device-visual img) { padding: 0; }
-.sport-line { display: flex; align-items: center; gap: 10px; }
-.sport-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: var(--activity-wash); color: var(--cadence); }
-.sport-line strong { font-size: 19px; font-weight: 700; }
-.sport-distance { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-.sport-time { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: var(--muted); font-size: 12px; }
-.metric-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(138px, 1fr)); gap: 10px; margin: 6px 0 4px; }
-.metric-list > div { min-width: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); border-top: 2px solid var(--line-strong); }
-.metric-list > div.tone-heart { border-top-color: var(--route-coral); } .metric-list > div.tone-pace { border-top-color: var(--route-cyan); } .metric-list > div.tone-calories { border-top-color: var(--route-amber); } .metric-list > div.tone-training { border-top-color: var(--accent); } .metric-list > div.tone-distance { border-top-color: var(--route-mint); }
+.ai-action { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 5px 8px 5px 6px; border: 1px solid rgba(125,163,62,.34); border-radius: 12px; background: rgba(125,163,62,.1); color: #b9da77; font-weight: 700; text-decoration: none; transition: transform .18s ease, background .18s ease; }
+.ai-action:hover { transform: translateY(-1px); background: rgba(125,163,62,.17); }
+.workout-hero { position: relative; overflow: hidden; display: grid; gap: 18px; padding: 22px; border: 1px solid rgba(226,234,242,.1); border-radius: 24px; background: radial-gradient(circle at 88% 18%, rgba(43,179,192,.14), transparent 30%), linear-gradient(145deg, #20242b 0%, #191c21 58%, #171a1f 100%); box-shadow: 0 22px 70px rgba(4,6,8,.22); }
+.workout-hero::before { position: absolute; inset: 0; pointer-events: none; content: ''; background: linear-gradient(120deg, rgba(255,255,255,.035), transparent 38%); }
+.hero-copy { position: relative; z-index: 1; display: flex; align-items: center; gap: 20px; min-width: 0; }
+.hero-device { display: grid; justify-items: center; gap: 7px; flex: 0 0 auto; }
+.hero-device :deep(.device-visual) { width: 112px; height: 112px; flex-basis: 112px; border-radius: 22px; background: rgba(11,14,17,.5); box-shadow: inset 0 0 24px rgba(255,255,255,.025); }
+.hero-device :deep(.device-visual img) { padding: 8px; }
+.device-live { display: inline-flex; align-items: center; gap: 5px; max-width: 132px; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.device-live i { width: 6px; height: 6px; border-radius: 50%; background: var(--readiness); box-shadow: 0 0 0 4px rgba(61,216,76,.1); }
+.hero-title-group { min-width: 0; }
+.source-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 27px; padding: 3px 10px 3px 5px; border: 1px solid rgba(125,163,62,.25); border-radius: 999px; background: rgba(125,163,62,.08); color: #b8ce90; font-size: 11px; }
+.sport-line { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+.hero-kicker, .section-eyebrow { margin: 0; color: var(--subtle); font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: .16em; }
+.sport-line h1 { margin: 1px 0 0; color: var(--ink); font-size: clamp(25px, 3vw, 38px); line-height: 1.1; letter-spacing: -.04em; }
+.sport-time { display: inline-flex; align-items: center; gap: 6px; margin: 9px 0 0; color: var(--muted); font-size: 12px; }
+.hero-signal { position: absolute; z-index: 0; top: -8px; right: 3%; opacity: .13; filter: saturate(1.4); transform: rotate(5deg); }
+.metric-list { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(7, minmax(112px, 1fr)); gap: 9px; }
+.metric-tile { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 78px; padding: 10px; border: 1px solid rgba(226,234,242,.08); border-radius: 15px; background: rgba(11,14,17,.42); }
+.metric-tile > .design-icon { flex: 0 0 auto; }
+.metric-tile.tone-heart { background: linear-gradient(135deg, rgba(240,97,106,.12), rgba(11,14,17,.45)); } .metric-tile.tone-pace { background: linear-gradient(135deg, rgba(74,168,232,.12), rgba(11,14,17,.45)); } .metric-tile.tone-altitude { background: linear-gradient(135deg, rgba(245,195,59,.11), rgba(11,14,17,.45)); } .metric-tile.tone-training { background: linear-gradient(135deg, rgba(125,163,62,.12), rgba(11,14,17,.45)); } .metric-tile.tone-distance { background: linear-gradient(135deg, rgba(47,169,107,.13), rgba(11,14,17,.45)); } .metric-tile.tone-vo2 { background: linear-gradient(135deg, rgba(139,92,246,.12), rgba(11,14,17,.45)); }
 .metric-label { margin: 0; color: var(--muted); font-size: 12px; }
-.metric-value { display: flex; align-items: baseline; gap: 5px; margin: 7px 0 0; flex-wrap: wrap; }
-.metric-value strong { color: var(--ink); font-family: var(--font-mono); font-size: 17px; font-variant-numeric: tabular-nums; font-weight: 600; letter-spacing: -.01em; }
+.metric-value { display: flex; align-items: baseline; gap: 5px; margin: 3px 0 0; flex-wrap: wrap; }
+.metric-value strong { color: var(--ink); font-family: var(--font-mono); font-size: 15px; font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: -.02em; }
 .metric-value span { color: var(--muted); font-size: 11px; }
-.lower { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(300px, .85fr); align-items: start; gap: 14px; }
-.main-col, .side-col { display: grid; gap: 14px; min-width: 0; }
+.lower { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(310px, .72fr); align-items: start; gap: 16px; }
+.main-col, .side-col { display: grid; gap: 16px; min-width: 0; }
 .surface-card { min-width: 0; }
-.card-title { margin: 0 0 6px; color: var(--ink); font-size: 14px; font-weight: 700; }
+.card-title { margin: 0; color: var(--ink); font-size: 14px; font-weight: 700; }
 .card-title em { color: var(--subtle); font-size: 12px; font-style: normal; font-weight: 400; }
 .card-sub { margin: 0 0 12px; color: var(--muted); font-size: 12px; }
-.series-card, .side-card { padding: 14px 16px 16px; }
-.chart-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.series-card, .side-card { padding: 16px 18px 18px; border-radius: 19px; }
+.section-head { display: flex; align-items: center; gap: 10px; margin-bottom: 13px; }
+.section-head h2 { margin: 1px 0 0; font-size: 16px; letter-spacing: -.02em; }
+.section-head.compact { margin-bottom: 14px; }
+.section-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 13px; background: rgba(47,169,107,.11); }
+.section-icon.data-tone { background: rgba(74,168,232,.12); } .section-icon.export-tone { background: rgba(139,92,246,.12); } .section-icon.source-tone { background: rgba(245,195,59,.1); }
+.chart-head { display: flex; align-items: center; gap: 8px; }
 .route-note { color: var(--subtle); font-size: 11px; }
+.section-head .route-note { margin-left: auto; }
 .route-wrap { position: relative; overflow: hidden; min-height: 300px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); }
 .route-canvas-texture { position: absolute; inset: 0; pointer-events: none; opacity: .65; background-image: linear-gradient(rgba(224,235,240,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(224,235,240,.06) 1px, transparent 1px), radial-gradient(circle at 72% 25%, rgba(110,216,245,.10), transparent 36%), radial-gradient(circle at 22% 70%, rgba(118,229,191,.09), transparent 38%); background-size: 28px 28px, 28px 28px, auto, auto; }
 .route-svg { position: absolute; inset: 14px; display: block; width: calc(100% - 28px); height: calc(100% - 28px); }
@@ -469,25 +585,39 @@ watch([dataRevision, workoutId], () => void loadDetail());
 .route-legend .steady-dot { background: var(--route-cyan); }
 .route-legend .warm-dot { background: var(--route-amber); }
 .route-legend .slow-dot { background: var(--route-coral); }
-.route-empty { display: grid; justify-items: center; gap: 8px; padding: 40px 16px; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); color: var(--subtle); font-size: 12px; text-align: center; }
+.route-empty { display: grid; justify-items: center; gap: 6px; padding: 46px 16px; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); color: var(--subtle); font-size: 12px; text-align: center; background: radial-gradient(circle at 50% 50%, rgba(47,169,107,.07), transparent 45%); }
+.route-empty strong { color: var(--muted); }
 .route-empty p { margin: 0; }
 .chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.chart-card { padding: 12px 14px; min-width: 0; }
-.chart-stats { color: var(--subtle); font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.series-chart { width: 100%; height: 150px; }
-.chart-empty { display: flex; align-items: center; gap: 10px; padding: 16px; color: var(--muted); font-size: 12px; }
-.chart-empty p { margin: 0; }
+.chart-card { overflow: hidden; padding: 12px 14px; min-width: 0; border-radius: 18px; }
+.chart-card::before { display: block; height: 2px; margin: -12px -14px 10px; content: ''; background: var(--line); }
+.chart-heart::before { background: linear-gradient(90deg, var(--heart), transparent); } .chart-pace::before { background: linear-gradient(90deg, var(--pace), transparent); } .chart-altitude::before { background: linear-gradient(90deg, var(--warning), transparent); } .chart-cadence::before { background: linear-gradient(90deg, var(--readiness), transparent); }
+.chart-icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 11px; background: rgba(255,255,255,.025); }
+.chart-stats { margin-left: auto; max-width: 62%; overflow: hidden; color: var(--subtle); font-size: 10px; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.series-chart { width: 100%; height: 170px; }
+.chart-empty { display: flex; align-items: center; gap: 12px; padding: 20px; color: var(--muted); font-size: 12px; }
+.chart-empty strong { color: var(--ink); }
+.chart-empty p { margin: 2px 0 0; }
+.decoded-list { display: grid; gap: 4px; }
+.decoded-list > div { display: grid; grid-template-columns: 34px minmax(0,1fr) auto; align-items: center; gap: 7px; min-height: 43px; padding: 4px 3px; border-bottom: 1px solid var(--line); }
+.decoded-list > div:last-child { border-bottom: 0; }
+.decoded-list span { color: var(--muted); font-size: 11px; }
+.decoded-list strong { color: var(--ink); font-family: var(--font-mono); font-size: 11px; font-variant-numeric: tabular-nums; }
+.mapping-note { display: flex; align-items: flex-start; gap: 7px; margin: 12px 0 0; padding: 9px; border-radius: 10px; background: rgba(125,163,62,.08); color: #aeb99b; font-size: 10px; }
+.mapping-note .design-icon { flex: 0 0 auto; }
 .format-row { display: flex; gap: 8px; flex-wrap: wrap; }
-.format-pill { padding: 7px 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-raised); color: var(--muted); font-size: 12px; cursor: pointer; }
+.format-pill { flex: 1; min-width: 58px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-raised); color: var(--muted); font-size: 11px; cursor: pointer; }
 .format-pill.is-on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
-.format-pill.export-go { margin-left: auto; }
+.export-go { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 43px; margin-top: 10px; border: 1px solid rgba(125,163,62,.36); border-radius: 11px; background: var(--action-green); color: #f2f4ee; font-weight: 700; cursor: pointer; }
+.export-go:hover { background: var(--action-green-hover); }
 .action-note { display: inline-flex; align-items: center; gap: 6px; margin: 10px 0 0; font-size: 12px; }
 .action-note.ok { color: var(--readiness); } .action-note.bad { color: var(--danger); }
 .meta-card dl { display: grid; gap: 8px; margin: 0; }
 .meta-card dl > div { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-width: 0; }
 .meta-card dt { color: var(--muted); font-size: 12px; } .meta-card dd { margin: 0; color: var(--ink); font-size: 12px; overflow-wrap: anywhere; text-align: right; }
-.page-foot { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 4px 0 0; color: var(--subtle); font-size: 12px; }
-@media (max-width: 1180px) { .lower { grid-template-columns: minmax(0, 1fr); } }
-@media (max-width: 760px) { .metric-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } .chart-grid { grid-template-columns: minmax(0, 1fr); } .route-wrap { min-height: 240px; } .route-note { display: none; } }
+.page-foot { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 2px 0 0; color: var(--subtle); font-size: 11px; }
+@media (max-width: 1320px) { .metric-list { grid-template-columns: repeat(4, minmax(130px, 1fr)); } }
+@media (max-width: 1180px) { .lower { grid-template-columns: minmax(0, 1fr); } .side-col { grid-template-columns: repeat(2, minmax(0,1fr)); } .decoded-card { grid-row: span 2; } }
+@media (max-width: 760px) { .page-toolbar { align-items: flex-start; } .ai-action span { display: none; } .workout-hero { padding: 16px; border-radius: 19px; } .hero-copy { align-items: flex-start; gap: 12px; } .hero-device :deep(.device-visual) { width: 78px; height: 78px; flex-basis: 78px; } .device-live { display: none; } .sport-line > .design-icon { width: 45px !important; height: 45px !important; } .sport-line h1 { font-size: 24px; } .source-chip { font-size: 10px; } .metric-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } .metric-tile { min-height: 70px; } .chart-grid, .side-col { grid-template-columns: minmax(0, 1fr); } .decoded-card { grid-row: auto; } .route-wrap { min-height: 240px; } .route-note { display: none; } .chart-stats { display: none; } }
 @media (prefers-reduced-motion: reduce) { .route-direction { text-shadow: none; } }
 </style>

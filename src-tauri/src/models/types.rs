@@ -136,12 +136,23 @@ pub struct WorkoutPause {
     pub kind: String,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct WorkoutSeriesSummary {
+    pub average_pace: Option<f64>,
+    pub average_cadence: Option<f64>,
+    pub max_cadence: Option<f64>,
+    pub average_stride_cm: Option<f64>,
+    pub elevation_gain_m: Option<f64>,
+    pub elevation_loss_m: Option<f64>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct WorkoutSeries {
     pub workout_id: String,
     pub samples: Vec<WorkoutSeriesSample>,
     pub route: Vec<WorkoutRoutePoint>,
     pub pauses: Vec<WorkoutPause>,
+    pub summary: WorkoutSeriesSummary,
 }
 
 #[derive(Debug, Clone)]

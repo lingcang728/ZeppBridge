@@ -198,6 +198,16 @@ export interface WorkoutSeries {
   samples: WorkoutSeriesSample[];
   route: WorkoutRoutePoint[];
   pauses: WorkoutPause[];
+  summary: WorkoutSeriesSummary;
+}
+
+export interface WorkoutSeriesSummary {
+  average_pace?: number | null;
+  average_cadence?: number | null;
+  max_cadence?: number | null;
+  average_stride_cm?: number | null;
+  elevation_gain_m?: number | null;
+  elevation_loss_m?: number | null;
 }
 
 export type ExportDataType =
