@@ -660,8 +660,7 @@ fn sleep_stages_from_band(
     // 午睡等按当日零点编码的片段，用与 [st, ed] 的重叠量自动选出当日锚点。
     let session_start =
         first_value(sleep, &["st", "startTime", "start_time"]).and_then(parse_timestamp);
-    let session_end =
-        first_value(sleep, &["ed", "endTime", "end_time"]).and_then(parse_timestamp);
+    let session_end = first_value(sleep, &["ed", "endTime", "end_time"]).and_then(parse_timestamp);
     let prev_day = build(utc_midnight - Duration::days(1));
     match (session_start, session_end) {
         (Some(start), Some(end)) => {
