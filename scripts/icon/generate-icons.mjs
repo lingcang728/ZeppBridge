@@ -5,7 +5,9 @@ import { spawnSync } from 'node:child_process';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const root = resolve(scriptDir, '../..');
-const source = join(root, 'src-tauri', 'icons', 'icon-source.svg');
+// v0.8.4 起平台图标以 design_picture 定稿的位图母版为源；
+// icon-source.svg 仍保留给应用内 BrandMark 使用。
+const source = join(root, 'src-tauri', 'icons', 'icon-master.png');
 const output = join(root, 'src-tauri', 'icons');
 const publicIcon = join(root, 'public', 'zeppbridge-icon.png');
 const tauriCli = join(root, 'node_modules', '@tauri-apps', 'cli', 'tauri.js');

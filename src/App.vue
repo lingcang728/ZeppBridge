@@ -518,28 +518,30 @@ a { color: inherit; }
 .source-card {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
-  padding: 10px 12px;
+  padding: 11px 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--surface);
   text-decoration: none;
   color: inherit;
+  transition: border-color 150ms ease, background-color 150ms ease;
 }
 .source-card:hover { background: var(--surface-raised); border-color: var(--line-strong); }
+.source-card:hover .source-chevron { color: var(--muted); }
 .source-icon {
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
-  flex: 0 0 38px;
-  border-radius: 10px;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border-radius: 11px;
   background: var(--surface-raised);
   border: 1px solid var(--line);
   color: var(--muted);
 }
-.source-icon :deep(.device-visual) { width: 38px; max-width: 100%; height: 38px; max-height: 100%; min-width: 0; min-height: 0; flex: 0 0 38px; border: 0; border-radius: 10px; background: transparent; }
+.source-icon :deep(.device-visual) { width: 42px; max-width: 100%; height: 42px; max-height: 100%; min-width: 0; min-height: 0; flex: 0 0 42px; border: 0; border-radius: 11px; background: transparent; }
 .source-icon :deep(.device-visual img) { padding: 3px; }
 .source-copy { display: grid; gap: 2px; min-width: 0; flex: 1; }
 .source-copy strong { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

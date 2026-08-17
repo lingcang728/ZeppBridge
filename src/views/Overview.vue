@@ -342,7 +342,7 @@ watch(dataRevision, () => {
           <!-- 24 小时心率 -->
           <section class="surface-card stat-card hr-card" aria-label="24 小时心率">
             <div class="stat-head">
-              <span class="stat-label">24 小时心率</span>
+              <span class="stat-label"><Icon name="heart" :size="14" class="tone-heart" />24 小时心率</span>
               <span class="hr-latest">最新 <strong>{{ num(hrLatest) }}</strong> 次/分</span>
             </div>
             <div class="stat-slot">
@@ -362,7 +362,7 @@ watch(dataRevision, () => {
 
           <!-- 今日步数 -->
           <section class="surface-card stat-card steps-card" aria-label="今日步数">
-            <div class="stat-head"><span class="stat-label">今日步数</span></div>
+            <div class="stat-head"><span class="stat-label"><Icon name="steps" :size="14" class="tone-accent" />今日步数</span></div>
             <div class="stat-slot">
               <div class="steps-ring">
                 <CircularProgress :value="stepsPercent" :size="104" :stroke-width="9" color="#7DA33E" track-color="rgba(226, 234, 242, .1)">
@@ -379,7 +379,7 @@ watch(dataRevision, () => {
           <!-- 昨晚睡眠 -->
           <section class="surface-card stat-card sleep-card" aria-label="昨晚睡眠">
             <div class="stat-head">
-              <span class="stat-label">昨晚睡眠</span>
+              <span class="stat-label"><Icon name="moon" :size="14" class="tone-sleep" />昨晚睡眠</span>
               <span v-if="lastSleep && isFiniteNumber(lastSleep.score)" class="sleep-score">{{ lastSleep.score }}</span>
             </div>
             <div class="stat-slot">
@@ -414,7 +414,7 @@ watch(dataRevision, () => {
 
           <!-- 训练负荷 -->
           <section class="surface-card stat-card mini-card" aria-label="训练负荷">
-            <span class="stat-label">训练负荷</span>
+            <span class="stat-label"><Icon name="training-load" :size="14" class="tone-training" />训练负荷</span>
             <div class="load-gauge">
               <svg viewBox="0 0 72 42" fill="none">
                 <path d="M8 38 A 28 28 0 0 1 64 38" class="gauge-track" />
@@ -441,7 +441,7 @@ watch(dataRevision, () => {
         <!-- 最近记录 -->
         <section class="surface-card recent-card" aria-label="最近记录">
           <div class="stat-head">
-            <span class="stat-label">最近记录</span>
+            <span class="stat-label"><Icon name="clock" :size="14" class="tone-muted" />最近记录</span>
             <RouterLink class="text-link" to="/recent">查看全部记录 <Icon name="arrow-right" :size="12" /></RouterLink>
           </div>
           <div v-if="recentItems.length" class="recent-list">
@@ -484,17 +484,19 @@ watch(dataRevision, () => {
 .hero-card {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr);
-  gap: 24px;
+  gap: 28px;
   align-items: center;
-  padding: 26px 28px;
+  padding: 30px 32px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(640px 300px at 88% -40%, rgba(125, 163, 62, .14), transparent 70%),
+    var(--surface);
   overflow: hidden;
 }
 .hero-copy { min-width: 0; }
-.hero-copy h1 { margin: 0 0 8px; font-size: 24px; font-weight: 700; color: var(--ink); letter-spacing: -.01em; line-height: 1.25; }
-.hero-intro { margin: 0 0 18px; color: var(--muted); font-size: 13px; }
+.hero-copy h1 { margin: 0 0 8px; font-size: 25px; font-weight: 700; color: var(--ink); letter-spacing: -.01em; line-height: 1.25; }
+.hero-intro { margin: 0 0 20px; color: var(--muted); font-size: 13px; }
 .hero-values { display: flex; flex-wrap: wrap; gap: 12px; margin: 0; padding: 0; list-style: none; }
 .hero-values li { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); }
 .hv-icon { display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 30px; border-radius: 8px; background: var(--accent-soft); color: var(--accent); }
@@ -505,26 +507,37 @@ watch(dataRevision, () => {
 /* 设备 → AI 大脑 图示 */
 .hero-visual {
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(48px, 1fr) auto;
+  grid-template-rows: 1fr 1fr;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-height: 150px;
+  column-gap: 10px;
+  row-gap: 14px;
+  min-height: 196px;
   padding: 8px 4px;
 }
 .hv-device { position: relative; z-index: 1; display: grid; justify-items: center; gap: 6px; margin: 0; }
-.hv-device :deep(.device-visual) { width: 64px; height: 64px; flex-basis: 64px; border-radius: 14px; }
-.hv-device figcaption { max-width: 92px; overflow: hidden; color: var(--subtle); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.hv-a { transform: translateY(-10px); }
-.hv-b { transform: translateY(14px); }
-.hv-devices { display: flex; gap: 6px; }
-.hv-flow { flex: 1; min-width: 60px; height: 72px; color: var(--accent); opacity: .85; }
+.hv-device :deep(.device-visual) {
+  width: 66px;
+  height: 66px;
+  flex-basis: 66px;
+  border-radius: 15px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .28);
+}
+.hv-device figcaption { max-width: 96px; overflow: hidden; color: var(--subtle); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+/* 图示自带 figcaption 说明，隐藏占位图内部的小标签避免与图形叠切 */
+.hv-device :deep(.device-fallback-label) { display: none; }
+.hv-device :deep(.device-fallback svg) { height: 100%; }
+.hv-a { grid-area: 1 / 1; justify-self: start; }
+.hv-b { grid-area: 2 / 1; justify-self: end; }
+.hv-flow { grid-area: 1 / 2 / 3 / 3; width: 100%; height: 72px; color: var(--accent); opacity: .85; }
 .flow-line { stroke: currentColor; stroke-width: 2; stroke-dasharray: 5 7; animation: flowdash 1.6s linear infinite; }
 .flow-head { fill: currentColor; }
 @keyframes flowdash { to { stroke-dashoffset: -12; } }
 .hv-brain {
   position: relative;
   z-index: 1;
+  grid-area: 1 / 3 / 3 / 4;
   display: grid;
   justify-items: center;
   place-items: center;
@@ -569,6 +582,11 @@ watch(dataRevision, () => {
 .stat-slot { min-height: 148px; min-width: 0; display: grid; align-content: center; }
 .stat-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
 .stat-label { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 600; }
+.stat-label svg { flex: 0 0 auto; }
+.tone-accent { color: var(--accent); }
+.tone-sleep { color: var(--sleep-light); }
+.tone-training { color: var(--training); }
+.tone-muted { color: var(--subtle); }
 .stat-foot { margin: 0; color: var(--subtle); font-size: 11px; text-align: center; font-variant-numeric: tabular-nums; }
 .stat-empty { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 148px; height: 100%; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); color: var(--subtle); font-size: 12px; text-align: center; padding: 12px; }
 .num { font-variant-numeric: tabular-nums; }
