@@ -23,7 +23,10 @@ const LEGACY_DIRS: [&str; 2] = ["exports", "backups"];
 pub fn resolve_data_dir() -> io::Result<PathBuf> {
     let exe = std::env::current_exe()?;
     let exe_dir = exe.parent().ok_or_else(|| {
-        io::Error::new(io::ErrorKind::NotFound, "executable has no parent directory")
+        io::Error::new(
+            io::ErrorKind::NotFound,
+            "executable has no parent directory",
+        )
     })?;
     let data_dir = if is_build_artifact_dir(exe_dir) {
         repository_data_dir().unwrap_or_else(|| exe_dir.join("data"))
@@ -87,7 +90,9 @@ fn repository_data_dir() -> Option<PathBuf> {
 }
 
 fn normalize_path(path: &Path) -> String {
-    path.to_string_lossy().replace('/', "\\").to_ascii_lowercase()
+    path.to_string_lossy()
+        .replace('/', "\\")
+        .to_ascii_lowercase()
 }
 
 fn ensure_writable_dir(dir: &Path) -> io::Result<()> {
@@ -106,7 +111,11 @@ fn legacy_source_dirs() -> Vec<PathBuf> {
     }
     if let Ok(roaming) = std::env::var("APPDATA") {
         dirs.push(PathBuf::from(&roaming).join("com.zeppbridge.app"));
-        dirs.push(PathBuf::from(&roaming).join("zeppbridge").join("ZeppBridge"));
+        dirs.push(
+            PathBuf::from(&roaming)
+                .join("zeppbridge")
+                .join("ZeppBridge"),
+        );
         dirs.push(
             PathBuf::from(roaming)
                 .join("zeppbridge")
@@ -256,7 +265,10 @@ mod tests {
         relocate_from(&source, &dest).unwrap();
         assert_eq!(fs::read(dest.join("zepp.db")).unwrap(), b"db");
         assert_eq!(fs::read(dest.join("auth.json")).unwrap(), b"{}");
-        assert_eq!(fs::read(dest.join("exports").join("a.json")).unwrap(), b"[]");
+        assert_eq!(
+            fs::read(dest.join("exports").join("a.json")).unwrap(),
+            b"[]"
+        );
         assert!(!source.join("zepp.db").exists());
 
         fs::create_dir_all(&source).unwrap();
