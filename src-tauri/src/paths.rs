@@ -133,7 +133,7 @@ fn relocate_from(source_dir: &Path, data_dir: &Path) -> io::Result<()> {
         return Ok(());
     }
 
-    let mut names: Vec<&str> = LEGACY_FILES.iter().copied().collect();
+    let mut names: Vec<&str> = LEGACY_FILES.to_vec();
     names.extend(LEGACY_OPTIONAL_FILES);
     for name in names {
         relocate_entry(&source_dir.join(name), &data_dir.join(name))?;
