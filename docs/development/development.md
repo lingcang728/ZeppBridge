@@ -91,7 +91,7 @@ Tauri command 在 `src-tauri/src/lib.rs` 注册，前端封装在 `src/lib/bridg
 | `get_sleep_detail` / `get_workout_detail` | 按稳定 ID 读取单条详情 | 找不到返回 `null`；不生成估算字段 |
 | `get_workout_series` | 读取已解码的跑步 samples/route/pauses | 没有点则空数组，不编造 |
 | `cleanup_old_data` | 按天清理旧数据 | `1–365` 天；跨 canonical 表并清理无引用 raw |
-| `open_data_folder` | 在 Windows Explorer 打开 app data | 实际目录由 Tauri `app_data_dir` 决定 |
+| `open_data_folder` | 在 Windows Explorer 打开安装目录旁的 `data/` | 不再使用 `%APPDATA%` |
 
 `LoginStatus.state` 只能是：`idle`、`waiting`、`extracting`、`verifying`、`connected`、`failed`。
 

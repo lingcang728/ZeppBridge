@@ -5,7 +5,7 @@
 ## 凭据
 
 - app token 由 Windows Credential Manager 保存，服务名为 `com.zeppbridge.app`，账户名按 user ID 区分。
-- `auth.json` 位于 Tauri `app_data_dir()`，只保存认证元数据（版本、user ID、区域 host、更新时间）；正常保存不会把 token 写入文件。
+- `auth.json` 位于程序目录旁的 `data/`（`{exe_dir}/data`），只保存认证元数据（版本、user ID、区域 host、更新时间）；正常保存不会把 token 写入文件。不写入 `%APPDATA%`。
 - 启动恢复会从元数据和凭据管理器重建同步 manager。凭据缺失或失效时，设置页显示需要重新认证，不把 token 放进状态响应。
 - 网页登录在独立窗口内读取会话 cookie，解析出 user ID 与 app token 后立刻写入凭据管理器。`login://status` 只返回 `state`、`message`、`page_url`，不返回 token。
 - token 仍然是敏感数据。不要记录、复制到 issue、提交到 Git、发送给第三方或公开分享。
@@ -30,7 +30,7 @@
 
 ## 健康数据库
 
-- 数据库和 raw payload 位于 Tauri `app_data_dir()`，默认 SQLite 明文；当前没有整库加密或远程备份。
+- 数据库和 raw payload 位于程序目录旁的 `data/zepp.db`，默认 SQLite 明文；当前没有整库加密或远程备份。WebView 缓存在 `data/webview`。
 - SQLite 启用 WAL、外键、migration、去重和 raw provenance。canonical 健康行可回指对应 raw 记录，便于解释来源。
 - retention 可由用户在 1–365 天内选择，默认 365 天；清理依据健康记录时间，成功同步后删除旧 canonical 和无引用 raw。清理不可撤销，请先备份。
 - `band_data` 的编码/压缩 payload 可能只保留 raw 并标记 `unverified`；程序不将未知内容伪造成睡眠阶段。

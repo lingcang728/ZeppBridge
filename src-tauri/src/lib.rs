@@ -8,6 +8,7 @@ mod fetcher;
 mod ipc_types;
 mod models;
 mod normalizer;
+mod paths;
 mod storage;
 mod sync;
 
@@ -39,6 +40,11 @@ fn show_main_window(app: &AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    if let Ok(data_dir) = paths::resolve_data_dir() {
+        let webview_dir = paths::webview_user_data_dir(&data_dir);
+        let _ = std::fs::create_dir_all(&webview_dir);
+        std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &webview_dir);
+    }
     tauri::Builder::default()
         // Single-instance must be registered first so a second launch never
         // reaches tray setup and creates a duplicate icon.
@@ -48,10 +54,12 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
-            let data_dir = app
-                .path()
-                .app_data_dir()
-                .map_err(|error| anyhow::anyhow!("无法获取应用数据目录: {error}"))?;
+            let data_dir = paths::resolve_data_dir()
+                .map_err(|error| anyhow::anyhow!("无法创建安装目录旁的数据文件夹: {error}"))?;
+            let webview_dir = paths::webview_user_data_dir(&data_dir);
+            std::fs::create_dir_all(&webview_dir)
+                .map_err(|error| anyhow::anyhow!("无法创建 WebView 数据目录: {error}"))?;
+            std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &webview_dir);
             let state = AppState::new(data_dir.clone())
                 .map_err(|error| anyhow::anyhow!("无法初始化应用状态: {error}"))?;
             app.manage(state);

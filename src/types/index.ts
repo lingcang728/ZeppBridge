@@ -120,6 +120,8 @@ export interface HealthOverview {
   training_load?: number;
   vo2max?: number;
   steps_today?: number;
+  steps_goal?: number;
+  training_load_scale?: number;
   active_calories_today?: number;
   latest_heart_rate_at?: string;
   last_updated?: string;

@@ -32,8 +32,6 @@ const route = useRoute();
 const router = useRouter();
 const mobileMenuOpen = ref(false);
 const trayHint = ref(false);
-const userMenuOpen = ref(false);
-const userControl = ref<HTMLElement | null>(null);
 const {
   appStatus, statusError, syncState, syncMessage, syncProgress, isSyncing, canIncrementalSync,
   dataRevision, initialize, runSync, cancelSync,
@@ -93,21 +91,12 @@ const lastSyncClock = computed(() => {
   }).format(date).replace(/\//g, '-');
 });
 const accountLabel = computed(() => appStatus.value?.masked_user_id || '未识别账户');
-const accountInitial = computed(() => {
-  const first = accountLabel.value.match(/[A-Za-z0-9]/)?.[0];
-  return first ? first.toUpperCase() : '未';
-});
-const regionLabel = computed(() => appStatus.value?.region_host || '未提供');
 const browserPreview = computed(() => !desktopRuntime);
 const routeNotice = computed(() => route.query.notice === 'not-found');
 
-const onDocumentPointerDown = (event: PointerEvent) => {
-  if (!userControl.value?.contains(event.target as Node)) userMenuOpen.value = false;
-};
 const onDocumentKeydown = (event: KeyboardEvent) => {
   const target = event.target as HTMLElement | null;
   if (target && target.closest('input, textarea, select, [contenteditable]')) return;
-  if (event.key === 'Escape') userMenuOpen.value = false;
   if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
   if (event.key === '=' || event.key === '+' || event.code === 'NumpadAdd') {
     event.preventDefault();
@@ -127,7 +116,6 @@ onMounted(() => {
   initializeScale();
   void initialize();
   void loadDevices();
-  document.addEventListener('pointerdown', onDocumentPointerDown);
   document.addEventListener('keydown', onDocumentKeydown);
   if (route.query.notice === 'not-found') {
     window.setTimeout(() => {
@@ -149,7 +137,6 @@ watch(dataRevision, () => {
   if (!showLanding) void loadDevices();
 });
 onUnmounted(() => {
-  document.removeEventListener('pointerdown', onDocumentPointerDown);
   document.removeEventListener('keydown', onDocumentKeydown);
 });
 </script>
@@ -252,23 +239,6 @@ onUnmounted(() => {
             {{ syncProgress ? `${syncProgress.current}/${syncProgress.total}` : '同步中…' }}
             <button class="cancel-link" type="button" @click="cancelSync">取消</button>
           </span>
-        </div>
-        <div class="topbar-actions">
-          <div ref="userControl" class="user-control">
-            <button class="user-trigger" type="button" aria-haspopup="menu" :aria-expanded="userMenuOpen" :aria-label="`账户 ${accountLabel}`" @click="userMenuOpen = !userMenuOpen">
-              <span class="avatar">{{ accountInitial }}</span>
-              <span class="user-name">{{ accountLabel }}</span>
-              <Icon name="chevron-down" :size="14" />
-            </button>
-            <div v-if="userMenuOpen" class="user-menu" role="menu" aria-label="用户菜单">
-              <div class="user-menu-summary">
-                <span>当前账户</span>
-                <strong>{{ accountLabel }}</strong>
-                <span>区域 / Host：{{ regionLabel }}</span>
-              </div>
-              <RouterLink :to="{ path: '/settings', hash: '#account-section' }" role="menuitem" @click="userMenuOpen = false"><Icon name="user" :size="15" /><span>账户与区域</span></RouterLink>
-            </div>
-          </div>
         </div>
       </header>
 
@@ -632,8 +602,7 @@ a { color: inherit; }
   background: var(--canvas);
   border-bottom: 1px solid var(--line);
 }
-.topbar-leading, .topbar-actions { display: flex; min-width: 0; align-items: center; gap: 10px; }
-.topbar-actions { flex-wrap: wrap; justify-content: flex-end; }
+.topbar-leading { display: flex; min-width: 0; align-items: center; gap: 10px; }
 .mobile-menu-button { display: none; }
 .connection-chip {
   display: inline-flex;
@@ -682,59 +651,6 @@ a { color: inherit; }
   cursor: pointer;
 }
 .icon-round:hover { background: var(--surface-hover); color: var(--ink); }
-.user-control { position: relative; }
-.user-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 36px;
-  padding: 3px 6px 3px 3px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-}
-.user-trigger:hover { background: var(--surface-hover); }
-.avatar {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: var(--surface-raised);
-  border: 1px solid var(--line-strong);
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 600;
-}
-.user-name { max-width: 180px; overflow: hidden; color: var(--ink); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-.user-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 40;
-  width: min(260px, calc(100vw - 24px));
-  padding: 5px;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
-  background: var(--surface-raised);
-}
-.user-menu-summary { display: grid; gap: 2px; padding: 8px 9px 9px; border-bottom: 1px solid var(--line); color: var(--subtle); font-size: 11px; line-height: 1.45; }
-.user-menu-summary strong { overflow: hidden; color: var(--ink); font-family: var(--font-mono); font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.user-menu a {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  min-height: 36px;
-  padding: 7px 9px;
-  border-radius: 7px;
-  color: var(--muted);
-  font-size: 12px;
-  text-decoration: none;
-}
-.user-menu a span { color: var(--ink); }
-.user-menu a:hover { background: var(--accent-soft); color: var(--accent); }
 
 .sync-feedback { display: flex; min-height: 32px; min-width: 0; align-items: center; gap: 7px; padding: 6px 28px; border-bottom: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 12px; }
 .sync-feedback.tone-updated { color: var(--accent); }
@@ -763,10 +679,8 @@ a { color: inherit; }
   .topbar { height: 56px; padding: 0 16px; }
   .mobile-menu-button { display: inline-flex; width: 44px; height: 44px; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: var(--radius-sm); background: transparent; cursor: pointer; }
   .sync-time { display: none; }
-  .topbar-actions { gap: 6px; }
   .connection-chip { padding-inline: 8px; }
   .connection-chip span { display: none; }
-  .user-name { display: none; }
   .sync-feedback { padding-inline: 16px; }
   .mobile-menu { display: block; padding: 8px 12px 12px; background: var(--bg); border-bottom: 1px solid var(--line); }
   .mobile-menu-links { display: grid; gap: 3px; }

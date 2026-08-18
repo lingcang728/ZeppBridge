@@ -3,10 +3,11 @@ use crate::connectors::ZeppConnector;
 use crate::fetcher::DataFetcher;
 use crate::ipc_types::LoginStatus;
 use crate::models::{error::Result, AuthInfo, ZeppBridgeError};
+use crate::paths;
 use crate::storage::Database;
 use crate::sync::SyncManager;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 
@@ -25,10 +26,6 @@ impl LoginSession {
         }
     }
 }
-
-const LEGACY_SQLITE_FILES: [&str; 3] = ["zepp.db", "zepp.db-wal", "zepp.db-shm"];
-const AUTH_FILE: &str = "auth.json";
-static MIGRATION_TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// Shared process state for the Tauri commands.
 ///
@@ -61,7 +58,7 @@ impl AppState {
     pub fn new(data_dir: PathBuf) -> Result<Self> {
         std::fs::create_dir_all(&data_dir)?;
 
-        let migration_warning = migrate_legacy_data(&data_dir);
+        let migration_warning = paths::relocate_legacy_data(&data_dir);
         let db = Database::new(data_dir.join("zepp.db"))?;
         // Do not replay every raw payload during startup. A full reprocess of a
         // large local library blocks window creation and looks like a hang.
@@ -133,135 +130,6 @@ fn startup_warning(error: ZeppBridgeError) -> String {
         "无法恢复 Zepp 认证，请在设置里重新连接后重试：{}",
         error.user_message()
     )
-}
-
-fn migrate_legacy_data(data_dir: &Path) -> Option<String> {
-    let legacy_data_dir = directories::ProjectDirs::from("com", "zeppbridge", "ZeppBridge")
-        .map(|directories| directories.data_dir().to_path_buf());
-    let legacy_data_dir = legacy_data_dir?;
-
-    if legacy_data_dir == data_dir {
-        return None;
-    }
-
-    migrate_legacy_data_from(&legacy_data_dir, data_dir)
-}
-
-fn migrate_legacy_data_from(legacy_data_dir: &Path, data_dir: &Path) -> Option<String> {
-    let mut failed_files = Vec::new();
-
-    if migrate_sqlite_group(legacy_data_dir, data_dir).is_err() {
-        failed_files.push("数据库文件组");
-    }
-    if migrate_auth_file(legacy_data_dir, data_dir).is_err() {
-        failed_files.push("认证元数据");
-    }
-
-    if failed_files.is_empty() {
-        None
-    } else {
-        Some(format!(
-            "旧版本地数据迁移未完全成功（{}）。应用仍可启动，现有文件未被覆盖。",
-            failed_files.join("、")
-        ))
-    }
-}
-
-fn migrate_sqlite_group(legacy_data_dir: &Path, data_dir: &Path) -> std::io::Result<()> {
-    let database_path = data_dir.join(LEGACY_SQLITE_FILES[0]);
-    if path_exists(&database_path)? {
-        return Ok(());
-    }
-
-    // A SQLite sidecar without its primary database cannot be opened safely.
-    // Treat the group as absent until the legacy primary file is available.
-    if !path_exists(&legacy_data_dir.join(LEGACY_SQLITE_FILES[0]))? {
-        return Ok(());
-    }
-
-    let mut copied_files = Vec::new();
-    for file_name in LEGACY_SQLITE_FILES {
-        let source = legacy_data_dir.join(file_name);
-        if !path_exists(&source)? {
-            continue;
-        }
-
-        let destination = data_dir.join(file_name);
-        if !path_is_missing(&destination)? {
-            continue;
-        }
-
-        if let Err(error) = copy_file_atomically(&source, &destination) {
-            cleanup_copied_files(&copied_files);
-            return Err(error);
-        }
-        copied_files.push(destination);
-    }
-
-    Ok(())
-}
-
-fn migrate_auth_file(legacy_data_dir: &Path, data_dir: &Path) -> std::io::Result<()> {
-    let source = legacy_data_dir.join(AUTH_FILE);
-    if !path_exists(&source)? {
-        return Ok(());
-    }
-
-    let destination = data_dir.join(AUTH_FILE);
-    if !path_is_missing(&destination)? {
-        return Ok(());
-    }
-
-    copy_file_atomically(&source, &destination)
-}
-
-fn path_exists(path: &Path) -> std::io::Result<bool> {
-    match std::fs::symlink_metadata(path) {
-        Ok(_) => Ok(true),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
-        Err(error) => Err(error),
-    }
-}
-
-fn path_is_missing(path: &Path) -> std::io::Result<bool> {
-    path_exists(path).map(|exists| !exists)
-}
-
-fn copy_file_atomically(source: &Path, destination: &Path) -> std::io::Result<()> {
-    let temporary_path = migration_temp_path(destination);
-    let result = (|| {
-        std::fs::copy(source, &temporary_path)?;
-        if path_exists(destination)? {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::AlreadyExists,
-                "migration destination already exists",
-            ));
-        }
-        std::fs::rename(&temporary_path, destination)
-    })();
-
-    if result.is_err() {
-        let _ = std::fs::remove_file(&temporary_path);
-    }
-    result.map(|_| ())
-}
-
-fn migration_temp_path(destination: &Path) -> PathBuf {
-    let file_name = destination
-        .file_name()
-        .map(|name| name.to_string_lossy().into_owned())
-        .unwrap_or_else(|| "migration-file".to_string());
-    let sequence = MIGRATION_TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
-    destination.with_file_name(format!(
-        ".{file_name}.migration-{}-{sequence}.tmp",
-        std::process::id()
-    ))
-}
-
-fn cleanup_copied_files(copied_files: &[PathBuf]) {
-    for path in copied_files {
-        let _ = std::fs::remove_file(path);
-    }
 }
 
 fn merge_startup_warnings(

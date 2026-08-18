@@ -35,6 +35,16 @@ interface RouteSegment {
   to: RouteCanvasPoint;
 }
 
+interface GhostRoad {
+  d: string;
+  opacity: number;
+}
+
+interface ChartStat {
+  label: string;
+  value: string;
+}
+
 const route = useRoute();
 const { appStatus, dataRevision } = useSyncController();
 const workout = ref<WorkoutMetrics | null>(null);
@@ -66,10 +76,15 @@ const formatClock = (minutes?: number | null): string => {
   return `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
 };
 
-const paceText = (minutes?: number | null): string => {
+const paceClock = (minutes?: number | null): string => {
   if (!isFiniteNumber(minutes) || minutes <= 0) return '未提供';
   const totalSeconds = Math.round(minutes * 60);
-  return `${Math.floor(totalSeconds / 60)}'${String(totalSeconds % 60).padStart(2, '0')}" /km`;
+  return `${Math.floor(totalSeconds / 60)}'${String(totalSeconds % 60).padStart(2, '0')}"`;
+};
+
+const paceText = (minutes?: number | null): string => {
+  const clock = paceClock(minutes);
+  return clock === '未提供' ? clock : `${clock} /km`;
 };
 
 const distanceLabel = computed(() => formatDistance(workout.value?.distance_meters, '未提供'));
@@ -128,15 +143,65 @@ const pauses = computed(() => (series.value?.pauses ?? []).map((pause) => ({
   end: new Date(pause.end_time).getTime(),
 })).filter((pause) => Number.isFinite(pause.start) && Number.isFinite(pause.end) && pause.end > pause.start));
 
+const paceSamples = computed(() => samplesByTime.value.filter((item) => isFiniteNumber(item.sample.pace) && item.sample.pace > 0));
+
 const nearestPace = (timestamp: number): { value: number | null; delta: number | null } => {
-  let best: { value: number | null; delta: number | null } = { value: null, delta: null };
-  for (const item of samplesByTime.value) {
-    const delta = Math.abs(item.time - timestamp);
-    if (best.delta !== null && delta > best.delta) continue;
-    if (isFiniteNumber(item.sample.pace) && item.sample.pace > 0) best = { value: item.sample.pace, delta };
+  const items = paceSamples.value;
+  if (!items.length) return { value: null, delta: null };
+  let lo = 0;
+  let hi = items.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (items[mid].time < timestamp) lo = mid + 1;
+    else hi = mid;
   }
-  // A sample from a different part of a workout should not paint the route.
-  return best.delta !== null && best.delta <= 45_000 ? best : { value: null, delta: best.delta };
+  let best = items[lo];
+  if (lo > 0 && Math.abs(items[lo - 1].time - timestamp) < Math.abs(best.time - timestamp)) best = items[lo - 1];
+  const delta = Math.abs(best.time - timestamp);
+  return delta <= 45_000 ? { value: best.sample.pace ?? null, delta } : { value: null, delta };
+};
+
+const toSvgPath = (points: Array<{ x: number; y: number }>): string => points
+  .map((point, index) => `${index ? 'L' : 'M'}${point.x.toFixed(1)} ${point.y.toFixed(1)}`)
+  .join(' ');
+
+const offsetPolyline = (points: Array<{ x: number; y: number }>, distance: number) => points.map((point, index) => {
+  const prev = points[Math.max(0, index - 1)];
+  const next = points[Math.min(points.length - 1, index + 1)];
+  const dx = next.x - prev.x;
+  const dy = next.y - prev.y;
+  const length = Math.hypot(dx, dy) || 1;
+  return { x: point.x + (-dy / length) * distance, y: point.y + (dx / length) * distance };
+});
+
+const buildGhostRoads = (points: Array<{ x: number; y: number }>): GhostRoad[] => {
+  if (points.length < 3) return [];
+  const step = Math.max(1, Math.ceil(points.length / 48));
+  const spine = points.filter((_, index) => index % step === 0);
+  if (spine[spine.length - 1] !== points[points.length - 1]) spine.push(points[points.length - 1]);
+  if (spine.length < 3) return [];
+  const ghosts: GhostRoad[] = [
+    { d: toSvgPath(offsetPolyline(spine, 16)), opacity: .13 },
+    { d: toSvgPath(offsetPolyline(spine, -13)), opacity: .1 },
+    { d: toSvgPath(offsetPolyline(spine, 30)), opacity: .07 },
+    { d: toSvgPath(offsetPolyline(spine, -27)), opacity: .06 },
+  ];
+  for (let index = 3; index < spine.length - 3; index += 5) {
+    const prev = spine[index - 1];
+    const next = spine[index + 1];
+    const dx = next.x - prev.x;
+    const dy = next.y - prev.y;
+    const length = Math.hypot(dx, dy) || 1;
+    const side = index % 10 < 5 ? 1 : -1;
+    const stub = 16 + (index % 3) * 7;
+    const nx = (-dy / length) * side * stub;
+    const ny = (dx / length) * side * stub;
+    ghosts.push({
+      d: `M${spine[index].x.toFixed(1)} ${spine[index].y.toFixed(1)} L${(spine[index].x + nx).toFixed(1)} ${(spine[index].y + ny).toFixed(1)}`,
+      opacity: .08,
+    });
+  }
+  return ghosts;
 };
 
 const isPaused = (from: number, to: number): boolean => pauses.value.some((pause) => Math.max(from, pause.start) <= Math.min(to, pause.end));
@@ -176,15 +241,31 @@ const routeCanvas = computed(() => {
   const maxLat = Math.max(...lats);
   const minLon = Math.min(...lons);
   const maxLon = Math.max(...lons);
-  const latSpan = Math.max(maxLat - minLat, 1e-7);
-  const lonSpan = Math.max(maxLon - minLon, 1e-7);
+  const viewW = 1000;
+  const viewH = 620;
+  const midLat = (minLat + maxLat) / 2;
+  const lonFactor = Math.max(Math.cos(midLat * Math.PI / 180), .2);
+  const rawW = Math.max(maxLon - minLon, 1e-7) * lonFactor;
+  const rawH = Math.max(maxLat - minLat, 1e-7);
+  const innerW = viewW - 120;
+  const innerH = viewH - 96;
+  const scale = Math.min(innerW / rawW, innerH / rawH);
+  const usedW = rawW * scale;
+  const usedH = rawH * scale;
+  const originX = (viewW - usedW) / 2;
+  const originY = (viewH - usedH) / 2;
+  const project = (latitude: number, longitude: number) => ({
+    x: originX + (longitude - minLon) * lonFactor * scale,
+    y: originY + (maxLat - latitude) * scale,
+  });
   const canvasPoints: RouteCanvasPoint[] = points.map((point) => {
     const time = new Date(point.timestamp).getTime();
     const pace = nearestPace(time);
+    const projected = project(point.latitude, point.longitude);
     return {
       ...point,
-      x: ((point.longitude - minLon) / lonSpan) * 100,
-      y: (1 - (point.latitude - minLat) / latSpan) * 100,
+      x: projected.x,
+      y: projected.y,
       pace: pace.value,
       paceDelta: pace.delta,
       paused: Number.isFinite(time) && pauses.value.some((pause) => time >= pause.start && time <= pause.end),
@@ -207,13 +288,8 @@ const routeCanvas = computed(() => {
     const paceMissing = enoughPace && (from.pace === null || to.pace === null || (from.paceDelta ?? Infinity) > 45_000 || (to.paceDelta ?? Infinity) > 45_000);
     if (jump || paused || paceMissing) continue;
     const pace = from.pace !== null && to.pace !== null ? (from.pace + to.pace) / 2 : null;
-    segments.push({ d: `M${from.x.toFixed(2)} ${from.y.toFixed(2)} L${to.x.toFixed(2)} ${to.y.toFixed(2)}`, color: routeColor(pace, low, high, enoughPace), from, to });
+    segments.push({ d: `M${from.x.toFixed(1)} ${from.y.toFixed(1)} L${to.x.toFixed(1)} ${to.y.toFixed(1)}`, color: routeColor(pace, low, high, enoughPace), from, to });
   }
-  const markers = segments.filter((_, index) => index % Math.max(1, Math.ceil(segments.length / 6)) === 0).map((segment) => ({
-    x: (segment.from.x + segment.to.x) / 2,
-    y: (segment.from.y + segment.to.y) / 2,
-    angle: Math.atan2(segment.to.y - segment.from.y, segment.to.x - segment.from.x) * 180 / Math.PI,
-  }));
   const pauseMarkers = pauses.value.map((pause) => {
     const target = canvasPoints.reduce((best, point) => {
       const time = new Date(point.timestamp).getTime();
@@ -223,8 +299,10 @@ const routeCanvas = computed(() => {
     return { x: target.x, y: target.y };
   });
   return {
+    viewBox: `0 0 ${viewW} ${viewH}`,
+    ghosts: buildGhostRoads(canvasPoints),
+    glow: toSvgPath(canvasPoints),
     segments,
-    markers,
     pauseMarkers,
     start: canvasPoints[0],
     end: canvasPoints[canvasPoints.length - 1],
@@ -310,14 +388,8 @@ const lineOption = (points: { t: number; v: number }[], color: string, unit: str
           color: 'rgba(243, 244, 236, 0.4)',
           width: 1.2,
         },
-        data: [{ yAxis: Math.round(avg * 10) / 10, name: '均值' }],
-        label: {
-          show: true,
-          position: 'insideEndTop',
-          formatter: `均值 ${Math.round(avg * 10) / 10}`,
-          color: '#A9AF97',
-          fontSize: 10,
-        },
+        data: [{ yAxis: Math.round(avg) }],
+        label: { show: false },
       },
     }],
   };
@@ -328,21 +400,29 @@ const paceOption = computed(() => lineOption(pacePoints.value, zeppSemanticColor
 const altitudeOption = computed(() => lineOption(altitudePoints.value, zeppSemanticColors.altitude, 'm'));
 const cadenceOption = computed(() => lineOption(cadencePoints.value, zeppSemanticColors.cadence, 'spm'));
 
-const statSummary = (points: { v: number }[], mode: 'normal' | 'pace' = 'normal'): string | null => {
+const statSummary = (points: { v: number }[], mode: 'heart' | 'pace' | 'normal' = 'normal'): ChartStat[] | null => {
   if (points.length < 2) return null;
   const values = points.map((point) => point.v);
   const avg = values.reduce((sum, value) => sum + value, 0) / values.length;
   const min = Math.min(...values);
   const max = Math.max(...values);
-  if (mode === 'pace') return `最小 ${paceText(min)} · 平均 ${paceText(avg)} · 最大 ${paceText(max)}`;
-  return `最小 ${numberValue(min, 1)} · 平均 ${numberValue(avg, 1)} · 最大 ${numberValue(max, 1)}`;
+  if (mode === 'pace') return [
+    { label: '最快', value: paceClock(min) },
+    { label: '平均', value: paceClock(avg) },
+    { label: '最慢', value: paceClock(max) },
+  ];
+  return [
+    { label: '最小', value: numberValue(min, 0) },
+    { label: '平均', value: numberValue(avg, 0) },
+    { label: '最大', value: numberValue(max, 0) },
+  ];
 };
 
 const chartCards = computed(() => [
-  { key: 'heart', title: '心率', unit: '(bpm)', option: heartOption.value, stats: statSummary(heartPoints.value), icon: 'heart-rate' as DesignIconName, tone: 'heart' },
-  { key: 'pace', title: '配速', unit: '(min/km)', option: paceOption.value, stats: statSummary(pacePoints.value, 'pace'), icon: 'body-activity' as DesignIconName, tone: 'pace' },
-  { key: 'altitude', title: '海拔', unit: '(m)', option: altitudeOption.value, stats: statSummary(altitudePoints.value), icon: 'health-watch' as DesignIconName, tone: 'altitude' },
-  { key: 'cadence', title: '步频', unit: '(spm)', option: cadenceOption.value, stats: statSummary(cadencePoints.value), icon: 'steps' as DesignIconName, tone: 'cadence' },
+  { key: 'heart', title: '心率', unit: 'bpm', option: heartOption.value, stats: statSummary(heartPoints.value, 'heart'), icon: 'heart-rate' as DesignIconName, tone: 'heart' },
+  { key: 'pace', title: '配速', unit: 'min/km', option: paceOption.value, stats: statSummary(pacePoints.value, 'pace'), icon: 'body-activity' as DesignIconName, tone: 'pace' },
+  { key: 'altitude', title: '海拔', unit: 'm', option: altitudeOption.value, stats: statSummary(altitudePoints.value), icon: 'health-watch' as DesignIconName, tone: 'altitude' },
+  { key: 'cadence', title: '步频', unit: 'spm', option: cadenceOption.value, stats: statSummary(cadencePoints.value), icon: 'steps' as DesignIconName, tone: 'cadence' },
 ].filter((card): card is typeof card & { option: NonNullable<typeof card.option> } => card.option !== null));
 
 const decodedMetrics = computed(() => {
@@ -376,15 +456,18 @@ const loadDetail = async () => {
   error.value = null;
   if (!isTauri()) { loading.value = false; return; }
   try {
-    const detail = await tauriApi.getWorkoutDetail(workoutId.value);
-    if (seq !== detailSeq) return;
-    const [profile, workoutSeries] = await Promise.all([
-      detail ? tauriApi.getDeviceProfile({ deviceId: detail.device_id, sourceScope: detail.source_scope }).catch(() => ({})) : Promise.resolve({}),
-      detail ? tauriApi.getWorkoutSeries(workoutId.value).catch(() => ({ workout_id: workoutId.value, samples: [], route: [], pauses: [], summary: {} })) : Promise.resolve(null),
+    const emptySeries = { workout_id: workoutId.value, samples: [], route: [], pauses: [], summary: {} };
+    const [detail, workoutSeries] = await Promise.all([
+      tauriApi.getWorkoutDetail(workoutId.value),
+      tauriApi.getWorkoutSeries(workoutId.value).catch(() => emptySeries),
     ]);
     if (seq !== detailSeq) return;
+    const profile = detail
+      ? await tauriApi.getDeviceProfile({ deviceId: detail.device_id, sourceScope: detail.source_scope }).catch(() => ({}))
+      : {};
+    if (seq !== detailSeq) return;
     workout.value = detail as WorkoutMetrics | null;
-    series.value = workoutSeries;
+    series.value = detail ? workoutSeries : null;
     device.value = profile;
   } catch (cause) {
     if (seq === detailSeq) error.value = toUserMessage(cause, '训练数据包详情暂时不可用');
@@ -471,13 +554,18 @@ watch([dataRevision, workoutId], () => void loadDetail());
             </div>
             <div v-if="routeCanvas" class="route-wrap">
               <div class="route-canvas-texture" aria-hidden="true"></div>
-              <svg class="route-svg" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="按时间与最近配速样本着色的本地 GPS 轨迹">
-                <path v-for="(segment, index) in routeCanvas.segments" :key="`${segment.d}-${index}`" :d="segment.d" fill="none" :stroke="segment.color" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+              <svg class="route-svg" :viewBox="routeCanvas.viewBox" preserveAspectRatio="xMidYMid meet" role="img" aria-label="按时间与最近配速样本着色的本地 GPS 轨迹">
+                <path v-for="(road, index) in routeCanvas.ghosts" :key="`ghost-${index}`" class="ghost-road" :d="road.d" fill="none" :stroke-opacity="road.opacity" />
+                <path class="route-glow" :d="routeCanvas.glow" fill="none" />
+                <path v-for="(segment, index) in routeCanvas.segments" :key="`${segment.d}-${index}`" :d="segment.d" fill="none" :stroke="segment.color" stroke-width="5.2" stroke-linecap="round" stroke-linejoin="round" />
+                <circle class="route-dot start" :cx="routeCanvas.start.x" :cy="routeCanvas.start.y" r="8" />
+                <circle class="route-dot end" :cx="routeCanvas.end.x" :cy="routeCanvas.end.y" r="8" />
+                <path class="route-end-mark" :transform="`translate(${routeCanvas.end.x} ${routeCanvas.end.y})`" d="M-3.6-3.6 3.6 3.6 M3.6-3.6-3.6 3.6" />
+                <g v-for="(marker, index) in routeCanvas.pauseMarkers" :key="`pause-${index}`" class="pause-mark" :transform="`translate(${marker.x} ${marker.y})`">
+                  <circle r="7" />
+                  <path d="M-2-2.6 V2.6 M2-2.6 V2.6" />
+                </g>
               </svg>
-              <span class="route-marker start" :style="{ left: `${routeCanvas.start.x}%`, top: `${routeCanvas.start.y}%` }">起</span>
-              <span class="route-marker end" :style="{ left: `${routeCanvas.end.x}%`, top: `${routeCanvas.end.y}%` }">终</span>
-              <span v-for="(marker, index) in routeCanvas.markers" :key="`arrow-${index}`" class="route-direction" :style="{ left: `${marker.x}%`, top: `${marker.y}%`, transform: `translate(-50%, -50%) rotate(${marker.angle}deg)` }">›</span>
-              <span v-for="(marker, index) in routeCanvas.pauseMarkers" :key="`pause-${index}`" class="pause-marker" :style="{ left: `${marker.x}%`, top: `${marker.y}%` }">Ⅱ</span>
               <div class="route-legend"><span><i class="neutral-dot"></i>{{ routeCanvas.enoughPace ? `有效配速 ${routeCanvas.validPaceCount} 点 · P10–P90` : '有效配速不足 3 个 · 未按速度着色' }}</span><template v-if="routeCanvas.enoughPace"><span><i class="fast-dot"></i>快</span><span><i class="steady-dot"></i>稳定</span><span><i class="warm-dot"></i>偏慢</span><span><i class="slow-dot"></i>慢</span></template></div>
             </div>
             <div v-else class="route-empty"><DesignIcon name="outdoor-run" :size="58" /><strong>没有可用轨迹</strong><p>本次记录没有足够的 GPS 点，因此不画路线。</p></div>
@@ -488,7 +576,9 @@ watch([dataRevision, workoutId], () => void loadDetail());
               <div class="chart-head">
                 <span class="chart-icon"><DesignIcon :name="card.icon" :size="34" /></span>
                 <p class="card-title">{{ card.title }} <em>{{ card.unit }}</em></p>
-                <span v-if="card.stats" class="chart-stats">{{ card.stats }}</span>
+                <ul v-if="card.stats" class="chart-stats">
+                  <li v-for="stat in card.stats" :key="stat.label"><em>{{ stat.label }}</em><strong>{{ stat.value }}</strong></li>
+                </ul>
               </div>
               <VChart class="series-chart" :option="card.option" autoresize role="img" :aria-label="`${card.title}曲线`" />
             </section>
@@ -567,17 +657,23 @@ watch([dataRevision, workoutId], () => void loadDetail());
 .section-head.compact { margin-bottom: 14px; }
 .section-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 13px; background: rgba(47,169,107,.11); }
 .section-icon.data-tone { background: rgba(74,168,232,.12); } .section-icon.export-tone { background: rgba(139,92,246,.12); } .section-icon.source-tone { background: rgba(245,195,59,.1); }
-.chart-head { display: flex; align-items: center; gap: 8px; }
+.chart-head { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.chart-head .card-title { flex: 1 1 auto; min-width: 72px; }
 .route-note { color: var(--subtle); font-size: 11px; }
 .section-head .route-note { margin-left: auto; }
-.route-wrap { position: relative; overflow: hidden; min-height: 300px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); }
-.route-canvas-texture { position: absolute; inset: 0; pointer-events: none; opacity: .65; background-image: linear-gradient(rgba(224,235,240,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(224,235,240,.06) 1px, transparent 1px), radial-gradient(circle at 72% 25%, rgba(110,216,245,.10), transparent 36%), radial-gradient(circle at 22% 70%, rgba(118,229,191,.09), transparent 38%); background-size: 28px 28px, 28px 28px, auto, auto; }
-.route-svg { position: absolute; inset: 14px; display: block; width: calc(100% - 28px); height: calc(100% - 28px); }
-.route-marker, .pause-marker, .route-direction { position: absolute; z-index: 2; display: grid; place-items: center; transform: translate(-50%, -50%); font-family: var(--font-mono); font-size: 10px; }
-.route-marker { width: 26px; height: 26px; border: 2px solid var(--surface); border-radius: 50%; color: var(--surface); font-weight: 700; }
-.route-marker.start { background: var(--readiness); } .route-marker.end { background: var(--heart); }
-.pause-marker { width: 20px; height: 20px; border: 1px solid var(--route-amber); border-radius: 50%; background: rgba(17,21,24,.88); color: var(--route-amber); font-size: 11px; }
-.route-direction { color: var(--ink); font-size: 21px; text-shadow: 0 1px 2px rgba(8,10,12,.75); }
+.route-wrap { position: relative; overflow: hidden; min-height: 320px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: #171a14; }
+.route-canvas-texture { position: absolute; inset: 0; pointer-events: none; background:
+  radial-gradient(circle at 72% 22%, rgba(136,164,73,.1), transparent 42%),
+  radial-gradient(circle at 18% 78%, rgba(47,169,107,.07), transparent 46%),
+  repeating-radial-gradient(circle at 40% 45%, rgba(228,235,208,.025) 0 1px, transparent 1px 7px); }
+.route-svg { position: absolute; inset: 10px 10px 42px; display: block; width: calc(100% - 20px); height: calc(100% - 52px); }
+.ghost-road { stroke: #c8d6a2; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.route-glow { stroke: rgba(198, 220, 132, .22); stroke-width: 14; stroke-linecap: round; stroke-linejoin: round; }
+.route-dot.start { fill: #6ad980; stroke: #12150f; stroke-width: 2; }
+.route-dot.end { fill: #e15a63; stroke: #12150f; stroke-width: 2; }
+.route-end-mark { fill: none; stroke: #12150f; stroke-width: 1.6; stroke-linecap: round; }
+.pause-mark circle { fill: rgba(17,21,24,.88); stroke: var(--route-amber); stroke-width: 1.2; }
+.pause-mark path { fill: none; stroke: var(--route-amber); stroke-width: 1.4; stroke-linecap: round; }
 .route-legend { position: absolute; right: 10px; bottom: 10px; left: 10px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; background: rgba(14,17,19,.88); color: var(--muted); font-size: 10px; }
 .route-legend span { display: inline-flex; align-items: center; gap: 4px; }
 .route-legend i { width: 9px; height: 4px; border-radius: 999px; background: var(--route-neutral); }
@@ -593,7 +689,10 @@ watch([dataRevision, workoutId], () => void loadDetail());
 .chart-card::before { display: block; height: 2px; margin: -12px -14px 10px; content: ''; background: var(--line); }
 .chart-heart::before { background: linear-gradient(90deg, var(--heart), transparent); } .chart-pace::before { background: linear-gradient(90deg, var(--pace), transparent); } .chart-altitude::before { background: linear-gradient(90deg, var(--warning), transparent); } .chart-cadence::before { background: linear-gradient(90deg, var(--readiness), transparent); }
 .chart-icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 11px; background: rgba(255,255,255,.025); }
-.chart-stats { margin-left: auto; max-width: 62%; overflow: hidden; color: var(--subtle); font-size: 10px; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.chart-stats { display: grid; grid-template-columns: repeat(3, max-content); justify-content: end; gap: 8px 16px; margin: 1px 0 0 auto; min-width: 0; padding: 0; list-style: none; color: var(--subtle); font-variant-numeric: tabular-nums; }
+.chart-stats li { display: grid; gap: 1px; min-width: 0; }
+.chart-stats em { color: #7E856D; font-size: 10px; font-style: normal; line-height: 1.2; }
+.chart-stats strong { color: #E8EBD8; font-size: 13px; font-weight: 600; line-height: 1.2; white-space: nowrap; }
 .series-chart { width: 100%; height: 170px; }
 .chart-empty { display: flex; align-items: center; gap: 12px; padding: 20px; color: var(--muted); font-size: 12px; }
 .chart-empty strong { color: var(--ink); }
@@ -618,6 +717,5 @@ watch([dataRevision, workoutId], () => void loadDetail());
 .page-foot { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 2px 0 0; color: var(--subtle); font-size: 11px; }
 @media (max-width: 1320px) { .metric-list { grid-template-columns: repeat(4, minmax(130px, 1fr)); } }
 @media (max-width: 1180px) { .lower { grid-template-columns: minmax(0, 1fr); } .side-col { grid-template-columns: repeat(2, minmax(0,1fr)); } .decoded-card { grid-row: span 2; } }
-@media (max-width: 760px) { .page-toolbar { align-items: flex-start; } .ai-action span { display: none; } .workout-hero { padding: 16px; border-radius: 19px; } .hero-copy { align-items: flex-start; gap: 12px; } .hero-device :deep(.device-visual) { width: 78px; height: 78px; flex-basis: 78px; } .device-live { display: none; } .sport-line > .design-icon { width: 45px !important; height: 45px !important; } .sport-line h1 { font-size: 24px; } .source-chip { font-size: 10px; } .metric-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } .metric-tile { min-height: 70px; } .chart-grid, .side-col { grid-template-columns: minmax(0, 1fr); } .decoded-card { grid-row: auto; } .route-wrap { min-height: 240px; } .route-note { display: none; } .chart-stats { display: none; } }
-@media (prefers-reduced-motion: reduce) { .route-direction { text-shadow: none; } }
+@media (max-width: 760px) { .page-toolbar { align-items: flex-start; } .ai-action span { display: none; } .workout-hero { padding: 16px; border-radius: 19px; } .hero-copy { align-items: flex-start; gap: 12px; } .hero-device :deep(.device-visual) { width: 78px; height: 78px; flex-basis: 78px; } .device-live { display: none; } .sport-line > .design-icon { width: 45px !important; height: 45px !important; } .sport-line h1 { font-size: 24px; } .source-chip { font-size: 10px; } .metric-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } .metric-tile { min-height: 70px; } .chart-grid, .side-col { grid-template-columns: minmax(0, 1fr); } .decoded-card { grid-row: auto; } .route-wrap { min-height: 240px; } .route-note { display: none; } .chart-head { flex-wrap: wrap; } .chart-stats { width: 100%; justify-content: flex-start; } }
 </style>

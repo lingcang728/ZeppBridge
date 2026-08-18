@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import DesignIcon from '../components/DesignIcon.vue';
 import DeviceVisual from '../components/DeviceVisual.vue';
 import Icon from '../components/Icon.vue';
 import { useDevices } from '../composables/useDevices';
@@ -7,6 +8,7 @@ import { useSyncController } from '../composables/useSyncController';
 import { AUTO_SYNC_INTERVALS } from '../lib/autoSync';
 import { UI_SCALES, useUiScale, type UiScale } from '../composables/useUiScale';
 import { backend, toUserMessage } from '../lib/bridge';
+import { regionShortName } from '../lib/deviceCopy';
 import type { LoginStatus } from '../types';
 
 const {
@@ -97,6 +99,11 @@ const connectionLabel = computed(() => {
   if (connected.value || configuredOnly.value) return '账号已识别';
   return '未识别';
 });
+
+const accountLabel = computed(() => appStatus.value?.masked_user_id || '未识别');
+const accountInitial = computed(() => accountLabel.value.match(/[A-Za-z0-9]/)?.[0]?.toUpperCase() || '未');
+const regionLabel = computed(() => regionShortName(appStatus.value?.region_host));
+const regionHost = computed(() => appStatus.value?.region_host || '未提供');
 
 const formatDateTime = (value?: string): string => {
   if (!value) return '尚无记录';
@@ -462,32 +469,18 @@ onUnmounted(() => {
     <!-- 2 列网格：账户与区域 + 连接设备 -->
     <div class="two-col">
       <!-- 2. 账户与区域 -->
-      <section id="account-section" class="settings-card" aria-labelledby="account-title">
+      <section id="account-section" class="settings-card account-card" aria-labelledby="account-title">
         <h2 id="account-title">2. 账户与区域</h2>
-        <div class="kv-list">
-          <div class="kv-row">
-            <span class="kv-label">当前账户</span>
-            <span class="kv-value">{{ appStatus?.masked_user_id || '未识别' }}</span>
-            <button v-if="configuredOnly" class="kv-btn" type="button" :disabled="isSyncing" @click="verifyAndSync">验证并同步</button>
-            <button v-else class="kv-btn" type="button" :disabled="loginBusy" @click="startLogin">重新认证</button>
+        <div class="account-strip">
+          <span class="account-avatar">{{ accountInitial }}</span>
+          <div class="account-meta">
+            <strong>{{ accountLabel }}</strong>
+            <span :title="regionHost">区域 {{ regionLabel }} · 上次同步 {{ formatDateTime(appStatus?.last_cloud_sync_at) }}</span>
           </div>
-          <div class="kv-row">
-            <span class="kv-label">用户 ID</span>
-            <span class="kv-value mono">{{ appStatus?.masked_user_id || '未提供' }}</span>
-          </div>
-          <div class="kv-row">
-            <span class="kv-label">区域 / Host</span>
-            <span class="kv-value mono">{{ appStatus?.region_host || 'region_host' }}</span>
-          </div>
-          <div class="kv-row">
-            <span class="kv-label">最后认证时间</span>
-            <span class="kv-value">{{ formatDateTime(appStatus?.last_cloud_sync_at) }}</span>
-          </div>
+          <span :class="['account-state', { on: accountRecognized }]"><i class="dot"></i>{{ connectionLabel }}</span>
+          <button v-if="configuredOnly" class="kv-btn" type="button" :disabled="isSyncing" @click="verifyAndSync">验证并同步</button>
+          <button v-else class="kv-btn" type="button" :disabled="loginBusy" @click="startLogin">重新认证</button>
         </div>
-        <p class="hint-line ok">
-          <Icon name="shield" :size="13" />
-          {{ connected ? '认证状态正常，数据可正常同步。' : `认证状态：${connectionLabel}。` }}
-        </p>
       </section>
 
       <!-- 3. 连接设备 / 数据来源 -->
@@ -514,7 +507,7 @@ onUnmounted(() => {
           <div v-for="source in dataSources" :key="source.name" class="source-row">
             <span class="source-icon">
               <DeviceVisual v-if="source.kind === 'device'" :src="source.model.image" :alt="source.name" :kind="source.model.kind" compact />
-              <Icon v-else name="cloud" :size="18" />
+              <DesignIcon v-else name="zepp-cloud" :size="32" />
             </span>
             <div class="source-copy">
               <strong>{{ source.name }}</strong>
@@ -525,7 +518,6 @@ onUnmounted(() => {
             <span :class="['source-state', { on: source.state !== '未识别' }]"><i class="dot"></i>{{ source.state }}</span>
           </div>
         </div>
-        <p class="device-cache-note">设备缓存：{{ deviceCache?.status || '正常' }}。仅展示必要掩码信息，保护硬件标识隐私。</p>
       </section>
     </div>
 
@@ -652,35 +644,44 @@ onUnmounted(() => {
       <summary>
         <span>
           <strong>高级与维护</strong>
-          <em>界面缩放、数据文件夹与认证清除，仅在需要时使用。</em>
+          <em>缩放、数据文件夹与认证清除，仅在需要时使用。</em>
         </span>
         <Icon name="chevron-down" :size="16" />
       </summary>
       <div class="advanced-content">
-        <p class="section-description">界面缩放。100% 为设计基准，也可通过 Ctrl + / Ctrl - 快捷键缩放。</p>
-        <div class="scale-options" role="radiogroup" aria-label="界面缩放">
-          <button
-            v-for="option in UI_SCALES"
-            :key="option"
-            type="button"
-            role="radio"
-            :aria-checked="scale === option"
-            @click="setScale(option as UiScale)"
-          >{{ option }}%</button>
-        </div>
-        <p class="section-description">数据库位于：<code>{{ appStatus?.database_path || '应用数据目录' }}</code>。当前保留 {{ retentionDays }} 天。</p>
-        <div class="inline-actions">
-          <button class="button secondary" type="button" @click="openDataFolder"><Icon name="folder" :size="15" />打开数据文件夹</button>
-          <button class="button danger-button" type="button" @click="clearAuth">清除认证</button>
-        </div>
-        <p class="section-description">同步数据流诊断：</p>
-        <div class="stream-list">
-          <div v-for="stream in appStatus?.streams" :key="stream.stream" class="stream-row">
-            <strong>{{ stream.stream }}</strong>
-            <span>{{ stream.status }}</span>
-            <span>{{ formatDateTime(stream.last_cloud_sync_at) }}</span>
+        <div class="advanced-block">
+          <p class="advanced-label">界面缩放</p>
+          <p class="section-description">100% 为设计基准，也可使用 Ctrl + / Ctrl -。</p>
+          <div class="scale-options" role="radiogroup" aria-label="界面缩放">
+            <button
+              v-for="option in UI_SCALES"
+              :key="option"
+              type="button"
+              role="radio"
+              :aria-checked="scale === option"
+              @click="setScale(option as UiScale)"
+            >{{ option }}%</button>
           </div>
         </div>
+        <div class="advanced-block">
+          <p class="advanced-label">数据与认证</p>
+          <p class="section-description">数据保存在程序目录的 data 文件夹，当前保留 {{ retentionDays }} 天。</p>
+          <div class="inline-actions">
+            <button class="button secondary" type="button" @click="openDataFolder"><Icon name="folder" :size="15" />打开数据文件夹</button>
+            <button class="button danger-button" type="button" @click="clearAuth">清除认证</button>
+          </div>
+        </div>
+        <details class="diag-fold">
+          <summary>同步诊断</summary>
+          <div class="stream-list">
+            <div v-for="stream in appStatus?.streams" :key="stream.stream" class="stream-row">
+              <strong>{{ stream.stream }}</strong>
+              <span>{{ stream.status }}</span>
+              <span>{{ formatDateTime(stream.last_cloud_sync_at) }}</span>
+            </div>
+            <p v-if="!appStatus?.streams?.length" class="section-description">尚无同步诊断。</p>
+          </div>
+        </details>
       </div>
     </details>
 
@@ -706,7 +707,6 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <p class="font-credits">界面字体：MiSans（小米，免费商用许可）与 Inter（OFL）。</p>
   </section>
 </template>
 
@@ -724,9 +724,27 @@ h3 { margin-bottom: 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
 .section-heading-row h2 { margin-bottom: 14px; }
 .identify-button { flex: 0 0 auto; }
 .device-alert { margin: 0 0 10px; }
-.device-cache-note { margin: 10px 0 0; color: var(--subtle); font-size: 11px; }
+.account-card h2 { margin-bottom: 10px; }
+.account-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 58px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+}
+.account-avatar { display: grid; width: 36px; height: 36px; flex: 0 0 36px; place-items: center; border-radius: 9px; background: var(--accent-soft); color: var(--accent); font-family: var(--font-mono); font-size: 15px; font-weight: 700; }
+.account-meta { display: grid; min-width: 0; gap: 1px; flex: 1; }
+.account-meta strong { overflow: hidden; color: var(--ink); font-family: var(--font-mono); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.account-meta span { overflow: hidden; color: var(--subtle); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.account-state { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.account-state.on { color: var(--accent); }
+.account-state .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .device-empty { display: flex; align-items: center; gap: 7px; min-height: 60px; padding: 10px; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); color: var(--muted); font-size: 12px; }
-.two-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 14px; }
+.two-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 14px; align-items: start; }
 .three-col { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .two-col > *, .three-col > * { min-width: 0; }
 
@@ -785,8 +803,8 @@ h3 { margin-bottom: 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 44px;
-  padding: 8px 0;
+  min-height: 36px;
+  padding: 6px 0;
   border-bottom: 1px solid var(--line);
 }
 .kv-row:last-child { border-bottom: 0; }
@@ -811,7 +829,7 @@ h3 { margin-bottom: 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
   align-items: center;
   gap: 10px;
   min-width: 0;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--surface-raised);
@@ -945,7 +963,13 @@ h3 { margin-bottom: 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
 .advanced > summary strong { font-size: 14px; font-weight: 700; color: var(--ink); }
 .advanced > summary em { color: var(--muted); font-size: 12px; font-style: normal; }
 .advanced[open] > summary > svg { transform: rotate(180deg); }
-.advanced-content { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 4px; }
+.advanced-content { display: grid; gap: 16px; margin-top: 12px; border-top: 1px solid var(--line); padding-top: 12px; }
+.advanced-block { display: grid; gap: 6px; }
+.advanced-label { margin: 0; color: var(--ink); font-size: 13px; font-weight: 600; }
+.diag-fold { border-top: 1px solid var(--line); padding-top: 8px; }
+.diag-fold > summary { cursor: pointer; color: var(--muted); font-size: 12px; list-style: none; }
+.diag-fold > summary::-webkit-details-marker { display: none; }
+.diag-fold[open] > summary { color: var(--ink); }
 .scale-options { display: flex; flex-wrap: wrap; gap: 6px; }
 .scale-options button { min-width: 48px; min-height: 30px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); font-variant-numeric: tabular-nums; font-family: 'Inter', var(--font-sans); font-size: 12px; cursor: pointer; }
 .scale-options button[aria-checked='true'] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
@@ -958,7 +982,6 @@ h3 { margin-bottom: 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
 .alert.warning { color: var(--warning); }
 .alert button { margin-left: auto; border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 12px; }
 code { color: var(--muted); font-family: var(--font-mono); font-size: 12px; }
-.font-credits { margin: 0; color: var(--subtle); font-size: 12px; }
 .manual-auth-form { margin-top: 16px; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); }
 .manual-auth-form h3 { margin: 0 0 8px; font-size: 14px; font-weight: 700; color: var(--ink); }
 .manual-auth-form .form-hint { margin: 0 0 12px; color: var(--muted); font-size: 12px; }
@@ -988,6 +1011,8 @@ code { color: var(--muted); font-family: var(--font-mono); font-size: 12px; }
 @media (max-width: 860px) {
   .two-col { grid-template-columns: minmax(0, 1fr); }
   .auth-grid { grid-template-columns: minmax(0, 1fr); }
+  .account-strip { flex-wrap: wrap; }
+  .account-meta { flex: 1 1 160px; }
 }
 @media (prefers-reduced-motion: reduce) { .switch span { transition: none; } .skeleton-row { animation: none; } }
 </style>

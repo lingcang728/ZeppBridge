@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import BrandMark from '../components/BrandMark.vue';
 import DesignIcon, { type DesignIconName } from '../components/DesignIcon.vue';
-import DeviceVisual from '../components/DeviceVisual.vue';
-import trexImage from '../assets/devices/amazfit-t-rex-3.webp';
-import helioImage from '../assets/devices/amazfit-helio-strap.webp';
+import DeviceMarquee from '../components/DeviceMarquee.vue';
 
 const githubUrl = 'https://github.com/lingcang728/ZeppBridge';
 const releaseUrl = `${githubUrl}/releases/latest`;
@@ -43,17 +41,13 @@ const authMethods: Array<{ icon: DesignIconName; title: string; copy: string; ta
           <div class="trust-row"><span><DesignIcon name="secure" :size="23" />本地优先</span><span><DesignIcon name="private" :size="23" />隐私安全</span><span><DesignIcon name="structured-data" :size="23" />结构化数据</span></div>
         </div>
 
-        <div class="hero-stage" aria-label="设备数据进入 ZeppBridge 并输出结构化数据的示意图">
+        <div class="hero-stage" aria-label="Amazfit 在售设备进入 ZeppBridge 并输出结构化数据">
           <div class="stage-glow"></div>
-          <div class="device-stack">
-            <article class="device-card watch-card"><DeviceVisual :src="trexImage" alt="Amazfit T-Rex 3" kind="watch" /><div><strong>T-Rex 3</strong><span>运动与健康</span></div><i class="live-dot"></i></article>
-            <article class="device-card strap-card"><DeviceVisual :src="helioImage" alt="Amazfit Helio Strap" kind="strap" /><div><strong>Helio Strap</strong><span>恢复与睡眠</span></div><i class="live-dot"></i></article>
-          </div>
-          <div class="flow-lines" aria-hidden="true"><i></i><i></i><i></i></div>
-          <article class="bridge-core"><DesignIcon name="app-icon" :size="91" /><div><span>LOCAL BRIDGE</span><strong>ZeppBridge</strong><small>解码 · 整理 · 可视化</small></div></article>
+          <DeviceMarquee class="hero-marquee" />
+          <article class="bridge-core"><DesignIcon name="app-icon" :size="72" /><div><span>LOCAL BRIDGE</span><strong>ZeppBridge</strong><small>解码 · 整理 · 可视化</small></div></article>
           <div class="output-stack">
             <article><DesignIcon name="structured-data" :size="37" /><span><b>结构化记录</b><small>保留来源与时间</small></span></article>
-            <article><DesignIcon name="ai-chip" :size="37" /><span><b>AI-ready</b><small>由你决定何时交付</small></span></article>
+            <article><DesignIcon name="ai-ready" :size="37" /><span><b>AI-ready</b><small>由你决定何时交付</small></span></article>
           </div>
           <div class="stage-status"><DesignIcon name="verified" :size="24" /><span><b>本地管道就绪</b><small>数据不经过 ZeppBridge 服务器</small></span></div>
         </div>
@@ -114,23 +108,17 @@ main, footer { position: relative; z-index: 1; }
 .primary-cta:hover, .secondary-cta:hover, .nav-github:hover { transform: translateY(-2px); border-color: rgba(185,220,112,.5); }
 .trust-row { display: flex; gap: 20px; margin-top: 26px; color: #7e8a79; font-size: 10px; }
 .trust-row span { display: inline-flex; align-items: center; gap: 5px; }
-.hero-stage { position: relative; min-height: 510px; border: 1px solid var(--site-line); border-radius: 28px; background: linear-gradient(145deg, rgba(26,32,25,.9), rgba(13,16,14,.94)); box-shadow: inset 0 1px 0 rgba(255,255,255,.025), 0 35px 90px rgba(0,0,0,.24); }
-.stage-glow { position: absolute; inset: 13% 24%; border-radius: 50%; background: rgba(130,175,61,.13); filter: blur(70px); }
-.device-stack { position: absolute; top: 92px; left: 36px; display: grid; gap: 15px; }
-.device-card { position: relative; display: grid; grid-template-columns: 68px 105px 10px; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--site-line); border-radius: 17px; background: rgba(27,33,28,.91); box-shadow: 0 14px 28px rgba(0,0,0,.18); }
-.device-card :deep(.device-visual) { width: 68px; height: 68px; flex-basis: 68px; border-color: var(--site-line); background: #111512; }
-.device-card div { display: grid; gap: 3px; } .device-card strong { font-size: 12px; } .device-card span { color: #778174; font-size: 9px; }
-.live-dot { width: 7px; height: 7px; border-radius: 50%; background: #85b444; box-shadow: 0 0 0 5px rgba(133,180,68,.08); }
-.strap-card { margin-left: 18px; }
-.flow-lines { position: absolute; top: 175px; left: 262px; width: 88px; display: grid; gap: 20px; }
-.flow-lines i, .mini-flow i { position: relative; display: block; height: 1px; background: linear-gradient(90deg, rgba(145,180,78,.15), #8fb34a); }
-.flow-lines i::after, .mini-flow i::after { position: absolute; top: -3px; right: -1px; width: 7px; height: 7px; border-top: 1px solid #8fb34a; border-right: 1px solid #8fb34a; content: ''; transform: rotate(45deg); }
-.bridge-core { position: absolute; top: 145px; left: 50%; display: grid; justify-items: center; gap: 10px; width: 154px; padding: 18px 12px; border: 1px solid rgba(185,220,112,.25); border-radius: 23px; background: linear-gradient(145deg, rgba(56,72,38,.85), rgba(26,33,24,.95)); box-shadow: 0 20px 55px rgba(0,0,0,.3); transform: translateX(-34%); }
+.hero-stage { position: relative; display: grid; align-content: start; gap: 18px; min-height: 510px; padding: 28px 22px 18px; overflow: hidden; border: 1px solid var(--site-line); border-radius: 28px; background: linear-gradient(145deg, rgba(26,32,25,.9), rgba(13,16,14,.94)); box-shadow: inset 0 1px 0 rgba(255,255,255,.025), 0 35px 90px rgba(0,0,0,.24); }
+.stage-glow { position: absolute; inset: 13% 24%; border-radius: 50%; background: rgba(130,175,61,.13); filter: blur(70px); pointer-events: none; }
+.hero-marquee { position: relative; z-index: 1; }
+.mini-flow i { position: relative; display: block; height: 1px; background: linear-gradient(90deg, rgba(145,180,78,.15), #8fb34a); }
+.mini-flow i::after { position: absolute; top: -3px; right: -1px; width: 7px; height: 7px; border-top: 1px solid #8fb34a; border-right: 1px solid #8fb34a; content: ''; transform: rotate(45deg); }
+.bridge-core { position: relative; z-index: 2; display: grid; justify-items: center; justify-self: center; gap: 8px; width: 168px; padding: 14px 12px; border: 1px solid rgba(185,220,112,.25); border-radius: 23px; background: linear-gradient(145deg, rgba(56,72,38,.85), rgba(26,33,24,.95)); box-shadow: 0 20px 55px rgba(0,0,0,.3); }
 .bridge-core div { display: grid; justify-items: center; } .bridge-core span { color: #8fa968; font-family: var(--font-mono); font-size: 8px; letter-spacing: .14em; } .bridge-core strong { font-size: 16px; } .bridge-core small { color: #7e8a76; font-size: 9px; }
-.output-stack { position: absolute; top: 123px; right: 26px; display: grid; gap: 13px; }
-.output-stack article { display: flex; align-items: center; gap: 8px; width: 160px; padding: 9px; border: 1px solid var(--site-line); border-radius: 14px; background: rgba(20,25,21,.92); }
+.output-stack { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+.output-stack article { display: flex; align-items: center; gap: 8px; padding: 9px; border: 1px solid var(--site-line); border-radius: 14px; background: rgba(20,25,21,.92); }
 .output-stack span { display: grid; } .output-stack b { font-size: 11px; } .output-stack small { color: #737e70; font-size: 8px; }
-.stage-status { position: absolute; right: 26px; bottom: 25px; left: 26px; display: flex; align-items: center; gap: 8px; padding: 9px; border-top: 1px solid var(--site-line); color: #9aaa8e; }
+.stage-status { position: relative; z-index: 1; display: flex; align-items: center; gap: 8px; padding: 9px 0 0; border-top: 1px solid var(--site-line); color: #9aaa8e; }
 .stage-status span { display: grid; } .stage-status b { color: #b8d27e; font-size: 10px; } .stage-status small { font-size: 9px; }
 .principle-strip { display: grid; grid-template-columns: repeat(4,1fr); width: min(1240px, calc(100% - 48px)); margin: 0 auto; border-top: 1px solid var(--site-line); border-bottom: 1px solid var(--site-line); }
 .principle-strip > div { display: flex; align-items: center; justify-content: center; gap: 9px; min-height: 92px; border-right: 1px solid var(--site-line); }
@@ -161,6 +149,6 @@ main, footer { position: relative; z-index: 1; }
 .privacy-vault div { display: grid; gap: 6px; }.privacy-vault b { color: #b9d87a; font-family: var(--font-mono); font-size: 13px; letter-spacing: .12em; }.privacy-vault span { color: #7e8979; font-size: 11px; line-height: 1.6; }
 footer { display: flex; align-items: center; gap: 18px; width: min(1240px, calc(100% - 48px)); min-height: 120px; margin: 0 auto; } footer p { margin-right: auto; color: #697365; font-size: 10px; } footer > div { display: flex; gap: 20px; } footer > div a { color: #909b8c; font-size: 11px; text-decoration: none; }
 @media (max-width: 1080px) { .hero-section { grid-template-columns: 1fr; padding-top: 56px; } .hero-stage { min-height: 500px; } .capability-grid { grid-template-columns: repeat(2,1fr); } .connect-section { grid-template-columns: 1fr; } .privacy-section { grid-template-columns: 1fr; } }
-@media (max-width: 720px) { .landing-nav { width: min(100% - 28px,1240px); }.landing-nav nav { display: none; }.hero-section, .content-section, .principle-strip, footer { width: min(100% - 28px,1240px); }.hero-section { min-height: auto; padding: 48px 0 64px; }.hero-copy h1 { font-size: 44px; }.hero-actions { align-items: stretch; flex-direction: column; }.primary-cta { min-width: 0; }.trust-row { flex-wrap: wrap; }.hero-stage { min-height: 610px; }.device-stack { top: 28px; left: 20px; }.flow-lines { display: none; }.bridge-core { top: 225px; left: 50%; transform: translateX(-50%); }.output-stack { top: 405px; right: 20px; left: 20px; grid-template-columns: 1fr 1fr; }.output-stack article { width: auto; }.principle-strip { grid-template-columns: repeat(2,1fr); }.principle-strip > div:nth-child(2) { border-right: 0; }.principle-strip > div:nth-child(-n+2) { border-bottom: 1px solid var(--site-line); }.content-section { padding: 84px 0; }.capability-grid, .auth-grid { grid-template-columns: 1fr; }.capability-card { min-height: 210px; }.auth-grid article { min-height: 245px; }.privacy-section { padding: 80px 20px; }.privacy-vault { align-items: flex-start; flex-direction: column; }.privacy-vault > .design-icon { width: 78px !important; height: 78px !important; } footer { align-items: flex-start; flex-wrap: wrap; padding: 28px 0; } footer p { width: 100%; order: 3; } }
+@media (max-width: 720px) { .landing-nav { width: min(100% - 28px,1240px); }.landing-nav nav { display: none; }.hero-section, .content-section, .principle-strip, footer { width: min(100% - 28px,1240px); }.hero-section { min-height: auto; padding: 48px 0 64px; }.hero-copy h1 { font-size: 44px; }.hero-actions { align-items: stretch; flex-direction: column; }.primary-cta { min-width: 0; }.trust-row { flex-wrap: wrap; }.hero-stage { min-height: auto; }.output-stack { grid-template-columns: 1fr 1fr; }.principle-strip { grid-template-columns: repeat(2,1fr); }.principle-strip > div:nth-child(2) { border-right: 0; }.principle-strip > div:nth-child(-n+2) { border-bottom: 1px solid var(--site-line); }.content-section { padding: 84px 0; }.capability-grid, .auth-grid { grid-template-columns: 1fr; }.capability-card { min-height: 210px; }.auth-grid article { min-height: 245px; }.privacy-section { padding: 80px 20px; }.privacy-vault { align-items: flex-start; flex-direction: column; }.privacy-vault > .design-icon { width: 78px !important; height: 78px !important; } footer { align-items: flex-start; flex-wrap: wrap; padding: 28px 0; } footer p { width: 100%; order: 3; } }
 @media (prefers-reduced-motion: reduce) { .landing-page { scroll-behavior: auto; } .primary-cta, .secondary-cta, .nav-github { transition: none; } }
 </style>
