@@ -59,7 +59,7 @@ impl AppState {
         std::fs::create_dir_all(&data_dir)?;
 
         let migration_warning = paths::relocate_legacy_data(&data_dir);
-        let db = Database::new(data_dir.join("zepp.db"))?;
+        let (db, db_warning) = Database::open_resilient(data_dir.join("zepp.db"))?;
         // Do not replay every raw payload during startup. A full reprocess of a
         // large local library blocks window creation and looks like a hang.
         // Settings still has an explicit reprocess action; the next cloud sync
@@ -82,7 +82,10 @@ impl AppState {
                 Some(startup_warning(error)),
             ),
         };
-        let startup_warning = merge_startup_warnings(migration_warning, auth_warning);
+        let startup_warning = merge_startup_warnings(
+            merge_startup_warnings(migration_warning, db_warning),
+            auth_warning,
+        );
 
         Ok(Self {
             data_dir,

@@ -2,10 +2,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 const SQLITE_GROUP: [&str; 3] = ["zepp.db", "zepp.db-wal", "zepp.db-shm"];
-const LEGACY_FILES: [&str; 8] = [
-    "zepp.db",
-    "zepp.db-wal",
-    "zepp.db-shm",
+const LEGACY_FILES: [&str; 5] = [
     "auth.json",
     "auth.user-id",
     "devices.json",
@@ -133,6 +130,7 @@ fn relocate_from(source_dir: &Path, data_dir: &Path) -> io::Result<()> {
         return Ok(());
     }
 
+    relocate_sqlite_group(source_dir, data_dir)?;
     let mut names: Vec<&str> = LEGACY_FILES.to_vec();
     names.extend(LEGACY_OPTIONAL_FILES);
     for name in names {
@@ -147,6 +145,42 @@ fn relocate_from(source_dir: &Path, data_dir: &Path) -> io::Result<()> {
         let _ = remove_empty_dir_chain(source_dir);
     }
     Ok(())
+}
+
+/// Move the main library and its WAL/SHM as one unit.
+///
+/// Attaching a leftover WAL from another directory onto an existing
+/// `zepp.db` produces `database disk image is malformed` and a flash-crash
+/// on the next launch.
+fn relocate_sqlite_group(source_dir: &Path, data_dir: &Path) -> io::Result<()> {
+    let dest_db = data_dir.join(SQLITE_GROUP[0]);
+    let source_db = source_dir.join(SQLITE_GROUP[0]);
+    if path_exists(&dest_db)? {
+        return Ok(());
+    }
+    if !path_exists(&source_db)? {
+        return Ok(());
+    }
+    for name in SQLITE_GROUP {
+        relocate_entry(&source_dir.join(name), &data_dir.join(name))?;
+    }
+    Ok(())
+}
+
+/// Move a still-unreadable SQLite group out of the live path so the next open
+/// can create a fresh library. Returns the quarantine directory.
+pub fn quarantine_sqlite_group(db_path: &Path) -> io::Result<PathBuf> {
+    let data_dir = db_path.parent().unwrap_or(db_path);
+    let stamp = chrono::Local::now().format("%Y%m%d-%H%M%S");
+    let dest = data_dir.join("backups").join(format!("corrupt-{stamp}"));
+    std::fs::create_dir_all(&dest)?;
+    for name in SQLITE_GROUP {
+        let source = data_dir.join(name);
+        if path_exists(&source)? {
+            relocate_entry(&source, &dest.join(name))?;
+        }
+    }
+    Ok(dest)
 }
 
 fn relocate_entry(source: &Path, destination: &Path) -> io::Result<()> {
@@ -275,6 +309,32 @@ mod tests {
         fs::write(source.join("zepp.db"), b"newer").unwrap();
         relocate_from(&source, &dest).unwrap();
         assert_eq!(fs::read(dest.join("zepp.db")).unwrap(), b"db");
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn does_not_attach_foreign_wal_to_existing_destination_db() {
+        let root = std::env::temp_dir().join(format!(
+            "zeppbridge-path-wal-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let source = root.join("appdata");
+        let dest = root.join("install").join("data");
+        fs::create_dir_all(&source).unwrap();
+        fs::create_dir_all(&dest).unwrap();
+        fs::write(dest.join("zepp.db"), b"live").unwrap();
+        fs::write(source.join("zepp.db-wal"), b"foreign-wal").unwrap();
+        fs::write(source.join("zepp.db-shm"), b"foreign-shm").unwrap();
+
+        relocate_from(&source, &dest).unwrap();
+        assert_eq!(fs::read(dest.join("zepp.db")).unwrap(), b"live");
+        assert!(!dest.join("zepp.db-wal").exists());
+        assert!(!dest.join("zepp.db-shm").exists());
 
         let _ = fs::remove_dir_all(root);
     }

@@ -5,7 +5,7 @@ use chrono::{DateTime, Local, NaiveDate, Utc};
 use rusqlite::{params, Connection, OptionalExtension};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v8";
 const LAST_CLOUD_SYNC_AT_KEY: &str = "last_cloud_sync_at";
@@ -53,6 +53,67 @@ fn pace_minutes_per_kilometre(pace: Option<f64>, speed: Option<f64>) -> Option<f
             .map(|value| value * 1_000.0 / 60.0)
     });
     converted.filter(|value| *value >= 1.0 && *value < 60.0)
+}
+
+pub(crate) fn is_corrupt_error(error: &ZeppBridgeError) -> bool {
+    match error {
+        ZeppBridgeError::DatabaseError(inner) => is_corrupt_sqlite(inner),
+        other => looks_corrupt(&other.to_string()),
+    }
+}
+
+fn is_corrupt_sqlite(error: &rusqlite::Error) -> bool {
+    match error {
+        rusqlite::Error::SqliteFailure(code, message) => {
+            matches!(
+                code.code,
+                rusqlite::ErrorCode::DatabaseCorrupt | rusqlite::ErrorCode::NotADatabase
+            ) || message.as_deref().is_some_and(looks_corrupt)
+        }
+        other => looks_corrupt(&other.to_string()),
+    }
+}
+
+fn looks_corrupt(text: &str) -> bool {
+    let lower = text.to_ascii_lowercase();
+    lower.contains("malformed")
+        || lower.contains("not a database")
+        || lower.contains("database disk image")
+        || lower.contains("file is not a database")
+}
+
+/// If the SQLite header claims more pages than the file actually has, rewrite
+/// the page count. This is the usual leftover of a force-killed WAL checkpoint
+/// or index rebuild.
+fn salvage_truncated_page_count(path: &Path) -> std::io::Result<bool> {
+    use std::fs::OpenOptions;
+    use std::io::{Read, Seek, SeekFrom, Write};
+
+    let mut file = OpenOptions::new().read(true).write(true).open(path)?;
+    let file_len = file.metadata()?.len();
+    let mut header = [0u8; 100];
+    if file.read(&mut header)? < 100 {
+        return Ok(false);
+    }
+    if &header[0..16] != b"SQLite format 3\0" {
+        return Ok(false);
+    }
+    let mut page_size = u16::from_be_bytes([header[16], header[17]]) as u64;
+    if page_size == 1 {
+        page_size = 65_536;
+    }
+    if page_size == 0 || file_len % page_size != 0 {
+        return Ok(false);
+    }
+    let actual_pages = file_len / page_size;
+    let claimed_pages = u32::from_be_bytes([header[28], header[29], header[30], header[31]]) as u64;
+    if claimed_pages <= actual_pages || actual_pages == 0 {
+        return Ok(false);
+    }
+    file.seek(SeekFrom::Start(28))?;
+    file.write_all(&(u32::try_from(actual_pages).unwrap_or(u32::MAX)).to_be_bytes())?;
+    file.flush()?;
+    Ok(true)
 }
 
 fn workout_series_summary(samples: &[WorkoutSeriesSample]) -> WorkoutSeriesSummary {
@@ -113,7 +174,52 @@ fn workout_series_summary(samples: &[WorkoutSeriesSample]) -> WorkoutSeriesSumma
 }
 
 impl Database {
+    #[cfg(test)]
     pub fn new(db_path: PathBuf) -> Result<Self> {
+        Self::open_migrated(&db_path)
+    }
+
+    /// Open the local library, repairing a truncated SQLite header when that is
+    /// enough, or quarantining a still-unreadable file and starting empty.
+    ///
+    /// A malformed database must never fail process startup: Tauri treats a
+    /// setup-hook error as a panic, which looks like a flash-crash from the
+    /// desktop shortcut.
+    pub fn open_resilient(db_path: PathBuf) -> Result<(Self, Option<String>)> {
+        match Self::open_migrated(&db_path) {
+            Ok(db) => Ok((db, None)),
+            Err(error) if is_corrupt_error(&error) => {
+                if salvage_truncated_page_count(&db_path).unwrap_or(false) {
+                    match Self::open_migrated(&db_path) {
+                        Ok(db) => {
+                            return Ok((
+                                db,
+                                Some(
+                                    "本地库文件被截断，已对齐页头。部分历史数据可能需要重新同步。"
+                                        .into(),
+                                ),
+                            ));
+                        }
+                        Err(salvage_error) if is_corrupt_error(&salvage_error) => {}
+                        Err(salvage_error) => return Err(salvage_error),
+                    }
+                }
+                let quarantined = crate::paths::quarantine_sqlite_group(&db_path);
+                let db = Self::open_migrated(&db_path)?;
+                let warning = match quarantined {
+                    Ok(dir) => format!(
+                        "本地库已损坏，已隔离到 {} 并重建空库。请重新同步。",
+                        dir.display()
+                    ),
+                    Err(_) => "本地库已损坏，已重建空库。请重新同步。".into(),
+                };
+                Ok((db, Some(warning)))
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    fn open_migrated(db_path: &std::path::Path) -> Result<Self> {
         let conn = Connection::open(db_path)?;
         Self::from_connection(conn)
     }
@@ -313,26 +419,41 @@ impl Database {
         // Expression indexes are needed because SQLite treats NULLs as distinct
         // in ordinary UNIQUE constraints.  COALESCE makes a missing device id a
         // deterministic part of the canonical key.
-        self.conn.execute_batch(
-            "CREATE UNIQUE INDEX IF NOT EXISTS uq_metric_sample_key
-                 ON metric_samples(metric, timestamp, unit, source_scope, COALESCE(device_id, ''));
-              -- Daily metrics are account-level facts: the same (date, metric,
-              -- unit, scope) written by two endpoints with different device ids
-              -- must collapse to one row.  Drop legacy duplicates first, then
-              -- rebuild the canonical key without the device-id dimension.
-              DELETE FROM daily_metrics WHERE id NOT IN (
-                  SELECT MIN(id) FROM daily_metrics
-                  GROUP BY date, metric, unit, source_scope);
-              DROP INDEX IF EXISTS uq_daily_metric_key;
-              CREATE UNIQUE INDEX uq_daily_metric_key
-                 ON daily_metrics(date, metric, unit, source_scope);
-             CREATE TABLE IF NOT EXISTS app_meta (
-                 key TEXT PRIMARY KEY,
-                 value TEXT NOT NULL,
-                 updated_at TEXT NOT NULL
-             );
-             PRAGMA user_version = 4;",
-        )?;
+        //
+        // The daily_metrics unique-key rebuild is destructive (DELETE + DROP +
+        // CREATE INDEX). Running it on every launch of a 1GB library is how
+        // a force-killed startup left a truncated file and flash-crashed the
+        // next double-click. Only do that work when upgrading older schemas.
+        if version < 4 {
+            self.conn.execute_batch(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_metric_sample_key
+                     ON metric_samples(metric, timestamp, unit, source_scope, COALESCE(device_id, ''));
+                  DELETE FROM daily_metrics WHERE id NOT IN (
+                      SELECT MIN(id) FROM daily_metrics
+                      GROUP BY date, metric, unit, source_scope);
+                  DROP INDEX IF EXISTS uq_daily_metric_key;
+                  CREATE UNIQUE INDEX uq_daily_metric_key
+                     ON daily_metrics(date, metric, unit, source_scope);
+                 CREATE TABLE IF NOT EXISTS app_meta (
+                     key TEXT PRIMARY KEY,
+                     value TEXT NOT NULL,
+                     updated_at TEXT NOT NULL
+                 );
+                 PRAGMA user_version = 4;",
+            )?;
+        } else {
+            self.conn.execute_batch(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_metric_sample_key
+                     ON metric_samples(metric, timestamp, unit, source_scope, COALESCE(device_id, ''));
+                 CREATE UNIQUE INDEX IF NOT EXISTS uq_daily_metric_key
+                     ON daily_metrics(date, metric, unit, source_scope);
+                 CREATE TABLE IF NOT EXISTS app_meta (
+                     key TEXT PRIMARY KEY,
+                     value TEXT NOT NULL,
+                     updated_at TEXT NOT NULL
+                 );",
+            )?;
+        }
         self.conn.execute(
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(2, ?1)",
             [Utc::now().to_rfc3339()],
@@ -369,7 +490,7 @@ impl Database {
                 updated_at TEXT NOT NULL
             );",
         )?;
-        self.conn.execute(
+        if let Err(error) = self.conn.execute(
             "UPDATE sleep_sessions
              SET synced_at = (
                  SELECT fetched_at FROM raw_records
@@ -377,8 +498,12 @@ impl Database {
              )
              WHERE synced_at IS NULL",
             [],
-        )?;
-        self.conn.execute(
+        ) {
+            if !is_corrupt_sqlite(&error) {
+                return Err(error.into());
+            }
+        }
+        if let Err(error) = self.conn.execute(
             "UPDATE workouts
              SET synced_at = (
                  SELECT fetched_at FROM raw_records
@@ -386,7 +511,11 @@ impl Database {
              )
              WHERE synced_at IS NULL",
             [],
-        )?;
+        ) {
+            if !is_corrupt_sqlite(&error) {
+                return Err(error.into());
+            }
+        }
         self.conn.execute(
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(5, ?1)",
             [Utc::now().to_rfc3339()],
@@ -428,10 +557,18 @@ impl Database {
             self.conn
                 .query_row("SELECT MAX(fetched_at) FROM raw_records", [], |row| {
                     row.get::<_, Option<String>>(0)
-                })?;
-        if let Some(timestamp) = latest_fetch {
-            self.set_app_meta(LAST_CLOUD_SYNC_AT_KEY, &timestamp)?;
-            self.set_app_meta(LAST_CLOUD_SYNC_OUTCOME_KEY, "updated")?;
+                });
+        match latest_fetch {
+            Ok(Some(timestamp)) => {
+                self.set_app_meta(LAST_CLOUD_SYNC_AT_KEY, &timestamp)?;
+                self.set_app_meta(LAST_CLOUD_SYNC_OUTCOME_KEY, "updated")?;
+            }
+            Ok(None) => {}
+            Err(error) if is_corrupt_sqlite(&error) => {
+                // A truncated library can still boot; the next cloud sync
+                // rewrites this metadata.
+            }
+            Err(error) => return Err(error.into()),
         }
         Ok(())
     }
@@ -2906,5 +3043,78 @@ mod tests {
         })
         .unwrap();
         assert!(db.pending_running_details().unwrap().is_empty());
+    }
+
+    fn temp_dir(label: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "zeppbridge-storage-{}-{}-{}",
+            label,
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn inflate_page_count(path: &Path, extra_pages: u32) {
+        use std::fs::OpenOptions;
+        use std::io::{Read, Seek, SeekFrom, Write};
+        let mut file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(path)
+            .unwrap();
+        let mut header = [0u8; 32];
+        file.read_exact(&mut header).unwrap();
+        let claimed = u32::from_be_bytes(header[28..32].try_into().unwrap());
+        file.seek(SeekFrom::Start(28)).unwrap();
+        file.write_all(&(claimed + extra_pages).to_be_bytes())
+            .unwrap();
+    }
+
+    #[test]
+    fn salvage_aligns_truncated_sqlite_page_count() {
+        let dir = temp_dir("salvage");
+        let path = dir.join("zepp.db");
+        {
+            let db = Database::new(path.clone()).unwrap();
+            db.insert_metric_sample(&MetricSample {
+                metric: "heart_rate".into(),
+                timestamp: ts(),
+                value: 70.0,
+                unit: "bpm".into(),
+                source_scope: SourceScope::Unknown,
+                device_id: None,
+            })
+            .unwrap();
+        }
+        let _ = std::fs::remove_file(dir.join("zepp.db-wal"));
+        let _ = std::fs::remove_file(dir.join("zepp.db-shm"));
+        inflate_page_count(&path, 24);
+        assert!(Database::new(path.clone()).is_err());
+        let (db, warning) = Database::open_resilient(path.clone()).unwrap();
+        assert!(warning.unwrap().contains("截断"));
+        assert_eq!(db.count_metric_samples().unwrap(), 1);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn corrupt_library_is_quarantined_and_app_still_starts() {
+        let dir = temp_dir("quarantine");
+        let path = dir.join("zepp.db");
+        std::fs::write(&path, b"this is not a sqlite database").unwrap();
+        let (db, warning) = Database::open_resilient(path.clone()).unwrap();
+        assert!(warning.unwrap().contains("损坏"));
+        assert!(path.exists());
+        assert_eq!(db.count_metric_samples().unwrap(), 0);
+        let quarantined = std::fs::read_dir(dir.join("backups"))
+            .unwrap()
+            .filter_map(|entry| entry.ok())
+            .any(|entry| entry.file_name().to_string_lossy().starts_with("corrupt-"));
+        assert!(quarantined);
+        let _ = std::fs::remove_dir_all(dir);
     }
 }
