@@ -6,6 +6,8 @@
   "permissions": [
     "core:default",
     "dialog:allow-save",
+    "updater:default",
+    "process:allow-restart",
     {
       "identifier": "opener:allow-open-url",
       "allow": [

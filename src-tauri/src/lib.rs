@@ -11,6 +11,7 @@ mod normalizer;
 mod paths;
 mod storage;
 mod sync;
+mod updates;
 
 use app_state::AppState;
 use commands::{
@@ -53,6 +54,8 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let data_dir = paths::resolve_data_dir()
                 .map_err(|error| anyhow::anyhow!("无法创建安装目录旁的数据文件夹: {error}"))?;
@@ -165,6 +168,8 @@ pub fn run() {
             get_storage_estimate,
             cleanup_old_data,
             open_data_folder,
+            updates::is_portable_update,
+            updates::launch_migrated_install,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|error| eprintln!("Tauri application exited with an error: {error}"));

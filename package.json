@@ -1,7 +1,7 @@
 {
   "name": "zeppbridge",
   "private": true,
-  "version": "0.8.6",
+  "version": "0.9.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,7 @@
     "build:web": "vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "package:release": "tauri build && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/publish-local.ps1",
+    "package:release": "pwsh -NoProfile -File scripts/windows/package-release.ps1",
     "publish:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/publish-local.ps1 -UserEntryOnly",
     "icons:generate": "node scripts/icon/generate-icons.mjs",
     "icons:verify": "python scripts/icon/verify-icons.py || py -3 scripts/icon/verify-icons.py"
@@ -18,6 +18,8 @@
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.7.2",
     "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-updater": "^2.10.1",
     "echarts": "^5.5.1",
     "vue": "^3.5.13",
     "vue-echarts": "^7.0.3",

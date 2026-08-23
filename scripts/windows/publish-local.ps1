@@ -28,6 +28,10 @@ function Get-Sha256([string]$Path) {
   }
 }
 
+function Write-Utf8NoBom([string]$Path, [string]$Content) {
+  [System.IO.File]::WriteAllText($Path, $Content, [System.Text.UTF8Encoding]::new($false))
+}
+
 function Remove-FileSafe([string]$Path) {
   if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $false }
   [System.IO.File]::SetAttributes($Path, [System.IO.FileAttributes]::Normal)
@@ -312,6 +316,26 @@ if (-not $UserEntryOnly) {
     $nsisDest = Join-Path $ReleaseDir $nsisName
     Copy-WithRetry -Source $nsisSource.FullName -Destination $nsisDest
     Write-Host "已复制 NSIS：$nsisDest"
+    $signaturePath = "$($nsisSource.FullName).sig"
+    if (-not (Test-Path -LiteralPath $signaturePath -PathType Leaf)) {
+      throw "缺少 updater 签名：$signaturePath"
+    }
+    $signature = (Get-Content -LiteralPath $signaturePath -Raw).Trim()
+    if ([string]::IsNullOrWhiteSpace($signature)) { throw 'updater 签名为空。' }
+    $latest = [ordered]@{
+      version = $version
+      notes = if ($env:ZEPPBRIDGE_RELEASE_NOTES) { $env:ZEPPBRIDGE_RELEASE_NOTES.Trim() } else { '新增 GitHub Release 自动检查、下载安装与重启更新。' }
+      pub_date = (Get-Date).ToUniversalTime().ToString('o')
+      size = (Get-Item -LiteralPath $nsisDest).Length
+      platforms = [ordered]@{
+        'windows-x86_64' = [ordered]@{
+          signature = $signature
+          url = "https://github.com/lingcang728/ZeppBridge/releases/download/v$version/$nsisName"
+          size = (Get-Item -LiteralPath $nsisDest).Length
+        }
+      }
+    }
+    Write-Utf8NoBom -Path (Join-Path $ReleaseDir 'latest.json') -Content ($latest | ConvertTo-Json -Depth 6)
   }
   if ($msiSource) {
     $msiDest = Join-Path $ReleaseDir $msiName

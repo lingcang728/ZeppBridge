@@ -91,6 +91,9 @@ jobs:
 
       - name: Build and bundle (NSIS + MSI)
         # beforeBuildCommand (icons:generate + vite build) runs as part of this.
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run tauri build
 
       - name: Collect installers into release/
@@ -104,6 +107,7 @@ jobs:
           path: |
             release/ZeppBridge_*-setup.exe
             release/ZeppBridge_*.msi
+            release/latest.json
           if-no-files-found: error
           retention-days: 14
 
@@ -121,5 +125,6 @@ jobs:
           gh release create "${GITHUB_REF_NAME}" \
             release/ZeppBridge_*-setup.exe \
             release/ZeppBridge_*.msi \
+            release/latest.json \
             --title "ZeppBridge ${GITHUB_REF_NAME#v}" \
             --generate-notes

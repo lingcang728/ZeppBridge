@@ -10,6 +10,7 @@ import { UI_SCALES, useUiScale, type UiScale } from '../composables/useUiScale';
 import { backend, toUserMessage } from '../lib/bridge';
 import { regionShortName } from '../lib/deviceCopy';
 import type { LoginStatus } from '../types';
+import { checkForDesktopUpdate, downloadAndInstallDesktopUpdate, updateState } from '../services/updateService';
 
 const {
   appStatus,
@@ -79,6 +80,29 @@ const onExportFormatChange = () => {
 
 /* 隐私政策弹窗 */
 const privacyModalOpen = ref(false);
+const updateInstallArmed = ref(false);
+const updateBusy = computed(() => ['checking', 'downloading', 'installing'].includes(updateState.status));
+const updateProgress = computed(() => updateState.totalBytes
+  ? Math.min(100, Math.round(updateState.downloadedBytes / updateState.totalBytes * 100))
+  : null);
+const updateStatusLabel = computed(() => ({
+  idle: '尚未检查',
+  checking: '正在检查 GitHub Release',
+  available: `发现新版本 ${updateState.version}`,
+  downloading: updateProgress.value === null ? '正在下载更新' : `正在下载 ${updateProgress.value}%`,
+  installing: '正在安装，完成后会自动重启',
+  failed: '更新失败',
+  upToDate: '当前已是最新版本',
+}[updateState.status]));
+
+const formatUpdateBytes = (bytes: number) => bytes < 1024 * 1024
+  ? `${(bytes / 1024).toFixed(1)} KB`
+  : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+
+const installUpdate = async () => {
+  updateInstallArmed.value = false;
+  await downloadAndInstallDesktopUpdate();
+};
 
 const connected = computed(() => appStatus.value?.connection_state === 'connected');
 const configuredOnly = computed(() => appStatus.value?.connection_state === 'configured');
@@ -610,12 +634,45 @@ onUnmounted(() => {
       </section>
     </div>
 
-    <!-- 7. 自动同步 -->
+    <!-- 7. 软件更新 -->
+    <section class="settings-card update-card" aria-labelledby="update-title">
+      <div class="update-head">
+        <div>
+          <h2 id="update-title">7. 软件更新</h2>
+          <p>每天最多静默检查一次，也可随时手动检查。</p>
+        </div>
+        <button class="button secondary" type="button" :disabled="updateBusy" @click="checkForDesktopUpdate(true)">
+          <Icon name="sync" :size="14" :class="{ spinning: updateState.status === 'checking' }" />
+          {{ updateState.status === 'checking' ? '检查中…' : '检查更新' }}
+        </button>
+      </div>
+      <div :class="['update-state', `is-${updateState.status}`]" role="status" aria-live="polite">
+        <i aria-hidden="true"></i>
+        <div>
+          <strong>{{ updateStatusLabel }}</strong>
+          <p v-if="updateState.status === 'failed'">{{ updateState.error }}</p>
+          <p v-else-if="updateState.status === 'available'">当前 {{ updateState.currentVersion }}<template v-if="updateState.sizeBytes"> · {{ formatUpdateBytes(updateState.sizeBytes) }}</template></p>
+          <p v-else>版本 {{ updateState.currentVersion || '读取中' }}</p>
+        </div>
+      </div>
+      <progress v-if="updateState.status === 'downloading' && updateProgress !== null" :value="updateProgress" max="100">{{ updateProgress }}%</progress>
+      <div v-if="updateState.status === 'available'" class="update-release">
+        <div><strong>ZeppBridge {{ updateState.version }}</strong><p>{{ updateState.notes || '本次 Release 未填写更新说明。' }}</p></div>
+        <button class="button primary" type="button" @click="updateInstallArmed = true">下载安装</button>
+      </div>
+      <div v-if="updateInstallArmed" class="update-confirm" role="alert">
+        <div><strong>安装 ZeppBridge {{ updateState.version }}？</strong><p>应用会自动重启，本地健康数据不会被删除。</p></div>
+        <button class="button secondary" type="button" @click="updateInstallArmed = false">取消</button>
+        <button class="button primary" type="button" @click="installUpdate">确认安装</button>
+      </div>
+    </section>
+
+    <!-- 8. 自动同步 -->
     <section class="settings-card sync-card" aria-labelledby="sync-title">
       <div class="sync-lead">
         <span class="sync-icon"><Icon name="monitor" :size="20" /></span>
         <div>
-          <h2 id="sync-title">7. 自动同步</h2>
+          <h2 id="sync-title">8. 自动同步</h2>
           <p class="sync-desc">应用打开期间每 {{ autoSyncInterval }} 分钟自动同步云端记录<br />保持开启可获得连续的时序数据。</p>
         </div>
       </div>
@@ -720,6 +777,18 @@ h3 { margin-bottom: 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
 .page-intro, .section-description { margin-bottom: 0; color: var(--muted); font-size: 12px; }
 .section-description { margin: 12px 0 8px; }
 .settings-card { padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); min-width: 0; }
+.update-head, .update-release, .update-confirm { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px; }
+.update-head h2 { margin-bottom: 4px; }
+.update-head p, .update-state p, .update-release p, .update-confirm p { margin: 0; color: var(--subtle); font-size: 11px; line-height: 1.5; }
+.update-state { display: grid; grid-template-columns: 7px minmax(0, 1fr); align-items: center; gap: 11px; margin-top: 14px; padding: 11px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); }
+.update-state i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.update-state.is-available i, .update-state.is-upToDate i { background: var(--accent); }
+.update-state.is-checking i, .update-state.is-downloading i, .update-state.is-installing i { background: var(--warning); }
+.update-state.is-failed i { background: var(--danger); }
+.update-state strong, .update-release strong, .update-confirm strong { color: var(--ink); font-size: 12px; }
+.update-card progress { width: 100%; height: 6px; margin-top: 10px; accent-color: var(--accent); }
+.update-release, .update-confirm { margin-top: 10px; padding: 11px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); }
+.update-confirm { grid-template-columns: minmax(0, 1fr) auto auto; }
 .section-heading-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .section-heading-row h2 { margin-bottom: 14px; }
 .identify-button { flex: 0 0 auto; }
