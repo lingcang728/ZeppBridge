@@ -8,7 +8,7 @@
   [![License: MIT](https://img.shields.io/github/license/lingcang728/ZeppBridge?color=69b48b)](LICENSE)
   [![Tauri 2](https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white)](https://tauri.app/)
   [![Windows](https://img.shields.io/badge/platform-Windows-0078D4?logo=windows11&logoColor=white)](#下载与安装)
-  [![macOS](https://img.shields.io/badge/platform-macOS-333333?logo=apple&logoColor=white)](#下载与安装)
+  [![macOS](https://img.shields.io/badge/macOS-自行构建-333333?logo=apple&logoColor=white)](#从源码构建)
 </div>
 
 > [!IMPORTANT]
@@ -82,9 +82,16 @@ curl.exe "http://127.0.0.1:43921/workouts/<WORKOUT_ID>/series"
 
 **macOS（Apple Silicon）**
 
-1. 在 [Releases](https://github.com/lingcang728/ZeppBridge/releases) 页面下载 `ZeppBridge_<版本>_aarch64.dmg`，双击打开后把 `ZeppBridge.app` 拖入「应用程序」。
-2. 应用尚未签名/公证，首次打开会提示「无法验证开发者」。右键（或按住 Control 点按）应用 → 打开 → 再点「打开」即可；也可在终端执行 `xattr -dr com.apple.quarantine /Applications/ZeppBridge.app`。
-3. 升级时覆盖旧的 `ZeppBridge.app` 即可，本地数据保留在 `~/Library/Application Support/com.zeppbridge.ZeppBridge/data`。
+1. 当前 Releases 暂不提供 macOS 安装包，需自行构建（见下方[从源码构建](#从源码构建)）。
+2. 构建产物为 ad-hoc 签名，首次打开会提示「无法验证开发者」。右键（或按住 Control 点按）应用 → 打开 → 再点「打开」即可；也可在终端执行 `xattr -dr com.apple.quarantine /Applications/ZeppBridge.app`。
+3. 本地数据保留在 `~/Library/Application Support/com.zeppbridge.ZeppBridge/data`，覆盖升级不影响数据。
+
+## 从源码构建
+
+需要 Node 20+ 与 Rust 工具链（macOS 还需 Xcode Command Line Tools）。安装依赖后：
+
+- **macOS（Apple Silicon）**：`npm run build:mac`，产物在 `src-tauri/target/release/bundle/`（ZeppBridge.app 与 .dmg）
+- **Windows**：见 `scripts/windows/` 下的打包脚本
 
 ## 第一次连接
 
