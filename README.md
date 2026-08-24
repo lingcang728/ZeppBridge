@@ -1,13 +1,14 @@
 <div align="center">
   <img src="src-tauri/icons/icon.png" width="96" height="96" alt="ZeppBridge">
   <h1>ZeppBridge</h1>
-  <p><strong>把 Zepp 穿戴设备的健康数据，同步到你自己的 Windows 电脑。</strong></p>
+  <p><strong>把 Zepp 穿戴设备的健康数据，同步到你自己的 Windows / macOS 电脑。</strong></p>
   <p>Local-first desktop bridge for Zepp / Amazfit health data.</p>
 
   [![CI](https://github.com/lingcang728/ZeppBridge/actions/workflows/ci.yml/badge.svg)](https://github.com/lingcang728/ZeppBridge/actions/workflows/ci.yml)
   [![License: MIT](https://img.shields.io/github/license/lingcang728/ZeppBridge?color=69b48b)](LICENSE)
   [![Tauri 2](https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white)](https://tauri.app/)
   [![Windows](https://img.shields.io/badge/platform-Windows-0078D4?logo=windows11&logoColor=white)](#下载与安装)
+  [![macOS](https://img.shields.io/badge/platform-macOS-333333?logo=apple&logoColor=white)](#下载与安装)
 </div>
 
 > [!IMPORTANT]
@@ -18,7 +19,7 @@
 Zepp 手机 App 把数据放在区域云端。ZeppBridge 在电脑上登录你的账号，把心率、睡眠、运动等记录拉到本机 SQLite，用桌面界面核对，再按需通过桌面界面、本机 REST API 或 JSON 导出交给你自己的工具。
 
 - **电脑直接读云**：设置里点「连接」，在弹出的官方登录页登入。不装证书，不改 Wi-Fi 代理。
-- **数据只在本机**：没有 ZeppBridge 自建云，也没有产品遥测。token 进 Windows Credential Manager。
+- **数据只在本机**：没有 ZeppBridge 自建云，也没有产品遥测。token 存系统凭据管理器（Windows Credential Manager / macOS 钥匙串）。
 - **不编造**：没有样本就不画曲线；没有设备信息就写「未提供」；云端拉取时间和健康样本时间分开显示。
 - **分析外置**：应用不做解读。到「交给 AI」复制标准化 JSON，或另存为 JSON / CSV / GPX。
 - **本机 API 网关**：其他本机程序可直接请求标准化的运动 samples、route、pauses 和 summary，无需理解 Zepp 原始差分字符串。
@@ -73,9 +74,17 @@ curl.exe "http://127.0.0.1:43921/workouts/<WORKOUT_ID>/series"
 
 ## 下载与安装
 
+**Windows**
+
 1. 在 [Releases](https://github.com/lingcang728/ZeppBridge/releases) 页面下载最新版安装包：`ZeppBridge_<版本>_x64-setup.exe` 或 `.msi`。
 2. 安装包尚未签名，Windows 可能提示「未知发布者」，选择「仍要运行」即可。
 3. 直接覆盖安装即可升级，本地数据会保留。
+
+**macOS（Apple Silicon）**
+
+1. 在 [Releases](https://github.com/lingcang728/ZeppBridge/releases) 页面下载 `ZeppBridge_<版本>_aarch64.dmg`，双击打开后把 `ZeppBridge.app` 拖入「应用程序」。
+2. 应用尚未签名/公证，首次打开会提示「无法验证开发者」。右键（或按住 Control 点按）应用 → 打开 → 再点「打开」即可；也可在终端执行 `xattr -dr com.apple.quarantine /Applications/ZeppBridge.app`。
+3. 升级时覆盖旧的 `ZeppBridge.app` 即可，本地数据保留在 `~/Library/Application Support/com.zeppbridge.ZeppBridge/data`。
 
 ## 第一次连接
 
@@ -90,7 +99,7 @@ curl.exe "http://127.0.0.1:43921/workouts/<WORKOUT_ID>/series"
 
 - 同步时会访问你授权的 Zepp 区域服务，所以这不是离线软件。
 - `auth.json` 只留用户 ID、区域主机等元数据，不含 token。
-- 健康库目前是本机明文 SQLite。共用电脑请使用独立的 Windows 账户。
+- 健康库目前是本机明文 SQLite。共用电脑请使用独立的系统账户。
 - 本机 REST API 只监听 `127.0.0.1` 且不开放浏览器跨域，但电脑上的其他本机进程仍可读取接口返回的健康数据与精确路线。
 - 应用没有自建云、没有产品遥测，数据只保存在你的电脑上。
 
