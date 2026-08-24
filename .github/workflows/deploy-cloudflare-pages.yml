@@ -23,7 +23,7 @@ jobs:
           cache: npm
 
       - name: Build landing page
-        run: npm ci && npm run build:web
+        run: npm ci && npm run build
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3

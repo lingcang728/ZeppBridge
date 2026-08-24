@@ -4,6 +4,7 @@ mod commands;
 mod connectors;
 mod decoder;
 mod device_catalog;
+mod export_formats;
 mod fetcher;
 mod ipc_types;
 mod local_api;
@@ -21,8 +22,9 @@ use commands::{
     get_heart_rate_series, get_login_status, get_recent_sleep, get_recent_workouts,
     get_sleep_detail, get_storage_estimate, get_training_load_series, get_workout_detail,
     get_workout_series, import_from_har, manual_auth, open_data_folder, prepare_ai_handoff,
-    publish_ai_export, reprocess_local_data, save_auth, save_json_export, set_user_prefs,
-    start_history_sync, start_incremental_sync, start_initial_sync, start_web_login, verify_auth,
+    publish_ai_export, reprocess_local_data, save_auth, save_csv_export, save_gpx_export,
+    save_json_export, set_user_prefs, start_history_sync, start_incremental_sync,
+    start_initial_sync, start_web_login, verify_auth,
 };
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
@@ -168,6 +170,8 @@ pub fn run() {
             reprocess_local_data,
             get_export_json,
             save_json_export,
+            save_csv_export,
+            save_gpx_export,
             publish_ai_export,
             prepare_ai_handoff,
             set_user_prefs,

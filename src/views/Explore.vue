@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import Icon from '../components/Icon.vue';
 import type { IconName } from '../components/Icon.vue';
-import { useExport } from '../composables/useExport';
+import { useExport, type SaveFormat } from '../composables/useExport';
 import { useSyncController } from '../composables/useSyncController';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { useAiHandoff } from '../composables/useAiHandoff';
@@ -18,8 +18,7 @@ const {
   exportError,
   exportMessage,
   applyExportRange,
-  copyExportJson,
-  saveExportFile,
+  saveExportAs,
 } = useExport();
 
 const { dataRevision } = useSyncController();
@@ -155,12 +154,15 @@ const selectTemplate = (tpl: PromptTemplate) => {
 };
 
 /* ── 导出格式与目标工具 ────────────────── */
-const formats = [
-  { key: 'json', label: 'JSON', sub: '结构化数据', icon: 'braces' as IconName },
-  { key: 'csv', label: 'CSV', sub: '表格数据', icon: 'table' as IconName },
-  { key: 'gpx', label: 'GPX', sub: '轨迹数据', icon: 'map' as IconName },
+const formats: { key: SaveFormat; label: string; sub: string; icon: IconName }[] = [
+  { key: 'json', label: 'JSON', sub: '完整结构化数据', icon: 'braces' },
+  { key: 'csv', label: 'CSV', sub: '汇总表（不含逐点序列）', icon: 'table' },
+  { key: 'gpx', label: 'GPX', sub: '仅含 GPS 轨迹的运动', icon: 'map' },
 ];
-const activeFormat = ref('json');
+const activeFormat = ref<SaveFormat>('json');
+const activeFormatLabel = computed(
+  () => formats.find((format) => format.key === activeFormat.value)?.label ?? 'JSON',
+);
 
 const activeProviderId = ref<AiProviderId>('chatgpt');
 const activeProvider = computed(() => AI_PROVIDER_BY_ID[activeProviderId.value]);
@@ -393,9 +395,9 @@ const retryOpenAi = async () => {
   }
 };
 
+// 每种格式都走各自真实的转换与另存；选了 CSV/GPX 却拿到 JSON 属于骗用户。
 const runExport = async () => {
-  if (activeFormat.value === 'json') await saveExportFile();
-  else await copyExportJson();
+  await saveExportAs(activeFormat.value);
 };
 
 watch([exportStartDate, exportEndDate, exportDataTypes], schedulePreview, { deep: true, immediate: true });
@@ -579,7 +581,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
           </p>
           <div class="footer-actions">
             <button class="button button-secondary" type="button" :disabled="Boolean(exportBusy)" @click="runExport">
-              <Icon name="export" :size="14" />附加数据
+              <Icon name="export" :size="14" />另存 {{ activeFormatLabel }}
             </button>
             <button class="button button-secondary" type="button" @click="copyPrompt">
               <Icon name="copy" :size="14" />复制提示词

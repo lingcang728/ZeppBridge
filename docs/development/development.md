@@ -81,6 +81,8 @@ Tauri command 在 `src-tauri/src/lib.rs` 注册，前端封装在 `src/lib/bridg
 | `save_auth` | 保存认证元数据和 token | token 进入 Windows Credential Manager；host 由连接器再次校验 |
 | `verify_auth` | 最近两小时真实心率请求 | 只接受结构化 JSON 和明确成功代码；401/403 需要重新认证 |
 | `clear_auth` | 作废登录会话并清除认证 | 保留健康数据库 |
+| `import_from_har` | 从用户自己导出的 HAR 里抽取凭据 | 必须含 `api-mifit*` 请求且带 `apptoken`；随后走 `save_auth` 同一条保存路径 |
+| `manual_auth` | 手动输入 token / user id / region host | 只是 `save_auth` 的包装，边界完全相同 |
 | `start_initial_sync` / `start_history_sync` | 按用户选择的 1–365 天补拉 | 默认 30 天；有进度事件和取消 |
 | `start_incremental_sync` | 7 天 overlap 增量 | 仅已验证连接可用；顶栏/自动同步/托盘触发 |
 | `cancel_sync` | 取消进行中的同步 | 原子标记，下一窗口停止 |
@@ -90,9 +92,20 @@ Tauri command 在 `src-tauri/src/lib.rs` 注册，前端封装在 `src/lib/bridg
 | `get_recent_sleep` / `get_recent_workouts` | 读取最近记录 | limit 在后端限制为 `1–500` |
 | `get_sleep_detail` / `get_workout_detail` | 按稳定 ID 读取单条详情 | 找不到返回 `null`；不生成估算字段 |
 | `get_workout_series` | 读取已解码的跑步 samples/route/pauses | 没有点则空数组，不编造 |
+| `get_heart_rate_series` / `get_training_load_series` | 概览折线用的时序点 | 按小时 / 天读本地库；没有样本就是空数组 |
+| `get_device_profile` / `get_device_profiles` | 读取识别到的设备档案 | 来自编译进二进制的 `catalog.json`；认不出的设备不猜型号 |
+| `get_storage_estimate` | 估算本地库体积与可清理量 | 只读，按天计算 |
+| `reprocess_local_data` | 用当前解析器重放本地 raw | 不触网，不改云端同步时间；返回各 stream 重放条数 |
+| `get_export_json` | 生成导出 JSON 字符串 | 只按 `ExportSelection` 取本地数据 |
+| `save_json_export` | 另存导出文件 | 路径经 `validate_export_path(.., "json")` 校验 |
+| `save_csv_export` | 另存长表 CSV（汇总） | 复用同一份标准化 JSON 再转换；`record_count` 是数据行数；不含逐点序列与轨迹 |
+| `save_gpx_export` | 另存 GPX 1.1 轨迹 | 只有解码出 route 的运动才成轨；一个点都没有时报错而不是写空文件；心率仅在时间戳完全一致时写入 |
+| `publish_ai_export` | 更新本机 `exports/zeppbridge-ai-feed.json` | 固定路径，原子写 |
+| `prepare_ai_handoff` | 生成交给外部 AI 的脱敏数据包 | 复用同一 export builder 后再做递归脱敏；> 2 MiB 改写桌面文件；精确轨迹需显式开启 |
 | `get_local_api_status` | 读取本机 REST API 启动状态与固定地址 | 端口冲突不会阻止桌面 App 启动 |
 | `cleanup_old_data` | 按天清理旧数据 | `1–365` 天；跨 canonical 表并清理无引用 raw |
 | `open_data_folder` | 在 Windows Explorer 打开安装目录旁的 `data/` | 不再使用 `%APPDATA%` |
+| `is_portable_update` / `launch_migrated_install` | 判断当前是否为非安装版入口，并在更新后拉起 `%LOCALAPPDATA%\ZeppBridge\ZeppBridge.exe` | 仅 Windows；找不到安装版时报错而不是静默退出 |
 
 `LoginStatus.state` 只能是：`idle`、`waiting`、`extracting`、`verifying`、`connected`、`failed`。
 
@@ -116,7 +129,7 @@ API 不监听 `0.0.0.0`、不提供 CORS、响应 `Cache-Control: no-store`，�
 3. `ZeppConnector` 只构造 HTTPS origin，host 仅允许 `api-mifit*.zepp.com` / `api-mifit*.huami.com`，HTTP client 超时 30 秒，401/403/404/429/5xx 分类处理。
 4. `DataFetcher` 为每个响应保留 stream/source key/raw payload。连接器有有限重试，但没有通用的 cursor 分页实现；运动 endpoint 使用 track ID 语义，当前窗口 helper 仍是保守范围。
 5. `Normalizer` 只接受能识别的结构化数组/对象，并能解码当前真实 fixture 验证过的 Base64 `band_data` 睡眠/分钟心率结构；无法识别的编码仍只保留 raw 并标记 `unverified`。
-6. `Database` 使用 WAL、外键和 schema migration（当前版本 1→2）；表达式唯一索引处理 `NULL device_id`，canonical 行保留 `raw_record_id`。
+6. `Database` 使用 WAL、外键和 schema migration（`PRAGMA user_version`，当前为 6；新版本只能追加迁移步骤，不要改已有 DDL）；表达式唯一索引处理 `NULL device_id`，canonical 行保留 `raw_record_id`。
 7. `SyncManager` 用 run lock 防止并发同步；核心流失败时 `success=false`，可选流显示 `unavailable`/`unverified`，成功后再做 retention。
 
 ## 前端开发约定
@@ -124,7 +137,7 @@ API 不监听 `0.0.0.0`、不提供 CORS、响应 `Cache-Control: no-store`，�
 - 页面通过 `tauriApi` / `backend` 调用 command，不直接访问 Zepp。
 - 空值显示 `—`、`未记录` 或明确的空状态；不要把缺失数据变成 `0`。
 - 时间格式化前检查 `Date.getTime()`；错误应保留可操作信息，不要静默吞掉字符串。
-- 使用 `App.vue` 里的主题变量、`focus-visible`、语义元素、ARIA 和最小 44px 触控区域；移动端断点目前以 760px 为主。
+- 使用 `App.vue` `:root` 里的设计 token（唯一来源，界面统一深色，不做浅色分支）、`focus-visible`、语义元素、ARIA 和最小 44px 触控区域；移动端断点目前以 760px 为主。详见 [UI 约束](ui-guidelines.md)。
 - `index.html` 的语言为 `zh-CN`，标题为 `ZeppBridge · 健康数据`；当前没有把默认 Vite 图标当成产品 favicon 的验收证据。
 
 ## 推荐验收顺序

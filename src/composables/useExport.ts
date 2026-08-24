@@ -4,6 +4,8 @@ import { tauriApi, toUserMessage } from './useTauriApi';
 import { localDateString } from '../lib/format';
 import type { ExportDataType, ExportResult, ExportSelection } from '../types';
 
+export type SaveFormat = 'json' | 'csv' | 'gpx';
+
 export const exportTypeOptions: { value: ExportDataType; label: string }[] = [
   { value: 'heart_rate', label: '心率' },
   { value: 'sleep', label: '睡眠' },
@@ -88,25 +90,55 @@ export const useExport = () => {
     }
   };
 
-  const saveExportFile = async () => {
+  // 三种格式共用同一份本地数据：后端先生成标准化 JSON，再转成 CSV / GPX，
+  // 所以「换个格式」不会换成另一套数据口径。计数单位各不相同，文案必须跟着变，
+  // 否则「已保存 N 条记录」会把 CSV 行数或轨迹点数说成记录数。
+  const saveFormats = {
+    json: {
+      title: '另存 ZeppBridge JSON',
+      extension: 'json',
+      filterName: 'JSON 文件',
+      unit: '条记录',
+      save: (selection: ExportSelection, path: string) => tauriApi.saveJsonExport(selection, path),
+    },
+    csv: {
+      title: '另存 ZeppBridge CSV（汇总表）',
+      extension: 'csv',
+      filterName: 'CSV 表格',
+      unit: '行',
+      save: (selection: ExportSelection, path: string) => tauriApi.saveCsvExport(selection, path),
+    },
+    gpx: {
+      title: '另存 ZeppBridge GPX（GPS 轨迹）',
+      extension: 'gpx',
+      filterName: 'GPX 轨迹',
+      unit: '个轨迹点',
+      save: (selection: ExportSelection, path: string) => tauriApi.saveGpxExport(selection, path),
+    },
+  } as const;
+
+  const saveExportAs = async (format: SaveFormat) => {
     const selection = exportSelection();
     if (!selection) return;
+    const meta = saveFormats[format];
     exportBusy.value = 'save';
     try {
       const path = await showSaveDialog({
-        title: '另存 ZeppBridge JSON',
-        defaultPath: `zeppbridge-${selection.startDate}-${selection.endDate}.json`,
-        filters: [{ name: 'JSON 文件', extensions: ['json'] }],
+        title: meta.title,
+        defaultPath: `zeppbridge-${selection.startDate}-${selection.endDate}.${meta.extension}`,
+        filters: [{ name: meta.filterName, extensions: [meta.extension] }],
       });
       if (!path) return;
-      exportResult.value = await tauriApi.saveJsonExport(selection, path);
-      exportMessage.value = `已保存 ${exportResult.value.record_count} 条记录。`;
+      exportResult.value = await meta.save(selection, path);
+      exportMessage.value = `已保存 ${exportResult.value.record_count} ${meta.unit}。`;
     } catch (error) {
-      exportError.value = toUserMessage(error, '保存 JSON 失败');
+      exportError.value = toUserMessage(error, `保存 ${meta.extension.toUpperCase()} 失败`);
     } finally {
       exportBusy.value = null;
     }
   };
+
+  const saveExportFile = () => saveExportAs('json');
 
   const publishAiFeed = async () => {
     const selection = exportSelection();
@@ -137,6 +169,7 @@ export const useExport = () => {
     applyExportRange,
     copyExportJson,
     saveExportFile,
+    saveExportAs,
     publishAiFeed,
   };
 };

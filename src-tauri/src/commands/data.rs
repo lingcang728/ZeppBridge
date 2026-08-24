@@ -1,6 +1,7 @@
 use crate::app_state::AppState;
 use crate::connectors::ZeppConnector;
 use crate::device_catalog::{match_catalog, CatalogMatchInput, CatalogMatchStatus};
+use crate::export_formats;
 use crate::ipc_types::CleanupResult;
 use crate::models::{
     AiHandoffMetadata, AiHandoffResult, DailyPoint, DeviceCacheMetadata, DeviceMatchStatus,
@@ -203,6 +204,69 @@ pub async fn publish_ai_export(
     selection: ExportSelection,
 ) -> std::result::Result<ExportResult, String> {
     write_export(&state, selection, None, true).await
+}
+
+/// Save the selection as a tidy CSV table.
+///
+/// `record_count` is the number of data rows, not the number of source
+/// records: one sleep session or workout expands into one row per metric it
+/// actually has.
+#[tauri::command]
+pub async fn save_csv_export(
+    state: tauri::State<'_, AppState>,
+    selection: ExportSelection,
+    path: String,
+) -> std::result::Result<ExportResult, String> {
+    let path = validate_export_path(&path, "csv")?;
+    write_converted_export(&state, selection, path, export_formats::to_csv, "CSV").await
+}
+
+/// Save the GPS tracks of the selection as GPX 1.1.
+///
+/// `record_count` is the number of track points. Workouts without decoded
+/// route points contribute nothing, and a selection with no points at all is
+/// an error rather than an empty file.
+#[tauri::command]
+pub async fn save_gpx_export(
+    state: tauri::State<'_, AppState>,
+    selection: ExportSelection,
+    path: String,
+) -> std::result::Result<ExportResult, String> {
+    let path = validate_export_path(&path, "gpx")?;
+    write_converted_export(&state, selection, path, export_formats::to_gpx, "GPX").await
+}
+
+/// Shared body for the non-JSON exports: build the same canonical payload the
+/// JSON export uses, convert it, then write atomically. Conversion failures
+/// (including "nothing to write") happen before any file is touched.
+async fn write_converted_export(
+    state: &AppState,
+    selection: ExportSelection,
+    path: PathBuf,
+    convert: fn(&Value) -> std::result::Result<(String, usize), String>,
+    label: &str,
+) -> std::result::Result<ExportResult, String> {
+    let (encoded, record_count) = {
+        let db = state.db.lock().await;
+        db.build_ai_export(&selection)
+            .map_err(|error| error.to_string())?
+    };
+    if record_count == 0 {
+        return Err("这段时间没有可导出的记录".to_string());
+    }
+    let export: Value =
+        serde_json::from_str(&encoded).map_err(|error| format!("读取导出数据失败: {error}"))?;
+    let (converted, converted_count) = convert(&export)?;
+
+    let generated_at = Utc::now();
+    write_file_atomically(&path, converted.as_bytes())
+        .map_err(|error| format!("写入 {label} 导出失败: {error}"))?;
+    Ok(ExportResult {
+        path: path.to_string_lossy().into_owned(),
+        record_count: converted_count,
+        bytes: converted.len(),
+        generated_at: generated_at.to_rfc3339(),
+    })
 }
 
 /// Prepare a privacy-preserving payload for an external AI provider.
@@ -1198,20 +1262,31 @@ fn first_string(value: &serde_json::Value, keys: &[&str]) -> Option<String> {
 }
 
 fn validate_json_export_path(value: &str) -> std::result::Result<PathBuf, String> {
+    validate_export_path(value, "json")
+}
+
+/// Validate a user-picked export destination for one concrete format.
+///
+/// The extension check is not cosmetic: it keeps a mistyped destination from
+/// silently producing a file whose contents do not match its name.
+fn validate_export_path(value: &str, extension: &str) -> std::result::Result<PathBuf, String> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
-        return Err("请选择 JSON 文件的保存位置".to_string());
+        return Err(format!(
+            "请选择 {} 文件的保存位置",
+            extension.to_ascii_uppercase()
+        ));
     }
     let path = PathBuf::from(trimmed);
     if !path.is_absolute() {
         return Err("保存位置必须是绝对路径".to_string());
     }
-    let is_json = path
+    let matches_extension = path
         .extension()
-        .and_then(|extension| extension.to_str())
-        .is_some_and(|extension| extension.eq_ignore_ascii_case("json"));
-    if !is_json {
-        return Err("导出文件必须使用 .json 扩展名".to_string());
+        .and_then(|value| value.to_str())
+        .is_some_and(|value| value.eq_ignore_ascii_case(extension));
+    if !matches_extension {
+        return Err(format!("导出文件必须使用 .{extension} 扩展名"));
     }
     let Some(parent) = path
         .parent()

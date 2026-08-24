@@ -57,6 +57,8 @@ export interface BridgeBackend {
   reprocessLocalData(): Promise<ReprocessResult>;
   getExportJson(selection: ExportSelection): Promise<string>;
   saveJsonExport(selection: ExportSelection, path: string): Promise<ExportResult>;
+  saveCsvExport(selection: ExportSelection, path: string): Promise<ExportResult>;
+  saveGpxExport(selection: ExportSelection, path: string): Promise<ExportResult>;
   publishAiExport(selection: ExportSelection): Promise<ExportResult>;
   prepareAiHandoff(
     selection: ExportSelection,

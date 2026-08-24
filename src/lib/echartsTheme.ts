@@ -1,5 +1,5 @@
 /* ZeppBridge ECharts 统一主题（设计系统 v4）
-   暗色 `zeppbridge-dark` 为 P1 基准；`zeppbridge-light` 供 P3 使用。
+   只有暗色 `zeppbridge-dark`：产品不做浅色模式，不要再加浅色主题分支。
    语义色集中定义；品牌色不进入健康数据的默认序列调色板。
    v4 配色：冷调深灰底 + 橄榄军绿主色。 */
 
@@ -50,13 +50,6 @@ const darkAxis = {
   splitLine: { show: true, lineStyle: { color: 'rgba(226,234,242,0.07)', type: 'dashed' as const } },
 };
 
-const lightAxis = {
-  axisLine: { show: false },
-  axisTick: { show: false },
-  axisLabel: { color: '#66727A', fontSize: 11, fontFamily: fonts },
-  splitLine: { show: true, lineStyle: { color: 'rgba(14,17,19,0.10)', type: 'dashed' as const } },
-};
-
 export const zeppThemeDark = {
   color: healthSeriesPalette,
   backgroundColor: 'transparent',
@@ -71,28 +64,6 @@ export const zeppThemeDark = {
     borderWidth: 1,
     padding: [8, 12],
     textStyle: { color: '#F2F4EE', fontSize: 12, fontFamily: fonts },
-    extraCssText: 'border-radius:8px;box-shadow:none;',
-  },
-  line: {
-    symbol: 'circle',
-    symbolSize: 0,
-    smooth: 0.25,
-    lineStyle: { width: 2.5, cap: 'round' as const, join: 'round' as const },
-  },
-};
-
-export const zeppThemeLight = {
-  color: healthSeriesPalette,
-  categoryAxis: { ...lightAxis },
-  valueAxis: { ...lightAxis },
-  timeAxis: { ...lightAxis },
-  logAxis: { ...lightAxis },
-  tooltip: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DCE1',
-    borderWidth: 1,
-    padding: [8, 12],
-    textStyle: { color: '#14171C', fontSize: 12, fontFamily: fonts },
     extraCssText: 'border-radius:8px;box-shadow:none;',
   },
   line: {

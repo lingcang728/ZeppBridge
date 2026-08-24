@@ -6,12 +6,11 @@ import { CanvasRenderer } from "echarts/renderers";
 import VChart from "vue-echarts";
 import App from "./App.vue";
 import router from "./router";
-import { zeppThemeDark, zeppThemeLight } from "./lib/echartsTheme";
+import { zeppThemeDark } from "./lib/echartsTheme";
 import "./styles/fonts.css";
 
 use([LineChart, BarChart, GridComponent, TooltipComponent, LegendComponent, MarkLineComponent, VisualMapComponent, CanvasRenderer]);
 registerTheme("zeppbridge-dark", zeppThemeDark);
-registerTheme("zeppbridge-light", zeppThemeLight);
 
 const app = createApp(App);
 app.component("VChart", VChart);

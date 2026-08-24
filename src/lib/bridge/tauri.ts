@@ -161,6 +161,14 @@ export const tauriBackend: BridgeBackend = {
     return call<ExportResult>('save_json_export', { selection, path });
   },
 
+  saveCsvExport(selection: ExportSelection, path: string) {
+    return call<ExportResult>('save_csv_export', { selection, path });
+  },
+
+  saveGpxExport(selection: ExportSelection, path: string) {
+    return call<ExportResult>('save_gpx_export', { selection, path });
+  },
+
   publishAiExport(selection: ExportSelection) {
     return call<ExportResult>('publish_ai_export', { selection });
   },
