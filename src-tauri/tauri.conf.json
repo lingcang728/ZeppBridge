@@ -47,6 +47,9 @@
     "shortDescription": "Local-first Zepp health data bridge",
     "longDescription": "ZeppBridge is a local-first desktop companion for syncing and exploring Zepp wearable health data.",
     "copyright": "Copyright © 2026 ZeppBridge contributors",
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    },
     "windows": {
       "wix": {
         "language": "en-US"

@@ -63,22 +63,56 @@ impl CredentialBackend for WindowsCredentialBackend {
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
+#[derive(Debug, Default)]
+pub struct MacOsCredentialBackend;
+
+#[cfg(target_os = "macos")]
+impl CredentialBackend for MacOsCredentialBackend {
+    fn set(&self, user_id: &str, token: &str) -> std::result::Result<(), String> {
+        let entry = keyring::Entry::new(CREDENTIAL_SERVICE, user_id)
+            .map_err(|_| "无法打开 macOS 钥匙串条目".to_string())?;
+        entry
+            .set_password(token)
+            .map_err(|_| "无法写入 macOS 钥匙串".to_string())
+    }
+
+    fn get(&self, user_id: &str) -> std::result::Result<Option<String>, String> {
+        let entry = keyring::Entry::new(CREDENTIAL_SERVICE, user_id)
+            .map_err(|_| "无法打开 macOS 钥匙串条目".to_string())?;
+        match entry.get_password() {
+            Ok(value) => Ok(Some(value)),
+            Err(keyring::Error::NoEntry) => Ok(None),
+            Err(_) => Err("无法读取 macOS 钥匙串".to_string()),
+        }
+    }
+
+    fn delete(&self, user_id: &str) -> std::result::Result<(), String> {
+        let entry = keyring::Entry::new(CREDENTIAL_SERVICE, user_id)
+            .map_err(|_| "无法打开 macOS 钥匙串条目".to_string())?;
+        match entry.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(_) => Err("无法删除 macOS 钥匙串条目".to_string()),
+        }
+    }
+}
+
+#[cfg(all(not(windows), not(target_os = "macos")))]
 #[derive(Debug, Default)]
 struct UnavailableCredentialBackend;
 
-#[cfg(not(windows))]
+#[cfg(all(not(windows), not(target_os = "macos")))]
 impl CredentialBackend for UnavailableCredentialBackend {
     fn set(&self, _user_id: &str, _token: &str) -> std::result::Result<(), String> {
-        Err("Windows 凭据管理器仅在 Windows 上可用；测试请注入 CredentialBackend".to_string())
+        Err("凭据管理器仅在 Windows/macOS 上可用；测试请注入 CredentialBackend".to_string())
     }
 
     fn get(&self, _user_id: &str) -> std::result::Result<Option<String>, String> {
-        Err("Windows 凭据管理器仅在 Windows 上可用；测试请注入 CredentialBackend".to_string())
+        Err("凭据管理器仅在 Windows/macOS 上可用；测试请注入 CredentialBackend".to_string())
     }
 
     fn delete(&self, _user_id: &str) -> std::result::Result<(), String> {
-        Err("Windows 凭据管理器仅在 Windows 上可用；测试请注入 CredentialBackend".to_string())
+        Err("凭据管理器仅在 Windows/macOS 上可用；测试请注入 CredentialBackend".to_string())
     }
 }
 
@@ -419,7 +453,11 @@ fn default_credential_backend() -> Arc<dyn CredentialBackend> {
     {
         Arc::new(WindowsCredentialBackend)
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    {
+        Arc::new(MacOsCredentialBackend)
+    }
+    #[cfg(all(not(windows), not(target_os = "macos")))]
     {
         Arc::new(UnavailableCredentialBackend)
     }
