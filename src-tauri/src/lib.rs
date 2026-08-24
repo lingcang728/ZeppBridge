@@ -44,6 +44,7 @@ fn show_main_window(app: &AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(target_os = "windows")]
     if let Ok(data_dir) = paths::resolve_data_dir() {
         let webview_dir = paths::webview_user_data_dir(&data_dir);
         let _ = std::fs::create_dir_all(&webview_dir);

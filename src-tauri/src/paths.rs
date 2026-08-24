@@ -17,6 +17,10 @@ const LEGACY_DIRS: [&str; 2] = ["exports", "backups"];
 /// Build-cache binaries (`cargo-target`, rustc `target/`) never own user data.
 /// Those fall back to the repository `data/` folder so `tauri dev` does not
 /// drop a 1GB library into `G:\build_cache`.
+///
+/// macOS: `.app` bundles live in `/Applications`, which is not writable, so
+/// the install-local layout falls back to the user Application Support
+/// directory (`~/Library/Application Support/com.zeppbridge.ZeppBridge/data`).
 pub fn resolve_data_dir() -> io::Result<PathBuf> {
     let exe = std::env::current_exe()?;
     let exe_dir = exe.parent().ok_or_else(|| {
@@ -30,8 +34,29 @@ pub fn resolve_data_dir() -> io::Result<PathBuf> {
     } else {
         exe_dir.join("data")
     };
-    ensure_writable_dir(&data_dir)?;
-    Ok(data_dir)
+    match ensure_writable_dir(&data_dir) {
+        Ok(()) => Ok(data_dir),
+        #[cfg(target_os = "macos")]
+        Err(_) => {
+            // /Applications/ZeppBridge.app/Contents/MacOS is read-only; store
+            // user data under the user's Application Support instead.
+            let base = user_support_data_dir()?;
+            ensure_writable_dir(&base)?;
+            Ok(base)
+        }
+        #[cfg(not(target_os = "macos"))]
+        Err(error) => Err(error),
+    }
+}
+
+/// User-writable data directory for macOS: `~/Library/Application Support/
+/// com.zeppbridge.ZeppBridge/data` (same `data/` layout as the Windows
+/// install-local folder).
+#[cfg(target_os = "macos")]
+fn user_support_data_dir() -> io::Result<PathBuf> {
+    let project = directories::ProjectDirs::from("com", "zeppbridge", "ZeppBridge")
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "无法确定用户数据目录"))?;
+    Ok(project.data_dir().join("data"))
 }
 
 pub fn webview_user_data_dir(data_dir: &Path) -> PathBuf {

@@ -1630,7 +1630,7 @@ mod tests {
     }
 }
 
-/// Open the application's local data directory in Windows Explorer.
+/// Open the application's local data directory in the platform file manager.
 #[tauri::command]
 pub fn open_data_folder(state: tauri::State<'_, AppState>) -> std::result::Result<(), String> {
     #[cfg(target_os = "windows")]
@@ -1642,9 +1642,18 @@ pub fn open_data_folder(state: tauri::State<'_, AppState>) -> std::result::Resul
             .map_err(|error| format!("打开数据文件夹失败: {error}"))
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&state.data_dir)
+            .spawn()
+            .map(|_| ())
+            .map_err(|error| format!("打开数据文件夹失败: {error}"))
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     {
         let _ = state;
-        Err("打开数据文件夹仅支持 Windows".to_string())
+        Err("打开数据文件夹仅支持 Windows/macOS".to_string())
     }
 }
