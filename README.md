@@ -82,8 +82,8 @@ curl.exe "http://127.0.0.1:43921/workouts/<WORKOUT_ID>/series"
 
 **macOS（Apple Silicon）**
 
-1. 当前 Releases 暂不提供 macOS 安装包，需自行构建（见下方[从源码构建](#从源码构建)）。
-2. 构建产物为 ad-hoc 签名，首次打开会提示「无法验证开发者」。右键（或按住 Control 点按）应用 → 打开 → 再点「打开」即可；也可在终端执行 `xattr -dr com.apple.quarantine /Applications/ZeppBridge.app`。
+1. 从 v0.9.2 起，[Releases](https://github.com/lingcang728/ZeppBridge/releases) 会随版本发布 `ZeppBridge_<版本>_aarch64.dmg`；在此之前的版本需自行构建（见下方[从源码构建](#从源码构建)）。
+2. 应用为 ad-hoc 签名，没有 Apple Developer ID 也未公证，首次打开会提示「无法验证开发者」。右键（或按住 Control 点按）应用 → 打开 → 再点「打开」即可；也可在终端执行 `xattr -dr com.apple.quarantine /Applications/ZeppBridge.app`。
 3. 本地数据保留在 `~/Library/Application Support/com.zeppbridge.ZeppBridge/data`，覆盖升级不影响数据。
 
 ## 从源码构建

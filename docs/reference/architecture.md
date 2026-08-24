@@ -4,7 +4,7 @@
 
 ## 产品边界
 
-ZeppBridge 是 Windows 优先、本地存储的 Zepp 健康数据桌面应用：
+ZeppBridge 是本地存储的 Zepp 健康数据桌面应用，支持 Windows 与 macOS（Apple Silicon）；Windows 是主力验证平台，macOS 端由 CI 的 `macos-latest` job 保证编译、clippy 与测试通过：
 
 ```text
 网页登录窗口 → 会话 cookie → 区域探测 → Credential Manager
@@ -22,7 +22,7 @@ Zepp 区域云端 → ZeppConnector → Raw provenance → Normalizer → SQLite
 - 首次连接走应用内网页登录：独立 `zepp-login` 窗口打开 `watchface.zepp.com`（超时后备用 `user.huami.com`），只允许导航到 `zepp.com` / `huami.com` 的 HTTPS 页面。
 - 后端轮询登录窗口 cookie，解析 `hm-user-login-info` 或 `userid` + `apptoken`，再在允许的区域 host 上用最近心率请求验证。
 - 前端只调用 `start_web_login` / `cancel_web_login` / `get_login_status`，并监听 `login://status`。载荷为 `{ state, message, page_url }`。
-- app token 存在 Windows Credential Manager；`auth.json` 只保留非敏感元数据。
+- app token 存在平台凭据存储（Windows Credential Manager / macOS 钥匙串）；`auth.json` 只保留非敏感元数据。
 - 已保存认证在应用重启后直接恢复为「已配置」；启动后会尝试 `verify_auth`。只有明确 401/403 或 `needs_reauth` 才要求重新连接。
 - 首次/历史同步覆盖用户选择的 1–365 天（默认 30）；增量同步带 7 天重叠窗口。单例同步控制器统一顶部「立即同步」、设置页、启动同步、15 分钟自动检查、并发锁和页面刷新。
 - 同步结果区分 `updated`、`no_new_data`、`partial`、`failed`；云端拉取时间与各数据流最新样本时间分别保存和显示。本地重解析不会改变云端同步时间。
@@ -56,7 +56,8 @@ Zepp 区域云端 → ZeppConnector → Raw provenance → Normalizer → SQLite
 - 任意浏览器会话都能稳定给出可解析 cookie（需在真实账号上验证）；
 - 跑步 detail 在所有区域/固件上都能返回可解码差分串；
 - 走路、骑行等非 `type=1` 运动已有逐点采样；
-- 安装包已签名、数据库已整库加密，或已达到公开发布门槛。
+- 安装包已签名、数据库已整库加密，或已达到公开发布门槛；
+- **macOS 端已在真实设备上验收**：目前仅有 CI（`macos-latest`）的编译、clippy 与测试通过，以及贡献者本人在 M 芯片上的一次冒烟；仓库维护者没有 macOS 设备，无法独立复核同步、登录与钥匙串行为。
 
 ## 后续阶段
 
@@ -67,4 +68,5 @@ Zepp 区域云端 → ZeppConnector → Raw provenance → Normalizer → SQLite
 | 本机只读 REST（`/health`、`/workouts/{id}/series`） | 已实现 |
 | MCP | 未开始 |
 | 更多数据源 | 未开始 |
+| macOS（Apple Silicon）桌面端 | 已合入（#1）；CI 有编译/测试门禁，Release 自 v0.9.2 起提供 dmg 与 updater 产物；ad-hoc 签名，无 Apple 公证 |
 | 公开发布工程（签名、更新、SBOM、干净 VM） | 部分完成：updater 产物与 `latest.json` 已用 Tauri 密钥签名并经 GitHub Release 自动更新；安装包仍无 Authenticode 证书，也没有干净 VM 验收 |

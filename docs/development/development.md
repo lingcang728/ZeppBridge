@@ -1,12 +1,12 @@
 # ZeppBridge 开发与门禁
 
-本文面向需要修改代码、运行测试或生成 Windows 安装包的人。产品入口请先看项目 [README](../../README.md)；连接流程请看 [连接指南](../guides/connection.md)。
+本文面向需要修改代码、运行测试或生成安装包（Windows 与 macOS）的人。产品入口请先看项目 [README](../../README.md)；连接流程请看 [连接指南](../guides/connection.md)。
 
 ## 环境与目录
 
-- Windows 11（当前交付目标）
+- Windows 11（主力交付目标）或 macOS 11+（Apple Silicon）
 - Node.js 18+、npm
-- Rust 工具链（`cargo`、Windows MSVC build tools）
+- Rust 工具链（Windows 需 MSVC build tools；macOS 需 Xcode Command Line Tools）
 - 使用项目锁文件通过 `npm ci` 安装前端依赖；当前门禁不依赖 Playwright。
 
 进入仓库后先检查工具：
@@ -56,7 +56,15 @@ npm run tauri build
 
 日常只认 `release\ZeppBridge.exe`。不要跑 NSIS / MSI 往 `LocalAppData` 再装一份，否则 Windows 搜索会打开旧入口。若快捷方式被安装包改走了，跑 `npm run publish:local` 即可拨回。不要删除仅作本机缓存的 `G:\build_cache\cargo-target`。
 
-安装包当前在 `src-tauri/tauri.conf.json` 声明目标 `nsis` 和 `msi`。NSIS updater 产物与 `latest.json` 已使用 Tauri updater 密钥签名，并由 GitHub Release 提供自动更新；安装包本身仍没有受 Windows 信任的 Authenticode 证书，也没有干净 Windows VM 的验收声明。
+### macOS 构建
+
+```bash
+npm run build:mac   # scripts/macos/build-release.sh：前端 + 门禁 + tauri build（app,dmg）
+```
+
+无 `TAURI_SIGNING_PRIVATE_KEY` 时脚本自动跳过 updater 产物，便于本地验证构建。产物在 `src-tauri/target/release/bundle/`。
+
+安装包当前在 `src-tauri/tauri.conf.json` 声明目标 `nsis` 和 `msi`（macOS 侧由 `--bundles app,dmg` 指定）。NSIS updater 产物与 `latest.json` 已使用 Tauri updater 密钥签名，并由 GitHub Release 提供自动更新；安装包本身仍没有受 Windows 信任的 Authenticode 证书，也没有干净 Windows VM 的验收声明。
 
 ### Rust 检查与测试
 
