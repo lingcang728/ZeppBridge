@@ -1,10 +1,28 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import BrandMark from '../components/BrandMark.vue';
 import DesignIcon, { type DesignIconName } from '../components/DesignIcon.vue';
 import DeviceMarquee from '../components/DeviceMarquee.vue';
 
 const githubUrl = 'https://github.com/lingcang728/ZeppBridge';
 const releaseUrl = `${githubUrl}/releases/latest`;
+
+// 访客系统探测：Mac 用户默认看到 macOS 版按钮，其余一律 Windows。
+// 只做一次静态判断——探测不到就退回 Windows，绝不隐藏另一个平台的入口。
+const isMacVisitor = (): boolean => {
+  if (typeof navigator === 'undefined') return false;
+  const platform = `${navigator.platform ?? ''} ${navigator.userAgent ?? ''}`;
+  // iPadOS 会伪装成 Mac，但它同样不是 Windows，归到 macOS 一侧不影响判断。
+  return /Mac|iPad|iPhone|iPod/i.test(platform);
+};
+
+const downloads = {
+  windows: { key: 'windows', label: '下载 Windows 版', hint: 'x64 安装包 · exe / msi' },
+  macos: { key: 'macos', label: '下载 macOS 版', hint: 'Apple Silicon · dmg' },
+} as const;
+
+const primaryDownload = computed(() => (isMacVisitor() ? downloads.macos : downloads.windows));
+const secondaryDownload = computed(() => (isMacVisitor() ? downloads.windows : downloads.macos));
 
 const capabilities: Array<{ icon: DesignIconName; title: string; copy: string; tone: string }> = [
   { icon: 'heart-rate', title: '连续心率', copy: '保留时间戳与数据来源，查看真实波动。', tone: 'red' },
@@ -35,7 +53,8 @@ const authMethods: Array<{ icon: DesignIconName; title: string; copy: string; ta
           <h1>把你的 Zepp 数据，<br /><em>完整交还给你。</em></h1>
           <p class="hero-lead">ZeppBridge 在 Windows 与 macOS 本机连接、整理并可视化 Amazfit 穿戴数据。数据来源保持清晰，既能自己看，也能安全交给 AI 分析。</p>
           <div class="hero-actions">
-            <a class="primary-cta" :href="releaseUrl" target="_blank" rel="noreferrer"><DesignIcon name="app-icon" :size="34" /><span><b>下载桌面版</b><small>Windows · macOS (Apple Silicon)</small></span><DesignIcon name="chevron-right" :size="20" /></a>
+            <a class="primary-cta" :href="releaseUrl" target="_blank" rel="noreferrer"><DesignIcon name="app-icon" :size="34" /><span><b>{{ primaryDownload.label }}</b><small>{{ primaryDownload.hint }}</small></span><DesignIcon name="chevron-right" :size="20" /></a>
+            <a class="alt-cta" :href="releaseUrl" target="_blank" rel="noreferrer"><DesignIcon name="app-icon" :size="24" /><span><b>{{ secondaryDownload.label }}</b><small>{{ secondaryDownload.hint }}</small></span></a>
             <a class="secondary-cta" :href="githubUrl" target="_blank" rel="noreferrer"><DesignIcon name="document" :size="27" />查看源代码</a>
           </div>
           <div class="trust-row"><span><DesignIcon name="secure" :size="23" />本地优先</span><span><DesignIcon name="private" :size="23" />隐私安全</span><span><DesignIcon name="structured-data" :size="23" />结构化数据</span></div>
@@ -76,7 +95,7 @@ const authMethods: Array<{ icon: DesignIconName; title: string; copy: string; ta
       </section>
     </main>
 
-    <footer><a class="landing-brand" href="#top"><span><BrandMark :size="29" /></span><strong>ZeppBridge</strong></a><p>开源的 Amazfit 数据桥接工具 · Windows &amp; macOS</p><div><a :href="githubUrl" target="_blank" rel="noreferrer">GitHub</a><a :href="releaseUrl" target="_blank" rel="noreferrer">下载</a></div></footer>
+    <footer><a class="landing-brand" href="#top"><span><BrandMark :size="29" /></span><strong>ZeppBridge</strong></a><p>开源的 Amazfit 数据桥接工具 · Windows 和 Mac</p><div><a :href="githubUrl" target="_blank" rel="noreferrer">GitHub</a><a :href="releaseUrl" target="_blank" rel="noreferrer">下载</a></div></footer>
   </div>
 </template>
 
@@ -103,6 +122,11 @@ main, footer { position: relative; z-index: 1; }
 .primary-cta { gap: 10px; min-width: 258px; padding: 8px 10px 8px 8px; border: 1px solid rgba(185,220,112,.45); border-radius: 14px; background: linear-gradient(135deg, #789f39, #58772c); color: #f8faef; box-shadow: 0 14px 32px rgba(80,111,38,.2); }
 .primary-cta > span { display: grid; margin-right: auto; }
 .primary-cta b { font-size: 13px; } .primary-cta small { color: rgba(247,250,238,.68); font-size: 10px; }
+.alt-cta { display: inline-flex; gap: 9px; align-items: center; padding: 8px 14px 8px 9px; border: 1px solid var(--site-line); border-radius: 14px; background: #151915; color: #dce6cd; text-decoration: none; }
+.alt-cta > span { display: grid; }
+.alt-cta b { font-size: 12px; font-weight: 700; } .alt-cta small { color: rgba(220,230,205,.6); font-size: 10px; }
+.alt-cta:hover { transform: translateY(-2px); border-color: rgba(185,220,112,.5); }
+.alt-cta { transition: transform .2s ease, border-color .2s ease; }
 .secondary-cta { gap: 8px; padding: 12px 16px 12px 10px; border: 1px solid var(--site-line); border-radius: 14px; background: #151915; color: #dce6cd; font-size: 12px; font-weight: 700; }
 .primary-cta, .secondary-cta, .nav-github { transition: transform .2s ease, border-color .2s ease; }
 .primary-cta:hover, .secondary-cta:hover, .nav-github:hover { transform: translateY(-2px); border-color: rgba(185,220,112,.5); }
