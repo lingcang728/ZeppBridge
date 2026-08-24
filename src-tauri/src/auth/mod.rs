@@ -17,6 +17,12 @@ pub use har::extract_from_har;
 /// The single service name used for the app token in the platform credential
 /// store.  The user id is used as the credential account name so that an
 /// account switch cannot accidentally read another account's token.
+///
+/// Only the Windows backend consumes this today; the fallback backend on other
+/// platforms refuses every operation, so the constant is dead code there and
+/// `-D warnings` would fail the macOS gate.  The allow disappears on its own
+/// once another platform grows a real credential backend.
+#[cfg_attr(not(windows), allow(dead_code))]
 pub const CREDENTIAL_SERVICE: &str = "com.zeppbridge.app";
 const AUTH_FILE_VERSION: u32 = 1;
 
