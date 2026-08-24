@@ -141,13 +141,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          notes=$(git tag -l --format='%(contents:subject)' "${GITHUB_REF_NAME}")
-          if [[ -n "$notes" ]]; then
-            echo "ZEPPBRIDGE_RELEASE_NOTES=${notes}" >> "$GITHUB_ENV"
-            echo "更新说明：${notes}"
-          else
-            echo "标签没有注释消息，沿用默认说明"
+          # 浅克隆只取到 tag 指向的 commit，附注对象不在本地；不显式拉取的话
+          # `%(contents:subject)` 会静默回退成 commit 标题，把「fix(site): ...」
+          # 这种工程日志当成更新说明推给用户。
+          git fetch --force --no-tags origin \
+            "+refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
+          if [[ "$(git cat-file -t "refs/tags/${GITHUB_REF_NAME}")" != "tag" ]]; then
+            echo "::warning::${GITHUB_REF_NAME} 是轻量标签，没有注释消息；沿用默认说明"
+            exit 0
           fi
+          notes=$(git for-each-ref "refs/tags/${GITHUB_REF_NAME}" --format='%(contents:subject)')
+          if [[ -z "$notes" ]]; then
+            echo "::warning::标签注释为空，沿用默认说明"
+            exit 0
+          fi
+          echo "ZEPPBRIDGE_RELEASE_NOTES=${notes}" >> "$GITHUB_ENV"
+          echo "更新说明：${notes}"
 
       - name: Collect installers into release/
         shell: pwsh
