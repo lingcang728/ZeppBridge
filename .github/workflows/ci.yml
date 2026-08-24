@@ -134,6 +134,21 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run tauri build
 
+      # latest.json 的 notes 就是应用内更新弹窗展示给用户的说明，硬编码会
+      # 让每次发版都显示上一版的内容。发布 tag 时取该 tag 的注释首行。
+      - name: Resolve release notes from tag
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: |
+          set -euo pipefail
+          notes=$(git tag -l --format='%(contents:subject)' "${GITHUB_REF_NAME}")
+          if [[ -n "$notes" ]]; then
+            echo "ZEPPBRIDGE_RELEASE_NOTES=${notes}" >> "$GITHUB_ENV"
+            echo "更新说明：${notes}"
+          else
+            echo "标签没有注释消息，沿用默认说明"
+          fi
+
       - name: Collect installers into release/
         shell: pwsh
         run: ./scripts/windows/publish-local.ps1 -SkipShortcuts -SkipStaleInstall

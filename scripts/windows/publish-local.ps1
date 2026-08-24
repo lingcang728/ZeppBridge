@@ -324,7 +324,7 @@ if (-not $UserEntryOnly) {
     if ([string]::IsNullOrWhiteSpace($signature)) { throw 'updater 签名为空。' }
     $latest = [ordered]@{
       version = $version
-      notes = if ($env:ZEPPBRIDGE_RELEASE_NOTES) { $env:ZEPPBRIDGE_RELEASE_NOTES.Trim() } else { '新增仅限本机访问的只读 REST API，可直接读取标准化运动序列 JSON。' }
+      notes = if ($env:ZEPPBRIDGE_RELEASE_NOTES) { $env:ZEPPBRIDGE_RELEASE_NOTES.Trim() } else { '本次更新内容见 GitHub Release 页面。' }
       pub_date = (Get-Date).ToUniversalTime().ToString('o')
       size = (Get-Item -LiteralPath $nsisDest).Length
       platforms = [ordered]@{
