@@ -9,7 +9,7 @@ import { AUTO_SYNC_INTERVALS } from '../lib/autoSync';
 import { UI_SCALES, useUiScale, type UiScale } from '../composables/useUiScale';
 import { backend, toUserMessage } from '../lib/bridge';
 import { regionShortName } from '../lib/deviceCopy';
-import type { LoginStatus } from '../types';
+import type { LocalApiStatus, LoginStatus } from '../types';
 import { checkForDesktopUpdate, downloadAndInstallDesktopUpdate, updateState } from '../services/updateService';
 
 const {
@@ -52,6 +52,7 @@ const manualAuthBusy = ref(false);
 const dataBusy = ref<string | null>(null);
 const dataMessage = ref<string | null>(null);
 const dataError = ref<string | null>(null);
+const localApiStatus = ref<LocalApiStatus | null>(null);
 const deviceRefreshBusy = ref(false);
 const deviceRefreshMessage = ref<string | null>(null);
 const deviceRefreshError = ref<string | null>(null);
@@ -337,6 +338,16 @@ const openDataFolder = async () => {
   catch (error) { dataError.value = toUserMessage(error, '无法打开数据文件夹'); }
 };
 
+const copyLocalApiExample = async () => {
+  const baseUrl = localApiStatus.value?.base_url || 'http://127.0.0.1:43921';
+  try {
+    await navigator.clipboard.writeText(`curl.exe "${baseUrl}/workouts/WORKOUT_ID/series"`);
+    dataMessage.value = '本机 API 调用示例已复制。';
+  } catch {
+    dataError.value = '无法复制调用示例，请手动复制接口地址。';
+  }
+};
+
 const savePrefs = async () => {
   const retention = clampDays(Number(retentionDays.value));
   const history = clampDays(Number(historyDays.value));
@@ -386,6 +397,7 @@ const confirmHistorySync = async () => {
 
 onMounted(async () => {
   void loadDevices();
+  localApiStatus.value = await backend.getLocalApiStatus().catch(() => null);
   const status = await refreshStatus();
   retentionDays.value = status?.retention_days ?? 365;
   historyDays.value = status?.history_sync_days ?? 30;
@@ -634,11 +646,33 @@ onUnmounted(() => {
       </section>
     </div>
 
-    <!-- 7. 软件更新 -->
+    <!-- 7. 本机 API -->
+    <section class="settings-card api-card" aria-labelledby="api-title">
+      <div class="api-head">
+        <span class="api-icon"><Icon name="braces" :size="20" /></span>
+        <div>
+          <h2 id="api-title">7. 本机 REST API</h2>
+          <p>让其他本机程序直接读取已标准化的运动序列 JSON。</p>
+        </div>
+        <span :class="['api-state', { on: localApiStatus?.running }]">
+          <i aria-hidden="true"></i>{{ localApiStatus?.running ? '正在监听' : '未运行' }}
+        </span>
+      </div>
+      <div class="api-endpoint">
+        <code>{{ localApiStatus?.base_url || 'http://127.0.0.1:43921' }}/workouts/{id}/series</code>
+        <button class="button secondary" type="button" :disabled="!localApiStatus?.running" @click="copyLocalApiExample">
+          <Icon name="copy" :size="14" />复制示例
+        </button>
+      </div>
+      <p v-if="localApiStatus?.error" class="api-error" role="alert">{{ localApiStatus.error }}</p>
+      <p v-else class="api-note">仅绑定 127.0.0.1，只读且不开放浏览器跨域；退出 ZeppBridge 后停止。</p>
+    </section>
+
+    <!-- 8. 软件更新 -->
     <section class="settings-card update-card" aria-labelledby="update-title">
       <div class="update-head">
         <div>
-          <h2 id="update-title">7. 软件更新</h2>
+          <h2 id="update-title">8. 软件更新</h2>
           <p>每天最多静默检查一次，也可随时手动检查。</p>
         </div>
         <button class="button secondary" type="button" :disabled="updateBusy" @click="checkForDesktopUpdate(true)">
@@ -667,12 +701,12 @@ onUnmounted(() => {
       </div>
     </section>
 
-    <!-- 8. 自动同步 -->
+    <!-- 9. 自动同步 -->
     <section class="settings-card sync-card" aria-labelledby="sync-title">
       <div class="sync-lead">
         <span class="sync-icon"><Icon name="monitor" :size="20" /></span>
         <div>
-          <h2 id="sync-title">8. 自动同步</h2>
+          <h2 id="sync-title">9. 自动同步</h2>
           <p class="sync-desc">应用打开期间每 {{ autoSyncInterval }} 分钟自动同步云端记录<br />保持开启可获得连续的时序数据。</p>
         </div>
       </div>
@@ -777,6 +811,17 @@ h3 { margin-bottom: 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
 .page-intro, .section-description { margin-bottom: 0; color: var(--muted); font-size: 12px; }
 .section-description { margin: 12px 0 8px; }
 .settings-card { padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); min-width: 0; }
+.api-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.api-head h2 { margin-bottom: 4px; }
+.api-head p, .api-note, .api-error { margin: 0; color: var(--subtle); font-size: 11px; line-height: 1.5; }
+.api-icon { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 10px; background: var(--accent-soft); color: var(--accent); }
+.api-state { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.api-state.on { color: var(--accent); }
+.api-state i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.api-endpoint { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; margin-top: 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); }
+.api-endpoint code { overflow: hidden; color: var(--ink); font-family: var(--font-mono); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.api-note, .api-error { margin-top: 9px; }
+.api-error { color: var(--danger); }
 .update-head, .update-release, .update-confirm { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px; }
 .update-head h2 { margin-bottom: 4px; }
 .update-head p, .update-state p, .update-release p, .update-confirm p { margin: 0; color: var(--subtle); font-size: 11px; line-height: 1.5; }

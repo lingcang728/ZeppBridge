@@ -212,6 +212,13 @@ export interface WorkoutSeriesSummary {
   elevation_loss_m?: number | null;
 }
 
+export interface LocalApiStatus {
+  running: boolean;
+  base_url: string;
+  workout_series_path: string;
+  error?: string | null;
+}
+
 export type ExportDataType =
   | 'heart_rate'
   | 'sleep'

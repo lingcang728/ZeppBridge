@@ -6,6 +6,7 @@ mod decoder;
 mod device_catalog;
 mod fetcher;
 mod ipc_types;
+mod local_api;
 mod models;
 mod normalizer;
 mod paths;
@@ -65,6 +66,11 @@ pub fn run() {
             std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &webview_dir);
             let state = AppState::new(data_dir.clone())
                 .map_err(|error| anyhow::anyhow!("无法初始化应用状态: {error}"))?;
+            let local_api_status = local_api::start(data_dir.clone());
+            if let Some(error) = &local_api_status.error {
+                eprintln!("{error}");
+            }
+            app.manage(local_api_status);
             app.manage(state);
 
             // 解析器修订号变化后，后台一次性重放本地原始报文以纠正派生数据
@@ -170,6 +176,7 @@ pub fn run() {
             open_data_folder,
             updates::is_portable_update,
             updates::launch_migrated_install,
+            local_api::get_local_api_status,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|error| eprintln!("Tauri application exited with an error: {error}"));

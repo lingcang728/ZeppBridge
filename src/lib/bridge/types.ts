@@ -8,6 +8,7 @@ import type {
   HeartRatePoint,
   DailyPoint,
   LoginStatus,
+  LocalApiStatus,
   ReprocessResult,
   DeviceProfile,
   DeviceProfilesResult,
@@ -49,6 +50,7 @@ export interface BridgeBackend {
   getRecentWorkouts(limit?: number): Promise<Workout[]>;
   getWorkoutDetail(workoutId: string): Promise<Workout | null>;
   getWorkoutSeries(workoutId: string): Promise<WorkoutSeries>;
+  getLocalApiStatus(): Promise<LocalApiStatus>;
   getDeviceProfile(query?: { deviceId?: string; sourceScope?: string }): Promise<DeviceProfile>;
   getDeviceProfiles(refresh?: boolean): Promise<DeviceProfilesResult>;
 

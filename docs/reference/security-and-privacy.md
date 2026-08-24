@@ -17,6 +17,7 @@
 - HTTP client 有 30 秒 timeout，并对 401/403、404、429/5xx 与其他非 2xx 做分类和有限重试。
 - 登录窗口只允许导航到 `https://*.zepp.com` / `https://*.huami.com`（以及 `about`/`data`/`blob` 中间页）。区域探测只打 allow-list 上的 API origin。
 - 当前没有局域网 HTTP 代理，也不安装系统或用户 CA。
+- 本机 REST API 只绑定 `127.0.0.1:43921`，不监听局域网地址，不提供 CORS，只暴露只读健康探针和运动序列路由。
 
 ## 网页登录会话
 
@@ -70,13 +71,13 @@ ZeppBridge 当前没有产品遥测或使用统计上报，但同步、认证验
 - 登录窗口访问的 Zepp / Huami 官方页面；
 - 应用自身的本地 Tauri IPC。
 
-REST/MCP 尚未实现，也没有默认开启的本地 API 监听器。
+ZeppBridge 运行期间会开启只读本机 API。`GET /workouts/{id}/series` 不返回认证字段，但可能包含心率、步态和精确 GPS；电脑上的其他本机进程可访问，因此只应运行可信程序。退出托盘进程后监听器停止。MCP 尚未实现。
 
 ## 发布前余留风险
 
 - 本机安装包可用本地自签证书 `CN=ZeppBridge Local` 做 Authenticode 签名，便于识别发布者；证书链不在 Windows 受信任根里，SmartScreen 仍可能提示。这不是 EV/OV 代码签名，不能当公开发布门槛；
 - 健康 DB 默认明文；
-- 没有后台定时调度、自动更新、SBOM 或干净 VM 证据；
+- 没有系统级后台服务、SBOM 或干净 VM 证据；更新检查只在应用进程运行期间进行；
 - 没有覆盖全部区域/账号的真实登录证据；
 - 真实睡眠阶段、GPS/路线、训练详情和 HybridCharge 尚未有脱敏 fixture 验证。
 

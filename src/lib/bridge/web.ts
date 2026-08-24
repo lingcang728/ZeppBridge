@@ -29,6 +29,7 @@ export const webBackend: BridgeBackend = {
   getRecentWorkouts: unavailable,
   getWorkoutDetail: unavailable,
   getWorkoutSeries: unavailable,
+  getLocalApiStatus: unavailable,
   getDeviceProfile: unavailable,
   getDeviceProfiles: unavailable,
   reprocessLocalData: unavailable,

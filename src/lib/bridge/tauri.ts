@@ -12,6 +12,7 @@ import type {
   ExportSelection,
   HealthOverview,
   LoginStatus,
+  LocalApiStatus,
   ReprocessResult,
   SleepSession,
   SyncReport,
@@ -131,6 +132,10 @@ export const tauriBackend: BridgeBackend = {
 
   getWorkoutSeries(workoutId: string) {
     return call<WorkoutSeries>('get_workout_series', { workoutId });
+  },
+
+  getLocalApiStatus() {
+    return call<LocalApiStatus>('get_local_api_status');
   },
 
   getDeviceProfile(query?: { deviceId?: string; sourceScope?: string }) {

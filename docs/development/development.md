@@ -56,7 +56,7 @@ npm run tauri build
 
 日常只认 `release\ZeppBridge.exe`。不要跑 NSIS / MSI 往 `LocalAppData` 再装一份，否则 Windows 搜索会打开旧入口。若快捷方式被安装包改走了，跑 `npm run publish:local` 即可拨回。不要删除仅作本机缓存的 `G:\build_cache\cargo-target`。
 
-安装包当前在 `src-tauri/tauri.conf.json` 声明目标 `nsis` 和 `msi`。配置存在不等于已签名发布；当前没有签名、自动更新或干净 Windows VM 的验收声明。
+安装包当前在 `src-tauri/tauri.conf.json` 声明目标 `nsis` 和 `msi`。NSIS updater 产物与 `latest.json` 已使用 Tauri updater 密钥签名，并由 GitHub Release 提供自动更新；安装包本身仍没有受 Windows 信任的 Authenticode 证书，也没有干净 Windows VM 的验收声明。
 
 ### Rust 检查与测试
 
@@ -90,12 +90,24 @@ Tauri command 在 `src-tauri/src/lib.rs` 注册，前端封装在 `src/lib/bridg
 | `get_recent_sleep` / `get_recent_workouts` | 读取最近记录 | limit 在后端限制为 `1–500` |
 | `get_sleep_detail` / `get_workout_detail` | 按稳定 ID 读取单条详情 | 找不到返回 `null`；不生成估算字段 |
 | `get_workout_series` | 读取已解码的跑步 samples/route/pauses | 没有点则空数组，不编造 |
+| `get_local_api_status` | 读取本机 REST API 启动状态与固定地址 | 端口冲突不会阻止桌面 App 启动 |
 | `cleanup_old_data` | 按天清理旧数据 | `1–365` 天；跨 canonical 表并清理无引用 raw |
 | `open_data_folder` | 在 Windows Explorer 打开安装目录旁的 `data/` | 不再使用 `%APPDATA%` |
 
 `LoginStatus.state` 只能是：`idle`、`waiting`、`extracting`、`verifying`、`connected`、`failed`。
 
 已删除、不得再注册：`start_capture`、`get_capture_status`、`complete_capture_user_id`、`reuse_saved_auth`、`stop_capture`。
+
+## 本机 REST API
+
+桌面进程启动时由 `src-tauri/src/local_api.rs` 绑定 `127.0.0.1:43921`。当前公开两个只读 GET 路由：
+
+| 路由 | 说明 |
+| --- | --- |
+| `/health` | 服务状态和应用版本 |
+| `/workouts/{id}/series` | 复用 `Database::get_workout_series()`，返回标准化 `WorkoutSeries` JSON；未知 ID 返回 404 |
+
+API 不监听 `0.0.0.0`、不提供 CORS、响应 `Cache-Control: no-store`，也不读取或返回认证信息。端口被占用时桌面 App 继续启动，设置页通过 `get_local_api_status` 显示错误。测试必须覆盖路由、404/405、编码 ID、泛化 500 错误以及无 CORS 边界。
 
 ## 当前数据链路
 
@@ -129,7 +141,7 @@ Tauri command 在 `src-tauri/src/lib.rs` 注册，前端封装在 `src/lib/bridg
 
 ## 变更边界
 
-- REST/MCP 尚未实现；不要在文档或 UI 中把它们写成现有 command。
+- MCP 尚未实现；REST 仅限上述本机只读接口，不得扩展到局域网监听或返回凭据。
 - 不要恢复局域网 MITM、用户 CA、Wi-Fi 代理教程或 `start_capture` 一类 command。
 - 应用启动后同步一次；关闭主窗口后进程留在托盘，并每 15 分钟检查。再次启动会唤醒已有进程，不会创建第二个托盘图标。只有从托盘退出或结束进程后同步才会停止；当前没有系统级后台服务。
 - GPS/路线、逐点训练样本及未覆盖的专有指标，仍需取得合法、脱敏的真实响应后再从 `unverified` 提升。
