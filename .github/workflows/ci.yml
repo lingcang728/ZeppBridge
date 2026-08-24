@@ -60,6 +60,46 @@ jobs:
       - name: Test Rust
         run: cargo test --manifest-path src-tauri/Cargo.toml --locked --jobs 1
 
+  verify-macos:
+    name: macOS verification
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Set up Rust
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt,clippy
+          rustup default stable
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # tauri-build resolves frontendDist (../dist) at compile time, so the
+      # frontend must exist before any cargo command runs.
+      - name: Build frontend
+        run: npm run build
+
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
+
+      - name: Check Rust
+        run: cargo check --manifest-path src-tauri/Cargo.toml --locked --all-targets
+
+      - name: Lint Rust
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
+
+      - name: Test Rust
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked --jobs 1
+
   package:
     name: Package Windows installers
     runs-on: windows-latest
