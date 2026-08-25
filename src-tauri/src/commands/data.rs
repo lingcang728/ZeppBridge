@@ -4,10 +4,10 @@ use crate::device_catalog::{match_catalog, CatalogMatchInput, CatalogMatchStatus
 use crate::export_formats;
 use crate::ipc_types::CleanupResult;
 use crate::models::{
-    AiHandoffMetadata, AiHandoffResult, DailyPoint, DeviceCacheMetadata, DeviceMatchStatus,
-    DeviceProfile, DeviceProfilesResult, ExportDetail, ExportResult, ExportSelection,
-    HealthOverview, HeartRatePoint, SleepSession, StorageEstimate, UserPrefs, Workout,
-    WorkoutSeries,
+    AiHandoffMetadata, AiHandoffResult, CapabilityOverview, DailyPoint, DeviceCacheMetadata,
+    DeviceMatchStatus, DeviceProfile, DeviceProfilesResult, ExportDetail, ExportResult,
+    ExportSelection, HealthOverview, HeartRatePoint, SleepSession, StorageEstimate, UserPrefs,
+    Workout, WorkoutSeries,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -29,6 +29,19 @@ pub async fn get_health_overview(
         db.get_health_overview().map_err(|error| error.to_string())
     };
     result
+}
+
+/// What this account can actually give an AI, and what it cannot.
+///
+/// Read from stored data wherever the library already proves the answer, which
+/// is most of it; the rest comes from the last silent capability check that ran
+/// during a sync. Nothing here costs a request.
+#[tauri::command]
+pub async fn get_capability_overview(
+    state: tauri::State<'_, AppState>,
+) -> std::result::Result<CapabilityOverview, String> {
+    let db = state.db.lock().await;
+    db.capability_overview().map_err(|error| error.to_string())
 }
 
 /// Return the most recent persisted sleep sessions.

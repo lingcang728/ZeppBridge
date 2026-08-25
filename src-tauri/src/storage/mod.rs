@@ -7,7 +7,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v12";
+const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v13";
 const LAST_CLOUD_SYNC_AT_KEY: &str = "last_cloud_sync_at";
 const LAST_CLOUD_SYNC_OUTCOME_KEY: &str = "last_cloud_sync_outcome";
 const LAST_LOCAL_REPROCESS_AT_KEY: &str = "last_local_reprocess_at";
@@ -198,6 +198,208 @@ impl DailyMetricGroup {
             }
         }
         record
+    }
+}
+
+/// Where a capability's evidence lives, so the overview can count it without
+/// a network request.
+enum CapabilityEvidence {
+    /// Distinct days in `daily_metrics` whose metric matches a prefix.
+    DailyPrefix(&'static str),
+    /// Rows in `metric_samples` for one metric name.
+    Samples(&'static str),
+    /// Rows in a table with a timestamp column.
+    Table(&'static str, &'static str),
+}
+
+/// The capability list, in display order.
+///
+/// Nine of these are answered entirely from stored data — the strongest
+/// evidence available, since "you have 32 days of stress readings" beats any
+/// probe. Only the three with no local trace need a request, and those are the
+/// ones where silence is genuinely ambiguous.
+const CAPABILITY_ROWS: [(&str, CapabilityEvidence, i64); 15] = [
+    ("heart_rate", CapabilityEvidence::Samples("heart_rate"), 30),
+    (
+        "sleep",
+        CapabilityEvidence::Table("sleep_sessions", "start_time"),
+        30,
+    ),
+    (
+        "workouts",
+        CapabilityEvidence::Table("workouts", "start_time"),
+        90,
+    ),
+    ("steps", CapabilityEvidence::DailyPrefix("steps"), 30),
+    (
+        "daily_activity",
+        CapabilityEvidence::DailyPrefix("distance"),
+        30,
+    ),
+    ("stress", CapabilityEvidence::DailyPrefix("stress"), 30),
+    ("spo2", CapabilityEvidence::DailyPrefix("spo2"), 30),
+    (
+        "respiratory_rate",
+        CapabilityEvidence::DailyPrefix("respiratory"),
+        30,
+    ),
+    ("hrv", CapabilityEvidence::Samples("hrv"), 30),
+    ("hrv_rmssd", CapabilityEvidence::Samples("hrv_rmssd"), 30),
+    ("recovery", CapabilityEvidence::DailyPrefix("readiness"), 30),
+    (
+        "training_load",
+        CapabilityEvidence::DailyPrefix("training_load"),
+        30,
+    ),
+    ("vo2max", CapabilityEvidence::DailyPrefix("vo2max"), 365),
+    (
+        "lactate_threshold",
+        CapabilityEvidence::DailyPrefix("lactate_threshold"),
+        365,
+    ),
+    ("pai", CapabilityEvidence::DailyPrefix("pai"), 30),
+];
+
+/// Streams with no local trace at all. Only these cost a request.
+pub(crate) const PROBE_ONLY_CAPABILITIES: [&str; 3] = ["blood_pressure", "weight", "emotion"];
+
+const CAPABILITY_PROBE_RESULT_KEY: &str = "capability_probe_result";
+const CAPABILITY_PROBE_AT_KEY: &str = "capability_probe_at";
+
+impl Database {
+    /// Build the capability overview: read what the library already proves,
+    /// then fold in the stored result of the last probe for the rest.
+    pub fn capability_overview(&self) -> Result<CapabilityOverview> {
+        let mut items = Vec::new();
+        for (stream, evidence, window_days) in CAPABILITY_ROWS {
+            let (records, latest, unit) = match evidence {
+                CapabilityEvidence::DailyPrefix(prefix) => {
+                    let pattern = format!("{prefix}%");
+                    let row = self.conn.query_row(
+                        "SELECT COUNT(DISTINCT date), MAX(date) FROM daily_metrics
+                         WHERE metric LIKE ?1 AND date >= date('now', ?2)",
+                        params![pattern, format!("-{window_days} day")],
+                        |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Option<String>>(1)?)),
+                    )?;
+                    (row.0, row.1, "天")
+                }
+                CapabilityEvidence::Samples(metric) => {
+                    let row = self.conn.query_row(
+                        "SELECT COUNT(*), MAX(date(timestamp)) FROM metric_samples
+                         WHERE metric = ?1 AND timestamp >= datetime('now', ?2)",
+                        params![metric, format!("-{window_days} day")],
+                        |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Option<String>>(1)?)),
+                    )?;
+                    (row.0, row.1, "条")
+                }
+                CapabilityEvidence::Table(table, column) => {
+                    let sql = format!(
+                        "SELECT COUNT(*), MAX(date({column})) FROM {table}
+                         WHERE {column} >= datetime('now', ?1)"
+                    );
+                    let row = self.conn.query_row(
+                        &sql,
+                        params![format!("-{window_days} day")],
+                        |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Option<String>>(1)?)),
+                    )?;
+                    (row.0, row.1, "条")
+                }
+            };
+            items.push(CapabilityItem {
+                stream: stream.to_string(),
+                status: if records > 0 {
+                    "available"
+                } else {
+                    "no_records"
+                }
+                .to_string(),
+                records,
+                records_unit: unit.to_string(),
+                latest_date: latest,
+                note: (records == 0).then(|| format!("最近 {window_days} 天没有记录")),
+                source: "derived".to_string(),
+            });
+        }
+
+        // Streams that leave no local trace: report the last probe, or say
+        // plainly that they have not been checked yet.
+        let probed: BTreeMap<String, CapabilityProbe> = self
+            .get_app_meta(CAPABILITY_PROBE_RESULT_KEY)?
+            .and_then(|raw| serde_json::from_str::<Vec<CapabilityProbe>>(&raw).ok())
+            .unwrap_or_default()
+            .into_iter()
+            .map(|probe| (probe.stream.clone(), probe))
+            .collect();
+        for stream in PROBE_ONLY_CAPABILITIES {
+            let item = match probed.get(stream) {
+                Some(probe) if probe.status == "available" => CapabilityItem {
+                    stream: stream.to_string(),
+                    status: "available".to_string(),
+                    records: probe.records as i64,
+                    records_unit: "条".to_string(),
+                    latest_date: probe.latest_date.clone(),
+                    note: None,
+                    source: "probed".to_string(),
+                },
+                // Only an outright rejection licenses "your device does not
+                // provide this"; an empty answer does not, because this API
+                // answers that way for names that cannot exist.
+                Some(probe) if probe.status == "unavailable" => CapabilityItem {
+                    stream: stream.to_string(),
+                    status: "unsupported".to_string(),
+                    records: 0,
+                    records_unit: "条".to_string(),
+                    latest_date: None,
+                    note: Some("你的账号或设备不提供这项数据".to_string()),
+                    source: "probed".to_string(),
+                },
+                Some(_) => CapabilityItem {
+                    stream: stream.to_string(),
+                    status: "no_records".to_string(),
+                    records: 0,
+                    records_unit: "条".to_string(),
+                    latest_date: None,
+                    note: Some("过去一年没有测量记录".to_string()),
+                    source: "probed".to_string(),
+                },
+                None => CapabilityItem {
+                    stream: stream.to_string(),
+                    status: "unknown".to_string(),
+                    records: 0,
+                    records_unit: "条".to_string(),
+                    latest_date: None,
+                    note: Some("尚未检测".to_string()),
+                    source: "probed".to_string(),
+                },
+            };
+            items.push(item);
+        }
+
+        Ok(CapabilityOverview {
+            items,
+            probed_at: self.get_app_meta(CAPABILITY_PROBE_AT_KEY)?,
+        })
+    }
+
+    pub fn save_capability_probe(&self, probes: &[CapabilityProbe]) -> Result<()> {
+        let encoded = serde_json::to_string(probes)
+            .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
+        self.set_app_meta(CAPABILITY_PROBE_RESULT_KEY, &encoded)?;
+        self.set_app_meta(CAPABILITY_PROBE_AT_KEY, &Utc::now().to_rfc3339())
+    }
+
+    /// Whether the request-only streams are due a re-check.
+    ///
+    /// A first answer is not a permanent one: someone may start measuring
+    /// blood pressure, or connect a scale, long after install.
+    pub fn capability_probe_is_stale(&self, max_age_days: i64) -> Result<bool> {
+        let Some(raw) = self.get_app_meta(CAPABILITY_PROBE_AT_KEY)? else {
+            return Ok(true);
+        };
+        let Ok(probed_at) = DateTime::parse_from_rfc3339(&raw) else {
+            return Ok(true);
+        };
+        Ok((Utc::now() - probed_at.with_timezone(&Utc)).num_days() >= max_age_days)
     }
 }
 
@@ -4053,6 +4255,86 @@ mod tests {
                 .rem_minutes,
             None
         );
+    }
+
+    #[test]
+    fn capability_overview_never_calls_missing_data_unsupported() {
+        // This API answers "200 with no items" for event names that cannot
+        // exist, so an absence never proves a device lacks a sensor. Saying
+        // "your watch does not support blood pressure" to someone who simply
+        // has not measured would send them shopping for hardware they own.
+        let db = Database::in_memory().unwrap();
+        let overview = db.capability_overview().unwrap();
+        let by_stream: std::collections::BTreeMap<_, _> = overview
+            .items
+            .iter()
+            .map(|item| (item.stream.as_str(), item))
+            .collect();
+
+        // Nothing synced yet: everything is absent, and nothing is condemned.
+        assert!(overview
+            .items
+            .iter()
+            .all(|item| item.status != "unsupported"));
+        assert_eq!(by_stream["heart_rate"].status, "no_records");
+        // A stream that needs a request and has never been checked says so.
+        assert_eq!(by_stream["blood_pressure"].status, "unknown");
+        assert_eq!(by_stream["blood_pressure"].source, "probed");
+
+        db.insert_metric_sample(&MetricSample {
+            metric: "heart_rate".into(),
+            timestamp: Utc::now() - chrono::Duration::hours(2),
+            value: 60.0,
+            unit: "bpm".into(),
+            source_scope: SourceScope::Device,
+            device_id: None,
+        })
+        .unwrap();
+        let overview = db.capability_overview().unwrap();
+        let heart_rate = overview
+            .items
+            .iter()
+            .find(|item| item.stream == "heart_rate")
+            .unwrap();
+        assert_eq!(heart_rate.status, "available");
+        assert_eq!(heart_rate.records, 1);
+        // Derived from stored rows, so it cost no request.
+        assert_eq!(heart_rate.source, "derived");
+    }
+
+    #[test]
+    fn only_an_outright_rejection_licenses_unsupported() {
+        let db = Database::in_memory().unwrap();
+        let probe = |status: &str| CapabilityProbe {
+            stream: "blood_pressure".into(),
+            surface: "v2_events".into(),
+            cadence: "episodic".into(),
+            window_days: 365,
+            event_type: "blood_pressure".into(),
+            sub_type: "real_data".into(),
+            status: status.into(),
+            records: 0,
+            latest_date: None,
+            fields: Vec::new(),
+        };
+
+        db.save_capability_probe(&[probe("empty")]).unwrap();
+        let overview = db.capability_overview().unwrap();
+        let item = overview
+            .items
+            .iter()
+            .find(|item| item.stream == "blood_pressure")
+            .unwrap();
+        assert_eq!(item.status, "no_records", "an empty answer proves nothing");
+
+        db.save_capability_probe(&[probe("unavailable")]).unwrap();
+        let overview = db.capability_overview().unwrap();
+        let item = overview
+            .items
+            .iter()
+            .find(|item| item.stream == "blood_pressure")
+            .unwrap();
+        assert_eq!(item.status, "unsupported", "a rejection is evidence");
     }
 
     #[test]

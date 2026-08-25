@@ -87,7 +87,45 @@ impl SyncManager {
             database.device_time_zone().unwrap_or(None)
         }
         .unwrap_or_else(|| "UTC".to_string());
-        self.fetcher.probe_event_streams(day, &time_zone).await
+        self.fetcher
+            .probe_event_streams(day, &time_zone, None)
+            .await
+    }
+
+    /// Check only the streams that leave no local trace, and remember the answer.
+    ///
+    /// Capability is not something a person should have to ask for by pressing a
+    /// button: it is a fact about their account, learned the same way heart rate
+    /// is. Most of it comes free from stored data; this covers the remainder, at
+    /// three requests, and only once the last answer has gone stale.
+    pub async fn refresh_capabilities_if_stale(&self, max_age_days: i64) -> Result<bool> {
+        let stale = {
+            let database = self.db.lock().await;
+            database.capability_probe_is_stale(max_age_days)?
+        };
+        if !stale {
+            return Ok(false);
+        }
+        let day = (Utc::now() - Duration::days(1)).date_naive();
+        let time_zone = {
+            let database = self.db.lock().await;
+            database.device_time_zone().unwrap_or(None)
+        }
+        .unwrap_or_else(|| "UTC".to_string());
+        let probes = self
+            .fetcher
+            .probe_event_streams(
+                day,
+                &time_zone,
+                Some(&crate::storage::PROBE_ONLY_CAPABILITIES),
+            )
+            .await;
+        if probes.is_empty() {
+            return Ok(false);
+        }
+        let database = self.db.lock().await;
+        database.save_capability_probe(&probes)?;
+        Ok(true)
     }
 
     /// Compatibility command surface. A report containing failed core streams
@@ -284,6 +322,15 @@ impl SyncManager {
                 streams.push(self.unavailable_report("wellness", &error).await?)
             }
             Err(error) => streams.push(self.failure_report("wellness", &error).await?),
+        }
+
+        // Learned quietly, alongside everything else the sync brings back. A
+        // failure here must not colour the sync outcome: it is a convenience,
+        // not one of the data streams.
+        if let Err(error) = self.refresh_capabilities_if_stale(7).await {
+            if error.is_cancelled() {
+                return Err(error);
+            }
         }
 
         let core_failed = streams.iter().any(|report| {

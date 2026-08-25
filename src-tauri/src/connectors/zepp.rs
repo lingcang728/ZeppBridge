@@ -567,6 +567,34 @@ impl ZeppConnector {
         .await
     }
 
+    /// `/users/me/fileInfo/events` — an index of stored measurement files
+    /// rather than the measurements themselves.
+    ///
+    /// Dense series (per-second heart rate, and possibly the continuous blood
+    /// oxygen the app charts) are not served inline anywhere; this endpoint
+    /// lists the files that hold them. Probing it answers whether a stream
+    /// exists at all before any file is downloaded.
+    pub async fn fetch_file_info_events(
+        &self,
+        event_type: &str,
+        sub_type: &str,
+        from_ms: i64,
+        to_ms: i64,
+        limit: i64,
+    ) -> Result<Value> {
+        self.get_json(
+            "/users/me/fileInfo/events",
+            vec![
+                ("eventType", event_type.to_owned()),
+                ("subType", sub_type.to_owned()),
+                ("from", from_ms.to_string()),
+                ("to", to_ms.to_string()),
+                ("limit", limit.max(1).to_string()),
+            ],
+        )
+        .await
+    }
+
     // Backwards-compatible wrappers. They now use real endpoints and are not
     // aliases for the old fabricated `/v1/health/*` paths.
     #[allow(dead_code)]

@@ -288,6 +288,29 @@ export interface DeviceProfilesResult {
 }
 
 /**
+ * One row of the capability overview.
+ *
+ * `status` is not a boolean on purpose: the Zepp events endpoint answers
+ * "200 with no items" for names that cannot exist, so missing data never
+ * proves a device lacks a sensor. Only `unsupported` — an outright rejection —
+ * licenses saying so.
+ */
+export interface CapabilityItem {
+  stream: string;
+  status: 'available' | 'no_records' | 'unsupported' | 'unknown' | string;
+  records: number;
+  recordsUnit: string;
+  latestDate?: string | null;
+  note?: string | null;
+  source: 'derived' | 'probed' | string;
+}
+
+export interface CapabilityOverview {
+  items: CapabilityItem[];
+  probedAt?: string | null;
+}
+
+/**
  * The result of asking the server whether one candidate stream exists.
  *
  * Which Zepp event streams answer depends on the account, the devices and the

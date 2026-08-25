@@ -1424,13 +1424,31 @@ fn hrv_rmssd_samples(items: &[Value], out: &mut WellnessNormalizedData) {
     }
 }
 
-/// Each item is one reading, and the reading lives in `extra` — a JSON string,
-/// not an object. There is no `value` envelope on this stream.
+/// `blood_oxygen` is three different records under one event type, told apart
+/// by `subType`:
+///
+/// - `click` — one spot reading, in an `extra` JSON string.
+/// - `odi` — a night's oxygen-desaturation summary, flat on the item.
+/// - `osa_event` — one apnea event, with the saturation it dipped to.
+///
+/// Asking for `click` alone was what made blood oxygen look like it stopped on
+/// 2026-08-16: spot readings did stop, while the nightly summaries continued.
 fn spo2_samples(items: &[Value], out: &mut WellnessNormalizedData) {
     for item in items {
         let Some(object) = item.as_object() else {
             continue;
         };
+        match first_string(object, &["subType"]).as_deref() {
+            Some("odi") => {
+                spo2_odi_metrics(object, out);
+                continue;
+            }
+            Some("osa_event") => {
+                spo2_apnea_sample(object, out);
+                continue;
+            }
+            _ => {}
+        }
         let Some(extra) = object
             .get("extra")
             .and_then(Value::as_str)
@@ -1462,6 +1480,85 @@ fn spo2_samples(items: &[Value], out: &mut WellnessNormalizedData) {
             device_id: device_id(extra),
         });
     }
+}
+
+/// A night's oxygen-desaturation summary. `odi` is events per hour, `odiNum`
+/// the count, `score` the night's rating and `cost` how long the measurement
+/// ran. `valid` is -1 on every record ever seen, so it is a constant rather
+/// than a validity flag and is not used to gate anything.
+fn spo2_odi_metrics(object: &Map<String, Value>, out: &mut WellnessNormalizedData) {
+    let Some(date) = summary_date(object, None) else {
+        return;
+    };
+    for (metric, keys, unit, range) in [
+        ("spo2_odi", &["odi"][..], "events/h", (0.0, 100.0)),
+        ("spo2_odi_events", &["odiNum"][..], "count", (0.0, 1000.0)),
+        ("spo2_night_score", &["score"][..], "score", (0.0, 100.0)),
+    ] {
+        if let Some(value) =
+            first_number(object, keys).filter(|value| (range.0..=range.1).contains(value))
+        {
+            out.daily_metrics.push(DailyMetric {
+                date: date.clone(),
+                metric: metric.into(),
+                value,
+                unit: unit.into(),
+                source_scope: SourceScope::Device,
+                device_id: device_id(object),
+            });
+        }
+    }
+    // `cost` is the measured span in seconds; minutes are the unit every other
+    // sleep figure in this database already uses.
+    if let Some(seconds) =
+        first_number(object, &["cost"]).filter(|value| (60.0..=86_400.0).contains(value))
+    {
+        out.daily_metrics.push(DailyMetric {
+            date,
+            metric: "spo2_measured_minutes".into(),
+            value: (seconds / 60.0).round(),
+            unit: "min".into(),
+            source_scope: SourceScope::Device,
+            device_id: device_id(object),
+        });
+    }
+}
+
+/// One apnea event's saturation low point.
+///
+/// Kept as its own metric rather than folded into `spo2`: these are by
+/// definition the dips, and averaging them together with ordinary readings
+/// would report a saturation the sleeper never sustained.
+fn spo2_apnea_sample(object: &Map<String, Value>, out: &mut WellnessNormalizedData) {
+    let Some(extra) = object
+        .get("extra")
+        .and_then(Value::as_str)
+        .and_then(|text| serde_json::from_str::<Value>(text).ok())
+    else {
+        return;
+    };
+    let Some(extra) = extra.as_object() else {
+        return;
+    };
+    let Some(value) = first_number(extra, &["spo2_decrease", "spo2Decrease"])
+        .filter(|value| (50.0..=100.0).contains(value))
+    else {
+        return;
+    };
+    let Some(timestamp) = first_number(extra, &["timestamp"])
+        .or_else(|| first_number(object, &["timestamp"]))
+        .and_then(|millis| DateTime::from_timestamp_millis(millis.round() as i64))
+    else {
+        return;
+    };
+    out.metric_samples.push(MetricSample {
+        metric: "spo2_apnea_low".into(),
+        timestamp,
+        value,
+        unit: "%".into(),
+        source_scope: SourceScope::Device,
+        device_id: device_id(extra),
+    });
 }
 
 /// PAI items are flat — no `value` envelope. Alongside the score they carry the

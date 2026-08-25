@@ -603,6 +603,8 @@ enum ProbeSurface {
     UserEvents,
     /// `/users/{id}/events/dateString`, ISO-8601 window plus IANA timezone.
     UserEventsDay,
+    /// `/users/me/fileInfo/events` — an index of stored measurement files.
+    FileInfoEvents,
 }
 
 impl ProbeSurface {
@@ -611,6 +613,7 @@ impl ProbeSurface {
             ProbeSurface::V2Events => "v2_events",
             ProbeSurface::UserEvents => "user_events",
             ProbeSurface::UserEventsDay => "user_events_day",
+            ProbeSurface::FileInfoEvents => "file_info_events",
         }
     }
 }
@@ -654,7 +657,7 @@ impl ProbeCadence {
 /// `skinTemp/real_data` and `blood_pressure/real_data`. This table is
 /// transcribed from two independent open-source clients that talk to the same
 /// API — m4ary/zepp-health-cli and Thejuampi/icu — which agree on every entry.
-const CAPABILITY_PROBES: [(&str, ProbeSurface, &str, Option<&str>, ProbeCadence); 16] = [
+const CAPABILITY_PROBES: [(&str, ProbeSurface, &str, Option<&str>, ProbeCadence); 19] = [
     // Controls. The positive one proves the probe itself works; the negative
     // one tells us whether an empty answer carries any information at all.
     (
@@ -692,6 +695,30 @@ const CAPABILITY_PROBES: [(&str, ProbeSurface, &str, Option<&str>, ProbeCadence)
         ProbeSurface::UserEvents,
         "blood_oxygen",
         None,
+        ProbeCadence::Continuous,
+    ),
+    // Where the per-reading series might live now that spot readings have
+    // gone quiet: this endpoint indexes stored measurement files rather than
+    // serving samples inline.
+    (
+        "spo2_files",
+        ProbeSurface::FileInfoEvents,
+        "blood_oxygen",
+        Some("real_data"),
+        ProbeCadence::Continuous,
+    ),
+    (
+        "spo2_files",
+        ProbeSurface::FileInfoEvents,
+        "spo2",
+        Some("real_data"),
+        ProbeCadence::Continuous,
+    ),
+    (
+        "second_heart_rate",
+        ProbeSurface::FileInfoEvents,
+        "second_heart_rate",
+        Some("real_data"),
         ProbeCadence::Continuous,
     ),
     (
@@ -886,13 +913,23 @@ impl DataFetcher {
     /// about *this* account and *these* devices. A stream that answers with no
     /// items is a different fact from one that 404s, and both are different
     /// from a stream ZeppBridge has not implemented.
+    /// `only` narrows the run to named streams. The silent check that runs
+    /// during a sync uses it: nine of the twelve capabilities are already
+    /// answered by stored data, so asking the server about them would spend
+    /// requests to learn something the database already knows.
     pub async fn probe_event_streams(
         &self,
         day: NaiveDate,
         time_zone: &str,
+        only: Option<&[&str]>,
     ) -> Vec<CapabilityProbe> {
         let mut results = Vec::new();
         for (stream, surface, event_type, sub_type, cadence) in CAPABILITY_PROBES {
+            if let Some(only) = only {
+                if !only.contains(&stream) {
+                    continue;
+                }
+            }
             let Some(start) = (day - Duration::days(cadence.days() - 1)).and_hms_opt(0, 0, 0)
             else {
                 continue;
@@ -929,6 +966,17 @@ impl DataFetcher {
                             &start.and_utc().to_rfc3339(),
                             &end.and_utc().to_rfc3339(),
                             time_zone,
+                            50,
+                        )
+                        .await
+                }
+                ProbeSurface::FileInfoEvents => {
+                    self.connector
+                        .fetch_file_info_events(
+                            event_type,
+                            sub_type.unwrap_or("real_data"),
+                            from,
+                            to,
                             50,
                         )
                         .await
@@ -1112,6 +1160,17 @@ impl DataFetcher {
                                 &slice.end_utc.to_rfc3339(),
                                 time_zone,
                                 999,
+                            )
+                            .await
+                    }
+                    ProbeSurface::FileInfoEvents => {
+                        self.connector
+                            .fetch_file_info_events(
+                                event_type,
+                                sub_type.unwrap_or("real_data"),
+                                from,
+                                to,
+                                1000,
                             )
                             .await
                     }

@@ -334,6 +334,44 @@ pub struct HealthOverview {
     pub source_scope: Option<String>,
 }
 
+/// One row of the capability overview shown in settings.
+///
+/// `status` is deliberately not a boolean. This API answers "200 with no
+/// items" for event names that cannot possibly exist, so an absence of data
+/// never proves a device lacks a sensor — only an outright rejection does.
+/// Telling someone their watch does not support blood pressure when they have
+/// simply never measured would send them shopping for hardware they own.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CapabilityItem {
+    /// Stable key the UI maps to a label.
+    pub stream: String,
+    /// `available` — data is on disk.
+    /// `no_records` — nothing measured in the window; cause unknown.
+    /// `unsupported` — the server rejected the request outright.
+    /// `unknown` — never checked.
+    pub status: String,
+    /// How many rows back this up, when there are any.
+    pub records: i64,
+    /// Unit for `records`, e.g. `天` or `条`.
+    pub records_unit: String,
+    /// Newest calendar date behind this capability.
+    pub latest_date: Option<String>,
+    /// One plain sentence about the data — never a claim about the hardware
+    /// unless the server actually rejected the stream.
+    pub note: Option<String>,
+    /// `derived` when read from stored data, `probed` when it took a request.
+    pub source: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CapabilityOverview {
+    pub items: Vec<CapabilityItem>,
+    /// When the streams that needed a request were last checked.
+    pub probed_at: Option<String>,
+}
+
 /// The result of asking the server whether one candidate stream exists.
 ///
 /// Zepp's mobile event endpoint has no discovery call, and which streams
