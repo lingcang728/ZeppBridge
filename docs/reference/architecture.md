@@ -1,6 +1,6 @@
 # ZeppBridge 架构摘要
 
-本文描述 v0.4.0 的产品边界与当前实现。使用入口见项目 [README](../../README.md)，工程门禁见 [开发文档](../development/development.md)。
+本文描述 v0.10.0 的产品边界与当前实现。使用入口见项目 [README](../../README.md)，工程门禁见 [开发文档](../development/development.md)。
 
 ## 产品边界
 
