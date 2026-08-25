@@ -1,7 +1,7 @@
 use crate::fetcher::{DataFetcher, FetchWindow, FetchedRecord};
 use crate::models::{error::*, *};
 use crate::storage::Database;
-use chrono::Utc;
+use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -69,6 +69,25 @@ impl SyncManager {
 
     pub fn request_cancel(&self) {
         self.cancel.store(true, Ordering::SeqCst);
+    }
+
+    /// Ask the server which optional event streams this account and these
+    /// devices actually expose.
+    ///
+    /// Read-only by construction: results are returned to the caller and never
+    /// persisted, so a probe cannot pollute the library with guesses. The day
+    /// probed is yesterday, which is the most recent day a watch has certainly
+    /// finished syncing.
+    pub async fn probe_capabilities(&self) -> Vec<CapabilityProbe> {
+        let day = (Utc::now() - Duration::days(1)).date_naive();
+        // The dateString surface wants an IANA zone name; the devices already
+        // told us theirs, so ask them rather than assuming UTC.
+        let time_zone = {
+            let database = self.db.lock().await;
+            database.device_time_zone().unwrap_or(None)
+        }
+        .unwrap_or_else(|| "UTC".to_string());
+        self.fetcher.probe_event_streams(day, &time_zone).await
     }
 
     /// Compatibility command surface. A report containing failed core streams
@@ -177,21 +196,21 @@ impl SyncManager {
             Ok(())
         };
 
-        emit("heart_rate", 1, 6, "正在同步心率");
+        emit("heart_rate", 1, 7, "正在同步心率");
         check()?;
         match self.fetcher.fetch_heart_rate_records(window).await {
             Ok(records) => streams.push(self.persist_records("heart_rate", records).await?),
             Err(error) if error.is_cancelled() => return Err(error),
             Err(error) => streams.push(self.failure_report("heart_rate", &error).await?),
         }
-        emit("daily_summary", 2, 6, "正在同步每日概览");
+        emit("daily_summary", 2, 7, "正在同步每日概览");
         check()?;
         match self.fetcher.fetch_daily_statistics_records(window).await {
             Ok(records) => streams.push(self.persist_records("daily_summary", records).await?),
             Err(error) if error.is_cancelled() => return Err(error),
             Err(error) => streams.push(self.failure_report("daily_summary", &error).await?),
         }
-        emit("workouts", 3, 6, "正在同步运动");
+        emit("workouts", 3, 7, "正在同步运动");
         check()?;
         match self.fetcher.fetch_workout_records(window).await {
             Ok(records) => streams.push(self.persist_records("workouts", records).await?),
@@ -201,7 +220,7 @@ impl SyncManager {
             }
             Err(error) => streams.push(self.failure_report("workouts", &error).await?),
         }
-        emit("workout_detail", 4, 6, "正在同步跑步明细");
+        emit("workout_detail", 4, 7, "正在同步跑步明细");
         check()?;
         match self.fetch_pending_running_details().await {
             Ok(records) if records.is_empty() => {
@@ -225,7 +244,7 @@ impl SyncManager {
 
         // Optional streams are retained and reported, never promoted to a
         // verified empty success.
-        emit("sleep", 5, 6, "正在同步睡眠");
+        emit("sleep", 5, 7, "正在同步睡眠");
         check()?;
         match self.fetcher.fetch_sleep_records(window).await {
             Ok(records) => streams.push(self.persist_records("sleep", records).await?),
@@ -235,7 +254,7 @@ impl SyncManager {
             }
             Err(error) => streams.push(self.failure_report("sleep", &error).await?),
         }
-        emit("hrv", 6, 6, "正在同步心率变异性");
+        emit("hrv", 6, 7, "正在同步心率变异性");
         check()?;
         match self.fetcher.fetch_hrv_records(window).await {
             Ok(records) => streams.push(self.persist_records("hrv", records).await?),
@@ -244,6 +263,27 @@ impl SyncManager {
                 streams.push(self.unavailable_report("hrv", &error).await?)
             }
             Err(error) => streams.push(self.failure_report("hrv", &error).await?),
+        }
+        emit("wellness", 7, 7, "正在同步压力、血氧等可选指标");
+        check()?;
+        // The dateString surface needs an IANA zone name, and the devices
+        // already told us theirs.
+        let wellness_time_zone = {
+            let database = self.db.lock().await;
+            database.device_time_zone().unwrap_or(None)
+        }
+        .unwrap_or_else(|| "UTC".to_string());
+        match self
+            .fetcher
+            .fetch_wellness_records(window, &wellness_time_zone)
+            .await
+        {
+            Ok(records) => streams.push(self.persist_records("wellness", records).await?),
+            Err(error) if error.is_cancelled() => return Err(error),
+            Err(error) if error.is_unavailable() => {
+                streams.push(self.unavailable_report("wellness", &error).await?)
+            }
+            Err(error) => streams.push(self.failure_report("wellness", &error).await?),
         }
 
         let core_failed = streams.iter().any(|report| {

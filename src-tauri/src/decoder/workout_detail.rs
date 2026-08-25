@@ -10,7 +10,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 const COORD_FACTOR: f64 = 100_000_000.0;
-const INVALID_ALTITUDE_CM: i64 = -2_000_000;
+/// Zepp marks "no altitude fix" with a large negative sentinel, but real
+/// payloads do not use one constant: observed leading values include
+/// -2000000, -2002110 and -2003943. An equality test against -2000000 lets the
+/// variants through and they land as ~-20000 m samples, so the guard is a
+/// plausibility window instead. Bounds are deliberately generous (-1000 m ..
+/// 10000 m) so genuine terrain is never discarded.
+const MIN_PLAUSIBLE_ALTITUDE_CM: i64 = -100_000;
+const MAX_PLAUSIBLE_ALTITUDE_CM: i64 = 1_000_000;
 const MAX_ACTIVITY_SECONDS: i64 = 12 * 60 * 60;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -39,6 +46,175 @@ pub struct PauseInterval {
     pub kind: String,
 }
 
+/// One kilometre of a workout, measured rather than estimated.
+///
+/// Splits come from the server's own cumulative distance series. Integrating
+/// the per-second speed instead lands within 0.15% on a run but 12.6% out on a
+/// ride, so the speed series is not a substitute.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct WorkoutSplit {
+    /// 1-based kilometre number.
+    pub index: i32,
+    pub start_time: DateTime<Utc>,
+    pub end_time: DateTime<Utc>,
+    pub distance_m: f64,
+    pub duration_seconds: i64,
+    /// Minutes per kilometre; `None` when the split covered no distance.
+    pub pace_min_per_km: Option<f64>,
+    pub avg_hr: Option<i32>,
+    pub max_hr: Option<i32>,
+    pub elevation_gain_m: Option<f64>,
+    pub elevation_loss_m: Option<f64>,
+    /// True for a trailing partial kilometre, so an 800 m remainder is never
+    /// read as a slow full kilometre.
+    pub partial: bool,
+}
+
+/// Altitude has to move by at least this much before it counts as climbing.
+/// Barometric drift of a few centimetres per second would otherwise accumulate
+/// into hundreds of metres of imaginary ascent over an hour.
+const ELEVATION_NOISE_FLOOR_M: f64 = 1.0;
+
+/// Accumulator for the split currently being filled.
+#[derive(Debug)]
+struct SplitBuilder {
+    index: i32,
+    start_time: DateTime<Utc>,
+    start_distance_m: f64,
+    hr_sum: i64,
+    hr_count: i64,
+    max_hr: Option<i32>,
+    committed_altitude: Option<f64>,
+    gain: f64,
+    loss: f64,
+    saw_altitude: bool,
+}
+
+impl SplitBuilder {
+    fn new(index: i32, start_time: DateTime<Utc>, start_distance_m: f64) -> Self {
+        Self {
+            index,
+            start_time,
+            start_distance_m,
+            hr_sum: 0,
+            hr_count: 0,
+            max_hr: None,
+            committed_altitude: None,
+            gain: 0.0,
+            loss: 0.0,
+            saw_altitude: false,
+        }
+    }
+
+    fn observe(&mut self, sample: &WorkoutSample) {
+        if let Some(heart_rate) = sample.heart_rate {
+            self.hr_sum += i64::from(heart_rate);
+            self.hr_count += 1;
+            self.max_hr = Some(self.max_hr.map_or(heart_rate, |best| best.max(heart_rate)));
+        }
+        if let Some(altitude) = sample.altitude_m {
+            self.saw_altitude = true;
+            match self.committed_altitude {
+                None => self.committed_altitude = Some(altitude),
+                Some(previous) => {
+                    let change = altitude - previous;
+                    if change >= ELEVATION_NOISE_FLOOR_M {
+                        self.gain += change;
+                        self.committed_altitude = Some(altitude);
+                    } else if change <= -ELEVATION_NOISE_FLOOR_M {
+                        self.loss += -change;
+                        self.committed_altitude = Some(altitude);
+                    }
+                }
+            }
+        }
+    }
+
+    fn finish(self, end_time: DateTime<Utc>, end_distance_m: f64, partial: bool) -> WorkoutSplit {
+        let distance_m = (end_distance_m - self.start_distance_m).max(0.0);
+        let duration_seconds = (end_time - self.start_time).num_seconds().max(0);
+        let pace_min_per_km = (distance_m > 0.0 && duration_seconds > 0)
+            .then(|| (duration_seconds as f64 / 60.0) / (distance_m / 1000.0));
+        WorkoutSplit {
+            index: self.index,
+            start_time: self.start_time,
+            end_time,
+            distance_m,
+            duration_seconds,
+            pace_min_per_km,
+            avg_hr: (self.hr_count > 0).then(|| (self.hr_sum / self.hr_count) as i32),
+            max_hr: self.max_hr,
+            // A workout with no altitude readings reports nothing rather than a
+            // confident zero.
+            elevation_gain_m: self.saw_altitude.then_some(self.gain),
+            elevation_loss_m: self.saw_altitude.then_some(self.loss),
+            partial,
+        }
+    }
+}
+
+/// Cut a workout into kilometres along the server's cumulative distance.
+///
+/// The distance series drives the walk, not the sample series: a workout's
+/// distance readings can run past its last per-second sample, and driving from
+/// the samples silently dropped that tail — a 578 m walk came out 1.75% short.
+/// Samples are folded in for heart rate and altitude wherever they line up.
+fn compute_splits(
+    samples: &[WorkoutSample],
+    distance_by_second: &std::collections::BTreeMap<i64, f64>,
+) -> Vec<WorkoutSplit> {
+    let Some((&first_ts, _)) = distance_by_second.iter().next() else {
+        return Vec::new();
+    };
+    let Some(first_time) = Utc.timestamp_opt(first_ts, 0).single() else {
+        return Vec::new();
+    };
+    let sample_by_second: std::collections::BTreeMap<i64, &WorkoutSample> = samples
+        .iter()
+        .map(|sample| (sample.timestamp.timestamp(), sample))
+        .collect();
+
+    let mut splits = Vec::new();
+    let mut boundary = 1000.0f64;
+    let mut builder = SplitBuilder::new(1, first_time, 0.0);
+    let mut previous_ts: Option<i64> = None;
+    let mut travelled = 0.0f64;
+    let mut last_time = first_time;
+
+    for (&unix_ts, distance) in distance_by_second {
+        let Some(moment) = Utc.timestamp_opt(unix_ts, 0).single() else {
+            continue;
+        };
+        // Every sample since the previous distance reading belongs to this
+        // split, so a distance series coarser than one second still averages
+        // heart rate over the whole kilometre.
+        let lower = previous_ts.map_or(unix_ts, |previous| previous + 1);
+        for sample in sample_by_second
+            .range(lower..=unix_ts)
+            .map(|(_, item)| *item)
+        {
+            builder.observe(sample);
+        }
+        previous_ts = Some(unix_ts);
+        travelled = *distance;
+        last_time = moment;
+
+        // A single reading can only span more than one boundary in corrupt
+        // data; looping keeps the indices contiguous if it ever happens.
+        while travelled >= boundary {
+            let index = builder.index;
+            splits.push(builder.finish(moment, boundary, false));
+            builder = SplitBuilder::new(index + 1, moment, boundary);
+            boundary += 1000.0;
+        }
+    }
+
+    if travelled > builder.start_distance_m {
+        splits.push(builder.finish(last_time, travelled, true));
+    }
+    splits
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct DecodedWorkout {
     pub track_id: i64,
@@ -48,6 +224,7 @@ pub struct DecodedWorkout {
     pub route: Vec<RoutePoint>,
     pub samples: Vec<WorkoutSample>,
     pub pauses: Vec<PauseInterval>,
+    pub splits: Vec<WorkoutSplit>,
 }
 
 pub fn decode_workout_detail(
@@ -96,6 +273,13 @@ pub fn decode_workout_detail(
 
     let (latitudes, longitudes) = parse_coordinate_deltas(data.get("longitude_latitude"));
     let altitudes_cm = parse_altitude_cm(data.get("altitude"));
+    // `time_delta_altitude` carries its own `(dt, altitude_cm)` cursor, so it
+    // is not tied to GPS fixes and, unlike `altitude`, carries no leading
+    // sentinel. Prefer it and keep the index-aligned list as the fallback.
+    let altitude_pairs = parse_delta_pairs(data.get("time_delta_altitude"), true);
+    // `currentDistance` is `(dt, cumulative centimetres)`. Verified against a
+    // 15 km run: its final value, 1521722 cm, matches the summary's 15217 m.
+    let distance_pairs = parse_delta_pairs(data.get("currentDistance"), true);
     let hr_pairs = parse_delta_pairs(data.get("heart_rate"), true);
     let speed_pairs = parse_float_pairs(data.get("speed"));
     let gait = parse_gait(data.get("gait"));
@@ -130,6 +314,16 @@ pub fn decode_workout_detail(
     let mut route = Vec::new();
     let mut altitude_by_second: std::collections::BTreeMap<i64, f64> =
         std::collections::BTreeMap::new();
+    let has_pair_altitude = !altitude_pairs.is_empty();
+    if has_pair_altitude {
+        let mut cursor = from;
+        for (delta, centimetres) in &altitude_pairs {
+            cursor += (*delta).max(0);
+            if let Some(meters) = cm_to_meters(i64::from(*centimetres)) {
+                altitude_by_second.insert(cursor, meters);
+            }
+        }
+    }
     if !time_deltas.is_empty() && !latitudes.is_empty() && !longitudes.is_empty() {
         let mut unix_ts = from;
         let mut latitude = 0i64;
@@ -140,10 +334,15 @@ pub fn decode_workout_detail(
             if let (Some(lat_delta), Some(lon_delta)) = (latitudes[index], longitudes[index]) {
                 latitude += lat_delta;
                 longitude += lon_delta;
-                let altitude_m = altitudes_cm.get(index).copied().and_then(cm_to_meters);
-                if let Some(meters) = altitude_m {
-                    altitude_by_second.insert(unix_ts, meters);
-                }
+                let altitude_m = if has_pair_altitude {
+                    altitude_by_second.get(&unix_ts).copied()
+                } else {
+                    let meters = altitudes_cm.get(index).copied().and_then(cm_to_meters);
+                    if let Some(meters) = meters {
+                        altitude_by_second.insert(unix_ts, meters);
+                    }
+                    meters
+                };
                 if let Some(timestamp) = Utc.timestamp_opt(unix_ts, 0).single() {
                     route.push(RoutePoint {
                         timestamp,
@@ -182,6 +381,17 @@ pub fn decode_workout_detail(
         });
     }
 
+    let mut distance_by_second: std::collections::BTreeMap<i64, f64> =
+        std::collections::BTreeMap::new();
+    {
+        let mut cursor = from;
+        for (delta, centimetres) in &distance_pairs {
+            cursor += (*delta).max(0);
+            distance_by_second.insert(cursor, f64::from(*centimetres) / 100.0);
+        }
+    }
+    let splits = compute_splits(&samples, &distance_by_second);
+
     Ok(DecodedWorkout {
         track_id,
         source,
@@ -190,6 +400,7 @@ pub fn decode_workout_detail(
         route,
         samples,
         pauses,
+        splits,
     })
 }
 
@@ -243,7 +454,7 @@ fn parse_altitude_cm(value: Option<&Value>) -> Vec<i64> {
         .collect::<Vec<_>>();
     if let Some(first_valid) = values
         .iter()
-        .position(|value| *value != INVALID_ALTITUDE_CM)
+        .position(|value| is_plausible_altitude_cm(*value))
     {
         let fill = values[first_valid];
         for item in values.iter_mut().take(first_valid) {
@@ -253,12 +464,12 @@ fn parse_altitude_cm(value: Option<&Value>) -> Vec<i64> {
     values
 }
 
+fn is_plausible_altitude_cm(cm: i64) -> bool {
+    (MIN_PLAUSIBLE_ALTITUDE_CM..=MAX_PLAUSIBLE_ALTITUDE_CM).contains(&cm)
+}
+
 fn cm_to_meters(cm: i64) -> Option<f64> {
-    if cm == INVALID_ALTITUDE_CM {
-        None
-    } else {
-        Some(cm as f64 / 100.0)
-    }
+    is_plausible_altitude_cm(cm).then(|| cm as f64 / 100.0)
 }
 
 fn parse_delta_pairs(value: Option<&Value>, empty_delta_is_one: bool) -> Vec<(i64, i32)> {
@@ -461,6 +672,96 @@ mod tests {
             .samples
             .iter()
             .any(|sample| sample.stride_cm == Some(71.0)));
+    }
+
+    #[test]
+    fn altitude_sentinel_variants_are_never_terrain() {
+        // Real payloads lead with -2000000 *plus a tail* (-2002110, -2003943
+        // observed). An equality guard let those through as ~-20000 m samples.
+        for sentinel in ["-2000000", "-2002110", "-2003943"] {
+            let raw = json!({
+                "trackid": 1_700_000_000i64,
+                "time": "0;1;1;",
+                "longitude_latitude": "4004663552,11629333504;1,1;1,1;",
+                "altitude": format!("{sentinel};1451;1448;"),
+            });
+            let decoded = decode_workout_detail(&raw, None).unwrap();
+            // The leading sentinel is backfilled from the first plausible
+            // reading, never divided by 100 into terrain.
+            assert_eq!(decoded.route[0].altitude_m, Some(14.51), "{sentinel}");
+            assert!(
+                decoded
+                    .samples
+                    .iter()
+                    .filter_map(|sample| sample.altitude_m)
+                    .all(|meters| (-1000.0..=10000.0).contains(&meters)),
+                "{sentinel} leaked an implausible altitude"
+            );
+        }
+    }
+
+    #[test]
+    fn time_delta_altitude_wins_over_the_index_aligned_list() {
+        let raw = json!({
+            "trackid": 1_700_000_000i64,
+            "time": "0;1;1;",
+            "longitude_latitude": "4004663552,11629333504;1,1;1,1;",
+            "altitude": "-2002110;9900;9900;",
+            "time_delta_altitude": "1,3516;1,3518;1,3521;",
+        });
+        let decoded = decode_workout_detail(&raw, None).unwrap();
+        let altitudes: Vec<Option<f64>> =
+            decoded.route.iter().map(|point| point.altitude_m).collect();
+        assert!(
+            altitudes.contains(&Some(35.16)) || altitudes.contains(&Some(35.18)),
+            "expected the pair series to supply altitude, got {altitudes:?}"
+        );
+        assert!(!altitudes.contains(&Some(99.0)));
+    }
+
+    #[test]
+    fn splits_come_from_the_servers_cumulative_distance() {
+        // Integrating the per-second speed instead is 0.15% out on a run but
+        // 12.6% out on a ride, so splits must read `currentDistance`.
+        let raw = json!({
+            "trackid": 1_700_000_000i64,
+            "time": "0;1;1;1;1;",
+            "currentDistance": "0,0;1,40000;1,100000;1,160000;1,240000;",
+            "heart_rate": "0,150;1,10;1,0;1,-10;1,0;",
+            "time_delta_altitude": "1,1000;1,1200;1,1100;1,1300;",
+        });
+        let decoded = decode_workout_detail(&raw, None).unwrap();
+        let splits = &decoded.splits;
+        assert_eq!(splits.len(), 3, "two full kilometres and a remainder");
+        assert_eq!(splits[0].index, 1);
+        assert_eq!(splits[1].index, 2);
+        assert!(!splits[0].partial);
+        assert!(!splits[1].partial);
+        assert_eq!(splits[0].distance_m, 1000.0);
+        assert_eq!(splits[1].distance_m, 1000.0);
+
+        // The trailing 400 m is flagged, so it is never read as a slow
+        // kilometre.
+        assert!(splits[2].partial);
+        assert_eq!(splits[2].distance_m, 400.0);
+
+        // Pace is only defined where distance and time both moved.
+        assert!(splits[0].pace_min_per_km.unwrap() > 0.0);
+        assert!(splits[0].avg_hr.is_some());
+        assert!(splits[0].max_hr.unwrap() >= splits[0].avg_hr.unwrap());
+    }
+
+    #[test]
+    fn a_workout_without_distance_reports_no_splits() {
+        // Silence is the honest answer: an indoor session with no distance
+        // series must not get kilometres invented for it.
+        let raw = json!({
+            "trackid": 1_700_000_100i64,
+            "time": "1;1;1;",
+            "heart_rate": "1,120;1,2;1,1;"
+        });
+        let decoded = decode_workout_detail(&raw, None).unwrap();
+        assert!(decoded.splits.is_empty());
     }
 
     #[test]

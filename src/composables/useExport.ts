@@ -2,20 +2,51 @@ import { ref } from 'vue';
 import { save as showSaveDialog } from '@tauri-apps/plugin-dialog';
 import { tauriApi, toUserMessage } from './useTauriApi';
 import { localDateString } from '../lib/format';
-import type { ExportDataType, ExportResult, ExportSelection } from '../types';
+import type {
+  ExportDataType,
+  ExportDetail,
+  ExportResult,
+  ExportSelection,
+  ExportTypeGroup,
+} from '../types';
 
 export type SaveFormat = 'json' | 'csv' | 'gpx';
 
-export const exportTypeOptions: { value: ExportDataType; label: string }[] = [
-  { value: 'heart_rate', label: '心率' },
-  { value: 'sleep', label: '睡眠' },
-  { value: 'workouts', label: '运动' },
-  { value: 'steps', label: '步数' },
-  { value: 'spo2', label: '血氧' },
-  { value: 'stress', label: '压力' },
-  { value: 'hrv', label: 'HRV' },
-  { value: 'training_load', label: '训练负荷' },
-  { value: 'vo2max', label: 'VO₂max' },
+/**
+ * The export picker grew from five entries to fifteen; a flat checkbox list of
+ * that length is hard to scan, so each type declares the section it belongs to.
+ */
+export const exportTypeOptions: {
+  value: ExportDataType;
+  label: string;
+  group: ExportTypeGroup;
+}[] = [
+  { value: 'steps', label: '步数', group: '活动' },
+  { value: 'daily_activity', label: '日常活动', group: '活动' },
+  { value: 'workouts', label: '运动', group: '活动' },
+  { value: 'sleep', label: '睡眠', group: '睡眠' },
+  { value: 'heart_rate', label: '心率', group: '身体状态' },
+  { value: 'hrv', label: 'HRV (SDNN)', group: '身体状态' },
+  { value: 'hrv_rmssd', label: 'HRV (RMSSD)', group: '身体状态' },
+  { value: 'spo2', label: '血氧', group: '身体状态' },
+  { value: 'stress', label: '压力', group: '身体状态' },
+  { value: 'respiratory_rate', label: '呼吸率', group: '身体状态' },
+  { value: 'recovery', label: '恢复状态', group: '身体状态' },
+  { value: 'training_load', label: '训练负荷', group: '训练' },
+  { value: 'vo2max', label: 'VO₂max', group: '训练' },
+  { value: 'lactate_threshold', label: '乳酸阈值', group: '训练' },
+  { value: 'pai', label: 'PAI 活力指数', group: '训练' },
+];
+
+export const exportTypeGroups: ExportTypeGroup[] = ['活动', '睡眠', '身体状态', '训练'];
+
+export const exportDetailOptions: { value: ExportDetail; label: string; hint: string }[] = [
+  {
+    value: 'summary',
+    label: '摘要',
+    hint: '心率按小时聚合，省略逐秒运动序列；结构化指标完整，体积适合交给 AI',
+  },
+  { value: 'full', label: '完整', hint: '保留逐秒运动序列与逐条心率，体积大，适合归档' },
 ];
 
 const rangeFromToday = (days: number): { start: string; end: string } => {
@@ -34,8 +65,10 @@ export const useExport = () => {
     'sleep',
     'workouts',
     'steps',
-    'spo2',
+    'daily_activity',
+    'recovery',
   ]);
+  const exportDetail = ref<ExportDetail>('summary');
   const exportBusy = ref<'copy' | 'save' | 'publish' | null>(null);
   const exportError = ref<string | null>(null);
   const exportMessage = ref<string | null>(null);
@@ -62,6 +95,7 @@ export const useExport = () => {
       startDate: exportStartDate.value,
       endDate: exportEndDate.value,
       dataTypes: [...exportDataTypes.value],
+      detail: exportDetail.value,
     };
   };
 
@@ -162,6 +196,7 @@ export const useExport = () => {
     exportStartDate,
     exportEndDate,
     exportDataTypes,
+    exportDetail,
     exportBusy,
     exportError,
     exportMessage,

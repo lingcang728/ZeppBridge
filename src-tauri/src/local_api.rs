@@ -314,6 +314,7 @@ mod tests {
             samples: vec![],
             route: vec![],
             pauses: vec![],
+            splits: vec![],
             summary: WorkoutSeriesSummary::default(),
         }
     }

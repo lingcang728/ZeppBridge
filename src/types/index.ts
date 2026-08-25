@@ -147,6 +147,8 @@ export interface SleepSession {
   light_minutes: number;
   rem_minutes?: number | null;
   awake_minutes: number;
+  /** Times woken during the night (`wc`). Distinct from awake_minutes. */
+  wake_count?: number | null;
   source_scope: SourceScope;
   device_id?: string;
   synced_at?: string | null;
@@ -200,7 +202,24 @@ export interface WorkoutSeries {
   samples: WorkoutSeriesSample[];
   route: WorkoutRoutePoint[];
   pauses: WorkoutPause[];
+  splits: WorkoutSplitRow[];
   summary: WorkoutSeriesSummary;
+}
+
+/** One kilometre of a workout, cut from the server's cumulative distance. */
+export interface WorkoutSplitRow {
+  index: number;
+  start_time: string;
+  end_time: string;
+  distance_m: number;
+  duration_seconds: number;
+  pace_min_per_km?: number | null;
+  avg_hr?: number | null;
+  max_hr?: number | null;
+  elevation_gain_m?: number | null;
+  elevation_loss_m?: number | null;
+  /** A trailing partial kilometre, never to be read as a slow full one. */
+  partial: boolean;
 }
 
 export interface WorkoutSeriesSummary {
@@ -227,10 +246,17 @@ export type ExportDataType =
   | 'spo2'
   | 'stress'
   | 'hrv'
+  | 'hrv_rmssd'
+  | 'respiratory_rate'
+  | 'pai'
+  | 'lactate_threshold'
   | 'training_load'
   | 'vo2max'
   | 'daily_activity'
   | 'recovery';
+
+/** Which section of the export picker a data type belongs to. */
+export type ExportTypeGroup = '活动' | '睡眠' | '身体状态' | '训练';
 
 export interface DeviceProfile {
   name?: string;
@@ -261,10 +287,45 @@ export interface DeviceProfilesResult {
   cache: DeviceCacheMetadata;
 }
 
+/**
+ * The result of asking the server whether one candidate stream exists.
+ *
+ * Which Zepp event streams answer depends on the account, the devices and the
+ * region, and the endpoint has no discovery call — so availability is probed,
+ * not assumed. A probe reports status and field names only; no measured value
+ * is read and nothing is stored.
+ */
+export interface CapabilityProbe {
+  stream: string;
+  /** Which surface answered — the same event name behaves differently on each. */
+  surface: 'v2_events' | 'user_events' | 'user_events_day' | string;
+  /** How often the stream is measured; decides how far back the probe looks. */
+  cadence: 'continuous' | 'episodic' | string;
+  windowDays: number;
+  eventType: string;
+  subType: string;
+  status: 'available' | 'empty' | 'unavailable' | 'error';
+  records: number;
+  /** Newest item's calendar date — the answer for episodic metrics. */
+  latestDate?: string | null;
+  fields: string[];
+}
+
+/**
+ * How much of each stream an export carries.
+ *
+ * `summary` aggregates the two streams that dominate an export's size
+ * (per-minute heart rate, per-second workout series) and keeps every
+ * structured metric intact, so a month of data stays small enough to hand to a
+ * model. `full` keeps the raw series and is what the CSV/GPX converters use.
+ */
+export type ExportDetail = 'summary' | 'full';
+
 export interface ExportSelection {
   startDate: string;
   endDate: string;
   dataTypes: ExportDataType[];
+  detail?: ExportDetail;
 }
 
 export interface ExportResult {

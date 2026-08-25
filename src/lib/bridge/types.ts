@@ -2,6 +2,7 @@ import type {
   AppStatus,
   AiHandoffResult,
   AuthInfo,
+  CapabilityProbe,
   ExportResult,
   ExportSelection,
   HealthOverview,
@@ -38,6 +39,7 @@ export interface BridgeBackend {
   startHistorySync(days: number): Promise<SyncReport>;
   startIncrementalSync(): Promise<SyncReport>;
   cancelSync(): Promise<void>;
+  probeDataCapabilities(): Promise<CapabilityProbe[]>;
 
   getHealthOverview(): Promise<HealthOverview>;
   getHeartRateSeries(hours?: number): Promise<HeartRatePoint[]>;

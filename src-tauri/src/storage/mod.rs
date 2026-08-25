@@ -1,13 +1,13 @@
 use crate::decoder::{decode_workout_detail, DecodedWorkout};
 use crate::models::{error::*, *};
 use crate::normalizer::Normalizer;
-use chrono::{DateTime, Local, NaiveDate, Utc};
+use chrono::{DateTime, Duration, Local, NaiveDate, Utc};
 use rusqlite::{params, Connection, OptionalExtension};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v8";
+const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v12";
 const LAST_CLOUD_SYNC_AT_KEY: &str = "last_cloud_sync_at";
 const LAST_CLOUD_SYNC_OUTCOME_KEY: &str = "last_cloud_sync_outcome";
 const LAST_LOCAL_REPROCESS_AT_KEY: &str = "last_local_reprocess_at";
@@ -17,6 +17,188 @@ const BYTES_PER_HISTORY_DAY: u64 = 800_000;
 
 pub struct Database {
     conn: Connection,
+}
+
+/// Metrics dense enough that a month of them dwarfs everything else in an
+/// export. In `Summary` detail these collapse to one row per hour; sparse
+/// streams such as HRV keep their exact sample times, which is the whole point
+/// of measuring them.
+const HOURLY_AGGREGATED_METRICS: [&str; 3] = ["heart_rate", "spo2", "stress"];
+
+/// Export types whose raw payloads are fetched but whose field-by-field
+/// normalization has not been verified against a real response yet.
+///
+/// These need their own status. Reporting `empty_in_range` would say "the
+/// stream is wired, you simply have no data", and for these that is false —
+/// the data is on disk as a retained raw response, only the parse is pending.
+/// Each entry maps an export type to the `wellness` source-key labels that
+/// carry its raw payloads.
+const RAW_PENDING_STREAMS: [(&str, &[&str]); 6] = [
+    ("spo2", &["spo2", "spo2_auto", "spo2_odi"]),
+    ("stress", &["stress"]),
+    ("respiratory_rate", &["respiratory_rate"]),
+    ("hrv_rmssd", &["hrv_rmssd"]),
+    ("pai", &["pai"]),
+    ("lactate_threshold", &["lactate_threshold"]),
+];
+
+#[derive(Debug, Clone, Default)]
+struct ExportDeviceProfile {
+    model: Option<String>,
+    kind: Option<String>,
+}
+
+/// Per-export device aliasing. Labels are positional (`device_1`, `device_2`)
+/// and carry no identifying information, so they survive the AI-handoff
+/// redaction pass that strips serials and device ids.
+#[derive(Debug, Default)]
+struct ExportDevices {
+    label_by_alias: BTreeMap<String, String>,
+    profiles: BTreeMap<String, ExportDeviceProfile>,
+}
+
+impl ExportDevices {
+    fn label(&self, device_id: Option<&str>) -> Option<String> {
+        device_id.and_then(|alias| self.label_by_alias.get(alias).cloned())
+    }
+}
+
+/// One hour of a dense metric, reduced to the shape a reader can actually use.
+#[derive(Debug)]
+struct HourBucket {
+    selected_type: String,
+    unit: String,
+    source_scope: String,
+    device_label: Option<String>,
+    min: f64,
+    max: f64,
+    sum: f64,
+    count: usize,
+}
+
+impl HourBucket {
+    fn new(
+        selected_type: String,
+        unit: String,
+        source_scope: String,
+        device_label: Option<String>,
+    ) -> Self {
+        Self {
+            selected_type,
+            unit,
+            source_scope,
+            device_label,
+            min: f64::INFINITY,
+            max: f64::NEG_INFINITY,
+            sum: 0.0,
+            count: 0,
+        }
+    }
+
+    fn push(&mut self, value: f64) {
+        self.min = self.min.min(value);
+        self.max = self.max.max(value);
+        self.sum += value;
+        self.count += 1;
+    }
+
+    fn render(&self, metric: &str, hour: &str) -> serde_json::Value {
+        let average = if self.count == 0 {
+            None
+        } else {
+            Some((self.sum / self.count as f64 * 10.0).round() / 10.0)
+        };
+        serde_json::json!({
+            "metric": metric,
+            "hour": hour,
+            "min": self.count.gt(&0).then_some(self.min),
+            "avg": average,
+            "max": self.count.gt(&0).then_some(self.max),
+            "samples": self.count,
+            "unit": self.unit,
+            "source_scope": self.source_scope,
+            "device_label": self.device_label,
+        })
+    }
+}
+
+/// All readings of one `(date, metric)` pair across sources.
+///
+/// Since account-level aggregates stopped being mislabelled as device data,
+/// the same day's step count can arrive twice: once fused, once from the watch
+/// that measured it. Picking one silently would hide a disagreement, so the
+/// fused reading leads and anything that differs is kept beside it.
+#[derive(Debug)]
+struct DailyMetricGroup {
+    date: String,
+    metric: String,
+    selected_type: String,
+    readings: Vec<(f64, String, String, Option<String>)>,
+}
+
+impl DailyMetricGroup {
+    fn new(date: String, metric: String, selected_type: &str) -> Self {
+        Self {
+            date,
+            metric,
+            selected_type: selected_type.to_string(),
+            readings: Vec::new(),
+        }
+    }
+
+    fn push(
+        &mut self,
+        value: f64,
+        unit: String,
+        source_scope: String,
+        device_label: Option<String>,
+    ) {
+        self.readings
+            .push((value, unit, source_scope, device_label));
+    }
+
+    fn render(&self) -> serde_json::Value {
+        // user_fused is the account's own reconciliation of its devices, so it
+        // leads when present; otherwise the first reading in query order does.
+        let primary_index = self
+            .readings
+            .iter()
+            .position(|(_, _, scope, _)| scope == "user_fused")
+            .unwrap_or(0);
+        let Some((value, unit, source_scope, device_label)) = self.readings.get(primary_index)
+        else {
+            return serde_json::Value::Null;
+        };
+        let alternates = self
+            .readings
+            .iter()
+            .enumerate()
+            .filter(|(index, (other, _, _, _))| {
+                *index != primary_index && (other - value).abs() > f64::EPSILON
+            })
+            .map(|(_, (other, _, scope, label))| {
+                serde_json::json!({
+                    "value": other,
+                    "source_scope": scope,
+                    "device_label": label,
+                })
+            })
+            .collect::<Vec<_>>();
+        let mut record = serde_json::json!({
+            "date": self.date,
+            "metric": self.metric,
+            "value": value,
+            "unit": unit,
+            "source_scope": source_scope,
+            "device_label": device_label,
+        });
+        if !alternates.is_empty() {
+            if let Some(object) = record.as_object_mut() {
+                object.insert("alternates".into(), serde_json::Value::Array(alternates));
+            }
+        }
+        record
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -545,6 +727,60 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(6, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // daily_metrics' canonical key predates device attribution, so two
+        // devices reporting the same metric on the same day collide and one
+        // silently overwrites the other. metric_samples already keys on
+        // COALESCE(device_id, '') (version 4); bring daily_metrics in line.
+        // Widening a unique key can never surface a duplicate, so unlike the
+        // version-4 rebuild this needs no DELETE. Gate it on the version so a
+        // large library does not rebuild the index on every launch.
+        if version < 7 {
+            self.conn.execute_batch(
+                "DROP INDEX IF EXISTS uq_daily_metric_key;
+                 CREATE UNIQUE INDEX uq_daily_metric_key
+                     ON daily_metrics(date, metric, unit, source_scope, COALESCE(device_id, ''));
+                 PRAGMA user_version = 7;",
+            )?;
+        }
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(7, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // Per-kilometre splits are derived from the raw detail payload, so the
+        // table starts empty and fills in on the next normalizer replay.
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS workout_splits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                workout_id TEXT NOT NULL,
+                split_index INTEGER NOT NULL,
+                start_time TEXT NOT NULL,
+                end_time TEXT NOT NULL,
+                distance_m REAL NOT NULL,
+                duration_seconds INTEGER NOT NULL,
+                pace_min_per_km REAL,
+                avg_hr INTEGER,
+                max_hr INTEGER,
+                elevation_gain_m REAL,
+                elevation_loss_m REAL,
+                partial INTEGER NOT NULL,
+                FOREIGN KEY(workout_id) REFERENCES workouts(workout_id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_workout_splits_workout
+                ON workout_splits(workout_id, split_index);
+            PRAGMA user_version = 8;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(8, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // `wc` has been in every band payload all along; nights already stored
+        // backfill on the next normalizer replay.
+        self.ensure_table_columns("sleep_sessions", &[("wake_count", "INTEGER")])?;
+        self.conn.execute_batch("PRAGMA user_version = 9;")?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(9, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }
@@ -861,6 +1097,24 @@ impl Database {
                     self.insert_metric_sample_with_raw(&row, Some(raw_record_id))?;
                 }
             }
+            // Optional wellness streams. Their payload shapes are not verified
+            // field by field yet, so normalization is best-effort and must
+            // never fail: `persist_fetched_record` rolls the raw insert back on
+            // error, and losing the raw response is what would make verifying
+            // those shapes impossible without re-fetching.
+            "wellness" => {
+                let batch = Normalizer::normalize_wellness(source_key, payload);
+                counts.primary_records =
+                    (batch.daily_metrics.len() + batch.metric_samples.len()) as i64;
+                self.clear_normalized_for_raw(raw_record_id, "daily_summary")?;
+                self.clear_normalized_for_raw(raw_record_id, "heart_rate")?;
+                for row in batch.daily_metrics {
+                    self.insert_daily_metric_with_raw(&row, Some(raw_record_id))?;
+                }
+                for row in batch.metric_samples {
+                    self.insert_metric_sample_with_raw(&row, Some(raw_record_id))?;
+                }
+            }
             "daily_summary" => {
                 let rows = Normalizer::normalize_daily_summary(payload)?;
                 counts.primary_records = rows.len() as i64;
@@ -1136,8 +1390,8 @@ impl Database {
             "INSERT INTO sleep_sessions
                 (sleep_id, start_time, end_time, score, duration_minutes,
                  deep_minutes, light_minutes, rem_minutes, rem_available, awake_minutes,
-                 source_scope, device_id, raw_record_id, synced_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+                 source_scope, device_id, raw_record_id, synced_at, wake_count)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
              ON CONFLICT(sleep_id) DO UPDATE SET
                 start_time = excluded.start_time,
                 end_time = excluded.end_time,
@@ -1148,6 +1402,7 @@ impl Database {
                 rem_minutes = excluded.rem_minutes,
                 rem_available = excluded.rem_available,
                 awake_minutes = excluded.awake_minutes,
+                wake_count = excluded.wake_count,
                 source_scope = excluded.source_scope,
                 device_id = excluded.device_id,
                 raw_record_id = COALESCE(excluded.raw_record_id, sleep_sessions.raw_record_id),
@@ -1167,6 +1422,7 @@ impl Database {
                 sleep.device_id,
                 raw_record_id,
                 synced_at.to_rfc3339(),
+                sleep.wake_count,
             ],
         )?;
         self.replace_sleep_stages(&sleep.sleep_id, &sleep.stages)?;
@@ -1300,6 +1556,10 @@ impl Database {
             "DELETE FROM workout_pauses WHERE workout_id = ?1",
             [workout_id],
         )?;
+        self.conn.execute(
+            "DELETE FROM workout_splits WHERE workout_id = ?1",
+            [workout_id],
+        )?;
 
         {
             let mut insert = self.conn.prepare(
@@ -1348,6 +1608,31 @@ impl Database {
                     pause.start_time.to_rfc3339(),
                     pause.end_time.to_rfc3339(),
                     pause.kind,
+                ])?;
+            }
+        }
+        {
+            let mut insert = self.conn.prepare(
+                "INSERT INTO workout_splits
+                    (workout_id, split_index, start_time, end_time, distance_m,
+                     duration_seconds, pace_min_per_km, avg_hr, max_hr,
+                     elevation_gain_m, elevation_loss_m, partial)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+            )?;
+            for split in &decoded.splits {
+                insert.execute(params![
+                    workout_id,
+                    split.index,
+                    split.start_time.to_rfc3339(),
+                    split.end_time.to_rfc3339(),
+                    split.distance_m,
+                    split.duration_seconds,
+                    split.pace_min_per_km,
+                    split.avg_hr,
+                    split.max_hr,
+                    split.elevation_gain_m,
+                    split.elevation_loss_m,
+                    i64::from(split.partial),
                 ])?;
             }
         }
@@ -1422,11 +1707,14 @@ impl Database {
 
         let summary = workout_series_summary(&samples);
 
+        let splits = self.load_workout_splits(workout_id)?;
+
         Ok(WorkoutSeries {
             workout_id: workout_id.to_owned(),
             samples,
             route,
             pauses,
+            splits,
             summary,
         })
     }
@@ -1462,6 +1750,59 @@ impl Database {
             )?;
         }
         Ok(())
+    }
+
+    /// The IANA timezone the devices report, for endpoints that ask for a zone
+    /// name rather than an offset.
+    pub fn device_time_zone(&self) -> Result<Option<String>> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT timezone FROM device_identities
+                 WHERE timezone IS NOT NULL AND timezone <> ''
+                 ORDER BY updated_at DESC LIMIT 1",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?)
+    }
+
+    /// How many retained `wellness` raw responses carry one of these labels.
+    fn count_wellness_raw(&self, labels: &[&str]) -> Result<i64> {
+        let mut total = 0i64;
+        for label in labels {
+            let pattern = format!("wellness:{label}:%");
+            total += self.conn.query_row(
+                "SELECT COUNT(*) FROM raw_records WHERE stream = 'wellness' AND source_key LIKE ?1",
+                [&pattern],
+                |row| row.get::<_, i64>(0),
+            )?;
+        }
+        Ok(total)
+    }
+
+    fn load_workout_splits(&self, workout_id: &str) -> Result<Vec<WorkoutSplitRow>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT split_index, start_time, end_time, distance_m, duration_seconds,
+                    pace_min_per_km, avg_hr, max_hr, elevation_gain_m, elevation_loss_m, partial
+             FROM workout_splits WHERE workout_id = ?1 ORDER BY split_index",
+        )?;
+        let rows = stmt.query_map([workout_id], |row| {
+            Ok(WorkoutSplitRow {
+                index: row.get(0)?,
+                start_time: row.get(1)?,
+                end_time: row.get(2)?,
+                distance_m: row.get(3)?,
+                duration_seconds: row.get(4)?,
+                pace_min_per_km: row.get(5)?,
+                avg_hr: row.get(6)?,
+                max_hr: row.get(7)?,
+                elevation_gain_m: row.get(8)?,
+                elevation_loss_m: row.get(9)?,
+                partial: row.get::<_, i64>(10)? != 0,
+            })
+        })?;
+        Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
     }
 
     fn load_sleep_stages(&self, sleep_id: &str) -> Result<Vec<SleepStageSlice>> {
@@ -1627,7 +1968,7 @@ impl Database {
         let mut stmt = self.conn.prepare(
             "SELECT sleep_id, start_time, end_time, score, duration_minutes,
                     deep_minutes, light_minutes, rem_minutes, rem_available, awake_minutes,
-                    source_scope, device_id, synced_at
+                    source_scope, device_id, synced_at, wake_count
              FROM sleep_sessions ORDER BY start_time DESC LIMIT ?1",
         )?;
         let rows = stmt.query_map([limit], |row| {
@@ -1645,6 +1986,7 @@ impl Database {
                 row.get::<_, String>(10)?,
                 row.get::<_, Option<String>>(11)?,
                 row.get::<_, Option<String>>(12)?,
+                row.get::<_, Option<i32>>(13)?,
             ))
         })?;
         let mut sessions = Vec::new();
@@ -1663,6 +2005,7 @@ impl Database {
                 scope,
                 device_id,
                 synced_at,
+                wake_count,
             ) = row?;
             sessions.push(SleepSession {
                 sleep_id,
@@ -1682,6 +2025,7 @@ impl Database {
                     .transpose()?,
                 time_in_bed_minutes: None,
                 stages: Vec::new(),
+                wake_count,
             });
         }
         Ok(sessions)
@@ -1693,7 +2037,7 @@ impl Database {
             .query_row(
                 "SELECT sleep_id, start_time, end_time, score, duration_minutes,
                         deep_minutes, light_minutes, rem_minutes, rem_available, awake_minutes,
-                        source_scope, device_id, synced_at
+                        source_scope, device_id, synced_at, wake_count
                  FROM sleep_sessions WHERE sleep_id = ?1 LIMIT 1",
                 [sleep_id],
                 |row| {
@@ -1711,6 +2055,7 @@ impl Database {
                         row.get::<_, String>(10)?,
                         row.get::<_, Option<String>>(11)?,
                         row.get::<_, Option<String>>(12)?,
+                        row.get::<_, Option<i32>>(13)?,
                     ))
                 },
             )
@@ -1729,6 +2074,7 @@ impl Database {
             scope,
             device_id,
             synced_at,
+            wake_count,
         )) = row
         else {
             return Ok(None);
@@ -1752,6 +2098,7 @@ impl Database {
                 .transpose()?,
             time_in_bed_minutes: None,
             stages,
+            wake_count,
         }))
     }
 
@@ -1997,6 +2344,249 @@ impl Database {
         Ok((last_updated, coverage, source_scope))
     }
 
+    /// Non-identifying device labels for one export.
+    ///
+    /// Zepp addresses one physical device by several aliases — the Helio Strap
+    /// is `2445B138005129` in band summaries and `D85403FFFEE4D576` in
+    /// readiness events — so aliases are folded onto a single label via
+    /// `device_identities`. Only the catalog's canonical model name and kind
+    /// leave the machine; the serial and the user's nickname for the device
+    /// never do.
+    fn export_devices(&self) -> Result<ExportDevices> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT alias, name, serial, device_id FROM device_identities")?;
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, Option<String>>(1)?,
+                row.get::<_, Option<String>>(2)?,
+                row.get::<_, Option<String>>(3)?,
+            ))
+        })?;
+        let mut groups: BTreeMap<String, (BTreeSet<String>, Option<String>)> = BTreeMap::new();
+        for row in rows {
+            let (alias, name, serial, device_id) = row?;
+            // The serial is the stable identity of a physical device: the
+            // strap's rows share `2445B138005129` but differ in device_id
+            // (`2445B138005129` vs `D85403FFFEE4D576`), so keying on both
+            // would report one device twice.
+            let key = serial
+                .clone()
+                .or_else(|| device_id.clone())
+                .unwrap_or_else(|| alias.clone());
+            let entry = groups.entry(key).or_default();
+            entry.0.insert(alias);
+            if let Some(serial) = serial {
+                entry.0.insert(serial);
+            }
+            if let Some(device_id) = device_id {
+                entry.0.insert(device_id);
+            }
+            if entry.1.is_none() {
+                entry.1 = name;
+            }
+        }
+
+        let mut devices = ExportDevices::default();
+        for (index, (_, (aliases, name))) in groups.into_iter().enumerate() {
+            let label = format!("device_{}", index + 1);
+            // The stored name is the user's nickname, so it is only ever used
+            // to look the product up in the bundled catalog.
+            let matched = name.as_deref().and_then(|name| {
+                crate::device_catalog::match_catalog(&crate::device_catalog::CatalogMatchInput {
+                    device_names: vec![name],
+                    display_name: Some(name),
+                    ..Default::default()
+                })
+            });
+            devices.profiles.insert(
+                label.clone(),
+                ExportDeviceProfile {
+                    model: matched
+                        .as_ref()
+                        .map(|found| found.entry.canonical_name.clone()),
+                    kind: matched.as_ref().map(|found| found.entry.kind.clone()),
+                },
+            );
+            for alias in aliases {
+                devices.label_by_alias.insert(alias, label.clone());
+            }
+        }
+        Ok(devices)
+    }
+
+    /// Locally derived analysis that needs no extra network call.
+    ///
+    /// Everything here is computed from data already on disk and states its own
+    /// basis, so a reader can tell a measurement from a derivation.
+    fn export_analysis(
+        &self,
+        start_text: &str,
+        end_text: &str,
+        selected: &BTreeSet<String>,
+    ) -> Result<serde_json::Map<String, serde_json::Value>> {
+        let mut analysis = serde_json::Map::new();
+
+        if selected.contains("workouts") {
+            // Zone boundaries need a maximum heart rate. Estimating one from
+            // age (220 − age) would be a fabricated number in a file that
+            // promises never to fabricate, so the basis is the highest rate
+            // this account has actually recorded — and the export says so,
+            // including that a rate never reached is a rate never counted.
+            let observed: Option<(i32, String)> = self
+                .conn
+                .query_row(
+                    "SELECT max_hr, start_time FROM workouts
+                     WHERE max_hr IS NOT NULL AND max_hr > 0
+                     ORDER BY max_hr DESC, start_time DESC LIMIT 1",
+                    [],
+                    |row| Ok((row.get::<_, i32>(0)?, row.get::<_, String>(1)?)),
+                )
+                .optional()?;
+
+            if let Some((max_hr, observed_at)) = observed {
+                let mut histogram: BTreeMap<i32, i64> = BTreeMap::new();
+                let mut stmt = self.conn.prepare(
+                    "SELECT workout_samples.heart_rate, COUNT(*)
+                     FROM workout_samples
+                     JOIN workouts ON workouts.workout_id = workout_samples.workout_id
+                     WHERE workout_samples.heart_rate IS NOT NULL
+                       AND date(workouts.start_time, 'localtime') BETWEEN ?1 AND ?2
+                     GROUP BY workout_samples.heart_rate",
+                )?;
+                let rows = stmt.query_map(params![start_text, end_text], |row| {
+                    Ok((row.get::<_, i32>(0)?, row.get::<_, i64>(1)?))
+                })?;
+                for row in rows {
+                    let (heart_rate, seconds) = row?;
+                    *histogram.entry(heart_rate).or_default() += seconds;
+                }
+
+                // Percentage bands of the observed maximum, the convention Zepp
+                // itself uses for its five zones.
+                let bands: [(i32, f64, f64); 5] = [
+                    (1, 0.50, 0.60),
+                    (2, 0.60, 0.70),
+                    (3, 0.70, 0.80),
+                    (4, 0.80, 0.90),
+                    (5, 0.90, 1.01),
+                ];
+                let zones = bands
+                    .iter()
+                    .map(|(zone, low, high)| {
+                        let low_bpm = (f64::from(max_hr) * low).round() as i32;
+                        let high_bpm = (f64::from(max_hr) * high).round() as i32;
+                        let seconds: i64 = histogram
+                            .range(low_bpm..high_bpm)
+                            .map(|(_, count)| *count)
+                            .sum();
+                        serde_json::json!({
+                            "zone": zone,
+                            "min_bpm": low_bpm,
+                            "max_bpm": high_bpm - 1,
+                            "seconds": seconds,
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                let below: i64 = histogram
+                    .range(..(f64::from(max_hr) * 0.50).round() as i32)
+                    .map(|(_, count)| *count)
+                    .sum();
+
+                analysis.insert(
+                    "heart_rate_zones".into(),
+                    serde_json::json!({
+                        "basis": {
+                            "type": "observed_max",
+                            "value": max_hr,
+                            "observed_at": observed_at,
+                            "note": "区间上界取自本地记录到的最高心率，不使用 220−年龄 之类的估算；若从未跑到真正的极限，区间会整体偏窄",
+                        },
+                        "unit": "seconds",
+                        "source": "workout_samples",
+                        "zones": zones,
+                        "below_zone_1_seconds": below,
+                    }),
+                );
+            }
+        }
+
+        if selected.contains("training_load") || selected.contains("recovery") {
+            // Acute:chronic workload ratio. The chronic window reaches 27 days
+            // before the export range, so the first day in range is already
+            // backed by a full window instead of ramping up from zero.
+            let Some(range_start) = NaiveDate::parse_from_str(start_text, "%Y-%m-%d").ok() else {
+                return Ok(analysis);
+            };
+            let history_start = (range_start - Duration::days(27))
+                .format("%Y-%m-%d")
+                .to_string();
+            let mut stmt = self.conn.prepare(
+                "SELECT date, MAX(value) FROM daily_metrics
+                 WHERE metric = 'training_load' AND date BETWEEN ?1 AND ?2
+                 GROUP BY date ORDER BY date",
+            )?;
+            let rows = stmt.query_map(params![history_start, end_text], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?))
+            })?;
+            let mut by_date: BTreeMap<String, f64> = BTreeMap::new();
+            for row in rows {
+                let (date, value) = row?;
+                by_date.insert(date, value);
+            }
+
+            let mut balance = Vec::new();
+            let mut day = range_start;
+            let end_date = NaiveDate::parse_from_str(end_text, "%Y-%m-%d")
+                .map_err(|_| ZeppBridgeError::ConfigError("导出结束日期无效".into()))?;
+            while day <= end_date {
+                let window_sum = |days: i64| -> (f64, usize) {
+                    let mut total = 0.0;
+                    let mut present = 0usize;
+                    for back in 0..days {
+                        let key = (day - Duration::days(back)).format("%Y-%m-%d").to_string();
+                        if let Some(value) = by_date.get(&key) {
+                            total += *value;
+                            present += 1;
+                        }
+                    }
+                    (total, present)
+                };
+                let (acute, acute_days) = window_sum(7);
+                let (chronic, chronic_days) = window_sum(28);
+                // A ratio against a partly-empty chronic window would read as a
+                // spike that never happened, so it is only reported once the
+                // window is mostly covered.
+                let chronic_weekly = chronic / 4.0;
+                let ratio = (chronic_days >= 21 && chronic_weekly > 0.0)
+                    .then(|| (acute / chronic_weekly * 100.0).round() / 100.0);
+                balance.push(serde_json::json!({
+                    "date": day.format("%Y-%m-%d").to_string(),
+                    "acute_7d": (acute * 10.0).round() / 10.0,
+                    "acute_days_with_data": acute_days,
+                    "chronic_28d": (chronic * 10.0).round() / 10.0,
+                    "chronic_days_with_data": chronic_days,
+                    "acute_chronic_ratio": ratio,
+                }));
+                day += Duration::days(1);
+            }
+
+            if !balance.is_empty() {
+                analysis.insert(
+                    "training_load_balance".into(),
+                    serde_json::json!({
+                        "source": "daily_metrics.training_load",
+                        "note": "acute = 最近 7 天负荷之和；chronic = 最近 28 天之和；ratio = acute ÷ (chronic ÷ 4)。chronic 窗口覆盖不足 21 天时不给 ratio。",
+                        "days": balance,
+                    }),
+                );
+            }
+        }
+
+        Ok(analysis)
+    }
+
     pub fn build_ai_export(&self, selection: &ExportSelection) -> Result<(String, usize)> {
         let start = NaiveDate::parse_from_str(&selection.start_date, "%Y-%m-%d")
             .map_err(|_| ZeppBridgeError::ConfigError("导出开始日期无效".into()))?;
@@ -2015,6 +2605,10 @@ impl Database {
         let allowed: BTreeSet<&str> = [
             "heart_rate",
             "hrv",
+            "hrv_rmssd",
+            "respiratory_rate",
+            "pai",
+            "lactate_threshold",
             "daily_activity",
             "sleep",
             "workouts",
@@ -2040,6 +2634,15 @@ impl Database {
         }
         let start_text = start.format("%Y-%m-%d").to_string();
         let end_text = end.format("%Y-%m-%d").to_string();
+        let full = selection.detail.is_full();
+        let devices = self.export_devices()?;
+        // How many rows each selected type contributed, so the export can say
+        // "available, 30 records" instead of silently omitting a type the user
+        // ticked and leaving the reader to guess why.
+        let mut produced: BTreeMap<String, usize> = BTreeMap::new();
+        // Rows actually written into this export. In summary detail these are
+        // far fewer than the readings behind them.
+        let mut emitted: BTreeMap<String, usize> = BTreeMap::new();
 
         let mut metric_samples = Vec::new();
         if selected.contains("heart_rate")
@@ -2063,21 +2666,56 @@ impl Database {
                     row.get::<_, Option<String>>(5)?,
                 ))
             })?;
+            let mut buckets: BTreeMap<(String, String, String), HourBucket> = BTreeMap::new();
             for row in rows {
                 let (metric, timestamp, value, unit, source_scope, device_id) = row?;
-                if selected.contains(&metric)
-                    || (metric.contains("spo2") && selected.contains("spo2"))
-                    || (metric.contains("stress") && selected.contains("stress"))
+                let matched_type = if selected.contains(&metric) {
+                    Some(metric.clone())
+                } else if metric.contains("spo2") && selected.contains("spo2") {
+                    Some("spo2".to_string())
+                } else if metric.contains("stress") && selected.contains("stress") {
+                    Some("stress".to_string())
+                } else if metric.starts_with("respiratory") && selected.contains("respiratory_rate")
                 {
+                    Some("respiratory_rate".to_string())
+                } else if metric == "hrv_rmssd" && selected.contains("hrv_rmssd") {
+                    Some("hrv_rmssd".to_string())
+                } else {
+                    None
+                };
+                let Some(matched_type) = matched_type else {
+                    continue;
+                };
+                *produced.entry(matched_type.clone()).or_default() += 1;
+                let device_label = devices.label(device_id.as_deref());
+                if !full && HOURLY_AGGREGATED_METRICS.contains(&metric.as_str()) {
+                    let moment = parse_datetime(&timestamp, "metric_samples.timestamp")?;
+                    let hour = moment.format("%Y-%m-%dT%H:00:00+00:00").to_string();
+                    buckets
+                        .entry((
+                            metric.clone(),
+                            device_label.clone().unwrap_or_default(),
+                            hour,
+                        ))
+                        .or_insert_with(|| {
+                            HourBucket::new(matched_type, unit, source_scope, device_label)
+                        })
+                        .push(value);
+                } else {
+                    *emitted.entry(matched_type).or_default() += 1;
                     metric_samples.push(serde_json::json!({
                         "metric": metric,
                         "timestamp": timestamp,
                         "value": value,
                         "unit": unit,
                         "source_scope": source_scope,
-                        "device_id": device_id,
+                        "device_label": device_label,
                     }));
                 }
+            }
+            for ((metric, _, hour), bucket) in buckets {
+                *emitted.entry(bucket.selected_type.clone()).or_default() += 1;
+                metric_samples.push(bucket.render(&metric, &hour));
             }
         }
 
@@ -2097,6 +2735,10 @@ impl Database {
             "ahi_readiness",
             "training_load",
             "vo2max",
+            "lactate_threshold_hr",
+            "lactate_threshold_pace",
+            "pai_daily",
+            "pai_total",
         ]
         .into_iter()
         .collect();
@@ -2124,27 +2766,61 @@ impl Database {
                     row.get::<_, Option<String>>(5)?,
                 ))
             })?;
+            // One (date, metric) can now legitimately arrive twice: once as the
+            // account-level aggregate and once from the device that measured
+            // it. Fold them so a reader sees one number, and keep a differing
+            // second reading as an explicit alternate rather than dropping it.
+            let mut folded: BTreeMap<(String, String), DailyMetricGroup> = BTreeMap::new();
             for row in rows {
                 let (date, metric, value, unit, source_scope, device_id) = row?;
                 let is_recovery = recovery_metrics.contains(metric.as_str());
-                let want = (is_recovery && selected.contains("recovery"))
-                    || (!is_recovery && selected.contains("daily_activity"))
-                    || (metric == "steps" && selected.contains("steps"))
-                    || ((metric.contains("spo2") || metric == "blood_oxygen")
-                        && selected.contains("spo2"))
-                    || (metric.contains("stress") && selected.contains("stress"))
-                    || (metric == "training_load" && selected.contains("training_load"))
-                    || (metric == "vo2max" && selected.contains("vo2max"));
-                if want {
-                    daily_metrics.push(serde_json::json!({
-                        "date": date,
-                        "metric": metric,
-                        "value": value,
-                        "unit": unit,
-                        "source_scope": source_scope,
-                        "device_id": device_id,
-                    }));
-                }
+                let matched_type = if metric == "steps" && selected.contains("steps") {
+                    Some("steps")
+                } else if metric == "training_load" && selected.contains("training_load") {
+                    Some("training_load")
+                } else if metric == "vo2max" && selected.contains("vo2max") {
+                    Some("vo2max")
+                } else if (metric.contains("spo2") || metric == "blood_oxygen")
+                    && selected.contains("spo2")
+                {
+                    Some("spo2")
+                } else if metric.contains("stress") && selected.contains("stress") {
+                    Some("stress")
+                } else if metric.starts_with("respiratory") && selected.contains("respiratory_rate")
+                {
+                    Some("respiratory_rate")
+                } else if metric.starts_with("lactate_threshold")
+                    && selected.contains("lactate_threshold")
+                {
+                    Some("lactate_threshold")
+                } else if metric.starts_with("pai") && selected.contains("pai") {
+                    Some("pai")
+                } else if metric == "hrv_rmssd" && selected.contains("hrv_rmssd") {
+                    Some("hrv_rmssd")
+                } else if is_recovery && selected.contains("recovery") {
+                    Some("recovery")
+                } else if !is_recovery && selected.contains("daily_activity") {
+                    Some("daily_activity")
+                } else {
+                    None
+                };
+                let Some(matched_type) = matched_type else {
+                    continue;
+                };
+                folded
+                    .entry((date.clone(), metric.clone()))
+                    .or_insert_with(|| DailyMetricGroup::new(date, metric, matched_type))
+                    .push(
+                        value,
+                        unit,
+                        source_scope,
+                        devices.label(device_id.as_deref()),
+                    );
+            }
+            for group in folded.into_values() {
+                *produced.entry(group.selected_type.clone()).or_default() += 1;
+                *emitted.entry(group.selected_type.clone()).or_default() += 1;
+                daily_metrics.push(group.render());
             }
         }
 
@@ -2153,29 +2829,77 @@ impl Database {
             let mut stmt = self.conn.prepare(
                 "SELECT sleep_id, start_time, end_time, score, duration_minutes,
                         deep_minutes, light_minutes, rem_minutes, rem_available, awake_minutes,
-                        source_scope, device_id
+                        source_scope, device_id, wake_count
                  FROM sleep_sessions
                  WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2
                  ORDER BY start_time",
             )?;
             let rows = stmt.query_map(params![start_text, end_text], |row| {
-                let rem_minutes = row.get::<_, i32>(7)?;
-                let rem_available = row.get::<_, i64>(8)?;
-                Ok(serde_json::json!({
-                    "sleep_id": row.get::<_, String>(0)?,
-                    "start_time": row.get::<_, String>(1)?,
-                    "end_time": row.get::<_, String>(2)?,
-                    "score": row.get::<_, Option<i32>>(3)?,
-                    "duration_minutes": row.get::<_, i32>(4)?,
-                    "deep_minutes": row.get::<_, i32>(5)?,
-                    "light_minutes": row.get::<_, i32>(6)?,
-                    "rem_minutes": (rem_available != 0).then_some(rem_minutes),
-                    "awake_minutes": row.get::<_, i32>(9)?,
-                    "source_scope": row.get::<_, String>(10)?,
-                    "device_id": row.get::<_, Option<String>>(11)?,
-                }))
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, Option<i32>>(3)?,
+                    row.get::<_, i32>(4)?,
+                    row.get::<_, i32>(5)?,
+                    row.get::<_, i32>(6)?,
+                    row.get::<_, i32>(7)?,
+                    row.get::<_, i64>(8)?,
+                    row.get::<_, i32>(9)?,
+                    row.get::<_, String>(10)?,
+                    row.get::<_, Option<String>>(11)?,
+                    row.get::<_, Option<i32>>(12)?,
+                ))
             })?;
-            sleep_sessions = rows.collect::<std::result::Result<Vec<_>, _>>()?;
+            for row in rows {
+                let (
+                    sleep_id,
+                    start_time,
+                    end_time,
+                    score,
+                    duration_minutes,
+                    deep_minutes,
+                    light_minutes,
+                    rem_minutes,
+                    rem_available,
+                    awake_minutes,
+                    source_scope,
+                    device_id,
+                    wake_count,
+                ) = row?;
+                // The stage timeline is what turns "slept 7h44" into what the
+                // night actually looked like. It has been in the database since
+                // the sleep decoder landed but never reached an export, and it
+                // is small enough to include in both detail modes.
+                let stages = self
+                    .load_sleep_stages(&sleep_id)?
+                    .into_iter()
+                    .map(|stage| {
+                        serde_json::json!({
+                            "stage": stage.stage,
+                            "start_time": stage.start_time.to_rfc3339(),
+                            "end_time": stage.end_time.to_rfc3339(),
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                sleep_sessions.push(serde_json::json!({
+                    "sleep_id": sleep_id,
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "score": score,
+                    "duration_minutes": duration_minutes,
+                    "deep_minutes": deep_minutes,
+                    "light_minutes": light_minutes,
+                    "rem_minutes": (rem_available != 0).then_some(rem_minutes),
+                    "awake_minutes": awake_minutes,
+                    "wake_count": wake_count,
+                    "source_scope": source_scope,
+                    "device_label": devices.label(device_id.as_deref()),
+                    "stages": stages,
+                }));
+            }
+            produced.insert("sleep".to_string(), sleep_sessions.len());
+            emitted.insert("sleep".to_string(), sleep_sessions.len());
         }
 
         let mut workouts = Vec::new();
@@ -2220,7 +2944,7 @@ impl Database {
                     device_id,
                 ) = row?;
                 let series = self.get_workout_series(&workout_id)?;
-                workouts.push(serde_json::json!({
+                let mut workout = serde_json::json!({
                     "workout_id": workout_id,
                     "workout_type": workout_type,
                     "start_time": start_time,
@@ -2232,27 +2956,109 @@ impl Database {
                     "training_load": training_load,
                     "vo2max": vo2max,
                     "source_scope": source_scope,
-                    "device_id": device_id,
-                    "samples": series.samples,
-                    "route": series.route,
+                    "device_label": devices.label(device_id.as_deref()),
+                    "sample_count": series.samples.len(),
+                    "route_point_count": series.route.len(),
                     "pauses": series.pauses,
-                }));
+                    "splits": series.splits,
+                });
+                if full {
+                    let samples = serde_json::to_value(series.samples)
+                        .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
+                    let route = serde_json::to_value(series.route)
+                        .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
+                    if let Some(object) = workout.as_object_mut() {
+                        object.insert("samples".into(), samples);
+                        object.insert("route".into(), route);
+                    }
+                }
+                workouts.push(workout);
             }
+            produced.insert("workouts".to_string(), workouts.len());
+            emitted.insert("workouts".to_string(), workouts.len());
         }
+
+        // Every ticked type gets a verdict. A type that produced nothing is
+        // either not wired up yet or genuinely empty for this window, and those
+        // are very different facts for whoever reads the export.
+        let capabilities = selected
+            .iter()
+            .map(|selected_type| {
+                let count = produced.get(selected_type).copied().unwrap_or(0);
+                let raw_pending = (count == 0)
+                    .then(|| {
+                        RAW_PENDING_STREAMS
+                            .iter()
+                            .find(|(name, _)| *name == selected_type.as_str())
+                            .and_then(|(_, labels)| self.count_wellness_raw(labels).ok())
+                            .filter(|found| *found > 0)
+                    })
+                    .flatten();
+                let entry = if let Some(raw_records) = raw_pending {
+                    serde_json::json!({
+                        "status": "raw_pending",
+                        "rows_in_export": 0,
+                        "raw_records": raw_records,
+                        "note": "已从云端抓取并保留原始报文，但字段解析尚未在真实响应上验证，因此没有派生出结构化记录",
+                    })
+                } else if count == 0 {
+                    serde_json::json!({
+                        "status": "empty_in_range",
+                        "records": 0,
+                        "note": "该数据流已接入，但这段时间没有记录",
+                    })
+                } else {
+                    let rows = emitted.get(selected_type).copied().unwrap_or(count);
+                    // In summary detail a stream is backed by far more readings
+                    // than it emits rows; say both, so nobody has to reconcile
+                    // "22517 records" against 423 lines of JSON.
+                    serde_json::json!({
+                        "status": "available",
+                        "source_records": count,
+                        "rows_in_export": rows,
+                    })
+                };
+                (selected_type.clone(), entry)
+            })
+            .collect::<serde_json::Map<String, serde_json::Value>>();
+
+        let device_entries = devices
+            .profiles
+            .iter()
+            .map(|(label, profile)| {
+                serde_json::json!({
+                    "label": label,
+                    "model": profile.model,
+                    "kind": profile.kind,
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let analysis = self.export_analysis(&start_text, &end_text, &selected)?;
 
         let record_count =
             metric_samples.len() + daily_metrics.len() + sleep_sessions.len() + workouts.len();
+        let detail_note = if full {
+            "detail=full：逐秒运动序列与逐条心率原样导出。"
+        } else {
+            "detail=summary：心率按小时聚合为 min/avg/max，逐秒运动序列省略（sample_count 说明有多少条）；结构化指标全部完整。需要原始序列请用 detail=full 重新导出。"
+        };
         let export = serde_json::json!({
-            "schema_version": "zeppbridge.ai.v1",
+            "schema_version": "zeppbridge.ai.v2",
             "generated_at": Utc::now().to_rfc3339(),
             "date_range": { "start": start_text, "end": end_text, "timezone": "system_local" },
             "selected_types": selected,
+            "detail": if full { "full" } else { "summary" },
             "record_count": record_count,
+            "capabilities": capabilities,
+            "devices": device_entries,
+            "analysis": analysis,
             "provenance": {
                 "source": "ZeppBridge local SQLite",
                 "normalized": true,
                 "raw_payloads_included": false,
-                "note": "Missing fields are omitted or null; values are never fabricated. source_scope preserves user_fused, device, or unknown provenance."
+                "note": "Missing fields are omitted or null; values are never fabricated. source_scope preserves user_fused, device, or unknown provenance. device_label is a per-export alias and is not a device identifier.",
+                "detail_note": detail_note,
             },
             "data": {
                 "metric_samples": metric_samples,
@@ -2549,6 +3355,10 @@ impl Database {
             "DELETE FROM workout_pauses WHERE start_time < ?1",
             [&cutoff_timestamp],
         )?;
+        self.conn.execute(
+            "DELETE FROM workout_splits WHERE start_time < ?1",
+            [&cutoff_timestamp],
+        )?;
         // Raw responses are retained from their fetch time, not their query
         // window start. A 30-day request naturally starts near the retention
         // cutoff and must not be deleted seconds after it is fetched.
@@ -2765,6 +3575,398 @@ mod tests {
         DateTime::from_timestamp(1_700_000_000, 0).unwrap()
     }
 
+    fn export_selection(types: &[&str], detail: ExportDetail) -> ExportSelection {
+        ExportSelection {
+            start_date: "2023-11-01".into(),
+            end_date: "2023-11-30".into(),
+            data_types: types.iter().map(|value| value.to_string()).collect(),
+            detail,
+        }
+    }
+
+    fn parsed_export(db: &Database, types: &[&str], detail: ExportDetail) -> serde_json::Value {
+        let (encoded, _) = db
+            .build_ai_export(&export_selection(types, detail))
+            .unwrap();
+        serde_json::from_str(&encoded).unwrap()
+    }
+
+    #[test]
+    fn summary_export_aggregates_heart_rate_and_drops_the_per_second_series() {
+        let db = Database::in_memory().unwrap();
+        for (offset, value) in [(0, 60.0), (60, 70.0), (120, 80.0), (3600, 100.0)] {
+            db.insert_metric_sample(&MetricSample {
+                metric: "heart_rate".into(),
+                timestamp: ts() + chrono::Duration::seconds(offset),
+                value,
+                unit: "bpm".into(),
+                source_scope: SourceScope::Device,
+                device_id: Some("SN-ONE".into()),
+            })
+            .unwrap();
+        }
+        db.insert_workout(&Workout {
+            workout_id: "1700000000".into(),
+            workout_type: "run".into(),
+            start_time: ts(),
+            end_time: ts() + chrono::Duration::minutes(10),
+            distance_meters: Some(1000.0),
+            calories: Some(80),
+            avg_hr: Some(140),
+            max_hr: Some(160),
+            training_load: Some(20.0),
+            vo2max: None,
+            source_scope: SourceScope::Device,
+            device_id: Some("SN-ONE".into()),
+            synced_at: None,
+            gps_available: false,
+            sample_count: 0,
+            zepp_source: None,
+            zepp_type: None,
+        })
+        .unwrap();
+
+        let summary = parsed_export(&db, &["heart_rate", "workouts"], ExportDetail::Summary);
+        let samples = summary["data"]["metric_samples"].as_array().unwrap();
+        // Three samples inside one hour collapse to one row; the fourth starts
+        // the next hour.
+        assert_eq!(samples.len(), 2);
+        let first = &samples[0];
+        assert_eq!(first["min"], 60.0);
+        assert_eq!(first["max"], 80.0);
+        assert_eq!(first["avg"], 70.0);
+        assert_eq!(first["samples"], 3);
+        assert!(
+            first.get("timestamp").is_none(),
+            "aggregated rows have hours"
+        );
+
+        let workout = &summary["data"]["workouts"][0];
+        assert!(
+            workout.get("samples").is_none(),
+            "summary must not carry the per-second series"
+        );
+        assert!(workout.get("route").is_none());
+        assert!(workout.get("sample_count").is_some());
+
+        let full = parsed_export(&db, &["heart_rate", "workouts"], ExportDetail::Full);
+        assert_eq!(full["data"]["metric_samples"].as_array().unwrap().len(), 4);
+        assert!(full["data"]["workouts"][0].get("samples").is_some());
+        assert!(full["data"]["workouts"][0].get("route").is_some());
+    }
+
+    #[test]
+    fn wake_count_survives_the_round_trip_and_is_not_awake_minutes() {
+        // Ten one-minute wakings and one ten-minute waking are the same
+        // duration but not the same night, so `wc` is its own field.
+        let db = Database::in_memory().unwrap();
+        db.insert_sleep_session(&SleepSession {
+            sleep_id: "sleep-wc".into(),
+            start_time: ts(),
+            end_time: ts() + chrono::Duration::minutes(400),
+            score: Some(80),
+            duration_minutes: 380,
+            deep_minutes: 80,
+            light_minutes: 240,
+            rem_minutes: Some(40),
+            awake_minutes: 20,
+            source_scope: SourceScope::Device,
+            device_id: None,
+            synced_at: None,
+            time_in_bed_minutes: None,
+            stages: Vec::new(),
+            wake_count: Some(4),
+        })
+        .unwrap();
+        assert_eq!(
+            db.get_sleep_detail("sleep-wc").unwrap().unwrap().wake_count,
+            Some(4)
+        );
+        let export = parsed_export(&db, &["sleep"], ExportDetail::Summary);
+        let session = &export["data"]["sleep_sessions"][0];
+        assert_eq!(session["wake_count"], 4);
+        assert_eq!(session["awake_minutes"], 20);
+    }
+
+    #[test]
+    fn export_carries_the_sleep_stage_timeline() {
+        let db = Database::in_memory().unwrap();
+        let start = ts();
+        db.insert_sleep_session(&SleepSession {
+            sleep_id: "sleep-export".into(),
+            start_time: start,
+            end_time: start + chrono::Duration::minutes(400),
+            score: Some(80),
+            duration_minutes: 380,
+            deep_minutes: 80,
+            light_minutes: 240,
+            rem_minutes: Some(40),
+            awake_minutes: 20,
+            source_scope: SourceScope::Device,
+            device_id: Some("SN-ONE".into()),
+            synced_at: None,
+            time_in_bed_minutes: None,
+            wake_count: None,
+            stages: vec![
+                SleepStageSlice {
+                    stage: "light".into(),
+                    start_time: start,
+                    end_time: start + chrono::Duration::minutes(30),
+                },
+                SleepStageSlice {
+                    stage: "deep".into(),
+                    start_time: start + chrono::Duration::minutes(30),
+                    end_time: start + chrono::Duration::minutes(90),
+                },
+            ],
+        })
+        .unwrap();
+
+        for detail in [ExportDetail::Summary, ExportDetail::Full] {
+            let export = parsed_export(&db, &["sleep"], detail);
+            let stages = export["data"]["sleep_sessions"][0]["stages"]
+                .as_array()
+                .unwrap();
+            assert_eq!(stages.len(), 2, "{detail:?}");
+            assert_eq!(stages[0]["stage"], "light");
+            assert_eq!(stages[1]["stage"], "deep");
+        }
+    }
+
+    #[test]
+    fn export_says_why_a_selected_type_is_missing() {
+        let db = Database::in_memory().unwrap();
+        db.insert_metric_sample(&MetricSample {
+            metric: "hrv".into(),
+            timestamp: ts(),
+            value: 45.0,
+            unit: "ms".into(),
+            source_scope: SourceScope::Device,
+            device_id: Some("SN-ONE".into()),
+        })
+        .unwrap();
+
+        let export = parsed_export(&db, &["hrv", "spo2", "sleep"], ExportDetail::Summary);
+        let capabilities = &export["capabilities"];
+        assert_eq!(capabilities["hrv"]["status"], "available");
+        assert_eq!(capabilities["hrv"]["source_records"], 1);
+        assert_eq!(capabilities["hrv"]["rows_in_export"], 1);
+        // Nothing fetched and nothing stored: genuinely empty for this window.
+        assert_eq!(capabilities["spo2"]["status"], "empty_in_range");
+        assert_eq!(capabilities["sleep"]["status"], "empty_in_range");
+    }
+
+    #[test]
+    fn a_fetched_but_unparsed_stream_is_not_reported_as_empty() {
+        // "empty_in_range" claims the stream is wired and the account has no
+        // data. For a stream whose raw responses are on disk but whose field
+        // mapping is not verified yet, that is false in a way that would send
+        // a reader looking for a device problem that does not exist.
+        let db = Database::in_memory().unwrap();
+        db.insert_raw_record(&RawRecord {
+            stream: "wellness".into(),
+            source_key: "wellness:spo2:user_events:2023-11-01:2023-11-08".into(),
+            source_scope: SourceScope::UserFused,
+            device_id: None,
+            start_utc: ts(),
+            end_utc: Some(ts() + chrono::Duration::days(7)),
+            payload: serde_json::json!({ "items": [] }),
+            capability: CapabilityStatus::Unverified,
+        })
+        .unwrap();
+
+        let export = parsed_export(&db, &["spo2", "sleep"], ExportDetail::Summary);
+        let capabilities = &export["capabilities"];
+        assert_eq!(capabilities["spo2"]["status"], "raw_pending");
+        assert_eq!(capabilities["spo2"]["raw_records"], 1);
+        // A stream with no raw responses at all still reports plain emptiness.
+        assert_eq!(capabilities["sleep"]["status"], "empty_in_range");
+    }
+
+    #[test]
+    fn daily_metric_sources_fold_with_the_fused_reading_first() {
+        let db = Database::in_memory().unwrap();
+        db.insert_daily_metric(&DailyMetric {
+            date: "2023-11-15".into(),
+            metric: "steps".into(),
+            value: 67.0,
+            unit: "steps".into(),
+            source_scope: SourceScope::UserFused,
+            device_id: None,
+        })
+        .unwrap();
+        db.insert_daily_metric(&DailyMetric {
+            date: "2023-11-15".into(),
+            metric: "steps".into(),
+            value: 99.0,
+            unit: "steps".into(),
+            source_scope: SourceScope::Device,
+            device_id: Some("SN-ONE".into()),
+        })
+        .unwrap();
+
+        let export = parsed_export(&db, &["steps"], ExportDetail::Summary);
+        let rows = export["data"]["daily_metrics"].as_array().unwrap();
+        assert_eq!(rows.len(), 1, "one day and one metric is one row");
+        assert_eq!(rows[0]["value"], 67.0);
+        assert_eq!(rows[0]["source_scope"], "user_fused");
+        // The disagreeing device reading is kept, not silently dropped.
+        let alternates = rows[0]["alternates"].as_array().unwrap();
+        assert_eq!(alternates.len(), 1);
+        assert_eq!(alternates[0]["value"], 99.0);
+        assert_eq!(alternates[0]["source_scope"], "device");
+    }
+
+    #[test]
+    fn one_physical_device_gets_one_label() {
+        // Zepp stores an identity row per alias. The strap's rows share a
+        // serial but differ in device_id, and keying a group on both reported
+        // one device as two.
+        let db = Database::in_memory().unwrap();
+        for (alias, device_id) in [
+            ("2445B138005129", "2445B138005129"),
+            ("D85403FFFEE4D576", "D85403FFFEE4D576"),
+        ] {
+            db.conn
+                .execute(
+                    "INSERT INTO device_identities
+                        (alias, name, firmware, serial, device_id, timezone, updated_at)
+                     VALUES (?1, ?2, NULL, ?3, ?4, NULL, ?5)",
+                    params![
+                        alias,
+                        "凌苍的Helio Strap",
+                        "2445B138005129",
+                        device_id,
+                        Utc::now().to_rfc3339()
+                    ],
+                )
+                .unwrap();
+        }
+        db.insert_metric_sample(&MetricSample {
+            metric: "hrv".into(),
+            timestamp: ts(),
+            value: 45.0,
+            unit: "ms".into(),
+            source_scope: SourceScope::Device,
+            device_id: Some("D85403FFFEE4D576".into()),
+        })
+        .unwrap();
+
+        let export = parsed_export(&db, &["hrv"], ExportDetail::Summary);
+        let devices = export["devices"].as_array().unwrap();
+        assert_eq!(devices.len(), 1, "one strap must not appear twice");
+        assert_eq!(devices[0]["label"], "device_1");
+        assert_eq!(devices[0]["model"], "Amazfit Helio Strap");
+        assert_eq!(devices[0]["kind"], "strap");
+        // Neither the serial nor the user's nickname may leave the machine.
+        let encoded = serde_json::to_string(&export).unwrap();
+        assert!(!encoded.contains("2445B138005129"));
+        assert!(!encoded.contains("凌苍"));
+        assert_eq!(
+            export["data"]["metric_samples"][0]["device_label"],
+            "device_1"
+        );
+    }
+
+    #[test]
+    fn heart_rate_zones_state_their_basis_and_are_absent_without_one() {
+        let db = Database::in_memory().unwrap();
+        // No workout has a max_hr yet, so there is no defensible zone basis.
+        let empty = parsed_export(&db, &["workouts"], ExportDetail::Summary);
+        assert!(
+            empty["analysis"].get("heart_rate_zones").is_none(),
+            "zones must not appear without a measured maximum"
+        );
+
+        db.insert_workout(&Workout {
+            workout_id: "1700000000".into(),
+            workout_type: "run".into(),
+            start_time: ts(),
+            end_time: ts() + chrono::Duration::minutes(10),
+            distance_meters: Some(1000.0),
+            calories: Some(80),
+            avg_hr: Some(140),
+            max_hr: Some(200),
+            training_load: Some(20.0),
+            vo2max: None,
+            source_scope: SourceScope::Device,
+            device_id: None,
+            synced_at: None,
+            gps_available: false,
+            sample_count: 0,
+            zepp_source: None,
+            zepp_type: None,
+        })
+        .unwrap();
+
+        let export = parsed_export(&db, &["workouts"], ExportDetail::Summary);
+        let zones = &export["analysis"]["heart_rate_zones"];
+        assert_eq!(zones["basis"]["type"], "observed_max");
+        assert_eq!(zones["basis"]["value"], 200);
+        // 50-60% of 200 bpm.
+        assert_eq!(zones["zones"][0]["min_bpm"], 100);
+        assert_eq!(zones["zones"][0]["max_bpm"], 119);
+        assert_eq!(zones["zones"].as_array().unwrap().len(), 5);
+    }
+
+    #[test]
+    fn acwr_stays_silent_until_the_chronic_window_is_covered() {
+        let db = Database::in_memory().unwrap();
+        // Nine days of load: enough for the acute window, nowhere near the
+        // chronic one. A ratio here would read as a spike that never happened.
+        for day in 1..=9 {
+            db.insert_daily_metric(&DailyMetric {
+                date: format!("2023-11-{day:02}"),
+                metric: "training_load".into(),
+                value: 100.0,
+                unit: "load".into(),
+                source_scope: SourceScope::Unknown,
+                device_id: None,
+            })
+            .unwrap();
+        }
+        let export = parsed_export(&db, &["training_load"], ExportDetail::Summary);
+        let days = export["analysis"]["training_load_balance"]["days"]
+            .as_array()
+            .unwrap();
+        let ninth = days
+            .iter()
+            .find(|day| day["date"] == "2023-11-09")
+            .expect("day in range");
+        assert_eq!(ninth["acute_7d"], 700.0);
+        assert_eq!(ninth["acute_days_with_data"], 7);
+        assert!(
+            ninth["acute_chronic_ratio"].is_null(),
+            "a ratio against a partly empty chronic window is misleading"
+        );
+    }
+
+    #[test]
+    fn agreeing_daily_sources_do_not_produce_noise() {
+        let db = Database::in_memory().unwrap();
+        for (scope, device) in [
+            (SourceScope::UserFused, None),
+            (SourceScope::Device, Some("SN-ONE".to_string())),
+        ] {
+            db.insert_daily_metric(&DailyMetric {
+                date: "2023-11-15".into(),
+                metric: "steps".into(),
+                value: 67.0,
+                unit: "steps".into(),
+                source_scope: scope,
+                device_id: device,
+            })
+            .unwrap();
+        }
+        let export = parsed_export(&db, &["steps"], ExportDetail::Summary);
+        let rows = export["data"]["daily_metrics"].as_array().unwrap();
+        assert_eq!(rows.len(), 1);
+        assert!(
+            rows[0].get("alternates").is_none(),
+            "sources that agree need no alternates block"
+        );
+    }
+
     #[test]
     fn zepp_pace_is_remapped_to_minutes_per_kilometre() {
         let from_speed = pace_minutes_per_kilometre(Some(0.4), Some(2.5)).unwrap();
@@ -2840,6 +4042,7 @@ mod tests {
             device_id: None,
             synced_at: None,
             time_in_bed_minutes: None,
+            wake_count: None,
             stages: Vec::new(),
         })
         .unwrap();
@@ -2956,6 +4159,7 @@ mod tests {
             device_id: Some("SN-ONE".into()),
             synced_at: Some(start + chrono::Duration::hours(10)),
             time_in_bed_minutes: None,
+            wake_count: None,
             stages: vec![SleepStageSlice {
                 stage: "deep".into(),
                 start_time: start,

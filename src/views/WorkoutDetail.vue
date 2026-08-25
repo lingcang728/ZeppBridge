@@ -456,7 +456,7 @@ const loadDetail = async () => {
   error.value = null;
   if (!isTauri()) { loading.value = false; return; }
   try {
-    const emptySeries = { workout_id: workoutId.value, samples: [], route: [], pauses: [], summary: {} };
+    const emptySeries = { workout_id: workoutId.value, samples: [], route: [], pauses: [], splits: [], summary: {} };
     const [detail, workoutSeries] = await Promise.all([
       tauriApi.getWorkoutDetail(workoutId.value),
       tauriApi.getWorkoutSeries(workoutId.value).catch(() => emptySeries),

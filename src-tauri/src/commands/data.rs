@@ -5,8 +5,9 @@ use crate::export_formats;
 use crate::ipc_types::CleanupResult;
 use crate::models::{
     AiHandoffMetadata, AiHandoffResult, DailyPoint, DeviceCacheMetadata, DeviceMatchStatus,
-    DeviceProfile, DeviceProfilesResult, ExportResult, ExportSelection, HealthOverview,
-    HeartRatePoint, SleepSession, StorageEstimate, UserPrefs, Workout, WorkoutSeries,
+    DeviceProfile, DeviceProfilesResult, ExportDetail, ExportResult, ExportSelection,
+    HealthOverview, HeartRatePoint, SleepSession, StorageEstimate, UserPrefs, Workout,
+    WorkoutSeries,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -241,11 +242,15 @@ pub async fn save_gpx_export(
 /// (including "nothing to write") happen before any file is touched.
 async fn write_converted_export(
     state: &AppState,
-    selection: ExportSelection,
+    mut selection: ExportSelection,
     path: PathBuf,
     convert: fn(&Value) -> std::result::Result<(String, usize), String>,
     label: &str,
 ) -> std::result::Result<ExportResult, String> {
+    // CSV rows and GPX track points come from the per-second series, which the
+    // summary export omits by design. These formats are archival, so they
+    // always read the full payload regardless of what the UI has selected.
+    selection.detail = ExportDetail::Full;
     let (encoded, record_count) = {
         let db = state.db.lock().await;
         db.build_ai_export(&selection)

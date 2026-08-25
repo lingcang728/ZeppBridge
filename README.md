@@ -105,6 +105,16 @@ curl.exe "http://127.0.0.1:43921/workouts/<WORKOUT_ID>/series"
 
 更多见 [安全与隐私](docs/reference/security-and-privacy.md)。安全问题请走 GitHub 私密漏洞报告。
 
+## 致谢
+
+Zepp 的移动端接口没有公开文档，也没有能力发现接口——某个数据流是否存在，只能靠已经把它跑通的人写下来。ZeppBridge 的接口映射站在这些项目的肩膀上：
+
+- **[m4ary/zepp-health-cli](https://github.com/m4ary/zepp-health-cli)** — 三套事件接口面的划分（`/v2/users/me/events`、`/users/{id}/events`、`/users/{id}/events/dateString`）与各自的时间参数形态，以及血氧、压力、呼吸率、皮温、血压、PAI 的真实 `eventType`/`subType` 取值。ZeppBridge 此前自行猜测的名字（`stress/real_data`、`skin_temp/real_data`、`bloodpressure/real_data`）**无一命中**；正确的是 `Charge/stress_data`、`skinTemp/real_data`、`blood_pressure/real_data`。
+- **[Thejuampi/icu](https://github.com/Thejuampi/icu)** — 独立复现了同一组接口，两者逐条一致，使这份映射可以当作交叉验证过的事实而非孤证。
+- **[H3llK33p3r/zepp-fit-extractor](https://github.com/H3llK33p3r/zepp-fit-extractor)** (Apache-2.0) — `/v1/sport/run/detail.json` 差分串的解码算法。
+
+这些项目本身不含在发行物内，ZeppBridge 参考的是它们记录下来的接口事实。
+
 ## 许可证
 
 [MIT License](LICENSE)。Zepp、Amazfit 及相关商标属于各自权利人。

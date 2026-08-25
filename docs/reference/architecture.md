@@ -59,6 +59,36 @@ Zepp 区域云端 → ZeppConnector → Raw provenance → Normalizer → SQLite
 - 安装包已签名、数据库已整库加密，或已达到公开发布门槛；
 - **macOS 端已在真实设备上验收**：目前仅有 CI（`macos-latest`）的编译、clippy 与测试通过，以及贡献者本人在 M 芯片上的一次冒烟；仓库维护者没有 macOS 设备，无法独立复核同步、登录与钥匙串行为。
 
+## Zepp 事件接口映射
+
+Zepp 的事件接口有**三套互不等价的形态**，同一个 `eventType` 在不同形态下行为不同。把它们当成一个接口的变体，是 ZeppBridge 早期认定「本账号没有血氧」的直接原因——而 Zepp App 里明明有连续血氧记录。
+
+| 形态 | 路径 | 时间参数 | 用途 |
+|---|---|---|---|
+| v2 | `/v2/users/me/events` | `from`/`to` 毫秒 | HRV、readiness、Charge（含压力）、呼吸率、皮温、血压 |
+| user | `/users/{id}/events` | `from`/`to` 毫秒 | 血氧（`click`）、`all_day_stress`、PAI |
+| day | `/users/{id}/events/dateString` | `from`/`to` ISO-8601 + `timeZone` | 夜间血氧 `odi` / `osa_event` |
+
+已确证的 `eventType`/`subType`（来源见 README 致谢，两个独立项目逐条一致）：
+
+```
+v2:    hrv_sdnn/real_data · HRVRMSSD/real_data · readiness/watch_score
+       Charge/real_data · Charge/stress_data · Charge/insight_data
+       DailyHealth/summary · RespiratoryRate/real_data · skinTemp/real_data
+       blood_pressure/real_data · Emotion/real_data · LactateThreshold/summary
+user:  blood_oxygen/click · all_day_stress · single_stress · PaiHealthInfo
+day:   blood_oxygen/odi · blood_oxygen/osa_event
+```
+
+### 能力探测为什么必须带对照组
+
+`/v2/users/me/events` 对**任何** `eventType` 都返回 HTTP 200 与空列表，包括根本不存在的名字。因此「返回空」本身不构成任何证据。设置页的探测器固定跑两个对照：
+
+- **正对照** `hrv_sdnn/real_data` — 已知有数据。它若为空，说明探测链路本身坏了（鉴权、时间窗、解析），其余结果一律不可信。
+- **负对照** 一个不存在的流名 — 它若同样返回空，则「空」对任何候选流都不构成证据，界面必须显示「无法判断」，而不是「接口有响应但没数据」。
+
+探测只读，不落库、不写日志、不读取任何测量值，只记录状态与字段名。
+
 ## 后续阶段
 
 | 阶段 | 状态 |

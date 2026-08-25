@@ -506,6 +506,67 @@ impl ZeppConnector {
         .await
     }
 
+    /// The user-scoped event timeline: `/users/{id}/events`.
+    ///
+    /// This is a different surface from `/v2/users/me/events`, not a variant of
+    /// it — blood oxygen, all-day stress and PAI live here and are invisible to
+    /// the v2 path. Endpoint shape confirmed against two independent
+    /// reverse-engineering projects (see `docs/reference/architecture.md`).
+    /// `sub_type` is genuinely optional here: `all_day_stress` takes none.
+    pub async fn fetch_user_events(
+        &self,
+        event_type: &str,
+        sub_type: Option<&str>,
+        from_ms: i64,
+        to_ms: i64,
+        limit: i64,
+        reverse: bool,
+    ) -> Result<Value> {
+        let path = format!("/users/{}/events", self.auth.user_id);
+        let mut params = vec![
+            ("eventType", event_type.to_owned()),
+            ("from", from_ms.to_string()),
+            ("to", to_ms.to_string()),
+            ("limit", limit.max(1).to_string()),
+            ("reverse", if reverse { "1" } else { "0" }.to_owned()),
+            ("userId", self.auth.user_id.clone()),
+        ];
+        if let Some(sub_type) = sub_type {
+            params.push(("subType", sub_type.to_owned()));
+        }
+        self.get_json(&path, params).await
+    }
+
+    /// `/users/{id}/events/dateString` — the same timeline addressed by an
+    /// ISO-8601 window plus an IANA timezone instead of epoch milliseconds.
+    /// The nightly SpO2 desaturation (`odi`) and apnea (`osa_event`) windows
+    /// are only served here.
+    pub async fn fetch_user_events_date_string(
+        &self,
+        event_type: &str,
+        sub_type: &str,
+        from_iso: &str,
+        to_iso: &str,
+        time_zone: &str,
+        limit: i64,
+    ) -> Result<Value> {
+        let path = format!("/users/{}/events/dateString", self.auth.user_id);
+        self.get_json(
+            &path,
+            vec![
+                ("eventType", event_type.to_owned()),
+                ("subType", sub_type.to_owned()),
+                ("from", from_iso.to_owned()),
+                ("to", to_iso.to_owned()),
+                ("timeZone", time_zone.to_owned()),
+                ("limit", limit.max(1).to_string()),
+                ("reverse", "0".to_owned()),
+                ("userId", self.auth.user_id.clone()),
+            ],
+        )
+        .await
+    }
+
     // Backwards-compatible wrappers. They now use real endpoints and are not
     // aliases for the old fabricated `/v1/health/*` paths.
     #[allow(dead_code)]

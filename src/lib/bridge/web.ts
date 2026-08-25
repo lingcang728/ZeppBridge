@@ -19,6 +19,7 @@ export const webBackend: BridgeBackend = {
   startHistorySync: unavailable,
   startIncrementalSync: unavailable,
   cancelSync: unavailable,
+  probeDataCapabilities: unavailable,
   getHealthOverview: unavailable,
   getHeartRateSeries: unavailable,
   getTrainingLoadSeries: unavailable,

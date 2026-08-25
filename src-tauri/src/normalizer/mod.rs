@@ -262,6 +262,11 @@ impl Normalizer {
                     &["max_hr", "maxHr", "maximumHeartRate", "max_heart_rate"],
                 )
                 .map(|v| v as i32),
+                // Zepp reports "not measured" as a negative sentinel, and only
+                // running-type activities produce VO2 max at all: `-1` covers
+                // 103 of 172 local workouts. Keeping it would hand downstream
+                // readers a fabricated number, so it becomes null; the raw
+                // payload still holds the original value.
                 training_load: first_number(
                     object,
                     &[
@@ -270,8 +275,10 @@ impl Normalizer {
                         "trainLoad",
                         "exercise_load",
                     ],
-                ),
-                vo2max: first_number(object, &["vo2max", "vo2Max", "VO2_MAX", "VO2_max"]),
+                )
+                .filter(|value| *value >= 0.0),
+                vo2max: first_number(object, &["vo2max", "vo2Max", "VO2_MAX", "VO2_max"])
+                    .filter(|value| *value > 0.0),
                 source_scope: source_scope(Some(object), source_device.as_deref()),
                 device_id: source_device,
                 synced_at: None,
@@ -547,6 +554,9 @@ fn sleep_from_band_item(
         synced_at: None,
         time_in_bed_minutes: None,
         stages,
+        wake_count: first_number(sleep, &["wc", "wakeCount"])
+            .map(|value| value.round() as i32)
+            .filter(|value| (0..=200).contains(value)),
     })
 }
 
@@ -588,6 +598,7 @@ fn sleep_from_flat_object(object: &Map<String, Value>) -> Option<SleepSession> {
         synced_at: None,
         time_in_bed_minutes: None,
         stages: Vec::new(),
+        wake_count: None,
     })
 }
 
@@ -878,7 +889,9 @@ fn collect_charge_metrics(
         return 0;
     };
     let source_device = device_id(value).or_else(|| device_id(event));
-    let scope = source_scope(Some(value), source_device.as_deref());
+    // The event object carries `eventType`; the inner value object does not,
+    // and Charge is an account-level aggregate.
+    let scope = source_scope(Some(event), source_device.as_deref());
     let mut count = 0;
     for (metric, field) in [
         ("hybrid_charge", "total"),
@@ -1212,25 +1225,363 @@ fn summary_date(
     .and_then(parse_date)
 }
 
+/// What one wellness raw response yields once parsed.
+///
+/// Unrecognised streams return empty vectors and a diagnostic rather than an
+/// error: the raw response has to survive so its shape can be verified later.
+#[derive(Debug, Clone, Default)]
+pub struct WellnessNormalizedData {
+    pub daily_metrics: Vec<DailyMetric>,
+    pub metric_samples: Vec<MetricSample>,
+    pub diagnostics: Vec<String>,
+}
+
+impl Normalizer {
+    /// Parse one optional wellness stream.
+    ///
+    /// The stream is identified by its source key (`wellness:{label}:…`) rather
+    /// than sniffed from the payload, because several of these share an
+    /// envelope shape while meaning entirely different things.
+    ///
+    /// Only shapes verified against a real response are parsed here. Stress
+    /// (`Charge/stress_data`) is deliberately absent: its payload is a
+    /// protobuf whose float fields do not match the ranges the Zepp app shows,
+    /// so mapping it would be a guess. The raw response is retained and the
+    /// daily summary is read from `all_day_stress` instead.
+    pub fn normalize_wellness(source_key: &str, raw: &Value) -> WellnessNormalizedData {
+        let label = source_key.split(':').nth(1).unwrap_or_default();
+        let mut out = WellnessNormalizedData::default();
+        let Some(items) = raw.get("items").and_then(Value::as_array) else {
+            out.diagnostics
+                .push(format!("{label}: 报文没有 items 数组"));
+            return out;
+        };
+        match label {
+            "lactate_threshold" => lactate_threshold_metrics(items, &mut out),
+            "respiratory_rate" => respiratory_rate_metrics(items, &mut out),
+            "hrv_rmssd" => hrv_rmssd_samples(items, &mut out),
+            "spo2" | "spo2_auto" => spo2_samples(items, &mut out),
+            "pai" => pai_metrics(items, &mut out),
+            "all_day_stress" => all_day_stress_metrics(items, &mut out),
+            other => out
+                .diagnostics
+                .push(format!("{other}: 结构尚未验证，仅保留原始报文")),
+        }
+        out
+    }
+}
+
+/// `value.samples[]` carries `dateString`, `lactateThresholdHr` (bpm) and
+/// `lactateThresholdPace` (seconds per kilometre). Verified against the Zepp
+/// app: 2026-08-11 reads 175 bpm and 309 s/km, which the app shows as
+/// "175 次/分" and "05'09"/公里".
+fn lactate_threshold_metrics(items: &[Value], out: &mut WellnessNormalizedData) {
+    for item in items {
+        let Some(samples) = item
+            .pointer("/value/samples")
+            .and_then(Value::as_array)
+            .filter(|list| !list.is_empty())
+        else {
+            continue;
+        };
+        for sample in samples {
+            let Some(object) = sample.as_object() else {
+                continue;
+            };
+            let Some(date) = first_string(object, &["dateString", "date"])
+                .filter(|value| NaiveDate::parse_from_str(value, "%Y-%m-%d").is_ok())
+            else {
+                continue;
+            };
+            for (metric, keys, unit, range) in [
+                (
+                    "lactate_threshold_hr",
+                    &["lactateThresholdHr"][..],
+                    "bpm",
+                    (60.0, 230.0),
+                ),
+                (
+                    "lactate_threshold_pace",
+                    &["lactateThresholdPace"][..],
+                    "s/km",
+                    (100.0, 1800.0),
+                ),
+            ] {
+                if let Some(value) =
+                    first_number(object, keys).filter(|value| (range.0..=range.1).contains(value))
+                {
+                    out.daily_metrics.push(DailyMetric {
+                        date: date.clone(),
+                        metric: metric.into(),
+                        value,
+                        unit: unit.into(),
+                        source_scope: SourceScope::UserFused,
+                        device_id: None,
+                    });
+                }
+            }
+        }
+    }
+}
+
+/// `value.measurements` is base64 of 1440 bytes — one breaths-per-minute
+/// reading per minute of the local day, with 0 meaning "not measured".
+/// Verified physiologically: the non-zero values land between 11 and 18.
+fn respiratory_rate_metrics(items: &[Value], out: &mut WellnessNormalizedData) {
+    for item in items {
+        let Some(object) = item.as_object() else {
+            continue;
+        };
+        let Some(encoded) = item
+            .pointer("/value/measurements")
+            .and_then(Value::as_str)
+            .filter(|text| !text.is_empty())
+        else {
+            continue;
+        };
+        let Ok(bytes) = STANDARD.decode(encoded) else {
+            out.diagnostics
+                .push("respiratory_rate: measurements 不是合法 base64".into());
+            continue;
+        };
+        // Physiologically impossible readings are sensor noise, not data.
+        let readings: Vec<f64> = bytes
+            .iter()
+            .map(|value| f64::from(*value))
+            .filter(|value| (4.0..=60.0).contains(value))
+            .collect();
+        if readings.is_empty() {
+            continue;
+        }
+        let Some(date) = summary_date(object, None) else {
+            continue;
+        };
+        let count = readings.len() as f64;
+        let average = readings.iter().sum::<f64>() / count;
+        let minimum = readings.iter().cloned().fold(f64::INFINITY, f64::min);
+        let maximum = readings.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        for (metric, value) in [
+            ("respiratory_rate", (average * 10.0).round() / 10.0),
+            ("respiratory_rate_min", minimum),
+            ("respiratory_rate_max", maximum),
+        ] {
+            out.daily_metrics.push(DailyMetric {
+                date: date.clone(),
+                metric: metric.into(),
+                value,
+                unit: "brpm".into(),
+                source_scope: SourceScope::Device,
+                device_id: None,
+            });
+        }
+    }
+}
+
+/// `value.samples[]` carries `{hrv, s}` where `s` is a millisecond offset from
+/// `value.startTime` — the offsets step in whole minutes (0, 60000, 120000 …).
+fn hrv_rmssd_samples(items: &[Value], out: &mut WellnessNormalizedData) {
+    for item in items {
+        let Some(start) = item
+            .pointer("/value/startTime")
+            .and_then(Value::as_i64)
+            .and_then(DateTime::from_timestamp_millis)
+        else {
+            continue;
+        };
+        let device = item
+            .pointer("/value")
+            .and_then(Value::as_object)
+            .and_then(device_id);
+        let Some(samples) = item.pointer("/value/samples").and_then(Value::as_array) else {
+            continue;
+        };
+        for sample in samples {
+            let Some(object) = sample.as_object() else {
+                continue;
+            };
+            // RMSSD outside this band is a failed read, not a heart.
+            let Some(value) = first_number(object, &["hrv", "rmssd"])
+                .filter(|value| (1.0..=400.0).contains(value))
+            else {
+                continue;
+            };
+            let offset_ms = first_number(object, &["s", "offset"])
+                .map(|value| value.round() as i64)
+                .unwrap_or(0);
+            let Some(timestamp) = start.checked_add_signed(Duration::milliseconds(offset_ms))
+            else {
+                continue;
+            };
+            out.metric_samples.push(MetricSample {
+                metric: "hrv_rmssd".into(),
+                timestamp,
+                value,
+                unit: "ms".into(),
+                source_scope: SourceScope::Device,
+                device_id: device.clone(),
+            });
+        }
+    }
+}
+
+/// Each item is one reading, and the reading lives in `extra` — a JSON string,
+/// not an object. There is no `value` envelope on this stream.
+fn spo2_samples(items: &[Value], out: &mut WellnessNormalizedData) {
+    for item in items {
+        let Some(object) = item.as_object() else {
+            continue;
+        };
+        let Some(extra) = object
+            .get("extra")
+            .and_then(Value::as_str)
+            .and_then(|text| serde_json::from_str::<Value>(text).ok())
+        else {
+            continue;
+        };
+        let Some(extra) = extra.as_object() else {
+            continue;
+        };
+        // A saturation outside this band is a failed read.
+        let Some(value) =
+            first_number(extra, &["spo2", "value"]).filter(|value| (50.0..=100.0).contains(value))
+        else {
+            continue;
+        };
+        let Some(timestamp) = first_number(extra, &["timestamp"])
+            .or_else(|| first_number(object, &["timestamp"]))
+            .and_then(|millis| DateTime::from_timestamp_millis(millis.round() as i64))
+        else {
+            continue;
+        };
+        out.metric_samples.push(MetricSample {
+            metric: "spo2".into(),
+            timestamp,
+            value,
+            unit: "%".into(),
+            source_scope: SourceScope::Device,
+            device_id: device_id(extra),
+        });
+    }
+}
+
+/// PAI items are flat — no `value` envelope. Alongside the score they carry the
+/// watch's own `maxHr` and `restHr`, which are the only device-sourced heart
+/// rate bounds available anywhere in this API.
+fn pai_metrics(items: &[Value], out: &mut WellnessNormalizedData) {
+    for item in items {
+        let Some(object) = item.as_object() else {
+            continue;
+        };
+        let Some(date) = summary_date(object, None) else {
+            continue;
+        };
+        for (metric, keys, unit, range) in [
+            ("pai_daily", &["dailyPai"][..], "pai", (0.0, 500.0)),
+            ("pai_low_zone", &["lowZonePai"][..], "pai", (0.0, 500.0)),
+            (
+                "pai_medium_zone",
+                &["mediumZonePai"][..],
+                "pai",
+                (0.0, 500.0),
+            ),
+            ("pai_high_zone", &["highZonePai"][..], "pai", (0.0, 500.0)),
+            ("device_max_hr", &["maxHr"][..], "bpm", (100.0, 240.0)),
+            ("device_resting_hr", &["restHr"][..], "bpm", (25.0, 120.0)),
+        ] {
+            if let Some(value) =
+                first_number(object, keys).filter(|value| (range.0..=range.1).contains(value))
+            {
+                out.daily_metrics.push(DailyMetric {
+                    date: date.clone(),
+                    metric: metric.into(),
+                    value,
+                    unit: unit.into(),
+                    source_scope: SourceScope::Device,
+                    device_id: device_id(object),
+                });
+            }
+        }
+    }
+}
+
+/// The all-day stress roll-up: named daily fields, unlike the `Charge`
+/// per-minute stream whose protobuf floats do not match any range the app
+/// displays.
+fn all_day_stress_metrics(items: &[Value], out: &mut WellnessNormalizedData) {
+    for item in items {
+        let Some(object) = item.as_object() else {
+            continue;
+        };
+        let value = item.pointer("/value").and_then(Value::as_object);
+        let Some(date) = summary_date(object, value) else {
+            continue;
+        };
+        for (metric, keys, unit, range) in [
+            (
+                "stress",
+                &["avgStress", "averageStress", "stress"][..],
+                "score",
+                (0.0, 100.0),
+            ),
+            ("stress_min", &["minStress"][..], "score", (0.0, 100.0)),
+            ("stress_max", &["maxStress"][..], "score", (0.0, 100.0)),
+            ("stress_relaxed_pct", &["relaxPct"][..], "%", (0.0, 100.0)),
+            ("stress_normal_pct", &["normalPct"][..], "%", (0.0, 100.0)),
+            ("stress_medium_pct", &["mediumPct"][..], "%", (0.0, 100.0)),
+            ("stress_high_pct", &["highPct"][..], "%", (0.0, 100.0)),
+        ] {
+            if let Some(reading) = first_number_from(object, value, keys)
+                .filter(|reading| (range.0..=range.1).contains(reading))
+            {
+                out.daily_metrics.push(DailyMetric {
+                    date: date.clone(),
+                    metric: metric.into(),
+                    value: reading,
+                    unit: unit.into(),
+                    source_scope: SourceScope::Device,
+                    device_id: value.and_then(device_id).or_else(|| device_id(object)),
+                });
+            }
+        }
+    }
+}
+
 fn device_id(object: &Map<String, Value>) -> Option<String> {
     first_string(
         object,
         &["device_id", "deviceId", "deviceid", "sourceDeviceId"],
     )
-    .map(|value| sanitize_device_id(&value))
+    .and_then(|value| sanitize_device_id(&value))
 }
 
-/// Zepp payloads occasionally carry a placeholder device id such as "1,"
-/// (trailing punctuation).  Trim surrounding whitespace and stray commas so
-/// the stored id stays comparable across endpoints and devices.
-fn sanitize_device_id(value: &str) -> String {
-    let mut cleaned = value.trim().to_string();
-    while cleaned.ends_with(',') || cleaned.ends_with(';') {
-        cleaned.pop();
-        cleaned = cleaned.trim_end().to_string();
-    }
-    cleaned
+/// The shortest observed real identifier is a 14-character serial; anything
+/// shorter is bookkeeping, not a device.
+const MIN_DEVICE_ID_LEN: usize = 8;
+
+/// A device id has to look like one. Zepp reuses these field names for
+/// comma-joined bookkeeping — "1,", "1,-1", "1440,app", "3,D85403FFFEE4D576" —
+/// and storing those verbatim mislabels which watch produced a metric (and
+/// splits one device across several bogus ids). Take the longest
+/// comma-separated segment and keep it only if it has serial shape; that also
+/// recovers the real id out of "3,D85403FFFEE4D576". Unrecognisable values
+/// become `None`, which is honest: the payload did not name a device.
+fn sanitize_device_id(value: &str) -> Option<String> {
+    value
+        .split(',')
+        .map(str::trim)
+        .filter(|segment| {
+            segment.len() >= MIN_DEVICE_ID_LEN
+                && segment.chars().all(|item| item.is_ascii_alphanumeric())
+        })
+        .max_by_key(|segment| segment.len())
+        .map(str::to_owned)
 }
+
+/// Event types whose payload is an account-level aggregate rather than one
+/// device's reading. They carry a bookkeeping `deviceId` that `device_id`
+/// now rejects, so their provenance has to come from the event type instead
+/// of from the presence of an id — otherwise they fall through to `Unknown`.
+const USER_FUSED_EVENT_TYPES: [&str; 2] = ["DailyHealth", "Charge"];
 
 fn source_scope(object: Option<&Map<String, Value>>, device_id: Option<&str>) -> SourceScope {
     if let Some(object) = object {
@@ -1240,6 +1591,16 @@ fn source_scope(object: Option<&Map<String, Value>>, device_id: Option<&str>) ->
             || first_string(object, &["source_scope", "sourceScope"])
                 .map(|scope| scope.eq_ignore_ascii_case("user_fused"))
                 .unwrap_or(false)
+        {
+            return SourceScope::UserFused;
+        }
+        if first_string(object, &["eventType"])
+            .map(|event| {
+                USER_FUSED_EVENT_TYPES
+                    .iter()
+                    .any(|known| known.eq_ignore_ascii_case(&event))
+            })
+            .unwrap_or(false)
         {
             return SourceScope::UserFused;
         }
@@ -1274,16 +1635,48 @@ mod tests {
     }
 
     #[test]
-    fn device_id_placeholder_punctuation_is_trimmed() {
-        let placeholder = json!({"deviceId": "1,"});
-        assert_eq!(
-            device_id(placeholder.as_object().unwrap()).as_deref(),
-            Some("1")
-        );
+    fn bookkeeping_device_ids_are_not_devices() {
+        // These are the placeholder shapes Zepp actually sends. Trimming
+        // punctuation off "1," used to yield a device id of "1", which then
+        // labelled account-level aggregates as if a watch had reported them.
+        for placeholder in ["1,", "1", "1,-1", "1440,app", ""] {
+            let payload = json!({ "deviceId": placeholder });
+            assert_eq!(
+                device_id(payload.as_object().unwrap()),
+                None,
+                "{placeholder} should not pass as a device id"
+            );
+        }
         let real = json!({"sourceDeviceId": "23229501001311"});
         assert_eq!(
             device_id(real.as_object().unwrap()).as_deref(),
             Some("23229501001311")
+        );
+        // A real id joined onto an index is recovered, not discarded.
+        let joined = json!({"deviceId": "3,D85403FFFEE4D576"});
+        assert_eq!(
+            device_id(joined.as_object().unwrap()).as_deref(),
+            Some("D85403FFFEE4D576")
+        );
+    }
+
+    #[test]
+    fn account_level_events_are_user_fused_not_device() {
+        // DailyHealth/Charge carry a bookkeeping deviceId that `device_id`
+        // rejects; without the event-type rule they would fall to `Unknown`
+        // and the export would lose the fact that these are fused totals.
+        for event_type in ["DailyHealth", "Charge"] {
+            let event = json!({ "eventType": event_type, "deviceId": "1," });
+            assert_eq!(
+                source_scope(event.as_object(), None),
+                SourceScope::UserFused,
+                "{event_type}"
+            );
+        }
+        let device_event = json!({ "eventType": "readiness" });
+        assert_eq!(
+            source_scope(device_event.as_object(), Some("D8803CFFFEC19AC6")),
+            SourceScope::Device
         );
     }
 

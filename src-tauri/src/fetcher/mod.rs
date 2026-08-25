@@ -1,7 +1,8 @@
 use crate::connectors::ZeppConnector;
 use crate::models::{error::*, *};
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Duration, NaiveDate, Utc};
 use serde_json::{json, Value};
+use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, Copy)]
 pub struct FetchWindow {
@@ -588,6 +589,569 @@ impl DataFetcher {
 }
 
 #[allow(dead_code)]
+/// Which of the three Zepp event surfaces a candidate lives on.
+///
+/// They are not variants of one endpoint: the same `blood_oxygen` name returns
+/// nothing on `/v2/users/me/events` and real readings on `/users/{id}/events`.
+/// A probe that only knew the v2 path concluded this account had no blood
+/// oxygen at all, which the Zepp app disproved.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ProbeSurface {
+    /// `/v2/users/me/events`, epoch milliseconds.
+    V2Events,
+    /// `/users/{id}/events`, epoch milliseconds.
+    UserEvents,
+    /// `/users/{id}/events/dateString`, ISO-8601 window plus IANA timezone.
+    UserEventsDay,
+}
+
+impl ProbeSurface {
+    fn as_str(self) -> &'static str {
+        match self {
+            ProbeSurface::V2Events => "v2_events",
+            ProbeSurface::UserEvents => "user_events",
+            ProbeSurface::UserEventsDay => "user_events_day",
+        }
+    }
+}
+
+/// How far back a candidate is asked about.
+///
+/// Not every stream is sampled the same way, and using one window for all of
+/// them misreports the sparse ones. Blood pressure and lactate threshold are
+/// measured occasionally — a week of silence means "you have not measured
+/// lately", which is a different statement from "this stream may not exist".
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ProbeCadence {
+    /// Sampled all day, every day: a week is plenty and keeps the probe cheap.
+    Continuous,
+    /// Measured occasionally. Look back a year and report the latest reading's
+    /// date rather than declaring the stream unknown.
+    Episodic,
+}
+
+impl ProbeCadence {
+    fn days(self) -> i64 {
+        match self {
+            ProbeCadence::Continuous => 7,
+            ProbeCadence::Episodic => 365,
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            ProbeCadence::Continuous => "continuous",
+            ProbeCadence::Episodic => "episodic",
+        }
+    }
+}
+
+/// Candidate streams, as `(stream, surface, eventType, subType, cadence)`.
+///
+/// These names are not guesses. The first version invented plausible-looking
+/// ones (`stress/real_data`, `skin_temp/real_data`, `bloodpressure/real_data`)
+/// and every single one missed; the real names are `Charge/stress_data`,
+/// `skinTemp/real_data` and `blood_pressure/real_data`. This table is
+/// transcribed from two independent open-source clients that talk to the same
+/// API — m4ary/zepp-health-cli and Thejuampi/icu — which agree on every entry.
+const CAPABILITY_PROBES: [(&str, ProbeSurface, &str, Option<&str>, ProbeCadence); 16] = [
+    // Controls. The positive one proves the probe itself works; the negative
+    // one tells us whether an empty answer carries any information at all.
+    (
+        CONTROL_POSITIVE,
+        ProbeSurface::V2Events,
+        "hrv_sdnn",
+        Some("real_data"),
+        ProbeCadence::Continuous,
+    ),
+    (
+        CONTROL_NEGATIVE,
+        ProbeSurface::V2Events,
+        "zzz_stream_that_does_not_exist",
+        Some("real_data"),
+        ProbeCadence::Continuous,
+    ),
+    // Stress hides under `Charge`, the same event type as body battery.
+    (
+        "stress",
+        ProbeSurface::V2Events,
+        "Charge",
+        Some("stress_data"),
+        ProbeCadence::Continuous,
+    ),
+    (
+        "stress",
+        ProbeSurface::UserEvents,
+        "all_day_stress",
+        None,
+        ProbeCadence::Continuous,
+    ),
+    // Blood oxygen is only on the user-scoped surfaces.
+    (
+        "spo2",
+        ProbeSurface::UserEvents,
+        "blood_oxygen",
+        None,
+        ProbeCadence::Continuous,
+    ),
+    (
+        "spo2",
+        ProbeSurface::UserEventsDay,
+        "blood_oxygen",
+        Some("odi"),
+        ProbeCadence::Continuous,
+    ),
+    (
+        "spo2",
+        ProbeSurface::UserEventsDay,
+        "blood_oxygen",
+        Some("osa_event"),
+        ProbeCadence::Continuous,
+    ),
+    (
+        "respiratory_rate",
+        ProbeSurface::V2Events,
+        "RespiratoryRate",
+        Some("real_data"),
+        ProbeCadence::Continuous,
+    ),
+    (
+        "hrv_rmssd",
+        ProbeSurface::V2Events,
+        "HRVRMSSD",
+        Some("real_data"),
+        ProbeCadence::Continuous,
+    ),
+    (
+        "hybrid_charge",
+        ProbeSurface::V2Events,
+        "Charge",
+        Some("insight_data"),
+        ProbeCadence::Continuous,
+    ),
+    (
+        "pai",
+        ProbeSurface::UserEvents,
+        "PaiHealthInfo",
+        None,
+        ProbeCadence::Continuous,
+    ),
+    (
+        "second_heart_rate",
+        ProbeSurface::V2Events,
+        "second_heart_rate",
+        Some("real_data"),
+        ProbeCadence::Continuous,
+    ),
+    // Episodic: a week of silence says nothing about these.
+    (
+        "blood_pressure",
+        ProbeSurface::V2Events,
+        "blood_pressure",
+        Some("real_data"),
+        ProbeCadence::Episodic,
+    ),
+    (
+        "lactate_threshold",
+        ProbeSurface::V2Events,
+        "LactateThreshold",
+        Some("summary"),
+        ProbeCadence::Episodic,
+    ),
+    (
+        "emotion",
+        ProbeSurface::V2Events,
+        "Emotion",
+        Some("real_data"),
+        ProbeCadence::Episodic,
+    ),
+    (
+        "weight",
+        ProbeSurface::V2Events,
+        "weight",
+        Some("summary"),
+        ProbeCadence::Episodic,
+    ),
+];
+
+/// A stream ZeppBridge already reads successfully. If this comes back empty the
+/// probe itself is broken (auth, window, transport) and no other row means
+/// anything.
+const CONTROL_POSITIVE: &str = "control_positive";
+
+/// A name the server cannot know. If this comes back "empty" rather than
+/// unavailable, then "empty" carries no information for any candidate.
+const CONTROL_NEGATIVE: &str = "control_negative";
+
+/// Field names seen at the top of a probed payload, capped so a surprising
+/// response cannot turn into an unbounded list.
+const MAX_PROBE_FIELDS: usize = 24;
+
+/// Collect the field *names* a payload uses. Names are schema, not readings —
+/// no measured value is ever read out of the payload here, and nothing the
+/// probe returns is written to the database or to a log.
+fn probe_field_names(items: &[Value]) -> Vec<String> {
+    let mut names = BTreeSet::new();
+    for item in items.iter().take(4) {
+        let Some(object) = item.as_object() else {
+            continue;
+        };
+        for (key, value) in object {
+            names.insert(key.clone());
+            // Event payloads nest the interesting schema one or two levels
+            // down, under `value` and then `samples[]`.
+            if key == "value" {
+                if let Some(nested) = value.as_object() {
+                    for (nested_key, nested_value) in nested {
+                        names.insert(format!("value.{nested_key}"));
+                        if nested_key == "samples" {
+                            if let Some(sample) =
+                                nested_value.as_array().and_then(|list| list.first())
+                            {
+                                if let Some(sample) = sample.as_object() {
+                                    for sample_key in sample.keys() {
+                                        names.insert(format!("value.samples[].{sample_key}"));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    names.into_iter().take(MAX_PROBE_FIELDS).collect()
+}
+
+/// The calendar date of the newest item in a probed payload.
+///
+/// This is metadata, not a reading: for an episodic stream "last measured on
+/// 2026-06-14" is the whole answer the user needs, and reporting it is the
+/// difference between "no idea whether you have blood pressure data" and "you
+/// do, you just have not measured since June".
+fn probe_latest_date(items: &[Value]) -> Option<String> {
+    let mut newest: Option<DateTime<Utc>> = None;
+    for item in items {
+        let Some(object) = item.as_object() else {
+            continue;
+        };
+        let moment = ["timestamp", "time", "startTime", "date", "dateString"]
+            .iter()
+            .find_map(|key| object.get(*key).and_then(probe_moment));
+        if let Some(moment) = moment {
+            newest = Some(newest.map_or(moment, |best: DateTime<Utc>| best.max(moment)));
+        }
+    }
+    newest.map(|moment| moment.format("%Y-%m-%d").to_string())
+}
+
+/// Read one timestamp-ish value: epoch seconds, epoch millis, or a date string.
+fn probe_moment(value: &Value) -> Option<DateTime<Utc>> {
+    match value {
+        Value::Number(number) => {
+            let raw = number.as_i64()?;
+            let seconds = if raw >= 10_000_000_000 {
+                raw / 1000
+            } else {
+                raw
+            };
+            DateTime::from_timestamp(seconds, 0)
+        }
+        Value::String(text) => {
+            let text = text.trim();
+            if let Ok(parsed) = DateTime::parse_from_rfc3339(text) {
+                return Some(parsed.with_timezone(&Utc));
+            }
+            if let Ok(day) = NaiveDate::parse_from_str(text, "%Y-%m-%d") {
+                return day.and_hms_opt(0, 0, 0).map(|naive| naive.and_utc());
+            }
+            text.parse::<i64>().ok().and_then(|raw| {
+                let seconds = if raw >= 10_000_000_000 {
+                    raw / 1000
+                } else {
+                    raw
+                };
+                DateTime::from_timestamp(seconds, 0)
+            })
+        }
+        _ => None,
+    }
+}
+
+impl DataFetcher {
+    /// Ask the server, per candidate, whether a stream exists for this account.
+    ///
+    /// A probe never persists anything: the point is to replace guesswork
+    /// ("another client can read HRV, so you should be able to") with a fact
+    /// about *this* account and *these* devices. A stream that answers with no
+    /// items is a different fact from one that 404s, and both are different
+    /// from a stream ZeppBridge has not implemented.
+    pub async fn probe_event_streams(
+        &self,
+        day: NaiveDate,
+        time_zone: &str,
+    ) -> Vec<CapabilityProbe> {
+        let mut results = Vec::new();
+        for (stream, surface, event_type, sub_type, cadence) in CAPABILITY_PROBES {
+            let Some(start) = (day - Duration::days(cadence.days() - 1)).and_hms_opt(0, 0, 0)
+            else {
+                continue;
+            };
+            let Some(end) = day.and_hms_opt(23, 59, 59) else {
+                continue;
+            };
+            let from = start.and_utc().timestamp_millis();
+            let to = end.and_utc().timestamp_millis();
+
+            let outcome = match surface {
+                ProbeSurface::V2Events => {
+                    self.connector
+                        .fetch_events(
+                            event_type,
+                            sub_type.unwrap_or("real_data"),
+                            from,
+                            to,
+                            50,
+                            true,
+                        )
+                        .await
+                }
+                ProbeSurface::UserEvents => {
+                    self.connector
+                        .fetch_user_events(event_type, sub_type, from, to, 50, true)
+                        .await
+                }
+                ProbeSurface::UserEventsDay => {
+                    self.connector
+                        .fetch_user_events_date_string(
+                            event_type,
+                            sub_type.unwrap_or("odi"),
+                            &start.and_utc().to_rfc3339(),
+                            &end.and_utc().to_rfc3339(),
+                            time_zone,
+                            50,
+                        )
+                        .await
+                }
+            };
+
+            let mut probe = CapabilityProbe {
+                stream: stream.to_string(),
+                surface: surface.as_str().to_string(),
+                cadence: cadence.as_str().to_string(),
+                window_days: cadence.days(),
+                event_type: event_type.to_string(),
+                sub_type: sub_type.unwrap_or_default().to_string(),
+                status: "error".to_string(),
+                records: 0,
+                latest_date: None,
+                fields: Vec::new(),
+            };
+            match outcome {
+                Ok(payload) => {
+                    let items = payload_items(&payload);
+                    probe.status = if items.is_empty() {
+                        "empty".to_string()
+                    } else {
+                        "available".to_string()
+                    };
+                    probe.records = items.len();
+                    probe.latest_date = probe_latest_date(&items);
+                    probe.fields = probe_field_names(&items);
+                }
+                Err(error) if error.is_unavailable() => probe.status = "unavailable".to_string(),
+                // The server's error body can echo request context, so only the
+                // fact of the failure is kept.
+                Err(_) => {}
+            }
+            results.push(probe);
+        }
+        results
+    }
+}
+
+/// The optional wellness streams, as `(label, surface, eventType, subType)`.
+///
+/// Every entry here answered a live capability probe on a real account, so
+/// these are fetched rather than guessed at. They are deliberately kept in one
+/// raw stream: their payload shapes are not yet verified field by field, and
+/// the architecture's rule is to retain the raw response and normalize only
+/// what is recognised rather than invent a mapping.
+/// Days per request for a stream that would otherwise be truncated.
+///
+/// The server caps a response at 1000 items. Blood oxygen samples every five
+/// minutes, so a month asked for in one go returns barely three days and says
+/// nothing at all about the rest.
+const WELLNESS_CHUNK_DAYS: i64 = 7;
+
+/// One optional stream: its label, which surface serves it, the event type and
+/// sub type that name it, and how many days may be asked for at once.
+type WellnessStream = (
+    &'static str,
+    ProbeSurface,
+    &'static str,
+    Option<&'static str>,
+    Option<i64>,
+);
+
+const WELLNESS_STREAMS: [WellnessStream; 9] = [
+    // The per-minute `Charge/stress_data` payload is a protobuf whose float
+    // fields match none of the ranges the app displays, so the daily roll-up is
+    // read from `all_day_stress` instead. Both are fetched: retaining the raw
+    // per-minute response is what would let its shape be verified later.
+    (
+        "all_day_stress",
+        ProbeSurface::UserEvents,
+        "all_day_stress",
+        None,
+        None,
+    ),
+    (
+        "stress",
+        ProbeSurface::V2Events,
+        "Charge",
+        Some("stress_data"),
+        None,
+    ),
+    (
+        "respiratory_rate",
+        ProbeSurface::V2Events,
+        "RespiratoryRate",
+        Some("real_data"),
+        None,
+    ),
+    (
+        "hrv_rmssd",
+        ProbeSurface::V2Events,
+        "HRVRMSSD",
+        Some("real_data"),
+        None,
+    ),
+    (
+        "charge_insight",
+        ProbeSurface::V2Events,
+        "Charge",
+        Some("insight_data"),
+        None,
+    ),
+    (
+        "lactate_threshold",
+        ProbeSurface::V2Events,
+        "LactateThreshold",
+        Some("summary"),
+        None,
+    ),
+    // No subType: `click` is one subset of this stream and it stops on
+    // 2026-08-16, while the unfiltered stream runs to the present. Asking for
+    // the subset and reading its exhaustion as the device going quiet is the
+    // kind of silent gap this project exists to avoid.
+    (
+        "spo2",
+        ProbeSurface::UserEvents,
+        "blood_oxygen",
+        None,
+        Some(WELLNESS_CHUNK_DAYS),
+    ),
+    ("pai", ProbeSurface::UserEvents, "PaiHealthInfo", None, None),
+    (
+        "spo2_odi",
+        ProbeSurface::UserEventsDay,
+        "blood_oxygen",
+        Some("odi"),
+        Some(WELLNESS_CHUNK_DAYS),
+    ),
+];
+
+impl DataFetcher {
+    /// Fetch the optional wellness streams for a window.
+    ///
+    /// Each stream is independent: one that is unavailable for this account
+    /// must not take the others down with it, so failures are collected rather
+    /// than propagated. An empty result set is reported as unavailable so the
+    /// sync surfaces "nothing came back" instead of a silent success.
+    pub async fn fetch_wellness_records(
+        &self,
+        window: FetchWindow,
+        time_zone: &str,
+    ) -> Result<Vec<FetchedRecord>> {
+        let mut records = Vec::new();
+        let mut last_error = None;
+
+        for (label, surface, event_type, sub_type, chunk_days) in WELLNESS_STREAMS {
+            let slices = match chunk_days {
+                Some(days) => window.chunks(days),
+                None => vec![window],
+            };
+            for slice in slices {
+                let from = slice.start_utc.timestamp_millis();
+                let to = slice.end_utc.timestamp_millis();
+                let outcome = match surface {
+                    ProbeSurface::V2Events => {
+                        self.connector
+                            .fetch_events(
+                                event_type,
+                                sub_type.unwrap_or("real_data"),
+                                from,
+                                to,
+                                1000,
+                                true,
+                            )
+                            .await
+                    }
+                    ProbeSurface::UserEvents => {
+                        self.connector
+                            .fetch_user_events(event_type, sub_type, from, to, 1000, true)
+                            .await
+                    }
+                    ProbeSurface::UserEventsDay => {
+                        self.connector
+                            .fetch_user_events_date_string(
+                                event_type,
+                                sub_type.unwrap_or("odi"),
+                                &slice.start_utc.to_rfc3339(),
+                                &slice.end_utc.to_rfc3339(),
+                                time_zone,
+                                999,
+                            )
+                            .await
+                    }
+                };
+                match outcome {
+                    Ok(payload) => records.push(FetchedRecord {
+                        raw: RawRecord {
+                            stream: "wellness".into(),
+                            source_key: format!(
+                                "wellness:{label}:{}:{}:{}",
+                                surface.as_str(),
+                                slice.start_day(),
+                                slice.end_day()
+                            ),
+                            source_scope: SourceScope::UserFused,
+                            device_id: None,
+                            start_utc: slice.start_utc,
+                            end_utc: Some(slice.end_utc),
+                            payload,
+                            // Shapes verified against a real response are parsed
+                            // by the normalizer; the rest are retained raw so
+                            // they can be verified without another round trip.
+                            capability: CapabilityStatus::Unverified,
+                        },
+                    }),
+                    Err(error) if error.is_unavailable() => last_error = Some(error),
+                    Err(error) => last_error = Some(error),
+                }
+            }
+        }
+
+        if records.is_empty() {
+            return Err(last_error.unwrap_or_else(|| {
+                ZeppBridgeError::Unavailable("没有可用的可选健康数据流".into())
+            }));
+        }
+        Ok(records)
+    }
+}
+
 fn payload_items(payload: &Value) -> Vec<Value> {
     if let Some(items) = payload.get("items").and_then(Value::as_array) {
         return items.clone();

@@ -6,6 +6,7 @@ import type {
   AppStatus,
   AiHandoffResult,
   AuthInfo,
+  CapabilityProbe,
   DeviceProfile,
   DeviceProfilesResult,
   ExportResult,
@@ -92,6 +93,10 @@ export const tauriBackend: BridgeBackend = {
 
   cancelSync() {
     return call<void>('cancel_sync');
+  },
+
+  probeDataCapabilities() {
+    return call<CapabilityProbe[]>('probe_data_capabilities');
   },
 
   getHealthOverview() {

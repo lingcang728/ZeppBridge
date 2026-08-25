@@ -9,7 +9,7 @@ import { AUTO_SYNC_INTERVALS } from '../lib/autoSync';
 import { UI_SCALES, useUiScale, type UiScale } from '../composables/useUiScale';
 import { backend, toUserMessage } from '../lib/bridge';
 import { regionShortName } from '../lib/deviceCopy';
-import type { LocalApiStatus, LoginStatus } from '../types';
+import type { CapabilityProbe, LocalApiStatus, LoginStatus } from '../types';
 import { checkForDesktopUpdate, downloadAndInstallDesktopUpdate, updateState } from '../services/updateService';
 
 const {
@@ -412,6 +412,141 @@ onMounted(async () => {
 onUnmounted(() => {
   unlistenLogin?.();
 });
+/* ── 数据能力探测 ───────────────────────
+ * 哪些可选数据流真的存在，取决于账号、设备和区域，服务端没有发现接口。
+ * 所以这里是「问一天、看谁回应」，不落库、不写日志、不读取任何测量值。 */
+const probeBusy = ref(false);
+const probeError = ref<string | null>(null);
+const probeResults = ref<CapabilityProbe[] | null>(null);
+
+const streamLabels: Record<string, string> = {
+  spo2: '血氧 SpO₂',
+  stress: '压力',
+  respiratory_rate: '呼吸率',
+  blood_pressure: '血压',
+  weight: '体重',
+  hrv_rmssd: 'HRV (RMSSD)',
+  emotion: '情绪',
+  hybrid_charge: '综合能量 (insight)',
+  pai: 'PAI 活力指数',
+  lactate_threshold: '乳酸阈值',
+  second_heart_rate: '逐秒心率索引',
+};
+
+const surfaceLabels: Record<string, string> = {
+  v2_events: '/v2/users/me/events',
+  user_events: '/users/{id}/events',
+  user_events_day: '/users/{id}/events/dateString',
+};
+
+/* 两个对照组决定其余结果怎么读。
+ * 第一版没有对照组，六个候选流全部返回「200 但没有条目」，界面写成「接口有
+ * 响应」——而这个接口对根本不存在的名字也是同样的回答，所以那句话是过度声称。
+ * 正对照是已知有数据的流；负对照是一个服务端不可能认识的名字。 */
+const probeSelfCheck = computed(() => {
+  if (!probeResults.value) return null;
+  const positive = probeResults.value.find((probe) => probe.stream === 'control_positive');
+  const negative = probeResults.value.find((probe) => probe.stream === 'control_negative');
+  const probeWorks = positive?.status === 'available';
+  // 负对照也返回空 => 「空」对任何候选流都不构成证据。
+  const emptyIsEvidence = negative ? negative.status !== 'empty' : false;
+  return {
+    probeWorks,
+    emptyIsEvidence,
+    positiveText: probeWorks
+      ? `已知数据流 ${positive?.eventType} 回应 ${positive?.records} 条 — 探测链路正常`
+      : `已知数据流 ${positive?.eventType ?? 'hrv_sdnn'} 没有回应（${positive?.status ?? '未探测'}）— 下面的结果都不能采信`,
+    negativeText: emptyIsEvidence
+      ? '不存在的流名被明确拒绝 — 「空」可以当作「流存在但没数据」来读'
+      : '不存在的流名同样返回空 — 这个接口不区分「没数据」和「没这个流」',
+  };
+});
+
+const daysSince = (isoDate: string): number | null => {
+  const then = new Date(`${isoDate}T00:00:00`).getTime();
+  if (!Number.isFinite(then)) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.max(0, Math.round((today.getTime() - then) / 86400000));
+};
+
+const capabilityRows = computed(() => {
+  if (!probeResults.value) return [];
+  const emptyIsEvidence = probeSelfCheck.value?.emptyIsEvidence ?? false;
+  const grouped = new Map<string, CapabilityProbe[]>();
+  for (const probe of probeResults.value) {
+    if (probe.stream.startsWith('control_')) continue;
+    grouped.set(probe.stream, [...(grouped.get(probe.stream) ?? []), probe]);
+  }
+  return [...grouped].map(([stream, probes]) => {
+    const label = streamLabels[stream] ?? stream;
+    const episodic = probes.some((probe) => probe.cadence === 'episodic');
+    const hit = probes.find((probe) => probe.status === 'available');
+    const answered = probes.find((probe) => probe.status === 'empty');
+
+    // The endpoint names belong in the diagnostics block, not in a line a
+    // person reads to learn whether their watch records blood oxygen.
+    let state: string;
+    let verdict: string;
+    let ok = false;
+    if (hit && episodic) {
+      const ago = hit.latestDate ? daysSince(hit.latestDate) : null;
+      state = hit.latestDate
+        ? `最近一次测量 ${hit.latestDate}${ago === null ? '' : `（${ago} 天前）`}`
+        : '有历史记录';
+      verdict = '有历史值';
+      ok = true;
+    } else if (hit) {
+      state = `最近 7 天 ${hit.records} 条`;
+      verdict = '可用';
+      ok = true;
+    } else if (answered && episodic) {
+      state = '过去一年没有任何测量记录';
+      verdict = '未测量过';
+    } else if (answered && emptyIsEvidence) {
+      state = '接口正常，最近 7 天没有数据';
+      verdict = '无数据';
+    } else if (answered) {
+      state = '最近 7 天没有数据，且无法确认这个流是否存在';
+      verdict = '无法判断';
+    } else {
+      state = '该账号／设备不提供这项数据';
+      verdict = '不可用';
+    }
+    return { stream, label, state, verdict, ok };
+  });
+});
+
+/** One line per probed endpoint, for the collapsed diagnostics block. */
+const probeDiagnostics = computed(() => {
+  if (!probeResults.value) return [];
+  return probeResults.value.map((probe) => {
+    const name = `${probe.eventType}${probe.subType ? '/' + probe.subType : ''}`;
+    const surface = surfaceLabels[probe.surface] ?? probe.surface;
+    const result =
+      probe.status === 'available'
+        ? `${probe.records} 条${probe.latestDate ? `，最新 ${probe.latestDate}` : ''}`
+        : probe.status === 'empty'
+          ? '无数据'
+          : probe.status === 'unavailable'
+            ? '接口拒绝'
+            : '请求失败';
+    return `${name} @ ${surface} — ${result}`;
+  });
+});
+
+const runCapabilityProbe = async () => {
+  probeBusy.value = true;
+  probeError.value = null;
+  try {
+    probeResults.value = await backend.probeDataCapabilities();
+  } catch (error) {
+    probeError.value = toUserMessage(error);
+  } finally {
+    probeBusy.value = false;
+  }
+};
+
 </script>
 
 <template>
@@ -555,7 +690,54 @@ onUnmounted(() => {
           </div>
         </div>
       </section>
+
     </div>
+
+    <section class="settings-card" aria-labelledby="capability-title">
+      <div class="section-heading-row">
+        <h2 id="capability-title">数据能力探测</h2>
+        <button class="button secondary identify-button" type="button" :disabled="probeBusy" @click="runCapabilityProbe">
+          <Icon name="sync" :size="14" :class="{ spinning: probeBusy }" />
+          {{ probeBusy ? '正在探测…' : '探测可选数据流' }}
+        </button>
+      </div>
+      <p class="section-description">
+        哪些数据流对你的账号可用，取决于设备与区域，Zepp 没有提供查询接口，只能实测。
+        探测只读取「有没有回应」和日期，不保存任何测量值。
+      </p>
+      <div v-if="probeError" class="alert danger device-alert" role="alert"><Icon name="warning" :size="14" />{{ probeError }}</div>
+      <div v-if="!probeResults && !probeBusy" class="device-empty">
+        <Icon name="info" :size="16" />尚未探测。未探测不等于没有数据。
+      </div>
+      <template v-else-if="probeResults">
+        <div
+          v-if="probeSelfCheck && !probeSelfCheck.probeWorks"
+          class="alert danger device-alert"
+          role="alert"
+        >
+          <Icon name="warning" :size="14" />
+          <span>探测链路异常，下面的结果都不可采信：{{ probeSelfCheck.positiveText }}</span>
+        </div>
+        <div class="source-list">
+          <div v-for="row in capabilityRows" :key="row.stream" class="source-row">
+            <div class="source-copy">
+              <strong>{{ row.label }}</strong>
+              <span>{{ row.state }}</span>
+            </div>
+            <span :class="['source-state', { on: row.ok }]"><i class="dot"></i>{{ row.verdict }}</span>
+          </div>
+        </div>
+        <details class="probe-diagnostics">
+          <summary>接口诊断详情</summary>
+          <p v-if="probeSelfCheck" class="probe-selfcheck">
+            {{ probeSelfCheck.positiveText }}；{{ probeSelfCheck.negativeText }}
+          </p>
+          <ul>
+            <li v-for="line in probeDiagnostics" :key="line">{{ line }}</li>
+          </ul>
+        </details>
+      </template>
+    </section>
 
     <!-- 3 列网格：隐私 + 数据保留 + 导出默认值 -->
     <div class="three-col">
@@ -857,6 +1039,11 @@ h3 { margin-bottom: 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
 .account-state { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; white-space: nowrap; }
 .account-state.on { color: var(--accent); }
 .account-state .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.probe-diagnostics { margin-top: 12px; }
+.probe-diagnostics > summary { color: var(--muted); font-size: 12px; cursor: pointer; }
+.probe-diagnostics ul { margin: 8px 0 0; padding-left: 18px; }
+.probe-diagnostics li,
+.probe-selfcheck { color: var(--muted); font-size: 11px; line-height: 1.7; overflow-wrap: anywhere; }
 .device-empty { display: flex; align-items: center; gap: 7px; min-height: 60px; padding: 10px; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); color: var(--muted); font-size: 12px; }
 .two-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 14px; align-items: start; }
 .three-col { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }

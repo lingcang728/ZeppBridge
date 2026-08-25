@@ -15,5 +15,6 @@ pub(crate) use data::{
 pub(crate) use login::{cancel_web_login, get_login_status, start_web_login};
 pub(crate) use status::get_app_status;
 pub(crate) use sync::{
-    cancel_sync, start_history_sync, start_incremental_sync, start_initial_sync,
+    cancel_sync, probe_data_capabilities, start_history_sync, start_incremental_sync,
+    start_initial_sync,
 };

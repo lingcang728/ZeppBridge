@@ -79,6 +79,11 @@ pub struct SleepSession {
     pub time_in_bed_minutes: Option<i32>,
     #[serde(default)]
     pub stages: Vec<SleepStageSlice>,
+    /// Times the sleeper woke during the night (`wc`). Distinct from
+    /// `awake_minutes`: ten one-minute wakings and one ten-minute waking are
+    /// the same duration but not the same night.
+    #[serde(default)]
+    pub wake_count: Option<i32>,
 }
 
 /// 运动记录
@@ -146,12 +151,32 @@ pub struct WorkoutSeriesSummary {
     pub elevation_loss_m: Option<f64>,
 }
 
+/// One kilometre of a workout, as stored.
+///
+/// Times are RFC3339 strings to match the rest of the series shapes crossing
+/// the IPC boundary.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct WorkoutSplitRow {
+    pub index: i32,
+    pub start_time: String,
+    pub end_time: String,
+    pub distance_m: f64,
+    pub duration_seconds: i64,
+    pub pace_min_per_km: Option<f64>,
+    pub avg_hr: Option<i32>,
+    pub max_hr: Option<i32>,
+    pub elevation_gain_m: Option<f64>,
+    pub elevation_loss_m: Option<f64>,
+    pub partial: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct WorkoutSeries {
     pub workout_id: String,
     pub samples: Vec<WorkoutSeriesSample>,
     pub route: Vec<WorkoutRoutePoint>,
     pub pauses: Vec<WorkoutPause>,
+    pub splits: Vec<WorkoutSplitRow>,
     pub summary: WorkoutSeriesSummary,
 }
 
@@ -309,12 +334,64 @@ pub struct HealthOverview {
     pub source_scope: Option<String>,
 }
 
+/// The result of asking the server whether one candidate stream exists.
+///
+/// Zepp's mobile event endpoint has no discovery call, and which streams
+/// answer depends on the account, the devices and the region. A probe records
+/// only whether a stream answered and the field *names* it used — never a
+/// measured value, and nothing is written to the database.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CapabilityProbe {
+    /// The ZeppBridge stream this candidate would feed, e.g. `spo2`.
+    pub stream: String,
+    /// Which event surface answered: `v2_events`, `user_events` or
+    /// `user_events_day`. The same event name behaves differently on each.
+    pub surface: String,
+    /// `continuous` or `episodic` — how often the stream is measured, which
+    /// decides how far back the probe looks and how silence should be read.
+    pub cadence: String,
+    pub window_days: i64,
+    pub event_type: String,
+    pub sub_type: String,
+    /// `available` | `empty` | `unavailable` | `error`
+    pub status: String,
+    pub records: usize,
+    /// Calendar date of the newest item, for streams measured occasionally.
+    pub latest_date: Option<String>,
+    pub fields: Vec<String>,
+}
+
+/// How much of each stream an export carries.
+///
+/// The per-second workout series and per-minute heart rate are 99% of an
+/// export's bytes; a 30-day `Full` export is ~9 MB, which no model will read.
+/// `Summary` aggregates those two and keeps every structured metric intact, so
+/// the same window fits in a context window. `Full` stays available for
+/// archival and is what the CSV/GPX converters always use.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExportDetail {
+    #[default]
+    Summary,
+    Full,
+}
+
+impl ExportDetail {
+    pub fn is_full(self) -> bool {
+        matches!(self, ExportDetail::Full)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportSelection {
     pub start_date: String,
     pub end_date: String,
     pub data_types: Vec<String>,
+    /// Absent means `Summary`; older callers keep working.
+    #[serde(default)]
+    pub detail: ExportDetail,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

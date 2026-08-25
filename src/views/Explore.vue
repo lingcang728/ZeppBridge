@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import Icon from '../components/Icon.vue';
 import type { IconName } from '../components/Icon.vue';
-import { useExport, type SaveFormat } from '../composables/useExport';
+import { exportDetailOptions, useExport, type SaveFormat } from '../composables/useExport';
 import { useSyncController } from '../composables/useSyncController';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { useAiHandoff } from '../composables/useAiHandoff';
@@ -14,6 +14,7 @@ const {
   exportStartDate,
   exportEndDate,
   exportDataTypes,
+  exportDetail,
   exportBusy,
   exportError,
   exportMessage,
@@ -41,7 +42,16 @@ const templates: PromptTemplate[] = [
     sub: '生成整体表现的清晰摘要',
     category: 'summary',
     icon: 'bars',
-    types: ['heart_rate', 'sleep', 'workouts', 'steps', 'hrv', 'training_load'],
+    types: [
+      'heart_rate',
+      'sleep',
+      'workouts',
+      'steps',
+      'daily_activity',
+      'hrv',
+      'recovery',
+      'training_load',
+    ],
     prompt: `你是一位专业的运动健康分析师，擅长将可穿戴设备数据转化为易懂的洞察。
 基于以下来自 ZeppBridge 的多源数据（已按时间顺序整理），
 为我生成一份结构清晰、重点突出的整体表现总结。
@@ -57,7 +67,7 @@ const templates: PromptTemplate[] = [
     sub: '深入分析训练负荷与趋势',
     category: 'training',
     icon: 'activity',
-    types: ['workouts', 'heart_rate', 'training_load', 'vo2max'],
+    types: ['workouts', 'heart_rate', 'training_load', 'vo2max', 'lactate_threshold'],
     prompt: `你是一位经验丰富的耐力训练教练。
 基于以下来自 ZeppBridge 的训练数据（含心率、训练负荷与 VO₂max），
 分析我的训练结构、强度分布与负荷趋势，
@@ -71,7 +81,16 @@ const templates: PromptTemplate[] = [
     sub: '评估恢复、HRV 与准备度',
     category: 'recovery',
     icon: 'heart',
-    types: ['hrv', 'heart_rate', 'sleep', 'stress'],
+    types: [
+      'hrv',
+      'hrv_rmssd',
+      'heart_rate',
+      'sleep',
+      'stress',
+      'spo2',
+      'respiratory_rate',
+      'recovery',
+    ],
     prompt: `你是一位专注于运动恢复的生理学专家。
 基于以下来自 ZeppBridge 的 HRV、静息心率、睡眠与压力数据，
 评估我的恢复状况与训练准备度，
@@ -85,7 +104,7 @@ const templates: PromptTemplate[] = [
     sub: '睡眠质量与规律性洞察',
     category: 'sleep',
     icon: 'moon',
-    types: ['sleep', 'heart_rate', 'hrv'],
+    types: ['sleep', 'heart_rate', 'hrv', 'spo2', 'respiratory_rate', 'stress'],
     prompt: `你是一位睡眠健康顾问。
 基于以下来自 ZeppBridge 的睡眠分期、时长与心率数据，
 分析我的睡眠质量、规律性与影响因素，
@@ -99,7 +118,7 @@ const templates: PromptTemplate[] = [
     sub: '日常活动与趋势概览',
     category: 'summary',
     icon: 'steps',
-    types: ['steps', 'workouts', 'heart_rate'],
+    types: ['steps', 'daily_activity', 'workouts', 'heart_rate', 'pai'],
     prompt: `你是一位健康生活方式顾问。
 基于以下来自 ZeppBridge 的步数、运动与心率数据，
 概览我的日常活动水平与变化趋势，
@@ -113,7 +132,16 @@ const templates: PromptTemplate[] = [
     sub: '周度复盘与细致建议',
     category: 'training',
     icon: 'clock',
-    types: ['heart_rate', 'sleep', 'workouts', 'steps', 'hrv', 'training_load'],
+    types: [
+      'heart_rate',
+      'sleep',
+      'workouts',
+      'steps',
+      'daily_activity',
+      'hrv',
+      'recovery',
+      'training_load',
+    ],
     prompt: `你是一位私人健康教练，每周为我做一次数据复盘。
 基于以下来自 ZeppBridge 的本周数据，
 对比一般健康人群基准，总结本周表现，
@@ -196,6 +224,7 @@ const datesValid = computed(() =>
 const typeLabels: Record<string, string> = {
   heart_rate: '心率数据', sleep: '睡眠数据', workouts: '训练数据', steps: '活动数据',
   spo2: '血氧数据', stress: '压力数据', hrv: '生理指标', training_load: '训练负荷', vo2max: 'VO₂max',
+  daily_activity: '日常活动', recovery: '恢复状态',
 };
 const packageContents = computed(() =>
   exportDataTypes.value.map((type) => ({ type, label: typeLabels[type] ?? type })),
@@ -231,6 +260,7 @@ const loadPreview = async () => {
       startDate: exportStartDate.value,
       endDate: exportEndDate.value,
       dataTypes: [...exportDataTypes.value],
+      detail: exportDetail.value,
     });
     if (seq !== previewSeq) return;
     const parsed = JSON.parse(encoded) as { record_count?: number; records?: unknown[] };
@@ -362,6 +392,7 @@ const sendToAi = async () => {
     startDate: exportStartDate.value,
     endDate: exportEndDate.value,
     dataTypes: [...exportDataTypes.value],
+    detail: exportDetail.value,
   };
   try {
     const result = await prepareAndCopy(
@@ -400,7 +431,7 @@ const runExport = async () => {
   await saveExportAs(activeFormat.value);
 };
 
-watch([exportStartDate, exportEndDate, exportDataTypes], schedulePreview, { deep: true, immediate: true });
+watch([exportStartDate, exportEndDate, exportDataTypes, exportDetail], schedulePreview, { deep: true, immediate: true });
 watch(dataRevision, () => void loadPreview());
 onBeforeUnmount(() => window.clearTimeout(previewTimer));
 </script>
@@ -627,6 +658,23 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
               <Icon :name="format.icon" :size="20" />
               <strong>{{ format.label }}</strong>
               <span>{{ format.sub }}</span>
+            </button>
+          </div>
+
+          <p class="group-label">详细程度</p>
+          <div class="format-grid detail-grid" role="radiogroup" aria-label="详细程度">
+            <button
+              v-for="option in exportDetailOptions"
+              :key="option.value"
+              type="button"
+              role="radio"
+              :aria-checked="exportDetail === option.value"
+              :class="['format-card', { 'is-on': exportDetail === option.value }]"
+              @click="exportDetail = option.value"
+            >
+              <Icon v-if="exportDetail === option.value" name="circle-check" :size="14" class="format-check" />
+              <strong>{{ option.label }}</strong>
+              <span>{{ option.hint }}</span>
             </button>
           </div>
 

@@ -3,7 +3,7 @@ use tauri::{AppHandle, Emitter};
 
 use crate::app_state::AppState;
 use crate::ipc_types::{ui_sync_report, UiSyncReport};
-use crate::models::UserPrefs;
+use crate::models::{CapabilityProbe, UserPrefs};
 use crate::sync::{StreamStatus, SyncManager, SyncProgress, SyncReport};
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -55,6 +55,24 @@ pub async fn start_incremental_sync(
     }
     let manager = require_manager(&state).await?;
     run_sync(&app, &state, manager, None).await
+}
+
+/// Probe the optional Zepp event streams and report what answers.
+///
+/// This exists because "another tool can read HRV, so ZeppBridge should too"
+/// is not a fact about *this* account: stream availability varies by device
+/// and region, and the endpoint offers no discovery call. The probe makes a
+/// handful of one-day requests and reports status plus field names, writing
+/// nothing to the database and logging nothing.
+#[tauri::command]
+pub async fn probe_data_capabilities(
+    state: tauri::State<'_, AppState>,
+) -> std::result::Result<Vec<CapabilityProbe>, String> {
+    if state.auth_state.read().await.as_str() != "verified" {
+        return Err("请先完成连接验证，再探测数据能力".to_string());
+    }
+    let manager = require_manager(&state).await?;
+    Ok(manager.probe_capabilities().await)
 }
 
 #[tauri::command]
