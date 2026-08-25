@@ -19,11 +19,12 @@ use app_state::AppState;
 use commands::{
     cancel_sync, cancel_web_login, cleanup_old_data, clear_auth, get_app_status,
     get_capability_overview, get_device_profile, get_device_profiles, get_export_json,
-    get_health_overview, get_heart_rate_series, get_login_status, get_recent_sleep,
-    get_recent_workouts, get_sleep_detail, get_storage_estimate, get_training_load_series,
-    get_workout_detail, get_workout_series, import_from_har, manual_auth, open_data_folder,
-    prepare_ai_handoff, probe_data_capabilities, publish_ai_export, reprocess_local_data,
-    save_auth, save_csv_export, save_gpx_export, save_json_export, set_user_prefs,
+    get_health_overview, get_heart_rate_series, get_heart_rate_zones, get_login_status,
+    get_metric_series, get_recent_sleep, get_recent_workouts, get_sleep_detail,
+    get_storage_estimate, get_training_balance, get_training_load_series, get_workout_detail,
+    get_workout_series, import_from_har, manual_auth, open_data_folder, prepare_ai_handoff,
+    probe_data_capabilities, publish_ai_export, reprocess_local_data, save_auth, save_csv_export,
+    save_gpx_export, save_json_export, set_heart_rate_zone_preference, set_user_prefs,
     start_history_sync, start_incremental_sync, start_initial_sync, start_web_login, verify_auth,
 };
 use tauri::menu::{Menu, MenuItem};
@@ -163,6 +164,10 @@ pub fn run() {
             get_health_overview,
             get_heart_rate_series,
             get_training_load_series,
+            get_metric_series,
+            get_training_balance,
+            get_heart_rate_zones,
+            set_heart_rate_zone_preference,
             get_recent_sleep,
             get_recent_workouts,
             get_sleep_detail,

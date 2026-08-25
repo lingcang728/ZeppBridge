@@ -15,7 +15,7 @@ import { checkForDesktopUpdate } from './services/updateService';
 
 // 桌面端从 Tauri 运行时读取版本（与 tauri.conf.json 单一来源），
 // 浏览器预览环境回退到下面的常量（与 package.json 保持同步）。
-const FALLBACK_APP_VERSION = '0.9.2';
+const FALLBACK_APP_VERSION = '0.10.0';
 const APP_VERSION = ref(FALLBACK_APP_VERSION);
 const desktopRuntime = isDesktop();
 const showLanding = !desktopRuntime && !new URLSearchParams(window.location.search).has('app-preview');
@@ -249,7 +249,7 @@ onUnmounted(() => {
         <span>{{ statusError }}</span>
       </div>
       <div v-if="syncState !== 'idle'" :class="['sync-feedback', `tone-${syncState}`]" role="status" aria-live="polite">
-        <Icon :name="syncState === 'failed' ? 'warning' : syncState === 'updated' ? 'circle-check' : 'info'" :size="14" :class="{ spinning: isSyncing }" />
+        <Icon :name="syncState === 'failed' ? 'warning' : syncState === 'updated' ? 'circle-check' : 'info'" :size="14" :class="{ spinning: isSyncing || syncState === 'deferred' }" />
         <span>{{ syncMessage }}</span>
       </div>
       <div v-if="trayHint" class="sync-feedback" role="status">关闭窗口后 ZeppBridge 仍在托盘运行，可继续自动同步。</div>
@@ -659,6 +659,7 @@ a { color: inherit; }
 .sync-feedback.tone-partial { color: var(--warning); }
 .sync-feedback.tone-no_new_data { color: var(--muted); }
 .sync-feedback.tone-cancelled { color: var(--muted); }
+.sync-feedback.tone-deferred { color: var(--muted); }
 .sync-feedback.tone-failed { color: var(--danger); }
 .sync-feedback a { color: inherit; }
 .spinning { animation: spin 900ms linear infinite; }

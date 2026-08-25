@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router';
 import Overview from '../views/Overview.vue';
 import RecentRecords from '../views/RecentRecords.vue';
 import Explore from '../views/Explore.vue';
+import BodyStatus from '../views/BodyStatus.vue';
+import TrainingStatus from '../views/TrainingStatus.vue';
 import SleepList from '../views/SleepList.vue';
 import WorkoutList from '../views/WorkoutList.vue';
 import SleepDetail from '../views/SleepDetail.vue';
@@ -23,6 +25,16 @@ const routes = [
     path: '/explore',
     name: 'Explore',
     component: Explore,
+  },
+  {
+    path: '/body',
+    name: 'BodyStatus',
+    component: BodyStatus,
+  },
+  {
+    path: '/training',
+    name: 'TrainingStatus',
+    component: TrainingStatus,
   },
   {
     path: '/sleep',

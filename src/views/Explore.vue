@@ -2,7 +2,13 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import Icon from '../components/Icon.vue';
 import type { IconName } from '../components/Icon.vue';
-import { exportDetailOptions, useExport, type SaveFormat } from '../composables/useExport';
+import {
+  exportDetailOptions,
+  exportTypeGroups,
+  exportTypeOptions,
+  useExport,
+  type SaveFormat,
+} from '../composables/useExport';
 import { useSyncController } from '../composables/useSyncController';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { useAiHandoff } from '../composables/useAiHandoff';
@@ -221,14 +227,53 @@ const datesValid = computed(() =>
   Boolean(exportStartDate.value && exportEndDate.value && exportStartDate.value <= exportEndDate.value),
 );
 
-const typeLabels: Record<string, string> = {
-  heart_rate: '心率数据', sleep: '睡眠数据', workouts: '训练数据', steps: '活动数据',
-  spo2: '血氧数据', stress: '压力数据', hrv: '生理指标', training_load: '训练负荷', vo2max: 'VO₂max',
-  daily_activity: '日常活动', recovery: '恢复状态',
-};
-const packageContents = computed(() =>
-  exportDataTypes.value.map((type) => ({ type, label: typeLabels[type] ?? type })),
+/**
+ * The picker is grouped because it holds fifteen entries: a flat list that
+ * long is hard to scan, and the four sections match how the data is actually
+ * organised elsewhere in the app.
+ *
+ * A template seeds the selection; it does not lock it. Whatever is ticked here
+ * is exactly what the export carries, so the summary counts below always
+ * describe the file the user is about to get.
+ */
+const groupedTypes = computed(() =>
+  exportTypeGroups
+    .map((group) => ({
+      group,
+      options: exportTypeOptions.filter((option) => option.group === group),
+    }))
+    .filter((section) => section.options.length > 0),
 );
+
+const isTypeSelected = (value: ExportDataType) => exportDataTypes.value.includes(value);
+
+const toggleType = (value: ExportDataType) => {
+  const next = new Set(exportDataTypes.value);
+  if (next.has(value)) next.delete(value);
+  else next.add(value);
+  // Keep the picker's own order so the list never reshuffles as it is used.
+  exportDataTypes.value = exportTypeOptions
+    .map((option) => option.value)
+    .filter((option) => next.has(option));
+};
+
+const toggleGroup = (group: (typeof exportTypeGroups)[number]) => {
+  const options = exportTypeOptions.filter((option) => option.group === group).map((option) => option.value);
+  const allOn = options.every((option) => exportDataTypes.value.includes(option));
+  const next = new Set(exportDataTypes.value);
+  for (const option of options) {
+    if (allOn) next.delete(option);
+    else next.add(option);
+  }
+  exportDataTypes.value = exportTypeOptions
+    .map((option) => option.value)
+    .filter((option) => next.has(option));
+};
+
+const groupIsFull = (group: (typeof exportTypeGroups)[number]) =>
+  exportTypeOptions
+    .filter((option) => option.group === group)
+    .every((option) => exportDataTypes.value.includes(option.value));
 
 const formatBytes = (bytes: number | null) => {
   if (bytes === null) return '—';
@@ -679,17 +724,36 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
           </div>
 
           <div class="group-row">
-            <p class="group-label">已选数据流</p>
-            <span class="see-more">{{ packageContents.length }} 项</span>
+            <p class="group-label">数据流</p>
+            <span class="see-more">已选 {{ exportDataTypes.length }} / {{ exportTypeOptions.length }} 项</span>
           </div>
-          <ul class="content-list">
-            <li v-for="item in packageContents" :key="item.type">
-              <Icon :name="item.type === 'sleep' ? 'moon' : item.type === 'workouts' ? 'activity' : item.type === 'steps' ? 'steps' : item.type === 'heart_rate' ? 'heart' : 'database'" :size="14" />
-              <span>{{ item.label }}</span>
-              <Icon name="circle-check" :size="14" class="content-check" />
-            </li>
-            <li v-if="!packageContents.length" class="empty-note">尚未选择数据类型。</li>
-          </ul>
+          <div class="stream-picker">
+            <div v-for="section in groupedTypes" :key="section.group" class="stream-group">
+              <button
+                type="button"
+                class="stream-group-head"
+                :aria-pressed="groupIsFull(section.group)"
+                @click="toggleGroup(section.group)"
+              >
+                <span>{{ section.group }}</span>
+                <em>{{ groupIsFull(section.group) ? '全不选' : '全选' }}</em>
+              </button>
+              <label
+                v-for="option in section.options"
+                :key="option.value"
+                :class="['stream-row', { 'is-on': isTypeSelected(option.value) }]"
+              >
+                <input
+                  type="checkbox"
+                  :checked="isTypeSelected(option.value)"
+                  @change="toggleType(option.value)"
+                />
+                <span>{{ option.label }}</span>
+                <Icon v-if="isTypeSelected(option.value)" name="circle-check" :size="14" class="content-check" />
+              </label>
+            </div>
+            <p v-if="!exportDataTypes.length" class="empty-note">尚未选择数据类型，导出会被拒绝。</p>
+          </div>
 
           <div class="size-row">
             <span>数据包预估体积</span>
@@ -733,6 +797,38 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 
 <style scoped>
 .export-page.page { display: grid; gap: 16px; }
+.stream-picker { display: grid; gap: 10px; margin-bottom: 14px; }
+.stream-group { display: grid; gap: 3px; }
+.stream-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--subtle);
+  font-size: 11px;
+  cursor: pointer;
+}
+.stream-group-head:hover em { color: var(--accent); }
+.stream-group-head em { color: var(--faint); font-style: normal; }
+.stream-row {
+  display: grid;
+  grid-template-columns: 15px minmax(0, 1fr) 14px;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.stream-row:hover { background: var(--surface-raised); }
+.stream-row.is-on { border-color: var(--line-strong); background: var(--surface-raised); color: var(--ink); }
+.stream-row input { width: 13px; height: 13px; margin: 0; accent-color: var(--accent); cursor: pointer; }
 .page-head h1 { margin-bottom: 6px; font-size: 24px; font-weight: 700; color: var(--ink); }
 
 .export-layout {
@@ -990,19 +1086,6 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 .format-card.is-on svg, .format-card.is-on strong { color: var(--accent); }
 .format-check { position: absolute; top: 6px; right: 6px; }
 
-.content-list { display: grid; gap: 4px; margin: 8px 0 0; padding: 0; list-style: none; }
-.content-list li {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 30px;
-  padding: 5px 10px;
-  border-radius: 8px;
-  background: var(--surface-raised);
-  color: var(--ink);
-  font-size: 12px;
-}
-.content-list li span { flex: 1; }
 .content-check { color: var(--accent); }
 
 .size-row {

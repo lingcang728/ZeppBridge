@@ -1,6 +1,6 @@
 # ZeppBridge UI 设计与交互约束
 
-更新时间：2026-08-24（对齐 v0.9.1 实现）。ZeppBridge 是用户的穿戴健康数据桥梁，不是臃肿的分析 App。
+更新时间：2026-08-25（对齐第二轮 UI：身体状态 / 训练状态两页、心率区间选择器、导出数据流选择器）。ZeppBridge 是用户的穿戴健康数据桥梁，不是臃肿的分析 App。
 
 视觉是**冷灰底 + 橄榄绿**的暗色系统：品牌色 `--brand: #7DA33E`，界面底色 `#131519`（侧栏 `#0F1114`、卡片 `#1D2026`），不使用泛滥的紫色或高饱和荧光色。分类色（心率红、配速蓝、睡眠紫、活动青等）只用于标记数据类别，不作装饰。
 
@@ -33,7 +33,9 @@
 | 轨迹配速色谱 | `--route-neutral` / `-mint` / `-cyan` / `-amber` / `-coral` |
 | 间距 / 圆角 | `--space-1…8`、`--radius-sm` 10px / `-md` 14px / `-lg` 18px |
 
-心率区间用绝对阈值，不做个体化推算：休息 0–99 / 燃脂 100–139 / 有氧 140–169 / 无氧 170+（`Overview.vue` 的 `HR_ZONES`）。
+概览 24 小时心率折线下方的四段标注用**绝对阈值**，只是给曲线一个粗读的刻度，不是个体化区间：休息 0–99 / 燃脂 100–139 / 有氧 140–169 / 无氧 170+（`Overview.vue` 的 `HR_ZONES`）。
+
+个体化的心率区间是另一回事，在 `/training` 的选择器里：三种算法（最大心率 / 储备心率 / 乳酸阈值）、五个实测基准，**不预设默认**，每个基准都要标出处和测量日期。禁止用 220−年龄 之类的公式估算。算法与百分比的来源见[架构摘要](../reference/architecture.md)。
 
 ### 只做深色（已定的设计取舍）
 
@@ -50,15 +52,18 @@
 
 ## 页面架构
 
-主导航三项：**概览** (`/`)、**交给 AI** (`/explore`)、**设置** (`/settings`)。
-二级页面不进主导航：`/recent`（最近记录）、`/sleep`、`/workouts` 列表，以及 `/sleep/:sleepId`、`/workouts/:workoutId` 详情，由概览与最近记录页的「查看全部」进入。
+主导航三项：**概览** (`/`)、**交给 AI** (`/explore`)、**设置** (`/settings`)。导航保持三项——新页面进入口卡片，不进侧栏。
+
+二级页面不进主导航：`/body`（身体状态）、`/training`（训练状态）、`/recent`（最近记录）、`/sleep`、`/workouts` 列表，以及 `/sleep/:sleepId`、`/workouts/:workoutId` 详情，由概览的入口卡片与「查看全部」进入。
 
 ### 1. 概览 (`/`)
 
 - Hero 卡：品牌标语 + 三张价值卡（安全 / 私密 / AI-ready）+ 右侧「已识别设备 → 流动虚线 → 云端 AI」示意；设备来自真实识别结果，没有设备就不画这条流。
-- 12 列 dashboard 网格：24 小时心率折线（span 6）、今日步数圆环（span 3）、昨晚睡眠结构（span 3）、静息心率 / 训练负荷 / VO₂ Max 三张 mini 卡（各 span 4）、最近记录两列列表（整行）。
+- 12 列 dashboard 网格：24 小时心率折线（span 6）、今日步数圆环（span 3）、昨晚睡眠结构（span 3）、静息心率 mini 卡 + 身体状态 / 训练状态两张入口卡（各 span 4）、最近记录两列列表（整行）。
+- 两张入口卡各带当日数值与 7 天 `Sparkline`，点进 `/body` 与 `/training`。它们取代了原来的训练负荷 / VO₂ Max mini 卡——同一屏不重复展示同一个数字。
+- `Sparkline` 少于两个点时不画：一个读数是数值不是趋势，画成一条平线等于宣称了没测过的稳定性。
 - 每张卡片都有独立空态；加载中用 `SkeletonBlock` 占位，失败给可重试的 `EmptyState`。
-- 不在概览做恢复度、训练建议一类解读。
+- 不在概览做恢复度、训练建议一类解读。入口卡只给数字和形状，解读留给用户自选的 AI。
 
 ### 2. 交给 AI (`/explore`)
 
@@ -68,7 +73,7 @@
 - 中列：当前模板的提示词编辑框（可改、可复制）、数据感知摘要四格（时间范围 / 记录条数 / 数据类型数 / 预估体积）、快捷范围 pill 与自绘日历弹层（不用原生 date input）。
 - 右列：导出格式、目标 AI（7 家：ChatGPT、Claude、Gemini、Kimi、豆包、DeepSeek、Grok，走 `AI_PROVIDERS` 白名单，非白名单地址直接拒绝打开）、另存 / 复制提示词 / 发送三个动作。
 - 三种格式各走各自真实的转换，卡片副标题必须说明差异，不允许「选了 CSV 实际给 JSON」：JSON = 完整结构化；CSV = 长表汇总（不含逐点采样与轨迹）；GPX = 只含有 GPS 轨迹的运动。没有可导出内容时报错，不落空文件。
-- 可选数据类型固定 9 类（`exportTypeOptions`）：心率、睡眠、运动、步数、血氧、压力、HRV、训练负荷、VO₂max。
+- 可选数据类型 15 项（`exportTypeOptions`），在右列按 `exportTypeGroups` 的四组呈现：活动 / 睡眠 / 身体状态 / 训练。组标题可整组全选或全不选，单项是复选框。模板只负责**预填**选择，不锁定它——勾了什么，导出就是什么，摘要里的条数与体积始终描述用户马上会拿到的那个文件。
 - 体积与条数是异步预览，计算中显示 `…` 而不是 `0`。
 
 ### 3. 最近记录与详情 (`/recent`, `/sleep`, `/workouts`, `/sleep/:id`, `/workouts/:id`)
@@ -77,7 +82,15 @@
 - 运动详情：指标矩阵 + ECharts 心率/配速曲线 + 本地 SVG 轨迹（按配速映射 `--route-*` 色谱）+ 暂停区间。没有轨迹点就不画地图，没有逐点采样就不画曲线。
 - 睡眠详情：`StageBar` 阶段构成（用 `--sleep-*` 四色）+「阶段说明」折叠 + 近 7 天睡眠结构堆叠柱状图；时长、评分、来源、设备如实展示，缺失即 `未提供`。
 
-### 4. 设置 (`/settings`)
+### 4. 身体状态 (`/body`) 与训练状态 (`/training`)
+
+- 两页同构：`PageHeader` 右侧是 7 天 / 1 个月 / 6 个月的 `range-switch`，主体是 `minmax(320px, 1fr)` 自适应卡片网格。
+- 身体状态八张 `MetricTrendCard`：恢复、压力、血氧、夜间血氧 ODI、HRV (SDNN)、HRV (RMSSD)、呼吸率、静息心率。有实测区间的（压力、血氧、HRV、呼吸率）在折线后面画当日 min–max 阴影；**没测出区间的当天不画零宽阴影**。
+- 训练状态：VO₂max / 训练负荷 / PAI 三张趋势卡，乳酸阈值心率+配速双轴卡（配速轴 `inverse`，让「更快」朝上），运动负荷平衡卡（7 天负荷、28 天周均、急慢比三条线），以及 `HeartRateZonePicker`。
+- 每张卡片都写明覆盖度：「30 天里有 12 天记录」。**缺的天曲线直接断开**（`connectNulls: false`），不插值、不补零。只有 1 天数据时不画图，直接说「画不出趋势」。
+- 6 个月这一档不是装饰：VO₂max 与乳酸阈值一年只测几次，30 天窗口会把库里已有的数据显示成空。
+
+### 5. 设置 (`/settings`)
 
 按编号分区，自上而下：1 认证方式（官方网页登录 / HAR 导入 / 手动输入）→ 2 账户与区域 → 3 连接设备与数据来源 → 4 隐私与安全（含隐私原则弹窗）→ 5 本地数据保留 → 6 导出与补拉偏好 → 7 本机 REST API 状态 → 8 软件更新 → 9 自动同步。
 
@@ -85,7 +98,8 @@
 
 ## 组件与图表
 
-- 无 UI 框架，组件全部自研，位于 `src/components/`：`BrandMark`、`CategoryMark`、`CircularProgress`、`DesignIcon`、`DeviceCard`、`DeviceMarquee`、`DeviceVisual`、`EmptyState`、`Icon`、`PageHeader`、`RecordRow`、`SkeletonBlock`、`StageBar`。新增前先确认这里没有能复用的。
+- 无 UI 框架，组件全部自研，位于 `src/components/`：`BrandMark`、`CategoryMark`、`CircularProgress`、`DesignIcon`、`DeviceCard`、`DeviceMarquee`、`DeviceVisual`、`EmptyState`、`HeartRateZonePicker`、`Icon`、`MetricTrendCard`、`PageHeader`、`RecordRow`、`SkeletonBlock`、`Sparkline`、`StageBar`。新增前先确认这里没有能复用的。
+- 按天趋势一律走 `MetricTrendCard` + `lib/metricSeries.ts` 的 `buildSeriesOption`，不要在页面里各写一套 option；`SERIES_RANGES` 是三档范围的唯一来源。
 - 两套图标各有分工：`Icon.vue` 是内联 SVG 线性图标（UI 控件、小尺寸），`DesignIcon.vue` 是 `src/assets/design-icons/` 的 PNG 设计图标（导航、大号语义图标）。图片必须走 import 让 Vite 产出实体文件——桌面 CSP 不允许 data URL 与外部图源。
 - 图表统一用 `vue-echarts` + `main.ts` 注册的 `zeppbridge-dark` 主题，不要在页面里重复定义配色。
 

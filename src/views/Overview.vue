@@ -9,15 +9,18 @@ import DeviceVisual from '../components/DeviceVisual.vue';
 import Icon from '../components/Icon.vue';
 import RecordRow from '../components/RecordRow.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
+import Sparkline from '../components/Sparkline.vue';
 import { useDevices } from '../composables/useDevices';
 import { useSyncController } from '../composables/useSyncController';
 import { AI_PROVIDERS } from '../lib/aiProviders';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { formatDeviceIntro } from '../lib/deviceCopy';
+import { zeppSemanticColors } from '../lib/echartsTheme';
+import { indexSeries, latestValue } from '../lib/metricSeries';
 import { formatDistance, formatDuration, formatMetric, formatTime, isFiniteNumber, type HealthCategory } from '../lib/format';
 import { workoutLabel } from '../lib/labels';
 import { displayableWorkouts, workoutDurationMinutes, workoutTypeKey } from '../lib/workouts';
-import type { HealthOverview, HeartRatePoint, SleepSession, Workout } from '../types';
+import type { HealthOverview, HeartRatePoint, MetricSeries, SleepSession, Workout } from '../types';
 
 const { dataRevision } = useSyncController();
 const { models: deviceModels, error: deviceError, load: loadDevices } = useDevices();
@@ -26,6 +29,7 @@ const overview = ref<HealthOverview | null>(null);
 const heartRateSeries = ref<HeartRatePoint[]>([]);
 const recentSleep = ref<SleepSession[]>([]);
 const recentWorkouts = ref<Workout[]>([]);
+const statusSeries = ref<Record<string, MetricSeries>>({});
 const loading = ref(true);
 const error = ref<string | null>(null);
 const partialWarning = ref<string | null>(null);
@@ -169,14 +173,54 @@ const loadBand = computed(() => {
   if (ratio < 1) return '较高';
   return '很高';
 });
-const vo2max = computed(() => isFiniteNumber(overview.value?.vo2max) ? overview.value.vo2max : null);
-const vo2Band = computed(() => {
-  if (vo2max.value === null) return null;
-  if (vo2max.value >= 49) return '优秀';
-  if (vo2max.value >= 42) return '良好';
-  if (vo2max.value >= 35) return '中等';
-  return '待提升';
-});
+
+/**
+ * The two entry cards.
+ *
+ * Each shows today's figures and a seven-day shape, and nothing more: the
+ * reading of those numbers belongs on the page behind the card, and the
+ * interpreting of them belongs to the AI the user chooses.
+ */
+const ENTRY_METRICS = ['readiness', 'stress', 'spo2', 'vo2max', 'training_load'];
+
+const seriesValues = (metric: string): number[] =>
+  (statusSeries.value[metric]?.points ?? []).map((point) => point.value);
+
+const entryFigure = (metric: string, unit: string, digits = 0) => {
+  const value = latestValue(statusSeries.value[metric]);
+  return value === null ? '—' : `${formatMetric(value, digits)}${unit}`;
+};
+
+const bodyEntry = computed(() => ({
+  facts: [
+    { key: 'readiness', label: '恢复', text: entryFigure('readiness', '') },
+    { key: 'stress', label: '压力', text: entryFigure('stress', '') },
+    { key: 'spo2', label: '血氧', text: entryFigure('spo2', '%') },
+  ],
+  spark: seriesValues('readiness'),
+  // Say what the sparkline is, rather than leaving a shape with no caption.
+  sparkLabel: '近 7 天恢复状态趋势',
+  measured: Boolean(statusSeries.value.readiness?.days_with_data
+    || statusSeries.value.stress?.days_with_data
+    || statusSeries.value.spo2?.days_with_data),
+}));
+
+const trainingEntry = computed(() => ({
+  facts: [
+    { key: 'vo2max', label: 'VO₂max', text: entryFigure('vo2max', '', 1) },
+    {
+      key: 'training_load',
+      label: '负荷',
+      text: trainingLoad.value === null
+        ? '—'
+        : `${formatMetric(trainingLoad.value)}${loadBand.value ? ` ${loadBand.value}` : ''}`,
+    },
+  ],
+  spark: seriesValues('training_load'),
+  sparkLabel: '近 7 天训练负荷趋势',
+  measured: Boolean(statusSeries.value.training_load?.days_with_data
+    || statusSeries.value.vo2max?.days_with_data),
+}));
 
 interface RecentItem {
   key: string;
@@ -231,17 +275,20 @@ const loadOverview = async () => {
     heartRateSeries.value = [];
     recentSleep.value = [];
     recentWorkouts.value = [];
+    statusSeries.value = {};
     loading.value = false;
     return;
   }
   const results = await Promise.allSettled([
     backend.getHealthOverview(), backend.getHeartRateSeries(24), backend.getRecentSleep(3), backend.getRecentWorkouts(5),
+    backend.getMetricSeries(ENTRY_METRICS, 7),
   ]);
-  const [health, heartRate, sleep, workouts] = results;
+  const [health, heartRate, sleep, workouts, status] = results;
   overview.value = health.status === 'fulfilled' ? health.value : null;
   heartRateSeries.value = heartRate.status === 'fulfilled' ? heartRate.value : [];
   recentSleep.value = sleep.status === 'fulfilled' ? sleep.value : [];
   recentWorkouts.value = workouts.status === 'fulfilled' ? workouts.value : [];
+  statusSeries.value = status.status === 'fulfilled' ? indexSeries(status.value) : {};
   const rejected = results.filter((result) => result.status === 'rejected');
   if (rejected.length === results.length) error.value = toUserMessage(rejected[0].reason, '健康数据暂时不可用');
   else if (rejected.length) partialWarning.value = toUserMessage(rejected[0].reason, '部分数据流尚未获取');
@@ -334,18 +381,43 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
         <div class="mini-icon"><DesignIcon name="resting-heart-rate" :size="68" /></div><div><p class="mini-label">静息心率</p><p class="mini-value"><strong>{{ num(restingHr) }}</strong><span>次/分</span></p><p class="mini-note">{{ hrUpdatedAt }}</p></div>
       </section>
 
-      <section class="metric-panel mini-panel load-panel" aria-label="训练负荷">
-        <div class="mini-icon"><DesignIcon name="training-load" :size="68" /></div>
-        <div>
-          <p class="mini-label">训练负荷</p>
-          <p class="mini-value"><strong>{{ num(trainingLoad) }}</strong></p>
-          <p class="mini-note">{{ loadBand ? `${loadBand} · 结合近期训练` : '等待同步' }}</p>
+      <RouterLink class="metric-panel entry-panel body-entry" to="/body" aria-label="打开身体状态">
+        <div class="entry-icon"><DesignIcon name="recovery" :size="52" /></div>
+        <div class="entry-copy">
+          <p class="entry-label">身体状态 <DesignIcon name="chevron-right" :size="18" /></p>
+          <p class="entry-facts">
+            <span v-for="fact in bodyEntry.facts" :key="fact.key">
+              {{ fact.label }} <strong>{{ fact.text }}</strong>
+            </span>
+          </p>
+          <Sparkline
+            v-if="bodyEntry.spark.length > 1"
+            :values="bodyEntry.spark"
+            :color="zeppSemanticColors.readiness"
+            :label="bodyEntry.sparkLabel"
+          />
+          <p v-else class="entry-note">{{ bodyEntry.measured ? '近 7 天记录不足以画出趋势' : '同步后展示恢复、压力与血氧' }}</p>
         </div>
-      </section>
+      </RouterLink>
 
-      <section class="metric-panel mini-panel vo2-panel" aria-label="VO2 Max">
-        <div class="mini-icon"><DesignIcon name="vo2-max" :size="68" /></div><div><p class="mini-label">VO₂ Max</p><p class="mini-value"><strong>{{ num(vo2max) }}</strong></p><p class="mini-note">{{ vo2Band ?? '等待同步' }}</p></div>
-      </section>
+      <RouterLink class="metric-panel entry-panel training-entry" to="/training" aria-label="打开训练状态">
+        <div class="entry-icon"><DesignIcon name="training-load" :size="52" /></div>
+        <div class="entry-copy">
+          <p class="entry-label">训练状态 <DesignIcon name="chevron-right" :size="18" /></p>
+          <p class="entry-facts">
+            <span v-for="fact in trainingEntry.facts" :key="fact.key">
+              {{ fact.label }} <strong>{{ fact.text }}</strong>
+            </span>
+          </p>
+          <Sparkline
+            v-if="trainingEntry.spark.length > 1"
+            :values="trainingEntry.spark"
+            :color="zeppSemanticColors.training"
+            :label="trainingEntry.sparkLabel"
+          />
+          <p v-else class="entry-note">{{ trainingEntry.measured ? '近 7 天记录不足以画出趋势' : '同步后展示 VO₂max 与训练负荷' }}</p>
+        </div>
+      </RouterLink>
 
       <section class="metric-panel recent-panel" aria-label="最近记录">
         <div class="panel-head"><span class="panel-title"><DesignIcon name="document" :size="38" /><span><strong>最近记录</strong><small>睡眠、跑步与力量训练</small></span></span><RouterLink class="text-link" to="/recent">查看全部 <DesignIcon name="chevron-right" :size="22" /></RouterLink></div>
@@ -394,10 +466,19 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
 .steps-goal { margin: 0; color: #8A929B; font-size: 12px; font-variant-numeric: tabular-nums; }
 .sleep-panel { background: radial-gradient(380px 240px at 90% 0, rgba(104,87,217,.12), transparent 70%), linear-gradient(145deg, #20222C, #1C1F27); }.sleep-score { padding: 4px 10px; border-radius: 999px; background: rgba(131,109,235,.14); color: #A895FF; font-family: var(--font-mono); font-size: 12px; }.sleep-total { margin: 16px 0 10px; color: #F4F3FC; font-family: var(--font-mono); font-size: 20px; font-weight: 600; }.sleep-bar { display: flex; gap: 3px; height: 7px; overflow: hidden; border-radius: 999px; }.sleep-bar span { min-width: 3px; border-radius: 999px; }.sleep-stages { display: grid; grid-template-columns: minmax(0,1fr); gap: 9px; margin: 14px 0 0; padding: 0; list-style: none; }.sleep-stages li { display: grid; grid-template-columns: 8px minmax(0,1fr) auto; align-items: center; gap: 8px; min-width: 0; color: #9299A4; font-size: 12px; }.sleep-stages i { width: 6px; height: 6px; border-radius: 50%; }.sleep-stages strong { color: #C4C8D0; font-family: var(--font-mono); font-size: 12px; font-weight: 500; white-space: nowrap; }
 .mini-panel { display: grid; grid-template-columns: auto minmax(0,1fr); align-items: center; gap: 14px; }.mini-icon { display: grid; width: 68px; height: 68px; place-items: center; overflow: hidden; border-radius: 18px; }.mini-label { margin: 0; color: #B4BAC1; font-size: 13px; font-weight: 500; }.mini-value { display: flex; align-items: baseline; gap: 6px; margin: 5px 0; }.mini-value strong { color: #F5F6F2; font-family: var(--font-mono); font-size: 22px; font-weight: 600; line-height: 1; }.mini-value span { color: #8A929B; font-size: 12px; }.mini-note { margin: 0; color: #7B838C; font-size: 11px; line-height: 1.4; }.resting-panel { background: radial-gradient(300px 180px at 0 100%, rgba(225,75,88,.1), transparent 72%), linear-gradient(145deg, #221E23, #1D2025); }
-.load-panel { background: radial-gradient(300px 180px at 0 100%, rgba(136,164,73,.1), transparent 72%), linear-gradient(145deg, #1E2218, #1C2018); }.vo2-panel { background: radial-gradient(320px 190px at 0 100%, rgba(41,161,221,.09), transparent 70%), linear-gradient(145deg, #1C2328, #1D2025); }
+.entry-panel { display: grid; grid-template-columns: auto minmax(0,1fr); grid-column: span 4; align-items: start; gap: 12px; min-height: 166px; padding: 18px; color: inherit; text-decoration: none; }
+.entry-panel:hover { border-color: rgba(221,231,239,.18); }
+.entry-icon { display: grid; width: 52px; height: 52px; place-items: center; overflow: hidden; border-radius: 15px; }
+.entry-copy { display: grid; align-content: start; gap: 7px; min-width: 0; }
+.entry-label { display: flex; align-items: center; gap: 3px; margin: 0; color: #B4BAC1; font-size: 13px; font-weight: 500; }
+.entry-facts { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; color: #7B838C; font-size: 11px; }
+.entry-facts strong { color: #F5F6F2; font-family: var(--font-mono); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.entry-note { margin: 0; color: #7B838C; font-size: 11px; line-height: 1.5; }
+.body-entry { background: radial-gradient(300px 180px at 0 100%, rgba(61,216,76,.09), transparent 72%), linear-gradient(145deg, #1C2320, #1D2025); }
+.training-entry { background: radial-gradient(300px 180px at 0 100%, rgba(136,164,73,.1), transparent 72%), linear-gradient(145deg, #1E2218, #1C2018); }
 .text-link { display: inline-flex; align-items: center; gap: 3px; color: #9DBA5D; font-size: 11px; text-decoration: none; }.text-link:hover { color: #C7DC80; }.recent-list { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); margin-top: 12px; overflow: hidden; border: 1px solid rgba(226,234,242,.07); border-radius: 16px; }.recent-list :deep(.record-row:nth-child(odd)) { border-right: 1px solid var(--line); }.recent-list :deep(.record-row) { min-height: 72px; transition: background .2s ease, transform .2s ease; }.recent-list :deep(.record-row:hover) { transform: translateX(2px); }.recent-empty { min-height: 120px; }
-@media (max-width: 1180px) { .hero-card { grid-template-columns: minmax(0,1fr); }.hero-visual { min-height: 210px; padding: 0 34px 24px; }.hero-copy { padding-right: 34px; }.hr-panel { grid-column: span 8; }.steps-panel { grid-column: span 4; }.sleep-panel { grid-column: span 6; }.mini-panel { grid-column: span 6; }.vo2-panel { grid-column: span 6; } }
-@media (max-width: 820px) { .overview-page { padding-inline: 16px; }.hero-card { border-radius: 20px; }.hero-copy { padding: 26px 22px 18px; }.hero-visual { grid-template-columns: auto auto; padding: 0 20px 24px; }.data-flow { display: none; }.hero-values li { min-width: calc(50% - 5px); }.dashboard-grid { grid-template-columns: minmax(0,1fr); }.hr-panel,.steps-panel,.sleep-panel,.mini-panel,.recent-panel { grid-column: 1; }.recent-list { grid-template-columns: minmax(0,1fr); }.recent-list :deep(.record-row:nth-child(odd)) { border-right: 0; }.skeleton-grid { grid-template-columns: minmax(0,1fr); } }
+@media (max-width: 1180px) { .hero-card { grid-template-columns: minmax(0,1fr); }.hero-visual { min-height: 210px; padding: 0 34px 24px; }.hero-copy { padding-right: 34px; }.hr-panel { grid-column: span 8; }.steps-panel { grid-column: span 4; }.sleep-panel { grid-column: span 6; }.mini-panel, .entry-panel { grid-column: span 6; } }
+@media (max-width: 820px) { .overview-page { padding-inline: 16px; }.hero-card { border-radius: 20px; }.hero-copy { padding: 26px 22px 18px; }.hero-visual { grid-template-columns: auto auto; padding: 0 20px 24px; }.data-flow { display: none; }.hero-values li { min-width: calc(50% - 5px); }.dashboard-grid { grid-template-columns: minmax(0,1fr); }.hr-panel,.steps-panel,.sleep-panel,.mini-panel,.entry-panel,.recent-panel { grid-column: 1; }.recent-list { grid-template-columns: minmax(0,1fr); }.recent-list :deep(.record-row:nth-child(odd)) { border-right: 0; }.skeleton-grid { grid-template-columns: minmax(0,1fr); } }
 @media (max-width: 520px) { .hero-visual { grid-template-columns: minmax(0,1fr); }.hero-values { display: grid; }.hero-values li { min-width: 0; } }
 @media (prefers-reduced-motion: reduce) { .data-flow path { animation: none; }.metric-panel { transition: none; } }
 </style>

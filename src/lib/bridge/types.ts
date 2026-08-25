@@ -8,8 +8,11 @@ import type {
   ExportSelection,
   HealthOverview,
   HeartRatePoint,
+  HeartRateZoneOptions,
+  HeartRateZonePreference,
   DailyPoint,
   LoginStatus,
+  MetricSeries,
   LocalApiStatus,
   ReprocessResult,
   DeviceProfile,
@@ -17,6 +20,7 @@ import type {
   SleepSession,
   StorageEstimate,
   SyncReport,
+  TrainingBalancePoint,
   UserPrefs,
   Workout,
   WorkoutSeries,
@@ -46,6 +50,13 @@ export interface BridgeBackend {
   getHealthOverview(): Promise<HealthOverview>;
   getHeartRateSeries(hours?: number): Promise<HeartRatePoint[]>;
   getTrainingLoadSeries(days?: number): Promise<DailyPoint[]>;
+  getMetricSeries(metrics: string[], days: number): Promise<MetricSeries[]>;
+  getTrainingBalance(days: number): Promise<TrainingBalancePoint[]>;
+  getHeartRateZones(days: number): Promise<HeartRateZoneOptions>;
+  setHeartRateZonePreference(
+    preference: HeartRateZonePreference,
+    days: number,
+  ): Promise<HeartRateZoneOptions>;
   getStorageEstimate(days: number): Promise<StorageEstimate>;
   setUserPrefs(retentionDays: number, historySyncDays: number): Promise<UserPrefs>;
 

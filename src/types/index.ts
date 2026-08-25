@@ -89,7 +89,18 @@ export interface SyncStreamResult {
   newest_sample_at?: string;
 }
 
-export type SyncOutcome = 'updated' | 'no_new_data' | 'partial' | 'failed' | 'cancelled';
+/**
+ * `deferred` is not a failure: the library is replaying its stored raw
+ * payloads after a normalizer upgrade and the sync stood aside rather than
+ * fight it for the write lock. Nothing was lost and the caller retries.
+ */
+export type SyncOutcome =
+  | 'updated'
+  | 'no_new_data'
+  | 'partial'
+  | 'failed'
+  | 'cancelled'
+  | 'deferred';
 
 export interface SyncReport {
   success: boolean;
@@ -189,6 +200,16 @@ export interface WorkoutSeriesSample {
   cadence?: number | null;
   stride_cm?: number | null;
   altitude_m?: number | null;
+  /** Running power in watts, verified against the summary's average/max. */
+  power_watts?: number | null;
+  /** Ground contact time in milliseconds. */
+  ground_contact_ms?: number | null;
+  /** Vertical oscillation in millimetres. */
+  vertical_oscillation_mm?: number | null;
+  /** Vertical stride ratio in percent. */
+  vertical_ratio_pct?: number | null;
+  /** Grade-adjusted equivalent pace in seconds per kilometre. */
+  equivalent_pace_s_per_km?: number | null;
 }
 
 export interface WorkoutPause {
@@ -229,6 +250,13 @@ export interface WorkoutSeriesSummary {
   average_stride_cm?: number | null;
   elevation_gain_m?: number | null;
   elevation_loss_m?: number | null;
+  average_power_watts?: number | null;
+  max_power_watts?: number | null;
+  average_ground_contact_ms?: number | null;
+  average_vertical_oscillation_mm?: number | null;
+  average_vertical_ratio_pct?: number | null;
+  /** The fastest equivalent pace in the series, in seconds per kilometre. */
+  best_equivalent_pace_s_per_km?: number | null;
 }
 
 export interface LocalApiStatus {
@@ -380,4 +408,116 @@ export interface ReprocessResult {
   total_records: number;
   streams: Record<string, number>;
   message: string;
+}
+
+/**
+ * One day of a metric.
+ *
+ * `min` / `max` appear only where the data really carries a spread — a
+ * companion daily metric, or the spread of that day's samples. A day with one
+ * reading reports no spread rather than a zero-width one.
+ */
+export interface MetricSeriesPoint {
+  date: string;
+  value: number;
+  min?: number | null;
+  max?: number | null;
+  samples?: number | null;
+}
+
+/** One metric over a window, with everything needed to label it honestly. */
+export interface MetricSeries {
+  metric: string;
+  unit: string;
+  source: 'daily_metrics' | 'metric_samples' | string;
+  points: MetricSeriesPoint[];
+  latest?: MetricSeriesPoint | null;
+  average?: number | null;
+  minimum?: number | null;
+  maximum?: number | null;
+  /** Days in the window that carry a value, so gaps can be stated, not drawn. */
+  days_with_data: number;
+  window_days: number;
+}
+
+export interface TrainingBalancePoint {
+  date: string;
+  acute_7d: number;
+  acute_days_with_data: number;
+  chronic_28d: number;
+  chronic_days_with_data: number;
+  /** Absent until the chronic window is mostly covered. */
+  acute_chronic_ratio?: number | null;
+}
+
+/**
+ * One measured number a zone model can stand on.
+ *
+ * Every entry names where it came from and when it was measured. There is
+ * deliberately no 220−age estimate: this list is measurements only.
+ */
+export interface HeartRateBasis {
+  id: string;
+  kind: 'max_hr' | 'resting_hr' | 'threshold_hr' | string;
+  label: string;
+  value: number;
+  unit: string;
+  source: string;
+  measuredAt?: string | null;
+  note?: string | null;
+}
+
+export interface HeartRateZoneBand {
+  zone: number;
+  label: string;
+  lowPercent: number;
+  highPercent: number;
+}
+
+export interface HeartRateZoneModel {
+  id: 'max_hr' | 'hr_reserve' | 'lactate_threshold' | string;
+  label: string;
+  formula: string;
+  requires: string[];
+  bands: HeartRateZoneBand[];
+  /** False when the library holds no basis of a required kind. */
+  available: boolean;
+}
+
+export interface HeartRateZoneRow {
+  zone: number;
+  label: string;
+  minBpm: number;
+  maxBpm: number;
+  seconds: number;
+}
+
+/** Every field starts empty: no model is chosen on the user's behalf. */
+export interface HeartRateZonePreference {
+  model?: string | null;
+  maxBasis?: string | null;
+  restingBasis?: string | null;
+  thresholdBasis?: string | null;
+}
+
+export interface HeartRateZoneReport {
+  model: string;
+  modelLabel: string;
+  formula: string;
+  bases: HeartRateBasis[];
+  zones: HeartRateZoneRow[];
+  belowZone1Seconds: number;
+  aboveZone5Seconds: number;
+  totalSeconds: number;
+  windowDays: number;
+  source: string;
+}
+
+export interface HeartRateZoneOptions {
+  bases: HeartRateBasis[];
+  models: HeartRateZoneModel[];
+  preference: HeartRateZonePreference;
+  /** Present only once the preference names a model and its bases. */
+  report?: HeartRateZoneReport | null;
+  windowDays: number;
 }

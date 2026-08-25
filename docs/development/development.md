@@ -101,6 +101,10 @@ Tauri command 在 `src-tauri/src/lib.rs` 注册，前端封装在 `src/lib/bridg
 | `get_sleep_detail` / `get_workout_detail` | 按稳定 ID 读取单条详情 | 找不到返回 `null`；不生成估算字段 |
 | `get_workout_series` | 读取已解码的跑步 samples/route/pauses | 没有点则空数组，不编造 |
 | `get_heart_rate_series` / `get_training_load_series` | 概览折线用的时序点 | 按小时 / 天读本地库；没有样本就是空数组 |
+| `get_metric_series` | `/body` 与 `/training` 的按天曲线 | 只应答 `SERIES_METRICS` 白名单里的指标名，别的直接跳过；返回 `days_with_data`，缺的天不补 0 |
+| `get_training_balance` | 7 天 / 28 天负荷与急慢比 | 与导出 `training_load_balance` 同一个函数；chronic 窗口不足 21 天时 ratio 为 `null` |
+| `get_heart_rate_zones` | 心率区间选择器的全部状态 | 基准全部实测并带出处与测量日期；未选算法时 `report` 为 `null` |
+| `set_heart_rate_zone_preference` | 记录用户选的算法与基准 | 四个槽位都可为 `null`——「还没决定」必须能存回去 |
 | `get_device_profile` / `get_device_profiles` | 读取识别到的设备档案 | 来自编译进二进制的 `catalog.json`；认不出的设备不猜型号 |
 | `get_storage_estimate` | 估算本地库体积与可清理量 | 只读，按天计算 |
 | `reprocess_local_data` | 用当前解析器重放本地 raw | 不触网，不改云端同步时间；返回各 stream 重放条数 |
@@ -116,6 +120,8 @@ Tauri command 在 `src-tauri/src/lib.rs` 注册，前端封装在 `src/lib/bridg
 | `is_portable_update` / `launch_migrated_install` | 判断当前是否为非安装版入口，并在更新后拉起 `%LOCALAPPDATA%\ZeppBridge\ZeppBridge.exe` | 仅 Windows；找不到安装版时报错而不是静默退出 |
 
 `LoginStatus.state` 只能是：`idle`、`waiting`、`extracting`、`verifying`、`connected`、`failed`。
+
+`SyncReport.outcome` 只能是：`updated`、`no_new_data`、`partial`、`failed`、`cancelled`、`deferred`。`deferred` 不是失败——启动时的原始报文重放正在批量写库，本次同步主动让路，前端一分钟后自动重试，横幅用中性灰而不是红色。
 
 已删除、不得再注册：`start_capture`、`get_capture_status`、`complete_capture_user_id`、`reuse_saved_auth`、`stop_capture`。
 

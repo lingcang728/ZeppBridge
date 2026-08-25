@@ -677,7 +677,7 @@ const runCapabilityProbe = async () => {
     <section class="settings-card" aria-labelledby="capability-title">
       <div class="section-heading-row">
         <h2 id="capability-title">你的设备能提供什么</h2>
-        <span v-if="capabilityCheckedAt" class="api-state">{{ capabilityCheckedAt }}</span>
+        <span v-if="capabilityCheckedAt" class="capability-checked">{{ capabilityCheckedAt }}</span>
       </div>
       <p class="section-description">
         以下是 ZeppBridge 目前能从你的账号读到的数据。这份清单在同步时自动更新，无需手动操作。
@@ -688,25 +688,29 @@ const runCapabilityProbe = async () => {
 
       <div v-if="capabilityOverview" class="capability-columns">
         <div class="capability-column">
-          <p class="group-label">可提供给 AI</p>
+          <p class="capability-heading">可提供给 AI<em>{{ capabilityAvailable.length }}</em></p>
           <ul class="capability-list">
-            <li v-for="row in capabilityAvailable" :key="row.key">
-              <Icon name="circle-check" :size="14" class="capability-yes" />
-              <strong>{{ row.label }}</strong>
-              <span>{{ row.detail }}</span>
+            <li v-for="row in capabilityAvailable" :key="row.key" class="capability-row">
+              <Icon name="circle-check" :size="15" class="capability-yes" />
+              <span class="capability-copy">
+                <strong>{{ row.label }}</strong>
+                <span>{{ row.detail }}</span>
+              </span>
             </li>
-            <li v-if="!capabilityAvailable.length" class="empty-note">尚未同步到任何数据。</li>
+            <li v-if="!capabilityAvailable.length" class="capability-empty">尚未同步到任何数据。</li>
           </ul>
         </div>
         <div class="capability-column">
-          <p class="group-label">暂未获取到</p>
+          <p class="capability-heading">暂未获取到<em>{{ capabilityMissing.length }}</em></p>
           <ul class="capability-list">
-            <li v-for="row in capabilityMissing" :key="row.key">
-              <Icon name="dots" :size="14" class="capability-no" />
-              <strong>{{ row.label }}</strong>
-              <span>{{ row.detail }}</span>
+            <li v-for="row in capabilityMissing" :key="row.key" class="capability-row">
+              <Icon name="dots" :size="15" class="capability-no" />
+              <span class="capability-copy">
+                <strong>{{ row.label }}</strong>
+                <span>{{ row.detail }}</span>
+              </span>
             </li>
-            <li v-if="!capabilityMissing.length" class="empty-note">全部数据流都已获取。</li>
+            <li v-if="!capabilityMissing.length" class="capability-empty">全部数据流都已获取。</li>
           </ul>
         </div>
       </div>
@@ -978,7 +982,7 @@ h1 { font-size: 24px; font-weight: 700; color: var(--ink); }
 h2 { margin-bottom: 14px; font-size: 15px; font-weight: 700; color: var(--ink); }
 h3 { margin-bottom: 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
 .page-intro, .section-description { margin-bottom: 0; color: var(--muted); font-size: 12px; }
-.section-description { margin: 12px 0 8px; }
+.section-description { margin: 0 0 var(--space-3); }
 .settings-card { padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); min-width: 0; }
 .api-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; }
 .api-head h2 { margin-bottom: 4px; }
@@ -1026,14 +1030,55 @@ h3 { margin-bottom: 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
 .account-state { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; white-space: nowrap; }
 .account-state.on { color: var(--accent); }
 .account-state .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.capability-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 4px; }
+/* Deliberately the same surface, radius, gap and type scale as `.source-row`
+   above: these two cards sit one under the other and describe the same
+   devices, so they have to read as one system rather than two. */
+.capability-columns { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
 @media (max-width: 720px) { .capability-columns { grid-template-columns: 1fr; } }
-.capability-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
-.capability-list li { display: grid; grid-template-columns: 16px minmax(0, auto) 1fr; align-items: center; gap: 8px; font-size: 12px; }
-.capability-list strong { font-weight: 600; }
-.capability-list span { color: var(--muted); overflow-wrap: anywhere; }
-.capability-yes { color: var(--accent); }
-.capability-no { color: var(--muted); }
+.capability-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+.capability-heading em {
+  padding: 1px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-raised);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 400;
+}
+.capability-list { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.capability-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+}
+.capability-copy { display: grid; gap: 1px; min-width: 0; flex: 1; }
+.capability-copy strong { color: var(--ink); font-size: 13px; font-weight: 400; }
+.capability-copy span { color: var(--subtle); font-size: 11px; overflow-wrap: anywhere; }
+.capability-empty {
+  padding: 8px 10px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--subtle);
+  font-size: 12px;
+}
+.capability-checked { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.capability-yes { color: var(--accent); flex: 0 0 auto; }
+.capability-no { color: var(--faint); flex: 0 0 auto; }
 .probe-diagnostics { margin-top: 16px; }
 .probe-diagnostics > summary { color: var(--muted); font-size: 12px; cursor: pointer; }
 .probe-diagnostics ul { margin: 8px 0 0; padding-left: 18px; }

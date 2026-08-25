@@ -99,6 +99,28 @@ async fn run_sync(
     history_days: Option<i64>,
 ) -> std::result::Result<UiSyncReport, String> {
     let _command_guard = state.sync_command_lock.lock().await;
+    // A `NORMALIZER_REVISION` bump makes the next launch replay every stored
+    // raw payload, which writes in bulk for as long as a quarter of an hour on
+    // a large library. A sync starting in the middle of that used to lose the
+    // race for SQLite's write lock and surface as "workouts 失败：本地数据库
+    // 暂时不可用" — alarming wording for a library that is busy healing
+    // itself and has lost nothing. Standing aside and coming back is both
+    // truthful and what the user would want.
+    if crate::storage::replay_in_progress() {
+        let now = Utc::now().to_rfc3339();
+        return Ok(ui_sync_report(
+            SyncReport {
+                success: false,
+                streams: Vec::new(),
+                records_written: 0,
+                message: Some("正在用本地原始报文重建派生数据，本次云端同步稍后自动重试".into()),
+            },
+            now.clone(),
+            now,
+            "deferred".to_string(),
+            &BTreeMap::new(),
+        ));
+    }
     let before = {
         let database = state.db.lock().await;
         database

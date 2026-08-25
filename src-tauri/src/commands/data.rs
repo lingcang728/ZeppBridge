@@ -6,8 +6,9 @@ use crate::ipc_types::CleanupResult;
 use crate::models::{
     AiHandoffMetadata, AiHandoffResult, CapabilityOverview, DailyPoint, DeviceCacheMetadata,
     DeviceMatchStatus, DeviceProfile, DeviceProfilesResult, ExportDetail, ExportResult,
-    ExportSelection, HealthOverview, HeartRatePoint, SleepSession, StorageEstimate, UserPrefs,
-    Workout, WorkoutSeries,
+    ExportSelection, HealthOverview, HeartRatePoint, HeartRateZoneOptions, HeartRateZonePreference,
+    MetricSeries, SleepSession, StorageEstimate, TrainingBalancePoint, UserPrefs, Workout,
+    WorkoutSeries,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -123,6 +124,74 @@ pub async fn get_training_load_series(
 ) -> std::result::Result<Vec<DailyPoint>, String> {
     let db = state.db.lock().await;
     db.training_load_series(days)
+        .map_err(|error| error.to_string())
+}
+
+/// Daily series for the body and training screens.
+///
+/// One round trip fills a whole screen: the caller names the metrics it wants
+/// and gets each one back with its unit, its source table and how many days of
+/// the window actually carry data.
+#[tauri::command]
+pub async fn get_metric_series(
+    state: tauri::State<'_, AppState>,
+    metrics: Vec<String>,
+    days: i64,
+) -> std::result::Result<Vec<MetricSeries>, String> {
+    let db = state.db.lock().await;
+    db.metric_series(&metrics, days)
+        .map_err(|error| error.to_string())
+}
+
+/// Acute (7 day) versus chronic (28 day) training load, day by day.
+#[tauri::command]
+pub async fn get_training_balance(
+    state: tauri::State<'_, AppState>,
+    days: i64,
+) -> std::result::Result<Vec<TrainingBalancePoint>, String> {
+    let window = days.clamp(1, 1825);
+    let end = chrono::Local::now().date_naive();
+    let start = end - chrono::Duration::days(window - 1);
+    let db = state.db.lock().await;
+    db.training_load_balance(start, end)
+        .map_err(|error| error.to_string())
+}
+
+/// The heart-rate zone picker's state: measured bases, the models they
+/// support, the user's choice and the zones that choice produces.
+#[tauri::command]
+pub async fn get_heart_rate_zones(
+    state: tauri::State<'_, AppState>,
+    days: i64,
+) -> std::result::Result<HeartRateZoneOptions, String> {
+    let db = state.db.lock().await;
+    db.heart_rate_zone_options(days)
+        .map_err(|error| error.to_string())
+}
+
+/// Record which zone model and which measured bases the user picked.
+///
+/// Every field is optional and clearing them all is a valid state: nothing
+/// here is chosen on the user's behalf, so "not decided yet" has to survive a
+/// round trip.
+#[tauri::command]
+pub async fn set_heart_rate_zone_preference(
+    state: tauri::State<'_, AppState>,
+    model: Option<String>,
+    max_basis: Option<String>,
+    resting_basis: Option<String>,
+    threshold_basis: Option<String>,
+    days: i64,
+) -> std::result::Result<HeartRateZoneOptions, String> {
+    let db = state.db.lock().await;
+    db.set_heart_rate_zone_preference(&HeartRateZonePreference {
+        model,
+        max_basis,
+        resting_basis,
+        threshold_basis,
+    })
+    .map_err(|error| error.to_string())?;
+    db.heart_rate_zone_options(days)
         .map_err(|error| error.to_string())
 }
 

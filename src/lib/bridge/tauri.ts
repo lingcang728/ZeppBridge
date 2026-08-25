@@ -13,11 +13,15 @@ import type {
   ExportResult,
   ExportSelection,
   HealthOverview,
+  HeartRateZoneOptions,
+  HeartRateZonePreference,
   LoginStatus,
+  MetricSeries,
   LocalApiStatus,
   ReprocessResult,
   SleepSession,
   SyncReport,
+  TrainingBalancePoint,
   UserPrefs,
   Workout,
   WorkoutSeries,
@@ -114,6 +118,30 @@ export const tauriBackend: BridgeBackend = {
 
   getTrainingLoadSeries(days = 7) {
     return call('get_training_load_series', { days });
+  },
+
+  getMetricSeries(metrics: string[], days: number) {
+    return call<MetricSeries[]>('get_metric_series', { metrics, days });
+  },
+
+  getTrainingBalance(days: number) {
+    return call<TrainingBalancePoint[]>('get_training_balance', { days });
+  },
+
+  getHeartRateZones(days: number) {
+    return call<HeartRateZoneOptions>('get_heart_rate_zones', { days });
+  },
+
+  setHeartRateZonePreference(preference: HeartRateZonePreference, days: number) {
+    // Every slot is nullable on purpose: clearing the choice has to survive a
+    // round trip, because "not decided yet" is a state the picker returns to.
+    return call<HeartRateZoneOptions>('set_heart_rate_zone_preference', {
+      model: preference.model ?? null,
+      maxBasis: preference.maxBasis ?? null,
+      restingBasis: preference.restingBasis ?? null,
+      thresholdBasis: preference.thresholdBasis ?? null,
+      days,
+    });
   },
 
   getStorageEstimate(days: number) {

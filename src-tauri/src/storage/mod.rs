@@ -7,17 +7,169 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v13";
+const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v14";
 const LAST_CLOUD_SYNC_AT_KEY: &str = "last_cloud_sync_at";
 const LAST_CLOUD_SYNC_OUTCOME_KEY: &str = "last_cloud_sync_outcome";
 const LAST_LOCAL_REPROCESS_AT_KEY: &str = "last_local_reprocess_at";
 const RETENTION_DAYS_KEY: &str = "retention_days";
 const HISTORY_SYNC_DAYS_KEY: &str = "history_sync_days";
+const HEART_RATE_ZONE_PREF_KEY: &str = "heart_rate_zone_preference";
 const BYTES_PER_HISTORY_DAY: u64 = 800_000;
 
 pub struct Database {
     conn: Connection,
 }
+
+/// True while the startup replay is rewriting derived rows from stored raw
+/// payloads.
+///
+/// The replay writes in bulk on its own connection; an automatic sync landing
+/// in the middle of it used to lose the race for the write lock and surface as
+/// a red "本地数据库暂时不可用". A sync that knows the replay is running can
+/// stand aside and come back instead, which is the honest answer: nothing
+/// failed, the library is busy healing itself.
+static REPLAY_IN_PROGRESS: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+/// Whether a raw-payload replay is running right now.
+pub fn replay_in_progress() -> bool {
+    REPLAY_IN_PROGRESS.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+/// Clears the replay flag however the replay ends, including on an early
+/// return or a panic.
+struct ReplayGuard;
+
+impl ReplayGuard {
+    fn enter() -> Self {
+        REPLAY_IN_PROGRESS.store(true, std::sync::atomic::Ordering::SeqCst);
+        Self
+    }
+}
+
+impl Drop for ReplayGuard {
+    fn drop(&mut self) {
+        REPLAY_IN_PROGRESS.store(false, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+/// The daily metrics the body/training screens can chart, and the unit each
+/// carries. Charting is limited to this list so a caller cannot ask for an
+/// arbitrary metric name and have the UI invent a label for it.
+///
+/// `metric_samples` metrics are aggregated to one point per local day; the
+/// spread of that day's samples becomes `min` / `max`, which is real rather
+/// than derived.
+const SERIES_METRICS: [(&str, MetricSource, &str); 22] = [
+    ("readiness", MetricSource::Daily(None), "score"),
+    ("physical_readiness", MetricSource::Daily(None), "score"),
+    ("mental_readiness", MetricSource::Daily(None), "score"),
+    ("hybrid_charge", MetricSource::Daily(None), "score"),
+    ("physical_charge", MetricSource::Daily(None), "score"),
+    ("mental_charge", MetricSource::Daily(None), "score"),
+    (
+        "stress",
+        MetricSource::Daily(Some(("stress_min", "stress_max"))),
+        "score",
+    ),
+    (
+        "respiratory_rate",
+        MetricSource::Daily(Some(("respiratory_rate_min", "respiratory_rate_max"))),
+        "次/分",
+    ),
+    ("resting_hr", MetricSource::Daily(None), "bpm"),
+    ("spo2_odi", MetricSource::Daily(None), "events/h"),
+    ("spo2_night_score", MetricSource::Daily(None), "score"),
+    ("spo2_measured_minutes", MetricSource::Daily(None), "分钟"),
+    ("training_load", MetricSource::Daily(None), "load"),
+    ("vo2max", MetricSource::Daily(None), "ml/kg/min"),
+    ("lactate_threshold_hr", MetricSource::Daily(None), "bpm"),
+    (
+        "lactate_threshold_pace",
+        MetricSource::Daily(None),
+        "秒/公里",
+    ),
+    ("pai_daily", MetricSource::Daily(None), "pai"),
+    ("pai_low_zone", MetricSource::Daily(None), "pai"),
+    ("pai_medium_zone", MetricSource::Daily(None), "pai"),
+    ("pai_high_zone", MetricSource::Daily(None), "pai"),
+    ("hrv", MetricSource::Samples, "ms"),
+    ("hrv_rmssd", MetricSource::Samples, "ms"),
+];
+
+/// Sample-backed metrics that are not in `SERIES_METRICS` above because they
+/// share a name with a daily metric; charted from `metric_samples`.
+const SAMPLE_ONLY_SERIES_METRICS: [(&str, &str); 1] = [("spo2", "%")];
+
+#[derive(Debug, Clone, Copy)]
+enum MetricSource {
+    /// One row per day in `daily_metrics`, optionally with companion metrics
+    /// carrying that day's measured minimum and maximum.
+    Daily(Option<(&'static str, &'static str)>),
+    /// Individual readings in `metric_samples`, folded to one point per day.
+    Samples,
+}
+
+/// The three ways Zepp itself splits heart rate into zones.
+///
+/// The percentages are not invented: the workout summary carries the device's
+/// own boundaries (`heart_range`) alongside `heartrate_setting_type`, and for
+/// this account's threshold model those boundaries are
+/// 113/141/154/162/173/190 against a lactate threshold of 175 bpm — exactly
+/// floor(175 x 65/81/88/93/99/109%). The other two models use Zepp's published
+/// splits for the same five zones.
+/// `(zone, label, low percent, high percent)`.
+type ZoneBandSpec = (i32, &'static str, f64, f64);
+/// `(id, label, formula, required basis kinds, five bands)`.
+type ZoneModelSpec = (
+    &'static str,
+    &'static str,
+    &'static str,
+    &'static [&'static str],
+    [ZoneBandSpec; 5],
+);
+
+const ZONE_MODELS: [ZoneModelSpec; 3] = [
+    (
+        "max_hr",
+        "最大心率区间",
+        "区间下界 = 最大心率 x 百分比",
+        &["max_hr"],
+        [
+            (1, "热身", 0.50, 0.60),
+            (2, "燃脂", 0.60, 0.70),
+            (3, "有氧耐力", 0.70, 0.80),
+            (4, "无氧耐力", 0.80, 0.90),
+            (5, "极限", 0.90, 1.00),
+        ],
+    ),
+    (
+        "hr_reserve",
+        "储备心率区间",
+        "区间下界 = 静息心率 + (最大心率 - 静息心率) x 百分比",
+        &["max_hr", "resting_hr"],
+        [
+            (1, "热身", 0.50, 0.60),
+            (2, "燃脂", 0.60, 0.70),
+            (3, "有氧耐力", 0.70, 0.80),
+            (4, "无氧耐力", 0.80, 0.90),
+            (5, "极限", 0.90, 1.00),
+        ],
+    ),
+    (
+        "lactate_threshold",
+        "乳酸阈值区间",
+        "区间下界 = 乳酸阈值心率 x 百分比",
+        &["threshold_hr"],
+        [
+            (1, "轻松", 0.65, 0.81),
+            (2, "耐力", 0.81, 0.88),
+            (3, "节奏", 0.88, 0.93),
+            (4, "阈值", 0.93, 0.99),
+            (5, "无氧", 0.99, 1.09),
+        ],
+    ),
+];
 
 /// Metrics dense enough that a month of them dwarfs everything else in an
 /// export. In `Summary` detail these collapse to one row per hour; sparse
@@ -416,6 +568,107 @@ pub struct StreamFreshness {
     pub newest_sample_at: Option<String>,
 }
 
+/// The IPC structs are camelCase for the frontend, but an export file is
+/// snake_case throughout. Rendering these two shapes by hand keeps one file
+/// from carrying both conventions.
+fn basis_json(basis: &HeartRateBasis) -> serde_json::Value {
+    serde_json::json!({
+        "id": basis.id,
+        "kind": basis.kind,
+        "label": basis.label,
+        "value": basis.value,
+        "unit": basis.unit,
+        "source": basis.source,
+        "measured_at": basis.measured_at,
+        "note": basis.note,
+    })
+}
+
+fn zone_json(zone: &HeartRateZoneRow) -> serde_json::Value {
+    serde_json::json!({
+        "zone": zone.zone,
+        "label": zone.label,
+        "min_bpm": zone.min_bpm,
+        "max_bpm": zone.max_bpm,
+        "seconds": zone.seconds,
+    })
+}
+
+/// Turn one model plus its chosen bases into five zones and the time spent in
+/// each.
+///
+/// Boundaries are floored, matching the device: a lactate threshold of 175 bpm
+/// produces 113/141/154/162/173/190 on the watch, and 175 x 0.65 = 113.75 only
+/// lands on 113 by flooring.
+fn zone_report(
+    model: &HeartRateZoneModel,
+    used: Vec<HeartRateBasis>,
+    histogram: &BTreeMap<i32, i64>,
+    window_days: i64,
+) -> HeartRateZoneReport {
+    let value_of = |kind: &str| -> f64 {
+        used.iter()
+            .find(|basis| basis.kind == kind)
+            .map(|basis| basis.value)
+            .unwrap_or_default()
+    };
+    let boundary = |percent: f64| -> i32 {
+        let raw = match model.id.as_str() {
+            "hr_reserve" => {
+                let max = value_of("max_hr");
+                let rest = value_of("resting_hr");
+                rest + (max - rest) * percent
+            }
+            "lactate_threshold" => value_of("threshold_hr") * percent,
+            _ => value_of("max_hr") * percent,
+        };
+        raw.floor() as i32
+    };
+
+    let zones = model
+        .bands
+        .iter()
+        .map(|band| {
+            let low = boundary(band.low_percent);
+            let high = boundary(band.high_percent);
+            HeartRateZoneRow {
+                zone: band.zone,
+                label: band.label.clone(),
+                min_bpm: low,
+                max_bpm: (high - 1).max(low),
+                seconds: histogram.range(low..high).map(|(_, count)| *count).sum(),
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let floor_bpm = zones.first().map(|zone| zone.min_bpm).unwrap_or_default();
+    let ceiling_bpm = zones
+        .last()
+        .map(|zone| zone.max_bpm + 1)
+        .unwrap_or_default();
+    HeartRateZoneReport {
+        model: model.id.clone(),
+        model_label: model.label.clone(),
+        formula: model.formula.clone(),
+        bases: used,
+        below_zone_1_seconds: histogram.range(..floor_bpm).map(|(_, count)| *count).sum(),
+        above_zone_5_seconds: histogram
+            .range(ceiling_bpm..)
+            .map(|(_, count)| *count)
+            .sum(),
+        total_seconds: histogram.values().sum(),
+        zones,
+        window_days,
+        source: "workout_samples".into(),
+    }
+}
+
+/// One decimal place, which is as much precision as any of these sources
+/// actually carries.
+fn round1(value: f64) -> f64 {
+    (value * 10.0).round() / 10.0
+}
+
 fn average_finite(values: impl Iterator<Item = f64>) -> Option<f64> {
     let values: Vec<f64> = values.filter(|value| value.is_finite()).collect();
     if values.is_empty() {
@@ -437,6 +690,18 @@ fn pace_minutes_per_kilometre(pace: Option<f64>, speed: Option<f64>) -> Option<f
             .map(|value| value * 1_000.0 / 60.0)
     });
     converted.filter(|value| *value >= 1.0 && *value < 60.0)
+}
+
+/// Drop equivalent-pace readings that describe standing still.
+///
+/// The device keeps emitting `equivPace` while a runner is stopped, which
+/// produces values like 51604 s/km — fourteen hours per kilometre. Zepp's own
+/// `avgEquivPace` excludes them by being distance-weighted, and the stored
+/// column keeps exactly what the device sent; the filter belongs on the read
+/// path, the same place `pace` is turned into minutes per kilometre. The
+/// window matches that one: 1:00 to 60:00 per kilometre.
+fn plausible_equivalent_pace(seconds: Option<f64>) -> Option<f64> {
+    seconds.filter(|value| value.is_finite() && (60.0..3_600.0).contains(value))
 }
 
 pub(crate) fn is_corrupt_error(error: &ZeppBridgeError) -> bool {
@@ -547,6 +812,12 @@ fn workout_series_summary(samples: &[WorkoutSeriesSample]) -> WorkoutSeriesSumma
         (Some(gain), Some(loss))
     };
 
+    let powers: Vec<f64> = samples
+        .iter()
+        .filter_map(|sample| sample.power_watts)
+        .filter(|value| value.is_finite() && *value >= 0.0 && *value < 2_000.0)
+        .collect();
+
     WorkoutSeriesSummary {
         average_pace,
         average_cadence,
@@ -554,6 +825,32 @@ fn workout_series_summary(samples: &[WorkoutSeriesSample]) -> WorkoutSeriesSumma
         average_stride_cm,
         elevation_gain_m,
         elevation_loss_m,
+        average_power_watts: average_finite(powers.iter().copied()),
+        max_power_watts: powers.iter().copied().reduce(f64::max),
+        average_ground_contact_ms: average_finite(
+            samples
+                .iter()
+                .filter_map(|sample| sample.ground_contact_ms)
+                .filter(|value| *value > 0.0 && *value < 2_000.0),
+        ),
+        average_vertical_oscillation_mm: average_finite(
+            samples
+                .iter()
+                .filter_map(|sample| sample.vertical_oscillation_mm)
+                .filter(|value| *value > 0.0 && *value < 1_000.0),
+        ),
+        average_vertical_ratio_pct: average_finite(
+            samples
+                .iter()
+                .filter_map(|sample| sample.vertical_ratio_pct)
+                .filter(|value| *value > 0.0 && *value < 100.0),
+        ),
+        // The best equivalent pace is the smallest number of seconds, so this
+        // is a minimum even though it reads as "best".
+        best_equivalent_pace_s_per_km: samples
+            .iter()
+            .filter_map(|sample| plausible_equivalent_pace(sample.equivalent_pace_s_per_km))
+            .reduce(f64::min),
     }
 }
 
@@ -616,7 +913,7 @@ impl Database {
         let conn = Connection::open(db_path)?;
         conn.execute_batch(
             "PRAGMA foreign_keys = ON;
-             PRAGMA busy_timeout = 5000;
+             PRAGMA busy_timeout = 30000;
              PRAGMA journal_mode = WAL;",
         )?;
         Ok(Self { conn })
@@ -631,7 +928,7 @@ impl Database {
         // These pragmas are set for every connection, including test databases.
         conn.execute_batch(
             "PRAGMA foreign_keys = ON;
-             PRAGMA busy_timeout = 5000;
+             PRAGMA busy_timeout = 30000;
              PRAGMA journal_mode = WAL;",
         )?;
         let db = Self { conn };
@@ -981,6 +1278,24 @@ impl Database {
         self.conn.execute_batch("PRAGMA user_version = 9;")?;
         self.conn.execute(
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(9, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // Running power and form come from the same detail payload the samples
+        // already carry, so the columns start empty and fill in on the replay
+        // that the revision bump triggers.
+        self.ensure_table_columns(
+            "workout_samples",
+            &[
+                ("power_watts", "REAL"),
+                ("ground_contact_ms", "REAL"),
+                ("vertical_oscillation_mm", "REAL"),
+                ("vertical_ratio_pct", "REAL"),
+                ("equivalent_pace_s", "REAL"),
+            ],
+        )?;
+        self.conn.execute_batch("PRAGMA user_version = 10;")?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(10, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
         self.ensure_cloud_sync_metadata()?;
@@ -1441,6 +1756,7 @@ impl Database {
     }
 
     pub fn reprocess_raw_records(&self) -> Result<BTreeMap<String, i64>> {
+        let _replay_guard = ReplayGuard::enter();
         let raw_records = {
             let mut stmt = self
                 .conn
@@ -1766,8 +2082,10 @@ impl Database {
         {
             let mut insert = self.conn.prepare(
                 "INSERT INTO workout_samples
-                    (workout_id, timestamp, heart_rate, pace, speed, cadence, altitude, stride)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                    (workout_id, timestamp, heart_rate, pace, speed, cadence, altitude, stride,
+                     power_watts, ground_contact_ms, vertical_oscillation_mm, vertical_ratio_pct,
+                     equivalent_pace_s)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
             )?;
             for sample in &decoded.samples {
                 insert.execute(params![
@@ -1779,6 +2097,11 @@ impl Database {
                     sample.cadence,
                     sample.altitude_m,
                     sample.stride_cm,
+                    sample.power_watts,
+                    sample.ground_contact_ms,
+                    sample.vertical_oscillation_mm,
+                    sample.vertical_ratio_pct,
+                    sample.equivalent_pace_s_per_km,
                 ])?;
             }
         }
@@ -1856,7 +2179,9 @@ impl Database {
     pub fn get_workout_series(&self, workout_id: &str) -> Result<WorkoutSeries> {
         let mut samples = {
             let mut stmt = self.conn.prepare(
-                "SELECT timestamp, heart_rate, pace, speed, cadence, altitude, stride
+                "SELECT timestamp, heart_rate, pace, speed, cadence, altitude, stride,
+                        power_watts, ground_contact_ms, vertical_oscillation_mm,
+                        vertical_ratio_pct, equivalent_pace_s
                  FROM workout_samples WHERE workout_id = ?1 ORDER BY timestamp",
             )?;
             let rows = stmt.query_map([workout_id], |row| {
@@ -1868,12 +2193,19 @@ impl Database {
                     cadence: row.get(4)?,
                     altitude_m: row.get(5)?,
                     stride_cm: row.get(6)?,
+                    power_watts: row.get(7)?,
+                    ground_contact_ms: row.get(8)?,
+                    vertical_oscillation_mm: row.get(9)?,
+                    vertical_ratio_pct: row.get(10)?,
+                    equivalent_pace_s_per_km: row.get(11)?,
                 })
             })?;
             rows.collect::<std::result::Result<Vec<_>, _>>()?
         };
         for sample in &mut samples {
             sample.pace = pace_minutes_per_kilometre(sample.pace, sample.speed);
+            sample.equivalent_pace_s_per_km =
+                plausible_equivalent_pace(sample.equivalent_pace_s_per_km);
         }
 
         let route = {
@@ -2631,86 +2963,8 @@ impl Database {
         let mut analysis = serde_json::Map::new();
 
         if selected.contains("workouts") {
-            // Zone boundaries need a maximum heart rate. Estimating one from
-            // age (220 − age) would be a fabricated number in a file that
-            // promises never to fabricate, so the basis is the highest rate
-            // this account has actually recorded — and the export says so,
-            // including that a rate never reached is a rate never counted.
-            let observed: Option<(i32, String)> = self
-                .conn
-                .query_row(
-                    "SELECT max_hr, start_time FROM workouts
-                     WHERE max_hr IS NOT NULL AND max_hr > 0
-                     ORDER BY max_hr DESC, start_time DESC LIMIT 1",
-                    [],
-                    |row| Ok((row.get::<_, i32>(0)?, row.get::<_, String>(1)?)),
-                )
-                .optional()?;
-
-            if let Some((max_hr, observed_at)) = observed {
-                let mut histogram: BTreeMap<i32, i64> = BTreeMap::new();
-                let mut stmt = self.conn.prepare(
-                    "SELECT workout_samples.heart_rate, COUNT(*)
-                     FROM workout_samples
-                     JOIN workouts ON workouts.workout_id = workout_samples.workout_id
-                     WHERE workout_samples.heart_rate IS NOT NULL
-                       AND date(workouts.start_time, 'localtime') BETWEEN ?1 AND ?2
-                     GROUP BY workout_samples.heart_rate",
-                )?;
-                let rows = stmt.query_map(params![start_text, end_text], |row| {
-                    Ok((row.get::<_, i32>(0)?, row.get::<_, i64>(1)?))
-                })?;
-                for row in rows {
-                    let (heart_rate, seconds) = row?;
-                    *histogram.entry(heart_rate).or_default() += seconds;
-                }
-
-                // Percentage bands of the observed maximum, the convention Zepp
-                // itself uses for its five zones.
-                let bands: [(i32, f64, f64); 5] = [
-                    (1, 0.50, 0.60),
-                    (2, 0.60, 0.70),
-                    (3, 0.70, 0.80),
-                    (4, 0.80, 0.90),
-                    (5, 0.90, 1.01),
-                ];
-                let zones = bands
-                    .iter()
-                    .map(|(zone, low, high)| {
-                        let low_bpm = (f64::from(max_hr) * low).round() as i32;
-                        let high_bpm = (f64::from(max_hr) * high).round() as i32;
-                        let seconds: i64 = histogram
-                            .range(low_bpm..high_bpm)
-                            .map(|(_, count)| *count)
-                            .sum();
-                        serde_json::json!({
-                            "zone": zone,
-                            "min_bpm": low_bpm,
-                            "max_bpm": high_bpm - 1,
-                            "seconds": seconds,
-                        })
-                    })
-                    .collect::<Vec<_>>();
-                let below: i64 = histogram
-                    .range(..(f64::from(max_hr) * 0.50).round() as i32)
-                    .map(|(_, count)| *count)
-                    .sum();
-
-                analysis.insert(
-                    "heart_rate_zones".into(),
-                    serde_json::json!({
-                        "basis": {
-                            "type": "observed_max",
-                            "value": max_hr,
-                            "observed_at": observed_at,
-                            "note": "区间上界取自本地记录到的最高心率，不使用 220−年龄 之类的估算；若从未跑到真正的极限，区间会整体偏窄",
-                        },
-                        "unit": "seconds",
-                        "source": "workout_samples",
-                        "zones": zones,
-                        "below_zone_1_seconds": below,
-                    }),
-                );
+            if let Some(zones) = self.heart_rate_zone_variants(start_text, end_text)? {
+                analysis.insert("heart_rate_zones".into(), zones);
             }
         }
 
@@ -2721,58 +2975,11 @@ impl Database {
             let Some(range_start) = NaiveDate::parse_from_str(start_text, "%Y-%m-%d").ok() else {
                 return Ok(analysis);
             };
-            let history_start = (range_start - Duration::days(27))
-                .format("%Y-%m-%d")
-                .to_string();
-            let mut stmt = self.conn.prepare(
-                "SELECT date, MAX(value) FROM daily_metrics
-                 WHERE metric = 'training_load' AND date BETWEEN ?1 AND ?2
-                 GROUP BY date ORDER BY date",
-            )?;
-            let rows = stmt.query_map(params![history_start, end_text], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?))
-            })?;
-            let mut by_date: BTreeMap<String, f64> = BTreeMap::new();
-            for row in rows {
-                let (date, value) = row?;
-                by_date.insert(date, value);
-            }
-
-            let mut balance = Vec::new();
-            let mut day = range_start;
             let end_date = NaiveDate::parse_from_str(end_text, "%Y-%m-%d")
                 .map_err(|_| ZeppBridgeError::ConfigError("导出结束日期无效".into()))?;
-            while day <= end_date {
-                let window_sum = |days: i64| -> (f64, usize) {
-                    let mut total = 0.0;
-                    let mut present = 0usize;
-                    for back in 0..days {
-                        let key = (day - Duration::days(back)).format("%Y-%m-%d").to_string();
-                        if let Some(value) = by_date.get(&key) {
-                            total += *value;
-                            present += 1;
-                        }
-                    }
-                    (total, present)
-                };
-                let (acute, acute_days) = window_sum(7);
-                let (chronic, chronic_days) = window_sum(28);
-                // A ratio against a partly-empty chronic window would read as a
-                // spike that never happened, so it is only reported once the
-                // window is mostly covered.
-                let chronic_weekly = chronic / 4.0;
-                let ratio = (chronic_days >= 21 && chronic_weekly > 0.0)
-                    .then(|| (acute / chronic_weekly * 100.0).round() / 100.0);
-                balance.push(serde_json::json!({
-                    "date": day.format("%Y-%m-%d").to_string(),
-                    "acute_7d": (acute * 10.0).round() / 10.0,
-                    "acute_days_with_data": acute_days,
-                    "chronic_28d": (chronic * 10.0).round() / 10.0,
-                    "chronic_days_with_data": chronic_days,
-                    "acute_chronic_ratio": ratio,
-                }));
-                day += Duration::days(1);
-            }
+            // Same computation the training screen shows, so a chart and an
+            // exported file can never quote different ratios for one day.
+            let balance = self.training_load_balance(range_start, end_date)?;
 
             if !balance.is_empty() {
                 analysis.insert(
@@ -2787,6 +2994,552 @@ impl Database {
         }
 
         Ok(analysis)
+    }
+
+    /// Daily series for the body and training screens.
+    ///
+    /// Only names in `SERIES_METRICS` / `SAMPLE_ONLY_SERIES_METRICS` are
+    /// answered; anything else is skipped rather than guessed at, so a typo in
+    /// a caller cannot produce a chart with an invented unit.
+    pub fn metric_series(&self, metrics: &[String], days: i64) -> Result<Vec<MetricSeries>> {
+        let window_days = days.clamp(1, 1825);
+        let end = Local::now().date_naive();
+        let start = end - Duration::days(window_days - 1);
+        let start_text = start.format("%Y-%m-%d").to_string();
+        let end_text = end.format("%Y-%m-%d").to_string();
+
+        let mut result = Vec::new();
+        for metric in metrics {
+            let daily = SERIES_METRICS
+                .iter()
+                .find(|(name, _, _)| name == metric)
+                .map(|(name, source, unit)| (*name, *source, *unit));
+            let sample_only = SAMPLE_ONLY_SERIES_METRICS
+                .iter()
+                .find(|(name, _)| name == metric)
+                .map(|(name, unit)| (*name, MetricSource::Samples, *unit));
+            let Some((name, source, unit)) = daily.or(sample_only) else {
+                continue;
+            };
+
+            let points = match source {
+                MetricSource::Daily(spread) => {
+                    self.daily_metric_points(name, spread, &start_text, &end_text)?
+                }
+                MetricSource::Samples => self.sample_metric_points(name, &start_text, &end_text)?,
+            };
+
+            let values: Vec<f64> = points.iter().map(|point| point.value).collect();
+            result.push(MetricSeries {
+                metric: name.to_string(),
+                unit: unit.to_string(),
+                source: match source {
+                    MetricSource::Daily(_) => "daily_metrics".to_string(),
+                    MetricSource::Samples => "metric_samples".to_string(),
+                },
+                latest: points.last().cloned(),
+                average: average_finite(values.iter().copied()).map(round1),
+                minimum: values.iter().copied().reduce(f64::min),
+                maximum: values.iter().copied().reduce(f64::max),
+                days_with_data: points.len() as i64,
+                window_days,
+                points,
+            });
+        }
+        Ok(result)
+    }
+
+    /// One point per calendar day from `daily_metrics`.
+    ///
+    /// Where the same day is reported twice — once by the account's own fused
+    /// roll-up, once by the watch — the fused reading wins, the same
+    /// precedence the export uses, so a chart and an export never disagree.
+    fn daily_metric_points(
+        &self,
+        metric: &str,
+        spread: Option<(&str, &str)>,
+        start: &str,
+        end: &str,
+    ) -> Result<Vec<MetricSeriesPoint>> {
+        let pick = |metric: &str| -> Result<BTreeMap<String, f64>> {
+            let mut stmt = self.conn.prepare(
+                "SELECT date,
+                        COALESCE(
+                            MAX(CASE WHEN source_scope = 'user_fused' THEN value END),
+                            MAX(value)
+                        )
+                 FROM daily_metrics
+                 WHERE metric = ?1 AND date BETWEEN ?2 AND ?3
+                 GROUP BY date ORDER BY date",
+            )?;
+            let rows = stmt.query_map(params![metric, start, end], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?))
+            })?;
+            let mut map = BTreeMap::new();
+            for row in rows {
+                let (date, value) = row?;
+                map.insert(date, value);
+            }
+            Ok(map)
+        };
+
+        let values = pick(metric)?;
+        let (minima, maxima) = match spread {
+            Some((low, high)) => (pick(low)?, pick(high)?),
+            None => (BTreeMap::new(), BTreeMap::new()),
+        };
+
+        Ok(values
+            .into_iter()
+            .map(|(date, value)| MetricSeriesPoint {
+                min: minima.get(&date).copied().map(round1),
+                max: maxima.get(&date).copied().map(round1),
+                samples: None,
+                value: round1(value),
+                date,
+            })
+            .collect())
+    }
+
+    /// One point per local day from `metric_samples`.
+    ///
+    /// The day's value is the mean of its readings and the spread is the
+    /// readings' own minimum and maximum — measured, not modelled. A day with
+    /// one reading reports no spread rather than a zero-width one.
+    fn sample_metric_points(
+        &self,
+        metric: &str,
+        start: &str,
+        end: &str,
+    ) -> Result<Vec<MetricSeriesPoint>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT date(timestamp, 'localtime') AS day,
+                    AVG(value), MIN(value), MAX(value), COUNT(*)
+             FROM metric_samples
+             WHERE metric = ?1 AND date(timestamp, 'localtime') BETWEEN ?2 AND ?3
+             GROUP BY day ORDER BY day",
+        )?;
+        let rows = stmt.query_map(params![metric, start, end], |row| {
+            Ok(MetricSeriesPoint {
+                date: row.get(0)?,
+                value: round1(row.get::<_, f64>(1)?),
+                min: Some(round1(row.get::<_, f64>(2)?)),
+                max: Some(round1(row.get::<_, f64>(3)?)),
+                samples: Some(row.get::<_, i64>(4)?),
+            })
+        })?;
+        Ok(rows
+            .collect::<std::result::Result<Vec<_>, _>>()?
+            .into_iter()
+            .map(|mut point| {
+                if point.samples == Some(1) {
+                    point.min = None;
+                    point.max = None;
+                }
+                point
+            })
+            .collect())
+    }
+
+    /// Acute (7 day) against chronic (28 day) training load.
+    ///
+    /// The chronic window reaches 27 days before the range so the first day
+    /// asked for is already backed by a full window instead of ramping up from
+    /// zero. Shared with the export so the screen and the file agree.
+    pub fn training_load_balance(
+        &self,
+        start: NaiveDate,
+        end: NaiveDate,
+    ) -> Result<Vec<TrainingBalancePoint>> {
+        let history_start = (start - Duration::days(27)).format("%Y-%m-%d").to_string();
+        let end_text = end.format("%Y-%m-%d").to_string();
+        let mut stmt = self.conn.prepare(
+            "SELECT date, MAX(value) FROM daily_metrics
+             WHERE metric = 'training_load' AND date BETWEEN ?1 AND ?2
+             GROUP BY date ORDER BY date",
+        )?;
+        let rows = stmt.query_map(params![history_start, end_text], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?))
+        })?;
+        let mut by_date: BTreeMap<String, f64> = BTreeMap::new();
+        for row in rows {
+            let (date, value) = row?;
+            by_date.insert(date, value);
+        }
+
+        let mut balance = Vec::new();
+        let mut day = start;
+        while day <= end {
+            let window_sum = |days: i64| -> (f64, i64) {
+                let mut total = 0.0;
+                let mut present = 0i64;
+                for back in 0..days {
+                    let key = (day - Duration::days(back)).format("%Y-%m-%d").to_string();
+                    if let Some(value) = by_date.get(&key) {
+                        total += *value;
+                        present += 1;
+                    }
+                }
+                (total, present)
+            };
+            let (acute, acute_days) = window_sum(7);
+            let (chronic, chronic_days) = window_sum(28);
+            let chronic_weekly = chronic / 4.0;
+            let ratio = (chronic_days >= 21 && chronic_weekly > 0.0)
+                .then(|| (acute / chronic_weekly * 100.0).round() / 100.0);
+            balance.push(TrainingBalancePoint {
+                date: day.format("%Y-%m-%d").to_string(),
+                acute_7d: round1(acute),
+                acute_days_with_data: acute_days,
+                chronic_28d: round1(chronic),
+                chronic_days_with_data: chronic_days,
+                acute_chronic_ratio: ratio,
+            });
+            day += Duration::days(1);
+        }
+        Ok(balance)
+    }
+
+    /// Every heart-rate number this library actually measured.
+    ///
+    /// Five entries at most, each naming its table, its column and the day it
+    /// was recorded. There is no age-based estimate here on purpose: 220−age
+    /// would be a fabricated basis in a product that promises not to fabricate.
+    pub fn heart_rate_bases(&self) -> Result<Vec<HeartRateBasis>> {
+        let mut bases = Vec::new();
+
+        let observed: Option<(i32, String)> = self
+            .conn
+            .query_row(
+                "SELECT max_hr, start_time FROM workouts
+                 WHERE max_hr IS NOT NULL AND max_hr > 0
+                 ORDER BY max_hr DESC, start_time DESC LIMIT 1",
+                [],
+                |row| Ok((row.get::<_, i32>(0)?, row.get::<_, String>(1)?)),
+            )
+            .optional()?;
+        if let Some((value, observed_at)) = observed {
+            bases.push(HeartRateBasis {
+                id: "observed_max".into(),
+                kind: "max_hr".into(),
+                label: "实测最高心率".into(),
+                value: f64::from(value),
+                unit: "bpm".into(),
+                source: "max(workouts.max_hr)".into(),
+                measured_at: observed_at.get(..10).map(str::to_owned),
+                note: Some("本地记录到的最高心率。没跑到真正的极限时，区间会整体偏窄。".into()),
+            });
+        }
+
+        for (id, metric, label, source, note) in [
+            (
+                "device_max",
+                "device_max_hr",
+                "手表自报最大心率",
+                "daily_metrics.device_max_hr",
+                "手表在 PAI 报文里自报的最大心率，通常来自 Zepp App 的个人设置。",
+            ),
+            (
+                "device_resting",
+                "device_resting_hr",
+                "手表自报静息心率",
+                "daily_metrics.device_resting_hr",
+                "手表在 PAI 报文里自报的静息心率。",
+            ),
+            (
+                "lactate_threshold",
+                "lactate_threshold_hr",
+                "乳酸阈值心率",
+                "daily_metrics.lactate_threshold_hr",
+                "手表在一次高强度跑步后测出的乳酸阈值心率。",
+            ),
+        ] {
+            let latest: Option<(String, f64)> = self
+                .conn
+                .query_row(
+                    "SELECT date, value FROM daily_metrics
+                     WHERE metric = ?1 AND value > 0
+                     ORDER BY date DESC LIMIT 1",
+                    [metric],
+                    |row| Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?)),
+                )
+                .optional()?;
+            if let Some((date, value)) = latest {
+                bases.push(HeartRateBasis {
+                    id: id.into(),
+                    kind: if id == "lactate_threshold" {
+                        "threshold_hr".into()
+                    } else if id == "device_max" {
+                        "max_hr".into()
+                    } else {
+                        "resting_hr".into()
+                    },
+                    label: label.into(),
+                    value: round1(value),
+                    unit: "bpm".into(),
+                    source: source.into(),
+                    measured_at: Some(date),
+                    note: Some(note.into()),
+                });
+            }
+        }
+
+        // The rolling resting heart rate ZeppBridge computes itself. It is an
+        // average of measured days, not a model, so it carries the window it
+        // was taken over instead of a single measurement date.
+        let computed: Option<(f64, i64, Option<String>)> = self
+            .conn
+            .query_row(
+                "SELECT AVG(value), COUNT(*), MAX(date) FROM daily_metrics
+                 WHERE metric = 'resting_hr' AND value > 0
+                   AND date >= date('now', 'localtime', '-30 day')",
+                [],
+                |row| {
+                    Ok((
+                        row.get::<_, Option<f64>>(0)?.unwrap_or_default(),
+                        row.get::<_, i64>(1)?,
+                        row.get::<_, Option<String>>(2)?,
+                    ))
+                },
+            )
+            .optional()?;
+        if let Some((average, count, latest)) = computed {
+            if count > 0 {
+                bases.push(HeartRateBasis {
+                    id: "computed_resting".into(),
+                    kind: "resting_hr".into(),
+                    label: "本地统计静息心率".into(),
+                    value: average.round(),
+                    unit: "bpm".into(),
+                    source: "avg(daily_metrics.resting_hr)".into(),
+                    measured_at: latest,
+                    note: Some(format!("近 30 天里有数据的 {count} 天的平均值。")),
+                });
+            }
+        }
+
+        Ok(bases)
+    }
+
+    pub fn heart_rate_zone_preference(&self) -> Result<HeartRateZonePreference> {
+        let Some(stored) = self.get_app_meta(HEART_RATE_ZONE_PREF_KEY)? else {
+            return Ok(HeartRateZonePreference::default());
+        };
+        // A preference written by an older build must never block the picker.
+        Ok(serde_json::from_str(&stored).unwrap_or_default())
+    }
+
+    pub fn set_heart_rate_zone_preference(
+        &self,
+        preference: &HeartRateZonePreference,
+    ) -> Result<HeartRateZonePreference> {
+        let encoded = serde_json::to_string(preference)
+            .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
+        self.set_app_meta(HEART_RATE_ZONE_PREF_KEY, &encoded)?;
+        Ok(preference.clone())
+    }
+
+    /// The zone picker's whole state: measured bases, the models they can
+    /// support, the user's choice, and the zones that choice produces.
+    ///
+    /// No model is preselected. Until someone picks one, `report` is `None`
+    /// and the screen shows the choice rather than a number.
+    pub fn heart_rate_zone_options(&self, days: i64) -> Result<HeartRateZoneOptions> {
+        let window_days = days.clamp(1, 1825);
+        let bases = self.heart_rate_bases()?;
+        let has_kind = |kind: &str| bases.iter().any(|basis| basis.kind == kind);
+
+        let models = ZONE_MODELS
+            .iter()
+            .map(|(id, label, formula, requires, bands)| HeartRateZoneModel {
+                id: (*id).to_string(),
+                label: (*label).to_string(),
+                formula: (*formula).to_string(),
+                requires: requires.iter().map(|kind| (*kind).to_string()).collect(),
+                bands: bands
+                    .iter()
+                    .map(|(zone, name, low, high)| HeartRateZoneBand {
+                        zone: *zone,
+                        label: (*name).to_string(),
+                        low_percent: *low,
+                        high_percent: *high,
+                    })
+                    .collect(),
+                available: requires.iter().all(|kind| has_kind(kind)),
+            })
+            .collect::<Vec<_>>();
+
+        let preference = self.heart_rate_zone_preference()?;
+        let report = self.heart_rate_zone_report(&bases, &models, &preference, window_days)?;
+        Ok(HeartRateZoneOptions {
+            bases,
+            models,
+            preference,
+            report,
+            window_days,
+        })
+    }
+
+    fn heart_rate_zone_report(
+        &self,
+        bases: &[HeartRateBasis],
+        models: &[HeartRateZoneModel],
+        preference: &HeartRateZonePreference,
+        window_days: i64,
+    ) -> Result<Option<HeartRateZoneReport>> {
+        let Some(model_id) = preference.model.as_deref() else {
+            return Ok(None);
+        };
+        let Some(model) = models.iter().find(|model| model.id == model_id) else {
+            return Ok(None);
+        };
+        let pick = |kind: &str| -> Option<&HeartRateBasis> {
+            let chosen = match kind {
+                "max_hr" => preference.max_basis.as_deref(),
+                "resting_hr" => preference.resting_basis.as_deref(),
+                "threshold_hr" => preference.threshold_basis.as_deref(),
+                _ => None,
+            }?;
+            bases
+                .iter()
+                .find(|basis| basis.id == chosen && basis.kind == kind)
+        };
+        let mut used = Vec::new();
+        for kind in &model.requires {
+            let Some(basis) = pick(kind) else {
+                return Ok(None);
+            };
+            used.push(basis.clone());
+        }
+
+        let end = Local::now().date_naive();
+        let start = end - Duration::days(window_days - 1);
+        let histogram = self.workout_heart_rate_histogram(
+            &start.format("%Y-%m-%d").to_string(),
+            &end.format("%Y-%m-%d").to_string(),
+        )?;
+
+        Ok(Some(zone_report(model, used, &histogram, window_days)))
+    }
+
+    /// Every way this library's measured numbers can be turned into zones.
+    ///
+    /// The export cannot silently pick one: which model a runner trains by is
+    /// their decision, and this account holds two candidate maxima and two
+    /// candidate resting rates. So every combination that the stored numbers
+    /// support is written out, each stating the bases behind it, and
+    /// `selected_model` says which one the user actually chose — `null` when
+    /// they have not chosen yet.
+    fn heart_rate_zone_variants(
+        &self,
+        start_text: &str,
+        end_text: &str,
+    ) -> Result<Option<serde_json::Value>> {
+        let bases = self.heart_rate_bases()?;
+        if bases.is_empty() {
+            return Ok(None);
+        }
+        let preference = self.heart_rate_zone_preference()?;
+        let histogram = self.workout_heart_rate_histogram(start_text, end_text)?;
+        let options = self.heart_rate_zone_options(1)?;
+
+        let of_kind = |kind: &str| -> Vec<&HeartRateBasis> {
+            bases.iter().filter(|basis| basis.kind == kind).collect()
+        };
+
+        let mut variants = Vec::new();
+        for model in &options.models {
+            if !model.available {
+                continue;
+            }
+            let maxima = if model.requires.iter().any(|kind| kind == "max_hr") {
+                of_kind("max_hr")
+            } else {
+                vec![]
+            };
+            let restings = if model.requires.iter().any(|kind| kind == "resting_hr") {
+                of_kind("resting_hr")
+            } else {
+                vec![]
+            };
+            let thresholds = if model.requires.iter().any(|kind| kind == "threshold_hr") {
+                of_kind("threshold_hr")
+            } else {
+                vec![]
+            };
+            let combinations: Vec<Vec<HeartRateBasis>> = match model.id.as_str() {
+                "hr_reserve" => maxima
+                    .iter()
+                    .flat_map(|max| {
+                        restings
+                            .iter()
+                            .map(|rest| vec![(*max).clone(), (*rest).clone()])
+                            .collect::<Vec<_>>()
+                    })
+                    .collect(),
+                "lactate_threshold" => thresholds
+                    .iter()
+                    .map(|threshold| vec![(*threshold).clone()])
+                    .collect(),
+                _ => maxima.iter().map(|max| vec![(*max).clone()]).collect(),
+            };
+            for used in combinations {
+                let report = zone_report(model, used, &histogram, 0);
+                let selected = preference.model.as_deref() == Some(model.id.as_str())
+                    && report.bases.iter().all(|basis| {
+                        let chosen = match basis.kind.as_str() {
+                            "max_hr" => preference.max_basis.as_deref(),
+                            "resting_hr" => preference.resting_basis.as_deref(),
+                            _ => preference.threshold_basis.as_deref(),
+                        };
+                        chosen == Some(basis.id.as_str())
+                    });
+                variants.push(serde_json::json!({
+                    "model": report.model,
+                    "label": report.model_label,
+                    "formula": report.formula,
+                    "selected": selected,
+                    "bases": report.bases.iter().map(basis_json).collect::<Vec<_>>(),
+                    "zones": report.zones.iter().map(zone_json).collect::<Vec<_>>(),
+                    "below_zone_1_seconds": report.below_zone_1_seconds,
+                    "above_zone_5_seconds": report.above_zone_5_seconds,
+                }));
+            }
+        }
+        if variants.is_empty() {
+            return Ok(None);
+        }
+
+        Ok(Some(serde_json::json!({
+            "unit": "seconds",
+            "source": "workout_samples",
+            "selected_model": preference.model,
+            "measured_bases": bases.iter().map(basis_json).collect::<Vec<_>>(),
+            "note": "区间边界一律向下取整，与手表一致（乳酸阈值 175 bpm 在表上就是 113/141/154/162/173/190）。不使用 220−年龄 之类的估算，所有基准都取自本地实测值。用户没有指定模型时 selected 全为 false，这里列出的是全部可算的组合，而不是替他挑一个。",
+            "models": variants,
+        })))
+    }
+
+    /// Seconds spent at each recorded heart rate during workouts in a range.
+    fn workout_heart_rate_histogram(&self, start: &str, end: &str) -> Result<BTreeMap<i32, i64>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT workout_samples.heart_rate, COUNT(*)
+             FROM workout_samples
+             JOIN workouts ON workouts.workout_id = workout_samples.workout_id
+             WHERE workout_samples.heart_rate IS NOT NULL
+               AND workout_samples.heart_rate > 0
+               AND date(workouts.start_time, 'localtime') BETWEEN ?1 AND ?2
+             GROUP BY workout_samples.heart_rate",
+        )?;
+        let rows = stmt.query_map(params![start, end], |row| {
+            Ok((row.get::<_, i32>(0)?, row.get::<_, i64>(1)?))
+        })?;
+        let mut histogram = BTreeMap::new();
+        for row in rows {
+            let (heart_rate, seconds) = row?;
+            *histogram.entry(heart_rate).or_default() += seconds;
+        }
+        Ok(histogram)
     }
 
     pub fn build_ai_export(&self, selection: &ExportSelection) -> Result<(String, usize)> {
@@ -4071,13 +4824,13 @@ mod tests {
     }
 
     #[test]
-    fn heart_rate_zones_state_their_basis_and_are_absent_without_one() {
+    fn heart_rate_zones_offer_every_measured_basis_and_preselect_none() {
         let db = Database::in_memory().unwrap();
-        // No workout has a max_hr yet, so there is no defensible zone basis.
+        // Nothing measured yet, so there is no defensible basis for any model.
         let empty = parsed_export(&db, &["workouts"], ExportDetail::Summary);
         assert!(
             empty["analysis"].get("heart_rate_zones").is_none(),
-            "zones must not appear without a measured maximum"
+            "zones must not appear without a measured basis"
         );
 
         db.insert_workout(&Workout {
@@ -4103,12 +4856,155 @@ mod tests {
 
         let export = parsed_export(&db, &["workouts"], ExportDetail::Summary);
         let zones = &export["analysis"]["heart_rate_zones"];
-        assert_eq!(zones["basis"]["type"], "observed_max");
-        assert_eq!(zones["basis"]["value"], 200);
+        assert!(
+            zones["selected_model"].is_null(),
+            "the export must not choose a model on the user's behalf"
+        );
+        let models = zones["models"].as_array().unwrap();
+        // Only the observed maximum exists, so only the max-HR model can be
+        // computed; the reserve model needs a resting rate and the threshold
+        // model a threshold, and neither is measured yet.
+        assert_eq!(models.len(), 1);
+        assert_eq!(models[0]["model"], "max_hr");
+        assert_eq!(models[0]["selected"], false);
+        assert_eq!(models[0]["bases"][0]["id"], "observed_max");
+        assert_eq!(models[0]["bases"][0]["value"], 200.0);
         // 50-60% of 200 bpm.
-        assert_eq!(zones["zones"][0]["min_bpm"], 100);
-        assert_eq!(zones["zones"][0]["max_bpm"], 119);
-        assert_eq!(zones["zones"].as_array().unwrap().len(), 5);
+        assert_eq!(models[0]["zones"][0]["min_bpm"], 100);
+        assert_eq!(models[0]["zones"][0]["max_bpm"], 119);
+        assert_eq!(models[0]["zones"].as_array().unwrap().len(), 5);
+    }
+
+    /// The three models are not house style: the watch ships its own
+    /// boundaries in every workout summary. For a lactate threshold of
+    /// 175 bpm it sends 113/141/154/162/173/190, and reproducing those exact
+    /// integers is what proves the percentages and the flooring are right.
+    #[test]
+    fn threshold_zone_boundaries_match_the_watch() {
+        let db = Database::in_memory().unwrap();
+        db.insert_daily_metric(&DailyMetric {
+            date: "2026-08-11".into(),
+            metric: "lactate_threshold_hr".into(),
+            value: 175.0,
+            unit: "bpm".into(),
+            source_scope: SourceScope::Device,
+            device_id: None,
+        })
+        .unwrap();
+
+        db.set_heart_rate_zone_preference(&HeartRateZonePreference {
+            model: Some("lactate_threshold".into()),
+            threshold_basis: Some("lactate_threshold".into()),
+            ..Default::default()
+        })
+        .unwrap();
+        let options = db.heart_rate_zone_options(30).unwrap();
+        let report = options.report.expect("a chosen model produces zones");
+        let lower: Vec<i32> = report.zones.iter().map(|zone| zone.min_bpm).collect();
+        assert_eq!(lower, vec![113, 141, 154, 162, 173]);
+        assert_eq!(
+            report.zones[4].max_bpm, 189,
+            "the 109% cap is 190 exclusive"
+        );
+        assert_eq!(report.bases[0].measured_at.as_deref(), Some("2026-08-11"));
+    }
+
+    /// A model can only be chosen once its basis is measured, and clearing the
+    /// choice has to be a state the picker can return to.
+    #[test]
+    fn zone_preference_needs_a_measured_basis_and_can_be_cleared() {
+        let db = Database::in_memory().unwrap();
+        db.set_heart_rate_zone_preference(&HeartRateZonePreference {
+            model: Some("lactate_threshold".into()),
+            threshold_basis: Some("lactate_threshold".into()),
+            ..Default::default()
+        })
+        .unwrap();
+        let chosen = db.heart_rate_zone_options(30).unwrap();
+        assert!(
+            chosen.report.is_none(),
+            "a preference naming a basis nothing measured yields no zones"
+        );
+        assert!(chosen.models.iter().all(|model| !model.available));
+
+        db.set_heart_rate_zone_preference(&HeartRateZonePreference::default())
+            .unwrap();
+        let cleared = db.heart_rate_zone_options(30).unwrap();
+        assert_eq!(cleared.preference, HeartRateZonePreference::default());
+        assert!(cleared.report.is_none());
+    }
+
+    /// Charts must read the same numbers the export does, and must say how
+    /// much of the window is actually covered rather than drawing through the
+    /// gaps.
+    #[test]
+    fn metric_series_reports_coverage_and_prefers_the_fused_reading() {
+        let db = Database::in_memory().unwrap();
+        let today = Local::now().date_naive().format("%Y-%m-%d").to_string();
+        for (scope, value) in [(SourceScope::Device, 40.0), (SourceScope::UserFused, 26.0)] {
+            db.insert_daily_metric(&DailyMetric {
+                date: today.clone(),
+                metric: "stress".into(),
+                value,
+                unit: "score".into(),
+                source_scope: scope,
+                device_id: None,
+            })
+            .unwrap();
+        }
+        db.insert_daily_metric(&DailyMetric {
+            date: today.clone(),
+            metric: "stress_max".into(),
+            value: 55.0,
+            unit: "score".into(),
+            source_scope: SourceScope::UserFused,
+            device_id: None,
+        })
+        .unwrap();
+
+        let series = db.metric_series(&["stress".to_string()], 7).unwrap();
+        assert_eq!(series.len(), 1);
+        assert_eq!(series[0].unit, "score");
+        assert_eq!(series[0].window_days, 7);
+        assert_eq!(
+            series[0].days_with_data, 1,
+            "six of the seven days are empty"
+        );
+        assert_eq!(series[0].points[0].value, 26.0);
+        assert_eq!(series[0].points[0].max, Some(55.0));
+        assert_eq!(series[0].points[0].min, None, "no minimum was measured");
+
+        // An unknown name is skipped rather than charted with a made-up unit.
+        assert!(db
+            .metric_series(&["not_a_metric".to_string()], 7)
+            .unwrap()
+            .is_empty());
+    }
+
+    /// A stopped runner still gets `equivPace` readings, and the device sends
+    /// them unchanged — 51604 s/km appears in this account's own library. They
+    /// are not paces and must not reach a chart or a summary.
+    #[test]
+    fn standing_still_is_not_an_equivalent_pace() {
+        assert_eq!(plausible_equivalent_pace(Some(355.0)), Some(355.0));
+        assert_eq!(plausible_equivalent_pace(Some(51_604.0)), None);
+        assert_eq!(plausible_equivalent_pace(Some(0.0)), None);
+        assert_eq!(plausible_equivalent_pace(None), None);
+
+        let samples = vec![
+            WorkoutSeriesSample {
+                timestamp: "1".into(),
+                equivalent_pace_s_per_km: Some(51_604.0),
+                ..Default::default()
+            },
+            WorkoutSeriesSample {
+                timestamp: "2".into(),
+                equivalent_pace_s_per_km: Some(264.0),
+                ..Default::default()
+            },
+        ];
+        let summary = workout_series_summary(&samples);
+        assert_eq!(summary.best_equivalent_pace_s_per_km, Some(264.0));
     }
 
     #[test]
@@ -4189,6 +5085,7 @@ mod tests {
                 cadence: Some(160.0),
                 stride_cm: Some(98.0),
                 altitude_m: Some(10.0),
+                ..Default::default()
             },
             WorkoutSeriesSample {
                 timestamp: "2".into(),
@@ -4198,6 +5095,7 @@ mod tests {
                 cadence: Some(170.0),
                 stride_cm: Some(102.0),
                 altitude_m: Some(14.0),
+                ..Default::default()
             },
             WorkoutSeriesSample {
                 timestamp: "3".into(),
@@ -4207,6 +5105,7 @@ mod tests {
                 cadence: Some(0.0),
                 stride_cm: None,
                 altitude_m: Some(100.0),
+                ..Default::default()
             },
         ];
         let summary = workout_series_summary(&samples);

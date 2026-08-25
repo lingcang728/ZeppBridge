@@ -37,6 +37,38 @@ pub struct WorkoutSample {
     pub cadence: Option<f64>,
     pub stride_cm: Option<f64>,
     pub altitude_m: Option<f64>,
+    /// Running power in watts, from `power_meter`.
+    ///
+    /// Verified against the workout summary rather than assumed: the mean of
+    /// this series is 249.3 W where the summary reports `average_power` 249.0,
+    /// and its maximum is 326 W against `max_power` 326.0 (second workout:
+    /// 231.5 / 231.0 and 303 / 303).
+    pub power_watts: Option<f64>,
+    /// Ground contact time in milliseconds, `runPosture` field 1.
+    ///
+    /// Its mean is 263.5 ms against the summary's `averageGct` 263, and its
+    /// minimum 232 ms against `minGct` 232. 65535 is the "not measured"
+    /// sentinel and never reaches storage.
+    pub ground_contact_ms: Option<f64>,
+    /// Vertical oscillation in millimetres, `runPosture` field 2.
+    ///
+    /// Mean 88.3 against the summary's `averageVo` 88 and maximum 95 against
+    /// `maxVo` 95. Millimetres rather than centimetres because field 3 equals
+    /// this divided by the stride length in the same units (88 / 1010 = 8.7%).
+    pub vertical_oscillation_mm: Option<f64>,
+    /// Vertical stride ratio in percent, `runPosture` field 3.
+    ///
+    /// Stored as a percentage: the raw integers are tenths of a percent and
+    /// their mean, 87.1, matches the summary's `avgVertStrideRatio` 87.
+    /// The 255 sentinel never reaches storage.
+    pub vertical_ratio_pct: Option<f64>,
+    /// Grade-adjusted equivalent pace in seconds per kilometre, `equivPace`.
+    ///
+    /// Not the reciprocal of `speed` — comparing the two disagrees on a third
+    /// of the samples. What does line up is the summary: the series minimum,
+    /// 264 s/km, is `bestEquivPace` 264, and the distance-weighted mean
+    /// (5428.6 s over `equivDistance` 15257 m = 355.8) is `avgEquivPace` 355.
+    pub equivalent_pace_s_per_km: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -283,6 +315,12 @@ pub fn decode_workout_detail(
     let hr_pairs = parse_delta_pairs(data.get("heart_rate"), true);
     let speed_pairs = parse_float_pairs(data.get("speed"));
     let gait = parse_gait(data.get("gait"));
+    // Running power and equivalent pace carry the same `(dt, value)` shape as
+    // speed, but a leading empty delta appears in real payloads, so they use
+    // the lenient reader rather than dropping the sample.
+    let power_pairs = parse_valued_pairs(data.get("power_meter"));
+    let equiv_pace_pairs = parse_valued_pairs(data.get("equivPace"));
+    let posture = parse_run_posture(data.get("runPosture"));
     let pauses = parse_pauses(data.get("pause"));
 
     let heart_rates = if hr_pairs.is_empty() {
@@ -310,6 +348,37 @@ pub fn decode_workout_detail(
         )
     };
     let _ = steps;
+
+    let powers = (!power_pairs.is_empty()).then(|| timed_fixed_f64(from, to, &power_pairs));
+    let equiv_paces =
+        (!equiv_pace_pairs.is_empty()).then(|| timed_fixed_f64(from, to, &equiv_pace_pairs));
+    let (ground_contacts, oscillations, vertical_ratios) = if posture.is_empty() {
+        (None, None, None)
+    } else {
+        // Sentinels are carried through the fill as NaN so a "not measured"
+        // second never inherits the previous second's reading.
+        let column = |pick: fn(&PostureRow) -> (i64, f64)| -> Vec<(i64, f64)> {
+            posture.iter().map(pick).collect()
+        };
+        (
+            Some(timed_fixed_f64(
+                from,
+                to,
+                &column(|row| (row.0, sentinel_free(row.1, 65535))),
+            )),
+            Some(timed_fixed_f64(
+                from,
+                to,
+                &column(|row| (row.0, sentinel_free(row.2, 65535))),
+            )),
+            Some(timed_fixed_f64(
+                from,
+                to,
+                // Raw units are tenths of a percent.
+                &column(|row| (row.0, sentinel_free(row.3, 255) / 10.0)),
+            )),
+        )
+    };
 
     let mut route = Vec::new();
     let mut altitude_by_second: std::collections::BTreeMap<i64, f64> =
@@ -378,6 +447,12 @@ pub fn decode_workout_detail(
             cadence: cadences.as_ref().and_then(|map| map.get(&unix_ts).copied()),
             stride_cm: strides.as_ref().and_then(|map| map.get(&unix_ts).copied()),
             altitude_m: last_altitude,
+            power_watts: finite_at(powers.as_ref(), unix_ts),
+            ground_contact_ms: finite_at(ground_contacts.as_ref(), unix_ts),
+            vertical_oscillation_mm: finite_at(oscillations.as_ref(), unix_ts),
+            equivalent_pace_s_per_km: finite_at(equiv_paces.as_ref(), unix_ts)
+                .filter(|value| *value > 0.0),
+            vertical_ratio_pct: finite_at(vertical_ratios.as_ref(), unix_ts),
         });
     }
 
@@ -510,6 +585,81 @@ fn parse_float_pairs(value: Option<&Value>) -> Vec<(i64, f64)> {
         pairs.push((delta, sample));
     }
     pairs
+}
+
+/// `(dt, value)` pairs where the value is a plain reading rather than a delta.
+///
+/// Unlike `parse_float_pairs` an empty leading delta means "one second later",
+/// the same convention `parse_delta_pairs` uses, because real `power_meter`
+/// and `equivPace` strings contain them.
+fn parse_valued_pairs(value: Option<&Value>) -> Vec<(i64, f64)> {
+    let Some(text) = value.and_then(Value::as_str) else {
+        return Vec::new();
+    };
+    let mut pairs = Vec::new();
+    for part in text.split(';').filter(|part| !part.is_empty()) {
+        let mut bits = part.splitn(2, ',');
+        let raw_delta = bits.next().unwrap_or("").trim();
+        let delta = if raw_delta.is_empty() {
+            1
+        } else {
+            raw_delta.parse().unwrap_or(0)
+        };
+        let Some(sample) = bits.next().and_then(|item| item.trim().parse::<f64>().ok()) else {
+            continue;
+        };
+        pairs.push((delta, sample));
+    }
+    pairs
+}
+
+/// `(dt, ground contact, vertical oscillation, vertical stride ratio)`.
+type PostureRow = (i64, i32, i32, i32);
+
+fn parse_run_posture(value: Option<&Value>) -> Vec<PostureRow> {
+    let Some(text) = value.and_then(Value::as_str) else {
+        return Vec::new();
+    };
+    let mut rows = Vec::new();
+    for part in text.split(';').filter(|part| !part.is_empty()) {
+        let bits: Vec<&str> = part.split(',').collect();
+        if bits.len() < 4 {
+            continue;
+        }
+        let raw_delta = bits[0].trim();
+        let delta = if raw_delta.is_empty() {
+            1
+        } else {
+            match raw_delta.parse::<i64>() {
+                Ok(value) => value,
+                Err(_) => continue,
+            }
+        };
+        let (Ok(contact), Ok(oscillation), Ok(ratio)) = (
+            bits[1].trim().parse::<i32>(),
+            bits[2].trim().parse::<i32>(),
+            bits[3].trim().parse::<i32>(),
+        ) else {
+            continue;
+        };
+        rows.push((delta, contact, oscillation, ratio));
+    }
+    rows
+}
+
+/// Map a device sentinel to NaN so the fill never carries it forward as a
+/// real reading; `finite_at` then drops it.
+fn sentinel_free(value: i32, sentinel: i32) -> f64 {
+    if value == sentinel || value < 0 {
+        f64::NAN
+    } else {
+        f64::from(value)
+    }
+}
+
+fn finite_at(map: Option<&std::collections::HashMap<i64, f64>>, unix_ts: i64) -> Option<f64> {
+    map.and_then(|map| map.get(&unix_ts).copied())
+        .filter(|value| value.is_finite())
 }
 
 fn parse_gait(value: Option<&Value>) -> Vec<(i64, i32, i32, i32)> {

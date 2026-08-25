@@ -248,6 +248,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # The tag annotation is the release body, and a depth-1 checkout does
+          # not bring the tag object with it.
+          fetch-depth: 0
 
       - name: Download Windows installers
         uses: actions/download-artifact@v4
@@ -275,6 +279,30 @@ jobs:
             --out release/latest.json
           cat release/latest.json
 
+      # 发版说明取附注标签的正文。`--generate-notes` 给的是 commit 列表，
+      # 那是工程日志不是更新说明——读者要知道这版能多做什么，不是有哪些
+      # commit。轻量标签没有正文，那时才回退到自动生成。
+      - name: Resolve release body from tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --force --no-tags origin \
+            "+refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
+          if [[ "$(git cat-file -t "refs/tags/${GITHUB_REF_NAME}")" != "tag" ]]; then
+            echo "::warning::${GITHUB_REF_NAME} 是轻量标签，发版说明回退为自动生成"
+            echo "RELEASE_BODY_MODE=generate" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          git for-each-ref "refs/tags/${GITHUB_REF_NAME}" --format='%(contents)' \
+            > release-notes.md
+          if [[ ! -s release-notes.md ]]; then
+            echo "::warning::标签正文为空，发版说明回退为自动生成"
+            echo "RELEASE_BODY_MODE=generate" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          echo "RELEASE_BODY_MODE=file" >> "$GITHUB_ENV"
+          cat release-notes.md
+
       - name: Publish GitHub Release
         # Idempotent: skips if the release already exists.
         shell: bash
@@ -287,6 +315,11 @@ jobs:
             echo "Release ${GITHUB_REF_NAME} already exists, skipping publish"
             exit 0
           fi
+          if [[ "${RELEASE_BODY_MODE}" == "file" ]]; then
+            notes_args=(--notes-file release-notes.md)
+          else
+            notes_args=(--generate-notes)
+          fi
           gh release create "${GITHUB_REF_NAME}" \
             release/ZeppBridge_*-setup.exe \
             release/ZeppBridge_*.msi \
@@ -294,4 +327,4 @@ jobs:
             "release-macos/ZeppBridge_${version}_aarch64.app.tar.gz" \
             release/latest.json \
             --title "ZeppBridge ${version}" \
-            --generate-notes
+            "${notes_args[@]}"

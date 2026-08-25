@@ -52,6 +52,9 @@ const messageForReport = (report: SyncReport): string => {
   if (report.outcome === 'no_new_data') return latest ? `云端暂无新数据 · 最新心率仍为 ${formatTime(latest)}` : '同步完成，云端暂无新数据';
   if (report.outcome === 'partial') return failed.length ? `部分同步失败：${failed.join('、')}` : '同步已完成，但部分数据流失败';
   if (report.outcome === 'cancelled') return '同步已取消';
+  if (report.outcome === 'deferred') {
+    return report.message ?? '正在重建本地派生数据，稍后自动重试同步';
+  }
   return '同步失败，请检查连接后重试';
 };
 
@@ -78,6 +81,24 @@ const refreshStatus = async (opts?: { preserveError?: boolean }): Promise<AppSta
     statusError.value = toUserMessage(error, '连接状态暂时不可用');
     return null;
   }
+};
+
+/**
+ * Come back once the raw-payload replay has had another minute.
+ *
+ * The replay runs for as long as a quarter of an hour on a large library, and
+ * a sync that gave up permanently would leave the user looking at stale data
+ * with no way back except restarting the app. `runSync` already refuses to
+ * stack, so a retry landing on a running sync is a no-op.
+ */
+const DEFERRED_RETRY_MS = 60_000;
+let deferredRetryTimer = 0;
+
+const scheduleDeferredRetry = (mode: 'incremental' | 'initial' | 'history', days?: number) => {
+  window.clearTimeout(deferredRetryTimer);
+  deferredRetryTimer = window.setTimeout(() => {
+    void runSync(mode, days, { silent: true });
+  }, DEFERRED_RETRY_MS);
 };
 
 const runSync = (
@@ -125,7 +146,11 @@ const runSync = (
       syncState.value = report.outcome;
       syncMessage.value = messageForReport(report);
       await refreshStatus();
+      // A deferred sync wrote nothing, but the replay it stood aside for is
+      // rewriting derived rows right now — so the screens still need to
+      // reread, and the sync itself has to come back rather than be lost.
       dataRevision.value += 1;
+      if (report.outcome === 'deferred') scheduleDeferredRetry(mode, days);
       return report;
     } catch (error) {
       syncState.value = 'failed';

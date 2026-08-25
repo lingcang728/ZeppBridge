@@ -7,3 +7,12 @@ Copyright the zepp-fit-extractor authors, licensed under the Apache
 License, Version 2.0. Field comments for `/v1/sport/run/detail.json`
 were also used as a reference. A copy of the Apache License is
 available at https://www.apache.org/licenses/LICENSE-2.0
+
+This product bundles the MiSans typeface (Xiaomi Inc.), which is free for
+commercial use and embedding and asks to be credited in the software; the
+credit appears in the application's settings screen. A copy of its licence
+ships at src/assets/fonts/LICENSE-misans.txt.
+
+This product bundles the Inter typeface (Rasmus Andersson), licensed under
+the SIL Open Font License 1.1. A copy of its licence ships at
+src/assets/fonts/LICENSE-inter.txt.

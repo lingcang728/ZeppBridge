@@ -12,6 +12,7 @@ import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { dataProviderLabel, dataScopeLabel, workoutLabel } from '../lib/labels';
 import { formatDate, formatDistance, formatTime, isFiniteNumber } from '../lib/format';
 import { zeppSemanticColors } from '../lib/echartsTheme';
+import { formatPaceSeconds } from '../lib/metricSeries';
 import trexFallback from '../assets/devices/amazfit-t-rex-3.webp';
 import type { DeviceProfile, Workout, WorkoutSeries, WorkoutSeriesSample, WorkoutRoutePoint } from '../types';
 
@@ -439,6 +440,14 @@ const decodedMetrics = computed(() => {
     { label: '平均步幅', value: isFiniteNumber(summary.average_stride_cm) ? `${numberValue(summary.average_stride_cm)} cm` : '未提供', icon: 'body-activity' as DesignIconName },
     { label: '累计下降', value: isFiniteNumber(summary.elevation_loss_m) ? `${numberValue(summary.elevation_loss_m)} m` : '未提供', icon: 'health-watch' as DesignIconName },
     { label: '最大心率', value: isFiniteNumber(item.max_hr) ? `${numberValue(item.max_hr)} bpm` : '未提供', icon: 'resting-heart-rate' as DesignIconName },
+    // Running power and form only exist on watches that measure them, and only
+    // for running; every one of these reads `未提供` rather than 0 elsewhere.
+    { label: '平均功率', value: isFiniteNumber(summary.average_power_watts) ? `${numberValue(summary.average_power_watts)} W` : '未提供', icon: 'training-load' as DesignIconName },
+    { label: '最大功率', value: isFiniteNumber(summary.max_power_watts) ? `${numberValue(summary.max_power_watts)} W` : '未提供', icon: 'training-load' as DesignIconName },
+    { label: '平均触地时间', value: isFiniteNumber(summary.average_ground_contact_ms) ? `${numberValue(summary.average_ground_contact_ms)} ms` : '未提供', icon: 'body-activity' as DesignIconName },
+    { label: '平均垂直振幅', value: isFiniteNumber(summary.average_vertical_oscillation_mm) ? `${(summary.average_vertical_oscillation_mm / 10).toFixed(1)} cm` : '未提供', icon: 'body-activity' as DesignIconName },
+    { label: '垂直步幅比', value: isFiniteNumber(summary.average_vertical_ratio_pct) ? `${summary.average_vertical_ratio_pct.toFixed(1)} %` : '未提供', icon: 'body-activity' as DesignIconName },
+    { label: '最佳等效配速', value: isFiniteNumber(summary.best_equivalent_pace_s_per_km) ? `${formatPaceSeconds(summary.best_equivalent_pace_s_per_km)} /km` : '未提供', icon: 'outdoor-run' as DesignIconName },
   ];
 });
 
