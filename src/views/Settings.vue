@@ -13,8 +13,10 @@ import type {
   CapabilityItem,
   CapabilityOverview,
   CapabilityProbe,
+  DeviceCatalogOption,
   LocalApiStatus,
   LoginStatus,
+  WorkoutCodeLabel,
 } from '../types';
 import { checkForDesktopUpdate, downloadAndInstallDesktopUpdate, updateState } from '../services/updateService';
 
@@ -63,6 +65,79 @@ const deviceRefreshBusy = ref(false);
 const deviceRefreshMessage = ref<string | null>(null);
 const deviceRefreshError = ref<string | null>(null);
 const diagnosticBusy = ref(false);
+
+/* 设备型号指认与未识别运动编号命名。
+   两者都是「本机推不出来，就问用户」，而不是让应用去猜：
+   有些账号的设备响应里根本没有任何产品名字段（只有 deviceSource / deviceType
+   这类数字），Zepp 的自定义训练模板也只给编号不给名字。 */
+const deviceCatalogOptions = ref<DeviceCatalogOption[]>([]);
+const deviceAssignBusy = ref(false);
+const deviceAssignError = ref<string | null>(null);
+const deviceAssignMessage = ref<string | null>(null);
+const unknownCodes = ref<WorkoutCodeLabel[]>([]);
+const codeDrafts = ref<Record<number, string>>({});
+const codeBusy = ref<number | null>(null);
+const codeError = ref<string | null>(null);
+const codeMessage = ref<string | null>(null);
+
+const unnamedCodeCount = computed(() => unknownCodes.value.filter((entry) => !entry.label).length);
+
+const deviceKeyFor = (model: { profile: { device_id?: string | null; serial?: string | null } }): string =>
+  (model.profile.device_id || model.profile.serial || '').trim();
+
+const loadCorrections = async () => {
+  const [options, codes] = await Promise.all([
+    backend.getDeviceCatalogOptions().catch(() => [] as DeviceCatalogOption[]),
+    backend.getUnknownWorkoutCodes().catch(() => [] as WorkoutCodeLabel[]),
+  ]);
+  deviceCatalogOptions.value = options;
+  unknownCodes.value = codes;
+  codeDrafts.value = Object.fromEntries(codes.map((entry) => [entry.zeppType, entry.label]));
+};
+
+const assignDeviceModel = async (deviceKey: string, catalogId: string) => {
+  if (!deviceKey) {
+    deviceAssignError.value = '这台设备没有可用的本机标识，无法保存指认。';
+    return;
+  }
+  deviceAssignBusy.value = true;
+  deviceAssignError.value = null;
+  deviceAssignMessage.value = null;
+  try {
+    await backend.setDeviceModelOverride(deviceKey, catalogId || null);
+    await loadDevices(false);
+    deviceAssignMessage.value = catalogId
+      ? '已记录你的型号指认。界面会把它标成「你指认的型号」，不会当成自动识别结果。'
+      : '已撤销型号指认。';
+  } catch (error) {
+    deviceAssignError.value = toUserMessage(error, '无法保存型号指认');
+  } finally {
+    deviceAssignBusy.value = false;
+  }
+};
+
+const onAssignDeviceModel = (deviceKey: string, event: Event) => {
+  void assignDeviceModel(deviceKey, (event.target as HTMLSelectElement).value);
+};
+
+const saveCodeLabel = async (zeppType: number) => {
+  codeBusy.value = zeppType;
+  codeError.value = null;
+  codeMessage.value = null;
+  try {
+    const draft = (codeDrafts.value[zeppType] || '').trim();
+    unknownCodes.value = await backend.setWorkoutCodeLabel(zeppType, draft || null);
+    codeDrafts.value = Object.fromEntries(unknownCodes.value.map((entry) => [entry.zeppType, entry.label]));
+    codeMessage.value = draft
+      ? `编号 ${zeppType} 以后都显示为「${draft}」。`
+      : `已清除编号 ${zeppType} 的自定义名称。`;
+    markDataChanged();
+  } catch (error) {
+    codeError.value = toUserMessage(error, '无法保存自定义运动名称');
+  } finally {
+    codeBusy.value = null;
+  }
+};
 
 /* 这里曾有三个只写 localStorage、没有任何后端行为的开关（本地数据加密 /
    启动解锁保护 / 匿名使用洞察）。一个默认打开、写着「加密保护」却什么都不做的
@@ -452,7 +527,7 @@ const copyLocalApiExample = async () => {
 
 const submitDiagnosticReport = async () => {
   const confirmed = window.confirm(
-    '只会发送应用版本、系统类型、解析器版本、未识别设备的产品级提示与字段结构、固件版本，以及未知运动编号和数量。不会发送 Zepp 账号、Token、序列号、设备 ID、GPS、健康数值、原始响应或本机路径。确认提交吗？',
+    '只会发送应用版本、系统类型、解析器版本、未识别设备的产品级提示与字段结构、固件版本、型号类编号（deviceSource / deviceType，只有整数，描述的是「哪一款表」而不是「哪一台表」），以及未知运动编号和数量。不会发送 Zepp 账号、Token、序列号、设备 ID、MAC 地址、GPS、健康数值、原始响应或本机路径。确认提交吗？',
   );
   if (!confirmed) return;
   diagnosticBusy.value = true;
@@ -519,6 +594,7 @@ onMounted(async () => {
   clearStalePrivacyPrefs();
   void loadCapabilityOverview();
   void loadDevices();
+  void loadCorrections();
   localApiStatus.value = await backend.getLocalApiStatus().catch(() => null);
   if (localApiStatus.value?.error) localApiError.value = localApiStatus.value.error;
   const status = await refreshStatus();
@@ -784,11 +860,30 @@ const runCapabilityProbe = async () => {
               <span v-if="source.kind === 'device'">设备 ID {{ maskIdentifier(source.model.profile.device_id || source.model.profile.serial) }}</span>
             </div>
             <span :class="['source-state', { on: source.state !== '未识别' }]"><i class="dot"></i>{{ source.state }}</span>
+            <label v-if="source.kind === 'device' && source.state === '未识别'" class="assign-model">
+              这是哪台设备？
+              <select
+                :disabled="deviceAssignBusy || !deviceKeyFor(source.model)"
+                :value="source.model.profile.catalog_id || ''"
+                @change="onAssignDeviceModel(deviceKeyFor(source.model), $event)"
+              >
+                <option value="">先不指认</option>
+                <option v-for="option in deviceCatalogOptions" :key="option.catalogId" :value="option.catalogId">
+                  {{ option.nameZh || option.canonicalName }}
+                </option>
+              </select>
+            </label>
           </div>
         </div>
         <div v-if="unknownDeviceDetected && !devicesLoading" class="diagnostic-panel unknown-device-report" role="status">
           <strong>检测到未识别设备</strong>
-          <p>先尝试「重新识别设备」；如果仍未识别，可以直接提交固定白名单的错误报告，无需 GitHub 账号或手动复制数据。</p>
+          <p>
+            有些 Zepp 账号的设备响应里<strong>没有任何产品名字段</strong>，只有内部编号，本机无法推断型号——这种情况下「重新识别设备」再点多少次也不会变。
+            你可以在上面直接指认型号：那会被如实标注成「你指认的型号」，不会伪装成自动识别结果。
+          </p>
+          <p>提交错误报告可以帮我把这台设备的编号补进内置目录，之后所有人都不用手动指认。报告只含固定白名单字段，无需 GitHub 账号。</p>
+          <p v-if="deviceAssignError" class="api-error" role="alert">{{ deviceAssignError }}</p>
+          <p v-else-if="deviceAssignMessage" class="hint-line ok">{{ deviceAssignMessage }}</p>
           <button class="button secondary" type="button" :disabled="diagnosticBusy" @click="submitDiagnosticReport">
             <Icon name="send" :size="14" />{{ diagnosticBusy ? '正在安全提交…' : '提交错误报告' }}
           </button>
@@ -854,6 +949,44 @@ const runCapabilityProbe = async () => {
       </details>
     </section>
 
+    <section v-if="unknownCodes.length" class="settings-card" aria-labelledby="codes-title">
+      <div class="section-heading-row">
+        <h2 id="codes-title">未识别的运动编号</h2>
+        <span v-if="unnamedCodeCount" class="capability-checked">{{ unnamedCodeCount }} 个还没有名字</span>
+      </div>
+      <p class="section-description">
+        Zepp 的自定义训练模板只给编号、不给名字，内置目录里也查不到它们。
+        与其猜一个运动名塞给你，不如你给这个编号起一次名字——之后所有同编号的记录都会用它，
+        并且在运动详情里如实标注成「你起的名字」。
+      </p>
+      <div class="code-list">
+        <div v-for="entry in unknownCodes" :key="entry.zeppType" class="code-row">
+          <div class="code-meta">
+            <strong>编号 {{ entry.zeppType }}</strong>
+            <span>本机有 {{ entry.records }} 条记录</span>
+          </div>
+          <input
+            v-model="codeDrafts[entry.zeppType]"
+            type="text"
+            maxlength="24"
+            :aria-label="`编号 ${entry.zeppType} 的自定义名称`"
+            placeholder="例如：我的核心训练"
+            :disabled="codeBusy === entry.zeppType"
+            @keyup.enter="saveCodeLabel(entry.zeppType)"
+          />
+          <button
+            class="button secondary"
+            type="button"
+            :disabled="codeBusy === entry.zeppType"
+            @click="saveCodeLabel(entry.zeppType)"
+          >{{ codeBusy === entry.zeppType ? '保存中…' : '保存' }}</button>
+        </div>
+      </div>
+      <p v-if="codeError" class="api-error" role="alert">{{ codeError }}</p>
+      <p v-else-if="codeMessage" class="hint-line ok">{{ codeMessage }}</p>
+      <p class="retain-note">名字只保存在本机，不会回传 Zepp，也不会被重新解析覆盖。留空并保存即可清除。</p>
+    </section>
+
     <div class="three-col">
       <!-- 4. 隐私安全 -->
       <section id="privacy-section" class="settings-card" aria-labelledby="privacy-title">
@@ -886,7 +1019,7 @@ const runCapabilityProbe = async () => {
         </button>
         <div class="diagnostic-panel">
           <strong>设备或运动没有识别？</strong>
-          <p>无需注册 GitHub 或复制数据。确认后只把产品级字段结构、固件版本、未知运动编号和数量发送到 ZeppBridge 的私有错误报告库；绝不发送账号、Token、序列号、设备 ID、GPS、健康数值、原始响应或本机路径。</p>
+          <p>无需注册 GitHub 或复制数据。确认后只把产品级字段结构、固件版本、型号类编号（整数，只说明是哪一款表）、未知运动编号和数量发送到 ZeppBridge 的私有错误报告库；绝不发送账号、Token、序列号、设备 ID、MAC 地址、GPS、健康数值、原始响应或本机路径。</p>
           <button class="button secondary" type="button" :disabled="diagnosticBusy" @click="submitDiagnosticReport">
             <Icon name="send" :size="14" />{{ diagnosticBusy ? '正在安全提交…' : '提交错误报告' }}
           </button>
@@ -1169,6 +1302,12 @@ h3 { margin-bottom: 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
 .fact-list li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; }
 .fact-list strong { display: block; margin-bottom: 3px; color: var(--ink); font-size: 12px; font-weight: 500; }
 .fact-list span { color: var(--subtle); font-size: 11px; line-height: 1.55; }
+.code-list { display: grid; gap: 10px; margin-top: 12px; }
+.code-row { display: grid; grid-template-columns: minmax(0, 160px) minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); }
+.code-meta { display: grid; gap: 2px; }
+.code-meta strong { color: var(--ink); font-size: 12px; font-weight: 500; }
+.code-meta span { color: var(--subtle); font-size: 11px; }
+.assign-model { display: grid; gap: 4px; grid-column: 1 / -1; margin-top: 8px; color: var(--subtle); font-size: 11px; }
 .api-error { color: var(--danger); }
 .update-head, .update-release, .update-confirm { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px; }
 .update-head h2 { margin-bottom: 4px; }

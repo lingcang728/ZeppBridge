@@ -7,6 +7,9 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
+/// 当前 SQLite schema 版本（`PRAGMA user_version`）。加新版本只能追加迁移
+/// 步骤，不要改已有 DDL。
+pub const CURRENT_SCHEMA_VERSION: i64 = 13;
 pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v16-workout-catalog";
 const PREVIOUS_RELEASE_NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v14";
 const LAST_CLOUD_SYNC_AT_KEY: &str = "last_cloud_sync_at";
@@ -16,6 +19,9 @@ const RETENTION_DAYS_KEY: &str = "retention_days";
 const HISTORY_SYNC_DAYS_KEY: &str = "history_sync_days";
 const HEART_RATE_ZONE_PREF_KEY: &str = "heart_rate_zone_preference";
 const BYTES_PER_HISTORY_DAY: u64 = 800_000;
+
+pub mod corrections;
+pub mod provenance;
 
 pub struct Database {
     conn: Connection,
@@ -1447,14 +1453,82 @@ impl Database {
                     END;",
             )?;
         }
-        // Earlier migrations are intentionally idempotent and still stamp
-        // their historical versions on every launch. Restore the current
-        // schema marker after they have all run.
         self.conn.execute_batch("PRAGMA user_version = 11;")?;
         self.conn.execute(
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(11, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // Per-stream provenance: fetch / parse / write are three different
+        // things that can fail independently, and collapsing them into one
+        // status is how "the data is stale" becomes unanswerable. The table
+        // starts empty; `data_health` falls back to raw_records.fetched_at so
+        // an upgraded library does not claim it has never fetched anything.
+        //
+        // The raw_record_id indexes make the "retained but never normalized"
+        // count a lookup instead of four full scans of the canonical tables.
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS stream_provenance (
+                stream TEXT PRIMARY KEY,
+                last_fetch_ok_at TEXT,
+                last_fetch_error_at TEXT,
+                last_fetch_error_kind TEXT,
+                last_fetch_error_message TEXT,
+                last_parse_ok_at TEXT,
+                last_parse_error_at TEXT,
+                last_parse_error_kind TEXT,
+                last_parse_error_message TEXT,
+                last_write_ok_at TEXT,
+                last_write_error_at TEXT,
+                last_write_error_kind TEXT,
+                last_write_error_message TEXT,
+                last_written_records INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_metric_samples_raw
+                ON metric_samples(raw_record_id);
+            CREATE INDEX IF NOT EXISTS idx_daily_metrics_raw
+                ON daily_metrics(raw_record_id);
+            CREATE INDEX IF NOT EXISTS idx_sleep_sessions_raw
+                ON sleep_sessions(raw_record_id);
+            CREATE INDEX IF NOT EXISTS idx_workouts_raw
+                ON workouts(raw_record_id);
+            CREATE INDEX IF NOT EXISTS idx_raw_records_stream
+                ON raw_records(stream);
+            PRAGMA user_version = 12;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(12, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // The user-correction layer. Kept in its own tables so a normalizer
+        // replay can rewrite ZeppBridge's interpretation without touching what
+        // the user told us, and so a correction is always displayable as
+        // "you filled this in" rather than as a recognition result.
+        //
+        // Both tables answer real reports: a custom Zepp training template
+        // arrives as a numeric code the bundled catalog does not know, and some
+        // accounts' device responses carry no product-name field at all, so no
+        // amount of matching can name the watch.
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS workout_code_labels (
+                zepp_type INTEGER PRIMARY KEY,
+                label TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS device_model_overrides (
+                device_key TEXT PRIMARY KEY,
+                catalog_id TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            PRAGMA user_version = 13;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(13, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // Earlier migrations are intentionally idempotent and still stamp
+        // their historical versions on every launch, so the current schema
+        // marker is restored only after all of them have run.
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }
@@ -1483,7 +1557,7 @@ impl Database {
         Ok(())
     }
 
-    fn set_app_meta(&self, key: &str, value: &str) -> Result<()> {
+    pub(crate) fn set_app_meta(&self, key: &str, value: &str) -> Result<()> {
         self.conn.execute(
             "INSERT INTO app_meta(key, value, updated_at)
              VALUES(?1, ?2, ?3)
@@ -1493,7 +1567,7 @@ impl Database {
         Ok(())
     }
 
-    fn get_app_meta(&self, key: &str) -> Result<Option<String>> {
+    pub(crate) fn get_app_meta(&self, key: &str) -> Result<Option<String>> {
         self.conn
             .query_row("SELECT value FROM app_meta WHERE key = ?1", [key], |row| {
                 row.get(0)
@@ -2229,47 +2303,6 @@ impl Database {
         Ok(())
     }
 
-    pub fn set_workout_type_override(
-        &self,
-        workout_id: &str,
-        user_override: Option<&str>,
-    ) -> Result<()> {
-        let normalized = user_override
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .map(str::to_lowercase);
-        if let Some(value) = normalized.as_deref() {
-            const ALLOWED: [&str; 15] = [
-                "run",
-                "walking",
-                "ride",
-                "indoor_cycling",
-                "swimming",
-                "treadmill",
-                "trail",
-                "hiking",
-                "strength",
-                "elliptical",
-                "rowing",
-                "yoga",
-                "climb",
-                "badminton",
-                "activity",
-            ];
-            if !ALLOWED.contains(&value) {
-                return Err(ZeppBridgeError::ConfigError("不支持的运动类型纠正".into()));
-            }
-        }
-        let changed = self.conn.execute(
-            "UPDATE workouts SET workout_type_override = ?2 WHERE workout_id = ?1",
-            params![workout_id, normalized],
-        )?;
-        if changed == 0 {
-            return Err(ZeppBridgeError::DataUnavailable("运动记录不存在".into()));
-        }
-        Ok(())
-    }
-
     pub fn diagnostic_schema_version(&self) -> Result<i64> {
         self.conn
             .query_row("PRAGMA user_version", [], |row| row.get(0))
@@ -2955,6 +2988,9 @@ impl Database {
                 row.get::<_, Option<String>>(17)?,
             ))
         })?;
+        // 一次读完编号别名，再在内存里套到每条记录上：表很小，比给两个大
+        // SELECT 各加一个 JOIN 更不容易改错。
+        let code_labels = self.workout_code_label_map()?;
         let mut workouts = Vec::new();
         for row in rows {
             let (
@@ -2980,6 +3016,7 @@ impl Database {
             let effective_type = user_override
                 .clone()
                 .unwrap_or_else(|| workout_type.clone());
+            let custom_label = zepp_type.and_then(|code| code_labels.get(&code).cloned());
             workouts.push(Workout {
                 workout_id,
                 workout_type: workout_type.clone(),
@@ -2987,6 +3024,7 @@ impl Database {
                 type_source,
                 user_override,
                 effective_type,
+                custom_label,
                 start_time: parse_datetime(&start, "workout.start_time")?,
                 end_time: parse_datetime(&end, "workout.end_time")?,
                 distance_meters,
@@ -3081,6 +3119,10 @@ impl Database {
         let effective_type = user_override
             .clone()
             .unwrap_or_else(|| workout_type.clone());
+        let custom_label = match zepp_type {
+            Some(code) => self.workout_code_label_map()?.get(&code).cloned(),
+            None => None,
+        };
         Ok(Some(Workout {
             workout_id,
             workout_type: workout_type.clone(),
@@ -3088,6 +3130,7 @@ impl Database {
             type_source,
             user_override,
             effective_type,
+            custom_label,
             start_time: parse_datetime(&start, "workout.start_time")?,
             end_time: parse_datetime(&end, "workout.end_time")?,
             distance_meters,
@@ -4877,6 +4920,7 @@ mod tests {
             type_source: source.into(),
             user_override: None,
             effective_type: normalized.into(),
+            custom_label: None,
             start_time: ts(),
             end_time: ts() + chrono::Duration::minutes(30),
             distance_meters: None,
@@ -4896,11 +4940,17 @@ mod tests {
     }
 
     #[test]
-    fn schema_v11_marker_survives_repeated_idempotent_migrations() {
+    fn current_schema_marker_survives_repeated_idempotent_migrations() {
         let db = Database::in_memory().unwrap();
-        assert_eq!(db.diagnostic_schema_version().unwrap(), 11);
+        assert_eq!(
+            db.diagnostic_schema_version().unwrap(),
+            CURRENT_SCHEMA_VERSION
+        );
         db.migrate().unwrap();
-        assert_eq!(db.diagnostic_schema_version().unwrap(), 11);
+        assert_eq!(
+            db.diagnostic_schema_version().unwrap(),
+            CURRENT_SCHEMA_VERSION
+        );
     }
 
     #[test]
@@ -4987,7 +5037,10 @@ mod tests {
             )
             .unwrap();
         db.migrate().unwrap();
-        assert_eq!(db.diagnostic_schema_version().unwrap(), 11);
+        assert_eq!(
+            db.diagnostic_schema_version().unwrap(),
+            CURRENT_SCHEMA_VERSION
+        );
         let source: String = db
             .conn
             .query_row(
@@ -5083,6 +5136,7 @@ mod tests {
             type_source: "string_field".into(),
             user_override: None,
             effective_type: "run".into(),
+            custom_label: None,
             start_time: ts(),
             end_time: ts() + chrono::Duration::minutes(10),
             distance_meters: Some(1000.0),
@@ -5360,6 +5414,7 @@ mod tests {
             type_source: "string_field".into(),
             user_override: None,
             effective_type: "run".into(),
+            custom_label: None,
             start_time: ts(),
             end_time: ts() + chrono::Duration::minutes(10),
             distance_meters: Some(1000.0),
@@ -5893,6 +5948,7 @@ mod tests {
             type_source: "numeric_mapped".into(),
             user_override: None,
             effective_type: "run".into(),
+            custom_label: None,
             start_time: ts(),
             end_time: ts() + chrono::Duration::minutes(10),
             distance_meters: Some(1000.0),

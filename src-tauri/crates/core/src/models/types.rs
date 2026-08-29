@@ -103,6 +103,13 @@ pub struct Workout {
     pub user_override: Option<String>,
     /// The type consumers should display: override first, otherwise normalized.
     pub effective_type: String,
+    /// The name the user gave this Zepp type code, when the bundled catalog
+    /// cannot resolve it. Zepp's custom training templates arrive as numbers
+    /// with no name attached, and guessing what code 226 means would be
+    /// inventing data — so the user names it once and every record with that
+    /// code uses it. Never set for codes the catalog already knows.
+    #[serde(default)]
+    pub custom_label: Option<String>,
     pub start_time: DateTime<Utc>,
     pub end_time: DateTime<Utc>,
     pub distance_meters: Option<f64>,
@@ -500,6 +507,10 @@ pub struct AiHandoffResult {
 pub enum DeviceMatchStatus {
     Exact,
     Alias,
+    /// The user told us which model this is, because the account's device
+    /// response carried no product name for ZeppBridge to match on. It is a
+    /// correction, not a recognition, and the UI must say so.
+    UserAssigned,
     #[default]
     Unknown,
 }
@@ -568,6 +579,14 @@ pub struct DiagnosticDeviceEvidence {
     pub firmware_field_objects: usize,
     pub candidates: Vec<DiagnosticDeviceCandidate>,
     pub unmatched_product_hints: Vec<String>,
+    /// 型号类数字标识，形如 `deviceSource:7930112` / `deviceType:5`。
+    ///
+    /// 有些账号的设备响应里根本没有产品名字段，这两个数字是仅有的型号线索。
+    /// 它们描述的是「哪一款表」，不是「哪一台表」：没有序列号、MAC、
+    /// 绑定时间或任何随设备实例变化的值，所以可以安全地用来补内置目录。
+    /// 只收整数，其他一律丢弃。
+    #[serde(default)]
+    pub model_identifier_hints: Vec<String>,
     pub shapes: Vec<DiagnosticObjectShape>,
 }
 
@@ -618,6 +637,16 @@ pub struct DeviceCacheMetadata {
 pub struct DeviceProfilesResult {
     pub profiles: Vec<DeviceProfile>,
     pub cache: DeviceCacheMetadata,
+}
+
+/// 供界面渲染「这是我的哪台设备」下拉框的一个选项。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DeviceCatalogOption {
+    pub catalog_id: String,
+    pub canonical_name: String,
+    pub name_zh: Option<String>,
+    pub kind: String,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

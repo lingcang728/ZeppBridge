@@ -5,12 +5,13 @@ use crate::export_formats;
 use crate::ipc_types::CleanupResult;
 use crate::models::{
     AiHandoffMetadata, AiHandoffResult, CapabilityOverview, DailyPoint, DeviceCacheMetadata,
-    DeviceMatchStatus, DeviceProfile, DeviceProfilesResult, DiagnosticDeviceCandidate,
-    DiagnosticDeviceEvidence, DiagnosticField, DiagnosticObjectShape, DiagnosticReport,
-    ExportDetail, ExportResult, ExportSelection, FeedbackSubmissionResult, HealthOverview,
-    HeartRatePoint, HeartRateZoneOptions, HeartRateZonePreference, MetricSeries, SleepSession,
-    StorageEstimate, TrainingBalancePoint, UserPrefs, Workout, WorkoutSeries,
+    DeviceCatalogOption, DeviceMatchStatus, DeviceProfile, DeviceProfilesResult,
+    DiagnosticDeviceCandidate, DiagnosticDeviceEvidence, DiagnosticField, DiagnosticObjectShape,
+    DiagnosticReport, ExportDetail, ExportResult, ExportSelection, FeedbackSubmissionResult,
+    HealthOverview, HeartRatePoint, HeartRateZoneOptions, HeartRateZonePreference, MetricSeries,
+    SleepSession, StorageEstimate, TrainingBalancePoint, UserPrefs, Workout, WorkoutSeries,
 };
+use crate::storage::corrections::WorkoutCodeLabel;
 use crate::storage::NORMALIZER_REVISION;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -259,6 +260,75 @@ pub async fn reprocess_local_data(
         "streams": streams,
         "message": "已使用新版解析器重新处理本地原始响应"
     }))
+}
+
+/// 随包运动目录里的全部可选项，供纠正下拉框渲染。
+///
+/// 目录被 `include_str!` 编进二进制，所以这份列表和后端的允许值天然一致，
+/// 界面不需要再维护一份会漂移的副本。
+#[tauri::command]
+pub fn get_workout_type_options() -> Vec<zeppbridge_core::sport_catalog::SportOption> {
+    zeppbridge_core::sport_catalog::options().to_vec()
+}
+
+/// 本机所有还没有名字的 Zepp 运动编号。
+///
+/// Zepp 的自定义训练模板会给出目录里没有的编号（真实反馈里是 12 和 226）。
+/// 我们没有证据说这些编号是什么运动，所以不猜；把它们连同影响到的记录数交给
+/// 用户，由用户起一次名字。
+#[tauri::command]
+pub async fn get_unknown_workout_codes(
+    state: tauri::State<'_, AppState>,
+) -> std::result::Result<Vec<WorkoutCodeLabel>, String> {
+    let db = state.db.lock().await;
+    db.unknown_workout_code_labels()
+        .map_err(|error| error.user_message())
+}
+
+/// 给一个未识别编号起名字（传 `null` 撤销）。所有同编号的记录一起生效。
+#[tauri::command]
+pub async fn set_workout_code_label(
+    state: tauri::State<'_, AppState>,
+    zepp_type: i32,
+    label: Option<String>,
+) -> std::result::Result<Vec<WorkoutCodeLabel>, String> {
+    let db = state.db.lock().await;
+    db.set_workout_code_label(zepp_type, label.as_deref())
+        .map_err(|error| error.user_message())?;
+    db.unknown_workout_code_labels()
+        .map_err(|error| error.user_message())
+}
+
+/// 随包设备目录里可供用户指认的型号。
+#[tauri::command]
+pub fn get_device_catalog_options() -> Vec<DeviceCatalogOption> {
+    let mut options = zeppbridge_core::device_catalog::catalog_entries()
+        .iter()
+        .filter(|entry| entry.supported && entry.status == "active")
+        .map(|entry| DeviceCatalogOption {
+            catalog_id: entry.catalog_id.clone(),
+            canonical_name: entry.canonical_name.clone(),
+            name_zh: entry.name_zh.clone(),
+            kind: entry.kind.clone(),
+        })
+        .collect::<Vec<_>>();
+    options.sort_by(|a, b| a.canonical_name.cmp(&b.canonical_name));
+    options
+}
+
+/// 用户指认某台设备的型号（传 `null` 撤销）。
+///
+/// 这不是识别结果，是用户纠正：`match_status` 会是 `user_assigned`，界面必须
+/// 如实标注，不能伪装成自动识别。
+#[tauri::command]
+pub async fn set_device_model_override(
+    state: tauri::State<'_, AppState>,
+    device_key: String,
+    catalog_id: Option<String>,
+) -> std::result::Result<(), String> {
+    let db = state.db.lock().await;
+    db.set_device_model_override(&device_key, catalog_id.as_deref())
+        .map_err(|error| error.user_message())
 }
 
 #[tauri::command]
@@ -1213,6 +1283,33 @@ async fn enrich_profile_with_local_data(
             apply_catalog_match(&mut profile, matched.entry, matched.status);
         }
     }
+    // Some accounts' device response has no product-name field at all, so no
+    // matcher can name the watch. When the user has told us which model it is,
+    // use that — and mark it as a user correction rather than a match.
+    if profile.match_status == DeviceMatchStatus::Unknown {
+        let keys = [
+            requested_device_id,
+            profile.device_id.as_deref(),
+            profile.serial.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
+        let assigned = {
+            let db = state.db.lock().await;
+            db.device_model_override(&keys)
+                .map_err(|error| error.to_string())?
+        };
+        if let Some(assigned) = assigned {
+            if let Some(entry) = crate::device_catalog::catalog_entries()
+                .iter()
+                .find(|entry| entry.catalog_id == assigned.catalog_id)
+            {
+                apply_catalog_match(&mut profile, entry, CatalogMatchStatus::Exact);
+                profile.match_status = DeviceMatchStatus::UserAssigned;
+            }
+        }
+    }
     let aliases = [
         requested_device_id,
         profile.device_id.as_deref(),
@@ -1277,6 +1374,7 @@ fn empty_device_diagnostic(status: &str) -> DiagnosticDeviceEvidence {
         firmware_field_objects: 0,
         candidates: Vec::new(),
         unmatched_product_hints: Vec::new(),
+        model_identifier_hints: Vec::new(),
         shapes: Vec::new(),
     }
 }
@@ -1458,7 +1556,9 @@ fn build_device_diagnostic(value: &Value) -> DiagnosticDeviceEvidence {
     evidence.shapes = shapes.into_iter().collect();
     let mut seen = BTreeSet::new();
     let mut unmatched_product_hints = BTreeSet::new();
+    let mut model_identifier_hints = BTreeSet::new();
     for item in device_items(value) {
+        collect_model_identifier_hints(&item, &mut model_identifier_hints);
         let Some(profile) = parse_device_profiles(&item).into_iter().next() else {
             continue;
         };
@@ -1483,7 +1583,48 @@ fn build_device_diagnostic(value: &Value) -> DiagnosticDeviceEvidence {
         .candidates
         .sort_by(|a, b| a.catalog_id.cmp(&b.catalog_id));
     evidence.unmatched_product_hints = unmatched_product_hints.into_iter().collect();
+    evidence.model_identifier_hints = model_identifier_hints.into_iter().take(8).collect();
     evidence
+}
+
+/// 收集型号类的数字标识。
+///
+/// 这些是「哪一款表」而不是「哪一台表」：只取整数，`deviceSource` 和
+/// `deviceType` 在 Zepp 的接口里都是型号维度的取值。序列号、MAC、绑定时间和
+/// 任何字符串一律不收 —— 没有它们这份报告也够补目录，收了就越界了。
+fn collect_model_identifier_hints(item: &Value, out: &mut BTreeSet<String>) {
+    let extra = flattened_device_metadata(item);
+    for (source, keys) in [
+        (
+            item,
+            ["deviceSource", "device_source", "deviceType", "device_type"],
+        ),
+        (
+            &extra,
+            ["deviceSource", "device_source", "deviceType", "device_type"],
+        ),
+    ] {
+        let Some(object) = source.as_object() else {
+            continue;
+        };
+        for key in keys {
+            let Some(Value::Number(number)) = object.get(key) else {
+                continue;
+            };
+            let Some(value) = number.as_i64() else {
+                continue;
+            };
+            if !(0..=99_999_999).contains(&value) {
+                continue;
+            }
+            let canonical = if key.starts_with("deviceS") || key.starts_with("device_s") {
+                "deviceSource"
+            } else {
+                "deviceType"
+            };
+            out.insert(format!("{canonical}:{value}"));
+        }
+    }
 }
 
 pub(crate) fn parse_device_profiles(value: &serde_json::Value) -> Vec<DeviceProfile> {
@@ -1496,11 +1637,23 @@ pub(crate) fn parse_device_profiles(value: &serde_json::Value) -> Vec<DeviceProf
                 first_string(&item, &["displayName", "deviceName", "nickname", "name"]).or_else(
                     || first_string(&extra, &["displayName", "deviceName", "nickname", "name"]),
                 );
-            let product_names = merged_string_values(
+            let mut product_names = merged_string_values(
                 &item,
                 &extra,
                 &["productName", "product_name", "modelName", "model"],
             );
+            // `productId` / `hardwareVersion` are sometimes the internal
+            // codename ("amazfit_balance2"), which normalizes to exactly the
+            // same string as the catalog alias "Amazfit Balance 2". Alias
+            // matching is equality on the normalized form, so a value that is
+            // not a product name simply matches nothing.
+            product_names.extend(merged_string_values(
+                &item,
+                &extra,
+                &["productId", "product_id", "hardwareVersion"],
+            ));
+            product_names.sort();
+            product_names.dedup();
             let mut model_codes = string_values(
                 &item,
                 &[
@@ -1521,6 +1674,29 @@ pub(crate) fn parse_device_profiles(value: &serde_json::Value) -> Vec<DeviceProf
                     "productCode",
                 ],
             ));
+            // Some accounts' device list carries no product-name field at all
+            // (issue #4: nameFieldObjects = 0). The only model-class facts in
+            // that payload are these numeric/short identifiers, so they have to
+            // reach the matcher — otherwise the watch is unidentifiable by
+            // construction no matter how complete the catalog gets.
+            //
+            // Feeding them in does not invent a mapping: the bundled catalog
+            // still has to carry the value before anything matches.
+            model_codes.extend(merged_string_values(
+                &item,
+                &extra,
+                &[
+                    "deviceSource",
+                    "device_source",
+                    "deviceType",
+                    "device_type",
+                    "productId",
+                    "product_id",
+                    "hardwareVersion",
+                ],
+            ));
+            model_codes.sort();
+            model_codes.dedup();
             let device_names = merged_string_values(&item, &extra, &["deviceName", "deviceType"]);
             let device_id = first_string(
                 &item,
@@ -1795,6 +1971,87 @@ mod tests {
         assert!(encoded.contains("6.2.208.7"));
         assert_eq!(report.id_alias_objects, 1);
         assert_eq!(report.serial_alias_objects, 1);
+    }
+
+    /// 真实反馈（issue #4）里的设备响应形状：整个对象没有任何产品名字段，
+    /// 只有 `deviceSource` / `deviceType` / `productId` 这类数字。
+    ///
+    /// 这个用例钉住两件事：目录里没有对应编号时必须诚实地判为未识别（不能
+    /// 靠猜一个型号来「修好」），以及诊断报告必须带上型号类数字，否则内置
+    /// 目录永远补不全，这台表对每个用户都会一直是未识别。
+    #[test]
+    fn a_device_response_with_no_product_name_stays_unknown_and_reports_model_numbers() {
+        let payload = json!({
+            "items": [{
+                "deviceId": "0123456789abcdef",
+                "deviceSource": 7930112,
+                "deviceType": 5,
+                "macAddress": "AA:BB:CC:DD:EE:FF",
+                "sn": "SERIAL-PRIVATE-998877",
+                "firmwareVersion": "6.2.208.7",
+                "additionalInfo": serde_json::to_string(&json!({
+                    "productId": "8290304",
+                    "productVersion": "6.2.208.7",
+                    "hardwareVersion": "1.0",
+                    "btmac": "AA:BB:CC:DD:EE:FF",
+                    "sn": "SERIAL-PRIVATE-998877"
+                })).unwrap()
+            }]
+        });
+
+        let profile = parse_device_profile(&payload);
+        assert_eq!(
+            profile.match_status,
+            DeviceMatchStatus::Unknown,
+            "目录里没有这些编号时不许猜一个型号出来"
+        );
+        assert!(profile.canonical_name.is_none());
+        assert_eq!(profile.firmware.as_deref(), Some("6.2.208.7"));
+
+        let report = build_device_diagnostic(&payload);
+        assert_eq!(report.name_field_objects, 0, "这份响应里确实没有名字字段");
+        assert_eq!(report.unknown_device_count, 1);
+        assert!(
+            report
+                .model_identifier_hints
+                .contains(&"deviceSource:7930112".to_string()),
+            "缺了型号编号，内置目录就永远补不上: {:?}",
+            report.model_identifier_hints
+        );
+        assert!(report
+            .model_identifier_hints
+            .contains(&"deviceType:5".to_string()));
+
+        // 型号线索只能是「哪一款」，不能夹带「哪一台」。
+        let encoded = serde_json::to_string(&report.model_identifier_hints).unwrap();
+        for private in [
+            "SERIAL-PRIVATE-998877",
+            "AA:BB:CC:DD:EE:FF",
+            "0123456789abcdef",
+        ] {
+            assert!(!encoded.contains(private), "型号线索泄露了 {private}");
+        }
+    }
+
+    /// `productId` / `hardwareVersion` 有时就是内部代号，归一化之后和目录别名
+    /// 完全相同。把它们喂进匹配器不是在猜，而是让本来就存在的等价关系生效。
+    #[test]
+    fn internal_codename_fields_can_still_match_a_catalog_alias() {
+        let value = json!({
+            "items": [{
+                "deviceId": "0123456789abcdef",
+                "additionalInfo": {
+                    "productId": "amazfit_t-rex_3",
+                    "productVersion": "1.2.3.4"
+                }
+            }]
+        });
+        let profile = parse_device_profile(&value);
+        assert_eq!(
+            profile.canonical_name.as_deref(),
+            Some("Amazfit T-Rex 3 48mm")
+        );
+        assert_eq!(profile.match_status, DeviceMatchStatus::Alias);
     }
 
     #[test]

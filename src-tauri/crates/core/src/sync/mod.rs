@@ -1,5 +1,6 @@
 use crate::fetcher::{DataFetcher, FetchWindow, FetchedRecord};
 use crate::models::{error::*, *};
+use crate::storage::provenance::{Stage, StageErrorKind, StageOutcome};
 use crate::storage::Database;
 use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
@@ -431,6 +432,7 @@ impl SyncManager {
                 .then(|| format!("已解析可用数据；{notices} 个可选响应没有可识别记录"));
         }
         let db = self.db.lock().await;
+        db.record_stream_written(stream, aggregate.records_written)?;
         db.update_sync_state_details(
             stream,
             None,
@@ -457,25 +459,62 @@ impl SyncManager {
             needs_reauth: false,
             message: None,
         };
+        // 报文已经拿回来了，所以无论后面解析和写入成败，fetch 阶段都是成功的。
+        // 把三个阶段分开记录，界面才能说清是「没拉到」「没看懂」还是「没写进去」。
+        db.record_stream_stage(&stream, Stage::Fetch, &StageOutcome::Ok)?;
         match db.persist_fetched_record(&record.raw) {
             Ok((_, value)) => {
                 report.records_written = value.primary_records;
+                db.record_stream_stage(&stream, Stage::Parse, &StageOutcome::Ok)?;
+                db.record_stream_stage(&stream, Stage::Write, &StageOutcome::Ok)?;
             }
             Err(error) if error.is_unavailable() && capability == CapabilityStatus::Unverified => {
                 report.status = StreamStatus::Unverified;
                 report.capability = CapabilityStatus::Unverified;
                 report.message = Some(error.user_message());
+                // 拿到了报文但当前 normalizer 不认识它的结构。raw 已保留，
+                // 这是解析阶段的失败，不是网络失败。
+                db.record_stream_stage(
+                    &stream,
+                    Stage::Parse,
+                    &StageOutcome::Failed {
+                        kind: StageErrorKind::UnrecognizedPayload,
+                        message: report.message.clone(),
+                    },
+                )?;
             }
             Err(error) if error.is_unavailable() => {
                 report.status = StreamStatus::Unavailable;
                 report.capability = CapabilityStatus::Unavailable;
                 report.message = Some(error.user_message());
+                db.record_stream_stage(
+                    &stream,
+                    Stage::Parse,
+                    &StageOutcome::Failed {
+                        kind: StageErrorKind::NotAvailable,
+                        message: report.message.clone(),
+                    },
+                )?;
             }
             Err(error) => {
                 report.status = StreamStatus::Failed;
                 report.capability = CapabilityStatus::Unavailable;
                 report.needs_reauth = error.needs_reauth();
                 report.message = Some(error.user_message());
+                let kind = StageErrorKind::classify(&error);
+                let stage = if kind == StageErrorKind::Storage {
+                    Stage::Write
+                } else {
+                    Stage::Parse
+                };
+                db.record_stream_stage(
+                    &stream,
+                    stage,
+                    &StageOutcome::Failed {
+                        kind,
+                        message: report.message.clone(),
+                    },
+                )?;
             }
         }
         db.update_sync_state_details(
@@ -503,6 +542,14 @@ impl SyncManager {
             message: Some(error.user_message()),
         };
         let db = self.db.lock().await;
+        db.record_stream_stage(
+            stream,
+            Stage::Fetch,
+            &StageOutcome::Failed {
+                kind: StageErrorKind::classify(error),
+                message: report.message.clone(),
+            },
+        )?;
         db.update_sync_state_details(
             stream,
             None,

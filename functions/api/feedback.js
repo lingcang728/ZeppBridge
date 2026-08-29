@@ -48,6 +48,7 @@ const validDeviceEvidence = (device) => hasOnlyKeys(device, [
   'firmwareFieldObjects',
   'candidates',
   'unmatchedProductHints',
+  'modelIdentifierHints',
   'shapes',
 ])
   && boundedString(device.status, 40)
@@ -59,6 +60,14 @@ const validDeviceEvidence = (device) => hasOnlyKeys(device, [
   && Array.isArray(device.unmatchedProductHints)
   && device.unmatchedProductHints.length <= 12
   && device.unmatchedProductHints.every((hint) => boundedString(hint, 64))
+  // 型号类数字标识（deviceSource / deviceType）。有些账号的设备响应里没有任何
+  // 产品名字段，这两个数字是仅有的型号线索。形状被钉死成 `名字:整数`，所以
+  // 序列号、MAC 或任何字符串都进不来。字段可缺省：旧客户端不会发它。
+  && (device.modelIdentifierHints === undefined
+    || (Array.isArray(device.modelIdentifierHints)
+      && device.modelIdentifierHints.length <= 8
+      && device.modelIdentifierHints.every((hint) => boundedString(hint, 32)
+        && /^(deviceSource|deviceType):\d{1,8}$/.test(hint))))
   && Array.isArray(device.shapes)
   && device.shapes.length <= 40
   && device.shapes.every(validShape);

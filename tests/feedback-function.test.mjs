@@ -18,6 +18,7 @@ const report = () => ({
     firmwareFieldObjects: 1,
     candidates: [],
     unmatchedProductHints: ['Amazfit Future Watch'],
+    modelIdentifierHints: ['deviceSource:7930112', 'deviceType:5'],
     shapes: [{ path: '$.items[]', fields: [{ name: 'productCode', jsonType: 'string' }] }],
   },
   unknownWorkoutCodes: [{ code: 240, records: 2 }],
@@ -35,6 +36,29 @@ test('rejects extra fields and reports without an actionable problem', () => {
   clean.deviceEvidence.unknownDeviceCount = 0;
   clean.unknownWorkoutCodes = [];
   assert.equal(validateFeedbackReport(clean), false);
+});
+
+test('model identifier hints only accept model-class integers', () => {
+  const withoutHints = report();
+  delete withoutHints.deviceEvidence.modelIdentifierHints;
+  assert.equal(validateFeedbackReport(withoutHints), true, '旧客户端不发这个字段也要能收');
+
+  for (const bad of [
+    ['sn:ABC123'],
+    ['deviceSource:not-a-number'],
+    ['macAddress:001122334455'],
+    ['deviceSource:123456789'],
+    ['deviceSource:12 deviceType:3'],
+    [''],
+  ]) {
+    const invalid = report();
+    invalid.deviceEvidence.modelIdentifierHints = bad;
+    assert.equal(validateFeedbackReport(invalid), false, `不该接受 ${JSON.stringify(bad)}`);
+  }
+
+  const tooMany = report();
+  tooMany.deviceEvidence.modelIdentifierHints = Array.from({ length: 9 }, (_, i) => `deviceType:${i}`);
+  assert.equal(validateFeedbackReport(tooMany), false);
 });
 
 test('stores accepted reports and returns an opaque report id', async () => {

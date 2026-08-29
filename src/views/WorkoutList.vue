@@ -8,9 +8,8 @@ import EmptyState from '../components/EmptyState.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
-import { workoutLabel } from '../lib/labels';
 import { formatDate, formatDuration, isFiniteNumber } from '../lib/format';
-import { displayableWorkouts, workoutDisplayType, workoutDurationMinutes } from '../lib/workouts';
+import { displayableWorkouts, workoutDisplayLabel, workoutDisplayType, workoutDurationMinutes } from '../lib/workouts';
 import type { Workout } from '../types';
 
 const { dataRevision } = useSyncController();
@@ -92,7 +91,7 @@ watch(dataRevision, () => void loadList());
         icon="run"
         :icon-bg="workoutTypeBg(workoutDisplayType(workout))"
         :kicker="formatDate(workout.start_time)"
-        :title="workoutLabel(workoutDisplayType(workout))"
+        :title="workoutDisplayLabel(workout)"
         :fact="workoutFact(workout).fact"
         :fact-label="workoutFact(workout).label"
       />

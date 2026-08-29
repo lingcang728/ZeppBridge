@@ -175,6 +175,8 @@ export interface Workout {
   type_source: 'numeric_mapped' | 'unknown_code' | 'string_field' | 'missing' | string;
   user_override?: string | null;
   effective_type: string;
+  /** 用户给这个 Zepp 编号起的名字；目录已经认识的编号永远为空。 */
+  custom_label?: string | null;
   zepp_type?: number | null;
   start_time: string;
   end_time: string;
@@ -189,6 +191,28 @@ export interface Workout {
   source_scope: SourceScope;
   device_id?: string;
   synced_at?: string | null;
+}
+
+/** 随包运动目录里的一个可选项，纠正下拉框用它渲染。 */
+export interface SportOption {
+  key: string;
+  label: string;
+}
+
+/** 随包设备目录里的一个型号，供用户指认自己的设备。 */
+export interface DeviceCatalogOption {
+  catalogId: string;
+  canonicalName: string;
+  nameZh?: string | null;
+  kind: string;
+}
+
+/** 一个还没有名字的 Zepp 运动编号，以及它影响到的记录数。 */
+export interface WorkoutCodeLabel {
+  zeppType: number;
+  label: string;
+  records: number;
+  updatedAt: string;
 }
 
 export interface DiagnosticField {
@@ -349,7 +373,8 @@ export interface DeviceProfile {
   catalog_id?: string;
   kind?: 'watch' | 'strap' | 'ring' | 'band' | 'scale' | 'unknown' | string;
   image_key?: string | null;
-  match_status?: 'exact' | 'alias' | 'unknown';
+  /** `user_assigned` = 用户自己指认的型号，不是识别结果。 */
+  match_status?: 'exact' | 'alias' | 'user_assigned' | 'unknown';
   has_local_data?: boolean;
   last_data_at?: string | null;
   firmware?: string;

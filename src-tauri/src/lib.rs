@@ -16,15 +16,17 @@ pub use zeppbridge_core::{
 use app_state::AppState;
 use commands::{
     cancel_sync, cancel_web_login, cleanup_old_data, clear_auth, get_app_status,
-    get_capability_overview, get_device_profile, get_device_profiles, get_diagnostic_report,
-    get_export_json, get_health_overview, get_heart_rate_series, get_heart_rate_zones,
-    get_login_status, get_metric_series, get_recent_sleep, get_recent_workouts, get_sleep_detail,
-    get_storage_estimate, get_training_balance, get_training_load_series, get_workout_detail,
-    get_workout_series, import_from_har, manual_auth, open_data_folder, prepare_ai_handoff,
+    get_capability_overview, get_device_catalog_options, get_device_profile, get_device_profiles,
+    get_diagnostic_report, get_export_json, get_health_overview, get_heart_rate_series,
+    get_heart_rate_zones, get_login_status, get_metric_series, get_recent_sleep,
+    get_recent_workouts, get_sleep_detail, get_storage_estimate, get_training_balance,
+    get_training_load_series, get_unknown_workout_codes, get_workout_detail, get_workout_series,
+    get_workout_type_options, import_from_har, manual_auth, open_data_folder, prepare_ai_handoff,
     probe_data_capabilities, publish_ai_export, reprocess_local_data, save_auth, save_csv_export,
-    save_gpx_export, save_json_export, set_heart_rate_zone_preference, set_user_prefs,
-    set_workout_type_override, start_history_sync, start_incremental_sync, start_initial_sync,
-    start_web_login, submit_diagnostic_report, verify_auth,
+    save_gpx_export, save_json_export, set_device_model_override, set_heart_rate_zone_preference,
+    set_user_prefs, set_workout_code_label, set_workout_type_override, start_history_sync,
+    start_incremental_sync, start_initial_sync, start_web_login, submit_diagnostic_report,
+    verify_auth,
 };
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
@@ -181,6 +183,11 @@ pub fn run() {
             get_diagnostic_report,
             submit_diagnostic_report,
             set_workout_type_override,
+            get_workout_type_options,
+            get_unknown_workout_codes,
+            set_workout_code_label,
+            get_device_catalog_options,
+            set_device_model_override,
             reprocess_local_data,
             get_export_json,
             save_json_export,

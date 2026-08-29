@@ -13,9 +13,9 @@ import { dataProviderLabel, dataScopeLabel, workoutLabel } from '../lib/labels';
 import { formatDate, formatDistance, formatTime, isFiniteNumber } from '../lib/format';
 import { zeppSemanticColors } from '../lib/echartsTheme';
 import { formatPaceSeconds } from '../lib/metricSeries';
-import { workoutDisplayType } from '../lib/workouts';
+import { workoutDisplayLabel, workoutDisplayType } from '../lib/workouts';
 import trexFallback from '../assets/devices/amazfit-t-rex-3.webp';
-import type { DeviceProfile, Workout, WorkoutSeries, WorkoutSeriesSample, WorkoutRoutePoint } from '../types';
+import type { DeviceProfile, SportOption, Workout, WorkoutSeries, WorkoutSeriesSample, WorkoutRoutePoint } from '../types';
 
 type WorkoutMetrics = Workout & {
   pace?: number | string | null;
@@ -60,13 +60,10 @@ const activeFormat = ref<'json' | 'csv' | 'gpx'>('json');
 const workoutId = computed(() => String(route.params.workoutId || ''));
 const displayType = computed(() => workout.value ? workoutDisplayType(workout.value) : 'unknown');
 const typeOverrideBusy = ref(false);
-const typeOverrideOptions = [
-  ['run', '户外跑步'], ['walking', '健走'], ['ride', '户外骑行'],
-  ['indoor_cycling', '室内骑行'], ['swimming', '游泳'], ['treadmill', '室内跑步'],
-  ['trail', '越野跑'], ['hiking', '徒步'], ['strength', '力量训练'],
-  ['elliptical', '椭圆机'], ['rowing', '划船'], ['yoga', '瑜伽'],
-  ['climb', '攀爬'], ['badminton', '羽毛球'], ['activity', '其他活动'],
-] as const;
+/* 纠正选项直接来自随包运动目录（一百多项），不是一份写死的短名单：目录里有
+   「壁球」而名单里没有，用户就永远改不成它。目录被 include_str! 编进二进制，
+   所以这里和后端的允许值天然一致。 */
+const typeOverrideOptions = ref<SportOption[]>([]);
 
 const durationMinutes = computed(() => {
   const item = workout.value;
@@ -531,7 +528,14 @@ const exportRecord = async () => {
   } catch { actionError.value = '复制这条记录失败'; }
 };
 
-onMounted(() => void loadDetail());
+onMounted(() => {
+  void loadDetail();
+  if (isTauri()) {
+    void tauriApi.getWorkoutTypeOptions()
+      .then((options) => { typeOverrideOptions.value = options; })
+      .catch(() => { typeOverrideOptions.value = []; });
+  }
+});
 watch([dataRevision, workoutId], () => void loadDetail());
 </script>
 
@@ -563,18 +567,19 @@ watch([dataRevision, workoutId], () => void loadDetail());
               <DesignIcon :name="workoutArt" :size="64" />
               <div>
                 <p class="hero-kicker">WORKOUT DETAIL</p>
-                <h1 id="workout-detail-title">{{ workoutLabel(displayType) }}</h1>
+                <h1 id="workout-detail-title">{{ workout ? workoutDisplayLabel(workout) : workoutLabel(displayType) }}</h1>
               </div>
             </div>
             <p class="sport-time"><Icon name="clock" :size="14" />{{ formatDate(workout.start_time, 'short') }} {{ formatTime(workout.start_time) }} · {{ formatClock(durationMinutes) }}</p>
             <div class="type-evidence" aria-label="运动类型判定">
               <span>Zepp 原始编号：{{ workout.zepp_type ?? '未提供' }}</span>
               <span>ZeppBridge 识别：{{ workoutLabel(workout.normalized_type) }}</span>
+              <span v-if="workout.custom_label">你给编号 {{ workout.zepp_type }} 起的名字：{{ workout.custom_label }}</span>
               <label>
                 我的纠正
                 <select :value="workout.user_override || ''" :disabled="typeOverrideBusy" @change="changeWorkoutOverride">
                   <option value="">不纠正</option>
-                  <option v-for="option in typeOverrideOptions" :key="option[0]" :value="option[0]">{{ option[1] }}</option>
+                  <option v-for="option in typeOverrideOptions" :key="option.key" :value="option.key">{{ option.label }}</option>
                 </select>
               </label>
             </div>

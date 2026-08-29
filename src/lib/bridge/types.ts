@@ -13,7 +13,10 @@ import type {
   DailyPoint,
   LoginStatus,
   MetricSeries,
+  DeviceCatalogOption,
   LocalApiStatus,
+  SportOption,
+  WorkoutCodeLabel,
   ReprocessResult,
   DeviceProfile,
   DeviceProfilesResult,
@@ -68,6 +71,11 @@ export interface BridgeBackend {
   getWorkoutDetail(workoutId: string): Promise<Workout | null>;
   getWorkoutSeries(workoutId: string): Promise<WorkoutSeries>;
   setWorkoutTypeOverride(workoutId: string, userOverride?: string | null): Promise<Workout>;
+  getWorkoutTypeOptions(): Promise<SportOption[]>;
+  getUnknownWorkoutCodes(): Promise<WorkoutCodeLabel[]>;
+  setWorkoutCodeLabel(zeppType: number, label: string | null): Promise<WorkoutCodeLabel[]>;
+  getDeviceCatalogOptions(): Promise<DeviceCatalogOption[]>;
+  setDeviceModelOverride(deviceKey: string, catalogId: string | null): Promise<void>;
   getLocalApiStatus(): Promise<LocalApiStatus>;
   setLocalApiEnabled(enabled: boolean): Promise<LocalApiStatus>;
   revealLocalApiToken(): Promise<string>;

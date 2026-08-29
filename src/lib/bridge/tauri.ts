@@ -19,7 +19,10 @@ import type {
   HeartRateZonePreference,
   LoginStatus,
   MetricSeries,
+  DeviceCatalogOption,
   LocalApiStatus,
+  SportOption,
+  WorkoutCodeLabel,
   ReprocessResult,
   SleepSession,
   SyncReport,
@@ -181,6 +184,21 @@ export const tauriBackend: BridgeBackend = {
     });
   },
 
+  getWorkoutTypeOptions() {
+    return call<SportOption[]>('get_workout_type_options');
+  },
+  getUnknownWorkoutCodes() {
+    return call<WorkoutCodeLabel[]>('get_unknown_workout_codes');
+  },
+  setWorkoutCodeLabel(zeppType: number, label: string | null) {
+    return call<WorkoutCodeLabel[]>('set_workout_code_label', { zeppType, label });
+  },
+  getDeviceCatalogOptions() {
+    return call<DeviceCatalogOption[]>('get_device_catalog_options');
+  },
+  setDeviceModelOverride(deviceKey: string, catalogId: string | null) {
+    return call<void>('set_device_model_override', { deviceKey, catalogId });
+  },
   getLocalApiStatus() {
     return call<LocalApiStatus>('get_local_api_status');
   },

@@ -265,6 +265,7 @@ impl Normalizer {
                 type_source,
                 user_override: None,
                 effective_type: workout_type,
+                custom_label: None,
                 start_time,
                 end_time,
                 distance_meters: first_number(

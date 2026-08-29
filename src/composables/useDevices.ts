@@ -8,7 +8,7 @@ import type { DeviceCacheMetadata, DeviceProfile, DeviceProfilesResult } from '.
  * of products we happen to ship assets for.  Views consume this normalized
  * model so an empty/unknown account never falls back to a made-up watch.
  */
-export type DeviceState = '账号已识别' | '最近有数据' | '使用缓存' | '未识别';
+export type DeviceState = '账号已识别' | '你指认的型号' | '最近有数据' | '使用缓存' | '未识别';
 
 export interface DeviceCardModel {
   profile: DeviceProfile;
@@ -52,6 +52,7 @@ const formatDeviceDate = (value?: string | null): string => {
 const stateFor = (profile: DeviceProfile): DeviceState => {
   if (profile.has_local_data) return '最近有数据';
   if (cache.value?.status === 'stale' || cache.value?.status === 'refresh_failed') return '使用缓存';
+  if (profile.match_status === 'user_assigned') return '你指认的型号';
   if (profile.canonical_name || profile.match_status === 'exact' || profile.match_status === 'alias') return '账号已识别';
   return '未识别';
 };
@@ -102,7 +103,8 @@ const setLoadFailure = (cause: unknown, refresh: boolean): void => {
 const hasCanonicalMatch = (profile: DeviceProfile): boolean => Boolean(
   profile.canonical_name?.trim()
   || profile.match_status === 'exact'
-  || profile.match_status === 'alias',
+  || profile.match_status === 'alias'
+  || profile.match_status === 'user_assigned',
 );
 
 const needsBackgroundRefresh = (result: DeviceProfilesResult): boolean => {

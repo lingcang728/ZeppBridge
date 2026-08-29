@@ -18,8 +18,7 @@ import { formatDeviceIntro } from '../lib/deviceCopy';
 import { zeppSemanticColors } from '../lib/echartsTheme';
 import { indexSeries, latestValue } from '../lib/metricSeries';
 import { formatDistance, formatDuration, formatMetric, formatTime, isFiniteNumber, type HealthCategory } from '../lib/format';
-import { workoutLabel } from '../lib/labels';
-import { displayableWorkouts, workoutDisplayType, workoutDurationMinutes, workoutTypeKey } from '../lib/workouts';
+import { displayableWorkouts, workoutDisplayLabel, workoutDurationMinutes, workoutTypeKey } from '../lib/workouts';
 import type { HealthOverview, HeartRatePoint, MetricSeries, SleepSession, Workout } from '../types';
 
 const { dataRevision } = useSyncController();
@@ -243,7 +242,7 @@ const shortDateTime = (value: string) => {
 };
 const workoutPresentation = (workout: Workout): Pick<RecentItem, 'category' | 'designIcon'> => {
   const key = workoutTypeKey(workout);
-  const label = workoutLabel(workoutDisplayType(workout));
+  const label = workoutDisplayLabel(workout);
   if (/strength|weight|力量|健身|无氧/.test(`${key} ${label}`.toLowerCase())) return { category: 'heart', designIcon: 'body-activity' };
   if (/cycl|ride|骑行/.test(`${key} ${label}`.toLowerCase())) return { category: 'activity', designIcon: 'outdoor-cycling' };
   return { category: 'activity', designIcon: 'outdoor-run' };
@@ -258,7 +257,7 @@ const recentItems = computed<RecentItem[]>(() => {
     const presentation = workoutPresentation(workout);
     items.push({
       key: `workout-${workout.workout_id}`, to: `/workouts/${workout.workout_id}`, ...presentation, icon: 'run',
-      time: new Date(workout.start_time).getTime(), kicker: shortDateTime(workout.start_time), title: workoutLabel(workoutDisplayType(workout)),
+      time: new Date(workout.start_time).getTime(), kicker: shortDateTime(workout.start_time), title: workoutDisplayLabel(workout),
       fact: isFiniteNumber(workout.distance_meters) && workout.distance_meters > 0 ? formatDistance(workout.distance_meters) : formatDuration(workoutDurationMinutes(workout), '—'),
       factLabel: isFiniteNumber(workout.avg_hr) ? `均心率 ${Math.round(workout.avg_hr)}` : undefined,
     });
