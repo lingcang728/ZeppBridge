@@ -61,6 +61,40 @@ test('model identifier hints only accept model-class integers', () => {
   assert.equal(validateFeedbackReport(tooMany), false);
 });
 
+test('user-assigned model pairings are model-class only, and optional', () => {
+  const base = report();
+  assert.equal(base.userAssignedModels, undefined);
+  assert.equal(validateFeedbackReport(base), true, '不勾选就不发这个字段');
+
+  const good = report();
+  good.userAssignedModels = [
+    { catalogId: 'amazfit-balance-2', modelIdentifierHints: ['deviceSource:7930112'] },
+  ];
+  assert.equal(validateFeedbackReport(good), true);
+
+  // 一个只有指认、没有其他问题的报告也算「有事可报」：它就是来补目录的。
+  const onlyAssignment = report();
+  onlyAssignment.deviceEvidence.unknownDeviceCount = 0;
+  onlyAssignment.unknownWorkoutCodes = [];
+  onlyAssignment.userAssignedModels = [
+    { catalogId: 'amazfit-balance-2', modelIdentifierHints: ['deviceSource:7930112'] },
+  ];
+  assert.equal(validateFeedbackReport(onlyAssignment), true);
+
+  for (const bad of [
+    [{ catalogId: 'amazfit-balance-2', modelIdentifierHints: [] }],
+    [{ catalogId: 'amazfit-balance-2', modelIdentifierHints: ['sn:ABC123'] }],
+    [{ catalogId: '../../etc/passwd', modelIdentifierHints: ['deviceSource:1'] }],
+    [{ catalogId: 'Amazfit Balance 2', modelIdentifierHints: ['deviceSource:1'] }],
+    [{ catalogId: 'amazfit-balance-2', modelIdentifierHints: ['deviceSource:1'], sn: 'leak' }],
+    [{ catalogId: '', modelIdentifierHints: ['deviceSource:1'] }],
+  ]) {
+    const invalid = report();
+    invalid.userAssignedModels = bad;
+    assert.equal(validateFeedbackReport(invalid), false, `不该接受 ${JSON.stringify(bad)}`);
+  }
+});
+
 test('stores accepted reports and returns an opaque report id', async () => {
   let values;
   const db = {

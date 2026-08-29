@@ -234,6 +234,9 @@ export const tauriBackend: BridgeBackend = {
   submitDiagnosticReport() {
     return call<FeedbackSubmissionResult>('submit_diagnostic_report');
   },
+  submitDeviceModelAssignment() {
+    return call<FeedbackSubmissionResult>('submit_device_model_assignment');
+  },
 
   getExportJson(selection: ExportSelection) {
     return call<string>('get_export_json', { selection });

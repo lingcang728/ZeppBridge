@@ -72,6 +72,19 @@ const validDeviceEvidence = (device) => hasOnlyKeys(device, [
   && device.shapes.length <= 40
   && device.shapes.every(validShape);
 
+// 「用户指认的型号 ↔ 这台设备的型号类编号」。这一对是内置目录唯一可能的成长
+// 来源：华米没有公开编号对照表，而有些账号的设备响应里除了这些数字什么都没有。
+// 两半都被钉死成型号级取值 —— catalogId 必须长得像目录 id，hints 只能是
+// `名字:整数`，所以序列号、MAC、账号都进不来。
+const validAssignedModel = (entry) => hasOnlyKeys(entry, ['catalogId', 'modelIdentifierHints'])
+  && boundedString(entry.catalogId, 80)
+  && /^[a-z0-9][a-z0-9-]*$/.test(entry.catalogId)
+  && Array.isArray(entry.modelIdentifierHints)
+  && entry.modelIdentifierHints.length >= 1
+  && entry.modelIdentifierHints.length <= 8
+  && entry.modelIdentifierHints.every((hint) => boundedString(hint, 32)
+    && /^(deviceSource|deviceType):\d{1,8}$/.test(hint));
+
 const validWorkoutCode = (entry) => hasOnlyKeys(entry, ['code', 'records'])
   && boundedInteger(entry.code, -1, 65535)
   && boundedInteger(entry.records, 1, 1_000_000_000);
@@ -84,6 +97,7 @@ export const validateFeedbackReport = (report) => {
     'normalizerRevision',
     'operatingSystem',
     'deviceEvidence',
+    'userAssignedModels',
     'unknownWorkoutCodes',
     'workoutTypeConflicts',
   ])) return false;
@@ -93,11 +107,17 @@ export const validateFeedbackReport = (report) => {
   if (!boundedString(report.normalizerRevision, 100)) return false;
   if (!['windows', 'macos', 'linux'].includes(report.operatingSystem)) return false;
   if (!validDeviceEvidence(report.deviceEvidence)) return false;
+  // 字段可缺省：只有用户在设备选择器里勾选了「帮忙补充目录」才会带上它。
+  if (report.userAssignedModels !== undefined
+    && (!Array.isArray(report.userAssignedModels)
+      || report.userAssignedModels.length > 8
+      || !report.userAssignedModels.every(validAssignedModel))) return false;
   if (!Array.isArray(report.unknownWorkoutCodes)
     || report.unknownWorkoutCodes.length > 100
     || !report.unknownWorkoutCodes.every(validWorkoutCode)) return false;
   if (!boundedInteger(report.workoutTypeConflicts, 0, 1_000_000_000)) return false;
   return report.deviceEvidence.unknownDeviceCount > 0
+    || (report.userAssignedModels?.length ?? 0) > 0
     || report.unknownWorkoutCodes.length > 0
     || report.workoutTypeConflicts > 0;
 };
@@ -139,8 +159,9 @@ export async function onRequestPost(context) {
       INSERT INTO feedback_reports (
         id, received_at, app_version, operating_system, schema_version,
         normalizer_revision, device_status, unknown_device_count,
-        device_evidence_json, unknown_workout_codes_json, workout_type_conflicts
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        device_evidence_json, unknown_workout_codes_json, workout_type_conflicts,
+        user_assigned_models_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       reportId,
       submittedAt,
@@ -153,6 +174,7 @@ export async function onRequestPost(context) {
       JSON.stringify(report.deviceEvidence),
       JSON.stringify(report.unknownWorkoutCodes),
       report.workoutTypeConflicts,
+      JSON.stringify(report.userAssignedModels ?? []),
     ).run();
   } catch {
     return response({ ok: false, error: 'storage_unavailable' }, 503);

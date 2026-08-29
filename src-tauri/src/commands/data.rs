@@ -6,12 +6,14 @@ use crate::ipc_types::CleanupResult;
 use crate::models::{
     AiHandoffMetadata, AiHandoffResult, CapabilityOverview, DailyPoint, DeviceCacheMetadata,
     DeviceCatalogOption, DeviceMatchStatus, DeviceProfile, DeviceProfilesResult,
-    DiagnosticDeviceCandidate, DiagnosticDeviceEvidence, DiagnosticField, DiagnosticObjectShape,
-    DiagnosticReport, ExportDetail, ExportResult, ExportSelection, FeedbackSubmissionResult,
-    HealthOverview, HeartRatePoint, HeartRateZoneOptions, HeartRateZonePreference, MetricSeries,
-    SleepSession, StorageEstimate, TrainingBalancePoint, UserPrefs, Workout, WorkoutSeries,
+    DiagnosticAssignedModel, DiagnosticDeviceCandidate, DiagnosticDeviceEvidence, DiagnosticField,
+    DiagnosticObjectShape, DiagnosticReport, ExportDetail, ExportResult, ExportSelection,
+    FeedbackSubmissionResult, HealthOverview, HeartRatePoint, HeartRateZoneOptions,
+    HeartRateZonePreference, MetricSeries, SleepSession, StorageEstimate, TrainingBalancePoint,
+    UserPrefs, Workout, WorkoutSeries,
 };
 use crate::storage::corrections::WorkoutCodeLabel;
+use crate::storage::provenance::{DataHealth, IntegrityCheckResult};
 use crate::storage::NORMALIZER_REVISION;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -251,8 +253,13 @@ pub async fn reprocess_local_data(
 ) -> std::result::Result<serde_json::Value, String> {
     let streams = {
         let db = state.db.lock().await;
-        db.reprocess_raw_records()
-            .map_err(|error| error.to_string())?
+        let streams = db
+            .reprocess_raw_records()
+            .map_err(|error| error.to_string())?;
+        // 手动重新解析记在自己的时间线上，云端同步时间原样不动。
+        db.record_local_replay(true)
+            .map_err(|error| error.to_string())?;
+        streams
     };
     let total_records: i64 = streams.values().sum();
     Ok(serde_json::json!({
@@ -260,6 +267,36 @@ pub async fn reprocess_local_data(
         "streams": streams,
         "message": "已使用新版解析器重新处理本地原始响应"
     }))
+}
+
+/// 数据健康中心的后端契约。
+///
+/// 这个调用不触网，也不跑 `integrity_check`：打开页面必须是便宜的。完整性
+/// 检查是显式动作，见 `run_database_integrity_check`。
+#[tauri::command]
+pub async fn get_data_health(
+    state: tauri::State<'_, AppState>,
+    window_days: Option<i64>,
+) -> std::result::Result<DataHealth, String> {
+    let database_bytes = std::fs::metadata(state.data_dir.join("zepp.db"))
+        .map(|meta| meta.len())
+        .unwrap_or(0);
+    let db = state.db.lock().await;
+    db.data_health(window_days.unwrap_or(90), database_bytes)
+        .map_err(|error| error.user_message())
+}
+
+/// 对整库跑一次 SQLite `integrity_check` 并记录结果。
+///
+/// 大库上这是一次全表扫描，所以只在用户主动点击时执行；页面平时显示上一次的
+/// 结论和时间。
+#[tauri::command]
+pub async fn run_database_integrity_check(
+    state: tauri::State<'_, AppState>,
+) -> std::result::Result<IntegrityCheckResult, String> {
+    let db = state.db.lock().await;
+    db.run_integrity_check()
+        .map_err(|error| error.user_message())
 }
 
 /// 随包运动目录里的全部可选项，供纠正下拉框渲染。
@@ -351,18 +388,38 @@ pub async fn set_workout_type_override(
 pub async fn get_diagnostic_report(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<DiagnosticReport, String> {
-    let device_evidence = match state.auth.load_auth() {
+    build_diagnostic_report(&state, false).await
+}
+
+/// 组装诊断报告。
+///
+/// `include_assignments` 为真时附上「用户指认的型号 ↔ 这台设备的型号类编号」。
+/// 这一对是内置目录唯一可能的成长来源，但它仍然是用户主动交出来的东西：
+/// 只有在选择器里勾选了「帮忙补充目录」的那一次提交才会带上。
+async fn build_diagnostic_report(
+    state: &AppState,
+    include_assignments: bool,
+) -> std::result::Result<DiagnosticReport, String> {
+    let device_payload = match state.auth.load_auth() {
         Ok(Some(auth)) => match ZeppConnector::new(auth) {
             Ok(connector) => match connector.fetch_devices().await {
-                Ok(payload) => build_device_diagnostic(&payload),
-                Err(_) => empty_device_diagnostic("request_failed"),
+                Ok(payload) => Ok(payload),
+                Err(_) => Err("request_failed"),
             },
-            Err(_) => empty_device_diagnostic("connection_unavailable"),
+            Err(_) => Err("connection_unavailable"),
         },
-        Ok(None) => empty_device_diagnostic("not_configured"),
-        Err(_) => empty_device_diagnostic("authentication_unavailable"),
+        Ok(None) => Err("not_configured"),
+        Err(_) => Err("authentication_unavailable"),
+    };
+    let device_evidence = match &device_payload {
+        Ok(payload) => build_device_diagnostic(payload),
+        Err(status) => empty_device_diagnostic(status),
     };
     let db = state.db.lock().await;
+    let user_assigned_models = match (&device_payload, include_assignments) {
+        (Ok(payload), true) => collect_assigned_models(&db, payload),
+        _ => Vec::new(),
+    };
     Ok(DiagnosticReport {
         format: "zeppbridge.feedback.v1".into(),
         app_version: env!("CARGO_PKG_VERSION").into(),
@@ -372,6 +429,7 @@ pub async fn get_diagnostic_report(
         normalizer_revision: NORMALIZER_REVISION.into(),
         operating_system: std::env::consts::OS.into(),
         device_evidence,
+        user_assigned_models,
         unknown_workout_codes: db
             .diagnostic_unknown_workout_codes()
             .map_err(|error| error.user_message())?,
@@ -381,14 +439,78 @@ pub async fn get_diagnostic_report(
     })
 }
 
+/// 逐台设备把「用户指认的型号」和「这台设备的型号类编号」配成对。
+///
+/// 一份响应里可能有好几台设备，所以配对必须在设备粒度上做，不能把一堆编号和
+/// 一堆型号平铺在一起让服务端去猜。没有编号可交的设备直接跳过：只有型号没有
+/// 编号，对补目录没有任何用处。
+fn collect_assigned_models(
+    db: &zeppbridge_core::storage::Database,
+    payload: &Value,
+) -> Vec<DiagnosticAssignedModel> {
+    let mut out = Vec::new();
+    for item in device_items(payload) {
+        let mut hints = BTreeSet::new();
+        collect_model_identifier_hints(&item, &mut hints);
+        if hints.is_empty() {
+            continue;
+        }
+        let extra = flattened_device_metadata(&item);
+        let device_id = first_string(&item, &["deviceId", "device_id", "macAddress"])
+            .or_else(|| first_string(&extra, &["deviceId", "device_id"]));
+        let serial = first_string(&extra, &["sn", "serial", "serialNumber"])
+            .or_else(|| first_string(&item, &["sn", "serial", "serialNumber"]));
+        let keys = [device_id.as_deref(), serial.as_deref()]
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
+        if keys.is_empty() {
+            continue;
+        }
+        let Ok(Some(assigned)) = db.device_model_override(&keys) else {
+            continue;
+        };
+        out.push(DiagnosticAssignedModel {
+            catalog_id: assigned.catalog_id,
+            model_identifier_hints: hints.into_iter().take(8).collect(),
+        });
+    }
+    out.sort_by(|a, b| a.catalog_id.cmp(&b.catalog_id));
+    out.dedup();
+    out
+}
+
 const FEEDBACK_ENDPOINT: &str = "https://zeppbridge.pages.dev/api/feedback";
 
 #[tauri::command]
 pub async fn submit_diagnostic_report(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<FeedbackSubmissionResult, String> {
-    let report = get_diagnostic_report(state).await?;
+    let report = build_diagnostic_report(&state, false).await?;
+    post_diagnostic_report(report).await
+}
+
+/// 把「用户指认的型号 ↔ 这台设备的型号类编号」交回来，让下一版目录能自动
+/// 识别同款设备。
+///
+/// 单独一个命令而不是在指认时自动发送：用户在选择器里勾选了才会走到这里，
+/// 设置页那句「应用不会自动上报任何使用行为」才不会变成空话。
+#[tauri::command]
+pub async fn submit_device_model_assignment(
+    state: tauri::State<'_, AppState>,
+) -> std::result::Result<FeedbackSubmissionResult, String> {
+    let report = build_diagnostic_report(&state, true).await?;
+    if report.user_assigned_models.is_empty() {
+        return Err("这台设备没有可用于补充目录的型号编号，暂时不需要提交".into());
+    }
+    post_diagnostic_report(report).await
+}
+
+async fn post_diagnostic_report(
+    report: DiagnosticReport,
+) -> std::result::Result<FeedbackSubmissionResult, String> {
     let has_reportable_issue = report.device_evidence.unknown_device_count > 0
+        || !report.user_assigned_models.is_empty()
         || !report.unknown_workout_codes.is_empty()
         || report.workout_type_conflicts > 0;
     if !has_reportable_issue {

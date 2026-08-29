@@ -1988,11 +1988,15 @@ impl Database {
         // decoding very large, unrelated daily-summary payloads during the
         // v0.11.0 upgrade while still applying the new sport catalog.
         if current.as_deref() == Some(PREVIOUS_RELEASE_NORMALIZER_REVISION) {
-            return self
-                .reprocess_raw_records_for_stream(Some("workouts"))
-                .map(Some);
+            let counts = self.reprocess_raw_records_for_stream(Some("workouts"))?;
+            // 本地重放有自己的时间线。它绝不改写云端同步时间：用户问「数据新
+            // 不新」和「你什么时候连过云」是两个问题。
+            self.record_local_replay(false)?;
+            return Ok(Some(counts));
         }
-        self.reprocess_raw_records().map(Some)
+        let counts = self.reprocess_raw_records()?;
+        self.record_local_replay(false)?;
+        Ok(Some(counts))
     }
 
     pub fn reprocess_raw_records(&self) -> Result<BTreeMap<String, i64>> {

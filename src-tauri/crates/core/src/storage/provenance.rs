@@ -927,3 +927,264 @@ pub fn summarize_stage(stage: &StageState) -> String {
         _ => "尚未发生".into(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{MetricSample, SourceScope};
+    use chrono::TimeZone;
+
+    fn db() -> Database {
+        Database::in_memory().unwrap()
+    }
+
+    fn day(offset: i64) -> chrono::DateTime<Utc> {
+        Utc.with_ymd_and_hms(2026, 8, 1, 12, 0, 0).unwrap() + Duration::days(offset)
+    }
+
+    fn sample(metric: &str, offset: i64, scope: SourceScope) -> MetricSample {
+        MetricSample {
+            metric: metric.into(),
+            timestamp: day(offset),
+            value: 60.0 + offset as f64,
+            unit: "bpm".into(),
+            source_scope: scope,
+            device_id: Some("device-a".into()),
+        }
+    }
+
+    #[test]
+    fn the_three_stages_are_recorded_independently() {
+        let db = db();
+        // 报文拿回来了、但看不懂：这必须表达成「fetch 正常 / parse 失败」，
+        // 而不是被折叠成一个笼统的红点。
+        db.record_stream_stage("sleep", Stage::Fetch, &StageOutcome::Ok)
+            .unwrap();
+        db.record_stream_stage(
+            "sleep",
+            Stage::Parse,
+            &StageOutcome::Failed {
+                kind: StageErrorKind::UnrecognizedPayload,
+                message: Some("band_data 编码未识别".into()),
+            },
+        )
+        .unwrap();
+
+        let (states, _) = db.stage_states().unwrap();
+        let stages = states.get("sleep").unwrap();
+        assert_eq!(stages[0].state, "ok");
+        assert_eq!(stages[1].state, "failed");
+        assert_eq!(
+            stages[1].error_kind.as_deref(),
+            Some("unrecognized_payload")
+        );
+        assert_eq!(stages[2].state, "never", "从没写过不是失败");
+    }
+
+    #[test]
+    fn a_later_success_clears_an_earlier_failure_but_keeps_the_last_good_time() {
+        let db = db();
+        db.record_stream_stage(
+            "hrv",
+            Stage::Fetch,
+            &StageOutcome::Failed {
+                kind: StageErrorKind::Network,
+                message: Some("超时".into()),
+            },
+        )
+        .unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        db.record_stream_stage("hrv", Stage::Fetch, &StageOutcome::Ok)
+            .unwrap();
+
+        let (states, _) = db.stage_states().unwrap();
+        let fetch = &states.get("hrv").unwrap()[0];
+        assert_eq!(fetch.state, "ok");
+        assert!(fetch.error_kind.is_none());
+        assert!(fetch.last_ok_at.is_some());
+    }
+
+    #[test]
+    fn cloud_sync_local_replay_and_manual_reprocess_are_separate_timelines() {
+        let db = db();
+        db.record_cloud_sync("2026-08-20T00:00:00+00:00", "updated")
+            .unwrap();
+        db.record_local_replay(false).unwrap();
+
+        let health = db.data_health(90, 0).unwrap();
+        assert_eq!(
+            health.timings.last_cloud_sync_at.as_deref(),
+            Some("2026-08-20T00:00:00+00:00"),
+            "本地重放不得改写云端同步时间"
+        );
+        assert!(health.timings.last_local_replay_at.is_some());
+        assert!(
+            health.timings.last_manual_reprocess_at.is_none(),
+            "后台自动重放不是手动重新解析"
+        );
+
+        db.record_local_replay(true).unwrap();
+        let health = db.data_health(90, 0).unwrap();
+        assert!(health.timings.last_manual_reprocess_at.is_some());
+        assert_eq!(
+            health.timings.last_cloud_sync_at.as_deref(),
+            Some("2026-08-20T00:00:00+00:00")
+        );
+    }
+
+    #[test]
+    fn coverage_is_explained_by_cadence_not_by_one_completeness_percentage() {
+        // 连续流：可以说「缺了哪几天」。
+        let daily = explain_coverage(
+            StreamCadence::Daily,
+            30,
+            Observed {
+                days: vec!["2026-08-01".into(), "2026-08-04".into()],
+            },
+        );
+        assert_eq!(daily.kind, "gaps");
+        assert_eq!(daily.gap_total, 2);
+        assert_eq!(daily.gap_dates, vec!["2026-08-02", "2026-08-03"]);
+
+        // 偶发流：只能说「哪几天观察到了」。VO₂max 一年给几次是正常的，
+        // 用统一的完整度去衡量必然画成一片红。
+        let occasional = explain_coverage(
+            StreamCadence::Occasional,
+            365,
+            Observed {
+                days: vec!["2026-03-02".into(), "2026-08-01".into()],
+            },
+        );
+        assert_eq!(occasional.kind, "observations");
+        assert_eq!(occasional.gap_total, 0);
+        assert!(occasional.gap_dates.is_empty());
+        assert_eq!(occasional.latest_observed_at.as_deref(), Some("2026-08-01"));
+
+        // 按事件的流同理：没有运动就是没有运动。
+        assert_eq!(
+            explain_coverage(StreamCadence::PerEvent, 30, Observed::default()).kind,
+            "observations"
+        );
+    }
+
+    #[test]
+    fn gaps_are_only_counted_after_the_first_observed_day() {
+        // 一个刚装好的用户只有最近三天数据。把之前的空白算成缺口，会让人
+        // 第一次打开就看到一片红。
+        let coverage = explain_coverage(
+            StreamCadence::Daily,
+            365,
+            Observed {
+                days: vec![
+                    "2026-08-01".into(),
+                    "2026-08-02".into(),
+                    "2026-08-03".into(),
+                ],
+            },
+        );
+        assert_eq!(coverage.gap_total, 0);
+        assert_eq!(coverage.observed_days, 3);
+    }
+
+    #[test]
+    fn unknown_source_scopes_are_never_folded_into_device_data() {
+        let db = db();
+        db.insert_metric_sample(&sample("heart_rate", 0, SourceScope::Device))
+            .unwrap();
+        db.insert_metric_sample(&sample("heart_rate", 1, SourceScope::UserFused))
+            .unwrap();
+        db.insert_metric_sample(&sample("heart_rate", 2, SourceScope::Unknown))
+            .unwrap();
+
+        let health = db.data_health(90, 0).unwrap();
+        let heart_rate = health
+            .streams
+            .iter()
+            .find(|stream| stream.stream == "heart_rate")
+            .unwrap();
+        let mut sources: Vec<&str> = heart_rate
+            .sources
+            .iter()
+            .map(|entry| entry.source.as_str())
+            .collect();
+        sources.sort_unstable();
+        assert_eq!(sources, vec!["device", "unknown", "user_fused"]);
+        assert!(heart_rate.sources.iter().all(|entry| entry.records == 1));
+    }
+
+    #[test]
+    fn health_falls_back_to_fetched_at_so_an_upgraded_library_is_not_called_never_fetched() {
+        let db = db();
+        db.insert_raw_record(&crate::models::RawRecord {
+            stream: "workouts".into(),
+            source_key: "w-1".into(),
+            source_scope: SourceScope::Device,
+            device_id: Some("device-a".into()),
+            start_utc: day(0),
+            end_utc: Some(day(0)),
+            payload: serde_json::json!({ "items": [] }),
+            capability: crate::models::CapabilityStatus::Verified,
+        })
+        .unwrap();
+
+        let health = db.data_health(90, 0).unwrap();
+        let workouts = health
+            .streams
+            .iter()
+            .find(|stream| stream.stream == "workouts")
+            .unwrap();
+        assert_eq!(
+            workouts.fetch.state, "ok",
+            "库里明摆着有报文，不能说从来没拉过"
+        );
+        assert_eq!(workouts.raw_records, 1);
+    }
+
+    #[test]
+    fn integrity_check_is_explicit_and_its_result_is_remembered() {
+        let db = db();
+        assert!(
+            db.data_health(90, 0)
+                .unwrap()
+                .database
+                .last_integrity_check
+                .is_none(),
+            "打开页面不该自动跑全库扫描"
+        );
+        let result = db.run_integrity_check().unwrap();
+        assert!(result.ok);
+        assert!(result.detail.is_none());
+        let remembered = db
+            .data_health(90, 0)
+            .unwrap()
+            .database
+            .last_integrity_check
+            .unwrap();
+        assert_eq!(remembered.checked_at, result.checked_at);
+    }
+
+    #[test]
+    fn actions_only_appear_when_there_is_something_to_do() {
+        let db = db();
+        db.record_stream_stage(
+            "heart_rate",
+            Stage::Fetch,
+            &StageOutcome::Failed {
+                kind: StageErrorKind::Auth,
+                message: Some("需要重新认证".into()),
+            },
+        )
+        .unwrap();
+        let health = db.data_health(90, 0).unwrap();
+        let ids: Vec<&str> = health
+            .actions
+            .iter()
+            .map(|action| action.id.as_str())
+            .collect();
+        assert!(ids.contains(&"reauth"));
+        assert!(
+            !ids.contains(&"reprocess"),
+            "没有待归一化的报文就不该建议重放"
+        );
+    }
+}

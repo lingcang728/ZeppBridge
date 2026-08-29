@@ -50,6 +50,7 @@ export const webBackend: BridgeBackend = {
   reprocessLocalData: unavailable,
   getDiagnosticReport: unavailable,
   submitDiagnosticReport: unavailable,
+  submitDeviceModelAssignment: unavailable,
   getExportJson: unavailable,
   saveJsonExport: unavailable,
   saveCsvExport: unavailable,

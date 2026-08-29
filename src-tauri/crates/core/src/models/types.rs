@@ -590,6 +590,21 @@ pub struct DiagnosticDeviceEvidence {
     pub shapes: Vec<DiagnosticObjectShape>,
 }
 
+/// 用户手动指认的型号，配上这台设备的型号类编号。
+///
+/// 这一对是内置目录唯一可能的成长来源：华米没有公开「编号 → 型号」的对照，
+/// 而有些账号的设备响应里除了这些数字什么都没有。一个用户指认一次，下一版
+/// 目录就能让所有同款设备自动识别。
+///
+/// 两半都是型号级事实：`catalog_id` 是随包目录里的产品，`hints` 只含
+/// `deviceSource:整数` 这种取值。没有序列号、MAC、账号或任何设备实例信息。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticAssignedModel {
+    pub catalog_id: String,
+    pub model_identifier_hints: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct DiagnosticWorkoutCode {
@@ -609,6 +624,10 @@ pub struct DiagnosticReport {
     pub normalizer_revision: String,
     pub operating_system: String,
     pub device_evidence: DiagnosticDeviceEvidence,
+    /// 用户手动指认的型号与该设备的型号类编号。只有用户在选择器里勾选了
+    /// 「帮忙补充目录」时才会有内容；没勾选就是空的，报告里也就没有这一段。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub user_assigned_models: Vec<DiagnosticAssignedModel>,
     pub unknown_workout_codes: Vec<DiagnosticWorkoutCode>,
     pub workout_type_conflicts: i64,
 }

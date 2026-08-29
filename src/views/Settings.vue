@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import DesignIcon from '../components/DesignIcon.vue';
+import DevicePicker from '../components/DevicePicker.vue';
 import DeviceVisual from '../components/DeviceVisual.vue';
 import Icon from '../components/Icon.vue';
 import { useDevices } from '../composables/useDevices';
@@ -13,7 +14,6 @@ import type {
   CapabilityItem,
   CapabilityOverview,
   CapabilityProbe,
-  DeviceCatalogOption,
   LocalApiStatus,
   LoginStatus,
   WorkoutCodeLabel,
@@ -70,8 +70,9 @@ const diagnosticBusy = ref(false);
    两者都是「本机推不出来，就问用户」，而不是让应用去猜：
    有些账号的设备响应里根本没有任何产品名字段（只有 deviceSource / deviceType
    这类数字），Zepp 的自定义训练模板也只给编号不给名字。 */
-const deviceCatalogOptions = ref<DeviceCatalogOption[]>([]);
 const deviceAssignBusy = ref(false);
+/** 正在指认哪台设备（device_id / 序列号）；`null` = 选择器没打开。 */
+const pickerDeviceKey = ref<string | null>(null);
 const deviceAssignError = ref<string | null>(null);
 const deviceAssignMessage = ref<string | null>(null);
 const unknownCodes = ref<WorkoutCodeLabel[]>([]);
@@ -86,16 +87,16 @@ const deviceKeyFor = (model: { profile: { device_id?: string | null; serial?: st
   (model.profile.device_id || model.profile.serial || '').trim();
 
 const loadCorrections = async () => {
-  const [options, codes] = await Promise.all([
-    backend.getDeviceCatalogOptions().catch(() => [] as DeviceCatalogOption[]),
-    backend.getUnknownWorkoutCodes().catch(() => [] as WorkoutCodeLabel[]),
-  ]);
-  deviceCatalogOptions.value = options;
+  const codes = await backend.getUnknownWorkoutCodes().catch(() => [] as WorkoutCodeLabel[]);
   unknownCodes.value = codes;
   codeDrafts.value = Object.fromEntries(codes.map((entry) => [entry.zeppType, entry.label]));
 };
 
-const assignDeviceModel = async (deviceKey: string, catalogId: string) => {
+/* 起名字的快捷入口。这些只是「少打几个字」，不是对编号的识别结论——
+   点一下只是把文本填进输入框，用户仍然可以改成任何名字。 */
+const CODE_NAME_SUGGESTIONS = ['力量训练', '核心训练', 'HIIT', '拉伸放松', '康复训练', '自定义训练'];
+
+const assignDeviceModel = async (deviceKey: string, catalogId: string, contribute = false) => {
   if (!deviceKey) {
     deviceAssignError.value = '这台设备没有可用的本机标识，无法保存指认。';
     return;
@@ -106,9 +107,20 @@ const assignDeviceModel = async (deviceKey: string, catalogId: string) => {
   try {
     await backend.setDeviceModelOverride(deviceKey, catalogId || null);
     await loadDevices(false);
-    deviceAssignMessage.value = catalogId
-      ? '已记录你的型号指认。界面会把它标成「你指认的型号」，不会当成自动识别结果。'
-      : '已撤销型号指认。';
+    pickerDeviceKey.value = null;
+    if (!catalogId) {
+      deviceAssignMessage.value = '已撤销型号指认。';
+      return;
+    }
+    deviceAssignMessage.value = '已记录你的型号指认。界面会把它标成「你指认的型号」，不会当成自动识别结果。';
+    if (!contribute) return;
+    // 补目录的提交失败不该让指认看起来没保存成功：本机的那一半已经写好了。
+    try {
+      const result = await backend.submitDeviceModelAssignment();
+      deviceAssignMessage.value = `已记录你的型号指认，并把型号编号交给了 ZeppBridge（编号 ${result.reportId}）。下一版目录会让同款设备自动识别。`;
+    } catch (error) {
+      deviceAssignMessage.value = `已记录你的型号指认（只在本机）。补充目录没发送成功：${toUserMessage(error, '网络不可用')}`;
+    }
   } catch (error) {
     deviceAssignError.value = toUserMessage(error, '无法保存型号指认');
   } finally {
@@ -116,8 +128,10 @@ const assignDeviceModel = async (deviceKey: string, catalogId: string) => {
   }
 };
 
-const onAssignDeviceModel = (deviceKey: string, event: Event) => {
-  void assignDeviceModel(deviceKey, (event.target as HTMLSelectElement).value);
+const openPicker = (deviceKey: string) => {
+  deviceAssignError.value = null;
+  deviceAssignMessage.value = null;
+  pickerDeviceKey.value = pickerDeviceKey.value === deviceKey ? null : deviceKey;
 };
 
 const saveCodeLabel = async (zeppType: number) => {
@@ -848,7 +862,8 @@ const runCapabilityProbe = async () => {
           <div v-if="!deviceModels.length" class="device-empty">
             <Icon name="watch" :size="16" />尚未识别实体设备；Zepp Cloud 仍可作为云服务同步。
           </div>
-          <div v-for="source in dataSources" :key="source.name" class="source-row">
+          <template v-for="source in dataSources" :key="source.name">
+          <div class="source-row">
             <span class="source-icon">
               <DeviceVisual v-if="source.kind === 'device'" :src="source.model.image" :alt="source.name" :kind="source.model.kind" compact />
               <DesignIcon v-else name="zepp-cloud" :size="32" />
@@ -860,20 +875,25 @@ const runCapabilityProbe = async () => {
               <span v-if="source.kind === 'device'">设备 ID {{ maskIdentifier(source.model.profile.device_id || source.model.profile.serial) }}</span>
             </div>
             <span :class="['source-state', { on: source.state !== '未识别' }]"><i class="dot"></i>{{ source.state }}</span>
-            <label v-if="source.kind === 'device' && source.state === '未识别'" class="assign-model">
-              这是哪台设备？
-              <select
-                :disabled="deviceAssignBusy || !deviceKeyFor(source.model)"
-                :value="source.model.profile.catalog_id || ''"
-                @change="onAssignDeviceModel(deviceKeyFor(source.model), $event)"
-              >
-                <option value="">先不指认</option>
-                <option v-for="option in deviceCatalogOptions" :key="option.catalogId" :value="option.catalogId">
-                  {{ option.nameZh || option.canonicalName }}
-                </option>
-              </select>
-            </label>
+            <button
+              v-if="source.kind === 'device' && (source.state === '未识别' || source.state === '你指认的型号')"
+              class="button secondary assign-trigger"
+              type="button"
+              :disabled="deviceAssignBusy || !deviceKeyFor(source.model)"
+              @click="openPicker(deviceKeyFor(source.model))"
+            >
+              <Icon name="watch" :size="14" />{{ source.state === '你指认的型号' ? '换一台' : '手动认一下' }}
+            </button>
           </div>
+          <DevicePicker
+            v-if="source.kind === 'device' && pickerDeviceKey && pickerDeviceKey === deviceKeyFor(source.model)"
+            :model-value="source.model.profile.catalog_id"
+            :busy="deviceAssignBusy"
+            @confirm="(id: string, contribute: boolean) => assignDeviceModel(pickerDeviceKey!, id, contribute)"
+            @clear="assignDeviceModel(pickerDeviceKey!, '')"
+            @cancel="pickerDeviceKey = null"
+          />
+          </template>
         </div>
         <div v-if="unknownDeviceDetected && !devicesLoading" class="diagnostic-panel unknown-device-report" role="status">
           <strong>检测到未识别设备</strong>
@@ -961,25 +981,42 @@ const runCapabilityProbe = async () => {
       </p>
       <div class="code-list">
         <div v-for="entry in unknownCodes" :key="entry.zeppType" class="code-row">
-          <div class="code-meta">
-            <strong>编号 {{ entry.zeppType }}</strong>
-            <span>本机有 {{ entry.records }} 条记录</span>
+          <div class="code-head">
+            <span class="code-badge" aria-hidden="true">{{ entry.zeppType }}</span>
+            <div class="code-meta">
+              <strong>Zepp 编号 {{ entry.zeppType }}</strong>
+              <span>本机 {{ entry.records }} 条记录会一起改名</span>
+            </div>
+            <span v-if="entry.label" class="code-preview">现在显示为「{{ entry.label }}」</span>
+            <span v-else class="code-preview muted">现在显示为「未识别运动（编号 {{ entry.zeppType }}）」</span>
           </div>
-          <input
-            v-model="codeDrafts[entry.zeppType]"
-            type="text"
-            maxlength="24"
-            :aria-label="`编号 ${entry.zeppType} 的自定义名称`"
-            placeholder="例如：我的核心训练"
-            :disabled="codeBusy === entry.zeppType"
-            @keyup.enter="saveCodeLabel(entry.zeppType)"
-          />
-          <button
-            class="button secondary"
-            type="button"
-            :disabled="codeBusy === entry.zeppType"
-            @click="saveCodeLabel(entry.zeppType)"
-          >{{ codeBusy === entry.zeppType ? '保存中…' : '保存' }}</button>
+          <div class="code-input-row">
+            <input
+              v-model="codeDrafts[entry.zeppType]"
+              type="text"
+              maxlength="24"
+              :aria-label="`编号 ${entry.zeppType} 的自定义名称`"
+              placeholder="给它起个名字，例如：我的核心训练"
+              :disabled="codeBusy === entry.zeppType"
+              @keyup.enter="saveCodeLabel(entry.zeppType)"
+            />
+            <button
+              class="button primary"
+              type="button"
+              :disabled="codeBusy === entry.zeppType"
+              @click="saveCodeLabel(entry.zeppType)"
+            >{{ codeBusy === entry.zeppType ? '保存中…' : '保存' }}</button>
+          </div>
+          <div class="code-suggestions">
+            <button
+              v-for="name in CODE_NAME_SUGGESTIONS"
+              :key="name"
+              type="button"
+              class="filter-chip"
+              :disabled="codeBusy === entry.zeppType"
+              @click="codeDrafts[entry.zeppType] = name"
+            >{{ name }}</button>
+          </div>
         </div>
       </div>
       <p v-if="codeError" class="api-error" role="alert">{{ codeError }}</p>
@@ -1303,11 +1340,19 @@ h3 { margin-bottom: 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
 .fact-list strong { display: block; margin-bottom: 3px; color: var(--ink); font-size: 12px; font-weight: 500; }
 .fact-list span { color: var(--subtle); font-size: 11px; line-height: 1.55; }
 .code-list { display: grid; gap: 10px; margin-top: 12px; }
-.code-row { display: grid; grid-template-columns: minmax(0, 160px) minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); }
+.code-row { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-raised); }
+.code-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+.code-badge { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); font-family: var(--font-mono); font-size: 11px; }
 .code-meta { display: grid; gap: 2px; }
 .code-meta strong { color: var(--ink); font-size: 12px; font-weight: 500; }
 .code-meta span { color: var(--subtle); font-size: 11px; }
-.assign-model { display: grid; gap: 4px; grid-column: 1 / -1; margin-top: 8px; color: var(--subtle); font-size: 11px; }
+.code-preview { color: var(--accent); font-size: 11px; text-align: right; }
+.code-preview.muted { color: var(--muted); }
+.code-input-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.code-suggestions { display: flex; flex-wrap: wrap; gap: 6px; }
+.code-suggestions .filter-chip { padding: 3px 10px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); font-size: 11px; cursor: pointer; }
+.code-suggestions .filter-chip:hover { border-color: var(--accent); color: var(--accent); }
+.assign-trigger { justify-self: end; }
 .api-error { color: var(--danger); }
 .update-head, .update-release, .update-confirm { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px; }
 .update-head h2 { margin-bottom: 4px; }
