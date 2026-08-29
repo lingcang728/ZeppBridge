@@ -1282,15 +1282,22 @@ impl Database {
 
     /// 每条流在本机的实际占用速率。
     ///
-    /// 用本机已有的原始报文长度除以观察到的天数，而不是一个写死的常数：
-    /// 「再补三年要多大」只有用这个人自己的数据算才有意义。观察不足
-    /// `MIN_OBSERVED_DAYS` 天的流标 `measured: false`，宁可说不知道，
-    /// 也不拿一个编出来的速率去乘三年。
+    /// 用本机已有的原始报文长度除以**这些报文覆盖的日历跨度**，而不是一个
+    /// 写死的常数：「再补三年要多大」只有用这个人自己的数据算才有意义。
+    ///
+    /// 分母刻意不是「有多少个不同的抓取日期」。抓取是按月批量做的，一条
+    /// `daily_summary` 报文可能覆盖整整一个月，于是一年的数据只落在十几个
+    /// 抓取日上——拿 19 去除 1.5 GB，会得出「每天 76 MB」这种荒唐结论，
+    /// 再乘一年就是 27 GB，足够把人吓得不敢补拉。真正的问题是「每天历史
+    /// 占多少」，分母就该是这些报文覆盖的天数。
+    ///
+    /// 跨度不足 `MIN_OBSERVED_DAYS` 天的流标 `measured: false`，宁可说不知道，
+    /// 也不拿一个从几天样本外推出来的速率去乘三年。
     fn stream_storage_rates(&self, days: i64) -> Result<Vec<StreamStorageEstimate>> {
         let mut stmt = self.conn.prepare(
             "SELECT stream,
                     SUM(LENGTH(CAST(payload AS BLOB))),
-                    COUNT(DISTINCT substr(start_utc, 1, 10))
+                    CAST(julianday(MAX(start_utc)) - julianday(MIN(start_utc)) AS INTEGER) + 1
              FROM raw_records
              GROUP BY stream",
         )?;
@@ -1300,7 +1307,7 @@ impl Database {
                     row.get::<_, String>(0)?,
                     (
                         row.get::<_, i64>(1).unwrap_or(0).max(0) as u64,
-                        row.get::<_, i64>(2).unwrap_or(0),
+                        row.get::<_, i64>(2).unwrap_or(0).max(0),
                     ),
                 ))
             })?
@@ -4945,20 +4952,22 @@ mod tests {
     #[test]
     fn storage_estimate_only_extrapolates_streams_that_have_enough_local_history() {
         let db = Database::in_memory().unwrap();
-        // 十天的 daily_summary，够外推；只有一天的 sleep，不够。
-        for day in 0..10 {
+        // daily_summary：一年的历史，但只在 12 次抓取里拿回来——真实数据就是
+        // 这样，一条报文覆盖一个月。分母必须是覆盖的天数，不是抓取的次数。
+        for month in 0..12 {
             db.insert_raw_record(&RawRecord {
                 stream: "daily_summary".into(),
-                source_key: format!("daily-{day}"),
+                source_key: format!("daily-{month}"),
                 source_scope: SourceScope::UserFused,
                 device_id: None,
-                start_utc: ts() + chrono::Duration::days(day),
+                start_utc: ts() + chrono::Duration::days(month * 30),
                 end_utc: None,
                 payload: serde_json::json!({ "data": [{ "date": "2023-11-14" }] }),
                 capability: CapabilityStatus::Verified,
             })
             .unwrap();
         }
+        // sleep：只有一天，不够外推。
         db.insert_raw_record(&RawRecord {
             stream: "sleep".into(),
             source_key: "sleep-only-one-day".into(),
@@ -4980,8 +4989,12 @@ mod tests {
             .iter()
             .find(|stream| stream.stream == "daily_summary")
             .unwrap();
-        assert!(daily.measured, "十天样本应当足以外推");
-        assert!(daily.bytes_per_day > 0);
+        assert!(daily.measured, "跨越一年的样本足以外推");
+        assert!(
+            daily.observed_days > 300,
+            "分母应当是覆盖的天数（约 331），拿到的是 {}——如果这里是 12，             说明又在用抓取次数当分母，一年的估算会被放大三十倍",
+            daily.observed_days
+        );
         assert_eq!(daily.estimated_add_bytes, daily.bytes_per_day * 365);
 
         let sleep = estimate
@@ -4994,7 +5007,6 @@ mod tests {
             sleep.estimated_add_bytes, 0,
             "样本不足时应当说不知道，而不是编一个速率乘一年"
         );
-        assert_eq!(sleep.observed_days, 1, "观察到的天数仍要如实报出来");
 
         assert!(!estimate.measured, "还有流没有样本，总数不能声称是实测的");
         assert!(

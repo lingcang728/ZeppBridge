@@ -1131,10 +1131,6 @@ const runCapabilityProbe = async () => {
         </div>
       </section>
 
-      <HistoryArchivePanel :prefs="userPrefs" @prefs-changed="applyPrefsChange" />
-
-      <BackupPanel />
-
       <!-- 6. 导出默认值 -->
       <section class="settings-card" aria-labelledby="export-title">
         <h2 id="export-title">6. 导出与补拉偏好</h2>
@@ -1162,6 +1158,13 @@ const runCapabilityProbe = async () => {
           </button>
         </div>
       </section>
+    </div>
+
+    <!-- 归档与备份两块内容都带表格，塞进三栏会挤成两行一格；
+         单独给它们一行，宽度才够把「云端无返回」这类状态说清楚。 -->
+    <div class="two-col wide-panels">
+      <HistoryArchivePanel :prefs="userPrefs" @prefs-changed="applyPrefsChange" />
+      <BackupPanel />
     </div>
 
     <!-- 7. 本机 API -->
@@ -1495,6 +1498,7 @@ h3 { margin-bottom: 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
 .probe-selfcheck { color: var(--muted); font-size: 11px; line-height: 1.7; overflow-wrap: anywhere; }
 .device-empty { display: flex; align-items: center; gap: 7px; min-height: 60px; padding: 10px; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); color: var(--muted); font-size: 12px; }
 .two-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 14px; align-items: start; }
+.wide-panels { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .three-col { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .two-col > *, .three-col > * { min-width: 0; }
 
