@@ -659,6 +659,8 @@ export interface CapabilityItem {
   latestDate?: string | null;
   note?: string | null;
   source: 'derived' | 'probed' | string;
+  /** ZeppBridge 是否真的把这条流读进了本机库。云端有 ≠ 本机有。 */
+  ingested?: boolean;
 }
 
 export interface CapabilityOverview {

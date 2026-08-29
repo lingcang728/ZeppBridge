@@ -683,14 +683,30 @@ const capabilityRow = (item: CapabilityItem) => ({
   key: item.stream,
   label: streamLabels[item.stream] ?? item.stream,
   detail:
-    item.status === 'available'
+    item.status === 'available' && item.ingested !== false
       ? `${item.records} ${item.recordsUnit}${item.latestDate ? ` · 至 ${item.latestDate}` : ''}`
-      : (item.note ?? ''),
+      : item.status === 'available'
+        // 数量前面必须写清是云端的，否则读起来就像本机已经有了。
+        ? `云端 ${item.records} ${item.recordsUnit}${item.latestDate ? ` · 至 ${item.latestDate}` : ''}`
+        : (item.note ?? ''),
+  note: item.ingested === false ? (item.note ?? null) : null,
 });
 
+/* 三分，不是两分。
+ *
+ * 「云端有」和「本机有」是两件事：血压和体重目前只做探测，不做归一化——
+ * 缺少可核对的报文样本，贸然解析只会产出没人能验证的数字。把它们和真正
+ * 收录了的数据流并排放在「可提供给 AI」里，会让人以为 ZeppBridge 已经
+ * 存着他的血压，那是这个产品最不该给出的错觉。 */
 const capabilityAvailable = computed(() =>
   (capabilityOverview.value?.items ?? [])
-    .filter((item) => item.status === 'available')
+    .filter((item) => item.status === 'available' && item.ingested !== false)
+    .map(capabilityRow),
+);
+
+const capabilityNotIngested = computed(() =>
+  (capabilityOverview.value?.items ?? [])
+    .filter((item) => item.status === 'available' && item.ingested === false)
     .map(capabilityRow),
 );
 
@@ -951,6 +967,19 @@ const runCapabilityProbe = async () => {
               </span>
             </li>
             <li v-if="!capabilityAvailable.length" class="capability-empty">尚未同步到任何数据。</li>
+          </ul>
+        </div>
+        <div v-if="capabilityNotIngested.length" class="capability-column">
+          <p class="capability-heading">云端有，本机未收录<em>{{ capabilityNotIngested.length }}</em></p>
+          <ul class="capability-list">
+            <li v-for="row in capabilityNotIngested" :key="row.key" class="capability-row">
+              <Icon name="info" :size="15" class="capability-pending" />
+              <span class="capability-copy">
+                <strong>{{ row.label }}</strong>
+                <span>{{ row.detail }}</span>
+                <span v-if="row.note" class="capability-why">{{ row.note }}</span>
+              </span>
+            </li>
           </ul>
         </div>
         <div class="capability-column">
@@ -1457,6 +1486,8 @@ h3 { margin-bottom: 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
 .capability-checked { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .capability-yes { color: var(--accent); flex: 0 0 auto; }
 .capability-no { color: var(--faint); flex: 0 0 auto; }
+.capability-pending { color: var(--warning); flex: 0 0 auto; }
+.capability-why { color: var(--subtle); font-size: 10px; line-height: 1.5; }
 .probe-diagnostics { margin-top: 16px; }
 .probe-diagnostics > summary { color: var(--muted); font-size: 12px; cursor: pointer; }
 .probe-diagnostics ul { margin: 8px 0 0; padding-left: 18px; }

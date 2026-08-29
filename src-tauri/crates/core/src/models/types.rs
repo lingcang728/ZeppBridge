@@ -466,6 +466,13 @@ pub struct CapabilityItem {
     pub note: Option<String>,
     /// `derived` when read from stored data, `probed` when it took a request.
     pub source: String,
+    /// ZeppBridge 是否真的把这条流读进了本机库。
+    ///
+    /// 探测说「云端有 42 条」并不等于本机有：体重和血压目前只探测、不归一化。
+    /// 不把这两件事分开，能力页会让人以为 ZeppBridge 已经存着他的血压——
+    /// 那是这个产品最不该给出的错觉。
+    #[serde(default)]
+    pub ingested: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -597,6 +597,8 @@ impl Database {
                 latest_date: latest,
                 note: (records == 0).then(|| format!("最近 {window_days} 天没有记录")),
                 source: "derived".to_string(),
+                // 这些行的证据本来就是库里的数据，所以按定义已收录。
+                ingested: true,
             });
         }
 
@@ -617,8 +619,13 @@ impl Database {
                     records: probe.records as i64,
                     records_unit: "条".to_string(),
                     latest_date: probe.latest_date.clone(),
-                    note: None,
+                    // 说清楚这是云端的数量，不是本机的。
+                    note: Some(
+                        "云端有记录，但 ZeppBridge 还没有收录这条流：缺少可核对的报文样本，贸然归一化只会产出没人能验证的数字。"
+                            .to_string(),
+                    ),
                     source: "probed".to_string(),
+                    ingested: false,
                 },
                 // Only an outright rejection licenses "your device does not
                 // provide this"; an empty answer does not, because this API
@@ -631,6 +638,7 @@ impl Database {
                     latest_date: None,
                     note: Some("你的账号或设备不提供这项数据".to_string()),
                     source: "probed".to_string(),
+                    ingested: false,
                 },
                 Some(_) => CapabilityItem {
                     stream: stream.to_string(),
@@ -640,6 +648,7 @@ impl Database {
                     latest_date: None,
                     note: Some("过去一年没有测量记录".to_string()),
                     source: "probed".to_string(),
+                    ingested: false,
                 },
                 None => CapabilityItem {
                     stream: stream.to_string(),
@@ -649,6 +658,7 @@ impl Database {
                     latest_date: None,
                     note: Some("尚未检测".to_string()),
                     source: "probed".to_string(),
+                    ingested: false,
                 },
             };
             items.push(item);
@@ -4700,6 +4710,46 @@ mod tests {
             zepp_source: None,
             zepp_type: code,
         }
+    }
+
+    #[test]
+    fn a_stream_the_cloud_has_but_we_never_read_is_not_reported_as_available_data() {
+        // 体重和血压只探测、不归一化。探测说「云端有 42 条」，本机一条也没有。
+        // 把这两件事混在一起，能力页会让人以为 ZeppBridge 已经存着他的血压。
+        let db = Database::in_memory().unwrap();
+        db.save_capability_probe(&[CapabilityProbe {
+            stream: "blood_pressure".into(),
+            surface: "v2_events".into(),
+            cadence: "episodic".into(),
+            window_days: 365,
+            event_type: "blood_pressure".into(),
+            sub_type: "real_data".into(),
+            status: "available".into(),
+            records: 42,
+            latest_date: Some("2026-08-01".into()),
+            fields: Vec::new(),
+        }])
+        .unwrap();
+
+        let overview = db.capability_overview().unwrap();
+        let row = overview
+            .items
+            .iter()
+            .find(|item| item.stream == "blood_pressure")
+            .expect("血压应当出现在能力总览里");
+        assert_eq!(row.status, "available", "云端确实有，这一点要如实说");
+        assert!(!row.ingested, "但本机没有收录，不能混进「已具备」");
+        assert!(
+            row.note.is_some(),
+            "必须说明为什么没有收录，而不是让用户自己去猜"
+        );
+
+        // 真正读进库的流仍然算已收录，否则这个标记就没有意义了。
+        assert!(overview
+            .items
+            .iter()
+            .filter(|item| item.source == "derived")
+            .all(|item| item.ingested));
     }
 
     #[test]
