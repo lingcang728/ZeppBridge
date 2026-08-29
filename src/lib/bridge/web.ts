@@ -49,6 +49,8 @@ export const webBackend: BridgeBackend = {
   getDeviceProfiles: unavailable,
   reprocessLocalData: unavailable,
   getDiagnosticReport: unavailable,
+  getDataHealth: unavailable,
+  runDatabaseIntegrityCheck: unavailable,
   submitDiagnosticReport: unavailable,
   submitDeviceModelAssignment: unavailable,
   getExportJson: unavailable,

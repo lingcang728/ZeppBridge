@@ -19,7 +19,9 @@ import type {
   HeartRateZonePreference,
   LoginStatus,
   MetricSeries,
+  DataHealth,
   DeviceCatalogOption,
+  IntegrityCheckResult,
   LocalApiStatus,
   SportOption,
   WorkoutCodeLabel,
@@ -231,6 +233,12 @@ export const tauriBackend: BridgeBackend = {
     return call<DiagnosticReport>('get_diagnostic_report');
   },
 
+  getDataHealth(windowDays?: number) {
+    return call<DataHealth>('get_data_health', { windowDays });
+  },
+  runDatabaseIntegrityCheck() {
+    return call<IntegrityCheckResult>('run_database_integrity_check');
+  },
   submitDiagnosticReport() {
     return call<FeedbackSubmissionResult>('submit_diagnostic_report');
   },

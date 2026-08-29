@@ -56,7 +56,6 @@ impl StreamCadence {
 
 /// 三阶段中某一阶段的状态。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct StageState {
     /// `ok` / `failed` / `never`。`never` 是「从来没走到这一步」，
     /// 不是失败，界面不能画成红色。
@@ -169,7 +168,6 @@ impl Stage {
 /// `device` = 单设备上报，`user_fused` = Zepp 在云端融合过，`unknown` = 报文
 /// 没说。来源未知时不静默当成设备数据，也不把不同设备的数值相加或平均。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct SourceBreakdown {
     pub source: String,
     pub records: i64,
@@ -177,7 +175,6 @@ pub struct SourceBreakdown {
 
 /// 覆盖解释。按流的节奏给出不同的表达，绝不用一个统一的完整度百分比。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct CoverageExplanation {
     /// `gaps` = 可以说「缺了哪几天」；`observations` = 只能说「哪几天观察到了」。
     pub kind: String,
@@ -192,7 +189,6 @@ pub struct CoverageExplanation {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct StreamHealth {
     pub stream: String,
     pub label: String,
@@ -208,7 +204,6 @@ pub struct StreamHealth {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct DatabaseHealth {
     pub schema_version: i64,
     pub normalizer_revision: String,
@@ -225,7 +220,6 @@ pub struct DatabaseHealth {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct IntegrityCheckResult {
     pub checked_at: String,
     pub ok: bool,
@@ -235,7 +229,6 @@ pub struct IntegrityCheckResult {
 
 /// 四个互不冒充的时间。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct HealthTimings {
     pub last_cloud_sync_at: Option<String>,
     pub last_cloud_sync_outcome: Option<String>,
@@ -247,7 +240,6 @@ pub struct HealthTimings {
 
 /// 页面可以直接执行的修复动作。id 是稳定契约，前端据此映射到已有命令。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct HealthAction {
     pub id: String,
     pub label: String,
@@ -257,7 +249,6 @@ pub struct HealthAction {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct DataHealth {
     pub generated_at: String,
     pub database: DatabaseHealth,

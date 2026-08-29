@@ -48,6 +48,7 @@ const {
 const navigation = [
   { to: '/', label: '概览', icon: 'overview' as DesignIconName },
   { to: '/explore', label: '交给 AI', icon: 'handoff' as DesignIconName },
+  { to: '/health-check', label: '数据健康', icon: 'database' as DesignIconName },
   { to: '/settings', label: '设置', icon: 'settings' as DesignIconName },
 ];
 

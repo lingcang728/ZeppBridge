@@ -8,6 +8,7 @@ import SleepList from '../views/SleepList.vue';
 import WorkoutList from '../views/WorkoutList.vue';
 import SleepDetail from '../views/SleepDetail.vue';
 import WorkoutDetail from '../views/WorkoutDetail.vue';
+import HealthCheck from '../views/HealthCheck.vue';
 import Settings from '../views/Settings.vue';
 
 const routes = [
@@ -55,6 +56,11 @@ const routes = [
     path: '/workouts/:workoutId',
     name: 'WorkoutDetail',
     component: WorkoutDetail,
+  },
+  {
+    path: '/health-check',
+    name: 'HealthCheck',
+    component: HealthCheck,
   },
   {
     path: '/settings',

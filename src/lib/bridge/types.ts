@@ -13,7 +13,9 @@ import type {
   DailyPoint,
   LoginStatus,
   MetricSeries,
+  DataHealth,
   DeviceCatalogOption,
+  IntegrityCheckResult,
   LocalApiStatus,
   SportOption,
   WorkoutCodeLabel,
@@ -85,6 +87,8 @@ export interface BridgeBackend {
 
   reprocessLocalData(): Promise<ReprocessResult>;
   getDiagnosticReport(): Promise<DiagnosticReport>;
+  getDataHealth(windowDays?: number): Promise<DataHealth>;
+  runDatabaseIntegrityCheck(): Promise<IntegrityCheckResult>;
   submitDiagnosticReport(): Promise<FeedbackSubmissionResult>;
   submitDeviceModelAssignment(): Promise<FeedbackSubmissionResult>;
   getExportJson(selection: ExportSelection): Promise<string>;
