@@ -31,6 +31,28 @@ const capabilities: Array<{ icon: DesignIconName; title: string; copy: string; t
   { icon: 'vo2-max', title: '恢复指标', copy: 'VO₂ Max、HRV 与恢复数据按来源呈现。', tone: 'blue' },
 ];
 
+/* 1.0.0 起，桌面窗口不是唯一入口。这三条都在本机跑，没有一条会把数据发出去。 */
+const localOutlets: Array<{ icon: DesignIconName; title: string; copy: string; tag: string }> = [
+  {
+    icon: 'structured-data',
+    title: '完整历史与快照',
+    copy: '按月把云端历史补回本机，逐块记账；整库快照带校验，恢复前先看记录数差异。',
+    tag: '本机',
+  },
+  {
+    icon: 'document',
+    title: '命令行',
+    copy: 'status / sync / export，无交互，退出码稳定，可挂到任务计划或 cron。',
+    tag: 'CLI',
+  },
+  {
+    icon: 'ai-ready',
+    title: '只读 MCP',
+    copy: '让 AI 直接查你的本机数据。stdio 传输，不监听端口，也不联网。',
+    tag: 'MCP',
+  },
+];
+
 const authMethods: Array<{ icon: DesignIconName; title: string; copy: string; tag: string }> = [
   { icon: 'browser-login', title: '官方网页登录', copy: '在官方登录流程中识别账户授权，凭据留在本机。', tag: '推荐' },
   { icon: 'document', title: 'HAR 导入', copy: '面向调试与高级用户，复用已有的授权请求。', tag: '高级' },
@@ -42,7 +64,7 @@ const authMethods: Array<{ icon: DesignIconName; title: string; copy: string; ta
   <div class="landing-page">
     <header class="landing-nav">
       <a class="landing-brand" href="#top" aria-label="ZeppBridge 首页"><span><BrandMark :size="34" /></span><strong>ZeppBridge</strong></a>
-      <nav aria-label="网站导航"><a href="#features">数据能力</a><a href="#connect">连接方式</a><a href="#privacy">隐私</a></nav>
+      <nav aria-label="网站导航"><a href="#features">数据能力</a><a href="#local">本机出口</a><a href="#connect">连接方式</a><a href="#privacy">隐私</a></nav>
       <a class="nav-github" :href="githubUrl" target="_blank" rel="noopener"><DesignIcon name="handoff" :size="23" />GitHub</a>
     </header>
 
@@ -84,6 +106,11 @@ const authMethods: Array<{ icon: DesignIconName; title: string; copy: string; ta
         <div class="capability-grid"><article v-for="item in capabilities" :key="item.title" :class="`capability-card tone-${item.tone}`"><DesignIcon :name="item.icon" :size="62" /><span><b>{{ item.title }}</b><small>{{ item.copy }}</small></span><DesignIcon name="chevron-right" :size="19" /></article></div>
       </section>
 
+      <section id="local" class="content-section connect-section">
+        <div class="connect-intro"><p>NOT ONLY A WINDOW</p><h2>不打开界面，也能用。</h2><span>桌面应用、命令行、MCP 和本机只读接口共用同一个核心，因此单位、时区、来源和缺失值的说法只有一种。缺的数据就是缺的——任何一个出口都不会用 0 填空。</span><div class="connect-art"><DesignIcon name="app-icon" :size="84" /><div class="mini-flow"><i></i><i></i><i></i></div><DesignIcon name="structured-data" :size="84" /></div></div>
+        <div class="auth-grid"><article v-for="outlet in localOutlets" :key="outlet.title"><div class="auth-title"><DesignIcon :name="outlet.icon" :size="46" /><span>{{ outlet.tag }}</span></div><h3>{{ outlet.title }}</h3><p>{{ outlet.copy }}</p><DesignIcon name="chevron-right" :size="19" /></article></div>
+      </section>
+
       <section id="connect" class="content-section connect-section">
         <div class="connect-intro"><p>THREE PATHS, ONE LOCAL VAULT</p><h2>选择适合你的连接方式。</h2><span>ZeppBridge 支持从简单的官方网页登录，到可审计的手动授权流程。连接状态和错误原因都会明确显示。</span><div class="connect-art"><DesignIcon name="zepp-cloud" :size="84" /><div class="mini-flow"><i></i><i></i><i></i></div><DesignIcon name="app-icon" :size="84" /></div></div>
         <div class="auth-grid"><article v-for="method in authMethods" :key="method.title"><div class="auth-title"><DesignIcon :name="method.icon" :size="46" /><span>{{ method.tag }}</span></div><h3>{{ method.title }}</h3><p>{{ method.copy }}</p><DesignIcon name="chevron-right" :size="19" /></article></div>
@@ -95,7 +122,7 @@ const authMethods: Array<{ icon: DesignIconName; title: string; copy: string; ta
       </section>
     </main>
 
-    <footer><a class="landing-brand" href="#top"><span><BrandMark :size="29" /></span><strong>ZeppBridge</strong></a><p>开源的 Amazfit 数据桥接工具 · Windows 和 Mac</p><div><a :href="githubUrl" target="_blank" rel="noopener">GitHub</a><a :href="releaseUrl" target="_blank" rel="noopener">下载</a></div></footer>
+    <footer><a class="landing-brand" href="#top"><span><BrandMark :size="29" /></span><strong>ZeppBridge</strong></a><p>开源的 Amazfit 数据桥接工具 · Windows 和 Mac（Apple Silicon）</p><p class="footer-disclaimer">独立的非官方开源项目，与 Zepp Health、Huami、Amazfit 无隶属或背书关系。仅用于你本人有权访问的账号和数据。</p><div><a :href="githubUrl" target="_blank" rel="noopener">GitHub</a><a :href="releaseUrl" target="_blank" rel="noopener">下载</a></div></footer>
   </div>
 </template>
 
@@ -171,7 +198,7 @@ main, footer { position: relative; z-index: 1; }
 .privacy-points { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }.privacy-points span { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px 6px 6px; border: 1px solid var(--site-line); border-radius: 10px; color: #9faa99; font-size: 10px; }
 .privacy-vault { display: flex; align-items: center; gap: 18px; min-height: 210px; padding: 28px; border: 1px solid rgba(185,220,112,.22); border-radius: 28px; background: radial-gradient(circle at 28% 50%, rgba(126,167,58,.16), transparent 40%), rgba(11,14,11,.65); }
 .privacy-vault div { display: grid; gap: 6px; }.privacy-vault b { color: #b9d87a; font-family: var(--font-mono); font-size: 13px; letter-spacing: .12em; }.privacy-vault span { color: #7e8979; font-size: 11px; line-height: 1.6; }
-footer { display: flex; align-items: center; gap: 18px; width: min(1240px, calc(100% - 48px)); min-height: 120px; margin: 0 auto; } footer p { margin-right: auto; color: #697365; font-size: 10px; } footer > div { display: flex; gap: 20px; } footer > div a { color: #909b8c; font-size: 11px; text-decoration: none; }
+footer { display: flex; align-items: center; flex-wrap: wrap; gap: 18px; width: min(1240px, calc(100% - 48px)); min-height: 120px; margin: 0 auto; } footer p { margin-right: auto; color: #697365; font-size: 10px; } footer .footer-disclaimer { flex-basis: 100%; margin-right: 0; max-width: 62ch; line-height: 1.6; } footer > div { display: flex; gap: 20px; } footer > div a { color: #909b8c; font-size: 11px; text-decoration: none; }
 @media (max-width: 1080px) { .hero-section { grid-template-columns: 1fr; padding-top: 56px; } .hero-stage { min-height: 500px; } .capability-grid { grid-template-columns: repeat(2,1fr); } .connect-section { grid-template-columns: 1fr; } .privacy-section { grid-template-columns: 1fr; } }
 @media (max-width: 720px) { .landing-nav { width: min(100% - 28px,1240px); }.landing-nav nav { display: none; }.hero-section, .content-section, .principle-strip, footer { width: min(100% - 28px,1240px); }.hero-section { min-height: auto; padding: 48px 0 64px; }.hero-copy h1 { font-size: 44px; }.hero-actions { align-items: stretch; flex-direction: column; }.primary-cta { min-width: 0; }.trust-row { flex-wrap: wrap; }.hero-stage { min-height: auto; }.output-stack { grid-template-columns: 1fr 1fr; }.principle-strip { grid-template-columns: repeat(2,1fr); }.principle-strip > div:nth-child(2) { border-right: 0; }.principle-strip > div:nth-child(-n+2) { border-bottom: 1px solid var(--site-line); }.content-section { padding: 84px 0; }.capability-grid, .auth-grid { grid-template-columns: 1fr; }.capability-card { min-height: 210px; }.auth-grid article { min-height: 245px; }.privacy-section { padding: 80px 20px; }.privacy-vault { align-items: flex-start; flex-direction: column; }.privacy-vault > .design-icon { width: 78px !important; height: 78px !important; } footer { align-items: flex-start; flex-wrap: wrap; padding: 28px 0; } footer p { width: 100%; order: 3; } }
 @media (prefers-reduced-motion: reduce) { .landing-page { scroll-behavior: auto; } .primary-cta, .secondary-cta, .nav-github { transition: none; } }

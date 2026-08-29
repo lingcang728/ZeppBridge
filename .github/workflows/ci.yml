@@ -43,6 +43,14 @@ jobs:
       - name: Build frontend
         run: npm run build
 
+      # 版本号散落在七个文件里，少改一处不会报错，只会由用户在发版后发现。
+      - name: Check version consistency
+        run: npm run version:check
+
+      # 坏掉的相对链接不会让任何构建失败，只会让读者点进 404。
+      - name: Check documentation links
+        run: npm run docs:check
+
       # 首屏体积预算。挡的是「一次提交多出几百 kB」这种没人会主动去量的回归。
       - name: Check bundle budget
         run: npm run budget:check
@@ -269,6 +277,10 @@ jobs:
     needs: [package, package-macos]
     permissions:
       contents: write
+      # attestation 需要这两项：id-token 用于向 Sigstore 取短期证书，
+      # attestations 用于把签好的来源声明写回仓库。
+      id-token: write
+      attestations: write
 
     steps:
       - name: Checkout
@@ -328,6 +340,35 @@ jobs:
           echo "RELEASE_BODY_MODE=file" >> "$GITHUB_ENV"
           cat release-notes.md
 
+      # 一份覆盖全部发布产物的校验和清单。用户可以逐个核对，
+      # 而不必相信「下载页看起来没问题」。
+      - name: Generate checksum manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          : > SHA256SUMS.txt
+          for file in release/ZeppBridge_*-setup.exe release/ZeppBridge_*.msi \
+                      release/zeppbridge-tools-*.zip release-macos/zeppbridge-tools-*.zip \
+                      "release-macos/ZeppBridge_${version}_aarch64.dmg" \
+                      "release-macos/ZeppBridge_${version}_aarch64.app.tar.gz" \
+                      release/latest.json; do
+            sha256sum "$file" | sed "s#[^ ]*/##" >> SHA256SUMS.txt
+          done
+          cat SHA256SUMS.txt
+
+      # 构建来源声明：证明这些文件确实由本仓库这条 workflow 产出。
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            release/ZeppBridge_*-setup.exe
+            release/ZeppBridge_*.msi
+            release/zeppbridge-tools-*.zip
+            release-macos/zeppbridge-tools-*.zip
+            release-macos/ZeppBridge_*.dmg
+            release-macos/ZeppBridge_*.app.tar.gz
+
       - name: Publish GitHub Release
         # Idempotent: skips if the release already exists.
         shell: bash
@@ -353,5 +394,6 @@ jobs:
             "release-macos/ZeppBridge_${version}_aarch64.dmg" \
             "release-macos/ZeppBridge_${version}_aarch64.app.tar.gz" \
             release/latest.json \
+            SHA256SUMS.txt \
             --title "ZeppBridge ${version}" \
             "${notes_args[@]}"

@@ -34,7 +34,14 @@ npm run dev        # 只启动 Vite，适合查看静态 UI
 npm run build      # vue-tsc --noEmit && vite build
 npm run build:web  # 仅 vite build，跳过 vue-tsc
 npm run preview    # 预览 dist（不会连接账户数据）
+npm test           # Vitest：src/lib 的纯函数层
+npm run version:check   # 七处版本号是否一致
+npm run budget:check    # 首屏体积预算（需要先 build）
 ```
+
+`npm test` 集中在一条规则上：**缺失不能被显示成 0**。「0 分钟睡眠」的卡片比「—」危险得多，用户会拿它当真实读数。刻意不做组件快照——它会在每次调样式时红掉，于是被习惯性 `-u` 掉，最后既挡不住回归也没人再看。
+
+`npm run budget:check` 量的是「为了看到第一屏必须先加载多少」（入口脚本 + `modulepreload` 的 chunk + 入口样式），不是 `dist` 总大小。基线和上限在 `bundle-budget.json`；确认某次增长值得之后用 `npm run budget:update` 刷新，并在提交里说明原因。
 
 `dist` 是构建输出，不是源码真相。改动 `src/` 后必须重新运行 `npm run build`，不要手工修生成的 bundle。
 
@@ -70,9 +77,18 @@ npm run build:mac   # scripts/macos/build-release.sh：前端 + 门禁 + tauri b
 
 ```powershell
 cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
-cargo check --manifest-path src-tauri/Cargo.toml --locked --all-targets
-cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
-cargo test --manifest-path src-tauri/Cargo.toml --locked --jobs 1
+cargo check --manifest-path src-tauri/Cargo.toml --workspace --locked --all-targets
+cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --locked --all-targets -- -D warnings
+cargo test --manifest-path src-tauri/Cargo.toml --workspace --locked --jobs 1
+```
+
+`--workspace` 不能省：仓库是一个 cargo workspace，成员有 `zeppbridge`（Tauri 应用）、`zeppbridge-core`（共享核心）、`zeppbridge-cli` 和 `zeppbridge-mcp`。漏掉它就只检查了应用那一个包。
+
+单独构建两个附带程序并打成分发包：
+
+```powershell
+cargo build --release --manifest-path src-tauri/Cargo.toml -p zeppbridge-cli -p zeppbridge-mcp
+npm run tools:package   # 产出 release\zeppbridge-tools-<版本>-<平台>.zip（含 SHA256SUMS）
 ```
 
 Rust library 测试只保留会挡住假成功、丢数据、错文案的门禁：凭据不落盘、host 校验、同步 outcome、REM 不编造、保留天数边界、去重、登录 cookie 解析。不要为了数量再堆冗余用例。具体数量以当前 `cargo test` 输出为准。
@@ -143,8 +159,9 @@ API 不监听 `0.0.0.0`、不提供 CORS、响应 `Cache-Control: no-store`，�
 3. `ZeppConnector` 只构造 HTTPS origin，host 仅允许 `api-mifit*.zepp.com` / `api-mifit*.huami.com`，HTTP client 超时 30 秒，401/403/404/429/5xx 分类处理。
 4. `DataFetcher` 为每个响应保留 stream/source key/raw payload。连接器有有限重试，但没有通用的 cursor 分页实现；运动 endpoint 使用 track ID 语义，当前窗口 helper 仍是保守范围。
 5. `Normalizer` 只接受能识别的结构化数组/对象，并能解码当前真实 fixture 验证过的 Base64 `band_data` 睡眠/分钟心率结构；无法识别的编码仍只保留 raw 并标记 `unverified`。
-6. `Database` 使用 WAL、外键和 schema migration（`PRAGMA user_version`，当前为 6；新版本只能追加迁移步骤，不要改已有 DDL）；表达式唯一索引处理 `NULL device_id`，canonical 行保留 `raw_record_id`。
-7. `SyncManager` 用 run lock 防止并发同步；核心流失败时 `success=false`，可选流显示 `unavailable`/`unverified`，成功后再做 retention。
+6. `Database` 使用 WAL、外键和 schema migration（`PRAGMA user_version`，当前为 **14**；迁移步骤只能追加，不要改已有 DDL——已发布的库是按当时的 DDL 建的）；表达式唯一索引处理 `NULL device_id`，canonical 行保留 `raw_record_id`。迁移在拿到跨进程写锁并生成升级前备份之后才开始。
+7. `SyncManager` 用 run lock 防止进程内并发，并额外获取跨进程写锁，因此桌面应用和 CLI 不会同时写同一个库；核心流失败时 `success=false`，可选流显示 `unavailable`/`unverified`，成功后再做 retention（长期归档开启时跳过清理）。
+8. 抓取、解析、写入三个阶段分别记进 `stream_provenance`，失败带稳定的机器可读类别，供数据健康页和 MCP 的 `get_data_health` 使用。
 
 ## 前端开发约定
 
@@ -157,11 +174,13 @@ API 不监听 `0.0.0.0`、不提供 CORS、响应 `Cache-Control: no-store`，�
 ## 推荐验收顺序
 
 1. `npm run build`
-2. `cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check`
-3. `cargo check --manifest-path src-tauri/Cargo.toml --locked --all-targets`
-4. `cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings`
-5. `cargo test --manifest-path src-tauri/Cargo.toml --locked --jobs 1`
-6. `npm run package:release`（或 `cmd.exe /d /c scripts\windows\build.bat`），确认 `release\ZeppBridge.exe` 和当前版本 NSIS/MSI 已更新，旧版本安装包已被删掉。
+2. `npm test`
+3. `npm run version:check` 与 `npm run budget:check`
+4. `cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check`
+5. `cargo check --manifest-path src-tauri/Cargo.toml --workspace --locked --all-targets`
+6. `cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --locked --all-targets -- -D warnings`
+7. `cargo test --manifest-path src-tauri/Cargo.toml --workspace --locked --jobs 1`
+8. `npm run package:release`（或 `cmd.exe /d /c scripts\windows\build.bat`），确认 `release\ZeppBridge.exe` 和当前版本 NSIS/MSI 已更新，旧版本安装包已被删掉。
 7. 双击桌面或开始菜单的 ZeppBridge 快捷方式，确认打开的是 `release\ZeppBridge.exe`；再确认产品名/标识、首次启动恢复、设置页网页登录 command。
 
 第 6–7 步是用户真正会打开的交付面，不能以源码检查替代。真实 Zepp 网页登录以及多区域、多设备数据仍需按环境分别验证。

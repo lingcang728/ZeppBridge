@@ -1,7 +1,7 @@
 {
   "name": "zeppbridge",
   "private": true,
-  "version": "0.11.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -19,7 +19,9 @@
     "budget:check": "node scripts/release/check-bundle-budget.mjs",
     "budget:update": "node scripts/release/check-bundle-budget.mjs --update",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "version:check": "node scripts/release/check-version-consistency.mjs",
+    "docs:check": "node scripts/release/check-doc-links.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
