@@ -100,6 +100,21 @@ impl AppState {
         })
     }
 
+    /// 把一条启动提示追加到设置页要显示的内容里。
+    ///
+    /// 恢复在 `AppState` 建立之前执行，但它的结果得让用户看见 —— 成功要说
+    /// 「已从备份恢复」，失败要说「当前库没有改动」。
+    pub fn push_startup_warning(&self, notice: String) {
+        let mut current = self.startup_warning.blocking_write();
+        *current = Some(match current.take() {
+            Some(existing) => format!(
+                "{existing}
+{notice}"
+            ),
+            None => notice,
+        });
+    }
+
     /// Build a synchronizer with its own SQLite connection.
     pub(crate) fn build_sync_manager(auth: AuthInfo, data_dir: &Path) -> Result<Arc<SyncManager>> {
         let cancel = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -108,7 +123,11 @@ impl AppState {
         // The primary connection in `AppState::new` already migrated the
         // schema; re-running DDL here could collide with an active sync.
         let db = Database::open_without_migration(data_dir.join("zepp.db"))?;
-        Ok(Arc::new(SyncManager::new(fetcher, db, cancel)))
+        // 带上数据目录，同步就会额外获取跨进程写锁：CLI 与桌面应用不可能
+        // 同时写同一个库。
+        Ok(Arc::new(
+            SyncManager::new(fetcher, db, cancel).with_data_dir(data_dir.to_path_buf()),
+        ))
     }
 }
 

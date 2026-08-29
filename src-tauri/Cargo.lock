@@ -5934,6 +5934,7 @@ dependencies = [
  "getrandom 0.2.17",
  "hex",
  "keyring",
+ "libc",
  "regex",
  "reqwest 0.12.28",
  "rusqlite",

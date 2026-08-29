@@ -11,6 +11,8 @@ pub struct FetchWindow {
 }
 
 impl FetchWindow {
+    /// 常规同步窗口。上限仍是 365 天：一次请求覆盖太长会让服务端超时。
+    /// 想要更早的历史请走历史补拉，它按月分块并且可以断点续传。
     pub fn days(days: i64) -> Result<Self> {
         if !(1..=365).contains(&days) {
             return Err(ZeppBridgeError::ConfigError(
@@ -22,6 +24,17 @@ impl FetchWindow {
             start_utc: end_utc - Duration::days(days),
             end_utc,
         })
+    }
+
+    /// 任意区间。历史补拉自己按月切块，所以不受 365 天限制；这里只保证
+    /// 区间方向正确。
+    pub fn between(start_utc: DateTime<Utc>, end_utc: DateTime<Utc>) -> Result<Self> {
+        if end_utc <= start_utc {
+            return Err(ZeppBridgeError::ConfigError(
+                "抓取窗口的结束时间必须晚于开始时间".into(),
+            ));
+        }
+        Ok(Self { start_utc, end_utc })
     }
 
     pub fn start_day(&self) -> String {

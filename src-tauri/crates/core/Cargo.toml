@@ -26,6 +26,9 @@ base64 = { workspace = true }
 regex = { workspace = true }
 url = { workspace = true }
 
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [target.'cfg(windows)'.dependencies]
 keyring = { version = "3.6.3", default-features = false, features = ["windows-native"] }
 

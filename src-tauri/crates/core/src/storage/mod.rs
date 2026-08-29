@@ -9,7 +9,9 @@ use std::path::{Path, PathBuf};
 
 /// 当前 SQLite schema 版本（`PRAGMA user_version`）。加新版本只能追加迁移
 /// 步骤，不要改已有 DDL。
-pub const CURRENT_SCHEMA_VERSION: i64 = 13;
+pub const CURRENT_SCHEMA_VERSION: i64 = 14;
+/// 写进备份 manifest 的应用版本。Core 是独立 crate，用它自己的包版本。
+const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v16-workout-catalog";
 const PREVIOUS_RELEASE_NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v14";
 const LAST_CLOUD_SYNC_AT_KEY: &str = "last_cloud_sync_at";
@@ -17,11 +19,19 @@ const LAST_CLOUD_SYNC_OUTCOME_KEY: &str = "last_cloud_sync_outcome";
 const LAST_LOCAL_REPROCESS_AT_KEY: &str = "last_local_reprocess_at";
 const RETENTION_DAYS_KEY: &str = "retention_days";
 const HISTORY_SYNC_DAYS_KEY: &str = "history_sync_days";
+const ARCHIVE_ENABLED_KEY: &str = "archive_enabled";
 const HEART_RATE_ZONE_PREF_KEY: &str = "heart_rate_zone_preference";
 const BYTES_PER_HISTORY_DAY: u64 = 800_000;
+/// 少于这么多天的本机样本，不足以外推占用速率。
+const MIN_OBSERVED_DAYS: i64 = 7;
+/// 估算之外再留 200 MB。刚好填满磁盘和放不下一样糟糕。
+const SPACE_SAFETY_MARGIN_BYTES: u64 = 200 * 1024 * 1024;
 
+pub mod backup;
 pub mod corrections;
+pub mod coverage;
 pub mod provenance;
+pub mod write_lock;
 
 pub struct Database {
     /// crate 内可见：洞察、备份等同属 Core 的模块直接复用这条连接，
@@ -1017,8 +1027,57 @@ impl Database {
     }
 
     fn open_migrated(db_path: &std::path::Path) -> Result<Self> {
+        // 迁移前备份和 DDL 必须在同一把跨进程锁下完成：两个进程同时升级同一个
+        // 库，是这套系统里最危险的组合。拿不到锁就等，等不到就报可恢复错误。
+        let guard = match db_path.parent() {
+            Some(data_dir) => write_lock::acquire_with_timeout(
+                data_dir,
+                write_lock::WritePurpose::Migration,
+                std::time::Duration::from_secs(30),
+            )
+            .map(Some)
+            .map_err(|error| ZeppBridgeError::ConfigError(error.to_string()))?,
+            None => None,
+        };
+        Self::backup_before_schema_change(db_path)?;
         let conn = Connection::open(db_path)?;
-        Self::from_connection(conn)
+        let db = Self::from_connection(conn);
+        drop(guard);
+        db
+    }
+
+    /// 在任何 DDL 之前给现有库留一份可校验的快照。
+    ///
+    /// 迁移只往前走，改坏了没有回头路。备份或校验失败时直接返回可恢复错误，
+    /// 让用户看到「升级没有开始」，而不是让一次半成品迁移把库改成谁也认不出的
+    /// 状态。全新的空库（`user_version = 0`）没有东西可丢，跳过。
+    fn backup_before_schema_change(db_path: &std::path::Path) -> Result<()> {
+        let Some(data_dir) = db_path.parent() else {
+            return Ok(());
+        };
+        if !db_path.exists() {
+            return Ok(());
+        }
+        let version = {
+            let probe = Connection::open(db_path)?;
+            probe
+                .query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0))
+                .unwrap_or(0)
+        };
+        if version == 0 || version >= CURRENT_SCHEMA_VERSION {
+            return Ok(());
+        }
+        match backup::create_backup(data_dir, backup::BackupKind::PreMigration, APP_VERSION) {
+            Ok(_) => {
+                // 滚动清理只动自动生成的迁移备份，手动备份和标记保留的永远不碰。
+                let _ = backup::prune_migration_backups(data_dir);
+                Ok(())
+            }
+            Err(error) => Err(ZeppBridgeError::DataUnavailable(format!(
+                "数据库需要升级到新版本，但升级前的自动备份没有成功，所以没有开始升级：{}。请确认数据文件夹所在磁盘还有空间后重试。",
+                error.user_message()
+            ))),
+        }
     }
 
     /// Open a connection that assumes the schema was already migrated by the
@@ -1528,6 +1587,31 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(13, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // 历史覆盖账本。「请求过」「拿到了」「写进去了」和「云端没有返回」是
+        // 四种不同的状态；只记一个「已同步到某年某月」会让它们长得一模一样，
+        // 于是既没法断点续传，也没法诚实回答「我的历史到底补全了没有」。
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS coverage_ledger (
+                stream TEXT NOT NULL,
+                chunk_start TEXT NOT NULL,
+                chunk_end TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                requested_at TEXT,
+                fetched_at TEXT,
+                persisted_at TEXT,
+                records INTEGER NOT NULL DEFAULT 0,
+                error TEXT,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY(stream, chunk_start)
+            );
+            CREATE INDEX IF NOT EXISTS idx_coverage_ledger_status
+                ON coverage_ledger(status, chunk_start DESC);
+            PRAGMA user_version = 14;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(14, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         // Earlier migrations are intentionally idempotent and still stamp
         // their historical versions on every launch, so the current schema
         // marker is restored only after all of them have run.
@@ -1594,21 +1678,39 @@ impl Database {
         Ok(UserPrefs {
             retention_days: self
                 .read_pref_days(RETENTION_DAYS_KEY, UserPrefs::DEFAULT_RETENTION_DAYS)?,
-            history_sync_days: self
-                .read_pref_days(HISTORY_SYNC_DAYS_KEY, UserPrefs::DEFAULT_HISTORY_SYNC_DAYS)?,
+            history_sync_days: self.read_history_days()?,
+            archive_enabled: self.get_app_meta(ARCHIVE_ENABLED_KEY)?.as_deref() == Some("1"),
         })
+    }
+
+    fn read_history_days(&self) -> Result<i64> {
+        match self.get_app_meta(HISTORY_SYNC_DAYS_KEY)? {
+            Some(value) => Ok(value
+                .parse::<i64>()
+                .ok()
+                .and_then(|days| UserPrefs::clamp_history_days(days).ok())
+                .unwrap_or(UserPrefs::DEFAULT_HISTORY_SYNC_DAYS)),
+            None => Ok(UserPrefs::DEFAULT_HISTORY_SYNC_DAYS),
+        }
     }
 
     pub fn set_user_prefs(&self, prefs: &UserPrefs) -> Result<UserPrefs> {
         let retention_days =
             UserPrefs::clamp_days(prefs.retention_days).map_err(ZeppBridgeError::ConfigError)?;
-        let history_sync_days =
-            UserPrefs::clamp_days(prefs.history_sync_days).map_err(ZeppBridgeError::ConfigError)?;
+        // 补拉范围和保留期各有各的上限：保留期决定本机留多久，补拉决定往回
+        // 取多远。共用一个 365 天上限时，「把三年前的记录拿回来」根本没法表达。
+        let history_sync_days = UserPrefs::clamp_history_days(prefs.history_sync_days)
+            .map_err(ZeppBridgeError::ConfigError)?;
         self.set_app_meta(RETENTION_DAYS_KEY, &retention_days.to_string())?;
         self.set_app_meta(HISTORY_SYNC_DAYS_KEY, &history_sync_days.to_string())?;
+        self.set_app_meta(
+            ARCHIVE_ENABLED_KEY,
+            if prefs.archive_enabled { "1" } else { "0" },
+        )?;
         Ok(UserPrefs {
             retention_days,
             history_sync_days,
+            archive_enabled: prefs.archive_enabled,
         })
     }
 
@@ -1623,33 +1725,136 @@ impl Database {
         }
     }
 
+    /// 每条流在本机的实际占用速率。
+    ///
+    /// 用本机已有的原始报文长度除以观察到的天数，而不是一个写死的常数：
+    /// 「再补三年要多大」只有用这个人自己的数据算才有意义。观察不足
+    /// `MIN_OBSERVED_DAYS` 天的流标 `measured: false`，宁可说不知道，
+    /// 也不拿一个编出来的速率去乘三年。
+    fn stream_storage_rates(&self, days: i64) -> Result<Vec<StreamStorageEstimate>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT stream,
+                    SUM(LENGTH(CAST(payload AS BLOB))),
+                    COUNT(DISTINCT substr(start_utc, 1, 10))
+             FROM raw_records
+             GROUP BY stream",
+        )?;
+        let observed: std::collections::HashMap<String, (u64, i64)> = stmt
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    (
+                        row.get::<_, i64>(1).unwrap_or(0).max(0) as u64,
+                        row.get::<_, i64>(2).unwrap_or(0),
+                    ),
+                ))
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?
+            .into_iter()
+            .collect();
+
+        Ok(coverage::BACKFILL_STREAMS
+            .iter()
+            .map(|stream| {
+                let (bytes, observed_days) = observed.get(*stream).copied().unwrap_or((0, 0));
+                let measured = observed_days >= MIN_OBSERVED_DAYS;
+                let bytes_per_day = if measured {
+                    bytes / observed_days.max(1) as u64
+                } else {
+                    0
+                };
+                StreamStorageEstimate {
+                    stream: (*stream).to_string(),
+                    observed_days,
+                    observed_bytes: bytes,
+                    bytes_per_day,
+                    measured,
+                    estimated_add_bytes: bytes_per_day.saturating_mul(days.max(0) as u64),
+                }
+            })
+            .collect())
+    }
+
     pub fn storage_estimate(
         &self,
         days: i64,
         data_dir: &std::path::Path,
     ) -> Result<StorageEstimate> {
-        let days = UserPrefs::clamp_days(days).map_err(ZeppBridgeError::ConfigError)?;
+        // 这里用补拉的取值范围（最长十年），而不是保留期的 1–365；
+        // 「补三年要多大」是这个估算存在的主要原因。
+        let days = UserPrefs::clamp_history_days(days).map_err(ZeppBridgeError::ConfigError)?;
         let database_bytes = std::fs::metadata(data_dir.join("zepp.db"))
             .map(|meta| meta.len())
             .unwrap_or(0);
-        let estimated_add_bytes = (days as u64).saturating_mul(BYTES_PER_HISTORY_DAY);
+
+        let streams = self.stream_storage_rates(days)?;
+        let measured_bytes: u64 = streams
+            .iter()
+            .map(|stream| stream.estimated_add_bytes)
+            .sum();
+        let observed_bytes: u64 = streams.iter().map(|stream| stream.observed_bytes).sum();
+        let any_measured = streams.iter().any(|stream| stream.measured);
+        let all_measured = streams.iter().all(|stream| stream.measured);
+
+        // 库比原始报文大：还有 canonical 行、索引和 WAL。用本机实测的比例
+        // 放大，而不是再猜一个系数；比例只在合理区间内取用。
+        let overhead = if observed_bytes > 0 && database_bytes > observed_bytes {
+            ((database_bytes as f64) / (observed_bytes as f64)).clamp(1.0, 4.0)
+        } else {
+            1.0
+        };
+        let estimated_add_bytes = if any_measured {
+            ((measured_bytes as f64) * overhead) as u64
+        } else {
+            (days as u64).saturating_mul(BYTES_PER_HISTORY_DAY)
+        };
+
         let free_bytes = disk_free_bytes(data_dir).unwrap_or(0);
+        // 留一点余量：刚好填满磁盘和放不下一样糟糕。
+        let needed_bytes = estimated_add_bytes.saturating_add(SPACE_SAFETY_MARGIN_BYTES);
+        let stop_reason = if free_bytes > 0 && needed_bytes > free_bytes {
+            Some(format!(
+                "这次补拉预计需要 {}（含安全余量），本盘只剩 {}，不会开始。请先腾出空间或缩短范围。",
+                format_bytes(needed_bytes),
+                format_bytes(free_bytes)
+            ))
+        } else {
+            None
+        };
+
         let warn_tight_space =
             free_bytes < 1_073_741_824 || (free_bytes > 0 && estimated_add_bytes > free_bytes / 5);
-        let allow_long_history = !(free_bytes > 0 && free_bytes < 300 * 1024 * 1024 && days >= 90);
-        let message = if free_bytes == 0 {
+        let allow_long_history = stop_reason.is_none()
+            && !(free_bytes > 0 && free_bytes < 300 * 1024 * 1024 && days >= 90);
+        let message = if let Some(reason) = &stop_reason {
+            reason.clone()
+        } else if free_bytes == 0 {
             "未能读取磁盘剩余空间，补拉前请确认本机还有足够空间。".into()
         } else if !allow_long_history {
             "磁盘剩余不足 300 MB，不能补拉 90 天以上的历史。".into()
-        } else if warn_tight_space {
-            "磁盘空间较紧，建议先只补拉 30 天。".into()
+        } else if !any_measured {
+            format!(
+                "本机样本还不够，用的是内置粗略估算：{} 天大约占用 {}，本盘剩余 {}。",
+                days,
+                format_bytes(estimated_add_bytes),
+                format_bytes(free_bytes)
+            )
+        } else if all_measured {
+            format!(
+                "按本机已有数据的实际速率推算，{} 天大约占用 {}，本盘剩余 {}。",
+                days,
+                format_bytes(estimated_add_bytes),
+                format_bytes(free_bytes)
+            )
         } else {
             format!(
-                "本盘大约剩余 {}，这次补拉大约占用 {}。",
-                format_bytes(free_bytes),
-                format_bytes(estimated_add_bytes)
+                "只按本机已有样本的那几条流推算，{} 天大约占用 {}（其余流样本不足，未计入），本盘剩余 {}。",
+                days,
+                format_bytes(estimated_add_bytes),
+                format_bytes(free_bytes)
             )
         };
+
         Ok(StorageEstimate {
             free_bytes,
             estimated_add_bytes,
@@ -1657,6 +1862,10 @@ impl Database {
             allow_long_history,
             warn_tight_space,
             message,
+            requested_days: days,
+            streams,
+            measured: all_measured,
+            stop_reason,
         })
     }
 
@@ -4961,6 +5170,79 @@ mod tests {
             zepp_source: None,
             zepp_type: code,
         }
+    }
+
+    #[test]
+    fn storage_estimate_only_extrapolates_streams_that_have_enough_local_history() {
+        let db = Database::in_memory().unwrap();
+        // 十天的 daily_summary，够外推；只有一天的 sleep，不够。
+        for day in 0..10 {
+            db.insert_raw_record(&RawRecord {
+                stream: "daily_summary".into(),
+                source_key: format!("daily-{day}"),
+                source_scope: SourceScope::UserFused,
+                device_id: None,
+                start_utc: ts() + chrono::Duration::days(day),
+                end_utc: None,
+                payload: serde_json::json!({ "data": [{ "date": "2023-11-14" }] }),
+                capability: CapabilityStatus::Verified,
+            })
+            .unwrap();
+        }
+        db.insert_raw_record(&RawRecord {
+            stream: "sleep".into(),
+            source_key: "sleep-only-one-day".into(),
+            source_scope: SourceScope::Device,
+            device_id: None,
+            start_utc: ts(),
+            end_utc: None,
+            payload: serde_json::json!({ "data": [] }),
+            capability: CapabilityStatus::Verified,
+        })
+        .unwrap();
+
+        let estimate = db
+            .storage_estimate(365, &std::env::temp_dir())
+            .expect("估算不该失败");
+
+        let daily = estimate
+            .streams
+            .iter()
+            .find(|stream| stream.stream == "daily_summary")
+            .unwrap();
+        assert!(daily.measured, "十天样本应当足以外推");
+        assert!(daily.bytes_per_day > 0);
+        assert_eq!(daily.estimated_add_bytes, daily.bytes_per_day * 365);
+
+        let sleep = estimate
+            .streams
+            .iter()
+            .find(|stream| stream.stream == "sleep")
+            .unwrap();
+        assert!(!sleep.measured, "一天样本不足以外推");
+        assert_eq!(
+            sleep.estimated_add_bytes, 0,
+            "样本不足时应当说不知道，而不是编一个速率乘一年"
+        );
+        assert_eq!(sleep.observed_days, 1, "观察到的天数仍要如实报出来");
+
+        assert!(!estimate.measured, "还有流没有样本，总数不能声称是实测的");
+        assert!(
+            estimate.message.contains("未计入"),
+            "总数只覆盖部分流这件事必须说出来: {}",
+            estimate.message
+        );
+    }
+
+    #[test]
+    fn storage_estimate_covers_multi_year_backfill_not_just_the_retention_window() {
+        let db = Database::in_memory().unwrap();
+        // 保留期上限是 365 天，但补拉可以跨多年；估算必须能回答后者。
+        let estimate = db
+            .storage_estimate(1095, &std::env::temp_dir())
+            .expect("三年的估算不该被保留期的上限挡住");
+        assert_eq!(estimate.requested_days, 1095);
+        assert!(db.storage_estimate(4000, &std::env::temp_dir()).is_err());
     }
 
     #[test]

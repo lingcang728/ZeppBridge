@@ -13,8 +13,13 @@ import type {
   DailyPoint,
   LoginStatus,
   MetricSeries,
+  BackupManifest,
+  BackupVerification,
+  CoverageLedger,
   DataHealth,
   DeviceCatalogOption,
+  PendingRestore,
+  RestorePreview,
   WeeklyReport,
   WorkoutInsight,
   IntegrityCheckResult,
@@ -67,7 +72,8 @@ export interface BridgeBackend {
     days: number,
   ): Promise<HeartRateZoneOptions>;
   getStorageEstimate(days: number): Promise<StorageEstimate>;
-  setUserPrefs(retentionDays: number, historySyncDays: number): Promise<UserPrefs>;
+  setUserPrefs(retentionDays: number, historySyncDays: number, archiveEnabled?: boolean): Promise<UserPrefs>;
+  getUserPrefs(): Promise<UserPrefs>;
 
   getRecentSleep(limit?: number): Promise<SleepSession[]>;
   getSleepDetail(sleepId: string): Promise<SleepSession | null>;
@@ -92,6 +98,17 @@ export interface BridgeBackend {
   getWorkoutInsight(workoutId: string): Promise<WorkoutInsight>;
   getWeeklyReport(): Promise<WeeklyReport>;
   getDataHealth(windowDays?: number): Promise<DataHealth>;
+  startHistoryBackfill(fromDate: string, maxChunks?: number): Promise<CoverageLedger>;
+  getCoverageLedger(): Promise<CoverageLedger>;
+  resetCoverageLedger(): Promise<CoverageLedger>;
+  listBackups(): Promise<BackupManifest[]>;
+  createManualBackup(): Promise<BackupManifest>;
+  verifyBackup(backupId: string): Promise<BackupVerification>;
+  setBackupPinned(backupId: string, pinned: boolean): Promise<BackupManifest>;
+  getRestorePreview(backupId: string): Promise<RestorePreview>;
+  stageRestore(backupId: string): Promise<PendingRestore>;
+  getPendingRestore(): Promise<PendingRestore | null>;
+  cancelPendingRestore(): Promise<void>;
   runDatabaseIntegrityCheck(): Promise<IntegrityCheckResult>;
   submitDiagnosticReport(): Promise<FeedbackSubmissionResult>;
   submitDeviceModelAssignment(): Promise<FeedbackSubmissionResult>;

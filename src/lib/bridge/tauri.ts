@@ -19,8 +19,13 @@ import type {
   HeartRateZonePreference,
   LoginStatus,
   MetricSeries,
+  BackupManifest,
+  BackupVerification,
+  CoverageLedger,
   DataHealth,
   DeviceCatalogOption,
+  PendingRestore,
+  RestorePreview,
   WeeklyReport,
   WorkoutInsight,
   IntegrityCheckResult,
@@ -157,8 +162,12 @@ export const tauriBackend: BridgeBackend = {
     return call('get_storage_estimate', { days });
   },
 
-  setUserPrefs(retentionDays: number, historySyncDays: number) {
-    return call<UserPrefs>('set_user_prefs', { retentionDays, historySyncDays });
+  setUserPrefs(retentionDays: number, historySyncDays: number, archiveEnabled?: boolean) {
+    return call<UserPrefs>('set_user_prefs', { retentionDays, historySyncDays, archiveEnabled });
+  },
+
+  getUserPrefs() {
+    return call<UserPrefs>('get_user_prefs');
   },
 
   getRecentSleep(limit = 500) {
@@ -240,6 +249,39 @@ export const tauriBackend: BridgeBackend = {
   },
   getWeeklyReport() {
     return call<WeeklyReport>('get_weekly_report');
+  },
+  startHistoryBackfill(fromDate: string, maxChunks?: number) {
+    return call<CoverageLedger>('start_history_backfill', { fromDate, maxChunks });
+  },
+  getCoverageLedger() {
+    return call<CoverageLedger>('get_coverage_ledger');
+  },
+  resetCoverageLedger() {
+    return call<CoverageLedger>('reset_coverage_ledger');
+  },
+  listBackups() {
+    return call<BackupManifest[]>('list_backups');
+  },
+  createManualBackup() {
+    return call<BackupManifest>('create_manual_backup');
+  },
+  verifyBackup(backupId: string) {
+    return call<BackupVerification>('verify_backup', { backupId });
+  },
+  setBackupPinned(backupId: string, pinned: boolean) {
+    return call<BackupManifest>('set_backup_pinned', { backupId, pinned });
+  },
+  getRestorePreview(backupId: string) {
+    return call<RestorePreview>('get_restore_preview', { backupId });
+  },
+  stageRestore(backupId: string) {
+    return call<PendingRestore>('stage_restore', { backupId });
+  },
+  getPendingRestore() {
+    return call<PendingRestore | null>('get_pending_restore');
+  },
+  cancelPendingRestore() {
+    return call<void>('cancel_pending_restore');
   },
   getDataHealth(windowDays?: number) {
     return call<DataHealth>('get_data_health', { windowDays });

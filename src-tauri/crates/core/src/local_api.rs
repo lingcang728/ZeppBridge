@@ -993,15 +993,20 @@ mod tests {
     #[test]
     fn first_install_does_not_listen_until_the_user_enables_it() {
         let dir = temp_dir("first-install");
-        let address = ephemeral_address();
-        let controller = controller_at(&dir, address.clone());
+        // 占住这个端口再让 controller 恢复。如果它偷偷尝试绑定，就会拿到
+        // 「端口被占用」的错误；`error` 为 None 才能证明它压根没试过。
+        // 这比「连一下看看通不通」可靠：临时端口随时可能被别的测试抢走。
+        let squatter = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = squatter.local_addr().unwrap().to_string();
+        let controller = controller_at(&dir, address);
         let status = controller.restore();
         assert!(!status.enabled);
         assert!(!status.running);
         assert!(
-            ClientStream::connect(address.as_str()).is_err(),
-            "没有状态文件时不得监听任何端口"
+            status.error.is_none(),
+            "没有状态文件时连绑定都不该尝试: {status:?}"
         );
+        drop(squatter);
     }
 
     #[test]

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import BackupPanel from '../components/BackupPanel.vue';
 import DesignIcon from '../components/DesignIcon.vue';
 import DevicePicker from '../components/DevicePicker.vue';
 import DeviceVisual from '../components/DeviceVisual.vue';
+import HistoryArchivePanel from '../components/HistoryArchivePanel.vue';
 import Icon from '../components/Icon.vue';
 import { useDevices } from '../composables/useDevices';
 import { useSyncController } from '../composables/useSyncController';
@@ -16,6 +18,7 @@ import type {
   CapabilityProbe,
   LocalApiStatus,
   LoginStatus,
+  UserPrefs,
   WorkoutCodeLabel,
 } from '../types';
 import { checkForDesktopUpdate, downloadAndInstallDesktopUpdate, updateState } from '../services/updateService';
@@ -223,6 +226,8 @@ const retentionDays = ref(appStatus.value?.retention_days ?? 365);
 const historyDays = ref(appStatus.value?.history_sync_days ?? 30);
 const storageEstimate = ref(appStatus.value?.storage ?? null);
 const prefsBusy = ref(false);
+/** 完整偏好（含归档开关）。AppStatus 只带保留期与补拉窗口。 */
+const userPrefs = ref<UserPrefs | null>(null);
 
 const connectionLabel = computed(() => {
   if (loginInProgress.value) {
@@ -568,6 +573,7 @@ const savePrefs = async () => {
   prefsBusy.value = true;
   try {
     const prefs = await backend.setUserPrefs(retention, history);
+    userPrefs.value = prefs;
     retentionDays.value = prefs.retention_days;
     historyDays.value = prefs.history_sync_days;
     try {
@@ -582,6 +588,14 @@ const savePrefs = async () => {
   } finally {
     prefsBusy.value = false;
   }
+};
+
+/** 归档面板改了偏好，回写到设置页自己的几个 ref，避免两处说法不一致。 */
+const applyPrefsChange = (prefs: UserPrefs) => {
+  userPrefs.value = prefs;
+  retentionDays.value = prefs.retention_days;
+  historyDays.value = prefs.history_sync_days;
+  void refreshStatus();
 };
 
 const confirmHistorySync = async () => {
@@ -615,6 +629,7 @@ onMounted(async () => {
   retentionDays.value = status?.retention_days ?? 365;
   historyDays.value = status?.history_sync_days ?? 30;
   storageEstimate.value = status?.storage ?? null;
+  userPrefs.value = await backend.getUserPrefs().catch(() => null);
   try {
     unlistenLogin = await backend.listen<LoginStatus>('login://status', (payload) => { void applyLoginStatus(payload); });
     await applyLoginStatus(await backend.getLoginStatus());
@@ -1086,6 +1101,10 @@ const runCapabilityProbe = async () => {
           </button>
         </div>
       </section>
+
+      <HistoryArchivePanel :prefs="userPrefs" @prefs-changed="applyPrefsChange" />
+
+      <BackupPanel />
 
       <!-- 6. 导出默认值 -->
       <section class="settings-card" aria-labelledby="export-title">

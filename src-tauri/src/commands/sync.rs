@@ -4,6 +4,7 @@ use tauri::{AppHandle, Emitter};
 use crate::app_state::AppState;
 use crate::ipc_types::{ui_sync_report, UiSyncReport};
 use crate::models::{CapabilityProbe, UserPrefs};
+use crate::storage::coverage::CoverageLedger;
 use crate::sync::{StreamStatus, SyncManager, SyncProgress, SyncReport};
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -73,6 +74,59 @@ pub async fn probe_data_capabilities(
     }
     let manager = require_manager(&state).await?;
     Ok(manager.probe_capabilities().await)
+}
+
+/// 完整历史补拉。
+///
+/// 和常规同步不是一回事：按自然月分块、逐块记账、可中断续传，而且**不做清理**。
+/// 每次调用处理有限块数并返回账本，界面据此显示进度并决定是否继续，
+/// 于是一次几年的补拉不会变成一个无法取消的长任务。
+#[tauri::command]
+pub async fn start_history_backfill(
+    app: AppHandle,
+    state: tauri::State<'_, AppState>,
+    from_date: String,
+    max_chunks: Option<usize>,
+) -> std::result::Result<CoverageLedger, String> {
+    if state.auth_state.read().await.as_str() != "verified" {
+        return Err("请先完成连接验证，再补拉历史".to_string());
+    }
+    let manager = require_manager(&state).await?;
+    let from = chrono::NaiveDate::parse_from_str(from_date.trim(), "%Y-%m-%d")
+        .map_err(|_| "补拉起点日期无效，需要 YYYY-MM-DD".to_string())?;
+    let to = Utc::now().date_naive();
+    if from > to {
+        return Err("补拉起点不能晚于今天".to_string());
+    }
+    let _command_guard = state.sync_command_lock.lock().await;
+    manager
+        .history_backfill(from, to, max_chunks.unwrap_or(24), |progress| {
+            emit_sync_progress(&app, progress)
+        })
+        .await
+        .map_err(|error| error.user_message())
+}
+
+/// 当前的历史覆盖账本。
+#[tauri::command]
+pub async fn get_coverage_ledger(
+    state: tauri::State<'_, AppState>,
+) -> std::result::Result<CoverageLedger, String> {
+    let db = state.db.lock().await;
+    db.coverage_ledger().map_err(|error| error.user_message())
+}
+
+/// 清空账本，重新规划一次补拉。
+///
+/// 只清账本，不删任何已经写进本机库的数据。
+#[tauri::command]
+pub async fn reset_coverage_ledger(
+    state: tauri::State<'_, AppState>,
+) -> std::result::Result<CoverageLedger, String> {
+    let db = state.db.lock().await;
+    db.reset_coverage_ledger()
+        .map_err(|error| error.user_message())?;
+    db.coverage_ledger().map_err(|error| error.user_message())
 }
 
 #[tauri::command]

@@ -1,12 +1,18 @@
 use crate::fetcher::{DataFetcher, FetchWindow, FetchedRecord};
 use crate::models::{error::*, *};
+use crate::storage::coverage::{self, ChunkStatus, CoverageChunk, CoverageLedger};
 use crate::storage::provenance::{Stage, StageErrorKind, StageOutcome};
+use crate::storage::write_lock::{self, ExclusiveWriteGuard, WritePurpose};
 use crate::storage::Database;
 use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
+
+/// 等另一个写者最多这么久。超过就告诉用户「另一个操作正在进行」，
+/// 而不是让界面一直转圈。
+const WRITE_LOCK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
 use tokio::sync::Mutex;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -41,6 +47,8 @@ pub struct SyncManager {
     fetcher: Arc<DataFetcher>,
     db: Arc<Mutex<Database>>,
     run_lock: Arc<Mutex<()>>,
+    /// 跨进程写锁的作用范围。`None` 时只有进程内互斥（测试用的内存库）。
+    data_dir: Option<std::path::PathBuf>,
     pub cancel: Arc<AtomicBool>,
 }
 
@@ -64,7 +72,25 @@ impl SyncManager {
             fetcher: Arc::new(fetcher),
             db: Arc::new(Mutex::new(db)),
             run_lock: Arc::new(Mutex::new(())),
+            data_dir: None,
             cancel,
+        }
+    }
+
+    /// 指定数据目录后，同步会额外获取跨进程写锁。
+    pub fn with_data_dir(mut self, data_dir: std::path::PathBuf) -> Self {
+        self.data_dir = Some(data_dir);
+        self
+    }
+
+    /// 等待写锁，超时后把「谁在写」告诉调用方而不是假死。
+    fn acquire_write_lock(&self, purpose: WritePurpose) -> Result<Option<ExclusiveWriteGuard>> {
+        let Some(data_dir) = self.data_dir.as_ref() else {
+            return Ok(None);
+        };
+        match write_lock::acquire_with_timeout(data_dir, purpose, WRITE_LOCK_TIMEOUT) {
+            Ok(guard) => Ok(Some(guard)),
+            Err(error) => Err(ZeppBridgeError::ConfigError(error.to_string())),
         }
     }
 
@@ -200,6 +226,9 @@ impl SyncManager {
     ) -> Result<SyncReport> {
         self.cancel.store(false, Ordering::SeqCst);
         let _run_guard = self.run_lock.lock().await;
+        // 进程内的 run_lock 拦不住第二个进程。CLI 的 `sync` 和桌面应用同时跑
+        // 起来时，重复请求和重复清理是最轻的后果。
+        let _write_guard = self.acquire_write_lock(WritePurpose::Sync)?;
         let window = FetchWindow::days(days)?;
         let mut streams = Vec::new();
         let started = Instant::now();
@@ -344,8 +373,12 @@ impl SyncManager {
         let total_written = streams.iter().map(|report| report.records_written).sum();
         if success {
             let db = self.db.lock().await;
-            let retention_days = db.user_prefs()?.retention_days;
-            db.cleanup_old_data(retention_days)?;
+            let prefs = db.user_prefs()?;
+            // 开了长期归档就不再自动清理。刚补拉回来的历史在下一次成功同步后
+            // 被删掉，是这类功能最让人失去信任的行为。
+            if !prefs.archive_enabled {
+                db.cleanup_old_data(prefs.retention_days)?;
+            }
         }
         Ok(SyncReport {
             success,
@@ -357,6 +390,145 @@ impl SyncManager {
                 None
             },
         })
+    }
+
+    /// 完整历史补拉。
+    ///
+    /// 按自然月分块、逐块记账，所以：中断之后从没做完的那块继续；重复执行
+    /// 不会重复写；「云端没有返回」和「我们没请求过」在账本里是两种状态。
+    ///
+    /// 补拉**不做清理**。刚拿回来的历史在同一轮里又被 retention 删掉，是最
+    /// 让人失去信任的行为；调用方在开始之前就应该被 `backfill_would_be_cleaned_up`
+    /// 拦住。
+    pub async fn history_backfill<F>(
+        &self,
+        from: chrono::NaiveDate,
+        to: chrono::NaiveDate,
+        max_chunks: usize,
+        on_progress: F,
+    ) -> Result<CoverageLedger>
+    where
+        F: Fn(SyncProgress) + Send + Sync,
+    {
+        self.cancel.store(false, Ordering::SeqCst);
+        let _run_guard = self.run_lock.lock().await;
+        let _write_guard = self.acquire_write_lock(WritePurpose::HistoryBackfill)?;
+
+        {
+            let db = self.db.lock().await;
+            let prefs = db.user_prefs()?;
+            let requested_days = (Utc::now().date_naive() - from).num_days().max(0);
+            if prefs.backfill_would_be_cleaned_up(requested_days) {
+                return Err(ZeppBridgeError::ConfigError(format!(
+                    "这次补拉要取回 {requested_days} 天的历史，但本机只保留最近 {} 天，下一次成功同步就会把刚拿回来的数据删掉。请先打开「长期归档」，或者把保留期调长。",
+                    prefs.retention_days
+                )));
+            }
+            db.plan_backfill(from, to)?;
+        }
+
+        let time_zone = {
+            let db = self.db.lock().await;
+            db.device_time_zone().unwrap_or(None)
+        }
+        .unwrap_or_else(|| "UTC".to_string());
+
+        let mut processed = 0usize;
+        loop {
+            if self.cancel.load(Ordering::SeqCst) {
+                break;
+            }
+            let chunk = {
+                let db = self.db.lock().await;
+                db.pending_backfill_chunks(1)?.into_iter().next()
+            };
+            let Some(chunk) = chunk else { break };
+            if processed >= max_chunks {
+                break;
+            }
+            processed += 1;
+
+            let total = {
+                let db = self.db.lock().await;
+                let ledger = db.coverage_ledger()?;
+                ledger.total_chunks.max(1) as u32
+            };
+            on_progress(SyncProgress {
+                stream: chunk.stream.clone(),
+                current: processed as u32,
+                total,
+                message: format!("正在补拉 {} · {}", chunk.stream, &chunk.chunk_start[..7]),
+            });
+
+            let outcome = self.backfill_one_chunk(&chunk, &time_zone).await;
+            let db = self.db.lock().await;
+            match outcome {
+                Ok((status, records)) => db.record_backfill_chunk(
+                    &chunk.stream,
+                    &chunk.chunk_start,
+                    status,
+                    records,
+                    None,
+                )?,
+                Err(error) if error.is_cancelled() => break,
+                Err(error) => db.record_backfill_chunk(
+                    &chunk.stream,
+                    &chunk.chunk_start,
+                    ChunkStatus::Failed,
+                    0,
+                    Some(&error.user_message()),
+                )?,
+            }
+        }
+
+        let db = self.db.lock().await;
+        db.coverage_ledger()
+    }
+
+    /// 拉取并写入一块。返回这块的结论和写入条数。
+    async fn backfill_one_chunk(
+        &self,
+        chunk: &CoverageChunk,
+        time_zone: &str,
+    ) -> Result<(ChunkStatus, i64)> {
+        let start = chrono::NaiveDate::parse_from_str(&chunk.chunk_start, "%Y-%m-%d")
+            .map_err(|_| ZeppBridgeError::ParseError("覆盖账本里的日期无效".into()))?;
+        let end = chrono::NaiveDate::parse_from_str(&chunk.chunk_end, "%Y-%m-%d")
+            .map_err(|_| ZeppBridgeError::ParseError("覆盖账本里的日期无效".into()))?;
+        let window = FetchWindow::between(coverage::to_utc(start), coverage::to_utc(end))?;
+
+        let records = match chunk.stream.as_str() {
+            "heart_rate" => self.fetcher.fetch_heart_rate_records(window).await,
+            "daily_summary" => self.fetcher.fetch_daily_statistics_records(window).await,
+            "workouts" => self.fetcher.fetch_workout_records(window).await,
+            "sleep" => self.fetcher.fetch_sleep_records(window).await,
+            "hrv" => self.fetcher.fetch_hrv_records(window).await,
+            "wellness" => self.fetcher.fetch_wellness_records(window, time_zone).await,
+            other => {
+                return Err(ZeppBridgeError::ConfigError(format!(
+                    "未知的补拉数据流: {other}"
+                )))
+            }
+        };
+
+        match records {
+            Ok(records) if records.is_empty() => {
+                // 请求过了，云端明确没有这段时间的数据。这不是失败，也不该重试。
+                Ok((ChunkStatus::EmptyFromCloud, 0))
+            }
+            Ok(records) => {
+                let report = self.persist_records(&chunk.stream, records).await?;
+                if report.records_written > 0 {
+                    Ok((ChunkStatus::Persisted, report.records_written))
+                } else {
+                    // 报文回来了但一条 canonical 都没产出：这不是「云端没有」，
+                    // 记成失败以便重试和排查。
+                    Ok((ChunkStatus::Failed, 0))
+                }
+            }
+            Err(error) if error.is_unavailable() => Ok((ChunkStatus::EmptyFromCloud, 0)),
+            Err(error) => Err(error),
+        }
     }
 
     async fn fetch_pending_running_details(&self) -> Result<Vec<FetchedRecord>> {

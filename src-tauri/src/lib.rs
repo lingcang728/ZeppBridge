@@ -15,19 +15,22 @@ pub use zeppbridge_core::{
 
 use app_state::AppState;
 use commands::{
-    cancel_sync, cancel_web_login, cleanup_old_data, clear_auth, get_app_status,
-    get_capability_overview, get_data_health, get_device_catalog_options, get_device_profile,
-    get_device_profiles, get_diagnostic_report, get_export_json, get_health_overview,
-    get_heart_rate_series, get_heart_rate_zones, get_login_status, get_metric_series,
-    get_recent_sleep, get_recent_workouts, get_sleep_detail, get_storage_estimate,
-    get_training_balance, get_training_load_series, get_unknown_workout_codes, get_weekly_report,
-    get_workout_detail, get_workout_insight, get_workout_series, get_workout_type_options,
-    import_from_har, manual_auth, open_data_folder, prepare_ai_handoff, probe_data_capabilities,
-    publish_ai_export, reprocess_local_data, run_database_integrity_check, save_auth,
-    save_csv_export, save_gpx_export, save_json_export, set_device_model_override,
-    set_heart_rate_zone_preference, set_user_prefs, set_workout_code_label,
-    set_workout_type_override, start_history_sync, start_incremental_sync, start_initial_sync,
-    start_web_login, submit_device_model_assignment, submit_diagnostic_report, verify_auth,
+    cancel_pending_restore, cancel_sync, cancel_web_login, cleanup_old_data, clear_auth,
+    create_manual_backup, get_app_status, get_capability_overview, get_coverage_ledger,
+    get_data_health, get_device_catalog_options, get_device_profile, get_device_profiles,
+    get_diagnostic_report, get_export_json, get_health_overview, get_heart_rate_series,
+    get_heart_rate_zones, get_login_status, get_metric_series, get_pending_restore,
+    get_recent_sleep, get_recent_workouts, get_restore_preview, get_sleep_detail,
+    get_storage_estimate, get_training_balance, get_training_load_series,
+    get_unknown_workout_codes, get_user_prefs, get_weekly_report, get_workout_detail,
+    get_workout_insight, get_workout_series, get_workout_type_options, import_from_har,
+    list_backups, manual_auth, open_data_folder, prepare_ai_handoff, probe_data_capabilities,
+    publish_ai_export, reprocess_local_data, reset_coverage_ledger, run_database_integrity_check,
+    save_auth, save_csv_export, save_gpx_export, save_json_export, set_backup_pinned,
+    set_device_model_override, set_heart_rate_zone_preference, set_user_prefs,
+    set_workout_code_label, set_workout_type_override, stage_restore, start_history_backfill,
+    start_history_sync, start_incremental_sync, start_initial_sync, start_web_login,
+    submit_device_model_assignment, submit_diagnostic_report, verify_auth, verify_backup,
 };
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
@@ -70,8 +73,15 @@ pub fn run() {
             std::fs::create_dir_all(&webview_dir)
                 .map_err(|error| anyhow::anyhow!("无法创建 WebView 数据目录: {error}"))?;
             std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &webview_dir);
+            // 排队中的恢复要在这里执行：AppState 一旦建立，桌面命令、同步线程
+            // 和本机 API 就各自持有连接，那时再去换文件必然打架。
+            let restore_notice = zeppbridge_core::storage::backup::apply_pending_restore(&data_dir)
+                .map(|outcome| outcome.message);
             let state = AppState::new(data_dir.clone())
                 .map_err(|error| anyhow::anyhow!("无法初始化应用状态: {error}"))?;
+            if let Some(notice) = restore_notice {
+                state.push_startup_warning(notice);
+            }
             // 本机 API 首次安装默认关闭；`restore` 只恢复用户明确保存过的启用
             // 状态。端口占用只让 API 进入错误态，不阻止桌面应用启动。
             let local_api = std::sync::Arc::new(
@@ -202,11 +212,23 @@ pub fn run() {
             publish_ai_export,
             prepare_ai_handoff,
             set_user_prefs,
+            get_user_prefs,
             get_storage_estimate,
             cleanup_old_data,
             open_data_folder,
             updates::is_portable_update,
             updates::launch_migrated_install,
+            list_backups,
+            create_manual_backup,
+            verify_backup,
+            set_backup_pinned,
+            get_restore_preview,
+            stage_restore,
+            get_pending_restore,
+            cancel_pending_restore,
+            start_history_backfill,
+            get_coverage_ledger,
+            reset_coverage_ledger,
             local_api::get_local_api_status,
             local_api::set_local_api_enabled,
             local_api::reveal_local_api_token,

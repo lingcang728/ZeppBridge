@@ -212,16 +212,38 @@ pub async fn get_storage_estimate(
         .map_err(|error| error.to_string())
 }
 
+/// 当前的保留 / 补拉 / 归档偏好。
+///
+/// `AppStatus` 只带了保留期和补拉窗口，归档开关不在里面；界面需要一个能单独
+/// 读到完整偏好的入口，否则归档面板只能靠猜。
+#[tauri::command]
+pub async fn get_user_prefs(
+    state: tauri::State<'_, AppState>,
+) -> std::result::Result<UserPrefs, String> {
+    let db = state.db.lock().await;
+    db.user_prefs().map_err(|error| error.to_string())
+}
+
 #[tauri::command]
 pub async fn set_user_prefs(
     state: tauri::State<'_, AppState>,
     retention_days: i64,
     history_sync_days: i64,
+    archive_enabled: Option<bool>,
 ) -> std::result::Result<UserPrefs, String> {
     let db = state.db.lock().await;
+    // 没传归档开关的旧调用方保持原状，不会被静默关掉归档。
+    let archive_enabled = match archive_enabled {
+        Some(value) => value,
+        None => db
+            .user_prefs()
+            .map(|prefs| prefs.archive_enabled)
+            .unwrap_or(false),
+    };
     db.set_user_prefs(&UserPrefs {
         retention_days,
         history_sync_days,
+        archive_enabled,
     })
     .map_err(|error| error.to_string())
 }
@@ -237,6 +259,12 @@ pub async fn cleanup_old_data(
     }
 
     let result = {
+        let _write_guard = zeppbridge_core::storage::write_lock::acquire_with_timeout(
+            &state.data_dir,
+            zeppbridge_core::storage::write_lock::WritePurpose::Cleanup,
+            std::time::Duration::from_secs(20),
+        )
+        .map_err(|error| error.to_string())?;
         let db = state.db.lock().await;
         db.cleanup_old_data(days).map_err(|error| error.to_string())
     };
@@ -253,6 +281,13 @@ pub async fn reprocess_local_data(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<serde_json::Value, String> {
     let streams = {
+        // 重放会重写全部派生数据，必须和同步、迁移、恢复互斥。
+        let _write_guard = zeppbridge_core::storage::write_lock::acquire_with_timeout(
+            &state.data_dir,
+            zeppbridge_core::storage::write_lock::WritePurpose::Reprocess,
+            std::time::Duration::from_secs(20),
+        )
+        .map_err(|error| error.to_string())?;
         let db = state.db.lock().await;
         let streams = db
             .reprocess_raw_records()

@@ -241,21 +241,73 @@ pub struct DailyPoint {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct UserPrefs {
+    /// 本机保留最近多少天。清理在每次成功同步之后执行。
     pub retention_days: i64,
+    /// 一次历史补拉往回覆盖多少天。
+    ///
+    /// 和 `retention_days` **解耦**：保留期决定本机留多久，补拉决定往回取多远。
+    /// 以前两者共用一个 1–365 的上限，于是「我想把三年前的记录拿回来」这件事
+    /// 在界面上根本表达不出来。
     pub history_sync_days: i64,
+    /// 长期归档。开启后成功同步不再自动清理历史，`retention_days` 只作为
+    /// 关闭归档时的参考值保留。
+    #[serde(default)]
+    pub archive_enabled: bool,
 }
 
 impl UserPrefs {
     pub const DEFAULT_RETENTION_DAYS: i64 = 365;
     pub const DEFAULT_HISTORY_SYNC_DAYS: i64 = 180;
+    /// 历史补拉的上限：十年。再往前 Zepp 也不会有记录，而一个没有上限的
+    /// 输入框只会让人不小心排出一个跑几天的任务。
+    pub const MAX_HISTORY_SYNC_DAYS: i64 = 3650;
 
+    /// 保留期的取值范围。
     pub fn clamp_days(value: i64) -> std::result::Result<i64, String> {
         if (1..=365).contains(&value) {
             Ok(value)
         } else {
-            Err("天数必须在 1 到 365 之间".into())
+            Err("保留天数必须在 1 到 365 之间".into())
         }
     }
+
+    /// 历史补拉的取值范围。
+    pub fn clamp_history_days(value: i64) -> std::result::Result<i64, String> {
+        if (1..=Self::MAX_HISTORY_SYNC_DAYS).contains(&value) {
+            Ok(value)
+        } else {
+            Err(format!(
+                "历史补拉天数必须在 1 到 {} 之间",
+                Self::MAX_HISTORY_SYNC_DAYS
+            ))
+        }
+    }
+
+    /// 这次补拉会不会拉回一批马上又被清掉的数据。
+    ///
+    /// 「刚补拉完，下一次成功同步就删掉」是最让人失去信任的行为之一，所以
+    /// 这个组合要在开始之前就被拦住，而不是事后解释。
+    pub fn backfill_would_be_cleaned_up(&self, requested_days: i64) -> bool {
+        !self.archive_enabled && requested_days > self.retention_days
+    }
+}
+
+/// 单条流的占用估算。
+///
+/// 拆到流一级，是因为「再补三年要多大」这个问题的答案完全取决于用户戴不戴表
+/// 睡觉、跑不跑步。一个全局常数对每天跑步的人和一年跑两次的人给出同一个数字，
+/// 那个数字对两个人都没用。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct StreamStorageEstimate {
+    pub stream: String,
+    /// 本机已经存下多少个不同的日子。样本太少就不足以外推。
+    pub observed_days: i64,
+    /// 本机这条流的原始报文字节数。
+    pub observed_bytes: u64,
+    pub bytes_per_day: u64,
+    /// true = 从本机已有数据量算出来的；false = 本机样本不足，没有估算。
+    pub measured: bool,
+    pub estimated_add_bytes: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -266,6 +318,17 @@ pub struct StorageEstimate {
     pub allow_long_history: bool,
     pub warn_tight_space: bool,
     pub message: String,
+    /// 这次估算针对多少天。
+    #[serde(default)]
+    pub requested_days: i64,
+    #[serde(default)]
+    pub streams: Vec<StreamStorageEstimate>,
+    /// 全部六条流都有足够本机样本时才为真。为假时总数只是粗略参考。
+    #[serde(default)]
+    pub measured: bool,
+    /// 非 None 表示空间不足以开始这次补拉，值是给用户看的理由。
+    #[serde(default)]
+    pub stop_reason: Option<String>,
 }
 
 /// 同步状态
@@ -469,8 +532,16 @@ impl ExportDetail {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", tag = "kind")]
 pub enum ExportScope {
-    DateRange { start: String, end: String },
-    Workout { workout_id: String },
+    DateRange {
+        start: String,
+        end: String,
+    },
+    // 枚举上的 rename_all 只改变体名，不改变体内字段名，所以这里要再标一次，
+    // 否则前端发的 `workoutId` 会被当成缺字段。
+    #[serde(rename_all = "camelCase")]
+    Workout {
+        workout_id: String,
+    },
 }
 
 /// 单次导出的最大跨度。365 天之外的历史请走数据库快照，不要塞进一个
@@ -909,4 +980,120 @@ pub struct HeartRateZoneOptions {
     /// Present only once the preference names a model and its bases.
     pub report: Option<HeartRateZoneReport>,
     pub window_days: i64,
+}
+
+#[cfg(test)]
+mod export_scope_tests {
+    use super::*;
+
+    fn selection(
+        scope: Option<ExportScope>,
+        start: Option<&str>,
+        end: Option<&str>,
+    ) -> ExportSelection {
+        ExportSelection {
+            scope,
+            start_date: start.map(str::to_string),
+            end_date: end.map(str::to_string),
+            data_types: vec!["workouts".into()],
+            detail: ExportDetail::default(),
+        }
+    }
+
+    #[test]
+    fn a_request_that_names_both_a_range_and_a_workout_is_refused() {
+        // 这是矛盾请求。定一个优先级只会让下一个人写出「我以为传了 workoutId
+        // 就只导这一条」的 bug，所以直接拒绝。
+        let both = selection(
+            Some(ExportScope::Workout {
+                workout_id: "run-1".into(),
+            }),
+            Some("2026-08-01"),
+            Some("2026-08-07"),
+        );
+        let error = both.resolve_scope().unwrap_err();
+        assert!(error.contains("二选一"), "{error}");
+    }
+
+    #[test]
+    fn a_request_with_no_range_at_all_is_refused() {
+        let error = selection(None, None, None).resolve_scope().unwrap_err();
+        assert!(error.contains("缺少范围"), "{error}");
+    }
+
+    #[test]
+    fn half_a_legacy_range_is_refused_rather_than_guessed() {
+        assert!(selection(None, Some("2026-08-01"), None)
+            .resolve_scope()
+            .is_err());
+        assert!(selection(None, None, Some("2026-08-07"))
+            .resolve_scope()
+            .is_err());
+    }
+
+    #[test]
+    fn legacy_date_fields_still_work_on_their_own() {
+        let resolved = selection(None, Some("2026-08-01"), Some("2026-08-07"))
+            .resolve_scope()
+            .unwrap();
+        assert_eq!(
+            resolved,
+            ExportScope::date_range("2026-08-01", "2026-08-07")
+        );
+    }
+
+    #[test]
+    fn a_reversed_range_is_refused() {
+        let error = ExportScope::date_range("2026-08-07", "2026-08-01")
+            .validated()
+            .unwrap_err();
+        assert!(error.contains("不能早于"), "{error}");
+    }
+
+    #[test]
+    fn an_oversized_range_is_refused_at_the_documented_boundary() {
+        // 恰好 365 天之差（366 天含头尾）仍然允许；再多一天就拒绝。
+        assert!(ExportScope::date_range("2025-08-01", "2026-08-01")
+            .validated()
+            .is_ok());
+        assert!(ExportScope::date_range("2025-08-01", "2026-08-02")
+            .validated()
+            .is_err());
+    }
+
+    #[test]
+    fn a_malformed_date_is_refused_rather_than_silently_clamped() {
+        assert!(ExportScope::date_range("not-a-date", "2026-08-01")
+            .validated()
+            .is_err());
+        assert!(ExportScope::date_range("2026-08-01", "2026-13-45")
+            .validated()
+            .is_err());
+    }
+
+    #[test]
+    fn an_empty_workout_id_is_refused() {
+        let error = ExportScope::Workout {
+            workout_id: "   ".into(),
+        }
+        .validated()
+        .unwrap_err();
+        assert!(error.contains("不能为空"), "{error}");
+    }
+
+    #[test]
+    fn scope_round_trips_through_the_ipc_shape_the_frontend_sends() {
+        let workout: ExportScope =
+            serde_json::from_str(r#"{"kind":"workout","workoutId":"run-1"}"#).unwrap();
+        assert_eq!(
+            workout,
+            ExportScope::Workout {
+                workout_id: "run-1".into()
+            }
+        );
+        let range: ExportScope =
+            serde_json::from_str(r#"{"kind":"dateRange","start":"2026-08-01","end":"2026-08-07"}"#)
+                .unwrap();
+        assert_eq!(range, ExportScope::date_range("2026-08-01", "2026-08-07"));
+    }
 }

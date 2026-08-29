@@ -40,6 +40,16 @@ export interface AppStatus {
   storage?: StorageEstimate;
 }
 
+/** 单条流的占用估算。样本不足时 measured 为 false，且不给速率。 */
+export interface StreamStorageEstimate {
+  stream: string;
+  observed_days: number;
+  observed_bytes: number;
+  bytes_per_day: number;
+  measured: boolean;
+  estimated_add_bytes: number;
+}
+
 export interface StorageEstimate {
   free_bytes: number;
   estimated_add_bytes: number;
@@ -47,11 +57,20 @@ export interface StorageEstimate {
   allow_long_history: boolean;
   warn_tight_space: boolean;
   message: string;
+  requested_days: number;
+  streams: StreamStorageEstimate[];
+  /** 六条流全部有足够本机样本时才为真。为假时总数只是粗略参考。 */
+  measured: boolean;
+  /** 非 null 表示空间不足，补拉不会开始。 */
+  stop_reason: string | null;
 }
 
 export interface UserPrefs {
   retention_days: number;
+  /** 历史补拉往回覆盖多少天。和保留期解耦，上限 3650。 */
   history_sync_days: number;
+  /** 长期归档：开启后成功同步不再自动清理历史。 */
+  archive_enabled: boolean;
 }
 
 export interface HeartRatePoint {
@@ -191,6 +210,86 @@ export interface Workout {
   source_scope: SourceScope;
   device_id?: string;
   synced_at?: string | null;
+}
+
+/* ---------- 归档、补拉与备份 ---------- */
+
+/** 一条流的历史覆盖。「请求过」「拿到了」「写进去了」是三件事。 */
+export interface StreamCoverage {
+  stream: string;
+  requested_chunks: number;
+  persisted_chunks: number;
+  /** 请求过、云端明确没有数据的月份数。这不是失败。 */
+  empty_chunks: number;
+  failed_chunks: number;
+  pending_chunks: number;
+  persisted_from: string | null;
+  persisted_to: string | null;
+  empty_months: string[];
+  records: number;
+}
+
+export interface CoverageLedger {
+  requested_from: string | null;
+  requested_to: string | null;
+  streams: StreamCoverage[];
+  total_chunks: number;
+  completed_chunks: number;
+  /** 只有每一块都有结论时才为真。「完整副本」这句话只有在这里为真时才成立。 */
+  complete: boolean;
+}
+
+export type BackupKind = 'manual' | 'pre_migration' | 'pre_restore';
+
+export interface BackupCoverage {
+  earliest_sample_at: string | null;
+  latest_sample_at: string | null;
+  last_cloud_sync_at: string | null;
+}
+
+export interface BackupManifest {
+  id: string;
+  created_at: string;
+  app_version: string;
+  schema_version: number;
+  normalizer_revision: string;
+  kind: BackupKind;
+  coverage: BackupCoverage;
+  table_counts: Record<string, number>;
+  bytes: number;
+  sha256: string;
+  integrity_ok: boolean;
+  pinned: boolean;
+}
+
+export interface BackupVerification {
+  id: string;
+  file_present: boolean;
+  bytes_match: boolean;
+  sha256_match: boolean;
+  integrity_ok: boolean;
+  problem: string | null;
+}
+
+export type RestoreCompatibility =
+  | 'same_schema'
+  | 'older_schema_will_migrate'
+  | 'future_schema_refused';
+
+export interface RestorePreview {
+  manifest: BackupManifest;
+  verification: BackupVerification;
+  compatibility: RestoreCompatibility;
+  current_schema_version: number;
+  current_table_counts: Record<string, number>;
+  can_restore: boolean;
+  blocker: string | null;
+}
+
+export interface PendingRestore {
+  backup_id: string;
+  staged_at: string;
+  rollback_backup_id: string;
 }
 
 /* ---------- 确定性洞察 ---------- */
