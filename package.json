@@ -14,7 +14,8 @@
     "build:mac": "bash scripts/macos/build-release.sh",
     "publish:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/publish-local.ps1 -UserEntryOnly",
     "icons:generate": "node scripts/icon/generate-icons.mjs",
-    "icons:verify": "python scripts/icon/verify-icons.py || py -3 scripts/icon/verify-icons.py"
+    "icons:verify": "python scripts/icon/verify-icons.py || py -3 scripts/icon/verify-icons.py",
+    "tools:package": "pwsh -NoProfile -File scripts/release/package-tools.ps1"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

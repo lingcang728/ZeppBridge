@@ -48,6 +48,14 @@ pub enum ZeppBridgeError {
     #[error("配置错误: {0}")]
     ConfigError(String),
 
+    /// 另一个进程正在写同一个数据库。
+    ///
+    /// 和 `ConfigError` 分开，是因为调用方对这两件事的处理完全不同：
+    /// busy 是「等一会儿再来」，配置错误是「你得改点什么」。混在一起，
+    /// 调度脚本就只能去匹配错误文案。
+    #[error("{0}")]
+    Busy(String),
+
     #[error("IO 错误: {0}")]
     IoError(#[from] std::io::Error),
 
@@ -61,6 +69,11 @@ pub type Result<T> = std::result::Result<T, ZeppBridgeError>;
 impl ZeppBridgeError {
     pub fn needs_reauth(&self) -> bool {
         matches!(self, Self::NeedsReauth(_))
+    }
+
+    /// 另一个写者占着库。可重试，不是失败。
+    pub fn is_busy(&self) -> bool {
+        matches!(self, Self::Busy(_))
     }
 
     pub fn is_unavailable(&self) -> bool {
@@ -91,9 +104,10 @@ impl ZeppBridgeError {
                 format!("Zepp 服务返回 HTTP {status}，请稍后重试")
             }
             Self::Cancelled => "同步已取消".into(),
-            Self::AuthError(message) | Self::InvalidHost(message) | Self::ConfigError(message) => {
-                sanitize_user_text(message)
-            }
+            Self::AuthError(message)
+            | Self::InvalidHost(message)
+            | Self::ConfigError(message)
+            | Self::Busy(message) => sanitize_user_text(message),
             Self::ParseError(_) => "Zepp 返回的数据无法解析".into(),
             Self::DatabaseError(_) => "本地数据库暂时不可用".into(),
             Self::IoError(_) => "读写本地文件失败".into(),

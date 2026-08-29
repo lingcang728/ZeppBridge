@@ -90,6 +90,10 @@ impl SyncManager {
         };
         match write_lock::acquire_with_timeout(data_dir, purpose, WRITE_LOCK_TIMEOUT) {
             Ok(guard) => Ok(Some(guard)),
+            // 「有人在写」和「锁建不起来」要分开：前者可重试，后者要人介入。
+            Err(error @ write_lock::WriteLockError::Busy { .. }) => {
+                Err(ZeppBridgeError::Busy(error.to_string()))
+            }
             Err(error) => Err(ZeppBridgeError::ConfigError(error.to_string())),
         }
     }

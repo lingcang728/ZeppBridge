@@ -95,6 +95,8 @@ pub enum StageErrorKind {
     UnrecognizedPayload,
     /// 本地写库失败。
     Storage,
+    /// 另一个进程正在写同一个库，这一轮让开了。可重试，不是坏了。
+    Busy,
     /// 用户取消。
     Cancelled,
     Unknown,
@@ -108,6 +110,7 @@ impl StageErrorKind {
             StageErrorKind::NotAvailable => "not_available",
             StageErrorKind::UnrecognizedPayload => "unrecognized_payload",
             StageErrorKind::Storage => "storage",
+            StageErrorKind::Busy => "busy",
             StageErrorKind::Cancelled => "cancelled",
             StageErrorKind::Unknown => "unknown",
         }
@@ -130,6 +133,7 @@ impl StageErrorKind {
                 StageErrorKind::Network
             }
             E::ParseError(_) => StageErrorKind::UnrecognizedPayload,
+            E::Busy(_) => StageErrorKind::Busy,
             E::DatabaseError(_) | E::IoError(_) => StageErrorKind::Storage,
             E::InvalidHost(_) | E::ConfigError(_) | E::Unknown(_) => StageErrorKind::Unknown,
         }

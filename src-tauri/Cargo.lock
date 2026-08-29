@@ -5924,6 +5924,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "zeppbridge-cli"
+version = "0.11.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+ "tokio",
+ "zeppbridge-core",
+]
+
+[[package]]
 name = "zeppbridge-core"
 version = "0.11.0"
 dependencies = [
@@ -5945,6 +5956,16 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
+]
+
+[[package]]
+name = "zeppbridge-mcp"
+version = "0.11.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+ "zeppbridge-core",
 ]
 
 [[package]]

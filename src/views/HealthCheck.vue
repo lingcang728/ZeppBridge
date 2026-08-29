@@ -84,6 +84,7 @@ const ERROR_KIND_LABEL: Record<string, string> = {
   not_available: '这个账号没有这条流',
   unrecognized_payload: '拿到了报文但没看懂',
   storage: '写本地库失败',
+  busy: '另一个操作正在写库，这次让开了',
   cancelled: '被取消',
   unknown: '未分类的失败',
 };

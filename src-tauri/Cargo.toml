@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/core"]
+members = ["crates/core", "crates/cli", "crates/mcp"]
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }

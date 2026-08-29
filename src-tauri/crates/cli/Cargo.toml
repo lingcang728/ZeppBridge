@@ -1,0 +1,16 @@
+[package]
+name = "zeppbridge-cli"
+version = "0.11.0"
+description = "ZeppBridge 命令行：给 Task Scheduler / cron / agent 用的无交互入口"
+edition = "2021"
+
+[[bin]]
+name = "zeppbridge-cli"
+path = "src/main.rs"
+
+[dependencies]
+zeppbridge-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+tokio = { workspace = true }

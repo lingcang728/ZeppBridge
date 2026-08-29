@@ -6,6 +6,7 @@
 
 pub mod auth;
 pub mod connectors;
+pub mod contract;
 pub mod decoder;
 pub mod device_catalog;
 pub mod export_formats;

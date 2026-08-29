@@ -106,9 +106,21 @@ fn contains_rustc_target_triple(norm: &str) -> bool {
     MARKERS.iter().any(|marker| norm.contains(marker))
 }
 
+/// 从 cargo 产物目录跑起来时，数据目录回退到仓库根的 `data/`。
+///
+/// 刻意向上找仓库根的标志文件，而不是写死「manifest 的上一级」：core 被拆成
+/// workspace 成员之后，`CARGO_MANIFEST_DIR` 从 `src-tauri` 变成了
+/// `src-tauri/crates/core`，写死一层就会指到 `src-tauri/crates/data`，
+/// 开发时会安静地建一个空库，而用户那份 200 MB 的数据看起来像是不见了。
 fn repository_data_dir() -> Option<PathBuf> {
-    let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
-    Some(manifest.parent()?.join("data"))
+    let mut dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    loop {
+        // 仓库根同时有这两样；单看其中一个都可能撞上别的目录。
+        if dir.join("package.json").is_file() && dir.join("src-tauri").is_dir() {
+            return Some(dir.join("data"));
+        }
+        dir = dir.parent()?;
+    }
 }
 
 fn normalize_path(path: &Path) -> String {
@@ -284,6 +296,22 @@ fn path_exists(path: &Path) -> io::Result<bool> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_repository_fallback_lands_on_the_repository_root_not_a_crate_folder() {
+        // core 被拆成 workspace 成员后，manifest 目录深了两级。这个回退
+        // 必须继续指向仓库根的 data/，否则开发时会安静地换一个空库。
+        let dir = repository_data_dir().expect("仓库里应当能找到根目录");
+        assert!(dir.ends_with("data"), "{}", dir.display());
+        let root = dir.parent().unwrap();
+        assert!(root.join("package.json").is_file(), "{}", root.display());
+        assert!(root.join("src-tauri").is_dir(), "{}", root.display());
+        assert!(
+            !root.ends_with("crates"),
+            "回退不能停在 crates 目录：{}",
+            root.display()
+        );
+    }
+
     use super::*;
     use std::fs;
 
