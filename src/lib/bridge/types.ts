@@ -15,6 +15,8 @@ import type {
   MetricSeries,
   DataHealth,
   DeviceCatalogOption,
+  WeeklyReport,
+  WorkoutInsight,
   IntegrityCheckResult,
   LocalApiStatus,
   SportOption,
@@ -87,6 +89,8 @@ export interface BridgeBackend {
 
   reprocessLocalData(): Promise<ReprocessResult>;
   getDiagnosticReport(): Promise<DiagnosticReport>;
+  getWorkoutInsight(workoutId: string): Promise<WorkoutInsight>;
+  getWeeklyReport(): Promise<WeeklyReport>;
   getDataHealth(windowDays?: number): Promise<DataHealth>;
   runDatabaseIntegrityCheck(): Promise<IntegrityCheckResult>;
   submitDiagnosticReport(): Promise<FeedbackSubmissionResult>;

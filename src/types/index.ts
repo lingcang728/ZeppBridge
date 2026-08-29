@@ -193,6 +193,71 @@ export interface Workout {
   synced_at?: string | null;
 }
 
+/* ---------- 确定性洞察 ---------- */
+
+/** 和个人基线的比较。方向是事实；好坏由界面按指标含义决定。 */
+export interface InsightComparison {
+  baseline_value: number;
+  delta: number;
+  delta_percent: number;
+  direction: 'higher' | 'lower' | 'same' | string;
+}
+
+export interface BaselineWindow {
+  kind: 'comparable_runs' | 'previous_days' | string;
+  days: number;
+  min_samples: number;
+  max_samples: number;
+  distance_tolerance_percent?: number | null;
+}
+
+export type InsightConfidence = 'high' | 'medium' | 'low' | 'insufficient';
+
+/** 一条事实和它的依据。`value` 为 null 表示本地没有这项数据，不是 0。 */
+export interface InsightFact {
+  fact_id: string;
+  metric: string;
+  value: number | null;
+  unit: string;
+  comparison: InsightComparison | null;
+  baseline_window: BaselineWindow | null;
+  evidence_count: number;
+  source: string;
+  confidence: InsightConfidence;
+  reason: string | null;
+  evidence_refs: string[];
+}
+
+export interface BaselineEntry {
+  workout_id: string;
+  start_time: string;
+  distance_meters: number;
+}
+
+export interface BaselineExclusion {
+  workout_id: string;
+  reason: string;
+}
+
+export interface WorkoutInsight {
+  workout_id: string;
+  workout_type: string;
+  supported: boolean;
+  unsupported_reason: string | null;
+  facts: InsightFact[];
+  baseline_included: BaselineEntry[];
+  baseline_excluded: BaselineExclusion[];
+}
+
+export interface WeeklyReport {
+  generated_at: string;
+  recent_start: string;
+  recent_end: string;
+  baseline_start: string;
+  baseline_end: string;
+  facts: InsightFact[];
+}
+
 /** 三阶段中某一阶段的状态。`never` 是「从来没走到这一步」，不是失败。 */
 export interface StageState {
   state: 'ok' | 'failed' | 'never' | string;
@@ -536,9 +601,19 @@ export interface CapabilityProbe {
  */
 export type ExportDetail = 'summary' | 'full';
 
+/**
+ * 一次导出覆盖什么。两个变体互斥，不是「都传了谁优先」。
+ */
+export type ExportScope =
+  | { kind: 'dateRange'; start: string; end: string }
+  | { kind: 'workout'; workoutId: string };
+
 export interface ExportSelection {
-  startDate: string;
-  endDate: string;
+  /** 新调用方传这个。 */
+  scope?: ExportScope;
+  /** 旧调用方的日期范围。和 `scope` 同时提供会被后端拒绝。 */
+  startDate?: string;
+  endDate?: string;
   dataTypes: ExportDataType[];
   detail?: ExportDetail;
 }

@@ -92,8 +92,7 @@ export const useExport = () => {
       return null;
     }
     return {
-      startDate: exportStartDate.value,
-      endDate: exportEndDate.value,
+      scope: { kind: 'dateRange', start: exportStartDate.value, end: exportEndDate.value },
       dataTypes: [...exportDataTypes.value],
       detail: exportDetail.value,
     };
@@ -159,7 +158,7 @@ export const useExport = () => {
     try {
       const path = await showSaveDialog({
         title: meta.title,
-        defaultPath: `zeppbridge-${selection.startDate}-${selection.endDate}.${meta.extension}`,
+        defaultPath: `zeppbridge-${exportStartDate.value}-${exportEndDate.value}.${meta.extension}`,
         filters: [{ name: meta.filterName, extensions: [meta.extension] }],
       });
       if (!path) return;

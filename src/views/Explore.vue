@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import Icon from '../components/Icon.vue';
 import type { IconName } from '../components/Icon.vue';
 import {
@@ -14,7 +15,7 @@ import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { useAiHandoff } from '../composables/useAiHandoff';
 import { localDateString } from '../lib/format';
 import { AI_PROVIDERS, AI_PROVIDER_BY_ID, type AiProviderId } from '../lib/aiProviders';
-import type { ExportDataType, ExportSelection } from '../types';
+import type { ExportDataType, ExportScope, ExportSelection } from '../types';
 
 const {
   exportStartDate,
@@ -149,9 +150,13 @@ const templates: PromptTemplate[] = [
       'training_load',
     ],
     prompt: `你是一位私人健康教练，每周为我做一次数据复盘。
-基于以下来自 ZeppBridge 的本周数据，
-对比一般健康人群基准，总结本周表现，
-指出做得好的地方与需要注意的地方，并给出下周行动清单。
+基于以下来自 ZeppBridge 的本周数据，只和我自己此前的记录比较，
+总结本周变化，指出做得好的地方与值得留意的地方，并给出下周行动清单。
+
+约束：
+- 这份数据里没有任何人群基准，不要拿我和「一般健康人群」或任何平均水平比较；
+- 缺失的项直接说缺失，不要用 0 或估算值填补；
+- 不做医学诊断、疾病风险判断或治疗建议。
 
 请以 Markdown 格式输出。`,
   },
@@ -167,6 +172,19 @@ const categories = computed(() => {
     { key: 'sleep', label: '睡眠', icon: 'moon' as IconName, count: count('sleep') },
   ];
 });
+
+/* 从运动详情点「让 AI 展开分析」过来时，范围锁定在那一条记录上。
+   互斥的 ExportScope 让「日期范围」和「单次运动」不可能同时生效，
+   所以这里不需要任何优先级规则。 */
+const route = useRoute();
+const focusedWorkoutId = ref<string | null>(null);
+onMounted(() => {
+  const workout = route.query.workout;
+  if (typeof workout === 'string' && workout.trim()) focusedWorkoutId.value = workout.trim();
+});
+const currentScope = (): ExportScope => (focusedWorkoutId.value
+  ? { kind: 'workout', workoutId: focusedWorkoutId.value }
+  : { kind: 'dateRange', start: exportStartDate.value, end: exportEndDate.value });
 
 const activeCategory = ref('all');
 const templateQuery = ref('');
@@ -302,8 +320,7 @@ const loadPreview = async () => {
   previewBusy.value = true;
   try {
     const encoded = await tauriApi.getExportJson({
-      startDate: exportStartDate.value,
-      endDate: exportEndDate.value,
+      scope: currentScope(),
       dataTypes: [...exportDataTypes.value],
       detail: exportDetail.value,
     });
@@ -434,8 +451,7 @@ const sendToAi = async () => {
   }
 
   const selection: ExportSelection = {
-    startDate: exportStartDate.value,
-    endDate: exportEndDate.value,
+    scope: currentScope(),
     dataTypes: [...exportDataTypes.value],
     detail: exportDetail.value,
   };
@@ -487,6 +503,12 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
       <h1 id="export-title">交给 AI</h1>
       <p class="page-intro">选择模板、检查感知摘要并导出数据，一键将穿戴洞察发送到前沿 AI 工具。</p>
     </header>
+
+    <div v-if="focusedWorkoutId" class="workout-scope-banner" role="status">
+      <Icon name="info" :size="14" />
+      当前只导出运动记录 <code>{{ focusedWorkoutId }}</code>，日期范围暂不生效。
+      <button class="button secondary" type="button" @click="focusedWorkoutId = null">改回按日期范围</button>
+    </div>
 
     <div class="export-layout">
       <!-- 左列：模板列表 -->
@@ -831,6 +853,9 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 .stream-row input { width: 13px; height: 13px; margin: 0; accent-color: var(--accent); cursor: pointer; }
 .page-head h1 { margin-bottom: 6px; font-size: 24px; font-weight: 700; color: var(--ink); }
 
+.workout-scope-banner { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-raised); color: var(--subtle); font-size: 12px; }
+.workout-scope-banner code { color: var(--ink); font-family: var(--font-mono); font-size: 11px; }
+.workout-scope-banner .button { margin-left: auto; }
 .export-layout {
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr) 290px;

@@ -24,7 +24,9 @@ pub mod corrections;
 pub mod provenance;
 
 pub struct Database {
-    conn: Connection,
+    /// crate 内可见：洞察、备份等同属 Core 的模块直接复用这条连接，
+    /// 而不是各自再开一条去争锁。crate 之外仍然只能走公开方法。
+    pub(crate) conn: Connection,
 }
 
 /// True while the startup replay is rewriting derived rows from stored raw
@@ -3905,20 +3907,36 @@ impl Database {
     }
 
     pub fn build_ai_export(&self, selection: &ExportSelection) -> Result<(String, usize)> {
-        let start = NaiveDate::parse_from_str(&selection.start_date, "%Y-%m-%d")
-            .map_err(|_| ZeppBridgeError::ConfigError("导出开始日期无效".into()))?;
-        let end = NaiveDate::parse_from_str(&selection.end_date, "%Y-%m-%d")
-            .map_err(|_| ZeppBridgeError::ConfigError("导出结束日期无效".into()))?;
-        if end < start {
-            return Err(ZeppBridgeError::ConfigError(
-                "导出结束日期不能早于开始日期".into(),
-            ));
-        }
-        if (end - start).num_days() > 365 {
-            return Err(ZeppBridgeError::ConfigError(
-                "单次导出范围不能超过 366 天".into(),
-            ));
-        }
+        let scope = selection
+            .resolve_scope()
+            .map_err(ZeppBridgeError::ConfigError)?;
+        // 单次运动导出解析成「那条运动当天」加上一个 workout 过滤器：范围之内
+        // 的心率、睡眠等上下文照样带上，运动列表里只会有这一条。
+        let (start, end, workout_filter) = match &scope {
+            ExportScope::DateRange { start, end } => (
+                NaiveDate::parse_from_str(start, "%Y-%m-%d")
+                    .map_err(|_| ZeppBridgeError::ConfigError("导出开始日期无效".into()))?,
+                NaiveDate::parse_from_str(end, "%Y-%m-%d")
+                    .map_err(|_| ZeppBridgeError::ConfigError("导出结束日期无效".into()))?,
+                None,
+            ),
+            ExportScope::Workout { workout_id } => {
+                let day: String = self
+                    .conn
+                    .query_row(
+                        "SELECT date(start_time, 'localtime') FROM workouts WHERE workout_id = ?1",
+                        params![workout_id],
+                        |row| row.get(0),
+                    )
+                    .optional()?
+                    .ok_or_else(|| {
+                        ZeppBridgeError::DataUnavailable("本地库里没有这条运动记录".into())
+                    })?;
+                let day = NaiveDate::parse_from_str(&day, "%Y-%m-%d")
+                    .map_err(|_| ZeppBridgeError::ParseError("运动记录日期无效".into()))?;
+                (day, day, Some(workout_id.clone()))
+            }
+        };
         let allowed: BTreeSet<&str> = [
             "heart_rate",
             "hrv",
@@ -4228,9 +4246,10 @@ impl Database {
                         zepp_type, workout_type_source, workout_type_override
                  FROM workouts
                  WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2
+                   AND (?3 IS NULL OR workout_id = ?3)
                  ORDER BY start_time",
             )?;
-            let rows = stmt.query_map(params![start_text, end_text], |row| {
+            let rows = stmt.query_map(params![start_text, end_text, workout_filter], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
@@ -4909,8 +4928,9 @@ mod tests {
 
     fn export_selection(types: &[&str], detail: ExportDetail) -> ExportSelection {
         ExportSelection {
-            start_date: "2023-11-01".into(),
-            end_date: "2023-11-30".into(),
+            scope: Some(ExportScope::date_range("2023-11-01", "2023-11-30")),
+            start_date: None,
+            end_date: None,
             data_types: types.iter().map(|value| value.to_string()).collect(),
             detail,
         }

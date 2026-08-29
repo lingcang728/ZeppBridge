@@ -10,6 +10,7 @@ pub mod decoder;
 pub mod device_catalog;
 pub mod export_formats;
 pub mod fetcher;
+pub mod insight;
 pub mod local_api;
 pub mod models;
 pub mod normalizer;

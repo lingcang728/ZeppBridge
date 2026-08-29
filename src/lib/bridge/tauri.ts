@@ -21,6 +21,8 @@ import type {
   MetricSeries,
   DataHealth,
   DeviceCatalogOption,
+  WeeklyReport,
+  WorkoutInsight,
   IntegrityCheckResult,
   LocalApiStatus,
   SportOption,
@@ -233,6 +235,12 @@ export const tauriBackend: BridgeBackend = {
     return call<DiagnosticReport>('get_diagnostic_report');
   },
 
+  getWorkoutInsight(workoutId: string) {
+    return call<WorkoutInsight>('get_workout_insight', { workoutId });
+  },
+  getWeeklyReport() {
+    return call<WeeklyReport>('get_weekly_report');
+  },
   getDataHealth(windowDays?: number) {
     return call<DataHealth>('get_data_health', { windowDays });
   },

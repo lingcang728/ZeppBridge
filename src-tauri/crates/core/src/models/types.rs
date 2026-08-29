@@ -462,15 +462,100 @@ impl ExportDetail {
     }
 }
 
+/// 一次导出覆盖什么。
+///
+/// 两个变体互斥，不是「都传了谁优先」：一个既带日期范围又带 workout id 的
+/// 请求，调用方自己都说不清想要什么，与其替他选一个，不如直接拒绝。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", tag = "kind")]
+pub enum ExportScope {
+    DateRange { start: String, end: String },
+    Workout { workout_id: String },
+}
+
+/// 单次导出的最大跨度。365 天之外的历史请走数据库快照，不要塞进一个
+/// 要交给 AI 的 JSON。
+pub const MAX_EXPORT_RANGE_DAYS: i64 = 365;
+
+impl ExportScope {
+    pub fn date_range(start: impl Into<String>, end: impl Into<String>) -> Self {
+        ExportScope::DateRange {
+            start: start.into(),
+            end: end.into(),
+        }
+    }
+
+    /// 校验并归一化。日期必须是 `YYYY-MM-DD`，结束不能早于开始，跨度有上限，
+    /// workout id 不能为空。
+    pub fn validated(&self) -> std::result::Result<ExportScope, String> {
+        match self {
+            ExportScope::DateRange { start, end } => {
+                let parsed_start = chrono::NaiveDate::parse_from_str(start.trim(), "%Y-%m-%d")
+                    .map_err(|_| "导出开始日期无效".to_string())?;
+                let parsed_end = chrono::NaiveDate::parse_from_str(end.trim(), "%Y-%m-%d")
+                    .map_err(|_| "导出结束日期无效".to_string())?;
+                if parsed_end < parsed_start {
+                    return Err("导出结束日期不能早于开始日期".into());
+                }
+                if (parsed_end - parsed_start).num_days() > MAX_EXPORT_RANGE_DAYS {
+                    return Err("单次导出范围不能超过 366 天".into());
+                }
+                Ok(ExportScope::DateRange {
+                    start: parsed_start.format("%Y-%m-%d").to_string(),
+                    end: parsed_end.format("%Y-%m-%d").to_string(),
+                })
+            }
+            ExportScope::Workout { workout_id } => {
+                let trimmed = workout_id.trim();
+                if trimmed.is_empty() {
+                    return Err("workout id 不能为空".into());
+                }
+                Ok(ExportScope::Workout {
+                    workout_id: trimmed.to_string(),
+                })
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportSelection {
-    pub start_date: String,
-    pub end_date: String,
+    /// 新调用方传这个。
+    #[serde(default)]
+    pub scope: Option<ExportScope>,
+    /// 旧调用方的日期范围。短期兼容用，内部一律先转成 `ExportScope`。
+    #[serde(default)]
+    pub start_date: Option<String>,
+    #[serde(default)]
+    pub end_date: Option<String>,
     pub data_types: Vec<String>,
     /// Absent means `Summary`; older callers keep working.
     #[serde(default)]
     pub detail: ExportDetail,
+}
+
+impl ExportSelection {
+    /// 把新旧两种写法收敛成唯一的范围。
+    ///
+    /// 同时给了 `scope` 和 `startDate/endDate` 是矛盾请求，直接报错而不是
+    /// 定一个优先级——优先级规则只会让下一个人写出「我以为传了 workoutId
+    /// 就只导这一条」的 bug。
+    pub fn resolve_scope(&self) -> std::result::Result<ExportScope, String> {
+        let legacy = match (self.start_date.as_deref(), self.end_date.as_deref()) {
+            (Some(start), Some(end)) => Some(ExportScope::date_range(start, end)),
+            (None, None) => None,
+            _ => return Err("导出日期范围必须同时提供开始和结束".into()),
+        };
+        match (self.scope.as_ref(), legacy) {
+            (Some(_), Some(_)) => {
+                Err("导出范围只能二选一：日期范围或单次运动，不能同时提供".into())
+            }
+            (Some(scope), None) => scope.validated(),
+            (None, Some(scope)) => scope.validated(),
+            (None, None) => Err("导出请求缺少范围：需要日期范围或 workout id".into()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

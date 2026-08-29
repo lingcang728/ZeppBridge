@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { RouterLink, useRoute } from 'vue-router';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 import VChart from 'vue-echarts';
 import DesignIcon, { type DesignIconName } from '../components/DesignIcon.vue';
 import DeviceVisual from '../components/DeviceVisual.vue';
 import EmptyState from '../components/EmptyState.vue';
+import InsightCard from '../components/InsightCard.vue';
 import Icon from '../components/Icon.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import { useSyncController } from '../composables/useSyncController';
@@ -15,7 +16,7 @@ import { zeppSemanticColors } from '../lib/echartsTheme';
 import { formatPaceSeconds } from '../lib/metricSeries';
 import { workoutDisplayLabel, workoutDisplayType } from '../lib/workouts';
 import trexFallback from '../assets/devices/amazfit-t-rex-3.webp';
-import type { DeviceProfile, SportOption, Workout, WorkoutSeries, WorkoutSeriesSample, WorkoutRoutePoint } from '../types';
+import type { DeviceProfile, SportOption, Workout, WorkoutInsight, WorkoutSeries, WorkoutSeriesSample, WorkoutRoutePoint } from '../types';
 
 type WorkoutMetrics = Workout & {
   pace?: number | string | null;
@@ -59,6 +60,32 @@ const exportedNote = ref<string | null>(null);
 const activeFormat = ref<'json' | 'csv' | 'gpx'>('json');
 const workoutId = computed(() => String(route.params.workoutId || ''));
 const displayType = computed(() => workout.value ? workoutDisplayType(workout.value) : 'unknown');
+const router = useRouter();
+const insight = ref<WorkoutInsight | null>(null);
+const insightLoading = ref(false);
+const insightError = ref<string | null>(null);
+
+const loadInsight = async (id: string) => {
+  if (!isTauri()) return;
+  insightLoading.value = true;
+  insightError.value = null;
+  try {
+    insight.value = await tauriApi.getWorkoutInsight(id);
+  } catch (error) {
+    insight.value = null;
+    insightError.value = toUserMessage(error, '无法生成本次运动的洞察');
+  } finally {
+    insightLoading.value = false;
+  }
+};
+
+/* 「让 AI 展开分析」交给已有的交接流程，用同一份互斥导出范围指向这一条记录。
+   洞察事实和 AI 数据包因此读的是同一个库、同一套规则。 */
+const openAiHandoff = () => {
+  if (!workout.value) return;
+  void router.push({ path: '/explore', query: { workout: workout.value.workout_id } });
+};
+
 const typeOverrideBusy = ref(false);
 /* 纠正选项直接来自随包运动目录（一百多项），不是一份写死的短名单：目录里有
    「壁球」而名单里没有，用户就永远改不成它。目录被 include_str! 编进二进制，
@@ -530,6 +557,7 @@ const exportRecord = async () => {
 
 onMounted(() => {
   void loadDetail();
+  if (workoutId.value) void loadInsight(workoutId.value);
   if (isTauri()) {
     void tauriApi.getWorkoutTypeOptions()
       .then((options) => { typeOverrideOptions.value = options; })
@@ -594,6 +622,13 @@ watch([dataRevision, workoutId], () => void loadDetail());
           </div>
         </div>
       </section>
+
+      <InsightCard
+        :insight="insight"
+        :loading="insightLoading"
+        :error="insightError"
+        @handoff="openAiHandoff"
+      />
 
       <div class="lower">
         <div class="main-col">

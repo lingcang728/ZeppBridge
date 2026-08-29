@@ -2,15 +2,16 @@ use crate::app_state::AppState;
 use crate::connectors::ZeppConnector;
 use crate::device_catalog::{match_catalog, CatalogMatchInput, CatalogMatchStatus};
 use crate::export_formats;
+use crate::insight::{WeeklyReport, WorkoutInsight};
 use crate::ipc_types::CleanupResult;
 use crate::models::{
     AiHandoffMetadata, AiHandoffResult, CapabilityOverview, DailyPoint, DeviceCacheMetadata,
     DeviceCatalogOption, DeviceMatchStatus, DeviceProfile, DeviceProfilesResult,
     DiagnosticAssignedModel, DiagnosticDeviceCandidate, DiagnosticDeviceEvidence, DiagnosticField,
-    DiagnosticObjectShape, DiagnosticReport, ExportDetail, ExportResult, ExportSelection,
-    FeedbackSubmissionResult, HealthOverview, HeartRatePoint, HeartRateZoneOptions,
-    HeartRateZonePreference, MetricSeries, SleepSession, StorageEstimate, TrainingBalancePoint,
-    UserPrefs, Workout, WorkoutSeries,
+    DiagnosticObjectShape, DiagnosticReport, ExportDetail, ExportResult, ExportScope,
+    ExportSelection, FeedbackSubmissionResult, HealthOverview, HeartRatePoint,
+    HeartRateZoneOptions, HeartRateZonePreference, MetricSeries, SleepSession, StorageEstimate,
+    TrainingBalancePoint, UserPrefs, Workout, WorkoutSeries,
 };
 use crate::storage::corrections::WorkoutCodeLabel;
 use crate::storage::provenance::{DataHealth, IntegrityCheckResult};
@@ -267,6 +268,32 @@ pub async fn reprocess_local_data(
         "streams": streams,
         "message": "已使用新版解析器重新处理本地原始响应"
     }))
+}
+
+/// 单次运动的确定性洞察。
+///
+/// 后端只给可追溯的事实、比较和依据，一句自然语言都不产生：文案归界面，
+/// AI 只能解释这些事实，不能改写它们。
+#[tauri::command]
+pub async fn get_workout_insight(
+    state: tauri::State<'_, AppState>,
+    workout_id: String,
+) -> std::result::Result<WorkoutInsight, String> {
+    let db = state.db.lock().await;
+    db.workout_insight(&workout_id)
+        .map_err(|error| error.user_message())
+}
+
+/// 本地周报：最近 7 天对比你自己此前 28 天。
+///
+/// 不和任何人群基准比较 —— 项目没有人群数据，也不打算有。
+#[tauri::command]
+pub async fn get_weekly_report(
+    state: tauri::State<'_, AppState>,
+) -> std::result::Result<WeeklyReport, String> {
+    let db = state.db.lock().await;
+    db.weekly_report(Utc::now())
+        .map_err(|error| error.user_message())
 }
 
 /// 数据健康中心的后端契约。
@@ -1056,10 +1083,14 @@ async fn write_export(
         let file_name = if stable_ai_feed {
             "zeppbridge-ai-feed.json".to_string()
         } else {
+            // 文件名跟着范围走，所以单次运动导出不会和当天的整段导出撞名。
+            let label = match selection.resolve_scope() {
+                Ok(ExportScope::DateRange { start, end }) => format!("{start}-{end}"),
+                Ok(ExportScope::Workout { workout_id }) => format!("workout-{workout_id}"),
+                Err(_) => "export".to_string(),
+            };
             format!(
-                "zeppbridge-{}-{}-{}.json",
-                selection.start_date,
-                selection.end_date,
+                "zeppbridge-{label}-{}.json",
                 generated_at.format("%Y%m%d-%H%M%S")
             )
         };

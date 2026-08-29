@@ -9,8 +9,8 @@ mod updates;
 // `zeppbridge-core` so the CLI, MCP server and local REST API answer from the
 // same semantics instead of re-implementing them.
 pub use zeppbridge_core::{
-    auth, connectors, decoder, device_catalog, export_formats, fetcher, models, normalizer, paths,
-    sport_catalog, storage, sync,
+    auth, connectors, decoder, device_catalog, export_formats, fetcher, insight, models,
+    normalizer, paths, sport_catalog, storage, sync,
 };
 
 use app_state::AppState;
@@ -20,14 +20,14 @@ use commands::{
     get_device_profiles, get_diagnostic_report, get_export_json, get_health_overview,
     get_heart_rate_series, get_heart_rate_zones, get_login_status, get_metric_series,
     get_recent_sleep, get_recent_workouts, get_sleep_detail, get_storage_estimate,
-    get_training_balance, get_training_load_series, get_unknown_workout_codes, get_workout_detail,
-    get_workout_series, get_workout_type_options, import_from_har, manual_auth, open_data_folder,
-    prepare_ai_handoff, probe_data_capabilities, publish_ai_export, reprocess_local_data,
-    run_database_integrity_check, save_auth, save_csv_export, save_gpx_export, save_json_export,
-    set_device_model_override, set_heart_rate_zone_preference, set_user_prefs,
-    set_workout_code_label, set_workout_type_override, start_history_sync, start_incremental_sync,
-    start_initial_sync, start_web_login, submit_device_model_assignment, submit_diagnostic_report,
-    verify_auth,
+    get_training_balance, get_training_load_series, get_unknown_workout_codes, get_weekly_report,
+    get_workout_detail, get_workout_insight, get_workout_series, get_workout_type_options,
+    import_from_har, manual_auth, open_data_folder, prepare_ai_handoff, probe_data_capabilities,
+    publish_ai_export, reprocess_local_data, run_database_integrity_check, save_auth,
+    save_csv_export, save_gpx_export, save_json_export, set_device_model_override,
+    set_heart_rate_zone_preference, set_user_prefs, set_workout_code_label,
+    set_workout_type_override, start_history_sync, start_incremental_sync, start_initial_sync,
+    start_web_login, submit_device_model_assignment, submit_diagnostic_report, verify_auth,
 };
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
@@ -192,6 +192,8 @@ pub fn run() {
             submit_device_model_assignment,
             get_data_health,
             run_database_integrity_check,
+            get_workout_insight,
+            get_weekly_report,
             reprocess_local_data,
             get_export_json,
             save_json_export,

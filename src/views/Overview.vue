@@ -9,6 +9,7 @@ import DeviceVisual from '../components/DeviceVisual.vue';
 import Icon from '../components/Icon.vue';
 import RecordRow from '../components/RecordRow.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
+import WeeklyReportCard from '../components/WeeklyReportCard.vue';
 import Sparkline from '../components/Sparkline.vue';
 import { useDevices } from '../composables/useDevices';
 import { useSyncController } from '../composables/useSyncController';
@@ -332,6 +333,8 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
         </div>
       </div>
     </header>
+
+    <WeeklyReportCard />
 
     <div v-if="partialWarning" class="inline-alert warning" role="status"><Icon name="info" :size="15" />{{ partialWarning }}</div>
     <div v-if="deviceError" class="inline-alert warning" role="status"><Icon name="info" :size="15" />设备识别：{{ deviceError }}</div>
