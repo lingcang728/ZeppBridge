@@ -18,6 +18,7 @@ import type {
   DeviceProfile,
   DeviceProfilesResult,
   DiagnosticReport,
+  FeedbackSubmissionResult,
   SleepSession,
   StorageEstimate,
   SyncReport,
@@ -73,6 +74,7 @@ export interface BridgeBackend {
 
   reprocessLocalData(): Promise<ReprocessResult>;
   getDiagnosticReport(): Promise<DiagnosticReport>;
+  submitDiagnosticReport(): Promise<FeedbackSubmissionResult>;
   getExportJson(selection: ExportSelection): Promise<string>;
   saveJsonExport(selection: ExportSelection, path: string): Promise<ExportResult>;
   saveCsvExport(selection: ExportSelection, path: string): Promise<ExportResult>;

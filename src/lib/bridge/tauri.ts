@@ -11,6 +11,7 @@ import type {
   DeviceProfile,
   DeviceProfilesResult,
   DiagnosticReport,
+  FeedbackSubmissionResult,
   ExportResult,
   ExportSelection,
   HealthOverview,
@@ -201,6 +202,10 @@ export const tauriBackend: BridgeBackend = {
 
   getDiagnosticReport() {
     return call<DiagnosticReport>('get_diagnostic_report');
+  },
+
+  submitDiagnosticReport() {
+    return call<FeedbackSubmissionResult>('submit_diagnostic_report');
   },
 
   getExportJson(selection: ExportSelection) {

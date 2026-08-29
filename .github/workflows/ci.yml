@@ -43,6 +43,9 @@ jobs:
       - name: Build frontend
         run: npm run build
 
+      - name: Test feedback receiver
+        run: npm run test:feedback
+
       - name: Verify icon consistency
         run: |
           python -m pip install --upgrade pillow

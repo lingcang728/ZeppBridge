@@ -380,21 +380,11 @@ impl DataFetcher {
         let start = window.start_utc.timestamp();
         let end = window.end_utc.timestamp();
         let mut records = Vec::new();
-        let sports = [
-            "run",
-            "walking",
-            "ride",
-            "swimming",
-            "indoor_run",
-            "treadmill",
-            "trail",
-            "hiking",
-            "strength",
-            "elliptical",
-            "rowing",
-            "yoga",
-            "climb",
-        ];
+        // Despite its path, Zepp's run history endpoint is the account-wide
+        // workout feed. The activity kind lives in each record's numeric
+        // `type`; sibling paths such as `/strength/history.json` normally 404
+        // and must not be treated as separate feeds.
+        let sports = ["run"];
         let mut last_optional_error = None;
         for sport in sports {
             // Zepp 单页记录数有上限；响应 data.next 是下一页的 stopTrackId

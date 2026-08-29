@@ -7,9 +7,9 @@ use crate::models::{
     AiHandoffMetadata, AiHandoffResult, CapabilityOverview, DailyPoint, DeviceCacheMetadata,
     DeviceMatchStatus, DeviceProfile, DeviceProfilesResult, DiagnosticDeviceCandidate,
     DiagnosticDeviceEvidence, DiagnosticField, DiagnosticObjectShape, DiagnosticReport,
-    ExportDetail, ExportResult, ExportSelection, HealthOverview, HeartRatePoint,
-    HeartRateZoneOptions, HeartRateZonePreference, MetricSeries, SleepSession, StorageEstimate,
-    TrainingBalancePoint, UserPrefs, Workout, WorkoutSeries,
+    ExportDetail, ExportResult, ExportSelection, FeedbackSubmissionResult, HealthOverview,
+    HeartRatePoint, HeartRateZoneOptions, HeartRateZonePreference, MetricSeries, SleepSession,
+    StorageEstimate, TrainingBalancePoint, UserPrefs, Workout, WorkoutSeries,
 };
 use crate::storage::NORMALIZER_REVISION;
 use chrono::{DateTime, Utc};
@@ -18,6 +18,7 @@ use serde_json::{Map, Value};
 use std::collections::BTreeSet;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 const DEVICE_CACHE_MAX_AGE_SECONDS: i64 = 24 * 60 * 60;
 pub(crate) const AI_HANDOFF_INLINE_LIMIT_BYTES: usize = 2 * 1024 * 1024;
@@ -274,7 +275,7 @@ pub async fn set_workout_type_override(
         .ok_or_else(|| "运动记录不存在".to_owned())
 }
 
-/// Build an allowlist-only report for Issue #3. The cloud response is examined
+/// Build an allowlist-only report. The cloud response is examined
 /// in memory and is never copied into the result or persisted as a diagnostic.
 #[tauri::command]
 pub async fn get_diagnostic_report(
@@ -293,7 +294,7 @@ pub async fn get_diagnostic_report(
     };
     let db = state.db.lock().await;
     Ok(DiagnosticReport {
-        format: "zeppbridge.issue3.diagnostic.v1".into(),
+        format: "zeppbridge.feedback.v1".into(),
         app_version: env!("CARGO_PKG_VERSION").into(),
         schema_version: db
             .diagnostic_schema_version()
@@ -308,6 +309,43 @@ pub async fn get_diagnostic_report(
             .diagnostic_workout_type_conflicts()
             .map_err(|error| error.user_message())?,
     })
+}
+
+const FEEDBACK_ENDPOINT: &str = "https://zeppbridge.pages.dev/api/feedback";
+
+#[tauri::command]
+pub async fn submit_diagnostic_report(
+    state: tauri::State<'_, AppState>,
+) -> std::result::Result<FeedbackSubmissionResult, String> {
+    let report = get_diagnostic_report(state).await?;
+    let has_reportable_issue = report.device_evidence.unknown_device_count > 0
+        || !report.unknown_workout_codes.is_empty()
+        || report.workout_type_conflicts > 0;
+    if !has_reportable_issue {
+        return Err("当前没有检测到未识别设备或运动类型，无需提交报告".into());
+    }
+
+    // This client is intentionally separate from the Zepp connector: it has
+    // no cookie jar and receives no account token or cloud headers.
+    let client = reqwest::Client::builder()
+        .connect_timeout(Duration::from_secs(5))
+        .timeout(Duration::from_secs(12))
+        .user_agent(format!("ZeppBridge/{} feedback", env!("CARGO_PKG_VERSION")))
+        .build()
+        .map_err(|_| "无法初始化错误报告连接".to_string())?;
+    let response = client
+        .post(FEEDBACK_ENDPOINT)
+        .json(&report)
+        .send()
+        .await
+        .map_err(|_| "错误报告发送失败，请检查网络后重试".to_string())?;
+    if !response.status().is_success() {
+        return Err("错误报告服务暂时不可用，请稍后重试".into());
+    }
+    response
+        .json::<FeedbackSubmissionResult>()
+        .await
+        .map_err(|_| "错误报告服务返回了无法识别的结果".to_string())
 }
 
 #[tauri::command]
@@ -1232,12 +1270,79 @@ fn empty_device_diagnostic(status: &str) -> DiagnosticDeviceEvidence {
     DiagnosticDeviceEvidence {
         status: status.into(),
         object_count: 0,
+        unknown_device_count: 0,
         id_alias_objects: 0,
         serial_alias_objects: 0,
         name_field_objects: 0,
         firmware_field_objects: 0,
         candidates: Vec::new(),
+        unmatched_product_hints: Vec::new(),
         shapes: Vec::new(),
+    }
+}
+
+fn safe_product_hint(value: &str) -> Option<String> {
+    let value = value.trim();
+    if !(2..=64).contains(&value.chars().count())
+        || value.contains(['@', '\\', ':'])
+        || !value.chars().all(|ch| {
+            ch.is_alphanumeric()
+                || ch.is_whitespace()
+                || matches!(ch, '-' | '_' | '/' | '(' | ')' | '.')
+        })
+    {
+        return None;
+    }
+    let compact = value
+        .chars()
+        .filter(|ch| ch.is_alphanumeric())
+        .collect::<String>();
+    let looks_like_long_identifier =
+        compact.len() >= 12 && compact.chars().all(|ch| ch.is_ascii_hexdigit());
+    (!looks_like_long_identifier).then(|| value.to_owned())
+}
+
+fn collect_unmatched_product_hints(value: &Value, hints: &mut BTreeSet<String>, depth: usize) {
+    if depth > 6 || hints.len() >= 12 {
+        return;
+    }
+    match value {
+        Value::Array(items) => {
+            for item in items.iter().take(8) {
+                collect_unmatched_product_hints(item, hints, depth + 1);
+            }
+        }
+        Value::Object(object) => {
+            for (key, child) in object {
+                let is_product_hint = matches!(
+                    key.as_str(),
+                    "productName"
+                        | "product_name"
+                        | "modelName"
+                        | "model"
+                        | "modelCode"
+                        | "model_code"
+                        | "modelNumber"
+                        | "hardwareModel"
+                        | "productCode"
+                        | "deviceType"
+                );
+                if is_product_hint {
+                    if let Some(hint) = child.as_str().and_then(safe_product_hint) {
+                        hints.insert(hint);
+                    }
+                }
+                collect_unmatched_product_hints(child, hints, depth + 1);
+                if key == "additionalInfo" || key == "bind_device" || key == "bindDevice" {
+                    if let Some(raw) = child.as_str() {
+                        if let Ok(decoded) = serde_json::from_str::<Value>(raw) {
+                            collect_unmatched_product_hints(&decoded, hints, depth + 1);
+                        }
+                    }
+                }
+            }
+        }
+        _ => {}
     }
 }
 
@@ -1352,7 +1457,15 @@ fn build_device_diagnostic(value: &Value) -> DiagnosticDeviceEvidence {
     collect_device_shapes(value, "$", &mut evidence, &mut shapes, 0);
     evidence.shapes = shapes.into_iter().collect();
     let mut seen = BTreeSet::new();
-    for profile in parse_device_profiles(value) {
+    let mut unmatched_product_hints = BTreeSet::new();
+    for item in device_items(value) {
+        let Some(profile) = parse_device_profiles(&item).into_iter().next() else {
+            continue;
+        };
+        if profile.match_status == DeviceMatchStatus::Unknown {
+            evidence.unknown_device_count += 1;
+            collect_unmatched_product_hints(&item, &mut unmatched_product_hints, 0);
+        }
         let (Some(catalog_id), Some(canonical_name)) = (profile.catalog_id, profile.canonical_name)
         else {
             continue;
@@ -1369,6 +1482,7 @@ fn build_device_diagnostic(value: &Value) -> DiagnosticDeviceEvidence {
     evidence
         .candidates
         .sort_by(|a, b| a.catalog_id.cmp(&b.catalog_id));
+    evidence.unmatched_product_hints = unmatched_product_hints.into_iter().collect();
     evidence
 }
 
@@ -1377,13 +1491,7 @@ pub(crate) fn parse_device_profiles(value: &serde_json::Value) -> Vec<DeviceProf
     items
         .into_iter()
         .map(|item| {
-            let extra = match item.get("additionalInfo") {
-                Some(serde_json::Value::String(raw)) => {
-                    serde_json::from_str(raw).unwrap_or(item.clone())
-                }
-                Some(value) => value.clone(),
-                None => item.clone(),
-            };
+            let extra = flattened_device_metadata(&item);
             let display_name =
                 first_string(&item, &["displayName", "deviceName", "nickname", "name"]).or_else(
                     || first_string(&extra, &["displayName", "deviceName", "nickname", "name"]),
@@ -1471,6 +1579,37 @@ pub(crate) fn parse_device_profiles(value: &serde_json::Value) -> Vec<DeviceProf
             profile.device_id.is_some() || profile.serial.is_some() || profile.name.is_some()
         })
         .collect()
+}
+
+fn merge_device_metadata(target: &mut Map<String, Value>, value: &Value, depth: usize) {
+    if depth > 6 {
+        return;
+    }
+    let decoded;
+    let value = if let Some(raw) = value.as_str() {
+        decoded = serde_json::from_str::<Value>(raw).ok();
+        decoded.as_ref().unwrap_or(value)
+    } else {
+        value
+    };
+    let Some(object) = value.as_object() else {
+        return;
+    };
+    for (key, child) in object {
+        target.entry(key.clone()).or_insert_with(|| child.clone());
+        if matches!(
+            key.as_str(),
+            "additionalInfo" | "bind_device" | "bindDevice" | "deviceInfo" | "device_info"
+        ) {
+            merge_device_metadata(target, child, depth + 1);
+        }
+    }
+}
+
+fn flattened_device_metadata(item: &Value) -> Value {
+    let mut merged = Map::new();
+    merge_device_metadata(&mut merged, item, 0);
+    Value::Object(merged)
 }
 
 fn device_items(value: &serde_json::Value) -> Vec<serde_json::Value> {
@@ -1678,6 +1817,28 @@ mod tests {
             Some("Amazfit T-Rex 3 Pro 48mm/44mm")
         );
         assert_eq!(profile.match_status, DeviceMatchStatus::Alias);
+    }
+
+    #[test]
+    fn parse_device_profiles_reads_double_nested_bind_metadata() {
+        let nested = serde_json::to_string(&json!({
+            "bindDevice": serde_json::to_string(&json!({
+                "productName": "Amazfit Balance 2",
+                "productVersion": "6.2.208.7"
+            })).unwrap()
+        }))
+        .unwrap();
+        let value = json!({
+            "items": [{
+                "deviceId": "private-device-id",
+                "displayName": "我的手表",
+                "additionalInfo": nested
+            }]
+        });
+        let profile = parse_device_profile(&value);
+        assert_eq!(profile.catalog_id.as_deref(), Some("amazfit-balance-2"));
+        assert_eq!(profile.canonical_name.as_deref(), Some("Amazfit Balance 2"));
+        assert_eq!(profile.firmware.as_deref(), Some("6.2.208.7"));
     }
 
     #[test]

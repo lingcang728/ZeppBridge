@@ -1,6 +1,13 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "zeppbridge",
-  "compatibility_date": "2026-08-18",
-  "pages_build_output_dir": "./dist"
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "zeppbridge",
+	"compatibility_date": "2026-08-18",
+	"pages_build_output_dir": "./dist",
+	"d1_databases": [
+		{
+			"binding": "FEEDBACK_DB",
+			"database_name": "zeppbridge-feedback",
+			"database_id": "0a25f637-ed8f-41ad-9927-2c80cdad5bf2"
+		}
+	]
 }

@@ -7,7 +7,8 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-pub(crate) const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v15-issue-3";
+pub(crate) const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v16-workout-catalog";
+const PREVIOUS_RELEASE_NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v14";
 const LAST_CLOUD_SYNC_AT_KEY: &str = "last_cloud_sync_at";
 const LAST_CLOUD_SYNC_OUTCOME_KEY: &str = "last_cloud_sync_outcome";
 const LAST_LOCAL_REPROCESS_AT_KEY: &str = "last_local_reprocess_at";
@@ -1890,12 +1891,42 @@ impl Database {
         if current.as_deref() == Some(NORMALIZER_REVISION) {
             return Ok(None);
         }
+        // v0.10.0 already contains every non-workout normalization change that
+        // precedes this revision. Replaying only workout summaries avoids
+        // decoding very large, unrelated daily-summary payloads during the
+        // v0.11.0 upgrade while still applying the new sport catalog.
+        if current.as_deref() == Some(PREVIOUS_RELEASE_NORMALIZER_REVISION) {
+            return self
+                .reprocess_raw_records_for_stream(Some("workouts"))
+                .map(Some);
+        }
         self.reprocess_raw_records().map(Some)
     }
 
     pub fn reprocess_raw_records(&self) -> Result<BTreeMap<String, i64>> {
+        self.reprocess_raw_records_for_stream(None)
+    }
+
+    fn reprocess_raw_records_for_stream(
+        &self,
+        stream_filter: Option<&str>,
+    ) -> Result<BTreeMap<String, i64>> {
         let _replay_guard = ReplayGuard::enter();
-        let raw_records = {
+        let raw_records = if let Some(stream) = stream_filter {
+            let mut stmt = self.conn.prepare(
+                "SELECT id, stream, source_key, payload
+                 FROM raw_records WHERE stream = ?1 ORDER BY id",
+            )?;
+            let rows = stmt.query_map([stream], |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                ))
+            })?;
+            rows.collect::<std::result::Result<Vec<_>, _>>()?
+        } else {
             let mut stmt = self
                 .conn
                 .prepare("SELECT id, stream, source_key, payload FROM raw_records ORDER BY id")?;
@@ -4852,6 +4883,64 @@ mod tests {
         assert_eq!(db.diagnostic_schema_version().unwrap(), 11);
         db.migrate().unwrap();
         assert_eq!(db.diagnostic_schema_version().unwrap(), 11);
+    }
+
+    #[test]
+    fn v14_upgrade_replays_workouts_without_touching_unrelated_large_streams() {
+        let db = Database::in_memory().unwrap();
+        db.insert_raw_record(&RawRecord {
+            stream: "daily_summary".into(),
+            source_key: "daily-summary-test".into(),
+            source_scope: SourceScope::UserFused,
+            device_id: None,
+            start_utc: ts(),
+            end_utc: None,
+            payload: serde_json::json!({
+                "data": [{ "date": "2023-11-14", "steps": 1234 }]
+            }),
+            capability: CapabilityStatus::Verified,
+        })
+        .unwrap();
+        db.insert_raw_record(&RawRecord {
+            stream: "workouts".into(),
+            source_key: "workouts-test".into(),
+            source_scope: SourceScope::Device,
+            device_id: None,
+            start_utc: ts(),
+            end_utc: None,
+            payload: serde_json::json!({
+                "data": [{
+                    "trackid": 1_700_000_000i64,
+                    "end_time": 1_700_003_600i64,
+                    "type": 52
+                }]
+            }),
+            capability: CapabilityStatus::Verified,
+        })
+        .unwrap();
+        db.conn
+            .execute(
+                "INSERT INTO app_meta(key, value, updated_at)
+                 VALUES('normalizer_revision', ?1, ?2)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                params![PREVIOUS_RELEASE_NORMALIZER_REVISION, ts().to_rfc3339()],
+            )
+            .unwrap();
+
+        let counts = db.reprocess_raw_records_if_needed().unwrap().unwrap();
+
+        assert_eq!(counts.get("workouts"), Some(&1));
+        assert_eq!(db.normalized_stream_count("daily_summary").unwrap(), 0);
+        assert_eq!(db.normalized_stream_count("workouts").unwrap(), 1);
+        let revision: String = db
+            .conn
+            .query_row(
+                "SELECT value FROM app_meta WHERE key = 'normalizer_revision'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(revision, NORMALIZER_REVISION);
     }
 
     #[test]

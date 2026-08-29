@@ -115,6 +115,10 @@ const installUpdate = async () => {
 const connected = computed(() => appStatus.value?.connection_state === 'connected');
 const configuredOnly = computed(() => appStatus.value?.connection_state === 'configured');
 const accountRecognized = computed(() => connected.value || configuredOnly.value);
+const unknownDeviceDetected = computed(() => accountRecognized.value && (
+  deviceModels.value.length === 0
+  || deviceModels.value.some((model) => model.profile.match_status === 'unknown')
+));
 const loginInProgress = computed(() => ['waiting', 'extracting', 'verifying'].includes(String(loginStatus.value.state)));
 const retentionDays = ref(appStatus.value?.retention_days ?? 365);
 const historyDays = ref(appStatus.value?.history_sync_days ?? 30);
@@ -355,16 +359,19 @@ const copyLocalApiExample = async () => {
   }
 };
 
-const copyDiagnosticReport = async () => {
+const submitDiagnosticReport = async () => {
+  const confirmed = window.confirm(
+    '只会发送应用版本、系统类型、解析器版本、未识别设备的产品级提示与字段结构、固件版本，以及未知运动编号和数量。不会发送 Zepp 账号、Token、序列号、设备 ID、GPS、健康数值、原始响应或本机路径。确认提交吗？',
+  );
+  if (!confirmed) return;
   diagnosticBusy.value = true;
   dataError.value = null;
   dataMessage.value = null;
   try {
-    const report = await backend.getDiagnosticReport();
-    await navigator.clipboard.writeText(JSON.stringify(report, null, 2));
-    dataMessage.value = 'Issue #3 脱敏诊断已复制，可直接粘贴到 GitHub；请勿另附 raw、token 或健康截图。';
+    const result = await backend.submitDiagnosticReport();
+    dataMessage.value = `错误报告已安全提交，报告编号：${result.reportId}`;
   } catch (error) {
-    dataError.value = toUserMessage(error, '生成脱敏诊断失败');
+    dataError.value = toUserMessage(error, '错误报告提交失败');
   } finally {
     diagnosticBusy.value = false;
   }
@@ -686,6 +693,13 @@ const runCapabilityProbe = async () => {
             <span :class="['source-state', { on: source.state !== '未识别' }]"><i class="dot"></i>{{ source.state }}</span>
           </div>
         </div>
+        <div v-if="unknownDeviceDetected && !devicesLoading" class="diagnostic-panel unknown-device-report" role="status">
+          <strong>检测到未识别设备</strong>
+          <p>先尝试「重新识别设备」；如果仍未识别，可以直接提交固定白名单的错误报告，无需 GitHub 账号或手动复制数据。</p>
+          <button class="button secondary" type="button" :disabled="diagnosticBusy" @click="submitDiagnosticReport">
+            <Icon name="send" :size="14" />{{ diagnosticBusy ? '正在安全提交…' : '提交错误报告' }}
+          </button>
+        </div>
       </section>
 
     </div>
@@ -781,10 +795,10 @@ const runCapabilityProbe = async () => {
           <Icon name="shield" :size="13" />查看本地隐私与脱敏原则
         </button>
         <div class="diagnostic-panel">
-          <strong>设备与运动类型诊断</strong>
-          <p>只包含字段名、JSON 类型、布尔状态、计数、目录候选和固件版本；不包含账号、token、序列号、设备 ID、GPS、健康数值、原始响应或本机路径。</p>
-          <button class="button secondary" type="button" :disabled="diagnosticBusy" @click="copyDiagnosticReport">
-            <Icon name="copy" :size="14" />{{ diagnosticBusy ? '正在生成…' : '复制脱敏诊断' }}
+          <strong>设备或运动没有识别？</strong>
+          <p>无需注册 GitHub 或复制数据。确认后只把产品级字段结构、固件版本、未知运动编号和数量发送到 ZeppBridge 的私有错误报告库；绝不发送账号、Token、序列号、设备 ID、GPS、健康数值、原始响应或本机路径。</p>
+          <button class="button secondary" type="button" :disabled="diagnosticBusy" @click="submitDiagnosticReport">
+            <Icon name="send" :size="14" />{{ diagnosticBusy ? '正在安全提交…' : '提交错误报告' }}
           </button>
         </div>
       </section>
@@ -986,7 +1000,8 @@ const runCapabilityProbe = async () => {
           <p><strong>1. 本地处理优先：</strong>所有健康与运动时序数据仅存储在本地 SQLite 数据库中，解析与脱敏完全在本地完成。</p>
           <p><strong>2. 认证凭据严格隔离：</strong>App Token 与 User ID 等凭据不与任何第三方分享，AI 导出时自动执行不可逆脱敏。</p>
           <p><strong>3. 敏感定位控制：</strong>GPS 经纬度数据默认不注入 AI 剪贴板，严格保障家庭与常用运动路线隐私。</p>
-          <p><strong>4. 透明开源：</strong>端到端代码开源，无暗中网络回传逻辑。</p>
+          <p><strong>4. 错误报告由你决定：</strong>只有点击并确认「提交错误报告」后，才发送固定白名单的产品级诊断；不会发送账号、设备 ID、运动详情或健康数据，也不会自动创建 GitHub Issue。</p>
+          <p><strong>5. 透明开源：</strong>端到端代码开源，无暗中网络回传逻辑。</p>
         </div>
         <div class="modal-foot">
           <button type="button" class="button primary" @click="privacyModalOpen = false">我知道了</button>

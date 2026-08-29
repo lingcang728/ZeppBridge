@@ -1,3 +1,9 @@
+import workoutCatalog from '../assets/workouts/catalog.json';
+
+const catalogLabels = new Map(
+  workoutCatalog.sports.map((sport) => [sport.key, sport.label_zh]),
+);
+
 export const workoutLabel = (value: string): string => {
   const unknownCode = value.trim().toLowerCase().match(/^unknown:(-?\d+)$/);
   if (unknownCode) return `未识别运动（编号 ${unknownCode[1]}）`;
@@ -23,7 +29,8 @@ export const workoutLabel = (value: string): string => {
     activity: '活动',
     unknown: '未识别运动',
   };
-  return labels[value.trim().toLowerCase()] || value || '运动';
+  const normalized = value.trim().toLowerCase();
+  return catalogLabels.get(normalized) || labels[normalized] || value || '运动';
 };
 
 export const sourceLabel = (scope?: string): string => dataScopeLabel(scope);

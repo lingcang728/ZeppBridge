@@ -217,15 +217,22 @@ export interface DiagnosticReport {
   deviceEvidence: {
     status: string;
     objectCount: number;
+    unknownDeviceCount: number;
     idAliasObjects: number;
     serialAliasObjects: number;
     nameFieldObjects: number;
     firmwareFieldObjects: number;
     candidates: DiagnosticDeviceCandidate[];
+    unmatchedProductHints: string[];
     shapes: DiagnosticObjectShape[];
   };
   unknownWorkoutCodes: Array<{ code: number; records: number }>;
   workoutTypeConflicts: number;
+}
+
+export interface FeedbackSubmissionResult {
+  reportId: string;
+  submittedAt: string;
 }
 
 export interface WorkoutRoutePoint {

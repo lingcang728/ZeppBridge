@@ -561,11 +561,13 @@ pub struct DiagnosticDeviceCandidate {
 pub struct DiagnosticDeviceEvidence {
     pub status: String,
     pub object_count: usize,
+    pub unknown_device_count: usize,
     pub id_alias_objects: usize,
     pub serial_alias_objects: usize,
     pub name_field_objects: usize,
     pub firmware_field_objects: usize,
     pub candidates: Vec<DiagnosticDeviceCandidate>,
+    pub unmatched_product_hints: Vec<String>,
     pub shapes: Vec<DiagnosticObjectShape>,
 }
 
@@ -590,6 +592,13 @@ pub struct DiagnosticReport {
     pub device_evidence: DiagnosticDeviceEvidence,
     pub unknown_workout_codes: Vec<DiagnosticWorkoutCode>,
     pub workout_type_conflicts: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct FeedbackSubmissionResult {
+    pub report_id: String,
+    pub submitted_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

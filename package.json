@@ -1,12 +1,13 @@
 {
   "name": "zeppbridge",
   "private": true,
-  "version": "0.10.0",
+  "version": "0.11.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "build:web": "vite build",
+    "test:feedback": "node --test tests/feedback-function.test.mjs",
     "preview": "vite preview",
     "tauri": "tauri",
     "package:release": "pwsh -NoProfile -File scripts/windows/package-release.ps1",
@@ -31,6 +32,7 @@
     "@vitejs/plugin-vue": "^5.2.1",
     "typescript": "~5.6.2",
     "vite": "^6.0.3",
-    "vue-tsc": "^2.1.10"
+    "vue-tsc": "^2.1.10",
+    "wrangler": "^4.127.1"
   }
 }

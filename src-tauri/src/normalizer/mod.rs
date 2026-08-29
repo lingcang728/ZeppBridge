@@ -221,15 +221,26 @@ impl Normalizer {
             // codes as outdoor runs. Keep unknown numeric facts explicit.
             let zepp_type =
                 first_number(object, &["type", "sport_mode"]).map(|value| value.round() as i32);
+            let explicit_type = first_string(
+                object,
+                &[
+                    "workout_type",
+                    "sportType",
+                    "sport_title",
+                    "sportTitle",
+                    "sport_name",
+                    "sportName",
+                ],
+            );
             let (workout_type, type_source) = if let Some(code) = zepp_type {
                 match zepp_sport_type_name(i64::from(code)) {
                     Some(mapped) => (mapped.to_owned(), "numeric_mapped".to_owned()),
-                    None => (format!("unknown:{code}"), "unknown_code".to_owned()),
+                    None => match explicit_type {
+                        Some(value) => (normalize_type_text(&value), "string_field".to_owned()),
+                        None => (format!("unknown:{code}"), "unknown_code".to_owned()),
+                    },
                 }
-            } else if let Some(value) = first_string(
-                object,
-                &["workout_type", "sportType", "sport", "sport_title"],
-            ) {
+            } else if let Some(value) = explicit_type {
                 (normalize_type_text(&value), "string_field".to_owned())
             } else {
                 ("unknown".to_owned(), "missing".to_owned())
@@ -479,26 +490,7 @@ impl Normalizer {
 /// 8/10/14/23/92 来自社区参考实现；13/22/192 按本地记录动态特征
 /// （步频/步幅/配速/心率）推断，新设备编码出现时可再校正。
 fn zepp_sport_type_name(type_id: i64) -> Option<&'static str> {
-    match type_id {
-        1 => Some("run"),
-        6 => Some("walking"),
-        8 => Some("treadmill"),
-        9 => Some("ride"),
-        10 => Some("indoor_cycling"),
-        // 步频 ~99spm、配速 ~3.5km/h，步行特征（13 的语义待 Zepp 官方确认）
-        13 => Some("walking"),
-        14 => Some("swimming"),
-        16 => Some("activity"),
-        // 10-15km、~3.6km/h 长时户外带 GPS，徒步特征
-        22 => Some("hiking"),
-        23 => Some("rowing"),
-        92 => Some("badminton"),
-        // 步频 ~166spm、步幅 ~105cm，明确跑步步态（新固件编码）
-        192 => Some("run"),
-        // AI 活动：仅卡路里 + 心率，无距离
-        223 => Some("activity"),
-        _ => None,
-    }
+    crate::sport_catalog::resolve(type_id)
 }
 
 fn normalize_type_text(value: &str) -> String {
@@ -1907,6 +1899,39 @@ mod tests {
         assert_eq!(result[0].type_source, "unknown_code");
         assert_eq!(result[0].effective_type, "unknown:105");
         assert_ne!(result[0].workout_type, "run");
+    }
+
+    #[test]
+    fn unknown_numeric_workout_uses_explicit_server_title_when_available() {
+        let result = Normalizer::normalize_workouts_with_sport(
+            &json!({
+                "data": { "summary": [{
+                    "trackid": 1_700_350_000i64,
+                    "end_time": 1_700_353_600i64,
+                    "type": 240,
+                    "sport_title": "HYROX Training"
+                }] }
+            }),
+            Some("run"),
+        )
+        .unwrap();
+        assert_eq!(result[0].zepp_type, Some(240));
+        assert_eq!(result[0].normalized_type, "hyrox_training");
+        assert_eq!(result[0].type_source, "string_field");
+        assert_ne!(result[0].workout_type, "run");
+    }
+
+    #[test]
+    fn extended_cloud_codes_cover_strength_and_cross_training() {
+        let result = Normalizer::normalize_workouts(&json!({
+            "data": { "summary": [
+                {"trackid": 1_700_600_000i64, "end_time": 1_700_603_600i64, "type": 52},
+                {"trackid": 1_700_700_000i64, "end_time": 1_700_703_600i64, "type": 130}
+            ] }
+        }))
+        .unwrap();
+        assert_eq!(result[0].workout_type, "strength");
+        assert_eq!(result[1].workout_type, "cross_training");
     }
 
     #[test]

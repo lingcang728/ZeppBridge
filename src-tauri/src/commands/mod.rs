@@ -13,6 +13,7 @@ pub(crate) use data::{
     get_workout_detail, get_workout_series, open_data_folder, prepare_ai_handoff,
     publish_ai_export, reprocess_local_data, save_csv_export, save_gpx_export, save_json_export,
     set_heart_rate_zone_preference, set_user_prefs, set_workout_type_override,
+    submit_diagnostic_report,
 };
 pub(crate) use login::{cancel_web_login, get_login_status, start_web_login};
 pub(crate) use status::get_app_status;

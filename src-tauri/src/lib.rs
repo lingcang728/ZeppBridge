@@ -11,6 +11,7 @@ mod local_api;
 mod models;
 mod normalizer;
 mod paths;
+mod sport_catalog;
 mod storage;
 mod sync;
 mod updates;
@@ -26,7 +27,7 @@ use commands::{
     probe_data_capabilities, publish_ai_export, reprocess_local_data, save_auth, save_csv_export,
     save_gpx_export, save_json_export, set_heart_rate_zone_preference, set_user_prefs,
     set_workout_type_override, start_history_sync, start_incremental_sync, start_initial_sync,
-    start_web_login, verify_auth,
+    start_web_login, submit_diagnostic_report, verify_auth,
 };
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
@@ -177,6 +178,7 @@ pub fn run() {
             get_device_profile,
             get_device_profiles,
             get_diagnostic_report,
+            submit_diagnostic_report,
             set_workout_type_override,
             reprocess_local_data,
             get_export_json,
