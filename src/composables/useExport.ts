@@ -2,6 +2,7 @@ import { ref } from 'vue';
 import { save as showSaveDialog } from '@tauri-apps/plugin-dialog';
 import { tauriApi, toUserMessage } from './useTauriApi';
 import { localDateString } from '../lib/format';
+import { buildExportSelection } from '../lib/exportScope';
 import type {
   ExportDataType,
   ExportDetail,
@@ -83,19 +84,18 @@ export const useExport = () => {
   const exportSelection = (): ExportSelection | null => {
     exportError.value = null;
     exportMessage.value = null;
-    if (!exportStartDate.value || !exportEndDate.value || exportStartDate.value > exportEndDate.value) {
-      exportError.value = '请选择有效的开始和结束日期。';
-      return null;
-    }
-    if (!exportDataTypes.value.length) {
-      exportError.value = '请至少选择一种数据类型。';
-      return null;
-    }
-    return {
-      scope: { kind: 'dateRange', start: exportStartDate.value, end: exportEndDate.value },
+    // 范围规则在 lib/exportScope.ts 一处实现：CLI 和后端也认同一套。
+    const result = buildExportSelection({
+      startDate: exportStartDate.value,
+      endDate: exportEndDate.value,
       dataTypes: [...exportDataTypes.value],
       detail: exportDetail.value,
-    };
+    });
+    if (!result.ok) {
+      exportError.value = result.error;
+      return null;
+    }
+    return result.selection;
   };
 
   const copyExportJson = async () => {

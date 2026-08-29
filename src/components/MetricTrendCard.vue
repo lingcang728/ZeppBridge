@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import VChart from 'vue-echarts';
+import { VChart } from '../lib/echartsSetup';
 import { buildSeriesOption, coverageLabel } from '../lib/metricSeries';
 import type { MetricSeries } from '../types';
 

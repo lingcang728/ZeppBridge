@@ -43,6 +43,13 @@ jobs:
       - name: Build frontend
         run: npm run build
 
+      # 首屏体积预算。挡的是「一次提交多出几百 kB」这种没人会主动去量的回归。
+      - name: Check bundle budget
+        run: npm run budget:check
+
+      - name: Test frontend
+        run: npm test
+
       - name: Test feedback receiver
         run: npm run test:feedback
 

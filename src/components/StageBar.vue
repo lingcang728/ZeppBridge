@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import VChart from 'vue-echarts';
+import { VChart } from '../lib/echartsSetup';
 import { formatDuration, formatTime, isFiniteNumber } from '../lib/format';
 import { zeppSemanticColors } from '../lib/echartsTheme';
 import type { SleepStageSlice } from '../types';

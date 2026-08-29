@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
-import VChart from 'vue-echarts';
+import { VChart } from '../lib/echartsSetup';
 import DesignIcon, { type DesignIconName } from '../components/DesignIcon.vue';
 import DeviceVisual from '../components/DeviceVisual.vue';
 import EmptyState from '../components/EmptyState.vue';

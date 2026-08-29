@@ -15,7 +15,11 @@
     "publish:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/publish-local.ps1 -UserEntryOnly",
     "icons:generate": "node scripts/icon/generate-icons.mjs",
     "icons:verify": "python scripts/icon/verify-icons.py || py -3 scripts/icon/verify-icons.py",
-    "tools:package": "pwsh -NoProfile -File scripts/release/package-tools.ps1"
+    "tools:package": "pwsh -NoProfile -File scripts/release/package-tools.ps1",
+    "budget:check": "node scripts/release/check-bundle-budget.mjs",
+    "budget:update": "node scripts/release/check-bundle-budget.mjs --update",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -33,6 +37,7 @@
     "@vitejs/plugin-vue": "^5.2.1",
     "typescript": "~5.6.2",
     "vite": "^6.0.3",
+    "vitest": "^4.1.11",
     "vue-tsc": "^2.1.10",
     "wrangler": "^4.127.1"
   }

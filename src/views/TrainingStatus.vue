@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import VChart from 'vue-echarts';
+import { VChart } from '../lib/echartsSetup';
 import HeartRateZonePicker from '../components/HeartRateZonePicker.vue';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
 import PageHeader from '../components/PageHeader.vue';

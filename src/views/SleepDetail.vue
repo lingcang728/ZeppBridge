@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
-import VChart from 'vue-echarts';
+import { VChart } from '../lib/echartsSetup';
 import Icon from '../components/Icon.vue';
 import CircularProgress from '../components/CircularProgress.vue';
 import StageBar from '../components/StageBar.vue';

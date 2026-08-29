@@ -1,17 +1,9 @@
 import { createApp } from "vue";
-import { registerTheme, use } from "echarts/core";
-import { LineChart, BarChart } from "echarts/charts";
-import { GridComponent, TooltipComponent, LegendComponent, MarkLineComponent, VisualMapComponent } from "echarts/components";
-import { CanvasRenderer } from "echarts/renderers";
-import VChart from "vue-echarts";
 import App from "./App.vue";
 import router from "./router";
-import { zeppThemeDark } from "./lib/echartsTheme";
 import "./styles/fonts.css";
 
-use([LineChart, BarChart, GridComponent, TooltipComponent, LegendComponent, MarkLineComponent, VisualMapComponent, CanvasRenderer]);
-registerTheme("zeppbridge-dark", zeppThemeDark);
-
+// ECharts 的注册刻意不在这里：见 lib/echartsSetup.ts。放在入口会把整个图表
+// 引擎钉进首屏 bundle，连只看落地页的访客也要下载一遍。
 const app = createApp(App);
-app.component("VChart", VChart);
 app.use(router).mount("#app");

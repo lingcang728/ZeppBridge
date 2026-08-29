@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import { graphic } from 'echarts/core';
-import VChart from 'vue-echarts';
+import { VChart } from '../lib/echartsSetup';
 import CircularProgress from '../components/CircularProgress.vue';
 import DesignIcon, { type DesignIconName } from '../components/DesignIcon.vue';
 import DeviceVisual from '../components/DeviceVisual.vue';
