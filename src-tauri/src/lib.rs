@@ -1,20 +1,17 @@
 mod app_state;
-mod auth;
 mod commands;
-mod connectors;
-mod decoder;
-mod device_catalog;
-mod export_formats;
-mod fetcher;
 mod ipc_types;
 mod local_api;
-mod models;
-mod normalizer;
-mod paths;
-mod sport_catalog;
-mod storage;
-mod sync;
 mod updates;
+
+// The desktop shell is an adapter over the shared core: models, storage,
+// migrations, normalization, queries, export and write coordination all live in
+// `zeppbridge-core` so the CLI, MCP server and local REST API answer from the
+// same semantics instead of re-implementing them.
+pub use zeppbridge_core::{
+    auth, connectors, decoder, device_catalog, export_formats, fetcher, models, normalizer, paths,
+    sport_catalog, storage, sync,
+};
 
 use app_state::AppState;
 use commands::{
@@ -72,11 +69,15 @@ pub fn run() {
             std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &webview_dir);
             let state = AppState::new(data_dir.clone())
                 .map_err(|error| anyhow::anyhow!("无法初始化应用状态: {error}"))?;
-            let local_api_status = local_api::start(data_dir.clone());
-            if let Some(error) = &local_api_status.error {
+            // 本机 API 首次安装默认关闭；`restore` 只恢复用户明确保存过的启用
+            // 状态。端口占用只让 API 进入错误态，不阻止桌面应用启动。
+            let local_api = std::sync::Arc::new(
+                zeppbridge_core::local_api::LocalApiController::new(data_dir.clone()),
+            );
+            if let Some(error) = local_api.restore().error {
                 eprintln!("{error}");
             }
-            app.manage(local_api_status);
+            app.manage(local_api::LocalApi(local_api.clone()));
             app.manage(state);
 
             // 解析器修订号变化后，后台一次性重放本地原始报文以纠正派生数据
@@ -194,6 +195,9 @@ pub fn run() {
             updates::is_portable_update,
             updates::launch_migrated_install,
             local_api::get_local_api_status,
+            local_api::set_local_api_enabled,
+            local_api::reveal_local_api_token,
+            local_api::rotate_local_api_token,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|error| eprintln!("Tauri application exited with an error: {error}"));

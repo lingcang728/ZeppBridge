@@ -85,7 +85,7 @@ pub fn relocate_legacy_data(data_dir: &Path) -> Option<String> {
     }
 }
 
-pub(crate) fn is_build_artifact_dir(dir: &Path) -> bool {
+pub fn is_build_artifact_dir(dir: &Path) -> bool {
     let norm = normalize_path(dir);
     norm.contains("\\cargo-target\\")
         || norm.contains("/cargo-target/")

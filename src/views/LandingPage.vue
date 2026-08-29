@@ -43,7 +43,7 @@ const authMethods: Array<{ icon: DesignIconName; title: string; copy: string; ta
     <header class="landing-nav">
       <a class="landing-brand" href="#top" aria-label="ZeppBridge 首页"><span><BrandMark :size="34" /></span><strong>ZeppBridge</strong></a>
       <nav aria-label="网站导航"><a href="#features">数据能力</a><a href="#connect">连接方式</a><a href="#privacy">隐私</a></nav>
-      <a class="nav-github" :href="githubUrl" target="_blank" rel="noreferrer"><DesignIcon name="handoff" :size="23" />GitHub</a>
+      <a class="nav-github" :href="githubUrl" target="_blank" rel="noopener"><DesignIcon name="handoff" :size="23" />GitHub</a>
     </header>
 
     <main id="top">
@@ -53,9 +53,9 @@ const authMethods: Array<{ icon: DesignIconName; title: string; copy: string; ta
           <h1>把你的 Zepp 数据，<br /><em>完整交还给你。</em></h1>
           <p class="hero-lead">ZeppBridge 在 Windows 与 macOS 本机连接、整理并可视化 Amazfit 穿戴数据。数据来源保持清晰，既能自己看，也能安全交给 AI 分析。</p>
           <div class="hero-actions">
-            <a class="primary-cta" :href="releaseUrl" target="_blank" rel="noreferrer"><DesignIcon name="app-icon" :size="34" /><span><b>{{ primaryDownload.label }}</b><small>{{ primaryDownload.hint }}</small></span><DesignIcon name="chevron-right" :size="20" /></a>
-            <a class="alt-cta" :href="releaseUrl" target="_blank" rel="noreferrer"><DesignIcon name="app-icon" :size="24" /><span><b>{{ secondaryDownload.label }}</b><small>{{ secondaryDownload.hint }}</small></span></a>
-            <a class="secondary-cta" :href="githubUrl" target="_blank" rel="noreferrer"><DesignIcon name="document" :size="27" />查看源代码</a>
+            <a class="primary-cta" :href="releaseUrl" target="_blank" rel="noopener"><DesignIcon name="app-icon" :size="34" /><span><b>{{ primaryDownload.label }}</b><small>{{ primaryDownload.hint }}</small></span><DesignIcon name="chevron-right" :size="20" /></a>
+            <a class="alt-cta" :href="releaseUrl" target="_blank" rel="noopener"><DesignIcon name="app-icon" :size="24" /><span><b>{{ secondaryDownload.label }}</b><small>{{ secondaryDownload.hint }}</small></span></a>
+            <a class="secondary-cta" :href="githubUrl" target="_blank" rel="noopener"><DesignIcon name="document" :size="27" />查看源代码</a>
           </div>
           <div class="trust-row"><span><DesignIcon name="secure" :size="23" />本地优先</span><span><DesignIcon name="private" :size="23" />隐私安全</span><span><DesignIcon name="structured-data" :size="23" />结构化数据</span></div>
         </div>
@@ -95,7 +95,7 @@ const authMethods: Array<{ icon: DesignIconName; title: string; copy: string; ta
       </section>
     </main>
 
-    <footer><a class="landing-brand" href="#top"><span><BrandMark :size="29" /></span><strong>ZeppBridge</strong></a><p>开源的 Amazfit 数据桥接工具 · Windows 和 Mac</p><div><a :href="githubUrl" target="_blank" rel="noreferrer">GitHub</a><a :href="releaseUrl" target="_blank" rel="noreferrer">下载</a></div></footer>
+    <footer><a class="landing-brand" href="#top"><span><BrandMark :size="29" /></span><strong>ZeppBridge</strong></a><p>开源的 Amazfit 数据桥接工具 · Windows 和 Mac</p><div><a :href="githubUrl" target="_blank" rel="noopener">GitHub</a><a :href="releaseUrl" target="_blank" rel="noopener">下载</a></div></footer>
   </div>
 </template>
 

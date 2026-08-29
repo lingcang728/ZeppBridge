@@ -55,13 +55,13 @@ jobs:
         run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
 
       - name: Check Rust
-        run: cargo check --manifest-path src-tauri/Cargo.toml --locked --all-targets
+        run: cargo check --manifest-path src-tauri/Cargo.toml --workspace --locked --all-targets
 
       - name: Lint Rust
-        run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --locked --all-targets -- -D warnings
 
       - name: Test Rust
-        run: cargo test --manifest-path src-tauri/Cargo.toml --locked --jobs 1
+        run: cargo test --manifest-path src-tauri/Cargo.toml --workspace --locked --jobs 1
 
   verify-macos:
     name: macOS verification
@@ -95,13 +95,13 @@ jobs:
         run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
 
       - name: Check Rust
-        run: cargo check --manifest-path src-tauri/Cargo.toml --locked --all-targets
+        run: cargo check --manifest-path src-tauri/Cargo.toml --workspace --locked --all-targets
 
       - name: Lint Rust
-        run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --locked --all-targets -- -D warnings
 
       - name: Test Rust
-        run: cargo test --manifest-path src-tauri/Cargo.toml --locked --jobs 1
+        run: cargo test --manifest-path src-tauri/Cargo.toml --workspace --locked --jobs 1
 
   package:
     name: Package Windows installers

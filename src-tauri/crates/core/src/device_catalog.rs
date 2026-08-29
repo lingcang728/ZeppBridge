@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use std::sync::OnceLock;
 
-const CATALOG_JSON: &str = include_str!("../../src/assets/devices/catalog.json");
+const CATALOG_JSON: &str = include_str!("../../../../src/assets/devices/catalog.json");
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]

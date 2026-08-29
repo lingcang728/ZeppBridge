@@ -7,7 +7,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-pub(crate) const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v16-workout-catalog";
+pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v16-workout-catalog";
 const PREVIOUS_RELEASE_NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v14";
 const LAST_CLOUD_SYNC_AT_KEY: &str = "last_cloud_sync_at";
 const LAST_CLOUD_SYNC_OUTCOME_KEY: &str = "last_cloud_sync_outcome";
@@ -521,7 +521,7 @@ const CAPABILITY_ROWS: [(&str, CapabilityEvidence, i64); 15] = [
 ];
 
 /// Streams with no local trace at all. Only these cost a request.
-pub(crate) const PROBE_ONLY_CAPABILITIES: [&str; 3] = ["blood_pressure", "weight", "emotion"];
+pub const PROBE_ONLY_CAPABILITIES: [&str; 3] = ["blood_pressure", "weight", "emotion"];
 
 const CAPABILITY_PROBE_RESULT_KEY: &str = "capability_probe_result";
 const CAPABILITY_PROBE_AT_KEY: &str = "capability_probe_at";
@@ -812,7 +812,7 @@ fn plausible_equivalent_pace(seconds: Option<f64>) -> Option<f64> {
     seconds.filter(|value| value.is_finite() && (60.0..3_600.0).contains(value))
 }
 
-pub(crate) fn is_corrupt_error(error: &ZeppBridgeError) -> bool {
+pub fn is_corrupt_error(error: &ZeppBridgeError) -> bool {
     match error {
         ZeppBridgeError::DatabaseError(inner) => is_corrupt_sqlite(inner),
         other => looks_corrupt(&other.to_string()),
@@ -1023,6 +1023,24 @@ impl Database {
             "PRAGMA foreign_keys = ON;
              PRAGMA busy_timeout = 30000;
              PRAGMA journal_mode = WAL;",
+        )?;
+        Ok(Self { conn })
+    }
+
+    /// Open a query-only connection.
+    ///
+    /// Read paths that must never write — the local REST API, the MCP server,
+    /// `zeppbridge status` — use this so a bug in an adapter cannot mutate the
+    /// user's library, and so they never contend for the write lock.
+    /// `query_only` is belt-and-braces on top of the read-only open flag.
+    pub fn open_read_only(db_path: PathBuf) -> Result<Self> {
+        let conn = Connection::open_with_flags(
+            db_path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+        )?;
+        conn.execute_batch(
+            "PRAGMA busy_timeout = 30000;
+             PRAGMA query_only = ON;",
         )?;
         Ok(Self { conn })
     }

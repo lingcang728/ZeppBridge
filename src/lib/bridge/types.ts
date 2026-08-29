@@ -69,6 +69,9 @@ export interface BridgeBackend {
   getWorkoutSeries(workoutId: string): Promise<WorkoutSeries>;
   setWorkoutTypeOverride(workoutId: string, userOverride?: string | null): Promise<Workout>;
   getLocalApiStatus(): Promise<LocalApiStatus>;
+  setLocalApiEnabled(enabled: boolean): Promise<LocalApiStatus>;
+  revealLocalApiToken(): Promise<string>;
+  rotateLocalApiToken(): Promise<string>;
   getDeviceProfile(query?: { deviceId?: string; sourceScope?: string }): Promise<DeviceProfile>;
   getDeviceProfiles(refresh?: boolean): Promise<DeviceProfilesResult>;
 

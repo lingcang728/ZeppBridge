@@ -184,6 +184,15 @@ export const tauriBackend: BridgeBackend = {
   getLocalApiStatus() {
     return call<LocalApiStatus>('get_local_api_status');
   },
+  setLocalApiEnabled(enabled: boolean) {
+    return call<LocalApiStatus>('set_local_api_enabled', { enabled });
+  },
+  revealLocalApiToken() {
+    return call<string>('reveal_local_api_token');
+  },
+  rotateLocalApiToken() {
+    return call<string>('rotate_local_api_token');
+  },
 
   getDeviceProfile(query?: { deviceId?: string; sourceScope?: string }) {
     return call<DeviceProfile>('get_device_profile', {

@@ -1,3 +1,25 @@
+[workspace]
+members = ["crates/core"]
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", features = ["json", "cookies"] }
+rusqlite = { version = "0.32", features = ["bundled", "backup"] }
+tokio = { version = "1", features = ["full"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1.0"
+anyhow = "1.0"
+sha2 = "0.10"
+getrandom = "0.2"
+hex = "0.4"
+directories = "5.0"
+tracing = "0.1"
+base64 = "0.22"
+regex = "1.10"
+url = "2.5"
+zeppbridge-core = { path = "crates/core" }
+
 [package]
 name = "zeppbridge"
 version = "0.11.0"
@@ -15,30 +37,24 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+zeppbridge-core = { workspace = true }
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2.7.2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-process = "2.3.1"
 tauri-plugin-updater = "2.10.1"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-reqwest = { version = "0.12", features = ["json", "cookies"] }
-rusqlite = { version = "0.32", features = ["bundled"] }
-tokio = { version = "1", features = ["full"] }
-chrono = { version = "0.4", features = ["serde"] }
-thiserror = "1.0"
-anyhow = "1.0"
-sha2 = "0.10"
-hex = "0.4"
-directories = "5.0"
-tracing = "0.1"
-base64 = "0.22"
-regex = "1.10"
-url = "2.5"
-
-[target.'cfg(windows)'.dependencies]
-keyring = { version = "3.6.3", default-features = false, features = ["windows-native"] }
-
-[target.'cfg(target_os = "macos")'.dependencies]
-keyring = { version = "3.6.3", default-features = false, features = ["apple-native"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+reqwest = { workspace = true }
+rusqlite = { workspace = true }
+directories = { workspace = true }
+tokio = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+tracing = { workspace = true }
+base64 = { workspace = true }
+url = { workspace = true }

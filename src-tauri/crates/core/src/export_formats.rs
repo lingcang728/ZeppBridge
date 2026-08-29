@@ -43,7 +43,7 @@ const WORKOUT_METRICS: [(&str, &str); 6] = [
 ///
 /// 逐点采样与 GPS 轨迹**不进 CSV**：它们是每秒一条的序列，混进汇总表会让
 /// 行数暴涨且语义混乱。需要序列请用 GPX 或 JSON。
-pub(crate) fn to_csv(export: &Value) -> Result<(String, usize), String> {
+pub fn to_csv(export: &Value) -> Result<(String, usize), String> {
     let data = export
         .get("data")
         .ok_or_else(|| "导出数据结构异常：缺少 data 段".to_string())?;
@@ -174,7 +174,7 @@ pub(crate) fn to_csv(export: &Value) -> Result<(String, usize), String> {
 /// 只有真的解码出 GPS 点的运动才会生成 `<trk>`；一个点都没有时直接报错，
 /// 而不是产出一个空轨迹文件。心率只在时间戳与逐点采样**完全一致**时写入
 /// Garmin `TrackPointExtension`，不做就近匹配或插值。
-pub(crate) fn to_gpx(export: &Value) -> Result<(String, usize), String> {
+pub fn to_gpx(export: &Value) -> Result<(String, usize), String> {
     let data = export
         .get("data")
         .ok_or_else(|| "导出数据结构异常：缺少 data 段".to_string())?;

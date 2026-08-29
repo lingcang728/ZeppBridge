@@ -64,21 +64,31 @@ const deviceRefreshMessage = ref<string | null>(null);
 const deviceRefreshError = ref<string | null>(null);
 const diagnosticBusy = ref(false);
 
-/* 本地偏好（隐私区开关，仅保存在本机） */
-const readLocalPref = (key: string, fallback: boolean) => {
-  const raw = window.localStorage.getItem(key);
-  return raw === null ? fallback : raw === '1';
+/* 这里曾有三个只写 localStorage、没有任何后端行为的开关（本地数据加密 /
+   启动解锁保护 / 匿名使用洞察）。一个默认打开、写着「加密保护」却什么都不做的
+   开关，和把缺失值填成 0 的曲线是同一种错误，所以它们被删掉，而不是留成
+   「计划中」继续占位。顺手清掉旧安装遗留的偏好值。 */
+const STALE_PRIVACY_PREF_KEYS = [
+  'zeppbridge-pref-encrypt',
+  'zeppbridge-pref-launch-lock',
+  'zeppbridge-pref-anon',
+];
+const clearStalePrivacyPrefs = () => {
+  for (const key of STALE_PRIVACY_PREF_KEYS) window.localStorage.removeItem(key);
 };
-const localEncrypt = ref(readLocalPref('zeppbridge-pref-encrypt', true));
-const launchLock = ref(readLocalPref('zeppbridge-pref-launch-lock', false));
-const anonymousUsage = ref(readLocalPref('zeppbridge-pref-anon', false));
-const toggleLocalPref = (key: string, target: { value: boolean }) => {
-  target.value = !target.value;
-  window.localStorage.setItem(key, target.value ? '1' : '0');
-};
-const toggleEncrypt = () => toggleLocalPref('zeppbridge-pref-encrypt', localEncrypt);
-const toggleLaunchLock = () => toggleLocalPref('zeppbridge-pref-launch-lock', launchLock);
-const toggleAnonymous = () => toggleLocalPref('zeppbridge-pref-anon', anonymousUsage);
+
+/* 本机 API 的界面状态。token 默认遮罩，只有用户点「显示」或「复制」才会向
+   后端要明文。 */
+const localApiBusy = ref(false);
+const localApiToken = ref<string | null>(null);
+const localApiTokenVisible = ref(false);
+const localApiMessage = ref<string | null>(null);
+const localApiError = ref<string | null>(null);
+const maskedToken = computed(() => {
+  const token = localApiToken.value;
+  if (!token) return '••••••••••••••••';
+  return `${token.slice(0, 8)}${'•'.repeat(16)}${token.slice(-4)}`;
+});
 
 /* 默认导出格式持久化 */
 const defaultExportFormat = ref(window.localStorage.getItem('zeppbridge-default-export-format') || 'json');
@@ -150,9 +160,11 @@ const formatDateTime = (value?: string): string => {
   }).format(date).replace(/\//g, '-');
 };
 
-const cleanupDate = computed(() => {
+/* 保留天数是「往回保留最近 N 天」，不是「N 天后清理」，而且清理只在每次成功
+   同步之后执行。所以这里显示会被保留的最早日期，不再显示一个算错的未来日期。 */
+const retentionCutoffDate = computed(() => {
   const date = new Date();
-  date.setDate(date.getDate() + Number(retentionDays.value || 30));
+  date.setDate(date.getDate() - Number(retentionDays.value || 30));
   return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date).replace(/\//g, '-');
 });
 
@@ -349,13 +361,92 @@ const openDataFolder = async () => {
   catch (error) { dataError.value = toUserMessage(error, '无法打开数据文件夹'); }
 };
 
-const copyLocalApiExample = async () => {
-  const baseUrl = localApiStatus.value?.base_url || 'http://127.0.0.1:43921';
+const ensureLocalApiToken = async (): Promise<string | null> => {
+  if (localApiToken.value) return localApiToken.value;
   try {
-    await navigator.clipboard.writeText(`curl.exe "${baseUrl}/workouts/WORKOUT_ID/series"`);
-    dataMessage.value = '本机 API 调用示例已复制。';
+    localApiToken.value = await backend.revealLocalApiToken();
+    return localApiToken.value;
+  } catch (error) {
+    localApiError.value = toUserMessage(error, '无法读取本机 API 访问令牌');
+    return null;
+  }
+};
+
+const toggleLocalApi = async () => {
+  const next = !localApiStatus.value?.enabled;
+  localApiBusy.value = true;
+  localApiError.value = null;
+  localApiMessage.value = null;
+  try {
+    localApiStatus.value = await backend.setLocalApiEnabled(next);
+    if (localApiStatus.value.error) {
+      localApiError.value = localApiStatus.value.error;
+    } else if (next) {
+      localApiMessage.value = '本机 API 已启用，无需重启应用。';
+    } else {
+      localApiToken.value = null;
+      localApiTokenVisible.value = false;
+      localApiMessage.value = '本机 API 已关闭，端口已释放。';
+    }
+  } catch (error) {
+    localApiError.value = toUserMessage(error, '无法切换本机 API');
+  } finally {
+    localApiBusy.value = false;
+  }
+};
+
+const toggleTokenVisibility = async () => {
+  if (localApiTokenVisible.value) {
+    localApiTokenVisible.value = false;
+    return;
+  }
+  localApiError.value = null;
+  if (await ensureLocalApiToken()) localApiTokenVisible.value = true;
+};
+
+const copyLocalApiToken = async () => {
+  localApiError.value = null;
+  localApiMessage.value = null;
+  const token = await ensureLocalApiToken();
+  if (!token) return;
+  try {
+    await navigator.clipboard.writeText(token);
+    localApiMessage.value = '访问令牌已复制到剪贴板。';
   } catch {
-    dataError.value = '无法复制调用示例，请手动复制接口地址。';
+    localApiError.value = '无法写入剪贴板，请点击「显示」后手动复制。';
+  }
+};
+
+const regenerateLocalApiToken = async () => {
+  if (!window.confirm('重新生成后，旧令牌会立即失效，所有已经配置过它的本机程序都需要更新。确定吗？')) return;
+  localApiBusy.value = true;
+  localApiError.value = null;
+  localApiMessage.value = null;
+  try {
+    localApiToken.value = await backend.rotateLocalApiToken();
+    localApiTokenVisible.value = true;
+    localApiStatus.value = await backend.getLocalApiStatus();
+    localApiMessage.value = '已生成新的访问令牌，旧令牌已失效。';
+  } catch (error) {
+    localApiError.value = toUserMessage(error, '无法重新生成访问令牌');
+  } finally {
+    localApiBusy.value = false;
+  }
+};
+
+const copyLocalApiExample = async () => {
+  localApiError.value = null;
+  localApiMessage.value = null;
+  const baseUrl = localApiStatus.value?.base_url || 'http://127.0.0.1:43921';
+  const token = await ensureLocalApiToken();
+  if (!token) return;
+  try {
+    await navigator.clipboard.writeText(
+      `curl.exe -H "Authorization: Bearer ${token}" "${baseUrl}/workouts/WORKOUT_ID/series"`,
+    );
+    localApiMessage.value = '带鉴权的调用示例已复制（其中包含你的访问令牌）。';
+  } catch {
+    localApiError.value = '无法复制调用示例，请手动拼接接口地址与 Authorization 头。';
   }
 };
 
@@ -425,9 +516,11 @@ const confirmHistorySync = async () => {
 };
 
 onMounted(async () => {
+  clearStalePrivacyPrefs();
   void loadCapabilityOverview();
   void loadDevices();
   localApiStatus.value = await backend.getLocalApiStatus().catch(() => null);
+  if (localApiStatus.value?.error) localApiError.value = localApiStatus.value.error;
   const status = await refreshStatus();
   retentionDays.value = status?.retention_days ?? 365;
   historyDays.value = status?.history_sync_days ?? 30;
@@ -765,32 +858,29 @@ const runCapabilityProbe = async () => {
       <!-- 4. 隐私安全 -->
       <section id="privacy-section" class="settings-card" aria-labelledby="privacy-title">
         <h2 id="privacy-title">4. 隐私与安全</h2>
-        <div class="toggle-list">
-          <div class="toggle-row">
+        <ul class="fact-list">
+          <li>
             <span class="toggle-icon"><Icon name="lock" :size="14" /></span>
-            <div class="toggle-copy">
-              <strong>本地数据加密</strong>
-              <span>对本地存储的穿戴健康记录进行加密保护</span>
+            <div>
+              <strong>本地数据库未加密</strong>
+              <span>健康数据以明文 SQLite 保存在程序目录的 data 文件夹，依赖 Windows / macOS 的账户与磁盘加密保护。ZeppBridge 不提供整库加密，也不会假装提供。</span>
             </div>
-            <button class="switch" type="button" role="switch" :aria-checked="localEncrypt" @click="toggleEncrypt"><span></span></button>
-          </div>
-          <div class="toggle-row">
+          </li>
+          <li>
             <span class="toggle-icon"><Icon name="shield" :size="14" /></span>
-            <div class="toggle-copy">
-              <strong>启动解锁保护</strong>
-              <span>启动应用时验证本地身份权限</span>
+            <div>
+              <strong>Zepp 令牌只进系统凭据存储</strong>
+              <span>Windows 凭据管理器 / macOS 钥匙串保存令牌，auth.json 里只有账号与区域等元数据，令牌不会写进日志、导出或错误报告。</span>
             </div>
-            <button class="switch" type="button" role="switch" :aria-checked="launchLock" @click="toggleLaunchLock"><span></span></button>
-          </div>
-          <div class="toggle-row">
+          </li>
+          <li>
             <span class="toggle-icon"><Icon name="user" :size="14" /></span>
-            <div class="toggle-copy">
-              <strong>匿名使用洞察</strong>
-              <span>仅限本地脱敏统计，绝不上传生物特征</span>
+            <div>
+              <strong>没有埋点，没有使用统计</strong>
+              <span>应用不会自动上报任何使用行为。只有你亲手点击「提交错误报告」时，才会发送下面列出的那几类脱敏字段。</span>
             </div>
-            <button class="switch" type="button" role="switch" :aria-checked="anonymousUsage" @click="toggleAnonymous"><span></span></button>
-          </div>
-        </div>
+          </li>
+        </ul>
         <button class="privacy-link-btn" type="button" @click="privacyModalOpen = true">
           <Icon name="shield" :size="13" />查看本地隐私与脱敏原则
         </button>
@@ -815,8 +905,8 @@ const runCapabilityProbe = async () => {
             <option :value="365">365 天</option>
           </select>
         </div>
-        <p class="retain-note">超过保留时长的数据将自动从本地清理，以释放空间并保障隐私。</p>
-        <p class="hint-line">{{ storageEstimate?.message || `将在 ${cleanupDate} 自动清理过期数据` }}</p>
+        <p class="retain-note">保留最近 {{ retentionDays }} 天的本地数据；清理在每次<strong>成功同步之后</strong>执行，不会在后台自行发生。</p>
+        <p class="hint-line">{{ storageEstimate?.message || `下次成功同步后，${retentionCutoffDate} 以前的数据会被清理` }}</p>
         <div class="inline-actions">
           <button class="button secondary" type="button" :disabled="Boolean(dataBusy)" @click="cleanupData">
             {{ dataBusy === 'cleanup' ? '正在清理…' : '立即清理' }}
@@ -862,20 +952,58 @@ const runCapabilityProbe = async () => {
         <span class="api-icon"><Icon name="braces" :size="20" /></span>
         <div>
           <h2 id="api-title">7. 本机 REST API</h2>
-          <p>让其他本机程序直接读取已标准化的运动序列 JSON。</p>
+          <p>让本机上的其他程序读取已标准化的运动序列 JSON。默认关闭，需要你显式启用。</p>
         </div>
         <span :class="['api-state', { on: localApiStatus?.running }]">
-          <i aria-hidden="true"></i>{{ localApiStatus?.running ? '正在监听' : '未运行' }}
+          <i aria-hidden="true"></i>{{ localApiStatus?.running ? '正在监听' : (localApiStatus?.enabled ? '已启用但未监听' : '已关闭') }}
         </span>
       </div>
-      <div class="api-endpoint">
-        <code>{{ localApiStatus?.base_url || 'http://127.0.0.1:43921' }}/workouts/{id}/series</code>
-        <button class="button secondary" type="button" :disabled="!localApiStatus?.running" @click="copyLocalApiExample">
-          <Icon name="copy" :size="14" />复制示例
-        </button>
+
+      <div class="toggle-row api-toggle">
+        <div class="toggle-copy">
+          <strong>启用本机 API</strong>
+          <span>开关立即生效，不需要重启应用；关闭后 {{ localApiStatus?.address || '127.0.0.1:43921' }} 会立刻释放。</span>
+        </div>
+        <button
+          class="switch"
+          type="button"
+          role="switch"
+          aria-label="启用本机 REST API"
+          :aria-checked="Boolean(localApiStatus?.enabled)"
+          :disabled="localApiBusy"
+          @click="toggleLocalApi"
+        ><span></span></button>
       </div>
-      <p v-if="localApiStatus?.error" class="api-error" role="alert">{{ localApiStatus.error }}</p>
-      <p v-else class="api-note">仅绑定 127.0.0.1，只读且不开放浏览器跨域；退出 ZeppBridge 后停止。</p>
+
+      <template v-if="localApiStatus?.enabled">
+        <div class="api-endpoint">
+          <code>{{ localApiStatus?.base_url || 'http://127.0.0.1:43921' }}/workouts/{id}/series</code>
+          <button class="button secondary" type="button" :disabled="localApiBusy" @click="copyLocalApiExample">
+            <Icon name="copy" :size="14" />复制带鉴权示例
+          </button>
+        </div>
+
+        <div class="api-token">
+          <span class="kv-label">访问令牌</span>
+          <code>{{ localApiTokenVisible && localApiToken ? localApiToken : maskedToken }}</code>
+          <div class="inline-actions">
+            <button class="button secondary" type="button" :disabled="localApiBusy" @click="toggleTokenVisibility">
+              {{ localApiTokenVisible ? '隐藏' : '显示' }}
+            </button>
+            <button class="button secondary" type="button" :disabled="localApiBusy" @click="copyLocalApiToken">
+              <Icon name="copy" :size="14" />复制
+            </button>
+            <button class="button secondary" type="button" :disabled="localApiBusy" @click="regenerateLocalApiToken">
+              重新生成
+            </button>
+          </div>
+        </div>
+        <p class="api-note">每个请求都必须带 <code>Authorization: Bearer &lt;令牌&gt;</code>，否则返回 401。重新生成后旧令牌立即失效。</p>
+      </template>
+
+      <p v-if="localApiError" class="api-error" role="alert">{{ localApiError }}</p>
+      <p v-else-if="localApiMessage" class="hint-line ok">{{ localApiMessage }}</p>
+      <p class="api-note">仅绑定 127.0.0.1，只读、不开放浏览器跨域、不返回任何凭据；退出 ZeppBridge 后停止。</p>
     </section>
 
     <!-- 8. 软件更新 -->
@@ -1032,6 +1160,15 @@ h3 { margin-bottom: 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
 .api-endpoint { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; margin-top: 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); }
 .api-endpoint code { overflow: hidden; color: var(--ink); font-family: var(--font-mono); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .api-note, .api-error { margin-top: 9px; }
+.api-note code { padding: 1px 5px; border-radius: 4px; background: var(--surface-raised); font-family: var(--font-mono); font-size: 10px; }
+.api-toggle { margin-top: 12px; border-bottom: 0; }
+.api-token { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px 12px; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); }
+.api-token code { overflow: hidden; color: var(--ink); font-family: var(--font-mono); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.api-token .inline-actions { grid-column: 1 / -1; }
+.fact-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.fact-list li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; }
+.fact-list strong { display: block; margin-bottom: 3px; color: var(--ink); font-size: 12px; font-weight: 500; }
+.fact-list span { color: var(--subtle); font-size: 11px; line-height: 1.55; }
 .api-error { color: var(--danger); }
 .update-head, .update-release, .update-confirm { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px; }
 .update-head h2 { margin-bottom: 4px; }

@@ -113,7 +113,9 @@ file:  second_heart_rate/real_data
 - **`Charge/stress_data`** — 已确认是 protobuf，正确解析后是 4 个 repeated float32（2880 / 255 / 8 / 6 个值），没有一组对得上 App 显示的日均与区间。日汇总走 `all_day_stress`（最低/最高与 App 完全一致），这条不接。
 - **`second_heart_rate/real_data`** — `/users/me/fileInfo/events` 确认有数据，但返回的是 COS 文件索引而不是样本，取到逐秒心率还需要再下载文件。当前 host allow-list 只放行 `api-mifit*.zepp.com` / `huami.com`，COS 域名不在其中，接入等于放宽网络边界，未做。
 - **8/16 之后的逐条血氧** — `blood_oxygen/click` 的点测在 2026-08-16 停止，之后只有 `odi` 夜间汇总，但 Zepp App 仍能画出连续曲线。已排除的方向：`/users/me/fileInfo/events`（同接口面 `second_heart_rate` 有数据、血氧没有，是有依据的否定）、`band_data` 的 8 字节块（只有模式/强度/步数/心率）、`blood_oxygen` 的 `auto` / `real_data` 子类型。**剩下的方向只有抓 Zepp App 的真实请求，而本项目明令禁止恢复 MITM / 用户 CA / Wi-Fi 代理路线**，所以这条到此为止。
-- **未接的端点** — `/users/me/bloodPressure`、`/users/{id}/members/-1/weightRecords`、`/huami.health.getUserInfo.json`、`/v1/user/manualData.json`。血压与体重已由能力探测覆盖（账号近一年确无记录），`getUserInfo` 只有年龄/身高，而年龄**不能**用来估算心率区间（见下），因此都没有接入价值。
+- **未接的端点** — `/users/me/bloodPressure`、`/users/{id}/members/-1/weightRecords`、`/huami.health.getUserInfo.json`、`/v1/user/manualData.json`。
+  - 血压与体重：**当前样本未验证，不是「没有接入价值」**。此前的结论来自单个开发账号近一年没有记录（n=1），那只能说明这个账号没有数据，不能推断字段语义、单位或成员范围。已有用户反馈需要体脂秤与血压，接入的前置条件是拿到经过审计的真实脱敏 fixture，并与用户自己的 Zepp App 显示逐条对照。在这两样证据齐备之前不归一化、不宣称支持，界面也不显示空卡片或 0 值（见 `todo.md` 8.0 证据门禁）。
+  - `getUserInfo` / `manualData`：只有年龄/身高，而年龄**不能**用来估算心率区间（见下），因此不接。
 
 ### 心率区间：三种算法，一个都不预设
 

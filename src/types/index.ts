@@ -310,9 +310,15 @@ export interface WorkoutSeriesSummary {
 }
 
 export interface LocalApiStatus {
+  /** 用户保存的启用意图；首次安装为 false。 */
+  enabled: boolean;
+  /** 端口此刻是否真的在监听，来自 controller 实时状态而非启动快照。 */
   running: boolean;
   base_url: string;
+  address: string;
   workout_series_path: string;
+  /** 是否已生成过访问 token。关闭状态下也可能为真。 */
+  token_present: boolean;
   error?: string | null;
 }
 

@@ -5904,8 +5904,6 @@ dependencies = [
  "chrono",
  "directories",
  "hex",
- "keyring",
- "regex",
  "reqwest 0.12.28",
  "rusqlite",
  "serde",
@@ -5918,6 +5916,30 @@ dependencies = [
  "tauri-plugin-process",
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "url",
+ "zeppbridge-core",
+]
+
+[[package]]
+name = "zeppbridge-core"
+version = "0.11.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "chrono",
+ "directories",
+ "getrandom 0.2.17",
+ "hex",
+ "keyring",
+ "regex",
+ "reqwest 0.12.28",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
  "thiserror 1.0.69",
  "tokio",
  "tracing",

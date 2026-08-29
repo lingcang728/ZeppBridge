@@ -454,7 +454,7 @@ impl AuthManager {
     }
 }
 
-fn default_credential_backend() -> Arc<dyn CredentialBackend> {
+pub fn default_credential_backend() -> Arc<dyn CredentialBackend> {
     #[cfg(windows)]
     {
         Arc::new(WindowsCredentialBackend)

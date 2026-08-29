@@ -1,0 +1,33 @@
+[package]
+name = "zeppbridge-core"
+version = "0.11.0"
+description = "ZeppBridge 的共享数据核心：模型、存储、迁移、归一化、查询、导出与写入协调"
+edition = "2021"
+
+[lib]
+name = "zeppbridge_core"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+reqwest = { workspace = true }
+rusqlite = { workspace = true }
+tokio = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+sha2 = { workspace = true }
+getrandom = { workspace = true }
+hex = { workspace = true }
+directories = { workspace = true }
+tracing = { workspace = true }
+base64 = { workspace = true }
+regex = { workspace = true }
+url = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+keyring = { version = "3.6.3", default-features = false, features = ["windows-native"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3.6.3", default-features = false, features = ["apple-native"] }
