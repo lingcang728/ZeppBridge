@@ -1116,12 +1116,13 @@ impl Database {
     /// `zeppbridge status` — use this so a bug in an adapter cannot mutate the
     /// user's library, and so they never contend for the write lock.
     /// `query_only` is belt-and-braces on top of the read-only open flag.
-    /// 只读打开，并先确认 schema 版本对得上。
+    /// 只读打开任意版本的库。
     ///
-    /// 只读连接迁移不了，所以版本不匹配必须在这里变成一句能照做的话。
-    /// 否则 CLI / MCP 会一路跑到某个查询上撞见「没有这张表」，
-    /// 用户看到的是「数据库暂时不可用」——既不知道原因，也不知道该做什么。
-    pub fn open_read_only(db_path: PathBuf) -> Result<Self> {
+    /// 备份与恢复本身就要读别的版本的库——升级前的快照按定义是旧版本的，
+    /// 恢复预览要读的也可能是。所以这一层只提供机制，不带版本判断。
+    ///
+    /// 回答用户查询的调用方请用 `open_read_only`。
+    pub fn open_read_only_any_version(db_path: PathBuf) -> Result<Self> {
         let conn = Connection::open_with_flags(
             db_path,
             rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
@@ -1130,6 +1131,20 @@ impl Database {
             "PRAGMA busy_timeout = 30000;
              PRAGMA query_only = ON;",
         )?;
+        Ok(Self { conn })
+    }
+
+    /// 只读打开，并先确认 schema 版本对得上。
+    ///
+    /// 只读连接迁移不了，所以版本不匹配必须在这里变成一句能照做的话。
+    /// 否则 CLI / MCP 会一路跑到某个查询上撞见「没有这张表」，
+    /// 用户看到的是「数据库暂时不可用」——既不知道原因，也不知道该做什么。
+    ///
+    /// 这条版本判断是**产品策略**，不是打开文件的机制。把它写进机制里，
+    /// 会连带挡住升级前的自动备份——那意味着谁也升级不了。
+    pub fn open_read_only(db_path: PathBuf) -> Result<Self> {
+        let db = Self::open_read_only_any_version(db_path)?;
+        let conn = db.conn;
         let version: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
         match version.cmp(&CURRENT_SCHEMA_VERSION) {
             std::cmp::Ordering::Equal => Ok(Self { conn }),
@@ -4752,6 +4767,92 @@ mod tests {
             .all(|item| item.ingested));
     }
 
+    /// 真实旧库的升级演练。默认跳过——它需要一个真实的旧数据库。
+    ///
+    /// 合成的小库证明不了升级安全：真正会出问题的是几百 MB、跨过好几个
+    /// schema 版本、里面有各种历史遗留行的库。把这个演练留在仓库里，是为了
+    /// 每次加迁移步骤时都能对着真库跑一遍，而不是只在发版当天临时想办法。
+    ///
+    /// ```powershell
+    /// $env:ZEPPBRIDGE_UPGRADE_FIXTURE = "D:/somewhere/a-copy-of/zepp.db"
+    /// cargo test --manifest-path src-tauri/Cargo.toml -p zeppbridge-core --jobs 1 `
+    ///   -- --ignored upgrade_a_real_old_database
+    /// ```
+    ///
+    /// **传一份副本。** 这个测试会真的迁移你指给它的文件。
+    #[test]
+    #[ignore = "需要真实旧库，用 ZEPPBRIDGE_UPGRADE_FIXTURE 指定一份副本"]
+    fn upgrade_a_real_old_database_without_losing_rows() {
+        let Ok(source) = std::env::var("ZEPPBRIDGE_UPGRADE_FIXTURE") else {
+            panic!("没有设置 ZEPPBRIDGE_UPGRADE_FIXTURE");
+        };
+        let source = PathBuf::from(source);
+        let dir = std::env::temp_dir().join("zeppbridge-upgrade-drill");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("zepp.db");
+        std::fs::copy(&source, &path).expect("复制旧库");
+
+        // 升级前先记下几张关键表的行数。升级只应当增加结构，不应当减少事实。
+        let before = {
+            let conn = Connection::open(&path).unwrap();
+            let version: i64 = conn
+                .query_row("PRAGMA user_version", [], |row| row.get(0))
+                .unwrap();
+            let counts: Vec<(String, i64)> =
+                ["raw_records", "workouts", "daily_metrics", "metric_samples"]
+                    .iter()
+                    .filter_map(|table| {
+                        conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+                            row.get::<_, i64>(0)
+                        })
+                        .ok()
+                        .map(|count| ((*table).to_string(), count))
+                    })
+                    .collect();
+            (version, counts)
+        };
+        assert!(
+            before.0 < CURRENT_SCHEMA_VERSION,
+            "这份 fixture 已经是 v{}，演练不了升级",
+            before.0
+        );
+
+        let db = Database::open_migrated(&path).expect("升级应当成功");
+        assert_eq!(
+            db.diagnostic_schema_version().unwrap(),
+            CURRENT_SCHEMA_VERSION
+        );
+
+        for (table, count) in &before.1 {
+            let after: i64 = db
+                .conn
+                .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+                    row.get(0)
+                })
+                .unwrap();
+            assert!(
+                after >= *count,
+                "{table} 从 {count} 掉到了 {after}——升级不该让事实变少"
+            );
+        }
+
+        // 升级前必须留下一份可用的备份，否则「升级失败可以退回去」是空话。
+        let backups = backup::list_backups(&dir).expect("读备份清单");
+        let pre = backups
+            .iter()
+            .find(|item| item.kind == backup::BackupKind::PreMigration)
+            .expect("升级前应当自动生成一份备份");
+        assert!(pre.integrity_ok, "自动备份必须通过完整性检查");
+        assert_eq!(
+            pre.schema_version, before.0,
+            "自动备份应当是升级之前那个版本的样子"
+        );
+
+        let verified = backup::verify_backup(&dir, &pre.id).unwrap();
+        assert!(verified.problem.is_none(), "{:?}", verified.problem);
+    }
+
     #[test]
     fn a_read_only_connection_refuses_writes_and_ignores_the_write_lock() {
         // MCP 和 CLI 的查询路径靠这两条性质成立：写不进去是连接层保证的，
@@ -4772,6 +4873,44 @@ mod tests {
             .execute("DELETE FROM raw_records", [])
             .map_err(|error| error.to_string());
         assert!(write_attempt.is_err(), "只读连接必须在 SQLite 层就拒绝写入");
+    }
+
+    #[test]
+    fn the_pre_migration_backup_can_still_read_a_database_that_is_out_of_date() {
+        // 「只读连接必须版本一致」是给用户查询用的策略，不是打开文件的机制。
+        // 把它写进机制里，升级前的自动备份就打不开旧库，于是备份失败，
+        // 于是迁移拒绝开始——所有老用户都升不了级。
+        let dir = std::env::temp_dir().join("zeppbridge-premigration-open");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("zepp.db");
+        drop(Database::open_migrated(&path).unwrap());
+
+        let conn = Connection::open(&path).unwrap();
+        conn.execute_batch(&format!(
+            "PRAGMA user_version = {};",
+            CURRENT_SCHEMA_VERSION - 1
+        ))
+        .unwrap();
+        drop(conn);
+
+        assert!(
+            Database::open_read_only(path.clone()).is_err(),
+            "面向用户查询的入口仍然要拦住版本不一致的库"
+        );
+        assert!(
+            Database::open_read_only_any_version(path.clone()).is_ok(),
+            "备份与恢复必须能读旧版本的库，那正是它们存在的理由"
+        );
+        // 迁移这条路要能一路走通，包括中间那次自动备份。
+        drop(Database::open_migrated(&path).expect("旧库应当能被升级"));
+        let backups = backup::list_backups(&dir).unwrap();
+        assert!(
+            backups
+                .iter()
+                .any(|item| item.kind == backup::BackupKind::PreMigration),
+            "升级前应当留下一份备份"
+        );
     }
 
     #[test]

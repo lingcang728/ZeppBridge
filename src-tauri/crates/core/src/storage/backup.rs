@@ -208,7 +208,7 @@ pub fn create_backup(
             backup.run_to_completion(i32::MAX, std::time::Duration::ZERO, None)?;
         }
 
-        let snapshot = Database::open_read_only(target.clone())?;
+        let snapshot = Database::open_read_only_any_version(target.clone())?;
         let first: String = snapshot
             .conn
             .query_row("PRAGMA integrity_check(1)", [], |row| row.get(0))?;
@@ -370,7 +370,7 @@ pub fn verify_backup(data_dir: &Path, id: &str) -> Result<BackupVerification> {
     // 内容对不上时不要再去打开它：SQLite 打开一个被截断的文件可能返回一个
     // 看似正常的空库，那会让「校验失败」变成「校验通过但没有数据」。
     let integrity_ok = if bytes_match && sha256_match {
-        match Database::open_read_only(path.clone()) {
+        match Database::open_read_only_any_version(path.clone()) {
             Ok(db) => db
                 .conn
                 .query_row("PRAGMA integrity_check(1)", [], |row| {
@@ -435,7 +435,7 @@ pub fn restore_preview(data_dir: &Path, id: &str) -> Result<RestorePreview> {
         RestoreCompatibility::OlderSchemaWillMigrate
     };
     let mut current_table_counts = BTreeMap::new();
-    if let Ok(db) = Database::open_read_only(database_path(data_dir)) {
+    if let Ok(db) = Database::open_read_only_any_version(database_path(data_dir)) {
         for table in COUNTED_TABLES {
             let count: i64 = db
                 .conn
@@ -471,7 +471,7 @@ pub fn restore_preview(data_dir: &Path, id: &str) -> Result<RestorePreview> {
 }
 
 fn current_schema_version(data_dir: &Path) -> i64 {
-    Database::open_read_only(database_path(data_dir))
+    Database::open_read_only_any_version(database_path(data_dir))
         .ok()
         .and_then(|db| {
             db.conn
@@ -570,7 +570,7 @@ fn run_restore(data_dir: &Path, pending: &PendingRestore) -> RestoreOutcome {
         ));
     }
     // 换上去之前先确认这个临时文件真的能打开、真的完整。
-    let staged_ok = Database::open_read_only(staging.clone())
+    let staged_ok = Database::open_read_only_any_version(staging.clone())
         .ok()
         .and_then(|db| {
             db.conn
@@ -774,7 +774,7 @@ mod tests {
         assert!(outcome.succeeded, "{outcome:?}");
         assert!(pending_restore(&dir).is_none(), "执行后待办要清掉");
 
-        let db = Database::open_read_only(database_path(&dir)).unwrap();
+        let db = Database::open_read_only_any_version(database_path(&dir)).unwrap();
         let count: i64 = db
             .conn
             .query_row("SELECT COUNT(*) FROM metric_samples", [], |row| row.get(0))
@@ -801,7 +801,7 @@ mod tests {
         assert!(!outcome.succeeded);
         assert!(outcome.message.contains("当前库没有改动"), "{outcome:?}");
 
-        let db = Database::open_read_only(database_path(&dir)).unwrap();
+        let db = Database::open_read_only_any_version(database_path(&dir)).unwrap();
         let count: i64 = db
             .conn
             .query_row("SELECT COUNT(*) FROM metric_samples", [], |row| row.get(0))
