@@ -350,7 +350,11 @@ fn cmd_status(args: &[String]) -> u8 {
             "rawRecords": stream.raw_records,
             "canonicalRecords": stream.canonical_records,
         })).collect::<Vec<_>>(),
+        "historyPlanned": ledger.as_ref().map(|value| value.total_chunks > 0),
         "historyComplete": ledger.as_ref().map(|value| value.complete),
+        "historyPendingChunks": ledger
+            .as_ref()
+            .map(|value| value.total_chunks - value.completed_chunks),
     });
 
     let human = format!(
@@ -363,10 +367,16 @@ fn cmd_status(args: &[String]) -> u8 {
             .last_cloud_sync_at
             .as_deref()
             .unwrap_or("从未"),
-        match ledger.as_ref().map(|value| value.complete) {
-            Some(true) => "每个月份块都有结论",
-            Some(false) => "尚未完成（还有块没有结论）",
-            None => "未规划",
+        // 「一块都没排过」和「排了还没做完」不是一回事。前者不是进度落后，
+        // 是根本还没开始规划补拉。
+        match ledger.as_ref() {
+            Some(value) if value.total_chunks == 0 => "尚未规划补拉".to_string(),
+            Some(value) if value.complete => "每个月份块都有结论".to_string(),
+            Some(value) => format!(
+                "还有 {} 个月份块没有结论",
+                value.total_chunks - value.completed_chunks
+            ),
+            None => "读不到账本".to_string(),
         }
     );
     emit(json_mode, payload, &human);
