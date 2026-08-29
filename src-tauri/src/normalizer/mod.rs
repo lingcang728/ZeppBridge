@@ -193,7 +193,7 @@ impl Normalizer {
 
     fn normalize_workouts_with_diagnostics_and_sport(
         raw: &Value,
-        sport: Option<&str>,
+        _sport: Option<&str>,
     ) -> Result<NormalizedBatch<Workout>> {
         let items = extract_items(raw)?;
         let mut records = Vec::new();
@@ -215,20 +215,25 @@ impl Normalizer {
                 diagnostics.push(format!("item {index}: workout end 不晚于 start"));
                 continue;
             }
-            // 类型以记录自带的数字 `type` 为准（1=跑步/6=健走/9=骑行…）。
-            // 接口路径名（如 run）只能兜底：/v1/sport/run/history.json 不带过滤时
-            // 会返回全部运动类型，先用路径名会把骑行/健走/AI 活动全部错标成跑步。
-            let workout_type = first_number(object, &["type", "sport_mode"])
-                .and_then(|value| zepp_sport_type_name(value.round() as i64))
-                .map(str::to_owned)
-                .or_else(|| {
-                    first_string(
-                        object,
-                        &["workout_type", "sportType", "sport", "sport_title"],
-                    )
-                })
-                .or_else(|| sport.map(str::to_owned))
-                .unwrap_or_else(|| "unknown".into());
+            // The endpoint path is fetch provenance, not type evidence.
+            // `/v1/sport/run/history.json` can return every activity, so using
+            // `sport == run` here silently relabels unknown strength/custom
+            // codes as outdoor runs. Keep unknown numeric facts explicit.
+            let zepp_type =
+                first_number(object, &["type", "sport_mode"]).map(|value| value.round() as i32);
+            let (workout_type, type_source) = if let Some(code) = zepp_type {
+                match zepp_sport_type_name(i64::from(code)) {
+                    Some(mapped) => (mapped.to_owned(), "numeric_mapped".to_owned()),
+                    None => (format!("unknown:{code}"), "unknown_code".to_owned()),
+                }
+            } else if let Some(value) = first_string(
+                object,
+                &["workout_type", "sportType", "sport", "sport_title"],
+            ) {
+                (normalize_type_text(&value), "string_field".to_owned())
+            } else {
+                ("unknown".to_owned(), "missing".to_owned())
+            };
             let workout_id = first_string(
                 object,
                 &["workout_id", "workoutId", "trackId", "trackid", "id"],
@@ -244,7 +249,11 @@ impl Normalizer {
             let source_device = device_id(object);
             records.push(Workout {
                 workout_id,
-                workout_type,
+                workout_type: workout_type.clone(),
+                normalized_type: workout_type.clone(),
+                type_source,
+                user_override: None,
+                effective_type: workout_type,
                 start_time,
                 end_time,
                 distance_meters: first_number(
@@ -286,7 +295,7 @@ impl Normalizer {
                 gps_available: workout_has_track_geometry(object),
                 sample_count: workout_sample_count(object),
                 zepp_source: first_string(object, &["source"]),
-                zepp_type: first_number(object, &["type", "sport_mode"]).map(|value| value as i32),
+                zepp_type,
             });
         }
         Ok(NormalizedBatch {
@@ -489,6 +498,15 @@ fn zepp_sport_type_name(type_id: i64) -> Option<&'static str> {
         // AI 活动：仅卡路里 + 心率，无距离
         223 => Some("activity"),
         _ => None,
+    }
+}
+
+fn normalize_type_text(value: &str) -> String {
+    let normalized = value.trim().to_lowercase().replace([' ', '-'], "_");
+    if normalized.is_empty() {
+        "unknown".to_owned()
+    } else {
+        normalized
     }
 }
 
@@ -1868,6 +1886,45 @@ mod tests {
         assert_eq!(result[0].zepp_type, Some(9));
         assert_eq!(result[1].workout_type, "activity");
         assert_eq!(result[2].workout_type, "run");
+    }
+
+    #[test]
+    fn unknown_numeric_workout_never_inherits_endpoint_sport_name() {
+        let result = Normalizer::normalize_workouts_with_sport(
+            &json!({
+                "data": { "summary": [{
+                    "trackid": 1_700_300_000i64,
+                    "end_time": 1_700_303_600i64,
+                    "type": 105,
+                    "calorie": 120
+                }] }
+            }),
+            Some("run"),
+        )
+        .unwrap();
+        assert_eq!(result[0].zepp_type, Some(105));
+        assert_eq!(result[0].normalized_type, "unknown:105");
+        assert_eq!(result[0].type_source, "unknown_code");
+        assert_eq!(result[0].effective_type, "unknown:105");
+        assert_ne!(result[0].workout_type, "run");
+    }
+
+    #[test]
+    fn record_string_type_is_used_only_when_numeric_type_is_absent() {
+        let result = Normalizer::normalize_workouts_with_sport(
+            &json!({
+                "data": { "summary": [
+                    {"trackid": 1_700_400_000i64, "end_time": 1_700_403_600i64, "sportType": "Custom Training"},
+                    {"trackid": 1_700_500_000i64, "end_time": 1_700_503_600i64}
+                ] }
+            }),
+            Some("run"),
+        )
+        .unwrap();
+        assert_eq!(result[0].normalized_type, "custom_training");
+        assert_eq!(result[0].type_source, "string_field");
+        assert_eq!(result[1].normalized_type, "unknown");
+        assert_eq!(result[1].type_source, "missing");
     }
 
     #[test]

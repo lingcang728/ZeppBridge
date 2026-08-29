@@ -169,7 +169,13 @@ export interface SleepSession {
 
 export interface Workout {
   workout_id: string;
+  /** Backwards-compatible normalized type. */
   workout_type: string;
+  normalized_type: string;
+  type_source: 'numeric_mapped' | 'unknown_code' | 'string_field' | 'missing' | string;
+  user_override?: string | null;
+  effective_type: string;
+  zepp_type?: number | null;
   start_time: string;
   end_time: string;
   distance_meters?: number;
@@ -183,6 +189,43 @@ export interface Workout {
   source_scope: SourceScope;
   device_id?: string;
   synced_at?: string | null;
+}
+
+export interface DiagnosticField {
+  name: string;
+  jsonType: 'null' | 'boolean' | 'number' | 'string' | 'array' | 'object' | string;
+}
+
+export interface DiagnosticObjectShape {
+  path: string;
+  fields: DiagnosticField[];
+}
+
+export interface DiagnosticDeviceCandidate {
+  catalogId: string;
+  canonicalName: string;
+  firmware?: string | null;
+  matchStatus: 'exact' | 'alias' | 'unknown';
+}
+
+export interface DiagnosticReport {
+  format: string;
+  appVersion: string;
+  schemaVersion: number;
+  normalizerRevision: string;
+  operatingSystem: string;
+  deviceEvidence: {
+    status: string;
+    objectCount: number;
+    idAliasObjects: number;
+    serialAliasObjects: number;
+    nameFieldObjects: number;
+    firmwareFieldObjects: number;
+    candidates: DiagnosticDeviceCandidate[];
+    shapes: DiagnosticObjectShape[];
+  };
+  unknownWorkoutCodes: Array<{ code: number; records: number }>;
+  workoutTypeConflicts: number;
 }
 
 export interface WorkoutRoutePoint {

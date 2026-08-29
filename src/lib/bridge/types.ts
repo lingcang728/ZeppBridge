@@ -17,6 +17,7 @@ import type {
   ReprocessResult,
   DeviceProfile,
   DeviceProfilesResult,
+  DiagnosticReport,
   SleepSession,
   StorageEstimate,
   SyncReport,
@@ -65,11 +66,13 @@ export interface BridgeBackend {
   getRecentWorkouts(limit?: number): Promise<Workout[]>;
   getWorkoutDetail(workoutId: string): Promise<Workout | null>;
   getWorkoutSeries(workoutId: string): Promise<WorkoutSeries>;
+  setWorkoutTypeOverride(workoutId: string, userOverride?: string | null): Promise<Workout>;
   getLocalApiStatus(): Promise<LocalApiStatus>;
   getDeviceProfile(query?: { deviceId?: string; sourceScope?: string }): Promise<DeviceProfile>;
   getDeviceProfiles(refresh?: boolean): Promise<DeviceProfilesResult>;
 
   reprocessLocalData(): Promise<ReprocessResult>;
+  getDiagnosticReport(): Promise<DiagnosticReport>;
   getExportJson(selection: ExportSelection): Promise<string>;
   saveJsonExport(selection: ExportSelection, path: string): Promise<ExportResult>;
   saveCsvExport(selection: ExportSelection, path: string): Promise<ExportResult>;

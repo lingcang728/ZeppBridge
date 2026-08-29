@@ -10,7 +10,7 @@ import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { useSyncController } from '../composables/useSyncController';
 import { workoutLabel } from '../lib/labels';
 import { formatDate, formatDuration, isFiniteNumber } from '../lib/format';
-import { displayableWorkouts, workoutDurationMinutes, workoutTypeKey } from '../lib/workouts';
+import { displayableWorkouts, workoutDisplayType, workoutDurationMinutes, workoutTypeKey } from '../lib/workouts';
 import type { SleepSession, Workout } from '../types';
 
 const loading = ref(true);
@@ -216,9 +216,9 @@ function formatDateHint(value: string): string {
             :to="{ name: 'WorkoutDetail', params: { workoutId: workout.workout_id } }"
             category="activity"
             icon="run"
-            :icon-bg="workoutTypeBg(workout.workout_type)"
+            :icon-bg="workoutTypeBg(workoutDisplayType(workout))"
             :kicker="formatDateHint(workout.start_time)"
-            :title="workoutLabel(workout.workout_type)"
+            :title="workoutLabel(workoutDisplayType(workout))"
             :fact="workoutFact(workout)"
           />
           <div v-if="!filteredWorkouts.length" class="empty-row">{{ activeFilter === 'all' ? '没有可展示的运动记录。' : '该运动类型没有可展示记录。' }}</div>

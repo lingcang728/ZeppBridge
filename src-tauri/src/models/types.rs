@@ -90,7 +90,19 @@ pub struct SleepSession {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Workout {
     pub workout_id: String,
+    /// Backwards-compatible alias for `normalized_type`. Request-path names
+    /// are never allowed to populate this field.
     pub workout_type: String,
+    /// ZeppBridge's interpretation of the record's own type evidence.
+    pub normalized_type: String,
+    /// `numeric_mapped`, `unknown_code`, `string_field`, or `missing`.
+    pub type_source: String,
+    /// Optional local correction. This never overwrites Zepp's raw type or the
+    /// normalizer result and therefore survives a raw-record replay.
+    #[serde(default)]
+    pub user_override: Option<String>,
+    /// The type consumers should display: override first, otherwise normalized.
+    pub effective_type: String,
     pub start_time: DateTime<Utc>,
     pub end_time: DateTime<Utc>,
     pub distance_meters: Option<f64>,
@@ -517,6 +529,67 @@ pub struct DeviceProfile {
     pub serial: Option<String>,
     pub device_id: Option<String>,
     pub timezone: Option<String>,
+}
+
+/// One allowlisted field description. Only the key and JSON kind are carried;
+/// the value is structurally impossible to serialize into a diagnostic report.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticField {
+    pub name: String,
+    pub json_type: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticObjectShape {
+    pub path: String,
+    pub fields: Vec<DiagnosticField>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticDeviceCandidate {
+    pub catalog_id: String,
+    pub canonical_name: String,
+    pub firmware: Option<String>,
+    pub match_status: DeviceMatchStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticDeviceEvidence {
+    pub status: String,
+    pub object_count: usize,
+    pub id_alias_objects: usize,
+    pub serial_alias_objects: usize,
+    pub name_field_objects: usize,
+    pub firmware_field_objects: usize,
+    pub candidates: Vec<DiagnosticDeviceCandidate>,
+    pub shapes: Vec<DiagnosticObjectShape>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticWorkoutCode {
+    pub code: i32,
+    pub records: i64,
+}
+
+/// Strongly typed, allowlist-only issue report. It has no slots for account
+/// identifiers, tokens, serial values, GPS, health measurements, raw payloads,
+/// or filesystem paths.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticReport {
+    pub format: String,
+    pub app_version: String,
+    pub schema_version: i64,
+    pub normalizer_revision: String,
+    pub operating_system: String,
+    pub device_evidence: DiagnosticDeviceEvidence,
+    pub unknown_workout_codes: Vec<DiagnosticWorkoutCode>,
+    pub workout_type_conflicts: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

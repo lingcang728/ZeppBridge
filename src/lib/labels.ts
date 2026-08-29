@@ -1,4 +1,6 @@
 export const workoutLabel = (value: string): string => {
+  const unknownCode = value.trim().toLowerCase().match(/^unknown:(-?\d+)$/);
+  if (unknownCode) return `未识别运动（编号 ${unknownCode[1]}）`;
   const labels: Record<string, string> = {
     run: '户外跑步',
     running: '跑步',
@@ -19,7 +21,7 @@ export const workoutLabel = (value: string): string => {
     climb: '攀爬',
     badminton: '羽毛球',
     activity: '活动',
-    unknown: '运动',
+    unknown: '未识别运动',
   };
   return labels[value.trim().toLowerCase()] || value || '运动';
 };

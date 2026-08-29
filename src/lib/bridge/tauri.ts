@@ -10,6 +10,7 @@ import type {
   CapabilityProbe,
   DeviceProfile,
   DeviceProfilesResult,
+  DiagnosticReport,
   ExportResult,
   ExportSelection,
   HealthOverview,
@@ -172,6 +173,13 @@ export const tauriBackend: BridgeBackend = {
     return call<WorkoutSeries>('get_workout_series', { workoutId });
   },
 
+  setWorkoutTypeOverride(workoutId: string, userOverride?: string | null) {
+    return call<Workout>('set_workout_type_override', {
+      workoutId,
+      userOverride: userOverride || null,
+    });
+  },
+
   getLocalApiStatus() {
     return call<LocalApiStatus>('get_local_api_status');
   },
@@ -189,6 +197,10 @@ export const tauriBackend: BridgeBackend = {
 
   reprocessLocalData() {
     return call<ReprocessResult>('reprocess_local_data');
+  },
+
+  getDiagnosticReport() {
+    return call<DiagnosticReport>('get_diagnostic_report');
   },
 
   getExportJson(selection: ExportSelection) {

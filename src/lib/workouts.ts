@@ -34,4 +34,9 @@ export const isDisplayableWorkout = (workout: Workout): boolean =>
 
 export const displayableWorkouts = (workouts: Workout[]): Workout[] => workouts.filter(isDisplayableWorkout);
 
-export const workoutTypeKey = (workout: Workout): string => workout.workout_type.trim().toLowerCase();
+export const workoutDisplayType = (workout: Partial<Workout>): string =>
+  (workout.effective_type || workout.user_override || workout.normalized_type || workout.workout_type || 'unknown')
+    .trim()
+    .toLowerCase();
+
+export const workoutTypeKey = (workout: Workout): string => workoutDisplayType(workout);

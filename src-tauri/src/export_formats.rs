@@ -125,7 +125,11 @@ pub(crate) fn to_csv(export: &Value) -> Result<(String, usize), String> {
 
         // 运动类型是字符串而不是数值，但丢掉它会让 CSV 无法区分跑步和骑行，
         // 因此单独占一行放进 value 列。
-        let workout_type = text(workout.get("workout_type"));
+        let workout_type = text(
+            workout
+                .get("effective_type")
+                .or_else(|| workout.get("workout_type")),
+        );
         if !workout_type.is_empty() {
             push_row(
                 &mut rows,
@@ -187,7 +191,11 @@ pub(crate) fn to_gpx(export: &Value) -> Result<(String, usize), String> {
         let heart_rates = heart_rate_index(workout);
         let resumes = pause_resume_times(workout);
 
-        let workout_type = text(workout.get("workout_type"));
+        let workout_type = text(
+            workout
+                .get("effective_type")
+                .or_else(|| workout.get("workout_type")),
+        );
         let start = text(workout.get("start_time"));
         let name = if start.is_empty() {
             workout_type.to_string()

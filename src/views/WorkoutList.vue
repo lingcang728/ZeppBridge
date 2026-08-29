@@ -10,7 +10,7 @@ import { useSyncController } from '../composables/useSyncController';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { workoutLabel } from '../lib/labels';
 import { formatDate, formatDuration, isFiniteNumber } from '../lib/format';
-import { displayableWorkouts, workoutDurationMinutes } from '../lib/workouts';
+import { displayableWorkouts, workoutDisplayType, workoutDurationMinutes } from '../lib/workouts';
 import type { Workout } from '../types';
 
 const { dataRevision } = useSyncController();
@@ -90,9 +90,9 @@ watch(dataRevision, () => void loadList());
         :to="{ name: 'WorkoutDetail', params: { workoutId: workout.workout_id } }"
         category="activity"
         icon="run"
-        :icon-bg="workoutTypeBg(workout.workout_type)"
+        :icon-bg="workoutTypeBg(workoutDisplayType(workout))"
         :kicker="formatDate(workout.start_time)"
-        :title="workoutLabel(workout.workout_type)"
+        :title="workoutLabel(workoutDisplayType(workout))"
         :fact="workoutFact(workout).fact"
         :fact-label="workoutFact(workout).label"
       />

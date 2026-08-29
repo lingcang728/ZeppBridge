@@ -7,7 +7,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v14";
+pub(crate) const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v15-issue-3";
 const LAST_CLOUD_SYNC_AT_KEY: &str = "last_cloud_sync_at";
 const LAST_CLOUD_SYNC_OUTCOME_KEY: &str = "last_cloud_sync_outcome";
 const LAST_LOCAL_REPROCESS_AT_KEY: &str = "last_local_reprocess_at";
@@ -51,6 +51,113 @@ impl Drop for ReplayGuard {
     fn drop(&mut self) {
         REPLAY_IN_PROGRESS.store(false, std::sync::atomic::Ordering::SeqCst);
     }
+}
+
+#[derive(Debug, Clone)]
+struct StoredWorkoutType {
+    normalized_type: String,
+    type_source: String,
+    user_override: Option<String>,
+    zepp_type: Option<i32>,
+    conflict: Option<String>,
+}
+
+fn type_evidence_rank(source: &str) -> u8 {
+    match source {
+        "numeric_mapped" | "unknown_code" => 3,
+        "string_field" => 2,
+        _ => 1,
+    }
+}
+
+fn merge_workout_type(
+    existing: Option<StoredWorkoutType>,
+    incoming: &Workout,
+) -> StoredWorkoutType {
+    let Some(existing) = existing else {
+        return StoredWorkoutType {
+            normalized_type: incoming.normalized_type.clone(),
+            type_source: incoming.type_source.clone(),
+            user_override: incoming.user_override.clone(),
+            zepp_type: incoming.zepp_type,
+            conflict: None,
+        };
+    };
+
+    let old_rank = type_evidence_rank(&existing.type_source);
+    let new_rank = type_evidence_rank(&incoming.type_source);
+    let mut merged = if new_rank > old_rank {
+        StoredWorkoutType {
+            normalized_type: incoming.normalized_type.clone(),
+            type_source: incoming.type_source.clone(),
+            user_override: existing.user_override.clone(),
+            zepp_type: incoming.zepp_type,
+            conflict: existing.conflict.clone(),
+        }
+    } else if new_rank < old_rank {
+        existing.clone()
+    } else if new_rank == 3 && incoming.zepp_type == existing.zepp_type {
+        // Same raw code, newer normalizer interpretation. This is what makes a
+        // revision replay able to correct old rows without losing overrides.
+        StoredWorkoutType {
+            normalized_type: incoming.normalized_type.clone(),
+            type_source: incoming.type_source.clone(),
+            user_override: existing.user_override.clone(),
+            zepp_type: incoming.zepp_type,
+            conflict: existing.conflict.clone(),
+        }
+    } else if new_rank == 3 {
+        // Two different numeric facts for one workout are a server conflict.
+        // Pick the smaller code deterministically so request order cannot
+        // change the result, and retain every observed code for diagnostics.
+        let old_code = existing.zepp_type.unwrap_or(i32::MAX);
+        let new_code = incoming.zepp_type.unwrap_or(i32::MAX);
+        if new_code < old_code {
+            StoredWorkoutType {
+                normalized_type: incoming.normalized_type.clone(),
+                type_source: incoming.type_source.clone(),
+                user_override: existing.user_override.clone(),
+                zepp_type: incoming.zepp_type,
+                conflict: existing.conflict.clone(),
+            }
+        } else {
+            existing.clone()
+        }
+    } else if incoming.normalized_type < existing.normalized_type {
+        StoredWorkoutType {
+            normalized_type: incoming.normalized_type.clone(),
+            type_source: incoming.type_source.clone(),
+            user_override: existing.user_override.clone(),
+            zepp_type: incoming.zepp_type,
+            conflict: existing.conflict.clone(),
+        }
+    } else {
+        existing.clone()
+    };
+
+    if new_rank == 3 && old_rank == 3 && incoming.zepp_type != existing.zepp_type {
+        let mut codes = BTreeSet::new();
+        if let Some(raw) = existing.conflict.as_deref() {
+            codes.extend(raw.split(',').filter_map(|value| value.parse::<i32>().ok()));
+        }
+        if let Some(code) = existing.zepp_type {
+            codes.insert(code);
+        }
+        if let Some(code) = incoming.zepp_type {
+            codes.insert(code);
+        }
+        merged.conflict = Some(
+            codes
+                .into_iter()
+                .map(|code| code.to_string())
+                .collect::<Vec<_>>()
+                .join(","),
+        );
+    }
+    merged.user_override = existing
+        .user_override
+        .or_else(|| incoming.user_override.clone());
+    merged
 }
 
 /// The daily metrics the body/training screens can chart, and the unit each
@@ -1298,6 +1405,37 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(10, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // Keep Zepp's raw numeric fact, our interpretation, and a user's local
+        // correction as separate layers. Existing rows are classified from the
+        // evidence already stored; the revision bump then replays retained raw
+        // records using the current normalizer without changing cloud sync time.
+        self.ensure_table_columns(
+            "workouts",
+            &[
+                ("workout_type_source", "TEXT NOT NULL DEFAULT 'missing'"),
+                ("workout_type_override", "TEXT"),
+                ("workout_type_conflict", "TEXT"),
+            ],
+        )?;
+        if version < 11 {
+            self.conn.execute_batch(
+                "UPDATE workouts
+                    SET workout_type_source = CASE
+                        WHEN zepp_type IS NOT NULL AND workout_type LIKE 'unknown:%' THEN 'unknown_code'
+                        WHEN zepp_type IS NOT NULL THEN 'numeric_mapped'
+                        WHEN workout_type <> 'unknown' THEN 'string_field'
+                        ELSE 'missing'
+                    END;",
+            )?;
+        }
+        // Earlier migrations are intentionally idempotent and still stamp
+        // their historical versions on every launch. Restore the current
+        // schema marker after they have all run.
+        self.conn.execute_batch("PRAGMA user_version = 11;")?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(11, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }
@@ -1961,23 +2099,43 @@ impl Database {
             .synced_at
             .or_else(|| self.fetched_at_for_raw(raw_record_id))
             .unwrap_or_else(Utc::now);
+        let existing = self
+            .conn
+            .query_row(
+                "SELECT workout_type, workout_type_source, workout_type_override,
+                        zepp_type, workout_type_conflict
+                 FROM workouts WHERE workout_id = ?1",
+                [&workout.workout_id],
+                |row| {
+                    Ok(StoredWorkoutType {
+                        normalized_type: row.get(0)?,
+                        type_source: row.get(1)?,
+                        user_override: row.get(2)?,
+                        zepp_type: row.get(3)?,
+                        conflict: row.get(4)?,
+                    })
+                },
+            )
+            .optional()?;
+        let merged_type = merge_workout_type(existing, workout);
         self.conn.execute(
             "INSERT INTO workouts
                 (workout_id, workout_type, start_time, end_time, distance_meters,
                  calories, avg_hr, max_hr, training_load, vo2max,
                  source_scope, device_id, raw_record_id, synced_at,
-                 gps_available, sample_count, zepp_source, zepp_type)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
+                 gps_available, sample_count, zepp_source, zepp_type,
+                 workout_type_source, workout_type_override, workout_type_conflict)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)
              ON CONFLICT(workout_id) DO UPDATE SET
                 workout_type = excluded.workout_type,
                 start_time = excluded.start_time,
                 end_time = excluded.end_time,
-                distance_meters = excluded.distance_meters,
-                calories = excluded.calories,
-                avg_hr = excluded.avg_hr,
-                max_hr = excluded.max_hr,
-                training_load = excluded.training_load,
-                vo2max = excluded.vo2max,
+                distance_meters = COALESCE(excluded.distance_meters, workouts.distance_meters),
+                calories = COALESCE(excluded.calories, workouts.calories),
+                avg_hr = COALESCE(excluded.avg_hr, workouts.avg_hr),
+                max_hr = COALESCE(excluded.max_hr, workouts.max_hr),
+                training_load = COALESCE(excluded.training_load, workouts.training_load),
+                vo2max = COALESCE(excluded.vo2max, workouts.vo2max),
                 source_scope = excluded.source_scope,
                 device_id = excluded.device_id,
                 raw_record_id = COALESCE(excluded.raw_record_id, workouts.raw_record_id),
@@ -1991,10 +2149,13 @@ impl Database {
                     ELSE workouts.sample_count
                 END,
                 zepp_source = COALESCE(excluded.zepp_source, workouts.zepp_source),
-                zepp_type = COALESCE(excluded.zepp_type, workouts.zepp_type)",
+                zepp_type = excluded.zepp_type,
+                workout_type_source = excluded.workout_type_source,
+                workout_type_override = COALESCE(workouts.workout_type_override, excluded.workout_type_override),
+                workout_type_conflict = excluded.workout_type_conflict",
             params![
                 workout.workout_id,
-                workout.workout_type,
+                merged_type.normalized_type,
                 workout.start_time.to_rfc3339(),
                 workout.end_time.to_rfc3339(),
                 workout.distance_meters,
@@ -2010,10 +2171,87 @@ impl Database {
                 i64::from(workout.gps_available),
                 workout.sample_count,
                 workout.zepp_source,
-                workout.zepp_type,
+                merged_type.zepp_type,
+                merged_type.type_source,
+                merged_type.user_override,
+                merged_type.conflict,
             ],
         )?;
         Ok(())
+    }
+
+    pub fn set_workout_type_override(
+        &self,
+        workout_id: &str,
+        user_override: Option<&str>,
+    ) -> Result<()> {
+        let normalized = user_override
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_lowercase);
+        if let Some(value) = normalized.as_deref() {
+            const ALLOWED: [&str; 15] = [
+                "run",
+                "walking",
+                "ride",
+                "indoor_cycling",
+                "swimming",
+                "treadmill",
+                "trail",
+                "hiking",
+                "strength",
+                "elliptical",
+                "rowing",
+                "yoga",
+                "climb",
+                "badminton",
+                "activity",
+            ];
+            if !ALLOWED.contains(&value) {
+                return Err(ZeppBridgeError::ConfigError("不支持的运动类型纠正".into()));
+            }
+        }
+        let changed = self.conn.execute(
+            "UPDATE workouts SET workout_type_override = ?2 WHERE workout_id = ?1",
+            params![workout_id, normalized],
+        )?;
+        if changed == 0 {
+            return Err(ZeppBridgeError::DataUnavailable("运动记录不存在".into()));
+        }
+        Ok(())
+    }
+
+    pub fn diagnostic_schema_version(&self) -> Result<i64> {
+        self.conn
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .map_err(Into::into)
+    }
+
+    pub fn diagnostic_unknown_workout_codes(&self) -> Result<Vec<DiagnosticWorkoutCode>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT zepp_type, COUNT(*)
+             FROM workouts
+             WHERE workout_type_source = 'unknown_code' AND zepp_type IS NOT NULL
+             GROUP BY zepp_type ORDER BY zepp_type",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(DiagnosticWorkoutCode {
+                code: row.get(0)?,
+                records: row.get(1)?,
+            })
+        })?;
+        rows.collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(Into::into)
+    }
+
+    pub fn diagnostic_workout_type_conflicts(&self) -> Result<i64> {
+        self.conn
+            .query_row(
+                "SELECT COUNT(*) FROM workouts WHERE workout_type_conflict IS NOT NULL",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(Into::into)
     }
 
     fn workout_exists(&self, workout_id: &str) -> Result<bool> {
@@ -2642,7 +2880,8 @@ impl Database {
             "SELECT workout_id, workout_type, start_time, end_time,
                     distance_meters, calories, avg_hr, max_hr,
                     training_load, vo2max, source_scope, device_id,
-                    synced_at, gps_available, sample_count
+                    synced_at, gps_available, sample_count, zepp_type,
+                    workout_type_source, workout_type_override
              FROM workouts ORDER BY start_time DESC LIMIT ?1",
         )?;
         let rows = stmt.query_map([limit], |row| {
@@ -2662,6 +2901,9 @@ impl Database {
                 row.get::<_, Option<String>>(12)?,
                 row.get::<_, i64>(13)?,
                 row.get::<_, i64>(14)?,
+                row.get::<_, Option<i32>>(15)?,
+                row.get::<_, String>(16)?,
+                row.get::<_, Option<String>>(17)?,
             ))
         })?;
         let mut workouts = Vec::new();
@@ -2682,10 +2924,20 @@ impl Database {
                 synced_at,
                 gps_available,
                 sample_count,
+                zepp_type,
+                type_source,
+                user_override,
             ) = row?;
+            let effective_type = user_override
+                .clone()
+                .unwrap_or_else(|| workout_type.clone());
             workouts.push(Workout {
                 workout_id,
-                workout_type,
+                workout_type: workout_type.clone(),
+                normalized_type: workout_type,
+                type_source,
+                user_override,
+                effective_type,
                 start_time: parse_datetime(&start, "workout.start_time")?,
                 end_time: parse_datetime(&end, "workout.end_time")?,
                 distance_meters,
@@ -2703,7 +2955,7 @@ impl Database {
                 gps_available: gps_available != 0,
                 sample_count,
                 zepp_source: None,
-                zepp_type: None,
+                zepp_type,
             });
         }
         Ok(workouts)
@@ -2716,7 +2968,8 @@ impl Database {
                 "SELECT workout_id, workout_type, start_time, end_time,
                         distance_meters, calories, avg_hr, max_hr,
                         training_load, vo2max, source_scope, device_id,
-                        synced_at, gps_available, sample_count
+                        synced_at, gps_available, sample_count, zepp_type,
+                        workout_type_source, workout_type_override
                  FROM workouts WHERE workout_id = ?1 LIMIT 1",
                 [workout_id],
                 |row| {
@@ -2736,6 +2989,9 @@ impl Database {
                         row.get::<_, Option<String>>(12)?,
                         row.get::<_, i64>(13)?,
                         row.get::<_, i64>(14)?,
+                        row.get::<_, Option<i32>>(15)?,
+                        row.get::<_, String>(16)?,
+                        row.get::<_, Option<String>>(17)?,
                     ))
                 },
             )
@@ -2756,6 +3012,9 @@ impl Database {
             synced_at,
             gps_available,
             sample_count,
+            zepp_type,
+            type_source,
+            user_override,
         )) = row
         else {
             return Ok(None);
@@ -2770,9 +3029,16 @@ impl Database {
             [&workout_id],
             |row| row.get(0),
         )?;
+        let effective_type = user_override
+            .clone()
+            .unwrap_or_else(|| workout_type.clone());
         Ok(Some(Workout {
             workout_id,
-            workout_type,
+            workout_type: workout_type.clone(),
+            normalized_type: workout_type,
+            type_source,
+            user_override,
+            effective_type,
             start_time: parse_datetime(&start, "workout.start_time")?,
             end_time: parse_datetime(&end, "workout.end_time")?,
             distance_meters,
@@ -2790,7 +3056,7 @@ impl Database {
             gps_available: gps_available != 0 || route_points > 0,
             sample_count: sample_count.max(stored_samples),
             zepp_source: None,
-            zepp_type: None,
+            zepp_type,
         }))
     }
 
@@ -3862,7 +4128,8 @@ impl Database {
             let mut stmt = self.conn.prepare(
                 "SELECT workout_id, workout_type, start_time, end_time,
                         distance_meters, calories, avg_hr, max_hr,
-                        training_load, vo2max, source_scope, device_id
+                        training_load, vo2max, source_scope, device_id,
+                        zepp_type, workout_type_source, workout_type_override
                  FROM workouts
                  WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2
                  ORDER BY start_time",
@@ -3881,6 +4148,9 @@ impl Database {
                     row.get::<_, Option<f64>>(9)?,
                     row.get::<_, String>(10)?,
                     row.get::<_, Option<String>>(11)?,
+                    row.get::<_, Option<i32>>(12)?,
+                    row.get::<_, String>(13)?,
+                    row.get::<_, Option<String>>(14)?,
                 ))
             })?;
             for row in rows {
@@ -3897,11 +4167,22 @@ impl Database {
                     vo2max,
                     source_scope,
                     device_id,
+                    zepp_type,
+                    type_source,
+                    user_override,
                 ) = row?;
                 let series = self.get_workout_series(&workout_id)?;
+                let effective_type = user_override
+                    .clone()
+                    .unwrap_or_else(|| workout_type.clone());
                 let mut workout = serde_json::json!({
                     "workout_id": workout_id,
-                    "workout_type": workout_type,
+                    "workout_type": effective_type.clone(),
+                    "zepp_type": zepp_type,
+                    "normalized_type": workout_type,
+                    "type_source": type_source,
+                    "user_override": user_override,
+                    "effective_type": effective_type,
                     "start_time": start_time,
                     "end_time": end_time,
                     "distance_meters": distance_meters,
@@ -4539,6 +4820,134 @@ mod tests {
         }
     }
 
+    fn workout_with_type(code: Option<i32>, normalized: &str, source: &str) -> Workout {
+        Workout {
+            workout_id: "same-workout".into(),
+            workout_type: normalized.into(),
+            normalized_type: normalized.into(),
+            type_source: source.into(),
+            user_override: None,
+            effective_type: normalized.into(),
+            start_time: ts(),
+            end_time: ts() + chrono::Duration::minutes(30),
+            distance_meters: None,
+            calories: Some(100),
+            avg_hr: None,
+            max_hr: None,
+            training_load: None,
+            vo2max: None,
+            source_scope: SourceScope::Device,
+            device_id: None,
+            synced_at: Some(ts() + chrono::Duration::hours(1)),
+            gps_available: false,
+            sample_count: 0,
+            zepp_source: None,
+            zepp_type: code,
+        }
+    }
+
+    #[test]
+    fn schema_v11_marker_survives_repeated_idempotent_migrations() {
+        let db = Database::in_memory().unwrap();
+        assert_eq!(db.diagnostic_schema_version().unwrap(), 11);
+        db.migrate().unwrap();
+        assert_eq!(db.diagnostic_schema_version().unwrap(), 11);
+    }
+
+    #[test]
+    fn schema_v10_workout_rows_migrate_without_losing_type_facts() {
+        let db = Database::in_memory().unwrap();
+        db.conn
+            .execute_batch(
+                "ALTER TABLE workouts DROP COLUMN workout_type_conflict;
+                 ALTER TABLE workouts DROP COLUMN workout_type_override;
+                 ALTER TABLE workouts DROP COLUMN workout_type_source;
+                 DELETE FROM schema_migrations WHERE version = 11;
+                 PRAGMA user_version = 10;",
+            )
+            .unwrap();
+        db.conn
+            .execute(
+                "INSERT INTO workouts
+                    (workout_id, workout_type, start_time, end_time, source_scope,
+                     synced_at, gps_available, sample_count, zepp_type)
+                 VALUES ('legacy', 'run', ?1, ?2, 'device', ?3, 0, 0, 105)",
+                params![
+                    ts().to_rfc3339(),
+                    (ts() + chrono::Duration::minutes(30)).to_rfc3339(),
+                    (ts() + chrono::Duration::hours(1)).to_rfc3339(),
+                ],
+            )
+            .unwrap();
+        db.migrate().unwrap();
+        assert_eq!(db.diagnostic_schema_version().unwrap(), 11);
+        let source: String = db
+            .conn
+            .query_row(
+                "SELECT workout_type_source FROM workouts WHERE workout_id = 'legacy'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(source, "numeric_mapped");
+        assert_eq!(
+            db.get_workout_detail("legacy").unwrap().unwrap().zepp_type,
+            Some(105)
+        );
+    }
+
+    #[test]
+    fn workout_type_merge_is_order_independent_and_numeric_evidence_wins() {
+        let numeric = workout_with_type(Some(105), "unknown:105", "unknown_code");
+        let string = workout_with_type(None, "strength", "string_field");
+        let first = Database::in_memory().unwrap();
+        first.insert_workout(&string).unwrap();
+        first.insert_workout(&numeric).unwrap();
+        let second = Database::in_memory().unwrap();
+        second.insert_workout(&numeric).unwrap();
+        second.insert_workout(&string).unwrap();
+        let a = first.get_workout_detail("same-workout").unwrap().unwrap();
+        let b = second.get_workout_detail("same-workout").unwrap().unwrap();
+        assert_eq!(a.normalized_type, "unknown:105");
+        assert_eq!(a.normalized_type, b.normalized_type);
+        assert_eq!(a.type_source, b.type_source);
+        assert_eq!(a.zepp_type, b.zepp_type);
+    }
+
+    #[test]
+    fn workout_override_survives_replay_and_does_not_replace_raw_facts() {
+        let db = Database::in_memory().unwrap();
+        let workout = workout_with_type(Some(105), "unknown:105", "unknown_code");
+        db.insert_workout(&workout).unwrap();
+        db.set_workout_type_override("same-workout", Some("strength"))
+            .unwrap();
+        let mut replay = workout.clone();
+        replay.synced_at = Some(ts() + chrono::Duration::days(1));
+        db.insert_workout(&replay).unwrap();
+        let stored = db.get_workout_detail("same-workout").unwrap().unwrap();
+        assert_eq!(stored.zepp_type, Some(105));
+        assert_eq!(stored.normalized_type, "unknown:105");
+        assert_eq!(stored.user_override.as_deref(), Some("strength"));
+        assert_eq!(stored.effective_type, "strength");
+        assert_eq!(stored.synced_at, workout.synced_at);
+        let export = parsed_export(&db, &["workouts"], ExportDetail::Summary);
+        let exported = &export["data"]["workouts"][0];
+        assert_eq!(exported["zepp_type"], 105);
+        assert_eq!(exported["normalized_type"], "unknown:105");
+        assert_eq!(exported["type_source"], "unknown_code");
+        assert_eq!(exported["user_override"], "strength");
+        assert_eq!(exported["effective_type"], "strength");
+        assert_eq!(exported["workout_type"], "strength");
+        db.set_workout_type_override("same-workout", None).unwrap();
+        assert_eq!(
+            db.get_workout_detail("same-workout")
+                .unwrap()
+                .unwrap()
+                .effective_type,
+            "unknown:105"
+        );
+    }
+
     fn parsed_export(db: &Database, types: &[&str], detail: ExportDetail) -> serde_json::Value {
         let (encoded, _) = db
             .build_ai_export(&export_selection(types, detail))
@@ -4563,6 +4972,10 @@ mod tests {
         db.insert_workout(&Workout {
             workout_id: "1700000000".into(),
             workout_type: "run".into(),
+            normalized_type: "run".into(),
+            type_source: "string_field".into(),
+            user_override: None,
+            effective_type: "run".into(),
             start_time: ts(),
             end_time: ts() + chrono::Duration::minutes(10),
             distance_meters: Some(1000.0),
@@ -4836,6 +5249,10 @@ mod tests {
         db.insert_workout(&Workout {
             workout_id: "1700000000".into(),
             workout_type: "run".into(),
+            normalized_type: "run".into(),
+            type_source: "string_field".into(),
+            user_override: None,
+            effective_type: "run".into(),
             start_time: ts(),
             end_time: ts() + chrono::Duration::minutes(10),
             distance_meters: Some(1000.0),
@@ -5365,6 +5782,10 @@ mod tests {
         db.insert_workout(&Workout {
             workout_id: "1700000000".into(),
             workout_type: "run".into(),
+            normalized_type: "run".into(),
+            type_source: "numeric_mapped".into(),
+            user_override: None,
+            effective_type: "run".into(),
             start_time: ts(),
             end_time: ts() + chrono::Duration::minutes(10),
             distance_meters: Some(1000.0),

@@ -62,6 +62,7 @@ const localApiStatus = ref<LocalApiStatus | null>(null);
 const deviceRefreshBusy = ref(false);
 const deviceRefreshMessage = ref<string | null>(null);
 const deviceRefreshError = ref<string | null>(null);
+const diagnosticBusy = ref(false);
 
 /* 本地偏好（隐私区开关，仅保存在本机） */
 const readLocalPref = (key: string, fallback: boolean) => {
@@ -351,6 +352,21 @@ const copyLocalApiExample = async () => {
     dataMessage.value = '本机 API 调用示例已复制。';
   } catch {
     dataError.value = '无法复制调用示例，请手动复制接口地址。';
+  }
+};
+
+const copyDiagnosticReport = async () => {
+  diagnosticBusy.value = true;
+  dataError.value = null;
+  dataMessage.value = null;
+  try {
+    const report = await backend.getDiagnosticReport();
+    await navigator.clipboard.writeText(JSON.stringify(report, null, 2));
+    dataMessage.value = 'Issue #3 脱敏诊断已复制，可直接粘贴到 GitHub；请勿另附 raw、token 或健康截图。';
+  } catch (error) {
+    dataError.value = toUserMessage(error, '生成脱敏诊断失败');
+  } finally {
+    diagnosticBusy.value = false;
   }
 };
 
@@ -764,6 +780,13 @@ const runCapabilityProbe = async () => {
         <button class="privacy-link-btn" type="button" @click="privacyModalOpen = true">
           <Icon name="shield" :size="13" />查看本地隐私与脱敏原则
         </button>
+        <div class="diagnostic-panel">
+          <strong>设备与运动类型诊断</strong>
+          <p>只包含字段名、JSON 类型、布尔状态、计数、目录候选和固件版本；不包含账号、token、序列号、设备 ID、GPS、健康数值、原始响应或本机路径。</p>
+          <button class="button secondary" type="button" :disabled="diagnosticBusy" @click="copyDiagnosticReport">
+            <Icon name="copy" :size="14" />{{ diagnosticBusy ? '正在生成…' : '复制脱敏诊断' }}
+          </button>
+        </div>
       </section>
 
       <!-- 5. 数据保留 -->
@@ -1244,6 +1267,10 @@ h3 { margin-bottom: 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
   transition: color 140ms ease;
 }
 .privacy-link-btn:hover { color: var(--accent); }
+.diagnostic-panel { display: grid; gap: 7px; margin-top: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.025); }
+.diagnostic-panel strong { color: var(--ink); font-size: 12px; }
+.diagnostic-panel p { margin: 0; color: var(--subtle); font-size: 11px; line-height: 1.55; }
+.diagnostic-panel .button { justify-self: start; }
 
 .field-row {
   display: flex;

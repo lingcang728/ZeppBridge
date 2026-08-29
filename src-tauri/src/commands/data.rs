@@ -5,11 +5,13 @@ use crate::export_formats;
 use crate::ipc_types::CleanupResult;
 use crate::models::{
     AiHandoffMetadata, AiHandoffResult, CapabilityOverview, DailyPoint, DeviceCacheMetadata,
-    DeviceMatchStatus, DeviceProfile, DeviceProfilesResult, ExportDetail, ExportResult,
-    ExportSelection, HealthOverview, HeartRatePoint, HeartRateZoneOptions, HeartRateZonePreference,
-    MetricSeries, SleepSession, StorageEstimate, TrainingBalancePoint, UserPrefs, Workout,
-    WorkoutSeries,
+    DeviceMatchStatus, DeviceProfile, DeviceProfilesResult, DiagnosticDeviceCandidate,
+    DiagnosticDeviceEvidence, DiagnosticField, DiagnosticObjectShape, DiagnosticReport,
+    ExportDetail, ExportResult, ExportSelection, HealthOverview, HeartRatePoint,
+    HeartRateZoneOptions, HeartRateZonePreference, MetricSeries, SleepSession, StorageEstimate,
+    TrainingBalancePoint, UserPrefs, Workout, WorkoutSeries,
 };
+use crate::storage::NORMALIZER_REVISION;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -256,6 +258,56 @@ pub async fn reprocess_local_data(
         "streams": streams,
         "message": "已使用新版解析器重新处理本地原始响应"
     }))
+}
+
+#[tauri::command]
+pub async fn set_workout_type_override(
+    state: tauri::State<'_, AppState>,
+    workout_id: String,
+    user_override: Option<String>,
+) -> std::result::Result<Workout, String> {
+    let db = state.db.lock().await;
+    db.set_workout_type_override(&workout_id, user_override.as_deref())
+        .map_err(|error| error.user_message())?;
+    db.get_workout_detail(&workout_id)
+        .map_err(|error| error.user_message())?
+        .ok_or_else(|| "运动记录不存在".to_owned())
+}
+
+/// Build an allowlist-only report for Issue #3. The cloud response is examined
+/// in memory and is never copied into the result or persisted as a diagnostic.
+#[tauri::command]
+pub async fn get_diagnostic_report(
+    state: tauri::State<'_, AppState>,
+) -> std::result::Result<DiagnosticReport, String> {
+    let device_evidence = match state.auth.load_auth() {
+        Ok(Some(auth)) => match ZeppConnector::new(auth) {
+            Ok(connector) => match connector.fetch_devices().await {
+                Ok(payload) => build_device_diagnostic(&payload),
+                Err(_) => empty_device_diagnostic("request_failed"),
+            },
+            Err(_) => empty_device_diagnostic("connection_unavailable"),
+        },
+        Ok(None) => empty_device_diagnostic("not_configured"),
+        Err(_) => empty_device_diagnostic("authentication_unavailable"),
+    };
+    let db = state.db.lock().await;
+    Ok(DiagnosticReport {
+        format: "zeppbridge.issue3.diagnostic.v1".into(),
+        app_version: env!("CARGO_PKG_VERSION").into(),
+        schema_version: db
+            .diagnostic_schema_version()
+            .map_err(|error| error.user_message())?,
+        normalizer_revision: NORMALIZER_REVISION.into(),
+        operating_system: std::env::consts::OS.into(),
+        device_evidence,
+        unknown_workout_codes: db
+            .diagnostic_unknown_workout_codes()
+            .map_err(|error| error.user_message())?,
+        workout_type_conflicts: db
+            .diagnostic_workout_type_conflicts()
+            .map_err(|error| error.user_message())?,
+    })
 }
 
 #[tauri::command]
@@ -1176,6 +1228,150 @@ pub(crate) fn parse_device_profile(value: &serde_json::Value) -> DeviceProfile {
         .unwrap_or_default()
 }
 
+fn empty_device_diagnostic(status: &str) -> DiagnosticDeviceEvidence {
+    DiagnosticDeviceEvidence {
+        status: status.into(),
+        object_count: 0,
+        id_alias_objects: 0,
+        serial_alias_objects: 0,
+        name_field_objects: 0,
+        firmware_field_objects: 0,
+        candidates: Vec::new(),
+        shapes: Vec::new(),
+    }
+}
+
+fn diagnostic_json_type(value: &Value) -> &'static str {
+    match value {
+        Value::Null => "null",
+        Value::Bool(_) => "boolean",
+        Value::Number(_) => "number",
+        Value::String(_) => "string",
+        Value::Array(_) => "array",
+        Value::Object(_) => "object",
+    }
+}
+
+fn diagnostic_field_name(key: &str) -> String {
+    let safe = key.len() <= 64
+        && key
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-'))
+        && key.chars().filter(|ch| ch.is_ascii_digit()).count() <= 12;
+    if safe {
+        key.to_owned()
+    } else {
+        "<dynamic_key>".into()
+    }
+}
+
+fn collect_device_shapes(
+    value: &Value,
+    path: &str,
+    evidence: &mut DiagnosticDeviceEvidence,
+    shapes: &mut BTreeSet<DiagnosticObjectShape>,
+    depth: usize,
+) {
+    if depth > 8 || shapes.len() >= 40 {
+        return;
+    }
+    match value {
+        Value::Array(items) => {
+            for item in items.iter().take(8) {
+                collect_device_shapes(item, &format!("{path}[]"), evidence, shapes, depth + 1);
+            }
+        }
+        Value::Object(object) => {
+            evidence.object_count += 1;
+            let has_any = |names: &[&str]| names.iter().any(|name| object.contains_key(*name));
+            evidence.id_alias_objects += usize::from(has_any(&[
+                "device_id",
+                "deviceId",
+                "deviceid",
+                "deviceSource",
+                "macAddress",
+            ]));
+            evidence.serial_alias_objects +=
+                usize::from(has_any(&["sn", "serial", "serialNumber"]));
+            evidence.name_field_objects += usize::from(has_any(&[
+                "displayName",
+                "deviceName",
+                "productName",
+                "product_name",
+                "modelName",
+                "model",
+                "nickname",
+                "name",
+            ]));
+            evidence.firmware_field_objects += usize::from(has_any(&[
+                "productVersion",
+                "firmwareVersion",
+                "hardwareVersion",
+                "fwVersion",
+                "bind_device",
+                "bindDevice",
+            ]));
+            let mut fields = object
+                .iter()
+                .map(|(name, value)| DiagnosticField {
+                    name: diagnostic_field_name(name),
+                    json_type: diagnostic_json_type(value).into(),
+                })
+                .collect::<Vec<_>>();
+            fields.sort();
+            fields.dedup();
+            shapes.insert(DiagnosticObjectShape {
+                path: path.into(),
+                fields,
+            });
+            for (key, child) in object {
+                let child_path = format!("{path}.{}", diagnostic_field_name(key));
+                collect_device_shapes(child, &child_path, evidence, shapes, depth + 1);
+                if key == "additionalInfo" {
+                    if let Some(raw) = child.as_str() {
+                        if let Ok(decoded) = serde_json::from_str::<Value>(raw) {
+                            collect_device_shapes(
+                                &decoded,
+                                &format!("{child_path}<json>"),
+                                evidence,
+                                shapes,
+                                depth + 1,
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+fn build_device_diagnostic(value: &Value) -> DiagnosticDeviceEvidence {
+    let mut evidence = empty_device_diagnostic("available");
+    let mut shapes = BTreeSet::new();
+    collect_device_shapes(value, "$", &mut evidence, &mut shapes, 0);
+    evidence.shapes = shapes.into_iter().collect();
+    let mut seen = BTreeSet::new();
+    for profile in parse_device_profiles(value) {
+        let (Some(catalog_id), Some(canonical_name)) = (profile.catalog_id, profile.canonical_name)
+        else {
+            continue;
+        };
+        if seen.insert(catalog_id.clone()) {
+            evidence.candidates.push(DiagnosticDeviceCandidate {
+                catalog_id,
+                canonical_name,
+                firmware: profile.firmware,
+                match_status: profile.match_status,
+            });
+        }
+    }
+    evidence
+        .candidates
+        .sort_by(|a, b| a.catalog_id.cmp(&b.catalog_id));
+    evidence
+}
+
 pub(crate) fn parse_device_profiles(value: &serde_json::Value) -> Vec<DeviceProfile> {
     let items = device_items(value);
     items
@@ -1390,9 +1586,9 @@ fn validate_export_path(value: &str, extension: &str) -> std::result::Result<Pat
 #[cfg(test)]
 mod tests {
     use super::{
-        ai_handoff_mode_for_bytes, merge_cached_device_profile, parse_device_profile,
-        parse_device_profiles, read_device_profile_cache, redact_ai_export, unknown_device_profile,
-        validate_json_export_path, AI_HANDOFF_INLINE_LIMIT_BYTES,
+        ai_handoff_mode_for_bytes, build_device_diagnostic, merge_cached_device_profile,
+        parse_device_profile, parse_device_profiles, read_device_profile_cache, redact_ai_export,
+        unknown_device_profile, validate_json_export_path, AI_HANDOFF_INLINE_LIMIT_BYTES,
     };
     use crate::models::DeviceMatchStatus;
     use serde_json::json;
@@ -1416,6 +1612,50 @@ mod tests {
         assert_eq!(profile.firmware.as_deref(), Some("3.9.1.2"));
         assert_eq!(profile.serial.as_deref(), Some("2143123A1B23456"));
         assert_eq!(profile.device_id.as_deref(), Some("A194"));
+    }
+
+    #[test]
+    fn diagnostic_device_report_contains_shapes_but_never_payload_values() {
+        let token = "SECRET-APP-TOKEN-DO-NOT-LEAK";
+        let serial = "SERIAL-PRIVATE-998877";
+        let account = "ACCOUNT-PRIVATE-112233";
+        let payload = json!({
+            "accountId": account,
+            "appToken": token,
+            "items": [{
+                "deviceId": "MAC-PRIVATE-AA-BB-CC",
+                "displayName": "My private nickname",
+                "additionalInfo": serde_json::to_string(&json!({
+                    "productName": "Amazfit Balance 2",
+                    "productVersion": "6.2.208.7",
+                    "sn": serial,
+                    "gps": { "latitude": 31.2345, "longitude": 121.4567 },
+                    "heartRate": 188,
+                    "futureSecret": "UNKNOWN-FIELD-VALUE"
+                })).unwrap()
+            }]
+        });
+        let report = build_device_diagnostic(&payload);
+        let encoded = serde_json::to_string(&report).unwrap();
+        for secret in [
+            token,
+            serial,
+            account,
+            "MAC-PRIVATE-AA-BB-CC",
+            "My private nickname",
+            "31.2345",
+            "121.4567",
+            "188",
+            "UNKNOWN-FIELD-VALUE",
+        ] {
+            assert!(!encoded.contains(secret), "diagnostic leaked {secret}");
+        }
+        assert!(encoded.contains("additionalInfo"));
+        assert!(encoded.contains("productName"));
+        assert!(encoded.contains("Amazfit Balance 2"));
+        assert!(encoded.contains("6.2.208.7"));
+        assert_eq!(report.id_alias_objects, 1);
+        assert_eq!(report.serial_alias_objects, 1);
     }
 
     #[test]

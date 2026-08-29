@@ -13,6 +13,7 @@ import { dataProviderLabel, dataScopeLabel, workoutLabel } from '../lib/labels';
 import { formatDate, formatDistance, formatTime, isFiniteNumber } from '../lib/format';
 import { zeppSemanticColors } from '../lib/echartsTheme';
 import { formatPaceSeconds } from '../lib/metricSeries';
+import { workoutDisplayType } from '../lib/workouts';
 import trexFallback from '../assets/devices/amazfit-t-rex-3.webp';
 import type { DeviceProfile, Workout, WorkoutSeries, WorkoutSeriesSample, WorkoutRoutePoint } from '../types';
 
@@ -57,6 +58,15 @@ const actionError = ref<string | null>(null);
 const exportedNote = ref<string | null>(null);
 const activeFormat = ref<'json' | 'csv' | 'gpx'>('json');
 const workoutId = computed(() => String(route.params.workoutId || ''));
+const displayType = computed(() => workout.value ? workoutDisplayType(workout.value) : 'unknown');
+const typeOverrideBusy = ref(false);
+const typeOverrideOptions = [
+  ['run', '户外跑步'], ['walking', '健走'], ['ride', '户外骑行'],
+  ['indoor_cycling', '室内骑行'], ['swimming', '游泳'], ['treadmill', '室内跑步'],
+  ['trail', '越野跑'], ['hiking', '徒步'], ['strength', '力量训练'],
+  ['elliptical', '椭圆机'], ['rowing', '划船'], ['yoga', '瑜伽'],
+  ['climb', '攀爬'], ['badminton', '羽毛球'], ['activity', '其他活动'],
+] as const;
 
 const durationMinutes = computed(() => {
   const item = workout.value;
@@ -101,7 +111,7 @@ const numberValue = (value: unknown, digits = 0): string => isFiniteNumber(value
   : '未提供';
 
 const workoutArt = computed<DesignIconName>(() => {
-  const raw = `${workout.value?.workout_type ?? ''} ${workoutLabel(workout.value?.workout_type ?? '')}`.toLowerCase();
+  const raw = `${displayType.value} ${workoutLabel(displayType.value)}`.toLowerCase();
   return /cycle|cycling|bike|骑/.test(raw) ? 'outdoor-cycling' : 'outdoor-run';
 });
 const deviceName = computed(() => device.value.canonical_name || device.value.name || '设备名称未提供');
@@ -485,6 +495,22 @@ const loadDetail = async () => {
   }
 };
 
+const changeWorkoutOverride = async (event: Event) => {
+  if (!workout.value) return;
+  const target = event.target as HTMLSelectElement;
+  typeOverrideBusy.value = true;
+  actionError.value = null;
+  try {
+    const updated = await tauriApi.setWorkoutTypeOverride(workout.value.workout_id, target.value || null);
+    workout.value = updated as WorkoutMetrics;
+    exportedNote.value = target.value ? '已保存本地运动类型纠正。' : '已清除纠正，恢复 ZeppBridge 识别结果。';
+  } catch (cause) {
+    actionError.value = toUserMessage(cause, '保存运动类型纠正失败');
+  } finally {
+    typeOverrideBusy.value = false;
+  }
+};
+
 const exportRecord = async () => {
   if (!workout.value) return;
   actionError.value = null;
@@ -496,7 +522,7 @@ const exportRecord = async () => {
       return [fields.join(','), ...(series.value?.samples ?? []).map((sample) => fields.map((field) => csvCell(sample[field])).join(','))].join('\r\n');
     };
     const xmlEscape = (value: unknown): string => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[character] ?? character);
-    const gpx = () => `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="ZeppBridge" xmlns="http://www.topografix.com/GPX/1/1"><metadata><name>${xmlEscape(workoutLabel(workout.value?.workout_type ?? ''))}</name></metadata><trk><name>${xmlEscape(workout.value?.workout_id)}</name><trkseg>${(series.value?.route ?? []).map((point) => `<trkpt lat="${point.latitude}" lon="${point.longitude}">${isFiniteNumber(point.altitude_m) ? `<ele>${point.altitude_m}</ele>` : ''}<time>${xmlEscape(point.timestamp)}</time></trkpt>`).join('')}</trkseg></trk></gpx>`;
+    const gpx = () => `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="ZeppBridge" xmlns="http://www.topografix.com/GPX/1/1"><metadata><name>${xmlEscape(workoutLabel(displayType.value))}</name></metadata><trk><name>${xmlEscape(workout.value?.workout_id)}</name><trkseg>${(series.value?.route ?? []).map((point) => `<trkpt lat="${point.latitude}" lon="${point.longitude}">${isFiniteNumber(point.altitude_m) ? `<ele>${point.altitude_m}</ele>` : ''}<time>${xmlEscape(point.timestamp)}</time></trkpt>`).join('')}</trkseg></trk></gpx>`;
     const payload = activeFormat.value === 'json'
       ? JSON.stringify({ workout: workout.value, series: series.value }, null, 2)
       : activeFormat.value === 'csv' ? csv() : gpx();
@@ -537,10 +563,21 @@ watch([dataRevision, workoutId], () => void loadDetail());
               <DesignIcon :name="workoutArt" :size="64" />
               <div>
                 <p class="hero-kicker">WORKOUT DETAIL</p>
-                <h1 id="workout-detail-title">{{ workoutLabel(workout.workout_type) }}</h1>
+                <h1 id="workout-detail-title">{{ workoutLabel(displayType) }}</h1>
               </div>
             </div>
             <p class="sport-time"><Icon name="clock" :size="14" />{{ formatDate(workout.start_time, 'short') }} {{ formatTime(workout.start_time) }} · {{ formatClock(durationMinutes) }}</p>
+            <div class="type-evidence" aria-label="运动类型判定">
+              <span>Zepp 原始编号：{{ workout.zepp_type ?? '未提供' }}</span>
+              <span>ZeppBridge 识别：{{ workoutLabel(workout.normalized_type) }}</span>
+              <label>
+                我的纠正
+                <select :value="workout.user_override || ''" :disabled="typeOverrideBusy" @change="changeWorkoutOverride">
+                  <option value="">不纠正</option>
+                  <option v-for="option in typeOverrideOptions" :key="option[0]" :value="option[0]">{{ option[1] }}</option>
+                </select>
+              </label>
+            </div>
           </div>
         </div>
         <div class="hero-signal" aria-hidden="true"><DesignIcon name="health-watch" :size="124" /></div>
@@ -645,6 +682,10 @@ watch([dataRevision, workoutId], () => void loadDetail());
 .hero-kicker, .section-eyebrow { margin: 0; color: var(--subtle); font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: .16em; }
 .sport-line h1 { margin: 1px 0 0; color: var(--ink); font-size: clamp(25px, 3vw, 38px); line-height: 1.1; letter-spacing: -.04em; }
 .sport-time { display: inline-flex; align-items: center; gap: 6px; margin: 9px 0 0; color: var(--muted); font-size: 12px; }
+.type-evidence { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 12px; margin-top: 10px; color: var(--muted); font-size: 11px; }
+.type-evidence > span { padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.025); }
+.type-evidence label { display: inline-flex; align-items: center; gap: 7px; }
+.type-evidence select { min-height: 29px; padding: 3px 28px 3px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-raised); color: var(--ink); font-size: 11px; }
 .hero-signal { position: absolute; z-index: 0; top: -8px; right: 3%; opacity: .13; filter: saturate(1.4); transform: rotate(5deg); }
 .metric-list { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(7, minmax(112px, 1fr)); gap: 9px; }
 .metric-tile { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 78px; padding: 10px; border: 1px solid rgba(226,234,242,.08); border-radius: 15px; background: rgba(11,14,17,.42); }
