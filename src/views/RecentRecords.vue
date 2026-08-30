@@ -13,7 +13,61 @@ import { workoutLabel } from '../lib/labels';
 import { formatDate, formatDuration, isFiniteNumber } from '../lib/format';
 import { displayableWorkouts, workoutDisplayLabel, workoutDisplayType, workoutDurationMinutes, workoutTypeKey } from '../lib/workouts';
 import type { SleepSession, Workout } from '../types';
-import { intlLocale } from '../i18n';
+import { defineMessages, intlLocale, useMessages } from '../i18n';
+
+const messages = defineMessages(
+  {
+    backToOverview: '返回概览',
+    title: '最近记录',
+    intro: '最近同步的睡眠与运动记录，合并查看。',
+    loadingLabel: '正在加载最近记录',
+    loadFailedTitle: '最近记录加载失败',
+    retry: '重试',
+    partialUnavailable: '部分数据暂时不可用',
+    filterAll: '全部',
+    recentSleep: '最近睡眠',
+    recentWorkouts: '最近运动',
+    countBadge: (count: number) => `共 ${count} 条`,
+    seeAll: '查看全部',
+    noSleep: '暂无睡眠记录',
+    noWorkouts: '没有可展示的运动记录。',
+    noWorkoutsOfType: '该运动类型没有可展示记录。',
+    hiddenIncomplete: (count: number) => `${count} 条数据不完整已隐藏`,
+    notProvided: '未提供',
+    kilometres: (value: string) => `${value} 公里`,
+    metres: (value: number) => `${value} 米`,
+    dateUnknown: '日期未知',
+    today: '今天',
+    yesterday: '昨天',
+    listDate: (month: number, day: number, weekday: string) => `${month}月${day}日（${weekday}）`,
+  },
+  {
+    backToOverview: 'Back to overview',
+    title: 'Recent records',
+    intro: 'Recently synced sleep and workouts, side by side.',
+    loadingLabel: 'Loading recent records',
+    loadFailedTitle: 'Could not load the recent records',
+    retry: 'Try again',
+    partialUnavailable: 'Some data is unavailable right now',
+    filterAll: 'All',
+    recentSleep: 'Recent sleep',
+    recentWorkouts: 'Recent workouts',
+    countBadge: (count: number) => `${count} total`,
+    seeAll: 'See all',
+    noSleep: 'No sleep records yet',
+    noWorkouts: 'Nothing to show here.',
+    noWorkoutsOfType: 'Nothing to show for this workout type.',
+    hiddenIncomplete: (count: number) => `${count} incomplete records hidden`,
+    notProvided: 'Not provided',
+    kilometres: (value: string) => `${value} km`,
+    metres: (value: number) => `${value} m`,
+    dateUnknown: 'Date unknown',
+    today: 'Today',
+    yesterday: 'Yesterday',
+    listDate: (month: number, day: number, weekday: string) => `${weekday}, ${month}/${day}`,
+  },
+);
+const t = useMessages(messages);
 
 const loading = ref(true);
 const error = ref<string | null>(null);
@@ -39,7 +93,7 @@ const workoutFilters = computed(() => {
       return true;
     });
   return [
-    { label: '全部', value: 'all', icon: 'grid' as const },
+    { label: t.value.filterAll, value: 'all', icon: 'grid' as const },
     ...types.map((type) => ({ label: workoutLabel(type), value: type, icon: 'run' as const })),
   ];
 });
@@ -83,7 +137,7 @@ const loadRecent = async () => {
   recentWorkouts.value = workouts.status === 'fulfilled' ? workouts.value : [];
   const rejected = [sleep, workouts].filter((result) => result.status === 'rejected');
   if (rejected.length) {
-    partialWarning.value = toUserMessage(rejected[0].reason, '部分数据暂时不可用');
+    partialWarning.value = toUserMessage(rejected[0].reason, t.value.partialUnavailable);
   }
   loading.value = false;
 };
@@ -95,25 +149,27 @@ watch(workoutFilters, (filters) => {
 });
 
 const workoutFact = (workout: Workout): string => {
-  const distance = formatDistanceZh(workout.distance_meters);
+  const distance = shortDistance(workout.distance_meters);
   if (distance) return distance;
   if (isFiniteNumber(workout.calories)) return `${Math.round(workout.calories)} kcal`;
   const minutes = workoutDurationMinutes(workout);
-  return formatDuration(minutes, '未提供');
+  return formatDuration(minutes, t.value.notProvided);
 };
 
 function listDate(value: string): string {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '日期未知';
+  if (Number.isNaN(date.getTime())) return t.value.dateUnknown;
   const month = date.getMonth() + 1;
   const day = date.getDate();
   const weekday = new Intl.DateTimeFormat(intlLocale(), { weekday: 'short' }).format(date);
-  return `${month}月${day}日（${weekday}）`;
+  return t.value.listDate(month, day, weekday);
 }
 
-function formatDistanceZh(meters?: number): string {
+function shortDistance(meters?: number): string {
   if (!isFiniteNumber(meters) || meters <= 0) return '';
-  return meters >= 1000 ? `${(meters / 1000).toFixed(2)} 公里` : `${Math.round(meters)} 米`;
+  return meters >= 1000
+    ? t.value.kilometres((meters / 1000).toFixed(2))
+    : t.value.metres(Math.round(meters));
 }
 
 function formatDateHint(value: string): string {
@@ -123,8 +179,8 @@ function formatDateHint(value: string): string {
   const startOfToday = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate()).getTime();
   const startOfThat = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
   const diff = Math.round((startOfToday - startOfThat) / 86400000);
-  if (diff === 0) return '今天';
-  if (diff === 1) return '昨天';
+  if (diff === 0) return t.value.today;
+  if (diff === 1) return t.value.yesterday;
   return listDate(value);
 }
 </script>
@@ -133,10 +189,10 @@ function formatDateHint(value: string): string {
   <section class="page recent-page" aria-labelledby="recent-title">
     <PageHeader
       back="/"
-      back-label="返回概览"
+      :back-label="t.backToOverview"
       title-id="recent-title"
-      title="最近记录"
-      intro="最近同步的睡眠与运动记录，合并查看。"
+      :title="t.title"
+      :intro="t.intro"
     />
 
     <div v-if="partialWarning" class="partial-warning" role="status">
@@ -144,7 +200,7 @@ function formatDateHint(value: string): string {
       <span>{{ partialWarning }}</span>
     </div>
 
-    <div v-if="loading" class="recent-skeleton" aria-label="正在加载最近记录" aria-live="polite">
+    <div v-if="loading" class="recent-skeleton" :aria-label="t.loadingLabel" aria-live="polite">
       <div class="recent-grid">
         <SkeletonBlock height="100%" />
         <SkeletonBlock height="100%" />
@@ -155,10 +211,10 @@ function formatDateHint(value: string): string {
       v-else-if="error"
       tone="error"
       icon="warning"
-      title="最近记录加载失败"
+      :title="t.loadFailedTitle"
       :message="error"
     >
-      <button class="button button-secondary" type="button" @click="loadRecent"><Icon name="refresh" :size="15" />重试</button>
+      <button class="button button-secondary" type="button" @click="loadRecent"><Icon name="refresh" :size="15" />{{ t.retry }}</button>
     </EmptyState>
 
     <div v-else class="recent-grid">
@@ -166,10 +222,10 @@ function formatDateHint(value: string): string {
       <section class="recent-col" aria-labelledby="recent-sleep-title">
         <div class="group-head">
           <h2 id="recent-sleep-title" class="col-label">
-            <Icon name="moon" :size="15" /><span>最近睡眠</span>
-            <em v-if="recentSleep.length">共 {{ recentSleep.length }} 条</em>
+            <Icon name="moon" :size="15" /><span>{{ t.recentSleep }}</span>
+            <em v-if="recentSleep.length">{{ t.countBadge(recentSleep.length) }}</em>
           </h2>
-          <RouterLink class="see-all" to="/sleep">查看全部<Icon name="arrow-right" :size="13" /></RouterLink>
+          <RouterLink class="see-all" to="/sleep">{{ t.seeAll }}<Icon name="arrow-right" :size="13" /></RouterLink>
         </div>
         <div class="surface-card list-card">
           <RecordRow
@@ -181,9 +237,9 @@ function formatDateHint(value: string): string {
             icon="moon"
             :kicker="formatDateHint(session.start_time)"
             :title="formatDuration(session.duration_minutes)"
-            :fact="isFiniteNumber(session.score) ? String(Math.round(session.score)) : '未提供'"
+            :fact="isFiniteNumber(session.score) ? String(Math.round(session.score)) : t.notProvided"
           />
-          <div v-if="!recentSleep.length" class="empty-row">暂无睡眠记录</div>
+          <div v-if="!recentSleep.length" class="empty-row">{{ t.noSleep }}</div>
         </div>
       </section>
 
@@ -191,10 +247,10 @@ function formatDateHint(value: string): string {
       <section class="recent-col" aria-labelledby="recent-workout-title">
         <div class="group-head">
           <h2 id="recent-workout-title" class="col-label">
-            <Icon name="run" :size="15" /><span>最近运动</span>
-            <em v-if="displayableRecentWorkouts.length">共 {{ displayableRecentWorkouts.length }} 条</em>
+            <Icon name="run" :size="15" /><span>{{ t.recentWorkouts }}</span>
+            <em v-if="displayableRecentWorkouts.length">{{ t.countBadge(displayableRecentWorkouts.length) }}</em>
           </h2>
-          <RouterLink class="see-all" to="/workouts">查看全部<Icon name="arrow-right" :size="13" /></RouterLink>
+          <RouterLink class="see-all" to="/workouts">{{ t.seeAll }}<Icon name="arrow-right" :size="13" /></RouterLink>
         </div>
         <div class="filter-tabs">
           <button
@@ -211,7 +267,7 @@ function formatDateHint(value: string): string {
         <div class="surface-card list-card">
           <div v-if="hiddenWorkoutsCount > 0" class="filter-note">
             <Icon name="info" :size="12" />
-            <span>{{ hiddenWorkoutsCount }} 条数据不完整已隐藏</span>
+            <span>{{ t.hiddenIncomplete(hiddenWorkoutsCount) }}</span>
           </div>
           <RecordRow
             v-for="workout in filteredWorkouts"
@@ -225,7 +281,7 @@ function formatDateHint(value: string): string {
             :title="workoutDisplayLabel(workout)"
             :fact="workoutFact(workout)"
           />
-          <div v-if="!filteredWorkouts.length" class="empty-row">{{ activeFilter === 'all' ? '没有可展示的运动记录。' : '该运动类型没有可展示记录。' }}</div>
+          <div v-if="!filteredWorkouts.length" class="empty-row">{{ activeFilter === 'all' ? t.noWorkouts : t.noWorkoutsOfType }}</div>
         </div>
       </section>
     </div>

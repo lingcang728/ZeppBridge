@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { deviceCatalog, deviceThumbnailFor } from '../lib/deviceCatalog';
+import { defineMessages, useMessages } from '../i18n';
+
+const messages = defineMessages(
+  { marqueeAria: '已收录的 Amazfit 在售设备' },
+  { marqueeAria: 'Amazfit devices currently in the catalog' },
+);
+const t = useMessages(messages);
 
 const items = computed(() => deviceCatalog
   .filter((entry) => entry.status === 'active' && entry.supported)
@@ -16,7 +23,7 @@ const rowB = computed(() => [...items.value].reverse());
 </script>
 
 <template>
-  <div class="device-marquee" aria-label="已收录的 Amazfit 在售设备">
+  <div class="device-marquee" :aria-label="t.marqueeAria">
     <div v-for="(row, index) in [rowA, rowB]" :key="index" :class="['marquee-row', `dir-${index === 0 ? 'ltr' : 'rtl'}`]">
       <div class="marquee-track">
         <span v-for="pass in 2" :key="pass" class="marquee-pass">

@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router';
 import Icon from './Icon.vue';
+import { defineMessages, useMessages } from '../i18n';
+
+const messages = defineMessages(
+  { backToOverview: '返回概览' },
+  { backToOverview: 'Back to overview' },
+);
+const t = useMessages(messages);
 
 /*
  * 二级页统一的页头。
@@ -24,7 +31,7 @@ defineProps<{
 <template>
   <div class="page-header-wrap">
     <RouterLink v-if="back" class="back-link" :to="back">
-      <Icon name="arrow-left" :size="14" />{{ backLabel || '返回概览' }}
+      <Icon name="arrow-left" :size="14" />{{ backLabel || t.backToOverview }}
     </RouterLink>
     <header class="page-header">
       <div>

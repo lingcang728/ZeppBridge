@@ -8,8 +8,75 @@ import Icon from '../components/Icon.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { zeppSemanticColors } from '../lib/echartsTheme';
-import { indexSeries, SERIES_RANGES, type SeriesRangeDays } from '../lib/metricSeries';
+import { indexSeries, seriesRanges, type SeriesRangeDays } from '../lib/metricSeries';
 import type { MetricSeries } from '../types';
+import { defineMessages, useMessages } from '../i18n';
+
+const messages = defineMessages(
+  {
+    backToOverview: '返回概览',
+    eyebrow: '身体状态',
+    title: '身体状态',
+    intro: '恢复、压力、血氧、HRV、呼吸率与静息心率的本机趋势。全部读自已同步的记录，没有推算。',
+    rangeAria: '时间范围',
+    desktopOnly: '请使用桌面应用；浏览器预览不会读取账户数据。',
+    loadFailed: '身体状态数据暂时不可用',
+    retry: '重试',
+    loadingAria: '正在加载身体状态',
+    noneInRange: '这段范围没有身体状态记录。换个更长的范围，或先完成一次同步。',
+    emptyCard: '这段范围没有记录。',
+    readinessLabel: '恢复状态',
+    readinessHint: '手表综合睡眠、HRV 与静息心率给出的准备度',
+    stressLabel: '压力',
+    stressHint: '全天压力平均值，阴影是当日实测区间',
+    spo2Label: '血氧',
+    spo2Hint: '逐条血氧读数按天平均，阴影是当日实测区间',
+    spo2Empty: '这段范围没有逐条血氧读数。',
+    odiLabel: '夜间血氧 ODI',
+    odiHint: '每小时血氧下降次数，越低越好',
+    hrvHint: '心率变异性，逐次测量按天平均',
+    rmssdHint: '夜间高频心率变异性，按天平均',
+    respiratoryLabel: '呼吸率',
+    respiratoryHint: '睡眠期间呼吸频率，阴影是当日实测区间',
+    restingLabel: '静息心率',
+    restingHint: 'ZeppBridge 按天统计的静息心率',
+    unitScore: '分',
+    unitPerHour: '次/时',
+    unitBreathsPerMinute: '次/分',
+  },
+  {
+    backToOverview: 'Back to overview',
+    eyebrow: 'Body status',
+    title: 'Body status',
+    intro: 'Local trends for readiness, stress, blood oxygen, HRV, respiratory rate and resting heart rate. All read from synced records, nothing extrapolated.',
+    rangeAria: 'Time range',
+    desktopOnly: 'Use the desktop app. This browser preview reads no account data.',
+    loadFailed: 'Body status data is unavailable right now',
+    retry: 'Try again',
+    loadingAria: 'Loading body status',
+    noneInRange: 'No body status records in this range. Try a longer range, or run a sync first.',
+    emptyCard: 'Nothing recorded in this range.',
+    readinessLabel: 'Readiness',
+    readinessHint: 'The watch weighs sleep, HRV and resting heart rate into one score',
+    stressLabel: 'Stress',
+    stressHint: 'All-day average; the shaded band is that day\'s measured range',
+    spo2Label: 'Blood oxygen',
+    spo2Hint: 'Individual SpO2 readings averaged per day; the band is that day\'s measured range',
+    spo2Empty: 'No individual SpO2 readings in this range.',
+    odiLabel: 'Nighttime SpO2 ODI',
+    odiHint: 'Desaturations per hour; lower is better',
+    hrvHint: 'Heart rate variability, individual measurements averaged per day',
+    rmssdHint: 'Nighttime high-frequency variability, averaged per day',
+    respiratoryLabel: 'Respiratory rate',
+    respiratoryHint: 'Breathing rate during sleep; the band is that day\'s measured range',
+    restingLabel: 'Resting heart rate',
+    restingHint: 'Resting heart rate as ZeppBridge computes it per day',
+    unitScore: 'pts',
+    unitPerHour: '/hr',
+    unitBreathsPerMinute: 'br/min',
+  },
+);
+const t = useMessages(messages);
 
 const { dataRevision } = useSyncController();
 
@@ -29,43 +96,54 @@ interface BodyCard {
  * presentation, not collection. The list is fixed so the backend can refuse
  * any name it does not have a unit for.
  */
-const CARDS: BodyCard[] = [
+const METRICS = [
+  'readiness',
+  'stress',
+  'spo2',
+  'spo2_odi',
+  'hrv',
+  'hrv_rmssd',
+  'respiratory_rate',
+  'resting_hr',
+];
+
+const CARDS = computed<BodyCard[]>(() => [
   {
     metric: 'readiness',
-    label: '恢复状态',
-    hint: '手表综合睡眠、HRV 与静息心率给出的准备度',
+    label: t.value.readinessLabel,
+    hint: t.value.readinessHint,
     color: zeppSemanticColors.readiness,
-    unit: '分',
+    unit: t.value.unitScore,
   },
   {
     metric: 'stress',
-    label: '压力',
-    hint: '全天压力平均值，阴影是当日实测区间',
+    label: t.value.stressLabel,
+    hint: t.value.stressHint,
     color: zeppSemanticColors.calories,
-    unit: '分',
+    unit: t.value.unitScore,
     showSpread: true,
   },
   {
     metric: 'spo2',
-    label: '血氧',
-    hint: '逐条血氧读数按天平均，阴影是当日实测区间',
+    label: t.value.spo2Label,
+    hint: t.value.spo2Hint,
     color: zeppSemanticColors.pace,
     unit: '%',
     showSpread: true,
-    emptyText: '这段范围没有逐条血氧读数。',
+    emptyText: t.value.spo2Empty,
   },
   {
     metric: 'spo2_odi',
-    label: '夜间血氧 ODI',
-    hint: '每小时血氧下降次数，越低越好',
+    label: t.value.odiLabel,
+    hint: t.value.odiHint,
     color: zeppSemanticColors.altitude,
-    unit: '次/时',
+    unit: t.value.unitPerHour,
     decimals: 1,
   },
   {
     metric: 'hrv',
     label: 'HRV (SDNN)',
-    hint: '心率变异性，逐次测量按天平均',
+    hint: t.value.hrvHint,
     color: zeppSemanticColors.stride,
     unit: 'ms',
     showSpread: true,
@@ -73,35 +151,36 @@ const CARDS: BodyCard[] = [
   {
     metric: 'hrv_rmssd',
     label: 'HRV (RMSSD)',
-    hint: '夜间高频心率变异性，按天平均',
+    hint: t.value.rmssdHint,
     color: zeppSemanticColors.sleep.light,
     unit: 'ms',
     showSpread: true,
   },
   {
     metric: 'respiratory_rate',
-    label: '呼吸率',
-    hint: '睡眠期间呼吸频率，阴影是当日实测区间',
+    label: t.value.respiratoryLabel,
+    hint: t.value.respiratoryHint,
     color: zeppSemanticColors.sleep.rem,
-    unit: '次/分',
+    unit: t.value.unitBreathsPerMinute,
     decimals: 1,
     showSpread: true,
   },
   {
     metric: 'resting_hr',
-    label: '静息心率',
-    hint: 'ZeppBridge 按天统计的静息心率',
+    label: t.value.restingLabel,
+    hint: t.value.restingHint,
     color: zeppSemanticColors.heart,
     unit: 'bpm',
   },
-];
+]);
 
+const ranges = computed(() => seriesRanges());
 const rangeDays = ref<SeriesRangeDays>(30);
 const series = ref<Record<string, MetricSeries>>({});
 const loading = ref(true);
 const error = ref<string | null>(null);
 
-const cards = computed(() => CARDS.map((card) => ({ ...card, series: series.value[card.metric] ?? null })));
+const cards = computed(() => CARDS.value.map((card) => ({ ...card, series: series.value[card.metric] ?? null })));
 const anyData = computed(() => cards.value.some((card) => (card.series?.points.length ?? 0) > 0));
 
 const load = async () => {
@@ -110,16 +189,16 @@ const load = async () => {
   if (!isDesktop()) {
     series.value = {};
     loading.value = false;
-    error.value = '请使用桌面应用；浏览器预览不会读取账户数据。';
+    error.value = t.value.desktopOnly;
     return;
   }
   try {
     series.value = indexSeries(
-      await backend.getMetricSeries(CARDS.map((card) => card.metric), rangeDays.value),
+      await backend.getMetricSeries(METRICS, rangeDays.value),
     );
   } catch (cause) {
     series.value = {};
-    error.value = toUserMessage(cause, '身体状态数据暂时不可用');
+    error.value = toUserMessage(cause, t.value.loadFailed);
   } finally {
     loading.value = false;
   }
@@ -134,15 +213,15 @@ watch(dataRevision, () => { void load(); });
   <section class="page body-page" aria-labelledby="body-title">
     <PageHeader
       back="/"
-      back-label="返回概览"
+      :back-label="t.backToOverview"
       title-id="body-title"
-      eyebrow="身体状态"
-      title="身体状态"
-      intro="恢复、压力、血氧、HRV、呼吸率与静息心率的本机趋势。全部读自已同步的记录，没有推算。"
+      :eyebrow="t.eyebrow"
+      :title="t.title"
+      :intro="t.intro"
     >
-      <div class="range-switch" role="radiogroup" aria-label="时间范围">
+      <div class="range-switch" role="radiogroup" :aria-label="t.rangeAria">
         <button
-          v-for="range in SERIES_RANGES"
+          v-for="range in ranges"
           :key="range.days"
           type="button"
           role="radio"
@@ -155,16 +234,16 @@ watch(dataRevision, () => { void load(); });
 
     <div v-if="error" class="inline-alert" role="alert">
       <Icon name="warning" :size="14" />{{ error }}
-      <button v-if="isDesktop()" class="button button-secondary retry" type="button" @click="load">重试</button>
+      <button v-if="isDesktop()" class="button button-secondary retry" type="button" @click="load">{{ t.retry }}</button>
     </div>
 
-    <div v-if="loading" class="card-grid" aria-live="polite" aria-label="正在加载身体状态">
+    <div v-if="loading" class="card-grid" aria-live="polite" :aria-label="t.loadingAria">
       <SkeletonBlock v-for="index in 6" :key="index" height="268px" />
     </div>
     <template v-else>
       <p v-if="!anyData && !error" class="inline-alert" role="status">
         <Icon name="info" :size="14" />
-        这段范围没有身体状态记录。换个更长的范围，或先完成一次同步。
+        {{ t.noneInRange }}
       </p>
       <div class="card-grid">
         <MetricTrendCard
@@ -177,7 +256,7 @@ watch(dataRevision, () => { void load(); });
           :unit="card.unit"
           :decimals="card.decimals ?? 0"
           :show-spread="card.showSpread ?? false"
-          :empty-text="card.emptyText ?? '这段范围没有记录。'"
+          :empty-text="card.emptyText ?? t.emptyCard"
         />
       </div>
     </template>

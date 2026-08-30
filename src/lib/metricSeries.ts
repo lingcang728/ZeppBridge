@@ -1,5 +1,30 @@
 import type { MetricSeries, MetricSeriesPoint } from '../types';
-import { intlLocale } from '../i18n';
+import { defineMessages, intlLocale, messagesOf } from '../i18n';
+
+const messages = defineMessages(
+  {
+    range7: '7 天',
+    range30: '1 个月',
+    range180: '6 个月',
+    notSyncedYet: '尚未同步',
+    noRecordsInWindow: (days: number) => `近 ${days} 天无记录`,
+    coverage: (days: number, withData: number) => `${days} 天里有 ${withData} 天记录`,
+    dayRange: (low: string, high: string, unit: string) => `当日区间 ${low} – ${high}${unit}`,
+    samples: (count: number) => `${count} 次读数`,
+  },
+  {
+    range7: '7 days',
+    range30: '1 month',
+    range180: '6 months',
+    notSyncedYet: 'Not synced yet',
+    noRecordsInWindow: (days: number) => `No records in the last ${days} days`,
+    coverage: (days: number, withData: number) => `${withData} of ${days} days have records`,
+    dayRange: (low: string, high: string, unit: string) => `That day ranged ${low} – ${high}${unit}`,
+    samples: (count: number) => `${count} readings`,
+  },
+);
+
+const copy = () => messagesOf(messages);
 
 /**
  * The three windows the body and training screens offer.
@@ -8,13 +33,19 @@ import { intlLocale } from '../i18n';
  * handful of times a year, so a 30-day window shows an empty chart for metrics
  * the library actually holds a year of.
  */
-export const SERIES_RANGES = [
-  { days: 7, label: '7 天' },
-  { days: 30, label: '1 个月' },
-  { days: 180, label: '6 个月' },
-] as const;
+export const SERIES_RANGE_DAYS = [7, 30, 180] as const;
 
-export type SeriesRangeDays = (typeof SERIES_RANGES)[number]['days'];
+export type SeriesRangeDays = (typeof SERIES_RANGE_DAYS)[number];
+
+/** 范围切换按钮的文字。跟着当前语言走，所以是函数而不是常量数组。 */
+export const seriesRanges = (): Array<{ days: SeriesRangeDays; label: string }> => {
+  const t = copy();
+  return [
+    { days: 7, label: t.range7 },
+    { days: 30, label: t.range30 },
+    { days: 180, label: t.range180 },
+  ];
+};
 
 /** Index a `getMetricSeries` response by metric name. */
 export const indexSeries = (series: MetricSeries[]): Record<string, MetricSeries> => {
@@ -36,9 +67,10 @@ export const latestValue = (series?: MetricSeries | null): number | null => {
  * reading a slope into it.
  */
 export const coverageLabel = (series?: MetricSeries | null): string => {
-  if (!series) return '尚未同步';
-  if (!series.days_with_data) return `近 ${series.window_days} 天无记录`;
-  return `${series.window_days} 天里有 ${series.days_with_data} 天记录`;
+  const t = copy();
+  if (!series) return t.notSyncedYet;
+  if (!series.days_with_data) return t.noRecordsInWindow(series.window_days);
+  return t.coverage(series.window_days, series.days_with_data);
 };
 
 // 刻意不缓存成模块级常量：那样会把语言钉死在模块加载的那一刻，
@@ -113,10 +145,10 @@ export const buildSeriesOption = (
         const unit = options.unit ? ` ${options.unit}` : '';
         const spread =
           typeof point.min === 'number' && typeof point.max === 'number'
-            ? `<br><span style="color:#9AA1A9">当日区间 ${format(point.min)} – ${format(point.max)}${unit}</span>`
+            ? `<br><span style="color:#9AA1A9">${copy().dayRange(format(point.min), format(point.max), unit)}</span>`
             : '';
         const samples = point.samples
-          ? `<br><span style="color:#6E757D">${point.samples} 次读数</span>`
+          ? `<br><span style="color:#6E757D">${copy().samples(point.samples)}</span>`
           : '';
         return `${point.date}<br><b>${format(point.value)}</b>${unit}${spread}${samples}`;
       },

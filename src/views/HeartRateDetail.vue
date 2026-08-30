@@ -18,16 +18,73 @@ import Icon from '../components/Icon.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { zeppSemanticColors } from '../lib/echartsTheme';
-import { indexSeries, SERIES_RANGES, type SeriesRangeDays } from '../lib/metricSeries';
+import { indexSeries, SERIES_RANGE_DAYS, seriesRanges, type SeriesRangeDays } from '../lib/metricSeries';
 import { isFiniteNumber } from '../lib/format';
 import type { HeartRatePoint, MetricSeries } from '../types';
-import { intlLocale } from '../i18n';
+import { defineMessages, intlLocale, useMessages } from '../i18n';
+
+const messages = defineMessages(
+  {
+    backToOverview: '返回概览',
+    eyebrow: '心率',
+    title: '心率',
+    intro: '今天的全天心率曲线，以及静息心率与 HRV 的按天趋势。没有采样的时间不画线，也不补 0。',
+    rangeAria: '趋势时间范围',
+    desktopOnly: '请使用桌面应用；浏览器预览不会读取账户数据。',
+    loadFailed: '心率数据暂时不可用',
+    retry: '重试',
+    loadingAria: '正在加载心率',
+    dayCardAria: '24 小时心率',
+    dayTitle: '最近 24 小时',
+    daySub: '逐条读数，按时间排列',
+    statLatest: '最新',
+    statAverage: '平均',
+    statLowest: '最低',
+    statHighest: '最高',
+    chartAria: '最近 24 小时心率曲线',
+    noSamples: '最近 24 小时没有心率采样，所以这里不画曲线。',
+    bpmTooltip: (clock: string, value: number) => `${clock}　<b>${value}</b> 次/分`,
+    restingLabel: '静息心率',
+    restingHint: '手表每天给出的静息心率，越稳越好',
+    hrvHint: '逐条 HRV 读数按天平均',
+    rmssdHint: '另一种 HRV 口径，和上面不是同一个数',
+    emptyCard: '这段范围没有记录。',
+  },
+  {
+    backToOverview: 'Back to overview',
+    eyebrow: 'Heart rate',
+    title: 'Heart rate',
+    intro: "Today's full-day heart rate curve, plus resting heart rate and HRV day by day. Stretches without samples are left blank, not filled with a zero.",
+    rangeAria: 'Trend time range',
+    desktopOnly: 'Use the desktop app. This browser preview reads no account data.',
+    loadFailed: 'Heart rate data is unavailable right now',
+    retry: 'Try again',
+    loadingAria: 'Loading heart rate',
+    dayCardAria: '24-hour heart rate',
+    dayTitle: 'Last 24 hours',
+    daySub: 'Individual readings, in time order',
+    statLatest: 'Latest',
+    statAverage: 'Avg',
+    statLowest: 'Min',
+    statHighest: 'Max',
+    chartAria: 'Heart rate over the last 24 hours',
+    noSamples: 'No heart rate samples in the last 24 hours, so there is no curve to draw.',
+    bpmTooltip: (clock: string, value: number) => `${clock}　<b>${value}</b> bpm`,
+    restingLabel: 'Resting heart rate',
+    restingHint: 'The watch reports one per day; steadier is better',
+    hrvHint: 'Individual HRV readings, averaged per day',
+    rmssdHint: 'A different HRV measure, not the same number as above',
+    emptyCard: 'Nothing recorded in this range.',
+  },
+);
+const t = useMessages(messages);
 
 const { dataRevision } = useSyncController();
 
 const TREND_METRICS = ['resting_hr', 'hrv', 'hrv_rmssd'] as const;
 
-const rangeDays = ref<SeriesRangeDays>(SERIES_RANGES[0].days);
+const ranges = computed(() => seriesRanges());
+const rangeDays = ref<SeriesRangeDays>(SERIES_RANGE_DAYS[0]);
 const series = ref<Record<string, MetricSeries>>({});
 const dayPoints = ref<HeartRatePoint[]>([]);
 const loading = ref(true);
@@ -68,7 +125,7 @@ const dayChartOption = computed(() => {
       formatter: (params: Array<{ value: [number, number] }>) => {
         const point = Array.isArray(params) ? params[0] : params;
         if (!point) return '';
-        return `${clock(point.value[0])}　<b>${Math.round(point.value[1])}</b> 次/分`;
+        return t.value.bpmTooltip(clock(point.value[0]), Math.round(point.value[1]));
       },
     },
     xAxis: {
@@ -101,8 +158,8 @@ const dayChartOption = computed(() => {
 const trendCards = computed(() => [
   {
     metric: 'resting_hr',
-    label: '静息心率',
-    hint: '手表每天给出的静息心率，越稳越好',
+    label: t.value.restingLabel,
+    hint: t.value.restingHint,
     color: zeppSemanticColors.readiness,
     unit: 'bpm',
     series: series.value.resting_hr ?? null,
@@ -110,7 +167,7 @@ const trendCards = computed(() => [
   {
     metric: 'hrv',
     label: 'HRV (SDNN)',
-    hint: '逐条 HRV 读数按天平均',
+    hint: t.value.hrvHint,
     color: zeppSemanticColors.pace,
     unit: 'ms',
     series: series.value.hrv ?? null,
@@ -118,7 +175,7 @@ const trendCards = computed(() => [
   {
     metric: 'hrv_rmssd',
     label: 'HRV (RMSSD)',
-    hint: '另一种 HRV 口径，和上面不是同一个数',
+    hint: t.value.rmssdHint,
     color: zeppSemanticColors.calories,
     unit: 'ms',
     series: series.value.hrv_rmssd ?? null,
@@ -132,7 +189,7 @@ const load = async () => {
     series.value = {};
     dayPoints.value = [];
     loading.value = false;
-    error.value = '请使用桌面应用；浏览器预览不会读取账户数据。';
+    error.value = t.value.desktopOnly;
     return;
   }
   const [day, trends] = await Promise.allSettled([
@@ -142,7 +199,7 @@ const load = async () => {
   dayPoints.value = day.status === 'fulfilled' ? day.value : [];
   series.value = trends.status === 'fulfilled' ? indexSeries(trends.value) : {};
   if (day.status === 'rejected' && trends.status === 'rejected') {
-    error.value = toUserMessage(day.reason, '心率数据暂时不可用');
+    error.value = toUserMessage(day.reason, t.value.loadFailed);
   }
   loading.value = false;
 };
@@ -156,15 +213,15 @@ watch(dataRevision, () => { void load(); });
   <section class="page metric-page" aria-labelledby="hr-title">
     <PageHeader
       back="/"
-      back-label="返回概览"
+      :back-label="t.backToOverview"
       title-id="hr-title"
-      eyebrow="心率"
-      title="心率"
-      intro="今天的全天心率曲线，以及静息心率与 HRV 的按天趋势。没有采样的时间不画线，也不补 0。"
+      :eyebrow="t.eyebrow"
+      :title="t.title"
+      :intro="t.intro"
     >
-      <div class="range-switch" role="radiogroup" aria-label="趋势时间范围">
+      <div class="range-switch" role="radiogroup" :aria-label="t.rangeAria">
         <button
-          v-for="range in SERIES_RANGES"
+          v-for="range in ranges"
           :key="range.days"
           type="button"
           role="radio"
@@ -177,25 +234,25 @@ watch(dataRevision, () => { void load(); });
 
     <div v-if="error" class="inline-alert" role="alert">
       <Icon name="warning" :size="14" />{{ error }}
-      <button v-if="isDesktop()" class="button button-secondary retry" type="button" @click="load">重试</button>
+      <button v-if="isDesktop()" class="button button-secondary retry" type="button" @click="load">{{ t.retry }}</button>
     </div>
 
-    <div v-if="loading" class="stack" aria-live="polite" aria-label="正在加载心率">
+    <div v-if="loading" class="stack" aria-live="polite" :aria-label="t.loadingAria">
       <SkeletonBlock height="280px" /><SkeletonBlock height="268px" />
     </div>
 
     <template v-else>
-      <section class="surface-card day-card" aria-label="24 小时心率">
+      <section class="surface-card day-card" :aria-label="t.dayCardAria">
         <header class="day-head">
           <div>
-            <h2>最近 24 小时</h2>
-            <p>逐条读数，按时间排列</p>
+            <h2>{{ t.dayTitle }}</h2>
+            <p>{{ t.daySub }}</p>
           </div>
           <dl class="day-stats">
-            <div><dt>最新</dt><dd>{{ latest === null ? '—' : Math.round(latest) }}</dd></div>
-            <div><dt>平均</dt><dd>{{ average === null ? '—' : average }}</dd></div>
-            <div><dt>最低</dt><dd>{{ lowest === null ? '—' : Math.round(lowest) }}</dd></div>
-            <div><dt>最高</dt><dd>{{ highest === null ? '—' : Math.round(highest) }}</dd></div>
+            <div><dt>{{ t.statLatest }}</dt><dd>{{ latest === null ? '—' : Math.round(latest) }}</dd></div>
+            <div><dt>{{ t.statAverage }}</dt><dd>{{ average === null ? '—' : average }}</dd></div>
+            <div><dt>{{ t.statLowest }}</dt><dd>{{ lowest === null ? '—' : Math.round(lowest) }}</dd></div>
+            <div><dt>{{ t.statHighest }}</dt><dd>{{ highest === null ? '—' : Math.round(highest) }}</dd></div>
           </dl>
         </header>
         <VChart
@@ -204,10 +261,10 @@ watch(dataRevision, () => { void load(); });
           :option="dayChartOption"
           autoresize
           role="img"
-          aria-label="最近 24 小时心率曲线"
+          :aria-label="t.chartAria"
         />
         <p v-else class="inline-alert" role="status">
-          <Icon name="info" :size="14" />最近 24 小时没有心率采样，所以这里不画曲线。
+          <Icon name="info" :size="14" />{{ t.noSamples }}
         </p>
       </section>
 
@@ -221,7 +278,7 @@ watch(dataRevision, () => { void load(); });
           :color="card.color"
           :unit="card.unit"
           :decimals="0"
-          empty-text="这段范围没有记录。"
+          :empty-text="t.emptyCard"
         />
       </div>
     </template>

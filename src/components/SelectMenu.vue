@@ -11,6 +11,7 @@
  * 目录）有它们自己的组件，不要往这里堆。
  */
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { defineMessages, useMessages } from '../i18n';
 import Icon from './Icon.vue';
 
 export interface SelectMenuOption {
@@ -30,10 +31,18 @@ const props = withDefaults(defineProps<{
   dropUp?: boolean;
 }>(), {
   disabled: false,
-  placeholder: '请选择',
+  // 空串表示「用默认文案」：withDefaults 的默认值在 props 解析时求值，
+  // 那时还拿不到当前语言。
+  placeholder: '',
   ariaLabel: undefined,
   dropUp: false,
 });
+
+const messages = defineMessages(
+  { placeholder: '请选择' },
+  { placeholder: 'Select…' },
+);
+const t = useMessages(messages);
 
 const emit = defineEmits<{ (event: 'update:modelValue', value: string | number): void }>();
 
@@ -82,7 +91,7 @@ const measure = () => {
 const selectedIndex = computed(() =>
   props.options.findIndex((option) => option.value === props.modelValue));
 const selectedLabel = computed(() =>
-  (selectedIndex.value >= 0 ? props.options[selectedIndex.value].label : props.placeholder));
+  (selectedIndex.value >= 0 ? props.options[selectedIndex.value].label : (props.placeholder || t.value.placeholder)));
 
 const scrollActiveIntoView = () => {
   void nextTick(() => {
