@@ -63,11 +63,12 @@ export const AI_PROVIDERS: readonly AiProvider[] = [
   },
   {
     id: 'doubao',
-    label: '豆包',
+    // 品牌名不翻译，但英文界面上写它的官方英文名，不然读者连搜都搜不到。
+    label: 'Doubao',
     url: 'https://www.doubao.com/chat/',
     localIcon: doubaoIcon,
     brandColor: '#1769ff',
-    fallback: '豆',
+    fallback: 'D',
   },
   {
     id: 'deepseek',

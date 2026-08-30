@@ -1,4 +1,10 @@
 import { reactive } from 'vue';
+import { defineMessages, messagesOf } from '../i18n';
+
+const updateMessages = defineMessages(
+  { nothingToInstall: '没有可安装的更新，请重新检查。' },
+  { nothingToInstall: 'There is no update to install. Check again.' },
+);
 
 export type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'installing' | 'failed' | 'upToDate';
 
@@ -104,7 +110,7 @@ export async function checkForDesktopUpdate(manual = false): Promise<void> {
 export async function downloadAndInstallDesktopUpdate(): Promise<void> {
   if (!pendingUpdate || updateState.status !== 'available') {
     updateState.status = 'failed';
-    updateState.error = '没有可安装的更新，请重新检查。';
+    updateState.error = messagesOf(updateMessages).nothingToInstall;
     return;
   }
   try {

@@ -16,8 +16,11 @@ import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { useAiHandoff } from '../composables/useAiHandoff';
 import { localDateString } from '../lib/format';
 import { AI_PROVIDERS, AI_PROVIDER_BY_ID, type AiProviderId } from '../lib/aiProviders';
-import type { ExportDataType, ExportScope, ExportSelection } from '../types';
-import { intlLocale } from '../i18n';
+import type { ExportDataType, ExportScope, ExportSelection, ExportTypeGroup } from '../types';
+import { exploreMessages, promptTemplates, type PromptTemplate } from './Explore.i18n';
+import { intlLocale, locale, useMessages } from '../i18n';
+
+const t = useMessages(exploreMessages);
 
 const {
   exportStartDate,
@@ -33,145 +36,18 @@ const {
 
 const { dataRevision } = useSyncController();
 
-/* ── 模板定义 ─────────────────────────── */
-interface PromptTemplate {
-  id: string;
-  name: string;
-  sub: string;
-  category: string;
-  icon: IconName;
-  types: ExportDataType[];
-  prompt: string;
-}
-
-const templates: PromptTemplate[] = [
-  {
-    id: 'performance',
-    name: '表现总结',
-    sub: '生成整体表现的清晰摘要',
-    category: 'summary',
-    icon: 'bars',
-    types: [
-      'heart_rate',
-      'sleep',
-      'workouts',
-      'steps',
-      'daily_activity',
-      'hrv',
-      'recovery',
-      'training_load',
-    ],
-    prompt: `你是一位专业的运动健康分析师，擅长将可穿戴设备数据转化为易懂的洞察。
-基于以下来自 ZeppBridge 的多源数据（已按时间顺序整理），
-为我生成一份结构清晰、重点突出的整体表现总结。
-请包含总体概览、关键趋势、亮点表现、潜在风险与可执行建议。
-若数据不足，请如实说明并给出改进数据采集的建议。
-
-请以 Markdown 格式输出，使用表格、列表与要点来提升可读性。
-语言风格专业、简洁、积极。`,
-  },
-  {
-    id: 'training',
-    name: '训练洞察',
-    sub: '深入分析训练负荷与趋势',
-    category: 'training',
-    icon: 'activity',
-    types: ['workouts', 'heart_rate', 'training_load', 'vo2max', 'lactate_threshold'],
-    prompt: `你是一位经验丰富的耐力训练教练。
-基于以下来自 ZeppBridge 的训练数据（含心率、训练负荷与 VO₂max），
-分析我的训练结构、强度分布与负荷趋势，
-指出训练安排中的问题，并给出下一周期的调整建议。
-
-请以 Markdown 格式输出，语言专业、直接。`,
-  },
-  {
-    id: 'recovery',
-    name: '恢复与准备度',
-    sub: '评估恢复、HRV 与准备度',
-    category: 'recovery',
-    icon: 'heart',
-    types: [
-      'hrv',
-      'hrv_rmssd',
-      'heart_rate',
-      'sleep',
-      'stress',
-      'spo2',
-      'respiratory_rate',
-      'recovery',
-    ],
-    prompt: `你是一位专注于运动恢复的生理学专家。
-基于以下来自 ZeppBridge 的 HRV、静息心率、睡眠与压力数据，
-评估我的恢复状况与训练准备度，
-识别疲劳积累的信号，并给出恢复优化建议。
-
-请以 Markdown 格式输出。`,
-  },
-  {
-    id: 'sleep',
-    name: '睡眠分析',
-    sub: '睡眠质量与规律性洞察',
-    category: 'sleep',
-    icon: 'moon',
-    types: ['sleep', 'heart_rate', 'hrv', 'spo2', 'respiratory_rate', 'stress'],
-    prompt: `你是一位睡眠健康顾问。
-基于以下来自 ZeppBridge 的睡眠分期、时长与心率数据，
-分析我的睡眠质量、规律性与影响因素，
-并给出具体、可执行的睡眠改善建议。
-
-请以 Markdown 格式输出。`,
-  },
-  {
-    id: 'activity',
-    name: '活动概览',
-    sub: '日常活动与趋势概览',
-    category: 'summary',
-    icon: 'steps',
-    types: ['steps', 'daily_activity', 'workouts', 'heart_rate', 'pai'],
-    prompt: `你是一位健康生活方式顾问。
-基于以下来自 ZeppBridge 的步数、运动与心率数据，
-概览我的日常活动水平与变化趋势，
-并给出提升日常活动量的实用建议。
-
-请以 Markdown 格式输出。`,
-  },
-  {
-    id: 'weekly',
-    name: '每周表现复盘',
-    sub: '周度复盘与细致建议',
-    category: 'training',
-    icon: 'clock',
-    types: [
-      'heart_rate',
-      'sleep',
-      'workouts',
-      'steps',
-      'daily_activity',
-      'hrv',
-      'recovery',
-      'training_load',
-    ],
-    prompt: `你是一位私人健康教练，每周为我做一次数据复盘。
-基于以下来自 ZeppBridge 的本周数据，只和我自己此前的记录比较，
-总结本周变化，指出做得好的地方与值得留意的地方，并给出下周行动清单。
-
-约束：
-- 这份数据里没有任何人群基准，不要拿我和「一般健康人群」或任何平均水平比较；
-- 缺失的项直接说缺失，不要用 0 或估算值填补；
-- 不做医学诊断、疾病风险判断或治疗建议。
-
-请以 Markdown 格式输出。`,
-  },
-];
+/* 模板文案（含六段提示词）在 Explore.i18n.ts。 */
+const templates = computed<PromptTemplate[]>(() => promptTemplates());
 
 const categories = computed(() => {
-  const count = (key: string) => templates.filter((tpl) => tpl.category === key).length;
+  const list = templates.value;
+  const count = (key: string) => list.filter((tpl) => tpl.category === key).length;
   return [
-    { key: 'all', label: '全部模板', icon: 'grid' as IconName, count: templates.length },
-    { key: 'summary', label: '总结', icon: 'file' as IconName, count: count('summary') },
-    { key: 'training', label: '训练', icon: 'activity' as IconName, count: count('training') },
-    { key: 'recovery', label: '恢复', icon: 'heart' as IconName, count: count('recovery') },
-    { key: 'sleep', label: '睡眠', icon: 'moon' as IconName, count: count('sleep') },
+    { key: 'all', label: t.value.categoryAll, icon: 'grid' as IconName, count: list.length },
+    { key: 'summary', label: t.value.categorySummary, icon: 'file' as IconName, count: count('summary') },
+    { key: 'training', label: t.value.categoryTraining, icon: 'activity' as IconName, count: count('training') },
+    { key: 'recovery', label: t.value.categoryRecovery, icon: 'heart' as IconName, count: count('recovery') },
+    { key: 'sleep', label: t.value.categorySleep, icon: 'moon' as IconName, count: count('sleep') },
   ];
 });
 
@@ -194,12 +70,21 @@ const currentScope = (): ExportScope => (focusedWorkoutId.value
 
 const activeCategory = ref('all');
 const templateQuery = ref('');
-const activeTemplateId = ref(templates[0].id);
-const activeTemplate = computed(() => templates.find((tpl) => tpl.id === activeTemplateId.value) ?? templates[0]);
-const editedPrompt = ref(templates[0].prompt);
+const activeTemplateId = ref(templates.value[0].id);
+const activeTemplate = computed(() =>
+  templates.value.find((tpl) => tpl.id === activeTemplateId.value) ?? templates.value[0]);
+const editedPrompt = ref(templates.value[0].prompt);
+/* 换语言时，没动过的提示词跟着换成另一种语言的那一份；动过的一个字都不碰
+   ——用户自己写的东西不该被一次语言切换抹掉。
+   用一个「改过没有」的标记，而不是拿当前文本去和模板比对：切完语言之后
+   模板已经是新语言了，比不出来。 */
+const promptEdited = ref(false);
+watch(locale, () => {
+  if (!promptEdited.value) editedPrompt.value = activeTemplate.value.prompt;
+});
 
 const filteredTemplates = computed(() =>
-  templates.filter((tpl) =>
+  templates.value.filter((tpl) =>
     (activeCategory.value === 'all' || tpl.category === activeCategory.value)
     && (!templateQuery.value.trim() || tpl.name.includes(templateQuery.value.trim()) || tpl.sub.includes(templateQuery.value.trim())),
   ),
@@ -208,19 +93,21 @@ const filteredTemplates = computed(() =>
 const selectTemplate = (tpl: PromptTemplate) => {
   activeTemplateId.value = tpl.id;
   editedPrompt.value = tpl.prompt;
+  promptEdited.value = false;
   exportDataTypes.value = [...tpl.types];
 };
 
 /* ── 导出格式与目标工具 ────────────────── */
-const formats: { key: SaveFormat; label: string; sub: string; icon: IconName }[] = [
-  { key: 'json', label: 'JSON', sub: '完整结构化数据', icon: 'braces' },
-  { key: 'csv', label: 'CSV', sub: '汇总表（不含逐点序列）', icon: 'table' },
-  { key: 'gpx', label: 'GPX', sub: '仅含 GPS 轨迹的运动', icon: 'map' },
-];
+const formats = computed<{ key: SaveFormat; label: string; sub: string; icon: IconName }[]>(() => [
+  { key: 'json', label: 'JSON', sub: t.value.formatJsonSub, icon: 'braces' },
+  { key: 'csv', label: 'CSV', sub: t.value.formatCsvSub, icon: 'table' },
+  { key: 'gpx', label: 'GPX', sub: t.value.formatGpxSub, icon: 'map' },
+]);
 const activeFormat = ref<SaveFormat>('json');
 const activeFormatLabel = computed(
-  () => formats.find((format) => format.key === activeFormat.value)?.label ?? 'JSON',
+  () => formats.value.find((format) => format.key === activeFormat.value)?.label ?? 'JSON',
 );
+const detailOptions = computed(() => exportDetailOptions());
 
 const activeProviderId = ref<AiProviderId>('chatgpt');
 const activeProvider = computed(() => AI_PROVIDER_BY_ID[activeProviderId.value]);
@@ -256,9 +143,9 @@ const datesValid = computed(() =>
    起止时刻，而不是页面上那两个和它无关的日期。 */
 const scopeRangeText = computed(() => {
   if (focusedWorkoutId.value) {
-    if (!previewScope.value) return '这一条运动';
+    if (!previewScope.value) return t.value.thisWorkout;
     const start = new Date(previewScope.value.startTime);
-    if (Number.isNaN(start.getTime())) return '这一条运动';
+    if (Number.isNaN(start.getTime())) return t.value.thisWorkout;
     return new Intl.DateTimeFormat(intlLocale(), {
       year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
     }).format(start);
@@ -268,13 +155,13 @@ const scopeRangeText = computed(() => {
 
 const scopeRangeSub = computed(() => {
   if (focusedWorkoutId.value) {
-    if (!previewScope.value?.endTime) return '仅这一条运动';
+    if (!previewScope.value?.endTime) return t.value.onlyThisWorkout;
     const start = new Date(previewScope.value.startTime).getTime();
     const end = new Date(previewScope.value.endTime).getTime();
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return '仅这一条运动';
-    return `（约 ${Math.max(1, Math.round((end - start) / 60000))} 分钟）`;
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return t.value.onlyThisWorkout;
+    return t.value.approxMinutes(Math.max(1, Math.round((end - start) / 60000)));
   }
-  return rangeDays.value ? `（${rangeDays.value} 天）` : '';
+  return rangeDays.value ? t.value.rangeDays(rangeDays.value) : '';
 });
 
 /**
@@ -286,11 +173,14 @@ const scopeRangeSub = computed(() => {
  * is exactly what the export carries, so the summary counts below always
  * describe the file the user is about to get.
  */
+const typeOptions = computed(() => exportTypeOptions());
+
 const groupedTypes = computed(() =>
-  exportTypeGroups
+  exportTypeGroups()
     .map((group) => ({
-      group,
-      options: exportTypeOptions.filter((option) => option.group === group),
+      key: group.key,
+      label: group.label,
+      options: typeOptions.value.filter((option) => option.group === group.key),
     }))
     .filter((section) => section.options.length > 0),
 );
@@ -302,26 +192,26 @@ const toggleType = (value: ExportDataType) => {
   if (next.has(value)) next.delete(value);
   else next.add(value);
   // Keep the picker's own order so the list never reshuffles as it is used.
-  exportDataTypes.value = exportTypeOptions
+  exportDataTypes.value = typeOptions.value
     .map((option) => option.value)
     .filter((option) => next.has(option));
 };
 
-const toggleGroup = (group: (typeof exportTypeGroups)[number]) => {
-  const options = exportTypeOptions.filter((option) => option.group === group).map((option) => option.value);
+const toggleGroup = (group: ExportTypeGroup) => {
+  const options = typeOptions.value.filter((option) => option.group === group).map((option) => option.value);
   const allOn = options.every((option) => exportDataTypes.value.includes(option));
   const next = new Set(exportDataTypes.value);
   for (const option of options) {
     if (allOn) next.delete(option);
     else next.add(option);
   }
-  exportDataTypes.value = exportTypeOptions
+  exportDataTypes.value = typeOptions.value
     .map((option) => option.value)
     .filter((option) => next.has(option));
 };
 
-const groupIsFull = (group: (typeof exportTypeGroups)[number]) =>
-  exportTypeOptions
+const groupIsFull = (group: ExportTypeGroup) =>
+  typeOptions.value
     .filter((option) => option.group === group)
     .every((option) => exportDataTypes.value.includes(option.value));
 
@@ -339,14 +229,14 @@ const loadPreview = async () => {
     previewCount.value = null;
     previewBytes.value = null;
     previewBusy.value = false;
-    previewError.value = exportDataTypes.value.length ? null : '请至少选择一种数据类型。';
+    previewError.value = exportDataTypes.value.length ? null : t.value.needDataTypes;
     return;
   }
   if (!isTauri()) {
     previewCount.value = null;
     previewBytes.value = null;
     previewBusy.value = false;
-    previewError.value = '请从 ZeppBridge 桌面应用打开，数据感知需要读取本地记录。';
+    previewError.value = t.value.previewDesktopOnly;
     return;
   }
   previewBusy.value = true;
@@ -372,7 +262,7 @@ const loadPreview = async () => {
     if (seq !== previewSeq) return;
     previewCount.value = null;
     previewBytes.value = null;
-    previewError.value = toUserMessage(error, '无法读取本机导出感知数据');
+    previewError.value = toUserMessage(error, t.value.previewFailed);
   } finally {
     if (seq === previewSeq) previewBusy.value = false;
   }
@@ -383,12 +273,12 @@ const schedulePreview = () => {
   previewTimer = window.setTimeout(() => { void loadPreview(); }, 280);
 };
 
-const ranges = [
-  { days: 7, label: '7 天' },
-  { days: 30, label: '30 天' },
-];
+const ranges = computed(() => [
+  { days: 7, label: t.value.range7 },
+  { days: 30, label: t.value.range30 },
+]);
 const activeRangeDays = computed(() => {
-  for (const range of ranges) {
+  for (const range of ranges.value) {
     const end = new Date();
     const start = new Date(end);
     start.setDate(start.getDate() - Math.max(0, range.days - 1));
@@ -432,7 +322,21 @@ const nextMonth = () => {
   }
 };
 
-const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+/* 月份和星期名交给 Intl，不再写死中文数组：英文界面上「2026年 8月」
+   既不是英文也不是任何人的日期写法。 */
+const calendarTitle = computed(() => new Intl.DateTimeFormat(intlLocale(), {
+  year: 'numeric', month: 'long',
+}).format(new Date(pickerYear.value, pickerMonth.value, 1)));
+
+const weekdayNames = computed(() => {
+  // 2026-01-04 是星期日，从它数七天就是一周的表头。
+  const sunday = new Date(2026, 0, 4);
+  const formatter = new Intl.DateTimeFormat(intlLocale(), {
+    weekday: locale.value === 'zh' ? 'narrow' : 'short',
+  });
+  return Array.from({ length: 7 }, (_unused, offset) =>
+    formatter.format(new Date(2026, 0, sunday.getDate() + offset)));
+});
 
 const calendarDays = computed(() => {
   const firstDay = new Date(pickerYear.value, pickerMonth.value, 1).getDay();
@@ -474,23 +378,23 @@ const handoffNotice = ref<string | null>(null);
 const sendToAi = async () => {
   handoffNotice.value = null;
   if (!isTauri()) {
-    handoffNotice.value = 'AI 交接需要桌面应用环境；当前网页预览不会打开外部网站。';
+    handoffNotice.value = t.value.needDesktop;
     return;
   }
   if (!focusedWorkoutId.value && !datesValid.value) {
-    handoffNotice.value = '请先选择有效的日期范围。';
+    handoffNotice.value = t.value.needValidDates;
     return;
   }
   if (!exportDataTypes.value.length) {
-    handoffNotice.value = '请至少选择一种数据类型。';
+    handoffNotice.value = t.value.needDataTypes;
     return;
   }
   if (previewBusy.value || previewCount.value === null) {
-    handoffNotice.value = '正在读取本机记录，请稍候再试。';
+    handoffNotice.value = t.value.stillReading;
     return;
   }
   if (previewCount.value <= 0) {
-    handoffNotice.value = '当前范围没有可交接的已同步记录。';
+    handoffNotice.value = t.value.nothingInScope;
     return;
   }
 
@@ -508,14 +412,14 @@ const sendToAi = async () => {
     );
     const browserOpened = handoffState.value !== 'copied_only';
     if (result.mode === 'attachment') {
-      const uploadNotice = '数据包已导出到桌面（zeppbridge-ai-handoff.json），拖入 AI 对话框即可。提示词已复制到剪贴板。';
+      const uploadNotice = t.value.attachmentNotice;
       handoffNotice.value = browserOpened
-        ? `${uploadNotice} 已打开 ${activeProvider.value.label}。`
-        : `${uploadNotice} 可在浏览器中打开 ${activeProvider.value.label} 进行分析。`;
+        ? t.value.attachmentOpened(uploadNotice, activeProvider.value.label)
+        : t.value.attachmentNotOpened(uploadNotice, activeProvider.value.label);
     } else {
       handoffNotice.value = browserOpened
-        ? `已复制脱敏数据并打开 ${activeProvider.value.label}，粘贴即可开始分析。`
-        : `已复制脱敏数据，可手动打开 ${activeProvider.value.label} 进行粘贴。`;
+        ? t.value.copiedAndOpened(activeProvider.value.label)
+        : t.value.copiedOnly(activeProvider.value.label);
     }
   } catch {
     // Error handled via handoffError state
@@ -525,7 +429,7 @@ const sendToAi = async () => {
 const retryOpenAi = async () => {
   try {
     await retryOpen();
-    handoffNotice.value = `已打开 ${preparedProvider.value?.label ?? activeProvider.value.label}，请在网站内粘贴提交。`;
+    handoffNotice.value = t.value.reopened(preparedProvider.value?.label ?? activeProvider.value.label);
   } catch {
     // Error rendered from handoffError
   }
@@ -548,23 +452,22 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 <template>
   <section class="page export-page" aria-labelledby="export-title">
     <header class="page-head">
-      <h1 id="export-title">交给 AI</h1>
-      <p class="page-intro">选择模板、检查感知摘要并导出数据，一键将穿戴洞察发送到前沿 AI 工具。</p>
+      <h1 id="export-title">{{ t.title }}</h1>
+      <p class="page-intro">{{ t.intro }}</p>
     </header>
 
     <div v-if="focusedWorkoutId" class="workout-scope-banner" role="status">
       <Icon name="info" :size="14" />
-      当前只导出运动记录 <code>{{ focusedWorkoutId }}</code> 这一条：包含它本身与它进行期间的逐点指标，
-      睡眠、步数等按天记录的数据不在范围内。日期范围暂不生效。
-      <button class="button secondary" type="button" @click="focusedWorkoutId = null">改回按日期范围</button>
+      {{ t.workoutScopeBanner(focusedWorkoutId) }}
+      <button class="button secondary" type="button" @click="focusedWorkoutId = null">{{ t.backToDateRange }}</button>
     </div>
 
     <div class="export-layout">
       <!-- 左列：模板列表 -->
       <aside class="col-templates">
         <section class="surface-card pad">
-          <p class="col-title">模板分类</p>
-          <div class="category-list" role="group" aria-label="模板分类">
+          <p class="col-title">{{ t.categoryTitle }}</p>
+          <div class="category-list" role="group" :aria-label="t.categoryAria">
             <button
               v-for="cat in categories"
               :key="cat.key"
@@ -581,10 +484,10 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
         </section>
 
         <section class="surface-card pad">
-          <p class="col-title">模板列表</p>
+          <p class="col-title">{{ t.templateListTitle }}</p>
           <div class="template-search">
             <Icon name="search" :size="14" />
-            <input v-model="templateQuery" type="search" placeholder="搜索模板…" aria-label="搜索模板" />
+            <input v-model="templateQuery" type="search" :placeholder="t.templateSearchPlaceholder" :aria-label="t.templateSearchAria" />
           </div>
           <div class="template-list">
             <button
@@ -601,7 +504,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
               </span>
               <Icon v-if="activeTemplateId === tpl.id" name="star" :size="14" class="tpl-star" />
             </button>
-            <p v-if="!filteredTemplates.length" class="empty-note">没有匹配的模板。</p>
+            <p v-if="!filteredTemplates.length" class="empty-note">{{ t.noTemplates }}</p>
           </div>
         </section>
       </aside>
@@ -611,55 +514,61 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
         <section class="surface-card pad current-template">
           <div class="current-head">
             <div>
-              <p class="col-title">当前模板</p>
+              <p class="col-title">{{ t.currentTemplate }}</p>
               <h2 class="tpl-name">{{ activeTemplate.name }} <Icon name="edit" :size="15" /></h2>
-              <p class="tpl-desc">{{ activeTemplate.sub }}。</p>
+              <p class="tpl-desc">{{ activeTemplate.sub }}</p>
             </div>
-            <button class="mini-btn" type="button" @click="copyPrompt" title="复制提示词文本到剪贴板">
-              <Icon name="copy" :size="13" />复制提示词
+            <button class="mini-btn" type="button" @click="copyPrompt" :title="t.copyPromptTitle">
+              <Icon name="copy" :size="13" />{{ t.copyPrompt }}
             </button>
           </div>
 
           <div class="prompt-editor">
             <div class="editor-head">
-              <span>提示词编辑<em>（数据已自动对齐）</em></span>
-              <span class="injected"><Icon name="database" :size="13" />已注入 {{ exportDataTypes.length }} 类数据源</span>
+              <span>{{ t.promptEditor }}<em>{{ t.promptEditorHint }}</em></span>
+              <span class="injected"><Icon name="database" :size="13" />{{ t.injected(exportDataTypes.length) }}</span>
             </div>
-            <textarea v-model="editedPrompt" rows="9" spellcheck="false" aria-label="提示词编辑"></textarea>
+            <textarea
+              v-model="editedPrompt"
+              rows="9"
+              spellcheck="false"
+              :aria-label="t.promptEditorAria"
+              @input="promptEdited = true"
+            ></textarea>
           </div>
 
           <!-- 数据感知摘要（四格卡片） -->
           <div class="summary-block">
             <div class="summary-head">
-              <span>数据感知摘要 <Icon name="info" :size="13" /></span>
-              <span class="see-more">按需精准注入</span>
+              <span>{{ t.summaryTitle }} <Icon name="info" :size="13" /></span>
+              <span class="see-more">{{ t.summaryHint }}</span>
             </div>
             <div class="summary-grid">
               <div class="summary-cell">
-                <span class="cell-label"><Icon name="clock" :size="13" />时间范围</span>
+                <span class="cell-label"><Icon name="clock" :size="13" />{{ t.cellRange }}</span>
                 <strong class="cell-value small">{{ scopeRangeText }}</strong>
                 <span class="cell-sub">{{ scopeRangeSub }}</span>
               </div>
               <div class="summary-cell">
-                <span class="cell-label"><Icon name="file" :size="13" />记录条数</span>
+                <span class="cell-label"><Icon name="file" :size="13" />{{ t.cellCount }}</span>
                 <strong class="cell-value font-mono">{{ previewBusy ? '…' : (previewCount === null ? '—' : previewCount.toLocaleString(intlLocale())) }}</strong>
-                <span class="cell-sub">已同步记录</span>
+                <span class="cell-sub">{{ t.cellCountSub }}</span>
               </div>
               <div class="summary-cell">
-                <span class="cell-label"><Icon name="sliders" :size="13" />数据类型</span>
-                <strong class="cell-value font-mono">{{ exportDataTypes.length }} 类</strong>
-                <span class="cell-sub">已选入数据包</span>
+                <span class="cell-label"><Icon name="sliders" :size="13" />{{ t.cellTypes }}</span>
+                <strong class="cell-value font-mono">{{ t.cellTypesValue(exportDataTypes.length) }}</strong>
+                <span class="cell-sub">{{ t.cellTypesSub }}</span>
               </div>
               <div class="summary-cell">
-                <span class="cell-label"><Icon name="database" :size="13" />数据体积</span>
+                <span class="cell-label"><Icon name="database" :size="13" />{{ t.cellSize }}</span>
                 <strong class="cell-value font-mono">{{ previewBusy ? '…' : formatBytes(previewBytes) }}</strong>
-                <span class="cell-sub">预估大小</span>
+                <span class="cell-sub">{{ t.cellSizeSub }}</span>
               </div>
             </div>
 
             <!-- 范围选择与自定义日期选择器 -->
             <div class="range-row">
-              <span class="range-label">快捷范围：</span>
+              <span class="range-label">{{ t.quickRange }}</span>
               <button
                 v-for="range in ranges"
                 :key="range.days"
@@ -676,7 +585,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
                   @click="datePickerOpen === 'start' ? closeDatePicker() : openDatePicker('start')"
                 >
                   <Icon name="clock" :size="12" />
-                  <span>{{ exportStartDate || '起始日期' }}</span>
+                  <span>{{ exportStartDate || t.startDate }}</span>
                 </button>
                 <span>~</span>
                 <button
@@ -686,18 +595,18 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
                   @click="datePickerOpen === 'end' ? closeDatePicker() : openDatePicker('end')"
                 >
                   <Icon name="clock" :size="12" />
-                  <span>{{ exportEndDate || '结束日期' }}</span>
+                  <span>{{ exportEndDate || t.endDate }}</span>
                 </button>
 
                 <!-- 自定义深橄榄底日历弹层 -->
-                <div v-if="datePickerOpen" class="calendar-popover" role="dialog" aria-label="日期选择">
+                <div v-if="datePickerOpen" class="calendar-popover" role="dialog" :aria-label="t.datePickerAria">
                   <div class="cal-header">
                     <button type="button" class="cal-nav-btn" @click="prevMonth"><Icon name="arrow-left" :size="12" /></button>
-                    <span class="cal-title">{{ pickerYear }}年 {{ monthNames[pickerMonth] }}</span>
+                    <span class="cal-title">{{ calendarTitle }}</span>
                     <button type="button" class="cal-nav-btn" @click="nextMonth"><Icon name="arrow-right" :size="12" /></button>
                   </div>
                   <div class="cal-weekdays">
-                    <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+                    <span v-for="name in weekdayNames" :key="name">{{ name }}</span>
                   </div>
                   <div class="cal-grid">
                     <button
@@ -723,27 +632,27 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
         <footer class="editor-footer surface-card">
           <p class="secure-note">
             <Icon name="shield" :size="14" />
-            已采用本地脱敏隔离，仅在本地生成结构化数据与提示词。
-            <span class="secure-ok"><Icon name="circle-check" :size="13" />安全可靠</span>
+            {{ t.secureNote }}
+            <span class="secure-ok"><Icon name="circle-check" :size="13" />{{ t.secureOk }}</span>
           </p>
           <div class="footer-actions">
             <!-- 三个按钮做的是三件不同的事，名字得让人分得开：
                  「导出文件」存到磁盘、「只复制提示词」不含数据、
                  「交给 X」才是数据+提示词一起复制并打开那个网站。 -->
             <button class="button button-secondary" type="button" :disabled="Boolean(exportBusy)" @click="runExport">
-              <Icon name="export" :size="14" />导出 {{ activeFormatLabel }} 文件
+              <Icon name="export" :size="14" />{{ t.exportFile(activeFormatLabel) }}
             </button>
             <button class="button button-secondary" type="button" @click="copyPrompt">
-              <Icon name="copy" :size="14" />只复制提示词
+              <Icon name="copy" :size="14" />{{ t.copyPromptOnly }}
             </button>
             <button class="button button-primary send-btn" type="button" :disabled="handoffState === 'preparing'" @click="sendToAi">
-              <Icon :name="handoffState === 'preparing' ? 'clock' : 'send'" :size="14" />{{ handoffState === 'preparing' ? '正在准备…' : `交给 ${activeProvider.label}` }}
+              <Icon :name="handoffState === 'preparing' ? 'clock' : 'send'" :size="14" />{{ handoffState === 'preparing' ? t.preparing : t.handTo(activeProvider.label) }}
             </button>
           </div>
         </footer>
 
-        <p v-if="sendState === 'copied'" class="action-note ok" role="status"><Icon name="circle-check" :size="13" />提示词已复制（不含数据）。</p>
-        <p v-else-if="sendState === 'failed'" class="action-note bad" role="alert"><Icon name="warning" :size="13" />复制失败，请重试。</p>
+        <p v-if="sendState === 'copied'" class="action-note ok" role="status"><Icon name="circle-check" :size="13" />{{ t.promptCopied }}</p>
+        <p v-else-if="sendState === 'failed'" class="action-note bad" role="alert"><Icon name="warning" :size="13" />{{ t.copyFailed }}</p>
         <p v-if="handoffNotice" class="action-note" :class="handoffState === 'failed' ? 'bad' : 'ok'" role="status">{{ handoffNotice }}</p>
         <p v-if="handoffError" class="action-note bad" role="alert"><Icon name="warning" :size="13" />{{ handoffError }}</p>
         <button
@@ -751,7 +660,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
           class="button button-secondary retry-open"
           type="button"
           @click="retryOpenAi"
-        ><Icon name="external" :size="14" />重试打开 {{ preparedProvider?.label ?? activeProvider.label }}</button>
+        ><Icon name="external" :size="14" />{{ t.retryOpen(preparedProvider?.label ?? activeProvider.label) }}</button>
         <p v-if="exportMessage" class="action-note ok" role="status"><Icon name="circle-check" :size="13" />{{ exportMessage }}</p>
         <p v-if="exportError" class="action-note bad" role="alert"><Icon name="warning" :size="13" />{{ exportError }}</p>
       </div>
@@ -759,11 +668,11 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
       <!-- 右列：打包选项与目标 AI -->
       <aside class="col-send">
         <section class="surface-card pad">
-          <p class="col-title big">打包与发送</p>
-          <p class="col-sub">选择导出格式与目标 AI 工具。</p>
+          <p class="col-title big">{{ t.packTitle }}</p>
+          <p class="col-sub">{{ t.packSub }}</p>
 
-          <p class="group-label">导出格式</p>
-          <div class="format-grid" role="radiogroup" aria-label="导出格式">
+          <p class="group-label">{{ t.formatGroup }}</p>
+          <div class="format-grid" role="radiogroup" :aria-label="t.formatAria">
             <button
               v-for="format in formats"
               :key="format.key"
@@ -780,10 +689,10 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
             </button>
           </div>
 
-          <p class="group-label">详细程度</p>
-          <div class="format-grid detail-grid" role="radiogroup" aria-label="详细程度">
+          <p class="group-label">{{ t.detailGroup }}</p>
+          <div class="format-grid detail-grid" role="radiogroup" :aria-label="t.detailAria">
             <button
-              v-for="option in exportDetailOptions"
+              v-for="option in detailOptions"
               :key="option.value"
               type="button"
               role="radio"
@@ -798,19 +707,19 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
           </div>
 
           <div class="group-row">
-            <p class="group-label">数据流</p>
-            <span class="see-more">已选 {{ exportDataTypes.length }} / {{ exportTypeOptions.length }} 项</span>
+            <p class="group-label">{{ t.streamsGroup }}</p>
+            <span class="see-more">{{ t.selectedCount(exportDataTypes.length, typeOptions.length) }}</span>
           </div>
           <div class="stream-picker">
-            <div v-for="section in groupedTypes" :key="section.group" class="stream-group">
+            <div v-for="section in groupedTypes" :key="section.key" class="stream-group">
               <button
                 type="button"
                 class="stream-group-head"
-                :aria-pressed="groupIsFull(section.group)"
-                @click="toggleGroup(section.group)"
+                :aria-pressed="groupIsFull(section.key)"
+                @click="toggleGroup(section.key)"
               >
-                <span>{{ section.group }}</span>
-                <em>{{ groupIsFull(section.group) ? '全不选' : '全选' }}</em>
+                <span>{{ section.label }}</span>
+                <em>{{ groupIsFull(section.key) ? t.selectNone : t.selectAll }}</em>
               </button>
               <label
                 v-for="option in section.options"
@@ -826,16 +735,16 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
                 <Icon v-if="isTypeSelected(option.value)" name="circle-check" :size="14" class="content-check" />
               </label>
             </div>
-            <p v-if="!exportDataTypes.length" class="empty-note">尚未选择数据类型，导出会被拒绝。</p>
+            <p v-if="!exportDataTypes.length" class="empty-note">{{ t.noTypesSelected }}</p>
           </div>
 
           <div class="size-row">
-            <span>数据包预估体积</span>
+            <span>{{ t.estimatedSize }}</span>
             <strong class="font-mono">{{ previewBusy ? '…' : formatBytes(previewBytes) }}</strong>
           </div>
 
-          <p class="group-label">目标 AI 工具</p>
-          <div class="tool-grid" role="radiogroup" aria-label="目标 AI 工具">
+          <p class="group-label">{{ t.targetGroup }}</p>
+          <div class="tool-grid" role="radiogroup" :aria-label="t.targetAria">
             <button
               v-for="tool in AI_PROVIDERS"
               :key="tool.id"
@@ -850,7 +759,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
                 <img
                   v-if="!providerIconFailed[tool.id]"
                   :src="tool.localIcon"
-                  :alt="`${tool.label} 图标`"
+                  :alt="t.providerIconAlt(tool.label)"
                   @error="markProviderIconFailed(tool.id)"
                 />
                 <span v-else class="tool-fallback" aria-hidden="true">{{ tool.fallback }}</span>
@@ -861,7 +770,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 
           <p class="send-hint">
             <Icon name="info" :size="13" />
-            ≤ 2 MiB 自动随提示词复制到剪贴板；> 2 MiB 会直接导出 JSON 到桌面，拖入对话即可。
+            {{ t.sendHint }}
           </p>
         </section>
       </aside>
