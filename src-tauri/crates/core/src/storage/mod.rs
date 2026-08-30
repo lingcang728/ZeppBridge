@@ -4911,10 +4911,35 @@ fn disk_free_bytes(path: &std::path::Path) -> Option<u64> {
         };
         (ok != 0).then_some(free)
     }
+    // macOS / Linux 走 statvfs。
+    //
+    // 这里以前直接返回 None，于是每台 Mac 上 `free_bytes` 恒为 0，补拉估算永远
+    // 只会说「未能读取磁盘剩余空间」——既给不出占用预估，`allow_long_history`
+    // 也拿不到判断依据。README 里写着支持 macOS，这一条就不能只在 Windows 上成立。
     #[cfg(not(windows))]
     {
-        let _ = path;
-        None
+        use std::ffi::CString;
+        use std::os::unix::ffi::OsStrExt;
+
+        let c_path = CString::new(path.as_os_str().as_bytes()).ok()?;
+        let mut stat: libc::statvfs = unsafe { std::mem::zeroed() };
+        if unsafe { libc::statvfs(c_path.as_ptr(), &mut stat) } != 0 {
+            return None;
+        }
+        // f_bavail 是**非特权用户**真正能用的块数；f_bfree 含保留给 root 的部分，
+        // 拿它报给用户会偏大。f_frsize 为 0 的文件系统退回 f_bsize。
+        let block = if stat.f_frsize > 0 {
+            stat.f_frsize
+        } else {
+            stat.f_bsize
+        };
+        if block == 0 {
+            return None;
+        }
+        // 用 `u64::from` 而不是 `as u64`：这些字段的宽度随平台变（macOS 上
+        // fsblkcnt_t 是 u32，Linux 上是 u64），写死 `as` 在其中一个平台上会被
+        // clippy 判成多余转换，而 CI 是 `-D warnings`。
+        Some(u64::from(stat.f_bavail) * u64::from(block))
     }
 }
 
