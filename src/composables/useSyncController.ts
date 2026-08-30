@@ -2,6 +2,7 @@ import { computed, readonly, ref } from 'vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { readAutoSyncSettings, writeAutoSyncSettings } from '../lib/autoSync';
 import type { AppStatus, LoginStatus, SyncOutcome, SyncProgress, SyncReport } from '../types';
+import { syncStreamLabel } from '../lib/syncStreams';
 import { defineMessages, intlLocale, messagesOf } from '../i18n';
 
 export type SyncUiState = 'idle' | 'syncing' | SyncOutcome;
@@ -35,6 +36,8 @@ const messages = defineMessages(
     cancelFailed: '无法取消同步',
     /** 数据流的分隔符：中文用顿号，英文用逗号。 */
     streamSeparator: '、',
+    syncingStream: (stream: string) => `正在同步${stream}`,
+    backfillingStream: (stream: string, month: string) => `正在补拉${stream} · ${month}`,
   },
   {
     notSyncedYet: 'Not synced yet',
@@ -63,6 +66,8 @@ const messages = defineMessages(
     cancelling: 'Cancelling the sync…',
     cancelFailed: 'Could not cancel the sync',
     streamSeparator: ', ',
+    syncingStream: (stream: string) => `Syncing ${stream.toLowerCase()}`,
+    backfillingStream: (stream: string, month: string) => `Backfilling ${stream.toLowerCase()} · ${month}`,
   },
 );
 
@@ -82,6 +87,7 @@ const copy = () => messagesOf(messages);
 type SyncNotice =
   | { kind: 'none' }
   | { kind: 'backend'; text: string }
+  | { kind: 'progress'; code: string; stream: string; month: string | null; text: string }
   | { kind: 'syncingRecent' }
   | { kind: 'backfilling'; days: number }
   | { kind: 'alreadySyncing' }
@@ -150,7 +156,9 @@ const renderReport = (
   if (outcome === 'updated') return latest ? t.updatedWithLatest(latest) : t.updated;
   if (outcome === 'no_new_data') return latest ? t.noNewDataWithLatest(latest) : t.noNewData;
   if (outcome === 'partial') {
-    return failedStreams.length ? t.partialWithStreams(failedStreams.join(t.streamSeparator)) : t.partial;
+    // 失败流列的是键（heart_rate…），显示时换成人话。
+    const names = failedStreams.map((stream) => syncStreamLabel(stream));
+    return names.length ? t.partialWithStreams(names.join(t.streamSeparator)) : t.partial;
   }
   if (outcome === 'cancelled') return t.cancelled;
   if (outcome === 'deferred') return backendMessage ?? t.deferred;
@@ -162,6 +170,14 @@ const renderNotice = (value: SyncNotice): string => {
   switch (value.kind) {
     case 'none': return t.notSyncedYet;
     case 'backend': return value.text;
+    case 'progress': {
+      const stream = syncStreamLabel(value.stream);
+      if (value.code === 'backfilling' && value.month) return t.backfillingStream(stream, value.month);
+      if (value.code === 'backfilling') return t.syncingStream(stream);
+      if (value.code === 'syncing') return t.syncingStream(stream);
+      // 后端加了新的一步而界面还不认识它：退回后端那句原文，别把它吞掉。
+      return value.text;
+    }
     case 'syncingRecent': return t.syncingRecent;
     case 'backfilling': return t.backfilling(value.days);
     case 'alreadySyncing': return t.alreadySyncing;
@@ -331,7 +347,17 @@ const initialize = async () => {
   if (isDesktop()) {
     const unlistenProgress = await backend.listen<SyncProgress>('sync://progress', (payload) => {
       syncProgress.value = payload;
-      notice.value = { kind: 'backend', text: payload.message };
+      /* 进度这句话由界面按码和 stream 自己写。后端那份中文留作兜底：
+         它加了新的一步而界面还不认识时，宁可显示中文也不显示空白。 */
+      notice.value = payload.code
+        ? {
+          kind: 'progress',
+          code: payload.code,
+          stream: payload.stream,
+          month: payload.detail ?? null,
+          text: payload.message,
+        }
+        : { kind: 'backend', text: payload.message };
     });
     if (typeof unlistenProgress === 'function') unlisteners.push(unlistenProgress);
     const unlistenTray = await backend.listen('tray://sync', () => {

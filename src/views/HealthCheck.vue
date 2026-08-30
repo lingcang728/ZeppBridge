@@ -19,6 +19,7 @@ import SkeletonBlock from '../components/SkeletonBlock.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import type { DataHealth, HealthAction, StageState, StreamHealth } from '../types';
+import { syncStreamLabel } from '../lib/syncStreams';
 import { defineMessages, intlLocale, useMessages } from '../i18n';
 
 const messages = defineMessages(
@@ -98,6 +99,27 @@ const messages = defineMessages(
     actionFolderOpened: '已打开数据文件夹。',
     actionReconnect: '请到设置页重新连接 Zepp 账号。',
     actionFailed: (label: string) => `${label}失败`,
+
+    /* 覆盖说明由 kind / cadence / observed_days / gap_total 组合出来。
+       后端也发了一句中文 note，那是给 CLI 的：这里不用它，免得英文界面上
+       冒出半句中文。 */
+    coveragePerEvent: '按事件产生：没有记录代表这段时间没有对应活动，不是缺口。',
+    coverageOccasional: '手表偶尔才给一次：空白日期是正常的，不代表数据丢失。',
+    coverageNoData: '这段时间还没有任何本地数据；先做一次同步再看。',
+    coverageNoGaps: '从第一天有数据起，没有观察到缺口。',
+    coverageGaps: (days: number) =>
+      `从第一天有数据起，有 ${days} 天没有观察到数据。手表没戴、没同步或云端未返回都会造成缺口。`,
+
+    action: {
+      reauth: { label: '重新连接 Zepp 账号', reason: '有数据流因为认证失效而拉不到数据。' },
+      reprocess: { label: '用当前解析器重放本地报文', reason: '' },
+      sync_retry: { label: '再同步一次', reason: '上一次有数据流没能从云端取回数据。' },
+      sync_first: { label: '做第一次同步', reason: '本机还没有任何一次成功的云端同步记录。' },
+      integrity_check: { label: '检查数据库完整性', reason: '对整库做一次 SQLite integrity_check，大库上需要一点时间。' },
+      open_data_folder: { label: '打开数据文件夹', reason: '本机数据库、备份和导出都在这里。' },
+    },
+    reprocessReason: (pending: number) =>
+      `有 ${pending} 份已保留的报文还没产出任何标准化记录。重放不触网，也不会改写云端同步时间。`,
 
     cadence: {
       continuous: '一天多次',
@@ -200,6 +222,24 @@ const messages = defineMessages(
     actionReconnect: 'Go to Settings and connect the Zepp account again.',
     actionFailed: (label: string) => `${label} failed`,
 
+    coveragePerEvent: 'Produced per event: no record means nothing happened then, not that something is missing.',
+    coverageOccasional: 'The watch only reports this occasionally; blank days are normal and mean nothing was lost.',
+    coverageNoData: 'No local data for this period yet. Run a sync first.',
+    coverageNoGaps: 'No gaps observed since the first day with data.',
+    coverageGaps: (days: number) =>
+      `${days} days with no data observed since the first day with data. Not wearing the watch, not syncing, or the cloud returning nothing all cause gaps.`,
+
+    action: {
+      reauth: { label: 'Connect the Zepp account again', reason: 'Some streams cannot fetch because the credentials expired.' },
+      reprocess: { label: 'Replay local payloads with the current parser', reason: '' },
+      sync_retry: { label: 'Sync again', reason: 'Some streams failed to fetch from the cloud last time.' },
+      sync_first: { label: 'Run the first sync', reason: 'This machine has no successful cloud sync on record yet.' },
+      integrity_check: { label: 'Check database integrity', reason: 'Runs one SQLite integrity_check over the whole database; it takes a while on a large one.' },
+      open_data_folder: { label: 'Open the data folder', reason: 'The local database, backups and exports all live here.' },
+    },
+    reprocessReason: (pending: number) =>
+      `${pending} stored payloads have produced no normalized record yet. A replay touches no network and does not rewrite the cloud sync time.`,
+
     cadence: {
       continuous: 'many times a day',
       daily: 'once a day',
@@ -281,6 +321,29 @@ const formatBytes = (bytes: number): string => {
 
 const cadenceLabel = (cadence: string): string => lookup(t.value.cadence, cadence) ?? cadence;
 
+/* 覆盖说明和动作文案都由界面按码组合，不用后端那份中文。 */
+const coverageNote = (stream: StreamHealth): string => {
+  const { coverage } = stream;
+  if (coverage.kind !== 'gaps') {
+    return stream.cadence === 'per_event' ? t.value.coveragePerEvent : t.value.coverageOccasional;
+  }
+  if (coverage.observed_days === 0) return t.value.coverageNoData;
+  if (coverage.gap_total === 0) return t.value.coverageNoGaps;
+  return t.value.coverageGaps(coverage.gap_total);
+};
+
+const actionCopy = (action: HealthAction): { label: string; reason: string } => {
+  const known = (t.value.action as Record<string, { label: string; reason: string } | undefined>)[
+    action.code ?? ''
+  ];
+  // 后端认识但界面还没有的动作：原样显示后端那份，总比空着强。
+  if (!known) return { label: action.label, reason: action.reason };
+  const reason = action.code === 'reprocess'
+    ? t.value.reprocessReason(health.value?.database.pending_normalization ?? 0)
+    : known.reason;
+  return { label: known.label, reason };
+};
+
 const stageText = (stage: StageState): string => {
   if (stage.state === 'failed') {
     return lookup(t.value.errorKind, stage.error_kind || 'unknown') ?? t.value.stage.failed;
@@ -299,7 +362,8 @@ const sourceSummary = (stream: StreamHealth): string => {
 };
 
 const runAction = async (action: HealthAction) => {
-  if (action.destructive && !window.confirm(t.value.confirmDestructive(action.label, action.reason))) return;
+  const copy = actionCopy(action);
+  if (action.destructive && !window.confirm(t.value.confirmDestructive(copy.label, copy.reason))) return;
   busyAction.value = action.id;
   actionError.value = null;
   actionMessage.value = null;
@@ -325,7 +389,7 @@ const runAction = async (action: HealthAction) => {
     }
     await load();
   } catch (cause) {
-    actionError.value = toUserMessage(cause, t.value.actionFailed(action.label));
+    actionError.value = toUserMessage(cause, t.value.actionFailed(actionCopy(action).label));
   } finally {
     busyAction.value = null;
   }
@@ -437,7 +501,7 @@ onMounted(() => void load());
         <div class="stream-list">
           <article v-for="stream in allStreams" :key="stream.stream" class="stream-row">
             <header>
-              <strong>{{ stream.label }}</strong>
+              <strong>{{ syncStreamLabel(stream.stream, stream.label) }}</strong>
               <span class="cadence">{{ cadenceLabel(stream.cadence) }}</span>
             </header>
             <div class="stages">
@@ -457,7 +521,7 @@ onMounted(() => void load());
               <div><dt>{{ t.factObservedDays }}</dt><dd>{{ t.days(stream.coverage.observed_days) }}</dd></div>
             </dl>
             <p class="coverage-note">
-              {{ stream.coverage.note }}
+              {{ coverageNote(stream) }}
               <template v-if="stream.coverage.gap_dates.length">
                 {{ t.gapExamples(stream.coverage.gap_dates.join(t.sourceSeparator)) }}<template v-if="stream.coverage.gap_total > stream.coverage.gap_dates.length">{{ t.gapMore }}</template>{{ t.period }}
               </template>
@@ -475,7 +539,7 @@ onMounted(() => void load());
         <p class="health-note">{{ t.occasionalNote }}</p>
         <div class="occasional-list">
           <div v-for="metric in occasional" :key="metric.stream" class="occasional-row">
-            <strong>{{ metric.label }}</strong>
+            <strong>{{ syncStreamLabel(metric.stream, metric.label) }}</strong>
             <span>{{ t.occasionalLine(metric.canonical_records.toLocaleString(intlLocale()), metric.coverage.observed_days) }}</span>
             <span class="muted">
               {{ metric.coverage.latest_observed_at ? t.occasionalLatest(metric.coverage.latest_observed_at) : t.occasionalNone }}
@@ -490,8 +554,8 @@ onMounted(() => void load());
         <div class="action-list">
           <div v-for="action in health.actions" :key="action.id" class="action-row">
             <div>
-              <strong>{{ action.label }}</strong>
-              <span>{{ action.reason }}</span>
+              <strong>{{ actionCopy(action).label }}</strong>
+              <span>{{ actionCopy(action).reason }}</span>
             </div>
             <button
               class="button secondary"

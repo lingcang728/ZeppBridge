@@ -380,6 +380,13 @@ export const settingsMessages = defineMessages(
       second_heart_rate: '逐秒心率索引',
       spo2_files: '逐条血氧原始文件索引',
     },
+    unitDays: '天',
+    unitRecords: '条',
+    capabilityNoRecords: (days: number) => `最近 ${days} 天没有记录`,
+    capabilityNotIngested: '云端有记录，但 ZeppBridge 还没有收录这条流：缺少可核对的报文样本，贸然归一化只会产出没人能验证的数字。',
+    capabilityUnsupported: '你的账号或设备不提供这项数据',
+    capabilityNoneProbed: (days: number) => `过去 ${days} 天没有测量记录`,
+    capabilityNotProbed: '尚未检测',
     capabilityLocal: (records: number, unit: string, latest: string) =>
       `${records} ${unit}${latest ? ` · 至 ${latest}` : ''}`,
     capabilityCloud: (records: number, unit: string, latest: string) =>
@@ -764,6 +771,13 @@ If you need anything from me (which client I use, where the file lives), just as
       second_heart_rate: 'Per-second heart rate index',
       spo2_files: 'Per-reading SpO2 raw file index',
     },
+    unitDays: 'days',
+    unitRecords: 'records',
+    capabilityNoRecords: (days: number) => `Nothing recorded in the last ${days} days`,
+    capabilityNotIngested: 'The cloud has records, but ZeppBridge does not store this stream yet: without payload samples anyone can check against, normalizing it would only produce numbers nobody can verify.',
+    capabilityUnsupported: 'Your account or device does not provide this',
+    capabilityNoneProbed: (days: number) => `No measurement in the last ${days} days`,
+    capabilityNotProbed: 'Not probed yet',
     capabilityLocal: (records: number, unit: string, latest: string) =>
       `${records} ${unit}${latest ? ` · through ${latest}` : ''}`,
     capabilityCloud: (records: number, unit: string, latest: string) =>

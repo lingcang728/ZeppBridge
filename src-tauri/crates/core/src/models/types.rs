@@ -471,7 +471,19 @@ pub struct CapabilityItem {
     /// How many rows back this up, when there are any.
     pub records: i64,
     /// Unit for `records`, e.g. `天` or `条`.
+    ///
+    /// 这一份是给 CLI / MCP / 本机 API 的：它们的输出不跟界面语言走，改它等于
+    /// 改外部工具看到的东西。界面读的是下面的 `records_unit_code`。
     pub records_unit: String,
+    /// 单位的稳定码（`days` / `records`），界面按它出文案。
+    ///
+    /// 后端不按 locale 产出文案是刻意的：GUI / CLI / MCP / 导出四个出口对同一个
+    /// 问题必须给同一份回答。所以后端发码，翻译留在界面。
+    #[serde(default)]
+    pub records_unit_code: String,
+    /// 这条流的判定窗口有多少天。界面要用它说「最近 N 天没有记录」。
+    #[serde(default)]
+    pub window_days: i64,
     /// Newest calendar date behind this capability.
     pub latest_date: Option<String>,
     /// One plain sentence about the data — never a claim about the hardware
@@ -938,7 +950,12 @@ pub struct HeartRateBasis {
     pub source: String,
     /// The day it was measured, when the source pins one down.
     pub measured_at: Option<String>,
+    /// 中文说明。CLI / MCP 用它，不跟界面语言走；界面按 `id` 自己出文案。
     pub note: Option<String>,
+    /// 说明里带的那个数字（本地统计静息心率用了多少天）。界面要写出这个数，
+    /// 就不能只靠 `id` 查一句死文案。
+    #[serde(default)]
+    pub note_count: Option<i64>,
 }
 
 /// One band of a zone model, as a percentage of its basis.

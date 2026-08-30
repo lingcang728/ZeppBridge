@@ -15,6 +15,7 @@ import SelectMenu from './SelectMenu.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import type { CoverageLedger, StorageEstimate, UserPrefs } from '../types';
+import { syncStreamLabel } from '../lib/syncStreams';
 import { defineMessages, useMessages } from '../i18n';
 
 const messages = defineMessages(
@@ -145,8 +146,8 @@ const messages = defineMessages(
 );
 const t = useMessages(messages);
 
-const streamLabel = (stream: string): string =>
-  (t.value.stream as Record<string, string | undefined>)[stream] ?? stream;
+/* 流名和数据健康页、同步进度共用一份：各写各的，同一条流会在三处叫三个名字。 */
+const streamLabel = (stream: string): string => syncStreamLabel(stream);
 
 const props = defineProps<{ prefs: UserPrefs | null }>();
 const emit = defineEmits<{ (event: 'prefs-changed', prefs: UserPrefs): void }>();

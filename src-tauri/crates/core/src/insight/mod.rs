@@ -60,7 +60,18 @@ pub struct InsightFact {
     pub source: String,
     pub confidence: Confidence,
     /// 为什么没有比较、为什么置信度低。有结论时也可能有说明。
+    ///
+    /// 中文原文，给 CLI / MCP / 导出用，不跟界面语言走。界面读下面的
+    /// `reason_code`，配合 `baseline_window` 和 `baseline_count` 自己写句子。
     pub reason: Option<String>,
+    /// 说明的稳定码：`weekly_thin_baseline` / `weekly_no_recent_data` /
+    /// `workout_thin_baseline` / `workout_no_value`。
+    #[serde(default)]
+    pub reason_code: Option<String>,
+    /// 基线里实际找到多少个样本。`evidence_count` 数的是本期的样本数，
+    /// 两者不是一回事，界面写「此前 N 天里只有 M 天有数据」时要的是这个。
+    #[serde(default)]
+    pub baseline_count: i64,
     /// 这条事实指回了库里的哪些行（workout id 或日期），可以逐条查证。
     pub evidence_refs: Vec<String>,
 }
@@ -117,6 +128,9 @@ pub struct WorkoutInsight {
     pub supported: bool,
     /// 不支持时说明原因；支持时为 `None`。
     pub unsupported_reason: Option<String>,
+    /// 不支持原因的稳定码。目前只有 `unsupported_workout_type` 一种。
+    #[serde(default)]
+    pub unsupported_code: Option<String>,
     pub facts: Vec<InsightFact>,
     /// 实际被纳入基线的记录。
     pub baseline_included: Vec<BaselineEntry>,
@@ -201,6 +215,7 @@ impl Database {
                     "暂不支持这类运动的洞察。第一版只做已用真实数据验证过的跑步；其他运动仍可正常查看、纠正和导出。"
                         .into(),
                 ),
+                unsupported_code: Some("unsupported_workout_type".into()),
                 facts: Vec::new(),
                 baseline_included: Vec::new(),
                 baseline_excluded: Vec::new(),
@@ -278,6 +293,7 @@ impl Database {
             workout_type,
             supported: true,
             unsupported_reason: None,
+            unsupported_code: None,
             facts,
             baseline_included: included
                 .iter()
@@ -437,7 +453,8 @@ impl Database {
             .unwrap_or_else(|| "unknown".into());
 
         let enough_baseline = baseline.values.len() as i64 >= weekly::MIN_BASELINE_DAYS;
-        let (comparison, confidence, reason) = match (value, mean(&baseline.values)) {
+        let baseline_count = baseline.values.len() as i64;
+        let (comparison, confidence, reason, reason_code) = match (value, mean(&baseline.values)) {
             (Some(current), Some(previous)) if enough_baseline && previous != 0.0 => {
                 let delta = current - previous;
                 (
@@ -448,6 +465,7 @@ impl Database {
                         direction: direction_of(delta),
                     }),
                     Confidence::from_samples(baseline.values.len()),
+                    None,
                     None,
                 )
             }
@@ -460,11 +478,13 @@ impl Database {
                     baseline.values.len(),
                     weekly::MIN_BASELINE_DAYS
                 )),
+                Some("weekly_thin_baseline".to_string()),
             ),
             (None, _) => (
                 None,
                 Confidence::Insufficient,
                 Some("最近 7 天本机没有这项数据。".into()),
+                Some("weekly_no_recent_data".to_string()),
             ),
         };
 
@@ -479,6 +499,8 @@ impl Database {
             source,
             confidence,
             reason,
+            reason_code,
+            baseline_count,
             evidence_refs: recent.dates,
         })
     }
@@ -674,7 +696,7 @@ where
     }
 
     let enough = values.len() >= baseline::MIN_SAMPLES;
-    let (comparison, reason) = match (value, mean(&values)) {
+    let (comparison, reason, reason_code) = match (value, mean(&values)) {
         (Some(current), Some(previous)) if enough && previous != 0.0 => {
             let delta = current - previous;
             (
@@ -684,6 +706,7 @@ where
                     delta_percent: round1(delta / previous.abs() * 100.0),
                     direction: direction_of(delta),
                 }),
+                None,
                 None,
             )
         }
@@ -695,8 +718,13 @@ where
                 values.len(),
                 baseline::MIN_SAMPLES
             )),
+            Some("workout_thin_baseline".to_string()),
         ),
-        (None, _) => (None, Some("这次运动没有这项数据。".into())),
+        (None, _) => (
+            None,
+            Some("这次运动没有这项数据。".into()),
+            Some("workout_no_value".to_string()),
+        ),
     };
 
     InsightFact {
@@ -714,6 +742,8 @@ where
             Confidence::from_samples(values.len())
         },
         reason,
+        reason_code,
+        baseline_count: values.len() as i64,
         evidence_refs: refs,
     }
 }

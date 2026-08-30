@@ -96,7 +96,12 @@ export interface SyncProgress {
   stream: string;
   current: number;
   total: number;
+  /** 后端的中文原文。界面优先用 `code` 自己写句子，这一份是兜底。 */
   message: string;
+  /** `syncing` / `backfilling`。后端不按 locale 出文案，所以它发码。 */
+  code?: string;
+  /** 补拉时这一块是哪个月（`YYYY-MM`）。 */
+  detail?: string | null;
 }
 
 export type LoginState = 'idle' | 'waiting' | 'extracting' | 'verifying' | 'connected' | 'failed';
@@ -333,6 +338,10 @@ export interface InsightFact {
   source: string;
   confidence: InsightConfidence;
   reason: string | null;
+  /** 说明的稳定码，界面按它加上 baseline_window / baseline_count 自己写句子。 */
+  reason_code?: string | null;
+  /** 基线里实际找到多少个样本。和 evidence_count 不是一回事。 */
+  baseline_count?: number;
   evidence_refs: string[];
 }
 
@@ -352,6 +361,8 @@ export interface WorkoutInsight {
   workout_type: string;
   supported: boolean;
   unsupported_reason: string | null;
+  /** 目前只有 `unsupported_workout_type`。 */
+  unsupported_code?: string | null;
   facts: InsightFact[];
   baseline_included: BaselineEntry[];
   baseline_excluded: BaselineExclusion[];
@@ -434,7 +445,11 @@ export interface HealthTimings {
 }
 
 export interface HealthAction {
+  /** 执行用。两个不同的动作可能共用一个 id（都跑同步）。 */
   id: string;
+  /** 显示用的稳定码；能区分「再同步一次」和「做第一次同步」。 */
+  code?: string;
+  /** 后端的中文原文，给 CLI 用；界面按 `code` 出文案，认不出来时才回退到它。 */
   label: string;
   reason: string;
   destructive: boolean;
@@ -667,6 +682,10 @@ export interface CapabilityItem {
   status: 'available' | 'no_records' | 'unsupported' | 'unknown' | string;
   records: number;
   recordsUnit: string;
+  /** 单位的稳定码：`days` / `records`。界面按它出文案。 */
+  recordsUnitCode?: string;
+  /** 这条流的判定窗口有多少天。界面写「最近 N 天没有记录」要用它。 */
+  windowDays?: number;
   latestDate?: string | null;
   note?: string | null;
   source: 'derived' | 'probed' | string;
@@ -815,7 +834,10 @@ export interface HeartRateBasis {
   unit: string;
   source: string;
   measuredAt?: string | null;
+  /** 中文说明。界面按 `id` 自己出文案，这一份是兜底。 */
   note?: string | null;
+  /** 说明里带的那个数字（本地统计静息心率用了多少天）。 */
+  noteCount?: number | null;
 }
 
 export interface HeartRateZoneBand {
