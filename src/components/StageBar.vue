@@ -3,7 +3,25 @@ import { computed } from 'vue';
 import { VChart } from '../lib/echartsSetup';
 import { formatDuration, formatTime, isFiniteNumber } from '../lib/format';
 import { zeppSemanticColors } from '../lib/echartsTheme';
+import { sleepStageLabels } from '../lib/sleepStages';
 import type { SleepStageSlice } from '../types';
+import { defineMessages, useMessages } from '../i18n';
+
+const messages = defineMessages(
+  {
+    notProvided: '未提供',
+    zeroMinutes: '0 分钟',
+    hypnogramAria: '睡眠阶段阶梯图',
+    summaryAria: '睡眠阶段汇总比例',
+  },
+  {
+    notProvided: 'Not provided',
+    zeroMinutes: '0 min',
+    hypnogramAria: 'Sleep stage hypnogram',
+    summaryAria: 'Sleep stage share',
+  },
+);
+const t = useMessages(messages);
 
 export interface StageItem {
   label: string;
@@ -24,7 +42,7 @@ const STAGE_LEVEL: Record<StageItem['tone'], number> = {
   rem: 2,
   awake: 3,
 };
-const STAGE_LABELS = ['深睡', '浅睡', 'REM', '清醒'];
+const stageLabels = computed(() => sleepStageLabels());
 const STAGE_COLORS = {
   deep: zeppSemanticColors.sleep.deep,
   light: zeppSemanticColors.sleep.light,
@@ -96,8 +114,8 @@ const percent = (minutes?: number | null): number =>
 const barPercent = (minutes: number): number =>
   barTotal.value > 0 ? Math.max(0, (minutes / barTotal.value) * 100) : 0;
 const labelFor = (minutes?: number | null): string => {
-  if (!isFiniteNumber(minutes)) return '未提供';
-  return formatDuration(minutes, '0 分钟');
+  if (!isFiniteNumber(minutes)) return t.value.notProvided;
+  return formatDuration(minutes, t.value.zeroMinutes);
 };
 const segmentStyle = (stage: BarSegment): Record<string, string> => {
   return { width: barPercent(stage.minutes) + '%' };
@@ -129,7 +147,7 @@ const hypnogramOption = computed(() => {
       formatter: (params: Array<{ value: [number, number] }>) => {
         const point = params?.[0]?.value;
         if (!point) return '';
-        return `${clock(point[0])}  ${STAGE_LABELS[point[1]] ?? ''}`;
+        return `${clock(point[0])}  ${stageLabels.value[point[1]] ?? ''}`;
       },
     },
     xAxis: {
@@ -147,7 +165,7 @@ const hypnogramOption = computed(() => {
       max: 3.45,
       interval: 1,
       axisLabel: {
-        formatter: (value: number) => STAGE_LABELS[value] ?? '',
+        formatter: (value: number) => stageLabels.value[value] ?? '',
         color: '#7E856D',
         fontSize: 11,
       },
@@ -188,11 +206,11 @@ const hypnogramOption = computed(() => {
         :option="hypnogramOption"
         autoresize
         role="img"
-        aria-label="睡眠阶段阶梯图"
+        :aria-label="t.hypnogramAria"
       />
     </template>
     <template v-else>
-      <div class="stage-bar" aria-label="睡眠阶段汇总比例">
+      <div class="stage-bar" :aria-label="t.summaryAria">
         <span
           v-for="(stage, index) in barSegments"
           :key="`${stage.tone}-${index}`"

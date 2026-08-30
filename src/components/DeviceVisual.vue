@@ -1,5 +1,28 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import { defineMessages, useMessages } from '../i18n';
+
+const messages = defineMessages(
+  {
+    watch: '手表',
+    strap: '腕带',
+    ring: '戒指',
+    band: '手环',
+    earbuds: '耳机',
+    scale: '体重秤',
+    unknown: '设备',
+  },
+  {
+    watch: 'Watch',
+    strap: 'Strap',
+    ring: 'Ring',
+    band: 'Band',
+    earbuds: 'Earbuds',
+    scale: 'Scale',
+    unknown: 'Device',
+  },
+);
+const t = useMessages(messages);
 
 const props = withDefaults(defineProps<{
   src: string;
@@ -21,15 +44,10 @@ const onImageError = (): void => {
   imageFailed.value = true;
 };
 
-const kindLabel = computed(() => ({
-  watch: '手表',
-  strap: '腕带',
-  ring: '戒指',
-  band: '手环',
-  earbuds: '耳机',
-  scale: '体重秤',
-  unknown: '设备',
-}[props.kind] ?? '设备'));
+const kindLabel = computed(() => {
+  const known = t.value as Record<string, string | undefined>;
+  return known[props.kind] ?? t.value.unknown;
+});
 </script>
 
 <template>

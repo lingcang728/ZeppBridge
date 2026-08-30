@@ -12,6 +12,47 @@ import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { formatDate, formatDuration, isFiniteNumber } from '../lib/format';
 import { displayableWorkouts, workoutDisplayLabel, workoutDisplayType, workoutDurationMinutes } from '../lib/workouts';
 import type { Workout } from '../types';
+import { defineMessages, useMessages } from '../i18n';
+
+const messages = defineMessages(
+  {
+    backToRecent: '返回最近记录',
+    backToOverview: '返回概览',
+    title: '运动',
+    intro: '本机已同步的运动记录。没有轨迹时不画地图。',
+    loadFailedTitle: '无法读取运动记录',
+    loadFailed: '运动列表暂时不可用',
+    retry: '重试',
+    emptyTitle: '没有可展示的运动记录',
+    emptyMessage: '同步后，只有包含类型、时间和至少一项有效指标的记录会显示在这里。没有 GPS 或逐点样本时不会画空图。',
+    kilometres: (value: string) => `${value} 公里`,
+    metres: (value: number) => `${value} 米`,
+    labelDistance: '距离',
+    labelBurn: '消耗',
+    labelDuration: '时长',
+    notProvided: '未提供',
+    footnote: (count: number) => `${count} 条可展示记录`,
+  },
+  {
+    backToRecent: 'Back to recent records',
+    backToOverview: 'Back to overview',
+    title: 'Workouts',
+    intro: 'Workouts synced to this machine. No track, no map.',
+    loadFailedTitle: 'Could not read the workouts',
+    loadFailed: 'The workout list is unavailable right now',
+    retry: 'Try again',
+    emptyTitle: 'Nothing to show yet',
+    emptyMessage: 'After a sync, only records carrying a type, a time and at least one real metric appear here. Without GPS or per-point samples, no empty chart is drawn.',
+    kilometres: (value: string) => `${value} km`,
+    metres: (value: number) => `${value} m`,
+    labelDistance: 'Distance',
+    labelBurn: 'Burn',
+    labelDuration: 'Duration',
+    notProvided: 'Not provided',
+    footnote: (count: number) => `${count} records shown`,
+  },
+);
+const t = useMessages(messages);
 
 const { dataRevision } = useSyncController();
 const workouts = ref<Workout[]>([]);
@@ -40,12 +81,14 @@ const workoutFact = (workout: Workout): { fact: string; label: string } => {
   const meters = workout.distance_meters;
   if (isFiniteNumber(meters) && meters > 0) {
     return {
-      fact: meters >= 1000 ? `${(meters / 1000).toFixed(2)} 公里` : `${Math.round(meters)} 米`,
-      label: '距离',
+      fact: meters >= 1000
+        ? t.value.kilometres((meters / 1000).toFixed(2))
+        : t.value.metres(Math.round(meters)),
+      label: t.value.labelDistance,
     };
   }
-  if (isFiniteNumber(workout.calories)) return { fact: `${Math.round(workout.calories)} kcal`, label: '消耗' };
-  return { fact: formatDuration(workoutDurationMinutes(workout), '未提供'), label: '时长' };
+  if (isFiniteNumber(workout.calories)) return { fact: `${Math.round(workout.calories)} kcal`, label: t.value.labelBurn };
+  return { fact: formatDuration(workoutDurationMinutes(workout), t.value.notProvided), label: t.value.labelDuration };
 };
 
 const loadList = async () => {
@@ -59,7 +102,7 @@ const loadList = async () => {
   try {
     workouts.value = displayableWorkouts(await tauriApi.getRecentWorkouts(500));
   } catch (cause) {
-    error.value = toUserMessage(cause, '运动列表暂时不可用');
+    error.value = toUserMessage(cause, t.value.loadFailed);
   } finally {
     loading.value = false;
   }
@@ -71,18 +114,18 @@ watch(dataRevision, () => void loadList());
 
 <template>
   <section class="page list-page" aria-labelledby="workout-list-title">
-    <RouterLink class="back-link" to="/recent"><Icon name="arrow-left" :size="14" />返回最近记录</RouterLink>
-    <PageHeader back="/" back-label="返回概览" title-id="workout-list-title" title="运动" intro="本机已同步的运动记录。没有轨迹时不画地图。" />
+    <RouterLink class="back-link" to="/recent"><Icon name="arrow-left" :size="14" />{{ t.backToRecent }}</RouterLink>
+    <PageHeader back="/" :back-label="t.backToOverview" title-id="workout-list-title" :title="t.title" :intro="t.intro" />
 
     <div v-if="loading" class="surface-card" aria-live="polite">
       <SkeletonBlock height="56px" />
       <SkeletonBlock height="56px" />
       <SkeletonBlock height="56px" />
     </div>
-    <EmptyState v-else-if="error" tone="error" icon="warning" title="无法读取运动记录" :message="error">
-      <button class="button button-secondary" type="button" @click="loadList">重试</button>
+    <EmptyState v-else-if="error" tone="error" icon="warning" :title="t.loadFailedTitle" :message="error">
+      <button class="button button-secondary" type="button" @click="loadList">{{ t.retry }}</button>
     </EmptyState>
-    <EmptyState v-else-if="!displayableList.length" icon="steps" title="没有可展示的运动记录" message="同步后，只有包含类型、时间和至少一项有效指标的记录会显示在这里。没有 GPS 或逐点样本时不会画空图。" />
+    <EmptyState v-else-if="!displayableList.length" icon="steps" :title="t.emptyTitle" :message="t.emptyMessage" />
     <div v-else class="surface-card">
       <RecordRow
         v-for="workout in displayableList"
@@ -97,7 +140,7 @@ watch(dataRevision, () => void loadList());
         :fact-label="workoutFact(workout).label"
       />
     </div>
-    <p v-if="displayableList.length" class="footnote">{{ displayableList.length }} 条可展示记录</p>
+    <p v-if="displayableList.length" class="footnote">{{ t.footnote(displayableList.length) }}</p>
   </section>
 </template>
 

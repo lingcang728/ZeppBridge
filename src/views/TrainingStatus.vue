@@ -13,10 +13,95 @@ import { zeppSemanticColors } from '../lib/echartsTheme';
 import {
   formatPaceSeconds,
   indexSeries,
-  SERIES_RANGES,
+  seriesRanges,
   type SeriesRangeDays,
 } from '../lib/metricSeries';
 import type { MetricSeries, TrainingBalancePoint } from '../types';
+import { defineMessages, useMessages } from '../i18n';
+
+const messages = defineMessages(
+  {
+    backToOverview: '返回概览',
+    eyebrow: '训练状态',
+    title: '训练状态',
+    intro: 'VO₂max、乳酸阈值、训练负荷与心率区间。全部读自已同步的记录，不做训练建议。',
+    rangeAria: '时间范围',
+    desktopOnly: '请使用桌面应用；浏览器预览不会读取账户数据。',
+    loadFailed: '训练状态数据暂时不可用',
+    retry: '重试',
+    loadingAria: '正在加载训练状态',
+    vo2Hint: '手表在户外跑步后估算的最大摄氧量',
+    vo2Empty: '这段范围没有 VO₂max 记录；它只在户外跑步后更新。',
+    loadLabel: '训练负荷',
+    loadHint: '每天的运动负荷得分',
+    loadEmpty: '这段范围没有训练负荷记录。',
+    paiLabel: 'PAI 活力指数',
+    paiHint: '滚动 7 天的个人活力指数',
+    paiEmpty: '这段范围没有 PAI 记录。',
+    thresholdLabel: '乳酸阈值',
+    thresholdHint: '心率与配速，只在高强度跑步后更新',
+    thresholdHr: '阈值心率',
+    thresholdPace: '阈值配速',
+    thresholdChartAria: '乳酸阈值心率与配速曲线',
+    thresholdOnce: (date: string) => `这段范围只有 1 次阈值测量（${date}），画不出趋势。`,
+    thresholdEmpty: '这段范围没有乳酸阈值测量记录。',
+    thresholdPaceTooltip: (value: string) => `阈值配速 <b>${value}</b> /km`,
+    thresholdHrTooltip: (value: number) => `阈值心率 <b>${value}</b> bpm`,
+    balanceLabel: '运动负荷平衡',
+    balanceHint: '7 天负荷相对 28 天周均，即急性／慢性负荷比',
+    balanceChartAria: '7 天与 28 天训练负荷及急慢比曲线',
+    balanceEmpty: '训练负荷记录还不够画出这条曲线。',
+    balanceNote: '急慢比 = 7 天负荷之和 ÷（28 天负荷之和 ÷ 4）。28 天窗口覆盖不足 21 天时不给比值，曲线在那里会断开——这是没算，不是等于零。',
+    acute7d: '7 天负荷',
+    chronicWeekly: '28 天周均',
+    acuteChronic: '急慢比',
+    ratioMissing: (days: number) => `—（28 天窗口只有 ${days} 天有数据）`,
+    acuteTooltip: (value: number, days: number) => `7 天负荷 <b>${value}</b>（${days}/7 天有数据）`,
+    chronicTooltip: (value: number) => `28 天周均 <b>${value}</b>`,
+    ratioTooltip: (value: string) => `急慢比 <b>${value}</b>`,
+  },
+  {
+    backToOverview: 'Back to overview',
+    eyebrow: 'Training status',
+    title: 'Training status',
+    intro: 'VO₂max, lactate threshold, training load and heart rate zones. All read from synced records; no coaching advice.',
+    rangeAria: 'Time range',
+    desktopOnly: 'Use the desktop app. This browser preview reads no account data.',
+    loadFailed: 'Training status data is unavailable right now',
+    retry: 'Try again',
+    loadingAria: 'Loading training status',
+    vo2Hint: 'Maximal oxygen uptake, estimated by the watch after outdoor runs',
+    vo2Empty: 'No VO₂max records in this range; it only updates after an outdoor run.',
+    loadLabel: 'Training load',
+    loadHint: 'Daily training load score',
+    loadEmpty: 'No training load records in this range.',
+    paiLabel: 'PAI',
+    paiHint: 'Personal Activity Intelligence over a rolling 7 days',
+    paiEmpty: 'No PAI records in this range.',
+    thresholdLabel: 'Lactate threshold',
+    thresholdHint: 'Heart rate and pace; only updates after a hard run',
+    thresholdHr: 'Threshold HR',
+    thresholdPace: 'Threshold pace',
+    thresholdChartAria: 'Lactate threshold heart rate and pace',
+    thresholdOnce: (date: string) => `Only one threshold measurement in this range (${date}), so there is no trend to draw.`,
+    thresholdEmpty: 'No lactate threshold measurements in this range.',
+    thresholdPaceTooltip: (value: string) => `Threshold pace <b>${value}</b> /km`,
+    thresholdHrTooltip: (value: number) => `Threshold HR <b>${value}</b> bpm`,
+    balanceLabel: 'Training load balance',
+    balanceHint: '7-day load against the 28-day weekly average, i.e. the acute-to-chronic ratio',
+    balanceChartAria: '7-day and 28-day training load with the acute-to-chronic ratio',
+    balanceEmpty: 'Not enough training load records to draw this line yet.',
+    balanceNote: 'Acute:chronic = sum of the last 7 days ÷ (sum of the last 28 days ÷ 4). When the 28-day window covers fewer than 21 days, no ratio is given and the line breaks there. That is uncomputed, not zero.',
+    acute7d: '7-day load',
+    chronicWeekly: '28-day weekly avg',
+    acuteChronic: 'Acute:chronic',
+    ratioMissing: (days: number) => `— (only ${days} days of data in the 28-day window)`,
+    acuteTooltip: (value: number, days: number) => `7-day load <b>${value}</b> (${days}/7 days with data)`,
+    chronicTooltip: (value: number) => `28-day weekly avg <b>${value}</b>`,
+    ratioTooltip: (value: string) => `Acute:chronic <b>${value}</b>`,
+  },
+);
+const t = useMessages(messages);
 
 const { dataRevision } = useSyncController();
 
@@ -28,6 +113,7 @@ const METRICS = [
   'pai_daily',
 ];
 
+const ranges = computed(() => seriesRanges());
 const rangeDays = ref<SeriesRangeDays>(180);
 const series = ref<Record<string, MetricSeries>>({});
 const balance = ref<TrainingBalancePoint[]>([]);
@@ -61,7 +147,7 @@ const thresholdOption = computed(() => {
     animationDuration: 600,
     grid: { left: 46, right: 52, top: 24, bottom: 28 },
     legend: {
-      data: ['阈值心率', '阈值配速'],
+      data: [t.value.thresholdHr, t.value.thresholdPace],
       top: 0,
       itemWidth: 14,
       itemHeight: 8,
@@ -69,13 +155,15 @@ const thresholdOption = computed(() => {
     },
     tooltip: {
       trigger: 'axis',
-      formatter: (params: Array<{ axisValue: string; seriesName: string; value: number | null }>) => {
+      // 用 seriesIndex 而不是 seriesName 判断是哪条线：名字要跟着界面语言
+      // 变，拿它当标识符的话一切到英文，两条线就都会走 else 分支。
+      formatter: (params: Array<{ axisValue: string; seriesIndex: number; value: number | null }>) => {
         if (!Array.isArray(params) || !params.length) return '';
         const lines = params
           .filter((item) => typeof item.value === 'number')
-          .map((item) => item.seriesName === '阈值配速'
-            ? `阈值配速 <b>${formatPaceSeconds(item.value)}</b> /km`
-            : `阈值心率 <b>${Math.round(item.value as number)}</b> bpm`);
+          .map((item) => (item.seriesIndex === 1
+            ? t.value.thresholdPaceTooltip(formatPaceSeconds(item.value))
+            : t.value.thresholdHrTooltip(Math.round(item.value as number))));
         return [params[0].axisValue, ...lines].join('<br>');
       },
     },
@@ -95,7 +183,7 @@ const thresholdOption = computed(() => {
     ],
     series: [
       {
-        name: '阈值心率',
+        name: t.value.thresholdHr,
         type: 'line',
         data: dates.map((date) => pick(thresholdHr.value, date)),
         connectNulls: true,
@@ -105,7 +193,7 @@ const thresholdOption = computed(() => {
         lineStyle: { width: 2, color: zeppSemanticColors.heart },
       },
       {
-        name: '阈值配速',
+        name: t.value.thresholdPace,
         type: 'line',
         yAxisIndex: 1,
         data: dates.map((date) => pick(thresholdPace.value, date)),
@@ -126,7 +214,7 @@ const balanceOption = computed(() => {
     animationDuration: 600,
     grid: { left: 46, right: 46, top: 24, bottom: 28 },
     legend: {
-      data: ['7 天负荷', '28 天周均', '急慢比'],
+      data: [t.value.acute7d, t.value.chronicWeekly, t.value.acuteChronic],
       top: 0,
       itemWidth: 14,
       itemHeight: 8,
@@ -140,12 +228,12 @@ const balanceOption = computed(() => {
         if (!point) return '';
         const ratio = typeof point.acute_chronic_ratio === 'number'
           ? `${point.acute_chronic_ratio.toFixed(2)}`
-          : `—（28 天窗口只有 ${point.chronic_days_with_data} 天有数据）`;
+          : t.value.ratioMissing(point.chronic_days_with_data);
         return [
           point.date,
-          `7 天负荷 <b>${Math.round(point.acute_7d)}</b>（${point.acute_days_with_data}/7 天有数据）`,
-          `28 天周均 <b>${Math.round(point.chronic_28d / 4)}</b>`,
-          `急慢比 <b>${ratio}</b>`,
+          t.value.acuteTooltip(Math.round(point.acute_7d), point.acute_days_with_data),
+          t.value.chronicTooltip(Math.round(point.chronic_28d / 4)),
+          t.value.ratioTooltip(ratio),
         ].join('<br>');
       },
     },
@@ -156,7 +244,7 @@ const balanceOption = computed(() => {
     ],
     series: [
       {
-        name: '7 天负荷',
+        name: t.value.acute7d,
         type: 'line',
         data: balance.value.map((point) => point.acute_7d),
         showSymbol: false,
@@ -165,7 +253,7 @@ const balanceOption = computed(() => {
         lineStyle: { width: 2, color: zeppSemanticColors.training },
       },
       {
-        name: '28 天周均',
+        name: t.value.chronicWeekly,
         type: 'line',
         data: balance.value.map((point) => Math.round((point.chronic_28d / 4) * 10) / 10),
         showSymbol: false,
@@ -174,7 +262,7 @@ const balanceOption = computed(() => {
         lineStyle: { width: 2, type: 'dashed', color: zeppSemanticColors.cadence },
       },
       {
-        name: '急慢比',
+        name: t.value.acuteChronic,
         type: 'line',
         yAxisIndex: 1,
         // A day whose chronic window is not covered carries no ratio, and the
@@ -204,7 +292,7 @@ const load = async () => {
     series.value = {};
     balance.value = [];
     loading.value = false;
-    error.value = '请使用桌面应用；浏览器预览不会读取账户数据。';
+    error.value = t.value.desktopOnly;
     return;
   }
   const results = await Promise.allSettled([
@@ -218,7 +306,7 @@ const load = async () => {
   balance.value = trend.status === 'fulfilled' ? trend.value : [];
   const rejected = results.find((result) => result.status === 'rejected');
   if (rejected && rejected.status === 'rejected') {
-    error.value = toUserMessage(rejected.reason, '训练状态数据暂时不可用');
+    error.value = toUserMessage(rejected.reason, t.value.loadFailed);
   }
   loading.value = false;
 };
@@ -232,15 +320,15 @@ watch(dataRevision, () => { void load(); });
   <section class="page training-page" aria-labelledby="training-title">
     <PageHeader
       back="/"
-      back-label="返回概览"
+      :back-label="t.backToOverview"
       title-id="training-title"
-      eyebrow="训练状态"
-      title="训练状态"
-      intro="VO₂max、乳酸阈值、训练负荷与心率区间。全部读自已同步的记录，不做训练建议。"
+      :eyebrow="t.eyebrow"
+      :title="t.title"
+      :intro="t.intro"
     >
-      <div class="range-switch" role="radiogroup" aria-label="时间范围">
+      <div class="range-switch" role="radiogroup" :aria-label="t.rangeAria">
         <button
-          v-for="range in SERIES_RANGES"
+          v-for="range in ranges"
           :key="range.days"
           type="button"
           role="radio"
@@ -253,10 +341,10 @@ watch(dataRevision, () => { void load(); });
 
     <p v-if="error" class="inline-alert" role="alert">
       <Icon name="warning" :size="14" />{{ error }}
-      <button v-if="isDesktop()" class="button button-secondary retry" type="button" @click="load">重试</button>
+      <button v-if="isDesktop()" class="button button-secondary retry" type="button" @click="load">{{ t.retry }}</button>
     </p>
 
-    <div v-if="loading" class="card-grid" aria-live="polite" aria-label="正在加载训练状态">
+    <div v-if="loading" class="card-grid" aria-live="polite" :aria-label="t.loadingAria">
       <SkeletonBlock v-for="index in 4" :key="index" height="268px" />
     </div>
 
@@ -264,35 +352,35 @@ watch(dataRevision, () => { void load(); });
       <div class="card-grid">
         <MetricTrendCard
           label="VO₂max"
-          hint="手表在户外跑步后估算的最大摄氧量"
+          :hint="t.vo2Hint"
           :series="vo2max"
           :color="zeppSemanticColors.vo2"
           unit="ml/kg/min"
           :decimals="1"
-          empty-text="这段范围没有 VO₂max 记录；它只在户外跑步后更新。"
+          :empty-text="t.vo2Empty"
         />
         <MetricTrendCard
-          label="训练负荷"
-          hint="每天的运动负荷得分"
+          :label="t.loadLabel"
+          :hint="t.loadHint"
           :series="trainingLoad"
           :color="zeppSemanticColors.training"
           unit="load"
-          empty-text="这段范围没有训练负荷记录。"
+          :empty-text="t.loadEmpty"
         />
         <MetricTrendCard
-          label="PAI 活力指数"
-          hint="滚动 7 天的个人活力指数"
+          :label="t.paiLabel"
+          :hint="t.paiHint"
           :series="pai"
           :color="zeppSemanticColors.calories"
           unit="PAI"
-          empty-text="这段范围没有 PAI 记录。"
+          :empty-text="t.paiEmpty"
         />
 
-        <section class="chart-card" aria-label="乳酸阈值">
+        <section class="chart-card" :aria-label="t.thresholdLabel">
           <header class="chart-head">
             <span class="chart-title">
-              <strong>乳酸阈值</strong>
-              <small>心率与配速，只在高强度跑步后更新</small>
+              <strong>{{ t.thresholdLabel }}</strong>
+              <small>{{ t.thresholdHint }}</small>
             </span>
             <span v-if="thresholdHr?.latest || thresholdPace?.latest" class="chart-latest">
               <b>{{ thresholdHr?.latest ? Math.round(thresholdHr.latest.value) : '—' }}</b><i>bpm</i>
@@ -306,23 +394,23 @@ watch(dataRevision, () => { void load(); });
             :option="thresholdOption"
             autoresize
             role="img"
-            aria-label="乳酸阈值心率与配速曲线"
+            :aria-label="t.thresholdChartAria"
           />
           <p v-else-if="hasThreshold" class="chart-empty">
-            这段范围只有 1 次阈值测量（{{ thresholdDates[0] }}），画不出趋势。
+            {{ t.thresholdOnce(thresholdDates[0]) }}
           </p>
-          <p v-else class="chart-empty">这段范围没有乳酸阈值测量记录。</p>
+          <p v-else class="chart-empty">{{ t.thresholdEmpty }}</p>
         </section>
       </div>
 
-      <section class="chart-card wide" aria-label="运动负荷平衡">
+      <section class="chart-card wide" :aria-label="t.balanceLabel">
         <header class="chart-head">
           <span class="chart-title">
-            <strong>运动负荷平衡</strong>
-            <small>7 天负荷相对 28 天周均，即急性／慢性负荷比</small>
+            <strong>{{ t.balanceLabel }}</strong>
+            <small>{{ t.balanceHint }}</small>
           </span>
           <span v-if="latestBalance" class="chart-latest">
-            <b>{{ latestBalance.acute_chronic_ratio?.toFixed(2) ?? '—' }}</b><i>急慢比</i>
+            <b>{{ latestBalance.acute_chronic_ratio?.toFixed(2) ?? '—' }}</b><i>{{ t.acuteChronic }}</i>
           </span>
         </header>
         <VChart
@@ -332,13 +420,10 @@ watch(dataRevision, () => { void load(); });
           :option="balanceOption"
           autoresize
           role="img"
-          aria-label="7 天与 28 天训练负荷及急慢比曲线"
+          :aria-label="t.balanceChartAria"
         />
-        <p v-else class="chart-empty">训练负荷记录还不够画出这条曲线。</p>
-        <p class="chart-note">
-          急慢比 = 7 天负荷之和 ÷（28 天负荷之和 ÷ 4）。28 天窗口覆盖不足 21 天时不给比值，
-          曲线在那里会断开——这是没算，不是等于零。
-        </p>
+        <p v-else class="chart-empty">{{ t.balanceEmpty }}</p>
+        <p class="chart-note">{{ t.balanceNote }}</p>
       </section>
 
       <HeartRateZonePicker :days="Math.max(30, rangeDays)" :revision="dataRevision" />

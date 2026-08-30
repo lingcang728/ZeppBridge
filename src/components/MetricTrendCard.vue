@@ -3,6 +3,31 @@ import { computed } from 'vue';
 import { VChart } from '../lib/echartsSetup';
 import { buildSeriesOption, coverageLabel } from '../lib/metricSeries';
 import type { MetricSeries } from '../types';
+import { defineMessages, useMessages } from '../i18n';
+
+const messages = defineMessages(
+  {
+    latestTag: '最新',
+    measuredOn: (date: string) => `测于 ${date}`,
+    trendAria: (label: string) => `${label}趋势曲线`,
+    onlyOneDay: '这段范围只有 1 天记录，暂时画不出趋势。',
+    defaultEmpty: '同步后展示这项指标的趋势。',
+    average: '平均',
+    minimum: '最低',
+    maximum: '最高',
+  },
+  {
+    latestTag: 'Latest',
+    measuredOn: (date: string) => `measured ${date}`,
+    trendAria: (label: string) => `${label} trend line`,
+    onlyOneDay: 'Only one day of data in this range, so there is no trend to draw yet.',
+    defaultEmpty: 'This metric shows its trend once it has been synced.',
+    average: 'Avg',
+    minimum: 'Min',
+    maximum: 'Max',
+  },
+);
+const t = useMessages(messages);
 
 const props = withDefaults(defineProps<{
   label: string;
@@ -22,8 +47,12 @@ const props = withDefaults(defineProps<{
 }>(), {
   decimals: 0,
   showSpread: false,
-  emptyText: '同步后展示这项指标的趋势。',
+  // 空串表示「用默认文案」。默认值不能直接写成 t.value.defaultEmpty：
+  // withDefaults 的默认值在 props 解析时求值，那时还没有组件上下文。
+  emptyText: '',
 });
+
+const emptyMessage = computed(() => props.emptyText || t.value.defaultEmpty);
 
 const render = computed(() => props.format ?? ((value: number) => value.toFixed(props.decimals)));
 const hasPoints = computed(() => (props.series?.points.length ?? 0) > 0);
@@ -41,9 +70,9 @@ const stats = computed(() => {
   const series = props.series;
   if (!series || !series.points.length) return [];
   const rows: { label: string; value: string }[] = [];
-  if (typeof series.average === 'number') rows.push({ label: '平均', value: render.value(series.average) });
-  if (typeof series.minimum === 'number') rows.push({ label: '最低', value: render.value(series.minimum) });
-  if (typeof series.maximum === 'number') rows.push({ label: '最高', value: render.value(series.maximum) });
+  if (typeof series.average === 'number') rows.push({ label: t.value.average, value: render.value(series.average) });
+  if (typeof series.minimum === 'number') rows.push({ label: t.value.minimum, value: render.value(series.minimum) });
+  if (typeof series.maximum === 'number') rows.push({ label: t.value.maximum, value: render.value(series.maximum) });
   return rows;
 });
 
@@ -72,7 +101,7 @@ const option = computed(() => {
            的平均/最低/最高和覆盖天数。以前它没有标签，读起来像「这个范围的
            值」，于是看着就像坏了。 -->
       <span class="trend-latest">
-        <em class="trend-latest-tag">最新</em>
+        <em class="trend-latest-tag">{{ t.latestTag }}</em>
         <strong :style="{ color }">{{ latest }}</strong>
         <small v-if="unit">{{ unit }}</small>
       </span>
@@ -80,7 +109,7 @@ const option = computed(() => {
 
     <p class="trend-meta">
       <span>{{ coverage }}</span>
-      <span v-if="latestDate" class="trend-date">测于 {{ latestDate }}</span>
+      <span v-if="latestDate" class="trend-date">{{ t.measuredOn(latestDate) }}</span>
       <span v-if="band" class="trend-band">{{ band }}</span>
     </p>
 
@@ -91,10 +120,10 @@ const option = computed(() => {
       :option="option"
       autoresize
       role="img"
-      :aria-label="`${label}趋势曲线`"
+      :aria-label="t.trendAria(label)"
     />
-    <p v-else-if="hasPoints" class="trend-empty">这段范围只有 1 天记录，暂时画不出趋势。</p>
-    <p v-else class="trend-empty">{{ emptyText }}</p>
+    <p v-else-if="hasPoints" class="trend-empty">{{ t.onlyOneDay }}</p>
+    <p v-else class="trend-empty">{{ emptyMessage }}</p>
 
     <dl v-if="stats.length" class="trend-stats">
       <div v-for="row in stats" :key="row.label">
