@@ -4,6 +4,68 @@ import Icon from './Icon.vue';
 import SkeletonBlock from './SkeletonBlock.vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import type { HeartRateBasis, HeartRateZoneOptions } from '../types';
+import { defineMessages, useMessages } from '../i18n';
+
+const messages = defineMessages(
+  {
+    title: '心率区间',
+    intro: '三种算法算出来的区间不一样，哪一种对你有意义只有你知道，所以 ZeppBridge 不预设默认，也不会用 220−年龄 之类的公式估算。下面每个基准都标了出处和测量日期。',
+    clearChoice: '清除选择',
+    desktopOnly: '请从 ZeppBridge 桌面应用打开，心率区间需要读取本机记录。',
+    noBases: '本机还没有可用的心率基准。完成一次运动同步后，这里会出现实测最高心率等基准。',
+    modelGroup: '算法',
+    modelAria: '心率区间算法',
+    pickModelFirst: '先选一种算法，下面就会按你选的基准算出区间。',
+    pickBasesNext: '再选齐上面的基准，就能算出区间与各区间时长。',
+    window: (days: number, total: string) => `近 ${days} 天运动逐秒心率 · 共 ${total}`,
+    outside: (below: string, above: string) => `区间外：低于 Z1 ${below} · 高于 Z5 ${above}`,
+    formulaNote: (formula: string, bases: string) =>
+      `${formula}；边界向下取整，与手表一致。基准：${bases}`,
+    missingBases: (list: string) => `本机还没有${list}`,
+    basesSeparator: '、',
+    zonesUnavailable: '心率区间暂时不可用',
+    saveFailed: '保存心率区间设置失败',
+    zeroMinutes: '0 分',
+    durationHours: (hours: number, minutes: number) => `${hours} 小时 ${minutes} 分`,
+    durationMinutes: (minutes: number) => `${minutes} 分`,
+    kind: {
+      max_hr: '最大心率基准',
+      resting_hr: '静息心率基准',
+      threshold_hr: '乳酸阈值基准',
+    },
+  },
+  {
+    title: 'Heart rate zones',
+    intro: 'The three models draw different zones, and only you know which one means something for you — so ZeppBridge picks no default and never estimates from a formula like 220 minus your age. Every basis below carries its source and the date it was measured.',
+    clearChoice: 'Clear selection',
+    desktopOnly: 'Open this in the ZeppBridge desktop app; heart rate zones read local records.',
+    noBases: 'No heart rate basis on this machine yet. After one workout sync, measured values such as your highest recorded heart rate show up here.',
+    modelGroup: 'Model',
+    modelAria: 'Heart rate zone model',
+    pickModelFirst: 'Pick a model, and the zones get computed from the bases you choose.',
+    pickBasesNext: 'Choose the remaining bases above to get the zones and the time spent in each.',
+    window: (days: number, total: string) => `Second-by-second workout heart rate over ${days} days · ${total} in total`,
+    outside: (below: string, above: string) => `Outside the zones: below Z1 ${below} · above Z5 ${above}`,
+    formulaNote: (formula: string, bases: string) =>
+      `${formula}. Boundaries round down, matching the watch. Bases: ${bases}`,
+    missingBases: (list: string) => `Not on this machine yet: ${list}`,
+    basesSeparator: ', ',
+    zonesUnavailable: 'Heart rate zones are unavailable right now',
+    saveFailed: 'Could not save the heart rate zone settings',
+    zeroMinutes: '0 min',
+    durationHours: (hours: number, minutes: number) => `${hours} hr ${minutes} min`,
+    durationMinutes: (minutes: number) => `${minutes} min`,
+    kind: {
+      max_hr: 'Max HR basis',
+      resting_hr: 'Resting HR basis',
+      threshold_hr: 'Threshold HR basis',
+    },
+  },
+);
+const t = useMessages(messages);
+
+const kindLabel = (kind: string): string =>
+  (t.value.kind as Record<string, string | undefined>)[kind] ?? kind;
 
 const props = defineProps<{ days: number; revision: number }>();
 
@@ -11,13 +73,6 @@ const options = ref<HeartRateZoneOptions | null>(null);
 const loading = ref(true);
 const saving = ref(false);
 const error = ref<string | null>(null);
-
-/** The slot each basis kind fills, in the order the picker asks for them. */
-const KIND_LABELS: Record<string, string> = {
-  max_hr: '最大心率基准',
-  resting_hr: '静息心率基准',
-  threshold_hr: '乳酸阈值基准',
-};
 
 const preference = computed(() => options.value?.preference ?? {});
 const models = computed(() => options.value?.models ?? []);
@@ -33,7 +88,7 @@ const basisSlots = computed(() => {
   if (!model) return [];
   return model.requires.map((kind) => ({
     kind,
-    label: KIND_LABELS[kind] ?? kind,
+    label: kindLabel(kind),
     chosen:
       kind === 'max_hr'
         ? preference.value.maxBasis ?? null
@@ -47,8 +102,8 @@ const basisSlots = computed(() => {
 const unavailableReason = (requires: string[]): string => {
   const missing = requires
     .filter((kind) => !bases.value.some((basis) => basis.kind === kind))
-    .map((kind) => KIND_LABELS[kind] ?? kind);
-  return missing.length ? `本机还没有${missing.join('、')}` : '';
+    .map(kindLabel);
+  return missing.length ? t.value.missingBases(missing.join(t.value.basesSeparator)) : '';
 };
 
 const load = async () => {
@@ -63,7 +118,7 @@ const load = async () => {
     options.value = await backend.getHeartRateZones(props.days);
   } catch (cause) {
     options.value = null;
-    error.value = toUserMessage(cause, '心率区间暂时不可用');
+    error.value = toUserMessage(cause, t.value.zonesUnavailable);
   } finally {
     loading.value = false;
   }
@@ -84,7 +139,7 @@ const save = async (next: {
       props.days,
     );
   } catch (cause) {
-    error.value = toUserMessage(cause, '保存心率区间设置失败');
+    error.value = toUserMessage(cause, t.value.saveFailed);
   } finally {
     saving.value = false;
   }
@@ -128,11 +183,11 @@ const basisSummary = (basis: HeartRateBasis): string => {
 };
 
 const duration = (seconds: number): string => {
-  if (!Number.isFinite(seconds) || seconds <= 0) return '0 分';
+  if (!Number.isFinite(seconds) || seconds <= 0) return t.value.zeroMinutes;
   const total = Math.round(seconds / 60);
   const hours = Math.floor(total / 60);
   const minutes = total % 60;
-  return hours > 0 ? `${hours} 小时 ${minutes} 分` : `${minutes} 分`;
+  return hours > 0 ? t.value.durationHours(hours, minutes) : t.value.durationMinutes(minutes);
 };
 
 const peakSeconds = computed(() =>
@@ -155,11 +210,8 @@ watch(() => props.revision, () => { void load(); });
   <section class="zone-card" aria-labelledby="zone-title">
     <header class="zone-head">
       <div>
-        <h2 id="zone-title">心率区间</h2>
-        <p class="zone-intro">
-          三种算法算出来的区间不一样，哪一种对你有意义只有你知道，所以 ZeppBridge 不预设默认，
-          也不会用 220−年龄 之类的公式估算。下面每个基准都标了出处和测量日期。
-        </p>
+        <h2 id="zone-title">{{ t.title }}</h2>
+        <p class="zone-intro">{{ t.intro }}</p>
       </div>
       <button
         v-if="preference.model"
@@ -167,20 +219,18 @@ watch(() => props.revision, () => { void load(); });
         type="button"
         :disabled="saving"
         @click="clearChoice"
-      >清除选择</button>
+      >{{ t.clearChoice }}</button>
     </header>
 
     <p v-if="error" class="zone-alert" role="alert"><Icon name="warning" :size="14" />{{ error }}</p>
 
     <SkeletonBlock v-if="loading" height="220px" />
-    <p v-else-if="!isDesktop()" class="zone-empty">请从 ZeppBridge 桌面应用打开，心率区间需要读取本机记录。</p>
-    <p v-else-if="!bases.length" class="zone-empty">
-      本机还没有可用的心率基准。完成一次运动同步后，这里会出现实测最高心率等基准。
-    </p>
+    <p v-else-if="!isDesktop()" class="zone-empty">{{ t.desktopOnly }}</p>
+    <p v-else-if="!bases.length" class="zone-empty">{{ t.noBases }}</p>
 
     <template v-else>
-      <p class="group-label">算法</p>
-      <div class="model-grid" role="radiogroup" aria-label="心率区间算法">
+      <p class="group-label">{{ t.modelGroup }}</p>
+      <div class="model-grid" role="radiogroup" :aria-label="t.modelAria">
         <button
           v-for="model in models"
           :key="model.id"
@@ -229,13 +279,13 @@ watch(() => props.revision, () => { void load(); });
         </div>
       </template>
 
-      <p v-if="!preference.model" class="zone-empty">先选一种算法，下面就会按你选的基准算出区间。</p>
-      <p v-else-if="!report" class="zone-empty">再选齐上面的基准，就能算出区间与各区间时长。</p>
+      <p v-if="!preference.model" class="zone-empty">{{ t.pickModelFirst }}</p>
+      <p v-else-if="!report" class="zone-empty">{{ t.pickBasesNext }}</p>
 
       <template v-else>
         <div class="zone-summary">
           <span>{{ report.modelLabel }}</span>
-          <span class="zone-window">近 {{ report.windowDays }} 天运动逐秒心率 · 共 {{ duration(measuredSeconds) }}</span>
+          <span class="zone-window">{{ t.window(report.windowDays, duration(measuredSeconds)) }}</span>
         </div>
         <ul class="zone-list">
           <li v-for="zone in report.zones" :key="zone.zone">
@@ -246,12 +296,13 @@ watch(() => props.revision, () => { void load(); });
           </li>
         </ul>
         <p class="zone-outside">
-          区间外：低于 Z1 {{ duration(report.belowZone1Seconds) }} ·
-          高于 Z5 {{ duration(report.aboveZone5Seconds) }}
+          {{ t.outside(duration(report.belowZone1Seconds), duration(report.aboveZone5Seconds)) }}
         </p>
         <p class="zone-formula">
-          {{ report.formula }}；边界向下取整，与手表一致。
-          基准：{{ report.bases.map((basis) => `${basis.label} ${Math.round(basis.value)}`).join(' · ') }}
+          {{ t.formulaNote(
+            report.formula,
+            report.bases.map((basis) => `${basis.label} ${Math.round(basis.value)}`).join(' · '),
+          ) }}
         </p>
       </template>
     </template>
