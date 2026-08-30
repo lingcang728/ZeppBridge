@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildExportSelection, MAX_EXPORT_RANGE_DAYS } from '../exportScope';
+import { buildExportSelection } from '../exportScope';
 
 const base = {
   dataTypes: ['workouts'] as const,
@@ -17,7 +17,8 @@ describe('导出范围互斥', () => {
       workoutId: 'run-1',
     });
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain('互斥');
+    // 断言的是规则的码，不是它的中文说法——文案跟着界面语言走，规则不跟。
+    if (!result.ok) expect(result.error).toBe('scope_conflict');
   });
 
   it('只给单条运动时范围就是那一条', () => {
@@ -70,7 +71,7 @@ describe('日期边界', () => {
       endDate: '2026-03-01',
     });
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain('结束日期');
+    if (!result.ok) expect(result.error).toBe('end_before_start');
   });
 
   it('刚好一年可以，多一天不行', () => {
@@ -90,7 +91,7 @@ describe('日期边界', () => {
       endDate: '2026-01-01',
     });
     expect(oneMore.ok).toBe(false);
-    if (!oneMore.ok) expect(oneMore.error).toContain(String(MAX_EXPORT_RANGE_DAYS));
+    if (!oneMore.ok) expect(oneMore.error).toBe('range_too_long');
   });
 
   it('跨闰日的天数算对', () => {

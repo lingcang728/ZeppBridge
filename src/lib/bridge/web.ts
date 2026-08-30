@@ -2,7 +2,7 @@ import { DesktopUnavailableError } from './errors';
 import type { BridgeBackend, UnlistenFn } from './types';
 
 const unavailable = (): never => {
-  throw new DesktopUnavailableError('请使用桌面应用');
+  throw new DesktopUnavailableError();
 };
 
 export const webBackend: BridgeBackend = {

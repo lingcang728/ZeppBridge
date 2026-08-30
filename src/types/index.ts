@@ -620,7 +620,9 @@ export type ExportDataType =
   | 'recovery';
 
 /** Which section of the export picker a data type belongs to. */
-export type ExportTypeGroup = '活动' | '睡眠' | '身体状态' | '训练';
+/* 分组是码，不是中文。写成中文的话界面上到处会出现 `group === '活动'`
+   这种判断，一翻译就默默失效。显示交给 useExport 的分组名表。 */
+export type ExportTypeGroup = 'activity' | 'sleep' | 'body' | 'training';
 
 export interface DeviceProfile {
   name?: string;

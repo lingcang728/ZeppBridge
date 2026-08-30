@@ -22,9 +22,21 @@ export interface ExportScopeInput {
   detail: ExportDetail;
 }
 
+/**
+ * 为什么返回码而不是句子：这一层是产品规则，不是某个页面的文案。
+ * 规则得让 CLI、AI 出口和界面给出同一个答案，而界面还要按当前语言把它写
+ * 成人话——两件事混在一个字符串里，翻译的时候必然把规则也一起改了。
+ */
+export type ExportScopeError =
+  | 'scope_conflict'
+  | 'no_data_types'
+  | 'invalid_dates'
+  | 'end_before_start'
+  | 'range_too_long';
+
 export type ExportScopeResult =
   | { ok: true; selection: ExportSelection }
-  | { ok: false; error: string };
+  | { ok: false; error: ExportScopeError };
 
 const dayCount = (start: string, end: string): number | null => {
   const from = Date.parse(`${start}T00:00:00`);
@@ -38,14 +50,11 @@ export const buildExportSelection = (input: ExportScopeInput): ExportScopeResult
   const hasRange = Boolean(input.startDate || input.endDate);
 
   if (workoutId && hasRange) {
-    return {
-      ok: false,
-      error: '日期范围和单条运动是互斥的导出范围，只能选一个。',
-    };
+    return { ok: false, error: 'scope_conflict' };
   }
 
   if (!input.dataTypes.length) {
-    return { ok: false, error: '请至少选择一种数据类型。' };
+    return { ok: false, error: 'no_data_types' };
   }
 
   let scope: ExportScope;
@@ -53,21 +62,18 @@ export const buildExportSelection = (input: ExportScopeInput): ExportScopeResult
     scope = { kind: 'workout', workoutId };
   } else {
     if (!input.startDate || !input.endDate) {
-      return { ok: false, error: '请选择有效的开始和结束日期。' };
+      return { ok: false, error: 'invalid_dates' };
     }
     const days = dayCount(input.startDate, input.endDate);
     if (days === null) {
-      return { ok: false, error: '请选择有效的开始和结束日期。' };
+      return { ok: false, error: 'invalid_dates' };
     }
     if (days <= 0) {
-      return { ok: false, error: '结束日期不能早于开始日期。' };
+      return { ok: false, error: 'end_before_start' };
     }
     if (days > MAX_EXPORT_RANGE_DAYS) {
       // 一年以上的历史请走数据库快照，而不是塞进一个要交给 AI 的 JSON。
-      return {
-        ok: false,
-        error: `单次导出最多 ${MAX_EXPORT_RANGE_DAYS} 天。更长的历史请用设置页的数据库快照。`,
-      };
+      return { ok: false, error: 'range_too_long' };
     }
     scope = { kind: 'dateRange', start: input.startDate, end: input.endDate };
   }
