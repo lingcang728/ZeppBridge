@@ -91,7 +91,9 @@ export const initializeLocale = () => {
 /** 传给 `Intl.*` 的语言标记。日期和数字格式化都必须用它，不要再写死 `'zh-CN'`。 */
 export const intlLocale = (): string => INTL_LOCALE[current.value];
 
-type MessageLeaf = string | ((...args: never[]) => string);
+// 一条文案：一句话、一组固定的短语（比如输入框下面的几个建议），
+// 或者一个带参数的句子。
+type MessageLeaf = string | readonly string[] | ((...args: never[]) => string);
 
 /** 一份文案。可以嵌套，可以带参数（写成函数）。 */
 export type MessageTree = { readonly [key: string]: MessageLeaf | MessageTree };

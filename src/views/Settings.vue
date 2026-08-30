@@ -23,7 +23,13 @@ import type {
   WorkoutCodeLabel,
 } from '../types';
 import { checkForDesktopUpdate, downloadAndInstallDesktopUpdate, updateState } from '../services/updateService';
-import { intlLocale, locale, LOCALES, LOCALE_LABELS, setLocale } from '../i18n';
+import { settingsMessages } from './Settings.i18n';
+import { intlLocale, locale, LOCALES, LOCALE_LABELS, setLocale, useMessages } from '../i18n';
+
+const t = useMessages(settingsMessages);
+
+const lookup = (table: unknown, key: string): string | undefined =>
+  (table as Record<string, string | undefined>)[key];
 
 const {
   appStatus,
@@ -111,11 +117,17 @@ const runCompactPayloads = async () => {
   try {
     const result = await backend.compactRawPayloads();
     if (!result.compacted && !result.skipped) {
-      compactMessage.value = '没有需要压缩的历史报文——它们已经是压缩形态了。';
+      compactMessage.value = t.value.nothingToCompact;
     } else {
       const saved = result.bytesBefore - result.bytesAfter;
-      const skipped = result.skipped ? `，跳过 ${result.skipped} 条（压完没变小或校验没通过）` : '';
-      compactMessage.value = `已压缩 ${result.compacted} 条报文，${formatBytes(result.bytesBefore)} → ${formatBytes(result.bytesAfter)}，省下 ${formatBytes(saved)}${skipped}。`;
+      const skipped = result.skipped ? t.value.compactSkipped(result.skipped) : '';
+      compactMessage.value = t.value.compactDone(
+        result.compacted,
+        formatBytes(result.bytesBefore),
+        formatBytes(result.bytesAfter),
+        formatBytes(saved),
+        skipped,
+      );
     }
     try {
       storageEstimate.value = await backend.getStorageEstimate(historyDays.value);
@@ -123,74 +135,61 @@ const runCompactPayloads = async () => {
       // 估算刷新失败不影响压缩本身已经完成的事实
     }
   } catch (error) {
-    compactError.value = toUserMessage(error, '压缩历史报文失败');
+    compactError.value = toUserMessage(error, t.value.compactFailed);
   } finally {
     compactBusy.value = false;
   }
 };
 
-const MCP_TOOLS = [
-  { name: 'list_workouts', detail: '运动记录列表，最新在前' },
-  { name: 'get_workout_insight', detail: '一次运动和你自己基线的比较' },
-  { name: 'get_metric_series', detail: '按天的指标序列，每条带单位' },
-  { name: 'get_sleep_detail', detail: '一晚睡眠的分期明细' },
-  { name: 'get_data_health', detail: '每条流的抓取/解析/写入状态' },
-];
+const MCP_TOOLS = computed(() => [
+  { name: 'list_workouts', detail: t.value.mcpToolListWorkouts },
+  { name: 'get_workout_insight', detail: t.value.mcpToolWorkoutInsight },
+  { name: 'get_metric_series', detail: t.value.mcpToolMetricSeries },
+  { name: 'get_sleep_detail', detail: t.value.mcpToolSleepDetail },
+  { name: 'get_data_health', detail: t.value.mcpToolDataHealth },
+]);
 
 /* 与其在界面上写一大篇配置教程，不如给用户一段能直接丢给 AI 的话。
    配置细节因工具、因操作系统、因安装路径而异，AI 看着他的实际情况给指引，
-   比这里写死的四步准得多；用户本来也就是要截图去问 AI 的。 */
-const MCP_SETUP_PROMPT = `我在用一个叫 ZeppBridge 的 Windows 桌面应用，它把我的 Amazfit / Zepp 手表数据同步到本机的一个 SQLite 数据库里。
-它附带一个 MCP 程序（zeppbridge-mcp），我想把它配置到你这里，这样你就能直接查我的运动和健康数据，不用我每次导出再粘贴。
-
-关于它的已知信息：
-- MCP 程序要从 ZeppBridge 的 GitHub Release 页下载 zeppbridge-tools 压缩包，解压后里面有 zeppbridge-mcp 可执行文件。我可能还没下载。
-- 它是 stdio 类型的 MCP server，只读本机数据库，不联网、不监听端口、不需要任何 token 或 API key。
-- 典型配置形状是：{"mcpServers": {"zeppbridge": {"command": "<zeppbridge-mcp 的完整路径>", "args": []}}}
-- 它提供五个只读工具：list_workouts（运动列表）、get_workout_insight（单次运动与个人基线的比较）、get_metric_series（按天的指标序列）、get_sleep_detail（一晚睡眠明细）、get_data_health（每条数据流的抓取/解析/写入状态）。
-
-请告诉我：
-1. 针对你（我现在正在用的这个工具）具体应该把配置写到哪个文件、用什么命令添加；
-2. Windows 上路径要怎么写（反斜杠要不要转义）；
-3. 配完怎么验证生效。
-
-如果你需要我提供什么信息（比如我用的是哪个客户端、文件放在哪），直接问我。`;
-
-const MCP_CONFIG_EXAMPLE = `{
+   比这里写死的四步准得多；用户本来也就是要截图去问 AI 的。
+   两种语言的提示词都在 Settings.i18n.ts 里。 */
+const mcpConfigExample = computed(() => `{
   "mcpServers": {
     "zeppbridge": {
-      "command": "<zeppbridge-mcp 的路径>",
+      "command": "${t.value.mcpConfigPathPlaceholder}",
       "args": []
     }
   }
-}`;
+}`);
 
 const mcpMessage = ref<string | null>(null);
 const copyMcpPrompt = async () => {
   try {
-    await navigator.clipboard.writeText(MCP_SETUP_PROMPT);
-    mcpMessage.value = '已复制。粘给你正在用的 AI，它会照着你的机器给出配置步骤。';
+    await navigator.clipboard.writeText(t.value.mcpSetupPrompt);
+    mcpMessage.value = t.value.mcpPromptCopied;
   } catch {
-    mcpMessage.value = '复制失败，请手动选中上面那段文字。';
+    mcpMessage.value = t.value.mcpPromptCopyFailed;
   }
 };
 
 const copyMcpConfig = async () => {
   try {
-    await navigator.clipboard.writeText(MCP_CONFIG_EXAMPLE);
-    mcpMessage.value = '配置已复制。把 command 换成你本机 zeppbridge-mcp 的实际路径。';
+    await navigator.clipboard.writeText(mcpConfigExample.value);
+    mcpMessage.value = t.value.mcpConfigCopied;
   } catch {
-    mcpMessage.value = '复制失败，请手动选中上面的配置。';
+    mcpMessage.value = t.value.mcpConfigCopyFailed;
   }
 };
 
-const RETENTION_CHOICES = [30, 90, 180, 365].map((days) => ({ value: days, label: `${days} 天` }));
-const HISTORY_CHOICES = [7, 30, 90, 365].map((days) => ({ value: days, label: `最近 ${days} 天` }));
-const EXPORT_FORMAT_CHOICES = [
-  { value: 'json', label: 'JSON', hint: '结构化数据' },
-  { value: 'csv', label: 'CSV', hint: '表格数据' },
-  { value: 'gpx', label: 'GPX', hint: '运动轨迹' },
-];
+const RETENTION_CHOICES = computed(() =>
+  [30, 90, 180, 365].map((days) => ({ value: days, label: t.value.days(days) })));
+const HISTORY_CHOICES = computed(() =>
+  [7, 30, 90, 365].map((days) => ({ value: days, label: t.value.lastDays(days) })));
+const EXPORT_FORMAT_CHOICES = computed(() => [
+  { value: 'json', label: 'JSON', hint: t.value.formatJsonHint },
+  { value: 'csv', label: 'CSV', hint: t.value.formatCsvHint },
+  { value: 'gpx', label: 'GPX', hint: t.value.formatGpxHint },
+]);
 
 const unnamedCodeCount = computed(() => unknownCodes.value.filter((entry) => !entry.label).length);
 
@@ -205,7 +204,7 @@ const loadCorrections = async () => {
 
 /* 起名字的快捷入口。这些只是「少打几个字」，不是对编号的识别结论——
    点一下只是把文本填进输入框，用户仍然可以改成任何名字。 */
-const CODE_NAME_SUGGESTIONS = ['力量训练', '核心训练', 'HIIT', '拉伸放松', '康复训练', '自定义训练'];
+const CODE_NAME_SUGGESTIONS = computed(() => t.value.codeSuggestions);
 
 
 
@@ -218,11 +217,11 @@ const saveCodeLabel = async (zeppType: number) => {
     unknownCodes.value = await backend.setWorkoutCodeLabel(zeppType, draft || null);
     codeDrafts.value = Object.fromEntries(unknownCodes.value.map((entry) => [entry.zeppType, entry.label]));
     codeMessage.value = draft
-      ? `编号 ${zeppType} 以后都显示为「${draft}」。`
-      : `已清除编号 ${zeppType} 的自定义名称。`;
+      ? t.value.codeSaved(zeppType, draft)
+      : t.value.codeCleared(zeppType);
     markDataChanged();
   } catch (error) {
-    codeError.value = toUserMessage(error, '无法保存自定义运动名称');
+    codeError.value = toUserMessage(error, t.value.codeSaveFailed);
   } finally {
     codeBusy.value = null;
   }
@@ -267,7 +266,7 @@ const updateNotesOpen = ref(false);
 /** 卡片上只放第一行；完整说明在弹窗里，免得把一整篇 Release notes 压成一段。 */
 const releaseTeaser = computed(() => {
   const notes = updateState.notes.trim();
-  if (!notes) return '本次 Release 未填写更新说明。';
+  if (!notes) return t.value.releaseNotesEmpty;
   const firstLine = notes
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -285,13 +284,15 @@ const updateProgress = computed(() => updateState.totalBytes
   ? Math.min(100, Math.round(updateState.downloadedBytes / updateState.totalBytes * 100))
   : null);
 const updateStatusLabel = computed(() => ({
-  idle: '尚未检查',
-  checking: '正在检查 GitHub Release',
-  available: `发现新版本 ${updateState.version}`,
-  downloading: updateProgress.value === null ? '正在下载更新' : `正在下载 ${updateProgress.value}%`,
-  installing: '正在安装，完成后会自动重启',
-  failed: '更新失败',
-  upToDate: '当前已是最新版本',
+  idle: t.value.updateStatusIdle,
+  checking: t.value.updateStatusChecking,
+  available: t.value.updateStatusAvailable(updateState.version),
+  downloading: updateProgress.value === null
+    ? t.value.updateStatusDownloading
+    : t.value.updateStatusDownloadingPercent(updateProgress.value),
+  installing: t.value.updateStatusInstalling,
+  failed: t.value.updateStatusFailed,
+  upToDate: t.value.updateStatusUpToDate,
 }[updateState.status]));
 
 const formatUpdateBytes = (bytes: number) => bytes < 1024 * 1024
@@ -321,24 +322,25 @@ const userPrefs = ref<UserPrefs | null>(null);
 
 const connectionLabel = computed(() => {
   if (loginInProgress.value) {
-    if (loginStatus.value.state === 'extracting') return '正在提取登录信息';
-    if (loginStatus.value.state === 'verifying') return '正在验证';
-    return '等待登录';
+    if (loginStatus.value.state === 'extracting') return t.value.connExtracting;
+    if (loginStatus.value.state === 'verifying') return t.value.connVerifying;
+    return t.value.connWaiting;
   }
-  if (loginStatus.value.state === 'failed') return '登录失败';
-  if (connected.value || configuredOnly.value) return '账号已识别';
-  return '未识别';
+  if (loginStatus.value.state === 'failed') return t.value.connFailed;
+  if (connected.value || configuredOnly.value) return deviceStateLabel('account');
+  return deviceStateLabel('unknown');
 });
 
-const accountLabel = computed(() => appStatus.value?.masked_user_id || '未识别');
-const accountInitial = computed(() => accountLabel.value.match(/[A-Za-z0-9]/)?.[0]?.toUpperCase() || '未');
+const accountLabel = computed(() => appStatus.value?.masked_user_id || t.value.unidentified);
+const accountInitial = computed(() =>
+  accountLabel.value.match(/[A-Za-z0-9]/)?.[0]?.toUpperCase() || t.value.unidentifiedInitial);
 const regionLabel = computed(() => regionShortName(appStatus.value?.region_host));
-const regionHost = computed(() => appStatus.value?.region_host || '未提供');
+const regionHost = computed(() => appStatus.value?.region_host || t.value.notProvided);
 
 const formatDateTime = (value?: string): string => {
-  if (!value) return '尚无记录';
+  if (!value) return t.value.noRecords;
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '时间未知';
+  if (Number.isNaN(date.getTime())) return t.value.timeUnknown;
   return new Intl.DateTimeFormat(intlLocale(), {
     year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
   }).format(date).replace(/\//g, '-');
@@ -356,7 +358,7 @@ const dataSources = computed(() => [
   {
     kind: 'cloud' as const,
     name: 'Zepp Cloud',
-    sub: '云服务',
+    sub: t.value.cloudService,
     icon: 'cloud' as const,
     state: accountRecognized.value ? ('account' as const) : ('unknown' as const),
   },
@@ -377,11 +379,13 @@ const refreshDevices = async () => {
     await loadDevices(true);
     const refreshError = deviceCache.value?.refresh_error || deviceError.value;
     if (refreshError || deviceCache.value?.status === 'refresh_failed') {
-      deviceRefreshError.value = `重新识别失败，已回退到本机缓存${refreshError ? `：${refreshError}` : '。'}`;
+      deviceRefreshError.value = t.value.refreshFailed(
+        refreshError ? t.value.refreshFailedReason(refreshError) : t.value.refreshFailedPeriod,
+      );
     } else if (deviceCache.value?.refreshed) {
-      deviceRefreshMessage.value = `设备识别完成，共发现 ${deviceModels.value.length} 个实体设备。`;
+      deviceRefreshMessage.value = t.value.refreshDone(deviceModels.value.length);
     } else {
-      deviceRefreshMessage.value = '未获得新的设备列表，当前显示本机缓存。';
+      deviceRefreshMessage.value = t.value.refreshNoNewList;
     }
   } finally {
     deviceRefreshBusy.value = false;
@@ -397,7 +401,7 @@ const applyLoginStatus = async (status: LoginStatus) => {
     if (!appStatus.value?.last_cloud_sync_at) void runSync('incremental');
   }
   if (status.state === 'failed') {
-    loginError.value = status.message || '登录未完成';
+    loginError.value = status.message || t.value.loginIncomplete;
   }
 };
 
@@ -408,8 +412,8 @@ const startLogin = async () => {
   try {
     await applyLoginStatus(await backend.startWebLogin());
   } catch (error) {
-    loginStatus.value = { state: 'failed', message: toUserMessage(error, '无法打开登录窗口'), page_url: '' };
-    loginError.value = toUserMessage(error, '无法打开登录窗口');
+    loginStatus.value = { state: 'failed', message: toUserMessage(error, t.value.loginWindowFailed), page_url: '' };
+    loginError.value = toUserMessage(error, t.value.loginWindowFailed);
   } finally {
     loginBusy.value = false;
   }
@@ -422,7 +426,7 @@ const cancelLogin = async () => {
     reconnecting.value = false;
     loginError.value = null;
   } catch (error) {
-    loginError.value = toUserMessage(error, '无法取消登录');
+    loginError.value = toUserMessage(error, t.value.loginCancelFailed);
   } finally {
     loginBusy.value = false;
   }
@@ -434,7 +438,7 @@ const importHar = async () => {
     const { open } = await import('@tauri-apps/plugin-dialog');
     const selected = await open({
       multiple: false,
-      filters: [{ name: 'HAR文件', extensions: ['har', 'json'] }],
+      filters: [{ name: t.value.harFilter, extensions: ['har', 'json'] }],
     });
     if (!selected) return;
     loginBusy.value = true;
@@ -444,21 +448,21 @@ const importHar = async () => {
       await backend.importFromHar(harPath);
       await refreshStatus();
       loginError.value = null;
-      dataMessage.value = 'HAR文件导入成功，认证信息已保存。';
+      dataMessage.value = t.value.harImported;
     } catch (error) {
-      loginError.value = toUserMessage(error, 'HAR导入失败');
+      loginError.value = toUserMessage(error, t.value.harImportFailed);
     } finally {
       loginBusy.value = false;
     }
   } catch (error) {
-    loginError.value = toUserMessage(error, '无法打开文件选择器');
+    loginError.value = toUserMessage(error, t.value.filePickerFailed);
   }
 };
 
 // 手动认证
 const submitManualAuth = async () => {
   if (!manualAppToken.value || !manualUserId.value || !manualRegionHost.value) {
-    loginError.value = '请填写所有必填字段';
+    loginError.value = t.value.fillAllFields;
     return;
   }
   manualAuthBusy.value = true;
@@ -474,9 +478,9 @@ const submitManualAuth = async () => {
     manualAppToken.value = '';
     manualUserId.value = '';
     manualRegionHost.value = 'https://api-mifit-us3.zepp.com';
-    dataMessage.value = '手动认证成功，认证信息已保存。';
+    dataMessage.value = t.value.manualAuthDone;
   } catch (error) {
-    loginError.value = toUserMessage(error, '手动认证失败');
+    loginError.value = toUserMessage(error, t.value.manualAuthFailed);
   } finally {
     manualAuthBusy.value = false;
   }
@@ -488,23 +492,23 @@ const verifyAndSync = async () => {
     await refreshStatus();
     await runSync('incremental');
   } catch (error) {
-    dataError.value = toUserMessage(error, '验证未完成');
+    dataError.value = toUserMessage(error, t.value.verifyFailed);
   }
 };
 
 const clampDays = (value: number) => Math.min(365, Math.max(1, Math.round(value) || 1));
 
 const clearAuth = async () => {
-  if (!window.confirm('确定清除认证信息吗？本地健康数据会保留。')) return;
+  if (!window.confirm(t.value.clearAuthConfirm)) return;
   dataError.value = null;
   try {
     await backend.clearAuth();
     await refreshStatus();
     reconnecting.value = false;
     loginStatus.value = { state: 'idle', message: '', page_url: '' };
-    dataMessage.value = '认证已清除，本地健康数据仍保留。';
+    dataMessage.value = t.value.authCleared;
   } catch (error) {
-    dataError.value = toUserMessage(error, '无法清除认证信息');
+    dataError.value = toUserMessage(error, t.value.clearAuthFailed);
   }
 };
 
@@ -514,27 +518,27 @@ const reprocessLocalData = async () => {
   dataMessage.value = null;
   try {
     const result = await backend.reprocessLocalData();
-    dataMessage.value = `本地数据已重新解析，共 ${result.total_records} 条标准化记录；云端同步时间未改变。`;
+    dataMessage.value = t.value.reprocessed(result.total_records);
     markDataChanged();
     await refreshStatus();
   } catch (error) {
-    dataError.value = toUserMessage(error, '重新解析本地数据失败');
+    dataError.value = toUserMessage(error, t.value.reprocessFailed);
   } finally {
     dataBusy.value = null;
   }
 };
 
 const cleanupData = async () => {
-  if (!window.confirm(`确定清理 ${retentionDays.value} 天以前的本地数据吗？此操作无法撤销。`)) return;
+  if (!window.confirm(t.value.cleanupConfirm(retentionDays.value))) return;
   dataBusy.value = 'cleanup';
   dataError.value = null;
   try {
     await backend.cleanupOldData(retentionDays.value);
-    dataMessage.value = `已清理 ${retentionDays.value} 天以前的数据。`;
+    dataMessage.value = t.value.cleanupDone(retentionDays.value);
     storageEstimate.value = await backend.getStorageEstimate(retentionDays.value).catch(() => null);
     markDataChanged();
   } catch (error) {
-    dataError.value = toUserMessage(error, '清理旧数据失败');
+    dataError.value = toUserMessage(error, t.value.cleanupFailed);
   } finally {
     dataBusy.value = null;
   }
@@ -542,7 +546,7 @@ const cleanupData = async () => {
 
 const openDataFolder = async () => {
   try { await backend.openDataFolder(); }
-  catch (error) { dataError.value = toUserMessage(error, '无法打开数据文件夹'); }
+  catch (error) { dataError.value = toUserMessage(error, t.value.openFolderFailed); }
 };
 
 const ensureLocalApiToken = async (): Promise<string | null> => {
@@ -551,7 +555,7 @@ const ensureLocalApiToken = async (): Promise<string | null> => {
     localApiToken.value = await backend.revealLocalApiToken();
     return localApiToken.value;
   } catch (error) {
-    localApiError.value = toUserMessage(error, '无法读取本机 API 访问令牌');
+    localApiError.value = toUserMessage(error, t.value.apiTokenReadFailed);
     return null;
   }
 };
@@ -566,14 +570,14 @@ const toggleLocalApi = async () => {
     if (localApiStatus.value.error) {
       localApiError.value = localApiStatus.value.error;
     } else if (next) {
-      localApiMessage.value = '本机 API 已启用，无需重启应用。';
+      localApiMessage.value = t.value.apiEnabled;
     } else {
       localApiToken.value = null;
       localApiTokenVisible.value = false;
-      localApiMessage.value = '本机 API 已关闭，端口已释放。';
+      localApiMessage.value = t.value.apiDisabled;
     }
   } catch (error) {
-    localApiError.value = toUserMessage(error, '无法切换本机 API');
+    localApiError.value = toUserMessage(error, t.value.apiToggleFailed);
   } finally {
     localApiBusy.value = false;
   }
@@ -595,14 +599,14 @@ const copyLocalApiToken = async () => {
   if (!token) return;
   try {
     await navigator.clipboard.writeText(token);
-    localApiMessage.value = '访问令牌已复制到剪贴板。';
+    localApiMessage.value = t.value.apiTokenCopied;
   } catch {
-    localApiError.value = '无法写入剪贴板，请点击「显示」后手动复制。';
+    localApiError.value = t.value.apiTokenCopyFailed;
   }
 };
 
 const regenerateLocalApiToken = async () => {
-  if (!window.confirm('重新生成后，旧令牌会立即失效，所有已经配置过它的本机程序都需要更新。确定吗？')) return;
+  if (!window.confirm(t.value.apiRegenerateConfirm)) return;
   localApiBusy.value = true;
   localApiError.value = null;
   localApiMessage.value = null;
@@ -610,9 +614,9 @@ const regenerateLocalApiToken = async () => {
     localApiToken.value = await backend.rotateLocalApiToken();
     localApiTokenVisible.value = true;
     localApiStatus.value = await backend.getLocalApiStatus();
-    localApiMessage.value = '已生成新的访问令牌，旧令牌已失效。';
+    localApiMessage.value = t.value.apiTokenRegenerated;
   } catch (error) {
-    localApiError.value = toUserMessage(error, '无法重新生成访问令牌');
+    localApiError.value = toUserMessage(error, t.value.apiRegenerateFailed);
   } finally {
     localApiBusy.value = false;
   }
@@ -628,9 +632,9 @@ const copyLocalApiExample = async () => {
     await navigator.clipboard.writeText(
       `curl.exe -H "Authorization: Bearer ${token}" "${baseUrl}/workouts/WORKOUT_ID/series"`,
     );
-    localApiMessage.value = '带鉴权的调用示例已复制（其中包含你的访问令牌）。';
+    localApiMessage.value = t.value.apiExampleCopied;
   } catch {
-    localApiError.value = '无法复制调用示例，请手动拼接接口地址与 Authorization 头。';
+    localApiError.value = t.value.apiExampleCopyFailed;
   }
 };
 
@@ -644,21 +648,19 @@ const DIAGNOSTIC_NOTE_MAX = 500;
    本机的自动检测只能发现「有未识别的设备或运动编号」；用户遇到的可能是
    别的（数据对不上、某项一直是空）。以前这些人会被「无需提交报告」顶回去，
    而界面上又没有任何地方能说明情况。 */
-const REPORT_CATEGORIES = [
-  { value: 'device', label: '设备没有被识别', hint: '型号显示错误或显示「未识别」' },
-  { value: 'workout', label: '运动类型没有被识别', hint: '显示成「未知运动」或认错了项目' },
-  { value: 'data', label: '数据对不上', hint: '某项一直是空，或和 Zepp App 里的数字不一样' },
-  { value: 'other', label: '其它问题', hint: '在下面写清楚就行' },
-];
+const REPORT_CATEGORIES = computed(() =>
+  (['device', 'workout', 'data', 'other'] as const).map((value) => ({
+    value,
+    label: t.value.reportCategory[value].label,
+    hint: t.value.reportCategory[value].hint,
+  })));
 const diagnosticCategory = ref<string>('');
 const diagnosticNote = ref('');
 const diagnosticResult = ref<{ reportId: string; submittedAt: string } | null>(null);
 const diagnosticError = ref<string | null>(null);
 
 const submitDiagnosticReport = async () => {
-  const confirmed = window.confirm(
-    '只会发送应用版本、系统类型、解析器版本、未识别设备的产品级提示与字段结构、固件版本、型号类编号（deviceSource / deviceType，只有整数，描述的是「哪一款表」而不是「哪一台表」）、未知运动编号和数量，以及你在上面写的那段说明（会自动去掉本机路径、邮箱和长串标识）。不会发送 Zepp 账号、Token、序列号、设备 ID、MAC 地址、GPS、健康数值或原始响应。确认提交吗？',
-  );
+  const confirmed = window.confirm(t.value.reportConfirm);
   if (!confirmed) return;
   diagnosticBusy.value = true;
   diagnosticError.value = null;
@@ -675,7 +677,7 @@ const submitDiagnosticReport = async () => {
     diagnosticNote.value = '';
     diagnosticCategory.value = '';
   } catch (error) {
-    diagnosticError.value = toUserMessage(error, '错误报告提交失败');
+    diagnosticError.value = toUserMessage(error, t.value.reportFailed);
   } finally {
     diagnosticBusy.value = false;
   }
@@ -687,7 +689,7 @@ const savePrefs = async () => {
   retentionDays.value = retention;
   historyDays.value = history;
   if (retention < (appStatus.value?.retention_days ?? 365)) {
-    if (!window.confirm(`下次成功同步将删除 ${retention} 天以前的本地数据，不可恢复。确定吗？`)) return;
+    if (!window.confirm(t.value.retentionConfirm(retention))) return;
   }
   prefsBusy.value = true;
   try {
@@ -698,12 +700,12 @@ const savePrefs = async () => {
     try {
       storageEstimate.value = await backend.getStorageEstimate(history);
     } catch {
-      dataError.value = '设置已保存，但磁盘空间估算暂时不可用';
+      dataError.value = t.value.prefsSavedNoEstimate;
     }
-    dataMessage.value = '已保存本地保留与历史补拉设置。';
+    dataMessage.value = t.value.prefsSaved;
     await refreshStatus();
   } catch (error) {
-    dataError.value = toUserMessage(error, '无法保存设置');
+    dataError.value = toUserMessage(error, t.value.prefsSaveFailed);
   } finally {
     prefsBusy.value = false;
   }
@@ -719,21 +721,22 @@ const applyPrefsChange = (prefs: UserPrefs) => {
 
 const confirmHistorySync = async () => {
   if (isSyncing.value) {
-    dataError.value = '当前有同步进行中，请稍后再补拉';
+    dataError.value = t.value.syncInProgress;
     return;
   }
   const days = clampDays(Number(historyDays.value));
   historyDays.value = days;
   if (days >= 90) {
     const minutes = Math.max(2, Math.round(0.75 + days * 0.05));
-    const extra = days >= 365 ? '\n一年是上限，更早的云端记录不会进入本机。' : '';
-    if (!window.confirm(`补拉 ${days} 天大约需要 ${minutes}–${minutes + 3} 分钟（估算）。请保持应用打开，可随时取消。${extra}`)) return;
+    const extra = days >= 365 ? t.value.backfillYearCap : '';
+    if (!window.confirm(t.value.backfillConfirm(days, minutes, minutes + 3, extra))) return;
   }
   if (storageEstimate.value && !storageEstimate.value.allow_long_history && days >= 90) {
     dataError.value = storageEstimate.value.message;
     return;
   }
-  if (storageEstimate.value?.warn_tight_space && !window.confirm(`${storageEstimate.value.message}\n仍要按 ${days} 天补拉吗？建议先选 30 天。`)) return;
+  if (storageEstimate.value?.warn_tight_space
+    && !window.confirm(t.value.backfillTightSpace(storageEstimate.value.message, days))) return;
   await runSync('history', days);
 };
 
@@ -768,31 +771,11 @@ const capabilityError = ref<string | null>(null);
 const probeBusy = ref(false);
 const probeResults = ref<CapabilityProbe[] | null>(null);
 
-const streamLabels: Record<string, string> = {
-  heart_rate: '心率',
-  sleep: '睡眠',
-  workouts: '运动',
-  steps: '步数',
-  daily_activity: '日常活动',
-  stress: '压力',
-  // 这一行数的是 daily_metrics 里 spo2_* 那几项（ODI、夜间评分、实测时长），
-  // 全部来自夜间测量；身体状态页画的是 metric_samples 里的逐条读数，两者
-  // 是不同的东西。都叫「血氧」会让人以为「有数据」却看不到曲线。
-  spo2: '夜间血氧指标',
-  respiratory_rate: '呼吸率',
-  hrv: 'HRV (SDNN)',
-  hrv_rmssd: 'HRV (RMSSD)',
-  recovery: '恢复与能量',
-  training_load: '训练负荷',
-  vo2max: 'VO₂max',
-  lactate_threshold: '乳酸阈值',
-  pai: 'PAI 活力指数',
-  blood_pressure: '血压',
-  weight: '体重',
-  emotion: '情绪',
-  second_heart_rate: '逐秒心率索引',
-  spo2_files: '逐条血氧原始文件索引',
-};
+/* 数据流名在 Settings.i18n.ts。特别注意 spo2 那一项：它数的是 daily_metrics
+   里 spo2_* 那几项（ODI、夜间评分、实测时长），全部来自夜间测量；身体状态页
+   画的是 metric_samples 里的逐条读数，两者是不同的东西。都叫「血氧」会让人
+   以为「有数据」却看不到曲线，所以这里叫「夜间血氧指标」。 */
+const streamLabel = (stream: string): string => lookup(t.value.stream, stream) ?? stream;
 
 const surfaceLabels: Record<string, string> = {
   v2_events: '/v2/users/me/events',
@@ -803,13 +786,13 @@ const surfaceLabels: Record<string, string> = {
 
 const capabilityRow = (item: CapabilityItem) => ({
   key: item.stream,
-  label: streamLabels[item.stream] ?? item.stream,
+  label: streamLabel(item.stream),
   detail:
     item.status === 'available' && item.ingested !== false
-      ? `${item.records} ${item.recordsUnit}${item.latestDate ? ` · 至 ${item.latestDate}` : ''}`
+      ? t.value.capabilityLocal(item.records, item.recordsUnit, item.latestDate ?? '')
       : item.status === 'available'
         // 数量前面必须写清是云端的，否则读起来就像本机已经有了。
-        ? `云端 ${item.records} ${item.recordsUnit}${item.latestDate ? ` · 至 ${item.latestDate}` : ''}`
+        ? t.value.capabilityCloud(item.records, item.recordsUnit, item.latestDate ?? '')
         : (item.note ?? ''),
   note: item.ingested === false ? (item.note ?? null) : null,
 });
@@ -844,7 +827,7 @@ const capabilityCheckedAt = computed(() => {
   const then = new Date(raw).getTime();
   if (!Number.isFinite(then)) return null;
   const days = Math.floor((Date.now() - then) / 86400000);
-  return days <= 0 ? '今天检测' : `${days} 天前检测`;
+  return days <= 0 ? t.value.probedToday : t.value.probedDaysAgo(days);
 });
 
 const loadCapabilityOverview = async () => {
@@ -864,12 +847,12 @@ const probeDiagnostics = computed(() => {
     const surface = surfaceLabels[probe.surface] ?? probe.surface;
     const result =
       probe.status === 'available'
-        ? `${probe.records} 条${probe.latestDate ? `，最新 ${probe.latestDate}` : ''}`
+        ? t.value.probeRecords(probe.records, probe.latestDate ?? '')
         : probe.status === 'empty'
-          ? '无数据'
+          ? t.value.probeEmpty
           : probe.status === 'unavailable'
-            ? '接口拒绝'
-            : '请求失败';
+            ? t.value.probeRefused
+            : t.value.probeFailed;
     return `${name} @ ${surface} — ${result}`;
   });
 });
@@ -893,8 +876,8 @@ const runCapabilityProbe = async () => {
   <section class="page settings-page" aria-labelledby="settings-title">
     <header class="page-header">
       <div>
-        <h1 id="settings-title">设置</h1>
-        <p class="page-intro">管理认证方式、同步行为、隐私与默认导出偏好，确保本地数据安全。</p>
+        <h1 id="settings-title">{{ t.title }}</h1>
+        <p class="page-intro">{{ t.intro }}</p>
       </div>
       <!-- 语言开关标签是双语的，而且不跟着界面语言变：一个看不懂中文的人
            必须能在中文界面上找到它，反过来也一样。 -->
@@ -915,7 +898,7 @@ const runCapabilityProbe = async () => {
 
     <div v-if="statusError" class="alert danger" role="alert">
       <Icon name="warning" :size="15" />{{ statusError }}
-      <button type="button" @click="() => refreshStatus()">重试</button>
+      <button type="button" @click="() => refreshStatus()">{{ t.retry }}</button>
     </div>
     <div v-if="syncState !== 'idle'" :class="['alert', syncState === 'failed' ? 'danger' : 'success']" role="status">
       <Icon :name="syncState === 'failed' ? 'warning' : 'info'" :size="15" />{{ syncMessage }}
@@ -926,58 +909,58 @@ const runCapabilityProbe = async () => {
 
     <!-- 1. 认证方式 -->
     <section class="settings-card" aria-labelledby="auth-title">
-      <h2 id="auth-title">1. 认证方式</h2>
+      <h2 id="auth-title">{{ t.authTitle }}</h2>
       <div class="auth-grid">
         <div :class="['auth-card', { current: connected || configuredOnly }]">
           <div class="auth-head">
             <span class="auth-icon"><Icon name="globe" :size="18" /></span>
             <div>
-              <strong>官方网页登录</strong>
-              <p>通过官方页面登录，自动抓取 appToken</p>
+              <strong>{{ t.authWebTitle }}</strong>
+              <p>{{ t.authWebSub }}</p>
             </div>
           </div>
-          <button v-if="loginInProgress" class="auth-action" type="button" :disabled="loginBusy" @click="cancelLogin">取消登录</button>
+          <button v-if="loginInProgress" class="auth-action" type="button" :disabled="loginBusy" @click="cancelLogin">{{ t.authCancelLogin }}</button>
           <button v-else-if="connected && !reconnecting" class="auth-action is-current" type="button" @click="startLogin">
-            当前使用 <Icon name="circle-check" :size="14" />
+            {{ t.authInUse }} <Icon name="circle-check" :size="14" />
           </button>
           <button v-else class="auth-action" type="button" :disabled="loginBusy" @click="startLogin">
-            {{ loginBusy ? '正在打开…' : loginStatus.state === 'failed' ? '重试连接' : '使用' }}
+            {{ loginBusy ? t.authOpening : loginStatus.state === 'failed' ? t.authRetry : t.authUse }}
           </button>
         </div>
         <div class="auth-card">
           <div class="auth-head">
             <span class="auth-icon"><Icon name="file" :size="18" /></span>
             <div>
-              <strong>HAR 导入</strong>
-              <p>适合高级用户与调试，快速导入 HAR 文件</p>
+              <strong>{{ t.authHarTitle }}</strong>
+              <p>{{ t.authHarSub }}</p>
             </div>
           </div>
-          <button class="auth-action" type="button" :disabled="loginBusy" @click="importHar">使用</button>
+          <button class="auth-action" type="button" :disabled="loginBusy" @click="importHar">{{ t.authUse }}</button>
         </div>
         <div class="auth-card">
           <div class="auth-head">
             <span class="auth-icon"><Icon name="edit" :size="18" /></span>
             <div>
-              <strong>手动填写</strong>
-              <p>手动填写 appToken、user_id 等信息</p>
+              <strong>{{ t.authManualTitle }}</strong>
+              <p>{{ t.authManualSub }}</p>
             </div>
           </div>
-          <button class="auth-action" type="button" @click="showManualAuth = !showManualAuth">{{ showManualAuth ? '收起' : '使用' }}</button>
+          <button class="auth-action" type="button" @click="showManualAuth = !showManualAuth">{{ showManualAuth ? t.authCollapse : t.authUse }}</button>
         </div>
       </div>
       <p v-if="loginInProgress && loginStatus.message" class="hint-line"><Icon name="info" :size="13" />{{ loginStatus.message }}</p>
 
       <!-- 手动认证表单 -->
       <div v-if="showManualAuth" class="manual-auth-form">
-        <h3>手动输入认证信息</h3>
-        <p class="form-hint">从 mitmproxy/Charles 抓包或浏览器开发者工具获取。需要三个字段：</p>
+        <h3>{{ t.manualFormTitle }}</h3>
+        <p class="form-hint">{{ t.manualFormHint }}</p>
         <div class="form-group">
           <label for="manual-apptoken">App Token *</label>
-          <input id="manual-apptoken" v-model="manualAppToken" type="text" placeholder="从 HTTP 请求头 apptoken 字段复制" :disabled="manualAuthBusy" />
+          <input id="manual-apptoken" v-model="manualAppToken" type="text" :placeholder="t.manualTokenPlaceholder" :disabled="manualAuthBusy" />
         </div>
         <div class="form-group">
           <label for="manual-userid">User ID *</label>
-          <input id="manual-userid" v-model="manualUserId" type="text" placeholder="从 URL 路径 /users/{user_id}/ 提取" :disabled="manualAuthBusy" />
+          <input id="manual-userid" v-model="manualUserId" type="text" :placeholder="t.manualUserIdPlaceholder" :disabled="manualAuthBusy" />
         </div>
         <div class="form-group">
           <label for="manual-host">Region Host *</label>
@@ -985,9 +968,9 @@ const runCapabilityProbe = async () => {
         </div>
         <div class="form-actions">
           <button class="button primary" type="button" :disabled="manualAuthBusy" @click="submitManualAuth">
-            {{ manualAuthBusy ? '保存中...' : '保存认证' }}
+            {{ manualAuthBusy ? t.manualSaving : t.manualSave }}
           </button>
-          <button class="button secondary" type="button" :disabled="manualAuthBusy" @click="showManualAuth = false">取消</button>
+          <button class="button secondary" type="button" :disabled="manualAuthBusy" @click="showManualAuth = false">{{ t.cancel }}</button>
         </div>
       </div>
     </section>
@@ -996,31 +979,31 @@ const runCapabilityProbe = async () => {
     <div class="two-col">
       <!-- 2. 账户与区域 -->
       <section id="account-section" class="settings-card account-card" aria-labelledby="account-title">
-        <h2 id="account-title">2. 账户与区域</h2>
+        <h2 id="account-title">{{ t.accountTitle }}</h2>
         <div class="account-strip">
           <span class="account-avatar">{{ accountInitial }}</span>
           <div class="account-meta">
             <strong>{{ accountLabel }}</strong>
-            <span :title="regionHost">区域 {{ regionLabel }} · 上次同步 {{ formatDateTime(appStatus?.last_cloud_sync_at) }}</span>
+            <span :title="regionHost">{{ t.accountLine(regionLabel, formatDateTime(appStatus?.last_cloud_sync_at)) }}</span>
           </div>
           <span :class="['account-state', { on: accountRecognized }]"><i class="dot"></i>{{ connectionLabel }}</span>
-          <button v-if="configuredOnly" class="kv-btn" type="button" :disabled="isSyncing" @click="verifyAndSync">验证并同步</button>
-          <button v-else class="kv-btn" type="button" :disabled="loginBusy" @click="startLogin">重新认证</button>
+          <button v-if="configuredOnly" class="kv-btn" type="button" :disabled="isSyncing" @click="verifyAndSync">{{ t.verifyAndSync }}</button>
+          <button v-else class="kv-btn" type="button" :disabled="loginBusy" @click="startLogin">{{ t.reauthenticate }}</button>
         </div>
       </section>
 
       <!-- 3. 连接设备 / 数据来源 -->
       <section class="settings-card" aria-labelledby="devices-title">
         <div class="section-heading-row">
-          <h2 id="devices-title">3. 连接设备 / 数据来源</h2>
+          <h2 id="devices-title">{{ t.devicesTitle }}</h2>
           <button class="button secondary identify-button" type="button" :disabled="deviceRefreshBusy" @click="refreshDevices">
             <Icon name="sync" :size="14" :class="{ spinning: deviceRefreshBusy }" />
-            {{ deviceRefreshBusy ? '正在识别…' : '重新识别设备' }}
+            {{ deviceRefreshBusy ? t.identifying : t.identifyDevices }}
           </button>
         </div>
         <div v-if="deviceRefreshError" class="alert danger device-alert" role="alert"><Icon name="warning" :size="14" />{{ deviceRefreshError }}</div>
         <div v-if="deviceRefreshMessage" class="alert success device-alert" role="status"><Icon name="circle-check" :size="14" />{{ deviceRefreshMessage }}</div>
-        <div v-if="deviceError && !deviceRefreshError" class="alert warning device-alert" role="status"><Icon name="info" :size="14" />设备识别：{{ deviceError }}</div>
+        <div v-if="deviceError && !deviceRefreshError" class="alert warning device-alert" role="status"><Icon name="info" :size="14" />{{ t.deviceErrorPrefix }}{{ deviceError }}</div>
 
         <div v-if="devicesLoading" class="source-list source-list-loading">
           <div class="source-row skeleton-row"></div>
@@ -1028,7 +1011,7 @@ const runCapabilityProbe = async () => {
         </div>
         <div v-else class="source-list">
           <div v-if="!deviceModels.length" class="device-empty">
-            <Icon name="watch" :size="16" />尚未识别实体设备；Zepp Cloud 仍可作为云服务同步。
+            <Icon name="watch" :size="16" />{{ t.noDevices }}
           </div>
           <template v-for="source in dataSources" :key="source.name">
           <div class="source-row">
@@ -1039,8 +1022,8 @@ const runCapabilityProbe = async () => {
             <div class="source-copy">
               <strong>{{ source.name }}</strong>
               <span>{{ source.sub }}</span>
-              <span v-if="source.kind === 'device'">固件 {{ source.model.firmware }} · 最近数据 {{ source.model.lastData }}</span>
-              <span v-if="source.kind === 'device'">设备 ID {{ maskIdentifier(source.model.profile.device_id || source.model.profile.serial) }}</span>
+              <span v-if="source.kind === 'device'">{{ t.deviceMeta(source.model.firmware, source.model.lastData) }}</span>
+              <span v-if="source.kind === 'device'">{{ t.deviceIdLine(maskIdentifier(source.model.profile.device_id || source.model.profile.serial)) }}</span>
             </div>
             <span :class="['source-state', { on: source.state !== 'unknown' }]"><i class="dot"></i>{{ deviceStateLabel(source.state) }}</span>
             <!-- 入口对每台设备都在。识别对了不代表用户同意，识别错了更不能没有退路。 -->
@@ -1049,46 +1032,45 @@ const runCapabilityProbe = async () => {
               class="button secondary assign-trigger"
               :to="`/devices/${encodeURIComponent(deviceKeyFor(source.model))}`"
             >
-              <Icon name="watch" :size="14" />查看 / 换型号
+              <Icon name="watch" :size="14" />{{ t.viewOrChange }}
             </RouterLink>
           </div>
           </template>
         </div>
         <div v-if="unknownDeviceDetected && !devicesLoading" class="diagnostic-panel unknown-device-report" role="status">
-          <strong>检测到未识别设备</strong>
+          <strong>{{ t.unknownDeviceTitle }}</strong>
           <p>
-            有些 Zepp 账号的设备响应里<strong>没有任何产品名字段</strong>，只有内部编号，本机无法推断型号——这种情况下「重新识别设备」再点多少次也不会变。
-            你可以在上面直接指认型号：那会被如实标注成「你指认的型号」，不会伪装成自动识别结果。
+            {{ t.unknownDeviceBodyA }}<strong>{{ t.unknownDeviceNoName }}</strong>{{ t.unknownDeviceBodyB }}
           </p>
-          <p>提交错误报告可以帮我把这台设备的编号补进内置目录，之后所有人都不用手动指认。报告只含固定白名单字段，无需 GitHub 账号。</p>
+          <p>{{ t.unknownDeviceReport }}</p>
           <p v-if="deviceAssignError" class="api-error" role="alert">{{ deviceAssignError }}</p>
           <p v-else-if="deviceAssignMessage" class="hint-line ok">{{ deviceAssignMessage }}</p>
           <div class="diagnostic-note">
-            <span>要反馈什么<em>（本机没自动检测到问题时，选一个就能提交）</em></span>
+            <span>{{ t.reportWhat }}<em>{{ t.reportWhatHint }}</em></span>
             <SelectMenu
               v-model="diagnosticCategory"
               :options="REPORT_CATEGORIES"
-              placeholder="不指定（只发送自动检测到的问题）"
-              aria-label="要反馈的问题类型"
+              :placeholder="t.reportCategoryPlaceholder"
+              :aria-label="t.reportCategoryAria"
             />
           </div>
           <label class="diagnostic-note">
-            <span>补充说明<em>（选填，但很有用）</em></span>
+            <span>{{ t.reportNote }}<em>{{ t.reportNoteHint }}</em></span>
             <textarea
               v-model="diagnosticNote"
               rows="3"
               :maxlength="DIAGNOSTIC_NOTE_MAX"
-              placeholder="例如：我的表是 Amazfit Balance 2，但这里显示未识别；或者：户外骑行被识别成了未知运动。"
+              :placeholder="t.reportNotePlaceholder"
             ></textarea>
-            <small>{{ diagnosticNote.length }} / {{ DIAGNOSTIC_NOTE_MAX }} · 发送前会自动去掉本机路径、邮箱和长串标识</small>
+            <small>{{ t.reportNoteCounter(diagnosticNote.length, DIAGNOSTIC_NOTE_MAX) }}</small>
           </label>
           <button class="button secondary" type="button" :disabled="diagnosticBusy" @click="submitDiagnosticReport">
-            <Icon name="send" :size="14" />{{ diagnosticBusy ? '正在安全提交…' : '提交错误报告' }}
+            <Icon name="send" :size="14" />{{ diagnosticBusy ? t.reportSubmitting : t.reportSubmit }}
           </button>
           <div v-if="diagnosticResult" class="diagnostic-done" role="status">
-            <strong><Icon name="circle-check" :size="14" />已收到，谢谢</strong>
-            <p>报告编号 <code>{{ diagnosticResult.reportId }}</code>，提交时间 {{ formatDateTime(diagnosticResult.submittedAt) }}。</p>
-            <p class="diagnostic-done-note">发出去的就是上面列出的那几类字段和你写的那段说明，没有别的。</p>
+            <strong><Icon name="circle-check" :size="14" />{{ t.reportDoneTitle }}</strong>
+            <p>{{ t.reportDoneLine(diagnosticResult.reportId, formatDateTime(diagnosticResult.submittedAt)) }}</p>
+            <p class="diagnostic-done-note">{{ t.reportDoneNote }}</p>
           </div>
           <p v-if="diagnosticError" class="api-error" role="alert">{{ diagnosticError }}</p>
         </div>
@@ -1098,12 +1080,10 @@ const runCapabilityProbe = async () => {
 
     <section class="settings-card" aria-labelledby="capability-title">
       <div class="section-heading-row">
-        <h2 id="capability-title">你的设备能提供什么</h2>
+        <h2 id="capability-title">{{ t.capabilityTitle }}</h2>
         <span v-if="capabilityCheckedAt" class="capability-checked">{{ capabilityCheckedAt }}</span>
       </div>
-      <p class="section-description">
-        以下是 ZeppBridge 目前能从你的账号读到的数据。这份清单在同步时自动更新，无需手动操作。
-      </p>
+      <p class="section-description">{{ t.capabilityIntro }}</p>
       <div v-if="capabilityError" class="alert danger device-alert" role="alert">
         <Icon name="warning" :size="14" />{{ capabilityError }}
       </div>
@@ -1113,9 +1093,9 @@ const runCapabilityProbe = async () => {
            横向铺开，多少条流都能把宽度用满，也一眼看得出「亮了几个」。 -->
       <div v-if="capabilityOverview" class="capability-board">
         <p class="capability-legend">
-          <span class="legend-item"><i class="lamp on"></i>已获取 {{ capabilityAvailable.length }}</span>
-          <span v-if="capabilityNotIngested.length" class="legend-item"><i class="lamp pending"></i>云端有、本机未收录 {{ capabilityNotIngested.length }}</span>
-          <span class="legend-item"><i class="lamp off"></i>暂未获取 {{ capabilityMissing.length }}</span>
+          <span class="legend-item"><i class="lamp on"></i>{{ t.lampOn(capabilityAvailable.length) }}</span>
+          <span v-if="capabilityNotIngested.length" class="legend-item"><i class="lamp pending"></i>{{ t.lampPending(capabilityNotIngested.length) }}</span>
+          <span class="legend-item"><i class="lamp off"></i>{{ t.lampOff(capabilityMissing.length) }}</span>
         </p>
 
         <ul class="capability-grid">
@@ -1132,21 +1112,18 @@ const runCapabilityProbe = async () => {
             <span v-if="row.note" class="cell-note">{{ row.note }}</span>
           </li>
           <li v-if="!capabilityBoard.length" class="capability-cell off">
-            <span class="cell-head"><i class="lamp off" aria-hidden="true"></i><strong>尚未同步</strong></span>
-            <span class="cell-detail">完成一次同步后这里会亮起来。</span>
+            <span class="cell-head"><i class="lamp off" aria-hidden="true"></i><strong>{{ t.capabilityEmptyTitle }}</strong></span>
+            <span class="cell-detail">{{ t.capabilityEmptyBody }}</span>
           </li>
         </ul>
       </div>
 
       <details class="probe-diagnostics">
-        <summary>接口诊断详情</summary>
-        <p class="probe-selfcheck">
-          「暂未获取到」不等于设备不支持：Zepp 的接口对不存在的数据流也返回空响应，
-          只有接口明确拒绝时才会写成「你的设备不提供」。
-        </p>
+        <summary>{{ t.probeSummary }}</summary>
+        <p class="probe-selfcheck">{{ t.probeNote }}</p>
         <button class="button secondary identify-button" type="button" :disabled="probeBusy" @click="runCapabilityProbe">
           <Icon name="sync" :size="14" :class="{ spinning: probeBusy }" />
-          {{ probeBusy ? '正在检测…' : '立即重新检测' }}
+          {{ probeBusy ? t.probing : t.probeRun }}
         </button>
         <ul>
           <li v-for="line in probeDiagnostics" :key="line">{{ line }}</li>
@@ -1156,32 +1133,28 @@ const runCapabilityProbe = async () => {
 
     <section v-if="unknownCodes.length" class="settings-card" aria-labelledby="codes-title">
       <div class="section-heading-row">
-        <h2 id="codes-title">未识别的运动编号</h2>
-        <span v-if="unnamedCodeCount" class="capability-checked">{{ unnamedCodeCount }} 个还没有名字</span>
+        <h2 id="codes-title">{{ t.codesTitle }}</h2>
+        <span v-if="unnamedCodeCount" class="capability-checked">{{ t.codesUnnamed(unnamedCodeCount) }}</span>
       </div>
-      <p class="section-description">
-        Zepp 的自定义训练模板只给编号、不给名字，内置目录里也查不到它们。
-        与其猜一个运动名塞给你，不如你给这个编号起一次名字——之后所有同编号的记录都会用它，
-        并且在运动详情里如实标注成「你起的名字」。
-      </p>
+      <p class="section-description">{{ t.codesIntro }}</p>
       <div class="code-list">
         <div v-for="entry in unknownCodes" :key="entry.zeppType" class="code-row">
           <div class="code-head">
             <span class="code-badge" aria-hidden="true">{{ entry.zeppType }}</span>
             <div class="code-meta">
-              <strong>Zepp 编号 {{ entry.zeppType }}</strong>
-              <span>本机 {{ entry.records }} 条记录会一起改名</span>
+              <strong>{{ t.codeNumber(entry.zeppType) }}</strong>
+              <span>{{ t.codeRecords(entry.records) }}</span>
             </div>
-            <span v-if="entry.label" class="code-preview">现在显示为「{{ entry.label }}」</span>
-            <span v-else class="code-preview muted">现在显示为「未识别运动（编号 {{ entry.zeppType }}）」</span>
+            <span v-if="entry.label" class="code-preview">{{ t.codeShownAs(entry.label) }}</span>
+            <span v-else class="code-preview muted">{{ t.codeShownAsUnknown(entry.zeppType) }}</span>
           </div>
           <div class="code-input-row">
             <input
               v-model="codeDrafts[entry.zeppType]"
               type="text"
               maxlength="24"
-              :aria-label="`编号 ${entry.zeppType} 的自定义名称`"
-              placeholder="给它起个名字，例如：我的核心训练"
+              :aria-label="t.codeInputAria(entry.zeppType)"
+              :placeholder="t.codeInputPlaceholder"
               :disabled="codeBusy === entry.zeppType"
               @keyup.enter="saveCodeLabel(entry.zeppType)"
             />
@@ -1190,7 +1163,7 @@ const runCapabilityProbe = async () => {
               type="button"
               :disabled="codeBusy === entry.zeppType"
               @click="saveCodeLabel(entry.zeppType)"
-            >{{ codeBusy === entry.zeppType ? '保存中…' : '保存' }}</button>
+            >{{ codeBusy === entry.zeppType ? t.codeSaving : t.codeSave }}</button>
           </div>
           <div class="code-suggestions">
             <button
@@ -1206,7 +1179,7 @@ const runCapabilityProbe = async () => {
       </div>
       <p v-if="codeError" class="api-error" role="alert">{{ codeError }}</p>
       <p v-else-if="codeMessage" class="hint-line ok">{{ codeMessage }}</p>
-      <p class="retain-note">名字只保存在本机，不会回传 Zepp，也不会被重新解析覆盖。留空并保存即可清除。</p>
+      <p class="retain-note">{{ t.codeFootnote }}</p>
     </section>
 
     <!-- 隐私与安全这一块最高，早先和「本地数据保留」「导出偏好」并排在三栏里，
@@ -1215,62 +1188,62 @@ const runCapabilityProbe = async () => {
     <div class="one-col">
       <!-- 4. 隐私安全 -->
       <section id="privacy-section" class="settings-card" aria-labelledby="privacy-title">
-        <h2 id="privacy-title">4. 隐私与安全</h2>
+        <h2 id="privacy-title">{{ t.privacyTitle }}</h2>
         <ul class="fact-list">
           <li>
             <span class="toggle-icon"><Icon name="lock" :size="14" /></span>
             <div>
-              <strong>本地数据库未加密</strong>
-              <span>健康数据以明文 SQLite 保存在程序目录的 data 文件夹，依赖 Windows / macOS 的账户与磁盘加密保护。ZeppBridge 不提供整库加密，也不会假装提供。</span>
+              <strong>{{ t.privacyDbTitle }}</strong>
+              <span>{{ t.privacyDbBody }}</span>
             </div>
           </li>
           <li>
             <span class="toggle-icon"><Icon name="shield" :size="14" /></span>
             <div>
-              <strong>Zepp 令牌只进系统凭据存储</strong>
-              <span>Windows 凭据管理器 / macOS 钥匙串保存令牌，auth.json 里只有账号与区域等元数据，令牌不会写进日志、导出或错误报告。</span>
+              <strong>{{ t.privacyTokenTitle }}</strong>
+              <span>{{ t.privacyTokenBody }}</span>
             </div>
           </li>
           <li>
             <span class="toggle-icon"><Icon name="user" :size="14" /></span>
             <div>
-              <strong>没有埋点，没有使用统计</strong>
-              <span>应用不会自动上报任何使用行为。只有你亲手点击「提交错误报告」时，才会发送下面列出的那几类脱敏字段。</span>
+              <strong>{{ t.privacyTelemetryTitle }}</strong>
+              <span>{{ t.privacyTelemetryBody }}</span>
             </div>
           </li>
         </ul>
         <button class="privacy-link-btn" type="button" @click="privacyModalOpen = true">
-          <Icon name="shield" :size="13" />查看本地隐私与脱敏原则
+          <Icon name="shield" :size="13" />{{ t.privacyModalLink }}
         </button>
         <div class="diagnostic-panel">
-          <strong>设备或运动没有识别？</strong>
-          <p>无需注册 GitHub 或复制数据。确认后只把产品级字段结构、固件版本、型号类编号（整数，只说明是哪一款表）、未知运动编号和数量发送到 ZeppBridge 的私有错误报告库；绝不发送账号、Token、序列号、设备 ID、MAC 地址、GPS、健康数值、原始响应或本机路径。</p>
+          <strong>{{ t.privacyReportTitle }}</strong>
+          <p>{{ t.privacyReportBody }}</p>
           <div class="diagnostic-note">
-            <span>要反馈什么<em>（本机没自动检测到问题时，选一个就能提交）</em></span>
+            <span>{{ t.reportWhat }}<em>{{ t.reportWhatHint }}</em></span>
             <SelectMenu
               v-model="diagnosticCategory"
               :options="REPORT_CATEGORIES"
-              placeholder="不指定（只发送自动检测到的问题）"
-              aria-label="要反馈的问题类型"
+              :placeholder="t.reportCategoryPlaceholder"
+              :aria-label="t.reportCategoryAria"
             />
           </div>
           <label class="diagnostic-note">
-            <span>补充说明<em>（选填，但很有用）</em></span>
+            <span>{{ t.reportNote }}<em>{{ t.reportNoteHint }}</em></span>
             <textarea
               v-model="diagnosticNote"
               rows="3"
               :maxlength="DIAGNOSTIC_NOTE_MAX"
-              placeholder="例如：我的表是 Amazfit Balance 2，但这里显示未识别；或者：户外骑行被识别成了未知运动。"
+              :placeholder="t.reportNotePlaceholder"
             ></textarea>
-            <small>{{ diagnosticNote.length }} / {{ DIAGNOSTIC_NOTE_MAX }} · 发送前会自动去掉本机路径、邮箱和长串标识</small>
+            <small>{{ t.reportNoteCounter(diagnosticNote.length, DIAGNOSTIC_NOTE_MAX) }}</small>
           </label>
           <button class="button secondary" type="button" :disabled="diagnosticBusy" @click="submitDiagnosticReport">
-            <Icon name="send" :size="14" />{{ diagnosticBusy ? '正在安全提交…' : '提交错误报告' }}
+            <Icon name="send" :size="14" />{{ diagnosticBusy ? t.reportSubmitting : t.reportSubmit }}
           </button>
           <div v-if="diagnosticResult" class="diagnostic-done" role="status">
-            <strong><Icon name="circle-check" :size="14" />已收到，谢谢</strong>
-            <p>报告编号 <code>{{ diagnosticResult.reportId }}</code>，提交时间 {{ formatDateTime(diagnosticResult.submittedAt) }}。</p>
-            <p class="diagnostic-done-note">发出去的就是上面列出的那几类字段和你写的那段说明，没有别的。</p>
+            <strong><Icon name="circle-check" :size="14" />{{ t.reportDoneTitle }}</strong>
+            <p>{{ t.reportDoneLine(diagnosticResult.reportId, formatDateTime(diagnosticResult.submittedAt)) }}</p>
+            <p class="diagnostic-done-note">{{ t.reportDoneNote }}</p>
           </div>
           <p v-if="diagnosticError" class="api-error" role="alert">{{ diagnosticError }}</p>
         </div>
@@ -1281,33 +1254,31 @@ const runCapabilityProbe = async () => {
     <!-- 5. MCP -->
     <section class="settings-card mcp-card" aria-labelledby="mcp-title">
       <div class="section-heading-row">
-        <h2 id="mcp-title">5. MCP（让 AI 工具直接问本机数据）</h2>
-        <span class="capability-checked">只读 · 不监听端口</span>
+        <h2 id="mcp-title">{{ t.mcpTitle }}</h2>
+        <span class="capability-checked">{{ t.mcpBadge }}</span>
       </div>
       <p class="section-description">
-        <strong>不知道 MCP 是什么可以跳过，它不影响 ZeppBridge 的任何功能。</strong>
-        一句话说：「交给 AI」是你导出数据粘给 AI；MCP 是<strong>让 AI 自己来问</strong>——
-        配好之后直接对它说「看看我最近一个月的睡眠」，它自己去你本机的库里查。
-        只对装在你电脑上的 AI 编程工具有用（Claude Code、Codex、Grok 这类）。
+        <strong>{{ t.mcpSkip }}</strong>
+        {{ t.mcpCompareA }}<strong>{{ t.mcpCompareStrong }}</strong>{{ t.mcpCompareB }}
       </p>
 
       <div class="mcp-handoff">
         <p class="mcp-sub">
-          配置步骤因工具而异，与其在这里写一大篇，不如<strong>把下面这段复制给你正在用的 AI</strong>，让它照着你的机器给你指引。
+          {{ t.mcpAskA }}<strong>{{ t.mcpAskStrong }}</strong>{{ t.mcpAskB }}
         </p>
-        <pre class="mcp-config"><code>{{ MCP_SETUP_PROMPT }}</code></pre>
+        <pre class="mcp-config"><code>{{ t.mcpSetupPrompt }}</code></pre>
         <div class="inline-actions">
           <button class="button primary" type="button" @click="copyMcpPrompt">
-            <Icon name="copy" :size="14" />复制这段去问 AI
+            <Icon name="copy" :size="14" />{{ t.mcpCopyPrompt }}
           </button>
           <button class="button secondary" type="button" @click="copyMcpConfig">
-            <Icon name="copy" :size="14" />只复制配置片段
+            <Icon name="copy" :size="14" />{{ t.mcpCopyConfig }}
           </button>
         </div>
         <p v-if="mcpMessage" class="hint-line ok" role="status">{{ mcpMessage }}</p>
       </div>
 
-      <p class="mcp-sub">配好之后，AI 能问到这五件事：</p>
+      <p class="mcp-sub">{{ t.mcpToolsLead }}</p>
       <div class="mcp-tools">
         <div v-for="tool in MCP_TOOLS" :key="tool.name" class="mcp-tool">
           <code>{{ tool.name }}</code>
@@ -1316,61 +1287,60 @@ const runCapabilityProbe = async () => {
       </div>
 
       <p class="retain-note">
-        <code>zeppbridge-mcp</code> 随 Release 的工具压缩包一起分发，和桌面应用同一个版本。
-        它读的是同一个本机数据库，所以看到的数据和你在这个界面里看到的完全一致。
+        <code>zeppbridge-mcp</code>{{ t.mcpFootA }}
       </p>
     </section>
 
     <div class="two-col paired">
       <!-- 6. 数据保留 -->
       <section class="settings-card" aria-labelledby="retention-title">
-        <h2 id="retention-title">6. 本地数据保留</h2>
+        <h2 id="retention-title">{{ t.retentionTitle }}</h2>
         <div class="field-row">
-          <span class="kv-label">保留时长</span>
+          <span class="kv-label">{{ t.retentionLabel }}</span>
           <SelectMenu
             v-model="retentionDays"
             :options="RETENTION_CHOICES"
-            aria-label="本地数据保留天数"
+            :aria-label="t.retentionAria"
             @update:model-value="savePrefs"
           />
         </div>
-        <p class="retain-note">保留最近 {{ retentionDays }} 天的本地数据；清理在每次<strong>成功同步之后</strong>执行，不会在后台自行发生。</p>
-        <p class="hint-line">{{ storageEstimate?.message || `下次成功同步后，${retentionCutoffDate} 以前的数据会被清理` }}</p>
+        <p class="retain-note">{{ t.retentionNote(retentionDays) }}<strong>{{ t.retentionNoteStrong }}</strong>{{ t.retentionNoteTail }}</p>
+        <p class="hint-line">{{ storageEstimate?.message || t.retentionCutoff(retentionCutoffDate) }}</p>
         <div class="inline-actions">
           <button class="button secondary" type="button" :disabled="Boolean(dataBusy)" @click="cleanupData">
-            {{ dataBusy === 'cleanup' ? '正在清理…' : '立即清理' }}
+            {{ dataBusy === 'cleanup' ? t.cleaningUp : t.cleanupNow }}
           </button>
           <button class="button secondary" type="button" :disabled="Boolean(dataBusy)" @click="reprocessLocalData">
-            {{ dataBusy === 'reprocess' ? '正在解析…' : '重新解析' }}
+            {{ dataBusy === 'reprocess' ? t.reprocessing : t.reprocessNow }}
           </button>
         </div>
       </section>
 
       <!-- 7. 导出默认值 -->
       <section class="settings-card" aria-labelledby="export-title">
-        <h2 id="export-title">7. 导出与补拉偏好</h2>
+        <h2 id="export-title">{{ t.exportTitle }}</h2>
         <div class="field-row">
-          <span class="kv-label">默认导出格式</span>
+          <span class="kv-label">{{ t.defaultFormatLabel }}</span>
           <SelectMenu
             v-model="defaultExportFormat"
             :options="EXPORT_FORMAT_CHOICES"
-            aria-label="默认导出格式"
+            :aria-label="t.defaultFormatAria"
             @update:model-value="onExportFormatChange"
           />
         </div>
         <div class="field-row">
-          <span class="kv-label">历史补拉范围</span>
+          <span class="kv-label">{{ t.historyRangeLabel }}</span>
           <SelectMenu
             v-model="historyDays"
             :options="HISTORY_CHOICES"
-            aria-label="历史补拉天数"
+            :aria-label="t.historyRangeAria"
             @update:model-value="savePrefs"
           />
         </div>
-        <p class="retain-note">设置「交给 AI」页面的默认格式与云端补拉窗口。</p>
+        <p class="retain-note">{{ t.exportNote }}</p>
         <div class="inline-actions">
           <button class="button primary" type="button" :disabled="isSyncing || (!connected && !configuredOnly) || prefsBusy" @click="confirmHistorySync">
-            开始历史补拉
+            {{ t.startBackfill }}
           </button>
         </div>
       </section>
@@ -1386,12 +1356,12 @@ const runCapabilityProbe = async () => {
     <section class="settings-card update-card" aria-labelledby="update-title">
       <div class="update-head">
         <div>
-          <h2 id="update-title">8. 软件更新</h2>
-          <p>每天最多静默检查一次，也可随时手动检查。</p>
+          <h2 id="update-title">{{ t.updateTitle }}</h2>
+          <p>{{ t.updateSub }}</p>
         </div>
         <button class="button secondary" type="button" :disabled="updateBusy" @click="checkForDesktopUpdate(true)">
           <Icon name="sync" :size="14" :class="{ spinning: updateState.status === 'checking' }" />
-          {{ updateState.status === 'checking' ? '检查中…' : '检查更新' }}
+          {{ updateState.status === 'checking' ? t.updateChecking : t.updateCheck }}
         </button>
       </div>
       <div :class="['update-state', `is-${updateState.status}`]" role="status" aria-live="polite">
@@ -1399,8 +1369,8 @@ const runCapabilityProbe = async () => {
         <div>
           <strong>{{ updateStatusLabel }}</strong>
           <p v-if="updateState.status === 'failed'">{{ updateState.error }}</p>
-          <p v-else-if="updateState.status === 'available'">当前 {{ updateState.currentVersion }}<template v-if="updateState.sizeBytes"> · {{ formatUpdateBytes(updateState.sizeBytes) }}</template></p>
-          <p v-else>版本 {{ updateState.currentVersion || '读取中' }}</p>
+          <p v-else-if="updateState.status === 'available'">{{ t.updateCurrent(updateState.currentVersion) }}<template v-if="updateState.sizeBytes"> · {{ formatUpdateBytes(updateState.sizeBytes) }}</template></p>
+          <p v-else>{{ t.updateVersion(updateState.currentVersion || t.updateVersionLoading) }}</p>
         </div>
       </div>
       <progress v-if="updateState.status === 'downloading' && updateProgress !== null" :value="updateProgress" max="100">{{ updateProgress }}%</progress>
@@ -1409,7 +1379,7 @@ const runCapabilityProbe = async () => {
           <strong>ZeppBridge {{ updateState.version }}</strong>
           <p class="release-teaser">{{ releaseTeaser }}</p>
         </div>
-        <button class="button primary" type="button" @click="updateNotesOpen = true">看看更新了什么</button>
+        <button class="button primary" type="button" @click="updateNotesOpen = true">{{ t.updateSeeNotes }}</button>
       </div>
     </section>
 
@@ -1418,12 +1388,12 @@ const runCapabilityProbe = async () => {
       <div class="sync-lead">
         <span class="sync-icon"><Icon name="monitor" :size="20" /></span>
         <div>
-          <h2 id="sync-title">9. 自动同步</h2>
-          <p class="sync-desc">应用打开期间每 {{ autoSyncInterval }} 分钟自动同步云端记录<br />保持开启可获得连续的时序数据。</p>
+          <h2 id="sync-title">{{ t.syncTitle }}</h2>
+          <p class="sync-desc">{{ t.syncDescA(autoSyncInterval) }}<br />{{ t.syncDescB }}</p>
         </div>
       </div>
       <div class="sync-controls">
-        <div class="interval-options" role="radiogroup" aria-label="自动同步间隔" :class="{ 'is-disabled': !autoSyncEnabled }">
+        <div class="interval-options" role="radiogroup" :aria-label="t.syncIntervalAria" :class="{ 'is-disabled': !autoSyncEnabled }">
           <button
             v-for="minutes in AUTO_SYNC_INTERVALS"
             :key="minutes"
@@ -1432,12 +1402,12 @@ const runCapabilityProbe = async () => {
             :aria-checked="autoSyncInterval === minutes"
             :disabled="!autoSyncEnabled"
             @click="setAutoSyncInterval(minutes)"
-          >{{ minutes }} 分钟</button>
+          >{{ t.minutes(minutes) }}</button>
         </div>
-        <span class="sync-toggle-label">{{ autoSyncEnabled ? '同步已开启' : '同步已关闭' }}</span>
+        <span class="sync-toggle-label">{{ autoSyncEnabled ? t.syncOn : t.syncOff }}</span>
         <button class="switch" type="button" role="switch" :aria-checked="autoSyncEnabled" @click="setAutoSyncEnabled(!autoSyncEnabled)"><span></span></button>
         <button class="button secondary sync-now" type="button" :disabled="isSyncing || !connected" @click="runSync('incremental')">
-          <Icon name="sync" :size="14" />{{ isSyncing ? '正在同步…' : '立即同步' }}
+          <Icon name="sync" :size="14" />{{ isSyncing ? t.syncing : t.syncNow }}
         </button>
       </div>
     </section>
@@ -1446,16 +1416,16 @@ const runCapabilityProbe = async () => {
     <details class="advanced settings-card">
       <summary>
         <span>
-          <strong>高级与维护</strong>
-          <em>缩放、数据文件夹与认证清除，仅在需要时使用。</em>
+          <strong>{{ t.advancedTitle }}</strong>
+          <em>{{ t.advancedSub }}</em>
         </span>
         <Icon name="chevron-down" :size="16" />
       </summary>
       <div class="advanced-content">
         <div class="advanced-block">
-          <p class="advanced-label">界面缩放</p>
-          <p class="section-description">100% 为设计基准，也可使用 Ctrl + / Ctrl -。</p>
-          <div class="scale-options" role="radiogroup" aria-label="界面缩放">
+          <p class="advanced-label">{{ t.scaleLabel }}</p>
+          <p class="section-description">{{ t.scaleNote }}</p>
+          <div class="scale-options" role="radiogroup" :aria-label="t.scaleLabel">
             <button
               v-for="option in UI_SCALES"
               :key="option"
@@ -1467,75 +1437,64 @@ const runCapabilityProbe = async () => {
           </div>
         </div>
         <div class="advanced-block">
-          <p class="advanced-label">数据与认证</p>
-          <p class="section-description">数据保存在程序目录的 data 文件夹，当前保留 {{ retentionDays }} 天。</p>
+          <p class="advanced-label">{{ t.dataAuthLabel }}</p>
+          <p class="section-description">{{ t.dataAuthNote(retentionDays) }}</p>
           <div class="inline-actions">
-            <button class="button secondary" type="button" @click="openDataFolder"><Icon name="folder" :size="15" />打开数据文件夹</button>
-            <button class="button danger-button" type="button" @click="clearAuth">清除认证</button>
+            <button class="button secondary" type="button" @click="openDataFolder"><Icon name="folder" :size="15" />{{ t.openDataFolder }}</button>
+            <button class="button danger-button" type="button" @click="clearAuth">{{ t.clearAuth }}</button>
           </div>
         </div>
         <div class="advanced-block">
-          <p class="advanced-label">数据健康检查</p>
-          <p class="section-description">
-            每条数据流从云端取回、被解析、写进本机这三步分别走到哪一步，覆盖了哪些日期，来自哪个来源。
-            平时不需要看；同步结果和你预期对不上时来这里找原因。
-          </p>
+          <p class="advanced-label">{{ t.healthCheckLabel }}</p>
+          <p class="section-description">{{ t.healthCheckNote }}</p>
           <div class="inline-actions">
-            <RouterLink class="button secondary" to="/health-check"><Icon name="database" :size="15" />打开数据健康检查</RouterLink>
+            <RouterLink class="button secondary" to="/health-check"><Icon name="database" :size="15" />{{ t.healthCheckOpen }}</RouterLink>
           </div>
         </div>
         <div class="advanced-block">
-          <p class="advanced-label">压缩历史报文</p>
+          <p class="advanced-label">{{ t.compactLabel }}</p>
           <p class="section-description">
-            云端原始报文是这个库里最占地方的东西，它们是 JSON 文本，压缩后通常只剩五分之一。
-            <strong>这件事默认自动做</strong>：装完新版本第一次启动时，后台会把存量报文压掉，顶部会显示「正在压缩」，压完自动消失。
-            这个按钮只是让你手动再跑一次（比如上次被中断了）。
-            压之前会先解压回来逐字比对，对不上的那条就跳过不动——原始报文是重放的唯一依据，宁可不压。
-            压完会执行一次 VACUUM，磁盘上的文件才会真正变小。
+            {{ t.compactNoteA }}
+            <strong>{{ t.compactNoteStrong }}</strong>{{ t.compactNoteB }}
           </p>
           <div class="inline-actions">
             <button class="button secondary" type="button" :disabled="compactBusy" @click="runCompactPayloads">
-              {{ compactBusy ? '正在压缩…（大库需要几分钟）' : '压缩历史报文' }}
+              {{ compactBusy ? t.compacting : t.compactRun }}
             </button>
           </div>
           <p v-if="compactError" class="api-error" role="alert">{{ compactError }}</p>
           <p v-else-if="compactMessage" class="hint-line ok" role="status">{{ compactMessage }}</p>
         </div>
         <div class="advanced-block">
-          <p class="advanced-label">数据库快照与恢复</p>
-          <p class="section-description">
-            灾难恢复用的整库副本，只能由 ZeppBridge 自己读回来。数据库升级前会自动生成一份，平时不需要手动做。
-          </p>
+          <p class="advanced-label">{{ t.backupLabel }}</p>
+          <p class="section-description">{{ t.backupNote }}</p>
           <BackupPanel />
         </div>
         <div class="advanced-block">
-          <p class="advanced-label">本机 REST API</p>
-          <p class="section-description">
-            给本机上的其他程序（脚本、看板、自建工具）读取已标准化的运动序列 JSON 用。
-            如果你没有这类需求，保持关闭即可。
-          </p>
+          <p class="advanced-label">{{ t.localApiLabel }}</p>
+          <p class="section-description">{{ t.localApiNote }}</p>
       <section class="settings-card api-card" aria-labelledby="api-title">
         <div class="api-head">
           <span class="api-icon"><Icon name="braces" :size="20" /></span>
           <div>
-            <h2 id="api-title">本机 REST API</h2>
-            <p>让本机上的其他程序读取已标准化的运动序列 JSON。默认关闭，需要你显式启用。</p>
+            <h2 id="api-title">{{ t.apiTitle }}</h2>
+            <p>{{ t.apiSub }}</p>
           </div>
           <span :class="['api-state', { on: localApiStatus?.running }]">
-            <i aria-hidden="true"></i>{{ localApiStatus?.running ? '正在监听' : (localApiStatus?.enabled ? '已启用但未监听' : '已关闭') }}
+            <i aria-hidden="true"></i>{{ localApiStatus?.running ? t.apiListening : (localApiStatus?.enabled ? t.apiEnabledNotListening : t.apiOff) }}
           </span>
         </div>
 
         <div class="toggle-row api-toggle">
           <div class="toggle-copy">
-            <strong>启用本机 API</strong>
-            <span>开关立即生效，不需要重启应用；关闭后 {{ localApiStatus?.address || '127.0.0.1:43921' }} 会立刻释放。</span>
+            <strong>{{ t.apiToggleTitle }}</strong>
+            <span>{{ t.apiToggleSub(localApiStatus?.address || '127.0.0.1:43921') }}</span>
           </div>
           <button
             class="switch"
             type="button"
             role="switch"
-            aria-label="启用本机 REST API"
+            :aria-label="t.apiToggleAria"
             :aria-checked="Boolean(localApiStatus?.enabled)"
             :disabled="localApiBusy"
             @click="toggleLocalApi"
@@ -1546,42 +1505,42 @@ const runCapabilityProbe = async () => {
           <div class="api-endpoint">
             <code>{{ localApiStatus?.base_url || 'http://127.0.0.1:43921' }}/workouts/{id}/series</code>
             <button class="button secondary" type="button" :disabled="localApiBusy" @click="copyLocalApiExample">
-              <Icon name="copy" :size="14" />复制带鉴权示例
+              <Icon name="copy" :size="14" />{{ t.apiCopyExample }}
             </button>
           </div>
 
           <div class="api-token">
-            <span class="kv-label">访问令牌</span>
+            <span class="kv-label">{{ t.apiTokenLabel }}</span>
             <code>{{ localApiTokenVisible && localApiToken ? localApiToken : maskedToken }}</code>
             <div class="inline-actions">
               <button class="button secondary" type="button" :disabled="localApiBusy" @click="toggleTokenVisibility">
-                {{ localApiTokenVisible ? '隐藏' : '显示' }}
+                {{ localApiTokenVisible ? t.apiHide : t.apiShow }}
               </button>
               <button class="button secondary" type="button" :disabled="localApiBusy" @click="copyLocalApiToken">
-                <Icon name="copy" :size="14" />复制
+                <Icon name="copy" :size="14" />{{ t.apiCopy }}
               </button>
               <button class="button secondary" type="button" :disabled="localApiBusy" @click="regenerateLocalApiToken">
-                重新生成
+                {{ t.apiRegenerate }}
               </button>
             </div>
           </div>
-          <p class="api-note">每个请求都必须带 <code>Authorization: Bearer &lt;令牌&gt;</code>，否则返回 401。重新生成后旧令牌立即失效。</p>
+          <p class="api-note">{{ t.apiAuthNoteA }}<code>Authorization: Bearer &lt;token&gt;</code>{{ t.apiAuthNoteB }}</p>
         </template>
 
         <p v-if="localApiError" class="api-error" role="alert">{{ localApiError }}</p>
         <p v-else-if="localApiMessage" class="hint-line ok">{{ localApiMessage }}</p>
-        <p class="api-note">仅绑定 127.0.0.1，只读、不开放浏览器跨域、不返回任何凭据；退出 ZeppBridge 后停止。</p>
+        <p class="api-note">{{ t.apiBindNote }}</p>
       </section>
         </div>
         <details class="diag-fold">
-          <summary>同步诊断</summary>
+          <summary>{{ t.syncDiagnostics }}</summary>
           <div class="stream-list">
             <div v-for="stream in appStatus?.streams" :key="stream.stream" class="stream-row">
               <strong>{{ stream.stream }}</strong>
               <span>{{ stream.status }}</span>
               <span>{{ formatDateTime(stream.last_cloud_sync_at) }}</span>
             </div>
-            <p v-if="!appStatus?.streams?.length" class="section-description">尚无同步诊断。</p>
+            <p v-if="!appStatus?.streams?.length" class="section-description">{{ t.noSyncDiagnostics }}</p>
           </div>
         </details>
       </div>
@@ -1596,23 +1555,23 @@ const runCapabilityProbe = async () => {
         <div class="modal-head">
           <div class="modal-title-row">
             <Icon name="sync" :size="18" class="shield-ic" />
-            <h3>ZeppBridge {{ updateState.version }} 更新了什么</h3>
+            <h3>{{ t.updateModalTitle(updateState.version) }}</h3>
           </div>
           <button type="button" class="close-btn" @click="updateNotesOpen = false"><Icon name="x" :size="16" /></button>
         </div>
         <p class="modal-sub">
-          你现在是 {{ updateState.currentVersion || '未知版本' }}
-          <template v-if="updateState.date"> · 发布于 {{ updateState.date.slice(0, 10) }}</template>
+          {{ t.updateModalCurrent(updateState.currentVersion || t.updateModalUnknownVersion) }}
+          <template v-if="updateState.date">{{ t.updateModalReleased(updateState.date.slice(0, 10)) }}</template>
           <template v-if="updateState.sizeBytes"> · {{ formatUpdateBytes(updateState.sizeBytes) }}</template>
         </p>
         <div class="modal-body">
-          <pre class="release-notes">{{ updateState.notes || '本次 Release 未填写更新说明。' }}</pre>
+          <pre class="release-notes">{{ updateState.notes || t.releaseNotesEmpty }}</pre>
         </div>
         <!-- 下载进度就放在更新说明下面：等待的这几十秒里，用户正好可以把上面
              的说明读完，而不是盯着一个没有反馈的按钮猜它有没有在动。 -->
         <div v-if="updateState.status === 'downloading' || updateState.status === 'installing'" class="update-progress">
           <div class="progress-head">
-            <strong>{{ updateState.status === 'installing' ? '正在安装…' : '正在下载更新' }}</strong>
+            <strong>{{ updateState.status === 'installing' ? t.updateInstalling : t.updateDownloading }}</strong>
             <span v-if="updateState.status === 'downloading' && updateProgress !== null">{{ updateProgress }}%</span>
           </div>
           <div class="progress-track" role="progressbar" :aria-valuenow="updateProgress ?? undefined" aria-valuemin="0" aria-valuemax="100">
@@ -1620,32 +1579,31 @@ const runCapabilityProbe = async () => {
                :style="updateState.status === 'downloading' && updateProgress !== null ? { width: `${updateProgress}%` } : undefined"></i>
           </div>
           <p class="progress-note">
-            <template v-if="updateState.status === 'installing'">安装完应用会自己重启，本地健康数据不会被删除。</template>
+            <template v-if="updateState.status === 'installing'">{{ t.updateInstallNote }}</template>
             <template v-else-if="updateState.totalBytes">
-              {{ formatUpdateBytes(updateState.downloadedBytes) }} / {{ formatUpdateBytes(updateState.totalBytes) }}
-              · 下载完会自动安装，这期间可以继续读上面的更新说明
+              {{ formatUpdateBytes(updateState.downloadedBytes) }} / {{ formatUpdateBytes(updateState.totalBytes) }}{{ t.updateDownloadNoteTail }}
             </template>
-            <template v-else>下载完会自动安装，这期间可以继续读上面的更新说明。</template>
+            <template v-else>{{ t.updateDownloadNote }}</template>
           </p>
         </div>
 
         <p v-else-if="updateState.status === 'failed'" class="progress-note bad" role="alert">
-          更新失败：{{ updateState.error }}
+          {{ t.updateFailedPrefix(updateState.error) }}
         </p>
-        <p v-else class="progress-note">安装时应用会自动重启，本地健康数据不会被删除。</p>
+        <p v-else class="progress-note">{{ t.updateRestartNote }}</p>
 
         <div class="modal-foot">
           <button
             type="button"
             class="button secondary"
             @click="updateNotesOpen = false"
-          >{{ updateState.status === 'downloading' || updateState.status === 'installing' ? '在后台继续' : '稍后再说' }}</button>
+          >{{ updateState.status === 'downloading' || updateState.status === 'installing' ? t.updateBackground : t.updateLater }}</button>
           <button
             v-if="updateState.status !== 'downloading' && updateState.status !== 'installing'"
             type="button"
             class="button primary"
             @click="installUpdate"
-          >{{ updateState.status === 'failed' ? '重试' : '下载并安装' }}</button>
+          >{{ updateState.status === 'failed' ? t.updateRetry : t.updateInstall }}</button>
         </div>
       </div>
     </div>
@@ -1656,19 +1614,19 @@ const runCapabilityProbe = async () => {
         <div class="modal-head">
           <div class="modal-title-row">
             <Icon name="shield" :size="18" class="shield-ic" />
-            <h3>ZeppBridge 本地隐私保障原则</h3>
+            <h3>{{ t.privacyModalTitle }}</h3>
           </div>
           <button type="button" class="close-btn" @click="privacyModalOpen = false"><Icon name="x" :size="16" /></button>
         </div>
         <div class="modal-body">
-          <p><strong>1. 本地处理优先：</strong>所有健康与运动时序数据仅存储在本地 SQLite 数据库中，解析与脱敏完全在本地完成。</p>
-          <p><strong>2. 认证凭据严格隔离：</strong>App Token 与 User ID 等凭据不与任何第三方分享，AI 导出时自动执行不可逆脱敏。</p>
-          <p><strong>3. 敏感定位控制：</strong>GPS 经纬度数据默认不注入 AI 剪贴板，严格保障家庭与常用运动路线隐私。</p>
-          <p><strong>4. 错误报告由你决定：</strong>只有点击并确认「提交错误报告」后，才发送固定白名单的产品级诊断；不会发送账号、设备 ID、运动详情或健康数据，也不会自动创建 GitHub Issue。</p>
-          <p><strong>5. 透明开源：</strong>端到端代码开源，无暗中网络回传逻辑。</p>
+          <p><strong>{{ t.privacyPoint1Title }}</strong>{{ t.privacyPoint1 }}</p>
+          <p><strong>{{ t.privacyPoint2Title }}</strong>{{ t.privacyPoint2 }}</p>
+          <p><strong>{{ t.privacyPoint3Title }}</strong>{{ t.privacyPoint3 }}</p>
+          <p><strong>{{ t.privacyPoint4Title }}</strong>{{ t.privacyPoint4 }}</p>
+          <p><strong>{{ t.privacyPoint5Title }}</strong>{{ t.privacyPoint5 }}</p>
         </div>
         <div class="modal-foot">
-          <button type="button" class="button primary" @click="privacyModalOpen = false">我知道了</button>
+          <button type="button" class="button primary" @click="privacyModalOpen = false">{{ t.privacyModalOk }}</button>
         </div>
       </div>
     </div>
