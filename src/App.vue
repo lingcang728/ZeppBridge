@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { getVersion } from '@tauri-apps/api/app';
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, watch } from 'vue';
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router';
 import BrandMark from './components/BrandMark.vue';
 import DesignIcon, { type DesignIconName } from './components/DesignIcon.vue';
 import DeviceVisual from './components/DeviceVisual.vue';
 import Icon from './components/Icon.vue';
-import LandingPage from './views/LandingPage.vue';
 import { useSyncController } from './composables/useSyncController';
 import { useDevices } from './composables/useDevices';
 import { useUiScale } from './composables/useUiScale';
@@ -18,6 +17,10 @@ import { checkForDesktopUpdate } from './services/updateService';
 const FALLBACK_APP_VERSION = '1.0.1';
 const APP_VERSION = ref(FALLBACK_APP_VERSION);
 const desktopRuntime = isDesktop();
+// 落地页只在非桌面环境渲染（Cloudflare Pages 部署的就是这个分支），
+// 静态 import 会把它连同两份文案一起塞进桌面应用的首屏 chunk。懒加载后
+// 桌面端根本不会下载它。
+const LandingPage = defineAsyncComponent(() => import('./views/LandingPage.vue'));
 const showLanding = !desktopRuntime && !new URLSearchParams(window.location.search).has('app-preview');
 if (desktopRuntime) {
   void getVersion()
