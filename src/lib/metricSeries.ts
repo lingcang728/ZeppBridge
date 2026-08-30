@@ -1,4 +1,5 @@
 import type { MetricSeries, MetricSeriesPoint } from '../types';
+import { intlLocale } from '../i18n';
 
 /**
  * The three windows the body and training screens offer.
@@ -40,11 +41,12 @@ export const coverageLabel = (series?: MetricSeries | null): string => {
   return `${series.window_days} 天里有 ${series.days_with_data} 天记录`;
 };
 
-const CLOCK = new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric' });
-
+// 刻意不缓存成模块级常量：那样会把语言钉死在模块加载的那一刻，
+// 切到英文之后坐标轴上的日期还是中文格式。
 const shortDate = (value: string): string => {
   const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? value : CLOCK.format(date);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(intlLocale(), { month: 'numeric', day: 'numeric' }).format(date);
 };
 
 /** Seconds per kilometre as `m:ss`, the unit runners actually read. */

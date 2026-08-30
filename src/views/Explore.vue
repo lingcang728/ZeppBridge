@@ -17,6 +17,7 @@ import { useAiHandoff } from '../composables/useAiHandoff';
 import { localDateString } from '../lib/format';
 import { AI_PROVIDERS, AI_PROVIDER_BY_ID, type AiProviderId } from '../lib/aiProviders';
 import type { ExportDataType, ExportScope, ExportSelection } from '../types';
+import { intlLocale } from '../i18n';
 
 const {
   exportStartDate,
@@ -258,7 +259,7 @@ const scopeRangeText = computed(() => {
     if (!previewScope.value) return '这一条运动';
     const start = new Date(previewScope.value.startTime);
     if (Number.isNaN(start.getTime())) return '这一条运动';
-    return new Intl.DateTimeFormat('zh-CN', {
+    return new Intl.DateTimeFormat(intlLocale(), {
       year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
     }).format(start);
   }
@@ -641,7 +642,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
               </div>
               <div class="summary-cell">
                 <span class="cell-label"><Icon name="file" :size="13" />记录条数</span>
-                <strong class="cell-value font-mono">{{ previewBusy ? '…' : (previewCount === null ? '—' : previewCount.toLocaleString('zh-CN')) }}</strong>
+                <strong class="cell-value font-mono">{{ previewBusy ? '…' : (previewCount === null ? '—' : previewCount.toLocaleString(intlLocale())) }}</strong>
                 <span class="cell-sub">已同步记录</span>
               </div>
               <div class="summary-cell">

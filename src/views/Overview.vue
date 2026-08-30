@@ -22,6 +22,7 @@ import { indexSeries, latestValue } from '../lib/metricSeries';
 import { formatDistance, formatDuration, formatMetric, formatTime, isFiniteNumber, type HealthCategory } from '../lib/format';
 import { displayableWorkouts, workoutDisplayLabel, workoutDurationMinutes, workoutTypeKey } from '../lib/workouts';
 import type { HealthOverview, HeartRatePoint, MetricSeries, SleepSession, Workout } from '../types';
+import { intlLocale } from '../i18n';
 
 const { dataRevision } = useSyncController();
 const { models: deviceModels, error: deviceError, load: loadDevices } = useDevices();
@@ -129,7 +130,7 @@ const hrChartOption = computed(() => {
     data.push([point.ts, point.value]);
   });
   const last = data[data.length - 1];
-  const clock = (value: number) => new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value));
+  const clock = (value: number) => new Intl.DateTimeFormat(intlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value));
   return {
     animationDuration: 900,
     animationEasing: 'cubicOut' as const,

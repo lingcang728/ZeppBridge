@@ -21,6 +21,7 @@ import { zeppSemanticColors } from '../lib/echartsTheme';
 import { indexSeries, SERIES_RANGES, type SeriesRangeDays } from '../lib/metricSeries';
 import { isFiniteNumber } from '../lib/format';
 import type { HeartRatePoint, MetricSeries } from '../types';
+import { intlLocale } from '../i18n';
 
 const { dataRevision } = useSyncController();
 
@@ -47,7 +48,7 @@ const average = computed(() => (points.value.length
   ? Math.round(points.value.reduce((total, point) => total + point.value, 0) / points.value.length)
   : null));
 
-const clock = (value: number) => new Intl.DateTimeFormat('zh-CN', {
+const clock = (value: number) => new Intl.DateTimeFormat(intlLocale(), {
   hour: '2-digit', minute: '2-digit', hour12: false,
 }).format(new Date(value));
 
