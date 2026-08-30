@@ -2,14 +2,81 @@ import { computed, ref } from 'vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { deviceImageFor } from '../lib/deviceCatalog';
 import type { DeviceCacheMetadata, DeviceProfile, DeviceProfilesResult } from '../types';
-import { intlLocale } from '../i18n';
+import { defineMessages, intlLocale, messagesOf } from '../i18n';
 
 /**
  * The device catalog is deliberately treated as account data, not as a list
  * of products we happen to ship assets for.  Views consume this normalized
  * model so an empty/unknown account never falls back to a made-up watch.
  */
-export type DeviceState = '账号已识别' | '你指认的型号' | '最近有数据' | '使用缓存' | '未识别';
+/*
+ * 设备状态存的是码，不是中文。
+ *
+ * 早先它是中文字符串联合类型，于是界面里到处写着 `state !== '未识别'` 这种
+ * 判断——一翻译就全断，而且断得没有声音：条件永远为真，指示灯一直亮着。
+ * 现在比较的是码，显示交给 deviceStateLabel()。
+ */
+export type DeviceState = 'account' | 'user_assigned' | 'recent_data' | 'cached' | 'unknown';
+
+const messages = defineMessages(
+  {
+    stateAccount: '账号已识别',
+    stateUserAssigned: '你指认的型号',
+    stateRecentData: '最近有数据',
+    stateCached: '使用缓存',
+    stateUnknown: '未识别',
+    notFetchedYet: '尚未获取',
+    timeUnknown: '时间未知',
+    unidentifiedDevice: '未识别设备',
+    notProvided: '未提供',
+    identifyUnavailable: '设备识别暂时不可用',
+    cacheUnavailable: '设备缓存暂时不可用',
+    noLocalIdentifier: '这台设备没有可用的本机标识，无法保存指认。',
+    assignmentCleared: '已撤销型号指认，恢复成自动识别结果。',
+    assignmentSaved: '已记录你的型号指认。界面会把它标成「你指认的型号」，不会当成自动识别结果。',
+    assignmentContributed: (reportId: string) =>
+      `已记录你的型号指认，并把型号编号交给了 ZeppBridge（编号 ${reportId}）。下一版目录会让同款设备自动识别。`,
+    assignmentContributionFailed: (reason: string) =>
+      `已记录你的型号指认（只在本机）。补充目录没发送成功：${reason}`,
+    networkUnavailable: '网络不可用',
+    assignmentFailed: '无法保存型号指认',
+  },
+  {
+    stateAccount: 'Known from account',
+    stateUserAssigned: 'Model you picked',
+    stateRecentData: 'Has recent data',
+    stateCached: 'From cache',
+    stateUnknown: 'Not identified',
+    notFetchedYet: 'Not fetched yet',
+    timeUnknown: 'Time unknown',
+    unidentifiedDevice: 'Unidentified device',
+    notProvided: 'Not provided',
+    identifyUnavailable: 'Device identification is unavailable right now',
+    cacheUnavailable: 'The device cache is unavailable right now',
+    noLocalIdentifier: 'This device carries no local identifier, so the pick cannot be saved.',
+    assignmentCleared: 'Pick withdrawn. Back to the automatic match.',
+    assignmentSaved: 'Your pick is saved. It shows up as "Model you picked" — never passed off as an automatic match.',
+    assignmentContributed: (reportId: string) =>
+      `Your pick is saved, and the model numbers went to ZeppBridge (report ${reportId}). The next catalog release will identify this model on its own.`,
+    assignmentContributionFailed: (reason: string) =>
+      `Your pick is saved on this machine. Sending the catalog contribution failed: ${reason}`,
+    networkUnavailable: 'Network unavailable',
+    assignmentFailed: 'Could not save the model pick',
+  },
+);
+
+const copy = () => messagesOf(messages);
+
+const DEVICE_STATE_KEYS = {
+  account: 'stateAccount',
+  user_assigned: 'stateUserAssigned',
+  recent_data: 'stateRecentData',
+  cached: 'stateCached',
+  unknown: 'stateUnknown',
+} as const;
+
+/** 设备状态在界面上的说法。跟着当前语言走。 */
+export const deviceStateLabel = (state: DeviceState): string => copy()[DEVICE_STATE_KEYS[state]];
 
 export interface DeviceCardModel {
   profile: DeviceProfile;
@@ -43,9 +110,9 @@ let backgroundRefreshAttempted = false;
 let backgroundRefreshInFlight: Promise<DeviceProfilesResult> | null = null;
 
 const formatDeviceDate = (value?: string | null): string => {
-  if (!value) return '尚未获取';
+  if (!value) return copy().notFetchedYet;
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '时间未知';
+  if (Number.isNaN(date.getTime())) return copy().timeUnknown;
   return new Intl.DateTimeFormat(intlLocale(), {
     year: 'numeric',
     month: '2-digit',
@@ -57,11 +124,11 @@ const formatDeviceDate = (value?: string | null): string => {
 };
 
 const stateFor = (profile: DeviceProfile): DeviceState => {
-  if (profile.has_local_data) return '最近有数据';
-  if (cache.value?.status === 'stale' || cache.value?.status === 'refresh_failed') return '使用缓存';
-  if (profile.match_status === 'user_assigned') return '你指认的型号';
-  if (profile.canonical_name || profile.match_status === 'exact' || profile.match_status === 'alias') return '账号已识别';
-  return '未识别';
+  if (profile.has_local_data) return 'recent_data';
+  if (cache.value?.status === 'stale' || cache.value?.status === 'refresh_failed') return 'cached';
+  if (profile.match_status === 'user_assigned') return 'user_assigned';
+  if (profile.canonical_name || profile.match_status === 'exact' || profile.match_status === 'alias') return 'account';
+  return 'unknown';
 };
 
 const normalizeResult = (result: DeviceProfilesResult | DeviceProfile[]): DeviceProfilesResult => {
@@ -99,7 +166,7 @@ const applyResult = (result: DeviceProfilesResult): void => {
 };
 
 const setLoadFailure = (cause: unknown, refresh: boolean): void => {
-  const message = toUserMessage(cause, refresh ? '设备识别暂时不可用' : '设备缓存暂时不可用');
+  const message = toUserMessage(cause, refresh ? copy().identifyUnavailable : copy().cacheUnavailable);
   error.value = message;
   const status = refresh ? 'refresh_failed' : 'unavailable';
   cache.value = cache.value
@@ -215,12 +282,12 @@ const reloadAfterLocalWrite = async (): Promise<void> => {
 
 const models = computed<DeviceCardModel[]>(() => profiles.value.map((profile) => ({
   profile,
-  canonicalName: profile.canonical_name?.trim() || profile.name?.trim() || '未识别设备',
-  displayName: profile.display_name?.trim() || '未提供',
+  canonicalName: profile.canonical_name?.trim() || profile.name?.trim() || copy().unidentifiedDevice,
+  displayName: profile.display_name?.trim() || copy().notProvided,
   image: deviceImageFor(profile.kind, profile.image_key),
   kind: profile.kind || 'unknown',
   state: stateFor(profile),
-  firmware: profile.firmware?.trim() || '尚未获取',
+  firmware: profile.firmware?.trim() || copy().notFetchedYet,
   lastData: formatDeviceDate(profile.last_data_at),
   hasLocalData: profile.has_local_data === true,
   deviceKey: (profile.device_id || profile.serial || '').trim(),
@@ -230,7 +297,7 @@ const models = computed<DeviceCardModel[]>(() => profiles.value.map((profile) =>
 
 const maskIdentifier = (value?: string | null): string => {
   const trimmed = value?.trim();
-  if (!trimmed) return '未提供';
+  if (!trimmed) return copy().notProvided;
   if (trimmed.length <= 4) return '•'.repeat(trimmed.length);
   return `••••${trimmed.slice(-4)}`;
 };
@@ -245,7 +312,7 @@ const assignMessage = ref<string | null>(null);
 
 const assignModel = async (deviceKey: string, catalogId: string, contribute = false): Promise<void> => {
   if (!deviceKey) {
-    assignError.value = '这台设备没有可用的本机标识，无法保存指认。';
+    assignError.value = copy().noLocalIdentifier;
     return;
   }
   assignBusy.value = true;
@@ -255,20 +322,20 @@ const assignModel = async (deviceKey: string, catalogId: string, contribute = fa
     await backend.setDeviceModelOverride(deviceKey, catalogId || null);
     await reloadAfterLocalWrite();
     if (!catalogId) {
-      assignMessage.value = '已撤销型号指认，恢复成自动识别结果。';
+      assignMessage.value = copy().assignmentCleared;
       return;
     }
-    assignMessage.value = '已记录你的型号指认。界面会把它标成「你指认的型号」，不会当成自动识别结果。';
+    assignMessage.value = copy().assignmentSaved;
     if (!contribute) return;
     // 补目录的提交失败不该让指认看起来没保存成功：本机的那一半已经写好了。
     try {
       const result = await backend.submitDeviceModelAssignment();
-      assignMessage.value = `已记录你的型号指认，并把型号编号交给了 ZeppBridge（编号 ${result.reportId}）。下一版目录会让同款设备自动识别。`;
+      assignMessage.value = copy().assignmentContributed(result.reportId);
     } catch (cause) {
-      assignMessage.value = `已记录你的型号指认（只在本机）。补充目录没发送成功：${toUserMessage(cause, '网络不可用')}`;
+      assignMessage.value = copy().assignmentContributionFailed(toUserMessage(cause, copy().networkUnavailable));
     }
   } catch (cause) {
-    assignError.value = toUserMessage(cause, '无法保存型号指认');
+    assignError.value = toUserMessage(cause, copy().assignmentFailed);
   } finally {
     assignBusy.value = false;
   }

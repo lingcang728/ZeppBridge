@@ -7,11 +7,79 @@ import DesignIcon, { type DesignIconName } from './components/DesignIcon.vue';
 import DeviceVisual from './components/DeviceVisual.vue';
 import Icon from './components/Icon.vue';
 import { useSyncController } from './composables/useSyncController';
-import { useDevices } from './composables/useDevices';
+import { deviceStateLabel, useDevices } from './composables/useDevices';
 import { useUiScale } from './composables/useUiScale';
 import { backend, isDesktop } from './lib/bridge';
 import { checkForDesktopUpdate } from './services/updateService';
-import { intlLocale } from './i18n';
+import { defineMessages, intlLocale, useMessages } from './i18n';
+
+const messages = defineMessages(
+  {
+    skipToContent: '跳到主要内容',
+    mainNav: '主导航',
+    mobileNav: '移动导航',
+    bottomNav: '移动主导航',
+    openNav: '打开导航',
+    navOverview: '概览',
+    navHandoff: '交给 AI',
+    navSettings: '设置',
+    dataSources: '数据来源',
+    identifyingDevices: '正在识别实体设备…',
+    identifyFailed: (reason: string) => `设备识别暂不可用：${reason}`,
+    noDevicesYet: '尚未识别实体设备。',
+    accountPrefix: '账户：',
+    manage: '管理',
+    privacyLink: '安全与隐私设置',
+    connectionTitle: '云端连接状态',
+    lastSyncPrefix: '上次同步：',
+    notFetchedYet: '尚未获取',
+    timeUnknown: '时间未知',
+    noAccount: '未识别账户',
+    syncNow: '立即同步',
+    verifyFirst: '请先完成连接验证',
+    syncing: '同步中…',
+    cancel: '取消',
+    compacting: (pending: number) =>
+      `正在压缩历史报文（${pending} 条），压完会自动消失。这期间同步会稍等一下。`,
+    compacted: (saved: string) => `历史报文已压缩，省下约 ${saved} 磁盘空间。`,
+    trayHint: '关闭窗口后 ZeppBridge 仍在托盘运行，可继续自动同步。',
+    browserPreview: '请使用桌面应用。浏览器预览不会读取账户数据。',
+    routeNotFound: '页面不存在，已返回概览。',
+  },
+  {
+    skipToContent: 'Skip to main content',
+    mainNav: 'Main navigation',
+    mobileNav: 'Mobile navigation',
+    bottomNav: 'Mobile main navigation',
+    openNav: 'Open navigation',
+    navOverview: 'Overview',
+    navHandoff: 'Hand to AI',
+    navSettings: 'Settings',
+    dataSources: 'Data sources',
+    identifyingDevices: 'Identifying your devices…',
+    identifyFailed: (reason: string) => `Device identification is unavailable: ${reason}`,
+    noDevicesYet: 'No device identified yet.',
+    accountPrefix: 'Account: ',
+    manage: 'Manage',
+    privacyLink: 'Security and privacy settings',
+    connectionTitle: 'Cloud connection state',
+    lastSyncPrefix: 'Last sync: ',
+    notFetchedYet: 'Not fetched yet',
+    timeUnknown: 'Time unknown',
+    noAccount: 'No account identified',
+    syncNow: 'Sync now',
+    verifyFirst: 'Verify the connection first',
+    syncing: 'Syncing…',
+    cancel: 'Cancel',
+    compacting: (pending: number) =>
+      `Compacting stored payloads (${pending} to go). This clears itself; syncing waits its turn.`,
+    compacted: (saved: string) => `Stored payloads compacted, about ${saved} of disk reclaimed.`,
+    trayHint: 'Closing the window keeps ZeppBridge in the tray, so auto-sync carries on.',
+    browserPreview: 'Use the desktop app. This browser preview reads no account data.',
+    routeNotFound: 'That page does not exist, so you are back on the overview.',
+  },
+);
+const t = useMessages(messages);
 
 // 桌面端从 Tauri 运行时读取版本（与 tauri.conf.json 单一来源），
 // 浏览器预览环境回退到下面的常量（与 package.json 保持同步）。
@@ -55,11 +123,11 @@ const {
  * 它回答的是「这条数据流为什么没同步过来」，属于出问题时才找的排查工具，
  * 而不是日常四个入口之一。路由 /health-check 仍然有效，入口挪到
  * 「设置 → 高级与维护」，需要的人找得到，不需要的人不用天天看见它。 */
-const navigation = [
-  { to: '/', label: '概览', icon: 'overview' as DesignIconName },
-  { to: '/explore', label: '交给 AI', icon: 'handoff' as DesignIconName },
-  { to: '/settings', label: '设置', icon: 'settings' as DesignIconName },
-];
+const navigation = computed(() => [
+  { to: '/', label: t.value.navOverview, icon: 'overview' as DesignIconName },
+  { to: '/explore', label: t.value.navHandoff, icon: 'handoff' as DesignIconName },
+  { to: '/settings', label: t.value.navSettings, icon: 'settings' as DesignIconName },
+]);
 
 /* 组件名要和 defineOptions({ name }) 对得上，KeepAlive 才认得出来。 */
 const CACHED_PAGES = [
@@ -91,17 +159,17 @@ const dataSources = computed(() => [
   {
     kind: 'cloud' as const,
     name: 'Zepp Cloud',
-    state: accountRecognized.value ? '账号已识别' : '未识别',
+    state: accountRecognized.value ? ('account' as const) : ('unknown' as const),
   },
 ]);
 
 const statusLabel = computed(() => {
   // Keep the chip within the same four account/device states used elsewhere.
   // The browser-preview banner separately explains that no account data is read.
-  if (!isDesktop()) return '未识别';
-  if (!appStatus.value) return '未识别';
-  if (appStatus.value.connection_state === 'connected' || appStatus.value.connection_state === 'configured') return '账号已识别';
-  return '未识别';
+  if (!isDesktop()) return 'unknown' as const;
+  if (!appStatus.value) return 'unknown' as const;
+  if (appStatus.value.connection_state === 'connected' || appStatus.value.connection_state === 'configured') return 'account' as const;
+  return 'unknown' as const;
 });
 const statusTone = computed(() => {
   if (appStatus.value?.connection_state === 'needs_reauth' || syncState.value === 'failed') return 'danger';
@@ -111,14 +179,14 @@ const statusTone = computed(() => {
 });
 const lastSyncClock = computed(() => {
   const raw = appStatus.value?.last_cloud_sync_at;
-  if (!raw) return '尚未获取';
+  if (!raw) return t.value.notFetchedYet;
   const date = new Date(raw);
-  if (Number.isNaN(date.getTime())) return '时间未知';
+  if (Number.isNaN(date.getTime())) return t.value.timeUnknown;
   return new Intl.DateTimeFormat(intlLocale(), {
     year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(date).replace(/\//g, '-');
 });
-const accountLabel = computed(() => appStatus.value?.masked_user_id || '未识别账户');
+const accountLabel = computed(() => appStatus.value?.masked_user_id || t.value.noAccount);
 const browserPreview = computed(() => !desktopRuntime);
 const routeNotice = computed(() => route.query.notice === 'not-found');
 
@@ -173,10 +241,10 @@ onUnmounted(() => {
 <template>
   <LandingPage v-if="showLanding" />
   <template v-else>
-    <a class="skip-link" href="#main-content">跳到主要内容</a>
+    <a class="skip-link" href="#main-content">{{ t.skipToContent }}</a>
 
     <div class="app-shell">
-    <aside class="sidebar" aria-label="主导航">
+    <aside class="sidebar" :aria-label="t.mainNav">
       <div class="brand-lockup">
         <span class="brand-badge"><BrandMark /></span>
         <span class="brand-text">
@@ -185,7 +253,7 @@ onUnmounted(() => {
         </span>
       </div>
 
-      <nav class="desktop-nav" aria-label="主导航">
+      <nav class="desktop-nav" :aria-label="t.mainNav">
         <RouterLink
           v-for="item in navigation"
           :key="item.to"
@@ -202,11 +270,11 @@ onUnmounted(() => {
 
       <div class="sources">
         <div class="sources-head">
-          <span>数据来源</span>
+          <span>{{ t.dataSources }}</span>
         </div>
-        <div v-if="devicesLoading" class="sources-feedback" role="status">正在识别实体设备…</div>
-        <div v-else-if="devicesError" class="sources-feedback error" role="alert">设备识别暂不可用：{{ devicesError }}</div>
-        <div v-else-if="!deviceModels.length" class="sources-feedback" role="status">尚未识别实体设备。</div>
+        <div v-if="devicesLoading" class="sources-feedback" role="status">{{ t.identifyingDevices }}</div>
+        <div v-else-if="devicesError" class="sources-feedback error" role="alert">{{ t.identifyFailed(devicesError) }}</div>
+        <div v-else-if="!deviceModels.length" class="sources-feedback" role="status">{{ t.noDevicesYet }}</div>
         <RouterLink v-for="source in dataSources" :key="source.name" class="source-card" to="/settings">
           <span class="source-icon">
             <DeviceVisual v-if="source.kind === 'device'" :src="source.model.image" :alt="source.name" :kind="source.model.kind" compact />
@@ -214,8 +282,8 @@ onUnmounted(() => {
           </span>
           <span class="source-copy">
             <strong>{{ source.name }}</strong>
-            <span :class="['source-state', { on: source.state !== '未识别' }]">
-              <i class="dot"></i>{{ source.state }}
+            <span :class="['source-state', { on: source.state !== 'unknown' }]">
+              <i class="dot"></i>{{ deviceStateLabel(source.state) }}
             </span>
           </span>
           <Icon name="chevron-down" :size="14" class="source-chevron" />
@@ -226,18 +294,18 @@ onUnmounted(() => {
         <div class="cloud-card">
           <div class="cloud-row">
             <DesignIcon name="zepp-cloud" :size="24" />
-            <span>Zepp Cloud · {{ accountRecognized ? '账号已识别' : '未识别' }}</span>
+            <span>Zepp Cloud · {{ deviceStateLabel(accountRecognized ? 'account' : 'unknown') }}</span>
             <Icon name="circle-check" :size="15" :class="['cloud-check', { on: connected }]" />
           </div>
           <div class="cloud-account">
-            <span>账户：{{ accountLabel }}</span>
-            <RouterLink to="/settings" class="manage-btn">管理</RouterLink>
+            <span>{{ t.accountPrefix }}{{ accountLabel }}</span>
+            <RouterLink to="/settings" class="manage-btn">{{ t.manage }}</RouterLink>
           </div>
         </div>
         <div class="version-row">
           <span class="version-brand"><BrandMark :size="20" /></span>
           <span>ZeppBridge　v{{ APP_VERSION }}</span>
-          <RouterLink :to="{ path: '/settings', hash: '#privacy-section' }" class="shield-link" title="安全与隐私设置">
+          <RouterLink :to="{ path: '/settings', hash: '#privacy-section' }" class="shield-link" :title="t.privacyLink">
             <DesignIcon name="secure" :size="20" />
           </RouterLink>
         </div>
@@ -247,26 +315,26 @@ onUnmounted(() => {
     <div class="app-body">
       <header class="topbar">
         <div class="topbar-leading">
-          <button class="mobile-menu-button" type="button" aria-label="打开导航" :aria-expanded="mobileMenuOpen" @click="mobileMenuOpen = !mobileMenuOpen">
+          <button class="mobile-menu-button" type="button" :aria-label="t.openNav" :aria-expanded="mobileMenuOpen" @click="mobileMenuOpen = !mobileMenuOpen">
             <Icon :name="mobileMenuOpen ? 'x' : 'sliders'" :size="19" />
           </button>
           <span v-if="statusError" class="sr-only" role="status">{{ statusError }}</span>
-          <span :class="['connection-chip', `tone-${statusTone}`]" title="云端连接状态" aria-live="polite">
-            <Icon name="circle-check" :size="14" /><span>{{ statusLabel }}</span>
+          <span :class="['connection-chip', `tone-${statusTone}`]" :title="t.connectionTitle" aria-live="polite">
+            <Icon name="circle-check" :size="14" /><span>{{ deviceStateLabel(statusLabel) }}</span>
           </span>
-          <span class="sync-time">上次同步：{{ lastSyncClock }}</span>
+          <span class="sync-time">{{ t.lastSyncPrefix }}{{ lastSyncClock }}</span>
           <button
             class="refresh-btn"
             type="button"
             :disabled="isSyncing || !canIncrementalSync"
-            :title="canIncrementalSync ? '立即同步' : '请先完成连接验证'"
+            :title="canIncrementalSync ? t.syncNow : t.verifyFirst"
             @click="runSync('incremental')"
           >
-            <DesignIcon name="sync" :size="20" :class="{ spinning: isSyncing }" /><span>立即同步</span>
+            <DesignIcon name="sync" :size="20" :class="{ spinning: isSyncing }" /><span>{{ t.syncNow }}</span>
           </button>
           <span v-if="isSyncing" class="sync-progress-text">
-            {{ syncProgress ? `${syncProgress.current}/${syncProgress.total}` : '同步中…' }}
-            <button class="cancel-link" type="button" @click="cancelSync">取消</button>
+            {{ syncProgress ? `${syncProgress.current}/${syncProgress.total}` : t.syncing }}
+            <button class="cancel-link" type="button" @click="cancelSync">{{ t.cancel }}</button>
           </span>
         </div>
       </header>
@@ -282,15 +350,15 @@ onUnmounted(() => {
       <!-- 装完新版本第一次启动时的一次性后台维护。压的时候说一声，压完自己走。 -->
       <div v-if="compacting" class="sync-feedback" role="status" aria-live="polite">
         <Icon name="database" :size="14" class="spinning" />
-        <span>正在压缩历史报文（{{ compactionPending }} 条），压完会自动消失。这期间同步会稍等一下。</span>
+        <span>{{ t.compacting(compactionPending) }}</span>
       </div>
       <div v-else-if="compactionSaved" class="sync-feedback tone-updated" role="status">
         <Icon name="circle-check" :size="14" />
-        <span>历史报文已压缩，省下约 {{ formatSavedBytes(compactionSaved) }} 磁盘空间。</span>
+        <span>{{ t.compacted(formatSavedBytes(compactionSaved)) }}</span>
       </div>
-      <div v-if="trayHint" class="sync-feedback" role="status">关闭窗口后 ZeppBridge 仍在托盘运行，可继续自动同步。</div>
+      <div v-if="trayHint" class="sync-feedback" role="status">{{ t.trayHint }}</div>
 
-      <div v-if="mobileMenuOpen" class="mobile-menu" aria-label="移动导航">
+      <div v-if="mobileMenuOpen" class="mobile-menu" :aria-label="t.mobileNav">
         <nav class="mobile-menu-links">
           <RouterLink v-for="item in navigation" :key="item.to" :to="item.to" class="nav-link" active-class="is-active" exact-active-class="is-active" @click="closeMobileMenu">
             <DesignIcon :name="item.icon" :size="25" /><span>{{ item.label }}</span>
@@ -300,10 +368,10 @@ onUnmounted(() => {
 
       <div v-if="browserPreview" class="preview-banner" role="status">
         <Icon name="terminal" :size="16" />
-        <span>请使用桌面应用。浏览器预览不会读取账户数据。</span>
+        <span>{{ t.browserPreview }}</span>
       </div>
       <div v-if="routeNotice" class="route-notice" role="status">
-        <Icon name="info" :size="16" />页面不存在，已返回概览。
+        <Icon name="info" :size="16" />{{ t.routeNotFound }}
       </div>
 
       <main id="main-content" class="main-content" tabindex="-1">
@@ -323,7 +391,7 @@ onUnmounted(() => {
         </RouterView>
       </main>
 
-      <nav class="bottom-nav" aria-label="移动主导航">
+      <nav class="bottom-nav" :aria-label="t.bottomNav">
         <RouterLink v-for="item in navigation" :key="item.to" :to="item.to" class="bottom-nav-link" active-class="is-active" exact-active-class="is-active">
           <DesignIcon :name="item.icon" :size="26" /><span>{{ item.label }}</span>
         </RouterLink>

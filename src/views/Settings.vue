@@ -7,7 +7,7 @@ import DeviceVisual from '../components/DeviceVisual.vue';
 import HistoryArchivePanel from '../components/HistoryArchivePanel.vue';
 import Icon from '../components/Icon.vue';
 import SelectMenu from '../components/SelectMenu.vue';
-import { useDeviceAssignment, useDevices } from '../composables/useDevices';
+import { deviceStateLabel, useDeviceAssignment, useDevices } from '../composables/useDevices';
 import { useSyncController } from '../composables/useSyncController';
 import { AUTO_SYNC_INTERVALS } from '../lib/autoSync';
 import { UI_SCALES, useUiScale, type UiScale } from '../composables/useUiScale';
@@ -358,7 +358,7 @@ const dataSources = computed(() => [
     name: 'Zepp Cloud',
     sub: '云服务',
     icon: 'cloud' as const,
-    state: accountRecognized.value ? '账号已识别' : '未识别',
+    state: accountRecognized.value ? ('account' as const) : ('unknown' as const),
   },
   ...deviceModels.value.map((model) => ({
     kind: 'device' as const,
@@ -1042,7 +1042,7 @@ const runCapabilityProbe = async () => {
               <span v-if="source.kind === 'device'">固件 {{ source.model.firmware }} · 最近数据 {{ source.model.lastData }}</span>
               <span v-if="source.kind === 'device'">设备 ID {{ maskIdentifier(source.model.profile.device_id || source.model.profile.serial) }}</span>
             </div>
-            <span :class="['source-state', { on: source.state !== '未识别' }]"><i class="dot"></i>{{ source.state }}</span>
+            <span :class="['source-state', { on: source.state !== 'unknown' }]"><i class="dot"></i>{{ deviceStateLabel(source.state) }}</span>
             <!-- 入口对每台设备都在。识别对了不代表用户同意，识别错了更不能没有退路。 -->
             <RouterLink
               v-if="source.kind === 'device' && deviceKeyFor(source.model)"

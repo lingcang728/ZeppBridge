@@ -2,14 +2,100 @@ import { computed, readonly, ref } from 'vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { readAutoSyncSettings, writeAutoSyncSettings } from '../lib/autoSync';
 import type { AppStatus, LoginStatus, SyncOutcome, SyncProgress, SyncReport } from '../types';
-import { intlLocale } from '../i18n';
+import { defineMessages, intlLocale, messagesOf } from '../i18n';
 
 export type SyncUiState = 'idle' | 'syncing' | SyncOutcome;
+
+const messages = defineMessages(
+  {
+    notSyncedYet: '尚未同步',
+    timeUnknown: '未知时间',
+    updatedWithLatest: (clock: string) => `已同步到新数据 · 最新心率 ${clock}`,
+    updated: '已同步到新数据',
+    noNewDataWithLatest: (clock: string) => `云端暂无新数据 · 最新心率仍为 ${clock}`,
+    noNewData: '同步完成，云端暂无新数据',
+    partialWithStreams: (streams: string) => `部分同步失败：${streams}`,
+    partial: '同步已完成，但部分数据流失败',
+    cancelled: '同步已取消',
+    deferred: '正在重建本地派生数据，稍后自动重试同步',
+    failed: '同步失败，请检查连接后重试',
+    lastCloudSync: (clock: string) => `上次云端同步 ${clock}`,
+    cloudSyncClock: (clock: string) => `云端同步时间 ${clock}`,
+    cloudSyncClockUnknown: '云端同步时间 —',
+    statusUnavailable: '连接状态暂时不可用',
+    alreadySyncing: '已有同步进行中，请稍后再试',
+    desktopOnly: '请使用桌面应用',
+    reauthNeeded: '认证已失效，请重新连接 Zepp',
+    verifyFirst: '请先完成连接验证',
+    connectFirst: '请先连接 Zepp',
+    syncingRecent: '正在同步最近 7 天…',
+    backfilling: (days: number) => `正在补拉最近 ${days} 天…`,
+    syncDidNotFinish: '云端同步未完成',
+    cancelling: '正在取消同步…',
+    cancelFailed: '无法取消同步',
+    /** 数据流的分隔符：中文用顿号，英文用逗号。 */
+    streamSeparator: '、',
+  },
+  {
+    notSyncedYet: 'Not synced yet',
+    timeUnknown: 'Time unknown',
+    updatedWithLatest: (clock: string) => `New data pulled in · latest heart rate ${clock}`,
+    updated: 'New data pulled in',
+    noNewDataWithLatest: (clock: string) => `Nothing new in the cloud · latest heart rate still ${clock}`,
+    noNewData: 'Sync finished. The cloud had nothing new',
+    partialWithStreams: (streams: string) => `Some streams failed: ${streams}`,
+    partial: 'Sync finished, but some data streams failed',
+    cancelled: 'Sync cancelled',
+    deferred: 'Rebuilding local derived data. The sync will retry on its own',
+    failed: 'Sync failed. Check the connection and try again',
+    lastCloudSync: (clock: string) => `Last cloud sync ${clock}`,
+    cloudSyncClock: (clock: string) => `Cloud sync ${clock}`,
+    cloudSyncClockUnknown: 'Cloud sync —',
+    statusUnavailable: 'Connection status is unavailable right now',
+    alreadySyncing: 'A sync is already running. Try again once it finishes',
+    desktopOnly: 'Use the desktop app',
+    reauthNeeded: 'Your Zepp session expired. Connect again',
+    verifyFirst: 'Verify the connection first',
+    connectFirst: 'Connect to Zepp first',
+    syncingRecent: 'Syncing the last 7 days…',
+    backfilling: (days: number) => `Backfilling the last ${days} days…`,
+    syncDidNotFinish: 'The cloud sync did not finish',
+    cancelling: 'Cancelling the sync…',
+    cancelFailed: 'Could not cancel the sync',
+    streamSeparator: ', ',
+  },
+);
+
+const copy = () => messagesOf(messages);
+
+/*
+ * 状态条上那句话存的是「发生了什么」，不是渲染好的字符串。
+ *
+ * 存字符串的话，用户切一次语言，横幅上就会留着上一种语言的句子直到下次同步
+ * ——而同步结果恰恰是最需要看懂的一句。存成结构，渲染放在 computed 里，
+ * 切语言时它自己会重算。
+ *
+ * `backend` 这一档是后端发来的原文（sync://progress 的进度消息、命令返回的
+ * 错误）。后端不按 locale 出文案是刻意的：GUI / CLI / MCP / 导出四个出口对
+ * 同一个问题必须给同一份回答。这些句子的语言跟着后端走。
+ */
+type SyncNotice =
+  | { kind: 'none' }
+  | { kind: 'backend'; text: string }
+  | { kind: 'syncingRecent' }
+  | { kind: 'backfilling'; days: number }
+  | { kind: 'alreadySyncing' }
+  | { kind: 'desktopOnly' }
+  | { kind: 'reauthNeeded' }
+  | { kind: 'verifyFirst' }
+  | { kind: 'connectFirst' }
+  | { kind: 'cancelling' }
+  | { kind: 'report'; outcome: SyncOutcome; failedStreams: string[]; latestAt?: string; backendMessage?: string };
 
 const appStatus = ref<AppStatus | null>(null);
 const statusError = ref<string | null>(null);
 const syncState = ref<SyncUiState>('idle');
-const syncMessage = ref('尚未同步');
+const notice = ref<SyncNotice>({ kind: 'none' });
 const syncReport = ref<SyncReport | null>(null);
 const syncProgress = ref<SyncProgress | null>(null);
 const loginStatus = ref<LoginStatus>({ state: 'idle', message: '', page_url: '' });
@@ -31,9 +117,9 @@ let autoSyncTickCount = 0;
 const unlisteners: Array<() => void> = [];
 
 const formatTime = (value?: string): string => {
-  if (!value) return '未知时间';
+  if (!value) return copy().timeUnknown;
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '未知时间';
+  if (Number.isNaN(date.getTime())) return copy().timeUnknown;
   return new Intl.DateTimeFormat(intlLocale(), {
     month: 'numeric',
     day: 'numeric',
@@ -53,27 +139,60 @@ const latestHeartRateAt = (report?: SyncReport | null): string | undefined =>
   report?.streams.find((stream) => stream.stream === 'heart_rate')?.newest_sample_at
   ?? appStatus.value?.streams.find((stream) => stream.stream === 'heart_rate')?.newest_sample_at;
 
-const messageForReport = (report: SyncReport): string => {
-  const failed = report.streams
-    .filter((stream) => ['failed', 'unavailable', 'unverified'].includes(stream.status))
-    .map((stream) => stream.stream);
-  const latest = latestHeartRateAt(report);
-  if (report.outcome === 'updated') return latest ? `已同步到新数据 · 最新心率 ${formatTime(latest)}` : '已同步到新数据';
-  if (report.outcome === 'no_new_data') return latest ? `云端暂无新数据 · 最新心率仍为 ${formatTime(latest)}` : '同步完成，云端暂无新数据';
-  if (report.outcome === 'partial') return failed.length ? `部分同步失败：${failed.join('、')}` : '同步已完成，但部分数据流失败';
-  if (report.outcome === 'cancelled') return '同步已取消';
-  if (report.outcome === 'deferred') {
-    return report.message ?? '正在重建本地派生数据，稍后自动重试同步';
+const renderReport = (
+  outcome: SyncOutcome,
+  failedStreams: string[],
+  latestAt?: string,
+  backendMessage?: string,
+): string => {
+  const t = copy();
+  const latest = latestAt ? formatTime(latestAt) : null;
+  if (outcome === 'updated') return latest ? t.updatedWithLatest(latest) : t.updated;
+  if (outcome === 'no_new_data') return latest ? t.noNewDataWithLatest(latest) : t.noNewData;
+  if (outcome === 'partial') {
+    return failedStreams.length ? t.partialWithStreams(failedStreams.join(t.streamSeparator)) : t.partial;
   }
-  return '同步失败，请检查连接后重试';
+  if (outcome === 'cancelled') return t.cancelled;
+  if (outcome === 'deferred') return backendMessage ?? t.deferred;
+  return t.failed;
 };
+
+const renderNotice = (value: SyncNotice): string => {
+  const t = copy();
+  switch (value.kind) {
+    case 'none': return t.notSyncedYet;
+    case 'backend': return value.text;
+    case 'syncingRecent': return t.syncingRecent;
+    case 'backfilling': return t.backfilling(value.days);
+    case 'alreadySyncing': return t.alreadySyncing;
+    case 'desktopOnly': return t.desktopOnly;
+    case 'reauthNeeded': return t.reauthNeeded;
+    case 'verifyFirst': return t.verifyFirst;
+    case 'connectFirst': return t.connectFirst;
+    case 'cancelling': return t.cancelling;
+    case 'report':
+      return renderReport(value.outcome, value.failedStreams, value.latestAt, value.backendMessage);
+  }
+};
+
+const syncMessage = computed(() => renderNotice(notice.value));
+
+const noticeForReport = (report: SyncReport): SyncNotice => ({
+  kind: 'report',
+  outcome: report.outcome,
+  failedStreams: report.streams
+    .filter((stream) => ['failed', 'unavailable', 'unverified'].includes(stream.status))
+    .map((stream) => stream.stream),
+  latestAt: latestHeartRateAt(report),
+  backendMessage: report.outcome === 'deferred' ? report.message ?? undefined : undefined,
+});
 
 const lastOutcomeLabel = computed(() => {
   const outcome = appStatus.value?.last_cloud_sync_outcome;
   if (!outcome) return null;
   const latest = latestHeartRateAt();
-  if (outcome === 'no_new_data' && latest) return `云端暂无新数据 · 最新心率仍为 ${formatTime(latest)}`;
-  return `上次云端同步 ${formatTime(appStatus.value?.last_cloud_sync_at)}`;
+  if (outcome === 'no_new_data' && latest) return copy().noNewDataWithLatest(formatTime(latest));
+  return copy().lastCloudSync(formatTime(appStatus.value?.last_cloud_sync_at));
 });
 
 const applyLoginStatus = (status: LoginStatus) => {
@@ -88,7 +207,7 @@ const refreshStatus = async (opts?: { preserveError?: boolean }): Promise<AppSta
     appStatus.value = await backend.getAppStatus();
     return appStatus.value;
   } catch (error) {
-    statusError.value = toUserMessage(error, '连接状态暂时不可用');
+    statusError.value = toUserMessage(error, copy().statusUnavailable);
     return null;
   }
 };
@@ -118,35 +237,39 @@ const runSync = (
 ): Promise<SyncReport | null> => {
   if (runningSync) {
     if (!opts?.silent) {
-      syncMessage.value = '已有同步进行中，请稍后再试';
+      notice.value = { kind: 'alreadySyncing' };
       return Promise.resolve(null);
     }
     return runningSync;
   }
   const promise = (async () => {
     if (!isDesktop()) {
-      statusError.value = '请使用桌面应用';
+      statusError.value = copy().desktopOnly;
       return null;
     }
     const status = appStatus.value ?? await refreshStatus();
     if (status?.connection_state === 'needs_reauth') {
       syncState.value = 'failed';
-      syncMessage.value = '认证已失效，请重新连接 Zepp';
+      notice.value = { kind: 'reauthNeeded' };
       return null;
     }
     if (mode === 'incremental' && status?.connection_state !== 'connected') {
       syncState.value = 'failed';
-      syncMessage.value = status?.connection_state === 'configured' ? '请先完成连接验证' : '请先连接 Zepp';
+      notice.value = status?.connection_state === 'configured'
+        ? { kind: 'verifyFirst' }
+        : { kind: 'connectFirst' };
       return null;
     }
     if (status?.connection_state === 'unconfigured') {
       syncState.value = 'failed';
-      syncMessage.value = '请先连接 Zepp';
+      notice.value = { kind: 'connectFirst' };
       return null;
     }
     syncState.value = 'syncing';
     syncProgress.value = null;
-    syncMessage.value = mode === 'incremental' ? '正在同步最近 7 天…' : `正在补拉最近 ${days ?? status?.history_sync_days ?? 30} 天…`;
+    notice.value = mode === 'incremental'
+      ? { kind: 'syncingRecent' }
+      : { kind: 'backfilling', days: days ?? status?.history_sync_days ?? 30 };
     statusError.value = null;
     try {
       const report = mode === 'incremental'
@@ -154,7 +277,7 @@ const runSync = (
         : await backend.startHistorySync(days ?? status?.history_sync_days ?? 30);
       syncReport.value = report;
       syncState.value = report.outcome;
-      syncMessage.value = messageForReport(report);
+      notice.value = noticeForReport(report);
       await refreshStatus();
       // A deferred sync wrote nothing, but the replay it stood aside for is
       // rewriting derived rows right now — so the screens still need to
@@ -164,7 +287,7 @@ const runSync = (
       return report;
     } catch (error) {
       syncState.value = 'failed';
-      syncMessage.value = toUserMessage(error, '云端同步未完成');
+      notice.value = { kind: 'backend', text: toUserMessage(error, copy().syncDidNotFinish) };
       statusError.value = syncMessage.value;
       await refreshStatus({ preserveError: true });
       return null;
@@ -183,9 +306,9 @@ const cancelSync = async () => {
   if (!isDesktop()) return;
   try {
     await backend.cancelSync();
-    syncMessage.value = '正在取消同步…';
+    notice.value = { kind: 'cancelling' };
   } catch (error) {
-    statusError.value = toUserMessage(error, '无法取消同步');
+    statusError.value = toUserMessage(error, copy().cancelFailed);
   }
 };
 
@@ -208,7 +331,7 @@ const initialize = async () => {
   if (isDesktop()) {
     const unlistenProgress = await backend.listen<SyncProgress>('sync://progress', (payload) => {
       syncProgress.value = payload;
-      syncMessage.value = payload.message;
+      notice.value = { kind: 'backend', text: payload.message };
     });
     if (typeof unlistenProgress === 'function') unlisteners.push(unlistenProgress);
     const unlistenTray = await backend.listen('tray://sync', () => {
@@ -272,7 +395,7 @@ export const useSyncController = () => ({
   appStatus: readonly(appStatus),
   statusError: readonly(statusError),
   syncState: readonly(syncState),
-  syncMessage: readonly(syncMessage),
+  syncMessage,
   syncReport: readonly(syncReport),
   syncProgress: readonly(syncProgress),
   loginStatus: readonly(loginStatus),
@@ -286,7 +409,7 @@ export const useSyncController = () => ({
   canIncrementalSync: computed(() => appStatus.value?.connection_state === 'connected'),
   lastCloudSyncLabel: computed(() => {
     const clock = formatClock(appStatus.value?.last_cloud_sync_at);
-    return clock ? `云端同步时间 ${clock}` : '云端同步时间 —';
+    return clock ? copy().cloudSyncClock(clock) : copy().cloudSyncClockUnknown;
   }),
   lastOutcomeLabel,
   initialize,

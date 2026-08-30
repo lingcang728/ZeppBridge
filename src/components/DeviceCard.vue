@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import DeviceVisual from './DeviceVisual.vue';
-import type { DeviceCardModel } from '../composables/useDevices';
+import { deviceStateLabel, type DeviceCardModel } from '../composables/useDevices';
 
 withDefaults(defineProps<{
   profile: DeviceCardModel;
@@ -21,7 +21,7 @@ withDefaults(defineProps<{
     <div class="device-card-copy">
       <strong>{{ profile.canonicalName }}</strong>
       <span class="device-display">{{ profile.displayName }}</span>
-      <span class="device-state"><i :class="['dot', profile.state === '最近有数据' ? 'has-data' : profile.state === '账号已识别' ? 'identified' : 'muted']"></i>{{ profile.state }}</span>
+      <span class="device-state"><i :class="['dot', profile.state === 'recent_data' ? 'has-data' : profile.state === 'account' ? 'identified' : 'muted']"></i>{{ deviceStateLabel(profile.state) }}</span>
       <span v-if="!compact" class="device-meta">固件 {{ profile.firmware }}<br />最近数据 {{ profile.lastData }}</span>
     </div>
   </article>
