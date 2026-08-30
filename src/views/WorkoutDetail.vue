@@ -20,7 +20,255 @@ import { formatPaceSeconds } from '../lib/metricSeries';
 import { workoutDisplayLabel, workoutDisplayType } from '../lib/workouts';
 import { deviceImageFor } from '../lib/deviceCatalog';
 import type { DeviceProfile, SportOption, Workout, WorkoutInsight, WorkoutSeries, WorkoutSeriesSample, WorkoutRoutePoint } from '../types';
-import { intlLocale } from '../i18n';
+import { defineMessages, intlLocale, useMessages } from '../i18n';
+
+const messages = defineMessages(
+  {
+    notProvided: '未提供',
+    backToRecent: '返回最近记录',
+    loadFailedTitle: '无法读取这条运动',
+    loadFailed: '训练数据包详情暂时不可用',
+    retry: '重试',
+    notFoundTitle: '找不到这条运动记录',
+    notFoundMessage: '它可能已被清理，或尚未同步到本机。',
+    insightFailed: '无法生成本次运动的洞察',
+    thisWorkout: '这次运动',
+    aiPrompt: (label: string) => `你是一位专业的运动分析师。下面是我一次${label}的完整记录（来自 ZeppBridge 本机数据库，已脱敏）。
+请只基于这条记录里的事实分析这次训练：强度、配速与心率的关系、是否有明显的掉速或异常段落，并给出下一次的具体建议。
+
+约束：
+- 这份数据里没有任何人群基准，不要拿我和「一般健康人群」或任何平均水平比较；
+- 缺失的项直接说缺失，不要用 0 或估算值填补；
+- 不做医学诊断、疾病风险判断或治疗建议。
+
+请以 Markdown 格式输出。`,
+    needDesktop: 'AI 交接需要桌面应用环境；当前网页预览不会打开外部网站。',
+    attachmentOpened: (provider: string) =>
+      `数据包已导出到桌面（zeppbridge-ai-handoff.json），拖入 ${provider} 即可；提示词已复制。`,
+    attachmentNotOpened: (provider: string) =>
+      `数据包已导出到桌面（zeppbridge-ai-handoff.json）；提示词已复制，可手动打开 ${provider}。`,
+    copiedAndOpened: (provider: string) => `已复制这条运动的脱敏数据并打开 ${provider}，粘贴即可。`,
+    copiedOnly: (provider: string) => `已复制这条运动的脱敏数据，可手动打开 ${provider} 粘贴。`,
+    noCorrection: '不纠正',
+    deviceNameMissing: '设备名称未提供',
+    notFetchedYet: '尚未获取',
+    timeUnknown: '时间未知',
+    overrideSaved: '已保存本地运动类型纠正。',
+    overrideCleared: '已清除纠正，恢复 ZeppBridge 识别结果。',
+    overrideFailed: '保存运动类型纠正失败',
+    copied: (format: string) => `已复制 ${format} 数据到剪贴板。`,
+    copyFailed: '复制这条记录失败',
+
+    metricDistance: '距离',
+    metricDuration: '运动时间',
+    metricAvgHr: '平均心率',
+    metricAvgPace: '平均配速',
+    metricAscent: '累计爬升',
+    metricTrainingLoad: '训练负荷',
+
+    statFastest: '最快',
+    statAverage: '平均',
+    statSlowest: '最慢',
+    statMin: '最小',
+    statMax: '最大',
+
+    chartHeart: '心率',
+    chartPace: '配速',
+    chartAltitude: '海拔',
+    chartCadence: '步频',
+    chartAria: (title: string) => `${title}曲线`,
+
+    decodedRoutePoints: 'GPS 轨迹点',
+    decodedSamples: '时序样本',
+    decodedPauses: '暂停区间',
+    decodedAvgCadence: '平均步频',
+    decodedMaxCadence: '最高步频',
+    decodedAvgStride: '平均步幅',
+    decodedDescent: '累计下降',
+    decodedMaxHr: '最大心率',
+    decodedAvgPower: '平均功率',
+    decodedMaxPower: '最大功率',
+    decodedGroundContact: '平均触地时间',
+    decodedVerticalOscillation: '平均垂直振幅',
+    decodedVerticalRatio: '垂直步幅比',
+    decodedBestEquivalentPace: '最佳等效配速',
+
+    heroAria: '训练概览',
+    decodedLocally: '本地已解码',
+    typeEvidenceAria: '运动类型判定',
+    zeppRawCode: (code: string) => `Zepp 原始编号：${code}`,
+    zeppBridgeMatch: (label: string) => `ZeppBridge 识别：${label}`,
+    customName: (code: string, name: string) => `你给编号 ${code} 起的名字：${name}`,
+    myCorrection: '我的纠正',
+    correctionAria: '我对这条运动类型的纠正',
+    metricListAria: '运动表现总结',
+
+    routeAria: 'GPS 全轨迹',
+    routeTitle: 'GPS 全轨迹',
+    routeNote: '本地画布 · 不请求地图瓦片',
+    routeSvgAria: '按时间与最近配速样本着色的本地 GPS 轨迹',
+    routeLegendPace: (count: number) => `有效配速 ${count} 点 · P10–P90`,
+    routeLegendNoPace: '有效配速不足 3 个 · 未按速度着色',
+    legendFast: '快',
+    legendSteady: '稳定',
+    legendWarm: '偏慢',
+    legendSlow: '慢',
+    routeEmptyTitle: '没有可用轨迹',
+    routeEmptyBody: '本次记录没有足够的 GPS 点，因此不画路线。',
+    chartsEmptyTitle: '暂无逐点曲线',
+    chartsEmptyBody: '本次未同步心率、配速、海拔或步频序列。',
+
+    decodedAria: '已解码参数',
+    decodedTitle: '已解码参数',
+    decodedNote: '摘要只从本条记录的有效样本计算，异常跳点会被忽略。',
+
+    exportAria: '导出与分享',
+    exportTitle: '导出与分享',
+    exportSub: '复制本地解码后的结构化数据，不访问地图服务。',
+    exportFormatAria: '导出格式',
+    exportGo: (format: string) => `复制 ${format} 数据`,
+
+    handoffAria: '交给 AI',
+    handoffTitle: '交给 AI',
+    handoffSub: '只把这一条运动的脱敏数据和提示词复制到剪贴板，并打开你选的 AI 网站。按天记录的睡眠、步数不在范围内。',
+    handoffTarget: '目标工具',
+    handoffTargetAria: '交给哪个 AI 工具',
+    preparing: '正在准备…',
+    handTo: (provider: string) => `交给 ${provider}`,
+
+    provenanceAria: '来源信息',
+    provenanceTitle: '来源信息',
+    provenanceProvider: '数据来源',
+    provenanceScope: '数据范围',
+    provenanceSynced: '最近同步',
+    provenanceRecordId: '记录 ID',
+    provenanceDevice: '设备',
+    pageFoot: '数据在本机解码；轨迹使用本地画布，不会发送给地图服务。',
+  },
+  {
+    notProvided: 'Not provided',
+    backToRecent: 'Back to recent records',
+    loadFailedTitle: 'Could not read this workout',
+    loadFailed: 'Workout detail is unavailable right now',
+    retry: 'Try again',
+    notFoundTitle: 'This workout is not here',
+    notFoundMessage: 'It may have been cleaned up, or it has not been synced to this machine yet.',
+    insightFailed: 'Could not build an insight for this workout',
+    thisWorkout: 'workout',
+    aiPrompt: (label: string) => `You are a sports analyst. Below is the complete record of one ${label} of mine, taken from the ZeppBridge local database and de-identified.
+Analyze this session using only the facts in this record: the intensity, how pace relates to heart rate, whether there is a clear slowdown or an anomalous stretch, and what specifically to do differently next time.
+
+Constraints:
+- There is no population baseline in this data. Do not compare me to "healthy adults" or to any average.
+- Where something is missing, say it is missing. Never fill the gap with a zero or an estimate.
+- No medical diagnosis, no disease-risk judgement, no treatment advice.
+
+Answer in Markdown.`,
+    needDesktop: 'The AI hand-off needs the desktop app; this browser preview will not open external sites.',
+    attachmentOpened: (provider: string) =>
+      `The data package was written to your desktop (zeppbridge-ai-handoff.json) — drag it into ${provider}. The prompt is on your clipboard.`,
+    attachmentNotOpened: (provider: string) =>
+      `The data package was written to your desktop (zeppbridge-ai-handoff.json). The prompt is on your clipboard; open ${provider} yourself.`,
+    copiedAndOpened: (provider: string) => `De-identified data for this workout copied and ${provider} opened. Paste it in.`,
+    copiedOnly: (provider: string) => `De-identified data for this workout copied. Open ${provider} yourself and paste it in.`,
+    noCorrection: 'No correction',
+    deviceNameMissing: 'Device name not provided',
+    notFetchedYet: 'Not fetched yet',
+    timeUnknown: 'Time unknown',
+    overrideSaved: 'Workout type correction saved locally.',
+    overrideCleared: "Correction cleared. Back to ZeppBridge's own match.",
+    overrideFailed: 'Could not save the workout type correction',
+    copied: (format: string) => `${format} data copied to the clipboard.`,
+    copyFailed: 'Could not copy this record',
+
+    metricDistance: 'Distance',
+    metricDuration: 'Moving time',
+    metricAvgHr: 'Avg heart rate',
+    metricAvgPace: 'Avg pace',
+    metricAscent: 'Ascent',
+    metricTrainingLoad: 'Training load',
+
+    statFastest: 'Fastest',
+    statAverage: 'Avg',
+    statSlowest: 'Slowest',
+    statMin: 'Min',
+    statMax: 'Max',
+
+    chartHeart: 'Heart rate',
+    chartPace: 'Pace',
+    chartAltitude: 'Altitude',
+    chartCadence: 'Cadence',
+    chartAria: (title: string) => `${title} over the session`,
+
+    decodedRoutePoints: 'GPS track points',
+    decodedSamples: 'Time series samples',
+    decodedPauses: 'Pause intervals',
+    decodedAvgCadence: 'Avg cadence',
+    decodedMaxCadence: 'Max cadence',
+    decodedAvgStride: 'Avg stride',
+    decodedDescent: 'Descent',
+    decodedMaxHr: 'Max heart rate',
+    decodedAvgPower: 'Avg power',
+    decodedMaxPower: 'Max power',
+    decodedGroundContact: 'Avg ground contact',
+    decodedVerticalOscillation: 'Avg vertical oscillation',
+    decodedVerticalRatio: 'Vertical ratio',
+    decodedBestEquivalentPace: 'Best equivalent pace',
+
+    heroAria: 'Workout overview',
+    decodedLocally: 'Decoded locally',
+    typeEvidenceAria: 'How the workout type was decided',
+    zeppRawCode: (code: string) => `Zepp raw code: ${code}`,
+    zeppBridgeMatch: (label: string) => `ZeppBridge reads it as: ${label}`,
+    customName: (code: string, name: string) => `Your name for code ${code}: ${name}`,
+    myCorrection: 'My correction',
+    correctionAria: 'My correction for this workout type',
+    metricListAria: 'Workout performance summary',
+
+    routeAria: 'Full GPS track',
+    routeTitle: 'Full GPS track',
+    routeNote: 'Drawn locally · no map tiles requested',
+    routeSvgAria: 'Local GPS track colored by time and the nearest pace sample',
+    routeLegendPace: (count: number) => `${count} valid pace points · P10–P90`,
+    routeLegendNoPace: 'Fewer than 3 valid pace points · not colored by speed',
+    legendFast: 'Fast',
+    legendSteady: 'Steady',
+    legendWarm: 'Slower',
+    legendSlow: 'Slow',
+    routeEmptyTitle: 'No usable track',
+    routeEmptyBody: 'This record does not carry enough GPS points, so no route is drawn.',
+    chartsEmptyTitle: 'No per-point curves',
+    chartsEmptyBody: 'No heart rate, pace, altitude or cadence series was synced for this session.',
+
+    decodedAria: 'Decoded values',
+    decodedTitle: 'Decoded values',
+    decodedNote: 'The summary is computed only from valid samples in this record; anomalous jumps are ignored.',
+
+    exportAria: 'Export and share',
+    exportTitle: 'Export and share',
+    exportSub: 'Copy the locally decoded structured data. No map service is contacted.',
+    exportFormatAria: 'Export format',
+    exportGo: (format: string) => `Copy ${format} data`,
+
+    handoffAria: 'Hand to AI',
+    handoffTitle: 'Hand to AI',
+    handoffSub: 'Copies the de-identified data for this one workout, plus the prompt, and opens the AI site you pick. Day-level streams such as sleep and steps stay out.',
+    handoffTarget: 'Target tool',
+    handoffTargetAria: 'Which AI tool to hand it to',
+    preparing: 'Preparing…',
+    handTo: (provider: string) => `Hand to ${provider}`,
+
+    provenanceAria: 'Provenance',
+    provenanceTitle: 'Provenance',
+    provenanceProvider: 'Provider',
+    provenanceScope: 'Scope',
+    provenanceSynced: 'Last synced',
+    provenanceRecordId: 'Record ID',
+    provenanceDevice: 'Device',
+    pageFoot: 'Decoded on this machine. The track is drawn on a local canvas and never sent to a map service.',
+  },
+);
+const t = useMessages(messages);
 
 type WorkoutMetrics = Workout & {
   pace?: number | string | null;
@@ -76,7 +324,7 @@ const loadInsight = async (id: string) => {
     insight.value = await tauriApi.getWorkoutInsight(id);
   } catch (error) {
     insight.value = null;
-    insightError.value = toUserMessage(error, '无法生成本次运动的洞察');
+    insightError.value = toUserMessage(error, t.value.insightFailed);
   } finally {
     insightLoading.value = false;
   }
@@ -93,23 +341,15 @@ const aiProviderChoices = computed(() =>
 const aiNote = ref<string | null>(null);
 
 const workoutAiPrompt = computed(() => {
-  const label = workout.value ? workoutDisplayLabel(workout.value) : '这次运动';
-  return `你是一位专业的运动分析师。下面是我一次${label}的完整记录（来自 ZeppBridge 本机数据库，已脱敏）。
-请只基于这条记录里的事实分析这次训练：强度、配速与心率的关系、是否有明显的掉速或异常段落，并给出下一次的具体建议。
-
-约束：
-- 这份数据里没有任何人群基准，不要拿我和「一般健康人群」或任何平均水平比较；
-- 缺失的项直接说缺失，不要用 0 或估算值填补；
-- 不做医学诊断、疾病风险判断或治疗建议。
-
-请以 Markdown 格式输出。`;
+  const label = workout.value ? workoutDisplayLabel(workout.value) : t.value.thisWorkout;
+  return t.value.aiPrompt(label);
 });
 
 const sendWorkoutToAi = async () => {
   aiNote.value = null;
   if (!workout.value) return;
   if (!isTauri()) {
-    aiNote.value = 'AI 交接需要桌面应用环境；当前网页预览不会打开外部网站。';
+    aiNote.value = t.value.needDesktop;
     return;
   }
   try {
@@ -126,12 +366,12 @@ const sendWorkoutToAi = async () => {
     const opened = handoffState.value !== 'copied_only';
     if (result.mode === 'attachment') {
       aiNote.value = opened
-        ? `数据包已导出到桌面（zeppbridge-ai-handoff.json），拖入 ${aiProvider.value.label} 即可；提示词已复制。`
-        : `数据包已导出到桌面（zeppbridge-ai-handoff.json）；提示词已复制，可手动打开 ${aiProvider.value.label}。`;
+        ? t.value.attachmentOpened(aiProvider.value.label)
+        : t.value.attachmentNotOpened(aiProvider.value.label);
     } else {
       aiNote.value = opened
-        ? `已复制这条运动的脱敏数据并打开 ${aiProvider.value.label}，粘贴即可。`
-        : `已复制这条运动的脱敏数据，可手动打开 ${aiProvider.value.label} 粘贴。`;
+        ? t.value.copiedAndOpened(aiProvider.value.label)
+        : t.value.copiedOnly(aiProvider.value.label);
     }
   } catch {
     // 错误从 handoffError 渲染
@@ -146,8 +386,9 @@ const typeOverrideBusy = ref(false);
    所以这里和后端的允许值天然一致。 */
 const typeOverrideOptions = ref<SportOption[]>([]);
 const typeOverrideChoices = computed(() => [
-  { value: '', label: '不纠正' },
-  ...typeOverrideOptions.value.map((option) => ({ value: option.key, label: option.label })),
+  { value: '', label: t.value.noCorrection },
+  // 后端发来的 label 是中文（那份列表也给 CLI 用），界面按 key 自己查名字。
+  ...typeOverrideOptions.value.map((option) => ({ value: option.key, label: workoutLabel(option.key) })),
 ]);
 
 const durationMinutes = computed(() => {
@@ -160,7 +401,7 @@ const durationMinutes = computed(() => {
 });
 
 const formatClock = (minutes?: number | null): string => {
-  if (!isFiniteNumber(minutes) || minutes < 0) return '未提供';
+  if (!isFiniteNumber(minutes) || minutes < 0) return t.value.notProvided;
   const totalSeconds = Math.round(minutes * 60);
   const hours = Math.floor(totalSeconds / 3600);
   const mins = Math.floor((totalSeconds % 3600) / 60);
@@ -170,33 +411,33 @@ const formatClock = (minutes?: number | null): string => {
 };
 
 const paceClock = (minutes?: number | null): string => {
-  if (!isFiniteNumber(minutes) || minutes <= 0) return '未提供';
+  if (!isFiniteNumber(minutes) || minutes <= 0) return t.value.notProvided;
   const totalSeconds = Math.round(minutes * 60);
   return `${Math.floor(totalSeconds / 60)}'${String(totalSeconds % 60).padStart(2, '0')}"`;
 };
 
 const paceText = (minutes?: number | null): string => {
   const clock = paceClock(minutes);
-  return clock === '未提供' ? clock : `${clock} /km`;
+  return clock === t.value.notProvided ? clock : `${clock} /km`;
 };
 
-const distanceLabel = computed(() => formatDistance(workout.value?.distance_meters, '未提供'));
+const distanceLabel = computed(() => formatDistance(workout.value?.distance_meters, t.value.notProvided));
 const rawPace = computed(() => workout.value?.pace);
 const paceLabel = computed(() => {
   if (typeof rawPace.value === 'string' && rawPace.value.trim()) return rawPace.value.trim();
   if (isFiniteNumber(rawPace.value)) return paceText(rawPace.value);
-  return '未提供';
+  return t.value.notProvided;
 });
 
 const numberValue = (value: unknown, digits = 0): string => isFiniteNumber(value)
   ? value.toLocaleString(intlLocale(), { minimumFractionDigits: digits, maximumFractionDigits: digits })
-  : '未提供';
+  : t.value.notProvided;
 
 const workoutArt = computed<DesignIconName>(() => {
   const raw = `${displayType.value} ${workoutLabel(displayType.value)}`.toLowerCase();
   return /cycle|cycling|bike|骑/.test(raw) ? 'outdoor-cycling' : 'outdoor-run';
 });
-const deviceName = computed(() => device.value.canonical_name || device.value.name || '设备名称未提供');
+const deviceName = computed(() => device.value.canonical_name || device.value.name || t.value.deviceNameMissing);
 /* 这张图必须跟着这条记录**实际**是哪台表走。
    以前这里硬写死了一张 T-Rex 3：戴 Balance 的人打开自己的记录，看到的是别人的表。 */
 const deviceImage = computed(() => deviceImageFor(device.value.kind, device.value.image_key));
@@ -206,15 +447,15 @@ const heroMetrics = computed(() => {
   const item = workout.value;
   if (!item) return [];
   const summary = series.value?.summary;
-  const resolvedPace = paceLabel.value !== '未提供' ? paceLabel.value : paceText(summary?.average_pace);
+  const resolvedPace = paceLabel.value !== t.value.notProvided ? paceLabel.value : paceText(summary?.average_pace);
   return [
-    { label: '距离', value: distanceLabel.value, tone: 'distance', icon: 'outdoor-run' as DesignIconName },
-    { label: '运动时间', value: formatClock(durationMinutes.value), tone: 'training', icon: 'auto-sync' as DesignIconName },
-    { label: '平均心率', value: numberValue(item.avg_hr), unit: isFiniteNumber(item.avg_hr) ? 'bpm' : undefined, tone: 'heart', icon: 'heart-rate' as DesignIconName },
-    { label: '平均配速', value: resolvedPace, tone: 'pace', icon: 'body-activity' as DesignIconName },
-    { label: '累计爬升', value: isFiniteNumber(summary?.elevation_gain_m) ? numberValue(summary?.elevation_gain_m) : '未提供', unit: isFiniteNumber(summary?.elevation_gain_m) ? 'm' : undefined, tone: 'altitude', icon: 'health-watch' as DesignIconName },
+    { label: t.value.metricDistance, value: distanceLabel.value, tone: 'distance', icon: 'outdoor-run' as DesignIconName },
+    { label: t.value.metricDuration, value: formatClock(durationMinutes.value), tone: 'training', icon: 'auto-sync' as DesignIconName },
+    { label: t.value.metricAvgHr, value: numberValue(item.avg_hr), unit: isFiniteNumber(item.avg_hr) ? 'bpm' : undefined, tone: 'heart', icon: 'heart-rate' as DesignIconName },
+    { label: t.value.metricAvgPace, value: resolvedPace, tone: 'pace', icon: 'body-activity' as DesignIconName },
+    { label: t.value.metricAscent, value: isFiniteNumber(summary?.elevation_gain_m) ? numberValue(summary?.elevation_gain_m) : t.value.notProvided, unit: isFiniteNumber(summary?.elevation_gain_m) ? 'm' : undefined, tone: 'altitude', icon: 'health-watch' as DesignIconName },
     { label: 'VO₂ Max', value: numberValue(item.vo2max), tone: 'vo2', icon: 'vo2-max' as DesignIconName },
-    { label: '训练负荷', value: numberValue(item.training_load), tone: 'training', icon: 'training-load' as DesignIconName },
+    { label: t.value.metricTrainingLoad, value: numberValue(item.training_load), tone: 'training', icon: 'training-load' as DesignIconName },
   ];
 });
 
@@ -504,22 +745,22 @@ const statSummary = (points: { v: number }[], mode: 'heart' | 'pace' | 'normal' 
   const min = Math.min(...values);
   const max = Math.max(...values);
   if (mode === 'pace') return [
-    { label: '最快', value: paceClock(min) },
-    { label: '平均', value: paceClock(avg) },
-    { label: '最慢', value: paceClock(max) },
+    { label: t.value.statFastest, value: paceClock(min) },
+    { label: t.value.statAverage, value: paceClock(avg) },
+    { label: t.value.statSlowest, value: paceClock(max) },
   ];
   return [
-    { label: '最小', value: numberValue(min, 0) },
-    { label: '平均', value: numberValue(avg, 0) },
-    { label: '最大', value: numberValue(max, 0) },
+    { label: t.value.statMin, value: numberValue(min, 0) },
+    { label: t.value.statAverage, value: numberValue(avg, 0) },
+    { label: t.value.statMax, value: numberValue(max, 0) },
   ];
 };
 
 const chartCards = computed(() => [
-  { key: 'heart', title: '心率', unit: 'bpm', option: heartOption.value, stats: statSummary(heartPoints.value, 'heart'), icon: 'heart-rate' as DesignIconName, tone: 'heart' },
-  { key: 'pace', title: '配速', unit: 'min/km', option: paceOption.value, stats: statSummary(pacePoints.value, 'pace'), icon: 'body-activity' as DesignIconName, tone: 'pace' },
-  { key: 'altitude', title: '海拔', unit: 'm', option: altitudeOption.value, stats: statSummary(altitudePoints.value), icon: 'health-watch' as DesignIconName, tone: 'altitude' },
-  { key: 'cadence', title: '步频', unit: 'spm', option: cadenceOption.value, stats: statSummary(cadencePoints.value), icon: 'steps' as DesignIconName, tone: 'cadence' },
+  { key: 'heart', title: t.value.chartHeart, unit: 'bpm', option: heartOption.value, stats: statSummary(heartPoints.value, 'heart'), icon: 'heart-rate' as DesignIconName, tone: 'heart' },
+  { key: 'pace', title: t.value.chartPace, unit: 'min/km', option: paceOption.value, stats: statSummary(pacePoints.value, 'pace'), icon: 'body-activity' as DesignIconName, tone: 'pace' },
+  { key: 'altitude', title: t.value.chartAltitude, unit: 'm', option: altitudeOption.value, stats: statSummary(altitudePoints.value), icon: 'health-watch' as DesignIconName, tone: 'altitude' },
+  { key: 'cadence', title: t.value.chartCadence, unit: 'spm', option: cadenceOption.value, stats: statSummary(cadencePoints.value), icon: 'steps' as DesignIconName, tone: 'cadence' },
 ].filter((card): card is typeof card & { option: NonNullable<typeof card.option> } => card.option !== null));
 
 const decodedMetrics = computed(() => {
@@ -528,30 +769,30 @@ const decodedMetrics = computed(() => {
   if (!item || !detail) return [];
   const summary = detail.summary;
   return [
-    { label: 'GPS 轨迹点', value: detail.route.length ? numberValue(detail.route.length) : '未提供', icon: 'outdoor-run' as DesignIconName },
-    { label: '时序样本', value: detail.samples.length ? numberValue(detail.samples.length) : '未提供', icon: 'structured-data' as DesignIconName },
-    { label: '暂停区间', value: detail.pauses.length ? numberValue(detail.pauses.length) : '未提供', icon: 'auto-sync' as DesignIconName },
-    { label: '平均步频', value: isFiniteNumber(summary.average_cadence) ? `${numberValue(summary.average_cadence)} spm` : '未提供', icon: 'steps' as DesignIconName },
-    { label: '最高步频', value: isFiniteNumber(summary.max_cadence) ? `${numberValue(summary.max_cadence)} spm` : '未提供', icon: 'training-load' as DesignIconName },
-    { label: '平均步幅', value: isFiniteNumber(summary.average_stride_cm) ? `${numberValue(summary.average_stride_cm)} cm` : '未提供', icon: 'body-activity' as DesignIconName },
-    { label: '累计下降', value: isFiniteNumber(summary.elevation_loss_m) ? `${numberValue(summary.elevation_loss_m)} m` : '未提供', icon: 'health-watch' as DesignIconName },
-    { label: '最大心率', value: isFiniteNumber(item.max_hr) ? `${numberValue(item.max_hr)} bpm` : '未提供', icon: 'resting-heart-rate' as DesignIconName },
+    { label: t.value.decodedRoutePoints, value: detail.route.length ? numberValue(detail.route.length) : t.value.notProvided, icon: 'outdoor-run' as DesignIconName },
+    { label: t.value.decodedSamples, value: detail.samples.length ? numberValue(detail.samples.length) : t.value.notProvided, icon: 'structured-data' as DesignIconName },
+    { label: t.value.decodedPauses, value: detail.pauses.length ? numberValue(detail.pauses.length) : t.value.notProvided, icon: 'auto-sync' as DesignIconName },
+    { label: t.value.decodedAvgCadence, value: isFiniteNumber(summary.average_cadence) ? `${numberValue(summary.average_cadence)} spm` : t.value.notProvided, icon: 'steps' as DesignIconName },
+    { label: t.value.decodedMaxCadence, value: isFiniteNumber(summary.max_cadence) ? `${numberValue(summary.max_cadence)} spm` : t.value.notProvided, icon: 'training-load' as DesignIconName },
+    { label: t.value.decodedAvgStride, value: isFiniteNumber(summary.average_stride_cm) ? `${numberValue(summary.average_stride_cm)} cm` : t.value.notProvided, icon: 'body-activity' as DesignIconName },
+    { label: t.value.decodedDescent, value: isFiniteNumber(summary.elevation_loss_m) ? `${numberValue(summary.elevation_loss_m)} m` : t.value.notProvided, icon: 'health-watch' as DesignIconName },
+    { label: t.value.decodedMaxHr, value: isFiniteNumber(item.max_hr) ? `${numberValue(item.max_hr)} bpm` : t.value.notProvided, icon: 'resting-heart-rate' as DesignIconName },
     // Running power and form only exist on watches that measure them, and only
-    // for running; every one of these reads `未提供` rather than 0 elsewhere.
-    { label: '平均功率', value: isFiniteNumber(summary.average_power_watts) ? `${numberValue(summary.average_power_watts)} W` : '未提供', icon: 'training-load' as DesignIconName },
-    { label: '最大功率', value: isFiniteNumber(summary.max_power_watts) ? `${numberValue(summary.max_power_watts)} W` : '未提供', icon: 'training-load' as DesignIconName },
-    { label: '平均触地时间', value: isFiniteNumber(summary.average_ground_contact_ms) ? `${numberValue(summary.average_ground_contact_ms)} ms` : '未提供', icon: 'body-activity' as DesignIconName },
-    { label: '平均垂直振幅', value: isFiniteNumber(summary.average_vertical_oscillation_mm) ? `${(summary.average_vertical_oscillation_mm / 10).toFixed(1)} cm` : '未提供', icon: 'body-activity' as DesignIconName },
-    { label: '垂直步幅比', value: isFiniteNumber(summary.average_vertical_ratio_pct) ? `${summary.average_vertical_ratio_pct.toFixed(1)} %` : '未提供', icon: 'body-activity' as DesignIconName },
-    { label: '最佳等效配速', value: isFiniteNumber(summary.best_equivalent_pace_s_per_km) ? `${formatPaceSeconds(summary.best_equivalent_pace_s_per_km)} /km` : '未提供', icon: 'outdoor-run' as DesignIconName },
+    // for running; every one of these reads "not provided" rather than 0.
+    { label: t.value.decodedAvgPower, value: isFiniteNumber(summary.average_power_watts) ? `${numberValue(summary.average_power_watts)} W` : t.value.notProvided, icon: 'training-load' as DesignIconName },
+    { label: t.value.decodedMaxPower, value: isFiniteNumber(summary.max_power_watts) ? `${numberValue(summary.max_power_watts)} W` : t.value.notProvided, icon: 'training-load' as DesignIconName },
+    { label: t.value.decodedGroundContact, value: isFiniteNumber(summary.average_ground_contact_ms) ? `${numberValue(summary.average_ground_contact_ms)} ms` : t.value.notProvided, icon: 'body-activity' as DesignIconName },
+    { label: t.value.decodedVerticalOscillation, value: isFiniteNumber(summary.average_vertical_oscillation_mm) ? `${(summary.average_vertical_oscillation_mm / 10).toFixed(1)} cm` : t.value.notProvided, icon: 'body-activity' as DesignIconName },
+    { label: t.value.decodedVerticalRatio, value: isFiniteNumber(summary.average_vertical_ratio_pct) ? `${summary.average_vertical_ratio_pct.toFixed(1)} %` : t.value.notProvided, icon: 'body-activity' as DesignIconName },
+    { label: t.value.decodedBestEquivalentPace, value: isFiniteNumber(summary.best_equivalent_pace_s_per_km) ? `${formatPaceSeconds(summary.best_equivalent_pace_s_per_km)} /km` : t.value.notProvided, icon: 'outdoor-run' as DesignIconName },
   ];
 });
 
 const syncBadge = computed(() => {
   const raw = appStatus.value?.last_cloud_sync_at;
-  if (!raw) return '尚未获取';
+  if (!raw) return t.value.notFetchedYet;
   const date = new Date(raw);
-  return Number.isNaN(date.getTime()) ? '时间未知' : new Intl.DateTimeFormat(intlLocale(), { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(date).replace(/\//g, '-');
+  return Number.isNaN(date.getTime()) ? t.value.timeUnknown : new Intl.DateTimeFormat(intlLocale(), { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(date).replace(/\//g, '-');
 });
 
 let detailSeq = 0;
@@ -575,7 +816,7 @@ const loadDetail = async () => {
     series.value = detail ? workoutSeries : null;
     device.value = profile;
   } catch (cause) {
-    if (seq === detailSeq) error.value = toUserMessage(cause, '训练数据包详情暂时不可用');
+    if (seq === detailSeq) error.value = toUserMessage(cause, t.value.loadFailed);
   } finally {
     if (seq === detailSeq) loading.value = false;
   }
@@ -589,9 +830,9 @@ const changeWorkoutOverride = async (value: string | number) => {
   try {
     const updated = await tauriApi.setWorkoutTypeOverride(workout.value.workout_id, next || null);
     workout.value = updated as WorkoutMetrics;
-    exportedNote.value = next ? '已保存本地运动类型纠正。' : '已清除纠正，恢复 ZeppBridge 识别结果。';
+    exportedNote.value = next ? t.value.overrideSaved : t.value.overrideCleared;
   } catch (cause) {
-    actionError.value = toUserMessage(cause, '保存运动类型纠正失败');
+    actionError.value = toUserMessage(cause, t.value.overrideFailed);
   } finally {
     typeOverrideBusy.value = false;
   }
@@ -613,8 +854,8 @@ const exportRecord = async () => {
       ? JSON.stringify({ workout: workout.value, series: series.value }, null, 2)
       : activeFormat.value === 'csv' ? csv() : gpx();
     await navigator.clipboard.writeText(payload);
-    exportedNote.value = `已复制 ${activeFormat.value.toUpperCase()} 数据到剪贴板。`;
-  } catch { actionError.value = '复制这条记录失败'; }
+    exportedNote.value = t.value.copied(activeFormat.value.toUpperCase());
+  } catch { actionError.value = t.value.copyFailed; }
 };
 
 onMounted(() => {
@@ -632,22 +873,22 @@ watch([dataRevision, workoutId], () => void loadDetail());
 <template>
   <section class="page workout-page" aria-labelledby="workout-detail-title">
     <div class="page-toolbar">
-      <RouterLink class="back-link" to="/recent"><Icon name="arrow-left" :size="14" />返回最近记录</RouterLink>
+      <RouterLink class="back-link" to="/recent"><Icon name="arrow-left" :size="14" />{{ t.backToRecent }}</RouterLink>
     </div>
 
     <div v-if="loading" class="detail-loading" aria-live="polite"><SkeletonBlock height="118px" /><SkeletonBlock height="280px" /></div>
-    <EmptyState v-else-if="error" tone="error" icon="warning" title="无法读取这条运动" :message="error"><button class="button button-secondary" type="button" @click="loadDetail">重试</button></EmptyState>
-    <EmptyState v-else-if="!workout" icon="steps" title="找不到这条运动记录" message="它可能已被清理，或尚未同步到本机。" />
+    <EmptyState v-else-if="error" tone="error" icon="warning" :title="t.loadFailedTitle" :message="error"><button class="button button-secondary" type="button" @click="loadDetail">{{ t.retry }}</button></EmptyState>
+    <EmptyState v-else-if="!workout" icon="steps" :title="t.notFoundTitle" :message="t.notFoundMessage" />
 
     <template v-else>
-      <section class="workout-hero" aria-label="训练概览">
+      <section class="workout-hero" :aria-label="t.heroAria">
         <div class="hero-copy">
           <div class="hero-device">
             <DeviceVisual :src="deviceImage" :alt="deviceName" :kind="deviceKind" />
             <span class="device-live"><i></i>{{ deviceName }}</span>
           </div>
           <div class="hero-title-group">
-            <span class="source-chip"><DesignIcon name="verified" :size="20" />本地已解码 · {{ dataScopeLabel(workout.source_scope) }}</span>
+            <span class="source-chip"><DesignIcon name="verified" :size="20" />{{ t.decodedLocally }} · {{ dataScopeLabel(workout.source_scope) }}</span>
             <div class="sport-line">
               <DesignIcon :name="workoutArt" :size="64" />
               <div>
@@ -656,18 +897,18 @@ watch([dataRevision, workoutId], () => void loadDetail());
               </div>
             </div>
             <p class="sport-time"><Icon name="clock" :size="14" />{{ formatDate(workout.start_time, 'short') }} {{ formatTime(workout.start_time) }} · {{ formatClock(durationMinutes) }}</p>
-            <div class="type-evidence" aria-label="运动类型判定">
-              <span>Zepp 原始编号：{{ workout.zepp_type ?? '未提供' }}</span>
-              <span>ZeppBridge 识别：{{ workoutLabel(workout.normalized_type) }}</span>
-              <span v-if="workout.custom_label">你给编号 {{ workout.zepp_type }} 起的名字：{{ workout.custom_label }}</span>
+            <div class="type-evidence" :aria-label="t.typeEvidenceAria">
+              <span>{{ t.zeppRawCode(workout.zepp_type === undefined || workout.zepp_type === null ? t.notProvided : String(workout.zepp_type)) }}</span>
+              <span>{{ t.zeppBridgeMatch(workoutLabel(workout.normalized_type)) }}</span>
+              <span v-if="workout.custom_label">{{ t.customName(String(workout.zepp_type), workout.custom_label) }}</span>
               <span class="type-correct">
-                我的纠正
+                {{ t.myCorrection }}
                 <SelectMenu
                   class="type-correct-menu"
                   :model-value="workout.user_override || ''"
                   :options="typeOverrideChoices"
                   :disabled="typeOverrideBusy"
-                  aria-label="我对这条运动类型的纠正"
+                  :aria-label="t.correctionAria"
                   @update:model-value="changeWorkoutOverride"
                 />
               </span>
@@ -676,7 +917,7 @@ watch([dataRevision, workoutId], () => void loadDetail());
         </div>
         <div class="hero-signal" aria-hidden="true"><DesignIcon name="health-watch" :size="124" /></div>
 
-        <div class="metric-list" aria-label="运动表现总结">
+        <div class="metric-list" :aria-label="t.metricListAria">
           <div v-for="metric in heroMetrics" :key="metric.label" :class="['metric-tile', `tone-${metric.tone}`]">
             <DesignIcon :name="metric.icon" :size="36" />
             <div><p class="metric-label">{{ metric.label }}</p><p class="metric-value"><strong>{{ metric.value }}</strong><span v-if="metric.unit">{{ metric.unit }}</span></p></div>
@@ -696,15 +937,15 @@ watch([dataRevision, workoutId], () => void loadDetail());
 
       <div class="lower">
         <div class="main-col">
-          <section class="surface-card series-card" aria-label="GPS 全轨迹">
+          <section class="surface-card series-card" :aria-label="t.routeAria">
             <div class="section-head">
               <span class="section-icon route-tone"><DesignIcon name="outdoor-run" :size="34" /></span>
-              <div><p class="section-eyebrow">ROUTE</p><h2>GPS 全轨迹</h2></div>
-              <span class="route-note">本地画布 · 不请求地图瓦片</span>
+              <div><p class="section-eyebrow">ROUTE</p><h2>{{ t.routeTitle }}</h2></div>
+              <span class="route-note">{{ t.routeNote }}</span>
             </div>
             <div v-if="routeCanvas" class="route-wrap">
               <div class="route-canvas-texture" aria-hidden="true"></div>
-              <svg class="route-svg" :viewBox="routeCanvas.viewBox" preserveAspectRatio="xMidYMid meet" role="img" aria-label="按时间与最近配速样本着色的本地 GPS 轨迹">
+              <svg class="route-svg" :viewBox="routeCanvas.viewBox" preserveAspectRatio="xMidYMid meet" role="img" :aria-label="t.routeSvgAria">
                 <path v-for="(road, index) in routeCanvas.ghosts" :key="`ghost-${index}`" class="ghost-road" :d="road.d" fill="none" :stroke-opacity="road.opacity" />
                 <path class="route-glow" :d="routeCanvas.glow" fill="none" />
                 <path v-for="(segment, index) in routeCanvas.segments" :key="`${segment.d}-${index}`" :d="segment.d" fill="none" :stroke="segment.color" stroke-width="5.2" stroke-linecap="round" stroke-linejoin="round" />
@@ -716,9 +957,9 @@ watch([dataRevision, workoutId], () => void loadDetail());
                   <path d="M-2-2.6 V2.6 M2-2.6 V2.6" />
                 </g>
               </svg>
-              <div class="route-legend"><span><i class="neutral-dot"></i>{{ routeCanvas.enoughPace ? `有效配速 ${routeCanvas.validPaceCount} 点 · P10–P90` : '有效配速不足 3 个 · 未按速度着色' }}</span><template v-if="routeCanvas.enoughPace"><span><i class="fast-dot"></i>快</span><span><i class="steady-dot"></i>稳定</span><span><i class="warm-dot"></i>偏慢</span><span><i class="slow-dot"></i>慢</span></template></div>
+              <div class="route-legend"><span><i class="neutral-dot"></i>{{ routeCanvas.enoughPace ? t.routeLegendPace(routeCanvas.validPaceCount) : t.routeLegendNoPace }}</span><template v-if="routeCanvas.enoughPace"><span><i class="fast-dot"></i>{{ t.legendFast }}</span><span><i class="steady-dot"></i>{{ t.legendSteady }}</span><span><i class="warm-dot"></i>{{ t.legendWarm }}</span><span><i class="slow-dot"></i>{{ t.legendSlow }}</span></template></div>
             </div>
-            <div v-else class="route-empty"><DesignIcon name="outdoor-run" :size="58" /><strong>没有可用轨迹</strong><p>本次记录没有足够的 GPS 点，因此不画路线。</p></div>
+            <div v-else class="route-empty"><DesignIcon name="outdoor-run" :size="58" /><strong>{{ t.routeEmptyTitle }}</strong><p>{{ t.routeEmptyBody }}</p></div>
           </section>
 
           <div class="chart-grid">
@@ -730,55 +971,55 @@ watch([dataRevision, workoutId], () => void loadDetail());
                   <li v-for="stat in card.stats" :key="stat.label"><em>{{ stat.label }}</em><strong>{{ stat.value }}</strong></li>
                 </ul>
               </div>
-              <VChart class="series-chart" :option="card.option" autoresize role="img" :aria-label="`${card.title}曲线`" />
+              <VChart class="series-chart" :option="card.option" autoresize role="img" :aria-label="t.chartAria(card.title)" />
             </section>
           </div>
-          <section v-if="!chartCards.length" class="surface-card chart-empty"><DesignIcon name="structured-data" :size="42" /><div><strong>暂无逐点曲线</strong><p>本次未同步心率、配速、海拔或步频序列。</p></div></section>
+          <section v-if="!chartCards.length" class="surface-card chart-empty"><DesignIcon name="structured-data" :size="42" /><div><strong>{{ t.chartsEmptyTitle }}</strong><p>{{ t.chartsEmptyBody }}</p></div></section>
         </div>
 
         <div class="side-col">
-          <section class="surface-card side-card decoded-card" aria-label="已解码参数">
-            <div class="section-head compact"><span class="section-icon data-tone"><DesignIcon name="structured-data" :size="32" /></span><div><p class="section-eyebrow">DECODED</p><h2>已解码参数</h2></div></div>
+          <section class="surface-card side-card decoded-card" :aria-label="t.decodedAria">
+            <div class="section-head compact"><span class="section-icon data-tone"><DesignIcon name="structured-data" :size="32" /></span><div><p class="section-eyebrow">DECODED</p><h2>{{ t.decodedTitle }}</h2></div></div>
             <div class="decoded-list">
               <div v-for="metric in decodedMetrics" :key="metric.label"><DesignIcon :name="metric.icon" :size="29" /><span>{{ metric.label }}</span><strong>{{ metric.value }}</strong></div>
             </div>
-            <p class="mapping-note"><DesignIcon name="verified" :size="20" />摘要只从本条记录的有效样本计算，异常跳点会被忽略。</p>
+            <p class="mapping-note"><DesignIcon name="verified" :size="20" />{{ t.decodedNote }}</p>
           </section>
 
-          <section class="surface-card side-card" aria-label="导出与分享">
-            <div class="section-head compact"><span class="section-icon export-tone"><DesignIcon name="document" :size="32" /></span><div><p class="section-eyebrow">EXPORT</p><h2>导出与分享</h2></div></div>
-            <p class="card-sub">复制本地解码后的结构化数据，不访问地图服务。</p>
-            <div class="format-row" role="radiogroup" aria-label="导出格式"><button v-for="format in (['json', 'csv', 'gpx'] as const)" :key="format" type="button" role="radio" :aria-checked="activeFormat === format" :class="['format-pill', { 'is-on': activeFormat === format }]" @click="activeFormat = format">{{ format === 'gpx' ? 'GPX' : format.toUpperCase() }}</button></div>
-            <button class="export-go" type="button" @click="exportRecord"><DesignIcon name="cloud-output" :size="27" />复制 {{ activeFormat.toUpperCase() }} 数据</button>
+          <section class="surface-card side-card" :aria-label="t.exportAria">
+            <div class="section-head compact"><span class="section-icon export-tone"><DesignIcon name="document" :size="32" /></span><div><p class="section-eyebrow">EXPORT</p><h2>{{ t.exportTitle }}</h2></div></div>
+            <p class="card-sub">{{ t.exportSub }}</p>
+            <div class="format-row" role="radiogroup" :aria-label="t.exportFormatAria"><button v-for="format in (['json', 'csv', 'gpx'] as const)" :key="format" type="button" role="radio" :aria-checked="activeFormat === format" :class="['format-pill', { 'is-on': activeFormat === format }]" @click="activeFormat = format">{{ format === 'gpx' ? 'GPX' : format.toUpperCase() }}</button></div>
+            <button class="export-go" type="button" @click="exportRecord"><DesignIcon name="cloud-output" :size="27" />{{ t.exportGo(activeFormat.toUpperCase()) }}</button>
             <p v-if="exportedNote" class="action-note ok" role="status"><Icon name="circle-check" :size="13" />{{ exportedNote }}</p><p v-if="actionError" class="action-note bad" role="alert"><Icon name="warning" :size="13" />{{ actionError }}</p>
           </section>
 
-          <section class="surface-card side-card ai-card" aria-label="交给 AI">
-            <div class="section-head compact"><span class="section-icon ai-tone"><DesignIcon name="handoff" :size="32" /></span><div><p class="section-eyebrow">HANDOFF</p><h2>交给 AI</h2></div></div>
-            <p class="card-sub">只把这一条运动的脱敏数据和提示词复制到剪贴板，并打开你选的 AI 网站。按天记录的睡眠、步数不在范围内。</p>
+          <section class="surface-card side-card ai-card" :aria-label="t.handoffAria">
+            <div class="section-head compact"><span class="section-icon ai-tone"><DesignIcon name="handoff" :size="32" /></span><div><p class="section-eyebrow">HANDOFF</p><h2>{{ t.handoffTitle }}</h2></div></div>
+            <p class="card-sub">{{ t.handoffSub }}</p>
             <label class="ai-provider">
-              <span>目标工具</span>
+              <span>{{ t.handoffTarget }}</span>
               <SelectMenu
                 v-model="aiProviderId"
                 :options="aiProviderChoices"
-                aria-label="交给哪个 AI 工具"
+                :aria-label="t.handoffTargetAria"
                 drop-up
               />
             </label>
             <button class="export-go" type="button" :disabled="handoffState === 'preparing'" @click="sendWorkoutToAi">
-              <DesignIcon name="handoff" :size="27" />{{ handoffState === 'preparing' ? '正在准备…' : `交给 ${aiProvider.label}` }}
+              <DesignIcon name="handoff" :size="27" />{{ handoffState === 'preparing' ? t.preparing : t.handTo(aiProvider.label) }}
             </button>
             <p v-if="aiNote" class="action-note ok" role="status"><Icon name="circle-check" :size="13" />{{ aiNote }}</p>
             <p v-if="handoffError" class="action-note bad" role="alert"><Icon name="warning" :size="13" />{{ handoffError }}</p>
           </section>
 
-          <section class="surface-card side-card meta-card" aria-label="来源信息">
-            <div class="section-head compact"><span class="section-icon source-tone"><DesignIcon name="database" :size="32" /></span><div><p class="section-eyebrow">PROVENANCE</p><h2>来源信息</h2></div></div>
-            <dl><div><dt>数据来源</dt><dd>{{ dataProviderLabel() }}</dd></div><div><dt>数据范围</dt><dd>{{ dataScopeLabel(workout.source_scope) }}</dd></div><div><dt>最近同步</dt><dd>{{ syncBadge }}</dd></div><div><dt>记录 ID</dt><dd>{{ workout.workout_id }}</dd></div><div><dt>设备</dt><dd>{{ deviceName }}</dd></div></dl>
+          <section class="surface-card side-card meta-card" :aria-label="t.provenanceAria">
+            <div class="section-head compact"><span class="section-icon source-tone"><DesignIcon name="database" :size="32" /></span><div><p class="section-eyebrow">PROVENANCE</p><h2>{{ t.provenanceTitle }}</h2></div></div>
+            <dl><div><dt>{{ t.provenanceProvider }}</dt><dd>{{ dataProviderLabel() }}</dd></div><div><dt>{{ t.provenanceScope }}</dt><dd>{{ dataScopeLabel(workout.source_scope) }}</dd></div><div><dt>{{ t.provenanceSynced }}</dt><dd>{{ syncBadge }}</dd></div><div><dt>{{ t.provenanceRecordId }}</dt><dd>{{ workout.workout_id }}</dd></div><div><dt>{{ t.provenanceDevice }}</dt><dd>{{ deviceName }}</dd></div></dl>
           </section>
         </div>
       </div>
-      <p class="page-foot"><DesignIcon name="secure" :size="20" />数据在本机解码；轨迹使用本地画布，不会发送给地图服务。</p>
+      <p class="page-foot"><DesignIcon name="secure" :size="20" />{{ t.pageFoot }}</p>
     </template>
   </section>
 </template>
