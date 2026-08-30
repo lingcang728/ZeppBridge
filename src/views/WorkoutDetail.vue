@@ -433,9 +433,10 @@ const numberValue = (value: unknown, digits = 0): string => isFiniteNumber(value
   ? value.toLocaleString(intlLocale(), { minimumFractionDigits: digits, maximumFractionDigits: digits })
   : t.value.notProvided;
 
+/* 同上：只看 key，不看显示名——名字跟着界面语言变，图标不该跟着变。 */
 const workoutArt = computed<DesignIconName>(() => {
-  const raw = `${displayType.value} ${workoutLabel(displayType.value)}`.toLowerCase();
-  return /cycle|cycling|bike|骑/.test(raw) ? 'outdoor-cycling' : 'outdoor-run';
+  const key = displayType.value.toLowerCase();
+  return /cycl|ride|bike|bmx|spinning/.test(key) ? 'outdoor-cycling' : 'outdoor-run';
 });
 const deviceName = computed(() => device.value.canonical_name || device.value.name || t.value.deviceNameMissing);
 /* 这张图必须跟着这条记录**实际**是哪台表走。
