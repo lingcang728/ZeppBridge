@@ -38,6 +38,8 @@ export interface AppStatus {
   retention_days: number;
   history_sync_days?: number;
   storage?: StorageEstimate;
+  /** 后台是否正在压缩历史报文。事件可能在前端监听之前就发出去了，所以状态里也要有。 */
+  compacting?: boolean;
 }
 
 /** 单条流的占用估算。样本不足时 measured 为 false，且不给速率。 */

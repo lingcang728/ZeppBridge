@@ -261,7 +261,7 @@ pub async fn compact_raw_payloads(
 ) -> std::result::Result<RawPayloadCompaction, String> {
     let _write_guard = zeppbridge_core::storage::write_lock::acquire_with_timeout(
         &state.data_dir,
-        zeppbridge_core::storage::write_lock::WritePurpose::Cleanup,
+        zeppbridge_core::storage::write_lock::WritePurpose::Compaction,
         std::time::Duration::from_secs(20),
     )
     .map_err(|error| error.to_string())?;

@@ -160,14 +160,23 @@ async fn run_sync(
     // 暂时不可用" — alarming wording for a library that is busy healing
     // itself and has lost nothing. Standing aside and coming back is both
     // truthful and what the user would want.
-    if crate::storage::replay_in_progress() {
+    // 装上新版本后的第一次启动会在后台压缩存量报文，而应用启动时又会自动同步
+    // 一次——两件事同时开始，同步抢不到写锁，用户看到的是一行红字
+    // 「另一个写入操作正在进行」。压缩是我们自己安排的、正常的一次性维护，
+    // 不该让它把用户吓一跳。和重放一样让路重试。
+    if crate::storage::replay_in_progress() || crate::storage::compaction_in_progress() {
+        let message = if crate::storage::compaction_in_progress() {
+            "正在压缩历史报文以节省磁盘空间，本次云端同步稍后自动重试"
+        } else {
+            "正在用本地原始报文重建派生数据，本次云端同步稍后自动重试"
+        };
         let now = Utc::now().to_rfc3339();
         return Ok(ui_sync_report(
             SyncReport {
                 success: false,
                 streams: Vec::new(),
                 records_written: 0,
-                message: Some("正在用本地原始报文重建派生数据，本次云端同步稍后自动重试".into()),
+                message: Some(message.into()),
             },
             now.clone(),
             now,

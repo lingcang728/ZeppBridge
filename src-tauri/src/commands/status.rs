@@ -90,6 +90,7 @@ pub(crate) async fn build_app_status(state: &AppState) -> std::result::Result<Ap
         retention_days: prefs.retention_days,
         history_sync_days: prefs.history_sync_days,
         storage: Some(storage),
+        compacting: zeppbridge_core::storage::compaction_in_progress(),
     })
 }
 

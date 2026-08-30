@@ -40,6 +40,13 @@ pub struct AppStatus {
     pub retention_days: i64,
     pub history_sync_days: i64,
     pub storage: Option<crate::models::StorageEstimate>,
+    /// 后台是否正在压缩历史报文。
+    ///
+    /// 只发一个 `compaction://started` 事件是不够的：它在 Rust 的 setup() 里
+    /// 就发出去了，而前端要等 onMounted 才开始监听——事件发出时没人在听，
+    /// 于是界面上只剩一行「同步让路」的提示，却没有任何东西解释为什么。
+    /// 状态可以随时被读到，事件不行。
+    pub compacting: bool,
 }
 
 /// Web-login progress exposed to the frontend and the `login://status` event.

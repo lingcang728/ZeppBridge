@@ -17,7 +17,10 @@ const dataRevision = ref(0);
    这期间界面要说一句「正在压缩」，压完自己消失——不然用户只会觉得
    「刚装完怎么有点卡」。 */
 const compactionPending = ref(0);
-const compacting = ref(false);
+/* 事件（compaction://started）可能在前端开始监听之前就发出去了，所以这里
+   同时认状态：refreshStatus() 每次都会带回后台此刻是不是在压缩。 */
+const compactingEvent = ref(false);
+const compacting = computed(() => compactingEvent.value || appStatus.value?.compacting === true);
 const compactionSaved = ref<number | null>(null);
 const autoSyncEnabled = ref(readAutoSyncSettings().enabled);
 const autoSyncInterval = ref(readAutoSyncSettings().intervalMinutes);
@@ -215,14 +218,14 @@ const initialize = async () => {
     if (typeof unlistenLogin === 'function') unlisteners.push(unlistenLogin);
     const unlistenCompactStart = await backend.listen<number>('compaction://started', (pending) => {
       compactionPending.value = typeof pending === 'number' ? pending : 0;
-      compacting.value = true;
+      compactingEvent.value = true;
       compactionSaved.value = null;
     });
     if (typeof unlistenCompactStart === 'function') unlisteners.push(unlistenCompactStart);
     const unlistenCompactDone = await backend.listen<{ bytesBefore: number; bytesAfter: number }>(
       'compaction://finished',
       (report) => {
-        compacting.value = false;
+        compactingEvent.value = false;
         const saved = (report?.bytesBefore ?? 0) - (report?.bytesAfter ?? 0);
         compactionSaved.value = saved > 0 ? saved : null;
         // 压完的提示自己退场：这是一次性的后台维护，不该常驻。
@@ -273,7 +276,7 @@ export const useSyncController = () => ({
   syncProgress: readonly(syncProgress),
   loginStatus: readonly(loginStatus),
   dataRevision: readonly(dataRevision),
-  compacting: readonly(compacting),
+  compacting,
   compactionPending: readonly(compactionPending),
   compactionSaved: readonly(compactionSaved),
   autoSyncEnabled: readonly(autoSyncEnabled),

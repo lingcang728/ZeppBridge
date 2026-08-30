@@ -37,6 +37,12 @@ pub enum WritePurpose {
     Backup,
     Reprocess,
     Cleanup,
+    /// 压缩历史原始报文。
+    ///
+    /// 它一度借用 `Cleanup`，于是等待中的同步会告诉用户「另一个写入操作正在
+    /// 进行（清理旧数据）」——压缩一个字节都没删，这句话是假的。用途会原样
+    /// 显示给用户，所以它必须说的是实际在做的事。
+    Compaction,
 }
 
 impl WritePurpose {
@@ -49,6 +55,7 @@ impl WritePurpose {
             WritePurpose::Backup => "backup",
             WritePurpose::Reprocess => "reprocess",
             WritePurpose::Cleanup => "cleanup",
+            WritePurpose::Compaction => "compaction",
         }
     }
 
@@ -61,6 +68,7 @@ impl WritePurpose {
             WritePurpose::Backup => "生成备份",
             WritePurpose::Reprocess => "重新解析本地报文",
             WritePurpose::Cleanup => "清理旧数据",
+            WritePurpose::Compaction => "压缩历史报文",
         }
     }
 }

@@ -127,7 +127,7 @@ pub fn run() {
                         let _ = compaction_handle.emit("compaction://started", pending);
                         let _write_guard = storage::write_lock::acquire_with_timeout(
                             &compaction_data_dir,
-                            storage::write_lock::WritePurpose::Cleanup,
+                            storage::write_lock::WritePurpose::Compaction,
                             std::time::Duration::from_secs(30),
                         );
                         match db.compact_raw_payloads() {
