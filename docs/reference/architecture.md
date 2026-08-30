@@ -152,7 +152,10 @@ file:  second_heart_rate/real_data
 - **`second_heart_rate/real_data`** — `/users/me/fileInfo/events` 确认有数据，但返回的是 COS 文件索引而不是样本，取到逐秒心率还需要再下载文件。当前 host allow-list 只放行 `api-mifit*.zepp.com` / `huami.com`，COS 域名不在其中，接入等于放宽网络边界，未做。
 - **8/16 之后的逐条血氧** — `blood_oxygen/click` 的点测在 2026-08-16 停止，之后只有 `odi` 夜间汇总，但 Zepp App 仍能画出连续曲线。已排除的方向：`/users/me/fileInfo/events`（同接口面 `second_heart_rate` 有数据、血氧没有，是有依据的否定）、`band_data` 的 8 字节块（只有模式/强度/步数/心率）、`blood_oxygen` 的 `auto` / `real_data` 子类型。**剩下的方向只有抓 Zepp App 的真实请求，而本项目明令禁止恢复 MITM / 用户 CA / Wi-Fi 代理路线**，所以这条到此为止。
 - **未接的端点** — `/users/me/bloodPressure`、`/users/{id}/members/-1/weightRecords`、`/huami.health.getUserInfo.json`、`/v1/user/manualData.json`。
-  - 血压与体重：**当前样本未验证，不是「没有接入价值」**。此前的结论来自单个开发账号近一年没有记录（n=1），那只能说明这个账号没有数据，不能推断字段语义、单位或成员范围。已有用户反馈需要体脂秤与血压，接入的前置条件是拿到经过审计的真实脱敏 fixture，并与用户自己的 Zepp App 显示逐条对照。在这两样证据齐备之前不归一化、不宣称支持，界面也不显示空卡片或 0 值（见 `todo.md` 8.0 证据门禁）。
+  - **血压与体重：明确不支持，也不计划支持。** 这是 2026-08-30 的产品决定，不是「证据不足、等 fixture 再说」——
+    早先那版「拿到经过审计的脱敏 fixture 就接」的结论已经作废，不要据此重启接入。
+    具体是：不请求 `/users/me/bloodPressure` 与 `weightRecords`，不归一化上面 v2 事件面里出现的血压 `eventType`，
+    界面和文档不出现体重/血压的卡片、占位或「即将支持」字样。需要体脂秤与血压的用户请继续用 Zepp App 自己看。
   - `getUserInfo` / `manualData`：只有年龄/身高，而年龄**不能**用来估算心率区间（见下），因此不接。
 
 ### 心率区间：三种算法，一个都不预设
