@@ -2,10 +2,17 @@
 /**
  * 版本号一致性检查。
  *
- * 版本号散落在六个文件里，其中几处只在特定路径上才会被读到——
+ * 版本号散落在八个位置，其中几处只在特定路径上才会被读到——
  * `App.vue` 的 FALLBACK_APP_VERSION 只在浏览器预览里出现，crate 版本只在
  * CLI/MCP 的 `--version` 里出现。少改一处不会有任何报错，只会在发版之后
  * 由用户发现：安装的是 1.0.0，命令行说自己是 0.11.0。
+ *
+ * 文档也算在内。架构文档开头那句「本文描述 v1.0.0 的产品边界」是一个承诺，
+ * 漏改之后它就变成了一句假话——读的人以为看的是当前版本的边界。
+ *
+ * 注意哪些**不该**被算进来：README 里「1.0.0 起，本机数据库的结构开始被当作
+ * 要长期维护的东西」是历史陈述，永远指向 1.0.0，不跟着版本走；
+ * 两个 README 的版本徽章是 shields.io 动态读 GitHub Release 的，也不用管。
  *
  * 用法:
  *   node scripts/release/check-version-consistency.mjs        检查
@@ -26,6 +33,10 @@ const SITES = [
   { file: 'src-tauri/crates/cli/Cargo.toml', pattern: /(\nversion = ")([0-9][^"]*)(")/ },
   { file: 'src-tauri/crates/mcp/Cargo.toml', pattern: /(\nversion = ")([0-9][^"]*)(")/ },
   { file: 'src/App.vue', pattern: /(const FALLBACK_APP_VERSION = ')([0-9][^']*)(')/ },
+  {
+    file: 'docs/reference/architecture.md',
+    pattern: /(本文描述 v)([0-9][^\s]*?)( 的产品边界)/,
+  },
 ];
 
 const target = process.argv[2];
