@@ -18,6 +18,69 @@ import EmptyState from '../components/EmptyState.vue';
 import Icon from '../components/Icon.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import { deviceStateLabel, useDeviceAssignment, useDevices } from '../composables/useDevices';
+import { defineMessages, useMessages } from '../i18n';
+
+const messages = defineMessages(
+  {
+    backToSettings: '返回设置',
+    notFoundTitle: '找不到这台设备',
+    notFoundMessage: '它可能已从账号中移除，或者本机还没识别到它。',
+    reidentify: '重新识别设备',
+    factsAria: '设备信息',
+    factOrigin: '型号从哪来',
+    factFirmware: '固件',
+    factLastData: '最近数据',
+    factHasLocal: '本机是否有它的数据',
+    factDeviceId: '设备 ID',
+    hasLocalYes: '有',
+    hasLocalNo: '暂无',
+    factsNote: '设备 ID 只在本机使用，界面上永远只显示后四位，也不会写进导出或错误报告。',
+    assignAria: '型号识别',
+    assignTitle: '识别得对吗？',
+    assignSub: '识别结果不对（比如实际是 Balance 2，这里写成了别的型号），可以随时自己指认。指认只保存在本机，会被标成「你指认的型号」，不会伪装成自动识别结果；也可以随时撤销，恢复成自动识别。',
+    changeModel: '换一台',
+    pickModel: '不对，我来指认',
+    clearAssignment: '撤销指认，用回自动识别',
+    noLocalIdentifier: '这台设备没有可用的本机标识，暂时无法保存指认。',
+    originUnknown: '未知',
+    originUserAssigned: '你上次手动指认的',
+    originExact: '内置设备目录精确匹配',
+    originAlias: '内置设备目录别名匹配',
+    originNoMatchCloud: '没有匹配到（云端没有给出可识别的产品名）',
+    originCatalog: '内置设备目录匹配',
+    originNoMatch: '没有匹配到',
+  },
+  {
+    backToSettings: 'Back to settings',
+    notFoundTitle: 'This device is not here',
+    notFoundMessage: 'It may have been removed from the account, or this machine has not identified it yet.',
+    reidentify: 'Identify devices again',
+    factsAria: 'Device information',
+    factOrigin: 'Where the model came from',
+    factFirmware: 'Firmware',
+    factLastData: 'Latest data',
+    factHasLocal: 'Local data for it',
+    factDeviceId: 'Device ID',
+    hasLocalYes: 'Yes',
+    hasLocalNo: 'None yet',
+    factsNote: 'The device ID is used only on this machine, only its last four characters ever appear on screen, and it never reaches an export or an error report.',
+    assignAria: 'Model identification',
+    assignTitle: 'Is this right?',
+    assignSub: 'If the match is wrong — say it is really a Balance 2 and this says something else — you can point at the right model yourself. Your pick stays on this machine, shows up as "Model you picked" rather than posing as an automatic match, and can be withdrawn at any time.',
+    changeModel: 'Pick a different one',
+    pickModel: "That's wrong, let me pick",
+    clearAssignment: 'Withdraw the pick and go back to automatic',
+    noLocalIdentifier: 'This device carries no local identifier, so a pick cannot be saved for it.',
+    originUnknown: 'Unknown',
+    originUserAssigned: 'You picked it last time',
+    originExact: 'Exact match in the built-in catalog',
+    originAlias: 'Alias match in the built-in catalog',
+    originNoMatchCloud: 'No match (the cloud gave no recognizable product name)',
+    originCatalog: 'Matched in the built-in catalog',
+    originNoMatch: 'No match',
+  },
+);
+const t = useMessages(messages);
 
 const route = useRoute();
 const { models, loading, initialized, error, load, maskIdentifier } = useDevices();
@@ -32,13 +95,13 @@ const pickerOpen = ref(false);
    就得先知道现在这个结论是机器猜的、目录里对上的，还是他自己上次指认的。 */
 const originLabel = computed(() => {
   const item = model.value;
-  if (!item) return '未知';
-  if (item.userAssigned) return '你上次手动指认的';
+  if (!item) return t.value.originUnknown;
+  if (item.userAssigned) return t.value.originUserAssigned;
   switch (item.matchStatus) {
-    case 'exact': return '内置设备目录精确匹配';
-    case 'alias': return '内置设备目录别名匹配';
-    case 'unknown': return '没有匹配到（云端没有给出可识别的产品名）';
-    default: return item.profile.canonical_name ? '内置设备目录匹配' : '没有匹配到';
+    case 'exact': return t.value.originExact;
+    case 'alias': return t.value.originAlias;
+    case 'unknown': return t.value.originNoMatchCloud;
+    default: return item.profile.canonical_name ? t.value.originCatalog : t.value.originNoMatch;
   }
 });
 
@@ -65,7 +128,7 @@ onMounted(() => {
 <template>
   <section class="page device-page" aria-labelledby="device-detail-title">
     <div class="page-toolbar">
-      <RouterLink class="back-link" to="/settings"><Icon name="arrow-left" :size="14" />返回设置</RouterLink>
+      <RouterLink class="back-link" to="/settings"><Icon name="arrow-left" :size="14" />{{ t.backToSettings }}</RouterLink>
     </div>
 
     <div v-if="loading && !model" class="detail-loading" aria-live="polite">
@@ -75,10 +138,10 @@ onMounted(() => {
     <EmptyState
       v-else-if="!model"
       icon="link"
-      title="找不到这台设备"
-      :message="error || '它可能已从账号中移除，或者本机还没识别到它。'"
+      :title="t.notFoundTitle"
+      :message="error || t.notFoundMessage"
     >
-      <button class="button button-secondary" type="button" @click="load(true)">重新识别设备</button>
+      <button class="button button-secondary" type="button" @click="load(true)">{{ t.reidentify }}</button>
     </EmptyState>
 
     <template v-else>
@@ -92,30 +155,27 @@ onMounted(() => {
         </div>
       </section>
 
-      <section class="surface-card facts-card" aria-label="设备信息">
+      <section class="surface-card facts-card" :aria-label="t.factsAria">
         <dl>
-          <div><dt>型号从哪来</dt><dd>{{ originLabel }}</dd></div>
-          <div><dt>固件</dt><dd>{{ model.firmware }}</dd></div>
-          <div><dt>最近数据</dt><dd>{{ model.lastData }}</dd></div>
-          <div><dt>本机是否有它的数据</dt><dd>{{ model.hasLocalData ? '有' : '暂无' }}</dd></div>
-          <div><dt>设备 ID</dt><dd>{{ maskIdentifier(model.profile.device_id || model.profile.serial) }}</dd></div>
+          <div><dt>{{ t.factOrigin }}</dt><dd>{{ originLabel }}</dd></div>
+          <div><dt>{{ t.factFirmware }}</dt><dd>{{ model.firmware }}</dd></div>
+          <div><dt>{{ t.factLastData }}</dt><dd>{{ model.lastData }}</dd></div>
+          <div><dt>{{ t.factHasLocal }}</dt><dd>{{ model.hasLocalData ? t.hasLocalYes : t.hasLocalNo }}</dd></div>
+          <div><dt>{{ t.factDeviceId }}</dt><dd>{{ maskIdentifier(model.profile.device_id || model.profile.serial) }}</dd></div>
         </dl>
         <p class="facts-note">
           <DesignIcon name="secure" :size="20" />
-          设备 ID 只在本机使用，界面上永远只显示后四位，也不会写进导出或错误报告。
+          {{ t.factsNote }}
         </p>
       </section>
 
-      <section class="surface-card assign-card" aria-label="型号识别">
-        <h2>识别得对吗？</h2>
-        <p class="assign-sub">
-          识别结果不对（比如实际是 Balance 2，这里写成了别的型号），可以随时自己指认。
-          指认只保存在本机，会被标成「你指认的型号」，不会伪装成自动识别结果；也可以随时撤销，恢复成自动识别。
-        </p>
+      <section class="surface-card assign-card" :aria-label="t.assignAria">
+        <h2>{{ t.assignTitle }}</h2>
+        <p class="assign-sub">{{ t.assignSub }}</p>
 
         <div v-if="!pickerOpen" class="inline-actions">
           <button class="button primary" type="button" :disabled="assignBusy || !model.deviceKey" @click="openPicker">
-            <Icon name="watch" :size="15" />{{ model.userAssigned ? '换一台' : '不对，我来指认' }}
+            <Icon name="watch" :size="15" />{{ model.userAssigned ? t.changeModel : t.pickModel }}
           </button>
           <button
             v-if="model.userAssigned"
@@ -123,12 +183,10 @@ onMounted(() => {
             type="button"
             :disabled="assignBusy"
             @click="clearPick"
-          >撤销指认，用回自动识别</button>
+          >{{ t.clearAssignment }}</button>
         </div>
 
-        <p v-if="!model.deviceKey" class="hint-line">
-          这台设备没有可用的本机标识，暂时无法保存指认。
-        </p>
+        <p v-if="!model.deviceKey" class="hint-line">{{ t.noLocalIdentifier }}</p>
         <p v-if="assignError" class="api-error" role="alert">{{ assignError }}</p>
         <p v-else-if="assignMessage" class="hint-line ok" role="status">{{ assignMessage }}</p>
 
