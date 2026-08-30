@@ -183,6 +183,35 @@ const load = async (refresh = false): Promise<void> => {
   }
 };
 
+/**
+ * 本机写过库之后的重读。**不能走 `load(false)`**：那条路会复用
+ * `profileRequests` 里已经在飞的请求，或者 `backgroundRefreshInFlight`——
+ * 两者都是在写入之前发出的，结果里没有刚保存的指认，用户看到的就是
+ * 「提交完型号依然没改过来」（C4 的表象，只不过那次的根因在后端）。
+ *
+ * 这里直接问一次后端，并照常抢 `requestId`：顺带让那条抢跑的后台刷新
+ * 结果失效，免得它稍后再把旧数据盖回来。
+ */
+const reloadAfterLocalWrite = async (): Promise<void> => {
+  if (!isDesktop()) return;
+  const currentRequest = ++requestId;
+  loading.value = true;
+  error.value = null;
+  try {
+    const result = normalizeResult(await backend.getDeviceProfiles(false));
+    if (currentRequest !== requestId) return;
+    applyResult(result);
+  } catch (cause) {
+    if (currentRequest !== requestId) return;
+    setLoadFailure(cause, false);
+  } finally {
+    if (currentRequest === requestId) {
+      initialized.value = true;
+      loading.value = false;
+    }
+  }
+};
+
 const models = computed<DeviceCardModel[]>(() => profiles.value.map((profile) => ({
   profile,
   canonicalName: profile.canonical_name?.trim() || profile.name?.trim() || '未识别设备',
@@ -223,7 +252,7 @@ const assignModel = async (deviceKey: string, catalogId: string, contribute = fa
   assignMessage.value = null;
   try {
     await backend.setDeviceModelOverride(deviceKey, catalogId || null);
-    await load(false);
+    await reloadAfterLocalWrite();
     if (!catalogId) {
       assignMessage.value = '已撤销型号指认，恢复成自动识别结果。';
       return;
