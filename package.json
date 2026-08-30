@@ -21,7 +21,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "version:check": "node scripts/release/check-version-consistency.mjs",
-    "docs:check": "node scripts/release/check-doc-links.mjs"
+    "docs:check": "node scripts/release/check-doc-links.mjs",
+    "i18n:check": "node scripts/release/check-i18n.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

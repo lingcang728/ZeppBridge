@@ -445,11 +445,12 @@ const shortDateTime = (value: string) => {
   const dd = String(date.getDate()).padStart(2, '0');
   return `${mm}/${dd} ${formatTime(value)}`;
 };
+/* 只按运动的 key 分图标，不看显示名。
+   显示名跟着界面语言变，拿它做分支判断，一换语言分类就悄悄失效。 */
 const workoutPresentation = (workout: Workout): Pick<RecentItem, 'category' | 'designIcon'> => {
   const key = workoutTypeKey(workout);
-  const label = workoutDisplayLabel(workout);
-  if (/strength|weight|力量|健身|无氧/.test(`${key} ${label}`.toLowerCase())) return { category: 'heart', designIcon: 'body-activity' };
-  if (/cycl|ride|骑行/.test(`${key} ${label}`.toLowerCase())) return { category: 'activity', designIcon: 'outdoor-cycling' };
+  if (/strength|weight|core|hiit|gym/.test(key)) return { category: 'heart', designIcon: 'body-activity' };
+  if (/cycl|ride|bike|bmx|spinning/.test(key)) return { category: 'activity', designIcon: 'outdoor-cycling' };
   return { category: 'activity', designIcon: 'outdoor-run' };
 };
 const recentItems = computed<RecentItem[]>(() => {

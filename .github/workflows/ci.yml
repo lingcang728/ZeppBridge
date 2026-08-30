@@ -55,6 +55,12 @@ jobs:
       - name: Check bundle budget
         run: npm run budget:check
 
+      # 硬编码的中文。翻译是一次性的，硬编码是持续发生的：写下一个组件时顺手
+      # 打一句中文，构建不会红，只有一个看不懂中文的用户会看到它——而他没法
+      # 告诉我们。所以让 CI 来管。
+      - name: Check for hardcoded Chinese in the UI
+        run: npm run i18n:check
+
       - name: Test frontend
         run: npm test
 
