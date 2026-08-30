@@ -4936,10 +4936,18 @@ fn disk_free_bytes(path: &std::path::Path) -> Option<u64> {
         if block == 0 {
             return None;
         }
-        // 用 `u64::from` 而不是 `as u64`：这些字段的宽度随平台变（macOS 上
-        // fsblkcnt_t 是 u32，Linux 上是 u64），写死 `as` 在其中一个平台上会被
-        // clippy 判成多余转换，而 CI 是 `-D warnings`。
-        Some(u64::from(stat.f_bavail) * u64::from(block))
+        // 中间走 u128。
+        //
+        // 这些字段的宽度随平台变：macOS 上 fsblkcnt_t 是 u32、c_ulong 是 u64，
+        // Linux 上两个都是 u64。所以「转成 u64」这件事在一个平台上是必要的、
+        // 在另一个平台上就是多余的——`as u64` 会被 unnecessary_cast 判错，
+        // `u64::from` 会被 useless_conversion 判错，而 CI 是 `-D warnings`，
+        // 两种写法都至少在一个平台上过不去。
+        //
+        // 转到 u128 则在任何平台上都是真实的加宽，没有哪条 lint 能说它多余；
+        // 顺带把「块数乘块大小」可能溢出这件事也一并解决了。
+        let free = u128::from(stat.f_bavail) * u128::from(block);
+        u64::try_from(free).ok()
     }
 }
 
