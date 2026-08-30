@@ -573,6 +573,9 @@ const CAPABILITY_ROWS: [(&str, CapabilityEvidence, i64); 15] = [
 /// Streams with no local trace at all. Only these cost a request.
 pub const PROBE_ONLY_CAPABILITIES: [&str; 3] = ["blood_pressure", "weight", "emotion"];
 
+/// 探测覆盖多久。和探测本身用的范围一致，界面拿它写「过去 N 天没有测量记录」。
+const PROBE_WINDOW_DAYS: i64 = 365;
+
 const CAPABILITY_PROBE_RESULT_KEY: &str = "capability_probe_result";
 const CAPABILITY_PROBE_AT_KEY: &str = "capability_probe_at";
 
@@ -591,7 +594,7 @@ impl Database {
                         params![pattern, format!("-{window_days} day")],
                         |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Option<String>>(1)?)),
                     )?;
-                    (row.0, row.1, "天")
+                    (row.0, row.1, ("天", "days"))
                 }
                 CapabilityEvidence::Samples(metric) => {
                     let row = self.conn.query_row(
@@ -600,7 +603,7 @@ impl Database {
                         params![metric, format!("-{window_days} day")],
                         |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Option<String>>(1)?)),
                     )?;
-                    (row.0, row.1, "条")
+                    (row.0, row.1, ("条", "records"))
                 }
                 CapabilityEvidence::Table(table, column) => {
                     let sql = format!(
@@ -612,9 +615,10 @@ impl Database {
                         params![format!("-{window_days} day")],
                         |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Option<String>>(1)?)),
                     )?;
-                    (row.0, row.1, "条")
+                    (row.0, row.1, ("条", "records"))
                 }
             };
+            let (unit_label, unit_code) = unit;
             items.push(CapabilityItem {
                 stream: stream.to_string(),
                 status: if records > 0 {
@@ -624,7 +628,9 @@ impl Database {
                 }
                 .to_string(),
                 records,
-                records_unit: unit.to_string(),
+                records_unit: unit_label.to_string(),
+                records_unit_code: unit_code.to_string(),
+                window_days,
                 latest_date: latest,
                 note: (records == 0).then(|| format!("最近 {window_days} 天没有记录")),
                 source: "derived".to_string(),
@@ -649,6 +655,8 @@ impl Database {
                     status: "available".to_string(),
                     records: probe.records as i64,
                     records_unit: "条".to_string(),
+                    records_unit_code: "records".to_string(),
+                    window_days: PROBE_WINDOW_DAYS,
                     latest_date: probe.latest_date.clone(),
                     // 说清楚这是云端的数量，不是本机的。
                     note: Some(
@@ -666,6 +674,8 @@ impl Database {
                     status: "unsupported".to_string(),
                     records: 0,
                     records_unit: "条".to_string(),
+                    records_unit_code: "records".to_string(),
+                    window_days: PROBE_WINDOW_DAYS,
                     latest_date: None,
                     note: Some("你的账号或设备不提供这项数据".to_string()),
                     source: "probed".to_string(),
@@ -676,6 +686,8 @@ impl Database {
                     status: "no_records".to_string(),
                     records: 0,
                     records_unit: "条".to_string(),
+                    records_unit_code: "records".to_string(),
+                    window_days: PROBE_WINDOW_DAYS,
                     latest_date: None,
                     note: Some("过去一年没有测量记录".to_string()),
                     source: "probed".to_string(),
@@ -686,6 +698,8 @@ impl Database {
                     status: "unknown".to_string(),
                     records: 0,
                     records_unit: "条".to_string(),
+                    records_unit_code: "records".to_string(),
+                    window_days: PROBE_WINDOW_DAYS,
                     latest_date: None,
                     note: Some("尚未检测".to_string()),
                     source: "probed".to_string(),
@@ -3422,6 +3436,7 @@ impl Database {
                 source: "max(workouts.max_hr)".into(),
                 measured_at: observed_at.get(..10).map(str::to_owned),
                 note: Some("本地记录到的最高心率。没跑到真正的极限时，区间会整体偏窄。".into()),
+                note_count: None,
             });
         }
 
@@ -3474,6 +3489,7 @@ impl Database {
                     source: source.into(),
                     measured_at: Some(date),
                     note: Some(note.into()),
+                    note_count: None,
                 });
             }
         }
@@ -3508,6 +3524,7 @@ impl Database {
                     source: "avg(daily_metrics.resting_hr)".into(),
                     measured_at: latest,
                     note: Some(format!("近 30 天里有数据的 {count} 天的平均值。")),
+                    note_count: Some(count),
                 });
             }
         }

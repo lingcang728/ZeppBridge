@@ -246,6 +246,13 @@ pub struct HealthTimings {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HealthAction {
     pub id: String,
+    /// 动作的稳定码，界面按它出文案。
+    ///
+    /// 和 `id` 分开是因为 `id` 是**执行**用的（两个不同的动作都跑同一条同步
+    /// 命令，所以 id 相同），而文案要能分得清「再同步一次」和「做第一次同步」。
+    /// `label` / `reason` 保持中文，那是 CLI 的输出，不跟界面语言走。
+    #[serde(default)]
+    pub code: String,
     pub label: String,
     pub reason: String,
     /// 需要二次确认的动作（清理、恢复等）。
@@ -885,6 +892,7 @@ fn suggested_actions(
     {
         actions.push(HealthAction {
             id: "reauth".into(),
+            code: "reauth".into(),
             label: "重新连接 Zepp 账号".into(),
             reason: "有数据流因为认证失效而拉不到数据。".into(),
             destructive: false,
@@ -893,6 +901,7 @@ fn suggested_actions(
     if database.pending_normalization > 0 || database.replay_in_progress {
         actions.push(HealthAction {
             id: "reprocess".into(),
+            code: "reprocess".into(),
             label: "用当前解析器重放本地报文".into(),
             reason: format!(
                 "有 {} 份已保留的报文还没产出任何标准化记录。重放不触网，也不会改写云端同步时间。",
@@ -906,6 +915,7 @@ fn suggested_actions(
     }) {
         actions.push(HealthAction {
             id: "sync".into(),
+            code: "sync_retry".into(),
             label: "再同步一次".into(),
             reason: "上一次有数据流没能从云端取回数据。".into(),
             destructive: false,
@@ -914,6 +924,7 @@ fn suggested_actions(
     if timings.last_cloud_sync_at.is_none() {
         actions.push(HealthAction {
             id: "sync".into(),
+            code: "sync_first".into(),
             label: "做第一次同步".into(),
             reason: "本机还没有任何一次成功的云端同步记录。".into(),
             destructive: false,
@@ -921,12 +932,14 @@ fn suggested_actions(
     }
     actions.push(HealthAction {
         id: "integrity_check".into(),
+        code: "integrity_check".into(),
         label: "检查数据库完整性".into(),
         reason: "对整库做一次 SQLite integrity_check，大库上需要一点时间。".into(),
         destructive: false,
     });
     actions.push(HealthAction {
         id: "open_data_folder".into(),
+        code: "open_data_folder".into(),
         label: "打开数据文件夹".into(),
         reason: "本机数据库、备份和导出都在这里。".into(),
         destructive: false,

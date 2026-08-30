@@ -14,6 +14,7 @@ import { defineMessages, useMessages } from '../i18n';
 const messages = defineMessages(
   {
     title: '跑完怎么样',
+    unsupportedWorkoutType: '暂不支持这类运动的洞察。第一版只做已用真实数据验证过的跑步；其他运动仍可正常查看、纠正和导出。',
     handoff: '让 AI 展开分析',
     reading: '正在读取本地记录…',
     comparedTo: (count: number) => `和你自己距离相近的最近 ${count} 次跑步相比：`,
@@ -52,6 +53,7 @@ const messages = defineMessages(
   },
   {
     title: 'How the run went',
+    unsupportedWorkoutType: 'Insights for this workout type are not supported yet. The first version covers running only, because that is what has been checked against real data. Every other workout still displays, corrects and exports normally.',
     handoff: 'Let AI dig in',
     reading: 'Reading local records…',
     comparedTo: (count: number) => `Against your own ${count} most recent runs of a similar distance:`,
@@ -89,6 +91,15 @@ const messages = defineMessages(
   },
 );
 const t = useMessages(messages);
+
+/* 不支持的原因按后端发来的码渲染。后端那份中文是给 CLI / MCP 的，
+   它们的输出不跟界面语言走；界面不认识这个码时才回退到它。 */
+const unsupportedText = computed(() => {
+  const insight = props.insight;
+  if (!insight) return '';
+  if (insight.unsupported_code === 'unsupported_workout_type') return t.value.unsupportedWorkoutType;
+  return insight.unsupported_reason ?? '';
+});
 
 const metricLabel = (factId: string, fallback: string): string =>
   (t.value.metric as Record<string, string | undefined>)[factId] ?? fallback;
@@ -167,7 +178,7 @@ const exclusionSummary = computed(() => {
     <p v-else-if="error" class="insight-error" role="alert">{{ error }}</p>
 
     <template v-else-if="insight && !insight.supported">
-      <p class="insight-note">{{ insight.unsupported_reason }}</p>
+      <p class="insight-note">{{ unsupportedText }}</p>
     </template>
 
     <template v-else-if="insight">

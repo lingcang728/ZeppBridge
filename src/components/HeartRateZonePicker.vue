@@ -33,6 +33,38 @@ const messages = defineMessages(
       resting_hr: '静息心率基准',
       threshold_hr: '乳酸阈值基准',
     },
+    /* 算法名、公式、区间名和基准说明都按后端发来的稳定 id 查表。
+       后端也带着一份中文，那是给 CLI / MCP 的：它们的输出不跟界面语言走。 */
+    model: {
+      max_hr: { label: '最大心率区间', formula: '区间下界 = 最大心率 x 百分比' },
+      hr_reserve: { label: '储备心率区间', formula: '区间下界 = 静息心率 + (最大心率 - 静息心率) x 百分比' },
+      lactate_threshold: { label: '乳酸阈值区间', formula: '区间下界 = 乳酸阈值心率 x 百分比' },
+    },
+    percentBands: ['热身', '燃脂', '有氧耐力', '无氧耐力', '极限'],
+    thresholdBands: ['轻松', '耐力', '节奏', '阈值', '无氧'],
+    basis: {
+      observed_max: {
+        label: '实测最高心率',
+        note: '本地记录到的最高心率。没跑到真正的极限时，区间会整体偏窄。',
+      },
+      device_max: {
+        label: '手表自报最大心率',
+        note: '手表在 PAI 报文里自报的最大心率，通常来自 Zepp App 的个人设置。',
+      },
+      device_resting: {
+        label: '手表自报静息心率',
+        note: '手表在 PAI 报文里自报的静息心率。',
+      },
+      lactate_threshold: {
+        label: '乳酸阈值心率',
+        note: '手表在一次高强度跑步后测出的乳酸阈值心率。',
+      },
+      computed_resting: {
+        label: '本地统计静息心率',
+        note: '',
+      },
+    },
+    computedRestingNote: (days: number) => `近 30 天里有数据的 ${days} 天的平均值。`,
   },
   {
     title: 'Heart rate zones',
@@ -60,12 +92,67 @@ const messages = defineMessages(
       resting_hr: 'Resting HR basis',
       threshold_hr: 'Threshold HR basis',
     },
+    model: {
+      max_hr: { label: 'Max heart rate zones', formula: 'Zone floor = max heart rate x percentage' },
+      hr_reserve: { label: 'Heart rate reserve zones', formula: 'Zone floor = resting HR + (max HR - resting HR) x percentage' },
+      lactate_threshold: { label: 'Lactate threshold zones', formula: 'Zone floor = threshold heart rate x percentage' },
+    },
+    percentBands: ['Warm-up', 'Fat burn', 'Aerobic', 'Anaerobic', 'Maximum'],
+    thresholdBands: ['Easy', 'Endurance', 'Tempo', 'Threshold', 'Anaerobic'],
+    basis: {
+      observed_max: {
+        label: 'Highest recorded heart rate',
+        note: 'The highest heart rate recorded locally. If you never went to a real limit, the zones come out narrow.',
+      },
+      device_max: {
+        label: 'Max heart rate reported by the watch',
+        note: 'What the watch reports in its PAI payload, usually taken from your Zepp app profile.',
+      },
+      device_resting: {
+        label: 'Resting heart rate reported by the watch',
+        note: 'What the watch reports in its PAI payload.',
+      },
+      lactate_threshold: {
+        label: 'Lactate threshold heart rate',
+        note: 'Measured by the watch after a hard run.',
+      },
+      computed_resting: {
+        label: 'Resting heart rate computed locally',
+        note: '',
+      },
+    },
+    computedRestingNote: (days: number) => `Average across the ${days} days with data in the last 30.`,
   },
 );
 const t = useMessages(messages);
 
 const kindLabel = (kind: string): string =>
   (t.value.kind as Record<string, string | undefined>)[kind] ?? kind;
+
+type ModelCopy = { label: string; formula: string };
+type BasisCopy = { label: string; note: string };
+
+const modelCopy = (id: string): ModelCopy | undefined =>
+  (t.value.model as Record<string, ModelCopy | undefined>)[id];
+const basisCopy = (id: string): BasisCopy | undefined =>
+  (t.value.basis as Record<string, BasisCopy | undefined>)[id];
+
+/** 后端认识而界面还不认识的模型／基准：退回它那份中文，别显示空白。 */
+const modelLabel = (id: string, fallback: string): string => modelCopy(id)?.label ?? fallback;
+const modelFormula = (id: string, fallback: string): string => modelCopy(id)?.formula ?? fallback;
+const basisLabel = (basis: HeartRateBasis): string => basisCopy(basis.id)?.label ?? basis.label;
+const basisNote = (basis: HeartRateBasis): string => {
+  if (basis.id === 'computed_resting') {
+    return basis.noteCount ? t.value.computedRestingNote(basis.noteCount) : (basis.note ?? '');
+  }
+  return basisCopy(basis.id)?.note || (basis.note ?? '');
+};
+
+/** 区间名按算法分两套：阈值模型的五个区间和百分比模型不是一回事。 */
+const zoneName = (modelId: string, zone: number): string => {
+  const names = modelId === 'lactate_threshold' ? t.value.thresholdBands : t.value.percentBands;
+  return names[zone - 1] ?? '';
+};
 
 const props = defineProps<{ days: number; revision: number }>();
 
@@ -243,9 +330,9 @@ watch(() => props.revision, () => { void load(); });
         >
           <span class="model-name">
             <Icon v-if="preference.model === model.id" name="circle-check" :size="14" />
-            {{ model.label }}
+            {{ modelLabel(model.id, model.label) }}
           </span>
-          <span class="model-formula">{{ model.formula }}</span>
+          <span class="model-formula">{{ modelFormula(model.id, model.formula) }}</span>
           <span class="model-bands">
             {{ model.bands.map((band) => `${Math.round(band.lowPercent * 100)}–${Math.round(band.highPercent * 100)}%`).join(' / ') }}
           </span>
@@ -269,9 +356,9 @@ watch(() => props.revision, () => { void load(); });
             >
               <span class="basis-value">{{ Math.round(basis.value) }}<i>{{ basis.unit }}</i></span>
               <span class="basis-copy">
-                <strong>{{ basis.label }}</strong>
+                <strong>{{ basisLabel(basis) }}</strong>
                 <span class="basis-source">{{ basisSummary(basis) }}</span>
-                <span v-if="basis.note" class="basis-note">{{ basis.note }}</span>
+                <span v-if="basisNote(basis)" class="basis-note">{{ basisNote(basis) }}</span>
               </span>
               <Icon v-if="slot.chosen === basis.id" name="circle-check" :size="15" class="basis-check" />
             </button>
@@ -284,12 +371,12 @@ watch(() => props.revision, () => { void load(); });
 
       <template v-else>
         <div class="zone-summary">
-          <span>{{ report.modelLabel }}</span>
+          <span>{{ modelLabel(report.model, report.modelLabel) }}</span>
           <span class="zone-window">{{ t.window(report.windowDays, duration(measuredSeconds)) }}</span>
         </div>
         <ul class="zone-list">
           <li v-for="zone in report.zones" :key="zone.zone">
-            <span class="zone-name">Z{{ zone.zone }} {{ zone.label }}</span>
+            <span class="zone-name">Z{{ zone.zone }} {{ zoneName(report.model, zone.zone) || zone.label }}</span>
             <span class="zone-range">{{ zone.minBpm }}–{{ zone.maxBpm }}</span>
             <span class="zone-bar"><i :style="{ width: `${Math.round((zone.seconds / peakSeconds) * 100)}%` }"></i></span>
             <span class="zone-time">{{ duration(zone.seconds) }}</span>
@@ -300,8 +387,8 @@ watch(() => props.revision, () => { void load(); });
         </p>
         <p class="zone-formula">
           {{ t.formulaNote(
-            report.formula,
-            report.bases.map((basis) => `${basis.label} ${Math.round(basis.value)}`).join(' · '),
+            modelFormula(report.model, report.formula),
+            report.bases.map((basis) => `${basisLabel(basis)} ${Math.round(basis.value)}`).join(' · '),
           ) }}
         </p>
       </template>

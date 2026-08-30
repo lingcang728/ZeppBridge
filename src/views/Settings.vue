@@ -789,13 +789,33 @@ const capabilityRow = (item: CapabilityItem) => ({
   label: streamLabel(item.stream),
   detail:
     item.status === 'available' && item.ingested !== false
-      ? t.value.capabilityLocal(item.records, item.recordsUnit, item.latestDate ?? '')
+      ? t.value.capabilityLocal(item.records, unitLabel(item), item.latestDate ?? '')
       : item.status === 'available'
         // 数量前面必须写清是云端的，否则读起来就像本机已经有了。
-        ? t.value.capabilityCloud(item.records, item.recordsUnit, item.latestDate ?? '')
-        : (item.note ?? ''),
-  note: item.ingested === false ? (item.note ?? null) : null,
+        ? t.value.capabilityCloud(item.records, unitLabel(item), item.latestDate ?? '')
+        : capabilityNote(item),
+  note: item.ingested === false ? capabilityNote(item) : null,
 });
+
+/* 单位和说明都按后端发来的码渲染，不用后端那份中文。
+   后端仍然带着中文 recordsUnit / note，那是 CLI、MCP 和本机 API 的输出，
+   不跟界面语言走。 */
+const unitLabel = (item: CapabilityItem): string =>
+  (item.recordsUnitCode === 'days' ? t.value.unitDays : t.value.unitRecords);
+
+const capabilityNote = (item: CapabilityItem): string => {
+  const windowDays = item.windowDays ?? 0;
+  if (item.status === 'available' && item.ingested === false) return t.value.capabilityNotIngested;
+  if (item.status === 'unsupported') return t.value.capabilityUnsupported;
+  if (item.status === 'unknown') return t.value.capabilityNotProbed;
+  if (item.status === 'no_records') {
+    return item.source === 'probed'
+      ? t.value.capabilityNoneProbed(windowDays)
+      : t.value.capabilityNoRecords(windowDays);
+  }
+  // 后端加了新的状态而界面还不认识：显示它那句原文，别显示空白。
+  return item.note ?? '';
+};
 
 /* 三分，不是两分。
  *

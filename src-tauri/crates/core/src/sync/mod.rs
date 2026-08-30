@@ -57,7 +57,15 @@ pub struct SyncProgress {
     pub stream: String,
     pub current: u32,
     pub total: u32,
+    /// 中文原文。CLI 和日志用它，不跟界面语言走。
     pub message: String,
+    /// 这一步在做什么的稳定码（`syncing` / `backfilling`）。界面按它加上
+    /// `stream` 自己写句子——后端不按 locale 出文案，四个出口才会说同一件事。
+    #[serde(default)]
+    pub code: String,
+    /// 补拉时这一块是哪个月（`YYYY-MM`）。同步时为空。
+    #[serde(default)]
+    pub detail: Option<String>,
 }
 
 struct PersistResult {
@@ -252,6 +260,8 @@ impl SyncManager {
                     current,
                     total,
                     message: message.into(),
+                    code: "syncing".into(),
+                    detail: None,
                 });
             }
         };
@@ -462,6 +472,8 @@ impl SyncManager {
                 current: processed as u32,
                 total,
                 message: format!("正在补拉 {} · {}", chunk.stream, &chunk.chunk_start[..7]),
+                code: "backfilling".into(),
+                detail: Some(chunk.chunk_start[..7].to_string()),
             });
 
             let outcome = self.backfill_one_chunk(&chunk, &time_zone).await;

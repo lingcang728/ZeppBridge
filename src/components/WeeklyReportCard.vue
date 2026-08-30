@@ -29,6 +29,9 @@ const messages = defineMessages(
     barThisWeek: '本周',
     barBaseline: '此前 28 天',
     noBaseline: '此前的数据不够，这次只报现状',
+    thinBaseline: (days: number, found: number, needed: number) =>
+      `此前 ${days} 天里只有 ${found} 天有这项数据，不足 ${needed} 天，所以只报现状不做比较。`,
+    noRecentData: '最近 7 天本机没有这项数据。',
     notProvided: '未提供',
     sleepDuration: (hours: number, minutes: number) => `${hours} 小时 ${minutes} 分`,
     regularity: (minutes: number) => `±${minutes} 分`,
@@ -57,6 +60,9 @@ const messages = defineMessages(
     barThisWeek: 'This week',
     barBaseline: 'Prev. 28 days',
     noBaseline: 'Not enough history behind it, so this is the current figure only',
+    thinBaseline: (days: number, found: number, needed: number) =>
+      `Only ${found} of the previous ${days} days carry this metric, fewer than the ${needed} needed, so this is the current figure without a comparison.`,
+    noRecentData: 'Nothing recorded locally for this metric in the last 7 days.',
     notProvided: 'Not provided',
     sleepDuration: (hours: number, minutes: number) => `${hours} hr ${minutes} min`,
     regularity: (minutes: number) => `±${minutes} min`,
@@ -73,6 +79,20 @@ const messages = defineMessages(
   },
 );
 const t = useMessages(messages);
+
+/* 没有比较的原因按后端发来的码渲染，参数取自同一条事实里已有的字段。
+   后端那份中文原文是给 CLI / MCP / 导出的，不跟界面语言走。 */
+const reasonText = (fact: InsightFact): string => {
+  if (fact.reason_code === 'weekly_no_recent_data') return t.value.noRecentData;
+  if (fact.reason_code === 'weekly_thin_baseline' && fact.baseline_window) {
+    return t.value.thinBaseline(
+      fact.baseline_window.days,
+      fact.baseline_count ?? 0,
+      fact.baseline_window.min_samples,
+    );
+  }
+  return fact.reason || t.value.noBaseline;
+};
 
 const metricLabel = (factId: string, fallback: string): string =>
   (t.value.metric as Record<string, string | undefined>)[factId] ?? fallback;
@@ -217,7 +237,7 @@ function formatNumber(fact: InsightFact, value: number): string {
             </span>
           </template>
 
-          <span v-else class="weekly-delta muted">{{ fact.reason || t.noBaseline }}</span>
+          <span v-else class="weekly-delta muted">{{ reasonText(fact) }}</span>
         </div>
       </div>
     </template>
