@@ -1,6 +1,19 @@
 <script setup lang="ts">
 import DeviceVisual from './DeviceVisual.vue';
 import { deviceStateLabel, type DeviceCardModel } from '../composables/useDevices';
+import { defineMessages, useMessages } from '../i18n';
+
+const messages = defineMessages(
+  {
+    firmware: (value: string) => `固件 ${value}`,
+    lastData: (value: string) => `最近数据 ${value}`,
+  },
+  {
+    firmware: (value: string) => `Firmware ${value}`,
+    lastData: (value: string) => `Latest data ${value}`,
+  },
+);
+const t = useMessages(messages);
 
 withDefaults(defineProps<{
   profile: DeviceCardModel;
@@ -22,7 +35,7 @@ withDefaults(defineProps<{
       <strong>{{ profile.canonicalName }}</strong>
       <span class="device-display">{{ profile.displayName }}</span>
       <span class="device-state"><i :class="['dot', profile.state === 'recent_data' ? 'has-data' : profile.state === 'account' ? 'identified' : 'muted']"></i>{{ deviceStateLabel(profile.state) }}</span>
-      <span v-if="!compact" class="device-meta">固件 {{ profile.firmware }}<br />最近数据 {{ profile.lastData }}</span>
+      <span v-if="!compact" class="device-meta">{{ t.firmware(profile.firmware) }}<br />{{ t.lastData(profile.lastData) }}</span>
     </div>
   </article>
 </template>

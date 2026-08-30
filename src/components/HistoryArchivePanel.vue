@@ -15,6 +15,138 @@ import SelectMenu from './SelectMenu.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import type { CoverageLedger, StorageEstimate, UserPrefs } from '../types';
+import { defineMessages, useMessages } from '../i18n';
+
+const messages = defineMessages(
+  {
+    title: '长期归档与完整历史',
+    intro: '归档管「从今天起不再删」，补拉管「把以前的取回来」。两个都到位，本机才真的是一份完整副本。',
+    archiveTitle: '长期归档',
+    archiveBody: '开启后，成功同步不再按保留期自动清理历史。库会持续变大，可以随时关闭；关闭时会提示下一次同步的清理影响。',
+    archiveAria: '长期归档',
+    startLabel: '补拉起点',
+    startAria: '历史补拉起点',
+    customDateLabel: '起始日期',
+    customDateAria: '补拉起始日期',
+    estimateTitle: '预计占用',
+    estimateRate: (days: number, perDay: string) => `本机 ${days} 天样本 · 约 ${perDay}/天`,
+    unmeasured: (streams: string) =>
+      `本机样本不足、没有估算：${streams}。这几条不计入上面的总数——与其编一个速率乘上几年，不如说不知道。`,
+    wouldBeCleanedUp: (requested: number, retention: number) =>
+      `这次补拉要取回 ${requested} 天的历史，但本机只保留最近 ${retention} 天——取回来的数据会在下一次成功同步后被删掉。请先打开长期归档，或把保留期调长。`,
+    backfilling: '正在补拉…',
+    continueBackfill: '继续补拉',
+    startBackfill: '开始补拉',
+    resetLedger: '清空账本',
+    ledgerTitle: '覆盖账本',
+    ledgerProgress: (done: number, total: number) => `${done} / ${total} 个月份块已有结论`,
+    ledgerFrom: (from: string) => ` · 请求范围 ${from} 起`,
+    ledgerComplete: '账本里每个月份块都有结论：要么已写入本机，要么云端明确没有那段时间的数据。',
+    ledgerIncomplete: (remaining: number) =>
+      `还有 ${remaining} 个块没有结论。在它们全部完成之前，这份本地副本只能算「已成功同步范围内的副本」，不是完整副本。`,
+    ledgerStats: (persisted: number, empty: number, pending: number) =>
+      `已写入 ${persisted} · 云端无返回 ${empty} · 待做 ${pending}`,
+    ledgerFailed: (failed: number) => `失败 ${failed}`,
+    ledgerRange: (from: string, to: string, records: number) => `${from} ~ ${to} · ${records} 条`,
+    ledgerNothingWritten: '尚未写入任何月份',
+
+    range1y: '最近 1 年',
+    range2y: '最近 2 年',
+    range3y: '最近 3 年',
+    rangeAll: (years: number) => `全部可获取历史（最多 ${years} 年）`,
+    rangeCustom: '自定义起点',
+
+    confirmDisableArchive: '关掉长期归档后，下一次成功同步会按保留期清理更早的数据，且不可恢复。\n如果你刚补拉过历史，建议先做一份数据库快照。\n确定关闭吗？',
+    archiveEnabled: '已开启长期归档：成功同步后不再自动清理历史。',
+    archiveDisabled: '已关闭长期归档：下一次成功同步会按保留期清理。',
+    archiveSaveFailed: '无法保存归档设置',
+    pickStartFirst: '请先选择补拉起点。',
+    outOfRetention: '这次补拉的范围超出了本机保留期，取回来的数据会在下一次成功同步后被清掉。请先打开长期归档，或把保留期调长。',
+    roundDone: (remaining: number) =>
+      `这一轮已处理完，还剩 ${remaining} 个月份块。再点一次「继续补拉」接着做，随时可以停。`,
+    allChunksDone: '账本里的每个月份块都有结论了。',
+    backfillFailed: '历史补拉失败',
+    confirmResetLedger: '只清空覆盖账本，不会删除任何已经写进本机的数据。之后可以重新规划一次补拉。确定吗？',
+    ledgerReset: '账本已清空，可以重新规划补拉范围。',
+    ledgerResetFailed: '无法清空账本',
+    streamSeparator: '、',
+
+    stream: {
+      heart_rate: '心率',
+      daily_summary: '每日概览',
+      workouts: '运动记录',
+      sleep: '睡眠',
+      hrv: '心率变异性',
+      wellness: '压力 / 血氧等',
+    },
+  },
+  {
+    title: 'Long-term archive and full history',
+    intro: 'The archive covers "stop deleting from today on"; the backfill covers "go get what came before". Only with both is the local copy actually complete.',
+    archiveTitle: 'Long-term archive',
+    archiveBody: 'With this on, a successful sync no longer prunes history by the retention window. The database keeps growing; you can turn it off at any time, and turning it off tells you what the next sync would prune.',
+    archiveAria: 'Long-term archive',
+    startLabel: 'Backfill from',
+    startAria: 'History backfill start',
+    customDateLabel: 'Start date',
+    customDateAria: 'Backfill start date',
+    estimateTitle: 'Estimated growth',
+    estimateRate: (days: number, perDay: string) => `${days} days of local samples · about ${perDay}/day`,
+    unmeasured: (streams: string) =>
+      `Not enough local samples to estimate: ${streams}. These are left out of the total above — better to say we do not know than to invent a rate and multiply it by years.`,
+    wouldBeCleanedUp: (requested: number, retention: number) =>
+      `This backfill would fetch ${requested} days of history, but this machine only keeps the last ${retention} days — what comes back would be deleted at the next successful sync. Turn on the long-term archive first, or raise the retention window.`,
+    backfilling: 'Backfilling…',
+    continueBackfill: 'Continue backfilling',
+    startBackfill: 'Start backfilling',
+    resetLedger: 'Clear the ledger',
+    ledgerTitle: 'Coverage ledger',
+    ledgerProgress: (done: number, total: number) => `${done} of ${total} monthly chunks resolved`,
+    ledgerFrom: (from: string) => ` · requested from ${from}`,
+    ledgerComplete: 'Every monthly chunk in the ledger is resolved: either written locally, or the cloud said plainly it has nothing for that period.',
+    ledgerIncomplete: (remaining: number) =>
+      `${remaining} chunks are still unresolved. Until they are all done, this local copy is a copy of the successfully synced range — not a complete one.`,
+    ledgerStats: (persisted: number, empty: number, pending: number) =>
+      `${persisted} written · ${empty} empty from the cloud · ${pending} to do`,
+    ledgerFailed: (failed: number) => `${failed} failed`,
+    ledgerRange: (from: string, to: string, records: number) => `${from} ~ ${to} · ${records} records`,
+    ledgerNothingWritten: 'No month written yet',
+
+    range1y: 'Last 1 year',
+    range2y: 'Last 2 years',
+    range3y: 'Last 3 years',
+    rangeAll: (years: number) => `All available history (up to ${years} years)`,
+    rangeCustom: 'Custom start',
+
+    confirmDisableArchive: 'With the long-term archive off, the next successful sync prunes older data by the retention window, and that cannot be undone.\nIf you just backfilled history, take a database snapshot first.\nTurn it off?',
+    archiveEnabled: 'Long-term archive on: successful syncs no longer prune history.',
+    archiveDisabled: 'Long-term archive off: the next successful sync prunes by the retention window.',
+    archiveSaveFailed: 'Could not save the archive setting',
+    pickStartFirst: 'Choose where the backfill starts first.',
+    outOfRetention: 'This backfill reaches past the local retention window, so what comes back would be pruned at the next successful sync. Turn on the long-term archive first, or raise the retention window.',
+    roundDone: (remaining: number) =>
+      `This round is done; ${remaining} monthly chunks remain. Press "Continue backfilling" to carry on — you can stop whenever you like.`,
+    allChunksDone: 'Every monthly chunk in the ledger is resolved.',
+    backfillFailed: 'The history backfill failed',
+    confirmResetLedger: 'This clears the coverage ledger only. Nothing already written locally is deleted, and you can plan a new backfill afterwards. Continue?',
+    ledgerReset: 'The ledger is cleared. You can plan a new backfill range.',
+    ledgerResetFailed: 'Could not clear the ledger',
+    streamSeparator: ', ',
+
+    stream: {
+      heart_rate: 'Heart rate',
+      daily_summary: 'Daily summaries',
+      workouts: 'Workouts',
+      sleep: 'Sleep',
+      hrv: 'Heart rate variability',
+      wellness: 'Stress / SpO2 and similar',
+    },
+  },
+);
+const t = useMessages(messages);
+
+const streamLabel = (stream: string): string =>
+  (t.value.stream as Record<string, string | undefined>)[stream] ?? stream;
 
 const props = defineProps<{ prefs: UserPrefs | null }>();
 const emit = defineEmits<{ (event: 'prefs-changed', prefs: UserPrefs): void }>();
@@ -29,25 +161,16 @@ const estimate = ref<StorageEstimate | null>(null);
 const startChoice = ref<'1y' | '2y' | '3y' | 'all' | 'custom'>('1y');
 const customFrom = ref('');
 
-const STREAM_LABEL: Record<string, string> = {
-  heart_rate: '心率',
-  daily_summary: '每日概览',
-  workouts: '运动记录',
-  sleep: '睡眠',
-  hrv: '心率变异性',
-  wellness: '压力 / 血氧等',
-};
-
 /** Zepp 云端本身也不会有更早的记录；给「全部」一个诚实的下界而不是 1970。 */
 const ALL_HISTORY_YEARS = 10;
 
-const START_CHOICES = [
-  { value: '1y', label: '最近 1 年' },
-  { value: '2y', label: '最近 2 年' },
-  { value: '3y', label: '最近 3 年' },
-  { value: 'all', label: `全部可获取历史（最多 ${ALL_HISTORY_YEARS} 年）` },
-  { value: 'custom', label: '自定义起点' },
-];
+const START_CHOICES = computed(() => [
+  { value: '1y', label: t.value.range1y },
+  { value: '2y', label: t.value.range2y },
+  { value: '3y', label: t.value.range3y },
+  { value: 'all', label: t.value.rangeAll(ALL_HISTORY_YEARS) },
+  { value: 'custom', label: t.value.rangeCustom },
+]);
 
 const fromDate = computed(() => {
   const today = new Date();
@@ -124,10 +247,7 @@ watch(requestedDays, () => { void loadEstimate(); });
 const toggleArchive = async () => {
   if (!props.prefs) return;
   const next = !props.prefs.archive_enabled;
-  if (!next && !window.confirm(
-    '关掉长期归档后，下一次成功同步会按保留期清理更早的数据，且不可恢复。\n'
-    + '如果你刚补拉过历史，建议先做一份数据库快照。\n确定关闭吗？',
-  )) return;
+  if (!next && !window.confirm(t.value.confirmDisableArchive)) return;
   busy.value = true;
   error.value = null;
   message.value = null;
@@ -138,11 +258,9 @@ const toggleArchive = async () => {
       next,
     );
     emit('prefs-changed', updated);
-    message.value = next
-      ? '已开启长期归档：成功同步后不再自动清理历史。'
-      : '已关闭长期归档：下一次成功同步会按保留期清理。';
+    message.value = next ? t.value.archiveEnabled : t.value.archiveDisabled;
   } catch (cause) {
-    error.value = toUserMessage(cause, '无法保存归档设置');
+    error.value = toUserMessage(cause, t.value.archiveSaveFailed);
   } finally {
     busy.value = false;
   }
@@ -150,7 +268,7 @@ const toggleArchive = async () => {
 
 const runBackfill = async () => {
   if (!fromDate.value) {
-    error.value = '请先选择补拉起点。';
+    error.value = t.value.pickStartFirst;
     return;
   }
   if (estimate.value?.stop_reason) {
@@ -158,7 +276,7 @@ const runBackfill = async () => {
     return;
   }
   if (wouldBeCleanedUp.value) {
-    error.value = '这次补拉的范围超出了本机保留期，取回来的数据会在下一次成功同步后被清掉。请先打开长期归档，或把保留期调长。';
+    error.value = t.value.outOfRetention;
     return;
   }
   busy.value = true;
@@ -168,10 +286,10 @@ const runBackfill = async () => {
     ledger.value = await backend.startHistoryBackfill(fromDate.value);
     markDataChanged();
     message.value = remaining.value > 0
-      ? `这一轮已处理完，还剩 ${remaining.value} 个月份块。再点一次「继续补拉」接着做，随时可以停。`
-      : '账本里的每个月份块都有结论了。';
+      ? t.value.roundDone(remaining.value)
+      : t.value.allChunksDone;
   } catch (cause) {
-    error.value = toUserMessage(cause, '历史补拉失败');
+    error.value = toUserMessage(cause, t.value.backfillFailed);
     await loadLedger();
   } finally {
     busy.value = false;
@@ -179,14 +297,14 @@ const runBackfill = async () => {
 };
 
 const resetLedger = async () => {
-  if (!window.confirm('只清空覆盖账本，不会删除任何已经写进本机的数据。之后可以重新规划一次补拉。确定吗？')) return;
+  if (!window.confirm(t.value.confirmResetLedger)) return;
   busy.value = true;
   error.value = null;
   try {
     ledger.value = await backend.resetCoverageLedger();
-    message.value = '账本已清空，可以重新规划补拉范围。';
+    message.value = t.value.ledgerReset;
   } catch (cause) {
-    error.value = toUserMessage(cause, '无法清空账本');
+    error.value = toUserMessage(cause, t.value.ledgerResetFailed);
   } finally {
     busy.value = false;
   }
@@ -195,24 +313,19 @@ const resetLedger = async () => {
 
 <template>
   <section class="settings-card" aria-labelledby="archive-title">
-    <h2 id="archive-title">长期归档与完整历史</h2>
-    <p class="section-description">
-      归档管「从今天起不再删」，补拉管「把以前的取回来」。两个都到位，本机才真的是一份完整副本。
-    </p>
+    <h2 id="archive-title">{{ t.title }}</h2>
+    <p class="section-description">{{ t.intro }}</p>
 
     <div class="toggle-row archive-toggle">
       <div class="toggle-copy">
-        <strong>长期归档</strong>
-        <span>
-          开启后，成功同步不再按保留期自动清理历史。库会持续变大，可以随时关闭；
-          关闭时会提示下一次同步的清理影响。
-        </span>
+        <strong>{{ t.archiveTitle }}</strong>
+        <span>{{ t.archiveBody }}</span>
       </div>
       <button
         class="switch"
         type="button"
         role="switch"
-        aria-label="长期归档"
+        :aria-label="t.archiveAria"
         :aria-checked="Boolean(prefs?.archive_enabled)"
         :disabled="busy || !prefs"
         @click="toggleArchive"
@@ -220,39 +333,37 @@ const resetLedger = async () => {
     </div>
 
     <div class="field-row">
-      <span class="kv-label">补拉起点</span>
-      <SelectMenu v-model="startChoice" :options="START_CHOICES" aria-label="历史补拉起点" />
+      <span class="kv-label">{{ t.startLabel }}</span>
+      <SelectMenu v-model="startChoice" :options="START_CHOICES" :aria-label="t.startAria" />
     </div>
     <div v-if="startChoice === 'custom'" class="field-row">
-      <span class="kv-label">起始日期</span>
-      <input v-model="customFrom" type="date" aria-label="补拉起始日期" />
+      <span class="kv-label">{{ t.customDateLabel }}</span>
+      <input v-model="customFrom" type="date" :aria-label="t.customDateAria" />
     </div>
 
     <div v-if="estimate" class="estimate-block">
       <div class="estimate-head">
-        <strong>预计占用</strong>
+        <strong>{{ t.estimateTitle }}</strong>
         <span>{{ estimate.message }}</span>
       </div>
       <div v-if="measuredStreams.length" class="estimate-list">
         <div v-for="item in measuredStreams" :key="item.stream" class="estimate-row">
-          <span>{{ STREAM_LABEL[item.stream] || item.stream }}</span>
+          <span>{{ streamLabel(item.stream) }}</span>
           <span class="estimate-rate">
-            本机 {{ item.observed_days }} 天样本 · 约 {{ formatBytes(item.bytes_per_day) }}/天
+            {{ t.estimateRate(item.observed_days, formatBytes(item.bytes_per_day)) }}
           </span>
           <span class="estimate-total">+{{ formatBytes(item.estimated_add_bytes) }}</span>
         </div>
       </div>
       <p v-if="unmeasuredStreams.length" class="retain-note">
-        本机样本不足、没有估算：{{ unmeasuredStreams.map((item) => STREAM_LABEL[item.stream] || item.stream).join('、') }}。
-        这几条不计入上面的总数——与其编一个速率乘上几年，不如说不知道。
+        {{ t.unmeasured(unmeasuredStreams.map((item) => streamLabel(item.stream)).join(t.streamSeparator)) }}
       </p>
     </div>
 
     <p v-if="estimate?.stop_reason" class="api-error" role="alert">{{ estimate.stop_reason }}</p>
 
     <p v-if="wouldBeCleanedUp" class="api-error" role="alert">
-      这次补拉要取回 {{ requestedDays }} 天的历史，但本机只保留最近 {{ prefs?.retention_days }} 天——
-      取回来的数据会在下一次成功同步后被删掉。请先打开长期归档，或把保留期调长。
+      {{ t.wouldBeCleanedUp(requestedDays, prefs?.retention_days ?? 0) }}
     </p>
 
     <div class="inline-actions">
@@ -261,9 +372,9 @@ const resetLedger = async () => {
         type="button"
         :disabled="busy || isSyncing || !fromDate || wouldBeCleanedUp || Boolean(estimate?.stop_reason)"
         @click="runBackfill"
-      >{{ busy ? '正在补拉…' : (remaining > 0 ? '继续补拉' : '开始补拉') }}</button>
+      >{{ busy ? t.backfilling : (remaining > 0 ? t.continueBackfill : t.startBackfill) }}</button>
       <button v-if="ledger?.total_chunks" class="button secondary" type="button" :disabled="busy" @click="resetLedger">
-        清空账本
+        {{ t.resetLedger }}
       </button>
     </div>
 
@@ -272,36 +383,30 @@ const resetLedger = async () => {
 
     <template v-if="ledger && ledger.total_chunks > 0">
       <div class="ledger-head">
-        <strong>覆盖账本</strong>
+        <strong>{{ t.ledgerTitle }}</strong>
         <span>
-          {{ ledger.completed_chunks }} / {{ ledger.total_chunks }} 个月份块已有结论
+          {{ t.ledgerProgress(ledger.completed_chunks, ledger.total_chunks) }}
           <template v-if="ledger.requested_from">
-            · 请求范围 {{ ledger.requested_from.slice(0, 7) }} 起
+            {{ t.ledgerFrom(ledger.requested_from.slice(0, 7)) }}
           </template>
         </span>
       </div>
       <p class="retain-note">
-        <template v-if="ledger.complete">
-          账本里每个月份块都有结论：要么已写入本机，要么云端明确没有那段时间的数据。
-        </template>
-        <template v-else>
-          还有 {{ remaining }} 个块没有结论。在它们全部完成之前，这份本地副本只能算「已成功同步范围内的副本」，不是完整副本。
-        </template>
+        <template v-if="ledger.complete">{{ t.ledgerComplete }}</template>
+        <template v-else>{{ t.ledgerIncomplete(remaining) }}</template>
       </p>
       <div class="ledger-list">
         <div v-for="stream in ledger.streams" :key="stream.stream" class="ledger-row">
-          <strong>{{ STREAM_LABEL[stream.stream] || stream.stream }}</strong>
+          <strong>{{ streamLabel(stream.stream) }}</strong>
           <span class="ledger-stats">
-            已写入 {{ stream.persisted_chunks }}
-            · 云端无返回 {{ stream.empty_chunks }}
-            · 待做 {{ stream.pending_chunks }}
-            <template v-if="stream.failed_chunks"> · <em>失败 {{ stream.failed_chunks }}</em></template>
+            {{ t.ledgerStats(stream.persisted_chunks, stream.empty_chunks, stream.pending_chunks) }}
+            <template v-if="stream.failed_chunks"> · <em>{{ t.ledgerFailed(stream.failed_chunks) }}</em></template>
           </span>
           <span class="ledger-range">
             <template v-if="stream.persisted_from">
-              {{ stream.persisted_from.slice(0, 7) }} ~ {{ stream.persisted_to?.slice(0, 7) }} · {{ stream.records }} 条
+              {{ t.ledgerRange(stream.persisted_from.slice(0, 7), stream.persisted_to?.slice(0, 7) ?? '', stream.records) }}
             </template>
-            <template v-else>尚未写入任何月份</template>
+            <template v-else>{{ t.ledgerNothingWritten }}</template>
           </span>
         </div>
       </div>

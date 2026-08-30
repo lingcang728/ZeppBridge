@@ -16,6 +16,166 @@ import Icon from './Icon.vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { formatFullDateTime } from '../lib/format';
 import type { BackupManifest, BackupVerification, PendingRestore, RestorePreview } from '../types';
+import { defineMessages, useMessages } from '../i18n';
+
+const messages = defineMessages(
+  {
+    title: '数据库快照与恢复',
+    intro1a: '快照是整个 ',
+    intro1b: ' 的一份完整副本，全部留在本机，不会上传任何地方。数据库升级前会自动生成一份，你也可以随时手动做。',
+    compareLead: '三种「导出」不要混淆：',
+    compareExchange: ' 是给别的工具用的数据交换，只含选中的范围；',
+    compareSnapshotName: '数据库快照',
+    compareSnapshot: '是灾难恢复用的整库副本，只能由 ZeppBridge 自己读回来；',
+    comparePackName: 'AI 数据包',
+    comparePack: '是你主动挑选并脱敏后交给外部模型的材料。只有快照能把库恢复回从前的样子。',
+
+    pendingTitle: '有一次恢复正在排队',
+    pendingBodyA: (stagedAt: string) => `排队于 ${stagedAt}，将在`,
+    pendingNextStart: '下次启动',
+    pendingBodyB: '时替换数据库。替换前的当前库已经存成回滚点，出问题可以再恢复回来。',
+    cancelRestore: '取消恢复',
+
+    creating: '正在生成…',
+    createSnapshot: '生成快照',
+    refreshList: '刷新列表',
+    noSnapshots: '还没有任何快照。',
+
+    pinned: '保留',
+    metaLine: (size: string, appVersion: string, schemaVersion: number) =>
+      `${size} · 程序 ${appVersion} · 数据库版本 ${schemaVersion}`,
+    coverage: (from: string, to: string) => ` · 样本覆盖 ${from} ~ ${to}`,
+    noSamples: ' · 快照里没有健康样本',
+    verifyFailed: (problem: string) => `校验未通过：${problem}`,
+    verifyPassed: '刚刚重新校验：文件、大小、SHA-256 与完整性都对得上。',
+    integrityOk: (sha: string) => `生成时完整性检查通过 · SHA-256 ${sha}…`,
+    integrityBad: '生成时完整性检查未通过，不要用它恢复。',
+    verifyAgain: '重新校验',
+    unpin: '取消保留',
+    pin: '标记保留',
+    restoreToThis: '恢复到这一份',
+
+    previewTitle: '恢复预览',
+    compatibilityUnknown: '兼容性未知。',
+    colContent: '内容',
+    colBackup: '快照里',
+    colCurrent: '当前库',
+    colDelta: '差值',
+    previewNote: '差值为负的行，恢复后会比现在少这么多条。恢复不会去云端重新拉取——如果还需要那部分数据，要在恢复完成后再同步一次。',
+    staging: '正在排队…',
+    stageRestore: '排队恢复（下次启动生效）',
+    cancel: '取消',
+
+    listFailed: '无法读取备份列表',
+    created: (size: string) => `已生成快照：${size}，完整性检查通过。`,
+    createFailed: '生成快照失败',
+    verifyError: '校验失败',
+    pinFailed: '无法修改保留标记',
+    previewFailed: '无法生成恢复预览',
+    staged: '恢复已排队。当前这次运行不会有任何变化，下次启动 ZeppBridge 时才会替换数据库。',
+    stageFailed: '无法排队恢复',
+    cancelled: '已取消排队中的恢复，数据库保持不变。',
+    cancelFailed: '无法取消恢复',
+
+    kind: {
+      manual: '手动',
+      pre_migration: '升级前自动',
+      pre_restore: '恢复前回滚点',
+    },
+    compatibility: {
+      same_schema: '快照的数据库版本和当前程序一致，可以直接恢复。',
+      older_schema_will_migrate: '快照来自更早的数据库版本，恢复后会在下次启动时自动升级。',
+      future_schema_refused: '快照来自更新的程序版本，当前程序读不了它的结构，不能恢复。',
+    },
+    table: {
+      raw_records: '原始报文',
+      workouts: '运动记录',
+      daily_summaries: '每日概览',
+      metric_samples: '指标采样',
+      sleep_sessions: '睡眠',
+    },
+  },
+  {
+    title: 'Database snapshots and restore',
+    intro1a: 'A snapshot is a complete copy of the whole ',
+    intro1b: ' file. It stays on this machine and is never uploaded anywhere. One is taken automatically before a database upgrade, and you can take one whenever you like.',
+    compareLead: 'Three things are called "export" here, and they are not the same: ',
+    compareExchange: ' is data interchange for other tools, and holds only the range you picked;',
+    compareSnapshotName: 'a database snapshot',
+    compareSnapshot: ' is a whole-database copy for disaster recovery that only ZeppBridge can read back;',
+    comparePackName: 'an AI package',
+    comparePack: ' is material you deliberately pick and de-identify for an outside model. Only a snapshot can put the database back the way it was.',
+
+    pendingTitle: 'A restore is queued',
+    pendingBodyA: (stagedAt: string) => `Queued ${stagedAt}. The database will be replaced at the `,
+    pendingNextStart: 'next start',
+    pendingBodyB: '. The current database is already saved as a rollback point, so you can come back from it.',
+    cancelRestore: 'Cancel the restore',
+
+    creating: 'Creating…',
+    createSnapshot: 'Take a snapshot',
+    refreshList: 'Refresh',
+    noSnapshots: 'No snapshots yet.',
+
+    pinned: 'Kept',
+    metaLine: (size: string, appVersion: string, schemaVersion: number) =>
+      `${size} · app ${appVersion} · schema ${schemaVersion}`,
+    coverage: (from: string, to: string) => ` · samples ${from} ~ ${to}`,
+    noSamples: ' · no health samples in this snapshot',
+    verifyFailed: (problem: string) => `Verification failed: ${problem}`,
+    verifyPassed: 'Just re-verified: file, size, SHA-256 and integrity all line up.',
+    integrityOk: (sha: string) => `Integrity check passed at creation · SHA-256 ${sha}…`,
+    integrityBad: 'The integrity check failed at creation. Do not restore from it.',
+    verifyAgain: 'Verify again',
+    unpin: 'Stop keeping',
+    pin: 'Keep',
+    restoreToThis: 'Restore to this one',
+
+    previewTitle: 'Restore preview',
+    compatibilityUnknown: 'Compatibility unknown.',
+    colContent: 'Content',
+    colBackup: 'In snapshot',
+    colCurrent: 'Current',
+    colDelta: 'Difference',
+    previewNote: 'Rows with a negative difference will hold that many fewer records after the restore. A restore never re-fetches from the cloud, so if you still need that data, sync again once it is done.',
+    staging: 'Queueing…',
+    stageRestore: 'Queue the restore (takes effect at next start)',
+    cancel: 'Cancel',
+
+    listFailed: 'Could not read the snapshot list',
+    created: (size: string) => `Snapshot created: ${size}, integrity check passed.`,
+    createFailed: 'Could not create the snapshot',
+    verifyError: 'Verification failed',
+    pinFailed: 'Could not change the keep flag',
+    previewFailed: 'Could not build the restore preview',
+    staged: 'The restore is queued. Nothing changes in this run; the database is replaced the next time ZeppBridge starts.',
+    stageFailed: 'Could not queue the restore',
+    cancelled: 'The queued restore was cancelled. The database is unchanged.',
+    cancelFailed: 'Could not cancel the restore',
+
+    kind: {
+      manual: 'manual',
+      pre_migration: 'before upgrade',
+      pre_restore: 'rollback point',
+    },
+    compatibility: {
+      same_schema: 'The snapshot has the same schema version as this app, so it restores directly.',
+      older_schema_will_migrate: 'The snapshot comes from an older schema version. After restoring, it upgrades itself at the next start.',
+      future_schema_refused: 'The snapshot comes from a newer app version whose structure this app cannot read, so it cannot be restored.',
+    },
+    table: {
+      raw_records: 'Raw payloads',
+      workouts: 'Workouts',
+      daily_summaries: 'Daily summaries',
+      metric_samples: 'Metric samples',
+      sleep_sessions: 'Sleep',
+    },
+  },
+);
+const t = useMessages(messages);
+
+const lookup = (table: unknown, key: string): string | undefined =>
+  (table as Record<string, string | undefined>)[key];
 
 const backups = ref<BackupManifest[]>([]);
 const pending = ref<PendingRestore | null>(null);
@@ -25,26 +185,13 @@ const busy = ref<string | null>(null);
 const error = ref<string | null>(null);
 const message = ref<string | null>(null);
 
-const KIND_LABEL: Record<string, string> = {
-  manual: '手动',
-  pre_migration: '升级前自动',
-  pre_restore: '恢复前回滚点',
-};
-
-const COMPATIBILITY_COPY: Record<string, string> = {
-  same_schema: '快照的数据库版本和当前程序一致，可以直接恢复。',
-  older_schema_will_migrate: '快照来自更早的数据库版本，恢复后会在下次启动时自动升级。',
-  future_schema_refused: '快照来自更新的程序版本，当前程序读不了它的结构，不能恢复。',
-};
+const kindLabel = (kind: string): string => lookup(t.value.kind, kind) ?? kind;
+const compatibilityCopy = (kind: string): string =>
+  lookup(t.value.compatibility, kind) ?? t.value.compatibilityUnknown;
 
 /** 只显示真正有意义的几张表，避免把内部表堆到界面上。 */
-const COUNT_LABEL: Record<string, string> = {
-  raw_records: '原始报文',
-  workouts: '运动记录',
-  daily_summaries: '每日概览',
-  metric_samples: '指标采样',
-  sleep_sessions: '睡眠',
-};
+const TABLE_KEYS = ['raw_records', 'workouts', 'daily_summaries', 'metric_samples', 'sleep_sessions'];
+const tableLabel = (key: string): string => lookup(t.value.table, key) ?? key;
 
 const formatBytes = (bytes: number): string => {
   if (bytes < 1024) return `${bytes} B`;
@@ -55,13 +202,13 @@ const formatBytes = (bytes: number): string => {
 const previewRows = computed(() => {
   const value = preview.value;
   if (!value) return [];
-  const keys = Object.keys(COUNT_LABEL).filter(
+  const keys = TABLE_KEYS.filter(
     (key) => key in value.manifest.table_counts || key in value.current_table_counts,
   );
   return keys.map((key) => {
     const from = value.manifest.table_counts[key] ?? 0;
     const to = value.current_table_counts[key] ?? 0;
-    return { key, label: COUNT_LABEL[key], backup: from, current: to, delta: from - to };
+    return { key, label: tableLabel(key), backup: from, current: to, delta: from - to };
   });
 });
 
@@ -72,7 +219,7 @@ const load = async () => {
     backups.value = list;
     pending.value = staged;
   } catch (cause) {
-    error.value = toUserMessage(cause, '无法读取备份列表');
+    error.value = toUserMessage(cause, t.value.listFailed);
   }
 };
 
@@ -84,10 +231,10 @@ const createBackup = async () => {
   message.value = null;
   try {
     const created = await backend.createManualBackup();
-    message.value = `已生成快照：${formatBytes(created.bytes)}，完整性检查通过。`;
+    message.value = t.value.created(formatBytes(created.bytes));
     await load();
   } catch (cause) {
-    error.value = toUserMessage(cause, '生成快照失败');
+    error.value = toUserMessage(cause, t.value.createFailed);
   } finally {
     busy.value = null;
   }
@@ -100,7 +247,7 @@ const verify = async (id: string) => {
   try {
     verifications.value = { ...verifications.value, [id]: await backend.verifyBackup(id) };
   } catch (cause) {
-    error.value = toUserMessage(cause, '校验失败');
+    error.value = toUserMessage(cause, t.value.verifyError);
   } finally {
     busy.value = null;
   }
@@ -113,7 +260,7 @@ const togglePinned = async (item: BackupManifest) => {
     await backend.setBackupPinned(item.id, !item.pinned);
     await load();
   } catch (cause) {
-    error.value = toUserMessage(cause, '无法修改保留标记');
+    error.value = toUserMessage(cause, t.value.pinFailed);
   } finally {
     busy.value = null;
   }
@@ -126,7 +273,7 @@ const openPreview = async (id: string) => {
   try {
     preview.value = await backend.getRestorePreview(id);
   } catch (cause) {
-    error.value = toUserMessage(cause, '无法生成恢复预览');
+    error.value = toUserMessage(cause, t.value.previewFailed);
   } finally {
     busy.value = null;
   }
@@ -140,10 +287,10 @@ const confirmRestore = async () => {
   try {
     pending.value = await backend.stageRestore(target.manifest.id);
     preview.value = null;
-    message.value = '恢复已排队。当前这次运行不会有任何变化，下次启动 ZeppBridge 时才会替换数据库。';
+    message.value = t.value.staged;
     await load();
   } catch (cause) {
-    error.value = toUserMessage(cause, '无法排队恢复');
+    error.value = toUserMessage(cause, t.value.stageFailed);
   } finally {
     busy.value = null;
   }
@@ -155,10 +302,10 @@ const cancelRestore = async () => {
   try {
     await backend.cancelPendingRestore();
     pending.value = null;
-    message.value = '已取消排队中的恢复，数据库保持不变。';
+    message.value = t.value.cancelled;
     await load();
   } catch (cause) {
-    error.value = toUserMessage(cause, '无法取消恢复');
+    error.value = toUserMessage(cause, t.value.cancelFailed);
   } finally {
     busy.value = null;
   }
@@ -167,92 +314,90 @@ const cancelRestore = async () => {
 
 <template>
   <section class="settings-card" aria-labelledby="backup-title">
-    <h2 id="backup-title">数据库快照与恢复</h2>
+    <h2 id="backup-title">{{ t.title }}</h2>
     <p class="section-description">
-      快照是整个 <code>zepp.db</code> 的一份完整副本，全部留在本机，不会上传任何地方。
-      数据库升级前会自动生成一份，你也可以随时手动做。
+      {{ t.intro1a }}<code>zepp.db</code>{{ t.intro1b }}
     </p>
     <p class="section-description compare">
-      三种「导出」不要混淆：<b>JSON / CSV / GPX</b> 是给别的工具用的数据交换，只含选中的范围；
-      <b>数据库快照</b>是灾难恢复用的整库副本，只能由 ZeppBridge 自己读回来；
-      <b>AI 数据包</b>是你主动挑选并脱敏后交给外部模型的材料。只有快照能把库恢复回从前的样子。
+      {{ t.compareLead }}<b>JSON / CSV / GPX</b>{{ t.compareExchange }}
+      <b>{{ t.compareSnapshotName }}</b>{{ t.compareSnapshot }}
+      <b>{{ t.comparePackName }}</b>{{ t.comparePack }}
     </p>
 
     <div v-if="pending" class="pending-banner" role="status">
       <Icon name="clock" :size="15" />
       <div>
-        <strong>有一次恢复正在排队</strong>
+        <strong>{{ t.pendingTitle }}</strong>
         <span>
-          排队于 {{ formatFullDateTime(pending.staged_at) }}，将在<b>下次启动</b>时替换数据库。
-          替换前的当前库已经存成回滚点，出问题可以再恢复回来。
+          {{ t.pendingBodyA(formatFullDateTime(pending.staged_at)) }}<b>{{ t.pendingNextStart }}</b>{{ t.pendingBodyB }}
         </span>
       </div>
       <button class="button secondary" type="button" :disabled="busy === 'cancel'" @click="cancelRestore">
-        取消恢复
+        {{ t.cancelRestore }}
       </button>
     </div>
 
     <div class="inline-actions">
       <button class="button primary" type="button" :disabled="busy === 'create'" @click="createBackup">
-        {{ busy === 'create' ? '正在生成…' : '生成快照' }}
+        {{ busy === 'create' ? t.creating : t.createSnapshot }}
       </button>
-      <button class="button secondary" type="button" :disabled="Boolean(busy)" @click="load">刷新列表</button>
+      <button class="button secondary" type="button" :disabled="Boolean(busy)" @click="load">{{ t.refreshList }}</button>
     </div>
 
     <p v-if="error" class="api-error" role="alert">{{ error }}</p>
     <p v-else-if="message" class="hint-line ok" role="status"><Icon name="check" :size="13" />{{ message }}</p>
 
-    <p v-if="!backups.length" class="retain-note">还没有任何快照。</p>
+    <p v-if="!backups.length" class="retain-note">{{ t.noSnapshots }}</p>
 
     <div v-else class="backup-list">
       <div v-for="item in backups" :key="item.id" class="backup-row">
         <div class="backup-head">
-          <span class="kind-tag" :class="item.kind">{{ KIND_LABEL[item.kind] || item.kind }}</span>
+          <span class="kind-tag" :class="item.kind">{{ kindLabel(item.kind) }}</span>
           <strong>{{ formatFullDateTime(item.created_at) }}</strong>
-          <span v-if="item.pinned" class="pin-tag"><Icon name="pin" :size="11" />保留</span>
+          <span v-if="item.pinned" class="pin-tag"><Icon name="pin" :size="11" />{{ t.pinned }}</span>
         </div>
         <div class="backup-meta">
-          {{ formatBytes(item.bytes) }} · 程序 {{ item.app_version }} · 数据库版本 {{ item.schema_version }}
+          {{ t.metaLine(formatBytes(item.bytes), item.app_version, item.schema_version) }}
           <template v-if="item.coverage.earliest_sample_at && item.coverage.latest_sample_at">
-            · 样本覆盖 {{ item.coverage.earliest_sample_at.slice(0, 10) }} ~ {{ item.coverage.latest_sample_at.slice(0, 10) }}
+            {{ t.coverage(item.coverage.earliest_sample_at.slice(0, 10), item.coverage.latest_sample_at.slice(0, 10)) }}
           </template>
-          <template v-else> · 快照里没有健康样本</template>
+          <template v-else>{{ t.noSamples }}</template>
         </div>
         <div class="backup-meta">
           <template v-if="verifications[item.id]">
             <template v-if="verifications[item.id].problem">
-              <em class="bad">校验未通过：{{ verifications[item.id].problem }}</em>
+              <em class="bad">{{ t.verifyFailed(verifications[item.id].problem!) }}</em>
             </template>
             <template v-else>
-              <span class="good">刚刚重新校验：文件、大小、SHA-256 与完整性都对得上。</span>
+              <span class="good">{{ t.verifyPassed }}</span>
             </template>
           </template>
-          <template v-else-if="item.integrity_ok">生成时完整性检查通过 · SHA-256 {{ item.sha256.slice(0, 12) }}…</template>
-          <template v-else><em class="bad">生成时完整性检查未通过，不要用它恢复。</em></template>
+          <template v-else-if="item.integrity_ok">{{ t.integrityOk(item.sha256.slice(0, 12)) }}</template>
+          <template v-else><em class="bad">{{ t.integrityBad }}</em></template>
         </div>
         <div class="inline-actions">
           <button class="button secondary" type="button" :disabled="Boolean(busy)" @click="verify(item.id)">
-            重新校验
+            {{ t.verifyAgain }}
           </button>
           <button class="button secondary" type="button" :disabled="Boolean(busy)" @click="togglePinned(item)">
-            {{ item.pinned ? '取消保留' : '标记保留' }}
+            {{ item.pinned ? t.unpin : t.pin }}
           </button>
           <button
             class="button secondary"
             type="button"
             :disabled="Boolean(busy) || Boolean(pending)"
             @click="openPreview(item.id)"
-          >恢复到这一份</button>
+          >{{ t.restoreToThis }}</button>
         </div>
       </div>
     </div>
 
     <div v-if="preview" class="preview-panel">
-      <strong>恢复预览</strong>
-      <p>{{ COMPATIBILITY_COPY[preview.compatibility] || '兼容性未知。' }}</p>
+      <strong>{{ t.previewTitle }}</strong>
+      <p>{{ compatibilityCopy(preview.compatibility) }}</p>
       <table class="preview-table">
         <thead>
-          <tr><th>内容</th><th>快照里</th><th>当前库</th><th>差值</th></tr>
+          <tr><th>{{ t.colContent }}</th><th>{{ t.colBackup }}</th><th>{{ t.colCurrent }}</th><th>{{ t.colDelta }}</th></tr>
         </thead>
         <tbody>
           <tr v-for="row in previewRows" :key="row.key">
@@ -263,10 +408,7 @@ const cancelRestore = async () => {
           </tr>
         </tbody>
       </table>
-      <p class="retain-note">
-        差值为负的行，恢复后会比现在少这么多条。恢复不会去云端重新拉取——如果还需要那部分数据，
-        要在恢复完成后再同步一次。
-      </p>
+      <p class="retain-note">{{ t.previewNote }}</p>
       <p v-if="preview.blocker" class="api-error" role="alert">{{ preview.blocker }}</p>
       <div class="inline-actions">
         <button
@@ -274,8 +416,8 @@ const cancelRestore = async () => {
           type="button"
           :disabled="!preview.can_restore || busy === 'stage'"
           @click="confirmRestore"
-        >{{ busy === 'stage' ? '正在排队…' : '排队恢复（下次启动生效）' }}</button>
-        <button class="button secondary" type="button" @click="preview = null">取消</button>
+        >{{ busy === 'stage' ? t.staging : t.stageRestore }}</button>
+        <button class="button secondary" type="button" @click="preview = null">{{ t.cancel }}</button>
       </div>
     </div>
   </section>
