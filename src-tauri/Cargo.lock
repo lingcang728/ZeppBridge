@@ -5897,7 +5897,7 @@ dependencies = [
 
 [[package]]
 name = "zeppbridge"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -5925,7 +5925,7 @@ dependencies = [
 
 [[package]]
 name = "zeppbridge-cli"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "chrono",
  "serde",
@@ -5936,7 +5936,7 @@ dependencies = [
 
 [[package]]
 name = "zeppbridge-core"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -5961,7 +5961,7 @@ dependencies = [
 
 [[package]]
 name = "zeppbridge-mcp"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "chrono",
  "serde",

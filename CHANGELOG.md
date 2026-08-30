@@ -2,6 +2,24 @@
 
 本文件记录每个版本的实际改动。写给使用者看，不是施工日志：只写用户能感知到的变化，以及为什么这么改。
 
+## 1.1.1
+
+Two urgent fixes for the Zepp account sign-in and the English desktop layout.
+
+两个紧急修复：Zepp 账号登录与英文桌面布局。
+
+### Fixes / 修复
+
+- **Xiaomi, WeChat, Google and Facebook sign-in buttons work inside the Zepp login window.** The previous navigation policy allowed only Zepp/Huami domains, so the official page's OAuth form submissions were silently blocked. The login window now allows only the exact provider hosts used by that page, keeps popup-style OAuth in the same cookie session, and still rejects unrelated destinations.
+- **小米、微信、Google、Facebook 登录按钮现在可在 Zepp 登录窗口内使用。** 旧版导航策略只允许 Zepp/Huami 域名，官方页面提交到第三方 OAuth 时会被静默拦截。新版只精确放行该页面实际使用的认证主机；即使认证改成弹窗，也会留在同一 Cookie 会话，陌生地址仍会被拒绝。
+- **English text in the lower-left cloud and version area no longer runs outside the sidebar.** Long status, account and version text now shrinks and ellipsizes within the available width, including enlarged UI scale.
+- **英文界面左下角不再出格。** 云端状态、账号和版本文字会在侧栏可用宽度内收缩并显示省略号，放大界面时也不会撑破容器。
+
+### Upgrade / 升级说明
+
+- Overlay-install from 1.1.0. Local data, backups and settings are untouched. No schema change.
+- 从 1.1.0 覆盖安装即可。本地数据、备份和设置都不会动。数据库结构没有变化。
+
 ## 1.1.0
 
 The first build an English-speaking user can actually sit down and use. The desktop UI follows the system language (Chinese or English) and has a switch in Settings.
