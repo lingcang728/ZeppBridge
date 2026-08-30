@@ -2,6 +2,39 @@
 
 本文件记录每个版本的实际改动。写给使用者看，不是施工日志：只写用户能感知到的变化，以及为什么这么改。
 
+## 1.1.0
+
+The first build an English-speaking user can actually sit down and use. The desktop UI follows the system language (Chinese or English) and has a switch in Settings.
+
+这一版是第一次能给英文用户直接用的正式包。桌面界面跟随系统语言（中/英），设置页可以切换。
+
+### New / 新增
+
+- **English and Chinese UI.** Overview, workouts, sleep, devices, insights, weekly report, export, Hand to AI, settings, health check, backups and history backfill. Dates and numbers follow the interface language. Prompts handed to an AI are translated too — an English user should not get a Chinese prompt that makes the model answer in Chinese.
+- **桌面界面中英双语。** 概览、运动、睡眠、设备、洞察、周报、导出、交给 AI、设置、数据健康、快照和历史补拉。日期和数字跟着界面语言走。交给 AI 的提示词也翻译了——英文用户不该拿到一段中文提示词，然后看 AI 用中文回答。
+- **Public landing page is bilingual**, with a language toggle. 落地页同样中英双语，有语言开关。
+- CI now fails the build if someone hard-codes Chinese into a Vue file. A leftover Chinese string is exactly the kind of bug an English-speaking user cannot report.
+  CI 现在会拦住界面里的硬编码中文。漏翻一句，只有看不懂中文的用户会看到它——而他没法告诉你。
+
+### Fixes / 修复
+
+- **"Pending normalisation" counted already-parsed workout details.** A health-page counter that would never go down, and kept suggesting another replay. It now recognises workout-detail output sitting in the sample / route / pause tables.
+- **「待归一化」把已经解析好的运动详情也算进去了。** 这个数字永远降不下来，健康页还一直劝你再重放一次。现在会把落在逐点样本 / 轨迹 / 暂停表里的运动详情认回来。
+- **Re-identifying a device could show the old model after you had just assigned one.** A request that started before the write could land afterwards and overwrite the screen.
+- **刚指认完型号，界面可能又闪回旧的。** 写入前发出去的请求稍后回来，会把屏幕盖回旧数据。
+
+### Still in Chinese / 仍是中文
+
+- CLI and MCP output stays Chinese: the four exits (GUI / CLI / MCP / export) must give the same answer to the same question, so the backend sends codes and the GUI translates. CLI/MCP still print the original Chinese string.
+  CLI 和 MCP 的输出仍是中文：四个出口对同一个问题必须给同一份回答，所以后端发码、界面翻译；CLI/MCP 继续打印原来的中文。
+- A few failure-path messages from the backend (some errors, disk-estimate stop reasons, snapshot blockers) still arrive as Chinese. They are on exception paths.
+  少数异常路径上的后端文案（部分错误、磁盘估算的停止原因、快照拦截原因）仍是中文。
+
+### Upgrade / 升级说明
+
+- Overlay-install from 1.0.x. Local data, backups and settings are untouched. No schema change.
+- 从 1.0.x 覆盖安装即可。本地数据、备份和设置都不会动。数据库结构没有变化。
+
 ## 1.0.1
 
 修一个只在**从旧版本升级上来**时才会出现的问题。全新安装不受影响。

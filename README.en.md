@@ -66,13 +66,13 @@ Get the latest build from [Releases](https://github.com/lingcang728/ZeppBridge/r
 
 ## First connection
 
-1. Open ZeppBridge and go to **设置** (Settings) in the sidebar.
+1. Open ZeppBridge and go to **Settings** in the sidebar.
 2. Click connect. The **official Zepp login page** opens in its own window; sign in with your usual credentials.
 3. Once it says connected, the window closes and the app runs its first sync. Give it about 40 seconds.
 
 Both mainland-China and international accounts work; the app detects which regional server you belong to.
 
-The first sync fetches 30 days. For older history, use **长期归档与完整历史** (Long-term archive and full history) in settings: choose 1/2/3 years or a custom start, and it fetches month by month. You can stop at any point and continue later. Before starting, it estimates disk usage from the actual rate your own data accumulates — not from a hard-coded constant.
+The first sync fetches 30 days. For older history, use **Long-term archive and full history** in Settings: choose 1/2/3 years or a custom start, and it fetches month by month. You can stop at any point and continue later. Before starting, it estimates disk usage from the actual rate your own data accumulates — not from a hard-coded constant.
 
 If the range exceeds your local retention window, the app requires you to enable long-term archiving first; otherwise the history you just fetched would be cleaned up after the next successful sync.
 
