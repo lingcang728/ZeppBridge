@@ -555,12 +555,36 @@ impl Database {
                   + (SELECT COUNT(*) FROM sleep_sessions)
                   + (SELECT COUNT(*) FROM workouts)",
         )?;
+        // 「待归一化」= 留着的报文一条标准化记录都没产出。
+        //
+        // `workout_detail` 的产物落在 `workout_samples` / `route_points` /
+        // `workout_pauses`，这三张表按 `workout_id` 关联，**没有 raw_record_id**
+        // 这一列——所以只按 raw_record_id 查那四张表，会把每一条解析得好好的
+        // 运动详情都算成「没归一化」，数字只增不减，用户重放多少次也降不下来。
+        // 这里按 source_key（`workout_detail:{workout_id}:{source}`）把它认回来。
         let pending_normalization = self.scalar_i64(
-            "SELECT COUNT(*) FROM raw_records r
+            "WITH detail AS (
+                 SELECT r.id AS raw_id,
+                        substr(r.source_key, 16, instr(substr(r.source_key, 16), ':') - 1)
+                            AS workout_id
+                 FROM raw_records r
+                 WHERE r.stream = 'workout_detail'
+                   AND instr(substr(r.source_key, 16), ':') > 1
+             )
+             SELECT COUNT(*) FROM raw_records r
              WHERE NOT EXISTS (SELECT 1 FROM metric_samples WHERE raw_record_id = r.id)
                AND NOT EXISTS (SELECT 1 FROM daily_metrics  WHERE raw_record_id = r.id)
                AND NOT EXISTS (SELECT 1 FROM sleep_sessions WHERE raw_record_id = r.id)
-               AND NOT EXISTS (SELECT 1 FROM workouts       WHERE raw_record_id = r.id)",
+               AND NOT EXISTS (SELECT 1 FROM workouts       WHERE raw_record_id = r.id)
+               AND NOT EXISTS (
+                     SELECT 1 FROM detail d
+                     WHERE d.raw_id = r.id
+                       AND (EXISTS (SELECT 1 FROM workout_samples s
+                                    WHERE s.workout_id = d.workout_id)
+                         OR EXISTS (SELECT 1 FROM route_points p
+                                    WHERE p.workout_id = d.workout_id)
+                         OR EXISTS (SELECT 1 FROM workout_pauses w
+                                    WHERE w.workout_id = d.workout_id)))",
         )?;
 
         let (last_cloud_sync_at, last_cloud_sync_outcome) = self.cloud_sync_metadata()?;
@@ -926,7 +950,7 @@ pub fn summarize_stage(stage: &StageState) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{MetricSample, SourceScope};
+    use crate::models::{CapabilityStatus, MetricSample, RawRecord, SourceScope, Workout};
     use chrono::TimeZone;
 
     fn db() -> Database {
@@ -1180,6 +1204,93 @@ mod tests {
         assert!(
             !ids.contains(&"reprocess"),
             "没有待归一化的报文就不该建议重放"
+        );
+    }
+    #[test]
+    fn a_replayed_workout_detail_is_not_pending_normalization() {
+        // 运动详情的产物落在 workout_samples / route_points / workout_pauses，
+        // 这三张表按 workout_id 关联，没有 raw_record_id。早先的统计只查那四张
+        // 带 raw_record_id 的表，于是每一条解析得好好的详情报文都被永久算成
+        // 「待归一化」——用户重放多少次，那个数字都降不下来。
+        let db = db();
+        db.insert_workout(&Workout {
+            workout_id: "1700000000".into(),
+            workout_type: "run".into(),
+            normalized_type: "run".into(),
+            type_source: "numeric_mapped".into(),
+            user_override: None,
+            effective_type: "run".into(),
+            custom_label: None,
+            start_time: day(0),
+            end_time: day(0) + Duration::minutes(10),
+            distance_meters: Some(1000.0),
+            calories: Some(80),
+            avg_hr: Some(140),
+            max_hr: Some(160),
+            training_load: None,
+            vo2max: None,
+            source_scope: SourceScope::Device,
+            device_id: None,
+            synced_at: None,
+            gps_available: false,
+            sample_count: 0,
+            zepp_source: Some("run.gps".into()),
+            zepp_type: Some(1),
+        })
+        .unwrap();
+
+        let payload = serde_json::json!({
+            "trackid": 1_700_000_000i64,
+            "source": "run.gps",
+            "time": "0;1;",
+            "longitude_latitude": "4004663552,11629333504;16403,8392;",
+            "heart_rate": "1,80;1,2;"
+        });
+        let source_key = "workout_detail:1700000000:run.gps";
+        let raw_id = db
+            .insert_raw_record(&RawRecord {
+                stream: "workout_detail".into(),
+                source_key: source_key.into(),
+                source_scope: SourceScope::Device,
+                device_id: None,
+                start_utc: day(0),
+                end_utc: None,
+                payload: payload.clone(),
+                capability: CapabilityStatus::Verified,
+            })
+            .unwrap();
+        db.normalize_and_persist_raw(raw_id, "workout_detail", source_key, &payload)
+            .unwrap();
+
+        assert_eq!(
+            db.data_health(90, 0)
+                .unwrap()
+                .database
+                .pending_normalization,
+            0,
+            "详情已经产出逐点样本，就不该还算「待归一化」"
+        );
+
+        // 反向钉住：真的什么都没产出的报文仍然要被数出来，
+        // 否则这个修法就成了「把问题藏起来」。
+        db.insert_raw_record(&RawRecord {
+            stream: "workout_detail".into(),
+            source_key: "workout_detail:1799999999:run.gps".into(),
+            source_scope: SourceScope::Device,
+            device_id: None,
+            start_utc: day(1),
+            end_utc: None,
+            payload: serde_json::json!({ "items": [] }),
+            capability: CapabilityStatus::Verified,
+        })
+        .unwrap();
+        assert_eq!(
+            db.data_health(90, 0)
+                .unwrap()
+                .database
+                .pending_normalization,
+            1,
+            "没产出任何记录的报文还是要算进来"
         );
     }
 }
