@@ -70,7 +70,7 @@ const heroRoster = computed(() => {
  * 有几台就提示几台，并且直接把人送到那台设备的页面，而不是丢到设置首页
  * 让他自己找。 */
 const unrecognizedDevices = computed(() => deviceModels.value
-  .filter((model) => model.state === '未识别')
+  .filter((model) => model.state === 'unknown')
   .map((model) => ({
     key: model.deviceKey || model.canonicalName,
     name: model.profile.display_name?.trim() || model.canonicalName,

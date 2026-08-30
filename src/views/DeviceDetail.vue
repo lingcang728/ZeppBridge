@@ -17,7 +17,7 @@ import DeviceVisual from '../components/DeviceVisual.vue';
 import EmptyState from '../components/EmptyState.vue';
 import Icon from '../components/Icon.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
-import { useDeviceAssignment, useDevices } from '../composables/useDevices';
+import { deviceStateLabel, useDeviceAssignment, useDevices } from '../composables/useDevices';
 
 const route = useRoute();
 const { models, loading, initialized, error, load, maskIdentifier } = useDevices();
@@ -88,7 +88,7 @@ onMounted(() => {
           <p class="hero-eyebrow">DEVICE</p>
           <h1 id="device-detail-title">{{ model.canonicalName }}</h1>
           <p class="hero-sub">{{ model.displayName }}</p>
-          <span :class="['hero-state', { on: model.state !== '未识别' }]"><i></i>{{ model.state }}</span>
+          <span :class="['hero-state', { on: model.state !== 'unknown' }]"><i></i>{{ deviceStateLabel(model.state) }}</span>
         </div>
       </section>
 
