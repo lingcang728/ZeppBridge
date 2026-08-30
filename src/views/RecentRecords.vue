@@ -13,6 +13,7 @@ import { workoutLabel } from '../lib/labels';
 import { formatDate, formatDuration, isFiniteNumber } from '../lib/format';
 import { displayableWorkouts, workoutDisplayLabel, workoutDisplayType, workoutDurationMinutes, workoutTypeKey } from '../lib/workouts';
 import type { SleepSession, Workout } from '../types';
+import { intlLocale } from '../i18n';
 
 const loading = ref(true);
 const error = ref<string | null>(null);
@@ -106,7 +107,7 @@ function listDate(value: string): string {
   if (Number.isNaN(date.getTime())) return '日期未知';
   const month = date.getMonth() + 1;
   const day = date.getDate();
-  const weekday = new Intl.DateTimeFormat('zh-CN', { weekday: 'short' }).format(date);
+  const weekday = new Intl.DateTimeFormat(intlLocale(), { weekday: 'short' }).format(date);
   return `${month}月${day}日（${weekday}）`;
 }
 

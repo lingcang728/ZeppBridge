@@ -23,6 +23,7 @@ import type {
   WorkoutCodeLabel,
 } from '../types';
 import { checkForDesktopUpdate, downloadAndInstallDesktopUpdate, updateState } from '../services/updateService';
+import { intlLocale, locale, LOCALES, LOCALE_LABELS, setLocale } from '../i18n';
 
 const {
   appStatus,
@@ -338,7 +339,7 @@ const formatDateTime = (value?: string): string => {
   if (!value) return '尚无记录';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '时间未知';
-  return new Intl.DateTimeFormat('zh-CN', {
+  return new Intl.DateTimeFormat(intlLocale(), {
     year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
   }).format(date).replace(/\//g, '-');
 };
@@ -348,7 +349,7 @@ const formatDateTime = (value?: string): string => {
 const retentionCutoffDate = computed(() => {
   const date = new Date();
   date.setDate(date.getDate() - Number(retentionDays.value || 30));
-  return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date).replace(/\//g, '-');
+  return new Intl.DateTimeFormat(intlLocale(), { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date).replace(/\//g, '-');
 });
 
 const dataSources = computed(() => [
@@ -894,6 +895,21 @@ const runCapabilityProbe = async () => {
       <div>
         <h1 id="settings-title">设置</h1>
         <p class="page-intro">管理认证方式、同步行为、隐私与默认导出偏好，确保本地数据安全。</p>
+      </div>
+      <!-- 语言开关标签是双语的，而且不跟着界面语言变：一个看不懂中文的人
+           必须能在中文界面上找到它，反过来也一样。 -->
+      <div class="locale-switch">
+        <p class="advanced-label">语言 · Language</p>
+        <div class="scale-options" role="radiogroup" aria-label="语言 · Language">
+          <button
+            v-for="option in LOCALES"
+            :key="option"
+            type="button"
+            role="radio"
+            :aria-checked="locale === option"
+            @click="setLocale(option)"
+          >{{ LOCALE_LABELS[option] }}</button>
+        </div>
       </div>
     </header>
 
@@ -1662,7 +1678,11 @@ const runCapabilityProbe = async () => {
 
 <style scoped>
 .page { width: 100%; min-width: 0; margin: 0; display: grid; gap: 14px; }
-.page-header { margin-bottom: 0; min-width: 0; }
+.page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 0; min-width: 0; }
+.locale-switch { flex: 0 0 auto; text-align: right; }
+.locale-switch .advanced-label { margin-bottom: 6px; }
+.locale-switch .scale-options { justify-content: flex-end; }
+.locale-switch .scale-options button { min-width: 62px; }
 h1, h2, h3, p { margin-top: 0; }
 h1 { font-size: 24px; font-weight: 700; color: var(--ink); }
 h2 { margin-bottom: 14px; font-size: 15px; font-weight: 700; color: var(--ink); }

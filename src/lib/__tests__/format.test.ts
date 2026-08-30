@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   formatDistance,
   formatDuration,
@@ -7,6 +7,7 @@ import {
   isFiniteNumber,
   localDateString,
 } from '../format';
+import { setLocale } from '../../i18n';
 
 /*
  * 这一层的规则只有一条，但它是整个产品的立身之本：**缺失不能被显示成 0**。
@@ -86,5 +87,35 @@ describe('本地日期字符串', () => {
 
   it('月和日补零到两位', () => {
     expect(localDateString(new Date(2026, 8, 5, 12))).toBe('2026-09-05');
+  });
+});
+
+/*
+ * 语言切换后，这些占位文案也必须跟着换。英文界面上冒出一句「时长未知」
+ * 比不翻更糟——它恰恰是在说「这里没有数据」，看不懂就会被当成读数。
+ */
+describe('缺失值的说法跟着界面语言走', () => {
+  afterEach(() => setLocale('zh'));
+
+  it('英文界面下的占位是英文', () => {
+    setLocale('en');
+    expect(formatDistance(undefined)).toBe('Not recorded');
+    expect(formatDuration(null)).toBe('Duration unknown');
+    // 「—」两种语言通用，不需要翻。
+    expect(formatMetric(undefined)).toBe('—');
+  });
+
+  it('英文界面下的时长单位是 hr / min', () => {
+    setLocale('en');
+    expect(formatDuration(45)).toBe('45 min');
+    expect(formatDuration(125)).toBe('2 hr 5 min');
+    // 真的是 0 仍然显示 0，这条规则和语言无关。
+    expect(formatDuration(0)).toBe('0 min');
+  });
+
+  it('切回中文后又是中文', () => {
+    setLocale('en');
+    setLocale('zh');
+    expect(formatDuration(125)).toBe('2 小时 5 分');
   });
 });

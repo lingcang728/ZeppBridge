@@ -2,6 +2,7 @@ import { computed, readonly, ref } from 'vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { readAutoSyncSettings, writeAutoSyncSettings } from '../lib/autoSync';
 import type { AppStatus, LoginStatus, SyncOutcome, SyncProgress, SyncReport } from '../types';
+import { intlLocale } from '../i18n';
 
 export type SyncUiState = 'idle' | 'syncing' | SyncOutcome;
 
@@ -33,7 +34,7 @@ const formatTime = (value?: string): string => {
   if (!value) return '未知时间';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '未知时间';
-  return new Intl.DateTimeFormat('zh-CN', {
+  return new Intl.DateTimeFormat(intlLocale(), {
     month: 'numeric',
     day: 'numeric',
     hour: '2-digit',
@@ -45,7 +46,7 @@ const formatClock = (value?: string): string | null => {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(date);
+  return new Intl.DateTimeFormat(intlLocale(), { hour: '2-digit', minute: '2-digit' }).format(date);
 };
 
 const latestHeartRateAt = (report?: SyncReport | null): string | undefined =>

@@ -19,6 +19,7 @@ import SkeletonBlock from '../components/SkeletonBlock.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import type { DataHealth, HealthAction, StageState, StreamHealth } from '../types';
+import { intlLocale } from '../i18n';
 
 const { runSync, isSyncing, markDataChanged } = useSyncController();
 
@@ -57,7 +58,7 @@ const formatDateTime = (value?: string | null): string => {
   if (!value) return '尚无记录';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '时间未知';
-  return new Intl.DateTimeFormat('zh-CN', {
+  return new Intl.DateTimeFormat(intlLocale(), {
     year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(date).replace(/\//g, '-');
 };

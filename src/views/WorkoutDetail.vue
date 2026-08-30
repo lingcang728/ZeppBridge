@@ -20,6 +20,7 @@ import { formatPaceSeconds } from '../lib/metricSeries';
 import { workoutDisplayLabel, workoutDisplayType } from '../lib/workouts';
 import { deviceImageFor } from '../lib/deviceCatalog';
 import type { DeviceProfile, SportOption, Workout, WorkoutInsight, WorkoutSeries, WorkoutSeriesSample, WorkoutRoutePoint } from '../types';
+import { intlLocale } from '../i18n';
 
 type WorkoutMetrics = Workout & {
   pace?: number | string | null;
@@ -188,7 +189,7 @@ const paceLabel = computed(() => {
 });
 
 const numberValue = (value: unknown, digits = 0): string => isFiniteNumber(value)
-  ? value.toLocaleString('zh-CN', { minimumFractionDigits: digits, maximumFractionDigits: digits })
+  ? value.toLocaleString(intlLocale(), { minimumFractionDigits: digits, maximumFractionDigits: digits })
   : '未提供';
 
 const workoutArt = computed<DesignIconName>(() => {
@@ -453,7 +454,7 @@ const lineOption = (points: { t: number; v: number }[], color: string, unit: str
       formatter: (params: Array<{ value: [number, number] }>) => {
         const point = Array.isArray(params) ? params[0] : params;
         if (!point) return '';
-        const time = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(point.value[0]));
+        const time = new Intl.DateTimeFormat(intlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(point.value[0]));
         return `${time}　<b>${Math.round(point.value[1] * 10) / 10}</b> ${unit}`;
       },
     },
@@ -550,7 +551,7 @@ const syncBadge = computed(() => {
   const raw = appStatus.value?.last_cloud_sync_at;
   if (!raw) return '尚未获取';
   const date = new Date(raw);
-  return Number.isNaN(date.getTime()) ? '时间未知' : new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(date).replace(/\//g, '-');
+  return Number.isNaN(date.getTime()) ? '时间未知' : new Intl.DateTimeFormat(intlLocale(), { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(date).replace(/\//g, '-');
 });
 
 let detailSeq = 0;
