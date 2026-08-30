@@ -12,22 +12,76 @@ import SkeletonBlock from './SkeletonBlock.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import type { InsightFact, WeeklyReport } from '../types';
+import { defineMessages, useMessages } from '../i18n';
+
+const messages = defineMessages(
+  {
+    title: '这一周',
+    window: (recentStart: string, recentEnd: string, baseStart: string, baseEnd: string) =>
+      `${recentStart} ~ ${recentEnd} · 对比你自己 ${baseStart} ~ ${baseEnd}`,
+    legendGood: '绿色 = 对这项指标来说更好',
+    legendBad: '红色 = 更差',
+    legendNote: '只和你自己此前 28 天比，不和任何人群基准比',
+    desktopOnly: '周报需要从 ZeppBridge 桌面应用打开。',
+    nothingComparable: '这一周还没有可比较的记录。完成一次同步后再看。',
+    loadFailed: '无法生成本地周报',
+    barsAria: (recent: string, baseline: string) => `本周 ${recent}，此前 28 天 ${baseline}`,
+    barThisWeek: '本周',
+    barBaseline: '此前 28 天',
+    noBaseline: '此前的数据不够，这次只报现状',
+    notProvided: '未提供',
+    sleepDuration: (hours: number, minutes: number) => `${hours} 小时 ${minutes} 分`,
+    regularity: (minutes: number) => `±${minutes} 分`,
+    workoutCount: (count: number) => `${count} 次`,
+    metric: {
+      'weekly.resting_hr': '静息心率',
+      'weekly.hrv': 'HRV',
+      'weekly.stress': '压力',
+      'weekly.sleep_duration': '睡眠时长',
+      'weekly.sleep_start_regularity': '入睡时间波动',
+      'weekly.workout_count': '训练次数',
+      'weekly.training_load': '训练负荷',
+    },
+  },
+  {
+    title: 'This week',
+    window: (recentStart: string, recentEnd: string, baseStart: string, baseEnd: string) =>
+      `${recentStart} ~ ${recentEnd} · against your own ${baseStart} ~ ${baseEnd}`,
+    legendGood: 'Green = better for this metric',
+    legendBad: 'Red = worse',
+    legendNote: 'Compared only to your own previous 28 days, never to a population baseline',
+    desktopOnly: 'The weekly report needs the ZeppBridge desktop app.',
+    nothingComparable: 'Nothing comparable this week yet. Come back after a sync.',
+    loadFailed: 'Could not build the local weekly report',
+    barsAria: (recent: string, baseline: string) => `This week ${recent}, previous 28 days ${baseline}`,
+    barThisWeek: 'This week',
+    barBaseline: 'Prev. 28 days',
+    noBaseline: 'Not enough history behind it, so this is the current figure only',
+    notProvided: 'Not provided',
+    sleepDuration: (hours: number, minutes: number) => `${hours} hr ${minutes} min`,
+    regularity: (minutes: number) => `±${minutes} min`,
+    workoutCount: (count: number) => `${count} sessions`,
+    metric: {
+      'weekly.resting_hr': 'Resting HR',
+      'weekly.hrv': 'HRV',
+      'weekly.stress': 'Stress',
+      'weekly.sleep_duration': 'Sleep duration',
+      'weekly.sleep_start_regularity': 'Bedtime spread',
+      'weekly.workout_count': 'Workouts',
+      'weekly.training_load': 'Training load',
+    },
+  },
+);
+const t = useMessages(messages);
+
+const metricLabel = (factId: string, fallback: string): string =>
+  (t.value.metric as Record<string, string | undefined>)[factId] ?? fallback;
 
 const { dataRevision } = useSyncController();
 
 const report = ref<WeeklyReport | null>(null);
 const loading = ref(true);
 const error = ref<string | null>(null);
-
-const LABEL: Record<string, string> = {
-  'weekly.resting_hr': '静息心率',
-  'weekly.hrv': 'HRV',
-  'weekly.stress': '压力',
-  'weekly.sleep_duration': '睡眠时长',
-  'weekly.sleep_start_regularity': '入睡时间波动',
-  'weekly.workout_count': '训练次数',
-  'weekly.training_load': '训练负荷',
-};
 
 /** 数字变小对这个指标意味着「更好」吗？只影响配色，不改变事实。 */
 const LOWER_IS_BETTER = new Set([
@@ -46,7 +100,7 @@ const load = async () => {
   try {
     report.value = await backend.getWeeklyReport();
   } catch (cause) {
-    error.value = toUserMessage(cause, '无法生成本地周报');
+    error.value = toUserMessage(cause, t.value.loadFailed);
   } finally {
     loading.value = false;
   }
@@ -55,16 +109,8 @@ const load = async () => {
 onMounted(() => void load());
 watch(dataRevision, () => void load());
 
-const formatValue = (fact: InsightFact): string => {
-  if (fact.value === null) return '未提供';
-  if (fact.metric === 'sleep_duration') {
-    const total = Math.round(fact.value);
-    return `${Math.floor(total / 60)} 小时 ${total % 60} 分`;
-  }
-  if (fact.metric === 'sleep_start_regularity') return `±${Math.round(fact.value)} 分`;
-  if (fact.metric === 'workout_count') return `${Math.round(fact.value)} 次`;
-  return `${Math.round(fact.value)} ${fact.unit}`;
-};
+const formatValue = (fact: InsightFact): string =>
+  (fact.value === null ? t.value.notProvided : formatNumber(fact, fact.value));
 
 const tone = (fact: InsightFact): 'good' | 'bad' | 'flat' => {
   if (!fact.comparison || fact.comparison.direction === 'same') return 'flat';
@@ -109,14 +155,14 @@ const chartFor = (fact: InsightFact) => {
   };
 };
 
-/** 把一个数字按这个指标的口径写出来（和 formatValue 同一套规则，只是不读 fact.value）。 */
+/** 把一个数字按这个指标的口径写出来。formatValue 也走这里，两处口径不会跑偏。 */
 function formatNumber(fact: InsightFact, value: number): string {
   if (fact.metric === 'sleep_duration') {
     const total = Math.round(value);
-    return `${Math.floor(total / 60)} 小时 ${total % 60} 分`;
+    return t.value.sleepDuration(Math.floor(total / 60), total % 60);
   }
-  if (fact.metric === 'sleep_start_regularity') return `±${Math.round(value)} 分`;
-  if (fact.metric === 'workout_count') return `${Math.round(value)} 次`;
+  if (fact.metric === 'sleep_start_regularity') return t.value.regularity(Math.round(value));
+  if (fact.metric === 'workout_count') return t.value.workoutCount(Math.round(value));
   return `${Math.round(value)} ${fact.unit}`;
 }
 </script>
@@ -124,42 +170,42 @@ function formatNumber(fact: InsightFact, value: number): string {
 <template>
   <section class="weekly-card" aria-labelledby="weekly-title">
     <header>
-      <h2 id="weekly-title"><Icon name="activity" :size="15" />这一周</h2>
+      <h2 id="weekly-title"><Icon name="activity" :size="15" />{{ t.title }}</h2>
       <span v-if="report" class="weekly-window">
-        {{ report.recent_start }} ~ {{ report.recent_end }} · 对比你自己 {{ report.baseline_start }} ~ {{ report.baseline_end }}
+        {{ t.window(report.recent_start, report.recent_end, report.baseline_start, report.baseline_end) }}
       </span>
     </header>
 
     <!-- 「静息心率 −3.4% 是绿的、压力 +1.6% 是红的」这件事必须解释一句：
          数字的正负是事实，好坏是按指标含义判断的，两者不是一回事。 -->
     <p v-if="report && facts.length" class="weekly-legend">
-      <span><i class="legend-dot good"></i>绿色 = 对这项指标来说更好</span>
-      <span><i class="legend-dot bad"></i>红色 = 更差</span>
-      <span class="legend-note">只和你自己此前 28 天比，不和任何人群基准比</span>
+      <span><i class="legend-dot good"></i>{{ t.legendGood }}</span>
+      <span><i class="legend-dot bad"></i>{{ t.legendBad }}</span>
+      <span class="legend-note">{{ t.legendNote }}</span>
     </p>
     <SkeletonBlock v-if="loading" height="120px" />
     <p v-else-if="error" class="weekly-error" role="alert">{{ error }}</p>
-    <p v-else-if="!report" class="weekly-note">周报需要从 ZeppBridge 桌面应用打开。</p>
+    <p v-else-if="!report" class="weekly-note">{{ t.desktopOnly }}</p>
 
-    <p v-else-if="!facts.length" class="weekly-note">这一周还没有可比较的记录。完成一次同步后再看。</p>
+    <p v-else-if="!facts.length" class="weekly-note">{{ t.nothingComparable }}</p>
 
     <template v-else>
       <div class="weekly-grid">
         <div v-for="fact in facts" :key="fact.fact_id" class="weekly-item">
-          <span class="weekly-label">{{ LABEL[fact.fact_id] || fact.metric }}</span>
+          <span class="weekly-label">{{ metricLabel(fact.fact_id, fact.metric) }}</span>
           <strong>{{ formatValue(fact) }}</strong>
 
           <template v-if="chartFor(fact)">
             <div class="weekly-bars" role="img"
-              :aria-label="`本周 ${formatValue(fact)}，此前 28 天 ${chartFor(fact)!.baselineText}`">
+              :aria-label="t.barsAria(formatValue(fact), chartFor(fact)!.baselineText)">
               <div class="bar-row">
-                <span class="bar-tag">本周</span>
+                <span class="bar-tag">{{ t.barThisWeek }}</span>
                 <span class="bar-track">
                   <i :class="['bar-fill', tone(fact)]" :style="{ width: `${chartFor(fact)!.recentPercent}%` }"></i>
                 </span>
               </div>
               <div class="bar-row">
-                <span class="bar-tag">此前 28 天</span>
+                <span class="bar-tag">{{ t.barBaseline }}</span>
                 <span class="bar-track">
                   <i class="bar-fill baseline" :style="{ width: `${chartFor(fact)!.baselinePercent}%` }"></i>
                 </span>
@@ -171,7 +217,7 @@ function formatNumber(fact: InsightFact, value: number): string {
             </span>
           </template>
 
-          <span v-else class="weekly-delta muted">{{ fact.reason || '此前的数据不够，这次只报现状' }}</span>
+          <span v-else class="weekly-delta muted">{{ fact.reason || t.noBaseline }}</span>
         </div>
       </div>
     </template>

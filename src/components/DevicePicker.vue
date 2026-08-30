@@ -12,6 +12,53 @@ import { computed, ref, watch } from 'vue';
 import DesignIcon from './DesignIcon.vue';
 import DeviceVisual from './DeviceVisual.vue';
 import { deviceCatalog, deviceImageFor, type DeviceCatalogEntry } from '../lib/deviceCatalog';
+import { defineMessages, locale, useMessages } from '../i18n';
+
+const messages = defineMessages(
+  {
+    pickerAria: '手动指认设备型号',
+    searchAria: '按型号名称搜索',
+    searchPlaceholder: '搜型号，例如 Balance 2',
+    empty: '没有匹配的型号。换个关键词，或者把筛选切回「全部」。',
+    prev: '上一个型号',
+    next: '下一个型号',
+    alreadyAssigned: '已经是这台了',
+    confirm: '这就是我的设备',
+    clear: '撤销指认',
+    later: '稍后再说',
+    contributeTitle: '顺便帮下一版自动认出这台设备',
+    contributeBody: '把「你选的型号 + 这台设备的型号编号（deviceSource / deviceType，只有整数）」交给 ZeppBridge。这两样都只说明「哪一款表」，不含账号、序列号、MAC 或任何健康数据。华米没有公开编号对照表，这是内置目录唯一能长大的方式——几个人指认过之后，同款设备对所有人都会自动识别。',
+    note: '选完会显示成「你指认的型号」，不会被当成自动识别结果。图片和型号都来自随包目录，翻页全程不联网。',
+    filterAll: '全部',
+    filterWatch: '手表',
+    filterBand: '手环',
+    filterStrap: '表带',
+    filterRing: '戒指',
+    filterEarbuds: '耳机',
+  },
+  {
+    pickerAria: 'Pick your device model by hand',
+    searchAria: 'Search by model name',
+    searchPlaceholder: 'Search a model, e.g. Balance 2',
+    empty: 'No model matches. Try another keyword, or switch the filter back to All.',
+    prev: 'Previous model',
+    next: 'Next model',
+    alreadyAssigned: 'Already this one',
+    confirm: "That's my device",
+    clear: 'Withdraw the pick',
+    later: 'Not now',
+    contributeTitle: 'Help the next release recognize this device on its own',
+    contributeBody: 'Sends ZeppBridge the model you picked plus this device\'s model numbers (deviceSource / deviceType, integers only). Both say which watch it is and nothing else: no account, no serial, no MAC, no health data. Huami publishes no lookup table for those numbers, so this is the only way the built-in catalog grows. Once a few people have pointed at a model, it gets recognized automatically for everyone.',
+    note: 'Your pick shows up as "Model you picked" and is never passed off as an automatic match. Images and model names come from the bundled catalog; browsing them touches no network.',
+    filterAll: 'All',
+    filterWatch: 'Watches',
+    filterBand: 'Bands',
+    filterStrap: 'Straps',
+    filterRing: 'Rings',
+    filterEarbuds: 'Earbuds',
+  },
+);
+const t = useMessages(messages);
 
 const props = defineProps<{
   /** 当前已指认的 catalog_id（如果有）。 */
@@ -28,14 +75,14 @@ const emit = defineEmits<{
    所以这里必须是一个用户看得见、能取消的选项，而不是点确定就顺手发出去。 */
 const contribute = ref(true);
 
-const KIND_FILTERS = [
-  { key: 'all', label: '全部' },
-  { key: 'watch', label: '手表' },
-  { key: 'band', label: '手环' },
-  { key: 'strap', label: '表带' },
-  { key: 'ring', label: '戒指' },
-  { key: 'earbuds', label: '耳机' },
-] as const;
+const KIND_FILTERS = computed(() => [
+  { key: 'all', label: t.value.filterAll },
+  { key: 'watch', label: t.value.filterWatch },
+  { key: 'band', label: t.value.filterBand },
+  { key: 'strap', label: t.value.filterStrap },
+  { key: 'ring', label: t.value.filterRing },
+  { key: 'earbuds', label: t.value.filterEarbuds },
+]);
 
 const kind = ref<string>('all');
 const query = ref('');
@@ -90,13 +137,22 @@ watch(() => props.modelValue, (value) => {
 const isCurrentAssigned = computed(() => Boolean(
   current.value && props.modelValue && current.value.catalog_id === props.modelValue,
 ));
+
+/* 目录里的中文名只在中文界面下用。英文界面下 name_zh 和 canonical_name
+   会是同一个词或一个读不懂的中文名，两行都摆出来只是噪音。 */
+const heroName = computed(() => (current.value
+  ? (locale.value === 'zh' ? current.value.name_zh || current.value.canonical_name : current.value.canonical_name)
+  : ''));
+const heroSub = computed(() => (current.value && current.value.canonical_name !== heroName.value
+  ? current.value.canonical_name
+  : ''));
 </script>
 
 <template>
   <div
     class="device-picker"
     role="group"
-    aria-label="手动指认设备型号"
+    :aria-label="t.pickerAria"
     tabindex="0"
     @keydown.left.prevent="step(-1)"
     @keydown.right.prevent="step(1)"
@@ -114,20 +170,18 @@ const isCurrentAssigned = computed(() => Boolean(
         v-model="query"
         type="search"
         class="picker-search"
-        aria-label="按型号名称搜索"
-        placeholder="搜型号，例如 Balance 2"
+        :aria-label="t.searchAria"
+        :placeholder="t.searchPlaceholder"
       />
     </div>
 
-    <div v-if="!entries.length" class="picker-empty">
-      没有匹配的型号。换个关键词，或者把筛选切回「全部」。
-    </div>
+    <div v-if="!entries.length" class="picker-empty">{{ t.empty }}</div>
 
     <div v-else class="picker-stage">
       <button
         class="picker-arrow"
         type="button"
-        aria-label="上一个型号"
+        :aria-label="t.prev"
         :disabled="entries.length < 2"
         @click="step(-1)"
       ><DesignIcon name="chevron-right" :size="20" class="flip" /></button>
@@ -150,8 +204,8 @@ const isCurrentAssigned = computed(() => Boolean(
             :alt="current!.canonical_name"
             :kind="current!.kind"
           />
-          <p class="hero-name">{{ current!.name_zh || current!.canonical_name }}</p>
-          <p class="hero-sub">{{ current!.canonical_name }}</p>
+          <p class="hero-name">{{ heroName }}</p>
+          <p v-if="heroSub" class="hero-sub">{{ heroSub }}</p>
           <p class="hero-count">{{ index + 1 }} / {{ entries.length }}</p>
         </div>
         <DeviceVisual
@@ -166,7 +220,7 @@ const isCurrentAssigned = computed(() => Boolean(
       <button
         class="picker-arrow"
         type="button"
-        aria-label="下一个型号"
+        :aria-label="t.next"
         :disabled="entries.length < 2"
         @click="step(1)"
       ><DesignIcon name="chevron-right" :size="20" /></button>
@@ -178,24 +232,20 @@ const isCurrentAssigned = computed(() => Boolean(
         type="button"
         :disabled="busy || !current || isCurrentAssigned"
         @click="current && emit('confirm', current.catalog_id, contribute)"
-      >{{ isCurrentAssigned ? '已经是这台了' : '这就是我的设备' }}</button>
+      >{{ isCurrentAssigned ? t.alreadyAssigned : t.confirm }}</button>
       <button v-if="modelValue" class="button secondary" type="button" :disabled="busy" @click="emit('clear')">
-        撤销指认
+        {{ t.clear }}
       </button>
-      <button class="button secondary" type="button" :disabled="busy" @click="emit('cancel')">稍后再说</button>
+      <button class="button secondary" type="button" :disabled="busy" @click="emit('cancel')">{{ t.later }}</button>
     </div>
     <label class="picker-contribute">
       <input v-model="contribute" type="checkbox" :disabled="busy" />
       <span>
-        <strong>顺便帮下一版自动认出这台设备</strong>
-        把「你选的型号 + 这台设备的型号编号（deviceSource / deviceType，只有整数）」交给 ZeppBridge。
-        这两样都只说明「哪一款表」，不含账号、序列号、MAC 或任何健康数据。
-        华米没有公开编号对照表，这是内置目录唯一能长大的方式——几个人指认过之后，同款设备对所有人都会自动识别。
+        <strong>{{ t.contributeTitle }}</strong>
+        {{ t.contributeBody }}
       </span>
     </label>
-    <p class="picker-note">
-      选完会显示成「你指认的型号」，不会被当成自动识别结果。图片和型号都来自随包目录，翻页全程不联网。
-    </p>
+    <p class="picker-note">{{ t.note }}</p>
   </div>
 </template>
 
