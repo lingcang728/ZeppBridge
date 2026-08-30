@@ -5,6 +5,96 @@ import { VChart } from '../lib/echartsSetup';
 import Icon from '../components/Icon.vue';
 import CircularProgress from '../components/CircularProgress.vue';
 import StageBar from '../components/StageBar.vue';
+import { sleepStageLabel, sleepStageLabels } from '../lib/sleepStages';
+import { defineMessages, useMessages } from '../i18n';
+
+const messages = defineMessages(
+  {
+    backToRecent: '返回最近记录',
+    title: '睡眠记录详情',
+    loadingDetail: '正在读取睡眠详情…',
+    loadFailedTitle: '无法读取这条睡眠',
+    loadFailed: '睡眠详情暂时不可用',
+    retry: '重试',
+    notFoundTitle: '找不到这条睡眠记录',
+    notFoundMessage: '它可能已被清理，或尚未同步到本机。',
+    heroAria: '睡眠时长与评分',
+    durationKicker: '睡眠时长',
+    heroMeta: (fellAsleep: string, wokeUp: string, inBed: string) =>
+      `${fellAsleep} 入睡 · ${wokeUp} 醒来 · 在床 ${inBed}`,
+    scoreKicker: '睡眠评分',
+    scoreNote: '设备提供的评分，仅作记录展示。',
+    stagesAria: '睡眠阶段',
+    stagesTitle: '睡眠阶段',
+    stageHelpButton: '阶段说明',
+    stageHelp: '深睡：恢复体力的深度睡眠。浅睡：占比较高的过渡阶段。REM：快速眼动期，多与记忆和梦境有关。清醒：夜间醒来或清醒片段。以上为阶段含义说明，不是健康诊断。',
+    weeklyAria: '近 7 天睡眠趋势',
+    weeklyTitle: '近 7 天睡眠结构',
+    weeklySub: '每日分期堆叠',
+    weeklyChartAria: '近 7 天睡眠结构柱状图',
+    metaAria: '来源与设备',
+    sourceTitle: '来源',
+    sourceProvider: '数据来源',
+    sourceScope: '数据范围',
+    syncedAt: '同步时间',
+    timezone: '时区',
+    deviceTitle: '设备',
+    deviceName: '设备名称',
+    deviceFirmware: '固件版本',
+    deviceId: '设备 ID',
+    footnote: '只展示云端给出的阶段汇总。没有 REM 字段时显示「未提供」，不会用减法编造，也不绘制未提供的时间轴。',
+    notProvided: '未提供',
+    syncTimeMissing: '同步时间未提供',
+    lastCloudSync: (clock: string) => `最近云端同步 ${clock}`,
+    deviceUndetermined: '设备未确定',
+    hoursAxis: '小时',
+    tooltipTotal: (date: string, hours: string) => `<b>${date} 睡眠合计：${hours} 小时</b><br/>`,
+    tooltipRow: (name: string, hours: number) => `${name}: ${hours} 小时<br/>`,
+  },
+  {
+    backToRecent: 'Back to recent records',
+    title: 'Sleep record',
+    loadingDetail: 'Reading the sleep record…',
+    loadFailedTitle: 'Could not read this sleep record',
+    loadFailed: 'Sleep detail is unavailable right now',
+    retry: 'Try again',
+    notFoundTitle: 'This sleep record is not here',
+    notFoundMessage: 'It may have been cleaned up, or it has not been synced to this machine yet.',
+    heroAria: 'Sleep duration and score',
+    durationKicker: 'Time asleep',
+    heroMeta: (fellAsleep: string, wokeUp: string, inBed: string) =>
+      `Asleep ${fellAsleep} · awake ${wokeUp} · in bed ${inBed}`,
+    scoreKicker: 'Sleep score',
+    scoreNote: 'Reported by the device; shown as recorded, nothing more.',
+    stagesAria: 'Sleep stages',
+    stagesTitle: 'Sleep stages',
+    stageHelpButton: 'What the stages mean',
+    stageHelp: 'Deep: the restorative stretch. Light: the transitional stage that takes up most of the night. REM: rapid eye movement, tied to memory and dreaming. Awake: waking up or lying awake in the night. These are definitions, not a health diagnosis.',
+    weeklyAria: 'Sleep over the last 7 days',
+    weeklyTitle: 'Sleep structure, last 7 days',
+    weeklySub: 'Stages stacked per night',
+    weeklyChartAria: 'Stacked bar chart of sleep structure over the last 7 days',
+    metaAria: 'Source and device',
+    sourceTitle: 'Source',
+    sourceProvider: 'Provider',
+    sourceScope: 'Scope',
+    syncedAt: 'Synced',
+    timezone: 'Time zone',
+    deviceTitle: 'Device',
+    deviceName: 'Name',
+    deviceFirmware: 'Firmware',
+    deviceId: 'Device ID',
+    footnote: 'Only the stage summary the cloud actually gave. When there is no REM field it reads "Not provided" — never back-computed by subtraction — and a timeline that was not provided is never drawn.',
+    notProvided: 'Not provided',
+    syncTimeMissing: 'Sync time not provided',
+    lastCloudSync: (clock: string) => `Last cloud sync ${clock}`,
+    deviceUndetermined: 'Device undetermined',
+    hoursAxis: 'hours',
+    tooltipTotal: (date: string, hours: string) => `<b>${date} — ${hours} h asleep in total</b><br/>`,
+    tooltipRow: (name: string, hours: number) => `${name}: ${hours} h<br/>`,
+  },
+);
+const t = useMessages(messages);
 import EmptyState from '../components/EmptyState.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { useDevices } from '../composables/useDevices';
@@ -26,10 +116,10 @@ const stageHelpOpen = ref(false);
 const sleepId = computed(() => String(route.params.sleepId || ''));
 
 const stages = computed(() => session.value ? [
-  { label: '深睡', minutes: session.value.deep_minutes, tone: 'deep' as const },
-  { label: '浅睡', minutes: session.value.light_minutes, tone: 'light' as const },
-  { label: 'REM', minutes: session.value.rem_minutes, tone: 'rem' as const },
-  { label: '清醒', minutes: session.value.awake_minutes, tone: 'awake' as const },
+  { label: sleepStageLabel('deep'), minutes: session.value.deep_minutes, tone: 'deep' as const },
+  { label: sleepStageLabel('light'), minutes: session.value.light_minutes, tone: 'light' as const },
+  { label: sleepStageLabel('rem'), minutes: session.value.rem_minutes, tone: 'rem' as const },
+  { label: sleepStageLabel('awake'), minutes: session.value.awake_minutes, tone: 'awake' as const },
 ] : []);
 
 const score = computed(() => {
@@ -39,18 +129,18 @@ const score = computed(() => {
 
 const timeInBedLabel = computed(() => {
   const minutes = session.value?.time_in_bed_minutes;
-  return isFiniteNumber(minutes) ? formatDuration(minutes, '未提供') : '未提供';
+  return isFiniteNumber(minutes) ? formatDuration(minutes, t.value.notProvided) : t.value.notProvided;
 });
 
 const syncTimeLabel = computed(() => {
-  if (session.value?.synced_at) return formatDateTime(session.value.synced_at, '同步时间未提供');
+  if (session.value?.synced_at) return formatDateTime(session.value.synced_at, t.value.syncTimeMissing);
   if (appStatus.value?.last_cloud_sync_at) {
-    return `最近云端同步 ${formatDateTime(appStatus.value.last_cloud_sync_at, '同步时间未提供')}`;
+    return t.value.lastCloudSync(formatDateTime(appStatus.value.last_cloud_sync_at, t.value.syncTimeMissing));
   }
-  return '同步时间未提供';
+  return t.value.syncTimeMissing;
 });
 
-const timezoneLabel = computed(() => device.value.timezone || '未提供');
+const timezoneLabel = computed(() => device.value.timezone || t.value.notProvided);
 const deviceIdentifier = computed(() => maskIdentifier(device.value.device_id || session.value?.device_id));
 
 // 周睡眠堆叠柱状图
@@ -77,7 +167,7 @@ const weeklyChartOption = computed(() => {
     animation: false,
     grid: { left: 34, right: 12, top: 24, bottom: 24, containLabel: false },
     legend: {
-      data: ['深睡', '浅睡', 'REM', '清醒'],
+      data: sleepStageLabels(),
       top: 0,
       right: 0,
       textStyle: { color: '#7E856D', fontSize: 11 },
@@ -95,9 +185,9 @@ const weeklyChartOption = computed(() => {
         if (!params || !params.length) return '';
         const name = params[0].name;
         const total = params.reduce((sum, p) => sum + (Number(p.value) || 0), 0);
-        let text = `<b>${name} 睡眠合计：${total.toFixed(1)} 小时</b><br/>`;
+        let text = t.value.tooltipTotal(name, total.toFixed(1));
         params.forEach((p) => {
-          text += `${p.seriesName}: ${p.value} 小时<br/>`;
+          text += t.value.tooltipRow(p.seriesName, p.value);
         });
         return text;
       },
@@ -115,7 +205,7 @@ const weeklyChartOption = computed(() => {
     },
     yAxis: {
       type: 'value',
-      name: '小时',
+      name: t.value.hoursAxis,
       nameTextStyle: { color: '#7E856D', fontSize: 10, align: 'right' },
       axisLine: { show: false },
       axisTick: { show: false },
@@ -124,7 +214,7 @@ const weeklyChartOption = computed(() => {
     },
     series: [
       {
-        name: '深睡',
+        name: sleepStageLabel('deep'),
         type: 'bar',
         stack: 'sleep',
         data: deepData,
@@ -132,21 +222,21 @@ const weeklyChartOption = computed(() => {
         barWidth: 20,
       },
       {
-        name: '浅睡',
+        name: sleepStageLabel('light'),
         type: 'bar',
         stack: 'sleep',
         data: lightData,
         itemStyle: { color: zeppSemanticColors.sleep.light },
       },
       {
-        name: 'REM',
+        name: sleepStageLabel('rem'),
         type: 'bar',
         stack: 'sleep',
         data: remData,
         itemStyle: { color: zeppSemanticColors.sleep.rem },
       },
       {
-        name: '清醒',
+        name: sleepStageLabel('awake'),
         type: 'bar',
         stack: 'sleep',
         data: awakeData,
@@ -179,7 +269,7 @@ const loadDetail = async () => {
       ? await tauriApi.getDeviceProfile({
           deviceId: detail.device_id,
           sourceScope: detail.source_scope,
-        }).catch(() => ({ name: '设备未确定' }))
+        }).catch(() => ({ name: t.value.deviceUndetermined }))
       : {};
     if (seq !== detailSeq) return;
     session.value = detail;
@@ -187,7 +277,7 @@ const loadDetail = async () => {
     device.value = profile;
   } catch (cause) {
     if (seq !== detailSeq) return;
-    error.value = toUserMessage(cause, '睡眠详情暂时不可用');
+    error.value = toUserMessage(cause, t.value.loadFailed);
   } finally {
     if (seq === detailSeq) loading.value = false;
   }
@@ -199,24 +289,24 @@ watch([dataRevision, sleepId], () => void loadDetail());
 
 <template>
   <section class="page sleep-page" aria-labelledby="sleep-detail-title">
-    <RouterLink class="back-link" to="/recent"><Icon name="arrow-left" :size="14" />返回最近记录</RouterLink>
+    <RouterLink class="back-link" to="/recent"><Icon name="arrow-left" :size="14" />{{ t.backToRecent }}</RouterLink>
     <header class="page-heading">
-      <h1 id="sleep-detail-title">睡眠记录详情</h1>
+      <h1 id="sleep-detail-title">{{ t.title }}</h1>
       <p v-if="session">{{ formatDate(session.start_time, 'long') }}</p>
     </header>
 
-    <div v-if="loading" class="muted-line" aria-live="polite">正在读取睡眠详情…</div>
-    <EmptyState v-else-if="error" tone="error" icon="warning" title="无法读取这条睡眠" :message="error">
-      <button class="button button-secondary" type="button" @click="loadDetail">重试</button>
+    <div v-if="loading" class="muted-line" aria-live="polite">{{ t.loadingDetail }}</div>
+    <EmptyState v-else-if="error" tone="error" icon="warning" :title="t.loadFailedTitle" :message="error">
+      <button class="button button-secondary" type="button" @click="loadDetail">{{ t.retry }}</button>
     </EmptyState>
-    <EmptyState v-else-if="!session" icon="moon" title="找不到这条睡眠记录" message="它可能已被清理，或尚未同步到本机。" />
+    <EmptyState v-else-if="!session" icon="moon" :title="t.notFoundTitle" :message="t.notFoundMessage" />
 
     <template v-else>
-      <article class="sleep-hero" aria-label="睡眠时长与评分">
+      <article class="sleep-hero" :aria-label="t.heroAria">
         <div class="hero-duration">
-          <p class="kicker"><span class="mark"><Icon name="moon" :size="16" /></span>睡眠时长</p>
-          <p class="value">{{ formatDuration(session.duration_minutes, '未提供') }}</p>
-          <p class="meta">{{ formatTime(session.start_time) }} 入睡 · {{ formatTime(session.end_time) }} 醒来 · 在床 {{ timeInBedLabel }}</p>
+          <p class="kicker"><span class="mark"><Icon name="moon" :size="16" /></span>{{ t.durationKicker }}</p>
+          <p class="value">{{ formatDuration(session.duration_minutes, t.notProvided) }}</p>
+          <p class="meta">{{ t.heroMeta(formatTime(session.start_time), formatTime(session.end_time), timeInBedLabel) }}</p>
         </div>
         <div class="hero-score">
           <CircularProgress
@@ -230,25 +320,23 @@ watch([dataRevision, sleepId], () => void loadDetail());
           />
           <strong v-else class="score-empty">—</strong>
           <div class="score-copy">
-            <p class="kicker">睡眠评分</p>
-            <p class="score-num">{{ score !== null ? score : '未提供' }}<small v-if="score !== null"> / 100</small></p>
-            <p v-if="score !== null" class="score-note">设备提供的评分，仅作记录展示。</p>
+            <p class="kicker">{{ t.scoreKicker }}</p>
+            <p class="score-num">{{ score !== null ? score : t.notProvided }}<small v-if="score !== null"> / 100</small></p>
+            <p v-if="score !== null" class="score-note">{{ t.scoreNote }}</p>
           </div>
         </div>
       </article>
 
       <!-- 睡眠阶段 -->
-      <section class="surface-card stage-card" aria-label="睡眠阶段">
+      <section class="surface-card stage-card" :aria-label="t.stagesAria">
         <div class="stage-head">
-          <h2>睡眠阶段</h2>
+          <h2>{{ t.stagesTitle }}</h2>
           <div class="stage-actions">
             <p>{{ formatTime(session.start_time) }} – {{ formatTime(session.end_time) }}</p>
-            <button class="stage-help-button" type="button" @click="stageHelpOpen = !stageHelpOpen">阶段说明</button>
+            <button class="stage-help-button" type="button" @click="stageHelpOpen = !stageHelpOpen">{{ t.stageHelpButton }}</button>
           </div>
         </div>
-        <p v-if="stageHelpOpen" class="stage-help">
-          深睡：恢复体力的深度睡眠。浅睡：占比较高的过渡阶段。REM：快速眼动期，多与记忆和梦境有关。清醒：夜间醒来或清醒片段。以上为阶段含义说明，不是健康诊断。
-        </p>
+        <p v-if="stageHelpOpen" class="stage-help">{{ t.stageHelp }}</p>
         <StageBar
           :stages="stages"
           :slices="session.stages"
@@ -258,56 +346,56 @@ watch([dataRevision, sleepId], () => void loadDetail());
       </section>
 
       <!-- 睡眠时长周堆叠图 -->
-      <section v-if="weeklyChartOption" class="surface-card chart-card" aria-label="近7天睡眠趋势">
+      <section v-if="weeklyChartOption" class="surface-card chart-card" :aria-label="t.weeklyAria">
         <div class="stage-head">
-          <h2>近 7 天睡眠结构</h2>
-          <p>每日分期堆叠</p>
+          <h2>{{ t.weeklyTitle }}</h2>
+          <p>{{ t.weeklySub }}</p>
         </div>
-        <VChart class="weekly-sleep-chart" :option="weeklyChartOption" autoresize role="img" aria-label="近7天睡眠结构柱状图" />
+        <VChart class="weekly-sleep-chart" :option="weeklyChartOption" autoresize role="img" :aria-label="t.weeklyChartAria" />
       </section>
 
       <!-- 元数据与设备 -->
-      <section class="meta-grid" aria-label="来源与设备">
+      <section class="meta-grid" :aria-label="t.metaAria">
         <article class="surface-card meta-card">
-          <p class="meta-title"><Icon name="cloud" :size="15" />来源</p>
+          <p class="meta-title"><Icon name="cloud" :size="15" />{{ t.sourceTitle }}</p>
           <dl>
             <div>
-              <dt>数据来源</dt>
+              <dt>{{ t.sourceProvider }}</dt>
               <dd>{{ dataProviderLabel() }}</dd>
             </div>
             <div>
-              <dt>数据范围</dt>
+              <dt>{{ t.sourceScope }}</dt>
               <dd>{{ dataScopeLabel(session.source_scope) }}</dd>
             </div>
             <div>
-              <dt>同步时间</dt>
+              <dt>{{ t.syncedAt }}</dt>
               <dd>{{ syncTimeLabel }}</dd>
             </div>
             <div>
-              <dt>时区</dt>
+              <dt>{{ t.timezone }}</dt>
               <dd>{{ timezoneLabel }}</dd>
             </div>
           </dl>
         </article>
         <article class="surface-card meta-card">
-          <p class="meta-title"><Icon name="watch" :size="15" />设备</p>
+          <p class="meta-title"><Icon name="watch" :size="15" />{{ t.deviceTitle }}</p>
           <dl>
             <div>
-              <dt>设备名称</dt>
-              <dd>{{ device.name || '未提供' }}</dd>
+              <dt>{{ t.deviceName }}</dt>
+              <dd>{{ device.name || t.notProvided }}</dd>
             </div>
             <div>
-              <dt>固件版本</dt>
-              <dd>{{ device.firmware || '未提供' }}</dd>
+              <dt>{{ t.deviceFirmware }}</dt>
+              <dd>{{ device.firmware || t.notProvided }}</dd>
             </div>
             <div>
-              <dt>设备 ID</dt>
+              <dt>{{ t.deviceId }}</dt>
               <dd>{{ deviceIdentifier }}</dd>
             </div>
           </dl>
         </article>
       </section>
-      <p class="note">只展示云端给出的阶段汇总。没有 REM 字段时显示「未提供」，不会用减法编造，也不绘制未提供的时间轴。</p>
+      <p class="note">{{ t.footnote }}</p>
     </template>
   </section>
 </template>

@@ -22,7 +22,164 @@ import { indexSeries, latestValue } from '../lib/metricSeries';
 import { formatDistance, formatDuration, formatMetric, formatTime, isFiniteNumber, type HealthCategory } from '../lib/format';
 import { displayableWorkouts, workoutDisplayLabel, workoutDurationMinutes, workoutTypeKey } from '../lib/workouts';
 import type { HealthOverview, HeartRatePoint, MetricSeries, SleepSession, Workout } from '../types';
-import { intlLocale } from '../i18n';
+import { sleepStageLabel } from '../lib/sleepStages';
+import { defineMessages, intlLocale, useMessages } from '../i18n';
+
+const messages = defineMessages(
+  {
+    heroTitleLine1: '你的穿戴数据，',
+    heroTitleLine2: '已准备好交给 AI',
+    valueSecure: '安全',
+    valueSecureSub: '数据留在本机',
+    valuePrivate: '私密',
+    valuePrivateSub: '不上传原始记录',
+    valueAiReady: 'AI-ready',
+    valueAiReadySub: '结构化再交付',
+    heroVisualAria: '已识别设备的数据汇入云端 AI',
+    aiNodeAria: '交接给云端 AI：ChatGPT、豆包、DeepSeek',
+    cloudAi: '云端 AI',
+    unrecognizedSuffix: ' 还没有识别出型号',
+    unrecognizedCta: '点这里手动指认',
+    deviceErrorPrefix: '设备识别：',
+    loadingAria: '正在加载概览',
+    loadFailedTitle: '无法读取数据概览',
+    retry: '重试',
+    healthUnavailable: '健康数据暂时不可用',
+    partialUnavailable: '部分数据流尚未获取',
+    hrPanelAria: '打开心率详情，查看完整 24 小时',
+    hrTitle: '最近心率',
+    hrWindow: (hours: number) => `最近 ${hours} 小时`,
+    latest: '最新',
+    bpm: '次/分',
+    hrChartAria: '24 小时心率曲线',
+    hrZonesAria: '心率区间（绝对阈值）',
+    hrEmpty: '同步后展示真实的心率波动。',
+    hrMore: '完整 24 小时',
+    hrTooltip: (clock: string, value: number) => `${clock}　<b>${value}</b> 次/分`,
+    zoneRest: '休息 0–99',
+    zoneFat: '燃脂 100–139',
+    zoneAerobic: '有氧 140–169',
+    zoneAnaerobic: '无氧 170+',
+    stepsPanelAria: '打开日常活动详情',
+    stepsTitle: '今日步数',
+    stepsGoalReference: '参考目标',
+    stepsGoalToday: '今日目标',
+    stepsUnit: '步',
+    stepsGoalLine: (goal: string, percent: number) => `目标 ${goal} · ${percent}%`,
+    seeMore: '看更多',
+    sleepPanelAria: '打开睡眠详情',
+    sleepTitle: '昨晚睡眠',
+    sleepSub: '睡眠结构简介',
+    sleepBarAria: '睡眠阶段比例',
+    sleepEmpty: '同步后展示昨晚睡眠。',
+    bodyPanelAria: '打开身体状态',
+    bodyTitle: '身体状态',
+    factRecovery: '恢复',
+    factStress: '压力',
+    factSpo2: '血氧',
+    bodySparkLabel: '近 7 天恢复状态趋势',
+    bodyThin: '近 7 天记录不足以画出趋势',
+    bodyEmpty: '同步后展示恢复、压力与血氧',
+    trainingPanelAria: '打开训练状态',
+    trainingTitle: '训练状态',
+    factLoad: '负荷',
+    trainingSparkLabel: '近 7 天训练负荷趋势',
+    trainingThin: '近 7 天记录不足以画出趋势',
+    trainingEmpty: '同步后展示 VO₂max 与训练负荷',
+    recentAria: '最近记录',
+    recentTitle: '最近记录',
+    recentSub: '睡眠、跑步与力量训练',
+    seeAll: '查看全部',
+    recentEmpty: '暂无记录，完成一次同步后展示。',
+    sleepRecordTitle: '睡眠',
+    sleepScore: (score: number) => `睡眠评分 ${score}`,
+    avgHr: (value: number) => `均心率 ${value}`,
+    timeUnknown: '时间未知',
+    durationHours: (hours: number, minutes: number) => `${hours} 小时 ${minutes} 分`,
+    durationMinutes: (minutes: number) => `${minutes} 分`,
+    loadLow: '偏低',
+    loadMedium: '中等',
+    loadHigh: '较高',
+    loadVeryHigh: '很高',
+  },
+  {
+    heroTitleLine1: 'Your wearable data,',
+    heroTitleLine2: 'ready to hand to an AI',
+    valueSecure: 'Secure',
+    valueSecureSub: 'Data stays on this machine',
+    valuePrivate: 'Private',
+    valuePrivateSub: 'Raw records are never uploaded',
+    valueAiReady: 'AI-ready',
+    valueAiReadySub: 'Structured before it leaves',
+    heroVisualAria: 'Data from recognized devices flowing to a cloud AI',
+    aiNodeAria: 'Hand-off to a cloud AI: ChatGPT, Doubao, DeepSeek',
+    cloudAi: 'Cloud AI',
+    unrecognizedSuffix: ' has no model identified yet',
+    unrecognizedCta: 'Pick it by hand',
+    deviceErrorPrefix: 'Device identification: ',
+    loadingAria: 'Loading the overview',
+    loadFailedTitle: 'Could not read the data overview',
+    retry: 'Try again',
+    healthUnavailable: 'Health data is unavailable right now',
+    partialUnavailable: 'Some data streams have not been fetched yet',
+    hrPanelAria: 'Open heart rate detail for the full 24 hours',
+    hrTitle: 'Recent heart rate',
+    hrWindow: (hours: number) => `Last ${hours} hours`,
+    latest: 'Latest',
+    bpm: 'bpm',
+    hrChartAria: '24-hour heart rate curve',
+    hrZonesAria: 'Heart rate zones (absolute thresholds)',
+    hrEmpty: 'Real heart rate movement shows up here after a sync.',
+    hrMore: 'Full 24 hours',
+    hrTooltip: (clock: string, value: number) => `${clock}　<b>${value}</b> bpm`,
+    zoneRest: 'Rest 0–99',
+    zoneFat: 'Fat burn 100–139',
+    zoneAerobic: 'Aerobic 140–169',
+    zoneAnaerobic: 'Anaerobic 170+',
+    stepsPanelAria: 'Open daily activity detail',
+    stepsTitle: "Today's steps",
+    stepsGoalReference: 'Reference goal',
+    stepsGoalToday: "Today's goal",
+    stepsUnit: 'steps',
+    stepsGoalLine: (goal: string, percent: number) => `Goal ${goal} · ${percent}%`,
+    seeMore: 'See more',
+    sleepPanelAria: 'Open sleep detail',
+    sleepTitle: 'Last night',
+    sleepSub: 'Sleep structure at a glance',
+    sleepBarAria: 'Sleep stage share',
+    sleepEmpty: "Last night's sleep shows up here after a sync.",
+    bodyPanelAria: 'Open body status',
+    bodyTitle: 'Body status',
+    factRecovery: 'Readiness',
+    factStress: 'Stress',
+    factSpo2: 'SpO2',
+    bodySparkLabel: 'Readiness over the last 7 days',
+    bodyThin: 'Not enough records in the last 7 days to draw a trend',
+    bodyEmpty: 'Readiness, stress and blood oxygen show up here after a sync',
+    trainingPanelAria: 'Open training status',
+    trainingTitle: 'Training status',
+    factLoad: 'Load',
+    trainingSparkLabel: 'Training load over the last 7 days',
+    trainingThin: 'Not enough records in the last 7 days to draw a trend',
+    trainingEmpty: 'VO₂max and training load show up here after a sync',
+    recentAria: 'Recent records',
+    recentTitle: 'Recent records',
+    recentSub: 'Sleep, runs and strength work',
+    seeAll: 'See all',
+    recentEmpty: 'Nothing recorded yet. Run a sync and it shows up here.',
+    sleepRecordTitle: 'Sleep',
+    sleepScore: (score: number) => `Sleep score ${score}`,
+    avgHr: (value: number) => `Avg HR ${value}`,
+    timeUnknown: 'Time unknown',
+    durationHours: (hours: number, minutes: number) => `${hours} hr ${minutes} min`,
+    durationMinutes: (minutes: number) => `${minutes} min`,
+    loadLow: 'low',
+    loadMedium: 'moderate',
+    loadHigh: 'high',
+    loadVeryHigh: 'very high',
+  },
+);
+const t = useMessages(messages);
 
 const { dataRevision } = useSyncController();
 const { models: deviceModels, error: deviceError, load: loadDevices } = useDevices();
@@ -42,7 +199,7 @@ const hm = (minutes?: number | null) => {
   const total = Math.round(minutes);
   const hours = Math.floor(total / 60);
   const remainder = total % 60;
-  return hours > 0 ? `${hours} 小时 ${remainder} 分` : `${remainder} 分`;
+  return hours > 0 ? t.value.durationHours(hours, remainder) : t.value.durationMinutes(remainder);
 };
 
 const heroRoster = computed(() => {
@@ -107,12 +264,12 @@ const hrLatest = computed(() => {
   if (isFiniteNumber(overview.value?.current_hr)) return overview.value.current_hr;
   return hrPoints.value[hrPoints.value.length - 1]?.value ?? null;
 });
-const HR_ZONES = [
-  { key: 'rest', label: '休息 0–99', from: 0, to: 99, color: 'rgba(120,129,140,.10)' },
-  { key: 'fat', label: '燃脂 100–139', from: 100, to: 139, color: 'rgba(245,195,59,.12)' },
-  { key: 'aero', label: '有氧 140–169', from: 140, to: 169, color: 'rgba(74,168,232,.12)' },
-  { key: 'an', label: '无氧 170+', from: 170, to: 240, color: 'rgba(240,97,106,.12)' },
-] as const;
+const HR_ZONES = computed(() => [
+  { key: 'rest', label: t.value.zoneRest, from: 0, to: 99, color: 'rgba(120,129,140,.10)' },
+  { key: 'fat', label: t.value.zoneFat, from: 100, to: 139, color: 'rgba(245,195,59,.12)' },
+  { key: 'aero', label: t.value.zoneAerobic, from: 140, to: 169, color: 'rgba(74,168,232,.12)' },
+  { key: 'an', label: t.value.zoneAnaerobic, from: 170, to: 240, color: 'rgba(240,97,106,.12)' },
+]);
 const hrAverage = computed(() => {
   if (!hrPoints.value.length) return null;
   const sum = hrPoints.value.reduce((total, point) => total + point.value, 0);
@@ -146,8 +303,7 @@ const hrChartOption = computed(() => {
       formatter: (params: Array<{ value: [number, number] }>) => {
         const point = Array.isArray(params) ? params[0] : params;
         if (!point) return '';
-        const time = clock(point.value[0]);
-        return `${time}　<b>${Math.round(point.value[1])}</b> 次/分`;
+        return t.value.hrTooltip(clock(point.value[0]), Math.round(point.value[1]));
       },
     },
     xAxis: {
@@ -194,10 +350,10 @@ const sleepStages = computed(() => {
   const sleep = lastSleep.value;
   if (!sleep) return [];
   return [
-    { key: 'deep', label: '深睡', minutes: sleep.deep_minutes, color: 'var(--sleep-deep)' },
-    { key: 'light', label: '浅睡', minutes: sleep.light_minutes, color: 'var(--sleep-light)' },
-    { key: 'rem', label: 'REM', minutes: sleep.rem_minutes ?? 0, color: 'var(--sleep-rem)' },
-    { key: 'awake', label: '清醒', minutes: sleep.awake_minutes, color: 'var(--sleep-awake)' },
+    { key: 'deep', label: sleepStageLabel('deep'), minutes: sleep.deep_minutes, color: 'var(--sleep-deep)' },
+    { key: 'light', label: sleepStageLabel('light'), minutes: sleep.light_minutes, color: 'var(--sleep-light)' },
+    { key: 'rem', label: sleepStageLabel('rem'), minutes: sleep.rem_minutes ?? 0, color: 'var(--sleep-rem)' },
+    { key: 'awake', label: sleepStageLabel('awake'), minutes: sleep.awake_minutes, color: 'var(--sleep-awake)' },
   ];
 });
 
@@ -210,10 +366,10 @@ const trainingLoad = computed(() => isFiniteNumber(overview.value?.training_load
 const loadBand = computed(() => {
   if (trainingLoad.value === null) return null;
   const ratio = trainingLoad.value / loadScale.value;
-  if (ratio < 1 / 6) return '偏低';
-  if (ratio < 1 / 2) return '中等';
-  if (ratio < 1) return '较高';
-  return '很高';
+  if (ratio < 1 / 6) return t.value.loadLow;
+  if (ratio < 1 / 2) return t.value.loadMedium;
+  if (ratio < 1) return t.value.loadHigh;
+  return t.value.loadVeryHigh;
 });
 
 /**
@@ -241,13 +397,13 @@ const withValues = (facts: EntryFact[]) =>
 
 const bodyEntry = computed(() => ({
   facts: withValues([
-    { key: 'readiness', label: '恢复', text: entryFigure('readiness', '') },
-    { key: 'stress', label: '压力', text: entryFigure('stress', '') },
-    { key: 'spo2', label: '血氧', text: entryFigure('spo2', '%') },
+    { key: 'readiness', label: t.value.factRecovery, text: entryFigure('readiness', '') },
+    { key: 'stress', label: t.value.factStress, text: entryFigure('stress', '') },
+    { key: 'spo2', label: t.value.factSpo2, text: entryFigure('spo2', '%') },
   ]),
   spark: seriesValues('readiness'),
   // Say what the sparkline is, rather than leaving a shape with no caption.
-  sparkLabel: '近 7 天恢复状态趋势',
+  sparkLabel: t.value.bodySparkLabel,
   measured: Boolean(statusSeries.value.readiness?.days_with_data
     || statusSeries.value.stress?.days_with_data
     || statusSeries.value.spo2?.days_with_data),
@@ -258,14 +414,14 @@ const trainingEntry = computed(() => ({
     { key: 'vo2max', label: 'VO₂max', text: entryFigure('vo2max', '', 1) },
     {
       key: 'training_load',
-      label: '负荷',
+      label: t.value.factLoad,
       text: trainingLoad.value === null
         ? null
         : `${formatMetric(trainingLoad.value)}${loadBand.value ? ` ${loadBand.value}` : ''}`,
     },
   ]),
   spark: seriesValues('training_load'),
-  sparkLabel: '近 7 天训练负荷趋势',
+  sparkLabel: t.value.trainingSparkLabel,
   measured: Boolean(statusSeries.value.training_load?.days_with_data
     || statusSeries.value.vo2max?.days_with_data),
 }));
@@ -284,7 +440,7 @@ interface RecentItem {
 }
 const shortDateTime = (value: string) => {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '时间未知';
+  if (Number.isNaN(date.getTime())) return t.value.timeUnknown;
   const mm = String(date.getMonth() + 1).padStart(2, '0');
   const dd = String(date.getDate()).padStart(2, '0');
   return `${mm}/${dd} ${formatTime(value)}`;
@@ -299,8 +455,8 @@ const workoutPresentation = (workout: Workout): Pick<RecentItem, 'category' | 'd
 const recentItems = computed<RecentItem[]>(() => {
   const items: RecentItem[] = recentSleep.value.map((sleep) => ({
     key: `sleep-${sleep.sleep_id}`, to: `/sleep/${sleep.sleep_id}`, category: 'sleep', icon: 'moon', designIcon: 'sleep',
-    time: new Date(sleep.end_time || sleep.start_time).getTime(), kicker: shortDateTime(sleep.start_time), title: '睡眠',
-    fact: formatDuration(sleep.duration_minutes, '—'), factLabel: isFiniteNumber(sleep.score) ? `睡眠评分 ${sleep.score}` : undefined,
+    time: new Date(sleep.end_time || sleep.start_time).getTime(), kicker: shortDateTime(sleep.start_time), title: t.value.sleepRecordTitle,
+    fact: formatDuration(sleep.duration_minutes, '—'), factLabel: isFiniteNumber(sleep.score) ? t.value.sleepScore(sleep.score) : undefined,
   }));
   for (const workout of displayableWorkouts(recentWorkouts.value)) {
     const presentation = workoutPresentation(workout);
@@ -308,7 +464,7 @@ const recentItems = computed<RecentItem[]>(() => {
       key: `workout-${workout.workout_id}`, to: `/workouts/${workout.workout_id}`, ...presentation, icon: 'run',
       time: new Date(workout.start_time).getTime(), kicker: shortDateTime(workout.start_time), title: workoutDisplayLabel(workout),
       fact: isFiniteNumber(workout.distance_meters) && workout.distance_meters > 0 ? formatDistance(workout.distance_meters) : formatDuration(workoutDurationMinutes(workout), '—'),
-      factLabel: isFiniteNumber(workout.avg_hr) ? `均心率 ${Math.round(workout.avg_hr)}` : undefined,
+      factLabel: isFiniteNumber(workout.avg_hr) ? t.value.avgHr(Math.round(workout.avg_hr)) : undefined,
     });
   }
   return items.sort((a, b) => b.time - a.time).slice(0, 5);
@@ -338,8 +494,8 @@ const loadOverview = async () => {
   recentWorkouts.value = workouts.status === 'fulfilled' ? workouts.value : [];
   statusSeries.value = status.status === 'fulfilled' ? indexSeries(status.value) : {};
   const rejected = results.filter((result) => result.status === 'rejected');
-  if (rejected.length === results.length) error.value = toUserMessage(rejected[0].reason, '健康数据暂时不可用');
-  else if (rejected.length) partialWarning.value = toUserMessage(rejected[0].reason, '部分数据流尚未获取');
+  if (rejected.length === results.length) error.value = toUserMessage(rejected[0].reason, t.value.healthUnavailable);
+  else if (rejected.length) partialWarning.value = toUserMessage(rejected[0].reason, t.value.partialUnavailable);
   loading.value = false;
 };
 
@@ -352,16 +508,16 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
     <header class="hero-card">
       <div class="hero-copy">
         <p class="hero-kicker"><span></span> LOCAL HEALTH DATA BRIDGE</p>
-        <h1 id="overview-title">你的穿戴数据，<br><em>已准备好交给 AI</em></h1>
+        <h1 id="overview-title">{{ t.heroTitleLine1 }}<br><em>{{ t.heroTitleLine2 }}</em></h1>
         <p class="hero-intro">{{ heroRoster.intro }}</p>
         <ul class="hero-values">
-          <li><DesignIcon name="secure" :size="46" /><span><strong>安全</strong><small>数据留在本机</small></span></li>
-          <li><DesignIcon name="private" :size="46" /><span><strong>私密</strong><small>不上传原始记录</small></span></li>
-          <li><DesignIcon name="ai-ready" :size="46" /><span><strong>AI-ready</strong><small>结构化再交付</small></span></li>
+          <li><DesignIcon name="secure" :size="46" /><span><strong>{{ t.valueSecure }}</strong><small>{{ t.valueSecureSub }}</small></span></li>
+          <li><DesignIcon name="private" :size="46" /><span><strong>{{ t.valuePrivate }}</strong><small>{{ t.valuePrivateSub }}</small></span></li>
+          <li><DesignIcon name="ai-ready" :size="46" /><span><strong>{{ t.valueAiReady }}</strong><small>{{ t.valueAiReadySub }}</small></span></li>
         </ul>
       </div>
 
-      <div class="hero-visual" aria-label="已识别设备的数据汇入云端 AI">
+      <div class="hero-visual" :aria-label="t.heroVisualAria">
         <div v-if="heroRoster.shown.length" class="device-stack" :class="{ solo: heroRoster.shown.length === 1 }">
           <figure v-for="device in heroRoster.shown" :key="device.key" class="hero-device">
             <span class="device-plinth"><DeviceVisual :src="device.image" :alt="device.name" :kind="device.kind" /></span>
@@ -373,11 +529,11 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
           <path d="M0 22H142" /><path d="M0 44H142" /><path d="M0 66H142" />
           <path class="arrow" d="m142 17 18 5-18 5z" /><path class="arrow" d="m142 39 18 5-18 5z" /><path class="arrow" d="m142 61 18 5-18 5z" />
         </svg>
-        <div class="ai-node" aria-label="交接给云端 AI：ChatGPT、豆包、DeepSeek">
+        <div class="ai-node" :aria-label="t.aiNodeAria">
           <div class="ai-logos">
             <img v-for="provider in heroAiProviders" :key="provider.id" :src="provider.localIcon" :alt="provider.label" />
           </div>
-          <span>云端 AI</span>
+          <span>{{ t.cloudAi }}</span>
         </div>
       </div>
     </header>
@@ -391,62 +547,62 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
       :to="device.to"
     >
       <Icon name="warning" :size="15" />
-      <span><strong>{{ device.name }}</strong> 还没有识别出型号</span>
-      <em>点这里手动指认 <DesignIcon name="chevron-right" :size="16" /></em>
+      <span><strong>{{ device.name }}</strong>{{ t.unrecognizedSuffix }}</span>
+      <em>{{ t.unrecognizedCta }} <DesignIcon name="chevron-right" :size="16" /></em>
     </RouterLink>
 
     <WeeklyReportCard />
 
     <div v-if="partialWarning" class="inline-alert warning" role="status"><Icon name="info" :size="15" />{{ partialWarning }}</div>
-    <div v-if="deviceError" class="inline-alert warning" role="status"><Icon name="info" :size="15" />设备识别：{{ deviceError }}</div>
+    <div v-if="deviceError" class="inline-alert warning" role="status"><Icon name="info" :size="15" />{{ t.deviceErrorPrefix }}{{ deviceError }}</div>
 
-    <div v-if="loading" class="overview-skeleton" aria-live="polite" aria-label="正在加载概览">
+    <div v-if="loading" class="overview-skeleton" aria-live="polite" :aria-label="t.loadingAria">
       <SkeletonBlock height="270px" /><div class="skeleton-grid"><SkeletonBlock v-for="index in 6" :key="index" height="188px" /></div>
     </div>
     <div v-else-if="error" class="empty-wrap">
-      <div class="empty-state" role="alert"><DesignIcon name="cloud-output" :size="72" /><strong>无法读取数据概览</strong><span>{{ error }}</span><button class="button button-secondary" type="button" @click="loadOverview">重试</button></div>
+      <div class="empty-state" role="alert"><DesignIcon name="cloud-output" :size="72" /><strong>{{ t.loadFailedTitle }}</strong><span>{{ error }}</span><button class="button button-secondary" type="button" @click="loadOverview">{{ t.retry }}</button></div>
     </div>
 
     <div v-else class="dashboard-grid">
-      <RouterLink class="metric-panel hr-panel" to="/heart" aria-label="打开心率详情，查看完整 24 小时">
-        <div class="panel-head"><span class="panel-title"><span class="chart-icon"><DesignIcon name="heart-rate" :size="34" /></span><span><strong>最近心率</strong><small>最近 {{ OVERVIEW_HR_WINDOW_HOURS }} 小时</small></span></span><span class="latest-value">最新 <strong>{{ num(hrLatest) }}</strong><small>次/分</small></span></div>
-        <VChart v-if="hrPoints.length > 1" class="hr-chart" theme="zeppbridge-dark" :option="hrChartOption" autoresize role="img" aria-label="24 小时心率曲线" />
-        <ul v-if="hrPoints.length > 1" class="hr-zones" aria-label="心率区间（绝对阈值）">
+      <RouterLink class="metric-panel hr-panel" to="/heart" :aria-label="t.hrPanelAria">
+        <div class="panel-head"><span class="panel-title"><span class="chart-icon"><DesignIcon name="heart-rate" :size="34" /></span><span><strong>{{ t.hrTitle }}</strong><small>{{ t.hrWindow(OVERVIEW_HR_WINDOW_HOURS) }}</small></span></span><span class="latest-value">{{ t.latest }} <strong>{{ num(hrLatest) }}</strong><small>{{ t.bpm }}</small></span></div>
+        <VChart v-if="hrPoints.length > 1" class="hr-chart" theme="zeppbridge-dark" :option="hrChartOption" autoresize role="img" :aria-label="t.hrChartAria" />
+        <ul v-if="hrPoints.length > 1" class="hr-zones" :aria-label="t.hrZonesAria">
           <li v-for="zone in HR_ZONES" :key="zone.key">{{ zone.label }}</li>
         </ul>
-        <div v-else class="panel-empty"><DesignIcon name="heart-rate" :size="56" /><span>同步后展示真实的心率波动。</span></div>
-        <span class="panel-more">完整 24 小时 <DesignIcon name="chevron-right" :size="18" /></span>
+        <div v-else class="panel-empty"><DesignIcon name="heart-rate" :size="56" /><span>{{ t.hrEmpty }}</span></div>
+        <span class="panel-more">{{ t.hrMore }} <DesignIcon name="chevron-right" :size="18" /></span>
       </RouterLink>
 
-      <RouterLink class="metric-panel steps-panel" to="/activity" aria-label="打开日常活动详情">
-        <div class="panel-head"><span class="panel-title"><DesignIcon name="steps" :size="34" /><span><strong>今日步数</strong><small>{{ stepGoalIsReference ? '参考目标' : '今日目标' }}</small></span></span></div>
+      <RouterLink class="metric-panel steps-panel" to="/activity" :aria-label="t.stepsPanelAria">
+        <div class="panel-head"><span class="panel-title"><DesignIcon name="steps" :size="34" /><span><strong>{{ t.stepsTitle }}</strong><small>{{ stepGoalIsReference ? t.stepsGoalReference : t.stepsGoalToday }}</small></span></span></div>
         <div class="steps-content">
           <CircularProgress :value="stepsPercent" :size="148" :stroke-width="9" color="#66D77D" track-color="rgba(116, 216, 137, .14)" :show-label="false">
             <div class="steps-inring">
               <strong>{{ num(stepsToday) }}</strong>
-              <span>步</span>
+              <span>{{ t.stepsUnit }}</span>
             </div>
           </CircularProgress>
-          <p class="steps-goal">目标 {{ formatMetric(stepGoal) }} · {{ stepsPercent }}%</p>
+          <p class="steps-goal">{{ t.stepsGoalLine(formatMetric(stepGoal), stepsPercent) }}</p>
         </div>
-        <span class="panel-more">看更多 <DesignIcon name="chevron-right" :size="18" /></span>
+        <span class="panel-more">{{ t.seeMore }} <DesignIcon name="chevron-right" :size="18" /></span>
       </RouterLink>
 
-      <RouterLink class="metric-panel sleep-panel" :to="lastSleep ? `/sleep/${lastSleep.sleep_id}` : '/sleep'" aria-label="打开睡眠详情">
-        <div class="panel-head"><span class="panel-title"><DesignIcon name="sleep" :size="38" /><span><strong>昨晚睡眠</strong><small>睡眠结构简介</small></span></span><span v-if="lastSleep && isFiniteNumber(lastSleep.score)" class="sleep-score">{{ lastSleep.score }}</span></div>
+      <RouterLink class="metric-panel sleep-panel" :to="lastSleep ? `/sleep/${lastSleep.sleep_id}` : '/sleep'" :aria-label="t.sleepPanelAria">
+        <div class="panel-head"><span class="panel-title"><DesignIcon name="sleep" :size="38" /><span><strong>{{ t.sleepTitle }}</strong><small>{{ t.sleepSub }}</small></span></span><span v-if="lastSleep && isFiniteNumber(lastSleep.score)" class="sleep-score">{{ lastSleep.score }}</span></div>
         <template v-if="lastSleep">
           <p class="sleep-total">{{ hm(lastSleep.duration_minutes) }}</p>
-          <div class="sleep-bar" aria-label="睡眠阶段比例"><span v-for="stage in sleepStages" :key="stage.key" :style="{ flex: Math.max(1, stage.minutes || 0), background: stage.color }"></span></div>
+          <div class="sleep-bar" :aria-label="t.sleepBarAria"><span v-for="stage in sleepStages" :key="stage.key" :style="{ flex: Math.max(1, stage.minutes || 0), background: stage.color }"></span></div>
           <ul class="sleep-stages"><li v-for="stage in sleepStages" :key="stage.key"><i :style="{ background: stage.color }"></i><span>{{ stage.label }}</span><strong>{{ hm(stage.minutes) }}</strong></li></ul>
         </template>
-        <div v-else class="panel-empty compact"><DesignIcon name="sleep" :size="50" /><span>同步后展示昨晚睡眠。</span></div>
-        <span class="panel-more">看更多 <DesignIcon name="chevron-right" :size="18" /></span>
+        <div v-else class="panel-empty compact"><DesignIcon name="sleep" :size="50" /><span>{{ t.sleepEmpty }}</span></div>
+        <span class="panel-more">{{ t.seeMore }} <DesignIcon name="chevron-right" :size="18" /></span>
       </RouterLink>
 
-      <RouterLink class="metric-panel entry-panel body-entry" to="/body" aria-label="打开身体状态">
+      <RouterLink class="metric-panel entry-panel body-entry" to="/body" :aria-label="t.bodyPanelAria">
         <div class="entry-icon"><DesignIcon name="recovery" :size="52" /></div>
         <div class="entry-copy">
-          <p class="entry-label">身体状态 <DesignIcon name="chevron-right" :size="18" /></p>
+          <p class="entry-label">{{ t.bodyTitle }} <DesignIcon name="chevron-right" :size="18" /></p>
           <p class="entry-facts">
             <span v-for="fact in bodyEntry.facts" :key="fact.key">
               {{ fact.label }} <strong>{{ fact.text }}</strong>
@@ -458,14 +614,14 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
             :color="zeppSemanticColors.readiness"
             :label="bodyEntry.sparkLabel"
           />
-          <p v-else class="entry-note">{{ bodyEntry.measured ? '近 7 天记录不足以画出趋势' : '同步后展示恢复、压力与血氧' }}</p>
+          <p v-else class="entry-note">{{ bodyEntry.measured ? t.bodyThin : t.bodyEmpty }}</p>
         </div>
       </RouterLink>
 
-      <RouterLink class="metric-panel entry-panel training-entry" to="/training" aria-label="打开训练状态">
+      <RouterLink class="metric-panel entry-panel training-entry" to="/training" :aria-label="t.trainingPanelAria">
         <div class="entry-icon"><DesignIcon name="training-load" :size="52" /></div>
         <div class="entry-copy">
-          <p class="entry-label">训练状态 <DesignIcon name="chevron-right" :size="18" /></p>
+          <p class="entry-label">{{ t.trainingTitle }} <DesignIcon name="chevron-right" :size="18" /></p>
           <p class="entry-facts">
             <span v-for="fact in trainingEntry.facts" :key="fact.key">
               {{ fact.label }} <strong>{{ fact.text }}</strong>
@@ -477,14 +633,14 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
             :color="zeppSemanticColors.training"
             :label="trainingEntry.sparkLabel"
           />
-          <p v-else class="entry-note">{{ trainingEntry.measured ? '近 7 天记录不足以画出趋势' : '同步后展示 VO₂max 与训练负荷' }}</p>
+          <p v-else class="entry-note">{{ trainingEntry.measured ? t.trainingThin : t.trainingEmpty }}</p>
         </div>
       </RouterLink>
 
-      <section class="metric-panel recent-panel" aria-label="最近记录">
-        <div class="panel-head"><span class="panel-title"><DesignIcon name="document" :size="38" /><span><strong>最近记录</strong><small>睡眠、跑步与力量训练</small></span></span><RouterLink class="text-link" to="/recent">查看全部 <DesignIcon name="chevron-right" :size="22" /></RouterLink></div>
+      <section class="metric-panel recent-panel" :aria-label="t.recentAria">
+        <div class="panel-head"><span class="panel-title"><DesignIcon name="document" :size="38" /><span><strong>{{ t.recentTitle }}</strong><small>{{ t.recentSub }}</small></span></span><RouterLink class="text-link" to="/recent">{{ t.seeAll }} <DesignIcon name="chevron-right" :size="22" /></RouterLink></div>
         <div v-if="recentItems.length" class="recent-list"><RecordRow v-for="item in recentItems" :key="item.key" :to="item.to" :category="item.category" :icon="item.icon" :design-icon="item.designIcon" :kicker="item.kicker" :title="item.title" :fact="item.fact" :fact-label="item.factLabel" /></div>
-        <div v-else class="panel-empty recent-empty"><DesignIcon name="document" :size="58" /><span>暂无记录，完成一次同步后展示。</span></div>
+        <div v-else class="panel-empty recent-empty"><DesignIcon name="document" :size="58" /><span>{{ t.recentEmpty }}</span></div>
       </section>
     </div>
   </section>
