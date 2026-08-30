@@ -10,8 +10,9 @@ use crate::models::{
     DiagnosticAssignedModel, DiagnosticDeviceCandidate, DiagnosticDeviceEvidence, DiagnosticField,
     DiagnosticObjectShape, DiagnosticReport, ExportDetail, ExportResult, ExportScope,
     ExportSelection, FeedbackSubmissionResult, HealthOverview, HeartRatePoint,
-    HeartRateZoneOptions, HeartRateZonePreference, MetricSeries, SleepSession, StorageEstimate,
-    TrainingBalancePoint, UserPrefs, Workout, WorkoutSeries,
+    HeartRateZoneOptions, HeartRateZonePreference, MetricSeries, RawPayloadCompaction,
+    SleepSession, StorageEstimate, TrainingBalancePoint, UserPrefs, Workout, WorkoutSeries,
+    DIAGNOSTIC_NOTE_MAX_CHARS,
 };
 use crate::storage::corrections::WorkoutCodeLabel;
 use crate::storage::provenance::{DataHealth, IntegrityCheckResult};
@@ -249,6 +250,25 @@ pub async fn set_user_prefs(
 }
 
 /// Remove records older than the requested retention window.
+/// 把存量的原始报文压缩掉。
+///
+/// 单独一个命令、由用户点一次触发，而不是塞进同步：老库里可能有上千条报文、
+/// 一 GB 以上的文本，压一遍要完整读写一轮。放进同步会让一次「看看有没有新
+/// 数据」变成几分钟的等待。
+#[tauri::command]
+pub async fn compact_raw_payloads(
+    state: tauri::State<'_, AppState>,
+) -> std::result::Result<RawPayloadCompaction, String> {
+    let _write_guard = zeppbridge_core::storage::write_lock::acquire_with_timeout(
+        &state.data_dir,
+        zeppbridge_core::storage::write_lock::WritePurpose::Cleanup,
+        std::time::Duration::from_secs(20),
+    )
+    .map_err(|error| error.to_string())?;
+    let db = state.db.lock().await;
+    db.compact_raw_payloads().map_err(|error| error.to_string())
+}
+
 #[tauri::command]
 pub async fn cleanup_old_data(
     state: tauri::State<'_, AppState>,
@@ -450,7 +470,7 @@ pub async fn set_workout_type_override(
 pub async fn get_diagnostic_report(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<DiagnosticReport, String> {
-    build_diagnostic_report(&state, false).await
+    build_diagnostic_report(&state, false, None).await
 }
 
 /// 组装诊断报告。
@@ -461,6 +481,7 @@ pub async fn get_diagnostic_report(
 async fn build_diagnostic_report(
     state: &AppState,
     include_assignments: bool,
+    user_note: Option<&str>,
 ) -> std::result::Result<DiagnosticReport, String> {
     let device_payload = match state.auth.load_auth() {
         Ok(Some(auth)) => match ZeppConnector::new(auth) {
@@ -498,7 +519,79 @@ async fn build_diagnostic_report(
         workout_type_conflicts: db
             .diagnostic_workout_type_conflicts()
             .map_err(|error| error.user_message())?,
+        // 类型由调用方按需要填；这个构造函数只负责本机能自动查到的事实。
+        category: None,
+        user_note: user_note.and_then(sanitize_diagnostic_note),
     })
+}
+
+/// 把用户写的自由文本收拾成可以发出去的样子。
+///
+/// 报告的其它部分都是固定白名单字段，唯独这一段是用户自己敲的，所以这里替他
+/// 兜住三件事：去掉本机路径（沿用剪贴板那套判断）、抹掉看起来像凭据或长串标识
+/// 的东西、截到长度上限。空白内容返回 None，让整个字段不出现在 JSON 里，而不是
+/// 发一个空字符串出去。
+fn sanitize_diagnostic_note(note: &str) -> Option<String> {
+    let without_paths = sanitize_clipboard_text(note.trim());
+    let mut cleaned = String::with_capacity(without_paths.len());
+    for (index, token) in without_paths
+        .split_inclusive(char::is_whitespace)
+        .enumerate()
+    {
+        let _ = index;
+        let trimmed = token.trim_end();
+        if looks_like_secret(trimmed) {
+            cleaned.push_str("[已移除]");
+            if token.len() > trimmed.len() {
+                cleaned.push_str(&token[trimmed.len()..]);
+            }
+        } else {
+            cleaned.push_str(token);
+        }
+    }
+    let mut collapsed = cleaned.split_whitespace().collect::<Vec<_>>().join(" ");
+    if collapsed.chars().count() > DIAGNOSTIC_NOTE_MAX_CHARS {
+        collapsed = collapsed
+            .chars()
+            .take(DIAGNOSTIC_NOTE_MAX_CHARS)
+            .collect::<String>();
+    }
+    (!collapsed.is_empty()).then_some(collapsed)
+}
+
+/// 一个词看起来像不像凭据、序列号或设备 ID。
+///
+/// 判断只看形状，不看它自称是什么：长串的十六进制、长串数字、带 @ 的地址、
+/// MAC 形状，都直接换掉。宁可多抹一个型号编号，也不要漏出一个 token。
+fn looks_like_secret(token: &str) -> bool {
+    let value = token.trim_matches(|character: char| {
+        !character.is_alphanumeric() && character != '@' && character != ':' && character != '-'
+    });
+    if value.chars().count() < 8 {
+        return false;
+    }
+    if value.contains('@') && value.contains('.') {
+        return true;
+    }
+    // aa:bb:cc:dd:ee:ff 形状的 MAC 地址
+    let colon_groups: Vec<&str> = value.split(':').collect();
+    if colon_groups.len() >= 6
+        && colon_groups
+            .iter()
+            .all(|group| group.len() == 2 && group.chars().all(|c| c.is_ascii_hexdigit()))
+    {
+        return true;
+    }
+    let alnum = value.chars().filter(|c| c.is_ascii_alphanumeric()).count();
+    let digits = value.chars().filter(|c| c.is_ascii_digit()).count();
+    if alnum >= 16
+        && value
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        return true;
+    }
+    digits >= 10
 }
 
 /// 逐台设备把「用户指认的型号」和「这台设备的型号类编号」配成对。
@@ -547,9 +640,22 @@ const FEEDBACK_ENDPOINT: &str = "https://zeppbridge.pages.dev/api/feedback";
 #[tauri::command]
 pub async fn submit_diagnostic_report(
     state: tauri::State<'_, AppState>,
+    note: Option<String>,
+    category: Option<String>,
 ) -> std::result::Result<FeedbackSubmissionResult, String> {
-    let report = build_diagnostic_report(&state, false).await?;
+    let mut report = build_diagnostic_report(&state, false, note.as_deref()).await?;
+    report.category = normalize_report_category(category.as_deref());
     post_diagnostic_report(report).await
+}
+
+/// 用户选的问题类型。只认固定几个取值——这是个分类，不是又一个自由文本框。
+fn normalize_report_category(value: Option<&str>) -> Option<String> {
+    const ALLOWED: [&str; 4] = ["device", "workout", "data", "other"];
+    let value = value?.trim();
+    ALLOWED
+        .iter()
+        .find(|allowed| **allowed == value)
+        .map(|allowed| (*allowed).to_string())
 }
 
 /// 把「用户指认的型号 ↔ 这台设备的型号类编号」交回来，让下一版目录能自动
@@ -560,8 +666,9 @@ pub async fn submit_diagnostic_report(
 #[tauri::command]
 pub async fn submit_device_model_assignment(
     state: tauri::State<'_, AppState>,
+    note: Option<String>,
 ) -> std::result::Result<FeedbackSubmissionResult, String> {
-    let report = build_diagnostic_report(&state, true).await?;
+    let report = build_diagnostic_report(&state, true, note.as_deref()).await?;
     if report.user_assigned_models.is_empty() {
         return Err("这台设备没有可用于补充目录的型号编号，暂时不需要提交".into());
     }
@@ -571,12 +678,20 @@ pub async fn submit_device_model_assignment(
 async fn post_diagnostic_report(
     report: DiagnosticReport,
 ) -> std::result::Result<FeedbackSubmissionResult, String> {
+    // 自动检测到问题，或者用户自己说了「我要报什么」，两条路都算数。
+    //
+    // 以前只认前者：本机没检测到异常时，用户哪怕手打了一整段说明也会被
+    // 「无需提交报告」顶回去，而界面上又没有任何地方让他说明报的是什么。
+    // 用户比检测器更清楚自己遇到了什么。
     let has_reportable_issue = report.device_evidence.unknown_device_count > 0
         || !report.user_assigned_models.is_empty()
         || !report.unknown_workout_codes.is_empty()
-        || report.workout_type_conflicts > 0;
+        || report.workout_type_conflicts > 0
+        || report.category.is_some();
     if !has_reportable_issue {
-        return Err("当前没有检测到未识别设备或运动类型，无需提交报告".into());
+        return Err(
+            "请先选择要反馈的问题类型，或写一句说明——否则这份报告里没有任何可处理的内容".into(),
+        );
     }
 
     // This client is intentionally separate from the Zepp connector: it has
@@ -593,8 +708,17 @@ async fn post_diagnostic_report(
         .send()
         .await
         .map_err(|_| "错误报告发送失败，请检查网络后重试".to_string())?;
-    if !response.status().is_success() {
-        return Err("错误报告服务暂时不可用，请稍后重试".into());
+    // 状态码要带出来。只说「服务暂时不可用」的话，字段被拒（4xx）和服务端
+    // 真的挂了（5xx）长得一模一样，谁也查不下去。响应体不带——那是别人的
+    // 服务器写的内容，不该原样显示给用户。
+    let status = response.status();
+    if !status.is_success() {
+        let hint = if status.is_client_error() {
+            "这个版本发出的报告字段和服务端对不上（可能服务端还没更新）"
+        } else {
+            "错误报告服务暂时不可用，请稍后重试"
+        };
+        return Err(format!("{hint}（HTTP {}）", status.as_u16()));
     }
     response
         .json::<FeedbackSubmissionResult>()
@@ -1471,10 +1595,16 @@ async fn enrich_profile_with_local_data(
             apply_catalog_match(&mut profile, matched.entry, matched.status);
         }
     }
-    // Some accounts' device response has no product-name field at all, so no
-    // matcher can name the watch. When the user has told us which model it is,
-    // use that — and mark it as a user correction rather than a match.
-    if profile.match_status == DeviceMatchStatus::Unknown {
+    // 用户指认了型号，就用用户说的。
+    //
+    // 这里以前有个 `if match_status == Unknown` 的前提，意思是「只有本机认不出
+    // 来的时候才听用户的」。那等于假设自动识别不会错——可自动识别**恰恰会错**：
+    // 目录靠别名匹配，一块别名撞车的表会被认成另一款，而用户点了「不对，我来
+    // 指认」之后，指认存进了库却永远不显示，界面上看还是那个错的型号。
+    //
+    // 现在不管自动识别得出了什么，用户的指认一律优先，并如实标成
+    // `UserAssigned`——不是伪装成识别结果。
+    {
         let keys = [
             requested_device_id,
             profile.device_id.as_deref(),
@@ -1489,13 +1619,7 @@ async fn enrich_profile_with_local_data(
                 .map_err(|error| error.to_string())?
         };
         if let Some(assigned) = assigned {
-            if let Some(entry) = crate::device_catalog::catalog_entries()
-                .iter()
-                .find(|entry| entry.catalog_id == assigned.catalog_id)
-            {
-                apply_catalog_match(&mut profile, entry, CatalogMatchStatus::Exact);
-                profile.match_status = DeviceMatchStatus::UserAssigned;
-            }
+            apply_user_assignment(&mut profile, &assigned.catalog_id);
         }
     }
     let aliases = [
@@ -1515,6 +1639,26 @@ async fn enrich_profile_with_local_data(
     profile.has_local_data = has_local_data;
     profile.last_data_at = last_data_at;
     Ok(profile)
+}
+
+/// 把用户指认的型号套到这份 profile 上。
+///
+/// 单独一个函数是因为它踩过一次坑：这段逻辑原先藏在一个
+/// `if match_status == Unknown` 里，于是已经被自动识别过的设备永远采纳不了
+/// 用户的纠正。抽出来才能用测试把「不管识别成了什么，用户说了算」钉住。
+///
+/// 返回是否真的套上了：目录里没有这个 id 时什么都不改，而不是清空成未知。
+fn apply_user_assignment(profile: &mut DeviceProfile, catalog_id: &str) -> bool {
+    let Some(entry) = crate::device_catalog::catalog_entries()
+        .iter()
+        .find(|entry| entry.catalog_id == catalog_id)
+    else {
+        return false;
+    };
+    apply_catalog_match(profile, entry, CatalogMatchStatus::Exact);
+    // 如实标注来源：这是用户指认的，不是识别结果。
+    profile.match_status = DeviceMatchStatus::UserAssigned;
+    true
 }
 
 fn apply_catalog_match(
@@ -2089,11 +2233,13 @@ fn validate_export_path(value: &str, extension: &str) -> std::result::Result<Pat
 #[cfg(test)]
 mod tests {
     use super::{
-        ai_handoff_mode_for_bytes, build_device_diagnostic, merge_cached_device_profile,
-        parse_device_profile, parse_device_profiles, read_device_profile_cache, redact_ai_export,
+        ai_handoff_mode_for_bytes, apply_user_assignment, build_device_diagnostic,
+        merge_cached_device_profile, parse_device_profile, parse_device_profiles,
+        read_device_profile_cache, redact_ai_export, sanitize_diagnostic_note,
         unknown_device_profile, validate_json_export_path, AI_HANDOFF_INLINE_LIMIT_BYTES,
+        DIAGNOSTIC_NOTE_MAX_CHARS,
     };
-    use crate::models::DeviceMatchStatus;
+    use crate::models::{DeviceMatchStatus, DeviceProfile};
     use serde_json::json;
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -2560,6 +2706,84 @@ mod tests {
             ]
         );
         assert!(urls.iter().all(|url| url.starts_with("https://")));
+    }
+
+    #[test]
+    fn a_user_assignment_overrides_even_a_confident_auto_match() {
+        // 这条用例来自一个真实的坏法：指认逻辑被包在
+        // `if match_status == Unknown` 里，于是一台已经被目录别名匹配上的表，
+        // 用户点了「不对，我来指认」之后型号根本不变——指认存进了库，界面上
+        // 却永远是那个错的。自动识别会错，用户的话必须能盖过它。
+        let target = crate::device_catalog::catalog_entries()
+            .iter()
+            .find(|entry| entry.image_key.is_some())
+            .expect("随包目录里至少要有一款带图的设备");
+        let target_id = target.catalog_id.clone();
+        let target_name = target.canonical_name.clone();
+
+        let mut profile = DeviceProfile {
+            canonical_name: Some("被自动认错的型号".into()),
+            match_status: DeviceMatchStatus::Alias,
+            ..Default::default()
+        };
+        assert!(apply_user_assignment(&mut profile, &target_id));
+        assert_eq!(
+            profile.canonical_name.as_deref(),
+            Some(target_name.as_str())
+        );
+        // 来源要如实标成「用户指认」，不能伪装成识别结果。
+        assert_eq!(profile.match_status, DeviceMatchStatus::UserAssigned);
+
+        // 目录里没有的 id 什么都不改，而不是把设备清空成未知。
+        let mut untouched = DeviceProfile {
+            canonical_name: Some("原样保留".into()),
+            match_status: DeviceMatchStatus::Exact,
+            ..Default::default()
+        };
+        assert!(!apply_user_assignment(&mut untouched, "no-such-catalog-id"));
+        assert_eq!(untouched.canonical_name.as_deref(), Some("原样保留"));
+        assert_eq!(untouched.match_status, DeviceMatchStatus::Exact);
+    }
+
+    #[test]
+    fn a_report_note_keeps_the_useful_sentence() {
+        // 用户写这句话的目的就是让收报告的人知道这是哪一款表，
+        // 脱敏不能把这句话本身也吃掉。
+        let note =
+            sanitize_diagnostic_note("我的表是 Balance 2，固件 3.5.1，但显示未识别").unwrap();
+        assert!(note.contains("Balance 2"));
+        assert!(note.contains("未识别"));
+    }
+
+    #[test]
+    fn a_report_note_drops_pasted_credentials_and_paths() {
+        let note = sanitize_diagnostic_note(
+            r"设备没识别 token=a1b2c3d4e5f6a7b8c9d0e1f2 邮箱 someone@example.com 日志在 C:\Users\me\zepp.db",
+        )
+        .unwrap();
+        assert!(note.contains("设备没识别"));
+        assert!(
+            !note.contains("a1b2c3d4e5f6a7b8c9d0e1f2"),
+            "长串标识必须被抹掉：{note}"
+        );
+        assert!(
+            !note.contains("someone@example.com"),
+            "邮箱必须被抹掉：{note}"
+        );
+        assert!(!note.contains("Users"), "本机路径必须被抹掉：{note}");
+    }
+
+    #[test]
+    fn a_report_note_is_capped_and_can_be_absent() {
+        let long = "设".repeat(DIAGNOSTIC_NOTE_MAX_CHARS + 200);
+        let note = sanitize_diagnostic_note(&long).unwrap();
+        assert_eq!(note.chars().count(), DIAGNOSTIC_NOTE_MAX_CHARS);
+        // 空白备注不该变成一个空字符串发出去。
+        assert!(sanitize_diagnostic_note(
+            "   
+  "
+        )
+        .is_none());
     }
 }
 

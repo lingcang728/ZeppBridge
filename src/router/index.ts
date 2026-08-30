@@ -58,6 +58,21 @@ const routes = [
     component: () => import('../views/WorkoutDetail.vue'),
   },
   {
+    path: '/heart',
+    name: 'HeartRateDetail',
+    component: () => import('../views/HeartRateDetail.vue'),
+  },
+  {
+    path: '/activity',
+    name: 'ActivityDetail',
+    component: () => import('../views/ActivityDetail.vue'),
+  },
+  {
+    path: '/devices/:deviceKey',
+    name: 'DeviceDetail',
+    component: () => import('../views/DeviceDetail.vue'),
+  },
+  {
     path: '/health-check',
     name: 'HealthCheck',
     component: () => import('../views/HealthCheck.vue'),

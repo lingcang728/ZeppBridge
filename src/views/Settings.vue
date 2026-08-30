@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { RouterLink } from 'vue-router';
 import BackupPanel from '../components/BackupPanel.vue';
 import DesignIcon from '../components/DesignIcon.vue';
-import DevicePicker from '../components/DevicePicker.vue';
 import DeviceVisual from '../components/DeviceVisual.vue';
 import HistoryArchivePanel from '../components/HistoryArchivePanel.vue';
 import Icon from '../components/Icon.vue';
-import { useDevices } from '../composables/useDevices';
+import SelectMenu from '../components/SelectMenu.vue';
+import { useDeviceAssignment, useDevices } from '../composables/useDevices';
 import { useSyncController } from '../composables/useSyncController';
 import { AUTO_SYNC_INTERVALS } from '../lib/autoSync';
 import { UI_SCALES, useUiScale, type UiScale } from '../composables/useUiScale';
@@ -73,16 +74,122 @@ const diagnosticBusy = ref(false);
    两者都是「本机推不出来，就问用户」，而不是让应用去猜：
    有些账号的设备响应里根本没有任何产品名字段（只有 deviceSource / deviceType
    这类数字），Zepp 的自定义训练模板也只给编号不给名字。 */
-const deviceAssignBusy = ref(false);
-/** 正在指认哪台设备（device_id / 序列号）；`null` = 选择器没打开。 */
-const pickerDeviceKey = ref<string | null>(null);
-const deviceAssignError = ref<string | null>(null);
-const deviceAssignMessage = ref<string | null>(null);
+/* 指认动作本身住在设备二级页（/devices/:deviceKey）；这里只显示它留下的结果，
+   状态共享自 useDeviceAssignment，两处不会各说各话。 */
+const { assignError: deviceAssignError, assignMessage: deviceAssignMessage } = useDeviceAssignment();
 const unknownCodes = ref<WorkoutCodeLabel[]>([]);
 const codeDrafts = ref<Record<number, string>>({});
 const codeBusy = ref<number | null>(null);
 const codeError = ref<string | null>(null);
 const codeMessage = ref<string | null>(null);
+
+/* 一块板子上的所有数据流，按「已获取 → 云端有但本机没收 → 还没拿到」排。
+   状态分三档而不是两档：「云端有、本机未收录」既不是拿到了，也不是没有，
+   压成任何一档都会骗人。 */
+const capabilityBoard = computed(() => [
+  ...capabilityAvailable.value.map((row) => ({ ...row, state: 'on', lamp: 'on', note: undefined as string | undefined })),
+  ...capabilityNotIngested.value.map((row) => ({ ...row, state: 'pending', lamp: 'pending' })),
+  ...capabilityMissing.value.map((row) => ({ ...row, state: 'off', lamp: 'off', note: undefined as string | undefined })),
+]);
+
+const compactBusy = ref(false);
+const compactMessage = ref<string | null>(null);
+const compactError = ref<string | null>(null);
+
+const formatBytes = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1048576).toFixed(1)} MB`;
+  return `${(bytes / 1073741824).toFixed(2)} GB`;
+};
+
+const runCompactPayloads = async () => {
+  compactBusy.value = true;
+  compactError.value = null;
+  compactMessage.value = null;
+  try {
+    const result = await backend.compactRawPayloads();
+    if (!result.compacted && !result.skipped) {
+      compactMessage.value = '没有需要压缩的历史报文——它们已经是压缩形态了。';
+    } else {
+      const saved = result.bytesBefore - result.bytesAfter;
+      const skipped = result.skipped ? `，跳过 ${result.skipped} 条（压完没变小或校验没通过）` : '';
+      compactMessage.value = `已压缩 ${result.compacted} 条报文，${formatBytes(result.bytesBefore)} → ${formatBytes(result.bytesAfter)}，省下 ${formatBytes(saved)}${skipped}。`;
+    }
+    try {
+      storageEstimate.value = await backend.getStorageEstimate(historyDays.value);
+    } catch {
+      // 估算刷新失败不影响压缩本身已经完成的事实
+    }
+  } catch (error) {
+    compactError.value = toUserMessage(error, '压缩历史报文失败');
+  } finally {
+    compactBusy.value = false;
+  }
+};
+
+const MCP_TOOLS = [
+  { name: 'list_workouts', detail: '运动记录列表，最新在前' },
+  { name: 'get_workout_insight', detail: '一次运动和你自己基线的比较' },
+  { name: 'get_metric_series', detail: '按天的指标序列，每条带单位' },
+  { name: 'get_sleep_detail', detail: '一晚睡眠的分期明细' },
+  { name: 'get_data_health', detail: '每条流的抓取/解析/写入状态' },
+];
+
+/* 与其在界面上写一大篇配置教程，不如给用户一段能直接丢给 AI 的话。
+   配置细节因工具、因操作系统、因安装路径而异，AI 看着他的实际情况给指引，
+   比这里写死的四步准得多；用户本来也就是要截图去问 AI 的。 */
+const MCP_SETUP_PROMPT = `我在用一个叫 ZeppBridge 的 Windows 桌面应用，它把我的 Amazfit / Zepp 手表数据同步到本机的一个 SQLite 数据库里。
+它附带一个 MCP 程序（zeppbridge-mcp），我想把它配置到你这里，这样你就能直接查我的运动和健康数据，不用我每次导出再粘贴。
+
+关于它的已知信息：
+- MCP 程序要从 ZeppBridge 的 GitHub Release 页下载 zeppbridge-tools 压缩包，解压后里面有 zeppbridge-mcp 可执行文件。我可能还没下载。
+- 它是 stdio 类型的 MCP server，只读本机数据库，不联网、不监听端口、不需要任何 token 或 API key。
+- 典型配置形状是：{"mcpServers": {"zeppbridge": {"command": "<zeppbridge-mcp 的完整路径>", "args": []}}}
+- 它提供五个只读工具：list_workouts（运动列表）、get_workout_insight（单次运动与个人基线的比较）、get_metric_series（按天的指标序列）、get_sleep_detail（一晚睡眠明细）、get_data_health（每条数据流的抓取/解析/写入状态）。
+
+请告诉我：
+1. 针对你（我现在正在用的这个工具）具体应该把配置写到哪个文件、用什么命令添加；
+2. Windows 上路径要怎么写（反斜杠要不要转义）；
+3. 配完怎么验证生效。
+
+如果你需要我提供什么信息（比如我用的是哪个客户端、文件放在哪），直接问我。`;
+
+const MCP_CONFIG_EXAMPLE = `{
+  "mcpServers": {
+    "zeppbridge": {
+      "command": "<zeppbridge-mcp 的路径>",
+      "args": []
+    }
+  }
+}`;
+
+const mcpMessage = ref<string | null>(null);
+const copyMcpPrompt = async () => {
+  try {
+    await navigator.clipboard.writeText(MCP_SETUP_PROMPT);
+    mcpMessage.value = '已复制。粘给你正在用的 AI，它会照着你的机器给出配置步骤。';
+  } catch {
+    mcpMessage.value = '复制失败，请手动选中上面那段文字。';
+  }
+};
+
+const copyMcpConfig = async () => {
+  try {
+    await navigator.clipboard.writeText(MCP_CONFIG_EXAMPLE);
+    mcpMessage.value = '配置已复制。把 command 换成你本机 zeppbridge-mcp 的实际路径。';
+  } catch {
+    mcpMessage.value = '复制失败，请手动选中上面的配置。';
+  }
+};
+
+const RETENTION_CHOICES = [30, 90, 180, 365].map((days) => ({ value: days, label: `${days} 天` }));
+const HISTORY_CHOICES = [7, 30, 90, 365].map((days) => ({ value: days, label: `最近 ${days} 天` }));
+const EXPORT_FORMAT_CHOICES = [
+  { value: 'json', label: 'JSON', hint: '结构化数据' },
+  { value: 'csv', label: 'CSV', hint: '表格数据' },
+  { value: 'gpx', label: 'GPX', hint: '运动轨迹' },
+];
 
 const unnamedCodeCount = computed(() => unknownCodes.value.filter((entry) => !entry.label).length);
 
@@ -99,43 +206,7 @@ const loadCorrections = async () => {
    点一下只是把文本填进输入框，用户仍然可以改成任何名字。 */
 const CODE_NAME_SUGGESTIONS = ['力量训练', '核心训练', 'HIIT', '拉伸放松', '康复训练', '自定义训练'];
 
-const assignDeviceModel = async (deviceKey: string, catalogId: string, contribute = false) => {
-  if (!deviceKey) {
-    deviceAssignError.value = '这台设备没有可用的本机标识，无法保存指认。';
-    return;
-  }
-  deviceAssignBusy.value = true;
-  deviceAssignError.value = null;
-  deviceAssignMessage.value = null;
-  try {
-    await backend.setDeviceModelOverride(deviceKey, catalogId || null);
-    await loadDevices(false);
-    pickerDeviceKey.value = null;
-    if (!catalogId) {
-      deviceAssignMessage.value = '已撤销型号指认。';
-      return;
-    }
-    deviceAssignMessage.value = '已记录你的型号指认。界面会把它标成「你指认的型号」，不会当成自动识别结果。';
-    if (!contribute) return;
-    // 补目录的提交失败不该让指认看起来没保存成功：本机的那一半已经写好了。
-    try {
-      const result = await backend.submitDeviceModelAssignment();
-      deviceAssignMessage.value = `已记录你的型号指认，并把型号编号交给了 ZeppBridge（编号 ${result.reportId}）。下一版目录会让同款设备自动识别。`;
-    } catch (error) {
-      deviceAssignMessage.value = `已记录你的型号指认（只在本机）。补充目录没发送成功：${toUserMessage(error, '网络不可用')}`;
-    }
-  } catch (error) {
-    deviceAssignError.value = toUserMessage(error, '无法保存型号指认');
-  } finally {
-    deviceAssignBusy.value = false;
-  }
-};
 
-const openPicker = (deviceKey: string) => {
-  deviceAssignError.value = null;
-  deviceAssignMessage.value = null;
-  pickerDeviceKey.value = pickerDeviceKey.value === deviceKey ? null : deviceKey;
-};
 
 const saveCodeLabel = async (zeppType: number) => {
   codeBusy.value = zeppType;
@@ -190,7 +261,24 @@ const onExportFormatChange = () => {
 
 /* 隐私政策弹窗 */
 const privacyModalOpen = ref(false);
-const updateInstallArmed = ref(false);
+const updateNotesOpen = ref(false);
+
+/** 卡片上只放第一行；完整说明在弹窗里，免得把一整篇 Release notes 压成一段。 */
+const releaseTeaser = computed(() => {
+  const notes = updateState.notes.trim();
+  if (!notes) return '本次 Release 未填写更新说明。';
+  const firstLine = notes
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean) ?? notes;
+  return firstLine.length > 60 ? `${firstLine.slice(0, 60)}…` : firstLine;
+});
+
+/* 一发现新版本就把「更新了什么」摆到用户面前。
+   只报一个版本号的话，用户没有任何依据判断这次该不该更新。 */
+watch(() => updateState.status, (status) => {
+  if (status === 'available') updateNotesOpen.value = true;
+});
 const updateBusy = computed(() => ['checking', 'downloading', 'installing'].includes(updateState.status));
 const updateProgress = computed(() => updateState.totalBytes
   ? Math.min(100, Math.round(updateState.downloadedBytes / updateState.totalBytes * 100))
@@ -209,8 +297,9 @@ const formatUpdateBytes = (bytes: number) => bytes < 1024 * 1024
   ? `${(bytes / 1024).toFixed(1)} KB`
   : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
+/* 弹窗全程不关：下载和安装的进度都显示在更新说明下面。
+   用户想干别的可以点「在后台继续」把弹窗收起来，下载不受影响。 */
 const installUpdate = async () => {
-  updateInstallArmed.value = false;
   await downloadAndInstallDesktopUpdate();
 };
 
@@ -544,19 +633,48 @@ const copyLocalApiExample = async () => {
   }
 };
 
+/* 用户自己写的一句说明。
+ *
+ * 只发字段结构和编号时，收到报告的人经常判断不出这是哪一款表；
+ * 「我的表是 Balance 2，但显示未识别」这一句往往比十个字段都管用。
+ * 自由文本会在后端过一遍脱敏（本机路径、邮箱、长串标识）并截到 500 字。 */
+const DIAGNOSTIC_NOTE_MAX = 500;
+/* 让用户自己说要报什么。
+   本机的自动检测只能发现「有未识别的设备或运动编号」；用户遇到的可能是
+   别的（数据对不上、某项一直是空）。以前这些人会被「无需提交报告」顶回去，
+   而界面上又没有任何地方能说明情况。 */
+const REPORT_CATEGORIES = [
+  { value: 'device', label: '设备没有被识别', hint: '型号显示错误或显示「未识别」' },
+  { value: 'workout', label: '运动类型没有被识别', hint: '显示成「未知运动」或认错了项目' },
+  { value: 'data', label: '数据对不上', hint: '某项一直是空，或和 Zepp App 里的数字不一样' },
+  { value: 'other', label: '其它问题', hint: '在下面写清楚就行' },
+];
+const diagnosticCategory = ref<string>('');
+const diagnosticNote = ref('');
+const diagnosticResult = ref<{ reportId: string; submittedAt: string } | null>(null);
+const diagnosticError = ref<string | null>(null);
+
 const submitDiagnosticReport = async () => {
   const confirmed = window.confirm(
-    '只会发送应用版本、系统类型、解析器版本、未识别设备的产品级提示与字段结构、固件版本、型号类编号（deviceSource / deviceType，只有整数，描述的是「哪一款表」而不是「哪一台表」），以及未知运动编号和数量。不会发送 Zepp 账号、Token、序列号、设备 ID、MAC 地址、GPS、健康数值、原始响应或本机路径。确认提交吗？',
+    '只会发送应用版本、系统类型、解析器版本、未识别设备的产品级提示与字段结构、固件版本、型号类编号（deviceSource / deviceType，只有整数，描述的是「哪一款表」而不是「哪一台表」）、未知运动编号和数量，以及你在上面写的那段说明（会自动去掉本机路径、邮箱和长串标识）。不会发送 Zepp 账号、Token、序列号、设备 ID、MAC 地址、GPS、健康数值或原始响应。确认提交吗？',
   );
   if (!confirmed) return;
   diagnosticBusy.value = true;
+  diagnosticError.value = null;
+  diagnosticResult.value = null;
   dataError.value = null;
   dataMessage.value = null;
   try {
-    const result = await backend.submitDiagnosticReport();
-    dataMessage.value = `错误报告已安全提交，报告编号：${result.reportId}`;
+    const note = diagnosticNote.value.trim();
+    const result = await backend.submitDiagnosticReport(
+      note || undefined,
+      diagnosticCategory.value || undefined,
+    );
+    diagnosticResult.value = { reportId: result.reportId, submittedAt: result.submittedAt };
+    diagnosticNote.value = '';
+    diagnosticCategory.value = '';
   } catch (error) {
-    dataError.value = toUserMessage(error, '错误报告提交失败');
+    diagnosticError.value = toUserMessage(error, '错误报告提交失败');
   } finally {
     diagnosticBusy.value = false;
   }
@@ -656,7 +774,10 @@ const streamLabels: Record<string, string> = {
   steps: '步数',
   daily_activity: '日常活动',
   stress: '压力',
-  spo2: '血氧 SpO₂',
+  // 这一行数的是 daily_metrics 里 spo2_* 那几项（ODI、夜间评分、实测时长），
+  // 全部来自夜间测量；身体状态页画的是 metric_samples 里的逐条读数，两者
+  // 是不同的东西。都叫「血氧」会让人以为「有数据」却看不到曲线。
+  spo2: '夜间血氧指标',
   respiratory_rate: '呼吸率',
   hrv: 'HRV (SDNN)',
   hrv_rmssd: 'HRV (RMSSD)',
@@ -669,7 +790,7 @@ const streamLabels: Record<string, string> = {
   weight: '体重',
   emotion: '情绪',
   second_heart_rate: '逐秒心率索引',
-  spo2_files: '血氧原始文件索引',
+  spo2_files: '逐条血氧原始文件索引',
 };
 
 const surfaceLabels: Record<string, string> = {
@@ -906,24 +1027,15 @@ const runCapabilityProbe = async () => {
               <span v-if="source.kind === 'device'">设备 ID {{ maskIdentifier(source.model.profile.device_id || source.model.profile.serial) }}</span>
             </div>
             <span :class="['source-state', { on: source.state !== '未识别' }]"><i class="dot"></i>{{ source.state }}</span>
-            <button
-              v-if="source.kind === 'device' && (source.state === '未识别' || source.state === '你指认的型号')"
+            <!-- 入口对每台设备都在。识别对了不代表用户同意，识别错了更不能没有退路。 -->
+            <RouterLink
+              v-if="source.kind === 'device' && deviceKeyFor(source.model)"
               class="button secondary assign-trigger"
-              type="button"
-              :disabled="deviceAssignBusy || !deviceKeyFor(source.model)"
-              @click="openPicker(deviceKeyFor(source.model))"
+              :to="`/devices/${encodeURIComponent(deviceKeyFor(source.model))}`"
             >
-              <Icon name="watch" :size="14" />{{ source.state === '你指认的型号' ? '换一台' : '手动认一下' }}
-            </button>
+              <Icon name="watch" :size="14" />查看 / 换型号
+            </RouterLink>
           </div>
-          <DevicePicker
-            v-if="source.kind === 'device' && pickerDeviceKey && pickerDeviceKey === deviceKeyFor(source.model)"
-            :model-value="source.model.profile.catalog_id"
-            :busy="deviceAssignBusy"
-            @confirm="(id: string, contribute: boolean) => assignDeviceModel(pickerDeviceKey!, id, contribute)"
-            @clear="assignDeviceModel(pickerDeviceKey!, '')"
-            @cancel="pickerDeviceKey = null"
-          />
           </template>
         </div>
         <div v-if="unknownDeviceDetected && !devicesLoading" class="diagnostic-panel unknown-device-report" role="status">
@@ -935,9 +1047,34 @@ const runCapabilityProbe = async () => {
           <p>提交错误报告可以帮我把这台设备的编号补进内置目录，之后所有人都不用手动指认。报告只含固定白名单字段，无需 GitHub 账号。</p>
           <p v-if="deviceAssignError" class="api-error" role="alert">{{ deviceAssignError }}</p>
           <p v-else-if="deviceAssignMessage" class="hint-line ok">{{ deviceAssignMessage }}</p>
+          <div class="diagnostic-note">
+            <span>要反馈什么<em>（本机没自动检测到问题时，选一个就能提交）</em></span>
+            <SelectMenu
+              v-model="diagnosticCategory"
+              :options="REPORT_CATEGORIES"
+              placeholder="不指定（只发送自动检测到的问题）"
+              aria-label="要反馈的问题类型"
+            />
+          </div>
+          <label class="diagnostic-note">
+            <span>补充说明<em>（选填，但很有用）</em></span>
+            <textarea
+              v-model="diagnosticNote"
+              rows="3"
+              :maxlength="DIAGNOSTIC_NOTE_MAX"
+              placeholder="例如：我的表是 Amazfit Balance 2，但这里显示未识别；或者：户外骑行被识别成了未知运动。"
+            ></textarea>
+            <small>{{ diagnosticNote.length }} / {{ DIAGNOSTIC_NOTE_MAX }} · 发送前会自动去掉本机路径、邮箱和长串标识</small>
+          </label>
           <button class="button secondary" type="button" :disabled="diagnosticBusy" @click="submitDiagnosticReport">
             <Icon name="send" :size="14" />{{ diagnosticBusy ? '正在安全提交…' : '提交错误报告' }}
           </button>
+          <div v-if="diagnosticResult" class="diagnostic-done" role="status">
+            <strong><Icon name="circle-check" :size="14" />已收到，谢谢</strong>
+            <p>报告编号 <code>{{ diagnosticResult.reportId }}</code>，提交时间 {{ formatDateTime(diagnosticResult.submittedAt) }}。</p>
+            <p class="diagnostic-done-note">发出去的就是上面列出的那几类字段和你写的那段说明，没有别的。</p>
+          </div>
+          <p v-if="diagnosticError" class="api-error" role="alert">{{ diagnosticError }}</p>
         </div>
       </section>
 
@@ -955,46 +1092,34 @@ const runCapabilityProbe = async () => {
         <Icon name="warning" :size="14" />{{ capabilityError }}
       </div>
 
-      <div v-if="capabilityOverview" class="capability-columns">
-        <div class="capability-column">
-          <p class="capability-heading">可提供给 AI<em>{{ capabilityAvailable.length }}</em></p>
-          <ul class="capability-list">
-            <li v-for="row in capabilityAvailable" :key="row.key" class="capability-row">
-              <Icon name="circle-check" :size="15" class="capability-yes" />
-              <span class="capability-copy">
-                <strong>{{ row.label }}</strong>
-                <span>{{ row.detail }}</span>
-              </span>
-            </li>
-            <li v-if="!capabilityAvailable.length" class="capability-empty">尚未同步到任何数据。</li>
-          </ul>
-        </div>
-        <div v-if="capabilityNotIngested.length" class="capability-column">
-          <p class="capability-heading">云端有，本机未收录<em>{{ capabilityNotIngested.length }}</em></p>
-          <ul class="capability-list">
-            <li v-for="row in capabilityNotIngested" :key="row.key" class="capability-row">
-              <Icon name="info" :size="15" class="capability-pending" />
-              <span class="capability-copy">
-                <strong>{{ row.label }}</strong>
-                <span>{{ row.detail }}</span>
-                <span v-if="row.note" class="capability-why">{{ row.note }}</span>
-              </span>
-            </li>
-          </ul>
-        </div>
-        <div class="capability-column">
-          <p class="capability-heading">暂未获取到<em>{{ capabilityMissing.length }}</em></p>
-          <ul class="capability-list">
-            <li v-for="row in capabilityMissing" :key="row.key" class="capability-row">
-              <Icon name="dots" :size="15" class="capability-no" />
-              <span class="capability-copy">
-                <strong>{{ row.label }}</strong>
-                <span>{{ row.detail }}</span>
-              </span>
-            </li>
-            <li v-if="!capabilityMissing.length" class="capability-empty">全部数据流都已获取。</li>
-          </ul>
-        </div>
+      <!-- 三列竖排会让最长的那一列决定整块高度，右边两列下面全是空的。
+           改成一格一条数据流的指示灯：亮 = 本机已有，暗 = 还没拿到。
+           横向铺开，多少条流都能把宽度用满，也一眼看得出「亮了几个」。 -->
+      <div v-if="capabilityOverview" class="capability-board">
+        <p class="capability-legend">
+          <span class="legend-item"><i class="lamp on"></i>已获取 {{ capabilityAvailable.length }}</span>
+          <span v-if="capabilityNotIngested.length" class="legend-item"><i class="lamp pending"></i>云端有、本机未收录 {{ capabilityNotIngested.length }}</span>
+          <span class="legend-item"><i class="lamp off"></i>暂未获取 {{ capabilityMissing.length }}</span>
+        </p>
+
+        <ul class="capability-grid">
+          <li
+            v-for="row in capabilityBoard"
+            :key="row.key"
+            :class="['capability-cell', row.state]"
+          >
+            <span class="cell-head">
+              <i :class="['lamp', row.lamp]" aria-hidden="true"></i>
+              <strong>{{ row.label }}</strong>
+            </span>
+            <span class="cell-detail">{{ row.detail }}</span>
+            <span v-if="row.note" class="cell-note">{{ row.note }}</span>
+          </li>
+          <li v-if="!capabilityBoard.length" class="capability-cell off">
+            <span class="cell-head"><i class="lamp off" aria-hidden="true"></i><strong>尚未同步</strong></span>
+            <span class="cell-detail">完成一次同步后这里会亮起来。</span>
+          </li>
+        </ul>
       </div>
 
       <details class="probe-diagnostics">
@@ -1068,7 +1193,10 @@ const runCapabilityProbe = async () => {
       <p class="retain-note">名字只保存在本机，不会回传 Zepp，也不会被重新解析覆盖。留空并保存即可清除。</p>
     </section>
 
-    <div class="three-col">
+    <!-- 隐私与安全这一块最高，早先和「本地数据保留」「导出偏好」并排在三栏里，
+         网格拉平行高，右边两张卡片下面就空出小半屏没有意义的留白。
+         现在它单独一行，另外两块自己配一对。 -->
+    <div class="one-col">
       <!-- 4. 隐私安全 -->
       <section id="privacy-section" class="settings-card" aria-labelledby="privacy-title">
         <h2 id="privacy-title">4. 隐私与安全</h2>
@@ -1101,23 +1229,94 @@ const runCapabilityProbe = async () => {
         <div class="diagnostic-panel">
           <strong>设备或运动没有识别？</strong>
           <p>无需注册 GitHub 或复制数据。确认后只把产品级字段结构、固件版本、型号类编号（整数，只说明是哪一款表）、未知运动编号和数量发送到 ZeppBridge 的私有错误报告库；绝不发送账号、Token、序列号、设备 ID、MAC 地址、GPS、健康数值、原始响应或本机路径。</p>
+          <div class="diagnostic-note">
+            <span>要反馈什么<em>（本机没自动检测到问题时，选一个就能提交）</em></span>
+            <SelectMenu
+              v-model="diagnosticCategory"
+              :options="REPORT_CATEGORIES"
+              placeholder="不指定（只发送自动检测到的问题）"
+              aria-label="要反馈的问题类型"
+            />
+          </div>
+          <label class="diagnostic-note">
+            <span>补充说明<em>（选填，但很有用）</em></span>
+            <textarea
+              v-model="diagnosticNote"
+              rows="3"
+              :maxlength="DIAGNOSTIC_NOTE_MAX"
+              placeholder="例如：我的表是 Amazfit Balance 2，但这里显示未识别；或者：户外骑行被识别成了未知运动。"
+            ></textarea>
+            <small>{{ diagnosticNote.length }} / {{ DIAGNOSTIC_NOTE_MAX }} · 发送前会自动去掉本机路径、邮箱和长串标识</small>
+          </label>
           <button class="button secondary" type="button" :disabled="diagnosticBusy" @click="submitDiagnosticReport">
             <Icon name="send" :size="14" />{{ diagnosticBusy ? '正在安全提交…' : '提交错误报告' }}
           </button>
+          <div v-if="diagnosticResult" class="diagnostic-done" role="status">
+            <strong><Icon name="circle-check" :size="14" />已收到，谢谢</strong>
+            <p>报告编号 <code>{{ diagnosticResult.reportId }}</code>，提交时间 {{ formatDateTime(diagnosticResult.submittedAt) }}。</p>
+            <p class="diagnostic-done-note">发出去的就是上面列出的那几类字段和你写的那段说明，没有别的。</p>
+          </div>
+          <p v-if="diagnosticError" class="api-error" role="alert">{{ diagnosticError }}</p>
         </div>
       </section>
 
-      <!-- 5. 数据保留 -->
+    </div>
+
+    <!-- 5. MCP -->
+    <section class="settings-card mcp-card" aria-labelledby="mcp-title">
+      <div class="section-heading-row">
+        <h2 id="mcp-title">5. MCP（让 AI 工具直接问本机数据）</h2>
+        <span class="capability-checked">只读 · 不监听端口</span>
+      </div>
+      <p class="section-description">
+        <strong>不知道 MCP 是什么可以跳过，它不影响 ZeppBridge 的任何功能。</strong>
+        一句话说：「交给 AI」是你导出数据粘给 AI；MCP 是<strong>让 AI 自己来问</strong>——
+        配好之后直接对它说「看看我最近一个月的睡眠」，它自己去你本机的库里查。
+        只对装在你电脑上的 AI 编程工具有用（Claude Code、Codex、Grok 这类）。
+      </p>
+
+      <div class="mcp-handoff">
+        <p class="mcp-sub">
+          配置步骤因工具而异，与其在这里写一大篇，不如<strong>把下面这段复制给你正在用的 AI</strong>，让它照着你的机器给你指引。
+        </p>
+        <pre class="mcp-config"><code>{{ MCP_SETUP_PROMPT }}</code></pre>
+        <div class="inline-actions">
+          <button class="button primary" type="button" @click="copyMcpPrompt">
+            <Icon name="copy" :size="14" />复制这段去问 AI
+          </button>
+          <button class="button secondary" type="button" @click="copyMcpConfig">
+            <Icon name="copy" :size="14" />只复制配置片段
+          </button>
+        </div>
+        <p v-if="mcpMessage" class="hint-line ok" role="status">{{ mcpMessage }}</p>
+      </div>
+
+      <p class="mcp-sub">配好之后，AI 能问到这五件事：</p>
+      <div class="mcp-tools">
+        <div v-for="tool in MCP_TOOLS" :key="tool.name" class="mcp-tool">
+          <code>{{ tool.name }}</code>
+          <span>{{ tool.detail }}</span>
+        </div>
+      </div>
+
+      <p class="retain-note">
+        <code>zeppbridge-mcp</code> 随 Release 的工具压缩包一起分发，和桌面应用同一个版本。
+        它读的是同一个本机数据库，所以看到的数据和你在这个界面里看到的完全一致。
+      </p>
+    </section>
+
+    <div class="two-col paired">
+      <!-- 6. 数据保留 -->
       <section class="settings-card" aria-labelledby="retention-title">
-        <h2 id="retention-title">5. 本地数据保留</h2>
+        <h2 id="retention-title">6. 本地数据保留</h2>
         <div class="field-row">
           <span class="kv-label">保留时长</span>
-          <select v-model.number="retentionDays" aria-label="本地数据保留天数" @change="savePrefs">
-            <option :value="30">30 天</option>
-            <option :value="90">90 天</option>
-            <option :value="180">180 天</option>
-            <option :value="365">365 天</option>
-          </select>
+          <SelectMenu
+            v-model="retentionDays"
+            :options="RETENTION_CHOICES"
+            aria-label="本地数据保留天数"
+            @update:model-value="savePrefs"
+          />
         </div>
         <p class="retain-note">保留最近 {{ retentionDays }} 天的本地数据；清理在每次<strong>成功同步之后</strong>执行，不会在后台自行发生。</p>
         <p class="hint-line">{{ storageEstimate?.message || `下次成功同步后，${retentionCutoffDate} 以前的数据会被清理` }}</p>
@@ -1131,25 +1330,26 @@ const runCapabilityProbe = async () => {
         </div>
       </section>
 
-      <!-- 6. 导出默认值 -->
+      <!-- 7. 导出默认值 -->
       <section class="settings-card" aria-labelledby="export-title">
-        <h2 id="export-title">6. 导出与补拉偏好</h2>
+        <h2 id="export-title">7. 导出与补拉偏好</h2>
         <div class="field-row">
           <span class="kv-label">默认导出格式</span>
-          <select v-model="defaultExportFormat" aria-label="默认导出格式" @change="onExportFormatChange">
-            <option value="json">JSON（结构化数据）</option>
-            <option value="csv">CSV（表格数据）</option>
-            <option value="gpx">GPX（运动轨迹）</option>
-          </select>
+          <SelectMenu
+            v-model="defaultExportFormat"
+            :options="EXPORT_FORMAT_CHOICES"
+            aria-label="默认导出格式"
+            @update:model-value="onExportFormatChange"
+          />
         </div>
         <div class="field-row">
           <span class="kv-label">历史补拉范围</span>
-          <select v-model.number="historyDays" aria-label="历史补拉天数" @change="savePrefs">
-            <option :value="7">最近 7 天</option>
-            <option :value="30">最近 30 天</option>
-            <option :value="90">最近 90 天</option>
-            <option :value="365">最近 365 天</option>
-          </select>
+          <SelectMenu
+            v-model="historyDays"
+            :options="HISTORY_CHOICES"
+            aria-label="历史补拉天数"
+            @update:model-value="savePrefs"
+          />
         </div>
         <p class="retain-note">设置「交给 AI」页面的默认格式与云端补拉窗口。</p>
         <div class="inline-actions">
@@ -1160,72 +1360,11 @@ const runCapabilityProbe = async () => {
       </section>
     </div>
 
-    <!-- 归档与备份两块内容都带表格，塞进三栏会挤成两行一格；
-         单独给它们一行，宽度才够把「云端无返回」这类状态说清楚。 -->
-    <div class="two-col wide-panels">
+    <!-- 历史补拉的账本要和「补拉范围」一起看，所以留在正文；
+         数据库快照是灾难恢复工具，进「高级与维护」。 -->
+    <div class="one-col wide-panels">
       <HistoryArchivePanel :prefs="userPrefs" @prefs-changed="applyPrefsChange" />
-      <BackupPanel />
     </div>
-
-    <!-- 7. 本机 API -->
-    <section class="settings-card api-card" aria-labelledby="api-title">
-      <div class="api-head">
-        <span class="api-icon"><Icon name="braces" :size="20" /></span>
-        <div>
-          <h2 id="api-title">7. 本机 REST API</h2>
-          <p>让本机上的其他程序读取已标准化的运动序列 JSON。默认关闭，需要你显式启用。</p>
-        </div>
-        <span :class="['api-state', { on: localApiStatus?.running }]">
-          <i aria-hidden="true"></i>{{ localApiStatus?.running ? '正在监听' : (localApiStatus?.enabled ? '已启用但未监听' : '已关闭') }}
-        </span>
-      </div>
-
-      <div class="toggle-row api-toggle">
-        <div class="toggle-copy">
-          <strong>启用本机 API</strong>
-          <span>开关立即生效，不需要重启应用；关闭后 {{ localApiStatus?.address || '127.0.0.1:43921' }} 会立刻释放。</span>
-        </div>
-        <button
-          class="switch"
-          type="button"
-          role="switch"
-          aria-label="启用本机 REST API"
-          :aria-checked="Boolean(localApiStatus?.enabled)"
-          :disabled="localApiBusy"
-          @click="toggleLocalApi"
-        ><span></span></button>
-      </div>
-
-      <template v-if="localApiStatus?.enabled">
-        <div class="api-endpoint">
-          <code>{{ localApiStatus?.base_url || 'http://127.0.0.1:43921' }}/workouts/{id}/series</code>
-          <button class="button secondary" type="button" :disabled="localApiBusy" @click="copyLocalApiExample">
-            <Icon name="copy" :size="14" />复制带鉴权示例
-          </button>
-        </div>
-
-        <div class="api-token">
-          <span class="kv-label">访问令牌</span>
-          <code>{{ localApiTokenVisible && localApiToken ? localApiToken : maskedToken }}</code>
-          <div class="inline-actions">
-            <button class="button secondary" type="button" :disabled="localApiBusy" @click="toggleTokenVisibility">
-              {{ localApiTokenVisible ? '隐藏' : '显示' }}
-            </button>
-            <button class="button secondary" type="button" :disabled="localApiBusy" @click="copyLocalApiToken">
-              <Icon name="copy" :size="14" />复制
-            </button>
-            <button class="button secondary" type="button" :disabled="localApiBusy" @click="regenerateLocalApiToken">
-              重新生成
-            </button>
-          </div>
-        </div>
-        <p class="api-note">每个请求都必须带 <code>Authorization: Bearer &lt;令牌&gt;</code>，否则返回 401。重新生成后旧令牌立即失效。</p>
-      </template>
-
-      <p v-if="localApiError" class="api-error" role="alert">{{ localApiError }}</p>
-      <p v-else-if="localApiMessage" class="hint-line ok">{{ localApiMessage }}</p>
-      <p class="api-note">仅绑定 127.0.0.1，只读、不开放浏览器跨域、不返回任何凭据；退出 ZeppBridge 后停止。</p>
-    </section>
 
     <!-- 8. 软件更新 -->
     <section class="settings-card update-card" aria-labelledby="update-title">
@@ -1250,13 +1389,11 @@ const runCapabilityProbe = async () => {
       </div>
       <progress v-if="updateState.status === 'downloading' && updateProgress !== null" :value="updateProgress" max="100">{{ updateProgress }}%</progress>
       <div v-if="updateState.status === 'available'" class="update-release">
-        <div><strong>ZeppBridge {{ updateState.version }}</strong><p>{{ updateState.notes || '本次 Release 未填写更新说明。' }}</p></div>
-        <button class="button primary" type="button" @click="updateInstallArmed = true">下载安装</button>
-      </div>
-      <div v-if="updateInstallArmed" class="update-confirm" role="alert">
-        <div><strong>安装 ZeppBridge {{ updateState.version }}？</strong><p>应用会自动重启，本地健康数据不会被删除。</p></div>
-        <button class="button secondary" type="button" @click="updateInstallArmed = false">取消</button>
-        <button class="button primary" type="button" @click="installUpdate">确认安装</button>
+        <div>
+          <strong>ZeppBridge {{ updateState.version }}</strong>
+          <p class="release-teaser">{{ releaseTeaser }}</p>
+        </div>
+        <button class="button primary" type="button" @click="updateNotesOpen = true">看看更新了什么</button>
       </div>
     </section>
 
@@ -1321,6 +1458,105 @@ const runCapabilityProbe = async () => {
             <button class="button danger-button" type="button" @click="clearAuth">清除认证</button>
           </div>
         </div>
+        <div class="advanced-block">
+          <p class="advanced-label">数据健康检查</p>
+          <p class="section-description">
+            每条数据流从云端取回、被解析、写进本机这三步分别走到哪一步，覆盖了哪些日期，来自哪个来源。
+            平时不需要看；同步结果和你预期对不上时来这里找原因。
+          </p>
+          <div class="inline-actions">
+            <RouterLink class="button secondary" to="/health-check"><Icon name="database" :size="15" />打开数据健康检查</RouterLink>
+          </div>
+        </div>
+        <div class="advanced-block">
+          <p class="advanced-label">压缩历史报文</p>
+          <p class="section-description">
+            云端原始报文是这个库里最占地方的东西，它们是 JSON 文本，压缩后通常只剩五分之一。
+            <strong>这件事默认自动做</strong>：装完新版本第一次启动时，后台会把存量报文压掉，顶部会显示「正在压缩」，压完自动消失。
+            这个按钮只是让你手动再跑一次（比如上次被中断了）。
+            压之前会先解压回来逐字比对，对不上的那条就跳过不动——原始报文是重放的唯一依据，宁可不压。
+            压完会执行一次 VACUUM，磁盘上的文件才会真正变小。
+          </p>
+          <div class="inline-actions">
+            <button class="button secondary" type="button" :disabled="compactBusy" @click="runCompactPayloads">
+              {{ compactBusy ? '正在压缩…（大库需要几分钟）' : '压缩历史报文' }}
+            </button>
+          </div>
+          <p v-if="compactError" class="api-error" role="alert">{{ compactError }}</p>
+          <p v-else-if="compactMessage" class="hint-line ok" role="status">{{ compactMessage }}</p>
+        </div>
+        <div class="advanced-block">
+          <p class="advanced-label">数据库快照与恢复</p>
+          <p class="section-description">
+            灾难恢复用的整库副本，只能由 ZeppBridge 自己读回来。数据库升级前会自动生成一份，平时不需要手动做。
+          </p>
+          <BackupPanel />
+        </div>
+        <div class="advanced-block">
+          <p class="advanced-label">本机 REST API</p>
+          <p class="section-description">
+            给本机上的其他程序（脚本、看板、自建工具）读取已标准化的运动序列 JSON 用。
+            如果你没有这类需求，保持关闭即可。
+          </p>
+      <section class="settings-card api-card" aria-labelledby="api-title">
+        <div class="api-head">
+          <span class="api-icon"><Icon name="braces" :size="20" /></span>
+          <div>
+            <h2 id="api-title">本机 REST API</h2>
+            <p>让本机上的其他程序读取已标准化的运动序列 JSON。默认关闭，需要你显式启用。</p>
+          </div>
+          <span :class="['api-state', { on: localApiStatus?.running }]">
+            <i aria-hidden="true"></i>{{ localApiStatus?.running ? '正在监听' : (localApiStatus?.enabled ? '已启用但未监听' : '已关闭') }}
+          </span>
+        </div>
+
+        <div class="toggle-row api-toggle">
+          <div class="toggle-copy">
+            <strong>启用本机 API</strong>
+            <span>开关立即生效，不需要重启应用；关闭后 {{ localApiStatus?.address || '127.0.0.1:43921' }} 会立刻释放。</span>
+          </div>
+          <button
+            class="switch"
+            type="button"
+            role="switch"
+            aria-label="启用本机 REST API"
+            :aria-checked="Boolean(localApiStatus?.enabled)"
+            :disabled="localApiBusy"
+            @click="toggleLocalApi"
+          ><span></span></button>
+        </div>
+
+        <template v-if="localApiStatus?.enabled">
+          <div class="api-endpoint">
+            <code>{{ localApiStatus?.base_url || 'http://127.0.0.1:43921' }}/workouts/{id}/series</code>
+            <button class="button secondary" type="button" :disabled="localApiBusy" @click="copyLocalApiExample">
+              <Icon name="copy" :size="14" />复制带鉴权示例
+            </button>
+          </div>
+
+          <div class="api-token">
+            <span class="kv-label">访问令牌</span>
+            <code>{{ localApiTokenVisible && localApiToken ? localApiToken : maskedToken }}</code>
+            <div class="inline-actions">
+              <button class="button secondary" type="button" :disabled="localApiBusy" @click="toggleTokenVisibility">
+                {{ localApiTokenVisible ? '隐藏' : '显示' }}
+              </button>
+              <button class="button secondary" type="button" :disabled="localApiBusy" @click="copyLocalApiToken">
+                <Icon name="copy" :size="14" />复制
+              </button>
+              <button class="button secondary" type="button" :disabled="localApiBusy" @click="regenerateLocalApiToken">
+                重新生成
+              </button>
+            </div>
+          </div>
+          <p class="api-note">每个请求都必须带 <code>Authorization: Bearer &lt;令牌&gt;</code>，否则返回 401。重新生成后旧令牌立即失效。</p>
+        </template>
+
+        <p v-if="localApiError" class="api-error" role="alert">{{ localApiError }}</p>
+        <p v-else-if="localApiMessage" class="hint-line ok">{{ localApiMessage }}</p>
+        <p class="api-note">仅绑定 127.0.0.1，只读、不开放浏览器跨域、不返回任何凭据；退出 ZeppBridge 后停止。</p>
+      </section>
+        </div>
         <details class="diag-fold">
           <summary>同步诊断</summary>
           <div class="stream-list">
@@ -1334,6 +1570,69 @@ const runCapabilityProbe = async () => {
         </details>
       </div>
     </details>
+
+    <!-- 更新说明弹窗。
+         发现新版本时自动弹一次：只给一个版本号，用户没法判断这次值不值得更新。
+         Release 说明是 Markdown，这里按纯文本原样显示（保留换行），不做渲染——
+         更新说明是别处写的内容，不该在这里当富文本执行。 -->
+    <div v-if="updateNotesOpen" class="modal-backdrop" @click.self="updateNotesOpen = false">
+      <div class="privacy-modal surface-card pad">
+        <div class="modal-head">
+          <div class="modal-title-row">
+            <Icon name="sync" :size="18" class="shield-ic" />
+            <h3>ZeppBridge {{ updateState.version }} 更新了什么</h3>
+          </div>
+          <button type="button" class="close-btn" @click="updateNotesOpen = false"><Icon name="x" :size="16" /></button>
+        </div>
+        <p class="modal-sub">
+          你现在是 {{ updateState.currentVersion || '未知版本' }}
+          <template v-if="updateState.date"> · 发布于 {{ updateState.date.slice(0, 10) }}</template>
+          <template v-if="updateState.sizeBytes"> · {{ formatUpdateBytes(updateState.sizeBytes) }}</template>
+        </p>
+        <div class="modal-body">
+          <pre class="release-notes">{{ updateState.notes || '本次 Release 未填写更新说明。' }}</pre>
+        </div>
+        <!-- 下载进度就放在更新说明下面：等待的这几十秒里，用户正好可以把上面
+             的说明读完，而不是盯着一个没有反馈的按钮猜它有没有在动。 -->
+        <div v-if="updateState.status === 'downloading' || updateState.status === 'installing'" class="update-progress">
+          <div class="progress-head">
+            <strong>{{ updateState.status === 'installing' ? '正在安装…' : '正在下载更新' }}</strong>
+            <span v-if="updateState.status === 'downloading' && updateProgress !== null">{{ updateProgress }}%</span>
+          </div>
+          <div class="progress-track" role="progressbar" :aria-valuenow="updateProgress ?? undefined" aria-valuemin="0" aria-valuemax="100">
+            <i :class="{ indeterminate: updateProgress === null || updateState.status === 'installing' }"
+               :style="updateState.status === 'downloading' && updateProgress !== null ? { width: `${updateProgress}%` } : undefined"></i>
+          </div>
+          <p class="progress-note">
+            <template v-if="updateState.status === 'installing'">安装完应用会自己重启，本地健康数据不会被删除。</template>
+            <template v-else-if="updateState.totalBytes">
+              {{ formatUpdateBytes(updateState.downloadedBytes) }} / {{ formatUpdateBytes(updateState.totalBytes) }}
+              · 下载完会自动安装，这期间可以继续读上面的更新说明
+            </template>
+            <template v-else>下载完会自动安装，这期间可以继续读上面的更新说明。</template>
+          </p>
+        </div>
+
+        <p v-else-if="updateState.status === 'failed'" class="progress-note bad" role="alert">
+          更新失败：{{ updateState.error }}
+        </p>
+        <p v-else class="progress-note">安装时应用会自动重启，本地健康数据不会被删除。</p>
+
+        <div class="modal-foot">
+          <button
+            type="button"
+            class="button secondary"
+            @click="updateNotesOpen = false"
+          >{{ updateState.status === 'downloading' || updateState.status === 'installing' ? '在后台继续' : '稍后再说' }}</button>
+          <button
+            v-if="updateState.status !== 'downloading' && updateState.status !== 'installing'"
+            type="button"
+            class="button primary"
+            @click="installUpdate"
+          >{{ updateState.status === 'failed' ? '重试' : '下载并安装' }}</button>
+        </div>
+      </div>
+    </div>
 
     <!-- 隐私政策弹窗 -->
     <div v-if="privacyModalOpen" class="modal-backdrop" @click.self="privacyModalOpen = false">
@@ -1405,18 +1704,25 @@ h3 { margin-bottom: 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
 .code-suggestions .filter-chip:hover { border-color: var(--accent); color: var(--accent); }
 .assign-trigger { justify-self: end; }
 .api-error { color: var(--danger); }
-.update-head, .update-release, .update-confirm { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px; }
+.update-head, .update-release { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px; }
 .update-head h2 { margin-bottom: 4px; }
-.update-head p, .update-state p, .update-release p, .update-confirm p { margin: 0; color: var(--subtle); font-size: 11px; line-height: 1.5; }
+.update-head p, .update-state p, .update-release p { margin: 0; color: var(--subtle); font-size: 11px; line-height: 1.5; }
 .update-state { display: grid; grid-template-columns: 7px minmax(0, 1fr); align-items: center; gap: 11px; margin-top: 14px; padding: 11px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); }
 .update-state i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
 .update-state.is-available i, .update-state.is-upToDate i { background: var(--accent); }
 .update-state.is-checking i, .update-state.is-downloading i, .update-state.is-installing i { background: var(--warning); }
 .update-state.is-failed i { background: var(--danger); }
-.update-state strong, .update-release strong, .update-confirm strong { color: var(--ink); font-size: 12px; }
+.update-state strong, .update-release strong { color: var(--ink); font-size: 12px; }
 .update-card progress { width: 100%; height: 6px; margin-top: 10px; accent-color: var(--accent); }
-.update-release, .update-confirm { margin-top: 10px; padding: 11px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); }
-.update-confirm { grid-template-columns: minmax(0, 1fr) auto auto; }
+.update-release { margin-top: 10px; padding: 11px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); }
+.diagnostic-note { display: grid; gap: 6px; margin: 10px 0; font-size: 12px; color: var(--muted); }
+.diagnostic-note em { font-style: normal; color: var(--subtle); }
+.diagnostic-note textarea { width: 100%; min-height: 68px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); font: inherit; resize: vertical; }
+.diagnostic-note small { color: var(--subtle); font-size: 11px; }
+.diagnostic-done { display: grid; gap: 4px; margin-top: 10px; padding: 10px 12px; border: 1px solid rgba(125,163,62,.34); border-radius: 10px; background: rgba(125,163,62,.1); color: var(--ink); font-size: 12px; }
+.diagnostic-done strong { display: inline-flex; align-items: center; gap: 6px; color: #b9da77; }
+.diagnostic-done code { font-family: var(--font-mono); font-size: 11px; }
+.diagnostic-done-note { color: var(--muted); }
 .section-heading-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .section-heading-row h2 { margin-bottom: 14px; }
 .identify-button { flex: 0 0 auto; }
@@ -1443,8 +1749,82 @@ h3 { margin-bottom: 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
 /* Deliberately the same surface, radius, gap and type scale as `.source-row`
    above: these two cards sit one under the other and describe the same
    devices, so they have to read as one system rather than two. */
-.capability-columns { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
-@media (max-width: 720px) { .capability-columns { grid-template-columns: 1fr; } }
+.release-teaser { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.update-progress { display: grid; gap: 7px; margin-top: 14px; }
+.progress-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; color: var(--ink); font-size: 13px; }
+.progress-head span { color: var(--accent); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.progress-track { height: 6px; overflow: hidden; border-radius: 3px; background: rgba(232, 238, 244, .1); }
+.progress-track i { display: block; height: 100%; border-radius: 3px; background: var(--accent); transition: width 220ms ease; }
+/* 拿不到总大小时用一条来回跑的条，而不是假装一个百分比。 */
+.progress-track i.indeterminate { width: 40%; animation: progress-slide 1.2s ease-in-out infinite; }
+@keyframes progress-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .progress-track i.indeterminate { animation: none; width: 100%; opacity: .5; }
+}
+.progress-note { margin: 10px 0 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.progress-note.bad { color: var(--danger); }
+.modal-sub { margin: 0 0 10px; color: var(--muted); font-size: 12px; }
+.release-notes {
+  margin: 0;
+  padding: 14px 16px;
+  max-height: 46vh;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1.85;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.mcp-handoff { margin-bottom: var(--space-4); }
+.mcp-handoff .mcp-config { max-height: 200px; overflow: auto; white-space: pre-wrap; font-size: 11.5px; line-height: 1.75; }
+.mcp-handoff .inline-actions { margin-top: 10px; }
+.mcp-tools { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--space-2); margin-bottom: var(--space-3); }
+.mcp-tool { display: grid; gap: 2px; padding: 9px 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); min-width: 0; }
+.mcp-tool code { color: var(--ink); font-family: var(--font-mono); font-size: 12px; }
+.mcp-tool span { color: var(--muted); font-size: 11px; }
+.mcp-sub { margin: 0 0 6px; color: var(--muted); font-size: 12px; }
+.mcp-config { margin: 0; padding: 12px 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); color: var(--ink); font-family: var(--font-mono); font-size: 12px; line-height: 1.6; }
+
+.capability-board { display: grid; gap: var(--space-3); }
+.capability-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; color: var(--muted); font-size: 12px; }
+.legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.lamp { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: var(--subtle); }
+.lamp.on { background: #7da33e; box-shadow: 0 0 0 3px rgba(125,163,62,.16); }
+.lamp.pending { background: #f5c33b; box-shadow: 0 0 0 3px rgba(245,195,59,.14); }
+.lamp.off { background: rgba(232,238,244,.18); }
+
+.capability-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.capability-cell {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  min-width: 0;
+}
+.capability-cell.off { opacity: .62; }
+.cell-head { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.cell-head strong { overflow: hidden; color: var(--ink); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.cell-detail { color: var(--muted); font-size: 11px; }
+.cell-note { color: var(--subtle); font-size: 11px; line-height: 1.5; }
+@media (max-width: 720px) { .capability-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
 .capability-heading {
   display: flex;
   align-items: center;
@@ -1498,6 +1878,9 @@ h3 { margin-bottom: 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
 .probe-selfcheck { color: var(--muted); font-size: 11px; line-height: 1.7; overflow-wrap: anywhere; }
 .device-empty { display: flex; align-items: center; gap: 7px; min-height: 60px; padding: 10px; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); color: var(--muted); font-size: 12px; }
 .two-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 14px; align-items: start; }
+/* 成对的两块卡片等高对齐；高度由内容较多的一块决定，而不是被第三块撑开。 */
+.two-col.paired { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
+.one-col { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .wide-panels { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .three-col { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .two-col > *, .three-col > * { min-width: 0; }
@@ -1670,16 +2053,8 @@ h3 { margin-bottom: 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
   min-height: 44px;
   padding: 6px 0;
 }
-.field-row select {
-  min-height: 34px;
-  min-width: 140px;
-  padding: 5px 10px;
-  border: 1px solid var(--line-strong);
-  border-radius: 9px;
-  background: var(--surface-raised);
-  color: var(--ink);
-  font-size: 12px;
-}
+/* 这些下拉现在是 SelectMenu，不是原生 select；宽度在这里定，其余样式在组件里。 */
+.field-row .select-menu { min-width: 180px; flex: 0 0 auto; }
 .retain-note { margin: 6px 0 8px; color: var(--muted); font-size: 12px; line-height: 1.6; }
 .inline-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 .button { display: inline-flex; min-height: 32px; align-items: center; justify-content: center; gap: 6px; padding: 5px 14px; border: 1px solid transparent; border-radius: 9px; background: transparent; font-size: 12px; cursor: pointer; }

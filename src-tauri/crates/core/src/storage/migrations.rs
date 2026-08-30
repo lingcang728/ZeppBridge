@@ -494,6 +494,19 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(14, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // 压缩后的原始报文。
+        //
+        // 原始报文是整个库里最占地方的东西：这台机器上 2000 多条 raw_records
+        // 就吃掉了一 GB 出头，而它们是 JSON 文本，deflate 之后只剩 18%。
+        //
+        // 新增一列而不是改 `payload`：已发布的 DDL 不能改，而且旧行必须原样
+        // 可读。读的时候优先用 `payload_zip`，没有就退回 `payload`。
+        self.ensure_table_columns("raw_records", &[("payload_zip", "BLOB")])?;
+        self.conn.execute_batch("PRAGMA user_version = 15;")?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(15, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         // Earlier migrations are intentionally idempotent and still stamp
         // their historical versions on every launch, so the current schema
         // marker is restored only after all of them have run.

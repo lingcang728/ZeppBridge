@@ -65,6 +65,7 @@ export const webBackend: BridgeBackend = {
   cancelPendingRestore: unavailable,
   getDataHealth: unavailable,
   runDatabaseIntegrityCheck: unavailable,
+  compactRawPayloads: unavailable,
   submitDiagnosticReport: unavailable,
   submitDeviceModelAssignment: unavailable,
   getExportJson: unavailable,

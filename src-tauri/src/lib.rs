@@ -16,12 +16,12 @@ pub use zeppbridge_core::{
 use app_state::AppState;
 use commands::{
     cancel_pending_restore, cancel_sync, cancel_web_login, cleanup_old_data, clear_auth,
-    create_manual_backup, get_app_status, get_capability_overview, get_coverage_ledger,
-    get_data_health, get_device_catalog_options, get_device_profile, get_device_profiles,
-    get_diagnostic_report, get_export_json, get_health_overview, get_heart_rate_series,
-    get_heart_rate_zones, get_login_status, get_metric_series, get_pending_restore,
-    get_recent_sleep, get_recent_workouts, get_restore_preview, get_sleep_detail,
-    get_storage_estimate, get_training_balance, get_training_load_series,
+    compact_raw_payloads, create_manual_backup, get_app_status, get_capability_overview,
+    get_coverage_ledger, get_data_health, get_device_catalog_options, get_device_profile,
+    get_device_profiles, get_diagnostic_report, get_export_json, get_health_overview,
+    get_heart_rate_series, get_heart_rate_zones, get_login_status, get_metric_series,
+    get_pending_restore, get_recent_sleep, get_recent_workouts, get_restore_preview,
+    get_sleep_detail, get_storage_estimate, get_training_balance, get_training_load_series,
     get_unknown_workout_codes, get_user_prefs, get_weekly_report, get_workout_detail,
     get_workout_insight, get_workout_series, get_workout_type_options, import_from_har,
     list_backups, manual_auth, open_data_folder, prepare_ai_handoff, probe_data_capabilities,
@@ -35,6 +35,7 @@ use commands::{
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager};
+use zeppbridge_core::models::RawPayloadCompaction;
 
 fn show_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
@@ -95,6 +96,11 @@ pub fn run() {
 
             // 解析器修订号变化后，后台一次性重放本地原始报文以纠正派生数据
             // （运动类型、睡眠阶段等）。独立连接 + 后台线程，不阻塞窗口创建。
+            //
+            // 重放之后顺带把存量原始报文压掉。这两件事都要拿写锁，串在同一个
+            // 线程里，省得互相抢；也都不能挡住窗口创建。
+            let compaction_handle = app.handle().clone();
+            let compaction_data_dir = data_dir.clone();
             std::thread::spawn(move || {
                 let Ok(db) = storage::Database::open_without_migration(data_dir.join("zepp.db"))
                 else {
@@ -107,6 +113,38 @@ pub fn run() {
                     }
                     Ok(None) => {}
                     Err(error) => eprintln!("本地报文重放失败: {error}"),
+                }
+
+                // 存量报文压缩：默认开着，装完新版本第一次启动时自己做完。
+                // 原始报文是库里最占地方的东西（JSON 文本，压完只剩五分之一），
+                // 让每个人手动去高级设置里点一下，等于绝大多数人永远不会压。
+                //
+                // 界面通过 `compaction_in_progress()` 显示「正在压缩」，压完
+                // 自己消失；这期间同步会像遇到重放一样让路并自动重试。
+                match db.pending_raw_payload_count() {
+                    Ok(0) | Err(_) => {}
+                    Ok(pending) => {
+                        let _ = compaction_handle.emit("compaction://started", pending);
+                        let _write_guard = storage::write_lock::acquire_with_timeout(
+                            &compaction_data_dir,
+                            storage::write_lock::WritePurpose::Cleanup,
+                            std::time::Duration::from_secs(30),
+                        );
+                        match db.compact_raw_payloads() {
+                            Ok(report) => {
+                                eprintln!(
+                                    "已压缩历史报文 {} 条，{} → {} 字节",
+                                    report.compacted, report.bytes_before, report.bytes_after
+                                );
+                                let _ = compaction_handle.emit("compaction://finished", report);
+                            }
+                            Err(error) => {
+                                eprintln!("历史报文压缩失败: {error}");
+                                let _ = compaction_handle
+                                    .emit("compaction://finished", RawPayloadCompaction::default());
+                            }
+                        }
+                    }
                 }
             });
 
@@ -215,6 +253,7 @@ pub fn run() {
             get_user_prefs,
             get_storage_estimate,
             cleanup_old_data,
+            compact_raw_payloads,
             open_data_folder,
             updates::is_portable_update,
             updates::launch_migrated_install,

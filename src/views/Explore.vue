@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+defineOptions({ name: 'Explore' });
+import { computed, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import Icon from '../components/Icon.vue';
 import type { IconName } from '../components/Icon.vue';
@@ -178,10 +179,14 @@ const categories = computed(() => {
    所以这里不需要任何优先级规则。 */
 const route = useRoute();
 const focusedWorkoutId = ref<string | null>(null);
-onMounted(() => {
+/* 这一页被 KeepAlive 缓存，第二次进来不会重新挂载，所以锁定范围要在
+   activated 时也读一遍 query，否则会沿用上一次的范围。 */
+const readFocusFromRoute = () => {
   const workout = route.query.workout;
-  if (typeof workout === 'string' && workout.trim()) focusedWorkoutId.value = workout.trim();
-});
+  focusedWorkoutId.value = typeof workout === 'string' && workout.trim() ? workout.trim() : null;
+};
+onMounted(readFocusFromRoute);
+onActivated(readFocusFromRoute);
 const currentScope = (): ExportScope => (focusedWorkoutId.value
   ? { kind: 'workout', workoutId: focusedWorkoutId.value }
   : { kind: 'dateRange', start: exportStartDate.value, end: exportEndDate.value });
@@ -230,6 +235,7 @@ const previewBusy = ref(false);
 const previewError = ref<string | null>(null);
 const previewCount = ref<number | null>(null);
 const previewBytes = ref<number | null>(null);
+const previewScope = ref<{ startTime: string; endTime: string | null } | null>(null);
 const sendState = ref<'idle' | 'copied' | 'failed'>('idle');
 let previewTimer = 0;
 let previewSeq = 0;
@@ -244,6 +250,31 @@ const rangeDays = computed(() => {
 const datesValid = computed(() =>
   Boolean(exportStartDate.value && exportEndDate.value && exportStartDate.value <= exportEndDate.value),
 );
+
+/* 摘要里显示的范围来自后端真正用了的范围。锁定单条运动时显示这条运动的
+   起止时刻，而不是页面上那两个和它无关的日期。 */
+const scopeRangeText = computed(() => {
+  if (focusedWorkoutId.value) {
+    if (!previewScope.value) return '这一条运动';
+    const start = new Date(previewScope.value.startTime);
+    if (Number.isNaN(start.getTime())) return '这一条运动';
+    return new Intl.DateTimeFormat('zh-CN', {
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
+    }).format(start);
+  }
+  return datesValid.value ? `${exportStartDate.value} ~ ${exportEndDate.value}` : '—';
+});
+
+const scopeRangeSub = computed(() => {
+  if (focusedWorkoutId.value) {
+    if (!previewScope.value?.endTime) return '仅这一条运动';
+    const start = new Date(previewScope.value.startTime).getTime();
+    const end = new Date(previewScope.value.endTime).getTime();
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return '仅这一条运动';
+    return `（约 ${Math.max(1, Math.round((end - start) / 60000))} 分钟）`;
+  }
+  return rangeDays.value ? `（${rangeDays.value} 天）` : '';
+});
 
 /**
  * The picker is grouped because it holds fifteen entries: a flat list that
@@ -303,7 +334,7 @@ const formatBytes = (bytes: number | null) => {
 const loadPreview = async () => {
   const seq = ++previewSeq;
   previewError.value = null;
-  if (!datesValid.value || !exportDataTypes.value.length) {
+  if ((!datesValid.value && !focusedWorkoutId.value) || !exportDataTypes.value.length) {
     previewCount.value = null;
     previewBytes.value = null;
     previewBusy.value = false;
@@ -325,9 +356,17 @@ const loadPreview = async () => {
       detail: exportDetail.value,
     });
     if (seq !== previewSeq) return;
-    const parsed = JSON.parse(encoded) as { record_count?: number; records?: unknown[] };
+    const parsed = JSON.parse(encoded) as {
+      record_count?: number;
+      records?: unknown[];
+      scope?: { kind?: string; start_time?: string; end_time?: string };
+    };
     previewCount.value = parsed.record_count ?? parsed.records?.length ?? 0;
     previewBytes.value = new TextEncoder().encode(encoded).length;
+    // 摘要里的「时间范围」必须是后端真正用了的范围，而不是页面上那两个日期。
+    previewScope.value = parsed.scope?.kind === 'workout' && parsed.scope.start_time
+      ? { startTime: parsed.scope.start_time, endTime: parsed.scope.end_time ?? null }
+      : null;
   } catch (error) {
     if (seq !== previewSeq) return;
     previewCount.value = null;
@@ -437,8 +476,12 @@ const sendToAi = async () => {
     handoffNotice.value = 'AI 交接需要桌面应用环境；当前网页预览不会打开外部网站。';
     return;
   }
-  if (!datesValid.value || !exportDataTypes.value.length) {
-    handoffNotice.value = '请先选择有效日期范围和至少一种数据类型。';
+  if (!focusedWorkoutId.value && !datesValid.value) {
+    handoffNotice.value = '请先选择有效的日期范围。';
+    return;
+  }
+  if (!exportDataTypes.value.length) {
+    handoffNotice.value = '请至少选择一种数据类型。';
     return;
   }
   if (previewBusy.value || previewCount.value === null) {
@@ -492,7 +535,11 @@ const runExport = async () => {
   await saveExportAs(activeFormat.value);
 };
 
-watch([exportStartDate, exportEndDate, exportDataTypes, exportDetail], schedulePreview, { deep: true, immediate: true });
+watch(
+  [exportStartDate, exportEndDate, exportDataTypes, exportDetail, focusedWorkoutId],
+  schedulePreview,
+  { deep: true, immediate: true },
+);
 watch(dataRevision, () => void loadPreview());
 onBeforeUnmount(() => window.clearTimeout(previewTimer));
 </script>
@@ -506,7 +553,8 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 
     <div v-if="focusedWorkoutId" class="workout-scope-banner" role="status">
       <Icon name="info" :size="14" />
-      当前只导出运动记录 <code>{{ focusedWorkoutId }}</code>，日期范围暂不生效。
+      当前只导出运动记录 <code>{{ focusedWorkoutId }}</code> 这一条：包含它本身与它进行期间的逐点指标，
+      睡眠、步数等按天记录的数据不在范围内。日期范围暂不生效。
       <button class="button secondary" type="button" @click="focusedWorkoutId = null">改回按日期范围</button>
     </div>
 
@@ -588,8 +636,8 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
             <div class="summary-grid">
               <div class="summary-cell">
                 <span class="cell-label"><Icon name="clock" :size="13" />时间范围</span>
-                <strong class="cell-value small">{{ datesValid ? `${exportStartDate} ~ ${exportEndDate}` : '—' }}</strong>
-                <span class="cell-sub">{{ rangeDays ? `（${rangeDays} 天）` : '' }}</span>
+                <strong class="cell-value small">{{ scopeRangeText }}</strong>
+                <span class="cell-sub">{{ scopeRangeSub }}</span>
               </div>
               <div class="summary-cell">
                 <span class="cell-label"><Icon name="file" :size="13" />记录条数</span>
@@ -678,19 +726,22 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
             <span class="secure-ok"><Icon name="circle-check" :size="13" />安全可靠</span>
           </p>
           <div class="footer-actions">
+            <!-- 三个按钮做的是三件不同的事，名字得让人分得开：
+                 「导出文件」存到磁盘、「只复制提示词」不含数据、
+                 「交给 X」才是数据+提示词一起复制并打开那个网站。 -->
             <button class="button button-secondary" type="button" :disabled="Boolean(exportBusy)" @click="runExport">
-              <Icon name="export" :size="14" />另存 {{ activeFormatLabel }}
+              <Icon name="export" :size="14" />导出 {{ activeFormatLabel }} 文件
             </button>
             <button class="button button-secondary" type="button" @click="copyPrompt">
-              <Icon name="copy" :size="14" />复制提示词
+              <Icon name="copy" :size="14" />只复制提示词
             </button>
             <button class="button button-primary send-btn" type="button" :disabled="handoffState === 'preparing'" @click="sendToAi">
-              <Icon :name="handoffState === 'preparing' ? 'clock' : 'send'" :size="14" />{{ handoffState === 'preparing' ? '正在准备…' : '发送到 AI' }}
+              <Icon :name="handoffState === 'preparing' ? 'clock' : 'send'" :size="14" />{{ handoffState === 'preparing' ? '正在准备…' : `交给 ${activeProvider.label}` }}
             </button>
           </div>
         </footer>
 
-        <p v-if="sendState === 'copied'" class="action-note ok" role="status"><Icon name="circle-check" :size="13" />提示词已复制到剪贴板。</p>
+        <p v-if="sendState === 'copied'" class="action-note ok" role="status"><Icon name="circle-check" :size="13" />提示词已复制（不含数据）。</p>
         <p v-else-if="sendState === 'failed'" class="action-note bad" role="alert"><Icon name="warning" :size="13" />复制失败，请重试。</p>
         <p v-if="handoffNotice" class="action-note" :class="handoffState === 'failed' ? 'bad' : 'ok'" role="status">{{ handoffNotice }}</p>
         <p v-if="handoffError" class="action-note bad" role="alert"><Icon name="warning" :size="13" />{{ handoffError }}</p>
@@ -856,14 +907,32 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 .workout-scope-banner { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-raised); color: var(--subtle); font-size: 12px; }
 .workout-scope-banner code { color: var(--ink); font-family: var(--font-mono); font-size: 11px; }
 .workout-scope-banner .button { margin-left: auto; }
+/* 三栏底部对齐。
+ *
+ * 以前每一栏只有内容那么高，于是「模板列表」到底、右栏空一截、中栏又多一截，
+ * 页面底边像被啃过。现在三栏拉平到最高的那一栏，各栏最后一块面板补足高度，
+ * 内容过长的列表在自己内部滚动，而不是把整页顶长。 */
 .export-layout {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr) 290px;
+  /* 两侧用比例而不是死宽度。
+     界面缩放调到 80% 时，可用的 CSS 宽度变大，固定的 240px / 290px 侧栏就
+     显得越来越细，中间那栏一个人吃掉多出来的全部空间——三栏看着就散了。
+     用 minmax(下限, 百分比) 让它们跟着一起长，同时保住可读的最小宽度。 */
+  grid-template-columns: minmax(210px, 17%) minmax(0, 1fr) minmax(260px, 22%);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
 }
-.col-templates, .col-send { display: grid; gap: 14px; min-width: 0; }
-.col-editor { display: grid; gap: 12px; min-width: 0; }
+.col-templates, .col-send { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.col-editor { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.col-templates > :last-child,
+.col-send > :last-child { flex: 1 1 auto; }
+/* 中间栏撑高的必须是**编辑区那张卡**，不是最后一个元素。
+   按「最后一个」拉伸时，被拉伸的是底部那条操作栏（里面只有一句安全说明和
+   三个按钮），于是它被抻成大半屏空白，说明文字孤零零浮在正中间。 */
+.col-editor > .current-template { flex: 1 1 auto; }
+.col-editor > .editor-footer { flex: 0 0 auto; }
+.col-templates > :last-child { display: flex; flex-direction: column; min-height: 0; }
+.col-templates > :last-child .template-list { overflow-y: auto; min-height: 0; }
 .pad { padding: 16px; }
 .col-title { margin: 0 0 10px; color: var(--ink); font-size: 13px; font-weight: 700; }
 .col-title.big { font-size: 15px; margin-bottom: 4px; }
@@ -961,7 +1030,12 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 }
 .mini-btn:hover { color: var(--accent); border-color: var(--accent); }
 
-.prompt-editor { border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); overflow: hidden; margin-bottom: 14px; }
+/* 中间这一栏被拉到和最高的一栏齐平（三栏底边要对齐）。多出来的高度必须
+   有人吃掉，否则就是一大片空白卡片——空白比参差更难看。
+   让提示词编辑框吃掉：多出来的空间变成更大的编辑区，是有用的。 */
+.col-editor > .current-template { display: flex; flex-direction: column; min-height: 0; }
+.col-editor > .current-template .summary-block { flex: 0 0 auto; }
+.prompt-editor { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 190px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); overflow: hidden; margin-bottom: 14px; }
 .editor-head {
   display: flex;
   align-items: center;
@@ -978,9 +1052,11 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 .prompt-editor textarea {
   display: block;
   width: 100%;
+  flex: 1 1 auto;
+  min-height: 150px;
   border: 0;
   outline: 0;
-  resize: vertical;
+  resize: none;
   padding: 12px 14px;
   background: transparent;
   color: var(--ink);
@@ -1165,7 +1241,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 
 /* 响应式 */
 @media (max-width: 1180px) {
-  .export-layout { grid-template-columns: 220px minmax(0, 1fr); }
+  .export-layout { grid-template-columns: minmax(200px, 24%) minmax(0, 1fr); }
   .col-send { grid-column: 1 / -1; }
   .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

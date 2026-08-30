@@ -82,6 +82,9 @@ const kindLabel = computed(() => ({
   place-items: center;
   width: 76px;
   height: 76px;
+  /* 必须裁剪。上一版为了「图显示不全」把它改成 visible，结果图直接画到框外，
+     压住了下面的设备名——那是把问题从「显示不全」换成了「盖住别人」。
+     要让整表显示完整，得把框放大或调比例，不是让内容跑出去。 */
   overflow: hidden;
   flex: 0 0 76px;
   border: 1px solid var(--line);
@@ -89,7 +92,9 @@ const kindLabel = computed(() => ({
   background: var(--surface-raised);
 }
 .device-visual.compact { width: 48px; height: 48px; flex-basis: 48px; border-radius: var(--radius-sm); }
-.device-visual img { display: block; width: 100%; height: 100%; object-fit: contain; padding: 5px; }
+/* 表壳加表带是竖长的，塞进正方框再留 5px 内边距，上下就会顶到边。
+   内边距收到 2px 就够了；`contain` 保证不管什么比例都完整显示在框内。 */
+.device-visual img { display: block; width: 100%; height: 100%; object-fit: contain; padding: 2px; }
 .device-fallback { display: grid; justify-items: center; gap: 1px; width: 100%; height: 100%; padding: 5px; color: var(--muted); }
 .device-fallback svg { display: block; width: 100%; height: calc(100% - 12px); }
 .device-fallback-label { max-width: 100%; overflow: hidden; color: var(--subtle); font-size: 9px; line-height: 11px; text-overflow: ellipsis; white-space: nowrap; }

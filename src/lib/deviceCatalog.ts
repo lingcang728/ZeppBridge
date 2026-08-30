@@ -78,14 +78,25 @@ const keyFromPath = (path: string, suffix: string): string | null => {
 };
 
 /**
- * Vite emits imported assets according to the configured base. Keep a
- * defensive relative form for old/dev bundles that still contain a leading
- * slash; Tauri's asset protocol does not have the host-root path those URLs
- * imply. Data URLs (the original silhouette fallback) are left untouched.
+ * 把 Vite 给的资源地址变成一个**和当前路由无关**的绝对地址。
+ *
+ * 早先这里把地址改写成相对形式（`/src/... → ./src/...`）。相对地址是相对
+ * *当前文档 URL* 解析的：在 `/settings` 下 `./assets/x.webp` 正好是
+ * `/assets/x.webp`，但在 `/devices/9AC6` 这种两段式路由下就变成了
+ * `/devices/assets/x.webp`——404，于是设备图片全成了破图。
+ *
+ * 改成用本模块自己的 URL 作基准解析。构建产物里 Vite 发的本来就是
+ * `new URL("x.webp", import.meta.url).href`（带协议的绝对地址），会走上面
+ * 那个提前返回；dev 下的 `/src/assets/...` 则会被补成完整地址。两种情况都
+ * 不再依赖当前页面在第几层路由。data URL 原样返回。
  */
 const runtimeAssetUrl = (source: string): string => {
   if (/^(?:data:|https?:|asset:|blob:)/u.test(source)) return source;
-  return source.replace(/^\/+/, './');
+  try {
+    return new URL(source, import.meta.url).href;
+  } catch {
+    return source;
+  }
 };
 
 export const localDeviceAssets: Readonly<Record<string, string>> = Object.freeze(

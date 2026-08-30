@@ -1,4 +1,5 @@
 <script setup lang="ts">
+defineOptions({ name: 'WorkoutList' });
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import Icon from '../components/Icon.vue';
@@ -71,7 +72,7 @@ watch(dataRevision, () => void loadList());
 <template>
   <section class="page list-page" aria-labelledby="workout-list-title">
     <RouterLink class="back-link" to="/recent"><Icon name="arrow-left" :size="14" />返回最近记录</RouterLink>
-    <PageHeader title-id="workout-list-title" title="运动" intro="本机已同步的运动记录。没有轨迹时不画地图。" />
+    <PageHeader back="/" back-label="返回概览" title-id="workout-list-title" title="运动" intro="本机已同步的运动记录。没有轨迹时不画地图。" />
 
     <div v-if="loading" class="surface-card" aria-live="polite">
       <SkeletonBlock height="56px" />

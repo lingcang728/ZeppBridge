@@ -153,6 +153,8 @@ onMounted(() => void load());
 <template>
   <section class="page health-page" aria-labelledby="health-title">
     <PageHeader
+      back="/settings"
+      back-label="返回设置"
       title-id="health-title"
       eyebrow="数据健康"
       title="数据健康检查"

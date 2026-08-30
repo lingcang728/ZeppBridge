@@ -36,13 +36,6 @@ const LOWER_IS_BETTER = new Set([
   'weekly.sleep_start_regularity',
 ]);
 
-const CONFIDENCE_LABEL: Record<string, string> = {
-  high: '证据充分',
-  medium: '证据一般',
-  low: '证据偏少',
-  insufficient: '证据不足',
-};
-
 const load = async () => {
   if (!isDesktop()) {
     loading.value = false;
@@ -79,11 +72,53 @@ const tone = (fact: InsightFact): 'good' | 'bad' | 'flat' => {
   return LOWER_IS_BETTER.has(fact.fact_id) === lower ? 'good' : 'bad';
 };
 
-/** 有数据的排前面；完全没有数据的沉底，但不隐藏——缺失本身也是信息。 */
-const facts = computed(() => [...(report.value?.facts ?? [])].sort((a, b) => {
-  const rank = (fact: InsightFact) => (fact.comparison ? 0 : fact.value === null ? 2 : 1);
-  return rank(a) - rank(b);
-}));
+/**
+ * 只显示这一周真的有数的指标。
+ *
+ * 早先没有数据的项也会占一格，写上「未提供」。判断本来就在本机做完了，
+ * 把结论摆出来就行——一整排「未提供」既不能让人多知道什么，又把有数的那
+ * 几项挤到了后面。能比较的排前面，只有现状的排后面。
+ */
+const facts = computed(() => (report.value?.facts ?? [])
+  .filter((fact) => fact.value !== null)
+  .sort((a, b) => Number(Boolean(b.comparison)) - Number(Boolean(a.comparison))));
+
+/**
+ * 「本周 vs 你自己此前 28 天」画成两条并排的条。
+ *
+ * 一串「48 bpm −2.9%」要在脑子里换算才知道是变好还是变差；两条并排的条一眼
+ * 就能看出谁长谁短、差多少。画的就是事实里已有的那两个数（本周值和基线值），
+ * 没有插值，也没有编造逐日曲线——周报本来就只有这两个数。
+ *
+ * 只有拿得到比较的指标才画。证据不足的指标保持纯文字：与其画一根没有对照的
+ * 孤条让人误以为「有对比」，不如老实说这周还比不了。
+ */
+const BAR_MIN_PERCENT = 6;
+
+const chartFor = (fact: InsightFact) => {
+  if (!fact.comparison || fact.value === null) return null;
+  const recent = Math.abs(fact.value);
+  const baseline = Math.abs(fact.comparison.baseline_value);
+  const peak = Math.max(recent, baseline);
+  if (!Number.isFinite(peak) || peak <= 0) return null;
+  const scale = (value: number) => Math.max(BAR_MIN_PERCENT, Math.round((value / peak) * 100));
+  return {
+    recentPercent: scale(recent),
+    baselinePercent: scale(baseline),
+    baselineText: formatNumber(fact, fact.comparison.baseline_value),
+  };
+};
+
+/** 把一个数字按这个指标的口径写出来（和 formatValue 同一套规则，只是不读 fact.value）。 */
+function formatNumber(fact: InsightFact, value: number): string {
+  if (fact.metric === 'sleep_duration') {
+    const total = Math.round(value);
+    return `${Math.floor(total / 60)} 小时 ${total % 60} 分`;
+  }
+  if (fact.metric === 'sleep_start_regularity') return `±${Math.round(value)} 分`;
+  if (fact.metric === 'workout_count') return `${Math.round(value)} 次`;
+  return `${Math.round(value)} ${fact.unit}`;
+}
 </script>
 
 <template>
@@ -95,25 +130,50 @@ const facts = computed(() => [...(report.value?.facts ?? [])].sort((a, b) => {
       </span>
     </header>
 
+    <!-- 「静息心率 −3.4% 是绿的、压力 +1.6% 是红的」这件事必须解释一句：
+         数字的正负是事实，好坏是按指标含义判断的，两者不是一回事。 -->
+    <p v-if="report && facts.length" class="weekly-legend">
+      <span><i class="legend-dot good"></i>绿色 = 对这项指标来说更好</span>
+      <span><i class="legend-dot bad"></i>红色 = 更差</span>
+      <span class="legend-note">只和你自己此前 28 天比，不和任何人群基准比</span>
+    </p>
     <SkeletonBlock v-if="loading" height="120px" />
     <p v-else-if="error" class="weekly-error" role="alert">{{ error }}</p>
     <p v-else-if="!report" class="weekly-note">周报需要从 ZeppBridge 桌面应用打开。</p>
+
+    <p v-else-if="!facts.length" class="weekly-note">这一周还没有可比较的记录。完成一次同步后再看。</p>
 
     <template v-else>
       <div class="weekly-grid">
         <div v-for="fact in facts" :key="fact.fact_id" class="weekly-item">
           <span class="weekly-label">{{ LABEL[fact.fact_id] || fact.metric }}</span>
           <strong>{{ formatValue(fact) }}</strong>
-          <span v-if="fact.comparison" :class="['weekly-delta', tone(fact)]">
-            {{ fact.comparison.delta_percent > 0 ? '+' : '' }}{{ fact.comparison.delta_percent.toFixed(1) }}%
-            · {{ CONFIDENCE_LABEL[fact.confidence] }}（{{ fact.evidence_count }} 项证据）
-          </span>
-          <span v-else class="weekly-delta muted">{{ fact.reason || CONFIDENCE_LABEL[fact.confidence] }}</span>
+
+          <template v-if="chartFor(fact)">
+            <div class="weekly-bars" role="img"
+              :aria-label="`本周 ${formatValue(fact)}，此前 28 天 ${chartFor(fact)!.baselineText}`">
+              <div class="bar-row">
+                <span class="bar-tag">本周</span>
+                <span class="bar-track">
+                  <i :class="['bar-fill', tone(fact)]" :style="{ width: `${chartFor(fact)!.recentPercent}%` }"></i>
+                </span>
+              </div>
+              <div class="bar-row">
+                <span class="bar-tag">此前 28 天</span>
+                <span class="bar-track">
+                  <i class="bar-fill baseline" :style="{ width: `${chartFor(fact)!.baselinePercent}%` }"></i>
+                </span>
+                <span class="bar-value">{{ chartFor(fact)!.baselineText }}</span>
+              </div>
+            </div>
+            <span :class="['weekly-delta', tone(fact)]">
+              {{ fact.comparison!.delta_percent > 0 ? '+' : '' }}{{ fact.comparison!.delta_percent.toFixed(1) }}%
+            </span>
+          </template>
+
+          <span v-else class="weekly-delta muted">{{ fact.reason || '此前的数据不够，这次只报现状' }}</span>
         </div>
       </div>
-      <p class="weekly-note">
-        全部在本机计算，只和你自己此前 28 天比较，不和任何人群基准比较，也不做医学判断。没有数据的项显示「未提供」。
-      </p>
     </template>
   </section>
 </template>
@@ -130,15 +190,32 @@ const facts = computed(() => [...(report.value?.facts ?? [])].sort((a, b) => {
 .weekly-card header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
 .weekly-card h2 { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--ink); font-size: 14px; font-weight: 500; }
 .weekly-window { color: var(--muted); font-size: 11px; }
+.weekly-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; color: var(--muted); font-size: 11px; }
+.weekly-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend-dot { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 2px; }
+.legend-dot.good { background: var(--accent); }
+.legend-dot.bad { background: var(--danger); }
+.legend-note { color: var(--subtle); }
 
-.weekly-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
-.weekly-item { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; background: var(--surface-raised); }
+.weekly-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; align-items: stretch; }
+.weekly-item { display: grid; gap: 2px; align-content: start; padding: 10px 12px; border-radius: 12px; background: var(--surface-raised); }
 .weekly-label { color: var(--muted); font-size: 11px; }
 .weekly-item strong { color: var(--ink); font-size: 16px; font-weight: 500; }
 .weekly-delta { font-size: 11px; line-height: 1.5; }
 .weekly-delta.good { color: var(--accent); }
 .weekly-delta.bad { color: var(--danger); }
 .weekly-delta.flat, .weekly-delta.muted { color: var(--muted); }
+
+.weekly-bars { display: grid; gap: 5px; margin: 6px 0 2px; }
+.bar-row { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; align-items: center; gap: 7px; }
+.bar-tag { color: var(--subtle); font-size: 10px; white-space: nowrap; }
+.bar-track { height: 6px; border-radius: 3px; background: rgba(232,238,244,.08); overflow: hidden; }
+.bar-fill { display: block; height: 100%; border-radius: 3px; background: var(--muted); transition: width .4s cubic-bezier(.16,1,.3,1); }
+.bar-fill.good { background: var(--accent); }
+.bar-fill.bad { background: var(--danger); }
+.bar-fill.flat { background: var(--muted); }
+.bar-fill.baseline { background: rgba(232,238,244,.22); }
+.bar-value { color: var(--subtle); font-size: 10px; white-space: nowrap; }
 
 .weekly-note { margin: 0; color: var(--subtle); font-size: 11px; line-height: 1.6; }
 .weekly-error { margin: 0; color: var(--danger); font-size: 12px; }

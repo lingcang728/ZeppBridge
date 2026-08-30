@@ -13,6 +13,12 @@ const syncReport = ref<SyncReport | null>(null);
 const syncProgress = ref<SyncProgress | null>(null);
 const loginStatus = ref<LoginStatus>({ state: 'idle', message: '', page_url: '' });
 const dataRevision = ref(0);
+/* 装完新版本第一次启动时，后台会把存量原始报文压掉（默认开启）。
+   这期间界面要说一句「正在压缩」，压完自己消失——不然用户只会觉得
+   「刚装完怎么有点卡」。 */
+const compactionPending = ref(0);
+const compacting = ref(false);
+const compactionSaved = ref<number | null>(null);
 const autoSyncEnabled = ref(readAutoSyncSettings().enabled);
 const autoSyncInterval = ref(readAutoSyncSettings().intervalMinutes);
 let initialized = false;
@@ -207,6 +213,23 @@ const initialize = async () => {
     if (typeof unlistenTray === 'function') unlisteners.push(unlistenTray);
     const unlistenLogin = await backend.listen<LoginStatus>('login://status', applyLoginStatus);
     if (typeof unlistenLogin === 'function') unlisteners.push(unlistenLogin);
+    const unlistenCompactStart = await backend.listen<number>('compaction://started', (pending) => {
+      compactionPending.value = typeof pending === 'number' ? pending : 0;
+      compacting.value = true;
+      compactionSaved.value = null;
+    });
+    if (typeof unlistenCompactStart === 'function') unlisteners.push(unlistenCompactStart);
+    const unlistenCompactDone = await backend.listen<{ bytesBefore: number; bytesAfter: number }>(
+      'compaction://finished',
+      (report) => {
+        compacting.value = false;
+        const saved = (report?.bytesBefore ?? 0) - (report?.bytesAfter ?? 0);
+        compactionSaved.value = saved > 0 ? saved : null;
+        // 压完的提示自己退场：这是一次性的后台维护，不该常驻。
+        window.setTimeout(() => { compactionSaved.value = null; }, 12_000);
+      },
+    );
+    if (typeof unlistenCompactDone === 'function') unlisteners.push(unlistenCompactDone);
     try {
       applyLoginStatus(await backend.getLoginStatus());
     } catch {
@@ -250,6 +273,9 @@ export const useSyncController = () => ({
   syncProgress: readonly(syncProgress),
   loginStatus: readonly(loginStatus),
   dataRevision: readonly(dataRevision),
+  compacting: readonly(compacting),
+  compactionPending: readonly(compactionPending),
+  compactionSaved: readonly(compactionSaved),
   autoSyncEnabled: readonly(autoSyncEnabled),
   autoSyncInterval: readonly(autoSyncInterval),
   isSyncing: computed(() => syncState.value === 'syncing'),

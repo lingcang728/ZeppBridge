@@ -1,4 +1,5 @@
 <script setup lang="ts">
+defineOptions({ name: 'TrainingStatus' });
 import { computed, onMounted, ref, watch } from 'vue';
 import { VChart } from '../lib/echartsSetup';
 import HeartRateZonePicker from '../components/HeartRateZonePicker.vue';
@@ -230,6 +231,8 @@ watch(dataRevision, () => { void load(); });
 <template>
   <section class="page training-page" aria-labelledby="training-title">
     <PageHeader
+      back="/"
+      back-label="返回概览"
       title-id="training-title"
       eyebrow="训练状态"
       title="训练状态"

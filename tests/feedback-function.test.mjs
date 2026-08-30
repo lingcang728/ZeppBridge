@@ -118,4 +118,51 @@ test('stores accepted reports and returns an opaque report id', async () => {
   assert.match(body.reportId, /^[0-9a-f-]{36}$/);
   assert.equal(values[2], '0.11.0');
   assert.equal(values[7], 1);
+  // 没填备注的报告存空串，不是 undefined —— 读的人不用分两种情况处理。
+  assert.equal(values[12], '');
+});
+
+test('a user note is accepted, bounded, and stored', async () => {
+  // 这一句话往往比十个字段都管用（「我的表是 Balance 2，但显示未识别」），
+  // 所以它必须能过校验；但它是自由文本，上限不能只靠客户端自觉。
+  assert.equal(validateFeedbackReport({ ...report(), userNote: '我的表是 Balance 2，但显示未识别' }), true);
+  assert.equal(validateFeedbackReport({ ...report(), userNote: 'x'.repeat(500) }), true);
+  assert.equal(validateFeedbackReport({ ...report(), userNote: 'x'.repeat(501) }), false);
+  assert.equal(validateFeedbackReport({ ...report(), userNote: 42 }), false);
+
+  let values;
+  const db = {
+    prepare() {
+      return {
+        bind(...bound) {
+          values = bound;
+          return { run: async () => ({ success: true }) };
+        },
+      };
+    },
+  };
+  const request = new Request('https://zeppbridge.pages.dev/api/feedback', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ ...report(), userNote: '设备是 Balance 2' }),
+  });
+  const result = await onRequestPost({ request, env: { FEEDBACK_DB: db } });
+  assert.equal(result.status, 201);
+  assert.equal(values[12], '设备是 Balance 2');
+});
+
+test('a user-declared category makes an otherwise quiet report submittable', async () => {
+  // 本机什么异常都没检测到时，用户仍然可能真的遇到了问题。
+  // 只认自动检测的话，这些人连报都报不了。
+  const quiet = {
+    ...report(),
+    deviceEvidence: { ...report().deviceEvidence, unknownDeviceCount: 0 },
+    unknownWorkoutCodes: [],
+    workoutTypeConflicts: 0,
+  };
+  assert.equal(validateFeedbackReport(quiet), false, '没问题也没说明的报告仍然应当拒收');
+  assert.equal(validateFeedbackReport({ ...quiet, category: 'data' }), true);
+  // 分类是固定取值，不能借它塞任意文本。
+  assert.equal(validateFeedbackReport({ ...quiet, category: '随便写的' }), false);
+  assert.equal(validateFeedbackReport({ ...quiet, category: 'x'.repeat(200) }), false);
 });

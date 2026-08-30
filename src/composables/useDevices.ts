@@ -20,6 +20,12 @@ export interface DeviceCardModel {
   firmware: string;
   lastData: string;
   hasLocalData: boolean;
+  /** 本机用来记住「你指认的型号」的键；为空表示这台设备没有可用标识。 */
+  deviceKey: string;
+  /** 当前型号是不是用户手动指认的。和 state 分开：一台设备可以既「最近有数据」
+   *  又是「你指认的型号」，早先只报前者，于是用户再也找不到改型号的入口。 */
+  userAssigned: boolean;
+  matchStatus: string;
 }
 
 const profiles = ref<DeviceProfile[]>([]);
@@ -187,6 +193,9 @@ const models = computed<DeviceCardModel[]>(() => profiles.value.map((profile) =>
   firmware: profile.firmware?.trim() || '尚未获取',
   lastData: formatDeviceDate(profile.last_data_at),
   hasLocalData: profile.has_local_data === true,
+  deviceKey: (profile.device_id || profile.serial || '').trim(),
+  userAssigned: profile.match_status === 'user_assigned',
+  matchStatus: profile.match_status || 'unknown',
 })));
 
 const maskIdentifier = (value?: string | null): string => {
@@ -195,6 +204,58 @@ const maskIdentifier = (value?: string | null): string => {
   if (trimmed.length <= 4) return '•'.repeat(trimmed.length);
   return `••••${trimmed.slice(-4)}`;
 };
+
+/* 型号指认的状态放在模块级共享。
+ *
+ * 设置页的行内选择器和设备二级页说的是同一件事，各存一份 busy/error 只会让
+ * 两处显示不一致。 */
+const assignBusy = ref(false);
+const assignError = ref<string | null>(null);
+const assignMessage = ref<string | null>(null);
+
+const assignModel = async (deviceKey: string, catalogId: string, contribute = false): Promise<void> => {
+  if (!deviceKey) {
+    assignError.value = '这台设备没有可用的本机标识，无法保存指认。';
+    return;
+  }
+  assignBusy.value = true;
+  assignError.value = null;
+  assignMessage.value = null;
+  try {
+    await backend.setDeviceModelOverride(deviceKey, catalogId || null);
+    await load(false);
+    if (!catalogId) {
+      assignMessage.value = '已撤销型号指认，恢复成自动识别结果。';
+      return;
+    }
+    assignMessage.value = '已记录你的型号指认。界面会把它标成「你指认的型号」，不会当成自动识别结果。';
+    if (!contribute) return;
+    // 补目录的提交失败不该让指认看起来没保存成功：本机的那一半已经写好了。
+    try {
+      const result = await backend.submitDeviceModelAssignment();
+      assignMessage.value = `已记录你的型号指认，并把型号编号交给了 ZeppBridge（编号 ${result.reportId}）。下一版目录会让同款设备自动识别。`;
+    } catch (cause) {
+      assignMessage.value = `已记录你的型号指认（只在本机）。补充目录没发送成功：${toUserMessage(cause, '网络不可用')}`;
+    }
+  } catch (cause) {
+    assignError.value = toUserMessage(cause, '无法保存型号指认');
+  } finally {
+    assignBusy.value = false;
+  }
+};
+
+const clearAssignFeedback = () => {
+  assignError.value = null;
+  assignMessage.value = null;
+};
+
+export const useDeviceAssignment = () => ({
+  assignBusy,
+  assignError,
+  assignMessage,
+  assignModel,
+  clearAssignFeedback,
+});
 
 export const useDevices = () => ({
   profiles,

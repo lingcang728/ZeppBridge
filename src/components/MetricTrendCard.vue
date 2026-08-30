@@ -67,7 +67,12 @@ const option = computed(() => {
         <strong>{{ label }}</strong>
         <small v-if="hint">{{ hint }}</small>
       </span>
+      <!-- 这个大数字是**最近一次读数**，不是这个范围的汇总，所以切 7 天 / 1 个月
+           / 6 个月时它本来就不该变（最近一次还是同一次）。跟着范围变的是下面
+           的平均/最低/最高和覆盖天数。以前它没有标签，读起来像「这个范围的
+           值」，于是看着就像坏了。 -->
       <span class="trend-latest">
+        <em class="trend-latest-tag">最新</em>
         <strong :style="{ color }">{{ latest }}</strong>
         <small v-if="unit">{{ unit }}</small>
       </span>
@@ -75,7 +80,7 @@ const option = computed(() => {
 
     <p class="trend-meta">
       <span>{{ coverage }}</span>
-      <span v-if="latestDate" class="trend-date">最新 {{ latestDate }}</span>
+      <span v-if="latestDate" class="trend-date">测于 {{ latestDate }}</span>
       <span v-if="band" class="trend-band">{{ band }}</span>
     </p>
 
@@ -117,6 +122,7 @@ const option = computed(() => {
 .trend-latest { display: flex; align-items: baseline; gap: 4px; white-space: nowrap; }
 .trend-latest strong { font-family: var(--font-mono); font-size: 22px; font-variant-numeric: tabular-nums; }
 .trend-latest small { color: var(--subtle); font-size: 11px; }
+.trend-latest-tag { color: var(--subtle); font-size: 11px; font-style: normal; }
 .trend-meta {
   display: flex;
   flex-wrap: wrap;

@@ -10,6 +10,7 @@
  */
 import { computed, ref, watch } from 'vue';
 import DesignIcon from './DesignIcon.vue';
+import DeviceVisual from './DeviceVisual.vue';
 import { deviceCatalog, deviceImageFor, type DeviceCatalogEntry } from '../lib/deviceCatalog';
 
 const props = defineProps<{
@@ -132,14 +133,34 @@ const isCurrentAssigned = computed(() => Boolean(
       ><DesignIcon name="chevron-right" :size="20" class="flip" /></button>
 
       <div class="picker-frame">
-        <img v-if="neighbours.prev" class="peek left" :src="neighbours.prev.src" :alt="neighbours.prev.entry.canonical_name" aria-hidden="true" />
+        <DeviceVisual
+          v-if="neighbours.prev"
+          class="peek left"
+          :src="neighbours.prev.src"
+          :alt="neighbours.prev.entry.canonical_name"
+          :kind="neighbours.prev.entry.kind"
+        />
         <div class="picker-hero">
-          <img :key="current!.catalog_id" :src="currentImage" :alt="current!.canonical_name" />
+          <!-- 目录里偶尔缺一张图。用 DeviceVisual 是为了走它的 SVG 兜底，
+               而不是把一个破图图标和 alt 文字摆在用户面前。 -->
+          <DeviceVisual
+            :key="current!.catalog_id"
+            class="hero-visual"
+            :src="currentImage"
+            :alt="current!.canonical_name"
+            :kind="current!.kind"
+          />
           <p class="hero-name">{{ current!.name_zh || current!.canonical_name }}</p>
           <p class="hero-sub">{{ current!.canonical_name }}</p>
           <p class="hero-count">{{ index + 1 }} / {{ entries.length }}</p>
         </div>
-        <img v-if="neighbours.next" class="peek right" :src="neighbours.next.src" :alt="neighbours.next.entry.canonical_name" aria-hidden="true" />
+        <DeviceVisual
+          v-if="neighbours.next"
+          class="peek right"
+          :src="neighbours.next.src"
+          :alt="neighbours.next.entry.canonical_name"
+          :kind="neighbours.next.entry.kind"
+        />
       </div>
 
       <button
@@ -224,12 +245,13 @@ const isCurrentAssigned = computed(() => Boolean(
   background: var(--surface-raised);
   overflow: hidden;
 }
-.peek { width: 56px; height: 56px; object-fit: contain; opacity: .28; }
+.peek { width: 56px; height: 56px; flex-basis: 56px; border: 0; background: transparent; opacity: .28; }
 .peek.left { justify-self: end; }
 .peek.right { justify-self: start; }
 
 .picker-hero { display: grid; justify-items: center; gap: 2px; text-align: center; }
-.picker-hero img { width: 124px; height: 124px; object-fit: contain; }
+/* 主图给足高度：竖长的表身在正方框里会被上下切掉。 */
+.picker-hero .hero-visual { width: 132px; height: 150px; flex-basis: 150px; border: 0; background: transparent; }
 .hero-name { margin: 6px 0 0; color: var(--ink); font-size: 14px; font-weight: 500; }
 .hero-sub { margin: 0; color: var(--subtle); font-size: 11px; }
 .hero-count { margin: 4px 0 0; color: var(--muted); font-size: 11px; font-family: var(--font-mono); }

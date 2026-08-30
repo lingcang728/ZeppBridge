@@ -1,4 +1,5 @@
 <script setup lang="ts">
+defineOptions({ name: 'Overview' });
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import { graphic } from 'echarts/core';
@@ -61,13 +62,46 @@ const heroRoster = computed(() => {
     intro: formatDeviceIntro(sorted.map((model) => model.canonicalName)),
   };
 });
+/* 没被认出来的设备。
+ *
+ * 认不出来时首页会显示一个占位图和「未识别设备」，但不会告诉用户这能改——
+ * 于是他要么以为坏了，要么以为自己的表不支持。其实设置里点两下就能指认。
+ * 有几台就提示几台，并且直接把人送到那台设备的页面，而不是丢到设置首页
+ * 让他自己找。 */
+const unrecognizedDevices = computed(() => deviceModels.value
+  .filter((model) => model.state === '未识别')
+  .map((model) => ({
+    key: model.deviceKey || model.canonicalName,
+    name: model.profile.display_name?.trim() || model.canonicalName,
+    to: model.deviceKey ? `/devices/${encodeURIComponent(model.deviceKey)}` : '/settings',
+  })));
+
 const heroAiProviders = AI_PROVIDERS.filter((provider) => (
   provider.id === 'chatgpt' || provider.id === 'doubao' || provider.id === 'deepseek'
 ));
 
-const hrPoints = computed(() => heartRateSeries.value
+/**
+ * 首页这张卡只画**最近几个小时**。
+ *
+ * 把整整 24 小时压进一张小卡，几百个点挤在两百来像素里，看到的是一团锯齿，
+ * 既看不出「刚才怎么样」，也看不出趋势。完整的 24 小时留给心率二级页，那里
+ * 有足够的宽度。
+ */
+const OVERVIEW_HR_WINDOW_HOURS = 5;
+/** 超过这个间隔就断线。没有采样的时段不画线，不用一根直线把两头连起来。 */
+const HR_GAP_BREAK_MINUTES = 15;
+
+const allHrPoints = computed(() => heartRateSeries.value
   .map((point) => ({ ts: new Date(point.timestamp).getTime(), value: point.value }))
   .filter((point) => Number.isFinite(point.ts) && isFiniteNumber(point.value)));
+
+const hrPoints = computed(() => {
+  const points = allHrPoints.value;
+  const newest = points[points.length - 1]?.ts;
+  if (!newest) return points;
+  const cutoff = newest - OVERVIEW_HR_WINDOW_HOURS * 3_600_000;
+  return points.filter((point) => point.ts >= cutoff);
+});
 const hrLatest = computed(() => {
   if (isFiniteNumber(overview.value?.current_hr)) return overview.value.current_hr;
   return hrPoints.value[hrPoints.value.length - 1]?.value ?? null;
@@ -84,7 +118,16 @@ const hrAverage = computed(() => {
   return Math.round(sum / hrPoints.value.length);
 });
 const hrChartOption = computed(() => {
-  const data = hrPoints.value.map((point) => [point.ts, point.value]);
+  // 采样断档处插一个 null，让线断开而不是被直线连起来。
+  const points = hrPoints.value;
+  const data: Array<[number, number] | [number, null]> = [];
+  points.forEach((point, index) => {
+    const previous = points[index - 1];
+    if (previous && point.ts - previous.ts > HR_GAP_BREAK_MINUTES * 60_000) {
+      data.push([previous.ts + 1, null]);
+    }
+    data.push([point.ts, point.value]);
+  });
   const last = data[data.length - 1];
   const clock = (value: number) => new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value));
   return {
@@ -157,8 +200,6 @@ const sleepStages = computed(() => {
   ];
 });
 
-const restingHr = computed(() => isFiniteNumber(overview.value?.resting_hr) ? overview.value.resting_hr : null);
-const hrUpdatedAt = computed(() => overview.value?.latest_heart_rate_at ? `最新测量 ${formatTime(overview.value.latest_heart_rate_at)}` : '等待同步');
 const DEFAULT_LOAD_SCALE = 600;
 const loadScale = computed(() => {
   const scale = overview.value?.training_load_scale;
@@ -186,17 +227,23 @@ const ENTRY_METRICS = ['readiness', 'stress', 'spo2', 'vo2max', 'training_load']
 const seriesValues = (metric: string): number[] =>
   (statusSeries.value[metric]?.points ?? []).map((point) => point.value);
 
-const entryFigure = (metric: string, unit: string, digits = 0) => {
+/* 拿不到值就返回 null，让这一项整个消失。
+   一排「血氧 —」「VO₂max —」既没告诉用户任何事，又把有数的那几项挤窄了。 */
+const entryFigure = (metric: string, unit: string, digits = 0): string | null => {
   const value = latestValue(statusSeries.value[metric]);
-  return value === null ? '—' : `${formatMetric(value, digits)}${unit}`;
+  return value === null ? null : `${formatMetric(value, digits)}${unit}`;
 };
 
+type EntryFact = { key: string; label: string; text: string | null };
+const withValues = (facts: EntryFact[]) =>
+  facts.filter((fact): fact is EntryFact & { text: string } => fact.text !== null);
+
 const bodyEntry = computed(() => ({
-  facts: [
+  facts: withValues([
     { key: 'readiness', label: '恢复', text: entryFigure('readiness', '') },
     { key: 'stress', label: '压力', text: entryFigure('stress', '') },
     { key: 'spo2', label: '血氧', text: entryFigure('spo2', '%') },
-  ],
+  ]),
   spark: seriesValues('readiness'),
   // Say what the sparkline is, rather than leaving a shape with no caption.
   sparkLabel: '近 7 天恢复状态趋势',
@@ -206,16 +253,16 @@ const bodyEntry = computed(() => ({
 }));
 
 const trainingEntry = computed(() => ({
-  facts: [
+  facts: withValues([
     { key: 'vo2max', label: 'VO₂max', text: entryFigure('vo2max', '', 1) },
     {
       key: 'training_load',
       label: '负荷',
       text: trainingLoad.value === null
-        ? '—'
+        ? null
         : `${formatMetric(trainingLoad.value)}${loadBand.value ? ` ${loadBand.value}` : ''}`,
     },
-  ],
+  ]),
   spark: seriesValues('training_load'),
   sparkLabel: '近 7 天训练负荷趋势',
   measured: Boolean(statusSeries.value.training_load?.days_with_data
@@ -334,6 +381,19 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
       </div>
     </header>
 
+    <!-- 认不出型号不是「坏了」，是可以自己指认的。不说这一句，用户只会以为
+         自己的表不受支持。 -->
+    <RouterLink
+      v-for="device in unrecognizedDevices"
+      :key="device.key"
+      class="unrecognized-banner"
+      :to="device.to"
+    >
+      <Icon name="warning" :size="15" />
+      <span><strong>{{ device.name }}</strong> 还没有识别出型号</span>
+      <em>点这里手动指认 <DesignIcon name="chevron-right" :size="16" /></em>
+    </RouterLink>
+
     <WeeklyReportCard />
 
     <div v-if="partialWarning" class="inline-alert warning" role="status"><Icon name="info" :size="15" />{{ partialWarning }}</div>
@@ -347,16 +407,17 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
     </div>
 
     <div v-else class="dashboard-grid">
-      <section class="metric-panel hr-panel" aria-label="24 小时心率">
-        <div class="panel-head"><span class="panel-title"><span class="chart-icon"><DesignIcon name="heart-rate" :size="34" /></span><span><strong>24 小时心率</strong><small>全天波动</small></span></span><span class="latest-value">最新 <strong>{{ num(hrLatest) }}</strong><small>次/分</small></span></div>
+      <RouterLink class="metric-panel hr-panel" to="/heart" aria-label="打开心率详情，查看完整 24 小时">
+        <div class="panel-head"><span class="panel-title"><span class="chart-icon"><DesignIcon name="heart-rate" :size="34" /></span><span><strong>最近心率</strong><small>最近 {{ OVERVIEW_HR_WINDOW_HOURS }} 小时</small></span></span><span class="latest-value">最新 <strong>{{ num(hrLatest) }}</strong><small>次/分</small></span></div>
         <VChart v-if="hrPoints.length > 1" class="hr-chart" theme="zeppbridge-dark" :option="hrChartOption" autoresize role="img" aria-label="24 小时心率曲线" />
         <ul v-if="hrPoints.length > 1" class="hr-zones" aria-label="心率区间（绝对阈值）">
           <li v-for="zone in HR_ZONES" :key="zone.key">{{ zone.label }}</li>
         </ul>
-        <div v-else class="panel-empty"><DesignIcon name="heart-rate" :size="56" /><span>同步后展示真实的 24 小时心率波动。</span></div>
-      </section>
+        <div v-else class="panel-empty"><DesignIcon name="heart-rate" :size="56" /><span>同步后展示真实的心率波动。</span></div>
+        <span class="panel-more">完整 24 小时 <DesignIcon name="chevron-right" :size="18" /></span>
+      </RouterLink>
 
-      <section class="metric-panel steps-panel" aria-label="今日步数">
+      <RouterLink class="metric-panel steps-panel" to="/activity" aria-label="打开日常活动详情">
         <div class="panel-head"><span class="panel-title"><DesignIcon name="steps" :size="34" /><span><strong>今日步数</strong><small>{{ stepGoalIsReference ? '参考目标' : '今日目标' }}</small></span></span></div>
         <div class="steps-content">
           <CircularProgress :value="stepsPercent" :size="148" :stroke-width="9" color="#66D77D" track-color="rgba(116, 216, 137, .14)" :show-label="false">
@@ -367,9 +428,10 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
           </CircularProgress>
           <p class="steps-goal">目标 {{ formatMetric(stepGoal) }} · {{ stepsPercent }}%</p>
         </div>
-      </section>
+        <span class="panel-more">看更多 <DesignIcon name="chevron-right" :size="18" /></span>
+      </RouterLink>
 
-      <section class="metric-panel sleep-panel" aria-label="昨晚睡眠">
+      <RouterLink class="metric-panel sleep-panel" :to="lastSleep ? `/sleep/${lastSleep.sleep_id}` : '/sleep'" aria-label="打开睡眠详情">
         <div class="panel-head"><span class="panel-title"><DesignIcon name="sleep" :size="38" /><span><strong>昨晚睡眠</strong><small>睡眠结构简介</small></span></span><span v-if="lastSleep && isFiniteNumber(lastSleep.score)" class="sleep-score">{{ lastSleep.score }}</span></div>
         <template v-if="lastSleep">
           <p class="sleep-total">{{ hm(lastSleep.duration_minutes) }}</p>
@@ -377,11 +439,8 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
           <ul class="sleep-stages"><li v-for="stage in sleepStages" :key="stage.key"><i :style="{ background: stage.color }"></i><span>{{ stage.label }}</span><strong>{{ hm(stage.minutes) }}</strong></li></ul>
         </template>
         <div v-else class="panel-empty compact"><DesignIcon name="sleep" :size="50" /><span>同步后展示昨晚睡眠。</span></div>
-      </section>
-
-      <section class="metric-panel mini-panel resting-panel" aria-label="静息心率">
-        <div class="mini-icon"><DesignIcon name="resting-heart-rate" :size="68" /></div><div><p class="mini-label">静息心率</p><p class="mini-value"><strong>{{ num(restingHr) }}</strong><span>次/分</span></p><p class="mini-note">{{ hrUpdatedAt }}</p></div>
-      </section>
+        <span class="panel-more">看更多 <DesignIcon name="chevron-right" :size="18" /></span>
+      </RouterLink>
 
       <RouterLink class="metric-panel entry-panel body-entry" to="/body" aria-label="打开身体状态">
         <div class="entry-icon"><DesignIcon name="recovery" :size="52" /></div>
@@ -468,7 +527,29 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
 .steps-goal { margin: 0; color: #8A929B; font-size: 12px; font-variant-numeric: tabular-nums; }
 .sleep-panel { background: radial-gradient(380px 240px at 90% 0, rgba(104,87,217,.12), transparent 70%), linear-gradient(145deg, #20222C, #1C1F27); }.sleep-score { padding: 4px 10px; border-radius: 999px; background: rgba(131,109,235,.14); color: #A895FF; font-family: var(--font-mono); font-size: 12px; }.sleep-total { margin: 16px 0 10px; color: #F4F3FC; font-family: var(--font-mono); font-size: 20px; font-weight: 600; }.sleep-bar { display: flex; gap: 3px; height: 7px; overflow: hidden; border-radius: 999px; }.sleep-bar span { min-width: 3px; border-radius: 999px; }.sleep-stages { display: grid; grid-template-columns: minmax(0,1fr); gap: 9px; margin: 14px 0 0; padding: 0; list-style: none; }.sleep-stages li { display: grid; grid-template-columns: 8px minmax(0,1fr) auto; align-items: center; gap: 8px; min-width: 0; color: #9299A4; font-size: 12px; }.sleep-stages i { width: 6px; height: 6px; border-radius: 50%; }.sleep-stages strong { color: #C4C8D0; font-family: var(--font-mono); font-size: 12px; font-weight: 500; white-space: nowrap; }
 .mini-panel { display: grid; grid-template-columns: auto minmax(0,1fr); align-items: center; gap: 14px; }.mini-icon { display: grid; width: 68px; height: 68px; place-items: center; overflow: hidden; border-radius: 18px; }.mini-label { margin: 0; color: #B4BAC1; font-size: 13px; font-weight: 500; }.mini-value { display: flex; align-items: baseline; gap: 6px; margin: 5px 0; }.mini-value strong { color: #F5F6F2; font-family: var(--font-mono); font-size: 22px; font-weight: 600; line-height: 1; }.mini-value span { color: #8A929B; font-size: 12px; }.mini-note { margin: 0; color: #7B838C; font-size: 11px; line-height: 1.4; }.resting-panel { background: radial-gradient(300px 180px at 0 100%, rgba(225,75,88,.1), transparent 72%), linear-gradient(145deg, #221E23, #1D2025); }
-.entry-panel { display: grid; grid-template-columns: auto minmax(0,1fr); grid-column: span 4; align-items: start; gap: 12px; min-height: 166px; padding: 18px; color: inherit; text-decoration: none; }
+/* 四张指标卡现在是链接，得把 <a> 的默认样式收掉，并给出一致的「看更多」提示。 */
+.unrecognized-banner {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 14px;
+  border: 1px solid rgba(245, 195, 59, .28);
+  border-radius: 14px;
+  background: rgba(245, 195, 59, .08);
+  color: #e8cf86;
+  font-size: 12px;
+  text-decoration: none;
+}
+.unrecognized-banner strong { color: #f4e2ae; font-weight: 600; }
+.unrecognized-banner em { display: inline-flex; align-items: center; gap: 3px; margin-left: auto; font-style: normal; white-space: nowrap; }
+.unrecognized-banner:hover { border-color: rgba(245, 195, 59, .45); }
+
+a.metric-panel { display: block; color: inherit; text-decoration: none; }
+a.metric-panel.mini-panel { display: flex; align-items: center; gap: 14px; }
+.panel-more { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; color: #737C86; font-size: 11px; }
+.mini-chevron { margin-left: auto; opacity: .55; }
+/* 静息心率卡撤掉之后，这一行由身体状态和训练状态平分。 */
+.entry-panel { display: grid; grid-template-columns: auto minmax(0,1fr); grid-column: span 6; align-items: start; gap: 12px; min-height: 166px; padding: 18px; color: inherit; text-decoration: none; }
 .entry-panel:hover { border-color: rgba(221,231,239,.18); }
 .entry-icon { display: grid; width: 52px; height: 52px; place-items: center; overflow: hidden; border-radius: 15px; }
 .entry-copy { display: grid; align-content: start; gap: 7px; min-width: 0; }

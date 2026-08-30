@@ -18,6 +18,9 @@ tracing = "0.1"
 base64 = "0.22"
 regex = "1.10"
 url = "2.5"
+# 原始报文压缩。已经在依赖树里（reqwest 的 gzip 走的是它），这里只是把它
+# 变成直接依赖，好在 storage 里显式使用。
+flate2 = "1"
 zeppbridge-core = { path = "crates/core" }
 
 [package]

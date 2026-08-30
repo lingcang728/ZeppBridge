@@ -25,6 +25,7 @@ import type {
   DataHealth,
   DeviceCatalogOption,
   PendingRestore,
+  RawPayloadCompaction,
   RestorePreview,
   WeeklyReport,
   WorkoutInsight,
@@ -289,11 +290,17 @@ export const tauriBackend: BridgeBackend = {
   runDatabaseIntegrityCheck() {
     return call<IntegrityCheckResult>('run_database_integrity_check');
   },
-  submitDiagnosticReport() {
-    return call<FeedbackSubmissionResult>('submit_diagnostic_report');
+  compactRawPayloads() {
+    return call<RawPayloadCompaction>('compact_raw_payloads');
   },
-  submitDeviceModelAssignment() {
-    return call<FeedbackSubmissionResult>('submit_device_model_assignment');
+  submitDiagnosticReport(note?: string, category?: string) {
+    return call<FeedbackSubmissionResult>('submit_diagnostic_report', {
+      note: note ?? null,
+      category: category ?? null,
+    });
+  },
+  submitDeviceModelAssignment(note?: string) {
+    return call<FeedbackSubmissionResult>('submit_device_model_assignment', { note: note ?? null });
   },
 
   getExportJson(selection: ExportSelection) {

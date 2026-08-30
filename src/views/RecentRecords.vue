@@ -1,4 +1,5 @@
 <script setup lang="ts">
+defineOptions({ name: 'RecentRecords' });
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import Icon from '../components/Icon.vue';
@@ -130,6 +131,8 @@ function formatDateHint(value: string): string {
 <template>
   <section class="page recent-page" aria-labelledby="recent-title">
     <PageHeader
+      back="/"
+      back-label="返回概览"
       title-id="recent-title"
       title="最近记录"
       intro="最近同步的睡眠与运动记录，合并查看。"

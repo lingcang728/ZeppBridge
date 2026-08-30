@@ -85,6 +85,12 @@ const validAssignedModel = (entry) => hasOnlyKeys(entry, ['catalogId', 'modelIde
   && entry.modelIdentifierHints.every((hint) => boundedString(hint, 32)
     && /^(deviceSource|deviceType):\d{1,8}$/.test(hint));
 
+/** 和客户端 `DIAGNOSTIC_NOTE_MAX_CHARS` 保持一致。 */
+const USER_NOTE_MAX = 500;
+
+/** 用户自己选的问题类型。和客户端 `normalize_report_category` 保持一致。 */
+const REPORT_CATEGORIES = ['device', 'workout', 'data', 'other'];
+
 const validWorkoutCode = (entry) => hasOnlyKeys(entry, ['code', 'records'])
   && boundedInteger(entry.code, -1, 65535)
   && boundedInteger(entry.records, 1, 1_000_000_000);
@@ -100,6 +106,8 @@ export const validateFeedbackReport = (report) => {
     'userAssignedModels',
     'unknownWorkoutCodes',
     'workoutTypeConflicts',
+    'userNote',
+    'category',
   ])) return false;
   if (report.format !== 'zeppbridge.feedback.v1') return false;
   if (!boundedString(report.appVersion, 32) || !/^[0-9A-Za-z.+-]+$/.test(report.appVersion)) return false;
@@ -116,10 +124,19 @@ export const validateFeedbackReport = (report) => {
     || report.unknownWorkoutCodes.length > 100
     || !report.unknownWorkoutCodes.every(validWorkoutCode)) return false;
   if (!boundedInteger(report.workoutTypeConflicts, 0, 1_000_000_000)) return false;
+  // 用户自己写的一句说明。客户端发之前已经脱敏并截到 500 字，这里按同样的上限
+  // 再校验一次——服务端不能因为「客户端应该已经处理过」就放行。字段可缺省：
+  // 没填的报告和旧客户端都不会带它。
+  if (report.userNote !== undefined && !boundedString(report.userNote, USER_NOTE_MAX)) return false;
+  // 分类是固定取值，不是又一个自由文本框。
+  if (report.category !== undefined && !REPORT_CATEGORIES.includes(report.category)) return false;
+  // 自动检测到问题，或者用户自己说明了要报什么——两条路都算数。只认前者的话，
+  // 本机没检测到异常的人就永远提交不了，哪怕他真的遇到了问题。
   return report.deviceEvidence.unknownDeviceCount > 0
     || (report.userAssignedModels?.length ?? 0) > 0
     || report.unknownWorkoutCodes.length > 0
-    || report.workoutTypeConflicts > 0;
+    || report.workoutTypeConflicts > 0
+    || report.category !== undefined;
 };
 
 export async function onRequestPost(context) {
@@ -160,8 +177,8 @@ export async function onRequestPost(context) {
         id, received_at, app_version, operating_system, schema_version,
         normalizer_revision, device_status, unknown_device_count,
         device_evidence_json, unknown_workout_codes_json, workout_type_conflicts,
-        user_assigned_models_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        user_assigned_models_json, user_note, category
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       reportId,
       submittedAt,
@@ -175,6 +192,8 @@ export async function onRequestPost(context) {
       JSON.stringify(report.unknownWorkoutCodes),
       report.workoutTypeConflicts,
       JSON.stringify(report.userAssignedModels ?? []),
+      report.userNote ?? '',
+      report.category ?? '',
     ).run();
   } catch {
     return response({ ok: false, error: 'storage_unavailable' }, 503);

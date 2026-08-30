@@ -32,6 +32,7 @@ import type {
   DiagnosticReport,
   FeedbackSubmissionResult,
   SleepSession,
+  RawPayloadCompaction,
   StorageEstimate,
   SyncReport,
   TrainingBalancePoint,
@@ -110,8 +111,11 @@ export interface BridgeBackend {
   getPendingRestore(): Promise<PendingRestore | null>;
   cancelPendingRestore(): Promise<void>;
   runDatabaseIntegrityCheck(): Promise<IntegrityCheckResult>;
-  submitDiagnosticReport(): Promise<FeedbackSubmissionResult>;
-  submitDeviceModelAssignment(): Promise<FeedbackSubmissionResult>;
+  /** `note` 是用户自己写的一句说明；后端会脱敏并截断，空白等同于没填。 */
+  /** 把存量原始报文压缩掉，返回压缩前后的字节数。耗时随库大小增长。 */
+  compactRawPayloads(): Promise<RawPayloadCompaction>;
+  submitDiagnosticReport(note?: string, category?: string): Promise<FeedbackSubmissionResult>;
+  submitDeviceModelAssignment(note?: string): Promise<FeedbackSubmissionResult>;
   getExportJson(selection: ExportSelection): Promise<string>;
   saveJsonExport(selection: ExportSelection, path: string): Promise<ExportResult>;
   saveCsvExport(selection: ExportSelection, path: string): Promise<ExportResult>;

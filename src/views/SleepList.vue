@@ -1,4 +1,5 @@
 <script setup lang="ts">
+defineOptions({ name: 'SleepList' });
 import { onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import Icon from '../components/Icon.vue';
@@ -40,7 +41,7 @@ watch(dataRevision, () => void loadList());
 <template>
   <section class="page list-page" aria-labelledby="sleep-list-title">
     <RouterLink class="back-link" to="/recent"><Icon name="arrow-left" :size="14" />返回最近记录</RouterLink>
-    <PageHeader title-id="sleep-list-title" title="睡眠" intro="本机已同步的睡眠记录。没有完整时间轴时，只展示汇总。" />
+    <PageHeader back="/" back-label="返回概览" title-id="sleep-list-title" title="睡眠" intro="本机已同步的睡眠记录。没有完整时间轴时，只展示汇总。" />
 
     <div v-if="loading" class="surface-card" aria-live="polite">
       <SkeletonBlock height="56px" />

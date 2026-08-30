@@ -11,6 +11,7 @@
  * 「我 2023 年的数据到底有没有」。
  */
 import { computed, onMounted, ref, watch } from 'vue';
+import SelectMenu from './SelectMenu.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import type { CoverageLedger, StorageEstimate, UserPrefs } from '../types';
@@ -39,6 +40,14 @@ const STREAM_LABEL: Record<string, string> = {
 
 /** Zepp 云端本身也不会有更早的记录；给「全部」一个诚实的下界而不是 1970。 */
 const ALL_HISTORY_YEARS = 10;
+
+const START_CHOICES = [
+  { value: '1y', label: '最近 1 年' },
+  { value: '2y', label: '最近 2 年' },
+  { value: '3y', label: '最近 3 年' },
+  { value: 'all', label: `全部可获取历史（最多 ${ALL_HISTORY_YEARS} 年）` },
+  { value: 'custom', label: '自定义起点' },
+];
 
 const fromDate = computed(() => {
   const today = new Date();
@@ -212,13 +221,7 @@ const resetLedger = async () => {
 
     <div class="field-row">
       <span class="kv-label">补拉起点</span>
-      <select v-model="startChoice" aria-label="历史补拉起点">
-        <option value="1y">最近 1 年</option>
-        <option value="2y">最近 2 年</option>
-        <option value="3y">最近 3 年</option>
-        <option value="all">全部可获取历史（最多 {{ ALL_HISTORY_YEARS }} 年）</option>
-        <option value="custom">自定义起点</option>
-      </select>
+      <SelectMenu v-model="startChoice" :options="START_CHOICES" aria-label="历史补拉起点" />
     </div>
     <div v-if="startChoice === 'custom'" class="field-row">
       <span class="kv-label">起始日期</span>
@@ -332,7 +335,7 @@ h2 { margin: 0 0 14px; font-size: 15px; font-weight: 700; color: var(--ink); }
 .switch[aria-checked='true'] span { transform: translateX(18px); background: var(--accent); }
 .switch:disabled { opacity: .5; cursor: not-allowed; }
 .field-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 6px 0; }
-.field-row select, .field-row input {
+.field-row input {
   min-height: 34px;
   min-width: 160px;
   padding: 5px 10px;
@@ -342,6 +345,7 @@ h2 { margin: 0 0 14px; font-size: 15px; font-weight: 700; color: var(--ink); }
   color: var(--ink);
   font-size: 12px;
 }
+.field-row .select-menu { min-width: 220px; flex: 0 0 auto; }
 .kv-label { flex: 0 0 96px; color: var(--muted); font-size: 12px; }
 .retain-note { margin: 6px 0 8px; color: var(--muted); font-size: 12px; line-height: 1.6; }
 .inline-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }

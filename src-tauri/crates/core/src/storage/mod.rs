@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 /// 当前 SQLite schema 版本（`PRAGMA user_version`）。加新版本只能追加迁移
 /// 步骤，不要改已有 DDL。
-pub const CURRENT_SCHEMA_VERSION: i64 = 14;
+pub const CURRENT_SCHEMA_VERSION: i64 = 15;
 /// 写进备份 manifest 的应用版本。Core 是独立 crate，用它自己的包版本。
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v16-workout-catalog";
@@ -48,6 +48,31 @@ pub struct Database {
 /// a red "本地数据库暂时不可用". A sync that knows the replay is running can
 /// stand aside and come back instead, which is the honest answer: nothing
 /// failed, the library is busy healing itself.
+/// 是否正在后台压缩历史报文。
+///
+/// 和重放同样的做法：界面要能说「正在压缩」，同步也要知道此刻有人在写库。
+static COMPACTION_IN_PROGRESS: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+pub fn compaction_in_progress() -> bool {
+    COMPACTION_IN_PROGRESS.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+struct CompactionGuard;
+
+impl CompactionGuard {
+    fn enter() -> Self {
+        COMPACTION_IN_PROGRESS.store(true, std::sync::atomic::Ordering::SeqCst);
+        CompactionGuard
+    }
+}
+
+impl Drop for CompactionGuard {
+    fn drop(&mut self) {
+        COMPACTION_IN_PROGRESS.store(false, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
 static REPLAY_IN_PROGRESS: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
@@ -187,7 +212,7 @@ fn merge_workout_type(
 /// `metric_samples` metrics are aggregated to one point per local day; the
 /// spread of that day's samples becomes `min` / `max`, which is real rather
 /// than derived.
-const SERIES_METRICS: [(&str, MetricSource, &str); 22] = [
+const SERIES_METRICS: [(&str, MetricSource, &str); 26] = [
     ("readiness", MetricSource::Daily(None), "score"),
     ("physical_readiness", MetricSource::Daily(None), "score"),
     ("mental_readiness", MetricSource::Daily(None), "score"),
@@ -205,6 +230,12 @@ const SERIES_METRICS: [(&str, MetricSource, &str); 22] = [
         "次/分",
     ),
     ("resting_hr", MetricSource::Daily(None), "bpm"),
+    // 首页那四张卡要有能点进去的二级页，日活动这几项就得能按天成序列。
+    // 它们本来就在 daily_metrics 里，这里只是允许查询它们。
+    ("steps", MetricSource::Daily(None), "步"),
+    ("distance", MetricSource::Daily(None), "米"),
+    ("active_calories", MetricSource::Daily(None), "千卡"),
+    ("active_minutes", MetricSource::Daily(None), "分钟"),
     ("spo2_odi", MetricSource::Daily(None), "events/h"),
     ("spo2_night_score", MetricSource::Daily(None), "score"),
     ("spo2_measured_minutes", MetricSource::Daily(None), "分钟"),
@@ -1295,8 +1326,14 @@ impl Database {
     /// 也不拿一个从几天样本外推出来的速率去乘三年。
     fn stream_storage_rates(&self, days: i64) -> Result<Vec<StreamStorageEstimate>> {
         let mut stmt = self.conn.prepare(
+            // 占用要算**实际落盘**的那一份：压过的行按压缩后的字节数算，
+            // 否则估算会按明文报价，用户看到的数字比真实占用大好几倍。
             "SELECT stream,
-                    SUM(LENGTH(CAST(payload AS BLOB))),
+                    SUM(CASE
+                          WHEN payload_zip IS NOT NULL AND LENGTH(payload_zip) > 0
+                            THEN LENGTH(payload_zip)
+                          ELSE LENGTH(CAST(payload AS BLOB))
+                        END),
                     CAST(julianday(MAX(start_utc)) - julianday(MIN(start_utc)) AS INTEGER) + 1
              FROM raw_records
              GROUP BY stream",
@@ -1557,19 +1594,23 @@ impl Database {
             .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
         let mut hasher = Sha256::new();
         hasher.update(payload.as_bytes());
+        // 校验和永远针对**未压缩**的 JSON。压缩是存储细节，不该改变
+        // 「这份报文是什么」的身份。
         let payload_hash = hex::encode(hasher.finalize());
         let fetched_at = Utc::now().to_rfc3339();
+        let payload_zip = compress_payload(&payload)?;
         self.conn.execute(
             "INSERT INTO raw_records
                 (stream, source_key, source_scope, device_id, start_utc, end_utc,
-                 payload, payload_hash, fetched_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+                 payload, payload_zip, payload_hash, fetched_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, '', ?7, ?8, ?9)
              ON CONFLICT(stream, source_key) DO UPDATE SET
                 source_scope = excluded.source_scope,
                 device_id = excluded.device_id,
                 start_utc = excluded.start_utc,
                 end_utc = excluded.end_utc,
-                payload = excluded.payload,
+                payload = '',
+                payload_zip = excluded.payload_zip,
                 payload_hash = excluded.payload_hash,
                 fetched_at = excluded.fetched_at",
             params![
@@ -1579,7 +1620,7 @@ impl Database {
                 record.device_id,
                 record.start_utc.to_rfc3339(),
                 record.end_utc.map(|value| value.to_rfc3339()),
-                payload,
+                payload_zip,
                 payload_hash,
                 fetched_at,
             ],
@@ -1783,7 +1824,7 @@ impl Database {
         let _replay_guard = ReplayGuard::enter();
         let raw_records = if let Some(stream) = stream_filter {
             let mut stmt = self.conn.prepare(
-                "SELECT id, stream, source_key, payload
+                "SELECT id, stream, source_key, payload, payload_zip
                  FROM raw_records WHERE stream = ?1 ORDER BY id",
             )?;
             let rows = stmt.query_map([stream], |row| {
@@ -1792,19 +1833,21 @@ impl Database {
                     row.get::<_, String>(1)?,
                     row.get::<_, String>(2)?,
                     row.get::<_, String>(3)?,
+                    row.get::<_, Option<Vec<u8>>>(4)?,
                 ))
             })?;
             rows.collect::<std::result::Result<Vec<_>, _>>()?
         } else {
-            let mut stmt = self
-                .conn
-                .prepare("SELECT id, stream, source_key, payload FROM raw_records ORDER BY id")?;
+            let mut stmt = self.conn.prepare(
+                "SELECT id, stream, source_key, payload, payload_zip FROM raw_records ORDER BY id",
+            )?;
             let rows = stmt.query_map([], |row| {
                 Ok((
                     row.get::<_, i64>(0)?,
                     row.get::<_, String>(1)?,
                     row.get::<_, String>(2)?,
                     row.get::<_, String>(3)?,
+                    row.get::<_, Option<Vec<u8>>>(4)?,
                 ))
             })?;
             rows.collect::<std::result::Result<Vec<_>, _>>()?
@@ -1812,7 +1855,8 @@ impl Database {
 
         let mut counts = BTreeMap::<String, i64>::new();
         let mut band_heart_rate = 0i64;
-        for (id, stream, source_key, encoded_payload) in raw_records {
+        for (id, stream, source_key, stored_payload, payload_zip) in raw_records {
+            let encoded_payload = decode_raw_payload(stored_payload, payload_zip)?;
             let payload: serde_json::Value = serde_json::from_str(&encoded_payload)
                 .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
             if let Ok(result) = self.normalize_and_persist_raw(id, &stream, &source_key, &payload) {
@@ -3094,13 +3138,20 @@ impl Database {
         start_text: &str,
         end_text: &str,
         selected: &BTreeSet<String>,
+        workout_id: Option<&str>,
     ) -> Result<serde_json::Map<String, serde_json::Value>> {
         let mut analysis = serde_json::Map::new();
 
         if selected.contains("workouts") {
-            if let Some(zones) = self.heart_rate_zone_variants(start_text, end_text)? {
+            if let Some(zones) = self.heart_rate_zone_variants(start_text, end_text, workout_id)? {
                 analysis.insert("heart_rate_zones".into(), zones);
             }
+        }
+
+        // 训练负荷平衡是一条 28 天的窗口统计。单条运动的导出说的是「这一条」，
+        // 把四周的日负荷塞进去就又变成了用户没要的范围，所以这里直接不算。
+        if workout_id.is_some() {
+            return Ok(analysis);
         }
 
         if selected.contains("training_load") || selected.contains("recovery") {
@@ -3247,14 +3298,22 @@ impl Database {
         start: &str,
         end: &str,
     ) -> Result<Vec<MetricSeriesPoint>> {
+        let bounds = local_day_range_utc_bounds(start, end);
+        let (lower, upper) = match &bounds {
+            Some((lower, upper)) => (Some(lower.as_str()), Some(upper.as_str())),
+            None => (None, None),
+        };
         let mut stmt = self.conn.prepare(
             "SELECT date(timestamp, 'localtime') AS day,
                     AVG(value), MIN(value), MAX(value), COUNT(*)
              FROM metric_samples
-             WHERE metric = ?1 AND date(timestamp, 'localtime') BETWEEN ?2 AND ?3
+             WHERE metric = ?1
+               AND (?4 IS NULL OR timestamp >= ?4)
+               AND (?5 IS NULL OR timestamp < ?5)
+               AND date(timestamp, 'localtime') BETWEEN ?2 AND ?3
              GROUP BY day ORDER BY day",
         )?;
-        let rows = stmt.query_map(params![metric, start, end], |row| {
+        let rows = stmt.query_map(params![metric, start, end, lower, upper], |row| {
             Ok(MetricSeriesPoint {
                 date: row.get(0)?,
                 value: round1(row.get::<_, f64>(1)?),
@@ -3552,6 +3611,7 @@ impl Database {
         let histogram = self.workout_heart_rate_histogram(
             &start.format("%Y-%m-%d").to_string(),
             &end.format("%Y-%m-%d").to_string(),
+            None,
         )?;
 
         Ok(Some(zone_report(model, used, &histogram, window_days)))
@@ -3569,13 +3629,14 @@ impl Database {
         &self,
         start_text: &str,
         end_text: &str,
+        workout_id: Option<&str>,
     ) -> Result<Option<serde_json::Value>> {
         let bases = self.heart_rate_bases()?;
         if bases.is_empty() {
             return Ok(None);
         }
         let preference = self.heart_rate_zone_preference()?;
-        let histogram = self.workout_heart_rate_histogram(start_text, end_text)?;
+        let histogram = self.workout_heart_rate_histogram(start_text, end_text, workout_id)?;
         let options = self.heart_rate_zone_options(1)?;
 
         let of_kind = |kind: &str| -> Vec<&HeartRateBasis> {
@@ -3656,7 +3717,12 @@ impl Database {
     }
 
     /// Seconds spent at each recorded heart rate during workouts in a range.
-    fn workout_heart_rate_histogram(&self, start: &str, end: &str) -> Result<BTreeMap<i32, i64>> {
+    fn workout_heart_rate_histogram(
+        &self,
+        start: &str,
+        end: &str,
+        workout_id: Option<&str>,
+    ) -> Result<BTreeMap<i32, i64>> {
         let mut stmt = self.conn.prepare(
             "SELECT workout_samples.heart_rate, COUNT(*)
              FROM workout_samples
@@ -3664,9 +3730,10 @@ impl Database {
              WHERE workout_samples.heart_rate IS NOT NULL
                AND workout_samples.heart_rate > 0
                AND date(workouts.start_time, 'localtime') BETWEEN ?1 AND ?2
+               AND (?3 IS NULL OR workout_samples.workout_id = ?3)
              GROUP BY workout_samples.heart_rate",
         )?;
-        let rows = stmt.query_map(params![start, end], |row| {
+        let rows = stmt.query_map(params![start, end, workout_id], |row| {
             Ok((row.get::<_, i32>(0)?, row.get::<_, i64>(1)?))
         })?;
         let mut histogram = BTreeMap::new();
@@ -3681,23 +3748,32 @@ impl Database {
         let scope = selection
             .resolve_scope()
             .map_err(ZeppBridgeError::ConfigError)?;
-        // 单次运动导出解析成「那条运动当天」加上一个 workout 过滤器：范围之内
-        // 的心率、睡眠等上下文照样带上，运动列表里只会有这一条。
-        let (start, end, workout_filter) = match &scope {
+        // 「单条运动」就是这一条运动，不是这条运动当天。
+        //
+        // 早先的实现把它解析成「那条运动所在的那一天」，于是用户从运动详情点
+        // 「交给 AI」时，界面写着只导出这一条，实际却带上了整天的心率、睡眠和
+        // 日级指标。界面说的和发出去的不一样，这是产品红线。
+        //
+        // 现在的语义：运动列表只有这一条；逐点指标按这条运动的**实际起止时刻**
+        // 截取；日级数据（睡眠、步数、日常活动等）不属于「一条运动」，直接排除
+        // 并在 capabilities 里如实写明原因，而不是悄悄少给。
+        let (start, end, workout_filter, workout_window) = match &scope {
             ExportScope::DateRange { start, end } => (
                 NaiveDate::parse_from_str(start, "%Y-%m-%d")
                     .map_err(|_| ZeppBridgeError::ConfigError("导出开始日期无效".into()))?,
                 NaiveDate::parse_from_str(end, "%Y-%m-%d")
                     .map_err(|_| ZeppBridgeError::ConfigError("导出结束日期无效".into()))?,
                 None,
+                None,
             ),
             ExportScope::Workout { workout_id } => {
-                let day: String = self
+                let (day, started_at, ended_at): (String, String, String) = self
                     .conn
                     .query_row(
-                        "SELECT date(start_time, 'localtime') FROM workouts WHERE workout_id = ?1",
+                        "SELECT date(start_time, 'localtime'), start_time, end_time
+                         FROM workouts WHERE workout_id = ?1",
                         params![workout_id],
-                        |row| row.get(0),
+                        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
                     )
                     .optional()?
                     .ok_or_else(|| {
@@ -3705,9 +3781,28 @@ impl Database {
                     })?;
                 let day = NaiveDate::parse_from_str(&day, "%Y-%m-%d")
                     .map_err(|_| ZeppBridgeError::ParseError("运动记录日期无效".into()))?;
-                (day, day, Some(workout_id.clone()))
+                (
+                    day,
+                    day,
+                    Some(workout_id.clone()),
+                    Some((started_at, ended_at)),
+                )
             }
         };
+        let single_workout = workout_filter.is_some();
+        // 日级数据流：一条运动没有「昨晚睡了多久」这种字段，硬塞进来就是范围外的数据。
+        // 只在 daily_metrics / sleep_sessions 里出现的类型；心率、HRV、血氧这类
+        // 逐点指标不在其中，它们会按运动时段截取后照常导出。
+        const DAY_LEVEL_TYPES: [&str; 8] = [
+            "sleep",
+            "steps",
+            "daily_activity",
+            "recovery",
+            "training_load",
+            "vo2max",
+            "lactate_threshold",
+            "pai",
+        ];
         let allowed: BTreeSet<&str> = [
             "heart_rate",
             "hrv",
@@ -3756,22 +3851,49 @@ impl Database {
             || selected.contains("spo2")
             || selected.contains("stress")
         {
+            // 单条运动范围下，逐点指标只取这条运动进行期间的采样；日期区间下
+            // 仍然按整天取。两条路径共用一条 SQL，避免两处各自解释范围。
+            let (window_start, window_end) = match &workout_window {
+                Some((started_at, ended_at)) => {
+                    (Some(started_at.as_str()), Some(ended_at.as_str()))
+                }
+                None => (None, None),
+            };
             let mut stmt = self.conn.prepare(
                 "SELECT metric, timestamp, value, unit, source_scope, device_id
                  FROM metric_samples
-                 WHERE date(timestamp, 'localtime') BETWEEN ?1 AND ?2
+                 WHERE (?5 IS NULL OR timestamp >= ?5)
+                   AND (?6 IS NULL OR timestamp < ?6)
+                   AND date(timestamp, 'localtime') BETWEEN ?1 AND ?2
+                   AND (?3 IS NULL OR timestamp >= ?3)
+                   AND (?4 IS NULL OR timestamp <= ?4)
                  ORDER BY timestamp",
             )?;
-            let rows = stmt.query_map(params![start_text, end_text], |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, String>(1)?,
-                    row.get::<_, f64>(2)?,
-                    row.get::<_, String>(3)?,
-                    row.get::<_, String>(4)?,
-                    row.get::<_, Option<String>>(5)?,
-                ))
-            })?;
+            let day_bounds = local_day_range_utc_bounds(&start_text, &end_text);
+            let (day_lower, day_upper) = match &day_bounds {
+                Some((lower, upper)) => (Some(lower.as_str()), Some(upper.as_str())),
+                None => (None, None),
+            };
+            let rows = stmt.query_map(
+                params![
+                    start_text,
+                    end_text,
+                    window_start,
+                    window_end,
+                    day_lower,
+                    day_upper
+                ],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, f64>(2)?,
+                        row.get::<_, String>(3)?,
+                        row.get::<_, String>(4)?,
+                        row.get::<_, Option<String>>(5)?,
+                    ))
+                },
+            )?;
             let mut buckets: BTreeMap<(String, String, String), HourBucket> = BTreeMap::new();
             for row in rows {
                 let (metric, timestamp, value, unit, source_scope, device_id) = row?;
@@ -3849,13 +3971,14 @@ impl Database {
         .into_iter()
         .collect();
         let mut daily_metrics = Vec::new();
-        if selected.contains("daily_activity")
-            || selected.contains("recovery")
-            || selected.contains("steps")
-            || selected.contains("spo2")
-            || selected.contains("stress")
-            || selected.contains("training_load")
-            || selected.contains("vo2max")
+        if !single_workout
+            && (selected.contains("daily_activity")
+                || selected.contains("recovery")
+                || selected.contains("steps")
+                || selected.contains("spo2")
+                || selected.contains("stress")
+                || selected.contains("training_load")
+                || selected.contains("vo2max"))
         {
             let mut stmt = self.conn.prepare(
                 "SELECT date, metric, value, unit, source_scope, device_id
@@ -3931,7 +4054,7 @@ impl Database {
         }
 
         let mut sleep_sessions = Vec::new();
-        if selected.contains("sleep") {
+        if selected.contains("sleep") && !single_workout {
             let mut stmt = self.conn.prepare(
                 "SELECT sleep_id, start_time, end_time, score, duration_minutes,
                         deep_minutes, light_minutes, rem_minutes, rem_available, awake_minutes,
@@ -4107,6 +4230,18 @@ impl Database {
             .iter()
             .map(|selected_type| {
                 let count = produced.get(selected_type).copied().unwrap_or(0);
+                // 单条运动范围下被排除的日级数据流：必须说清是「范围之外」，
+                // 而不是让它看起来像「这段时间没有数据」。
+                if single_workout && DAY_LEVEL_TYPES.contains(&selected_type.as_str()) {
+                    return (
+                        selected_type.clone(),
+                        serde_json::json!({
+                            "status": "excluded_by_scope",
+                            "rows_in_export": 0,
+                            "note": "这是按天记录的数据，不属于「一条运动」的范围，因此没有包含在这次导出里。需要它请改用日期范围导出。",
+                        }),
+                    );
+                }
                 let raw_pending = (count == 0)
                     .then(|| {
                         RAW_PENDING_STREAMS
@@ -4127,7 +4262,11 @@ impl Database {
                     serde_json::json!({
                         "status": "empty_in_range",
                         "records": 0,
-                        "note": "该数据流已接入，但这段时间没有记录",
+                        "note": if single_workout {
+                            "该数据流已接入，但这条运动进行期间没有记录"
+                        } else {
+                            "该数据流已接入，但这段时间没有记录"
+                        },
                     })
                 } else {
                     let rows = emitted.get(selected_type).copied().unwrap_or(count);
@@ -4156,7 +4295,8 @@ impl Database {
             })
             .collect::<Vec<_>>();
 
-        let analysis = self.export_analysis(&start_text, &end_text, &selected)?;
+        let analysis =
+            self.export_analysis(&start_text, &end_text, &selected, workout_filter.as_deref())?;
 
         let record_count =
             metric_samples.len() + daily_metrics.len() + sleep_sessions.len() + workouts.len();
@@ -4165,9 +4305,26 @@ impl Database {
         } else {
             "detail=summary：心率按小时聚合为 min/avg/max，逐秒运动序列省略（sample_count 说明有多少条）；结构化指标全部完整。需要原始序列请用 detail=full 重新导出。"
         };
+        // 范围要能被读到的人核对。日期区间就写日期区间；单条运动就写这条运动的
+        // 真实起止时刻，别再让读者以为自己拿到的是一整天。
+        let scope_note = match (&workout_filter, &workout_window) {
+            (Some(workout_id), Some((started_at, ended_at))) => serde_json::json!({
+                "kind": "workout",
+                "workout_id": workout_id,
+                "start_time": started_at,
+                "end_time": ended_at,
+                "note": "只包含这一条运动，以及它进行期间的逐点指标；按天记录的数据流不在范围内。",
+            }),
+            _ => serde_json::json!({
+                "kind": "date_range",
+                "start": start_text,
+                "end": end_text,
+            }),
+        };
         let export = serde_json::json!({
             "schema_version": "zeppbridge.ai.v2",
             "generated_at": Utc::now().to_rfc3339(),
+            "scope": scope_note,
             "date_range": { "start": start_text, "end": end_text, "timezone": "system_local" },
             "selected_types": selected,
             "detail": if full { "full" } else { "summary" },
@@ -4442,6 +4599,88 @@ impl Database {
         .transpose()
     }
 
+    /// 把还没压缩的历史报文压掉，返回压缩前后的字节数。
+    ///
+    /// 新写入的报文一进库就是压缩的，这个方法只管**装这一版之前**攒下来的
+    /// 存量。它是一次性的维护动作，不在同步路径上跑：老库里可能有上千条、
+    /// 上 GB 的报文，压一遍要读写一整轮，不该让一次普通同步顺手做这件事。
+    ///
+    /// 安全边界：**先解压回来比对，一模一样才落库**。原始报文是重放的唯一
+    /// 依据，压坏一条就等于永久丢一条——宁可这一条不压。
+    pub fn compact_raw_payloads(&self) -> Result<RawPayloadCompaction> {
+        let _guard = CompactionGuard::enter();
+        let pending: Vec<(i64, String)> = {
+            let mut stmt = self.conn.prepare(
+                "SELECT id, payload FROM raw_records
+                 WHERE (payload_zip IS NULL OR LENGTH(payload_zip) = 0)
+                   AND LENGTH(payload) > ?1
+                 ORDER BY id",
+            )?;
+            let rows = stmt.query_map([MIN_COMPRESSIBLE_PAYLOAD_BYTES], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+            })?;
+            rows.collect::<std::result::Result<Vec<_>, _>>()?
+        };
+
+        let mut report = RawPayloadCompaction::default();
+        for (id, payload) in pending {
+            let original = payload.len() as u64;
+            let Ok(compressed) = compress_payload(&payload) else {
+                report.skipped += 1;
+                continue;
+            };
+            // 压不小就别费这个事，也别冒风险。
+            if compressed.len() as u64 >= original {
+                report.skipped += 1;
+                continue;
+            }
+            match decompress_payload(&compressed) {
+                Ok(round_tripped) if round_tripped == payload => {}
+                _ => {
+                    report.skipped += 1;
+                    continue;
+                }
+            }
+            self.conn.execute(
+                "UPDATE raw_records SET payload = '', payload_zip = ?2 WHERE id = ?1",
+                params![id, compressed],
+            )?;
+            report.compacted += 1;
+            report.bytes_before += original;
+            report.bytes_after += compressed.len() as u64;
+        }
+
+        // 压缩腾出来的是**数据库内部**的空闲页：不 VACUUM 的话，磁盘上的文件
+        // 一个字节都不会小，用户看不到任何变化。VACUUM 会重建整个文件，过程中
+        // 需要差不多一倍的临时空间，所以只在真的压过东西时才做，而且失败不算
+        // 整件事失败——数据已经压好了，文件没缩只是没拿到那份收益。
+        if report.compacted > 0 {
+            if let Err(error) = self.conn.execute_batch("VACUUM") {
+                tracing::warn!("压缩后 VACUUM 失败，磁盘占用暂时不会下降: {error}");
+            }
+        }
+        Ok(report)
+    }
+
+    /// 还有多少条**值得压**的历史报文。用来决定要不要在启动后台跑一次。
+    ///
+    /// 门槛必须和 [`compact_raw_payloads`] 用的是同一个，否则会出现这样的循环：
+    /// 计数说「还有 10 条待压」→ 界面弹出「正在压缩」→ 压缩函数发现这 10 条
+    /// 压完反而更大、全部跳过 → 下次启动同样的 10 条又被算成待压。
+    /// 实测就踩了：库里十条 `{"items":[]}`（12 字节的空响应）让横幅每次启动
+    /// 都要闪一下。
+    pub fn pending_raw_payload_count(&self) -> Result<i64> {
+        self.conn
+            .query_row(
+                "SELECT COUNT(*) FROM raw_records
+                 WHERE (payload_zip IS NULL OR LENGTH(payload_zip) = 0)
+                   AND LENGTH(payload) > ?1",
+                [MIN_COMPRESSIBLE_PAYLOAD_BYTES],
+                |row| row.get(0),
+            )
+            .map_err(Into::into)
+    }
+
     pub fn cleanup_old_data(&self, days: i64) -> Result<()> {
         if !(1..=365).contains(&days) {
             return Err(ZeppBridgeError::ConfigError(
@@ -4687,6 +4926,80 @@ fn workout_id_from_detail_key(source_key: &str) -> Option<String> {
     } else {
         Some(workout_id.to_owned())
     }
+}
+
+/// 原始报文的压缩与还原。
+///
+/// 原始报文是这个库里最占地方的东西：一个用过一年的账号，两千多条
+/// `raw_records` 就能吃掉一 GB 出头。它们是 JSON 文本，deflate 之后大约只剩
+/// 五分之一，而且解压的代价只在重放时付一次——重放本来就是分钟级的操作。
+///
+/// 压的是 `serde_json::to_string` 出来的那串字节，还回来必须一模一样：重放、
+/// 校验和、导出都依赖这一点，所以 [`decode_raw_payload`] 之后不做任何「修补」。
+/// 小于这个字节数的报文不压。
+///
+/// zlib 自己就有十几字节的头，几百字节以下压不出什么名堂，甚至会更大
+/// （空响应 `{"items":[]}` 只有 12 字节，压完反而变长）。省下的那点空间不值
+/// 得为它维护「压过但没变小」这种状态。
+const MIN_COMPRESSIBLE_PAYLOAD_BYTES: i64 = 512;
+
+fn compress_payload(payload: &str) -> Result<Vec<u8>> {
+    use flate2::write::ZlibEncoder;
+    use flate2::Compression;
+    use std::io::Write;
+
+    let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+    encoder
+        .write_all(payload.as_bytes())
+        .map_err(|error| ZeppBridgeError::ParseError(format!("压缩原始报文失败: {error}")))?;
+    encoder
+        .finish()
+        .map_err(|error| ZeppBridgeError::ParseError(format!("压缩原始报文失败: {error}")))
+}
+
+fn decompress_payload(bytes: &[u8]) -> Result<String> {
+    use flate2::read::ZlibDecoder;
+    use std::io::Read;
+
+    let mut decoder = ZlibDecoder::new(bytes);
+    let mut out = String::new();
+    decoder
+        .read_to_string(&mut out)
+        .map_err(|error| ZeppBridgeError::ParseError(format!("解压原始报文失败: {error}")))?;
+    Ok(out)
+}
+
+/// 取出一条原始报文。
+///
+/// 压缩是后加的，老库里的行仍然是明文 `payload`，而且**永远**要能读——所以
+/// 这里两种形态都认，压缩的优先。
+fn decode_raw_payload(payload: String, payload_zip: Option<Vec<u8>>) -> Result<String> {
+    match payload_zip {
+        Some(bytes) if !bytes.is_empty() => decompress_payload(&bytes),
+        _ => Ok(payload),
+    }
+}
+
+/// 把「本地日期区间」换成一对可以直接比字符串的 UTC 时间戳边界。
+///
+/// `metric_samples.timestamp` 存的是 RFC3339 UTC（统一以 `+00:00` 结尾），所以
+/// 字典序就是时间序。问题出在过滤条件上：`date(timestamp,'localtime')` 是个函数
+/// 调用，SQLite 没法拿它去索引里做区间定位，只能把这个 metric 的**全部**采样扫
+/// 一遍——一年的心率就是二十多万行，只为了挑出七天。
+///
+/// 加一层宽松的时间戳边界，索引就能先把范围缩到几天（实测心率 7 天 92ms → 5ms）。
+/// 边界各放宽一天，覆盖任何时区偏移（-12..+14 小时），所以它只负责「少扫一点」，
+/// 不改变结果：真正决定哪一天算哪一天的，仍然是后面那个 `date(...,'localtime')`。
+fn local_day_range_utc_bounds(start: &str, end: &str) -> Option<(String, String)> {
+    let start = NaiveDate::parse_from_str(start, "%Y-%m-%d").ok()?;
+    let end = NaiveDate::parse_from_str(end, "%Y-%m-%d").ok()?;
+    let lower = (start - Duration::days(1))
+        .format("%Y-%m-%dT00:00:00")
+        .to_string();
+    let upper = (end + Duration::days(2))
+        .format("%Y-%m-%dT00:00:00")
+        .to_string();
+    Some((lower, upper))
 }
 
 #[cfg(test)]
@@ -5371,6 +5684,298 @@ mod tests {
         // Nothing fetched and nothing stored: genuinely empty for this window.
         assert_eq!(capabilities["spo2"]["status"], "empty_in_range");
         assert_eq!(capabilities["sleep"]["status"], "empty_in_range");
+    }
+
+    #[test]
+    fn compressed_raw_payloads_survive_a_round_trip_and_still_replay() {
+        // 原始报文是重放的唯一依据。压缩只能改变它占多少字节，不能改变它是什么——
+        // 少一个字节，这条记录就永久毁了。
+        let db = Database::in_memory().unwrap();
+        let payload = serde_json::json!({
+            "items": (0..200).map(|index| serde_json::json!({
+                "time": format!("2026-08-{:02}T00:00:00Z", (index % 28) + 1),
+                "bpm": 60 + (index % 40),
+            })).collect::<Vec<_>>()
+        });
+        db.insert_raw_record(&RawRecord {
+            stream: "wellness".into(),
+            source_key: "wellness:spo2:user_events:2026-08-01:2026-08-08".into(),
+            source_scope: SourceScope::UserFused,
+            device_id: None,
+            start_utc: ts(),
+            end_utc: Some(ts() + chrono::Duration::days(7)),
+            payload: payload.clone(),
+            capability: CapabilityStatus::Unverified,
+        })
+        .unwrap();
+
+        // 存的是压缩形态，而且明显更小。
+        let (stored_text, zipped): (String, Option<Vec<u8>>) = db
+            .conn
+            .query_row(
+                "SELECT payload, payload_zip FROM raw_records ORDER BY id DESC LIMIT 1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(stored_text, "", "压缩之后不该再留一份明文");
+        let zipped = zipped.expect("新写入的报文应当是压缩的");
+        let expected = serde_json::to_string(&payload).unwrap();
+        assert!(
+            zipped.len() < expected.len(),
+            "压完反而更大就没有意义：{} vs {}",
+            zipped.len(),
+            expected.len()
+        );
+
+        // 还原必须一字不差。
+        assert_eq!(
+            decode_raw_payload(String::new(), Some(zipped)).unwrap(),
+            expected
+        );
+
+        // 老库里的明文行仍然照常读。
+        assert_eq!(
+            decode_raw_payload("{\"legacy\":true}".into(), None).unwrap(),
+            "{\"legacy\":true}"
+        );
+        assert_eq!(
+            decode_raw_payload("{\"legacy\":true}".into(), Some(Vec::new())).unwrap(),
+            "{\"legacy\":true}"
+        );
+    }
+
+    #[test]
+    fn compacting_history_leaves_the_payload_readable() {
+        // 存量报文是这一版之前攒下来的明文。压缩它们不能改变任何一条的内容。
+        let db = Database::in_memory().unwrap();
+        let text = serde_json::to_string(&serde_json::json!({
+            "summary": "x".repeat(4000),
+        }))
+        .unwrap();
+        db.conn
+            .execute(
+                "INSERT INTO raw_records
+                    (stream, source_key, source_scope, device_id, start_utc, end_utc,
+                     payload, payload_hash, fetched_at)
+                 VALUES ('wellness', 'legacy:1', 'device', NULL, ?1, NULL, ?2, 'hash', ?1)",
+                params![ts().to_rfc3339(), text],
+            )
+            .unwrap();
+
+        let report = db.compact_raw_payloads().unwrap();
+        assert_eq!(report.compacted, 1);
+        assert_eq!(report.skipped, 0);
+        assert!(report.bytes_after < report.bytes_before);
+
+        let (stored, zipped): (String, Option<Vec<u8>>) = db
+            .conn
+            .query_row(
+                "SELECT payload, payload_zip FROM raw_records WHERE source_key = 'legacy:1'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(decode_raw_payload(stored, zipped).unwrap(), text);
+
+        // 再压一次没有可压的了，也不该把已压的行算进去。
+        let again = db.compact_raw_payloads().unwrap();
+        assert_eq!(again.compacted, 0);
+        // 压完之后就不该再被算成「待压」，否则每次启动都会白弹一次进度提示。
+        assert_eq!(db.pending_raw_payload_count().unwrap(), 0);
+    }
+
+    #[test]
+    fn tiny_payloads_are_never_counted_as_pending() {
+        // 空响应 `{"items":[]}` 只有 12 字节，压完比原文还大，压缩函数会跳过它。
+        // 如果计数函数还把它算成「待压」，就会变成：每次启动都判定有活要干、
+        // 弹出「正在压缩」、然后立刻 0 条结束。实测在真实库上就是这样。
+        let db = Database::in_memory().unwrap();
+        for index in 0..3 {
+            db.conn
+                .execute(
+                    "INSERT INTO raw_records
+                        (stream, source_key, source_scope, device_id, start_utc, end_utc,
+                         payload, payload_hash, fetched_at)
+                     VALUES ('wellness', ?2, 'device', NULL, ?1, NULL, '{\"items\":[]}', 'hash', ?1)",
+                    params![ts().to_rfc3339(), format!("empty:{index}")],
+                )
+                .unwrap();
+        }
+        assert_eq!(db.pending_raw_payload_count().unwrap(), 0);
+        let report = db.compact_raw_payloads().unwrap();
+        assert_eq!(report.compacted, 0);
+        assert_eq!(report.skipped, 0, "小到不值得压的报文根本不该被取出来");
+    }
+
+    #[test]
+    fn the_index_window_never_hides_a_day_inside_the_range() {
+        // 这层时间戳边界只是为了让索引能定位，不能改变结果。
+        // 边界必须比本地日期区间宽出至少一天，否则某些时区下第一天或
+        // 最后一天的采样会被悄悄丢掉。
+        let (lower, upper) = local_day_range_utc_bounds("2026-08-23", "2026-08-29").unwrap();
+        assert!(
+            lower.as_str() < "2026-08-23T00:00:00",
+            "下界必须早于区间第一天：{lower}"
+        );
+        assert!(
+            upper.as_str() > "2026-08-30T00:00:00",
+            "上界必须晚于区间最后一天的末尾：{upper}"
+        );
+        // 单日区间同样成立。
+        let (lower, upper) = local_day_range_utc_bounds("2026-08-28", "2026-08-28").unwrap();
+        assert!(lower.as_str() < "2026-08-28T00:00:00");
+        assert!(upper.as_str() > "2026-08-29T00:00:00");
+        // 日期无效时返回 None，让调用方退回不带边界的查询而不是查空。
+        assert!(local_day_range_utc_bounds("not-a-date", "2026-08-29").is_none());
+    }
+
+    #[test]
+    fn a_single_workout_export_carries_only_that_workout() {
+        // 从运动详情点「交给 AI」时，界面说的是「只导出这一条运动」。
+        // 早先的实现把范围解析成「这条运动当天」，于是整天的心率、睡眠和步数
+        // 都被一起发了出去——界面说的和发出去的不一样。这条用例把它钉住。
+        let db = Database::in_memory().unwrap();
+        let start = ts();
+        let end = start + chrono::Duration::minutes(30);
+        db.insert_workout(&Workout {
+            workout_id: "target-workout".into(),
+            workout_type: "run".into(),
+            normalized_type: "run".into(),
+            type_source: "string_field".into(),
+            user_override: None,
+            effective_type: "run".into(),
+            custom_label: None,
+            start_time: start,
+            end_time: end,
+            distance_meters: Some(5000.0),
+            calories: Some(300),
+            avg_hr: Some(150),
+            max_hr: Some(170),
+            training_load: Some(40.0),
+            vo2max: None,
+            source_scope: SourceScope::Device,
+            device_id: Some("SN-ONE".into()),
+            synced_at: None,
+            gps_available: false,
+            sample_count: 0,
+            zepp_source: None,
+            zepp_type: None,
+        })
+        .unwrap();
+        // 同一天的另一条运动：日期范围会带上它，单条运动范围不该带。
+        db.insert_workout(&Workout {
+            workout_id: "other-workout".into(),
+            workout_type: "walk".into(),
+            normalized_type: "walk".into(),
+            type_source: "string_field".into(),
+            user_override: None,
+            effective_type: "walk".into(),
+            custom_label: None,
+            start_time: end + chrono::Duration::hours(2),
+            end_time: end + chrono::Duration::hours(3),
+            distance_meters: Some(2000.0),
+            calories: Some(90),
+            avg_hr: Some(100),
+            max_hr: Some(110),
+            training_load: None,
+            vo2max: None,
+            source_scope: SourceScope::Device,
+            device_id: Some("SN-ONE".into()),
+            synced_at: None,
+            gps_available: false,
+            sample_count: 0,
+            zepp_source: None,
+            zepp_type: None,
+        })
+        .unwrap();
+        for (moment, value) in [
+            (start + chrono::Duration::minutes(5), 152.0),
+            (end + chrono::Duration::hours(4), 61.0),
+        ] {
+            db.insert_metric_sample(&MetricSample {
+                metric: "heart_rate".into(),
+                timestamp: moment,
+                value,
+                unit: "bpm".into(),
+                source_scope: SourceScope::Device,
+                device_id: Some("SN-ONE".into()),
+            })
+            .unwrap();
+        }
+        db.insert_daily_metric(&DailyMetric {
+            date: start.with_timezone(&Local).format("%Y-%m-%d").to_string(),
+            metric: "steps".into(),
+            value: 9000.0,
+            unit: "steps".into(),
+            source_scope: SourceScope::Device,
+            device_id: Some("SN-ONE".into()),
+        })
+        .unwrap();
+        db.insert_sleep_session(&SleepSession {
+            sleep_id: "sleep-1".into(),
+            start_time: start - chrono::Duration::hours(8),
+            end_time: start - chrono::Duration::hours(1),
+            score: Some(80),
+            duration_minutes: 420,
+            deep_minutes: 90,
+            light_minutes: 280,
+            rem_minutes: Some(50),
+            awake_minutes: 10,
+            source_scope: SourceScope::Device,
+            device_id: Some("SN-ONE".into()),
+            synced_at: None,
+            time_in_bed_minutes: None,
+            stages: Vec::new(),
+            wake_count: Some(1),
+        })
+        .unwrap();
+
+        let selection = ExportSelection {
+            scope: Some(ExportScope::Workout {
+                workout_id: "target-workout".into(),
+            }),
+            start_date: None,
+            end_date: None,
+            data_types: ["workouts", "heart_rate", "steps", "sleep"]
+                .iter()
+                .map(|value| value.to_string())
+                .collect(),
+            detail: ExportDetail::Summary,
+        };
+        let (encoded, _) = db.build_ai_export(&selection).unwrap();
+        let export: serde_json::Value = serde_json::from_str(&encoded).unwrap();
+
+        // 只有这一条运动。
+        let workouts = export["data"]["workouts"].as_array().unwrap();
+        assert_eq!(workouts.len(), 1);
+        assert_eq!(workouts[0]["workout_id"], "target-workout");
+
+        // 逐点心率只截取运动进行期间的采样，四小时后那条不在里面。
+        let samples = export["data"]["metric_samples"].as_array().unwrap();
+        assert_eq!(samples.len(), 1, "运动时段之外的心率不该被带上");
+
+        // 日级数据整块排除，并且如实说明是范围之外，而不是「这段时间没有」。
+        assert!(export["data"]["daily_metrics"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+        assert!(export["data"]["sleep_sessions"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+        assert_eq!(
+            export["capabilities"]["steps"]["status"],
+            "excluded_by_scope"
+        );
+        assert_eq!(
+            export["capabilities"]["sleep"]["status"],
+            "excluded_by_scope"
+        );
+
+        // 范围本身要能被读到的人核对到具体这一条运动。
+        assert_eq!(export["scope"]["kind"], "workout");
+        assert_eq!(export["scope"]["workout_id"], "target-workout");
     }
 
     #[test]

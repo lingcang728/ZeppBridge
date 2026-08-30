@@ -35,6 +35,7 @@ const mobileMenuOpen = ref(false);
 const trayHint = ref(false);
 const {
   appStatus, statusError, syncState, syncMessage, syncProgress, isSyncing, canIncrementalSync,
+  compacting, compactionPending, compactionSaved,
   dataRevision, initialize, runSync, cancelSync,
 } = useSyncController();
 const { initializeScale, bumpScale, resetScale } = useUiScale();
@@ -45,12 +46,33 @@ const {
   load: loadDevices,
 } = useDevices();
 
+/* 「数据健康」不在主导航里。
+ *
+ * 它回答的是「这条数据流为什么没同步过来」，属于出问题时才找的排查工具，
+ * 而不是日常四个入口之一。路由 /health-check 仍然有效，入口挪到
+ * 「设置 → 高级与维护」，需要的人找得到，不需要的人不用天天看见它。 */
 const navigation = [
   { to: '/', label: '概览', icon: 'overview' as DesignIconName },
   { to: '/explore', label: '交给 AI', icon: 'handoff' as DesignIconName },
-  { to: '/health-check', label: '数据健康', icon: 'database' as DesignIconName },
   { to: '/settings', label: '设置', icon: 'settings' as DesignIconName },
 ];
+
+/* 组件名要和 defineOptions({ name }) 对得上，KeepAlive 才认得出来。 */
+const CACHED_PAGES = [
+  'Overview',
+  'RecentRecords',
+  'Explore',
+  'BodyStatus',
+  'TrainingStatus',
+  'SleepList',
+  'WorkoutList',
+];
+
+const formatSavedBytes = (bytes: number): string => {
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1048576).toFixed(0)} MB`;
+  return `${(bytes / 1073741824).toFixed(2)} GB`;
+};
 
 const connected = computed(() => appStatus.value?.connection_state === 'connected');
 const accountRecognized = computed(() => ['connected', 'configured'].includes(String(appStatus.value?.connection_state || '')));
@@ -253,6 +275,15 @@ onUnmounted(() => {
         <Icon :name="syncState === 'failed' ? 'warning' : syncState === 'updated' ? 'circle-check' : 'info'" :size="14" :class="{ spinning: isSyncing || syncState === 'deferred' }" />
         <span>{{ syncMessage }}</span>
       </div>
+      <!-- 装完新版本第一次启动时的一次性后台维护。压的时候说一声，压完自己走。 -->
+      <div v-if="compacting" class="sync-feedback" role="status" aria-live="polite">
+        <Icon name="database" :size="14" class="spinning" />
+        <span>正在压缩历史报文（{{ compactionPending }} 条），压完会自动消失。这期间同步会稍等一下。</span>
+      </div>
+      <div v-else-if="compactionSaved" class="sync-feedback tone-updated" role="status">
+        <Icon name="circle-check" :size="14" />
+        <span>历史报文已压缩，省下约 {{ formatSavedBytes(compactionSaved) }} 磁盘空间。</span>
+      </div>
       <div v-if="trayHint" class="sync-feedback" role="status">关闭窗口后 ZeppBridge 仍在托盘运行，可继续自动同步。</div>
 
       <div v-if="mobileMenuOpen" class="mobile-menu" aria-label="移动导航">
@@ -272,9 +303,18 @@ onUnmounted(() => {
       </div>
 
       <main id="main-content" class="main-content" tabindex="-1">
+        <!-- 主要页面缓存起来，切回去不再重新查库。
+             以前每次切页都重新挂载一遍组件，于是每次都把那一页的全部查询重跑
+             一遍——首页一次就是六条命令，而命令侧共用一把数据库锁，它们只能
+             排队。缓存之后，页面只在首次进入和同步产生新数据（dataRevision
+             变化，各页都在监听）时才重新读库。
+
+             详情页不缓存：它们按 URL 参数取数，缓存一堆实例既没收益又占内存。 -->
         <RouterView v-slot="{ Component }">
           <Transition name="page" mode="out-in">
-            <component :is="Component" />
+            <KeepAlive :include="CACHED_PAGES" :max="6">
+              <component :is="Component" />
+            </KeepAlive>
           </Transition>
         </RouterView>
       </main>

@@ -50,6 +50,13 @@ export interface StreamStorageEstimate {
   estimated_add_bytes: number;
 }
 
+export interface RawPayloadCompaction {
+  compacted: number;
+  skipped: number;
+  bytesBefore: number;
+  bytesAfter: number;
+}
+
 export interface StorageEstimate {
   free_bytes: number;
   estimated_add_bytes: number;

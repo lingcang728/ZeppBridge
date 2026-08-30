@@ -1,4 +1,5 @@
 <script setup lang="ts">
+defineOptions({ name: 'BodyStatus' });
 import { computed, onMounted, ref, watch } from 'vue';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
 import PageHeader from '../components/PageHeader.vue';
@@ -132,6 +133,8 @@ watch(dataRevision, () => { void load(); });
 <template>
   <section class="page body-page" aria-labelledby="body-title">
     <PageHeader
+      back="/"
+      back-label="返回概览"
       title-id="body-title"
       eyebrow="身体状态"
       title="身体状态"

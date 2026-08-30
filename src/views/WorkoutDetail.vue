@@ -1,21 +1,24 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { RouterLink, useRoute, useRouter } from 'vue-router';
+import { RouterLink, useRoute } from 'vue-router';
 import { VChart } from '../lib/echartsSetup';
 import DesignIcon, { type DesignIconName } from '../components/DesignIcon.vue';
 import DeviceVisual from '../components/DeviceVisual.vue';
 import EmptyState from '../components/EmptyState.vue';
 import InsightCard from '../components/InsightCard.vue';
 import Icon from '../components/Icon.vue';
+import SelectMenu from '../components/SelectMenu.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
+import { useAiHandoff } from '../composables/useAiHandoff';
 import { useSyncController } from '../composables/useSyncController';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
+import { AI_PROVIDERS, AI_PROVIDER_BY_ID, type AiProviderId } from '../lib/aiProviders';
 import { dataProviderLabel, dataScopeLabel, workoutLabel } from '../lib/labels';
 import { formatDate, formatDistance, formatTime, isFiniteNumber } from '../lib/format';
 import { zeppSemanticColors } from '../lib/echartsTheme';
 import { formatPaceSeconds } from '../lib/metricSeries';
 import { workoutDisplayLabel, workoutDisplayType } from '../lib/workouts';
-import trexFallback from '../assets/devices/amazfit-t-rex-3.webp';
+import { deviceImageFor } from '../lib/deviceCatalog';
 import type { DeviceProfile, SportOption, Workout, WorkoutInsight, WorkoutSeries, WorkoutSeriesSample, WorkoutRoutePoint } from '../types';
 
 type WorkoutMetrics = Workout & {
@@ -60,7 +63,6 @@ const exportedNote = ref<string | null>(null);
 const activeFormat = ref<'json' | 'csv' | 'gpx'>('json');
 const workoutId = computed(() => String(route.params.workoutId || ''));
 const displayType = computed(() => workout.value ? workoutDisplayType(workout.value) : 'unknown');
-const router = useRouter();
 const insight = ref<WorkoutInsight | null>(null);
 const insightLoading = ref(false);
 const insightError = ref<string | null>(null);
@@ -79,18 +81,73 @@ const loadInsight = async (id: string) => {
   }
 };
 
-/* 「让 AI 展开分析」交给已有的交接流程，用同一份互斥导出范围指向这一条记录。
-   洞察事实和 AI 数据包因此读的是同一个库、同一套规则。 */
-const openAiHandoff = () => {
+/* 「交给 AI」就在这一页完成，不再把用户丢回「交给 AI」大页面再让他确认一遍
+   范围。范围就是这一条运动，走的是和导出同一套互斥 ExportScope，所以洞察、
+   导出和 AI 数据包读的是同一个库、同一套规则。 */
+const { handoffState, handoffError, prepareAndCopy } = useAiHandoff();
+const aiProviderId = ref<AiProviderId>('chatgpt');
+const aiProvider = computed(() => AI_PROVIDER_BY_ID[aiProviderId.value]);
+const aiProviderChoices = computed(() =>
+  AI_PROVIDERS.map((provider) => ({ value: provider.id, label: provider.label })));
+const aiNote = ref<string | null>(null);
+
+const workoutAiPrompt = computed(() => {
+  const label = workout.value ? workoutDisplayLabel(workout.value) : '这次运动';
+  return `你是一位专业的运动分析师。下面是我一次${label}的完整记录（来自 ZeppBridge 本机数据库，已脱敏）。
+请只基于这条记录里的事实分析这次训练：强度、配速与心率的关系、是否有明显的掉速或异常段落，并给出下一次的具体建议。
+
+约束：
+- 这份数据里没有任何人群基准，不要拿我和「一般健康人群」或任何平均水平比较；
+- 缺失的项直接说缺失，不要用 0 或估算值填补；
+- 不做医学诊断、疾病风险判断或治疗建议。
+
+请以 Markdown 格式输出。`;
+});
+
+const sendWorkoutToAi = async () => {
+  aiNote.value = null;
   if (!workout.value) return;
-  void router.push({ path: '/explore', query: { workout: workout.value.workout_id } });
+  if (!isTauri()) {
+    aiNote.value = 'AI 交接需要桌面应用环境；当前网页预览不会打开外部网站。';
+    return;
+  }
+  try {
+    const result = await prepareAndCopy(
+      aiProvider.value,
+      {
+        scope: { kind: 'workout', workoutId: workout.value.workout_id },
+        dataTypes: ['workouts', 'heart_rate'],
+        detail: 'full',
+      },
+      workoutAiPrompt.value,
+      false, // 精确轨迹默认不外发
+    );
+    const opened = handoffState.value !== 'copied_only';
+    if (result.mode === 'attachment') {
+      aiNote.value = opened
+        ? `数据包已导出到桌面（zeppbridge-ai-handoff.json），拖入 ${aiProvider.value.label} 即可；提示词已复制。`
+        : `数据包已导出到桌面（zeppbridge-ai-handoff.json）；提示词已复制，可手动打开 ${aiProvider.value.label}。`;
+    } else {
+      aiNote.value = opened
+        ? `已复制这条运动的脱敏数据并打开 ${aiProvider.value.label}，粘贴即可。`
+        : `已复制这条运动的脱敏数据，可手动打开 ${aiProvider.value.label} 粘贴。`;
+    }
+  } catch {
+    // 错误从 handoffError 渲染
+  }
 };
+
+const openAiHandoff = () => { void sendWorkoutToAi(); };
 
 const typeOverrideBusy = ref(false);
 /* 纠正选项直接来自随包运动目录（一百多项），不是一份写死的短名单：目录里有
    「壁球」而名单里没有，用户就永远改不成它。目录被 include_str! 编进二进制，
    所以这里和后端的允许值天然一致。 */
 const typeOverrideOptions = ref<SportOption[]>([]);
+const typeOverrideChoices = computed(() => [
+  { value: '', label: '不纠正' },
+  ...typeOverrideOptions.value.map((option) => ({ value: option.key, label: option.label })),
+]);
 
 const durationMinutes = computed(() => {
   const item = workout.value;
@@ -139,6 +196,10 @@ const workoutArt = computed<DesignIconName>(() => {
   return /cycle|cycling|bike|骑/.test(raw) ? 'outdoor-cycling' : 'outdoor-run';
 });
 const deviceName = computed(() => device.value.canonical_name || device.value.name || '设备名称未提供');
+/* 这张图必须跟着这条记录**实际**是哪台表走。
+   以前这里硬写死了一张 T-Rex 3：戴 Balance 的人打开自己的记录，看到的是别人的表。 */
+const deviceImage = computed(() => deviceImageFor(device.value.kind, device.value.image_key));
+const deviceKind = computed(() => device.value.kind || 'unknown');
 
 const heroMetrics = computed(() => {
   const item = workout.value;
@@ -519,15 +580,15 @@ const loadDetail = async () => {
   }
 };
 
-const changeWorkoutOverride = async (event: Event) => {
+const changeWorkoutOverride = async (value: string | number) => {
   if (!workout.value) return;
-  const target = event.target as HTMLSelectElement;
+  const next = String(value);
   typeOverrideBusy.value = true;
   actionError.value = null;
   try {
-    const updated = await tauriApi.setWorkoutTypeOverride(workout.value.workout_id, target.value || null);
+    const updated = await tauriApi.setWorkoutTypeOverride(workout.value.workout_id, next || null);
     workout.value = updated as WorkoutMetrics;
-    exportedNote.value = target.value ? '已保存本地运动类型纠正。' : '已清除纠正，恢复 ZeppBridge 识别结果。';
+    exportedNote.value = next ? '已保存本地运动类型纠正。' : '已清除纠正，恢复 ZeppBridge 识别结果。';
   } catch (cause) {
     actionError.value = toUserMessage(cause, '保存运动类型纠正失败');
   } finally {
@@ -571,11 +632,6 @@ watch([dataRevision, workoutId], () => void loadDetail());
   <section class="page workout-page" aria-labelledby="workout-detail-title">
     <div class="page-toolbar">
       <RouterLink class="back-link" to="/recent"><Icon name="arrow-left" :size="14" />返回最近记录</RouterLink>
-      <RouterLink v-if="workout" class="ai-action" :to="{ path: '/explore', query: { workout: workoutId } }">
-        <DesignIcon name="handoff" :size="25" />
-        <span>交给 AI 分析</span>
-        <DesignIcon name="chevron-right" :size="18" />
-      </RouterLink>
     </div>
 
     <div v-if="loading" class="detail-loading" aria-live="polite"><SkeletonBlock height="118px" /><SkeletonBlock height="280px" /></div>
@@ -586,7 +642,7 @@ watch([dataRevision, workoutId], () => void loadDetail());
       <section class="workout-hero" aria-label="训练概览">
         <div class="hero-copy">
           <div class="hero-device">
-            <DeviceVisual :src="trexFallback" :alt="deviceName" kind="watch" />
+            <DeviceVisual :src="deviceImage" :alt="deviceName" :kind="deviceKind" />
             <span class="device-live"><i></i>{{ deviceName }}</span>
           </div>
           <div class="hero-title-group">
@@ -603,13 +659,17 @@ watch([dataRevision, workoutId], () => void loadDetail());
               <span>Zepp 原始编号：{{ workout.zepp_type ?? '未提供' }}</span>
               <span>ZeppBridge 识别：{{ workoutLabel(workout.normalized_type) }}</span>
               <span v-if="workout.custom_label">你给编号 {{ workout.zepp_type }} 起的名字：{{ workout.custom_label }}</span>
-              <label>
+              <span class="type-correct">
                 我的纠正
-                <select :value="workout.user_override || ''" :disabled="typeOverrideBusy" @change="changeWorkoutOverride">
-                  <option value="">不纠正</option>
-                  <option v-for="option in typeOverrideOptions" :key="option.key" :value="option.key">{{ option.label }}</option>
-                </select>
-              </label>
+                <SelectMenu
+                  class="type-correct-menu"
+                  :model-value="workout.user_override || ''"
+                  :options="typeOverrideChoices"
+                  :disabled="typeOverrideBusy"
+                  aria-label="我对这条运动类型的纠正"
+                  @update:model-value="changeWorkoutOverride"
+                />
+              </span>
             </div>
           </div>
         </div>
@@ -623,7 +683,10 @@ watch([dataRevision, workoutId], () => void loadDetail());
         </div>
       </section>
 
+      <!-- 不支持这类运动的洞察时整块不渲染：一张只会说「暂不支持」的卡片
+           除了占地方和让人困惑之外没有别的作用。 -->
       <InsightCard
+        v-if="insightLoading || insightError || insight?.supported"
         :insight="insight"
         :loading="insightLoading"
         :error="insightError"
@@ -689,6 +752,25 @@ watch([dataRevision, workoutId], () => void loadDetail());
             <p v-if="exportedNote" class="action-note ok" role="status"><Icon name="circle-check" :size="13" />{{ exportedNote }}</p><p v-if="actionError" class="action-note bad" role="alert"><Icon name="warning" :size="13" />{{ actionError }}</p>
           </section>
 
+          <section class="surface-card side-card ai-card" aria-label="交给 AI">
+            <div class="section-head compact"><span class="section-icon ai-tone"><DesignIcon name="handoff" :size="32" /></span><div><p class="section-eyebrow">HANDOFF</p><h2>交给 AI</h2></div></div>
+            <p class="card-sub">只把这一条运动的脱敏数据和提示词复制到剪贴板，并打开你选的 AI 网站。按天记录的睡眠、步数不在范围内。</p>
+            <label class="ai-provider">
+              <span>目标工具</span>
+              <SelectMenu
+                v-model="aiProviderId"
+                :options="aiProviderChoices"
+                aria-label="交给哪个 AI 工具"
+                drop-up
+              />
+            </label>
+            <button class="export-go" type="button" :disabled="handoffState === 'preparing'" @click="sendWorkoutToAi">
+              <DesignIcon name="handoff" :size="27" />{{ handoffState === 'preparing' ? '正在准备…' : `交给 ${aiProvider.label}` }}
+            </button>
+            <p v-if="aiNote" class="action-note ok" role="status"><Icon name="circle-check" :size="13" />{{ aiNote }}</p>
+            <p v-if="handoffError" class="action-note bad" role="alert"><Icon name="warning" :size="13" />{{ handoffError }}</p>
+          </section>
+
           <section class="surface-card side-card meta-card" aria-label="来源信息">
             <div class="section-head compact"><span class="section-icon source-tone"><DesignIcon name="database" :size="32" /></span><div><p class="section-eyebrow">PROVENANCE</p><h2>来源信息</h2></div></div>
             <dl><div><dt>数据来源</dt><dd>{{ dataProviderLabel() }}</dd></div><div><dt>数据范围</dt><dd>{{ dataScopeLabel(workout.source_scope) }}</dd></div><div><dt>最近同步</dt><dd>{{ syncBadge }}</dd></div><div><dt>记录 ID</dt><dd>{{ workout.workout_id }}</dd></div><div><dt>设备</dt><dd>{{ deviceName }}</dd></div></dl>
@@ -706,8 +788,8 @@ watch([dataRevision, workoutId], () => void loadDetail());
 .page-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 38px; }
 .back-link { display: inline-flex; align-items: center; gap: 6px; justify-self: start; color: var(--muted); font-size: 12px; text-decoration: none; }
 .back-link:hover { color: var(--accent); }
-.ai-action { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 5px 8px 5px 6px; border: 1px solid rgba(125,163,62,.34); border-radius: 12px; background: rgba(125,163,62,.1); color: #b9da77; font-weight: 700; text-decoration: none; transition: transform .18s ease, background .18s ease; }
-.ai-action:hover { transform: translateY(-1px); background: rgba(125,163,62,.17); }
+.ai-provider { display: grid; gap: 6px; margin-bottom: 10px; font-size: 12px; color: var(--muted); }
+.ai-provider select { min-height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); font: inherit; }
 .workout-hero { position: relative; overflow: hidden; display: grid; gap: 18px; padding: 22px; border: 1px solid rgba(226,234,242,.1); border-radius: 24px; background: radial-gradient(circle at 88% 18%, rgba(43,179,192,.14), transparent 30%), linear-gradient(145deg, #20242b 0%, #191c21 58%, #171a1f 100%); box-shadow: 0 22px 70px rgba(4,6,8,.22); }
 .workout-hero::before { position: absolute; inset: 0; pointer-events: none; content: ''; background: linear-gradient(120deg, rgba(255,255,255,.035), transparent 38%); }
 .hero-copy { position: relative; z-index: 1; display: flex; align-items: center; gap: 20px; min-width: 0; }
@@ -724,8 +806,10 @@ watch([dataRevision, workoutId], () => void loadDetail());
 .sport-time { display: inline-flex; align-items: center; gap: 6px; margin: 9px 0 0; color: var(--muted); font-size: 12px; }
 .type-evidence { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 12px; margin-top: 10px; color: var(--muted); font-size: 11px; }
 .type-evidence > span { padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.025); }
-.type-evidence label { display: inline-flex; align-items: center; gap: 7px; }
-.type-evidence select { min-height: 29px; padding: 3px 28px 3px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-raised); color: var(--ink); font-size: 11px; }
+/* 「我的纠正」这一格是标签 + 选择器；`> span` 的边框不该套在它外面。
+   选择器本身不做任何尺寸覆盖——全应用只有一种下拉长相，这是用户点名要的。 */
+.type-evidence > .type-correct { display: inline-flex; align-items: center; gap: 7px; padding: 0; border: 0; background: none; }
+.type-correct-menu { min-width: 180px; }
 .hero-signal { position: absolute; z-index: 0; top: -8px; right: 3%; opacity: .13; filter: saturate(1.4); transform: rotate(5deg); }
 .metric-list { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(7, minmax(112px, 1fr)); gap: 9px; }
 .metric-tile { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 78px; padding: 10px; border: 1px solid rgba(226,234,242,.08); border-radius: 15px; background: rgba(11,14,17,.42); }

@@ -310,6 +310,19 @@ pub struct StreamStorageEstimate {
     pub estimated_add_bytes: u64,
 }
 
+/// 一次历史报文压缩的结果。
+///
+/// 分开报「压了几条」和「跳过几条」：跳过不是失败，但也不能算成功——
+/// 用户点了一次按钮，得知道到底动了多少东西。
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RawPayloadCompaction {
+    pub compacted: u64,
+    pub skipped: u64,
+    pub bytes_before: u64,
+    pub bytes_after: u64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct StorageEstimate {
     pub free_bytes: u64,
@@ -793,7 +806,25 @@ pub struct DiagnosticReport {
     pub user_assigned_models: Vec<DiagnosticAssignedModel>,
     pub unknown_workout_codes: Vec<DiagnosticWorkoutCode>,
     pub workout_type_conflicts: i64,
+    /// 用户自己选的问题类型（`device` / `workout` / `data` / `other`）。
+    ///
+    /// 本机的自动检测只能发现「有未识别的设备或运动编号」这类问题。用户遇到的
+    /// 可能是别的——数据对不上、某项一直是空。没有这个字段时，这些人连报都报
+    /// 不了，因为服务端会判定「没有可处理的内容」。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+    /// 用户自己写的一句说明（「我的表是 Balance 2，但没被识别」）。
+    ///
+    /// 光有字段结构和编号，收到报告的人经常判断不出这到底是哪一款表；一句人话
+    /// 往往比十个字段更有用。但它是自由文本，所以在发出之前要过一遍脱敏和长度
+    /// 上限——用户可能顺手把 token 或本机路径粘进来。没填就整段不出现。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user_note: Option<String>,
 }
+
+/// 自由文本备注的上限。够写清「设备是 Balance 2，固件 3.5.1，运动类型显示成未知」，
+/// 又不至于让人把整段日志粘进来。
+pub const DIAGNOSTIC_NOTE_MAX_CHARS: usize = 500;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
