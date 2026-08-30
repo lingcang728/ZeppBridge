@@ -39,7 +39,7 @@ Zepp 区域云端 → ZeppConnector → Raw provenance → Normalizer → SQLite
 - retention 可由用户在 1–365 天内选择，默认 365 天；清理由健康记录时间决定，并回收无引用 raw。
 - `user_fused`、`device`、`unknown` 来源继续保留。来源不明确时不做静默融合。
 - 编码但未验证的 `band_data` 只保留 raw；没有真实采样或路线时不绘制模拟曲线和地图。
-- schema 版本为 `PRAGMA user_version = 14`。迁移步骤只能追加，已发布的 DDL 永不修改（`storage/migrations.rs`）。v10 给 `workout_samples` 加了跑步功率与跑姿列；v12 加了逐流三阶段 provenance；v13 加了未识别运动编号的用户命名与设备型号指认；v14 加了历史覆盖账本。派生列由 `NORMALIZER_REVISION` 变更触发的本地重放回填，不需要重新联网。
+- schema 版本为 `PRAGMA user_version = 15`。迁移步骤只能追加，已发布的 DDL 永不修改（`storage/migrations.rs`）。v10 给 `workout_samples` 加了跑步功率与跑姿列；v12 加了逐流三阶段 provenance；v13 加了未识别运动编号的用户命名与设备型号指认；v14 加了历史覆盖账本；v15 给 `raw_records` 加了压缩列 `payload_zip`（读的时候两种形态都认，明文行永远可读）。派生列由 `NORMALIZER_REVISION` 变更触发的本地重放回填，不需要重新联网。
 - 每次 schema 迁移之前自动生成一份一致性备份；备份或完整性校验失败时迁移不会继续。迁移本身在拿到跨进程写锁之后才开始。
 - 重放期间 `storage::replay_in_progress()` 为真，此时发起的云端同步会以 `deferred` 结果让路并在一分钟后自动重试，而不是去抢 SQLite 写锁后报「本地数据库暂时不可用」。`busy_timeout` 同时从 5 秒提到 30 秒。
 
