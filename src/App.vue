@@ -83,7 +83,7 @@ const t = useMessages(messages);
 
 // 桌面端从 Tauri 运行时读取版本（与 tauri.conf.json 单一来源），
 // 浏览器预览环境回退到下面的常量（与 package.json 保持同步）。
-const FALLBACK_APP_VERSION = '1.1.0';
+const FALLBACK_APP_VERSION = '1.1.1';
 const APP_VERSION = ref(FALLBACK_APP_VERSION);
 const desktopRuntime = isDesktop();
 // 落地页只在非桌面环境渲染（Cloudflare Pages 部署的就是这个分支），
@@ -651,6 +651,8 @@ a { color: inherit; }
 
 .sidebar-footer { margin-top: auto; padding-top: 16px; min-width: 0; display: grid; gap: 12px; }
 .cloud-card {
+  min-width: 0;
+  overflow: hidden;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--surface);
@@ -658,7 +660,7 @@ a { color: inherit; }
   display: grid;
   gap: 8px;
 }
-.cloud-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink); }
+.cloud-row { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12px; color: var(--ink); }
 .cloud-row svg:first-child { color: var(--muted); }
 .cloud-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cloud-check { color: var(--faint); }
@@ -668,12 +670,13 @@ a { color: inherit; }
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  min-width: 0;
   padding-top: 8px;
   border-top: 1px solid var(--line);
   color: var(--subtle);
   font-size: 11px;
 }
-.cloud-account span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cloud-account span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .manage-btn {
   flex: 0 0 auto;
   padding: 2px 10px;
@@ -688,11 +691,12 @@ a { color: inherit; }
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   padding: 0 6px;
   color: var(--subtle);
   font-size: 11px;
 }
-.version-row span:nth-child(2) { flex: 1; }
+.version-row span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .version-brand { display: grid; place-items: center; width: 18px; height: 18px; opacity: .8; }
 .version-brand svg { width: 18px; height: 18px; }
 .shield-link {

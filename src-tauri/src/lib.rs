@@ -63,7 +63,14 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_main_window(app);
         }))
-        .plugin(tauri_plugin_opener::init())
+        // Main-window AI handoff links call the opener API explicitly.  Do
+        // not inject its `_blank` click interceptor into the Zepp login
+        // webview: OAuth must stay inside the cookie-polling login session.
+        .plugin(
+            tauri_plugin_opener::Builder::new()
+                .open_js_links_on_click(false)
+                .build(),
+        )
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())

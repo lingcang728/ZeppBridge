@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "zepp-login",
+  "description": "Minimal capability for the external Zepp account login window",
+  "windows": ["zepp-login"],
+  "permissions": ["core:default"]
+}

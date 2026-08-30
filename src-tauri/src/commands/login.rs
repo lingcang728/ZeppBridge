@@ -6,7 +6,10 @@ use crate::models::AuthInfo;
 use serde_json::Value;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
-use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{
+    webview::NewWindowResponse, AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow,
+    WebviewWindowBuilder,
+};
 
 const LOGIN_WINDOW_LABEL: &str = "zepp-login";
 const LOGIN_EVENT: &str = "login://status";
@@ -84,12 +87,34 @@ fn build_login_window(
     page_url: &str,
 ) -> std::result::Result<WebviewWindow, String> {
     let url = page_url.parse().map_err(|_| "登录地址无效".to_string())?;
+    let app_for_new_window = app.clone();
     WebviewWindowBuilder::new(app, LOGIN_WINDOW_LABEL, WebviewUrl::External(url))
         .title("登录 Zepp")
         .inner_size(920.0, 760.0)
         .min_inner_size(420.0, 520.0)
         .resizable(true)
-        .on_navigation(|url| is_allowed_login_url(url.as_str()))
+        .on_navigation(|url| {
+            let allowed = is_allowed_login_url(url.as_str());
+            if !allowed {
+                log_blocked_login_url("navigation", url);
+            }
+            allowed
+        })
+        // Keep OAuth in this login webview.  A provider that switches to
+        // `target=_blank` must not escape to the system browser because the
+        // resulting Zepp cookies would live in a different browser profile.
+        .on_new_window(move |url, _features| {
+            if !is_allowed_login_url(url.as_str()) {
+                log_blocked_login_url("new-window", &url);
+                return NewWindowResponse::Deny;
+            }
+            if let Some(window) = app_for_new_window.get_webview_window(LOGIN_WINDOW_LABEL) {
+                if let Err(error) = window.navigate(url) {
+                    eprintln!("Zepp login OAuth navigation failed: {error}");
+                }
+            }
+            NewWindowResponse::Deny
+        })
         .build()
         .map_err(|error| format!("无法打开登录窗口：{error}"))
 }
@@ -524,7 +549,8 @@ fn is_allowed_login_url(url: &str) -> bool {
     let Ok(parsed) = reqwest::Url::parse(url) else {
         return false;
     };
-    // Only HTTPS navigation to the known Zepp/Huami login domains is allowed.
+    // Only HTTPS navigation to the Zepp/Huami account domains and the exact
+    // OAuth hosts used by the official universal-login page is allowed.
     // `data:`, `blob:` and `about:` URLs are deliberately rejected: page
     // scripts must never be able to steer the credential-collecting webview
     // onto attacker-controlled inline content.
@@ -537,7 +563,25 @@ fn is_allowed_login_url(url: &str) -> bool {
             || host.ends_with(".zepp.com")
             || host == "huami.com"
             || host.ends_with(".huami.com")
+            || matches!(
+                host.as_str(),
+                "account.xiaomi.com"
+                    | "open.weixin.qq.com"
+                    | "accounts.google.com"
+                    | "www.facebook.com"
+                    | "account-us.amazfit.com"
+            )
     })
+}
+
+fn login_url_log_fields(url: &reqwest::Url) -> String {
+    let host = url.host_str().unwrap_or("<none>");
+    format!("host={host} path={}", url.path())
+}
+
+fn log_blocked_login_url(kind: &str, url: &reqwest::Url) {
+    // Query and fragment can contain OAuth state/code values.  Never log them.
+    eprintln!("blocked Zepp login {kind}: {}", login_url_log_fields(url));
 }
 
 fn should_use_fallback(elapsed: Duration, fallback_used: bool, page_url: &str) -> bool {
@@ -684,11 +728,60 @@ mod tests {
         assert!(is_allowed_login_url(
             "https://user.huami.com/privacy2/index.html"
         ));
+        assert!(is_allowed_login_url(
+            "https://account.xiaomi.com/oauth2/authorize"
+        ));
+        assert!(is_allowed_login_url(
+            "https://open.weixin.qq.com/connect/qrconnect"
+        ));
+        assert!(is_allowed_login_url(
+            "https://accounts.google.com/o/oauth2/auth"
+        ));
+        assert!(is_allowed_login_url(
+            "https://www.facebook.com/dialog/oauth"
+        ));
+        assert!(is_allowed_login_url(
+            "https://account-us.amazfit.com/v1/accounts/connect/facebook/callback"
+        ));
         assert!(!is_allowed_login_url("about:blank"));
         assert!(!is_allowed_login_url(
             "data:text/html,<script>alert(1)</script>"
         ));
         assert!(!is_allowed_login_url("https://example.com/"));
         assert!(!is_allowed_login_url("http://watchface.zepp.com/"));
+        assert!(!is_allowed_login_url(
+            "https://evil.xiaomi.com/oauth2/authorize"
+        ));
+        assert!(!is_allowed_login_url("https://facebook.com/dialog/oauth"));
+    }
+
+    #[test]
+    fn blocked_login_log_omits_query_and_fragment() {
+        let url = reqwest::Url::parse(
+            "https://example.com/oauth/callback?code=secret&state=private#access_token",
+        )
+        .unwrap();
+        let fields = login_url_log_fields(&url);
+        assert_eq!(fields, "host=example.com path=/oauth/callback");
+        assert!(!fields.contains("secret"));
+        assert!(!fields.contains("private"));
+        assert!(!fields.contains("access_token"));
+    }
+
+    #[test]
+    fn login_window_has_no_opener_permission() {
+        let main: serde_json::Value =
+            serde_json::from_str(include_str!("../../capabilities/default.json")).unwrap();
+        assert_eq!(main["windows"], serde_json::json!(["main"]));
+
+        let login: serde_json::Value =
+            serde_json::from_str(include_str!("../../capabilities/zepp-login.json")).unwrap();
+        assert_eq!(login["windows"], serde_json::json!(["zepp-login"]));
+        assert!(login["permissions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|permission| permission.as_str() != Some("opener:default")
+                && permission["identifier"] != "opener:allow-open-url"));
     }
 }
