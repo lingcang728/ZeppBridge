@@ -200,10 +200,17 @@ fn open_exclusive(path: &Path) -> io::Result<File> {
 
 #[cfg(unix)]
 fn is_contention(error: &io::Error) -> bool {
-    matches!(
-        error.raw_os_error(),
-        Some(libc::EWOULDBLOCK) | Some(libc::EAGAIN) | Some(libc::EACCES)
-    )
+    // 比较值，不用 match 分支。
+    //
+    // 在 macOS 上 `EWOULDBLOCK` 和 `EAGAIN` 是同一个数，写成两个模式分支时
+    // 第二个永远到不了，clippy 的 `unreachable_patterns` 会把它判成错误
+    // （CI 上 `-D warnings`）；而在 Linux 上它们是两个不同的值，两个都得认。
+    // 用 `||` 比较就没有这个平台差异——同一个值比两次只是多做一次比较，
+    // 不同的值则各自命中。
+    let Some(code) = error.raw_os_error() else {
+        return false;
+    };
+    code == libc::EWOULDBLOCK || code == libc::EAGAIN || code == libc::EACCES
 }
 
 #[cfg(unix)]
