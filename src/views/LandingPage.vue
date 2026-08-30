@@ -33,8 +33,6 @@ interface LandingCopy {
     headlineAccent: string;
     lead: string;
     viewSource: string;
-    /** 只有英文版有：界面还是中文，不能让人下完才发现。 */
-    uiLanguageNotice: string | null;
     trust: Array<{ icon: DesignIconName; label: string }>;
     stageLabel: string;
     coreCaption: string;
@@ -78,7 +76,6 @@ const COPY: Record<'zh' | 'en', LandingCopy> = {
       headlineAccent: '完整交还给你。',
       lead: 'ZeppBridge 在 Windows 与 macOS 本机连接、整理并可视化 Amazfit 穿戴数据。数据来源保持清晰，既能自己看，也能安全交给 AI 分析。',
       viewSource: '查看源代码',
-      uiLanguageNotice: null,
       trust: [
         { icon: 'secure', label: '本地优先' },
         { icon: 'private', label: '隐私安全' },
@@ -181,8 +178,6 @@ const COPY: Record<'zh' | 'en', LandingCopy> = {
       headlineAccent: 'handed back in full.',
       lead: 'ZeppBridge connects, organizes and visualizes your Amazfit wearable data on your own Windows or Mac. Every field keeps its source, so you can read it yourself — or hand it to an AI on your terms.',
       viewSource: 'View source',
-      // 落地页英文了、下载下来还是中文界面，等于把人骗进来。应用 i18n 做完再删掉这句。
-      uiLanguageNotice: 'The app UI is currently Chinese only — English is in progress.',
       trust: [
         { icon: 'secure', label: 'Local-first' },
         { icon: 'private', label: 'Private by default' },
@@ -296,7 +291,6 @@ const secondaryDownload = computed(() => (isMacVisitor() ? t.value.downloads.win
             <a class="alt-cta" :href="releaseUrl" target="_blank" rel="noopener"><DesignIcon name="app-icon" :size="24" /><span><b>{{ secondaryDownload.label }}</b><small>{{ secondaryDownload.hint }}</small></span></a>
             <a class="secondary-cta" :href="githubUrl" target="_blank" rel="noopener"><DesignIcon name="document" :size="27" />{{ t.hero.viewSource }}</a>
           </div>
-          <p v-if="t.hero.uiLanguageNotice" class="ui-language-notice"><DesignIcon name="handoff" :size="19" />{{ t.hero.uiLanguageNotice }}</p>
           <div class="trust-row"><span v-for="item in t.hero.trust" :key="item.label"><DesignIcon :name="item.icon" :size="23" />{{ item.label }}</span></div>
         </div>
 
@@ -355,7 +349,6 @@ const secondaryDownload = computed(() => (isMacVisitor() ? t.value.downloads.win
 .lang-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px 7px 8px; border: 1px solid var(--site-line); border-radius: 11px; background: rgba(255,255,255,.02); color: #9ca892; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .lang-toggle:hover { color: #d6e99e; border-color: rgba(185,220,112,.5); }
 .nav-github { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px 7px 7px; border: 1px solid var(--site-line); border-radius: 11px; background: rgba(255,255,255,.02); color: #dce7cb; font-size: 12px; font-weight: 700; text-decoration: none; }
-.ui-language-notice { display: inline-flex; align-items: center; gap: 7px; margin: 16px 0 0; padding: 7px 12px 7px 9px; border: 1px solid rgba(211,231,171,.16); border-radius: 11px; color: #a9b79c; font-size: 11px; line-height: 1.5; }
 main, footer { position: relative; z-index: 1; }
 .hero-section { display: grid; grid-template-columns: minmax(0,.9fr) minmax(520px,1.1fr); align-items: center; gap: 42px; width: min(1240px, calc(100% - 48px)); min-height: 690px; margin: 0 auto; padding: 72px 0 82px; }
 .overline, .section-heading > p, .connect-intro > p, .privacy-copy > p { display: flex; align-items: center; gap: 8px; margin: 0 0 20px; color: #91b44e; font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: .17em; }
@@ -419,6 +412,6 @@ main, footer { position: relative; z-index: 1; }
 .privacy-vault div { display: grid; gap: 6px; }.privacy-vault b { color: #b9d87a; font-family: var(--font-mono); font-size: 13px; letter-spacing: .12em; }.privacy-vault span { color: #7e8979; font-size: 11px; line-height: 1.6; }
 footer { display: flex; align-items: center; flex-wrap: wrap; gap: 18px; width: min(1240px, calc(100% - 48px)); min-height: 120px; margin: 0 auto; } footer p { margin-right: auto; color: #697365; font-size: 10px; } footer .footer-disclaimer { flex-basis: 100%; margin-right: 0; max-width: 62ch; line-height: 1.6; } footer > div { display: flex; gap: 20px; } footer > div a { color: #909b8c; font-size: 11px; text-decoration: none; }
 @media (max-width: 1080px) { .hero-section { grid-template-columns: 1fr; padding-top: 56px; } .hero-stage { min-height: 500px; } .capability-grid { grid-template-columns: repeat(2,1fr); } .connect-section { grid-template-columns: 1fr; } .privacy-section { grid-template-columns: 1fr; } }
-@media (max-width: 720px) { .landing-nav { width: min(100% - 28px,1240px); }.landing-nav nav { display: none; }.hero-section, .content-section, .principle-strip, footer { width: min(100% - 28px,1240px); }.hero-section { min-height: auto; padding: 48px 0 64px; }.hero-copy h1 { font-size: 44px; }.hero-actions { align-items: stretch; flex-direction: column; }.primary-cta { min-width: 0; }.ui-language-notice { align-items: flex-start; }.trust-row { flex-wrap: wrap; }.hero-stage { min-height: auto; }.output-stack { grid-template-columns: 1fr 1fr; }.principle-strip { grid-template-columns: repeat(2,1fr); }.principle-strip > div:nth-child(2) { border-right: 0; }.principle-strip > div:nth-child(-n+2) { border-bottom: 1px solid var(--site-line); }.content-section { padding: 84px 0; }.capability-grid, .auth-grid { grid-template-columns: 1fr; }.capability-card { min-height: 210px; }.auth-grid article { min-height: 245px; }.privacy-section { padding: 80px 20px; }.privacy-vault { align-items: flex-start; flex-direction: column; }.privacy-vault > .design-icon { width: 78px !important; height: 78px !important; } footer { align-items: flex-start; flex-wrap: wrap; padding: 28px 0; } footer p { width: 100%; order: 3; } }
+@media (max-width: 720px) { .landing-nav { width: min(100% - 28px,1240px); }.landing-nav nav { display: none; }.hero-section, .content-section, .principle-strip, footer { width: min(100% - 28px,1240px); }.hero-section { min-height: auto; padding: 48px 0 64px; }.hero-copy h1 { font-size: 44px; }.hero-actions { align-items: stretch; flex-direction: column; }.primary-cta { min-width: 0; }.trust-row { flex-wrap: wrap; }.hero-stage { min-height: auto; }.output-stack { grid-template-columns: 1fr 1fr; }.principle-strip { grid-template-columns: repeat(2,1fr); }.principle-strip > div:nth-child(2) { border-right: 0; }.principle-strip > div:nth-child(-n+2) { border-bottom: 1px solid var(--site-line); }.content-section { padding: 84px 0; }.capability-grid, .auth-grid { grid-template-columns: 1fr; }.capability-card { min-height: 210px; }.auth-grid article { min-height: 245px; }.privacy-section { padding: 80px 20px; }.privacy-vault { align-items: flex-start; flex-direction: column; }.privacy-vault > .design-icon { width: 78px !important; height: 78px !important; } footer { align-items: flex-start; flex-wrap: wrap; padding: 28px 0; } footer p { width: 100%; order: 3; } }
 @media (prefers-reduced-motion: reduce) { .landing-page { scroll-behavior: auto; } .primary-cta, .secondary-cta, .nav-github, .lang-toggle { transition: none; } }
 </style>
