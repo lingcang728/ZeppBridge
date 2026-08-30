@@ -16,7 +16,7 @@
 > [!IMPORTANT]
 > ZeppBridge is an independent, unofficial open-source project. It is not affiliated with or endorsed by Zepp Health, Huami or Amazfit. Use it only with accounts and data you are entitled to access.
 
-> The Chinese README is the primary document, and the application's interface is in Chinese. This page describes exactly the same capabilities — nothing here is translated more generously than it is implemented.
+> The app ships in English and Chinese; it follows your system language on first launch, and Settings has a switch. The Chinese README stays the primary document — this page describes exactly the same capabilities, and nothing here is translated more generously than it is implemented.
 
 ## Isn't this already in the Zepp app?
 

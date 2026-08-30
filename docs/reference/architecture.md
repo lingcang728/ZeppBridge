@@ -80,6 +80,12 @@ Zepp 区域云端 → ZeppConnector → Raw provenance → Normalizer → SQLite
 
 - 主导航为概览、交给 AI（`/explore`）、数据健康（`/health-check`）、设置。顶栏提供连接状态与全局同步。
 - 界面是**统一深色**：设计上不提供浅色 / 跟随系统模式，也没有主题切换入口。可调的只有界面缩放（80%–125%，设置「高级与维护」或 Ctrl + / Ctrl - / Ctrl 0）。
+- 界面是**中英双语**。首次启动跟随系统语言（只有明确说中文的才给中文），设置页页头可以随时切换，选择存在 `localStorage['zeppbridge-locale']`。日期、星期和数字分组跟着语言走（`i18n/intlLocale()`），不只换文字。
+  - **没有引 vue-i18n。** 量过：接上它（含运行时构建、一句文案都没翻）首屏 gzip 从 73.0 kB 涨到 91.6 kB，超出体积预算 7.6 kB。自建的那一层不到一屏代码，首屏只多 0.4 kB。
+  - 文案跟着用它的模块走（`defineMessages(zh, en)` 就地定义，大页面放同名 `*.i18n.ts`），不建全局大字典：懒加载页面的 chunk 仍然只带自己那份。
+  - `defineMessages` 用 `NoInfer` 把形状钉在中文那份上，英文漏键、多键、参数对不上都编译不过。
+  - **后端不按 locale 出文案。** GUI / CLI / MCP / 导出四个出口对同一个问题必须给同一份回答，所以后端发稳定的码（`recordsUnitCode`、`HealthAction.code`、`SyncProgress.code`、`InsightFact.reason_code`…），中文原文一并保留给 CLI，界面按码自己出人话，认不出码时才回退到原文。导出 JSON 的 `note` / `detail_note` / `reason` 一个都不翻——它们是外部脚本读的契约。
+  - CI 有一道 `npm run i18n:check`：界面里再出现硬编码中文就红。逐条豁免写在 `scripts/release/check-i18n.mjs` 的 ALLOWED 里。
 - 概览按「最新心率 → 交给 AI 入口 → 最近睡眠/运动」组织；同步时间与心率样本时间明确分开。不在概览做恢复或训练分析。
 - 睡眠与运动不进主导航。概览「查看全部」进入 `/sleep`、`/workouts`；单条详情为 `/sleep/:sleepId`、`/workouts/:workoutId`。
 - 身体状态 `/body` 与训练状态 `/training` 同样是二级页面，由概览的两张入口卡片进入。两页都是纯展示：数据早已在本地库里，页面只负责按 7 天 / 1 个月 / 6 个月呈现，并如实说明「N 天里有 M 天有记录」，缺的那几天曲线直接断开，不做插值。
