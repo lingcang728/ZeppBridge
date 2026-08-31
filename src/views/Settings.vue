@@ -431,7 +431,7 @@ const startLogin = async () => {
   loginBusy.value = true;
   reconnecting.value = true;
   try {
-    await applyLoginStatus(await backend.startWebLogin());
+    await applyLoginStatus(await backend.startWebLogin(locale.value));
   } catch (error) {
     loginStatus.value = { state: 'failed', message: toUserMessage(error, t.value.loginWindowFailed), page_url: '' };
     loginError.value = toUserMessage(error, t.value.loginWindowFailed);

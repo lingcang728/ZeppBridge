@@ -46,7 +46,9 @@ const messages = defineMessages(
     'err.login.credentials_unreadable':
       '已经登录，但没能从登录窗口读到凭据。可以改用 HAR 导入或手动填写 App Token。',
     'err.login.region_probe_failed':
-      '读到了凭据，但没有一个 Zepp 区域接受它。账号可能不在已知区域，或者网络被拦截了。',
+      '读到了凭据，但无法确认账号区域。请重新登录，或改用 HAR 导入。',
+    'err.login.credentials_rejected': 'Zepp 拒绝了这次登录凭据，请退出登录窗口后重新登录',
+    'err.login.region_unreachable': '暂时无法连接 Zepp 区域服务，请检查网络后重试',
     'err.login.bad_url': '登录地址无效',
     'err.login.window_failed': '无法打开登录窗口',
     'err.login.state_unavailable': '应用状态不可用',
@@ -153,7 +155,11 @@ const messages = defineMessages(
     'err.login.credentials_unreadable':
       "You're signed in, but the credentials could not be read from the sign-in window. Try the HAR import or enter an App Token manually.",
     'err.login.region_probe_failed':
-      'The credentials were read, but no Zepp region accepted them. The account may live in a region we do not know, or the network is blocking us.',
+      "Credentials were read, but the account region couldn't be confirmed. Sign in again or import a HAR file.",
+    'err.login.credentials_rejected':
+      'Zepp rejected these credentials. Sign out in the login window, then sign in again',
+    'err.login.region_unreachable':
+      "Couldn't reach the Zepp region service. Check your network and try again",
     'err.login.bad_url': 'Invalid sign-in address',
     'err.login.window_failed': "Couldn't open the sign-in window",
     'err.login.state_unavailable': 'Application state is unavailable',

@@ -2,6 +2,15 @@
 
 本文件记录每个版本的实际改动。写给使用者看，不是施工日志：只写用户能感知到的变化，以及为什么这么改。
 
+## Unreleased
+
+### Fixes / 修复
+
+- **Third-party sign-in no longer reuses another account's WebView session.** Each attempt now starts in an isolated session, reads only cookies that apply to the current login page, prefers the current `userid` / `apptoken` pair, and uses the region host returned by Zepp (`domains`, `cname` or `wf_baseUrl`) before trying fallbacks. This fixes the misleading “credentials were read, but no region accepted them” failure caused by stale or cross-account cookies. Region verification now distinguishes rejected credentials from a network outage, and a terminal failure closes the login window.
+- **第三方登录不再复用另一个账号的 WebView 会话。** 每次连接都使用隔离会话，只读取当前登录页适用的 Cookie，优先采用当前 `userid` / `apptoken`，并先使用 Zepp 返回的 `domains`、`cname` 或 `wf_baseUrl` 区域地址，再尝试兜底区域。这修复了旧 Cookie 或跨账号 Cookie 导致的「已读取凭据，但没有区域接受」误报。区域验证也会区分凭据被拒与网络不可达，最终失败后会关闭登录窗口。
+- **The native sign-in window title follows the interface language.** English now shows “Sign in to Zepp” instead of the hard-coded Chinese title; OAuth callback URLs exposed to the interface no longer contain query strings or fragments.
+- **原生登录窗口标题现在跟随界面语言。** 英文界面显示 “Sign in to Zepp”，不再出现写死的「登录 Zepp」；传给界面的 OAuth 回调地址也不再包含 query 或 fragment。
+
 ## 1.1.3
 
 Why "I picked 6 months but only see 30 days" was never a calendar bug.
