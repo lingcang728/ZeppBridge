@@ -44,6 +44,9 @@ pub struct AppStatus {
     pub retention_days: i64,
     pub history_sync_days: i64,
     pub storage: Option<crate::models::StorageEstimate>,
+    /// 本机实际有数据的那段日子。界面上每一个「最近 N 天」选择器读的都是本机
+    /// 库，所以每一个都需要知道这个，才不会把「库里没有」画成「那几个月你没动」。
+    pub coverage: crate::storage::LocalCoverage,
     /// 后台是否正在压缩历史报文。
     ///
     /// 只发一个 `compaction://started` 事件是不够的：它在 Rust 的 setup() 里

@@ -40,8 +40,25 @@ export interface AppStatus {
   retention_days: number;
   history_sync_days?: number;
   storage?: StorageEstimate;
+  /** 本机实际有数据的那段日子。界面上每个「最近 N 天」读的都是本机库。 */
+  coverage?: LocalCoverage;
   /** 后台是否正在压缩历史报文。事件可能在前端监听之前就发出去了，所以状态里也要有。 */
   compacting?: boolean;
+}
+
+/**
+ * 本机实际有数据的那段日子。
+ *
+ * 存在的理由：图表和导出的「最近 N 天」读的都是本机库，不是云端。库里只有 30 天
+ * 时选 6 个月，只会把坐标轴拉长、前五个月空着——在此之前没有任何一处说明这件事。
+ */
+export interface LocalCoverage {
+  /** 最早一天（`YYYY-MM-DD`）。库是空的时候为 null。 */
+  earliest_day: string | null;
+  /** 最晚一天（`YYYY-MM-DD`）。 */
+  latest_day: string | null;
+  /** `earliest_day` 到今天的天数。用来和用户选的范围直接比较。 */
+  covered_days: number;
 }
 
 /** 单条流的占用估算。样本不足时 measured 为 false，且不给速率。 */

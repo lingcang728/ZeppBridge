@@ -3,6 +3,7 @@ defineOptions({ name: 'BodyStatus' });
 import { computed, onMounted, ref, watch } from 'vue';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
 import PageHeader from '../components/PageHeader.vue';
+import CoverageNotice from '../components/CoverageNotice.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import Icon from '../components/Icon.vue';
 import { useSyncController } from '../composables/useSyncController';
@@ -231,6 +232,8 @@ watch(dataRevision, () => { void load(); });
         >{{ range.label }}</button>
       </div>
     </PageHeader>
+
+    <CoverageNotice :requested-days="rangeDays" />
 
     <div v-if="error" class="inline-alert" role="alert">
       <Icon name="warning" :size="14" />{{ error }}

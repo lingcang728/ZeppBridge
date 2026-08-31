@@ -11,14 +11,29 @@ use crate::ipc_types::{capability_views, stream_views, AppStatus, StreamStatusVi
 pub(crate) async fn build_app_status(state: &AppState) -> std::result::Result<AppStatus, AppError> {
     let auth_status = state.auth.status()?;
 
-    let (statuses, freshness, (last_cloud_sync_at, last_cloud_sync_outcome), prefs, storage) = {
+    let (
+        statuses,
+        freshness,
+        (last_cloud_sync_at, last_cloud_sync_outcome),
+        prefs,
+        storage,
+        coverage,
+    ) = {
         let database = state.db.lock().await;
         let statuses = database.list_data_status()?;
         let freshness = database.stream_freshness()?;
         let cloud_metadata = database.cloud_sync_metadata()?;
         let prefs = database.user_prefs()?;
         let storage = database.storage_estimate(prefs.history_sync_days, &state.data_dir)?;
-        (statuses, freshness, cloud_metadata, prefs, storage)
+        let coverage = database.local_coverage()?;
+        (
+            statuses,
+            freshness,
+            cloud_metadata,
+            prefs,
+            storage,
+            coverage,
+        )
     };
 
     let auth_state = state.auth_state.read().await.clone();
@@ -83,6 +98,7 @@ pub(crate) async fn build_app_status(state: &AppState) -> std::result::Result<Ap
         retention_days: prefs.retention_days,
         history_sync_days: prefs.history_sync_days,
         storage: Some(storage),
+        coverage,
         compacting: zeppbridge_core::storage::compaction_in_progress(),
     })
 }

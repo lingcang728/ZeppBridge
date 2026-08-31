@@ -308,7 +308,7 @@ impl DataFetcher {
     pub async fn fetch_events(
         &self,
         event_type: &str,
-        sub_type: &str,
+        sub_type: Option<&str>,
         from_ms: i64,
         to_ms: i64,
         limit: i64,
@@ -519,7 +519,7 @@ impl DataFetcher {
         let to = window.end_utc.timestamp_millis();
         let event = self
             .connector
-            .fetch_events("DailyHealth", "summary", from, to, 2000, true)
+            .fetch_events("DailyHealth", Some("summary"), from, to, 2000, true)
             .await?;
         records.push(FetchedRecord {
             raw: RawRecord {
@@ -536,7 +536,7 @@ impl DataFetcher {
         for (event_type, sub_type) in [("Charge", "real_data"), ("readiness", "watch_score")] {
             match self
                 .connector
-                .fetch_events(event_type, sub_type, from, to, 2000, true)
+                .fetch_events(event_type, Some(sub_type), from, to, 2000, true)
                 .await
             {
                 Ok(payload) => records.push(FetchedRecord {
@@ -660,7 +660,7 @@ impl ProbeCadence {
 /// `skinTemp/real_data` and `blood_pressure/real_data`. This table is
 /// transcribed from two independent open-source clients that talk to the same
 /// API — m4ary/zepp-health-cli and Thejuampi/icu — which agree on every entry.
-const CAPABILITY_PROBES: [(&str, ProbeSurface, &str, Option<&str>, ProbeCadence); 19] = [
+const CAPABILITY_PROBES: [(&str, ProbeSurface, &str, Option<&str>, ProbeCadence); 20] = [
     // Controls. The positive one proves the probe itself works; the negative
     // one tells us whether an empty answer carries any information at all.
     (
@@ -800,6 +800,23 @@ const CAPABILITY_PROBES: [(&str, ProbeSurface, &str, Option<&str>, ProbeCadence)
         ProbeSurface::V2Events,
         "weight",
         Some("summary"),
+        ProbeCadence::Episodic,
+    ),
+    // The Food Log: an official Zepp app feature outside mainland China, where
+    // meals are logged by photo and stored as macros. Addressed by `eventType`
+    // alone — there is no subType, hence `None`, and hence the connector had to
+    // stop inventing one.
+    //
+    // Episodic on purpose. Food is hand-logged, so a quiet week means "this
+    // person did not log", not "this account cannot". Asking a year back and
+    // reporting the latest entry's date is the only reading that separates the
+    // two, and the difference matters: it decides whether this is worth
+    // building a stream for.
+    (
+        "food",
+        ProbeSurface::V2Events,
+        "Food",
+        None,
         ProbeCadence::Episodic,
     ),
 ];
@@ -946,14 +963,7 @@ impl DataFetcher {
             let outcome = match surface {
                 ProbeSurface::V2Events => {
                     self.connector
-                        .fetch_events(
-                            event_type,
-                            sub_type.unwrap_or("real_data"),
-                            from,
-                            to,
-                            50,
-                            true,
-                        )
+                        .fetch_events(event_type, sub_type, from, to, 50, true)
                         .await
                 }
                 ProbeSurface::UserEvents => {
@@ -1139,14 +1149,7 @@ impl DataFetcher {
                 let outcome = match surface {
                     ProbeSurface::V2Events => {
                         self.connector
-                            .fetch_events(
-                                event_type,
-                                sub_type.unwrap_or("real_data"),
-                                from,
-                                to,
-                                1000,
-                                true,
-                            )
+                            .fetch_events(event_type, sub_type, from, to, 1000, true)
                             .await
                     }
                     ProbeSurface::UserEvents => {
