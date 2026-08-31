@@ -16,7 +16,7 @@
 > [!IMPORTANT]
 > ZeppBridge is an independent, unofficial open-source project. It is not affiliated with or endorsed by Zepp Health, Huami or Amazfit. Use it only with accounts and data you are entitled to access.
 
-> The app ships in English and Chinese; it follows your system language on first launch, and Settings has a switch. The Chinese README stays the primary document — this page describes exactly the same capabilities, and nothing here is translated more generously than it is implemented.
+> The app ships in English and Chinese; it follows your system language on first launch, and Settings has a switch. This page and [its Chinese counterpart](README.zh-CN.md) are kept in step with each other, and nothing here is described more generously than it is implemented.
 
 ## Isn't this already in the Zepp app?
 
@@ -128,12 +128,19 @@ Stuck at login? See the [connection guide](docs/guides/connection.md) for troubl
 
 | Page | What it shows |
 | --- | --- |
-| **Overview** | 24-hour heart rate, today's steps, last night's sleep structure, resting heart rate |
+| **Overview** | Heart rate over the last few hours, today's steps, last night's sleep structure, this week against your own previous 28 days, and entry points to body and training status. Every card opens |
+| **Heart rate** | The full 24-hour curve, plus per-day trends for resting heart rate and HRV under two definitions |
+| **Daily activity** | Per-day trends for steps, distance, active calories and active minutes |
 | **Body status** | Recovery, stress, SpO₂, HRV, respiratory rate and resting heart rate over time |
 | **Training status** | VO₂max, training load, lactate threshold, PAI, and whether recent volume is high or low |
 | **Recent records** | Every sleep session and workout, each openable in detail |
 | **Workout detail** | Distance, pace, heart rate, per-kilometre splits, GPS track; running also shows power and form |
-| **Data health** | Per-stream fetch / parse / write state — whether a gap means "not synced" or "nothing was ever measured" |
+| **Devices** | Where each device's model came from (catalogue match or your own assignment), firmware, most recent data — reassignable at any time |
+| **Data health** (Settings → Advanced and maintenance) | Per-stream fetch / parse / write state — whether a gap means "not synced" or "nothing was ever measured" |
+
+A metric with no data does not sit there showing "—"; it simply does not appear.
+And a curve breaks wherever more than 15 minutes passed without a sample, rather
+than drawing a straight line between the two ends.
 
 **Post-workout insight and weekly report**
 
@@ -143,13 +150,36 @@ After a workout, the app compares it against your own history: recent runs in th
 
 Several prompt templates are built in (performance summary, training insight, recovery assessment, sleep analysis). Pick a template and range, and the app packages the data, strips device identifiers and precise locations, copies it to the clipboard and opens the AI site you chose.
 
-Packages over 2 MB are written to a file on your desktop instead.
+A workout detail page has its own "hand to AI" button, scoped to **that one
+workout**: the workout itself and the per-point metrics recorded while it was
+happening. Per-day records such as sleep and step counts do not go with it.
+
+Packages over 2 MB are written to a file on your desktop instead, ready to drag
+into the conversation.
 
 **Export files**
 
 - **JSON** — full structured data, for scripts or models
 - **CSV** — tabular summary for spreadsheets
 - **GPX** — standard tracks for Strava, Garmin and others
+
+**It does not get heavier over time**
+
+Raw cloud payloads are the largest thing in the local database. ZeppBridge
+stores them compressed — anything newly synced arrives compressed, and the first
+launch after an update compacts the existing ones in the background and reclaims
+the disk space, with progress at the top of the window that disappears when it
+finishes.
+
+Before replacing a payload it decompresses it again and compares byte for byte,
+skipping any that does not match: the raw payload is the only basis for
+re-parsing locally, so not compressing is always better than compressing it
+wrongly. A measured 211 MB database came out at 55 MB.
+
+**Leave it running**
+
+Closing the window leaves the app in the tray, still syncing on its own. If you
+do not want it running, right-click the tray icon and quit.
 
 **Without a window**
 
@@ -158,11 +188,19 @@ Each release also ships `zeppbridge-tools-<version>-<platform>.zip` containing t
 - `zeppbridge-cli` — non-interactive: `status`, `sync`, `export`. Exit codes are a stable contract, so it schedules cleanly under Task Scheduler or cron.
 - `zeppbridge-mcp` — read-only MCP server over stdio. No ports, no network. Lets a model query your local data without the data leaving your machine.
 
-See [CLI and MCP](docs/reference/cli-and-mcp.md) for usage and configuration examples.
+See [CLI and MCP](docs/reference/cli-and-mcp.md) for usage and configuration
+examples. The MCP section in Settings also offers a block of text you can paste
+straight to an AI, so it can walk you through configuring it for your machine.
 
 **Local read-only REST**
 
 Settings can enable a read-only endpoint bound to `127.0.0.1` only, for your own scripts. It is off by default, requires a token once enabled, returns no credentials, and never listens on the local network.
+
+## What's changed
+
+Per-version changes are in [CHANGELOG.md](CHANGELOG.md). When Settings →
+Software update → Check for updates finds a new version, it also shows you the
+release notes directly, and reports progress while downloading.
 
 ## FAQ
 
@@ -187,6 +225,10 @@ Yes. Uninstalling leaves the `data` folder, backups, coverage ledger and setting
 
 **Can I back up and restore the database?**
 Yes. Settings can create a whole-database snapshot at any time, each with a SHA-256 and an integrity check. Restores are queued and applied at the next launch — the only moment a file can be swapped atomically — and the queue step shows a record-count diff first. See [backup and restore](docs/guides/backup-and-restore.md).
+
+**I have more than one watch — will the data get mixed together?**
+No. Every record carries which device it came from, and the interface keeps them
+apart.
 
 **Does anything get sent to your servers?**
 Health data, workout details and credentials never leave your machine. Only if you explicitly confirm "submit an error report" does the app send application/parser versions, OS, safe model hints and field structure for unrecognised products, firmware version, and unknown workout codes with counts. It never sends accounts, tokens, serial numbers, device IDs, GPS, health values, raw responses or local paths. There is no automatic telemetry and no background crash reporting.
