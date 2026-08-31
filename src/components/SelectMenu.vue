@@ -12,6 +12,7 @@
  */
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { defineMessages, useMessages } from '../i18n';
+import { popoverStyle } from '../lib/popoverPosition';
 import Icon from './Icon.vue';
 
 export interface SelectMenuOption {
@@ -61,31 +62,22 @@ const listRef = ref<HTMLElement | null>(null);
  *
  * 这两件事都不是调 z-index 能可靠解决的——只要祖先里有 overflow、transform
  * 或自己的层叠上下文，就会再犯。挂到 body 上用 fixed 定位，从根上避开。
+ *
+ * 具体的翻转和夹取算法在 `lib/popoverPosition.ts`，日期选择器共用同一份——
+ * 它当初就是因为自己另写了一套固定向下的定位，才在窗口底部被裁掉（issue #9）。
  */
 const menuStyle = ref<Record<string, string>>({});
 const MENU_MAX_HEIGHT = 268;
-const VIEWPORT_MARGIN = 8;
 
 const measure = () => {
   const trigger = triggerRef.value;
   if (!trigger) return;
   const rect = trigger.getBoundingClientRect();
-  const spaceBelow = window.innerHeight - rect.bottom - VIEWPORT_MARGIN;
-  const spaceAbove = rect.top - VIEWPORT_MARGIN;
-  // 下方放不下就翻上去；两边都不宽裕时选空间大的那一侧，并把高度压到放得下。
-  const dropUp = props.dropUp
-    ? spaceAbove > MENU_MAX_HEIGHT || spaceAbove > spaceBelow
-    : spaceBelow < Math.min(MENU_MAX_HEIGHT, 160) && spaceAbove > spaceBelow;
-  const available = Math.max(120, Math.floor(dropUp ? spaceAbove : spaceBelow));
-  menuStyle.value = {
-    position: 'fixed',
-    left: `${Math.round(rect.left)}px`,
-    width: `${Math.round(rect.width)}px`,
-    maxHeight: `${Math.min(MENU_MAX_HEIGHT, available)}px`,
-    ...(dropUp
-      ? { bottom: `${Math.round(window.innerHeight - rect.top + 4)}px` }
-      : { top: `${Math.round(rect.bottom + 4)}px` }),
-  };
+  menuStyle.value = popoverStyle(
+    { top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width },
+    { width: window.innerWidth, height: window.innerHeight },
+    { maxHeight: MENU_MAX_HEIGHT, width: rect.width, preferUp: props.dropUp },
+  ) as unknown as Record<string, string>;
 };
 
 const selectedIndex = computed(() =>
