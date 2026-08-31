@@ -17,8 +17,7 @@ import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import type { CoverageLedger, FailedChunk, StorageEstimate, UserPrefs } from '../types';
 import { syncStreamLabel } from '../lib/syncStreams';
 import { defineMessages, useMessages } from '../i18n';
-import { errorTextFor } from '../i18n/errors';
-import { backendText } from '../i18n/backendText';
+import { failedChunkText } from '../lib/failedChunkText';
 import { storageEstimateText, storageStopReasonText } from '../lib/storageEstimateText';
 
 const messages = defineMessages(
@@ -79,7 +78,6 @@ const messages = defineMessages(
     failedAttempts: (attempts: number) => `已尝试 ${attempts} 次`,
     failedExhausted: '自动重试已用尽，点「重试失败项」再试一次',
     failedNoReason: '没有记录原因',
-    chunkNoCanonical: '云端返回了报文，但没有解析出可用记录',
     retryFailed: '重试失败项',
     retryFailedDone: '失败的月份已重新排队，可以继续补拉了。',
     retryFailedFailed: '无法重新排队失败的月份',
@@ -151,7 +149,6 @@ const messages = defineMessages(
     failedAttempts: (attempts: number) => `${attempts} attempt${attempts === 1 ? '' : 's'}`,
     failedExhausted: 'Automatic retries are used up. Use "Retry failed months" to try again',
     failedNoReason: 'No reason recorded',
-    chunkNoCanonical: 'The cloud returned a payload, but no usable records could be parsed from it',
     retryFailed: 'Retry failed months',
     retryFailedDone: 'The failed months are queued again. You can continue the backfill.',
     retryFailedFailed: 'Could not re-queue the failed months',
@@ -299,13 +296,9 @@ const toggleArchive = async () => {
 const estimateText = computed(() => storageEstimateText(estimate.value));
 const stopReasonText = computed(() => storageStopReasonText(estimate.value));
 
-/** 失败原因：先按码取本地文案，取不到才回落到后端原文。 */
-const chunkErrorText = (item: FailedChunk): string => {
-  if (item.error_code === 'err.backfill.no_canonical_records') return t.value.chunkNoCanonical;
-  const localized = errorTextFor(item.error_code);
-  if (localized) return localized;
-  return backendText(item.error, t.value.failedNoReason);
-};
+/* 失败原因的实现在 lib/failedChunkText.ts，那里可以直接拿数据库行做单测；
+   写在 SFC 里就只能靠人点界面看，这正是前几次没能及时发现的原因。 */
+const chunkErrorText = (item: FailedChunk): string => failedChunkText(item);
 
 const runBackfill = async () => {
   if (!fromDate.value) {
