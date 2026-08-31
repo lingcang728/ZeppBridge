@@ -263,6 +263,9 @@ export const tauriBackend: BridgeBackend = {
   retryFailedBackfillChunks() {
     return call<CoverageLedger>('retry_failed_backfill_chunks');
   },
+  setTrayLocale(locale: string) {
+    return call<void>('set_tray_locale', { locale });
+  },
   listBackups() {
     return call<BackupManifest[]>('list_backups');
   },

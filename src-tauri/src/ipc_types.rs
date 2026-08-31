@@ -21,6 +21,10 @@ pub struct CapabilityStatusView {
     pub capability: String,
     pub available: bool,
     pub reason: Option<String>,
+    /// `reason` 那句话的稳定码。为空表示这条 reason 是后端透传的原始消息，
+    /// 界面只能原样显示。
+    #[serde(default)]
+    pub reason_code: Option<String>,
 }
 
 /// Overall application status exposed to the frontend.
@@ -55,6 +59,10 @@ pub struct LoginStatus {
     pub state: String,
     pub message: String,
     pub page_url: String,
+    /// `message` 那句话的稳定码。界面按它取自己语言的文案，取不到才回落到
+    /// 中文原文。登录是英文用户最容易卡住的一步，这里尤其不能只有中文。
+    #[serde(default)]
+    pub code: String,
 }
 
 impl LoginStatus {
@@ -63,14 +71,21 @@ impl LoginStatus {
             state: "idle".to_string(),
             message: String::new(),
             page_url: String::new(),
+            code: String::new(),
         }
     }
 
-    pub fn new(state: &str, message: impl Into<String>, page_url: impl Into<String>) -> Self {
+    pub fn new(
+        state: &str,
+        code: &str,
+        message: impl Into<String>,
+        page_url: impl Into<String>,
+    ) -> Self {
         Self {
             state: state.to_string(),
             message: message.into(),
             page_url: page_url.into(),
+            code: code.to_string(),
         }
     }
 }
@@ -98,6 +113,10 @@ pub struct UiSyncReport {
     pub total_records: i64,
     pub streams: Vec<UiSyncStreamResult>,
     pub message: Option<String>,
+    /// `message` 那句话的稳定码。界面按它取自己语言的文案，取不到才回落到
+    /// `message` 的中文原文——后端不按界面语言出文案。
+    #[serde(default)]
+    pub message_code: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -152,6 +171,7 @@ pub fn ui_sync_report(
         total_records,
         streams,
         message: report.message,
+        message_code: None,
     }
 }
 
@@ -196,7 +216,7 @@ pub fn capability_views(statuses: &[models::DataStatus]) -> Vec<CapabilityStatus
     .into_iter()
     .map(|capability| {
         let status = find_capability_status(statuses, capability);
-        let (available, reason) = match status {
+        let (available, reason, reason_code) = match status {
             Some(status) => {
                 let capability_state = status.capability.trim().to_ascii_lowercase();
                 let stream_state = status.status.trim().to_ascii_lowercase();
@@ -206,19 +226,25 @@ pub fn capability_views(statuses: &[models::DataStatus]) -> Vec<CapabilityStatus
                         stream_state.as_str(),
                         "failed" | "error" | "unavailable" | "unverified"
                     );
-                let reason = if available {
-                    status.message.clone()
+                let (reason, reason_code) = if available {
+                    (status.message.clone(), None)
                 } else {
-                    Some(capability_reason(status, &capability_state))
+                    let (code, message) = capability_reason(status, &capability_state);
+                    (Some(message), code)
                 };
-                (available, reason)
+                (available, reason, reason_code)
             }
-            None => (false, Some("尚未同步".to_string())),
+            None => (
+                false,
+                Some("尚未同步".to_string()),
+                Some("err.capability.not_synced".to_string()),
+            ),
         };
 
         CapabilityStatusView {
             capability: capability.to_string(),
             available,
+            reason_code,
             reason,
         }
     })
@@ -245,21 +271,43 @@ fn find_capability_status<'a>(
         })
 }
 
-fn capability_reason(status: &models::DataStatus, capability_state: &str) -> String {
+/// 这条能力为什么不可用。返回 (稳定码, 中文原文)。
+///
+/// 码为 `None` 的那一支是后端透传的原始消息——它来自云端，翻不了，界面只能
+/// 原样显示。其余几支都是我们自己写的话，必须能按界面语言换。
+fn capability_reason(
+    status: &models::DataStatus,
+    capability_state: &str,
+) -> (Option<String>, String) {
     if status.needs_reauth {
-        return status
-            .message
-            .clone()
-            .unwrap_or_else(|| "需要重新认证".to_string());
+        return match status.message.clone() {
+            Some(message) => (None, message),
+            None => (
+                Some("err.capability.needs_reauth".to_string()),
+                "需要重新认证".to_string(),
+            ),
+        };
     }
     if let Some(message) = status.message.clone() {
-        return message;
+        return (None, message);
     }
     match capability_state {
-        "unverified" => "能力尚未验证".to_string(),
-        "unavailable" => "能力不可用".to_string(),
-        "" => "能力状态未知".to_string(),
-        other => format!("能力状态: {other}"),
+        "unverified" => (
+            Some("err.capability.unverified".to_string()),
+            "能力尚未验证".to_string(),
+        ),
+        "unavailable" => (
+            Some("err.capability.unavailable".to_string()),
+            "能力不可用".to_string(),
+        ),
+        "" => (
+            Some("err.capability.unknown".to_string()),
+            "能力状态未知".to_string(),
+        ),
+        other => (
+            Some("err.capability.other".to_string()),
+            format!("能力状态: {other}"),
+        ),
     }
 }
 
@@ -280,12 +328,14 @@ mod tests {
     fn login_status_serializes_required_fields() {
         let status = LoginStatus::new(
             "waiting",
+            "err.login.waiting",
             "请在弹出窗口完成登录",
             "https://watchface.zepp.com/",
         );
         let value = serde_json::to_value(&status).unwrap();
         assert_eq!(value["state"], "waiting");
         assert_eq!(value["message"], "请在弹出窗口完成登录");
+        assert_eq!(value["code"], "err.login.waiting");
         assert_eq!(value["page_url"], "https://watchface.zepp.com/");
     }
 }

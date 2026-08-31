@@ -21,6 +21,8 @@ export interface CapabilityStatus {
   capability: string;
   available: boolean;
   reason?: string;
+  /** `reason` 那句话的稳定码。为空表示它是云端透传的原文，翻不了。 */
+  reason_code?: string | null;
 }
 
 export interface AppStatus {
@@ -110,6 +112,8 @@ export interface LoginStatus {
   state: LoginState | string;
   message: string;
   page_url: string;
+  /** `message` 那句话的稳定码（`err.login.*`）。界面按它取自己语言的文案。 */
+  code?: string;
 }
 
 export interface SyncStreamResult {
@@ -144,6 +148,8 @@ export interface SyncReport {
   total_records: number;
   streams: SyncStreamResult[];
   message?: string;
+  /** `message` 那句话的稳定码（`err.sync.*`）。界面按它取自己语言的文案。 */
+  message_code?: string | null;
 }
 
 export interface Coverage {

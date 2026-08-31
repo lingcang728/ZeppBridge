@@ -25,6 +25,7 @@ import type {
 import { checkForDesktopUpdate, downloadAndInstallDesktopUpdate, updateState } from '../services/updateService';
 import { settingsMessages } from './Settings.i18n';
 import { intlLocale, locale, LOCALES, LOCALE_LABELS, setLocale, useMessages } from '../i18n';
+import { errorTextFor } from '../i18n/errors';
 
 const t = useMessages(settingsMessages);
 
@@ -319,6 +320,14 @@ const storageEstimate = ref(appStatus.value?.storage ?? null);
 const prefsBusy = ref(false);
 /** 完整偏好（含归档开关）。AppStatus 只带保留期与补拉窗口。 */
 const userPrefs = ref<UserPrefs | null>(null);
+
+/* 登录窗口那几行进度和失败原因原本直接显示后端字符串——全是中文。后端现在
+   给的是稳定码，这里按界面语言取文案，取不到才回落到那句中文原文。 */
+const loginMessage = computed(() => {
+  const status = loginStatus.value;
+  if (!status.message && !status.code) return '';
+  return errorTextFor(status.code) ?? status.message;
+});
 
 const connectionLabel = computed(() => {
   if (loginInProgress.value) {
@@ -968,7 +977,12 @@ const runCapabilityProbe = async () => {
           <button class="auth-action" type="button" @click="showManualAuth = !showManualAuth">{{ showManualAuth ? t.authCollapse : t.authUse }}</button>
         </div>
       </div>
-      <p v-if="loginInProgress && loginStatus.message" class="hint-line"><Icon name="info" :size="13" />{{ loginStatus.message }}</p>
+      <p v-if="loginInProgress && loginMessage" class="hint-line"><Icon name="info" :size="13" />{{ loginMessage }}</p>
+      <!-- 登录失败要看得见原因，尤其是「登录了但没读到凭据」——那时该直接去
+           用下面的 HAR / 手动填写，而不是反复重试网页登录。 -->
+      <p v-else-if="loginStatus.state === 'failed' && loginMessage" class="api-error" role="alert">
+        <Icon name="info" :size="13" />{{ loginMessage }}
+      </p>
 
       <!-- 手动认证表单 -->
       <div v-if="showManualAuth" class="manual-auth-form">

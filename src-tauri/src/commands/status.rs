@@ -1,4 +1,5 @@
 use crate::app_state::{mask_user_id, AppState};
+use crate::ipc_error::AppError;
 use crate::ipc_types::{capability_views, stream_views, AppStatus, StreamStatusView};
 
 /// Build the non-sensitive snapshot used by the dashboard and settings UI.
@@ -7,24 +8,24 @@ use crate::ipc_types::{capability_views, stream_views, AppStatus, StreamStatusVi
 /// while the database lock is held only for the status query.  The resulting
 /// snapshot owns all values, so no state lock remains held while it is
 /// assembled or returned to Tauri.
-pub(crate) async fn build_app_status(state: &AppState) -> std::result::Result<AppStatus, String> {
-    let auth_status = state.auth.status().map_err(|error| error.to_string())?;
+pub(crate) async fn build_app_status(state: &AppState) -> std::result::Result<AppStatus, AppError> {
+    let auth_status = state.auth.status()?;
 
     let (statuses, freshness, (last_cloud_sync_at, last_cloud_sync_outcome), prefs, storage) = {
         let database = state.db.lock().await;
         let statuses = database
             .list_data_status()
-            .map_err(|error| error.to_string())?;
+            ?;
         let freshness = database
             .stream_freshness()
-            .map_err(|error| error.to_string())?;
+            ?;
         let cloud_metadata = database
             .cloud_sync_metadata()
-            .map_err(|error| error.to_string())?;
-        let prefs = database.user_prefs().map_err(|error| error.to_string())?;
+            ?;
+        let prefs = database.user_prefs()?;
         let storage = database
             .storage_estimate(prefs.history_sync_days, &state.data_dir)
-            .map_err(|error| error.to_string())?;
+            ?;
         (statuses, freshness, cloud_metadata, prefs, storage)
     };
 
@@ -98,6 +99,6 @@ pub(crate) async fn build_app_status(state: &AppState) -> std::result::Result<Ap
 #[tauri::command]
 pub(crate) async fn get_app_status(
     state: tauri::State<'_, AppState>,
-) -> std::result::Result<AppStatus, String> {
+) -> std::result::Result<AppStatus, AppError> {
     build_app_status(&state).await
 }

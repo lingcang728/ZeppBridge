@@ -11,7 +11,7 @@ import { deviceStateLabel, useDevices } from './composables/useDevices';
 import { useUiScale } from './composables/useUiScale';
 import { backend, isDesktop } from './lib/bridge';
 import { checkForDesktopUpdate } from './services/updateService';
-import { defineMessages, intlLocale, useMessages } from './i18n';
+import { defineMessages, intlLocale, locale, useMessages } from './i18n';
 
 const messages = defineMessages(
   {
@@ -207,8 +207,21 @@ const onDocumentKeydown = (event: KeyboardEvent) => {
 };
 const closeMobileMenu = () => { mobileMenuOpen.value = false; };
 
+/* 托盘菜单是原生的，建起来的时候前端还没加载，只能先按系统语言猜一次。
+   界面语言一确定（以及之后每次切换）就把它校正过来——不然英文用户右键
+   托盘看到的还是中文。 */
+const syncTrayLocale = () => {
+  if (!desktopRuntime) return;
+  void backend.setTrayLocale(locale.value).catch(() => {
+    // 托盘文案不是关键路径，失败就算了，不该弹错给用户。
+  });
+};
+
+watch(locale, syncTrayLocale);
+
 onMounted(() => {
   if (showLanding) return;
+  syncTrayLocale();
   initializeScale();
   void initialize();
   void loadDevices();

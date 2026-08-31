@@ -89,7 +89,37 @@ impl ZeppBridgeError {
         matches!(self, Self::RetryExhausted { .. } | Self::NetworkError(_))
     }
 
+    /// 稳定的错误码。
+    ///
+    /// 界面按码取本地化文案，`user_message()` 只作为取不到时的兜底。这两件事
+    /// 必须分开：上一版界面直接显示后端返回的字符串，而这些字符串全是中文，
+    /// 于是英文界面上每一个后端错误都是中文。
+    ///
+    /// 码是对外契约的一部分——改名等于让已经翻好的文案失效，加新码要同时加
+    /// 中英文案（`npm run i18n:check` 会挡住漏的那一个）。
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::NetworkError(_) => "err.core.network",
+            Self::NeedsReauth(_) => "err.core.needs_reauth",
+            Self::Unavailable(_) | Self::DataUnavailable(_) => "err.core.unavailable",
+            Self::RetryExhausted { .. } => "err.core.retry_exhausted",
+            Self::HttpStatus { .. } => "err.core.http_status",
+            Self::Cancelled => "err.core.cancelled",
+            Self::AuthError(_) => "err.core.auth",
+            Self::InvalidHost(_) => "err.core.invalid_host",
+            Self::ConfigError(_) => "err.core.config",
+            Self::Busy(_) => "err.core.busy",
+            Self::ParseError(_) => "err.core.parse",
+            Self::DatabaseError(_) => "err.core.database",
+            Self::IoError(_) => "err.core.io",
+            Self::Unknown(_) => "err.core.unknown",
+        }
+    }
+
     /// Short, token-free, URL-free copy for the desktop UI.
+    ///
+    /// 中文原文。界面优先用 `code()` 查本地化文案，这里是兜底；CLI 和日志
+    /// 一直用它，不跟界面语言走。
     pub fn user_message(&self) -> String {
         match self {
             Self::NetworkError(_) => "无法连接 Zepp 区域，请检查网络后重试".into(),

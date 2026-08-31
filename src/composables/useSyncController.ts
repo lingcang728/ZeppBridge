@@ -4,6 +4,7 @@ import { readAutoSyncSettings, writeAutoSyncSettings } from '../lib/autoSync';
 import type { AppStatus, LoginStatus, SyncOutcome, SyncProgress, SyncReport } from '../types';
 import { syncStreamLabel } from '../lib/syncStreams';
 import { defineMessages, intlLocale, messagesOf } from '../i18n';
+import { errorTextFor } from '../i18n/errors';
 
 export type SyncUiState = 'idle' | 'syncing' | SyncOutcome;
 
@@ -200,7 +201,10 @@ const noticeForReport = (report: SyncReport): SyncNotice => ({
     .filter((stream) => ['failed', 'unavailable', 'unverified'].includes(stream.status))
     .map((stream) => stream.stream),
   latestAt: latestHeartRateAt(report),
-  backendMessage: report.outcome === 'deferred' ? report.message ?? undefined : undefined,
+  // deferred 那句话后端给了稳定码，按界面语言取；取不到才用后端的中文原文。
+  backendMessage: report.outcome === 'deferred'
+    ? errorTextFor(report.message_code) ?? report.message ?? undefined
+    : undefined,
 });
 
 const lastOutcomeLabel = computed(() => {

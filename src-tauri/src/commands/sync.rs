@@ -2,6 +2,7 @@ use chrono::Utc;
 use tauri::{AppHandle, Emitter};
 
 use crate::app_state::AppState;
+use crate::ipc_error::AppError;
 use crate::ipc_types::{ui_sync_report, UiSyncReport};
 use crate::models::{CapabilityProbe, UserPrefs};
 use crate::storage::coverage::CoverageLedger;
@@ -21,10 +22,11 @@ pub async fn start_initial_sync(
     app: AppHandle,
     state: tauri::State<'_, AppState>,
     days: Option<i64>,
-) -> std::result::Result<UiSyncReport, String> {
+) -> std::result::Result<UiSyncReport, AppError> {
     let manager = require_manager(&state).await?;
     let days = match days {
-        Some(value) => UserPrefs::clamp_days(value)?,
+        Some(value) => UserPrefs::clamp_days(value)
+            .map_err(|message| AppError::new("err.sync.history_days_out_of_range", message))?,
         None => {
             let database = state.db.lock().await;
             database
@@ -41,7 +43,7 @@ pub async fn start_history_sync(
     app: AppHandle,
     state: tauri::State<'_, AppState>,
     days: i64,
-) -> std::result::Result<UiSyncReport, String> {
+) -> std::result::Result<UiSyncReport, AppError> {
     start_initial_sync(app, state, Some(days)).await
 }
 
@@ -50,9 +52,12 @@ pub async fn start_history_sync(
 pub async fn start_incremental_sync(
     app: AppHandle,
     state: tauri::State<'_, AppState>,
-) -> std::result::Result<UiSyncReport, String> {
+) -> std::result::Result<UiSyncReport, AppError> {
     if state.auth_state.read().await.as_str() != "verified" {
-        return Err("请先完成连接验证，再同步最近数据".to_string());
+        return Err(AppError::new(
+            "err.sync.not_verified",
+            "请先完成连接验证，再同步最近数据",
+        ));
     }
     let manager = require_manager(&state).await?;
     run_sync(&app, &state, manager, None).await
@@ -68,9 +73,12 @@ pub async fn start_incremental_sync(
 #[tauri::command]
 pub async fn probe_data_capabilities(
     state: tauri::State<'_, AppState>,
-) -> std::result::Result<Vec<CapabilityProbe>, String> {
+) -> std::result::Result<Vec<CapabilityProbe>, AppError> {
     if state.auth_state.read().await.as_str() != "verified" {
-        return Err("请先完成连接验证，再探测数据能力".to_string());
+        return Err(AppError::new(
+            "err.sync.not_verified_probe",
+            "请先完成连接验证，再探测数据能力",
+        ));
     }
     let manager = require_manager(&state).await?;
     Ok(manager.probe_capabilities().await)
@@ -87,16 +95,22 @@ pub async fn start_history_backfill(
     state: tauri::State<'_, AppState>,
     from_date: String,
     max_chunks: Option<usize>,
-) -> std::result::Result<CoverageLedger, String> {
+) -> std::result::Result<CoverageLedger, AppError> {
     if state.auth_state.read().await.as_str() != "verified" {
-        return Err("请先完成连接验证，再补拉历史".to_string());
+        return Err(AppError::new(
+            "err.sync.not_verified_backfill",
+            "请先完成连接验证，再补拉历史",
+        ));
     }
     let manager = require_manager(&state).await?;
     let from = chrono::NaiveDate::parse_from_str(from_date.trim(), "%Y-%m-%d")
-        .map_err(|_| "补拉起点日期无效，需要 YYYY-MM-DD".to_string())?;
+        .map_err(|_| AppError::new("err.backfill.bad_start_date", "补拉起点日期无效，需要 YYYY-MM-DD"))?;
     let to = Utc::now().date_naive();
     if from > to {
-        return Err("补拉起点不能晚于今天".to_string());
+        return Err(AppError::new(
+            "err.backfill.start_in_future",
+            "补拉起点不能晚于今天",
+        ));
     }
     let _command_guard = state.sync_command_lock.lock().await;
     manager
@@ -104,16 +118,16 @@ pub async fn start_history_backfill(
             emit_sync_progress(&app, progress)
         })
         .await
-        .map_err(|error| error.user_message())
+        .map_err(AppError::from)
 }
 
 /// 当前的历史覆盖账本。
 #[tauri::command]
 pub async fn get_coverage_ledger(
     state: tauri::State<'_, AppState>,
-) -> std::result::Result<CoverageLedger, String> {
+) -> std::result::Result<CoverageLedger, AppError> {
     let db = state.db.lock().await;
-    db.coverage_ledger().map_err(|error| error.user_message())
+    db.coverage_ledger().map_err(AppError::from)
 }
 
 /// 清空账本，重新规划一次补拉。
@@ -122,11 +136,11 @@ pub async fn get_coverage_ledger(
 #[tauri::command]
 pub async fn reset_coverage_ledger(
     state: tauri::State<'_, AppState>,
-) -> std::result::Result<CoverageLedger, String> {
+) -> std::result::Result<CoverageLedger, AppError> {
     let db = state.db.lock().await;
     db.reset_coverage_ledger()
-        .map_err(|error| error.user_message())?;
-    db.coverage_ledger().map_err(|error| error.user_message())
+        ?;
+    db.coverage_ledger().map_err(AppError::from)
 }
 
 /// 让失败的块重新进入自动补拉队列。
@@ -137,28 +151,28 @@ pub async fn reset_coverage_ledger(
 #[tauri::command]
 pub async fn retry_failed_backfill_chunks(
     state: tauri::State<'_, AppState>,
-) -> std::result::Result<CoverageLedger, String> {
+) -> std::result::Result<CoverageLedger, AppError> {
     let db = state.db.lock().await;
     db.reset_failed_backfill_chunks()
-        .map_err(|error| error.user_message())?;
-    db.coverage_ledger().map_err(|error| error.user_message())
+        ?;
+    db.coverage_ledger().map_err(AppError::from)
 }
 
 #[tauri::command]
-pub async fn cancel_sync(state: tauri::State<'_, AppState>) -> std::result::Result<(), String> {
+pub async fn cancel_sync(state: tauri::State<'_, AppState>) -> std::result::Result<(), AppError> {
     if let Some(manager) = state.sync.read().await.clone() {
         manager.request_cancel();
     }
     Ok(())
 }
 
-async fn require_manager(state: &AppState) -> std::result::Result<Arc<SyncManager>, String> {
+async fn require_manager(state: &AppState) -> std::result::Result<Arc<SyncManager>, AppError> {
     state
         .sync
         .read()
         .await
         .clone()
-        .ok_or_else(|| "尚未连接 Zepp，请先完成连接".to_string())
+        .ok_or_else(|| AppError::new("err.sync.not_connected", "尚未连接 Zepp，请先完成连接"))
 }
 
 async fn run_sync(
@@ -166,7 +180,7 @@ async fn run_sync(
     state: &AppState,
     manager: Arc<SyncManager>,
     history_days: Option<i64>,
-) -> std::result::Result<UiSyncReport, String> {
+) -> std::result::Result<UiSyncReport, AppError> {
     let _command_guard = state.sync_command_lock.lock().await;
     // A `NORMALIZER_REVISION` bump makes the next launch replay every stored
     // raw payload, which writes in bulk for as long as a quarter of an hour on
@@ -180,13 +194,19 @@ async fn run_sync(
     // 「另一个写入操作正在进行」。压缩是我们自己安排的、正常的一次性维护，
     // 不该让它把用户吓一跳。和重放一样让路重试。
     if crate::storage::replay_in_progress() || crate::storage::compaction_in_progress() {
-        let message = if crate::storage::compaction_in_progress() {
-            "正在压缩历史报文以节省磁盘空间，本次云端同步稍后自动重试"
+        let (code, message) = if crate::storage::compaction_in_progress() {
+            (
+                "err.sync.deferred_compaction",
+                "正在压缩历史报文以节省磁盘空间，本次云端同步稍后自动重试",
+            )
         } else {
-            "正在用本地原始报文重建派生数据，本次云端同步稍后自动重试"
+            (
+                "err.sync.deferred_replay",
+                "正在用本地原始报文重建派生数据，本次云端同步稍后自动重试",
+            )
         };
         let now = Utc::now().to_rfc3339();
-        return Ok(ui_sync_report(
+        let mut deferred = ui_sync_report(
             SyncReport {
                 success: false,
                 streams: Vec::new(),
@@ -197,13 +217,15 @@ async fn run_sync(
             now,
             "deferred".to_string(),
             &BTreeMap::new(),
-        ));
+        );
+        deferred.message_code = Some(code.to_string());
+        return Ok(deferred);
     }
     let before = {
         let database = state.db.lock().await;
         database
             .newest_samples()
-            .map_err(|error| error.to_string())?
+            ?
     };
     let started_at = Utc::now().to_rfc3339();
     let report_result = if let Some(days) = history_days {
@@ -225,7 +247,7 @@ async fn run_sync(
             let database = state.db.lock().await;
             database
                 .record_cloud_sync(&finished_at, "cancelled")
-                .map_err(|record_error| record_error.to_string())?;
+                ?;
             return Ok(ui_sync_report(
                 SyncReport {
                     success: false,
@@ -243,18 +265,18 @@ async fn run_sync(
             let database = state.db.lock().await;
             database
                 .record_cloud_sync(&finished_at, "failed")
-                .map_err(|record_error| record_error.to_string())?;
+                ?;
             if error.needs_reauth() {
                 *state.auth_state.write().await = "needs_reauth".to_string();
             }
-            return Err(error.user_message());
+            return Err(error.into());
         }
     };
     let (freshness, after) = {
         let database = state.db.lock().await;
         let freshness = database
             .stream_freshness()
-            .map_err(|error| error.to_string())?;
+            ?;
         let after = freshness
             .iter()
             .map(|(stream, value)| (stream.clone(), value.newest_sample_at.clone()))
@@ -266,7 +288,7 @@ async fn run_sync(
         let database = state.db.lock().await;
         database
             .record_cloud_sync(&finished_at, outcome)
-            .map_err(|error| error.to_string())?;
+            ?;
     }
 
     if report.streams.iter().any(|stream| stream.needs_reauth) {

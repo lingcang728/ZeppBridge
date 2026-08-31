@@ -21,6 +21,8 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
 const srcDir = join(root, 'src');
+const tauriDir = join(root, 'src-tauri');
+const ERROR_MESSAGES_FILE = join(srcDir, 'i18n', 'errors.ts');
 
 /** 整份文件都是文案，或者自带一套双语机制。 */
 const SKIP_FILES = [
@@ -56,6 +58,9 @@ const ALLOWED = [
     why: '把设备名前面的中文品牌前缀去掉。这是在处理数据，不是在写文案。',
   },
 ];
+
+// 整份文件都是错误码文案，和 `*.i18n.ts` 同理。
+SKIP_FILES.push('i18n/errors.ts');
 
 const CHINESE = /[一-鿿]/;
 
@@ -147,4 +152,59 @@ if (findings.length) {
   process.exit(1);
 }
 
-console.log('界面文案检查通过：没有硬编码的中文。');
+/*
+ * 第二道门：后端每一个错误码都必须有中英两份文案。
+ *
+ * 后端不按界面语言出文案，只给一个稳定的 `err.*` 码；界面按码取文案，取不到
+ * 才回落到后端那句中文原文。回落是兜底，不是常态——漏掉一个码，英文用户就会
+ * 又看到一句中文。上一版整个后端都没有这一层，Reddit 上真实走通流程的用户
+ * 就是被它绊住的，所以这件事必须由构建来管。
+ */
+const walkRust = (dir) => readdirSync(dir).flatMap((name) => {
+  if (name === 'target' || name === 'node_modules') return [];
+  const full = join(dir, name);
+  if (statSync(full).isDirectory()) return walkRust(full);
+  return name.endsWith('.rs') ? [full] : [];
+});
+
+// 码统一挂在 `err.` 名字空间下，所以不会和文件名、JSON 字段名撞车。
+const CODE_PATTERN = /"(err\.[a-z_]+\.[a-z0-9_]+)"/g;
+const declaredCodes = new Set();
+for (const file of walkRust(tauriDir)) {
+  const source = readFileSync(file, 'utf8');
+  for (const match of source.matchAll(CODE_PATTERN)) declaredCodes.add(match[1]);
+}
+
+const errorBundle = readFileSync(ERROR_MESSAGES_FILE, 'utf8');
+// 中英两份都要有：`'err.x.y':` 在文件里出现两次才算齐。
+const translated = new Map();
+for (const match of errorBundle.matchAll(/'(err\.[a-z_]+\.[a-z0-9_]+)':/g)) {
+  translated.set(match[1], (translated.get(match[1]) ?? 0) + 1);
+}
+
+const missingCodes = [...declaredCodes].filter((code) => (translated.get(code) ?? 0) < 2).sort();
+const unusedCodes = [...translated.keys()].filter((code) => !declaredCodes.has(code)).sort();
+
+if (missingCodes.length || unusedCodes.length) {
+  if (missingCodes.length) {
+    console.error('后端错误码缺少中英文案——英文界面上它会退回成中文：');
+    console.error('');
+    for (const code of missingCodes) {
+      const count = translated.get(code) ?? 0;
+      console.error(`  ${code}  （errors.ts 里出现 ${count} 次，需要 2 次：中文一份、英文一份）`);
+    }
+  }
+  if (unusedCodes.length) {
+    console.error('');
+    console.error('src/i18n/errors.ts 里有后端已经不再使用的码：');
+    console.error('');
+    for (const code of unusedCodes) console.error(`  ${code}`);
+  }
+  console.error('');
+  console.error('后端加错误码时，src/i18n/errors.ts 的中英两份都要同时补上。');
+  process.exit(1);
+}
+
+console.log(
+  `界面文案检查通过：没有硬编码的中文；${declaredCodes.size} 个后端错误码都有中英文案。`,
+);
