@@ -116,7 +116,11 @@ If you use macOS and something misbehaves, a report is genuinely useful.
 
 Both mainland-China and international accounts work; the app detects which regional server you belong to.
 
-The first sync fetches 30 days. For older history, use **Long-term archive and full history** in Settings: choose 1/2/3 years or a custom start, and it fetches month by month. You can stop at any point and continue later. Before starting, it estimates disk usage from the actual rate your own data accumulates — not from a hard-coded constant.
+The first sync fetches 30 days so there is something on screen quickly, then keeps going in the background until 180 days are in. The progress is visible and you can stop it at any time. Later syncs are incremental.
+
+Every "last N days" selector in the app — on the training and body screens, and on the export page — reads your **local** library, not the cloud. If you pick a range that reaches further back than what this machine holds, the app says so and offers to fetch the rest. A blank stretch in a chart means *not fetched yet*, never *you recorded nothing then*.
+
+For history older than 180 days, use **Long-term archive and full history** in Settings: choose 1/2/3 years or a custom start, and it fetches month by month. You can stop at any point and continue later. Before starting, it estimates disk usage from the actual rate your own data accumulates — not from a hard-coded constant.
 
 If the range exceeds your local retention window, the app requires you to enable long-term archiving first; otherwise the history you just fetched would be cleaned up after the next successful sync.
 
