@@ -102,7 +102,11 @@ pub struct BackupVerification {
     pub bytes_match: bool,
     pub sha256_match: bool,
     pub integrity_ok: bool,
+    /// 中文原文。界面优先用 `problem_code`，取不到才显示它。
     pub problem: Option<String>,
+    /// 失败原因的稳定码。界面按它取自己语言的说法。
+    #[serde(default)]
+    pub problem_code: Option<String>,
 }
 
 impl BackupVerification {
@@ -361,6 +365,7 @@ pub fn verify_backup(data_dir: &Path, id: &str) -> Result<BackupVerification> {
             sha256_match: false,
             integrity_ok: false,
             problem: Some("备份文件已不在备份目录中".into()),
+            problem_code: Some("ui.backup.file_missing".into()),
         });
     }
     let bytes = std::fs::metadata(&path)?.len();
@@ -383,14 +388,23 @@ pub fn verify_backup(data_dir: &Path, id: &str) -> Result<BackupVerification> {
     } else {
         false
     };
-    let problem = if !bytes_match {
-        Some("备份文件大小和清单不一致，可能已损坏".into())
+    let (problem_code, problem): (Option<&str>, Option<String>) = if !bytes_match {
+        (
+            Some("ui.backup.size_mismatch"),
+            Some("备份文件大小和清单不一致，可能已损坏".into()),
+        )
     } else if !sha256_match {
-        Some("备份文件的 SHA-256 和清单不一致，可能已损坏或被修改".into())
+        (
+            Some("ui.backup.sha256_mismatch"),
+            Some("备份文件的 SHA-256 和清单不一致，可能已损坏或被修改".into()),
+        )
     } else if !integrity_ok {
-        Some("备份文件没有通过 SQLite 完整性检查".into())
+        (
+            Some("ui.backup.integrity_failed"),
+            Some("备份文件没有通过 SQLite 完整性检查".into()),
+        )
     } else {
-        None
+        (None, None)
     };
     Ok(BackupVerification {
         id: id.to_string(),
@@ -399,6 +413,7 @@ pub fn verify_backup(data_dir: &Path, id: &str) -> Result<BackupVerification> {
         sha256_match,
         integrity_ok,
         problem,
+        problem_code: problem_code.map(str::to_string),
     })
 }
 
@@ -688,6 +703,35 @@ mod tests {
         let manifest = create_backup(&dir, BackupKind::Manual, "1.0.0").unwrap();
         assert_eq!(manifest.table_counts.get("metric_samples"), Some(&40));
         drop(db);
+    }
+
+    /// 校验失败的原因也要能翻译。
+    ///
+    /// `problem` 是中文原文，界面靠 `problem_code` 取自己语言的说法。少了码，
+    /// 英文用户在「快照」里看到的就是一行中文——和补拉账本当初一模一样的毛病。
+    #[test]
+    fn a_failed_verification_carries_a_code_for_the_interface() {
+        let dir = temp_dir("problem-code");
+        drop(seed(&dir, 3));
+        let manifest = create_backup(&dir, BackupKind::Manual, "1.0.0").unwrap();
+
+        // 删掉快照文件：最容易构造、也最常见的一种失败。
+        std::fs::remove_file(snapshot_path(&dir, &manifest.id)).unwrap();
+        let verification = verify_backup(&dir, &manifest.id).unwrap();
+
+        assert!(!verification.is_usable());
+        let problem = verification.problem.as_deref().unwrap_or_default();
+        assert!(
+            problem
+                .chars()
+                .any(|c| ('\u{4e00}'..='\u{9fff}').contains(&c)),
+            "这一版的原文本来就是中文，前提变了就要改这条断言"
+        );
+        assert_eq!(
+            verification.problem_code.as_deref(),
+            Some("ui.backup.file_missing"),
+            "有中文原文就必须有码，否则英文界面会原样显示这句中文"
+        );
     }
 
     #[test]

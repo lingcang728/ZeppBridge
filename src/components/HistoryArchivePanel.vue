@@ -18,6 +18,7 @@ import type { CoverageLedger, FailedChunk, StorageEstimate, UserPrefs } from '..
 import { syncStreamLabel } from '../lib/syncStreams';
 import { defineMessages, useMessages } from '../i18n';
 import { errorTextFor } from '../i18n/errors';
+import { storageEstimateText, storageStopReasonText } from '../lib/storageEstimateText';
 
 const messages = defineMessages(
   {
@@ -77,16 +78,6 @@ const messages = defineMessages(
     failedAttempts: (attempts: number) => `已尝试 ${attempts} 次`,
     failedExhausted: '自动重试已用尽，点「重试失败项」再试一次',
     failedNoReason: '没有记录原因',
-    estimateStopNoSpace: (needed: string, free: string) =>
-      `这次补拉预计需要 ${needed}（含安全余量），本盘只剩 ${free}，不会开始。请先腾出空间或缩短范围。`,
-    estimateDiskUnknown: '未能读取磁盘剩余空间，补拉前请确认本机还有足够空间。',
-    estimateDiskTooSmall: '磁盘剩余不足 300 MB，不能补拉 90 天以上的历史。',
-    estimateBuiltinGuess: (days: number, add: string, free: string) =>
-      `本机样本还不够，用的是内置粗略估算：${days} 天大约占用 ${add}，本盘剩余 ${free}。`,
-    estimateMeasured: (days: number, add: string, free: string) =>
-      `按本机已有数据的实际速率推算，${days} 天大约占用 ${add}，本盘剩余 ${free}。`,
-    estimatePartial: (days: number, add: string, free: string) =>
-      `只按本机已有样本的那几条流推算，${days} 天大约占用 ${add}（其余流样本不足，未计入），本盘剩余 ${free}。`,
     chunkNoCanonical: '云端返回了报文，但没有解析出可用记录',
     retryFailed: '重试失败项',
     retryFailedDone: '失败的月份已重新排队，可以继续补拉了。',
@@ -159,16 +150,6 @@ const messages = defineMessages(
     failedAttempts: (attempts: number) => `${attempts} attempt${attempts === 1 ? '' : 's'}`,
     failedExhausted: 'Automatic retries are used up. Use "Retry failed months" to try again',
     failedNoReason: 'No reason recorded',
-    estimateStopNoSpace: (needed: string, free: string) =>
-      `This backfill needs about ${needed} (including a safety margin) but only ${free} is free, so it will not start. Free up space or shorten the range.`,
-    estimateDiskUnknown: 'Could not read the free disk space. Make sure there is enough room before backfilling.',
-    estimateDiskTooSmall: 'Less than 300 MB free — history longer than 90 days cannot be backfilled.',
-    estimateBuiltinGuess: (days: number, add: string, free: string) =>
-      `Not enough local samples yet, so this is a rough built-in estimate: ${days} days takes about ${add}, and ${free} is free on this drive.`,
-    estimateMeasured: (days: number, add: string, free: string) =>
-      `Based on the rate your own data actually accumulates, ${days} days takes about ${add}, and ${free} is free on this drive.`,
-    estimatePartial: (days: number, add: string, free: string) =>
-      `Based only on the streams that have enough local samples, ${days} days takes about ${add} (the rest are not counted), and ${free} is free on this drive.`,
     chunkNoCanonical: 'The cloud returned a payload, but no usable records could be parsed from it',
     retryFailed: 'Retry failed months',
     retryFailedDone: 'The failed months are queued again. You can continue the backfill.',
@@ -314,36 +295,8 @@ const toggleArchive = async () => {
  *
  * 后端现在只给稳定码，句子在这里按界面语言拼，数字用本地的 formatBytes。
  */
-const estimateText = computed(() => {
-  const value = estimate.value;
-  if (!value) return '';
-  const copy = t.value;
-  const add = formatBytes(value.estimated_add_bytes);
-  const free = formatBytes(value.free_bytes);
-  switch (value.message_code) {
-    case 'ui.estimate.stop_no_space':
-      return copy.estimateStopNoSpace(formatBytes(value.needed_bytes ?? 0), free);
-    case 'ui.estimate.disk_unknown': return copy.estimateDiskUnknown;
-    case 'ui.estimate.disk_too_small': return copy.estimateDiskTooSmall;
-    case 'ui.estimate.builtin_guess': return copy.estimateBuiltinGuess(value.requested_days, add, free);
-    case 'ui.estimate.measured': return copy.estimateMeasured(value.requested_days, add, free);
-    case 'ui.estimate.partial': return copy.estimatePartial(value.requested_days, add, free);
-    // 后端加了新说法而界面还不认识：显示它那句原文，别显示空白。
-    default: return value.message;
-  }
-});
-
-const stopReasonText = computed(() => {
-  const value = estimate.value;
-  if (!value?.stop_reason) return '';
-  if (value.stop_reason_code === 'ui.estimate.stop_no_space') {
-    return t.value.estimateStopNoSpace(
-      formatBytes(value.needed_bytes ?? 0),
-      formatBytes(value.free_bytes),
-    );
-  }
-  return value.stop_reason;
-});
+const estimateText = computed(() => storageEstimateText(estimate.value));
+const stopReasonText = computed(() => storageStopReasonText(estimate.value));
 
 /** 失败原因：先按码取本地文案，取不到才回落到后端原文。 */
 const chunkErrorText = (item: FailedChunk): string => {

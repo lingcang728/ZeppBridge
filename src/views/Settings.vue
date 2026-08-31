@@ -26,6 +26,7 @@ import { checkForDesktopUpdate, downloadAndInstallDesktopUpdate, updateState } f
 import { settingsMessages } from './Settings.i18n';
 import { intlLocale, locale, LOCALES, LOCALE_LABELS, setLocale, useMessages } from '../i18n';
 import { errorTextFor } from '../i18n/errors';
+import { storageEstimateText } from '../lib/storageEstimateText';
 
 const t = useMessages(settingsMessages);
 
@@ -323,6 +324,8 @@ const userPrefs = ref<UserPrefs | null>(null);
 
 /* 登录窗口那几行进度和失败原因原本直接显示后端字符串——全是中文。后端现在
    给的是稳定码，这里按界面语言取文案，取不到才回落到那句中文原文。 */
+const estimateText = computed(() => storageEstimateText(storageEstimate.value));
+
 const loginMessage = computed(() => {
   const status = loginStatus.value;
   if (!status.message && !status.code) return '';
@@ -410,7 +413,8 @@ const applyLoginStatus = async (status: LoginStatus) => {
     if (!appStatus.value?.last_cloud_sync_at) void runSync('incremental');
   }
   if (status.state === 'failed') {
-    loginError.value = status.message || t.value.loginIncomplete;
+    // status.message 是后端的中文原文，只能兜底；先按码取当前语言的说法。
+    loginError.value = errorTextFor(status.code) ?? status.message ?? t.value.loginIncomplete;
   }
 };
 
@@ -740,12 +744,16 @@ const confirmHistorySync = async () => {
     const extra = days >= 365 ? t.value.backfillYearCap : '';
     if (!window.confirm(t.value.backfillConfirm(days, minutes, minutes + 3, extra))) return;
   }
+  // 这两句原本直接显示后端的 `message`——那是中文原文，英文界面上就这么露出来了。
+  // 文案实现只有 lib/storageEstimateText.ts 一份，不要在这里再抄一遍。
   if (storageEstimate.value && !storageEstimate.value.allow_long_history && days >= 90) {
-    dataError.value = storageEstimate.value.message;
+    dataError.value = storageEstimateText(storageEstimate.value);
     return;
   }
   if (storageEstimate.value?.warn_tight_space
-    && !window.confirm(t.value.backfillTightSpace(storageEstimate.value.message, days))) return;
+    && !window.confirm(
+      t.value.backfillTightSpace(storageEstimateText(storageEstimate.value), days),
+    )) return;
   await runSync('history', days);
 };
 
@@ -1339,7 +1347,7 @@ const runCapabilityProbe = async () => {
           />
         </div>
         <p class="retain-note">{{ t.retentionNote(retentionDays) }}<strong>{{ t.retentionNoteStrong }}</strong>{{ t.retentionNoteTail }}</p>
-        <p class="hint-line">{{ storageEstimate?.message || t.retentionCutoff(retentionCutoffDate) }}</p>
+        <p class="hint-line">{{ estimateText || t.retentionCutoff(retentionCutoffDate) }}</p>
         <div class="inline-actions">
           <button class="button secondary" type="button" :disabled="Boolean(dataBusy)" @click="cleanupData">
             {{ dataBusy === 'cleanup' ? t.cleaningUp : t.cleanupNow }}

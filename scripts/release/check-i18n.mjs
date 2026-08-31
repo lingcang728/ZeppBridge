@@ -201,6 +201,102 @@ const unhandledUiCodes = [...declaredUiCodes]
   .filter((code) => !frontendSource.includes(code))
   .sort();
 
+/*
+ * 第四道门：后端那些**带中文原文**的字段，界面不许直接拿来显示。
+ *
+ * 前三道门管的是后端有没有给码。这一道管的是界面有没有用码——两次翻车都是
+ * 这里：后端给了 code，界面却仍然渲染 message/reason/note 的中文原文。
+ * 尤其是同一句话有多个渲染点时（估算说明一度有三处），改了一处就以为修好了。
+ *
+ * 规则：下面这些字段名的每一次出现都必须在 ALLOWED_PROSE 里登记，并写清
+ * 为什么那里可以碰它（几乎总是「按码取不到时的兜底」）。加新的渲染点会红，
+ * 这正是我们要的——它逼你去看一眼有没有走码。
+ */
+const PROSE_FIELDS = /\.(message|stop_reason|reason|note|problem)\b/;
+
+/*
+ * 放过这三类，它们不是「后端散文」：
+ *   - JS 自己的 Error：`error.message` / `cause.message`；
+ *   - 已经走 `toUserMessage(...)` 的地方——那里面就是先查码再回落；
+ *   - CSS（.vue 的 <style> 块、以及形如 `.note { ... }` 的选择器）。
+ */
+const JS_ERROR = /\b(error|err|cause|reason|e)\.(message|reason)\b/;
+const CSS_LINE = /^[.#&][\w-]*[^;]*\{|^\s*[.#][\w-]+\s*[,{]/;
+const isProseRisk = (line) => {
+  if (!PROSE_FIELDS.test(line)) return false;
+  if (line.includes('toUserMessage(')) return false;
+  if (CSS_LINE.test(line.trim())) return false;
+  // `error.message` 这种是 JS Error，不是后端载荷。
+  const stripped = line.replace(JS_ERROR, '');
+  return PROSE_FIELDS.test(stripped);
+};
+
+const ALLOWED_PROSE = [
+  { file: 'lib/storageEstimateText.ts', text: 'estimate.message', why: '估算文案的唯一实现：按 message_code 分支，取不到才回落到原文。' },
+  { file: 'lib/storageEstimateText.ts', text: 'estimate.stop_reason', why: '同上，stop_reason 的兜底。' },
+  { file: 'lib/storageEstimateText.ts', text: 'estimate?.stop_reason', why: '同上。' },
+  { file: 'lib/bridge/errors.ts', text: 'candidate.message', why: 'toUserMessage 本身：先查 code，查不到才用后端原文。' },
+  { file: 'lib/bridge/errors.ts', text: 'error.message', why: '取 JS Error 的 message，不是后端字段。' },
+  { file: 'components/HistoryArchivePanel.vue', text: 'item.error', why: '先按 error_code 查文案，未知码才回落。' },
+  { file: 'components/HistoryArchivePanel.vue', text: 'stop_reason', why: '走 storageStopReasonText，先查码。' },
+  { file: 'components/WeeklyReportCard.vue', text: 'fact.reason', why: 'reason_code 优先，未知码才显示后端原文。' },
+  { file: 'components/BackupPanel.vue', text: 'verification.problem', why: 'verifyProblemText 按 problem_code 分支，未知码才回落。' },
+  { file: 'components/BackupPanel.vue', text: "verifications[item.id].problem", why: '只用来判断有没有失败，显示走 verifyProblemText。' },
+  {
+    file: 'components/HeartRateZonePicker.vue',
+    text: 'basis.note',
+    why: 'basisCopy(basis.id) 优先。后端只产 observed_max / device_max / device_resting / '
+      + 'lactate_threshold / computed_resting 五个 id，界面五个都有文案，所以这只是理论兜底。',
+  },
+  { file: 'components/DevicePicker.vue', text: 't.note', why: '本组件自己的文案，不是后端字段。' },
+  { file: 'components/InsightCard.vue', text: 'entry.reason', why: '只当计数用的 map key，不显示。' },
+  { file: 'composables/useSyncController.ts', text: 'report.message', why: '先按 message_code 取文案。' },
+  { file: 'views/HealthCheck.vue', text: 'action.reason', why: 'actionCopy 按 action.code 取文案，未知才回落。' },
+  { file: 'views/HealthCheck.vue', text: 'stage.message', why: '只在失败类别（error_kind）都认不出来时才兜底显示。' },
+  { file: 'views/Settings.vue', text: 'status.message', why: '先 errorTextFor(status.code)，原文只作兜底。' },
+  { file: 'views/Settings.vue', text: 'item.note', why: 'capability 先按 status 分支，未知状态才回落。' },
+  { file: 'views/Settings.vue', text: 'row.note', why: 'row.note 来自 capabilityNote()，那里已经先按 status 取文案。' },
+  { file: 'composables/useSyncController.ts', text: 'text: payload.message', why: '进度由 code + stream 拼；后端原文只在界面不认识这一步时兜底。' },
+  { file: 'composables/useSyncController.ts', text: 'value.text', why: '同上，renderNotice 里的兜底分支。' },
+  { file: 'views/HealthCheck.vue', text: 'known.reason', why: 'known 是界面自己的文案对象，不是后端字段。' },
+  { file: 'views/HealthCheck.vue', text: 'copy.reason', why: 'copy 是 actionCopy 的结果，已经本地化。' },
+  { file: 'views/HealthCheck.vue', text: 'actionCopy(action).reason', why: '同上，已经本地化。' },
+];
+
+const proseFindings = [];
+for (const file of walk(srcDir)) {
+  const relativePath = relative(srcDir, file).split(sep).join('/');
+  if (SKIP_FILES.includes(relativePath)) continue;
+
+  // .vue 的样式块整段挖掉：CSS 里的 .note / .detail 是类名，不是字段。
+  const raw = readFileSync(file, 'utf8').replace(
+    /<style[\s\S]*?<\/style>/g,
+    (match) => match.replace(/[^\n]/g, ' '),
+  );
+  const cleaned = stripComments(raw);
+  cleaned.split('\n').forEach((line, index) => {
+    if (!isProseRisk(line)) return;
+    const allowed = ALLOWED_PROSE.some(
+      (entry) => entry.file === relativePath && line.includes(entry.text),
+    );
+    if (allowed) return;
+    proseFindings.push({ file: relativePath, line: index + 1, text: line.trim() });
+  });
+}
+
+if (proseFindings.length) {
+  console.error('这里直接用了后端可能是中文原文的字段——先按码取当前语言的文案：');
+  console.error('');
+  for (const finding of proseFindings) {
+    console.error(`  src/${finding.file}:${finding.line}`);
+    console.error(`    ${finding.text.slice(0, 110)}`);
+  }
+  console.error('');
+  console.error('改成先查 code（errorTextFor / *_code 分支），原文只作兜底；');
+  console.error('如果这里确实只能用原文，在 check-i18n.mjs 的 ALLOWED_PROSE 里登记并写清为什么。');
+  process.exit(1);
+}
+
 const missingCodes = [...declaredCodes].filter((code) => (translated.get(code) ?? 0) < 2).sort();
 const unusedCodes = [...translated.keys()].filter((code) => !declaredCodes.has(code)).sort();
 
@@ -235,5 +331,5 @@ if (missingCodes.length || unusedCodes.length) {
 
 console.log(
   `界面文案检查通过：没有硬编码的中文；${declaredCodes.size} 个后端错误码都有中英文案；`
-  + `${declaredUiCodes.size} 个界面文案码都已处理。`,
+  + `${declaredUiCodes.size} 个界面文案码都已处理；后端原文字段只在登记过的兜底处使用。`,
 );

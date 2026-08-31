@@ -313,6 +313,8 @@ export interface BackupVerification {
   sha256_match: boolean;
   integrity_ok: boolean;
   problem: string | null;
+  /** `problem` 那句话的稳定码（`ui.backup.*`）。界面按它取自己语言的说法。 */
+  problem_code?: string | null;
 }
 
 export type RestoreCompatibility =
