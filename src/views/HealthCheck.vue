@@ -344,6 +344,16 @@ const actionCopy = (action: HealthAction): { label: string; reason: string } => 
   return { label: known.label, reason };
 };
 
+/* 只有当失败类别是我们不认识的，后端那句原文才有价值；否则它是冗余的中文。 */
+const unknownStageDetail = (stream: StreamHealth): string => {
+  for (const stage of [stream.fetch, stream.parse]) {
+    if (stage.state !== 'failed' || !stage.message) continue;
+    const known = lookup(t.value.errorKind, stage.error_kind || 'unknown');
+    if (!known) return stage.message;
+  }
+  return '';
+};
+
 const stageText = (stage: StageState): string => {
   if (stage.state === 'failed') {
     return lookup(t.value.errorKind, stage.error_kind || 'unknown') ?? t.value.stage.failed;
@@ -511,8 +521,11 @@ onMounted(() => void load());
                 <i aria-hidden="true"></i>{{ t.stageLine(stage[0], stageText(stage[1])) }}
               </span>
             </div>
-            <p v-if="stream.parse.message || stream.fetch.message" class="stream-message">
-              {{ stream.fetch.message || stream.parse.message }}
+            <!-- `error_kind` 是稳定码，上面那行已经按界面语言显示过了。
+                 后端的 `message` 是中文原文，只有在类别都认不出来时才拿它兜底，
+                 否则英文界面会在这里冒出一段中文。 -->
+            <p v-if="unknownStageDetail(stream)" class="stream-message">
+              {{ unknownStageDetail(stream) }}
             </p>
             <dl class="stream-facts">
               <div><dt>{{ t.factRaw }}</dt><dd>{{ stream.raw_records.toLocaleString(intlLocale()) }}</dd></div>

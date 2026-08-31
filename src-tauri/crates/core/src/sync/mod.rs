@@ -490,7 +490,8 @@ impl SyncManager {
                     &chunk.chunk_start,
                     status,
                     records,
-                    reason.as_deref(),
+                    reason.as_ref().map(|(_, text)| text.as_str()),
+                    reason.as_ref().map(|(code, _)| *code),
                 )?,
                 Err(error) if error.is_cancelled() => break,
                 Err(error) => db.record_backfill_chunk(
@@ -499,6 +500,7 @@ impl SyncManager {
                     ChunkStatus::Failed,
                     0,
                     Some(&error.user_message()),
+                    Some(error.code()),
                 )?,
             }
         }
@@ -515,7 +517,7 @@ impl SyncManager {
         &self,
         chunk: &CoverageChunk,
         time_zone: &str,
-    ) -> Result<(ChunkStatus, i64, Option<String>)> {
+    ) -> Result<(ChunkStatus, i64, Option<(&'static str, String)>)> {
         let start = chrono::NaiveDate::parse_from_str(&chunk.chunk_start, "%Y-%m-%d")
             .map_err(|_| ZeppBridgeError::ParseError("覆盖账本里的日期无效".into()))?;
         let end = chrono::NaiveDate::parse_from_str(&chunk.chunk_end, "%Y-%m-%d")
@@ -555,7 +557,10 @@ impl SyncManager {
                     Ok((
                         ChunkStatus::Failed,
                         0,
-                        Some("云端返回了报文，但没有解析出可用记录".to_string()),
+                        Some((
+                            "err.backfill.no_canonical_records",
+                            "云端返回了报文，但没有解析出可用记录".to_string(),
+                        )),
                     ))
                 }
             }

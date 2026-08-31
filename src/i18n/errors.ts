@@ -63,6 +63,7 @@ const messages = defineMessages(
     'err.sync.deferred_compaction': '正在压缩历史报文以节省磁盘空间，本次云端同步稍后自动重试',
     'err.sync.deferred_replay': '正在用本地原始报文重建派生数据，本次云端同步稍后自动重试',
     'err.backfill.bad_start_date': '补拉起点日期无效，需要 YYYY-MM-DD',
+    'err.backfill.no_canonical_records': '云端返回了报文，但没有解析出可用记录',
     'err.backfill.start_in_future': '补拉起点不能晚于今天',
 
     /* —— 能力状态 —— */
@@ -171,6 +172,8 @@ const messages = defineMessages(
     'err.sync.deferred_replay':
       'Rebuilding derived data from local payloads. This sync will retry automatically',
     'err.backfill.bad_start_date': 'Invalid backfill start date — use YYYY-MM-DD',
+    'err.backfill.no_canonical_records':
+      'The cloud returned a payload, but no usable records could be parsed from it',
     'err.backfill.start_in_future': 'The backfill start cannot be later than today',
 
     /* —— capabilities —— */

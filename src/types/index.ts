@@ -68,12 +68,19 @@ export interface StorageEstimate {
   allow_long_history: boolean;
   warn_tight_space: boolean;
   message: string;
+  /** `message` 那句话的稳定码（`ui.estimate.*`）。界面按它选说法，再用
+      上面这些数字自己排版——后端不按界面语言出文案。 */
+  message_code?: string;
   requested_days: number;
   streams: StreamStorageEstimate[];
   /** 六条流全部有足够本机样本时才为真。为假时总数只是粗略参考。 */
   measured: boolean;
   /** 非 null 表示空间不足，补拉不会开始。 */
   stop_reason: string | null;
+  /** `stop_reason` 那句话的稳定码。 */
+  stop_reason_code?: string | null;
+  /** 这次补拉预计需要的字节数，含安全余量。排 stop_reason 那句话要用。 */
+  needed_bytes?: number;
 }
 
 export interface UserPrefs {
@@ -255,6 +262,8 @@ export interface FailedChunk {
   /** `YYYY-MM-01`。 */
   chunk_start: string;
   error: string | null;
+  /** 失败原因的稳定码。界面按它取自己语言的文案，取不到才显示 `error`。 */
+  error_code?: string | null;
   attempts: number;
   /** 自动重试已用尽，要用户显式重试才会再动。 */
   exhausted: boolean;

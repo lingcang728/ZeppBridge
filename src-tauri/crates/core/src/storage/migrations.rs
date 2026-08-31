@@ -519,6 +519,9 @@ impl Database {
             &[
                 ("attempts", "INTEGER NOT NULL DEFAULT 0"),
                 ("last_attempt_at", "TEXT"),
+                // 失败原因的稳定码。没有它，界面就只能显示后端那句中文原文——
+                // 英文用户在补拉账本里看到的就是一行中文。
+                ("error_code", "TEXT"),
             ],
         )?;
         self.conn.execute_batch("PRAGMA user_version = 16;")?;

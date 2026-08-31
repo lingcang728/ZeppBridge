@@ -84,8 +84,10 @@ pub struct FailedChunk {
     pub stream: String,
     /// `YYYY-MM-01`。界面只显示到月。
     pub chunk_start: String,
-    /// 已脱敏的失败原因。可能为空（旧库里的行没有记）。
+    /// 已脱敏的失败原因（中文原文）。界面优先用 `error_code`，取不到才显示它。
     pub error: Option<String>,
+    /// 失败原因的稳定码。旧库里的行没有，为空。
+    pub error_code: Option<String>,
     pub attempts: i64,
     /// 自动重试次数已用尽，要用户显式重试才会再动。
     pub exhausted: bool,
@@ -225,7 +227,7 @@ impl Database {
     /// ——用户既不知道是哪个月，也不知道该不该重试。
     pub fn failed_backfill_chunks(&self) -> Result<Vec<FailedChunk>> {
         let mut stmt = self.conn.prepare(
-            "SELECT stream, chunk_start, error, attempts
+            "SELECT stream, chunk_start, error, attempts, error_code
              FROM coverage_ledger
              WHERE status = 'failed'
              ORDER BY chunk_start DESC, stream ASC",
@@ -235,6 +237,7 @@ impl Database {
                 stream: row.get(0)?,
                 chunk_start: row.get(1)?,
                 error: row.get::<_, Option<String>>(2)?,
+                error_code: row.get::<_, Option<String>>(4)?,
                 attempts: row.get(3)?,
                 exhausted: row.get::<_, i64>(3)? >= MAX_AUTO_ATTEMPTS,
             })
@@ -268,6 +271,7 @@ impl Database {
         status: ChunkStatus,
         records: i64,
         error: Option<&str>,
+        error_code: Option<&str>,
     ) -> Result<()> {
         let now = Utc::now().to_rfc3339();
         let fetched_at = matches!(status, ChunkStatus::Persisted | ChunkStatus::EmptyFromCloud)
@@ -281,6 +285,7 @@ impl Database {
                     error = ?5,
                     fetched_at = COALESCE(?6, fetched_at),
                     persisted_at = COALESCE(?7, persisted_at),
+                    error_code = ?10,
                     attempts = CASE WHEN ?9 THEN attempts + 1 ELSE 0 END,
                     last_attempt_at = ?8,
                     updated_at = ?8
@@ -294,7 +299,8 @@ impl Database {
                 fetched_at,
                 persisted_at,
                 now,
-                failed
+                failed,
+                error_code
             ],
         )?;
         Ok(())
@@ -482,6 +488,7 @@ mod tests {
                 ChunkStatus::Failed,
                 0,
                 Some("网络中断"),
+                Some("err.core.network"),
             )
             .unwrap();
         }
@@ -507,8 +514,15 @@ mod tests {
             .unwrap();
 
         for _ in 0..2 {
-            db.record_backfill_chunk("hrv", "2026-08-01", ChunkStatus::Failed, 0, Some("超时"))
-                .unwrap();
+            db.record_backfill_chunk(
+                "hrv",
+                "2026-08-01",
+                ChunkStatus::Failed,
+                0,
+                Some("超时"),
+                Some("err.backfill.no_canonical_records"),
+            )
+            .unwrap();
         }
         let failed = db.failed_backfill_chunks().unwrap();
         let entry = failed
@@ -520,7 +534,7 @@ mod tests {
         assert!(!entry.exhausted);
 
         // 后来成功了，就不该再背着历史包袱。
-        db.record_backfill_chunk("hrv", "2026-08-01", ChunkStatus::Persisted, 42, None)
+        db.record_backfill_chunk("hrv", "2026-08-01", ChunkStatus::Persisted, 42, None, None)
             .unwrap();
         assert!(db
             .failed_backfill_chunks()
@@ -534,13 +548,21 @@ mod tests {
         let db = db();
         db.plan_backfill(date("2026-08-01"), date("2026-08-31"))
             .unwrap();
-        db.record_backfill_chunk("sleep", "2026-08-01", ChunkStatus::Persisted, 30, None)
-            .unwrap();
+        db.record_backfill_chunk(
+            "sleep",
+            "2026-08-01",
+            ChunkStatus::Persisted,
+            30,
+            None,
+            None,
+        )
+        .unwrap();
         db.record_backfill_chunk(
             "wellness",
             "2026-08-01",
             ChunkStatus::EmptyFromCloud,
             0,
+            None,
             None,
         )
         .unwrap();
@@ -551,6 +573,7 @@ mod tests {
                 ChunkStatus::Failed,
                 0,
                 Some("解析失败"),
+                Some("err.backfill.no_canonical_records"),
             )
             .unwrap();
         }
@@ -583,6 +606,74 @@ mod tests {
         assert_eq!(wellness.empty_chunks, 1);
     }
 
+    /// 送到界面的中文必须带一个码。
+    ///
+    /// 这是这一类 bug 的通用门禁，不是某几句话的补丁。后端仍然带中文原文当
+    /// 兜底（CLI 和日志要用），但只要某个字段可能是中文，界面就必须能从
+    /// 兄弟字段 `<字段>_code` 拿到码去查自己语言的说法。
+    ///
+    /// 会漏的历史：`StorageEstimate.message`、`CoverageLedger` 里失败块的
+    /// `error`——它们都不是「错误」，所以上一轮给错误加码时没被覆盖到，
+    /// 于是英文界面上照样是中文。
+    fn assert_chinese_carries_a_code(value: &serde_json::Value, path: &str) {
+        fn has_chinese(text: &str) -> bool {
+            text.chars().any(|c| ('\u{4e00}'..='\u{9fff}').contains(&c))
+        }
+        match value {
+            serde_json::Value::Object(map) => {
+                for (key, child) in map {
+                    if let serde_json::Value::String(text) = child {
+                        if has_chinese(text) {
+                            let code_key = format!("{key}_code");
+                            let code = map.get(&code_key);
+                            assert!(
+                                matches!(code, Some(serde_json::Value::String(c)) if !c.is_empty()),
+                                "{path}.{key} 是中文却没有 {code_key}：英文界面会原样显示这句中文\n值：{text}"
+                            );
+                        }
+                    }
+                    assert_chinese_carries_a_code(child, &format!("{path}.{key}"));
+                }
+            }
+            serde_json::Value::Array(items) => {
+                for (index, child) in items.iter().enumerate() {
+                    assert_chinese_carries_a_code(child, &format!("{path}[{index}]"));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    #[test]
+    fn the_ledger_never_sends_chinese_without_a_code() {
+        let db = db();
+        db.plan_backfill(date("2026-08-01"), date("2026-08-31"))
+            .unwrap();
+        // 三种失败来源都走一遍：core 错误、确定性解析失败、以及没有码的旧行。
+        db.record_backfill_chunk(
+            "heart_rate",
+            "2026-08-01",
+            ChunkStatus::Failed,
+            0,
+            Some("云端返回了报文，但没有解析出可用记录"),
+            Some("err.backfill.no_canonical_records"),
+        )
+        .unwrap();
+        db.record_backfill_chunk(
+            "sleep",
+            "2026-08-01",
+            ChunkStatus::Failed,
+            0,
+            Some("无法连接 Zepp 区域，请检查网络后重试"),
+            Some("err.core.network"),
+        )
+        .unwrap();
+
+        let ledger = db.coverage_ledger().unwrap();
+        let json = serde_json::to_value(&ledger).unwrap();
+        assert_chinese_carries_a_code(&json, "ledger");
+    }
+
     #[test]
     fn chunks_align_to_calendar_months_and_cover_both_ends() {
         let chunks = month_chunks(date("2026-01-15"), date("2026-03-02"));
@@ -607,8 +698,15 @@ mod tests {
             .unwrap();
         assert_eq!(planned, (BACKFILL_STREAMS.len() * 2) as i64);
 
-        db.record_backfill_chunk("sleep", "2026-01-01", ChunkStatus::Persisted, 31, None)
-            .unwrap();
+        db.record_backfill_chunk(
+            "sleep",
+            "2026-01-01",
+            ChunkStatus::Persisted,
+            31,
+            None,
+            None,
+        )
+        .unwrap();
 
         // 再排一次同样的范围：已完成的块不该被打回待办。
         let replanned = db
@@ -631,8 +729,15 @@ mod tests {
         let db = db();
         db.plan_backfill(date("2026-01-01"), date("2026-01-31"))
             .unwrap();
-        db.record_backfill_chunk("hrv", "2026-01-01", ChunkStatus::EmptyFromCloud, 0, None)
-            .unwrap();
+        db.record_backfill_chunk(
+            "hrv",
+            "2026-01-01",
+            ChunkStatus::EmptyFromCloud,
+            0,
+            None,
+            None,
+        )
+        .unwrap();
 
         let pending = db.pending_backfill_chunks(100).unwrap();
         assert!(
@@ -664,6 +769,7 @@ mod tests {
             ChunkStatus::Failed,
             0,
             Some("网络超时"),
+            Some("err.core.network"),
         )
         .unwrap();
 
@@ -675,8 +781,15 @@ mod tests {
         assert_eq!(failed.error.as_deref(), Some("网络超时"));
 
         // 重试成功之后错误要被清掉，不能一直挂着。
-        db.record_backfill_chunk("workouts", "2026-01-01", ChunkStatus::Persisted, 5, None)
-            .unwrap();
+        db.record_backfill_chunk(
+            "workouts",
+            "2026-01-01",
+            ChunkStatus::Persisted,
+            5,
+            None,
+            None,
+        )
+        .unwrap();
         let ledger = db.coverage_ledger().unwrap();
         let workouts = ledger
             .streams
@@ -700,7 +813,7 @@ mod tests {
         assert!(!db.coverage_ledger().unwrap().complete);
 
         for stream in BACKFILL_STREAMS {
-            db.record_backfill_chunk(stream, "2026-01-01", ChunkStatus::Persisted, 1, None)
+            db.record_backfill_chunk(stream, "2026-01-01", ChunkStatus::Persisted, 1, None, None)
                 .unwrap();
         }
         let ledger = db.coverage_ledger().unwrap();

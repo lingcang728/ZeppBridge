@@ -182,8 +182,36 @@ for (const match of errorBundle.matchAll(/'(err\.[a-z_]+\.[a-z0-9_]+)':/g)) {
   translated.set(match[1], (translated.get(match[1]) ?? 0) + 1);
 }
 
+/*
+ * 第三道门：后端的**非错误散文**也得有码，而且界面得真的处理了它。
+ *
+ * 上一轮只给错误加了码，于是「估算说明」「补拉失败原因」这类散文字段仍然
+ * 裸奔到界面——英文界面上照样是中文。这类文案要带数字参数，住在组件自己的
+ * 文案包里而不是 errors.ts，所以这里只能检查「界面有没有处理这个码」：
+ * Rust 里声明的每个 `ui.*` 码，都必须在 src/ 里出现过。
+ */
+const UI_CODE_PATTERN = /"(ui\.[a-z_]+\.[a-z0-9_]+)"/g;
+const declaredUiCodes = new Set();
+for (const file of walkRust(tauriDir)) {
+  const source = readFileSync(file, 'utf8');
+  for (const match of source.matchAll(UI_CODE_PATTERN)) declaredUiCodes.add(match[1]);
+}
+const frontendSource = walk(srcDir).map((file) => readFileSync(file, 'utf8')).join('\n');
+const unhandledUiCodes = [...declaredUiCodes]
+  .filter((code) => !frontendSource.includes(code))
+  .sort();
+
 const missingCodes = [...declaredCodes].filter((code) => (translated.get(code) ?? 0) < 2).sort();
 const unusedCodes = [...translated.keys()].filter((code) => !declaredCodes.has(code)).sort();
+
+if (unhandledUiCodes.length) {
+  console.error('后端声明了界面没有处理的文案码——界面会回落到后端那句中文：');
+  console.error('');
+  for (const code of unhandledUiCodes) console.error(`  ${code}`);
+  console.error('');
+  console.error('在对应组件的 defineMessages 里补中英两份，并在渲染处按码分支。');
+  process.exit(1);
+}
 
 if (missingCodes.length || unusedCodes.length) {
   if (missingCodes.length) {
@@ -206,5 +234,6 @@ if (missingCodes.length || unusedCodes.length) {
 }
 
 console.log(
-  `界面文案检查通过：没有硬编码的中文；${declaredCodes.size} 个后端错误码都有中英文案。`,
+  `界面文案检查通过：没有硬编码的中文；${declaredCodes.size} 个后端错误码都有中英文案；`
+  + `${declaredUiCodes.size} 个界面文案码都已处理。`,
 );
