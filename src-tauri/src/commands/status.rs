@@ -26,7 +26,14 @@ pub(crate) async fn build_app_status(state: &AppState) -> std::result::Result<Ap
         let prefs = database.user_prefs()?;
         let storage = database.storage_estimate(prefs.history_sync_days, &state.data_dir)?;
         let coverage = database.local_coverage()?;
-        (statuses, freshness, cloud_metadata, prefs, storage, coverage)
+        (
+            statuses,
+            freshness,
+            cloud_metadata,
+            prefs,
+            storage,
+            coverage,
+        )
     };
 
     let auth_state = state.auth_state.read().await.clone();
