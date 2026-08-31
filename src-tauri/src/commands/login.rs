@@ -17,9 +17,46 @@ const LOGIN_EVENT: &str = "login://status";
 const PRIMARY_LOGIN_URL: &str = "https://watchface.zepp.com/";
 const FALLBACK_LOGIN_URL: &str = "https://user.huami.com/privacy2/index.html";
 const POLL_INTERVAL: Duration = Duration::from_millis(750);
-const FALLBACK_AFTER: Duration = Duration::from_secs(40);
+/// 多久没人动这一页，才替用户去开备用页。
+///
+/// 这个计时器只对付一种情况：主登录页在这台机器上根本没渲染出来，用户对着
+/// 一片空白干等。它不是「登录该在多少秒内完成」——输邮箱密码、等邮箱里的
+/// 验证码、走第三方授权，本来就会花掉远不止这点时间。所以除了等够时间，
+/// 还要确认这一页确实没人碰过，见 `fallback_is_due` 与 `login_page_is_idle`。
+const FALLBACK_AFTER: Duration = Duration::from_secs(90);
 const SESSION_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const COOKIE_EVAL_TIMEOUT: Duration = Duration::from_secs(2);
+/// 区域探测因为网络问题失败之后，隔多久再试一次。
+const REGION_RETRY_BACKOFF: Duration = Duration::from_secs(5);
+
+/// 在登录窗口里记一个「用户碰过这一页」的标记。
+///
+/// 只记有没有发生过输入类事件，不看键值、不看内容。登录表单常常在跨源 iframe
+/// 里，事件不会冒泡到顶层文档，所以子框架用 postMessage 往上报一个固定字符串。
+/// 每次导航都会重新注入，标记因此只代表当前这一页。
+const LOGIN_ACTIVITY_SCRIPT: &str = r#"(function(){
+  try {
+    if (window.__zeppbridgeActivityHooked) { return; }
+    window.__zeppbridgeActivityHooked = true;
+    window.__zeppbridgeInteracted = false;
+    var mark = function(){
+      window.__zeppbridgeInteracted = true;
+      try {
+        if (window.top && window.top !== window) {
+          window.top.postMessage('zeppbridge:login-activity', '*');
+        }
+      } catch (e) {}
+    };
+    ['keydown','pointerdown','mousedown','touchstart','paste','input','change'].forEach(function(name){
+      window.addEventListener(name, mark, true);
+    });
+    window.addEventListener('message', function(event){
+      if (event && event.data === 'zeppbridge:login-activity') {
+        window.__zeppbridgeInteracted = true;
+      }
+    }, true);
+  } catch (e) {}
+})();"#;
 
 const REGION_HOST_ALLOWLIST: &[&str] = &[
     "https://api-mifit-cn.huami.com",
@@ -107,6 +144,8 @@ fn build_login_window(
         // but closing it discards the session instead of silently reusing it
         // for the next account.
         .incognito(true)
+        // 登录表单可能在子框架里，两边都要挂上活动标记。
+        .initialization_script_for_all_frames(LOGIN_ACTIVITY_SCRIPT)
         .inner_size(920.0, 760.0)
         .min_inner_size(420.0, 520.0)
         .resizable(true)
@@ -150,13 +189,25 @@ fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow) {
         // 东西——后者该直接把手动 / HAR 兜底摆到他面前，而不是让他等满 15
         // 分钟再看到一句「登录超时」。
         let mut looked_signed_in = false;
+        // 这次会话里，用户碰过登录窗口没有。只认阳性证据：页面明确说有人在
+        // 输入，或者地址已经走到第三方登录页。一旦立起来就不再放下——页面
+        // 内部的跳转会把注入的活动标记清空，可用户并没有因此变成没在登录。
+        let mut user_active = false;
+        // 凭据已经读到了，卡住的是后面的区域确认。这和「压根没登录」「登录了
+        // 但读不到凭据」都不一样，超时那一刻得说对是哪一种。
+        let mut credentials_extracted = false;
 
         loop {
             if !epoch_active(&app, epoch) {
                 return;
             }
             if started.elapsed() >= SESSION_TIMEOUT {
-                let (code, message) = if looked_signed_in {
+                let (code, message) = if credentials_extracted {
+                    (
+                        "err.login.region_unreachable",
+                        "读到了凭据，但一直没能连上 Zepp 区域服务确认账号，请检查网络后重试",
+                    )
+                } else if looked_signed_in {
                     (
                         "err.login.credentials_unreadable",
                         "已经登录，但没能从登录窗口读到凭据。可以改用 HAR 导入或手动填写 App Token。",
@@ -174,7 +225,24 @@ fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow) {
             }
 
             let page_url = current_page_url(&window);
-            if should_use_fallback(started.elapsed(), fallback_used, &page_url) {
+            // 只有在还可能跳转时才去问页面；问出「有人在用」就永久作罢。
+            let mut page_is_idle = false;
+            if !user_active {
+                if is_primary_login_page(&page_url) {
+                    match login_page_activity(&window).await {
+                        Some(true) => page_is_idle = true,
+                        Some(false) => user_active = true,
+                        // 问不出来就什么都不做：既不当成有人用（那会让「页面
+                        // 根本没渲染出来」永远等不到备用页），也不当成空闲。
+                        None => {}
+                    }
+                } else {
+                    // 地址已经不是我们打开的那一页——小米验证码页、Google /
+                    // Facebook 授权页、微信扫码页。用户正在登录流程里。
+                    user_active = true;
+                }
+            }
+            if page_is_idle && fallback_is_due(started.elapsed(), fallback_used) {
                 fallback_used = true;
                 let _ = window.navigate(
                     FALLBACK_LOGIN_URL
@@ -200,6 +268,7 @@ fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow) {
                 log_credential_probe(&page_url, &cookies);
             }
             if let Some(extracted) = parse_login_cookies(&cookies) {
+                credentials_extracted = true;
                 emit_progress(
                     &app,
                     epoch,
@@ -236,8 +305,31 @@ fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow) {
                         close_login_window(&app);
                         return;
                     }
+                    // 网络这会儿不通，凭据本身没问题。关掉登录窗口等于把
+                    // 隔离会话一起丢掉——用户要连验证码、扫码一起重来一遍。
+                    // 所以窗口留着，隔几秒再试，直到网络恢复或整场会话超时。
+                    Err(failure) if failure.retryable => {
+                        emit_progress(
+                            &app,
+                            epoch,
+                            "waiting",
+                            "err.login.region_retrying",
+                            "暂时连不上 Zepp 区域服务，正在重试；登录窗口先留着",
+                            &page_url,
+                        )
+                        .await;
+                        tokio::time::sleep(REGION_RETRY_BACKOFF).await;
+                        continue;
+                    }
                     Err(failure) => {
-                        finish_failed(&app, epoch, &failure.code, &failure.message, page_url).await;
+                        finish_failed(
+                            &app,
+                            epoch,
+                            &failure.error.code,
+                            &failure.error.message,
+                            page_url,
+                        )
+                        .await;
                         close_login_window(&app);
                         return;
                     }
@@ -249,16 +341,42 @@ fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow) {
     });
 }
 
+/// 一次登录失败，值不值得原地再试一次。
+///
+/// 「网络不通」和「Zepp 拒绝了这个凭据」是两件事：前者过一会儿就好，后者再
+/// 等也没用。之前两者都直接关掉登录窗口——而这个窗口是隔离会话，关掉就等于
+/// 让用户把验证码、扫码、第三方授权全部重来一遍。
+struct LoginFailure {
+    error: AppError,
+    retryable: bool,
+}
+
+impl LoginFailure {
+    fn fatal(error: AppError) -> Self {
+        Self {
+            error,
+            retryable: false,
+        }
+    }
+
+    fn retryable(error: AppError) -> Self {
+        Self {
+            error,
+            retryable: true,
+        }
+    }
+}
+
 async fn persist_extracted_login(
     app: &AppHandle,
     epoch: u64,
     extracted: &ExtractedLogin,
-) -> std::result::Result<(), AppError> {
+) -> std::result::Result<(), LoginFailure> {
     let Some(state) = app.try_state::<AppState>() else {
-        return Err(AppError::new(
+        return Err(LoginFailure::fatal(AppError::new(
             "err.login.state_unavailable",
             "应用状态不可用",
-        ));
+        )));
     };
     let (preferred, authoritative_count) =
         preferred_region_hosts(&state, &extracted.user_id, extracted.region_hint.as_deref()).await;
@@ -270,14 +388,16 @@ async fn persist_extracted_login(
     )
     .await?;
     if !epoch_active(app, epoch) {
-        return Err(AppError::new("err.login.cancelled", "登录已取消"));
+        return Err(LoginFailure::fatal(AppError::new(
+            "err.login.cancelled",
+            "登录已取消",
+        )));
     }
 
     if let Err(error) = state.auth.save_auth(&auth) {
-        return Err(AppError::new(
-            "err.login.save_failed",
-            format!("认证信息保存失败：{error}"),
-        ));
+        // 保存失败通常是系统凭据管理器的事（被策略禁用、令牌超长），原样带上
+        // 底层原因；界面按 code 取本地化文案，这句中文留给 CLI、日志和报告。
+        return Err(LoginFailure::fatal(AppError::from(error)));
     }
 
     let manager = match AppState::build_sync_manager(auth, &state.data_dir) {
@@ -297,7 +417,10 @@ async fn persist_extracted_login(
                 let mut warning = state.auth_warning.write().await;
                 *warning = Some(format!("无法初始化同步，请检查认证区域后重试：{message}"));
             }
-            return Err(AppError::new("err.login.sync_init_failed", message));
+            return Err(LoginFailure::fatal(AppError::new(
+                "err.login.sync_init_failed",
+                message,
+            )));
         }
     };
 
@@ -344,25 +467,26 @@ impl RegionProbeFailures {
         }
     }
 
-    fn into_app_error(self) -> AppError {
+    fn into_login_failure(self) -> LoginFailure {
         // An explicit 401/403 is stronger evidence than failures from the
         // fallback hosts. Do not hide it behind unrelated 404s or timeouts.
         if self.rejected > 0 {
-            return AppError::new(
+            return LoginFailure::fatal(AppError::new(
                 "err.login.credentials_rejected",
                 "Zepp 拒绝了这次登录凭据，请退出登录窗口后重新登录",
-            );
+            ));
         }
+        // 唯一值得原地重试的一类：凭据没被否掉，只是这会儿够不着区域服务。
         if self.transient > 0 {
-            return AppError::new(
+            return LoginFailure::retryable(AppError::new(
                 "err.login.region_unreachable",
                 "暂时无法连接 Zepp 区域服务，请检查网络后重试",
-            );
+            ));
         }
-        AppError::new(
+        LoginFailure::fatal(AppError::new(
             "err.login.region_probe_failed",
             "读到了凭据，但无法确认账号区域。请重新登录，或改用 HAR 导入。",
-        )
+        ))
     }
 }
 
@@ -381,7 +505,7 @@ async fn probe_region_hosts(
     app_token: &str,
     hosts: &[String],
     authoritative_count: usize,
-) -> std::result::Result<AuthInfo, AppError> {
+) -> std::result::Result<AuthInfo, LoginFailure> {
     let deadline = tokio::time::Instant::now() + Duration::from_secs(45);
     let mut failures = RegionProbeFailures::default();
     let authoritative_count = authoritative_count.min(hosts.len());
@@ -419,7 +543,7 @@ async fn probe_region_hosts(
     {
         return Ok(auth);
     }
-    Err(failures.into_app_error())
+    Err(failures.into_login_failure())
 }
 
 async fn probe_region_batch(
@@ -862,11 +986,19 @@ fn sanitize_user_id(value: &str) -> Option<String> {
 
 fn sanitize_app_token(value: &str) -> Option<String> {
     let value = value.trim();
-    if value.is_empty() || value.len() > 16 * 1024 || value.chars().any(char::is_control) {
-        None
-    } else {
-        Some(value.to_string())
+    if value.is_empty() || value.chars().any(char::is_control) {
+        return None;
     }
+    // 存不进系统凭据管理器的东西，不可能是 App Token。以前这里放行到 16 KB，
+    // 比 Windows 真正存得下的多出六倍：超长的值一路走到保存那一步才炸，而且
+    // 报的是「无法写入 Windows 凭据管理器」，完全指不到长度上。
+    //
+    // 早一步否掉还有第二个好处：候选是按顺序试的，否掉一段从页面存储里捞到的
+    // JSON，下一个候选（打包在 hm-user-login-info 里的那个真令牌）才有机会。
+    if value.encode_utf16().count() > crate::auth::CREDENTIAL_MAX_UTF16_UNITS {
+        return None;
+    }
+    Some(value.to_string())
 }
 
 fn is_allowed_login_url(url: &str) -> bool {
@@ -955,8 +1087,61 @@ fn log_credential_probe(page_url: &str, cookies: &[(String, String)]) {
     );
 }
 
-fn should_use_fallback(elapsed: Duration, fallback_used: bool, page_url: &str) -> bool {
-    !fallback_used && elapsed >= FALLBACK_AFTER && !page_url.starts_with("https://user.huami.com/")
+/// 备用页的时间前提。
+///
+/// 「这一页还有没有人在用」由 `login_page_activity` 单独回答，两件事分开判断：
+/// 这里只管等够了没有、以及是不是已经跳过一次。
+///
+/// 之前这里只看时间，于是所有需要输密码或等验证码的登录都会在计时到点时被
+/// 打断，页面被换成 `user.huami.com` 的隐私页（那上面只有清除数据、注销账号
+/// 这些选项）。
+fn fallback_is_due(elapsed: Duration, fallback_used: bool) -> bool {
+    !fallback_used && elapsed >= FALLBACK_AFTER
+}
+
+/// 窗口是不是还停在我们自己打开的那一页。
+///
+/// 地址一变，用户就已经在第三方登录流程里了，任何自动跳转都是打断。
+fn is_primary_login_page(page_url: &str) -> bool {
+    page_url.starts_with("https://watchface.zepp.com")
+}
+
+/// 这一页有没有人在用：`Some(true)` 空闲，`Some(false)` 有人，`None` 问不出来。
+///
+/// 三态是有意的。答不上来的时候既不能当成有人用——那样「主登录页压根没渲染
+/// 出来」的人永远等不到备用页；也不能当成空闲——那样一次超时就足以把正在等
+/// 验证码的人导走。所以问不出来就什么都不做，下一轮再问。
+async fn login_page_activity(window: &WebviewWindow) -> Option<bool> {
+    const SCRIPT: &str = r#"(function(){
+  try {
+    var typed = false;
+    var fields = document.querySelectorAll('input, textarea');
+    for (var i = 0; i < fields.length; i++) {
+      var field = fields[i];
+      if (field.type === 'hidden') { continue; }
+      if (field.value && String(field.value).length > 0) { typed = true; break; }
+    }
+    return JSON.stringify({ idle: !window.__zeppbridgeInteracted && !typed });
+  } catch (e) { return JSON.stringify({ idle: false }); }
+})()"#;
+
+    let (tx, rx) = tokio::sync::oneshot::channel::<String>();
+    let sent = std::sync::Mutex::new(Some(tx));
+    window
+        .eval_with_callback(SCRIPT, move |raw| {
+            if let Some(tx) = sent.lock().ok().and_then(|mut guard| guard.take()) {
+                let _ = tx.send(decode_eval_string(&raw));
+            }
+        })
+        .ok()?;
+    let raw = tokio::time::timeout(COOKIE_EVAL_TIMEOUT, rx)
+        .await
+        .ok()
+        .and_then(Result::ok)?;
+    serde_json::from_str::<Value>(&raw)
+        .ok()?
+        .get("idle")
+        .and_then(Value::as_bool)
 }
 
 fn current_page_url(window: &WebviewWindow) -> String {
@@ -1043,6 +1228,49 @@ async fn finish_idle_if_active(app: &AppHandle, epoch: u64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 用户还在主登录页上输密码时，绝不能把页面导走。
+    ///
+    /// 这一条对应线上反馈：邮箱密码刚输一半，或者去邮箱抄验证码的工夫，
+    /// 页面就被换成了隐私页（清除数据／注销账号），登录只能从头再来。
+    #[test]
+    fn fallback_needs_the_full_wait_and_fires_at_most_once() {
+        let long_enough = FALLBACK_AFTER + Duration::from_secs(5);
+
+        assert!(fallback_is_due(long_enough, false));
+        assert!(!fallback_is_due(Duration::from_secs(5), false));
+        assert!(!fallback_is_due(long_enough, true));
+    }
+
+    /// 用户一旦走进第三方登录流程，就绝不能把页面导走。
+    ///
+    /// 这一条对应线上反馈：去邮箱抄小米验证码的工夫，页面被换成了隐私页
+    /// （清除数据／注销账号），登录只能从头再来。地址已经不是我们打开的那
+    /// 一页，就是「用户正在登录」的确证，轮不到计时器说话。
+    #[test]
+    fn only_the_page_we_opened_may_be_navigated_away() {
+        assert!(is_primary_login_page("https://watchface.zepp.com"));
+        assert!(is_primary_login_page("https://watchface.zepp.com/"));
+        assert!(is_primary_login_page(
+            "https://watchface.zepp.com/login?from=app"
+        ));
+
+        assert!(!is_primary_login_page(
+            "https://account.xiaomi.com/oauth2/authorize"
+        ));
+        assert!(!is_primary_login_page(
+            "https://accounts.google.com/o/oauth2/auth"
+        ));
+        assert!(!is_primary_login_page(
+            "https://www.facebook.com/dialog/oauth"
+        ));
+        assert!(!is_primary_login_page(
+            "https://open.weixin.qq.com/connect/qrconnect"
+        ));
+        assert!(!is_primary_login_page(
+            "https://user.huami.com/privacy2/index.html"
+        ));
+    }
 
     /// localStorage 里的凭据要和 cookie 一样能用。
     ///
@@ -1257,13 +1485,62 @@ mod tests {
             classify_region_probe_error(&ZeppBridgeError::Unavailable("HTTP 404".into())),
             RegionProbeFailure::Other
         );
-        let error = RegionProbeFailures {
+        let rejected = RegionProbeFailures {
             rejected: 1,
             transient: 2,
             other: 3,
         }
-        .into_app_error();
-        assert_eq!(error.code, "err.login.credentials_rejected");
+        .into_login_failure();
+        assert_eq!(rejected.error.code, "err.login.credentials_rejected");
+        // 凭据被否掉了，再试一百次也是这个结果——不能留着窗口空转。
+        assert!(!rejected.retryable);
+
+        // 只有网络那一类值得原地重试，而且必须保住登录窗口：它是隔离会话，
+        // 关掉就意味着验证码、扫码全部重来。
+        let unreachable = RegionProbeFailures {
+            transient: 2,
+            ..Default::default()
+        }
+        .into_login_failure();
+        assert_eq!(unreachable.error.code, "err.login.region_unreachable");
+        assert!(unreachable.retryable);
+
+        let other = RegionProbeFailures {
+            other: 1,
+            ..Default::default()
+        }
+        .into_login_failure();
+        assert_eq!(other.error.code, "err.login.region_probe_failed");
+        assert!(!other.retryable);
+    }
+
+    /// 超出系统凭据管理器容量的值不可能是 App Token。
+    ///
+    /// Windows 凭据管理器只存得下 1280 个 UTF-16 码元；以前这里放行到 16 KB，
+    /// 于是从页面存储里捞到的一整段 JSON 会被当成令牌采用，一路走到保存那步
+    /// 才失败，报的还是一句指不到长度的「无法写入 Windows 凭据管理器」。
+    #[test]
+    fn an_oversized_candidate_is_not_mistaken_for_an_app_token() {
+        let real_token = "a".repeat(96);
+        assert_eq!(
+            sanitize_app_token(&real_token).as_deref(),
+            Some(real_token.as_str())
+        );
+
+        let blob = "x".repeat(crate::auth::CREDENTIAL_MAX_UTF16_UNITS + 1);
+        assert_eq!(sanitize_app_token(&blob), None);
+
+        // 否掉超长候选之后，打包在 hm-user-login-info 里的真令牌才轮得到。
+        let cookies = vec![
+            ("apptoken".to_string(), blob),
+            (
+                "hm-user-login-info".to_string(),
+                r#"{"token_info":{"user_id":"77","app_token":"the-real-token"}}"#.to_string(),
+            ),
+        ];
+        let got = parse_login_cookies(&cookies).expect("falls back to the bundled token");
+        assert_eq!(got.user_id, "77");
+        assert_eq!(got.app_token, "the-real-token");
     }
 
     #[test]

@@ -24,6 +24,17 @@ pub use har::extract_from_har;
 /// once another platform grows a real credential backend.
 #[cfg_attr(not(windows), allow(dead_code))]
 pub const CREDENTIAL_SERVICE: &str = "com.zeppbridge.app";
+
+/// 令牌最多能有多少个 UTF-16 码元。
+///
+/// Windows 凭据管理器的 `CRED_MAX_CREDENTIAL_BLOB_SIZE` 是 2560 字节，凭据
+/// 以 UTF-16 存放，于是上限就是 1280 个码元。以前这里放行到 16 KB，比真正
+/// 存得下的多出六倍：超出的令牌一路走到 `CredWrite` 才失败，用户只看到一句
+/// 「无法写入 Windows 凭据管理器」，没有任何线索指向长度。
+///
+/// 真实的 Zepp App Token 只有几十个字符。会撞上这个上限的，基本都是从页面
+/// 存储里捞到的一整段 JSON——那本来就不是令牌，早点认出来比写失败好。
+pub const CREDENTIAL_MAX_UTF16_UNITS: usize = 1280;
 const AUTH_FILE_VERSION: u32 = 1;
 
 /// A small abstraction around the platform credential store.  Keeping this
@@ -35,6 +46,26 @@ pub trait CredentialBackend: Send + Sync {
     fn delete(&self, user_id: &str) -> std::result::Result<(), String>;
 }
 
+/// 把系统凭据存储的真实失败原因带出来。
+///
+/// 以前每一处都是 `map_err(|_| "无法写入 Windows 凭据管理器")`：底层错误被整个
+/// 丢掉，包括 Win32 错误码，以及「某个字段超长」这种已经说得很清楚的原因。
+/// 用户报上来一句「无法写入」，我们和他都无从下手。
+#[cfg(any(windows, target_os = "macos"))]
+fn describe_keyring_error(action: &str, error: &keyring::Error) -> String {
+    match error {
+        keyring::Error::TooLong(attribute, limit) => {
+            format!("{action}：{attribute} 超出系统上限 {limit}")
+        }
+        keyring::Error::Invalid(attribute, reason) => format!("{action}：{attribute} {reason}"),
+        keyring::Error::NoStorageAccess(inner) => {
+            format!("{action}：系统拒绝访问凭据存储（{inner}）")
+        }
+        keyring::Error::PlatformFailure(inner) => format!("{action}：{inner}"),
+        other => format!("{action}：{other}"),
+    }
+}
+
 #[cfg(windows)]
 #[derive(Debug, Default)]
 pub struct WindowsCredentialBackend;
@@ -43,28 +74,34 @@ pub struct WindowsCredentialBackend;
 impl CredentialBackend for WindowsCredentialBackend {
     fn set(&self, user_id: &str, token: &str) -> std::result::Result<(), String> {
         let entry = keyring::Entry::new(CREDENTIAL_SERVICE, user_id)
-            .map_err(|_| "无法打开 Windows 凭据管理器条目".to_string())?;
+            .map_err(|error| describe_keyring_error("无法打开 Windows 凭据管理器条目", &error))?;
         entry
             .set_password(token)
-            .map_err(|_| "无法写入 Windows 凭据管理器".to_string())
+            .map_err(|error| describe_keyring_error("无法写入 Windows 凭据管理器", &error))
     }
 
     fn get(&self, user_id: &str) -> std::result::Result<Option<String>, String> {
         let entry = keyring::Entry::new(CREDENTIAL_SERVICE, user_id)
-            .map_err(|_| "无法打开 Windows 凭据管理器条目".to_string())?;
+            .map_err(|error| describe_keyring_error("无法打开 Windows 凭据管理器条目", &error))?;
         match entry.get_password() {
             Ok(value) => Ok(Some(value)),
             Err(keyring::Error::NoEntry) => Ok(None),
-            Err(_) => Err("无法读取 Windows 凭据管理器".to_string()),
+            Err(error) => Err(describe_keyring_error(
+                "无法读取 Windows 凭据管理器",
+                &error,
+            )),
         }
     }
 
     fn delete(&self, user_id: &str) -> std::result::Result<(), String> {
         let entry = keyring::Entry::new(CREDENTIAL_SERVICE, user_id)
-            .map_err(|_| "无法打开 Windows 凭据管理器条目".to_string())?;
+            .map_err(|error| describe_keyring_error("无法打开 Windows 凭据管理器条目", &error))?;
         match entry.delete_credential() {
             Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-            Err(_) => Err("无法删除 Windows 凭据管理器条目".to_string()),
+            Err(error) => Err(describe_keyring_error(
+                "无法删除 Windows 凭据管理器条目",
+                &error,
+            )),
         }
     }
 }
@@ -77,28 +114,28 @@ pub struct MacOsCredentialBackend;
 impl CredentialBackend for MacOsCredentialBackend {
     fn set(&self, user_id: &str, token: &str) -> std::result::Result<(), String> {
         let entry = keyring::Entry::new(CREDENTIAL_SERVICE, user_id)
-            .map_err(|_| "无法打开 macOS 钥匙串条目".to_string())?;
+            .map_err(|error| describe_keyring_error("无法打开 macOS 钥匙串条目", &error))?;
         entry
             .set_password(token)
-            .map_err(|_| "无法写入 macOS 钥匙串".to_string())
+            .map_err(|error| describe_keyring_error("无法写入 macOS 钥匙串", &error))
     }
 
     fn get(&self, user_id: &str) -> std::result::Result<Option<String>, String> {
         let entry = keyring::Entry::new(CREDENTIAL_SERVICE, user_id)
-            .map_err(|_| "无法打开 macOS 钥匙串条目".to_string())?;
+            .map_err(|error| describe_keyring_error("无法打开 macOS 钥匙串条目", &error))?;
         match entry.get_password() {
             Ok(value) => Ok(Some(value)),
             Err(keyring::Error::NoEntry) => Ok(None),
-            Err(_) => Err("无法读取 macOS 钥匙串".to_string()),
+            Err(error) => Err(describe_keyring_error("无法读取 macOS 钥匙串", &error)),
         }
     }
 
     fn delete(&self, user_id: &str) -> std::result::Result<(), String> {
         let entry = keyring::Entry::new(CREDENTIAL_SERVICE, user_id)
-            .map_err(|_| "无法打开 macOS 钥匙串条目".to_string())?;
+            .map_err(|error| describe_keyring_error("无法打开 macOS 钥匙串条目", &error))?;
         match entry.delete_credential() {
             Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-            Err(_) => Err("无法删除 macOS 钥匙串条目".to_string()),
+            Err(error) => Err(describe_keyring_error("无法删除 macOS 钥匙串条目", &error)),
         }
     }
 }
@@ -471,13 +508,23 @@ pub fn default_credential_backend() -> Arc<dyn CredentialBackend> {
 
 fn credential_error(error: String) -> ZeppBridgeError {
     // Backends are not allowed to include secret values in their error text.
-    ZeppBridgeError::AuthError(error)
+    //
+    // 这是「系统凭据存储不肯配合」，不是「认证信息不对」。分开之后界面才能
+    // 给出对得上的说法：一个让人重连，一个让人去看凭据管理器。
+    ZeppBridgeError::CredentialStore(error)
 }
 
 fn validate_token(raw: &str) -> Result<String> {
     let value = raw.trim();
-    if value.is_empty() || value.len() > 16 * 1024 || value.chars().any(char::is_control) {
+    if value.is_empty() || value.chars().any(char::is_control) {
         return Err(ZeppBridgeError::AuthError("令牌为空或格式无效".to_string()));
+    }
+    if value.encode_utf16().count() > CREDENTIAL_MAX_UTF16_UNITS {
+        return Err(ZeppBridgeError::CredentialStore(format!(
+            "令牌有 {} 个字符，超过系统凭据管理器能存的 {CREDENTIAL_MAX_UTF16_UNITS} 个；\
+             这多半说明读到的不是 App Token 本身",
+            value.chars().count()
+        )));
     }
     Ok(value.to_string())
 }

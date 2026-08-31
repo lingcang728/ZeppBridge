@@ -2,6 +2,21 @@
 
 本文件记录每个版本的实际改动。写给使用者看，不是施工日志：只写用户能感知到的变化，以及为什么这么改。
 
+## 1.1.5
+
+Sign-in could not be completed at all on 1.1.4. This release is only about that.
+
+1.1.4 上根本登录不进去。这一版只做这一件事。
+
+### Fixes / 修复
+
+- **The sign-in window no longer navigates away while you are signing in.** After 40 seconds the login window switched itself to Zepp's privacy page — the one offering *clear data* and *delete account* — no matter what you were doing. Typing an email and password, waiting for a Xiaomi one-time code to arrive by mail, or completing a Google sign-in all take longer than that, so the page was replaced mid-flow and the attempt had to be started over. The switch now happens only when the window is still on the page ZeppBridge opened and nothing has been typed or clicked in it for 90 seconds, which is the case it was written for: a primary page that never rendered.
+- **登录窗口不会再在你登录到一半时自己跳走。** 之前无论你在做什么，40 秒一到，登录窗口就会跳到 Zepp 的隐私页——就是那个只有「清除数据」「注销账号」的页面。输邮箱密码、等小米发到邮箱的验证码、走完 Google 授权，本来都不止 40 秒，于是页面在流程中间被换掉，整次登录只能从头再来。现在只有当窗口还停在应用打开的那一页、并且 90 秒内没有任何输入或点击时才会跳转——那才是这条兜底当初要处理的情况：主登录页压根没渲染出来。
+- **A dropped network no longer throws away the whole sign-in.** When the region check failed because the network was momentarily unreachable, ZeppBridge closed the sign-in window and gave up. Since each attempt runs in an isolated session, closing that window discarded it — the next try meant retyping the password and waiting for a fresh one-time code. A network failure now keeps the window open and retries in place; only a credential Zepp actually rejected ends the attempt.
+- **网络抖一下不再让整次登录作废。** 区域确认因为一时连不上而失败时，ZeppBridge 会直接关掉登录窗口放弃。而每次连接用的是隔离会话，窗口一关这个会话就没了——重试意味着重新输密码、重新等一遍验证码。现在网络类失败会保住窗口原地重试，只有 Zepp 真正拒绝了凭据才结束这次尝试。
+- **A token that cannot fit the credential store is no longer mistaken for one.** Token candidates were accepted up to 16 KB, six times more than Windows Credential Manager can hold, so an oversized value scraped from page storage was used as the App Token and only failed at save time — reported as an unexplained “could not write to Windows Credential Manager”. Oversized candidates are now rejected up front, which also lets the real bundled token be used instead. When the credential store does refuse a write, the underlying reason is now carried through instead of being discarded.
+- **存不进凭据管理器的东西不再被当成令牌。** 令牌候选此前放行到 16 KB，是 Windows 凭据管理器实际容量的六倍：从页面存储里捞到的超长值会被当成 App Token 采用，一路走到保存那步才失败，报出来的却是一句指不到长度的「无法写入 Windows 凭据管理器」。现在超长候选会被提前否掉，真正打包在登录信息里的那个令牌因此有机会被采用；凭据管理器真的拒绝写入时，底层原因也会原样带出来，不再被丢掉。
+
 ## 1.1.4
 
 ### Fixes / 修复

@@ -40,9 +40,13 @@ ZeppBridge uses the region host returned by the signed-in page before trying
 known fallback regions. A rejected credential and a temporarily unreachable
 region are reported separately.
 
-If the primary page has no usable session after about 40 seconds, the window
-switches to the fallback page `https://user.huami.com/privacy2/index.html`. The
-whole session times out after 15 minutes; **Retry** starts it again.
+If the primary page is still untouched after about 90 seconds — nothing typed,
+nothing clicked, and the window still on the page ZeppBridge opened — it switches
+to the fallback page `https://user.huami.com/privacy2/index.html`. That switch is
+for a page that never rendered, so it never happens while you are signing in:
+once you type or click, or the window reaches a Xiaomi, Google, Facebook or
+WeChat page, ZeppBridge leaves it alone for the rest of the session. The whole
+session times out after 15 minutes; **Retry** starts it again.
 
 If you are signed in but ZeppBridge says it **could not read the credentials**,
 web sign-in will not get any further no matter how many times you retry — use
@@ -100,9 +104,11 @@ token is never displayed.
 | What you see | Check first | If it still fails |
 | --- | --- | --- |
 | **Connect** opens no window | That you are in the desktop app; whether antivirus or a window manager is blocking new windows | Restart the app and try again |
-| Stuck on *waiting for sign-in* | Whether you actually completed sign-in in the pop-up | Wait for the fallback page, or cancel and retry |
+| Stuck on *waiting for sign-in* | Whether you actually completed sign-in in the pop-up | Cancel and retry, or use one of the fallbacks below |
 | *Signed in, but the credentials could not be read* | Nothing — retrying web sign-in will not help | Use HAR import or manual entry |
 | *No Zepp region accepted the credentials* | Whether this network can reach the Zepp region APIs; whether sign-in really completed | Try another network or later; confirm the sign-in page was on zepp.com / huami.com |
+| *Can't reach the Zepp region service — retrying* | Nothing; the sign-in window stays open and ZeppBridge keeps trying until the session times out | Fix the network, or cancel and retry |
+| *The token could not be saved to the system credential store* | Whether Windows Credential Manager (or the macOS keychain) is disabled by a system policy | The message carries the underlying reason; use it to tell a disabled store apart from a token too long to save |
 | Sign-in timed out | Whether more than 15 minutes passed | Click **Retry** |
 | *Needs reconnecting* | Whether the token expired, or you just cleared the credentials | Run web sign-in again |
 | Sleep shows *unverified / unavailable* | `band_data` may be a compressed or encoded payload | Only the raw record is kept; sleep stages are never fabricated |
