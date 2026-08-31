@@ -39,7 +39,10 @@ npm run preview    # 预览 dist（不会连接账户数据）
 npm test           # Vitest：src/lib 的纯函数层
 npm run version:check   # 七处版本号是否一致
 npm run budget:check    # 首屏体积预算（需要先 build）
+npm run verify:login-probe  # 真实浏览器；不进 CI，见下
 ```
+
+`npm run verify:login-probe` 直接从 `src-tauri/src/commands/login.rs` 里抠出注入登录窗口的那两段脚本，放进真实浏览器跑：没人碰过的页面读作空闲，输入过或被自动填充过的不是，**跨源 iframe** 里输入的验证码也要能报到顶层。这三个答案就是「能不能把登录窗口导走」的全部依据，而 Rust 测试够不到它们——答错一个，用户就回到 1.1.4 那个下场：登录到一半被扔出去。它需要本机 Chromium（会复用已装的 Chrome 或 Edge），所以 CI 不跑；改动这两段脚本时手动跑一次。
 
 `npm test` 集中在一条规则上：**缺失不能被显示成 0**。「0 分钟睡眠」的卡片比「—」危险得多，用户会拿它当真实读数。刻意不做组件快照——它会在每次调样式时红掉，于是被习惯性 `-u` 掉，最后既挡不住回归也没人再看。
 

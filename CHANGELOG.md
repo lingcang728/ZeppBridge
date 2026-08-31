@@ -2,7 +2,11 @@
 
 本文件记录每个版本的实际改动。写给使用者看，不是施工日志：只写用户能感知到的变化，以及为什么这么改。
 
-## 未发布 / Unreleased
+## 1.1.5
+
+Sign-in could not be completed at all on 1.1.4. This release is only about that.
+
+1.1.4 上根本登录不进去。这一版只做这一件事。
 
 ### Fixes / 修复
 

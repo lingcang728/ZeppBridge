@@ -1,7 +1,7 @@
 {
   "name": "zeppbridge",
   "private": true,
-  "version": "1.1.4",
+  "version": "1.1.5",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -23,7 +23,8 @@
     "test:watch": "vitest",
     "version:check": "node scripts/release/check-version-consistency.mjs",
     "docs:check": "node scripts/release/check-doc-links.mjs",
-    "i18n:check": "node scripts/release/check-i18n.mjs"
+    "i18n:check": "node scripts/release/check-i18n.mjs",
+    "verify:login-probe": "python scripts/verify/login-activity-probe.py || py -3 scripts/verify/login-activity-probe.py"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
