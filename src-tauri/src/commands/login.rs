@@ -414,7 +414,74 @@ async fn collect_cookies(window: &WebviewWindow) -> Vec<(String, String)> {
             }
         }
     }
+
+    // 凭据不一定放在 cookie 里。表盘站是个前端应用，把登录信息写进
+    // localStorage / sessionStorage 完全正常，那样 `document.cookie` 和
+    // webview 的 cookie jar 都看不到它——用户于是只能自己打开开发者工具
+    // 把 App Token 抠出来（Reddit 上就有人这么做）。这里再看一眼存储，
+    // 名字对得上就当成凭据来源。
+    if parse_login_cookies(&pairs).is_none() {
+        if let Some(entries) = web_storage_entries(window).await {
+            for pair in entries {
+                if !pairs
+                    .iter()
+                    .any(|(name, _)| name.eq_ignore_ascii_case(&pair.0))
+                {
+                    pairs.push(pair);
+                }
+            }
+        }
+    }
     pairs
+}
+
+/// 从 localStorage / sessionStorage 里捞可能是凭据的键值。
+///
+/// 只取名字看起来相关的那几个键，不把整个存储读回来——那里面还有用户的其它
+/// 东西，我们没有理由碰。取回来的值一律走和 cookie 相同的
+/// `sanitize_user_id` / `sanitize_app_token` 校验，格式不对就当没看见。
+async fn web_storage_entries(window: &WebviewWindow) -> Option<Vec<(String, String)>> {
+    const SCRIPT: &str = r#"(function(){
+  try {
+    var wanted = ['hm-user-login-info','hm_user_login_info','userid','user_id','apptoken','app_token','app-token','token_info','loginInfo'];
+    var out = {};
+    [window.localStorage, window.sessionStorage].forEach(function(store){
+      if (!store) return;
+      for (var i = 0; i < store.length; i++) {
+        var key = store.key(i);
+        if (!key) continue;
+        var lowered = key.toLowerCase();
+        if (wanted.some(function(name){ return lowered.indexOf(name) !== -1; })) {
+          if (!(key in out)) out[key] = store.getItem(key) || '';
+        }
+      }
+    });
+    return JSON.stringify(out);
+  } catch (e) { return '{}'; }
+})()"#;
+
+    let (tx, rx) = tokio::sync::oneshot::channel::<String>();
+    let sent = std::sync::Mutex::new(Some(tx));
+    window
+        .eval_with_callback(SCRIPT, move |raw| {
+            if let Some(tx) = sent.lock().ok().and_then(|mut guard| guard.take()) {
+                let _ = tx.send(decode_eval_string(&raw));
+            }
+        })
+        .ok()?;
+    let raw = tokio::time::timeout(COOKIE_EVAL_TIMEOUT, rx)
+        .await
+        .ok()
+        .and_then(Result::ok)?;
+    let parsed: serde_json::Map<String, Value> = serde_json::from_str(&raw).ok()?;
+    let entries: Vec<(String, String)> = parsed
+        .into_iter()
+        .filter_map(|(key, value)| match value {
+            Value::String(text) => Some((key, text)),
+            other => Some((key, other.to_string())),
+        })
+        .collect();
+    (!entries.is_empty()).then_some(entries)
 }
 
 async fn document_cookie(window: &WebviewWindow) -> Option<String> {
@@ -758,6 +825,45 @@ async fn finish_idle_if_active(app: &AppHandle, epoch: u64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// localStorage 里的凭据要和 cookie 一样能用。
+    ///
+    /// 表盘站是个前端应用，把登录信息写进 localStorage 完全正常；那样
+    /// `document.cookie` 和 webview 的 cookie jar 都看不到它，用户就只能自己
+    /// 开开发者工具抠 App Token——Reddit 上真有人是这么过来的。
+    #[test]
+    fn credentials_from_web_storage_parse_like_cookies() {
+        let raw = r#"{"token_info":{"user_id":"55","app_token":"from-local-storage"}}"#;
+        let entries = vec![("hm-user-login-info".to_string(), raw.to_string())];
+        let got = parse_login_cookies(&entries).expect("storage credentials");
+        assert_eq!(got.user_id, "55");
+        assert_eq!(got.app_token, "from-local-storage");
+    }
+
+    /// 「还没登录」和「登录了但我们没读到凭据」必须能分开。
+    ///
+    /// 分不开的话，后者只能一路静默等到 15 分钟超时，再给一句「登录超时，
+    /// 请重试」——而重试多少次都不会好，该做的是改用 HAR 或手动填 Token。
+    #[test]
+    fn a_signed_in_page_is_told_apart_from_the_login_page() {
+        let none: Vec<(String, String)> = Vec::new();
+
+        // 还停在登录页，cookie 里也没有任何登录后才有的名字。
+        assert!(!page_looks_signed_in(
+            "https://watchface.zepp.com/login",
+            &none
+        ));
+        assert!(!page_looks_signed_in("https://account.xiaomi.com/oauth2/authorize", &none));
+
+        // 已经离开登录页。
+        assert!(page_looks_signed_in("https://watchface.zepp.com/dashboard", &none));
+
+        // 或者 cookie 里已经出现了登录后才有的名字，哪怕还没解析出凭据。
+        assert!(page_looks_signed_in(
+            "https://user.huami.com/privacy2/index.html",
+            &[("apptoken".to_string(), "whatever".to_string())]
+        ));
+    }
 
     #[test]
     fn parses_hm_user_login_info_token_info() {
