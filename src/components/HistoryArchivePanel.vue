@@ -70,6 +70,15 @@ const messages = defineMessages(
     confirmResetLedger: '只清空覆盖账本，不会删除任何已经写进本机的数据。之后可以重新规划一次补拉。确定吗？',
     ledgerReset: '账本已清空，可以重新规划补拉范围。',
     ledgerResetFailed: '无法清空账本',
+    failedTitle: '没能取回的月份',
+    failedIntro: '这些块失败了。其余的月份没有受影响，已经照常补拉。',
+    failedRow: (stream: string, month: string) => `${stream} · ${month}`,
+    failedAttempts: (attempts: number) => `已尝试 ${attempts} 次`,
+    failedExhausted: '自动重试已用尽，点「重试失败项」再试一次',
+    failedNoReason: '没有记录原因',
+    retryFailed: '重试失败项',
+    retryFailedDone: '失败的月份已重新排队，可以继续补拉了。',
+    retryFailedFailed: '无法重新排队失败的月份',
     streamSeparator: '、',
 
     stream: {
@@ -132,6 +141,15 @@ const messages = defineMessages(
     confirmResetLedger: 'This clears the coverage ledger only. Nothing already written locally is deleted, and you can plan a new backfill afterwards. Continue?',
     ledgerReset: 'The ledger is cleared. You can plan a new backfill range.',
     ledgerResetFailed: 'Could not clear the ledger',
+    failedTitle: 'Months that could not be fetched',
+    failedIntro: 'These chunks failed. Every other month was unaffected and has been backfilled as usual.',
+    failedRow: (stream: string, month: string) => `${stream} · ${month}`,
+    failedAttempts: (attempts: number) => `${attempts} attempt${attempts === 1 ? '' : 's'}`,
+    failedExhausted: 'Automatic retries are used up. Use "Retry failed months" to try again',
+    failedNoReason: 'No reason recorded',
+    retryFailed: 'Retry failed months',
+    retryFailedDone: 'The failed months are queued again. You can continue the backfill.',
+    retryFailedFailed: 'Could not re-queue the failed months',
     streamSeparator: ', ',
 
     stream: {
@@ -297,6 +315,22 @@ const runBackfill = async () => {
   }
 };
 
+/* 「重试失败项」和「清空账本」是两件事：前者只让失败的月份重新排队，
+   已经写入的历史一条都不动。上一版没有前者，用户为了重试一个月份只能清掉
+   整个账本，把几年历史重拉一遍。 */
+const retryFailed = async () => {
+  busy.value = true;
+  error.value = null;
+  try {
+    ledger.value = await backend.retryFailedBackfillChunks();
+    message.value = t.value.retryFailedDone;
+  } catch (cause) {
+    error.value = toUserMessage(cause, t.value.retryFailedFailed);
+  } finally {
+    busy.value = false;
+  }
+};
+
 const resetLedger = async () => {
   if (!window.confirm(t.value.confirmResetLedger)) return;
   busy.value = true;
@@ -374,6 +408,13 @@ const resetLedger = async () => {
         :disabled="busy || isSyncing || !fromDate || wouldBeCleanedUp || Boolean(estimate?.stop_reason)"
         @click="runBackfill"
       >{{ busy ? t.backfilling : (remaining > 0 ? t.continueBackfill : t.startBackfill) }}</button>
+      <button
+        v-if="ledger?.failed_chunks_detail?.length"
+        class="button secondary"
+        type="button"
+        :disabled="busy || isSyncing"
+        @click="retryFailed"
+      >{{ t.retryFailed }}</button>
       <button v-if="ledger?.total_chunks" class="button secondary" type="button" :disabled="busy" @click="resetLedger">
         {{ t.resetLedger }}
       </button>
@@ -411,11 +452,33 @@ const resetLedger = async () => {
           </span>
         </div>
       </div>
+
+      <!-- 哪个月、为什么。只显示到月，原因在后端已经脱敏。 -->
+      <div v-if="ledger.failed_chunks_detail.length" class="failed-block">
+        <strong>{{ t.failedTitle }}</strong>
+        <p class="retain-note">{{ t.failedIntro }}</p>
+        <ul class="failed-list">
+          <li v-for="item in ledger.failed_chunks_detail" :key="`${item.stream}:${item.chunk_start}`">
+            <span class="failed-where">{{ t.failedRow(streamLabel(item.stream), item.chunk_start.slice(0, 7)) }}</span>
+            <span class="failed-why">{{ item.error || t.failedNoReason }}</span>
+            <span class="failed-meta">
+              {{ t.failedAttempts(item.attempts) }}
+              <template v-if="item.exhausted"> · {{ t.failedExhausted }}</template>
+            </span>
+          </li>
+        </ul>
+      </div>
     </template>
   </section>
 </template>
 
 <style scoped>
+.failed-block { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); }
+.failed-list { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.failed-list li { display: grid; gap: 2px; }
+.failed-where { color: var(--ink); font-size: 13px; font-weight: 600; }
+.failed-why { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.failed-meta { color: var(--subtle); font-size: 11px; }
 .estimate-block { margin-top: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); }
 .estimate-head { display: grid; gap: 3px; }
 .estimate-head strong { color: var(--ink); font-size: 12px; font-weight: 500; }

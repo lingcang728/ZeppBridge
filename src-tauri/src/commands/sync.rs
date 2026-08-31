@@ -129,6 +129,21 @@ pub async fn reset_coverage_ledger(
     db.coverage_ledger().map_err(|error| error.user_message())
 }
 
+/// 让失败的块重新进入自动补拉队列。
+///
+/// 和「清空账本」的区别很重要：这个动作只碰 `failed`，已经写入和云端确认
+/// 为空的块原样不动。用户为了重试一个失败的月份而不得不清掉整个账本、
+/// 把几年历史重拉一遍——那是上一版逼出来的操作，不该继续存在。
+#[tauri::command]
+pub async fn retry_failed_backfill_chunks(
+    state: tauri::State<'_, AppState>,
+) -> std::result::Result<CoverageLedger, String> {
+    let db = state.db.lock().await;
+    db.reset_failed_backfill_chunks()
+        .map_err(|error| error.user_message())?;
+    db.coverage_ledger().map_err(|error| error.user_message())
+}
+
 #[tauri::command]
 pub async fn cancel_sync(state: tauri::State<'_, AppState>) -> std::result::Result<(), String> {
     if let Some(manager) = state.sync.read().await.clone() {

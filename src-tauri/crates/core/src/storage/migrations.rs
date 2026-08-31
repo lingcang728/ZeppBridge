@@ -507,6 +507,25 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(15, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // 补拉的尝试次数。
+        //
+        // 没有这一列时，`failed` 和 `pending` 在待办查询里完全等价：一块失败
+        // 之后立刻回到队首，下一轮必然再选中它，后面的块永远轮不上。记下尝试
+        // 次数，才能把「这一轮已经试过」和「以后还可以再试」分开，也才能让
+        // 确定性失败（比如报文能拿到但一条都解析不出来）在自动重试若干次后
+        // 停下来等用户显式重试，而不是无限空转。
+        self.ensure_table_columns(
+            "coverage_ledger",
+            &[
+                ("attempts", "INTEGER NOT NULL DEFAULT 0"),
+                ("last_attempt_at", "TEXT"),
+            ],
+        )?;
+        self.conn.execute_batch("PRAGMA user_version = 16;")?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(16, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         // Earlier migrations are intentionally idempotent and still stamp
         // their historical versions on every launch, so the current schema
         // marker is restored only after all of them have run.

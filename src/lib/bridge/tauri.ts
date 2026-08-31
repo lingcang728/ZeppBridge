@@ -260,6 +260,9 @@ export const tauriBackend: BridgeBackend = {
   resetCoverageLedger() {
     return call<CoverageLedger>('reset_coverage_ledger');
   },
+  retryFailedBackfillChunks() {
+    return call<CoverageLedger>('retry_failed_backfill_chunks');
+  },
   listBackups() {
     return call<BackupManifest[]>('list_backups');
   },

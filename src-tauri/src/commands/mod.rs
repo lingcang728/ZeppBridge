@@ -27,5 +27,6 @@ pub(crate) use login::{cancel_web_login, get_login_status, start_web_login};
 pub(crate) use status::get_app_status;
 pub(crate) use sync::{
     cancel_sync, get_coverage_ledger, probe_data_capabilities, reset_coverage_ledger,
-    start_history_backfill, start_history_sync, start_incremental_sync, start_initial_sync,
+    retry_failed_backfill_chunks, start_history_backfill, start_history_sync,
+    start_incremental_sync, start_initial_sync,
 };

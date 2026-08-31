@@ -447,26 +447,32 @@ impl SyncManager {
         }
         .unwrap_or_else(|| "UTC".to_string());
 
+        // 这一轮要做的块**一次取齐**，而不是每轮回数据库拿「当前第一块」。
+        //
+        // 旧写法每次取 `pending_backfill_chunks(1)`：一块失败后被写回
+        // `failed`，而 `failed` 仍然满足待办条件、排序键也没变，于是下一轮
+        // 必然再选中同一块，把 max_chunks 的额度全耗在它身上——同月其余的流
+        // 和所有更早的月份一块都轮不上。这正是 issue #10「一个心率块失败之后
+        // 整个补拉就不动了」的成因。
+        //
+        // 一次取齐之后，每个 (stream, 月份) 在一轮里最多被尝试一次；失败的块
+        // 留给下一轮（或用户显式重试），不会挡住任何人。
+        let queue = {
+            let db = self.db.lock().await;
+            db.pending_backfill_chunks(max_chunks)?
+        };
+        let total = {
+            let db = self.db.lock().await;
+            db.coverage_ledger()?.total_chunks.max(1) as u32
+        };
+
         let mut processed = 0usize;
-        loop {
+        for chunk in queue {
             if self.cancel.load(Ordering::SeqCst) {
-                break;
-            }
-            let chunk = {
-                let db = self.db.lock().await;
-                db.pending_backfill_chunks(1)?.into_iter().next()
-            };
-            let Some(chunk) = chunk else { break };
-            if processed >= max_chunks {
                 break;
             }
             processed += 1;
 
-            let total = {
-                let db = self.db.lock().await;
-                let ledger = db.coverage_ledger()?;
-                ledger.total_chunks.max(1) as u32
-            };
             on_progress(SyncProgress {
                 stream: chunk.stream.clone(),
                 current: processed as u32,
@@ -479,12 +485,12 @@ impl SyncManager {
             let outcome = self.backfill_one_chunk(&chunk, &time_zone).await;
             let db = self.db.lock().await;
             match outcome {
-                Ok((status, records)) => db.record_backfill_chunk(
+                Ok((status, records, reason)) => db.record_backfill_chunk(
                     &chunk.stream,
                     &chunk.chunk_start,
                     status,
                     records,
-                    None,
+                    reason.as_deref(),
                 )?,
                 Err(error) if error.is_cancelled() => break,
                 Err(error) => db.record_backfill_chunk(
@@ -501,12 +507,15 @@ impl SyncManager {
         db.coverage_ledger()
     }
 
-    /// 拉取并写入一块。返回这块的结论和写入条数。
+    /// 拉取并写入一块。返回这块的结论、写入条数，以及失败时的原因。
+    ///
+    /// 原因要一路带到账本里：界面只显示「失败 N 块」而不说为什么，用户既
+    /// 判断不了该不该重试，也没法把有用的信息报回来。
     async fn backfill_one_chunk(
         &self,
         chunk: &CoverageChunk,
         time_zone: &str,
-    ) -> Result<(ChunkStatus, i64)> {
+    ) -> Result<(ChunkStatus, i64, Option<String>)> {
         let start = chrono::NaiveDate::parse_from_str(&chunk.chunk_start, "%Y-%m-%d")
             .map_err(|_| ZeppBridgeError::ParseError("覆盖账本里的日期无效".into()))?;
         let end = chrono::NaiveDate::parse_from_str(&chunk.chunk_end, "%Y-%m-%d")
@@ -530,19 +539,27 @@ impl SyncManager {
         match records {
             Ok(records) if records.is_empty() => {
                 // 请求过了，云端明确没有这段时间的数据。这不是失败，也不该重试。
-                Ok((ChunkStatus::EmptyFromCloud, 0))
+                Ok((ChunkStatus::EmptyFromCloud, 0, None))
             }
             Ok(records) => {
                 let report = self.persist_records(&chunk.stream, records).await?;
                 if report.records_written > 0 {
-                    Ok((ChunkStatus::Persisted, report.records_written))
+                    Ok((ChunkStatus::Persisted, report.records_written, None))
                 } else {
                     // 报文回来了但一条 canonical 都没产出：这不是「云端没有」，
                     // 记成失败以便重试和排查。
-                    Ok((ChunkStatus::Failed, 0))
+                    //
+                    // 这一类多半是**确定性**失败——同样的报文再拉一次还是解析
+                    // 不出来。账本里的 attempts 会让它自动重试几次后停下来，
+                    // 不再挡住后面的块。
+                    Ok((
+                        ChunkStatus::Failed,
+                        0,
+                        Some("云端返回了报文，但没有解析出可用记录".to_string()),
+                    ))
                 }
             }
-            Err(error) if error.is_unavailable() => Ok((ChunkStatus::EmptyFromCloud, 0)),
+            Err(error) if error.is_unavailable() => Ok((ChunkStatus::EmptyFromCloud, 0, None)),
             Err(error) => Err(error),
         }
     }

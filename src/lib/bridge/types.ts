@@ -102,6 +102,7 @@ export interface BridgeBackend {
   startHistoryBackfill(fromDate: string, maxChunks?: number): Promise<CoverageLedger>;
   getCoverageLedger(): Promise<CoverageLedger>;
   resetCoverageLedger(): Promise<CoverageLedger>;
+  retryFailedBackfillChunks(): Promise<CoverageLedger>;
   listBackups(): Promise<BackupManifest[]>;
   createManualBackup(): Promise<BackupManifest>;
   verifyBackup(backupId: string): Promise<BackupVerification>;

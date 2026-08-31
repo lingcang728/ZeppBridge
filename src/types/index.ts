@@ -243,6 +243,17 @@ export interface StreamCoverage {
   records: number;
 }
 
+/** 一个失败块的明细。只显示到月，原因已在后端脱敏。 */
+export interface FailedChunk {
+  stream: string;
+  /** `YYYY-MM-01`。 */
+  chunk_start: string;
+  error: string | null;
+  attempts: number;
+  /** 自动重试已用尽，要用户显式重试才会再动。 */
+  exhausted: boolean;
+}
+
 export interface CoverageLedger {
   requested_from: string | null;
   requested_to: string | null;
@@ -251,6 +262,10 @@ export interface CoverageLedger {
   completed_chunks: number;
   /** 只有每一块都有结论时才为真。「完整副本」这句话只有在这里为真时才成立。 */
   complete: boolean;
+  /** 哪个月、为什么失败。界面靠它把「失败 N 块」说清楚。 */
+  failed_chunks_detail: FailedChunk[];
+  /** 有块的自动重试次数已用尽，需要用户按「重试失败项」。 */
+  needs_manual_retry: boolean;
 }
 
 export type BackupKind = 'manual' | 'pre_migration' | 'pre_restore';
