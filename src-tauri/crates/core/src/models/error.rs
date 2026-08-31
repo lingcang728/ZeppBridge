@@ -5,6 +5,15 @@ pub enum ZeppBridgeError {
     #[error("认证错误: {0}")]
     AuthError(String),
 
+    /// 系统凭据存储（Windows 凭据管理器 / macOS 钥匙串）拒绝了这次读写。
+    ///
+    /// 和 `AuthError` 分开，是因为这两件事用户能做的完全不同：认证错误是
+    /// 「重新连一次」，这一条是「你这台机器存不下这个令牌」——可能被组策略
+    /// 禁用了，也可能令牌长得超出了凭据管理器的容量。混在「认证出错了」里，
+    /// 用户看不出该往哪个方向查。
+    #[error("凭据存储错误: {0}")]
+    CredentialStore(String),
+
     #[error("网络请求失败: {0}")]
     NetworkError(#[from] reqwest::Error),
 
@@ -106,6 +115,7 @@ impl ZeppBridgeError {
             Self::HttpStatus { .. } => "err.core.http_status",
             Self::Cancelled => "err.core.cancelled",
             Self::AuthError(_) => "err.core.auth",
+            Self::CredentialStore(_) => "err.core.credential_store",
             Self::InvalidHost(_) => "err.core.invalid_host",
             Self::ConfigError(_) => "err.core.config",
             Self::Busy(_) => "err.core.busy",
@@ -135,6 +145,7 @@ impl ZeppBridgeError {
             }
             Self::Cancelled => "同步已取消".into(),
             Self::AuthError(message)
+            | Self::CredentialStore(message)
             | Self::InvalidHost(message)
             | Self::ConfigError(message)
             | Self::Busy(message) => sanitize_user_text(message),

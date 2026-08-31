@@ -22,6 +22,8 @@ const messages = defineMessages(
     'err.core.http_status': 'Zepp 服务返回了错误，请稍后重试',
     'err.core.cancelled': '操作已取消',
     'err.core.auth': '认证出错了',
+    'err.core.credential_store':
+      '令牌没能存进系统凭据管理器。可能是它被系统策略禁用了，也可能读到的根本不是 App Token（长得超出了凭据管理器的容量）。',
     'err.core.invalid_host': '不安全的 Zepp 区域地址',
     'err.core.config': '配置有问题，需要先改一下',
     'err.core.busy': '另一个写入操作正在进行，请等它结束',
@@ -49,11 +51,11 @@ const messages = defineMessages(
       '读到了凭据，但无法确认账号区域。请重新登录，或改用 HAR 导入。',
     'err.login.credentials_rejected': 'Zepp 拒绝了这次登录凭据，请退出登录窗口后重新登录',
     'err.login.region_unreachable': '暂时无法连接 Zepp 区域服务，请检查网络后重试',
+    'err.login.region_retrying': '暂时连不上 Zepp 区域服务，正在重试；登录窗口先留着，不用重新登录',
     'err.login.bad_url': '登录地址无效',
     'err.login.window_failed': '无法打开登录窗口',
     'err.login.state_unavailable': '应用状态不可用',
     'err.login.cancelled': '登录已取消',
-    'err.login.save_failed': '认证信息保存失败',
     'err.login.sync_init_failed': '登录成功了，但同步初始化失败',
 
     /* —— 同步与补拉 —— */
@@ -129,6 +131,8 @@ const messages = defineMessages(
     'err.core.http_status': 'Zepp returned an error. Try again shortly',
     'err.core.cancelled': 'Cancelled',
     'err.core.auth': 'Something went wrong with authentication',
+    'err.core.credential_store':
+      "The token could not be saved to the system credential store. It may be turned off by a system policy, or what was read is not an App Token at all — too long for the store to hold.",
     'err.core.invalid_host': 'Unsafe Zepp region address',
     'err.core.config': 'Something in the configuration needs changing first',
     'err.core.busy': 'Another write is in progress. Wait for it to finish',
@@ -160,11 +164,12 @@ const messages = defineMessages(
       'Zepp rejected these credentials. Sign out in the login window, then sign in again',
     'err.login.region_unreachable':
       "Couldn't reach the Zepp region service. Check your network and try again",
+    'err.login.region_retrying':
+      "Can't reach the Zepp region service right now — retrying. The sign-in window stays open, so there is no need to sign in again",
     'err.login.bad_url': 'Invalid sign-in address',
     'err.login.window_failed': "Couldn't open the sign-in window",
     'err.login.state_unavailable': 'Application state is unavailable',
     'err.login.cancelled': 'Sign-in cancelled',
-    'err.login.save_failed': "Couldn't save the credentials",
     'err.login.sync_init_failed': "Signed in, but syncing couldn't be initialised",
 
     /* —— sync & backfill —— */

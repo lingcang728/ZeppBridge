@@ -107,6 +107,8 @@ token is never displayed.
 | Stuck on *waiting for sign-in* | Whether you actually completed sign-in in the pop-up | Cancel and retry, or use one of the fallbacks below |
 | *Signed in, but the credentials could not be read* | Nothing — retrying web sign-in will not help | Use HAR import or manual entry |
 | *No Zepp region accepted the credentials* | Whether this network can reach the Zepp region APIs; whether sign-in really completed | Try another network or later; confirm the sign-in page was on zepp.com / huami.com |
+| *Can't reach the Zepp region service — retrying* | Nothing; the sign-in window stays open and ZeppBridge keeps trying until the session times out | Fix the network, or cancel and retry |
+| *The token could not be saved to the system credential store* | Whether Windows Credential Manager (or the macOS keychain) is disabled by a system policy | The message carries the underlying reason; use it to tell a disabled store apart from a token too long to save |
 | Sign-in timed out | Whether more than 15 minutes passed | Click **Retry** |
 | *Needs reconnecting* | Whether the token expired, or you just cleared the credentials | Run web sign-in again |
 | Sleep shows *unverified / unavailable* | `band_data` may be a compressed or encoded payload | Only the raw record is kept; sleep stages are never fabricated |

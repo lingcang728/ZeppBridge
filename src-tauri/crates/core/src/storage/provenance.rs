@@ -127,7 +127,7 @@ impl StageErrorKind {
         use crate::models::ZeppBridgeError as E;
         match error {
             E::Cancelled => StageErrorKind::Cancelled,
-            E::NeedsReauth(_) | E::AuthError(_) => StageErrorKind::Auth,
+            E::NeedsReauth(_) | E::AuthError(_) | E::CredentialStore(_) => StageErrorKind::Auth,
             E::Unavailable(_) | E::DataUnavailable(_) => StageErrorKind::NotAvailable,
             E::NetworkError(_) | E::RetryExhausted { .. } | E::HttpStatus { .. } => {
                 StageErrorKind::Network

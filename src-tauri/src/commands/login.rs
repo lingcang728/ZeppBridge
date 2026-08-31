@@ -26,6 +26,8 @@ const POLL_INTERVAL: Duration = Duration::from_millis(750);
 const FALLBACK_AFTER: Duration = Duration::from_secs(90);
 const SESSION_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const COOKIE_EVAL_TIMEOUT: Duration = Duration::from_secs(2);
+/// 区域探测因为网络问题失败之后，隔多久再试一次。
+const REGION_RETRY_BACKOFF: Duration = Duration::from_secs(5);
 
 /// 在登录窗口里记一个「用户碰过这一页」的标记。
 ///
@@ -191,13 +193,21 @@ fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow) {
         // 输入，或者地址已经走到第三方登录页。一旦立起来就不再放下——页面
         // 内部的跳转会把注入的活动标记清空，可用户并没有因此变成没在登录。
         let mut user_active = false;
+        // 凭据已经读到了，卡住的是后面的区域确认。这和「压根没登录」「登录了
+        // 但读不到凭据」都不一样，超时那一刻得说对是哪一种。
+        let mut credentials_extracted = false;
 
         loop {
             if !epoch_active(&app, epoch) {
                 return;
             }
             if started.elapsed() >= SESSION_TIMEOUT {
-                let (code, message) = if looked_signed_in {
+                let (code, message) = if credentials_extracted {
+                    (
+                        "err.login.region_unreachable",
+                        "读到了凭据，但一直没能连上 Zepp 区域服务确认账号，请检查网络后重试",
+                    )
+                } else if looked_signed_in {
                     (
                         "err.login.credentials_unreadable",
                         "已经登录，但没能从登录窗口读到凭据。可以改用 HAR 导入或手动填写 App Token。",
@@ -258,6 +268,7 @@ fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow) {
                 log_credential_probe(&page_url, &cookies);
             }
             if let Some(extracted) = parse_login_cookies(&cookies) {
+                credentials_extracted = true;
                 emit_progress(
                     &app,
                     epoch,
@@ -294,8 +305,31 @@ fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow) {
                         close_login_window(&app);
                         return;
                     }
+                    // 网络这会儿不通，凭据本身没问题。关掉登录窗口等于把
+                    // 隔离会话一起丢掉——用户要连验证码、扫码一起重来一遍。
+                    // 所以窗口留着，隔几秒再试，直到网络恢复或整场会话超时。
+                    Err(failure) if failure.retryable => {
+                        emit_progress(
+                            &app,
+                            epoch,
+                            "waiting",
+                            "err.login.region_retrying",
+                            "暂时连不上 Zepp 区域服务，正在重试；登录窗口先留着",
+                            &page_url,
+                        )
+                        .await;
+                        tokio::time::sleep(REGION_RETRY_BACKOFF).await;
+                        continue;
+                    }
                     Err(failure) => {
-                        finish_failed(&app, epoch, &failure.code, &failure.message, page_url).await;
+                        finish_failed(
+                            &app,
+                            epoch,
+                            &failure.error.code,
+                            &failure.error.message,
+                            page_url,
+                        )
+                        .await;
                         close_login_window(&app);
                         return;
                     }
@@ -307,16 +341,42 @@ fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow) {
     });
 }
 
+/// 一次登录失败，值不值得原地再试一次。
+///
+/// 「网络不通」和「Zepp 拒绝了这个凭据」是两件事：前者过一会儿就好，后者再
+/// 等也没用。之前两者都直接关掉登录窗口——而这个窗口是隔离会话，关掉就等于
+/// 让用户把验证码、扫码、第三方授权全部重来一遍。
+struct LoginFailure {
+    error: AppError,
+    retryable: bool,
+}
+
+impl LoginFailure {
+    fn fatal(error: AppError) -> Self {
+        Self {
+            error,
+            retryable: false,
+        }
+    }
+
+    fn retryable(error: AppError) -> Self {
+        Self {
+            error,
+            retryable: true,
+        }
+    }
+}
+
 async fn persist_extracted_login(
     app: &AppHandle,
     epoch: u64,
     extracted: &ExtractedLogin,
-) -> std::result::Result<(), AppError> {
+) -> std::result::Result<(), LoginFailure> {
     let Some(state) = app.try_state::<AppState>() else {
-        return Err(AppError::new(
+        return Err(LoginFailure::fatal(AppError::new(
             "err.login.state_unavailable",
             "应用状态不可用",
-        ));
+        )));
     };
     let (preferred, authoritative_count) =
         preferred_region_hosts(&state, &extracted.user_id, extracted.region_hint.as_deref()).await;
@@ -328,14 +388,16 @@ async fn persist_extracted_login(
     )
     .await?;
     if !epoch_active(app, epoch) {
-        return Err(AppError::new("err.login.cancelled", "登录已取消"));
+        return Err(LoginFailure::fatal(AppError::new(
+            "err.login.cancelled",
+            "登录已取消",
+        )));
     }
 
     if let Err(error) = state.auth.save_auth(&auth) {
-        return Err(AppError::new(
-            "err.login.save_failed",
-            format!("认证信息保存失败：{error}"),
-        ));
+        // 保存失败通常是系统凭据管理器的事（被策略禁用、令牌超长），原样带上
+        // 底层原因；界面按 code 取本地化文案，这句中文留给 CLI、日志和报告。
+        return Err(LoginFailure::fatal(AppError::from(error)));
     }
 
     let manager = match AppState::build_sync_manager(auth, &state.data_dir) {
@@ -355,7 +417,10 @@ async fn persist_extracted_login(
                 let mut warning = state.auth_warning.write().await;
                 *warning = Some(format!("无法初始化同步，请检查认证区域后重试：{message}"));
             }
-            return Err(AppError::new("err.login.sync_init_failed", message));
+            return Err(LoginFailure::fatal(AppError::new(
+                "err.login.sync_init_failed",
+                message,
+            )));
         }
     };
 
@@ -402,25 +467,26 @@ impl RegionProbeFailures {
         }
     }
 
-    fn into_app_error(self) -> AppError {
+    fn into_login_failure(self) -> LoginFailure {
         // An explicit 401/403 is stronger evidence than failures from the
         // fallback hosts. Do not hide it behind unrelated 404s or timeouts.
         if self.rejected > 0 {
-            return AppError::new(
+            return LoginFailure::fatal(AppError::new(
                 "err.login.credentials_rejected",
                 "Zepp 拒绝了这次登录凭据，请退出登录窗口后重新登录",
-            );
+            ));
         }
+        // 唯一值得原地重试的一类：凭据没被否掉，只是这会儿够不着区域服务。
         if self.transient > 0 {
-            return AppError::new(
+            return LoginFailure::retryable(AppError::new(
                 "err.login.region_unreachable",
                 "暂时无法连接 Zepp 区域服务，请检查网络后重试",
-            );
+            ));
         }
-        AppError::new(
+        LoginFailure::fatal(AppError::new(
             "err.login.region_probe_failed",
             "读到了凭据，但无法确认账号区域。请重新登录，或改用 HAR 导入。",
-        )
+        ))
     }
 }
 
@@ -439,7 +505,7 @@ async fn probe_region_hosts(
     app_token: &str,
     hosts: &[String],
     authoritative_count: usize,
-) -> std::result::Result<AuthInfo, AppError> {
+) -> std::result::Result<AuthInfo, LoginFailure> {
     let deadline = tokio::time::Instant::now() + Duration::from_secs(45);
     let mut failures = RegionProbeFailures::default();
     let authoritative_count = authoritative_count.min(hosts.len());
@@ -477,7 +543,7 @@ async fn probe_region_hosts(
     {
         return Ok(auth);
     }
-    Err(failures.into_app_error())
+    Err(failures.into_login_failure())
 }
 
 async fn probe_region_batch(
@@ -920,11 +986,19 @@ fn sanitize_user_id(value: &str) -> Option<String> {
 
 fn sanitize_app_token(value: &str) -> Option<String> {
     let value = value.trim();
-    if value.is_empty() || value.len() > 16 * 1024 || value.chars().any(char::is_control) {
-        None
-    } else {
-        Some(value.to_string())
+    if value.is_empty() || value.chars().any(char::is_control) {
+        return None;
     }
+    // 存不进系统凭据管理器的东西，不可能是 App Token。以前这里放行到 16 KB，
+    // 比 Windows 真正存得下的多出六倍：超长的值一路走到保存那一步才炸，而且
+    // 报的是「无法写入 Windows 凭据管理器」，完全指不到长度上。
+    //
+    // 早一步否掉还有第二个好处：候选是按顺序试的，否掉一段从页面存储里捞到的
+    // JSON，下一个候选（打包在 hm-user-login-info 里的那个真令牌）才有机会。
+    if value.encode_utf16().count() > crate::auth::CREDENTIAL_MAX_UTF16_UNITS {
+        return None;
+    }
+    Some(value.to_string())
 }
 
 fn is_allowed_login_url(url: &str) -> bool {
@@ -1187,7 +1261,9 @@ mod tests {
         assert!(!is_primary_login_page(
             "https://accounts.google.com/o/oauth2/auth"
         ));
-        assert!(!is_primary_login_page("https://www.facebook.com/dialog/oauth"));
+        assert!(!is_primary_login_page(
+            "https://www.facebook.com/dialog/oauth"
+        ));
         assert!(!is_primary_login_page(
             "https://open.weixin.qq.com/connect/qrconnect"
         ));
@@ -1409,13 +1485,62 @@ mod tests {
             classify_region_probe_error(&ZeppBridgeError::Unavailable("HTTP 404".into())),
             RegionProbeFailure::Other
         );
-        let error = RegionProbeFailures {
+        let rejected = RegionProbeFailures {
             rejected: 1,
             transient: 2,
             other: 3,
         }
-        .into_app_error();
-        assert_eq!(error.code, "err.login.credentials_rejected");
+        .into_login_failure();
+        assert_eq!(rejected.error.code, "err.login.credentials_rejected");
+        // 凭据被否掉了，再试一百次也是这个结果——不能留着窗口空转。
+        assert!(!rejected.retryable);
+
+        // 只有网络那一类值得原地重试，而且必须保住登录窗口：它是隔离会话，
+        // 关掉就意味着验证码、扫码全部重来。
+        let unreachable = RegionProbeFailures {
+            transient: 2,
+            ..Default::default()
+        }
+        .into_login_failure();
+        assert_eq!(unreachable.error.code, "err.login.region_unreachable");
+        assert!(unreachable.retryable);
+
+        let other = RegionProbeFailures {
+            other: 1,
+            ..Default::default()
+        }
+        .into_login_failure();
+        assert_eq!(other.error.code, "err.login.region_probe_failed");
+        assert!(!other.retryable);
+    }
+
+    /// 超出系统凭据管理器容量的值不可能是 App Token。
+    ///
+    /// Windows 凭据管理器只存得下 1280 个 UTF-16 码元；以前这里放行到 16 KB，
+    /// 于是从页面存储里捞到的一整段 JSON 会被当成令牌采用，一路走到保存那步
+    /// 才失败，报的还是一句指不到长度的「无法写入 Windows 凭据管理器」。
+    #[test]
+    fn an_oversized_candidate_is_not_mistaken_for_an_app_token() {
+        let real_token = "a".repeat(96);
+        assert_eq!(
+            sanitize_app_token(&real_token).as_deref(),
+            Some(real_token.as_str())
+        );
+
+        let blob = "x".repeat(crate::auth::CREDENTIAL_MAX_UTF16_UNITS + 1);
+        assert_eq!(sanitize_app_token(&blob), None);
+
+        // 否掉超长候选之后，打包在 hm-user-login-info 里的真令牌才轮得到。
+        let cookies = vec![
+            ("apptoken".to_string(), blob),
+            (
+                "hm-user-login-info".to_string(),
+                r#"{"token_info":{"user_id":"77","app_token":"the-real-token"}}"#.to_string(),
+            ),
+        ];
+        let got = parse_login_cookies(&cookies).expect("falls back to the bundled token");
+        assert_eq!(got.user_id, "77");
+        assert_eq!(got.app_token, "the-real-token");
     }
 
     #[test]
