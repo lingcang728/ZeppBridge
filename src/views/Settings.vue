@@ -325,6 +325,8 @@ const userPrefs = ref<UserPrefs | null>(null);
 
 /* 登录窗口那几行进度和失败原因原本直接显示后端字符串——全是中文。后端现在
    给的是稳定码，这里按界面语言取文案，取不到才回落到那句中文原文。 */
+const BUILD_STAMP = __BUILD_STAMP__;
+
 const estimateText = computed(() => storageEstimateText(storageEstimate.value));
 
 const loginMessage = computed(() => {
@@ -1415,6 +1417,8 @@ const runCapabilityProbe = async () => {
           <p v-if="updateState.status === 'failed'">{{ updateState.error }}</p>
           <p v-else-if="updateState.status === 'available'">{{ t.updateCurrent(updateState.currentVersion) }}<template v-if="updateState.sizeBytes"> · {{ formatUpdateBytes(updateState.sizeBytes) }}</template></p>
           <p v-else>{{ t.updateVersion(updateState.currentVersion || t.updateVersionLoading) }}</p>
+          <!-- 同一个版本号会构建很多次；报问题时把这一行带上，就不用猜手上是哪个包了。 -->
+          <p class="build-stamp">{{ t.buildStamp(BUILD_STAMP) }}</p>
         </div>
       </div>
       <progress v-if="updateState.status === 'downloading' && updateProgress !== null" :value="updateProgress" max="100">{{ updateProgress }}%</progress>
@@ -1679,6 +1683,7 @@ const runCapabilityProbe = async () => {
 </template>
 
 <style scoped>
+.build-stamp { color: var(--subtle); font-size: 11px; font-family: var(--font-mono); }
 .page { width: 100%; min-width: 0; margin: 0; display: grid; gap: 14px; }
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 0; min-width: 0; }
 .locale-switch { flex: 0 0 auto; text-align: right; }

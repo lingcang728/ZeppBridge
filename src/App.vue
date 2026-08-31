@@ -84,6 +84,8 @@ const t = useMessages(messages);
 // 桌面端从 Tauri 运行时读取版本（与 tauri.conf.json 单一来源），
 // 浏览器预览环境回退到下面的常量（与 package.json 保持同步）。
 const FALLBACK_APP_VERSION = '1.1.2';
+/* 构建标识。同一个版本号会构建很多次，光看版本号分不清手上是哪一个。 */
+const BUILD_STAMP = __BUILD_STAMP__;
 const APP_VERSION = ref(FALLBACK_APP_VERSION);
 const desktopRuntime = isDesktop();
 // 落地页只在非桌面环境渲染（Cloudflare Pages 部署的就是这个分支），
@@ -317,7 +319,7 @@ onUnmounted(() => {
         </div>
         <div class="version-row">
           <span class="version-brand"><BrandMark :size="20" /></span>
-          <span>ZeppBridge　v{{ APP_VERSION }}</span>
+          <span :title="`build ${BUILD_STAMP}`">ZeppBridge　v{{ APP_VERSION }}</span>
           <RouterLink :to="{ path: '/settings', hash: '#privacy-section' }" class="shield-link" :title="t.privacyLink">
             <DesignIcon name="secure" :size="20" />
           </RouterLink>
