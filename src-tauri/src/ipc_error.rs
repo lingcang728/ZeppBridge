@@ -72,7 +72,9 @@ impl From<zeppbridge_core::storage::write_lock::WriteLockError> for AppError {
     fn from(error: zeppbridge_core::storage::write_lock::WriteLockError) -> Self {
         use zeppbridge_core::storage::write_lock::WriteLockError;
         match &error {
-            WriteLockError::Busy { .. } => AppError::new("err.storage.write_busy", error.to_string()),
+            WriteLockError::Busy { .. } => {
+                AppError::new("err.storage.write_busy", error.to_string())
+            }
             WriteLockError::Unavailable(_) => {
                 AppError::new("err.storage.write_lock_unavailable", error.to_string())
             }

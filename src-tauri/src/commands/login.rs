@@ -1,7 +1,7 @@
 use super::auth::verify_recent_heart_rate;
 use crate::app_state::AppState;
-use crate::ipc_error::AppError;
 use crate::connectors::zepp::validate_region_host;
+use crate::ipc_error::AppError;
 use crate::ipc_types::LoginStatus;
 use crate::models::AuthInfo;
 use serde_json::Value;
@@ -245,7 +245,10 @@ async fn persist_extracted_login(
     extracted: &ExtractedLogin,
 ) -> std::result::Result<(), AppError> {
     let Some(state) = app.try_state::<AppState>() else {
-        return Err(AppError::new("err.login.state_unavailable", "应用状态不可用"));
+        return Err(AppError::new(
+            "err.login.state_unavailable",
+            "应用状态不可用",
+        ));
     };
     let preferred = preferred_region_hosts(&state, extracted.region_hint.as_deref()).await;
     let Some(auth) = probe_region_hosts(&extracted.user_id, &extracted.app_token, &preferred).await
@@ -476,9 +479,9 @@ async fn web_storage_entries(window: &WebviewWindow) -> Option<Vec<(String, Stri
     let parsed: serde_json::Map<String, Value> = serde_json::from_str(&raw).ok()?;
     let entries: Vec<(String, String)> = parsed
         .into_iter()
-        .filter_map(|(key, value)| match value {
-            Value::String(text) => Some((key, text)),
-            other => Some((key, other.to_string())),
+        .map(|(key, value)| match value {
+            Value::String(text) => (key, text),
+            other => (key, other.to_string()),
         })
         .collect();
     (!entries.is_empty()).then_some(entries)
@@ -726,9 +729,7 @@ fn page_looks_signed_in(page_url: &str, cookies: &[(String, String)]) -> bool {
     ];
     if cookies.iter().any(|(name, _)| {
         let lowered = name.to_ascii_lowercase();
-        SIGNED_IN_HINTS
-            .iter()
-            .any(|hint| lowered.contains(hint))
+        SIGNED_IN_HINTS.iter().any(|hint| lowered.contains(hint))
     }) {
         return true;
     }
@@ -853,10 +854,16 @@ mod tests {
             "https://watchface.zepp.com/login",
             &none
         ));
-        assert!(!page_looks_signed_in("https://account.xiaomi.com/oauth2/authorize", &none));
+        assert!(!page_looks_signed_in(
+            "https://account.xiaomi.com/oauth2/authorize",
+            &none
+        ));
 
         // 已经离开登录页。
-        assert!(page_looks_signed_in("https://watchface.zepp.com/dashboard", &none));
+        assert!(page_looks_signed_in(
+            "https://watchface.zepp.com/dashboard",
+            &none
+        ));
 
         // 或者 cookie 里已经出现了登录后才有的名字，哪怕还没解析出凭据。
         assert!(page_looks_signed_in(

@@ -536,8 +536,14 @@ mod tests {
             .unwrap();
         db.record_backfill_chunk("sleep", "2026-08-01", ChunkStatus::Persisted, 30, None)
             .unwrap();
-        db.record_backfill_chunk("wellness", "2026-08-01", ChunkStatus::EmptyFromCloud, 0, None)
-            .unwrap();
+        db.record_backfill_chunk(
+            "wellness",
+            "2026-08-01",
+            ChunkStatus::EmptyFromCloud,
+            0,
+            None,
+        )
+        .unwrap();
         for _ in 0..MAX_AUTO_ATTEMPTS {
             db.record_backfill_chunk(
                 "heart_rate",

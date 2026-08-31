@@ -13,19 +13,11 @@ pub(crate) async fn build_app_status(state: &AppState) -> std::result::Result<Ap
 
     let (statuses, freshness, (last_cloud_sync_at, last_cloud_sync_outcome), prefs, storage) = {
         let database = state.db.lock().await;
-        let statuses = database
-            .list_data_status()
-            ?;
-        let freshness = database
-            .stream_freshness()
-            ?;
-        let cloud_metadata = database
-            .cloud_sync_metadata()
-            ?;
+        let statuses = database.list_data_status()?;
+        let freshness = database.stream_freshness()?;
+        let cloud_metadata = database.cloud_sync_metadata()?;
         let prefs = database.user_prefs()?;
-        let storage = database
-            .storage_estimate(prefs.history_sync_days, &state.data_dir)
-            ?;
+        let storage = database.storage_estimate(prefs.history_sync_days, &state.data_dir)?;
         (statuses, freshness, cloud_metadata, prefs, storage)
     };
 

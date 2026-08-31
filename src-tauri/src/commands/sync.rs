@@ -103,8 +103,12 @@ pub async fn start_history_backfill(
         ));
     }
     let manager = require_manager(&state).await?;
-    let from = chrono::NaiveDate::parse_from_str(from_date.trim(), "%Y-%m-%d")
-        .map_err(|_| AppError::new("err.backfill.bad_start_date", "补拉起点日期无效，需要 YYYY-MM-DD"))?;
+    let from = chrono::NaiveDate::parse_from_str(from_date.trim(), "%Y-%m-%d").map_err(|_| {
+        AppError::new(
+            "err.backfill.bad_start_date",
+            "补拉起点日期无效，需要 YYYY-MM-DD",
+        )
+    })?;
     let to = Utc::now().date_naive();
     if from > to {
         return Err(AppError::new(
@@ -138,8 +142,7 @@ pub async fn reset_coverage_ledger(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<CoverageLedger, AppError> {
     let db = state.db.lock().await;
-    db.reset_coverage_ledger()
-        ?;
+    db.reset_coverage_ledger()?;
     db.coverage_ledger().map_err(AppError::from)
 }
 
@@ -153,8 +156,7 @@ pub async fn retry_failed_backfill_chunks(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<CoverageLedger, AppError> {
     let db = state.db.lock().await;
-    db.reset_failed_backfill_chunks()
-        ?;
+    db.reset_failed_backfill_chunks()?;
     db.coverage_ledger().map_err(AppError::from)
 }
 
@@ -223,9 +225,7 @@ async fn run_sync(
     }
     let before = {
         let database = state.db.lock().await;
-        database
-            .newest_samples()
-            ?
+        database.newest_samples()?
     };
     let started_at = Utc::now().to_rfc3339();
     let report_result = if let Some(days) = history_days {
@@ -245,9 +245,7 @@ async fn run_sync(
             // not a failure: report it as `cancelled` so the UI can show a
             // neutral banner instead of a red error.
             let database = state.db.lock().await;
-            database
-                .record_cloud_sync(&finished_at, "cancelled")
-                ?;
+            database.record_cloud_sync(&finished_at, "cancelled")?;
             return Ok(ui_sync_report(
                 SyncReport {
                     success: false,
@@ -263,9 +261,7 @@ async fn run_sync(
         }
         Err(error) => {
             let database = state.db.lock().await;
-            database
-                .record_cloud_sync(&finished_at, "failed")
-                ?;
+            database.record_cloud_sync(&finished_at, "failed")?;
             if error.needs_reauth() {
                 *state.auth_state.write().await = "needs_reauth".to_string();
             }
@@ -274,9 +270,7 @@ async fn run_sync(
     };
     let (freshness, after) = {
         let database = state.db.lock().await;
-        let freshness = database
-            .stream_freshness()
-            ?;
+        let freshness = database.stream_freshness()?;
         let after = freshness
             .iter()
             .map(|(stream, value)| (stream.clone(), value.newest_sample_at.clone()))
@@ -286,9 +280,7 @@ async fn run_sync(
     let outcome = classify_outcome(&report, &before, &after);
     {
         let database = state.db.lock().await;
-        database
-            .record_cloud_sync(&finished_at, outcome)
-            ?;
+        database.record_cloud_sync(&finished_at, outcome)?;
     }
 
     if report.streams.iter().any(|stream| stream.needs_reauth) {

@@ -27,9 +27,8 @@ use commands::{
     get_workout_insight, get_workout_series, get_workout_type_options, import_from_har,
     list_backups, manual_auth, open_data_folder, prepare_ai_handoff, probe_data_capabilities,
     publish_ai_export, reprocess_local_data, reset_coverage_ledger, retry_failed_backfill_chunks,
-    run_database_integrity_check,
-    save_auth, save_csv_export, save_gpx_export, save_json_export, set_backup_pinned,
-    set_device_model_override, set_heart_rate_zone_preference, set_user_prefs,
+    run_database_integrity_check, save_auth, save_csv_export, save_gpx_export, save_json_export,
+    set_backup_pinned, set_device_model_override, set_heart_rate_zone_preference, set_user_prefs,
     set_workout_code_label, set_workout_type_override, stage_restore, start_history_backfill,
     start_history_sync, start_incremental_sync, start_initial_sync, start_web_login,
     submit_device_model_assignment, submit_diagnostic_report, verify_auth, verify_backup,
@@ -50,8 +49,6 @@ fn show_main_window(app: &AppHandle) {
         let _ = window.set_always_on_top(false);
     }
 }
-
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
 
 /// 托盘菜单的三条文案。原生菜单没法走前端的 i18n，只能在这里备一份。
 struct TrayLabels {
@@ -100,11 +97,7 @@ fn system_prefers_chinese() -> bool {
     {
         // Windows 不设这些环境变量，问系统要用户的界面语言。
         let output = std::process::Command::new("powershell")
-            .args([
-                "-NoProfile",
-                "-Command",
-                "(Get-Culture).Name",
-            ])
+            .args(["-NoProfile", "-Command", "(Get-Culture).Name"])
             .output();
         if let Ok(output) = output {
             let name = String::from_utf8_lossy(&output.stdout).to_ascii_lowercase();
@@ -127,6 +120,7 @@ fn set_tray_locale(app: AppHandle, locale: String) -> std::result::Result<(), ip
     Ok(())
 }
 
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[cfg(target_os = "windows")]
     if let Ok(data_dir) = paths::resolve_data_dir() {

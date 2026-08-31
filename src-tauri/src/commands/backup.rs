@@ -4,8 +4,8 @@
 //! `zeppbridge_core::storage::backup`；这里只负责拿写锁、把结果交给界面，
 //! 以及把「恢复要在下次启动时执行」这件事如实告诉用户。
 
-use crate::ipc_error::AppError;
 use crate::app_state::AppState;
+use crate::ipc_error::AppError;
 use std::time::Duration;
 use zeppbridge_core::storage::backup::{
     self, BackupKind, BackupManifest, BackupVerification, PendingRestore, RestorePreview,
@@ -30,8 +30,7 @@ pub async fn list_backups(
 pub async fn create_manual_backup(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<BackupManifest, AppError> {
-    let _guard = acquire_with_timeout(&state.data_dir, WritePurpose::Backup, LOCK_TIMEOUT)
-        ?;
+    let _guard = acquire_with_timeout(&state.data_dir, WritePurpose::Backup, LOCK_TIMEOUT)?;
     backup::create_backup(
         &state.data_dir,
         BackupKind::Manual,
@@ -77,8 +76,7 @@ pub async fn stage_restore(
     state: tauri::State<'_, AppState>,
     backup_id: String,
 ) -> std::result::Result<PendingRestore, AppError> {
-    let _guard = acquire_with_timeout(&state.data_dir, WritePurpose::Restore, LOCK_TIMEOUT)
-        ?;
+    let _guard = acquire_with_timeout(&state.data_dir, WritePurpose::Restore, LOCK_TIMEOUT)?;
     backup::stage_restore(&state.data_dir, &backup_id, env!("CARGO_PKG_VERSION"))
         .map_err(AppError::from)
 }

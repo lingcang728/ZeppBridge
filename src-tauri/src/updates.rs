@@ -1,5 +1,5 @@
-use tauri::AppHandle;
 use crate::ipc_error::AppError;
+use tauri::AppHandle;
 
 #[cfg(windows)]
 use std::{path::PathBuf, process::Command, thread, time::Duration};
@@ -9,13 +9,12 @@ use std::{path::PathBuf, process::Command, thread, time::Duration};
 /// macOS ships a single `.app` bundle with no portable variant.
 #[cfg(windows)]
 fn installed_path() -> Result<PathBuf, AppError> {
-    let local = std::env::var_os("LOCALAPPDATA")
-        .ok_or_else(|| {
-            AppError::new(
-                "err.update.localappdata_missing",
-                "Windows LOCALAPPDATA 路径不可用",
-            )
-        })?;
+    let local = std::env::var_os("LOCALAPPDATA").ok_or_else(|| {
+        AppError::new(
+            "err.update.localappdata_missing",
+            "Windows LOCALAPPDATA 路径不可用",
+        )
+    })?;
     Ok(PathBuf::from(local)
         .join("ZeppBridge")
         .join("ZeppBridge.exe"))
@@ -45,14 +44,12 @@ pub(crate) fn launch_migrated_install(app: AppHandle) -> Result<(), AppError> {
         let installed = installed_path()?;
         for _ in 0..30 {
             if installed.is_file() {
-                Command::new(&installed)
-                    .spawn()
-                    .map_err(|error| {
-                        AppError::new(
-                            "err.update.launch_failed",
-                            format!("无法启动更新后的安装版：{error}"),
-                        )
-                    })?;
+                Command::new(&installed).spawn().map_err(|error| {
+                    AppError::new(
+                        "err.update.launch_failed",
+                        format!("无法启动更新后的安装版：{error}"),
+                    )
+                })?;
                 app.exit(0);
                 return Ok(());
             }

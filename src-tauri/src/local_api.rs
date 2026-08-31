@@ -3,8 +3,8 @@
 //! 生命周期、鉴权、解析上限和数据读取都在 `zeppbridge_core::local_api`：
 //! 这里只把 controller 的实时状态和三个用户动作暴露成命令。
 
-use std::sync::Arc;
 use crate::ipc_error::AppError;
+use std::sync::Arc;
 use zeppbridge_core::local_api::{LocalApiController, LocalApiStatus};
 
 /// Tauri 管理的 controller 句柄。

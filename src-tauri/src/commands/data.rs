@@ -1,9 +1,9 @@
-use crate::ipc_error::AppError;
 use crate::app_state::AppState;
 use crate::connectors::ZeppConnector;
 use crate::device_catalog::{match_catalog, CatalogMatchInput, CatalogMatchStatus};
 use crate::export_formats;
 use crate::insight::{WeeklyReport, WorkoutInsight};
+use crate::ipc_error::AppError;
 use crate::ipc_types::CleanupResult;
 use crate::models::{
     AiHandoffMetadata, AiHandoffResult, CapabilityOverview, DailyPoint, DeviceCacheMetadata,
@@ -63,8 +63,7 @@ pub async fn get_recent_sleep(
     let limit = limit.clamp(1, 500);
     let result = {
         let db = state.db.lock().await;
-        db.get_recent_sleep_sessions(limit)
-            .map_err(AppError::from)
+        db.get_recent_sleep_sessions(limit).map_err(AppError::from)
     };
     result
 }
@@ -76,8 +75,7 @@ pub async fn get_sleep_detail(
     sleep_id: String,
 ) -> std::result::Result<Option<SleepSession>, AppError> {
     let db = state.db.lock().await;
-    db.get_sleep_detail(&sleep_id)
-        .map_err(AppError::from)
+    db.get_sleep_detail(&sleep_id).map_err(AppError::from)
 }
 
 /// Return the most recent persisted workouts.
@@ -89,8 +87,7 @@ pub async fn get_recent_workouts(
     let limit = limit.clamp(1, 500);
     let result = {
         let db = state.db.lock().await;
-        db.get_recent_workouts(limit)
-            .map_err(AppError::from)
+        db.get_recent_workouts(limit).map_err(AppError::from)
     };
     result
 }
@@ -102,8 +99,7 @@ pub async fn get_workout_detail(
     workout_id: String,
 ) -> std::result::Result<Option<Workout>, AppError> {
     let db = state.db.lock().await;
-    db.get_workout_detail(&workout_id)
-        .map_err(AppError::from)
+    db.get_workout_detail(&workout_id).map_err(AppError::from)
 }
 
 #[tauri::command]
@@ -112,8 +108,7 @@ pub async fn get_workout_series(
     workout_id: String,
 ) -> std::result::Result<WorkoutSeries, AppError> {
     let db = state.db.lock().await;
-    db.get_workout_series(&workout_id)
-        .map_err(AppError::from)
+    db.get_workout_series(&workout_id).map_err(AppError::from)
 }
 
 #[tauri::command]
@@ -122,8 +117,7 @@ pub async fn get_heart_rate_series(
     hours: i64,
 ) -> std::result::Result<Vec<HeartRatePoint>, AppError> {
     let db = state.db.lock().await;
-    db.heart_rate_series(hours)
-        .map_err(AppError::from)
+    db.heart_rate_series(hours).map_err(AppError::from)
 }
 
 #[tauri::command]
@@ -132,8 +126,7 @@ pub async fn get_training_load_series(
     days: i64,
 ) -> std::result::Result<Vec<DailyPoint>, AppError> {
     let db = state.db.lock().await;
-    db.training_load_series(days)
-        .map_err(AppError::from)
+    db.training_load_series(days).map_err(AppError::from)
 }
 
 /// Daily series for the body and training screens.
@@ -148,8 +141,7 @@ pub async fn get_metric_series(
     days: i64,
 ) -> std::result::Result<Vec<MetricSeries>, AppError> {
     let db = state.db.lock().await;
-    db.metric_series(&metrics, days)
-        .map_err(AppError::from)
+    db.metric_series(&metrics, days).map_err(AppError::from)
 }
 
 /// Acute (7 day) versus chronic (28 day) training load, day by day.
@@ -162,8 +154,7 @@ pub async fn get_training_balance(
     let end = chrono::Local::now().date_naive();
     let start = end - chrono::Duration::days(window - 1);
     let db = state.db.lock().await;
-    db.training_load_balance(start, end)
-        .map_err(AppError::from)
+    db.training_load_balance(start, end).map_err(AppError::from)
 }
 
 /// The heart-rate zone picker's state: measured bases, the models they
@@ -174,8 +165,7 @@ pub async fn get_heart_rate_zones(
     days: i64,
 ) -> std::result::Result<HeartRateZoneOptions, AppError> {
     let db = state.db.lock().await;
-    db.heart_rate_zone_options(days)
-        .map_err(AppError::from)
+    db.heart_rate_zone_options(days).map_err(AppError::from)
 }
 
 /// Record which zone model and which measured bases the user picked.
@@ -198,10 +188,8 @@ pub async fn set_heart_rate_zone_preference(
         max_basis,
         resting_basis,
         threshold_basis,
-    })
-    ?;
-    db.heart_rate_zone_options(days)
-        .map_err(AppError::from)
+    })?;
+    db.heart_rate_zone_options(days).map_err(AppError::from)
 }
 
 #[tauri::command]
@@ -264,8 +252,7 @@ pub async fn compact_raw_payloads(
         &state.data_dir,
         zeppbridge_core::storage::write_lock::WritePurpose::Compaction,
         std::time::Duration::from_secs(20),
-    )
-    ?;
+    )?;
     let db = state.db.lock().await;
     db.compact_raw_payloads().map_err(AppError::from)
 }
@@ -287,8 +274,7 @@ pub async fn cleanup_old_data(
             &state.data_dir,
             zeppbridge_core::storage::write_lock::WritePurpose::Cleanup,
             std::time::Duration::from_secs(20),
-        )
-        ?;
+        )?;
         let db = state.db.lock().await;
         db.cleanup_old_data(days).map_err(AppError::from)
     };
@@ -310,15 +296,11 @@ pub async fn reprocess_local_data(
             &state.data_dir,
             zeppbridge_core::storage::write_lock::WritePurpose::Reprocess,
             std::time::Duration::from_secs(20),
-        )
-        ?;
+        )?;
         let db = state.db.lock().await;
-        let streams = db
-            .reprocess_raw_records()
-            ?;
+        let streams = db.reprocess_raw_records()?;
         // 手动重新解析记在自己的时间线上，云端同步时间原样不动。
-        db.record_local_replay(true)
-            ?;
+        db.record_local_replay(true)?;
         streams
     };
     let total_records: i64 = streams.values().sum();
@@ -339,8 +321,7 @@ pub async fn get_workout_insight(
     workout_id: String,
 ) -> std::result::Result<WorkoutInsight, AppError> {
     let db = state.db.lock().await;
-    db.workout_insight(&workout_id)
-        .map_err(AppError::from)
+    db.workout_insight(&workout_id).map_err(AppError::from)
 }
 
 /// 本地周报：最近 7 天对比你自己此前 28 天。
@@ -351,8 +332,7 @@ pub async fn get_weekly_report(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<WeeklyReport, AppError> {
     let db = state.db.lock().await;
-    db.weekly_report(Utc::now())
-        .map_err(AppError::from)
+    db.weekly_report(Utc::now()).map_err(AppError::from)
 }
 
 /// 数据健康中心的后端契约。
@@ -381,8 +361,7 @@ pub async fn run_database_integrity_check(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<IntegrityCheckResult, AppError> {
     let db = state.db.lock().await;
-    db.run_integrity_check()
-        .map_err(AppError::from)
+    db.run_integrity_check().map_err(AppError::from)
 }
 
 /// 随包运动目录里的全部可选项，供纠正下拉框渲染。
@@ -404,8 +383,7 @@ pub async fn get_unknown_workout_codes(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<Vec<WorkoutCodeLabel>, AppError> {
     let db = state.db.lock().await;
-    db.unknown_workout_code_labels()
-        .map_err(AppError::from)
+    db.unknown_workout_code_labels().map_err(AppError::from)
 }
 
 /// 给一个未识别编号起名字（传 `null` 撤销）。所有同编号的记录一起生效。
@@ -416,10 +394,8 @@ pub async fn set_workout_code_label(
     label: Option<String>,
 ) -> std::result::Result<Vec<WorkoutCodeLabel>, AppError> {
     let db = state.db.lock().await;
-    db.set_workout_code_label(zepp_type, label.as_deref())
-        ?;
-    db.unknown_workout_code_labels()
-        .map_err(AppError::from)
+    db.set_workout_code_label(zepp_type, label.as_deref())?;
+    db.unknown_workout_code_labels().map_err(AppError::from)
 }
 
 /// 随包设备目录里可供用户指认的型号。
@@ -461,10 +437,8 @@ pub async fn set_workout_type_override(
     user_override: Option<String>,
 ) -> std::result::Result<Workout, AppError> {
     let db = state.db.lock().await;
-    db.set_workout_type_override(&workout_id, user_override.as_deref())
-        ?;
-    db.get_workout_detail(&workout_id)
-        ?
+    db.set_workout_type_override(&workout_id, user_override.as_deref())?;
+    db.get_workout_detail(&workout_id)?
         .ok_or_else(|| AppError::new("err.workout.not_found", "运动记录不存在"))
 }
 
@@ -510,19 +484,13 @@ async fn build_diagnostic_report(
     Ok(DiagnosticReport {
         format: "zeppbridge.feedback.v1".into(),
         app_version: env!("CARGO_PKG_VERSION").into(),
-        schema_version: db
-            .diagnostic_schema_version()
-            ?,
+        schema_version: db.diagnostic_schema_version()?,
         normalizer_revision: NORMALIZER_REVISION.into(),
         operating_system: std::env::consts::OS.into(),
         device_evidence,
         user_assigned_models,
-        unknown_workout_codes: db
-            .diagnostic_unknown_workout_codes()
-            ?,
-        workout_type_conflicts: db
-            .diagnostic_workout_type_conflicts()
-            ?,
+        unknown_workout_codes: db.diagnostic_unknown_workout_codes()?,
+        workout_type_conflicts: db.diagnostic_workout_type_conflicts()?,
         // 类型由调用方按需要填；这个构造函数只负责本机能自动查到的事实。
         category: None,
         user_note: user_note.and_then(sanitize_diagnostic_note),
@@ -709,7 +677,12 @@ async fn post_diagnostic_report(
         .timeout(Duration::from_secs(12))
         .user_agent(format!("ZeppBridge/{} feedback", env!("CARGO_PKG_VERSION")))
         .build()
-        .map_err(|_| AppError::new("err.diagnostic.client_init_failed", "无法初始化错误报告连接"))?;
+        .map_err(|_| {
+            AppError::new(
+                "err.diagnostic.client_init_failed",
+                "无法初始化错误报告连接",
+            )
+        })?;
     let response = client
         .post(FEEDBACK_ENDPOINT)
         .json(&report)
@@ -755,8 +728,7 @@ pub async fn get_export_json(
 ) -> std::result::Result<String, AppError> {
     let result = {
         let db = state.db.lock().await;
-        db.build_ai_export(&selection)
-            .map_err(AppError::from)
+        db.build_ai_export(&selection).map_err(AppError::from)
     }?;
     Ok(result.0)
 }
@@ -825,8 +797,7 @@ async fn write_converted_export(
     selection.detail = ExportDetail::Full;
     let (encoded, record_count) = {
         let db = state.db.lock().await;
-        db.build_ai_export(&selection)
-            ?
+        db.build_ai_export(&selection)?
     };
     if record_count == 0 {
         return Err(AppError::new(
@@ -834,21 +805,25 @@ async fn write_converted_export(
             "这段时间没有可导出的记录",
         ));
     }
-    let export: Value =
-        serde_json::from_str(&encoded).map_err(|error| {
-            AppError::new("err.export.read_failed", format!("读取导出数据失败: {error}"))
-        })?;
+    let export: Value = serde_json::from_str(&encoded).map_err(|error| {
+        AppError::new(
+            "err.export.read_failed",
+            format!("读取导出数据失败: {error}"),
+        )
+    })?;
     let (converted, converted_count) = convert(&export).map_err(|message| {
         AppError::new("err.export.convert_failed", message)
             .with_params(serde_json::json!({ "format": label }))
     })?;
 
     let generated_at = Utc::now();
-    write_file_atomically(&path, converted.as_bytes())
-        .map_err(|error| {
-            AppError::new("err.export.write_failed", format!("写入 {label} 导出失败: {error}"))
-                .with_params(serde_json::json!({ "format": label }))
-        })?;
+    write_file_atomically(&path, converted.as_bytes()).map_err(|error| {
+        AppError::new(
+            "err.export.write_failed",
+            format!("写入 {label} 导出失败: {error}"),
+        )
+        .with_params(serde_json::json!({ "format": label }))
+    })?;
     Ok(ExportResult {
         path: path.to_string_lossy().into_owned(),
         record_count: converted_count,
@@ -872,13 +847,15 @@ pub async fn prepare_ai_handoff(
 ) -> std::result::Result<AiHandoffResult, AppError> {
     let prompt = sanitize_clipboard_text(prompt.trim());
     if prompt.is_empty() {
-        return Err(AppError::new("err.handoff.prompt_required", "请先填写提示词"));
+        return Err(AppError::new(
+            "err.handoff.prompt_required",
+            "请先填写提示词",
+        ));
     }
 
     let (encoded, record_count) = {
         let db = state.db.lock().await;
-        db.build_ai_export(&selection)
-            ?
+        db.build_ai_export(&selection)?
     };
     if record_count == 0 {
         return Err(AppError::new(
@@ -900,21 +877,19 @@ pub async fn prepare_ai_handoff(
         let target_dir = directories::UserDirs::new()
             .and_then(|u| u.desktop_dir().map(|p| p.to_path_buf()))
             .unwrap_or_else(|| state.data_dir.join("exports"));
-        std::fs::create_dir_all(&target_dir)
-            .map_err(|error| {
-                AppError::new(
-                    "err.handoff.mkdir_failed",
-                    format!("创建数据包导出目录失败: {error}"),
-                )
-            })?;
+        std::fs::create_dir_all(&target_dir).map_err(|error| {
+            AppError::new(
+                "err.handoff.mkdir_failed",
+                format!("创建数据包导出目录失败: {error}"),
+            )
+        })?;
         let path = target_dir.join("zeppbridge-ai-handoff.json");
-        write_file_atomically(&path, redacted.as_bytes())
-            .map_err(|error| {
-                AppError::new(
-                    "err.handoff.write_failed",
-                    format!("写入脱敏 AI 数据到桌面失败: {error}"),
-                )
-            })?;
+        write_file_atomically(&path, redacted.as_bytes()).map_err(|error| {
+            AppError::new(
+                "err.handoff.write_failed",
+                format!("写入脱敏 AI 数据到桌面失败: {error}"),
+            )
+        })?;
         (
             format!("{prompt}\n\n数据包已导出到桌面（zeppbridge-ai-handoff.json），拖入 AI 对话框即可。"),
             Some(path.to_string_lossy().into_owned()),
@@ -953,10 +928,12 @@ pub(crate) fn redact_ai_export(
     encoded: &str,
     include_precise_route: bool,
 ) -> std::result::Result<(String, Vec<String>), AppError> {
-    let mut value: Value = serde_json::from_str(encoded)
-        .map_err(|error| {
-            AppError::new("err.handoff.parse_failed", format!("解析 AI 导出 JSON 失败: {error}"))
-        })?;
+    let mut value: Value = serde_json::from_str(encoded).map_err(|error| {
+        AppError::new(
+            "err.handoff.parse_failed",
+            format!("解析 AI 导出 JSON 失败: {error}"),
+        )
+    })?;
     let mut redactions = BTreeSet::from([
         "authentication_fields".to_string(),
         "identity_fields".to_string(),
@@ -984,10 +961,12 @@ pub(crate) fn redact_ai_export(
         );
     }
 
-    let encoded = serde_json::to_string_pretty(&value)
-        .map_err(|error| {
-            AppError::new("err.handoff.encode_failed", format!("编码脱敏 AI 导出失败: {error}"))
-        })?;
+    let encoded = serde_json::to_string_pretty(&value).map_err(|error| {
+        AppError::new(
+            "err.handoff.encode_failed",
+            format!("编码脱敏 AI 导出失败: {error}"),
+        )
+    })?;
     Ok((encoded, redactions.into_iter().collect()))
 }
 
@@ -1274,8 +1253,7 @@ async fn write_export(
 ) -> std::result::Result<ExportResult, AppError> {
     let (encoded, record_count) = {
         let db = state.db.lock().await;
-        db.build_ai_export(&selection)
-            ?
+        db.build_ai_export(&selection)?
     };
     // A zero-record export must not leave a misleading empty file on disk:
     // report an error before anything is written.
@@ -1290,10 +1268,12 @@ async fn write_export(
         path
     } else {
         let export_dir = state.data_dir.join("exports");
-        std::fs::create_dir_all(&export_dir)
-            .map_err(|error| {
-                AppError::new("err.export.mkdir_failed", format!("创建导出目录失败: {error}"))
-            })?;
+        std::fs::create_dir_all(&export_dir).map_err(|error| {
+            AppError::new(
+                "err.export.mkdir_failed",
+                format!("创建导出目录失败: {error}"),
+            )
+        })?;
         let file_name = if stable_ai_feed {
             "zeppbridge-ai-feed.json".to_string()
         } else {
@@ -1310,10 +1290,12 @@ async fn write_export(
         };
         export_dir.join(file_name)
     };
-    write_file_atomically(&path, encoded.as_bytes())
-        .map_err(|error| {
-            AppError::new("err.export.write_json_failed", format!("写入 JSON 导出失败: {error}"))
-        })?;
+    write_file_atomically(&path, encoded.as_bytes()).map_err(|error| {
+        AppError::new(
+            "err.export.write_json_failed",
+            format!("写入 JSON 导出失败: {error}"),
+        )
+    })?;
     Ok(ExportResult {
         path: path.to_string_lossy().into_owned(),
         record_count,
@@ -1468,8 +1450,7 @@ async fn resolve_device_profile(
     };
     let from_db = {
         let db = state.db.lock().await;
-        db.lookup_device_profile(device_id)
-            ?
+        db.lookup_device_profile(device_id)?
     };
     let cached_profile = read_device_profile_cache(&state.data_dir)
         .profiles
@@ -1672,8 +1653,7 @@ async fn enrich_profile_with_local_data(
         .collect::<Vec<_>>();
         let assigned = {
             let db = state.db.lock().await;
-            db.device_model_override(&keys)
-                ?
+            db.device_model_override(&keys)?
         };
         if let Some(assigned) = assigned {
             apply_user_assignment(&mut profile, &assigned.catalog_id);
@@ -1690,8 +1670,7 @@ async fn enrich_profile_with_local_data(
     .collect::<Vec<_>>();
     let (has_local_data, last_data_at) = {
         let db = state.db.lock().await;
-        db.device_data_summary(&aliases)
-            ?
+        db.device_data_summary(&aliases)?
     };
     profile.has_local_data = has_local_data;
     profile.last_data_at = last_data_at;
@@ -2868,7 +2847,10 @@ pub fn open_data_folder(state: tauri::State<'_, AppState>) -> std::result::Resul
             .spawn()
             .map(|_| ())
             .map_err(|error| {
-                AppError::new("err.data_folder.open_failed", format!("打开数据文件夹失败: {error}"))
+                AppError::new(
+                    "err.data_folder.open_failed",
+                    format!("打开数据文件夹失败: {error}"),
+                )
             })
     }
 
@@ -2879,7 +2861,10 @@ pub fn open_data_folder(state: tauri::State<'_, AppState>) -> std::result::Resul
             .spawn()
             .map(|_| ())
             .map_err(|error| {
-                AppError::new("err.data_folder.open_failed", format!("打开数据文件夹失败: {error}"))
+                AppError::new(
+                    "err.data_folder.open_failed",
+                    format!("打开数据文件夹失败: {error}"),
+                )
             })
     }
 
