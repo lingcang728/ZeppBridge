@@ -103,7 +103,7 @@ Tauri command 在 `src-tauri/src/lib.rs` 注册，前端封装在 `src/lib/bridg
 | --- | --- | --- |
 | `start_web_login` | 打开 Zepp 登录窗口并开始轮询 | 返回 `LoginStatus`；事件 `login://status` |
 | `cancel_web_login` | 关闭登录窗口并作废 epoch | 状态回到 `idle` |
-| `get_login_status` | 读取当前登录状态 | `{ state, message, page_url }` |
+| `get_login_status` | 读取当前登录状态 | `{ state, message, page_url, code }` |
 | `save_auth` | 保存认证元数据和 token | token 进入 Windows Credential Manager；host 由连接器再次校验 |
 | `verify_auth` | 最近两小时真实心率请求 | 只接受结构化 JSON 和明确成功代码；401/403 需要重新认证 |
 | `clear_auth` | 作废登录会话并清除认证 | 保留健康数据库 |
@@ -136,6 +136,8 @@ Tauri command 在 `src-tauri/src/lib.rs` 注册，前端封装在 `src/lib/bridg
 | `cleanup_old_data` | 按天清理旧数据 | `1–365` 天；跨 canonical 表并清理无引用 raw |
 | `open_data_folder` | 在 Windows Explorer 打开安装目录旁的 `data/` | 不再使用 `%APPDATA%` |
 | `is_portable_update` / `launch_migrated_install` | 判断当前是否为非安装版入口，并在更新后拉起 `%LOCALAPPDATA%\ZeppBridge\ZeppBridge.exe` | 仅 Windows；找不到安装版时报错而不是静默退出 |
+| `retry_failed_backfill_chunks` | 让失败的补拉块重新排队 | 只碰 `failed`；已写入和云端确认为空的块不动 |
+| `set_tray_locale` | 校正原生托盘菜单的语言 | 前端确定界面语言后调用 |
 
 `LoginStatus.state` 只能是：`idle`、`waiting`、`extracting`、`verifying`、`connected`、`failed`。
 
@@ -161,7 +163,7 @@ API 不监听 `0.0.0.0`、不提供 CORS、响应 `Cache-Control: no-store`，�
 3. `ZeppConnector` 只构造 HTTPS origin，host 仅允许 `api-mifit*.zepp.com` / `api-mifit*.huami.com`，HTTP client 超时 30 秒，401/403/404/429/5xx 分类处理。
 4. `DataFetcher` 为每个响应保留 stream/source key/raw payload。连接器有有限重试，但没有通用的 cursor 分页实现；运动 endpoint 使用 track ID 语义，当前窗口 helper 仍是保守范围。
 5. `Normalizer` 只接受能识别的结构化数组/对象，并能解码当前真实 fixture 验证过的 Base64 `band_data` 睡眠/分钟心率结构；无法识别的编码仍只保留 raw 并标记 `unverified`。
-6. `Database` 使用 WAL、外键和 schema migration（`PRAGMA user_version`，当前为 **15**；迁移步骤只能追加，不要改已有 DDL——已发布的库是按当时的 DDL 建的）；表达式唯一索引处理 `NULL device_id`，canonical 行保留 `raw_record_id`。迁移在拿到跨进程写锁并生成升级前备份之后才开始。
+6. `Database` 使用 WAL、外键和 schema migration（`PRAGMA user_version`，当前为 **16**；迁移步骤只能追加，不要改已有 DDL——已发布的库是按当时的 DDL 建的）；表达式唯一索引处理 `NULL device_id`，canonical 行保留 `raw_record_id`。迁移在拿到跨进程写锁并生成升级前备份之后才开始。
 7. `SyncManager` 用 run lock 防止进程内并发，并额外获取跨进程写锁，因此桌面应用和 CLI 不会同时写同一个库；核心流失败时 `success=false`，可选流显示 `unavailable`/`unverified`，成功后再做 retention（长期归档开启时跳过清理）。
 8. 抓取、解析、写入三个阶段分别记进 `stream_provenance`，失败带稳定的机器可读类别，供数据健康页和 MCP 的 `get_data_health` 使用。
 
@@ -170,7 +172,7 @@ API 不监听 `0.0.0.0`、不提供 CORS、响应 `Cache-Control: no-store`，�
 - 页面通过 `tauriApi` / `backend` 调用 command，不直接访问 Zepp。
 - 空值显示 `—`、`未记录` 或明确的空状态；不要把缺失数据变成 `0`。
 - 时间格式化前检查 `Date.getTime()`；错误应保留可操作信息，不要静默吞掉字符串。
-- 使用 `App.vue` `:root` 里的设计 token（唯一来源，界面统一深色，不做浅色分支）、`focus-visible`、语义元素、ARIA 和最小 44px 触控区域；移动端断点目前以 760px 为主。详见 [UI 约束](ui-guidelines.md)。
+- 使用 `App.vue` `:root` 里的设计 token（唯一来源，界面统一深色，不做浅色分支）、`focus-visible`、语义元素、ARIA 和最小 44px 触控区域；移动端断点目前以 760px 为主。详见 [UI 约束](ui-guidelines.zh-CN.md)。
 - `index.html` 的语言为 `zh-CN`，标题为 `ZeppBridge · 健康数据`；当前没有把默认 Vite 图标当成产品 favicon 的验收证据。
 
 ## 推荐验收顺序
@@ -189,7 +191,7 @@ API 不监听 `0.0.0.0`、不提供 CORS、响应 `Cache-Control: no-store`，�
 
 ## 变更边界
 
-- MCP 尚未实现；REST 仅限上述本机只读接口，不得扩展到局域网监听或返回凭据。
+- REST 仅限上述本机只读接口，不得扩展到局域网监听或返回凭据。
 - 不要恢复局域网 MITM、用户 CA、Wi-Fi 代理教程或 `start_capture` 一类 command。
 - 应用启动后同步一次；关闭主窗口后进程留在托盘，并每 15 分钟检查。再次启动会唤醒已有进程，不会创建第二个托盘图标。只有从托盘退出或结束进程后同步才会停止；当前没有系统级后台服务。
 - GPS/路线、逐点训练样本及未覆盖的专有指标，仍需取得合法、脱敏的真实响应后再从 `unverified` 提升。

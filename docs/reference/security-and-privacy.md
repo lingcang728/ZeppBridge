@@ -2,8 +2,8 @@
 
 This page describes the data flows and deletion scope of the current
 implementation. It is not a claim of absolute safety: the installers are
-unsigned, the health database is plaintext by default, and behaviour against
-real accounts and regions has not been fully verified live.
+unsigned, the health database is plaintext by default, and the behaviour across
+real accounts and regions has not been fully verified against live services.
 
 [简体中文](security-and-privacy.zh-CN.md)
 
@@ -27,7 +27,7 @@ real accounts and regions has not been fully verified live.
 ## Network and regions
 
 - Syncing is not an offline feature: once you press verify or sync, ZeppBridge
-  makes HTTPS requests to the Zepp region host you allowed.
+  makes HTTPS requests to the Zepp region host configured for your account.
 - The connector accepts only origins of the form `https://api-mifit*.zepp.com`
   or `https://api-mifit*.huami.com` — no arbitrary domains, paths, queries,
   fragments, embedded credentials or uncontrolled ports.
@@ -109,7 +109,7 @@ share the sign-in URL with anyone you do not trust.
 "Send to AI" in Explore first calls the local `prepare_ai_handoff` to build a
 structured export for the current date range and data types, then recursively
 removes authentication fields (token, cookie, authorization, credential and
-friends) along with account, device and serial identifiers and sleep/training
+other authentication keys) along with account, device and serial identifiers and sleep/training
 record IDs. `route`, latitude/longitude and other precise coordinates are
 removed entirely by default; they are kept only if you deliberately enable
 "include precise GPS route" and pass a second confirmation. Authentication data
@@ -117,12 +117,12 @@ is never exported, and `redactions` plus `metadata` record which policy applied.
 
 A redacted JSON payload of 2 MiB or less goes to the clipboard together with the
 prompt. Above that threshold the clipboard gets only the prompt and a note
-asking you to upload the generated file, while the redacted JSON is written to a
-stable path in the app data directory: `exports/zeppbridge-ai-handoff.json`. A
+asking you to upload the generated file, while the redacted JSON is written to
+`zeppbridge-ai-handoff.json` on your Desktop — or, when no Desktop directory can
+be resolved, to `exports/` in the app data directory. A
 clipboard failure does not open the browser; if the browser fails to open, the
-copied content is kept so you can retry. The destination URLs are seven
-provider addresses fixed in code — they cannot be changed by your input or your
-prompt, and they carry no query parameters, health data or prompt text.
+copied content is kept so you can retry. The seven destination URLs are hard-coded — your input and your prompt cannot
+change them, and they carry no query parameters, health data or prompt text.
 
 The hand-off only copies and opens the destination site. It performs no page
 injection, no automatic sign-in and no automatic submission. The account,
@@ -143,12 +143,14 @@ parser version, operating system, database schema version, the field names and
 JSON types in the device response, catalogue candidates, firmware version, safe
 product-name and short-model hints, model-class numbers, the count of
 unrecognised devices, unrecognised workout codes with record counts, and the
-count of type conflicts. The report type has no field slot at all for accounts,
-tokens, cookies, serial numbers, device IDs, MAC addresses, GPS, health values,
-raw responses or local paths.
+count of type conflicts. The report schema has no fields for accounts, tokens, cookies, serial numbers,
+device IDs, MAC addresses, GPS, health values, raw responses or local paths.
 
-Model-class numbers (`modelIdentifierHints`) accept only integer values shaped
-like `deviceSource:7930112` or `deviceType:5`. Some Zepp accounts return no
+Model-class numbers (`modelIdentifierHints`) are strings of the exact form
+`name:integer`, and only two names are accepted: `deviceSource` and
+`deviceType`. The value must be a JSON integer in the device response, within
+0–99,999,999; anything else is dropped before the report is built. Some Zepp
+accounts return no
 product-name field whatsoever, and those two numbers are the only model clue
 available. They describe *which model of watch*, not *which watch*, and the
 shape is pinned to `name:integer` on both the client and the Pages Function, so

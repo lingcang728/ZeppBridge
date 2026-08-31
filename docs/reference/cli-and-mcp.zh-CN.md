@@ -4,13 +4,20 @@
 
 `zeppbridge-cli` 和 `zeppbridge-mcp` 是桌面应用之外的两个出口，随每个 Release 以独立压缩包分发：需要它们的人不该被迫先装一个 GUI，装了 GUI 的人也不该被塞进两个用不到的程序。
 
-两者都只是 [`zeppbridge-core`](architecture.md) 的适配层，读的是桌面应用同一个 `data/zepp.db`。
+两者都只是 [`zeppbridge-core`](architecture.zh-CN.md) 的适配层，读的是桌面应用同一个 `data/zepp.db`。
 
 ## 安装
 
 从 [Releases](https://github.com/lingcang728/ZeppBridge/releases) 下载对应平台的 `zeppbridge-tools-<版本>-<平台>.zip`，解压后核对 `SHA256SUMS.txt`。
 
-把两个程序放到 `ZeppBridge.exe` 所在目录，它们就会用同一份数据（数据目录是安装目录旁的 `data/`，不是 `%APPDATA%`）。
+把两个程序放到 ZeppBridge 可执行文件旁边，它们就会读同一个库。数据目录由 `paths.rs` 决定：
+
+| 平台 | 数据目录 |
+|---|---|
+| Windows | `ZeppBridge.exe` 旁边的 `data\` |
+| macOS | 可执行文件旁的 `data/`；在 `ZeppBridge.app` 里那个位置不可写，于是回退到 `~/Library/Application Support/com.zeppbridge.ZeppBridge/data` |
+
+所以 macOS 上两个工具放哪儿都行，它们解析出的目录和应用是同一个。两个平台都不用 `%APPDATA%`。
 
 **前提**：先用桌面应用连接账号并至少同步一次。命令行不做登录，MCP 不联网。
 
@@ -74,10 +81,14 @@ switch ($LASTEXITCODE) {
 
 ```cron
 # 每天 07:00 增量同步；退出码 4（另有进程在写）当作跳过而不是失败
-0 7 * * * /path/to/zeppbridge-cli sync --mode incremental --json; [ $? -eq 4 ] && exit 0
+0 7 * * * /path/to/zeppbridge-cli sync --mode incremental --json; s=$?; [ $s -eq 4 ] && s=0; exit $s
 ```
 
-macOS 下 cron 需要「完全磁盘访问权限」才能读到安装目录里的数据。
+不要写成 `...; [ $? -eq 4 ] && exit 0`：同步成功时那个判断为假，整行退出码变成
+1，于是每一次成功的同步都会被 cron 记成失败；真失败时退出码也会被压成 1，
+上面那张退出码表就失去意义了。
+
+macOS 下 cron 需要「完全磁盘访问权限」才能读到数据目录。
 
 ## zeppbridge-mcp
 

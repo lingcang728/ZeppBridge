@@ -1,6 +1,7 @@
 # Command line and MCP
 
-`zeppbridge-cli` and `zeppbridge-mcp` are two outlets beside the desktop app,
+`zeppbridge-cli` and `zeppbridge-mcp` are two companion tools alongside the
+desktop app,
 shipped as a separate archive with every release: people who need them should
 not be forced to install a GUI first, and people who installed the GUI should
 not be handed two programs they will never run.
@@ -16,9 +17,17 @@ Download `zeppbridge-tools-<version>-<platform>.zip` for your platform from
 [Releases](https://github.com/lingcang728/ZeppBridge/releases), unpack it, and
 check it against `SHA256SUMS.txt`.
 
-Put both programs in the same directory as `ZeppBridge.exe` and they will use
-the same data (the data directory sits next to the install directory as `data/`,
-not in `%APPDATA%`).
+Put both programs next to the ZeppBridge executable and they will read the same
+database. The data directory is resolved by `paths.rs`:
+
+| Platform | Data directory |
+|---|---|
+| Windows | `data\` next to `ZeppBridge.exe` |
+| macOS | `data/` next to the executable when it is writable; inside `ZeppBridge.app` it is not, so it falls back to `~/Library/Application Support/com.zeppbridge.ZeppBridge/data` |
+
+On macOS, then, put the two tools wherever you like and point them at the same
+machine — they resolve the same directory the app does. Neither platform uses
+`%APPDATA%`.
 
 **Prerequisite**: connect your account with the desktop app and sync at least
 once. The command line does not sign in, and MCP does not touch the network.
@@ -37,8 +46,8 @@ zeppbridge-cli contract          # prints the unit, timezone, source and missing
 zeppbridge-cli help
 ```
 
-With `--json`, the payload has stdout to itself and human-readable notices go to
-stderr, so `zeppbridge-cli export > a.csv` gives you a clean file.
+With `--json`, stdout contains only the payload; human-readable notices go to
+stderr. So `zeppbridge-cli export > a.csv` gives you a clean file.
 
 A misspelled flag is always an error rather than being ignored — silently
 accepting `--form json` would let a script believe the format took effect.
@@ -56,12 +65,12 @@ meaning of an existing one never changes.
 | 3 | No Zepp account connected | Sign in with the desktop app |
 | 4 | Another process is writing to the database | **Retry later; this is not a failure** |
 | 5 | Cloud request failed | Back off and retry |
-| 6 | Local database error | Needs a human |
+| 6 | Local database error | Requires human intervention |
 | 7 | Database version does not match this build | Launch the desktop app once to upgrade, or update the CLI to the same version |
 
 4 is separate from 1 because "the desktop app happens to be syncing" and
-"something actually broke" call for completely different responses. Merged into
-one code, retry logic becomes impossible to write.
+"something actually broke" call for completely different responses. If they
+shared one code, a retry script would have no way to tell them apart.
 
 ### Windows Task Scheduler
 
@@ -91,10 +100,14 @@ switch ($LASTEXITCODE) {
 
 ```cron
 # Incremental sync daily at 07:00; exit code 4 (another writer) counts as skipped, not failed
-0 7 * * * /path/to/zeppbridge-cli sync --mode incremental --json; [ $? -eq 4 ] && exit 0
+0 7 * * * /path/to/zeppbridge-cli sync --mode incremental --json; s=$?; [ $s -eq 4 ] && s=0; exit $s
 ```
 
-On macOS, cron needs Full Disk Access to read data inside the install directory.
+Do not write it as `...; [ $? -eq 4 ] && exit 0`. When the sync succeeds, the
+test fails, and the whole line then exits 1 — cron records every successful sync
+as a failure, and a real failure loses its own exit code along the way.
+
+On macOS, cron needs Full Disk Access to read the data directory.
 
 ## zeppbridge-mcp
 
