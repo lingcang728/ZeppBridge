@@ -331,6 +331,10 @@ pub struct StorageEstimate {
     pub allow_long_history: bool,
     pub warn_tight_space: bool,
     pub message: String,
+    /// `message` 那句话的稳定码。界面按它选自己语言的说法，再用下面这些
+    /// 数字自己排版——后端不按 locale 出文案。
+    #[serde(default)]
+    pub message_code: String,
     /// 这次估算针对多少天。
     #[serde(default)]
     pub requested_days: i64,
@@ -342,6 +346,12 @@ pub struct StorageEstimate {
     /// 非 None 表示空间不足以开始这次补拉，值是给用户看的理由。
     #[serde(default)]
     pub stop_reason: Option<String>,
+    /// `stop_reason` 那句话的稳定码。
+    #[serde(default)]
+    pub stop_reason_code: Option<String>,
+    /// 这次补拉预计需要的字节数，含安全余量。界面排 stop_reason 那句话要用。
+    #[serde(default)]
+    pub needed_bytes: u64,
 }
 
 /// 同步状态

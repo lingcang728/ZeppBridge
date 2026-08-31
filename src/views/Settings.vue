@@ -25,6 +25,9 @@ import type {
 import { checkForDesktopUpdate, downloadAndInstallDesktopUpdate, updateState } from '../services/updateService';
 import { settingsMessages } from './Settings.i18n';
 import { intlLocale, locale, LOCALES, LOCALE_LABELS, setLocale, useMessages } from '../i18n';
+import { errorTextFor } from '../i18n/errors';
+import { backendText } from '../i18n/backendText';
+import { storageEstimateText } from '../lib/storageEstimateText';
 
 const t = useMessages(settingsMessages);
 
@@ -320,6 +323,18 @@ const prefsBusy = ref(false);
 /** 完整偏好（含归档开关）。AppStatus 只带保留期与补拉窗口。 */
 const userPrefs = ref<UserPrefs | null>(null);
 
+/* 登录窗口那几行进度和失败原因原本直接显示后端字符串——全是中文。后端现在
+   给的是稳定码，这里按界面语言取文案，取不到才回落到那句中文原文。 */
+const BUILD_STAMP = __BUILD_STAMP__;
+
+const estimateText = computed(() => storageEstimateText(storageEstimate.value));
+
+const loginMessage = computed(() => {
+  const status = loginStatus.value;
+  if (!status.message && !status.code) return '';
+  return errorTextFor(status.code) ?? backendText(status.message, '');
+});
+
 const connectionLabel = computed(() => {
   if (loginInProgress.value) {
     if (loginStatus.value.state === 'extracting') return t.value.connExtracting;
@@ -401,7 +416,9 @@ const applyLoginStatus = async (status: LoginStatus) => {
     if (!appStatus.value?.last_cloud_sync_at) void runSync('incremental');
   }
   if (status.state === 'failed') {
-    loginError.value = status.message || t.value.loginIncomplete;
+    // status.message 是后端的中文原文，只能兜底；先按码取当前语言的说法。
+    loginError.value = errorTextFor(status.code)
+      ?? backendText(status.message, t.value.loginIncomplete);
   }
 };
 
@@ -731,12 +748,16 @@ const confirmHistorySync = async () => {
     const extra = days >= 365 ? t.value.backfillYearCap : '';
     if (!window.confirm(t.value.backfillConfirm(days, minutes, minutes + 3, extra))) return;
   }
+  // 这两句原本直接显示后端的 `message`——那是中文原文，英文界面上就这么露出来了。
+  // 文案实现只有 lib/storageEstimateText.ts 一份，不要在这里再抄一遍。
   if (storageEstimate.value && !storageEstimate.value.allow_long_history && days >= 90) {
-    dataError.value = storageEstimate.value.message;
+    dataError.value = storageEstimateText(storageEstimate.value);
     return;
   }
   if (storageEstimate.value?.warn_tight_space
-    && !window.confirm(t.value.backfillTightSpace(storageEstimate.value.message, days))) return;
+    && !window.confirm(
+      t.value.backfillTightSpace(storageEstimateText(storageEstimate.value), days),
+    )) return;
   await runSync('history', days);
 };
 
@@ -813,8 +834,8 @@ const capabilityNote = (item: CapabilityItem): string => {
       ? t.value.capabilityNoneProbed(windowDays)
       : t.value.capabilityNoRecords(windowDays);
   }
-  // 后端加了新的状态而界面还不认识：显示它那句原文，别显示空白。
-  return item.note ?? '';
+  // 后端加了新的状态而界面还不认识：英文界面下不吐中文原文。
+  return backendText(item.note, '');
 };
 
 /* 三分，不是两分。
@@ -968,7 +989,12 @@ const runCapabilityProbe = async () => {
           <button class="auth-action" type="button" @click="showManualAuth = !showManualAuth">{{ showManualAuth ? t.authCollapse : t.authUse }}</button>
         </div>
       </div>
-      <p v-if="loginInProgress && loginStatus.message" class="hint-line"><Icon name="info" :size="13" />{{ loginStatus.message }}</p>
+      <p v-if="loginInProgress && loginMessage" class="hint-line"><Icon name="info" :size="13" />{{ loginMessage }}</p>
+      <!-- 登录失败要看得见原因，尤其是「登录了但没读到凭据」——那时该直接去
+           用下面的 HAR / 手动填写，而不是反复重试网页登录。 -->
+      <p v-else-if="loginStatus.state === 'failed' && loginMessage" class="api-error" role="alert">
+        <Icon name="info" :size="13" />{{ loginMessage }}
+      </p>
 
       <!-- 手动认证表单 -->
       <div v-if="showManualAuth" class="manual-auth-form">
@@ -1325,7 +1351,7 @@ const runCapabilityProbe = async () => {
           />
         </div>
         <p class="retain-note">{{ t.retentionNote(retentionDays) }}<strong>{{ t.retentionNoteStrong }}</strong>{{ t.retentionNoteTail }}</p>
-        <p class="hint-line">{{ storageEstimate?.message || t.retentionCutoff(retentionCutoffDate) }}</p>
+        <p class="hint-line">{{ estimateText || t.retentionCutoff(retentionCutoffDate) }}</p>
         <div class="inline-actions">
           <button class="button secondary" type="button" :disabled="Boolean(dataBusy)" @click="cleanupData">
             {{ dataBusy === 'cleanup' ? t.cleaningUp : t.cleanupNow }}
@@ -1391,6 +1417,8 @@ const runCapabilityProbe = async () => {
           <p v-if="updateState.status === 'failed'">{{ updateState.error }}</p>
           <p v-else-if="updateState.status === 'available'">{{ t.updateCurrent(updateState.currentVersion) }}<template v-if="updateState.sizeBytes"> · {{ formatUpdateBytes(updateState.sizeBytes) }}</template></p>
           <p v-else>{{ t.updateVersion(updateState.currentVersion || t.updateVersionLoading) }}</p>
+          <!-- 同一个版本号会构建很多次；报问题时把这一行带上，就不用猜手上是哪个包了。 -->
+          <p class="build-stamp">{{ t.buildStamp(BUILD_STAMP) }}</p>
         </div>
       </div>
       <progress v-if="updateState.status === 'downloading' && updateProgress !== null" :value="updateProgress" max="100">{{ updateProgress }}%</progress>
@@ -1655,6 +1683,7 @@ const runCapabilityProbe = async () => {
 </template>
 
 <style scoped>
+.build-stamp { color: var(--subtle); font-size: 11px; font-family: var(--font-mono); }
 .page { width: 100%; min-width: 0; margin: 0; display: grid; gap: 14px; }
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 0; min-width: 0; }
 .locale-switch { flex: 0 0 auto; text-align: right; }

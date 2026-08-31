@@ -1,89 +1,123 @@
-# 命令行与 MCP
+# Command line and MCP
 
-`zeppbridge-cli` 和 `zeppbridge-mcp` 是桌面应用之外的两个出口，随每个 Release 以独立压缩包分发：需要它们的人不该被迫先装一个 GUI，装了 GUI 的人也不该被塞进两个用不到的程序。
+`zeppbridge-cli` and `zeppbridge-mcp` are two companion tools alongside the
+desktop app,
+shipped as a separate archive with every release: people who need them should
+not be forced to install a GUI first, and people who installed the GUI should
+not be handed two programs they will never run.
 
-两者都只是 [`zeppbridge-core`](architecture.md) 的适配层，读的是桌面应用同一个 `data/zepp.db`。
+[简体中文](cli-and-mcp.zh-CN.md)
 
-## 安装
+Both are thin adapters over [`zeppbridge-core`](architecture.md), reading the
+same `data/zepp.db` the desktop app uses.
 
-从 [Releases](https://github.com/lingcang728/ZeppBridge/releases) 下载对应平台的 `zeppbridge-tools-<版本>-<平台>.zip`，解压后核对 `SHA256SUMS.txt`。
+## Installing
 
-把两个程序放到 `ZeppBridge.exe` 所在目录，它们就会用同一份数据（数据目录是安装目录旁的 `data/`，不是 `%APPDATA%`）。
+Download `zeppbridge-tools-<version>-<platform>.zip` for your platform from
+[Releases](https://github.com/lingcang728/ZeppBridge/releases), unpack it, and
+check it against `SHA256SUMS.txt`.
 
-**前提**：先用桌面应用连接账号并至少同步一次。命令行不做登录，MCP 不联网。
+Put both programs next to the ZeppBridge executable and they will read the same
+database. The data directory is resolved by `paths.rs`:
+
+| Platform | Data directory |
+|---|---|
+| Windows | `data\` next to `ZeppBridge.exe` |
+| macOS | `data/` next to the executable when it is writable; inside `ZeppBridge.app` it is not, so it falls back to `~/Library/Application Support/com.zeppbridge.ZeppBridge/data` |
+
+On macOS, then, put the two tools wherever you like and point them at the same
+machine — they resolve the same directory the app does. Neither platform uses
+`%APPDATA%`.
+
+**Prerequisite**: connect your account with the desktop app and sync at least
+once. The command line does not sign in, and MCP does not touch the network.
 
 ## zeppbridge-cli
 
-无交互：不会提问、不会等按键、不会弹窗。所有需要人来决定的事（登录、授权、删数据）都不在这里做。
+Non-interactive: it never asks a question, waits for a key press or opens a
+window. Everything that needs a human decision (signing in, granting access,
+deleting data) is deliberately not here.
 
 ```bash
 zeppbridge-cli status --json
 zeppbridge-cli sync --mode incremental --json
 zeppbridge-cli export --from 2026-01-01 --to 2026-01-31 --format csv --out january.csv
-zeppbridge-cli contract          # 打印单位、时区、来源与缺失值的定义
+zeppbridge-cli contract          # prints the unit, timezone, source and missing-value definitions
 zeppbridge-cli help
 ```
 
-`--json` 的正文独占 stdout，人读的提示走 stderr，所以 `zeppbridge-cli export > a.csv` 拿到的是干净的文件。
+With `--json`, stdout contains only the payload; human-readable notices go to
+stderr. So `zeppbridge-cli export > a.csv` gives you a clean file.
 
-拼错的开关一律报错而不是忽略——静默接受 `--form json` 会让脚本以为格式生效了。
+A misspelled flag is always an error rather than being ignored — silently
+accepting `--form json` would let a script believe the format took effect.
 
-### 退出码
+### Exit codes
 
-退出码是对调度脚本的契约，只会新增，不会改变含义。
+Exit codes are a contract for scheduling scripts. New ones may be added; the
+meaning of an existing one never changes.
 
-| 码 | 含义 | 该怎么办 |
+| Code | Meaning | What to do |
 |---|---|---|
-| 0 | 成功 | — |
-| 1 | 其他失败 | 看错误消息 |
-| 2 | 用法错误 | 改命令 |
-| 3 | 未连接 Zepp 账号 | 打开桌面应用登录 |
-| 4 | 另一个进程正在写库 | **稍后重试，这不是失败** |
-| 5 | 云端请求失败 | 退避后重试 |
-| 6 | 本机数据库错误 | 需要人介入 |
-| 7 | 数据库版本与本程序不匹配 | 先启动一次桌面应用完成升级，或把命令行升到同一版本 |
+| 0 | Success | — |
+| 1 | Other failure | Read the error message |
+| 2 | Usage error | Fix the command |
+| 3 | No Zepp account connected | Sign in with the desktop app |
+| 4 | Another process is writing to the database | **Retry later; this is not a failure** |
+| 5 | Cloud request failed | Back off and retry |
+| 6 | Local database error | Requires human intervention |
+| 7 | Database version does not match this build | Launch the desktop app once to upgrade, or update the CLI to the same version |
 
-4 和 1 分开，是因为「桌面应用正开着同步」和「真的出错了」需要完全不同的应对；把它们并成一个码，重试逻辑就没法写。
+4 is separate from 1 because "the desktop app happens to be syncing" and
+"something actually broke" call for completely different responses. If they
+shared one code, a retry script would have no way to tell them apart.
 
-### Windows 任务计划程序
+### Windows Task Scheduler
 
-每天 07:00 增量同步，busy 时不当作失败：
+Incremental sync daily at 07:00, without treating "busy" as a failure:
 
 ```powershell
 $action = New-ScheduledTaskAction `
   -Execute 'C:\Program Files\ZeppBridge\zeppbridge-cli.exe' `
   -Argument 'sync --mode incremental --json'
 $trigger = New-ScheduledTaskTrigger -Daily -At 7:00am
-Register-ScheduledTask -TaskName 'ZeppBridge 每日同步' -Action $action -Trigger $trigger
+Register-ScheduledTask -TaskName 'ZeppBridge daily sync' -Action $action -Trigger $trigger
 ```
 
-把路径换成你自己的安装位置。任务计划程序会记录退出码；如果你在意 busy 与失败的区别，用一个包装脚本：
+Replace the path with your own install location. Task Scheduler records the exit
+code; if you care about the difference between busy and failed, use a wrapper:
 
 ```powershell
 & 'C:\Program Files\ZeppBridge\zeppbridge-cli.exe' sync --mode incremental --json
 switch ($LASTEXITCODE) {
   0 { exit 0 }
-  4 { Write-Host '桌面应用正在写库，跳过这一轮'; exit 0 }
+  4 { Write-Host 'The desktop app is writing; skipping this round'; exit 0 }
   default { exit $LASTEXITCODE }
 }
 ```
 
-### cron（macOS / Linux）
+### cron (macOS / Linux)
 
 ```cron
-# 每天 07:00 增量同步；退出码 4（另有进程在写）当作跳过而不是失败
-0 7 * * * /path/to/zeppbridge-cli sync --mode incremental --json; [ $? -eq 4 ] && exit 0
+# Incremental sync daily at 07:00; exit code 4 (another writer) counts as skipped, not failed
+0 7 * * * /path/to/zeppbridge-cli sync --mode incremental --json; s=$?; [ $s -eq 4 ] && s=0; exit $s
 ```
 
-macOS 下 cron 需要「完全磁盘访问权限」才能读到安装目录里的数据。
+Do not write it as `...; [ $? -eq 4 ] && exit 0`. When the sync succeeds, the
+test fails, and the whole line then exits 1 — cron records every successful sync
+as a failure, and a real failure loses its own exit code along the way.
+
+On macOS, cron needs Full Disk Access to read the data directory.
 
 ## zeppbridge-mcp
 
-stdio 传输，**不监听任何端口，不发出任何网络请求**。只读由连接层保证（`PRAGMA query_only`），不是靠工具列表里恰好没有写操作。
+Uses stdio transport. It **listens on no port and makes no network requests**.
+Read-only is enforced by the connection layer (`PRAGMA query_only`), not by the
+tool list happening to contain no write operations.
 
-### 配置示例
+### Example configuration
 
-大多数 MCP 客户端读同一种形状的配置：
+Most MCP clients read the same shape of configuration:
 
 ```json
 {
@@ -96,35 +130,50 @@ stdio 传输，**不监听任何端口，不发出任何网络请求**。只读�
 }
 ```
 
-把 `command` 换成解压后的实际路径。**不需要任何 token、API key 或环境变量**——这个程序只读本机文件。
+Replace `command` with the real path where you unpacked it. **No token, API key
+or environment variable is needed** — the program only reads a local file.
 
-压缩包里的 `mcp-config-example.json` 是同一段内容。
+`mcp-config-example.json` in the archive contains the same snippet.
 
-### 工具
+### Tools
 
-| 工具 | 返回 |
+| Tool | Returns |
 |---|---|
-| `list_workouts` | 运动记录列表，最新在前。距离米、心率 bpm |
-| `get_workout_insight` | 一次运动与个人基线的比较、基线窗口、样本数、置信度 |
-| `get_metric_series` | 按天的指标序列，每条带 `unit` |
-| `get_sleep_detail` | 一晚睡眠的明细，分期时长单位分钟 |
-| `get_data_health` | 每条流的抓取/解析/写入状态与覆盖情况 |
+| `list_workouts` | Workouts, newest first. Distance in metres, heart rate in bpm |
+| `get_workout_insight` | One workout compared against your own baseline, with the baseline window, sample count and confidence |
+| `get_metric_series` | A per-day metric series, each carrying its `unit` |
+| `get_sleep_detail` | One night in detail, stage durations in minutes |
+| `get_data_health` | Fetch/parse/write state and coverage per stream |
 
-`get_data_health` 值得单独说：它让模型能区分「这个问题查不到」是因为没同步，还是因为那段时间本来就没数据。
+`get_data_health` deserves a mention of its own: it lets a model tell the
+difference between "this question cannot be answered because nothing was synced"
+and "there genuinely was no data in that period".
 
-### 契约
+### The contract
 
-握手时服务器就把边界交给调用方，不必等它拿到一条空序列自己猜：
+The server hands the caller its boundaries at handshake time, rather than
+letting it receive an empty series and guess:
 
-- **时间**：全部 RFC 3339 带时区偏移。云端拉取时间与健康样本发生时间是两件事，任何情况下都不互相替代。
-- **缺失值**：没有采样就是缺失，字段为 `null` 或整段不存在。**任何情况下都不会用 0、上一个值或估算值填空。** 一条曲线的点数少于时间跨度，说明那几天确实没有数据。
-- **来源**：`source_scope` 说明记录来自哪一层——`device` 是某块表上报的，`user_fused` 是云端跨设备合成的，`unknown` 是无法判断的；`unknown` 不会被归并进 `device`。
-- **不返回**：token、Cookie、完整账号、本机绝对路径。
+- **Time**: everything is RFC 3339 with a timezone offset. The time data was
+  fetched from the cloud and the time a health sample occurred are two different
+  things, and one never substitutes for the other.
+- **Missing values**: no sample means missing — the field is `null` or the whole
+  segment is absent. **A gap is never filled with 0, the previous value or an
+  estimate.** If a curve has fewer points than its time span, those days really
+  had no data.
+- **Source**: `source_scope` says which layer a record came from — `device` is
+  what a specific watch reported, `user_fused` is the cloud's cross-device
+  composite, `unknown` cannot be determined. `unknown` is never folded into
+  `device`.
+- **Never returned**: tokens, cookies, full account identifiers, absolute local
+  paths.
 
-`zeppbridge-cli contract` 打印的是同一份定义。
+`zeppbridge-cli contract` prints the same definitions.
 
-## 与桌面应用并发
+## Running alongside the desktop app
 
-CLI 的 `sync` 和桌面应用的同步走同一把跨进程写锁，任何时刻只有一个写者。拿不到锁时 CLI 以退出码 4 退出，不会和 GUI 抢着写。
+The CLI's `sync` and the desktop app's sync share one cross-process write lock,
+so there is only ever one writer. When the CLI cannot get the lock it exits with
+code 4 rather than racing the GUI.
 
-MCP 的只读查询不拿写锁，可以和同步同时进行。
+MCP's read-only queries take no write lock and can run during a sync.

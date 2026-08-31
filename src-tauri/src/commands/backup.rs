@@ -5,6 +5,7 @@
 //! 以及把「恢复要在下次启动时执行」这件事如实告诉用户。
 
 use crate::app_state::AppState;
+use crate::ipc_error::AppError;
 use std::time::Duration;
 use zeppbridge_core::storage::backup::{
     self, BackupKind, BackupManifest, BackupVerification, PendingRestore, RestorePreview,
@@ -17,8 +18,8 @@ const LOCK_TIMEOUT: Duration = Duration::from_secs(30);
 #[tauri::command]
 pub async fn list_backups(
     state: tauri::State<'_, AppState>,
-) -> std::result::Result<Vec<BackupManifest>, String> {
-    backup::list_backups(&state.data_dir).map_err(|error| error.user_message())
+) -> std::result::Result<Vec<BackupManifest>, AppError> {
+    backup::list_backups(&state.data_dir).map_err(AppError::from)
 }
 
 /// 用户主动生成一份快照。
@@ -28,15 +29,14 @@ pub async fn list_backups(
 #[tauri::command]
 pub async fn create_manual_backup(
     state: tauri::State<'_, AppState>,
-) -> std::result::Result<BackupManifest, String> {
-    let _guard = acquire_with_timeout(&state.data_dir, WritePurpose::Backup, LOCK_TIMEOUT)
-        .map_err(|error| error.to_string())?;
+) -> std::result::Result<BackupManifest, AppError> {
+    let _guard = acquire_with_timeout(&state.data_dir, WritePurpose::Backup, LOCK_TIMEOUT)?;
     backup::create_backup(
         &state.data_dir,
         BackupKind::Manual,
         env!("CARGO_PKG_VERSION"),
     )
-    .map_err(|error| error.user_message())
+    .map_err(AppError::from)
 }
 
 /// 重新校验一份已有快照：文件、大小、SHA-256 和完整性。
@@ -44,8 +44,8 @@ pub async fn create_manual_backup(
 pub async fn verify_backup(
     state: tauri::State<'_, AppState>,
     backup_id: String,
-) -> std::result::Result<BackupVerification, String> {
-    backup::verify_backup(&state.data_dir, &backup_id).map_err(|error| error.user_message())
+) -> std::result::Result<BackupVerification, AppError> {
+    backup::verify_backup(&state.data_dir, &backup_id).map_err(AppError::from)
 }
 
 /// 标记 / 取消标记「不要自动清理这份备份」。
@@ -54,8 +54,8 @@ pub async fn set_backup_pinned(
     state: tauri::State<'_, AppState>,
     backup_id: String,
     pinned: bool,
-) -> std::result::Result<BackupManifest, String> {
-    backup::set_pinned(&state.data_dir, &backup_id, pinned).map_err(|error| error.user_message())
+) -> std::result::Result<BackupManifest, AppError> {
+    backup::set_pinned(&state.data_dir, &backup_id, pinned).map_err(AppError::from)
 }
 
 /// 恢复前的预览：清单、覆盖范围、和当前库的记录数差异、兼容性判断。
@@ -63,8 +63,8 @@ pub async fn set_backup_pinned(
 pub async fn get_restore_preview(
     state: tauri::State<'_, AppState>,
     backup_id: String,
-) -> std::result::Result<RestorePreview, String> {
-    backup::restore_preview(&state.data_dir, &backup_id).map_err(|error| error.user_message())
+) -> std::result::Result<RestorePreview, AppError> {
+    backup::restore_preview(&state.data_dir, &backup_id).map_err(AppError::from)
 }
 
 /// 排队一次恢复。
@@ -75,18 +75,17 @@ pub async fn get_restore_preview(
 pub async fn stage_restore(
     state: tauri::State<'_, AppState>,
     backup_id: String,
-) -> std::result::Result<PendingRestore, String> {
-    let _guard = acquire_with_timeout(&state.data_dir, WritePurpose::Restore, LOCK_TIMEOUT)
-        .map_err(|error| error.to_string())?;
+) -> std::result::Result<PendingRestore, AppError> {
+    let _guard = acquire_with_timeout(&state.data_dir, WritePurpose::Restore, LOCK_TIMEOUT)?;
     backup::stage_restore(&state.data_dir, &backup_id, env!("CARGO_PKG_VERSION"))
-        .map_err(|error| error.user_message())
+        .map_err(AppError::from)
 }
 
 /// 当前是否有排队中的恢复。
 #[tauri::command]
 pub async fn get_pending_restore(
     state: tauri::State<'_, AppState>,
-) -> std::result::Result<Option<PendingRestore>, String> {
+) -> std::result::Result<Option<PendingRestore>, AppError> {
     Ok(backup::pending_restore(&state.data_dir))
 }
 
@@ -94,6 +93,6 @@ pub async fn get_pending_restore(
 #[tauri::command]
 pub async fn cancel_pending_restore(
     state: tauri::State<'_, AppState>,
-) -> std::result::Result<(), String> {
-    backup::cancel_pending_restore(&state.data_dir).map_err(|error| error.user_message())
+) -> std::result::Result<(), AppError> {
+    backup::cancel_pending_restore(&state.data_dir).map_err(AppError::from)
 }

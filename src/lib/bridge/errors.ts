@@ -1,4 +1,6 @@
 import { defineMessages, messagesOf } from '../../i18n';
+import { errorTextFor } from '../../i18n/errors';
+import { backendText } from '../../i18n/backendText';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -49,9 +51,25 @@ const errorText = (error: unknown): string => {
   return '';
 };
 
+/* 后端返回的是 `{ code, message, params? }`。code 才是契约，message 是中文
+   原文——只在这里还没有对应文案时兜底。 */
+const errorCode = (error: unknown): string | undefined => {
+  if (typeof error === 'object' && error !== null) {
+    const candidate = error as UnknownRecord;
+    if (typeof candidate.code === 'string' && candidate.code) return candidate.code;
+  }
+  return undefined;
+};
+
 export const toUserMessage = (error: unknown, fallback = copy().genericFailure): string => {
+  // 先按码取当前语言的说法。取不到才回落到后端那句中文——那是兜底，不是常态。
+  const localized = errorTextFor(errorCode(error));
+  if (localized) return localized;
+
   const source = errorText(error).replace(/^Err\((.*)\)$/s, '$1').trim();
   if (!source) return fallback;
+  // 英文界面下绝不吐后端中文：查不到码时宁可给一句笼统的话。
+  if (backendText(source, '') === '') return fallback;
   const lower = source.toLowerCase();
   if (lower.includes(DESKTOP_ONLY_MARKER) || error instanceof DesktopUnavailableError) {
     return copy().desktopOnly;

@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 /// 当前 SQLite schema 版本（`PRAGMA user_version`）。加新版本只能追加迁移
 /// 步骤，不要改已有 DDL。
-pub const CURRENT_SCHEMA_VERSION: i64 = 15;
+pub const CURRENT_SCHEMA_VERSION: i64 = 16;
 /// 写进备份 manifest 的应用版本。Core 是独立 crate，用它自己的包版本。
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v16-workout-catalog";
@@ -1434,37 +1434,57 @@ impl Database {
         } else {
             None
         };
+        let stop_reason_code = stop_reason
+            .as_ref()
+            .map(|_| "ui.estimate.stop_no_space".to_string());
 
         let warn_tight_space =
             free_bytes < 1_073_741_824 || (free_bytes > 0 && estimated_add_bytes > free_bytes / 5);
         let allow_long_history = stop_reason.is_none()
             && !(free_bytes > 0 && free_bytes < 300 * 1024 * 1024 && days >= 90);
-        let message = if let Some(reason) = &stop_reason {
-            reason.clone()
+        // 码和中文原文一起给：界面按码排自己的句子（天数和字节它都有），
+        // 取不到码才回落到这句中文。
+        let (message_code, message) = if let Some(reason) = &stop_reason {
+            ("ui.estimate.stop_no_space", reason.clone())
         } else if free_bytes == 0 {
-            "未能读取磁盘剩余空间，补拉前请确认本机还有足够空间。".into()
+            (
+                "ui.estimate.disk_unknown",
+                "未能读取磁盘剩余空间，补拉前请确认本机还有足够空间。".to_string(),
+            )
         } else if !allow_long_history {
-            "磁盘剩余不足 300 MB，不能补拉 90 天以上的历史。".into()
+            (
+                "ui.estimate.disk_too_small",
+                "磁盘剩余不足 300 MB，不能补拉 90 天以上的历史。".to_string(),
+            )
         } else if !any_measured {
-            format!(
-                "本机样本还不够，用的是内置粗略估算：{} 天大约占用 {}，本盘剩余 {}。",
-                days,
-                format_bytes(estimated_add_bytes),
-                format_bytes(free_bytes)
+            (
+                "ui.estimate.builtin_guess",
+                format!(
+                    "本机样本还不够，用的是内置粗略估算：{} 天大约占用 {}，本盘剩余 {}。",
+                    days,
+                    format_bytes(estimated_add_bytes),
+                    format_bytes(free_bytes)
+                ),
             )
         } else if all_measured {
-            format!(
-                "按本机已有数据的实际速率推算，{} 天大约占用 {}，本盘剩余 {}。",
-                days,
-                format_bytes(estimated_add_bytes),
-                format_bytes(free_bytes)
+            (
+                "ui.estimate.measured",
+                format!(
+                    "按本机已有数据的实际速率推算，{} 天大约占用 {}，本盘剩余 {}。",
+                    days,
+                    format_bytes(estimated_add_bytes),
+                    format_bytes(free_bytes)
+                ),
             )
         } else {
-            format!(
-                "只按本机已有样本的那几条流推算，{} 天大约占用 {}（其余流样本不足，未计入），本盘剩余 {}。",
-                days,
-                format_bytes(estimated_add_bytes),
-                format_bytes(free_bytes)
+            (
+                "ui.estimate.partial",
+                format!(
+                    "只按本机已有样本的那几条流推算，{} 天大约占用 {}（其余流样本不足，未计入），本盘剩余 {}。",
+                    days,
+                    format_bytes(estimated_add_bytes),
+                    format_bytes(free_bytes)
+                ),
             )
         };
 
@@ -1475,10 +1495,13 @@ impl Database {
             allow_long_history,
             warn_tight_space,
             message,
+            message_code: message_code.to_string(),
+            needed_bytes,
             requested_days: days,
             streams,
             measured: all_measured,
             stop_reason,
+            stop_reason_code,
         })
     }
 

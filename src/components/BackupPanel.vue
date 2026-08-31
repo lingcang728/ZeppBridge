@@ -16,6 +16,7 @@ import Icon from './Icon.vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { formatFullDateTime } from '../lib/format';
 import type { BackupManifest, BackupVerification, PendingRestore, RestorePreview } from '../types';
+import { backendText } from '../i18n/backendText';
 import { defineMessages, useMessages } from '../i18n';
 
 const messages = defineMessages(
@@ -47,6 +48,11 @@ const messages = defineMessages(
     coverage: (from: string, to: string) => ` · 样本覆盖 ${from} ~ ${to}`,
     noSamples: ' · 快照里没有健康样本',
     verifyFailed: (problem: string) => `校验未通过：${problem}`,
+    problemFileMissing: '备份文件已不在备份目录中',
+    problemSizeMismatch: '备份文件大小和清单不一致，可能已损坏',
+    problemSha256Mismatch: '备份文件的 SHA-256 和清单不一致，可能已损坏或被修改',
+    problemIntegrityFailed: '备份文件没有通过 SQLite 完整性检查',
+    problemUnknown: '这份快照没有通过校验，原因未记录。',
     verifyPassed: '刚刚重新校验：文件、大小、SHA-256 与完整性都对得上。',
     integrityOk: (sha: string) => `生成时完整性检查通过 · SHA-256 ${sha}…`,
     integrityBad: '生成时完整性检查未通过，不要用它恢复。',
@@ -123,6 +129,12 @@ const messages = defineMessages(
     coverage: (from: string, to: string) => ` · samples ${from} ~ ${to}`,
     noSamples: ' · no health samples in this snapshot',
     verifyFailed: (problem: string) => `Verification failed: ${problem}`,
+    problemFileMissing: 'The backup file is no longer in the backup folder',
+    problemSizeMismatch: "The backup file's size does not match the manifest — it may be damaged",
+    problemSha256Mismatch:
+      "The backup file's SHA-256 does not match the manifest — it may be damaged or altered",
+    problemIntegrityFailed: 'The backup file did not pass the SQLite integrity check',
+    problemUnknown: 'This snapshot failed verification, and no reason was recorded.',
     verifyPassed: 'Just re-verified: file, size, SHA-256 and integrity all line up.',
     integrityOk: (sha: string) => `Integrity check passed at creation · SHA-256 ${sha}…`,
     integrityBad: 'The integrity check failed at creation. Do not restore from it.',
@@ -192,6 +204,18 @@ const compatibilityCopy = (kind: string): string =>
 /** 只显示真正有意义的几张表，避免把内部表堆到界面上。 */
 const TABLE_KEYS = ['raw_records', 'workouts', 'daily_summaries', 'metric_samples', 'sleep_sessions'];
 const tableLabel = (key: string): string => lookup(t.value.table, key) ?? key;
+
+/* 校验失败原因：后端给稳定码，这里按界面语言出文案；
+   未知码才回落到它那句中文原文。 */
+const verifyProblemText = (verification: BackupVerification): string => {
+  switch (verification.problem_code) {
+    case 'ui.backup.file_missing': return t.value.problemFileMissing;
+    case 'ui.backup.size_mismatch': return t.value.problemSizeMismatch;
+    case 'ui.backup.sha256_mismatch': return t.value.problemSha256Mismatch;
+    case 'ui.backup.integrity_failed': return t.value.problemIntegrityFailed;
+    default: return backendText(verification.problem, t.value.problemUnknown);
+  }
+};
 
 const formatBytes = (bytes: number): string => {
   if (bytes < 1024) return `${bytes} B`;
@@ -366,7 +390,7 @@ const cancelRestore = async () => {
         <div class="backup-meta">
           <template v-if="verifications[item.id]">
             <template v-if="verifications[item.id].problem">
-              <em class="bad">{{ t.verifyFailed(verifications[item.id].problem!) }}</em>
+              <em class="bad">{{ t.verifyFailed(verifyProblemText(verifications[item.id])) }}</em>
             </template>
             <template v-else>
               <span class="good">{{ t.verifyPassed }}</span>

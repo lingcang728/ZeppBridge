@@ -1,92 +1,138 @@
-# 备份、恢复与完整历史
+# Backups, restore, and complete history
 
-这份文档回答三个容易混淆的问题：我的数据有没有备份、能不能拿回来、以及「本机有一份完整副本」这句话什么时候才成立。
+This page answers three questions that are easy to confuse: is my data backed
+up, can I get it back, and when is it actually true that "this machine holds a
+complete copy".
 
-## 三种「导出」不是一回事
+[简体中文](backup-and-restore.zh-CN.md)
 
-| | 是什么 | 谁能读 | 用来干什么 |
+## The three kinds of "export" are not the same thing
+
+| | What it is | Who can read it | What it is for |
 |---|---|---|---|
-| **JSON / CSV / GPX** | 选中范围的数据交换文件 | 任何工具 | 交给别的软件、自己分析 |
-| **数据库快照** | 整个 `zepp.db` 的完整副本 | 只有 ZeppBridge | 灾难恢复 |
-| **AI 数据包** | 你主动挑选并脱敏后的材料 | 你选的模型 | 让 AI 解释你的数据 |
+| **JSON / CSV / GPX** | An interchange file for the selected range | Any tool | Handing data to other software, analysing it yourself |
+| **Database snapshot** | A complete copy of the whole `zepp.db` | ZeppBridge only | Disaster recovery |
+| **AI hand-off package** | Material you picked, with redaction applied | The model you chose | Getting an AI to explain your data |
 
-**只有快照能把库恢复回从前的样子。** 导出的 JSON 再全，也不包含 raw 报文、provenance 和覆盖账本，重新导入回来只会得到一个残缺的库。
+**Only a snapshot can put the database back the way it was.** However complete
+an exported JSON looks, it contains no raw payloads, no provenance and no
+coverage ledger; importing it back would give you a crippled database.
 
-## 快照
+## Snapshots
 
-设置页「数据库快照与恢复」。
+Settings → "Database snapshots and restore".
 
-- 走 SQLite 的 Backup API，不直接复制正在使用的数据库文件——直接复制一个开着 WAL 的 SQLite 文件，得到的往往是一份打不开的备份。
-- 每份快照带 manifest：创建时间、应用版本、schema 版本、normalizer revision、样本覆盖范围、各表记录数、字节数和 SHA-256。
-- 生成后立刻跑 `integrity_check`。校验不过就删掉半成品并报错——留下一份「看起来能用」的坏备份，比没有备份更糟。
-- 随时可以「重新校验」：文件在不在、大小对不对、SHA-256 一致不一致、库本身完不完整。
-- **数据库升级前会自动生成一份。** 这些自动快照滚动保留 5 份；手动生成的、以及你标记了「保留」的，永远不会被自动清理。
+- Uses SQLite's Backup API rather than copying the live database file. Copying a
+  SQLite file that has an open WAL usually produces a backup that will not open.
+- Every snapshot carries a manifest: creation time, app version, schema version,
+  normalizer revision, sample coverage range, per-table row counts, byte size
+  and SHA-256.
+- `integrity_check` runs immediately after creation. If it fails, the
+  half-finished file is deleted and an error is raised — a broken backup that
+  *looks* usable is worse than no backup at all.
+- You can re-verify at any time: does the file exist, is the size right, does
+  the SHA-256 match, is the database itself intact.
+- **One is taken automatically before every database upgrade.** Those automatic
+  snapshots are kept on a rolling basis, five at a time. Ones you created
+  yourself, and any you marked "keep", are never cleaned up automatically.
 
-快照全部留在本机的 `data/backups/`，不会上传任何地方。它和 `zepp.db` 在同一块盘上——**如果你担心的是硬盘损坏，请自己把快照复制到别处。**
+All snapshots stay in `data/backups/` on this machine and are never uploaded.
+They sit on the same drive as `zepp.db` — **if what you are worried about is
+drive failure, copy a snapshot somewhere else yourself.**
 
-## 恢复
+## Restoring
 
-恢复分两步，这是有意的。
+Restoring happens in two steps, deliberately.
 
-1. **排队**。你选一份快照，应用先做全部校验并给出预览：快照里各表的记录数 vs 当前库的记录数，差值为负的行会明确写出「恢复后会少多少条」。这里不会出现「可能会有数据丢失」这种含糊说法。
-2. **下次启动时执行**。真正的文件替换发生在应用启动、任何数据库连接打开之前——那是唯一能做到原子替换的时刻。当前这次运行不会有任何变化。
+1. **Queue it.** You pick a snapshot; the app runs every check and shows a
+   preview: row counts per table in the snapshot versus the current database,
+   with any negative difference spelled out as "this many rows fewer after
+   restoring". There is no vague "some data may be lost" here.
+2. **It runs at the next launch.** The actual file replacement happens as the
+   app starts, before any database connection is opened — the only moment an
+   atomic swap is possible. Nothing changes in the session you are in.
 
-排队之后随时可以取消。
+You can cancel a queued restore at any time.
 
-替换之前，当前的库会先被存成一个回滚点。替换过程中任何一步失败，都会自动回到原库。
+Before replacing anything, the current database is saved as a rollback point.
+If any step of the replacement fails, the original database is restored
+automatically.
 
-### 版本兼容
+### Version compatibility
 
-| 快照的 schema | 结果 |
+| Snapshot schema | Result |
 |---|---|
-| 比当前程序旧 | 可以恢复，恢复后在启动时自动升级 |
-| 和当前程序一致 | 直接恢复 |
-| 比当前程序新 | **明确拒绝，且不改动当前库** |
+| Older than this build | Restores, then upgrades automatically at launch |
+| Same as this build | Restores directly |
+| Newer than this build | **Refused outright, and the current database is left untouched** |
 
-用旧版程序去读新版结构的库，最好的结果是打不开，最坏的结果是读出错的值。所以这一项不给「我知道风险，继续」的选项——请升级应用。
+Reading a newer schema with an older build gives you, at best, a database that
+will not open — at worst, wrong values read out of it. So there is no "I
+understand the risk, continue" option here. Update the app instead.
 
-### 恢复不会去云端重新拉取
+### Restoring does not re-fetch from the cloud
 
-恢复只是把库换成快照里的样子。如果预览显示会少掉一部分记录，而你还需要它们，请在恢复完成后再同步一次。
+A restore only makes the database look like the snapshot. If the preview says
+some records will be lost and you still need them, run a sync after the restore
+finishes.
 
-## 完整历史
+## Complete history
 
-装 ZeppBridge 之前的数据不会自己出现在本机。「长期归档」和「历史补拉」管的是时间轴的两半：
+Data from before you installed ZeppBridge does not appear on its own.
+"Long-term archive" and "history backfill" cover the two halves of the timeline:
 
-- **长期归档**管右半边——从今天起，成功同步不再按保留期清理历史。
-- **历史补拉**管左半边——把装 ZeppBridge 以前的记录取回来。
+- **Long-term archive** covers the right-hand half — from today on, a successful
+  sync no longer prunes history by the retention window.
+- **History backfill** covers the left-hand half — fetching records from before
+  you installed ZeppBridge.
 
-两个都到位，本机才真的是一份完整副本。
+Only with both in place is this machine really a complete copy.
 
-### 覆盖账本
+### The coverage ledger
 
-补拉按自然月分块，逐块记账。每一块只有四种结局：
+Backfill splits the range into calendar months and keeps a ledger. Each chunk
+has exactly four possible outcomes:
 
-| 状态 | 含义 |
+| Status | Meaning |
 |---|---|
-| 已写入 | 拿到了，也存进本机了 |
-| 云端无返回 | 请求过，Zepp 明确说那段时间没有数据。**这不是失败** |
-| 待做 | 还没轮到 |
-| 失败 | 可以重试 |
+| Written | Fetched, and stored locally |
+| Nothing from the cloud | Requested, and Zepp said clearly that it has no data for that period. **This is not a failure** |
+| Pending | Not its turn yet |
+| Failed | Can be retried |
 
-界面刻意不把这四种压成一个百分比。压成进度条之后，「我 2023 年的数据到底有没有」就没有答案了——而这恰恰是唯一值得问的问题。
+The interface deliberately does not flatten these four into one percentage.
+Once it becomes a progress bar, "do I actually have my 2023 data" has no answer
+— and that is the only question worth asking.
 
-**只有账本里每一块都有结论时，界面和文档才会说「本机完整副本」。** 在那之前，措辞一律是「已成功同步范围内的本地副本」。
+**Only when every chunk in the ledger has a conclusion will the interface and
+the documentation say "a complete local copy".** Until then the wording is
+always "a local copy of the range that synced successfully".
 
-### 补拉可以中断
+### Backfill can be interrupted
 
-随时可以停。下次点「继续补拉」从账本里还没有结论的块接着做，不会重头再来，也不会产生重复记录。
+Stop whenever you like. "Continue backfill" picks up from the chunks that have
+no conclusion yet. It does not start over, and it does not create duplicates.
 
-### 保留期与补拉的冲突
+### When retention and backfill conflict
 
-如果补拉范围超出了本机保留期，而长期归档是关着的，应用会直接拦下这次补拉，并告诉你要么打开归档、要么把保留期调长。
+If the backfill range reaches outside your local retention window and long-term
+archiving is off, the app stops the backfill up front and tells you to either
+turn archiving on or lengthen the retention.
 
-刚把三年的历史取回来、下一次成功同步就被清掉，是最伤信任的行为——所以这个组合在开始之前就被挡住，而不是事后解释。
+Fetching three years of history and having the next successful sync delete it is
+the most trust-destroying thing this app could do — so that combination is
+blocked before it starts, rather than explained afterwards.
 
-### 会占多少空间
+### How much space it will take
 
-估算按流分别给出，用的是**你本机已有数据的实际速率**（已存报文的字节数 ÷ 观察到的天数），不是一个写死的常数。每天跑步的人和一年跑两次的人，答案本来就不该一样。
+The estimate is given per stream, using **the rate your own local data actually
+accumulates** (bytes of stored payloads ÷ days observed), not a hard-coded
+constant. Someone who runs daily and someone who runs twice a year should not
+get the same answer.
 
-本机样本不足 7 天的流会明确标注「样本不足、未计入」——与其编一个速率乘上三年，不如说不知道。
+Streams with fewer than seven days of local samples are labelled explicitly as
+"not enough samples, not counted" — better than inventing a rate and multiplying
+it by three years.
 
-剩余空间放不下这次补拉时，补拉不会开始。
+If the free space cannot hold the estimated backfill, the backfill does not
+start.

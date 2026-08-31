@@ -55,6 +55,8 @@ export const webBackend: BridgeBackend = {
   startHistoryBackfill: unavailable,
   getCoverageLedger: unavailable,
   resetCoverageLedger: unavailable,
+  retryFailedBackfillChunks: unavailable,
+  setTrayLocale: unavailable,
   listBackups: unavailable,
   createManualBackup: unavailable,
   verifyBackup: unavailable,

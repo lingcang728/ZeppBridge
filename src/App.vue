@@ -11,7 +11,7 @@ import { deviceStateLabel, useDevices } from './composables/useDevices';
 import { useUiScale } from './composables/useUiScale';
 import { backend, isDesktop } from './lib/bridge';
 import { checkForDesktopUpdate } from './services/updateService';
-import { defineMessages, intlLocale, useMessages } from './i18n';
+import { defineMessages, intlLocale, locale, useMessages } from './i18n';
 
 const messages = defineMessages(
   {
@@ -83,7 +83,9 @@ const t = useMessages(messages);
 
 // 桌面端从 Tauri 运行时读取版本（与 tauri.conf.json 单一来源），
 // 浏览器预览环境回退到下面的常量（与 package.json 保持同步）。
-const FALLBACK_APP_VERSION = '1.1.1';
+const FALLBACK_APP_VERSION = '1.1.2';
+/* 构建标识。同一个版本号会构建很多次，光看版本号分不清手上是哪一个。 */
+const BUILD_STAMP = __BUILD_STAMP__;
 const APP_VERSION = ref(FALLBACK_APP_VERSION);
 const desktopRuntime = isDesktop();
 // 落地页只在非桌面环境渲染（Cloudflare Pages 部署的就是这个分支），
@@ -207,8 +209,21 @@ const onDocumentKeydown = (event: KeyboardEvent) => {
 };
 const closeMobileMenu = () => { mobileMenuOpen.value = false; };
 
+/* 托盘菜单是原生的，建起来的时候前端还没加载，只能先按系统语言猜一次。
+   界面语言一确定（以及之后每次切换）就把它校正过来——不然英文用户右键
+   托盘看到的还是中文。 */
+const syncTrayLocale = () => {
+  if (!desktopRuntime) return;
+  void backend.setTrayLocale(locale.value).catch(() => {
+    // 托盘文案不是关键路径，失败就算了，不该弹错给用户。
+  });
+};
+
+watch(locale, syncTrayLocale);
+
 onMounted(() => {
   if (showLanding) return;
+  syncTrayLocale();
   initializeScale();
   void initialize();
   void loadDevices();
@@ -304,7 +319,7 @@ onUnmounted(() => {
         </div>
         <div class="version-row">
           <span class="version-brand"><BrandMark :size="20" /></span>
-          <span>ZeppBridge　v{{ APP_VERSION }}</span>
+          <span :title="`build ${BUILD_STAMP}`">ZeppBridge　v{{ APP_VERSION }}</span>
           <RouterLink :to="{ path: '/settings', hash: '#privacy-section' }" class="shield-link" :title="t.privacyLink">
             <DesignIcon name="secure" :size="20" />
           </RouterLink>

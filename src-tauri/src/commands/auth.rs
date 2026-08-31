@@ -2,6 +2,7 @@ use super::status::build_app_status;
 use crate::app_state::AppState;
 use crate::auth::extract_from_har;
 use crate::connectors::ZeppConnector;
+use crate::ipc_error::AppError;
 use crate::ipc_types::AppStatus;
 use crate::models::{error::ZeppBridgeError, AuthInfo};
 use chrono::{Duration, Utc};
@@ -20,17 +21,14 @@ pub async fn save_auth(
     app_token: String,
     user_id: String,
     region_host: String,
-) -> std::result::Result<AppStatus, String> {
+) -> std::result::Result<AppStatus, AppError> {
     let auth = AuthInfo {
         app_token,
         user_id,
         region_host,
     };
 
-    state
-        .auth
-        .save_auth(&auth)
-        .map_err(|error| error.to_string())?;
+    state.auth.save_auth(&auth)?;
 
     let manager = match AppState::build_sync_manager(auth, &state.data_dir) {
         Ok(manager) => manager,
@@ -49,11 +47,15 @@ pub async fn save_auth(
                 let mut auth_state = state.auth_state.write().await;
                 *auth_state = "unconfigured".to_string();
             }
+            let failure = AppError::new(
+                "err.auth.sync_init_failed",
+                format!("无法初始化同步，请检查认证区域后重试：{message}"),
+            );
             {
                 let mut warning = state.auth_warning.write().await;
-                *warning = Some(format!("无法初始化同步，请检查认证区域后重试：{message}"));
+                *warning = Some(failure.message.clone());
             }
-            return Err(message);
+            return Err(failure);
         }
     };
 
@@ -86,7 +88,7 @@ pub async fn save_auth(
 #[tauri::command]
 pub async fn verify_auth(
     state: tauri::State<'_, AppState>,
-) -> std::result::Result<AppStatus, String> {
+) -> std::result::Result<AppStatus, AppError> {
     let auth = match state.auth.load_auth() {
         Ok(Some(auth)) => auth,
         Ok(None) => {
@@ -134,7 +136,7 @@ pub async fn verify_auth(
 #[tauri::command]
 pub async fn clear_auth(
     state: tauri::State<'_, AppState>,
-) -> std::result::Result<AppStatus, String> {
+) -> std::result::Result<AppStatus, AppError> {
     state
         .login
         .epoch
@@ -144,7 +146,7 @@ pub async fn clear_auth(
         *login = crate::ipc_types::LoginStatus::idle();
     }
 
-    state.auth.clear_auth().map_err(|error| error.to_string())?;
+    state.auth.clear_auth()?;
 
     {
         let mut sync = state.sync.write().await;
@@ -219,28 +221,32 @@ pub(crate) fn validate_verify_payload(value: &Value) -> std::result::Result<(), 
 async fn verify_failure(
     state: &AppState,
     error: ZeppBridgeError,
-) -> std::result::Result<AppStatus, String> {
-    let message = user_facing_verify_error(&error);
+) -> std::result::Result<AppStatus, AppError> {
+    let failure = user_facing_verify_error(&error);
     if error.needs_reauth() {
         let mut auth_state = state.auth_state.write().await;
         *auth_state = "needs_reauth".to_string();
     }
     {
         let mut warning = state.auth_warning.write().await;
-        *warning = Some(message.clone());
+        *warning = Some(failure.message.clone());
     }
-    Err(message)
+    Err(failure)
 }
 
-fn user_facing_verify_error(error: &ZeppBridgeError) -> String {
+/// 验证失败分三类，各有各的下一步：网络问题重试就行，凭据失效要重新连接，
+/// 其余的才是「说不清」。上一版把它们混成一句中文，英文界面上更是完全读不懂。
+fn user_facing_verify_error(error: &ZeppBridgeError) -> AppError {
     match error {
-        ZeppBridgeError::NetworkError(_) => {
-            "认证验证失败：无法连接 Zepp 服务，请检查网络后重试".to_string()
-        }
-        ZeppBridgeError::NeedsReauth(_) => {
-            "认证验证失败：认证已失效，请重新保存认证信息".to_string()
-        }
-        _ => format!("认证验证失败：{error}"),
+        ZeppBridgeError::NetworkError(_) => AppError::new(
+            "err.auth.verify_network",
+            "认证验证失败：无法连接 Zepp 服务，请检查网络后重试",
+        ),
+        ZeppBridgeError::NeedsReauth(_) => AppError::new(
+            "err.auth.verify_needs_reauth",
+            "认证验证失败：认证已失效，请重新保存认证信息",
+        ),
+        _ => AppError::new("err.auth.verify_failed", format!("认证验证失败：{error}")),
     }
 }
 
@@ -281,10 +287,10 @@ mod tests {
 pub async fn import_from_har(
     state: tauri::State<'_, AppState>,
     har_path: String,
-) -> std::result::Result<AppStatus, String> {
+) -> std::result::Result<AppStatus, AppError> {
     let path = PathBuf::from(&har_path);
 
-    let auth = extract_from_har(&path).map_err(|e| e.to_string())?;
+    let auth = extract_from_har(&path)?;
 
     // Use the same save flow as manual entry
     save_auth(state, auth.app_token, auth.user_id, auth.region_host).await
@@ -301,6 +307,6 @@ pub async fn manual_auth(
     app_token: String,
     user_id: String,
     region_host: String,
-) -> std::result::Result<AppStatus, String> {
+) -> std::result::Result<AppStatus, AppError> {
     save_auth(state, app_token, user_id, region_host).await
 }

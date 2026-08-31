@@ -1,5 +1,6 @@
 mod app_state;
 mod commands;
+mod ipc_error;
 mod ipc_types;
 mod local_api;
 mod updates;
@@ -25,9 +26,9 @@ use commands::{
     get_unknown_workout_codes, get_user_prefs, get_weekly_report, get_workout_detail,
     get_workout_insight, get_workout_series, get_workout_type_options, import_from_har,
     list_backups, manual_auth, open_data_folder, prepare_ai_handoff, probe_data_capabilities,
-    publish_ai_export, reprocess_local_data, reset_coverage_ledger, run_database_integrity_check,
-    save_auth, save_csv_export, save_gpx_export, save_json_export, set_backup_pinned,
-    set_device_model_override, set_heart_rate_zone_preference, set_user_prefs,
+    publish_ai_export, reprocess_local_data, reset_coverage_ledger, retry_failed_backfill_chunks,
+    run_database_integrity_check, save_auth, save_csv_export, save_gpx_export, save_json_export,
+    set_backup_pinned, set_device_model_override, set_heart_rate_zone_preference, set_user_prefs,
     set_workout_code_label, set_workout_type_override, stage_restore, start_history_backfill,
     start_history_sync, start_incremental_sync, start_initial_sync, start_web_login,
     submit_device_model_assignment, submit_diagnostic_report, verify_auth, verify_backup,
@@ -47,6 +48,76 @@ fn show_main_window(app: &AppHandle) {
         let _ = window.set_focus();
         let _ = window.set_always_on_top(false);
     }
+}
+
+/// 托盘菜单的三条文案。原生菜单没法走前端的 i18n，只能在这里备一份。
+struct TrayLabels {
+    show: &'static str,
+    sync: &'static str,
+    quit: &'static str,
+}
+
+fn tray_labels(chinese: bool) -> TrayLabels {
+    if chinese {
+        TrayLabels {
+            show: "打开窗口",
+            sync: "立即同步",
+            quit: "退出",
+        }
+    } else {
+        TrayLabels {
+            show: "Open ZeppBridge",
+            sync: "Sync now",
+            quit: "Quit",
+        }
+    }
+}
+
+/// 托盘建好之后还要能改文案：用户在设置里换语言，托盘不该还留在旧语言上。
+struct TrayMenuItems {
+    show: MenuItem<tauri::Wry>,
+    sync: MenuItem<tauri::Wry>,
+    quit: MenuItem<tauri::Wry>,
+}
+
+/// 系统语言是不是中文。
+///
+/// 只在前端还没告诉我们语言之前用一次。判断标准和前端 `detectLocale` 一致：
+/// 明确以 `zh` 开头才算中文，其余一律英文。
+fn system_prefers_chinese() -> bool {
+    for key in ["LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"] {
+        if let Some(value) = std::env::var_os(key) {
+            let value = value.to_string_lossy().to_ascii_lowercase();
+            if !value.is_empty() {
+                return value.starts_with("zh");
+            }
+        }
+    }
+    #[cfg(windows)]
+    {
+        // Windows 不设这些环境变量，问系统要用户的界面语言。
+        let output = std::process::Command::new("powershell")
+            .args(["-NoProfile", "-Command", "(Get-Culture).Name"])
+            .output();
+        if let Ok(output) = output {
+            let name = String::from_utf8_lossy(&output.stdout).to_ascii_lowercase();
+            return name.trim().starts_with("zh");
+        }
+    }
+    false
+}
+
+/// 前端确定界面语言后校正托盘文案。
+#[tauri::command]
+fn set_tray_locale(app: AppHandle, locale: String) -> std::result::Result<(), ipc_error::AppError> {
+    let Some(items) = app.try_state::<TrayMenuItems>() else {
+        return Ok(());
+    };
+    let labels = tray_labels(locale.trim().to_ascii_lowercase().starts_with("zh"));
+    let _ = items.show.set_text(labels.show);
+    let _ = items.sync.set_text(labels.sync);
+    let _ = items.quit.set_text(labels.quit);
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -175,10 +246,19 @@ pub fn run() {
                 });
             }
 
-            let show = MenuItem::with_id(app, "show", "打开窗口", true, None::<&str>)?;
-            let sync = MenuItem::with_id(app, "sync", "立即同步", true, None::<&str>)?;
-            let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+            // 托盘菜单是原生的，界面那套 i18n 到不了这里，而它又是英文用户
+            // 一定会右键点开的东西。托盘在前端加载之前就要建起来，所以先按
+            // 系统语言给一份，前端确定语言后再用 `set_tray_locale` 校正。
+            let labels = tray_labels(system_prefers_chinese());
+            let show = MenuItem::with_id(app, "show", labels.show, true, None::<&str>)?;
+            let sync = MenuItem::with_id(app, "sync", labels.sync, true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", labels.quit, true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show, &sync, &quit])?;
+            app.manage(TrayMenuItems {
+                show: show.clone(),
+                sync: sync.clone(),
+                quit: quit.clone(),
+            });
             let mut tray = TrayIconBuilder::new()
                 .menu(&menu)
                 .tooltip("ZeppBridge")
@@ -275,6 +355,8 @@ pub fn run() {
             start_history_backfill,
             get_coverage_ledger,
             reset_coverage_ledger,
+            retry_failed_backfill_chunks,
+            set_tray_locale,
             local_api::get_local_api_status,
             local_api::set_local_api_enabled,
             local_api::reveal_local_api_token,

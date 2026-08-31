@@ -1,6 +1,6 @@
 <script setup lang="ts">
 defineOptions({ name: 'Explore' });
-import { computed, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import Icon from '../components/Icon.vue';
 import type { IconName } from '../components/Icon.vue';
@@ -15,6 +15,7 @@ import { useSyncController } from '../composables/useSyncController';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { useAiHandoff } from '../composables/useAiHandoff';
 import { localDateString } from '../lib/format';
+import { popoverStyle } from '../lib/popoverPosition';
 import { AI_PROVIDERS, AI_PROVIDER_BY_ID, type AiProviderId } from '../lib/aiProviders';
 import type { ExportDataType, ExportScope, ExportSelection, ExportTypeGroup } from '../types';
 import { exploreMessages, promptTemplates, type PromptTemplate } from './Explore.i18n';
@@ -288,9 +289,41 @@ const activeRangeDays = computed(() => {
 });
 
 /* ── 自定义日期选择器弹层逻辑 ─────────────── */
+/*
+ * 日历 Teleport 到 body 并用 fixed 定位。
+ *
+ * 上一版是 `position: absolute; top: calc(100% + 6px); right: 0`，钉死向下
+ * 展开。「快捷范围」这一行本来就靠近面板底部，于是日历整块落到窗口下沿之外，
+ * 既看不见也滚不到 —— 这就是 issue #9。只调 z-index 或 overflow 都救不回来：
+ * 绝对定位的浮层出不了它的包含块。
+ *
+ * 翻转和夹取的算法与 SelectMenu 共用 `lib/popoverPosition.ts`，两个浮层不该
+ * 各写一套、各错一次。
+ */
+const CALENDAR_WIDTH = 220;
+const CALENDAR_MAX_HEIGHT = 300;
+
 const datePickerOpen = ref<'start' | 'end' | null>(null);
 const pickerYear = ref(new Date().getFullYear());
 const pickerMonth = ref(new Date().getMonth()); // 0-indexed
+const startTriggerRef = ref<HTMLElement | null>(null);
+const endTriggerRef = ref<HTMLElement | null>(null);
+const calendarRef = ref<HTMLElement | null>(null);
+const calendarStyle = ref<Record<string, string>>({});
+
+const activeTrigger = () =>
+  (datePickerOpen.value === 'start' ? startTriggerRef.value : endTriggerRef.value);
+
+const measureDatePicker = () => {
+  const trigger = activeTrigger();
+  if (!trigger) return;
+  const rect = trigger.getBoundingClientRect();
+  calendarStyle.value = popoverStyle(
+    { top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width },
+    { width: window.innerWidth, height: window.innerHeight },
+    { maxHeight: CALENDAR_MAX_HEIGHT, width: CALENDAR_WIDTH },
+  ) as unknown as Record<string, string>;
+};
 
 const openDatePicker = (target: 'start' | 'end') => {
   const currentVal = target === 'start' ? exportStartDate.value : exportEndDate.value;
@@ -298,11 +331,64 @@ const openDatePicker = (target: 'start' | 'end') => {
   pickerYear.value = d.getFullYear();
   pickerMonth.value = d.getMonth();
   datePickerOpen.value = target;
+  // 触发按钮的位置要在 DOM 更新后才准，但 v-if 的浮层还没挂上来，
+  // 先按当前按钮量一次，挂上之后 watch 里再量一次。
+  void nextTick(measureDatePicker);
 };
 
-const closeDatePicker = () => {
+const closeDatePicker = (restoreFocus = false) => {
+  const trigger = activeTrigger();
   datePickerOpen.value = null;
+  if (restoreFocus) trigger?.focus();
 };
+
+/* 浮层已经不在按钮旁边了，页面一滚它就会停在原地；跟着重新量比强行关掉
+   更不打断人，窗口尺寸变化同理。和 SelectMenu 的处理保持一致。 */
+const repositionDatePicker = () => {
+  if (!datePickerOpen.value) return;
+  measureDatePicker();
+};
+
+const onDatePickerKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape' && datePickerOpen.value) {
+    event.preventDefault();
+    closeDatePicker(true);
+  }
+};
+
+/* 捕获阶段监听：日历被 Teleport 到 body 之后已经不在 `.range-row` 里，
+   只判断触发按钮会让「点日期」在 click 落地前就被关掉，于是怎么点都选不中。
+   两边都要放行。 */
+const onDatePickerPointerDown = (event: PointerEvent) => {
+  if (!datePickerOpen.value) return;
+  const target = event.target as Node;
+  if (calendarRef.value?.contains(target)) return;
+  if (startTriggerRef.value?.contains(target)) return;
+  if (endTriggerRef.value?.contains(target)) return;
+  closeDatePicker();
+};
+
+watch(datePickerOpen, (open) => {
+  if (open) {
+    void nextTick(measureDatePicker);
+    window.addEventListener('pointerdown', onDatePickerPointerDown, true);
+    window.addEventListener('scroll', repositionDatePicker, true);
+    window.addEventListener('resize', repositionDatePicker);
+    window.addEventListener('keydown', onDatePickerKeydown);
+  } else {
+    window.removeEventListener('pointerdown', onDatePickerPointerDown, true);
+    window.removeEventListener('scroll', repositionDatePicker, true);
+    window.removeEventListener('resize', repositionDatePicker);
+    window.removeEventListener('keydown', onDatePickerKeydown);
+  }
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('pointerdown', onDatePickerPointerDown, true);
+  window.removeEventListener('scroll', repositionDatePicker, true);
+  window.removeEventListener('resize', repositionDatePicker);
+  window.removeEventListener('keydown', onDatePickerKeydown);
+});
 
 const prevMonth = () => {
   if (pickerMonth.value === 0) {
@@ -360,7 +446,7 @@ const selectCalendarDay = (dateStr: string) => {
   } else if (datePickerOpen.value === 'end') {
     exportEndDate.value = dateStr;
   }
-  closeDatePicker();
+  closeDatePicker(true);
 };
 
 const copyPrompt = async () => {
@@ -579,9 +665,12 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 
               <div class="custom-date-picker-wrap">
                 <button
+                  ref="startTriggerRef"
                   type="button"
                   class="date-trigger-btn"
                   :class="{ 'is-open': datePickerOpen === 'start' }"
+                  :aria-expanded="datePickerOpen === 'start'"
+                  aria-haspopup="dialog"
                   @click="datePickerOpen === 'start' ? closeDatePicker() : openDatePicker('start')"
                 >
                   <Icon name="clock" :size="12" />
@@ -589,41 +678,54 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
                 </button>
                 <span>~</span>
                 <button
+                  ref="endTriggerRef"
                   type="button"
                   class="date-trigger-btn"
                   :class="{ 'is-open': datePickerOpen === 'end' }"
+                  :aria-expanded="datePickerOpen === 'end'"
+                  aria-haspopup="dialog"
                   @click="datePickerOpen === 'end' ? closeDatePicker() : openDatePicker('end')"
                 >
                   <Icon name="clock" :size="12" />
                   <span>{{ exportEndDate || t.endDate }}</span>
                 </button>
 
-                <!-- 自定义深橄榄底日历弹层 -->
-                <div v-if="datePickerOpen" class="calendar-popover" role="dialog" :aria-label="t.datePickerAria">
-                  <div class="cal-header">
-                    <button type="button" class="cal-nav-btn" @click="prevMonth"><Icon name="arrow-left" :size="12" /></button>
-                    <span class="cal-title">{{ calendarTitle }}</span>
-                    <button type="button" class="cal-nav-btn" @click="nextMonth"><Icon name="arrow-right" :size="12" /></button>
+                <!-- 自定义深橄榄底日历弹层。
+                     Teleport 到 body：留在原地就会被祖先的包含块裁掉（issue #9）。 -->
+                <Teleport to="body">
+                  <div
+                    v-if="datePickerOpen"
+                    ref="calendarRef"
+                    class="calendar-popover"
+                    :style="calendarStyle"
+                    role="dialog"
+                    :aria-label="t.datePickerAria"
+                  >
+                    <div class="cal-header">
+                      <button type="button" class="cal-nav-btn" @click="prevMonth"><Icon name="arrow-left" :size="12" /></button>
+                      <span class="cal-title">{{ calendarTitle }}</span>
+                      <button type="button" class="cal-nav-btn" @click="nextMonth"><Icon name="arrow-right" :size="12" /></button>
+                    </div>
+                    <div class="cal-weekdays">
+                      <span v-for="name in weekdayNames" :key="name">{{ name }}</span>
+                    </div>
+                    <div class="cal-grid">
+                      <button
+                        v-for="(item, idx) in calendarDays"
+                        :key="idx"
+                        type="button"
+                        :disabled="!item.day"
+                        :class="['cal-day', {
+                          'is-empty': !item.day,
+                          'is-selected': item.dateStr === (datePickerOpen === 'start' ? exportStartDate : exportEndDate)
+                        }]"
+                        @click="selectCalendarDay(item.dateStr)"
+                      >
+                        {{ item.day || '' }}
+                      </button>
+                    </div>
                   </div>
-                  <div class="cal-weekdays">
-                    <span v-for="name in weekdayNames" :key="name">{{ name }}</span>
-                  </div>
-                  <div class="cal-grid">
-                    <button
-                      v-for="(item, idx) in calendarDays"
-                      :key="idx"
-                      type="button"
-                      :disabled="!item.day"
-                      :class="['cal-day', {
-                        'is-empty': !item.day,
-                        'is-selected': item.dateStr === (datePickerOpen === 'start' ? exportStartDate : exportEndDate)
-                      }]"
-                      @click="selectCalendarDay(item.dateStr)"
-                    >
-                      {{ item.day || '' }}
-                    </button>
-                  </div>
-                </div>
+                </Teleport>
               </div>
             </div>
           </div>
@@ -777,6 +879,43 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
     </div>
   </section>
 </template>
+
+<!-- 日历弹层被 Teleport 到 body，已经不在这个组件的作用域里，样式必须
+     写成非 scoped。位置由 lib/popoverPosition.ts 算好后以内联样式套上，
+     这里只管长相，不再写死 top / right。 -->
+<style>
+.calendar-popover {
+  z-index: 2000;
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  /* 实心背景。半透明会让下面的内容透上来，日期就没法读了。 */
+  background: var(--surface);
+  box-shadow: 0 18px 44px rgba(4, 6, 8, .55);
+}
+.calendar-popover .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.calendar-popover .cal-title { font-size: 12px; font-weight: 600; color: var(--ink); }
+.calendar-popover .cal-nav-btn { display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 4px; background: var(--surface-raised); color: var(--muted); cursor: pointer; }
+.calendar-popover .cal-nav-btn:hover { color: var(--accent); }
+.calendar-popover .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 10px; color: var(--subtle); margin-bottom: 4px; }
+.calendar-popover .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.calendar-popover .cal-day {
+  display: grid;
+  place-items: center;
+  height: 24px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+.calendar-popover .cal-day:hover:not(:disabled) { background: var(--surface-hover); }
+.calendar-popover .cal-day.is-selected { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.calendar-popover .cal-day.is-empty { cursor: default; }
+</style>
 
 <style scoped>
 .export-page.page { display: grid; gap: 16px; }
@@ -1018,41 +1157,6 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 }
 .date-trigger-btn.is-open { border-color: var(--accent); }
 .date-trigger-btn:hover { border-color: var(--line-strong); }
-
-/* 自绘日历弹层 */
-.calendar-popover {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 50;
-  width: 220px;
-  padding: 10px;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, .4);
-}
-.cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.cal-title { font-size: 12px; font-weight: 600; color: var(--ink); }
-.cal-nav-btn { display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 4px; background: var(--surface-raised); color: var(--muted); cursor: pointer; }
-.cal-nav-btn:hover { color: var(--accent); }
-.cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 10px; color: var(--subtle); margin-bottom: 4px; }
-.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
-.cal-day {
-  display: grid;
-  place-items: center;
-  height: 24px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--ink);
-  font-size: 11px;
-  font-family: var(--font-mono);
-  cursor: pointer;
-}
-.cal-day:hover:not(:disabled) { background: var(--surface-hover); }
-.cal-day.is-selected { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
-.cal-day.is-empty { cursor: default; }
 
 /* 底部操作条 */
 .editor-footer {

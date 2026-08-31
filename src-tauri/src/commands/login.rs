@@ -1,6 +1,7 @@
 use super::auth::verify_recent_heart_rate;
 use crate::app_state::AppState;
 use crate::connectors::zepp::validate_region_host;
+use crate::ipc_error::AppError;
 use crate::ipc_types::LoginStatus;
 use crate::models::AuthInfo;
 use serde_json::Value;
@@ -50,12 +51,17 @@ pub(crate) struct ExtractedLogin {
 pub async fn start_web_login(
     app: AppHandle,
     state: tauri::State<'_, AppState>,
-) -> std::result::Result<LoginStatus, String> {
+) -> std::result::Result<LoginStatus, AppError> {
     let epoch = state.login.epoch.fetch_add(1, Ordering::SeqCst) + 1;
     close_login_window(&app);
 
     let page_url = PRIMARY_LOGIN_URL.to_string();
-    let status = LoginStatus::new("waiting", "请在弹出窗口完成 Zepp 登录", page_url.clone());
+    let status = LoginStatus::new(
+        "waiting",
+        "err.login.waiting",
+        "请在弹出窗口完成 Zepp 登录",
+        page_url.clone(),
+    );
     publish_status(&app, &state, status.clone()).await;
 
     let window = build_login_window(&app, &page_url)?;
@@ -67,7 +73,7 @@ pub async fn start_web_login(
 pub async fn cancel_web_login(
     app: AppHandle,
     state: tauri::State<'_, AppState>,
-) -> std::result::Result<LoginStatus, String> {
+) -> std::result::Result<LoginStatus, AppError> {
     state.login.epoch.fetch_add(1, Ordering::SeqCst);
     close_login_window(&app);
     let status = LoginStatus::idle();
@@ -78,15 +84,17 @@ pub async fn cancel_web_login(
 #[tauri::command]
 pub async fn get_login_status(
     state: tauri::State<'_, AppState>,
-) -> std::result::Result<LoginStatus, String> {
+) -> std::result::Result<LoginStatus, AppError> {
     Ok(state.login.status.read().await.clone())
 }
 
 fn build_login_window(
     app: &AppHandle,
     page_url: &str,
-) -> std::result::Result<WebviewWindow, String> {
-    let url = page_url.parse().map_err(|_| "登录地址无效".to_string())?;
+) -> std::result::Result<WebviewWindow, AppError> {
+    let url = page_url
+        .parse()
+        .map_err(|_| AppError::new("err.login.bad_url", "登录地址无效"))?;
     let app_for_new_window = app.clone();
     WebviewWindowBuilder::new(app, LOGIN_WINDOW_LABEL, WebviewUrl::External(url))
         .title("登录 Zepp")
@@ -116,20 +124,38 @@ fn build_login_window(
             NewWindowResponse::Deny
         })
         .build()
-        .map_err(|error| format!("无法打开登录窗口：{error}"))
+        .map_err(|error| {
+            AppError::new(
+                "err.login.window_failed",
+                format!("无法打开登录窗口：{error}"),
+            )
+        })
 }
 
 fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow) {
     tauri::async_runtime::spawn(async move {
         let started = std::time::Instant::now();
         let mut fallback_used = false;
+        // 曾经走到过「看起来已经登录」的页面，却始终没读出凭据。这两种超时
+        // 对用户完全不是一回事：一种是没登录完，另一种是登录完了但我们没拿到
+        // 东西——后者该直接把手动 / HAR 兜底摆到他面前，而不是让他等满 15
+        // 分钟再看到一句「登录超时」。
+        let mut looked_signed_in = false;
 
         loop {
             if !epoch_active(&app, epoch) {
                 return;
             }
             if started.elapsed() >= SESSION_TIMEOUT {
-                finish_failed(&app, epoch, "登录超时，请重试", current_page_url(&window)).await;
+                let (code, message) = if looked_signed_in {
+                    (
+                        "err.login.credentials_unreadable",
+                        "已经登录，但没能从登录窗口读到凭据。可以改用 HAR 导入或手动填写 App Token。",
+                    )
+                } else {
+                    ("err.login.timeout", "登录超时，请重试")
+                };
+                finish_failed(&app, epoch, code, message, current_page_url(&window)).await;
                 close_login_window(&app);
                 return;
             }
@@ -150,6 +176,7 @@ fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow) {
                     &app,
                     epoch,
                     "waiting",
+                    "err.login.fallback_page",
                     "正在打开备用登录页",
                     FALLBACK_LOGIN_URL,
                 )
@@ -157,29 +184,51 @@ fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow) {
             }
 
             let cookies = collect_cookies(&window).await;
+            // 只记 cookie 的名字，绝不记值——名字足以判断「是不是根本没有这个
+            // cookie」，而值是凭据本身。
+            if !looked_signed_in && page_looks_signed_in(&page_url, &cookies) {
+                looked_signed_in = true;
+                log_credential_probe(&page_url, &cookies);
+            }
             if let Some(extracted) = parse_login_cookies(&cookies) {
                 emit_progress(
                     &app,
                     epoch,
                     "extracting",
+                    "err.login.extracting",
                     "已读取登录凭据，正在确认区域",
                     &page_url,
                 )
                 .await;
-                emit_progress(&app, epoch, "verifying", "正在验证账号", &page_url).await;
+                emit_progress(
+                    &app,
+                    epoch,
+                    "verifying",
+                    "err.login.verifying",
+                    "正在验证账号",
+                    &page_url,
+                )
+                .await;
 
                 match persist_extracted_login(&app, epoch, &extracted).await {
                     Ok(()) => {
                         if !epoch_active(&app, epoch) {
                             return;
                         }
-                        emit_progress(&app, epoch, "connected", "已连接 Zepp 账号", &page_url)
-                            .await;
+                        emit_progress(
+                            &app,
+                            epoch,
+                            "connected",
+                            "err.login.connected",
+                            "已连接 Zepp 账号",
+                            &page_url,
+                        )
+                        .await;
                         close_login_window(&app);
                         return;
                     }
-                    Err(message) => {
-                        finish_failed(&app, epoch, &message, page_url).await;
+                    Err(failure) => {
+                        finish_failed(&app, epoch, &failure.code, &failure.message, page_url).await;
                         return;
                     }
                 }
@@ -194,21 +243,31 @@ async fn persist_extracted_login(
     app: &AppHandle,
     epoch: u64,
     extracted: &ExtractedLogin,
-) -> std::result::Result<(), String> {
+) -> std::result::Result<(), AppError> {
     let Some(state) = app.try_state::<AppState>() else {
-        return Err("应用状态不可用".to_string());
+        return Err(AppError::new(
+            "err.login.state_unavailable",
+            "应用状态不可用",
+        ));
     };
     let preferred = preferred_region_hosts(&state, extracted.region_hint.as_deref()).await;
     let Some(auth) = probe_region_hosts(&extracted.user_id, &extracted.app_token, &preferred).await
     else {
-        return Err("未能在允许的 Zepp 区域上验证账号，请确认已登录后再试".to_string());
+        // 拿到凭据了，但没有一个区域认它。和「没登录」「网络不通」是三件事。
+        return Err(AppError::new(
+            "err.login.region_probe_failed",
+            "读到了凭据，但没有一个 Zepp 区域接受它。账号可能不在已知区域，或者网络被拦截了。",
+        ));
     };
     if !epoch_active(app, epoch) {
-        return Err("登录已取消".to_string());
+        return Err(AppError::new("err.login.cancelled", "登录已取消"));
     }
 
     if let Err(error) = state.auth.save_auth(&auth) {
-        return Err(format!("认证信息保存失败：{error}"));
+        return Err(AppError::new(
+            "err.login.save_failed",
+            format!("认证信息保存失败：{error}"),
+        ));
     }
 
     let manager = match AppState::build_sync_manager(auth, &state.data_dir) {
@@ -228,7 +287,7 @@ async fn persist_extracted_login(
                 let mut warning = state.auth_warning.write().await;
                 *warning = Some(format!("无法初始化同步，请检查认证区域后重试：{message}"));
             }
-            return Err(message);
+            return Err(AppError::new("err.login.sync_init_failed", message));
         }
     };
 
@@ -358,7 +417,74 @@ async fn collect_cookies(window: &WebviewWindow) -> Vec<(String, String)> {
             }
         }
     }
+
+    // 凭据不一定放在 cookie 里。表盘站是个前端应用，把登录信息写进
+    // localStorage / sessionStorage 完全正常，那样 `document.cookie` 和
+    // webview 的 cookie jar 都看不到它——用户于是只能自己打开开发者工具
+    // 把 App Token 抠出来（Reddit 上就有人这么做）。这里再看一眼存储，
+    // 名字对得上就当成凭据来源。
+    if parse_login_cookies(&pairs).is_none() {
+        if let Some(entries) = web_storage_entries(window).await {
+            for pair in entries {
+                if !pairs
+                    .iter()
+                    .any(|(name, _)| name.eq_ignore_ascii_case(&pair.0))
+                {
+                    pairs.push(pair);
+                }
+            }
+        }
+    }
     pairs
+}
+
+/// 从 localStorage / sessionStorage 里捞可能是凭据的键值。
+///
+/// 只取名字看起来相关的那几个键，不把整个存储读回来——那里面还有用户的其它
+/// 东西，我们没有理由碰。取回来的值一律走和 cookie 相同的
+/// `sanitize_user_id` / `sanitize_app_token` 校验，格式不对就当没看见。
+async fn web_storage_entries(window: &WebviewWindow) -> Option<Vec<(String, String)>> {
+    const SCRIPT: &str = r#"(function(){
+  try {
+    var wanted = ['hm-user-login-info','hm_user_login_info','userid','user_id','apptoken','app_token','app-token','token_info','loginInfo'];
+    var out = {};
+    [window.localStorage, window.sessionStorage].forEach(function(store){
+      if (!store) return;
+      for (var i = 0; i < store.length; i++) {
+        var key = store.key(i);
+        if (!key) continue;
+        var lowered = key.toLowerCase();
+        if (wanted.some(function(name){ return lowered.indexOf(name) !== -1; })) {
+          if (!(key in out)) out[key] = store.getItem(key) || '';
+        }
+      }
+    });
+    return JSON.stringify(out);
+  } catch (e) { return '{}'; }
+})()"#;
+
+    let (tx, rx) = tokio::sync::oneshot::channel::<String>();
+    let sent = std::sync::Mutex::new(Some(tx));
+    window
+        .eval_with_callback(SCRIPT, move |raw| {
+            if let Some(tx) = sent.lock().ok().and_then(|mut guard| guard.take()) {
+                let _ = tx.send(decode_eval_string(&raw));
+            }
+        })
+        .ok()?;
+    let raw = tokio::time::timeout(COOKIE_EVAL_TIMEOUT, rx)
+        .await
+        .ok()
+        .and_then(Result::ok)?;
+    let parsed: serde_json::Map<String, Value> = serde_json::from_str(&raw).ok()?;
+    let entries: Vec<(String, String)> = parsed
+        .into_iter()
+        .map(|(key, value)| match value {
+            Value::String(text) => (key, text),
+            other => (key, other.to_string()),
+        })
+        .collect();
+    (!entries.is_empty()).then_some(entries)
 }
 
 async fn document_cookie(window: &WebviewWindow) -> Option<String> {
@@ -584,6 +710,53 @@ fn log_blocked_login_url(kind: &str, url: &reqwest::Url) {
     eprintln!("blocked Zepp login {kind}: {}", login_url_log_fields(url));
 }
 
+/// 这一页看起来已经登录了吗。
+///
+/// 判断只看两件公开的事：页面是不是已经离开登录页，以及 cookie 里有没有出现
+/// 任何一个「登录之后才会有」的名字。看不到凭据本身也没关系——我们要区分的是
+/// 「用户还没登录」和「用户登录了但我们没读到」，前者该继续等，后者该停下来
+/// 把兜底路径给他。
+fn page_looks_signed_in(page_url: &str, cookies: &[(String, String)]) -> bool {
+    const SIGNED_IN_HINTS: &[&str] = &[
+        "hm-user-login-info",
+        "hm_user_login_info",
+        "userid",
+        "user_id",
+        "apptoken",
+        "app_token",
+        "token",
+        "session",
+    ];
+    if cookies.iter().any(|(name, _)| {
+        let lowered = name.to_ascii_lowercase();
+        SIGNED_IN_HINTS.iter().any(|hint| lowered.contains(hint))
+    }) {
+        return true;
+    }
+    // 表盘站登录成功后会离开 /login 这一层。
+    page_url.starts_with("https://watchface.zepp.com/")
+        && !page_url.contains("/login")
+        && !page_url.contains("account.xiaomi.com")
+}
+
+/// 记下这一轮看到了哪些 cookie **名字**。
+///
+/// 只有名字和 host。值就是凭据本身，任何情况下都不写出去；query 里可能带
+/// OAuth 的 state/code，同样不写。这份日志的唯一用途是回答「到底有没有那个
+/// cookie」——旧版在这里什么都不说，用户和我们都只能猜。
+fn log_credential_probe(page_url: &str, cookies: &[(String, String)]) {
+    let host = reqwest::Url::parse(page_url)
+        .ok()
+        .and_then(|url| url.host_str().map(str::to_string))
+        .unwrap_or_else(|| "unknown".to_string());
+    let mut names: Vec<&str> = cookies.iter().map(|(name, _)| name.as_str()).collect();
+    names.sort_unstable();
+    eprintln!(
+        "Zepp login: page looks signed in (host={host}); cookie names seen: [{}]",
+        names.join(", ")
+    );
+}
+
 fn should_use_fallback(elapsed: Duration, fallback_used: bool, page_url: &str) -> bool {
     !fallback_used && elapsed >= FALLBACK_AFTER && !page_url.starts_with("https://user.huami.com/")
 }
@@ -618,6 +791,7 @@ async fn emit_progress(
     app: &AppHandle,
     epoch: u64,
     state_name: &str,
+    code: &str,
     message: &str,
     page_url: &str,
 ) {
@@ -627,11 +801,16 @@ async fn emit_progress(
     let Some(state) = app.try_state::<AppState>() else {
         return;
     };
-    publish_status(app, &state, LoginStatus::new(state_name, message, page_url)).await;
+    publish_status(
+        app,
+        &state,
+        LoginStatus::new(state_name, code, message, page_url),
+    )
+    .await;
 }
 
-async fn finish_failed(app: &AppHandle, epoch: u64, message: &str, page_url: String) {
-    emit_progress(app, epoch, "failed", message, &page_url).await;
+async fn finish_failed(app: &AppHandle, epoch: u64, code: &str, message: &str, page_url: String) {
+    emit_progress(app, epoch, "failed", code, message, &page_url).await;
 }
 
 async fn finish_idle_if_active(app: &AppHandle, epoch: u64) {
@@ -647,6 +826,51 @@ async fn finish_idle_if_active(app: &AppHandle, epoch: u64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// localStorage 里的凭据要和 cookie 一样能用。
+    ///
+    /// 表盘站是个前端应用，把登录信息写进 localStorage 完全正常；那样
+    /// `document.cookie` 和 webview 的 cookie jar 都看不到它，用户就只能自己
+    /// 开开发者工具抠 App Token——Reddit 上真有人是这么过来的。
+    #[test]
+    fn credentials_from_web_storage_parse_like_cookies() {
+        let raw = r#"{"token_info":{"user_id":"55","app_token":"from-local-storage"}}"#;
+        let entries = vec![("hm-user-login-info".to_string(), raw.to_string())];
+        let got = parse_login_cookies(&entries).expect("storage credentials");
+        assert_eq!(got.user_id, "55");
+        assert_eq!(got.app_token, "from-local-storage");
+    }
+
+    /// 「还没登录」和「登录了但我们没读到凭据」必须能分开。
+    ///
+    /// 分不开的话，后者只能一路静默等到 15 分钟超时，再给一句「登录超时，
+    /// 请重试」——而重试多少次都不会好，该做的是改用 HAR 或手动填 Token。
+    #[test]
+    fn a_signed_in_page_is_told_apart_from_the_login_page() {
+        let none: Vec<(String, String)> = Vec::new();
+
+        // 还停在登录页，cookie 里也没有任何登录后才有的名字。
+        assert!(!page_looks_signed_in(
+            "https://watchface.zepp.com/login",
+            &none
+        ));
+        assert!(!page_looks_signed_in(
+            "https://account.xiaomi.com/oauth2/authorize",
+            &none
+        ));
+
+        // 已经离开登录页。
+        assert!(page_looks_signed_in(
+            "https://watchface.zepp.com/dashboard",
+            &none
+        ));
+
+        // 或者 cookie 里已经出现了登录后才有的名字，哪怕还没解析出凭据。
+        assert!(page_looks_signed_in(
+            "https://user.huami.com/privacy2/index.html",
+            &[("apptoken".to_string(), "whatever".to_string())]
+        ));
+    }
 
     #[test]
     fn parses_hm_user_login_info_token_info() {

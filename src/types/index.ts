@@ -21,6 +21,8 @@ export interface CapabilityStatus {
   capability: string;
   available: boolean;
   reason?: string;
+  /** `reason` 那句话的稳定码。为空表示它是云端透传的原文，翻不了。 */
+  reason_code?: string | null;
 }
 
 export interface AppStatus {
@@ -66,12 +68,19 @@ export interface StorageEstimate {
   allow_long_history: boolean;
   warn_tight_space: boolean;
   message: string;
+  /** `message` 那句话的稳定码（`ui.estimate.*`）。界面按它选说法，再用
+      上面这些数字自己排版——后端不按界面语言出文案。 */
+  message_code?: string;
   requested_days: number;
   streams: StreamStorageEstimate[];
   /** 六条流全部有足够本机样本时才为真。为假时总数只是粗略参考。 */
   measured: boolean;
   /** 非 null 表示空间不足，补拉不会开始。 */
   stop_reason: string | null;
+  /** `stop_reason` 那句话的稳定码。 */
+  stop_reason_code?: string | null;
+  /** 这次补拉预计需要的字节数，含安全余量。排 stop_reason 那句话要用。 */
+  needed_bytes?: number;
 }
 
 export interface UserPrefs {
@@ -110,6 +119,8 @@ export interface LoginStatus {
   state: LoginState | string;
   message: string;
   page_url: string;
+  /** `message` 那句话的稳定码（`err.login.*`）。界面按它取自己语言的文案。 */
+  code?: string;
 }
 
 export interface SyncStreamResult {
@@ -144,6 +155,8 @@ export interface SyncReport {
   total_records: number;
   streams: SyncStreamResult[];
   message?: string;
+  /** `message` 那句话的稳定码（`err.sync.*`）。界面按它取自己语言的文案。 */
+  message_code?: string | null;
 }
 
 export interface Coverage {
@@ -243,6 +256,19 @@ export interface StreamCoverage {
   records: number;
 }
 
+/** 一个失败块的明细。只显示到月，原因已在后端脱敏。 */
+export interface FailedChunk {
+  stream: string;
+  /** `YYYY-MM-01`。 */
+  chunk_start: string;
+  error: string | null;
+  /** 失败原因的稳定码。界面按它取自己语言的文案，取不到才显示 `error`。 */
+  error_code?: string | null;
+  attempts: number;
+  /** 自动重试已用尽，要用户显式重试才会再动。 */
+  exhausted: boolean;
+}
+
 export interface CoverageLedger {
   requested_from: string | null;
   requested_to: string | null;
@@ -251,6 +277,10 @@ export interface CoverageLedger {
   completed_chunks: number;
   /** 只有每一块都有结论时才为真。「完整副本」这句话只有在这里为真时才成立。 */
   complete: boolean;
+  /** 哪个月、为什么失败。界面靠它把「失败 N 块」说清楚。 */
+  failed_chunks_detail: FailedChunk[];
+  /** 有块的自动重试次数已用尽，需要用户按「重试失败项」。 */
+  needs_manual_retry: boolean;
 }
 
 export type BackupKind = 'manual' | 'pre_migration' | 'pre_restore';
@@ -283,6 +313,8 @@ export interface BackupVerification {
   sha256_match: boolean;
   integrity_ok: boolean;
   problem: string | null;
+  /** `problem` 那句话的稳定码（`ui.backup.*`）。界面按它取自己语言的说法。 */
+  problem_code?: string | null;
 }
 
 export type RestoreCompatibility =

@@ -1,5 +1,28 @@
+import { execSync } from "node:child_process";
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
+
+/*
+ * 构建标识：短 SHA + 构建时间。
+ *
+ * 同一个版本号会被构建很多次（修 bug 时尤其如此），只看 "v1.1.2" 分不清
+ * 手上跑的是哪一次。缺了这个，"我还是看到中文" 这种反馈就只能靠猜是不是
+ * 旧包——已经因此来回三次了。
+ */
+const buildStamp = () => {
+  let sha = "unknown";
+  try {
+    sha = execSync("git rev-parse --short HEAD", { encoding: "utf8" }).trim();
+  } catch {
+    // 不在 git 工作树里（比如从压缩包构建）时就留 unknown，不要让构建失败。
+  }
+  // 用本地时间，不用 UTC：这一行是给人对着自己的钟看的。
+  const now = new Date();
+  const pad = (value: number) => String(value).padStart(2, "0");
+  const at = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+    + ` ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  return `${sha} · ${at}`;
+};
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
@@ -15,6 +38,9 @@ export default defineConfig(async () => ({
   // icon as a local emitted file rather than a data URL, because the desktop
   // CSP intentionally does not allow arbitrary inline image payloads.
   base: './',
+  define: {
+    __BUILD_STAMP__: JSON.stringify(buildStamp()),
+  },
   build: {
     assetsInlineLimit: 0,
     rollupOptions: {

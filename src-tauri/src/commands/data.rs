@@ -3,6 +3,7 @@ use crate::connectors::ZeppConnector;
 use crate::device_catalog::{match_catalog, CatalogMatchInput, CatalogMatchStatus};
 use crate::export_formats;
 use crate::insight::{WeeklyReport, WorkoutInsight};
+use crate::ipc_error::AppError;
 use crate::ipc_types::CleanupResult;
 use crate::models::{
     AiHandoffMetadata, AiHandoffResult, CapabilityOverview, DailyPoint, DeviceCacheMetadata,
@@ -32,10 +33,10 @@ pub(crate) const AI_HANDOFF_INLINE_LIMIT_BYTES: usize = 2 * 1024 * 1024;
 #[tauri::command]
 pub async fn get_health_overview(
     state: tauri::State<'_, AppState>,
-) -> std::result::Result<HealthOverview, String> {
+) -> std::result::Result<HealthOverview, AppError> {
     let result = {
         let db = state.db.lock().await;
-        db.get_health_overview().map_err(|error| error.to_string())
+        db.get_health_overview().map_err(AppError::from)
     };
     result
 }
@@ -48,9 +49,9 @@ pub async fn get_health_overview(
 #[tauri::command]
 pub async fn get_capability_overview(
     state: tauri::State<'_, AppState>,
-) -> std::result::Result<CapabilityOverview, String> {
+) -> std::result::Result<CapabilityOverview, AppError> {
     let db = state.db.lock().await;
-    db.capability_overview().map_err(|error| error.to_string())
+    db.capability_overview().map_err(AppError::from)
 }
 
 /// Return the most recent persisted sleep sessions.
@@ -58,12 +59,11 @@ pub async fn get_capability_overview(
 pub async fn get_recent_sleep(
     state: tauri::State<'_, AppState>,
     limit: usize,
-) -> std::result::Result<Vec<SleepSession>, String> {
+) -> std::result::Result<Vec<SleepSession>, AppError> {
     let limit = limit.clamp(1, 500);
     let result = {
         let db = state.db.lock().await;
-        db.get_recent_sleep_sessions(limit)
-            .map_err(|error| error.to_string())
+        db.get_recent_sleep_sessions(limit).map_err(AppError::from)
     };
     result
 }
@@ -73,10 +73,9 @@ pub async fn get_recent_sleep(
 pub async fn get_sleep_detail(
     state: tauri::State<'_, AppState>,
     sleep_id: String,
-) -> std::result::Result<Option<SleepSession>, String> {
+) -> std::result::Result<Option<SleepSession>, AppError> {
     let db = state.db.lock().await;
-    db.get_sleep_detail(&sleep_id)
-        .map_err(|error| error.to_string())
+    db.get_sleep_detail(&sleep_id).map_err(AppError::from)
 }
 
 /// Return the most recent persisted workouts.
@@ -84,12 +83,11 @@ pub async fn get_sleep_detail(
 pub async fn get_recent_workouts(
     state: tauri::State<'_, AppState>,
     limit: usize,
-) -> std::result::Result<Vec<Workout>, String> {
+) -> std::result::Result<Vec<Workout>, AppError> {
     let limit = limit.clamp(1, 500);
     let result = {
         let db = state.db.lock().await;
-        db.get_recent_workouts(limit)
-            .map_err(|error| error.to_string())
+        db.get_recent_workouts(limit).map_err(AppError::from)
     };
     result
 }
@@ -99,40 +97,36 @@ pub async fn get_recent_workouts(
 pub async fn get_workout_detail(
     state: tauri::State<'_, AppState>,
     workout_id: String,
-) -> std::result::Result<Option<Workout>, String> {
+) -> std::result::Result<Option<Workout>, AppError> {
     let db = state.db.lock().await;
-    db.get_workout_detail(&workout_id)
-        .map_err(|error| error.to_string())
+    db.get_workout_detail(&workout_id).map_err(AppError::from)
 }
 
 #[tauri::command]
 pub async fn get_workout_series(
     state: tauri::State<'_, AppState>,
     workout_id: String,
-) -> std::result::Result<WorkoutSeries, String> {
+) -> std::result::Result<WorkoutSeries, AppError> {
     let db = state.db.lock().await;
-    db.get_workout_series(&workout_id)
-        .map_err(|error| error.to_string())
+    db.get_workout_series(&workout_id).map_err(AppError::from)
 }
 
 #[tauri::command]
 pub async fn get_heart_rate_series(
     state: tauri::State<'_, AppState>,
     hours: i64,
-) -> std::result::Result<Vec<HeartRatePoint>, String> {
+) -> std::result::Result<Vec<HeartRatePoint>, AppError> {
     let db = state.db.lock().await;
-    db.heart_rate_series(hours)
-        .map_err(|error| error.to_string())
+    db.heart_rate_series(hours).map_err(AppError::from)
 }
 
 #[tauri::command]
 pub async fn get_training_load_series(
     state: tauri::State<'_, AppState>,
     days: i64,
-) -> std::result::Result<Vec<DailyPoint>, String> {
+) -> std::result::Result<Vec<DailyPoint>, AppError> {
     let db = state.db.lock().await;
-    db.training_load_series(days)
-        .map_err(|error| error.to_string())
+    db.training_load_series(days).map_err(AppError::from)
 }
 
 /// Daily series for the body and training screens.
@@ -145,10 +139,9 @@ pub async fn get_metric_series(
     state: tauri::State<'_, AppState>,
     metrics: Vec<String>,
     days: i64,
-) -> std::result::Result<Vec<MetricSeries>, String> {
+) -> std::result::Result<Vec<MetricSeries>, AppError> {
     let db = state.db.lock().await;
-    db.metric_series(&metrics, days)
-        .map_err(|error| error.to_string())
+    db.metric_series(&metrics, days).map_err(AppError::from)
 }
 
 /// Acute (7 day) versus chronic (28 day) training load, day by day.
@@ -156,13 +149,12 @@ pub async fn get_metric_series(
 pub async fn get_training_balance(
     state: tauri::State<'_, AppState>,
     days: i64,
-) -> std::result::Result<Vec<TrainingBalancePoint>, String> {
+) -> std::result::Result<Vec<TrainingBalancePoint>, AppError> {
     let window = days.clamp(1, 1825);
     let end = chrono::Local::now().date_naive();
     let start = end - chrono::Duration::days(window - 1);
     let db = state.db.lock().await;
-    db.training_load_balance(start, end)
-        .map_err(|error| error.to_string())
+    db.training_load_balance(start, end).map_err(AppError::from)
 }
 
 /// The heart-rate zone picker's state: measured bases, the models they
@@ -171,10 +163,9 @@ pub async fn get_training_balance(
 pub async fn get_heart_rate_zones(
     state: tauri::State<'_, AppState>,
     days: i64,
-) -> std::result::Result<HeartRateZoneOptions, String> {
+) -> std::result::Result<HeartRateZoneOptions, AppError> {
     let db = state.db.lock().await;
-    db.heart_rate_zone_options(days)
-        .map_err(|error| error.to_string())
+    db.heart_rate_zone_options(days).map_err(AppError::from)
 }
 
 /// Record which zone model and which measured bases the user picked.
@@ -190,27 +181,25 @@ pub async fn set_heart_rate_zone_preference(
     resting_basis: Option<String>,
     threshold_basis: Option<String>,
     days: i64,
-) -> std::result::Result<HeartRateZoneOptions, String> {
+) -> std::result::Result<HeartRateZoneOptions, AppError> {
     let db = state.db.lock().await;
     db.set_heart_rate_zone_preference(&HeartRateZonePreference {
         model,
         max_basis,
         resting_basis,
         threshold_basis,
-    })
-    .map_err(|error| error.to_string())?;
-    db.heart_rate_zone_options(days)
-        .map_err(|error| error.to_string())
+    })?;
+    db.heart_rate_zone_options(days).map_err(AppError::from)
 }
 
 #[tauri::command]
 pub async fn get_storage_estimate(
     state: tauri::State<'_, AppState>,
     days: i64,
-) -> std::result::Result<StorageEstimate, String> {
+) -> std::result::Result<StorageEstimate, AppError> {
     let db = state.db.lock().await;
     db.storage_estimate(days, &state.data_dir)
-        .map_err(|error| error.to_string())
+        .map_err(AppError::from)
 }
 
 /// 当前的保留 / 补拉 / 归档偏好。
@@ -220,9 +209,9 @@ pub async fn get_storage_estimate(
 #[tauri::command]
 pub async fn get_user_prefs(
     state: tauri::State<'_, AppState>,
-) -> std::result::Result<UserPrefs, String> {
+) -> std::result::Result<UserPrefs, AppError> {
     let db = state.db.lock().await;
-    db.user_prefs().map_err(|error| error.to_string())
+    db.user_prefs().map_err(AppError::from)
 }
 
 #[tauri::command]
@@ -231,7 +220,7 @@ pub async fn set_user_prefs(
     retention_days: i64,
     history_sync_days: i64,
     archive_enabled: Option<bool>,
-) -> std::result::Result<UserPrefs, String> {
+) -> std::result::Result<UserPrefs, AppError> {
     let db = state.db.lock().await;
     // 没传归档开关的旧调用方保持原状，不会被静默关掉归档。
     let archive_enabled = match archive_enabled {
@@ -246,7 +235,7 @@ pub async fn set_user_prefs(
         history_sync_days,
         archive_enabled,
     })
-    .map_err(|error| error.to_string())
+    .map_err(AppError::from)
 }
 
 /// Remove records older than the requested retention window.
@@ -258,24 +247,26 @@ pub async fn set_user_prefs(
 #[tauri::command]
 pub async fn compact_raw_payloads(
     state: tauri::State<'_, AppState>,
-) -> std::result::Result<RawPayloadCompaction, String> {
+) -> std::result::Result<RawPayloadCompaction, AppError> {
     let _write_guard = zeppbridge_core::storage::write_lock::acquire_with_timeout(
         &state.data_dir,
         zeppbridge_core::storage::write_lock::WritePurpose::Compaction,
         std::time::Duration::from_secs(20),
-    )
-    .map_err(|error| error.to_string())?;
+    )?;
     let db = state.db.lock().await;
-    db.compact_raw_payloads().map_err(|error| error.to_string())
+    db.compact_raw_payloads().map_err(AppError::from)
 }
 
 #[tauri::command]
 pub async fn cleanup_old_data(
     state: tauri::State<'_, AppState>,
     days: i64,
-) -> std::result::Result<CleanupResult, String> {
+) -> std::result::Result<CleanupResult, AppError> {
     if !(1..=365).contains(&days) {
-        return Err("保留天数必须在 1 到 365 天之间".to_string());
+        return Err(AppError::new(
+            "err.prefs.retention_out_of_range",
+            "保留天数必须在 1 到 365 天之间",
+        ));
     }
 
     let result = {
@@ -283,10 +274,9 @@ pub async fn cleanup_old_data(
             &state.data_dir,
             zeppbridge_core::storage::write_lock::WritePurpose::Cleanup,
             std::time::Duration::from_secs(20),
-        )
-        .map_err(|error| error.to_string())?;
+        )?;
         let db = state.db.lock().await;
-        db.cleanup_old_data(days).map_err(|error| error.to_string())
+        db.cleanup_old_data(days).map_err(AppError::from)
     };
     result?;
 
@@ -299,22 +289,18 @@ pub async fn cleanup_old_data(
 #[tauri::command]
 pub async fn reprocess_local_data(
     state: tauri::State<'_, AppState>,
-) -> std::result::Result<serde_json::Value, String> {
+) -> std::result::Result<serde_json::Value, AppError> {
     let streams = {
         // 重放会重写全部派生数据，必须和同步、迁移、恢复互斥。
         let _write_guard = zeppbridge_core::storage::write_lock::acquire_with_timeout(
             &state.data_dir,
             zeppbridge_core::storage::write_lock::WritePurpose::Reprocess,
             std::time::Duration::from_secs(20),
-        )
-        .map_err(|error| error.to_string())?;
+        )?;
         let db = state.db.lock().await;
-        let streams = db
-            .reprocess_raw_records()
-            .map_err(|error| error.to_string())?;
+        let streams = db.reprocess_raw_records()?;
         // 手动重新解析记在自己的时间线上，云端同步时间原样不动。
-        db.record_local_replay(true)
-            .map_err(|error| error.to_string())?;
+        db.record_local_replay(true)?;
         streams
     };
     let total_records: i64 = streams.values().sum();
@@ -333,10 +319,9 @@ pub async fn reprocess_local_data(
 pub async fn get_workout_insight(
     state: tauri::State<'_, AppState>,
     workout_id: String,
-) -> std::result::Result<WorkoutInsight, String> {
+) -> std::result::Result<WorkoutInsight, AppError> {
     let db = state.db.lock().await;
-    db.workout_insight(&workout_id)
-        .map_err(|error| error.user_message())
+    db.workout_insight(&workout_id).map_err(AppError::from)
 }
 
 /// 本地周报：最近 7 天对比你自己此前 28 天。
@@ -345,10 +330,9 @@ pub async fn get_workout_insight(
 #[tauri::command]
 pub async fn get_weekly_report(
     state: tauri::State<'_, AppState>,
-) -> std::result::Result<WeeklyReport, String> {
+) -> std::result::Result<WeeklyReport, AppError> {
     let db = state.db.lock().await;
-    db.weekly_report(Utc::now())
-        .map_err(|error| error.user_message())
+    db.weekly_report(Utc::now()).map_err(AppError::from)
 }
 
 /// 数据健康中心的后端契约。
@@ -359,13 +343,13 @@ pub async fn get_weekly_report(
 pub async fn get_data_health(
     state: tauri::State<'_, AppState>,
     window_days: Option<i64>,
-) -> std::result::Result<DataHealth, String> {
+) -> std::result::Result<DataHealth, AppError> {
     let database_bytes = std::fs::metadata(state.data_dir.join("zepp.db"))
         .map(|meta| meta.len())
         .unwrap_or(0);
     let db = state.db.lock().await;
     db.data_health(window_days.unwrap_or(90), database_bytes)
-        .map_err(|error| error.user_message())
+        .map_err(AppError::from)
 }
 
 /// 对整库跑一次 SQLite `integrity_check` 并记录结果。
@@ -375,10 +359,9 @@ pub async fn get_data_health(
 #[tauri::command]
 pub async fn run_database_integrity_check(
     state: tauri::State<'_, AppState>,
-) -> std::result::Result<IntegrityCheckResult, String> {
+) -> std::result::Result<IntegrityCheckResult, AppError> {
     let db = state.db.lock().await;
-    db.run_integrity_check()
-        .map_err(|error| error.user_message())
+    db.run_integrity_check().map_err(AppError::from)
 }
 
 /// 随包运动目录里的全部可选项，供纠正下拉框渲染。
@@ -398,10 +381,9 @@ pub fn get_workout_type_options() -> Vec<zeppbridge_core::sport_catalog::SportOp
 #[tauri::command]
 pub async fn get_unknown_workout_codes(
     state: tauri::State<'_, AppState>,
-) -> std::result::Result<Vec<WorkoutCodeLabel>, String> {
+) -> std::result::Result<Vec<WorkoutCodeLabel>, AppError> {
     let db = state.db.lock().await;
-    db.unknown_workout_code_labels()
-        .map_err(|error| error.user_message())
+    db.unknown_workout_code_labels().map_err(AppError::from)
 }
 
 /// 给一个未识别编号起名字（传 `null` 撤销）。所有同编号的记录一起生效。
@@ -410,12 +392,10 @@ pub async fn set_workout_code_label(
     state: tauri::State<'_, AppState>,
     zepp_type: i32,
     label: Option<String>,
-) -> std::result::Result<Vec<WorkoutCodeLabel>, String> {
+) -> std::result::Result<Vec<WorkoutCodeLabel>, AppError> {
     let db = state.db.lock().await;
-    db.set_workout_code_label(zepp_type, label.as_deref())
-        .map_err(|error| error.user_message())?;
-    db.unknown_workout_code_labels()
-        .map_err(|error| error.user_message())
+    db.set_workout_code_label(zepp_type, label.as_deref())?;
+    db.unknown_workout_code_labels().map_err(AppError::from)
 }
 
 /// 随包设备目录里可供用户指认的型号。
@@ -444,10 +424,10 @@ pub async fn set_device_model_override(
     state: tauri::State<'_, AppState>,
     device_key: String,
     catalog_id: Option<String>,
-) -> std::result::Result<(), String> {
+) -> std::result::Result<(), AppError> {
     let db = state.db.lock().await;
     db.set_device_model_override(&device_key, catalog_id.as_deref())
-        .map_err(|error| error.user_message())
+        .map_err(AppError::from)
 }
 
 #[tauri::command]
@@ -455,13 +435,11 @@ pub async fn set_workout_type_override(
     state: tauri::State<'_, AppState>,
     workout_id: String,
     user_override: Option<String>,
-) -> std::result::Result<Workout, String> {
+) -> std::result::Result<Workout, AppError> {
     let db = state.db.lock().await;
-    db.set_workout_type_override(&workout_id, user_override.as_deref())
-        .map_err(|error| error.user_message())?;
-    db.get_workout_detail(&workout_id)
-        .map_err(|error| error.user_message())?
-        .ok_or_else(|| "运动记录不存在".to_owned())
+    db.set_workout_type_override(&workout_id, user_override.as_deref())?;
+    db.get_workout_detail(&workout_id)?
+        .ok_or_else(|| AppError::new("err.workout.not_found", "运动记录不存在"))
 }
 
 /// Build an allowlist-only report. The cloud response is examined
@@ -469,7 +447,7 @@ pub async fn set_workout_type_override(
 #[tauri::command]
 pub async fn get_diagnostic_report(
     state: tauri::State<'_, AppState>,
-) -> std::result::Result<DiagnosticReport, String> {
+) -> std::result::Result<DiagnosticReport, AppError> {
     build_diagnostic_report(&state, false, None).await
 }
 
@@ -482,7 +460,7 @@ async fn build_diagnostic_report(
     state: &AppState,
     include_assignments: bool,
     user_note: Option<&str>,
-) -> std::result::Result<DiagnosticReport, String> {
+) -> std::result::Result<DiagnosticReport, AppError> {
     let device_payload = match state.auth.load_auth() {
         Ok(Some(auth)) => match ZeppConnector::new(auth) {
             Ok(connector) => match connector.fetch_devices().await {
@@ -506,19 +484,13 @@ async fn build_diagnostic_report(
     Ok(DiagnosticReport {
         format: "zeppbridge.feedback.v1".into(),
         app_version: env!("CARGO_PKG_VERSION").into(),
-        schema_version: db
-            .diagnostic_schema_version()
-            .map_err(|error| error.user_message())?,
+        schema_version: db.diagnostic_schema_version()?,
         normalizer_revision: NORMALIZER_REVISION.into(),
         operating_system: std::env::consts::OS.into(),
         device_evidence,
         user_assigned_models,
-        unknown_workout_codes: db
-            .diagnostic_unknown_workout_codes()
-            .map_err(|error| error.user_message())?,
-        workout_type_conflicts: db
-            .diagnostic_workout_type_conflicts()
-            .map_err(|error| error.user_message())?,
+        unknown_workout_codes: db.diagnostic_unknown_workout_codes()?,
+        workout_type_conflicts: db.diagnostic_workout_type_conflicts()?,
         // 类型由调用方按需要填；这个构造函数只负责本机能自动查到的事实。
         category: None,
         user_note: user_note.and_then(sanitize_diagnostic_note),
@@ -642,7 +614,7 @@ pub async fn submit_diagnostic_report(
     state: tauri::State<'_, AppState>,
     note: Option<String>,
     category: Option<String>,
-) -> std::result::Result<FeedbackSubmissionResult, String> {
+) -> std::result::Result<FeedbackSubmissionResult, AppError> {
     let mut report = build_diagnostic_report(&state, false, note.as_deref()).await?;
     report.category = normalize_report_category(category.as_deref());
     post_diagnostic_report(report).await
@@ -667,17 +639,20 @@ fn normalize_report_category(value: Option<&str>) -> Option<String> {
 pub async fn submit_device_model_assignment(
     state: tauri::State<'_, AppState>,
     note: Option<String>,
-) -> std::result::Result<FeedbackSubmissionResult, String> {
+) -> std::result::Result<FeedbackSubmissionResult, AppError> {
     let report = build_diagnostic_report(&state, true, note.as_deref()).await?;
     if report.user_assigned_models.is_empty() {
-        return Err("这台设备没有可用于补充目录的型号编号，暂时不需要提交".into());
+        return Err(AppError::new(
+            "err.diagnostic.nothing_to_submit",
+            "这台设备没有可用于补充目录的型号编号，暂时不需要提交",
+        ));
     }
     post_diagnostic_report(report).await
 }
 
 async fn post_diagnostic_report(
     report: DiagnosticReport,
-) -> std::result::Result<FeedbackSubmissionResult, String> {
+) -> std::result::Result<FeedbackSubmissionResult, AppError> {
     // 自动检测到问题，或者用户自己说了「我要报什么」，两条路都算数。
     //
     // 以前只认前者：本机没检测到异常时，用户哪怕手打了一整段说明也会被
@@ -689,9 +664,10 @@ async fn post_diagnostic_report(
         || report.workout_type_conflicts > 0
         || report.category.is_some();
     if !has_reportable_issue {
-        return Err(
-            "请先选择要反馈的问题类型，或写一句说明——否则这份报告里没有任何可处理的内容".into(),
-        );
+        return Err(AppError::new(
+            "err.diagnostic.empty_report",
+            "请先选择要反馈的问题类型，或写一句说明——否则这份报告里没有任何可处理的内容",
+        ));
     }
 
     // This client is intentionally separate from the Zepp connector: it has
@@ -701,13 +677,23 @@ async fn post_diagnostic_report(
         .timeout(Duration::from_secs(12))
         .user_agent(format!("ZeppBridge/{} feedback", env!("CARGO_PKG_VERSION")))
         .build()
-        .map_err(|_| "无法初始化错误报告连接".to_string())?;
+        .map_err(|_| {
+            AppError::new(
+                "err.diagnostic.client_init_failed",
+                "无法初始化错误报告连接",
+            )
+        })?;
     let response = client
         .post(FEEDBACK_ENDPOINT)
         .json(&report)
         .send()
         .await
-        .map_err(|_| "错误报告发送失败，请检查网络后重试".to_string())?;
+        .map_err(|_| {
+            AppError::new(
+                "err.diagnostic.send_failed",
+                "错误报告发送失败，请检查网络后重试",
+            )
+        })?;
     // 状态码要带出来。只说「服务暂时不可用」的话，字段被拒（4xx）和服务端
     // 真的挂了（5xx）长得一模一样，谁也查不下去。响应体不带——那是别人的
     // 服务器写的内容，不该原样显示给用户。
@@ -718,23 +704,31 @@ async fn post_diagnostic_report(
         } else {
             "错误报告服务暂时不可用，请稍后重试"
         };
-        return Err(format!("{hint}（HTTP {}）", status.as_u16()));
+        return Err(AppError::new(
+            "err.diagnostic.http_error",
+            format!("{hint}（HTTP {}）", status.as_u16()),
+        )
+        .with_params(serde_json::json!({ "status": status.as_u16() })));
     }
     response
         .json::<FeedbackSubmissionResult>()
         .await
-        .map_err(|_| "错误报告服务返回了无法识别的结果".to_string())
+        .map_err(|_| {
+            AppError::new(
+                "err.diagnostic.bad_response",
+                "错误报告服务返回了无法识别的结果",
+            )
+        })
 }
 
 #[tauri::command]
 pub async fn get_export_json(
     state: tauri::State<'_, AppState>,
     selection: ExportSelection,
-) -> std::result::Result<String, String> {
+) -> std::result::Result<String, AppError> {
     let result = {
         let db = state.db.lock().await;
-        db.build_ai_export(&selection)
-            .map_err(|error| error.to_string())
+        db.build_ai_export(&selection).map_err(AppError::from)
     }?;
     Ok(result.0)
 }
@@ -744,7 +738,7 @@ pub async fn save_json_export(
     state: tauri::State<'_, AppState>,
     selection: ExportSelection,
     path: String,
-) -> std::result::Result<ExportResult, String> {
+) -> std::result::Result<ExportResult, AppError> {
     let path = validate_json_export_path(&path)?;
     write_export(&state, selection, Some(path), false).await
 }
@@ -753,7 +747,7 @@ pub async fn save_json_export(
 pub async fn publish_ai_export(
     state: tauri::State<'_, AppState>,
     selection: ExportSelection,
-) -> std::result::Result<ExportResult, String> {
+) -> std::result::Result<ExportResult, AppError> {
     write_export(&state, selection, None, true).await
 }
 
@@ -767,7 +761,7 @@ pub async fn save_csv_export(
     state: tauri::State<'_, AppState>,
     selection: ExportSelection,
     path: String,
-) -> std::result::Result<ExportResult, String> {
+) -> std::result::Result<ExportResult, AppError> {
     let path = validate_export_path(&path, "csv")?;
     write_converted_export(&state, selection, path, export_formats::to_csv, "CSV").await
 }
@@ -782,7 +776,7 @@ pub async fn save_gpx_export(
     state: tauri::State<'_, AppState>,
     selection: ExportSelection,
     path: String,
-) -> std::result::Result<ExportResult, String> {
+) -> std::result::Result<ExportResult, AppError> {
     let path = validate_export_path(&path, "gpx")?;
     write_converted_export(&state, selection, path, export_formats::to_gpx, "GPX").await
 }
@@ -796,26 +790,40 @@ async fn write_converted_export(
     path: PathBuf,
     convert: fn(&Value) -> std::result::Result<(String, usize), String>,
     label: &str,
-) -> std::result::Result<ExportResult, String> {
+) -> std::result::Result<ExportResult, AppError> {
     // CSV rows and GPX track points come from the per-second series, which the
     // summary export omits by design. These formats are archival, so they
     // always read the full payload regardless of what the UI has selected.
     selection.detail = ExportDetail::Full;
     let (encoded, record_count) = {
         let db = state.db.lock().await;
-        db.build_ai_export(&selection)
-            .map_err(|error| error.to_string())?
+        db.build_ai_export(&selection)?
     };
     if record_count == 0 {
-        return Err("这段时间没有可导出的记录".to_string());
+        return Err(AppError::new(
+            "err.export.empty_range",
+            "这段时间没有可导出的记录",
+        ));
     }
-    let export: Value =
-        serde_json::from_str(&encoded).map_err(|error| format!("读取导出数据失败: {error}"))?;
-    let (converted, converted_count) = convert(&export)?;
+    let export: Value = serde_json::from_str(&encoded).map_err(|error| {
+        AppError::new(
+            "err.export.read_failed",
+            format!("读取导出数据失败: {error}"),
+        )
+    })?;
+    let (converted, converted_count) = convert(&export).map_err(|message| {
+        AppError::new("err.export.convert_failed", message)
+            .with_params(serde_json::json!({ "format": label }))
+    })?;
 
     let generated_at = Utc::now();
-    write_file_atomically(&path, converted.as_bytes())
-        .map_err(|error| format!("写入 {label} 导出失败: {error}"))?;
+    write_file_atomically(&path, converted.as_bytes()).map_err(|error| {
+        AppError::new(
+            "err.export.write_failed",
+            format!("写入 {label} 导出失败: {error}"),
+        )
+        .with_params(serde_json::json!({ "format": label }))
+    })?;
     Ok(ExportResult {
         path: path.to_string_lossy().into_owned(),
         record_count: converted_count,
@@ -836,19 +844,24 @@ pub async fn prepare_ai_handoff(
     selection: ExportSelection,
     prompt: String,
     include_precise_route: Option<bool>,
-) -> std::result::Result<AiHandoffResult, String> {
+) -> std::result::Result<AiHandoffResult, AppError> {
     let prompt = sanitize_clipboard_text(prompt.trim());
     if prompt.is_empty() {
-        return Err("请先填写提示词".to_string());
+        return Err(AppError::new(
+            "err.handoff.prompt_required",
+            "请先填写提示词",
+        ));
     }
 
     let (encoded, record_count) = {
         let db = state.db.lock().await;
-        db.build_ai_export(&selection)
-            .map_err(|error| error.to_string())?
+        db.build_ai_export(&selection)?
     };
     if record_count == 0 {
-        return Err("这段时间没有可交接的记录".to_string());
+        return Err(AppError::new(
+            "err.handoff.empty_range",
+            "这段时间没有可交接的记录",
+        ));
     }
 
     let include_precise_route = include_precise_route.unwrap_or(false);
@@ -864,11 +877,19 @@ pub async fn prepare_ai_handoff(
         let target_dir = directories::UserDirs::new()
             .and_then(|u| u.desktop_dir().map(|p| p.to_path_buf()))
             .unwrap_or_else(|| state.data_dir.join("exports"));
-        std::fs::create_dir_all(&target_dir)
-            .map_err(|error| format!("创建数据包导出目录失败: {error}"))?;
+        std::fs::create_dir_all(&target_dir).map_err(|error| {
+            AppError::new(
+                "err.handoff.mkdir_failed",
+                format!("创建数据包导出目录失败: {error}"),
+            )
+        })?;
         let path = target_dir.join("zeppbridge-ai-handoff.json");
-        write_file_atomically(&path, redacted.as_bytes())
-            .map_err(|error| format!("写入脱敏 AI 数据到桌面失败: {error}"))?;
+        write_file_atomically(&path, redacted.as_bytes()).map_err(|error| {
+            AppError::new(
+                "err.handoff.write_failed",
+                format!("写入脱敏 AI 数据到桌面失败: {error}"),
+            )
+        })?;
         (
             format!("{prompt}\n\n数据包已导出到桌面（zeppbridge-ai-handoff.json），拖入 AI 对话框即可。"),
             Some(path.to_string_lossy().into_owned()),
@@ -906,9 +927,13 @@ pub(crate) fn ai_handoff_mode_for_bytes(bytes: usize) -> &'static str {
 pub(crate) fn redact_ai_export(
     encoded: &str,
     include_precise_route: bool,
-) -> std::result::Result<(String, Vec<String>), String> {
-    let mut value: Value = serde_json::from_str(encoded)
-        .map_err(|error| format!("解析 AI 导出 JSON 失败: {error}"))?;
+) -> std::result::Result<(String, Vec<String>), AppError> {
+    let mut value: Value = serde_json::from_str(encoded).map_err(|error| {
+        AppError::new(
+            "err.handoff.parse_failed",
+            format!("解析 AI 导出 JSON 失败: {error}"),
+        )
+    })?;
     let mut redactions = BTreeSet::from([
         "authentication_fields".to_string(),
         "identity_fields".to_string(),
@@ -936,8 +961,12 @@ pub(crate) fn redact_ai_export(
         );
     }
 
-    let encoded = serde_json::to_string_pretty(&value)
-        .map_err(|error| format!("编码脱敏 AI 导出失败: {error}"))?;
+    let encoded = serde_json::to_string_pretty(&value).map_err(|error| {
+        AppError::new(
+            "err.handoff.encode_failed",
+            format!("编码脱敏 AI 导出失败: {error}"),
+        )
+    })?;
     Ok((encoded, redactions.into_iter().collect()))
 }
 
@@ -1221,24 +1250,30 @@ async fn write_export(
     selection: ExportSelection,
     selected_path: Option<PathBuf>,
     stable_ai_feed: bool,
-) -> std::result::Result<ExportResult, String> {
+) -> std::result::Result<ExportResult, AppError> {
     let (encoded, record_count) = {
         let db = state.db.lock().await;
-        db.build_ai_export(&selection)
-            .map_err(|error| error.to_string())?
+        db.build_ai_export(&selection)?
     };
     // A zero-record export must not leave a misleading empty file on disk:
     // report an error before anything is written.
     if record_count == 0 {
-        return Err("这段时间没有可导出的记录".to_string());
+        return Err(AppError::new(
+            "err.export.empty_range",
+            "这段时间没有可导出的记录",
+        ));
     }
     let generated_at = Utc::now();
     let path = if let Some(path) = selected_path {
         path
     } else {
         let export_dir = state.data_dir.join("exports");
-        std::fs::create_dir_all(&export_dir)
-            .map_err(|error| format!("创建导出目录失败: {error}"))?;
+        std::fs::create_dir_all(&export_dir).map_err(|error| {
+            AppError::new(
+                "err.export.mkdir_failed",
+                format!("创建导出目录失败: {error}"),
+            )
+        })?;
         let file_name = if stable_ai_feed {
             "zeppbridge-ai-feed.json".to_string()
         } else {
@@ -1255,8 +1290,12 @@ async fn write_export(
         };
         export_dir.join(file_name)
     };
-    write_file_atomically(&path, encoded.as_bytes())
-        .map_err(|error| format!("写入 JSON 导出失败: {error}"))?;
+    write_file_atomically(&path, encoded.as_bytes()).map_err(|error| {
+        AppError::new(
+            "err.export.write_json_failed",
+            format!("写入 JSON 导出失败: {error}"),
+        )
+    })?;
     Ok(ExportResult {
         path: path.to_string_lossy().into_owned(),
         record_count,
@@ -1270,7 +1309,7 @@ pub async fn get_device_profile(
     state: tauri::State<'_, AppState>,
     device_id: Option<String>,
     source_scope: Option<String>,
-) -> std::result::Result<DeviceProfile, String> {
+) -> std::result::Result<DeviceProfile, AppError> {
     resolve_device_profile(&state, device_id.as_deref(), source_scope.as_deref()).await
 }
 
@@ -1281,7 +1320,7 @@ pub async fn get_device_profile(
 pub async fn get_device_profiles(
     state: tauri::State<'_, AppState>,
     refresh: Option<bool>,
-) -> std::result::Result<DeviceProfilesResult, String> {
+) -> std::result::Result<DeviceProfilesResult, AppError> {
     let cached = read_device_profile_cache(&state.data_dir);
     let mut profiles = cached.profiles;
     let mut cached_at = cached.cached_at;
@@ -1381,7 +1420,7 @@ async fn resolve_device_profile(
     state: &AppState,
     device_id: Option<&str>,
     source_scope: Option<&str>,
-) -> std::result::Result<DeviceProfile, String> {
+) -> std::result::Result<DeviceProfile, AppError> {
     if source_scope
         .map(|scope| scope.eq_ignore_ascii_case("user_fused"))
         .unwrap_or(false)
@@ -1411,8 +1450,7 @@ async fn resolve_device_profile(
     };
     let from_db = {
         let db = state.db.lock().await;
-        db.lookup_device_profile(device_id)
-            .map_err(|error| error.to_string())?
+        db.lookup_device_profile(device_id)?
     };
     let cached_profile = read_device_profile_cache(&state.data_dir)
         .profiles
@@ -1566,7 +1604,7 @@ fn unknown_device_profile(device_id: &str) -> DeviceProfile {
 async fn enrich_profiles_with_local_data(
     state: &AppState,
     profiles: Vec<DeviceProfile>,
-) -> std::result::Result<Vec<DeviceProfile>, String> {
+) -> std::result::Result<Vec<DeviceProfile>, AppError> {
     let mut enriched = Vec::with_capacity(profiles.len());
     for profile in profiles {
         enriched.push(enrich_profile_with_local_data(state, profile, None).await?);
@@ -1578,7 +1616,7 @@ async fn enrich_profile_with_local_data(
     state: &AppState,
     mut profile: DeviceProfile,
     requested_device_id: Option<&str>,
-) -> std::result::Result<DeviceProfile, String> {
+) -> std::result::Result<DeviceProfile, AppError> {
     if profile.display_name.is_none() {
         profile.display_name = profile.name.clone();
     }
@@ -1615,8 +1653,7 @@ async fn enrich_profile_with_local_data(
         .collect::<Vec<_>>();
         let assigned = {
             let db = state.db.lock().await;
-            db.device_model_override(&keys)
-                .map_err(|error| error.to_string())?
+            db.device_model_override(&keys)?
         };
         if let Some(assigned) = assigned {
             apply_user_assignment(&mut profile, &assigned.catalog_id);
@@ -1633,8 +1670,7 @@ async fn enrich_profile_with_local_data(
     .collect::<Vec<_>>();
     let (has_local_data, last_data_at) = {
         let db = state.db.lock().await;
-        db.device_data_summary(&aliases)
-            .map_err(|error| error.to_string())?
+        db.device_data_summary(&aliases)?
     };
     profile.has_local_data = has_local_data;
     profile.last_data_at = last_data_at;
@@ -2191,7 +2227,7 @@ fn first_string(value: &serde_json::Value, keys: &[&str]) -> Option<String> {
     None
 }
 
-fn validate_json_export_path(value: &str) -> std::result::Result<PathBuf, String> {
+fn validate_json_export_path(value: &str) -> std::result::Result<PathBuf, AppError> {
     validate_export_path(value, "json")
 }
 
@@ -2199,33 +2235,47 @@ fn validate_json_export_path(value: &str) -> std::result::Result<PathBuf, String
 ///
 /// The extension check is not cosmetic: it keeps a mistyped destination from
 /// silently producing a file whose contents do not match its name.
-fn validate_export_path(value: &str, extension: &str) -> std::result::Result<PathBuf, String> {
+fn validate_export_path(value: &str, extension: &str) -> std::result::Result<PathBuf, AppError> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
-        return Err(format!(
-            "请选择 {} 文件的保存位置",
-            extension.to_ascii_uppercase()
-        ));
+        return Err(AppError::new(
+            "err.export.path_required",
+            format!("请选择 {} 文件的保存位置", extension.to_ascii_uppercase()),
+        )
+        .with_params(serde_json::json!({ "format": extension.to_ascii_uppercase() })));
     }
     let path = PathBuf::from(trimmed);
     if !path.is_absolute() {
-        return Err("保存位置必须是绝对路径".to_string());
+        return Err(AppError::new(
+            "err.export.path_not_absolute",
+            "保存位置必须是绝对路径",
+        ));
     }
     let matches_extension = path
         .extension()
         .and_then(|value| value.to_str())
         .is_some_and(|value| value.eq_ignore_ascii_case(extension));
     if !matches_extension {
-        return Err(format!("导出文件必须使用 .{extension} 扩展名"));
+        return Err(AppError::new(
+            "err.export.bad_extension",
+            format!("导出文件必须使用 .{extension} 扩展名"),
+        )
+        .with_params(serde_json::json!({ "extension": extension })));
     }
     let Some(parent) = path
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
     else {
-        return Err("保存位置缺少有效的文件夹".to_string());
+        return Err(AppError::new(
+            "err.export.path_no_parent",
+            "保存位置缺少有效的文件夹",
+        ));
     };
     if !parent.is_dir() {
-        return Err("所选保存文件夹不存在".to_string());
+        return Err(AppError::new(
+            "err.export.parent_missing",
+            "所选保存文件夹不存在",
+        ));
     }
     Ok(path)
 }
@@ -2789,14 +2839,19 @@ mod tests {
 
 /// Open the application's local data directory in the platform file manager.
 #[tauri::command]
-pub fn open_data_folder(state: tauri::State<'_, AppState>) -> std::result::Result<(), String> {
+pub fn open_data_folder(state: tauri::State<'_, AppState>) -> std::result::Result<(), AppError> {
     #[cfg(target_os = "windows")]
     {
         std::process::Command::new("explorer")
             .arg(&state.data_dir)
             .spawn()
             .map(|_| ())
-            .map_err(|error| format!("打开数据文件夹失败: {error}"))
+            .map_err(|error| {
+                AppError::new(
+                    "err.data_folder.open_failed",
+                    format!("打开数据文件夹失败: {error}"),
+                )
+            })
     }
 
     #[cfg(target_os = "macos")]
@@ -2805,12 +2860,20 @@ pub fn open_data_folder(state: tauri::State<'_, AppState>) -> std::result::Resul
             .arg(&state.data_dir)
             .spawn()
             .map(|_| ())
-            .map_err(|error| format!("打开数据文件夹失败: {error}"))
+            .map_err(|error| {
+                AppError::new(
+                    "err.data_folder.open_failed",
+                    format!("打开数据文件夹失败: {error}"),
+                )
+            })
     }
 
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     {
         let _ = state;
-        Err("打开数据文件夹仅支持 Windows/macOS".to_string())
+        Err(AppError::new(
+            "err.data_folder.unsupported_os",
+            "打开数据文件夹仅支持 Windows/macOS",
+        ))
     }
 }

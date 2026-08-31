@@ -2,6 +2,41 @@
 
 本文件记录每个版本的实际改动。写给使用者看，不是施工日志：只写用户能感知到的变化，以及为什么这么改。
 
+## 1.1.2
+
+Two reported bugs that blocked real use, and the reason English users kept seeing Chinese.
+
+两个卡住真实使用的报告 bug，以及英文界面一直冒中文的根本原因。
+
+### Fixes / 修复
+
+- **A single failed chunk no longer stalls the whole history backfill.** Each round picked the top pending chunk, and a failed chunk stayed at the top — so it was picked again every round until the round's budget ran out, and every other stream and older month was starved. One failing heart-rate month froze the entire backfill ([#10](https://github.com/lingcang728/ZeppBridge/issues/10)). A round now takes its whole work list up front, so each (stream, month) is attempted at most once per round; failures stay retryable next round, and a chunk that keeps failing steps out of the automatic queue instead of blocking everyone.
+- **一个失败的块不再卡死整个历史补拉。** 旧版每轮只取排在最前的待办块，而失败的块仍排在最前，于是每轮都再选中它，直到本轮额度耗尽——同月其余的流和所有更早的月份一块都轮不上。一个心率月份失败，整个补拉就不动了（[#10](https://github.com/lingcang728/ZeppBridge/issues/10)）。现在一轮的工作清单一次取齐，每个（数据流，月份）一轮最多尝试一次；失败的块下一轮仍可重试，反复失败的会退出自动队列，不再挡住别人。
+- **The backfill ledger now says which month failed and why**, and there is a **Retry failed months** button. Previously it only said "N failed", and the only way to retry was to clear the whole ledger and refetch years of history.
+- **补拉账本现在会说明哪个月失败、为什么**，并新增「重试失败项」按钮。旧版只显示「失败 N 块」，想重试就只能清空整个账本、把几年历史重拉一遍。
+- **The date picker under Hand to AI → Quick range is no longer cut off by the window edge** ([#9](https://github.com/lingcang728/ZeppBridge/issues/9)). The calendar was pinned to open downwards, so it fell below the bottom of the window and could neither be seen nor scrolled to. It now flips up when there is no room below, stays inside the window horizontally, and closes on Escape or a click outside.
+- **「交给 AI → 快捷范围」的日期选择器不再被窗口边缘裁掉**（[#9](https://github.com/lingcang728/ZeppBridge/issues/9)）。日历原本钉死向下展开，会落到窗口下沿之外，既看不见也滚不到。现在下方放不下就向上翻，横向也不会越界，按 Esc 或点击别处即可关闭。
+- **Backend errors are no longer shown in Chinese on the English interface.** Every command returned a hard-coded Chinese string and the interface displayed it verbatim, so an English user hit Chinese at every failure. The backend now returns a stable error code and the interface renders its own wording in the current language; 82 codes are covered, and the build fails if a new one lacks either translation. The native tray menu follows the interface language too.
+- **英文界面上不再出现后端的中文错误。** 旧版每个命令都返回硬编码中文，界面原样显示，于是英文用户每遇到一次失败就看到一次中文。现在后端只给稳定错误码，界面按当前语言渲染自己的文案；已覆盖 82 个错误码，新增的码缺任一语言就构建失败。原生托盘菜单同样跟随界面语言。
+- **Sign-in tells you when it read your credentials and when it did not.** If you were signed in but the credentials could not be read, the app used to poll silently until a 15-minute timeout and then say only "sign-in timed out" — retrying never helped. That is now its own state that points you straight at HAR import or manual entry, and credentials stored in the page's local storage are picked up as well.
+- **登录现在会区分「读到凭据」和「没读到」。** 旧版在已登录但读不到凭据时会静默轮询到 15 分钟超时，只说一句「登录超时」——重试多少次都没用。现在这是独立状态，会直接指向 HAR 导入或手动填写；页面把凭据放在 local storage 里的情况也能读到了。
+
+### Docs / 文档
+
+- **The macOS "damaged and can't be opened" message is documented honestly.** The build is unsigned — no Apple Developer ID, no notarisation — and right-click → Open does not fix that particular message; clearing the quarantine flag does. Both messages are now written up separately, and the build is labelled unsigned rather than presented as fixed ([#2](https://github.com/lingcang728/ZeppBridge/issues/2)). Correcting a long-standing misconception: notarisation does not require owning a Mac — CI already runs on macOS runners. What is missing is an Apple Developer Program membership.
+- **macOS「已损坏，无法打开」现在写清楚了。** 这是未签名版本——没有 Apple 开发者证书、也没有公证——而「右键打开」对这条提示没用，要清掉隔离标记才行。两种提示分别写明，并标注为未签名版本，不再当作已修复（[#2](https://github.com/lingcang728/ZeppBridge/issues/2)）。顺带更正一个长期误解：公证并不需要有 Mac，CI 已经跑在 macOS runner 上；缺的是 Apple Developer Program 会员。
+- **An English connection guide.** The English README linked to a Chinese-only guide at the step where people are most likely to get stuck.
+- **英文连接指南。** 英文 README 原本在最容易卡住的一步链到一份纯中文文档。
+- Both READMEs gained a platform verification matrix: the features are the same on Windows and Apple Silicon; what differs is who has verified what.
+- 两份 README 都加了平台验证矩阵：Windows 和 Apple Silicon 功能一致，区别只在于谁验过什么。
+
+### Upgrade / 升级说明
+
+- Overlay-install. Local data, backups and settings are untouched. The coverage ledger gains an attempt counter (schema 16), migrated automatically with the usual pre-migration backup.
+- 覆盖安装即可。本地数据、备份和设置都不会动。覆盖账本新增尝试次数字段（schema 16），升级时自动迁移，迁移前照例自动备份。
+- If a previous backfill left failed months behind, open **Long-term archive and full history** and use **Retry failed months** — you do not need to clear the ledger.
+- 如果之前的补拉留下了失败的月份，打开「长期归档与完整历史」点「重试失败项」即可，不需要清空账本。
+
 ## 1.1.1
 
 Two urgent fixes for the Zepp account sign-in and the English desktop layout.
