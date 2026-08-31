@@ -1,79 +1,116 @@
-# ZeppBridge 连接指南
+# ZeppBridge connection guide
 
-本页说明 ZeppBridge 的三种连接方式：推荐的应用内网页登录，以及登录失败时的两条备用路径。
+There are three ways to connect: the in-app web sign-in, which is what you
+should use, and two fallbacks for when that fails.
 
-[English version](connection.en.md)
+[简体中文](connection.zh-CN.md)
 
-## 先了解三件事
+## Three things worth knowing first
 
-- 登录窗口只打开 Zepp / Huami 的官方页面。请在你自己的账号里完成登录。
-- token 能访问你的健康数据。不要把 token、完整请求头、HAR 或登录截图发到公开渠道。
-- 登录信息只保存在本机：token 进 Windows Credential Manager，`auth.json` 只留用户 ID 和区域主机等元数据。
+- The sign-in window only ever opens official Zepp / Huami pages. You sign in to
+  your own account, on their page.
+- A token can read your health data. Never post a token, a full request header,
+  a HAR file, or a screenshot of a signed-in session anywhere public — including
+  GitHub issues.
+- Credentials stay on this machine: the token goes into the OS credential store
+  (Windows Credential Manager / macOS Keychain), and `auth.json` keeps only
+  metadata such as the user ID and region host.
 
-## 推荐流程：应用内网页登录
+## Recommended: in-app web sign-in
 
-### 1. 打开连接
+### 1. Start the connection
 
-1. 启动 ZeppBridge，进入「设置」。
-2. 点击「连接」。
-3. 应用会弹出独立窗口，默认打开 `https://watchface.zepp.com/`。
+1. Open ZeppBridge and go to **Settings**.
+2. Click **Connect**.
+3. A separate window opens at `https://watchface.zepp.com/`.
 
-### 2. 在弹出窗口里登录
+### 2. Sign in
 
-1. 用你的 Zepp 账号完成网页登录。
-2. 应用会在登录窗口内读取会话 cookie（不会把 token 显示在界面上）。
-3. 顶部状态会依次变为「等待登录 → 正在提取 → 正在验证 → 已连接」。
-4. 验证通过后弹出窗口会关闭，设置页自动刷新。若本机还没有云端同步记录，会接着跑一次增量同步。
+1. Sign in with your usual Zepp account.
+2. The app reads the session credentials inside that window. The token is never
+   shown in the interface.
+3. The status line moves through **waiting → extracting → verifying → connected**.
+4. Once verified the window closes and Settings refreshes. If this machine has
+   no cloud-sync history yet, an incremental sync starts straight away.
 
-如果主登录页长时间没有可用会话，大约 40 秒后会改开备用页 `https://user.huami.com/privacy2/index.html`。整次会话超过 15 分钟会超时，可点「重试连接」。
+If the primary page has no usable session after about 40 seconds, the window
+switches to the fallback page `https://user.huami.com/privacy2/index.html`. The
+whole session times out after 15 minutes; **Retry** starts it again.
 
-### 3. 以后怎么用
+If you are signed in but ZeppBridge says it **could not read the credentials**,
+web sign-in will not get any further no matter how many times you retry — use
+one of the two fallbacks below instead.
 
-认证保存成功后，日常同步由电脑直接访问你所在区域的 Zepp 服务。关窗口会留在托盘，不必每次重新登录。只有 401/403 或设置页显示「需要重新连接」时，再点「重新连接」。
+### 3. After that
 
-## 备用方式一：HAR 导入
+Once the credential is saved, day-to-day syncing talks to your region's Zepp
+service directly. Closing the window leaves the app in the tray; you do not sign
+in again. Only a 401/403, or Settings showing **needs reconnecting**, means it is
+time to reconnect.
 
-网页登录失败时用这条。HAR 是浏览器把一段时间内的网络请求导出成的文件，里面含有登录后的凭据。
+## Fallback 1: HAR import
 
-1. 在浏览器里登录 Zepp 网页版，让页面正常加载出数据。
-2. 打开开发者工具（F12）→「网络 / Network」面板，勾选保留日志，刷新一次页面。
-3. 在请求列表上右键 →「Save all as HAR with content」，存成 `.har` 文件。
-4. 回到 ZeppBridge 设置页的「认证方式」，选「HAR 导入」，选中刚才那个文件。
+Use this when web sign-in does not work. A HAR file is a browser's export of the
+network requests it made over some period, and it contains the credentials that
+were sent after you signed in.
 
-应用只从文件里读 `api-mifit*` 域名的请求，取出 token、用户 ID 与区域地址，其余内容一概不看。导入成功后请**删掉那个 HAR 文件**——它和你的账号密码等价。
+1. Sign in to Zepp on the web in your browser and let the page load real data.
+2. Open developer tools (F12) → **Network**, tick *Preserve log*, and reload the
+   page once.
+3. Right-click in the request list → **Save all as HAR with content**, and save
+   the `.har` file.
+4. Back in ZeppBridge, go to Settings → authentication method → **HAR import**
+   and pick that file.
 
-## 备用方式二：手动填写
+The app reads only the requests to `api-mifit*` hosts, takes the token, user ID
+and region host, and ignores everything else in the file. **Delete the HAR file
+once the import succeeds** — it is equivalent to your account password.
 
-已经通过你自己控制的合法途径拿到凭据时用这条。设置页「认证方式」里选「手动输入」，填三项：
+## Fallback 2: enter the credentials yourself
 
-| 字段 | 说明 |
+Use this when you already obtained the credentials through a legitimate route you
+control. In Settings → authentication method → **Manual entry**, fill in three
+fields:
+
+| Field | What it is |
 | --- | --- |
-| App Token | 登录后的访问凭据 |
-| User ID | 你的 Zepp 数字用户 ID |
-| 区域地址 | 形如 `https://api-mifit-us3.zepp.com`，国服是 `api-mifit*.huami.com` |
+| App Token | The access credential issued after sign-in |
+| User ID | Your numeric Zepp user ID |
+| Region host | Looks like `https://api-mifit-us3.zepp.com`; mainland-China accounts use `api-mifit*.huami.com` |
 
-区域地址只接受 `https://api-mifit*.zepp.com` 或 `https://api-mifit*.huami.com`，不能带端口、路径、查询参数、fragment 或凭据——这条限制在连接器里强制校验，填错会直接拒绝。
+The region host is accepted only as `https://api-mifit*.zepp.com` or
+`https://api-mifit*.huami.com`, with no port, path, query, fragment or embedded
+credentials. The connector enforces this, so a malformed value is rejected
+outright rather than silently used.
 
-两种方式的 token 都只写入系统凭据管理器，界面上永远不会显示完整 token。
+Either way the token is written only to the OS credential store, and the full
+token is never displayed.
 
-**若 token 来源不明，宁可不要导入。**
+**If you are not sure where a token came from, do not import it.**
 
-## 常见故障
+## Troubleshooting
 
-| 现象 | 先检查 | 仍失败时 |
+| What you see | Check first | If it still fails |
 | --- | --- | --- |
-| 点「连接」没有弹出窗口 | 是否在桌面应用内操作；杀毒/窗口管理是否拦截新窗口 | 重启应用后再试 |
-| 一直停在「等待登录」 | 是否已在弹出窗口真正登录成功 | 等备用页出现，或取消后重试 |
-| 提示未能验证区域 | 网络是否能访问 Zepp 区域 API；账号是否已登录完成 | 换网络或稍后重试；确认登录页属于 zepp.com / huami.com |
-| 登录超时 | 是否超过 15 分钟未完成 | 点「重试连接」 |
-| 显示「需要重新连接」 | token 是否过期；是否刚清除认证 | 重新走网页登录 |
-| 睡眠显示「未验证/不可用」 | `band_data` 可能是压缩或编码 payload | 当前只保留 raw，不伪造睡眠阶段 |
-| 同步只完成一部分 | 查看设置页「高级与隐私」里的数据流状态 | 核心流失败时重试；可选流不可用不等于其他数据丢失 |
+| **Connect** opens no window | That you are in the desktop app; whether antivirus or a window manager is blocking new windows | Restart the app and try again |
+| Stuck on *waiting for sign-in* | Whether you actually completed sign-in in the pop-up | Wait for the fallback page, or cancel and retry |
+| *Signed in, but the credentials could not be read* | Nothing — retrying web sign-in will not help | Use HAR import or manual entry |
+| *No Zepp region accepted the credentials* | Whether this network can reach the Zepp region APIs; whether sign-in really completed | Try another network or later; confirm the sign-in page was on zepp.com / huami.com |
+| Sign-in timed out | Whether more than 15 minutes passed | Click **Retry** |
+| *Needs reconnecting* | Whether the token expired, or you just cleared the credentials | Run web sign-in again |
+| Sleep shows *unverified / unavailable* | `band_data` may be a compressed or encoded payload | Only the raw record is kept; sleep stages are never fabricated |
+| Only part of a sync completes | The per-stream status in Settings → Advanced & privacy | Retry when a core stream fails; an optional stream being unavailable does not mean other data is missing |
 
-## 清除认证与本地数据
+## Clearing credentials and local data
 
-- 「清除认证」会取消进行中的网页登录、删除 Windows Credential Manager 中对应用户的 token、删除认证元数据，并重置内存中的连接状态；它**不会**删除已有健康数据库。
-- 设置页可选择本地保留 1–365 天（默认 365）。成功同步后按该天数清理；手动「清理旧数据」用同一个天数，不可撤销。
-- 需要完整删除时，先在设置页清除认证，再打开程序旁的 `data\` 确认；请先备份后删除整个安装文件夹。
+- **Clear credentials** cancels any in-flight web sign-in, deletes this user's
+  token from the OS credential store, deletes the auth metadata, and resets the
+  in-memory connection state. It does **not** delete your health database.
+- Settings lets you keep 1–365 days locally (365 by default). Cleanup runs after
+  a successful sync using that number; the manual **Clean up old data** uses the
+  same number and cannot be undone.
+- To remove everything, clear credentials in Settings first, then look at the
+  `data\` folder next to the program. Back it up before deleting the install
+  folder.
 
-更多边界见 [安全与隐私](../reference/security-and-privacy.md)。
+Further boundaries are in [security and privacy](../reference/security-and-privacy.md).
