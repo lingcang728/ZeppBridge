@@ -17,9 +17,44 @@ const LOGIN_EVENT: &str = "login://status";
 const PRIMARY_LOGIN_URL: &str = "https://watchface.zepp.com/";
 const FALLBACK_LOGIN_URL: &str = "https://user.huami.com/privacy2/index.html";
 const POLL_INTERVAL: Duration = Duration::from_millis(750);
-const FALLBACK_AFTER: Duration = Duration::from_secs(40);
+/// 多久没人动这一页，才替用户去开备用页。
+///
+/// 这个计时器只对付一种情况：主登录页在这台机器上根本没渲染出来，用户对着
+/// 一片空白干等。它不是「登录该在多少秒内完成」——输邮箱密码、等邮箱里的
+/// 验证码、走第三方授权，本来就会花掉远不止这点时间。所以除了等够时间，
+/// 还要确认这一页确实没人碰过，见 `fallback_is_due` 与 `login_page_is_idle`。
+const FALLBACK_AFTER: Duration = Duration::from_secs(90);
 const SESSION_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const COOKIE_EVAL_TIMEOUT: Duration = Duration::from_secs(2);
+
+/// 在登录窗口里记一个「用户碰过这一页」的标记。
+///
+/// 只记有没有发生过输入类事件，不看键值、不看内容。登录表单常常在跨源 iframe
+/// 里，事件不会冒泡到顶层文档，所以子框架用 postMessage 往上报一个固定字符串。
+/// 每次导航都会重新注入，标记因此只代表当前这一页。
+const LOGIN_ACTIVITY_SCRIPT: &str = r#"(function(){
+  try {
+    if (window.__zeppbridgeActivityHooked) { return; }
+    window.__zeppbridgeActivityHooked = true;
+    window.__zeppbridgeInteracted = false;
+    var mark = function(){
+      window.__zeppbridgeInteracted = true;
+      try {
+        if (window.top && window.top !== window) {
+          window.top.postMessage('zeppbridge:login-activity', '*');
+        }
+      } catch (e) {}
+    };
+    ['keydown','pointerdown','mousedown','touchstart','paste','input','change'].forEach(function(name){
+      window.addEventListener(name, mark, true);
+    });
+    window.addEventListener('message', function(event){
+      if (event && event.data === 'zeppbridge:login-activity') {
+        window.__zeppbridgeInteracted = true;
+      }
+    }, true);
+  } catch (e) {}
+})();"#;
 
 const REGION_HOST_ALLOWLIST: &[&str] = &[
     "https://api-mifit-cn.huami.com",
@@ -107,6 +142,8 @@ fn build_login_window(
         // but closing it discards the session instead of silently reusing it
         // for the next account.
         .incognito(true)
+        // 登录表单可能在子框架里，两边都要挂上活动标记。
+        .initialization_script_for_all_frames(LOGIN_ACTIVITY_SCRIPT)
         .inner_size(920.0, 760.0)
         .min_inner_size(420.0, 520.0)
         .resizable(true)
@@ -150,6 +187,10 @@ fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow) {
         // 东西——后者该直接把手动 / HAR 兜底摆到他面前，而不是让他等满 15
         // 分钟再看到一句「登录超时」。
         let mut looked_signed_in = false;
+        // 这次会话里，用户碰过登录窗口没有。只认阳性证据：页面明确说有人在
+        // 输入，或者地址已经走到第三方登录页。一旦立起来就不再放下——页面
+        // 内部的跳转会把注入的活动标记清空，可用户并没有因此变成没在登录。
+        let mut user_active = false;
 
         loop {
             if !epoch_active(&app, epoch) {
@@ -174,7 +215,24 @@ fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow) {
             }
 
             let page_url = current_page_url(&window);
-            if should_use_fallback(started.elapsed(), fallback_used, &page_url) {
+            // 只有在还可能跳转时才去问页面；问出「有人在用」就永久作罢。
+            let mut page_is_idle = false;
+            if !user_active {
+                if is_primary_login_page(&page_url) {
+                    match login_page_activity(&window).await {
+                        Some(true) => page_is_idle = true,
+                        Some(false) => user_active = true,
+                        // 问不出来就什么都不做：既不当成有人用（那会让「页面
+                        // 根本没渲染出来」永远等不到备用页），也不当成空闲。
+                        None => {}
+                    }
+                } else {
+                    // 地址已经不是我们打开的那一页——小米验证码页、Google /
+                    // Facebook 授权页、微信扫码页。用户正在登录流程里。
+                    user_active = true;
+                }
+            }
+            if page_is_idle && fallback_is_due(started.elapsed(), fallback_used) {
                 fallback_used = true;
                 let _ = window.navigate(
                     FALLBACK_LOGIN_URL
@@ -955,8 +1013,61 @@ fn log_credential_probe(page_url: &str, cookies: &[(String, String)]) {
     );
 }
 
-fn should_use_fallback(elapsed: Duration, fallback_used: bool, page_url: &str) -> bool {
-    !fallback_used && elapsed >= FALLBACK_AFTER && !page_url.starts_with("https://user.huami.com/")
+/// 备用页的时间前提。
+///
+/// 「这一页还有没有人在用」由 `login_page_activity` 单独回答，两件事分开判断：
+/// 这里只管等够了没有、以及是不是已经跳过一次。
+///
+/// 之前这里只看时间，于是所有需要输密码或等验证码的登录都会在计时到点时被
+/// 打断，页面被换成 `user.huami.com` 的隐私页（那上面只有清除数据、注销账号
+/// 这些选项）。
+fn fallback_is_due(elapsed: Duration, fallback_used: bool) -> bool {
+    !fallback_used && elapsed >= FALLBACK_AFTER
+}
+
+/// 窗口是不是还停在我们自己打开的那一页。
+///
+/// 地址一变，用户就已经在第三方登录流程里了，任何自动跳转都是打断。
+fn is_primary_login_page(page_url: &str) -> bool {
+    page_url.starts_with("https://watchface.zepp.com")
+}
+
+/// 这一页有没有人在用：`Some(true)` 空闲，`Some(false)` 有人，`None` 问不出来。
+///
+/// 三态是有意的。答不上来的时候既不能当成有人用——那样「主登录页压根没渲染
+/// 出来」的人永远等不到备用页；也不能当成空闲——那样一次超时就足以把正在等
+/// 验证码的人导走。所以问不出来就什么都不做，下一轮再问。
+async fn login_page_activity(window: &WebviewWindow) -> Option<bool> {
+    const SCRIPT: &str = r#"(function(){
+  try {
+    var typed = false;
+    var fields = document.querySelectorAll('input, textarea');
+    for (var i = 0; i < fields.length; i++) {
+      var field = fields[i];
+      if (field.type === 'hidden') { continue; }
+      if (field.value && String(field.value).length > 0) { typed = true; break; }
+    }
+    return JSON.stringify({ idle: !window.__zeppbridgeInteracted && !typed });
+  } catch (e) { return JSON.stringify({ idle: false }); }
+})()"#;
+
+    let (tx, rx) = tokio::sync::oneshot::channel::<String>();
+    let sent = std::sync::Mutex::new(Some(tx));
+    window
+        .eval_with_callback(SCRIPT, move |raw| {
+            if let Some(tx) = sent.lock().ok().and_then(|mut guard| guard.take()) {
+                let _ = tx.send(decode_eval_string(&raw));
+            }
+        })
+        .ok()?;
+    let raw = tokio::time::timeout(COOKIE_EVAL_TIMEOUT, rx)
+        .await
+        .ok()
+        .and_then(Result::ok)?;
+    serde_json::from_str::<Value>(&raw)
+        .ok()?
+        .get("idle")
+        .and_then(Value::as_bool)
 }
 
 fn current_page_url(window: &WebviewWindow) -> String {
@@ -1043,6 +1154,47 @@ async fn finish_idle_if_active(app: &AppHandle, epoch: u64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 用户还在主登录页上输密码时，绝不能把页面导走。
+    ///
+    /// 这一条对应线上反馈：邮箱密码刚输一半，或者去邮箱抄验证码的工夫，
+    /// 页面就被换成了隐私页（清除数据／注销账号），登录只能从头再来。
+    #[test]
+    fn fallback_needs_the_full_wait_and_fires_at_most_once() {
+        let long_enough = FALLBACK_AFTER + Duration::from_secs(5);
+
+        assert!(fallback_is_due(long_enough, false));
+        assert!(!fallback_is_due(Duration::from_secs(5), false));
+        assert!(!fallback_is_due(long_enough, true));
+    }
+
+    /// 用户一旦走进第三方登录流程，就绝不能把页面导走。
+    ///
+    /// 这一条对应线上反馈：去邮箱抄小米验证码的工夫，页面被换成了隐私页
+    /// （清除数据／注销账号），登录只能从头再来。地址已经不是我们打开的那
+    /// 一页，就是「用户正在登录」的确证，轮不到计时器说话。
+    #[test]
+    fn only_the_page_we_opened_may_be_navigated_away() {
+        assert!(is_primary_login_page("https://watchface.zepp.com"));
+        assert!(is_primary_login_page("https://watchface.zepp.com/"));
+        assert!(is_primary_login_page(
+            "https://watchface.zepp.com/login?from=app"
+        ));
+
+        assert!(!is_primary_login_page(
+            "https://account.xiaomi.com/oauth2/authorize"
+        ));
+        assert!(!is_primary_login_page(
+            "https://accounts.google.com/o/oauth2/auth"
+        ));
+        assert!(!is_primary_login_page("https://www.facebook.com/dialog/oauth"));
+        assert!(!is_primary_login_page(
+            "https://open.weixin.qq.com/connect/qrconnect"
+        ));
+        assert!(!is_primary_login_page(
+            "https://user.huami.com/privacy2/index.html"
+        ));
+    }
 
     /// localStorage 里的凭据要和 cookie 一样能用。
     ///

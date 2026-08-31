@@ -2,6 +2,13 @@
 
 本文件记录每个版本的实际改动。写给使用者看，不是施工日志：只写用户能感知到的变化，以及为什么这么改。
 
+## 未发布 / Unreleased
+
+### Fixes / 修复
+
+- **The sign-in window no longer navigates away while you are signing in.** After 40 seconds the login window switched itself to Zepp's privacy page — the one offering *clear data* and *delete account* — no matter what you were doing. Typing an email and password, waiting for a Xiaomi one-time code to arrive by mail, or completing a Google sign-in all take longer than that, so the page was replaced mid-flow and the attempt had to be started over. The switch now happens only when the window is still on the page ZeppBridge opened and nothing has been typed or clicked in it for 90 seconds, which is the case it was written for: a primary page that never rendered.
+- **登录窗口不会再在你登录到一半时自己跳走。** 之前无论你在做什么，40 秒一到，登录窗口就会跳到 Zepp 的隐私页——就是那个只有「清除数据」「注销账号」的页面。输邮箱密码、等小米发到邮箱的验证码、走完 Google 授权，本来都不止 40 秒，于是页面在流程中间被换掉，整次登录只能从头再来。现在只有当窗口还停在应用打开的那一页、并且 90 秒内没有任何输入或点击时才会跳转——那才是这条兜底当初要处理的情况：主登录页压根没渲染出来。
+
 ## 1.1.4
 
 ### Fixes / 修复
