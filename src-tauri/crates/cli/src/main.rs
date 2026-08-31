@@ -364,10 +364,16 @@ fn cmd_status(args: &[String]) -> u8 {
     });
 
     let human = format!(
-        "ZeppBridge {VERSION}\n账号：{}\n数据库：{} 字节，schema v{}\n上次云端同步：{}\n历史账本：{}",
+        "ZeppBridge {VERSION}\n账号：{}\n数据库：{} 字节，schema v{}\n本机覆盖：{}\n上次云端同步：{}\n历史账本：{}",
         if connected { "已连接" } else { "未连接" },
         database_bytes,
         health.database.schema_version,
+        // JSON 里早就有这三个字段，纯文本却漏了一行——同一个命令的两种
+        // 输出对「本机有多少历史」给出不同的答案，是这个项目最不该出现的事。
+        match coverage.earliest_day.as_deref() {
+            Some(day) => format!("{} 天，最早 {}", coverage.covered_days, day),
+            None => "本机还没有任何数据".to_string(),
+        },
         health
             .timings
             .last_cloud_sync_at
