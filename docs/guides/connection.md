@@ -2,6 +2,8 @@
 
 本页说明 ZeppBridge 的三种连接方式：推荐的应用内网页登录，以及登录失败时的两条备用路径。
 
+[English version](connection.en.md)
+
 ## 先了解三件事
 
 - 登录窗口只打开 Zepp / Huami 的官方页面。请在你自己的账号里完成登录。

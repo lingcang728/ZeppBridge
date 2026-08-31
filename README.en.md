@@ -56,11 +56,55 @@ Get the latest build from [Releases](https://github.com/lingcang728/ZeppBridge/r
 
 **macOS (Apple Silicon)**
 
+> **This is an unsigned build.** There is no Apple Developer ID certificate and
+> no notarisation, so macOS will refuse to open it until you clear the
+> quarantine flag yourself. The steps below are a deliberate workaround, not a
+> fix — see [#2](https://github.com/lingcang728/ZeppBridge/issues/2).
+
 1. Download `ZeppBridge_<version>_aarch64.dmg` and drag `ZeppBridge.app` into Applications.
-2. The bundle is ad-hoc signed — no Apple Developer ID, no notarisation — so the first launch reports an unverified developer. **Right-click the app → Open → Open.**
-3. macOS builds are covered by CI (compile, clippy, tests) and one contributor smoke test on Apple Silicon. The maintainer does not own a Mac and cannot independently verify sync or keychain behaviour. If that matters to you, prefer Windows.
+2. First launch will fail. Which message you get depends on your macOS version:
+   - **"unidentified developer"** → **Right-click the app → Open → Open.**
+   - **"ZeppBridge is damaged and can't be opened"** → right-clicking will *not*
+     help. Run this in Terminal, then open the app normally:
+
+     ```bash
+     xattr -dr com.apple.quarantine /Applications/ZeppBridge.app
+     ```
+
+   The app is not actually damaged. That message is what Gatekeeper says about
+   any downloaded bundle that is not notarised. Only run a command like this for
+   software you have decided to trust — you can read every line of this one on
+   GitHub and build it yourself.
+3. macOS builds are covered by CI (compile, clippy, tests) and one contributor
+   smoke test on Apple Silicon. The maintainer does not own a Mac and cannot
+   independently verify sync or keychain behaviour. If that matters to you,
+   prefer Windows.
+
+Why it stays this way for now: notarisation itself does not need a Mac — CI
+already runs on macOS runners and could sign and notarise there. What is missing
+is an Apple Developer Program membership (99 USD/year), which the project has
+not bought. If that changes, this section goes away.
 
 **Not supported**: Intel Macs, Linux, mobile.
+
+### What is verified on which platform
+
+Same app, same interface, same features on both — what differs is how much of it
+anyone has actually checked. Asking here beats guessing.
+
+| | Windows 10/11 (x64) | macOS Apple Silicon |
+| --- | --- | --- |
+| Interface and features | identical | identical |
+| Built in CI | yes | yes |
+| Automated tests in CI | yes | yes |
+| Installer opens without a workaround | yes (unknown-publisher warning) | **no** — see the unsigned-build note above |
+| Sign-in, sync, export | verified by the maintainer on every release | contributor smoke test only |
+| Credential store | Credential Manager, verified | Keychain, not independently verified |
+| Auto-update | verified | built, not independently verified |
+
+The maintainer develops on Windows and does not own a Mac. Nothing above is a
+statement that macOS is broken — it is a statement about who has checked what.
+If you use macOS and something misbehaves, a report is genuinely useful.
 
 **From 1.0.0 the local database's schema and upgrade path are treated as something to maintain long-term**: every migration takes an automatic backup first, and snapshots can be verified and restored. Your data stays local — but the snapshots live on the same disk as the database, so **if you are worried about drive failure, copy one somewhere else yourself.**
 
@@ -76,7 +120,7 @@ The first sync fetches 30 days. For older history, use **Long-term archive and f
 
 If the range exceeds your local retention window, the app requires you to enable long-term archiving first; otherwise the history you just fetched would be cleaned up after the next successful sync.
 
-Stuck at login? See the [connection guide](docs/guides/connection.md) (Chinese) for troubleshooting and two fallback methods.
+Stuck at login? See the [connection guide](docs/guides/connection.en.md) for troubleshooting and two fallback methods.
 
 ## What you get
 
