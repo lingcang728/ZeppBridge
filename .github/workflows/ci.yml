@@ -153,10 +153,34 @@ jobs:
 
       - name: Build and bundle (NSIS + MSI)
         # beforeBuildCommand (icons:generate + vite build) runs as part of this.
+        #
+        # 重试三次，因为 NSIS 打包这一步要现从 GitHub 下载 nsis-3.11.zip 和
+        # nsis_tauri_utils.dll。那两个下载是网络操作，会被对端重置——
+        # 见 run 33368661745：Rust 编译成功（6m22s，exe 已产出），随后倒在
+        #   `failed to bundle project: io: An existing connection was
+        #    forcibly closed by the remote host. (os error 10054)`
+        # 那不是代码问题，同一提交的 PR 跑是绿的。但它会让一次 23 分钟的
+        # 构建整个作废，还把 main 标红，看起来像是刚合进去的改动出了事。
+        #
+        # 重试很便宜：cargo 的 fingerprint 还在，第二次不会重新编译，
+        # 只重跑打包。真正的代码错误则三次都会失败，仍然照常报红。
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: npm run tauri build
+        shell: pwsh
+        run: |
+          $attempts = 3
+          for ($i = 1; $i -le $attempts; $i++) {
+            Write-Host "== tauri build attempt $i/$attempts =="
+            npm run tauri build
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            if ($i -lt $attempts) {
+              Write-Host "attempt $i failed (exit $LASTEXITCODE); retrying in 20s"
+              Start-Sleep -Seconds 20
+            }
+          }
+          Write-Error "tauri build failed after $attempts attempts"
+          exit 1
 
       # latest.json 的 notes 就是应用内更新弹窗展示给用户的说明，硬编码会
       # 让每次发版都显示上一版的内容。发布 tag 时取该 tag 的注释首行。
