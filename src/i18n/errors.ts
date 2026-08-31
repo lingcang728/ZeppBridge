@@ -54,6 +54,7 @@ const messages = defineMessages(
     'err.login.region_retrying': '暂时连不上 Zepp 区域服务，正在重试；登录窗口先留着，不用重新登录',
     'err.login.bad_url': '登录地址无效',
     'err.login.window_failed': '无法打开登录窗口',
+    'err.login.window_busy': '上一个登录窗口还没有关完，请稍等一下再试',
     'err.login.state_unavailable': '应用状态不可用',
     'err.login.cancelled': '登录已取消',
     'err.login.sync_init_failed': '登录成功了，但同步初始化失败',
@@ -168,6 +169,8 @@ const messages = defineMessages(
       "Can't reach the Zepp region service right now — retrying. The sign-in window stays open, so there is no need to sign in again",
     'err.login.bad_url': 'Invalid sign-in address',
     'err.login.window_failed': "Couldn't open the sign-in window",
+    'err.login.window_busy':
+      'The previous sign-in window is still closing. Wait a moment and try again',
     'err.login.state_unavailable': 'Application state is unavailable',
     'err.login.cancelled': 'Sign-in cancelled',
     'err.login.sync_init_failed': "Signed in, but syncing couldn't be initialised",

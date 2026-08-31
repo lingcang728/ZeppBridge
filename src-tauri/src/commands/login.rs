@@ -26,6 +26,13 @@ const POLL_INTERVAL: Duration = Duration::from_millis(750);
 const FALLBACK_AFTER: Duration = Duration::from_secs(90);
 const SESSION_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const COOKIE_EVAL_TIMEOUT: Duration = Duration::from_secs(2);
+/// 关掉上一个登录窗口后，最多等多久让它把 `zepp-login` 这个标签交还。
+///
+/// 正常是几毫秒的事——只要主线程转一圈就够。留到 3 秒是为了主线程正忙的时候
+/// 也别误判，同时又不至于让人对着一个没反应的按钮干等。见
+/// `close_login_window_and_wait`。
+const LOGIN_WINDOW_CLOSE_TIMEOUT: Duration = Duration::from_secs(3);
+const LOGIN_WINDOW_CLOSE_POLL: Duration = Duration::from_millis(25);
 /// 区域探测因为网络问题失败之后，隔多久再试一次。
 const REGION_RETRY_BACKOFF: Duration = Duration::from_secs(5);
 
@@ -93,9 +100,19 @@ pub async fn start_web_login(
     locale: String,
 ) -> std::result::Result<LoginStatus, AppError> {
     let epoch = state.login.epoch.fetch_add(1, Ordering::SeqCst) + 1;
-    close_login_window(&app);
-
     let page_url = PRIMARY_LOGIN_URL.to_string();
+
+    // 必须等上一个窗口真的消失，不能只是发出关闭请求，见
+    // `close_login_window_and_wait`。
+    if !close_login_window_and_wait(&app).await {
+        let error = AppError::new(
+            "err.login.window_busy",
+            "上一个登录窗口还没有关完，请稍等一下再试",
+        );
+        publish_failed(&app, &state, &error, &page_url).await;
+        return Err(error);
+    }
+
     let status = LoginStatus::new(
         "waiting",
         "err.login.waiting",
@@ -104,7 +121,16 @@ pub async fn start_web_login(
     );
     publish_status(&app, &state, status.clone()).await;
 
-    let window = build_login_window(&app, &page_url, &locale)?;
+    let window = match build_login_window(&app, &page_url, &locale) {
+        Ok(window) => window,
+        // 已经把状态推成「请在弹出窗口完成登录」了，可弹窗并没有开起来。
+        // 不改回去的话，界面下次读状态还会拿到这句 waiting，指着一个不存在
+        // 的窗口让人去操作。
+        Err(error) => {
+            publish_failed(&app, &state, &error, &page_url).await;
+            return Err(error);
+        }
+    };
     spawn_login_poll(app, epoch, window);
     Ok(status)
 }
@@ -1157,6 +1183,69 @@ fn close_login_window(app: &AppHandle) {
     }
 }
 
+/// 等这一轮该做什么：标签空出来了、还得再等、还是等不到了。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CloseWait {
+    /// `zepp-login` 这个标签已经没人占，可以建新窗口。
+    Released,
+    /// 还占着，但没等够，下一轮再看。
+    KeepWaiting,
+    /// 等到超时都没让出来。
+    TimedOut,
+}
+
+fn close_wait_step(window_still_registered: bool, elapsed: Duration) -> CloseWait {
+    if !window_still_registered {
+        return CloseWait::Released;
+    }
+    if elapsed >= LOGIN_WINDOW_CLOSE_TIMEOUT {
+        return CloseWait::TimedOut;
+    }
+    CloseWait::KeepWaiting
+}
+
+/// 关掉上一个登录窗口，并等到它的标签真的被交还。
+///
+/// `WebviewWindow::close()` 只是往主线程的事件循环里投一条关闭消息就返回了；
+/// 窗口和它的 webview 要等主线程处理完、发出 `Destroyed`，才会从 manager 的
+/// 表里摘掉。而登录窗口用的是固定标签 `zepp-login`，所以紧接着拿同一个标签去
+/// build，撞上的是「a webview with label `zepp-login` already exists」。
+///
+/// 这正是「登录窗口已经开着时再点一次重新认证」的下场：旧窗口被关掉了，新窗口
+/// 没建起来，界面只说一句「无法打开登录窗口」——用户手上什么都不剩。
+///
+/// 另一条路是复用旧窗口、直接把它导航到登录页，那样就不用等。但登录窗口是
+/// `.incognito(true)` 的隔离会话，复用等于把上一个账号的会话留着——这恰恰是
+/// f8f6150 要根除的东西。所以这里选择关掉再等。
+async fn close_login_window_and_wait(app: &AppHandle) -> bool {
+    close_login_window(app);
+    let started = std::time::Instant::now();
+    loop {
+        match close_wait_step(
+            app.get_webview_window(LOGIN_WINDOW_LABEL).is_some(),
+            started.elapsed(),
+        ) {
+            CloseWait::Released => return true,
+            CloseWait::TimedOut => return false,
+            CloseWait::KeepWaiting => tokio::time::sleep(LOGIN_WINDOW_CLOSE_POLL).await,
+        }
+    }
+}
+
+async fn publish_failed(app: &AppHandle, state: &AppState, error: &AppError, page_url: &str) {
+    publish_status(
+        app,
+        state,
+        LoginStatus::new(
+            "failed",
+            &error.code,
+            error.message.as_str(),
+            safe_login_page_url(page_url),
+        ),
+    )
+    .await;
+}
+
 fn epoch_active(app: &AppHandle, epoch: u64) -> bool {
     app.try_state::<AppState>()
         .is_some_and(|state| state.login.epoch.load(Ordering::SeqCst) == epoch)
@@ -1228,6 +1317,79 @@ async fn finish_idle_if_active(app: &AppHandle, epoch: u64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `close()` 不会当场把标签交还——这是那句「无法打开登录窗口」的来源。
+    ///
+    /// 登录窗口已经开着时再点一次「重新认证」，旧窗口被关掉、新窗口没建起来，
+    /// 界面只剩一句「无法打开登录窗口」和「登录失败」，除了重启应用没有出路。
+    ///
+    /// 这条测试钉住的是那个前提本身：`WebviewWindow::close()` 只是往主线程投一
+    /// 条关闭消息，返回时 `zepp-login` 这个标签仍然登记着，拿它去 build 一定
+    /// 撞车。只要这个前提还成立，`start_web_login` 里就必须先等标签被交还，
+    /// 见 `close_login_window_and_wait`。
+    #[test]
+    fn closing_the_login_window_does_not_free_its_label_right_away() {
+        let app = tauri::test::mock_app();
+        let url = PRIMARY_LOGIN_URL.parse().expect("login url is static");
+        let window =
+            WebviewWindowBuilder::new(app.handle(), LOGIN_WINDOW_LABEL, WebviewUrl::External(url))
+                .build()
+                .expect("first login window");
+
+        window.close().expect("close request is accepted");
+
+        // 关闭请求已经发出去了，标签却还占着。
+        assert!(app.get_webview_window(LOGIN_WINDOW_LABEL).is_some());
+
+        let url = PRIMARY_LOGIN_URL.parse().expect("login url is static");
+        let error =
+            WebviewWindowBuilder::new(app.handle(), LOGIN_WINDOW_LABEL, WebviewUrl::External(url))
+                .build()
+                .expect_err("a second window with the same label must not build");
+        // 用户看到的那句就是 `无法打开登录窗口：a webview with label
+        // `zepp-login` already exists`。
+        assert!(
+            error.to_string().contains("already exists"),
+            "unexpected builder error: {error}"
+        );
+    }
+
+    /// 旧窗口还占着标签时，绝不能去建新窗口。
+    ///
+    /// 这是上一条测试的另一半：既然 `close()` 之后标签还在，那么只要它还在，
+    /// 唯一正确的动作就是继续等。一旦这里放行，用户拿到的就是「无法打开登录
+    /// 窗口」，而他刚才那个能用的窗口已经被关掉了。
+    #[test]
+    fn a_new_login_window_waits_until_the_old_label_is_released() {
+        // 标签还占着——不管等了多久，都不是「可以建了」。
+        assert_eq!(
+            close_wait_step(true, Duration::ZERO),
+            CloseWait::KeepWaiting
+        );
+        assert_eq!(
+            close_wait_step(true, LOGIN_WINDOW_CLOSE_TIMEOUT - LOGIN_WINDOW_CLOSE_POLL),
+            CloseWait::KeepWaiting
+        );
+
+        // 标签空了才放行。第一次登录本来就没有旧窗口，不该被这段等待拖慢。
+        assert_eq!(close_wait_step(false, Duration::ZERO), CloseWait::Released);
+
+        // 等待必须有头。主线程真的卡住时，宁可给一句「稍等再试」，也不能让
+        // 命令永远不返回。
+        assert_eq!(
+            close_wait_step(true, LOGIN_WINDOW_CLOSE_TIMEOUT),
+            CloseWait::TimedOut
+        );
+        assert_eq!(
+            close_wait_step(true, LOGIN_WINDOW_CLOSE_TIMEOUT + Duration::from_secs(1)),
+            CloseWait::TimedOut
+        );
+        // 超时之后标签才空出来，仍然该放行，而不是报错。
+        assert_eq!(
+            close_wait_step(false, LOGIN_WINDOW_CLOSE_TIMEOUT + Duration::from_secs(1)),
+            CloseWait::Released
+        );
+    }
 
     /// 用户还在主登录页上输密码时，绝不能把页面导走。
     ///

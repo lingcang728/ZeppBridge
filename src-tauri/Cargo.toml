@@ -61,3 +61,9 @@ hex = { workspace = true }
 tracing = { workspace = true }
 base64 = { workspace = true }
 url = { workspace = true }
+
+# 登录窗口的标签是固定的，所以「关掉旧窗口」和「用同一个标签建新窗口」之间
+# 的时序是一条真实的失败路径。`tauri` 的 mock runtime 让这条路径可以在没有
+# 窗口系统的地方跑出来。
+[dev-dependencies]
+tauri = { version = "2", features = ["test"] }

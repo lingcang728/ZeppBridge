@@ -2,6 +2,13 @@
 
 本文件记录每个版本的实际改动。写给使用者看，不是施工日志：只写用户能感知到的变化，以及为什么这么改。
 
+## 1.1.6
+
+### Fixes / 修复
+
+- **Starting sign-in again while the sign-in window is open now reopens it.** Clicking **Re-authenticate** a second time closed the window that was already open and immediately tried to build a new one under the same name — but a window is not gone the moment it is asked to close, so the new one was refused. The outcome was the worst of both: the window you could have used was gone, the screen said *Couldn't open the sign-in window* and *Sign-in failed*, and there was no way on except restarting ZeppBridge. ZeppBridge now waits for the old window to actually be gone before opening the new one. In the rare case it has not closed within three seconds you get *wait a moment and try again* instead of a dead end. This was never specific to 1.1.5 — it had been there for as long as the window has been reopened this way.
+- **登录窗口开着的时候再点一次「重新认证」，现在会重新开出一个窗口。** 之前的做法是先关掉已经开着的那个，紧接着用同一个名字去建新的——可窗口不会在收到关闭请求的那一刻就消失，于是新窗口被拒绝了。结果是最坏的一种：原本还能用的那个窗口没了，界面上只剩「无法打开登录窗口」和「登录失败」，除了重启 ZeppBridge 没有别的出路。现在会等旧窗口真的消失，再开新的；万一它三秒内还没关掉，给出的是一句「稍等一下再试」，而不是死路。这不是 1.1.5 才有的问题，这条路径一直如此。
+
 ## 1.1.5
 
 Sign-in could not be completed at all on 1.1.4. This release is only about that.
