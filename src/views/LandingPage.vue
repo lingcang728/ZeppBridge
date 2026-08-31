@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import BrandMark from '../components/BrandMark.vue';
 import DesignIcon, { type DesignIconName } from '../components/DesignIcon.vue';
 import DeviceMarquee from '../components/DeviceMarquee.vue';
@@ -7,9 +7,9 @@ import { useLandingLocale } from '../composables/useLandingLocale';
 
 const githubUrl = 'https://github.com/lingcang728/ZeppBridge';
 const releaseUrl = `${githubUrl}/releases/latest`;
+const releaseEndpoint = '/api/release';
 
 const { locale, initializeLocale, toggleLocale } = useLandingLocale();
-onMounted(initializeLocale);
 
 // 访客系统探测：Mac 用户默认看到 macOS 版按钮，其余一律 Windows。
 // 只做一次静态判断——探测不到就退回 Windows，绝不隐藏另一个平台的入口。
@@ -22,17 +22,41 @@ const isMacVisitor = (): boolean => {
 
 type IconEntry = { icon: DesignIconName; title: string; copy: string };
 type TaggedEntry = IconEntry & { tag: string };
+type DownloadPlatform = 'windows' | 'macos';
+
+interface ReleaseAsset {
+  name: string;
+  url: string;
+  size: number;
+  digest: string | null;
+}
+
+interface LatestRelease {
+  version: string;
+  tagName: string;
+  publishedAt: string;
+  releaseUrl: string;
+  downloads: {
+    windowsExe: ReleaseAsset;
+    windowsMsi: ReleaseAsset;
+    macosDmg: ReleaseAsset;
+  };
+}
 
 interface LandingCopy {
-  nav: { home: string; site: string; features: string; local: string; connect: string; privacy: string };
+  nav: { home: string; site: string; features: string; local: string; connect: string; privacy: string; star: string };
   /** 切到另一种语言的按钮文字，所以写的是目标语言的名字。 */
   languageToggle: string;
-  downloads: { windows: { label: string; hint: string }; macos: { label: string; hint: string } };
+  downloads: {
+    windows: { label: string; hint: string; msi: string };
+    macos: { label: string; hint: string };
+    status: { loading: string; ready: string; fallback: string };
+  };
   hero: {
     headlineLead: string;
     headlineAccent: string;
     lead: string;
-    viewSource: string;
+    starNudge: { title: string; copy: string; action: string; dismiss: string };
     trust: Array<{ icon: DesignIconName; label: string }>;
     stageLabel: string;
     coreCaption: string;
@@ -65,17 +89,28 @@ const COPY: Record<'zh' | 'en', LandingCopy> = {
       local: '本机出口',
       connect: '连接方式',
       privacy: '隐私',
+      star: '给个 Star',
     },
     languageToggle: 'English',
     downloads: {
-      windows: { label: '下载 Windows 版', hint: 'x64 安装包 · exe / msi' },
-      macos: { label: '下载 macOS 版', hint: 'Apple Silicon · dmg' },
+      windows: { label: '下载 Windows 版', hint: '推荐 · x64 EXE 安装包', msi: '企业 / 批量部署：下载 MSI' },
+      macos: { label: '下载 macOS 版', hint: 'Apple Silicon · DMG 安装包' },
+      status: {
+        loading: '正在读取 GitHub 最新安装包…',
+        ready: '点击直接下载，无需打开 GitHub',
+        fallback: '暂时没读取到直链，点击会打开 GitHub Release 页面',
+      },
     },
     hero: {
       headlineLead: '把你的 Zepp 数据，',
       headlineAccent: '完整交还给你。',
       lead: 'ZeppBridge 在 Windows 与 macOS 本机连接、整理并可视化 Amazfit 穿戴数据。数据来源保持清晰，既能自己看，也能安全交给 AI 分析。',
-      viewSource: '查看源代码',
+      starNudge: {
+        title: '下载已开始',
+        copy: '如果 ZeppBridge 对你有用，欢迎顺手在 GitHub 点个 Star。它会让更多 Amazfit 用户找到这个项目。',
+        action: '去 GitHub 点 Star',
+        dismiss: '暂时不用',
+      },
       trust: [
         { icon: 'secure', label: '本地优先' },
         { icon: 'private', label: '隐私安全' },
@@ -167,17 +202,28 @@ const COPY: Record<'zh' | 'en', LandingCopy> = {
       local: 'Local outlets',
       connect: 'Connect',
       privacy: 'Privacy',
+      star: 'Star on GitHub',
     },
     languageToggle: '中文',
     downloads: {
-      windows: { label: 'Download for Windows', hint: 'x64 installer · exe / msi' },
-      macos: { label: 'Download for macOS', hint: 'Apple Silicon · dmg' },
+      windows: { label: 'Download for Windows', hint: 'Recommended · x64 EXE installer', msi: 'Managed deployment: download MSI' },
+      macos: { label: 'Download for macOS', hint: 'Apple Silicon · DMG installer' },
+      status: {
+        loading: 'Checking the latest GitHub release…',
+        ready: 'Downloads directly — no GitHub page in the way',
+        fallback: 'Direct links are temporarily unavailable; the Release page will open instead',
+      },
     },
     hero: {
       headlineLead: 'Your Zepp data,',
       headlineAccent: 'handed back in full.',
       lead: 'ZeppBridge connects, organizes and visualizes your Amazfit wearable data on your own Windows or Mac. Every field keeps its source, so you can read it yourself — or hand it to an AI on your terms.',
-      viewSource: 'View source',
+      starNudge: {
+        title: 'Your download has started',
+        copy: 'If ZeppBridge earns a place on your machine, a GitHub Star helps more Amazfit users find it.',
+        action: 'Star ZeppBridge on GitHub',
+        dismiss: 'Maybe later',
+      },
       trust: [
         { icon: 'secure', label: 'Local-first' },
         { icon: 'private', label: 'Private by default' },
@@ -265,8 +311,58 @@ const COPY: Record<'zh' | 'en', LandingCopy> = {
 
 const t = computed(() => COPY[locale.value]);
 
-const primaryDownload = computed(() => (isMacVisitor() ? t.value.downloads.macos : t.value.downloads.windows));
-const secondaryDownload = computed(() => (isMacVisitor() ? t.value.downloads.windows : t.value.downloads.macos));
+const latestRelease = ref<LatestRelease | null>(null);
+const releaseState = ref<'loading' | 'ready' | 'fallback'>('loading');
+const showStarNudge = ref(false);
+
+const isTrustedAssetUrl = (value: string): boolean =>
+  value.startsWith(`${githubUrl}/releases/download/`);
+
+const loadLatestRelease = async () => {
+  try {
+    const response = await fetch(releaseEndpoint, { headers: { Accept: 'application/json' } });
+    if (!response.ok) throw new Error(`release endpoint returned ${response.status}`);
+    const payload = await response.json() as LatestRelease;
+    const assets = Object.values(payload.downloads ?? {});
+    if (assets.length !== 3 || assets.some((asset) => !isTrustedAssetUrl(asset.url))) {
+      throw new Error('release endpoint returned an invalid asset set');
+    }
+    latestRelease.value = payload;
+    releaseState.value = 'ready';
+  } catch {
+    releaseState.value = 'fallback';
+  }
+};
+
+onMounted(() => {
+  initializeLocale();
+  void loadLatestRelease();
+});
+
+const primaryPlatform = computed<DownloadPlatform>(() => (isMacVisitor() ? 'macos' : 'windows'));
+const secondaryPlatform = computed<DownloadPlatform>(() => (primaryPlatform.value === 'macos' ? 'windows' : 'macos'));
+const primaryDownload = computed(() => t.value.downloads[primaryPlatform.value]);
+const secondaryDownload = computed(() => t.value.downloads[secondaryPlatform.value]);
+const assetFor = (platform: DownloadPlatform): ReleaseAsset | null => {
+  if (!latestRelease.value) return null;
+  return platform === 'windows'
+    ? latestRelease.value.downloads.windowsExe
+    : latestRelease.value.downloads.macosDmg;
+};
+const primaryAsset = computed(() => assetFor(primaryPlatform.value));
+const secondaryAsset = computed(() => assetFor(secondaryPlatform.value));
+const primaryHref = computed(() => primaryAsset.value?.url ?? releaseUrl);
+const secondaryHref = computed(() => secondaryAsset.value?.url ?? releaseUrl);
+const windowsMsiHref = computed(() => latestRelease.value?.downloads.windowsMsi.url ?? releaseUrl);
+const releaseStatusText = computed(() => {
+  if (releaseState.value === 'ready') {
+    return `v${latestRelease.value?.version} · ${t.value.downloads.status.ready}`;
+  }
+  return t.value.downloads.status[releaseState.value];
+});
+const revealStarNudge = () => {
+  showStarNudge.value = true;
+};
 </script>
 
 <template>
@@ -276,7 +372,10 @@ const secondaryDownload = computed(() => (isMacVisitor() ? t.value.downloads.win
       <nav :aria-label="t.nav.site"><a href="#features">{{ t.nav.features }}</a><a href="#local">{{ t.nav.local }}</a><a href="#connect">{{ t.nav.connect }}</a><a href="#privacy">{{ t.nav.privacy }}</a></nav>
       <div class="nav-actions">
         <button type="button" class="lang-toggle" @click="toggleLocale"><DesignIcon name="handoff" :size="19" />{{ t.languageToggle }}</button>
-        <a class="nav-github" :href="githubUrl" target="_blank" rel="noopener"><DesignIcon name="handoff" :size="23" />GitHub</a>
+        <a class="nav-github" :href="githubUrl" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.8 2.7 5.47 6.04.88-4.37 4.26 1.03 6.02L12 16.58l-5.4 2.85 1.03-6.02-4.37-4.26 6.04-.88L12 2.8Z" /></svg>
+          {{ t.nav.star }}
+        </a>
       </div>
     </header>
 
@@ -287,10 +386,31 @@ const secondaryDownload = computed(() => (isMacVisitor() ? t.value.downloads.win
           <h1>{{ t.hero.headlineLead }}<br /><em>{{ t.hero.headlineAccent }}</em></h1>
           <p class="hero-lead">{{ t.hero.lead }}</p>
           <div class="hero-actions">
-            <a class="primary-cta" :href="releaseUrl" target="_blank" rel="noopener"><DesignIcon name="app-icon" :size="34" /><span><b>{{ primaryDownload.label }}</b><small>{{ primaryDownload.hint }}</small></span><DesignIcon name="chevron-right" :size="20" /></a>
-            <a class="alt-cta" :href="releaseUrl" target="_blank" rel="noopener"><DesignIcon name="app-icon" :size="24" /><span><b>{{ secondaryDownload.label }}</b><small>{{ secondaryDownload.hint }}</small></span></a>
-            <a class="secondary-cta" :href="githubUrl" target="_blank" rel="noopener"><DesignIcon name="document" :size="27" />{{ t.hero.viewSource }}</a>
+            <div class="download-choice is-primary">
+              <a class="primary-cta" :href="primaryHref" :target="primaryAsset ? undefined : '_blank'" rel="noopener" @click="revealStarNudge">
+                <DesignIcon name="app-icon" :size="34" />
+                <span><b>{{ primaryDownload.label }}</b><small>{{ primaryDownload.hint }}</small></span>
+                <DesignIcon name="chevron-right" :size="20" />
+              </a>
+              <a v-if="primaryPlatform === 'windows'" class="format-link" :href="windowsMsiHref" :target="latestRelease ? undefined : '_blank'" rel="noopener" @click="revealStarNudge">{{ t.downloads.windows.msi }}</a>
+            </div>
+            <div class="download-choice">
+              <a class="alt-cta" :href="secondaryHref" :target="secondaryAsset ? undefined : '_blank'" rel="noopener" @click="revealStarNudge">
+                <DesignIcon name="app-icon" :size="24" />
+                <span><b>{{ secondaryDownload.label }}</b><small>{{ secondaryDownload.hint }}</small></span>
+              </a>
+              <a v-if="secondaryPlatform === 'windows'" class="format-link" :href="windowsMsiHref" :target="latestRelease ? undefined : '_blank'" rel="noopener" @click="revealStarNudge">{{ t.downloads.windows.msi }}</a>
+            </div>
           </div>
+          <p class="release-status" :class="`is-${releaseState}`"><i></i>{{ releaseStatusText }}</p>
+          <Transition name="star-nudge">
+            <aside v-if="showStarNudge" class="star-nudge" aria-live="polite">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.8 2.7 5.47 6.04.88-4.37 4.26 1.03 6.02L12 16.58l-5.4 2.85 1.03-6.02-4.37-4.26 6.04-.88L12 2.8Z" /></svg>
+              <div><strong>{{ t.hero.starNudge.title }}</strong><p>{{ t.hero.starNudge.copy }}</p></div>
+              <a :href="githubUrl" target="_blank" rel="noopener">{{ t.hero.starNudge.action }}</a>
+              <button type="button" @click="showStarNudge = false">{{ t.hero.starNudge.dismiss }}</button>
+            </aside>
+          </Transition>
           <div class="trust-row"><span v-for="item in t.hero.trust" :key="item.label"><DesignIcon :name="item.icon" :size="23" />{{ item.label }}</span></div>
         </div>
 
@@ -340,15 +460,16 @@ const secondaryDownload = computed(() => (isMacVisitor() ? t.value.downloads.win
 .landing-page::before { position: fixed; z-index: 0; inset: 0; pointer-events: none; content: ''; opacity: .25; background-image: linear-gradient(rgba(207,228,170,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(207,228,170,.025) 1px, transparent 1px); background-size: 56px 56px; mask-image: linear-gradient(to bottom, black, transparent 70%); }
 .landing-nav { position: relative; z-index: 10; display: flex; align-items: center; justify-content: space-between; width: min(1240px, calc(100% - 48px)); min-height: 74px; margin: 0 auto; border-bottom: 1px solid var(--site-line); }
 .landing-brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
-.landing-brand > span { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 13px; background: rgba(203,229,132,.05); }
+.landing-brand > span { display: grid; flex: 0 0 auto; place-items: center; width: 42px; height: 42px; border-radius: 13px; background: rgba(203,229,132,.05); }
 .landing-brand strong { font-size: 18px; letter-spacing: -.02em; }
 .landing-nav nav { display: flex; gap: 30px; }
 .landing-nav nav a { color: #9ca892; font-size: 12px; text-decoration: none; }
 .landing-nav nav a:hover { color: #d6e99e; }
 .nav-actions { display: inline-flex; align-items: center; gap: 10px; }
-.lang-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px 7px 8px; border: 1px solid var(--site-line); border-radius: 11px; background: rgba(255,255,255,.02); color: #9ca892; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.lang-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px 7px 8px; border: 1px solid var(--site-line); border-radius: 11px; background: rgba(255,255,255,.02); color: #9ca892; font: inherit; font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer; }
 .lang-toggle:hover { color: #d6e99e; border-color: rgba(185,220,112,.5); }
-.nav-github { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px 7px 7px; border: 1px solid var(--site-line); border-radius: 11px; background: rgba(255,255,255,.02); color: #dce7cb; font-size: 12px; font-weight: 700; text-decoration: none; }
+.nav-github { display: inline-flex; align-items: center; gap: 7px; padding: 8px 12px 8px 10px; border: 1px solid rgba(185,220,112,.28); border-radius: 11px; background: rgba(185,220,112,.07); color: #dce7cb; font-size: 12px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.nav-github svg { width: 17px; height: 17px; fill: none; stroke: #b9dc70; stroke-width: 1.65; stroke-linejoin: round; }
 main, footer { position: relative; z-index: 1; }
 .hero-section { display: grid; grid-template-columns: minmax(0,.9fr) minmax(520px,1.1fr); align-items: center; gap: 42px; width: min(1240px, calc(100% - 48px)); min-height: 690px; margin: 0 auto; padding: 72px 0 82px; }
 .overline, .section-heading > p, .connect-intro > p, .privacy-copy > p { display: flex; align-items: center; gap: 8px; margin: 0 0 20px; color: #91b44e; font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: .17em; }
@@ -356,8 +477,9 @@ main, footer { position: relative; z-index: 1; }
 .hero-copy h1 { max-width: 660px; margin: 0; font-size: clamp(48px, 5.5vw, 78px); line-height: 1.03; letter-spacing: -.065em; }
 .hero-copy h1 em { color: #b9dc70; font-style: normal; }
 .hero-lead { max-width: 620px; margin: 26px 0 0; color: #9da79a; font-size: 16px; line-height: 1.8; }
-.hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 32px; }
-.primary-cta, .secondary-cta { display: inline-flex; align-items: center; text-decoration: none; }
+.hero-actions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; margin-top: 32px; }
+.download-choice { display: grid; gap: 7px; }
+.primary-cta { display: inline-flex; align-items: center; text-decoration: none; }
 .primary-cta { gap: 10px; min-width: 244px; white-space: nowrap; padding: 8px 10px 8px 8px; border: 1px solid rgba(185,220,112,.45); border-radius: 14px; background: linear-gradient(135deg, #789f39, #58772c); color: #f8faef; box-shadow: 0 14px 32px rgba(80,111,38,.2); }
 .primary-cta > span { display: grid; margin-right: auto; }
 .primary-cta b { font-size: 13px; } .primary-cta small { color: rgba(247,250,238,.68); font-size: 10px; }
@@ -366,9 +488,29 @@ main, footer { position: relative; z-index: 1; }
 .alt-cta b { font-size: 12px; font-weight: 700; } .alt-cta small { color: rgba(220,230,205,.6); font-size: 10px; }
 .alt-cta:hover { transform: translateY(-2px); border-color: rgba(185,220,112,.5); }
 .alt-cta { transition: transform .2s ease, border-color .2s ease; }
-.secondary-cta { gap: 8px; white-space: nowrap; padding: 12px 16px 12px 10px; border: 1px solid var(--site-line); border-radius: 14px; background: #151915; color: #dce6cd; font-size: 12px; font-weight: 700; }
-.primary-cta, .secondary-cta, .nav-github, .lang-toggle { transition: transform .2s ease, border-color .2s ease, color .2s ease; }
-.primary-cta:hover, .secondary-cta:hover, .nav-github:hover { transform: translateY(-2px); border-color: rgba(185,220,112,.5); }
+.format-link { justify-self: center; color: #788474; font-size: 9px; text-underline-offset: 3px; }
+.format-link:hover { color: #b9ce9c; }
+.primary-cta, .nav-github, .lang-toggle { transition: transform .2s ease, border-color .2s ease, color .2s ease; }
+.primary-cta:hover, .nav-github:hover { transform: translateY(-2px); border-color: rgba(185,220,112,.5); }
+.primary-cta:active, .alt-cta:active, .nav-github:active, .lang-toggle:active { transform: translateY(1px) scale(.99); }
+.release-status { display: flex; align-items: center; gap: 7px; min-height: 18px; margin: 14px 0 0; color: #778274; font-size: 10px; }
+.release-status i { width: 6px; height: 6px; border-radius: 50%; background: #697365; }
+.release-status.is-loading i { background: #8faa58; animation: release-pulse 1.4s ease-in-out infinite; }
+.release-status.is-ready { color: #96aa86; }
+.release-status.is-ready i { background: #91b44e; }
+.release-status.is-fallback { color: #b69d70; }
+.release-status.is-fallback i { background: #b69d70; }
+.star-nudge { display: grid; grid-template-columns: auto minmax(0,1fr) auto auto; align-items: center; gap: 12px; max-width: 620px; margin-top: 16px; padding: 13px 14px; border: 1px solid rgba(185,220,112,.2); border-radius: 15px; background: rgba(24,30,22,.92); box-shadow: inset 0 1px 0 rgba(255,255,255,.035); }
+.star-nudge > svg { width: 25px; height: 25px; fill: rgba(185,220,112,.08); stroke: #b9dc70; stroke-width: 1.55; stroke-linejoin: round; }
+.star-nudge > div { display: grid; gap: 3px; }
+.star-nudge strong { color: #e3ead9; font-size: 11px; }
+.star-nudge p { margin: 0; color: #889582; font-size: 9px; line-height: 1.55; }
+.star-nudge a { padding: 8px 10px; border: 1px solid rgba(185,220,112,.25); border-radius: 10px; background: rgba(185,220,112,.08); color: #cce39b; font-size: 10px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.star-nudge button { padding: 7px 5px; border: 0; background: transparent; color: #6f7b6b; font: inherit; font-size: 9px; cursor: pointer; white-space: nowrap; }
+.star-nudge button:hover { color: #aebba7; }
+.star-nudge-enter-active, .star-nudge-leave-active { transition: opacity .24s ease, transform .24s cubic-bezier(.16,1,.3,1); }
+.star-nudge-enter-from, .star-nudge-leave-to { opacity: 0; transform: translateY(-5px); }
+@keyframes release-pulse { 0%,100% { opacity: .35; transform: scale(.78); } 50% { opacity: 1; transform: scale(1); } }
 .trust-row { display: flex; gap: 20px; margin-top: 26px; color: #7e8a79; font-size: 10px; }
 .trust-row span { display: inline-flex; align-items: center; gap: 5px; }
 .hero-stage { position: relative; display: grid; align-content: start; gap: 18px; min-height: 510px; padding: 28px 22px 18px; overflow: hidden; border: 1px solid var(--site-line); border-radius: 28px; background: linear-gradient(145deg, rgba(26,32,25,.9), rgba(13,16,14,.94)); box-shadow: inset 0 1px 0 rgba(255,255,255,.025), 0 35px 90px rgba(0,0,0,.24); }
@@ -412,6 +554,7 @@ main, footer { position: relative; z-index: 1; }
 .privacy-vault div { display: grid; gap: 6px; }.privacy-vault b { color: #b9d87a; font-family: var(--font-mono); font-size: 13px; letter-spacing: .12em; }.privacy-vault span { color: #7e8979; font-size: 11px; line-height: 1.6; }
 footer { display: flex; align-items: center; flex-wrap: wrap; gap: 18px; width: min(1240px, calc(100% - 48px)); min-height: 120px; margin: 0 auto; } footer p { margin-right: auto; color: #697365; font-size: 10px; } footer .footer-disclaimer { flex-basis: 100%; margin-right: 0; max-width: 62ch; line-height: 1.6; } footer > div { display: flex; gap: 20px; } footer > div a { color: #909b8c; font-size: 11px; text-decoration: none; }
 @media (max-width: 1080px) { .hero-section { grid-template-columns: 1fr; padding-top: 56px; } .hero-stage { min-height: 500px; } .capability-grid { grid-template-columns: repeat(2,1fr); } .connect-section { grid-template-columns: 1fr; } .privacy-section { grid-template-columns: 1fr; } }
-@media (max-width: 720px) { .landing-nav { width: min(100% - 28px,1240px); }.landing-nav nav { display: none; }.hero-section, .content-section, .principle-strip, footer { width: min(100% - 28px,1240px); }.hero-section { min-height: auto; padding: 48px 0 64px; }.hero-copy h1 { font-size: 44px; }.hero-actions { align-items: stretch; flex-direction: column; }.primary-cta { min-width: 0; }.trust-row { flex-wrap: wrap; }.hero-stage { min-height: auto; }.output-stack { grid-template-columns: 1fr 1fr; }.principle-strip { grid-template-columns: repeat(2,1fr); }.principle-strip > div:nth-child(2) { border-right: 0; }.principle-strip > div:nth-child(-n+2) { border-bottom: 1px solid var(--site-line); }.content-section { padding: 84px 0; }.capability-grid, .auth-grid { grid-template-columns: 1fr; }.capability-card { min-height: 210px; }.auth-grid article { min-height: 245px; }.privacy-section { padding: 80px 20px; }.privacy-vault { align-items: flex-start; flex-direction: column; }.privacy-vault > .design-icon { width: 78px !important; height: 78px !important; } footer { align-items: flex-start; flex-wrap: wrap; padding: 28px 0; } footer p { width: 100%; order: 3; } }
-@media (prefers-reduced-motion: reduce) { .landing-page { scroll-behavior: auto; } .primary-cta, .secondary-cta, .nav-github, .lang-toggle { transition: none; } }
+@media (max-width: 720px) { .landing-nav { width: min(100% - 28px,1240px); }.landing-nav nav { display: none; }.nav-github { padding-right: 9px; }.hero-section, .content-section, .principle-strip, footer { width: min(100% - 28px,1240px); }.hero-section { min-height: auto; padding: 48px 0 64px; }.hero-copy h1 { font-size: 44px; }.hero-actions { align-items: stretch; flex-direction: column; }.download-choice, .primary-cta, .alt-cta { width: 100%; }.primary-cta { min-width: 0; }.star-nudge { grid-template-columns: auto minmax(0,1fr); }.star-nudge a, .star-nudge button { grid-column: 2; justify-self: start; }.trust-row { flex-wrap: wrap; }.hero-stage { min-height: auto; }.output-stack { grid-template-columns: 1fr 1fr; }.principle-strip { grid-template-columns: repeat(2,1fr); }.principle-strip > div:nth-child(2) { border-right: 0; }.principle-strip > div:nth-child(-n+2) { border-bottom: 1px solid var(--site-line); }.content-section { padding: 84px 0; }.capability-grid, .auth-grid { grid-template-columns: 1fr; }.capability-card { min-height: 210px; }.auth-grid article { min-height: 245px; }.privacy-section { padding: 80px 20px; }.privacy-vault { align-items: flex-start; flex-direction: column; }.privacy-vault > .design-icon { width: 78px !important; height: 78px !important; } footer { align-items: flex-start; flex-wrap: wrap; padding: 28px 0; } footer p { width: 100%; order: 3; } }
+@media (max-width: 480px) { .landing-nav > .landing-brand strong { display: none; }.nav-actions { gap: 6px; } }
+@media (prefers-reduced-motion: reduce) { .landing-page { scroll-behavior: auto; } .primary-cta, .alt-cta, .nav-github, .lang-toggle, .star-nudge-enter-active, .star-nudge-leave-active { transition: none; } .release-status.is-loading i { animation: none; } }
 </style>

@@ -64,8 +64,8 @@ jobs:
       - name: Test frontend
         run: npm test
 
-      - name: Test feedback receiver
-        run: npm run test:feedback
+      - name: Test Pages functions
+        run: npm run test:functions
 
       - name: Verify icon consistency
         run: |

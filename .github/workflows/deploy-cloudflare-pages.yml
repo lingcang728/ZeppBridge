@@ -25,7 +25,7 @@ jobs:
           cache: npm
 
       - name: Build landing page
-        run: npm ci && npm run test:feedback && npm run build
+        run: npm ci && npm run test:functions && npm run build
 
       - name: Apply feedback database migrations
         if: env.CLOUDFLARE_D1_API_TOKEN != ''
