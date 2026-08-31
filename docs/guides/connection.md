@@ -29,9 +29,16 @@ should use, and two fallbacks for when that fails.
 1. Sign in with your usual Zepp account.
 2. The app reads the session credentials inside that window. The token is never
    shown in the interface.
+   Every connection attempt uses an isolated browser session, so a previous
+   Xiaomi, WeChat, Google or Facebook account cannot be selected from stale
+   cookies. The session is discarded when the login window closes.
 3. The status line moves through **waiting → extracting → verifying → connected**.
 4. Once verified the window closes and Settings refreshes. If this machine has
    no cloud-sync history yet, an incremental sync starts straight away.
+
+ZeppBridge uses the region host returned by the signed-in page before trying
+known fallback regions. A rejected credential and a temporarily unreachable
+region are reported separately.
 
 If the primary page has no usable session after about 40 seconds, the window
 switches to the fallback page `https://user.huami.com/privacy2/index.html`. The

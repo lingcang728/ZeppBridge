@@ -3,7 +3,7 @@ use crate::app_state::AppState;
 use crate::connectors::zepp::validate_region_host;
 use crate::ipc_error::AppError;
 use crate::ipc_types::LoginStatus;
-use crate::models::AuthInfo;
+use crate::models::{AuthInfo, ZeppBridgeError};
 use serde_json::Value;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
@@ -33,8 +33,10 @@ const REGION_HOST_ALLOWLIST: &[&str] = &[
     "https://api-mifit-us2.huami.com",
     "https://api-mifit-us3.zepp.com",
     "https://api-mifit-de.huami.com",
+    "https://api-mifit-de2.huami.com",
     "https://api-mifit-de.zepp.com",
     "https://api-mifit-sg.huami.com",
+    "https://api-mifit-sg2.huami.com",
     "https://api-mifit-in.huami.com",
     "https://api-mifit-ru.huami.com",
 ];
@@ -51,6 +53,7 @@ pub(crate) struct ExtractedLogin {
 pub async fn start_web_login(
     app: AppHandle,
     state: tauri::State<'_, AppState>,
+    locale: String,
 ) -> std::result::Result<LoginStatus, AppError> {
     let epoch = state.login.epoch.fetch_add(1, Ordering::SeqCst) + 1;
     close_login_window(&app);
@@ -64,7 +67,7 @@ pub async fn start_web_login(
     );
     publish_status(&app, &state, status.clone()).await;
 
-    let window = build_login_window(&app, &page_url)?;
+    let window = build_login_window(&app, &page_url, &locale)?;
     spawn_login_poll(app, epoch, window);
     Ok(status)
 }
@@ -91,13 +94,19 @@ pub async fn get_login_status(
 fn build_login_window(
     app: &AppHandle,
     page_url: &str,
+    locale: &str,
 ) -> std::result::Result<WebviewWindow, AppError> {
     let url = page_url
         .parse()
         .map_err(|_| AppError::new("err.login.bad_url", "登录地址无效"))?;
     let app_for_new_window = app.clone();
     WebviewWindowBuilder::new(app, LOGIN_WINDOW_LABEL, WebviewUrl::External(url))
-        .title("登录 Zepp")
+        .title(login_window_title(locale))
+        // A login attempt must not inherit a previous account's cookies or
+        // localStorage. OAuth popups still stay in this one WebView session,
+        // but closing it discards the session instead of silently reusing it
+        // for the next account.
+        .incognito(true)
         .inner_size(920.0, 760.0)
         .min_inner_size(420.0, 520.0)
         .resizable(true)
@@ -183,7 +192,7 @@ fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow) {
                 .await;
             }
 
-            let cookies = collect_cookies(&window).await;
+            let cookies = collect_cookies(&window, &page_url).await;
             // 只记 cookie 的名字，绝不记值——名字足以判断「是不是根本没有这个
             // cookie」，而值是凭据本身。
             if !looked_signed_in && page_looks_signed_in(&page_url, &cookies) {
@@ -229,6 +238,7 @@ fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow) {
                     }
                     Err(failure) => {
                         finish_failed(&app, epoch, &failure.code, &failure.message, page_url).await;
+                        close_login_window(&app);
                         return;
                     }
                 }
@@ -250,15 +260,15 @@ async fn persist_extracted_login(
             "应用状态不可用",
         ));
     };
-    let preferred = preferred_region_hosts(&state, extracted.region_hint.as_deref()).await;
-    let Some(auth) = probe_region_hosts(&extracted.user_id, &extracted.app_token, &preferred).await
-    else {
-        // 拿到凭据了，但没有一个区域认它。和「没登录」「网络不通」是三件事。
-        return Err(AppError::new(
-            "err.login.region_probe_failed",
-            "读到了凭据，但没有一个 Zepp 区域接受它。账号可能不在已知区域，或者网络被拦截了。",
-        ));
-    };
+    let (preferred, authoritative_count) =
+        preferred_region_hosts(&state, &extracted.user_id, extracted.region_hint.as_deref()).await;
+    let auth = probe_region_hosts(
+        &extracted.user_id,
+        &extracted.app_token,
+        &preferred,
+        authoritative_count,
+    )
+    .await?;
     if !epoch_active(app, epoch) {
         return Err(AppError::new("err.login.cancelled", "登录已取消"));
     }
@@ -311,8 +321,120 @@ async fn persist_extracted_login(
     Ok(())
 }
 
-async fn probe_region_hosts(user_id: &str, app_token: &str, hosts: &[String]) -> Option<AuthInfo> {
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<AuthInfo>(1);
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RegionProbeFailure {
+    Rejected,
+    Transient,
+    Other,
+}
+
+#[derive(Debug, Default)]
+struct RegionProbeFailures {
+    rejected: usize,
+    transient: usize,
+    other: usize,
+}
+
+impl RegionProbeFailures {
+    fn record(&mut self, failure: RegionProbeFailure) {
+        match failure {
+            RegionProbeFailure::Rejected => self.rejected += 1,
+            RegionProbeFailure::Transient => self.transient += 1,
+            RegionProbeFailure::Other => self.other += 1,
+        }
+    }
+
+    fn into_app_error(self) -> AppError {
+        // An explicit 401/403 is stronger evidence than failures from the
+        // fallback hosts. Do not hide it behind unrelated 404s or timeouts.
+        if self.rejected > 0 {
+            return AppError::new(
+                "err.login.credentials_rejected",
+                "Zepp 拒绝了这次登录凭据，请退出登录窗口后重新登录",
+            );
+        }
+        if self.transient > 0 {
+            return AppError::new(
+                "err.login.region_unreachable",
+                "暂时无法连接 Zepp 区域服务，请检查网络后重试",
+            );
+        }
+        AppError::new(
+            "err.login.region_probe_failed",
+            "读到了凭据，但无法确认账号区域。请重新登录，或改用 HAR 导入。",
+        )
+    }
+}
+
+fn classify_region_probe_error(error: &ZeppBridgeError) -> RegionProbeFailure {
+    match error {
+        ZeppBridgeError::NeedsReauth(_) => RegionProbeFailure::Rejected,
+        ZeppBridgeError::NetworkError(_) | ZeppBridgeError::RetryExhausted { .. } => {
+            RegionProbeFailure::Transient
+        }
+        _ => RegionProbeFailure::Other,
+    }
+}
+
+async fn probe_region_hosts(
+    user_id: &str,
+    app_token: &str,
+    hosts: &[String],
+    authoritative_count: usize,
+) -> std::result::Result<AuthInfo, AppError> {
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(45);
+    let mut failures = RegionProbeFailures::default();
+    let authoritative_count = authoritative_count.min(hosts.len());
+
+    // A cname/domains/wf_baseUrl hint came from this login response (or from
+    // the same already-saved user), so verify it before sending the token to
+    // any fallback region. A short stage timeout leaves enough of the global
+    // budget for recovery when Zepp returned a stale host.
+    if authoritative_count > 0 {
+        let stage_deadline = std::cmp::min(
+            deadline,
+            tokio::time::Instant::now() + Duration::from_secs(15),
+        );
+        if let Some(auth) = probe_region_batch(
+            user_id,
+            app_token,
+            &hosts[..authoritative_count],
+            stage_deadline,
+            &mut failures,
+        )
+        .await
+        {
+            return Ok(auth);
+        }
+    }
+
+    if let Some(auth) = probe_region_batch(
+        user_id,
+        app_token,
+        &hosts[authoritative_count..],
+        deadline,
+        &mut failures,
+    )
+    .await
+    {
+        return Ok(auth);
+    }
+    Err(failures.into_app_error())
+}
+
+async fn probe_region_batch(
+    user_id: &str,
+    app_token: &str,
+    hosts: &[String],
+    deadline: tokio::time::Instant,
+    failures: &mut RegionProbeFailures,
+) -> Option<AuthInfo> {
+    if hosts.is_empty() {
+        return None;
+    }
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<
+        std::result::Result<AuthInfo, RegionProbeFailure>,
+    >(hosts.len().max(1));
     let mut handles = Vec::new();
     for host in hosts {
         let auth = AuthInfo {
@@ -322,37 +444,63 @@ async fn probe_region_hosts(user_id: &str, app_token: &str, hosts: &[String]) ->
         };
         let tx = tx.clone();
         handles.push(tokio::spawn(async move {
-            if verify_recent_heart_rate(&auth).await.is_ok() {
-                let _ = tx.send(auth).await;
-            }
+            let result = verify_recent_heart_rate(&auth)
+                .await
+                .map(|_| auth)
+                .map_err(|error| classify_region_probe_error(&error));
+            let _ = tx.send(result).await;
         }));
     }
     drop(tx);
 
-    let winner = tokio::time::timeout(Duration::from_secs(45), rx.recv())
-        .await
-        .ok()
-        .flatten();
+    let mut winner = None;
+    for _ in 0..hosts.len() {
+        let Some(remaining) = deadline.checked_duration_since(tokio::time::Instant::now()) else {
+            failures.transient += 1;
+            break;
+        };
+        match tokio::time::timeout(remaining, rx.recv()).await {
+            Ok(Some(Ok(auth))) => {
+                winner = Some(auth);
+                break;
+            }
+            Ok(Some(Err(failure))) => failures.record(failure),
+            Ok(None) => break,
+            Err(_) => {
+                failures.transient += 1;
+                break;
+            }
+        }
+    }
     for handle in handles {
         handle.abort();
     }
     winner
 }
 
-async fn preferred_region_hosts(state: &AppState, hint: Option<&str>) -> Vec<String> {
+async fn preferred_region_hosts(
+    state: &AppState,
+    user_id: &str,
+    hint: Option<&str>,
+) -> (Vec<String>, usize) {
     let mut hosts = Vec::new();
-    if let Ok(Some(saved)) = state.auth.load_auth() {
-        push_unique_host(&mut hosts, &saved.region_host);
-    }
+    // The current login response is authoritative. A saved host belongs to
+    // the previous account and is only useful when that account id matches.
     if let Some(hint) = hint {
         for host in hosts_from_region_hint(hint) {
             push_unique_host(&mut hosts, &host);
         }
     }
+    if let Ok(Some(saved)) = state.auth.load_auth() {
+        if saved.user_id == user_id {
+            push_unique_host(&mut hosts, &saved.region_host);
+        }
+    }
+    let authoritative_count = hosts.len();
     for host in REGION_HOST_ALLOWLIST {
         push_unique_host(&mut hosts, host);
     }
-    hosts
+    (hosts, authoritative_count)
 }
 
 fn push_unique_host(hosts: &mut Vec<String>, raw: &str) {
@@ -379,7 +527,19 @@ pub(crate) fn hosts_from_region_hint(hint: &str) -> Vec<String> {
         .find(|part| {
             matches!(
                 *part,
-                "cn" | "cn2" | "cn3" | "us" | "us2" | "us3" | "de" | "sg" | "in" | "ru"
+                "cn" | "cn2"
+                    | "cn3"
+                    | "us"
+                    | "us2"
+                    | "us3"
+                    | "de"
+                    | "de2"
+                    | "sg"
+                    | "sg2"
+                    | "eu"
+                    | "eu2"
+                    | "in"
+                    | "ru"
             )
         })
         .unwrap_or(lowered.as_str());
@@ -391,31 +551,13 @@ pub(crate) fn hosts_from_region_hint(hint: &str) -> Vec<String> {
         .collect()
 }
 
-async fn collect_cookies(window: &WebviewWindow) -> Vec<(String, String)> {
-    let window_for_store = window.clone();
-    let mut pairs = tokio::task::spawn_blocking(move || match window_for_store.cookies() {
-        Ok(cookies) => cookies
-            .into_iter()
-            .map(|cookie| (cookie.name().to_string(), cookie.value().to_string()))
-            .collect(),
-        Err(_) => Vec::new(),
-    })
-    .await
-    .unwrap_or_default();
-
-    if parse_login_cookies(&pairs).is_some() {
-        return pairs;
-    }
-
+async fn collect_cookies(window: &WebviewWindow, page_url: &str) -> Vec<(String, String)> {
+    // Start with values visible to the current page. They are the freshest
+    // representation of the completed login and must win over cookie-store
+    // entries with the same name.
+    let mut pairs = Vec::new();
     if let Some(header) = document_cookie(window).await {
-        for pair in parse_cookie_header(&header) {
-            if !pairs
-                .iter()
-                .any(|(name, _)| name.eq_ignore_ascii_case(&pair.0))
-            {
-                pairs.push(pair);
-            }
-        }
+        append_missing_pairs(&mut pairs, parse_cookie_header(&header));
     }
 
     // 凭据不一定放在 cookie 里。表盘站是个前端应用，把登录信息写进
@@ -423,19 +565,43 @@ async fn collect_cookies(window: &WebviewWindow) -> Vec<(String, String)> {
     // webview 的 cookie jar 都看不到它——用户于是只能自己打开开发者工具
     // 把 App Token 抠出来（Reddit 上就有人这么做）。这里再看一眼存储，
     // 名字对得上就当成凭据来源。
-    if parse_login_cookies(&pairs).is_none() {
-        if let Some(entries) = web_storage_entries(window).await {
-            for pair in entries {
-                if !pairs
-                    .iter()
-                    .any(|(name, _)| name.eq_ignore_ascii_case(&pair.0))
-                {
-                    pairs.push(pair);
-                }
-            }
-        }
+    if let Some(entries) = web_storage_entries(window).await {
+        append_missing_pairs(&mut pairs, entries);
+    }
+
+    // `cookies()` returns the runtime store for every URL. That allowed a
+    // previous Xiaomi/Google/etc. account to supply the first matching
+    // userid/apptoken pair. Restrict the fallback to cookies applicable to the
+    // page that just completed the Zepp login.
+    if let Ok(url) = reqwest::Url::parse(page_url) {
+        let window_for_store = window.clone();
+        let scoped = tokio::task::spawn_blocking(move || {
+            window_for_store
+                .cookies_for_url(url)
+                .map(|cookies| {
+                    cookies
+                        .into_iter()
+                        .map(|cookie| (cookie.name().to_string(), cookie.value().to_string()))
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default()
+        })
+        .await
+        .unwrap_or_default();
+        append_missing_pairs(&mut pairs, scoped);
     }
     pairs
+}
+
+fn append_missing_pairs(target: &mut Vec<(String, String)>, incoming: Vec<(String, String)>) {
+    for pair in incoming {
+        if !target
+            .iter()
+            .any(|(name, _)| name.eq_ignore_ascii_case(&pair.0))
+        {
+            target.push(pair);
+        }
+    }
 }
 
 /// 从 localStorage / sessionStorage 里捞可能是凭据的键值。
@@ -446,7 +612,7 @@ async fn collect_cookies(window: &WebviewWindow) -> Vec<(String, String)> {
 async fn web_storage_entries(window: &WebviewWindow) -> Option<Vec<(String, String)>> {
     const SCRIPT: &str = r#"(function(){
   try {
-    var wanted = ['hm-user-login-info','hm_user_login_info','userid','user_id','apptoken','app_token','app-token','token_info','loginInfo'];
+    var wanted = ['hm-user-login-info','hm_user_login_info','userid','user_id','apptoken','app_token','app-token','token_info','loginInfo','domains','cname','region','country_code','wf_baseUrl'];
     var out = {};
     [window.localStorage, window.sessionStorage].forEach(function(store){
       if (!store) return;
@@ -528,21 +694,56 @@ pub(crate) fn parse_cookie_header(header: &str) -> Vec<(String, String)> {
 
 /// Extract a user id and app token from fake or real cookie pairs.
 pub(crate) fn parse_login_cookies(cookies: &[(String, String)]) -> Option<ExtractedLogin> {
+    // The official Watchface frontend treats the separate userid/apptoken
+    // cookies as authoritative over the bundled login-info cookie.
+    if let (Some(user_id), Some(app_token)) = (
+        cookie_value(cookies, &["userid", "user_id", "userId"])
+            .and_then(|value| sanitize_user_id(&percent_decode(&value))),
+        cookie_value(cookies, &["apptoken", "app_token", "app-token", "appToken"])
+            .and_then(|value| sanitize_app_token(&percent_decode(&value))),
+    ) {
+        return Some(ExtractedLogin {
+            user_id,
+            app_token,
+            region_hint: region_hint_from_pairs(cookies),
+        });
+    }
+
     if let Some(login_info) = cookie_value(cookies, &["hm-user-login-info", "hm_user_login_info"]) {
         if let Some(extracted) = extract_from_login_info(&login_info) {
             return Some(extracted);
         }
     }
 
-    let user_id = cookie_value(cookies, &["userid", "user_id", "userId"])
-        .and_then(|value| sanitize_user_id(&percent_decode(&value)))?;
-    let app_token = cookie_value(cookies, &["apptoken", "app_token", "app-token", "appToken"])
-        .and_then(|value| sanitize_app_token(&percent_decode(&value)))?;
-    Some(ExtractedLogin {
-        user_id,
-        app_token,
-        region_hint: None,
-    })
+    None
+}
+
+fn region_hint_from_pairs(pairs: &[(String, String)]) -> Option<String> {
+    const HOST_KEYS: &[&str] = &[
+        "wf_baseUrl",
+        "cname",
+        "domains",
+        "region_host",
+        "api_host",
+        "domain",
+        "host",
+    ];
+    for key in HOST_KEYS {
+        if let Some(raw) = cookie_value(pairs, &[*key]) {
+            let decoded = decode_possibly_encoded(&raw);
+            if let Ok(host) = validate_region_host(&decoded) {
+                return Some(host);
+            }
+            if let Ok(value) = serde_json::from_str::<Value>(&decoded) {
+                if let Some(host) = extract_host_from_value(&value) {
+                    return Some(host);
+                }
+            }
+        }
+    }
+    cookie_value(pairs, &["region", "country_code", "country"])
+        .map(|value| percent_decode(&value))
+        .filter(|value| !value.trim().is_empty())
 }
 
 fn extract_from_login_info(raw: &str) -> Option<ExtractedLogin> {
@@ -625,10 +826,7 @@ fn decode_possibly_encoded(raw: &str) -> String {
 }
 
 fn percent_decode(value: &str) -> String {
-    let replaced = value
-        .replace("+", " ")
-        .replace("%2C", ",")
-        .replace("%2c", ",");
+    let replaced = value.replace("%2C", ",").replace("%2c", ",");
     let bytes = replaced.as_bytes();
     let mut output = Vec::with_capacity(bytes.len());
     let mut index = 0;
@@ -804,9 +1002,28 @@ async fn emit_progress(
     publish_status(
         app,
         &state,
-        LoginStatus::new(state_name, code, message, page_url),
+        LoginStatus::new(state_name, code, message, safe_login_page_url(page_url)),
     )
     .await;
+}
+
+fn safe_login_page_url(raw: &str) -> String {
+    let Ok(mut url) = reqwest::Url::parse(raw) else {
+        return String::new();
+    };
+    let _ = url.set_username("");
+    let _ = url.set_password(None);
+    url.set_query(None);
+    url.set_fragment(None);
+    url.to_string()
+}
+
+fn login_window_title(locale: &str) -> &'static str {
+    if locale.trim().to_ascii_lowercase().starts_with("zh") {
+        "登录 Zepp"
+    } else {
+        "Sign in to Zepp"
+    }
 }
 
 async fn finish_failed(app: &AppHandle, epoch: u64, code: &str, message: &str, page_url: String) {
@@ -913,6 +1130,65 @@ mod tests {
     }
 
     #[test]
+    fn current_pair_overrides_stale_bundled_login_info() {
+        let cookies = vec![
+            (
+                "hm-user-login-info".into(),
+                r#"{"token_info":{"user_id":"old","app_token":"old-token"}}"#.into(),
+            ),
+            ("userid".into(), "new-user".into()),
+            ("apptoken".into(), "new+token".into()),
+            (
+                "wf_baseUrl".into(),
+                "https://api-mifit-sg2.huami.com".into(),
+            ),
+        ];
+        let got = parse_login_cookies(&cookies).expect("current pair");
+        assert_eq!(got.user_id, "new-user");
+        assert_eq!(got.app_token, "new+token");
+        assert_eq!(
+            got.region_hint.as_deref(),
+            Some("https://api-mifit-sg2.huami.com")
+        );
+    }
+
+    #[test]
+    fn region_host_can_be_read_from_domains_json() {
+        let cookies = vec![
+            ("userid".into(), "42".into()),
+            ("apptoken".into(), "token".into()),
+            (
+                "domains".into(),
+                r#"[{"cnames":["api-mifit-de2.huami.com"]}]"#.into(),
+            ),
+        ];
+        let got = parse_login_cookies(&cookies).expect("domains candidate");
+        assert_eq!(
+            got.region_hint.as_deref(),
+            Some("https://api-mifit-de2.huami.com")
+        );
+    }
+
+    #[test]
+    fn fresher_page_values_are_not_overwritten_by_cookie_store_values() {
+        let mut pairs = vec![
+            ("userid".into(), "current".into()),
+            ("apptoken".into(), "current-token".into()),
+        ];
+        append_missing_pairs(
+            &mut pairs,
+            vec![
+                ("userid".into(), "stale".into()),
+                ("apptoken".into(), "stale-token".into()),
+                ("cname".into(), "api-mifit-us2.huami.com".into()),
+            ],
+        );
+        let got = parse_login_cookies(&pairs).expect("page candidate");
+        assert_eq!(got.user_id, "current");
+        assert_eq!(got.app_token, "current-token");
+    }
+
+    #[test]
     fn parses_document_cookie_header() {
         let header = "foo=bar; userid=42; apptoken=tkn";
         let got = parse_login_cookies(&parse_cookie_header(header)).expect("header");
@@ -944,6 +1220,50 @@ mod tests {
         let us = hosts_from_region_hint("us");
         assert!(us.iter().all(|host| host.contains("-us")));
         assert!(hosts_from_region_hint("https://evil.example").is_empty());
+        assert_eq!(
+            hosts_from_region_hint("https://api-mifit-eu2.zepp.com"),
+            vec!["https://api-mifit-eu2.zepp.com".to_string()]
+        );
+        assert!(REGION_HOST_ALLOWLIST.contains(&"https://api-mifit-sg2.huami.com"));
+        assert!(REGION_HOST_ALLOWLIST.contains(&"https://api-mifit-de2.huami.com"));
+    }
+
+    #[test]
+    fn native_login_title_follows_the_interface_locale() {
+        assert_eq!(login_window_title("en"), "Sign in to Zepp");
+        assert_eq!(login_window_title("en-US"), "Sign in to Zepp");
+        assert_eq!(login_window_title("zh"), "登录 Zepp");
+        assert_eq!(login_window_title("zh-CN"), "登录 Zepp");
+    }
+
+    #[test]
+    fn login_status_url_drops_oauth_secrets() {
+        let safe = safe_login_page_url(
+            "https://account-us.zepp.com/callback?code=secret&state=private#access_token",
+        );
+        assert_eq!(safe, "https://account-us.zepp.com/callback");
+        assert!(!safe.contains("secret"));
+        assert!(!safe.contains("private"));
+        assert!(!safe.contains("access_token"));
+    }
+
+    #[test]
+    fn region_probe_error_classification_distinguishes_rejection() {
+        assert_eq!(
+            classify_region_probe_error(&ZeppBridgeError::NeedsReauth("HTTP 401".into())),
+            RegionProbeFailure::Rejected
+        );
+        assert_eq!(
+            classify_region_probe_error(&ZeppBridgeError::Unavailable("HTTP 404".into())),
+            RegionProbeFailure::Other
+        );
+        let error = RegionProbeFailures {
+            rejected: 1,
+            transient: 2,
+            other: 3,
+        }
+        .into_app_error();
+        assert_eq!(error.code, "err.login.credentials_rejected");
     }
 
     #[test]
