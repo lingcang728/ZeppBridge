@@ -53,8 +53,18 @@ describe('storage estimate copy', () => {
     expect(storageEstimateText(input)).toMatch(CHINESE);
   });
 
-  it('falls back to the backend text for an unknown code', () => {
-    // 后端加了新说法而界面还不认识：宁可显示看不懂的，也不要显示空白。
+  it('does not fall back to Chinese for an unknown code', () => {
+    /* 以前这里回落到后端原文，理由是「宁可显示看不懂的也不要空白」。
+       但后端原文一律是中文，那条回落正是英文界面冒中文的最后一个入口。
+       现在改成一句笼统的英文——看不懂的中文对英文用户既没信息量，
+       也没法反馈给我们。 */
+    const text = storageEstimateText({ ...base, message_code: 'ui.estimate.brand_new' });
+    expect(text).not.toMatch(CHINESE);
+    expect(text).toBe('The size of this backfill cannot be estimated right now.');
+  });
+
+  it('keeps the backend original in the Chinese interface', () => {
+    setLocale('zh');
     const text = storageEstimateText({ ...base, message_code: 'ui.estimate.brand_new' });
     expect(text).toBe(base.message);
   });

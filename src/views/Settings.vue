@@ -26,6 +26,7 @@ import { checkForDesktopUpdate, downloadAndInstallDesktopUpdate, updateState } f
 import { settingsMessages } from './Settings.i18n';
 import { intlLocale, locale, LOCALES, LOCALE_LABELS, setLocale, useMessages } from '../i18n';
 import { errorTextFor } from '../i18n/errors';
+import { backendText } from '../i18n/backendText';
 import { storageEstimateText } from '../lib/storageEstimateText';
 
 const t = useMessages(settingsMessages);
@@ -329,7 +330,7 @@ const estimateText = computed(() => storageEstimateText(storageEstimate.value));
 const loginMessage = computed(() => {
   const status = loginStatus.value;
   if (!status.message && !status.code) return '';
-  return errorTextFor(status.code) ?? status.message;
+  return errorTextFor(status.code) ?? backendText(status.message, '');
 });
 
 const connectionLabel = computed(() => {
@@ -414,7 +415,8 @@ const applyLoginStatus = async (status: LoginStatus) => {
   }
   if (status.state === 'failed') {
     // status.message 是后端的中文原文，只能兜底；先按码取当前语言的说法。
-    loginError.value = errorTextFor(status.code) ?? status.message ?? t.value.loginIncomplete;
+    loginError.value = errorTextFor(status.code)
+      ?? backendText(status.message, t.value.loginIncomplete);
   }
 };
 
@@ -830,8 +832,8 @@ const capabilityNote = (item: CapabilityItem): string => {
       ? t.value.capabilityNoneProbed(windowDays)
       : t.value.capabilityNoRecords(windowDays);
   }
-  // 后端加了新的状态而界面还不认识：显示它那句原文，别显示空白。
-  return item.note ?? '';
+  // 后端加了新的状态而界面还不认识：英文界面下不吐中文原文。
+  return backendText(item.note, '');
 };
 
 /* 三分，不是两分。

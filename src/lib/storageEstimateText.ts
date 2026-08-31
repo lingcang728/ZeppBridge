@@ -9,6 +9,7 @@
  * 现在只有这一份，两个调用方都从这里取。
  */
 import { defineMessages, messagesOf } from '../i18n';
+import { backendText } from '../i18n/backendText';
 
 /*
  * 只声明这里真正要读的字段，而不是整个 `StorageEstimate`。
@@ -38,6 +39,7 @@ const messages = defineMessages(
       `按本机已有数据的实际速率推算，${days} 天大约占用 ${add}，本盘剩余 ${free}。`,
     partial: (days: number, add: string, free: string) =>
       `只按本机已有样本的那几条流推算，${days} 天大约占用 ${add}（其余流样本不足，未计入），本盘剩余 ${free}。`,
+    unknownEstimate: '暂时无法估算这次补拉的占用。',
   },
   {
     stopNoSpace: (needed: string, free: string) =>
@@ -50,6 +52,7 @@ const messages = defineMessages(
       `Based on the rate your own data actually accumulates, ${days} days takes about ${add}, and ${free} is free on this drive.`,
     partial: (days: number, add: string, free: string) =>
       `Based only on the streams that have enough local samples, ${days} days takes about ${add} (the rest are not counted), and ${free} is free on this drive.`,
+    unknownEstimate: 'The size of this backfill cannot be estimated right now.',
   },
 );
 
@@ -83,7 +86,8 @@ export const storageEstimateText = (estimate: EstimateCopyInput | null | undefin
     case 'ui.estimate.builtin_guess': return t.builtinGuess(estimate.requested_days, add, free);
     case 'ui.estimate.measured': return t.measured(estimate.requested_days, add, free);
     case 'ui.estimate.partial': return t.partial(estimate.requested_days, add, free);
-    default: return estimate.message;
+    // 未知码：英文界面下不吐中文原文，给一句笼统的。
+    default: return backendText(estimate.message, t.unknownEstimate);
   }
 };
 
@@ -98,5 +102,5 @@ export const storageStopReasonText = (
       formatEstimateBytes(estimate.free_bytes),
     );
   }
-  return estimate.stop_reason;
+  return backendText(estimate.stop_reason, messagesOf(messages).unknownEstimate);
 };

@@ -18,6 +18,7 @@ import type { CoverageLedger, FailedChunk, StorageEstimate, UserPrefs } from '..
 import { syncStreamLabel } from '../lib/syncStreams';
 import { defineMessages, useMessages } from '../i18n';
 import { errorTextFor } from '../i18n/errors';
+import { backendText } from '../i18n/backendText';
 import { storageEstimateText, storageStopReasonText } from '../lib/storageEstimateText';
 
 const messages = defineMessages(
@@ -303,7 +304,7 @@ const chunkErrorText = (item: FailedChunk): string => {
   if (item.error_code === 'err.backfill.no_canonical_records') return t.value.chunkNoCanonical;
   const localized = errorTextFor(item.error_code);
   if (localized) return localized;
-  return item.error || t.value.failedNoReason;
+  return backendText(item.error, t.value.failedNoReason);
 };
 
 const runBackfill = async () => {

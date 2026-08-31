@@ -5,6 +5,7 @@ import type { AppStatus, LoginStatus, SyncOutcome, SyncProgress, SyncReport } fr
 import { syncStreamLabel } from '../lib/syncStreams';
 import { defineMessages, intlLocale, messagesOf } from '../i18n';
 import { errorTextFor } from '../i18n/errors';
+import { backendText } from '../i18n/backendText';
 
 export type SyncUiState = 'idle' | 'syncing' | SyncOutcome;
 
@@ -170,14 +171,14 @@ const renderNotice = (value: SyncNotice): string => {
   const t = copy();
   switch (value.kind) {
     case 'none': return t.notSyncedYet;
-    case 'backend': return value.text;
+    case 'backend': return backendText(value.text, t.syncingRecent);
     case 'progress': {
       const stream = syncStreamLabel(value.stream);
       if (value.code === 'backfilling' && value.month) return t.backfillingStream(stream, value.month);
       if (value.code === 'backfilling') return t.syncingStream(stream);
       if (value.code === 'syncing') return t.syncingStream(stream);
-      // 后端加了新的一步而界面还不认识它：退回后端那句原文，别把它吞掉。
-      return value.text;
+      // 后端加了新的一步而界面还不认识它：英文界面下不吐中文，给一句笼统的。
+      return backendText(value.text, t.syncingRecent);
     }
     case 'syncingRecent': return t.syncingRecent;
     case 'backfilling': return t.backfilling(value.days);

@@ -16,6 +16,7 @@ import Icon from './Icon.vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { formatFullDateTime } from '../lib/format';
 import type { BackupManifest, BackupVerification, PendingRestore, RestorePreview } from '../types';
+import { backendText } from '../i18n/backendText';
 import { defineMessages, useMessages } from '../i18n';
 
 const messages = defineMessages(
@@ -51,6 +52,7 @@ const messages = defineMessages(
     problemSizeMismatch: '备份文件大小和清单不一致，可能已损坏',
     problemSha256Mismatch: '备份文件的 SHA-256 和清单不一致，可能已损坏或被修改',
     problemIntegrityFailed: '备份文件没有通过 SQLite 完整性检查',
+    problemUnknown: '这份快照没有通过校验，原因未记录。',
     verifyPassed: '刚刚重新校验：文件、大小、SHA-256 与完整性都对得上。',
     integrityOk: (sha: string) => `生成时完整性检查通过 · SHA-256 ${sha}…`,
     integrityBad: '生成时完整性检查未通过，不要用它恢复。',
@@ -132,6 +134,7 @@ const messages = defineMessages(
     problemSha256Mismatch:
       "The backup file's SHA-256 does not match the manifest — it may be damaged or altered",
     problemIntegrityFailed: 'The backup file did not pass the SQLite integrity check',
+    problemUnknown: 'This snapshot failed verification, and no reason was recorded.',
     verifyPassed: 'Just re-verified: file, size, SHA-256 and integrity all line up.',
     integrityOk: (sha: string) => `Integrity check passed at creation · SHA-256 ${sha}…`,
     integrityBad: 'The integrity check failed at creation. Do not restore from it.',
@@ -210,7 +213,7 @@ const verifyProblemText = (verification: BackupVerification): string => {
     case 'ui.backup.size_mismatch': return t.value.problemSizeMismatch;
     case 'ui.backup.sha256_mismatch': return t.value.problemSha256Mismatch;
     case 'ui.backup.integrity_failed': return t.value.problemIntegrityFailed;
-    default: return verification.problem ?? '';
+    default: return backendText(verification.problem, t.value.problemUnknown);
   }
 };
 

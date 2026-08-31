@@ -57,6 +57,12 @@ const ALLOWED = [
     text: '跃我',
     why: '把设备名前面的中文品牌前缀去掉。这是在处理数据，不是在写文案。',
   },
+  {
+    file: 'i18n/backendText.ts',
+    text: 'const CJK =',
+    why: '这是判断「这段文字是不是中文」的字符区间，不是给用户看的字——'
+      + '整个闸门就靠它，挪进 defineMessages 反而没意义。',
+  },
 ];
 
 // 整份文件都是错误码文案，和 `*.i18n.ts` 同理。

@@ -1,5 +1,6 @@
 import { defineMessages, messagesOf } from '../../i18n';
 import { errorTextFor } from '../../i18n/errors';
+import { backendText } from '../../i18n/backendText';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -67,6 +68,8 @@ export const toUserMessage = (error: unknown, fallback = copy().genericFailure):
 
   const source = errorText(error).replace(/^Err\((.*)\)$/s, '$1').trim();
   if (!source) return fallback;
+  // 英文界面下绝不吐后端中文：查不到码时宁可给一句笼统的话。
+  if (backendText(source, '') === '') return fallback;
   const lower = source.toLowerCase();
   if (lower.includes(DESKTOP_ONLY_MARKER) || error instanceof DesktopUnavailableError) {
     return copy().desktopOnly;

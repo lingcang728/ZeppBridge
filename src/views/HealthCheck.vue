@@ -21,6 +21,7 @@ import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import type { DataHealth, HealthAction, StageState, StreamHealth } from '../types';
 import { syncStreamLabel } from '../lib/syncStreams';
 import { defineMessages, intlLocale, useMessages } from '../i18n';
+import { backendText } from '../i18n/backendText';
 
 const messages = defineMessages(
   {
@@ -349,7 +350,7 @@ const unknownStageDetail = (stream: StreamHealth): string => {
   for (const stage of [stream.fetch, stream.parse]) {
     if (stage.state !== 'failed' || !stage.message) continue;
     const known = lookup(t.value.errorKind, stage.error_kind || 'unknown');
-    if (!known) return stage.message;
+    if (!known) return backendText(stage.message, '');
   }
   return '';
 };
