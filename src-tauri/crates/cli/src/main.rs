@@ -332,6 +332,9 @@ fn cmd_status(args: &[String]) -> u8 {
     };
     let ledger = db.coverage_ledger().ok();
     let workouts = db.get_recent_workouts(1).unwrap_or_default();
+    // 「本机有多少历史」是所有出口都要能回答的问题，不只是桌面应用：
+    // 一个调度脚本同样需要在导出半年之前知道本机是不是只有 30 天。
+    let coverage = db.local_coverage().unwrap_or_default();
 
     let payload = serde_json::json!({
         "ok": true,
@@ -355,6 +358,9 @@ fn cmd_status(args: &[String]) -> u8 {
         "historyPendingChunks": ledger
             .as_ref()
             .map(|value| value.total_chunks - value.completed_chunks),
+        "coverageEarliestDay": coverage.earliest_day,
+        "coverageLatestDay": coverage.latest_day,
+        "coverageDays": coverage.covered_days,
     });
 
     let human = format!(

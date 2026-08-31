@@ -251,6 +251,35 @@ const scheduleDeferredRetry = (mode: 'incremental' | 'initial' | 'history', days
   }, DEFERRED_RETRY_MS);
 };
 
+/**
+ * 首次连接后，后台自动往回补到这么多天。
+ *
+ * 和后端的 `UserPrefs::DEFAULT_HISTORY_SYNC_DAYS` 是同一个数，故意的：
+ * 后端一直把 180 当作「一个人装完这个应用应该拥有多少历史」，只是从来没有
+ * 哪个入口去要它——所有入口跑的都是写死 30 天的增量同步。于是每个新用户的
+ * 本地库都只有 30 天，然后在图表上点「6 个月」，看到五个月的空白。
+ */
+const FIRST_RUN_BACKFILL_DAYS = 180;
+
+/**
+ * 首次同步之后接着把历史补齐。
+ *
+ * 为什么是「先 30 天再补」而不是一上来就要 180 天：首屏得有东西。一次 180 天的
+ * 同步要跑十分钟，这十分钟里界面上什么都没有，而 30 天只要几十秒。所以先拿近的
+ * 让人能用，剩下的在后台继续——进度条照常显示，随时可以取消。
+ *
+ * 只在**第一次**发生（此前没有 `last_cloud_sync_at`）。往后的每次同步都是增量，
+ * 不会再拖一条长任务。
+ */
+const scheduleFirstRunBackfill = () => {
+  // 空间不够就不要开始。设置页里手动补拉时后端已经会拦（`allow_long_history`），
+  // 而这条路径不经过那个对话框——不检查就等于用一条自动任务绕过了同一条规则。
+  if (appStatus.value?.storage && !appStatus.value.storage.allow_long_history) return;
+  window.setTimeout(() => {
+    void runSync('history', FIRST_RUN_BACKFILL_DAYS, { silent: true });
+  }, 0);
+};
+
 const runSync = (
   mode: 'incremental' | 'initial' | 'history' = 'incremental',
   days?: number,
@@ -269,6 +298,9 @@ const runSync = (
       return null;
     }
     const status = appStatus.value ?? await refreshStatus();
+    // 记在跑之前：同步一旦成功就会写上 last_cloud_sync_at，跑完再读就分不出
+    // 这是不是第一次了。
+    const wasFirstSync = !status?.last_cloud_sync_at;
     if (status?.connection_state === 'needs_reauth') {
       syncState.value = 'failed';
       notice.value = { kind: 'reauthNeeded' };
@@ -305,6 +337,18 @@ const runSync = (
       // reread, and the sync itself has to come back rather than be lost.
       dataRevision.value += 1;
       if (report.outcome === 'deferred') scheduleDeferredRetry(mode, days);
+      // 第一次拿到近 30 天之后，接着把 180 天补齐。
+      // `deferred` 不算——那次根本没写进任何数据，补拉要等重试真的成功了再排。
+      // `cancelled` 更不算：用户刚刚按了取消，紧接着自己排一个十分钟的任务，
+      // 是把取消当成没听见。
+      else if (
+        wasFirstSync
+        && mode === 'incremental'
+        && report.outcome !== 'failed'
+        && report.outcome !== 'cancelled'
+      ) {
+        scheduleFirstRunBackfill();
+      }
       return report;
     } catch (error) {
       syncState.value = 'failed';

@@ -13,6 +13,7 @@ import { AUTO_SYNC_INTERVALS } from '../lib/autoSync';
 import { UI_SCALES, useUiScale, type UiScale } from '../composables/useUiScale';
 import { backend, toUserMessage } from '../lib/bridge';
 import { regionShortName } from '../lib/deviceCopy';
+import { BACKFILL_RANGE_DAYS, rangeOptions } from '../lib/rangeOptions';
 import type {
   CapabilityItem,
   CapabilityOverview,
@@ -186,8 +187,11 @@ const copyMcpConfig = async () => {
 
 const RETENTION_CHOICES = computed(() =>
   [30, 90, 180, 365].map((days) => ({ value: days, label: t.value.days(days) })));
+/* 选项来自 lib/rangeOptions.ts 的那条唯一梯子。以前这里写死 [7,30,90,365]，
+   而后端的补拉默认值是 180——180 不在选项里，下拉就匹配不到任何一项，
+   全新安装时这个框是空的。 */
 const HISTORY_CHOICES = computed(() =>
-  [7, 30, 90, 365].map((days) => ({ value: days, label: t.value.lastDays(days) })));
+  rangeOptions(BACKFILL_RANGE_DAYS).map((range) => ({ value: range.days, label: range.label })));
 const EXPORT_FORMAT_CHOICES = computed(() => [
   { value: 'json', label: 'JSON', hint: t.value.formatJsonHint },
   { value: 'csv', label: 'CSV', hint: t.value.formatCsvHint },

@@ -571,7 +571,7 @@ const CAPABILITY_ROWS: [(&str, CapabilityEvidence, i64); 15] = [
 ];
 
 /// Streams with no local trace at all. Only these cost a request.
-pub const PROBE_ONLY_CAPABILITIES: [&str; 3] = ["blood_pressure", "weight", "emotion"];
+pub const PROBE_ONLY_CAPABILITIES: [&str; 4] = ["blood_pressure", "weight", "emotion", "food"];
 
 /// 探测覆盖多久。和探测本身用的范围一致，界面拿它写「过去 N 天没有测量记录」。
 const PROBE_WINDOW_DAYS: i64 = 365;
@@ -748,6 +748,22 @@ pub struct NormalizationCounts {
 pub struct StreamFreshness {
     pub last_cloud_sync_at: Option<String>,
     pub newest_sample_at: Option<String>,
+}
+
+/// 本机实际有数据的那段日子。
+///
+/// 存在的理由：界面上到处都能选「6 个月」，但那些选择器读的都是本机库。
+/// 库里只有 30 天时，选 6 个月只会把坐标轴拉长，前面五个月是空的——而在此之前
+/// 没有任何一处告诉用户这件事，于是「我选了 6 个月却只看到 30 天」被当成 bug
+/// 报了上来。它不是 bug，是我们没说。
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct LocalCoverage {
+    /// 最早一天（`YYYY-MM-DD`）。库是空的时候为 `None`。
+    pub earliest_day: Option<String>,
+    /// 最晚一天（`YYYY-MM-DD`）。
+    pub latest_day: Option<String>,
+    /// `earliest_day` 到今天的天数。用来和「你选的范围」直接比较。
+    pub covered_days: i64,
 }
 
 /// The IPC structs are camelCase for the frontend, but an export file is
@@ -1600,6 +1616,54 @@ impl Database {
             freshness.entry(stream.into()).or_default().newest_sample_at = timestamp;
         }
         Ok(freshness)
+    }
+
+    /// 本机实际有数据的那段日子。
+    ///
+    /// 四张表各问一次最早/最晚，取并集：只看其中一张会在「有运动没有日概览」
+    /// 这类账号上少报好几个月。返回的是**天**而不是时间戳，因为它要拿去和界面上
+    /// 「最近 7 天 / 30 天 / 6 个月」这些以天为单位的选择直接比较。
+    pub fn local_coverage(&self) -> Result<LocalCoverage> {
+        let mut earliest: Option<String> = None;
+        let mut latest: Option<String> = None;
+        for query in [
+            "SELECT MIN(date), MAX(date) FROM daily_metrics",
+            "SELECT MIN(substr(timestamp, 1, 10)), MAX(substr(timestamp, 1, 10)) FROM metric_samples",
+            "SELECT MIN(substr(start_time, 1, 10)), MAX(substr(end_time, 1, 10)) FROM sleep_sessions",
+            "SELECT MIN(substr(start_time, 1, 10)), MAX(substr(end_time, 1, 10)) FROM workouts",
+        ] {
+            let (low, high) = self.conn.query_row(query, [], |row| {
+                Ok((
+                    row.get::<_, Option<String>>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                ))
+            })?;
+            if let Some(low) = low {
+                if earliest.as_deref().is_none_or(|current| low.as_str() < current) {
+                    earliest = Some(low);
+                }
+            }
+            if let Some(high) = high {
+                if latest.as_deref().is_none_or(|current| high.as_str() > current) {
+                    latest = Some(high);
+                }
+            }
+        }
+
+        // 覆盖天数从最早那天数到**今天**，不是数到 `latest_day`：用户问的是
+        // 「我能往回看多远」，而表没同步的那两天不该让答案变小。
+        let covered_days = earliest
+            .as_deref()
+            .and_then(|day| NaiveDate::parse_from_str(day, "%Y-%m-%d").ok())
+            .map(|day| (Local::now().date_naive() - day).num_days() + 1)
+            .unwrap_or(0)
+            .max(0);
+
+        Ok(LocalCoverage {
+            earliest_day: earliest,
+            latest_day: latest,
+            covered_days,
+        })
     }
 
     pub fn newest_samples(&self) -> Result<BTreeMap<String, Option<String>>> {
@@ -6469,6 +6533,40 @@ mod tests {
         assert_eq!(prefs.retention_days, 365);
         assert_eq!(prefs.history_sync_days, 180);
         assert!(db.get_app_meta("retention_days").unwrap().is_none());
+    }
+
+    #[test]
+    fn local_coverage_is_empty_on_a_fresh_library() {
+        let db = Database::in_memory().unwrap();
+        let coverage = db.local_coverage().unwrap();
+        assert_eq!(coverage.earliest_day, None);
+        assert_eq!(coverage.latest_day, None);
+        // 0 而不是「今天到今天 = 1 天」：库里一条都没有，覆盖就是零。
+        assert_eq!(coverage.covered_days, 0);
+    }
+
+    #[test]
+    fn local_coverage_takes_the_union_across_tables() {
+        let db = Database::in_memory().unwrap();
+        // 只有运动、没有日概览的账号是真实存在的。只查 daily_metrics 会把这类
+        // 账号的覆盖范围少报好几个月——正是这里要防的。
+        db.conn
+            .execute(
+                "INSERT INTO daily_metrics (date, metric, value, unit, source_scope)                  VALUES ('2026-06-10', 'steps', 1000.0, 'count', 'user_fused')",
+                [],
+            )
+            .unwrap();
+        db.conn
+            .execute(
+                "INSERT INTO workouts (workout_id, workout_type, start_time, end_time,                  source_scope) VALUES ('w1', 'run', '2026-03-02T07:00:00Z',                  '2026-03-02T08:00:00Z', 'device')",
+                [],
+            )
+            .unwrap();
+
+        let coverage = db.local_coverage().unwrap();
+        assert_eq!(coverage.earliest_day.as_deref(), Some("2026-03-02"));
+        assert_eq!(coverage.latest_day.as_deref(), Some("2026-06-10"));
+        assert!(coverage.covered_days > 0);
     }
 
     #[test]

@@ -2,6 +2,37 @@
 
 本文件记录每个版本的实际改动。写给使用者看，不是施工日志：只写用户能感知到的变化，以及为什么这么改。
 
+## 未发布
+
+Why "I picked 6 months but only see 30 days" was never a calendar bug.
+
+「我选了 6 个月，却只看到最近 30 天」的真正原因。
+
+### Fixes / 修复
+
+- **A first sync no longer leaves you with 30 days and no way to know it.** Every entry point ran the incremental sync, whose window is hard-coded to 30 days; the 180-day path existed in the backend but no screen ever asked for it. So every new library held exactly one month. The first sync now still fetches 30 days — so there is something on screen in under a minute — and then continues in the background until 180 days are in, with the usual progress and cancel. Later syncs stay incremental.
+- **首次同步不再只给 30 天、而且不告诉你。** 所有入口跑的都是增量同步，而它的窗口写死 30 天；后端那条 180 天的路径一直存在，却没有任何一个界面去要它。于是每个新库都正好只有一个月。现在首次同步仍先取 30 天——一分钟内屏幕上就有东西——然后在后台继续补到 180 天，进度和取消照旧。之后的同步仍是增量。
+- **The screens now say how far back this machine actually goes.** Training status, body status and the export page each offer "last N days", and every one of them reads the **local** library, not the cloud. With 30 days stored, picking 6 months only stretched the axis and left five months blank — and nothing said why. A notice now states the covered range and offers to backfill, and it says the blank means *not fetched yet*, not *you recorded nothing then*. `zeppbridge status` gained the same three fields.
+- **界面现在会说明本机到底有多少历史。** 训练状态、身体状态和导出页都提供「最近 N 天」，而每一个读的都是**本机**库，不是云端。库里只有 30 天时选 6 个月，只会把坐标轴拉长、留下五个月空白——却没有任何一处解释。现在有一条提示写明覆盖范围并给出补拉入口，并且明确空白的含义是**还没取回来**，不是**那段时间你没有记录**。`zeppbridge status` 也补上了同样的三个字段。
+- **The history backfill dropdown is no longer blank on a fresh install.** Its options were `[7, 30, 90, 365]` while the backend default is 180 — a value not in the list, so the menu matched nothing and rendered its placeholder. Ranges now come from one shared ladder (`7 / 30 / 90 / 180 / 365`) that the export page and the charts draw from too; the export page previously offered only 7 and 30 days, so asking it for six months meant picking dates by hand.
+- **全新安装时「历史补拉范围」下拉不再是空的。** 它的选项是 `[7, 30, 90, 365]`，而后端默认值是 180——不在选项里，于是匹配不到任何一项，只显示占位符。现在范围来自同一条梯子（`7 / 30 / 90 / 180 / 365`），导出页和图表页共用；导出页此前只有 7 天和 30 天，想导半年只能手点日历。
+
+### Added / 新增
+
+- **The Zepp food log is now probed.** Outside mainland China the Zepp app has a Food Log — meals photographed, stored as calories, protein, carbohydrate, fat and fibre. It is served as `eventType=Food` on `/v2/users/me/events`, the same surface ZeppBridge already reads, and it is addressed by event type alone. The capability overview now reports whether this account has one. Nothing is fetched or stored yet: this answers whether a stream is worth building, on real accounts, instead of guessing.
+- **新增对 Zepp 饮食记录的能力探测。** 中国大陆以外的 Zepp 应用有「饮食记录」——拍照记录，存成卡路里、蛋白质、碳水、脂肪和膳食纤维。它在 `/v2/users/me/events` 上以 `eventType=Food` 提供，正是 ZeppBridge 已经在读的那个面，并且只用事件类型寻址、没有 subType。能力总览现在会报告这个账号有没有。**暂不抓取、不入库**：这一步只是在真实账号上回答「这条流值不值得做」，而不是靠猜。
+
+### Fixed under the hood / 内部修复
+
+- `fetch_events` 的 `subType` 改为可选，和 `fetch_user_events` 一致。此前它无条件发送 `subType`，探测不带 subType 的流时会被迫编一个 `real_data`——服务端返回空页，读起来和「这个账号真的没有」一模一样。
+
+### Upgrade / 升级说明
+
+- Overlay-install. Local data, backups and settings are untouched. No schema change.
+- 覆盖安装即可。本地数据、备份和设置都不会动。数据库结构没有变化。
+- After upgrading, the first sync on a **new** install backfills 180 days automatically. An existing library is left alone — use **Backfill more history** on any chart page, or Settings → Export and backfill defaults.
+- 升级后，**全新安装**的首次同步会自动补到 180 天。已有的库不会被动：想补历史就用图表页上的「补拉更多历史」，或设置 →「导出与补拉默认值」。
+
 ## 1.1.2
 
 Two reported bugs that blocked real use, and the reason English users kept seeing Chinese.

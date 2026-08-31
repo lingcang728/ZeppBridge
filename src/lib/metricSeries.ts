@@ -1,11 +1,9 @@
 import type { MetricSeries, MetricSeriesPoint } from '../types';
 import { defineMessages, intlLocale, messagesOf } from '../i18n';
+import { DISPLAY_RANGE_DAYS, rangeOptions } from './rangeOptions';
 
 const messages = defineMessages(
   {
-    range7: '7 天',
-    range30: '1 个月',
-    range180: '6 个月',
     notSyncedYet: '尚未同步',
     noRecordsInWindow: (days: number) => `近 ${days} 天无记录`,
     coverage: (days: number, withData: number) => `${days} 天里有 ${withData} 天记录`,
@@ -13,9 +11,6 @@ const messages = defineMessages(
     samples: (count: number) => `${count} 次读数`,
   },
   {
-    range7: '7 days',
-    range30: '1 month',
-    range180: '6 months',
     notSyncedYet: 'Not synced yet',
     noRecordsInWindow: (days: number) => `No records in the last ${days} days`,
     coverage: (days: number, withData: number) => `${withData} of ${days} days have records`,
@@ -33,19 +28,13 @@ const copy = () => messagesOf(messages);
  * handful of times a year, so a 30-day window shows an empty chart for metrics
  * the library actually holds a year of.
  */
-export const SERIES_RANGE_DAYS = [7, 30, 180] as const;
+export const SERIES_RANGE_DAYS = DISPLAY_RANGE_DAYS;
 
-export type SeriesRangeDays = (typeof SERIES_RANGE_DAYS)[number];
+export type SeriesRangeDays = (typeof DISPLAY_RANGE_DAYS)[number];
 
 /** 范围切换按钮的文字。跟着当前语言走，所以是函数而不是常量数组。 */
-export const seriesRanges = (): Array<{ days: SeriesRangeDays; label: string }> => {
-  const t = copy();
-  return [
-    { days: 7, label: t.range7 },
-    { days: 30, label: t.range30 },
-    { days: 180, label: t.range180 },
-  ];
-};
+export const seriesRanges = (): Array<{ days: SeriesRangeDays; label: string }> =>
+  rangeOptions(DISPLAY_RANGE_DAYS);
 
 /** Index a `getMetricSeries` response by metric name. */
 export const indexSeries = (series: MetricSeries[]): Record<string, MetricSeries> => {

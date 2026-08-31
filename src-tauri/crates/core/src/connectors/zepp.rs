@@ -483,27 +483,30 @@ impl ZeppConnector {
         .await
     }
 
+    /// `sub_type` is optional here, exactly as it is on `fetch_user_events`.
+    ///
+    /// Most v2 streams do name one, but not all of them: the `Food` stream is
+    /// addressed by `eventType` alone. Sending a made-up `subType=real_data`
+    /// to those returns an empty page, which reads as "this account has no
+    /// food log" — a false negative that looks exactly like a true one.
     pub async fn fetch_events(
         &self,
         event_type: &str,
-        sub_type: &str,
+        sub_type: Option<&str>,
         from_ms: i64,
         to_ms: i64,
         limit: i64,
         reverse: bool,
     ) -> Result<Value> {
-        self.get_json(
-            "/v2/users/me/events",
-            vec![
-                ("eventType", event_type.to_owned()),
-                ("subType", sub_type.to_owned()),
-                ("from", from_ms.to_string()),
-                ("to", to_ms.to_string()),
-                ("limit", limit.max(1).to_string()),
-                ("reverse", if reverse { "1" } else { "0" }.to_owned()),
-            ],
-        )
-        .await
+        let mut params = vec![("eventType", event_type.to_owned())];
+        if let Some(sub_type) = sub_type {
+            params.push(("subType", sub_type.to_owned()));
+        }
+        params.push(("from", from_ms.to_string()));
+        params.push(("to", to_ms.to_string()));
+        params.push(("limit", limit.max(1).to_string()));
+        params.push(("reverse", if reverse { "1" } else { "0" }.to_owned()));
+        self.get_json("/v2/users/me/events", params).await
     }
 
     /// The user-scoped event timeline: `/users/{id}/events`.
@@ -622,7 +625,7 @@ impl ZeppConnector {
             .ok_or_else(|| ZeppBridgeError::ConfigError("end_date 无效".into()))?
             .and_utc()
             .timestamp_millis();
-        self.fetch_events("hrv_sdnn", "real_data", start, end, 2000, true)
+        self.fetch_events("hrv_sdnn", Some("real_data"), start, end, 2000, true)
             .await
     }
 
@@ -640,7 +643,7 @@ impl ZeppConnector {
             .ok_or_else(|| ZeppBridgeError::ConfigError("end_date 无效".into()))?
             .and_utc()
             .timestamp_millis();
-        self.fetch_events("DailyHealth", "summary", start, end, 2000, true)
+        self.fetch_events("DailyHealth", Some("summary"), start, end, 2000, true)
             .await
     }
 }

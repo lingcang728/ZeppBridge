@@ -3,6 +3,7 @@ defineOptions({ name: 'Explore' });
 import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import Icon from '../components/Icon.vue';
+import CoverageNotice from '../components/CoverageNotice.vue';
 import type { IconName } from '../components/Icon.vue';
 import {
   exportDetailOptions,
@@ -16,6 +17,7 @@ import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { useAiHandoff } from '../composables/useAiHandoff';
 import { localDateString } from '../lib/format';
 import { popoverStyle } from '../lib/popoverPosition';
+import { rangeOptions } from '../lib/rangeOptions';
 import { AI_PROVIDERS, AI_PROVIDER_BY_ID, type AiProviderId } from '../lib/aiProviders';
 import type { ExportDataType, ExportScope, ExportSelection, ExportTypeGroup } from '../types';
 import { exploreMessages, promptTemplates, type PromptTemplate } from './Explore.i18n';
@@ -36,6 +38,9 @@ const {
 } = useExport();
 
 const { dataRevision } = useSyncController();
+
+/** 导出快捷范围。比图表多一档 3 个月，因为导出常按季度来。 */
+const EXPORT_RANGE_DAYS = [7, 30, 90, 180] as const;
 
 /* 模板文案（含六段提示词）在 Explore.i18n.ts。 */
 const templates = computed<PromptTemplate[]>(() => promptTemplates());
@@ -274,10 +279,22 @@ const schedulePreview = () => {
   previewTimer = window.setTimeout(() => { void loadPreview(); }, 280);
 };
 
-const ranges = computed(() => [
-  { days: 7, label: t.value.range7 },
-  { days: 30, label: t.value.range30 },
-]);
+/* 和训练/身体页用同一条梯子（lib/rangeOptions.ts）。以前这里只有 7 天和 30 天，
+   想导出半年只能手点日历两下，而图表页明明就摆着一个「6 个月」按钮——
+   两处对不上，是「我选了 6 个月却只拿到 30 天」这类误会的一半来源。 */
+const ranges = computed(() => rangeOptions(EXPORT_RANGE_DAYS));
+/* 选中的范围往回够到多少天。给 CoverageNotice 用：导出读的也是本机库，
+   选了半年而库里只有 30 天时，导出文件会安静地只装 30 天。 */
+const requestedSpanDays = computed(() => {
+  if (focusedWorkoutId.value) return 0;
+  if (!exportStartDate.value) return 0;
+  const start = Date.parse(`${exportStartDate.value}T00:00:00`);
+  if (!Number.isFinite(start)) return 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((today.getTime() - start) / 86_400_000) + 1;
+});
+
 const activeRangeDays = computed(() => {
   for (const range of ranges.value) {
     const end = new Date();
@@ -651,6 +668,8 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
                 <span class="cell-sub">{{ t.cellSizeSub }}</span>
               </div>
             </div>
+
+            <CoverageNotice :requested-days="requestedSpanDays" />
 
             <!-- 范围选择与自定义日期选择器 -->
             <div class="range-row">
