@@ -1732,6 +1732,23 @@ fn duration_to_minutes(value: f64) -> i32 {
 
 #[cfg(test)]
 mod tests {
+
+    /// 空报文报的是 `DataUnavailable`，不是解析失败。
+    ///
+    /// 有的账号心率接口对整段历史都返回 `{"items": []}`——那是在明确回答
+    /// 「这段时间没有心率」。补拉靠 `is_unavailable()` 把这一块记成
+    /// 「云端没有」而不是失败；这条断言就是那个判断的前提，别改成别的错误类型。
+    #[test]
+    fn an_empty_items_payload_reports_unavailable_not_a_parse_failure() {
+        let payload = serde_json::json!({ "items": [] });
+        let error = Normalizer::normalize_heart_rate(&payload)
+            .expect_err("空 items 目前按 DataUnavailable 上报");
+        assert!(
+            error.is_unavailable(),
+            "补拉据此区分「云端没有」和「我们没看懂」，改了这里要同步改 backfill_one_chunk"
+        );
+    }
+
     use super::*;
     use base64::engine::general_purpose::STANDARD;
     use serde_json::json;

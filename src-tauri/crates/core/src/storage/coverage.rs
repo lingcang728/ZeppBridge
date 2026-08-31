@@ -674,6 +674,57 @@ mod tests {
         assert_chinese_carries_a_code(&json, "ledger");
     }
 
+    /// 「云端没有」和「我们没看懂」必须分开记。
+    ///
+    /// 现场：某个账号的心率接口对整段历史都返回 `{"items": []}`——它明确
+    /// 在说「这段时间没有心率」。旧实现把「解析出 0 行」一律当失败，于是
+    /// 界面上排出一长串红色的「失败」，用户以为自己丢了几个月的数据；
+    /// 而这些块又永远排在待办队首，把后面的块全挡住（issue #10 的现场）。
+    ///
+    /// 这里钉住账本这一侧的语义：`empty_from_cloud` 不算失败，也不再重试，
+    /// 但仍然算「有结论」，所以不影响完整性判断。
+    #[test]
+    fn a_month_the_cloud_has_nothing_for_is_not_a_failure() {
+        let db = db();
+        db.plan_backfill(date("2026-08-01"), date("2026-08-31"))
+            .unwrap();
+
+        db.record_backfill_chunk(
+            "heart_rate",
+            "2026-08-01",
+            ChunkStatus::EmptyFromCloud,
+            0,
+            None,
+            None,
+        )
+        .unwrap();
+
+        // 不出现在失败清单里——界面不该把它画成红色。
+        assert!(db
+            .failed_backfill_chunks()
+            .unwrap()
+            .iter()
+            .all(|chunk| chunk.stream != "heart_rate"));
+
+        // 也不再回到待办队列——它没有失败，重试没有意义。
+        assert!(db
+            .pending_backfill_chunks(24)
+            .unwrap()
+            .iter()
+            .all(|chunk| !(chunk.stream == "heart_rate" && chunk.chunk_start == "2026-08-01")));
+
+        // 但它是一个「结论」，会计入完成数。
+        let ledger = db.coverage_ledger().unwrap();
+        let heart_rate = ledger
+            .streams
+            .iter()
+            .find(|item| item.stream == "heart_rate")
+            .unwrap();
+        assert_eq!(heart_rate.empty_chunks, 1);
+        assert_eq!(heart_rate.failed_chunks, 0);
+        assert!(!ledger.needs_manual_retry);
+    }
+
     #[test]
     fn chunks_align_to_calendar_months_and_cover_both_ends() {
         let chunks = month_chunks(date("2026-01-15"), date("2026-03-02"));

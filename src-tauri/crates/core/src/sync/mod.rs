@@ -547,6 +547,24 @@ impl SyncManager {
                 let report = self.persist_records(&chunk.stream, records).await?;
                 if report.records_written > 0 {
                     Ok((ChunkStatus::Persisted, report.records_written, None))
+                } else if matches!(
+                    report.status,
+                    StreamStatus::Unavailable | StreamStatus::Unverified | StreamStatus::Success
+                ) {
+                    // 云端返回的报文里没有可识别记录——比如心率接口对这段时间
+                    // 返回 `{"items": []}`，它是在明确回答「这段时间没有」。
+                    //
+                    // 上面那条 `Err(error) if error.is_unavailable()` 早就把同一件
+                    // 事记成 `EmptyFromCloud` 了；差别只在于报文是在取的时候失败，
+                    // 还是取回来之后才发现是空的。对用户来说这没有区别，账本不该
+                    // 因此给出两种结论。
+                    //
+                    // 记成失败会连锁出两个问题：界面把一段本来就没有数据的历史排成
+                    // 一长串红色「失败」，用户以为自己丢了几个月数据；而这些块又会
+                    // 一直排在待办队首，把后面的块全挡住——issue #10 的现场正是如此。
+                    //
+                    // `StreamStatus::Failed` 不在这里：那是真的写不进去或认证挂了。
+                    Ok((ChunkStatus::EmptyFromCloud, 0, None))
                 } else {
                     // 报文回来了但一条 canonical 都没产出：这不是「云端没有」，
                     // 记成失败以便重试和排查。
