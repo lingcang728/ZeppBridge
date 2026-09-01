@@ -159,6 +159,41 @@ jobs:
           flatpak-builder --show-manifest \
             packaging/flatpak/com.zeppbridge.app.yml > /dev/null
 
+      # `appstreamcli validate` 只看那份 XML 自己合不合法。flatpak-builder
+      # 真正跑的是 `appstreamcli compose`，那一步还要去读 desktop 文件和图标，
+      # 而它是在整个 Rust 编译成功之后才跑的——一个读不了的图标会让十五分钟
+      # 的构建倒在最后一步，报一句既不提文件名也不提图标的
+      #   com.zeppbridge.app  E: file-read-error
+      #
+      # 这里用打包用的那几个文件搭一个最小的 /usr 树，把同一个 compose 提前
+      # 到秒级跑掉。（这条检查就是这么发现 icon-source.svg 不能当平台图标的：
+      # 它用 <symbol> + <use> 间接引用，compose 读不了。）
+      - name: Dry-run the AppStream compose the Flatpak build will do
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y --no-install-recommends appstream-compose
+          root=$(mktemp -d)/files
+          mkdir -p "$root/usr/share/applications" "$root/usr/share/metainfo"
+          install -m644 packaging/flatpak/com.zeppbridge.app.desktop \
+            "$root/usr/share/applications/com.zeppbridge.app.desktop"
+          install -m644 packaging/flatpak/com.zeppbridge.app.metainfo.xml \
+            "$root/usr/share/metainfo/com.zeppbridge.app.metainfo.xml"
+
+          # 图标来源要和 manifest 里的 install 命令一致，否则这条检查会
+          # 检查一个和实际构建不同的东西。
+          for pair in 32x32:32x32 64x64:64x64 128x128:128x128 \
+                      128x128@2x:256x256 icon:512x512; do
+            src="${pair%%:*}"; dir="${pair##*:}"
+            mkdir -p "$root/usr/share/icons/hicolor/$dir/apps"
+            install -m644 "src-tauri/icons/$src.png" \
+              "$root/usr/share/icons/hicolor/$dir/apps/com.zeppbridge.app.png"
+          done
+
+          out=$(mktemp -d)
+          appstreamcli compose --origin=ci --prefix=/usr \
+            --result-root="$out" --data-dir="$out/data" --icons-dir="$out/icons" \
+            --components=com.zeppbridge.app "$root"
+
       # 钉住的 runtime 会在某一天停止维护，而那一天不会有任何东西提醒我们：
       # 构建照样绿，装出来的应用照样能跑，只是它内嵌的 WebView 不再收到
       # 安全更新了。这个项目上，WebView 是暴露面最大的那个组件。
@@ -436,21 +471,29 @@ jobs:
             libdbus-1-dev \
             libxdo-dev \
             patchelf \
-            rpm
+            rpm \
+            xdg-utils
 
       - name: Install frontend dependencies
         run: npm ci
 
       # deb/rpm/appimage 三样都出。三种发行版家族，不要求用户去转换包格式。
       #
-      # 刻意不签名、也不产出 updater 用的 .sig：latest.json 里没有 linux 的
-      # 条目，应用内更新在 Linux 上是关掉的（updates.rs 的
-      # self_update_supported）。这里的更新走包管理器。
+      # `--config src-tauri/tauri.linux.conf.json` 把 createUpdaterArtifacts
+      # 关掉。基础配置里它是 true（Windows 和 macOS 要用），而那个开关是全局
+      # 的：开着的时候 tauri 会去找签名私钥，找不到就直接失败——
+      #   `A public key has been found, but no private key.`
+      # 而 Linux 这边刻意不产出 updater 产物：latest.json 里没有 linux 条目，
+      # 应用内更新在 Linux 上是关掉的（updates.rs 的 self_update_supported），
+      # 签一份没人会去取的产物只是白签。这个作业因此也不需要拿到那个 secret。
       - name: Build and bundle (deb + rpm + appimage)
         # appimagetool 要用 FUSE 挂载自己，CI runner 上没有。
         env:
           APPIMAGE_EXTRACT_AND_RUN: 1
-        run: npm run tauri build -- --bundles deb,rpm,appimage
+        run: |
+          npm run tauri build -- \
+            --config src-tauri/tauri.linux.conf.json \
+            --bundles deb,rpm,appimage
 
       - name: Collect Linux artifacts
         shell: bash
@@ -460,13 +503,35 @@ jobs:
           bundle=src-tauri/target/release/bundle
           mkdir -p release-linux
 
-          # tauri 给出的文件名在不同版本间变过（`_amd64` / `_x86_64`、
-          # 有无 `-1` 的 rpm release 号）。用通配拿到那一个文件，再自己
-          # 命名，发布产物的名字才不会随工具链漂移。
-          cp "$(ls "$bundle"/deb/*.deb)"           "release-linux/ZeppBridge_${version}_amd64.deb"
-          cp "$(ls "$bundle"/rpm/*.rpm)"           "release-linux/ZeppBridge_${version}_x86_64.rpm"
-          cp "$(ls "$bundle"/appimage/*.AppImage)" "release-linux/ZeppBridge_${version}_x86_64.AppImage"
-          ls -la release-linux
+          # tauri 给出的文件名在不同版本间变过（`_amd64` / `_x86_64`、rpm 那边
+          # 还带一个 release 号：ZeppBridge-1.1.5-1.x86_64.rpm）。用通配拿到
+          # 文件再自己命名，发布产物的名字才不会随工具链漂移。
+          #
+          # 恰好一个匹配才算数。零个意味着打包静默地没产出这一种格式；两个
+          # 意味着上一次构建的残留还在，而那时 cp 会随机挑一个——发布出去的
+          # 就可能是个旧版本的包，且没有任何迹象。
+          # nullglob 是必须的：默认情况下不匹配的通配会原样留下，于是
+          # `matches` 里是那一段字面的模式字符串，计数报「1 个」。真正拦住它
+          # 的是下面的 -f 检查，但报错会指着一个看起来存在的文件名，读的人
+          # 得先怀疑自己。
+          shopt -s nullglob
+
+          take_one() {
+            local pattern="$1" dest="$2"
+            local matches=()
+            # shellcheck disable=SC2206
+            matches=($pattern)
+            if [[ ${#matches[@]} -ne 1 || ! -f "${matches[0]}" ]]; then
+              echo "::error::期望 $pattern 恰好匹配一个文件，实际 ${#matches[@]} 个：${matches[*]-}"
+              exit 1
+            fi
+            cp "${matches[0]}" "$dest"
+            echo "  ${matches[0]}  ->  $dest"
+          }
+
+          take_one "$bundle/deb/*.deb"           "release-linux/ZeppBridge_${version}_amd64.deb"
+          take_one "$bundle/rpm/*.rpm"           "release-linux/ZeppBridge_${version}_x86_64.rpm"
+          take_one "$bundle/appimage/*.AppImage" "release-linux/ZeppBridge_${version}_x86_64.AppImage"
 
       - name: Package CLI and MCP tools
         shell: bash
@@ -496,9 +561,15 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install flatpak-builder
+        # elfutils 提供 eu-strip。flatpak-builder 默认会把调试信息从二进制里
+        # 剥出来单独放，那一步就是调 eu-strip；缺了它，整个构建会在**编译全部
+        # 成功之后**才失败：
+        #   Failed to execute child process "eu-strip" (No such file or directory)
+        # ubuntu-latest 上没有预装它。
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder
+          sudo apt-get install -y --no-install-recommends \
+            flatpak flatpak-builder elfutils
 
       - name: Build and export the bundle
         # --bundle 会写 release/ZeppBridge_<version>_x86_64.flatpak；
