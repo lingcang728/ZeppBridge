@@ -1,0 +1,112 @@
+# Flatpak manifest for ZeppBridge.
+#
+# Build and install locally:
+#
+#   ./packaging/flatpak/build-flatpak.sh
+#
+# Scope note, so nobody discovers it the hard way: this manifest builds from
+# the working tree with network access during the build (`--share=network`
+# below). That is enough for a local build, for CI, and for a `.flatpak` bundle
+# users can install. It is *not* enough for Flathub, which requires a fully
+# offline build with every cargo and npm dependency declared as a source.
+# Getting there means generating `cargo-sources.json` and `node-sources.json`
+# with flatpak-builder-tools and dropping `--share=network`; see
+# docs/guides/linux.md. Writing the offline variant now would mean committing
+# two large generated files that go stale on every dependency bump, for a
+# submission that has not been made.
+id: com.zeppbridge.app
+
+# GNOME 50, not the 47 Tauri's own Flatpak guide still names: 47 went
+# end-of-life in October 2025 and 48 in March 2026, so both stopped receiving
+# security updates. A WebView is the most exposed component in this app —
+# pinning an unmaintained one to follow a stale doc is the wrong trade.
+#
+# What had to be checked before moving: Tauri 2 on Linux needs GTK3-era
+# webkit2gtk-4.1, and newer GNOME runtimes also ship the GTK4 webkitgtk-6.0.
+# GNOME 50 has both — `libwebkit2gtk-4.1.so.0` is present — so 4.1 has not been
+# dropped out from under us. Verify that again before the next bump; the day it
+# goes, this build stops compiling, and the error will point at a Rust crate
+# rather than at the runtime.
+runtime: org.gnome.Platform
+runtime-version: '50'
+sdk: org.gnome.Sdk
+
+# The extension branch tracks the freedesktop base of the GNOME runtime, not
+# the GNOME version: GNOME 50 is built on freedesktop 25.08. Getting this wrong
+# fails at "runtime not found", which reads like a network problem.
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.node20
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: zeppbridge
+
+finish-args:
+  # 窗口
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  - --device=dri
+
+  # Zepp 云同步。这是这个程序唯一要联网的理由。
+  - --share=network
+
+  # App Token 存在 Secret Service（GNOME Keyring / KWallet）里，不落盘。
+  # 没有这一条，登录能走完但令牌存不下去。
+  - --talk-name=org.freedesktop.secrets
+
+  # 托盘图标。GNOME 上要装 AppIndicator 扩展才看得见，KDE 原生支持。
+  - --talk-name=org.kde.StatusNotifierWatcher
+
+  # 刻意**不**给的：
+  #   --filesystem=home  导出和备份走 XDG 文件选择器 portal，用户点哪个
+  #                      目录才给哪个目录。开整个 home 换不来任何功能。
+  #   --socket=session-bus  上面两个 --talk-name 已经够了。整条会话总线
+  #                      等于沙箱开了个后门。
+
+modules:
+  - name: zeppbridge
+    buildsystem: simple
+    build-options:
+      append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/node20/bin
+      # npm 和 cargo 都要从网上取依赖。见文件开头关于 Flathub 的说明。
+      build-args:
+        - --share=network
+      env:
+        # 默认的 CARGO_HOME 在 $HOME 下，而构建沙箱里那不是一个稳定的位置。
+        CARGO_HOME: /run/build/zeppbridge/cargo
+        npm_config_cache: /run/build/zeppbridge/npm
+    build-commands:
+      - npm ci
+      # --no-bundle：只要那个可执行文件。前端资源在编译期就被嵌进二进制了，
+      # 而 .desktop、图标和 AppStream 元数据这里用仓库里自己那份，不用
+      # tauri 生成的——Flatpak 要求这三样的文件名是 $FLATPAK_ID.*。
+      - npm run tauri build -- --no-bundle
+      - install -Dm755 src-tauri/target/release/zeppbridge /app/bin/zeppbridge
+      - install -Dm644 packaging/flatpak/com.zeppbridge.app.desktop
+        /app/share/applications/com.zeppbridge.app.desktop
+      - install -Dm644 packaging/flatpak/com.zeppbridge.app.metainfo.xml
+        /app/share/metainfo/com.zeppbridge.app.metainfo.xml
+      - install -Dm644 src-tauri/icons/32x32.png
+        /app/share/icons/hicolor/32x32/apps/com.zeppbridge.app.png
+      - install -Dm644 src-tauri/icons/64x64.png
+        /app/share/icons/hicolor/64x64/apps/com.zeppbridge.app.png
+      - install -Dm644 src-tauri/icons/128x128.png
+        /app/share/icons/hicolor/128x128/apps/com.zeppbridge.app.png
+      - install -Dm644 src-tauri/icons/128x128@2x.png
+        /app/share/icons/hicolor/256x256/apps/com.zeppbridge.app.png
+      - install -Dm644 src-tauri/icons/icon.png
+        /app/share/icons/hicolor/512x512/apps/com.zeppbridge.app.png
+      - install -Dm644 src-tauri/icons/icon-source.svg
+        /app/share/icons/hicolor/scalable/apps/com.zeppbridge.app.svg
+    sources:
+      - type: dir
+        path: ../..
+        # 构建产物和依赖目录不进构建沙箱：node_modules 可能是给另一个平台
+        # 装的，target/ 里那几个 G 只会让复制变慢。
+        skip:
+          - node_modules
+          - dist
+          - src-tauri/target
+          - target
+          - .git
+          - release
+          - data

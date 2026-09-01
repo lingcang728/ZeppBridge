@@ -1,0 +1,39 @@
+# Keep the build context small and free of anything host-specific. The Rust
+# build in packaging/docker/Dockerfile only reads src-tauri/, but a fat context
+# is uploaded to the daemon on every build either way.
+
+.git
+.github
+node_modules
+dist
+dist-ssr
+src-tauri/target
+target
+release
+output
+packaging/flatpak/build-dir
+packaging/flatpak/repo
+packaging/flatpak/.flatpak-builder
+packaging/docker/data
+
+# Never let a local library or a credential end up in an image layer.
+data
+*.db
+*.db-*
+auth.json
+credentials.json
+*.har
+.env
+.env.*
+
+# Agent and editor scratch.
+.claude
+.grok
+.omo
+.agent_context
+.serena
+.vscode
+.idea
+docs/design
+design_picture
+temp

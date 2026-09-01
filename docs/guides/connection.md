@@ -13,8 +13,10 @@ should use, and two fallbacks for when that fails.
   a HAR file, or a screenshot of a signed-in session anywhere public — including
   GitHub issues.
 - Credentials stay on this machine: the token goes into the OS credential store
-  (Windows Credential Manager / macOS Keychain), and `auth.json` keeps only
-  metadata such as the user ID and region host.
+  (Windows Credential Manager / macOS Keychain / Linux Secret Service), and
+  `auth.json` keeps only metadata such as the user ID and region host. On a
+  Linux machine with no keyring, see the
+  [Linux guide](linux.md#where-the-token-is-stored) for the two alternatives.
 
 ## Recommended: in-app web sign-in
 

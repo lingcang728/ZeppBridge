@@ -9,7 +9,7 @@
 //! * 所有路由都要求 `Authorization: Bearer <token>`，token 存平台凭据存储；
 //! * 错误响应不包含数据库路径、文件系统路径或期望的 token。
 
-use crate::auth::{default_credential_backend, CredentialBackend};
+use crate::auth::{default_credential_backend_in, CredentialBackend};
 use crate::models::WorkoutSeries;
 use crate::storage::Database;
 use serde::Serialize;
@@ -123,7 +123,8 @@ impl std::fmt::Debug for LocalApiController {
 
 impl LocalApiController {
     pub fn new(data_dir: PathBuf) -> Self {
-        Self::with_credential_backend(data_dir, default_credential_backend())
+        let credentials = default_credential_backend_in(&data_dir);
+        Self::with_credential_backend(data_dir, credentials)
     }
 
     pub fn with_credential_backend(
