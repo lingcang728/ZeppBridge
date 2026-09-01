@@ -778,6 +778,15 @@ async fn post_diagnostic_report(
     // 服务器写的内容，不该原样显示给用户。
     let status = response.status();
     if !status.is_success() {
+        // 限流要有自己的码：它和「字段对不上」都是 4xx，但用户要做的事完全
+        // 不同——一个是等一会儿再来，一个是升级客户端。共用一个码时，界面
+        // 只能显示同一句「服务返回了错误」，等于什么都没说。
+        if status.as_u16() == 429 {
+            return Err(AppError::new(
+                "err.diagnostic.rate_limited",
+                "短时间内提交了太多份报告，请过一会儿再试",
+            ));
+        }
         let hint = if status.is_client_error() {
             "这个版本发出的报告字段和服务端对不上（可能服务端还没更新）"
         } else {
