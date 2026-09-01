@@ -29,14 +29,20 @@ for arg in "$@"; do
   esac
 done
 
-for tool in flatpak flatpak-builder; do
+# eu-strip is in the list because flatpak-builder does not check for it up
+# front: it strips debug info as a post-processing step, so a missing eu-strip
+# fails the build *after* the whole Rust release compile has succeeded. Ten
+# minutes in, with an error that names a binary nobody has heard of.
+for tool in flatpak flatpak-builder eu-strip; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     cat >&2 <<MSG
-$tool is not installed.
+$tool is not installed. All three are needed:
 
-  Debian/Ubuntu: sudo apt install flatpak flatpak-builder
-  Fedora:        sudo dnf install flatpak flatpak-builder
-  Arch:          sudo pacman -S flatpak flatpak-builder
+  Debian/Ubuntu: sudo apt install flatpak flatpak-builder elfutils
+  Fedora:        sudo dnf install flatpak flatpak-builder elfutils
+  Arch:          sudo pacman -S flatpak flatpak-builder elfutils
+
+(eu-strip comes from the elfutils package.)
 MSG
     exit 1
   fi

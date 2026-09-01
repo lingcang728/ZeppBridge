@@ -215,7 +215,8 @@ structural rather than a promise.
 ```bash
 docker build -f packaging/docker/Dockerfile.build -t zeppbridge-build:local .
 docker run --rm -v "$PWD:/src" -w /src zeppbridge-build:local \
-  bash -c 'npm ci && npm run tauri build -- --bundles deb,rpm,appimage'
+  bash -c 'npm ci && npm run tauri build -- \
+    --config src-tauri/tauri.linux.conf.json --bundles deb,rpm,appimage'
 ```
 
 Debian bookworm on purpose, not a rolling base: the glibc a binary links against

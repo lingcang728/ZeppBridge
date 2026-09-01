@@ -95,18 +95,33 @@ modules:
         /app/share/icons/hicolor/256x256/apps/com.zeppbridge.app.png
       - install -Dm644 src-tauri/icons/icon.png
         /app/share/icons/hicolor/512x512/apps/com.zeppbridge.app.png
-      - install -Dm644 src-tauri/icons/icon-source.svg
-        /app/share/icons/hicolor/scalable/apps/com.zeppbridge.app.svg
+      # 刻意不装 icons/icon-source.svg 作为 scalable 图标，两个理由：
+      #
+      # 1. 它不是平台图标。scripts/icon/generate-icons.mjs 说得很清楚：平台
+      #    图标以 icon-master.png 为源，icon-source.svg 是留给应用内
+      #    BrandMark 用的。它的描边是 currentColor，靠 CSS 给颜色——脱离
+      #    界面单独渲染时颜色是没有定义的。
+      # 2. 装了它，构建会在编译全部成功之后倒在 appstreamcli compose 上：
+      #    `com.zeppbridge.app  E: file-read-error`。那个 SVG 用 <symbol> +
+      #    <use href="#..."> 的间接引用，compose 读不了它。而这个报错既不
+      #    提文件名也不提 SVG，从它推回到「那一行 install」要花很久。
+      #
+      # 上面五个 PNG（32/64/128/256/512）覆盖了所有实际用到的尺寸。
     sources:
       - type: dir
         path: ../..
         # 构建产物和依赖目录不进构建沙箱：node_modules 可能是给另一个平台
         # 装的，target/ 里那几个 G 只会让复制变慢。
+        #
+        # `.git` 刻意**不**在这份名单里，尽管它是 31 MB。vite.config.ts 用
+        # `git rev-parse --short HEAD` 生成构建标记，那一行显示在设置页上，
+        # 是「同一个版本号构建了很多次，你手上是哪一个」的唯一答案。跳过
+        # .git 时它会安静地回落成 unknown——而 Flatpak 恰好是这三个渠道里
+        # 最没被验证过的那个，正是最需要收到可定位的问题报告的地方。
         skip:
           - node_modules
           - dist
           - src-tauri/target
           - target
-          - .git
           - release
           - data

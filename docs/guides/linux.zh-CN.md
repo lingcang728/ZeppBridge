@@ -32,7 +32,7 @@ cd ZeppBridge
 flatpak run com.zeppbridge.app
 ```
 
-脚本只要求宿主机上有 `flatpak` 和 `flatpak-builder`，别的都不需要——Rust 和 Node 来自 Flatpak 的 SDK 扩展，不会往系统里装任何工具链。全程 `--user`，不需要 root。
+脚本只要求宿主机上有 `flatpak`、`flatpak-builder` 和 `elfutils`（提供 `eu-strip`，flatpak-builder 剥调试信息时要用），别的都不需要——Rust 和 Node 来自 Flatpak 的 SDK 扩展，不会往系统里装任何工具链。全程 `--user`，不需要 root。
 
 加 `--bundle` 还会额外产出一个可直接安装的单文件：`release/ZeppBridge_<版本>_x86_64.flatpak`。
 
@@ -108,19 +108,32 @@ AppImage 用户手动换文件。为什么没有自更新：更新清单里没�
 
 ```bash
 sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev \
-  libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev libxdo-dev patchelf
+  libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev libxdo-dev patchelf \
+  rpm xdg-utils
 npm ci
-npm run tauri build -- --bundles deb,rpm,appimage
+npm run tauri build -- \
+  --config src-tauri/tauri.linux.conf.json \
+  --bundles deb,rpm,appimage
 ```
 
-`libdbus-1-dev` 是容易漏的那一个：它不在 Tauri 自己的前置依赖清单里。它在这里是因为 Secret Service 凭据后端链接 libdbus。运行时要 `libdbus-1-3`，deb 和 rpm 都已经声明了它。
+`--config src-tauri/tauri.linux.conf.json` 的作用是关掉 updater 产物。基础配置里
+它是开着的（Windows 和 macOS 要用），而那个开关是全局的：开着的时候打包会去找
+发布签名私钥，找不到就停在「A public key has been found, but no private key」。
+Linux 这边刻意不产出 updater 产物——应用内更新在 Linux 上本来就是关的。
+
+其中三个容易漏，而且都不在 Tauri 自己的前置依赖清单里：
+
+- `libdbus-1-dev` —— Secret Service 凭据后端链接 libdbus。运行时对应 `libdbus-1-3`，deb 和 rpm 都已经声明了它。
+- `rpm` —— rpm 打包那一步要调 `rpmbuild`。
+- `xdg-utils` —— AppImage 打包会把 `/usr/bin/xdg-open` 复制进镜像。缺了它，失败发生在 deb 和 rpm 都已经写出来**之后**，看起来像是 AppImage 自己的 bug，而不是少装了一个包。
 
 不想往系统里装这些的话，用那个版本钉死的工具链容器——编译器、webkit、glibc 都和 CI 一致：
 
 ```bash
 docker build -f packaging/docker/Dockerfile.build -t zeppbridge-build .
 docker run --rm -v "$PWD:/src" -w /src zeppbridge-build \
-  bash -c 'npm ci && npm run tauri build -- --bundles deb,rpm,appimage'
+  bash -c 'npm ci && npm run tauri build -- \
+    --config src-tauri/tauri.linux.conf.json --bundles deb,rpm,appimage'
 ```
 
 ## Flathub
