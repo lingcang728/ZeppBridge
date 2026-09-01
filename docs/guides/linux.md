@@ -1,0 +1,182 @@
+# Linux
+
+ZeppBridge on Linux ships as a Flatpak, a `.deb`, an `.rpm` and an AppImage.
+There is also a [headless container image](docker.md) for the CLI and the MCP
+server, which is a different thing and documented separately.
+
+[简体中文](linux.zh-CN.md)
+
+## What is verified, and what is not
+
+Read this before deciding whether to rely on it.
+
+| | Status |
+|---|---|
+| Compiles, clippy-clean, Rust tests pass on Linux | Covered by CI on every push |
+| Flatpak bundle builds and its metadata validates | Covered by CI on every push |
+| The headless image builds, runs, and resolves its data directory | Covered by CI on every push |
+| Sign-in, sync, keyring behaviour on a real Linux desktop | **Not verified by anyone yet** |
+
+The last row is the one that matters. Nobody has run a full sign-in-and-sync
+cycle on a Linux desktop. The Linux-specific code — the Secret Service
+credential backend and the XDG data directory — is exercised by unit tests and
+by a container, not by a person with a watch. If you try it, an issue saying
+what happened is the most useful thing you can send.
+
+This is the same posture the README takes for macOS, and for the same reason:
+saying "supported" when nobody has checked is how people lose data.
+
+## Install
+
+### Flatpak
+
+No release bundle is published yet, so build it from the repository:
+
+```bash
+git clone https://github.com/lingcang728/ZeppBridge.git
+cd ZeppBridge
+./packaging/flatpak/build-flatpak.sh
+flatpak run com.zeppbridge.app
+```
+
+The script needs `flatpak` and `flatpak-builder` on the host and nothing else —
+Rust and Node come from Flatpak SDK extensions, so no toolchain is installed
+system-wide. Everything is `--user`; it never asks for root.
+
+`--bundle` also writes a single installable file to
+`release/ZeppBridge_<version>_x86_64.flatpak`.
+
+### deb / rpm / AppImage
+
+Download from [Releases](https://github.com/lingcang728/ZeppBridge/releases):
+
+```bash
+sudo apt install ./ZeppBridge_<version>_amd64.deb      # Debian, Ubuntu
+sudo dnf install ./ZeppBridge_<version>_x86_64.rpm     # Fedora, RHEL
+chmod +x ZeppBridge_<version>_x86_64.AppImage && ./ZeppBridge_<version>_x86_64.AppImage
+```
+
+These builds are not signed. There is no code-signing story on Linux equivalent
+to the Windows/macOS one, so verify the download against `SHA256SUMS.txt` on the
+release page instead.
+
+The AppImage needs FUSE. On systems that only ship FUSE 3, either install
+`libfuse2` or run it with `--appimage-extract-and-run`.
+
+## Where things go
+
+| | Path |
+|---|---|
+| Flatpak | `~/.var/app/com.zeppbridge.app/data/zeppbridge/data/` |
+| deb / rpm | `~/.local/share/zeppbridge/data/` |
+| AppImage, unpacked tarball | `data/` next to the executable |
+| Anywhere, when set | `$ZEPPBRIDGE_DATA_DIR` |
+
+The split is deliberate. A package manager owns `/usr/bin` and a Flatpak's
+`/app/bin` is read-only, so for those two the data cannot live next to the
+program and goes to the XDG data directory. An AppImage sits in a folder that
+really is yours, so it keeps the same install-local layout Windows uses. Setting
+`ZEPPBRIDGE_DATA_DIR` to an absolute path overrides all of it; a relative path
+is rejected rather than resolved against whatever the working directory happened
+to be.
+
+`zeppbridge-cli` and `zeppbridge-mcp` resolve the same directory by the same
+rules, so they read the database the app writes without being configured.
+
+## Where the token is stored
+
+The App Token goes into the **Secret Service** — GNOME Keyring or KWallet, over
+D-Bus. `auth.json` next to the database keeps only non-secret metadata (user ID,
+region host). This matches Windows Credential Manager and the macOS Keychain.
+
+On a machine with no Secret Service — a headless server, a container, a minimal
+window manager with no keyring daemon — there is nothing to write to, and
+sign-in fails with a message naming the two alternatives:
+
+```bash
+# Store the token in the data directory instead, 0600, in credentials.json.
+# An explicit downgrade: file permissions are the only thing protecting it.
+ZEPPBRIDGE_CREDENTIAL_STORE=file zeppbridge-cli sync
+
+# Or hand the token in from the environment. Read-only: nothing is written to
+# disk, and the process cannot change it.
+ZEPPBRIDGE_CREDENTIAL_STORE=env ZEPPBRIDGE_APP_TOKEN=... zeppbridge-cli sync
+```
+
+`ZEPPBRIDGE_CREDENTIAL_STORE` takes `secret-service` (the default), `file` or
+`env`. A value it does not recognise is an error, not a fallback to the default
+— a typo should not quietly move where your token is kept.
+
+When unset, the choice is inferred from what is already true on the machine: a
+token in `ZEPPBRIDGE_APP_TOKEN` wins, then an existing `credentials.json` in the
+data directory, then Secret Service. That last-but-one rule is what stops a
+container from reporting "not connected" on its second run because the
+environment variable was only set the first time.
+
+## Updates
+
+In-app update checking is switched off on Linux, and the Settings page says so
+rather than showing a failed check. Updates come from wherever the build came
+from:
+
+```bash
+flatpak update com.zeppbridge.app     # Flatpak
+sudo apt install --only-upgrade ...   # deb, once a repository exists
+```
+
+AppImage users replace the file by hand. The reason there is no self-update: the
+updater manifest has no Linux entry, and writing into `/app` or `/usr/bin` would
+fight the package manager. A red "update failed" that means "there is nothing
+here to check" is worse than no button.
+
+## Sandbox permissions (Flatpak)
+
+| Permission | Why |
+|---|---|
+| `--share=network` | Syncing from the Zepp cloud. The only reason this app needs the network. |
+| `--socket=wayland`, `--socket=fallback-x11`, `--device=dri`, `--share=ipc` | Drawing a window. |
+| `--talk-name=org.freedesktop.secrets` | Storing the App Token in the keyring. Without it sign-in completes but the token cannot be saved. |
+| `--talk-name=org.kde.StatusNotifierWatcher` | The tray icon. On GNOME this also needs the AppIndicator shell extension; KDE supports it natively. |
+
+Not granted, on purpose: `--filesystem=home` (exports and backups go through the
+XDG file-chooser portal, so you grant one directory at the moment you pick it)
+and `--socket=session-bus` (the two `--talk-name` rules above are enough; the
+whole bus would be a hole in the sandbox).
+
+## Building from source
+
+```bash
+sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev \
+  libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev libxdo-dev patchelf
+npm ci
+npm run tauri build -- --bundles deb,rpm,appimage
+```
+
+`libdbus-1-dev` is the one that is easy to miss: it is not on Tauri's own
+prerequisites list. It is there because the Secret Service credential backend
+links libdbus. Runtime needs `libdbus-1-3`, which the deb and rpm both declare.
+
+To avoid installing any of that, use the pinned toolchain container instead —
+same compiler, same webkit, same glibc as CI:
+
+```bash
+docker build -f packaging/docker/Dockerfile.build -t zeppbridge-build .
+docker run --rm -v "$PWD:/src" -w /src zeppbridge-build \
+  bash -c 'npm ci && npm run tauri build -- --bundles deb,rpm,appimage'
+```
+
+## Flathub
+
+Not submitted. The manifest at `packaging/flatpak/com.zeppbridge.app.yml` builds
+with network access, which Flathub does not allow. Getting there needs:
+
+1. `cargo-sources.json` and `node-sources.json` generated with
+   [flatpak-builder-tools](https://github.com/flatpak/flatpak-builder-tools), so
+   every dependency is a declared source.
+2. `--share=network` dropped from `build-args`.
+3. At least one hosted screenshot in the AppStream metadata — the repository has
+   none, and the `<screenshots>` element is deliberately absent rather than
+   pointing at a URL that would 404.
+
+Those two generated files would be large and would go stale on every dependency
+bump, so they are not committed for a submission that has not been made.

@@ -20,6 +20,21 @@ fn installed_path() -> Result<PathBuf, AppError> {
         .join("ZeppBridge.exe"))
 }
 
+/// 这个构建能不能自己更新自己。
+///
+/// Linux 上的每一条分发渠道都由别人管着更新：Flatpak 走 `flatpak update`，
+/// deb/rpm 走发行版的包管理器。安装前缀（`/app`、`/usr/bin`）对应用进程是
+/// 只读的，能写进去也不该写——那会和包管理器的记账打架。
+///
+/// 之所以要有这么一个开关，而不是让前端直接调 `check()`：latest.json 里没有
+/// linux 的条目，`check()` 会抛「响应的 platforms 里找不到 linux-x86_64」。
+/// 那句话会以「更新失败」的样子出现在设置页上，而实际上什么都没坏，用户也
+/// 无事可做。一个说不出所以然的红字比不检查更糟。
+#[tauri::command]
+pub(crate) fn self_update_supported() -> bool {
+    cfg!(any(windows, target_os = "macos"))
+}
+
 #[tauri::command]
 pub(crate) fn is_portable_update() -> Result<bool, AppError> {
     #[cfg(windows)]

@@ -84,6 +84,110 @@ jobs:
       - name: Test Rust
         run: cargo test --manifest-path src-tauri/Cargo.toml --workspace --locked --jobs 1
 
+  verify-linux:
+    name: Linux verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Set up Rust
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt,clippy
+          rustup default stable
+
+      # Tauri 在 Linux 上的构建依赖。libdbus-1-dev 是这个项目额外要的一样：
+      # Linux 的凭据存储走 Secret Service，那条路链接 libdbus。
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libdbus-1-dev \
+            libxdo-dev \
+            patchelf
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # tauri-build resolves frontendDist (../dist) at compile time, so the
+      # frontend must exist before any cargo command runs.
+      - name: Build frontend
+        run: npm run build
+
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
+
+      - name: Check Rust
+        run: cargo check --manifest-path src-tauri/Cargo.toml --workspace --locked --all-targets
+
+      - name: Lint Rust
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --locked --all-targets -- -D warnings
+
+      # Linux 上跑一遍 Rust 测试，才能真的覆盖到只在这个平台编译的代码：
+      # 凭据存储的三个后端和数据目录的 XDG 回退都是 cfg 门后面的东西，
+      # Windows 和 macOS 的作业根本不会编译它们。
+      - name: Test Rust
+        run: cargo test --manifest-path src-tauri/Cargo.toml --workspace --locked --jobs 1
+
+      # 打包清单是会过期的东西：manifest 里的 runtime 版本、desktop 文件的
+      # 字段、AppStream 的必填元素，改错了不会让任何构建失败，只会在用户
+      # 装的时候变成一个没有名字的条目。
+      #
+      # 这几步都是秒级的，所以在 PR 上也跑。真正的 Flatpak 构建（十几分钟）
+      # 只在推 main 和打 tag 时跑，见 package-flatpak。
+      - name: Validate the Flatpak metadata
+        run: |
+          sudo apt-get install -y --no-install-recommends \
+            desktop-file-utils appstream flatpak flatpak-builder
+          desktop-file-validate packaging/flatpak/com.zeppbridge.app.desktop
+          appstreamcli validate --no-net --explain \
+            packaging/flatpak/com.zeppbridge.app.metainfo.xml
+          # manifest 本身能不能被解析、每个键是否认得。写错一个键名，
+          # flatpak-builder 是静默忽略它的。
+          flatpak-builder --show-manifest \
+            packaging/flatpak/com.zeppbridge.app.yml > /dev/null
+
+      # 钉住的 runtime 会在某一天停止维护，而那一天不会有任何东西提醒我们：
+      # 构建照样绿，装出来的应用照样能跑，只是它内嵌的 WebView 不再收到
+      # 安全更新了。这个项目上，WebView 是暴露面最大的那个组件。
+      #
+      # 这一步就是把那一天变成一次 CI 失败。Tauri 自己的 Flatpak 文档到现在
+      # 还写着 GNOME 47——那个版本 2025 年 10 月就 EOL 了。
+      - name: Check the pinned Flatpak runtime is still supported
+        run: |
+          set -euo pipefail
+          version=$(sed -n "s/^runtime-version: *'\{0,1\}\([^']*\)'\{0,1\}$/\1/p" \
+            packaging/flatpak/com.zeppbridge.app.yml)
+          : "${version:?could not read runtime-version from the manifest}"
+          echo "manifest pins org.gnome.Platform//$version"
+
+          flatpak remote-add --user --if-not-exists flathub \
+            https://dl.flathub.org/repo/flathub.flatpakrepo
+          info=$(flatpak remote-info --user flathub "org.gnome.Platform//$version")
+          echo "$info"
+
+          if grep -qi 'End-of-life' <<< "$info"; then
+            echo "::error::org.gnome.Platform//$version 已经 EOL，不再收到安全更新。"
+            echo "::error::请在 packaging/flatpak/com.zeppbridge.app.yml 里升 runtime-version，"
+            echo "::error::并确认新 runtime 仍然带 webkit2gtk-4.1（Tauri 2 需要 GTK3 那一版）："
+            echo "::error::  flatpak install --user org.gnome.Platform//<新版本>"
+            echo "::error::  find ~/.local/share/flatpak/runtime/org.gnome.Platform/x86_64/<新版本>/active/files -name 'libwebkit2gtk-4.1.so*'"
+            exit 1
+          fi
+          echo "runtime is still supported"
+
   verify-macos:
     name: macOS verification
     runs-on: macos-latest
@@ -298,13 +402,166 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  package-linux:
+    name: Package Linux bundles
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Package on pushes to main / release tags and manual dispatch, not on PRs.
+    if: github.event_name != 'pull_request'
+    needs: verify-linux
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Set up Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libdbus-1-dev \
+            libxdo-dev \
+            patchelf \
+            rpm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # deb/rpm/appimage 三样都出。三种发行版家族，不要求用户去转换包格式。
+      #
+      # 刻意不签名、也不产出 updater 用的 .sig：latest.json 里没有 linux 的
+      # 条目，应用内更新在 Linux 上是关掉的（updates.rs 的
+      # self_update_supported）。这里的更新走包管理器。
+      - name: Build and bundle (deb + rpm + appimage)
+        # appimagetool 要用 FUSE 挂载自己，CI runner 上没有。
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
+        run: npm run tauri build -- --bundles deb,rpm,appimage
+
+      - name: Collect Linux artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          bundle=src-tauri/target/release/bundle
+          mkdir -p release-linux
+
+          # tauri 给出的文件名在不同版本间变过（`_amd64` / `_x86_64`、
+          # 有无 `-1` 的 rpm release 号）。用通配拿到那一个文件，再自己
+          # 命名，发布产物的名字才不会随工具链漂移。
+          cp "$(ls "$bundle"/deb/*.deb)"           "release-linux/ZeppBridge_${version}_amd64.deb"
+          cp "$(ls "$bundle"/rpm/*.rpm)"           "release-linux/ZeppBridge_${version}_x86_64.rpm"
+          cp "$(ls "$bundle"/appimage/*.AppImage)" "release-linux/ZeppBridge_${version}_x86_64.AppImage"
+          ls -la release-linux
+
+      - name: Package CLI and MCP tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          pwsh -NoProfile -File scripts/release/package-tools.ps1 \
+            -Target x86_64-unknown-linux-gnu
+          mv release/zeppbridge-tools-*.zip release-linux/
+
+      - name: Upload Linux bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: zeppbridge-linux
+          path: release-linux/*
+          if-no-files-found: error
+          retention-days: 14
+
+  package-flatpak:
+    name: Package Flatpak bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: github.event_name != 'pull_request'
+    needs: verify-linux
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install flatpak-builder
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder
+
+      - name: Build and export the bundle
+        # --bundle 会写 release/ZeppBridge_<version>_x86_64.flatpak；
+        # --no-install 是因为 CI 上没人要运行它，装一遍只是浪费几分钟。
+        run: ./packaging/flatpak/build-flatpak.sh --bundle --no-install
+
+      - name: Upload Flatpak bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: zeppbridge-flatpak
+          path: release/ZeppBridge_*.flatpak
+          if-no-files-found: error
+          retention-days: 14
+
+  docker:
+    name: Build Docker images
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # 这个作业在 PR 上也跑。它是唯一一处会在 Linux 上真的把 CLI 和 MCP
+    # 编译出来并运行一次的地方，而 Dockerfile 本身也是会坏的东西——
+    # 一次 COPY 写漏了，只有构建镜像时才看得出来。
+    needs: verify-linux
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build the headless image
+        run: docker build -f packaging/docker/Dockerfile -t zeppbridge:ci .
+
+      # 一个只读、不联网的自检：镜像跑得起来，数据目录落在挂载的卷上，
+      # 没连账号时给出的是约定好的退出码 3（而不是崩掉或者退 1）。
+      - name: Smoke-test the headless image
+        run: |
+          set -euo pipefail
+          docker run --rm zeppbridge:ci zeppbridge-cli version
+          docker run --rm zeppbridge:ci zeppbridge-cli contract > /dev/null
+
+          set +e
+          out=$(docker run --rm --network none -v zeppbridge-ci-data:/data zeppbridge:ci)
+          code=$?
+          set -e
+          echo "$out"
+          if [[ "$code" -ne 3 ]]; then
+            echo "::error::空数据库上 status 应当退 3（未连接账号），实际 $code"
+            exit 1
+          fi
+
+          # 数据目录必须是挂进来的卷。落在镜像层里的话，容器一删数据就没了,
+          # 而这一步在 CI 上看起来仍然是绿的。
+          docker run --rm -v zeppbridge-ci-data:/data zeppbridge:ci \
+            sh -c 'test "$ZEPPBRIDGE_DATA_DIR" = /data && test -w /data'
+
+      - name: Build the toolchain image
+        run: docker build -f packaging/docker/Dockerfile.build -t zeppbridge-build:ci .
+
   release:
     name: Publish GitHub Release
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Only on release tags (v*), and only once both platforms packaged.
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [package, package-macos]
+    needs: [package, package-macos, package-linux, package-flatpak]
     permissions:
       contents: write
       # attestation 需要这两项：id-token 用于向 Sigstore 取短期证书，
@@ -331,6 +588,18 @@ jobs:
         with:
           name: zeppbridge-macos
           path: release-macos
+
+      - name: Download Linux bundles
+        uses: actions/download-artifact@v4
+        with:
+          name: zeppbridge-linux
+          path: release-linux
+
+      - name: Download Flatpak bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: zeppbridge-flatpak
+          path: release-linux
 
       - name: Merge updater metadata for both platforms
         shell: bash
@@ -380,8 +649,13 @@ jobs:
           : > SHA256SUMS.txt
           for file in release/ZeppBridge_*-setup.exe release/ZeppBridge_*.msi \
                       release/zeppbridge-tools-*.zip release-macos/zeppbridge-tools-*.zip \
+                      release-linux/zeppbridge-tools-*.zip \
                       "release-macos/ZeppBridge_${version}_aarch64.dmg" \
                       "release-macos/ZeppBridge_${version}_aarch64.app.tar.gz" \
+                      release-linux/ZeppBridge_*.deb \
+                      release-linux/ZeppBridge_*.rpm \
+                      release-linux/ZeppBridge_*.AppImage \
+                      release-linux/ZeppBridge_*.flatpak \
                       release/latest.json; do
             sha256sum "$file" | sed "s#[^ ]*/##" >> SHA256SUMS.txt
           done
@@ -398,6 +672,11 @@ jobs:
             release-macos/zeppbridge-tools-*.zip
             release-macos/ZeppBridge_*.dmg
             release-macos/ZeppBridge_*.app.tar.gz
+            release-linux/zeppbridge-tools-*.zip
+            release-linux/ZeppBridge_*.deb
+            release-linux/ZeppBridge_*.rpm
+            release-linux/ZeppBridge_*.AppImage
+            release-linux/ZeppBridge_*.flatpak
 
       - name: Publish GitHub Release
         # Idempotent: skips if the release already exists.
@@ -421,8 +700,13 @@ jobs:
             release/ZeppBridge_*.msi \
             release/zeppbridge-tools-*.zip \
             release-macos/zeppbridge-tools-*.zip \
+            release-linux/zeppbridge-tools-*.zip \
             "release-macos/ZeppBridge_${version}_aarch64.dmg" \
             "release-macos/ZeppBridge_${version}_aarch64.app.tar.gz" \
+            release-linux/ZeppBridge_*.deb \
+            release-linux/ZeppBridge_*.rpm \
+            release-linux/ZeppBridge_*.AppImage \
+            release-linux/ZeppBridge_*.flatpak \
             release/latest.json \
             SHA256SUMS.txt \
             --title "ZeppBridge ${version}" \

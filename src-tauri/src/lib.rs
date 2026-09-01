@@ -342,6 +342,7 @@ pub fn run() {
             cleanup_old_data,
             compact_raw_payloads,
             open_data_folder,
+            updates::self_update_supported,
             updates::is_portable_update,
             updates::launch_migrated_install,
             list_backups,

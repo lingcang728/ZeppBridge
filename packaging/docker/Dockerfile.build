@@ -1,0 +1,86 @@
+# Reproducible Linux build environment for ZeppBridge.
+#
+# This image builds nothing by itself — it is the toolchain. The point is that
+# "which webkit, which glibc, which node" stops being a property of whoever ran
+# the build. A .deb produced here on a maintainer's Arch laptop is the same one
+# CI produces.
+#
+#   docker build -f packaging/docker/Dockerfile.build -t zeppbridge-build:local .
+#   docker run --rm -v "$PWD:/src" -w /src zeppbridge-build:local \
+#       npm ci && npm run tauri build -- --bundles deb,rpm,appimage
+#
+# Bookworm on purpose, not trixie or a rolling base: the glibc a Tauri binary
+# is linked against is the oldest glibc it will run on. Building on the newest
+# available distribution produces packages that refuse to start on the LTS
+# releases most people are actually running.
+FROM debian:bookworm
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Tauri's Linux prerequisites, plus the two this project adds:
+#   libdbus-1-dev — the Secret Service credential backend (see
+#                   src-tauri/crates/core/Cargo.toml)
+#   rpm           — the rpm bundler shells out to rpmbuild
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        curl \
+        file \
+        git \
+        libayatana-appindicator3-dev \
+        libdbus-1-dev \
+        libgtk-3-dev \
+        librsvg2-dev \
+        libssl-dev \
+        libwebkit2gtk-4.1-dev \
+        libxdo-dev \
+        patchelf \
+        pkg-config \
+        rpm \
+        xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Node 20 to match .github/workflows/ci.yml. A different major here would mean
+# CI and a local build resolve different dependency trees.
+ARG NODE_VERSION=20.19.0
+RUN set -eux; \
+    arch=$(dpkg --print-architecture); \
+    case "$arch" in \
+        amd64) node_arch=x64 ;; \
+        arm64) node_arch=arm64 ;; \
+        *) echo "unsupported architecture: $arch" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${node_arch}.tar.xz" \
+        | tar -xJ -C /usr/local --strip-components=1 \
+            --exclude CHANGELOG.md --exclude LICENSE --exclude README.md; \
+    node --version; \
+    npm --version
+
+# Pinned rather than `stable`: "stable" is a moving target, and the whole
+# reason this image exists is that the toolchain should not move underneath a
+# release.
+#
+# Bump it deliberately, and keep it at or above what CI's `stable` resolves to.
+# A pin that lags is not merely old: clippy gains and loses lints between
+# releases, so an older toolchain rejects code that CI accepts. 1.90 flagged
+# `assert!(!CONST.is_empty())` in contract.rs under const_is_empty; stable does
+# not. A local build failing on a lint CI is green on is a trap, and the person
+# who hits it has no reason to suspect the container.
+ARG RUST_VERSION=1.98.0
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH
+RUN curl -fsSL https://sh.rustup.rs \
+        | sh -s -- -y --no-modify-path --profile minimal \
+            --default-toolchain "$RUST_VERSION" --component rustfmt,clippy \
+    && chmod -R a+w "$CARGO_HOME" "$RUSTUP_HOME" \
+    && rustc --version
+
+# appimagetool mounts itself with FUSE, which a container does not have. This
+# tells it to unpack into a temporary directory instead. Without it the
+# appimage bundler dies with "failed to set up FUSE".
+ENV APPIMAGE_EXTRACT_AND_RUN=1
+
+WORKDIR /src
+CMD ["bash"]

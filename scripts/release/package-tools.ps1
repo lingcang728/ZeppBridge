@@ -81,8 +81,19 @@ ZeppBridge 命令行与 MCP 工具 v$version（$platform）
   这两个程序读的是 ZeppBridge 桌面应用的本机数据库。请先安装桌面应用、
   连接账号并至少同步一次；命令行不做登录，MCP 不联网。
 
-  数据库位置是桌面应用安装目录旁的 data\zepp.db。把这两个 binary 放到
-  ZeppBridge.exe 同一个目录下，它们就会用同一份数据。
+  数据库位置取决于平台：
+    Windows  桌面应用安装目录旁的 data\zepp.db
+    macOS    ~/Library/Application Support/com.zeppbridge.ZeppBridge/data
+    Linux    包管理器安装的用 ~/.local/share/zeppbridge/data；
+             AppImage 和解包的 tarball 用可执行文件旁的 data/
+
+  注意：这条规则是每个可执行文件各自套用的。把这两个程序解压到一个
+  自己的目录里，它们解析出的就是那个目录旁边的 data/——一个空库，不是
+  应用在写的那个。表现是一句「本机还没有数据库」，而应用明明有数据。
+
+  要共用同一份数据，把 ZEPPBRIDGE_DATA_DIR 设成应用数据目录的绝对路径：
+    Linux/macOS  ZEPPBRIDGE_DATA_DIR=/path/to/data zeppbridge-cli status --json
+    Windows      set ZEPPBRIDGE_DATA_DIR=C:\path\to\data
 
 zeppbridge-cli
   zeppbridge-cli status --json

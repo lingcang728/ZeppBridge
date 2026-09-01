@@ -2,12 +2,13 @@
   <img src="src-tauri/icons/icon.png" width="96" height="96" alt="ZeppBridge">
   <h1>ZeppBridge</h1>
   <p><strong>把你的 Zepp 数据，完整交还给你。</strong></p>
-  <p>在自己的 Windows / macOS 电脑上查看、备份、导出 Amazfit 手表的健康记录。</p>
+  <p>在自己的 Windows / macOS / Linux 电脑上查看、备份、导出 Amazfit 手表的健康记录。</p>
 
   [![CI](https://github.com/lingcang728/ZeppBridge/actions/workflows/ci.yml/badge.svg)](https://github.com/lingcang728/ZeppBridge/actions/workflows/ci.yml)
   [![License: MIT](https://img.shields.io/github/license/lingcang728/ZeppBridge?color=69b48b)](LICENSE)
   [![Windows](https://img.shields.io/badge/Windows-可用-0078D4?logo=windows11&logoColor=white)](#下载与安装)
   [![macOS](https://img.shields.io/badge/macOS_Apple_Silicon-社区验证-999999?logo=apple&logoColor=white)](#下载与安装)
+  [![Linux](https://img.shields.io/badge/Linux-仅有构建-E95420?logo=linux&logoColor=white)](docs/guides/linux.zh-CN.md)
   [![版本](https://img.shields.io/github/v/release/lingcang728/ZeppBridge?color=8FB348&label=版本)](https://github.com/lingcang728/ZeppBridge/releases)
 
   <p><a href="README.md">English</a></p>
@@ -79,25 +80,47 @@
 公证都能在那里完成。缺的是 Apple Developer Program 会员（99 美元/年），项目还没买。
 买了之后这一段就会去掉。
 
-**暂不支持**：Intel Mac、Linux、手机。
+**Linux（x86_64）**
 
-### 两个平台各验证到什么程度
+> **能构建出来，但还没有人真的用过。** CI 每次推送都会编译、跑测试、打出包来。
+> **没有**发生过的是：在一台真实的 Linux 桌面上完整走一遍登录和同步——包括令牌
+> 有没有正确进到密钥环里。请把它当成一个需要你帮忙测试的构建，而不是一个发布版。
+
+发布页上有 Flatpak、`.deb`、`.rpm` 和 AppImage 四种包。都没有签名，请用
+`SHA256SUMS.txt` 核对下载。
+
+```bash
+sudo apt install ./ZeppBridge_<版本>_amd64.deb      # Debian、Ubuntu
+sudo dnf install ./ZeppBridge_<版本>_x86_64.rpm     # Fedora、RHEL
+flatpak install ./ZeppBridge_<版本>_x86_64.flatpak  # 任何发行版
+```
+
+[Linux 指南](docs/guides/linux.zh-CN.md)里写了数据放在哪、没有密钥环时令牌存在
+哪，以及怎么从源码构建。
+
+另外还有一个只含 CLI 和 MCP 服务的[无头容器镜像](docs/guides/docker.zh-CN.md)，
+适合在 NAS 或服务器上让数据库保持同步。它没法登录——那一步仍然需要桌面应用做一次。
+
+**暂不支持**：Intel Mac、手机。
+
+### 三个平台各验证到什么程度
 
 同一个应用、同一套界面、同样的功能，区别只在于「有没有人真的验过」。与其让人猜，
 不如写清楚。
 
-| | Windows 10/11 (x64) | macOS Apple Silicon |
-| --- | --- | --- |
-| 界面与功能 | 一致 | 一致 |
-| CI 里能编译 | 是 | 是 |
-| CI 里跑自动化测试 | 是 | 是 |
-| 安装后能直接打开 | 是（会有「未知发布者」提示） | **否** —— 见上面未签名版本的说明 |
-| 登录、同步、导出 | 每次发版维护者实测 | 只有贡献者的冒烟测试 |
-| 凭据存储 | Credential Manager，已验证 | 钥匙串，未独立验证 |
-| 自动更新 | 已验证 | 能构建，未独立验证 |
+| | Windows 10/11 (x64) | macOS Apple Silicon | Linux x86_64 |
+| --- | --- | --- | --- |
+| 界面与功能 | 一致 | 一致 | 一致 |
+| CI 里能编译 | 是 | 是 | 是 |
+| CI 里跑自动化测试 | 是 | 是 | 是 |
+| 安装后能直接打开 | 是（会有「未知发布者」提示） | **否** —— 见上面未签名版本的说明 | 是 |
+| 登录、同步、导出 | 每次发版维护者实测 | 只有贡献者的冒烟测试 | **还没有人验过** |
+| 凭据存储 | Credential Manager，已验证 | 钥匙串，未独立验证 | Secret Service，**还没有人验过** |
+| 自动更新 | 已验证 | 能构建，未独立验证 | 不适用 —— 由包管理器负责 |
 
-维护者在 Windows 上开发，本人没有 Mac。上面这些不是说 macOS 版有问题，而是说明
-「谁验过什么」。如果你在 macOS 上遇到异常，反馈会非常有用。
+维护者在 Windows 上开发，本人没有 Mac，也不用 Linux 桌面。上面这些不是说 macOS
+或 Linux 版有问题，而是说明「谁验过什么」。如果你在这两个平台上遇到异常，反馈会
+非常有用。
 
 **1.0.0 起，本机数据库的结构与升级路径开始被当作要长期维护的东西**：每次升级前自动备份，快照可以校验也可以恢复。数据存在本机、不会上传，但快照和数据库在同一块盘上——**如果你担心硬盘损坏，请自己再复制一份到别处。**
 
@@ -199,6 +222,9 @@ ZeppBridge 用你自己的登录凭据，**只发读取请求**——整个项�
 **我的数据存在哪？**
 - **Windows**：安装目录旁边的 `data` 文件夹（不是 `%APPDATA%`）。设置页的「高级与维护」里有「打开数据文件夹」按钮。
 - **macOS**：`~/Library/Application Support/com.zeppbridge.ZeppBridge/data`
+- **Linux**：`~/.local/share/zeppbridge/data`（Flatpak 是
+  `~/.var/app/com.zeppbridge.app/data/zeppbridge/data`）。AppImage 和解包的
+  tarball 保持可执行文件旁边的 `data/`。见 [Linux 指南](docs/guides/linux.zh-CN.md)。
 
 **卸载后数据还在吗？**
 在。卸载不会删 `data` 文件夹，也不会删备份、覆盖账本和你的设置；想彻底清理需要手动删除。
@@ -214,7 +240,7 @@ ZeppBridge 用你自己的登录凭据，**只发读取请求**——整个项�
 
 ## 隐私
 
-- **登录凭据**存在系统的凭据管理器里（Windows Credential Manager / macOS 钥匙串），不是明文文件。
+- **登录凭据**存在系统的凭据管理器里（Windows Credential Manager / macOS 钥匙串 / Linux Secret Service），不是明文文件。没有密钥环的机器上可以显式改用文件或环境变量存储，那是一次明确的降级，见 [Linux 指南](docs/guides/linux.zh-CN.md)。
 - **健康数据**是你电脑上一个未加密的数据库文件。和别人共用电脑的话，请用各自独立的系统账户。
 - **交给 AI 时会先脱敏**：自动抹掉设备编号、MAC 地址、精确 GPS 等信息，并在文件里列出抹掉了什么。精确轨迹要你主动勾选才会带上。
 - **地图只在本地画**，不会向任何第三方地图服务发请求。
@@ -236,6 +262,8 @@ npm run tauri dev
 - [架构摘要](docs/reference/architecture.zh-CN.md) — 产品边界、Zepp 接口映射、已验证与未验证清单
 - [命令行与 MCP](docs/reference/cli-and-mcp.zh-CN.md) — 退出码契约、只读工具、调度示例
 - [备份、恢复与完整历史](docs/guides/backup-and-restore.zh-CN.md) — 快照、恢复流程、覆盖账本
+- [Linux](docs/guides/linux.zh-CN.md) — Flatpak、deb/rpm/AppImage、数据目录、凭据存储
+- [Docker](docs/guides/docker.zh-CN.md) — 无头 CLI/MCP 镜像、定时同步、可复现构建
 - [UI 约束](docs/development/ui-guidelines.zh-CN.md) — 设计 token、页面结构、组件清单
 
 欢迎 issue 和 PR。改动前请先读架构摘要里的「未验证清单」——这个项目对「什么算已经确认的事实」有明确标准。

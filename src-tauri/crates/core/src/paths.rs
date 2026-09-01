@@ -12,7 +12,18 @@ const LEGACY_FILES: [&str; 5] = [
 const LEGACY_OPTIONAL_FILES: [&str; 1] = ["zeppbridge-ca.pem"];
 const LEGACY_DIRS: [&str; 2] = ["exports", "backups"];
 
+/// 显式指定数据目录的环境变量。
+///
+/// 容器里没有「安装目录旁边」这个概念：镜像是只读的（或者应当被当作只读），
+/// 而用户挂进来的卷可以在任何路径上。同样的问题也出现在 systemd 单元和
+/// NAS 的任务计划里——那里没人会去关心可执行文件躺在哪。给出这一个变量，
+/// 是为了让「数据在哪」变成部署时的一句声明，而不是一条要去反推的规则。
+pub const DATA_DIR_ENV: &str = "ZEPPBRIDGE_DATA_DIR";
+
 /// Install-local data directory: `{exe_dir}/data`.
+///
+/// `ZEPPBRIDGE_DATA_DIR` overrides everything below when it is set to an
+/// absolute path.
 ///
 /// Build-cache binaries (`cargo-target`, rustc `target/`) never own user data.
 /// Those fall back to the repository `data/` folder so `tauri dev` does not
@@ -21,7 +32,20 @@ const LEGACY_DIRS: [&str; 2] = ["exports", "backups"];
 /// macOS: `.app` bundles live in `/Applications`, which is not writable, so
 /// the install-local layout falls back to the user Application Support
 /// directory (`~/Library/Application Support/com.zeppbridge.ZeppBridge/data`).
+///
+/// Linux: a packaged build is installed into a shared, root-owned prefix
+/// (`/usr/bin` for deb/rpm, `/app/bin` inside a Flatpak sandbox). There is no
+/// "next to the executable" there, so those go straight to the XDG data
+/// directory (`~/.local/share/zeppbridge/data`, which a Flatpak redirects into
+/// `~/.var/app/com.zeppbridge.app/`). An AppImage or an unpacked tarball keeps
+/// the install-local layout, because for those the folder really is the
+/// user's.
 pub fn resolve_data_dir() -> io::Result<PathBuf> {
+    if let Some(dir) = data_dir_from_env()? {
+        ensure_writable_dir(&dir)?;
+        return Ok(dir);
+    }
+
     let exe = std::env::current_exe()?;
     let exe_dir = exe.parent().ok_or_else(|| {
         io::Error::new(
@@ -29,6 +53,17 @@ pub fn resolve_data_dir() -> io::Result<PathBuf> {
             "executable has no parent directory",
         )
     })?;
+
+    // 刻意在写之前就分流，而不是「先试着写 /usr/bin/data，失败了再退」：
+    // 容器里 CLI 常常是 root 跑的，那一步会**成功**，于是数据被写进镜像层，
+    // 容器一删就没了，而挂在旁边的卷是空的。以 root 运行不该改变数据落点。
+    #[cfg(all(unix, not(target_os = "macos")))]
+    if !is_build_artifact_dir(exe_dir) && is_shared_prefix_dir(exe_dir) {
+        let base = user_data_dir()?;
+        ensure_writable_dir(&base)?;
+        return Ok(base);
+    }
+
     let data_dir = if is_build_artifact_dir(exe_dir) {
         repository_data_dir().unwrap_or_else(|| exe_dir.join("data"))
     } else {
@@ -36,27 +71,85 @@ pub fn resolve_data_dir() -> io::Result<PathBuf> {
     };
     match ensure_writable_dir(&data_dir) {
         Ok(()) => Ok(data_dir),
-        #[cfg(target_os = "macos")]
+        #[cfg(unix)]
         Err(_) => {
             // /Applications/ZeppBridge.app/Contents/MacOS is read-only; store
-            // user data under the user's Application Support instead.
-            let base = user_support_data_dir()?;
+            // user data under the user's Application Support instead. On Linux
+            // this catches the read-only prefixes the check above does not
+            // name.
+            let base = user_data_dir()?;
             ensure_writable_dir(&base)?;
             Ok(base)
         }
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(not(unix))]
         Err(error) => Err(error),
     }
 }
 
-/// User-writable data directory for macOS: `~/Library/Application Support/
-/// com.zeppbridge.ZeppBridge/data` (same `data/` layout as the Windows
-/// install-local folder).
-#[cfg(target_os = "macos")]
-fn user_support_data_dir() -> io::Result<PathBuf> {
+/// `ZEPPBRIDGE_DATA_DIR`，校验过的。
+///
+/// 相对路径被当成配置错误而不是悄悄按当前工作目录展开：cron 和容器
+/// entrypoint 的工作目录都不是写单元文件的人能看见的东西，按它展开等于
+/// 把数据放到一个随调用方式漂移的位置上。
+fn data_dir_from_env() -> io::Result<Option<PathBuf>> {
+    data_dir_from_env_value(std::env::var_os(DATA_DIR_ENV))
+}
+
+/// 和 `data_dir_from_env` 分开，只为了能在测试里传值。
+///
+/// 直接在测试里 `set_var` 是不行的：cargo 把同一个 crate 的测试跑在一个进程的
+/// 多个线程里，环境变量是进程级的，谁先跑就影响谁——这类测试会随机失败，
+/// 而失败看起来像是被测代码的问题。
+fn data_dir_from_env_value(raw: Option<std::ffi::OsString>) -> io::Result<Option<PathBuf>> {
+    let Some(raw) = raw else {
+        return Ok(None);
+    };
+    let raw = PathBuf::from(raw);
+    if raw.as_os_str().is_empty() {
+        return Ok(None);
+    }
+    if !raw.is_absolute() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("{DATA_DIR_ENV} 必须是绝对路径，收到：{}", raw.display()),
+        ));
+    }
+    Ok(Some(raw))
+}
+
+/// User-writable data directory: `~/Library/Application Support/
+/// com.zeppbridge.ZeppBridge/data` on macOS, `~/.local/share/zeppbridge/data`
+/// on Linux. Both keep the same `data/` layout as the Windows install-local
+/// folder, so the CLI and MCP tools resolve the same place the app does.
+#[cfg(unix)]
+fn user_data_dir() -> io::Result<PathBuf> {
     let project = directories::ProjectDirs::from("com", "zeppbridge", "ZeppBridge")
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "无法确定用户数据目录"))?;
     Ok(project.data_dir().join("data"))
+}
+
+/// 这个目录是不是「操作系统或包管理器拥有的共享前缀」。
+///
+/// 判断的是所有权而不是可写性。AppImage 挂载点和解包出来的 tarball 不在
+/// 这份名单里，那两种情况下目录确实属于用户，安装目录旁边就是对的位置。
+#[cfg(all(unix, not(target_os = "macos")))]
+fn is_shared_prefix_dir(dir: &Path) -> bool {
+    // `/app` 是 Flatpak 沙箱里的安装前缀；`/nix/store` 与 `/snap` 是只读的
+    // 内容寻址存储，路径里还带哈希，往旁边写数据在下一次更新后就找不到了。
+    const PREFIXES: [&str; 8] = [
+        "/usr/",
+        "/bin/",
+        "/sbin/",
+        "/opt/",
+        "/app/",
+        "/snap/",
+        "/nix/store/",
+        "/var/lib/flatpak/",
+    ];
+    let path = dir.to_string_lossy();
+    // 结尾补一个分隔符，`/usr` 本身也能被 `/usr/` 命中。
+    let path = format!("{path}/");
+    PREFIXES.iter().any(|prefix| path.starts_with(prefix))
 }
 
 pub fn webview_user_data_dir(data_dir: &Path) -> PathBuf {
@@ -314,6 +407,58 @@ mod tests {
 
     use super::*;
     use std::fs;
+
+    #[test]
+    fn an_explicit_data_dir_must_be_absolute() {
+        // 相对路径按当前工作目录展开，就会让「数据在哪」取决于是谁、从哪
+        // 启动了进程。cron 和容器 entrypoint 的工作目录都不在部署者的视野里。
+        let error = super::data_dir_from_env_value(Some(std::ffi::OsString::from("data")))
+            .expect_err("相对路径应当被拒绝");
+        assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+        assert!(error.to_string().contains(DATA_DIR_ENV), "{error}");
+    }
+
+    #[test]
+    fn an_unset_or_empty_data_dir_falls_through() {
+        assert!(super::data_dir_from_env_value(None).unwrap().is_none());
+        // 空值当作没设。docker-compose 里 `ZEPPBRIDGE_DATA_DIR=` 是一句
+        // 「用默认」，不是一句「用根目录」。
+        assert!(
+            super::data_dir_from_env_value(Some(std::ffi::OsString::new()))
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn an_absolute_data_dir_is_taken_as_given() {
+        let raw = if cfg!(windows) { r"C:\zepp" } else { "/data" };
+        let dir = super::data_dir_from_env_value(Some(std::ffi::OsString::from(raw)))
+            .unwrap()
+            .expect("绝对路径应当被接受");
+        assert_eq!(dir, PathBuf::from(raw));
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    #[test]
+    fn packaged_linux_prefixes_do_not_own_user_data() {
+        // deb/rpm 装到 /usr/bin，Flatpak 沙箱里是 /app/bin。这两处都不该
+        // 被当成「安装目录旁边可以放数据」——即便进程是 root，写得进去。
+        assert!(is_shared_prefix_dir(Path::new("/usr/bin")));
+        assert!(is_shared_prefix_dir(Path::new("/usr")));
+        assert!(is_shared_prefix_dir(Path::new("/app/bin")));
+        assert!(is_shared_prefix_dir(Path::new("/opt/zeppbridge")));
+        assert!(is_shared_prefix_dir(Path::new(
+            "/snap/zeppbridge/current/bin"
+        )));
+
+        // AppImage 的挂载点和解包出来的 tarball 属于用户，保持安装目录布局。
+        assert!(!is_shared_prefix_dir(Path::new("/tmp/.mount_ZeppBrXXXXXX")));
+        assert!(!is_shared_prefix_dir(Path::new("/home/alice/zeppbridge")));
+        assert!(!is_shared_prefix_dir(Path::new("/data")));
+        // 前缀匹配是按整段目录名比的，`/usrlocal` 不是 `/usr` 下面的东西。
+        assert!(!is_shared_prefix_dir(Path::new("/usrlocal/bin")));
+    }
 
     #[test]
     fn build_cache_dirs_are_detected() {

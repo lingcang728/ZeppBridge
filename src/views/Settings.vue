@@ -300,6 +300,7 @@ const updateStatusLabel = computed(() => ({
   installing: t.value.updateStatusInstalling,
   failed: t.value.updateStatusFailed,
   upToDate: t.value.updateStatusUpToDate,
+  unmanaged: t.value.updateStatusUnmanaged,
 }[updateState.status]));
 
 const formatUpdateBytes = (bytes: number) => bytes < 1024 * 1024
@@ -1409,7 +1410,15 @@ const runCapabilityProbe = async () => {
           <h2 id="update-title">{{ t.updateTitle }}</h2>
           <p>{{ t.updateSub }}</p>
         </div>
-        <button class="button secondary" type="button" :disabled="updateBusy" @click="checkForDesktopUpdate(true)">
+        <!-- 更新由包管理器管的渠道上不摆这个按钮：按下去只能得到一句
+             「这里不管更新」，不如一开始就别给。 -->
+        <button
+          v-if="updateState.status !== 'unmanaged'"
+          class="button secondary"
+          type="button"
+          :disabled="updateBusy"
+          @click="checkForDesktopUpdate(true)"
+        >
           <Icon name="sync" :size="14" :class="{ spinning: updateState.status === 'checking' }" />
           {{ updateState.status === 'checking' ? t.updateChecking : t.updateCheck }}
         </button>
@@ -1419,6 +1428,7 @@ const runCapabilityProbe = async () => {
         <div>
           <strong>{{ updateStatusLabel }}</strong>
           <p v-if="updateState.status === 'failed'">{{ updateState.error }}</p>
+          <p v-else-if="updateState.status === 'unmanaged'">{{ t.updateUnmanagedHint(updateState.currentVersion || t.updateVersionLoading) }}</p>
           <p v-else-if="updateState.status === 'available'">{{ t.updateCurrent(updateState.currentVersion) }}<template v-if="updateState.sizeBytes"> · {{ formatUpdateBytes(updateState.sizeBytes) }}</template></p>
           <p v-else>{{ t.updateVersion(updateState.currentVersion || t.updateVersionLoading) }}</p>
           <!-- 同一个版本号会构建很多次；报问题时把这一行带上，就不用猜手上是哪个包了。 -->

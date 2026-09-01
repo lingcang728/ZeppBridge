@@ -24,10 +24,38 @@ database. The data directory is resolved by `paths.rs`:
 |---|---|
 | Windows | `data\` next to `ZeppBridge.exe` |
 | macOS | `data/` next to the executable when it is writable; inside `ZeppBridge.app` it is not, so it falls back to `~/Library/Application Support/com.zeppbridge.ZeppBridge/data` |
+| Linux | `~/.local/share/zeppbridge/data` for a packaged install (deb, rpm, Flatpak — those live in a prefix the app does not own); `data/` next to the executable for an AppImage or an unpacked tarball |
+| Any | `$ZEPPBRIDGE_DATA_DIR`, when set to an absolute path, overrides all of the above |
 
-On macOS, then, put the two tools wherever you like and point them at the same
-machine — they resolve the same directory the app does. Neither platform uses
-`%APPDATA%`.
+No platform uses `%APPDATA%`.
+
+Read that table as a rule about **each executable**, not about the machine. The
+tools apply it to their own location, so unpacking them somewhere of their own —
+`~/tools/`, say — resolves `~/tools/data`, which is a fresh empty library, not
+the one the app has been filling. The symptom is a confident "no database on
+this machine" next to an app that clearly has one.
+
+Two ways to actually share the library:
+
+```bash
+# Put them next to the app's data directory, so the rule lands in the same place.
+# Or, more reliably, name the directory:
+ZEPPBRIDGE_DATA_DIR=~/.local/share/zeppbridge/data zeppbridge-cli status --json
+```
+
+Naming it is the better habit on macOS and Linux, where the app's data directory
+is usually nowhere near where you would keep two command-line binaries.
+
+`ZEPPBRIDGE_DATA_DIR` exists for the cases where "next to the executable" is
+not a meaningful idea: a container, a systemd unit, a NAS task scheduler. A
+relative value is rejected rather than resolved against the working directory,
+because a scheduler's working directory is not something the person writing the
+unit file can see.
+
+On Linux the token is read from the Secret Service (GNOME Keyring / KWallet).
+A headless machine has none, so `ZEPPBRIDGE_CREDENTIAL_STORE=file` or
+`=env` with `ZEPPBRIDGE_APP_TOKEN` is how the CLI gets a token there — see the
+[Linux guide](../guides/linux.md#where-the-token-is-stored).
 
 **Prerequisite**: connect your account with the desktop app and sync at least
 once. The command line does not sign in, and MCP does not touch the network.

@@ -28,6 +28,18 @@ lerna-debug.log*
 /release/
 /output/
 
+# Flatpak build output. flatpak-builder writes several GB here.
+packaging/flatpak/build-dir/
+packaging/flatpak/repo/
+packaging/flatpak/.flatpak-builder/
+# Generated offline source manifests, if anyone runs the flatpak-builder-tools
+# generators locally. Large, and stale the moment a dependency moves.
+packaging/flatpak/cargo-sources.json
+packaging/flatpak/node-sources.json
+
+# Local library used by the compose file's bind mount.
+packaging/docker/data/
+
 # Tauri and native build output
 src-tauri/target/
 src-tauri/gen/

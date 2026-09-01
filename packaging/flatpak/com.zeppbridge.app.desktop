@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=ZeppBridge
+GenericName=Zepp health data bridge
+GenericName[zh_CN]=Zepp 健康数据桥
+Comment=View, archive and export your Amazfit health records on your own machine
+Comment[zh_CN]=在自己的电脑上查看、归档和导出 Amazfit 健康记录
+Exec=zeppbridge
+Icon=com.zeppbridge.app
+Terminal=false
+# One main category only. Two of them (Utility;Science;) makes the app show up
+# twice in some application menus. There is no Health or Fitness main category
+# in the freedesktop spec, so the searchable words live in Keywords instead.
+Categories=Utility;
+Keywords=zepp;amazfit;huami;health;fitness;sleep;workout;heart rate;
+StartupWMClass=ZeppBridge

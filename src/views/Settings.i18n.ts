@@ -209,6 +209,9 @@ export const settingsMessages = defineMessages(
     updateStatusInstalling: '正在安装，完成后会自动重启',
     updateStatusFailed: '更新失败',
     updateStatusUpToDate: '当前已是最新版本',
+    updateStatusUnmanaged: '由包管理器管理更新',
+    updateUnmanagedHint: (version: string) => `当前 ${version}。这个安装包由 Flatpak 或系统包管理器更新：`
+      + `flatpak update com.zeppbridge.app，或用发行版的包管理器升级。`,
     releaseNotesEmpty: '本次 Release 未填写更新说明。',
     updateModalTitle: (version: string) => `ZeppBridge ${version} 更新了什么`,
     updateModalCurrent: (version: string) => `你现在是 ${version}`,
@@ -602,6 +605,9 @@ If you need anything from me (which client I use, where the file lives), just as
     updateStatusInstalling: 'Installing; the app restarts when it is done',
     updateStatusFailed: 'The update failed',
     updateStatusUpToDate: 'You are on the latest version',
+    updateStatusUnmanaged: 'Updates come from your package manager',
+    updateUnmanagedHint: (version: string) => `On ${version}. This build updates through Flatpak or your `
+      + `distribution's package manager: run flatpak update com.zeppbridge.app, or upgrade the package.`,
     releaseNotesEmpty: 'This release carries no notes.',
     updateModalTitle: (version: string) => `What changed in ZeppBridge ${version}`,
     updateModalCurrent: (version: string) => `You are on ${version}`,

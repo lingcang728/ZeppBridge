@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  AppStream metadata. GNOME Software, KDE Discover and `flatpak search` read
+  this; without it the app installs but shows up as a nameless entry.
+
+  Still missing for a Flathub submission: <screenshots>. Flathub requires at
+  least one hosted screenshot, and this repository does not ship any yet.
+  Adding a made-up URL here would validate today and 404 for every user, so
+  the element is deliberately absent rather than wrong.
+-->
+<component type="desktop-application">
+  <id>com.zeppbridge.app</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+
+  <name>ZeppBridge</name>
+  <name xml:lang="zh_CN">ZeppBridge</name>
+  <summary>Your Zepp data, handed back to you</summary>
+  <summary xml:lang="zh_CN">把你的 Zepp 数据交回给你</summary>
+
+  <description>
+    <p>
+      ZeppBridge is a local-first desktop companion for Amazfit and Zepp
+      wearables. It syncs your health records out of the Zepp cloud into a
+      single SQLite file on your own machine, and lets you read, archive and
+      export them without going through a phone.
+    </p>
+    <p>What it does:</p>
+    <ul>
+      <li>Long-term trends for heart rate, sleep, workouts, recovery, stress and SpO₂.</li>
+      <li>Backfills history from before you installed it, month by month, pausable and resumable.</li>
+      <li>Whole-database backups with checksums, and a record-count diff before any restore.</li>
+      <li>Exports to JSON, CSV and GPX.</li>
+      <li>Ships a non-interactive CLI and a read-only MCP server for scripts and local models.</li>
+    </ul>
+    <p>
+      It does not prettify data. A day you did not wear the watch is a gap in
+      the chart, and a metric your watch never measured reads "not provided"
+      rather than zero.
+    </p>
+    <p>
+      ZeppBridge is an independent, unofficial project. It is not affiliated
+      with or endorsed by Zepp Health, Huami or Amazfit.
+    </p>
+    <p xml:lang="zh_CN">
+      ZeppBridge 是一个本地优先的桌面伴侣程序，面向 Amazfit / Zepp 手表和手环。
+      它把你的健康记录从 Zepp 云同步到本机的一个 SQLite 文件里，让你不必通过
+      手机就能查看、归档和导出这些数据。
+    </p>
+    <p xml:lang="zh_CN">
+      它不会美化数据：没戴表的那天，图上就是一个缺口；手表从未测量过的指标
+      显示「未提供」，而不是 0。
+    </p>
+    <p xml:lang="zh_CN">
+      本项目是独立的非官方开源项目，与 Zepp Health、华米、Amazfit 无关。
+    </p>
+  </description>
+
+  <launchable type="desktop-id">com.zeppbridge.app.desktop</launchable>
+
+  <url type="homepage">https://github.com/lingcang728/ZeppBridge</url>
+  <url type="bugtracker">https://github.com/lingcang728/ZeppBridge/issues</url>
+  <url type="vcs-browser">https://github.com/lingcang728/ZeppBridge</url>
+
+  <developer id="io.github.lingcang728">
+    <name>ZeppBridge contributors</name>
+  </developer>
+
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+  <recommends>
+    <display_length compare="ge">768</display_length>
+  </recommends>
+
+  <!-- Nothing in the OARS list applies: no violence, no chat, no purchases.
+       The element still has to be present, or storefronts show "unrated". -->
+  <content_rating type="oars-1.1"/>
+
+  <releases>
+    <release version="1.1.5" date="2026-08-31"/>
+  </releases>
+</component>

@@ -16,8 +16,26 @@
 |---|---|
 | Windows | `ZeppBridge.exe` 旁边的 `data\` |
 | macOS | 可执行文件旁的 `data/`；在 `ZeppBridge.app` 里那个位置不可写，于是回退到 `~/Library/Application Support/com.zeppbridge.ZeppBridge/data` |
+| Linux | 包管理器安装的（deb、rpm、Flatpak）用 `~/.local/share/zeppbridge/data`——那些前缀不属于这个程序；AppImage 和解包的 tarball 用可执行文件旁的 `data/` |
+| 任何平台 | `$ZEPPBRIDGE_DATA_DIR` 设成绝对路径时覆盖以上全部 |
 
-所以 macOS 上两个工具放哪儿都行，它们解析出的目录和应用是同一个。两个平台都不用 `%APPDATA%`。
+所有平台都不用 `%APPDATA%`。
+
+这张表要按「每个可执行文件各自」来读，而不是按「这台机器」。两个工具是拿自己的位置去套这条规则的，所以把它们解压到一个自己的目录里——比如 `~/tools/`——解析出来的是 `~/tools/data`，那是一个全新的空库，不是应用一直在写的那个。表现出来就是：一句理直气壮的「本机还没有数据库」，而旁边那个应用明明有。
+
+要让它们真的共用同一个库，有两条路：
+
+```bash
+# 放到应用数据目录旁边，让这条规则落到同一个位置上。
+# 或者——更可靠的做法——直接把目录说出来：
+ZEPPBRIDGE_DATA_DIR=~/.local/share/zeppbridge/data zeppbridge-cli status --json
+```
+
+在 macOS 和 Linux 上，直接指定是更好的习惯：那两个平台上应用的数据目录，通常离你想放两个命令行程序的地方很远。
+
+`ZEPPBRIDGE_DATA_DIR` 是给「安装目录旁边」这句话没有意义的场合准备的：容器、systemd 单元、NAS 的任务计划。相对路径会被拒绝，而不是按工作目录展开——调度器的工作目录不是写单元文件的人能看见的东西。
+
+Linux 上令牌从 Secret Service（GNOME Keyring / KWallet）读。无头机器上没有它，所以那里要用 `ZEPPBRIDGE_CREDENTIAL_STORE=file`，或者 `=env` 配合 `ZEPPBRIDGE_APP_TOKEN`——见 [Linux 指南](../guides/linux.zh-CN.md)。
 
 **前提**：先用桌面应用连接账号并至少同步一次。命令行不做登录，MCP 不联网。
 
