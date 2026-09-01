@@ -1318,47 +1318,17 @@ async fn finish_idle_if_active(app: &AppHandle, epoch: u64) {
 mod tests {
     use super::*;
 
-    /// `close()` 不会当场把标签交还——这是那句「无法打开登录窗口」的来源。
-    ///
-    /// 登录窗口已经开着时再点一次「重新认证」，旧窗口被关掉、新窗口没建起来，
-    /// 界面只剩一句「无法打开登录窗口」和「登录失败」，除了重启应用没有出路。
-    ///
-    /// 这条测试钉住的是那个前提本身：`WebviewWindow::close()` 只是往主线程投一
-    /// 条关闭消息，返回时 `zepp-login` 这个标签仍然登记着，拿它去 build 一定
-    /// 撞车。只要这个前提还成立，`start_web_login` 里就必须先等标签被交还，
-    /// 见 `close_login_window_and_wait`。
-    #[test]
-    fn closing_the_login_window_does_not_free_its_label_right_away() {
-        let app = tauri::test::mock_app();
-        let url = PRIMARY_LOGIN_URL.parse().expect("login url is static");
-        let window =
-            WebviewWindowBuilder::new(app.handle(), LOGIN_WINDOW_LABEL, WebviewUrl::External(url))
-                .build()
-                .expect("first login window");
-
-        window.close().expect("close request is accepted");
-
-        // 关闭请求已经发出去了，标签却还占着。
-        assert!(app.get_webview_window(LOGIN_WINDOW_LABEL).is_some());
-
-        let url = PRIMARY_LOGIN_URL.parse().expect("login url is static");
-        let error =
-            WebviewWindowBuilder::new(app.handle(), LOGIN_WINDOW_LABEL, WebviewUrl::External(url))
-                .build()
-                .expect_err("a second window with the same label must not build");
-        // 用户看到的那句就是 `无法打开登录窗口：a webview with label
-        // `zepp-login` already exists`。
-        assert!(
-            error.to_string().contains("already exists"),
-            "unexpected builder error: {error}"
-        );
-    }
-
     /// 旧窗口还占着标签时，绝不能去建新窗口。
     ///
-    /// 这是上一条测试的另一半：既然 `close()` 之后标签还在，那么只要它还在，
-    /// 唯一正确的动作就是继续等。一旦这里放行，用户拿到的就是「无法打开登录
-    /// 窗口」，而他刚才那个能用的窗口已经被关掉了。
+    /// `close()` 之后标签不会当场交还（原因见 `close_login_window_and_wait`），
+    /// 那么只要它还占着，唯一正确的动作就是继续等。一旦这里放行，用户拿到的
+    /// 就是「无法打开登录窗口」，而他刚才那个能用的窗口已经被关掉了。
+    ///
+    /// 「close() 之后标签仍在」这个前提本身没有测试：钉住它要 `tauri` 的
+    /// mock runtime，而把 `tauri = { features = ["test"] }` 加进 dev-dependencies
+    /// 会让 `tauri/test` 在整个测试构建里生效，Windows 上产出的测试二进制直接
+    /// 加载失败（STATUS_ENTRYPOINT_NOT_FOUND，一条用例都跑不到）。为一条关于
+    /// 第三方库行为的断言换掉整个 Windows 门禁，不划算。
     #[test]
     fn a_new_login_window_waits_until_the_old_label_is_released() {
         // 标签还占着——不管等了多久，都不是「可以建了」。
