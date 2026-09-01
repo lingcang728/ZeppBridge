@@ -1,7 +1,8 @@
 # Official Amazfit device catalog
 
-`src/assets/devices/catalog.json` is a maintenance-time snapshot checked on
-2026-08-15. It contains 52 total entries, of which 51 are `active`/`supported`,
+`src/assets/devices/catalog.json` is a maintenance-time snapshot; the model
+list was checked on 2026-08-15 and `device_source_codes` was added on
+2026-09-01. It contains 52 total entries, of which 51 are `active`/`supported`,
 covering 50 canonical model keys. The 48-card baseline is the supplied official
 Amazfit Japan store capture set (`design_picture/Product`, 12 rows × 4 cards);
 the duplicate GTR 4 black colour card shares the canonical GTR 4 material and
@@ -18,13 +19,44 @@ catalog ID, canonical model key, and material source.
 
 ## Matching contract
 
-1. A stable model code is matched first (known examples are `A2322`/`A2323`
+1. A `deviceSource` number is matched first against `device_source_codes`.
+   Some accounts return a device list with no product-name field at all
+   (issue #4), and these integers are then the only model-class fact in the
+   payload.
+2. A stable model code is matched next (known examples are `A2322`/`A2323`
    for T-Rex 3 and `A2321` for Helio Ring).
-2. `productName`/`deviceName` is matched against an exact normalized alias.
-3. A complete multi-word or numbered alias may occur in a display nickname
+3. `productName`/`deviceName` is matched against an exact normalized alias.
+4. A complete multi-word or numbered alias may occur in a display nickname
    (for example, `我的 T-Rex 3`).
-4. Generic fuzzy matching is never used. A value that does not pass one of
+5. Generic fuzzy matching is never used. A value that does not pass one of
    these checks remains `unknown`.
+
+### How `device_source_codes` is populated
+
+Huami publishes no lookup table for these integers, so every entry comes from
+users assigning a model by hand in the app and opting in to share it. The
+assignments are aggregated in the feedback database; see
+[feedback triage](./feedback-triage.md) for the tooling.
+
+Admission rules, enforced by `DEVICE_SOURCE_CODES` in
+[`scripts/assets/build-device-catalog.py`](../../scripts/assets/build-device-catalog.py)
+and asserted by the `device_catalog` unit tests:
+
+* **`deviceSource` only — never `deviceType`.** `deviceType` is a family code:
+  in the feedback data, `deviceType:0` alone spans twenty different models.
+* **High band only (>= 1,000,000).** The low band is self-contradictory in the
+  same data: `deviceSource:102` was assigned to four different models by four
+  different people.
+* **At least two independent reports per number.**
+* **Conflicts are adjudicated by hand, never by majority vote.** Two were
+  accepted (`9568513` -> Balance 2, `10289411` -> Helio Strap): their
+  neighbouring numbers are unanimous for the same product, and every
+  dissenting report also assigned a second watch, i.e. the reporter picked the
+  wrong device in the picker. One was rejected (`10813699`, Active MAX 2 vs
+  Active 2 44mm 2) — a tie is not evidence.
+
+Several adjacent numbers mapping to one product is normal: the low bits encode
+the colour/size variant.
 
 The original account nickname remains in `name`/`display_name`; the catalog
 adds `canonical_name`, `display_name`, `name_zh`, and `catalog_id`. `user_fused`
