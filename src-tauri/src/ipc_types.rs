@@ -47,6 +47,14 @@ pub struct AppStatus {
     /// 本机实际有数据的那段日子。界面上每一个「最近 N 天」选择器读的都是本机
     /// 库，所以每一个都需要知道这个，才不会把「库里没有」画成「那几个月你没动」。
     pub coverage: crate::storage::LocalCoverage,
+    /// 凭什么认定当前 `region_host` 属于这个账号：`identified` / `hinted` /
+    /// `unconfirmed` / `unknown`。界面按这个码自己写句子——后端不按 locale 出
+    /// 文案，四个出口才会说同一件事。
+    ///
+    /// `unconfirmed` 是唯一需要提醒用户的一档：区域是从兜底列表里猜的，没有
+    /// 任何东西证明它属于这个账号。同步之后一条记录都没有时，这是用户唯一
+    /// 能看到的线索。
+    pub region_confidence: String,
     /// 后台是否正在压缩历史报文。
     ///
     /// 只发一个 `compaction://started` 事件是不够的：它在 Rust 的 setup() 里
