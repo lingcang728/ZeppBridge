@@ -24,6 +24,7 @@
     "version:check": "node scripts/release/check-version-consistency.mjs",
     "docs:check": "node scripts/release/check-doc-links.mjs",
     "i18n:check": "node scripts/release/check-i18n.mjs",
+    "feedback:triage": "node scripts/feedback/triage.mjs",
     "verify:login-probe": "python scripts/verify/login-activity-probe.py || py -3 scripts/verify/login-activity-probe.py"
   },
   "dependencies": {

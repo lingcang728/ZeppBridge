@@ -1,6 +1,6 @@
 {
-  "version": 2,
-  "checked_at": "2026-08-15",
+  "version": 3,
+  "checked_at": "2026-09-01",
   "sources": [
     "https://www.amazfit.jp/",
     "https://us.amazfit.com/products.json?limit=250",
@@ -30,7 +30,7 @@
       "official_url": "https://www.amazfit.jp/",
       "image_source_url": "design_picture/Product/屏幕截图 2026-08-15 144308.png",
       "asset_source": "screenshot-derived",
-      "provenance": "Official Amazfit Japan store card capture 屏幕截图 2026-08-15 144308.png, row 1, column 1; product-only crop with store labels, prices, award badges, and UI removed; white background removed. Bundled as internal/local product-reference art pending release-license review.",
+      "provenance": "Official Amazfit Japan store card capture 屏幕截图 2026-08-15 144308.png, row 1, column 1; product-only crop with store labels, prices, award badges, and UI removed; white background removed. Bundled as internal/local product-reference art pending release-license review. deviceSource numbers added from the user model assignments collected in the feedback database (2026-09-01, 104 reports carrying an assignment). Only deviceSource values of 1000000 or more with at least two independent reports were accepted; deviceType was never used, and the self-contradictory low band (15/101/102/104) was rejected. See DEVICE_SOURCE_CODES in scripts/assets/build-device-catalog.py for the per-code adjudication.",
       "screenshot_card": {
         "row": 1,
         "column": 1,
@@ -41,7 +41,10 @@
       "canonical_device_key": "amazfit-balance-3",
       "asset_hash": "sha256:584419F7CEFCFA04BCD5E863BAF3959CF9CC2B4B3AF9F3FCF1B0886969258000",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-balance-3"
+      "image_key": "amazfit-balance-3",
+      "device_source_codes": [
+        11141379
+      ]
     },
     {
       "catalog_id": "amazfit-balance-ultra",
@@ -74,7 +77,8 @@
       "canonical_device_key": "amazfit-balance-ultra",
       "asset_hash": "sha256:362940CE15AC7A85922A8FF6BFA816D79DD818C840B6969C71900153D73191A3",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-balance-ultra"
+      "image_key": "amazfit-balance-ultra",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-cheetah-2-pro",
@@ -107,7 +111,8 @@
       "canonical_device_key": "amazfit-cheetah-2-pro",
       "asset_hash": "sha256:BACE4A952D1699FC0D156BAB9B19923784ED0B8084D6B9D4915654E67751BFE8",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-cheetah-2-pro"
+      "image_key": "amazfit-cheetah-2-pro",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-cheetah-2-ultra",
@@ -129,7 +134,7 @@
       "official_url": "https://www.amazfit.jp/",
       "image_source_url": "design_picture/Product/屏幕截图 2026-08-15 144308.png",
       "asset_source": "screenshot-derived",
-      "provenance": "Official Amazfit Japan store card capture 屏幕截图 2026-08-15 144308.png, row 1, column 4; product-only crop with store labels, prices, award badges, and UI removed; white background removed. Bundled as internal/local product-reference art pending release-license review.",
+      "provenance": "Official Amazfit Japan store card capture 屏幕截图 2026-08-15 144308.png, row 1, column 4; product-only crop with store labels, prices, award badges, and UI removed; white background removed. Bundled as internal/local product-reference art pending release-license review. deviceSource numbers added from the user model assignments collected in the feedback database (2026-09-01, 104 reports carrying an assignment). Only deviceSource values of 1000000 or more with at least two independent reports were accepted; deviceType was never used, and the self-contradictory low band (15/101/102/104) was rejected. See DEVICE_SOURCE_CODES in scripts/assets/build-device-catalog.py for the per-code adjudication.",
       "screenshot_card": {
         "row": 1,
         "column": 4,
@@ -140,7 +145,10 @@
       "canonical_device_key": "amazfit-cheetah-2-ultra",
       "asset_hash": "sha256:EA7FC341B04DEC9901FCA7F6C1ADDD7835F0B0855526A98D5C6E444B5D8267FA",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-cheetah-2-ultra"
+      "image_key": "amazfit-cheetah-2-ultra",
+      "device_source_codes": [
+        9978113
+      ]
     },
     {
       "catalog_id": "amazfit-bip-max",
@@ -173,7 +181,8 @@
       "canonical_device_key": "amazfit-bip-max",
       "asset_hash": "sha256:DBF27B73706D79F7B42E751635CCBC0DF42FE4136B4BB78B73F6829A93301EFB",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-bip-max"
+      "image_key": "amazfit-bip-max",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-active-3-premium",
@@ -206,7 +215,8 @@
       "canonical_device_key": "amazfit-active-3-premium",
       "asset_hash": "sha256:3AB74A932F505F60FCAB5DC8D77325437E7CD09A1701DFA9CBD756ACA7497094",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-active-3-premium"
+      "image_key": "amazfit-active-3-premium",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-t-rex-ultra-2",
@@ -239,7 +249,8 @@
       "canonical_device_key": "amazfit-t-rex-ultra-2",
       "asset_hash": "sha256:9C5CDBEC5897E75ECEDAAAD81298B989031B27EA51E6AC7C2BF6680146BFD7DF",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-t-rex-ultra-2"
+      "image_key": "amazfit-t-rex-ultra-2",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-active-max",
@@ -272,7 +283,8 @@
       "canonical_device_key": "amazfit-active-max",
       "asset_hash": "sha256:BF25B6A3A2B650B227CC50432BA0E7AB2DC65F93938E448502D45B7C6D1B2AE6",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-active-max"
+      "image_key": "amazfit-active-max",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-t-rex-3-pro-48-44mm",
@@ -297,7 +309,7 @@
       "official_url": "https://www.amazfit.jp/",
       "image_source_url": "design_picture/Product/屏幕截图 2026-08-15 144326.png",
       "asset_source": "screenshot-derived",
-      "provenance": "Official Amazfit Japan store card capture 屏幕截图 2026-08-15 144326.png, row 3, column 1; product-only crop with store labels, prices, award badges, and UI removed; white background removed. Bundled as internal/local product-reference art pending release-license review.",
+      "provenance": "Official Amazfit Japan store card capture 屏幕截图 2026-08-15 144326.png, row 3, column 1; product-only crop with store labels, prices, award badges, and UI removed; white background removed. Bundled as internal/local product-reference art pending release-license review. deviceSource numbers added from the user model assignments collected in the feedback database (2026-09-01, 104 reports carrying an assignment). Only deviceSource values of 1000000 or more with at least two independent reports were accepted; deviceType was never used, and the self-contradictory low band (15/101/102/104) was rejected. See DEVICE_SOURCE_CODES in scripts/assets/build-device-catalog.py for the per-code adjudication.",
       "screenshot_card": {
         "row": 3,
         "column": 1,
@@ -308,7 +320,10 @@
       "canonical_device_key": "amazfit-t-rex-3-pro-48-44mm",
       "asset_hash": "sha256:A0CF32FDA786772F9A09B736FE38FE2430C92B9C73C36AC05B4A9A196AA5AD6D",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-t-rex-3-pro-48-44mm"
+      "image_key": "amazfit-t-rex-3-pro-48-44mm",
+      "device_source_codes": [
+        10551552
+      ]
     },
     {
       "catalog_id": "amazfit-balance-2",
@@ -330,7 +345,7 @@
       "official_url": "https://www.amazfit.jp/",
       "image_source_url": "design_picture/Product/屏幕截图 2026-08-15 144326.png",
       "asset_source": "screenshot-derived",
-      "provenance": "Official Amazfit Japan store card capture 屏幕截图 2026-08-15 144326.png, row 3, column 2; product-only crop with store labels, prices, award badges, and UI removed; white background removed. Bundled as internal/local product-reference art pending release-license review.",
+      "provenance": "Official Amazfit Japan store card capture 屏幕截图 2026-08-15 144326.png, row 3, column 2; product-only crop with store labels, prices, award badges, and UI removed; white background removed. Bundled as internal/local product-reference art pending release-license review. deviceSource numbers added from the user model assignments collected in the feedback database (2026-09-01, 104 reports carrying an assignment). Only deviceSource values of 1000000 or more with at least two independent reports were accepted; deviceType was never used, and the self-contradictory low band (15/101/102/104) was rejected. See DEVICE_SOURCE_CODES in scripts/assets/build-device-catalog.py for the per-code adjudication.",
       "screenshot_card": {
         "row": 3,
         "column": 2,
@@ -341,7 +356,13 @@
       "canonical_device_key": "amazfit-balance-2",
       "asset_hash": "sha256:3F9B1B247A1D9AC0AAB078559BB2015402201D7A94B102B72960431DBA1A62BA",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-balance-2"
+      "image_key": "amazfit-balance-2",
+      "device_source_codes": [
+        9568512,
+        9568513,
+        9568515,
+        10486017
+      ]
     },
     {
       "catalog_id": "amazfit-active-2-square",
@@ -363,7 +384,7 @@
       "official_url": "https://www.amazfit.jp/",
       "image_source_url": "design_picture/Product/屏幕截图 2026-08-15 144326.png",
       "asset_source": "screenshot-derived",
-      "provenance": "Official Amazfit Japan store card capture 屏幕截图 2026-08-15 144326.png, row 3, column 3; product-only crop with store labels, prices, award badges, and UI removed; white background removed. Bundled as internal/local product-reference art pending release-license review.",
+      "provenance": "Official Amazfit Japan store card capture 屏幕截图 2026-08-15 144326.png, row 3, column 3; product-only crop with store labels, prices, award badges, and UI removed; white background removed. Bundled as internal/local product-reference art pending release-license review. deviceSource numbers added from the user model assignments collected in the feedback database (2026-09-01, 104 reports carrying an assignment). Only deviceSource values of 1000000 or more with at least two independent reports were accepted; deviceType was never used, and the self-contradictory low band (15/101/102/104) was rejected. See DEVICE_SOURCE_CODES in scripts/assets/build-device-catalog.py for the per-code adjudication.",
       "screenshot_card": {
         "row": 3,
         "column": 3,
@@ -374,7 +395,10 @@
       "canonical_device_key": "amazfit-active-2-square",
       "asset_hash": "sha256:C469470DC39F92B201F38286A212AA2671E28AE70000E51FB3A068E613C23C92",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-active-2-square"
+      "image_key": "amazfit-active-2-square",
+      "device_source_codes": [
+        10223873
+      ]
     },
     {
       "catalog_id": "amazfit-active-2-44mm",
@@ -397,7 +421,7 @@
       "official_url": "https://www.amazfit.jp/",
       "image_source_url": "design_picture/Product/屏幕截图 2026-08-15 144326.png",
       "asset_source": "screenshot-derived",
-      "provenance": "Official Amazfit Japan store card capture 屏幕截图 2026-08-15 144326.png, row 3, column 4; product-only crop with store labels, prices, award badges, and UI removed; white background removed. Bundled as internal/local product-reference art pending release-license review.",
+      "provenance": "Official Amazfit Japan store card capture 屏幕截图 2026-08-15 144326.png, row 3, column 4; product-only crop with store labels, prices, award badges, and UI removed; white background removed. Bundled as internal/local product-reference art pending release-license review. deviceSource numbers added from the user model assignments collected in the feedback database (2026-09-01, 104 reports carrying an assignment). Only deviceSource values of 1000000 or more with at least two independent reports were accepted; deviceType was never used, and the self-contradictory low band (15/101/102/104) was rejected. See DEVICE_SOURCE_CODES in scripts/assets/build-device-catalog.py for the per-code adjudication.",
       "screenshot_card": {
         "row": 3,
         "column": 4,
@@ -408,7 +432,12 @@
       "canonical_device_key": "amazfit-active-2-round",
       "asset_hash": "sha256:C7CABE13CCC687248B1DBA20B01B8942A7B73A45182EF37D5D5C581634ED70C8",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-active-2-44mm"
+      "image_key": "amazfit-active-2-44mm",
+      "device_source_codes": [
+        10092800,
+        10092801,
+        10092807
+      ]
     },
     {
       "catalog_id": "amazfit-bip-6",
@@ -430,7 +459,7 @@
       "official_url": "https://www.amazfit.jp/",
       "image_source_url": "design_picture/Product/屏幕截图 2026-08-15 144333.png",
       "asset_source": "screenshot-derived",
-      "provenance": "Official Amazfit Japan store card capture 屏幕截图 2026-08-15 144333.png, row 4, column 1; product-only crop with store labels, prices, award badges, and UI removed; white background removed. Bundled as internal/local product-reference art pending release-license review.",
+      "provenance": "Official Amazfit Japan store card capture 屏幕截图 2026-08-15 144333.png, row 4, column 1; product-only crop with store labels, prices, award badges, and UI removed; white background removed. Bundled as internal/local product-reference art pending release-license review. deviceSource numbers added from the user model assignments collected in the feedback database (2026-09-01, 104 reports carrying an assignment). Only deviceSource values of 1000000 or more with at least two independent reports were accepted; deviceType was never used, and the self-contradictory low band (15/101/102/104) was rejected. See DEVICE_SOURCE_CODES in scripts/assets/build-device-catalog.py for the per-code adjudication.",
       "screenshot_card": {
         "row": 4,
         "column": 1,
@@ -441,7 +470,10 @@
       "canonical_device_key": "amazfit-bip-6",
       "asset_hash": "sha256:E2B2378D4250AE1C01DF07878752B452AB0E2B140922ED30E86A0A20F11E23FF",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-bip-6"
+      "image_key": "amazfit-bip-6",
+      "device_source_codes": [
+        10158337
+      ]
     },
     {
       "catalog_id": "amazfit-t-rex-3",
@@ -468,7 +500,7 @@
       "official_url": "https://www.amazfit.jp/",
       "image_source_url": "design_picture/Product/屏幕截图 2026-08-15 144333.png",
       "asset_source": "screenshot-derived",
-      "provenance": "Official Amazfit Japan store card capture 屏幕截图 2026-08-15 144333.png, row 4, column 2; product-only crop with store labels, prices, award badges, and UI removed; white background removed. Bundled as internal/local product-reference art pending release-license review.",
+      "provenance": "Official Amazfit Japan store card capture 屏幕截图 2026-08-15 144333.png, row 4, column 2; product-only crop with store labels, prices, award badges, and UI removed; white background removed. Bundled as internal/local product-reference art pending release-license review. deviceSource numbers added from the user model assignments collected in the feedback database (2026-09-01, 104 reports carrying an assignment). Only deviceSource values of 1000000 or more with at least two independent reports were accepted; deviceType was never used, and the self-contradictory low band (15/101/102/104) was rejected. See DEVICE_SOURCE_CODES in scripts/assets/build-device-catalog.py for the per-code adjudication.",
       "screenshot_card": {
         "row": 4,
         "column": 2,
@@ -479,7 +511,12 @@
       "canonical_device_key": "amazfit-t-rex-3",
       "asset_hash": "sha256:E629B4C854F48E675833BC5DC826DC5BDBC2C394DBC1D08A9C3381C3948B24CB",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-t-rex-3"
+      "image_key": "amazfit-t-rex-3",
+      "device_source_codes": [
+        8716544,
+        8716545,
+        8716547
+      ]
     },
     {
       "catalog_id": "amazfit-helio-strap",
@@ -502,7 +539,7 @@
       "official_url": "https://www.amazfit.jp/",
       "image_source_url": "design_picture/Product/屏幕截图 2026-08-15 144333.png",
       "asset_source": "screenshot-derived",
-      "provenance": "Official Amazfit Japan store card capture 屏幕截图 2026-08-15 144333.png, row 4, column 3; product-only crop with store labels, prices, award badges, and UI removed; white background removed. Bundled as internal/local product-reference art pending release-license review.",
+      "provenance": "Official Amazfit Japan store card capture 屏幕截图 2026-08-15 144333.png, row 4, column 3; product-only crop with store labels, prices, award badges, and UI removed; white background removed. Bundled as internal/local product-reference art pending release-license review. deviceSource numbers added from the user model assignments collected in the feedback database (2026-09-01, 104 reports carrying an assignment). Only deviceSource values of 1000000 or more with at least two independent reports were accepted; deviceType was never used, and the self-contradictory low band (15/101/102/104) was rejected. See DEVICE_SOURCE_CODES in scripts/assets/build-device-catalog.py for the per-code adjudication.",
       "screenshot_card": {
         "row": 4,
         "column": 3,
@@ -513,7 +550,11 @@
       "canonical_device_key": "amazfit-helio-strap",
       "asset_hash": "sha256:8051B6F0B652DFEDB19E941953E1EC5C3A7A9D10A4C908A25C5F916492EEC255",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-helio-strap"
+      "image_key": "amazfit-helio-strap",
+      "device_source_codes": [
+        10289410,
+        10289411
+      ]
     },
     {
       "catalog_id": "amazfit-balance-46mm",
@@ -536,7 +577,7 @@
       "official_url": "https://www.amazfit.jp/",
       "image_source_url": "design_picture/Product/屏幕截图 2026-08-15 144333.png",
       "asset_source": "screenshot-derived",
-      "provenance": "Official Amazfit Japan store card capture 屏幕截图 2026-08-15 144333.png, row 4, column 4; product-only crop with store labels, prices, award badges, and UI removed; white background removed. Bundled as internal/local product-reference art pending release-license review.",
+      "provenance": "Official Amazfit Japan store card capture 屏幕截图 2026-08-15 144333.png, row 4, column 4; product-only crop with store labels, prices, award badges, and UI removed; white background removed. Bundled as internal/local product-reference art pending release-license review. deviceSource numbers added from the user model assignments collected in the feedback database (2026-09-01, 104 reports carrying an assignment). Only deviceSource values of 1000000 or more with at least two independent reports were accepted; deviceType was never used, and the self-contradictory low band (15/101/102/104) was rejected. See DEVICE_SOURCE_CODES in scripts/assets/build-device-catalog.py for the per-code adjudication.",
       "screenshot_card": {
         "row": 4,
         "column": 4,
@@ -547,7 +588,12 @@
       "canonical_device_key": "amazfit-balance",
       "asset_hash": "sha256:D5AFE3387699381876C08A80B7FD9669698820309307D0E0B8BCC91DBF86E362",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-balance-46mm"
+      "image_key": "amazfit-balance-46mm",
+      "device_source_codes": [
+        8519936,
+        8519937,
+        8519939
+      ]
     },
     {
       "catalog_id": "amazfit-active-edge-46mm",
@@ -581,7 +627,8 @@
       "canonical_device_key": "amazfit-active-edge-46mm",
       "asset_hash": "sha256:8603FDD1EA930374F49786287775BE23C830D8033C56FA66F530F36783D54E54",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-active-edge-46mm"
+      "image_key": "amazfit-active-edge-46mm",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-up",
@@ -615,7 +662,8 @@
       "canonical_device_key": "amazfit-up",
       "asset_hash": "sha256:C088313EE9CD1770DAAD005AD90ACF322D736A9C22C9C333C3E679B08DDABF19",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-up"
+      "image_key": "amazfit-up",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-bip-5-unity-46mm",
@@ -649,7 +697,8 @@
       "canonical_device_key": "amazfit-bip-5-unity-46mm",
       "asset_hash": "sha256:E573AA2FB75226C58E3A22EFA065F705CC7EABE5F3879B8498F5C11102BAF1CA",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-bip-5-unity-46mm"
+      "image_key": "amazfit-bip-5-unity-46mm",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-active-42mm",
@@ -683,7 +732,8 @@
       "canonical_device_key": "amazfit-active",
       "asset_hash": "sha256:04AD7D302028FBE17109D3EDCC214DA12C085B2E2F2AF12DCE5C7094256373D2",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-active-42mm"
+      "image_key": "amazfit-active-42mm",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-bip-5-46mm",
@@ -717,7 +767,8 @@
       "canonical_device_key": "amazfit-bip-5",
       "asset_hash": "sha256:4A47E3ABF6E6F7C99E71EB41AC1037AF266015393E89FEE7288DDD6F6B15E6FA",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-bip-5-46mm"
+      "image_key": "amazfit-bip-5-46mm",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-cheetah-pro-47mm",
@@ -751,7 +802,8 @@
       "canonical_device_key": "amazfit-cheetah-pro",
       "asset_hash": "sha256:C3E42E7A068596016830C660134EF9AFCA7D16B125D3BC3D1CE62081958E125C",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-cheetah-pro-47mm"
+      "image_key": "amazfit-cheetah-pro-47mm",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-cheetah-47mm",
@@ -784,7 +836,8 @@
       "canonical_device_key": "amazfit-cheetah-47mm",
       "asset_hash": "sha256:3D6C123B8F16EE638CFD8DE3348E84B9F889E54D4556A83ECB705CB7E29126FD",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-cheetah-47mm"
+      "image_key": "amazfit-cheetah-47mm",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-falcon-49mm",
@@ -818,7 +871,8 @@
       "canonical_device_key": "amazfit-falcon",
       "asset_hash": "sha256:3D5CDC649E480347CBA19DFC26A5A8D169C60E42D49736DEE93D0D32C8F7AE24",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-falcon-49mm"
+      "image_key": "amazfit-falcon-49mm",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-t-rex-ultra-47mm",
@@ -852,7 +906,8 @@
       "canonical_device_key": "amazfit-t-rex-ultra",
       "asset_hash": "sha256:D68CB51E5A4355A742765640CAEFA3F04184761F60455A8D8198F97B74C1A252",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-t-rex-ultra-47mm"
+      "image_key": "amazfit-t-rex-ultra-47mm",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-gtr-mini-43mm",
@@ -885,7 +940,8 @@
       "canonical_device_key": "amazfit-gtr-mini-43mm",
       "asset_hash": "sha256:34B02EF5BAEF9C8F927A0B467939251C436CBFD339B7C15390E73C0B4AA1104E",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-gtr-mini-43mm"
+      "image_key": "amazfit-gtr-mini-43mm",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-bip-3",
@@ -918,7 +974,8 @@
       "canonical_device_key": "amazfit-bip-3",
       "asset_hash": "sha256:F77F3A369965B4446F67C1A7F40C77D7DEF451F1040157E63BFC7EDB4B15CA0A",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-bip-3"
+      "image_key": "amazfit-bip-3",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-gts-4-43mm",
@@ -951,7 +1008,8 @@
       "canonical_device_key": "amazfit-gts-4-43mm",
       "asset_hash": "sha256:A2D3DE733F1E98662BA776C44F7A01CC93606B0196E20863A491EECCB24E915A",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-gts-4-43mm"
+      "image_key": "amazfit-gts-4-43mm",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-gtr-4-46mm",
@@ -974,7 +1032,7 @@
       "official_url": "https://www.amazfit.jp/",
       "image_source_url": "design_picture/Product/屏幕截图 2026-08-15 144405.png",
       "asset_source": "screenshot-derived",
-      "provenance": "Official Amazfit Japan store card capture 屏幕截图 2026-08-15 144405.png, row 8, column 1; product-only crop with store labels, prices, award badges, and UI removed; white background removed. Bundled as internal/local product-reference art pending release-license review.",
+      "provenance": "Official Amazfit Japan store card capture 屏幕截图 2026-08-15 144405.png, row 8, column 1; product-only crop with store labels, prices, award badges, and UI removed; white background removed. Bundled as internal/local product-reference art pending release-license review. deviceSource numbers added from the user model assignments collected in the feedback database (2026-09-01, 104 reports carrying an assignment). Only deviceSource values of 1000000 or more with at least two independent reports were accepted; deviceType was never used, and the self-contradictory low band (15/101/102/104) was rejected. See DEVICE_SOURCE_CODES in scripts/assets/build-device-catalog.py for the per-code adjudication.",
       "screenshot_card": {
         "row": 8,
         "column": 1,
@@ -985,7 +1043,10 @@
       "canonical_device_key": "amazfit-gtr-4-46mm",
       "asset_hash": "sha256:EB703AE812B44F9AD09E98BC3DB2FFDF89ED96E50AA05F193F441EF88F609555",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-gtr-4-46mm"
+      "image_key": "amazfit-gtr-4-46mm",
+      "device_source_codes": [
+        7930113
+      ]
     },
     {
       "catalog_id": "amazfit-band-7",
@@ -1018,7 +1079,8 @@
       "canonical_device_key": "amazfit-band-7",
       "asset_hash": "sha256:79E0F10281EBF665BEBBF85AD18D91A9BC201D4FA73117BC30EB35D09A6F9E76",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-band-7"
+      "image_key": "amazfit-band-7",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-gts-4-mini",
@@ -1052,7 +1114,8 @@
       "canonical_device_key": "amazfit-gts-4-mini",
       "asset_hash": "sha256:982FF6DE6E49311D6871D2C09191FF94F2779C08D1461AA7FE5A075BA5B3A859",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-gts-4-mini"
+      "image_key": "amazfit-gts-4-mini",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-bip-3-pro",
@@ -1085,7 +1148,8 @@
       "canonical_device_key": "amazfit-bip-3-pro",
       "asset_hash": "sha256:D9E828B29C8BE49C4A2C513798CE750F05F43D1EB0266725EBB157F4D062007C",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-bip-3-pro"
+      "image_key": "amazfit-bip-3-pro",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-gts-2-new-43mm",
@@ -1119,7 +1183,8 @@
       "canonical_device_key": "amazfit-gts-2-new-43mm",
       "asset_hash": "sha256:4CEC170234882088BE716ABBA95E3A3EDC2D7E2B8BDDF52318B689AE3FF810B3",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-gts-2-new-43mm"
+      "image_key": "amazfit-gts-2-new-43mm",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-gtr-4-46mm-black",
@@ -1153,7 +1218,8 @@
       "canonical_device_key": "amazfit-gtr-4-46mm",
       "asset_hash": "sha256:EB703AE812B44F9AD09E98BC3DB2FFDF89ED96E50AA05F193F441EF88F609555",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-gtr-4-46mm"
+      "image_key": "amazfit-gtr-4-46mm",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-t-rex-2-47mm",
@@ -1186,7 +1252,8 @@
       "canonical_device_key": "amazfit-t-rex-2-47mm",
       "asset_hash": "sha256:4AB8A5DAFACF4A1581ECE5CA681AE3701C33F85B2C090F6F12C57FEA6BFC3AF4",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-t-rex-2-47mm"
+      "image_key": "amazfit-t-rex-2-47mm",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-gtr-2-new-46mm",
@@ -1220,7 +1287,8 @@
       "canonical_device_key": "amazfit-gtr-2-new-46mm",
       "asset_hash": "sha256:1560BD2D922B1CB2CB1D81C15214E190B9591814C8F410B22F8729888704D6B9",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-gtr-2-new-46mm"
+      "image_key": "amazfit-gtr-2-new-46mm",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-gts-3-42mm",
@@ -1253,7 +1321,8 @@
       "canonical_device_key": "amazfit-gts-3-42mm",
       "asset_hash": "sha256:780D71624694557B0648BD190F04BAF3FE1301C4EFBAF76B85A5E8BFD9D9DD26",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-gts-3-42mm"
+      "image_key": "amazfit-gts-3-42mm",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-gtr-3-46mm",
@@ -1286,7 +1355,8 @@
       "canonical_device_key": "amazfit-gtr-3-46mm",
       "asset_hash": "sha256:E5843FE15F3A25C4C87EF2507CE769A4B6F6E0393457CA213EEA31CA3D31F6FE",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-gtr-3-46mm"
+      "image_key": "amazfit-gtr-3-46mm",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-gtr-3-pro-46mm",
@@ -1319,7 +1389,8 @@
       "canonical_device_key": "amazfit-gtr-3-pro-46mm",
       "asset_hash": "sha256:85F2D5A49935EC2EE8F500643E694669D37CD114AB8C1C1723F56624DBD617A9",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-gtr-3-pro-46mm"
+      "image_key": "amazfit-gtr-3-pro-46mm",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-gtr-2e",
@@ -1352,7 +1423,8 @@
       "canonical_device_key": "amazfit-gtr-2e",
       "asset_hash": "sha256:627262817C10C2BA0D01D0B51510668DB828F704230405C0333B942EDE4005F9",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-gtr-2e"
+      "image_key": "amazfit-gtr-2e",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-gts-2e",
@@ -1385,7 +1457,8 @@
       "canonical_device_key": "amazfit-gts-2e",
       "asset_hash": "sha256:C74F0052425C6DF637B01D988922203EC4A2A73E4462A3CB6EBECB0EF2B2DD92",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-gts-2e"
+      "image_key": "amazfit-gts-2e",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-t-rex-pro",
@@ -1418,7 +1491,8 @@
       "canonical_device_key": "amazfit-t-rex-pro",
       "asset_hash": "sha256:97AA4D9D4C5D9286BE9BB8021D5A20EC38CADCAAADB65EB46AE0169F2447E6D3",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-t-rex-pro"
+      "image_key": "amazfit-t-rex-pro",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-bip-u-series",
@@ -1452,7 +1526,8 @@
       "canonical_device_key": "amazfit-bip-u-series",
       "asset_hash": "sha256:2648A5027720CEF026998EA4E95D6CECF0CC1AE33976F465B237E38116662DBF",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-bip-u-series"
+      "image_key": "amazfit-bip-u-series",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-gts",
@@ -1485,7 +1560,8 @@
       "canonical_device_key": "amazfit-gts",
       "asset_hash": "sha256:67851753EBD59D9608F06B6A714E4E3A52BAF1B0299BC6BA502F3B6A49BCEDFC",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-gts"
+      "image_key": "amazfit-gts",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-gts-2",
@@ -1518,7 +1594,8 @@
       "canonical_device_key": "amazfit-gts-2",
       "asset_hash": "sha256:71E5565E613F572D463355C9DC43E38504A6D98FFF9E6EA4D7E249497342113B",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-gts-2"
+      "image_key": "amazfit-gts-2",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-gts-2-mini",
@@ -1551,7 +1628,8 @@
       "canonical_device_key": "amazfit-gts-2-mini",
       "asset_hash": "sha256:30123F18E4F46DE97AD43EAB65B91B07B780CDC15D79E429090F5E54E6B5228D",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-gts-2-mini"
+      "image_key": "amazfit-gts-2-mini",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-gtr-42mm",
@@ -1584,7 +1662,8 @@
       "canonical_device_key": "amazfit-gtr-42mm",
       "asset_hash": "sha256:351611A505DCED0AED21625104E05AB23A4FA75BF88B20FEDD25D8A7695FEF07",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-gtr-42mm"
+      "image_key": "amazfit-gtr-42mm",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-band-5",
@@ -1617,7 +1696,8 @@
       "canonical_device_key": "amazfit-band-5",
       "asset_hash": "sha256:21726177A2E7EDD1D12D8F2D31ABE903628CAF3E5778EC795A96499C896B5510",
       "checked_at": "2026-08-15",
-      "image_key": "amazfit-band-5"
+      "image_key": "amazfit-band-5",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-helio-strap-pro",
@@ -1644,7 +1724,8 @@
       "image_key": "amazfit-helio-strap-pro",
       "status": "active",
       "supported": true,
-      "checked_at": "2026-08-15"
+      "checked_at": "2026-08-15",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-helio-core",
@@ -1671,7 +1752,8 @@
       "image_key": "amazfit-helio-core",
       "status": "active",
       "supported": true,
-      "checked_at": "2026-08-15"
+      "checked_at": "2026-08-15",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-helio-armband",
@@ -1699,7 +1781,8 @@
       "provenance": "Official Amazfit US product page/CDN checked 2026-08-15; downloaded at maintenance time and background-removed to local RGBA WebP. Bundled as internal/local product-reference art pending release-license review.",
       "asset_hash": "sha256:887BF7A8904396AE2A2D57B5BE6D28285FFB7CC051B0C1DBC0EF245A76A9FDA6",
       "image_key": "amazfit-helio-armband",
-      "checked_at": "2026-08-15"
+      "checked_at": "2026-08-15",
+      "device_source_codes": []
     },
     {
       "catalog_id": "amazfit-helio-ring",
@@ -1731,7 +1814,8 @@
       "image_key": "amazfit-helio-ring",
       "status": "active",
       "supported": true,
-      "checked_at": "2026-08-15"
+      "checked_at": "2026-08-15",
+      "device_source_codes": []
     }
   ]
 }

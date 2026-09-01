@@ -12,8 +12,18 @@ use std::path::{Path, PathBuf};
 pub const CURRENT_SCHEMA_VERSION: i64 = 16;
 /// 写进备份 manifest 的应用版本。Core 是独立 crate，用它自己的包版本。
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v16-workout-catalog";
-const PREVIOUS_RELEASE_NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v14";
+/// 解析器修订号。**改了运动目录或任何归一化规则，就必须往前走一格。**
+///
+/// 它是自动重放的唯一触发条件：启动时发现库里存的修订号和这个不一样，就把
+/// `raw_records` 重新跑一遍。不动它，新加的编号只对以后同步来的记录生效，
+/// 已经存成 `unknown:211` 的那 199 条记录会永远挂着——而报这个问题的人恰恰
+/// 是因为历史记录才来报的。
+pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v17-road-cycling";
+/// 上一版的修订号。从它升上来时只重放 workouts。
+///
+/// v16 到 v17 之间只改了运动目录，daily_summary、sleep 那些报文一个字节都没变
+/// ——把它们整个解一遍只是让升级后的第一次启动白等。
+const PREVIOUS_RELEASE_NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v16-workout-catalog";
 const LAST_CLOUD_SYNC_AT_KEY: &str = "last_cloud_sync_at";
 const LAST_CLOUD_SYNC_OUTCOME_KEY: &str = "last_cloud_sync_outcome";
 const LAST_LOCAL_REPROCESS_AT_KEY: &str = "last_local_reprocess_at";
@@ -5547,6 +5557,47 @@ mod tests {
             )
             .unwrap();
         assert_eq!(revision, NORMALIZER_REVISION);
+    }
+
+    /// 升级之后，旧的 `unknown:211` 会被重新认成公路骑行。
+    ///
+    /// 报这个问题的人是为历史记录来的：199 条记录已经存成 `unknown:211` 了。
+    /// 只把编号加进目录，新记录会对，旧记录一条都不会变——所以这条用例钉的
+    /// 不是目录，而是「目录改了会自动重放」这件事。
+    #[test]
+    fn upgrading_replays_history_so_unknown_211_becomes_road_cycling() {
+        let db = Database::in_memory().unwrap();
+        db.insert_raw_record(&RawRecord {
+            stream: "workouts".into(),
+            source_key: "workouts-211".into(),
+            source_scope: SourceScope::Device,
+            device_id: None,
+            start_utc: ts(),
+            end_utc: None,
+            payload: serde_json::json!({
+                "data": [{
+                    "trackid": 1_700_000_000i64,
+                    "end_time": 1_700_003_600i64,
+                    "type": 211
+                }]
+            }),
+            capability: CapabilityStatus::Verified,
+        })
+        .unwrap();
+        db.conn
+            .execute(
+                "INSERT INTO app_meta(key, value, updated_at)
+                 VALUES('normalizer_revision', ?1, ?2)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                params![PREVIOUS_RELEASE_NORMALIZER_REVISION, ts().to_rfc3339()],
+            )
+            .unwrap();
+
+        db.reprocess_raw_records_if_needed().unwrap().unwrap();
+
+        let workouts = db.get_recent_workouts(10).unwrap();
+        assert_eq!(workouts.len(), 1);
+        assert_eq!(workouts[0].workout_type, "road_cycling");
     }
 
     #[test]
