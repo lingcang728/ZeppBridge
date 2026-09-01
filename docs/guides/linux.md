@@ -39,7 +39,8 @@ cd ZeppBridge
 flatpak run com.zeppbridge.app
 ```
 
-The script needs `flatpak` and `flatpak-builder` on the host and nothing else —
+The script needs `flatpak`, `flatpak-builder` and `elfutils` on the host and
+nothing else —
 Rust and Node come from Flatpak SDK extensions, so no toolchain is installed
 system-wide. Everything is `--user`; it never asks for root.
 
@@ -147,14 +148,28 @@ whole bus would be a hole in the sandbox).
 
 ```bash
 sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev \
-  libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev libxdo-dev patchelf
+  libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev libxdo-dev patchelf \
+  rpm xdg-utils
 npm ci
-npm run tauri build -- --bundles deb,rpm,appimage
+npm run tauri build -- \
+  --config src-tauri/tauri.linux.conf.json \
+  --bundles deb,rpm,appimage
 ```
 
-`libdbus-1-dev` is the one that is easy to miss: it is not on Tauri's own
-prerequisites list. It is there because the Secret Service credential backend
-links libdbus. Runtime needs `libdbus-1-3`, which the deb and rpm both declare.
+`--config src-tauri/tauri.linux.conf.json` turns off updater artifacts. The base
+config enables them for Windows and macOS, and that switch is global — with it
+on, the bundler looks for the release signing key and stops with *"A public key
+has been found, but no private key"*. Linux builds deliberately produce no
+updater artifacts, since in-app updating is off there.
+
+Three of those are easy to miss, and none is on Tauri's own prerequisites list:
+
+- `libdbus-1-dev` — the Secret Service credential backend links libdbus. At
+  runtime this is `libdbus-1-3`, which the deb and rpm both declare.
+- `rpm` — the rpm bundler shells out to `rpmbuild`.
+- `xdg-utils` — the AppImage bundler copies `/usr/bin/xdg-open` into the image.
+  Missing it fails *after* the deb and rpm have already been written, which
+  makes it look like an AppImage-specific bug rather than a missing package.
 
 To avoid installing any of that, use the pinned toolchain container instead —
 same compiler, same webkit, same glibc as CI:
@@ -162,7 +177,8 @@ same compiler, same webkit, same glibc as CI:
 ```bash
 docker build -f packaging/docker/Dockerfile.build -t zeppbridge-build .
 docker run --rm -v "$PWD:/src" -w /src zeppbridge-build \
-  bash -c 'npm ci && npm run tauri build -- --bundles deb,rpm,appimage'
+  bash -c 'npm ci && npm run tauri build -- \
+    --config src-tauri/tauri.linux.conf.json --bundles deb,rpm,appimage'
 ```
 
 ## Flathub

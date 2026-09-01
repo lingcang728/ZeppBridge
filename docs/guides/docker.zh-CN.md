@@ -171,7 +171,8 @@ docker compose -f packaging/docker/docker-compose.yml run --rm sync
 ```bash
 docker build -f packaging/docker/Dockerfile.build -t zeppbridge-build:local .
 docker run --rm -v "$PWD:/src" -w /src zeppbridge-build:local \
-  bash -c 'npm ci && npm run tauri build -- --bundles deb,rpm,appimage'
+  bash -c 'npm ci && npm run tauri build -- \
+    --config src-tauri/tauri.linux.conf.json --bundles deb,rpm,appimage'
 ```
 
 刻意用 Debian bookworm 而不是滚动版本：二进制链接的 glibc 就是它能运行的最低 glibc，在最新的发行版上构建，产出的包会在人们实际在用的 LTS 上拒绝启动。Node 和 Rust 的版本作为构建参数钉死——要升就明确地升。

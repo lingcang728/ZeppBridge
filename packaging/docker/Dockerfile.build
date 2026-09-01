@@ -7,7 +7,8 @@
 #
 #   docker build -f packaging/docker/Dockerfile.build -t zeppbridge-build:local .
 #   docker run --rm -v "$PWD:/src" -w /src zeppbridge-build:local \
-#       npm ci && npm run tauri build -- --bundles deb,rpm,appimage
+#       npm ci && npm run tauri build -- \
+#         --config src-tauri/tauri.linux.conf.json --bundles deb,rpm,appimage
 #
 # Bookworm on purpose, not trixie or a rolling base: the glibc a Tauri binary
 # is linked against is the oldest glibc it will run on. Building on the newest
@@ -21,6 +22,10 @@ ENV DEBIAN_FRONTEND=noninteractive
 #   libdbus-1-dev — the Secret Service credential backend (see
 #                   src-tauri/crates/core/Cargo.toml)
 #   rpm           — the rpm bundler shells out to rpmbuild
+#   xdg-utils     — the AppImage bundler copies /usr/bin/xdg-open into the
+#                   image so "open this link" works on the host. Missing it
+#                   fails *after* deb and rpm have already been produced:
+#                   `failed to bundle project: xdg-open binary not found`
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         build-essential \
@@ -38,6 +43,7 @@ RUN apt-get update \
         patchelf \
         pkg-config \
         rpm \
+        xdg-utils \
         xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
