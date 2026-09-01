@@ -39,6 +39,7 @@ pub(crate) async fn build_app_status(state: &AppState) -> std::result::Result<Ap
     let auth_state = state.auth_state.read().await.clone();
     let startup_warning = state.startup_warning.read().await.clone();
     let auth_warning = state.auth_warning.read().await.clone();
+    let region_confidence = state.region_confidence.read().await.clone();
 
     let connection_state = if !auth_status.configured {
         "unconfigured"
@@ -99,6 +100,7 @@ pub(crate) async fn build_app_status(state: &AppState) -> std::result::Result<Ap
         history_sync_days: prefs.history_sync_days,
         storage: Some(storage),
         coverage,
+        region_confidence,
         compacting: zeppbridge_core::storage::compaction_in_progress(),
     })
 }

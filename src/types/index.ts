@@ -42,6 +42,14 @@ export interface AppStatus {
   storage?: StorageEstimate;
   /** 本机实际有数据的那段日子。界面上每个「最近 N 天」读的都是本机库。 */
   coverage?: LocalCoverage;
+  /**
+    * 凭什么认定当前 `region_host` 属于这个账号。
+    *
+    * `identified` 拿到了这个账号绑定的设备；`hinted` 是 Zepp 在登录响应里指名
+    * 的；`unconfirmed` 是从兜底列表里猜的——同步之后一条记录都没有时，这一档
+    * 是用户唯一能看到的线索。进程重启后无从得知，为 `unknown`。
+    */
+  region_confidence?: 'identified' | 'hinted' | 'unconfirmed' | 'unknown' | string;
   /** 后台是否正在压缩历史报文。事件可能在前端监听之前就发出去了，所以状态里也要有。 */
   compacting?: boolean;
 }

@@ -160,6 +160,10 @@ pub async fn clear_auth(
         let mut warning = state.startup_warning.write().await;
         *warning = None;
     }
+    {
+        let mut region = state.region_confidence.write().await;
+        *region = "unknown".to_string();
+    }
 
     build_app_status(&state).await
 }
@@ -211,6 +215,52 @@ pub(crate) fn validate_verify_payload(value: &Value) -> std::result::Result<(), 
         Err(ZeppBridgeError::ParseError(
             "认证验证返回了失败的响应代码".to_string(),
         ))
+    }
+}
+
+/// 登录时的区域判定证据强度。
+///
+/// 「这份凭据还有效吗」和「这个 host 是不是本账号的区域」是两个问题，之前由
+/// 同一个判据回答。`validate_verify_payload` 回答的是前者，那里「空」是合法
+/// 的——用户可能这两小时没戴表。可后者不行：一个根本不认识这个账号的区域
+/// 同样返回结构化空响应，而且因为它压根不去查数据，往往还答得更快。于是在
+/// 十来个候选区域的并发竞速里，最先返回的常常是错的那个，被存成
+/// `region_host`；之后每一次同步都打向那里，界面显示「已连接」，库里一条
+/// 记录也没有。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum RegionEvidence {
+    /// 请求成功了，但没有任何内容能证明这个 host 认识本账号。
+    Empty,
+    /// 这个 host 按 `user_id` 返回了该账号绑定的设备——它认识这个人。
+    Identified,
+}
+
+/// 判断某个区域 host 是不是本账号的区域。
+///
+/// 用 `/users/{user_id}/devices`：路径里带着 `user_id`，所以「区域对但这两
+/// 小时没数据」和「这个区域不认识这个用户」不再返回同一个东西。会用
+/// ZeppBridge 的人必然绑过一块表，因此拿到设备就是强证据。
+///
+/// 设备端点因为非鉴权原因失败时，退回到与 `verify_auth` 相同的心率检查，把
+/// 结果记成弱证据——宁可退回改动前的判据，也不要让一条从来没出过问题的
+/// 登录路径因为换了端点而失败。
+pub(crate) async fn probe_region_evidence(
+    auth: &AuthInfo,
+) -> std::result::Result<RegionEvidence, ZeppBridgeError> {
+    let connector = ZeppConnector::new(auth.clone())?;
+    match connector.fetch_devices().await {
+        Ok(payload) => {
+            if super::data::parse_device_profiles(&payload).is_empty() {
+                Ok(RegionEvidence::Empty)
+            } else {
+                Ok(RegionEvidence::Identified)
+            }
+        }
+        // 凭据被明确拒绝是结论，不必再问第二个端点。
+        Err(error @ ZeppBridgeError::NeedsReauth(_)) => Err(error),
+        Err(_) => verify_recent_heart_rate(auth)
+            .await
+            .map(|()| RegionEvidence::Empty),
     }
 }
 
