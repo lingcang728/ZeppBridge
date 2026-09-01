@@ -115,6 +115,8 @@ const messages = defineMessages(
     'err.diagnostic.client_init_failed': '无法初始化错误报告连接',
     'err.diagnostic.send_failed': '错误报告发送失败，请检查网络后重试',
     'err.diagnostic.http_error': '错误报告服务返回了错误',
+    'err.diagnostic.rate_limited':
+      '短时间内提交了太多份报告，请过一会儿再试。已经交过的那几份不会丢，也不用重复提交。',
     'err.diagnostic.bad_response': '错误报告服务返回了无法识别的结果',
 
     /* —— 其它 —— */
@@ -240,6 +242,8 @@ const messages = defineMessages(
     'err.diagnostic.client_init_failed': "Couldn't open a connection for the report",
     'err.diagnostic.send_failed': "Couldn't send the report. Check your network and try again",
     'err.diagnostic.http_error': 'The report service returned an error',
+    'err.diagnostic.rate_limited':
+      'Too many reports in a short time. Try again in a little while — the ones already sent are kept, and there is no need to resend them.',
     'err.diagnostic.bad_response': 'The report service returned something we could not read',
 
     /* —— misc —— */
