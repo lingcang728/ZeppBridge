@@ -1,4 +1,4 @@
-use super::auth::verify_recent_heart_rate;
+use super::auth::{probe_region_evidence, RegionEvidence};
 use crate::app_state::AppState;
 use crate::connectors::zepp::validate_region_host;
 use crate::ipc_error::AppError;
@@ -25,6 +25,14 @@ const POLL_INTERVAL: Duration = Duration::from_millis(750);
 /// 还要确认这一页确实没人碰过，见 `fallback_is_due` 与 `login_page_is_idle`。
 const FALLBACK_AFTER: Duration = Duration::from_secs(90);
 const SESSION_TIMEOUT: Duration = Duration::from_secs(15 * 60);
+/// 停在第三方授权页多久之后，主动说一句「这条路可能走不通」。
+///
+/// 这不是超时，也不会打断任何东西——登录本来就慢，输密码、等邮箱里的验证码、
+/// 扫码都要时间。它针对的是另一件事：Google 的 passkey 在嵌入式 WebView 里
+/// 常常停在 "verifying it's you" 不动，而这一点我们改不了。与其让人对着一个
+/// 不会有结果的页面等满十五分钟才看到一句「登录超时」，不如现在就告诉他还有
+/// 邮箱+密码，以及设置页里手动填 App Token 这两条路。
+const THIRD_PARTY_STALL_AFTER: Duration = Duration::from_secs(120);
 const COOKIE_EVAL_TIMEOUT: Duration = Duration::from_secs(2);
 /// 关掉上一个登录窗口后，最多等多久让它把 `zepp-login` 这个标签交还。
 ///
@@ -222,6 +230,11 @@ fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow) {
         // 凭据已经读到了，卡住的是后面的区域确认。这和「压根没登录」「登录了
         // 但读不到凭据」都不一样，超时那一刻得说对是哪一种。
         let mut credentials_extracted = false;
+        // 当前停在哪一页、从什么时候开始停的。第三方授权页的停滞提示按这个计时，
+        // 而不是按整场登录——不然在授权页之间正常来回跳也会被算成卡住。
+        let mut current_page = String::new();
+        let mut page_since = std::time::Instant::now();
+        let mut third_party_hinted = false;
 
         loop {
             if !epoch_active(&app, epoch) {
@@ -251,6 +264,28 @@ fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow) {
             }
 
             let page_url = current_page_url(&window);
+            if page_url != current_page {
+                current_page = page_url.clone();
+                page_since = std::time::Instant::now();
+                third_party_hinted = false;
+            }
+            if third_party_stall_is_due(
+                &page_url,
+                page_since.elapsed(),
+                credentials_extracted,
+                third_party_hinted,
+            ) {
+                third_party_hinted = true;
+                emit_progress(
+                    &app,
+                    epoch,
+                    "waiting",
+                    "err.login.third_party_stalled",
+                    "第三方登录好像卡住了。可以关掉这个窗口，改用邮箱+密码登录；也可以在设置里手动填写 App Token。",
+                    &page_url,
+                )
+                .await;
+            }
             // 只有在还可能跳转时才去问页面；问出「有人在用」就永久作罢。
             let mut page_is_idle = false;
             if !user_active {
@@ -406,13 +441,14 @@ async fn persist_extracted_login(
     };
     let (preferred, authoritative_count) =
         preferred_region_hosts(&state, &extracted.user_id, extracted.region_hint.as_deref()).await;
-    let auth = probe_region_hosts(
+    let winner = probe_region_hosts(
         &extracted.user_id,
         &extracted.app_token,
         &preferred,
         authoritative_count,
     )
     .await?;
+    let RegionWinner { auth, confidence } = winner;
     if !epoch_active(app, epoch) {
         return Err(LoginFailure::fatal(AppError::new(
             "err.login.cancelled",
@@ -465,6 +501,10 @@ async fn persist_extracted_login(
     {
         let mut warning = state.auth_warning.write().await;
         *warning = None;
+    }
+    {
+        let mut region = state.region_confidence.write().await;
+        *region = confidence.to_string();
     }
     super::data::refresh_device_profile(&state).await;
     Ok(())
@@ -526,12 +566,82 @@ fn classify_region_probe_error(error: &ZeppBridgeError) -> RegionProbeFailure {
     }
 }
 
+/// 最终选中的区域 host，以及选中它的理由有多硬。
+///
+/// `confidence` 是给界面的稳定码，不是文案：
+/// * `identified` —— 这个 host 按 `user_id` 交出了该账号绑定的设备；
+/// * `hinted` —— Zepp 在这次登录响应里就指名了这个 host，请求也通了，只是这个
+///   账号没有设备可拿；
+/// * `unconfirmed` —— 从兜底列表里猜出来的，没有任何东西证明它属于这个账号。
+struct RegionWinner {
+    auth: AuthInfo,
+    confidence: &'static str,
+}
+
+/// 一批 host 探完之后剩下什么。
+#[derive(Default)]
+struct RegionBatchOutcome {
+    /// 认领了这个账号的 host。有它就不必再看别的。
+    identified: Option<AuthInfo>,
+    /// 请求通了但拿不出设备的 host 里，偏好顺序最靠前的那个。
+    fallback: Option<(usize, AuthInfo)>,
+}
+
+impl RegionBatchOutcome {
+    /// 收下一个探测结果。返回 `true` 表示已经拿到最硬的证据，不必再等别人。
+    ///
+    /// 结果按完成先后到达，而选谁要按偏好顺序，所以弱证据之间比的是 `rank`
+    /// 而不是先来后到。这正是原来那个 bug 的所在：谁先答应就用谁，而一个不
+    /// 认识这个用户的区域根本不去查数据，往往答得最快。
+    fn record(&mut self, rank: usize, auth: AuthInfo, evidence: RegionEvidence) -> bool {
+        match evidence {
+            RegionEvidence::Identified => {
+                self.identified = Some(auth);
+                true
+            }
+            RegionEvidence::Empty => {
+                let better = match self.fallback.as_ref() {
+                    Some((current, _)) => rank < *current,
+                    None => true,
+                };
+                if better {
+                    self.fallback = Some((rank, auth));
+                }
+                false
+            }
+        }
+    }
+
+    /// 折算成最终结论。
+    ///
+    /// `authoritative` 指这批 host 是不是 Zepp 在这次登录响应里自己指出来的。
+    /// 是的话，即便它交不出设备（这个账号可能一块表都没绑），也仍然有 Zepp 的
+    /// 背书；不是的话，就只是从兜底列表里猜中的一个，必须标出来。
+    fn into_winner(self, authoritative: bool) -> Option<RegionWinner> {
+        if let Some(auth) = self.identified {
+            return Some(RegionWinner {
+                auth,
+                confidence: "identified",
+            });
+        }
+        let (_, auth) = self.fallback?;
+        Some(RegionWinner {
+            auth,
+            confidence: if authoritative {
+                "hinted"
+            } else {
+                "unconfirmed"
+            },
+        })
+    }
+}
+
 async fn probe_region_hosts(
     user_id: &str,
     app_token: &str,
     hosts: &[String],
     authoritative_count: usize,
-) -> std::result::Result<AuthInfo, LoginFailure> {
+) -> std::result::Result<RegionWinner, LoginFailure> {
     let deadline = tokio::time::Instant::now() + Duration::from_secs(45);
     let mut failures = RegionProbeFailures::default();
     let authoritative_count = authoritative_count.min(hosts.len());
@@ -540,79 +650,95 @@ async fn probe_region_hosts(
     // the same already-saved user), so verify it before sending the token to
     // any fallback region. A short stage timeout leaves enough of the global
     // budget for recovery when Zepp returned a stale host.
+    //
+    // 这一阶段的 host 是 Zepp 自己在这次登录响应里指出来的，它本身就是身份
+    // 证据。所以请求一通就采用，哪怕这个账号一块表都没绑——再去盲扫兜底列表
+    // 只会让最常见的那条路白等几十秒。
     if authoritative_count > 0 {
         let stage_deadline = std::cmp::min(
             deadline,
             tokio::time::Instant::now() + Duration::from_secs(15),
         );
-        if let Some(auth) = probe_region_batch(
+        let outcome = probe_region_batch(
             user_id,
             app_token,
             &hosts[..authoritative_count],
+            0,
             stage_deadline,
             &mut failures,
         )
-        .await
-        {
-            return Ok(auth);
+        .await;
+        if let Some(winner) = outcome.into_winner(true) {
+            return Ok(winner);
         }
     }
 
-    if let Some(auth) = probe_region_batch(
+    // 兜底阶段是在**猜**：这些 host 没有任何证据说它属于这个账号。所以这里不能
+    // 「谁先答应就用谁」——一个不认识这个用户的区域根本不会去查数据，它返回的
+    // 结构化空响应往往比正确区域返回真实数据还快。只有交出了设备的那个才算数；
+    // 全都交不出时才退而用偏好顺序最靠前的一个，并把这件事标成 unconfirmed。
+    let outcome = probe_region_batch(
         user_id,
         app_token,
         &hosts[authoritative_count..],
+        authoritative_count,
         deadline,
         &mut failures,
     )
-    .await
-    {
-        return Ok(auth);
+    .await;
+    if let Some(winner) = outcome.into_winner(false) {
+        return Ok(winner);
     }
     Err(failures.into_login_failure())
 }
 
+/// 并发探测一批 host。
+///
+/// `rank_offset` 是这批 host 在整个偏好列表里的起始位置：结果按完成先后到达，
+/// 而选谁要按偏好顺序，所以每个结果都得带着自己的名次回来。
 async fn probe_region_batch(
     user_id: &str,
     app_token: &str,
     hosts: &[String],
+    rank_offset: usize,
     deadline: tokio::time::Instant,
     failures: &mut RegionProbeFailures,
-) -> Option<AuthInfo> {
+) -> RegionBatchOutcome {
+    let mut outcome = RegionBatchOutcome::default();
     if hosts.is_empty() {
-        return None;
+        return outcome;
     }
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<
-        std::result::Result<AuthInfo, RegionProbeFailure>,
-    >(hosts.len().max(1));
+    type ProbeResult = std::result::Result<(usize, AuthInfo, RegionEvidence), RegionProbeFailure>;
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<ProbeResult>(hosts.len().max(1));
     let mut handles = Vec::new();
-    for host in hosts {
+    for (index, host) in hosts.iter().enumerate() {
         let auth = AuthInfo {
             app_token: app_token.to_string(),
             user_id: user_id.to_string(),
             region_host: host.clone(),
         };
+        let rank = rank_offset + index;
         let tx = tx.clone();
         handles.push(tokio::spawn(async move {
-            let result = verify_recent_heart_rate(&auth)
+            let result = probe_region_evidence(&auth)
                 .await
-                .map(|_| auth)
+                .map(|evidence| (rank, auth, evidence))
                 .map_err(|error| classify_region_probe_error(&error));
             let _ = tx.send(result).await;
         }));
     }
     drop(tx);
 
-    let mut winner = None;
     for _ in 0..hosts.len() {
         let Some(remaining) = deadline.checked_duration_since(tokio::time::Instant::now()) else {
             failures.transient += 1;
             break;
         };
         match tokio::time::timeout(remaining, rx.recv()).await {
-            Ok(Some(Ok(auth))) => {
-                winner = Some(auth);
-                break;
+            Ok(Some(Ok((rank, auth, evidence)))) => {
+                if outcome.record(rank, auth, evidence) {
+                    break;
+                }
             }
             Ok(Some(Err(failure))) => failures.record(failure),
             Ok(None) => break,
@@ -625,7 +751,7 @@ async fn probe_region_batch(
     for handle in handles {
         handle.abort();
     }
-    winner
+    outcome
 }
 
 async fn preferred_region_hosts(
@@ -1045,15 +1171,45 @@ fn is_allowed_login_url(url: &str) -> bool {
             || host.ends_with(".zepp.com")
             || host == "huami.com"
             || host.ends_with(".huami.com")
-            || matches!(
-                host.as_str(),
-                "account.xiaomi.com"
-                    | "open.weixin.qq.com"
-                    | "accounts.google.com"
-                    | "www.facebook.com"
-                    | "account-us.amazfit.com"
-            )
+            || THIRD_PARTY_AUTH_HOSTS.contains(&host.as_str())
     })
+}
+
+/// 官方通用登录页会跳过去的第三方账号域名。
+///
+/// 放行导航和判断「是不是卡在第三方授权页」用的是同一份表：多一处手写的名单，
+/// 就多一个哪天加了新登录方式却漏改的地方。
+const THIRD_PARTY_AUTH_HOSTS: &[&str] = &[
+    "account.xiaomi.com",
+    "open.weixin.qq.com",
+    "accounts.google.com",
+    "www.facebook.com",
+    "account-us.amazfit.com",
+];
+
+/// 这个地址是不是第三方账号的授权页（而不是我们自己打开的 Zepp 登录页）。
+fn is_third_party_auth_page(url: &str) -> bool {
+    reqwest::Url::parse(url)
+        .ok()
+        .and_then(|parsed| parsed.host_str().map(str::to_ascii_lowercase))
+        .is_some_and(|host| THIRD_PARTY_AUTH_HOSTS.contains(&host.as_str()))
+}
+
+/// 该不该现在就把兜底路径摆出来。
+///
+/// 四个条件缺一不可：停在第三方授权页、在这一页上已经待够久、还没读到凭据、
+/// 这一轮没说过。「在这一页上」是关键——计时要跟着地址走，用户在几个授权页之间
+/// 来回跳的时候，每一页都重新计时，不会因为整场登录拖得久就误报。
+fn third_party_stall_is_due(
+    page_url: &str,
+    elapsed_on_page: Duration,
+    credentials_extracted: bool,
+    already_hinted: bool,
+) -> bool {
+    !already_hinted
+        && !credentials_extracted
+        && elapsed_on_page >= THIRD_PARTY_STALL_AFTER
+        && is_third_party_auth_page(page_url)
 }
 
 fn login_url_log_fields(url: &reqwest::Url) -> String {
@@ -1317,6 +1473,140 @@ async fn finish_idle_if_active(app: &AppHandle, epoch: u64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn probe_auth(host: &str) -> AuthInfo {
+        AuthInfo {
+            app_token: "token".to_string(),
+            user_id: "user".to_string(),
+            region_host: host.to_string(),
+        }
+    }
+
+    /// 这是那个 bug 本身：错误区域先答应，正确区域后答应。
+    ///
+    /// 一个不认识这个用户的区域根本不去查数据，所以它的空响应往往比正确区域
+    /// 返回真实设备还快。旧代码「谁先答应就用谁」，于是把错的那个存了下来，
+    /// 之后每次同步都打向那里——界面显示已连接，库里一条记录也没有。
+    #[test]
+    fn a_fast_empty_region_does_not_beat_a_slower_one_that_knows_the_account() {
+        let mut outcome = RegionBatchOutcome::default();
+
+        assert!(!outcome.record(
+            0,
+            probe_auth("https://wrong.example"),
+            RegionEvidence::Empty
+        ));
+        assert!(outcome.record(
+            5,
+            probe_auth("https://right.example"),
+            RegionEvidence::Identified
+        ));
+
+        let winner = outcome.into_winner(false).expect("a winner");
+        assert_eq!(winner.auth.region_host, "https://right.example");
+        assert_eq!(winner.confidence, "identified");
+    }
+
+    /// 全都交不出设备时，按偏好顺序挑，而不是按谁先回来。
+    #[test]
+    fn only_empty_answers_fall_back_to_the_most_preferred_host() {
+        let mut outcome = RegionBatchOutcome::default();
+
+        outcome.record(
+            3,
+            probe_auth("https://third.example"),
+            RegionEvidence::Empty,
+        );
+        outcome.record(
+            1,
+            probe_auth("https://first.example"),
+            RegionEvidence::Empty,
+        );
+        outcome.record(
+            2,
+            probe_auth("https://second.example"),
+            RegionEvidence::Empty,
+        );
+
+        let winner = outcome.into_winner(false).expect("a winner");
+        assert_eq!(winner.auth.region_host, "https://first.example");
+        // 猜出来的就得说是猜的：同步之后一条记录都没有时，这是唯一的线索。
+        assert_eq!(winner.confidence, "unconfirmed");
+    }
+
+    /// Zepp 自己指名的 host 交不出设备，不等于它错了——这个账号可能一块表都没绑。
+    /// 它仍然算数，只是标成 `hinted` 而不是 `identified`。
+    #[test]
+    fn an_authoritative_host_still_counts_when_the_account_has_no_devices() {
+        let mut outcome = RegionBatchOutcome::default();
+        outcome.record(
+            0,
+            probe_auth("https://hinted.example"),
+            RegionEvidence::Empty,
+        );
+
+        let winner = outcome.into_winner(true).expect("a winner");
+        assert_eq!(winner.auth.region_host, "https://hinted.example");
+        assert_eq!(winner.confidence, "hinted");
+    }
+
+    /// 一个都没答应就是没有结论，不能随便挑一个凑数。
+    #[test]
+    fn no_answer_produces_no_winner() {
+        assert!(RegionBatchOutcome::default().into_winner(true).is_none());
+        assert!(RegionBatchOutcome::default().into_winner(false).is_none());
+    }
+
+    /// 凭据被明确拒绝，仍然是终局失败——不会被别处的空响应盖过去。
+    #[test]
+    fn an_explicit_rejection_stays_fatal() {
+        let mut failures = RegionProbeFailures::default();
+        failures.record(RegionProbeFailure::Transient);
+        failures.record(RegionProbeFailure::Rejected);
+        failures.record(RegionProbeFailure::Other);
+
+        let failure = failures.into_login_failure();
+        assert!(!failure.retryable);
+        assert_eq!(failure.error.code, "err.login.credentials_rejected");
+    }
+
+    /// 停在第三方授权页太久，才提示；其余情况一律不出声。
+    #[test]
+    fn the_third_party_hint_fires_only_while_stuck_on_a_third_party_page() {
+        let long = THIRD_PARTY_STALL_AFTER;
+        let short = Duration::from_secs(5);
+        let google = "https://accounts.google.com/o/oauth2/auth";
+
+        assert!(third_party_stall_is_due(google, long, false, false));
+        // 还没等够。登录本来就慢，输密码等验证码都要时间。
+        assert!(!third_party_stall_is_due(google, short, false, false));
+        // 这一页上已经说过一次了。
+        assert!(!third_party_stall_is_due(google, long, false, true));
+        // 凭据已经读到，卡住的是后面的区域确认，不该建议换登录方式。
+        assert!(!third_party_stall_is_due(google, long, true, false));
+        // 停在我们自己打开的那一页——那是另一条兜底路径（备用登录页）管的事。
+        assert!(!third_party_stall_is_due(
+            PRIMARY_LOGIN_URL,
+            long,
+            false,
+            false
+        ));
+    }
+
+    /// 放行导航和「是不是第三方授权页」读的是同一份 host 表。
+    #[test]
+    fn third_party_hosts_are_shared_with_the_navigation_allowlist() {
+        for host in THIRD_PARTY_AUTH_HOSTS {
+            let url = format!("https://{host}/oauth");
+            assert!(is_allowed_login_url(&url), "{url} should be allowed");
+            assert!(
+                is_third_party_auth_page(&url),
+                "{url} should be third-party"
+            );
+        }
+        assert!(!is_third_party_auth_page("https://watchface.zepp.com/"));
+        assert!(!is_third_party_auth_page("not a url"));
+    }
 
     /// 旧窗口还占着标签时，绝不能去建新窗口。
     ///

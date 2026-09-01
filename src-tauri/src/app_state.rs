@@ -47,6 +47,13 @@ pub struct AppState {
     /// `startup_warning` so a successful sync can clear the transient auth
     /// warning without erasing one-time startup notices.
     pub(crate) auth_warning: Arc<RwLock<Option<String>>>,
+    /// 上一次登录时，凭什么认定当前 `region_host` 属于这个账号。
+    ///
+    /// `identified` / `hinted` / `unconfirmed`，外加进程重启后无从得知的
+    /// `unknown`。留着它是因为「区域猜错了」和「这个账号这段时间确实没数据」
+    /// 在界面上长得一模一样——两者都是同步跑通、一条记录没有。见
+    /// `commands::login::RegionWinner`。
+    pub(crate) region_confidence: Arc<RwLock<String>>,
 }
 
 impl AppState {
@@ -97,6 +104,8 @@ impl AppState {
             auth_state: Arc::new(RwLock::new(auth_state)),
             startup_warning: Arc::new(RwLock::new(startup_warning)),
             auth_warning: Arc::new(RwLock::new(None)),
+            // 保存的凭据不记录当初是怎么认定区域的，重启后只能说不知道。
+            region_confidence: Arc::new(RwLock::new("unknown".to_string())),
         })
     }
 
