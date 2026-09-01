@@ -18,7 +18,7 @@ use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{mpsc, Arc, Mutex, RwLock};
 use std::time::Duration;
 
 pub const LOCAL_API_ADDRESS: &str = "127.0.0.1:43921";
@@ -38,6 +38,17 @@ const MAX_HEADER_LINES: usize = 64;
 const MAX_HEADER_TOTAL_BYTES: usize = 32 * 1024;
 const MAX_WORKOUT_ID_BYTES: usize = 256;
 const ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(50);
+
+/// 同时处理连接的工作线程数。
+///
+/// 以前是「接一个、同步处理到写完响应、再接下一个」：读超时 2 秒、写超时
+/// 10 秒，所以一个慢慢发 header 的本地客户端就能把另一个正常的 AI 客户端
+/// 堵住十几秒。不需要为此换成 Tokio——这个服务只有三个只读端点，一个有上限
+/// 的小线程池就够了。
+///
+/// 有上限是关键：thread-per-connection 没有上限时，本机上任何一个进程都能
+/// 靠不断建连接把线程数顶爆。
+const WORKER_THREADS: usize = 4;
 
 const TOKEN_PREFIX: &str = "zbk_";
 const TOKEN_RANDOM_BYTES: usize = 32;
@@ -187,7 +198,11 @@ impl LocalApiController {
         } else if let Some(server) = inner.server.take() {
             server.shutdown();
         }
-        write_enabled_flag(&self.data_dir, enabled);
+        // 存不下就说出来。这个开关的意义是「下次启动还开着」，存不下时它
+        // 只是这一次进程里有效，而用户有权知道这件事。
+        if let Err(error) = write_enabled_flag(&self.data_dir, enabled) {
+            inner.error = Some(error);
+        }
         self.status_locked(&inner)
     }
 
@@ -328,9 +343,29 @@ fn read_enabled_flag(data_dir: &Path) -> bool {
         .unwrap_or(false)
 }
 
-fn write_enabled_flag(data_dir: &Path, enabled: bool) {
+/// 原子地写下「本机 API 开没开」这个标志。
+///
+/// 以前是 `let _ = std::fs::write(...)`：磁盘只读或者写满时错误被整个吞掉，
+/// 界面显示已开启，重启之后设置却没了，而中间没有任何一处告诉过用户。
+///
+/// 先写临时文件再 rename：直接写目标文件的话，进程在写到一半时被杀会留下
+/// 一个半截的 JSON，下次 `read_enabled_flag` 解析失败、静默地当成「关」。
+fn write_enabled_flag(data_dir: &Path, enabled: bool) -> Result<(), String> {
+    let target = state_file(data_dir);
+    let temporary = target.with_extension("json.tmp");
     let body = json!({ "enabled": enabled }).to_string();
-    let _ = std::fs::write(state_file(data_dir), body);
+    let describe = |error: std::io::Error| format!("无法保存本机 API 开关状态：{error}");
+    if let Some(parent) = target.parent() {
+        std::fs::create_dir_all(parent).map_err(describe)?;
+    }
+    std::fs::write(&temporary, body).map_err(describe)?;
+    // Windows 上 rename 覆盖已存在的文件是允许的（std 用的是
+    // MoveFileEx + REPLACE_EXISTING）。
+    std::fs::rename(&temporary, &target).map_err(|error| {
+        // 收拾掉临时文件，否则数据目录里会慢慢堆出一串 .tmp。
+        let _ = std::fs::remove_file(&temporary);
+        describe(error)
+    })
 }
 
 fn generate_token() -> Result<String, String> {
@@ -360,18 +395,43 @@ fn serve(
     stop: Arc<AtomicBool>,
     token: Arc<RwLock<String>>,
 ) {
+    // 接进来的连接交给一个固定大小的工作池。accept 这条线程只负责接，
+    // 接完立刻回到 accept——一个慢客户端最多占住一个 worker，堵不住其他人。
+    let (sender, receiver) = mpsc::channel::<TcpStream>();
+    // `Receiver` 不是 `Sync`，所以几个 worker 共享一把锁轮流取。锁只在
+    // `recv` 期间持有，真正的请求处理在锁外面。
+    let receiver = Arc::new(Mutex::new(receiver));
+    let mut workers = Vec::with_capacity(WORKER_THREADS);
+    for _ in 0..WORKER_THREADS {
+        let receiver = Arc::clone(&receiver);
+        let data_dir = data_dir.clone();
+        let token = Arc::clone(&token);
+        workers.push(std::thread::spawn(move || loop {
+            let next = {
+                let guard = receiver.lock().unwrap_or_else(|e| e.into_inner());
+                guard.recv()
+            };
+            // sender 被 drop（accept 循环结束）时 recv 报错，worker 退出。
+            let Ok(mut stream) = next else { break };
+            let expected = token
+                .read()
+                .map(|value| value.clone())
+                .unwrap_or_else(|e| e.into_inner().clone());
+            if let Err(error) = handle_connection(&mut stream, &data_dir, &expected) {
+                eprintln!("本机 API 请求处理失败: {error}");
+            }
+        }));
+    }
+
     while !stop.load(Ordering::SeqCst) {
         match listener.accept() {
-            Ok((mut stream, _)) => {
+            Ok((stream, _)) => {
                 if stream.set_nonblocking(false).is_err() {
                     continue;
                 }
-                let expected = token
-                    .read()
-                    .map(|value| value.clone())
-                    .unwrap_or_else(|e| e.into_inner().clone());
-                if let Err(error) = handle_connection(&mut stream, &data_dir, &expected) {
-                    eprintln!("本机 API 请求处理失败: {error}");
+                if sender.send(stream).is_err() {
+                    // 一个 worker 都没有了，再接也没人处理。
+                    break;
                 }
             }
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
@@ -382,6 +442,13 @@ fn serve(
                 break;
             }
         }
+    }
+
+    // 关掉发送端，worker 处理完手上的连接后自行退出；join 一遍再返回，
+    // 这样 `set_enabled(false)` 回来时端口是真的没人用了。
+    drop(sender);
+    for worker in workers {
+        let _ = worker.join();
     }
     // listener 在这里 drop，端口随之释放。
 }
@@ -1037,6 +1104,60 @@ mod tests {
         assert!(controller.set_enabled(true).running);
         controller.shutdown();
         assert!(ClientStream::connect(address.as_str()).is_err());
+    }
+
+    /// 一个慢客户端不该把另一个正常客户端堵住。
+    ///
+    /// 这就是那个「单线程串行」的真实后果：读超时是 2 秒，所以以前一个连上
+    /// 来但一个字节都不发的本地进程，能让下一个正常请求整整等 2 秒；连着
+    /// 来几个就是十几秒。用一个明显小于读超时的预算来断言，才能真的把回归
+    /// 钉住——池子塌回串行时这条测试必然红。
+    #[test]
+    fn a_silent_client_does_not_block_the_next_request() {
+        let dir = temp_dir("slowloris");
+        let address = ephemeral_address();
+        let controller = controller_at(&dir, address.clone());
+        controller.set_enabled(true);
+        let token = controller.reveal_token().unwrap();
+
+        // 连上就不说话，占住一个 worker 直到它自己的读超时。
+        let _silent = ClientStream::connect(address.as_str()).unwrap();
+
+        let started = std::time::Instant::now();
+        let mut client = ClientStream::connect(address.as_str()).unwrap();
+        client
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+        client
+            .write_all(
+                format!(
+                    "GET /health HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer {token}\r\n\r\n"
+                )
+                .as_bytes(),
+            )
+            .unwrap();
+        // 一次 read 不保证把整行状态行都带回来，循环到够判断为止。
+        let mut status_line = Vec::new();
+        while status_line.len() < 12 {
+            let mut chunk = [0u8; 64];
+            let read = client.read(&mut chunk).unwrap();
+            if read == 0 {
+                break;
+            }
+            status_line.extend_from_slice(&chunk[..read]);
+        }
+        let elapsed = started.elapsed();
+
+        assert!(
+            String::from_utf8_lossy(&status_line).starts_with("HTTP/1.1 200"),
+            "实际响应：{}",
+            String::from_utf8_lossy(&status_line)
+        );
+        assert!(
+            elapsed < Duration::from_millis(1_500),
+            "被沉默的客户端堵了 {elapsed:?}——工作池没有生效"
+        );
+        controller.shutdown();
     }
 
     #[test]

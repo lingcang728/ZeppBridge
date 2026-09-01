@@ -6,14 +6,14 @@ use crate::insight::{WeeklyReport, WorkoutInsight};
 use crate::ipc_error::AppError;
 use crate::ipc_types::CleanupResult;
 use crate::models::{
-    AiHandoffMetadata, AiHandoffResult, CapabilityOverview, DailyPoint, DeviceCacheMetadata,
-    DeviceCatalogOption, DeviceMatchStatus, DeviceProfile, DeviceProfilesResult,
-    DiagnosticAssignedModel, DiagnosticDeviceCandidate, DiagnosticDeviceEvidence, DiagnosticField,
-    DiagnosticObjectShape, DiagnosticReport, ExportDetail, ExportResult, ExportScope,
-    ExportSelection, FeedbackSubmissionResult, HealthOverview, HeartRatePoint,
-    HeartRateZoneOptions, HeartRateZonePreference, MetricSeries, RawPayloadCompaction,
-    SleepSession, StorageEstimate, TrainingBalancePoint, UserPrefs, Workout, WorkoutSeries,
-    DIAGNOSTIC_NOTE_MAX_CHARS,
+    AiHandoffMetadata, AiHandoffResult, CapabilityOverview, DailyHeartRateExtreme, DailyPoint,
+    DeviceCacheMetadata, DeviceCatalogOption, DeviceMatchStatus, DeviceProfile,
+    DeviceProfilesResult, DiagnosticAssignedModel, DiagnosticDeviceCandidate,
+    DiagnosticDeviceEvidence, DiagnosticField, DiagnosticObjectShape, DiagnosticReport,
+    ExportDetail, ExportResult, ExportScope, ExportSelection, FeedbackSubmissionResult,
+    HealthOverview, HeartRatePoint, HeartRateZoneOptions, HeartRateZonePreference, MetricSeries,
+    RawPayloadCompaction, SleepSession, StorageEstimate, TrainingBalancePoint, UserPrefs, Workout,
+    WorkoutSeries, DIAGNOSTIC_NOTE_MAX_CHARS,
 };
 use crate::storage::corrections::WorkoutCodeLabel;
 use crate::storage::provenance::{DataHealth, IntegrityCheckResult};
@@ -54,6 +54,35 @@ pub async fn get_capability_overview(
     db.capability_overview().map_err(AppError::from)
 }
 
+/// 一页记录，外加本机的总条数。
+///
+/// 总数是分页的另一半：没有它，界面只能说「显示了 500 条」，说不出「共
+/// 2317 条」——而用户问的恰恰是「剩下的呢」（Reddit p6zxyo7）。
+/// 写成两个具体类型而不是一个泛型 `Page<T>`：`#[tauri::command]` 生成的
+/// 代码要对返回类型做类型推导，泛型参数在那里会退化成 never 类型，报出来的
+/// 错误（`!: Deserialize` / never type fallback）完全指不到这里。
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SleepPage {
+    pub items: Vec<SleepSession>,
+    /// 本机库里的总条数，不受本次分页影响。
+    pub total: i64,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkoutPage {
+    pub items: Vec<Workout>,
+    pub total: i64,
+}
+
+/// 单页最多几条。
+///
+/// 它是**页大小的上限**，不是「这个应用最多让你看到多少条」。以前
+/// `get_recent_*` 的 `clamp(1, 500)` 同时扮演了这两个角色：SQL 里没有
+/// `OFFSET`，所以第 501 条之后的记录在应用里根本没有入口。
+const MAX_PAGE_SIZE: usize = 500;
+
 /// Return the most recent persisted sleep sessions.
 #[tauri::command]
 pub async fn get_recent_sleep(
@@ -66,6 +95,21 @@ pub async fn get_recent_sleep(
         db.get_recent_sleep_sessions(limit).map_err(AppError::from)
     };
     result
+}
+
+/// 分页取睡眠记录，最新在前。
+#[tauri::command]
+pub async fn get_sleep_page(
+    state: tauri::State<'_, AppState>,
+    limit: usize,
+    offset: usize,
+) -> std::result::Result<SleepPage, AppError> {
+    let limit = limit.clamp(1, MAX_PAGE_SIZE);
+    let db = state.db.lock().await;
+    Ok(SleepPage {
+        items: db.sleep_sessions_page(limit, offset)?,
+        total: db.count_sleep_sessions()?,
+    })
 }
 
 /// Return one persisted sleep session by its stable source identifier.
@@ -90,6 +134,21 @@ pub async fn get_recent_workouts(
         db.get_recent_workouts(limit).map_err(AppError::from)
     };
     result
+}
+
+/// 分页取运动记录，最新在前。
+#[tauri::command]
+pub async fn get_workout_page(
+    state: tauri::State<'_, AppState>,
+    limit: usize,
+    offset: usize,
+) -> std::result::Result<WorkoutPage, AppError> {
+    let limit = limit.clamp(1, MAX_PAGE_SIZE);
+    let db = state.db.lock().await;
+    Ok(WorkoutPage {
+        items: db.workouts_page(limit, offset)?,
+        total: db.count_workouts()?,
+    })
 }
 
 /// Return one persisted workout by its stable source identifier.
@@ -142,6 +201,21 @@ pub async fn get_metric_series(
 ) -> std::result::Result<Vec<MetricSeries>, AppError> {
     let db = state.db.lock().await;
     db.metric_series(&metrics, days).map_err(AppError::from)
+}
+
+/// 按天的原始心率极值。
+///
+/// Zepp App 显示的日最高心率是**过滤过的**（有人报告 App 显示 104，而原始
+/// 数据里的峰值超过 120）。这个命令给的是本机原始样本的按日 max，不做过滤，
+/// 并把每天的样本数一起返回——样本稀疏的那一天，那个「最高」只是这几个点
+/// 里的最高。
+#[tauri::command]
+pub async fn get_daily_heart_rate_extremes(
+    state: tauri::State<'_, AppState>,
+    days: i64,
+) -> std::result::Result<Vec<DailyHeartRateExtreme>, AppError> {
+    let db = state.db.lock().await;
+    db.daily_heart_rate_extremes(days).map_err(AppError::from)
 }
 
 /// Acute (7 day) versus chronic (28 day) training load, day by day.
@@ -490,6 +564,7 @@ async fn build_diagnostic_report(
         device_evidence,
         user_assigned_models,
         unknown_workout_codes: db.diagnostic_unknown_workout_codes()?,
+        workout_type_corrections: db.diagnostic_workout_type_corrections()?,
         workout_type_conflicts: db.diagnostic_workout_type_conflicts()?,
         // 类型由调用方按需要填；这个构造函数只负责本机能自动查到的事实。
         category: None,
@@ -661,6 +736,10 @@ async fn post_diagnostic_report(
     let has_reportable_issue = report.device_evidence.unknown_device_count > 0
         || !report.user_assigned_models.is_empty()
         || !report.unknown_workout_codes.is_empty()
+        // 一次运动类型纠正本身就是一条可处理的线索：它说的是「这个编号你们
+        // 认错了」。以前这种情况本机检测不到——编号我们认识，只是认错了——
+        // 于是报告会被判成「没有可处理的内容」顶回去。
+        || !report.workout_type_corrections.is_empty()
         || report.workout_type_conflicts > 0
         || report.category.is_some();
     if !has_reportable_issue {

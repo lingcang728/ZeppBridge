@@ -28,12 +28,12 @@ const DOCUMENT_META: Record<LandingLocale, {
     title: 'ZeppBridge · 本地数据桥梁',
     description: 'ZeppBridge 是本地优先、开源的 Amazfit/Zepp 穿戴数据桥接与可视化工具。',
     ogTitle: 'ZeppBridge · 把 Zepp 数据完整交还给你',
-    ogDescription: '在 Windows 与 macOS 本机连接、整理并可视化 Amazfit 穿戴数据，保留来源并按需交给 AI。',
+    ogDescription: '在 Windows、macOS 与 Linux 本机连接、整理并可视化 Amazfit 穿戴数据，保留来源并按需交给 AI。',
   },
   en: {
     title: 'ZeppBridge · Local Data Bridge',
     description:
-      'ZeppBridge is a local-first, open-source bridge and viewer for Amazfit / Zepp wearable data. Runs on your own Windows or Mac.',
+      'ZeppBridge is a local-first, open-source bridge and viewer for Amazfit / Zepp wearable data. Runs on your own Windows, Mac or Linux machine.',
     ogTitle: 'ZeppBridge · Your Zepp data, handed back in full',
     ogDescription:
       'Connect, organize and visualize Amazfit wearable data on your own machine. Sources stay intact, and nothing leaves until you send it.',

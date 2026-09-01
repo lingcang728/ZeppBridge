@@ -193,6 +193,18 @@ into the conversation.
 - **CSV** — tabular summary for spreadsheets
 - **GPX** — standard tracks for Strava, Garmin and others
 
+What an export contains: workout summaries (type, start and end, distance,
+calories, average and peak heart rate, training load), daily metrics (steps,
+resting heart rate, HRV, SpO2, stress, respiratory rate, PAI, VO2max), and sleep
+sessions with their stage timeline. Choosing **Full** instead of **Summary**
+adds per-second workout series and individual heart rate readings.
+
+What it does not contain: device-native formats such as `.fit` or `.tcx`. The
+fields Zepp's cloud returns are not enough to reconstruct one honestly — no
+per-point GPS for most workouts, no barometric data, no device profile — so
+ZeppBridge does not write a file that claims to be a FIT. GPS tracks are
+available through GPX, and only for workouts that actually carry a track.
+
 **It does not get heavier over time**
 
 Raw cloud payloads are the largest thing in the local database. ZeppBridge

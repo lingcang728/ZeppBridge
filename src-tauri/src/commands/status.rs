@@ -98,6 +98,7 @@ pub(crate) async fn build_app_status(state: &AppState) -> std::result::Result<Ap
         ),
         retention_days: prefs.retention_days,
         history_sync_days: prefs.history_sync_days,
+        incremental_sync_days: zeppbridge_core::contract::INCREMENTAL_SYNC_DAYS,
         storage: Some(storage),
         coverage,
         region_confidence,

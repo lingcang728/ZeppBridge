@@ -20,7 +20,7 @@ import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { zeppSemanticColors } from '../lib/echartsTheme';
 import { indexSeries, SERIES_RANGE_DAYS, seriesRanges, type SeriesRangeDays } from '../lib/metricSeries';
 import { isFiniteNumber } from '../lib/format';
-import type { HeartRatePoint, MetricSeries } from '../types';
+import type { DailyHeartRateExtreme, HeartRatePoint, MetricSeries } from '../types';
 import { defineMessages, intlLocale, useMessages } from '../i18n';
 
 const messages = defineMessages(
@@ -49,6 +49,17 @@ const messages = defineMessages(
     hrvHint: '逐条 HRV 读数按天平均',
     rmssdHint: '另一种 HRV 口径，和上面不是同一个数',
     emptyCard: '这段范围没有记录。',
+    dailyMaxTitle: '每日最高心率（本机原始样本）',
+    dailyMaxSub: 'Zepp App 显示的日最高心率是过滤过的，这里不过滤——两个数字不一样是正常的。',
+    dailyMaxAria: '每日最高心率趋势',
+    dailyMaxNone: '这段范围里本机没有心率样本，所以没有可比的最高值。',
+    dailyMaxSparse: (days: number) =>
+      `其中 ${days} 天的样本很少（少于 60 个）。那几天的「最高」只是这几个点里的最高，不是那一天真正的峰值——图上用空心点标出。`,
+    dailyMaxLegendMax: '最高',
+    dailyMaxLegendAvg: '平均',
+    dailyMaxTooltip: (date: string, max: number, avg: number, samples: number) =>
+      `${date}<br/>最高 <b>${max}</b> 次/分<br/>平均 ${avg} 次/分<br/>${samples} 个样本`,
+    dailyMaxNote: '这里只用本机存着的原始逐条读数。Zepp 自己的日最高心率没有被采集进来（库里那个 device_max_hr 是手表的最大心率设定值，用来划分区间，不是当天实测峰值），所以无法在应用内并排对照——要核对请打开 Zepp App 看那一天的数字。',
   },
   {
     backToOverview: 'Back to overview',
@@ -75,6 +86,17 @@ const messages = defineMessages(
     hrvHint: 'Individual HRV readings, averaged per day',
     rmssdHint: 'A different HRV measure, not the same number as above',
     emptyCard: 'Nothing recorded in this range.',
+    dailyMaxTitle: 'Daily peak heart rate (raw samples on this machine)',
+    dailyMaxSub: 'The Zepp app filters its daily peak; this does not. The two numbers differing is expected.',
+    dailyMaxAria: 'Daily peak heart rate trend',
+    dailyMaxNone: 'No heart rate samples on this machine for this range, so there is no peak to compare.',
+    dailyMaxSparse: (days: number) =>
+      `${days} of these days have very few samples (fewer than 60). On those days the peak is the highest of just those points, not that day real peak — they are drawn as hollow markers.`,
+    dailyMaxLegendMax: 'Peak',
+    dailyMaxLegendAvg: 'Average',
+    dailyMaxTooltip: (date: string, max: number, avg: number, samples: number) =>
+      `${date}<br/>Peak <b>${max}</b> bpm<br/>Average ${avg} bpm<br/>${samples} samples`,
+    dailyMaxNote: 'This uses only the raw per-reading samples stored on this machine. The Zepp daily peak is never sent to us (the device_max_hr in the library is the configured maximum used for zone limits, not a measured peak), so there is nothing to place beside it here — open the Zepp app to compare that day number.',
   },
 );
 const t = useMessages(messages);
@@ -87,6 +109,20 @@ const ranges = computed(() => seriesRanges());
 const rangeDays = ref<SeriesRangeDays>(SERIES_RANGE_DAYS[0]);
 const series = ref<Record<string, MetricSeries>>({});
 const dayPoints = ref<HeartRatePoint[]>([]);
+/*
+ * 每日最高心率（Reddit p74fy0b：Zepp App 显示 104，原始数据峰值超过 120）。
+ *
+ * 只画本机原始样本的按日 max。**不和 Zepp 的日最高心率并排**——因为那个值
+ * 根本没被采集进来：库里唯一叫 device_max_hr 的东西来自 PAI 流的 maxHr，那
+ * 是这块表的最大心率设定值（划分区间用的），不是当天实测峰值。把它当成对照
+ * 的另一半，就是又造一个「界面上有个数但它不是你以为的意思」。
+ */
+const dailyExtremes = ref<DailyHeartRateExtreme[]>([]);
+/** 少于这个样本数的一天，它的 max 不能当成完整峰值看。 */
+const SPARSE_SAMPLE_THRESHOLD = 60;
+const sparseDays = computed(
+  () => dailyExtremes.value.filter((day) => day.samples < SPARSE_SAMPLE_THRESHOLD).length,
+);
 const loading = ref(true);
 const error = ref<string | null>(null);
 
@@ -192,17 +228,83 @@ const load = async () => {
     error.value = t.value.desktopOnly;
     return;
   }
-  const [day, trends] = await Promise.allSettled([
+  const [day, trends, extremes] = await Promise.allSettled([
     backend.getHeartRateSeries(24),
     backend.getMetricSeries([...TREND_METRICS], rangeDays.value),
+    backend.getDailyHeartRateExtremes(rangeDays.value),
   ]);
   dayPoints.value = day.status === 'fulfilled' ? day.value : [];
   series.value = trends.status === 'fulfilled' ? indexSeries(trends.value) : {};
+  dailyExtremes.value = extremes.status === 'fulfilled' ? extremes.value : [];
   if (day.status === 'rejected' && trends.status === 'rejected') {
     error.value = toUserMessage(day.reason, t.value.loadFailed);
   }
   loading.value = false;
 };
+
+/* 样本稀疏的那一天画成空心点。用不同的标记而不是干脆不画：那一天确实有
+   读数，只是不足以称为「这一天的最高」——把它藏起来会让曲线看着更完整，
+   而那正是这条功能要避免的事。 */
+const dailyMaxChartOption = computed(() => {
+  const rows = dailyExtremes.value;
+  return {
+    animationDuration: 700,
+    grid: { left: 40, right: 12, top: 28, bottom: 26 },
+    legend: {
+      data: [t.value.dailyMaxLegendMax, t.value.dailyMaxLegendAvg],
+      top: 0,
+      textStyle: { color: '#7E856D', fontSize: 11 },
+    },
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params: Array<{ dataIndex: number }>) => {
+        const row = rows[params?.[0]?.dataIndex ?? -1];
+        if (!row) return '';
+        return t.value.dailyMaxTooltip(row.date, row.max, row.average, row.samples);
+      },
+    },
+    xAxis: {
+      type: 'category',
+      data: rows.map((row) => row.date.slice(5)),
+      axisLabel: { color: '#7E856D', fontSize: 11, hideOverlap: true },
+      axisTick: { show: false },
+      axisLine: { lineStyle: { color: 'rgba(226, 234, 242, .12)' } },
+    },
+    yAxis: {
+      type: 'value',
+      scale: true,
+      axisLabel: { color: '#7E856D', fontSize: 11 },
+      axisLine: { show: false },
+      axisTick: { show: false },
+      splitLine: { lineStyle: { color: 'rgba(226, 234, 242, .08)', type: 'dashed' } },
+    },
+    series: [
+      {
+        name: t.value.dailyMaxLegendMax,
+        type: 'line',
+        data: rows.map((row) => row.max),
+        showSymbol: true,
+        symbolSize: 6,
+        lineStyle: { width: 2.2, color: zeppSemanticColors.heart },
+        itemStyle: {
+          color: (params: { dataIndex: number }) =>
+            (rows[params.dataIndex]?.samples ?? 0) < SPARSE_SAMPLE_THRESHOLD
+              ? 'transparent'
+              : zeppSemanticColors.heart,
+          borderColor: zeppSemanticColors.heart,
+          borderWidth: 1.6,
+        },
+      },
+      {
+        name: t.value.dailyMaxLegendAvg,
+        type: 'line',
+        data: rows.map((row) => row.average),
+        showSymbol: false,
+        lineStyle: { width: 1.4, type: 'dashed', color: 'rgba(226, 234, 242, .45)' },
+      },
+    ],
+  };
+});
 
 onMounted(() => { void load(); });
 watch(rangeDays, () => { void load(); });
@@ -268,6 +370,30 @@ watch(dataRevision, () => { void load(); });
         </p>
       </section>
 
+      <section class="surface-card day-card" :aria-label="t.dailyMaxAria">
+        <header class="day-head">
+          <div>
+            <h2>{{ t.dailyMaxTitle }}</h2>
+            <p>{{ t.dailyMaxSub }}</p>
+          </div>
+        </header>
+        <VChart
+          v-if="dailyExtremes.length"
+          class="day-chart"
+          :option="dailyMaxChartOption"
+          autoresize
+          role="img"
+          :aria-label="t.dailyMaxAria"
+        />
+        <p v-else class="inline-alert" role="status">
+          <Icon name="info" :size="14" />{{ t.dailyMaxNone }}
+        </p>
+        <p v-if="sparseDays" class="inline-alert" role="status">
+          <Icon name="info" :size="14" />{{ t.dailyMaxSparse(sparseDays) }}
+        </p>
+        <p class="daily-max-note">{{ t.dailyMaxNote }}</p>
+      </section>
+
       <div class="card-grid">
         <MetricTrendCard
           v-for="card in trendCards"
@@ -301,6 +427,8 @@ watch(dataRevision, () => { void load(); });
 .day-stats dt { color: var(--subtle); font-size: 11px; }
 .day-stats dd { margin: 0; color: var(--ink); font-size: 18px; font-weight: 700; font-family: var(--font-mono); }
 .day-chart { width: 100%; height: 240px; }
+/* 说明为什么这个数字和 Zepp App 里的不一样。少了它，用户只会以为其中一边坏了。 */
+.daily-max-note { margin: 10px 0 0; color: var(--subtle); font-size: 11px; line-height: 1.6; }
 .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-4); }
 .inline-alert { display: flex; align-items: center; gap: var(--space-2); margin: 0; padding: 9px 13px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); color: var(--muted); font-size: 12px; }
 .inline-alert[role='alert'] { color: var(--danger); }

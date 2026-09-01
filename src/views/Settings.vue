@@ -1041,6 +1041,19 @@ const runCapabilityProbe = async () => {
           <button v-if="configuredOnly" class="kv-btn" type="button" :disabled="isSyncing" @click="verifyAndSync">{{ t.verifyAndSync }}</button>
           <button v-else class="kv-btn" type="button" :disabled="loginBusy" @click="startLogin">{{ t.reauthenticate }}</button>
         </div>
+        <!--
+          「退出账号」放在这里，而不是继续埋在「高级 → 清除认证」里。
+
+          两个人在 Reddit 上问同一句话：「我怎么退出？找不到 logout 按钮。」
+          （p71rsj2、p7497lq）后端 `clear_auth` 的行为本来就是对的——只清凭据、
+          保留本机历史——错的是它叫「清除认证」，还藏在高级设置的最里面：
+          没人会为了退出账号去点一个听起来像会删数据的按钮。
+        -->
+        <div v-if="appStatus?.configured" class="account-logout">
+          <button class="link-button" type="button" @click="clearAuth">{{ t.logout }}</button>
+          <p class="account-logout-hint">{{ t.logoutHint }}</p>
+          <p class="account-logout-hint warn">{{ t.logoutNoMultiAccount }}</p>
+        </div>
       </section>
 
       <!-- 3. 连接设备 / 数据来源 -->
@@ -1503,7 +1516,7 @@ const runCapabilityProbe = async () => {
           <p class="section-description">{{ t.dataAuthNote(retentionDays) }}</p>
           <div class="inline-actions">
             <button class="button secondary" type="button" @click="openDataFolder"><Icon name="folder" :size="15" />{{ t.openDataFolder }}</button>
-            <button class="button danger-button" type="button" @click="clearAuth">{{ t.clearAuth }}</button>
+            <button class="button danger-button" type="button" @click="clearAuth">{{ t.logout }}</button>
           </div>
         </div>
         <div class="advanced-block">
@@ -1780,6 +1793,19 @@ h3 { margin-bottom: 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
   border-radius: var(--radius-sm);
   background: var(--surface-raised);
 }
+.account-logout { margin-top: 10px; }
+.account-logout .link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.account-logout .link-button:hover { text-decoration: underline; }
+.account-logout-hint { margin: 4px 0 0; color: var(--subtle); font-size: 11px; line-height: 1.55; }
+.account-logout-hint.warn { color: var(--muted); }
 .account-avatar { display: grid; width: 36px; height: 36px; flex: 0 0 36px; place-items: center; border-radius: 9px; background: var(--accent-soft); color: var(--accent); font-family: var(--font-mono); font-size: 15px; font-weight: 700; }
 .account-meta { display: grid; min-width: 0; gap: 1px; flex: 1; }
 .account-meta strong { overflow: hidden; color: var(--ink); font-family: var(--font-mono); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
