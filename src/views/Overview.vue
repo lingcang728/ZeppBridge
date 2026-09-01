@@ -5,6 +5,7 @@ import { RouterLink } from 'vue-router';
 import { graphic } from 'echarts/core';
 import { VChart } from '../lib/echartsSetup';
 import CircularProgress from '../components/CircularProgress.vue';
+import CoverageNotice from '../components/CoverageNotice.vue';
 import DesignIcon, { type DesignIconName } from '../components/DesignIcon.vue';
 import DeviceVisual from '../components/DeviceVisual.vue';
 import Icon from '../components/Icon.vue';
@@ -553,6 +554,12 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
     </RouterLink>
 
     <WeeklyReportCard />
+
+    <!--
+      同步跑通却一条记录都没有，最先看到的是这一页。上面每个面板各自说一句
+      「暂无数据」，谁也不解释为什么——而原因往往是登录时没确认对区域。
+    -->
+    <CoverageNotice />
 
     <div v-if="partialWarning" class="inline-alert warning" role="status"><Icon name="info" :size="15" />{{ partialWarning }}</div>
     <div v-if="deviceError" class="inline-alert warning" role="status"><Icon name="info" :size="15" />{{ t.deviceErrorPrefix }}{{ deviceError }}</div>

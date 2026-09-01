@@ -2,12 +2,24 @@
 
 本文件记录每个版本的实际改动。写给使用者看，不是施工日志：只写用户能感知到的变化，以及为什么这么改。
 
-## 1.1.6
+## 1.2.0
 
 ### Fixes / 修复
 
+- **Signing in no longer picks the wrong Zepp region and then shows an empty library.** Once your credentials were read, ZeppBridge asked around ten regional Zepp servers in parallel which one your account belongs to, and used whichever answered successfully first. The question it asked was "does this account have heart-rate samples in the last two hours" — and a server that has never heard of your account answers that with an empty result, exactly like the right server does when you simply were not wearing the watch. Worse, the wrong server answers *faster*, because it has nothing to look up. So the wrong region could win, get saved, and every sync after that went to a place your data is not: the screen said **Connected**, the sync said it succeeded, and nothing ever appeared. ZeppBridge now asks a question a stranger cannot answer — it looks up the devices bound to your account, by your account id — and prefers the server that actually returns your watch over one that merely replies. When no server can claim the account, the sign-in still completes, but the region is now marked as a guess instead of a fact.
+- **登录不再挑错 Zepp 区域，然后给你一个空库。** 读到凭据之后，ZeppBridge 会同时问十来个 Zepp 区域服务器「这个账号是不是你的」，谁先答应就用谁。可它问的问题是「这个账号最近两小时有没有心率数据」——一个从没听说过你的服务器，回答同样是「空」，跟正确的服务器在你没戴表时给的回答一模一样。更糟的是错的那个答得**更快**，因为它压根不用去查。于是错误区域可能赢下这场竞速、被保存下来，之后每一次同步都打向一个没有你数据的地方：界面写着**已连接**，同步说成功，而什么都没有出现。现在问的是一个陌生人答不上来的问题——按账号 ID 去取这个账号绑定的设备——并且优先采用真的交出了你那块表的服务器，而不是仅仅应了一声的。所有服务器都认领不了这个账号时，登录照常完成，但区域会被标成「猜的」，而不是当成事实。
+- **A sync that completes and brings back nothing now says so.** When the library was empty, every screen said *Nothing on this machine yet — sync once*, including right after a sync had just finished. That sentence asks you to redo the thing that just failed to help, and it never mentions the most likely reason. There is now a separate message for "the sync succeeded and returned nothing", and when the region was only a guess it says that first, with a way back to reconnecting.
+- **同步跑通却什么都没带回来，现在会说出来。** 库是空的时候，每一页显示的都是「本机还没有任何数据，先同步一次」——包括刚刚同步完的那一刻。这句话是在让你重做一件刚刚没起作用的事，而且完全不提最可能的原因。现在「同步成功但一条没有」有它自己的一句话；如果当时的区域只是猜出来的，会先说这件事，并给出重新连接的入口。
+- **A third-party sign-in that has stalled now tells you there is another way in.** Google passkeys frequently stop at *verifying it's you* inside an in-app window and never continue — that is a limitation of the embedded browser, not something ZeppBridge can drive through. Previously the only thing that ever happened was *Sign-in timed out*, fifteen minutes later. After two minutes stuck on a third-party account page with nothing read, ZeppBridge now says so and points at email + password, or entering an App Token by hand in Settings. Nothing is interrupted: the window stays open in case it does go through.
+- **第三方登录卡住时，现在会告诉你还有别的路。** Google 的通行密钥在应用内窗口里经常停在「正在验证是不是你本人」不再往下走——这是嵌入式浏览器的限制，不是 ZeppBridge 能推得动的。以前唯一会发生的事是十五分钟后的一句「登录超时」。现在停在第三方账号页两分钟、并且什么都没读到时，会直接说出来，并指向邮箱+密码，或者在设置里手动填写 App Token。不打断任何东西：窗口留着，万一它真的走通了呢。
 - **Starting sign-in again while the sign-in window is open now reopens it.** Clicking **Re-authenticate** a second time closed the window that was already open and immediately tried to build a new one under the same name — but a window is not gone the moment it is asked to close, so the new one was refused. The outcome was the worst of both: the window you could have used was gone, the screen said *Couldn't open the sign-in window* and *Sign-in failed*, and there was no way on except restarting ZeppBridge. ZeppBridge now waits for the old window to actually be gone before opening the new one. In the rare case it has not closed within three seconds you get *wait a moment and try again* instead of a dead end. This was never specific to 1.1.5 — it had been there for as long as the window has been reopened this way.
 - **登录窗口开着的时候再点一次「重新认证」，现在会重新开出一个窗口。** 之前的做法是先关掉已经开着的那个，紧接着用同一个名字去建新的——可窗口不会在收到关闭请求的那一刻就消失，于是新窗口被拒绝了。结果是最坏的一种：原本还能用的那个窗口没了，界面上只剩「无法打开登录窗口」和「登录失败」，除了重启 ZeppBridge 没有别的出路。现在会等旧窗口真的消失，再开新的；万一它三秒内还没关掉，给出的是一句「稍等一下再试」，而不是死路。这不是 1.1.5 才有的问题，这条路径一直如此。
+
+### Not verified on real accounts / 未在真实账号上验证
+
+Xiaomi-account sign-in, Google sign-in and Google passkeys could not be reproduced or re-tested here: the only account available for development is a mainland-China account, verified through email + password and the WeChat QR code. The region fix above is covered by tests that feed the selection synthetic answers, and the stalled-sign-in hint is a pure function with its own tests — but neither has been through a real Google or Xiaomi sign-in. If you reported one of these, a re-test on this build is what would close it.
+
+小米账号登录、Google 登录和 Google 通行密钥在这里无法复现，也无法复测：开发用的只有一个中国大陆账号，验证过的路径是邮箱+密码和微信扫码。上面的区域修复由喂给选择逻辑合成结果的测试覆盖，卡住提示是一个带测试的纯函数——但两者都没有走过真实的 Google 或小米登录。如果这几条是你报的，在这一版上复测一次才能真正闭环。
 
 ## 1.1.5
 
