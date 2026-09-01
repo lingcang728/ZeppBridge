@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 /// 当前 SQLite schema 版本（`PRAGMA user_version`）。加新版本只能追加迁移
 /// 步骤，不要改已有 DDL。
-pub const CURRENT_SCHEMA_VERSION: i64 = 16;
+pub const CURRENT_SCHEMA_VERSION: i64 = 17;
 /// 写进备份 manifest 的应用版本。Core 是独立 crate，用它自己的包版本。
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// 解析器修订号。**改了运动目录或任何归一化规则，就必须往前走一格。**
@@ -18,12 +18,18 @@ const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// `raw_records` 重新跑一遍。不动它，新加的编号只对以后同步来的记录生效，
 /// 已经存成 `unknown:211` 的那 199 条记录会永远挂着——而报这个问题的人恰恰
 /// 是因为历史记录才来报的。
-pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v17-road-cycling";
-/// 上一版的修订号。从它升上来时只重放 workouts。
+pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v18-sleep-unknown-device-codes";
+/// 上一版的修订号。从它升上来时只重放这几条流。
 ///
-/// v16 到 v17 之间只改了运动目录，daily_summary、sleep 那些报文一个字节都没变
-/// ——把它们整个解一遍只是让升级后的第一次启动白等。
-const PREVIOUS_RELEASE_NORMALIZER_REVISION: &str = "zepp-normalizer-2026-08-v16-workout-catalog";
+/// v17 到 v18 改了两处：设备目录多收了一批 `deviceSource` 编号（影响
+/// workouts 的归属），以及认不出来的睡眠阶段不再被写成 `awake`（影响
+/// sleep）。daily_summary、hrv、wellness 的报文一个字节都没变，把它们整个
+/// 解一遍只是让升级后的第一次启动白等——daily_summary 的报文恰好是库里最
+/// 大的那一批。
+const PREVIOUS_RELEASE_NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v17-road-cycling";
+/// 从上一版升上来时要重放的流。**改归一化规则时必须一起看这里**：漏掉一条
+/// 流，那条流的历史记录就永远停在旧规则上，而升级看起来是成功的。
+const PREVIOUS_RELEASE_REPLAY_STREAMS: [&str; 2] = ["workouts", "sleep"];
 const LAST_CLOUD_SYNC_AT_KEY: &str = "last_cloud_sync_at";
 const LAST_CLOUD_SYNC_OUTCOME_KEY: &str = "last_cloud_sync_outcome";
 const LAST_LOCAL_REPROCESS_AT_KEY: &str = "last_local_reprocess_at";
@@ -1913,7 +1919,8 @@ impl Database {
         // decoding very large, unrelated daily-summary payloads during the
         // v0.11.0 upgrade while still applying the new sport catalog.
         if current.as_deref() == Some(PREVIOUS_RELEASE_NORMALIZER_REVISION) {
-            let counts = self.reprocess_raw_records_for_stream(Some("workouts"))?;
+            let counts =
+                self.reprocess_raw_records_for_stream(Some(&PREVIOUS_RELEASE_REPLAY_STREAMS))?;
             // 本地重放有自己的时间线。它绝不改写云端同步时间：用户问「数据新
             // 不新」和「你什么时候连过云」是两个问题。
             self.record_local_replay(false)?;
@@ -1928,17 +1935,28 @@ impl Database {
         self.reprocess_raw_records_for_stream(None)
     }
 
+    /// 重放 `raw_records`。`stream_filter` 为 `None` 时重放全部。
+    ///
+    /// 过滤条件是一组流名而不是一个：一次修订往往同时动到不止一条流的归一化
+    /// 规则（v18 就同时改了 workouts 和 sleep），只能传一个的话，第二条流要么
+    /// 被漏掉，要么只能退回全量重放。
     fn reprocess_raw_records_for_stream(
         &self,
-        stream_filter: Option<&str>,
+        stream_filter: Option<&[&str]>,
     ) -> Result<BTreeMap<String, i64>> {
         let _replay_guard = ReplayGuard::enter();
-        let raw_records = if let Some(stream) = stream_filter {
-            let mut stmt = self.conn.prepare(
+        let raw_records = if let Some(streams) = stream_filter {
+            // 参数个数跟着流的条数走。手拼 IN 列表是这类代码最容易留下 SQL
+            // 注入口子的地方，即使这里的值全是编译期常量。
+            let placeholders = (1..=streams.len())
+                .map(|index| format!("?{index}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let mut stmt = self.conn.prepare(&format!(
                 "SELECT id, stream, source_key, payload, payload_zip
-                 FROM raw_records WHERE stream = ?1 ORDER BY id",
-            )?;
-            let rows = stmt.query_map([stream], |row| {
+                 FROM raw_records WHERE stream IN ({placeholders}) ORDER BY id"
+            ))?;
+            let rows = stmt.query_map(rusqlite::params_from_iter(streams.iter()), |row| {
                 Ok((
                     row.get::<_, i64>(0)?,
                     row.get::<_, String>(1)?,
@@ -2258,6 +2276,33 @@ impl Database {
             .map_err(Into::into)
     }
 
+    /// 用户做过的运动类型纠正，按「编号 → 我们的解释 → 用户的解释」聚合。
+    ///
+    /// 只取有 `zepp_type` 的行：没有原始编号的纠正对补目录没有帮助，而这份
+    /// 报告存在的唯一理由就是补目录。按三元组分组而不是按记录列出，是为了
+    /// 让报告的大小跟「有几种错法」走，而不是跟「用户改了多少条」走。
+    pub fn diagnostic_workout_type_corrections(&self) -> Result<Vec<DiagnosticWorkoutCorrection>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT zepp_type, workout_type, workout_type_override, COUNT(*)
+             FROM workouts
+             WHERE workout_type_override IS NOT NULL
+               AND zepp_type IS NOT NULL
+               AND workout_type_override <> workout_type
+             GROUP BY zepp_type, workout_type, workout_type_override
+             ORDER BY COUNT(*) DESC, zepp_type",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(DiagnosticWorkoutCorrection {
+                code: row.get(0)?,
+                interpreted: row.get(1)?,
+                corrected: row.get(2)?,
+                records: row.get(3)?,
+            })
+        })?;
+        rows.collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(Into::into)
+    }
+
     pub fn diagnostic_workout_type_conflicts(&self) -> Result<i64> {
         self.conn
             .query_row(
@@ -2525,13 +2570,14 @@ impl Database {
             .execute("DELETE FROM sleep_stages WHERE sleep_id = ?1", [sleep_id])?;
         for stage in stages {
             self.conn.execute(
-                "INSERT INTO sleep_stages (sleep_id, stage, start_time, end_time)
-                 VALUES (?1, ?2, ?3, ?4)",
+                "INSERT INTO sleep_stages (sleep_id, stage, start_time, end_time, raw_mode)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
                 params![
                     sleep_id,
                     stage.stage,
                     stage.start_time.to_rfc3339(),
                     stage.end_time.to_rfc3339(),
+                    stage.raw_mode,
                 ],
             )?;
         }
@@ -2593,7 +2639,7 @@ impl Database {
 
     fn load_sleep_stages(&self, sleep_id: &str) -> Result<Vec<SleepStageSlice>> {
         let mut stmt = self.conn.prepare(
-            "SELECT stage, start_time, end_time FROM sleep_stages
+            "SELECT stage, start_time, end_time, raw_mode FROM sleep_stages
              WHERE sleep_id = ?1 ORDER BY start_time, id",
         )?;
         let rows = stmt.query_map([sleep_id], |row| {
@@ -2601,15 +2647,17 @@ impl Database {
                 row.get::<_, String>(0)?,
                 row.get::<_, String>(1)?,
                 row.get::<_, String>(2)?,
+                row.get::<_, Option<i64>>(3)?,
             ))
         })?;
         let mut stages = Vec::new();
         for row in rows {
-            let (stage, start, end) = row?;
+            let (stage, start, end, raw_mode) = row?;
             stages.push(SleepStageSlice {
                 stage,
                 start_time: parse_datetime(&start, "sleep_stages.start_time")?,
                 end_time: parse_datetime(&end, "sleep_stages.end_time")?,
+                raw_mode,
             });
         }
         Ok(stages)
@@ -2749,15 +2797,35 @@ impl Database {
         Ok(value.map(|(value, timestamp)| (value.round() as i32, timestamp)))
     }
 
+    /// 本机一共有多少条睡眠记录。
+    ///
+    /// 分页要它：没有总数，界面只能说「显示了 500 条」，说不出「共 2317 条」，
+    /// 而用户问的恰恰是「剩下的呢」。
+    pub fn count_sleep_sessions(&self) -> Result<i64> {
+        self.conn
+            .query_row("SELECT COUNT(*) FROM sleep_sessions", [], |row| row.get(0))
+            .map_err(Into::into)
+    }
+
     pub fn get_recent_sleep_sessions(&self, limit: usize) -> Result<Vec<SleepSession>> {
+        self.sleep_sessions_page(limit, 0)
+    }
+
+    /// 一页睡眠记录，最新在前。
+    ///
+    /// `offset` 是这里的新东西。以前 SQL 只有 `LIMIT` 没有 `OFFSET`，所以
+    /// 界面上那个 500 是硬上限而不是页大小：一个下载了全部历史的人，第 501
+    /// 条之后的记录在应用里根本没有入口（Reddit p6zxyo7）。
+    pub fn sleep_sessions_page(&self, limit: usize, offset: usize) -> Result<Vec<SleepSession>> {
         let limit = i64::try_from(limit).unwrap_or(i64::MAX).max(0);
+        let offset = i64::try_from(offset).unwrap_or(i64::MAX).max(0);
         let mut stmt = self.conn.prepare(
             "SELECT sleep_id, start_time, end_time, score, duration_minutes,
                     deep_minutes, light_minutes, rem_minutes, rem_available, awake_minutes,
                     source_scope, device_id, synced_at, wake_count
-             FROM sleep_sessions ORDER BY start_time DESC LIMIT ?1",
+             FROM sleep_sessions ORDER BY start_time DESC LIMIT ?1 OFFSET ?2",
         )?;
-        let rows = stmt.query_map([limit], |row| {
+        let rows = stmt.query_map([limit, offset], |row| {
             Ok((
                 row.get::<_, String>(0)?,
                 row.get::<_, String>(1)?,
@@ -2888,17 +2956,30 @@ impl Database {
         }))
     }
 
+    /// 本机一共有多少条运动记录。见 `count_sleep_sessions` 的理由。
+    pub fn count_workouts(&self) -> Result<i64> {
+        self.conn
+            .query_row("SELECT COUNT(*) FROM workouts", [], |row| row.get(0))
+            .map_err(Into::into)
+    }
+
     pub fn get_recent_workouts(&self, limit: usize) -> Result<Vec<Workout>> {
+        self.workouts_page(limit, 0)
+    }
+
+    /// 一页运动记录，最新在前。见 `sleep_sessions_page`。
+    pub fn workouts_page(&self, limit: usize, offset: usize) -> Result<Vec<Workout>> {
         let limit = i64::try_from(limit).unwrap_or(i64::MAX).max(0);
+        let offset = i64::try_from(offset).unwrap_or(i64::MAX).max(0);
         let mut stmt = self.conn.prepare(
             "SELECT workout_id, workout_type, start_time, end_time,
                     distance_meters, calories, avg_hr, max_hr,
                     training_load, vo2max, source_scope, device_id,
                     synced_at, gps_available, sample_count, zepp_type,
                     workout_type_source, workout_type_override
-             FROM workouts ORDER BY start_time DESC LIMIT ?1",
+             FROM workouts ORDER BY start_time DESC LIMIT ?1 OFFSET ?2",
         )?;
-        let rows = stmt.query_map([limit], |row| {
+        let rows = stmt.query_map([limit, offset], |row| {
             Ok((
                 row.get::<_, String>(0)?,
                 row.get::<_, String>(1)?,
@@ -3298,6 +3379,56 @@ impl Database {
     /// Only names in `SERIES_METRICS` / `SAMPLE_ONLY_SERIES_METRICS` are
     /// answered; anything else is skipped rather than guessed at, so a typo in
     /// a caller cannot produce a chart with an invented unit.
+    /// 按天聚合原始心率样本：这一天的最高、最低、平均，以及有多少个样本。
+    ///
+    /// 为什么不用 `daily_metrics`：Zepp 的**日**最高心率根本没有被采集进来。
+    /// 库里唯一叫 `device_max_hr` 的东西来自 PAI 流的 `maxHr`，那是这块表的
+    /// 最大心率**设定值**（用来划分区间的 100–240 那个数），不是当天实测的
+    /// 峰值。把它当成日最高心率显示，会是又一个「界面上有个数，但它不是你
+    /// 以为的那个意思」。
+    ///
+    /// 所以这里只做一件事：把本机存着的原始样本按天取 max。用户看到的数字
+    /// 和 Zepp App 里的不一样是正常的——Zepp 会过滤，我们不过滤。
+    ///
+    /// **`samples` 必须一起返回。** 一天只有 12 个样本时，那个「最高值」是
+    /// 12 个点里的最高，不是这一天的最高；不把样本数交出去，界面就只能把它
+    /// 当成完整最大值来画，而那是在编造事实。
+    ///
+    /// 日期按本地时区切分：用户问的是「我那天」，不是「那个 UTC 日」。
+    pub fn daily_heart_rate_extremes(&self, days: i64) -> Result<Vec<DailyHeartRateExtreme>> {
+        let window_days = days.clamp(1, 1825);
+        let end = Local::now().date_naive();
+        let start = end - Duration::days(window_days - 1);
+        // `timestamp` 存的是 RFC 3339（带偏移）。SQLite 的 `localtime` 修饰符
+        // 按**本机**时区换算，这正是我们要的分日方式。
+        let mut stmt = self.conn.prepare(
+            "SELECT date(timestamp, 'localtime') AS day,
+                    MAX(value), MIN(value), AVG(value), COUNT(*)
+             FROM metric_samples
+             WHERE metric = 'heart_rate'
+               AND date(timestamp, 'localtime') BETWEEN ?1 AND ?2
+             GROUP BY day
+             ORDER BY day",
+        )?;
+        let rows = stmt.query_map(
+            [
+                start.format("%Y-%m-%d").to_string(),
+                end.format("%Y-%m-%d").to_string(),
+            ],
+            |row| {
+                Ok(DailyHeartRateExtreme {
+                    date: row.get(0)?,
+                    max: row.get::<_, f64>(1)?.round() as i32,
+                    min: row.get::<_, f64>(2)?.round() as i32,
+                    average: row.get::<_, f64>(3)?.round() as i32,
+                    samples: row.get(4)?,
+                })
+            },
+        )?;
+        rows.collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(Into::into)
+    }
+
     pub fn metric_series(&self, metrics: &[String], days: i64) -> Result<Vec<MetricSeries>> {
         let window_days = days.clamp(1, 1825);
         let end = Local::now().date_naive();
@@ -5830,11 +5961,13 @@ mod tests {
                     stage: "light".into(),
                     start_time: start,
                     end_time: start + chrono::Duration::minutes(30),
+                    raw_mode: None,
                 },
                 SleepStageSlice {
                     stage: "deep".into(),
                     start_time: start + chrono::Duration::minutes(30),
                     end_time: start + chrono::Duration::minutes(90),
+                    raw_mode: None,
                 },
             ],
         })
@@ -6839,6 +6972,7 @@ mod tests {
                 stage: "deep".into(),
                 start_time: start,
                 end_time: start + chrono::Duration::minutes(80),
+                raw_mode: None,
             }],
         })
         .unwrap();

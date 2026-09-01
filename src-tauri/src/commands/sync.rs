@@ -211,6 +211,7 @@ async fn run_sync(
         let mut deferred = ui_sync_report(
             SyncReport {
                 success: false,
+                core_ok: false,
                 streams: Vec::new(),
                 records_written: 0,
                 message: Some(message.into()),
@@ -249,6 +250,7 @@ async fn run_sync(
             return Ok(ui_sync_report(
                 SyncReport {
                     success: false,
+                    core_ok: false,
                     streams: Vec::new(),
                     records_written: 0,
                     message: Some("同步已取消".into()),
@@ -285,7 +287,9 @@ async fn run_sync(
 
     if report.streams.iter().any(|stream| stream.needs_reauth) {
         *state.auth_state.write().await = "needs_reauth".to_string();
-    } else if report.success {
+    } else if report.core_ok {
+        // 主干数据流通了就说明这份凭据是好的。一条支流（sleep / hrv……）失败
+        // 不代表登录状态有问题，不该把用户推回「需要重新认证」。
         *state.auth_state.write().await = "verified".to_string();
         // A successful sync proves the credential works: clear the transient
         // verify/auth warning so the UI never shows "已连接" next to a stale
@@ -302,25 +306,32 @@ async fn run_sync(
     ))
 }
 
+/// 把一次同步归成界面上的一个词。
+///
+/// 这里以前和 `SyncManager::sync_report` 各写了一遍「只有三个核心流算数」，
+/// 于是 sleep / hrv / wellness / workout_detail 真的取失败时，两边一致地
+/// 给出「已更新」。现在判据只有一条：**任何真实 `Failed` 都不能是绿的。**
+///
+/// `Unavailable` / `Unverified` 依旧中性——那是这块表没有这个能力，不是错误。
 fn classify_outcome(
     report: &SyncReport,
     before: &BTreeMap<String, Option<String>>,
     after: &BTreeMap<String, Option<String>>,
 ) -> &'static str {
-    let core_failed = report.streams.iter().any(|stream| {
-        matches!(
-            stream.stream.as_str(),
-            "heart_rate" | "daily_summary" | "workouts"
-        ) && stream.status == StreamStatus::Failed
-    });
+    let any_failed = report
+        .streams
+        .iter()
+        .any(|stream| stream.status == StreamStatus::Failed);
     let has_success = report
         .streams
         .iter()
         .any(|stream| stream.status == StreamStatus::Success);
-    if (core_failed || !report.success) && !has_success {
+    // 一条都没成功（或者根本没有流，例如上游整个挂掉）时才叫 failed。
+    if (any_failed || !report.success) && !has_success {
         return "failed";
     }
-    if core_failed {
+    // 有成功也有失败：partial。少了一条流这件事必须让用户看见。
+    if any_failed {
         return "partial";
     }
     if samples_advanced(before, after) {
@@ -351,11 +362,12 @@ fn emit_sync_progress(app: &AppHandle, progress: SyncProgress) {
 mod tests {
     use super::*;
     use crate::models::CapabilityStatus;
-    use crate::sync::StreamReport;
+    use crate::sync::{is_core_stream, StreamReport};
 
     fn report(statuses: &[StreamStatus], success: bool) -> SyncReport {
         SyncReport {
             success,
+            core_ok: success,
             streams: statuses
                 .iter()
                 .enumerate()
@@ -386,6 +398,66 @@ mod tests {
             "no_new_data"
         );
         assert_eq!(classify_outcome(&success, &before, &advanced), "updated");
+    }
+
+    /// 只给流起名字的报告构造器。`report()` 生成的是 `stream-0` / `stream-1`，
+    /// 而这条回归测试要说的恰恰是「哪条流失败」这件事。
+    fn named_report(streams: &[(&str, StreamStatus)]) -> SyncReport {
+        let any_failed = streams
+            .iter()
+            .any(|(_, status)| *status == StreamStatus::Failed);
+        let core_failed = streams
+            .iter()
+            .any(|(name, status)| is_core_stream(name) && *status == StreamStatus::Failed);
+        SyncReport {
+            success: !any_failed,
+            core_ok: !core_failed,
+            streams: streams
+                .iter()
+                .map(|(name, status)| StreamReport {
+                    stream: (*name).to_string(),
+                    status: status.clone(),
+                    records_written: 0,
+                    raw_records: 0,
+                    capability: CapabilityStatus::Verified,
+                    needs_reauth: false,
+                    message: None,
+                })
+                .collect(),
+            records_written: 0,
+            message: None,
+        }
+    }
+
+    /// 这条测试钉住的就是那个「假绿」：心率成功、睡眠**真的失败**，
+    /// 界面不许说「已更新」。
+    #[test]
+    fn an_optional_stream_failure_is_partial_not_success() {
+        let before = BTreeMap::from([("heart_rate".into(), Some("2026-08-12T10:00:00Z".into()))]);
+        let advanced = BTreeMap::from([("heart_rate".into(), Some("2026-08-12T10:01:00Z".into()))]);
+        let mixed = named_report(&[
+            ("heart_rate", StreamStatus::Success),
+            ("sleep", StreamStatus::Failed),
+        ]);
+
+        assert!(!mixed.success, "支流失败时整体不能算成功");
+        assert!(mixed.core_ok, "核心流没失败，凭据不该被判成有问题");
+        assert_eq!(classify_outcome(&mixed, &before, &advanced), "partial");
+        // 样本没前进也一样：不能退回 `no_new_data` 把失败藏起来。
+        assert_eq!(classify_outcome(&mixed, &before, &before), "partial");
+    }
+
+    /// 反过来：设备没有这个能力不是失败，不许把整次同步染成 partial。
+    #[test]
+    fn an_unavailable_stream_stays_neutral() {
+        let samples = BTreeMap::new();
+        let report = named_report(&[
+            ("heart_rate", StreamStatus::Success),
+            ("hrv", StreamStatus::Unavailable),
+            ("wellness", StreamStatus::Unverified),
+        ]);
+        assert!(report.success);
+        assert_eq!(classify_outcome(&report, &samples, &samples), "no_new_data");
     }
 
     #[test]

@@ -25,6 +25,8 @@ type TaggedEntry = IconEntry & { tag: string };
 type DownloadPlatform = 'windows' | 'macos';
 
 interface ReleaseAsset {
+  /** 这个下载项还没有经过真实设备验证。目前只有 Linux 的四个包会带上它。 */
+  preview?: boolean;
   name: string;
   url: string;
   size: number;
@@ -40,6 +42,17 @@ interface LatestRelease {
     windowsExe: ReleaseAsset;
     windowsMsi: ReleaseAsset;
     macosDmg: ReleaseAsset;
+    /*
+     * Linux 四个包。**可选**：它们从 2.0.0 才开始有，而这个页面还要能对着
+     * 更早的 latest release 正常渲染。
+     *
+     * `preview` 由 /api/release 给，不写死在页面上——写死的话，等哪天真的
+     * 有人在 Linux 上跑通了登录和密钥环，没人会记得回来删那句话。
+     */
+    linuxDeb?: ReleaseAsset;
+    linuxRpm?: ReleaseAsset;
+    linuxAppImage?: ReleaseAsset;
+    linuxFlatpak?: ReleaseAsset;
   };
 }
 
@@ -50,6 +63,7 @@ interface LandingCopy {
   downloads: {
     windows: { label: string; hint: string; msi: string };
     macos: { label: string; hint: string };
+    linux: { label: string; previewBadge: string; note: string };
     status: { loading: string; ready: string; fallback: string };
   };
   hero: {
@@ -95,6 +109,12 @@ const COPY: Record<'zh' | 'en', LandingCopy> = {
     downloads: {
       windows: { label: '下载 Windows 版', hint: '推荐 · x64 EXE 安装包', msi: '企业 / 批量部署：下载 MSI' },
       macos: { label: '下载 macOS 版', hint: 'Apple Silicon · DMG 安装包' },
+      linux: {
+        label: 'Linux',
+        previewBadge: '实验性',
+        // 一句话把边界说清楚。含糊其辞的「实验性支持」只会让人以为是客套。
+        note: 'deb / rpm / AppImage / Flatpak 已经能由 CI 构建出来，但还没有人在真实 Linux 桌面上完整跑通登录和密钥环（Secret Service / KWallet）。愿意试的话，遇到问题请开 issue——这正是它现在最需要的。',
+      },
       status: {
         loading: '正在读取 GitHub 最新安装包…',
         ready: '点击直接下载，无需打开 GitHub',
@@ -104,7 +124,7 @@ const COPY: Record<'zh' | 'en', LandingCopy> = {
     hero: {
       headlineLead: '把你的 Zepp 数据，',
       headlineAccent: '完整交还给你。',
-      lead: 'ZeppBridge 在 Windows 与 macOS 本机连接、整理并可视化 Amazfit 穿戴数据。数据来源保持清晰，既能自己看，也能安全交给 AI 分析。',
+      lead: 'ZeppBridge 在 Windows、macOS 与 Linux 本机连接、整理并可视化 Amazfit 穿戴数据。数据来源保持清晰，既能自己看，也能安全交给 AI 分析。',
       starNudge: {
         title: '下载已开始',
         copy: '如果 ZeppBridge 对你有用，欢迎顺手在 GitHub 点个 Star。它会让更多 Amazfit 用户找到这个项目。',
@@ -208,6 +228,11 @@ const COPY: Record<'zh' | 'en', LandingCopy> = {
     downloads: {
       windows: { label: 'Download for Windows', hint: 'Recommended · x64 EXE installer', msi: 'Managed deployment: download MSI' },
       macos: { label: 'Download for macOS', hint: 'Apple Silicon · DMG installer' },
+      linux: {
+        label: 'Linux',
+        previewBadge: 'Preview',
+        note: 'deb / rpm / AppImage / Flatpak all build in CI, but nobody has yet completed sign-in plus keyring (Secret Service / KWallet) on a real Linux desktop. Try it if you like — and please open an issue when something breaks. That is exactly what it needs right now.',
+      },
       status: {
         loading: 'Checking the latest GitHub release…',
         ready: 'Downloads directly — no GitHub page in the way',
@@ -217,7 +242,7 @@ const COPY: Record<'zh' | 'en', LandingCopy> = {
     hero: {
       headlineLead: 'Your Zepp data,',
       headlineAccent: 'handed back in full.',
-      lead: 'ZeppBridge connects, organizes and visualizes your Amazfit wearable data on your own Windows or Mac. Every field keeps its source, so you can read it yourself — or hand it to an AI on your terms.',
+      lead: 'ZeppBridge connects, organizes and visualizes your Amazfit wearable data on your own Windows, Mac or Linux machine. Every field keeps its source, so you can read it yourself — or hand it to an AI on your terms.',
       starNudge: {
         title: 'Your download has started',
         copy: 'If ZeppBridge earns a place on your machine, a GitHub Star helps more Amazfit users find it.',
@@ -354,6 +379,26 @@ const secondaryAsset = computed(() => assetFor(secondaryPlatform.value));
 const primaryHref = computed(() => primaryAsset.value?.url ?? releaseUrl);
 const secondaryHref = computed(() => secondaryAsset.value?.url ?? releaseUrl);
 const windowsMsiHref = computed(() => latestRelease.value?.downloads.windowsMsi.url ?? releaseUrl);
+/*
+ * Linux 的四个包。没有就整块不渲染——旧的 latest release 里确实没有它们，
+ * 那不是错误，不该在页面上留下四个指向 GitHub 首页的死链接。
+ */
+const linuxDownloads = computed(() => {
+  const downloads = latestRelease.value?.downloads;
+  if (!downloads) return [];
+  const candidates: Array<{ label: string; asset?: ReleaseAsset }> = [
+    { label: '.deb', asset: downloads.linuxDeb },
+    { label: '.rpm', asset: downloads.linuxRpm },
+    { label: 'AppImage', asset: downloads.linuxAppImage },
+    { label: 'Flatpak', asset: downloads.linuxFlatpak },
+  ];
+  return candidates
+    .filter((entry): entry is { label: string; asset: ReleaseAsset } => Boolean(entry.asset))
+    .map((entry) => ({ label: entry.label, url: entry.asset.url }));
+});
+const linuxIsPreview = computed(
+  () => latestRelease.value?.downloads.linuxDeb?.preview === true,
+);
 const releaseStatusText = computed(() => {
   if (releaseState.value === 'ready') {
     return `v${latestRelease.value?.version} · ${t.value.downloads.status.ready}`;
@@ -401,6 +446,22 @@ const revealStarNudge = () => {
               </a>
               <a v-if="secondaryPlatform === 'windows'" class="format-link" :href="windowsMsiHref" :target="latestRelease ? undefined : '_blank'" rel="noopener" @click="revealStarNudge">{{ t.downloads.windows.msi }}</a>
             </div>
+          </div>
+          <div v-if="linuxDownloads.length" class="linux-row">
+            <p class="linux-head">
+              <strong>{{ t.downloads.linux.label }}</strong>
+              <em v-if="linuxIsPreview">{{ t.downloads.linux.previewBadge }}</em>
+            </p>
+            <div class="linux-links">
+              <a
+                v-for="item in linuxDownloads"
+                :key="item.label"
+                :href="item.url"
+                rel="noopener"
+                @click="revealStarNudge"
+              >{{ item.label }}</a>
+            </div>
+            <p v-if="linuxIsPreview" class="linux-note">{{ t.downloads.linux.note }}</p>
           </div>
           <p class="release-status" :class="`is-${releaseState}`"><i></i>{{ releaseStatusText }}</p>
           <Transition name="star-nudge">
@@ -493,6 +554,32 @@ main, footer { position: relative; z-index: 1; }
 .primary-cta, .nav-github, .lang-toggle { transition: transform .2s ease, border-color .2s ease, color .2s ease; }
 .primary-cta:hover, .nav-github:hover { transform: translateY(-2px); border-color: rgba(185,220,112,.5); }
 .primary-cta:active, .alt-cta:active, .nav-github:active, .lang-toggle:active { transform: translateY(1px) scale(.99); }
+/* Linux 一行，四个包并排。刻意不做成第三个大按钮：它还没有经过实机验证，
+   和 Windows / macOS 并列会暗示同等成熟度。 */
+.linux-row { margin-top: 16px; }
+.linux-head { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 12px; color: #9aa79a; }
+.linux-head strong { color: #cfd8cd; font-size: 13px; }
+.linux-head em {
+  padding: 1px 7px;
+  border: 1px solid rgba(226, 234, 242, .22);
+  border-radius: 999px;
+  color: #c9a86a;
+  font-size: 10px;
+  font-style: normal;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.linux-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.linux-links a {
+  padding: 5px 12px;
+  border: 1px solid rgba(226, 234, 242, .18);
+  border-radius: 8px;
+  color: #cfd8cd;
+  font-size: 12px;
+  text-decoration: none;
+}
+.linux-links a:hover { border-color: rgba(226, 234, 242, .4); }
+.linux-note { max-width: 52ch; margin: 8px 0 0; color: #778274; font-size: 11px; line-height: 1.6; }
 .release-status { display: flex; align-items: center; gap: 7px; min-height: 18px; margin: 14px 0 0; color: #778274; font-size: 10px; }
 .release-status i { width: 6px; height: 6px; border-radius: 50%; background: #697365; }
 .release-status.is-loading i { background: #8faa58; animation: release-pulse 1.4s ease-in-out infinite; }

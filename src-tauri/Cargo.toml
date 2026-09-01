@@ -25,7 +25,7 @@ zeppbridge-core = { path = "crates/core" }
 
 [package]
 name = "zeppbridge"
-version = "1.1.5"
+version = "2.0.0"
 description = "本地优先的 Zepp 健康数据桥"
 authors = ["ZeppBridge"]
 edition = "2021"

@@ -7,6 +7,23 @@ use std::time::Duration;
 
 const MAX_ATTEMPTS: usize = 3;
 const RETRY_BACKOFF_MS: [u64; 2] = [50, 150];
+/// 一次请求最多跟几跳同域重定向。
+///
+/// 以前重定向和重试共用一个预算：一次合法的 3xx 走 `continue`，顺手吃掉一次
+/// 网络重试额度。某个区域哪天多两跳跳转，真正的请求就一次都重试不了了。两
+/// 件事的失败模式完全不同——重定向循环要立刻停，网络抖动要退避后再来——
+/// 所以各记各的。
+const MAX_REDIRECTS: usize = 5;
+/// 跳转预算必须比重试预算宽。
+///
+/// 夹得比它窄的话，两者等于又共用了一个额度——那正是这次要修掉的东西。
+/// 编译期断言而不是测试：这是两个常量之间的关系，不该等到跑测试才发现。
+const _: () = assert!(MAX_REDIRECTS > MAX_ATTEMPTS);
+/// 429 / 503 退避的上限。
+///
+/// 服务器给的 `Retry-After` 也要被它夹住：一个写着 `Retry-After: 3600` 的
+/// 响应不该让同步挂在那里一小时，那时候用户会去关窗口。
+const MAX_BACKOFF_MS: u64 = 8_000;
 static REQUEST_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 /// Validate and canonicalize a Zepp regional host.
@@ -84,6 +101,50 @@ pub fn validate_region_host(input: &str) -> Result<String> {
     Ok(format!("https://{host}"))
 }
 
+/// 服务器给的 `Retry-After`，换算成毫秒。
+///
+/// 两种合法写法都认：秒数（`Retry-After: 30`）和 HTTP 日期
+/// （`Retry-After: Wed, 21 Oct 2026 07:28:00 GMT`）。夹在 `MAX_BACKOFF_MS`
+/// 以内——一个写着一小时的响应不该让同步挂在那里，用户早就去关窗口了。
+///
+/// 抽成纯函数是为了能直接测：造一个 header map 比造一次 429 响应容易得多。
+fn retry_after_ms(headers: &header::HeaderMap) -> Option<u64> {
+    let raw = headers.get(header::RETRY_AFTER)?.to_str().ok()?.trim();
+    if raw.is_empty() {
+        return None;
+    }
+    // 先按秒数解。这是实际最常见的一种。
+    if let Ok(seconds) = raw.parse::<u64>() {
+        return Some(seconds.saturating_mul(1_000).min(MAX_BACKOFF_MS));
+    }
+    // 再按 HTTP 日期解。过去的时间点意味着「现在就可以重试」，等 0 毫秒。
+    let target = chrono::DateTime::parse_from_rfc2822(raw).ok()?;
+    let delta = target.with_timezone(&chrono::Utc) - chrono::Utc::now();
+    let millis = delta.num_milliseconds().max(0) as u64;
+    Some(millis.min(MAX_BACKOFF_MS))
+}
+
+/// 指数退避 + 抖动。
+///
+/// 服务器没给 `Retry-After` 时用它。抖动是为了不让同一时刻发起的几条流
+/// 在同一毫秒一起回来再撞一次——同步是并发跑多条流的，同步退避等于把
+/// 一次限流变成三次。
+fn exponential_backoff_ms(attempt: usize, base_ms: u64) -> u64 {
+    // 基数为 0（重试表用完之后）时给一个下限，否则「退避」实际是不等。
+    let base = base_ms.max(200);
+    let scaled = base.saturating_mul(1u64 << attempt.min(5));
+    let capped = scaled.min(MAX_BACKOFF_MS);
+    // 抖动取 [75%, 100%]。用 getrandom，因为这个 crate 里本来就有它，
+    // 不值得为一个退避再引一个 rand。取不到随机数时退回不抖动——退避本身
+    // 才是重点，抖动只是锦上添花。
+    let mut byte = [0u8; 1];
+    if getrandom::getrandom(&mut byte).is_err() {
+        return capped;
+    }
+    let jitter = 75 + (u64::from(byte[0]) % 26); // 75..=100
+    capped * jitter / 100
+}
+
 /// Classification is kept pure so callers/tests can verify the security
 /// boundary without constructing a live HTTP response.
 pub fn classify_status(status: u16) -> Option<ZeppBridgeError> {
@@ -130,9 +191,13 @@ impl ZeppConnector {
         }
 
         let mut defaults = header::HeaderMap::new();
+        // 版本号从 crate 元数据来，不再手写。手写的那个停在 `0.2.1` 上，
+        // 而应用早已经到 1.x——服务端日志、抓包和限流诊断里看到的会一直是
+        // 一个不存在的版本，出问题时对不上任何一次发布。
         defaults.insert(
             header::USER_AGENT,
-            header::HeaderValue::from_static("ZeppBridge/0.2.1"),
+            header::HeaderValue::from_str(concat!("ZeppBridge/", env!("CARGO_PKG_VERSION")))
+                .map_err(|_| ZeppBridgeError::ConfigError("User-Agent 无法构造".into()))?,
         );
         // Redirects are disabled so a 3xx can never forward the custom
         // `apptoken` header to a host outside the validated region. Manual,
@@ -219,49 +284,103 @@ impl ZeppConnector {
             .map_err(|_| ZeppBridgeError::ConfigError("API 路径无法构造".into()))
     }
 
+    /// 退避等待，等的过程中也响应取消。
+    ///
+    /// 直接 `sleep` 的话，用户在退避窗口里按取消要等这一觉睡完才生效。
+    async fn backoff(&self, millis: u64) -> Result<()> {
+        if millis == 0 {
+            return Ok(());
+        }
+        // 切成小段轮询取消标志。这里不引入 cancellation token，是因为这个
+        // 连接器的取消本来就是一个跨线程共享的 `AtomicBool`。
+        const TICK_MS: u64 = 50;
+        let mut left = millis;
+        while left > 0 {
+            if self.cancel.load(Ordering::SeqCst) {
+                return Err(ZeppBridgeError::Cancelled);
+            }
+            let step = left.min(TICK_MS);
+            tokio::time::sleep(Duration::from_millis(step)).await;
+            left -= step;
+        }
+        if self.cancel.load(Ordering::SeqCst) {
+            return Err(ZeppBridgeError::Cancelled);
+        }
+        Ok(())
+    }
+
+    /// 一个只有在取消被请求时才 ready 的 future。
+    ///
+    /// 用来和网络请求一起放进 `tokio::select!`。取消标志是一个跨线程共享的
+    /// `AtomicBool`，本身不是 future，所以这里用小步长轮询把它变成一个。
+    async fn cancelled(&self) {
+        loop {
+            if self.cancel.load(Ordering::SeqCst) {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    }
+
     fn request_id() -> String {
         let n = REQUEST_COUNTER.fetch_add(1, Ordering::Relaxed);
         format!("ZEPBRIDGE-{n:016X}")
     }
 
+    /// 发一次 GET 并解析 JSON。
+    ///
+    /// 两个预算分开记：`attempt` 是网络重试，`redirects` 是同域跳转。合在一起
+    /// 记的时候，跳转会悄悄吃掉重试次数——那正是「有时候同步失败，再点一次
+    /// 又好了」这类报告的来源之一。
     async fn get_json(&self, path: &str, params: Vec<(&str, String)>) -> Result<Value> {
         let mut url = self.path_url(path)?;
         let headers = self.build_headers()?;
         let mut last_retry_status = None;
+        let mut attempt = 0usize;
+        let mut redirects = 0usize;
 
-        for (attempt, backoff_ms) in RETRY_BACKOFF_MS
-            .iter()
-            .copied()
-            .chain(std::iter::repeat(0))
-            .take(MAX_ATTEMPTS)
-            .enumerate()
-        {
+        while attempt < MAX_ATTEMPTS {
+            // 这一轮失败时要等多久。429/503 会用服务器给的 `Retry-After`
+            // 覆盖掉它。
+            let backoff_ms = RETRY_BACKOFF_MS.get(attempt).copied().unwrap_or(0);
             if self.cancel.load(Ordering::SeqCst) {
                 return Err(ZeppBridgeError::Cancelled);
             }
             let mut query = params.clone();
             query.push(("r", Self::request_id()));
-            let response = match tokio::time::timeout(
+            // 取消和请求一起 select。以前取消只在两条流之间被检查，一个已经
+            // 发出去的请求要等满自己的 35 秒超时——网络差的时候，用户按了
+            // 取消还要看着应用转几十秒。`select!` 落到取消那一支时，请求
+            // future 被 drop，连接随之关闭。
+            let send = tokio::time::timeout(
                 Duration::from_secs(35),
                 self.client
                     .get(url.clone())
                     .headers(headers.clone())
                     .query(&query)
                     .send(),
-            )
-            .await
-            {
+            );
+            let outcome = tokio::select! {
+                // 先看取消：两边同时就绪时优先走取消，别再把一个用户已经
+                // 放弃的响应解出来。
+                biased;
+                _ = self.cancelled() => return Err(ZeppBridgeError::Cancelled),
+                outcome = send => outcome,
+            };
+            let response = match outcome {
                 Ok(Ok(response)) => response,
                 Ok(Err(error)) => {
-                    if attempt + 1 < MAX_ATTEMPTS {
-                        tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
+                    attempt += 1;
+                    if attempt < MAX_ATTEMPTS {
+                        self.backoff(backoff_ms).await?;
                         continue;
                     }
                     return Err(ZeppBridgeError::NetworkError(error));
                 }
                 Err(_elapsed) => {
-                    if attempt + 1 < MAX_ATTEMPTS {
-                        tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
+                    attempt += 1;
+                    if attempt < MAX_ATTEMPTS {
+                        self.backoff(backoff_ms).await?;
                         continue;
                     }
                     return Err(ZeppBridgeError::RetryExhausted {
@@ -277,6 +396,14 @@ impl ZeppConnector {
             // Follow a 3xx manually only when the target stays on the same
             // HTTPS host as the validated regional base URL.
             if (300..=399).contains(&status) {
+                // 跳转记在自己的预算上，**不动 `attempt`**。
+                redirects += 1;
+                if redirects > MAX_REDIRECTS {
+                    return Err(ZeppBridgeError::HttpStatus {
+                        status,
+                        message: "重定向次数过多".into(),
+                    });
+                }
                 let location = response
                     .headers()
                     .get(reqwest::header::LOCATION)
@@ -319,8 +446,15 @@ impl ZeppConnector {
                 }
                 Some(ZeppBridgeError::RetryExhausted { .. }) => {
                     last_retry_status = Some(status);
-                    if attempt + 1 < MAX_ATTEMPTS {
-                        tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
+                    // 服务器说了要等多久就等多久（夹在上限内）；没说才用我们
+                    // 自己的指数退避。以前 429 和 503 都只等 50/150 毫秒，
+                    // 等于没退避——对着一个正在限流的服务重试三次，只是把
+                    // 限流窗口烧得更久。
+                    let wait = retry_after_ms(response.headers())
+                        .unwrap_or_else(|| exponential_backoff_ms(attempt, backoff_ms));
+                    attempt += 1;
+                    if attempt < MAX_ATTEMPTS {
+                        self.backoff(wait).await?;
                         continue;
                     }
                     return Err(ZeppBridgeError::RetryExhausted {
@@ -723,5 +857,65 @@ mod tests {
         assert!(validate_track_id("../x").is_err());
         assert!(validate_detail_source("run.gps").is_ok());
         assert!(validate_detail_source("a/b").is_err());
+    }
+}
+
+#[cfg(test)]
+mod retry_policy_tests {
+    use super::*;
+
+    #[test]
+    fn retry_after_seconds_are_honoured_and_capped() {
+        let mut headers = header::HeaderMap::new();
+        headers.insert(header::RETRY_AFTER, header::HeaderValue::from_static("2"));
+        assert_eq!(retry_after_ms(&headers), Some(2_000));
+
+        // 服务器说等一小时也不能真等一小时。
+        headers.insert(
+            header::RETRY_AFTER,
+            header::HeaderValue::from_static("3600"),
+        );
+        assert_eq!(retry_after_ms(&headers), Some(MAX_BACKOFF_MS));
+    }
+
+    #[test]
+    fn a_past_http_date_means_retry_now_and_garbage_means_no_opinion() {
+        let mut headers = header::HeaderMap::new();
+        headers.insert(
+            header::RETRY_AFTER,
+            header::HeaderValue::from_static("Wed, 21 Oct 2020 07:28:00 GMT"),
+        );
+        assert_eq!(retry_after_ms(&headers), Some(0));
+
+        headers.insert(
+            header::RETRY_AFTER,
+            header::HeaderValue::from_static("soon-ish"),
+        );
+        assert_eq!(
+            retry_after_ms(&headers),
+            None,
+            "读不懂的 Retry-After 应当交回给我们自己的退避，而不是当成 0"
+        );
+
+        assert_eq!(retry_after_ms(&header::HeaderMap::new()), None);
+    }
+
+    /// 退避必须真的随尝试次数变长，而且始终落在上限之内。
+    #[test]
+    fn exponential_backoff_grows_and_stays_bounded() {
+        // 抖动是随机的，所以按区间断言而不是按具体值。
+        for attempt in 0..6 {
+            let value = exponential_backoff_ms(attempt, 200);
+            assert!(
+                value <= MAX_BACKOFF_MS,
+                "第 {attempt} 次退避 {value} 超过上限"
+            );
+        }
+        let early: u64 = (0..12).map(|_| exponential_backoff_ms(0, 200)).sum();
+        let later: u64 = (0..12).map(|_| exponential_backoff_ms(3, 200)).sum();
+        assert!(later > early, "退避没有随尝试次数变长：{early} -> {later}");
+
+        // 基数为 0（重试表用完）时也必须真的等一会儿，否则「退避」是假的。
+        assert!(exponential_backoff_ms(0, 0) > 0);
     }
 }

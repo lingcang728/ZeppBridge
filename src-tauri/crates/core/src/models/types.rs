@@ -21,11 +21,38 @@ impl SourceScope {
 }
 
 /// 认证信息
-#[derive(Debug, Clone, Serialize, Deserialize)]
+///
+/// **不 derive `Debug`。** `app_token` 就是这个账号的全部权限：任何一句
+/// `tracing::debug!("{auth:?}")`、任何一个 `.unwrap()` 的 panic 消息、任何
+/// 一份用户贴上来的日志，都会把它原样带出去。今天生产代码里确实没有人打印
+/// 完整的 `AuthInfo`，但那是靠所有人一直记得，而不是靠类型。
+#[derive(Clone, Serialize, Deserialize)]
 pub struct AuthInfo {
     pub app_token: String,
     pub user_id: String,
     pub region_host: String,
+}
+
+impl std::fmt::Debug for AuthInfo {
+    /// 永久打码 `app_token`。
+    ///
+    /// 连长度都不给：token 长度本身是可以用来做指纹的，而调试时想知道的
+    /// 只有「有没有」这一件事。`user_id` 和 `region_host` 保留——排查区域
+    /// 探测那类问题时它们是必需的，而且都不是凭据。
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AuthInfo")
+            .field(
+                "app_token",
+                &if self.app_token.is_empty() {
+                    "<empty>"
+                } else {
+                    "<redacted>"
+                },
+            )
+            .field("user_id", &self.user_id)
+            .field("region_host", &self.region_host)
+            .finish()
+    }
 }
 
 /// 指标样本（心率、HRV 等时间序列）
@@ -53,9 +80,20 @@ pub struct DailyMetric {
 /// 真实睡眠阶段时间片。顺序必须来自云端 `stage[]`，禁止按总量拼接。
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SleepStageSlice {
+    /// `deep` / `light` / `rem` / `awake`，以及认不出来时的 `unknown`。
+    ///
+    /// **`unknown` 不是 `awake`。** 以前认不出的 mode 被归成清醒「避免阶段条
+    /// 出现空洞」——代价是程序替用户断言了那一段他醒着。宁可画一段未知。
     pub stage: String,
     pub start_time: DateTime<Utc>,
     pub end_time: DateTime<Utc>,
+    /// 云端给的原始 mode 值。
+    ///
+    /// 留着它是为了下一次：Zepp 新增一个 stage mode 时，光知道「有一段认不
+    /// 出来」没法推进，知道「认不出来的是 13」才能查。和运动编号那件事是同
+    /// 一个教训——没有原始码的错分永远缺证据。旧行为 `NULL`。
+    #[serde(default)]
+    pub raw_mode: Option<i64>,
 }
 
 /// 睡眠会话
@@ -810,6 +848,30 @@ pub struct DiagnosticWorkoutCode {
     pub records: i64,
 }
 
+/// 用户把某个 Zepp 运动编号纠正成了什么。
+///
+/// 这是 issue #24 那类问题唯一可能的证据来源。报告者说「越野跑被识别成了
+/// 公开水域游泳」，而当时的诊断报告里 `unknown_workout_codes` 是空的、
+/// `workout_type_conflicts` 是 0 —— 因为那个编号我们**认识**，只是认错了。
+/// 认错和不认识在旧字段里长得完全一样：都没有任何编号信息。
+///
+/// 三个字段都是类型级事实：云端给的编号、我们的解释、用户的解释。**不含
+/// 任何实例信息**——没有 workout_id、没有时间、没有距离、没有 GPS。
+/// `corrected` 的取值被随包运动目录的 key 约束死（见
+/// `set_workout_type_override`），不是自由文本。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticWorkoutCorrection {
+    /// 云端给的原始运动编号。
+    pub code: i32,
+    /// ZeppBridge 自己解释成的运动 key（例如 `open_water_swimming`）。
+    pub interpreted: String,
+    /// 用户改成的运动 key（例如 `trail_running`）。
+    pub corrected: String,
+    /// 用户这样改过多少条记录。一条和二十条的分量不一样。
+    pub records: i64,
+}
+
 /// Strongly typed, allowlist-only issue report. It has no slots for account
 /// identifiers, tokens, serial values, GPS, health measurements, raw payloads,
 /// or filesystem paths.
@@ -827,6 +889,11 @@ pub struct DiagnosticReport {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub user_assigned_models: Vec<DiagnosticAssignedModel>,
     pub unknown_workout_codes: Vec<DiagnosticWorkoutCode>,
+    /// 用户做过的运动类型纠正，按「编号 → 我们的解释 → 用户的解释」聚合。
+    ///
+    /// 没有纠正过就整段不出现，报告不会因此变大。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub workout_type_corrections: Vec<DiagnosticWorkoutCorrection>,
     pub workout_type_conflicts: i64,
     /// 用户自己选的问题类型（`device` / `workout` / `data` / `other`）。
     ///
@@ -1161,4 +1228,20 @@ mod export_scope_tests {
                 .unwrap();
         assert_eq!(range, ExportScope::date_range("2026-08-01", "2026-08-07"));
     }
+}
+
+/// 某一天原始心率样本的极值和样本数。
+///
+/// `samples` 不是可选的。一天只有 12 个样本时，`max` 是这 12 个点里的最高，
+/// 不是这一天的最高；不把样本数一起交出去，界面只能把它当成完整最大值来
+/// 画——那就是在编造事实。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DailyHeartRateExtreme {
+    /// 本地时区的日期，`YYYY-MM-DD`。
+    pub date: String,
+    pub max: i32,
+    pub min: i32,
+    pub average: i32,
+    /// 这一天本机存了多少个原始心率样本。
+    pub samples: i64,
 }

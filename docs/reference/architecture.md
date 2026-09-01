@@ -1,6 +1,6 @@
 # ZeppBridge architecture summary
 
-This page describes the product boundaries and current implementation of v1.1.5.
+This page describes the product boundaries and current implementation of v2.0.0.
 For the usage entry point see the project [README](../../README.md); for
 engineering gates see the [development guide](../development/development.md).
 
@@ -54,7 +54,10 @@ way to tell which one is right.
   `verify_auth` runs at launch. Only an explicit 401/403 or `needs_reauth`
   requires reconnecting.
 - First-run and history syncs cover the 1–365 days you choose (default 30);
-  incremental syncs carry a 7-day overlap window. A single sync controller
+  incremental syncs carry a 30-day overlap window
+  (`zeppbridge_core::contract::INCREMENTAL_SYNC_DAYS`, surfaced to the UI as
+  `AppStatus.incremental_sync_days` — do not hard-code it anywhere else).
+  A single sync controller
   serves the top-bar "Sync now", Settings, launch sync, the 15-minute automatic
   check, the concurrency lock and page refreshes.
 - Sync outcomes distinguish `updated`, `no_new_data`, `partial` and `failed`.

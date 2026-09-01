@@ -43,7 +43,8 @@
       "checked_at": "2026-08-15",
       "image_key": "amazfit-balance-3",
       "device_source_codes": [
-        11141379
+        11141379,
+        11145472
       ]
     },
     {
@@ -216,7 +217,9 @@
       "asset_hash": "sha256:3AB74A932F505F60FCAB5DC8D77325437E7CD09A1701DFA9CBD756ACA7497094",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-active-3-premium",
-      "device_source_codes": []
+      "device_source_codes": [
+        10944769
+      ]
     },
     {
       "catalog_id": "amazfit-t-rex-ultra-2",
@@ -250,7 +253,9 @@
       "asset_hash": "sha256:9C5CDBEC5897E75ECEDAAAD81298B989031B27EA51E6AC7C2BF6680146BFD7DF",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-t-rex-ultra-2",
-      "device_source_codes": []
+      "device_source_codes": [
+        10879233
+      ]
     },
     {
       "catalog_id": "amazfit-active-max",

@@ -40,6 +40,16 @@ const messages = defineMessages(
     backfilling: '正在补拉…',
     continueBackfill: '继续补拉',
     startBackfill: '开始补拉',
+    autoContinue: '自动跑完',
+    autoContinueHint: '一轮跑完自动接着下一轮，直到全部补完。随时可以停，已经拉回来的不会丢。',
+    stopBackfill: '停止',
+    stopping: '正在停止…',
+    roundProgress: (done: number, total: number) =>
+      `正在补拉：已完成 ${done} / ${total} 个月份块。可以随时停。`,
+    stoppedByUser: (remaining: number) =>
+      `已停止，还剩 ${remaining} 个月份块。已经拉回来的历史都在，点「继续补拉」接着做。`,
+    stalled: (remaining: number) =>
+      `还剩 ${remaining} 个月份块，但这一轮一个都没能推进，已经停下来。多半是这些块反复失败——看下面的失败列表，或者点「重试失败项」。`,
     resetLedger: '清空账本',
     ledgerTitle: '覆盖账本',
     ledgerProgress: (done: number, total: number) => `${done} / ${total} 个月份块已有结论`,
@@ -111,6 +121,16 @@ const messages = defineMessages(
     backfilling: 'Backfilling…',
     continueBackfill: 'Continue backfilling',
     startBackfill: 'Start backfilling',
+    autoContinue: 'Run to completion',
+    autoContinueHint: 'Each round starts the next one automatically until the whole range is backfilled. Stop whenever you like — nothing already fetched is lost.',
+    stopBackfill: 'Stop',
+    stopping: 'Stopping…',
+    roundProgress: (done: number, total: number) =>
+      `Backfilling: ${done} of ${total} monthly chunks done. You can stop at any time.`,
+    stoppedByUser: (remaining: number) =>
+      `Stopped with ${remaining} monthly chunks left. Everything already fetched is kept — press "Continue backfilling" to carry on.`,
+    stalled: (remaining: number) =>
+      `${remaining} monthly chunks remain, but this round moved none of them, so it stopped. They are most likely failing repeatedly — see the failed list below, or press "Retry failed items".`,
     resetLedger: 'Clear the ledger',
     ledgerTitle: 'Coverage ledger',
     ledgerProgress: (done: number, total: number) => `${done} of ${total} monthly chunks resolved`,
@@ -300,6 +320,23 @@ const stopReasonText = computed(() => storageStopReasonText(estimate.value));
    写在 SFC 里就只能靠人点界面看，这正是前几次没能及时发现的原因。 */
 const chunkErrorText = (item: FailedChunk): string => failedChunkText(item);
 
+/*
+ * 一轮跑完自动接着下一轮（issue #29）。
+ *
+ * 后端每次调用只处理有限块数并返回账本——这个设计本身是对的，它让一次几年
+ * 的补拉可以被中断、被记账、被续传。错的是把「再来一轮」这件事整个丢给用户：
+ * 报告者说他连着点了一小时。
+ *
+ * 所以循环放在这里，而不是把后端那一轮改成无限：可取消、可观察、失败时能停
+ * 在原地，这三条都还是靠「一轮一轮来」保证的。
+ */
+const autoContinue = ref(true);
+const stopRequested = ref(false);
+
+const stopBackfill = () => {
+  stopRequested.value = true;
+};
+
 const runBackfill = async () => {
   if (!fromDate.value) {
     error.value = t.value.pickStartFirst;
@@ -314,19 +351,47 @@ const runBackfill = async () => {
     return;
   }
   busy.value = true;
+  stopRequested.value = false;
   error.value = null;
   message.value = null;
   try {
-    ledger.value = await backend.startHistoryBackfill(fromDate.value);
-    markDataChanged();
-    message.value = remaining.value > 0
-      ? t.value.roundDone(remaining.value)
-      : t.value.allChunksDone;
+    for (;;) {
+      const before = remaining.value;
+      ledger.value = await backend.startHistoryBackfill(fromDate.value);
+      markDataChanged();
+
+      if (remaining.value <= 0) {
+        message.value = t.value.allChunksDone;
+        break;
+      }
+      if (!autoContinue.value) {
+        message.value = t.value.roundDone(remaining.value);
+        break;
+      }
+      if (stopRequested.value) {
+        message.value = t.value.stoppedByUser(remaining.value);
+        break;
+      }
+      // 一轮下来一块都没推进：再循环下去就是空转。可能是这些块反复失败，
+      // 也可能是账本和云端对不上——两种情况都需要人看一眼，不该让应用
+      // 自己转到天亮。
+      if (before > 0 && remaining.value >= before) {
+        message.value = t.value.stalled(remaining.value);
+        break;
+      }
+      // 让出一帧，进度文案和「停止」按钮才有机会真的更新和被点到。
+      message.value = t.value.roundProgress(
+        ledger.value?.completed_chunks ?? 0,
+        ledger.value?.total_chunks ?? 0,
+      );
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
+    }
   } catch (cause) {
     error.value = toUserMessage(cause, t.value.backfillFailed);
     await loadLedger();
   } finally {
     busy.value = false;
+    stopRequested.value = false;
   }
 };
 
@@ -416,6 +481,14 @@ const resetLedger = async () => {
       {{ t.wouldBeCleanedUp(requestedDays, prefs?.retention_days ?? 0) }}
     </p>
 
+    <label class="auto-continue">
+      <input v-model="autoContinue" type="checkbox" :disabled="busy" />
+      <span>
+        <strong>{{ t.autoContinue }}</strong>
+        <em>{{ t.autoContinueHint }}</em>
+      </span>
+    </label>
+
     <div class="inline-actions">
       <button
         class="button primary"
@@ -423,6 +496,13 @@ const resetLedger = async () => {
         :disabled="busy || isSyncing || !fromDate || wouldBeCleanedUp || Boolean(estimate?.stop_reason)"
         @click="runBackfill"
       >{{ busy ? t.backfilling : (remaining > 0 ? t.continueBackfill : t.startBackfill) }}</button>
+      <button
+        v-if="busy && autoContinue"
+        class="button secondary"
+        type="button"
+        :disabled="stopRequested"
+        @click="stopBackfill"
+      >{{ stopRequested ? t.stopping : t.stopBackfill }}</button>
       <button
         v-if="ledger?.failed_chunks_detail?.length"
         class="button secondary"
@@ -533,6 +613,11 @@ h2 { margin: 0 0 14px; font-size: 15px; font-weight: 700; color: var(--ink); }
 .kv-label { flex: 0 0 96px; color: var(--muted); font-size: 12px; }
 .retain-note { margin: 6px 0 8px; color: var(--muted); font-size: 12px; line-height: 1.6; }
 .inline-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+/* 「自动跑完」放在按钮正上方：它改变的正是下面那个按钮的行为。 */
+.auto-continue { display: flex; gap: 8px; align-items: flex-start; margin-top: 14px; cursor: pointer; }
+.auto-continue input { margin-top: 3px; flex: none; }
+.auto-continue span { display: flex; flex-direction: column; gap: 2px; }
+.auto-continue em { font-style: normal; font-size: 12px; opacity: .72; line-height: 1.5; }
 .hint-line { display: inline-flex; align-items: center; gap: 6px; margin: 12px 0 0; color: var(--muted); font-size: 12px; }
 .hint-line.ok { color: var(--accent); }
 .api-error { margin: 12px 0 0; color: var(--danger); font-size: 12px; line-height: 1.55; }

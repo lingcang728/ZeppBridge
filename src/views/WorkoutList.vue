@@ -32,6 +32,9 @@ const messages = defineMessages(
     labelDuration: '时长',
     notProvided: '未提供',
     footnote: (count: number) => `${count} 条可展示记录`,
+    shown: (loaded: number, total: number) => `已读取 ${loaded} / 共 ${total} 条`,
+    loadMore: '加载更多',
+    loadingMore: '正在加载…',
   },
   {
     backToRecent: 'Back to recent records',
@@ -50,6 +53,9 @@ const messages = defineMessages(
     labelDuration: 'Duration',
     notProvided: 'Not provided',
     footnote: (count: number) => `${count} records shown`,
+    shown: (loaded: number, total: number) => `Loaded ${loaded} of ${total}`,
+    loadMore: 'Load more',
+    loadingMore: 'Loading…',
   },
 );
 const t = useMessages(messages);
@@ -59,6 +65,18 @@ const workouts = ref<Workout[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
 const displayableList = computed(() => displayableWorkouts(workouts.value));
+/*
+ * 分页，不是上限。见 SleepList.vue 里的同一段说明（Reddit p6zxyo7）。
+ *
+ * 注意这里有两个数字，不能混：`total` 是库里的**全部**运动记录数，
+ * `displayableList.length` 是过滤掉不可展示项之后**这一屏**的条数。所以
+ * 「已读取 X / 共 N」用的是取回来的原始条数，「N 条可展示记录」保持原样。
+ * 把两者混成一句会让人以为应用丢了记录。
+ */
+const PAGE_SIZE = 200;
+const total = ref(0);
+const loadingMore = ref(false);
+const hasMore = computed(() => workouts.value.length < total.value);
 
 function workoutTypeBg(type: string): string {
   const map: Record<string, string> = {
@@ -97,14 +115,34 @@ const loadList = async () => {
   if (!isTauri()) {
     loading.value = false;
     workouts.value = [];
+    total.value = 0;
     return;
   }
   try {
-    workouts.value = displayableWorkouts(await tauriApi.getRecentWorkouts(500));
+    const page = await tauriApi.getWorkoutPage(PAGE_SIZE, 0);
+    // 过滤留给 `displayableList`：这里保留原始条数，否则 offset 会和后端
+    // 的行号对不上，越翻越漏。
+    workouts.value = page.items;
+    total.value = page.total;
   } catch (cause) {
     error.value = toUserMessage(cause, t.value.loadFailed);
   } finally {
     loading.value = false;
+  }
+};
+
+const loadMore = async () => {
+  if (loadingMore.value || !hasMore.value) return;
+  loadingMore.value = true;
+  try {
+    const page = await tauriApi.getWorkoutPage(PAGE_SIZE, workouts.value.length);
+    const seen = new Set(workouts.value.map((item) => item.workout_id));
+    workouts.value = [...workouts.value, ...page.items.filter((item) => !seen.has(item.workout_id))];
+    total.value = page.total;
+  } catch (cause) {
+    error.value = toUserMessage(cause, t.value.loadFailed);
+  } finally {
+    loadingMore.value = false;
   }
 };
 
@@ -140,7 +178,14 @@ watch(dataRevision, () => void loadList());
         :fact-label="workoutFact(workout).label"
       />
     </div>
-    <p v-if="displayableList.length" class="footnote">{{ t.footnote(displayableList.length) }}</p>
+    <div v-if="hasMore" class="load-more">
+      <button class="button button-secondary" type="button" :disabled="loadingMore" @click="loadMore">
+        {{ loadingMore ? t.loadingMore : t.loadMore }}
+      </button>
+    </div>
+    <p v-if="displayableList.length" class="footnote">
+      {{ t.shown(workouts.length, total) }} · {{ t.footnote(displayableList.length) }}
+    </p>
   </section>
 </template>
 
@@ -156,6 +201,7 @@ watch(dataRevision, () => void loadList());
   text-decoration: none;
 }
 .back-link:hover { color: var(--accent); }
+.load-more { display: flex; justify-content: center; margin-top: 12px; }
 .footnote {
   margin: 12px 0 0;
   color: var(--muted);

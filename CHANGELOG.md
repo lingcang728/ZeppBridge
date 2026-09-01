@@ -2,7 +2,52 @@
 
 本文件记录每个版本的实际改动。写给使用者看，不是施工日志：只写用户能感知到的变化，以及为什么这么改。
 
-## 1.2.0
+## 2.0.0
+
+### Added / 新增
+
+- **The history list is no longer capped at 500 records.** With a full history downloaded, everything past the 500th record had no way into the app at all — the query had a limit and no offset, so the rest of your library existed on disk and nowhere on screen. Workout and sleep lists now page through the whole thing with a *Load more* button and say how many of the total you are looking at.
+- **历史列表不再只显示最近 500 条。** 把全部历史下载下来之后，第 501 条往后的记录在应用里根本没有入口——查询只有上限没有偏移，于是剩下的记录存在磁盘上，却在界面上不存在。运动和睡眠列表现在能一直往下翻，底部有「加载更多」，并写明当前显示了总数里的多少条。
+- **A history backfill can run itself to the end.** It used to hand back control after each round, so filling in years of history meant pressing *Start backfilling* every few minutes for an hour. There is now a *Run to completion* switch (on by default): each round starts the next until the range is done. You can stop at any point, nothing already fetched is lost, and if a round moves nothing it stops on its own and says so instead of spinning until morning.
+- **补拉历史可以自己跑完。** 以前每跑完一轮就把控制权交回来，于是补几年的历史意味着一个小时里每隔几分钟点一次「开始补拉」。现在有一个「自动跑完」开关（默认打开）：一轮结束自动接上下一轮，直到整个范围做完。随时可以停，已经拉回来的一条都不会丢；而一轮下来一块都没推进时，它会自己停下来说明原因，而不是转到天亮。
+- **A plain *Log out*, where you would look for it.** The only way out was called *Clear credentials* and lived at the bottom of Advanced — which reads like it might delete your data, so nobody pressed it. It is now on the account card, says in as many words that only the sign-in is cleared and every synced record stays, and states plainly that switching between accounts is not supported yet.
+- **一个就叫「退出账号」的按钮，而且在你会去找它的地方。** 以前唯一的出口叫「清除认证」，藏在高级设置的最底下——那听起来像是会把数据删掉，所以没人敢点。它现在在账户卡片上，明说只清除登录、已同步的记录一条不动，并且直白地写出暂不支持多账号切换。
+- **Daily peak heart rate, from the raw samples.** The Zepp app filters its daily peak — one report had it showing 104 on a day whose raw readings went past 120. The heart rate page now charts the peak, average and low of the samples actually stored on this machine, day by day. Days with very few samples are drawn as hollow markers and counted out loud, because the "peak" of twelve readings is not that day's peak. Zepp's own daily figure is never sent to us, so there is nothing to place beside it; the page says that rather than implying a comparison it cannot make.
+- **每日最高心率，取自原始样本。** Zepp App 显示的日最高心率是过滤过的——有一份报告里，某天 App 显示 104，而原始读数超过 120。心率页现在按天画出本机实际存着的样本的最高、平均和最低值。样本很少的那几天画成空心点并单独点出来，因为十二个读数里的「最高」不是那一天的最高。Zepp 自己的那个日数值从来没有被送到我们这里，所以没有东西可以并排放；页面把这件事说出来，而不是暗示一个它做不到的对照。
+- **Sixteen more Amazfit models are recognised by number alone.** Balance 3, Active 3 Premium and T-Rex Ultra 2 join the built-in catalog, from device numbers that two or more people independently identified. Codes that are still contradicted, or that only one person has reported, are deliberately left out.
+- **又有一批 Amazfit 型号能只凭编号认出来。** Balance 3、Active 3 Premium 和 T-Rex Ultra 2 进入内置目录，依据是两份以上互相独立的用户指认。仍然互相矛盾的编号，以及只有一份报告的编号，刻意不收。
+- **The MCP server speaks the 2026-07-28 protocol as well as the old one.** That revision removed the `initialize` handshake entirely and added `server/discover`; a client that follows it strictly could not connect at all. Both eras now work off the same server, so nothing you have configured needs changing.
+- **MCP 服务同时支持 2026-07-28 和旧版协议。** 那一版把 `initialize` 握手整个取消了，并新增 `server/discover`；严格按新协议说话的客户端此前根本连不上。现在两个时代走同一个服务，你已经配好的东西不用动。
+
+### Fixes / 修复
+
+- **A sync that lost a whole data stream no longer reports success.** Only heart rate, daily summary and workouts counted towards the outcome. If sleep, HRV, wellness or workout detail genuinely failed, the app still said *Updated* or *No new data* — the screen was telling you everything was fine while a stream was missing. Any real failure is now *Partial*, and names which streams failed. A stream your watch simply does not provide still counts as neutral, not a failure.
+- **整条数据流丢了的同步不再报成功。** 以前只有心率、每日汇总和运动记录参与判定。睡眠、HRV、健康指标或运动明细真的失败时，界面照样显示「已更新」或「没有新数据」——屏幕上说一切正常，而事实上少了一整条流。现在任何真实失败都会显示为「部分完成」，并说明是哪几条流失败了。你的表本来就不提供的那一项仍然算中性，不算失败。
+- **A sleep stage we do not recognise is no longer called *awake*.** Unknown stage codes were mapped to awake so the stage bar would have no gaps — which meant the app was telling you that you were awake during a stretch nobody had verified. Those stretches are now drawn as *Unknown*, and the raw code from the cloud is kept so the next one can actually be identified.
+- **认不出来的睡眠阶段不再被写成「清醒」。** 未知的阶段编码以前一律归为清醒，好让阶段条不出现空洞——代价是应用在替你断言一段没有任何人验证过的时间里你醒着。那些片段现在画成「未知」，并保留云端给的原始编码，好让下一次真的能查出它是什么。
+- **A corrupt reading in a workout no longer shifts the ones after it.** An unparseable time delta was quietly read as zero, which put that sample on the same timestamp as the previous one — the sample count still looked right while pace, power and split were wrong. Unreadable rows are now skipped.
+- **运动记录里的一个坏读数不再挪动它后面的读数。** 解析不了的时间增量以前被安静地当成 0，于是这个样本和上一个落到了同一个时间戳上——采样数看着是对的，而配速、功率和分段是错的。现在读不懂的行会被跳过。
+- **Syncs that failed once and worked on the second press should be rarer.** A legitimate redirect used to eat one of the three network retries, and a rate-limited or overloaded response was retried after 50 ms whatever the server asked for. Redirects and retries now have separate budgets, and a `Retry-After` from the server is honoured, with exponential backoff and jitter otherwise.
+- **「有时候同步失败，再点一次又好了」应该会少很多。** 一次合法的跳转以前会吃掉三次网络重试中的一次；而被限流或服务器过载的响应，不管对方说等多久，都只等 50 毫秒就重试。现在跳转和重试各记各的预算，服务器给的 `Retry-After` 会被尊重，没给时用指数退避加抖动。
+- **Cancelling a sync now takes effect immediately.** Cancel was only checked between streams, so a request already in flight ran to its own 35-second timeout — on a bad connection you could watch the app spin for a while after pressing stop.
+- **取消同步现在立刻生效。** 以前只在两条数据流之间检查取消，已经发出去的请求要等满自己 35 秒的超时——网络差的时候，按下取消之后还得看着应用转一会儿。
+- **When the token cannot be saved, the app now tells you what to do about it.** A blocked or disabled credential store produced a red line and nothing else. It now names the likely causes and points at entering the App Token by hand, or the HAR import — neither of which depends on that automatic save.
+- **令牌存不下去的时候，应用现在会告诉你怎么办。** 凭据管理器被禁用或被挡住时，以前只有一行红字，然后没有下文。现在会说明可能的原因，并指向「手动填写 App Token」和 HAR 导入——这两条路都不依赖那次自动保存。
+- **The local API no longer lets one slow client block another.** Connections were handled one at a time, so a client that connected and then said nothing held everything else up until its read timed out. There is now a small pool of workers. Separately, saving the local API on/off switch could fail silently, leaving the screen saying it was on while the setting vanished on restart; that write is now atomic and reports failure.
+- **本机 API 不再让一个慢客户端堵住另一个。** 连接以前是一个一个串行处理的，于是一个连上来却不说话的客户端能把其他人挡到它自己读超时为止。现在有一个小的工作线程池。另外，本机 API 开关的保存以前可能静默失败，界面显示已开启而设置在重启后消失；那次写入现在是原子的，失败会报出来。
+
+### Changed / 变更
+
+- **Linux packages are published for the first time — as a preview.** `.deb`, `.rpm`, AppImage and Flatpak are all built and attached to this release, and the download page lists them. They are marked preview on purpose: CI builds and tests every one of them, but **nobody has yet completed sign-in plus keyring (Secret Service / KWallet) on a real Linux desktop.** Please open an issue when something breaks — that is exactly what it needs.
+- **首次发布 Linux 安装包——标为实验性。** `.deb`、`.rpm`、AppImage 和 Flatpak 都会随这次发布一起附上，下载页也会列出它们。标成实验性是有意的：CI 会把每一种都构建出来并跑测试，但**还没有任何人在真实的 Linux 桌面上完整走通登录加密钥环（Secret Service / KWallet）。** 遇到问题请开 issue——那正是它现在最需要的。
+- **The export page now says what an export contains before you press it.** One report expected per-workout `.fit` files and found summaries instead. The page and the README now list what is included and what is not. `.fit` is not among it: the fields Zepp's cloud returns are not enough to reconstruct one honestly, and ZeppBridge will not write a file that claims to be something it is not.
+- **导出页现在会在你按下之前说明导出包里有什么。** 有一份报告本来期待拿到每次训练的 `.fit` 文件，结果只有摘要。页面和 README 现在都列出包含什么、不包含什么。`.fit` 不在其中：Zepp 云端返回的字段不足以诚实地还原一份 FIT，而 ZeppBridge 不会写一个自称是它并不是的东西的文件。
+- **The "syncing the last N days" line now matches what actually happens.** The incremental window moved to 30 days a while back; the interface kept saying 7. It now reads the number from the same contract value the backend uses.
+- **「正在同步最近 N 天」这句话现在和实际发生的事一致了。** 增量窗口早就改成 30 天，界面却一直说 7。它现在从后端用的同一个契约值里读这个数字。
+- **The feedback endpoint drops duplicate submissions and limits how fast one source can add new ones.** The risk was never disk space — it is that device and workout codes are only accepted once two independent reports agree, and repeated submissions make any code look well-attested. Submitting the same report twice now returns the first report's id instead of storing a second copy. What is stored for rate limiting is a salted, daily-rotating hash, never an address.
+- **反馈接口会去掉重复提交，并限制同一个来源添加新内容的速度。** 风险从来不是磁盘空间——而是设备编号和运动编号的收录规则是「至少两份互相独立的报告」，重复提交会让任何一个编号看起来都很有依据。同一份内容提交两次现在会返回第一份的 id，而不是存第二份。为限流存下的是一个加盐、每天轮换的哈希，绝不是地址。
+- **Diagnostic reports can now carry "which Zepp code you corrected, and to what".** A workout being recognised as the wrong sport looked identical to one not being recognised at all — both arrived with no code information whatsoever, which is why [#24](https://github.com/lingcang728/ZeppBridge/issues/24) has been impossible to act on. The report now carries the code, our reading of it and yours, with no workout id, time, distance or GPS attached.
+- **诊断报告现在能带上「你把哪个 Zepp 编号纠正成了什么」。** 一次运动被认成了别的运动，和它压根没被认出来，在报告里长得一模一样——两者都不带任何编号信息，这正是 [#24](https://github.com/lingcang728/ZeppBridge/issues/24) 一直推不动的原因。报告现在会带上编号、我们的解释和你的解释，不含 workout id、时间、距离或 GPS。
 
 ### Added / 新增
 

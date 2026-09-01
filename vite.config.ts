@@ -10,11 +10,22 @@ import vue from "@vitejs/plugin-vue";
  * 旧包——已经因此来回三次了。
  */
 const buildStamp = () => {
+  // @ts-expect-error process is a nodejs global
+  const injected: string | undefined = process.env.ZEPPBRIDGE_BUILD_SHA;
   let sha = "unknown";
-  try {
-    sha = execSync("git rev-parse --short HEAD", { encoding: "utf8" }).trim();
-  } catch {
-    // 不在 git 工作树里（比如从压缩包构建）时就留 unknown，不要让构建失败。
+  if (injected && injected.trim()) {
+    // CI 显式传进来的 SHA 优先。
+    //
+    // 光靠 `git rev-parse` 会在两种真实情况下静默退化成 "unknown"：Flatpak
+    // 的构建沙箱、以及从压缩包构建。而 Flatpak 恰恰是最没被实机验证过的
+    // 渠道，最需要能从用户的报告里定位到具体那一次构建。
+    sha = injected.trim().slice(0, 7);
+  } else {
+    try {
+      sha = execSync("git rev-parse --short HEAD", { encoding: "utf8" }).trim();
+    } catch {
+      // 不在 git 工作树里时就留 unknown，不要让构建失败。
+    }
   }
   // 用本地时间，不用 UTC：这一行是给人对着自己的钟看的。
   const now = new Date();
