@@ -37,10 +37,34 @@ pub struct StreamReport {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncReport {
+    /// 这一次同步有没有整体成功。
+    ///
+    /// **任何一个数据流真的 `Failed` 都会让它变成 false**，不只是那三个核心
+    /// 流。以前它只看 `heart_rate` / `daily_summary` / `workouts`，于是 sleep
+    /// 或 hrv 真的取失败时，界面照样显示「已更新」或者「没有新数据」——程序
+    /// 表面告诉用户一切正常，底层事实已经缺了一整条流。
+    ///
+    /// `Unavailable` / `Unverified` **不算失败**：用户的表本来就可能不提供
+    /// HRV，那是能力边界，不是错误。
     pub success: bool,
+    /// 三个核心流（`heart_rate` / `daily_summary` / `workouts`）有没有全都没
+    /// 失败。用来决定「凭据是否算验证通过」和「要不要跑 retention 清理」这
+    /// 两件事——它们关心的是主干数据通没通，不是每一条支流。
+    pub core_ok: bool,
     pub streams: Vec<StreamReport>,
     pub records_written: i64,
     pub message: Option<String>,
+}
+
+/// 这三条是核心流。缺了它们这个应用没有存在意义；其余的是支流。
+///
+/// 注意它只用来判断 `core_ok`。**判断 `success` 时不分主次**——支流失败
+/// 一样是失败，只是不至于让整次同步降级成 `failed`。
+const CORE_STREAMS: [&str; 3] = ["heart_rate", "daily_summary", "workouts"];
+
+/// 某个流名是不是核心流。
+pub fn is_core_stream(stream: &str) -> bool {
+    CORE_STREAMS.contains(&stream)
 }
 
 pub struct SyncManager {
@@ -169,10 +193,14 @@ impl SyncManager {
 
     /// Compatibility command surface. A report containing failed core streams
     /// is converted to an error, so callers cannot display false success.
+    ///
+    /// 这里看的是 `core_ok` 而不是 `success`：这个入口只有「Ok 或者 Err」两
+    /// 种表达，把一条支流失败升级成硬错误会让调用方以为什么都没拿到。要看
+    /// 完整结果的用 `initial_sync_report`。
     #[allow(dead_code)]
     pub async fn initial_sync(&self) -> Result<()> {
         let report = self.initial_sync_report().await?;
-        if report.success {
+        if report.core_ok {
             Ok(())
         } else {
             Err(ZeppBridgeError::DataUnavailable(
@@ -203,10 +231,11 @@ impl SyncManager {
         self.sync_report(days, Some(&on_progress)).await
     }
 
+    /// 同 `initial_sync`：这个入口只表达核心流通没通。
     #[allow(dead_code)]
     pub async fn incremental_sync(&self) -> Result<()> {
         let report = self.incremental_sync_report().await?;
-        if report.success {
+        if report.core_ok {
             Ok(())
         } else {
             Err(ZeppBridgeError::DataUnavailable(
@@ -218,7 +247,8 @@ impl SyncManager {
     }
 
     pub async fn incremental_sync_report(&self) -> Result<SyncReport> {
-        self.sync_report(30, None).await
+        self.sync_report(crate::contract::INCREMENTAL_SYNC_DAYS, None)
+            .await
     }
 
     pub async fn incremental_sync_report_with_progress<F>(
@@ -228,7 +258,8 @@ impl SyncManager {
     where
         F: Fn(SyncProgress) + Send + Sync,
     {
-        self.sync_report(30, Some(&on_progress)).await
+        self.sync_report(crate::contract::INCREMENTAL_SYNC_DAYS, Some(&on_progress))
+            .await
     }
 
     async fn sync_report(
@@ -377,15 +408,20 @@ impl SyncManager {
             }
         }
 
-        let core_failed = streams.iter().any(|report| {
-            matches!(
-                report.stream.as_str(),
-                "heart_rate" | "daily_summary" | "workouts"
-            ) && report.status == StreamStatus::Failed
-        });
-        let success = !core_failed;
+        // 真正失败的流。`Unavailable` / `Unverified` 不在其中：那是「这块表
+        // 没有这个能力」，不是「取失败了」。
+        let failed: Vec<String> = streams
+            .iter()
+            .filter(|report| report.status == StreamStatus::Failed)
+            .map(|report| report.stream.clone())
+            .collect();
+        let core_failed = failed.iter().any(|stream| is_core_stream(stream));
+        let core_ok = !core_failed;
+        // 一条支流失败也是失败。以前这里只看核心流，sleep 取挂了界面照样
+        // 报「已更新」。
+        let success = failed.is_empty();
         let total_written = streams.iter().map(|report| report.records_written).sum();
-        if success {
+        if core_ok {
             let db = self.db.lock().await;
             let prefs = db.user_prefs()?;
             // 开了长期归档就不再自动清理。刚补拉回来的历史在下一次成功同步后
@@ -396,10 +432,14 @@ impl SyncManager {
         }
         Ok(SyncReport {
             success,
+            core_ok,
             streams,
             records_written: total_written,
             message: if core_failed {
                 Some("至少一个核心数据流失败；同步未报告成功".into())
+            } else if !failed.is_empty() {
+                // 说清是哪几条。「部分失败」不告诉用户少了什么，等于没说。
+                Some(format!("以下数据流失败：{}", failed.join("、")))
             } else {
                 None
             },

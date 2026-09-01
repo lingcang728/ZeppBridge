@@ -39,6 +39,14 @@ export interface AppStatus {
   database_path?: string;
   retention_days: number;
   history_sync_days?: number;
+  /**
+   * 一次增量同步往回拉多少天。契约值来自后端
+   * （`zeppbridge_core::contract::INCREMENTAL_SYNC_DAYS`）。
+   *
+   * 界面上那句「正在同步最近 N 天」的 N 只能从这里来。写死过一次，后端从
+   * 7 改成 30 之后界面整整一个版本还在说 7。
+   */
+  incremental_sync_days?: number;
   storage?: StorageEstimate;
   /** 本机实际有数据的那段日子。界面上每个「最近 N 天」读的都是本机库。 */
   coverage?: LocalCoverage;
@@ -950,4 +958,31 @@ export interface HeartRateZoneOptions {
   /** Present only once the preference names a model and its bases. */
   report?: HeartRateZoneReport | null;
   windowDays: number;
+}
+
+/**
+ * 一页记录 + 本机总条数。
+ *
+ * 总数是分页的另一半：没有它，界面只能说「显示了 500 条」，说不出
+ * 「共 2317 条」——而用户问的恰恰是「剩下的呢」（Reddit p6zxyo7）。
+ */
+export interface Page<T> {
+  items: T[];
+  total: number;
+}
+
+/**
+ * 某一天原始心率样本的极值和样本数。
+ *
+ * Zepp App 显示的日最高心率是过滤过的；这里给的是本机原始样本的按日 max，
+ * 不做过滤。`samples` 必须一起用：一天只有十几个样本时，那个「最高」只是
+ * 这十几个点里的最高，把它当成完整最大值展示就是在编造事实。
+ */
+export interface DailyHeartRateExtreme {
+  /** 本地时区的日期，`YYYY-MM-DD`。 */
+  date: string;
+  max: number;
+  min: number;
+  average: number;
+  samples: number;
 }

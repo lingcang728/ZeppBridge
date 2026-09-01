@@ -43,6 +43,11 @@ pub struct AppStatus {
     pub database_path: Option<String>,
     pub retention_days: i64,
     pub history_sync_days: i64,
+    /// 一次增量同步往回拉多少天。
+    ///
+    /// 界面那句「正在同步最近 N 天」的 N 从这里来，**不许在前端写死**。它从
+    /// 7 改成 30 的时候，只有后端跟着改了，界面上整整一个版本都还在说 7。
+    pub incremental_sync_days: i64,
     pub storage: Option<crate::models::StorageEstimate>,
     /// 本机实际有数据的那段日子。界面上每一个「最近 N 天」选择器读的都是本机
     /// 库，所以每一个都需要知道这个，才不会把「库里没有」画成「那几个月你没动」。

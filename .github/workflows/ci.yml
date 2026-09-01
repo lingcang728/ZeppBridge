@@ -15,6 +15,19 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # 构建标记里的短 SHA。
+  #
+  # vite.config.ts 优先读它，读不到才退回 `git rev-parse`。而 `git rev-parse`
+  # 在两种真实情况下会安静地变成 "unknown"：构建沙箱里没有 .git，以及从
+  # 压缩包构建。设置页上那一行是「同一个版本号构建了很多次，你手上是哪一
+  # 个」的唯一答案——它一旦变成 unknown，一份「我还是看到旧行为」的报告就
+  # 没法定位到具体构建。
+  #
+  # 放在 workflow 层：每一个跑 `npm run build` 或 `tauri build` 的作业都要
+  # 它，一处漏掉的代价是那个渠道的产物无法追溯，而 CI 是绿的。
+  ZEPPBRIDGE_BUILD_SHA: ${{ github.sha }}
+
 jobs:
   verify:
     name: Windows verification
@@ -28,7 +41,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Set up Rust
@@ -96,7 +109,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Set up Rust
@@ -235,7 +248,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Set up Rust
@@ -278,7 +291,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Set up Rust
@@ -382,7 +395,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Set up Rust
@@ -452,7 +465,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Set up Rust

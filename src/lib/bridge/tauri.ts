@@ -3,6 +3,8 @@ import { listen } from '@tauri-apps/api/event';
 import { DesktopUnavailableError } from './errors';
 import type { BridgeBackend, UnlistenFn } from './types';
 import type {
+  DailyHeartRateExtreme,
+  Page,
   AppStatus,
   AiHandoffResult,
   AuthInfo,
@@ -135,6 +137,11 @@ export const tauriBackend: BridgeBackend = {
     return call('get_training_load_series', { days });
   },
 
+  /** 按天的原始心率极值 + 样本数。见 `DailyHeartRateExtreme` 的说明。 */
+  getDailyHeartRateExtremes(days: number) {
+    return call<DailyHeartRateExtreme[]>('get_daily_heart_rate_extremes', { days });
+  },
+
   getMetricSeries(metrics: string[], days: number) {
     return call<MetricSeries[]>('get_metric_series', { metrics, days });
   },
@@ -175,12 +182,22 @@ export const tauriBackend: BridgeBackend = {
     return call<SleepSession[]>('get_recent_sleep', { limit });
   },
 
+  /** 一页睡眠记录 + 本机总条数。单页上限 500，`offset` 不设上限。 */
+  getSleepPage(limit: number, offset: number) {
+    return call<Page<SleepSession>>('get_sleep_page', { limit, offset });
+  },
+
   getSleepDetail(sleepId: string) {
     return call<SleepSession | null>('get_sleep_detail', { sleepId });
   },
 
   getRecentWorkouts(limit = 500) {
     return call<Workout[]>('get_recent_workouts', { limit });
+  },
+
+  /** 一页运动记录 + 本机总条数。 */
+  getWorkoutPage(limit: number, offset: number) {
+    return call<Page<Workout>>('get_workout_page', { limit, offset });
   },
 
   getWorkoutDetail(workoutId: string) {

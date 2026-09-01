@@ -529,6 +529,18 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(16, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // 睡眠阶段的原始 mode 值。
+        //
+        // 认不出来的 mode 以前被归成 `awake`，现在归成 `unknown`——但只知道
+        // 「有一段认不出来」推不动任何事。留下云端给的那个数字，下一次才有
+        // 得查。旧行 `NULL`：它们是在这一列存在之前写进去的，谎称一个值和
+        // 当初谎称 `awake` 是同一个错误。
+        self.ensure_table_columns("sleep_stages", &[("raw_mode", "INTEGER")])?;
+        self.conn.execute_batch("PRAGMA user_version = 17;")?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(17, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         // Earlier migrations are intentionally idempotent and still stamp
         // their historical versions on every launch, so the current schema
         // marker is restored only after all of them have run.

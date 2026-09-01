@@ -792,6 +792,12 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
           <p class="col-title big">{{ t.packTitle }}</p>
           <p class="col-sub">{{ t.packSub }}</p>
 
+          <details class="pack-contents">
+            <summary>{{ t.packContentsTitle }}</summary>
+            <p>{{ t.packContentsIncluded }}</p>
+            <p>{{ t.packContentsExcluded }}</p>
+          </details>
+
           <p class="group-label">{{ t.formatGroup }}</p>
           <div class="format-grid" role="radiogroup" :aria-label="t.formatAria">
             <button
@@ -1197,6 +1203,11 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 
 /* 右列 */
 .group-label { margin: 0 0 8px; color: var(--ink); font-size: 12px; font-weight: 700; }
+/* 折叠而不是常驻：大多数人不需要读它，但需要读的时候必须在按下导出**之前**
+   就能找到（issue #28）。 */
+.pack-contents { margin: 0 0 14px; }
+.pack-contents summary { color: var(--accent); cursor: pointer; font-size: 12px; font-weight: 600; }
+.pack-contents p { margin: 8px 0 0; color: var(--subtle); font-size: 11px; line-height: 1.65; }
 .group-row { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; }
 .group-row .group-label { margin: 0; }
 .format-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 4px; }

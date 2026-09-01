@@ -72,3 +72,51 @@ test('fails closed when GitHub is unavailable', async (context) => {
   assert.equal(response.status, 502);
   assert.deepEqual(await response.json(), { error: 'latest_release_unavailable' });
 });
+
+test('linux packages are optional, and marked preview when present', () => {
+  // 1.1.5 及之前的发布里没有 Linux 包。把它们当成必需资产的话，这段代码
+  // 一部署 /api/release 就会对着还挂在 latest 上的旧版整个 502——下载页会
+  // 在新版发布之前先坏掉。
+  const withoutLinux = projectLatestRelease(releaseFixture());
+  assert.equal(withoutLinux.downloads.linuxDeb, undefined);
+  assert.equal(withoutLinux.downloads.windowsExe.url, 'https://example.test/windows.exe');
+
+  const fixture = releaseFixture();
+  fixture.assets.push(
+    {
+      name: 'ZeppBridge_1.1.2_amd64.deb',
+      browser_download_url: 'https://example.test/linux.deb',
+      size: 12_000_000,
+      digest: 'sha256:deb',
+    },
+    {
+      name: 'ZeppBridge_1.1.2_x86_64.rpm',
+      browser_download_url: 'https://example.test/linux.rpm',
+      size: 12_100_000,
+      digest: 'sha256:rpm',
+    },
+    {
+      name: 'ZeppBridge_1.1.2_x86_64.AppImage',
+      browser_download_url: 'https://example.test/linux.AppImage',
+      size: 90_000_000,
+      digest: 'sha256:appimage',
+    },
+    {
+      name: 'ZeppBridge_1.1.2_x86_64.flatpak',
+      browser_download_url: 'https://example.test/linux.flatpak',
+      size: 31_000_000,
+      digest: 'sha256:flatpak',
+    },
+  );
+
+  const result = projectLatestRelease(fixture);
+  assert.equal(result.downloads.linuxDeb.url, 'https://example.test/linux.deb');
+  assert.equal(result.downloads.linuxFlatpak.digest, 'sha256:flatpak');
+  // preview 标记跟着数据走，不是写死在下载页上——写死的话，等哪天真的验证
+  // 过了，没人会记得回去删那句话。
+  for (const key of ['linuxDeb', 'linuxRpm', 'linuxAppImage', 'linuxFlatpak']) {
+    assert.equal(result.downloads[key].preview, true, `${key} 应当标为 preview`);
+  }
+  // Windows 和 macOS 不是 preview。
+  assert.equal(result.downloads.windowsExe.preview, undefined);
+});

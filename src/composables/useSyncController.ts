@@ -31,7 +31,7 @@ const messages = defineMessages(
     reauthNeeded: '认证已失效，请重新连接 Zepp',
     verifyFirst: '请先完成连接验证',
     connectFirst: '请先连接 Zepp',
-    syncingRecent: '正在同步最近 7 天…',
+    syncingRecent: (days: number) => `正在同步最近 ${days} 天…`,
     backfilling: (days: number) => `正在补拉最近 ${days} 天…`,
     syncDidNotFinish: '云端同步未完成',
     cancelling: '正在取消同步…',
@@ -62,7 +62,7 @@ const messages = defineMessages(
     reauthNeeded: 'Your Zepp session expired. Connect again',
     verifyFirst: 'Verify the connection first',
     connectFirst: 'Connect to Zepp first',
-    syncingRecent: 'Syncing the last 7 days…',
+    syncingRecent: (days: number) => `Syncing the last ${days} days…`,
     backfilling: (days: number) => `Backfilling the last ${days} days…`,
     syncDidNotFinish: 'The cloud sync did not finish',
     cancelling: 'Cancelling the sync…',
@@ -123,6 +123,15 @@ let initialized = false;
 let runningSync: Promise<SyncReport | null> | null = null;
 let autoSyncTickCount = 0;
 const unlisteners: Array<() => void> = [];
+/**
+ * 自动同步那个每分钟一跳的定时器。
+ *
+ * 以前 `setInterval` 的返回值直接丢掉了，于是 `initialize()` 每被调一次就多
+ * 出一个永远清不掉的定时器：HMR、窗口重建、或者以后哪次 composable 被重新
+ * 初始化，就会有两个自动同步同时在跑。监听器那边本来就会先解绑再重注册，
+ * 定时器却漏了——这里补上，并由 `dispose()` 统一收口。
+ */
+let autoSyncTimer: number | null = null;
 
 const formatTime = (value?: string): string => {
   if (!value) return copy().timeUnknown;
@@ -167,20 +176,33 @@ const renderReport = (
   return t.failed;
 };
 
+/**
+ * 增量同步往回拉多少天。
+ *
+ * 从后端状态读，**不在这里写死**。它曾经写死成 7：后端改成 30 之后，界面
+ * 整整一个版本都还在说「正在同步最近 7 天」——用户看到的数字和程序做的事
+ * 不是一回事，而这种漂移不会让任何测试变红。契约值在
+ * `zeppbridge_core::contract::INCREMENTAL_SYNC_DAYS`。
+ *
+ * 状态还没到手时（第一次同步的头几百毫秒）用 30 兜底：那是当前的契约值，
+ * 而这一句话本来就是过渡态的提示。
+ */
+const incrementalSyncDays = () => appStatus.value?.incremental_sync_days ?? 30;
+
 const renderNotice = (value: SyncNotice): string => {
   const t = copy();
   switch (value.kind) {
     case 'none': return t.notSyncedYet;
-    case 'backend': return backendText(value.text, t.syncingRecent);
+    case 'backend': return backendText(value.text, t.syncingRecent(incrementalSyncDays()));
     case 'progress': {
       const stream = syncStreamLabel(value.stream);
       if (value.code === 'backfilling' && value.month) return t.backfillingStream(stream, value.month);
       if (value.code === 'backfilling') return t.syncingStream(stream);
       if (value.code === 'syncing') return t.syncingStream(stream);
       // 后端加了新的一步而界面还不认识它：英文界面下不吐中文，给一句笼统的。
-      return backendText(value.text, t.syncingRecent);
+      return backendText(value.text, t.syncingRecent(incrementalSyncDays()));
     }
-    case 'syncingRecent': return t.syncingRecent;
+    case 'syncingRecent': return t.syncingRecent(incrementalSyncDays());
     case 'backfilling': return t.backfilling(value.days);
     case 'alreadySyncing': return t.alreadySyncing;
     case 'desktopOnly': return t.desktopOnly;
@@ -387,10 +409,25 @@ const setAutoSyncInterval = (minutes: number) => {
   writeAutoSyncSettings({ enabled: autoSyncEnabled.value, intervalMinutes: minutes });
 };
 
+/**
+ * 释放这个 composable 持有的全部长生命周期资源。
+ *
+ * 监听器和定时器走同一个出口：分散在两处时，加第三样东西的人只会记得其中
+ * 一个。调用它之后再 `initialize()` 是安全的。
+ */
+const dispose = () => {
+  for (const unlisten of unlisteners.splice(0)) unlisten();
+  if (autoSyncTimer !== null) {
+    window.clearInterval(autoSyncTimer);
+    autoSyncTimer = null;
+  }
+  initialized = false;
+};
+
 const initialize = async () => {
   if (initialized) {
-    // Re-entry: tear down previously registered listeners before re-registering.
-    for (const unlisten of unlisteners.splice(0)) unlisten();
+    // 重入：先把上一轮注册的监听器和定时器全部拆掉，再重新注册。
+    dispose();
   }
   initialized = true;
   if (isDesktop()) {
@@ -438,7 +475,7 @@ const initialize = async () => {
       // Login status is optional at startup.
     }
     // Fixed 1-minute tick; interval changes take effect without rebuilding the timer.
-    window.setInterval(() => {
+    autoSyncTimer = window.setInterval(() => {
       autoSyncTickCount += 1;
       if (autoSyncEnabled.value && appStatus.value?.connection_state === 'connected') {
         if (autoSyncTickCount >= autoSyncInterval.value) {
@@ -494,4 +531,5 @@ export const useSyncController = () => ({
   setAutoSyncEnabled,
   setAutoSyncInterval,
   markDataChanged,
+  dispose,
 });

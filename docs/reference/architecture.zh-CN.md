@@ -2,7 +2,7 @@
 
 [English](architecture.md)
 
-本文描述 v1.1.5 的产品边界与当前实现。使用入口见项目 [README](../../README.zh-CN.md)，工程门禁见 [开发文档](../development/development.zh-CN.md)。
+本文描述 v2.0.0 的产品边界与当前实现。使用入口见项目 [README](../../README.zh-CN.md)，工程门禁见 [开发文档](../development/development.zh-CN.md)。
 
 ## 产品边界
 
@@ -30,7 +30,7 @@ Zepp 区域云端 → ZeppConnector → Raw provenance → Normalizer → SQLite
 - 前端只调用 `start_web_login` / `cancel_web_login` / `get_login_status`，并监听 `login://status`。载荷为 `{ state, message, page_url, code }`。
 - app token 存在平台凭据存储（Windows Credential Manager / macOS 钥匙串）；`auth.json` 只保留非敏感元数据。
 - 已保存认证在应用重启后直接恢复为「已配置」；启动后会尝试 `verify_auth`。只有明确 401/403 或 `needs_reauth` 才要求重新连接。
-- 首次/历史同步覆盖用户选择的 1–365 天（默认 30）；增量同步带 7 天重叠窗口。单例同步控制器统一顶部「立即同步」、设置页、启动同步、15 分钟自动检查、并发锁和页面刷新。
+- 首次/历史同步覆盖用户选择的 1–365 天（默认 30）；增量同步带 30 天重叠窗口（契约值 `zeppbridge_core::contract::INCREMENTAL_SYNC_DAYS`，经 `AppStatus.incremental_sync_days` 给界面用——别的地方不许再写死这个数字）。单例同步控制器统一顶部「立即同步」、设置页、启动同步、15 分钟自动检查、并发锁和页面刷新。
 - 同步结果区分 `updated`、`no_new_data`、`partial`、`failed`；云端拉取时间与各数据流最新样本时间分别保存和显示。本地重解析不会改变云端同步时间。
 
 ### SQLite 与数据语义

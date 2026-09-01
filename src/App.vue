@@ -83,7 +83,7 @@ const t = useMessages(messages);
 
 // 桌面端从 Tauri 运行时读取版本（与 tauri.conf.json 单一来源），
 // 浏览器预览环境回退到下面的常量（与 package.json 保持同步）。
-const FALLBACK_APP_VERSION = '1.1.5';
+const FALLBACK_APP_VERSION = '2.0.0';
 /* 构建标识。同一个版本号会构建很多次，光看版本号分不清手上是哪一个。 */
 const BUILD_STAMP = __BUILD_STAMP__;
 const APP_VERSION = ref(FALLBACK_APP_VERSION);
@@ -110,8 +110,14 @@ const trayHint = ref(false);
 const {
   appStatus, statusError, syncState, syncMessage, syncProgress, isSyncing, canIncrementalSync,
   compacting, compactionPending, compactionSaved,
-  dataRevision, initialize, runSync, cancelSync,
+  dataRevision, initialize, runSync, cancelSync, dispose: disposeSyncController,
 } = useSyncController();
+/* 这个组件自己注册的 Tauri 监听器的解绑函数。
+
+   `backend.listen` 返回的是一个 unlisten——以前这里直接 `void` 掉了。单次
+   启动感觉不到，但 HMR 和窗口重建会让同一个事件挂上第二个监听器，托盘提示
+   就会连着弹两次。 */
+const ownUnlisteners: Array<() => void> = [];
 const { initializeScale, bumpScale, resetScale } = useUiScale();
 const {
   models: deviceModels,
@@ -242,6 +248,10 @@ onMounted(() => {
       window.localStorage.setItem('zeppbridge-tray-hint', '1');
       trayHint.value = true;
       window.setTimeout(() => { trayHint.value = false; }, 6000);
+    }).then((unlisten) => {
+      if (typeof unlisten === 'function') ownUnlisteners.push(unlisten);
+    }).catch(() => {
+      // 托盘提示不是关键路径。
     });
   }
 });
@@ -250,6 +260,10 @@ watch(dataRevision, () => {
 });
 onUnmounted(() => {
   document.removeEventListener('keydown', onDocumentKeydown);
+  for (const unlisten of ownUnlisteners.splice(0)) unlisten();
+  // 同步控制器是模块级单例，它的监听器和那个每分钟一跳的定时器都挂在
+  // `initialize()` 上。这个组件卸载时不放，下一次挂载就会多出一份。
+  disposeSyncController();
 });
 </script>
 

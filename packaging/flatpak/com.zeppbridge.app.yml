@@ -34,8 +34,16 @@ sdk: org.gnome.Sdk
 # The extension branch tracks the freedesktop base of the GNOME runtime, not
 # the GNOME version: GNOME 50 is built on freedesktop 25.08. Getting this wrong
 # fails at "runtime not found", which reads like a network problem.
+# node22 而不是 node20：Wrangler / Miniflare 那一组依赖已经在声明
+# `engines: node >= 22`，package.json 里现在也钉了同一条。三处（本地、
+# Actions、Flatpak）必须是同一个大版本，否则「本地能构建、Flatpak 上不能」
+# 这种问题只会在合并之后才出现。
+#
+# 上线前确认过：node22 扩展在 branch 25.08 上有——GNOME 50 正是构建在
+# freedesktop 25.08 上的。选错 branch 的报错是「runtime not found」，读起来
+# 像网络问题。
 sdk-extensions:
-  - org.freedesktop.Sdk.Extension.node20
+  - org.freedesktop.Sdk.Extension.node22
   - org.freedesktop.Sdk.Extension.rust-stable
 command: zeppbridge
 
@@ -66,7 +74,7 @@ modules:
   - name: zeppbridge
     buildsystem: simple
     build-options:
-      append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/node20/bin
+      append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/node22/bin
       # npm 和 cargo 都要从网上取依赖。见文件开头关于 Flathub 的说明。
       build-args:
         - --share=network

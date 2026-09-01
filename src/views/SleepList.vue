@@ -1,6 +1,6 @@
 <script setup lang="ts">
 defineOptions({ name: 'SleepList' });
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import Icon from '../components/Icon.vue';
 import PageHeader from '../components/PageHeader.vue';
@@ -26,6 +26,9 @@ const messages = defineMessages(
     emptyMessage: '同步后会显示在这里。没有真实阶段时不会编造。',
     scoreLabel: '评分',
     footnote: (count: number, from: string) => `${count} 条记录 · ${from} 起`,
+    shown: (shown: number, total: number) => `已显示 ${shown} / 共 ${total} 条`,
+    loadMore: '加载更多',
+    loadingMore: '正在加载…',
   },
   {
     backToRecent: 'Back to recent records',
@@ -39,6 +42,9 @@ const messages = defineMessages(
     emptyMessage: 'They show up here after a sync. Stages are never invented.',
     scoreLabel: 'Score',
     footnote: (count: number, from: string) => `${count} records · since ${from}`,
+    shown: (shown: number, total: number) => `Showing ${shown} of ${total}`,
+    loadMore: 'Load more',
+    loadingMore: 'Loading…',
   },
 );
 const t = useMessages(messages);
@@ -47,6 +53,20 @@ const { dataRevision } = useSyncController();
 const sessions = ref<SleepSession[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
+/*
+ * 分页，不是上限。
+ *
+ * 以前这里写死 `getRecentSleep(500)`，而后端的 SQL 只有 LIMIT 没有 OFFSET
+ * ——第 501 条之后的记录在应用里**根本没有入口**。一个下载了全部历史的人
+ * 会以为数据没同步下来（Reddit p6zxyo7）。
+ *
+ * 每页 200 而不是 500：首屏更快，而「加载更多」按一下就有下一批。
+ * 刻意不引虚拟滚动库：这一页是一串 RecordRow，`v-for` 加分页就够了。
+ */
+const PAGE_SIZE = 200;
+const total = ref(0);
+const loadingMore = ref(false);
+const hasMore = computed(() => sessions.value.length < total.value);
 
 const loadList = async () => {
   loading.value = true;
@@ -54,14 +74,35 @@ const loadList = async () => {
   if (!isTauri()) {
     loading.value = false;
     sessions.value = [];
+    total.value = 0;
     return;
   }
   try {
-    sessions.value = await tauriApi.getRecentSleep(500);
+    const page = await tauriApi.getSleepPage(PAGE_SIZE, 0);
+    sessions.value = page.items;
+    total.value = page.total;
   } catch (cause) {
     error.value = toUserMessage(cause, t.value.loadFailed);
   } finally {
     loading.value = false;
+  }
+};
+
+const loadMore = async () => {
+  if (loadingMore.value || !hasMore.value) return;
+  loadingMore.value = true;
+  try {
+    // offset 用已经拿到的条数。同步在翻页途中插进新记录会让边界上出现一条
+    // 重复——按 sleep_id 去一次重，比在前端自己维护游标简单，也不会因为
+    // 一次同步就把整个列表推翻重来。
+    const page = await tauriApi.getSleepPage(PAGE_SIZE, sessions.value.length);
+    const seen = new Set(sessions.value.map((item) => item.sleep_id));
+    sessions.value = [...sessions.value, ...page.items.filter((item) => !seen.has(item.sleep_id))];
+    total.value = page.total;
+  } catch (cause) {
+    error.value = toUserMessage(cause, t.value.loadFailed);
+  } finally {
+    loadingMore.value = false;
   }
 };
 
@@ -97,7 +138,15 @@ watch(dataRevision, () => void loadList());
         :compact="false"
       />
     </div>
-    <p v-if="sessions.length" class="footnote">{{ t.footnote(sessions.length, formatTime(sessions[sessions.length - 1].start_time)) }}</p>
+    <div v-if="hasMore" class="load-more">
+      <button class="button button-secondary" type="button" :disabled="loadingMore" @click="loadMore">
+        {{ loadingMore ? t.loadingMore : t.loadMore }}
+      </button>
+    </div>
+    <p v-if="sessions.length" class="footnote">
+      {{ t.shown(sessions.length, total) }} ·
+      {{ t.footnote(sessions.length, formatTime(sessions[sessions.length - 1].start_time)) }}
+    </p>
   </section>
 </template>
 
@@ -118,4 +167,5 @@ watch(dataRevision, () => void loadList());
   color: var(--muted);
   font-size: 12px;
 }
+.load-more { display: flex; justify-content: center; margin-top: 12px; }
 </style>
