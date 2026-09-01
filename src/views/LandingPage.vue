@@ -4,6 +4,7 @@ import BrandMark from '../components/BrandMark.vue';
 import DesignIcon, { type DesignIconName } from '../components/DesignIcon.vue';
 import DeviceMarquee from '../components/DeviceMarquee.vue';
 import { useLandingLocale } from '../composables/useLandingLocale';
+import { isUsableReleasePayload } from '../lib/releaseAssets';
 
 const githubUrl = 'https://github.com/lingcang728/ZeppBridge';
 const releaseUrl = `${githubUrl}/releases/latest`;
@@ -348,8 +349,15 @@ const loadLatestRelease = async () => {
     const response = await fetch(releaseEndpoint, { headers: { Accept: 'application/json' } });
     if (!response.ok) throw new Error(`release endpoint returned ${response.status}`);
     const payload = await response.json() as LatestRelease;
-    const assets = Object.values(payload.downloads ?? {});
-    if (assets.length !== 3 || assets.some((asset) => !isTrustedAssetUrl(asset.url))) {
+    /*
+     * 判据在 lib/releaseAssets.ts，那里能测。
+     *
+     * 这里原来写的是 `assets.length !== 3`：2.0.0 给 /api/release 加了四个
+     * 可选的 Linux 包之后，这一句立刻把整个下载页打进 fallback——三个 CTA
+     * 全部退化成「打开 GitHub Release 页面」，Windows 和 macOS 的直链也跟着
+     * 一起没了。页面照样渲染，控制台照样干净。
+     */
+    if (!isUsableReleasePayload(payload.downloads, isTrustedAssetUrl)) {
       throw new Error('release endpoint returned an invalid asset set');
     }
     latestRelease.value = payload;
