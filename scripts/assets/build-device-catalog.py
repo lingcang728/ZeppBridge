@@ -48,6 +48,44 @@ SCREENSHOTS = [
 ]
 
 
+# Zepp 设备列表里的 `deviceSource` 数字 -> catalog_id。
+#
+# 华米不公开对照表，而有些账号的设备响应里除了这些数字什么都没有（issue #4）。
+# 这一列全部来自用户在应用里主动指认的型号，由 Cloudflare 反馈库汇总。
+#
+# 收录规则（2026-09-01 那一轮的 104 份带指认报告上逐条验证过）：
+#   * 只收 deviceSource，绝不收 deviceType —— 后者是族码，光 deviceType:0
+#     一个值就横跨 20 款表；
+#   * 只收高位段 >= 1_000_000 —— 低位段（15/101/102/104）在数据里就是自相
+#     矛盾的，同一个数字被指认成四款不同的表；
+#   * 每个数字至少两份互相独立的报告。
+#
+# 同一款表有多个相邻数字是正常的：低位是配色/尺寸变体。
+DEVICE_SOURCE_CODES: dict[str, list[int]] = {
+    "amazfit-t-rex-3": [8716544, 8716545, 8716547],
+    "amazfit-balance-46mm": [8519936, 8519937, 8519939],
+    # 9568513 是人工裁决：相邻的 9568512 / 9568515 一致指向 Balance 2，而 8 份
+    # 报告里指认成 Helio Strap 的那 2 份，同一份报告里还指认了另一块表——是
+    # 在设备选择器里挑错了那一台，不是这个数字有歧义。
+    "amazfit-balance-2": [9568512, 9568513, 9568515, 10486017],
+    "amazfit-active-2-44mm": [10092800, 10092801, 10092807],
+    "amazfit-active-2-square": [10223873],
+    "amazfit-bip-6": [10158337],
+    "amazfit-cheetah-2-ultra": [9978113],
+    # 10289411 同样是人工裁决：17 份里 14 份 Helio Strap，相邻的 10289410
+    # 三份一致，3 份异议同样来自「一个账号两块表、挑错了」。
+    "amazfit-helio-strap": [10289410, 10289411],
+    "amazfit-t-rex-3-pro-48-44mm": [10551552],
+    "amazfit-balance-3": [11141379],
+    "amazfit-gtr-4-46mm": [7930113],
+}
+# 明确不收：
+#   * 10813699 —— Active MAX 2 份 vs Active 2 44mm 2 份，平票不是证据；
+#   * 只有一份报告的高位编号（8913155、10813697、11141376、11141377、
+#     10223872、10223875、10682624、8323329、10944769、11206915）——等第二份；
+#   * 全部低位段编号和全部 deviceType。
+
+
 def card(
     catalog_id: str,
     title: str,
@@ -70,6 +108,7 @@ def card(
         "name_zh": name_zh or f"Amazfit {title}",
         "kind": kind,
         "model_codes": model_codes or [],
+        "device_source_codes": DEVICE_SOURCE_CODES.get(catalog_id, []),
         "aliases": aliases or [f"Amazfit {title}", title],
         "region": ["jp"],
         "status": "active",
@@ -753,8 +792,14 @@ def build_catalog() -> None:
             hashes[key] = f"sha256:{hashlib.sha256(target.read_bytes()).hexdigest().upper()}"
 
     devices = [enrich_entry(entry, hashes[entry["asset_key"]]) for entry in [*CARDS, *EXTRAS]]
+    # EXTRAS 是手写的条目，不经过 card()，所以在这里统一补一次。
+    for device in devices:
+        device.setdefault("device_source_codes", DEVICE_SOURCE_CODES.get(device["catalog_id"], []))
+    unknown = sorted(set(DEVICE_SOURCE_CODES) - {device["catalog_id"] for device in devices})
+    if unknown:
+        raise SystemExit(f"DEVICE_SOURCE_CODES 指向了目录里没有的型号: {unknown}")
     document = {
-        "version": 2,
+        "version": 3,
         "checked_at": CHECKED_AT,
         "sources": [
             "https://www.amazfit.jp/",
