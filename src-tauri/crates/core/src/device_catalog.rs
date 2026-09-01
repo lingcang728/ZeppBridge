@@ -21,8 +21,24 @@ pub struct CatalogEntry {
     #[serde(default)]
     pub name_zh: Option<String>,
     pub kind: String,
+    /// 产品料号（`A2322` 这一类）。**不是** `deviceSource`。
     #[serde(default)]
     pub model_codes: Vec<String>,
+    /// Zepp 设备列表里的 `deviceSource` 数字。
+    ///
+    /// 有些账号的设备响应里连一个产品名字段都没有，只剩这些数字（issue #4）。
+    /// 华米没有公开对照表，所以这一列全部来自用户在应用里主动指认的型号，
+    /// 由反馈库汇总而来。收录规则写在 `docs/` 的设备目录说明里，要点是：
+    ///
+    /// * 只收 `deviceSource`，**绝不收 `deviceType`** —— 后者是族码，光是 0
+    ///   一个值就横跨二十款表，写成一对一必然误判；
+    /// * 只收高位段（≥ 1_000_000）。低位段（15/101/102/104 这些）在反馈里就是
+    ///   自相矛盾的，同一个数字被指认成四款不同的表；
+    /// * 每个数字至少要有两份互相独立的报告。
+    ///
+    /// 同一款表有多个相邻数字是正常的：低位是配色/尺寸变体。
+    #[serde(default)]
+    pub device_source_codes: Vec<i64>,
     pub aliases: Vec<String>,
     pub region: Vec<String>,
     pub status: String,
@@ -58,6 +74,9 @@ pub struct CatalogMatch<'a> {
 
 #[derive(Debug, Default)]
 pub struct CatalogMatchInput<'a> {
+    /// 设备响应里的 `deviceSource` 数字。只放 `deviceSource`，不要放
+    /// `deviceType` —— 见 `CatalogEntry::device_source_codes`。
+    pub device_source_codes: Vec<i64>,
     pub model_codes: Vec<&'a str>,
     pub product_names: Vec<&'a str>,
     pub device_names: Vec<&'a str>,
@@ -136,6 +155,21 @@ fn contains_complete_alias(display_name: &str, alias: &str) -> bool {
 }
 
 pub fn match_catalog(input: &CatalogMatchInput<'_>) -> Option<CatalogMatch<'static>> {
+    // deviceSource 排在最前：它是这些响应里唯一确切指向某一款表的东西，而
+    // 名字类字段在同一批账号上压根不存在。
+    for candidate in &input.device_source_codes {
+        if let Some(entry) = catalog_entries().iter().find(|entry| {
+            entry.supported
+                && entry.status == "active"
+                && entry.device_source_codes.contains(candidate)
+        }) {
+            return Some(CatalogMatch {
+                entry,
+                status: CatalogMatchStatus::Exact,
+            });
+        }
+    }
+
     for candidate in &input.model_codes {
         let normalized = normalize_model(candidate);
         if normalized.is_empty() {
@@ -213,6 +247,88 @@ mod tests {
         assert!(catalog_entries()
             .iter()
             .any(|entry| entry.catalog_id == "amazfit-helio-ring"));
+    }
+
+    /// 用户指认汇总出来的 deviceSource 数字能认出表来。
+    ///
+    /// 这是 issue #4 那类账号唯一的出路：它们的设备响应里一个产品名字段都没有，
+    /// 只剩这些数字，名字类匹配在那里永远是空转。
+    #[test]
+    fn a_device_source_number_identifies_the_model() {
+        for (code, catalog_id) in [
+            (8716547_i64, "amazfit-t-rex-3"),
+            (9568515, "amazfit-balance-2"),
+            (10289410, "amazfit-helio-strap"),
+            (10158337, "amazfit-bip-6"),
+            (11141379, "amazfit-balance-3"),
+        ] {
+            let matched = match_catalog(&CatalogMatchInput {
+                device_source_codes: vec![code],
+                ..CatalogMatchInput::default()
+            })
+            .unwrap_or_else(|| panic!("deviceSource {code} 应当匹配到型号"));
+            assert_eq!(matched.entry.catalog_id, catalog_id, "deviceSource {code}");
+            assert_eq!(matched.status, CatalogMatchStatus::Exact);
+        }
+    }
+
+    /// 同一款表的相邻编号都指向它——低位是配色/尺寸变体。
+    #[test]
+    fn neighbouring_device_source_numbers_stay_on_the_same_product() {
+        for code in [8716544_i64, 8716545, 8716547] {
+            let matched = match_catalog(&CatalogMatchInput {
+                device_source_codes: vec![code],
+                ..CatalogMatchInput::default()
+            })
+            .unwrap();
+            assert_eq!(matched.entry.catalog_id, "amazfit-t-rex-3");
+        }
+    }
+
+    /// 目录里绝不能出现族码。
+    ///
+    /// `deviceType` 的取值（0、1、7）和低位段的 `deviceSource`（15、101、102、
+    /// 104）在反馈库里都是自相矛盾的：同一个数字被不同用户指认成好几款表。
+    /// 一旦有人图省事把它们写进目录，所有装着这类表的账号都会被认成同一款。
+    #[test]
+    fn the_catalog_never_carries_a_family_code() {
+        for entry in catalog_entries() {
+            for code in &entry.device_source_codes {
+                assert!(
+                    *code >= 1_000_000,
+                    "{} 收了低位编号 {code}——那一段在反馈里就是自相矛盾的",
+                    entry.catalog_id
+                );
+            }
+        }
+        for code in [0_i64, 1, 7, 15, 101, 102, 104] {
+            assert!(
+                match_catalog(&CatalogMatchInput {
+                    device_source_codes: vec![code],
+                    ..CatalogMatchInput::default()
+                })
+                .is_none(),
+                "{code} 不该匹配到任何型号"
+            );
+        }
+    }
+
+    /// 一个编号只能属于一款表。
+    #[test]
+    fn every_device_source_number_belongs_to_exactly_one_product() {
+        let mut seen: Vec<(i64, &str)> = Vec::new();
+        for entry in catalog_entries() {
+            for code in &entry.device_source_codes {
+                if let Some((_, other)) = seen.iter().find(|(value, _)| value == code) {
+                    panic!(
+                        "deviceSource {code} 同时挂在 {other} 和 {}",
+                        entry.catalog_id
+                    );
+                }
+                seen.push((*code, entry.catalog_id.as_str()));
+            }
+        }
+        assert!(seen.len() >= 20, "写进去的编号太少了: {}", seen.len());
     }
 
     #[test]

@@ -1625,6 +1625,9 @@ async fn enrich_profile_with_local_data(
         let names = profile.name.as_deref().into_iter().collect::<Vec<_>>();
         let display_name = profile.display_name.as_deref();
         if let Some(matched) = match_catalog(&CatalogMatchInput {
+            // 这条路径是从本机已存的 profile 补救的，手上只有 device_id，
+            // 没有原始设备响应，也就没有 deviceSource 数字可用。
+            device_source_codes: Vec::new(),
             model_codes,
             product_names: names.clone(),
             device_names: names,
@@ -1960,6 +1963,30 @@ fn build_device_diagnostic(value: &Value) -> DiagnosticDeviceEvidence {
 /// 这些是「哪一款表」而不是「哪一台表」：只取整数，`deviceSource` 和
 /// `deviceType` 在 Zepp 的接口里都是型号维度的取值。序列号、MAC、绑定时间和
 /// 任何字符串一律不收 —— 没有它们这份报告也够补目录，收了就越界了。
+/// 设备条目里的 `deviceSource` 数字。
+///
+/// **只取 `deviceSource`**。`deviceType` 长得像同一类东西，却是族码：反馈库里
+/// `deviceType:0` 一个值就横跨二十款表，拿它去查目录只会张冠李戴。
+fn device_source_numbers(item: &Value, extra: &Value) -> Vec<i64> {
+    let mut out = Vec::new();
+    for source in [item, extra] {
+        let Some(object) = source.as_object() else {
+            continue;
+        };
+        for key in ["deviceSource", "device_source"] {
+            let Some(Value::Number(number)) = object.get(key) else {
+                continue;
+            };
+            if let Some(value) = number.as_i64() {
+                if value > 0 && !out.contains(&value) {
+                    out.push(value);
+                }
+            }
+        }
+    }
+    out
+}
+
 fn collect_model_identifier_hints(item: &Value, out: &mut BTreeSet<String>) {
     let extra = flattened_device_metadata(item);
     for (source, keys) in [
@@ -2065,6 +2092,12 @@ pub(crate) fn parse_device_profiles(value: &serde_json::Value) -> Vec<DeviceProf
             ));
             model_codes.sort();
             model_codes.dedup();
+            // deviceSource 另走一条路，不跟上面那些字符串混在一起。
+            //
+            // 上面那一坨里 `deviceType` 也在，而它是族码——光 deviceType:0 一个
+            // 值在反馈库里就横跨二十款表。两者一旦并成一列，目录里就没办法只
+            // 收 deviceSource 而不误收 deviceType。
+            let device_source_codes = device_source_numbers(&item, &extra);
             let device_names = merged_string_values(&item, &extra, &["deviceName", "deviceType"]);
             let device_id = first_string(
                 &item,
@@ -2082,6 +2115,7 @@ pub(crate) fn parse_device_profiles(value: &serde_json::Value) -> Vec<DeviceProf
             let device_name_refs = device_names.iter().map(String::as_str).collect::<Vec<_>>();
             let model_code_refs = model_codes.iter().map(String::as_str).collect::<Vec<_>>();
             let matched = match_catalog(&CatalogMatchInput {
+                device_source_codes,
                 model_codes: model_code_refs,
                 product_names: names,
                 device_names: device_name_refs,
@@ -2284,10 +2318,10 @@ fn validate_export_path(value: &str, extension: &str) -> std::result::Result<Pat
 mod tests {
     use super::{
         ai_handoff_mode_for_bytes, apply_user_assignment, build_device_diagnostic,
-        merge_cached_device_profile, parse_device_profile, parse_device_profiles,
-        read_device_profile_cache, redact_ai_export, sanitize_diagnostic_note,
-        unknown_device_profile, validate_json_export_path, AI_HANDOFF_INLINE_LIMIT_BYTES,
-        DIAGNOSTIC_NOTE_MAX_CHARS,
+        device_source_numbers, merge_cached_device_profile, parse_device_profile,
+        parse_device_profiles, read_device_profile_cache, redact_ai_export,
+        sanitize_diagnostic_note, unknown_device_profile, validate_json_export_path,
+        AI_HANDOFF_INLINE_LIMIT_BYTES, DIAGNOSTIC_NOTE_MAX_CHARS,
     };
     use crate::models::{DeviceMatchStatus, DeviceProfile};
     use serde_json::json;
@@ -2415,6 +2449,47 @@ mod tests {
         ] {
             assert!(!encoded.contains(private), "型号线索泄露了 {private}");
         }
+    }
+
+    /// 反馈汇总出来的 deviceSource 一旦进了目录，同款设备就自动认得出来。
+    ///
+    /// 这是上面那条用例的另一半：`7930112` 没有第二份报告，所以仍然是未识别；
+    /// `8716547` 有七份用户指认，所以现在直接就是 T-Rex 3——用户不必再手动指认
+    /// 一次。整条回路（用户指认 → 反馈库 → 目录 → 自动识别）就是靠这个闭上的。
+    #[test]
+    fn a_contributed_device_source_number_is_recognised_without_any_product_name() {
+        let payload = json!({
+            "items": [{
+                "deviceId": "0123456789abcdef",
+                "deviceSource": 8716547,
+                "deviceType": 0,
+                "macAddress": "AA:BB:CC:DD:EE:FF",
+                "sn": "SERIAL-PRIVATE-998877",
+                "firmwareVersion": "6.2.208.7"
+            }]
+        });
+
+        let profile = parse_device_profile(&payload);
+        assert_eq!(profile.catalog_id.as_deref(), Some("amazfit-t-rex-3"));
+        assert_eq!(profile.match_status, DeviceMatchStatus::Exact);
+    }
+
+    /// `deviceType` 绝不能用来查目录。
+    ///
+    /// 反馈库里 `deviceType:0` 一个值横跨二十款表。它和 `deviceSource` 长得像，
+    /// 就挨着放在同一个 JSON 对象里，很容易被顺手一起喂进匹配器——那样每一台
+    /// 设备都会被认成同一款。
+    #[test]
+    fn device_type_is_never_used_to_look_up_the_catalog() {
+        let extra = json!({});
+        let item = json!({ "deviceType": 8716547, "deviceSource": 0 });
+        assert!(
+            device_source_numbers(&item, &extra).is_empty(),
+            "deviceType 的值不该被当成 deviceSource"
+        );
+
+        let item = json!({ "deviceSource": 8716547, "deviceType": 0 });
+        assert_eq!(device_source_numbers(&item, &extra), vec![8716547]);
     }
 
     /// `productId` / `hardwareVersion` 有时就是内部代号，归一化之后和目录别名
