@@ -1,0 +1,60 @@
+# Scheduled sync for a machine that is already on — a NAS, a home server, a VPS.
+#
+# Run from the repository root:
+#   docker compose -f packaging/docker/docker-compose.yml run --rm sync
+#
+# Nothing here starts on `docker compose up`. Every service is behind a profile
+# and is a one-shot command, because none of this is a daemon: the CLI syncs and
+# exits. What schedules it is the host — cron, a systemd timer, the NAS task
+# scheduler. Putting cron inside the container would mean a second init system,
+# its own log destination, and a container that looks healthy while doing
+# nothing. See docs/guides/docker.md for the timer.
+
+x-common: &common
+  image: zeppbridge:local
+  build:
+    context: ../..
+    dockerfile: packaging/docker/Dockerfile
+  # The uid that owns ./data on the host. Set ZEPPBRIDGE_UID/GID in a .env file
+  # next to this one, or export them; 1000:1000 is the common desktop default.
+  user: "${ZEPPBRIDGE_UID:-1000}:${ZEPPBRIDGE_GID:-1000}"
+  volumes:
+    # The whole library: zepp.db, auth.json, exports/, backups/.
+    - ./data:/data
+  environment:
+    ZEPPBRIDGE_DATA_DIR: /data
+    # The App Token, from the desktop app's credential store. Keep it in a .env
+    # file (or a real secret) rather than inline here — a compose file gets
+    # committed, and `docker inspect` shows environment values to anyone who can
+    # reach the daemon.
+    ZEPPBRIDGE_APP_TOKEN: "${ZEPPBRIDGE_APP_TOKEN:?set ZEPPBRIDGE_APP_TOKEN, see docs/guides/docker.md}"
+    ZEPPBRIDGE_CREDENTIAL_STORE: env
+    # Local days are local. Without this the container is UTC and a reading
+    # taken at 00:30 lands on the previous day.
+    TZ: "${TZ:-UTC}"
+  restart: "no"
+
+services:
+  # Incremental sync: only what changed since the last run. This is the one to
+  # put on a timer.
+  sync:
+    <<: *common
+    profiles: ["sync"]
+    command: ["zeppbridge-cli", "sync", "--mode", "incremental", "--json"]
+
+  # What is in the library right now, and how far back it goes.
+  status:
+    <<: *common
+    profiles: ["status"]
+    command: ["zeppbridge-cli", "status", "--json"]
+
+  # The read-only MCP server. Listed for completeness, but note it speaks stdio
+  # and listens on no port, so it is not a service you leave running — the MCP
+  # client spawns it. `docker compose run --rm -T mcp` is the shape that works;
+  # docs/guides/docker.md has the client config.
+  mcp:
+    <<: *common
+    profiles: ["mcp"]
+    command: ["zeppbridge-mcp"]
+    stdin_open: true
+    tty: false

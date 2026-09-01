@@ -6,7 +6,7 @@ const updateMessages = defineMessages(
   { nothingToInstall: 'There is no update to install. Check again.' },
 );
 
-export type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'installing' | 'failed' | 'upToDate';
+export type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'installing' | 'failed' | 'upToDate' | 'unmanaged';
 
 export interface UpdateViewState {
   status: UpdateStatus;
@@ -70,12 +70,34 @@ async function loadCurrentVersion(): Promise<void> {
   updateState.currentVersion = await getVersion();
 }
 
+/* Linux 的每条分发渠道（Flatpak、deb/rpm）都由包管理器管更新，latest.json 里
+   也没有 linux 的条目。后端说不支持时就不要去 check()：那一步只会抛一句
+   「响应的 platforms 里找不到 linux-x86_64」，以「更新失败」的样子出现在设置页
+   上——而实际上什么都没坏。 */
+let selfUpdateSupported: boolean | null = null;
+
+async function isSelfUpdateSupported(): Promise<boolean> {
+  if (selfUpdateSupported !== null) return selfUpdateSupported;
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    selfUpdateSupported = await invoke<boolean>('self_update_supported');
+  } catch {
+    // 老版本后端没有这个命令。那些构建全都是 Windows/macOS 的，能自己更新。
+    selfUpdateSupported = true;
+  }
+  return selfUpdateSupported;
+}
+
 export async function checkForDesktopUpdate(manual = false): Promise<void> {
   if (!isTauriRuntime()) return;
   updateState.status = 'checking';
   updateState.error = '';
   try {
     await loadCurrentVersion();
+    if (!(await isSelfUpdateSupported())) {
+      updateState.status = 'unmanaged';
+      return;
+    }
     const lastCheck = Number(localStorage.getItem(AUTO_CHECK_KEY) ?? 0);
     if (!manual && Date.now() - lastCheck < AUTO_CHECK_INTERVAL) {
       updateState.status = 'upToDate';

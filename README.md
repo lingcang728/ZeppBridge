@@ -2,12 +2,13 @@
   <img src="src-tauri/icons/icon.png" width="96" height="96" alt="ZeppBridge">
   <h1>ZeppBridge</h1>
   <p><strong>Your Zepp data, handed back to you.</strong></p>
-  <p>View, archive and export your Amazfit health records on your own Windows or macOS machine.</p>
+  <p>View, archive and export your Amazfit health records on your own Windows, macOS or Linux machine.</p>
 
   [![CI](https://github.com/lingcang728/ZeppBridge/actions/workflows/ci.yml/badge.svg)](https://github.com/lingcang728/ZeppBridge/actions/workflows/ci.yml)
   [![License: MIT](https://img.shields.io/github/license/lingcang728/ZeppBridge?color=69b48b)](LICENSE)
   [![Windows](https://img.shields.io/badge/Windows-supported-0078D4?logo=windows11&logoColor=white)](#download-and-install)
   [![macOS](https://img.shields.io/badge/macOS_Apple_Silicon-community_tested-999999?logo=apple&logoColor=white)](#download-and-install)
+  [![Linux](https://img.shields.io/badge/Linux-builds_only-E95420?logo=linux&logoColor=white)](docs/guides/linux.md)
   [![Version](https://img.shields.io/github/v/release/lingcang728/ZeppBridge?color=8FB348&label=version)](https://github.com/lingcang728/ZeppBridge/releases)
 
   <p><a href="README.zh-CN.md">简体中文</a></p>
@@ -85,26 +86,51 @@ already runs on macOS runners and could sign and notarise there. What is missing
 is an Apple Developer Program membership (99 USD/year), which the project has
 not bought. If that changes, this section goes away.
 
-**Not supported**: Intel Macs, Linux, mobile.
+**Linux (x86_64)**
+
+> **Builds, but nobody has run it yet.** CI compiles it, runs the tests and
+> builds the packages on every push. What has *not* happened is a full
+> sign-in-and-sync cycle on a real Linux desktop — including whether the token
+> lands in your keyring correctly. Treat this as a build you are helping to
+> test, not a release.
+
+Flatpak, `.deb`, `.rpm` and an AppImage are published on the release page.
+Nothing is signed; check downloads against `SHA256SUMS.txt`.
+
+```bash
+sudo apt install ./ZeppBridge_<version>_amd64.deb      # Debian, Ubuntu
+sudo dnf install ./ZeppBridge_<version>_x86_64.rpm     # Fedora, RHEL
+flatpak install ./ZeppBridge_<version>_x86_64.flatpak  # anywhere
+```
+
+The [Linux guide](docs/guides/linux.md) covers where the data goes, how the
+token is stored when you have no keyring, and how to build from source.
+
+There is also a [headless container image](docs/guides/docker.md) with just the
+CLI and MCP server, for keeping a library synced on a NAS or a server. It cannot
+sign in — that still needs the desktop app once.
+
+**Not supported**: Intel Macs, mobile.
 
 ### What is verified on which platform
 
-Same app, same interface, same features on both — what differs is how much of it
-anyone has actually checked. Asking here beats guessing.
+Same app, same interface, same features on all three — what differs is how much
+of it anyone has actually checked. Asking here beats guessing.
 
-| | Windows 10/11 (x64) | macOS Apple Silicon |
-| --- | --- | --- |
-| Interface and features | identical | identical |
-| Built in CI | yes | yes |
-| Automated tests in CI | yes | yes |
-| Installer opens without a workaround | yes (unknown-publisher warning) | **no** — see the unsigned-build note above |
-| Sign-in, sync, export | verified by the maintainer on every release | contributor smoke test only |
-| Credential store | Credential Manager, verified | Keychain, not independently verified |
-| Auto-update | verified | built, not independently verified |
+| | Windows 10/11 (x64) | macOS Apple Silicon | Linux x86_64 |
+| --- | --- | --- | --- |
+| Interface and features | identical | identical | identical |
+| Built in CI | yes | yes | yes |
+| Automated tests in CI | yes | yes | yes |
+| Installer opens without a workaround | yes (unknown-publisher warning) | **no** — see the unsigned-build note above | yes |
+| Sign-in, sync, export | verified by the maintainer on every release | contributor smoke test only | **nobody yet** |
+| Credential store | Credential Manager, verified | Keychain, not independently verified | Secret Service, **nobody yet** |
+| Auto-update | verified | built, not independently verified | n/a — your package manager |
 
-The maintainer develops on Windows and does not own a Mac. Nothing above is a
-statement that macOS is broken — it is a statement about who has checked what.
-If you use macOS and something misbehaves, a report is genuinely useful.
+The maintainer develops on Windows and does not own a Mac or use Linux on the
+desktop. Nothing above is a statement that macOS or Linux is broken — it is a
+statement about who has checked what. If you use either and something
+misbehaves, a report is genuinely useful.
 
 **From 1.0.0 the local database's schema and upgrade path are treated as something to maintain long-term**: every migration takes an automatic backup first, and snapshots can be verified and restored. Your data stays local — but the snapshots live on the same disk as the database, so **if you are worried about drive failure, copy one somewhere else yourself.**
 
@@ -223,6 +249,10 @@ First check whether your watch actually measured it. Some metrics (lactate thres
 **Where is my data?**
 - **Windows**: a `data` folder next to the install directory (not `%APPDATA%`). Settings → Advanced has a button to open it.
 - **macOS**: `~/Library/Application Support/com.zeppbridge.ZeppBridge/data`
+- **Linux**: `~/.local/share/zeppbridge/data` (Flatpak:
+  `~/.var/app/com.zeppbridge.app/data/zeppbridge/data`). An AppImage or an
+  unpacked tarball keeps `data/` next to the executable — see the
+  [Linux guide](docs/guides/linux.md).
 
 **Is my data still there after uninstalling?**
 Yes. Uninstalling leaves the `data` folder, backups, coverage ledger and settings alone. Delete it manually if you want it gone.
@@ -239,7 +269,7 @@ Health data, workout details and credentials never leave your machine. Only if y
 
 ## Privacy
 
-- **Credentials** live in the OS credential store (Windows Credential Manager / macOS Keychain), not in a plaintext file.
+- **Credentials** live in the OS credential store (Windows Credential Manager / macOS Keychain / Linux Secret Service), not in a plaintext file. On a machine with no keyring you can explicitly switch to a file or environment store — an acknowledged downgrade, documented in the [Linux guide](docs/guides/linux.md).
 - **Health data** is an unencrypted database file on your computer. If you share the machine, use separate OS accounts.
 - **AI packages are redacted first**: device identifiers, MAC addresses and precise GPS are stripped, and the file lists what was removed. Precise tracks are only included if you opt in.
 - **Maps render locally.** No requests go to any third-party map service.
@@ -261,6 +291,8 @@ npm run tauri dev
 - [Architecture](docs/reference/architecture.md) — product boundaries, Zepp API mapping, verified vs unverified list
 - [CLI and MCP](docs/reference/cli-and-mcp.md) — exit-code contract, read-only tools, scheduling examples
 - [Backup and restore](docs/guides/backup-and-restore.md) — snapshots, restore flow, coverage ledger
+- [Linux](docs/guides/linux.md) — Flatpak, deb/rpm/AppImage, data locations, credential stores
+- [Docker](docs/guides/docker.md) — headless CLI/MCP image, scheduling, reproducible builds
 - [UI guidelines](docs/development/ui-guidelines.md) — design tokens, page structure, components
 
 Documentation is available in English and Simplified Chinese; every page links to its counterpart. Issues and PRs are welcome in either language. Before changing anything, read the "unverified" list in the architecture document — this project has an explicit standard for what counts as an established fact.
