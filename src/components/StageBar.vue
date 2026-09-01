@@ -3,7 +3,7 @@ import { computed } from 'vue';
 import { VChart } from '../lib/echartsSetup';
 import { formatDuration, formatTime, isFiniteNumber } from '../lib/format';
 import { zeppSemanticColors } from '../lib/echartsTheme';
-import { sleepStageLabels } from '../lib/sleepStages';
+import { sleepStageLabels, sleepStageLabelsWithUnknown } from '../lib/sleepStages';
 import type { SleepStageSlice } from '../types';
 import { defineMessages, useMessages } from '../i18n';
 
@@ -26,7 +26,7 @@ const t = useMessages(messages);
 export interface StageItem {
   label: string;
   minutes?: number | null;
-  tone: 'deep' | 'light' | 'rem' | 'awake';
+  tone: 'deep' | 'light' | 'rem' | 'awake' | 'unknown';
 }
 
 interface BarSegment {
@@ -41,13 +41,17 @@ const STAGE_LEVEL: Record<StageItem['tone'], number> = {
   light: 1,
   rem: 2,
   awake: 3,
+  // 未知单独占一档，而不是并进「清醒」。后端以前就是把认不出来的 mode
+  // 归成 awake 的，代价是图上那一段在说一件没人验证过的事。
+  unknown: 4,
 };
-const stageLabels = computed(() => sleepStageLabels());
 const STAGE_COLORS = {
   deep: zeppSemanticColors.sleep.deep,
   light: zeppSemanticColors.sleep.light,
   rem: zeppSemanticColors.sleep.rem,
   awake: zeppSemanticColors.sleep.awake,
+  // 中性灰。四个睡眠色都有含义，未知不该借用其中任何一个。
+  unknown: 'rgba(226, 234, 242, .38)',
 } as const;
 
 const props = defineProps<{
@@ -70,9 +74,14 @@ const timeline = computed<BarSegment[]>(() => {
     .map((slice) => {
       const start = new Date(slice.start_time).getTime();
       const end = new Date(slice.end_time).getTime();
-      const tone = slice.stage === 'deep' || slice.stage === 'light' || slice.stage === 'rem' || slice.stage === 'awake'
-        ? slice.stage
-        : null;
+      const tone =
+        slice.stage === 'deep'
+        || slice.stage === 'light'
+        || slice.stage === 'rem'
+        || slice.stage === 'awake'
+        || slice.stage === 'unknown'
+          ? slice.stage
+          : null;
       if (!tone || !Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
       if (rangeFrom !== null && rangeTo !== null) {
         const overlapStart = Math.max(start, rangeFrom);
@@ -96,6 +105,17 @@ const range = computed<{ from: number; span: number } | null>(() => {
 });
 
 const isHypnogram = computed(() => timeline.value.length > 0 && range.value !== null);
+/**
+ * 这一夜有没有认不出来的阶段。
+ *
+ * 有才把「未知」画进 y 轴。绝大多数夜晚一个都没有，恒定多一根轴线只会让
+ * 正常的图变矮。
+ */
+const hasUnknownStage = computed(() => timeline.value.some((slice) => slice.tone === 'unknown'));
+const stageLabels = computed(() =>
+  hasUnknownStage.value ? sleepStageLabelsWithUnknown() : sleepStageLabels(),
+);
+const topLevel = computed(() => (hasUnknownStage.value ? 4 : 3));
 const axisLabels = computed(() => ({
   start: props.rangeStart ? formatTime(props.rangeStart) : '',
   end: props.rangeEnd ? formatTime(props.rangeEnd) : '',
@@ -162,7 +182,7 @@ const hypnogramOption = computed(() => {
     yAxis: {
       type: 'value',
       min: -0.45,
-      max: 3.45,
+      max: topLevel.value + 0.45,
       interval: 1,
       axisLabel: {
         formatter: (value: number) => stageLabels.value[value] ?? '',
@@ -182,6 +202,7 @@ const hypnogramOption = computed(() => {
         { min: 0.5, max: 1.5, color: STAGE_COLORS.light },
         { min: 1.5, max: 2.5, color: STAGE_COLORS.rem },
         { min: 2.5, max: 3.5, color: STAGE_COLORS.awake },
+        { min: 3.5, max: 4.5, color: STAGE_COLORS.unknown },
       ],
     },
     series: [
@@ -249,6 +270,16 @@ const hypnogramOption = computed(() => {
 .light, i.light { background: var(--sleep-light); }
 .rem, i.rem { background: var(--sleep-rem); }
 .awake, i.awake { background: var(--sleep-awake); }
+/* 未知片段：中性灰 + 斜纹，一眼能和四个真实阶段区分开。 */
+.unknown, i.unknown {
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(226, 234, 242, .28),
+    rgba(226, 234, 242, .28) 4px,
+    rgba(226, 234, 242, .1) 4px,
+    rgba(226, 234, 242, .1) 8px
+  );
+}
 .stage-axis {
   display: flex;
   justify-content: space-between;

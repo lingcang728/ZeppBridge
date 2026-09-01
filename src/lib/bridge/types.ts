@@ -1,5 +1,7 @@
 import type {
   AppStatus,
+  DailyHeartRateExtreme,
+  Page,
   AiHandoffResult,
   AuthInfo,
   CapabilityOverview,
@@ -76,9 +78,12 @@ export interface BridgeBackend {
   setUserPrefs(retentionDays: number, historySyncDays: number, archiveEnabled?: boolean): Promise<UserPrefs>;
   getUserPrefs(): Promise<UserPrefs>;
 
+  getDailyHeartRateExtremes(days: number): Promise<DailyHeartRateExtreme[]>;
   getRecentSleep(limit?: number): Promise<SleepSession[]>;
+  getSleepPage(limit: number, offset: number): Promise<Page<SleepSession>>;
   getSleepDetail(sleepId: string): Promise<SleepSession | null>;
   getRecentWorkouts(limit?: number): Promise<Workout[]>;
+  getWorkoutPage(limit: number, offset: number): Promise<Page<Workout>>;
   getWorkoutDetail(workoutId: string): Promise<Workout | null>;
   getWorkoutSeries(workoutId: string): Promise<WorkoutSeries>;
   setWorkoutTypeOverride(workoutId: string, userOverride?: string | null): Promise<Workout>;

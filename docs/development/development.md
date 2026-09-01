@@ -164,7 +164,7 @@ frontend in `src/lib/bridge/` (re-exported through `useTauriApi`):
 | `import_from_har` | Extract credentials from a HAR the user exported | Must contain an `api-mifit*` request carrying `apptoken`; then takes the same save path as `save_auth` |
 | `manual_auth` | Enter token / user id / region host by hand | A wrapper over `save_auth`, with identical boundaries |
 | `start_initial_sync` / `start_history_sync` | Fetch the 1–365 days the user chose | Defaults to 30 days; emits progress events and can be cancelled |
-| `start_incremental_sync` | Incremental with a 7-day overlap | Only for verified connections; triggered by the top bar, auto-sync or the tray |
+| `start_incremental_sync` | Incremental with a 30-day overlap (`contract::INCREMENTAL_SYNC_DAYS`) | Only for verified connections; triggered by the top bar, auto-sync or the tray |
 | `cancel_sync` | Cancel an in-flight sync | Atomic flag; stops at the next window |
 | `set_user_prefs` | Save retention days and history backfill days | 1–365 |
 | `get_app_status` | Connection, cloud sync outcome, per-stream sample times | A failed startup recovery keeps an actionable warning |

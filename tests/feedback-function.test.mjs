@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { onRequestPost, validateFeedbackReport } from '../functions/api/feedback.js';
+import { contentHashInput, onRequestPost, validateFeedbackReport } from '../functions/api/feedback.js';
 
 const report = () => ({
   format: 'zeppbridge.feedback.v1',
@@ -165,4 +165,147 @@ test('a user-declared category makes an otherwise quiet report submittable', asy
   // 分类是固定取值，不能借它塞任意文本。
   assert.equal(validateFeedbackReport({ ...quiet, category: '随便写的' }), false);
   assert.equal(validateFeedbackReport({ ...quiet, category: 'x'.repeat(200) }), false);
+});
+
+/**
+ * 一个够真的 D1 替身：按 SQL 文本分流，把行留在内存里。
+ *
+ * 之前那个替身只有 `bind().run()`，`first()` 一调就抛——去重和限流两条路
+ * 全部落进 catch 里放行，于是测试看起来是绿的，实际上一行新代码都没跑到。
+ */
+const fakeDb = () => {
+  const reports = [];
+  const counters = new Map();
+  return {
+    reports,
+    counters,
+    prepare(sql) {
+      return {
+        bind(...bound) {
+          return {
+            async first() {
+              if (sql.includes('FROM feedback_reports WHERE content_hash')) {
+                return reports.find((row) => row.content_hash === bound[0]) ?? null;
+              }
+              if (sql.includes('FROM feedback_intake_counters')) {
+                return counters.get(bound[0]) ?? null;
+              }
+              return null;
+            },
+            async run() {
+              if (sql.includes('INSERT INTO feedback_reports')) {
+                reports.push({ id: bound[0], received_at: bound[1], content_hash: bound[15], bound });
+              } else if (sql.includes('INSERT INTO feedback_intake_counters')) {
+                counters.set(bound[0], { window_started_at: bound[1], count: 1 });
+              } else if (sql.includes('UPDATE feedback_intake_counters')) {
+                const row = counters.get(bound[0]);
+                if (row) row.count += 1;
+              }
+              return { success: true };
+            },
+          };
+        },
+      };
+    },
+  };
+};
+
+const post = (db, body, ip = '203.0.113.7') => onRequestPost({
+  request: new Request('https://zeppbridge.pages.dev/api/feedback', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'CF-Connecting-IP': ip },
+    body: JSON.stringify(body),
+  }),
+  env: { FEEDBACK_DB: db },
+});
+
+test('workout type corrections are model-class only, and optional', () => {
+  // issue #24 那类问题唯一的证据：编号我们认识，只是认错了。
+  const good = {
+    ...report(),
+    workoutTypeCorrections: [
+      { code: 7, interpreted: 'open_water_swimming', corrected: 'trail_running', records: 3 },
+    ],
+  };
+  assert.equal(validateFeedbackReport(good), true);
+
+  // 没有它也要能过——旧客户端和没纠正过的用户都不会带。
+  assert.equal(validateFeedbackReport(report()), true);
+
+  // 只有一条纠正、其余全空的报告也算「有可处理的内容」。
+  const quiet = report();
+  quiet.deviceEvidence.unknownDeviceCount = 0;
+  quiet.unknownWorkoutCodes = [];
+  assert.equal(validateFeedbackReport(quiet), false);
+  quiet.workoutTypeCorrections = [
+    { code: 7, interpreted: 'open_water_swimming', corrected: 'trail_running', records: 1 },
+  ];
+  assert.equal(validateFeedbackReport(quiet), true);
+
+  for (const bad of [
+    // 自由文本会让这两个字段变成又一个可以塞任意内容的通道。
+    [{ code: 7, interpreted: 'Open Water Swimming', corrected: 'trail_running', records: 1 }],
+    [{ code: 7, interpreted: 'open_water_swimming', corrected: '../../etc/passwd', records: 1 }],
+    // 实例信息一律不许出现。
+    [{ code: 7, interpreted: 'a', corrected: 'b', records: 1, workoutId: 'leak' }],
+    [{ code: 7, interpreted: 'a', corrected: 'b' }],
+    [{ code: -2, interpreted: 'a', corrected: 'b', records: 1 }],
+    [{ code: 7, interpreted: 'a', corrected: 'b', records: 0 }],
+  ]) {
+    assert.equal(
+      validateFeedbackReport({ ...report(), workoutTypeCorrections: bad }),
+      false,
+      `不该接受 ${JSON.stringify(bad)}`,
+    );
+  }
+});
+
+test('the same report submitted twice is stored once and answered with the first id', async () => {
+  const db = fakeDb();
+  const first = await post(db, report());
+  assert.equal(first.status, 201);
+  const firstBody = await first.json();
+
+  const second = await post(db, report());
+  // 200 而不是 201：什么都没新建。对客户端仍然是一次成功——断线重发和用户
+  // 连点两下不该看到红色错误。
+  assert.equal(second.status, 200);
+  const secondBody = await second.json();
+  assert.equal(secondBody.reportId, firstBody.reportId);
+  assert.equal(secondBody.duplicate, true);
+  assert.equal(db.reports.length, 1, '重复内容不该在库里留下第二行');
+
+  // 只改一句备注仍然是同一份证据：备注不进摘要。
+  const third = await post(db, { ...report(), userNote: '补一句：表是 Balance 2' });
+  assert.equal(third.status, 200);
+  assert.equal(db.reports.length, 1);
+});
+
+test('one source cannot flood the library with distinct reports', async () => {
+  const db = fakeDb();
+  // 每份内容都不一样，所以去重挡不住——挡住它的必须是限流。
+  const distinct = (index) => {
+    const body = report();
+    body.unknownWorkoutCodes = [{ code: 300 + index, records: 1 }];
+    return body;
+  };
+
+  let limited = 0;
+  for (let index = 0; index < 20; index += 1) {
+    const result = await post(db, distinct(index));
+    if (result.status === 429) limited += 1;
+  }
+  assert.ok(limited > 0, '同一个来源连发 20 份不同报告应当被限流');
+  assert.ok(db.reports.length <= 12, `实际存了 ${db.reports.length} 份，超过了窗口额度`);
+
+  // 另一个来源不受影响：限流是按来源分桶的，不是全局开关。
+  const other = await post(db, distinct(99), '198.51.100.4');
+  assert.equal(other.status, 201);
+});
+
+test('the content hash does not depend on key order and never carries the note', () => {
+  const a = { format: 'x', unknownWorkoutCodes: [{ code: 1, records: 2 }], userNote: 'hello' };
+  const b = { unknownWorkoutCodes: [{ records: 2, code: 1 }], format: 'x' };
+  assert.equal(contentHashInput(a), contentHashInput(b));
+  assert.ok(!contentHashInput(a).includes('hello'));
 });

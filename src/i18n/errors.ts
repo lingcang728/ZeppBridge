@@ -22,8 +22,14 @@ const messages = defineMessages(
     'err.core.http_status': 'Zepp 服务返回了错误，请稍后重试',
     'err.core.cancelled': '操作已取消',
     'err.core.auth': '认证出错了',
+    // 有人报上来的原话就是这一句加一个红条，然后没有下文（反馈 e5fb37a5）：
+    // 登录明明走完了，凭据却存不下，而界面没告诉他还能怎么办。出路本来就
+    // 有——设置里那个「手动填 App Token」——只是没人会想到去找它。
     'err.core.credential_store':
-      '令牌没能存进系统凭据管理器。可能是它被系统策略禁用了，也可能读到的根本不是 App Token（长得超出了凭据管理器的容量）。',
+      '令牌没能存进系统凭据管理器。常见原因：凭据管理器被组策略或安全软件禁用了，'
+      + '或者读到的根本不是 App Token（长得超出了凭据管理器的容量）。'
+      + '出路：到「设置 → 高级 → 手动填写 App Token」直接把令牌填进去，'
+      + '或者用 HAR 导入。两条路都不依赖这次自动保存。',
     'err.core.invalid_host': '不安全的 Zepp 区域地址',
     'err.core.config': '配置有问题，需要先改一下',
     'err.core.busy': '另一个写入操作正在进行，请等它结束',
@@ -135,7 +141,10 @@ const messages = defineMessages(
     'err.core.cancelled': 'Cancelled',
     'err.core.auth': 'Something went wrong with authentication',
     'err.core.credential_store':
-      "The token could not be saved to the system credential store. It may be turned off by a system policy, or what was read is not an App Token at all — too long for the store to hold.",
+      'The token could not be saved to the system credential store. Common causes: the credential store is '
+      + 'disabled by a group policy or security software, or what was read is not an App Token at all '
+      + '(too long for the store to hold). What to do: go to Settings -> Advanced and enter the App Token '
+      + 'manually, or use the HAR import. Neither path depends on this automatic save.',
     'err.core.invalid_host': 'Unsafe Zepp region address',
     'err.core.config': 'Something in the configuration needs changing first',
     'err.core.busy': 'Another write is in progress. Wait for it to finish',

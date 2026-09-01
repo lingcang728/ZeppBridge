@@ -613,15 +613,21 @@ fn sleep_from_flat_object(object: &Map<String, Value>) -> Option<SleepSession> {
     })
 }
 
-fn sleep_stage_name(mode: i64) -> Option<&'static str> {
+/// 云端 stage mode -> 阶段名。
+///
+/// 认不出来的返回 `unknown`，**不再返回 `awake`**。原来的写法（`_ =>
+/// Some("awake")`，理由是「避免阶段条出现空洞」）意味着：Zepp 以后新增一个
+/// mode，或者某款新表产生一个我们还不认识的 mode，ZeppBridge 会明确告诉用户
+/// 「你那段时间醒着」。那是替用户编了一个事实，和这个项目「缺失就是缺失，
+/// 不生成假零值」的原则直接冲突。
+fn sleep_stage_name(mode: i64) -> &'static str {
     match mode {
-        5 => Some("deep"),
-        4 => Some("light"),
+        5 => "deep",
+        4 => "light",
         // 新固件 REM 也会编码为 11
-        8 | 11 => Some("rem"),
-        7 => Some("awake"),
-        // 未知模式归为清醒，避免阶段条出现空洞
-        _ => Some("awake"),
+        8 | 11 => "rem",
+        7 => "awake",
+        _ => "unknown",
     }
 }
 
@@ -656,7 +662,7 @@ fn sleep_stages_from_band(
             .filter_map(Value::as_object)
             .filter_map(|stage| {
                 let mode = first_number(stage, &["mode"])?.round() as i64;
-                let name = sleep_stage_name(mode)?;
+                let name = sleep_stage_name(mode);
                 let start = first_number(stage, &["start"])? as i64;
                 let stop = first_number(stage, &["stop"])? as i64;
                 if stop < start {
@@ -671,6 +677,8 @@ fn sleep_stages_from_band(
                     stage: name.to_string(),
                     start_time,
                     end_time,
+                    // 只有认不出来的才留原始码。认识的那四种留着没有信息量。
+                    raw_mode: (name == "unknown").then_some(mode),
                 })
             })
             .collect()

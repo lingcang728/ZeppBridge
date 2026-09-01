@@ -547,6 +547,15 @@ fn cm_to_meters(cm: i64) -> Option<f64> {
     is_plausible_altitude_cm(cm).then(|| cm as f64 / 100.0)
 }
 
+/// 解析一段 `dt,value;dt,value;...`。
+///
+/// **乱码的 delta 会让整行被丢掉，而不是当成 0。** 以前这里是
+/// `raw_delta.parse().unwrap_or(0)`：一个非空但解析不出来的 delta 会让这个
+/// 样本和上一个落到同一个时间戳上。轻则重复采样，重则污染配速、功率、
+/// 跑姿和分段——而这一切在界面上看起来完全正常，因为样本数是对的。
+///
+/// 空 delta 是另一回事：协议里它确实表示「下一秒」，由 `empty_delta_is_one`
+/// 明确开启，不是猜的。
 fn parse_delta_pairs(value: Option<&Value>, empty_delta_is_one: bool) -> Vec<(i64, i32)> {
     let Some(text) = value.and_then(Value::as_str) else {
         return Vec::new();
@@ -554,12 +563,21 @@ fn parse_delta_pairs(value: Option<&Value>, empty_delta_is_one: bool) -> Vec<(i6
     let mut pairs = Vec::new();
     for part in text.split(';').filter(|part| !part.is_empty()) {
         let mut bits = part.splitn(2, ',');
-        let raw_delta = bits.next().unwrap_or("");
+        let raw_delta = bits.next().unwrap_or("").trim();
         let raw_value = bits.next().unwrap_or("");
-        let delta = if raw_delta.is_empty() && empty_delta_is_one {
-            1
+        let delta = if raw_delta.is_empty() {
+            if empty_delta_is_one {
+                1
+            } else {
+                // 这一路的协议没有「空 = 1 秒」这条约定，空 delta 就是读不
+                // 懂的东西。跳过，别替它编一个。
+                continue;
+            }
         } else {
-            raw_delta.parse().unwrap_or(0)
+            match raw_delta.parse::<i64>() {
+                Ok(parsed) => parsed,
+                Err(_) => continue,
+            }
         };
         let Some(sample) = raw_value.parse::<i32>().ok() else {
             continue;
@@ -600,10 +618,15 @@ fn parse_valued_pairs(value: Option<&Value>) -> Vec<(i64, f64)> {
     for part in text.split(';').filter(|part| !part.is_empty()) {
         let mut bits = part.splitn(2, ',');
         let raw_delta = bits.next().unwrap_or("").trim();
+        // 同 `parse_delta_pairs`：空 delta 是协议里的「下一秒」，乱码 delta
+        // 不是 0，是读不懂。读不懂就跳过这一行。
         let delta = if raw_delta.is_empty() {
             1
         } else {
-            raw_delta.parse().unwrap_or(0)
+            match raw_delta.parse::<i64>() {
+                Ok(parsed) => parsed,
+                Err(_) => continue,
+            }
         };
         let Some(sample) = bits.next().and_then(|item| item.trim().parse::<f64>().ok()) else {
             continue;
@@ -951,5 +974,25 @@ mod tests {
             .iter()
             .all(|sample| sample.heart_rate.is_none()));
         assert_eq!(decoded.route.len(), 2);
+    }
+
+    /// 乱码的 delta 必须让整行消失，不能变成 0 秒。
+    ///
+    /// 变成 0 的后果不是「少一个样本」，是**这个样本和上一个落到同一个
+    /// 时间戳上**——采样数看着是对的，配速和功率却是错的，而界面上没有
+    /// 任何迹象。
+    #[test]
+    fn a_malformed_delta_drops_the_row_instead_of_becoming_zero() {
+        // 第二对的 delta 是 `x`：读不懂。
+        let pairs = parse_delta_pairs(Some(&json!("5,80;x,90;3,100;")), true);
+        assert_eq!(pairs, vec![(5, 80), (3, 100)], "读不懂的行应当被丢掉");
+
+        // 空 delta 仍然是协议约定的「下一秒」，不受影响。
+        let with_empty = parse_delta_pairs(Some(&json!("5,80;,90;")), true);
+        assert_eq!(with_empty, vec![(5, 80), (1, 90)]);
+
+        // 浮点那一路同理。
+        let valued = parse_valued_pairs(Some(&json!("2,180.5;oops,200.0;4,210.25;")));
+        assert_eq!(valued, vec![(2, 180.5), (4, 210.25)]);
     }
 }

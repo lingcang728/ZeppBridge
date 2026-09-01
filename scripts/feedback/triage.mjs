@@ -12,6 +12,7 @@
  *   node scripts/feedback/triage.mjs summary          总量、状态、版本、系统分布
  *   node scripts/feedback/triage.mjs notes            用户手写的那几条（最有信息量）
  *   node scripts/feedback/triage.mjs codes            未知运动编号汇总
+ *   node scripts/feedback/triage.mjs corrections      用户的运动类型纠正（认错了的编号）
  *   node scripts/feedback/triage.mjs devices          用户指认的型号 -> deviceSource 汇总
  *   node scripts/feedback/triage.mjs list <status>    列出某个状态的报告 id
  *   node scripts/feedback/triage.mjs mark <status> <id...>   改状态
@@ -152,6 +153,70 @@ const codes = () => {
   console.log('\n只有拿到文字证据的编号才写进 src/assets/workouts/catalog.json。数量再多也只说明有人在用，不说明它是什么运动。');
 };
 
+/**
+ * 用户的运动类型纠正汇总：**编号 → 我们的解释 → 用户的解释**。
+ *
+ * 和 `codes` 是两件事。`codes` 列的是「我们不认识的编号」；这里列的是
+ * 「我们认识、但认错了的编号」——issue #24 就是后者，所以它在 `codes` 里
+ * 一行都不会出现。
+ *
+ * 同一个编号被不同人纠正成不同运动是正常的（自定义训练模板），所以按
+ * 三元组分行，让分歧留在表里而不是被聚合掉。
+ */
+const corrections = () => {
+  const rows = query(
+    "SELECT app_version, workout_type_corrections_json FROM feedback_reports"
+    + " WHERE workout_type_corrections_json <> '[]'",
+  );
+  const stats = new Map();
+  for (const row of rows) {
+    for (const entry of parseJson(row.workout_type_corrections_json, [])) {
+      if (typeof entry?.code !== 'number') continue;
+      if (typeof entry?.interpreted !== 'string' || typeof entry?.corrected !== 'string') continue;
+      const key = `${entry.code}|${entry.interpreted}|${entry.corrected}`;
+      const stat = stats.get(key) ?? {
+        code: entry.code,
+        interpreted: entry.interpreted,
+        corrected: entry.corrected,
+        reports: 0,
+        records: 0,
+        versions: new Set(),
+      };
+      stat.reports += 1;
+      stat.records += Number(entry.records) || 0;
+      stat.versions.add(row.app_version);
+      stats.set(key, stat);
+    }
+  }
+  if (stats.size === 0) {
+    console.log('还没有任何运动类型纠正被上报。');
+    console.log('这个字段是 2.0.0 才加的，老版本的报告里没有它——需要等用户升级后再纠正一次。');
+    return;
+  }
+  // 同一个编号被指认成几种不同运动，是「这个编号有歧义」的信号，要标出来。
+  const kindsPerCode = new Map();
+  for (const stat of stats.values()) {
+    const set = kindsPerCode.get(stat.code) ?? new Set();
+    set.add(stat.corrected);
+    kindsPerCode.set(stat.code, set);
+  }
+  table([...stats.values()]
+    .sort((a, b) => b.reports - a.reports || b.records - a.records || a.code - b.code)
+    .map((stat) => ({
+      code: stat.code,
+      '我们认成': stat.interpreted,
+      '用户说是': stat.corrected,
+      reports: stat.reports,
+      records: stat.records,
+      versions: [...stat.versions].sort().join(','),
+      eligible: kindsPerCode.get(stat.code).size > 1
+        ? 'no (同一编号多个说法)'
+        : (stat.reports >= 2 ? 'review' : 'no (只有一份报告)'),
+    })));
+  console.log('\neligible=review 的需要人看，不是自动通过。');
+  console.log('改运动目录的规则没变：至少两份互相独立的报告，且没有分歧；改完必须推 NORMALIZER_REVISION。');
+};
+
 const devices = () => {
   const rows = query("SELECT id, user_assigned_models_json FROM feedback_reports WHERE user_assigned_models_json <> '[]'");
   // hint -> catalogId -> 报告数
@@ -222,6 +287,7 @@ try {
     case 'summary': summary(); break;
     case 'notes': notes(); break;
     case 'codes': codes(); break;
+    case 'corrections': corrections(); break;
     case 'devices': devices(); break;
     case 'list': list(rest[0]); break;
     case 'mark': mark(rest[0], rest.slice(1)); break;

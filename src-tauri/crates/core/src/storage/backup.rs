@@ -163,6 +163,28 @@ pub fn backup_dir(data_dir: &Path) -> PathBuf {
     data_dir.join(BACKUP_DIR)
 }
 
+/// 备份 id 的合法形状。
+///
+/// 生成规则是 `<prefix>-<UTC 时间戳>`（见 `create_backup`），所以真实的 id
+/// 只会用到字母、数字、`-` 和 `_`。
+///
+/// 校验它不是因为现在有人能传坏值——id 目前全部来自我们自己列目录的结果。
+/// 是因为它最终会被拼进文件路径（`{id}.db` / `{id}.json`）：哪天渲染进程被
+/// 攻破，或者某个新入口把用户输入接到这里，`../../` 就直接落在磁盘上了。
+/// 这一层挡的是那一天。
+fn validate_backup_id(id: &str) -> Result<()> {
+    let ok = !id.is_empty()
+        && id.len() <= 128
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'));
+    if ok {
+        Ok(())
+    } else {
+        Err(ZeppBridgeError::ConfigError("备份 ID 无效".into()))
+    }
+}
+
 fn snapshot_path(data_dir: &Path, id: &str) -> PathBuf {
     backup_dir(data_dir).join(format!("{id}.db"))
 }
@@ -339,6 +361,7 @@ pub fn list_backups(data_dir: &Path) -> Result<Vec<BackupManifest>> {
 }
 
 pub fn load_manifest(data_dir: &Path, id: &str) -> Result<BackupManifest> {
+    validate_backup_id(id)?;
     let text = std::fs::read_to_string(manifest_path(data_dir, id))?;
     serde_json::from_str(&text)
         .map_err(|error| ZeppBridgeError::ParseError(format!("备份清单无法解析: {error}")))
@@ -346,6 +369,7 @@ pub fn load_manifest(data_dir: &Path, id: &str) -> Result<BackupManifest> {
 
 /// 用户标记 / 取消标记「不要自动清理」。
 pub fn set_pinned(data_dir: &Path, id: &str, pinned: bool) -> Result<BackupManifest> {
+    validate_backup_id(id)?;
     let mut manifest = load_manifest(data_dir, id)?;
     manifest.pinned = pinned;
     write_manifest(data_dir, &manifest)?;
@@ -355,6 +379,7 @@ pub fn set_pinned(data_dir: &Path, id: &str, pinned: bool) -> Result<BackupManif
 /// 重新校验一份快照：文件在不在、大小对不对、SHA-256 对不对、能不能通过
 /// `integrity_check`。
 pub fn verify_backup(data_dir: &Path, id: &str) -> Result<BackupVerification> {
+    validate_backup_id(id)?;
     let manifest = load_manifest(data_dir, id)?;
     let path = snapshot_path(data_dir, id);
     if !path.exists() {
@@ -439,6 +464,7 @@ pub fn prune_migration_backups(data_dir: &Path) -> Result<Vec<String>> {
 
 /// 恢复前的预览：清单、校验结果、和当前库的差异、能不能恢复。
 pub fn restore_preview(data_dir: &Path, id: &str) -> Result<RestorePreview> {
+    validate_backup_id(id)?;
     let manifest = load_manifest(data_dir, id)?;
     let verification = verify_backup(data_dir, id)?;
     let current_schema_version = current_schema_version(data_dir);
@@ -501,6 +527,7 @@ fn current_schema_version(data_dir: &Path) -> i64 {
 /// 真正的文件替换推迟到下次启动 —— 那时应用、同步线程和本机 API 都还没有
 /// 打开任何连接，替换才可能真正原子。
 pub fn stage_restore(data_dir: &Path, id: &str, app_version: &str) -> Result<PendingRestore> {
+    validate_backup_id(id)?;
     let preview = restore_preview(data_dir, id)?;
     if !preview.can_restore {
         return Err(ZeppBridgeError::DataUnavailable(
@@ -887,5 +914,30 @@ mod tests {
             .filter(|m| m.kind == BackupKind::PreMigration && !m.pinned)
             .count();
         assert_eq!(kept_migrations, MIGRATION_BACKUP_KEEP);
+    }
+}
+
+#[cfg(test)]
+mod backup_id_tests {
+    use super::*;
+
+    #[test]
+    fn a_traversing_backup_id_is_rejected_before_it_reaches_the_filesystem() {
+        for bad in [
+            "",
+            "../../etc/passwd",
+            r"..\..\windows\system32",
+            "auto-2026/09/01",
+            "auto 2026",
+            "auto-2026\0",
+        ] {
+            assert!(
+                validate_backup_id(bad).is_err(),
+                "{bad:?} 不该被当成合法备份 ID"
+            );
+        }
+        // 真实生成的形状必须仍然合法，否则这道校验会把备份功能整个关掉。
+        assert!(validate_backup_id("auto-20260901T124736123Z").is_ok());
+        assert!(validate_backup_id("manual-20260901T124736123Z").is_ok());
     }
 }
