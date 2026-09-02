@@ -491,7 +491,12 @@ export interface IntegrityCheckResult {
 
 export interface DatabaseHealth {
   schema_version: number;
+  /** 这个程序按哪一版规则解析。 */
   normalizer_revision: string;
+  /** 库里的派生数据是哪一版规则产出的。null = 从没重放过。 */
+  stored_normalizer_revision?: string | null;
+  /** 库里存着报文，而它们是另一版解析器归一化的——欠一次重放。 */
+  normalizer_replay_pending?: boolean;
   replay_in_progress: boolean;
   database_bytes: number;
   raw_records: number;
