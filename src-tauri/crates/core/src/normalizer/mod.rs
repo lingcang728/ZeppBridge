@@ -1364,8 +1364,9 @@ impl Normalizer {
     /// Only shapes verified against a real response are parsed here. Stress
     /// (`Charge/stress_data`) is deliberately absent: its payload is a
     /// protobuf whose float fields do not match the ranges the Zepp app shows,
-    /// so mapping it would be a guess. The raw response is retained and the
-    /// daily summary is read from `all_day_stress` instead.
+    /// so mapping it would be a guess. The raw response is retained, and
+    /// everything the app actually needs — the daily roll-up *and* the whole
+    /// 24-hour curve — comes out of `all_day_stress` instead.
     pub fn normalize_wellness(source_key: &str, raw: &Value) -> WellnessNormalizedData {
         let label = source_key.split(':').nth(1).unwrap_or_default();
         let mut out = WellnessNormalizedData::default();
@@ -1719,9 +1720,29 @@ fn pai_metrics(items: &[Value], out: &mut WellnessNormalizedData) {
     }
 }
 
-/// The all-day stress roll-up: named daily fields, unlike the `Charge`
-/// per-minute stream whose protobuf floats do not match any range the app
-/// displays.
+/// The all-day stress roll-up. One item is one day, and it carries two
+/// different things:
+///
+/// * the named daily fields — the day's average, its minimum and maximum, and
+///   the share of the day spent in each of four bands;
+/// * `data`, a JSON **string** holding that same day's whole curve as
+///   `[{"time": <epoch ms>, "value": <1..100>}, ...]`, one reading roughly
+///   every five minutes.
+///
+/// `data` is the 24/7 curve the watch itself draws, and it used to be dropped
+/// on the floor — only the daily average reached the database, so nothing
+/// downstream could ever show more than one point per day. A user reported the
+/// stress display "isn't 24/7"; it was the reading that was missing, not the
+/// measurement.
+///
+/// Checked against every one of this library's 1104 real items before wiring
+/// it up: `minStress` and `maxStress` equal the series' own minimum and
+/// maximum in 946 of the 946 items that carry them, and `avgStress` lands
+/// within 3.9 of the series mean. The roll-up is computed from this curve, so
+/// the two are one measurement rather than two streams that happen to agree.
+///
+/// The per-minute `Charge/stress_data` stream is a different payload and stays
+/// unparsed: its protobuf floats still match no range the app displays.
 fn all_day_stress_metrics(items: &[Value], out: &mut WellnessNormalizedData) {
     for item in items {
         let Some(object) = item.as_object() else {
@@ -1731,6 +1752,7 @@ fn all_day_stress_metrics(items: &[Value], out: &mut WellnessNormalizedData) {
         let Some(date) = summary_date(object, value) else {
             continue;
         };
+        let device = value.and_then(device_id).or_else(|| device_id(object));
         for (metric, keys, unit, range) in [
             (
                 "stress",
@@ -1740,10 +1762,35 @@ fn all_day_stress_metrics(items: &[Value], out: &mut WellnessNormalizedData) {
             ),
             ("stress_min", &["minStress"][..], "score", (0.0, 100.0)),
             ("stress_max", &["maxStress"][..], "score", (0.0, 100.0)),
-            ("stress_relaxed_pct", &["relaxPct"][..], "%", (0.0, 100.0)),
-            ("stress_normal_pct", &["normalPct"][..], "%", (0.0, 100.0)),
-            ("stress_medium_pct", &["mediumPct"][..], "%", (0.0, 100.0)),
-            ("stress_high_pct", &["highPct"][..], "%", (0.0, 100.0)),
+            // The four band shares. `relaxProportion` is the name the payload
+            // actually uses; `relaxPct` was transcribed from another client and
+            // has never matched a field in any of the 1104 items here, so on
+            // its own it silently produced no rows at all. Verified name first,
+            // the older guess kept behind it.
+            (
+                "stress_relaxed_pct",
+                &["relaxProportion", "relaxPct"][..],
+                "%",
+                (0.0, 100.0),
+            ),
+            (
+                "stress_normal_pct",
+                &["normalProportion", "normalPct"][..],
+                "%",
+                (0.0, 100.0),
+            ),
+            (
+                "stress_medium_pct",
+                &["mediumProportion", "mediumPct"][..],
+                "%",
+                (0.0, 100.0),
+            ),
+            (
+                "stress_high_pct",
+                &["highProportion", "highPct"][..],
+                "%",
+                (0.0, 100.0),
+            ),
         ] {
             if let Some(reading) = first_number_from(object, value, keys)
                 .filter(|reading| (range.0..=range.1).contains(reading))
@@ -1754,10 +1801,61 @@ fn all_day_stress_metrics(items: &[Value], out: &mut WellnessNormalizedData) {
                     value: reading,
                     unit: unit.into(),
                     source_scope: SourceScope::Device,
-                    device_id: value.and_then(device_id).or_else(|| device_id(object)),
+                    device_id: device.clone(),
                 });
             }
         }
+        all_day_stress_curve(object, value, device.as_deref(), out);
+    }
+}
+
+/// One day's stress curve, parsed out of the `data` string.
+///
+/// The band shares above put the boundaries at 1-39 / 40-59 / 60-79 / 80-100:
+/// recomputing the four proportions from this series with that split
+/// reproduces the reported figures to within 0.4 percentage points on average
+/// across those 946 items, and they sum to exactly 100 in every one of them.
+///
+/// Zepp's scale starts at 1. A 0 never appears in any of the 62 626 distinct
+/// readings this library holds (522 days of them), while
+/// 0 is what these payloads use elsewhere to mean "nothing measured", so a
+/// reading below 1 is dropped rather than drawn as an impossibly calm minute.
+fn all_day_stress_curve(
+    object: &Map<String, Value>,
+    nested: Option<&Map<String, Value>>,
+    device: Option<&str>,
+    out: &mut WellnessNormalizedData,
+) {
+    let Some(points) = first_value_from(object, nested, &["data"])
+        .and_then(Value::as_str)
+        .and_then(|text| serde_json::from_str::<Value>(text).ok())
+    else {
+        return;
+    };
+    let Some(points) = points.as_array() else {
+        return;
+    };
+    for point in points {
+        let Some(point) = point.as_object() else {
+            continue;
+        };
+        let Some(reading) =
+            first_number(point, &["value"]).filter(|reading| (1.0..=100.0).contains(reading))
+        else {
+            continue;
+        };
+        let Some(timestamp) = first_value(point, &["time", "timestamp"]).and_then(parse_timestamp)
+        else {
+            continue;
+        };
+        out.metric_samples.push(MetricSample {
+            metric: "stress".into(),
+            timestamp,
+            value: reading,
+            unit: "score".into(),
+            source_scope: SourceScope::Device,
+            device_id: device.map(str::to_string),
+        });
     }
 }
 
@@ -2266,5 +2364,106 @@ mod tests {
         assert!(!result[0].gps_available);
         assert_eq!(result[0].sample_count, 0);
         assert_eq!(result[0].device_id.as_deref(), Some("AABBCCDDEEFF"));
+    }
+
+    /// `all_day_stress` 每天带一条五分钟一个点的全天曲线，以前整条被丢掉。
+    ///
+    /// 取值是真实报文里 2026-09-02 那一天（当时只同步到 01:00，所以刚好
+    /// 13 个点，适合整条写进测试）。只删掉了 `userId`。
+    fn all_day_stress_item() -> Value {
+        json!({
+            "avgStress": "22",
+            "data": "[{\"time\":1788307200000,\"value\":32},{\"time\":1788307500000,\"value\":25},{\"time\":1788307800000,\"value\":32},{\"time\":1788308100000,\"value\":48},{\"time\":1788308400000,\"value\":20},{\"time\":1788308700000,\"value\":32},{\"time\":1788309000000,\"value\":33},{\"time\":1788309300000,\"value\":10},{\"time\":1788309600000,\"value\":28},{\"time\":1788309900000,\"value\":6},{\"time\":1788310200000,\"value\":4},{\"time\":1788310500000,\"value\":7},{\"time\":1788310800000,\"value\":11}]",
+            "deviceId": "D85403FFFEE4D576",
+            "deviceMac": "",
+            "deviceSn": "2445B138005129",
+            "deviceSource": "10289410",
+            "deviceType": "0",
+            "eventType": "all_day_stress",
+            "highProportion": "0",
+            "maxStress": "48",
+            "mediumProportion": "0",
+            "minStress": "4",
+            "normalProportion": "8",
+            "relaxProportion": "92",
+            "subType": "all_day_stress",
+            "timestamp": 1788307200000i64
+        })
+    }
+
+    #[test]
+    fn all_day_stress_yields_the_whole_days_curve() {
+        let batch = Normalizer::normalize_wellness(
+            "wellness:all_day_stress:user_events:2026-09-02:2026-09-03",
+            &json!({ "items": [all_day_stress_item()] }),
+        );
+
+        // 13 个点，一个不少——这正是「压力不是 24/7」少掉的东西。
+        assert_eq!(batch.metric_samples.len(), 13);
+        assert!(batch
+            .metric_samples
+            .iter()
+            .all(|sample| sample.metric == "stress" && sample.unit == "score"));
+        assert!(batch
+            .metric_samples
+            .iter()
+            .all(|sample| sample.device_id.as_deref() == Some("D85403FFFEE4D576")));
+
+        let first = &batch.metric_samples[0];
+        assert_eq!(first.value, 32.0);
+        assert_eq!(first.timestamp.to_rfc3339(), "2026-09-02T00:00:00+00:00");
+        let last = batch.metric_samples.last().unwrap();
+        assert_eq!(last.value, 11.0);
+        assert_eq!(last.timestamp.to_rfc3339(), "2026-09-02T01:00:00+00:00");
+
+        // 服务器给的当日极值就是这条曲线自己的极值：两者是同一次测量，
+        // 不是两条碰巧对得上的流。
+        let values: Vec<f64> = batch.metric_samples.iter().map(|s| s.value).collect();
+        assert_eq!(values.iter().copied().reduce(f64::min), Some(4.0));
+        assert_eq!(values.iter().copied().reduce(f64::max), Some(48.0));
+    }
+
+    #[test]
+    fn all_day_stress_band_proportions_are_read() {
+        let batch = Normalizer::normalize_wellness(
+            "wellness:all_day_stress:user_events:2026-09-02:2026-09-03",
+            &json!({ "items": [all_day_stress_item()] }),
+        );
+
+        let daily = |metric: &str| {
+            batch
+                .daily_metrics
+                .iter()
+                .find(|row| row.metric == metric)
+                .map(|row| row.value)
+        };
+
+        assert_eq!(daily("stress"), Some(22.0));
+        assert_eq!(daily("stress_min"), Some(4.0));
+        assert_eq!(daily("stress_max"), Some(48.0));
+        // 报文里的名字是 `relaxProportion`。以前只认 `relaxPct`，那个名字在
+        // 1104 条真实记录里一次都没出现过，于是这四项从来没写进过库。
+        assert_eq!(daily("stress_relaxed_pct"), Some(92.0));
+        assert_eq!(daily("stress_normal_pct"), Some(8.0));
+        assert_eq!(daily("stress_medium_pct"), Some(0.0));
+        assert_eq!(daily("stress_high_pct"), Some(0.0));
+    }
+
+    #[test]
+    fn all_day_stress_drops_zero_readings() {
+        // Zepp 的压力量程从 1 起。0 在库里 62 626 条真实读数里一次都没有出现，
+        // 而这些报文里的 0 一贯表示「没测到」——画成 0 会看起来像那一刻
+        // 特别放松。
+        let batch = Normalizer::normalize_wellness(
+            "wellness:all_day_stress:user_events:2026-09-02:2026-09-03",
+            &json!({ "items": [{
+                "eventType": "all_day_stress",
+                "timestamp": 1788307200000i64,
+                "data": "[{\"time\":1788307200000,\"value\":0},{\"time\":1788307500000,\"value\":25}]"
+            }] }),
+        );
+
+        assert_eq!(batch.metric_samples.len(), 1);
+        assert_eq!(batch.metric_samples[0].value, 25.0);
     }
 }

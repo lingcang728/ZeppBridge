@@ -2,6 +2,13 @@
 
 本文件记录每个版本的实际改动。写给使用者看，不是施工日志：只写用户能感知到的变化，以及为什么这么改。
 
+## 未发布 / Unreleased
+
+### Fixes / 修复
+
+- **The stress screen shows the whole day, not one number a day.** A user wrote in to say the stress meter "isn't 24/7", and they were right. Zepp's `all_day_stress` payload carries the entire day's curve — a reading every five minutes — in a field called `data`, and ZeppBridge was reading the daily average out of the same record and throwing the curve away. In this library that was 62,626 readings over 522 days, downloaded and then discarded. The curve is now stored, exported, and drawn on the body-status screen as a 24-hour chart. Nothing needs re-syncing: the raw payloads were kept all along, so the first launch after updating re-reads them and fills in the history. The four band shares — how much of the day was relaxed, normal, medium or high — were being dropped too, for a duller reason: the code looked for `relaxPct` while every real payload says `relaxProportion`, so those four values had never once been written to the database.
+- **压力界面现在显示一整天，而不是一天一个数。** 有用户来信说压力「不是 24/7」——他是对的。Zepp 的 `all_day_stress` 报文里有个 `data` 字段，装的是当天整条曲线，五分钟一个点；而 ZeppBridge 从同一条记录里取走了日平均值，把曲线扔了。在本机这份库里，那是 522 天、62 626 条读数，下载下来又丢掉。现在这条曲线会入库、会进导出，也会在身体状态页画成 24 小时曲线。不需要重新同步：原始报文一直都留着，更新后第一次启动会重新解析它们，历史一并补上。四项区间占比（一天里放松 / 正常 / 中等 / 高各占多久）也一直在被丢，原因更平淡：代码找的是 `relaxPct`，而真实报文里写的是 `relaxProportion`，于是这四个值从来没有写进过数据库。
+
 ## 2.1.0
 
 ### Added / 新增

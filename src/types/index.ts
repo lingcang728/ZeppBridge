@@ -129,6 +129,12 @@ export interface HeartRatePoint {
   value: number;
 }
 
+/** 全天压力曲线上的一个读数。五分钟一个点，来自 `all_day_stress`。 */
+export interface StressPoint {
+  timestamp: string;
+  value: number;
+}
+
 export interface DailyPoint {
   date: string;
   value: number;

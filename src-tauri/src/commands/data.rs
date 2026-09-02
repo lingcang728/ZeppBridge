@@ -13,8 +13,8 @@ use crate::models::{
     DiagnosticDeviceEvidence, DiagnosticField, DiagnosticObjectShape, DiagnosticReport,
     ExportDetail, ExportResult, ExportScope, ExportSelection, FeedbackSubmissionResult,
     HealthOverview, HeartRatePoint, HeartRateZoneOptions, HeartRateZonePreference, MetricSeries,
-    RawPayloadCompaction, SleepSession, StorageEstimate, TrainingBalancePoint, UserPrefs, Workout,
-    WorkoutSeries, DIAGNOSTIC_NOTE_MAX_CHARS,
+    RawPayloadCompaction, SleepSession, StorageEstimate, StressPoint, TrainingBalancePoint,
+    UserPrefs, Workout, WorkoutSeries, DIAGNOSTIC_NOTE_MAX_CHARS,
 };
 use crate::storage::corrections::WorkoutCodeLabel;
 use crate::storage::provenance::{DataHealth, IntegrityCheckResult};
@@ -178,6 +178,15 @@ pub async fn get_heart_rate_series(
 ) -> std::result::Result<Vec<HeartRatePoint>, AppError> {
     let db = state.db.lock().await;
     db.heart_rate_series(hours).map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn get_stress_series(
+    state: tauri::State<'_, AppState>,
+    hours: i64,
+) -> std::result::Result<Vec<StressPoint>, AppError> {
+    let db = state.db.lock().await;
+    db.stress_series(hours).map_err(AppError::from)
 }
 
 #[tauri::command]
