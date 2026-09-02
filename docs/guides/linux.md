@@ -141,9 +141,10 @@ sudo zypper install libayatana-appindicator3-1  # openSUSE
 ```
 
 The `.deb` and `.rpm` packages declare this dependency, so it should already be
-present there. For the Flatpak it is not yet bundled — the tray is simply absent
-until it is. On GNOME the tray also needs the AppIndicator shell extension; KDE
-shows it natively.
+present there. The Flatpak now bundles it too — the manifest builds libdbusmenu,
+libayatana-indicator and libayatana-appindicator into the sandbox, because a
+Flatpak user has no way to install it themselves. On GNOME the tray also needs
+the AppIndicator shell extension; KDE shows it natively.
 
 ## Updates
 

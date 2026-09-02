@@ -252,6 +252,21 @@ export interface SleepSession {
   stages?: SleepStageSlice[];
 }
 
+/**
+ * 一段心率区间在本次运动里待了多久。
+ *
+ * 边界来自用户在手表上的设定（云端的 `heart_range`），**不是**我们自己切的。
+ * 训练状态页那套自选区间模型（最大心率 / 储备心率 / 阈值）是另一回事，两者
+ * 的数字对不上是正常的。
+ */
+export interface HeartRateZoneBucket {
+  /** 0 起的区间序号。 */
+  index: number;
+  /** 这一段的心率上限。 */
+  upper_bound_bpm: number;
+  seconds: number;
+}
+
 export interface Workout {
   workout_id: string;
   /** Backwards-compatible normalized type. */
@@ -276,6 +291,8 @@ export interface Workout {
   source_scope: SourceScope;
   device_id?: string;
   synced_at?: string | null;
+  /** 手表自己设定的心率区间分布。空数组表示这次没有心率数据。 */
+  hr_zones?: HeartRateZoneBucket[];
 }
 
 /* ---------- 归档、补拉与备份 ---------- */
@@ -427,6 +444,28 @@ export interface BaselineExclusion {
   reason: string;
 }
 
+/**
+ * 一次运动前后半程的「配速 × 心率」对比。
+ *
+ * 量的是每一拍心跳跑出多少米。后半程比前半程低，说明维持同样的速度要花更多
+ * 心跳。这个指标很容易被路况污染，所以后端在条件不满足时给的是原因码而不是
+ * 一个硬算出来的百分比。
+ */
+export interface HeartRateDrift {
+  first_half_metres_per_beat: number;
+  second_half_metres_per_beat: number;
+  /** 负数表示同样的速度花了更多心跳。 */
+  drift_percent: number;
+  first_half_avg_hr: number;
+  second_half_avg_hr: number;
+  first_half_avg_speed_mps: number;
+  second_half_avg_speed_mps: number;
+  first_half_samples: number;
+  second_half_samples: number;
+  /** 速度的变异系数。读的人可以自己判断这次到底稳不稳。 */
+  speed_cv: number;
+}
+
 export interface WorkoutInsight {
   workout_id: string;
   workout_type: string;
@@ -437,6 +476,10 @@ export interface WorkoutInsight {
   facts: InsightFact[];
   baseline_included: BaselineEntry[];
   baseline_excluded: BaselineExclusion[];
+  /** 前后半程对比。条件不满足时为 null。 */
+  heart_rate_drift?: HeartRateDrift | null;
+  /** `not_enough_samples` / `too_short` / `pace_too_variable` / `unsupported_workout_type`。 */
+  heart_rate_drift_unavailable?: string | null;
 }
 
 export interface WeeklyReport {

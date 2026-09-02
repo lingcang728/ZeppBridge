@@ -39,6 +39,59 @@ pub mod weekly {
     pub const MIN_BASELINE_DAYS: i64 = 7;
 }
 
+/// 心率漂移（前后半程）的成立条件。
+///
+/// 这些常量决定「算不算」，所以全部写在这里而不是散在函数里 —— 它们必须能被
+/// 测试钉住，也必须能被读的人核对。
+pub mod drift {
+    /// 短于这个时长不算。前十分钟基本都是心率还在爬的过程，把它和后半程比，
+    /// 量到的是热身，不是漂移。
+    pub const MIN_DURATION_SECONDS: i64 = 20 * 60;
+    /// 每一半至少要有这么多个同时带心率和速度的样本。
+    pub const MIN_SAMPLES_PER_HALF: usize = 60;
+    /// 速度的变异系数超过这个值就不算。间歇跑、红绿灯、爬坡都会把速度打散，
+    /// 那种情况下前后半程的差异来自路况而不是身体。
+    pub const MAX_SPEED_CV: f64 = 0.20;
+    /// 心率低于这个值的样本当作没测到扔掉（贴合不良时会掉到个位数）。
+    pub const MIN_PLAUSIBLE_HR: f64 = 40.0;
+    /// 速度低于这个值当作停着，不参与统计。
+    pub const MIN_PLAUSIBLE_SPEED_MPS: f64 = 0.5;
+}
+
+/// 一次运动前后半程的「配速 × 心率」对比。
+///
+/// 量的是**每一拍心跳跑出多少米**（速度 ÷ 心率）。后半程比前半程低，说明维持
+/// 同样的速度要花更多心跳 —— 通常叫心率漂移或者 decoupling。
+///
+/// 这个指标非常容易被路况污染：红绿灯、爬坡、间歇、GPS 漂移都会让两半程根本
+/// 不可比。所以条件不满足时它返回 `None` 和一个原因码，**不硬算一个百分比**
+/// —— 这和这个模块其它地方「证据不足就说不足」是同一条规矩。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HeartRateDrift {
+    /// 前半程每拍心跳跑出的米数。
+    pub first_half_metres_per_beat: f64,
+    /// 后半程每拍心跳跑出的米数。
+    pub second_half_metres_per_beat: f64,
+    /// 后半程相对前半程的变化百分比。负数表示同样的速度要花更多心跳。
+    pub drift_percent: f64,
+    pub first_half_avg_hr: f64,
+    pub second_half_avg_hr: f64,
+    pub first_half_avg_speed_mps: f64,
+    pub second_half_avg_speed_mps: f64,
+    /// 两半各自参与计算的样本数。
+    pub first_half_samples: i64,
+    pub second_half_samples: i64,
+    /// 速度的变异系数，读的人可以自己判断这次到底稳不稳。
+    pub speed_cv: f64,
+}
+
+/// 一个同时带心率和速度的采样点。
+struct DriftSample {
+    unix: i64,
+    heart_rate: f64,
+    speed_mps: f64,
+}
+
 /// 一条事实和它的依据。
 ///
 /// `value` 为 `None` 表示这项本地没有数据 —— 是「没有」，不是 0。
@@ -136,6 +189,13 @@ pub struct WorkoutInsight {
     pub baseline_included: Vec<BaselineEntry>,
     /// 被排除的记录和原因。用户能看到「为什么那次没算进去」。
     pub baseline_excluded: Vec<BaselineExclusion>,
+    /// 前后半程的「配速 × 心率」对比。条件不满足时为 `None`。
+    #[serde(default)]
+    pub heart_rate_drift: Option<HeartRateDrift>,
+    /// 算不了的时候给一个稳定原因码：`not_enough_samples` / `too_short` /
+    /// `pace_too_variable`。**不硬算一个百分比**是这里的规矩。
+    #[serde(default)]
+    pub heart_rate_drift_unavailable: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -216,6 +276,11 @@ impl Database {
                         .into(),
                 ),
                 unsupported_code: Some("unsupported_workout_type".into()),
+                // 前后半程的对比同样只做跑步。走路和骑行的逐点采样也够算，
+                // 但没有拿真实数据验过阈值 —— 那和这个模块开头写的第一条
+                // 规矩冲突，所以这里如实空着。
+                heart_rate_drift: None,
+                heart_rate_drift_unavailable: Some("unsupported_workout_type".into()),
                 facts: Vec::new(),
                 baseline_included: Vec::new(),
                 baseline_excluded: Vec::new(),
@@ -288,12 +353,23 @@ impl Database {
             ),
         ];
 
+        // 前后半程的对比和上面那组基线比较是两件事：它只看这一次运动自己的
+        // 逐点采样，不需要任何历史。所以即使可比样本不够、上面全是
+        // `insufficient`，这一条仍然可能有结论。
+        let (heart_rate_drift, heart_rate_drift_unavailable) =
+            match self.heart_rate_drift(workout_id)? {
+                Ok(drift) => (Some(drift), None),
+                Err(code) => (None, Some(code)),
+            };
+
         Ok(WorkoutInsight {
             workout_id: workout_id.to_string(),
             workout_type,
             supported: true,
             unsupported_reason: None,
             unsupported_code: None,
+            heart_rate_drift,
+            heart_rate_drift_unavailable,
             facts,
             baseline_included: included
                 .iter()
@@ -305,6 +381,115 @@ impl Database {
                 .collect(),
             baseline_excluded: excluded,
         })
+    }
+
+    /// 前后半程的「配速 × 心率」对比。
+    ///
+    /// 返回 `Err` 只表示读库失败；`Ok(Err(code))` 表示这次运动不满足计算条件，
+    /// 附一个稳定的原因码给界面去翻译。
+    pub fn heart_rate_drift(
+        &self,
+        workout_id: &str,
+    ) -> Result<std::result::Result<HeartRateDrift, String>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT timestamp, heart_rate, speed
+             FROM workout_samples
+             WHERE workout_id = ?1 AND heart_rate IS NOT NULL AND speed IS NOT NULL
+             ORDER BY timestamp",
+        )?;
+        let rows = stmt.query_map(rusqlite::params![workout_id], |row| {
+            let timestamp: String = row.get(0)?;
+            let heart_rate: f64 = row.get(1)?;
+            let speed: f64 = row.get(2)?;
+            Ok((timestamp, heart_rate, speed))
+        })?;
+
+        let mut samples: Vec<DriftSample> = Vec::new();
+        for row in rows {
+            let (timestamp, heart_rate, speed) = row?;
+            // 贴合不良会把心率掉到个位数，停下来会把速度掉到 0。两种都不是
+            // 「这一秒的真实强度」，参与平均只会把两半程都拉偏。
+            if !(heart_rate.is_finite() && heart_rate >= drift::MIN_PLAUSIBLE_HR) {
+                continue;
+            }
+            if !(speed.is_finite() && speed >= drift::MIN_PLAUSIBLE_SPEED_MPS) {
+                continue;
+            }
+            let Ok(parsed) = DateTime::parse_from_rfc3339(&timestamp) else {
+                continue;
+            };
+            samples.push(DriftSample {
+                unix: parsed.timestamp(),
+                heart_rate,
+                speed_mps: speed,
+            });
+        }
+
+        if samples.len() < drift::MIN_SAMPLES_PER_HALF * 2 {
+            return Ok(Err("not_enough_samples".into()));
+        }
+
+        let start = samples[0].unix;
+        let end = samples[samples.len() - 1].unix;
+        if end - start < drift::MIN_DURATION_SECONDS {
+            return Ok(Err("too_short".into()));
+        }
+
+        // 按**时间**的中点切，不是按样本个数切：中间掉了一段采样时，按个数切
+        // 会把两边的时长切得完全不一样，比出来的东西没有意义。
+        let midpoint = start + (end - start) / 2;
+        let (first, second): (Vec<&DriftSample>, Vec<&DriftSample>) =
+            samples.iter().partition(|sample| sample.unix < midpoint);
+
+        if first.len() < drift::MIN_SAMPLES_PER_HALF || second.len() < drift::MIN_SAMPLES_PER_HALF {
+            return Ok(Err("not_enough_samples".into()));
+        }
+
+        let speeds: Vec<f64> = samples.iter().map(|sample| sample.speed_mps).collect();
+        let speed_mean = speeds.iter().sum::<f64>() / speeds.len() as f64;
+        let variance = speeds
+            .iter()
+            .map(|value| (value - speed_mean).powi(2))
+            .sum::<f64>()
+            / speeds.len() as f64;
+        let speed_cv = if speed_mean > 0.0 {
+            variance.sqrt() / speed_mean
+        } else {
+            f64::INFINITY
+        };
+        if !(speed_cv.is_finite() && speed_cv <= drift::MAX_SPEED_CV) {
+            // 间歇、红绿灯、爬坡。两半程根本不可比，算出来的百分比是路况的
+            // 百分比，不是身体的。
+            return Ok(Err("pace_too_variable".into()));
+        }
+
+        let mean = |half: &[&DriftSample], pick: fn(&DriftSample) -> f64| {
+            half.iter().map(|sample| pick(sample)).sum::<f64>() / half.len() as f64
+        };
+        let first_hr = mean(&first, |sample| sample.heart_rate);
+        let second_hr = mean(&second, |sample| sample.heart_rate);
+        let first_speed = mean(&first, |sample| sample.speed_mps);
+        let second_speed = mean(&second, |sample| sample.speed_mps);
+
+        // 每拍心跳跑出的米数。心率是次/分，速度是米/秒。
+        let first_eff = first_speed * 60.0 / first_hr;
+        let second_eff = second_speed * 60.0 / second_hr;
+        if !(first_eff.is_finite() && second_eff.is_finite() && first_eff > 0.0) {
+            return Ok(Err("not_enough_samples".into()));
+        }
+
+        Ok(Ok(HeartRateDrift {
+            first_half_metres_per_beat: first_eff,
+            second_half_metres_per_beat: second_eff,
+            drift_percent: (second_eff - first_eff) / first_eff * 100.0,
+            first_half_avg_hr: first_hr,
+            second_half_avg_hr: second_hr,
+            first_half_avg_speed_mps: first_speed,
+            second_half_avg_speed_mps: second_speed,
+            first_half_samples: first.len() as i64,
+            second_half_samples: second.len() as i64,
+            speed_cv,
+        }))
     }
 
     fn run_row(&self, workout_id: &str) -> Result<Option<RunRow>> {
@@ -794,6 +979,205 @@ mod tests {
 
     fn db() -> Database {
         Database::in_memory().unwrap()
+    }
+
+    /// 造一次可控的跑步：`hr` 是一个「按进度返回心率」的函数，速度固定。
+    fn drift_workout(
+        db: &Database,
+        workout_id: &str,
+        seconds: i64,
+        speed: f64,
+        hr: fn(f64) -> f64,
+    ) {
+        let start = Utc.with_ymd_and_hms(2026, 8, 24, 6, 0, 0).unwrap();
+        db.conn
+            .execute(
+                "INSERT INTO workouts (workout_id, workout_type, start_time, end_time,
+                                       source_scope, synced_at)
+                 VALUES (?1, 'run', ?2, ?3, 'device', ?3)",
+                rusqlite::params![
+                    workout_id,
+                    start.to_rfc3339(),
+                    (start + Duration::seconds(seconds)).to_rfc3339()
+                ],
+            )
+            .unwrap();
+        for second in 0..=seconds {
+            let progress = second as f64 / seconds as f64;
+            db.conn
+                .execute(
+                    "INSERT INTO workout_samples (workout_id, timestamp, heart_rate, speed)
+                     VALUES (?1, ?2, ?3, ?4)",
+                    rusqlite::params![
+                        workout_id,
+                        (start + Duration::seconds(second)).to_rfc3339(),
+                        hr(progress),
+                        speed
+                    ],
+                )
+                .unwrap();
+        }
+    }
+
+    /// 速度不变而心率一路上抬 —— 这正是心率漂移的定义：同样的速度要花更多心跳。
+    #[test]
+    fn a_steady_pace_with_a_rising_heart_rate_reads_as_drift() {
+        let db = Database::in_memory().unwrap();
+        // 40 分钟，配速恒定 3 m/s，心率从 140 线性升到 160。
+        drift_workout(&db, "w1", 2400, 3.0, |p| 140.0 + 20.0 * p);
+
+        let drift = db.heart_rate_drift("w1").unwrap().expect("条件是满足的");
+
+        assert_eq!(drift.first_half_avg_speed_mps, 3.0);
+        assert_eq!(drift.second_half_avg_speed_mps, 3.0);
+        assert!(
+            drift.second_half_avg_hr > drift.first_half_avg_hr,
+            "后半程心率应当更高：{} vs {}",
+            drift.second_half_avg_hr,
+            drift.first_half_avg_hr
+        );
+        // 心率涨了，速度没变，所以每拍跑出的米数必然下降 —— drift 为负。
+        assert!(
+            drift.drift_percent < 0.0,
+            "同样的速度花了更多心跳，drift 应当为负：{}",
+            drift.drift_percent
+        );
+        // 心率 145 -> 155 附近，效率差约 -6.5%。给一个宽区间，钉的是方向和量级。
+        assert!(
+            (-9.0..=-4.0).contains(&drift.drift_percent),
+            "量级不对：{}",
+            drift.drift_percent
+        );
+        assert!(drift.speed_cv < 1e-9, "速度恒定，变异系数应当是 0");
+    }
+
+    /// 心率和速度都稳，就是没有漂移 —— 那时候必须报接近 0，不是报「没数据」。
+    #[test]
+    fn a_steady_effort_reads_as_no_drift() {
+        let db = Database::in_memory().unwrap();
+        drift_workout(&db, "w1", 2400, 3.0, |_| 150.0);
+
+        let drift = db.heart_rate_drift("w1").unwrap().expect("条件是满足的");
+        assert!(
+            drift.drift_percent.abs() < 0.001,
+            "心率和速度都没变，drift 应当是 0：{}",
+            drift.drift_percent
+        );
+    }
+
+    /// 太短的不算。前十分钟基本都是心率还在爬，把它和后半程比量到的是热身。
+    #[test]
+    fn a_short_workout_says_so_instead_of_reporting_a_number() {
+        let db = Database::in_memory().unwrap();
+        // 15 分钟，样本够多但时长不够。
+        drift_workout(&db, "w1", 900, 3.0, |p| 140.0 + 20.0 * p);
+
+        assert_eq!(db.heart_rate_drift("w1").unwrap().unwrap_err(), "too_short");
+    }
+
+    /// 配速忽快忽慢的不算：红绿灯、间歇、爬坡都长这样，两半程根本不可比。
+    #[test]
+    fn a_variable_pace_refuses_to_produce_a_percentage() {
+        let db = Database::in_memory().unwrap();
+        let start = Utc.with_ymd_and_hms(2026, 8, 24, 6, 0, 0).unwrap();
+        db.conn
+            .execute(
+                "INSERT INTO workouts (workout_id, workout_type, start_time, end_time,
+                                       source_scope, synced_at)
+                 VALUES ('w1', 'run', ?1, ?2, 'device', ?2)",
+                rusqlite::params![
+                    start.to_rfc3339(),
+                    (start + Duration::seconds(2400)).to_rfc3339()
+                ],
+            )
+            .unwrap();
+        for second in 0..=2400 {
+            // 每 30 秒在 1.5 和 4.5 m/s 之间切换：典型的间歇。
+            let speed = if (second / 30) % 2 == 0 { 1.5 } else { 4.5 };
+            db.conn
+                .execute(
+                    "INSERT INTO workout_samples (workout_id, timestamp, heart_rate, speed)
+                     VALUES ('w1', ?1, 150, ?2)",
+                    rusqlite::params![(start + Duration::seconds(second)).to_rfc3339(), speed],
+                )
+                .unwrap();
+        }
+
+        assert_eq!(
+            db.heart_rate_drift("w1").unwrap().unwrap_err(),
+            "pace_too_variable"
+        );
+    }
+
+    /// 没有逐点采样的运动直接说没有，不去猜。
+    #[test]
+    fn a_workout_without_samples_says_there_is_nothing_to_compare() {
+        let db = Database::in_memory().unwrap();
+        let start = Utc.with_ymd_and_hms(2026, 8, 24, 6, 0, 0).unwrap();
+        db.conn
+            .execute(
+                "INSERT INTO workouts (workout_id, workout_type, start_time, end_time,
+                                       source_scope, synced_at)
+                 VALUES ('w1', 'run', ?1, ?2, 'device', ?2)",
+                rusqlite::params![
+                    start.to_rfc3339(),
+                    (start + Duration::seconds(2400)).to_rfc3339()
+                ],
+            )
+            .unwrap();
+
+        assert_eq!(
+            db.heart_rate_drift("w1").unwrap().unwrap_err(),
+            "not_enough_samples"
+        );
+    }
+
+    /// 贴合不良掉到个位数的心率、以及停下来那几秒的 0 速度，都不该参与平均。
+    #[test]
+    fn implausible_readings_are_dropped_before_the_halves_are_compared() {
+        let db = Database::in_memory().unwrap();
+        let start = Utc.with_ymd_and_hms(2026, 8, 24, 6, 0, 0).unwrap();
+        db.conn
+            .execute(
+                "INSERT INTO workouts (workout_id, workout_type, start_time, end_time,
+                                       source_scope, synced_at)
+                 VALUES ('w1', 'run', ?1, ?2, 'device', ?2)",
+                rusqlite::params![
+                    start.to_rfc3339(),
+                    (start + Duration::seconds(2400)).to_rfc3339()
+                ],
+            )
+            .unwrap();
+        for second in 0..=2400 {
+            // 每 100 秒插一个贴合不良的读数：心率 5、速度 0。
+            let (hr, speed) = if second % 100 == 0 {
+                (5.0, 0.0)
+            } else {
+                (150.0, 3.0)
+            };
+            db.conn
+                .execute(
+                    "INSERT INTO workout_samples (workout_id, timestamp, heart_rate, speed)
+                     VALUES ('w1', ?1, ?2, ?3)",
+                    rusqlite::params![(start + Duration::seconds(second)).to_rfc3339(), hr, speed],
+                )
+                .unwrap();
+        }
+
+        let drift = db
+            .heart_rate_drift("w1")
+            .unwrap()
+            .expect("扔掉坏点后条件仍然满足");
+        assert_eq!(
+            drift.first_half_avg_hr, 150.0,
+            "心率 5 的那些点不该被平均进来"
+        );
+        assert_eq!(drift.first_half_avg_speed_mps, 3.0, "速度 0 的那些点同上");
+        assert!(
+            drift.speed_cv < 1e-9,
+            "坏点被扔掉之后速度是恒定的，变异系数应当是 0：{}",
+            drift.speed_cv
+        );
     }
 
     /// 一次跑步。`minutes` 是时长，`distance` 是米。

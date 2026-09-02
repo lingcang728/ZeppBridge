@@ -18,19 +18,18 @@ const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// `raw_records` 重新跑一遍。不动它，新加的编号只对以后同步来的记录生效，
 /// 已经存成 `unknown:211` 的那 199 条记录会永远挂着——而报这个问题的人恰恰
 /// 是因为历史记录才来报的。
-pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v19-all-day-stress-curve";
+pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v20-cloud-fields";
 /// 上一版的修订号。从它升上来时只重放这几条流。
 ///
-/// v18 到 v19 只改了一处：`all_day_stress` 的 `data` 字段——每天那条五分钟
-/// 一个点的全天压力曲线——原来整条被丢掉，现在解出来写进 `metric_samples`；
-/// 同一处顺手修好了四个区间占比的字段名。只有 wellness 这条流的报文解析变
-/// 了，workouts / sleep / daily_summary 一个字节都没动，重放它们只是让升级
-/// 后第一次启动白等。
+/// v19 到 v20 取回了两批云端汇总里一直有、以前没读的字段：daily_summary 的
+/// 睡眠期 HRV / 静息心率、HRV 与静息心率的个人基线、AHI 基线、以及三个目标
+/// 值；wellness 的七天 PAI 总分、三档区间的分钟数与心率下限。这两条流的报文
+/// 解析都变了，所以两条都要重放；workouts / sleep 一个字节都没动。
 const PREVIOUS_RELEASE_NORMALIZER_REVISION: &str =
-    "zepp-normalizer-2026-09-v18-sleep-unknown-device-codes";
+    "zepp-normalizer-2026-09-v19-all-day-stress-curve";
 /// 从上一版升上来时要重放的流。**改归一化规则时必须一起看这里**：漏掉一条
 /// 流，那条流的历史记录就永远停在旧规则上，而升级看起来是成功的。
-const PREVIOUS_RELEASE_REPLAY_STREAMS: [&str; 1] = ["wellness"];
+const PREVIOUS_RELEASE_REPLAY_STREAMS: [&str; 2] = ["daily_summary", "wellness"];
 const LAST_CLOUD_SYNC_AT_KEY: &str = "last_cloud_sync_at";
 const LAST_CLOUD_SYNC_OUTCOME_KEY: &str = "last_cloud_sync_outcome";
 const LAST_LOCAL_REPROCESS_AT_KEY: &str = "last_local_reprocess_at";
@@ -229,7 +228,7 @@ fn merge_workout_type(
 /// `metric_samples` metrics are aggregated to one point per local day; the
 /// spread of that day's samples becomes `min` / `max`, which is real rather
 /// than derived.
-const SERIES_METRICS: [(&str, MetricSource, &str); 26] = [
+const SERIES_METRICS: [(&str, MetricSource, &str); 41] = [
     ("readiness", MetricSource::Daily(None), "score"),
     ("physical_readiness", MetricSource::Daily(None), "score"),
     ("mental_readiness", MetricSource::Daily(None), "score"),
@@ -268,6 +267,22 @@ const SERIES_METRICS: [(&str, MetricSource, &str); 26] = [
     ("pai_low_zone", MetricSource::Daily(None), "pai"),
     ("pai_medium_zone", MetricSource::Daily(None), "pai"),
     ("pai_high_zone", MetricSource::Daily(None), "pai"),
+    // v20 取回的那批。全部落在 `daily_metrics` 里，这里只是允许按天查询。
+    ("pai_total", MetricSource::Daily(None), "pai"),
+    ("pai_low_zone_minutes", MetricSource::Daily(None), "分钟"),
+    ("pai_medium_zone_minutes", MetricSource::Daily(None), "分钟"),
+    ("pai_high_zone_minutes", MetricSource::Daily(None), "分钟"),
+    ("pai_low_zone_lower_hr", MetricSource::Daily(None), "bpm"),
+    ("pai_medium_zone_lower_hr", MetricSource::Daily(None), "bpm"),
+    ("pai_high_zone_lower_hr", MetricSource::Daily(None), "bpm"),
+    ("sleep_hrv", MetricSource::Daily(None), "ms"),
+    ("sleep_rhr", MetricSource::Daily(None), "bpm"),
+    ("hrv_baseline", MetricSource::Daily(None), "ms"),
+    ("rhr_baseline", MetricSource::Daily(None), "bpm"),
+    ("ahi_baseline", MetricSource::Daily(None), "events/h"),
+    ("step_goal", MetricSource::Daily(None), "步"),
+    ("calorie_goal", MetricSource::Daily(None), "千卡"),
+    ("active_minutes_goal", MetricSource::Daily(None), "分钟"),
     ("hrv", MetricSource::Samples, "ms"),
     ("hrv_rmssd", MetricSource::Samples, "ms"),
 ];
@@ -2046,7 +2061,16 @@ impl Database {
                 "SELECT COUNT(*) FROM metric_samples WHERE metric = ?1",
                 Some("hrv"),
             ),
-            "daily_summary" => ("SELECT COUNT(*) FROM daily_metrics", None),
+            // 按流数，不是整表数：wellness 也往 daily_metrics 里写日行，
+            // 而 v20 这次升级两条流都要重放。整表 COUNT(*) 会把 wellness 的
+            // 行算进 daily_summary 的账上，用户看到的两个数字加起来大于真实
+            // 写入量。
+            "daily_summary" => (
+                "SELECT COUNT(*) FROM daily_metrics d
+                   JOIN raw_records r ON r.id = d.raw_record_id
+                  WHERE r.stream = 'daily_summary'",
+                None,
+            ),
             "sleep" => ("SELECT COUNT(*) FROM sleep_sessions", None),
             "workouts" => ("SELECT COUNT(*) FROM workouts", None),
             "workout_detail" => ("SELECT COUNT(*) FROM workout_samples", None),
@@ -6081,9 +6105,11 @@ mod tests {
 
         let counts = db.reprocess_raw_records_if_needed().unwrap().unwrap();
 
-        // 这一版只改了 wellness 的解析，所以只有它被重放，而且报上来的
-        // 条数是真的条数——曲线两个点加上日均一行。
+        // v19 到 v20 改的是 daily_summary 和 wellness 两条流的解析，两条都
+        // 要重放，而且报上来的条数是真的条数——wellness 是曲线两个点加上
+        // 日均一行，daily_summary 是那条 steps。
         assert_eq!(counts.get("wellness"), Some(&3));
+        assert_eq!(counts.get("daily_summary"), Some(&1));
         assert_eq!(
             db.conn
                 .query_row(
@@ -6094,10 +6120,11 @@ mod tests {
                 .unwrap(),
             2
         );
-        // 另外两条流一个字节都没动过，不该被顺手解一遍：daily_summary 的
-        // 报文是库里最大的一批，白解一遍就是让升级后第一次启动干等。
+        // workouts 和 sleep 一个字节都没动过，不该被顺手解一遍：白解一遍
+        // 就是让升级后第一次启动干等。
         assert!(!counts.contains_key("workouts"));
         assert_eq!(db.normalized_stream_count("workouts").unwrap(), 0);
+        // daily_summary 这次真的被重放了，所以它的派生行必须落库。
         assert_eq!(
             db.conn
                 .query_row(
@@ -6106,7 +6133,7 @@ mod tests {
                     |row| row.get::<_, i64>(0),
                 )
                 .unwrap(),
-            0
+            1
         );
         let revision: String = db
             .conn
