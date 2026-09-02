@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import { save as showSaveDialog } from '@tauri-apps/plugin-dialog';
+import { open as showOpenDialog, save as showSaveDialog } from '@tauri-apps/plugin-dialog';
 import { tauriApi, toUserMessage } from './useTauriApi';
 import { localDateString } from '../lib/format';
 import { buildExportSelection, MAX_EXPORT_RANGE_DAYS, type ExportScopeError } from '../lib/exportScope';
@@ -12,7 +12,7 @@ import type {
   ExportTypeGroup,
 } from '../types';
 
-export type SaveFormat = 'json' | 'csv' | 'gpx';
+export type SaveFormat = 'json' | 'csv' | 'gpx' | 'fit';
 
 const messages = defineMessages(
   {
@@ -48,13 +48,18 @@ const messages = defineMessages(
     saveJsonTitle: '另存 ZeppBridge JSON',
     saveCsvTitle: '另存 ZeppBridge CSV（汇总表）',
     saveGpxTitle: '另存 ZeppBridge GPX（GPS 轨迹）',
+    saveFitTitle: '选择 FIT 导出目录（每条运动一个文件）',
     jsonFilter: 'JSON 文件',
     csvFilter: 'CSV 表格',
     gpxFilter: 'GPX 轨迹',
+    fitFilter: 'FIT 训练文件',
     unitRecords: '条记录',
     unitRows: '行',
     unitTrackPoints: '个轨迹点',
+    unitSamplePoints: '个采样点',
     saved: (count: number, unit: string) => `已保存 ${count} ${unit}。`,
+    savedFiles: (files: number, count: number, unit: string) =>
+      `已保存 ${files} 个 FIT 文件，共 ${count} ${unit}。`,
     saveFailed: (format: string) => `保存 ${format} 失败`,
     feedUpdated: (count: number) => `本地 AI 数据源已更新，共 ${count} 条记录。`,
     feedFailed: '更新本地 AI 数据源失败',
@@ -92,13 +97,18 @@ const messages = defineMessages(
     saveJsonTitle: 'Save ZeppBridge JSON',
     saveCsvTitle: 'Save ZeppBridge CSV (summary table)',
     saveGpxTitle: 'Save ZeppBridge GPX (GPS track)',
+    saveFitTitle: 'Choose a folder for the FIT export (one file per workout)',
     jsonFilter: 'JSON file',
     csvFilter: 'CSV table',
     gpxFilter: 'GPX track',
+    fitFilter: 'FIT activity files',
     unitRecords: 'records',
     unitRows: 'rows',
     unitTrackPoints: 'track points',
+    unitSamplePoints: 'sample points',
     saved: (count: number, unit: string) => `Saved ${count} ${unit}.`,
+    savedFiles: (files: number, count: number, unit: string) =>
+      `Saved ${files} FIT files, ${count} ${unit} in total.`,
     saveFailed: (format: string) => `Could not save the ${format}`,
     feedUpdated: (count: number) => `The local AI feed now holds ${count} records.`,
     feedFailed: 'Could not update the local AI feed',
@@ -269,6 +279,16 @@ export const useExport = () => {
         unit: t.unitTrackPoints,
         save: (selection: ExportSelection, path: string) => tauriApi.saveGpxExport(selection, path),
       },
+      // FIT 的 activity 文件按约定装一次活动，所以一次导出是一个目录下的多份
+      // 文件——选的是文件夹，不是文件名。
+      fit: {
+        title: t.saveFitTitle,
+        extension: 'fit',
+        filterName: t.fitFilter,
+        unit: t.unitSamplePoints,
+        directory: true,
+        save: (selection: ExportSelection, path: string) => tauriApi.saveFitExport(selection, path),
+      },
     } as const;
   };
 
@@ -278,14 +298,28 @@ export const useExport = () => {
     const meta = saveFormats()[format];
     exportBusy.value = 'save';
     try {
-      const path = await showSaveDialog({
-        title: meta.title,
-        defaultPath: `zeppbridge-${exportStartDate.value}-${exportEndDate.value}.${meta.extension}`,
-        filters: [{ name: meta.filterName, extensions: [meta.extension] }],
-      });
-      if (!path) return;
+      const path =
+        'directory' in meta && meta.directory
+          ? await showOpenDialog({
+              title: meta.title,
+              directory: true,
+              multiple: false,
+              defaultPath: `zeppbridge-fit-${exportStartDate.value}-${exportEndDate.value}`,
+            })
+          : await showSaveDialog({
+              title: meta.title,
+              defaultPath: `zeppbridge-${exportStartDate.value}-${exportEndDate.value}.${meta.extension}`,
+              filters: [{ name: meta.filterName, extensions: [meta.extension] }],
+            });
+      if (!path || typeof path !== 'string') return;
       exportResult.value = await meta.save(selection, path);
-      exportMessage.value = copy().saved(exportResult.value.record_count, meta.unit);
+      // 一次写出多个文件时报文件数，否则「已保存 N 个采样点」会让人以为只有
+      // 一个文件。
+      const files = exportResult.value.file_count;
+      exportMessage.value =
+        files === undefined
+          ? copy().saved(exportResult.value.record_count, meta.unit)
+          : copy().savedFiles(files, exportResult.value.record_count, meta.unit);
     } catch (error) {
       exportError.value = toUserMessage(error, copy().saveFailed(meta.extension.toUpperCase()));
     } finally {

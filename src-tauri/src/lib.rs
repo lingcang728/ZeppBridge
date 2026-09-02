@@ -10,8 +10,8 @@ mod updates;
 // `zeppbridge-core` so the CLI, MCP server and local REST API answer from the
 // same semantics instead of re-implementing them.
 pub use zeppbridge_core::{
-    auth, connectors, decoder, device_catalog, export_formats, fetcher, insight, models,
-    normalizer, paths, sport_catalog, storage, sync,
+    auth, connectors, decoder, device_catalog, export_fit, export_formats, fetcher, insight,
+    models, normalizer, paths, sport_catalog, storage, sync,
 };
 
 use app_state::AppState;
@@ -29,11 +29,11 @@ use commands::{
     import_from_har, list_backups, manual_auth, open_data_folder, prepare_ai_handoff,
     probe_data_capabilities, publish_ai_export, reprocess_local_data, reset_coverage_ledger,
     retry_failed_backfill_chunks, run_database_integrity_check, save_auth, save_csv_export,
-    save_gpx_export, save_json_export, set_backup_pinned, set_device_model_override,
-    set_heart_rate_zone_preference, set_user_prefs, set_workout_code_label,
-    set_workout_type_override, stage_restore, start_history_backfill, start_history_sync,
-    start_incremental_sync, start_initial_sync, start_web_login, submit_device_model_assignment,
-    submit_diagnostic_report, verify_auth, verify_backup,
+    save_fit_export, save_gpx_export, save_json_export, set_backup_pinned,
+    set_device_model_override, set_heart_rate_zone_preference, set_user_prefs,
+    set_workout_code_label, set_workout_type_override, stage_restore, start_history_backfill,
+    start_history_sync, start_incremental_sync, start_initial_sync, start_web_login,
+    submit_device_model_assignment, submit_diagnostic_report, verify_auth, verify_backup,
 };
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
@@ -124,6 +124,21 @@ fn set_tray_locale(app: AppHandle, locale: String) -> std::result::Result<(), ip
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Linux 上的白屏。
+    //
+    // WebKitGTK 2.42 起默认走 DMABUF 渲染器，而它在相当一批驱动与合成器的
+    // 组合上会直接失败——窗口出来了，是白的，终端一个字都不打印。issue #32
+    // 报的就是这个（openSUSE，AppImage 和 Flatpak 都白）：没有报错不是因为
+    // 没出错，是因为这条失败路径本身就是静默的。
+    //
+    // 关掉它会退回较慢的渲染路径，代价是真实存在的；但「慢一点」和「整个应用
+    // 是一块白板」不是一个量级的问题。留了逃生口：用户自己设过这个变量就尊重
+    // 他的值，想开回去就 `WEBKIT_DISABLE_DMABUF_RENDERER=0`。
+    #[cfg(all(unix, not(target_os = "macos")))]
+    if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+    }
+
     #[cfg(target_os = "windows")]
     if let Ok(data_dir) = paths::resolve_data_dir() {
         let webview_dir = paths::webview_user_data_dir(&data_dir);
@@ -228,6 +243,9 @@ pub fn run() {
                 }
             });
 
+            // 托盘到底建起来没有。窗口的关闭行为要看它，所以先声明后赋值。
+            let tray_present = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+
             if let Some(window) = app.get_webview_window("main") {
                 if let Ok(Some(monitor)) = window.current_monitor() {
                     let work = monitor.work_area();
@@ -239,8 +257,15 @@ pub fn run() {
                     let _ = window.set_size(tauri::LogicalSize::new(width, height));
                 }
                 let hidden = window.clone();
+                let tray_alive = tray_present.clone();
                 window.on_window_event(move |event| {
                     if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        // 没有托盘就不能藏到托盘里：那样窗口关掉之后再也没有
+                        // 入口把它叫回来，进程还活着，看起来就是「点了关闭，
+                        // 应用没了但也没退出」。托盘建不起来时按正常关闭走。
+                        if !tray_alive.load(std::sync::atomic::Ordering::Relaxed) {
+                            return;
+                        }
                         api.prevent_close();
                         let _ = hidden.hide();
                         let _ = hidden.app_handle().emit("app://hidden-to-tray", ());
@@ -285,7 +310,33 @@ pub fn run() {
             if let Some(icon) = app.default_window_icon() {
                 tray = tray.icon(icon.clone());
             }
-            tray.build(app)?;
+
+            // 托盘建不起来不该让整个应用起不来。
+            //
+            // Linux 上的托盘图标由桌面环境提供：Tauri 走 libayatana-appindicator3，
+            // 而 GNOME 的 Flatpak runtime 里没有这个库，一些发行版的桌面上也没装。
+            // 那个 C 库找不到 .so 时是直接 `panic!` 的（见 issue #11 里那份
+            // `Failed to load ayatana-appindicator3 or appindicator3 dynamic library`
+            // 回溯），所以这里不只要接住 `Err`，还要接住 unwind——否则用户看到的
+            // 是「装好了，一启动就崩」，而真正缺的只是一个装饰性的图标。
+            let built = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| tray.build(app)));
+            match built {
+                Ok(Ok(_)) => {
+                    tray_present.store(true, std::sync::atomic::Ordering::Relaxed);
+                }
+                Ok(Err(error)) => {
+                    eprintln!("托盘图标创建失败，程序继续运行（关闭窗口将直接退出）: {error}");
+                }
+                Err(_) => {
+                    eprintln!(
+                        "托盘图标创建时崩溃，程序继续运行（关闭窗口将直接退出）。
+                         Linux 上这通常是缺少 libayatana-appindicator3：
+                         Debian/Ubuntu: sudo apt install libayatana-appindicator3-1
+                         Fedora: sudo dnf install libayatana-appindicator3
+                         openSUSE: sudo zypper install libayatana-appindicator3-1"
+                    );
+                }
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -338,6 +389,7 @@ pub fn run() {
             get_export_json,
             save_json_export,
             save_csv_export,
+            save_fit_export,
             save_gpx_export,
             publish_ai_export,
             prepare_ai_handoff,

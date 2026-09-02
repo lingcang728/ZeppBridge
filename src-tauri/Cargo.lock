@@ -1043,6 +1043,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ef6b89e5b37196644d8796de5268852ff179b44e96276cf4290264843743bb7"
 
 [[package]]
+name = "embedded-io"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9eb1aa714776b75c7e67e1da744b81a129b3ff919c8712b5e1b32252c1f07cc7"
+
+[[package]]
+name = "embedded-io-adapters"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c900a1c087f1f7d17cdc84a1290df91521cd90933efa76d68e568385d889f2f4"
+dependencies = [
+ "embedded-io",
+]
+
+[[package]]
 name = "encoding_rs"
 version = "0.8.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3607,6 +3622,15 @@ name = "rustversion"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
+
+[[package]]
+name = "rustyfit"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f100a37f0672f038671fdd8d983a03d6e5223ee5850dcea7477413798cc69bfc"
+dependencies = [
+ "embedded-io",
+]
 
 [[package]]
 name = "ryu"
@@ -6208,7 +6232,7 @@ dependencies = [
 
 [[package]]
 name = "zeppbridge"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -6236,7 +6260,7 @@ dependencies = [
 
 [[package]]
 name = "zeppbridge-cli"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "chrono",
  "serde",
@@ -6247,12 +6271,13 @@ dependencies = [
 
 [[package]]
 name = "zeppbridge-core"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
  "chrono",
  "directories",
+ "embedded-io-adapters",
  "flate2",
  "getrandom 0.2.17",
  "hex",
@@ -6261,6 +6286,7 @@ dependencies = [
  "regex",
  "reqwest 0.12.28",
  "rusqlite",
+ "rustyfit",
  "serde",
  "serde_json",
  "sha2",
@@ -6272,7 +6298,7 @@ dependencies = [
 
 [[package]]
 name = "zeppbridge-mcp"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "chrono",
  "serde",

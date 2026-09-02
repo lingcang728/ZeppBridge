@@ -1,5 +1,8 @@
 blank_issues_enabled: true
 contact_links:
-  - name: 应用内一键报错（不需要 GitHub 账号）
-    url: https://github.com/lingcang728/ZeppBridge#提交错误报告
-    about: 设置页 →「隐私与安全」→「提交错误报告」，只发送脱敏的产品级字段结构，不发送账号、令牌、序列号、GPS 或健康数值。
+  - name: One-click error report from inside the app (no GitHub account needed) · 应用内一键报错（不需要 GitHub 账号）
+    url: https://github.com/lingcang728/ZeppBridge#privacy
+    about: >-
+      Settings → Privacy & security → Submit an error report. Sends only a redacted,
+      product-level field structure — never your account, tokens, serial numbers, GPS or
+      health values. · 只发送脱敏的产品级字段结构，不发送账号、令牌、序列号、GPS 或健康数值。

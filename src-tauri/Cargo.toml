@@ -21,11 +21,17 @@ url = "2.5"
 # 原始报文压缩。已经在依赖树里（reqwest 的 gzip 走的是它），这里只是把它
 # 变成直接依赖，好在 storage 里显式使用。
 flate2 = "1"
+# FIT 导出的编码器。rustyfit 同时支持解码和编码 FIT V2（BSD-3-Clause）；
+# 生态里其余几个（fitparser / fit_file / fit）只能读，写不了。
+rustyfit = "0.10.2"
+# rustyfit 的 Write/Seek 是 embedded-io 的 trait，这个适配器把 std 的
+# Cursor<Vec<u8>> 包成它们。
+embedded-io-adapters = { version = "0.7", features = ["std"] }
 zeppbridge-core = { path = "crates/core" }
 
 [package]
 name = "zeppbridge"
-version = "2.0.0"
+version = "2.1.0"
 description = "本地优先的 Zepp 健康数据桥"
 authors = ["ZeppBridge"]
 edition = "2021"

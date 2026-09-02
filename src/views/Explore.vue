@@ -108,6 +108,7 @@ const formats = computed<{ key: SaveFormat; label: string; sub: string; icon: Ic
   { key: 'json', label: 'JSON', sub: t.value.formatJsonSub, icon: 'braces' },
   { key: 'csv', label: 'CSV', sub: t.value.formatCsvSub, icon: 'table' },
   { key: 'gpx', label: 'GPX', sub: t.value.formatGpxSub, icon: 'map' },
+  { key: 'fit', label: 'FIT', sub: t.value.formatFitSub, icon: 'activity' },
 ]);
 const activeFormat = ref<SaveFormat>('json');
 const activeFormatLabel = computed(

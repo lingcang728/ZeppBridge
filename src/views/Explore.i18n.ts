@@ -131,21 +131,22 @@ export const exploreMessages = defineMessages(
     packTitle: '打包与发送',
     packSub: '选择导出格式与目标 AI 工具。',
     // issue #28：报告者导出了全部历史，才发现 JSON 里只有训练摘要，觉得
-    // 「被含糊地误导了」。他要的是逐次训练的 .fit。那个本轮不做，但至少
-    // 得在按下导出**之前**就把「你会拿到什么」写清楚。
+    // 「被含糊地误导了」。他要的是逐次训练的 .fit——现在有了，是单独一种
+    // 导出格式。这段文案仍然保留：按下导出**之前**就该说清会拿到什么。
     packContentsTitle: '这个导出包里有什么',
     packContentsIncluded:
       '包含：训练摘要（类型、起止时间、距离、卡路里、平均/最高心率、训练负荷）、'
       + '每日指标（步数、静息心率、HRV、血氧、压力、呼吸率、PAI、VO₂max）、'
       + '睡眠会话与阶段时间轴。选「完整」时还会带上运动的逐秒序列和逐条心率读数。',
     packContentsExcluded:
-      '不包含：`.fit` / `.tcx` 等设备原生格式（Zepp 云端返回的字段不足以还原它们）、'
-      + '账号信息、令牌、设备序列号。GPS 轨迹只在 GPX 格式里，且只覆盖带轨迹的运动。',
+      '不包含：`.tcx`、账号信息、令牌、设备序列号。GPS 轨迹在 GPX 和 FIT 里都有，'
+      + '且只覆盖带轨迹的运动。选 FIT 时是一次运动一个文件，写进你选的文件夹。',
     formatGroup: '导出格式',
     formatAria: '导出格式',
     formatJsonSub: '完整结构化数据',
     formatCsvSub: '汇总表（不含逐点序列）',
     formatGpxSub: '仅含 GPS 轨迹的运动',
+    formatFitSub: '每条运动一个文件，存进你选的文件夹',
     detailGroup: '详细程度',
     detailAria: '详细程度',
     streamsGroup: '数据流',
@@ -313,14 +314,15 @@ export const exploreMessages = defineMessages(
       + 'VO2max), and sleep sessions with their stage timeline. Choosing "Full" adds per-second workout series '
       + 'and individual heart rate readings.',
     packContentsExcluded:
-      'Not included: device-native formats such as .fit or .tcx (the fields Zepp returns are not enough to '
-      + 'reconstruct them), account details, tokens, or device serial numbers. GPS tracks live only in the GPX '
-      + 'format, and only for workouts that carry a track.',
+      'Not included: .tcx, account details, tokens, or device serial numbers. GPS tracks appear in the GPX '
+      + 'and FIT formats, and only for workouts that carry a track. FIT writes one file per workout into a '
+      + 'folder you pick.',
     formatGroup: 'Export format',
     formatAria: 'Export format',
     formatJsonSub: 'Full structured data',
     formatCsvSub: 'Summary table (no per-point series)',
     formatGpxSub: 'Only workouts carrying a GPS track',
+    formatFitSub: 'One file per workout, saved into the folder you pick',
     detailGroup: 'Level of detail',
     detailAria: 'Level of detail',
     streamsGroup: 'Data streams',

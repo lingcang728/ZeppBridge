@@ -199,11 +199,18 @@ resting heart rate, HRV, SpO2, stress, respiratory rate, PAI, VO2max), and sleep
 sessions with their stage timeline. Choosing **Full** instead of **Summary**
 adds per-second workout series and individual heart rate readings.
 
-What it does not contain: device-native formats such as `.fit` or `.tcx`. The
-fields Zepp's cloud returns are not enough to reconstruct one honestly — no
-per-point GPS for most workouts, no barometric data, no device profile — so
-ZeppBridge does not write a file that claims to be a FIT. GPS tracks are
-available through GPX, and only for workouts that actually carry a track.
+`.fit` is its own export format, one file per workout, written into a folder you
+pick. It carries the per-second series ZeppBridge decoded from Zepp's workout
+detail: GPS track, heart rate, speed, altitude, running power, ground contact
+time and vertical oscillation, plus per-kilometre laps and pause events. Fields
+that were never measured are simply absent — nothing is padded to make the file
+look complete. Cadence is deliberately left out: its unit cannot be reconciled
+against any summary field we hold, and a wrong unit would silently read twice
+too high.
+
+What an export does not contain: `.tcx`, account details, tokens, or device
+serial numbers. GPS tracks appear in GPX and FIT, and only for workouts that
+actually carry a track.
 
 **It does not get heavier over time**
 

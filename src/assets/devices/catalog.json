@@ -327,7 +327,8 @@
       "checked_at": "2026-08-15",
       "image_key": "amazfit-t-rex-3-pro-48-44mm",
       "device_source_codes": [
-        10551552
+        10551552,
+        10551555
       ]
     },
     {
@@ -1820,7 +1821,9 @@
       "status": "active",
       "supported": true,
       "checked_at": "2026-08-15",
-      "device_source_codes": []
+      "device_source_codes": [
+        8651008
+      ]
     }
   ]
 }
