@@ -1249,6 +1249,7 @@ mod tests {
             sample_count: 0,
             zepp_source: Some("run.gps".into()),
             zepp_type: Some(1),
+            ..Default::default()
         })
         .unwrap();
 

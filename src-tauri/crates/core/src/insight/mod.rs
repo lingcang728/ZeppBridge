@@ -828,6 +828,7 @@ mod tests {
             sample_count: 0,
             zepp_source: None,
             zepp_type: Some(1),
+            ..Default::default()
         }
     }
 
