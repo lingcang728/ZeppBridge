@@ -77,6 +77,7 @@ export const webBackend: BridgeBackend = {
   saveJsonExport: unavailable,
   saveCsvExport: unavailable,
   saveGpxExport: unavailable,
+  saveFitExport: unavailable,
   publishAiExport: unavailable,
   prepareAiHandoff: unavailable,
   cleanupOldData: unavailable,

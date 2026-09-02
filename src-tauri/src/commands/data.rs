@@ -1,6 +1,7 @@
 use crate::app_state::AppState;
 use crate::connectors::ZeppConnector;
 use crate::device_catalog::{match_catalog, CatalogMatchInput, CatalogMatchStatus};
+use crate::export_fit;
 use crate::export_formats;
 use crate::insight::{WeeklyReport, WorkoutInsight};
 use crate::ipc_error::AppError;
@@ -869,6 +870,81 @@ pub async fn save_gpx_export(
     write_converted_export(&state, selection, path, export_formats::to_gpx, "GPX").await
 }
 
+/// 把选中的运动写成 FIT，一次运动一个文件，全部落在 `directory` 下。
+///
+/// 为什么是目录而不是单个文件：FIT 的 activity 文件按约定装一次活动，而
+/// Garmin Connect 和 Strava 对把多次活动串成一个 chained FIT 的接受度并不
+/// 一致。issue #28 要的本来也是「一次把过去所有训练拿下来」，一个目录正好
+/// 就是那个东西。
+///
+/// `record_count` 是所有文件里逐秒采样点的总数；没有明细序列的运动不产出
+/// 文件，一条都产不出时是错误，而不是一个空目录。
+#[tauri::command]
+pub async fn save_fit_export(
+    state: tauri::State<'_, AppState>,
+    selection: ExportSelection,
+    directory: String,
+) -> std::result::Result<ExportResult, AppError> {
+    let directory = validate_export_directory(&directory)?;
+    // `mut` 不能出现在 `#[tauri::command]` 的参数模式上：宏会因此推不出参数
+    // 类型，编译期报成 never-type fallback。在函数体里重新绑定。
+    let mut selection = selection;
+
+    // 和 CSV / GPX 一样：逐秒序列是这些归档格式的全部意义，所以不管界面上
+    // 勾的是什么，这里都读完整载荷。
+    selection.detail = ExportDetail::Full;
+    let (encoded, record_count) = {
+        let db = state.db.lock().await;
+        db.build_ai_export(&selection)?
+    };
+    if record_count == 0 {
+        return Err(AppError::new(
+            "err.export.empty_range",
+            "这段时间没有可导出的记录",
+        ));
+    }
+    let export: Value = serde_json::from_str(&encoded).map_err(|error| {
+        AppError::new(
+            "err.export.read_failed",
+            format!("读取导出数据失败: {error}"),
+        )
+    })?;
+
+    let (files, point_count) = export_fit::to_fit(&export).map_err(|message| {
+        AppError::new("err.export.convert_failed", message)
+            .with_params(serde_json::json!({ "format": "FIT" }))
+    })?;
+
+    std::fs::create_dir_all(&directory).map_err(|error| {
+        AppError::new(
+            "err.export.write_failed",
+            format!("创建 FIT 导出目录失败: {error}"),
+        )
+        .with_params(serde_json::json!({ "format": "FIT" }))
+    })?;
+
+    let mut bytes = 0usize;
+    for (name, content) in &files {
+        let target = directory.join(name);
+        write_file_atomically(&target, content).map_err(|error| {
+            AppError::new(
+                "err.export.write_failed",
+                format!("写入 FIT 导出失败: {error}"),
+            )
+            .with_params(serde_json::json!({ "format": "FIT" }))
+        })?;
+        bytes += content.len();
+    }
+
+    Ok(ExportResult {
+        path: directory.to_string_lossy().into_owned(),
+        record_count: point_count,
+        bytes,
+        generated_at: Utc::now().to_rfc3339(),
+        file_count: Some(files.len()),
+    })
+}
+
 /// Shared body for the non-JSON exports: build the same canonical payload the
 /// JSON export uses, convert it, then write atomically. Conversion failures
 /// (including "nothing to write") happen before any file is touched.
@@ -917,6 +993,7 @@ async fn write_converted_export(
         record_count: converted_count,
         bytes: converted.len(),
         generated_at: generated_at.to_rfc3339(),
+        file_count: None,
     })
 }
 
@@ -1389,6 +1466,7 @@ async fn write_export(
         record_count,
         bytes: encoded.len(),
         generated_at: generated_at.to_rfc3339(),
+        file_count: None,
     })
 }
 
@@ -2357,6 +2435,36 @@ fn validate_json_export_path(value: &str) -> std::result::Result<PathBuf, AppErr
 ///
 /// The extension check is not cosmetic: it keeps a mistyped destination from
 /// silently producing a file whose contents do not match its name.
+/// FIT 导出的目标目录。
+///
+/// 和 `validate_export_path` 一样只做「说得清」的检查：非空、绝对路径。刻意
+/// 不要求目录已经存在——保存对话框里新建一个文件夹是很正常的用法，目录由写入
+/// 时创建。
+fn validate_export_directory(value: &str) -> std::result::Result<PathBuf, AppError> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Err(AppError::new(
+            "err.export.path_required",
+            "请选择 FIT 文件的保存目录",
+        )
+        .with_params(serde_json::json!({ "format": "FIT" })));
+    }
+    let path = PathBuf::from(trimmed);
+    if !path.is_absolute() {
+        return Err(AppError::new(
+            "err.export.path_not_absolute",
+            "保存位置必须是绝对路径",
+        ));
+    }
+    if path.is_file() {
+        return Err(AppError::new(
+            "err.export.not_a_directory",
+            "FIT 导出需要一个目录，这里选中的是一个文件",
+        ));
+    }
+    Ok(path)
+}
+
 fn validate_export_path(value: &str, extension: &str) -> std::result::Result<PathBuf, AppError> {
     let trimmed = value.trim();
     if trimmed.is_empty() {

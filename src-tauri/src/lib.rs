@@ -10,8 +10,8 @@ mod updates;
 // `zeppbridge-core` so the CLI, MCP server and local REST API answer from the
 // same semantics instead of re-implementing them.
 pub use zeppbridge_core::{
-    auth, connectors, decoder, device_catalog, export_formats, fetcher, insight, models,
-    normalizer, paths, sport_catalog, storage, sync,
+    auth, connectors, decoder, device_catalog, export_fit, export_formats, fetcher, insight,
+    models, normalizer, paths, sport_catalog, storage, sync,
 };
 
 use app_state::AppState;
@@ -29,7 +29,8 @@ use commands::{
     import_from_har, list_backups, manual_auth, open_data_folder, prepare_ai_handoff,
     probe_data_capabilities, publish_ai_export, reprocess_local_data, reset_coverage_ledger,
     retry_failed_backfill_chunks, run_database_integrity_check, save_auth, save_csv_export,
-    save_gpx_export, save_json_export, set_backup_pinned, set_device_model_override,
+    save_fit_export, save_gpx_export, save_json_export, set_backup_pinned,
+    set_device_model_override,
     set_heart_rate_zone_preference, set_user_prefs, set_workout_code_label,
     set_workout_type_override, stage_restore, start_history_backfill, start_history_sync,
     start_incremental_sync, start_initial_sync, start_web_login, submit_device_model_assignment,
@@ -338,6 +339,7 @@ pub fn run() {
             get_export_json,
             save_json_export,
             save_csv_export,
+            save_fit_export,
             save_gpx_export,
             publish_ai_export,
             prepare_ai_handoff,

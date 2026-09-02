@@ -26,6 +26,8 @@ base64 = { workspace = true }
 regex = { workspace = true }
 url = { workspace = true }
 flate2 = { workspace = true }
+rustyfit = { workspace = true }
+embedded-io-adapters = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

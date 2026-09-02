@@ -819,6 +819,8 @@ export interface ExportResult {
   record_count: number;
   bytes: number;
   generated_at: string;
+  /** 只有 FIT 会给：一次导出写了几个文件，`path` 则是装它们的目录。 */
+  file_count?: number;
 }
 
 export type AiHandoffMode = 'inline' | 'attachment';

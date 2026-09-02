@@ -2,6 +2,13 @@
 
 本文件记录每个版本的实际改动。写给使用者看，不是施工日志：只写用户能感知到的变化，以及为什么这么改。
 
+## Unreleased
+
+### Added / 新增
+
+- **Workouts export as `.fit`, one file per workout.** [#28](https://github.com/lingcang728/ZeppBridge/issues/28) asked for this and was told it could not be done honestly, because Zepp's cloud supposedly does not return enough raw data. **That answer was wrong, and the reporter was right.** ZeppBridge has been decoding the per-second series out of Zepp's workout detail all along — GPS track, heart rate, speed, altitude, running power, ground contact time, vertical oscillation, per-kilometre splits and pause intervals — and the GPX exporter already read them. The only missing piece was a FIT writer. Pick **FIT** on the export page, choose a folder, and every workout in range with a decoded series becomes its own `.fit` file. Fields that were never measured stay absent rather than being padded with zeroes, and a workout with no series produces no file rather than an empty one. Cadence is deliberately not written: its unit cannot be reconciled against any summary value in the local database, and a wrong unit would read exactly twice too high without looking wrong.
+- **运动可以导出成 `.fit` 了，一次运动一个文件。** [#28](https://github.com/lingcang728/ZeppBridge/issues/28) 提的就是这个，而当时的回复是「做不了，因为 Zepp 云端给的原始数据不够」。**那个回答是错的，提问的人是对的。** ZeppBridge 一直在解 Zepp 运动明细里的逐秒序列——GPS 轨迹、心率、速度、海拔、跑步功率、触地时间、垂直振幅、每公里分段、暂停区间——GPX 导出器读的就是它们。缺的只是一个写 FIT 的编码器。在导出页选 **FIT**、指定一个文件夹，范围内每条带明细序列的运动都会变成自己的一个 `.fit`。没测到的字段就是不写，不会补零；完全没有序列的运动不产出文件，而不是产出一个空文件。步频刻意不写：它的单位在本地库里找不到任何汇总字段可以对账，而单位错了会正好差两倍，且从结果上看不出来。
+
 ## 2.0.0
 
 ### Added / 新增
@@ -40,8 +47,8 @@
 
 - **Linux packages are published for the first time — as a preview.** `.deb`, `.rpm`, AppImage and Flatpak are all built and attached to this release, and the download page lists them. They are marked preview on purpose: CI builds and tests every one of them, but **nobody has yet completed sign-in plus keyring (Secret Service / KWallet) on a real Linux desktop.** Please open an issue when something breaks — that is exactly what it needs.
 - **首次发布 Linux 安装包——标为实验性。** `.deb`、`.rpm`、AppImage 和 Flatpak 都会随这次发布一起附上，下载页也会列出它们。标成实验性是有意的：CI 会把每一种都构建出来并跑测试，但**还没有任何人在真实的 Linux 桌面上完整走通登录加密钥环（Secret Service / KWallet）。** 遇到问题请开 issue——那正是它现在最需要的。
-- **The export page now says what an export contains before you press it.** One report expected per-workout `.fit` files and found summaries instead. The page and the README now list what is included and what is not. `.fit` is not among it: the fields Zepp's cloud returns are not enough to reconstruct one honestly, and ZeppBridge will not write a file that claims to be something it is not.
-- **导出页现在会在你按下之前说明导出包里有什么。** 有一份报告本来期待拿到每次训练的 `.fit` 文件，结果只有摘要。页面和 README 现在都列出包含什么、不包含什么。`.fit` 不在其中：Zepp 云端返回的字段不足以诚实地还原一份 FIT，而 ZeppBridge 不会写一个自称是它并不是的东西的文件。
+- **The export page now says what an export contains before you press it.** One report expected per-workout `.fit` files and found summaries instead. The page and the README now list what is included and what is not. **Correction:** this entry originally said `.fit` was impossible because Zepp's cloud does not return enough data. That was wrong — the data was already being decoded, only the writer was missing. See the Unreleased entry above and [#28](https://github.com/lingcang728/ZeppBridge/issues/28).
+- **导出页现在会在你按下之前说明导出包里有什么。** 有一份报告本来期待拿到每次训练的 `.fit` 文件，结果只有摘要。页面和 README 现在都列出包含什么、不包含什么。**更正：** 这条原本写的是「`.fit` 做不了，因为 Zepp 云端返回的字段不够」。那句话是错的——数据早就在解了，缺的只是一个写文件的编码器。见上面的 Unreleased 条目与 [#28](https://github.com/lingcang728/ZeppBridge/issues/28)。
 - **The "syncing the last N days" line now matches what actually happens.** The incremental window moved to 30 days a while back; the interface kept saying 7. It now reads the number from the same contract value the backend uses.
 - **「正在同步最近 N 天」这句话现在和实际发生的事一致了。** 增量窗口早就改成 30 天，界面却一直说 7。它现在从后端用的同一个契约值里读这个数字。
 - **The feedback endpoint drops duplicate submissions and limits how fast one source can add new ones.** The risk was never disk space — it is that device and workout codes are only accepted once two independent reports agree, and repeated submissions make any code look well-attested. Submitting the same report twice now returns the first report's id instead of storing a second copy. What is stored for rate limiting is a salted, daily-rotating hash, never an address.

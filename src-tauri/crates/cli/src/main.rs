@@ -20,6 +20,7 @@ use std::sync::Arc;
 use zeppbridge_core::auth::AuthManager;
 use zeppbridge_core::connectors::ZeppConnector;
 use zeppbridge_core::contract;
+use zeppbridge_core::export_fit;
 use zeppbridge_core::export_formats;
 use zeppbridge_core::fetcher::DataFetcher;
 use zeppbridge_core::models::{error::ZeppBridgeError, ExportDetail, ExportScope, ExportSelection};
@@ -70,7 +71,7 @@ sync 选项:
   --json                                 输出机器可读的同步报告
 
 export 选项:
-  --format <json|csv|gpx>   默认 json
+  --format <json|csv|gpx|fit>  默认 json；fit 需要 --out 指向一个目录
   --from <YYYY-MM-DD>       与 --to 成对使用
   --to <YYYY-MM-DD>
   --workout <id>            导出单条运动；与 --from/--to 互斥
@@ -540,12 +541,12 @@ fn cmd_export(args: &[String]) -> u8 {
     }
     let json_mode = flags.has("json");
     let format = flags.get("format").unwrap_or("json");
-    if !matches!(format, "json" | "csv" | "gpx") {
+    if !matches!(format, "json" | "csv" | "gpx" | "fit") {
         return fail(
             json_mode,
             EXIT_USAGE,
             "usage",
-            "--format 只能是 json、csv 或 gpx",
+            "--format 只能是 json、csv、gpx 或 fit",
         );
     }
 
@@ -622,6 +623,10 @@ fn cmd_export(args: &[String]) -> u8 {
         }
     };
 
+    if format == "fit" {
+        return export_fit_files(json_mode, &json_text, flags.get("out"));
+    }
+
     let (body, count) = match format {
         "json" => (json_text, records),
         other => {
@@ -682,6 +687,72 @@ fn write_lock_exit(error: &WriteLockError) -> u8 {
         WriteLockError::Busy { .. } => EXIT_BUSY,
         WriteLockError::Unavailable(_) => EXIT_FAILED,
     }
+}
+
+/// FIT 导出：一次运动一个文件，全部写进 `out` 指向的目录。
+///
+/// 为什么不支持 stdout：FIT 是二进制，而且一次导出通常是多份文件——把它们拼
+/// 进一条流没有任何一端能再拆开。所以这里要求 `--out`，而不是默默写出一个没
+/// 人能用的东西。
+fn export_fit_files(json_mode: bool, json_text: &str, out: Option<&str>) -> u8 {
+    let Some(directory) = out else {
+        return fail(
+            json_mode,
+            EXIT_FAILED,
+            "failed",
+            "--format fit 需要 --out 指向一个目录：FIT 是二进制，且一次运动一个文件，没法写到标准输出",
+        );
+    };
+
+    let parsed: serde_json::Value = match serde_json::from_str(json_text) {
+        Ok(value) => value,
+        Err(error) => {
+            return fail(
+                json_mode,
+                EXIT_FAILED,
+                "failed",
+                &format!("导出结果无法解析：{error}"),
+            )
+        }
+    };
+
+    let (files, points) = match export_fit::to_fit(&parsed) {
+        Ok(value) => value,
+        Err(message) => return fail(json_mode, EXIT_FAILED, "failed", &message),
+    };
+
+    if let Err(error) = std::fs::create_dir_all(directory) {
+        return fail(
+            json_mode,
+            EXIT_FAILED,
+            "failed",
+            &format!("创建目录失败：{error}"),
+        );
+    }
+    for (name, bytes) in &files {
+        let target = std::path::Path::new(directory).join(name);
+        if let Err(error) = std::fs::write(&target, bytes) {
+            return fail(
+                json_mode,
+                EXIT_FAILED,
+                "failed",
+                &format!("写文件失败：{error}"),
+            );
+        }
+    }
+
+    emit(
+        json_mode,
+        serde_json::json!({
+            "ok": true,
+            "format": "fit",
+            "files": files.len(),
+            "records": points,
+            "out": directory
+        }),
+        &format!("已导出 {} 个 FIT 文件（共 {points} 个采样点）到 {directory}", files.len()),
+    );
+    EXIT_OK
 }
 
 #[cfg(test)]
