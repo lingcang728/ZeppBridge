@@ -120,10 +120,7 @@ fn encode_workout(workout: &Value) -> Result<Option<(Vec<u8>, usize)>, String> {
         num: typedef::MesgNum::FILE_ID,
         fields: vec![
             enum_field(mesgdef::FileId::TYPE, typedef::File::ACTIVITY.0),
-            u16_field(
-                mesgdef::FileId::MANUFACTURER,
-                typedef::Manufacturer::ZEPP.0,
-            ),
+            u16_field(mesgdef::FileId::MANUFACTURER, typedef::Manufacturer::ZEPP.0),
             u32_field(mesgdef::FileId::TIME_CREATED, fit_timestamp(start_unix)),
         ],
         ..Default::default()
@@ -193,10 +190,7 @@ fn encode_workout(workout: &Value) -> Result<Option<(Vec<u8>, usize)>, String> {
             u16_field(mesgdef::Activity::NUM_SESSIONS, 1),
             enum_field(mesgdef::Activity::TYPE, typedef::Activity::MANUAL.0),
             enum_field(mesgdef::Activity::EVENT, typedef::Event::ACTIVITY.0),
-            enum_field(
-                mesgdef::Activity::EVENT_TYPE,
-                typedef::EventType::STOP.0,
-            ),
+            enum_field(mesgdef::Activity::EVENT_TYPE, typedef::EventType::STOP.0),
         ],
         ..Default::default()
     });
@@ -256,9 +250,8 @@ fn merge_series(workout: &Value) -> Vec<(i64, Point)> {
         point.speed_mps = entry.get("speed").and_then(Value::as_f64);
         point.power_watts = entry.get("power_watts").and_then(Value::as_f64);
         point.ground_contact_ms = entry.get("ground_contact_ms").and_then(Value::as_f64);
-        point.vertical_oscillation_mm = entry
-            .get("vertical_oscillation_mm")
-            .and_then(Value::as_f64);
+        point.vertical_oscillation_mm =
+            entry.get("vertical_oscillation_mm").and_then(Value::as_f64);
         // route 已经给过高度时不覆盖：两者同源，但 route 那份和坐标是配套的。
         if point.altitude_m.is_none() {
             point.altitude_m = entry.get("altitude_m").and_then(Value::as_f64);
@@ -300,7 +293,10 @@ fn record_message(unix: i64, point: &Point) -> Message {
     if let Some(heart_rate) = point.heart_rate.filter(|value| (1..=255).contains(value)) {
         fields.push(u8_field(mesgdef::Record::HEART_RATE, heart_rate as u8));
     }
-    if let Some(speed) = point.speed_mps.filter(|value| value.is_finite() && *value >= 0.0) {
+    if let Some(speed) = point
+        .speed_mps
+        .filter(|value| value.is_finite() && *value >= 0.0)
+    {
         let scaled = (speed * 1000.0).round();
         if scaled <= f64::from(u16::MAX) {
             fields.push(u16_field(mesgdef::Record::SPEED, scaled as u16));
@@ -371,10 +367,7 @@ fn push_laps(
             enum_field(mesgdef::Lap::SPORT, sport.0),
             enum_field(mesgdef::Lap::SUB_SPORT, sub_sport.0),
             enum_field(mesgdef::Lap::INTENSITY, typedef::Intensity::ACTIVE.0),
-            enum_field(
-                mesgdef::Lap::LAP_TRIGGER,
-                typedef::LapTrigger::DISTANCE.0,
-            ),
+            enum_field(mesgdef::Lap::LAP_TRIGGER, typedef::LapTrigger::DISTANCE.0),
             u32_field(
                 mesgdef::Lap::TOTAL_ELAPSED_TIME,
                 (duration * 1000.0).max(0.0) as u32,
@@ -483,10 +476,7 @@ fn push_session(
         .and_then(Value::as_f64)
         .filter(|value| value.is_finite() && *value >= 0.0 && *value <= f64::from(u16::MAX))
     {
-        fields.push(u16_field(
-            mesgdef::Session::TOTAL_CALORIES,
-            calories as u16,
-        ));
+        fields.push(u16_field(mesgdef::Session::TOTAL_CALORIES, calories as u16));
     }
     if let Some(avg_hr) = workout
         .get("avg_hr")

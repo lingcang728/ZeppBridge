@@ -2443,11 +2443,10 @@ fn validate_json_export_path(value: &str) -> std::result::Result<PathBuf, AppErr
 fn validate_export_directory(value: &str) -> std::result::Result<PathBuf, AppError> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
-        return Err(AppError::new(
-            "err.export.path_required",
-            "请选择 FIT 文件的保存目录",
-        )
-        .with_params(serde_json::json!({ "format": "FIT" })));
+        return Err(
+            AppError::new("err.export.path_required", "请选择 FIT 文件的保存目录")
+                .with_params(serde_json::json!({ "format": "FIT" })),
+        );
     }
     let path = PathBuf::from(trimmed);
     if !path.is_absolute() {

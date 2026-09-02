@@ -30,11 +30,10 @@ use commands::{
     probe_data_capabilities, publish_ai_export, reprocess_local_data, reset_coverage_ledger,
     retry_failed_backfill_chunks, run_database_integrity_check, save_auth, save_csv_export,
     save_fit_export, save_gpx_export, save_json_export, set_backup_pinned,
-    set_device_model_override,
-    set_heart_rate_zone_preference, set_user_prefs, set_workout_code_label,
-    set_workout_type_override, stage_restore, start_history_backfill, start_history_sync,
-    start_incremental_sync, start_initial_sync, start_web_login, submit_device_model_assignment,
-    submit_diagnostic_report, verify_auth, verify_backup,
+    set_device_model_override, set_heart_rate_zone_preference, set_user_prefs,
+    set_workout_code_label, set_workout_type_override, stage_restore, start_history_backfill,
+    start_history_sync, start_incremental_sync, start_initial_sync, start_web_login,
+    submit_device_model_assignment, submit_diagnostic_report, verify_auth, verify_backup,
 };
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;

@@ -750,7 +750,10 @@ fn export_fit_files(json_mode: bool, json_text: &str, out: Option<&str>) -> u8 {
             "records": points,
             "out": directory
         }),
-        &format!("已导出 {} 个 FIT 文件（共 {points} 个采样点）到 {directory}", files.len()),
+        &format!(
+            "已导出 {} 个 FIT 文件（共 {points} 个采样点）到 {directory}",
+            files.len()
+        ),
     );
     EXIT_OK
 }
