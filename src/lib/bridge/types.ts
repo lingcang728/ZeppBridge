@@ -127,6 +127,8 @@ export interface BridgeBackend {
   saveJsonExport(selection: ExportSelection, path: string): Promise<ExportResult>;
   saveCsvExport(selection: ExportSelection, path: string): Promise<ExportResult>;
   saveGpxExport(selection: ExportSelection, path: string): Promise<ExportResult>;
+  /** FIT 一次运动一个文件，所以收的是目录而不是文件路径。 */
+  saveFitExport(selection: ExportSelection, directory: string): Promise<ExportResult>;
   publishAiExport(selection: ExportSelection): Promise<ExportResult>;
   prepareAiHandoff(
     selection: ExportSelection,

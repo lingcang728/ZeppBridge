@@ -715,6 +715,13 @@ pub struct ExportResult {
     pub record_count: usize,
     pub bytes: usize,
     pub generated_at: String,
+    /// 这次导出写了几个文件。
+    ///
+    /// 只有 FIT 会给出它：FIT 的 activity 文件按约定装一次活动，所以一个日期
+    /// 范围导出的是一个目录下的多份文件，而 `path` 指向那个目录。其余格式一次
+    /// 只写一个文件，这里是 `None`，界面也就不会去说「共 1 个文件」这种废话。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_count: Option<usize>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
