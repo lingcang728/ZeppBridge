@@ -210,7 +210,19 @@ pub struct StreamHealth {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatabaseHealth {
     pub schema_version: i64,
+    /// 这个程序按哪一版规则解析。
     pub normalizer_revision: String,
+    /// 库里的派生数据是哪一版规则产出的。`None` = 从没重放过。
+    ///
+    /// 和上面那个分开，是因为它们可以不相等，而不相等正是要报告的事：
+    /// 只报程序自己的修订号，等于对着一个历史还停在旧规则上的库说
+    /// 「修订号：当前」。桌面应用启动就重放，所以那边几乎永远相等；
+    /// 只有命令行的人没有那次启动，这两个值可以差上好几个版本。
+    #[serde(default)]
+    pub stored_normalizer_revision: Option<String>,
+    /// 库里存着报文，而它们是另一版解析器归一化的——欠一次重放。
+    #[serde(default)]
+    pub normalizer_replay_pending: bool,
     /// 后台重放正在进行。此时云端同步会以 `deferred` 让路，这不是失败。
     pub replay_in_progress: bool,
     pub database_bytes: u64,
@@ -600,9 +612,17 @@ impl Database {
             .filter_map(|value| value.newest_sample_at.clone())
             .max();
 
+        // 空库不欠重放：修订号没记过只是因为还没有东西可重放，对它说
+        // 「历史停在旧解析器上」是句没有内容的警告。
+        let replay_plan = self.pending_replay_plan()?;
         let database = DatabaseHealth {
             schema_version: self.diagnostic_schema_version()?,
             normalizer_revision: NORMALIZER_REVISION.to_string(),
+            stored_normalizer_revision: self.stored_normalizer_revision()?,
+            normalizer_replay_pending: replay_plan
+                .as_ref()
+                .map(|plan| plan.raw_records > 0)
+                .unwrap_or(false),
             replay_in_progress: super::replay_in_progress(),
             database_bytes,
             raw_records: raw_total,
@@ -898,15 +918,32 @@ fn suggested_actions(
             destructive: false,
         });
     }
-    if database.pending_normalization > 0 || database.replay_in_progress {
+    if database.pending_normalization > 0
+        || database.replay_in_progress
+        || database.normalizer_replay_pending
+    {
+        // 两个理由要分开说。「有报文没产出记录」和「记录是旧规则产出的」
+        // 对用户是两件不同的事，混成一句话会让第二种情况看起来像数据丢了。
+        let reason = if database.normalizer_replay_pending {
+            format!(
+                "本机派生数据还是 {} 产出的，当前解析器是 {}。重放不触网，也不会改写云端同步时间。",
+                database
+                    .stored_normalizer_revision
+                    .as_deref()
+                    .unwrap_or("更早的版本"),
+                database.normalizer_revision
+            )
+        } else {
+            format!(
+                "有 {} 份已保留的报文还没产出任何标准化记录。重放不触网，也不会改写云端同步时间。",
+                database.pending_normalization
+            )
+        };
         actions.push(HealthAction {
             id: "reprocess".into(),
             code: "reprocess".into(),
             label: "用当前解析器重放本地报文".into(),
-            reason: format!(
-                "有 {} 份已保留的报文还没产出任何标准化记录。重放不触网，也不会改写云端同步时间。",
-                database.pending_normalization
-            ),
+            reason,
             destructive: false,
         });
     }
