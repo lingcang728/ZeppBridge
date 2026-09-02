@@ -52,10 +52,10 @@
     },
     "linux": {
       "deb": {
-        "depends": ["libdbus-1-3"]
+        "depends": ["libdbus-1-3", "libayatana-appindicator3-1"]
       },
       "rpm": {
-        "depends": ["dbus-libs"]
+        "depends": ["dbus-libs", "libayatana-appindicator3"]
       }
     },
     "windows": {
