@@ -369,7 +369,10 @@ jobs:
         run: ./scripts/release/package-tools.ps1
 
       - name: Upload installers
-        uses: actions/upload-artifact@v4
+        # v4 跑在已经废弃的 Node 20 上。upload 与 download 的大版本号从 v5
+        # 起就不再同步（download 多走了一版路径修复），所以这里是 v7 / v8，
+        # 不是同一个数字写错了。
+        uses: actions/upload-artifact@v7
         with:
           name: zeppbridge-installers
           path: |
@@ -443,7 +446,7 @@ jobs:
           mv release/zeppbridge-tools-*.zip release-macos/
 
       - name: Upload macOS bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: zeppbridge-macos
           path: release-macos/*
@@ -555,7 +558,7 @@ jobs:
           mv release/zeppbridge-tools-*.zip release-linux/
 
       - name: Upload Linux bundles
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: zeppbridge-linux
           path: release-linux/*
@@ -590,7 +593,7 @@ jobs:
         run: ./packaging/flatpak/build-flatpak.sh --bundle --no-install
 
       - name: Upload Flatpak bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: zeppbridge-flatpak
           path: release/ZeppBridge_*.flatpak
@@ -662,25 +665,27 @@ jobs:
           fetch-depth: 0
 
       - name: Download Windows installers
-        uses: actions/download-artifact@v4
+        # download v8 起，摘要对不上默认是**报错**而不是警告（`digest-mismatch`）。
+        # 这条路径上宁可发布失败，也不该把一个下载途中损坏的安装包发出去。
+        uses: actions/download-artifact@v8
         with:
           name: zeppbridge-installers
           path: release
 
       - name: Download macOS bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: zeppbridge-macos
           path: release-macos
 
       - name: Download Linux bundles
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: zeppbridge-linux
           path: release-linux
 
       - name: Download Flatpak bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: zeppbridge-flatpak
           path: release-linux
