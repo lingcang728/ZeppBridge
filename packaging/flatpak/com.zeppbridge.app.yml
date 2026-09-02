@@ -85,32 +85,61 @@ modules:
   # 装完只留运行时需要的 .so；头文件、静态库、pkg-config、vala、gir、
   # gtk-doc 全部 cleanup 掉 —— 它们只在构建期有用，留着白白撑大安装包。
 
+  # GNOME 50 SDK 已经不再带 intltool，但 libdbusmenu 16.04.0 的 configure
+  # 脚本仍然无条件要求它。把这个纯构建期工具显式装进来；cleanup: ['*']
+  # 会在最终运行时里把它完整移除。补丁来自 Flathub shared-modules，修正
+  # intltool 0.51.0 在现代 Perl 上已经不合法的未转义左花括号正则。
+  - name: intltool
+    cleanup:
+      - '*'
+    sources:
+      - type: archive
+        url: https://launchpad.net/intltool/trunk/0.51.0/+download/intltool-0.51.0.tar.gz
+        mirror-urls:
+          - https://sources.suse.com/SUSE:SLE-15-SP7:Update:BCI/000product/ca527df4d03bf96a67854a8ed2f0c64b/INCLUDED/SUSE:SLE-15-SP6:GA::intltool::45f77273c3f2ef792fa697b444183beb/intltool-0.51.0.tar.gz
+          - https://gstreamer.freedesktop.org/src/mirror/intltool-0.51.0.tar.gz
+        sha256: 67c74d94196b153b774ab9f89b2fa6c6ba79352407037c8c14d5aeb334e959cd
+      - type: patch
+        path: intltool-perl5.26-regex-fixes.patch
+
   - name: libdbusmenu
     buildsystem: autotools
+    build-options:
+      # 这个 2016 年的代码会在新编译器上产生告警；上游早已停止发布，
+      # 不让非功能性告警被环境里的全局 -Werror 误升成构建失败。
+      cflags: -Wno-error
     # 这是 2016 年的 Ubuntu 项目，早就不动了，16.04.0 就是最后一版。
     #
-    # `--disable-scrollkeeper` / `--disable-gtk-doc`：文档工具链在 GNOME
-    # runtime 里不全，而我们一个字的文档都不需要。
+    # `--disable-gtk-doc`：文档工具链在 GNOME runtime 里不全，而我们一个字
+    # 的文档都不需要。
     # `--disable-dumper`：那是个调试用的可执行文件。
     # `--enable-introspection=no` / `--disable-vala`：绑定只给别的语言用，
     # 这里只有 C 在调它。开着它们会在 runtime 里找不到 vapigen 而挂掉。
     # `--with-gtk=3`：Tauri 走的是 GTK3 那一支。
     config-opts:
-      - --disable-scrollkeeper
       - --disable-gtk-doc
       - --disable-dumper
       - --disable-static
+      - --disable-tests
       - --disable-vala
       - --enable-introspection=no
       - --with-gtk=3
     sources:
       - type: archive
         url: https://launchpad.net/libdbusmenu/16.04/16.04.0/+download/libdbusmenu-16.04.0.tar.gz
+        mirror-urls:
+          - https://sources.suse.com/SUSE:SLFO:Main:Build/libdbusmenu/a5b3e4717f09f90f9cd5568a5f933e8d/libdbusmenu-16.04.0.tar.gz
+          - https://ftp.fr.openbsd.org/pub/OpenBSD/distfiles/libdbusmenu-16.04.0.tar.gz
         # 这个校验值不是我们自己算的（本机拉不到 launchpad）。它取自两份
         # 互相独立的下游打包记录，两者逐字节一致：
         #   Homebrew  Formula/lib/libdbusmenu.rb
         #   OpenBSD   x11/libdbusmenu/distinfo（base64 转成十六进制后相同）
         sha256: b9cc4a2acd74509435892823607d966d424bd9ad5d0b00938f27240a1bfa878a
+      # libdbusmenu 把 HAVE_VALGRIND 的 AM_CONDITIONAL 错放在 tests 条件里，
+      # `--disable-tests` 时反而会因变量未定义而退出。Flathub 的共享模块也
+      # 携带这份补丁；它只把 AM_CONDITIONAL 移到条件外，不改变运行时代码。
+      - type: patch
+        path: libdbusmenu-fix-have-valgrind-conditional.patch
     cleanup:
       - /include
       - /lib/pkgconfig
@@ -124,8 +153,14 @@ modules:
     buildsystem: cmake-ninja
     config-opts:
       - -DCMAKE_BUILD_TYPE=Release
+      # GNOME SDK 的默认 libdir 是 lib64，但后续模块的 pkg-config 搜索 /app/lib。
+      # 三个托盘依赖统一安装到 /app/lib，构建期和运行期才能找到同一份库。
+      - -DCMAKE_INSTALL_LIBDIR=lib
       - -DENABLE_TESTS=OFF
       - -DENABLE_COVERAGE=OFF
+      # Tauri 的托盘只用标准菜单项。IDO 是音量滑块等特殊指示器控件；关闭它
+      # 同时避免为未使用的 UI 控件再打包 libayatana-ido。
+      - -DENABLE_IDO=OFF
     sources:
       # 用 git + commit 而不是 tarball：GitHub 自动打的 archive 压缩包不保证
       # 逐字节稳定，而 commit sha 本身就是内容校验。
@@ -143,10 +178,12 @@ modules:
     buildsystem: cmake-ninja
     config-opts:
       - -DCMAKE_BUILD_TYPE=Release
+      - -DCMAKE_INSTALL_LIBDIR=lib
       - -DENABLE_BINDINGS_MONO=OFF
       - -DENABLE_BINDINGS_VALA=OFF
       - -DENABLE_TESTS=OFF
       - -DENABLE_COVERAGE=OFF
+      - -DENABLE_GTKDOC=OFF
       - -DFLAVOUR_GTK3=ON
     sources:
       # 0.6.0 的附注标签 95ef64b7 指向这个 commit。
