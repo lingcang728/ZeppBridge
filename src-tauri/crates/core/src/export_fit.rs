@@ -159,14 +159,21 @@ fn encode_workout(workout: &Value) -> Result<Option<(Vec<u8>, usize)>, String> {
             messages.push(timer_event(resume_at, typedef::EventType::START));
             pause_cursor += 1;
         }
-        messages.push(record_message(*unix, point));
+        messages.push(record_message(*unix, point, sport));
         record_count += 1;
     }
 
     messages.push(timer_event(end_unix, typedef::EventType::STOP));
 
     let elapsed_seconds = (end_unix - start_unix).max(0) as f64;
-    let lap_count = push_laps(&mut messages, workout, sport, sub_sport, start_unix);
+    let lap_count = push_laps(
+        &mut messages,
+        workout,
+        sport,
+        sub_sport,
+        start_unix,
+        &points,
+    );
     push_session(
         &mut messages,
         workout,
@@ -216,6 +223,8 @@ struct Point {
     altitude_m: Option<f64>,
     heart_rate: Option<i64>,
     speed_mps: Option<f64>,
+    /// 步频，单位是**步/分钟**（见 `steps_per_minute_to_fit_cadence`）。
+    cadence_spm: Option<f64>,
     power_watts: Option<f64>,
     ground_contact_ms: Option<f64>,
     vertical_oscillation_mm: Option<f64>,
@@ -248,6 +257,7 @@ fn merge_series(workout: &Value) -> Vec<(i64, Point)> {
         let point = merged.entry(unix).or_default();
         point.heart_rate = entry.get("heart_rate").and_then(Value::as_i64);
         point.speed_mps = entry.get("speed").and_then(Value::as_f64);
+        point.cadence_spm = entry.get("cadence").and_then(Value::as_f64);
         point.power_watts = entry.get("power_watts").and_then(Value::as_f64);
         point.ground_contact_ms = entry.get("ground_contact_ms").and_then(Value::as_f64);
         point.vertical_oscillation_mm =
@@ -265,20 +275,14 @@ fn merge_series(workout: &Value) -> Vec<(i64, Point)> {
             || point.speed_mps.is_some()
             || point.power_watts.is_some()
             || point.altitude_m.is_some()
+            || point.cadence_spm.is_some()
     });
 
     merged.into_iter().collect()
 }
 
 /// 一个时间点写成一条 `record`。
-///
-/// 刻意没有写 `cadence`：`samples[].cadence` 来自 Zepp `gait` 的第四个分量，
-/// 而它到底是「步/分」还是 FIT 要的「步频 rpm（= 步/分 ÷ 2）」，本地库里没有
-/// 任何汇总字段可以对账——功率、触地时间、垂直振幅都有（见
-/// `decoder/workout_detail.rs` 里的逐项核对），唯独步频没有。两个单位差两倍，
-/// 猜错了 Garmin 上会稳定显示成两倍或一半，而且看不出来是错的。所以在能对上
-/// 账之前不写这个字段，而不是写一个可能错的值。
-fn record_message(unix: i64, point: &Point) -> Message {
+fn record_message(unix: i64, point: &Point, sport: typedef::Sport) -> Message {
     let mut fields = vec![u32_field(mesgdef::Record::TIMESTAMP, fit_timestamp(unix))];
 
     if let (Some(latitude), Some(longitude)) = (point.latitude, point.longitude) {
@@ -301,6 +305,12 @@ fn record_message(unix: i64, point: &Point) -> Message {
         if scaled <= f64::from(u16::MAX) {
             fields.push(u16_field(mesgdef::Record::SPEED, scaled as u16));
         }
+    }
+    if let Some(cadence) = point
+        .cadence_spm
+        .and_then(|value| steps_per_minute_to_fit_cadence(value, sport))
+    {
+        fields.push(u8_field(mesgdef::Record::CADENCE, cadence));
     }
     if let Some(power) = point
         .power_watts
@@ -348,6 +358,7 @@ fn push_laps(
     sport: typedef::Sport,
     sub_sport: typedef::SubSport,
     fallback_start: i64,
+    points: &[(i64, Point)],
 ) -> u16 {
     let mut count = 0u16;
     for split in array(workout, "splits") {
@@ -383,6 +394,20 @@ fn push_laps(
                 mesgdef::Lap::TOTAL_DISTANCE,
                 (distance * 100.0).max(0.0) as u32,
             ));
+        }
+        // 平均速度是「这一段的距离 ÷ 这一段的时间」，两个数都是上面刚写进
+        // 文件的实测值，不是估的。不写它的代价是实实在在的：导入方普遍直接读
+        // 这个字段而不是自己从 record 里算，于是分段表整列显示 0。
+        if let (Some(distance), true) = (
+            split.get("distance_m").and_then(Value::as_f64),
+            duration > 0.0,
+        ) {
+            if let Some(speed) = encode_speed(distance / duration) {
+                fields.push(u16_field(mesgdef::Lap::AVG_SPEED, speed));
+            }
+        }
+        if let Some(speed) = max_speed_between(points, start, end).and_then(encode_speed) {
+            fields.push(u16_field(mesgdef::Lap::MAX_SPEED, speed));
         }
         if let Some(avg_hr) = split
             .get("avg_hr")
@@ -469,6 +494,60 @@ fn push_session(
                 mesgdef::Session::TOTAL_DISTANCE,
                 (distance * 100.0) as u32,
             ));
+            // 同 lap：距离 ÷ 时间，两个操作数都是刚写进这个文件的实测值。
+            // 少了这一条，导入方的「平均速度 / 平均配速」整个是空的。
+            if elapsed_seconds > 0.0 {
+                if let Some(speed) = encode_speed(distance / elapsed_seconds) {
+                    fields.push(u16_field(mesgdef::Session::AVG_SPEED, speed));
+                }
+            }
+        }
+    }
+    if let Some(speed) = points
+        .iter()
+        .filter_map(|(_, point)| point.speed_mps)
+        .filter(|value| value.is_finite() && *value >= 0.0)
+        .fold(None, |best: Option<f64>, value| {
+            Some(best.map_or(value, |best| best.max(value)))
+        })
+        .and_then(encode_speed)
+    {
+        fields.push(u16_field(mesgdef::Session::MAX_SPEED, speed));
+    }
+    // 累计爬升/下降：逐段实测值之和。之前只写在 lap 上，而导入方的总览读的是
+    // session，于是「累计爬升」永远显示 0，哪怕分段里明明有 9.35 m。
+    if let Some(gain) = total_elevation(workout, "elevation_gain_m") {
+        if gain <= f64::from(u16::MAX) {
+            fields.push(u16_field(
+                mesgdef::Session::TOTAL_ASCENT,
+                gain.round() as u16,
+            ));
+        }
+    }
+    if let Some(loss) = total_elevation(workout, "elevation_loss_m") {
+        if loss <= f64::from(u16::MAX) {
+            fields.push(u16_field(
+                mesgdef::Session::TOTAL_DESCENT,
+                loss.round() as u16,
+            ));
+        }
+    }
+    // 平均/最高步频，单位换算同 record。
+    {
+        let cadences: Vec<f64> = points
+            .iter()
+            .filter_map(|(_, point)| point.cadence_spm)
+            .filter(|value| value.is_finite() && *value > 0.0)
+            .collect();
+        if !cadences.is_empty() {
+            let mean = cadences.iter().sum::<f64>() / cadences.len() as f64;
+            if let Some(value) = steps_per_minute_to_fit_cadence(mean, sport) {
+                fields.push(u8_field(mesgdef::Session::AVG_CADENCE, value));
+            }
+            let peak = cadences.iter().cloned().fold(f64::MIN, f64::max);
+            if let Some(value) = steps_per_minute_to_fit_cadence(peak, sport) {
+                fields.push(u8_field(mesgdef::Session::MAX_CADENCE, value));
+            }
         }
     }
     if let Some(calories) = workout
@@ -619,6 +698,104 @@ fn file_name_for(workout: &Value) -> String {
 
 fn fit_timestamp(unix: i64) -> u32 {
     (unix - FIT_EPOCH_OFFSET).clamp(0, i64::from(u32::MAX)) as u32
+}
+
+/// 把「步/分钟」换成 FIT 的 `cadence`。
+///
+/// # 单位是查出来的，不是猜的
+///
+/// `samples[].cadence` 来自 Zepp `gait` 的第四个分量。它到底是步/分还是
+/// 每分钟转数，可以直接和这条运动自己的云端汇总对账——那些字段在原始报文里，
+/// 只是解析器没有把它们取出来，所以之前误以为「无从对账」：
+///
+/// | 汇总字段（walk trackid 1787901817） | 我们的序列 |
+/// |---|---|
+/// | `max_frequency` = 141 | 序列最大值 141.0 |
+/// | `avg_frequency` = 99.0 | 序列均值 100.6 |
+/// | `avg_stride_length` = 70 cm | 按步/分推出的步幅 0.70 m |
+/// | `total_step` = 8998 | 按步/分推出的步数 ≈ 9060 |
+///
+/// 按「每分钟转数」解释则步幅 0.35 m、步数 18121，整整差两倍。所以这个序列
+/// 的单位是**步/分钟**。同一条骑行的 `avg_frequency` 是 0.0，和我们那条全零
+/// 的序列也对得上。
+///
+/// # 写进 FIT 时要不要除以二
+///
+/// FIT 的 `cadence` 单位是 rpm，也就是「每分钟多少个完整周期」。对跑步和
+/// 步行来说一个周期是一整步（two footfalls），所以规范里的值是
+/// 步/分 ÷ 2，读取方再乘回二显示——Garmin 的跑步手表写出来的 FIT 就是
+/// 80-95 这个量级，而不是 160-190。骑行的一个周期是曲柄转一圈，本身就是
+/// rpm，不能除。
+///
+/// 除错了会稳定差两倍且看不出来，所以按运动类型分开处理，而不是一律照搬。
+/// 米/秒 → FIT 的速度编码（scale 1000，u16）。超出量程就不写，不截断。
+fn encode_speed(mps: f64) -> Option<u16> {
+    if !mps.is_finite() || mps < 0.0 {
+        return None;
+    }
+    let scaled = (mps * 1000.0).round();
+    if scaled > f64::from(u16::MAX) {
+        return None;
+    }
+    Some(scaled as u16)
+}
+
+/// `[start, end]` 这段时间里实测到的最大速度。没有采样就返回 `None`。
+fn max_speed_between(points: &[(i64, Point)], start: i64, end: i64) -> Option<f64> {
+    points
+        .iter()
+        .filter(|(unix, _)| *unix >= start && *unix <= end)
+        .filter_map(|(_, point)| point.speed_mps)
+        .filter(|value| value.is_finite() && *value >= 0.0)
+        .fold(None, |best: Option<f64>, value| {
+            Some(best.map_or(value, |best| best.max(value)))
+        })
+}
+
+/// 把 `splits` 里逐段的爬升/下降加起来。
+///
+/// 这些数字是解析器从海拔序列按 1 米噪声底切出来的实测值（见
+/// `decoder/workout_detail.rs` 的 `ELEVATION_NOISE_FLOOR_M`），不是这里现估的。
+/// 云端汇总里那个 `distance_ascend` 是「爬升过程中走过的水平距离」，不是爬升
+/// 高度，不能拿来充数。
+fn total_elevation(workout: &Value, key: &str) -> Option<f64> {
+    let mut total = 0.0;
+    let mut seen = false;
+    for split in array(workout, "splits") {
+        if let Some(value) = split.get(key).and_then(Value::as_f64) {
+            if value.is_finite() && value >= 0.0 {
+                total += value;
+                seen = true;
+            }
+        }
+    }
+    seen.then_some(total)
+}
+
+fn steps_per_minute_to_fit_cadence(value: f64, sport: typedef::Sport) -> Option<u8> {
+    if !value.is_finite() || value <= 0.0 {
+        return None;
+    }
+    let cycles_per_minute = if is_foot_sport(sport) {
+        value / 2.0
+    } else {
+        value
+    };
+    let rounded = cycles_per_minute.round();
+    if rounded < 1.0 || rounded > f64::from(u8::MAX) {
+        return None;
+    }
+    Some(rounded as u8)
+}
+
+/// 一个周期等于一整步的运动。见 `steps_per_minute_to_fit_cadence`。
+fn is_foot_sport(sport: typedef::Sport) -> bool {
+    matches!(
+        sport.0,
+        value if value == typedef::Sport::RUNNING.0
+            || value == typedef::Sport::WALKING.0
+            || value == typedef::Sport::HIKING.0
+    )
 }
 
 fn semicircles(degrees: f64) -> Option<i32> {
@@ -860,17 +1037,93 @@ mod tests {
         assert_eq!(messages_of(&fit, typedef::MesgNum::ACTIVITY).len(), 1);
     }
 
+    /// 步频：源数据是步/分，FIT 的 `cadence` 是 rpm，跑步/步行要除以二。
+    ///
+    /// 单位不是猜的，是和这条运动自己的云端汇总对上的账 —— 见
+    /// `steps_per_minute_to_fit_cadence` 上面那张表。
     #[test]
-    fn never_writes_cadence_because_its_unit_is_unverified() {
+    fn cadence_is_halved_for_foot_sports_and_left_alone_for_cycling() {
+        // fixture 里那条跑步的第一个采样是 170 步/分 -> 85 rpm
         let (files, _) = to_fit(&running_export()).unwrap();
         let fit = decode(&files[0].1);
+        let records = messages_of(&fit, typedef::MesgNum::RECORD);
+        assert_eq!(
+            int_of(records[0], mesgdef::Record::CADENCE),
+            Some(85),
+            "跑步：170 步/分应写成 85 rpm，读取方乘二显示回 170"
+        );
 
-        for record in messages_of(&fit, typedef::MesgNum::RECORD) {
-            assert!(
-                raw(record, mesgdef::Record::CADENCE).is_none(),
-                "步频单位无法和任何汇总字段对账，写出去会稳定差两倍"
-            );
-        }
+        let session = messages_of(&fit, typedef::MesgNum::SESSION);
+        assert_eq!(int_of(session[0], mesgdef::Session::AVG_CADENCE), Some(85));
+        assert_eq!(int_of(session[0], mesgdef::Session::MAX_CADENCE), Some(85));
+
+        // 骑行的一个周期就是曲柄转一圈，本身已经是 rpm，不能再除。
+        let ride = export_with(json!({
+            "workouts": [{
+                "workout_id": "w1", "effective_type": "road_cycling",
+                "start_time": "2026-08-24T06:00:00+08:00",
+                "route": [], "splits": [], "pauses": [],
+                "samples": [
+                    { "timestamp": "2026-08-24T06:00:00+08:00", "cadence": 90.0 },
+                    { "timestamp": "2026-08-24T06:00:01+08:00", "cadence": 90.0 }
+                ]
+            }]
+        }));
+        let (files, _) = to_fit(&ride).unwrap();
+        let fit = decode(&files[0].1);
+        let records = messages_of(&fit, typedef::MesgNum::RECORD);
+        assert_eq!(
+            int_of(records[0], mesgdef::Record::CADENCE),
+            Some(90),
+            "骑行：90 rpm 原样写入"
+        );
+    }
+
+    /// 平均/最高速度和累计爬升必须写在 session 上。
+    ///
+    /// 导入方（实测 OPPO 健康）读的是 session 字段，不会自己从 record 里算：
+    /// 少了它们，总览里的「平均速度」「最快速度」「累计爬升」全是 0，哪怕
+    /// 分段和逐秒序列里明明有数。
+    #[test]
+    fn the_session_carries_average_speed_max_speed_and_elevation() {
+        // running_export() 那条 fixture 只有 2 秒却带 15217 m，算出来的平均
+        // 速度会溢出 u16 —— 那是 fixture 的人为设定，不是真实情况。这里另起
+        // 一条时长合理的记录来验。
+        let export = export_with(json!({
+            "workouts": [{
+                "workout_id": "w1", "effective_type": "run",
+                "start_time": "2026-08-24T06:00:00+08:00",
+                "distance_meters": 1000.0,
+                "route": [], "pauses": [],
+                "samples": [
+                    { "timestamp": "2026-08-24T06:00:00+08:00", "speed": 3.0 },
+                    { "timestamp": "2026-08-24T06:08:20+08:00", "speed": 5.0 }
+                ],
+                "splits": [{
+                    "index": 1,
+                    "start_time": "2026-08-24T06:00:00+08:00",
+                    "end_time": "2026-08-24T06:08:20+08:00",
+                    "distance_m": 1000.0, "duration_seconds": 500,
+                    "elevation_gain_m": 9.35, "elevation_loss_m": 1.16,
+                    "partial": false
+                }]
+            }]
+        }));
+        let (files, _) = to_fit(&export).unwrap();
+        let fit = decode(&files[0].1);
+        let session = messages_of(&fit, typedef::MesgNum::SESSION);
+
+        // 1000 m / 500 s = 2 m/s -> scale 1000 -> 2000
+        assert_eq!(int_of(session[0], mesgdef::Session::AVG_SPEED), Some(2000));
+        // 序列里的最大值 5 m/s -> 5000
+        assert_eq!(int_of(session[0], mesgdef::Session::MAX_SPEED), Some(5000));
+        // 9.35 m 四舍五入成 9
+        assert_eq!(int_of(session[0], mesgdef::Session::TOTAL_ASCENT), Some(9));
+        assert_eq!(int_of(session[0], mesgdef::Session::TOTAL_DESCENT), Some(1));
+
+        let lap = messages_of(&fit, typedef::MesgNum::LAP);
+        assert_eq!(int_of(lap[0], mesgdef::Lap::AVG_SPEED), Some(2000));
+        assert_eq!(int_of(lap[0], mesgdef::Lap::MAX_SPEED), Some(5000));
     }
 
     #[test]
