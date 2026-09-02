@@ -53,6 +53,21 @@ export default defineConfig(async () => ({
     __BUILD_STAMP__: JSON.stringify(buildStamp()),
   },
   build: {
+    // 产物的语法基线，显式钉死。
+    //
+    // Vite 6 的默认值是 `'modules'`，展开就是下面这一行。Vite 7 起默认
+    // 换成了 `baseline-widely-available`（现在解析成 chrome111 / edge111 /
+    // firefox114 / safari16.4），也就是说**升一次 vite 就会悄悄抬高用户
+    // 那台机器的门槛**。
+    //
+    // 这个应用跑在系统 WebView 里：Windows 的 WebView2 是常青版无所谓，
+    // 但 macOS 的 WKWebView 跟着系统走，而 tauri.conf.json 里写的最低系统
+    // 版本是 11.0 —— Big Sur 最高只能升到 Safari 16.6，离 16.4 只差两个
+    // 小版本。Linux 的 WebKitGTK 更说不准。
+    //
+    // 钉在这里以后，升 vite 就只是升构建工具，产物一个字节的语法都不动。
+    // 要抬高基线是另一件事，得单独决定、单独说明，不该是升级的副作用。
+    target: ['es2020', 'edge88', 'firefox78', 'chrome87', 'safari14'],
     assetsInlineLimit: 0,
     rollupOptions: {
       output: {

@@ -20,6 +20,23 @@ const messages = defineMessages(
     comparedTo: (count: number) => `和你自己距离相近的最近 ${count} 次跑步相比：`,
     noComparison: '还没有足够的可比历史记录，所以这次只报数值，不做比较。',
     baselinePrefix: (value: string, delta: string) => `基线 ${value} · ${delta}`,
+    driftTitle: '前后半程',
+    driftSub: '把这次运动按时间切成两半，比同样的速度各花了多少心跳。',
+    driftFirst: '前半程',
+    driftSecond: '后半程',
+    driftPerBeat: (metres: string) => `${metres} 米/拍`,
+    driftHrSpeed: (hr: number, pace: string) => `${hr} bpm · ${pace}`,
+    driftDelta: (percent: string) => `${percent}%`,
+    driftRising: '后半程维持同样的速度花了更多心跳。',
+    driftFlat: '前后半程基本一致。',
+    driftFalling: '后半程每一拍跑得比前半程更远。',
+    driftNote: '这只是这一次运动自己的前后对比，不和任何人比。红绿灯、爬坡、间歇和 GPS 漂移都会污染它，所以配速不够稳的时候这里不给数字。',
+    driftUnavailable: (code: string) => ({
+      too_short: '这次太短了，算不了前后半程：前十分钟基本都是心率还在爬，拿它和后半程比量到的是热身，不是漂移。',
+      pace_too_variable: '这次的配速起伏太大（间歇、红绿灯或者爬坡都会这样），前后两半根本不可比，所以不给数字。',
+      not_enough_samples: '这次没有足够的逐点心率和速度采样，算不了前后半程。',
+      unsupported_workout_type: '前后半程对比目前只做跑步 —— 走路和骑行的采样也够算，但还没有拿真实数据验过阈值。',
+    } as Record<string, string | undefined>)[code] ?? '这次算不了前后半程。',
     baselineSummary: '对比基准是怎么来的',
     // 容差可能没有（后端标成 null）。那时不编一个数字出来，写「—」。
     baselineRule: (days: number, tolerance: number | null | undefined, min: number, max: number) =>
@@ -59,6 +76,23 @@ const messages = defineMessages(
     comparedTo: (count: number) => `Against your own ${count} most recent runs of a similar distance:`,
     noComparison: 'Not enough comparable history yet, so this run reports its numbers without comparing them.',
     baselinePrefix: (value: string, delta: string) => `baseline ${value} · ${delta}`,
+    driftTitle: 'First half vs second',
+    driftSub: 'Splits this workout in two by time and compares how many beats the same speed cost.',
+    driftFirst: 'First half',
+    driftSecond: 'Second half',
+    driftPerBeat: (metres: string) => `${metres} m/beat`,
+    driftHrSpeed: (hr: number, pace: string) => `${hr} bpm · ${pace}`,
+    driftDelta: (percent: string) => `${percent}%`,
+    driftRising: 'Holding the same speed cost more beats in the second half.',
+    driftFlat: 'The two halves are essentially the same.',
+    driftFalling: 'Each beat carried you further in the second half.',
+    driftNote: 'This compares the workout only with itself, never with anyone else. Traffic lights, hills, intervals and GPS drift all contaminate it, so no number is given when the pace was not steady.',
+    driftUnavailable: (code: string) => ({
+      too_short: 'Too short to split. The first ten minutes are mostly the heart rate still climbing, so comparing them to the second half measures the warm-up, not drift.',
+      pace_too_variable: 'The pace varied too much (intervals, traffic lights or hills all look like this), so the two halves are not comparable and no number is given.',
+      not_enough_samples: 'Not enough per-point heart rate and speed samples in this workout to split it.',
+      unsupported_workout_type: 'The first-half/second-half comparison covers running only for now. Walking and cycling carry enough samples too, but the thresholds have not been checked against real data.',
+    } as Record<string, string | undefined>)[code] ?? 'This workout cannot be split.',
     baselineSummary: 'Where the baseline comes from',
     baselineRule: (days: number, tolerance: number | null | undefined, min: number, max: number) =>
       `The rule: runs of the same type from the last ${days} days whose distance is within ±${tolerance ?? '—'}% of this one, at least ${min} and at most ${max} of them.`,
@@ -144,6 +178,57 @@ const deltaText = (fact: InsightFact): string => {
   return `${sign}${fact.comparison.delta_percent.toFixed(1)}%`;
 };
 
+/*
+ * 前后半程。
+ *
+ * 后端在条件不满足时给的是原因码而不是数字 —— 这里照样把原因说出来，而不是
+ * 把整块藏起来：「这次为什么没有」和「这次是多少」一样值得看见。
+ */
+const drift = computed(() => props.insight?.heart_rate_drift ?? null);
+const driftReason = computed(() => props.insight?.heart_rate_drift_unavailable ?? null);
+
+/** 米/秒 -> 每公里的分秒。0 或非有限值不显示成 0'00"。 */
+const paceFromSpeed = (metresPerSecond: number): string => {
+  if (!Number.isFinite(metresPerSecond) || metresPerSecond <= 0) return t.value.notProvided;
+  const secondsPerKm = Math.round(1000 / metresPerSecond);
+  return `${Math.floor(secondsPerKm / 60)}'${String(secondsPerKm % 60).padStart(2, '0')}" /km`;
+};
+
+const driftRows = computed(() => {
+  const value = drift.value;
+  if (!value) return [];
+  return [
+    {
+      key: 'first',
+      label: t.value.driftFirst,
+      perBeat: t.value.driftPerBeat(value.first_half_metres_per_beat.toFixed(2)),
+      detail: t.value.driftHrSpeed(
+        Math.round(value.first_half_avg_hr),
+        paceFromSpeed(value.first_half_avg_speed_mps),
+      ),
+    },
+    {
+      key: 'second',
+      label: t.value.driftSecond,
+      perBeat: t.value.driftPerBeat(value.second_half_metres_per_beat.toFixed(2)),
+      detail: t.value.driftHrSpeed(
+        Math.round(value.second_half_avg_hr),
+        paceFromSpeed(value.second_half_avg_speed_mps),
+      ),
+    },
+  ];
+});
+
+/** 半个百分点以内当作没变化：那个量级是采样噪声，不是身体。 */
+const driftVerdict = computed(() => {
+  const percent = drift.value?.drift_percent;
+  if (percent === undefined) return null;
+  if (Math.abs(percent) < 0.5) return { tone: 'flat', text: t.value.driftFlat };
+  return percent < 0
+    ? { tone: 'bad', text: t.value.driftRising }
+    : { tone: 'good', text: t.value.driftFalling };
+});
+
 const facts = computed(() => props.insight?.facts ?? []);
 const baselineWindow = computed(() => facts.value.find((fact) => fact.baseline_window)?.baseline_window ?? null);
 const comparedFacts = computed(() => facts.value.filter((fact) => fact.comparison));
@@ -207,6 +292,29 @@ const exclusionSummary = computed(() => {
         </div>
       </div>
 
+      <section class="drift" :aria-label="t.driftTitle">
+        <p class="drift-head">
+          <strong>{{ t.driftTitle }}</strong>
+          <span
+            v-if="drift && driftVerdict"
+            :class="['delta', driftVerdict.tone]"
+          >{{ t.driftDelta(drift.drift_percent.toFixed(1)) }}</span>
+        </p>
+        <p class="insight-note">{{ t.driftSub }}</p>
+        <template v-if="drift">
+          <div class="drift-grid">
+            <div v-for="row in driftRows" :key="row.key" class="fact">
+              <span class="fact-label">{{ row.label }}</span>
+              <strong>{{ row.perBeat }}</strong>
+              <span class="fact-delta muted">{{ row.detail }}</span>
+            </div>
+          </div>
+          <p v-if="driftVerdict" class="insight-note">{{ driftVerdict.text }}</p>
+        </template>
+        <p v-else-if="driftReason" class="insight-note">{{ t.driftUnavailable(driftReason) }}</p>
+        <p class="insight-note subtle">{{ t.driftNote }}</p>
+      </section>
+
       <details v-if="insight.baseline_included.length || insight.baseline_excluded.length">
         <summary>{{ t.baselineSummary }}</summary>
         <p class="insight-note">
@@ -268,4 +376,9 @@ details summary { color: var(--subtle); font-size: 12px; cursor: pointer; }
 
 .insight-note { margin: 0; color: var(--subtle); font-size: 11px; line-height: 1.6; }
 .insight-error { margin: 0; color: var(--danger); font-size: 12px; }
+.drift { margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--line); }
+.drift-head { display: flex; align-items: baseline; gap: 8px; margin: 0 0 4px; }
+.drift-head strong { color: var(--ink); font-size: 13px; }
+.drift-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 10px 0 0; }
+.insight-note.subtle { color: var(--subtle); }
 </style>

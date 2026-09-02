@@ -550,6 +550,28 @@ fn push_session(
             }
         }
     }
+    // 步数 -> TOTAL_CYCLES。
+    //
+    // 以前不写这个字段，导入方只能自己估：OPPO 健康拿 0.83 km 估出 1274 步，
+    // 而云端汇总里明明写着真实步数。
+    //
+    // 除以二和 `steps_per_minute_to_fit_cadence` 同源：跑步/健走的一个 cycle
+    // 是一整步（两次落脚）。这个方向被实测钉死过 —— OPPO 显示「最快步频 142
+    // 步/分钟」，而文件里写的是 71 rpm。
+    //
+    // 只在走路类运动上写。骑行的一个 cycle 是曲柄转一圈，跟步数不是一回事，
+    // 把步数塞进去只会得到一个假的踏频总数。
+    if is_foot_sport(sport) {
+        if let Some(cycles) = workout
+            .get("total_steps")
+            .and_then(Value::as_i64)
+            .filter(|value| *value > 0)
+            .map(|value| value / 2)
+            .filter(|value| *value > 0 && *value <= i64::from(u32::MAX))
+        {
+            fields.push(u32_field(mesgdef::Session::TOTAL_CYCLES, cycles as u32));
+        }
+    }
     if let Some(calories) = workout
         .get("calories")
         .and_then(Value::as_f64)
@@ -964,6 +986,7 @@ mod tests {
                     "calories": 900.0,
                     "avg_hr": 141,
                     "max_hr": 173,
+                    "total_steps": 8998,
                     "device_label": "Amazfit Balance",
                     "route": [
                         { "timestamp": "2026-08-24T06:00:00+08:00", "latitude": 31.2304,
@@ -1089,6 +1112,66 @@ mod tests {
             int_of(records[0], mesgdef::Record::CADENCE),
             Some(90),
             "骑行：90 rpm 原样写入"
+        );
+    }
+
+    /// 步数写成 session 的 `TOTAL_CYCLES`，走路类运动要除以二。
+    ///
+    /// 不写这个字段的时候，导入方只能拿距离去估：OPPO 健康从 0.83 km 估出
+    /// 1274 步。云端汇总里本来就有真实步数，PR #34 之后也已经进库了。
+    #[test]
+    fn total_steps_become_session_cycles() {
+        // fixture 的 total_steps 是 8998 -> 4499 个整步
+        let (files, _) = to_fit(&running_export()).unwrap();
+        let fit = decode(&files[0].1);
+        let session = messages_of(&fit, typedef::MesgNum::SESSION);
+        assert_eq!(
+            int_of(session[0], mesgdef::Session::TOTAL_CYCLES),
+            Some(4499),
+            "跑步：8998 步应写成 4499 个 cycle，读取方乘二显示回 8998"
+        );
+
+        // 骑行的 cycle 是曲柄转一圈，跟步数无关，一个字都不该写。
+        let ride = export_with(json!({
+            "workouts": [{
+                "workout_id": "w1", "effective_type": "road_cycling",
+                "start_time": "2026-08-24T06:00:00+08:00",
+                "total_steps": 8998,
+                "route": [], "splits": [], "pauses": [],
+                "samples": [
+                    { "timestamp": "2026-08-24T06:00:00+08:00", "heart_rate": 120 },
+                    { "timestamp": "2026-08-24T06:00:01+08:00", "heart_rate": 121 }
+                ]
+            }]
+        }));
+        let (files, _) = to_fit(&ride).unwrap();
+        let fit = decode(&files[0].1);
+        let session = messages_of(&fit, typedef::MesgNum::SESSION);
+        assert_eq!(
+            int_of(session[0], mesgdef::Session::TOTAL_CYCLES),
+            None,
+            "骑行：步数不是踏频总数，不写 TOTAL_CYCLES"
+        );
+
+        // 没有步数的记录仍然不补零。
+        let bare = export_with(json!({
+            "workouts": [{
+                "workout_id": "w1", "effective_type": "run",
+                "start_time": "2026-08-24T06:00:00+08:00",
+                "route": [], "splits": [], "pauses": [],
+                "samples": [
+                    { "timestamp": "2026-08-24T06:00:00+08:00", "heart_rate": 120 },
+                    { "timestamp": "2026-08-24T06:00:01+08:00", "heart_rate": 121 }
+                ]
+            }]
+        }));
+        let (files, _) = to_fit(&bare).unwrap();
+        let fit = decode(&files[0].1);
+        let session = messages_of(&fit, typedef::MesgNum::SESSION);
+        assert_eq!(
+            int_of(session[0], mesgdef::Session::TOTAL_CYCLES),
+            None,
+            "没有步数就不写这个字段，不补零"
         );
     }
 

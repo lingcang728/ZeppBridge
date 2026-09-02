@@ -23,6 +23,7 @@ export const webBackend: BridgeBackend = {
   getCapabilityOverview: unavailable,
   getHealthOverview: unavailable,
   getHeartRateSeries: unavailable,
+  getStressSeries: unavailable,
   getTrainingLoadSeries: unavailable,
   getMetricSeries: unavailable,
   getTrainingBalance: unavailable,

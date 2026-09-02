@@ -261,6 +261,10 @@ mod tests {
             (10289410, "amazfit-helio-strap"),
             (10158337, "amazfit-bip-6"),
             (11141379, "amazfit-balance-3"),
+            // 2026-09-02 那批反馈里凑够第二份独立报告的三个。
+            (10813697, "amazfit-active-max"),
+            (11206915, "amazfit-bip-max"),
+            (10944771, "amazfit-active-3-premium"),
         ] {
             let matched = match_catalog(&CatalogMatchInput {
                 device_source_codes: vec![code],

@@ -388,6 +388,16 @@ pub struct HeartRatePoint {
     pub value: f64,
 }
 
+/// 全天压力曲线上的一个读数。
+///
+/// 和心率点长得一样，但不合并成一个类型：这两条曲线的单位、量程和空值含义
+/// 都不同，共用一个名字只会让调用处读起来像是在画心率。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StressPoint {
+    pub timestamp: String,
+    pub value: f64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DailyPoint {
     pub date: String,
