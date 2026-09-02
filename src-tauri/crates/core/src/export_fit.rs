@@ -516,7 +516,7 @@ fn push_session(
     }
     // 累计爬升/下降：逐段实测值之和。之前只写在 lap 上，而导入方的总览读的是
     // session，于是「累计爬升」永远显示 0，哪怕分段里明明有 9.35 m。
-    if let Some(gain) = total_elevation(workout, "elevation_gain_m") {
+    if let Some(gain) = total_elevation(workout, "elevation_gain_m", "elevation_gain_m") {
         if gain <= f64::from(u16::MAX) {
             fields.push(u16_field(
                 mesgdef::Session::TOTAL_ASCENT,
@@ -524,7 +524,7 @@ fn push_session(
             ));
         }
     }
-    if let Some(loss) = total_elevation(workout, "elevation_loss_m") {
+    if let Some(loss) = total_elevation(workout, "elevation_loss_m", "elevation_loss_m") {
         if loss <= f64::from(u16::MAX) {
             fields.push(u16_field(
                 mesgdef::Session::TOTAL_DESCENT,
@@ -752,17 +752,30 @@ fn max_speed_between(points: &[(i64, Point)], start: i64, end: i64) -> Option<f6
         })
 }
 
-/// 把 `splits` 里逐段的爬升/下降加起来。
+/// 累计爬升 / 下降。
 ///
-/// 这些数字是解析器从海拔序列按 1 米噪声底切出来的实测值（见
-/// `decoder/workout_detail.rs` 的 `ELEVATION_NOISE_FLOOR_M`），不是这里现估的。
+/// 优先用云端自己的 `elevation_gain_m` / `elevation_loss_m`：那是用户在
+/// Zepp App 里看到的数字，导出跟它一致才不会被当成 bug 报上来。云端没给时才
+/// 回退到把 `splits` 里逐段的爬升加起来——那是解析器从海拔序列按 1 米噪声底
+/// 切出来的实测值（见 `decoder/workout_detail.rs` 的 `ELEVATION_NOISE_FLOOR_M`）。
+///
+/// 两者会有出入：实测一次 6.37 km 健走，云端 59 m，分段之和 37 m。都不算错，
+/// 但只能有一个出现在导出里。
+///
 /// 云端汇总里那个 `distance_ascend` 是「爬升过程中走过的水平距离」，不是爬升
 /// 高度，不能拿来充数。
-fn total_elevation(workout: &Value, key: &str) -> Option<f64> {
+fn total_elevation(workout: &Value, summary_key: &str, split_key: &str) -> Option<f64> {
+    if let Some(value) = workout
+        .get(summary_key)
+        .and_then(Value::as_f64)
+        .filter(|value| value.is_finite() && *value >= 0.0)
+    {
+        return Some(value);
+    }
     let mut total = 0.0;
     let mut seen = false;
     for split in array(workout, "splits") {
-        if let Some(value) = split.get(key).and_then(Value::as_f64) {
+        if let Some(value) = split.get(split_key).and_then(Value::as_f64) {
             if value.is_finite() && value >= 0.0 {
                 total += value;
                 seen = true;
@@ -1193,6 +1206,52 @@ mod tests {
         let start = Some(i64::from(typedef::EventType::START.0));
         let stop = Some(i64::from(typedef::EventType::STOP.0));
         assert_eq!(types, vec![start, stop, start, stop]);
+    }
+
+    /// 云端给了爬升就用云端的，别再拿分段之和覆盖它。
+    ///
+    /// 实测差得不小：一次 6.37 km 健走，云端 59 m，分段之和 37 m。用户在
+    /// Zepp App 里看到的是 59。
+    #[test]
+    fn cloud_elevation_wins_over_the_sum_of_splits() {
+        let export = export_with(json!({
+            "workouts": [{
+                "workout_id": "w1", "effective_type": "walking",
+                "start_time": "2026-08-28T15:23:37+08:00",
+                "distance_meters": 6377.0,
+                "elevation_gain_m": 59.35,
+                "elevation_loss_m": 59.36,
+                "route": [], "pauses": [],
+                "samples": [
+                    { "timestamp": "2026-08-28T15:23:37+08:00", "heart_rate": 105 },
+                    { "timestamp": "2026-08-28T16:53:40+08:00", "heart_rate": 121 }
+                ],
+                // 分段之和只有 16，和云端的 59 明显不同
+                "splits": [
+                    { "index": 1, "start_time": "2026-08-28T15:23:37+08:00",
+                      "end_time": "2026-08-28T15:39:33+08:00", "distance_m": 1000.0,
+                      "duration_seconds": 956, "elevation_gain_m": 9.7,
+                      "elevation_loss_m": 12.01, "partial": false },
+                    { "index": 2, "start_time": "2026-08-28T15:39:33+08:00",
+                      "end_time": "2026-08-28T15:53:51+08:00", "distance_m": 1000.0,
+                      "duration_seconds": 858, "elevation_gain_m": 7.19,
+                      "elevation_loss_m": 3.03, "partial": false }
+                ]
+            }]
+        }));
+
+        let (files, _) = to_fit(&export).unwrap();
+        let fit = decode(&files[0].1);
+        let session = messages_of(&fit, typedef::MesgNum::SESSION);
+        assert_eq!(
+            int_of(session[0], mesgdef::Session::TOTAL_ASCENT),
+            Some(59),
+            "云端给了 59.35 就该写 59，而不是分段之和的 17"
+        );
+        assert_eq!(
+            int_of(session[0], mesgdef::Session::TOTAL_DESCENT),
+            Some(59)
+        );
     }
 
     #[test]

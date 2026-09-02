@@ -575,6 +575,56 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(18, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // 云端一直在给、而我们一直没取的运动汇总字段。
+        //
+        // 审计了一遍原始报文：workouts 流有 198 个字段，我们只读了 26 个；
+        // 剔掉恒为 -1/0/"" 的保留槽位之后，仍有 66 个带真实数据的字段被丢掉。
+        // 下面这些是其中用户能直接感知的那部分。
+        //
+        // 爬升为什么要存云端那份：解析器自己从海拔序列按 1 米噪声底也能算一个，
+        // 但两者对不上（实测一次健走：云端 59 m，我们 37 m），而用户在 Zepp App
+        // 里看到的是云端那个。以云端为准、我们算的做回退。
+        self.ensure_table_columns(
+            "workouts",
+            &[
+                ("min_hr", "INTEGER"),
+                ("total_steps", "INTEGER"),
+                ("moving_seconds", "INTEGER"),
+                ("elevation_gain_m", "REAL"),
+                ("elevation_loss_m", "REAL"),
+                ("max_altitude_m", "REAL"),
+                ("min_altitude_m", "REAL"),
+                ("training_effect", "REAL"),
+                ("anaerobic_training_effect", "REAL"),
+                ("rpe", "INTEGER"),
+                ("avg_cadence_spm", "REAL"),
+                ("max_cadence_spm", "REAL"),
+                ("avg_stride_cm", "REAL"),
+            ],
+        )?;
+        // 心率区间分布。
+        //
+        // 单独一张表而不是往 workouts 里塞一个 JSON 列：这是一组有序的
+        // (上限, 秒数)，要按区间聚合和排序。塞进 JSON 就得在 SQL 之外再解一次。
+        //
+        // 边界值一起存。区间边界来自用户在表上的设定，会随设定变化，所以
+        // 「Z2 待了多久」这句话只有连着当时的边界才有意义。
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS workout_hr_zones (
+                workout_id TEXT NOT NULL,
+                zone_index INTEGER NOT NULL,
+                upper_bound_bpm INTEGER NOT NULL,
+                seconds INTEGER NOT NULL,
+                PRIMARY KEY (workout_id, zone_index)
+            );
+            CREATE INDEX IF NOT EXISTS idx_workout_hr_zones_workout
+                ON workout_hr_zones(workout_id);",
+        )?;
+        self.conn.execute_batch("PRAGMA user_version = 19;")?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(19, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         // Earlier migrations are intentionally idempotent and still stamp
         // their historical versions on every launch, so the current schema
         // marker is restored only after all of them have run.

@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 /// 当前 SQLite schema 版本（`PRAGMA user_version`）。加新版本只能追加迁移
 /// 步骤，不要改已有 DDL。
-pub const CURRENT_SCHEMA_VERSION: i64 = 18;
+pub const CURRENT_SCHEMA_VERSION: i64 = 19;
 /// 写进备份 manifest 的应用版本。Core 是独立 crate，用它自己的包版本。
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// 解析器修订号。**改了运动目录或任何归一化规则，就必须往前走一格。**
@@ -2197,8 +2197,12 @@ impl Database {
                  calories, avg_hr, max_hr, training_load, vo2max,
                  source_scope, device_id, raw_record_id, synced_at,
                  gps_available, sample_count, zepp_source, zepp_type,
-                 workout_type_source, workout_type_override, workout_type_conflict)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)
+                 workout_type_source, workout_type_override, workout_type_conflict,
+                 min_hr, total_steps, moving_seconds, elevation_gain_m, elevation_loss_m,
+                 max_altitude_m, min_altitude_m, training_effect, anaerobic_training_effect,
+                 rpe, avg_cadence_spm, max_cadence_spm, avg_stride_cm)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21,
+                     ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30, ?31, ?32, ?33, ?34)
              ON CONFLICT(workout_id) DO UPDATE SET
                 workout_type = excluded.workout_type,
                 start_time = excluded.start_time,
@@ -2225,7 +2229,23 @@ impl Database {
                 zepp_type = excluded.zepp_type,
                 workout_type_source = excluded.workout_type_source,
                 workout_type_override = COALESCE(workouts.workout_type_override, excluded.workout_type_override),
-                workout_type_conflict = excluded.workout_type_conflict",
+                workout_type_conflict = excluded.workout_type_conflict,
+                -- 一律 COALESCE：补拉回来的摘要可能缺字段，缺的那次不该把上一次
+                -- 已经拿到的值抹成 NULL。
+                min_hr = COALESCE(excluded.min_hr, workouts.min_hr),
+                total_steps = COALESCE(excluded.total_steps, workouts.total_steps),
+                moving_seconds = COALESCE(excluded.moving_seconds, workouts.moving_seconds),
+                elevation_gain_m = COALESCE(excluded.elevation_gain_m, workouts.elevation_gain_m),
+                elevation_loss_m = COALESCE(excluded.elevation_loss_m, workouts.elevation_loss_m),
+                max_altitude_m = COALESCE(excluded.max_altitude_m, workouts.max_altitude_m),
+                min_altitude_m = COALESCE(excluded.min_altitude_m, workouts.min_altitude_m),
+                training_effect = COALESCE(excluded.training_effect, workouts.training_effect),
+                anaerobic_training_effect = COALESCE(
+                    excluded.anaerobic_training_effect, workouts.anaerobic_training_effect),
+                rpe = COALESCE(excluded.rpe, workouts.rpe),
+                avg_cadence_spm = COALESCE(excluded.avg_cadence_spm, workouts.avg_cadence_spm),
+                max_cadence_spm = COALESCE(excluded.max_cadence_spm, workouts.max_cadence_spm),
+                avg_stride_cm = COALESCE(excluded.avg_stride_cm, workouts.avg_stride_cm)",
             params![
                 workout.workout_id,
                 merged_type.normalized_type,
@@ -2248,9 +2268,60 @@ impl Database {
                 merged_type.type_source,
                 merged_type.user_override,
                 merged_type.conflict,
+                workout.min_hr,
+                workout.total_steps,
+                workout.moving_seconds,
+                workout.elevation_gain_m,
+                workout.elevation_loss_m,
+                workout.max_altitude_m,
+                workout.min_altitude_m,
+                workout.training_effect,
+                workout.anaerobic_training_effect,
+                workout.rpe,
+                workout.avg_cadence_spm,
+                workout.max_cadence_spm,
+                workout.avg_stride_cm,
             ],
         )?;
+        // 心率区间分布。整条替换而不是逐段 upsert：区间边界会随用户在表上的
+        // 设定变化，段数也可能不同，留着上一次的段会拼出一个从未存在过的分布。
+        // 空的 `hr_zones` 表示这次同步没带这项，不动已经存下来的。
+        if !workout.hr_zones.is_empty() {
+            self.conn.execute(
+                "DELETE FROM workout_hr_zones WHERE workout_id = ?1",
+                [&workout.workout_id],
+            )?;
+            for zone in &workout.hr_zones {
+                self.conn.execute(
+                    "INSERT INTO workout_hr_zones
+                        (workout_id, zone_index, upper_bound_bpm, seconds)
+                     VALUES (?1, ?2, ?3, ?4)",
+                    params![
+                        workout.workout_id,
+                        zone.index,
+                        zone.upper_bound_bpm,
+                        zone.seconds
+                    ],
+                )?;
+            }
+        }
         Ok(())
+    }
+
+    /// 一次运动的心率区间分布，按区间顺序。
+    pub fn workout_hr_zones(&self, workout_id: &str) -> Result<Vec<HeartRateZoneBucket>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT zone_index, upper_bound_bpm, seconds FROM workout_hr_zones
+              WHERE workout_id = ?1 ORDER BY zone_index",
+        )?;
+        let rows = stmt.query_map([workout_id], |row| {
+            Ok(HeartRateZoneBucket {
+                index: row.get(0)?,
+                upper_bound_bpm: row.get(1)?,
+                seconds: row.get(2)?,
+            })
+        })?;
+        Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
     }
 
     pub fn diagnostic_schema_version(&self) -> Result<i64> {
@@ -3046,6 +3117,23 @@ impl Database {
                 max_hr,
                 training_load,
                 vo2max,
+                // 列表视图不读这些：屏幕上只有类型、距离、时长和心率，
+                // 为此把 SELECT 加宽十三列再加一个 join，代价落在每一次列表
+                // 渲染上。要这些字段请走单条运动的详情查询。
+                min_hr: None,
+                total_steps: None,
+                moving_seconds: None,
+                elevation_gain_m: None,
+                elevation_loss_m: None,
+                max_altitude_m: None,
+                min_altitude_m: None,
+                training_effect: None,
+                anaerobic_training_effect: None,
+                rpe: None,
+                avg_cadence_spm: None,
+                max_cadence_spm: None,
+                avg_stride_cm: None,
+                hr_zones: Vec::new(),
                 source_scope: parse_scope(&scope)?,
                 device_id,
                 synced_at: synced_at
@@ -3069,7 +3157,12 @@ impl Database {
                         distance_meters, calories, avg_hr, max_hr,
                         training_load, vo2max, source_scope, device_id,
                         synced_at, gps_available, sample_count, zepp_type,
-                        workout_type_source, workout_type_override
+                        workout_type_source, workout_type_override,
+                        min_hr, total_steps, moving_seconds,
+                        elevation_gain_m, elevation_loss_m,
+                        max_altitude_m, min_altitude_m,
+                        training_effect, anaerobic_training_effect, rpe,
+                        avg_cadence_spm, max_cadence_spm, avg_stride_cm
                  FROM workouts WHERE workout_id = ?1 LIMIT 1",
                 [workout_id],
                 |row| {
@@ -3092,6 +3185,21 @@ impl Database {
                         row.get::<_, Option<i32>>(15)?,
                         row.get::<_, String>(16)?,
                         row.get::<_, Option<String>>(17)?,
+                        (
+                            row.get::<_, Option<i32>>(18)?,
+                            row.get::<_, Option<i32>>(19)?,
+                            row.get::<_, Option<i64>>(20)?,
+                            row.get::<_, Option<f64>>(21)?,
+                            row.get::<_, Option<f64>>(22)?,
+                            row.get::<_, Option<f64>>(23)?,
+                            row.get::<_, Option<f64>>(24)?,
+                            row.get::<_, Option<f64>>(25)?,
+                            row.get::<_, Option<f64>>(26)?,
+                            row.get::<_, Option<i32>>(27)?,
+                            row.get::<_, Option<f64>>(28)?,
+                            row.get::<_, Option<f64>>(29)?,
+                            row.get::<_, Option<f64>>(30)?,
+                        ),
                     ))
                 },
             )
@@ -3115,10 +3223,26 @@ impl Database {
             zepp_type,
             type_source,
             user_override,
+            (
+                min_hr,
+                total_steps,
+                moving_seconds,
+                elevation_gain_m,
+                elevation_loss_m,
+                max_altitude_m,
+                min_altitude_m,
+                training_effect,
+                anaerobic_training_effect,
+                rpe,
+                avg_cadence_spm,
+                max_cadence_spm,
+                avg_stride_cm,
+            ),
         )) = row
         else {
             return Ok(None);
         };
+        let hr_zones = self.workout_hr_zones(&workout_id)?;
         let route_points: i64 = self.conn.query_row(
             "SELECT COUNT(*) FROM route_points WHERE workout_id = ?1",
             [&workout_id],
@@ -3137,6 +3261,20 @@ impl Database {
             None => None,
         };
         Ok(Some(Workout {
+            min_hr,
+            total_steps,
+            moving_seconds,
+            elevation_gain_m,
+            elevation_loss_m,
+            max_altitude_m,
+            min_altitude_m,
+            training_effect,
+            anaerobic_training_effect,
+            rpe,
+            avg_cadence_spm,
+            max_cadence_spm,
+            avg_stride_cm,
+            hr_zones,
             workout_id,
             workout_type: workout_type.clone(),
             normalized_type: workout_type,
@@ -4382,7 +4520,12 @@ impl Database {
                 "SELECT workout_id, workout_type, start_time, end_time,
                         distance_meters, calories, avg_hr, max_hr,
                         training_load, vo2max, source_scope, device_id,
-                        zepp_type, workout_type_source, workout_type_override
+                        zepp_type, workout_type_source, workout_type_override,
+                        min_hr, total_steps, moving_seconds,
+                        elevation_gain_m, elevation_loss_m,
+                        max_altitude_m, min_altitude_m,
+                        training_effect, anaerobic_training_effect, rpe,
+                        avg_cadence_spm, max_cadence_spm, avg_stride_cm
                  FROM workouts
                  WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2
                    AND (?3 IS NULL OR workout_id = ?3)
@@ -4405,6 +4548,21 @@ impl Database {
                     row.get::<_, Option<i32>>(12)?,
                     row.get::<_, String>(13)?,
                     row.get::<_, Option<String>>(14)?,
+                    (
+                        row.get::<_, Option<i32>>(15)?,
+                        row.get::<_, Option<i32>>(16)?,
+                        row.get::<_, Option<i64>>(17)?,
+                        row.get::<_, Option<f64>>(18)?,
+                        row.get::<_, Option<f64>>(19)?,
+                        row.get::<_, Option<f64>>(20)?,
+                        row.get::<_, Option<f64>>(21)?,
+                        row.get::<_, Option<f64>>(22)?,
+                        row.get::<_, Option<f64>>(23)?,
+                        row.get::<_, Option<i32>>(24)?,
+                        row.get::<_, Option<f64>>(25)?,
+                        row.get::<_, Option<f64>>(26)?,
+                        row.get::<_, Option<f64>>(27)?,
+                    ),
                 ))
             })?;
             for row in rows {
@@ -4424,8 +4582,24 @@ impl Database {
                     zepp_type,
                     type_source,
                     user_override,
+                    (
+                        min_hr,
+                        total_steps,
+                        moving_seconds,
+                        elevation_gain_m,
+                        elevation_loss_m,
+                        max_altitude_m,
+                        min_altitude_m,
+                        training_effect,
+                        anaerobic_training_effect,
+                        rpe,
+                        avg_cadence_spm,
+                        max_cadence_spm,
+                        avg_stride_cm,
+                    ),
                 ) = row?;
                 let series = self.get_workout_series(&workout_id)?;
+                let hr_zones = self.workout_hr_zones(&workout_id)?;
                 let effective_type = user_override
                     .clone()
                     .unwrap_or_else(|| workout_type.clone());
@@ -4444,6 +4618,22 @@ impl Database {
                     "avg_hr": avg_hr,
                     "max_hr": max_hr,
                     "training_load": training_load,
+                    // 云端汇总里一直有、以前没取出来的那批。缺的仍然是 null，
+                    // 不补零——导出契约的规矩没变。
+                    "min_hr": min_hr,
+                    "total_steps": total_steps,
+                    "moving_seconds": moving_seconds,
+                    "elevation_gain_m": elevation_gain_m,
+                    "elevation_loss_m": elevation_loss_m,
+                    "max_altitude_m": max_altitude_m,
+                    "min_altitude_m": min_altitude_m,
+                    "training_effect": training_effect,
+                    "anaerobic_training_effect": anaerobic_training_effect,
+                    "rpe": rpe,
+                    "avg_cadence_spm": avg_cadence_spm,
+                    "max_cadence_spm": max_cadence_spm,
+                    "avg_stride_cm": avg_stride_cm,
+                    "hr_zones": hr_zones,
                     "vo2max": vo2max,
                     "source_scope": source_scope,
                     "device_label": devices.label(device_id.as_deref()),
@@ -5481,6 +5671,7 @@ mod tests {
             sample_count: 0,
             zepp_source: None,
             zepp_type: code,
+            ..Default::default()
         }
     }
 
@@ -6031,6 +6222,7 @@ mod tests {
             sample_count: 0,
             zepp_source: None,
             zepp_type: None,
+            ..Default::default()
         })
         .unwrap();
 
@@ -6341,6 +6533,7 @@ mod tests {
             sample_count: 0,
             zepp_source: None,
             zepp_type: None,
+            ..Default::default()
         })
         .unwrap();
         // 同一天的另一条运动：日期范围会带上它，单条运动范围不该带。
@@ -6367,6 +6560,7 @@ mod tests {
             sample_count: 0,
             zepp_source: None,
             zepp_type: None,
+            ..Default::default()
         })
         .unwrap();
         for (moment, value) in [
@@ -6603,6 +6797,7 @@ mod tests {
             sample_count: 0,
             zepp_source: None,
             zepp_type: None,
+            ..Default::default()
         })
         .unwrap();
 
@@ -7172,6 +7367,7 @@ mod tests {
             sample_count: 0,
             zepp_source: Some("run.gps".into()),
             zepp_type: Some(1),
+            ..Default::default()
         })
         .unwrap();
         let payload = serde_json::json!({
