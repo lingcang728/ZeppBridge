@@ -313,6 +313,41 @@ mod tests {
         }
     }
 
+    /// 2026-09-02 那批新收的编号，按既有规则（两份互相独立、无异议的报告）
+    /// 裁决通过：10551555 -> T-Rex 3 Pro，8651008 -> Helio Ring（Helio Ring
+    /// 的第一个编号）。
+    ///
+    /// 同一批里刻意没收的三个，理由记在
+    /// `scripts/assets/build-device-catalog.py` 的注释里：10813699 是 3:3 平票，
+    /// 8913155 和 7930112 各有一份来自单设备报告的真实异议——那种异议用不上
+    /// 「一个账号两块表、在选择器里挑错了」这条既有裁决理由。
+    #[test]
+    fn the_codes_adjudicated_on_2026_09_02_resolve_to_their_products() {
+        for (code, catalog_id) in [
+            (10_551_555_i64, "amazfit-t-rex-3-pro-48-44mm"),
+            (8_651_008, "amazfit-helio-ring"),
+        ] {
+            let found = match_catalog(&CatalogMatchInput {
+                device_source_codes: vec![code],
+                ..CatalogMatchInput::default()
+            })
+            .unwrap_or_else(|| panic!("{code} 应当能匹配到 {catalog_id}"));
+            assert_eq!(found.entry.catalog_id, catalog_id);
+        }
+
+        // 没裁决通过的那三个不能悄悄溜进去。
+        for code in [10_813_699_i64, 8_913_155, 7_930_112] {
+            assert!(
+                match_catalog(&CatalogMatchInput {
+                    device_source_codes: vec![code],
+                    ..CatalogMatchInput::default()
+                })
+                .is_none(),
+                "{code} 还没有裁决通过，不该匹配到任何型号"
+            );
+        }
+    }
+
     /// 一个编号只能属于一款表。
     #[test]
     fn every_device_source_number_belongs_to_exactly_one_product() {
