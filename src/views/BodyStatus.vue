@@ -235,8 +235,28 @@ const clock = (value: number) => new Intl.DateTimeFormat(intlLocale(), {
   hour: '2-digit', minute: '2-digit', hour12: false,
 }).format(new Date(value));
 
+/*
+ * 曲线断开的阈值。
+ *
+ * 手表每五分钟测一次。没戴、关了全天监测、或者补拉没覆盖到的那几个小时，
+ * 序列里就是没有点 —— 直接把缺口两端连起来，会画出一条从来没测过的直线。
+ * 卡片脚注写的是「没采样的时段留空」，那就得真的留空：超过三个采样间隔就
+ * 插一个 null，`connectNulls: false` 会让线在那里断开。
+ *
+ * 三个间隔而不是一个：五分钟一次只是标称值，实测相邻两点差 5–8 分钟很常见，
+ * 卡到一个间隔会把正常曲线打成虚线。
+ */
+const CURVE_GAP_MS = 15 * 60 * 1000;
+
 const curveChartOption = computed(() => {
-  const data = curve.value.map((point) => [point.ts, point.value]);
+  const data: Array<[number, number | null]> = [];
+  curve.value.forEach((point, index) => {
+    const previous = curve.value[index - 1];
+    if (previous && point.ts - previous.ts > CURVE_GAP_MS) {
+      data.push([previous.ts + 1, null]);
+    }
+    data.push([point.ts, point.value]);
+  });
   return {
     animationDuration: 700,
     grid: { left: 40, right: 18, top: 16, bottom: 28 },
@@ -248,16 +268,17 @@ const curveChartOption = computed(() => {
       padding: [8, 12],
       textStyle: { color: '#F3F4EC', fontSize: 12 },
       extraCssText: 'border-radius:8px;box-shadow:none;',
-      formatter: (params: Array<{ value: [number, number] }>) => {
+      formatter: (params: Array<{ value: [number, number | null] }>) => {
         const point = Array.isArray(params) ? params[0] : params;
-        if (!point) return '';
+        // 断点上没有读数，就不要报一个数出来。
+        if (!point || !isFiniteNumber(point.value?.[1])) return '';
         return t.value.stressTooltip(clock(point.value[0]), Math.round(point.value[1]));
       },
     },
     xAxis: {
       type: 'time',
-      min: data[0]?.[0],
-      max: data[data.length - 1]?.[0],
+      min: curve.value[0]?.ts,
+      max: curve.value[curve.value.length - 1]?.ts,
       axisLabel: { formatter: clock, hideOverlap: true, color: '#78818C', fontSize: 10 },
       axisLine: { lineStyle: { color: 'rgba(232,238,244,.12)' } },
       axisTick: { show: false },
