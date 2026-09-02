@@ -300,6 +300,65 @@ impl Normalizer {
                 .filter(|value| *value >= 0.0),
                 vo2max: first_number(object, &["vo2max", "vo2Max", "VO2_MAX", "VO2_max"])
                     .filter(|value| *value > 0.0),
+                // 下面这些字段云端一直在给，只是以前一个都没取。每一个的
+                // 「没测到」哨兵不一样，所以逐个写清楚，不共用一条规则。
+                min_hr: first_number(object, &["min_heart_rate", "minHeartRate", "min_hr"])
+                    .filter(|value| *value > 0.0)
+                    .map(|value| value as i32),
+                // 0 步对骑行来说是事实，对健走来说是「没测到」。分不开，所以
+                // 一律只收正数——真的 0 步的运动也没有什么可展示的。
+                total_steps: first_number(object, &["total_step", "totalStep", "steps"])
+                    .filter(|value| *value > 0.0)
+                    .map(|value| value as i32),
+                moving_seconds: first_number(object, &["run_time", "runTime", "sportTime"])
+                    .filter(|value| *value > 0.0)
+                    .map(|value| value as i64),
+                // 云端给两套：`elevationGain` 是厘米，`altitude_ascend` 是取整
+                // 的米。优先厘米那份，它没被提前四舍五入。
+                elevation_gain_m: first_number(object, &["elevationGain", "elevation_gain"])
+                    .filter(|value| *value >= 0.0)
+                    .map(|value| value / 100.0)
+                    .or_else(|| {
+                        first_number(object, &["altitude_ascend", "altitudeAscend"])
+                            .filter(|value| *value >= 0.0)
+                    }),
+                elevation_loss_m: first_number(object, &["elevationLoss", "elevation_loss"])
+                    .filter(|value| *value >= 0.0)
+                    .map(|value| value / 100.0)
+                    .or_else(|| {
+                        first_number(object, &["altitude_descend", "altitudeDescend"])
+                            .filter(|value| *value >= 0.0)
+                    }),
+                // 海拔同样是厘米。实测对得上解析出来的逐秒序列：一次健走
+                // `highestAltitude` 9178 cm，序列最大值 91.78 m。
+                max_altitude_m: first_number(object, &["highestAltitude", "max_altitude"])
+                    .filter(|value| value.is_finite())
+                    .map(|value| value / 100.0),
+                min_altitude_m: first_number(object, &["lowestAltitude", "min_altitude"])
+                    .filter(|value| value.is_finite())
+                    .map(|value| value / 100.0),
+                // 训练效果存的是十倍整数：22 表示 2.2。
+                training_effect: first_number(object, &["te", "trainingEffect"])
+                    .filter(|value| *value > 0.0)
+                    .map(|value| value / 10.0),
+                anaerobic_training_effect: first_number(
+                    object,
+                    &["anaerobic_te", "anaerobicTrainingEffect"],
+                )
+                .filter(|value| *value > 0.0)
+                .map(|value| value / 10.0),
+                rpe: first_number(object, &["rpe"])
+                    .filter(|value| *value > 0.0)
+                    .map(|value| value as i32),
+                // 步频单位是步/分，和云端的 `max_frequency` / `avg_stride_length`
+                // 对过账，见 export_fit 里那张表。
+                avg_cadence_spm: first_number(object, &["avg_frequency", "avgFrequency"])
+                    .filter(|value| *value > 0.0),
+                max_cadence_spm: first_number(object, &["max_frequency", "maxFrequency"])
+                    .filter(|value| *value > 0.0),
+                avg_stride_cm: first_number(object, &["avg_stride_length", "avgStrideLength"])
+                    .filter(|value| *value > 0.0),
+                hr_zones: parse_heart_range(first_string(object, &["heart_range"]).as_deref()),
                 source_scope: source_scope(Some(object), source_device.as_deref()),
                 device_id: source_device,
                 synced_at: None,
@@ -1158,6 +1217,46 @@ fn first_string(object: &Map<String, Value>, names: &[&str]) -> Option<String> {
     })
 }
 
+/// 解析云端的 `heart_range`：心率区间分布。
+///
+/// 格式是分号分隔的 `秒数,区间上限`，例如
+/// `1882,113;3486,141;10,154;0,162;0,173;0,190`——在 113 以下待了 1882 秒，
+/// 113 到 141 之间 3486 秒，依此类推。区间边界来自用户在表上的设定，我们没有
+/// 那份设定，所以这个分布只能取云端的，自己切会切出另一套数字。
+///
+/// 各段秒数之和实测能对上 `run_time`（一次健走 5378 vs 5403）。
+///
+/// 全零的分布（每一段都是 0 秒）返回空：那是「这次运动没有心率数据」，不是
+/// 「每个区间都待了 0 秒」。
+fn parse_heart_range(raw: Option<&str>) -> Vec<HeartRateZoneBucket> {
+    let Some(text) = raw else {
+        return Vec::new();
+    };
+    let mut buckets = Vec::new();
+    for (index, part) in text.split(';').filter(|part| !part.is_empty()).enumerate() {
+        let mut bits = part.split(',');
+        let (Some(seconds), Some(upper)) = (bits.next(), bits.next()) else {
+            continue;
+        };
+        let (Ok(seconds), Ok(upper)) = (seconds.trim().parse::<i64>(), upper.trim().parse::<i32>())
+        else {
+            continue;
+        };
+        if seconds < 0 || upper <= 0 {
+            continue;
+        }
+        buckets.push(HeartRateZoneBucket {
+            index: index as i32,
+            upper_bound_bpm: upper,
+            seconds,
+        });
+    }
+    if buckets.iter().all(|bucket| bucket.seconds == 0) {
+        return Vec::new();
+    }
+    buckets
+}
+
 fn first_number(object: &Map<String, Value>, names: &[&str]) -> Option<f64> {
     first_value(object, names).and_then(parse_number)
 }
@@ -1740,6 +1839,143 @@ fn duration_to_minutes(value: f64) -> i32 {
 
 #[cfg(test)]
 mod tests {
+
+    /// 云端一直在给、以前一个都没取的那批运动汇总字段。
+    ///
+    /// 取值全部来自真实报文（trackid 1787901817，一次 6.37 km 健走）。
+    #[test]
+    fn workout_summary_fields_are_read_from_the_cloud_payload() {
+        let raw = serde_json::json!({
+            "data": [{
+                "trackid": "1787901817",
+                "type": 6,
+                "start_time": 1787901817_i64,
+                "end_time": 1787907220_i64,
+                "dis": 6377.0,
+                "calorie": 562,
+                "avg_heart_rate": 115,
+                "max_heart_rate": 143,
+                "min_heart_rate": 83,
+                "total_step": 8998,
+                "run_time": "5403",
+                "elevationGain": 5935,
+                "elevationLoss": 5936,
+                "highestAltitude": 9178,
+                "lowestAltitude": 7867,
+                "te": 22,
+                "anaerobic_te": 1,
+                "rpe": 3,
+                "avg_frequency": "99.0",
+                "max_frequency": 141,
+                "avg_stride_length": 70,
+                "heart_range": "1882,113;3486,141;10,154;0,162;0,173;0,190"
+            }]
+        });
+
+        let records = Normalizer::normalize_workouts(&raw).expect("应当能解析");
+        let workout = records.first().expect("应当有一条运动");
+
+        assert_eq!(workout.min_hr, Some(83));
+        assert_eq!(workout.total_steps, Some(8998));
+        assert_eq!(workout.moving_seconds, Some(5403));
+        // 厘米换算成米
+        assert_eq!(workout.elevation_gain_m, Some(59.35));
+        assert_eq!(workout.elevation_loss_m, Some(59.36));
+        assert_eq!(workout.max_altitude_m, Some(91.78));
+        assert_eq!(workout.min_altitude_m, Some(78.67));
+        // 训练效果是十倍整数
+        assert_eq!(workout.training_effect, Some(2.2));
+        assert_eq!(workout.anaerobic_training_effect, Some(0.1));
+        assert_eq!(workout.rpe, Some(3));
+        assert_eq!(workout.avg_cadence_spm, Some(99.0));
+        assert_eq!(workout.max_cadence_spm, Some(141.0));
+        assert_eq!(workout.avg_stride_cm, Some(70.0));
+
+        // 心率区间分布
+        assert_eq!(workout.hr_zones.len(), 6);
+        assert_eq!(workout.hr_zones[0].upper_bound_bpm, 113);
+        assert_eq!(workout.hr_zones[0].seconds, 1882);
+        assert_eq!(workout.hr_zones[1].upper_bound_bpm, 141);
+        assert_eq!(workout.hr_zones[1].seconds, 3486);
+        assert_eq!(workout.hr_zones[5].seconds, 0);
+        // 各段之和应当接近 run_time（实测 5378 vs 5403）
+        let total: i64 = workout.hr_zones.iter().map(|z| z.seconds).sum();
+        assert!(
+            (total - 5403).abs() < 60,
+            "区间秒数之和 {total} 应当接近 run_time 5403"
+        );
+    }
+
+    /// 「没测到」的哨兵不能变成 0。
+    ///
+    /// 云端用 -1 表示没有这一项（`avg_cadence`、`average_power`），骑行的
+    /// `total_step` 是 0、`avg_frequency` 是 "0.0"。这些都不该落成数值。
+    #[test]
+    fn sentinels_do_not_become_zeroes() {
+        let raw = serde_json::json!({
+            "data": [{
+                "trackid": "1787186615",
+                "type": 9,
+                "start_time": 1787186615_i64,
+                "end_time": 1787187642_i64,
+                "dis": 1803.0,
+                "min_heart_rate": 94,
+                "total_step": 0,
+                "avg_frequency": "0.0",
+                "max_frequency": 0,
+                "avg_stride_length": 0,
+                "average_power": -1.0,
+                "avg_cadence": -1,
+                "rpe": 2,
+                "heart_range": "115,113;462,141;323,154;102,162;0,173;0,190"
+            }]
+        });
+
+        let records = Normalizer::normalize_workouts(&raw).expect("应当能解析");
+        let workout = records.first().expect("应当有一条运动");
+
+        assert_eq!(workout.min_hr, Some(94));
+        assert_eq!(
+            workout.total_steps, None,
+            "骑行的 0 步是「没有步数」，不能记成走了 0 步"
+        );
+        assert_eq!(workout.avg_cadence_spm, None);
+        assert_eq!(workout.max_cadence_spm, None);
+        assert_eq!(workout.avg_stride_cm, None);
+        assert_eq!(workout.training_effect, None, "没给 te 就不该有值");
+        assert_eq!(workout.rpe, Some(2));
+        // 骑行确实有心率区间
+        assert_eq!(workout.hr_zones.len(), 6);
+        assert_eq!(workout.hr_zones[3].seconds, 102);
+    }
+
+    /// 全零的心率区间是「这次没有心率」，不是「每个区间待了 0 秒」。
+    #[test]
+    fn an_all_zero_heart_range_is_treated_as_absent() {
+        assert!(parse_heart_range(Some("0,113;0,141;0,154")).is_empty());
+        assert!(parse_heart_range(None).is_empty());
+        assert!(parse_heart_range(Some("")).is_empty());
+        // 上限为 0 的段直接丢掉，不占位
+        let zones = parse_heart_range(Some("10,0;20,141"));
+        assert_eq!(zones.len(), 1);
+        assert_eq!(zones[0].upper_bound_bpm, 141);
+    }
+
+    /// 云端没给爬升时才回退到取整的米值。
+    #[test]
+    fn elevation_falls_back_to_the_metre_field_when_centimetres_are_absent() {
+        let raw = serde_json::json!({
+            "data": [{
+                "trackid": "x", "type": 6,
+                "start_time": 1787901817_i64, "end_time": 1787907220_i64,
+                "altitude_ascend": 59, "altitude_descend": 59
+            }]
+        });
+        let records = Normalizer::normalize_workouts(&raw).unwrap();
+        let workout = records.first().unwrap();
+        assert_eq!(workout.elevation_gain_m, Some(59.0));
+        assert_eq!(workout.elevation_loss_m, Some(59.0));
+    }
 
     /// 空报文报的是 `DataUnavailable`，不是解析失败。
     ///
