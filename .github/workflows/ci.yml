@@ -236,6 +236,63 @@ jobs:
           fi
           echo "runtime is still supported"
 
+      # 托盘那三个模块的来源。
+      #
+      # 真正的 Flatpak 构建只在推 main 和打 tag 时跑，所以这三个模块写错了，
+      # PR 上是绿的、合并之后 main 才红。这一步把最容易出错、也最容易静默
+      # 出错的那部分提前到秒级：URL 还在不在、tarball 的校验值对不对、两个
+      # git tag 还指不指着钉住的那个 commit。
+      #
+      # 它不构建任何东西。构建成不成立仍然由 package-flatpak 回答。
+      - name: Check the tray indicator modules can still be fetched
+        run: |
+          set -euo pipefail
+          manifest=packaging/flatpak/com.zeppbridge.app.yml
+          python3 - "$manifest" <<'PY'
+          import hashlib, subprocess, sys, urllib.request, yaml
+
+          manifest = yaml.safe_load(open(sys.argv[1], encoding="utf-8"))
+          failed = []
+          for module in manifest["modules"]:
+              if module["name"] == "zeppbridge":
+                  continue
+              for source in module.get("sources", []):
+                  if source["type"] == "archive":
+                      url = source["url"]
+                      print(f"{module['name']}: fetching {url}")
+                      blob = urllib.request.urlopen(url, timeout=120).read()
+                      got = hashlib.sha256(blob).hexdigest()
+                      if got != source["sha256"]:
+                          failed.append(
+                              f"{module['name']}: sha256 {got} != manifest {source['sha256']}"
+                          )
+                      else:
+                          print(f"  sha256 ok ({len(blob)} bytes)")
+                  elif source["type"] == "git":
+                      url, tag, commit = source["url"], source["tag"], source["commit"]
+                      print(f"{module['name']}: git ls-remote {url} tags/{tag}")
+                      out = subprocess.run(
+                          ["git", "ls-remote", url, f"refs/tags/{tag}^{{}}", f"refs/tags/{tag}"],
+                          check=True, capture_output=True, text=True,
+                      ).stdout
+                      # 附注标签有两行：`refs/tags/X` 是标签对象，`refs/tags/X^{}`
+                      # 是它指向的 commit。要比对的是后者。
+                      shas = {line.split("\t")[1]: line.split("\t")[0] for line in out.strip().splitlines()}
+                      resolved = shas.get(f"refs/tags/{tag}^{{}}") or shas.get(f"refs/tags/{tag}")
+                      if resolved != commit:
+                          failed.append(
+                              f"{module['name']}: tag {tag} 现在指向 {resolved}，manifest 钉的是 {commit}"
+                          )
+                      else:
+                          print(f"  commit ok ({commit})")
+
+          if failed:
+              for line in failed:
+                  print(f"::error::{line}")
+              sys.exit(1)
+          print("每个托盘模块的来源都还在，校验值也对得上")
+          PY
+
   verify-macos:
     name: macOS verification
     runs-on: macos-latest
