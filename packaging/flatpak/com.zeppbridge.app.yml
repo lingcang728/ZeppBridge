@@ -153,6 +153,9 @@ modules:
     buildsystem: cmake-ninja
     config-opts:
       - -DCMAKE_BUILD_TYPE=Release
+      # GNOME SDK 的默认 libdir 是 lib64，但后续模块的 pkg-config 搜索 /app/lib。
+      # 三个托盘依赖统一安装到 /app/lib，构建期和运行期才能找到同一份库。
+      - -DCMAKE_INSTALL_LIBDIR=lib
       - -DENABLE_TESTS=OFF
       - -DENABLE_COVERAGE=OFF
       # Tauri 的托盘只用标准菜单项。IDO 是音量滑块等特殊指示器控件；关闭它
@@ -175,6 +178,7 @@ modules:
     buildsystem: cmake-ninja
     config-opts:
       - -DCMAKE_BUILD_TYPE=Release
+      - -DCMAKE_INSTALL_LIBDIR=lib
       - -DENABLE_BINDINGS_MONO=OFF
       - -DENABLE_BINDINGS_VALA=OFF
       - -DENABLE_TESTS=OFF
