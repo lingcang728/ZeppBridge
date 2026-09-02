@@ -18,18 +18,19 @@ const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// `raw_records` 重新跑一遍。不动它，新加的编号只对以后同步来的记录生效，
 /// 已经存成 `unknown:211` 的那 199 条记录会永远挂着——而报这个问题的人恰恰
 /// 是因为历史记录才来报的。
-pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v18-sleep-unknown-device-codes";
+pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v19-all-day-stress-curve";
 /// 上一版的修订号。从它升上来时只重放这几条流。
 ///
-/// v17 到 v18 改了两处：设备目录多收了一批 `deviceSource` 编号（影响
-/// workouts 的归属），以及认不出来的睡眠阶段不再被写成 `awake`（影响
-/// sleep）。daily_summary、hrv、wellness 的报文一个字节都没变，把它们整个
-/// 解一遍只是让升级后的第一次启动白等——daily_summary 的报文恰好是库里最
-/// 大的那一批。
-const PREVIOUS_RELEASE_NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v17-road-cycling";
+/// v18 到 v19 只改了一处：`all_day_stress` 的 `data` 字段——每天那条五分钟
+/// 一个点的全天压力曲线——原来整条被丢掉，现在解出来写进 `metric_samples`；
+/// 同一处顺手修好了四个区间占比的字段名。只有 wellness 这条流的报文解析变
+/// 了，workouts / sleep / daily_summary 一个字节都没动，重放它们只是让升级
+/// 后第一次启动白等。
+const PREVIOUS_RELEASE_NORMALIZER_REVISION: &str =
+    "zepp-normalizer-2026-09-v18-sleep-unknown-device-codes";
 /// 从上一版升上来时要重放的流。**改归一化规则时必须一起看这里**：漏掉一条
 /// 流，那条流的历史记录就永远停在旧规则上，而升级看起来是成功的。
-const PREVIOUS_RELEASE_REPLAY_STREAMS: [&str; 2] = ["workouts", "sleep"];
+const PREVIOUS_RELEASE_REPLAY_STREAMS: [&str; 1] = ["wellness"];
 const LAST_CLOUD_SYNC_AT_KEY: &str = "last_cloud_sync_at";
 const LAST_CLOUD_SYNC_OUTCOME_KEY: &str = "last_cloud_sync_outcome";
 const LAST_LOCAL_REPROCESS_AT_KEY: &str = "last_local_reprocess_at";
@@ -1567,6 +1568,32 @@ impl Database {
             .map_err(Into::into)
     }
 
+    /// 全天压力曲线：`metric_samples` 里的逐条读数，按时间排列。
+    ///
+    /// 和心率那条不同，这里不需要按来源去重——压力只有 `all_day_stress`
+    /// 一个来源，同一时刻的重复读数只可能来自两块表，那时两条都该留着，
+    /// 唯一索引里本来就带 `device_id`。
+    ///
+    /// 没有采样的时间段不补点。手表整夜没戴就是没数据，画成一条平的 0
+    /// 会让人以为那几个小时特别放松。
+    pub fn stress_series(&self, hours: i64) -> Result<Vec<StressPoint>> {
+        let hours = hours.clamp(1, 24 * 14);
+        let cutoff = (Utc::now() - chrono::Duration::hours(hours)).to_rfc3339();
+        let mut stmt = self.conn.prepare(
+            "SELECT timestamp, value FROM metric_samples
+             WHERE metric = 'stress' AND timestamp >= ?1
+             ORDER BY timestamp ASC",
+        )?;
+        let rows = stmt.query_map([cutoff], |row| {
+            Ok(StressPoint {
+                timestamp: row.get(0)?,
+                value: row.get(1)?,
+            })
+        })?;
+        rows.collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(Into::into)
+    }
+
     pub fn training_load_series(&self, days: i64) -> Result<Vec<DailyPoint>> {
         let days = days.clamp(1, 365);
         let cutoff = (Utc::now() - chrono::Duration::days(days))
@@ -1914,10 +1941,8 @@ impl Database {
         if current.as_deref() == Some(NORMALIZER_REVISION) {
             return Ok(None);
         }
-        // v0.10.0 already contains every non-workout normalization change that
-        // precedes this revision. Replaying only workout summaries avoids
-        // decoding very large, unrelated daily-summary payloads during the
-        // v0.11.0 upgrade while still applying the new sport catalog.
+        // 这一版只动了 wellness 的解析，所以只重放 wellness。
+        // daily_summary 的报文是库里最大的一批，把它们整个解一遍纯属白等。
         if current.as_deref() == Some(PREVIOUS_RELEASE_NORMALIZER_REVISION) {
             let counts =
                 self.reprocess_raw_records_for_stream(Some(&PREVIOUS_RELEASE_REPLAY_STREAMS))?;
@@ -2025,6 +2050,18 @@ impl Database {
             "sleep" => ("SELECT COUNT(*) FROM sleep_sessions", None),
             "workouts" => ("SELECT COUNT(*) FROM workouts", None),
             "workout_detail" => ("SELECT COUNT(*) FROM workout_samples", None),
+            // wellness 没有自己的表，它写进 daily_metrics 和 metric_samples。
+            // 不数它的话，一次只重放 wellness 的升级会向用户报「0 条」，而
+            // 那次升级的全部意义恰恰就是这条流。
+            "wellness" => (
+                "SELECT (SELECT COUNT(*) FROM metric_samples s
+                           JOIN raw_records r ON r.id = s.raw_record_id
+                          WHERE r.stream = 'wellness')
+                      + (SELECT COUNT(*) FROM daily_metrics d
+                           JOIN raw_records r ON r.id = d.raw_record_id
+                          WHERE r.stream = 'wellness')",
+                None,
+            ),
             _ => return Ok(0),
         };
         if let Some(parameter) = parameter {
@@ -5983,7 +6020,7 @@ mod tests {
     }
 
     #[test]
-    fn v14_upgrade_replays_workouts_without_touching_unrelated_large_streams() {
+    fn previous_release_upgrade_replays_only_the_changed_streams() {
         let db = Database::in_memory().unwrap();
         db.insert_raw_record(&RawRecord {
             stream: "daily_summary".into(),
@@ -6015,6 +6052,24 @@ mod tests {
             capability: CapabilityStatus::Verified,
         })
         .unwrap();
+        db.insert_raw_record(&RawRecord {
+            stream: "wellness".into(),
+            source_key: "wellness:all_day_stress:user_events:2026-09-02:2026-09-03".into(),
+            source_scope: SourceScope::Device,
+            device_id: None,
+            start_utc: ts(),
+            end_utc: None,
+            payload: serde_json::json!({
+                "items": [{
+                    "eventType": "all_day_stress",
+                    "timestamp": 1788307200000i64,
+                    "avgStress": "22",
+                    "data": "[{\"time\":1788307200000,\"value\":32},{\"time\":1788307500000,\"value\":25}]"
+                }]
+            }),
+            capability: CapabilityStatus::Verified,
+        })
+        .unwrap();
         db.conn
             .execute(
                 "INSERT INTO app_meta(key, value, updated_at)
@@ -6026,9 +6081,33 @@ mod tests {
 
         let counts = db.reprocess_raw_records_if_needed().unwrap().unwrap();
 
-        assert_eq!(counts.get("workouts"), Some(&1));
-        assert_eq!(db.normalized_stream_count("daily_summary").unwrap(), 0);
-        assert_eq!(db.normalized_stream_count("workouts").unwrap(), 1);
+        // 这一版只改了 wellness 的解析，所以只有它被重放，而且报上来的
+        // 条数是真的条数——曲线两个点加上日均一行。
+        assert_eq!(counts.get("wellness"), Some(&3));
+        assert_eq!(
+            db.conn
+                .query_row(
+                    "SELECT COUNT(*) FROM metric_samples WHERE metric = 'stress'",
+                    [],
+                    |row| row.get::<_, i64>(0),
+                )
+                .unwrap(),
+            2
+        );
+        // 另外两条流一个字节都没动过，不该被顺手解一遍：daily_summary 的
+        // 报文是库里最大的一批，白解一遍就是让升级后第一次启动干等。
+        assert!(!counts.contains_key("workouts"));
+        assert_eq!(db.normalized_stream_count("workouts").unwrap(), 0);
+        assert_eq!(
+            db.conn
+                .query_row(
+                    "SELECT COUNT(*) FROM daily_metrics WHERE metric = 'steps'",
+                    [],
+                    |row| row.get::<_, i64>(0),
+                )
+                .unwrap(),
+            0
+        );
         let revision: String = db
             .conn
             .query_row(
@@ -6045,6 +6124,10 @@ mod tests {
     /// 报这个问题的人是为历史记录来的：199 条记录已经存成 `unknown:211` 了。
     /// 只把编号加进目录，新记录会对，旧记录一条都不会变——所以这条用例钉的
     /// 不是目录，而是「目录改了会自动重放」这件事。
+    ///
+    /// 库里存的是一个更早的修订号，走的是全量重放那条路。**不能用上一版的
+    /// 修订号**：那条路只重放当版真正改过的流，而那是随版本变的，钉在这里
+    /// 会让这条用例每次换版都假失败一次。
     #[test]
     fn upgrading_replays_history_so_unknown_211_becomes_road_cycling() {
         let db = Database::in_memory().unwrap();
@@ -6070,7 +6153,7 @@ mod tests {
                 "INSERT INTO app_meta(key, value, updated_at)
                  VALUES('normalizer_revision', ?1, ?2)
                  ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-                params![PREVIOUS_RELEASE_NORMALIZER_REVISION, ts().to_rfc3339()],
+                params!["zepp-normalizer-ancient", ts().to_rfc3339()],
             )
             .unwrap();
 

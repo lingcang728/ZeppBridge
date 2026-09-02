@@ -10,6 +10,7 @@ import type {
   ExportSelection,
   HealthOverview,
   HeartRatePoint,
+  StressPoint,
   HeartRateZoneOptions,
   HeartRateZonePreference,
   DailyPoint,
@@ -66,6 +67,7 @@ export interface BridgeBackend {
 
   getHealthOverview(): Promise<HealthOverview>;
   getHeartRateSeries(hours?: number): Promise<HeartRatePoint[]>;
+  getStressSeries(hours?: number): Promise<StressPoint[]>;
   getTrainingLoadSeries(days?: number): Promise<DailyPoint[]>;
   getMetricSeries(metrics: string[], days: number): Promise<MetricSeries[]>;
   getTrainingBalance(days: number): Promise<TrainingBalancePoint[]>;
