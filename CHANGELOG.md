@@ -2,7 +2,7 @@
 
 本文件记录每个版本的实际改动。写给使用者看，不是施工日志：只写用户能感知到的变化，以及为什么这么改。
 
-## Unreleased
+## 2.1.0
 
 ### Added / 新增
 
@@ -11,6 +11,8 @@
 
 ### Fixes / 修复
 
+- **A `.fit` now carries average speed, top speed, total ascent and cadence.** The first export produced files that imported cleanly but landed in the app with those four fields showing zero. The data was never missing — the summary fields simply were not written, and importers read those rather than recomputing from the per-second records. Average speed is distance over time, top speed is the measured maximum of the series, and ascent is the sum of the per-kilometre gains the decoder already measures against a 1 m noise floor. Cadence was previously left out on the grounds that its unit could not be checked; it can. The workout's own cloud summary carries `max_frequency` 141 against a series whose maximum is 141.0, `avg_stride_length` 70 cm against the 0.70 m implied by reading the series as steps per minute, and `total_step` 8998 against the 9060 that reading implies. Reading it as revolutions per minute would imply a 0.35 m stride and twice the steps. So the series is steps per minute, and it is written as FIT cadence — halved for running, walking and hiking, where one revolution is a full stride, and left alone for cycling, where a revolution is a crank turn.
+- **`.fit` 现在带上了平均速度、最高速度、累计爬升和步频。** 第一版导出的文件能正常导入，但这四项在应用里都显示为 0。数据从来就在，是汇总字段没写——而导入方读的正是这些字段，不会自己从逐秒记录里重算。平均速度就是距离除以时间，最高速度取自序列实测的最大值，累计爬升是解析器本来就按 1 米噪声底量出来的每公里爬升之和。步频之前以「单位无从核对」为由没写；其实核得了：这条运动自己的云端汇总里 `max_frequency` 是 141，而我们的序列最大值正好是 141.0；`avg_stride_length` 是 70 厘米，而按「步/分」读出来的步幅正好是 0.70 米；`total_step` 是 8998，按同一读法推出来是 9060。按「每分钟转数」读则步幅 0.35 米、步数翻倍。所以这个序列的单位是步/分，写进 FIT 时对跑步、健走、徒步除以二（一个周期是一整步），骑行原样保留（一个周期是曲柄转一圈）。
 - **Linux: a window that opened white now opens.** WebKitGTK 2.42 turned its DMABUF renderer on by default, and on a good number of driver and compositor combinations it fails outright — the window appears, it is blank, and the terminal prints nothing at all. [#32](https://github.com/lingcang728/ZeppBridge/issues/32) reported exactly that on openSUSE, from both the AppImage and the Flatpak. The silence was not the absence of an error; that failure path is simply quiet. ZeppBridge now sets `WEBKIT_DISABLE_DMABUF_RENDERER=1` on Linux unless you have set it yourself, so `WEBKIT_DISABLE_DMABUF_RENDERER=0` still gets the faster path back.
 - **Linux：开出来是一块白板的窗口，现在能开了。** WebKitGTK 2.42 起默认启用 DMABUF 渲染器，而它在相当一批驱动与合成器的组合上会直接失败——窗口出来了，是白的，终端一个字都不打印。[#32](https://github.com/lingcang728/ZeppBridge/issues/32) 在 openSUSE 上报的正是这个，AppImage 和 Flatpak 都白。没有报错不是因为没出错，是这条失败路径本身就是静默的。现在 Linux 上默认关掉它；你自己设过这个变量就尊重你的值，想要回那条快路径就设 `WEBKIT_DISABLE_DMABUF_RENDERER=0`。
 - **Linux: a missing tray library no longer stops the app from starting.** The tray icon comes from the desktop, through `libayatana-appindicator3` — a library the GNOME Flatpak runtime does not ship and some desktops do not install. When it is absent that C library does not return an error, it panics, which took the whole app down at launch ([#11](https://github.com/lingcang728/ZeppBridge/issues/11) carries the backtrace). What was actually missing was a decorative icon. ZeppBridge now catches that, keeps running, and prints the install command for your distribution. With no tray, closing the window quits instead of hiding — hiding into a tray that does not exist leaves a running process with no way back to it. The `.deb` and `.rpm` packages now declare the dependency, so there it should simply be present.
@@ -23,6 +25,8 @@
 
 ### Changed / 变更
 
+- **CI checks out and sets up Node with actions that run on Node 24.** `actions/checkout` and `actions/setup-node` were pinned at v4, which targets the deprecated Node 20 and was being forced onto Node 24 with a warning on every run. Both are now v5. The artifact upload and download actions are deliberately still v4: they only run in the packaging and release jobs, which are skipped on pull requests, so bumping them would put an unexercised change directly into the release path.
+- **CI 的 checkout 和 setup-node 换成跑在 Node 24 上的版本。** `actions/checkout` 和 `actions/setup-node` 原本钉在 v4，它面向已废弃的 Node 20，每次运行都被强制挪到 Node 24 并打一条告警。现在都升到 v5。artifact 的上传/下载动作**刻意**还留在 v4：它们只在打包和发布 job 里跑，而那些 job 在 PR 上是跳过的，升上去等于把一个没被验证过的改动直接放进发布路径。
 - **The issue templates are bilingual, and they know Linux exists.** Both forms were Chinese-only, and the "which package did you use" list offered Windows and macOS only — so the first Linux install report had to be filed against a form with no way to say it was Linux ([#32](https://github.com/lingcang728/ZeppBridge/issues/32)). Every label is now English and Chinese, the package list covers AppImage, Flatpak, `.deb`, `.rpm` and the container image, the OS list names the common distributions, and there is a field for the desktop session — the tray and the keyring both come from the desktop, so on Linux that answer is often the whole diagnosis. There is also a terminal-output field, because "nothing was printed" is itself evidence.
 - **Issue 模板改成中英双语，并且知道 Linux 的存在。** 两个表单原本全是中文，「你用的是哪个安装包」也只有 Windows 和 macOS——于是第一份 Linux 安装问题只能填在一个没法说明自己是 Linux 的表单里（[#32](https://github.com/lingcang728/ZeppBridge/issues/32)）。现在每一条标签都是中英两份，安装包一项涵盖 AppImage、Flatpak、`.deb`、`.rpm` 和容器镜像，操作系统一项列出常见发行版，另外加了一项桌面环境——托盘和密钥环都由桌面提供，在 Linux 上这一项常常就是答案本身。还加了一栏终端输出，因为「什么都没打印」本身就是证据。
 
