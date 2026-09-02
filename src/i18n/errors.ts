@@ -96,6 +96,7 @@ const messages = defineMessages(
     'err.export.mkdir_failed': '创建导出目录失败',
     'err.export.path_required': '请先选择保存位置',
     'err.export.path_not_absolute': '保存位置必须是绝对路径',
+    'err.export.not_a_directory': 'FIT 导出需要一个目录，这里选中的是一个文件',
     'err.export.bad_extension': '导出文件的扩展名不对',
     'err.export.path_no_parent': '保存位置缺少有效的文件夹',
     'err.export.parent_missing': '所选保存文件夹不存在',
@@ -222,6 +223,8 @@ const messages = defineMessages(
     'err.export.mkdir_failed': "Couldn't create the export folder",
     'err.export.path_required': 'Choose where to save the file first',
     'err.export.path_not_absolute': 'The save location must be an absolute path',
+    'err.export.not_a_directory':
+      'A FIT export needs a folder, but the selected path is a file',
     'err.export.bad_extension': 'The export file has the wrong extension',
     'err.export.path_no_parent': 'The save location has no valid folder',
     'err.export.parent_missing': "The chosen folder doesn't exist",

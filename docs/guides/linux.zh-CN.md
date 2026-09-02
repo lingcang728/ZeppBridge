@@ -82,6 +82,33 @@ ZEPPBRIDGE_CREDENTIAL_STORE=env ZEPPBRIDGE_APP_TOKEN=... zeppbridge-cli sync
 
 不设这个变量时，按机器上已经存在的事实推断：`ZEPPBRIDGE_APP_TOKEN` 里有令牌优先，其次是数据目录里已有的 `credentials.json`，最后才是 Secret Service。倒数第二条是为了不让一个容器在第二次运行时报「未连接账号」——只因为环境变量只在第一次带上了。
 
+## 窗口一片空白，或者根本起不来
+
+两个已知的 Linux 问题，应用里都已经做了处理。
+
+**白屏。** WebKitGTK 2.42 起默认启用 DMABUF 渲染器，它在一批驱动与合成器的组合
+上会静默失败——窗口开出来，是白的，终端什么都不打印。现在 Linux 上默认关掉它。
+如果你的机器上那条路径本来是好的，想要回去：
+
+```bash
+WEBKIT_DISABLE_DMABUF_RENDERER=0 zeppbridge
+```
+
+**没有托盘图标，并且 stderr 上有一行 `libayatana-appindicator3`。** 托盘图标由
+桌面环境通过这个库绘制。GNOME 的 Flatpak runtime 里没有它，一些桌面也没装。现在
+它不在的时候应用不会再崩——只是没有托盘图标，并且关闭窗口等于退出，因为藏进一个
+不存在的托盘会留下一个再也叫不回来的进程。要托盘的话：
+
+```bash
+sudo apt install libayatana-appindicator3-1     # Debian / Ubuntu
+sudo dnf install libayatana-appindicator3       # Fedora
+sudo zypper install libayatana-appindicator3-1  # openSUSE
+```
+
+`.deb` 和 `.rpm` 已经声明了这个依赖，这两种包上它应该本来就在。Flatpak 目前还
+没有打包它，在打进去之前那里就是没有托盘。另外 GNOME 上还需要装 AppIndicator
+扩展才看得见，KDE 原生支持。
+
 ## 更新
 
 Linux 上应用内的更新检查是关掉的，设置页会直接这么说，而不是显示一次失败的检查。更新从这个包的来处走：

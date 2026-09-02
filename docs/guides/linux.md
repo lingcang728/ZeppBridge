@@ -114,6 +114,37 @@ data directory, then Secret Service. That last-but-one rule is what stops a
 container from reporting "not connected" on its second run because the
 environment variable was only set the first time.
 
+## If the window is blank, or the app will not start
+
+Two known Linux failures, both with fixes already applied in the app.
+
+**A white, empty window.** WebKitGTK 2.42 enables a DMABUF renderer by default,
+and on a number of driver and compositor combinations it fails without printing
+anything — the window opens and stays blank. ZeppBridge now disables it on Linux
+by default. If you want the faster path back on a machine where it works:
+
+```bash
+WEBKIT_DISABLE_DMABUF_RENDERER=0 zeppbridge
+```
+
+**No tray icon, and a line about `libayatana-appindicator3` on stderr.** The tray
+icon is drawn by the desktop, through that library. It is not part of the GNOME
+Flatpak runtime and some desktops do not install it. ZeppBridge no longer dies
+when it is missing — it runs without a tray icon, and closing the window quits
+instead of hiding, because hiding into a tray that is not there would leave a
+process you cannot get back to. To get the tray:
+
+```bash
+sudo apt install libayatana-appindicator3-1     # Debian / Ubuntu
+sudo dnf install libayatana-appindicator3       # Fedora
+sudo zypper install libayatana-appindicator3-1  # openSUSE
+```
+
+The `.deb` and `.rpm` packages declare this dependency, so it should already be
+present there. For the Flatpak it is not yet bundled — the tray is simply absent
+until it is. On GNOME the tray also needs the AppIndicator shell extension; KDE
+shows it natively.
+
 ## Updates
 
 In-app update checking is switched off on Linux, and the Settings page says so

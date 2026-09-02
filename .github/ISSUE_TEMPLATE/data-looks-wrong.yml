@@ -1,103 +1,126 @@
-name: 数据不对
-description: 某项数据和 Zepp App 对不上、显示为空、单位或时间不对
-title: "[数据] "
+name: Data looks wrong · 数据不对
+description: A value disagrees with the Zepp app, shows up empty, or has the wrong unit or time · 某项数据和 Zepp App 对不上、显示为空、单位或时间不对
+title: "[data] "
 labels: ["data"]
 body:
   - type: markdown
     attributes:
       value: |
-        ### 先看一眼这条
+        ### Read this first · 先看一眼这条
 
-        **不要在这里粘贴任何令牌、cookie、账号、设备序列号、精确 GPS 坐标，或完整的接口返回内容。**
-        Issue 是公开的，一旦贴出去就无法真正撤回。
+        **Do not paste tokens, cookies, account names, device serial numbers, precise GPS coordinates, or raw API responses.**
+        Issues are public, and once posted this cannot really be taken back.
 
-        需要发原始报文时，请改用应用内的「设置 →隐私与安全 →提交错误报告」：
-        它只发送脱敏的字段结构、固件版本和未知编号，不发送以上任何内容。
+        To send raw payloads, use **Settings → Privacy & security → Submit an error report**
+        in the app instead: it sends only a redacted field structure, firmware version and
+        unrecognised codes — none of the above.
 
-        描述数值时，用「和 App 差了约 12%」「少了 3 天」这类相对描述就够了，
-        不必贴出你的真实心率、体重或睡眠时长。
+        Describing values relatively is enough — "about 12% off the app", "3 days missing".
+        You do not need to post your real heart rate, weight or sleep duration.
+
+        **不要粘贴任何令牌、cookie、账号、设备序列号、精确 GPS 坐标，或完整的接口返回内容。**
+        需要发原始报文时，请改用应用内的「设置 →隐私与安全 →提交错误报告」。
+        描述数值时用「和 App 差了约 12%」这类相对描述就够了。
   - type: input
     id: version
     attributes:
-      label: ZeppBridge 版本
-      description: 设置页底部，或安装包文件名里的版本号。
-      placeholder: "1.0.0"
+      label: ZeppBridge version · ZeppBridge 版本
+      description: At the bottom of the settings page, or in the installer filename. · 设置页底部，或安装包文件名里的版本号。
+      placeholder: "2.0.0"
     validations:
       required: true
   - type: dropdown
     id: os
     attributes:
-      label: 操作系统
+      label: Operating system · 操作系统
       options:
         - Windows 11
         - Windows 10
         - macOS (Apple Silicon)
-        - 其他
+        - Linux — Ubuntu / Debian
+        - Linux — Fedora / RHEL
+        - Linux — openSUSE
+        - Linux — Arch / Manjaro
+        - Linux — other distro · 其他发行版
+        - Other · 其他
     validations:
       required: true
   - type: input
     id: device
     attributes:
-      label: 手表 / 手环型号
-      description: 产品名即可，例如「Amazfit T-Rex 3」。**不要填序列号或设备 ID。**
+      label: Watch / band model · 手表 / 手环型号
+      description: The product name is enough, e.g. "Amazfit T-Rex 3". **Do not enter a serial number or device ID.** · 产品名即可。**不要填序列号或设备 ID。**
       placeholder: "Amazfit ..."
     validations:
       required: true
   - type: input
     id: firmware
     attributes:
-      label: 固件版本
-      description: Zepp App →设备 →关于手表。填不到就写「未知」。
+      label: Firmware version · 固件版本
+      description: Zepp app → Device → About watch. Write "unknown" if you cannot find it. · Zepp App →设备 →关于手表。填不到就写「未知」。
       placeholder: "1.2.34.5"
     validations:
       required: true
   - type: dropdown
     id: stream
     attributes:
-      label: 哪一类数据不对
+      label: Which kind of data is wrong? · 哪一类数据不对
       options:
-        - 睡眠
-        - 心率 / 静息心率
+        - Sleep · 睡眠
+        - Heart rate / resting HR · 心率 / 静息心率
         - HRV
-        - 压力
-        - 血氧
-        - 运动记录（摘要）
-        - 运动详情 / 曲线 / 轨迹
-        - 训练负荷 / 训练状态
-        - 步数 / 卡路里等日度指标
-        - 其他
+        - Stress · 压力
+        - Blood oxygen · 血氧
+        - Workout records (summary) · 运动记录（摘要）
+        - Workout detail / charts / GPS track · 运动详情 / 曲线 / 轨迹
+        - Workout type recognised as the wrong sport · 运动类型被认成了别的运动
+        - Device not recognised / unknown device · 设备没被识别 / 未知设备
+        - Training load / training status · 训练负荷 / 训练状态
+        - Steps / calories and other daily metrics · 步数 / 卡路里等日度指标
+        - Export file contents · 导出文件的内容
+        - Other · 其他
     validations:
       required: true
   - type: textarea
     id: expected
     attributes:
-      label: Zepp App 里显示的是什么，ZeppBridge 里显示的是什么
-      description: 用相对差异描述即可，不必贴真实数值。
+      label: What the Zepp app shows vs what ZeppBridge shows · Zepp App 里显示的是什么，ZeppBridge 里显示的是什么
+      description: A relative description is enough; real values are not needed. · 用相对差异描述即可，不必贴真实数值。
       placeholder: |
-        App：8 月 20 日有一次夜间睡眠。
-        ZeppBridge：同一天的睡眠页面是空的。
+        Zepp app: there is a night of sleep on 20 August.
+        ZeppBridge: the sleep page for that day is empty.
     validations:
       required: true
   - type: textarea
     id: steps
     attributes:
-      label: 复现步骤
+      label: Steps to reproduce · 复现步骤
       placeholder: |
-        1. 打开 ZeppBridge，完成一次同步
-        2. 进入「睡眠」页面
-        3. 选择 8 月 20 日
+        1. Open ZeppBridge and run a sync
+        2. Go to the Sleep page
+        3. Select 20 August
     validations:
       required: true
   - type: input
     id: report_id
     attributes:
-      label: 应用内错误报告编号（可选）
-      description: 如果你已经在设置页点过「提交错误报告」，把返回的编号填在这里，方便对上号。
-      placeholder: "例如 a1b2c3d4"
+      label: In-app error report id · 应用内错误报告编号（可选）
+      description: >-
+        If you already pressed "Submit an error report" in settings, paste the id it
+        returned so the two can be matched up. For a wrong workout type or an
+        unrecognised device this is by far the most useful thing you can attach —
+        it carries the raw code, which the issue text alone never does.
+        · 如果你已经在设置页点过「提交错误报告」，把返回的编号填在这里。运动类型认错
+        和设备没认出来这两类问题，这个编号是最有用的东西——它带着原始编号，而 issue
+        正文里没有。
+      placeholder: "e.g. a1b2c3d4"
   - type: checkboxes
     id: privacy
     attributes:
-      label: 提交前确认
+      label: Before you submit · 提交前确认
       options:
-        - label: 我确认这条 issue 里没有令牌、cookie、账号、序列号、设备 ID、精确 GPS 坐标或完整接口返回内容。
+        - label: >-
+            This issue contains no token, cookie, account name, serial number, device id,
+            precise GPS coordinate, or raw API response.
+            · 我确认这条 issue 里没有令牌、cookie、账号、序列号、设备 ID、精确 GPS 坐标或完整接口返回内容。
           required: true

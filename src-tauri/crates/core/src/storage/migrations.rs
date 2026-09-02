@@ -541,6 +541,40 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(17, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // 清掉被当成设备记下来的固件版本号。
+        //
+        // 有用户报告侧边栏里多出三个点不动也删不掉的「未识别数据源」，标签是
+        // `0.91.20.5`、`0.91.17.5` 这样的字符串。那不是设备，是固件版本：
+        // Zepp 某些报文在 `deviceId` / `sn` 位置上放的就是它，而抽取逻辑只认
+        // 字段名不看值。写入侧的闸已经加在 `looks_like_firmware_version`，这里
+        // 负责把已经落库的那些行删掉——否则它们会一直挂在界面上，而用户没有
+        // 任何入口能删。
+        //
+        // 判据必须和写入侧是同一个：这里直接调 `looks_like_firmware_version`，
+        // 而不是用 SQL 再写一遍。SQLite 没有正则，GLOB 写出来的近似式比那个
+        // 函数松（`[0-9]*.[0-9]*.[0-9]*` 里的 `*` 会跨过点，把 `1.a.b.2.3` 也
+        // 算进去），两套判据一旦不一致，就会出现「写得进来、却被迁移删掉」的
+        // 行。所以先取出来，在 Rust 里筛，再按精确 alias 删。
+        //
+        // 只删 device_identities 里的行。带这些 alias 的数据行不动：那些采样
+        // 是真的，只是被挂到了一个不存在的设备名下，删数据会把真实记录一起
+        // 删掉。它们会在下一次同步时重新归到正确的设备上。
+        let phantom_aliases: Vec<String> = {
+            let mut stmt = self.conn.prepare("SELECT alias FROM device_identities")?;
+            let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+            rows.filter_map(std::result::Result::ok)
+                .filter(|alias| super::looks_like_firmware_version(alias))
+                .collect()
+        };
+        for alias in &phantom_aliases {
+            self.conn
+                .execute("DELETE FROM device_identities WHERE alias = ?1", [alias])?;
+        }
+        self.conn.execute_batch("PRAGMA user_version = 18;")?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(18, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         // Earlier migrations are intentionally idempotent and still stamp
         // their historical versions on every launch, so the current schema
         // marker is restored only after all of them have run.

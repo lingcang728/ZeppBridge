@@ -1,0 +1,1390 @@
+{
+  "generated_at": "2026-09-02T01:59:57.083Z",
+  "source": "Cloudflare D1 zeppbridge-feedback (0a25f637-ed8f-41ad-9927-2c80cdad5bf2), --remote",
+  "purpose": "Snapshot taken BEFORE the 2026-09-02 bulk status backfill. The backfill marks 111 pre-2.0.0 reports resolved, which erases the status-level trace of device/workout codes that are still uncollected. This file is that trace.",
+  "totals": {
+    "reports": 165,
+    "by_status": {
+      "new": 91,
+      "resolved": 38,
+      "reviewed": 36
+    },
+    "v2_0_0_tagged_at": "2026-09-01T14:51:31Z",
+    "reports_after_tag": 16
+  },
+  "catalogs": {
+    "devices_version": 3,
+    "device_source_codes_collected": 24,
+    "workouts_version": 4,
+    "workout_codes_collected": 132
+  },
+  "device_source_evidence": [
+    {
+      "device_source": "10289411",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": true,
+      "reports_total": 21,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 4,
+      "claims": {
+        "amazfit-helio-strap": 17,
+        "amazfit-balance-2": 2,
+        "amazfit-active-3-premium": 1,
+        "amazfit-helio-core": 1
+      },
+      "meets_two_report_threshold": true,
+      "contested": true
+    },
+    {
+      "device_source": "102",
+      "band": "low",
+      "device_types": [
+        "1"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 13,
+      "reports_after_v2_0_0": 1,
+      "distinct_claims": 6,
+      "claims": {
+        "amazfit-balance-46mm": 6,
+        "amazfit-t-rex-3": 2,
+        "amazfit-balance-3": 2,
+        "amazfit-balance-2": 1,
+        "amazfit-up": 1,
+        "amazfit-t-rex-3-pro-48-44mm": 1
+      },
+      "meets_two_report_threshold": true,
+      "contested": true
+    },
+    {
+      "device_source": "9568513",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": true,
+      "reports_total": 11,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 2,
+      "claims": {
+        "amazfit-balance-2": 8,
+        "amazfit-helio-strap": 3
+      },
+      "meets_two_report_threshold": true,
+      "contested": true
+    },
+    {
+      "device_source": "8716547",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": true,
+      "reports_total": 7,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-t-rex-3": 7
+      },
+      "meets_two_report_threshold": true,
+      "contested": false
+    },
+    {
+      "device_source": "101",
+      "band": "low",
+      "device_types": [
+        "1"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 6,
+      "reports_after_v2_0_0": 1,
+      "distinct_claims": 2,
+      "claims": {
+        "amazfit-active-2-44mm": 4,
+        "amazfit-balance-46mm": 2
+      },
+      "meets_two_report_threshold": true,
+      "contested": true
+    },
+    {
+      "device_source": "10223873",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": true,
+      "reports_total": 6,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-active-2-square": 6
+      },
+      "meets_two_report_threshold": true,
+      "contested": false
+    },
+    {
+      "device_source": "10813699",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 6,
+      "reports_after_v2_0_0": 2,
+      "distinct_claims": 2,
+      "claims": {
+        "amazfit-active-max": 3,
+        "amazfit-active-2-44mm": 3
+      },
+      "meets_two_report_threshold": true,
+      "contested": true
+    },
+    {
+      "device_source": "64",
+      "band": "low",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 5,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 4,
+      "claims": {
+        "amazfit-helio-strap": 2,
+        "amazfit-gtr-2-new-46mm": 1,
+        "amazfit-t-rex-3-pro-48-44mm": 1,
+        "amazfit-helio-core": 1
+      },
+      "meets_two_report_threshold": true,
+      "contested": true
+    },
+    {
+      "device_source": "8519936",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": true,
+      "reports_total": 5,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-balance-46mm": 5
+      },
+      "meets_two_report_threshold": true,
+      "contested": false
+    },
+    {
+      "device_source": "9568512",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": true,
+      "reports_total": 5,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-balance-2": 5
+      },
+      "meets_two_report_threshold": true,
+      "contested": false
+    },
+    {
+      "device_source": "9568515",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": true,
+      "reports_total": 5,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-balance-2": 5
+      },
+      "meets_two_report_threshold": true,
+      "contested": false
+    },
+    {
+      "device_source": "10158337",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": true,
+      "reports_total": 5,
+      "reports_after_v2_0_0": 1,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-bip-6": 5
+      },
+      "meets_two_report_threshold": true,
+      "contested": false
+    },
+    {
+      "device_source": "10289410",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": true,
+      "reports_total": 5,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-helio-strap": 5
+      },
+      "meets_two_report_threshold": true,
+      "contested": false
+    },
+    {
+      "device_source": "104",
+      "band": "low",
+      "device_types": [
+        "1"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 4,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 2,
+      "claims": {
+        "amazfit-gts-4-mini": 3,
+        "amazfit-balance-3": 1
+      },
+      "meets_two_report_threshold": true,
+      "contested": true
+    },
+    {
+      "device_source": "8519937",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": true,
+      "reports_total": 4,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-balance-46mm": 4
+      },
+      "meets_two_report_threshold": true,
+      "contested": false
+    },
+    {
+      "device_source": "8716544",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": true,
+      "reports_total": 4,
+      "reports_after_v2_0_0": 2,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-t-rex-3": 4
+      },
+      "meets_two_report_threshold": true,
+      "contested": false
+    },
+    {
+      "device_source": "10092800",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": true,
+      "reports_total": 4,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-active-2-44mm": 4
+      },
+      "meets_two_report_threshold": true,
+      "contested": false
+    },
+    {
+      "device_source": "403",
+      "band": "low",
+      "device_types": [
+        "4"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 3,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 2,
+      "claims": {
+        "amazfit-balance-2": 2,
+        "amazfit-balance-46mm": 1
+      },
+      "meets_two_report_threshold": true,
+      "contested": true
+    },
+    {
+      "device_source": "411",
+      "band": "low",
+      "device_types": [
+        "4"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 3,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 2,
+      "claims": {
+        "amazfit-balance-2": 2,
+        "amazfit-t-rex-3": 1
+      },
+      "meets_two_report_threshold": true,
+      "contested": true
+    },
+    {
+      "device_source": "7930112",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 3,
+      "reports_after_v2_0_0": 2,
+      "distinct_claims": 2,
+      "claims": {
+        "amazfit-gtr-4-46mm": 2,
+        "amazfit-t-rex-3": 1
+      },
+      "meets_two_report_threshold": true,
+      "contested": true
+    },
+    {
+      "device_source": "8519939",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": true,
+      "reports_total": 3,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-balance-46mm": 3
+      },
+      "meets_two_report_threshold": true,
+      "contested": false
+    },
+    {
+      "device_source": "8913155",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 3,
+      "reports_after_v2_0_0": 2,
+      "distinct_claims": 2,
+      "claims": {
+        "amazfit-active-2-44mm": 2,
+        "amazfit-helio-strap": 1
+      },
+      "meets_two_report_threshold": true,
+      "contested": true
+    },
+    {
+      "device_source": "9978113",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": true,
+      "reports_total": 3,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-cheetah-2-ultra": 3
+      },
+      "meets_two_report_threshold": true,
+      "contested": false
+    },
+    {
+      "device_source": "10944769",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": true,
+      "reports_total": 3,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-active-3-premium": 3
+      },
+      "meets_two_report_threshold": true,
+      "contested": false
+    },
+    {
+      "device_source": "11141379",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": true,
+      "reports_total": 3,
+      "reports_after_v2_0_0": 1,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-balance-3": 3
+      },
+      "meets_two_report_threshold": true,
+      "contested": false
+    },
+    {
+      "device_source": "11145472",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": true,
+      "reports_total": 3,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-balance-3": 3
+      },
+      "meets_two_report_threshold": true,
+      "contested": false
+    },
+    {
+      "device_source": "15",
+      "band": "low",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 2,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 2,
+      "claims": {
+        "amazfit-balance-2": 1,
+        "amazfit-t-rex-3": 1
+      },
+      "meets_two_report_threshold": false,
+      "contested": true
+    },
+    {
+      "device_source": "263",
+      "band": "low",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 2,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-t-rex-3": 2
+      },
+      "meets_two_report_threshold": true,
+      "contested": false
+    },
+    {
+      "device_source": "419",
+      "band": "low",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 2,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-t-rex-3": 2
+      },
+      "meets_two_report_threshold": true,
+      "contested": false
+    },
+    {
+      "device_source": "7930113",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": true,
+      "reports_total": 2,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-gtr-4-46mm": 2
+      },
+      "meets_two_report_threshold": true,
+      "contested": false
+    },
+    {
+      "device_source": "8651008",
+      "band": "high",
+      "device_types": [
+        "13"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 2,
+      "reports_after_v2_0_0": 2,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-helio-ring": 2
+      },
+      "meets_two_report_threshold": true,
+      "contested": false
+    },
+    {
+      "device_source": "8716545",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": true,
+      "reports_total": 2,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-t-rex-3": 2
+      },
+      "meets_two_report_threshold": true,
+      "contested": false
+    },
+    {
+      "device_source": "10092801",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": true,
+      "reports_total": 2,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-active-2-44mm": 2
+      },
+      "meets_two_report_threshold": true,
+      "contested": false
+    },
+    {
+      "device_source": "10092807",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": true,
+      "reports_total": 2,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-active-2-44mm": 2
+      },
+      "meets_two_report_threshold": true,
+      "contested": false
+    },
+    {
+      "device_source": "10486017",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": true,
+      "reports_total": 2,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-balance-2": 2
+      },
+      "meets_two_report_threshold": true,
+      "contested": false
+    },
+    {
+      "device_source": "10551552",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": true,
+      "reports_total": 2,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-t-rex-3-pro-48-44mm": 2
+      },
+      "meets_two_report_threshold": true,
+      "contested": false
+    },
+    {
+      "device_source": "10551555",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 2,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-t-rex-3-pro-48-44mm": 2
+      },
+      "meets_two_report_threshold": true,
+      "contested": false
+    },
+    {
+      "device_source": "10879233",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": true,
+      "reports_total": 2,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-t-rex-ultra-2": 2
+      },
+      "meets_two_report_threshold": true,
+      "contested": false
+    },
+    {
+      "device_source": "4",
+      "band": "low",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 1,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-t-rex-3-pro-48-44mm": 1
+      },
+      "meets_two_report_threshold": false,
+      "contested": false
+    },
+    {
+      "device_source": "8",
+      "band": "low",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 1,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-balance-46mm": 1
+      },
+      "meets_two_report_threshold": false,
+      "contested": false
+    },
+    {
+      "device_source": "59",
+      "band": "low",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 1,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-t-rex-2-47mm": 1
+      },
+      "meets_two_report_threshold": false,
+      "contested": false
+    },
+    {
+      "device_source": "67",
+      "band": "low",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 1,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-bip-u-series": 1
+      },
+      "meets_two_report_threshold": false,
+      "contested": false
+    },
+    {
+      "device_source": "92",
+      "band": "low",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 1,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-t-rex-3": 1
+      },
+      "meets_two_report_threshold": false,
+      "contested": false
+    },
+    {
+      "device_source": "200",
+      "band": "low",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 1,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-t-rex-pro": 1
+      },
+      "meets_two_report_threshold": false,
+      "contested": false
+    },
+    {
+      "device_source": "211",
+      "band": "low",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 1,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-t-rex-3": 1
+      },
+      "meets_two_report_threshold": false,
+      "contested": false
+    },
+    {
+      "device_source": "229",
+      "band": "low",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 1,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-gtr-3-pro-46mm": 1
+      },
+      "meets_two_report_threshold": false,
+      "contested": false
+    },
+    {
+      "device_source": "414",
+      "band": "low",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 1,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-falcon-49mm": 1
+      },
+      "meets_two_report_threshold": false,
+      "contested": false
+    },
+    {
+      "device_source": "701",
+      "band": "low",
+      "device_types": [
+        "7"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 1,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-balance-3": 1
+      },
+      "meets_two_report_threshold": false,
+      "contested": false
+    },
+    {
+      "device_source": "8323329",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 1,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-active-42mm": 1
+      },
+      "meets_two_report_threshold": false,
+      "contested": false
+    },
+    {
+      "device_source": "10092803",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 1,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-active-2-44mm": 1
+      },
+      "meets_two_report_threshold": false,
+      "contested": false
+    },
+    {
+      "device_source": "10223872",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 1,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-active-2-square": 1
+      },
+      "meets_two_report_threshold": false,
+      "contested": false
+    },
+    {
+      "device_source": "10223875",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 1,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-active-2-square": 1
+      },
+      "meets_two_report_threshold": false,
+      "contested": false
+    },
+    {
+      "device_source": "10682624",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 1,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-t-rex-3-pro-48-44mm": 1
+      },
+      "meets_two_report_threshold": false,
+      "contested": false
+    },
+    {
+      "device_source": "10813697",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 1,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-active-max": 1
+      },
+      "meets_two_report_threshold": false,
+      "contested": false
+    },
+    {
+      "device_source": "10944768",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 1,
+      "reports_after_v2_0_0": 1,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-active-3-premium": 1
+      },
+      "meets_two_report_threshold": false,
+      "contested": false
+    },
+    {
+      "device_source": "10944771",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 1,
+      "reports_after_v2_0_0": 1,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-active-3-premium": 1
+      },
+      "meets_two_report_threshold": false,
+      "contested": false
+    },
+    {
+      "device_source": "11141376",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 1,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-balance-3": 1
+      },
+      "meets_two_report_threshold": false,
+      "contested": false
+    },
+    {
+      "device_source": "11141377",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 1,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-balance-3": 1
+      },
+      "meets_two_report_threshold": false,
+      "contested": false
+    },
+    {
+      "device_source": "11206915",
+      "band": "high",
+      "device_types": [
+        "0"
+      ],
+      "in_catalog_v3": false,
+      "reports_total": 1,
+      "reports_after_v2_0_0": 0,
+      "distinct_claims": 1,
+      "claims": {
+        "amazfit-bip-max": 1
+      },
+      "meets_two_report_threshold": false,
+      "contested": false
+    }
+  ],
+  "workout_code_evidence": [
+    {
+      "code": 108,
+      "in_catalog_v4": false,
+      "reports": 13,
+      "records": 318,
+      "reports_after_v2_0_0": 3,
+      "app_versions": [
+        "1.1.0",
+        "1.1.5"
+      ]
+    },
+    {
+      "code": 68,
+      "in_catalog_v4": false,
+      "reports": 11,
+      "records": 22,
+      "reports_after_v2_0_0": 1,
+      "app_versions": [
+        "1.1.2",
+        "1.1.5",
+        "2.0.0"
+      ]
+    },
+    {
+      "code": 211,
+      "in_catalog_v4": true,
+      "reports": 11,
+      "records": 264,
+      "reports_after_v2_0_0": 0,
+      "app_versions": [
+        "1.1.1",
+        "1.1.2",
+        "1.1.3",
+        "1.1.4",
+        "1.1.5"
+      ]
+    },
+    {
+      "code": 12,
+      "in_catalog_v4": false,
+      "reports": 10,
+      "records": 20,
+      "reports_after_v2_0_0": 4,
+      "app_versions": [
+        "0.11.0",
+        "1.1.5",
+        "2.0.0"
+      ]
+    },
+    {
+      "code": 224,
+      "in_catalog_v4": false,
+      "reports": 6,
+      "records": 21,
+      "reports_after_v2_0_0": 3,
+      "app_versions": [
+        "1.1.5"
+      ]
+    },
+    {
+      "code": 18,
+      "in_catalog_v4": false,
+      "reports": 4,
+      "records": 132,
+      "reports_after_v2_0_0": 0,
+      "app_versions": [
+        "1.1.2",
+        "1.1.3",
+        "1.1.4"
+      ]
+    },
+    {
+      "code": 222,
+      "in_catalog_v4": false,
+      "reports": 4,
+      "records": 17,
+      "reports_after_v2_0_0": 1,
+      "app_versions": [
+        "1.1.1",
+        "1.1.4",
+        "2.0.0"
+      ]
+    },
+    {
+      "code": 2002,
+      "in_catalog_v4": false,
+      "reports": 4,
+      "records": 5,
+      "reports_after_v2_0_0": 0,
+      "app_versions": [
+        "1.1.2",
+        "1.1.4"
+      ]
+    },
+    {
+      "code": 208,
+      "in_catalog_v4": false,
+      "reports": 3,
+      "records": 9,
+      "reports_after_v2_0_0": 0,
+      "app_versions": [
+        "1.1.5"
+      ]
+    },
+    {
+      "code": 215,
+      "in_catalog_v4": false,
+      "reports": 3,
+      "records": 4,
+      "reports_after_v2_0_0": 0,
+      "app_versions": [
+        "1.1.1",
+        "1.1.5"
+      ]
+    },
+    {
+      "code": 227,
+      "in_catalog_v4": false,
+      "reports": 3,
+      "records": 12,
+      "reports_after_v2_0_0": 0,
+      "app_versions": [
+        "1.1.5"
+      ]
+    },
+    {
+      "code": 1009,
+      "in_catalog_v4": false,
+      "reports": 3,
+      "records": 3,
+      "reports_after_v2_0_0": 0,
+      "app_versions": [
+        "1.1.4"
+      ]
+    },
+    {
+      "code": 137,
+      "in_catalog_v4": false,
+      "reports": 2,
+      "records": 6,
+      "reports_after_v2_0_0": 0,
+      "app_versions": [
+        "1.1.1",
+        "1.1.5"
+      ]
+    },
+    {
+      "code": 194,
+      "in_catalog_v4": false,
+      "reports": 2,
+      "records": 4,
+      "reports_after_v2_0_0": 0,
+      "app_versions": [
+        "1.1.4",
+        "1.1.5"
+      ]
+    },
+    {
+      "code": 197,
+      "in_catalog_v4": false,
+      "reports": 2,
+      "records": 2,
+      "reports_after_v2_0_0": 0,
+      "app_versions": [
+        "1.1.5"
+      ]
+    },
+    {
+      "code": 198,
+      "in_catalog_v4": false,
+      "reports": 2,
+      "records": 2,
+      "reports_after_v2_0_0": 0,
+      "app_versions": [
+        "1.1.5"
+      ]
+    },
+    {
+      "code": 204,
+      "in_catalog_v4": false,
+      "reports": 2,
+      "records": 4,
+      "reports_after_v2_0_0": 0,
+      "app_versions": [
+        "1.1.4"
+      ]
+    },
+    {
+      "code": 209,
+      "in_catalog_v4": false,
+      "reports": 2,
+      "records": 44,
+      "reports_after_v2_0_0": 0,
+      "app_versions": [
+        "1.1.1"
+      ]
+    },
+    {
+      "code": 218,
+      "in_catalog_v4": false,
+      "reports": 2,
+      "records": 4,
+      "reports_after_v2_0_0": 0,
+      "app_versions": [
+        "1.1.4"
+      ]
+    },
+    {
+      "code": 219,
+      "in_catalog_v4": false,
+      "reports": 2,
+      "records": 2,
+      "reports_after_v2_0_0": 0,
+      "app_versions": [
+        "1.1.4"
+      ]
+    },
+    {
+      "code": 1001,
+      "in_catalog_v4": false,
+      "reports": 2,
+      "records": 3,
+      "reports_after_v2_0_0": 0,
+      "app_versions": [
+        "1.1.2",
+        "1.1.4"
+      ]
+    },
+    {
+      "code": 47,
+      "in_catalog_v4": false,
+      "reports": 1,
+      "records": 2,
+      "reports_after_v2_0_0": 0,
+      "app_versions": [
+        "1.1.5"
+      ]
+    },
+    {
+      "code": 58,
+      "in_catalog_v4": false,
+      "reports": 1,
+      "records": 13,
+      "reports_after_v2_0_0": 0,
+      "app_versions": [
+        "1.1.5"
+      ]
+    },
+    {
+      "code": 105,
+      "in_catalog_v4": false,
+      "reports": 1,
+      "records": 2,
+      "reports_after_v2_0_0": 0,
+      "app_versions": [
+        "1.1.4"
+      ]
+    },
+    {
+      "code": 141,
+      "in_catalog_v4": false,
+      "reports": 1,
+      "records": 4,
+      "reports_after_v2_0_0": 0,
+      "app_versions": [
+        "1.1.4"
+      ]
+    },
+    {
+      "code": 205,
+      "in_catalog_v4": false,
+      "reports": 1,
+      "records": 1,
+      "reports_after_v2_0_0": 0,
+      "app_versions": [
+        "1.1.4"
+      ]
+    },
+    {
+      "code": 210,
+      "in_catalog_v4": false,
+      "reports": 1,
+      "records": 1,
+      "reports_after_v2_0_0": 0,
+      "app_versions": [
+        "1.1.1"
+      ]
+    },
+    {
+      "code": 216,
+      "in_catalog_v4": false,
+      "reports": 1,
+      "records": 1,
+      "reports_after_v2_0_0": 0,
+      "app_versions": [
+        "1.1.3"
+      ]
+    },
+    {
+      "code": 226,
+      "in_catalog_v4": false,
+      "reports": 1,
+      "records": 3,
+      "reports_after_v2_0_0": 0,
+      "app_versions": [
+        "0.11.0"
+      ]
+    },
+    {
+      "code": 1015,
+      "in_catalog_v4": false,
+      "reports": 1,
+      "records": 1,
+      "reports_after_v2_0_0": 0,
+      "app_versions": [
+        "1.1.4"
+      ]
+    }
+  ],
+  "user_notes": [
+    {
+      "id": "af3fba3c-ba41-4023-a761-007d17b09050",
+      "received_at": "2026-08-30T16:41:36.594Z",
+      "app_version": "1.1.1",
+      "operating_system": "windows",
+      "status": "reviewed",
+      "category": "workout",
+      "user_note": "I found a bug - trail running is considered as open water swimming, and I can not find that sport in the list to fix it thanks for making this, I have a few ideas if you are open to listen to them :)"
+    },
+    {
+      "id": "e5fb37a5-035e-4f08-9af6-c87b90742e07",
+      "received_at": "2026-08-30T21:45:39.847Z",
+      "app_version": "1.1.1",
+      "operating_system": "windows",
+      "status": "new",
+      "category": "other",
+      "user_note": "Cannot connect apptoken, only seeing these errors at the top after opening official web sign-in: Authentication information failed to be saved: Authentication error: Unable to write to Windows Credential Manager. 认证信息保存失败：认证错误: 无法写入 Windows 凭据管理器"
+    },
+    {
+      "id": "8896996b-1f93-40e2-b8a6-3d92a3c478b8",
+      "received_at": "2026-08-31T01:15:43.210Z",
+      "app_version": "1.1.1",
+      "operating_system": "windows",
+      "status": "new",
+      "category": "device",
+      "user_note": "我的表是amazfit [已移除]"
+    },
+    {
+      "id": "4a5c79f3-00ec-4681-8f66-814ecde36a86",
+      "received_at": "2026-08-31T07:18:27.268Z",
+      "app_version": "1.1.2",
+      "operating_system": "windows",
+      "status": "reviewed",
+      "category": "workout",
+      "user_note": "road cycling with zepp code 211 was read as unknown workout"
+    },
+    {
+      "id": "0f911a2d-7bd4-40f0-934b-70c74e231da3",
+      "received_at": "2026-08-31T10:06:20.436Z",
+      "app_version": "1.1.2",
+      "operating_system": "windows",
+      "status": "new",
+      "category": "device",
+      "user_note": "小米體脂計2"
+    },
+    {
+      "id": "404560ac-c859-4c0a-b092-47af2b0203d0",
+      "received_at": "2026-08-31T12:30:27.205Z",
+      "app_version": "1.1.3",
+      "operating_system": "windows",
+      "status": "new",
+      "category": "device",
+      "user_note": "I have a Bip 6. Says 0.135.23.0"
+    },
+    {
+      "id": "be476422-0c15-4876-a611-7cab86d69457",
+      "received_at": "2026-09-01T07:13:51.982Z",
+      "app_version": "1.1.5",
+      "operating_system": "windows",
+      "status": "new",
+      "category": "",
+      "user_note": "Helio Strap"
+    },
+    {
+      "id": "960dd932-ad8e-45f8-ac4b-7d74f56dd75d",
+      "received_at": "2026-09-01T12:19:18.639Z",
+      "app_version": "1.1.5",
+      "operating_system": "macos",
+      "status": "new",
+      "category": "device",
+      "user_note": "One of my devices is a Mi Body Composition Scale 2 (still working with the Zepp app). but not recognized here in Zeppbridge"
+    },
+    {
+      "id": "b9ec2be2-cf31-4ee3-968a-f5de2af718b1",
+      "received_at": "2026-09-02T01:10:44.277Z",
+      "app_version": "2.0.0",
+      "operating_system": "windows",
+      "status": "new",
+      "category": "device",
+      "user_note": "我的是华米balance2没有识别出来，"
+    }
+  ]
+}

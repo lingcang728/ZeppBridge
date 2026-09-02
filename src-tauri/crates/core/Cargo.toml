@@ -1,6 +1,6 @@
 [package]
 name = "zeppbridge-core"
-version = "2.0.0"
+version = "2.1.0"
 description = "ZeppBridge 的共享数据核心：模型、存储、迁移、归一化、查询、导出与写入协调"
 edition = "2021"
 
@@ -26,6 +26,8 @@ base64 = { workspace = true }
 regex = { workspace = true }
 url = { workspace = true }
 flate2 = { workspace = true }
+rustyfit = { workspace = true }
+embedded-io-adapters = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
