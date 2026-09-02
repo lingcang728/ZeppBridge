@@ -252,6 +252,21 @@ export interface SleepSession {
   stages?: SleepStageSlice[];
 }
 
+/**
+ * 一段心率区间在本次运动里待了多久。
+ *
+ * 边界来自用户在手表上的设定（云端的 `heart_range`），**不是**我们自己切的。
+ * 训练状态页那套自选区间模型（最大心率 / 储备心率 / 阈值）是另一回事，两者
+ * 的数字对不上是正常的。
+ */
+export interface HeartRateZoneBucket {
+  /** 0 起的区间序号。 */
+  index: number;
+  /** 这一段的心率上限。 */
+  upper_bound_bpm: number;
+  seconds: number;
+}
+
 export interface Workout {
   workout_id: string;
   /** Backwards-compatible normalized type. */
@@ -276,6 +291,8 @@ export interface Workout {
   source_scope: SourceScope;
   device_id?: string;
   synced_at?: string | null;
+  /** 手表自己设定的心率区间分布。空数组表示这次没有心率数据。 */
+  hr_zones?: HeartRateZoneBucket[];
 }
 
 /* ---------- 归档、补拉与备份 ---------- */
