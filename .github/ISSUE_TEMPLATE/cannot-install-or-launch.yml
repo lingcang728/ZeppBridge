@@ -1,89 +1,147 @@
-name: 装不上 / 打不开
-description: 安装失败、双击没反应、启动闪退、登录不上、更新失败
-title: "[安装] "
+name: Can't install / won't open · 装不上 / 打不开
+description: Install fails, nothing happens on launch, crashes on start, sign-in fails, update fails · 安装失败、双击没反应、启动闪退、登录不上、更新失败
+title: "[install] "
 labels: ["install"]
 body:
   - type: markdown
     attributes:
       value: |
-        ### 先看一眼这条
+        ### Read this first · 先看一眼这条
 
-        **不要在这里粘贴任何令牌、cookie、账号、密码、设备序列号，也不要贴含有你用户名的完整本机路径。**
+        **Do not paste tokens, cookies, account names, passwords, device serial numbers, or full local paths containing your username.**
+        Issues are public. Write paths as `C:\Users\<username>\...` instead.
+
+        **不要粘贴任何令牌、cookie、账号、密码、设备序列号，也不要贴含有你用户名的完整本机路径。**
         Issue 是公开的。需要路径时写成 `C:\Users\<用户名>\...` 这样即可。
   - type: input
     id: version
     attributes:
-      label: 你下载的 ZeppBridge 版本
-      description: 安装包文件名里的版本号。
-      placeholder: "1.0.0"
+      label: ZeppBridge version · 你下载的 ZeppBridge 版本
+      description: The version number in the installer filename. · 安装包文件名里的版本号。
+      placeholder: "2.0.0"
     validations:
       required: true
   - type: dropdown
     id: package
     attributes:
-      label: 你用的是哪个安装包
+      label: Which package did you use? · 你用的是哪个安装包
       options:
-        - Windows setup.exe（NSIS）
+        - Windows setup.exe (NSIS)
         - Windows .msi
         - macOS .dmg
-        - 应用内自动更新
-        - 不确定
+        - Linux AppImage
+        - Linux Flatpak
+        - Linux .deb
+        - Linux .rpm
+        - Linux container image (headless CLI / MCP)
+        - Built from source · 自己从源码构建
+        - In-app auto update · 应用内自动更新
+        - Not sure · 不确定
     validations:
       required: true
   - type: dropdown
     id: os
     attributes:
-      label: 操作系统
+      label: Operating system · 操作系统
       options:
         - Windows 11
         - Windows 10
         - macOS (Apple Silicon)
-        - macOS (Intel，当前不支持)
-        - 其他
+        - macOS (Intel — not supported yet · 当前不支持)
+        - Linux — Ubuntu / Debian
+        - Linux — Fedora / RHEL
+        - Linux — openSUSE
+        - Linux — Arch / Manjaro
+        - Linux — other distro · 其他发行版
+        - Other · 其他
     validations:
       required: true
   - type: input
     id: os_build
     attributes:
-      label: 系统版本号
-      description: Windows「设置 →系统 →系统信息」里的版本，或 macOS「关于本机」。
-      placeholder: "Windows 11 23H2 / macOS 15.3"
+      label: OS version · 系统版本号
+      description: >-
+        Windows: Settings → System → About. macOS: About This Mac.
+        Linux: the output of `cat /etc/os-release | head -2`.
+        · Windows「设置 →系统 →系统信息」，macOS「关于本机」，Linux 用
+        `cat /etc/os-release | head -2`。
+      placeholder: "Windows 11 23H2 / macOS 15.3 / Ubuntu 24.04"
     validations:
       required: true
   - type: dropdown
+    id: desktop
+    attributes:
+      label: Linux only — desktop session · 仅 Linux —— 桌面环境
+      description: >-
+        Leave as "Not applicable" on Windows and macOS. The desktop and display
+        server matter: the tray icon and the keyring both come from the desktop,
+        not from ZeppBridge. · Windows / macOS 选「不适用」。托盘图标和密钥环都由
+        桌面环境提供，不是 ZeppBridge 自己实现的，所以这一项对定位很关键。
+      options:
+        - Not applicable · 不适用
+        - GNOME (Wayland)
+        - GNOME (X11)
+        - KDE Plasma (Wayland)
+        - KDE Plasma (X11)
+        - XFCE
+        - Cinnamon
+        - Other / headless · 其他或无桌面
+    validations:
+      required: false
+  - type: dropdown
     id: stage
     attributes:
-      label: 卡在哪一步
+      label: Where does it stop? · 卡在哪一步
       options:
-        - 安装包无法运行 / 被系统拦截
-        - 安装完成但双击没反应
-        - 启动后立刻闪退
-        - 能打开但连接 Zepp 账号失败
-        - 自动更新失败
-        - 其他
+        - Installer won't run / blocked by the system · 安装包无法运行 / 被系统拦截
+        - Installed, but nothing happens on launch · 安装完成但双击没反应
+        - Crashes immediately on start · 启动后立刻闪退
+        - Opens to a blank / white window · 能启动但窗口一片空白
+        - Opens, but connecting the Zepp account fails · 能打开但连接 Zepp 账号失败
+        - Auto update fails · 自动更新失败
+        - Other · 其他
     validations:
       required: true
   - type: textarea
     id: what_happened
     attributes:
-      label: 实际发生了什么
-      description: 有报错弹窗就描述文字内容；有截图可以贴，但请先确认截图里没有账号或令牌。
+      label: What actually happened · 实际发生了什么
+      description: >-
+        Quote the text of any error dialog. Screenshots are welcome — check first
+        that they contain no account or token. · 有报错弹窗就描述文字内容；有截图可以贴，
+        但请先确认截图里没有账号或令牌。
     validations:
       required: true
   - type: textarea
+    id: terminal
+    attributes:
+      label: Terminal output · 终端输出（可选）
+      description: >-
+        Very useful for Linux, and for a blank window on any platform. Launch from
+        a terminal and paste what it prints: `./ZeppBridge.AppImage`,
+        `flatpak run com.zeppbridge.app`, or `zeppbridge`. "Nothing was printed" is
+        itself a useful answer. · Linux 和「白屏」这类问题特别需要这个。从终端启动并
+        把输出贴上来；如果什么都没打印，写「没有输出」也是有用的信息。
+      render: shell
+    validations:
+      required: false
+  - type: textarea
     id: steps
     attributes:
-      label: 复现步骤
+      label: Steps to reproduce · 复现步骤
       placeholder: |
-        1. 下载 ZeppBridge_1.0.0_x64-setup.exe
-        2. 双击安装，一路默认
-        3. 从开始菜单点击 ZeppBridge，窗口一闪就消失
+        1. Download ZeppBridge_2.0.0_amd64.AppImage
+        2. chmod +x, then run it from a terminal
+        3. A window opens but stays white; nothing is printed
     validations:
       required: true
   - type: checkboxes
     id: privacy
     attributes:
-      label: 提交前确认
+      label: Before you submit · 提交前确认
       options:
-        - label: 我确认这条 issue 和其中的截图里没有令牌、cookie、账号、密码、序列号或含真实用户名的完整路径。
+        - label: >-
+            This issue and its screenshots contain no token, cookie, account name,
+            password, serial number, or full path with my real username.
+            · 我确认这条 issue 和其中的截图里没有令牌、cookie、账号、密码、序列号或含真实用户名的完整路径。
           required: true

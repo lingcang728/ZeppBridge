@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 /// 当前 SQLite schema 版本（`PRAGMA user_version`）。加新版本只能追加迁移
 /// 步骤，不要改已有 DDL。
-pub const CURRENT_SCHEMA_VERSION: i64 = 17;
+pub const CURRENT_SCHEMA_VERSION: i64 = 18;
 /// 写进备份 manifest 的应用版本。Core 是独立 crate，用它自己的包版本。
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// 解析器修订号。**改了运动目录或任何归一化规则，就必须往前走一格。**
@@ -5025,10 +5025,41 @@ impl Database {
 fn push_alias(aliases: &mut Vec<String>, value: Option<String>) {
     if let Some(value) = value {
         let trimmed = value.trim();
-        if !trimmed.is_empty() && !aliases.iter().any(|existing| existing == trimmed) {
+        if trimmed.is_empty() || looks_like_firmware_version(trimmed) {
+            return;
+        }
+        if !aliases.iter().any(|existing| existing == trimmed) {
             aliases.push(trimmed.to_string());
         }
     }
+}
+
+/// 这个值看起来是不是一个固件版本号，而不是设备标识。
+///
+/// 起因：有用户报告侧边栏里冒出三个点不动也删不掉的「未识别数据源」，标签是
+/// `0.91.20.5`、`0.91.17.5`。那不是设备，那是固件版本——Zepp 某些报文里
+/// `deviceId` / `sn` 位置上放的就是这种字符串，而 `device_identity_hints` 只
+/// 认字段名不看值，于是每一个版本号都变成了一台「设备」，固件一升级就再多一
+/// 台。
+///
+/// 判据取自真实数据的形状差异，不是猜的：本地库里真实的设备标识是十六进制
+/// MAC（`D8803CFFFEC19AC6`）、纯数字序列号（`23229501001311`）或产品码
+/// （`PRUC72 070007001c`）——没有一个带点；而同一张表里的 `firmware` 列长
+/// 成 `0.116.137.19`、`0.132.139.2`、`V0.54.131.3`。所以「可选的 V/v 前缀 +
+/// 至少三段纯数字」这个形状只会命中版本号。
+///
+/// 刻意收得很紧：宁可漏掉一个没见过的假设备，也不能把某个厂商真的用点分十进
+/// 制当序列号的设备判成幽灵后再也进不来。
+pub(crate) fn looks_like_firmware_version(value: &str) -> bool {
+    let body = value.strip_prefix(['V', 'v']).unwrap_or(value);
+    let mut segments = 0usize;
+    for segment in body.split('.') {
+        if segment.is_empty() || !segment.bytes().all(|byte| byte.is_ascii_digit()) {
+            return false;
+        }
+        segments += 1;
+    }
+    segments >= 3
 }
 
 fn string_field(value: &serde_json::Value, keys: &[&str]) -> Option<String> {
@@ -5090,9 +5121,13 @@ fn device_identity_hints(payload: &serde_json::Value) -> Vec<DeviceIdentityHint>
             continue;
         }
         let bind = string_field(object, &["bind_device", "bindDevice"]);
+        // `device_id` 和 `serial` 也要过同一道闸：`upsert_device_identity` 会把
+        // 这两个值本身也当成别名写进去，只拦 `aliases` 拦不住它们。
         hints.push(DeviceIdentityHint {
-            device_id: string_field(object, &["device_id", "deviceId", "deviceid"]),
-            serial: string_field(object, &["sn", "serial", "serialNumber"]),
+            device_id: string_field(object, &["device_id", "deviceId", "deviceid"])
+                .filter(|value| !looks_like_firmware_version(value)),
+            serial: string_field(object, &["sn", "serial", "serialNumber"])
+                .filter(|value| !looks_like_firmware_version(value)),
             firmware: bind.as_deref().and_then(firmware_from_bind_device),
             timezone: string_field(object, &["syncedTimezone", "timezone", "tz"]).filter(|value| {
                 value.contains('/') || value.chars().any(|ch| ch.is_ascii_alphabetic())
@@ -5282,6 +5317,130 @@ fn local_day_range_utc_bounds(start: &str, end: &str) -> Option<(String, String)
 
 #[cfg(test)]
 mod tests {
+
+    /// 已经落库的幽灵设备要被迁移删掉，真设备一行不能少。
+    ///
+    /// 光在写入侧加闸不够：报告者库里那三行已经存在了，而界面上没有任何入口
+    /// 能删它们（点击无反应）。不清库的话，装了新版依然天天看见。
+    #[test]
+    fn migration_removes_firmware_shaped_devices_and_keeps_real_ones() {
+        let dir = std::env::temp_dir().join("zeppbridge-phantom-device-cleanup");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("zepp.db");
+
+        // 先建一个已升级的库，再往里塞进旧版本会写出来的那些行。
+        {
+            let db = Database::open_migrated(&path).unwrap();
+            for (alias, name) in [
+                ("0.91.20.5", None),
+                ("0.91.17.5", None),
+                ("V0.54.131.3", None),
+                ("D8803CFFFEC19AC6", Some("T-Rex 3")),
+                ("23229501001311", Some("T-Rex 3")),
+                ("PRUC72 070007001c", None),
+            ] {
+                db.conn
+                    .execute(
+                        "INSERT OR REPLACE INTO device_identities
+                            (alias, name, updated_at) VALUES (?1, ?2, ?3)",
+                        rusqlite::params![alias, name, "2026-09-02T00:00:00Z"],
+                    )
+                    .unwrap();
+            }
+            // 把版本退回去，让下一次打开重新跑一遍清理那一步。
+            db.conn.execute_batch("PRAGMA user_version = 17;").unwrap();
+        }
+
+        let db = Database::open_migrated(&path).expect("升级应当成功");
+        let mut stmt = db
+            .conn
+            .prepare("SELECT alias FROM device_identities ORDER BY alias")
+            .unwrap();
+        let aliases: Vec<String> = stmt
+            .query_map([], |row| row.get::<_, String>(0))
+            .unwrap()
+            .filter_map(std::result::Result::ok)
+            .collect();
+
+        assert_eq!(
+            aliases,
+            vec![
+                "23229501001311".to_string(),
+                "D8803CFFFEC19AC6".to_string(),
+                "PRUC72 070007001c".to_string(),
+            ],
+            "固件版本号那三行要没了，真设备一行不能少"
+        );
+    }
+
+    /// 固件版本号不是设备标识。
+    ///
+    /// 真实数据的形状对照（取自本地库 `device_identities`）：
+    ///   设备标识 → `D8803CFFFEC19AC6`（十六进制 MAC）、`23229501001311`
+    ///              （纯数字序列号）、`PRUC72 070007001c`（产品码）
+    ///   固件     → `0.116.137.19`、`0.132.139.2`、`V0.54.131.3`
+    #[test]
+    fn firmware_versions_are_not_mistaken_for_devices() {
+        // 用户报的那三个幽灵「设备」。
+        assert!(looks_like_firmware_version("0.91.20.5"));
+        assert!(looks_like_firmware_version("0.91.17.5"));
+        // 本地库里真实存在的固件字符串。
+        assert!(looks_like_firmware_version("0.116.137.19"));
+        assert!(looks_like_firmware_version("0.132.139.2"));
+        assert!(looks_like_firmware_version("V0.54.131.3"));
+
+        // 真实的设备标识一个都不能被误伤。
+        assert!(!looks_like_firmware_version("D8803CFFFEC19AC6"));
+        assert!(!looks_like_firmware_version("23229501001311"));
+        assert!(!looks_like_firmware_version("PRUC72 070007001c"));
+        assert!(!looks_like_firmware_version("2445B138005129"));
+        assert!(!looks_like_firmware_version("F75C87FFFE3A9B28"));
+
+        // 两段不算：判据要求至少三段，免得把某些点分的序列号扫进来。
+        assert!(!looks_like_firmware_version("1.2"));
+        assert!(!looks_like_firmware_version(""));
+        assert!(!looks_like_firmware_version("1..2.3"));
+        assert!(!looks_like_firmware_version("1.2.3a"));
+    }
+
+    /// 幽灵设备不该被记成一台设备。
+    #[test]
+    fn a_firmware_shaped_device_id_produces_no_identity() {
+        let payload = serde_json::json!({
+            "items": [
+                { "deviceId": "0.91.20.5", "displayName": "Bip 6" },
+                { "deviceId": "D8803CFFFEC19AC6", "sn": "23229501001311" }
+            ]
+        });
+        let hints = device_identity_hints(&payload);
+        let aliases: Vec<String> = hints.iter().flat_map(|h| h.aliases.clone()).collect();
+
+        assert!(
+            !aliases.iter().any(|a| a == "0.91.20.5"),
+            "固件版本号不能变成设备别名，实际拿到：{aliases:?}"
+        );
+        assert!(aliases.iter().any(|a| a == "D8803CFFFEC19AC6"));
+        assert!(aliases.iter().any(|a| a == "23229501001311"));
+    }
+
+    /// 真设备旁边混进一个固件形状的 `sn` 时，设备本身仍要留下，
+    /// 但那个假 `serial` 不能被记进去。
+    #[test]
+    fn a_firmware_shaped_serial_does_not_poison_a_real_device() {
+        let payload = serde_json::json!({
+            "items": [{ "deviceId": "D8803CFFFEC19AC6", "sn": "0.91.20.5" }]
+        });
+        let hints = device_identity_hints(&payload);
+
+        assert_eq!(hints.len(), 1);
+        assert_eq!(hints[0].device_id.as_deref(), Some("D8803CFFFEC19AC6"));
+        assert_eq!(
+            hints[0].serial, None,
+            "固件形状的 sn 不能落进 serial —— upsert 会把它也当成别名写进去"
+        );
+        assert!(!hints[0].aliases.iter().any(|a| a == "0.91.20.5"));
+    }
     use super::*;
 
     fn ts() -> DateTime<Utc> {
