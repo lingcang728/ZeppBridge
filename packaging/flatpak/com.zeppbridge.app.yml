@@ -71,6 +71,95 @@ finish-args:
   #                      等于沙箱开了个后门。
 
 modules:
+  # 托盘图标的三个依赖。GNOME runtime 里一个都没有。
+  #
+  # Tauri 的托盘在 Linux 上是**运行时 dlopen** libayatana-appindicator3 的：
+  # 缺了它编译照样过、应用照样启动，只是 stderr 上多一行、托盘图标不出现。
+  # 这正是 Flatpak 现在的样子（docs/guides/linux.md 里给原生安装的用户写的
+  # 解法就是 `apt install libayatana-appindicator3-1`；Flatpak 用户没有那条路，
+  # 只能由这份 manifest 把库带进沙箱）。
+  #
+  # 顺序不能换：appindicator 的 CMakeLists 在 0.6.0 上要求
+  # `ayatana-indicator3-0.4>=0.8.4` 和 `dbusmenu-gtk3-0.4`，两个都得先在。
+  #
+  # 装完只留运行时需要的 .so；头文件、静态库、pkg-config、vala、gir、
+  # gtk-doc 全部 cleanup 掉 —— 它们只在构建期有用，留着白白撑大安装包。
+
+  - name: libdbusmenu
+    buildsystem: autotools
+    # 这是 2016 年的 Ubuntu 项目，早就不动了，16.04.0 就是最后一版。
+    #
+    # `--disable-scrollkeeper` / `--disable-gtk-doc`：文档工具链在 GNOME
+    # runtime 里不全，而我们一个字的文档都不需要。
+    # `--disable-dumper`：那是个调试用的可执行文件。
+    # `--enable-introspection=no` / `--disable-vala`：绑定只给别的语言用，
+    # 这里只有 C 在调它。开着它们会在 runtime 里找不到 vapigen 而挂掉。
+    # `--with-gtk=3`：Tauri 走的是 GTK3 那一支。
+    config-opts:
+      - --disable-scrollkeeper
+      - --disable-gtk-doc
+      - --disable-dumper
+      - --disable-static
+      - --disable-vala
+      - --enable-introspection=no
+      - --with-gtk=3
+    sources:
+      - type: archive
+        url: https://launchpad.net/libdbusmenu/16.04/16.04.0/+download/libdbusmenu-16.04.0.tar.gz
+        # 这个校验值不是我们自己算的（本机拉不到 launchpad）。它取自两份
+        # 互相独立的下游打包记录，两者逐字节一致：
+        #   Homebrew  Formula/lib/libdbusmenu.rb
+        #   OpenBSD   x11/libdbusmenu/distinfo（base64 转成十六进制后相同）
+        sha256: b9cc4a2acd74509435892823607d966d424bd9ad5d0b00938f27240a1bfa878a
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+      - /lib/*.la
+      - /share/gtk-doc
+      - /share/gir-1.0
+      - /share/vala
+      - /libexec
+
+  - name: libayatana-indicator
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DENABLE_TESTS=OFF
+      - -DENABLE_COVERAGE=OFF
+    sources:
+      # 用 git + commit 而不是 tarball：GitHub 自动打的 archive 压缩包不保证
+      # 逐字节稳定，而 commit sha 本身就是内容校验。
+      # 0.9.5 的附注标签 0c3c88af 指向这个 commit。
+      - type: git
+        url: https://github.com/AyatanaIndicators/libayatana-indicator.git
+        tag: '0.9.5'
+        commit: 0db7877be8c61953b50540183d5932ab159181f1
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+      - /share/pkgconfig
+
+  - name: libayatana-appindicator
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DENABLE_BINDINGS_MONO=OFF
+      - -DENABLE_BINDINGS_VALA=OFF
+      - -DENABLE_TESTS=OFF
+      - -DENABLE_COVERAGE=OFF
+      - -DFLAVOUR_GTK3=ON
+    sources:
+      # 0.6.0 的附注标签 95ef64b7 指向这个 commit。
+      - type: git
+        url: https://github.com/AyatanaIndicators/libayatana-appindicator.git
+        tag: '0.6.0'
+        commit: 27f9d9ddcf20be87c6cede65c89c5b098b16330d
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+      - /share/gir-1.0
+      - /share/vala
+
   - name: zeppbridge
     buildsystem: simple
     build-options:
