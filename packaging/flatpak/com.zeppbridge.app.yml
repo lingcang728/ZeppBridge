@@ -135,6 +135,11 @@ modules:
         #   Homebrew  Formula/lib/libdbusmenu.rb
         #   OpenBSD   x11/libdbusmenu/distinfo（base64 转成十六进制后相同）
         sha256: b9cc4a2acd74509435892823607d966d424bd9ad5d0b00938f27240a1bfa878a
+      # libdbusmenu 把 HAVE_VALGRIND 的 AM_CONDITIONAL 错放在 tests 条件里，
+      # `--disable-tests` 时反而会因变量未定义而退出。Flathub 的共享模块也
+      # 携带这份补丁；它只把 AM_CONDITIONAL 移到条件外，不改变运行时代码。
+      - type: patch
+        path: libdbusmenu-fix-have-valgrind-conditional.patch
     cleanup:
       - /include
       - /lib/pkgconfig
