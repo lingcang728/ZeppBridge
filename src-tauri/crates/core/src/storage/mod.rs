@@ -38,6 +38,14 @@ const HISTORY_SYNC_DAYS_KEY: &str = "history_sync_days";
 const ARCHIVE_ENABLED_KEY: &str = "archive_enabled";
 const HEART_RATE_ZONE_PREF_KEY: &str = "heart_rate_zone_preference";
 const BYTES_PER_HISTORY_DAY: u64 = 800_000;
+/// 一次重放在一个事务里处理多少条原始报文。
+///
+/// 从前这里没有事务，每插一行派生记录就自动提交一次。842 MB 的库上光重放
+/// wellness 一条流就要 237 秒，而那段时间几乎没有一秒花在解析上——全花在
+/// 每次提交的 fsync 上。整库包成一个大事务会再快一点，代价是 WAL 得装下全
+/// 部派生数据；按批提交拿到同一个数量级的提速，同时把 WAL 峰值钉在一批之内，
+/// 而这段代码恰恰要在 NAS 和容器上跑。
+const REPLAY_BATCH_RECORDS: usize = 64;
 /// 少于这么多天的本机样本，不足以外推占用速率。
 const MIN_OBSERVED_DAYS: i64 = 7;
 /// 估算之外再留 200 MB。刚好填满磁盘和放不下一样糟糕。
@@ -111,6 +119,37 @@ impl ReplayGuard {
 impl Drop for ReplayGuard {
     fn drop(&mut self) {
         REPLAY_IN_PROGRESS.store(false, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+/// 一批重放的事务边界。
+///
+/// 提交必须显式调用 `commit()`；`?` 提前返回和 panic 都走 `Drop`，回滚。
+/// 手写而不是用 `rusqlite::Transaction`，是因为整个 `Database` 只拿得到
+/// `&self.conn`，而 `Transaction` 要借走 `&mut Connection`。
+struct ReplayBatch<'a> {
+    conn: &'a Connection,
+    open: bool,
+}
+
+impl<'a> ReplayBatch<'a> {
+    fn begin(conn: &'a Connection) -> Result<Self> {
+        conn.execute("BEGIN IMMEDIATE", [])?;
+        Ok(Self { conn, open: true })
+    }
+
+    fn commit(mut self) -> Result<()> {
+        self.open = false;
+        self.conn.execute("COMMIT", [])?;
+        Ok(())
+    }
+}
+
+impl Drop for ReplayBatch<'_> {
+    fn drop(&mut self) {
+        if self.open {
+            let _ = self.conn.execute("ROLLBACK", []);
+        }
     }
 }
 
@@ -776,6 +815,23 @@ pub struct NormalizationCounts {
     pub supplemental_daily_records: i64,
 }
 
+/// 这个库欠着的一次重放：从哪一版升到哪一版、要过几条报文。
+///
+/// 存在的理由是「先说清楚再做」。重放是分钟级的动作，而 `status` 这种命令
+/// 必须秒回，所以计算计划（只读、两条 SELECT）和执行计划必须能分开调用：
+/// 短命令拿它去说一句「你的历史还停在旧解析器上」，`reprocess` 拿它去干活。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReplayPlan {
+    /// 库里派生数据是哪一版解析器产出的。`None` = 从没重放过。
+    pub stored_revision: Option<String>,
+    /// 这个程序会把它升到哪一版。
+    pub target_revision: String,
+    /// 要重放的流。空 = 全部流。
+    pub streams: Vec<String>,
+    /// 这次重放要过一遍的原始报文条数。0 = 库是空的，重放是瞬间的事。
+    pub raw_records: i64,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct StreamFreshness {
     pub last_cloud_sync_at: Option<String>,
@@ -1242,7 +1298,7 @@ impl Database {
         match version.cmp(&CURRENT_SCHEMA_VERSION) {
             std::cmp::Ordering::Equal => Ok(Self { conn }),
             std::cmp::Ordering::Less => Err(ZeppBridgeError::ConfigError(format!(
-                "本机数据库还是 v{version}，这个程序需要 v{CURRENT_SCHEMA_VERSION}。只读连接无法升级——请先启动一次 ZeppBridge 桌面应用完成升级（升级前会自动生成备份），再重试。"
+                "本机数据库还是 v{version}，这个程序需要 v{CURRENT_SCHEMA_VERSION}。只读连接无法升级——无头环境请跑一次 `zeppbridge-cli reprocess`，有桌面应用就启动一次（两条路都会在升级前自动生成备份），再重试。"
             ))),
             std::cmp::Ordering::Greater => Err(ZeppBridgeError::ConfigError(format!(
                 "本机数据库是 v{version}，比这个程序（v{CURRENT_SCHEMA_VERSION}）新。请把命令行 / MCP 升级到与桌面应用相同的版本，不要用旧版去读新库。"
@@ -1878,7 +1934,11 @@ impl Database {
                     .and_then(|value| value.split(':').next());
                 let rows = Normalizer::normalize_workouts_with_sport(payload, sport)?;
                 counts.primary_records = rows.len() as i64;
-                self.clear_normalized_for_raw(raw_record_id, stream)?;
+                // 先算出新行，再只删「这条报文以前产出、现在不再产出」的那些。
+                // 别的流是「先清空，再插」；workouts 不能那么做，见
+                // `clear_workouts_for_raw_except`。
+                let keep: Vec<String> = rows.iter().map(|row| row.workout_id.clone()).collect();
+                self.clear_workouts_for_raw_except(raw_record_id, &keep)?;
                 for row in rows {
                     self.insert_workout_with_raw(&row, Some(raw_record_id))?;
                 }
@@ -1932,41 +1992,140 @@ impl Database {
                     [raw_record_id],
                 )?;
             }
-            "workouts" => {
-                self.conn.execute(
-                    "DELETE FROM workouts WHERE raw_record_id = ?1",
-                    [raw_record_id],
-                )?;
-            }
+            // workouts 的清理不在这里：它必须先知道哪些行马上会被重新插回来。
+            // 见 `clear_workouts_for_raw_except`。
+            "workouts" => {}
             "workout_detail" => {}
             _ => {}
         }
         Ok(())
     }
 
-    pub fn reprocess_raw_records_if_needed(&self) -> Result<Option<BTreeMap<String, i64>>> {
-        let current = self
-            .conn
+    /// 删掉这条报文以前产出、而这一次归一化不再产出的运动汇总行。
+    ///
+    /// 为什么不能像别的流那样「先全删再插」：`workout_samples`、`route_points`、
+    /// `workout_pauses`、`workout_splits` 四张表都以 `ON DELETE CASCADE` 挂在
+    /// `workouts` 上。删掉一条马上就要插回来的汇总行，级联会把这条运动的逐秒
+    /// 序列和 GPS 轨迹一起带走——而它们来自 `workout_detail`，那条流在一次
+    /// 局部重放里根本不会被重放（v17→v18 就只重放 workouts 和 sleep）。结果是
+    /// 升级报告成功，用户的历史轨迹全没了。
+    ///
+    /// 汇总行本身不需要先删：`insert_workout_with_raw` 是 upsert，而且它读旧行
+    /// 是有意的——`merge_workout_type` 靠那一行才能在纠正旧的归一化结果的同时
+    /// 保住用户自己改过的类型。先删一遍恰恰把这个机制废掉了。
+    fn clear_workouts_for_raw_except(&self, raw_record_id: i64, keep: &[String]) -> Result<()> {
+        if keep.is_empty() {
+            self.conn.execute(
+                "DELETE FROM workouts WHERE raw_record_id = ?1",
+                [raw_record_id],
+            )?;
+            return Ok(());
+        }
+        // 参数个数跟着这次产出的运动条数走，不手拼 IN 列表——这些值来自
+        // 云端报文，不是编译期常量。
+        let placeholders = (2..=keep.len() + 1)
+            .map(|index| format!("?{index}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let mut parameters: Vec<&dyn rusqlite::ToSql> = Vec::with_capacity(keep.len() + 1);
+        parameters.push(&raw_record_id);
+        for workout_id in keep {
+            parameters.push(workout_id);
+        }
+        self.conn.execute(
+            &format!(
+                "DELETE FROM workouts
+                 WHERE raw_record_id = ?1 AND workout_id NOT IN ({placeholders})"
+            ),
+            parameters.as_slice(),
+        )?;
+        Ok(())
+    }
+
+    /// 库里记着的解析器修订号。`None` = 这个库从来没有重放过。
+    ///
+    /// 和 `NORMALIZER_REVISION` 是两件事：后者说**这个程序**按哪一版规则解析，
+    /// 前者说**库里的派生数据**是哪一版规则产出的。两者不相等，就意味着历史
+    /// 记录还挂在旧规则上——只有重放能把它们对齐。
+    pub fn stored_normalizer_revision(&self) -> Result<Option<String>> {
+        self.conn
             .query_row(
                 "SELECT value FROM app_meta WHERE key = 'normalizer_revision'",
                 [],
                 |row| row.get::<_, String>(0),
             )
-            .optional()?;
-        if current.as_deref() == Some(NORMALIZER_REVISION) {
+            .optional()
+            .map_err(Into::into)
+    }
+
+    /// 这个库现在欠着的重放，`None` = 不欠。
+    ///
+    /// 只读：两条 SELECT，只读连接也能调。`status`、MCP 的健康报告都要能说出
+    /// 「你的历史还停在旧解析器上」，而它们一个字节都不该写库，更不该在一条
+    /// 本该秒回的命令里默默跑上几分钟。
+    pub fn pending_replay_plan(&self) -> Result<Option<ReplayPlan>> {
+        let stored = self.stored_normalizer_revision()?;
+        if stored.as_deref() == Some(NORMALIZER_REVISION) {
             return Ok(None);
         }
-        // 这一版只动了 wellness 的解析，所以只重放 wellness。
-        // daily_summary 的报文是库里最大的一批，把它们整个解一遍纯属白等。
-        if current.as_deref() == Some(PREVIOUS_RELEASE_NORMALIZER_REVISION) {
-            let counts =
-                self.reprocess_raw_records_for_stream(Some(&PREVIOUS_RELEASE_REPLAY_STREAMS))?;
-            // 本地重放有自己的时间线。它绝不改写云端同步时间：用户问「数据新
-            // 不新」和「你什么时候连过云」是两个问题。
-            self.record_local_replay(false)?;
-            return Ok(Some(counts));
+        // 从 v19 升到 v20 时只重放这一版确实改过的 daily_summary 和 wellness。
+        // 其他更早版本仍走整库重放，避免跳过中间版本带来的归一化变化。
+        let streams: Vec<String> =
+            if stored.as_deref() == Some(PREVIOUS_RELEASE_NORMALIZER_REVISION) {
+                PREVIOUS_RELEASE_REPLAY_STREAMS
+                    .iter()
+                    .map(|stream| (*stream).to_string())
+                    .collect()
+            } else {
+                Vec::new()
+            };
+        let raw_records = self.count_raw_records_for_streams(&streams)?;
+        Ok(Some(ReplayPlan {
+            stored_revision: stored,
+            target_revision: NORMALIZER_REVISION.to_string(),
+            streams,
+            raw_records,
+        }))
+    }
+
+    /// 库里一共存着多少条原始报文。整库重放前用它把「要过多少条」说清楚。
+    pub fn raw_record_count(&self) -> Result<i64> {
+        self.count_raw_records_for_streams(&[])
+    }
+
+    /// 空的 `streams` 表示全部流，和 `ReplayPlan::streams` 同一个约定。
+    fn count_raw_records_for_streams(&self, streams: &[String]) -> Result<i64> {
+        if streams.is_empty() {
+            return self
+                .conn
+                .query_row("SELECT COUNT(*) FROM raw_records", [], |row| row.get(0))
+                .map_err(Into::into);
         }
-        let counts = self.reprocess_raw_records()?;
+        let placeholders = (1..=streams.len())
+            .map(|index| format!("?{index}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        self.conn
+            .query_row(
+                &format!("SELECT COUNT(*) FROM raw_records WHERE stream IN ({placeholders})"),
+                rusqlite::params_from_iter(streams.iter()),
+                |row| row.get(0),
+            )
+            .map_err(Into::into)
+    }
+
+    pub fn reprocess_raw_records_if_needed(&self) -> Result<Option<BTreeMap<String, i64>>> {
+        let Some(plan) = self.pending_replay_plan()? else {
+            return Ok(None);
+        };
+        let counts = if plan.streams.is_empty() {
+            self.reprocess_raw_records_for_stream(None)?
+        } else {
+            let streams: Vec<&str> = plan.streams.iter().map(String::as_str).collect();
+            self.reprocess_raw_records_for_stream(Some(&streams))?
+        };
+        // 本地重放有自己的时间线。它绝不改写云端同步时间：用户问「数据新
+        // 不新」和「你什么时候连过云」是两个问题。
         self.record_local_replay(false)?;
         Ok(Some(counts))
     }
@@ -1985,7 +2144,11 @@ impl Database {
         stream_filter: Option<&[&str]>,
     ) -> Result<BTreeMap<String, i64>> {
         let _replay_guard = ReplayGuard::enter();
-        let raw_records = if let Some(streams) = stream_filter {
+        // 先只取 id 和归一化要用的那两个短字段，报文留到循环里一条一条读。
+        // 从前是连 payload 一起收进 Vec 的——那等于重放开始之前先把库里全部
+        // 报文读进内存，而这段代码恰恰要在 NAS 和有内存上限的容器里跑 842 MB
+        // 的库。
+        let plan: Vec<(i64, String, String)> = if let Some(streams) = stream_filter {
             // 参数个数跟着流的条数走。手拼 IN 列表是这类代码最容易留下 SQL
             // 注入口子的地方，即使这里的值全是编译期常量。
             let placeholders = (1..=streams.len())
@@ -1993,7 +2156,7 @@ impl Database {
                 .collect::<Vec<_>>()
                 .join(", ");
             let mut stmt = self.conn.prepare(&format!(
-                "SELECT id, stream, source_key, payload, payload_zip
+                "SELECT id, stream, source_key
                  FROM raw_records WHERE stream IN ({placeholders}) ORDER BY id"
             ))?;
             let rows = stmt.query_map(rusqlite::params_from_iter(streams.iter()), |row| {
@@ -2001,22 +2164,18 @@ impl Database {
                     row.get::<_, i64>(0)?,
                     row.get::<_, String>(1)?,
                     row.get::<_, String>(2)?,
-                    row.get::<_, String>(3)?,
-                    row.get::<_, Option<Vec<u8>>>(4)?,
                 ))
             })?;
             rows.collect::<std::result::Result<Vec<_>, _>>()?
         } else {
-            let mut stmt = self.conn.prepare(
-                "SELECT id, stream, source_key, payload, payload_zip FROM raw_records ORDER BY id",
-            )?;
+            let mut stmt = self
+                .conn
+                .prepare("SELECT id, stream, source_key FROM raw_records ORDER BY id")?;
             let rows = stmt.query_map([], |row| {
                 Ok((
                     row.get::<_, i64>(0)?,
                     row.get::<_, String>(1)?,
                     row.get::<_, String>(2)?,
-                    row.get::<_, String>(3)?,
-                    row.get::<_, Option<Vec<u8>>>(4)?,
                 ))
             })?;
             rows.collect::<std::result::Result<Vec<_>, _>>()?
@@ -2024,21 +2183,40 @@ impl Database {
 
         let mut counts = BTreeMap::<String, i64>::new();
         let mut band_heart_rate = 0i64;
-        for (id, stream, source_key, stored_payload, payload_zip) in raw_records {
-            let encoded_payload = decode_raw_payload(stored_payload, payload_zip)?;
-            let payload: serde_json::Value = serde_json::from_str(&encoded_payload)
-                .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
-            if let Ok(result) = self.normalize_and_persist_raw(id, &stream, &source_key, &payload) {
-                *counts.entry(stream.clone()).or_default() += result.primary_records;
-                band_heart_rate += result.band_heart_rate_records;
+        // 一批一个事务。批的边界落在报文之间，所以「先删掉这条报文的派生行、
+        // 再照新规则插一遍」始终在同一个事务里——中途失败不会留下一条被清空
+        // 却没被重建的记录。
+        for batch in plan.chunks(REPLAY_BATCH_RECORDS) {
+            let transaction = ReplayBatch::begin(&self.conn)?;
+            for (id, stream, source_key) in batch {
+                // 报文可能在这次重放开始之后被清理掉，跳过即可，不是错误。
+                let Some((stored_payload, payload_zip)) = self.raw_payload(*id)? else {
+                    continue;
+                };
+                let encoded_payload = decode_raw_payload(stored_payload, payload_zip)?;
+                let payload: serde_json::Value = serde_json::from_str(&encoded_payload)
+                    .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
+                if let Ok(result) =
+                    self.normalize_and_persist_raw(*id, stream, source_key, &payload)
+                {
+                    *counts.entry(stream.clone()).or_default() += result.primary_records;
+                    band_heart_rate += result.band_heart_rate_records;
+                }
             }
+            transaction.commit()?;
         }
         if band_heart_rate > 0 {
             counts.insert("heart_rate".to_string(), band_heart_rate);
         }
 
+        // 有自己那张表的流，报库里现在的总数（比这一趟的增量更有意义）。
+        // 没有自己那张表的流保留这一趟的实测值：`wellness` 的产物落在
+        // daily_metrics 和 metric_samples 里，问「wellness 表有多少行」只会
+        // 得到 0，而把 0 报给用户，等于说这条流一条都没解出来。
         for stream in counts.keys().cloned().collect::<Vec<_>>() {
-            counts.insert(stream.clone(), self.normalized_stream_count(&stream)?);
+            if let Some(total) = self.normalized_stream_count(&stream)? {
+                counts.insert(stream.clone(), total);
+            }
         }
 
         self.conn.execute(
@@ -2051,7 +2229,20 @@ impl Database {
         Ok(counts)
     }
 
-    fn normalized_stream_count(&self, stream: &str) -> Result<i64> {
+    /// 单条原始报文的存储表示（可能是压缩过的）。
+    fn raw_payload(&self, raw_record_id: i64) -> Result<Option<(String, Option<Vec<u8>>)>> {
+        self.conn
+            .query_row(
+                "SELECT payload, payload_zip FROM raw_records WHERE id = ?1",
+                [raw_record_id],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<Vec<u8>>>(1)?)),
+            )
+            .optional()
+            .map_err(Into::into)
+    }
+
+    /// `None` = 这条流没有属于自己的规范表，数不出一个只属于它的总数。
+    fn normalized_stream_count(&self, stream: &str) -> Result<Option<i64>> {
         let (query, parameter): (&str, Option<&str>) = match stream {
             "heart_rate" => (
                 "SELECT COUNT(*) FROM metric_samples WHERE metric = ?1",
@@ -2086,17 +2277,14 @@ impl Database {
                           WHERE r.stream = 'wellness')",
                 None,
             ),
-            _ => return Ok(0),
+            _ => return Ok(None),
         };
-        if let Some(parameter) = parameter {
-            self.conn
-                .query_row(query, [parameter], |row| row.get(0))
-                .map_err(Into::into)
+        let total = if let Some(parameter) = parameter {
+            self.conn.query_row(query, [parameter], |row| row.get(0))?
         } else {
-            self.conn
-                .query_row(query, [], |row| row.get(0))
-                .map_err(Into::into)
-        }
+            self.conn.query_row(query, [], |row| row.get(0))?
+        };
+        Ok(Some(total))
     }
 
     #[cfg(test)]
@@ -5932,12 +6120,14 @@ mod tests {
         let path = dir.join("zepp.db");
         drop(Database::open_migrated(&path).unwrap());
 
+        // 库比程序旧时给的两条路都要在场。只说「启动一次桌面应用」，
+        // 对一个跑在容器里的库等于没说——那里根本没有桌面应用。
         for (version, expected) in [
             (
                 CURRENT_SCHEMA_VERSION - 1,
-                "请先启动一次 ZeppBridge 桌面应用",
+                vec!["zeppbridge-cli reprocess", "桌面应用"],
             ),
-            (CURRENT_SCHEMA_VERSION + 1, "请把命令行"),
+            (CURRENT_SCHEMA_VERSION + 1, vec!["请把命令行"]),
         ] {
             let conn = Connection::open(&path).unwrap();
             conn.execute_batch(&format!("PRAGMA user_version = {version};"))
@@ -5947,7 +6137,9 @@ mod tests {
                 Ok(_) => panic!("版本对不上必须在打开时就报出来"),
                 Err(error) => error.user_message(),
             };
-            assert!(message.contains(expected), "{message}");
+            for needle in expected {
+                assert!(message.contains(needle), "{message}");
+            }
         }
     }
 
@@ -6123,7 +6315,7 @@ mod tests {
         // workouts 和 sleep 一个字节都没动过，不该被顺手解一遍：白解一遍
         // 就是让升级后第一次启动干等。
         assert!(!counts.contains_key("workouts"));
-        assert_eq!(db.normalized_stream_count("workouts").unwrap(), 0);
+        assert_eq!(db.normalized_stream_count("workouts").unwrap(), Some(0));
         // daily_summary 这次真的被重放了，所以它的派生行必须落库。
         assert_eq!(
             db.conn
@@ -6144,6 +6336,232 @@ mod tests {
             )
             .unwrap();
         assert_eq!(revision, NORMALIZER_REVISION);
+    }
+
+    /// 无头用户的库靠什么知道自己欠一次重放。
+    ///
+    /// 桌面应用启动时会自动重放，命令行没有那次启动。所以「欠不欠」必须能
+    /// 在**只读**的前提下问出来：`status` 要能说，MCP 要能报，而它们一个
+    /// 字节都不该写库。
+    #[test]
+    fn a_stale_library_can_be_recognized_without_writing_to_it() {
+        let db = Database::in_memory().unwrap();
+        db.insert_raw_record(&RawRecord {
+            stream: "daily_summary".into(),
+            source_key: "daily-summary-plan".into(),
+            source_scope: SourceScope::UserFused,
+            device_id: None,
+            start_utc: ts(),
+            end_utc: None,
+            payload: serde_json::json!({ "data": [{ "date": "2023-11-14", "steps": 1234 }] }),
+            capability: CapabilityStatus::Verified,
+        })
+        .unwrap();
+        db.conn
+            .execute(
+                "INSERT INTO app_meta(key, value, updated_at)
+                 VALUES('normalizer_revision', ?1, ?2)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                params![PREVIOUS_RELEASE_NORMALIZER_REVISION, ts().to_rfc3339()],
+            )
+            .unwrap();
+
+        let plan = db.pending_replay_plan().unwrap().unwrap();
+        assert_eq!(
+            plan.stored_revision.as_deref(),
+            Some(PREVIOUS_RELEASE_NORMALIZER_REVISION)
+        );
+        assert_eq!(plan.target_revision, NORMALIZER_REVISION);
+        assert_eq!(plan.streams, PREVIOUS_RELEASE_REPLAY_STREAMS.to_vec());
+        // 只数要重放的那几条流，不是整库。计划里那个数字会直接显示给用户，
+        // 它得是这次真的要过的报文条数。
+        assert_eq!(plan.raw_records, 1);
+
+        db.reprocess_raw_records_if_needed().unwrap().unwrap();
+        assert!(
+            db.pending_replay_plan().unwrap().is_none(),
+            "重放做完之后就不该再说自己欠着"
+        );
+    }
+
+    /// 空库不欠重放。
+    ///
+    /// 全新安装的库没记过修订号，那不是「历史停在旧解析器上」，只是还没有
+    /// 历史。对它喊「你的数据需要重放」是一句没有内容的警告，而 `status`
+    /// 每一分钟都可能被调度脚本调一次。
+    #[test]
+    fn a_brand_new_library_is_not_told_it_owes_a_replay() {
+        let db = Database::in_memory().unwrap();
+        let plan = db.pending_replay_plan().unwrap().unwrap();
+        assert_eq!(plan.raw_records, 0);
+        assert!(
+            !db.data_health(30, 0)
+                .unwrap()
+                .database
+                .normalizer_replay_pending
+        );
+
+        // 但它仍然要被盖上当前修订号，否则第一次同步之后会平白重放一次。
+        db.reprocess_raw_records_if_needed().unwrap().unwrap();
+        assert_eq!(
+            db.stored_normalizer_revision().unwrap().as_deref(),
+            Some(NORMALIZER_REVISION)
+        );
+    }
+
+    /// 健康报告要说库的修订号，不是程序自己的常量。
+    #[test]
+    fn health_reports_the_revision_the_library_actually_has() {
+        let db = Database::in_memory().unwrap();
+        db.insert_raw_record(&RawRecord {
+            stream: "daily_summary".into(),
+            source_key: "daily-summary-health".into(),
+            source_scope: SourceScope::UserFused,
+            device_id: None,
+            start_utc: ts(),
+            end_utc: None,
+            payload: serde_json::json!({ "data": [{ "date": "2023-11-14", "steps": 1234 }] }),
+            capability: CapabilityStatus::Verified,
+        })
+        .unwrap();
+        db.conn
+            .execute(
+                "INSERT INTO app_meta(key, value, updated_at)
+                 VALUES('normalizer_revision', ?1, ?2)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                params![PREVIOUS_RELEASE_NORMALIZER_REVISION, ts().to_rfc3339()],
+            )
+            .unwrap();
+
+        let health = db.data_health(30, 0).unwrap();
+        assert_eq!(health.database.normalizer_revision, NORMALIZER_REVISION);
+        assert_eq!(
+            health.database.stored_normalizer_revision.as_deref(),
+            Some(PREVIOUS_RELEASE_NORMALIZER_REVISION)
+        );
+        assert!(health.database.normalizer_replay_pending);
+        assert!(
+            health.actions.iter().any(|action| action.id == "reprocess"),
+            "库停在旧解析器上时，健康报告必须给得出那个动作"
+        );
+    }
+
+    /// 分批提交不能把跨批的记录漏掉。
+    ///
+    /// 重放现在一批 64 条报文包一个事务。批的边界是新加的东西，而边界正是
+    /// 这类改动最容易出错的地方：少提交一次、或者最后不满一批的那几条没被
+    /// 处理，用户看到的是「重放跑完了，可还是有一部分记录没变」。
+    #[test]
+    fn batched_replay_covers_every_record_across_batch_boundaries() {
+        let db = Database::in_memory().unwrap();
+        let total = REPLAY_BATCH_RECORDS * 2 + 5;
+        for index in 0..total {
+            let track = 1_700_000_000i64 + index as i64 * 7200;
+            db.insert_raw_record(&RawRecord {
+                stream: "workouts".into(),
+                source_key: format!("sport_history:0:{index}"),
+                source_scope: SourceScope::Device,
+                device_id: None,
+                start_utc: ts(),
+                end_utc: None,
+                payload: serde_json::json!({
+                    "data": [{ "trackid": track, "end_time": track + 3600, "type": 211 }]
+                }),
+                capability: CapabilityStatus::Verified,
+            })
+            .unwrap();
+        }
+        db.conn
+            .execute(
+                "INSERT INTO app_meta(key, value, updated_at)
+                 VALUES('normalizer_revision', ?1, ?2)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                params!["zepp-normalizer-before-selective-replay", ts().to_rfc3339()],
+            )
+            .unwrap();
+
+        db.reprocess_raw_records_if_needed().unwrap().unwrap();
+
+        assert_eq!(
+            db.normalized_stream_count("workouts").unwrap(),
+            Some(total as i64)
+        );
+        let workouts = db.get_recent_workouts(total + 10).unwrap();
+        assert_eq!(workouts.len(), total);
+        assert!(
+            workouts
+                .iter()
+                .all(|workout| workout.workout_type == "road_cycling"),
+            "最后不满一批的那几条也必须走过新规则"
+        );
+    }
+
+    /// 只重放 workouts 的那条升级路径，不能顺手把运动明细删掉。
+    ///
+    /// `workout_samples`、`route_points`、`workout_pauses`、`workout_splits`
+    /// 四张表都以 `ON DELETE CASCADE` 挂在 `workouts` 上。重放 workouts 时若
+    /// 先按 raw_record_id 删掉汇总行，级联会把这条运动的逐秒序列、GPS 轨迹和
+    /// 分段一起带走——而这条升级路径并不重放 workout_detail，于是它们再也回
+    /// 不来。用户看到的是「升级完，我以前那些运动的轨迹全没了」，而升级本身
+    /// 报告成功。
+    #[test]
+    fn replaying_workout_summaries_does_not_erase_the_detail_series() {
+        let db = Database::in_memory().unwrap();
+        db.persist_fetched_record(&RawRecord {
+            stream: "workouts".into(),
+            source_key: "sport_history:0:1".into(),
+            source_scope: SourceScope::Device,
+            device_id: None,
+            start_utc: ts(),
+            end_utc: None,
+            payload: serde_json::json!({
+                "data": [{ "trackid": 1_700_000_000i64, "end_time": 1_700_003_600i64, "type": 211 }]
+            }),
+            capability: CapabilityStatus::Verified,
+        })
+        .unwrap();
+        db.persist_fetched_record(&RawRecord {
+            stream: "workout_detail".into(),
+            source_key: "workout_detail:1700000000:run.gps".into(),
+            source_scope: SourceScope::Device,
+            device_id: None,
+            start_utc: ts(),
+            end_utc: None,
+            payload: serde_json::json!({
+                "trackid": 1_700_000_000i64,
+                "source": "run.gps",
+                "time": "0;1;",
+                "longitude_latitude": "4004663552,11629333504;16403,8392;",
+                "heart_rate": "1,80;1,2;"
+            }),
+            capability: CapabilityStatus::Verified,
+        })
+        .unwrap();
+        let samples_before = db.normalized_stream_count("workout_detail").unwrap();
+        let route_before: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM route_points", [], |row| row.get(0))
+            .unwrap();
+        assert!(samples_before.unwrap_or(0) > 0 && route_before > 0);
+
+        db.reprocess_raw_records_for_stream(Some(&["workouts"]))
+            .unwrap();
+
+        assert_eq!(
+            db.normalized_stream_count("workout_detail").unwrap(),
+            samples_before,
+            "重放运动汇总不该带走逐秒序列"
+        );
+        let route_after: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM route_points", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(route_after, route_before, "重放运动汇总不该带走 GPS 轨迹");
+        // 汇总本身仍然要按新规则重算过。
+        assert_eq!(
+            db.get_recent_workouts(10).unwrap()[0].workout_type,
+            "road_cycling"
+        );
     }
 
     /// 升级之后，旧的 `unknown:211` 会被重新认成公路骑行。

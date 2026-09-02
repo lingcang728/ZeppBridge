@@ -368,7 +368,12 @@ fn tool_definitions() -> Vec<Value> {
             "description": format!(
                 "本机数据的健康状况：每条流的抓取/解析/写入三个阶段各自的状态、\
                  覆盖情况和最近一次成功时间。用它判断一个问题「查不到」是因为没同步，\
-                 还是因为那段时间本来就没数据。{time} {missing}"
+                 还是因为那段时间本来就没数据。\
+                 `normalizer_replay_pending` 为真时，历史记录是旧版解析器产出的\
+                 （`stored_normalizer_revision` 是哪一版，`normalizer_revision` 是当前版）——\
+                 此时运动类型、睡眠阶段这类派生字段可能过时，回答里应当说明这一点。\
+                 修正的办法是在那台机器上跑一次 `zeppbridge-cli reprocess`，\
+                 或者启动一次桌面应用；这个服务只读，做不了。{time} {missing}"
             ),
             "inputSchema": {
                 "type": "object",

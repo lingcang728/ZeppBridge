@@ -46,6 +46,7 @@ Linux 上令牌从 Secret Service（GNOME Keyring / KWallet）读。无头机器
 ```bash
 zeppbridge-cli status --json
 zeppbridge-cli sync --mode incremental --json
+zeppbridge-cli reprocess --json  # 用当前解析器重放本地报文
 zeppbridge-cli export --from 2026-01-01 --to 2026-01-31 --format csv --out january.csv
 zeppbridge-cli contract          # 打印单位、时区、来源与缺失值的定义
 zeppbridge-cli help
@@ -54,6 +55,22 @@ zeppbridge-cli help
 `--json` 的正文独占 stdout，人读的提示走 stderr，所以 `zeppbridge-cli export > a.csv` 拿到的是干净的文件。
 
 拼错的开关一律报错而不是忽略——静默接受 `--form json` 会让脚本以为格式生效了。
+
+### 解析器升级
+
+派生记录——一次运动的类型、一晚的睡眠阶段、全天压力曲线——是报文第一次入库时由解析器产出的。规则改版之后，已经在库里的记录仍然是旧结果。只有把存下来的原始报文重放一遍，历史才会跟上；不重放，一个新增运动编号的版本只修好以后同步来的记录，此前那 199 条 `unknown:211` 一条都不会变——而来报这个问题的人恰恰是为历史记录来的。
+
+桌面应用在启动时用后台线程做这件事。无头安装没有那次启动，所以：
+
+| 命令 | 遇到旧库时做什么 |
+|---|---|
+| `sync` | 先重放，再同步。它是挂在定时器上的那条，所以无头用户什么都不用做。`--no-reprocess` 可以关掉。 |
+| `status`、`export` | 只提示，不执行。一条平时毫秒级返回的命令，不能突然开始一次几分钟的写入。 |
+| `reprocess` | 立刻重放。`--all` 重放全部报文，而不只是这次修订号变更需要的那些。 |
+
+重放全程持有跨进程写锁，不联网，也不改写「上次云端同步」的时间——它有自己的时间线。放进定时任务是安全的：不加 `--all` 时，修订号一旦对上它什么都不做。
+
+`status` 会报 `normalizerRevision`（库里记着的）、`normalizerRevisionExpected`（这个版本会产出的）和 `normalizerReplayPending`。前两者不相等，就是全部信号。
 
 ### 退出码
 
@@ -68,7 +85,7 @@ zeppbridge-cli help
 | 4 | 另一个进程正在写库 | **稍后重试，这不是失败** |
 | 5 | 云端请求失败 | 退避后重试 |
 | 6 | 本机数据库错误 | 需要人介入 |
-| 7 | 数据库版本与本程序不匹配 | 先启动一次桌面应用完成升级，或把命令行升到同一版本 |
+| 7 | 数据库版本与本程序不匹配 | 跑一次 `zeppbridge-cli reprocess`（或启动一次桌面应用）完成升级，或把命令行升到同一版本 |
 
 4 和 1 分开，是因为「桌面应用正开着同步」和「真的出错了」需要完全不同的应对；把它们并成一个码，重试逻辑就没法写。
 

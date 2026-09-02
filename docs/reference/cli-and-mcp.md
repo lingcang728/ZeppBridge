@@ -69,6 +69,7 @@ deleting data) is deliberately not here.
 ```bash
 zeppbridge-cli status --json
 zeppbridge-cli sync --mode incremental --json
+zeppbridge-cli reprocess --json  # replay local payloads with the current normalizer
 zeppbridge-cli export --from 2026-01-01 --to 2026-01-31 --format csv --out january.csv
 zeppbridge-cli contract          # prints the unit, timezone, source and missing-value definitions
 zeppbridge-cli help
@@ -79,6 +80,32 @@ stderr. So `zeppbridge-cli export > a.csv` gives you a clean file.
 
 A misspelled flag is always an error rather than being ignored — silently
 accepting `--form json` would let a script believe the format took effect.
+
+### Normalizer upgrades
+
+Derived records — a workout's sport type, a night's sleep stages, the all-day
+stress curve — are produced by the normalizer at the moment a payload is first
+stored. When its rules change, everything already in the library keeps the old
+result. Only a replay of the stored raw payloads brings history forward; without
+one, a release that adds sport codes fixes new records and leaves the 199 old
+ones sitting at `unknown:211`, which is exactly what people report.
+
+The desktop app replays on startup, in a background thread. A headless install
+never has that startup, so:
+
+| Command | What it does about a stale library |
+|---|---|
+| `sync` | Replays first, then syncs. This is the one on a timer, so headless users need to do nothing. `--no-reprocess` skips it. |
+| `status`, `export` | Say so and do nothing. A command that normally answers in milliseconds must not start a multi-minute write. |
+| `reprocess` | Runs the replay now. `--all` replays every payload rather than only what the revision bump requires. |
+
+A replay takes the cross-process write lock, never touches the network, and
+never rewrites the "last cloud sync" timestamp — it has its own timeline. It is
+safe on a timer: without `--all` it does nothing once the revision matches.
+
+`status` reports `normalizerRevision` (what the library holds),
+`normalizerRevisionExpected` (what this build produces) and
+`normalizerReplayPending`. Those first two being different is the whole signal.
 
 ### Exit codes
 
@@ -94,7 +121,7 @@ meaning of an existing one never changes.
 | 4 | Another process is writing to the database | **Retry later; this is not a failure** |
 | 5 | Cloud request failed | Back off and retry |
 | 6 | Local database error | Requires human intervention |
-| 7 | Database version does not match this build | Launch the desktop app once to upgrade, or update the CLI to the same version |
+| 7 | Database version does not match this build | Run `zeppbridge-cli reprocess` (or launch the desktop app once) to upgrade, or update the CLI to the same version |
 
 4 is separate from 1 because "the desktop app happens to be syncing" and
 "something actually broke" call for completely different responses. If they
