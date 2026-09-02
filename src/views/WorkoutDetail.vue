@@ -118,6 +118,14 @@ const messages = defineMessages(
     chartsEmptyTitle: '暂无逐点曲线',
     chartsEmptyBody: '本次未同步心率、配速、海拔或步频序列。',
 
+    hrZonesAria: '心率区间分布',
+    hrZonesTitle: '心率区间分布',
+    hrZonesNote: '区间边界来自你在手表上的设定，由 Zepp 随这条运动一起下发；ZeppBridge 没有重新划分。训练状态页那套自选区间模型是另一回事，两边的数字对不上属于正常。',
+    hrZoneBelow: (upper: number) => `${upper} 以下`,
+    hrZoneBetween: (low: number, high: number) => `${low}–${high}`,
+    hrZoneShare: (percent: string) => `${percent}%`,
+    hrZoneTotal: (duration: string) => `有心率的时长合计 ${duration}`,
+    hrZoneBarAria: '各心率区间的时长占比',
     decodedAria: '已解码参数',
     decodedTitle: '已解码参数',
     decodedNote: '摘要只从本条记录的有效样本计算，异常跳点会被忽略。',
@@ -240,6 +248,14 @@ Answer in Markdown.`,
     chartsEmptyTitle: 'No per-point curves',
     chartsEmptyBody: 'No heart rate, pace, altitude or cadence series was synced for this session.',
 
+    hrZonesAria: 'Heart rate zones',
+    hrZonesTitle: 'Heart rate zones',
+    hrZonesNote: 'The zone boundaries come from your own settings on the watch and are sent down by Zepp with this workout; ZeppBridge does not re-cut them. The Training Status page uses a separate model you pick yourself, so the two sets of numbers will not agree.',
+    hrZoneBelow: (upper: number) => `Below ${upper}`,
+    hrZoneBetween: (low: number, high: number) => `${low}-${high}`,
+    hrZoneShare: (percent: string) => `${percent}%`,
+    hrZoneTotal: (duration: string) => `${duration} with heart rate`,
+    hrZoneBarAria: 'Share of time spent in each heart rate zone',
     decodedAria: 'Decoded values',
     decodedTitle: 'Decoded values',
     decodedNote: 'The summary is computed only from valid samples in this record; anomalous jumps are ignored.',
@@ -764,6 +780,39 @@ const chartCards = computed(() => [
   { key: 'cadence', title: t.value.chartCadence, unit: 'spm', option: cadenceOption.value, stats: statSummary(cadencePoints.value), icon: 'steps' as DesignIconName, tone: 'cadence' },
 ].filter((card): card is typeof card & { option: NonNullable<typeof card.option> } => card.option !== null));
 
+/**
+ * 手表自己划的心率区间分布。
+ *
+ * 边界是云端随这条运动一起下发的（`heart_range`），**不是**我们切的：我们手上
+ * 没有用户在表上设的那份阈值，自己切只会切出另一套数字。训练状态页那套自选
+ * 区间模型（最大心率 / 储备心率 / 阈值）跟这里不是一回事，两边对不上是正常的。
+ *
+ * 全零的分布在解析层就被当成「这次没有心率数据」丢掉了，所以这里拿到的非空
+ * 数组一定有真实秒数，界面不用再判一次。
+ */
+const hrZones = computed(() => {
+  const zones = [...(workout.value?.hr_zones ?? [])].sort((a, b) => a.index - b.index);
+  const total = zones.reduce((sum, zone) => sum + zone.seconds, 0);
+  if (!zones.length || total <= 0) return null;
+  return {
+    totalLabel: formatClock(total / 60),
+    rows: zones.map((zone, position) => {
+      // 第一段是「某个上限以下」，其余每段的下限就是上一段的上限。
+      const low = position === 0 ? null : zones[position - 1].upper_bound_bpm;
+      const percent = (zone.seconds / total) * 100;
+      return {
+        index: zone.index,
+        range: low === null
+          ? t.value.hrZoneBelow(zone.upper_bound_bpm)
+          : t.value.hrZoneBetween(low, zone.upper_bound_bpm),
+        duration: formatClock(zone.seconds / 60),
+        percent,
+        percentLabel: t.value.hrZoneShare(percent.toFixed(1)),
+      };
+    }),
+  };
+});
+
 const decodedMetrics = computed(() => {
   const item = workout.value;
   const detail = series.value;
@@ -976,6 +1025,25 @@ watch([dataRevision, workoutId], () => void loadDetail());
             </section>
           </div>
           <section v-if="!chartCards.length" class="surface-card chart-empty"><DesignIcon name="structured-data" :size="42" /><div><strong>{{ t.chartsEmptyTitle }}</strong><p>{{ t.chartsEmptyBody }}</p></div></section>
+          <section v-if="hrZones" class="surface-card hr-zone-card" :aria-label="t.hrZonesAria">
+            <div class="section-head compact">
+              <span class="section-icon heart-tone"><DesignIcon name="heart-rate" :size="32" /></span>
+              <div><p class="section-eyebrow">HR ZONES</p><h2>{{ t.hrZonesTitle }}</h2></div>
+              <span class="route-note">{{ t.hrZoneTotal(hrZones.totalLabel) }}</span>
+            </div>
+            <div class="hr-zone-bar" role="img" :aria-label="t.hrZoneBarAria">
+              <span v-for="row in hrZones.rows" :key="row.index" :class="['hr-zone-fill', `zone-${row.index}`]" :style="{ width: `${row.percent}%` }"></span>
+            </div>
+            <ul class="hr-zone-list">
+              <li v-for="row in hrZones.rows" :key="row.index">
+                <i :class="['hr-zone-dot', `zone-${row.index}`]"></i>
+                <span class="hr-zone-range">{{ row.range }}</span>
+                <strong>{{ row.duration }}</strong>
+                <em>{{ row.percentLabel }}</em>
+              </li>
+            </ul>
+            <p class="mapping-note"><DesignIcon name="verified" :size="20" />{{ t.hrZonesNote }}</p>
+          </section>
         </div>
 
         <div class="side-col">
@@ -1101,6 +1169,18 @@ watch([dataRevision, workoutId], () => void loadDetail());
 .route-empty { display: grid; justify-items: center; gap: 6px; padding: 46px 16px; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); color: var(--subtle); font-size: 12px; text-align: center; background: radial-gradient(circle at 50% 50%, rgba(47,169,107,.07), transparent 45%); }
 .route-empty strong { color: var(--muted); }
 .route-empty p { margin: 0; }
+.section-icon.heart-tone { background: rgba(240,97,106,.12); }
+.hr-zone-bar { display: flex; overflow: hidden; height: 15px; border: 1px solid var(--line); border-radius: 999px; background: rgba(11,14,17,.45); }
+.hr-zone-fill { min-width: 0; }
+.hr-zone-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 20px; margin: 13px 0 0; padding: 0; list-style: none; font-variant-numeric: tabular-nums; }
+.hr-zone-list li { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.hr-zone-list .hr-zone-range { flex: 1 1 auto; color: var(--muted); }
+.hr-zone-list strong { color: var(--ink); font-weight: 600; }
+.hr-zone-list em { min-width: 46px; color: var(--subtle); font-style: normal; text-align: right; }
+.hr-zone-dot { flex: 0 0 auto; width: 9px; height: 9px; border-radius: 3px; }
+/* 六段固定配色：由凉到热，和心率本身的强度方向一致。手表最多下发六段。 */
+.zone-0 { background: #4aa8e8; } .zone-1 { background: #2fa96b; } .zone-2 { background: #b7c944; }
+.zone-3 { background: #f5c33b; } .zone-4 { background: #ef8f4a; } .zone-5 { background: #f0616a; }
 .chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .chart-card { overflow: hidden; padding: 12px 14px; min-width: 0; border-radius: 18px; }
 .chart-card::before { display: block; height: 2px; margin: -12px -14px 10px; content: ''; background: var(--line); }

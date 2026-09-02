@@ -105,9 +105,10 @@ sudo dnf install libayatana-appindicator3       # Fedora
 sudo zypper install libayatana-appindicator3-1  # openSUSE
 ```
 
-`.deb` 和 `.rpm` 已经声明了这个依赖，这两种包上它应该本来就在。Flatpak 目前还
-没有打包它，在打进去之前那里就是没有托盘。另外 GNOME 上还需要装 AppIndicator
-扩展才看得见，KDE 原生支持。
+`.deb` 和 `.rpm` 已经声明了这个依赖，这两种包上它应该本来就在。Flatpak 现在也把
+它打进去了——manifest 里多了 libdbusmenu、libayatana-indicator 和
+libayatana-appindicator 三个模块，因为 Flatpak 用户没有自己装这个库的路子。另外
+GNOME 上还需要装 AppIndicator 扩展才看得见，KDE 原生支持。
 
 ## 更新
 

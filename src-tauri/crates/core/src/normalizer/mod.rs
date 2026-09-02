@@ -993,6 +993,18 @@ fn collect_charge_metrics(
     count
 }
 
+/// `(指标名, 报文里的候选键, 单位, 可信区间)`。
+///
+/// 单独起个名字是因为 clippy 的 `type_complexity` 不收四元组套二元组，
+/// 而这四样缺一不可 —— 尤其是区间：它就是那条「这个字段的哨兵值长什么样」
+/// 的规则，每个字段都不一样，共用一条就等于把哨兵当读数写进库。
+type SentinelMetricSpec = (
+    &'static str,
+    &'static [&'static str],
+    &'static str,
+    (f64, f64),
+);
+
 fn collect_daily_metrics(
     object: &Map<String, Value>,
     parent: Option<&Map<String, Value>>,
@@ -1079,6 +1091,52 @@ fn collect_daily_metrics(
     for (metric, names, unit) in metric_fields {
         if let Some(value) =
             first_number_from(object, parent, names).filter(|value| value.is_finite())
+        {
+            records.push(DailyMetric {
+                date: date.clone(),
+                metric: metric.into(),
+                value,
+                unit: unit.into(),
+                source_scope: scope.clone(),
+                device_id: source_device.clone(),
+            });
+            count += 1;
+        }
+    }
+
+    // 云端汇总里一直有、以前没取出来的那批。
+    //
+    // 这些不能和上面那张表共用一条 `is_finite()`：这条流用**哨兵值**表示
+    // 「没测到」，而每个字段的哨兵不一样。全部是对着本机 25 348 条 readiness
+    // 记录数出来的：
+    //
+    // * `sleepHRV` 实测 44–133，`sleepRHR` 43–75，两个都没出现过哨兵；
+    // * `hrvBaseline` / `rhrBaseline` 各有 7 条是 255 —— 这条流里 255 就是
+    //   「没测到」（`afibScore` 整整 25 348 条全是 255）；
+    // * `ahiBaseline` 有 7 条是 -1，其余落在 0–0.49 之间；
+    // * 三个目标值是用户自己设的，0 表示没设，不是「目标是 0 步」。
+    //
+    // **没收 `phyBaseline` / `mentBaseLine`**：实测它们和 `phyScore` /
+    // `mentScore` 在 25 348 条记录里**逐条完全相等**，不是基线，是同一个分数
+    // 换了个名字。收进来只会在库里多两列一模一样的数。
+    let sentinel_fields: [SentinelMetricSpec; 8] = [
+        ("sleep_hrv", &["sleepHRV"], "ms", (1.0, 254.0)),
+        ("sleep_rhr", &["sleepRHR"], "bpm", (25.0, 120.0)),
+        ("hrv_baseline", &["hrvBaseline"], "ms", (1.0, 254.0)),
+        ("rhr_baseline", &["rhrBaseline"], "bpm", (25.0, 120.0)),
+        ("ahi_baseline", &["ahiBaseline"], "events/h", (0.0, 100.0)),
+        ("step_goal", &["stepGoal"], "steps", (1.0, 100_000.0)),
+        ("calorie_goal", &["calorieGoal"], "kcal", (1.0, 10_000.0)),
+        (
+            "active_minutes_goal",
+            &["burningDurationGoal"],
+            "min",
+            (1.0, 1440.0),
+        ),
+    ];
+    for (metric, names, unit, range) in sentinel_fields {
+        if let Some(value) = first_number_from(object, parent, names)
+            .filter(|value| value.is_finite() && (range.0..=range.1).contains(value))
         {
             records.push(DailyMetric {
                 date: date.clone(),
@@ -1364,8 +1422,9 @@ impl Normalizer {
     /// Only shapes verified against a real response are parsed here. Stress
     /// (`Charge/stress_data`) is deliberately absent: its payload is a
     /// protobuf whose float fields do not match the ranges the Zepp app shows,
-    /// so mapping it would be a guess. The raw response is retained and the
-    /// daily summary is read from `all_day_stress` instead.
+    /// so mapping it would be a guess. The raw response is retained, and
+    /// everything the app actually needs — the daily roll-up *and* the whole
+    /// 24-hour curve — comes out of `all_day_stress` instead.
     pub fn normalize_wellness(source_key: &str, raw: &Value) -> WellnessNormalizedData {
         let label = source_key.split(':').nth(1).unwrap_or_default();
         let mut out = WellnessNormalizedData::default();
@@ -1702,6 +1761,50 @@ fn pai_metrics(items: &[Value], out: &mut WellnessNormalizedData) {
             ("pai_high_zone", &["highZonePai"][..], "pai", (0.0, 500.0)),
             ("device_max_hr", &["maxHr"][..], "bpm", (100.0, 240.0)),
             ("device_resting_hr", &["restHr"][..], "bpm", (25.0, 120.0)),
+            // 七天滚动的 PAI 总分 —— Zepp 界面上那个大数字就是它，以前一直
+            // 没取。本机 1 363 条 PaiHealthInfo 里实测 0–270.8。
+            ("pai_total", &["totalPai"][..], "pai", (0.0, 1000.0)),
+            // 三档区间各自待了多久。0 分钟是真的「这档一分钟都没进」，不是
+            // 缺失，所以下界留在 0。实测 0–414 / 0–215 / 0–126。
+            (
+                "pai_low_zone_minutes",
+                &["lowZoneMinutes"][..],
+                "min",
+                (0.0, 1440.0),
+            ),
+            (
+                "pai_medium_zone_minutes",
+                &["mediumZoneMinutes"][..],
+                "min",
+                (0.0, 1440.0),
+            ),
+            (
+                "pai_high_zone_minutes",
+                &["highZoneMinutes"][..],
+                "min",
+                (0.0, 1440.0),
+            ),
+            // 三档的心率下限。这是手表按用户的最大/静息心率算出来的，不是
+            // 我们切的 —— 和运动详情页那份 `heart_range` 同理。实测低档
+            // 90–105、中档恒 119、高档 158–159。
+            (
+                "pai_low_zone_lower_hr",
+                &["lowZoneLowerLimit"][..],
+                "bpm",
+                (40.0, 240.0),
+            ),
+            (
+                "pai_medium_zone_lower_hr",
+                &["mediumZoneLowerLimit"][..],
+                "bpm",
+                (40.0, 240.0),
+            ),
+            (
+                "pai_high_zone_lower_hr",
+                &["highZoneLowerLimit"][..],
+                "bpm",
+                (40.0, 240.0),
+            ),
         ] {
             if let Some(value) =
                 first_number(object, keys).filter(|value| (range.0..=range.1).contains(value))
@@ -1719,9 +1822,29 @@ fn pai_metrics(items: &[Value], out: &mut WellnessNormalizedData) {
     }
 }
 
-/// The all-day stress roll-up: named daily fields, unlike the `Charge`
-/// per-minute stream whose protobuf floats do not match any range the app
-/// displays.
+/// The all-day stress roll-up. One item is one day, and it carries two
+/// different things:
+///
+/// * the named daily fields — the day's average, its minimum and maximum, and
+///   the share of the day spent in each of four bands;
+/// * `data`, a JSON **string** holding that same day's whole curve as
+///   `[{"time": <epoch ms>, "value": <1..100>}, ...]`, one reading roughly
+///   every five minutes.
+///
+/// `data` is the 24/7 curve the watch itself draws, and it used to be dropped
+/// on the floor — only the daily average reached the database, so nothing
+/// downstream could ever show more than one point per day. A user reported the
+/// stress display "isn't 24/7"; it was the reading that was missing, not the
+/// measurement.
+///
+/// Checked against every one of this library's 1104 real items before wiring
+/// it up: `minStress` and `maxStress` equal the series' own minimum and
+/// maximum in 946 of the 946 items that carry them, and `avgStress` lands
+/// within 3.9 of the series mean. The roll-up is computed from this curve, so
+/// the two are one measurement rather than two streams that happen to agree.
+///
+/// The per-minute `Charge/stress_data` stream is a different payload and stays
+/// unparsed: its protobuf floats still match no range the app displays.
 fn all_day_stress_metrics(items: &[Value], out: &mut WellnessNormalizedData) {
     for item in items {
         let Some(object) = item.as_object() else {
@@ -1731,6 +1854,7 @@ fn all_day_stress_metrics(items: &[Value], out: &mut WellnessNormalizedData) {
         let Some(date) = summary_date(object, value) else {
             continue;
         };
+        let device = value.and_then(device_id).or_else(|| device_id(object));
         for (metric, keys, unit, range) in [
             (
                 "stress",
@@ -1740,10 +1864,35 @@ fn all_day_stress_metrics(items: &[Value], out: &mut WellnessNormalizedData) {
             ),
             ("stress_min", &["minStress"][..], "score", (0.0, 100.0)),
             ("stress_max", &["maxStress"][..], "score", (0.0, 100.0)),
-            ("stress_relaxed_pct", &["relaxPct"][..], "%", (0.0, 100.0)),
-            ("stress_normal_pct", &["normalPct"][..], "%", (0.0, 100.0)),
-            ("stress_medium_pct", &["mediumPct"][..], "%", (0.0, 100.0)),
-            ("stress_high_pct", &["highPct"][..], "%", (0.0, 100.0)),
+            // The four band shares. `relaxProportion` is the name the payload
+            // actually uses; `relaxPct` was transcribed from another client and
+            // has never matched a field in any of the 1104 items here, so on
+            // its own it silently produced no rows at all. Verified name first,
+            // the older guess kept behind it.
+            (
+                "stress_relaxed_pct",
+                &["relaxProportion", "relaxPct"][..],
+                "%",
+                (0.0, 100.0),
+            ),
+            (
+                "stress_normal_pct",
+                &["normalProportion", "normalPct"][..],
+                "%",
+                (0.0, 100.0),
+            ),
+            (
+                "stress_medium_pct",
+                &["mediumProportion", "mediumPct"][..],
+                "%",
+                (0.0, 100.0),
+            ),
+            (
+                "stress_high_pct",
+                &["highProportion", "highPct"][..],
+                "%",
+                (0.0, 100.0),
+            ),
         ] {
             if let Some(reading) = first_number_from(object, value, keys)
                 .filter(|reading| (range.0..=range.1).contains(reading))
@@ -1754,10 +1903,61 @@ fn all_day_stress_metrics(items: &[Value], out: &mut WellnessNormalizedData) {
                     value: reading,
                     unit: unit.into(),
                     source_scope: SourceScope::Device,
-                    device_id: value.and_then(device_id).or_else(|| device_id(object)),
+                    device_id: device.clone(),
                 });
             }
         }
+        all_day_stress_curve(object, value, device.as_deref(), out);
+    }
+}
+
+/// One day's stress curve, parsed out of the `data` string.
+///
+/// The band shares above put the boundaries at 1-39 / 40-59 / 60-79 / 80-100:
+/// recomputing the four proportions from this series with that split
+/// reproduces the reported figures to within 0.4 percentage points on average
+/// across those 946 items, and they sum to exactly 100 in every one of them.
+///
+/// Zepp's scale starts at 1. A 0 never appears in any of the 62 626 distinct
+/// readings this library holds (522 days of them), while
+/// 0 is what these payloads use elsewhere to mean "nothing measured", so a
+/// reading below 1 is dropped rather than drawn as an impossibly calm minute.
+fn all_day_stress_curve(
+    object: &Map<String, Value>,
+    nested: Option<&Map<String, Value>>,
+    device: Option<&str>,
+    out: &mut WellnessNormalizedData,
+) {
+    let Some(points) = first_value_from(object, nested, &["data"])
+        .and_then(Value::as_str)
+        .and_then(|text| serde_json::from_str::<Value>(text).ok())
+    else {
+        return;
+    };
+    let Some(points) = points.as_array() else {
+        return;
+    };
+    for point in points {
+        let Some(point) = point.as_object() else {
+            continue;
+        };
+        let Some(reading) =
+            first_number(point, &["value"]).filter(|reading| (1.0..=100.0).contains(reading))
+        else {
+            continue;
+        };
+        let Some(timestamp) = first_value(point, &["time", "timestamp"]).and_then(parse_timestamp)
+        else {
+            continue;
+        };
+        out.metric_samples.push(MetricSample {
+            metric: "stress".into(),
+            timestamp,
+            value: reading,
+            unit: "score".into(),
+            source_scope: SourceScope::Device,
+            device_id: device.map(str::to_string),
+        });
     }
 }
 
@@ -2266,5 +2466,318 @@ mod tests {
         assert!(!result[0].gps_available);
         assert_eq!(result[0].sample_count, 0);
         assert_eq!(result[0].device_id.as_deref(), Some("AABBCCDDEEFF"));
+    }
+
+    /// `all_day_stress` 每天带一条五分钟一个点的全天曲线，以前整条被丢掉。
+    ///
+    /// 取值是真实报文里 2026-09-02 那一天（当时只同步到 01:00，所以刚好
+    /// 13 个点，适合整条写进测试）。只删掉了 `userId`。
+    /// 一条真实的 `watch_score` 报文，逐字段照抄本机库里 2026-08-12 那条。
+    fn readiness_item() -> Value {
+        json!({
+            "eventType": "readiness",
+            "subType": "watch_score",
+            "timestamp": 1786493641000i64,
+            "value": {
+                "afibBaseLine": 0, "afibInsight": 18, "afibScore": 255,
+                "ahiBaseline": 0.3827273, "ahiInsight": 100, "ahiScore": 100,
+                "algSubVer": 4, "algVer": 4,
+                "deviceId": "app", "deviceSource": 2,
+                "hrvBaseline": 101, "hrvInsight": 0, "hrvScore": 71,
+                "insightId": 9,
+                "mentBaseLine": 96, "mentInsight": 0, "mentScore": 96,
+                "phyBaseline": 64, "phyInsight": 64, "phyScore": 64,
+                "rdnsInsight": 5, "rdnsScore": 80,
+                "rhrBaseline": 49, "rhrInsight": 240, "rhrScore": 74,
+                "skinTempBaseLine": -7, "skinTempCalibrated": 11,
+                "skinTempInsight": 5, "skinTempScore": 97,
+                "sleepHRV": 88, "sleepRHR": 53,
+                "status": 200,
+                "timestamp": 1786464000000i64,
+                "timestampUpdate": 1786493641000i64,
+                "timezoneId": "Asia/Shanghai"
+            }
+        })
+    }
+
+    /// 睡眠期 HRV / 静息心率、两个基线、AHI 基线：报文里一直有，v20 之前
+    /// 一条都没进过库。
+    #[test]
+    fn readiness_carries_sleep_hrv_and_the_personal_baselines() {
+        let rows =
+            Normalizer::normalize_daily_summary(&json!({ "items": [readiness_item()] })).unwrap();
+        let daily = |metric: &str| {
+            rows.iter()
+                .find(|row| row.metric == metric)
+                .map(|row| (row.value, row.unit.as_str()))
+        };
+
+        assert_eq!(daily("sleep_hrv"), Some((88.0, "ms")));
+        assert_eq!(daily("sleep_rhr"), Some((53.0, "bpm")));
+        assert_eq!(daily("hrv_baseline"), Some((101.0, "ms")));
+        assert_eq!(daily("rhr_baseline"), Some((49.0, "bpm")));
+        assert_eq!(daily("ahi_baseline"), Some((0.3827273, "events/h")));
+
+        // 已经在库里的那几项不能因为这次改动跟着变。
+        assert_eq!(daily("hrv_readiness"), Some((71.0, "score")));
+        assert_eq!(daily("rhr_readiness"), Some((74.0, "score")));
+    }
+
+    /// `phyBaseline` / `mentBaseLine` 不收。
+    ///
+    /// 实测本机 25 348 条 readiness 记录里，它们和 `phyScore` / `mentScore`
+    /// **逐条完全相等**——不是基线，是同一个分数换了个名字。这条 fixture 里
+    /// 也是 64==64、96==96。收进来只会在库里多两列一模一样的数。
+    #[test]
+    fn the_physical_and_mental_baselines_are_not_stored_because_they_echo_the_score() {
+        let rows =
+            Normalizer::normalize_daily_summary(&json!({ "items": [readiness_item()] })).unwrap();
+        assert!(!rows.iter().any(|row| row.metric == "physical_baseline"));
+        assert!(!rows.iter().any(|row| row.metric == "mental_baseline"));
+        assert_eq!(
+            rows.iter()
+                .find(|row| row.metric == "physical_readiness")
+                .map(|row| row.value),
+            Some(64.0)
+        );
+    }
+
+    /// 255 是这条流的「没测到」。`afibScore` 在本机 25 348 条里条条都是 255，
+    /// 而 `hrvBaseline` / `rhrBaseline` 各有 7 条是 255。
+    #[test]
+    fn a_baseline_of_255_is_dropped_rather_than_stored_as_a_reading() {
+        let mut item = readiness_item();
+        item["value"]["hrvBaseline"] = json!(255);
+        item["value"]["rhrBaseline"] = json!(255);
+        // AHI 基线的哨兵是 -1，不是 255。
+        item["value"]["ahiBaseline"] = json!(-1.0);
+
+        let rows = Normalizer::normalize_daily_summary(&json!({ "items": [item] })).unwrap();
+        assert!(!rows.iter().any(|row| row.metric == "hrv_baseline"));
+        assert!(!rows.iter().any(|row| row.metric == "rhr_baseline"));
+        assert!(!rows.iter().any(|row| row.metric == "ahi_baseline"));
+        // 同一条记录里没被哨兵盖掉的仍然要写进去。
+        assert!(rows.iter().any(|row| row.metric == "sleep_hrv"));
+    }
+
+    /// 三个目标值来自 `DailyHealth` 的 samples，报文照抄 2026-08-12 那条。
+    #[test]
+    fn the_daily_goals_are_read_from_the_summary_samples() {
+        let raw = json!({ "items": [{
+            "eventType": "DailyHealth",
+            "subType": "summary",
+            "timestamp": 1786492800000i64,
+            "value": {
+                "deviceId": "1,", "deviceSN": "1,",
+                "deviceSource": "1,-1", "deviceType": "1,-1",
+                "samples": [{
+                    "burningDurationGoal": 30, "calorieGoal": 300,
+                    "dateString": "2026-08-12", "s": 0, "stepGoal": 8000,
+                    "totalBurningDuration": 0, "totalCalories": 12,
+                    "totalSteps": 189, "u": 50755973
+                }],
+                "startTime": 1786492800000i64,
+                "timeZone": "1,Asia/Shanghai"
+            }
+        }] });
+        let rows = Normalizer::normalize_daily_summary(&raw).unwrap();
+        let daily = |metric: &str| {
+            rows.iter()
+                .find(|row| row.metric == metric)
+                .map(|row| (row.value, row.unit.as_str()))
+        };
+
+        assert_eq!(daily("step_goal"), Some((8000.0, "steps")));
+        assert_eq!(daily("calorie_goal"), Some((300.0, "kcal")));
+        assert_eq!(daily("active_minutes_goal"), Some((30.0, "min")));
+        // 当天的实际值仍然照旧。
+        assert_eq!(daily("steps"), Some((189.0, "steps")));
+    }
+
+    /// 没设目标时报文写 0。0 不是「目标是 0 步」，不写进去。
+    #[test]
+    fn a_goal_of_zero_means_no_goal_was_set_and_is_not_stored() {
+        let raw = json!({ "items": [{
+            "eventType": "DailyHealth", "subType": "summary",
+            "timestamp": 1786492800000i64,
+            "value": { "samples": [{
+                "dateString": "2026-08-12", "stepGoal": 0, "calorieGoal": 0,
+                "burningDurationGoal": 0, "totalSteps": 189
+            }] }
+        }] });
+        let rows = Normalizer::normalize_daily_summary(&raw).unwrap();
+        assert!(!rows.iter().any(|row| row.metric == "step_goal"));
+        assert!(!rows.iter().any(|row| row.metric == "calorie_goal"));
+        assert!(!rows.iter().any(|row| row.metric == "active_minutes_goal"));
+        assert!(rows.iter().any(|row| row.metric == "steps"));
+    }
+
+    /// 一条真实的 PAI 报文，照抄本机库里 2026-05-18 那条（去掉两个数组字段）。
+    fn pai_item() -> Value {
+        json!({
+            "age": "20", "dailyPai": "11.707199",
+            "deviceId": "D8803CFFFEC19AC6", "deviceSource": "8716544",
+            "eventType": "PaiHealthInfo", "gender": "0",
+            "highZoneLowerLimit": "158", "highZoneMinutes": "1",
+            "highZonePai": "0.88804626", "index": "4",
+            "lowZoneLowerLimit": "105", "lowZoneMinutes": "119",
+            "lowZonePai": "2.0", "maxHr": "198",
+            "mediumZoneLowerLimit": "119", "mediumZoneMinutes": "66",
+            "mediumZonePai": "9.277756", "restHr": "65",
+            "sn": "23229501001311", "subType": "PaiHealthInfo",
+            "time": "1787155200000", "timeZone": "32",
+            "timestamp": 1787155200000i64, "totalPai": "50.944435",
+            "uploadTimestamp": "1787300767871", "userId": "1181735661",
+            "version": "5"
+        })
+    }
+
+    /// 七天 PAI 总分、三档的分钟数和心率下限。
+    ///
+    /// `totalPai` 正是 Zepp 界面上那个大数字，以前一直没取；三档的心率下限
+    /// 是手表按用户的最大/静息心率算出来的，不是我们切的。
+    #[test]
+    fn pai_carries_the_total_and_the_three_zones() {
+        let batch = Normalizer::normalize_wellness(
+            "wellness:pai:user_events:2026-05-18:2026-05-19",
+            &json!({ "items": [pai_item()] }),
+        );
+        let daily = |metric: &str| {
+            batch
+                .daily_metrics
+                .iter()
+                .find(|row| row.metric == metric)
+                .map(|row| (row.value, row.unit.as_str()))
+        };
+
+        assert_eq!(daily("pai_total"), Some((50.944435, "pai")));
+        assert_eq!(daily("pai_low_zone_minutes"), Some((119.0, "min")));
+        assert_eq!(daily("pai_medium_zone_minutes"), Some((66.0, "min")));
+        assert_eq!(daily("pai_high_zone_minutes"), Some((1.0, "min")));
+        assert_eq!(daily("pai_low_zone_lower_hr"), Some((105.0, "bpm")));
+        assert_eq!(daily("pai_medium_zone_lower_hr"), Some((119.0, "bpm")));
+        assert_eq!(daily("pai_high_zone_lower_hr"), Some((158.0, "bpm")));
+
+        // 原来就在的那几项不能跟着变。
+        assert_eq!(daily("pai_daily"), Some((11.707199, "pai")));
+        assert_eq!(daily("device_max_hr"), Some((198.0, "bpm")));
+    }
+
+    /// 某一档一分钟都没进的时候，报文写 0 —— 那是真的 0 分钟，要写进去。
+    ///
+    /// 和目标值的 0 不是一回事：目标的 0 表示「没设目标」。
+    #[test]
+    fn zero_minutes_in_a_pai_zone_is_a_real_reading() {
+        let mut item = pai_item();
+        item["highZoneMinutes"] = json!("0");
+        let batch = Normalizer::normalize_wellness(
+            "wellness:pai:user_events:2026-05-18:2026-05-19",
+            &json!({ "items": [item] }),
+        );
+        assert_eq!(
+            batch
+                .daily_metrics
+                .iter()
+                .find(|row| row.metric == "pai_high_zone_minutes")
+                .map(|row| row.value),
+            Some(0.0)
+        );
+    }
+
+    fn all_day_stress_item() -> Value {
+        json!({
+            "avgStress": "22",
+            "data": "[{\"time\":1788307200000,\"value\":32},{\"time\":1788307500000,\"value\":25},{\"time\":1788307800000,\"value\":32},{\"time\":1788308100000,\"value\":48},{\"time\":1788308400000,\"value\":20},{\"time\":1788308700000,\"value\":32},{\"time\":1788309000000,\"value\":33},{\"time\":1788309300000,\"value\":10},{\"time\":1788309600000,\"value\":28},{\"time\":1788309900000,\"value\":6},{\"time\":1788310200000,\"value\":4},{\"time\":1788310500000,\"value\":7},{\"time\":1788310800000,\"value\":11}]",
+            "deviceId": "D85403FFFEE4D576",
+            "deviceMac": "",
+            "deviceSn": "2445B138005129",
+            "deviceSource": "10289410",
+            "deviceType": "0",
+            "eventType": "all_day_stress",
+            "highProportion": "0",
+            "maxStress": "48",
+            "mediumProportion": "0",
+            "minStress": "4",
+            "normalProportion": "8",
+            "relaxProportion": "92",
+            "subType": "all_day_stress",
+            "timestamp": 1788307200000i64
+        })
+    }
+
+    #[test]
+    fn all_day_stress_yields_the_whole_days_curve() {
+        let batch = Normalizer::normalize_wellness(
+            "wellness:all_day_stress:user_events:2026-09-02:2026-09-03",
+            &json!({ "items": [all_day_stress_item()] }),
+        );
+
+        // 13 个点，一个不少——这正是「压力不是 24/7」少掉的东西。
+        assert_eq!(batch.metric_samples.len(), 13);
+        assert!(batch
+            .metric_samples
+            .iter()
+            .all(|sample| sample.metric == "stress" && sample.unit == "score"));
+        assert!(batch
+            .metric_samples
+            .iter()
+            .all(|sample| sample.device_id.as_deref() == Some("D85403FFFEE4D576")));
+
+        let first = &batch.metric_samples[0];
+        assert_eq!(first.value, 32.0);
+        assert_eq!(first.timestamp.to_rfc3339(), "2026-09-02T00:00:00+00:00");
+        let last = batch.metric_samples.last().unwrap();
+        assert_eq!(last.value, 11.0);
+        assert_eq!(last.timestamp.to_rfc3339(), "2026-09-02T01:00:00+00:00");
+
+        // 服务器给的当日极值就是这条曲线自己的极值：两者是同一次测量，
+        // 不是两条碰巧对得上的流。
+        let values: Vec<f64> = batch.metric_samples.iter().map(|s| s.value).collect();
+        assert_eq!(values.iter().copied().reduce(f64::min), Some(4.0));
+        assert_eq!(values.iter().copied().reduce(f64::max), Some(48.0));
+    }
+
+    #[test]
+    fn all_day_stress_band_proportions_are_read() {
+        let batch = Normalizer::normalize_wellness(
+            "wellness:all_day_stress:user_events:2026-09-02:2026-09-03",
+            &json!({ "items": [all_day_stress_item()] }),
+        );
+
+        let daily = |metric: &str| {
+            batch
+                .daily_metrics
+                .iter()
+                .find(|row| row.metric == metric)
+                .map(|row| row.value)
+        };
+
+        assert_eq!(daily("stress"), Some(22.0));
+        assert_eq!(daily("stress_min"), Some(4.0));
+        assert_eq!(daily("stress_max"), Some(48.0));
+        // 报文里的名字是 `relaxProportion`。以前只认 `relaxPct`，那个名字在
+        // 1104 条真实记录里一次都没出现过，于是这四项从来没写进过库。
+        assert_eq!(daily("stress_relaxed_pct"), Some(92.0));
+        assert_eq!(daily("stress_normal_pct"), Some(8.0));
+        assert_eq!(daily("stress_medium_pct"), Some(0.0));
+        assert_eq!(daily("stress_high_pct"), Some(0.0));
+    }
+
+    #[test]
+    fn all_day_stress_drops_zero_readings() {
+        // Zepp 的压力量程从 1 起。0 在库里 62 626 条真实读数里一次都没有出现，
+        // 而这些报文里的 0 一贯表示「没测到」——画成 0 会看起来像那一刻
+        // 特别放松。
+        let batch = Normalizer::normalize_wellness(
+            "wellness:all_day_stress:user_events:2026-09-02:2026-09-03",
+            &json!({ "items": [{
+                "eventType": "all_day_stress",
+                "timestamp": 1788307200000i64,
+                "data": "[{\"time\":1788307200000,\"value\":0},{\"time\":1788307500000,\"value\":25}]"
+            }] }),
+        );
+
+        assert_eq!(batch.metric_samples.len(), 1);
+        assert_eq!(batch.metric_samples[0].value, 25.0);
     }
 }

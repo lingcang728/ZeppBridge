@@ -345,9 +345,12 @@ Still kept as raw only, marked unverified:
   normalised.
 - **`Charge/stress_data`** — confirmed to be protobuf. Parsed correctly it is
   four repeated float32 arrays (2880 / 255 / 8 / 6 values), and none of them
-  matches the daily average and range the app displays. The daily summary comes
-  from `all_day_stress` (whose minimum/maximum match the app exactly), so this
-  one is not wired up.
+  matches the daily average and range the app displays. It is also no longer
+  needed: `all_day_stress` turned out to carry the whole day's curve in its
+  `data` field, five minutes apart, and the roll-up it ships alongside is
+  computed from exactly that curve — across 946 items the reported minimum and
+  maximum equal the series' own, every time. So the stress screen and the
+  export both read `all_day_stress`, and this one stays unwired.
 - **`second_heart_rate/real_data`** — `/users/me/fileInfo/events` confirms data
   exists, but it returns a COS file index rather than samples; getting
   per-second heart rate would need a further file download. The current host

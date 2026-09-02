@@ -1,6 +1,6 @@
 {
-  "version": 3,
-  "checked_at": "2026-09-01",
+  "version": 4,
+  "checked_at": "2026-09-02",
   "sources": [
     "https://www.amazfit.jp/",
     "https://us.amazfit.com/products.json?limit=250",
@@ -183,7 +183,9 @@
       "asset_hash": "sha256:DBF27B73706D79F7B42E751635CCBC0DF42FE4136B4BB78B73F6829A93301EFB",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-bip-max",
-      "device_source_codes": []
+      "device_source_codes": [
+        11206915
+      ]
     },
     {
       "catalog_id": "amazfit-active-3-premium",
@@ -218,7 +220,8 @@
       "checked_at": "2026-08-15",
       "image_key": "amazfit-active-3-premium",
       "device_source_codes": [
-        10944769
+        10944769,
+        10944771
       ]
     },
     {
@@ -289,7 +292,9 @@
       "asset_hash": "sha256:BF25B6A3A2B650B227CC50432BA0E7AB2DC65F93938E448502D45B7C6D1B2AE6",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-active-max",
-      "device_source_codes": []
+      "device_source_codes": [
+        10813697
+      ]
     },
     {
       "catalog_id": "amazfit-t-rex-3-pro-48-44mm",
