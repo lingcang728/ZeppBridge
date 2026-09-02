@@ -156,7 +156,7 @@ file:  second_heart_rate/real_data
 仍然只保留 raw、标 unverified：
 
 - **`Charge/insight_data`（原 `charge_insight`）** — 曾被怀疑是「综合能量分」，**已排除**：同一天可以出现三条样本（`insight` 分别为 6 / 79 / 6），按 `type` 分成 3 与 7 两类，各带 `s`/`e` 毫秒偏移和 `jsonExtra.hcInsightId`。一个日度分数不会一天出现三个值。`insight`、`insightId`、`type` 的语义都没有对照组可验证，因此不归一化。
-- **`Charge/stress_data`** — 已确认是 protobuf，正确解析后是 4 个 repeated float32（2880 / 255 / 8 / 6 个值），没有一组对得上 App 显示的日均与区间。日汇总走 `all_day_stress`（最低/最高与 App 完全一致），这条不接。
+- **`Charge/stress_data`** — 已确认是 protobuf，正确解析后是 4 个 repeated float32（2880 / 255 / 8 / 6 个值），没有一组对得上 App 显示的日均与区间。也已经不需要它了：`all_day_stress` 的 `data` 字段里本来就带着当天整条曲线（五分钟一个点），而同一条记录上的日汇总正是从这条曲线算出来的——带这两个字段的 946 条记录里，服务器给的最低/最高值每一次都等于这条序列自己的最低/最高。压力界面和导出都读 `all_day_stress`，这条不接。
 - **`second_heart_rate/real_data`** — `/users/me/fileInfo/events` 确认有数据，但返回的是 COS 文件索引而不是样本，取到逐秒心率还需要再下载文件。当前 host allow-list 只放行 `api-mifit*.zepp.com` / `huami.com`，COS 域名不在其中，接入等于放宽网络边界，未做。
 - **8/16 之后的逐条血氧** — `blood_oxygen/click` 的点测在 2026-08-16 停止，之后只有 `odi` 夜间汇总，但 Zepp App 仍能画出连续曲线。已排除的方向：`/users/me/fileInfo/events`（同接口面 `second_heart_rate` 有数据、血氧没有，是有依据的否定）、`band_data` 的 8 字节块（只有模式/强度/步数/心率）、`blood_oxygen` 的 `auto` / `real_data` 子类型。**剩下的方向只有抓 Zepp App 的真实请求，而本项目明令禁止恢复 MITM / 用户 CA / Wi-Fi 代理路线**，所以这条到此为止。
 - **未接的端点** — `/users/me/bloodPressure`、`/users/{id}/members/-1/weightRecords`、`/huami.health.getUserInfo.json`、`/v1/user/manualData.json`。

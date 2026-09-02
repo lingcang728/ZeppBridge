@@ -37,6 +37,7 @@ import type {
   WorkoutCodeLabel,
   ReprocessResult,
   SleepSession,
+  StressPoint,
   SyncReport,
   TrainingBalancePoint,
   UserPrefs,
@@ -131,6 +132,11 @@ export const tauriBackend: BridgeBackend = {
 
   getHeartRateSeries(hours = 24) {
     return call('get_heart_rate_series', { hours });
+  },
+
+  /** 全天压力曲线。默认 24 小时，和心率那条同一个口径。 */
+  getStressSeries(hours = 24) {
+    return call<StressPoint[]>('get_stress_series', { hours });
   },
 
   getTrainingLoadSeries(days = 7) {
