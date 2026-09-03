@@ -76,8 +76,10 @@ DEVICE_SOURCE_CODES: dict[str, list[int]] = {
     # 三份一致，3 份异议同样来自「一个账号两块表、挑错了」。
     "amazfit-helio-strap": [10289410, 10289411],
     # 10551555 是 2026-09-02 那批新增的：2 份报告一致，无异议，且和已经收了
-    # 的 10551552 同族。
-    "amazfit-t-rex-3-pro-48-44mm": [10551552, 10551555],
+    # 的 10551552 同族。10682625 是 2026-09-03 这一批（反馈库 183 行）：同样
+    # 2 份一致、零异议，两份分别来自 v1.1.1 和 v1.1.5，不是同一次提交的重复。
+    # 相邻的 10682624 仍然只有一份，继续等。
+    "amazfit-t-rex-3-pro-48-44mm": [10551552, 10551555, 10682625],
     # Helio Ring 的第一个编号：2 份独立报告一致，其中一份来自 2.0.0。
     "amazfit-helio-ring": [8651008],
     # 11145472 是 2026-09-01 那批新增的：3 份报告一致指向 Balance 3，和已经
@@ -98,18 +100,21 @@ DEVICE_SOURCE_CODES: dict[str, list[int]] = {
     "amazfit-active-max": [10813697],
     "amazfit-bip-max": [11206915],
 }
-# 明确不收（2026-09-02 的 165 行反馈快照上复核过）：
-#   * 10813699 —— Active MAX 3 份 vs Active 2 44mm 3 份。上一轮是 2:2，这一轮
-#     两边各多了一份，仍然是平票。平票不是证据，多久都不是。
-#   * 8913155 —— Active 2 44mm 2 份 vs Helio Strap 1 份。异议那份报告里只指认
-#     了这一台设备，所以「一个账号两块表、在选择器里挑错了」那条裁决理由用不
-#     上，这是真实分歧，等更多报告。
+# 明确不收（2026-09-03 的 183 行反馈快照上复核过）：
+#   * 10813699 —— Active 2 44mm 4 份 vs Active MAX 3 份。前两轮分别是 2:2 和
+#     3:3，这一轮 Active 2 那边多了一份（v2.1.0 / macOS），平票被打破了，但
+#     4:3 仍然是分歧，不是证据。多数票在这张表上从来不算数：收错一个编号，
+#     所有同款用户的设备名都会错，而且是静默地错。
+#   * 8913155 —— Active 2 44mm 3 份 vs Helio Strap 1 份（这一轮 Active 2 那边
+#     多了一份 v2.1.0 / macOS）。异议那份报告里只指认了这一台设备，所以
+#     「一个账号两块表、在选择器里挑错了」那条裁决理由用不上，这是真实分歧。
 #   * 7930112 —— GTR 4 46mm 2 份 vs T-Rex 3 1 份，同样是单设备报告提出的真实
 #     异议。附带一提，相邻的 7930113 已经收为 GTR 4 46mm，邻接性是支持 GTR 4
 #     的；但邻接性在这里只是旁证，不足以推翻一份明确的异议。
 #   * 只有一份报告的高位编号（11141376、11141377、10223872、10223875、
 #     10682624、8323329、10944768）——等第二份。原来在这一行里的 10813697、
-#     11206915、10944771 在 2026-09-02 那批里凑够了，已经收进上表；
+#     11206915、10944771 在 2026-09-02 那批里凑够了，10682625 在 2026-09-03
+#     这一批里凑够了，都已经收进上表；
 #   * 全部低位段编号和全部 deviceType。低位段不是漏收：同一个 102 被指认成
 #     balance-46mm / t-rex-3 / balance-3 / balance-2 / t-rex-3-pro / up 等多个
 #     型号，说明 deviceSource 在低位段根本不唯一标识型号，再多报告也收不出来。
@@ -325,6 +330,36 @@ EXTRAS: list[dict[str, Any]] = [
         "asset_source": "official-cdn",
         "canonical_device_key": "amazfit-helio-ring",
         "provenance": "Official Amazfit US product page/CDN checked 2026-08-15; downloaded at maintenance time and background-removed to local RGBA WebP. Bundled as internal/local product-reference art pending release-license review.",
+    },
+    # issue #42：Balance 2 XT 在型号列表里根本找不到，用户连手动指认都做不了。
+    #
+    # `asset_key` 是 None —— 这是目录里第一个**没有产品图**的条目。它目前只在
+    # Best Buy / Target 这类零售渠道上架（SKU W2547GL4N），us.amazfit.com 和
+    # amazfit.jp 都没有独立产品页，所以既没有官方 CDN 图可下，也没有店面截图可
+    # 裁。拿 Balance 2 的图顶上去是给用户看一张**错的表**，比没有图更糟；
+    # `deviceImageFor` 在查不到资源时会退到 DeviceVisual 的内联 SVG 兜底，那条
+    # 路本来就存在。有官方图之后，把 asset_key 和 image_source_url 填上再跑一次
+    # `--refresh-official` 就够了，条目本身不用动。
+    #
+    # `canonical_device_key` 指向 amazfit-balance-2：它是 Balance 2 的 47mm 零售
+    # 变体，不是一款新的规范型号，所以 canonical 计数不该因为它 +1。
+    {
+        "catalog_id": "amazfit-balance-2-xt",
+        "canonical_name": "Amazfit Balance 2 XT",
+        "display_name": "Amazfit Balance 2 XT",
+        "name_zh": "Amazfit 跃我 Balance 2 XT",
+        "kind": "watch",
+        "model_codes": ["W2547GL4N"],
+        "aliases": ["Amazfit Balance 2 XT", "Balance 2 XT"],
+        "region": ["global", "us"],
+        "official_page": "https://us.amazfit.com/products/balance-2",
+        "official_url": "https://us.amazfit.com/products/balance-2",
+        "image_source_url": None,
+        "asset_key": None,
+        "asset_source": "pending-official-art",
+        "canonical_device_key": "amazfit-balance-2",
+        "checked_at": "2026-09-03",
+        "provenance": "Reported missing from the model picker in GitHub issue #42 (2026-09-02). 47mm retail variant of the Balance 2, SKU W2547GL4N, currently listed only through US retailers; no dedicated official product page or CDN image exists yet, so the entry ships without art and the interface falls back to its inline placeholder. No deviceSource is claimed for it -- nobody has submitted a report from one.",
     },
 ]
 
@@ -782,15 +817,19 @@ def write_asset(
     return f"sha256:{digest}"
 
 
-def enrich_entry(entry: dict[str, Any], hash_value: str) -> dict[str, Any]:
+def enrich_entry(entry: dict[str, Any], hash_value: str | None) -> dict[str, Any]:
     entry = dict(entry)
+    # `asset_key` 为 None 表示这一款还没有产品图（见 EXTRAS 里的 Balance 2 XT）。
+    # 它照样是目录里的一等条目——能被搜到、能被手动指认——只是界面渲染占位图。
     entry["asset_hash"] = hash_value
     entry["image_key"] = entry.pop("asset_key")
-    entry["asset_source"] = entry.get("asset_source", "screenshot-derived")
+    entry["asset_source"] = entry.get("asset_source") or "screenshot-derived"
     entry.setdefault("status", "active")
     entry.setdefault("supported", True)
     entry.setdefault("region", ["global"])
-    entry["checked_at"] = CHECKED_AT
+    # CHECKED_AT 是那一批店面截图的核对日期。后来单独补进来的条目不该借用它——
+    # 借了就等于声称「这一款也在 2026-08-15 的那批截图里核对过」。
+    entry["checked_at"] = entry.get("checked_at") or CHECKED_AT
     return entry
 
 
@@ -812,6 +851,8 @@ def build_catalog() -> None:
 
     for entry in EXTRAS:
         key = entry["asset_key"]
+        if key is None:
+            continue
         target = ASSET_DIR / f"{key}.webp"
         if args.refresh_official or not target.exists():
             image = download_image(entry["image_source_url"])
@@ -820,7 +861,7 @@ def build_catalog() -> None:
         else:
             hashes[key] = f"sha256:{hashlib.sha256(target.read_bytes()).hexdigest().upper()}"
 
-    devices = [enrich_entry(entry, hashes[entry["asset_key"]]) for entry in [*CARDS, *EXTRAS]]
+    devices = [enrich_entry(entry, hashes.get(entry["asset_key"])) for entry in [*CARDS, *EXTRAS]]
     # EXTRAS 是手写的条目，不经过 card()，所以在这里统一补一次。
     for device in devices:
         device.setdefault("device_source_codes", DEVICE_SOURCE_CODES.get(device["catalog_id"], []))
@@ -828,7 +869,7 @@ def build_catalog() -> None:
     if unknown:
         raise SystemExit(f"DEVICE_SOURCE_CODES 指向了目录里没有的型号: {unknown}")
     document = {
-        "version": 3,
+        "version": 5,
         "checked_at": CHECKED_AT,
         "sources": [
             "https://www.amazfit.jp/",
