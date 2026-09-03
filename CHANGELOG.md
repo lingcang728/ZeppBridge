@@ -4,6 +4,18 @@
 
 ## 未发布 / Unreleased
 
+### Added / 新增
+
+- **Miles.** Distance, pace, ascent and the pace and altitude charts now follow a setting next to the language switch, and default to miles only where the system region actually uses them. Asked for by one person on Reddit, but it was never one person's problem: every non-metric country hit the same wall. Exports do not change — JSON, CSV, GPX and FIT stay metric, because that is what the command line, the MCP server and every third-party platform read them as.
+- **英里。** 距离、配速、爬升，以及配速和海拔两张图，现在跟着语言开关旁边的一个设置走；只有系统地区确实用英里时才默认英里。这是 Reddit 上一个人开口要的，但从来不是一个人的问题：所有不用公制的国家都撞在同一处。导出不变——JSON、CSV、GPX、FIT 仍然是公制，因为命令行、MCP 和所有第三方平台都是按公制读它们的。
+
+### Changed / 变化
+
+- **The command line speaks English.** `zeppbridge-cli` ships inside every installer, and its help text, prompts and usage errors were all Chinese — which is exactly what the Linux user in [#40](https://github.com/lingcang728/ZeppBridge/issues/40) ran into. All of it is English now. `--json` field names and exit codes are a contract and were not touched. Errors that come up from the shared core are still Chinese; translating those is a separate piece of work, and doing half of it would mix the two languages inside one sentence.
+- **命令行改说英文。** `zeppbridge-cli` 随每个安装包一起发出去，而它的帮助、提示和用法错误全是中文——[#40](https://github.com/lingcang728/ZeppBridge/issues/40) 那位 Linux 用户撞上的就是这个。现在全部是英文。`--json` 的字段名和退出码是契约，一个字都没动。从共用内核冒上来的错误仍然是中文：那是另一件事，翻一半只会让中英文混在同一句话里。
+- **The workout-type list is ordered by the names you can actually read.** It came back sorted by the Chinese names, so an English interface listed a hundred-odd sports in Chinese pinyin order.
+- **「更改运动类型」的列表按你真正看到的那串字排序。** 它是按中文名排好发过来的，于是英文界面上一百多个运动是按拼音序排的。
+
 ### Fixes / 修复
 
 - **When the app cannot start, it now says why.** Until now a failed launch on Windows produced nothing at all: no window, no message, no log — just a tray icon left behind by a process that had already exited, which did nothing when clicked. Reinstalling did not help, because the data folder sits next to the installation and survives an uninstall. A start-up failure now shows a dialog naming the exact folder and the operating-system error, and writes `logs/startup-error.log` next to your data so it can be attached to a bug report. Every launch also appends to `logs/zeppbridge.log` (2 MB per file, three kept), which is where the replay, compaction and tray messages went before — messages that a packaged Windows build had no way to display.

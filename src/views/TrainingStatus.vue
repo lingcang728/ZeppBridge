@@ -19,6 +19,7 @@ import {
 } from '../lib/metricSeries';
 import type { MetricSeries, TrainingBalancePoint } from '../types';
 import { defineMessages, useMessages } from '../i18n';
+import { paceUnitLabel } from '../lib/units';
 
 const messages = defineMessages(
   {
@@ -46,7 +47,7 @@ const messages = defineMessages(
     thresholdChartAria: '乳酸阈值心率与配速曲线',
     thresholdOnce: (date: string) => `这段范围只有 1 次阈值测量（${date}），画不出趋势。`,
     thresholdEmpty: '这段范围没有乳酸阈值测量记录。',
-    thresholdPaceTooltip: (value: string) => `阈值配速 <b>${value}</b> /km`,
+    thresholdPaceTooltip: (value: string, unit: string) => `阈值配速 <b>${value}</b> ${unit}`,
     thresholdHrTooltip: (value: number) => `阈值心率 <b>${value}</b> bpm`,
     balanceLabel: '运动负荷平衡',
     balanceHint: '7 天负荷相对 28 天周均，即急性／慢性负荷比',
@@ -86,7 +87,7 @@ const messages = defineMessages(
     thresholdChartAria: 'Lactate threshold heart rate and pace',
     thresholdOnce: (date: string) => `Only one threshold measurement in this range (${date}), so there is no trend to draw.`,
     thresholdEmpty: 'No lactate threshold measurements in this range.',
-    thresholdPaceTooltip: (value: string) => `Threshold pace <b>${value}</b> /km`,
+    thresholdPaceTooltip: (value: string, unit: string) => `Threshold pace <b>${value}</b> ${unit}`,
     thresholdHrTooltip: (value: number) => `Threshold HR <b>${value}</b> bpm`,
     balanceLabel: 'Training load balance',
     balanceHint: '7-day load against the 28-day weekly average, i.e. the acute-to-chronic ratio',
@@ -163,7 +164,7 @@ const thresholdOption = computed(() => {
         const lines = params
           .filter((item) => typeof item.value === 'number')
           .map((item) => (item.seriesIndex === 1
-            ? t.value.thresholdPaceTooltip(formatPaceSeconds(item.value))
+            ? t.value.thresholdPaceTooltip(formatPaceSeconds(item.value), paceUnitLabel())
             : t.value.thresholdHrTooltip(Math.round(item.value as number))));
         return [params[0].axisValue, ...lines].join('<br>');
       },
@@ -387,7 +388,7 @@ watch(dataRevision, () => { void load(); });
             </span>
             <span v-if="thresholdHr?.latest || thresholdPace?.latest" class="chart-latest">
               <b>{{ thresholdHr?.latest ? Math.round(thresholdHr.latest.value) : '—' }}</b><i>bpm</i>
-              <b>{{ formatPaceSeconds(thresholdPace?.latest?.value) }}</b><i>/km</i>
+              <b>{{ formatPaceSeconds(thresholdPace?.latest?.value) }}</b><i>{{ paceUnitLabel() }}</i>
             </span>
           </header>
           <VChart
