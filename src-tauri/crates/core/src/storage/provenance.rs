@@ -93,6 +93,8 @@ pub enum StageErrorKind {
     NotAvailable,
     /// 报文拿回来了，但当前 normalizer 不认识它的结构。
     UnrecognizedPayload,
+    /// HTTP 200，但报文自己写着「不成功」。见 `ZeppBridgeError::CloudRejected`。
+    CloudRejected,
     /// 本地写库失败。
     Storage,
     /// 另一个进程正在写同一个库，这一轮让开了。可重试，不是坏了。
@@ -109,6 +111,7 @@ impl StageErrorKind {
             StageErrorKind::Auth => "auth",
             StageErrorKind::NotAvailable => "not_available",
             StageErrorKind::UnrecognizedPayload => "unrecognized_payload",
+            StageErrorKind::CloudRejected => "cloud_rejected",
             StageErrorKind::Storage => "storage",
             StageErrorKind::Busy => "busy",
             StageErrorKind::Cancelled => "cancelled",
@@ -133,6 +136,9 @@ impl StageErrorKind {
                 StageErrorKind::Network
             }
             E::ParseError(_) => StageErrorKind::UnrecognizedPayload,
+            // 传输层成功、业务层拒绝。单独一类而不是并进 `unknown`：诊断报告
+            // 里这一格就是我们唯一能看到「云端到底给了哪个 code」的地方。
+            E::CloudRejected { .. } => StageErrorKind::CloudRejected,
             E::Busy(_) => StageErrorKind::Busy,
             E::DatabaseError(_) | E::IoError(_) => StageErrorKind::Storage,
             E::InvalidHost(_) | E::ConfigError(_) | E::Unknown(_) => StageErrorKind::Unknown,

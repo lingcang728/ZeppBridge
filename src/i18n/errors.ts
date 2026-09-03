@@ -20,6 +20,9 @@ const messages = defineMessages(
     'err.core.unavailable': '这个账号或区域没有这项数据',
     'err.core.retry_exhausted': 'Zepp 服务暂时不可用，请稍后重试',
     'err.core.http_status': 'Zepp 服务返回了错误，请稍后重试',
+    // 传输层是成功的（HTTP 200），是报文自己写着不成功。在这之前这类响应会
+    // 变成一句「数据无法解析」，用户既不知道该重新登录，也不知道该等。
+    'err.core.cloud_rejected': 'Zepp 云端收到了请求但拒绝了。如果反复出现，请在设置里重新连接 Zepp 账号',
     'err.core.cancelled': '操作已取消',
     'err.core.auth': '认证出错了',
     // 有人报上来的原话就是这一句加一个红条，然后没有下文（反馈 e5fb37a5）：
@@ -141,6 +144,8 @@ const messages = defineMessages(
     'err.core.unavailable': "This account or region doesn't provide that data",
     'err.core.retry_exhausted': 'Zepp is temporarily unavailable. Try again shortly',
     'err.core.http_status': 'Zepp returned an error. Try again shortly',
+    'err.core.cloud_rejected':
+      'Zepp received the request and refused it. If this keeps happening, reconnect the Zepp account in Settings',
     'err.core.cancelled': 'Cancelled',
     'err.core.auth': 'Something went wrong with authentication',
     'err.core.credential_store':
