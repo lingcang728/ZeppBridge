@@ -98,15 +98,34 @@ fn system_prefers_chinese() -> bool {
     #[cfg(windows)]
     {
         // Windows 不设这些环境变量，问系统要用户的界面语言。
-        let output = std::process::Command::new("powershell")
-            .args(["-NoProfile", "-Command", "(Get-Culture).Name"])
-            .output();
-        if let Ok(output) = output {
-            let name = String::from_utf8_lossy(&output.stdout).to_ascii_lowercase();
-            return name.trim().starts_with("zh");
+        //
+        // 这里曾经派生一个 `powershell -NoProfile -Command "(Get-Culture).Name"`
+        // 进程。它在启动路径上，而 PowerShell 的冷启动在装了杀软或组策略受限
+        // 的机器上要 0.5~2 秒——主界面就干等这么久，且这段等待没有任何界面
+        // 反馈。`GetUserDefaultLocaleName` 是同一件事的原生写法，微秒级。
+        if let Some(name) = windows_ui_locale() {
+            return name.to_ascii_lowercase().starts_with("zh");
         }
     }
     false
+}
+
+/// 用户的界面语言，形如 `zh-CN` / `en-US`。取不到就返回 `None`。
+#[cfg(windows)]
+fn windows_ui_locale() -> Option<String> {
+    use windows_sys::Win32::Globalization::GetUserDefaultLocaleName;
+
+    // `LOCALE_NAME_MAX_LENGTH`（winnls.h，85 个 wchar，含结尾 NUL）。
+    // windows-sys 没有导出这个常量，所以在这里写明出处而不是随手取个数。
+    const LOCALE_NAME_MAX_LENGTH: usize = 85;
+
+    let mut buffer = [0u16; LOCALE_NAME_MAX_LENGTH];
+    // 返回值是写进去的字符数，**含**结尾的 NUL；0 表示失败。
+    let written = unsafe { GetUserDefaultLocaleName(buffer.as_mut_ptr(), buffer.len() as i32) };
+    if written <= 1 {
+        return None;
+    }
+    Some(String::from_utf16_lossy(&buffer[..(written - 1) as usize]))
 }
 
 /// 前端确定界面语言后校正托盘文案。
@@ -226,13 +245,26 @@ pub fn run() {
                 else {
                     return;
                 };
-                match db.reprocess_raw_records_if_needed() {
-                    Ok(Some(counts)) => {
-                        let total: i64 = counts.values().sum();
-                        eprintln!("normalizer 升级，已重放本地原始报文（{total} 条派生记录）");
+                // 重放要拿写锁。这条路以前一把锁都没拿：CLI 或 MCP 正在同步
+                // 时启动桌面应用，两个进程会同时往同一个库写派生数据，而单
+                // 写者保障本来就是为了挡住这件事。拿不到就跳过——重放是幂等的，
+                // 下次启动会再来一遍，不该为它把启动卡住或去和别人抢。
+                match storage::write_lock::acquire_with_timeout(
+                    &compaction_data_dir,
+                    storage::write_lock::WritePurpose::Reprocess,
+                    std::time::Duration::from_secs(30),
+                ) {
+                    Ok(_reprocess_guard) => match db.reprocess_raw_records_if_needed() {
+                        Ok(Some(counts)) => {
+                            let total: i64 = counts.values().sum();
+                            eprintln!("normalizer 升级，已重放本地原始报文（{total} 条派生记录）");
+                        }
+                        Ok(None) => {}
+                        Err(error) => eprintln!("本地报文重放失败: {error}"),
+                    },
+                    Err(error) => {
+                        eprintln!("跳过本次报文重放，没能拿到写锁: {error}");
                     }
-                    Ok(None) => {}
-                    Err(error) => eprintln!("本地报文重放失败: {error}"),
                 }
 
                 // 存量报文压缩：默认开着，装完新版本第一次启动时自己做完。
@@ -245,11 +277,20 @@ pub fn run() {
                     Ok(0) | Err(_) => {}
                     Ok(pending) => {
                         let _ = compaction_handle.emit("compaction://started", pending);
-                        let _write_guard = storage::write_lock::acquire_with_timeout(
+                        // `let _write_guard = acquire_with_timeout(...)` 是把
+                        // 整个 `Result` 绑给了变量：30 秒等不到锁时返回的
+                        // `Err` 同样是个值，于是压缩照跑不误，写锁形同虚设。
+                        // 必须匹配出 `Ok` 才算真的拿到了。
+                        let Ok(_write_guard) = storage::write_lock::acquire_with_timeout(
                             &compaction_data_dir,
                             storage::write_lock::WritePurpose::Compaction,
                             std::time::Duration::from_secs(30),
-                        );
+                        ) else {
+                            eprintln!("跳过本次报文压缩，没能拿到写锁");
+                            let _ = compaction_handle
+                                .emit("compaction://finished", RawPayloadCompaction::default());
+                            return;
+                        };
                         match db.compact_raw_payloads() {
                             Ok(report) => {
                                 eprintln!(
@@ -448,4 +489,22 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|error| eprintln!("Tauri application exited with an error: {error}"));
+}
+
+#[cfg(all(test, windows))]
+mod locale_tests {
+    /// 原生取语言这条路必须真的能走通。
+    ///
+    /// 换掉 `powershell (Get-Culture).Name` 的意义在于不再派生进程，但只要
+    /// 缓冲区长度或返回值语义写错，它就会安静地退回 `None`，界面语言判断跟着
+    /// 一起错——而这不会让任何构建变红。所以在 CI 的 Windows runner 上跑一次。
+    #[test]
+    fn the_native_call_returns_a_locale_shaped_name() {
+        let name = super::windows_ui_locale().expect("Windows 上必须能取到界面语言");
+        assert!(
+            name.len() >= 2 && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-'),
+            "取回来的不像一个语言标记：{name:?}"
+        );
+        assert!(!name.contains('\0'), "结尾的 NUL 没有去掉：{name:?}");
+    }
 }
