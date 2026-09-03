@@ -29,6 +29,7 @@ nobody dumps raw rows by accident.
 | `summary` | Totals by status, app version, OS, category, and date span |
 | `notes` | Every report where the reporter wrote a sentence — usually the highest-signal rows |
 | `codes` | Unknown workout codes: report count, record count, versions seen |
+| `rejections` | Cloud business error codes — HTTP 200 responses that said "not successful" |
 | `devices` | User-assigned models grouped by `deviceSource`/`deviceType`, with an eligibility verdict |
 | `list <status>` | Report ids in one status |
 | `mark <status> <id...>` | Move reports to a status |
@@ -66,6 +67,30 @@ independent source.
 Of the 28 unknown codes seen so far, exactly one qualified: `211`, which one
 reporter described as "road cycling with zepp code 211 was read as unknown
 workout". The other 27 are still unmapped on purpose.
+
+### Cloud rejection codes
+
+`rejections` is the one aggregate that is expected to be **empty**, and that is
+the point. Zepp wraps three streams in `{ code, message, data }`, where `code: 1`
+means success. Across 3,466 retained payloads in one real library, all 1,075
+wrapped ones carried `code: 1` — not a single failure code has ever been
+observed here. So `classify_business_code` turns a non-1 code into a reported
+error and refuses to decide on its own that it means "sign in again": guessing
+would trade a certain bad experience (being thrown back to the login screen) for
+an unverified hunch.
+
+The moment a non-empty row appears here, map that specific code to
+`NeedsReauth` in
+[`src-tauri/crates/core/src/connectors/zepp.rs`](../../src-tauri/crates/core/src/connectors/zepp.rs)
+and record the report id next to it. Until then, people whose account looks
+empty ("All my readings are showing empty") get neither a prompt to reconnect
+nor any data — that dead end is what this column exists to end.
+
+The report carries the number, the stream and a timestamp. It never carries the
+cloud's own message: that is server-supplied free text, and the report's promise
+to users is an allow-list of fields.
+
+### Catalog entries with no code
 
 A catalog entry may carry `"code": null`. That means the sport is offered as a
 manual correction but no Zepp number is known to produce it — invent one and the

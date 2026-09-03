@@ -1,5 +1,6 @@
 mod app_state;
 mod commands;
+mod diagnostics;
 mod ipc_error;
 mod ipc_types;
 mod local_api;
@@ -41,15 +42,36 @@ use tauri::{AppHandle, Emitter, Manager};
 use zeppbridge_core::models::RawPayloadCompaction;
 
 fn show_main_window(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.unminimize();
-        let _ = window.show();
-        // A second launch is the foreground process on Windows; briefly raise
-        // z-order so the existing hidden-to-tray window can steal focus.
-        let _ = window.set_always_on_top(true);
-        let _ = window.set_focus();
-        let _ = window.set_always_on_top(false);
-    }
+    let window = match app.get_webview_window("main") {
+        Some(window) => window,
+        // 主窗口不在了。这不是假设出来的状态：WebView2 崩溃、用户的
+        // 显卡驱动重启、或者窗口被系统销毁之后，进程还活着、托盘图标也还
+        // 在，但这里以前是一个 `if let Some(...)`——拿不到就静静 return，
+        // 于是「点 Open ZeppBridge 没任何反应」成了一个没有出口的死局。
+        // 重建一个；建不起来至少还会落一条日志。
+        None => {
+            diagnostics::log("主窗口不在了，正在重建");
+            match tauri::WebviewWindowBuilder::from_config(
+                app,
+                &app.config().app.windows[0].clone(),
+            )
+            .and_then(|builder| builder.build())
+            {
+                Ok(window) => window,
+                Err(error) => {
+                    diagnostics::log(&format!("主窗口重建失败: {error}"));
+                    return;
+                }
+            }
+        }
+    };
+    let _ = window.unminimize();
+    let _ = window.show();
+    // A second launch is the foreground process on Windows; briefly raise
+    // z-order so the existing hidden-to-tray window can steal focus.
+    let _ = window.set_always_on_top(true);
+    let _ = window.set_focus();
+    let _ = window.set_always_on_top(false);
 }
 
 /// 托盘菜单的三条文案。原生菜单没法走前端的 i18n，只能在这里备一份。
@@ -207,18 +229,43 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
-            let data_dir = paths::resolve_data_dir()
-                .map_err(|error| anyhow::anyhow!("无法创建安装目录旁的数据文件夹: {error}"))?;
+            // 这三步以前都是光秃的 `?`。任一步失败，`setup` 返回 Err，
+            // 进程就没了——而 Windows 上既没有终端也没有日志，用户只能看到
+            // 通知区里一个点不动的死图标。现在每一条都会写日志、弹对话框，
+            // 把具体路径和系统错误摆给用户。见 `diagnostics.rs`。
+            let data_dir = match paths::resolve_data_dir() {
+                Ok(dir) => {
+                    diagnostics::init(Some(&dir));
+                    dir
+                }
+                Err(error) => {
+                    diagnostics::init(None);
+                    return Err(diagnostics::fatal_startup("无法使用数据文件夹", error).into());
+                }
+            };
             let webview_dir = paths::webview_user_data_dir(&data_dir);
-            std::fs::create_dir_all(&webview_dir)
-                .map_err(|error| anyhow::anyhow!("无法创建 WebView 数据目录: {error}"))?;
+            if let Err(error) = std::fs::create_dir_all(&webview_dir) {
+                return Err(diagnostics::fatal_startup(
+                    &format!("无法创建 WebView 数据目录 {}", webview_dir.display()),
+                    error,
+                )
+                .into());
+            }
             std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &webview_dir);
             // 排队中的恢复要在这里执行：AppState 一旦建立，桌面命令、同步线程
             // 和本机 API 就各自持有连接，那时再去换文件必然打架。
             let restore_notice = zeppbridge_core::storage::backup::apply_pending_restore(&data_dir)
                 .map(|outcome| outcome.message);
-            let state = AppState::new(data_dir.clone())
-                .map_err(|error| anyhow::anyhow!("无法初始化应用状态: {error}"))?;
+            let state = match AppState::new(data_dir.clone()) {
+                Ok(state) => state,
+                Err(error) => {
+                    return Err(diagnostics::fatal_startup(
+                        &format!("无法打开本机数据库 {}", data_dir.join("zepp.db").display()),
+                        error,
+                    )
+                    .into());
+                }
+            };
             if let Some(notice) = restore_notice {
                 state.push_startup_warning(notice);
             }
@@ -228,7 +275,7 @@ pub fn run() {
                 zeppbridge_core::local_api::LocalApiController::new(data_dir.clone()),
             );
             if let Some(error) = local_api.restore().error {
-                eprintln!("{error}");
+                diagnostics::log(&error);
             }
             app.manage(local_api::LocalApi(local_api.clone()));
             app.manage(state);
@@ -257,13 +304,15 @@ pub fn run() {
                     Ok(_reprocess_guard) => match db.reprocess_raw_records_if_needed() {
                         Ok(Some(counts)) => {
                             let total: i64 = counts.values().sum();
-                            eprintln!("normalizer 升级，已重放本地原始报文（{total} 条派生记录）");
+                            diagnostics::log(&format!(
+                                "normalizer 升级，已重放本地原始报文（{total} 条派生记录）"
+                            ));
                         }
                         Ok(None) => {}
-                        Err(error) => eprintln!("本地报文重放失败: {error}"),
+                        Err(error) => diagnostics::log(&format!("本地报文重放失败: {error}")),
                     },
                     Err(error) => {
-                        eprintln!("跳过本次报文重放，没能拿到写锁: {error}");
+                        diagnostics::log(&format!("跳过本次报文重放，没能拿到写锁: {error}"));
                     }
                 }
 
@@ -286,21 +335,21 @@ pub fn run() {
                             storage::write_lock::WritePurpose::Compaction,
                             std::time::Duration::from_secs(30),
                         ) else {
-                            eprintln!("跳过本次报文压缩，没能拿到写锁");
+                            diagnostics::log("跳过本次报文压缩，没能拿到写锁");
                             let _ = compaction_handle
                                 .emit("compaction://finished", RawPayloadCompaction::default());
                             return;
                         };
                         match db.compact_raw_payloads() {
                             Ok(report) => {
-                                eprintln!(
+                                diagnostics::log(&format!(
                                     "已压缩历史报文 {} 条，{} → {} 字节",
                                     report.compacted, report.bytes_before, report.bytes_after
-                                );
+                                ));
                                 let _ = compaction_handle.emit("compaction://finished", report);
                             }
                             Err(error) => {
-                                eprintln!("历史报文压缩失败: {error}");
+                                diagnostics::log(&format!("历史报文压缩失败: {error}"));
                                 let _ = compaction_handle
                                     .emit("compaction://finished", RawPayloadCompaction::default());
                             }
@@ -391,15 +440,17 @@ pub fn run() {
                     tray_present.store(true, std::sync::atomic::Ordering::Relaxed);
                 }
                 Ok(Err(error)) => {
-                    eprintln!("托盘图标创建失败，程序继续运行（关闭窗口将直接退出）: {error}");
+                    diagnostics::log(&format!(
+                        "托盘图标创建失败，程序继续运行（关闭窗口将直接退出）: {error}"
+                    ));
                 }
                 Err(_) => {
-                    eprintln!(
+                    diagnostics::log(
                         "托盘图标创建时崩溃，程序继续运行（关闭窗口将直接退出）。
                          Linux 上这通常是缺少 libayatana-appindicator3：
                          Debian/Ubuntu: sudo apt install libayatana-appindicator3-1
                          Fedora: sudo dnf install libayatana-appindicator3
-                         openSUSE: sudo zypper install libayatana-appindicator3-1"
+                         openSUSE: sudo zypper install libayatana-appindicator3-1",
                     );
                 }
             }
@@ -488,7 +539,9 @@ pub fn run() {
             local_api::rotate_local_api_token,
         ])
         .run(tauri::generate_context!())
-        .unwrap_or_else(|error| eprintln!("Tauri application exited with an error: {error}"));
+        .unwrap_or_else(|error| {
+            diagnostics::log(&format!("Tauri application exited with an error: {error}"));
+        });
 }
 
 #[cfg(all(test, windows))]

@@ -142,8 +142,10 @@ strongly typed allow-listed report only to
 parser version, operating system, database schema version, the field names and
 JSON types in the device response, catalogue candidates, firmware version, safe
 product-name and short-model hints, model-class numbers, the count of
-unrecognised devices, unrecognised workout codes with record counts, and the
-count of type conflicts. The report schema has no fields for accounts, tokens, cookies, serial numbers,
+unrecognised devices, unrecognised workout codes with record counts, the
+count of type conflicts, and the numeric error code from the most recent request
+the Zepp cloud rejected (the number, which data stream and when — never any text
+the cloud returned). The report schema has no fields for accounts, tokens, cookies, serial numbers,
 device IDs, MAC addresses, GPS, health values, raw responses or local paths.
 
 Model-class numbers (`modelIdentifierHints`) are strings of the exact form

@@ -71,19 +71,42 @@ pub fn resolve_data_dir() -> io::Result<PathBuf> {
     };
     match ensure_writable_dir(&data_dir) {
         Ok(()) => Ok(data_dir),
-        #[cfg(unix)]
-        Err(_) => {
-            // /Applications/ZeppBridge.app/Contents/MacOS is read-only; store
-            // user data under the user's Application Support instead. On Linux
-            // this catches the read-only prefixes the check above does not
-            // name.
-            let base = user_data_dir()?;
-            ensure_writable_dir(&base)?;
-            Ok(base)
-        }
-        #[cfg(not(unix))]
-        Err(error) => Err(error),
+        Err(error) => fall_back_to_user_data_dir(&data_dir, error),
     }
+}
+
+/// 安装目录旁边写不进去时的退路。
+///
+/// 以前这条退路只有 unix 有（`/Applications/...` 和只读前缀），Windows 那一支
+/// 是 `Err(error) => Err(error)`——一个字的退路都没有。可 Windows 上这件事**更
+/// 常见**：`.msi` 装的是 `C:\Program Files\ZeppBridge`，普通用户对它没有写权限；
+/// 受控文件夹访问、组策略、杀软的目录保护也都会命中。而调用方
+/// （`lib.rs` 的 `setup()`）对这个 `Err` 用的是 `?`，于是应用**静默退出**：
+/// 窗口没出来，通知区里留一个已经画好的死图标，日志一个字都没有。
+/// 见 2026-09-03 的那封 Reddit 私信。
+///
+/// 但退也不能闷头退：如果那个不可写的目录里**已经躺着用户的库**，换一个空目录
+/// 等于让用户看到「我的数据全没了」。那种情况如实报错，让启动对话框把两个路径
+/// 都摆出来。
+fn fall_back_to_user_data_dir(blocked: &Path, error: io::Error) -> io::Result<PathBuf> {
+    if blocked.join(SQLITE_GROUP[0]).exists() {
+        return Err(io::Error::new(
+            error.kind(),
+            format!(
+                concat!(
+                    "数据目录 {} 里已经有一个库，但现在写不进去（{}）。",
+                    "换一个目录会让这份数据看起来消失，所以这里不自作主张。",
+                    "请给该目录写权限，或者用 {} 指定一个可写的目录。"
+                ),
+                blocked.display(),
+                error,
+                DATA_DIR_ENV
+            ),
+        ));
+    }
+    let base = user_data_dir()?;
+    ensure_writable_dir(&base)?;
+    Ok(base)
 }
 
 /// `ZEPPBRIDGE_DATA_DIR`，校验过的。
@@ -119,9 +142,13 @@ fn data_dir_from_env_value(raw: Option<std::ffi::OsString>) -> io::Result<Option
 
 /// User-writable data directory: `~/Library/Application Support/
 /// com.zeppbridge.ZeppBridge/data` on macOS, `~/.local/share/zeppbridge/data`
-/// on Linux. Both keep the same `data/` layout as the Windows install-local
-/// folder, so the CLI and MCP tools resolve the same place the app does.
-#[cfg(unix)]
+/// on Linux, `%APPDATA%\zeppbridge\ZeppBridge\data` on Windows. All three keep
+/// the same `data/` layout as the install-local folder, so the CLI and MCP
+/// tools resolve the same place the app does.
+///
+/// Windows 上这个路径同时也在 `legacy_source_dirs()` 里，所以回退到它之后
+/// `relocate_legacy_data()` 不会把它自己搬给自己（那里有 `source == data_dir`
+/// 的短路）。
 fn user_data_dir() -> io::Result<PathBuf> {
     let project = directories::ProjectDirs::from("com", "zeppbridge", "ZeppBridge")
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "无法确定用户数据目录"))?;
@@ -407,6 +434,41 @@ mod tests {
 
     use super::*;
     use std::fs;
+
+    #[test]
+    fn a_blocked_empty_data_dir_falls_back_instead_of_failing() {
+        // 安装目录旁边写不进去、而那里又没有库（.msi 装进 Program Files
+        // 的新装机器就是这个样子）——必须退到用户目录，而不是把错误
+        // 往上抛给 `setup()` 的 `?` 变成一次静默退出。
+        let blocked = std::env::temp_dir().join("zeppbridge-blocked-empty");
+        let _ = fs::remove_dir_all(&blocked);
+        let resolved = fall_back_to_user_data_dir(
+            &blocked,
+            io::Error::new(io::ErrorKind::PermissionDenied, "access is denied"),
+        )
+        .expect("空目录写不进去时应当回退到用户目录");
+        assert_eq!(resolved, user_data_dir().unwrap());
+        assert_ne!(resolved, blocked);
+    }
+
+    #[test]
+    fn a_blocked_data_dir_that_already_holds_a_library_reports_instead_of_moving() {
+        // 反过来：里面已经有库了。静静换一个空目录，用户看到的是
+        // 「我的数据全没了」——那比报错更坏。错误文本里必须有路径和
+        // 环境变量名，启动对话框靠它告诉用户下一步做什么。
+        let blocked = std::env::temp_dir().join("zeppbridge-blocked-with-db");
+        fs::create_dir_all(&blocked).unwrap();
+        fs::write(blocked.join(SQLITE_GROUP[0]), b"not really sqlite").unwrap();
+        let error = fall_back_to_user_data_dir(
+            &blocked,
+            io::Error::new(io::ErrorKind::PermissionDenied, "access is denied"),
+        )
+        .expect_err("里面有库时不应该悠悠换目录");
+        let text = error.to_string();
+        assert!(text.contains(&blocked.display().to_string()), "{text}");
+        assert!(text.contains(DATA_DIR_ENV), "{text}");
+        let _ = fs::remove_dir_all(&blocked);
+    }
 
     #[test]
     fn an_explicit_data_dir_must_be_absolute() {

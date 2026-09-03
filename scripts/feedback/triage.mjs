@@ -12,6 +12,7 @@
  *   node scripts/feedback/triage.mjs summary          总量、状态、版本、系统分布
  *   node scripts/feedback/triage.mjs notes            用户手写的那几条（最有信息量）
  *   node scripts/feedback/triage.mjs codes            未知运动编号汇总
+ *   node scripts/feedback/triage.mjs rejections       云端业务错误码（HTTP 200 但说不成功）
  *   node scripts/feedback/triage.mjs corrections      用户的运动类型纠正（认错了的编号）
  *   node scripts/feedback/triage.mjs devices          用户指认的型号 -> deviceSource 汇总
  *   node scripts/feedback/triage.mjs list <status>    列出某个状态的报告 id
@@ -119,6 +120,33 @@ const summary = () => {
   table(query("SELECT CASE WHEN category = '' THEN '(自动检测)' ELSE category END AS category, COUNT(*) AS reports FROM feedback_reports GROUP BY category ORDER BY reports DESC"));
   console.log('\n== 时间跨度 ==');
   table(query('SELECT MIN(received_at) AS earliest, MAX(received_at) AS latest, COUNT(*) AS reports FROM feedback_reports'));
+};
+
+/**
+ * 云端在 HTTP 200 里写的那个「不成功」。
+ *
+ * 这一栏存在的唯一理由：客户端至今**一个失败码都没观测到过**（本地库里
+ * 1075 条带包裹的报文全是 `code = 1`），所以 `classify_business_code` 不敢把任何
+ * code 敎定为「需要重新登录」。这里一旦出现非空行，就可以把那个具体的 code
+ * 映成 `NeedsReauth`，那些「All my readings are showing empty」的人才会被提示重新连接，
+ * 而不是卡在一个既不报错也拉不到数据的假死态里。
+ */
+const rejections = () => {
+  const rows = query(
+    'SELECT cloud_rejection_code AS code, cloud_rejection_stream AS stream, '
+    + 'COUNT(*) AS reports, MIN(app_version) AS first_version, MAX(app_version) AS last_version '
+    + 'FROM feedback_reports WHERE cloud_rejection_code IS NOT NULL '
+    + 'GROUP BY cloud_rejection_code, cloud_rejection_stream ORDER BY reports DESC',
+  );
+  if (rows.length === 0) {
+    console.log('还没有任何一份报告带回业务错误码。');
+    console.log('在拿到真实的失败码之前，不要猜着把某个数字映成 NeedsReauth。');
+    return;
+  }
+  table(rows);
+  console.log('');
+  console.log('拿到 code 之后：在 `connectors/zepp.rs` 的 `classify_business_code` 里把它映成');
+  console.log('`NeedsReauth`，并把这份证据（报告 id + code）写进那段注释。');
 };
 
 const notes = () => {
@@ -287,12 +315,13 @@ try {
     case 'summary': summary(); break;
     case 'notes': notes(); break;
     case 'codes': codes(); break;
+    case 'rejections': rejections(); break;
     case 'corrections': corrections(); break;
     case 'devices': devices(); break;
     case 'list': list(rest[0]); break;
     case 'mark': mark(rest[0], rest.slice(1)); break;
     default:
-      console.error('用法：node scripts/feedback/triage.mjs <summary|notes|codes|devices|list|mark> [...]');
+      console.error('用法：node scripts/feedback/triage.mjs <summary|notes|codes|rejections|corrections|devices|list|mark> [...]');
       process.exit(2);
   }
 } catch (error) {
