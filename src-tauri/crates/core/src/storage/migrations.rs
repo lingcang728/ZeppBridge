@@ -665,6 +665,22 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(19, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+
+        // v20：云端业务错误码单存一列。
+        //
+        // `classify_business_code` 把 HTTP 200 + 非成功 code 变成了
+        // `CloudRejected`，但那个 code 只进了一句给人看的中文里。而我们
+        // 现在需要的恰恰是那个数字：本机那 1075 条留存报文全是
+        // `code = 1`，没有任何一个失败码可供观测，所以不能凭空把某个数字
+        // 映成「需要重新登录」。它得从遇到这件事的用户那里回来，
+        // 而诊断报告只发白名单字段——所以它必须是一个字段，不能是
+        // 一句话里的子串。对应反馈库的 `0007_cloud_rejection.sql`。
+        self.ensure_table_columns("stream_provenance", &[("last_error_code", "INTEGER")])?;
+        self.conn.execute_batch("PRAGMA user_version = 20;")?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(20, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         // Earlier migrations are intentionally idempotent and still stamp
         // their historical versions on every launch, so the current schema
         // marker is restored only after all of them have run.

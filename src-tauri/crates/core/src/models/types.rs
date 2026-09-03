@@ -982,6 +982,22 @@ pub struct DiagnosticWorkoutCode {
     pub records: i64,
 }
 
+/// 云端在 HTTP 200 里写的那个「不成功」。
+///
+/// 只有三个字段，里面没有一个是自由文本：哪条流、哪个 code、什么时候。
+/// 云端的原话（`message`）刷意不收——那是服务端给的自由文本，而这份报告
+/// 对用户的承诺是只发白名单字段。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticCloudRejection {
+    /// 哪条流被拒了（`workouts` / `sleep` / …）。
+    pub stream: String,
+    /// 报文里的 `code`。成功是 1；其余值目前一个都没观测到过。
+    pub code: i64,
+    /// RFC3339。取三个阶段里最先有值的那个。
+    pub at: Option<String>,
+}
+
 /// 用户把某个 Zepp 运动编号纠正成了什么。
 ///
 /// 这是 issue #24 那类问题唯一可能的证据来源。报告者说「越野跑被识别成了
@@ -1043,6 +1059,14 @@ pub struct DiagnosticReport {
     /// 上限——用户可能顺手把 token 或本机路径粘进来。没填就整段不出现。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub user_note: Option<String>,
+    /// 最近一次云端业务拒绝。没遇到过就整段不出现。
+    ///
+    /// 这是为了把 `classify_business_code` 那个环闭上：它已经能把「HTTP 200
+    /// 但云端说不成功」认出来了，却故意不敲定它是不是「需要重新登录」——
+    /// 因为本机根本没有观测到任何一个失败码。下一份带着具体 code 的报告
+    /// 就能把它精确地映成 `NeedsReauth`。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_cloud_rejection: Option<DiagnosticCloudRejection>,
 }
 
 /// 自由文本备注的上限。够写清「设备是 Balance 2，固件 3.5.1，运动类型显示成未知」，

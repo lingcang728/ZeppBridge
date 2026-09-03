@@ -72,4 +72,9 @@ url = { workspace = true }
 # `(Get-Culture).Name`，在启动路径上要 0.5~2 秒；windows-sys 本来就在依赖树里
 # （tauri 在 Windows 上依赖它），这里只是把它变成直接依赖。
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Globalization"] }
+windows-sys = { version = "0.61", features = [
+    "Win32_Globalization",
+    # 启动失败时那个原生对话框（MessageBoxW）。没有它，Windows 上起不来就是
+    # 完全无声的——见 src/diagnostics.rs 顶部。
+    "Win32_UI_WindowsAndMessaging",
+] }
