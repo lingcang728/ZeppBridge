@@ -273,6 +273,26 @@ First check whether your watch actually measured it. Some metrics (lactate thres
   unpacked tarball keeps `data/` next to the executable — see the
   [Linux guide](docs/guides/linux.md).
 
+**The app will not start — a window never appears.**
+Two things to look at, in this order:
+
+1. **The error dialog.** From v2.1.2 on, a start-up failure shows a dialog naming
+   the exact folder and the OS error instead of exiting silently. Earlier versions
+   exited without a word, which looked like "the tray icon is there but clicking
+   Open does nothing" — that icon was a leftover from a process that had already
+   gone.
+2. **The log.** `logs/zeppbridge.log` inside the data folder (see the previous
+   question), plus `logs/startup-error.log` if the last launch failed before the
+   window existed. Attach those to a bug report; they contain paths and version
+   numbers, no account data.
+
+The most common cause on Windows is a data folder the app cannot write to — the
+`.msi` installs into `Program Files`, where a standard user has no write access.
+From v2.1.2 the app falls back to `%APPDATA%\zeppbridge\ZeppBridge\data` when
+that happens (unless a database is already sitting in the blocked folder, in which
+case it says so rather than quietly starting empty). You can also point it
+anywhere with the `ZEPPBRIDGE_DATA_DIR` environment variable.
+
 **Is my data still there after uninstalling?**
 Yes. Uninstalling leaves the `data` folder, backups, coverage ledger and settings alone. Delete it manually if you want it gone.
 
@@ -284,7 +304,7 @@ No. Every record carries which device it came from, and the interface keeps them
 apart.
 
 **Does anything get sent to your servers?**
-Health data, workout details and credentials never leave your machine. Only if you explicitly confirm "submit an error report" does the app send application/parser versions, OS, safe model hints and field structure for unrecognised products, firmware version, and unknown workout codes with counts. It never sends accounts, tokens, serial numbers, device IDs, GPS, health values, raw responses or local paths. There is no automatic telemetry and no background crash reporting.
+Health data, workout details and credentials never leave your machine. Only if you explicitly confirm "submit an error report" does the app send application/parser versions, OS, safe model hints and field structure for unrecognised products, firmware version, unknown workout codes with counts, and the numeric error code from the most recent request the Zepp cloud rejected (the number, which data stream, and when — never any text the cloud returned). It never sends accounts, tokens, serial numbers, device IDs, GPS, health values, raw responses or local paths. There is no automatic telemetry and no background crash reporting.
 
 ## Privacy
 

@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 /// 当前 SQLite schema 版本（`PRAGMA user_version`）。加新版本只能追加迁移
 /// 步骤，不要改已有 DDL。
-pub const CURRENT_SCHEMA_VERSION: i64 = 19;
+pub const CURRENT_SCHEMA_VERSION: i64 = 20;
 /// 写进备份 manifest 的应用版本。Core 是独立 crate，用它自己的包版本。
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// 解析器修订号。**改了运动目录或任何归一化规则，就必须往前走一格。**
@@ -2577,6 +2577,44 @@ impl Database {
         self.conn
             .query_row("PRAGMA user_version", [], |row| row.get(0))
             .map_err(Into::into)
+    }
+
+    /// 最近一次「HTTP 200，但云端说不成功」。
+    ///
+    /// 只取三样东西：哪条流、哪个 code、什么时候。**不取云端的原话**
+    /// ——那是服务端给的自由文本，里面可能带账号信息，而这份报告对用户
+    /// 的承诺是只发白名单字段。一个整数就够把「凭据失效长什么样」定下来。
+    ///
+    /// 为什么需要它：`classify_business_code` 目前把所有非 1 的 code 都归成
+    /// `CloudRejected`，而不敎定为「需要重新登录」——因为本机那 1075 条留存
+    /// 报文全是 `code = 1`，一个失败码都没观测到。拿到真实的失败码之前，
+    /// 把用户踢去重新扫码登录是拿一个确定的坏体验去换一个猜测。
+    /// （对得上的真实反馈：D1 `c1f03eb2`「All my readings are showing empty」。）
+    pub fn diagnostic_cloud_rejection(&self) -> Result<Option<DiagnosticCloudRejection>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT stream, last_error_code,
+                    COALESCE(last_fetch_error_at, last_parse_error_at, last_write_error_at)
+             FROM stream_provenance
+             WHERE last_error_code IS NOT NULL
+               AND 'cloud_rejected' IN (
+                   COALESCE(last_fetch_error_kind, ''),
+                   COALESCE(last_parse_error_kind, ''),
+                   COALESCE(last_write_error_kind, '')
+               )
+             ORDER BY updated_at DESC
+             LIMIT 1",
+        )?;
+        let mut rows = stmt.query_map([], |row| {
+            Ok(DiagnosticCloudRejection {
+                stream: row.get(0)?,
+                code: row.get(1)?,
+                at: row.get(2)?,
+            })
+        })?;
+        match rows.next() {
+            Some(row) => Ok(Some(row?)),
+            None => Ok(None),
+        }
     }
 
     pub fn diagnostic_unknown_workout_codes(&self) -> Result<Vec<DiagnosticWorkoutCode>> {
@@ -5489,7 +5527,7 @@ fn push_alias(aliases: &mut Vec<String>, value: Option<String>) {
 ///
 /// 刻意收得很紧：宁可漏掉一个没见过的假设备，也不能把某个厂商真的用点分十进
 /// 制当序列号的设备判成幽灵后再也进不来。
-pub(crate) fn looks_like_firmware_version(value: &str) -> bool {
+pub fn looks_like_firmware_version(value: &str) -> bool {
     let body = value.strip_prefix(['V', 'v']).unwrap_or(value);
     let mut segments = 0usize;
     for segment in body.split('.') {
@@ -5756,6 +5794,94 @@ fn local_day_range_utc_bounds(start: &str, end: &str) -> Option<(String, String)
 
 #[cfg(test)]
 mod tests {
+
+    /// 云端的业务错误码要能一路走到诊断报告里。
+    ///
+    /// 这条链路上每一环以前都在，只差最后一步：`classify_business_code` 能认出
+    /// 「HTTP 200 但云端说不成功」，provenance 也把它归成了单独一类，但那个
+    /// code 只进了一句给人看的中文，诊断报告里一个字都没有。
+    #[test]
+    fn a_cloud_rejection_code_reaches_the_diagnostic_report() {
+        use crate::storage::provenance::{Stage, StageErrorKind, StageOutcome};
+
+        let dir = std::env::temp_dir().join("zeppbridge-cloud-rejection-code");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = Database::open_migrated(&dir.join("zepp.db")).unwrap();
+
+        assert_eq!(db.diagnostic_cloud_rejection().unwrap(), None);
+
+        // 先来一条不带 code 的普通失败：它不该被当成业务拒绝上报。
+        db.record_stream_stage(
+            "sleep",
+            Stage::Fetch,
+            &StageOutcome::Failed {
+                kind: StageErrorKind::Network,
+                message: Some("连接超时".into()),
+            },
+        )
+        .unwrap();
+        assert_eq!(db.diagnostic_cloud_rejection().unwrap(), None);
+
+        db.record_stream_stage(
+            "workouts",
+            Stage::Fetch,
+            &StageOutcome::Failed {
+                kind: StageErrorKind::CloudRejected { code: -1 },
+                message: Some("Zepp 云端拒绝了这次请求（code -1）".into()),
+            },
+        )
+        .unwrap();
+
+        let rejection = db
+            .diagnostic_cloud_rejection()
+            .unwrap()
+            .expect("业务拒绝应当能被读回来");
+        assert_eq!(rejection.stream, "workouts");
+        assert_eq!(rejection.code, -1);
+        assert!(rejection.at.is_some());
+
+        // 同一条流后来成功了，就不能再拿旧的 code 去烦收报告的人。
+        db.record_stream_stage("workouts", Stage::Fetch, &StageOutcome::Ok)
+            .unwrap();
+        assert_eq!(db.diagnostic_cloud_rejection().unwrap(), None);
+
+        drop(db);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// 跑完迁移，版本号必须停在 `CURRENT_SCHEMA_VERSION`。
+    ///
+    /// `migrate_steps` 是一条平铺的历史，中间会把 `user_version` 先写成 5（第
+    /// 319 行那句不在任何守卫里）再一路盖回 19。只要整个 `migrate()` 还包在
+    /// 一个事务里，这个中间态就对外不存在。这个测试看着的就是那个事务：
+    /// 哪天有人把 `BEGIN IMMEDIATE` 拆了、或者往后面加了一步却忘了推版本号，
+    /// 这里会红——而不是等用户的 CLI 报「本机数据库还是 v5」。
+    #[test]
+    fn migrating_twice_leaves_the_version_at_the_current_schema() {
+        let dir = std::env::temp_dir().join("zeppbridge-migration-version-invariant");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("zepp.db");
+
+        let read_version = |db: &Database| -> i64 {
+            db.conn
+                .query_row("PRAGMA user_version", [], |row| row.get(0))
+                .unwrap()
+        };
+
+        {
+            let db = Database::open_migrated(&path).expect("新库应当能建起来");
+            assert_eq!(read_version(&db), CURRENT_SCHEMA_VERSION);
+        }
+        // 再跑一遍。旧路径下这一遍会把 v19 的库从 5 重新盖到 19；
+        // 落定的结果不允许因此变。
+        {
+            let db = Database::open_migrated(&path).expect("重复升级应当无害");
+            assert_eq!(read_version(&db), CURRENT_SCHEMA_VERSION);
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     /// 已经落库的幽灵设备要被迁移删掉，真设备一行不能少。
     ///

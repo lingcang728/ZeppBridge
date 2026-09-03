@@ -94,7 +94,14 @@ pub enum StageErrorKind {
     /// 报文拿回来了，但当前 normalizer 不认识它的结构。
     UnrecognizedPayload,
     /// HTTP 200，但报文自己写着「不成功」。见 `ZeppBridgeError::CloudRejected`。
-    CloudRejected,
+    ///
+    /// 带着 code：它是整个系统里唯一能告诉我们「凭据失效到底长什么样」
+    /// 的数字，而这一点目前只能从用户那里拿（本地那 1075 条留存报文
+    /// 全是 `code = 1`）。放在类型里而不是只埋在人读的消息字符串里，
+    /// 是为了诊断报告能只上报这一个整数，不把云端的原话一并发出去。
+    CloudRejected {
+        code: i64,
+    },
     /// 本地写库失败。
     Storage,
     /// 另一个进程正在写同一个库，这一轮让开了。可重试，不是坏了。
@@ -111,7 +118,7 @@ impl StageErrorKind {
             StageErrorKind::Auth => "auth",
             StageErrorKind::NotAvailable => "not_available",
             StageErrorKind::UnrecognizedPayload => "unrecognized_payload",
-            StageErrorKind::CloudRejected => "cloud_rejected",
+            StageErrorKind::CloudRejected { .. } => "cloud_rejected",
             StageErrorKind::Storage => "storage",
             StageErrorKind::Busy => "busy",
             StageErrorKind::Cancelled => "cancelled",
@@ -138,7 +145,7 @@ impl StageErrorKind {
             E::ParseError(_) => StageErrorKind::UnrecognizedPayload,
             // 传输层成功、业务层拒绝。单独一类而不是并进 `unknown`：诊断报告
             // 里这一格就是我们唯一能看到「云端到底给了哪个 code」的地方。
-            E::CloudRejected { .. } => StageErrorKind::CloudRejected,
+            E::CloudRejected { code, .. } => StageErrorKind::CloudRejected { code: *code },
             E::Busy(_) => StageErrorKind::Busy,
             E::DatabaseError(_) | E::IoError(_) => StageErrorKind::Storage,
             E::InvalidHost(_) | E::ConfigError(_) | E::Unknown(_) => StageErrorKind::Unknown,
@@ -358,17 +365,25 @@ impl Database {
                 self.conn.execute(&sql, rusqlite::params![stream, now])?;
             }
             StageOutcome::Failed { kind, message } => {
+                // 业务码单独存一列。它也在 `message` 里，但那是一句给人看的
+                // 中文，而诊断报告只能发白名单字段——从一句散文里把数字
+                // 正则抠出来，等于把文案变成协议。
+                let code = match kind {
+                    StageErrorKind::CloudRejected { code } => Some(*code),
+                    _ => None,
+                };
                 let sql = format!(
                     "UPDATE stream_provenance
                      SET last_{prefix}_error_at = ?2,
                          last_{prefix}_error_kind = ?3,
                          last_{prefix}_error_message = ?4,
+                         last_error_code = ?5,
                          updated_at = ?2
                      WHERE stream = ?1"
                 );
                 self.conn.execute(
                     &sql,
-                    rusqlite::params![stream, now, kind.as_str(), message.as_deref()],
+                    rusqlite::params![stream, now, kind.as_str(), message.as_deref(), code],
                 )?;
             }
         }
