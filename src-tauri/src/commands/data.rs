@@ -3147,12 +3147,29 @@ pub fn open_data_folder(state: tauri::State<'_, AppState>) -> std::result::Resul
             })
     }
 
-    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    // Linux 上项目已经为 WebKitGTK、Flatpak、Secret Service、AppImage 做了
+    // 大量适配，设置页这一个按钮却直接返回「不支持」。`xdg-open` 是桌面环境
+    // 的标准入口，deb / rpm / Flatpak / AppImage 四条渠道都有。
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&state.data_dir)
+            .spawn()
+            .map(|_| ())
+            .map_err(|error| {
+                AppError::new(
+                    "err.data_folder.open_failed",
+                    format!("打开数据文件夹失败: {error}"),
+                )
+            })
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
     {
         let _ = state;
         Err(AppError::new(
             "err.data_folder.unsupported_os",
-            "打开数据文件夹仅支持 Windows/macOS",
+            "打开数据文件夹仅支持 Windows/macOS/Linux",
         ))
     }
 }
