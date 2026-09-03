@@ -42,6 +42,17 @@ pub enum ZeppBridgeError {
     #[error("Zepp 服务返回 HTTP {status}: {message}")]
     HttpStatus { status: u16, message: String },
 
+    /// HTTP 是 200，但报文自己写着「不成功」。
+    ///
+    /// 和 `HttpStatus` 分开：那一条说的是传输层拒绝，这一条是传输层成功、
+    /// 业务层拒绝。混在一起会让「HTTP 200」这句话在日志里自相矛盾。
+    ///
+    /// 和 `ParseError` 分开更重要——之前这类响应正是落进 ParseError 的：
+    /// 云端说不成功、没给 `data`，归一化器找不到东西，抛一句「数据无法解析」。
+    /// 用户看到的是既不提示重新登录、又永远拉不到数据的假死态。
+    #[error("Zepp 返回业务错误 code={code}: {message}")]
+    CloudRejected { code: i64, message: String },
+
     #[error("不安全的 Zepp 区域主机: {0}")]
     InvalidHost(String),
 
@@ -113,6 +124,7 @@ impl ZeppBridgeError {
             Self::Unavailable(_) | Self::DataUnavailable(_) => "err.core.unavailable",
             Self::RetryExhausted { .. } => "err.core.retry_exhausted",
             Self::HttpStatus { .. } => "err.core.http_status",
+            Self::CloudRejected { .. } => "err.core.cloud_rejected",
             Self::Cancelled => "err.core.cancelled",
             Self::AuthError(_) => "err.core.auth",
             Self::CredentialStore(_) => "err.core.credential_store",
@@ -143,6 +155,12 @@ impl ZeppBridgeError {
             Self::HttpStatus { status, .. } => {
                 format!("Zepp 服务返回 HTTP {status}，请稍后重试")
             }
+            // 把 code 和云端原话都带上：这是目前唯一能让下一份反馈报告告诉
+            // 我们「失效到底长什么样」的途径。`sanitize_user_text` 会去掉
+            // 里面可能出现的地址。
+            Self::CloudRejected { code, message } => sanitize_user_text(&format!(
+                "Zepp 云端拒绝了这次请求（code {code}）：{message}。如果反复出现，请在设置里重新连接 Zepp 账号。"
+            )),
             Self::Cancelled => "同步已取消".into(),
             Self::AuthError(message)
             | Self::CredentialStore(message)
