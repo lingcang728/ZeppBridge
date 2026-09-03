@@ -1,6 +1,6 @@
 [package]
 name = "zeppbridge-core"
-version = "2.1.1"
+version = "2.1.2"
 description = "ZeppBridge 的共享数据核心：模型、存储、迁移、归一化、查询、导出与写入协调"
 edition = "2021"
 
