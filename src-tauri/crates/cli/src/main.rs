@@ -59,56 +59,71 @@ const EXIT_SCHEMA: u8 = 7;
 /// 其他失败。
 const EXIT_FAILED: u8 = 1;
 
+/// The CLI ships inside the installer, so its human-readable output is English.
+///
+/// 注释保持中文，这里只是发出去给用户看的那一层。理由见仓库约定：随安装包
+/// 发出去的说明用英文，而 issue #40 那位 Linux 用户撞上的正是一句他读不懂的
+/// 中文提示。`--json` 的字段名和退出码是契约，一个字都没动。
+///
+/// **边界在哪：** 这个文件里的每一句人读文案都是英文了。从 `zeppbridge-core`
+/// 冒上来的错误（`error.user_message()`）**还是中文**——那些字符串散在 core 的
+/// 七百多处，桌面端靠错误码查本地文案、根本不显示它们（`i18n/backendText.ts`
+/// 在英文界面下会把带中文的后端原文整句换掉）。把 core 翻过来是另一件事，
+/// 不能顺手做一半：翻一半的结果是中英文混在同一条错误里，比全中文更难读。
 const HELP: &str = "\
-zeppbridge-cli —— ZeppBridge 的无交互命令行入口
+zeppbridge-cli — the non-interactive command line for ZeppBridge
 
-用法:
-  zeppbridge-cli <命令> [选项]
+Usage:
+  zeppbridge-cli <command> [options]
 
-命令:
-  status              打印本机数据库与账号状态（不联网）
-  sync                从 Zepp 云端同步到本机 SQLite
-  reprocess           用当前解析器重放本地原始报文（不联网）
-  export              把本机数据导出为 JSON / CSV / GPX
-  contract            打印只读读取契约（单位、时区、来源、缺失值）
-  version             打印版本
-  help                打印本帮助
+Commands:
+  status              Print local database and account status (no network)
+  sync                Sync from the Zepp cloud into the local SQLite database
+  reprocess           Replay stored payloads with the current parser (no network)
+  export              Export local data as JSON / CSV / GPX / FIT
+  contract            Print the read contract (units, time zone, source, missing values)
+  version             Print the version
+  help                Print this help
 
-sync 选项:
-  --mode <incremental|initial|history>   默认 incremental
-  --days <N>                             仅 history 模式；1–3650
-  --no-reprocess                         跳过同步前的解析器重放
-  --json                                 输出机器可读的同步报告
+sync options:
+  --mode <incremental|initial|history>   Default: incremental
+  --days <N>                             history mode only; 1-3650
+  --no-reprocess                         Skip the parser replay before syncing
+  --json                                 Emit a machine-readable sync report
 
-reprocess 选项:
-  --all                     重放全部报文，而不是只补解析器升级欠下的那些
-  --json                    输出机器可读的重放报告
+reprocess options:
+  --all                     Replay every payload, not only what a parser upgrade owes
+  --json                    Emit a machine-readable replay report
 
-export 选项:
-  --format <json|csv|gpx|fit>  默认 json；fit 需要 --out 指向一个目录
-  --from <YYYY-MM-DD>       与 --to 成对使用
+export options:
+  --format <json|csv|gpx|fit>  Default: json; fit needs --out to point at a directory
+  --from <YYYY-MM-DD>       Use together with --to
   --to <YYYY-MM-DD>
-  --workout <id>            导出单条运动；与 --from/--to 互斥
-  --types <a,b,c>           默认 workouts,daily,sleep
-  --detail <summary|full>   默认 summary
-  --out <文件路径>          默认写到 stdout
+  --workout <id>            Export one workout; mutually exclusive with --from/--to
+  --types <a,b,c>           Default: workouts,daily,sleep
+  --detail <summary|full>   Default: summary
+  --out <path>              Default: write to stdout
 
-通用选项:
-  --json                    机器可读输出走 stdout，人读的提示走 stderr
+Common options:
+  --json                    Machine-readable output on stdout, human notes on stderr
 
-退出码:
-  0 成功   1 失败   2 用法错误   3 未连接账号   4 另有进程在写库
-  5 云端请求失败   6 本机数据库错误   7 数据库版本与本程序不匹配
+Exit codes:
+  0 success        1 failure          2 usage error   3 no account connected
+  4 another process is writing        5 cloud request failed
+  6 local database error             7 database version does not match this binary
 
-解析器升级:
-  解析器规则改版后（新的运动编号、睡眠阶段修正、全天压力曲线等），已经存在
-  本机的历史记录仍然是旧规则产出的，要重放一次才会跟上。桌面应用在启动时自动
-  做这件事；无头环境没有那次启动，所以：`sync` 会在同步前自动补上（可用
-  --no-reprocess 关掉），`status` 只提示不执行，`reprocess` 是随时可以手动跑的
-  那一条。重放不联网，也不会改写「上次云端同步」的时间。
+Parser upgrades:
+  When the parser rules change (new workout codes, sleep-stage corrections, the
+  all-day stress curve), records already stored locally were produced by the old
+  rules and only catch up after a replay. The desktop app does this on launch; a
+  headless install never has that launch, so: `sync` runs it automatically before
+  syncing (turn it off with --no-reprocess), `status` only reports it, and
+  `reprocess` is the one you can run at any time. A replay uses no network and
+  does not touch the \"last cloud sync\" timestamp.
 
-隐私:
-  只读写本机数据目录，不监听任何端口，不打印 token、Cookie 或完整账号。
+Privacy:
+  Reads and writes the local data directory only. Listens on no port. Never
+  prints tokens, cookies or a full account name.
 ";
 
 fn main() -> ExitCode {
@@ -141,7 +156,7 @@ fn run(args: &[String]) -> u8 {
         "reprocess" => cmd_reprocess(rest),
         "export" => cmd_export(rest),
         other => {
-            eprintln!("未知命令：{other}\n");
+            eprintln!("Unknown command: {other}\n");
             eprint!("{HELP}");
             EXIT_USAGE
         }
@@ -163,7 +178,7 @@ impl Flags {
         while index < args.len() {
             let arg = &args[index];
             let Some(name) = arg.strip_prefix("--") else {
-                return Err(format!("多余的参数：{arg}"));
+                return Err(format!("Unexpected argument: {arg}"));
             };
             if let Some((key, value)) = name.split_once('=') {
                 values.push((key.to_string(), Some(value.to_string())));
@@ -201,7 +216,7 @@ impl Flags {
     fn reject_unknown(&self, known: &[&str]) -> Result<(), String> {
         for (name, _) in &self.values {
             if !known.contains(&name.as_str()) {
-                return Err(format!("未知选项：--{name}"));
+                return Err(format!("Unknown option: --{name}"));
             }
         }
         Ok(())
@@ -289,7 +304,8 @@ fn error_kind_for(code: u8) -> &'static str {
 /* ------------------------------ 公共装配 ------------------------------ */
 
 fn data_dir() -> Result<std::path::PathBuf, String> {
-    paths::resolve_data_dir().map_err(|error| format!("无法确定数据目录：{error}"))
+    paths::resolve_data_dir()
+        .map_err(|error| format!("Could not resolve the data directory: {error}"))
 }
 
 fn open_read_only() -> Result<Database, (u8, String)> {
@@ -298,7 +314,7 @@ fn open_read_only() -> Result<Database, (u8, String)> {
     if !db_path.exists() {
         return Err((
             EXIT_NOT_CONFIGURED,
-            "本机还没有数据库。请先在 ZeppBridge 桌面应用里连接账号并同步一次。".into(),
+            "No local database yet. Connect an account in the ZeppBridge desktop app and sync once first.".into(),
         ));
     }
     // 只读连接：CLI 的查询路径不拿写锁，也就不会在一次长同步期间被挡住。
@@ -355,7 +371,7 @@ impl ReplayOutcome {
 
     fn human(&self) -> String {
         format!(
-            "已用当前解析器重放本地报文 {} 条，得到 {} 条派生记录，用时 {:.1} 秒",
+            "Replayed {} stored payloads with the current parser: {} derived records in {:.1}s",
             self.raw_records,
             self.total_records(),
             self.elapsed.as_secs_f64()
@@ -366,23 +382,28 @@ impl ReplayOutcome {
 /// 重放前把要做的事说出来。几分钟的静默和卡死在终端里长得一模一样。
 fn announce_replay(plan: &ReplayPlan) {
     let scope = if plan.streams.is_empty() {
-        "全部流".to_string()
+        "every stream".to_string()
     } else {
         plan.streams.join("、")
     };
     // `--all` 可以在修订号没变的时候跑。那时候说「已从 X 升到 X」是句假话，
     // 用户会以为自己刚错过了一次升级。
     let reason = if plan.stored_revision.as_deref() == Some(plan.target_revision.as_str()) {
-        format!("正在按当前解析器（{}）重放", plan.target_revision)
+        format!(
+            "Replaying with the current parser ({})",
+            plan.target_revision
+        )
     } else {
         format!(
-            "解析器已从 {} 升到 {}，正在重放",
-            plan.stored_revision.as_deref().unwrap_or("更早的版本"),
+            "Parser upgraded from {} to {}; replaying",
+            plan.stored_revision
+                .as_deref()
+                .unwrap_or("an earlier revision"),
             plan.target_revision
         )
     };
     eprintln!(
-        "{reason}本机 {} 条原始报文（{scope}）。不联网，请勿中断。",
+        "{reason}: {} stored payloads ({scope}). No network is used. Do not interrupt.",
         plan.raw_records
     );
 }
@@ -444,8 +465,8 @@ fn pending_replay_notice(plan: Option<&ReplayPlan>) -> Option<String> {
         return None;
     }
     Some(format!(
-        "本机派生数据还是 {} 产出的，当前解析器是 {}；{} 条历史报文需要重放。跑 `zeppbridge-cli reprocess`，或者等下一次 sync 自动补上。",
-        plan.stored_revision.as_deref().unwrap_or("更早的版本"),
+        "Derived data here still comes from {}; the current parser is {}. {} stored payloads need a replay. Run `zeppbridge-cli reprocess`, or let the next sync do it.",
+        plan.stored_revision.as_deref().unwrap_or("an earlier revision"),
         plan.target_revision,
         plan.raw_records
     ))
@@ -460,7 +481,7 @@ fn open_writable() -> Result<(std::path::PathBuf, Database), (u8, String)> {
     if !db_path.exists() {
         return Err((
             EXIT_NOT_CONFIGURED,
-            "本机还没有数据库。请先在 ZeppBridge 桌面应用里连接账号并同步一次。".into(),
+            "No local database yet. Connect an account in the ZeppBridge desktop app and sync once first.".into(),
         ));
     }
     let db = Database::open_migrated(&db_path).map_err(|error| {
@@ -506,7 +527,7 @@ fn cmd_reprocess(args: &[String]) -> u8 {
                 "reason": "up_to_date",
                 "revision": NORMALIZER_REVISION,
             }),
-            &format!("本机派生数据已经是当前解析器（{NORMALIZER_REVISION}）产出的，无需重放"),
+            &format!("Derived data already comes from the current parser ({NORMALIZER_REVISION}); nothing to replay"),
         );
         return EXIT_OK;
     }
@@ -559,7 +580,7 @@ fn cmd_reprocess(args: &[String]) -> u8 {
                     "reason": "already_done",
                     "revision": NORMALIZER_REVISION,
                 }),
-                "等写锁的这段时间里，另一个 ZeppBridge 已经把这次重放做完了",
+                "Another ZeppBridge finished this replay while we waited for the write lock",
             );
             EXIT_OK
         }
@@ -653,34 +674,34 @@ fn cmd_status(args: &[String]) -> u8 {
     });
 
     let human = format!(
-        "ZeppBridge {VERSION}\n账号：{}\n数据库：{} 字节，schema v{}\n本机覆盖：{}\n上次云端同步：{}\n历史账本：{}{}",
-        if connected { "已连接" } else { "未连接" },
+        "ZeppBridge {VERSION}\nAccount: {}\nDatabase: {} bytes, schema v{}\nLocal coverage: {}\nLast cloud sync: {}\nHistory ledger: {}{}",
+        if connected { "connected" } else { "not connected" },
         database_bytes,
         health.database.schema_version,
         // JSON 里早就有这三个字段，纯文本却漏了一行——同一个命令的两种
         // 输出对「本机有多少历史」给出不同的答案，是这个项目最不该出现的事。
         match coverage.earliest_day.as_deref() {
-            Some(day) => format!("{} 天，最早 {}", coverage.covered_days, day),
-            None => "本机还没有任何数据".to_string(),
+            Some(day) => format!("{} days, earliest {}", coverage.covered_days, day),
+            None => "nothing stored yet".to_string(),
         },
         health
             .timings
             .last_cloud_sync_at
             .as_deref()
-            .unwrap_or("从未"),
+            .unwrap_or("never"),
         // 「一块都没排过」和「排了还没做完」不是一回事。前者不是进度落后，
         // 是根本还没开始规划补拉。
         match ledger.as_ref() {
-            Some(value) if value.total_chunks == 0 => "尚未规划补拉".to_string(),
-            Some(value) if value.complete => "每个月份块都有结论".to_string(),
+            Some(value) if value.total_chunks == 0 => "no backfill planned yet".to_string(),
+            Some(value) if value.complete => "every month chunk has an outcome".to_string(),
             Some(value) => format!(
-                "还有 {} 个月份块没有结论",
+                "{} month chunks still without an outcome",
                 value.total_chunks - value.completed_chunks
             ),
-            None => "读不到账本".to_string(),
+            None => "ledger unreadable".to_string(),
         },
         match replay_notice.as_deref() {
-            Some(notice) => format!("\n解析器：{notice}"),
+            Some(notice) => format!("\nParser: {notice}"),
             None => String::new(),
         }
     );
@@ -705,13 +726,20 @@ fn cmd_sync(args: &[String]) -> u8 {
             json_mode,
             EXIT_USAGE,
             "usage",
-            "--mode 只能是 incremental、initial 或 history",
+            "--mode must be incremental, initial or history",
         );
     }
     let days = match flags.get("days") {
         Some(raw) => match raw.parse::<i64>() {
             Ok(value) if (1..=3650).contains(&value) => Some(value),
-            _ => return fail(json_mode, EXIT_USAGE, "usage", "--days 必须是 1 到 3650"),
+            _ => {
+                return fail(
+                    json_mode,
+                    EXIT_USAGE,
+                    "usage",
+                    "--days must be between 1 and 3650",
+                )
+            }
         },
         None => None,
     };
@@ -720,7 +748,7 @@ fn cmd_sync(args: &[String]) -> u8 {
             json_mode,
             EXIT_USAGE,
             "usage",
-            "--days 只在 --mode history 下有意义",
+            "--days only means something with --mode history",
         );
     }
 
@@ -735,9 +763,10 @@ fn cmd_sync(args: &[String]) -> u8 {
                 json_mode,
                 EXIT_NOT_CONFIGURED,
                 "not_configured",
-                "还没有连接 Zepp 账号。命令行不做登录：请在桌面应用里登录，\
-                 或设 ZEPPBRIDGE_CREDENTIAL_STORE=env 并给出 ZEPPBRIDGE_APP_TOKEN。\
-                 跨机器搬库见 docs/guides/linux.md",
+                "No Zepp account is connected. The command line does not sign in: \
+                 sign in from the desktop app, or set ZEPPBRIDGE_CREDENTIAL_STORE=env \
+                 and supply ZEPPBRIDGE_APP_TOKEN. Moving a library between machines: \
+                 see docs/guides/linux.md",
             )
         }
         Err(error) => {
@@ -783,14 +812,17 @@ fn cmd_sync(args: &[String]) -> u8 {
                     // 重放失败不该连累同步：拉新数据仍然是有意义的，历史
                     // 记录晚一轮再对齐也比这次什么都不做强。说出来即可。
                     Err((_, _, message)) => {
-                        eprintln!("本地报文重放失败，继续同步：{message}");
+                        eprintln!("Local replay failed; syncing anyway: {message}");
                         None
                     }
                 }
             }
             Ok(_) => None,
             Err(error) => {
-                eprintln!("读不到解析器修订号，跳过重放：{}", error.user_message());
+                eprintln!(
+                    "Could not read the parser revision; skipping the replay: {}",
+                    error.user_message()
+                );
                 None
             }
         }
@@ -806,7 +838,7 @@ fn cmd_sync(args: &[String]) -> u8 {
                 json_mode,
                 EXIT_FAILED,
                 "failed",
-                &format!("无法启动异步运行时：{error}"),
+                &format!("Could not start the async runtime: {error}"),
             )
         }
     };
@@ -838,11 +870,11 @@ fn cmd_sync(args: &[String]) -> u8 {
                 })).collect::<Vec<_>>(),
             });
             let human = format!(
-                "同步{}：写入 {} 条。{}",
+                "Sync {}: {} records written. {}",
                 if report.success {
-                    "完成"
+                    "complete"
                 } else {
-                    "部分失败"
+                    "partly failed"
                 },
                 report.records_written,
                 report.message.as_deref().unwrap_or("")
@@ -878,7 +910,7 @@ fn cmd_export(args: &[String]) -> u8 {
             json_mode,
             EXIT_USAGE,
             "usage",
-            "--format 只能是 json、csv、gpx 或 fit",
+            "--format must be json, csv, gpx or fit",
         );
     }
 
@@ -889,7 +921,7 @@ fn cmd_export(args: &[String]) -> u8 {
                 json_mode,
                 EXIT_USAGE,
                 "usage",
-                "--from/--to 和 --workout 是互斥的范围，只能给一个",
+                "--from/--to and --workout are mutually exclusive ranges; give only one",
             )
         }
         (Some(from), Some(to), None) => ExportScope::date_range(from, to),
@@ -898,7 +930,7 @@ fn cmd_export(args: &[String]) -> u8 {
                 json_mode,
                 EXIT_USAGE,
                 "usage",
-                "--from 和 --to 必须成对给出",
+                "--from and --to must be given together",
             )
         }
         (None, None, Some(workout)) => ExportScope::Workout {
@@ -909,7 +941,7 @@ fn cmd_export(args: &[String]) -> u8 {
                 json_mode,
                 EXIT_USAGE,
                 "usage",
-                "必须给出导出范围：--from/--to 或 --workout",
+                "An export range is required: --from/--to or --workout",
             )
         }
     };
@@ -930,7 +962,7 @@ fn cmd_export(args: &[String]) -> u8 {
                 json_mode,
                 EXIT_USAGE,
                 "usage",
-                "--detail 只能是 summary 或 full",
+                "--detail must be summary or full",
             )
         }
     };
@@ -948,7 +980,7 @@ fn cmd_export(args: &[String]) -> u8 {
         .as_ref()
         .and_then(|plan| pending_replay_notice(Some(plan)))
     {
-        eprintln!("提示：{notice}");
+        eprintln!("Note: {notice}");
     }
     let selection = ExportSelection {
         scope: Some(scope),
@@ -980,7 +1012,7 @@ fn cmd_export(args: &[String]) -> u8 {
                         json_mode,
                         EXIT_FAILED,
                         "failed",
-                        &format!("导出结果无法解析：{error}"),
+                        &format!("The export result could not be parsed: {error}"),
                     )
                 }
             };
@@ -1003,21 +1035,21 @@ fn cmd_export(args: &[String]) -> u8 {
                     json_mode,
                     EXIT_FAILED,
                     "failed",
-                    &format!("写文件失败：{error}"),
+                    &format!("Could not write the file: {error}"),
                 );
             }
             // 只回显用户自己给的路径，不去解析成绝对路径打印出来。
             emit(
                 json_mode,
                 serde_json::json!({ "ok": true, "format": format, "records": count, "out": path }),
-                &format!("已导出 {count} 条到 {path}"),
+                &format!("Exported {count} records to {path}"),
             );
         }
         None => {
             // 没有 --out 时正文独占 stdout，条数提示走 stderr，
             // 这样 `zeppbridge-cli export > a.csv` 得到的是干净的文件。
             print!("{body}");
-            eprintln!("已导出 {count} 条（{format}）");
+            eprintln!("Exported {count} records ({format})");
         }
     }
     EXIT_OK
@@ -1042,7 +1074,7 @@ fn export_fit_files(json_mode: bool, json_text: &str, out: Option<&str>) -> u8 {
             json_mode,
             EXIT_FAILED,
             "failed",
-            "--format fit 需要 --out 指向一个目录：FIT 是二进制，且一次运动一个文件，没法写到标准输出",
+            "--format fit needs --out to point at a directory: FIT is binary and one file per workout, so it cannot go to stdout",
         );
     };
 
@@ -1053,7 +1085,7 @@ fn export_fit_files(json_mode: bool, json_text: &str, out: Option<&str>) -> u8 {
                 json_mode,
                 EXIT_FAILED,
                 "failed",
-                &format!("导出结果无法解析：{error}"),
+                &format!("The export result could not be parsed: {error}"),
             )
         }
     };
@@ -1068,7 +1100,7 @@ fn export_fit_files(json_mode: bool, json_text: &str, out: Option<&str>) -> u8 {
             json_mode,
             EXIT_FAILED,
             "failed",
-            &format!("创建目录失败：{error}"),
+            &format!("Could not create the directory: {error}"),
         );
     }
     for (name, bytes) in &files {
@@ -1078,7 +1110,7 @@ fn export_fit_files(json_mode: bool, json_text: &str, out: Option<&str>) -> u8 {
                 json_mode,
                 EXIT_FAILED,
                 "failed",
-                &format!("写文件失败：{error}"),
+                &format!("Could not write the file: {error}"),
             );
         }
     }
@@ -1093,7 +1125,7 @@ fn export_fit_files(json_mode: bool, json_text: &str, out: Option<&str>) -> u8 {
             "out": directory
         }),
         &format!(
-            "已导出 {} 个 FIT 文件（共 {points} 个采样点）到 {directory}",
+            "Exported {} FIT files ({points} sample points in total) to {directory}",
             files.len()
         ),
     );
@@ -1222,6 +1254,6 @@ mod tests {
             );
         }
         // 隐私边界要出现在 help 里，用户不该为了知道它去读源码。
-        assert!(HELP.contains("不监听任何端口"));
+        assert!(HELP.contains("Listens on no port"));
     }
 }

@@ -15,6 +15,13 @@ import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { AI_PROVIDERS, AI_PROVIDER_BY_ID, type AiProviderId } from '../lib/aiProviders';
 import { dataProviderLabel, dataScopeLabel, workoutLabel } from '../lib/labels';
 import { formatDate, formatDistance, formatTime, isFiniteNumber } from '../lib/format';
+import {
+  elevationUnitLabel,
+  paceAxisLabel,
+  paceMinutesPerBigUnit,
+  paceUnitLabel,
+  toElevation,
+} from '../lib/units';
 import { zeppSemanticColors } from '../lib/echartsTheme';
 import { formatPaceSeconds } from '../lib/metricSeries';
 import { workoutDisplayLabel, workoutDisplayType } from '../lib/workouts';
@@ -404,7 +411,13 @@ const typeOverrideOptions = ref<SportOption[]>([]);
 const typeOverrideChoices = computed(() => [
   { value: '', label: t.value.noCorrection },
   // 后端发来的 label 是中文（那份列表也给 CLI 用），界面按 key 自己查名字。
-  ...typeOverrideOptions.value.map((option) => ({ value: option.key, label: workoutLabel(option.key) })),
+  //
+  // 排序也得在这里做。后端那份是按**中文名**排好的（`sport_catalog::options()`），
+  // 英文界面拿着它按 key 换完名字之后，顺序仍然是中文拼音序——一百多项里找
+  // 「Squash」，得从头翻到尾。按真正显示出来的那串字排。
+  ...typeOverrideOptions.value
+    .map((option) => ({ value: option.key, label: workoutLabel(option.key) }))
+    .sort((a, b) => a.label.localeCompare(b.label, intlLocale())),
 ]);
 
 const durationMinutes = computed(() => {
@@ -426,15 +439,16 @@ const formatClock = (minutes?: number | null): string => {
   return `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
 };
 
-const paceClock = (minutes?: number | null): string => {
-  if (!isFiniteNumber(minutes) || minutes <= 0) return t.value.notProvided;
-  const totalSeconds = Math.round(minutes * 60);
+/** 入参是每公里分钟；显示时跟随当前距离单位。 */
+const paceClock = (minutesPerKm?: number | null): string => {
+  if (!isFiniteNumber(minutesPerKm) || minutesPerKm <= 0) return t.value.notProvided;
+  const totalSeconds = Math.round(paceMinutesPerBigUnit(minutesPerKm) * 60);
   return `${Math.floor(totalSeconds / 60)}'${String(totalSeconds % 60).padStart(2, '0')}"`;
 };
 
 const paceText = (minutes?: number | null): string => {
   const clock = paceClock(minutes);
-  return clock === t.value.notProvided ? clock : `${clock} /km`;
+  return clock === t.value.notProvided ? clock : `${clock} ${paceUnitLabel()}`;
 };
 
 const distanceLabel = computed(() => formatDistance(workout.value?.distance_meters, t.value.notProvided));
@@ -470,7 +484,7 @@ const heroMetrics = computed(() => {
     { label: t.value.metricDuration, value: formatClock(durationMinutes.value), tone: 'training', icon: 'auto-sync' as DesignIconName },
     { label: t.value.metricAvgHr, value: numberValue(item.avg_hr), unit: isFiniteNumber(item.avg_hr) ? 'bpm' : undefined, tone: 'heart', icon: 'heart-rate' as DesignIconName },
     { label: t.value.metricAvgPace, value: resolvedPace, tone: 'pace', icon: 'body-activity' as DesignIconName },
-    { label: t.value.metricAscent, value: isFiniteNumber(summary?.elevation_gain_m) ? numberValue(summary?.elevation_gain_m) : t.value.notProvided, unit: isFiniteNumber(summary?.elevation_gain_m) ? 'm' : undefined, tone: 'altitude', icon: 'health-watch' as DesignIconName },
+    { label: t.value.metricAscent, value: isFiniteNumber(summary?.elevation_gain_m) ? numberValue(toElevation(summary.elevation_gain_m)) : t.value.notProvided, unit: isFiniteNumber(summary?.elevation_gain_m) ? elevationUnitLabel() : undefined, tone: 'altitude', icon: 'health-watch' as DesignIconName },
     { label: 'VO₂ Max', value: numberValue(item.vo2max), tone: 'vo2', icon: 'vo2-max' as DesignIconName },
     { label: t.value.metricTrainingLoad, value: numberValue(item.training_load), tone: 'training', icon: 'training-load' as DesignIconName },
   ];
@@ -680,6 +694,19 @@ const sampleSeries = (key: keyof Pick<WorkoutSeriesSample, 'heart_rate' | 'pace'
 const heartPoints = computed(() => sampleSeries('heart_rate'));
 const pacePoints = computed(() => sampleSeries('pace'));
 const altitudePoints = computed(() => sampleSeries('altitude_m'));
+/*
+ * 图上画的那两条要跟着单位换算，采样本身不动。
+ *
+ * 分成两份而不是就地改 `pacePoints`：过滤条件（配速 1–60）是按公制定的，
+ * 而配速那三个统计值走的是 `paceClock`，它自己已经会换算——两边都换就成了
+ * 一次英里、再一次英里。
+ */
+const paceChartPoints = computed(() => pacePoints.value.map(
+  (point) => ({ t: point.t, v: paceMinutesPerBigUnit(point.v) }),
+));
+const altitudeChartPoints = computed(() => altitudePoints.value.map(
+  (point) => ({ t: point.t, v: toElevation(point.v) }),
+));
 const cadencePoints = computed(() => sampleSeries('cadence'));
 
 const lineOption = (points: { t: number; v: number }[], color: string, unit: string) => {
@@ -751,8 +778,8 @@ const lineOption = (points: { t: number; v: number }[], color: string, unit: str
 };
 
 const heartOption = computed(() => lineOption(heartPoints.value, zeppSemanticColors.heart, 'bpm'));
-const paceOption = computed(() => lineOption(pacePoints.value, zeppSemanticColors.pace, 'min/km'));
-const altitudeOption = computed(() => lineOption(altitudePoints.value, zeppSemanticColors.altitude, 'm'));
+const paceOption = computed(() => lineOption(paceChartPoints.value, zeppSemanticColors.pace, paceAxisLabel()));
+const altitudeOption = computed(() => lineOption(altitudeChartPoints.value, zeppSemanticColors.altitude, elevationUnitLabel()));
 const cadenceOption = computed(() => lineOption(cadencePoints.value, zeppSemanticColors.cadence, 'spm'));
 
 const statSummary = (points: { v: number }[], mode: 'heart' | 'pace' | 'normal' = 'normal'): ChartStat[] | null => {
@@ -775,8 +802,8 @@ const statSummary = (points: { v: number }[], mode: 'heart' | 'pace' | 'normal' 
 
 const chartCards = computed(() => [
   { key: 'heart', title: t.value.chartHeart, unit: 'bpm', option: heartOption.value, stats: statSummary(heartPoints.value, 'heart'), icon: 'heart-rate' as DesignIconName, tone: 'heart' },
-  { key: 'pace', title: t.value.chartPace, unit: 'min/km', option: paceOption.value, stats: statSummary(pacePoints.value, 'pace'), icon: 'body-activity' as DesignIconName, tone: 'pace' },
-  { key: 'altitude', title: t.value.chartAltitude, unit: 'm', option: altitudeOption.value, stats: statSummary(altitudePoints.value), icon: 'health-watch' as DesignIconName, tone: 'altitude' },
+  { key: 'pace', title: t.value.chartPace, unit: paceAxisLabel(), option: paceOption.value, stats: statSummary(pacePoints.value, 'pace'), icon: 'body-activity' as DesignIconName, tone: 'pace' },
+  { key: 'altitude', title: t.value.chartAltitude, unit: elevationUnitLabel(), option: altitudeOption.value, stats: statSummary(altitudeChartPoints.value), icon: 'health-watch' as DesignIconName, tone: 'altitude' },
   { key: 'cadence', title: t.value.chartCadence, unit: 'spm', option: cadenceOption.value, stats: statSummary(cadencePoints.value), icon: 'steps' as DesignIconName, tone: 'cadence' },
 ].filter((card): card is typeof card & { option: NonNullable<typeof card.option> } => card.option !== null));
 
@@ -825,7 +852,7 @@ const decodedMetrics = computed(() => {
     { label: t.value.decodedAvgCadence, value: isFiniteNumber(summary.average_cadence) ? `${numberValue(summary.average_cadence)} spm` : t.value.notProvided, icon: 'steps' as DesignIconName },
     { label: t.value.decodedMaxCadence, value: isFiniteNumber(summary.max_cadence) ? `${numberValue(summary.max_cadence)} spm` : t.value.notProvided, icon: 'training-load' as DesignIconName },
     { label: t.value.decodedAvgStride, value: isFiniteNumber(summary.average_stride_cm) ? `${numberValue(summary.average_stride_cm)} cm` : t.value.notProvided, icon: 'body-activity' as DesignIconName },
-    { label: t.value.decodedDescent, value: isFiniteNumber(summary.elevation_loss_m) ? `${numberValue(summary.elevation_loss_m)} m` : t.value.notProvided, icon: 'health-watch' as DesignIconName },
+    { label: t.value.decodedDescent, value: isFiniteNumber(summary.elevation_loss_m) ? `${numberValue(toElevation(summary.elevation_loss_m))} ${elevationUnitLabel()}` : t.value.notProvided, icon: 'health-watch' as DesignIconName },
     { label: t.value.decodedMaxHr, value: isFiniteNumber(item.max_hr) ? `${numberValue(item.max_hr)} bpm` : t.value.notProvided, icon: 'resting-heart-rate' as DesignIconName },
     // Running power and form only exist on watches that measure them, and only
     // for running; every one of these reads "not provided" rather than 0.
@@ -834,7 +861,7 @@ const decodedMetrics = computed(() => {
     { label: t.value.decodedGroundContact, value: isFiniteNumber(summary.average_ground_contact_ms) ? `${numberValue(summary.average_ground_contact_ms)} ms` : t.value.notProvided, icon: 'body-activity' as DesignIconName },
     { label: t.value.decodedVerticalOscillation, value: isFiniteNumber(summary.average_vertical_oscillation_mm) ? `${(summary.average_vertical_oscillation_mm / 10).toFixed(1)} cm` : t.value.notProvided, icon: 'body-activity' as DesignIconName },
     { label: t.value.decodedVerticalRatio, value: isFiniteNumber(summary.average_vertical_ratio_pct) ? `${summary.average_vertical_ratio_pct.toFixed(1)} %` : t.value.notProvided, icon: 'body-activity' as DesignIconName },
-    { label: t.value.decodedBestEquivalentPace, value: isFiniteNumber(summary.best_equivalent_pace_s_per_km) ? `${formatPaceSeconds(summary.best_equivalent_pace_s_per_km)} /km` : t.value.notProvided, icon: 'outdoor-run' as DesignIconName },
+    { label: t.value.decodedBestEquivalentPace, value: isFiniteNumber(summary.best_equivalent_pace_s_per_km) ? `${formatPaceSeconds(summary.best_equivalent_pace_s_per_km)} ${paceUnitLabel()}` : t.value.notProvided, icon: 'outdoor-run' as DesignIconName },
   ];
 });
 

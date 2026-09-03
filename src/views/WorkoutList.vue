@@ -9,7 +9,7 @@ import EmptyState from '../components/EmptyState.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
-import { formatDate, formatDuration, isFiniteNumber } from '../lib/format';
+import { formatDate, formatDistance, formatDuration, isFiniteNumber } from '../lib/format';
 import { displayableWorkouts, workoutDisplayLabel, workoutDisplayType, workoutDurationMinutes } from '../lib/workouts';
 import type { Workout } from '../types';
 import { defineMessages, useMessages } from '../i18n';
@@ -25,8 +25,6 @@ const messages = defineMessages(
     retry: '重试',
     emptyTitle: '没有可展示的运动记录',
     emptyMessage: '同步后，只有包含类型、时间和至少一项有效指标的记录会显示在这里。没有 GPS 或逐点样本时不会画空图。',
-    kilometres: (value: string) => `${value} 公里`,
-    metres: (value: number) => `${value} 米`,
     labelDistance: '距离',
     labelBurn: '消耗',
     labelDuration: '时长',
@@ -46,8 +44,6 @@ const messages = defineMessages(
     retry: 'Try again',
     emptyTitle: 'Nothing to show yet',
     emptyMessage: 'After a sync, only records carrying a type, a time and at least one real metric appear here. Without GPS or per-point samples, no empty chart is drawn.',
-    kilometres: (value: string) => `${value} km`,
-    metres: (value: number) => `${value} m`,
     labelDistance: 'Distance',
     labelBurn: 'Burn',
     labelDuration: 'Duration',
@@ -99,9 +95,7 @@ const workoutFact = (workout: Workout): { fact: string; label: string } => {
   const meters = workout.distance_meters;
   if (isFiniteNumber(meters) && meters > 0) {
     return {
-      fact: meters >= 1000
-        ? t.value.kilometres((meters / 1000).toFixed(2))
-        : t.value.metres(Math.round(meters)),
+      fact: formatDistance(meters, t.value.notProvided),
       label: t.value.labelDistance,
     };
   }

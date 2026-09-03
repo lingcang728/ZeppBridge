@@ -48,10 +48,10 @@ describe('缺失值不会被显示成 0', () => {
 });
 
 describe('单位换算', () => {
-  it('一公里以上用 km，以下用米', () => {
-    expect(formatDistance(999)).toBe('999 m');
-    expect(formatDistance(1000)).toBe('1.00 km');
-    expect(formatDistance(5432)).toBe('5.43 km');
+  it('一公里以上用公里，以下用米', () => {
+    expect(formatDistance(999)).toBe('999 米');
+    expect(formatDistance(1000)).toBe('1.00 公里');
+    expect(formatDistance(5432)).toBe('5.43 公里');
   });
 
   it('时长跨小时后拆成小时和分钟', () => {
@@ -60,7 +60,7 @@ describe('单位换算', () => {
     expect(formatDuration(125)).toBe('2 小时 5 分');
   });
 
-  it('配速是每公里的分秒，秒数补零', () => {
+  it('配速是每个显示单位的分秒，秒数补零', () => {
     // 10 km / 50 分钟 = 5:00 /km
     expect(formatPace(10_000, 50)).toBe('5:00 /km');
     // 秒数个位必须补零，不能出现 5:5 /km

@@ -10,6 +10,12 @@ import { computed } from 'vue';
 import Icon from './Icon.vue';
 import type { InsightFact, WorkoutInsight } from '../types';
 import { defineMessages, useMessages } from '../i18n';
+import {
+  distanceUnitLabel,
+  paceSecondsPerBigUnit,
+  paceUnitLabel,
+  toBigDistance,
+} from '../lib/units';
 
 const messages = defineMessages(
   {
@@ -153,8 +159,8 @@ const LOWER_IS_BETTER = new Set(['run.pace', 'run.avg_hr']);
 const formatValue = (fact: InsightFact): string => {
   if (fact.value === null) return t.value.notProvided;
   if (fact.metric === 'pace') {
-    const total = Math.round(fact.value);
-    return `${Math.floor(total / 60)}'${String(total % 60).padStart(2, '0')}"/km`;
+    const total = Math.round(paceSecondsPerBigUnit(fact.value));
+    return `${Math.floor(total / 60)}'${String(total % 60).padStart(2, '0')}"${paceUnitLabel()}`;
   }
   if (fact.metric === 'duration') {
     const total = Math.round(fact.value);
@@ -162,7 +168,7 @@ const formatValue = (fact: InsightFact): string => {
     const minutes = Math.floor((total % 3600) / 60);
     return hours ? t.value.durationHours(hours, minutes) : t.value.durationMinutes(minutes);
   }
-  if (fact.metric === 'distance') return `${(fact.value / 1000).toFixed(2)} km`;
+  if (fact.metric === 'distance') return `${toBigDistance(fact.value).toFixed(2)} ${distanceUnitLabel()}`;
   return `${Math.round(fact.value)} ${fact.unit}`;
 };
 
@@ -187,11 +193,11 @@ const deltaText = (fact: InsightFact): string => {
 const drift = computed(() => props.insight?.heart_rate_drift ?? null);
 const driftReason = computed(() => props.insight?.heart_rate_drift_unavailable ?? null);
 
-/** 米/秒 -> 每公里的分秒。0 或非有限值不显示成 0'00"。 */
+/** 米/秒 -> 每个显示单位的分秒。0 或非有限值不显示成 0'00"。 */
 const paceFromSpeed = (metresPerSecond: number): string => {
   if (!Number.isFinite(metresPerSecond) || metresPerSecond <= 0) return t.value.notProvided;
-  const secondsPerKm = Math.round(1000 / metresPerSecond);
-  return `${Math.floor(secondsPerKm / 60)}'${String(secondsPerKm % 60).padStart(2, '0')}" /km`;
+  const seconds = Math.round(paceSecondsPerBigUnit(1000 / metresPerSecond));
+  return `${Math.floor(seconds / 60)}'${String(seconds % 60).padStart(2, '0')}" ${paceUnitLabel()}`;
 };
 
 const driftRows = computed(() => {
@@ -330,7 +336,7 @@ const exclusionSummary = computed(() => {
         <ul class="baseline-list">
           <li v-for="entry in insight.baseline_included" :key="entry.workout_id">
             <RouterLink :to="`/workouts/${entry.workout_id}`">
-              {{ entry.start_time.slice(0, 10) }} · {{ (entry.distance_meters / 1000).toFixed(2) }} km
+              {{ entry.start_time.slice(0, 10) }} · {{ toBigDistance(entry.distance_meters).toFixed(2) }} {{ distanceUnitLabel() }}
             </RouterLink>
           </li>
         </ul>

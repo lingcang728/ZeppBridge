@@ -10,7 +10,7 @@ import SkeletonBlock from '../components/SkeletonBlock.vue';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { useSyncController } from '../composables/useSyncController';
 import { workoutLabel } from '../lib/labels';
-import { formatDate, formatDuration, isFiniteNumber } from '../lib/format';
+import { formatDate, formatDistance, formatDuration, isFiniteNumber } from '../lib/format';
 import { displayableWorkouts, workoutDisplayLabel, workoutDisplayType, workoutDurationMinutes, workoutTypeKey } from '../lib/workouts';
 import type { SleepSession, Workout } from '../types';
 import { defineMessages, intlLocale, useMessages } from '../i18n';
@@ -34,8 +34,6 @@ const messages = defineMessages(
     noWorkoutsOfType: '该运动类型没有可展示记录。',
     hiddenIncomplete: (count: number) => `${count} 条数据不完整已隐藏`,
     notProvided: '未提供',
-    kilometres: (value: string) => `${value} 公里`,
-    metres: (value: number) => `${value} 米`,
     dateUnknown: '日期未知',
     today: '今天',
     yesterday: '昨天',
@@ -59,8 +57,6 @@ const messages = defineMessages(
     noWorkoutsOfType: 'Nothing to show for this workout type.',
     hiddenIncomplete: (count: number) => `${count} incomplete records hidden`,
     notProvided: 'Not provided',
-    kilometres: (value: string) => `${value} km`,
-    metres: (value: number) => `${value} m`,
     dateUnknown: 'Date unknown',
     today: 'Today',
     yesterday: 'Yesterday',
@@ -167,9 +163,7 @@ function listDate(value: string): string {
 
 function shortDistance(meters?: number): string {
   if (!isFiniteNumber(meters) || meters <= 0) return '';
-  return meters >= 1000
-    ? t.value.kilometres((meters / 1000).toFixed(2))
-    : t.value.metres(Math.round(meters));
+  return formatDistance(meters, '');
 }
 
 function formatDateHint(value: string): string {

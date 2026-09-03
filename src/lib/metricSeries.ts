@@ -1,4 +1,5 @@
 import type { MetricSeries, MetricSeriesPoint } from '../types';
+import { paceSecondsPerBigUnit } from './units';
 import { defineMessages, intlLocale, messagesOf } from '../i18n';
 import { DISPLAY_RANGE_DAYS, rangeOptions } from './rangeOptions';
 
@@ -71,9 +72,17 @@ const shortDate = (value: string): string => {
 };
 
 /** Seconds per kilometre as `m:ss`, the unit runners actually read. */
-export const formatPaceSeconds = (seconds?: number | null): string => {
-  if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds <= 0) return '—';
-  const total = Math.round(seconds);
+/**
+ * 每公里秒 → `m:ss`。跟随当前距离单位（英制下是每英里）。
+ *
+ * 单位后缀不在这里拼：调用点有的把它放进 `<i>` 里、有的放进 tooltip。
+ * 它们统一用 `paceUnitLabel()`。
+ */
+export const formatPaceSeconds = (secondsPerKm?: number | null): string => {
+  if (typeof secondsPerKm !== 'number' || !Number.isFinite(secondsPerKm) || secondsPerKm <= 0) {
+    return '—';
+  }
+  const total = Math.round(paceSecondsPerBigUnit(secondsPerKm));
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
 };
 
