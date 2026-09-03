@@ -13,6 +13,7 @@ export const settingsMessages = defineMessages(
     title: '设置',
     intro: '管理认证方式、同步行为、隐私与默认导出偏好，确保本地数据安全。',
     retry: '重试',
+    distanceUnitLabel: '距离单位',
 
     // ── 1. 认证方式 ──
     authTitle: '1. 认证方式',
@@ -412,6 +413,7 @@ export const settingsMessages = defineMessages(
     title: 'Settings',
     intro: 'Authentication, sync behavior, privacy, and the export defaults — all in one place.',
     retry: 'Try again',
+    distanceUnitLabel: 'Distance unit',
 
     // ── 1. Authentication ──
     authTitle: '1. Authentication',

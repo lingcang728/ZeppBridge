@@ -26,6 +26,12 @@ import type {
 import { checkForDesktopUpdate, downloadAndInstallDesktopUpdate, updateState } from '../services/updateService';
 import { settingsMessages } from './Settings.i18n';
 import { intlLocale, locale, LOCALES, LOCALE_LABELS, setLocale, useMessages } from '../i18n';
+import {
+  DISTANCE_UNITS,
+  distanceUnit,
+  distanceUnitOptionLabel,
+  setDistanceUnit,
+} from '../lib/units';
 import { errorTextFor } from '../i18n/errors';
 import { backendText } from '../i18n/backendText';
 import { storageEstimateText } from '../lib/storageEstimateText';
@@ -938,6 +944,21 @@ const runCapabilityProbe = async () => {
             :aria-checked="locale === option"
             @click="setLocale(option)"
           >{{ LOCALE_LABELS[option] }}</button>
+        </div>
+      </div>
+      <!-- 单位就放在语言旁边：问「怎么把 km 换成 miles」的人（Reddit
+           u/Andrew-Scoggins）第一个会找的就是这里。导出永远是公制，界面才跟着这个走。 -->
+      <div class="locale-switch">
+        <p class="advanced-label">{{ t.distanceUnitLabel }}</p>
+        <div class="scale-options" role="radiogroup" :aria-label="t.distanceUnitLabel">
+          <button
+            v-for="option in DISTANCE_UNITS"
+            :key="option"
+            type="button"
+            role="radio"
+            :aria-checked="distanceUnit === option"
+            @click="setDistanceUnit(option)"
+          >{{ distanceUnitOptionLabel(option) }}</button>
         </div>
       </div>
     </header>
