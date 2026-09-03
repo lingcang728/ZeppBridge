@@ -1,6 +1,6 @@
 {
-  "version": 4,
-  "checked_at": "2026-09-01",
+  "version": 5,
+  "checked_at": "2026-09-03",
   "notes": "Zepp cloud-history observations take precedence where its numeric types differ from the Zepp OS device protocol. Extended identifiers are cross-checked against Gadgetbridge's Zepp OS catalog and user-supplied Zepp App screenshots. A null code means the sport is offered as a manual correction but no Zepp numeric type is known to produce it -- never guess one in to make the entry look complete.",
   "sports": [
     { "code": 1, "key": "run", "label_zh": "户外跑步", "label_en": "Outdoor Running", "source": "cloud_verified" },
@@ -13,6 +13,7 @@
     { "code": 8, "key": "treadmill", "label_zh": "跑步机", "label_en": "Treadmill", "source": "cloud_reference" },
     { "code": 9, "key": "ride", "label_zh": "户外骑行", "label_en": "Outdoor Cycling", "source": "cloud_verified" },
     { "code": 10, "key": "indoor_cycling", "label_zh": "室内骑行", "label_en": "Indoor Cycling", "source": "cloud_reference" },
+    { "code": 12, "key": "elliptical", "label_zh": "椭圆机", "label_en": "Elliptical", "source": "user_reported" },
     { "code": 13, "key": "walking", "label_zh": "健走", "label_en": "Walking", "source": "cloud_inferred" },
     { "code": 14, "key": "pool_swimming", "label_zh": "泳池游泳", "label_en": "Pool Swimming", "source": "cloud_reference" },
     { "code": 15, "key": "hiking", "label_zh": "徒步", "label_en": "Hiking", "source": "zepp_os_compatible" },
