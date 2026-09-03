@@ -133,13 +133,17 @@ fn heart_rate_cursor(items: &[Value]) -> Option<i64> {
             max_ts = Some(max_ts.map_or(ts, |current: i64| current.max(ts)));
         }
     }
-    // Advance one second: +1 for epoch-seconds, +1000 for epoch-millis.
+    // 一律换算成**秒**再进一格。
+    //
+    // 调用方的 `cursor` 和 `end` 都是秒（`window.start_utc.timestamp()`），
+    // 而它们原样进了请求的 `startTime` / `endTime`。之前这里对毫秒时间戳返回
+    // 的是 `ts + 1000`，也就是一个毫秒数：只要某一页里出现一条毫秒时间戳，
+    // 下一次请求的 `startTime` 就变成一个远大于 `endTime` 的数，服务端判定
+    // 区间非法返回空页，于是**满 1000 条的大体积心率数据，第 2 页之后整段
+    // 丢掉**——而同步是「成功」的。
     max_ts.map(|ts| {
-        if ts >= 10_000_000_000 {
-            ts.saturating_add(1000)
-        } else {
-            ts.saturating_add(1)
-        }
+        let seconds = if ts >= 10_000_000_000 { ts / 1000 } else { ts };
+        seconds.saturating_add(1)
     })
 }
 
@@ -1268,9 +1272,27 @@ mod tests {
             json!({ "value": 99 }), // malformed: skipped
             json!("not an object"), // malformed: skipped
         ];
-        // max is 1700007200000 ms, cursor advances one second
-        assert_eq!(heart_rate_cursor(&items), Some(1700007201000i64));
+        // 最大值是 1700007200000（毫秒），游标必须换算成秒再进一格。
+        assert_eq!(heart_rate_cursor(&items), Some(1_700_007_201i64));
         assert_eq!(heart_rate_cursor(&[]), None);
+    }
+
+    /// 游标和 `end` 必须是同一个单位。
+    ///
+    /// 这是上一版真正出问题的地方：旧实现对毫秒时间戳返回毫秒，而调用点拿它
+    /// 去和秒级的 `end` 比较、再原样发进请求。断言游标值本身是不够的——要断言
+    /// 它落在窗口里。
+    #[test]
+    fn heart_rate_cursor_stays_in_the_same_unit_as_the_window_end() {
+        let window_start = 1_700_000_000i64;
+        let window_end = 1_700_604_800i64;
+        // 服务端回的是毫秒时间戳，落在窗口正中间。
+        let items = vec![json!({ "timestamp": 1_700_300_000_000i64, "value": 70 })];
+        let cursor = heart_rate_cursor(&items).expect("有可用时间戳时必须给出游标");
+        assert!(
+            cursor > window_start && cursor < window_end,
+            "游标 {cursor} 落到了窗口 [{window_start}, {window_end}] 外面，下一页会返回空"
+        );
     }
 
     #[test]
