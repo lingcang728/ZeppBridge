@@ -172,6 +172,40 @@ by default. If you want the faster path back on a machine where it works:
 WEBKIT_DISABLE_DMABUF_RENDERER=0 zeppbridge
 ```
 
+**The AppImage specifically still will not open.** Disabling DMABUF fixed the
+Flatpak — [issue #32][issue-32] has a confirmation on 2.1.0 — but not the
+AppImage, and the same thread has the clue that explains why: the same source
+built on the reporter's own machine produced an AppImage that ran. That points
+at packaging, not code. The AppImage is built on `ubuntu-latest`, and the
+`libwayland` / `libEGL` / `libGL` / `libgbm` / `libdrm` layer it carries is
+tightly coupled to the host's graphics driver; a mismatch fails silently.
+
+Two changes since 2.1.0. The build now drops that layer from the bundle so the
+host's own copies are used, and the app disables accelerated compositing when it
+detects it is running from an AppImage (gated on the `APPIMAGE` variable the
+AppImage runtime sets, so the deb, rpm and Flatpak builds — all confirmed
+working — do not pay for it).
+
+Neither of those can be verified from a Windows development machine. If it still
+will not start, these are the escape hatches, in the order worth trying:
+
+```bash
+# Force X11 through XWayland. Not the app's default: on a pure Wayland system
+# with no XWayland installed this trades one failure for another, so it is
+# yours to decide, not ours.
+GDK_BACKEND=x11 ./ZeppBridge_<version>_x86_64.AppImage
+
+# Turn compositing off explicitly (the AppImage build already does this; set it
+# here if you are on a deb/rpm/Flatpak install that shows the same symptom).
+WEBKIT_DISABLE_COMPOSITING_MODE=1 zeppbridge
+```
+
+If none of them work, the Flatpak is the channel a user has actually confirmed
+working on 2.1.0, and a comment on that issue saying which distro and compositor
+you are on is the most useful thing you can send.
+
+[issue-32]: https://github.com/lingcang728/ZeppBridge/issues/32
+
 **No tray icon, and a line about `libayatana-appindicator3` on stderr.** The tray
 icon is drawn by the desktop, through that library. It is not part of the GNOME
 Flatpak runtime and some desktops do not install it. ZeppBridge no longer dies

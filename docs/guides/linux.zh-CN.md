@@ -132,6 +132,33 @@ App Token 本身从哪来，两条路：
 WEBKIT_DISABLE_DMABUF_RENDERER=0 zeppbridge
 ```
 
+**只有 AppImage 还是打不开。** 关掉 DMABUF 之后 Flatpak 好了（[issue #32][issue-32]
+里有 2.1.0 上的确认），AppImage 没好。同一个帖子里有一句决定性的线索：同一份源码
+在报告者自己机器上编出来的 AppImage 能跑。那指向打包，不是代码——AppImage 在
+`ubuntu-latest` 上构建，它带的那层 `libwayland` / `libEGL` / `libGL` / `libgbm` /
+`libdrm` 和宿主机的显卡驱动是强耦合的，对不上就静默失败。
+
+2.1.0 之后改了两处：构建时把那一层从包里删掉、改用宿主机自己的；应用在检测到
+自己是从 AppImage 启动时（认 AppImage 运行时设的 `APPIMAGE` 变量）关掉加速合成
+——deb / rpm / Flatpak 三条已经被确认能用的渠道不跟着变慢。
+
+这两处在 Windows 开发机上都验不了。如果还是起不来，按下面的顺序试逃生口：
+
+```bash
+# 通过 XWayland 强制走 X11。这不是应用的默认行为：在没装 XWayland 的纯 Wayland
+# 系统上，它是把一种打不开换成另一种，所以这个决定留给你，不由我们替你做。
+GDK_BACKEND=x11 ./ZeppBridge_<version>_x86_64.AppImage
+
+# 显式关掉合成（AppImage 版本已经自己这么做了；如果你装的是 deb/rpm/Flatpak
+# 却有同样的症状，在这里设它）。
+WEBKIT_DISABLE_COMPOSITING_MODE=1 zeppbridge
+```
+
+都不行的话，Flatpak 是目前唯一有用户在 2.1.0 上确认能用的渠道；在那个 issue 下
+留一句你的发行版和合成器是什么，是最有用的反馈。
+
+[issue-32]: https://github.com/lingcang728/ZeppBridge/issues/32
+
 **没有托盘图标，并且 stderr 上有一行 `libayatana-appindicator3`。** 托盘图标由
 桌面环境通过这个库绘制。GNOME 的 Flatpak runtime 里没有它，一些桌面也没装。现在
 它不在的时候应用不会再崩——只是没有托盘图标，并且关闭窗口等于退出，因为藏进一个

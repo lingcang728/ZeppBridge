@@ -139,6 +139,31 @@ pub fn run() {
         std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
     }
 
+    // 只有 AppImage 还是打不开。
+    //
+    // 关掉 DMABUF 之后 Flatpak 好了（issue #32，cchalk 2026-09-02 确认），
+    // AppImage 没好。同一个 issue 里 TheSaneWriter 给了决定性的一句：**同一份
+    // 源码在他自己机器上编出来的 AppImage 能跑**。那就不是代码，是 CI 打包进
+    // 去的那批 webkit / GL / Wayland 库和他的宿主机对不上。
+    //
+    // 合成器那条路是这类不匹配最先崩的地方，所以在 AppImage 里再退一步，连
+    // 加速合成一起关掉。这一步的代价是真实的（滚动和动画会变钝），所以用
+    // `APPIMAGE` 这个变量当门——它由 AppImage 运行时自己设，只有从 AppImage
+    // 启动才有。deb / rpm / Flatpak 三条渠道已经被用户确认能用，不该为一条坏
+    // 掉的渠道跟着变慢。
+    //
+    // 同样留逃生口：用户设过就尊重他的值。
+    //
+    // 注意这里**没有**动 `GDK_BACKEND`。强制 x11 能绕开一部分 Wayland 问题，
+    // 但会打死没装 XWayland 的纯 Wayland 系统——那是把一种打不开换成另一种。
+    // 它作为手动逃生口写在 docs/guides/linux.md 里，由人自己决定。
+    #[cfg(all(unix, not(target_os = "macos")))]
+    if std::env::var_os("APPIMAGE").is_some()
+        && std::env::var_os("WEBKIT_DISABLE_COMPOSITING_MODE").is_none()
+    {
+        std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
+    }
+
     #[cfg(target_os = "windows")]
     if let Ok(data_dir) = paths::resolve_data_dir() {
         let webview_dir = paths::webview_user_data_dir(&data_dir);
