@@ -11,7 +11,47 @@
 use super::*;
 
 impl Database {
+    /// 迁移的事务边界。
+    ///
+    /// 这里面的每一步单独看都是幂等的，但**合起来不是原子的**，而且版本号
+    /// 在过程中会先倒退再走回来：`PRAGMA user_version = 5` 那一行不在任何
+    /// `if version < N` 守卫里，所以一个 v19 的库每次启动都要从 5 一路重新
+    /// 盖到 19。在这中间断电或被强杀，磁盘上留下的就是「schema 已经是新的、
+    /// 版本号却写着 8」——只读连接（CLI / MCP）看到版本对不上直接拒绝启动，
+    /// 而用户完全不知道发生了什么。
+    ///
+    /// 包进一个事务之后，这个中间态对别的连接和对下一次启动都不存在：要么
+    /// 整套迁移落地，要么一个字节都没写。DDL 在 SQLite 里是事务性的，
+    /// `user_version` 存在头页里，同样跟着回滚。
+    ///
+    /// `journal_mode = WAL` 这类不能在事务里跑的 pragma 由 `from_connection`
+    /// 在调用这里**之前**设好，不要往 `migrate_steps` 里加。
     pub(super) fn migrate(&self) -> Result<()> {
+        self.conn.execute_batch("BEGIN IMMEDIATE;")?;
+        match self.migrate_steps() {
+            Ok(()) => {
+                if self.conn.is_autocommit() {
+                    // SQLite 自己把事务回滚掉了（I/O 错误、磁盘满、损坏都会
+                    // 触发）。这时候一个改动都没落地，不能当成升级成功——那会
+                    // 让下一步拿着旧 schema 当新的用。
+                    return Err(ZeppBridgeError::DataUnavailable(
+                        "数据库升级被中断，没有任何改动写入。请确认磁盘空间和文件权限后重试。"
+                            .into(),
+                    ));
+                }
+                self.conn.execute_batch("COMMIT;")?;
+                Ok(())
+            }
+            Err(error) => {
+                if !self.conn.is_autocommit() {
+                    let _ = self.conn.execute_batch("ROLLBACK;");
+                }
+                Err(error)
+            }
+        }
+    }
+
+    fn migrate_steps(&self) -> Result<()> {
         self.conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS schema_migrations (
                 version INTEGER PRIMARY KEY,
