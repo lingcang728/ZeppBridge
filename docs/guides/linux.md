@@ -175,12 +175,19 @@ WEBKIT_DISABLE_DMABUF_RENDERER=0 zeppbridge
 **The AppImage specifically still will not open.** Disabling DMABUF fixed the
 Flatpak — [issue #32][issue-32] has a confirmation on 2.1.0 — but not the
 AppImage, and the same thread has the clue that explains why: the same source
-built on the reporter's own machine produced an AppImage that ran. That points
-at packaging, not code. The AppImage is built on `ubuntu-latest`, and the
-`libwayland` / `libEGL` / `libGL` / `libgbm` / `libdrm` layer it carries is
-tightly coupled to the host's graphics driver; a mismatch fails silently.
+built on the reporter's own machine produced an AppImage that ran, and the
+reporter guessed it was "something weird with the Wayland display libraries".
 
-Two changes since 2.1.0. The build now drops that layer from the bundle so the
+That turned out to be exactly right. The AppImage is built on `ubuntu-latest`,
+and dumping its bundled `usr/lib` shows it shipped its own
+`libwayland-client.so.0`, `libwayland-cursor.so.0`, `libwayland-egl.so.1` and
+`libwayland-server.so.0`. `libwayland-client` has to agree with the compositor
+actually running on your machine, which is why AppImage's own excludelist marks
+it as must-come-from-the-host — and why an AppImage built on your own machine
+worked while the CI one did not. (The GL/DRM stack — `libEGL`, `libGL`, `libgbm`,
+`libdrm` — turned out not to be bundled at all, so it was never part of this.)
+
+Two changes since 2.1.0. The build now drops those four Wayland libraries so the
 host's own copies are used, and the app disables accelerated compositing when it
 detects it is running from an AppImage (gated on the `APPIMAGE` variable the
 AppImage runtime sets, so the deb, rpm and Flatpak builds — all confirmed

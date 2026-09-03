@@ -133,14 +133,20 @@ WEBKIT_DISABLE_DMABUF_RENDERER=0 zeppbridge
 ```
 
 **只有 AppImage 还是打不开。** 关掉 DMABUF 之后 Flatpak 好了（[issue #32][issue-32]
-里有 2.1.0 上的确认），AppImage 没好。同一个帖子里有一句决定性的线索：同一份源码
-在报告者自己机器上编出来的 AppImage 能跑。那指向打包，不是代码——AppImage 在
-`ubuntu-latest` 上构建，它带的那层 `libwayland` / `libEGL` / `libGL` / `libgbm` /
-`libdrm` 和宿主机的显卡驱动是强耦合的，对不上就静默失败。
+里有 2.1.0 上的确认），AppImage 没好。同一个帖子里有两句线索：同一份源码在报告者
+自己机器上编出来的 AppImage 能跑，而且他猜是「Wayland 显示库有点不对劲」。
 
-2.1.0 之后改了两处：构建时把那一层从包里删掉、改用宿主机自己的；应用在检测到
-自己是从 AppImage 启动时（认 AppImage 运行时设的 `APPIMAGE` 变量）关掉加速合成
-——deb / rpm / Flatpak 三条已经被确认能用的渠道不跟着变慢。
+两句都对。AppImage 在 `ubuntu-latest` 上构建，把它自带的 `usr/lib` 整份打印出来
+之后可以看到，里面确实带了自己的 `libwayland-client.so.0` /
+`libwayland-cursor.so.0` / `libwayland-egl.so.1` / `libwayland-server.so.0`。
+`libwayland-client` 必须和你机器上真正在跑的合成器对得上，所以 AppImage 上游的
+excludelist 把它标成「必须由宿主机提供」——这也正好解释了为什么他自己编的能跑、
+CI 编的不能。（GL / DRM 那一层——`libEGL`、`libGL`、`libgbm`、`libdrm`——实测
+根本没被打进来，所以和这件事无关。）
+
+2.1.0 之后改了两处：构建时把那四个 Wayland 库从包里删掉、改用宿主机自己的；应用
+在检测到自己是从 AppImage 启动时（认 AppImage 运行时设的 `APPIMAGE` 变量）关掉
+加速合成——deb / rpm / Flatpak 三条已经被确认能用的渠道不跟着变慢。
 
 这两处在 Windows 开发机上都验不了。如果还是起不来，按下面的顺序试逃生口：
 
