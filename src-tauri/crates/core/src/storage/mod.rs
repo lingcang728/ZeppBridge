@@ -18,18 +18,18 @@ const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// `raw_records` 重新跑一遍。不动它，新加的编号只对以后同步来的记录生效，
 /// 已经存成 `unknown:211` 的那 199 条记录会永远挂着——而报这个问题的人恰恰
 /// 是因为历史记录才来报的。
-pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v20-cloud-fields";
+pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v21-elliptical";
 /// 上一版的修订号。从它升上来时只重放这几条流。
 ///
-/// v19 到 v20 取回了两批云端汇总里一直有、以前没读的字段：daily_summary 的
-/// 睡眠期 HRV / 静息心率、HRV 与静息心率的个人基线、AHI 基线、以及三个目标
-/// 值；wellness 的七天 PAI 总分、三档区间的分钟数与心率下限。这两条流的报文
-/// 解析都变了，所以两条都要重放；workouts / sleep 一个字节都没动。
-const PREVIOUS_RELEASE_NORMALIZER_REVISION: &str =
-    "zepp-normalizer-2026-09-v19-all-day-stress-curve";
+/// v20 到 v21 只动了一件事：运动目录里加了 `12 -> elliptical`（椭圆机）。
+/// 编号只在 `normalize_workouts_*` 里被翻译成运动名（normalizer/mod.rs 的
+/// `zepp_sport_type_name`，全仓库唯一的调用点），所以只有 workouts 这一条流
+/// 需要重放。`workout_detail` 里没有类型编号，daily_summary / wellness /
+/// sleep / hrv / heart_rate 的解析一个字节都没动。
+const PREVIOUS_RELEASE_NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v20-cloud-fields";
 /// 从上一版升上来时要重放的流。**改归一化规则时必须一起看这里**：漏掉一条
 /// 流，那条流的历史记录就永远停在旧规则上，而升级看起来是成功的。
-const PREVIOUS_RELEASE_REPLAY_STREAMS: [&str; 2] = ["daily_summary", "wellness"];
+const PREVIOUS_RELEASE_REPLAY_STREAMS: [&str; 1] = ["workouts"];
 const LAST_CLOUD_SYNC_AT_KEY: &str = "last_cloud_sync_at";
 const LAST_CLOUD_SYNC_OUTCOME_KEY: &str = "last_cloud_sync_outcome";
 const LAST_LOCAL_REPROCESS_AT_KEY: &str = "last_local_reprocess_at";
@@ -2068,7 +2068,7 @@ impl Database {
         if stored.as_deref() == Some(NORMALIZER_REVISION) {
             return Ok(None);
         }
-        // 从 v19 升到 v20 时只重放这一版确实改过的 daily_summary 和 wellness。
+        // 从 v20 升到 v21 时只重放这一版确实改过的 workouts。
         // 其他更早版本仍走整库重放，避免跳过中间版本带来的归一化变化。
         let streams: Vec<String> =
             if stored.as_deref() == Some(PREVIOUS_RELEASE_NORMALIZER_REVISION) {
@@ -6262,7 +6262,8 @@ mod tests {
                 "data": [{
                     "trackid": 1_700_000_000i64,
                     "end_time": 1_700_003_600i64,
-                    "type": 52
+                    // v21 加进目录的那个编号。重放前它是 `unknown:12`。
+                    "type": 12
                 }]
             }),
             capability: CapabilityStatus::Verified,
@@ -6297,11 +6298,27 @@ mod tests {
 
         let counts = db.reprocess_raw_records_if_needed().unwrap().unwrap();
 
-        // v19 到 v20 改的是 daily_summary 和 wellness 两条流的解析，两条都
-        // 要重放，而且报上来的条数是真的条数——wellness 是曲线两个点加上
-        // 日均一行，daily_summary 是那条 steps。
-        assert_eq!(counts.get("wellness"), Some(&3));
-        assert_eq!(counts.get("daily_summary"), Some(&1));
+        // v20 到 v21 只改了运动目录，所以只有 workouts 这一条流要重放，而且
+        // 报上来的条数是真的条数——那一条运动。
+        assert_eq!(counts.get("workouts"), Some(&1));
+        // 而且重放确实把编号翻译过来了：这正是这一版存在的理由——已经存成
+        // `unknown:12` 的历史记录必须变成椭圆机，不然报这个问题的人（他就是
+        // 因为历史记录才来报的）升级完看到的还是老样子。
+        assert_eq!(
+            db.conn
+                .query_row("SELECT workout_type FROM workouts", [], |row| row
+                    .get::<_, String>(0),)
+                .unwrap(),
+            "elliptical"
+        );
+        // daily_summary / wellness 一个字节都没动过，不该被顺手解一遍：白解
+        // 一遍就是让升级后第一次启动干等。
+        assert!(!counts.contains_key("daily_summary"));
+        assert!(!counts.contains_key("wellness"));
+        assert_eq!(
+            db.normalized_stream_count("daily_summary").unwrap(),
+            Some(0)
+        );
         assert_eq!(
             db.conn
                 .query_row(
@@ -6310,13 +6327,8 @@ mod tests {
                     |row| row.get::<_, i64>(0),
                 )
                 .unwrap(),
-            2
+            0
         );
-        // workouts 和 sleep 一个字节都没动过，不该被顺手解一遍：白解一遍
-        // 就是让升级后第一次启动干等。
-        assert!(!counts.contains_key("workouts"));
-        assert_eq!(db.normalized_stream_count("workouts").unwrap(), Some(0));
-        // daily_summary 这次真的被重放了，所以它的派生行必须落库。
         assert_eq!(
             db.conn
                 .query_row(
@@ -6325,7 +6337,7 @@ mod tests {
                     |row| row.get::<_, i64>(0),
                 )
                 .unwrap(),
-            1
+            0
         );
         let revision: String = db
             .conn
@@ -6347,13 +6359,18 @@ mod tests {
     fn a_stale_library_can_be_recognized_without_writing_to_it() {
         let db = Database::in_memory().unwrap();
         db.insert_raw_record(&RawRecord {
-            stream: "daily_summary".into(),
-            source_key: "daily-summary-plan".into(),
-            source_scope: SourceScope::UserFused,
+            // 这一条必须落在**这一版要重放的那条流**上，否则 raw_records 会是
+            // 0，而 0 条报文的库本来就不欠重放——那样这个测试就在验一件不相干
+            // 的事。改归一化规则、换了重放的流时，这里要跟着换。
+            stream: "workouts".into(),
+            source_key: "workouts-plan".into(),
+            source_scope: SourceScope::Device,
             device_id: None,
             start_utc: ts(),
             end_utc: None,
-            payload: serde_json::json!({ "data": [{ "date": "2023-11-14", "steps": 1234 }] }),
+            payload: serde_json::json!({
+                "data": [{ "trackid": 1_700_000_000i64, "end_time": 1_700_003_600i64, "type": 12 }]
+            }),
             capability: CapabilityStatus::Verified,
         })
         .unwrap();
@@ -6414,13 +6431,16 @@ mod tests {
     fn health_reports_the_revision_the_library_actually_has() {
         let db = Database::in_memory().unwrap();
         db.insert_raw_record(&RawRecord {
-            stream: "daily_summary".into(),
-            source_key: "daily-summary-health".into(),
-            source_scope: SourceScope::UserFused,
+            // 同上：要落在这一版会重放的那条流上，不然「欠不欠重放」根本不成立。
+            stream: "workouts".into(),
+            source_key: "workouts-health".into(),
+            source_scope: SourceScope::Device,
             device_id: None,
             start_utc: ts(),
             end_utc: None,
-            payload: serde_json::json!({ "data": [{ "date": "2023-11-14", "steps": 1234 }] }),
+            payload: serde_json::json!({
+                "data": [{ "trackid": 1_700_000_000i64, "end_time": 1_700_003_600i64, "type": 12 }]
+            }),
             capability: CapabilityStatus::Verified,
         })
         .unwrap();

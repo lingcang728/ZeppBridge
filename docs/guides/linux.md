@@ -114,6 +114,51 @@ data directory, then Secret Service. That last-but-one rule is what stops a
 container from reporting "not connected" on its second run because the
 environment variable was only set the first time.
 
+## Moving an existing library from Windows or macOS
+
+Copy the database. Sign in again. Those are two separate steps, and the second
+one is not optional — see [issue #40][issue-40].
+
+**The database travels.** Copy `zepp.db` (and `auth.json` next to it) into
+whichever directory the table above says your packaging uses, with the app
+closed on both ends. Nothing in the file is machine-specific.
+
+**The token does not travel, and that is deliberate.** It never sat in the
+folder you copied. On Windows it is in Credential Manager, on macOS in the
+Keychain — both are bound to that machine and neither exports into a file.
+`auth.json` holds only the user ID and region host. So a copied folder arrives
+with the metadata and no secret, and the app says the credential store has no
+token for this account. It is not a corrupt copy; there was never anything to
+copy.
+
+Pick whichever of these fits the machine you moved to:
+
+```bash
+# A Linux desktop with a keyring. Just sign in again in the app — the copied
+# database is not touched, and the sync picks up where the old machine left off.
+
+# A desktop with no keyring daemon, or a headless box you drive with the CLI.
+# Paste the App Token once, and it is kept in the data directory at 0600.
+ZEPPBRIDGE_CREDENTIAL_STORE=file zeppbridge-cli sync
+
+# A container, or anything where the token comes from a secret manager.
+ZEPPBRIDGE_CREDENTIAL_STORE=env ZEPPBRIDGE_APP_TOKEN=... zeppbridge-cli sync
+```
+
+Two ways to get the App Token itself:
+
+- In the desktop app on any platform: **Settings → sign in manually** and read
+  the value back, or paste one in.
+- From a browser: sign in at `https://watchface.zepp.com/`, then read `apptoken`
+  and `userid` out of the developer tools. This is the same pair the app's own
+  sign-in window collects.
+
+The command line deliberately has no `login` command. Signing in means a
+browser, a password and sometimes a one-time code — the CLI is meant to be run
+by cron and by containers, where nobody is there to answer any of that.
+
+[issue-40]: https://github.com/lingcang728/ZeppBridge/issues/40
+
 ## If the window is blank, or the app will not start
 
 Two known Linux failures, both with fixes already applied in the app.
@@ -126,6 +171,47 @@ by default. If you want the faster path back on a machine where it works:
 ```bash
 WEBKIT_DISABLE_DMABUF_RENDERER=0 zeppbridge
 ```
+
+**The AppImage specifically still will not open.** Disabling DMABUF fixed the
+Flatpak — [issue #32][issue-32] has a confirmation on 2.1.0 — but not the
+AppImage, and the same thread has the clue that explains why: the same source
+built on the reporter's own machine produced an AppImage that ran, and the
+reporter guessed it was "something weird with the Wayland display libraries".
+
+That turned out to be exactly right. The AppImage is built on `ubuntu-latest`,
+and dumping its bundled `usr/lib` shows it shipped its own
+`libwayland-client.so.0`, `libwayland-cursor.so.0`, `libwayland-egl.so.1` and
+`libwayland-server.so.0`. `libwayland-client` has to agree with the compositor
+actually running on your machine, which is why AppImage's own excludelist marks
+it as must-come-from-the-host — and why an AppImage built on your own machine
+worked while the CI one did not. (The GL/DRM stack — `libEGL`, `libGL`, `libgbm`,
+`libdrm` — turned out not to be bundled at all, so it was never part of this.)
+
+Two changes since 2.1.0. The build now drops those four Wayland libraries so the
+host's own copies are used, and the app disables accelerated compositing when it
+detects it is running from an AppImage (gated on the `APPIMAGE` variable the
+AppImage runtime sets, so the deb, rpm and Flatpak builds — all confirmed
+working — do not pay for it).
+
+Neither of those can be verified from a Windows development machine. If it still
+will not start, these are the escape hatches, in the order worth trying:
+
+```bash
+# Force X11 through XWayland. Not the app's default: on a pure Wayland system
+# with no XWayland installed this trades one failure for another, so it is
+# yours to decide, not ours.
+GDK_BACKEND=x11 ./ZeppBridge_<version>_x86_64.AppImage
+
+# Turn compositing off explicitly (the AppImage build already does this; set it
+# here if you are on a deb/rpm/Flatpak install that shows the same symptom).
+WEBKIT_DISABLE_COMPOSITING_MODE=1 zeppbridge
+```
+
+If none of them work, the Flatpak is the channel a user has actually confirmed
+working on 2.1.0, and a comment on that issue saying which distro and compositor
+you are on is the most useful thing you can send.
+
+[issue-32]: https://github.com/lingcang728/ZeppBridge/issues/32
 
 **No tray icon, and a line about `libayatana-appindicator3` on stderr.** The tray
 icon is drawn by the desktop, through that library. It is not part of the GNOME

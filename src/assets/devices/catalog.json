@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "checked_at": "2026-09-02",
   "sources": [
     "https://www.amazfit.jp/",
@@ -7,7 +7,7 @@
     "https://os.zepp.com/compatibility-zepp-os-5"
   ],
   "audit_baseline": "Official Amazfit Japan store captures in design_picture/Product (12 rows x 4 cards)",
-  "active_supported_count": 51,
+  "active_supported_count": 52,
   "canonical_device_count": 50,
   "devices": [
     {
@@ -333,7 +333,8 @@
       "image_key": "amazfit-t-rex-3-pro-48-44mm",
       "device_source_codes": [
         10551552,
-        10551555
+        10551555,
+        10682625
       ]
     },
     {
@@ -1829,6 +1830,36 @@
       "device_source_codes": [
         8651008
       ]
+    },
+    {
+      "catalog_id": "amazfit-balance-2-xt",
+      "canonical_name": "Amazfit Balance 2 XT",
+      "display_name": "Amazfit Balance 2 XT",
+      "name_zh": "Amazfit 跃我 Balance 2 XT",
+      "kind": "watch",
+      "model_codes": [
+        "W2547GL4N"
+      ],
+      "aliases": [
+        "Amazfit Balance 2 XT",
+        "Balance 2 XT"
+      ],
+      "region": [
+        "global",
+        "us"
+      ],
+      "official_page": "https://us.amazfit.com/products/balance-2",
+      "official_url": "https://us.amazfit.com/products/balance-2",
+      "image_source_url": null,
+      "asset_source": "pending-official-art",
+      "canonical_device_key": "amazfit-balance-2",
+      "checked_at": "2026-09-03",
+      "provenance": "Reported missing from the model picker in GitHub issue #42 (2026-09-02). 47mm retail variant of the Balance 2, SKU W2547GL4N, currently listed only through US retailers; no dedicated official product page or CDN image exists yet, so the entry ships without art and the interface falls back to its inline placeholder. No deviceSource is claimed for it -- nobody has submitted a report from one.",
+      "asset_hash": null,
+      "image_key": null,
+      "status": "active",
+      "supported": true,
+      "device_source_codes": []
     }
   ]
 }

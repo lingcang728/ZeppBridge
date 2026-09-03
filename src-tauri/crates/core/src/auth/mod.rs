@@ -578,8 +578,20 @@ impl AuthManager {
                         .map_err(credential_error)?;
                     value
                 } else {
+                    // 这句话最常见的出处不是「凭据坏了」，而是**有人把另一台
+                    // 机器的 data 文件夹整个拷了过来**（issue #40）：库和
+                    // auth.json 都在，令牌却从来不在文件里——它在那台机器的
+                    // 凭据管理器 / 钥匙串 / Secret Service 里。所以这里不能只
+                    // 说「请重新配对」，得说清楚往哪配。两个环境变量名是 ASCII，
+                    // 即使这句中文原文原样落到英文用户的命令行里，能动手的那
+                    // 部分他也读得懂。
+                    //
+                    // 长度受 `sanitize_user_text` 的 140 字上限约束，别加地址：
+                    // URL 会被替换成「[已隐藏地址]」。
                     return Err(ZeppBridgeError::AuthError(
-                        "认证元数据存在，但凭据管理器中没有令牌，请重新配对".to_string(),
+                        "认证元数据在，但凭据管理器里没有这个账号的令牌。库能跨机器拷，令牌不能。\
+                         请重新登录，或设 ZEPPBRIDGE_CREDENTIAL_STORE=file / =env 后重试"
+                            .to_string(),
                     ));
                 }
             }
