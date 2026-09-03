@@ -606,6 +606,74 @@ jobs:
           take_one "$bundle/rpm/*.rpm"           "release-linux/ZeppBridge_${version}_x86_64.rpm"
           take_one "$bundle/appimage/*.AppImage" "release-linux/ZeppBridge_${version}_x86_64.AppImage"
 
+      # 让 AppImage 用宿主机的图形栈，而不是 CI runner 的那一份。
+      #
+      # issue #32：AppImage 在 openSUSE 上打不开，而 TheSaneWriter 说同一份源码
+      # 在他自己机器上编出来就能跑。那句话把范围缩到了打包——CI 是
+      # ubuntu-latest，打进 AppDir 的 libwayland / libEGL / libGL / libgbm /
+      # libdrm 这一层和宿主机的显卡驱动是强耦合的，版本一对不上就静默失败。
+      # AppImage 上游自己的 excludelist 里，这一层正是标着「必须由宿主机提供」
+      # 的那一批。
+      #
+      # 只删这一层，**不碰 glib / gtk / gio** —— 那些跟宿主机的 glibc 版本挂钩，
+      # 删了会在更多发行版上炸，而不是更少。
+      #
+      # 删之前先把整份 usr/lib 打印出来。这一步的假设（Tauri 确实把这些库打了
+      # 进去）在 Windows 上验不了，所以那份清单本身就是产出：如果日志显示一个
+      # 都没匹配上，说明假设是错的，这一步该整个撤掉，而不是留一个空操作在这里
+      # 让人以为问题解决了。
+      - name: Let the AppImage use the host graphics stack
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd release-linux
+          image=$(ls ZeppBridge_*_x86_64.AppImage)
+          chmod +x "$image"
+          ./"$image" --appimage-extract >/dev/null
+
+          echo "::group::AppDir usr/lib 的完整清单"
+          find squashfs-root/usr/lib -maxdepth 2 \( -type f -o -type l \) | sort
+          echo "::endgroup::"
+
+          # 与宿主机驱动强耦合的那一层。模式照 AppImage 上游 excludelist 的
+          # 图形部分抄，不多不少。
+          removed=0
+          for pattern in \
+            'libwayland-*.so*' 'libEGL*.so*' 'libGL.so*' 'libGLX*.so*' \
+            'libGLdispatch*.so*' 'libOpenGL*.so*' 'libgbm*.so*' 'libdrm*.so*' \
+            'libxcb-dri*.so*' 'libva*.so*'
+          do
+            while IFS= read -r victim; do
+              echo "  移除 ${victim#squashfs-root/}"
+              rm -f "$victim"
+              removed=$((removed + 1))
+            done < <(find squashfs-root/usr/lib -name "$pattern")
+          done
+          echo "共移除 $removed 个文件"
+
+          if [[ $removed -eq 0 ]]; then
+            echo "::warning::AppDir 里一个图形库都没有，issue #32 的成因假设不成立。" \
+                 "别把这一步当成已经修好了——去看上面那份清单，重新判断。"
+            rm -rf squashfs-root
+            exit 0
+          fi
+
+          # 应用自己的二进制必须还在。上面那批 find 一旦写错模式，最坏的情况是
+          # 把 AppDir 掏空，而重新打包照样会成功。
+          test -x squashfs-root/usr/bin/zeppbridge
+
+          appimagetool=$(command -v appimagetool || true)
+          if [[ -z "$appimagetool" ]]; then
+            curl -fsSL -o appimagetool \
+              https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+            chmod +x appimagetool
+            appimagetool=./appimagetool
+          fi
+          ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 "$appimagetool" squashfs-root "$image.new"
+          mv "$image.new" "$image"
+          rm -rf squashfs-root appimagetool
+          ls -l "$image"
+
       - name: Package CLI and MCP tools
         shell: bash
         run: |
