@@ -352,6 +352,64 @@ mod tests {
         }
     }
 
+    /// 2026-09-03 这一批（反馈库 183 行）唯一裁决通过的：10682625 -> T-Rex 3
+    /// Pro。2 份互相独立的报告（v1.1.1 / v1.1.5），零异议，高位段，且和已经
+    /// 收了的 10551552 / 10551555 同族。
+    ///
+    /// 同一批里两个有争议的编号又各多了一份，但仍然不收：10813699 从 3:3
+    /// 变成 Active 2 44mm 4 份 vs Active MAX 3 份，8913155 从 2:1 变成 3:1。
+    /// 平票被打破不等于分歧消失——多数票在这张表上从来不算数，因为收错一个
+    /// 编号会让所有同款用户的设备名静默地错掉。
+    #[test]
+    fn the_code_adjudicated_on_2026_09_03_resolves_to_its_product() {
+        let found = match_catalog(&CatalogMatchInput {
+            device_source_codes: vec![10_682_625],
+            ..CatalogMatchInput::default()
+        })
+        .expect("10682625 应当能匹配到 T-Rex 3 Pro");
+        assert_eq!(found.entry.catalog_id, "amazfit-t-rex-3-pro-48-44mm");
+
+        // 相邻的 10682624 仍然只有一份报告，不能跟着邻接性溜进去。
+        assert!(
+            match_catalog(&CatalogMatchInput {
+                device_source_codes: vec![10_682_624],
+                ..CatalogMatchInput::default()
+            })
+            .is_none(),
+            "10682624 还只有一份报告，不该匹配到任何型号"
+        );
+    }
+
+    /// Balance 2 XT 能被搜到、能被手动指认，哪怕它还没有产品图。
+    ///
+    /// issue #42：它在型号列表里根本不存在，于是那位用户连手动指认都做不了。
+    /// 它是目录里第一个 `image_key` 为空的条目——界面退到内联 SVG 占位图。
+    /// 拿 Balance 2 的图顶上去是给用户看一张错的表，比没有图更糟。
+    #[test]
+    fn balance_2_xt_is_selectable_without_product_art() {
+        let entry = catalog_entries()
+            .iter()
+            .find(|entry| entry.catalog_id == "amazfit-balance-2-xt")
+            .expect("Balance 2 XT 应当在目录里");
+        assert!(entry.supported && entry.status == "active");
+        assert!(entry.image_key.is_none(), "它还没有产品图");
+        assert!(entry.asset_hash.is_none());
+        // 它是 Balance 2 的零售变体，不是一款新的规范型号。
+        assert_eq!(
+            entry.canonical_device_key.as_deref(),
+            Some("amazfit-balance-2")
+        );
+        // 还没有人从这款表上提交过报告，所以一个编号都不该挂在它名下。
+        assert!(entry.device_source_codes.is_empty());
+
+        let matched = match_catalog(&CatalogMatchInput {
+            device_names: vec!["Amazfit Balance 2 XT"],
+            ..CatalogMatchInput::default()
+        })
+        .expect("按名字应当能匹配到 Balance 2 XT");
+        assert_eq!(matched.entry.catalog_id, "amazfit-balance-2-xt");
+    }
+
     /// 一个编号只能属于一款表。
     #[test]
     fn every_device_source_number_belongs_to_exactly_one_product() {

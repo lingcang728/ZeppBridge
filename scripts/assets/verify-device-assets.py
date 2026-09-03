@@ -21,9 +21,12 @@ ROOT = Path(__file__).resolve().parents[2]
 CATALOG_PATH = ROOT / "src" / "assets" / "devices" / "catalog.json"
 ASSET_DIR = CATALOG_PATH.parent
 AUDIT_PATH = ROOT / "docs" / "reference" / "device-catalog-audit.json"
-EXPECTED_ENTRY_COUNT = 52
-EXPECTED_SUPPORTED_COUNT = 51
+EXPECTED_ENTRY_COUNT = 53
+EXPECTED_SUPPORTED_COUNT = 52
 EXPECTED_CANONICAL_COUNT = 50
+# 资源数比条目数少两个：GTR 4 的配色卡和标准款共用一张图（见 audit 里的
+# merge relation），而 Balance 2 XT 还没有产品图（issue #42，见下面的
+# `image_key is None` 分支）。
 EXPECTED_ASSET_COUNT = 51
 
 
@@ -131,12 +134,24 @@ def main() -> None:
                 fail(f"{catalog_id} has empty model code")
             model_codes[normalized(model_code)].append(catalog_id)
 
-        for field in ("canonical_name", "display_name", "name_zh", "kind", "official_page", "asset_source", "provenance", "checked_at", "asset_hash"):
+        for field in ("canonical_name", "display_name", "name_zh", "kind", "official_page", "asset_source", "provenance", "checked_at"):
             if not entry.get(field):
                 fail(f"{catalog_id} missing {field}")
         key = entry.get("image_key")
+        # 没有产品图的条目是合法的，但两个字段必须一起缺：只缺一个说明有人手改
+        # 漏了半边，那会让下面的哈希核对静默跳过一款真有图的表。
+        if key is None or entry.get("asset_hash") is None:
+            if key is not None or entry.get("asset_hash") is not None:
+                fail(f"{catalog_id} has half of an image pair (image_key={key!r} asset_hash={entry.get('asset_hash')!r})")
+            # 型号是真的，只是官方还没有可下载的产品图；界面渲染内联 SVG 占位。
+            # 见 build-device-catalog.py 里 Balance 2 XT 那条的注释。
+            if entry.get("asset_source") != "pending-official-art":
+                fail(f"{catalog_id} has no art but asset_source={entry.get('asset_source')!r}, expected pending-official-art")
+            continue
         if not isinstance(key, str) or not key:
             fail(f"{catalog_id} missing image_key")
+        if not entry.get("asset_hash"):
+            fail(f"{catalog_id} missing asset_hash")
         webp = ASSET_DIR / f"{key}.webp"
         thumb = ASSET_DIR / f"{key}-thumb.png"
         if not webp.is_file() or not thumb.is_file():
@@ -167,7 +182,7 @@ def main() -> None:
     if duplicate_codes:
         fail(f"model code collision={duplicate_codes}")
 
-    image_keys = {entry["image_key"] for entry in entries}
+    image_keys = {entry["image_key"] for entry in entries if entry.get("image_key")}
     webp_keys = {path.stem for path in ASSET_DIR.glob("*.webp")}
     thumb_keys = {path.name.removesuffix("-thumb.png") for path in ASSET_DIR.glob("*-thumb.png")}
     if len(image_keys) != EXPECTED_ASSET_COUNT:
