@@ -166,7 +166,7 @@ fn encode_workout(workout: &Value) -> Result<Option<(Vec<u8>, usize)>, String> {
     messages.push(timer_event(end_unix, typedef::EventType::STOP));
 
     let elapsed_seconds = (end_unix - start_unix).max(0) as f64;
-    let lap_count = push_laps(
+    let mut lap_count = push_laps(
         &mut messages,
         workout,
         sport,
@@ -174,6 +174,20 @@ fn encode_workout(workout: &Value) -> Result<Option<(Vec<u8>, usize)>, String> {
         start_unix,
         &points,
     );
+    // 一条 lap 都没写出来的时候必须补一条，理由见 `push_whole_activity_lap`。
+    if lap_count == 0 {
+        push_whole_activity_lap(
+            &mut messages,
+            workout,
+            sport,
+            sub_sport,
+            start_unix,
+            end_unix,
+            elapsed_seconds,
+            &points,
+        );
+        lap_count = 1;
+    }
     push_session(
         &mut messages,
         workout,
@@ -186,19 +200,35 @@ fn encode_workout(workout: &Value) -> Result<Option<(Vec<u8>, usize)>, String> {
         &points,
     );
 
+    let mut activity_fields = vec![
+        u32_field(mesgdef::Activity::TIMESTAMP, fit_timestamp(end_unix)),
+        u32_field(
+            mesgdef::Activity::TOTAL_TIMER_TIME,
+            (elapsed_seconds * 1000.0) as u32,
+        ),
+        u16_field(mesgdef::Activity::NUM_SESSIONS, 1),
+        enum_field(mesgdef::Activity::TYPE, typedef::Activity::MANUAL.0),
+        enum_field(mesgdef::Activity::EVENT, typedef::Event::ACTIVITY.0),
+        enum_field(mesgdef::Activity::EVENT_TYPE, typedef::EventType::STOP.0),
+    ];
+    // 本地时间戳。
+    //
+    // `activity.local_timestamp` 是「同一个时刻，用本地时区表示」；导入方拿
+    // 它减掉 UTC 的 `timestamp` 就知道这次活动发生在哪个时区。只写 UTC 的话，
+    // Garmin Connect 只能退回账号的默认时区——于是北京时间早上六点的跑步会
+    // 显示成前一天晚上十点。
+    //
+    // 偏移量不用猜：导出 JSON 的 `start_time` 是带偏移的 RFC3339，手表当时在
+    // 哪个时区就写着哪个。读不出来就不写这个字段，而不是假设 UTC。
+    if let Some(offset) = local_offset_seconds(workout) {
+        activity_fields.push(u32_field(
+            mesgdef::Activity::LOCAL_TIMESTAMP,
+            fit_timestamp(end_unix + i64::from(offset)),
+        ));
+    }
     messages.push(Message {
         num: typedef::MesgNum::ACTIVITY,
-        fields: vec![
-            u32_field(mesgdef::Activity::TIMESTAMP, fit_timestamp(end_unix)),
-            u32_field(
-                mesgdef::Activity::TOTAL_TIMER_TIME,
-                (elapsed_seconds * 1000.0) as u32,
-            ),
-            u16_field(mesgdef::Activity::NUM_SESSIONS, 1),
-            enum_field(mesgdef::Activity::TYPE, typedef::Activity::MANUAL.0),
-            enum_field(mesgdef::Activity::EVENT, typedef::Event::ACTIVITY.0),
-            enum_field(mesgdef::Activity::EVENT_TYPE, typedef::EventType::STOP.0),
-        ],
+        fields: activity_fields,
         ..Default::default()
     });
 
@@ -351,7 +381,10 @@ fn record_message(unix: i64, point: &Point, sport: typedef::Sport) -> Message {
 }
 
 /// 每公里一条 `lap`，取自导出 JSON 的 `splits`——那是服务端自己的累积距离
-/// 切出来的，不是拿速度积分估的。没有 splits 就不写 lap，返回 0。
+/// 切出来的，不是拿速度积分估的。
+///
+/// 没有 splits 时这里返回 0，由调用方补一条覆盖全程的 lap
+/// （`push_whole_activity_lap`）——文件里绝不能一条 lap 都没有。
 fn push_laps(
     messages: &mut Vec<Message>,
     workout: &Value,
@@ -442,6 +475,117 @@ fn push_laps(
         count += 1;
     }
     count
+}
+
+/// 没有 `splits` 时补上的那一条 lap，覆盖整段活动。
+///
+/// FIT 规范要求每个 session 至少挂一条 lap，且 `session.num_laps >= 1`。而
+/// `splits` 是服务端按整公里切出来的：室内运动（跑步机、划船机、瑜伽、自由
+/// 训练、跳绳）和距离不足 1 km 的户外运动根本不会有。这些运动之前导出的文件
+/// 里一条 lap 都没有、`num_laps` 写着 0，Garmin Connect 和 Strava 在校验消息
+/// 层级时直接拒收整份文件——issue #28 要的 FIT 导出，对这一整类运动等于没做
+/// 出来，而本地看文件是「成功导出」的。
+///
+/// 补上去的值全部取自这个文件别处已经写过的实测值，不新引入任何估算：缺哪个
+/// 就不写哪个字段，一如整个导出的规矩。
+#[allow(clippy::too_many_arguments)]
+fn push_whole_activity_lap(
+    messages: &mut Vec<Message>,
+    workout: &Value,
+    sport: typedef::Sport,
+    sub_sport: typedef::SubSport,
+    start_unix: i64,
+    end_unix: i64,
+    elapsed_seconds: f64,
+    points: &[(i64, Point)],
+) {
+    let duration_ms = (elapsed_seconds * 1000.0).max(0.0) as u32;
+    let mut fields = vec![
+        u16_field(mesgdef::Lap::MESSAGE_INDEX, 0),
+        u32_field(mesgdef::Lap::TIMESTAMP, fit_timestamp(end_unix)),
+        u32_field(mesgdef::Lap::START_TIME, fit_timestamp(start_unix)),
+        enum_field(mesgdef::Lap::EVENT, typedef::Event::LAP.0),
+        enum_field(mesgdef::Lap::EVENT_TYPE, typedef::EventType::STOP.0),
+        enum_field(mesgdef::Lap::SPORT, sport.0),
+        enum_field(mesgdef::Lap::SUB_SPORT, sub_sport.0),
+        enum_field(mesgdef::Lap::INTENSITY, typedef::Intensity::ACTIVE.0),
+        // 这一圈是「整段活动」，不是按距离切出来的，所以 trigger 写
+        // session_end 而不是 distance——写 distance 会让导入方以为这里真的
+        // 存在过一个整公里分段点。
+        enum_field(
+            mesgdef::Lap::LAP_TRIGGER,
+            typedef::LapTrigger::SESSION_END.0,
+        ),
+        u32_field(mesgdef::Lap::TOTAL_ELAPSED_TIME, duration_ms),
+        u32_field(mesgdef::Lap::TOTAL_TIMER_TIME, duration_ms),
+    ];
+
+    // 起点坐标同 session：取第一个真有定位的点，室内运动本来就没有。
+    if let Some((latitude, longitude)) = points
+        .iter()
+        .find_map(|(_, point)| Some((point.latitude?, point.longitude?)))
+    {
+        if let (Some(lat), Some(lon)) = (semicircles(latitude), semicircles(longitude)) {
+            fields.push(i32_field(mesgdef::Lap::START_POSITION_LAT, lat));
+            fields.push(i32_field(mesgdef::Lap::START_POSITION_LONG, lon));
+        }
+    }
+
+    if let Some(distance) = workout
+        .get("distance_meters")
+        .and_then(Value::as_f64)
+        .filter(|value| value.is_finite() && *value >= 0.0)
+    {
+        fields.push(u32_field(
+            mesgdef::Lap::TOTAL_DISTANCE,
+            (distance * 100.0) as u32,
+        ));
+        if elapsed_seconds > 0.0 {
+            if let Some(speed) = encode_speed(distance / elapsed_seconds) {
+                fields.push(u16_field(mesgdef::Lap::AVG_SPEED, speed));
+            }
+        }
+    }
+    if let Some(speed) = max_speed_between(points, start_unix, end_unix).and_then(encode_speed) {
+        fields.push(u16_field(mesgdef::Lap::MAX_SPEED, speed));
+    }
+    if let Some(calories) = workout
+        .get("calories")
+        .and_then(Value::as_f64)
+        .filter(|value| value.is_finite() && *value >= 0.0 && *value <= f64::from(u16::MAX))
+    {
+        fields.push(u16_field(mesgdef::Lap::TOTAL_CALORIES, calories as u16));
+    }
+    if let Some(avg_hr) = workout
+        .get("avg_hr")
+        .and_then(Value::as_i64)
+        .filter(|value| (1..=255).contains(value))
+    {
+        fields.push(u8_field(mesgdef::Lap::AVG_HEART_RATE, avg_hr as u8));
+    }
+    if let Some(max_hr) = workout
+        .get("max_hr")
+        .and_then(Value::as_i64)
+        .filter(|value| (1..=255).contains(value))
+    {
+        fields.push(u8_field(mesgdef::Lap::MAX_HEART_RATE, max_hr as u8));
+    }
+    if let Some(gain) = total_elevation(workout, "elevation_gain_m", "elevation_gain_m") {
+        if gain <= f64::from(u16::MAX) {
+            fields.push(u16_field(mesgdef::Lap::TOTAL_ASCENT, gain.round() as u16));
+        }
+    }
+    if let Some(loss) = total_elevation(workout, "elevation_loss_m", "elevation_loss_m") {
+        if loss <= f64::from(u16::MAX) {
+            fields.push(u16_field(mesgdef::Lap::TOTAL_DESCENT, loss.round() as u16));
+        }
+    }
+
+    messages.push(Message {
+        num: typedef::MesgNum::LAP,
+        fields,
+        ..Default::default()
+    });
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -837,11 +981,21 @@ fn semicircles(degrees: f64) -> Option<i32> {
     if !degrees.is_finite() || degrees.abs() > 180.0 {
         return None;
     }
+    // 经度正好 180.0°（换日线）时 `180 × 2^31/180` 恰好是 2^31，比 i32::MAX
+    // 大 1。之前这里返回 None，于是那个点的经纬度字段被整个跳过——一个真实
+    // 存在的坐标因为差一个最低位就消失了。饱和截断的误差是 2^-31 个半圆，
+    // 约 8×10^-8 度，比 GPS 本身的精度小三个数量级。
     let scaled = (degrees * SEMICIRCLES_PER_DEGREE).round();
-    if scaled < f64::from(i32::MIN) || scaled > f64::from(i32::MAX) {
-        return None;
-    }
-    Some(scaled as i32)
+    Some(scaled.clamp(f64::from(i32::MIN), f64::from(i32::MAX)) as i32)
+}
+
+/// 这条运动所在时区相对 UTC 的偏移秒数。
+///
+/// 导出 JSON 的 `start_time` 是带偏移量的 RFC3339，手表当时在哪个时区就写着
+/// 哪个，所以不用猜。解析不出来就返回 `None`——调用方据此不写本地时间戳，而
+/// 不是假设 UTC。
+fn local_offset_seconds(workout: &Value) -> Option<i32> {
+    parse_time(text(workout.get("start_time"))).map(|time| time.offset().local_minus_utc())
 }
 
 fn encode_altitude(metres: f64) -> Option<u16> {
@@ -1071,6 +1225,80 @@ mod tests {
 
         assert_eq!(messages_of(&fit, typedef::MesgNum::LAP).len(), 1);
         assert_eq!(messages_of(&fit, typedef::MesgNum::ACTIVITY).len(), 1);
+    }
+
+    /// 没有 splits 的运动也必须有 lap，且 `num_laps >= 1`。
+    ///
+    /// 室内运动（跑步机、划船机、瑜伽、自由训练）和距离不足 1 km 的户外运动，
+    /// 服务端不给 `splits`。FIT 规范要求每个 session 至少挂一条 lap，缺了
+    /// Garmin Connect 和 Strava 会在校验消息层级时直接拒收整份文件。
+    #[test]
+    fn workout_without_splits_still_gets_one_lap() {
+        let treadmill = export_with(json!({
+            "workouts": [{
+                "workout_id": "w1", "effective_type": "treadmill",
+                "start_time": "2026-08-24T06:00:00+08:00",
+                "distance_meters": 830.0, "calories": 62.0,
+                "avg_hr": 128, "max_hr": 141,
+                "route": [], "splits": [], "pauses": [],
+                "samples": [
+                    { "timestamp": "2026-08-24T06:00:00+08:00", "heart_rate": 120, "speed": 2.5 },
+                    { "timestamp": "2026-08-24T06:05:00+08:00", "heart_rate": 141, "speed": 2.8 }
+                ]
+            }]
+        }));
+        let (files, _) = to_fit(&treadmill).unwrap();
+        let fit = decode(&files[0].1);
+
+        let laps = messages_of(&fit, typedef::MesgNum::LAP);
+        assert_eq!(laps.len(), 1, "没有 splits 也必须写出一条覆盖全程的 lap");
+        assert_eq!(
+            int_of(laps[0], mesgdef::Lap::LAP_TRIGGER),
+            Some(i64::from(typedef::LapTrigger::SESSION_END.0)),
+            "整段活动那一圈的 trigger 是 session_end，不是 distance"
+        );
+        // 300 秒 -> 300000 ms
+        assert_eq!(
+            int_of(laps[0], mesgdef::Lap::TOTAL_ELAPSED_TIME),
+            Some(300_000)
+        );
+        // 距离 scale 100：830 m -> 83000
+        assert_eq!(int_of(laps[0], mesgdef::Lap::TOTAL_DISTANCE), Some(83_000));
+        assert_eq!(int_of(laps[0], mesgdef::Lap::MAX_HEART_RATE), Some(141));
+
+        let session = messages_of(&fit, typedef::MesgNum::SESSION);
+        assert_eq!(
+            int_of(session[0], mesgdef::Session::NUM_LAPS),
+            Some(1),
+            "num_laps = 0 会被 Garmin / Strava 直接拒收"
+        );
+    }
+
+    /// `activity.local_timestamp` 要带上手表当时所在时区的偏移。
+    ///
+    /// 缺了它，Garmin Connect 只能退回账号默认时区，北京时间早上六点的跑步
+    /// 会被标成前一天晚上。偏移量取自 `start_time` 的 RFC3339 后缀，不是猜的。
+    #[test]
+    fn activity_carries_local_timestamp_from_the_recorded_offset() {
+        let (files, _) = to_fit(&running_export()).unwrap();
+        let fit = decode(&files[0].1);
+        let activity = messages_of(&fit, typedef::MesgNum::ACTIVITY);
+        assert_eq!(activity.len(), 1);
+
+        let utc = int_of(activity[0], mesgdef::Activity::TIMESTAMP).expect("UTC 时间戳应当写出来");
+        let local =
+            int_of(activity[0], mesgdef::Activity::LOCAL_TIMESTAMP).expect("本地时间戳应当写出来");
+        // fixture 是 +08:00
+        assert_eq!(local - utc, 8 * 3600);
+    }
+
+    /// 经度正好 180.0° 的点不该丢掉坐标。
+    #[test]
+    fn antimeridian_longitude_is_clamped_not_dropped() {
+        assert_eq!(semicircles(180.0), Some(i32::MAX));
+        assert_eq!(semicircles(-180.0), Some(i32::MIN));
+        assert_eq!(semicircles(180.5), None, "超出量程仍然拒收");
+        assert_eq!(semicircles(f64::NAN), None);
     }
 
     /// 步频：源数据是步/分，FIT 的 `cadence` 是 rpm，跑步/步行要除以二。
