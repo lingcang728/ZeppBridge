@@ -606,6 +606,84 @@ jobs:
           take_one "$bundle/rpm/*.rpm"           "release-linux/ZeppBridge_${version}_x86_64.rpm"
           take_one "$bundle/appimage/*.AppImage" "release-linux/ZeppBridge_${version}_x86_64.AppImage"
 
+      # 让 AppImage 用宿主机的 Wayland 库，而不是 CI runner 的那一份。
+      #
+      # issue #32：AppImage 在 openSUSE 上打不开，而 TheSaneWriter 说同一份源码
+      # 在他自己机器上编出来就能跑，还加了一句「must be something weird with the
+      # Wayland display libraries」。前半句把范围缩到打包，后半句猜对了。
+      #
+      # 2026-09-03 第一次把 AppDir 的 usr/lib 打印出来（166 个文件），实测结果：
+      #
+      #   * 里面**有** libwayland-client.so.0 / libwayland-cursor.so.0 /
+      #     libwayland-egl.so.1 / libwayland-server.so.0 —— 正是他说的那一批，
+      #     也正是 AppImage 上游 excludelist 里标着「必须由宿主机提供」的那几个。
+      #     libwayland-client 必须和宿主机的合成器对得上，自带一份是这类
+      #     「本机编能跑、别人的机器不能」最经典的成因。
+      #   * 里面**没有** libEGL / libGL / libGLX / libgbm / libdrm / libxcb-dri /
+      #     libva —— 一个都没打进来。所以那半边模式在今天是空转的。
+      #
+      # 空转的那几条留着是**防御**，不是装样子：Tauri 的打包器换个版本就可能开始
+      # 塞 GL，那时候这里会自己接住。真正的保险是下面那个「一个都没删到就打
+      # warning」——它保证这一步永远不会变成一个没人发现的空操作。
+      #
+      # 只删这一层，**不碰 glib / gtk / gio** —— 那些跟宿主机的 glibc 版本挂钩，
+      # 删了会在更多发行版上炸，而不是更少。
+      #
+      # 每次都先把整份 usr/lib 打印出来：这一步的效果在 Windows 上验不了，那份
+      # 清单是唯一能让人事后判断「删对了没有」的东西。
+      - name: Let the AppImage use the host graphics stack
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd release-linux
+          image=$(ls ZeppBridge_*_x86_64.AppImage)
+          chmod +x "$image"
+          ./"$image" --appimage-extract >/dev/null
+
+          echo "::group::AppDir usr/lib 的完整清单"
+          find squashfs-root/usr/lib -maxdepth 2 \( -type f -o -type l \) | sort
+          echo "::endgroup::"
+
+          # 与宿主机的合成器 / 驱动强耦合的那一层。模式照 AppImage 上游
+          # excludelist 的图形部分抄。2026-09-03 实测只有前四条（libwayland-*）
+          # 命中，其余是给将来准备的，见上面的说明。
+          removed=0
+          for pattern in \
+            'libwayland-*.so*' 'libEGL*.so*' 'libGL.so*' 'libGLX*.so*' \
+            'libGLdispatch*.so*' 'libOpenGL*.so*' 'libgbm*.so*' 'libdrm*.so*' \
+            'libxcb-dri*.so*' 'libva*.so*'
+          do
+            while IFS= read -r victim; do
+              echo "  移除 ${victim#squashfs-root/}"
+              rm -f "$victim"
+              removed=$((removed + 1))
+            done < <(find squashfs-root/usr/lib -name "$pattern")
+          done
+          echo "共移除 $removed 个文件"
+
+          if [[ $removed -eq 0 ]]; then
+            echo "::warning::AppDir 里一个图形库都没有，issue #32 的成因假设不成立。" \
+                 "别把这一步当成已经修好了——去看上面那份清单，重新判断。"
+            rm -rf squashfs-root
+            exit 0
+          fi
+
+          # 应用自己的二进制必须还在。上面那批 find 一旦写错模式，最坏的情况是
+          # 把 AppDir 掏空，而重新打包照样会成功。
+          test -x squashfs-root/usr/bin/zeppbridge
+
+          appimagetool=$(command -v appimagetool || true)
+          if [[ -z "$appimagetool" ]]; then
+            curl -fsSL -o appimagetool \
+              https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+            chmod +x appimagetool
+            appimagetool=./appimagetool
+          fi
+          ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 "$appimagetool" squashfs-root "$image.new"
+          mv "$image.new" "$image"
+          rm -rf squashfs-root appimagetool
+          ls -l "$image"
+
       - name: Package CLI and MCP tools
         shell: bash
         run: |

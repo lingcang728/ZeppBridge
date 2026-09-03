@@ -82,6 +82,44 @@ ZEPPBRIDGE_CREDENTIAL_STORE=env ZEPPBRIDGE_APP_TOKEN=... zeppbridge-cli sync
 
 不设这个变量时，按机器上已经存在的事实推断：`ZEPPBRIDGE_APP_TOKEN` 里有令牌优先，其次是数据目录里已有的 `credentials.json`，最后才是 Secret Service。倒数第二条是为了不让一个容器在第二次运行时报「未连接账号」——只因为环境变量只在第一次带上了。
 
+## 把已有的库从 Windows 或 macOS 搬过来
+
+拷数据库，然后重新登录一次。这是两件事，第二件不能省——见 [issue #40][issue-40]。
+
+**数据库能搬。** 两边都关掉应用，把 `zepp.db`（连同旁边的 `auth.json`）拷到
+上面那张表里对应你这种安装方式的目录。文件里没有任何和机器绑定的东西。
+
+**令牌搬不过来，而且这是有意的。** 它从来就不在你拷的那个文件夹里：Windows
+上它在凭据管理器，macOS 上在钥匙串，两者都和那台机器绑定，也都不导出成文件。
+`auth.json` 里只有用户 ID 和区域地址。所以拷过来的文件夹是「元数据齐了、密钥
+没有」，应用会说凭据管理器里没有这个账号的令牌。这不是拷坏了，是本来就没有
+可拷的东西。
+
+按你搬到的机器挑一条：
+
+```bash
+# 有 keyring 的 Linux 桌面：在应用里重新登录一次就行，拷过来的库不会被覆盖，
+# 同步会从旧机器停下的地方接着走。
+
+# 没有 keyring 守护进程的桌面，或者用命令行驱动的无头机器：
+# App Token 填一次，之后存在数据目录里，权限 0600。
+ZEPPBRIDGE_CREDENTIAL_STORE=file zeppbridge-cli sync
+
+# 容器，或者令牌来自密钥管理器的场合：
+ZEPPBRIDGE_CREDENTIAL_STORE=env ZEPPBRIDGE_APP_TOKEN=... zeppbridge-cli sync
+```
+
+App Token 本身从哪来，两条路：
+
+- 桌面应用里（任何平台）：**设置 → 手动登录**，可以读出来，也可以填进去。
+- 浏览器里：在 `https://watchface.zepp.com/` 登录，然后从开发者工具里读出
+  `apptoken` 和 `userid`。应用自己的登录窗口收的就是这一对。
+
+命令行**故意**没有 `login`。登录意味着浏览器、密码，有时还有一次性验证码，
+而命令行是给 cron 和容器跑的——那里没有人来回答这些。
+
+[issue-40]: https://github.com/lingcang728/ZeppBridge/issues/40
+
 ## 窗口一片空白，或者根本起不来
 
 两个已知的 Linux 问题，应用里都已经做了处理。
@@ -93,6 +131,39 @@ ZEPPBRIDGE_CREDENTIAL_STORE=env ZEPPBRIDGE_APP_TOKEN=... zeppbridge-cli sync
 ```bash
 WEBKIT_DISABLE_DMABUF_RENDERER=0 zeppbridge
 ```
+
+**只有 AppImage 还是打不开。** 关掉 DMABUF 之后 Flatpak 好了（[issue #32][issue-32]
+里有 2.1.0 上的确认），AppImage 没好。同一个帖子里有两句线索：同一份源码在报告者
+自己机器上编出来的 AppImage 能跑，而且他猜是「Wayland 显示库有点不对劲」。
+
+两句都对。AppImage 在 `ubuntu-latest` 上构建，把它自带的 `usr/lib` 整份打印出来
+之后可以看到，里面确实带了自己的 `libwayland-client.so.0` /
+`libwayland-cursor.so.0` / `libwayland-egl.so.1` / `libwayland-server.so.0`。
+`libwayland-client` 必须和你机器上真正在跑的合成器对得上，所以 AppImage 上游的
+excludelist 把它标成「必须由宿主机提供」——这也正好解释了为什么他自己编的能跑、
+CI 编的不能。（GL / DRM 那一层——`libEGL`、`libGL`、`libgbm`、`libdrm`——实测
+根本没被打进来，所以和这件事无关。）
+
+2.1.0 之后改了两处：构建时把那四个 Wayland 库从包里删掉、改用宿主机自己的；应用
+在检测到自己是从 AppImage 启动时（认 AppImage 运行时设的 `APPIMAGE` 变量）关掉
+加速合成——deb / rpm / Flatpak 三条已经被确认能用的渠道不跟着变慢。
+
+这两处在 Windows 开发机上都验不了。如果还是起不来，按下面的顺序试逃生口：
+
+```bash
+# 通过 XWayland 强制走 X11。这不是应用的默认行为：在没装 XWayland 的纯 Wayland
+# 系统上，它是把一种打不开换成另一种，所以这个决定留给你，不由我们替你做。
+GDK_BACKEND=x11 ./ZeppBridge_<version>_x86_64.AppImage
+
+# 显式关掉合成（AppImage 版本已经自己这么做了；如果你装的是 deb/rpm/Flatpak
+# 却有同样的症状，在这里设它）。
+WEBKIT_DISABLE_COMPOSITING_MODE=1 zeppbridge
+```
+
+都不行的话，Flatpak 是目前唯一有用户在 2.1.0 上确认能用的渠道；在那个 issue 下
+留一句你的发行版和合成器是什么，是最有用的反馈。
+
+[issue-32]: https://github.com/lingcang728/ZeppBridge/issues/32
 
 **没有托盘图标，并且 stderr 上有一行 `libayatana-appindicator3`。** 托盘图标由
 桌面环境通过这个库绘制。GNOME 的 Flatpak runtime 里没有它，一些桌面也没装。现在
