@@ -41,7 +41,12 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 const EXIT_OK: u8 = 0;
 /// 命令本身写错了（未知子命令、缺参数、参数非法）。
 const EXIT_USAGE: u8 = 2;
-/// 还没有连接 Zepp 账号，或者凭据已失效。需要人去桌面应用里重新登录。
+/// 还没有连接 Zepp 账号，或者凭据已失效。
+///
+/// 最常见的两种：从没登录过；以及把另一台机器的 `data` 文件夹整个拷了过来
+/// ——库和 `auth.json` 都在，令牌却从来不在文件里（issue #40）。两种都要人
+/// 出面：在桌面应用里登录，或者用 `ZEPPBRIDGE_CREDENTIAL_STORE` 把令牌交进
+/// 来。见 docs/guides/linux.md。
 const EXIT_NOT_CONFIGURED: u8 = 3;
 /// 另一个 ZeppBridge 进程正在写库。稍后重试即可，不是错误。
 const EXIT_BUSY: u8 = 4;
@@ -730,7 +735,9 @@ fn cmd_sync(args: &[String]) -> u8 {
                 json_mode,
                 EXIT_NOT_CONFIGURED,
                 "not_configured",
-                "还没有连接 Zepp 账号。请先在桌面应用里登录——命令行不做登录。",
+                "还没有连接 Zepp 账号。命令行不做登录：请在桌面应用里登录，\
+                 或设 ZEPPBRIDGE_CREDENTIAL_STORE=env 并给出 ZEPPBRIDGE_APP_TOKEN。\
+                 跨机器搬库见 docs/guides/linux.md",
             )
         }
         Err(error) => {
