@@ -219,6 +219,68 @@ const post = (db, body, ip = '203.0.113.7') => onRequestPost({
   env: { FEEDBACK_DB: db },
 });
 
+test('a cloud rejection is model-class only, optional, and makes a quiet report submittable', async () => {
+  // 那些「什么都看不到」的人（D1 `c1f03eb2`、Reddit u/WatercressAromatic79）
+  // 库里本来就没有未识别设备、也没有未知运动编号。旧判据下他们提交不了，
+  // 而他们手里的那个 code 恰恰是我们唯一需要的东西。
+  const quiet = {
+    ...report(),
+    deviceEvidence: { ...report().deviceEvidence, unknownDeviceCount: 0 },
+    unknownWorkoutCodes: [],
+    workoutTypeConflicts: 0,
+  };
+  assert.equal(validateFeedbackReport(quiet), false);
+  const withRejection = {
+    ...quiet,
+    lastCloudRejection: { stream: 'workouts', code: -1, at: '2026-09-03T10:00:00Z' },
+  };
+  assert.equal(validateFeedbackReport(withRejection), true);
+
+  // 旧客户端不带这个字段，照收。
+  assert.equal(validateFeedbackReport(report()), true);
+
+  for (const bad of [
+    { stream: 'workouts', code: -1, message: '云端的原话不收' },
+    { stream: '随便写的', code: -1 },
+    { stream: 'workouts', code: 'not-a-number' },
+    { stream: 'workouts', code: -1, at: 'not-a-date' },
+    { code: -1 },
+  ]) {
+    assert.equal(
+      validateFeedbackReport({ ...report(), lastCloudRejection: bad }),
+      false,
+      `不该接受 ${JSON.stringify(bad)}`,
+    );
+  }
+
+  // 存进去的是三个列，不是一坨 JSON。
+  const db = fakeDb();
+  const stored = await post(db, withRejection);
+  assert.equal(stored.status, 201);
+  const bound = db.reports[0].bound;
+  assert.equal(bound[16], -1);
+  assert.equal(bound[17], 'workouts');
+  assert.equal(bound[18], '2026-09-03T10:00:00Z');
+});
+
+test('a fresh cloud rejection is not deduplicated away by an older note-free report', async () => {
+  // 时间戳不进哈希，但 code 和 stream 进。
+  const db = fakeDb();
+  const first = await post(db, report());
+  assert.equal(first.status, 201);
+  const second = await post(db, {
+    ...report(),
+    lastCloudRejection: { stream: 'sleep', code: -1, at: '2026-09-03T10:00:00Z' },
+  });
+  assert.equal(second.status, 201, '带了新 code 就不是同一份报告');
+  const third = await post(db, {
+    ...report(),
+    lastCloudRejection: { stream: 'sleep', code: -1, at: '2026-09-03T23:59:00Z' },
+  });
+  assert.equal(third.status, 200, '只是时间戳变了，不该再建一行');
+  assert.equal(db.reports.length, 2);
+});
+
 test('workout type corrections are model-class only, and optional', () => {
   // issue #24 那类问题唯一的证据：编号我们认识，只是认错了。
   const good = {

@@ -72,7 +72,7 @@ export const settingsMessages = defineMessages(
     reportDoneTitle: '已收到，谢谢',
     reportDoneLine: (id: string, at: string) => `报告编号 ${id}，提交时间 ${at}。`,
     reportDoneNote: '发出去的就是上面列出的那几类字段和你写的那段说明，没有别的。',
-    reportConfirm: '只会发送应用版本、系统类型、解析器版本、未识别设备的产品级提示与字段结构、固件版本、型号类编号（deviceSource / deviceType，只有整数，描述的是「哪一款表」而不是「哪一台表」）、未知运动编号和数量，以及你在上面写的那段说明（会自动去掉本机路径、邮箱和长串标识）。不会发送 Zepp 账号、Token、序列号、设备 ID、MAC 地址、GPS、健康数值或原始响应。确认提交吗？',
+    reportConfirm: '只会发送应用版本、系统类型、解析器版本、未识别设备的产品级提示与字段结构、固件版本、型号类编号（deviceSource / deviceType，只有整数，描述的是「哪一款表」而不是「哪一台表」）、未知运动编号和数量、云端最近一次拒绝请求的数字错误码（只有编号、哪条数据流和时间，不包括云端返回的文字），以及你在上面写的那段说明（会自动去掉本机路径、邮箱和长串标识）。不会发送 Zepp 账号、Token、序列号、设备 ID、MAC 地址、GPS、健康数值或原始响应。确认提交吗？',
     reportFailed: '错误报告提交失败',
 
     // ── 能力清单 ──
@@ -471,7 +471,7 @@ export const settingsMessages = defineMessages(
     reportDoneTitle: 'Received, thank you',
     reportDoneLine: (id: string, at: string) => `Report ${id}, submitted ${at}.`,
     reportDoneNote: 'What went out is exactly the field types listed above plus the note you wrote. Nothing else.',
-    reportConfirm: 'This sends the app version, OS type, parser revision, product-level hints and field shapes for unidentified devices, firmware version, model-level numbers (deviceSource / deviceType — integers describing which model, not which unit), unknown workout codes and their counts, and the note you wrote above (with local paths, email addresses and long identifiers stripped). It never sends your Zepp account, tokens, serial numbers, device IDs, MAC addresses, GPS, health values or raw responses. Submit?',
+    reportConfirm: 'This sends the app version, OS type, parser revision, product-level hints and field shapes for unidentified devices, firmware version, model-level numbers (deviceSource / deviceType — integers describing which model, not which unit), unknown workout codes and their counts, the numeric error code from the most recent request the cloud rejected (just the number, which data stream, and when — never any text the cloud returned), and the note you wrote above (with local paths, email addresses and long identifiers stripped). It never sends your Zepp account, tokens, serial numbers, device IDs, MAC addresses, GPS, health values or raw responses. Submit?',
     reportFailed: 'The error report could not be submitted',
 
     // ── Capability board ──

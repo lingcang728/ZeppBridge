@@ -18,7 +18,7 @@ use crate::models::{
 };
 use crate::storage::corrections::WorkoutCodeLabel;
 use crate::storage::provenance::{DataHealth, IntegrityCheckResult};
-use crate::storage::NORMALIZER_REVISION;
+use crate::storage::{looks_like_firmware_version, NORMALIZER_REVISION};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -579,6 +579,7 @@ async fn build_diagnostic_report(
         // 类型由调用方按需要填；这个构造函数只负责本机能自动查到的事实。
         category: None,
         user_note: user_note.and_then(sanitize_diagnostic_note),
+        last_cloud_rejection: db.diagnostic_cloud_rejection()?,
     })
 }
 
@@ -2296,10 +2297,29 @@ pub(crate) fn parse_device_profiles(value: &serde_json::Value) -> Vec<DeviceProf
                 device_names: device_name_refs,
                 display_name: display_name.as_deref(),
             });
+            // 名字里不能出现固件号。
+            //
+            // 一些账号的设备列表**一个名字字段都没有**（反馈库里报告
+            // `404560ac` 就是这样，它的 `nameFieldObjects` 是 0），而
+            // `product_names` 里掘了 `hardwareVersion`——那是个形如 `0.135.23.0`
+            // 的东西。于是侧栏里就出现了名为「0.91.20.5」的数据来源，
+            // 点进去没有任何东西（Reddit u/Andrew-Scoggins 2026-09-02，
+            // 反馈库那位 Bip 6 用户的原话是「Says 0.135.23.0」）。
+            //
+            // 判据用的是 `looks_like_firmware_version`——写入侧的 `device_identities`
+            // 早就拿它拦过一道（`storage/mod.rs`），这条从云端报文直接到
+            // 界面的路径是漏掉的那一条。只拦「拿它当名字」：它继续留在
+            // `product_names` / `model_codes` 里参与目录匹配，那里匹不上就是
+            // 匹不上，不会造出一个假型号。
+            //
+            // 拦下之后名字是 `None`，前端（`useDevices.ts`）会如实显示
+            // 「未识别设备 / Unidentified device」并给出手动指认入口。
+            let named = |value: &String| !looks_like_firmware_version(value);
+            let display_name = display_name.filter(|value| named(value));
             let mut profile = DeviceProfile {
                 name: display_name
                     .clone()
-                    .or_else(|| product_names.first().cloned()),
+                    .or_else(|| product_names.iter().find(|v| named(v)).cloned()),
                 display_name,
                 canonical_name: None,
                 catalog_id: None,
@@ -2331,7 +2351,23 @@ pub(crate) fn parse_device_profiles(value: &serde_json::Value) -> Vec<DeviceProf
         .filter(|profile| {
             profile.device_id.is_some() || profile.serial.is_some() || profile.name.is_some()
         })
-        .collect()
+        .fold(Vec::new(), |mut kept: Vec<DeviceProfile>, profile| {
+            // 同一台表不该在侧栏里出现两遍。
+            //
+            // 云端的列表会把同一台设备的多次绑定各给一行（换手机、解绑重绑）。
+            // 以前名字各不相同时还看不出来，现在认不出来的都叫「未识别设备」，
+            // 重复就很刺眼。只合并**标识完全相同**的：两台真的不同的表哪怕同名
+            // 也不能并成一行，那会让用户少一台设备。
+            let duplicate = kept.iter().any(|existing| {
+                existing.device_id == profile.device_id
+                    && existing.serial == profile.serial
+                    && (existing.device_id.is_some() || existing.serial.is_some())
+            });
+            if !duplicate {
+                kept.push(profile);
+            }
+            kept
+        })
 }
 
 fn merge_device_metadata(target: &mut Map<String, Value>, value: &Value, depth: usize) {
@@ -2759,6 +2795,83 @@ mod tests {
         assert_eq!(profile.catalog_id.as_deref(), Some("amazfit-balance-2"));
         assert_eq!(profile.canonical_name.as_deref(), Some("Amazfit Balance 2"));
         assert_eq!(profile.firmware.as_deref(), Some("6.2.208.7"));
+    }
+
+    /// 固件号不能当设备名。
+    ///
+    /// 字段结构抄自反馈库报告 `404560ac`（Bip 6，v1.1.3）：它的
+    /// `nameFieldObjects` 是 **0**——那份设备列表里根本没有
+    /// `displayName` / `deviceName` / `nickname` / `name`，能当名字用的只剩
+    /// `additionalInfo.hardwareVersion`。这一幕的后果是两份独立报告：
+    /// 那位 Bip 6 用户的「Says 0.135.23.0」，和 Reddit u/Andrew-Scoggins
+    /// 侧栏里那三个叫 `0.91.20.5` / `0.91.17.5` 的幽灵数据来源。
+    #[test]
+    fn a_firmware_version_never_becomes_the_device_name() {
+        let value = json!({
+            "items": [{
+                "deviceId": "private-device-id",
+                "deviceSource": 10158337,
+                "deviceType": 0,
+                "firmwareVersion": "0.135.23.0",
+                "additionalInfo": {
+                    "sn": "SN-BIP6",
+                    "hardwareVersion": "0.135.23.0",
+                    "productId": "0.135.23.0",
+                    "productVersion": "0.135.23.0"
+                }
+            }]
+        });
+        let profiles = parse_device_profiles(&value);
+        assert_eq!(profiles.len(), 1);
+        let profile = &profiles[0];
+        // 这一台的 deviceSource 在目录里，所以名字是真型号。
+        // 重点是：无论如何都不会是那串版本号。
+        assert_eq!(profile.catalog_id.as_deref(), Some("amazfit-bip-6"));
+        assert_eq!(profile.canonical_name.as_deref(), Some("Amazfit Bip 6"));
+        // 报文里没有名字字段，`name` 就空着；显示名由目录补上。
+        // 旧行为里这两个字段拿到的都是 `"0.135.23.0"`。
+        assert_eq!(profile.name, None);
+        assert_eq!(profile.display_name.as_deref(), Some("Amazfit Bip 6"));
+        // 固件号本身仍然要当固件号显示，目录匹配也仍然拿得到
+        // deviceSource——拦的只是「拿它当名字」这一件事。
+        assert_eq!(profile.firmware.as_deref(), Some("0.135.23.0"));
+    }
+
+    /// 目录认不出来的那一半：名字宁可空着，也不拿版本号凑数。
+    ///
+    /// 前端（`useDevices.ts`）对 `name == None` 会如实显示「未识别设备」
+    /// 并给出手动指认入口；显示成「0.91.20.5」则既不是型号、也没有出口。
+    #[test]
+    fn an_unmatched_device_shows_no_name_rather_than_a_firmware_string() {
+        let value = json!({
+            "items": [{
+                "deviceId": "MAC-UNKNOWN",
+                "deviceSource": 999_999_999_i64,
+                "additionalInfo": { "sn": "SN-UNKNOWN", "hardwareVersion": "0.91.20.5" }
+            }]
+        });
+        let profiles = parse_device_profiles(&value);
+        assert_eq!(profiles.len(), 1);
+        assert_eq!(profiles[0].name, None);
+        assert_eq!(profiles[0].display_name, None);
+        assert_eq!(profiles[0].firmware.as_deref(), Some("0.91.20.5"));
+    }
+
+    /// 同一台表的多次绑定合成一行，两台真的不同的表不能合。
+    #[test]
+    fn repeated_bindings_of_one_watch_collapse_but_distinct_watches_do_not() {
+        let value = json!({
+            "items": [
+                { "deviceId": "MAC-ONE", "additionalInfo": { "sn": "SN-ONE", "hardwareVersion": "0.91.20.5" } },
+                { "deviceId": "MAC-ONE", "additionalInfo": { "sn": "SN-ONE", "hardwareVersion": "0.91.20.5" } },
+                { "deviceId": "MAC-TWO", "additionalInfo": { "sn": "SN-TWO", "hardwareVersion": "0.91.20.5" } }
+            ]
+        });
+        let profiles = parse_device_profiles(&value);
+        assert_eq!(profiles.len(), 2);
+        assert_eq!(profiles[0].device_id.as_deref(), Some("MAC-ONE"));
+        assert_eq!(profiles[1].device_id.as_deref(), Some("MAC-TWO"));
+        assert!(profiles.iter().all(|profile| profile.name.is_none()));
     }
 
     #[test]

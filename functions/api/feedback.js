@@ -110,6 +110,20 @@ const validWorkoutCode = (entry) => hasOnlyKeys(entry, ['code', 'records'])
   && boundedInteger(entry.records, 1, 1_000_000_000);
 
 /**
+ * 云端在 HTTP 200 里写的那个「不成功」。
+ *
+ * 三个字段全是形状受限的，没有一个是自由文本；云端的原话（`message`）
+ * 客户端根本不发。`stream` 取值只能是那七条固定的流名。
+ */
+const CLOUD_REJECTION_STREAMS = [
+  'workouts', 'workout_detail', 'daily_summary', 'wellness', 'sleep', 'hrv', 'heart_rate',
+];
+const validCloudRejection = (entry) => hasOnlyKeys(entry, ['stream', 'code', 'at'])
+  && CLOUD_REJECTION_STREAMS.includes(entry.stream)
+  && boundedInteger(entry.code, -1_000_000_000, 1_000_000_000)
+  && (entry.at === undefined || (boundedString(entry.at, 40) && !Number.isNaN(Date.parse(entry.at))));
+
+/**
  * 运动 key 的形状。和随包运动目录的 key 一致：小写字母、数字、下划线。
  *
  * 钉死形状是因为这两个字段最终会被人当成「用户说这个编号是什么」来读。
@@ -149,6 +163,7 @@ export const validateFeedbackReport = (report) => {
     'workoutTypeConflicts',
     'userNote',
     'category',
+    'lastCloudRejection',
   ])) return false;
   if (report.format !== 'zeppbridge.feedback.v1') return false;
   if (!boundedString(report.appVersion, 32) || !/^[0-9A-Za-z.+-]+$/.test(report.appVersion)) return false;
@@ -176,6 +191,9 @@ export const validateFeedbackReport = (report) => {
   if (report.userNote !== undefined && !boundedString(report.userNote, USER_NOTE_MAX)) return false;
   // 分类是固定取值，不是又一个自由文本框。
   if (report.category !== undefined && !REPORT_CATEGORIES.includes(report.category)) return false;
+  // 字段可缺省：没遇到过业务拒绝的人和旧客户端都不会带它。
+  if (report.lastCloudRejection !== undefined
+    && !validCloudRejection(report.lastCloudRejection)) return false;
   // 自动检测到问题，或者用户自己说明了要报什么——两条路都算数。只认前者的话，
   // 本机没检测到异常的人就永远提交不了，哪怕他真的遇到了问题。
   return report.deviceEvidence.unknownDeviceCount > 0
@@ -184,6 +202,10 @@ export const validateFeedbackReport = (report) => {
     // 一次运动类型纠正本身就是一条可处理的线索。
     || (report.workoutTypeCorrections?.length ?? 0) > 0
     || report.workoutTypeConflicts > 0
+    // 一次业务拒绝本身就是一条可处理的线索——而且恰恰是那些「什么都
+    // 看不到」的人手里唯一的证据：他们的库里本来就没有未识别设备、
+    // 也没有未知运动编号，旧判据下他们根本提交不了。
+    || report.lastCloudRejection !== undefined
     || report.category !== undefined;
 };
 
@@ -208,6 +230,16 @@ export const contentHashInput = (report) => {
     if (value !== null && typeof value === 'object') {
       return Object.keys(value).sort().reduce((acc, key) => {
         if (key === 'userNote') return acc;
+        // 业务拒绝只拿 `stream` + `code` 参与去重，`at` 不算。
+        //
+        // 带上时间戳的话，同一个人反复遇到同一个 code 会每次都建一行；
+        // 而把整段排除的话，他第一次带着 code 提交会和之前一份不带 code 的
+        // 旧报告撞哈希，那个 code 就被当成重复提交丢了——而那正是我们唯一
+        // 想要的东西。
+        if (key === 'lastCloudRejection' && isObject(value[key])) {
+          acc[key] = { code: value[key].code, stream: value[key].stream };
+          return acc;
+        }
         acc[key] = canonical(value[key]);
         return acc;
       }, {});
@@ -338,8 +370,9 @@ export async function onRequestPost(context) {
         normalizer_revision, device_status, unknown_device_count,
         device_evidence_json, unknown_workout_codes_json, workout_type_conflicts,
         user_assigned_models_json, user_note, category,
-        workout_type_corrections_json, content_hash
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        workout_type_corrections_json, content_hash,
+        cloud_rejection_code, cloud_rejection_stream, cloud_rejection_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       reportId,
       submittedAt,
@@ -357,6 +390,9 @@ export async function onRequestPost(context) {
       report.category ?? '',
       JSON.stringify(report.workoutTypeCorrections ?? []),
       contentHash,
+      report.lastCloudRejection?.code ?? null,
+      report.lastCloudRejection?.stream ?? '',
+      report.lastCloudRejection?.at ?? '',
     ).run();
   } catch {
     return response({ ok: false, error: 'storage_unavailable' }, 503);
