@@ -11,7 +11,7 @@
     "build": "vue-tsc --noEmit && vite build",
     "build:web": "vite build",
     "test:feedback": "node --test tests/feedback-function.test.mjs",
-    "test:functions": "node --test tests/feedback-function.test.mjs tests/release-function.test.mjs",
+    "test:functions": "node --test tests/dialog-capability.test.mjs tests/feedback-function.test.mjs tests/release-function.test.mjs",
     "preview": "vite preview",
     "tauri": "tauri",
     "package:release": "pwsh -NoProfile -File scripts/windows/package-release.ps1",
