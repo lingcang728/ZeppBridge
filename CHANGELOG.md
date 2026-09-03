@@ -2,6 +2,29 @@
 
 本文件记录每个版本的实际改动。写给使用者看，不是施工日志：只写用户能感知到的变化，以及为什么这么改。
 
+## 未发布 / Unreleased
+
+### Fixes / 修复
+
+- **Workout files now import into Garmin Connect and Strava.** Every FIT file needs at least one lap, and ZeppBridge only wrote laps for the per-kilometre splits Zepp's cloud returns — which it does not return for indoor workouts, or for outdoor ones that never reached a full kilometre. Those files went out with zero laps and were refused on import, while the export itself reported success. Across one real library of 332 workouts, 168 of the 313 exported files were affected — and not only treadmill sessions: 99 runs and 9 rides were among them. Files like these now carry a lap covering the whole activity, built only from figures already measured and stored. Two smaller things in the same files: the local time zone is now recorded, so a 6am run no longer shows up as the previous evening, and a point sitting exactly on the antimeridian keeps its coordinates instead of losing them to a rounding limit. This is the other half of [#28](https://github.com/lingcang728/ZeppBridge/issues/28) — 2.1.1 made the FIT button clickable, and this makes what comes out of it acceptable to the platforms people asked for it for.
+- **运动文件现在能导进 Garmin Connect 和 Strava 了。** FIT 文件至少要有一个「圈」，而 ZeppBridge 只在云端给了每公里分段时才写圈——室内运动、以及没跑够一公里的户外运动，云端根本不给分段。这些文件带着零个圈发出去，导入时被拒收，而导出本身报告的是成功。在一份 332 条运动的真实库上，导出的 313 份文件里有 168 份是这样，而且不只是跑步机：99 条跑步、9 条骑行也在其中。现在这类文件会带上一个覆盖整段活动的圈，里面每个数都来自已经测到并存下来的值。同一批文件里还有两处小的：现在会记下本地时区，早上六点的跑步不再显示成前一天晚上；正好落在换日线上的轨迹点也不会再因为一个进位边界而丢掉坐标。这是 [#28](https://github.com/lingcang728/ZeppBridge/issues/28) 的另一半——2.1.1 让 FIT 那个按钮能点了，这一版让它导出来的东西能被人家想用的那些平台收下。
+- **A very long workout is no longer cut off after twelve hours.** Ultramarathons, Ironman races and long tours routinely run past that, and everything after the twelfth hour was being discarded on decode.
+- **超长运动不再在第 12 小时被截断。** 百公里越野、大铁、长途骑行普遍超过这个时长，而 12 小时之后的轨迹和采样在解码时被整段丢掉。
+- **Large heart-rate ranges no longer lose everything after the first page.** A paging cursor mixed seconds and milliseconds, so any range dense enough to need a second page silently came back empty from there on — and the sync still reported success.
+- **大体积心率数据不再从第二页起全丢。** 翻页游标混用了秒和毫秒，于是任何密到需要翻第二页的区间，从那里开始安静地返回空——而同步仍然报告成功。
+- **Restoring from a backup can no longer corrupt the library it restores.** SQLite keeps a write-ahead log beside the database file, and the old log was being removed only after the new database had already taken its place. If that removal failed, or the machine lost power in between, SQLite replayed the previous database's log into the new one.
+- **从备份恢复不会再损坏恢复出来的库。** SQLite 在库文件旁边放着一份预写日志，而旧日志是在新库换上去**之后**才去删的。删除失败或中途断电，SQLite 就会把上一个库的日志重放进新库里。
+- **An interrupted database upgrade no longer leaves the command line locked out.** The upgrade now happens as one all-or-nothing step, so a power cut in the middle of it leaves the library exactly as it was, rather than marked with a version that no longer matches its own contents.
+- **升级数据库时被打断，不会再把命令行挡在门外。** 升级现在是一次要么全做要么全不做的操作，中途断电只会让库停在原样，而不是被标上一个和它自己内容对不上的版本号。
+- **Two startup tasks now respect the single-writer lock they were supposed to hold**, so running the command line or the MCP server while the desktop app starts no longer means two processes writing the same database at once.
+- **启动时的两个后台任务现在真的会去拿那把单写者锁**，桌面应用启动的同时跑命令行或 MCP 不再意味着两个进程同时写同一个库。
+- **When Zepp accepts a request and then refuses it, the app says so.** These responses arrive looking like ordinary successful ones, with the refusal written inside, and they were being reported as unreadable data — leaving the app neither asking you to sign in again nor ever showing anything. It now reports what the cloud actually said, which is also what will let the next report pin down exactly which refusal means "sign in again".
+- **Zepp 收下请求又拒绝时，应用会如实说出来。** 这类响应在传输层看起来和成功的一模一样，拒绝写在报文里，之前会被报成「数据无法解析」——于是应用既不提示重新登录，也永远不显示任何东西。现在它会把云端的原话报出来，这也是下一份反馈能把「哪一种拒绝意味着要重新登录」钉死的前提。
+- **Opening the data folder now works on Linux.**
+- **Linux 上「打开数据文件夹」现在能用了。**
+- **The app starts faster on Windows**, by asking the system for your display language directly instead of launching PowerShell to ask on its behalf — worth half a second to two seconds on machines with antivirus or restrictive group policy.
+- **Windows 上启动更快了**：直接问系统要界面语言，而不是为此启动一个 PowerShell 去代问——在装了杀毒软件或组策略受限的机器上值 0.5 到 2 秒。
+
 ## 2.1.1
 
 ### Fixes / 修复

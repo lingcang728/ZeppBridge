@@ -602,8 +602,10 @@ fn run_restore(data_dir: &Path, pending: &PendingRestore) -> RestoreOutcome {
     let live = database_path(data_dir);
     let staging = data_dir.join("zepp.db.restore-staging");
     let displaced = data_dir.join("zepp.db.restore-previous");
-    let _ = std::fs::remove_file(&staging);
-    let _ = std::fs::remove_file(&displaced);
+    // 上一次恢复留下的残骸连同它们的 WAL/SHM 一起清掉，否则这一轮挪过去的
+    // 主库会配上一轮的日志。
+    remove_sqlite_group(&staging);
+    remove_sqlite_group(&displaced);
 
     if let Err(error) = std::fs::copy(snapshot_path(data_dir, &pending.backup_id), &staging) {
         let _ = std::fs::remove_file(&staging);
@@ -629,30 +631,34 @@ fn run_restore(data_dir: &Path, pending: &PendingRestore) -> RestoreOutcome {
     }
 
     // 原子换名。先把现库挪开而不是直接删，这样中途失败还能换回来。
-    if live.exists() {
-        if let Err(error) = std::fs::rename(&live, &displaced) {
-            let _ = std::fs::remove_file(&staging);
-            return fail(format!(
-                "恢复未执行，当前库没有改动：无法移开当前库（{error}）"
-            ));
-        }
+    //
+    // `.db` / `.db-wal` / `.db-shm` 必须当**一组**挪走，而且要在新库换上去
+    // **之前**。旧的 WAL 属于被替换掉的那个库文件：留在原地的话，新库一被
+    // 打开，SQLite 就会把旧库的脏页重放进来，直接损坏 B-Tree。
+    //
+    // 之前的顺序是「挪走 .db → 换上新库 → 才去删 -wal / -shm」，而且两个删除
+    // 都是 `let _ =` 吞掉错误。在 Windows 上句柄没释放导致删除失败，或者在
+    // 这两步之间断电，就正好落进上面那个损坏场景。
+    //
+    // 挪去 `displaced` 旁边而不是直接删，回滚时才能拿回配套的 WAL。
+    if let Err(error) = displace_sqlite_group(&live, &displaced) {
+        let _ = restore_sqlite_group(&displaced, &live);
+        let _ = std::fs::remove_file(&staging);
+        return fail(format!(
+            "恢复未执行，当前库没有改动：无法移开当前库（{error}）"
+        ));
     }
     if let Err(error) = std::fs::rename(&staging, &live) {
-        // 换不上去就把原库放回原位。
-        if displaced.exists() {
-            let _ = std::fs::rename(&displaced, &live);
-        }
+        // 换不上去就把原库连同它的 WAL 一起放回原位。
+        let _ = restore_sqlite_group(&displaced, &live);
         let _ = std::fs::remove_file(&staging);
         return fail(format!("恢复失败，已换回原来的数据库：{error}"));
     }
-    // 旧的 WAL/SHM 属于被替换掉的那个库文件，留着会让 SQLite 用错日志。
-    let _ = std::fs::remove_file(data_dir.join("zepp.db-wal"));
-    let _ = std::fs::remove_file(data_dir.join("zepp.db-shm"));
 
     // 换上来的库可能来自更旧的 schema：正常打开一次让迁移跑完。失败就整体回滚。
     match Database::open_resilient(live.clone()) {
         Ok(_) => {
-            let _ = std::fs::remove_file(&displaced);
+            remove_sqlite_group(&displaced);
             RestoreOutcome {
                 backup_id: pending.backup_id.clone(),
                 rollback_backup_id: pending.rollback_backup_id.clone(),
@@ -661,15 +667,65 @@ fn run_restore(data_dir: &Path, pending: &PendingRestore) -> RestoreOutcome {
             }
         }
         Err(error) => {
-            let _ = std::fs::remove_file(&live);
-            if displaced.exists() {
-                let _ = std::fs::rename(&displaced, &live);
-            }
+            // 换上来的库自己也可能留下 WAL/SHM（`open_resilient` 走到一半就
+            // 会），回滚前必须一并清掉，否则原库换回来又要重放别人的日志。
+            remove_sqlite_group(&live);
+            let _ = restore_sqlite_group(&displaced, &live);
             fail(format!(
                 "恢复失败，已换回原来的数据库：{}",
                 error.user_message()
             ))
         }
+    }
+}
+
+/// SQLite 一个库在磁盘上的三个文件后缀。WAL 模式下它们必须同进同出。
+const SQLITE_SIDECARS: [&str; 2] = ["-wal", "-shm"];
+
+fn sidecar(path: &Path, suffix: &str) -> PathBuf {
+    let mut name = path.as_os_str().to_os_string();
+    name.push(suffix);
+    PathBuf::from(name)
+}
+
+/// 把 `live` 及其 `-wal` / `-shm` 整组挪到 `displaced` 及其同名 sidecar。
+///
+/// 主库挪失败就直接返回错误，一个 sidecar 都不动；sidecar 挪失败同样返回错误，
+/// 由调用方回滚。绝不 `let _ =` 吞掉——吞掉正是旧实现出问题的地方。
+fn displace_sqlite_group(live: &Path, displaced: &Path) -> std::io::Result<()> {
+    if !live.exists() {
+        return Ok(());
+    }
+    std::fs::rename(live, displaced)?;
+    for suffix in SQLITE_SIDECARS {
+        let from = sidecar(live, suffix);
+        if from.exists() {
+            std::fs::rename(&from, sidecar(displaced, suffix))?;
+        }
+    }
+    Ok(())
+}
+
+/// `displace_sqlite_group` 的逆操作，用于回滚。
+fn restore_sqlite_group(displaced: &Path, live: &Path) -> std::io::Result<()> {
+    if !displaced.exists() {
+        return Ok(());
+    }
+    std::fs::rename(displaced, live)?;
+    for suffix in SQLITE_SIDECARS {
+        let from = sidecar(displaced, suffix);
+        if from.exists() {
+            std::fs::rename(&from, sidecar(live, suffix))?;
+        }
+    }
+    Ok(())
+}
+
+/// 删掉一个库连同它的 WAL / SHM。只在这三个文件确定该一起消失时用。
+fn remove_sqlite_group(path: &Path) {
+    let _ = std::fs::remove_file(path);
+    for suffix in SQLITE_SIDECARS {
+        let _ = std::fs::remove_file(sidecar(path, suffix));
     }
 }
 
@@ -856,6 +912,78 @@ mod tests {
         let rollback = load_manifest(&dir, &outcome.rollback_backup_id).unwrap();
         assert_eq!(rollback.kind, BackupKind::PreRestore);
         assert_eq!(rollback.table_counts.get("metric_samples"), Some(&13));
+    }
+
+    /// 恢复必须把旧库的 `-wal` / `-shm` 一起挪走，而且要在新库换上去之前。
+    ///
+    /// 留在原地的 WAL 属于**被替换掉的那个库**。新库一被打开，SQLite 就会把
+    /// 它当成自己的日志重放进来，旧库的脏页直接盖进新库，B-Tree 就此损坏。
+    /// 旧实现是先换上新库、再 `let _ =` 去删 WAL——删失败（Windows 句柄没释放）
+    /// 或者在这两步之间断电，就正好落进这个场景。
+    #[test]
+    fn restore_moves_the_wal_away_before_the_new_library_takes_its_place() {
+        let dir = temp_dir("restore-wal");
+        drop(seed(&dir, 3));
+        let backup = create_backup(&dir, BackupKind::Manual, "1.0.0").unwrap();
+
+        // 造一份「属于旧库」的 WAL / SHM，内容带上可辨认的标记。真实的 WAL
+        // 由 SQLite 生成，这里只需要证明这两个文件不会留在新库旁边。
+        let stale = b"stale-wal-belonging-to-the-replaced-database";
+        std::fs::write(dir.join("zepp.db-wal"), stale).unwrap();
+        std::fs::write(dir.join("zepp.db-shm"), stale).unwrap();
+
+        stage_restore(&dir, &backup.id, "1.0.0").unwrap();
+        let outcome = apply_pending_restore(&dir).expect("有排队的恢复");
+        assert!(outcome.succeeded, "{outcome:?}");
+
+        for sidecar in ["zepp.db-wal", "zepp.db-shm"] {
+            let path = dir.join(sidecar);
+            if let Ok(bytes) = std::fs::read(&path) {
+                assert_ne!(
+                    bytes.as_slice(),
+                    stale,
+                    "{sidecar} 还是恢复之前那一份，它会被当成新库的日志重放"
+                );
+            }
+        }
+
+        // 恢复出来的库仍然读得动，而且确实是备份时那三条。
+        let db = Database::open_read_only_any_version(database_path(&dir)).unwrap();
+        let count: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM metric_samples", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 3);
+    }
+
+    /// 三件套要么整组挪走，要么整组回来。
+    #[test]
+    fn the_sqlite_group_moves_and_comes_back_together() {
+        let dir = temp_dir("sqlite-group");
+        let live = dir.join("zepp.db");
+        let displaced = dir.join("zepp.db.restore-previous");
+        std::fs::write(&live, b"main").unwrap();
+        std::fs::write(dir.join("zepp.db-wal"), b"wal").unwrap();
+        std::fs::write(dir.join("zepp.db-shm"), b"shm").unwrap();
+
+        displace_sqlite_group(&live, &displaced).unwrap();
+        assert!(!live.exists(), "主库应当已经挪走");
+        assert!(!dir.join("zepp.db-wal").exists(), "WAL 必须跟着主库一起走");
+        assert!(!dir.join("zepp.db-shm").exists());
+        assert_eq!(
+            std::fs::read(dir.join("zepp.db.restore-previous-wal")).unwrap(),
+            b"wal"
+        );
+
+        restore_sqlite_group(&displaced, &live).unwrap();
+        assert_eq!(std::fs::read(&live).unwrap(), b"main");
+        assert_eq!(std::fs::read(dir.join("zepp.db-wal")).unwrap(), b"wal");
+        assert_eq!(std::fs::read(dir.join("zepp.db-shm")).unwrap(), b"shm");
+
+        remove_sqlite_group(&live);
+        assert!(!live.exists());
+        assert!(!dir.join("zepp.db-wal").exists());
+        assert!(!dir.join("zepp.db-shm").exists());
     }
 
     #[test]

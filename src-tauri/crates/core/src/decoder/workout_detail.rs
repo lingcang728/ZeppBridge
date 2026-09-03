@@ -18,7 +18,16 @@ const COORD_FACTOR: f64 = 100_000_000.0;
 /// 10000 m) so genuine terrain is never discarded.
 const MIN_PLAUSIBLE_ALTITUDE_CM: i64 = -100_000;
 const MAX_PLAUSIBLE_ALTITUDE_CM: i64 = 1_000_000;
-const MAX_ACTIVITY_SECONDS: i64 = 12 * 60 * 60;
+/// 单条运动解码时接受的最长时长。
+///
+/// 这是一道防御性上限，挡的是报文里坏掉的时间戳把 `from..to` 撑成一个荒谬的
+/// 区间；它不该同时把真实的长距离运动砍掉。原来的 12 小时正好卡在真人会做的
+/// 事情中间：百公里越野、大铁、24 小时耐力赛、长途骑行普遍是 12~36 小时，
+/// 超过 12 小时的那一段轨迹点和逐秒采样会被整段丢掉——而导出看起来是成功的。
+///
+/// 48 小时仍然远小于任何一种坏时间戳会产生的量级（毫秒当秒读会得到几万年），
+/// 所以放宽之后这道防线照样有效。
+const MAX_ACTIVITY_SECONDS: i64 = 48 * 60 * 60;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RoutePoint {

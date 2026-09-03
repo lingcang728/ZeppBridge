@@ -163,6 +163,44 @@ pub fn classify_status(status: u16) -> Option<ZeppBridgeError> {
     }
 }
 
+/// 这三条流的报文外面裹着一层 `{ code, message, data }`，`code = 1` 是成功。
+///
+/// # 依据
+///
+/// 不是从文档抄的，是数出来的：一份真实的本地库里 3466 条留存报文，其中
+/// **1075 条带这层包裹**——`workouts` 484 条、`workout_detail` 334 条、
+/// `sleep` 257 条——**每一条的 `code` 都是 1，`message` 都是 `"success"`**。
+/// 另外四条流（`daily_summary` / `wellness` / `hrv` / `heart_rate`）顶层直接
+/// 就是数据，没有这层包裹，所以对它们这个函数什么都不做。
+///
+/// # 为什么必须拦
+///
+/// 在这之前，全部代码里检查这个 `code` 的地方是**零处**：只有 HTTP 401/403
+/// 会被认成需要重新登录（见 `classify_status`）。于是一个业务层已经失效的
+/// 凭据换来的是 HTTP 200 + 一个没有 `data` 的报文，归一化器找不到东西，抛出
+/// 「数据无法解析」——用户既不会被提示重新登录，也永远拉不到数据。
+///
+/// # 为什么不直接判成「需要重新认证」
+///
+/// 因为**没有观测到任何一个失败码**：1075 条全是成功。凭一个没见过的数字就
+/// 把用户踢去重新扫码登录，是拿一个确定的坏体验去换一个猜测。这里只做一件
+/// 事——把它变成一条带着 code 和云端原话的错误，让它在界面和诊断报告里现形。
+/// 下一份带着具体 code 的报告就能把它精确地映射成 `NeedsReauth`。
+const CLOUD_SUCCESS_CODE: i64 = 1;
+
+fn classify_business_code(payload: &Value) -> Option<ZeppBridgeError> {
+    let code = payload.as_object()?.get("code")?.as_i64()?;
+    if code == CLOUD_SUCCESS_CODE {
+        return None;
+    }
+    let message = payload
+        .get("message")
+        .and_then(Value::as_str)
+        .unwrap_or("(云端没有给出说明)")
+        .to_string();
+    Some(ZeppBridgeError::CloudRejected { code, message })
+}
+
 /// Zepp Cloud API connector.  The type is cloneable so network requests can
 /// happen without holding a database mutex in the synchronizer.
 #[derive(Clone)]
@@ -434,9 +472,13 @@ impl ZeppConnector {
             }
             match classify_status(status) {
                 None => {
-                    return response.json::<Value>().await.map_err(|error| {
+                    let body = response.json::<Value>().await.map_err(|error| {
                         ZeppBridgeError::ParseError(format!("JSON 响应无效: {error}"))
-                    });
+                    })?;
+                    if let Some(error) = classify_business_code(&body) {
+                        return Err(error);
+                    }
+                    return Ok(body);
                 }
                 Some(ZeppBridgeError::NeedsReauth(message)) => {
                     return Err(ZeppBridgeError::NeedsReauth(message));
@@ -806,6 +848,61 @@ pub fn validate_detail_source(input: &str) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `code = 1` 是成功，照旧放行。
+    ///
+    /// 三条流（workouts / workout_detail / sleep）的报文外面裹着
+    /// `{ code, message, data }`。一份真实库里 1075 条带包裹的报文，code 全是
+    /// 1、message 全是 "success"——所以这里必须一条都不误伤。
+    #[test]
+    fn a_successful_envelope_passes_through_untouched() {
+        let payload = serde_json::json!({
+            "code": 1,
+            "message": "success",
+            "data": { "next": -1, "summary": [] }
+        });
+        assert!(classify_business_code(&payload).is_none());
+    }
+
+    /// 另外四条流顶层没有 `code`，这个函数对它们必须完全无感。
+    #[test]
+    fn payloads_without_the_envelope_are_never_touched() {
+        assert!(classify_business_code(&serde_json::json!({ "items": [1, 2, 3] })).is_none());
+        assert!(classify_business_code(&serde_json::json!([1, 2, 3])).is_none());
+        // `code` 是字符串（不是这层包裹）时同样不该被当成业务码。
+        assert!(classify_business_code(&serde_json::json!({ "code": "ABC" })).is_none());
+    }
+
+    /// HTTP 200 + 非成功码，必须变成一条自己的错误，而不是「数据无法解析」。
+    ///
+    /// 这正是「登进去是个空账号、一条数据都没有」那类反馈的形状：传输层成功，
+    /// 业务层拒绝，`data` 缺席，归一化器抛一句看不懂的解析失败。
+    #[test]
+    fn a_rejected_envelope_becomes_its_own_error_with_the_code_visible() {
+        let payload = serde_json::json!({ "code": -1, "message": "token invalid" });
+        let error = classify_business_code(&payload).expect("非成功码必须被拦下");
+        assert!(matches!(
+            error,
+            ZeppBridgeError::CloudRejected { code: -1, .. }
+        ));
+        assert_eq!(error.code(), "err.core.cloud_rejected");
+        // 云端原话要出现在给用户看的文案里：这是下一份反馈报告认出具体
+        // 失败码的唯一途径。
+        let message = error.user_message();
+        assert!(message.contains("-1"), "{message}");
+        assert!(message.contains("token invalid"), "{message}");
+        // 但它不该被硬判成「需要重新认证」——一个失败码都没观测到，凭猜测把
+        // 用户踢去重新扫码，比现在这个 bug 更糟。
+        assert!(!error.needs_reauth());
+    }
+
+    /// 云端没给 message 时也不能崩，给一句说明就行。
+    #[test]
+    fn a_rejected_envelope_without_a_message_still_reports_the_code() {
+        let error = classify_business_code(&serde_json::json!({ "code": 401 }))
+            .expect("非成功码必须被拦下");
+        assert!(error.user_message().contains("401"));
+    }
 
     #[test]
     fn host_validation_accepts_known_regional_variants() {
