@@ -14,6 +14,10 @@
  * 要长期维护的东西」是历史陈述，永远指向 1.0.0，不跟着版本走；
  * 两个 README 的版本徽章是 shields.io 动态读 GitHub Release 的，也不用管。
  *
+ * **这个脚本只改版本号，不改日期。** AppStream 的 `<release>` 上还有一个
+ * `date=`，软件商店拿它排「最近更新」。它得手动改，脚本没法替你判断今天算
+ * 哪一天（打 tag 和改版本号常常不在同一天）。2.1.1 这一版就差点漏掉。
+ *
  * 用法:
  *   node scripts/release/check-version-consistency.mjs        检查
  *   node scripts/release/check-version-consistency.mjs 1.0.0  改成这个版本
