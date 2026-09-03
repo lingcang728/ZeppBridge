@@ -110,6 +110,23 @@ mod tests {
         assert!(is_known_key("road_cycling"));
     }
 
+    /// 12 是椭圆机。
+    ///
+    /// 和 211 一样，靠的是一句用户原话，不是数量：反馈 2db466d6（v2.1.0 /
+    /// linux，分类 workout，这个编号下挂着 80 条记录）写着「Zepp workout code
+    /// number 12 is an official activity, it's the Elliptical activity.」。
+    /// 183 份报告里这个编号出现了 11 次、共 100 条记录，但真正让它进目录的是
+    /// 那一句话——别的高频编号（108 是 15 份 320 条）只有数量没有语义，一个
+    /// 都没动。
+    ///
+    /// 椭圆机在此之前整个目录里都不存在，所以这一条同时补上了纠正列表里的
+    /// 一个缺口：以前用户连手动改成椭圆机都做不到。
+    #[test]
+    fn code_12_is_elliptical() {
+        assert_eq!(resolve(12), Some("elliptical"));
+        assert!(is_known_key("elliptical"));
+    }
+
     /// 越野跑能被选，但不会被自动派上。
     ///
     /// 有用户报告越野跑被显示成公开水域游泳，并且在纠正列表里找不到越野跑
