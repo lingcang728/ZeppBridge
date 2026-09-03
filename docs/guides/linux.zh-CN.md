@@ -82,6 +82,44 @@ ZEPPBRIDGE_CREDENTIAL_STORE=env ZEPPBRIDGE_APP_TOKEN=... zeppbridge-cli sync
 
 不设这个变量时，按机器上已经存在的事实推断：`ZEPPBRIDGE_APP_TOKEN` 里有令牌优先，其次是数据目录里已有的 `credentials.json`，最后才是 Secret Service。倒数第二条是为了不让一个容器在第二次运行时报「未连接账号」——只因为环境变量只在第一次带上了。
 
+## 把已有的库从 Windows 或 macOS 搬过来
+
+拷数据库，然后重新登录一次。这是两件事，第二件不能省——见 [issue #40][issue-40]。
+
+**数据库能搬。** 两边都关掉应用，把 `zepp.db`（连同旁边的 `auth.json`）拷到
+上面那张表里对应你这种安装方式的目录。文件里没有任何和机器绑定的东西。
+
+**令牌搬不过来，而且这是有意的。** 它从来就不在你拷的那个文件夹里：Windows
+上它在凭据管理器，macOS 上在钥匙串，两者都和那台机器绑定，也都不导出成文件。
+`auth.json` 里只有用户 ID 和区域地址。所以拷过来的文件夹是「元数据齐了、密钥
+没有」，应用会说凭据管理器里没有这个账号的令牌。这不是拷坏了，是本来就没有
+可拷的东西。
+
+按你搬到的机器挑一条：
+
+```bash
+# 有 keyring 的 Linux 桌面：在应用里重新登录一次就行，拷过来的库不会被覆盖，
+# 同步会从旧机器停下的地方接着走。
+
+# 没有 keyring 守护进程的桌面，或者用命令行驱动的无头机器：
+# App Token 填一次，之后存在数据目录里，权限 0600。
+ZEPPBRIDGE_CREDENTIAL_STORE=file zeppbridge-cli sync
+
+# 容器，或者令牌来自密钥管理器的场合：
+ZEPPBRIDGE_CREDENTIAL_STORE=env ZEPPBRIDGE_APP_TOKEN=... zeppbridge-cli sync
+```
+
+App Token 本身从哪来，两条路：
+
+- 桌面应用里（任何平台）：**设置 → 手动登录**，可以读出来，也可以填进去。
+- 浏览器里：在 `https://watchface.zepp.com/` 登录，然后从开发者工具里读出
+  `apptoken` 和 `userid`。应用自己的登录窗口收的就是这一对。
+
+命令行**故意**没有 `login`。登录意味着浏览器、密码，有时还有一次性验证码，
+而命令行是给 cron 和容器跑的——那里没有人来回答这些。
+
+[issue-40]: https://github.com/lingcang728/ZeppBridge/issues/40
+
 ## 窗口一片空白，或者根本起不来
 
 两个已知的 Linux 问题，应用里都已经做了处理。

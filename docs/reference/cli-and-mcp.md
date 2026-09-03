@@ -60,6 +60,15 @@ A headless machine has none, so `ZEPPBRIDGE_CREDENTIAL_STORE=file` or
 **Prerequisite**: connect your account with the desktop app and sync at least
 once. The command line does not sign in, and MCP does not touch the network.
 
+Copying a `data/` folder over from another machine is not enough on its own.
+The database travels; the token does not — it lives in that machine's Credential
+Manager / Keychain / Secret Service, never in a file. A copied folder therefore
+arrives with the metadata and no secret, and the CLI exits `3` saying the
+credential store has no token for this account. Fix it with either credential
+store above, or by signing in again in the desktop app on the new machine —
+[moving a library across platforms](../guides/linux.md#moving-an-existing-library-from-windows-or-macos)
+walks through both.
+
 ## zeppbridge-cli
 
 Non-interactive: it never asks a question, waits for a key press or opens a
@@ -117,7 +126,7 @@ meaning of an existing one never changes.
 | 0 | Success | — |
 | 1 | Other failure | Read the error message |
 | 2 | Usage error | Fix the command |
-| 3 | No Zepp account connected | Sign in with the desktop app |
+| 3 | No Zepp account connected, or the token is not on this machine | Sign in with the desktop app, or set `ZEPPBRIDGE_CREDENTIAL_STORE` |
 | 4 | Another process is writing to the database | **Retry later; this is not a failure** |
 | 5 | Cloud request failed | Back off and retry |
 | 6 | Local database error | Requires human intervention |
