@@ -599,7 +599,7 @@ enum CapabilityEvidence {
 /// evidence available, since "you have 32 days of stress readings" beats any
 /// probe. Only the three with no local trace need a request, and those are the
 /// ones where silence is genuinely ambiguous.
-const CAPABILITY_ROWS: [(&str, CapabilityEvidence, i64); 16] = [
+const CAPABILITY_ROWS: [(&str, CapabilityEvidence, i64); 17] = [
     ("heart_rate", CapabilityEvidence::Samples("heart_rate"), 30),
     (
         "sleep",
@@ -643,6 +643,9 @@ const CAPABILITY_ROWS: [(&str, CapabilityEvidence, i64); 16] = [
     // 样本本身——而这正是四个人报的那件事的终点：以前这一行永远显示探针
     // 的结论「最近 365 天没有测量记录」，因为探针打的是一个对谁都空的面。
     ("weight", CapabilityEvidence::Samples("weight"), 365),
+    // 饮食记录同理。窗口给 365 天：手动记录是间断的，一周没记不说明这个
+    // 账号没有这个功能。
+    ("food", CapabilityEvidence::DailyPrefix("intake_"), 365),
 ];
 
 /// The metric names one weigh-in produces.
@@ -667,7 +670,10 @@ pub const BODY_COMPOSITION_METRICS: [&str; 11] = [
 ];
 
 /// Streams with no local trace at all. Only these cost a request.
-pub const PROBE_ONLY_CAPABILITIES: [&str; 3] = ["blood_pressure", "emotion", "food"];
+///
+/// `weight` 和 `food` 都已经不在里面了：两条现在都真的入库，证据是库里的行
+/// 而不是一句探针结论。留下的是仍然只能靠探针回答的那两条。
+pub const PROBE_ONLY_CAPABILITIES: [&str; 2] = ["blood_pressure", "emotion"];
 
 /// 探测覆盖多久。和探测本身用的范围一致，界面拿它写「过去 N 天没有测量记录」。
 const PROBE_WINDOW_DAYS: i64 = 365;
@@ -1990,7 +1996,8 @@ impl Database {
                     ));
                 }
                 let summary_end = self.workout_end_time(&workout_id)?;
-                let decoded = decode_workout_detail(payload, summary_end)?;
+                let summary_distance = self.workout_distance_meters(&workout_id)?;
+                let decoded = decode_workout_detail(payload, summary_end, summary_distance)?;
                 self.replace_workout_series(&workout_id, &decoded)?;
                 counts.primary_records =
                     (decoded.samples.len() + decoded.route.len() + decoded.pauses.len()) as i64;
@@ -2723,6 +2730,23 @@ impl Database {
             |row| row.get(0),
         )?;
         Ok(count > 0)
+    }
+
+    /// 这条运动的总距离。
+    ///
+    /// 明细解码走 `kilo_pace` 兜底时要它：那份数据只给整公里，最后那截零头的
+    /// 长度只能从汇总来。汇总里没有距离（室内、无 GPS）就返回 None，那时不补
+    /// 零头，而不是猜一个。
+    fn workout_distance_meters(&self, workout_id: &str) -> Result<Option<f64>> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT distance_meters FROM workouts WHERE workout_id = ?1",
+                [workout_id],
+                |row| row.get::<_, Option<f64>>(0),
+            )
+            .optional()?
+            .flatten())
     }
 
     fn workout_end_time(&self, workout_id: &str) -> Result<Option<DateTime<Utc>>> {

@@ -194,6 +194,118 @@ impl SplitBuilder {
     }
 }
 
+/// Kilometre boundaries from the server's own `kilo_pace` series.
+///
+/// Splits normally come from `currentDistance`, but on this library **130 of
+/// 336 stored workout details have an empty `currentDistance` and a populated
+/// `kilo_pace`** — those workouts get no splits at all today, which is what a
+/// .fit comparison on GitHub surfaced as "run.fit: 1 lap, Zepp: 8 laps".
+///
+/// The row layout is **not stable**. Rows come 6, 14 or 15 fields wide, and at
+/// the same width the columns still move: on one workout field 4 is the average
+/// heart rate and field 13 is something else, on another it is the reverse. So
+/// only three columns are read here, and the decode has to prove itself before
+/// it is used:
+///
+/// * `[0]` the 0-based kilometre number, which must equal its position;
+/// * `[1]` that kilometre's duration in seconds, which must be plausible;
+/// * `[5]` the elapsed total, which must equal the running sum of `[1]`.
+///
+/// If any row fails, the whole series is refused and the workout keeps the
+/// single whole-activity lap it has today. On 266 real workouts this accepts
+/// 263 and rejects 3 — and the three it rejects are ones whose columns really
+/// do not line up.
+///
+/// Heart rate and elevation are **not** read out of `kilo_pace`. They are
+/// accumulated from our own per-second samples over each kilometre's time
+/// window, exactly as the `currentDistance` path does, because that needs no
+/// guess about which column means what.
+fn kilometre_seconds(value: Option<&Value>) -> Option<Vec<i64>> {
+    let text = value.and_then(Value::as_str)?.trim();
+    if text.is_empty() {
+        return None;
+    }
+    let mut seconds = Vec::new();
+    let mut elapsed = 0i64;
+    for (position, row) in text.split(';').filter(|row| !row.is_empty()).enumerate() {
+        let columns: Vec<&str> = row.split(',').collect();
+        if columns.len() < 6 {
+            return None;
+        }
+        let index: i64 = columns[0].trim().parse().ok()?;
+        let duration: i64 = columns[1].trim().parse().ok()?;
+        let cumulative: i64 = columns[5].trim().parse().ok()?;
+        if index != position as i64 {
+            return None;
+        }
+        // 一公里跑上一小时以上，那不是配速，是列读错了。
+        if !(1..=3600).contains(&duration) {
+            return None;
+        }
+        elapsed += duration;
+        // 允许 1 秒的取整误差：这一列在部分记录里是从毫秒四舍五入来的。
+        if (cumulative - elapsed).abs() > 2 {
+            return None;
+        }
+        seconds.push(duration);
+    }
+    (!seconds.is_empty()).then_some(seconds)
+}
+
+/// Build kilometre splits from `kilo_pace` durations plus our own samples.
+///
+/// `kilo_pace` carries exactly `floor(distance / 1000)` rows — the trailing
+/// partial kilometre is not one of them — so the remainder is added here from
+/// the summary distance, keeping the same `partial` flag the other path sets.
+/// Without it a 4975 m run would report 4 km and quietly lose 975 m.
+fn splits_from_kilometre_seconds(
+    samples: &[WorkoutSample],
+    kilometre_seconds: &[i64],
+    start: DateTime<Utc>,
+    end: DateTime<Utc>,
+    total_distance_m: Option<f64>,
+) -> Vec<WorkoutSplit> {
+    let sample_by_second: std::collections::BTreeMap<i64, &WorkoutSample> = samples
+        .iter()
+        .map(|sample| (sample.timestamp.timestamp(), sample))
+        .collect();
+
+    let mut splits = Vec::new();
+    let mut cursor = start;
+    let mut travelled = 0.0f64;
+    for (position, duration) in kilometre_seconds.iter().enumerate() {
+        let end = cursor + chrono::Duration::seconds(*duration);
+        let mut builder = SplitBuilder::new(position as i32 + 1, cursor, travelled);
+        for sample in sample_by_second
+            .range(cursor.timestamp()..=end.timestamp())
+            .map(|(_, item)| *item)
+        {
+            builder.observe(sample);
+        }
+        travelled += 1000.0;
+        splits.push(builder.finish(end, travelled, false));
+        cursor = end;
+    }
+
+    // 最后那截零头。`kilo_pace` 只给整公里，所以它的时长只能由运动的结束时刻
+    // 界定——不能用「最后一条采样」，那在采样比计时先停的记录上会把零头整段
+    // 丢掉，而丢掉的恰恰是一次 4975 m 跑步里的那 975 m。
+    if let Some(total) = total_distance_m.filter(|value| value.is_finite()) {
+        if total - travelled > 1.0 && end > cursor {
+            let index = splits.len() as i32 + 1;
+            let mut builder = SplitBuilder::new(index, cursor, travelled);
+            for sample in sample_by_second
+                .range(cursor.timestamp()..=end.timestamp())
+                .map(|(_, item)| *item)
+            {
+                builder.observe(sample);
+            }
+            splits.push(builder.finish(end, total, true));
+        }
+    }
+    splits
+}
+
 /// Cut a workout into kilometres along the server's cumulative distance.
 ///
 /// The distance series drives the walk, not the sample series: a workout's
@@ -268,9 +380,16 @@ pub struct DecodedWorkout {
     pub splits: Vec<WorkoutSplit>,
 }
 
+/// 解码一条运动明细。
+///
+/// `summary_end` 是汇总里的结束时刻，`summary_distance_m` 是汇总里的总距离。
+/// 后者只在走 `kilo_pace` 兜底那条路时用得上：那份数据只给整公里，最后那截
+/// 零头的长度只能从汇总来，缺了它一次 4975 m 的跑步会只报出 4 公里，另外
+/// 975 m 无声消失。两个都是 `Option`，因为室内运动可能两样都没有。
 pub fn decode_workout_detail(
     raw: &Value,
     summary_end: Option<DateTime<Utc>>,
+    summary_distance_m: Option<f64>,
 ) -> Result<DecodedWorkout> {
     let data = detail_object(raw)
         .ok_or_else(|| ZeppBridgeError::ParseError("workout detail 缺少 data 对象".into()))?;
@@ -474,7 +593,19 @@ pub fn decode_workout_detail(
             distance_by_second.insert(cursor, f64::from(*centimetres) / 100.0);
         }
     }
-    let splits = compute_splits(&samples, &distance_by_second);
+    let mut splits = compute_splits(&samples, &distance_by_second);
+    // `currentDistance` 是空的时候（这份库里 336 条明细有 130 条如此），
+    // 上面这一步返回空，整条运动就只剩一圈。云端自己的 `kilo_pace` 在这些
+    // 记录上恰恰是有的。
+    if splits.is_empty() {
+        if let Some(seconds) = kilometre_seconds(data.get("kilo_pace")) {
+            let total = summary_distance_m.or_else(|| {
+                // 汇总没给距离时，按整公里数兜底：kilo_pace 每一行就是一公里。
+                (!seconds.is_empty()).then_some(seconds.len() as f64 * 1000.0)
+            });
+            splits = splits_from_kilometre_seconds(&samples, &seconds, start_time, end_time, total);
+        }
+    }
 
     Ok(DecodedWorkout {
         track_id,
@@ -831,6 +962,7 @@ mod tests {
         let decoded = decode_workout_detail(
             &raw,
             Some(Utc.timestamp_opt(1_700_000_030, 0).single().unwrap()),
+            None,
         )
         .unwrap();
         assert_eq!(decoded.track_id, 1_700_000_000);
@@ -867,7 +999,7 @@ mod tests {
                 "longitude_latitude": "4004663552,11629333504;1,1;1,1;",
                 "altitude": format!("{sentinel};1451;1448;"),
             });
-            let decoded = decode_workout_detail(&raw, None).unwrap();
+            let decoded = decode_workout_detail(&raw, None, None).unwrap();
             // The leading sentinel is backfilled from the first plausible
             // reading, never divided by 100 into terrain.
             assert_eq!(decoded.route[0].altitude_m, Some(14.51), "{sentinel}");
@@ -891,7 +1023,7 @@ mod tests {
             "altitude": "-2002110;9900;9900;",
             "time_delta_altitude": "1,3516;1,3518;1,3521;",
         });
-        let decoded = decode_workout_detail(&raw, None).unwrap();
+        let decoded = decode_workout_detail(&raw, None, None).unwrap();
         let altitudes: Vec<Option<f64>> =
             decoded.route.iter().map(|point| point.altitude_m).collect();
         assert!(
@@ -912,7 +1044,7 @@ mod tests {
             "heart_rate": "0,150;1,10;1,0;1,-10;1,0;",
             "time_delta_altitude": "1,1000;1,1200;1,1100;1,1300;",
         });
-        let decoded = decode_workout_detail(&raw, None).unwrap();
+        let decoded = decode_workout_detail(&raw, None, None).unwrap();
         let splits = &decoded.splits;
         assert_eq!(splits.len(), 3, "two full kilometres and a remainder");
         assert_eq!(splits[0].index, 1);
@@ -942,7 +1074,7 @@ mod tests {
             "time": "1;1;1;",
             "heart_rate": "1,120;1,2;1,1;"
         });
-        let decoded = decode_workout_detail(&raw, None).unwrap();
+        let decoded = decode_workout_detail(&raw, None, None).unwrap();
         assert!(decoded.splits.is_empty());
     }
 
@@ -953,7 +1085,7 @@ mod tests {
             "time": "1;1;1;",
             "heart_rate": "1,120;1,2;1,-1;"
         });
-        let decoded = decode_workout_detail(&raw, None).unwrap();
+        let decoded = decode_workout_detail(&raw, None, None).unwrap();
         assert!(decoded.route.is_empty());
         assert!(!decoded.samples.is_empty());
         assert!(decoded
@@ -965,7 +1097,7 @@ mod tests {
     #[test]
     fn missing_trackid_is_an_error() {
         let raw = json!({ "time": "1;1;" });
-        assert!(decode_workout_detail(&raw, None).is_err());
+        assert!(decode_workout_detail(&raw, None, None).is_err());
     }
 
     #[test]
@@ -977,7 +1109,7 @@ mod tests {
                 "longitude_latitude": "1,1;2,2;"
             }
         });
-        let decoded = decode_workout_detail(&raw, None).unwrap();
+        let decoded = decode_workout_detail(&raw, None, None).unwrap();
         assert!(decoded
             .samples
             .iter()
@@ -1003,5 +1135,111 @@ mod tests {
         // 浮点那一路同理。
         let valued = parse_valued_pairs(Some(&json!("2,180.5;oops,200.0;4,210.25;")));
         assert_eq!(valued, vec![(2, 180.5), (4, 210.25)]);
+    }
+    /// `currentDistance` 是空的时候，公里分段从云端自己的 `kilo_pace` 来。
+    ///
+    /// 这份库里 336 条明细有 130 条正是这样：有 `kilo_pace`、没有 `currentDistance`，
+    /// 于是一段分段都出不来，导出的 .fit 整段跑步只有一圈。GitHub 上那份对拍报告
+    /// 里「run.fit: 1 圈，Zepp: 8 圈」说的就是它。
+    #[test]
+    fn kilo_pace_fills_in_splits_when_cumulative_distance_is_missing() {
+        // 三公里，各 300 / 310 / 290 秒；第 6 列是累计秒数，用来自证列没读错。
+        //
+        // `time` 必须覆盖 kilo_pace 声称的整段时间：一次只持续 4 秒的运动不
+        // 可能有 900 秒的公里数，那样的夹具证明不了任何事。这里 0/300/310/290/100
+        // 累加是 1000 秒，比三公里多出 100 秒——那 100 秒就是最后那截零头。
+        let raw = json!({
+            "trackid": 1_700_000_000i64,
+            "time": "0;300;310;290;100;",
+            "currentDistance": "",
+            "kilo_pace": "0,300,wtmkqm0228e3,1,-1,300,300266,69,0,109,0,4,0,164;\
+        1,310,wtmkqnm0p17s,1,-1,610,310237,71,0,107,0,2,0,164;\
+        2,290,wtmkqr93gqgr,1,-1,900,290246,69,0,105,0,1,0,160;",
+            "heart_rate": "0,150;300,10;310,0;290,-10;100,0;",
+        });
+        let decoded = decode_workout_detail(&raw, None, Some(3400.0)).unwrap();
+        let splits = &decoded.splits;
+        assert_eq!(splits.len(), 4, "三个整公里加一截零头");
+        assert_eq!(splits[0].duration_seconds, 300);
+        assert_eq!(splits[1].duration_seconds, 310);
+        assert_eq!(splits[2].duration_seconds, 290);
+        for split in splits.iter().take(3) {
+            assert_eq!(split.distance_m, 1000.0);
+            assert!(!split.partial);
+        }
+        // 零头的长度来自汇总距离，不是猜的：3400 - 3000 = 400。
+        assert!(splits[3].partial, "最后一截要标成不完整");
+        assert_eq!(splits[3].distance_m, 400.0);
+        assert_eq!(
+            splits.iter().map(|split| split.distance_m).sum::<f64>(),
+            3400.0,
+            "分段距离合计必须等于总距离，不能悄悄少一截"
+        );
+    }
+
+    /// 列对不上就整条拒掉，而不是拿一半当真。
+    ///
+    /// `kilo_pace` 的列在不同记录之间会挪位：同样宽度下，有的记录第 4 列是平均
+    /// 心率，有的记录第 13 列才是。所以判断依据不是宽度，而是「序号连续、单圈
+    /// 秒数累加起来等于累计列」这一条自洽性——它对不上，就说明列读错了。
+    #[test]
+    fn a_kilo_pace_series_that_does_not_add_up_is_refused() {
+        let inconsistent = json!({
+            "trackid": 1_700_000_000i64,
+            "time": "0;1;1;",
+            "currentDistance": "",
+            // 累计列写的是 300 / 999：第二行 300 + 310 = 610，对不上 999。
+            "kilo_pace": "0,300,geo,1,-1,300,300266,69,0,109,0,4,0,164;\
+        1,310,geo,1,-1,999,310237,71,0,107,0,2,0,164;",
+            "heart_rate": "0,150;1,10;1,0;",
+        });
+        let decoded = decode_workout_detail(&inconsistent, None, Some(2000.0)).unwrap();
+        assert!(decoded.splits.is_empty(), "对不上就不要，宁可只有整段一圈");
+
+        // 序号跳号同理。
+        let out_of_order = json!({
+            "trackid": 1_700_000_000i64,
+            "time": "0;1;1;",
+            "currentDistance": "",
+            "kilo_pace": "0,300,geo,1,-1,300,300266,69,0,109,0,4,0,164;\
+        5,310,geo,1,-1,610,310237,71,0,107,0,2,0,164;",
+            "heart_rate": "0,150;1,10;1,0;",
+        });
+        assert!(decode_workout_detail(&out_of_order, None, Some(2000.0))
+            .unwrap()
+            .splits
+            .is_empty());
+    }
+
+    /// 有 `currentDistance` 时不动它：那条路测得更细，逐秒切，不该被兜底顶掉。
+    #[test]
+    fn cumulative_distance_still_wins_when_it_is_present() {
+        let raw = json!({
+            "trackid": 1_700_000_000i64,
+            "time": "0;1;1;1;1;",
+            "currentDistance": "0,0;1,40000;1,100000;1,160000;1,240000;",
+            // 故意给一份和上面对不上的 kilo_pace：它不该被用到。
+            "kilo_pace": "0,999,geo,1,-1,999,999000,69,0,109,0,4,0,164;",
+            "heart_rate": "0,150;1,10;1,0;1,-10;1,0;",
+        });
+        let decoded = decode_workout_detail(&raw, None, Some(2400.0)).unwrap();
+        assert_eq!(decoded.splits.len(), 3);
+        assert_ne!(decoded.splits[0].duration_seconds, 999);
+    }
+
+    /// 汇总没给距离（室内、没 GPS）时不补零头，而不是编一个长度出来。
+    #[test]
+    fn without_a_summary_distance_the_remainder_is_left_out_rather_than_invented() {
+        let raw = json!({
+            "trackid": 1_700_000_000i64,
+            "time": "0;1;1;",
+            "currentDistance": "",
+            "kilo_pace": "0,300,geo,1,-1,300,300266,69,0,109,0,4,0,164;",
+            "heart_rate": "0,150;1,10;1,0;",
+        });
+        let decoded = decode_workout_detail(&raw, None, None).unwrap();
+        assert_eq!(decoded.splits.len(), 1, "只有那一个整公里");
+        assert!(!decoded.splits[0].partial);
+        assert_eq!(decoded.splits[0].distance_m, 1000.0);
     }
 }

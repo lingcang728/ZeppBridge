@@ -97,6 +97,7 @@ reprocess options:
 
 export options:
   --format <json|csv|gpx|fit>  Default: json; fit needs --out to point at a directory
+                               (fit always exports full detail: that is what a FIT file is)
   --from <YYYY-MM-DD>       Use together with --to
   --to <YYYY-MM-DD>
   --workout <id>            Export one workout; mutually exclusive with --from/--to
@@ -982,6 +983,18 @@ fn cmd_export(args: &[String]) -> u8 {
     {
         eprintln!("Note: {notice}");
     }
+    // FIT 只有 full 一档有意义。
+    //
+    // `--detail` 默认是 summary，而 summary 不带 `samples` / `route`——那正是
+    // FIT 的全部内容。于是 `export --format fit` 在不加 `--detail full` 时**永远**
+    // 导不出任何文件，只回一句「这段时间没有可导出的运动明细」，而那句话在有
+    // 明细的库上完全是误导。桌面端那条路一直是写死 full 的（commands/data.rs），
+    // 只有命令行漏了。
+    let detail = if format == "fit" {
+        ExportDetail::Full
+    } else {
+        detail
+    };
     let selection = ExportSelection {
         scope: Some(scope),
         start_date: None,

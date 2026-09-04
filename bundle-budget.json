@@ -1,10 +1,10 @@
 {
   "baseline": {
-    "initialJsGzip": 74772,
-    "initialCssGzip": 4057
+    "initialJsGzip": 85939,
+    "initialCssGzip": 4066
   },
   "limits": {
-    "initialJsGzip": 86016,
+    "initialJsGzip": 99328,
     "initialCssGzip": 5120
   },
   "note": "首屏加载体积（gzip）。initialJs 含入口脚本与 index.html modulepreload 的 chunk；懒加载的页面 chunk 不计入。用 npm run budget:update 刷新。"

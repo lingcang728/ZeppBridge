@@ -1092,7 +1092,7 @@ type WellnessStream = (
     Option<i64>,
 );
 
-const WELLNESS_STREAMS: [WellnessStream; 9] = [
+const WELLNESS_STREAMS: [WellnessStream; 10] = [
     // The per-minute `Charge/stress_data` payload is a protobuf whose float
     // fields match none of the ranges the app displays, so the daily roll-up is
     // read from `all_day_stress` instead. Both are fetched: retaining the raw
@@ -1156,6 +1156,21 @@ const WELLNESS_STREAMS: [WellnessStream; 9] = [
         ProbeSurface::UserEventsDay,
         "blood_oxygen",
         Some("odi"),
+        Some(WELLNESS_CHUNK_DAYS),
+    ),
+    // 饮食记录。大陆以外的 Zepp 应用里是官方功能，按餐拍照、存成宏量营养素。
+    //
+    // `subType` 必须是 `None`：这条流只用 `eventType` 寻址，编一个 subType 出来
+    // 会拿回一个空页，而空页读起来和「这个人没记过饮食」一模一样——这正是
+    // 2026-08-31 那次踩过的坑（见 connectors/zepp.rs 里 `fetch_events` 的注释）。
+    //
+    // 抓取窗口和别的可选流一样按周切：手动记录的量很小，但一次要一年会让
+    // 一个从没记过饭的账号也付一次大请求的代价。
+    (
+        "food",
+        ProbeSurface::V2Events,
+        "Food",
+        None,
         Some(WELLNESS_CHUNK_DAYS),
     ),
 ];

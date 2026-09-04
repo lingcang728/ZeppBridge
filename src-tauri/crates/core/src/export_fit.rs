@@ -258,6 +258,9 @@ struct Point {
     power_watts: Option<f64>,
     ground_contact_ms: Option<f64>,
     vertical_oscillation_mm: Option<f64>,
+    /// 步幅，单位厘米。`workout_samples.stride` 逐秒都有，而 FIT 文件里这
+    /// 一列一直是空的——对拍报告里「步幅只在 Zepp 那份里有」说的就是它。
+    stride_cm: Option<f64>,
 }
 
 /// 把 `route` 和 `samples` 两条序列按时间戳合并成一条。
@@ -290,6 +293,7 @@ fn merge_series(workout: &Value) -> Vec<(i64, Point)> {
         point.cadence_spm = entry.get("cadence").and_then(Value::as_f64);
         point.power_watts = entry.get("power_watts").and_then(Value::as_f64);
         point.ground_contact_ms = entry.get("ground_contact_ms").and_then(Value::as_f64);
+        point.stride_cm = entry.get("stride_cm").and_then(Value::as_f64);
         point.vertical_oscillation_mm =
             entry.get("vertical_oscillation_mm").and_then(Value::as_f64);
         // route 已经给过高度时不覆盖：两者同源，但 route 那份和坐标是配套的。
@@ -358,6 +362,17 @@ fn record_message(unix: i64, point: &Point, sport: typedef::Sport) -> Message {
         let scaled = (contact * 10.0).round();
         if scaled <= f64::from(u16::MAX) {
             fields.push(u16_field(mesgdef::Record::STANCE_TIME, scaled as u16));
+        }
+    }
+    // 步幅。库里是厘米；FIT 的 `step_length` 是 u16、单位毫米、scale 10，
+    // 也就是存「毫米的十倍」。1.09 m -> 1090 mm -> 10900。
+    if let Some(stride) = point
+        .stride_cm
+        .filter(|value| value.is_finite() && *value > 0.0)
+    {
+        let encoded = (stride * 100.0).round();
+        if encoded <= f64::from(u16::MAX) {
+            fields.push(u16_field(mesgdef::Record::STEP_LENGTH, encoded as u16));
         }
     }
     if let Some(oscillation) = point
@@ -738,11 +753,149 @@ fn push_session(
         fields.push(u8_field(mesgdef::Session::MAX_HEART_RATE, max_hr as u8));
     }
 
+    // 下面这几样的数据一直躺在 `workouts` 和 `workout_hr_zones` 里，只是
+    // 从来没被写进 FIT 文件。有人把我们导出的 .fit 和 Zepp 自己导出的逐
+    // 字段对拍过（GitHub，2026-09-04）：数值上我们更准（Zepp 的 avg_speed
+    // 和 total_strides 自相矛盾，我们的对得上），但「Zepp 那份带的东西更
+    // 多：海拔、功率、跑步功率、步幅、心率区间时间分布、训练效果」。
+    //
+    // 每个字段的 scale / offset 都照 FIT profile 来，写在各自的注释里。
+    // 这类编码错了不会报错，只会让读文件的人看到一个量级不对但仍然像样
+    // 的数字。
+
+    // 步幅。库里是厘米；FIT 的 `avg_step_length` 是 u16、单位毫米、scale 10,
+    // 也就是说存进去的是「毫米的十倍」。109 cm -> 1090 mm -> 10900。
+    if let Some(stride_cm) = workout
+        .get("avg_stride_cm")
+        .and_then(Value::as_f64)
+        .filter(|value| value.is_finite() && *value > 0.0)
+    {
+        let encoded = stride_cm * 100.0;
+        if encoded.is_finite() && encoded <= f64::from(u16::MAX) {
+            fields.push(u16_field(
+                mesgdef::Session::AVG_STEP_LENGTH,
+                encoded.round() as u16,
+            ));
+        }
+    }
+
+    // 功率。逐条 record 一直在写 `power`，session 上却没有汇总，于是按会话
+    // 读功率的平台会认为这次运动根本没有功率数据。单位就是瓦，没有 scale。
+    let powers: Vec<f64> = points
+        .iter()
+        .filter_map(|(_, point)| point.power_watts)
+        .filter(|value| value.is_finite() && *value >= 0.0)
+        .collect();
+    if !powers.is_empty() {
+        let average = powers.iter().sum::<f64>() / powers.len() as f64;
+        let peak = powers.iter().copied().fold(f64::MIN, f64::max);
+        if average.is_finite() && average <= f64::from(u16::MAX) {
+            fields.push(u16_field(
+                mesgdef::Session::AVG_POWER,
+                average.round() as u16,
+            ));
+        }
+        if peak.is_finite() && peak <= f64::from(u16::MAX) {
+            fields.push(u16_field(mesgdef::Session::MAX_POWER, peak.round() as u16));
+        }
+    }
+
+    // 海拔。总爬升/总下降早就在写了，绝对高度没有——而「跑在多高的地方」
+    // 和「爬了多少」不是同一个问题。编码沿用逐条 record 用的那个
+    // `encode_altitude`（(米 + 500) x 5），不在这里另写一份：两份迟早会分叉，
+    // 而分叉之后 session 和 record 的高度对不上，看文件的人只会以为数据坏了。
+    // 最高/最低取云端汇总：它覆盖整段运动，包括没有逐秒采样的那部分。
+    // 平均值汇总里没有，只能从采样算——不给的字段不去凭空补一个。
+    for (key, field) in [
+        ("max_altitude_m", mesgdef::Session::MAX_ALTITUDE),
+        ("min_altitude_m", mesgdef::Session::MIN_ALTITUDE),
+    ] {
+        if let Some(encoded) = workout
+            .get(key)
+            .and_then(Value::as_f64)
+            .filter(|value| value.is_finite())
+            .and_then(encode_altitude)
+        {
+            fields.push(u16_field(field, encoded));
+        }
+    }
+    let altitudes: Vec<f64> = points
+        .iter()
+        .filter_map(|(_, point)| point.altitude_m)
+        .filter(|value| value.is_finite())
+        .collect();
+    if !altitudes.is_empty() {
+        let average = altitudes.iter().sum::<f64>() / altitudes.len() as f64;
+        if let Some(encoded) = encode_altitude(average) {
+            fields.push(u16_field(mesgdef::Session::AVG_ALTITUDE, encoded));
+        }
+    }
+
+    // 训练效果。u8，scale 10：3.4 存成 34。手表给的范围是 0.0-5.0。
+    for (key, field) in [
+        ("training_effect", mesgdef::Session::TOTAL_TRAINING_EFFECT),
+        (
+            "anaerobic_training_effect",
+            mesgdef::Session::TOTAL_ANAEROBIC_TRAINING_EFFECT,
+        ),
+    ] {
+        if let Some(effect) = workout
+            .get(key)
+            .and_then(Value::as_f64)
+            .filter(|value| value.is_finite() && *value >= 0.0 && *value <= 5.0)
+        {
+            fields.push(u8_field(field, (effect * 10.0).round() as u8));
+        }
+    }
+
+    if let Some(zones) = hr_zone_field(workout) {
+        fields.push(u32_array_field(mesgdef::Session::TIME_IN_HR_ZONE, zones));
+    }
+
     messages.push(Message {
         num: typedef::MesgNum::SESSION,
         fields,
         ..Default::default()
     });
+}
+
+/// 心率区间的停留时间，换成 FIT 的 `time_in_hr_zone` 数组。
+///
+/// 库里的 `hr_zones` 是 `{index, upper_bound_bpm, seconds}`，`index` 从 0 起，
+/// 第 0 档就是「低于区间 1 下界」——和 FIT 数组的约定正好一致。即便如此也要
+/// **按 `index` 落位**而不是按数组顺序平铺：少了任何一档，平铺都会让后面每一
+/// 个数字往前串一个区间，而串完之后它们看上去仍然完全合理。
+///
+/// 字段是 `Vec<u32>`，scale 1000、单位秒，也就是说存进去的是毫秒。
+/// 手表没有测到的区间留 0：那是「这次没有在这个区间待过」，不是缺数据。
+fn hr_zone_field(workout: &Value) -> Option<Vec<u32>> {
+    let zones = workout.get("hr_zones").and_then(Value::as_array)?;
+    let mut buckets: Vec<u32> = Vec::new();
+    let mut wrote_any = false;
+    for zone in zones {
+        let Some(index) = zone.get("index").and_then(Value::as_i64) else {
+            continue;
+        };
+        let Some(seconds) = zone.get("seconds").and_then(Value::as_f64) else {
+            continue;
+        };
+        // 上限 8 是给区间编号留的余量（手表用 1-5）。越界的索引宁可丢掉，
+        // 也不要让一个坏编号把数组撑成几万个元素。
+        if !(0..=8).contains(&index) || !seconds.is_finite() || seconds < 0.0 {
+            continue;
+        }
+        let slot = index as usize;
+        if buckets.len() <= slot {
+            buckets.resize(slot + 1, 0);
+        }
+        let milliseconds = (seconds * 1000.0).round();
+        if !milliseconds.is_finite() || milliseconds > f64::from(u32::MAX) {
+            continue;
+        }
+        buckets[slot] = milliseconds as u32;
+        wrote_any = true;
+    }
+    wrote_any.then_some(buckets)
 }
 
 /// `(暂停开始, 恢复)` 的秒级时间戳对，按开始时间排序。
@@ -1070,6 +1223,20 @@ fn i32_field(num: u8, value: i32) -> Field {
         num,
         base_type: typedef::FitBaseType::SINT32,
         value: FitValue::Int32(value),
+        is_expanded: false,
+    }
+}
+
+/// 一个 `u32` 数组字段。
+///
+/// `time_in_hr_zone` 是这份导出里唯一的数组字段：每个心率区间一个元素。
+/// 别的字段都是标量，所以这个构造器只有它一个用户——但少了它，区间时间
+/// 分布就只能拆成几个自造的字段名，那样没有任何平台读得出来。
+fn u32_array_field(num: u8, values: Vec<u32>) -> Field {
+    Field {
+        num,
+        base_type: typedef::FitBaseType::UINT32,
+        value: FitValue::VecUint32(values),
         is_expanded: false,
     }
 }
@@ -1606,5 +1773,167 @@ mod tests {
         assert_eq!(encode_altitude(12.4), Some(2562));
         assert_eq!(encode_altitude(-20000.0), None, "海拔哨兵值不能写成假高度");
         assert_eq!(encode_altitude(f64::NAN), None);
+    }
+    /// 对拍报告里「Zepp 那份带的东西更多」的那一串，逐条钉住。
+    ///
+    /// 这些字段的数据一直在库里，只是没写进文件。每一个的 scale / offset 都不一样，
+    /// 写错了不会报错，只会让读文件的人看到一个量级不对却仍然像样的数字——所以这里
+    /// 不是断言「有值」，而是断言「解回来等于当初放进去的那个真实读数」。
+    #[test]
+    fn the_session_carries_stride_power_altitude_effect_and_hr_zones() {
+        let export = export_with(json!({
+            "workouts": [{
+                "workout_id": "1",
+                "effective_type": "run",
+                "start_time": "2026-08-26T01:57:30+00:00",
+                "end_time": "2026-08-26T02:00:30+00:00",
+                "distance_meters": 900.0,
+                "avg_stride_cm": 106.0,
+                "max_altitude_m": 58.2,
+                "min_altitude_m": 28.4,
+                "training_effect": 5.0,
+                "anaerobic_training_effect": 2.5,
+                "hr_zones": [
+                    { "index": 0, "upper_bound_bpm": 113, "seconds": 0 },
+                    { "index": 1, "upper_bound_bpm": 141, "seconds": 31 },
+                    { "index": 2, "upper_bound_bpm": 154, "seconds": 346 },
+                    { "index": 3, "upper_bound_bpm": 162, "seconds": 4734 }
+                ],
+                "samples": [
+                    { "timestamp": "2026-08-26T01:57:30+00:00", "heart_rate": 150,
+                      "power_watts": 200.0, "stride_cm": 100.0, "altitude_m": 30.0 },
+                    { "timestamp": "2026-08-26T01:57:31+00:00", "heart_rate": 152,
+                      "power_watts": 300.0, "stride_cm": 110.0, "altitude_m": 50.0 }
+                ],
+                "route": []
+            }]
+        }));
+        let (files, _) = to_fit(&export).expect("导出应当成功");
+        let fit = decode(&files[0].1);
+        let session = messages_of(&fit, typedef::MesgNum::SESSION);
+        assert_eq!(session.len(), 1);
+
+        // avg_step_length: u16, scale 10, 单位 mm -> 106 cm = 1060 mm -> 10600
+        assert_eq!(
+            int_of(session[0], mesgdef::Session::AVG_STEP_LENGTH),
+            Some(10600),
+            "步幅存的是「毫米的十倍」"
+        );
+        // 功率就是瓦，没有 scale。
+        assert_eq!(int_of(session[0], mesgdef::Session::AVG_POWER), Some(250));
+        assert_eq!(int_of(session[0], mesgdef::Session::MAX_POWER), Some(300));
+        // 海拔: (米 + 500) x 5
+        assert_eq!(
+            int_of(session[0], mesgdef::Session::MAX_ALTITUDE),
+            Some(((58.2_f64 + 500.0) * 5.0).round() as i64)
+        );
+        assert_eq!(
+            int_of(session[0], mesgdef::Session::MIN_ALTITUDE),
+            Some(((28.4_f64 + 500.0) * 5.0).round() as i64)
+        );
+        // 采样平均高度 (30 + 50) / 2 = 40
+        assert_eq!(
+            int_of(session[0], mesgdef::Session::AVG_ALTITUDE),
+            Some(((40.0_f64 + 500.0) * 5.0).round() as i64)
+        );
+        // 训练效果: u8, scale 10
+        assert_eq!(
+            int_of(session[0], mesgdef::Session::TOTAL_TRAINING_EFFECT),
+            Some(50)
+        );
+        assert_eq!(
+            int_of(
+                session[0],
+                mesgdef::Session::TOTAL_ANAEROBIC_TRAINING_EFFECT
+            ),
+            Some(25)
+        );
+    }
+
+    /// 心率区间必须按 `index` 落位。
+    ///
+    /// 中间缺一档时按顺序平铺，后面每一档都会往前串一个区间——而串完之后的数字
+    /// 依旧完全合理，没有任何东西会报错。所以这一条单独钉。
+    #[test]
+    fn hr_zone_buckets_land_on_their_own_index_even_with_a_gap() {
+        let export = export_with(json!({
+            "workouts": [{
+                "workout_id": "1",
+                "effective_type": "run",
+                "start_time": "2026-08-26T01:57:30+00:00",
+                "end_time": "2026-08-26T01:58:30+00:00",
+                "hr_zones": [
+                    { "index": 0, "upper_bound_bpm": 113, "seconds": 10 },
+                    { "index": 3, "upper_bound_bpm": 162, "seconds": 40 }
+                ],
+                "samples": [
+                    { "timestamp": "2026-08-26T01:57:30+00:00", "heart_rate": 150 },
+                    { "timestamp": "2026-08-26T01:57:31+00:00", "heart_rate": 152 }
+                ],
+                "route": []
+            }]
+        }));
+        let (files, _) = to_fit(&export).expect("导出应当成功");
+        let fit = decode(&files[0].1);
+        let session = messages_of(&fit, typedef::MesgNum::SESSION);
+        let zones = session[0]
+            .fields
+            .iter()
+            .find(|field| field.num == mesgdef::Session::TIME_IN_HR_ZONE)
+            .expect("心率区间应当写进去了");
+        // 单位是毫秒（scale 1000）。第 1、2 档没有读数，是 0 而不是被 40 顶上来。
+        match &zones.value {
+            FitValue::VecUint32(values) => {
+                assert_eq!(values.as_slice(), &[10_000, 0, 0, 40_000]);
+            }
+            other => panic!("心率区间应当是一个 u32 数组，拿到 {other:?}"),
+        }
+    }
+
+    /// 逐条 record 的步幅。库里每一秒都有，FIT 里以前一直是空的。
+    #[test]
+    fn each_record_carries_its_own_step_length() {
+        let export = export_with(json!({
+            "workouts": [{
+                "workout_id": "1",
+                "effective_type": "run",
+                "start_time": "2026-08-26T01:57:30+00:00",
+                "end_time": "2026-08-26T01:58:30+00:00",
+                "samples": [
+                    { "timestamp": "2026-08-26T01:57:30+00:00", "heart_rate": 150, "stride_cm": 98.5 }
+                ],
+                "route": []
+            }]
+        }));
+        let (files, _) = to_fit(&export).expect("导出应当成功");
+        let fit = decode(&files[0].1);
+        let records = messages_of(&fit, typedef::MesgNum::RECORD);
+        assert_eq!(records.len(), 1);
+        // step_length: u16, scale 10, 单位 mm -> 98.5 cm = 985 mm -> 9850
+        assert_eq!(int_of(records[0], mesgdef::Record::STEP_LENGTH), Some(9850));
+    }
+
+    /// 没有心率区间的运动不写这个字段，而不是写一个空数组。
+    #[test]
+    fn a_workout_without_hr_zones_writes_no_zone_field() {
+        let export = export_with(json!({
+            "workouts": [{
+                "workout_id": "1",
+                "effective_type": "run",
+                "start_time": "2026-08-26T01:57:30+00:00",
+                "end_time": "2026-08-26T01:58:30+00:00",
+                "samples": [
+                    { "timestamp": "2026-08-26T01:57:30+00:00", "heart_rate": 150 }
+                ],
+                "route": []
+            }]
+        }));
+        let (files, _) = to_fit(&export).expect("导出应当成功");
+        let fit = decode(&files[0].1);
+        let session = messages_of(&fit, typedef::MesgNum::SESSION);
+        assert!(session[0]
+            .fields
+            .iter()
+            .all(|field| field.num != mesgdef::Session::TIME_IN_HR_ZONE));
     }
 }
