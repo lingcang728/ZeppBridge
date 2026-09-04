@@ -47,7 +47,64 @@ pub struct MetricContract {
 ///
 /// 单位一律用机器可读的短串（`bpm`、`ml/kg/min`），中文说明单独放在
 /// `description`，这样 MCP schema 里的单位不会因为语言而变。
-pub const METRICS: [MetricContract; 23] = [
+pub const METRICS: [MetricContract; 34] = [
+    // 体重与体成分。来自 `/users/{id}/members/-1/weightRecords`，
+    // 不是事件面——见 `ZeppConnector::fetch_weight_records`。
+    MetricContract {
+        metric: "weight",
+        unit: "kg",
+        description: "体重，每次称重一条，不按日聚合",
+    },
+    MetricContract {
+        metric: "bmi",
+        unit: "kg/m2",
+        description: "身体质量指数，随体重一起由云端给出",
+    },
+    MetricContract {
+        metric: "height",
+        unit: "cm",
+        description: "身高。资料值而非当次测量，随每条称重记录回传",
+    },
+    MetricContract {
+        metric: "body_fat_rate",
+        unit: "%",
+        description: "体脂率。需要体脂秤；字段名尚未在真实秤上核对过，超出合理区间的读数会被丢弃",
+    },
+    MetricContract {
+        metric: "body_water_rate",
+        unit: "%",
+        description: "体水分率。同上",
+    },
+    MetricContract {
+        metric: "muscle_mass",
+        unit: "kg",
+        description: "肌肉量。同上",
+    },
+    MetricContract {
+        metric: "bone_mass",
+        unit: "kg",
+        description: "骨量。同上",
+    },
+    MetricContract {
+        metric: "protein_rate",
+        unit: "%",
+        description: "蛋白质率。同上",
+    },
+    MetricContract {
+        metric: "visceral_fat",
+        unit: "grade",
+        description: "内脏脂肪等级，不是百分比。同上",
+    },
+    MetricContract {
+        metric: "bmr",
+        unit: "kcal/day",
+        description: "基础代谢率。同上",
+    },
+    MetricContract {
+        metric: "body_balance_score",
+        unit: "score",
+        description: "身体平衡评分，0-100，单脚测量时由秤给出",
+    },
     MetricContract {
         metric: "readiness",
         unit: "score",

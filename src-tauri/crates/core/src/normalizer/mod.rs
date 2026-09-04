@@ -1448,6 +1448,239 @@ impl Normalizer {
     }
 }
 
+/// One body-composition metric: what to call it, which server field names have
+/// been seen to carry it, its unit, and the range a real human reading falls in.
+///
+/// The range is not decoration. Only `weight`, `bmi` and `height` were read off
+/// a live account — that account has no scale, so the fat / muscle / water
+/// fields a scale adds were not there to look at, and their names come from the
+/// wider Zepp ecosystem rather than from a response anyone here has seen.
+/// Publishing a health reading under a guessed name is worse than publishing
+/// nothing, so every unconfirmed field has to land inside a range only that
+/// metric can occupy. A `fatRate` that comes back as 31.4 is a body-fat
+/// percentage; one that comes back as 1980 is something else wearing the same
+/// name, and it gets dropped and reported rather than charted.
+struct BodyMetric {
+    metric: &'static str,
+    aliases: &'static [&'static str],
+    unit: &'static str,
+    range: (f64, f64),
+}
+
+/// Everything one weigh-in can carry.
+///
+/// The first three are confirmed against a live account (2026-09-04); the rest
+/// are accepted on sight but gated by `range`. Adding a name here is cheap and
+/// safe — the payload is retained either way, so a scale owner's records can be
+/// replayed once their real field names are known.
+const BODY_METRICS: [BodyMetric; 11] = [
+    // Confirmed: `summary.weight`, kilograms, a plain float.
+    BodyMetric {
+        metric: "weight",
+        aliases: &["weight"],
+        unit: "kg",
+        range: (2.0, 400.0),
+    },
+    // Confirmed: `summary.bmi`.
+    BodyMetric {
+        metric: "bmi",
+        aliases: &["bmi"],
+        unit: "kg/m2",
+        range: (5.0, 100.0),
+    },
+    // Confirmed: `summary.height`, centimetres. Not a measurement of the day —
+    // it is profile data echoed back — but it is what makes a weight readable,
+    // and this is the only place an export can get it from.
+    BodyMetric {
+        metric: "height",
+        aliases: &["height"],
+        unit: "cm",
+        range: (50.0, 260.0),
+    },
+    BodyMetric {
+        metric: "body_fat_rate",
+        aliases: &["fatRate", "bodyFatRate", "fat_rate", "bodyFat"],
+        unit: "%",
+        range: (2.0, 75.0),
+    },
+    BodyMetric {
+        metric: "body_water_rate",
+        aliases: &["bodyWaterRate", "waterRate", "moisture"],
+        unit: "%",
+        range: (20.0, 80.0),
+    },
+    BodyMetric {
+        metric: "muscle_mass",
+        aliases: &["muscleMass", "muscle"],
+        unit: "kg",
+        range: (5.0, 120.0),
+    },
+    BodyMetric {
+        metric: "bone_mass",
+        aliases: &["boneMass", "bone"],
+        unit: "kg",
+        range: (0.3, 12.0),
+    },
+    BodyMetric {
+        metric: "protein_rate",
+        aliases: &["proteinRate", "protein"],
+        unit: "%",
+        range: (5.0, 40.0),
+    },
+    // A grade, not a percentage: the Zepp app shows 1..30.
+    BodyMetric {
+        metric: "visceral_fat",
+        aliases: &["visceralFat", "visceralFatGrade", "viscera"],
+        unit: "grade",
+        range: (1.0, 60.0),
+    },
+    BodyMetric {
+        metric: "bmr",
+        aliases: &["bmr", "basalMetabolism", "metabolism"],
+        unit: "kcal/day",
+        range: (500.0, 5000.0),
+    },
+    // Confirmed present on one record: `summary.bodyBalanceScore`, 0..100.
+    BodyMetric {
+        metric: "body_balance_score",
+        aliases: &["bodyBalanceScore"],
+        unit: "score",
+        range: (0.0, 100.0),
+    },
+];
+
+/// Fields in `summary` that are context rather than readings.
+///
+/// They are excluded from the "not parsed yet" diagnostic below — otherwise the
+/// one line that exists to surface a scale's real field names gets buried under
+/// the names we already understand.
+const WEIGHT_FIELDS_NOT_METRICS: [&str; 12] = [
+    "age",
+    "bodyStyle",
+    "dataSourceType",
+    "deviceSn",
+    "deviceType",
+    // The scale's raw input, encrypted. See the note on `normalize_weight`.
+    "encryptImpedance",
+    "oneFootMeasureTime",
+    "source",
+    "syncHealth",
+    "syncHealthConnect",
+    "thirdPackage",
+    "timeZone",
+];
+
+impl Normalizer {
+    /// Weight and body composition from `/users/{id}/members/-1/weightRecords`.
+    ///
+    /// Written to `metric_samples`, not `daily_metrics`: a weigh-in has a real
+    /// timestamp and people weigh themselves more than once a day. Rolling them
+    /// into one number per date would throw away the morning/evening spread that
+    /// is most of what a weight chart is for, and the storage layer already
+    /// aggregates samples per local day when a chart asks it to.
+    ///
+    /// Shape, verified on a live account 2026-09-04:
+    ///
+    /// ```json
+    /// { "items": [ { "generatedTime": 1764743530, "createTime": 1764743529,
+    ///                "weightType": 1, "memberId": "-1", "deviceSource": -1,
+    ///                "summary": { "weight": 68.2, "bmi": 22.1, "height": 175.0,
+    ///                             "timeZone": "Asia/Shanghai", "age": 19 } } ] }
+    /// ```
+    ///
+    /// `summary` is not a fixed shape. Across four records on one account it
+    /// varied between ten and eleven keys, with `bodyStyle`, `bodyBalanceScore`,
+    /// `oneFootMeasureTime`, `encryptImpedance`, `age`, `deviceSn` and
+    /// `thirdPackage` each present on some and absent on others — and `timeZone`
+    /// appearing as `"Asia/Shanghai"`, `"GMT+08:00"` and `"28800000"` on three
+    /// different records of the same account. So every field is read as
+    /// optional, and the timestamp is taken from `generatedTime` rather than
+    /// reconstructed out of that zone soup.
+    ///
+    /// `encryptImpedance` is deliberately ignored. Body composition is derived
+    /// from impedance by the vendor's own model; deriving our own numbers from
+    /// it would be inventing health readings, not reading them.
+    pub fn normalize_weight(raw: &Value) -> WellnessNormalizedData {
+        let mut out = WellnessNormalizedData::default();
+        let Some(items) = raw.get("items").and_then(Value::as_array) else {
+            out.diagnostics.push("weight: 报文没有 items 数组".into());
+            return out;
+        };
+        let mut unknown: BTreeMap<String, usize> = BTreeMap::new();
+        for item in items {
+            let Some(object) = item.as_object() else {
+                continue;
+            };
+            // Unix **seconds**, not milliseconds. This endpoint differs from
+            // every event surface, and the shared `parse_timestamp` would read a
+            // millisecond value as a date fifty thousand years from now.
+            let Some(timestamp) = first_number(object, &["generatedTime", "createTime", "time"])
+                .filter(|value| value.is_finite() && *value > 0.0)
+                .and_then(|seconds| DateTime::from_timestamp(seconds as i64, 0))
+            else {
+                out.diagnostics
+                    .push("weight: 一条记录没有可用的时间戳".into());
+                continue;
+            };
+            let Some(summary) = object.get("summary").and_then(Value::as_object) else {
+                out.diagnostics.push("weight: 一条记录没有 summary".into());
+                continue;
+            };
+            let mut matched: Vec<&str> = Vec::new();
+            for spec in &BODY_METRICS {
+                for alias in spec.aliases {
+                    if summary.contains_key(*alias) {
+                        matched.push(alias);
+                    }
+                }
+                let Some(value) = first_number(summary, spec.aliases) else {
+                    continue;
+                };
+                if !value.is_finite() || value < spec.range.0 || value > spec.range.1 {
+                    // The name matched but the number cannot mean what the name
+                    // says. Report it so the real meaning can be found later;
+                    // do not chart it.
+                    out.diagnostics.push(format!(
+                        "weight: {} 的读数 {value} 不在 {:?} 内，已忽略",
+                        spec.metric, spec.range
+                    ));
+                    continue;
+                }
+                out.metric_samples.push(MetricSample {
+                    metric: spec.metric.to_string(),
+                    timestamp,
+                    value,
+                    unit: spec.unit.to_string(),
+                    source_scope: SourceScope::UserFused,
+                    device_id: None,
+                });
+            }
+            // Names we do not read yet, counted rather than listed per record so
+            // a five-year backfill cannot turn this into thousands of lines.
+            // This is how a scale owner's real field names reach us without
+            // asking them to run anything.
+            for key in summary.keys() {
+                if matched.contains(&key.as_str())
+                    || WEIGHT_FIELDS_NOT_METRICS.contains(&key.as_str())
+                {
+                    continue;
+                }
+                *unknown.entry(key.clone()).or_default() += 1;
+            }
+        }
+        if !unknown.is_empty() {
+            let listed = unknown
+                .iter()
+                .map(|(name, count)| format!("{name}x{count}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            out.diagnostics
+                .push(format!("weight: summary 里尚未解析的字段：{listed}"));
+        }
+        out
+    }
+}
+
 /// `value.samples[]` carries `dateString`, `lactateThresholdHr` (bpm) and
 /// `lactateThresholdPace` (seconds per kilometre). Verified against the Zepp
 /// app: 2026-08-11 reads 175 bpm and 309 s/km, which the app shows as
@@ -2779,5 +3012,178 @@ mod tests {
 
         assert_eq!(batch.metric_samples.len(), 1);
         assert_eq!(batch.metric_samples[0].value, 25.0);
+    }
+    /// 一条真实响应的形状（2026-09-04 从线上账号取回后脱敏，读数换成了别的数）。
+    ///
+    /// 三条记录刻意各不相同：`summary` 的键集合在真实账号上就是变的，而
+    /// `timeZone` 在同一个账号的三条记录上分别是 IANA 名、`GMT+08:00` 和一串
+    /// 毫秒偏移。解析要靠 `generatedTime`，不能去碰这锅时区汤。
+    fn weight_payload() -> Value {
+        serde_json::json!({
+            "items": [
+                {
+                    "generatedTime": 1764743530_i64,
+                    "createTime": 1764743529_i64,
+                    "weightType": 1,
+                    "memberId": "-1",
+                    "deviceSource": -1,
+                    "appName": "com.xiaomi.hm.health",
+                    "userId": "1",
+                    "summary": {
+                        "weight": 68.2, "bmi": 22.1, "height": 175.0,
+                        "age": 30, "bodyStyle": 0, "dataSourceType": 1,
+                        "deviceSn": "", "deviceType": 1, "source": 1,
+                        "syncHealthConnect": false, "timeZone": "Asia/Shanghai"
+                    }
+                },
+                {
+                    "generatedTime": 1738465258_i64,
+                    "createTime": 1738465258_i64,
+                    "weightType": 1,
+                    "memberId": "-1",
+                    "summary": {
+                        "weight": 69.0, "bmi": 22.5, "height": 175.0,
+                        "bodyBalanceScore": 55, "oneFootMeasureTime": 55.0,
+                        "encryptImpedance": "x", "deviceType": 1, "source": 1,
+                        "syncHealth": 1, "syncHealthConnect": false
+                    }
+                },
+                {
+                    "generatedTime": 1722772344_i64,
+                    "createTime": 1722772344_i64,
+                    "weightType": 0,
+                    "memberId": "-1",
+                    "summary": {
+                        "weight": 70.4, "bmi": 23.0, "height": 175.0,
+                        "timeZone": "28800000", "source": -1, "deviceType": 1
+                    }
+                }
+            ]
+        })
+    }
+
+    fn samples_named<'a>(batch: &'a WellnessNormalizedData, metric: &str) -> Vec<&'a MetricSample> {
+        batch
+            .metric_samples
+            .iter()
+            .filter(|sample| sample.metric == metric)
+            .collect()
+    }
+
+    /// 这一条是整个功能的理由：以前它一条记录都取不到，因为问的是另一个面。
+    #[test]
+    fn a_weigh_in_becomes_timestamped_samples_not_daily_rows() {
+        let batch = Normalizer::normalize_weight(&weight_payload());
+
+        let weights = samples_named(&batch, "weight");
+        assert_eq!(weights.len(), 3, "三条记录就该出三条体重样本");
+        // 一天可能称好几次，所以是 metric_samples 而不是 daily_metrics。
+        assert!(batch.daily_metrics.is_empty(), "体重不该被压成一天一个数字");
+        assert_eq!(weights[0].unit, "kg");
+
+        // generatedTime 是 Unix 秒。当成毫秒读会落在五万年后，而那种错法在图上
+        // 只表现为「一条数据都没有」——正是这次要修的症状的另一种形态。
+        assert_eq!(
+            weights[0].timestamp.format("%Y-%m-%d").to_string(),
+            "2025-12-03",
+            "时间戳按秒解读"
+        );
+        assert!(
+            weights.iter().all(|sample| {
+                let year: i32 = sample.timestamp.format("%Y").to_string().parse().unwrap();
+                (2024..=2026).contains(&year)
+            }),
+            "没有一条落在离谱的年份上"
+        );
+    }
+
+    /// `summary` 的键集合逐条不同，缺字段是常态，不是错误。
+    #[test]
+    fn a_summary_missing_fields_yields_fewer_samples_not_an_error() {
+        let batch = Normalizer::normalize_weight(&weight_payload());
+        assert_eq!(samples_named(&batch, "bmi").len(), 3);
+        assert_eq!(samples_named(&batch, "height").len(), 3);
+        // 只有第二条带 bodyBalanceScore。
+        assert_eq!(samples_named(&batch, "body_balance_score").len(), 1);
+        // 这个账号没有秤，所以体成分字段一个都不该被凭空造出来。
+        for metric in ["body_fat_rate", "muscle_mass", "bone_mass", "bmr"] {
+            assert!(
+                samples_named(&batch, metric).is_empty(),
+                "{metric} 在没有这个字段时不该出现"
+            );
+        }
+    }
+
+    /// 名字对上了，数字对不上，就不能当成那个指标。
+    ///
+    /// 体成分那几个字段名来自生态而不是我们见过的响应。名字撞上、含义不同的
+    /// 那一刻，把它画进体脂率曲线比什么都不显示更糟——用户会当真。
+    #[test]
+    fn a_reading_outside_the_plausible_range_is_dropped_and_reported() {
+        let payload = serde_json::json!({
+            "items": [{
+                "generatedTime": 1764743530_i64,
+                "summary": { "weight": 68.2, "fatRate": 1980.0 }
+            }]
+        });
+        let batch = Normalizer::normalize_weight(&payload);
+        assert_eq!(samples_named(&batch, "weight").len(), 1, "体重照常收下");
+        assert!(
+            samples_named(&batch, "body_fat_rate").is_empty(),
+            "1980 不可能是体脂率"
+        );
+        assert!(
+            batch
+                .diagnostics
+                .iter()
+                .any(|line| line.contains("body_fat_rate")),
+            "丢掉了就要说出来，否则没人知道这个名字其实是别的意思：{:?}",
+            batch.diagnostics
+        );
+    }
+
+    /// 有秤的用户一旦同步，他们的真实字段名就会出现在诊断里。
+    ///
+    /// 这是我们在没有秤的情况下唯一诚实的补全路径：不猜名字，让数据自己报上来。
+    #[test]
+    fn unrecognised_summary_fields_are_reported_so_they_can_be_named_later() {
+        let payload = serde_json::json!({
+            "items": [{
+                "generatedTime": 1764743530_i64,
+                "summary": { "weight": 68.2, "someUnknownScaleField": 12.5 }
+            }]
+        });
+        let batch = Normalizer::normalize_weight(&payload);
+        let joined = batch.diagnostics.join(" ");
+        assert!(
+            joined.contains("someUnknownScaleField"),
+            "没见过的字段要报出来：{joined}"
+        );
+        // 已经认识的上下文字段不该混进这条诊断里，否则真正的新名字会被淹没。
+        assert!(!joined.contains("timeZone"));
+    }
+
+    /// 空响应是事实，不是故障：没有秤、也没手填过体重的账号就是这样。
+    #[test]
+    fn an_empty_page_is_not_an_error() {
+        let batch = Normalizer::normalize_weight(&serde_json::json!({ "items": [] }));
+        assert!(batch.metric_samples.is_empty());
+        assert!(batch.diagnostics.is_empty(), "空不是需要解释的事");
+    }
+
+    /// 导出按类型选，库里按指标名存，两边的名单必须对得上。
+    #[test]
+    fn every_body_metric_is_exportable() {
+        for spec in &BODY_METRICS {
+            assert!(
+                crate::storage::BODY_COMPOSITION_METRICS.contains(&spec.metric),
+                "{} 写得进库却导不出去",
+                spec.metric
+            );
+        }
+        assert_eq!(
+            BODY_METRICS.len(),
+            crate::storage::BODY_COMPOSITION_METRICS.len()
+        );
     }
 }
