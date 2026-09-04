@@ -12,7 +12,14 @@ import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { zeppSemanticColors } from '../lib/echartsTheme';
 import { indexSeries, seriesRanges, type SeriesRangeDays } from '../lib/metricSeries';
 import { isFiniteNumber } from '../lib/format';
-import type { MetricSeries, StressPoint } from '../types';
+import {
+  bodyHeightUnitLabel,
+  bodyMassUnitLabel,
+  distanceUnit,
+  toBodyHeight,
+  toBodyMass,
+} from '../lib/units';
+import type { MetricSeries, MetricSeriesPoint, StressPoint } from '../types';
 import { defineMessages, intlLocale, useMessages } from '../i18n';
 
 const messages = defineMessages(
@@ -20,7 +27,7 @@ const messages = defineMessages(
     backToOverview: '返回概览',
     eyebrow: '身体状态',
     title: '身体状态',
-    intro: '恢复、压力、血氧、HRV、呼吸率与静息心率的本机趋势。全部读自已同步的记录，没有推算。',
+    intro: '恢复、压力、血氧、HRV、呼吸率、静息心率与体重体成分的本机趋势。全部读自已同步的记录，没有推算。',
     rangeAria: '时间范围',
     desktopOnly: '请使用桌面应用；浏览器预览不会读取账户数据。',
     loadFailed: '身体状态数据暂时不可用',
@@ -57,12 +64,33 @@ const messages = defineMessages(
     unitScore: '分',
     unitPerHour: '次/时',
     unitBreathsPerMinute: '次/分',
+    weightLabel: '体重',
+    weightHint: '每次称重的读数，按天取平均；阴影是当日的实测区间',
+    bmiLabel: 'BMI',
+    bmiHint: '身体质量指数，由云端随体重一起给出',
+    fatLabel: '体脂率',
+    fatHint: '需要体脂秤。手表和手动录入的体重不带这一项',
+    muscleLabel: '肌肉量',
+    muscleHint: '需要体脂秤',
+    waterLabel: '体水分率',
+    waterHint: '需要体脂秤',
+    boneLabel: '骨量',
+    boneHint: '需要体脂秤',
+    visceralLabel: '内脏脂肪',
+    visceralHint: '等级而非百分比，Zepp 的口径是 1–30',
+    bmrLabel: '基础代谢',
+    bmrHint: '需要体脂秤',
+    heightLabel: '身高',
+    heightHint: '资料值，随每条称重记录一起回传，不是当次测量',
+    unitGrade: '级',
+    unitKcalPerDay: '千卡/天',
+    scaleEmpty: '这段范围没有称重记录。体重秤的数据会在同步后出现在这里。',
   },
   {
     backToOverview: 'Back to overview',
     eyebrow: 'Body status',
     title: 'Body status',
-    intro: 'Local trends for readiness, stress, blood oxygen, HRV, respiratory rate and resting heart rate. All read from synced records, nothing extrapolated.',
+    intro: 'Local trends for readiness, stress, blood oxygen, HRV, respiratory rate, resting heart rate and body composition. All read from synced records, nothing extrapolated.',
     rangeAria: 'Time range',
     desktopOnly: 'Use the desktop app. This browser preview reads no account data.',
     loadFailed: 'Body status data is unavailable right now',
@@ -99,6 +127,27 @@ const messages = defineMessages(
     unitScore: 'pts',
     unitPerHour: '/hr',
     unitBreathsPerMinute: 'br/min',
+    weightLabel: 'Weight',
+    weightHint: 'Each weigh-in, averaged per day; the band is that day\'s measured range',
+    bmiLabel: 'BMI',
+    bmiHint: 'Body mass index, sent by the cloud alongside the weight',
+    fatLabel: 'Body fat',
+    fatHint: 'Needs a body-composition scale. Watch and hand-entered weights carry no fat reading',
+    muscleLabel: 'Muscle mass',
+    muscleHint: 'Needs a body-composition scale',
+    waterLabel: 'Body water',
+    waterHint: 'Needs a body-composition scale',
+    boneLabel: 'Bone mass',
+    boneHint: 'Needs a body-composition scale',
+    visceralLabel: 'Visceral fat',
+    visceralHint: 'A grade, not a percentage. Zepp scores it 1-30',
+    bmrLabel: 'Basal metabolism',
+    bmrHint: 'Needs a body-composition scale',
+    heightLabel: 'Height',
+    heightHint: 'Profile data echoed back with every weigh-in, not a measurement of the day',
+    unitGrade: 'grade',
+    unitKcalPerDay: 'kcal/day',
+    scaleEmpty: 'No weigh-ins in this range. Scale readings show up here after a sync.',
   },
 );
 const t = useMessages(messages);
@@ -114,6 +163,11 @@ interface BodyCard {
   decimals?: number;
   showSpread?: boolean;
   emptyText?: string;
+  /**
+   * 显示前的换算。只有体重系需要：库里一律是千克和厘米（导出契约不变），
+   * 界面按用户选的单位制显示。返回 `undefined` 表示不换算。
+   */
+  convert?: (value: number) => number;
 }
 
 /**
@@ -130,6 +184,17 @@ const METRICS = [
   'hrv_rmssd',
   'respiratory_rate',
   'resting_hr',
+  // 体重与体成分。前三项在真实账号上核对过；后面几项要有体脂秤才会有值，
+  // 没有秤的账号在这里看到的就是空卡片——那是事实，不是故障。
+  'weight',
+  'bmi',
+  'body_fat_rate',
+  'muscle_mass',
+  'body_water_rate',
+  'bone_mass',
+  'visceral_fat',
+  'bmr',
+  'height',
 ];
 
 const CARDS = computed<BodyCard[]>(() => [
@@ -197,6 +262,85 @@ const CARDS = computed<BodyCard[]>(() => [
     color: zeppSemanticColors.heart,
     unit: 'bpm',
   },
+  {
+    metric: 'weight',
+    label: t.value.weightLabel,
+    hint: t.value.weightHint,
+    color: zeppSemanticColors.distance,
+    unit: bodyMassUnitLabel(),
+    decimals: 1,
+    showSpread: true,
+    emptyText: t.value.scaleEmpty,
+    convert: toBodyMass,
+  },
+  {
+    metric: 'bmi',
+    label: t.value.bmiLabel,
+    hint: t.value.bmiHint,
+    color: zeppSemanticColors.distance,
+    // BMI 是个比值，两种单位制下是同一个数，不换算。
+    unit: '',
+    decimals: 1,
+    emptyText: t.value.scaleEmpty,
+  },
+  {
+    metric: 'body_fat_rate',
+    label: t.value.fatLabel,
+    hint: t.value.fatHint,
+    color: zeppSemanticColors.calories,
+    unit: '%',
+    decimals: 1,
+    showSpread: true,
+  },
+  {
+    metric: 'muscle_mass',
+    label: t.value.muscleLabel,
+    hint: t.value.muscleHint,
+    color: zeppSemanticColors.stride,
+    unit: bodyMassUnitLabel(),
+    decimals: 1,
+    convert: toBodyMass,
+  },
+  {
+    metric: 'body_water_rate',
+    label: t.value.waterLabel,
+    hint: t.value.waterHint,
+    color: zeppSemanticColors.pace,
+    unit: '%',
+    decimals: 1,
+  },
+  {
+    metric: 'bone_mass',
+    label: t.value.boneLabel,
+    hint: t.value.boneHint,
+    color: zeppSemanticColors.altitude,
+    unit: bodyMassUnitLabel(),
+    decimals: 2,
+    convert: toBodyMass,
+  },
+  {
+    metric: 'visceral_fat',
+    label: t.value.visceralLabel,
+    hint: t.value.visceralHint,
+    color: zeppSemanticColors.calories,
+    unit: t.value.unitGrade,
+  },
+  {
+    metric: 'bmr',
+    label: t.value.bmrLabel,
+    hint: t.value.bmrHint,
+    color: zeppSemanticColors.calories,
+    unit: t.value.unitKcalPerDay,
+  },
+  {
+    metric: 'height',
+    label: t.value.heightLabel,
+    hint: t.value.heightHint,
+    color: zeppSemanticColors.altitude,
+    unit: bodyHeightUnitLabel(),
+    decimals: 1,
+    convert: toBodyHeight,
+  },
 ]);
 
 const ranges = computed(() => seriesRanges());
@@ -205,7 +349,44 @@ const series = ref<Record<string, MetricSeries>>({});
 const loading = ref(true);
 const error = ref<string | null>(null);
 
-const cards = computed(() => CARDS.value.map((card) => ({ ...card, series: series.value[card.metric] ?? null })));
+/**
+ * 换算整条序列，包括 min/max/latest 和那三个汇总值。
+ *
+ * 漏掉其中任何一个都会出现「曲线是磅、下面的平均值还是千克」这种同一张卡上
+ * 自相矛盾的读数，而那比只有公制要糟得多——用户不会怀疑它，只会照着用。
+ */
+const convertSeries = (
+  source: MetricSeries | null,
+  convert?: (value: number) => number,
+): MetricSeries | null => {
+  if (!source || !convert) return source;
+  const num = (value: number | null | undefined): number | null | undefined =>
+    isFiniteNumber(value) ? convert(value) : value;
+  const point = (item: MetricSeriesPoint): MetricSeriesPoint => ({
+    ...item,
+    value: convert(item.value),
+    min: num(item.min),
+    max: num(item.max),
+  });
+  return {
+    ...source,
+    points: source.points.map(point),
+    latest: source.latest ? point(source.latest) : source.latest,
+    average: num(source.average) ?? null,
+    minimum: num(source.minimum) ?? null,
+    maximum: num(source.maximum) ?? null,
+  };
+};
+
+const cards = computed(() => {
+  // 单位制切换要让卡片重算：`toBodyMass` 读的是模块级的状态，Vue 看不见
+  // 它变了，所以在这里显式依赖一次。
+  void distanceUnit.value;
+  return CARDS.value.map((card) => ({
+    ...card,
+    series: convertSeries(series.value[card.metric] ?? null, card.convert),
+  }));
+});
 const anyData = computed(() => cards.value.some((card) => (card.series?.points.length ?? 0) > 0));
 
 /*
