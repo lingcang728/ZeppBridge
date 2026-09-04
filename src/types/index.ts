@@ -286,6 +286,15 @@ export interface Workout {
   max_hr?: number;
   training_load?: number;
   vo2max?: number;
+  /** 有氧训练效果 0.0-5.0。后端一直在返回，只是这里从来没声明过。 */
+  training_effect?: number | null;
+  /** 无氧训练效果 0.0-5.0。 */
+  anaerobic_training_effect?: number | null;
+  /** 主观疲劳度，用户在表上自己选的。 */
+  rpe?: number | null;
+  avg_cadence_spm?: number | null;
+  avg_stride_cm?: number | null;
+  total_steps?: number | null;
   gps_available?: boolean;
   sample_count?: number;
   source_scope: SourceScope;
