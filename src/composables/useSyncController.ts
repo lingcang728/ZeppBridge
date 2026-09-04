@@ -1,6 +1,6 @@
 import { computed, readonly, ref } from 'vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
-import { readAutoSyncSettings, writeAutoSyncSettings } from '../lib/autoSync';
+import { launchSyncIsDue, readAutoSyncSettings, writeAutoSyncSettings } from '../lib/autoSync';
 import type { AppStatus, LoginStatus, SyncOutcome, SyncProgress, SyncReport } from '../types';
 import { syncStreamLabel } from '../lib/syncStreams';
 import { defineMessages, intlLocale, messagesOf } from '../i18n';
@@ -496,7 +496,10 @@ const initialize = async () => {
       await refreshStatus();
     }
   }
-  if (autoSyncEnabled.value && status?.connection_state === 'connected') void runSync('incremental', undefined, { silent: true });
+  if (autoSyncEnabled.value && status?.connection_state === 'connected'
+    && launchSyncIsDue(status?.last_cloud_sync_at, autoSyncInterval.value)) {
+    void runSync('incremental', undefined, { silent: true });
+  }
 };
 
 const markDataChanged = () => {
