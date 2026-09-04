@@ -309,13 +309,83 @@ fn data_dir() -> Result<std::path::PathBuf, String> {
         .map_err(|error| format!("Could not resolve the data directory: {error}"))
 }
 
+/// 「在哪儿找的」这句话，附在每一条「找不到」后面。
+///
+/// issue #40 的两个小时全花在这上面：那位用户在
+/// `~/ZeppBridge/src-tauri/target/release/` 下跑 CLI，而
+/// `paths::is_build_artifact_dir()` 认出 `target/release` 是构建产物目录，
+/// 把数据目录重定向到了**仓库根**的 `~/ZeppBridge/data/`。那条规则是对的
+/// （否则 `cargo run` 会往构建缓存里丢一个上 GB 的库），但程序自己一个字
+/// 都没说——他把 data 文件夹放在了 exe 旁边，看到的却是「没有本地数据库」，
+/// 无从知道该往哪儿放。最后是维护者手动告诉他的。
+///
+/// 所以每一条「找不到」都要带上解析出来的路径；是构建目录时还要说明
+/// 为什么它和 exe 不在一起。
+/// 「没有连接账号」到底缺了什么。
+///
+/// 连接一个账号要两样东西：`auth.json`（用户 id 和区域），和凭据存储里的
+/// 令牌。以前无论缺哪一样，这里都印同一句「请设 ZEPPBRIDGE_CREDENTIAL_STORE
+/// =env 并提供 ZEPPBRIDGE_APP_TOKEN」——而 issue #40 那位用户**两个都设了**，
+/// 缺的是 `auth.json`。程序把他已经做过的那件事又叫他做了一遍，来回四轮。
+///
+/// 现在先看 `auth.json` 在不在，再决定说哪一句。
+fn not_connected_message(dir: &std::path::Path) -> String {
+    let auth_file = dir.join("auth.json");
+    if !auth_file.is_file() {
+        return format!(
+            "No Zepp account is connected: {} does not exist. It holds the account id \
+             and region, and it is not created by the command line -- sign in from the \
+             desktop app, or copy auth.json here from a machine that already has one. \
+             Note that the token is NOT in that file: it lives in the platform \
+             credential store and does not copy across machines, so supply it with \
+             ZEPPBRIDGE_CREDENTIAL_STORE=env and ZEPPBRIDGE_APP_TOKEN. {}",
+            auth_file.display(),
+            where_it_looked(dir)
+        );
+    }
+    format!(
+        "No Zepp account is connected. The command line does not sign in: sign in from \
+         the desktop app, or set ZEPPBRIDGE_CREDENTIAL_STORE=env and supply \
+         ZEPPBRIDGE_APP_TOKEN. Moving a library between machines: see \
+         docs/guides/linux.md. {}",
+        where_it_looked(dir)
+    )
+}
+
+fn where_it_looked(dir: &std::path::Path) -> String {
+    let exe_dir = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf));
+    where_it_looked_from(dir, exe_dir.as_deref())
+}
+
+/// 同上，但 exe 的位置由调用方给——`current_exe()` 在测试里指向测试二进制，
+/// 而这个分支的全部意义就是「exe 在构建目录里」，那种情况没法靠跑测试凑出来。
+fn where_it_looked_from(dir: &std::path::Path, exe_dir: Option<&std::path::Path>) -> String {
+    let mut text = format!("Looked in: {}", dir.display());
+    if exe_dir.is_some_and(paths::is_build_artifact_dir) {
+        text.push_str(
+            ". That is not next to the executable because this binary sits in a build \
+             directory (target/debug, target/release or a cargo target cache), and \
+             ZeppBridge keeps data out of build directories -- it uses the repository \
+             data/ folder instead",
+        );
+    }
+    text.push_str(&format!(". Override it with {}", paths::DATA_DIR_ENV));
+    text
+}
+
 fn open_read_only() -> Result<Database, (u8, String)> {
     let dir = data_dir().map_err(|message| (EXIT_FAILED, message))?;
     let db_path = dir.join("zepp.db");
     if !db_path.exists() {
         return Err((
             EXIT_NOT_CONFIGURED,
-            "No local database yet. Connect an account in the ZeppBridge desktop app and sync once first.".into(),
+            format!(
+                "No local database yet. Connect an account in the ZeppBridge desktop app \
+                 and sync once first, or copy an existing zepp.db here. {}",
+                where_it_looked(&dir)
+            ),
         ));
     }
     // 只读连接：CLI 的查询路径不拿写锁，也就不会在一次长同步期间被挡住。
@@ -482,7 +552,11 @@ fn open_writable() -> Result<(std::path::PathBuf, Database), (u8, String)> {
     if !db_path.exists() {
         return Err((
             EXIT_NOT_CONFIGURED,
-            "No local database yet. Connect an account in the ZeppBridge desktop app and sync once first.".into(),
+            format!(
+                "No local database yet. Connect an account in the ZeppBridge desktop app \
+                 and sync once first, or copy an existing zepp.db here. {}",
+                where_it_looked(&dir)
+            ),
         ));
     }
     let db = Database::open_migrated(&db_path).map_err(|error| {
@@ -764,10 +838,7 @@ fn cmd_sync(args: &[String]) -> u8 {
                 json_mode,
                 EXIT_NOT_CONFIGURED,
                 "not_configured",
-                "No Zepp account is connected. The command line does not sign in: \
-                 sign in from the desktop app, or set ZEPPBRIDGE_CREDENTIAL_STORE=env \
-                 and supply ZEPPBRIDGE_APP_TOKEN. Moving a library between machines: \
-                 see docs/guides/linux.md",
+                &not_connected_message(&dir),
             )
         }
         Err(error) => {
@@ -1268,5 +1339,75 @@ mod tests {
         }
         // 隐私边界要出现在 help 里，用户不该为了知道它去读源码。
         assert!(HELP.contains("Listens on no port"));
+    }
+    /// issue #40 的整整两个小时，就卡在这一句上。
+    ///
+    /// 那位用户在 `~/ZeppBridge/src-tauri/target/release/` 下跑 CLI，把 data
+    /// 文件夹放在了 exe 旁边，而程序去仓库根的 `data/` 找——两边都没说话，他
+    /// 只看到「没有本地数据库」。这里钉的就是「报错必须说出它去哪儿找了」。
+    #[test]
+    fn a_not_found_message_always_names_the_directory_it_looked_in() {
+        let dir = std::path::Path::new("/home/x/ZeppBridge/data");
+        let text = where_it_looked_from(dir, None);
+        assert!(text.contains("/home/x/ZeppBridge/data"), "{text}");
+        // 用户唯一能拿来固定落点的东西，也要出现。
+        assert!(text.contains("ZEPPBRIDGE_DATA_DIR"), "{text}");
+    }
+
+    /// 从构建目录里跑的时候，还要说明数据为什么不在 exe 旁边。
+    #[test]
+    fn running_from_a_build_directory_explains_why_data_is_elsewhere() {
+        let dir = std::path::Path::new("/home/x/ZeppBridge/data");
+        let exe_dir = std::path::Path::new("/home/x/ZeppBridge/src-tauri/target/release");
+        let text = where_it_looked_from(dir, Some(exe_dir));
+        assert!(text.contains("build"), "要点明这是构建目录：{text}");
+        assert!(text.contains("data/"), "要指向仓库的 data/ 目录：{text}");
+
+        // 装好的版本不该看到这段解释——它只会让人困惑。
+        let installed = std::path::Path::new("/usr/bin");
+        assert!(!where_it_looked_from(dir, Some(installed)).contains("build directory"));
+    }
+
+    /// 缺 `auth.json` 和缺令牌是两件事，不能给同一句话。
+    ///
+    /// 以前无论缺哪一样都印「请设 ZEPPBRIDGE_CREDENTIAL_STORE=env 并提供
+    /// ZEPPBRIDGE_APP_TOKEN」——而 issue #40 那位用户两个都设了，缺的是
+    /// `auth.json`。程序把他刚做过的事又叫他做一遍，来回四轮。
+    #[test]
+    fn a_missing_auth_file_is_reported_as_such_not_as_a_missing_token() {
+        let dir = std::env::temp_dir().join("zeppbridge-cli-not-connected-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let missing = not_connected_message(&dir);
+        assert!(
+            missing.contains("auth.json"),
+            "要点名缺的是哪个文件：{missing}"
+        );
+        assert!(
+            missing.contains("does not exist"),
+            "要说清它不存在，而不是叫人再设一遍环境变量：{missing}"
+        );
+        // 令牌那一半仍然要讲：库能跨机器拷，令牌不能——这是最容易踩的坑。
+        assert!(missing.contains("ZEPPBRIDGE_APP_TOKEN"), "{missing}");
+
+        // auth.json 在了，缺的就是令牌，这时才印原来那句。
+        std::fs::write(dir.join("auth.json"), "{}").unwrap();
+        let token_missing = not_connected_message(&dir);
+        assert!(
+            !token_missing.contains("does not exist"),
+            "文件在的时候不该再说它不存在：{token_missing}"
+        );
+        assert!(
+            token_missing.contains("ZEPPBRIDGE_CREDENTIAL_STORE"),
+            "{token_missing}"
+        );
+        // 两句都要带上目录。
+        assert!(
+            token_missing.contains(&dir.display().to_string()),
+            "{token_missing}"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
