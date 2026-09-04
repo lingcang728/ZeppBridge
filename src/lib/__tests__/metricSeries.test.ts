@@ -96,3 +96,38 @@ describe('图表选项', () => {
     expect(line?.data).toHaveLength(2);
   });
 });
+
+describe('手动记录的日子不能被画成连续的', () => {
+  const logged = series({
+    metric: 'intake_calories',
+    unit: 'kcal',
+    window_days: 30,
+    days_with_data: 3,
+    // 记了 1 号、2 号，跳过 3 号和 4 号，再记 5 号。
+    points: [
+      { date: '2026-03-01', value: 2100 },
+      { date: '2026-03-02', value: 1980 },
+      { date: '2026-03-05', value: 2260 },
+    ],
+    latest: { date: '2026-03-05', value: 2260 },
+  } as Partial<MetricSeries>);
+
+  it('默认那条轴根本没有缺的日子——所以线会直接连过去', () => {
+    // 这不是断言「应该这样」，是把现状钉住：默认轴只放有值的日子，
+    // 3 号和 4 号不是 null，是压根不存在。体重这种天天称的还好，
+    // 手动记录的必须开 calendarAxis。
+    const option = buildSeriesOption(logged, { color: '#fff' });
+    expect(option.xAxis).toMatchObject({ data: ['2026-03-01', '2026-03-02', '2026-03-05'] });
+  });
+
+  it('开了 calendarAxis，没记的日子在轴上留空', () => {
+    const option = buildSeriesOption(logged, { color: '#fff', chart: 'bar', calendarAxis: true });
+    expect(option.xAxis).toMatchObject({
+      data: ['2026-03-01', '2026-03-02', '2026-03-03', '2026-03-04', '2026-03-05'],
+    });
+    const [bars] = option.series as Array<{ type: string; data: Array<number | null> }>;
+    expect(bars.type).toBe('bar');
+    // 缺的两天是 null，不是 0：没记不等于没吃。
+    expect(bars.data).toEqual([2100, 1980, null, null, 2260]);
+  });
+});

@@ -1,6 +1,6 @@
 # ZeppBridge architecture summary
 
-This page describes the product boundaries and current implementation of v2.1.2.
+This page describes the product boundaries and current implementation of v2.2.0.
 For the usage entry point see the project [README](../../README.md); for
 engineering gates see the [development guide](../development/development.md).
 

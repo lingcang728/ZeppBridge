@@ -1,6 +1,6 @@
 [package]
 name = "zeppbridge-mcp"
-version = "2.1.2"
+version = "2.2.0"
 description = "ZeppBridge MCP 服务：只读、stdio、不监听任何端口"
 edition = "2021"
 
