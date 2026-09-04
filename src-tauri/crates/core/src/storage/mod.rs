@@ -599,7 +599,7 @@ enum CapabilityEvidence {
 /// evidence available, since "you have 32 days of stress readings" beats any
 /// probe. Only the three with no local trace need a request, and those are the
 /// ones where silence is genuinely ambiguous.
-const CAPABILITY_ROWS: [(&str, CapabilityEvidence, i64); 15] = [
+const CAPABILITY_ROWS: [(&str, CapabilityEvidence, i64); 16] = [
     ("heart_rate", CapabilityEvidence::Samples("heart_rate"), 30),
     (
         "sleep",
@@ -639,10 +639,35 @@ const CAPABILITY_ROWS: [(&str, CapabilityEvidence, i64); 15] = [
         365,
     ),
     ("pai", CapabilityEvidence::DailyPrefix("pai"), 30),
+    // 体重不再是「只能靠探针」的一条。它现在真的入库，所以证据就是库里的
+    // 样本本身——而这正是四个人报的那件事的终点：以前这一行永远显示探针
+    // 的结论「最近 365 天没有测量记录」，因为探针打的是一个对谁都空的面。
+    ("weight", CapabilityEvidence::Samples("weight"), 365),
+];
+
+/// The metric names one weigh-in produces.
+///
+/// Exports select by *type* (`--types weight`) while `metric_samples` stores by
+/// *metric*, and unlike heart rate the two do not share a name — a weigh-in
+/// yields eleven differently-named rows. Kept in step with `BODY_METRICS` in
+/// the normalizer: a name added there and forgotten here is written to the
+/// database and then silently missing from every export.
+pub const BODY_COMPOSITION_METRICS: [&str; 11] = [
+    "weight",
+    "bmi",
+    "height",
+    "body_fat_rate",
+    "body_water_rate",
+    "muscle_mass",
+    "bone_mass",
+    "protein_rate",
+    "visceral_fat",
+    "bmr",
+    "body_balance_score",
 ];
 
 /// Streams with no local trace at all. Only these cost a request.
-pub const PROBE_ONLY_CAPABILITIES: [&str; 4] = ["blood_pressure", "weight", "emotion", "food"];
+pub const PROBE_ONLY_CAPABILITIES: [&str; 3] = ["blood_pressure", "emotion", "food"];
 
 /// 探测覆盖多久。和探测本身用的范围一致，界面拿它写「过去 N 天没有测量记录」。
 const PROBE_WINDOW_DAYS: i64 = 365;
@@ -1892,6 +1917,17 @@ impl Database {
                     self.insert_metric_sample_with_raw(&row, Some(raw_record_id))?;
                 }
             }
+            // 体重 / 体成分。和 wellness 一样是尽力而为：`summary` 的字段随
+            // 记录来源变，认不出来的只写进 diagnostics，不让整条流失败——
+            // 原始报文丢了，就再也没法在不重新同步的情况下把它们认出来。
+            "weight" => {
+                let batch = Normalizer::normalize_weight(payload);
+                counts.primary_records = batch.metric_samples.len() as i64;
+                self.clear_normalized_for_raw(raw_record_id, stream)?;
+                for row in batch.metric_samples {
+                    self.insert_metric_sample_with_raw(&row, Some(raw_record_id))?;
+                }
+            }
             "daily_summary" => {
                 let rows = Normalizer::normalize_daily_summary(payload)?;
                 counts.primary_records = rows.len() as i64;
@@ -1966,7 +2002,7 @@ impl Database {
 
     fn clear_normalized_for_raw(&self, raw_record_id: i64, stream: &str) -> Result<()> {
         match stream {
-            "heart_rate" | "hrv" => {
+            "heart_rate" | "hrv" | "weight" => {
                 self.conn.execute(
                     "DELETE FROM metric_samples WHERE raw_record_id = ?1",
                     [raw_record_id],
@@ -2275,6 +2311,15 @@ impl Database {
                       + (SELECT COUNT(*) FROM daily_metrics d
                            JOIN raw_records r ON r.id = d.raw_record_id
                           WHERE r.stream = 'wellness')",
+                None,
+            ),
+            // 体重同样没有自己的表，它写进 metric_samples。不数它的话，一次
+            // 只重放 weight 的升级会向用户报「0 条」，而那次升级的全部意义
+            // 恰恰就是这条流。
+            "weight" => (
+                "SELECT COUNT(*) FROM metric_samples s
+                   JOIN raw_records r ON r.id = s.raw_record_id
+                  WHERE r.stream = 'weight'",
                 None,
             ),
             _ => return Ok(None),
@@ -4463,7 +4508,7 @@ impl Database {
         // 日级数据流：一条运动没有「昨晚睡了多久」这种字段，硬塞进来就是范围外的数据。
         // 只在 daily_metrics / sleep_sessions 里出现的类型；心率、HRV、血氧这类
         // 逐点指标不在其中，它们会按运动时段截取后照常导出。
-        const DAY_LEVEL_TYPES: [&str; 8] = [
+        const DAY_LEVEL_TYPES: [&str; 9] = [
             "sleep",
             "steps",
             "daily_activity",
@@ -4472,6 +4517,9 @@ impl Database {
             "vo2max",
             "lactate_threshold",
             "pai",
+            // 一次称重和某一条运动没有关系。单条运动的导出里不该出现
+            // 「体重：0 条」这样一个只会让人困惑的类型。
+            "weight",
         ];
         let allowed: BTreeSet<&str> = [
             "heart_rate",
@@ -4489,6 +4537,7 @@ impl Database {
             "stress",
             "training_load",
             "vo2max",
+            "weight",
         ]
         .into_iter()
         .collect();
@@ -4520,6 +4569,7 @@ impl Database {
             || selected.contains("hrv")
             || selected.contains("spo2")
             || selected.contains("stress")
+            || selected.contains("weight")
         {
             // 单条运动范围下，逐点指标只取这条运动进行期间的采样；日期区间下
             // 仍然按整天取。两条路径共用一条 SQL，避免两处各自解释范围。
@@ -4578,6 +4628,10 @@ impl Database {
                     Some("respiratory_rate".to_string())
                 } else if metric == "hrv_rmssd" && selected.contains("hrv_rmssd") {
                     Some("hrv_rmssd".to_string())
+                } else if selected.contains("weight")
+                    && BODY_COMPOSITION_METRICS.contains(&metric.as_str())
+                {
+                    Some("weight".to_string())
                 } else {
                     None
                 };

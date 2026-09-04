@@ -1,14 +1,15 @@
 {
-  "version": 5,
-  "checked_at": "2026-09-02",
+  "version": 6,
+  "checked_at": "2026-09-04",
   "sources": [
     "https://www.amazfit.jp/",
     "https://us.amazfit.com/products.json?limit=250",
-    "https://os.zepp.com/compatibility-zepp-os-5"
+    "https://os.zepp.com/compatibility-zepp-os-5",
+    "https://amazfit-en.cdn.bcebos.com/smart-scale.html"
   ],
   "audit_baseline": "Official Amazfit Japan store captures in design_picture/Product (12 rows x 4 cards)",
-  "active_supported_count": 52,
-  "canonical_device_count": 50,
+  "active_supported_count": 54,
+  "canonical_device_count": 52,
   "devices": [
     {
       "catalog_id": "amazfit-balance-3",
@@ -1855,6 +1856,71 @@
       "canonical_device_key": "amazfit-balance-2",
       "checked_at": "2026-09-03",
       "provenance": "Reported missing from the model picker in GitHub issue #42 (2026-09-02). 47mm retail variant of the Balance 2, SKU W2547GL4N, currently listed only through US retailers; no dedicated official product page or CDN image exists yet, so the entry ships without art and the interface falls back to its inline placeholder. No deviceSource is claimed for it -- nobody has submitted a report from one.",
+      "asset_hash": null,
+      "image_key": null,
+      "status": "active",
+      "supported": true,
+      "device_source_codes": []
+    },
+    {
+      "catalog_id": "amazfit-smart-scale",
+      "canonical_name": "Amazfit Smart Scale",
+      "display_name": "Amazfit Smart Scale",
+      "name_zh": "Amazfit 智能体脂秤",
+      "kind": "scale",
+      "model_codes": [
+        "A2003"
+      ],
+      "aliases": [
+        "Amazfit Smart Scale",
+        "Amazfit Scale",
+        "Smart Scale",
+        "A2003"
+      ],
+      "region": [
+        "global",
+        "us"
+      ],
+      "official_page": "https://amazfit-en.cdn.bcebos.com/smart-scale.html",
+      "official_url": "https://amazfit-en.cdn.bcebos.com/smart-scale.html",
+      "image_source_url": "https://site-cdn.huami.com/files/amazfit/amazfit-en/mobile/smart-scale/1-1.jpg",
+      "asset_source": "official-cdn",
+      "canonical_device_key": "amazfit-smart-scale",
+      "checked_at": "2026-09-04",
+      "provenance": "First scale in the catalog. Four people asked for body-composition support (Reddit u/T1beriu and u/DPShiro, GitHub issue reports 04c5fb2f on 2.1.0 and two more on 1.1.2 / 1.1.5) while `kind == 'scale'` matched zero rows. The Amazfit storefront no longer sells it and www.amazfit.com has no product page, but Huami's own CDN still serves the original one: the page snapshot lives at amazfit-en.cdn.bcebos.com/smart-scale.html and the hero shot at site-cdn.huami.com/files/amazfit/amazfit-en/mobile/smart-scale/1-1.jpg. The art here is that hero shot, cut out of its studio background. Officially: 16 body-composition metrics, Bluetooth 5.0 plus 2.4 GHz Wi-Fi, pairs with the Zepp app, 10 accounts of up to 12 family members each. No deviceSource code is claimed -- nobody has submitted a report from one yet, and inventing a number would make the picker confidently mislabel some other device.",
+      "asset_hash": "sha256:C76CEC1FD8BB404ECD7219073E8027FDC33CF8B3C54FF57E672E2843C32285B3",
+      "image_key": "amazfit-smart-scale",
+      "status": "active",
+      "supported": true,
+      "device_source_codes": []
+    },
+    {
+      "catalog_id": "mi-body-composition-scale-2",
+      "canonical_name": "Mi Body Composition Scale 2",
+      "display_name": "Mi Body Composition Scale 2",
+      "name_zh": "小米体脂秤 2",
+      "kind": "scale",
+      "model_codes": [
+        "XMTZC05HM"
+      ],
+      "aliases": [
+        "Mi Body Composition Scale 2",
+        "Xiaomi Body Composition Scale 2",
+        "小米體脂計2",
+        "小米体脂秤2",
+        "XMTZC05HM"
+      ],
+      "region": [
+        "global",
+        "cn"
+      ],
+      "official_page": "https://www.mi.com/global/mi-body-composition-scale-2/",
+      "official_url": "https://www.mi.com/global/mi-body-composition-scale-2/",
+      "image_source_url": null,
+      "asset_source": "pending-official-art",
+      "canonical_device_key": "mi-body-composition-scale-2",
+      "checked_at": "2026-09-04",
+      "provenance": "Asked for twice in GitHub reports (1.1.2 in Chinese, 1.1.5 on macOS: \"still working with the Zepp app but not recognized here\"). A Xiaomi product rather than an Amazfit one, so `official_url` points at Xiaomi's own page and there is no Huami CDN art to use; none is shipped -- the interface falls back to its inline scale placeholder. It is listed because its readings reach the same cloud surface as every other weigh-in (/users/{id}/members/-1/weightRecords), so ZeppBridge reads them; only the name and picture were missing. No deviceSource code is claimed.",
       "asset_hash": null,
       "image_key": null,
       "status": "active",

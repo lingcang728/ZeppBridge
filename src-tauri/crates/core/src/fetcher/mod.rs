@@ -610,6 +610,12 @@ enum ProbeSurface {
     UserEvents,
     /// `/users/{id}/events/dateString`, ISO-8601 window plus IANA timezone.
     UserEventsDay,
+    /// `/users/{id}/members/{member}/weightRecords`, epoch **seconds**.
+    ///
+    /// The odd one out: it is not an event surface at all, and its window is
+    /// in seconds rather than milliseconds. Weight lives here and nowhere
+    /// else — see `ZeppConnector::fetch_weight_records`.
+    WeightRecords,
     /// `/users/me/fileInfo/events` — an index of stored measurement files.
     FileInfoEvents,
 }
@@ -620,6 +626,7 @@ impl ProbeSurface {
             ProbeSurface::V2Events => "v2_events",
             ProbeSurface::UserEvents => "user_events",
             ProbeSurface::UserEventsDay => "user_events_day",
+            ProbeSurface::WeightRecords => "weight_records",
             ProbeSurface::FileInfoEvents => "file_info_events",
         }
     }
@@ -664,6 +671,17 @@ impl ProbeCadence {
 /// `skinTemp/real_data` and `blood_pressure/real_data`. This table is
 /// transcribed from two independent open-source clients that talk to the same
 /// API — m4ary/zepp-health-cli and Thejuampi/icu — which agree on every entry.
+/// The account holder on the scale. Family members have their own positive ids
+/// (see `/users/{id}/members`); reading theirs would be reading other people.
+pub const SCALE_ACCOUNT_MEMBER: &str = "-1";
+
+/// How many weight readings to ask for per window.
+///
+/// The endpoint truncates rather than paging, so the window is sliced by year
+/// (see `DataFetcher::fetch_weight_records`) and this only has to cover one
+/// year of one person weighing themselves. 300 covers weighing in twice a day.
+const WEIGHT_RECORD_LIMIT: i64 = 300;
+
 const CAPABILITY_PROBES: [(&str, ProbeSurface, &str, Option<&str>, ProbeCadence); 20] = [
     // Controls. The positive one proves the probe itself works; the negative
     // one tells us whether an empty answer carries any information at all.
@@ -799,11 +817,20 @@ const CAPABILITY_PROBES: [(&str, ProbeSurface, &str, Option<&str>, ProbeCadence)
         Some("real_data"),
         ProbeCadence::Episodic,
     ),
+    // Weight was probed on `/v2/users/me/events` for a year and answered "no
+    // records" every single time — to four different people who owned a scale
+    // and had years of readings in the Zepp app. The page was not lying; it was
+    // the wrong page. Weight lives on `/users/{id}/members/{member}/weightRecords`
+    // and nowhere else. Verified on a live account 2026-09-04: the v2 page
+    // returns `items: []` in the same second that this one returns records.
+    //
+    // `event_type` is carried for the report only; this surface takes no such
+    // parameter.
     (
         "weight",
-        ProbeSurface::V2Events,
+        ProbeSurface::WeightRecords,
         "weight",
-        Some("summary"),
+        None,
         ProbeCadence::Episodic,
     ),
     // The Food Log: an official Zepp app feature outside mainland China, where
@@ -987,6 +1014,12 @@ impl DataFetcher {
                         )
                         .await
                 }
+                // Seconds, not milliseconds. See `fetch_weight_records`.
+                ProbeSurface::WeightRecords => {
+                    self.connector
+                        .fetch_weight_records(SCALE_ACCOUNT_MEMBER, from / 1000, to / 1000, 50)
+                        .await
+                }
                 ProbeSurface::FileInfoEvents => {
                     self.connector
                         .fetch_file_info_events(
@@ -1134,6 +1167,66 @@ impl DataFetcher {
     /// must not take the others down with it, so failures are collected rather
     /// than propagated. An empty result set is reported as unavailable so the
     /// sync surfaces "nothing came back" instead of a silent success.
+    /// Weight and body composition.
+    ///
+    /// Its own fetcher rather than a row in `WELLNESS_STREAMS`, because it is
+    /// its own surface: a different path, a different member dimension, and a
+    /// window in **seconds** instead of milliseconds.
+    ///
+    /// Sliced by year. The endpoint truncates at `limit` instead of paging, so
+    /// asking for five years in one request and taking what comes back would
+    /// silently drop the oldest readings — which is what someone backfilling
+    /// "at least 5 years of weigh-ins" is asking for in the first place.
+    ///
+    /// An empty result is **not** an error here. Weight is episodic and
+    /// hand-logged as often as it is weighed; "no readings this year" is a fact
+    /// about the year, not a failed request, and turning it into an error would
+    /// mark the stream failed for every user who does not own a scale.
+    pub async fn fetch_weight_records(&self, window: FetchWindow) -> Result<Vec<FetchedRecord>> {
+        let mut records = Vec::new();
+        let mut last_error = None;
+        for slice in window.chunks(365) {
+            match self
+                .connector
+                .fetch_weight_records(
+                    SCALE_ACCOUNT_MEMBER,
+                    slice.start_utc.timestamp(),
+                    slice.end_utc.timestamp(),
+                    WEIGHT_RECORD_LIMIT,
+                )
+                .await
+            {
+                Ok(payload) => records.push(FetchedRecord {
+                    raw: RawRecord {
+                        stream: "weight".into(),
+                        source_key: format!(
+                            "weight:{SCALE_ACCOUNT_MEMBER}:{}:{}",
+                            slice.start_day(),
+                            slice.end_day()
+                        ),
+                        source_scope: SourceScope::UserFused,
+                        device_id: None,
+                        start_utc: slice.start_utc,
+                        end_utc: Some(slice.end_utc),
+                        payload,
+                        // The reading itself is verified — weight and BMI were
+                        // read off a live account. The body-composition fields a
+                        // scale adds on top are not, so the payload is retained
+                        // and a replay can pick them up without another sync.
+                        capability: CapabilityStatus::Unverified,
+                    },
+                }),
+                Err(error) => last_error = Some(error),
+            }
+        }
+        if records.is_empty() {
+            return Err(last_error.unwrap_or_else(|| {
+                ZeppBridgeError::Unavailable("体重记录接口没有返回任何内容".into())
+            }));
+        }
+        Ok(records)
+    }
+
     pub async fn fetch_wellness_records(
         &self,
         window: FetchWindow,
@@ -1173,6 +1266,11 @@ impl DataFetcher {
                             )
                             .await
                     }
+                    // Not reachable: `WELLNESS_STREAMS` has no weight row, because
+                    // weight is not an event stream. It has its own fetcher.
+                    ProbeSurface::WeightRecords => Err(ZeppBridgeError::Unavailable(
+                        "体重不是事件流，不能从这里取".into(),
+                    )),
                     ProbeSurface::FileInfoEvents => {
                         self.connector
                             .fetch_file_info_events(

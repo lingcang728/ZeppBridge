@@ -21,6 +21,11 @@ export const DISTANCE_UNITS: readonly DistanceUnit[] = ['metric', 'imperial'];
 
 const STORAGE_KEY = 'zeppbridge-distance-unit';
 
+/** 国际avoirdupois磅，精确值。体重秤给的是千克。 */
+export const KILOGRAMS_PER_POUND = 0.45359237;
+/** 国际英寸，精确值。身高在体重记录里以厘米回传。 */
+export const CENTIMETRES_PER_INCH = 2.54;
+
 /** 国际单位制定义的英里。不是约数，精确值。 */
 export const METRES_PER_MILE = 1609.344;
 /** 同上，国际英尺。 */
@@ -127,3 +132,25 @@ export const paceSecondsPerBigUnit = (secondsPerKm: number): number =>
 /** 每公里分 → 每个当前大单位的分。 */
 export const paceMinutesPerBigUnit = (minutesPerKm: number): number =>
   imperial() ? minutesPerKm * (METRES_PER_MILE / 1000) : minutesPerKm;
+
+/**
+ * 体重与体成分里的质量：千克 → 千克或磅。
+ *
+ * 体重秤和 Zepp 云端一律用千克，`metric_samples` 里存的也是千克——导出永远
+ * 是公制，这条没变（见文件开头那段）。这里只换界面上看到的那一层。
+ *
+ * 单独一个函数而不是复用 `toElevation`：那两件事只是碰巧都要乘一个数，
+ * 而把「爬升」和「体重」绑在同一个换算上，下一个人改其中一个就会弄坏另一个。
+ */
+export const toBodyMass = (kilograms: number): number =>
+  imperial() ? kilograms / KILOGRAMS_PER_POUND : kilograms;
+
+/** 质量的单位名：`kg` / `lb`。 */
+export const bodyMassUnitLabel = (): string => (imperial() ? 'lb' : 'kg');
+
+/** 身高：厘米 → 厘米或英寸。 */
+export const toBodyHeight = (centimetres: number): number =>
+  imperial() ? centimetres / CENTIMETRES_PER_INCH : centimetres;
+
+/** 身高的单位名：`cm` / `in`。 */
+export const bodyHeightUnitLabel = (): string => (imperial() ? 'in' : 'cm');
