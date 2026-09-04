@@ -72,6 +72,7 @@ The AppImage needs FUSE. On systems that only ship FUSE 3, either install
 | deb / rpm | `~/.local/share/zeppbridge/data/` |
 | AppImage, unpacked tarball | `data/` next to the executable |
 | Anywhere, when set | `$ZEPPBRIDGE_DATA_DIR` |
+| Built from source | the repository `data/` folder, **not** next to the binary |
 
 The split is deliberate. A package manager owns `/usr/bin` and a Flatpak's
 `/app/bin` is read-only, so for those two the data cannot live next to the
@@ -80,6 +81,15 @@ really is yours, so it keeps the same install-local layout Windows uses. Setting
 `ZEPPBRIDGE_DATA_DIR` to an absolute path overrides all of it; a relative path
 is rejected rather than resolved against whatever the working directory happened
 to be.
+
+If you built from source and are running `src-tauri/target/release/zeppbridge-cli`,
+the data directory is **not** the folder the binary sits in. ZeppBridge treats any
+`target/debug`, `target/release` or cargo target cache as a build directory and uses
+the repository `data/` folder instead, so that `cargo run` never drops a multi-gigabyte
+library into a build cache you are about to delete. Put `zepp.db` and `auth.json` in
+`<repo>/data/`, or point `ZEPPBRIDGE_DATA_DIR` wherever you want them. Every
+"no local database" and "no account connected" message prints the directory it actually
+looked in, so you never have to guess which rule applied.
 
 `zeppbridge-cli` and `zeppbridge-mcp` resolve the same directory by the same
 rules, so they read the database the app writes without being configured.
