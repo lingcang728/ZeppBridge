@@ -2,6 +2,36 @@
 
 本文件记录每个版本的实际改动。写给使用者看，不是施工日志：只写用户能感知到的变化，以及为什么这么改。
 
+## 2.2.0
+
+### Added / 新增
+
+- **The food log has a screen.** Calories, protein, fat and carbs now appear under Body status, alongside a dietary-balance ring showing what share of your calories each macronutrient contributed. Meals are logged by hand in the Zepp App, so the days you did not log stay blank: they get no bar, and are never filled with a zero. The percentages are worked out here from the daily grams using 4/9/4 kcal per gram — they are not sent by the cloud, and may differ by a point or two from the ones in the Zepp App.
+- **饮食有界面了。** 热量、蛋白质、脂肪、碳水现在出现在「身体状态」页里，上面还有一张膳食平衡环，显示三大营养素各自贡献了多少热量。饮食是在 Zepp App 里手动记的，所以没记的日子就留空：不画柱子，也绝不补 0。占比是这里用 4/9/4（每克千卡）从克数推算的，不是云端给的数，和 Zepp App 里的百分比可能差一两个点。
+
+- **Weight and body composition.** Weigh-ins now sync and land in the local library, read from the endpoint that actually carries them. Eleven readings are accepted where a scale reports them — weight, BMI, height, body fat, body water, muscle, bone, protein, visceral fat, basal metabolism and balance score. Only weight, BMI and height have been confirmed against a live account; the rest are gated by a plausible range for that specific reading, because publishing a health number under a guessed field name is worse than publishing nothing. The device catalogue now knows the scale as a product category too.
+- **体重与体成分。** 称重记录现在会同步并入本机库，读的是真正带着这些数据的那个接口。有秤的账号最多能收下十一项：体重、BMI、身高、体脂率、体水分率、肌肉量、骨量、蛋白质率、内脏脂肪、基础代谢、体态平衡分。其中只有体重、BMI、身高在真实账号上核对过；其余每一项都要落在只有它才可能出现的数值区间里才会被采用——用猜来的字段名发布一个健康读数，比不发布更糟。设备目录也收录了体脂秤这个品类。
+- **The `.fit` files carry more, and carry it right.** Kilometre laps are real splits now instead of one lap for the whole workout, and the laps your watch recorded with its own lap button come through as well — that field sat in 32 of 336 stored workout details and had never been decoded. Nutrition and strength-training load reach the file too, so Strava, Garmin Connect and Intervals.icu read what they expect.
+- **`.fit` 文件里的东西更全，也更对。** 公里分段现在是真的分段，而不是整条运动只有一圈；手表上你自己按圈键记的圈也一并带出来了——那个字段在 336 条留存的运动明细里有 32 条带着，从来没人解过它。营养和力量训练负荷也进了文件，Strava、Garmin Connect、Intervals.icu 读到的就是它们期待的东西。
+
+### Changed / 变化
+
+- **Cards with nothing in them no longer take up the screen.** Without a body-composition scale, Body status used to show nine identical "no records" cards, and an account that never logged a meal added four more — thirteen cards all saying the same thing, pushing everything that did have data off the screen. Empty cards are now left out, and when a whole group is empty one line explains why. Nothing is filled in with zeros; the missing readings are simply not restated thirteen times.
+- **没有内容的卡片不再占着屏幕。** 没有体脂秤时，「身体状态」页会显示九张一模一样的「无记录」卡片，没记过饮食的账号再加四张——十三张说着同一句话，把真正有数据的东西挤到了屏幕外。现在空卡片直接不显示，整组都空时用一句话说明原因。没有补 0，只是不再把「缺」重复十三遍。
+
+### Fixes / 修复
+
+- **The app could start with no window you could see.** The initial window size was derived from the monitor work area with no lower bound, and a work area of `0x0` — which remote desktop sessions, monitor hot-plug and the moment before a display is ready all report — produced a negative width that the window accepted. What you got was a tray icon, a running process, and nothing to click. The same release also stops the app re-syncing from scratch on every launch.
+- **应用可能开起来却看不见窗口。** 初始窗口尺寸是按显示器工作区算的，没有下界；而工作区报成 `0x0` 是真会发生的——远程桌面、显示器热插拔、显示器还没准备好的那一瞬间都会。算出来是个负的宽度，而窗口把它收下了。你看到的就是：托盘有图标、进程在跑、点了没反应。同一版还修掉了每次启动都从头重新同步一遍。
+- **The command line says where it looked.** Someone spent two hours over four rounds on [#40](https://github.com/lingcang728/ZeppBridge/issues/40) because nothing ever said which folder was being used: running the CLI from a build directory redirects the data folder to the repository root, which is the right rule and was completely silent. Every "not found" now names the resolved path, and explains why the data is not next to the executable when that is the case. "No account connected" is also split in two — a missing `auth.json` and a missing token are different problems, and that user had already done the half he was being told to do again.
+- **命令行会说出它去哪儿找了。** [#40](https://github.com/lingcang728/ZeppBridge/issues/40) 那位用户花了两小时、来回四轮，卡的全是我们没说话：从构建目录里跑 CLI 会把数据目录重定向到仓库根，这条规则本身是对的，但程序一个字都没说。现在每一条「找不到」都带上解析出来的路径，该说的时候还会说明数据为什么不在 exe 旁边。「没有连接账号」也拆成了两句——缺 `auth.json` 和缺令牌是两回事，而那位用户被叫去做的，正是他已经做过的那一半。
+- **The weight feature reached the screens it was supposed to.** The readings were stored and exportable, but the charts skipped them and the data-health page did not list the stream at all — the same fact living in several lists with nothing cross-checking them, invisible at every checkpoint that was actually looked at.
+- **体重终于到达了它本该到达的那几个界面。** 数据入了库、导得出来，但图表跳过了它们，数据健康页上那条流干脆不存在——同一件事登记在好几份名单里，彼此没有交叉校验，于是在每一个真正去看的检查点上都是「正常」。
+- **The command line no longer hangs instead of reporting an error.** Any failure raised after the database was opened — an unrecognised `--types`, an invalid date, a `--workout` that does not exist, a failed sync — left `zeppbridge-cli` spinning at 100% CPU and never returning, instead of printing the message and exiting with its documented code. A scheduled job that hit one of these would hang forever rather than fail. Exit codes are a contract; this one broke it silently.
+- **命令行不会再卡死在报错的地方。** 凡是数据库打开之后抛出来的错误——`--types` 不认识、日期非法、`--workout` 不存在、同步失败——`zeppbridge-cli` 都会 100% 占满一个核心永不返回，而不是印出错误再按契约的退出码退出。定时任务撞上这些会永远挂着，而不是失败。退出码是契约，这个 bug 无声地把它毁了。
+- **Food records can be exported.** `--types food` was silently dropped: intake data was stored and could be charted, but not a single row came out of an export. Worse, a catch-all branch could sweep intake into `daily_activity` — calories eaten and calories burned are opposite things, and mixing them under one type reads the food you ate as energy you spent.
+- **饮食能导出了。** `--types food` 会被静默丢掉：摄入数据入了库、画得出图，导出却一条都没有。更糟的是有个兜底分支会把摄入扫进 `daily_activity`——吃进去的热量和消耗掉的热量是相反的两件事，混在同一个类型下，就是把吃的读成了烧的。
+
 ## 2.1.2
 
 ### Added / 新增
