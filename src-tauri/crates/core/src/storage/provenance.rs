@@ -302,7 +302,7 @@ pub struct DataHealth {
 }
 
 /// 同步流目录。顺序即界面顺序。
-const STREAM_CATALOG: [(&str, &str, StreamCadence); 7] = [
+const STREAM_CATALOG: [(&str, &str, StreamCadence); 8] = [
     ("heart_rate", "心率", StreamCadence::Continuous),
     ("daily_summary", "每日概览", StreamCadence::Daily),
     ("sleep", "睡眠", StreamCadence::Nightly),
@@ -310,6 +310,9 @@ const STREAM_CATALOG: [(&str, &str, StreamCadence); 7] = [
     ("wellness", "压力 / 血氧等可选指标", StreamCadence::Daily),
     ("workouts", "运动记录", StreamCadence::PerEvent),
     ("workout_detail", "运动明细与轨迹", StreamCadence::PerEvent),
+    // 称重是「称了才有」，不是每天都该有的东西——一周没上秤不是故障，所以
+    // 是 Occasional 而不是 Daily，那样这一行才不会常年画成红色缺口。
+    ("weight", "体重与体成分", StreamCadence::Occasional),
 ];
 
 /// 已知节奏的指标。没列在这里的指标一律按 `Occasional` 处理 —— 宁可少报
@@ -1369,6 +1372,43 @@ mod tests {
                 .pending_normalization,
             1,
             "没产出任何记录的报文还是要算进来"
+        );
+    }
+    /// 同步会跑的每一条流，数据健康页都得认识。
+    ///
+    /// `STREAM_CATALOG` 是那一页的全部内容：不在这张表里的流，页面上根本没有
+    /// 它的行——没有「上次取到什么时候」，没有缺口判断，它开始失败了也不会有
+    /// 任何一处变红。而同步那边加一条流是不需要动这张表就能跑通的，所以两份
+    /// 名单会无声地分叉。体重那一版就是这么漏的：抓取、入库、导出、契约全对，
+    /// 唯独这一页当它不存在。
+    ///
+    /// 这里不去 grep 源码，而是把同步真正会 emit 的那几个名字写死一份对照：
+    /// 加流的人必须同时改两处，改漏了这条会红。
+    #[test]
+    fn every_synced_stream_appears_on_the_health_page() {
+        // 和 `SyncManager::run` 里那串 `emit(...)` 的第一个参数一一对应。
+        const SYNCED_STREAMS: [&str; 8] = [
+            "heart_rate",
+            "daily_summary",
+            "workouts",
+            "workout_detail",
+            "sleep",
+            "hrv",
+            "wellness",
+            "weight",
+        ];
+        let known: std::collections::BTreeSet<&str> = STREAM_CATALOG
+            .iter()
+            .map(|(stream, _, _)| *stream)
+            .collect();
+        let missing: Vec<&str> = SYNCED_STREAMS
+            .iter()
+            .copied()
+            .filter(|stream| !known.contains(stream))
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "这些流会同步，数据健康页却不认识它们：{missing:?}"
         );
     }
 }
