@@ -95,7 +95,34 @@ export interface SeriesChartOptions {
   /** Format a value for the tooltip; defaults to a fixed-decimal number. */
   format?: (value: number) => string;
   unit?: string;
+  /** Bars instead of a line. For values that are counted per day, not sampled. */
+  chart?: 'line' | 'bar';
+  /**
+   * Put every calendar day between the first and last reading on the axis,
+   * including the ones with no reading.
+   *
+   * Off by default the axis holds **only the days that carry a value**, so two
+   * readings a week apart sit in neighbouring slots and the line runs straight
+   * between them — the missing days are not drawn as gaps, they are not drawn
+   * at all. For something measured most days that is a small distortion. For
+   * something logged by hand it is not: it turns "I logged 51 of these 60 days"
+   * into a picture of an unbroken habit.
+   */
+  calendarAxis?: boolean;
 }
+
+/** Every ISO day from `first` to `last`, inclusive. */
+const calendarSpan = (first: string, last: string): string[] => {
+  const start = new Date(`${first}T00:00:00Z`);
+  const end = new Date(`${last}T00:00:00Z`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return [];
+  const days: string[] = [];
+  // 一年半的窗口最多 ~550 天，直接展开即可。
+  for (let day = start; day <= end; day = new Date(day.getTime() + 86_400_000)) {
+    days.push(day.toISOString().slice(0, 10));
+  }
+  return days;
+};
 
 const hexToRgba = (hex: string, alpha: number): string => {
   const parsed = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
@@ -105,11 +132,16 @@ const hexToRgba = (hex: string, alpha: number): string => {
 };
 
 /**
- * A daily line, drawn only where days actually carry values.
+ * A daily line (or bars), drawn only where days actually carry values.
  *
  * `connectNulls` stays off deliberately. A gap in the data is a gap on the
  * chart: joining across a fortnight of silence would draw a trend that was
  * never measured.
+ *
+ * That promise only holds with `calendarAxis`. Without it the axis is built
+ * from the points themselves, so a missing day is not a null — it is simply
+ * absent, and the line closes over it as if the days were adjacent. Anything
+ * recorded by hand should pass `calendarAxis: true`.
  */
 export const buildSeriesOption = (
   series: MetricSeries,
@@ -117,19 +149,33 @@ export const buildSeriesOption = (
 ): Record<string, unknown> => {
   const decimals = options.decimals ?? 0;
   const format = options.format ?? ((value: number) => value.toFixed(decimals));
-  const dates = series.points.map((point) => point.date);
-  const values = series.points.map((point) => point.value);
-  const hasSpread =
-    Boolean(options.showSpread)
-    && series.points.some((point) => typeof point.min === 'number' && typeof point.max === 'number');
-
-  const spreadBase = series.points.map((point) => (typeof point.min === 'number' ? point.min : null));
-  const spreadHeight = series.points.map((point) =>
-    typeof point.min === 'number' && typeof point.max === 'number' ? point.max - point.min : null);
+  const bar = options.chart === 'bar';
 
   const byDate = new Map<string, MetricSeriesPoint>(
     series.points.map((point) => [point.date, point]),
   );
+
+  // 有值的日子是数据；轴上多出来的日子是 null，`connectNulls: false` 让线断开、
+  // 让柱子缺席。两种画法下「那天没有记录」都不会被画成一个值。
+  const dates = options.calendarAxis && series.points.length
+    ? calendarSpan(series.points[0].date, series.points[series.points.length - 1].date)
+    : series.points.map((point) => point.date);
+  const at = (date: string) => byDate.get(date) ?? null;
+  const values = dates.map((date) => at(date)?.value ?? null);
+  const hasSpread =
+    Boolean(options.showSpread)
+    && series.points.some((point) => typeof point.min === 'number' && typeof point.max === 'number');
+
+  const spreadBase = dates.map((date) => {
+    const point = at(date);
+    return typeof point?.min === 'number' ? point.min : null;
+  });
+  const spreadHeight = dates.map((date) => {
+    const point = at(date);
+    return typeof point?.min === 'number' && typeof point.max === 'number'
+      ? point.max - point.min
+      : null;
+  });
 
   return {
     animationDuration: 600,
@@ -154,7 +200,7 @@ export const buildSeriesOption = (
     xAxis: {
       type: 'category',
       data: dates,
-      boundaryGap: false,
+      boundaryGap: bar,
       axisLabel: { formatter: shortDate, hideOverlap: true, fontSize: 10 },
       splitLine: { show: false },
     },
@@ -188,16 +234,23 @@ export const buildSeriesOption = (
             },
           ]
         : []),
-      {
-        type: 'line',
-        data: values,
-        smooth: 0.2,
-        connectNulls: false,
-        showSymbol: series.points.length <= 14,
-        symbolSize: 5,
-        itemStyle: { color: options.color },
-        lineStyle: { width: 2, color: options.color, cap: 'round' },
-      },
+      bar
+        ? {
+            type: 'bar',
+            data: values,
+            barMaxWidth: 14,
+            itemStyle: { color: options.color, borderRadius: [2, 2, 0, 0] },
+          }
+        : {
+            type: 'line',
+            data: values,
+            smooth: 0.2,
+            connectNulls: false,
+            showSymbol: series.points.length <= 14,
+            symbolSize: 5,
+            itemStyle: { color: options.color },
+            lineStyle: { width: 2, color: options.color, cap: 'round' },
+          },
     ],
   };
 };
