@@ -2831,6 +2831,16 @@ impl Database {
             "DELETE FROM workout_splits WHERE workout_id = ?1",
             [workout_id],
         )?;
+        // 圈也要先清掉。**这一条一度漏了**，而这个函数叫 `replace_`：
+        // `workout_laps` 是和圈一起加进来的新表，它和上面几张一样没有唯一
+        // 索引——那几张不出问题，靠的正是这里的 DELETE。漏掉它，每重放一次
+        // 圈就翻一倍（本机实测 341 → 682，341 组 (workout_id, lap_index)
+        // 一个不落全是两份），`.fit` 里每圈导两遍，界面上每圈列两行。
+        // 第一次重放看起来完全正常，所以它只会在下一次推修订号时才爆出来。
+        self.conn.execute(
+            "DELETE FROM workout_laps WHERE workout_id = ?1",
+            [workout_id],
+        )?;
 
         {
             let mut insert = self.conn.prepare(
@@ -6580,6 +6590,58 @@ mod tests {
         // 然后把圈清掉：旧版本解不出 `lap`，所以旧库里这张表是空的。v22 的
         // 重放要能把它们补回来，这正是要验的事。
         db.conn.execute("DELETE FROM workout_laps", []).unwrap();
+    }
+
+    /// 重放两次，派生行不能变成两份。
+    ///
+    /// `replace_workout_series` 清空四张表再重新插入，唯独漏了 v22 新加的
+    /// `workout_laps`。这几张表都没有唯一索引——不出问题靠的就是那几条
+    /// DELETE，所以漏一张就是纯追加。本机实测一次全库重放把 341 圈变成了
+    /// 682，341 组 `(workout_id, lap_index)` 一个不落全是两份。
+    ///
+    /// 骗过所有人的地方在于**第一次重放是对的**：2.1.2 升上来的人拿到的圈
+    /// 是准的，要等下一次推修订号才翻倍。所以这里数的是「重放第二次之后」，
+    /// 而不是「重放之后」。四张表一起数，下次再加派生表时这个用例会一起把
+    /// 它盖住。
+    #[test]
+    fn replaying_twice_does_not_duplicate_derived_rows() {
+        let db = Database::in_memory().unwrap();
+        insert_workout_with_lap_detail(&db);
+        let counts = || -> Vec<(String, i64)> {
+            [
+                "workout_laps",
+                "workout_splits",
+                "workout_samples",
+                "workout_pauses",
+            ]
+            .into_iter()
+            .map(|table| {
+                let n = db
+                    .conn
+                    .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+                        row.get::<_, i64>(0)
+                    })
+                    .unwrap();
+                (table.to_string(), n)
+            })
+            .collect()
+        };
+
+        db.reprocess_raw_records().unwrap();
+        let after_first = counts();
+        assert!(
+            after_first
+                .iter()
+                .any(|(table, n)| table == "workout_laps" && *n == 2),
+            "夹具本身要能解出两圈，否则这个用例什么都没验：{after_first:?}"
+        );
+
+        db.reprocess_raw_records().unwrap();
+        assert_eq!(
+            counts(),
+            after_first,
+            "重放第二次之后派生行变多了——某张表漏了 replace 前的 DELETE"
+        );
     }
 
     #[test]
