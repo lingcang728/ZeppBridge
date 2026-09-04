@@ -1440,12 +1440,40 @@ impl Normalizer {
             "spo2" | "spo2_auto" => spo2_samples(items, &mut out),
             "pai" => pai_metrics(items, &mut out),
             "all_day_stress" => all_day_stress_metrics(items, &mut out),
+            "food" => food_metrics(items, &mut out),
             other => out
                 .diagnostics
                 .push(format!("{other}: 结构尚未验证，仅保留原始报文")),
         }
         out
     }
+}
+
+/// 饮食记录：`/v2/users/me/events?eventType=Food`，没有 subType。
+///
+/// **这条流没有对着真实数据核对过，而这里说清楚为什么。** 饮食记录是大陆以外
+/// 的 Zepp 应用才有的功能，而手头能验证的账号在 `api-mifit-cn.huami.com` 上——
+/// 那个区域的应用里根本没有这个入口，所以它返回的永远是空页。要么按已知契约
+/// 写出来等有饭记录的人来验，要么继续挂在探针上什么都不做；后者已经挂了一个
+/// 版本，而问的人还在问。
+///
+/// 因此解析写成**宽容**的：认得的宏量营养素落到 `daily_metrics`，认不得的字段
+/// 名按出现次数记进诊断，原始报文本来就整份留着——真实样本一到，重放一次就能
+/// 把它们认出来，不必让任何人重新同步。
+///
+/// 写 `daily_metrics` 而不是 `metric_samples`：一天吃几餐，但有意义的是「今天
+/// 摄入了多少」。逐餐的热量单独看不构成一条能和活动量对照的曲线，而
+/// u/Vast_Snow_5216 要的正是「营养、恢复和活动量之间的相关性」。
+/// 一个宏量营养素：指标名、可能的字段名、单位，以及一个真实读数只可能落在的
+/// 区间。
+///
+/// 和体重那边一样，名字来自生态而不是我们见过的报文，所以每一项都要落在区间
+/// 里才会被采用。一天摄入 40000 kcal 不是热量，是某个撞了名字的别的东西。
+struct Macro {
+    metric: &'static str,
+    names: &'static [&'static str],
+    unit: &'static str,
+    range: (f64, f64),
 }
 
 /// One body-composition metric: what to call it, which server field names have
@@ -1466,6 +1494,121 @@ struct BodyMetric {
     unit: &'static str,
     range: (f64, f64),
 }
+
+fn food_metrics(items: &[Value], out: &mut WellnessNormalizedData) {
+    const MACROS: [Macro; 4] = [
+        Macro {
+            metric: "intake_calories",
+            names: &["calories", "calorie", "kcal", "energy"],
+            unit: "kcal",
+            range: (1.0, 20000.0),
+        },
+        Macro {
+            metric: "intake_protein_g",
+            names: &["protein", "proteins"],
+            unit: "g",
+            range: (0.0, 1000.0),
+        },
+        Macro {
+            metric: "intake_fat_g",
+            names: &["fat", "fats"],
+            unit: "g",
+            range: (0.0, 1000.0),
+        },
+        Macro {
+            metric: "intake_carbs_g",
+            names: &["carbohydrate", "carbohydrates", "carbs"],
+            unit: "g",
+            range: (0.0, 2000.0),
+        },
+    ];
+
+    // 按天累加：一天可能有好几条记录（早中晚各一条，或者一餐一条）。
+    let mut per_day: BTreeMap<(String, &'static str), (f64, &'static str)> = BTreeMap::new();
+    let mut unknown: BTreeMap<String, usize> = BTreeMap::new();
+
+    for item in items {
+        let Some(object) = item.as_object() else {
+            continue;
+        };
+        let Some(date) = summary_date(object, None) else {
+            out.diagnostics.push("food: 一条记录没有可用的日期".into());
+            continue;
+        };
+        // 数值可能挂在顶层，也可能在 `value` 里——别的 v2 流两种形状都出现过。
+        let nested = object.get("value").and_then(Value::as_object);
+        let mut matched: Vec<&str> = Vec::new();
+        for Macro {
+            metric,
+            names,
+            unit,
+            range,
+        } in MACROS
+        {
+            for name in names {
+                if object.contains_key(*name)
+                    || nested.is_some_and(|inner| inner.contains_key(*name))
+                {
+                    matched.push(name);
+                }
+            }
+            let Some(value) = first_number_from(object, nested, names) else {
+                continue;
+            };
+            if !value.is_finite() || value < range.0 || value > range.1 {
+                out.diagnostics.push(format!(
+                    "food: {metric} 的读数 {value} 不在 {range:?} 内，已忽略"
+                ));
+                continue;
+            }
+            let entry = per_day.entry((date.clone(), metric)).or_insert((0.0, unit));
+            entry.0 += value;
+        }
+        for key in object.keys() {
+            if matched.contains(&key.as_str()) || FOOD_FIELDS_NOT_MACROS.contains(&key.as_str()) {
+                continue;
+            }
+            *unknown.entry(key.clone()).or_default() += 1;
+        }
+    }
+
+    for ((date, metric), (value, unit)) in per_day {
+        out.daily_metrics.push(DailyMetric {
+            date,
+            metric: metric.to_string(),
+            value,
+            unit: unit.to_string(),
+            source_scope: SourceScope::UserFused,
+            device_id: None,
+        });
+    }
+    if !unknown.is_empty() {
+        let listed = unknown
+            .iter()
+            .map(|(name, count)| format!("{name}x{count}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        out.diagnostics
+            .push(format!("food: 尚未解析的字段：{listed}"));
+    }
+}
+
+/// 饮食记录里属于「记录本身」而不是营养读数的字段。
+///
+/// 排除它们，是为了让上面那条「尚未解析的字段」诊断里剩下的都是真正的新东西
+/// ——第一个有饮食记录的用户同步之后，那一行就是我们唯一的线索。
+const FOOD_FIELDS_NOT_MACROS: [&str; 10] = [
+    "date",
+    "dateString",
+    "day",
+    "eventType",
+    "subType",
+    "time",
+    "timestamp",
+    "timeZone",
+    "userId",
+    "value",
+];
 
 /// Everything one weigh-in can carry.
 ///

@@ -72,6 +72,12 @@ const messages = defineMessages(
     metricAvgPace: '平均配速',
     metricAscent: '累计爬升',
     metricTrainingLoad: '训练负荷',
+    metricTrainingEffect: '有氧训练效果',
+    metricAnaerobicEffect: '无氧训练效果',
+    metricRpe: '主观疲劳度',
+    metricMaxHr: '最高心率',
+    metricCalories: '消耗',
+    unitKcal: '千卡',
 
     statFastest: '最快',
     statAverage: '平均',
@@ -202,6 +208,12 @@ Answer in Markdown.`,
     metricAvgPace: 'Avg pace',
     metricAscent: 'Ascent',
     metricTrainingLoad: 'Training load',
+    metricTrainingEffect: 'Aerobic effect',
+    metricAnaerobicEffect: 'Anaerobic effect',
+    metricRpe: 'Perceived exertion',
+    metricMaxHr: 'Max heart rate',
+    metricCalories: 'Calories',
+    unitKcal: 'kcal',
 
     statFastest: 'Fastest',
     statAverage: 'Avg',
@@ -474,11 +486,42 @@ const deviceName = computed(() => device.value.canonical_name || device.value.na
 const deviceImage = computed(() => deviceImageFor(device.value.kind, device.value.image_key));
 const deviceKind = computed(() => device.value.kind || 'unknown');
 
+/**
+ * 没有距离的运动。
+ *
+ * 力量训练、划船机、椭圆机这些，「距离」「配速」「累计爬升」三格永远是
+ * 「未提供」——三张空卡片占着最显眼的位置，而这次训练真正的强度信息
+ * （训练效果、无氧训练效果、主观疲劳度）一个都没露面。
+ *
+ * 判断依据是这条记录**有没有距离**，不是运动类型白名单：室内跑有距离，
+ * 而户外的力量训练没有，按类型列名单迟早会两头都判错。
+ */
+const hasDistance = computed(() => isFiniteNumber(workout.value?.distance_meters)
+  && (workout.value?.distance_meters ?? 0) > 0);
+
 const heroMetrics = computed(() => {
   const item = workout.value;
   if (!item) return [];
   const summary = series.value?.summary;
   const resolvedPace = paceLabel.value !== t.value.notProvided ? paceLabel.value : paceText(summary?.average_pace);
+  /* 强度那一组。Zepp 云端不提供组数、次数和重量——`workouts` 表和它的
+     四张子表里都没有这几列，原始报文里也没有。所以这里显示的是**它
+     确实给了的**负荷指标，而不是把 per-set 数据编出来。 */
+  const loadMetrics = [
+    { label: t.value.metricTrainingEffect, value: numberValue(item.training_effect, 1), tone: 'training', icon: 'training-load' as DesignIconName },
+    { label: t.value.metricAnaerobicEffect, value: numberValue(item.anaerobic_training_effect, 1), tone: 'vo2', icon: 'vo2-max' as DesignIconName },
+    { label: t.value.metricRpe, value: numberValue(item.rpe), tone: 'heart', icon: 'body-activity' as DesignIconName },
+  ];
+  if (!hasDistance.value) {
+    return [
+      { label: t.value.metricDuration, value: formatClock(durationMinutes.value), tone: 'training', icon: 'auto-sync' as DesignIconName },
+      { label: t.value.metricAvgHr, value: numberValue(item.avg_hr), unit: isFiniteNumber(item.avg_hr) ? 'bpm' : undefined, tone: 'heart', icon: 'heart-rate' as DesignIconName },
+      { label: t.value.metricMaxHr, value: numberValue(item.max_hr), unit: isFiniteNumber(item.max_hr) ? 'bpm' : undefined, tone: 'heart', icon: 'heart-rate' as DesignIconName },
+      { label: t.value.metricCalories, value: numberValue(item.calories), unit: isFiniteNumber(item.calories) ? t.value.unitKcal : undefined, tone: 'distance', icon: 'body-activity' as DesignIconName },
+      { label: t.value.metricTrainingLoad, value: numberValue(item.training_load), tone: 'training', icon: 'training-load' as DesignIconName },
+      ...loadMetrics,
+    ];
+  }
   return [
     { label: t.value.metricDistance, value: distanceLabel.value, tone: 'distance', icon: 'outdoor-run' as DesignIconName },
     { label: t.value.metricDuration, value: formatClock(durationMinutes.value), tone: 'training', icon: 'auto-sync' as DesignIconName },
@@ -487,6 +530,7 @@ const heroMetrics = computed(() => {
     { label: t.value.metricAscent, value: isFiniteNumber(summary?.elevation_gain_m) ? numberValue(toElevation(summary.elevation_gain_m)) : t.value.notProvided, unit: isFiniteNumber(summary?.elevation_gain_m) ? elevationUnitLabel() : undefined, tone: 'altitude', icon: 'health-watch' as DesignIconName },
     { label: 'VO₂ Max', value: numberValue(item.vo2max), tone: 'vo2', icon: 'vo2-max' as DesignIconName },
     { label: t.value.metricTrainingLoad, value: numberValue(item.training_load), tone: 'training', icon: 'training-load' as DesignIconName },
+    ...loadMetrics,
   ];
 });
 
