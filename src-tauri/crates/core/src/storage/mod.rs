@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 /// 当前 SQLite schema 版本（`PRAGMA user_version`）。加新版本只能追加迁移
 /// 步骤，不要改已有 DDL。
-pub const CURRENT_SCHEMA_VERSION: i64 = 20;
+pub const CURRENT_SCHEMA_VERSION: i64 = 21;
 /// 写进备份 manifest 的应用版本。Core 是独立 crate，用它自己的包版本。
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// 解析器修订号。**改了运动目录或任何归一化规则，就必须往前走一格。**
@@ -18,18 +18,20 @@ const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// `raw_records` 重新跑一遍。不动它，新加的编号只对以后同步来的记录生效，
 /// 已经存成 `unknown:211` 的那 199 条记录会永远挂着——而报这个问题的人恰恰
 /// 是因为历史记录才来报的。
-pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v21-elliptical";
+pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v22-watch-laps";
 /// 上一版的修订号。从它升上来时只重放这几条流。
 ///
-/// v20 到 v21 只动了一件事：运动目录里加了 `12 -> elliptical`（椭圆机）。
-/// 编号只在 `normalize_workouts_*` 里被翻译成运动名（normalizer/mod.rs 的
-/// `zepp_sport_type_name`，全仓库唯一的调用点），所以只有 workouts 这一条流
-/// 需要重放。`workout_detail` 里没有类型编号，daily_summary / wellness /
-/// sleep / hrv / heart_rate 的解析一个字节都没动。
-const PREVIOUS_RELEASE_NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v20-cloud-fields";
+/// v21 到 v22 只动了一件事：`workout_detail` 现在解 `lap` 字段——手表自己记
+/// 的圈。那个字段一直在留存的报文里（本机 336 条明细中有 32 条带它），只是
+/// 从来没被解过，所以重放能把历史记录的圈补齐，不用重新同步。
+///
+/// 只有 `workout_detail` 需要重放：`lap` 只出现在明细报文里，workouts 汇总、
+/// daily_summary / wellness / weight / sleep / hrv / heart_rate 的解析一个
+/// 字节都没动。
+const PREVIOUS_RELEASE_NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v21-elliptical";
 /// 从上一版升上来时要重放的流。**改归一化规则时必须一起看这里**：漏掉一条
 /// 流，那条流的历史记录就永远停在旧规则上，而升级看起来是成功的。
-const PREVIOUS_RELEASE_REPLAY_STREAMS: [&str; 1] = ["workouts"];
+const PREVIOUS_RELEASE_REPLAY_STREAMS: [&str; 1] = ["workout_detail"];
 const LAST_CLOUD_SYNC_AT_KEY: &str = "last_cloud_sync_at";
 const LAST_CLOUD_SYNC_OUTCOME_KEY: &str = "last_cloud_sync_outcome";
 const LAST_LOCAL_REPROCESS_AT_KEY: &str = "last_local_reprocess_at";
@@ -1328,9 +1330,14 @@ impl Database {
         let version: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
         match version.cmp(&CURRENT_SCHEMA_VERSION) {
             std::cmp::Ordering::Equal => Ok(Self { conn }),
-            std::cmp::Ordering::Less => Err(ZeppBridgeError::ConfigError(format!(
-                "本机数据库还是 v{version}，这个程序需要 v{CURRENT_SCHEMA_VERSION}。只读连接无法升级——无头环境请跑一次 `zeppbridge-cli reprocess`，有桌面应用就启动一次（两条路都会在升级前自动生成备份），再重试。"
-            ))),
+            // 自己的错误码：撞上这一条的人几乎都在无头环境里，而命令行没有
+            // i18n 层，只有按码才出得了英文。见 `HeadlessProblem`。
+            std::cmp::Ordering::Less => Err(ZeppBridgeError::Headless(
+                crate::models::error::HeadlessProblem::SchemaUpgradeRequired {
+                    found: version,
+                    required: CURRENT_SCHEMA_VERSION,
+                },
+            )),
             std::cmp::Ordering::Greater => Err(ZeppBridgeError::ConfigError(format!(
                 "本机数据库是 v{version}，比这个程序（v{CURRENT_SCHEMA_VERSION}）新。请把命令行 / MCP 升级到与桌面应用相同的版本，不要用旧版去读新库。"
             ))),
@@ -2885,6 +2892,26 @@ impl Database {
                 ])?;
             }
         }
+        {
+            let mut insert = self.conn.prepare(
+                "INSERT INTO workout_laps
+                    (workout_id, lap_index, start_time, end_time, distance_m,
+                     duration_seconds, avg_hr, max_hr)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            )?;
+            for lap in &decoded.laps {
+                insert.execute(params![
+                    workout_id,
+                    lap.index,
+                    lap.start_time.to_rfc3339(),
+                    lap.end_time.to_rfc3339(),
+                    lap.distance_m,
+                    lap.duration_seconds,
+                    lap.avg_hr,
+                    lap.max_hr,
+                ])?;
+            }
+        }
 
         self.conn.execute(
             "UPDATE workouts
@@ -2966,6 +2993,7 @@ impl Database {
         let summary = workout_series_summary(&samples);
 
         let splits = self.load_workout_splits(workout_id)?;
+        let laps = self.load_workout_laps(workout_id)?;
 
         Ok(WorkoutSeries {
             workout_id: workout_id.to_owned(),
@@ -2973,6 +3001,7 @@ impl Database {
             route,
             pauses,
             splits,
+            laps,
             summary,
         })
     }
@@ -3038,6 +3067,26 @@ impl Database {
             )?;
         }
         Ok(total)
+    }
+
+    fn load_workout_laps(&self, workout_id: &str) -> Result<Vec<WorkoutLapRow>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT lap_index, start_time, end_time, distance_m, duration_seconds,
+                    avg_hr, max_hr
+             FROM workout_laps WHERE workout_id = ?1 ORDER BY lap_index",
+        )?;
+        let rows = stmt.query_map([workout_id], |row| {
+            Ok(WorkoutLapRow {
+                index: row.get(0)?,
+                start_time: row.get(1)?,
+                end_time: row.get(2)?,
+                distance_m: row.get(3)?,
+                duration_seconds: row.get(4)?,
+                avg_hr: row.get(5)?,
+                max_hr: row.get(6)?,
+            })
+        })?;
+        Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
     }
 
     fn load_workout_splits(&self, workout_id: &str) -> Result<Vec<WorkoutSplitRow>> {
@@ -5006,6 +5055,9 @@ impl Database {
                     "route_point_count": series.route.len(),
                     "pauses": series.pauses,
                     "splits": series.splits,
+                    // 手表自己记的圈。和 splits 并列而不是二选一：一次跑步
+                    // 可以同时有每公里分段和手表按圈键记下的圈，含义不同。
+                    "laps": series.laps,
                 });
                 if full {
                     let samples = serde_json::to_value(series.samples)
@@ -5514,6 +5566,10 @@ impl Database {
         )?;
         self.conn.execute(
             "DELETE FROM workout_pauses WHERE start_time < ?1",
+            [&cutoff_timestamp],
+        )?;
+        self.conn.execute(
+            "DELETE FROM workout_laps WHERE start_time < ?1",
             [&cutoff_timestamp],
         )?;
         self.conn.execute(
@@ -6439,9 +6495,63 @@ mod tests {
         );
     }
 
+    /// 一条运动加上它的明细报文，明细里带手表记的圈。
+    ///
+    /// v22 重放的是 `workout_detail`：`lap` 字段一直躺在留存的报文里（本机
+    /// 336 条明细中有 32 条带它），只是从来没被解过。重放要能把历史记录的圈
+    /// 补齐，否则问这件事的人升级完看到的还是老样子——而他就是因为历史记录
+    /// 才来问的。
+    fn insert_workout_with_lap_detail(db: &Database) {
+        db.insert_raw_record(&RawRecord {
+            stream: "workouts".into(),
+            source_key: "sport_history:run:lap-fixture".into(),
+            source_scope: SourceScope::Device,
+            device_id: None,
+            start_utc: ts(),
+            end_utc: None,
+            payload: serde_json::json!({
+                "data": [{
+                    "trackid": 1_700_000_000i64,
+                    "end_time": 1_700_000_600i64,
+                    "type": 1,
+                    "dis": "1000"
+                }]
+            }),
+            capability: CapabilityStatus::Verified,
+        })
+        .unwrap();
+        db.insert_raw_record(&RawRecord {
+            stream: "workout_detail".into(),
+            source_key: "workout_detail:1700000000:run.huami.com".into(),
+            source_scope: SourceScope::Device,
+            device_id: None,
+            start_utc: ts(),
+            end_utc: None,
+            payload: serde_json::json!({
+                "data": {
+                    "trackid": 1_700_000_000i64,
+                    "time": "0;300;300;",
+                    "heart_rate": "0,150;300,2;300,-2;",
+                    // 两圈各 500 m / 300 s，累计 300 与 600 —— 正好对上汇总的
+                    // 1000 m 和 600 s，两条对账都过得去。
+                    "lap": "0,300,500,s00000000000,150,300,-20000;1,300,500,s00000000000,152,600,-20000;"
+                }
+            }),
+            capability: CapabilityStatus::Verified,
+        })
+        .unwrap();
+        // `insert_raw_record` 只存报文，派生行是重放时才建的。先整体归一化
+        // 一遍，把运动汇总和逐秒采样做出来——真实的旧库正是这个样子。
+        db.reprocess_raw_records().unwrap();
+        // 然后把圈清掉：旧版本解不出 `lap`，所以旧库里这张表是空的。v22 的
+        // 重放要能把它们补回来，这正是要验的事。
+        db.conn.execute("DELETE FROM workout_laps", []).unwrap();
+    }
+
     #[test]
     fn previous_release_upgrade_replays_only_the_changed_streams() {
         let db = Database::in_memory().unwrap();
+        insert_workout_with_lap_detail(&db);
         db.insert_raw_record(&RawRecord {
             stream: "daily_summary".into(),
             source_key: "daily-summary-test".into(),
@@ -6502,18 +6612,19 @@ mod tests {
 
         let counts = db.reprocess_raw_records_if_needed().unwrap().unwrap();
 
-        // v20 到 v21 只改了运动目录，所以只有 workouts 这一条流要重放，而且
-        // 报上来的条数是真的条数——那一条运动。
-        assert_eq!(counts.get("workouts"), Some(&1));
-        // 而且重放确实把编号翻译过来了：这正是这一版存在的理由——已经存成
-        // `unknown:12` 的历史记录必须变成椭圆机，不然报这个问题的人（他就是
-        // 因为历史记录才来报的）升级完看到的还是老样子。
+        // v21 到 v22 只动了明细里的 `lap`，所以只有 workout_detail 这一条流要
+        // 重放。运动汇总的解析一个字节都没改，不该被顺手再解一遍。
+        assert!(counts.contains_key("workout_detail"), "counts = {counts:?}");
+        assert!(!counts.contains_key("workouts"), "{counts:?}");
+        // 而且重放确实把圈解出来了：这正是这一版存在的理由——报文里一直有的
+        // 东西，不重放的话只有以后新同步的运动才会有圈。
         assert_eq!(
             db.conn
-                .query_row("SELECT workout_type FROM workouts", [], |row| row
-                    .get::<_, String>(0),)
+                .query_row("SELECT COUNT(*) FROM workout_laps", [], |row| row
+                    .get::<_, i64>(0),)
                 .unwrap(),
-            "elliptical"
+            2,
+            "两圈都要落库"
         );
         // daily_summary / wellness 一个字节都没动过，不该被顺手解一遍：白解
         // 一遍就是让升级后第一次启动干等。
@@ -6562,22 +6673,10 @@ mod tests {
     #[test]
     fn a_stale_library_can_be_recognized_without_writing_to_it() {
         let db = Database::in_memory().unwrap();
-        db.insert_raw_record(&RawRecord {
-            // 这一条必须落在**这一版要重放的那条流**上，否则 raw_records 会是
-            // 0，而 0 条报文的库本来就不欠重放——那样这个测试就在验一件不相干
-            // 的事。改归一化规则、换了重放的流时，这里要跟着换。
-            stream: "workouts".into(),
-            source_key: "workouts-plan".into(),
-            source_scope: SourceScope::Device,
-            device_id: None,
-            start_utc: ts(),
-            end_utc: None,
-            payload: serde_json::json!({
-                "data": [{ "trackid": 1_700_000_000i64, "end_time": 1_700_003_600i64, "type": 12 }]
-            }),
-            capability: CapabilityStatus::Verified,
-        })
-        .unwrap();
+        // 这份夹具必须落在**这一版要重放的那条流**上，否则 raw_records 会是 0，
+        // 而 0 条报文的库本来就不欠重放——那样这个测试就在验一件不相干的事。
+        // 改归一化规则、换了重放的流时，这里要跟着换。
+        insert_workout_with_lap_detail(&db);
         db.conn
             .execute(
                 "INSERT INTO app_meta(key, value, updated_at)
@@ -6634,20 +6733,8 @@ mod tests {
     #[test]
     fn health_reports_the_revision_the_library_actually_has() {
         let db = Database::in_memory().unwrap();
-        db.insert_raw_record(&RawRecord {
-            // 同上：要落在这一版会重放的那条流上，不然「欠不欠重放」根本不成立。
-            stream: "workouts".into(),
-            source_key: "workouts-health".into(),
-            source_scope: SourceScope::Device,
-            device_id: None,
-            start_utc: ts(),
-            end_utc: None,
-            payload: serde_json::json!({
-                "data": [{ "trackid": 1_700_000_000i64, "end_time": 1_700_003_600i64, "type": 12 }]
-            }),
-            capability: CapabilityStatus::Verified,
-        })
-        .unwrap();
+        // 同上：要落在这一版会重放的那条流上，不然「欠不欠重放」根本不成立。
+        insert_workout_with_lap_detail(&db);
         db.conn
             .execute(
                 "INSERT INTO app_meta(key, value, updated_at)

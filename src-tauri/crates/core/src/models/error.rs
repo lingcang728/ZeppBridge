@@ -1,9 +1,102 @@
 use thiserror::Error;
 
+/// 只有无头环境才会撞上的那几种失败。
+///
+/// 单独列出来，是因为它们需要**自己的错误码**。桌面端按码取本地化文案，
+/// 所以那边一直没问题；而命令行没有 i18n 层，它把 `user_message()` 原样
+/// 印出来——那是中文。issue #40 那位 Linux 用户就是这样在一个英文命令行上
+/// 收到了两句中文：「无法读取系统密钥环…」和「本机数据库还是 v19…」。
+///
+/// 有了码，命令行就能自己出英文，而桌面端两种语言都不受影响。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HeadlessProblem {
+    /// 这台机器上没有在跑 Secret Service。无头服务器和容器通常没有。
+    NoCredentialStore {
+        /// keyring 给的原话，用来分辨是没装还是被策略挡了。
+        detail: String,
+    },
+    /// 库的 schema 比这个程序旧，而只读连接升不了级。
+    SchemaUpgradeRequired { found: i64, required: i64 },
+    /// `auth.json` 在，但凭据存储里没有这个账号的令牌。
+    ///
+    /// 最常见的出处不是「凭据坏了」，而是**有人把另一台机器的 data 文件夹
+    /// 整个拷了过来**：库和 auth.json 都能拷，令牌不能——它在那台机器的
+    /// 凭据管理器 / 钥匙串 / Secret Service 里。
+    TokenNotInStore,
+}
+
+impl HeadlessProblem {
+    fn code(&self) -> &'static str {
+        match self {
+            Self::NoCredentialStore { .. } => "err.headless.no_credential_store",
+            Self::SchemaUpgradeRequired { .. } => "err.headless.schema_upgrade",
+            Self::TokenNotInStore => "err.headless.token_not_in_store",
+        }
+    }
+
+    /// 中文原文。桌面端的中文界面直接用它；英文界面按码取自己的文案。
+    fn message(&self) -> String {
+        match self {
+            Self::NoCredentialStore { detail } => format!(
+                "{detail}。这台机器上可能没有运行 Secret Service（GNOME Keyring / \
+                 KWallet）——无头服务器和容器通常没有。改用 \
+                 ZEPPBRIDGE_CREDENTIAL_STORE=file（令牌以 0600 写在数据目录里），\
+                 或 ZEPPBRIDGE_CREDENTIAL_STORE=env 配合 ZEPPBRIDGE_APP_TOKEN"
+            ),
+            Self::SchemaUpgradeRequired { found, required } => format!(
+                "本机数据库还是 v{found}，这个程序需要 v{required}。只读连接无法\
+                 升级——无头环境请跑一次 `zeppbridge-cli reprocess`，有桌面应用就\
+                 启动一次（两条路都会在升级前自动生成备份），再重试。"
+            ),
+            Self::TokenNotInStore => "认证元数据在，但凭据管理器里没有这个账号的\
+                 令牌。库能跨机器拷，令牌不能。请重新登录，或设 \
+                 ZEPPBRIDGE_CREDENTIAL_STORE=file / =env 后重试"
+                .to_string(),
+        }
+    }
+
+    /// 英文。命令行印这一份——它没有 i18n 层，而它的读者多半读不懂中文。
+    ///
+    /// 两个环境变量名和路径本来就是 ASCII，所以即使只读得懂其中一半，
+    /// 能动手的那部分也认得出来。
+    pub fn english(&self) -> String {
+        match self {
+            Self::NoCredentialStore { detail } => format!(
+                "{detail}. There may be no Secret Service running on this machine \
+                 (GNOME Keyring / KWallet) -- headless servers and containers \
+                 usually have none. Use ZEPPBRIDGE_CREDENTIAL_STORE=file (the token \
+                 is written 0600 into the data directory) or \
+                 ZEPPBRIDGE_CREDENTIAL_STORE=env together with ZEPPBRIDGE_APP_TOKEN"
+            ),
+            Self::SchemaUpgradeRequired { found, required } => format!(
+                "This library is still v{found} and this build needs v{required}. A \
+                 read-only connection cannot upgrade it: run `zeppbridge-cli \
+                 reprocess` on a headless machine, or launch the desktop app once. \
+                 Both take a backup before upgrading. Then try again."
+            ),
+            Self::TokenNotInStore => "The account metadata is here but the credential \
+                 store has no token for it. A library copies between machines; a token \
+                 does not. Sign in again, or set ZEPPBRIDGE_CREDENTIAL_STORE=file / \
+                 =env and retry"
+                .to_string(),
+        }
+    }
+}
+
+impl std::fmt::Display for HeadlessProblem {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.message())
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum ZeppBridgeError {
     #[error("认证错误: {0}")]
     AuthError(String),
+
+    /// 无头环境才会撞上的那几种失败。见 [`HeadlessProblem`]。
+    #[error("{0}")]
+    Headless(HeadlessProblem),
 
     /// 系统凭据存储（Windows 凭据管理器 / macOS 钥匙串）拒绝了这次读写。
     ///
@@ -127,6 +220,7 @@ impl ZeppBridgeError {
             Self::CloudRejected { .. } => "err.core.cloud_rejected",
             Self::Cancelled => "err.core.cancelled",
             Self::AuthError(_) => "err.core.auth",
+            Self::Headless(problem) => problem.code(),
             Self::CredentialStore(_) => "err.core.credential_store",
             Self::InvalidHost(_) => "err.core.invalid_host",
             Self::ConfigError(_) => "err.core.config",
@@ -167,6 +261,10 @@ impl ZeppBridgeError {
             | Self::InvalidHost(message)
             | Self::ConfigError(message)
             | Self::Busy(message) => sanitize_user_text(message),
+            // 不过 `sanitize_user_text`：那一层有 140 字上限，而这几句的
+            // 全部价值就在于把两个环境变量名和该跑哪条命令说完整。它们是
+            // 我们自己写死的常量，里面没有地址，也没有云端回来的内容。
+            Self::Headless(problem) => problem.to_string(),
             Self::ParseError(_) => "Zepp 返回的数据无法解析".into(),
             Self::DatabaseError(_) => "本地数据库暂时不可用".into(),
             Self::IoError(_) => "读写本地文件失败".into(),

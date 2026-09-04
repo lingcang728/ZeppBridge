@@ -166,9 +166,26 @@ fn encode_workout(workout: &Value) -> Result<Option<(Vec<u8>, usize)>, String> {
     messages.push(timer_event(end_unix, typedef::EventType::STOP));
 
     let elapsed_seconds = (end_unix - start_unix).max(0) as f64;
+    // 手表自己记的圈优先于我们按公里切的分段。
+    //
+    // 「我经常按圈键，如果你的 .fit 里能带上圈数据，那会是我的首选」——
+    // GitHub 上那份逐字段对拍报告里的原话。手表记了圈，那就是这次运动真实
+    // 发生的分段；每公里是我们事后切的，两者都在库里，写进文件的只能有一组。
+    let lap_source = if array(workout, "laps").is_empty() {
+        LapSource {
+            field: "splits",
+            trigger: typedef::LapTrigger::DISTANCE,
+        }
+    } else {
+        LapSource {
+            field: "laps",
+            trigger: watch_lap_trigger(workout),
+        }
+    };
     let mut lap_count = push_laps(
         &mut messages,
         workout,
+        lap_source,
         sport,
         sub_sport,
         start_unix,
@@ -395,21 +412,66 @@ fn record_message(unix: i64, point: &Point, sport: typedef::Sport) -> Message {
     }
 }
 
-/// 每公里一条 `lap`，取自导出 JSON 的 `splits`——那是服务端自己的累积距离
-/// 切出来的，不是拿速度积分估的。
+/// 手表那组圈是按距离自动分的，还是人按出来的？
 ///
-/// 没有 splits 时这里返回 0，由调用方补一条覆盖全程的 lap
+/// 手表不告诉我们，但圈的长度会：自动分段每一圈一样长（真实数据里见过一次
+/// 5820 m 的跑步被切成 14 个 415 m 的圈），人按出来的长短不一（同一份数据里
+/// 另一次是 570 / 2310 / 320 / 150 / 530 m 的间歇）。
+///
+/// 分不出来的时候宁可报 `MANUAL`：它的意思是「这一圈是有人划出来的」，而这
+/// 组圈确实来自手表的圈列表，不是我们切的。反过来把人按的圈标成 `DISTANCE`，
+/// 是在替手表宣称一件它没说过的事。
+fn watch_lap_trigger(workout: &Value) -> typedef::LapTrigger {
+    let distances: Vec<f64> = array(workout, "laps")
+        .iter()
+        .filter_map(|lap| lap.get("distance_m").and_then(Value::as_f64))
+        .filter(|value| value.is_finite() && *value > 0.0)
+        .collect();
+    // 最后一圈是零头，长度天然不同，不参与判断。
+    let considered = distances.len().saturating_sub(1);
+    if considered < 2 {
+        return typedef::LapTrigger::MANUAL;
+    }
+    let first = distances[0];
+    let uniform = distances[..considered]
+        .iter()
+        .all(|value| (value - first).abs() / first < 0.01);
+    if uniform {
+        typedef::LapTrigger::DISTANCE
+    } else {
+        typedef::LapTrigger::MANUAL
+    }
+}
+
+/// 这组 `lap` 从导出 JSON 的哪个数组来，以及该报成什么触发方式。
+#[derive(Debug, Clone, Copy)]
+struct LapSource {
+    field: &'static str,
+    trigger: typedef::LapTrigger,
+}
+
+/// 一组 `lap`，来自导出 JSON 的 `laps.field` 数组。
+///
+/// `source` 有两个取值，含义不同：
+///
+/// * `laps` —— **手表自己记的圈**。按圈键、按距离自动分段、或者间歇课的每
+///   一段。这是运动当时真实发生的事，所以优先用它。
+/// * `splits` —— 我们按每公里切的分段，取自服务端的累积距离（不是拿速度
+///   积分估的）。手表没记圈时用这个。
+///
+/// 两者都没有时返回 0，由调用方补一条覆盖全程的 lap
 /// （`push_whole_activity_lap`）——文件里绝不能一条 lap 都没有。
 fn push_laps(
     messages: &mut Vec<Message>,
     workout: &Value,
+    laps: LapSource,
     sport: typedef::Sport,
     sub_sport: typedef::SubSport,
     fallback_start: i64,
     points: &[(i64, Point)],
 ) -> u16 {
     let mut count = 0u16;
-    for split in array(workout, "splits") {
+    for split in array(workout, laps.field) {
         let start = parse_unix(text(split.get("start_time"))).unwrap_or(fallback_start);
         let end = parse_unix(text(split.get("end_time"))).unwrap_or(start);
         let duration = split
@@ -426,7 +488,7 @@ fn push_laps(
             enum_field(mesgdef::Lap::SPORT, sport.0),
             enum_field(mesgdef::Lap::SUB_SPORT, sub_sport.0),
             enum_field(mesgdef::Lap::INTENSITY, typedef::Intensity::ACTIVE.0),
-            enum_field(mesgdef::Lap::LAP_TRIGGER, typedef::LapTrigger::DISTANCE.0),
+            enum_field(mesgdef::Lap::LAP_TRIGGER, laps.trigger.0),
             u32_field(
                 mesgdef::Lap::TOTAL_ELAPSED_TIME,
                 (duration * 1000.0).max(0.0) as u32,
