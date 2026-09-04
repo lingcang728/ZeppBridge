@@ -269,7 +269,7 @@ fn merge_workout_type(
 /// `metric_samples` metrics are aggregated to one point per local day; the
 /// spread of that day's samples becomes `min` / `max`, which is real rather
 /// than derived.
-const SERIES_METRICS: [(&str, MetricSource, &str); 41] = [
+const SERIES_METRICS: [(&str, MetricSource, &str); 56] = [
     ("readiness", MetricSource::Daily(None), "score"),
     ("physical_readiness", MetricSource::Daily(None), "score"),
     ("mental_readiness", MetricSource::Daily(None), "score"),
@@ -326,6 +326,28 @@ const SERIES_METRICS: [(&str, MetricSource, &str); 41] = [
     ("active_minutes_goal", MetricSource::Daily(None), "分钟"),
     ("hrv", MetricSource::Samples, "ms"),
     ("hrv_rmssd", MetricSource::Samples, "ms"),
+    // 体重与体成分。一天可能称好几次，所以存在 `metric_samples` 里，按天折成
+    // 一个点由这里完成。
+    //
+    // **这张表和归一化那边是两份名单，两份都要有。** 只写进库、忘了登记在
+    // 这里，`metric_series` 会在那个 `continue` 上悄悄跳过它——导出和契约都
+    // 正常，唯独界面上是一张空卡片，而且什么都不报错。
+    ("weight", MetricSource::Samples, "kg"),
+    ("bmi", MetricSource::Samples, "kg/m2"),
+    ("height", MetricSource::Samples, "cm"),
+    ("body_fat_rate", MetricSource::Samples, "%"),
+    ("body_water_rate", MetricSource::Samples, "%"),
+    ("muscle_mass", MetricSource::Samples, "kg"),
+    ("bone_mass", MetricSource::Samples, "kg"),
+    ("protein_rate", MetricSource::Samples, "%"),
+    ("visceral_fat", MetricSource::Samples, "grade"),
+    ("bmr", MetricSource::Samples, "kcal/day"),
+    ("body_balance_score", MetricSource::Samples, "score"),
+    // 饮食记录。按天汇总，落在 `daily_metrics`。
+    ("intake_calories", MetricSource::Daily(None), "kcal"),
+    ("intake_protein_g", MetricSource::Daily(None), "g"),
+    ("intake_fat_g", MetricSource::Daily(None), "g"),
+    ("intake_carbs_g", MetricSource::Daily(None), "g"),
 ];
 
 /// Sample-backed metrics that are not in `SERIES_METRICS` above because they
@@ -8328,5 +8350,77 @@ mod tests {
             .any(|entry| entry.file_name().to_string_lossy().starts_with("corrupt-"));
         assert!(quarantined);
         let _ = std::fs::remove_dir_all(dir);
+    }
+    /// 写得进库，就得画得出来。
+    ///
+    /// `metric_series` 对不认识的指标名是**静默跳过**（那个 `continue`），所以
+    /// 一个只登记在归一化那边、忘了写进 `SERIES_METRICS` 的指标，会一路正常：
+    /// 库里有行、导出有值、契约里也有它，唯独界面上是一张永远空着的卡片，而且
+    /// 没有任何一处报错。体重那一版正是这么漏的。
+    #[test]
+    fn every_metric_the_contract_promises_can_be_charted() {
+        let chartable: std::collections::BTreeSet<&str> = SERIES_METRICS
+            .iter()
+            .map(|(name, _, _)| *name)
+            .chain(SAMPLE_ONLY_SERIES_METRICS.iter().map(|(name, _)| *name))
+            .collect();
+        // 体重系和饮食：这两组都是「写进库了但界面读不到」翻过车的地方。
+        let must_chart = crate::storage::BODY_COMPOSITION_METRICS
+            .iter()
+            .copied()
+            .chain([
+                "intake_calories",
+                "intake_protein_g",
+                "intake_fat_g",
+                "intake_carbs_g",
+            ]);
+        let missing: Vec<&str> = must_chart
+            .filter(|metric| !chartable.contains(metric))
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "这些指标写得进库却画不出来，界面上会是空卡片：{missing:?}"
+        );
+    }
+
+    /// 登记成 `Samples` 的指标，真的要能从 `metric_samples` 里读出来。
+    ///
+    /// 光在名单里有一行不够：源写错了（比如把只存在 metric_samples 里的东西
+    /// 标成 Daily），查的是另一张表，结果同样是空的。
+    #[test]
+    fn weight_samples_come_back_as_a_series() {
+        let db = Database::in_memory().unwrap();
+        let now = Utc::now();
+        for (metric, value, unit) in [
+            ("weight", 68.2_f64, "kg"),
+            ("bmi", 22.1, "kg/m2"),
+            ("body_fat_rate", 18.5, "%"),
+        ] {
+            db.insert_metric_sample(&MetricSample {
+                metric: metric.to_string(),
+                timestamp: now,
+                value,
+                unit: unit.to_string(),
+                source_scope: SourceScope::UserFused,
+                device_id: None,
+            })
+            .unwrap();
+        }
+
+        let series = db
+            .metric_series(
+                &[
+                    "weight".to_string(),
+                    "bmi".to_string(),
+                    "body_fat_rate".to_string(),
+                ],
+                30,
+            )
+            .unwrap();
+        assert_eq!(series.len(), 3, "三条都要回来，一条都不能被静默跳过");
+        let weight = series.iter().find(|s| s.metric == "weight").unwrap();
+        assert_eq!(weight.source, "metric_samples");
+        assert_eq!(weight.unit, "kg");
+        assert_eq!(weight.latest.as_ref().map(|point| point.value), Some(68.2));
     }
 }
