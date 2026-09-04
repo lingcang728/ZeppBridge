@@ -1017,12 +1017,7 @@ impl DataFetcher {
                 // Seconds, not milliseconds. See `fetch_weight_records`.
                 ProbeSurface::WeightRecords => {
                     self.connector
-                        .fetch_weight_records(
-                            SCALE_ACCOUNT_MEMBER,
-                            from / 1000,
-                            to / 1000,
-                            50,
-                        )
+                        .fetch_weight_records(SCALE_ACCOUNT_MEMBER, from / 1000, to / 1000, 50)
                         .await
                 }
                 ProbeSurface::FileInfoEvents => {
