@@ -11,7 +11,10 @@
  * 那样会绕开注册，拿到一个没有 series 类型也没有主题的空图。
  */
 import { registerTheme, use } from 'echarts/core';
-import { BarChart, LineChart } from 'echarts/charts';
+// 加新图形时**必须**同时加进下面的 `use()`。漏了不会报错、不会警告，只会
+// 得到一张空画布——膳食平衡那个环就是这么空了一版：百分比算对了、卡片和
+// 说明都在，中间什么都没有。
+import { BarChart, LineChart, PieChart } from 'echarts/charts';
 import {
   GridComponent,
   LegendComponent,
@@ -26,6 +29,7 @@ import { zeppThemeDark } from './echartsTheme';
 use([
   LineChart,
   BarChart,
+  PieChart,
   GridComponent,
   TooltipComponent,
   LegendComponent,
