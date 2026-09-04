@@ -27,7 +27,7 @@ const messages = defineMessages(
     backToOverview: '返回概览',
     eyebrow: '身体状态',
     title: '身体状态',
-    intro: '恢复、压力、血氧、HRV、呼吸率、静息心率与体重体成分的本机趋势。全部读自已同步的记录，没有推算。',
+    intro: '恢复、压力、血氧、HRV、呼吸率、静息心率、体重体成分与饮食摄入的本机趋势。全部读自已同步的记录。',
     rangeAria: '时间范围',
     desktopOnly: '请使用桌面应用；浏览器预览不会读取账户数据。',
     loadFailed: '身体状态数据暂时不可用',
@@ -85,12 +85,28 @@ const messages = defineMessages(
     unitGrade: '级',
     unitKcalPerDay: '千卡/天',
     scaleEmpty: '这段范围没有称重记录。体重秤的数据会在同步后出现在这里。',
+    bodyGroupTitle: '体重与体成分',
+    bodyGroupEmpty: '这段范围没有体重或体成分记录。体成分要有体脂秤才会有；手表和手动录入的体重不带这些项。',
+    intakeGroupTitle: '摄入',
+    intakeGroupEmpty: '这段范围没有饮食记录。饮食要在 Zepp App 里手动记，记过之后同步就会出现在这里。',
+    intakeCaloriesLabel: '摄入热量',
+    intakeCaloriesHint: '当天记录的总热量。没记的日子不画柱子，也不补 0',
+    proteinLabel: '蛋白质',
+    fatIntakeLabel: '脂肪',
+    carbsLabel: '碳水',
+    macroHint: '当天记录的总量，按天汇总',
+    unitKcal: '千卡',
+    unitGram: '克',
+    macroTitle: '膳食平衡',
+    macroSub: '这段范围内三大营养素各自贡献的热量占比',
+    macroNote: '占比由每日克数按 4/9/4（蛋白质 / 脂肪 / 碳水，每克千卡）推算，不是云端给的数，和 Zepp App 里的百分比可能差一两个点。三项缺任何一项就不画。',
+    gramsPerDay: (grams: number) => `平均每天 ${grams} 克`,
   },
   {
     backToOverview: 'Back to overview',
     eyebrow: 'Body status',
     title: 'Body status',
-    intro: 'Local trends for readiness, stress, blood oxygen, HRV, respiratory rate, resting heart rate and body composition. All read from synced records, nothing extrapolated.',
+    intro: 'Local trends for readiness, stress, blood oxygen, HRV, respiratory rate, resting heart rate, body composition and food intake. All read from synced records.',
     rangeAria: 'Time range',
     desktopOnly: 'Use the desktop app. This browser preview reads no account data.',
     loadFailed: 'Body status data is unavailable right now',
@@ -148,6 +164,22 @@ const messages = defineMessages(
     unitGrade: 'grade',
     unitKcalPerDay: 'kcal/day',
     scaleEmpty: 'No weigh-ins in this range. Scale readings show up here after a sync.',
+    bodyGroupTitle: 'Weight and body composition',
+    bodyGroupEmpty: 'No weight or body-composition records in this range. Composition readings need a body-composition scale; watch and hand-entered weights carry none.',
+    intakeGroupTitle: 'Intake',
+    intakeGroupEmpty: 'No food records in this range. Meals are logged by hand in the Zepp App; once logged, they appear here after a sync.',
+    intakeCaloriesLabel: 'Calories eaten',
+    intakeCaloriesHint: 'Total logged for the day. Days with no log get no bar, and are never filled with 0',
+    proteinLabel: 'Protein',
+    fatIntakeLabel: 'Fat',
+    carbsLabel: 'Carbs',
+    macroHint: 'Total logged for the day',
+    unitKcal: 'kcal',
+    unitGram: 'g',
+    macroTitle: 'Dietary balance',
+    macroSub: 'Share of calories each macronutrient contributed over this range',
+    macroNote: 'Shares are derived here from the daily grams using 4/9/4 kcal per gram (protein / fat / carbs). They are not sent by the cloud and may differ by a point or two from the percentages in the Zepp App. Nothing is drawn unless all three are present.',
+    gramsPerDay: (grams: number) => `${grams} g per day on average`,
   },
 );
 const t = useMessages(messages);
@@ -163,6 +195,8 @@ interface BodyCard {
   decimals?: number;
   showSpread?: boolean;
   emptyText?: string;
+  chart?: 'line' | 'bar';
+  calendarAxis?: boolean;
   /**
    * 显示前的换算。只有体重系需要：库里一律是千克和厘米（导出契约不变），
    * 界面按用户选的单位制显示。返回 `undefined` 表示不换算。
@@ -175,7 +209,7 @@ interface BodyCard {
  * presentation, not collection. The list is fixed so the backend can refuse
  * any name it does not have a unit for.
  */
-const METRICS = [
+const VITALS_METRICS = [
   'readiness',
   'stress',
   'spo2',
@@ -184,8 +218,18 @@ const METRICS = [
   'hrv_rmssd',
   'respiratory_rate',
   'resting_hr',
-  // 体重与体成分。前三项在真实账号上核对过；后面几项要有体脂秤才会有值，
-  // 没有秤的账号在这里看到的就是空卡片——那是事实，不是故障。
+];
+
+/**
+ * 体重与体成分。前三项在真实账号上核对过；后面几项要有体脂秤才会有值。
+ *
+ * 没有秤的账号**不会**在这里看到九张空卡片。这一版之前是那样的，理由是
+ * 「空卡片是事实，不是故障」——事实没错，但九张一模一样的「近 180 天无记录」
+ * 只是噪音，把真正有数据的东西挤到了屏幕外。现在没有数据的卡片直接不渲染，
+ * 整组都空时留一句话说明为什么。**这不是补 0，也不是隐藏缺失**：缺的值仍然
+ * 是缺的，只是不再用一张卡片来复述一遍。
+ */
+const BODY_METRICS = [
   'weight',
   'bmi',
   'body_fat_rate',
@@ -196,6 +240,24 @@ const METRICS = [
   'bmr',
   'height',
 ];
+
+/**
+ * 饮食。手动记录，所以天然是稀疏的——同样遵守上面那条：没有就不显示。
+ *
+ * 字段名（`calories` / `protein` / `fat` / `carbohydrate`）来自生态而不是我们
+ * 见过的真实报文，所以「一条都没有」在这里是常态，不代表出错。
+ */
+const INTAKE_METRICS = ['intake_calories', 'intake_protein_g', 'intake_fat_g', 'intake_carbs_g'];
+
+const METRICS = [...VITALS_METRICS, ...BODY_METRICS, ...INTAKE_METRICS];
+
+type CardGroup = 'vitals' | 'body' | 'intake';
+
+const groupOf = (metric: string): CardGroup => {
+  if (INTAKE_METRICS.includes(metric)) return 'intake';
+  if (BODY_METRICS.includes(metric)) return 'body';
+  return 'vitals';
+};
 
 const CARDS = computed<BodyCard[]>(() => [
   {
@@ -341,6 +403,44 @@ const CARDS = computed<BodyCard[]>(() => [
     decimals: 1,
     convert: toBodyHeight,
   },
+  // 摄入。柱状而不是折线，而且轴上保留没记的日子：手动记录一周漏两天是常态，
+  // 折线会把中间那两天连成一条看不出断点的线，读起来像天天都记了。
+  {
+    metric: 'intake_calories',
+    label: t.value.intakeCaloriesLabel,
+    hint: t.value.intakeCaloriesHint,
+    color: zeppSemanticColors.calories,
+    unit: t.value.unitKcal,
+    chart: 'bar',
+    calendarAxis: true,
+  },
+  {
+    metric: 'intake_protein_g',
+    label: t.value.proteinLabel,
+    hint: t.value.macroHint,
+    color: zeppSemanticColors.stride,
+    unit: t.value.unitGram,
+    chart: 'bar',
+    calendarAxis: true,
+  },
+  {
+    metric: 'intake_fat_g',
+    label: t.value.fatIntakeLabel,
+    hint: t.value.macroHint,
+    color: zeppSemanticColors.altitude,
+    unit: t.value.unitGram,
+    chart: 'bar',
+    calendarAxis: true,
+  },
+  {
+    metric: 'intake_carbs_g',
+    label: t.value.carbsLabel,
+    hint: t.value.macroHint,
+    color: zeppSemanticColors.pace,
+    unit: t.value.unitGram,
+    chart: 'bar',
+    calendarAxis: true,
+  },
 ]);
 
 const ranges = computed(() => seriesRanges());
@@ -388,6 +488,87 @@ const cards = computed(() => {
   }));
 });
 const anyData = computed(() => cards.value.some((card) => (card.series?.points.length ?? 0) > 0));
+
+/**
+ * 只留这段范围里真的有读数的卡片。
+ *
+ * 没有体脂秤的账号以前会看到九张「近 180 天无记录」，没记过饮食的账号会再看到
+ * 四张——十三张说着同一句话的卡片。缺失仍然是缺失，只是不再逐张复述：整组都
+ * 空时下面用一句话说明为什么，而不是把它伪装成有内容。
+ */
+const withData = (group: CardGroup) => cards.value
+  .filter((card) => groupOf(card.metric) === group && (card.series?.points.length ?? 0) > 0);
+
+const vitalsCards = computed(() => cards.value.filter((card) => groupOf(card.metric) === 'vitals'));
+const bodyCards = computed(() => withData('body'));
+const intakeCards = computed(() => withData('intake'));
+
+/**
+ * 三大营养素各自贡献了多少热量。
+ *
+ * Zepp App 的「Food Trend Report」第一张卡就是这个环形图（碳水 / 蛋白质 /
+ * 脂肪的百分比），所以这里跟着画。但那边的百分比是华米自己算的，这里的是
+ * **我们**用 4/9/4（阿特沃特系数）从克数换算的——两边可能差一两个点，这不是
+ * 谁错了，是两套算法。卡片上如实写明是推算。
+ *
+ * 三项克数缺任何一项就不画：拿两项算百分比会得到一个看着像真的、其实没有
+ * 意义的数。
+ */
+const ENERGY_PER_GRAM = { protein: 4, fat: 9, carbs: 4 } as const;
+
+const macroSplit = computed(() => {
+  const average = (metric: string): number | null => {
+    const value = series.value[metric]?.average;
+    return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+  };
+  const protein = average('intake_protein_g');
+  const fat = average('intake_fat_g');
+  const carbs = average('intake_carbs_g');
+  if (protein === null || fat === null || carbs === null) return null;
+  const energy = {
+    carbs: carbs * ENERGY_PER_GRAM.carbs,
+    protein: protein * ENERGY_PER_GRAM.protein,
+    fat: fat * ENERGY_PER_GRAM.fat,
+  };
+  const total = energy.carbs + energy.protein + energy.fat;
+  if (!(total > 0)) return null;
+  return {
+    total,
+    slices: [
+      { key: 'carbs', label: t.value.carbsLabel, value: energy.carbs, grams: carbs, color: zeppSemanticColors.pace },
+      { key: 'protein', label: t.value.proteinLabel, value: energy.protein, grams: protein, color: zeppSemanticColors.stride },
+      { key: 'fat', label: t.value.fatIntakeLabel, value: energy.fat, grams: fat, color: zeppSemanticColors.altitude },
+    ].map((slice) => ({ ...slice, percent: Math.round((slice.value / total) * 100) })),
+  };
+});
+
+const macroChartOption = computed(() => {
+  const split = macroSplit.value;
+  if (!split) return null;
+  return {
+    animationDuration: 600,
+    tooltip: {
+      trigger: 'item',
+      formatter: (params: { name: string; percent: number; data: { grams: number } }) =>
+        `${params.name}<br><b>${params.percent}%</b>　${t.value.gramsPerDay(Math.round(params.data.grams))}`,
+    },
+    series: [
+      {
+        type: 'pie',
+        radius: ['58%', '82%'],
+        avoidLabelOverlap: false,
+        label: { show: false },
+        labelLine: { show: false },
+        data: split.slices.map((slice) => ({
+          name: slice.label,
+          value: slice.value,
+          grams: slice.grams,
+          itemStyle: { color: slice.color },
+        })),
+      },
+    ],
+  };
+});
 
 /*
  * 全天压力曲线。
@@ -586,7 +767,7 @@ watch(dataRevision, () => { void load(); });
 
       <div class="card-grid">
         <MetricTrendCard
-          v-for="card in cards"
+          v-for="card in vitalsCards"
           :key="card.metric"
           :label="card.label"
           :hint="card.hint"
@@ -598,6 +779,72 @@ watch(dataRevision, () => { void load(); });
           :empty-text="card.emptyText ?? t.emptyCard"
         />
       </div>
+
+      <!-- 体重与体成分。没有秤的账号这里只有一句话，而不是九张空卡片。 -->
+      <h2 class="group-title">{{ t.bodyGroupTitle }}</h2>
+      <p v-if="!bodyCards.length" class="inline-alert" role="status">
+        <Icon name="info" :size="14" />{{ t.bodyGroupEmpty }}
+      </p>
+      <div v-else class="card-grid">
+        <MetricTrendCard
+          v-for="card in bodyCards"
+          :key="card.metric"
+          :label="card.label"
+          :hint="card.hint"
+          :series="card.series"
+          :color="card.color"
+          :unit="card.unit"
+          :decimals="card.decimals ?? 0"
+          :show-spread="card.showSpread ?? false"
+          :empty-text="card.emptyText ?? t.emptyCard"
+        />
+      </div>
+
+      <!-- 摄入。同一条规则：没记过饮食就只有一句话。 -->
+      <h2 class="group-title">{{ t.intakeGroupTitle }}</h2>
+      <p v-if="!intakeCards.length" class="inline-alert" role="status">
+        <Icon name="info" :size="14" />{{ t.intakeGroupEmpty }}
+      </p>
+      <template v-else>
+        <section v-if="macroChartOption" class="surface-card day-card" :aria-label="t.macroTitle">
+          <header class="day-head">
+            <div>
+              <h2>{{ t.macroTitle }}</h2>
+              <p>{{ t.macroSub }}</p>
+            </div>
+            <dl class="day-stats">
+              <div v-for="slice in macroSplit?.slices ?? []" :key="slice.key">
+                <dt>{{ slice.label }}</dt>
+                <dd :style="{ color: slice.color }">{{ slice.percent }}%</dd>
+              </div>
+            </dl>
+          </header>
+          <VChart
+            class="macro-chart"
+            theme="zeppbridge-dark"
+            :option="macroChartOption"
+            autoresize
+            role="img"
+            :aria-label="t.macroTitle"
+          />
+          <p class="curve-note">{{ t.macroNote }}</p>
+        </section>
+        <div class="card-grid">
+          <MetricTrendCard
+            v-for="card in intakeCards"
+            :key="card.metric"
+            :label="card.label"
+            :hint="card.hint"
+            :series="card.series"
+            :color="card.color"
+            :unit="card.unit"
+            :decimals="card.decimals ?? 0"
+            :chart="card.chart"
+            :calendar-axis="card.calendarAxis ?? false"
+            :empty-text="card.emptyText ?? t.emptyCard"
+          />
+        </div>
+      </template>
     </template>
   </section>
 </template>
@@ -629,6 +876,8 @@ watch(dataRevision, () => { void load(); });
 /* 区间边界是手表给的，不是我们算的。不写清楚，它就会被当成又一套自选算法。 */
 .curve-note { margin: 10px 0 0; color: var(--subtle); font-size: 11px; line-height: 1.6; }
 .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-4); }
+.group-title { margin: var(--space-5) 0 0; font-size: 15px; font-weight: 700; color: var(--ink); }
+.macro-chart { height: 200px; }
 .inline-alert {
   display: flex;
   align-items: center;
