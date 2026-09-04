@@ -20,6 +20,7 @@ use std::fmt::Display;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 
 /// 单个日志文件的上限。够装几十次启动的记录，又不至于让用户在发文件时犯难。
@@ -28,6 +29,8 @@ const MAX_LOG_BYTES: u64 = 2 * 1024 * 1024;
 const KEPT_LOGS: usize = 3;
 
 static LOG_FILE: OnceLock<Option<PathBuf>> = OnceLock::new();
+/// 启动横幅写过没有。见 [`init`]。
+static BANNER_WRITTEN: AtomicBool = AtomicBool::new(false);
 /// 写日志是跨线程的（启动线程、后台重放线程、命令线程都会写），而轮转要在
 /// 「判断大小」和「改名」之间保持原子。一把进程内的锁就够——跨进程的那把在
 /// `storage::write_lock`，日志不需要那么强。
@@ -66,6 +69,12 @@ pub fn init(data_dir: Option<&Path>) {
         rotate_if_needed(&path);
         Some(path)
     });
+    // Windows 上现在有两处调用 `init`：`run()` 开头（为了让 WebView2 目录那几条
+    // 日志有地方落）和 `setup()` 里。横幅只写一次，否则同一次启动会出现两条
+    // 「启动 ZeppBridge」，看日志的人会以为程序重启过。
+    if BANNER_WRITTEN.swap(true, Ordering::Relaxed) {
+        return;
+    }
     log(&format!(
         "启动 ZeppBridge {} / {} / exe={} / data_dir={}",
         env!("CARGO_PKG_VERSION"),

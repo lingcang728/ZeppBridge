@@ -183,6 +183,35 @@ pub fn webview_user_data_dir(data_dir: &Path) -> PathBuf {
     data_dir.join("webview")
 }
 
+/// 除了这次用的目录之外，本机还有哪些地方躺着一个 `zepp.db`。
+///
+/// 为什么需要它：`resolve_data_dir()` 的落点会随安装方式变。NSIS 装到
+/// `%LOCALAPPDATA%`（可写，用 `{exe_dir}/data`），MSI 装到 `Program Files`
+/// （不可写，退到 `%APPDATA%`）。同一个人先后装过两种包、或者提权跑过一次，
+/// 两边就各留一个库——而应用只会用其中一个，另一边的数据看起来「消失了」。
+///
+/// 这里**只读、不搬、不删**：`fall_back_to_user_data_dir` 已经立下了
+/// 「不自作主张换目录」的规矩，这里沿用，只把事实报出来，由人来决定。
+/// 返回空表示没有第二份，也就是绝大多数人的情况。
+pub fn other_libraries_on_this_machine(data_dir: &Path) -> Vec<PathBuf> {
+    let mut found = Vec::new();
+    let mut candidates = legacy_source_dirs();
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            candidates.push(parent.join("data"));
+        }
+    }
+    for candidate in candidates {
+        if candidate == data_dir || !candidate.join(SQLITE_GROUP[0]).is_file() {
+            continue;
+        }
+        if !found.contains(&candidate) {
+            found.push(candidate);
+        }
+    }
+    found
+}
+
 /// Copy-or-move leftover AppData libraries into the install-local folder.
 /// Existing destination files are never overwritten.
 pub fn relocate_legacy_data(data_dir: &Path) -> Option<String> {
