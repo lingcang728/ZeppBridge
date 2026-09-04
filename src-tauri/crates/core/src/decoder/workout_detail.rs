@@ -111,6 +111,29 @@ pub struct WorkoutSplit {
     pub partial: bool,
 }
 
+/// One lap the watch itself recorded.
+///
+/// Not a [`WorkoutSplit`]. A split is our own cut at every kilometre; a lap is
+/// what the watch marked at the time — the lap button, an auto-lap by distance,
+/// or the intervals of a structured session. A 5820 m run can carry five
+/// kilometre splits *and* fourteen 415 m laps, and they mean different things.
+///
+/// Read from the `lap` field of the workout detail, which is populated on 32 of
+/// the 336 stored details in a real library. A .fit comparison on GitHub asked
+/// for exactly this: "I use the lap button often, if you could add lap data to
+/// your .fit file that would be my first choice."
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct WorkoutLap {
+    /// 1-based lap number.
+    pub index: i32,
+    pub start_time: DateTime<Utc>,
+    pub end_time: DateTime<Utc>,
+    pub distance_m: f64,
+    pub duration_seconds: i64,
+    pub avg_hr: Option<i32>,
+    pub max_hr: Option<i32>,
+}
+
 /// Altitude has to move by at least this much before it counts as climbing.
 /// Barometric drift of a few centimetres per second would otherwise accumulate
 /// into hundreds of metres of imaginary ascent over an hour.
@@ -193,6 +216,125 @@ impl SplitBuilder {
         }
     }
 }
+
+/// Laps from the `lap` field of the workout detail.
+///
+/// Row layout, confirmed against **all 32** workouts in a real library that
+/// carry this field — rows come 60, 62 or 66 columns wide and the first six are
+/// the same in every one:
+///
+/// ```text
+/// 0,300,570,s00000000000,135,301,...
+/// │ │   │   │             │   └ elapsed seconds at the end of this lap
+/// │ │   │   │             └ average heart rate
+/// │ │   │   └ geohash placeholder, always zeroed in these payloads
+/// │ │   └ distance in metres
+/// │ └ duration in seconds
+/// └ 0-based lap number
+/// ```
+///
+/// The check is not the column widths — those vary, and on `kilo_pace` the same
+/// width was seen with the columns in different orders. It is that the numbers
+/// have to agree with the workout: sequential indices, a non-decreasing elapsed
+/// column, and heart rates in a range a heart can occupy. The caller adds the
+/// two strongest checks, which need the summary: the lap distances must sum to
+/// the workout distance and the last elapsed value must match its duration.
+/// On the 32 real workouts all five hold every time.
+///
+/// Column `[1]` is **moving** time and can be shorter than the gap between two
+/// elapsed values when the watch was paused, so lap boundaries are placed from
+/// the elapsed column and `[1]` is not used for timing.
+fn parse_laps(value: Option<&Value>, start: DateTime<Utc>) -> Vec<WorkoutLap> {
+    let Some(text) = value.and_then(Value::as_str).map(str::trim) else {
+        return Vec::new();
+    };
+    if text.is_empty() {
+        return Vec::new();
+    }
+    let mut laps = Vec::new();
+    let mut previous_elapsed = 0i64;
+    for (position, row) in text.split(';').filter(|row| !row.is_empty()).enumerate() {
+        let columns: Vec<&str> = row.split(',').collect();
+        if columns.len() < 6 {
+            return Vec::new();
+        }
+        let (Ok(index), Ok(distance_m), Ok(heart_rate), Ok(elapsed)) = (
+            columns[0].trim().parse::<i64>(),
+            columns[2].trim().parse::<f64>(),
+            columns[4].trim().parse::<i64>(),
+            columns[5].trim().parse::<i64>(),
+        ) else {
+            return Vec::new();
+        };
+        if index != position as i64
+            || !distance_m.is_finite()
+            || distance_m < 0.0
+            || elapsed < previous_elapsed
+            || elapsed > MAX_ACTIVITY_SECONDS
+            || !(0..=250).contains(&heart_rate)
+        {
+            return Vec::new();
+        }
+        let (Some(lap_start), Some(lap_end)) = (
+            start.checked_add_signed(chrono::Duration::seconds(previous_elapsed)),
+            start.checked_add_signed(chrono::Duration::seconds(elapsed)),
+        ) else {
+            return Vec::new();
+        };
+        laps.push(WorkoutLap {
+            index: position as i32 + 1,
+            start_time: lap_start,
+            end_time: lap_end,
+            distance_m,
+            duration_seconds: elapsed - previous_elapsed,
+            // 0 从手表来的时候是「这一圈没测到心率」，不是「心率为 0」。
+            avg_hr: (heart_rate > 0).then_some(heart_rate as i32),
+            max_hr: None,
+        });
+        previous_elapsed = elapsed;
+    }
+    laps
+}
+
+/// Do the laps agree with the workout they belong to?
+///
+/// The two checks that need the summary, and the two that carry the most weight:
+/// lap distances have to add up to the workout distance, and the last lap has to
+/// end when the workout ended. A column read as the wrong field passes neither.
+/// Either summary value being absent skips its own check rather than failing —
+/// an indoor workout has no distance, and that is not evidence against the laps.
+fn laps_agree_with_summary(
+    laps: &[WorkoutLap],
+    summary_distance_m: Option<f64>,
+    duration_seconds: i64,
+) -> bool {
+    if laps.is_empty() {
+        return false;
+    }
+    if let Some(distance) = summary_distance_m.filter(|value| value.is_finite() && *value > 0.0) {
+        let total: f64 = laps.iter().map(|lap| lap.distance_m).sum();
+        if (total - distance).abs() / distance > LAP_SUMMARY_TOLERANCE {
+            return false;
+        }
+    }
+    if duration_seconds > 0 {
+        let last = laps
+            .last()
+            .map(|lap| (lap.end_time - laps[0].start_time).num_seconds())
+            .unwrap_or_default();
+        let drift = (last - duration_seconds).abs() as f64 / duration_seconds as f64;
+        if drift > LAP_SUMMARY_TOLERANCE {
+            return false;
+        }
+    }
+    true
+}
+
+/// 圈的总距离 / 总时长和汇总之间允许差多少。
+///
+/// 5% 不是随手取的：真实的 32 条里最大的一条差 2%（手表在停表和记圈之间
+/// 有几秒的差），而一次「把列读错了」的偏差是成倍的，不是几个百分点。
+const LAP_SUMMARY_TOLERANCE: f64 = 0.05;
 
 /// Kilometre boundaries from the server's own `kilo_pace` series.
 ///
@@ -378,6 +520,8 @@ pub struct DecodedWorkout {
     pub samples: Vec<WorkoutSample>,
     pub pauses: Vec<PauseInterval>,
     pub splits: Vec<WorkoutSplit>,
+    /// 手表自己记的圈。和 `splits` 并存，不互相替代——见 [`WorkoutLap`]。
+    pub laps: Vec<WorkoutLap>,
 }
 
 /// 解码一条运动明细。
@@ -607,6 +751,21 @@ pub fn decode_workout_detail(
         }
     }
 
+    // 手表自己记的圈。解出来之后还要和汇总对一遍账：距离加起来对不上、
+    // 或者最后一圈不在运动结束的时刻，就说明列读错了，整份丢掉。
+    let laps = {
+        let candidate = parse_laps(data.get("lap"), start_time);
+        if laps_agree_with_summary(
+            &candidate,
+            summary_distance_m,
+            (end_time - start_time).num_seconds(),
+        ) {
+            candidate
+        } else {
+            Vec::new()
+        }
+    };
+
     Ok(DecodedWorkout {
         track_id,
         source,
@@ -616,6 +775,7 @@ pub fn decode_workout_detail(
         samples,
         pauses,
         splits,
+        laps,
     })
 }
 
@@ -1241,5 +1401,125 @@ mod tests {
         assert_eq!(decoded.splits.len(), 1, "只有那一个整公里");
         assert!(!decoded.splits[0].partial);
         assert_eq!(decoded.splits[0].distance_m, 1000.0);
+    }
+    /// 手表自己记的圈，从 `lap` 字段来。
+    ///
+    /// 这个字段一直在留存的报文里（本机 336 条明细中 32 条带它），从来没被解过。
+    /// GitHub 上那份 .fit 对拍报告里点名要的就是它：「我经常按圈键，如果你的
+    /// .fit 里能带上圈数据，那会是我的首选。」
+    #[test]
+    fn watch_recorded_laps_are_read_from_the_lap_field() {
+        let raw = json!({
+            "trackid": 1_700_000_000i64,
+            "time": "0;300;300;",
+            "heart_rate": "0,150;300,2;300,-2;",
+            // 两圈各 500 m / 300 s；第 6 列是累计秒数。
+            "lap": "0,300,500,s00000000000,150,300,-20000;\
+        1,300,500,s00000000000,152,600,-20000;",
+        });
+        let decoded = decode_workout_detail(&raw, None, Some(1000.0)).unwrap();
+        assert_eq!(decoded.laps.len(), 2);
+        assert_eq!(decoded.laps[0].index, 1);
+        assert_eq!(decoded.laps[0].distance_m, 500.0);
+        assert_eq!(decoded.laps[0].duration_seconds, 300);
+        assert_eq!(decoded.laps[0].avg_hr, Some(150));
+        // 第二圈从第一圈结束的地方开始，不是从运动开头。
+        assert_eq!(decoded.laps[1].start_time, decoded.laps[0].end_time);
+        assert_eq!(decoded.laps[1].duration_seconds, 300);
+    }
+
+    /// 圈和每公里分段是两回事，谁也不替代谁。
+    ///
+    /// 一次 5820 m 的跑步可以同时有 5 段公里分段和 14 个 415 m 的圈。塞进同一张
+    /// 表、或者让其中一个覆盖另一个，「每公里配速」那张图就会突然变成别的东西。
+    #[test]
+    fn laps_and_kilometre_splits_coexist() {
+        let raw = json!({
+            "trackid": 1_700_000_000i64,
+            "time": "0;300;300;",
+            "currentDistance": "0,0;300,50000;300,100000;",
+            "heart_rate": "0,150;300,2;300,-2;",
+            "lap": "0,300,500,s00000000000,150,300,-20000;\
+        1,300,500,s00000000000,152,600,-20000;",
+        });
+        let decoded = decode_workout_detail(&raw, None, Some(1000.0)).unwrap();
+        assert_eq!(decoded.laps.len(), 2, "手表的圈");
+        assert!(!decoded.splits.is_empty(), "我们自己切的公里分段还在");
+    }
+
+    /// 和汇总对不上就整份丢掉，而不是拿一半当真。
+    ///
+    /// 这是最强的两条对账：圈距离加起来要等于运动距离，最后一圈要在运动结束的
+    /// 时刻收尾。列读错了，两条都过不去——真实的 32 条则两条都过得去。
+    #[test]
+    fn laps_that_do_not_add_up_to_the_workout_are_refused() {
+        // 圈距离合计 1000 m，汇总说这次跑了 5000 m。
+        let wrong_distance = json!({
+            "trackid": 1_700_000_000i64,
+            "time": "0;300;300;",
+            "heart_rate": "0,150;300,2;300,-2;",
+            "lap": "0,300,500,s00000000000,150,300,-20000;\
+        1,300,500,s00000000000,152,600,-20000;",
+        });
+        assert!(
+            decode_workout_detail(&wrong_distance, None, Some(5000.0))
+                .unwrap()
+                .laps
+                .is_empty(),
+            "距离对不上就不要"
+        );
+
+        // 序号跳号。
+        let out_of_order = json!({
+            "trackid": 1_700_000_000i64,
+            "time": "0;300;300;",
+            "heart_rate": "0,150;300,2;300,-2;",
+            "lap": "0,300,500,s00000000000,150,300,-20000;\
+        7,300,500,s00000000000,152,600,-20000;",
+        });
+        assert!(decode_workout_detail(&out_of_order, None, Some(1000.0))
+            .unwrap()
+            .laps
+            .is_empty());
+
+        // 累计秒数往回走。
+        let backwards = json!({
+            "trackid": 1_700_000_000i64,
+            "time": "0;300;300;",
+            "heart_rate": "0,150;300,2;300,-2;",
+            "lap": "0,300,500,s00000000000,150,600,-20000;\
+        1,300,500,s00000000000,152,300,-20000;",
+        });
+        assert!(decode_workout_detail(&backwards, None, Some(1000.0))
+            .unwrap()
+            .laps
+            .is_empty());
+    }
+
+    /// 没有 `lap` 字段是常态，不是错误：336 条明细里只有 32 条带它。
+    #[test]
+    fn a_workout_without_laps_is_not_an_error() {
+        let raw = json!({
+            "trackid": 1_700_000_000i64,
+            "time": "0;300;",
+            "heart_rate": "0,150;300,2;",
+            "lap": "",
+        });
+        let decoded = decode_workout_detail(&raw, None, Some(1000.0)).unwrap();
+        assert!(decoded.laps.is_empty());
+    }
+
+    /// 心率 0 是「这一圈没测到」，不是「心率为 0」。
+    #[test]
+    fn a_zero_heart_rate_on_a_lap_is_absent_not_zero() {
+        let raw = json!({
+            "trackid": 1_700_000_000i64,
+            "time": "0;300;",
+            "heart_rate": "0,150;300,2;",
+            "lap": "0,300,1000,s00000000000,0,300,-20000;",
+        });
+        let decoded = decode_workout_detail(&raw, None, Some(1000.0)).unwrap();
+        assert_eq!(decoded.laps.len(), 1);
+        assert_eq!(decoded.laps[0].avg_hr, None);
     }
 }

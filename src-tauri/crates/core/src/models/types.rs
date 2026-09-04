@@ -366,6 +366,22 @@ pub struct WorkoutSplitRow {
     pub partial: bool,
 }
 
+/// 手表自己记的一圈，从库里读出来的形状。
+///
+/// 和 [`WorkoutSplitRow`] 并列而不是取代它：split 是我们按每公里切的，
+/// lap 是手表在运动当时记的（圈键、按距离自动分段、间歇课的每一段）。
+/// 一次跑步可以同时有两者，含义不同。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct WorkoutLapRow {
+    pub index: i32,
+    pub start_time: String,
+    pub end_time: String,
+    pub distance_m: f64,
+    pub duration_seconds: i64,
+    pub avg_hr: Option<i32>,
+    pub max_hr: Option<i32>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct WorkoutSeries {
     pub workout_id: String,
@@ -373,6 +389,9 @@ pub struct WorkoutSeries {
     pub route: Vec<WorkoutRoutePoint>,
     pub pauses: Vec<WorkoutPause>,
     pub splits: Vec<WorkoutSplitRow>,
+    /// 手表记的圈。空数组表示这次运动没有记圈——绝大多数运动如此。
+    #[serde(default)]
+    pub laps: Vec<WorkoutLapRow>,
     pub summary: WorkoutSeriesSummary,
 }
 
