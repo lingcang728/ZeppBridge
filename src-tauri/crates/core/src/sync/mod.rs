@@ -309,21 +309,21 @@ impl SyncManager {
             Ok(())
         };
 
-        emit("heart_rate", 1, 7, "正在同步心率");
+        emit("heart_rate", 1, 8, "正在同步心率");
         check()?;
         match self.fetcher.fetch_heart_rate_records(window).await {
             Ok(records) => streams.push(self.persist_records("heart_rate", records).await?),
             Err(error) if error.is_cancelled() => return Err(error),
             Err(error) => streams.push(self.failure_report("heart_rate", &error).await?),
         }
-        emit("daily_summary", 2, 7, "正在同步每日概览");
+        emit("daily_summary", 2, 8, "正在同步每日概览");
         check()?;
         match self.fetcher.fetch_daily_statistics_records(window).await {
             Ok(records) => streams.push(self.persist_records("daily_summary", records).await?),
             Err(error) if error.is_cancelled() => return Err(error),
             Err(error) => streams.push(self.failure_report("daily_summary", &error).await?),
         }
-        emit("workouts", 3, 7, "正在同步运动");
+        emit("workouts", 3, 8, "正在同步运动");
         check()?;
         match self.fetcher.fetch_workout_records(window).await {
             Ok(records) => streams.push(self.persist_records("workouts", records).await?),
@@ -333,7 +333,7 @@ impl SyncManager {
             }
             Err(error) => streams.push(self.failure_report("workouts", &error).await?),
         }
-        emit("workout_detail", 4, 7, "正在同步跑步明细");
+        emit("workout_detail", 4, 8, "正在同步跑步明细");
         check()?;
         match self.fetch_pending_running_details().await {
             Ok(records) if records.is_empty() => {
@@ -357,7 +357,7 @@ impl SyncManager {
 
         // Optional streams are retained and reported, never promoted to a
         // verified empty success.
-        emit("sleep", 5, 7, "正在同步睡眠");
+        emit("sleep", 5, 8, "正在同步睡眠");
         check()?;
         match self.fetcher.fetch_sleep_records(window).await {
             Ok(records) => streams.push(self.persist_records("sleep", records).await?),
@@ -367,7 +367,7 @@ impl SyncManager {
             }
             Err(error) => streams.push(self.failure_report("sleep", &error).await?),
         }
-        emit("hrv", 6, 7, "正在同步心率变异性");
+        emit("hrv", 6, 8, "正在同步心率变异性");
         check()?;
         match self.fetcher.fetch_hrv_records(window).await {
             Ok(records) => streams.push(self.persist_records("hrv", records).await?),
@@ -377,7 +377,7 @@ impl SyncManager {
             }
             Err(error) => streams.push(self.failure_report("hrv", &error).await?),
         }
-        emit("wellness", 7, 7, "正在同步压力、血氧等可选指标");
+        emit("wellness", 7, 8, "正在同步压力、血氧等可选指标");
         check()?;
         // The dateString surface needs an IANA zone name, and the devices
         // already told us theirs.
@@ -397,6 +397,23 @@ impl SyncManager {
                 streams.push(self.unavailable_report("wellness", &error).await?)
             }
             Err(error) => streams.push(self.failure_report("wellness", &error).await?),
+        }
+
+        // 体重 / 体成分。四个人问过它，而以前它一条都没取过：能力探针打的是
+        // `/v2/users/me/events?eventType=weight`，那一页对任何账号都是空的。
+        // 真正的数据在 `/users/{id}/members/-1/weightRecords`。
+        //
+        // 没有秤的账号在这里同样会有记录（Zepp App 里手填的体重也走这条），
+        // 所以它不是「有秤才有用」的一条流。
+        emit("weight", 8, 8, "正在同步体重与体成分");
+        check()?;
+        match self.fetcher.fetch_weight_records(window).await {
+            Ok(records) => streams.push(self.persist_records("weight", records).await?),
+            Err(error) if error.is_cancelled() => return Err(error),
+            Err(error) if error.is_unavailable() => {
+                streams.push(self.unavailable_report("weight", &error).await?)
+            }
+            Err(error) => streams.push(self.failure_report("weight", &error).await?),
         }
 
         // Learned quietly, alongside everything else the sync brings back. A
@@ -571,6 +588,7 @@ impl SyncManager {
             "sleep" => self.fetcher.fetch_sleep_records(window).await,
             "hrv" => self.fetcher.fetch_hrv_records(window).await,
             "wellness" => self.fetcher.fetch_wellness_records(window, time_zone).await,
+            "weight" => self.fetcher.fetch_weight_records(window).await,
             other => {
                 return Err(ZeppBridgeError::ConfigError(format!(
                     "未知的补拉数据流: {other}"
