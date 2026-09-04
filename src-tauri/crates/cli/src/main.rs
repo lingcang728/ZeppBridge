@@ -26,6 +26,7 @@ use zeppbridge_core::contract;
 use zeppbridge_core::export_fit;
 use zeppbridge_core::export_formats;
 use zeppbridge_core::fetcher::DataFetcher;
+use zeppbridge_core::models::error::HeadlessProblem;
 use zeppbridge_core::models::{error::ZeppBridgeError, ExportDetail, ExportScope, ExportSelection};
 use zeppbridge_core::paths;
 use zeppbridge_core::storage::write_lock::{self, WriteLockError, WritePurpose};
@@ -66,7 +67,7 @@ const EXIT_FAILED: u8 = 1;
 /// 中文提示。`--json` 的字段名和退出码是契约，一个字都没动。
 ///
 /// **边界在哪：** 这个文件里的每一句人读文案都是英文了。从 `zeppbridge-core`
-/// 冒上来的错误（`error.user_message()`）**还是中文**——那些字符串散在 core 的
+/// 冒上来的错误（`user_text(&error)`）**还是中文**——那些字符串散在 core 的
 /// 七百多处，桌面端靠错误码查本地文案、根本不显示它们（`i18n/backendText.ts`
 /// 在英文界面下会把带中文的后端原文整句换掉）。把 core 翻过来是另一件事，
 /// 不能顺手做一半：翻一半的结果是中英文混在同一条错误里，比全中文更难读。
@@ -285,7 +286,28 @@ fn exit_code_for(error: &ZeppBridgeError) -> (u8, &'static str) {
         ZeppBridgeError::Busy(_) => (EXIT_BUSY, "busy"),
         ZeppBridgeError::DatabaseError(_) => (EXIT_DATABASE, "database"),
         ZeppBridgeError::ConfigError(_) | ZeppBridgeError::InvalidHost(_) => (EXIT_USAGE, "usage"),
+        // 库要先升级和「拿不到令牌」是两码事：前者重试没用、要先跑一次
+        // reprocess（调度脚本按这个码决定别再试了），后者要人把凭据给进来。
+        ZeppBridgeError::Headless(HeadlessProblem::SchemaUpgradeRequired { .. }) => {
+            (EXIT_SCHEMA, "schema")
+        }
+        ZeppBridgeError::Headless(_) => (EXIT_NOT_CONFIGURED, "auth"),
         _ => (EXIT_FAILED, "failed"),
+    }
+}
+
+/// 这条错误给命令行用户看的那句话。
+///
+/// `user_text(&error)` 是中文——桌面端按错误码取本地化文案，所以那边一直
+/// 没问题；命令行没有 i18n 层，直接印它就是给英文用户一句中文。issue #40 那位
+/// Linux 用户正是这么收到「无法读取系统密钥环…」和「本机数据库还是 v19…」的。
+///
+/// 所以在这里做一次语言边界：认得的错误出英文，认不得的仍然回落到原文——
+/// 看不懂的中文也好过一句空白，而回落的范围会随着核心那边逐条挪走而缩小。
+fn user_text(error: &ZeppBridgeError) -> String {
+    match error {
+        ZeppBridgeError::Headless(problem) => problem.english(),
+        other => user_text(other),
     }
 }
 
@@ -395,7 +417,7 @@ fn open_read_only() -> Result<Database, (u8, String)> {
         ZeppBridgeError::ConfigError(message) => (EXIT_SCHEMA, message),
         other => {
             let (code, _) = exit_code_for(&other);
-            (code, other.user_message())
+            (code, user_text(&other))
         }
     })
 }
@@ -523,7 +545,7 @@ fn run_replay(
 
 fn replay_failure(error: &ZeppBridgeError) -> (u8, &'static str, String) {
     let (code, kind) = exit_code_for(error);
-    (code, kind, error.user_message())
+    (code, kind, user_text(error))
 }
 
 /// 只读地问一句「这个库欠不欠重放」，欠就给一句提示。
@@ -561,7 +583,7 @@ fn open_writable() -> Result<(std::path::PathBuf, Database), (u8, String)> {
     }
     let db = Database::open_migrated(&db_path).map_err(|error| {
         let (code, _) = exit_code_for(&error);
-        (code, error.user_message())
+        (code, user_text(&error))
     })?;
     Ok((dir, db))
 }
@@ -587,7 +609,7 @@ fn cmd_reprocess(args: &[String]) -> u8 {
         Ok(plan) => plan,
         Err(error) => {
             let (code, kind) = exit_code_for(&error);
-            return fail(json_mode, code, kind, &error.user_message());
+            return fail(json_mode, code, kind, &user_text(&error));
         }
     };
 
@@ -621,7 +643,7 @@ fn cmd_reprocess(args: &[String]) -> u8 {
             Ok(count) => count,
             Err(error) => {
                 let (code, kind) = exit_code_for(&error);
-                return fail(json_mode, code, kind, &error.user_message());
+                return fail(json_mode, code, kind, &user_text(&error));
             }
         };
         forced
@@ -700,7 +722,7 @@ fn cmd_status(args: &[String]) -> u8 {
         Ok(health) => health,
         Err(error) => {
             let (code, kind) = exit_code_for(&error);
-            return fail(json_mode, code, kind, &error.user_message());
+            return fail(json_mode, code, kind, &user_text(&error));
         }
     };
     // 只读的一问：这个库欠不欠一次重放。status 说出来，但绝不代跑——
@@ -843,7 +865,7 @@ fn cmd_sync(args: &[String]) -> u8 {
         }
         Err(error) => {
             let (code, kind) = exit_code_for(&error);
-            return fail(json_mode, code, kind, &error.user_message());
+            return fail(json_mode, code, kind, &user_text(&error));
         }
     };
 
@@ -852,14 +874,14 @@ fn cmd_sync(args: &[String]) -> u8 {
         Ok(connector) => connector,
         Err(error) => {
             let (code, kind) = exit_code_for(&error);
-            return fail(json_mode, code, kind, &error.user_message());
+            return fail(json_mode, code, kind, &user_text(&error));
         }
     };
     let db = match Database::open_migrated(&dir.join("zepp.db")) {
         Ok(db) => db,
         Err(error) => {
             let (code, kind) = exit_code_for(&error);
-            return fail(json_mode, code, kind, &error.user_message());
+            return fail(json_mode, code, kind, &user_text(&error));
         }
     };
 
@@ -893,7 +915,7 @@ fn cmd_sync(args: &[String]) -> u8 {
             Err(error) => {
                 eprintln!(
                     "Could not read the parser revision; skipping the replay: {}",
-                    error.user_message()
+                    user_text(&error)
                 );
                 None
             }
@@ -958,7 +980,7 @@ fn cmd_sync(args: &[String]) -> u8 {
             // 写锁冲突不是失败：桌面应用正开着同步，调度脚本稍后重试即可。
             // 靠类型判断，不靠匹配错误文案——文案是会改的。
             let (code, kind) = exit_code_for(&error);
-            fail(json_mode, code, kind, &error.user_message())
+            fail(json_mode, code, kind, &user_text(&error))
         }
     }
 }
@@ -1078,7 +1100,7 @@ fn cmd_export(args: &[String]) -> u8 {
         Ok(value) => value,
         Err(error) => {
             let (code, kind) = exit_code_for(&error);
-            return fail(json_mode, code, kind, &error.user_message());
+            return fail(json_mode, code, kind, &user_text(&error));
         }
     };
 
@@ -1409,5 +1431,60 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+    /// 命令行印给人看的那句话必须是英文。
+    ///
+    /// issue #40 那位 Linux 用户在一个英文命令行上收到了两句中文：
+    /// 「无法读取系统密钥环…」和「本机数据库还是 v19…」。2.1.2 把命令行**自己**
+    /// 的文案换成了英文，但从核心冒上来的 `user_message()` 还是中文。
+    #[test]
+    fn headless_failures_are_reported_in_english() {
+        use zeppbridge_core::models::error::HeadlessProblem;
+
+        let cases = [
+            HeadlessProblem::NoCredentialStore {
+                detail: "could not read the keyring".into(),
+            },
+            HeadlessProblem::SchemaUpgradeRequired {
+                found: 19,
+                required: 21,
+            },
+            HeadlessProblem::TokenNotInStore,
+        ];
+        for problem in cases {
+            let error = ZeppBridgeError::Headless(problem);
+            let text = user_text(&error);
+            assert!(
+                !text
+                    .chars()
+                    .any(|character| ('\u{4e00}'..='\u{9fff}').contains(&character)),
+                "命令行不该出现中文：{text}"
+            );
+            // 中文原文仍然留着，桌面端的中文界面要用它。
+            assert!(error
+                .user_message()
+                .chars()
+                .any(|character| ('\u{4e00}'..='\u{9fff}').contains(&character)));
+        }
+    }
+
+    /// 「库要先升级」和「拿不到令牌」给调度脚本的应对完全不同，退出码必须分开。
+    ///
+    /// 前者重试多少次都没用，得先跑一次 reprocess；后者要人把凭据交进来。
+    #[test]
+    fn a_schema_upgrade_and_a_missing_token_do_not_share_an_exit_code() {
+        use zeppbridge_core::models::error::HeadlessProblem;
+
+        let (schema, _) = exit_code_for(&ZeppBridgeError::Headless(
+            HeadlessProblem::SchemaUpgradeRequired {
+                found: 19,
+                required: 21,
+            },
+        ));
+        let (token, _) =
+            exit_code_for(&ZeppBridgeError::Headless(HeadlessProblem::TokenNotInStore));
+        assert_eq!(schema, EXIT_SCHEMA);
+        assert_eq!(token, EXIT_NOT_CONFIGURED);
+        assert_ne!(schema, token);
     }
 }

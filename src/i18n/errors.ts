@@ -25,6 +25,19 @@ const messages = defineMessages(
     'err.core.cloud_rejected': 'Zepp 云端收到了请求但拒绝了。如果反复出现，请在设置里重新连接 Zepp 账号',
     'err.core.cancelled': '操作已取消',
     'err.core.auth': '认证出错了',
+    // 无头环境（服务器、容器）才会撞上的三种。桌面上极少见到，但它们必须有
+    // 自己的码：命令行没有 i18n 层，只有按码才出得了英文——issue #40 那位
+    // Linux 用户就是在英文命令行上收到了它们的中文原文。
+    'err.headless.no_credential_store':
+      '这台机器上没有可用的系统密钥环（GNOME Keyring / KWallet）。无头服务器和容器通常没有。'
+      + '可以设 ZEPPBRIDGE_CREDENTIAL_STORE=file 把令牌以 0600 写在数据目录里，'
+      + '或者用 ZEPPBRIDGE_CREDENTIAL_STORE=env 配合 ZEPPBRIDGE_APP_TOKEN 交进来。',
+    'err.headless.schema_upgrade':
+      '本机数据库的版本比这个程序旧，而只读连接升不了级。启动一次桌面应用，'
+      + '或者在无头环境跑一次 zeppbridge-cli reprocess——两条路都会在升级前自动备份。',
+    'err.headless.token_not_in_store':
+      '账号信息在，但凭据里没有对应的令牌。数据库能跨机器拷贝，令牌不能——'
+      + '它在原来那台机器的凭据管理器里。请重新登录一次。',
     // 有人报上来的原话就是这一句加一个红条，然后没有下文（反馈 e5fb37a5）：
     // 登录明明走完了，凭据却存不下，而界面没告诉他还能怎么办。出路本来就
     // 有——设置里那个「手动填 App Token」——只是没人会想到去找它。
@@ -148,6 +161,19 @@ const messages = defineMessages(
       'Zepp received the request and refused it. If this keeps happening, reconnect the Zepp account in Settings',
     'err.core.cancelled': 'Cancelled',
     'err.core.auth': 'Something went wrong with authentication',
+    'err.headless.no_credential_store':
+      'No system credential store is available on this machine (GNOME Keyring / KWallet). '
+      + 'Headless servers and containers usually have none. Set '
+      + 'ZEPPBRIDGE_CREDENTIAL_STORE=file to write the token 0600 into the data directory, '
+      + 'or ZEPPBRIDGE_CREDENTIAL_STORE=env together with ZEPPBRIDGE_APP_TOKEN.',
+    'err.headless.schema_upgrade':
+      'This library is older than the build reading it, and a read-only connection cannot '
+      + 'upgrade it. Launch the desktop app once, or run zeppbridge-cli reprocess on a '
+      + 'headless machine. Both take a backup before upgrading.',
+    'err.headless.token_not_in_store':
+      'The account details are here but the credential store has no token for them. A '
+      + 'database copies between machines; a token does not -- it stays in the credential '
+      + 'store of the machine it was created on. Sign in again.',
     'err.core.credential_store':
       'The token could not be saved to the system credential store. Common causes: the credential store is '
       + 'disabled by a group policy or security software, or what was read is not an App Token at all '
