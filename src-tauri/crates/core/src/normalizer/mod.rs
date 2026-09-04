@@ -1475,13 +1475,28 @@ struct BodyMetric {
 /// replayed once their real field names are known.
 const BODY_METRICS: [BodyMetric; 11] = [
     // Confirmed: `summary.weight`, kilograms, a plain float.
-    BodyMetric { metric: "weight", aliases: &["weight"], unit: "kg", range: (2.0, 400.0) },
+    BodyMetric {
+        metric: "weight",
+        aliases: &["weight"],
+        unit: "kg",
+        range: (2.0, 400.0),
+    },
     // Confirmed: `summary.bmi`.
-    BodyMetric { metric: "bmi", aliases: &["bmi"], unit: "kg/m2", range: (5.0, 100.0) },
+    BodyMetric {
+        metric: "bmi",
+        aliases: &["bmi"],
+        unit: "kg/m2",
+        range: (5.0, 100.0),
+    },
     // Confirmed: `summary.height`, centimetres. Not a measurement of the day —
     // it is profile data echoed back — but it is what makes a weight readable,
     // and this is the only place an export can get it from.
-    BodyMetric { metric: "height", aliases: &["height"], unit: "cm", range: (50.0, 260.0) },
+    BodyMetric {
+        metric: "height",
+        aliases: &["height"],
+        unit: "cm",
+        range: (50.0, 260.0),
+    },
     BodyMetric {
         metric: "body_fat_rate",
         aliases: &["fatRate", "bodyFatRate", "fat_rate", "bodyFat"],
@@ -1603,7 +1618,8 @@ impl Normalizer {
                 .filter(|value| value.is_finite() && *value > 0.0)
                 .and_then(|seconds| DateTime::from_timestamp(seconds as i64, 0))
             else {
-                out.diagnostics.push("weight: 一条记录没有可用的时间戳".into());
+                out.diagnostics
+                    .push("weight: 一条记录没有可用的时间戳".into());
                 continue;
             };
             let Some(summary) = object.get("summary").and_then(Value::as_object) else {
@@ -3046,10 +3062,7 @@ mod tests {
         })
     }
 
-    fn samples_named<'a>(
-        batch: &'a WellnessNormalizedData,
-        metric: &str,
-    ) -> Vec<&'a MetricSample> {
+    fn samples_named<'a>(batch: &'a WellnessNormalizedData, metric: &str) -> Vec<&'a MetricSample> {
         batch
             .metric_samples
             .iter()
@@ -3065,10 +3078,7 @@ mod tests {
         let weights = samples_named(&batch, "weight");
         assert_eq!(weights.len(), 3, "三条记录就该出三条体重样本");
         // 一天可能称好几次，所以是 metric_samples 而不是 daily_metrics。
-        assert!(
-            batch.daily_metrics.is_empty(),
-            "体重不该被压成一天一个数字"
-        );
+        assert!(batch.daily_metrics.is_empty(), "体重不该被压成一天一个数字");
         assert_eq!(weights[0].unit, "kg");
 
         // generatedTime 是 Unix 秒。当成毫秒读会落在五万年后，而那种错法在图上
