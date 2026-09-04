@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import type { Workout } from '../../types';
+import { setLocale } from '../../i18n';
 import {
   displayableWorkouts,
   hasWorkoutIdentity,
@@ -84,6 +85,8 @@ describe('时长', () => {
 });
 
 describe('运动类型的显示', () => {
+  afterEach(() => setLocale('zh'));
+
   it('用户的手动指认优先于云端给的类型', () => {
     const overridden = base({ effective_type: 'hiking', workout_type: 'run' });
     expect(workoutDisplayType(overridden)).toBe('hiking');
@@ -111,6 +114,18 @@ describe('运动类型的显示', () => {
     const label = workoutDisplayLabel(custom);
     expect(label).toContain('未识别');
     expect(label).toContain('226');
+  });
+
+  it('目录运动类型按当前语言显示', () => {
+    const rucking = base({
+      workout_type: 'rucking',
+      normalized_type: 'rucking',
+      effective_type: 'rucking',
+    });
+    setLocale('en');
+    expect(workoutDisplayLabel(rucking)).toBe('Rucking');
+    setLocale('zh');
+    expect(workoutDisplayLabel(rucking)).toBe('负重徒步');
   });
 
   it('已识别的类型不会被自定义名字顶掉', () => {

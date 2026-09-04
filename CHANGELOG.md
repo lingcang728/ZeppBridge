@@ -36,6 +36,8 @@
 
 ### Added / 新增
 
+- **Rucking is recognised as a workout.** Zepp activity code `225` now maps to Rucking, and upgrading to this release replays and corrects historical `unknown:225` workouts.
+- **负重徒步现在能被识别了。** Zepp 活动编号 `225` 现在映射为负重徒步，升级重放时已经存成 `unknown:225` 的运动也会一起改正。
 - **Miles.** Distance, pace, ascent and the pace and altitude charts now follow a setting next to the language switch, and default to miles only where the system region actually uses them. Asked for by one person on Reddit, but it was never one person's problem: every non-metric country hit the same wall. Exports do not change — JSON, CSV, GPX and FIT stay metric, because that is what the command line, the MCP server and every third-party platform read them as.
 - **英里。** 距离、配速、爬升，以及配速和海拔两张图，现在跟着语言开关旁边的一个设置走；只有系统地区确实用英里时才默认英里。这是 Reddit 上一个人开口要的，但从来不是一个人的问题：所有不用公制的国家都撞在同一处。导出不变——JSON、CSV、GPX、FIT 仍然是公制，因为命令行、MCP 和所有第三方平台都是按公制读它们的。
 
