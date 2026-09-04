@@ -47,7 +47,29 @@ pub struct MetricContract {
 ///
 /// 单位一律用机器可读的短串（`bpm`、`ml/kg/min`），中文说明单独放在
 /// `description`，这样 MCP schema 里的单位不会因为语言而变。
-pub const METRICS: [MetricContract; 23] = [
+pub const METRICS: [MetricContract; 27] = [
+    // 饮食记录。来自 `/v2/users/me/events?eventType=Food`（无 subType）。
+    // 字段名尚未在真实饮食数据上核对过，超出合理区间的读数会被丢弃。
+    MetricContract {
+        metric: "intake_calories",
+        unit: "kcal",
+        description: "当日饮食摄入热量。需要 Zepp 应用的饮食记录功能（中国大陆版没有）",
+    },
+    MetricContract {
+        metric: "intake_protein_g",
+        unit: "g",
+        description: "当日蛋白质摄入。同上",
+    },
+    MetricContract {
+        metric: "intake_fat_g",
+        unit: "g",
+        description: "当日脂肪摄入。同上",
+    },
+    MetricContract {
+        metric: "intake_carbs_g",
+        unit: "g",
+        description: "当日碳水摄入。同上",
+    },
     MetricContract {
         metric: "readiness",
         unit: "score",

@@ -599,7 +599,7 @@ enum CapabilityEvidence {
 /// evidence available, since "you have 32 days of stress readings" beats any
 /// probe. Only the three with no local trace need a request, and those are the
 /// ones where silence is genuinely ambiguous.
-const CAPABILITY_ROWS: [(&str, CapabilityEvidence, i64); 15] = [
+const CAPABILITY_ROWS: [(&str, CapabilityEvidence, i64); 16] = [
     ("heart_rate", CapabilityEvidence::Samples("heart_rate"), 30),
     (
         "sleep",
@@ -639,10 +639,16 @@ const CAPABILITY_ROWS: [(&str, CapabilityEvidence, i64); 15] = [
         365,
     ),
     ("pai", CapabilityEvidence::DailyPrefix("pai"), 30),
+    // 饮食记录现在入库了，所以证据是库里的日行而不是一句探针结论。窗口给
+    // 365 天：手动记录是间断的，一周没记不说明这个账号没有这个功能。
+    ("food", CapabilityEvidence::DailyPrefix("intake_"), 365),
 ];
 
 /// Streams with no local trace at all. Only these cost a request.
-pub const PROBE_ONLY_CAPABILITIES: [&str; 4] = ["blood_pressure", "weight", "emotion", "food"];
+///
+/// `food` 已经不在里面：它现在真的入库了。留在这里的是仍然只能靠探针回答的
+/// 那几条。
+pub const PROBE_ONLY_CAPABILITIES: [&str; 3] = ["blood_pressure", "weight", "emotion"];
 
 /// 探测覆盖多久。和探测本身用的范围一致，界面拿它写「过去 N 天没有测量记录」。
 const PROBE_WINDOW_DAYS: i64 = 365;
@@ -1954,7 +1960,8 @@ impl Database {
                     ));
                 }
                 let summary_end = self.workout_end_time(&workout_id)?;
-                let decoded = decode_workout_detail(payload, summary_end)?;
+                let summary_distance = self.workout_distance_meters(&workout_id)?;
+                let decoded = decode_workout_detail(payload, summary_end, summary_distance)?;
                 self.replace_workout_series(&workout_id, &decoded)?;
                 counts.primary_records =
                     (decoded.samples.len() + decoded.route.len() + decoded.pauses.len()) as i64;
@@ -2678,6 +2685,23 @@ impl Database {
             |row| row.get(0),
         )?;
         Ok(count > 0)
+    }
+
+    /// 这条运动的总距离。
+    ///
+    /// 明细解码走 `kilo_pace` 兜底时要它：那份数据只给整公里，最后那截零头的
+    /// 长度只能从汇总来。汇总里没有距离（室内、无 GPS）就返回 None，那时不补
+    /// 零头，而不是猜一个。
+    fn workout_distance_meters(&self, workout_id: &str) -> Result<Option<f64>> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT distance_meters FROM workouts WHERE workout_id = ?1",
+                [workout_id],
+                |row| row.get::<_, Option<f64>>(0),
+            )
+            .optional()?
+            .flatten())
     }
 
     fn workout_end_time(&self, workout_id: &str) -> Result<Option<DateTime<Utc>>> {
