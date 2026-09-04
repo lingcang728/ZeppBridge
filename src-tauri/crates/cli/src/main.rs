@@ -304,10 +304,17 @@ fn exit_code_for(error: &ZeppBridgeError) -> (u8, &'static str) {
 ///
 /// 所以在这里做一次语言边界：认得的错误出英文，认不得的仍然回落到原文——
 /// 看不懂的中文也好过一句空白，而回落的范围会随着核心那边逐条挪走而缩小。
+///
+/// 回落分支必须是 `Display`（`to_string()`），**不能是 `user_text(other)`**。
+/// 那样写传的是同一个值，条件永远成立，就是一个无条件自递归；release 把尾调用
+/// 优化成循环，于是不是栈溢出而是 100% CPU 空转，整条命令再也不返回。
+/// 它骗过了所有门禁：`unconditional_recursion` 因为上面那支会返回而不报，
+/// 类型和 clippy 都挑不出毛病，而测试从来没有断言过「错误路径会结束」。
+/// 下面 `every_error_renders_and_terminates` 就是补这个洞的。
 fn user_text(error: &ZeppBridgeError) -> String {
     match error {
         ZeppBridgeError::Headless(problem) => problem.english(),
-        other => user_text(other),
+        other => other.to_string(),
     }
 }
 
@@ -1244,6 +1251,38 @@ mod tests {
 
     fn args(values: &[&str]) -> Vec<String> {
         values.iter().map(|value| value.to_string()).collect()
+    }
+
+    /// 每一种错误都要能渲染出一句话，并且**渲染这件事本身要结束**。
+    ///
+    /// 之前 `user_text` 的回落分支写成了 `user_text(other)`——同一个值再传给
+    /// 自己，无条件自递归。release 把尾调用优化成循环，于是命令行不是崩掉而是
+    /// 100% CPU 空转、永不返回：`export --types food`、非法日期、不存在的
+    /// `--workout`，凡是数据库打开之后抛出来的错误，全都卡死在这里，而退出码
+    /// 是写进文档的契约，调度脚本会永远挂着。
+    ///
+    /// 只有 `Headless` 那一支会返回，所以 `status` 报「库还是 v20」看起来是好的
+    /// ——这也是它躲过人工验收的原因。这个用例走的是**非** Headless 的那些支。
+    #[test]
+    fn every_error_renders_and_terminates() {
+        // 卡死时这个用例会挂住而不是失败，那也是信号：CI 超时即回归。
+        let cases = vec![
+            ZeppBridgeError::ConfigError("请至少选择一种导出数据".into()),
+            ZeppBridgeError::AuthError("令牌读不出来".into()),
+            ZeppBridgeError::DataUnavailable("本地库里没有这条运动记录".into()),
+            ZeppBridgeError::Cancelled,
+            ZeppBridgeError::HttpStatus {
+                status: 503,
+                message: "维护中".into(),
+            },
+        ];
+        for error in &cases {
+            let text = user_text(error);
+            assert!(
+                !text.trim().is_empty(),
+                "{error:?} 渲染成了空字符串——命令行会印出一片空白"
+            );
+        }
     }
 
     #[test]

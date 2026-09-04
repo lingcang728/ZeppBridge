@@ -2,7 +2,7 @@
 
 [English](architecture.md)
 
-本文描述 v2.1.2 的产品边界与当前实现。使用入口见项目 [README](../../README.zh-CN.md)，工程门禁见 [开发文档](../development/development.zh-CN.md)。
+本文描述 v2.2.0 的产品边界与当前实现。使用入口见项目 [README](../../README.zh-CN.md)，工程门禁见 [开发文档](../development/development.zh-CN.md)。
 
 ## 产品边界
 

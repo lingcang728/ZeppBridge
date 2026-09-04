@@ -44,6 +44,10 @@ const props = withDefaults(defineProps<{
   band?: string | null;
   /** Shown in place of the chart when nothing has been measured. */
   emptyText?: string;
+  /** Bars instead of a line, for values counted per day rather than sampled. */
+  chart?: 'line' | 'bar';
+  /** Keep the days with no reading on the axis. See `buildSeriesOption`. */
+  calendarAxis?: boolean;
 }>(), {
   decimals: 0,
   showSpread: false,
@@ -85,6 +89,8 @@ const option = computed(() => {
     showSpread: props.showSpread,
     format: render.value,
     unit: props.unit,
+    chart: props.chart,
+    calendarAxis: props.calendarAxis,
   });
 });
 </script>

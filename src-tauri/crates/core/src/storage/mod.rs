@@ -2831,6 +2831,16 @@ impl Database {
             "DELETE FROM workout_splits WHERE workout_id = ?1",
             [workout_id],
         )?;
+        // 圈也要先清掉。**这一条一度漏了**，而这个函数叫 `replace_`：
+        // `workout_laps` 是和圈一起加进来的新表，它和上面几张一样没有唯一
+        // 索引——那几张不出问题，靠的正是这里的 DELETE。漏掉它，每重放一次
+        // 圈就翻一倍（本机实测 341 → 682，341 组 (workout_id, lap_index)
+        // 一个不落全是两份），`.fit` 里每圈导两遍，界面上每圈列两行。
+        // 第一次重放看起来完全正常，所以它只会在下一次推修订号时才爆出来。
+        self.conn.execute(
+            "DELETE FROM workout_laps WHERE workout_id = ?1",
+            [workout_id],
+        )?;
 
         {
             let mut insert = self.conn.prepare(
@@ -4603,7 +4613,7 @@ impl Database {
         // 日级数据流：一条运动没有「昨晚睡了多久」这种字段，硬塞进来就是范围外的数据。
         // 只在 daily_metrics / sleep_sessions 里出现的类型；心率、HRV、血氧这类
         // 逐点指标不在其中，它们会按运动时段截取后照常导出。
-        const DAY_LEVEL_TYPES: [&str; 9] = [
+        const DAY_LEVEL_TYPES: [&str; 10] = [
             "sleep",
             "steps",
             "daily_activity",
@@ -4615,6 +4625,8 @@ impl Database {
             // 一次称重和某一条运动没有关系。单条运动的导出里不该出现
             // 「体重：0 条」这样一个只会让人困惑的类型。
             "weight",
+            // 一天吃了什么和某一条运动同样没有关系，理由同上。
+            "food",
         ];
         let allowed: BTreeSet<&str> = [
             "heart_rate",
@@ -4633,6 +4645,10 @@ impl Database {
             "training_load",
             "vo2max",
             "weight",
+            // 饮食一度只登记在能力表（`CapabilityEvidence::DailyPrefix("intake_")`）
+            // 里，却从来没进过这张允许表：`--types food` 被静默丢掉，摄入数据
+            // 入了库、能画图、却导不出来。
+            "food",
         ]
         .into_iter()
         .collect();
@@ -4797,7 +4813,8 @@ impl Database {
                 || selected.contains("spo2")
                 || selected.contains("stress")
                 || selected.contains("training_load")
-                || selected.contains("vo2max"))
+                || selected.contains("vo2max")
+                || selected.contains("food"))
         {
             let mut stmt = self.conn.prepare(
                 "SELECT date, metric, value, unit, source_scope, device_id
@@ -4847,6 +4864,11 @@ impl Database {
                     Some("hrv_rmssd")
                 } else if is_recovery && selected.contains("recovery") {
                     Some("recovery")
+                } else if metric.starts_with("intake_") {
+                    // 必须排在 `daily_activity` 兜底之前。摄入的热量和活动消耗
+                    // 的热量是相反的两件事，被兜底扫进「日常活动」就会让读者
+                    // 把吃进去的算成烧掉的。没选 food 就整条不导，而不是改标。
+                    selected.contains("food").then_some("food")
                 } else if !is_recovery && selected.contains("daily_activity") {
                     Some("daily_activity")
                 } else {
@@ -6570,6 +6592,58 @@ mod tests {
         db.conn.execute("DELETE FROM workout_laps", []).unwrap();
     }
 
+    /// 重放两次，派生行不能变成两份。
+    ///
+    /// `replace_workout_series` 清空四张表再重新插入，唯独漏了 v22 新加的
+    /// `workout_laps`。这几张表都没有唯一索引——不出问题靠的就是那几条
+    /// DELETE，所以漏一张就是纯追加。本机实测一次全库重放把 341 圈变成了
+    /// 682，341 组 `(workout_id, lap_index)` 一个不落全是两份。
+    ///
+    /// 骗过所有人的地方在于**第一次重放是对的**：2.1.2 升上来的人拿到的圈
+    /// 是准的，要等下一次推修订号才翻倍。所以这里数的是「重放第二次之后」，
+    /// 而不是「重放之后」。四张表一起数，下次再加派生表时这个用例会一起把
+    /// 它盖住。
+    #[test]
+    fn replaying_twice_does_not_duplicate_derived_rows() {
+        let db = Database::in_memory().unwrap();
+        insert_workout_with_lap_detail(&db);
+        let counts = || -> Vec<(String, i64)> {
+            [
+                "workout_laps",
+                "workout_splits",
+                "workout_samples",
+                "workout_pauses",
+            ]
+            .into_iter()
+            .map(|table| {
+                let n = db
+                    .conn
+                    .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+                        row.get::<_, i64>(0)
+                    })
+                    .unwrap();
+                (table.to_string(), n)
+            })
+            .collect()
+        };
+
+        db.reprocess_raw_records().unwrap();
+        let after_first = counts();
+        assert!(
+            after_first
+                .iter()
+                .any(|(table, n)| table == "workout_laps" && *n == 2),
+            "夹具本身要能解出两圈，否则这个用例什么都没验：{after_first:?}"
+        );
+
+        db.reprocess_raw_records().unwrap();
+        assert_eq!(
+            counts(),
+            after_first,
+            "重放第二次之后派生行变多了——某张表漏了 replace 前的 DELETE"
+        );
+    }
+
     #[test]
     fn previous_release_upgrade_replays_only_the_changed_streams() {
         let db = Database::in_memory().unwrap();
@@ -7044,6 +7118,91 @@ mod tests {
             .build_ai_export(&export_selection(types, detail))
             .unwrap();
         serde_json::from_str(&encoded).unwrap()
+    }
+
+    /// 饮食能导出，而且不会被「日常活动」兜底扫走。
+    ///
+    /// `food` 一度只登记在能力表里，从来没进过导出的允许类型表：`--types food`
+    /// 被静默丢掉，摄入数据入了库、画得出图、却一条都导不出来。更糟的是那个
+    /// `daily_activity` 兜底分支——它会把没被认领的日级指标全收下，包括
+    /// `intake_*`。摄入的热量和活动消耗的热量是相反的两件事，混进同一个类型
+    /// 就是把吃进去的算成烧掉的。
+    #[test]
+    fn food_is_exportable_and_never_folded_into_daily_activity() {
+        let db = Database::in_memory().unwrap();
+        for (metric, value, unit) in [
+            ("intake_calories", 2100.0, "kcal"),
+            ("intake_protein_g", 120.0, "g"),
+            ("intake_fat_g", 70.0, "g"),
+            ("intake_carbs_g", 210.0, "g"),
+        ] {
+            db.insert_daily_metric(&DailyMetric {
+                date: "2023-11-05".into(),
+                metric: metric.into(),
+                value,
+                unit: unit.into(),
+                source_scope: SourceScope::UserFused,
+                device_id: None,
+            })
+            .unwrap();
+        }
+        // 同一天的活动消耗，用来证明两者没有混在一起。
+        db.insert_daily_metric(&DailyMetric {
+            date: "2023-11-05".into(),
+            metric: "active_calories".into(),
+            value: 480.0,
+            unit: "千卡".into(),
+            source_scope: SourceScope::UserFused,
+            device_id: None,
+        })
+        .unwrap();
+
+        let names = |export: &serde_json::Value| -> Vec<String> {
+            export["data"]["daily_metrics"]
+                .as_array()
+                .map(|rows| {
+                    rows.iter()
+                        .map(|row| row["metric"].as_str().unwrap_or_default().to_string())
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+
+        let food = parsed_export(&db, &["food"], ExportDetail::Summary);
+        let exported = names(&food);
+        for metric in [
+            "intake_calories",
+            "intake_protein_g",
+            "intake_fat_g",
+            "intake_carbs_g",
+        ] {
+            assert!(
+                exported.iter().any(|name| name == metric),
+                "--types food 没导出 {metric}；导出的是 {exported:?}"
+            );
+        }
+        assert!(
+            !exported.iter().any(|name| name == "active_calories"),
+            "选了 food 却把活动消耗也带出来了"
+        );
+        assert_eq!(
+            food["capabilities"]["food"]["status"], "available",
+            "有摄入记录时 food 必须是 available"
+        );
+
+        let activity = names(&parsed_export(
+            &db,
+            &["daily_activity"],
+            ExportDetail::Summary,
+        ));
+        assert!(
+            activity.iter().any(|name| name == "active_calories"),
+            "日常活动本身还得导得出来"
+        );
+        assert!(
+            !activity.iter().any(|name| name.starts_with("intake_")),
+            "摄入被兜底扫进了 daily_activity：{activity:?}"
+        );
     }
 
     #[test]
