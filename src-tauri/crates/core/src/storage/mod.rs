@@ -1330,9 +1330,14 @@ impl Database {
         let version: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
         match version.cmp(&CURRENT_SCHEMA_VERSION) {
             std::cmp::Ordering::Equal => Ok(Self { conn }),
-            std::cmp::Ordering::Less => Err(ZeppBridgeError::ConfigError(format!(
-                "本机数据库还是 v{version}，这个程序需要 v{CURRENT_SCHEMA_VERSION}。只读连接无法升级——无头环境请跑一次 `zeppbridge-cli reprocess`，有桌面应用就启动一次（两条路都会在升级前自动生成备份），再重试。"
-            ))),
+            // 自己的错误码：撞上这一条的人几乎都在无头环境里，而命令行没有
+            // i18n 层，只有按码才出得了英文。见 `HeadlessProblem`。
+            std::cmp::Ordering::Less => Err(ZeppBridgeError::Headless(
+                crate::models::error::HeadlessProblem::SchemaUpgradeRequired {
+                    found: version,
+                    required: CURRENT_SCHEMA_VERSION,
+                },
+            )),
             std::cmp::Ordering::Greater => Err(ZeppBridgeError::ConfigError(format!(
                 "本机数据库是 v{version}，比这个程序（v{CURRENT_SCHEMA_VERSION}）新。请把命令行 / MCP 升级到与桌面应用相同的版本，不要用旧版去读新库。"
             ))),
