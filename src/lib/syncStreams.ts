@@ -19,6 +19,7 @@ const messages = defineMessages(
     wellness: '压力 / 血氧等可选指标',
     workouts: '运动记录',
     workout_detail: '运动明细与轨迹',
+    weight: '体重与体成分',
 
     // 偶发指标：数据健康页把它们单列，键来自 daily_metrics / metric_samples。
     vo2max: '最大摄氧量（VO₂max）',
@@ -38,6 +39,7 @@ const messages = defineMessages(
     wellness: 'Stress, SpO2 and other optional metrics',
     workouts: 'Workouts',
     workout_detail: 'Workout detail and tracks',
+    weight: 'Weight and body composition',
 
     vo2max: 'VO₂max',
     lactate_threshold_hr: 'Lactate threshold heart rate',

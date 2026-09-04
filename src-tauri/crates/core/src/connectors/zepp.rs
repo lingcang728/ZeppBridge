@@ -556,6 +556,60 @@ impl ZeppConnector {
         .await
     }
 
+    /// Weight and body composition: `/users/{id}/members/{member}/weightRecords`.
+    ///
+    /// **A different surface, not another event type.** ZeppBridge probed
+    /// `/v2/users/me/events?eventType=weight&subType=summary` for a year and got
+    /// an empty page every time, which the UI reported — correctly, for what it
+    /// was asked — as "No measurement in the last 365 days", to four people who
+    /// owned a scale and had years of readings sitting in the Zepp app. Verified
+    /// on a live account 2026-09-04: the v2 page returns `items: []` while this
+    /// one returns the records.
+    ///
+    /// **The window is in Unix *seconds*.** Every event surface above takes
+    /// milliseconds; this one does not, and passing milliseconds asks for a
+    /// window fifty thousand years wide — which the server answers with nothing.
+    /// That is the easiest way to reintroduce the exact bug this method exists
+    /// to fix, so the seconds are in the parameter names.
+    ///
+    /// `member_id` is `-1` for the account holder. A scale can be shared and
+    /// `/users/{id}/members` lists the rest; only the account holder is read,
+    /// because the others are other people.
+    pub async fn fetch_weight_records(
+        &self,
+        member_id: &str,
+        from_seconds: i64,
+        to_seconds: i64,
+        limit: i64,
+    ) -> Result<Value> {
+        let path = format!(
+            "/users/{}/members/{member_id}/weightRecords",
+            self.auth.user_id
+        );
+        self.get_json(
+            &path,
+            vec![
+                ("fromTime", from_seconds.to_string()),
+                ("toTime", to_seconds.to_string()),
+                ("limit", limit.max(1).to_string()),
+                // 0 = newest first. A truncated page then still holds the
+                // readings most likely to be new to us.
+                ("isForward", "0".to_owned()),
+            ],
+        )
+        .await
+    }
+
+    /// The people who share this account's scale: `/users/{id}/members`.
+    ///
+    /// Only used to tell "this account has no weight records" apart from "the
+    /// records belong to a family member we never asked about". Nothing from it
+    /// is stored: the other members are other people.
+    pub async fn fetch_scale_members(&self) -> Result<Value> {
+        let path = format!("/users/{}/members", self.auth.user_id);
+        self.get_json(&path, Vec::new()).await
+    }
+
     /// Real raw band synchronization endpoint.  Its payload may be compressed;
     /// callers must not infer sleep from it unless normalization verifies it.
     pub async fn fetch_band_data(
