@@ -21,12 +21,12 @@ const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v23-rucking";
 /// 上一版的修订号。从它升上来时只重放这几条流。
 ///
-/// v22 到 v23 加入了 Zepp activity code 225 的 Rucking 映射。只有 workouts
-/// 汇总需要重放；workout_detail 的圈解析仍属于 v22 的规则。
-const PREVIOUS_RELEASE_NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v22-watch-laps";
+/// v21 是上一个公开发布版本；v22 的圈解析和 v23 的 Rucking 映射都要在
+/// 这次升级中补到历史数据里。
+const PREVIOUS_RELEASE_NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v21-elliptical";
 /// 从上一版升上来时要重放的流。**改归一化规则时必须一起看这里**：漏掉一条
 /// 流，那条流的历史记录就永远停在旧规则上，而升级看起来是成功的。
-const PREVIOUS_RELEASE_REPLAY_STREAMS: [&str; 1] = ["workouts"];
+const PREVIOUS_RELEASE_REPLAY_STREAMS: [&str; 2] = ["workout_detail", "workouts"];
 const LAST_CLOUD_SYNC_AT_KEY: &str = "last_cloud_sync_at";
 const LAST_CLOUD_SYNC_OUTCOME_KEY: &str = "last_cloud_sync_outcome";
 const LAST_LOCAL_REPROCESS_AT_KEY: &str = "last_local_reprocess_at";
@@ -2135,8 +2135,8 @@ impl Database {
         if stored.as_deref() == Some(NORMALIZER_REVISION) {
             return Ok(None);
         }
-        // 从 v22 升到 v23 时只重放这一版确实改过的 workouts。
-        // 其他更早版本仍走整库重放，避免跳过中间版本带来的归一化变化。
+        // 从公开 v21 升到 v23 时重放这一版涉及的 workout_detail 和 workouts。
+        // 其他修订号（包括未发布的 v22）仍走整库重放，避免跳过中间版本带来的归一化变化。
         let streams: Vec<String> =
             if stored.as_deref() == Some(PREVIOUS_RELEASE_NORMALIZER_REVISION) {
                 PREVIOUS_RELEASE_REPLAY_STREAMS
@@ -6536,8 +6536,8 @@ mod tests {
 
     /// 一条运动加上它的明细报文，明细里带手表记的圈。
     ///
-    /// 这个夹具模拟 v22 已经能重放 `workout_detail` 的旧库：明细里的 `lap`
-    /// 已经被清掉，后面的全量重放测试要把它补回来。
+    /// 这个夹具模拟明细规则尚未落库的旧库：明细里的 `lap` 已经被清掉，后面的
+    /// 重放测试要把它补回来。
     fn insert_workout_with_lap_detail(db: &Database) {
         db.insert_raw_record(&RawRecord {
             stream: "workouts".into(),
@@ -6580,18 +6580,18 @@ mod tests {
         // `insert_raw_record` 只存报文，派生行是重放时才建的。先整体归一化
         // 一遍，把运动汇总和逐秒采样做出来——真实的旧库正是这个样子。
         db.reprocess_raw_records().unwrap();
-        // 然后把圈清掉，模拟 v22 已经落库但还没有明细派生行的状态。
+        // 然后把圈清掉，模拟历史库还没有明细派生行的状态。
         db.conn.execute("DELETE FROM workout_laps", []).unwrap();
     }
 
     /// 重放两次，派生行不能变成两份。
     ///
-    /// `replace_workout_series` 清空四张表再重新插入，唯独漏了 v22 新加的
+    /// `replace_workout_series` 清空四张表再重新插入，唯独漏了新加的
     /// `workout_laps`。这几张表都没有唯一索引——不出问题靠的就是那几条
     /// DELETE，所以漏一张就是纯追加。本机实测一次全库重放把 341 圈变成了
     /// 682，341 组 `(workout_id, lap_index)` 一个不落全是两份。
     ///
-    /// 骗过所有人的地方在于**第一次重放是对的**：2.1.2 升上来的人拿到的圈
+    /// 骗过所有人的地方在于**第一次重放是对的**：旧版本升上来的人拿到的圈
     /// 是准的，要等下一次推修订号才翻倍。所以这里数的是「重放第二次之后」，
     /// 而不是「重放之后」。四张表一起数，下次再加派生表时这个用例会一起把
     /// 它盖住。
@@ -6637,7 +6637,7 @@ mod tests {
     }
 
     #[test]
-    fn previous_release_upgrade_replays_workouts_only_and_preserves_facts() {
+    fn previous_release_upgrade_replays_laps_and_rucking_and_preserves_facts() {
         let db = Database::in_memory().unwrap();
         db.insert_raw_record(&RawRecord {
             stream: "workouts".into(),
@@ -6650,7 +6650,7 @@ mod tests {
                 "data": [{
                     "workout_id": "same-workout",
                     "start_time": 1_700_000_000i64,
-                    "end_time": 1_700_003_600i64,
+                    "end_time": 1_700_000_600i64,
                     "type": 225,
                     "calorie": 120
                 }]
@@ -6669,7 +6669,21 @@ mod tests {
                 "trackid": 1_700_000_000i64,
                 "time": "0;1;",
                 "longitude_latitude": "4004663552,11629333504;16403,8392;",
-                "heart_rate": "1,80;1,2;"
+                "heart_rate": "1,80;1,2;",
+                "lap": "0,300,500,s00000000000,150,300,-20000;1,300,500,s00000000000,152,600,-20000;"
+            }),
+            capability: CapabilityStatus::Verified,
+        })
+        .unwrap();
+        db.insert_raw_record(&RawRecord {
+            stream: "daily_summary".into(),
+            source_key: "daily-summary-unrelated".into(),
+            source_scope: SourceScope::UserFused,
+            device_id: None,
+            start_utc: ts(),
+            end_utc: None,
+            payload: serde_json::json!({
+                "data": [{ "date": "2023-11-14", "steps": 1234 }]
             }),
             capability: CapabilityStatus::Verified,
         })
@@ -6717,25 +6731,25 @@ mod tests {
             )
             .unwrap();
 
+        let plan = db.pending_replay_plan().unwrap().unwrap();
+        assert_eq!(
+            plan.streams,
+            vec!["workout_detail".to_string(), "workouts".to_string()]
+        );
+        assert_eq!(plan.raw_records, 2, "无关流不应进入选择性重放计划");
+
         let counts = db.reprocess_raw_records_if_needed().unwrap().unwrap();
 
         assert!(counts.contains_key("workouts"), "counts = {counts:?}");
-        assert!(!counts.contains_key("workout_detail"), "{counts:?}");
-        assert_eq!(
-            db.conn
-                .query_row("SELECT COUNT(*) FROM workout_samples", [], |row| row
-                    .get::<_, i64>(0),)
-                .unwrap(),
-            0,
-            "选择性重放不能顺手重放 workout_detail"
-        );
+        assert!(counts.contains_key("workout_detail"), "counts = {counts:?}");
+        assert!(!counts.contains_key("daily_summary"), "{counts:?}");
         assert_eq!(
             db.conn
                 .query_row("SELECT COUNT(*) FROM workout_laps", [], |row| row
                     .get::<_, i64>(0),)
                 .unwrap(),
-            0,
-            "选择性重放不能顺手重放明细里的圈"
+            2,
+            "v21 到 v23 升级必须恢复 workout_detail 的圈"
         );
         let stored = db.get_workout_detail("same-workout").unwrap().unwrap();
         assert_eq!(stored.normalized_type, "rucking");
@@ -6776,7 +6790,7 @@ mod tests {
     }
 
     #[test]
-    fn an_older_revision_still_replays_workout_detail_and_laps() {
+    fn an_unshipped_v22_revision_still_replays_all_streams() {
         let db = Database::in_memory().unwrap();
         insert_workout_with_lap_detail(&db);
         db.conn
@@ -6784,9 +6798,13 @@ mod tests {
                 "INSERT INTO app_meta(key, value, updated_at)
                  VALUES('normalizer_revision', ?1, ?2)
                  ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-                params!["zepp-normalizer-ancient", ts().to_rfc3339()],
+                params!["zepp-normalizer-2026-09-v22-watch-laps", ts().to_rfc3339()],
             )
             .unwrap();
+
+        let plan = db.pending_replay_plan().unwrap().unwrap();
+        assert!(plan.streams.is_empty(), "未发布的 v22 必须走整库重放");
+        assert_eq!(plan.raw_records, 2);
 
         let counts = db.reprocess_raw_records_if_needed().unwrap().unwrap();
         assert!(counts.contains_key("workouts"), "counts = {counts:?}");
@@ -6797,7 +6815,7 @@ mod tests {
                     .get::<_, i64>(0),)
                 .unwrap(),
             2,
-            "更早版本的全量重放仍要补回明细里的圈"
+            "未发布的 v22 仍要走全量重放并补回明细里的圈"
         );
     }
 
@@ -6809,7 +6827,7 @@ mod tests {
     #[test]
     fn a_stale_library_can_be_recognized_without_writing_to_it() {
         let db = Database::in_memory().unwrap();
-        // 这份夹具必须落在**这一版要重放的那条流**上，否则 raw_records 会是 0，
+        // 这份夹具必须落在**这一版要重放的流**上，否则 raw_records 会是 0，
         // 而 0 条报文的库本来就不欠重放——那样这个测试就在验一件不相干的事。
         // 改归一化规则、换了重放的流时，这里要跟着换。
         insert_workout_with_lap_detail(&db);
@@ -6831,7 +6849,7 @@ mod tests {
         assert_eq!(plan.streams, PREVIOUS_RELEASE_REPLAY_STREAMS.to_vec());
         // 只数要重放的那几条流，不是整库。计划里那个数字会直接显示给用户，
         // 它得是这次真的要过的报文条数。
-        assert_eq!(plan.raw_records, 1);
+        assert_eq!(plan.raw_records, 2);
 
         db.reprocess_raw_records_if_needed().unwrap().unwrap();
         assert!(
