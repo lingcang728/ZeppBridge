@@ -18,20 +18,15 @@ const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// `raw_records` 重新跑一遍。不动它，新加的编号只对以后同步来的记录生效，
 /// 已经存成 `unknown:211` 的那 199 条记录会永远挂着——而报这个问题的人恰恰
 /// 是因为历史记录才来报的。
-pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v22-watch-laps";
+pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v23-rucking";
 /// 上一版的修订号。从它升上来时只重放这几条流。
 ///
-/// v21 到 v22 只动了一件事：`workout_detail` 现在解 `lap` 字段——手表自己记
-/// 的圈。那个字段一直在留存的报文里（本机 336 条明细中有 32 条带它），只是
-/// 从来没被解过，所以重放能把历史记录的圈补齐，不用重新同步。
-///
-/// 只有 `workout_detail` 需要重放：`lap` 只出现在明细报文里，workouts 汇总、
-/// daily_summary / wellness / weight / sleep / hrv / heart_rate 的解析一个
-/// 字节都没动。
-const PREVIOUS_RELEASE_NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v21-elliptical";
+/// v22 到 v23 加入了 Zepp activity code 225 的 Rucking 映射。只有 workouts
+/// 汇总需要重放；workout_detail 的圈解析仍属于 v22 的规则。
+const PREVIOUS_RELEASE_NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v22-watch-laps";
 /// 从上一版升上来时要重放的流。**改归一化规则时必须一起看这里**：漏掉一条
 /// 流，那条流的历史记录就永远停在旧规则上，而升级看起来是成功的。
-const PREVIOUS_RELEASE_REPLAY_STREAMS: [&str; 1] = ["workout_detail"];
+const PREVIOUS_RELEASE_REPLAY_STREAMS: [&str; 1] = ["workouts"];
 const LAST_CLOUD_SYNC_AT_KEY: &str = "last_cloud_sync_at";
 const LAST_CLOUD_SYNC_OUTCOME_KEY: &str = "last_cloud_sync_outcome";
 const LAST_LOCAL_REPROCESS_AT_KEY: &str = "last_local_reprocess_at";
@@ -2140,7 +2135,7 @@ impl Database {
         if stored.as_deref() == Some(NORMALIZER_REVISION) {
             return Ok(None);
         }
-        // 从 v20 升到 v21 时只重放这一版确实改过的 workouts。
+        // 从 v22 升到 v23 时只重放这一版确实改过的 workouts。
         // 其他更早版本仍走整库重放，避免跳过中间版本带来的归一化变化。
         let streams: Vec<String> =
             if stored.as_deref() == Some(PREVIOUS_RELEASE_NORMALIZER_REVISION) {
@@ -6541,10 +6536,8 @@ mod tests {
 
     /// 一条运动加上它的明细报文，明细里带手表记的圈。
     ///
-    /// v22 重放的是 `workout_detail`：`lap` 字段一直躺在留存的报文里（本机
-    /// 336 条明细中有 32 条带它），只是从来没被解过。重放要能把历史记录的圈
-    /// 补齐，否则问这件事的人升级完看到的还是老样子——而他就是因为历史记录
-    /// 才来问的。
+    /// 这个夹具模拟 v22 已经能重放 `workout_detail` 的旧库：明细里的 `lap`
+    /// 已经被清掉，后面的全量重放测试要把它补回来。
     fn insert_workout_with_lap_detail(db: &Database) {
         db.insert_raw_record(&RawRecord {
             stream: "workouts".into(),
@@ -6587,8 +6580,7 @@ mod tests {
         // `insert_raw_record` 只存报文，派生行是重放时才建的。先整体归一化
         // 一遍，把运动汇总和逐秒采样做出来——真实的旧库正是这个样子。
         db.reprocess_raw_records().unwrap();
-        // 然后把圈清掉：旧版本解不出 `lap`，所以旧库里这张表是空的。v22 的
-        // 重放要能把它们补回来，这正是要验的事。
+        // 然后把圈清掉，模拟 v22 已经落库但还没有明细派生行的状态。
         db.conn.execute("DELETE FROM workout_laps", []).unwrap();
     }
 
@@ -6645,58 +6637,77 @@ mod tests {
     }
 
     #[test]
-    fn previous_release_upgrade_replays_only_the_changed_streams() {
+    fn previous_release_upgrade_replays_workouts_only_and_preserves_facts() {
         let db = Database::in_memory().unwrap();
-        insert_workout_with_lap_detail(&db);
-        db.insert_raw_record(&RawRecord {
-            stream: "daily_summary".into(),
-            source_key: "daily-summary-test".into(),
-            source_scope: SourceScope::UserFused,
-            device_id: None,
-            start_utc: ts(),
-            end_utc: None,
-            payload: serde_json::json!({
-                "data": [{ "date": "2023-11-14", "steps": 1234 }]
-            }),
-            capability: CapabilityStatus::Verified,
-        })
-        .unwrap();
         db.insert_raw_record(&RawRecord {
             stream: "workouts".into(),
-            source_key: "workouts-test".into(),
+            source_key: "workouts-225".into(),
             source_scope: SourceScope::Device,
             device_id: None,
             start_utc: ts(),
             end_utc: None,
             payload: serde_json::json!({
                 "data": [{
-                    "trackid": 1_700_000_000i64,
+                    "workout_id": "same-workout",
+                    "start_time": 1_700_000_000i64,
                     "end_time": 1_700_003_600i64,
-                    // v21 加进目录的那个编号。重放前它是 `unknown:12`。
-                    "type": 12
+                    "type": 225,
+                    "calorie": 120
                 }]
             }),
             capability: CapabilityStatus::Verified,
         })
         .unwrap();
         db.insert_raw_record(&RawRecord {
-            stream: "wellness".into(),
-            source_key: "wellness:all_day_stress:user_events:2026-09-02:2026-09-03".into(),
+            stream: "workout_detail".into(),
+            source_key: "workout_detail:same-workout:run.gps".into(),
             source_scope: SourceScope::Device,
             device_id: None,
             start_utc: ts(),
             end_utc: None,
             payload: serde_json::json!({
-                "items": [{
-                    "eventType": "all_day_stress",
-                    "timestamp": 1788307200000i64,
-                    "avgStress": "22",
-                    "data": "[{\"time\":1788307200000,\"value\":32},{\"time\":1788307500000,\"value\":25}]"
-                }]
+                "trackid": 1_700_000_000i64,
+                "time": "0;1;",
+                "longitude_latitude": "4004663552,11629333504;16403,8392;",
+                "heart_rate": "1,80;1,2;"
             }),
             capability: CapabilityStatus::Verified,
         })
         .unwrap();
+        db.insert_workout(&workout_with_type(Some(225), "unknown:225", "unknown_code"))
+            .unwrap();
+        db.set_workout_type_override("same-workout", Some("strength"))
+            .unwrap();
+        let raw_before: (
+            String,
+            Option<Vec<u8>>,
+            String,
+            String,
+            String,
+            Option<String>,
+        ) = db
+            .conn
+            .query_row(
+                "SELECT payload, payload_zip, source_key, source_scope, start_utc, device_id
+                 FROM raw_records WHERE source_key = 'workouts-225'",
+                [],
+                |row| {
+                    Ok((
+                        row.get(0)?,
+                        row.get(1)?,
+                        row.get(2)?,
+                        row.get(3)?,
+                        row.get(4)?,
+                        row.get(5)?,
+                    ))
+                },
+            )
+            .unwrap();
+        let precondition = db.get_workout_detail("same-workout").unwrap().unwrap();
+        assert_eq!(precondition.normalized_type, "unknown:225");
+        assert_eq!(precondition.type_source, "unknown_code");
+        assert_eq!(precondition.user_override.as_deref(), Some("strength"));
+        assert_eq!(precondition.effective_type, "strength");
         db.conn
             .execute(
                 "INSERT INTO app_meta(key, value, updated_at)
@@ -6708,57 +6719,86 @@ mod tests {
 
         let counts = db.reprocess_raw_records_if_needed().unwrap().unwrap();
 
-        // v21 到 v22 只动了明细里的 `lap`，所以只有 workout_detail 这一条流要
-        // 重放。运动汇总的解析一个字节都没改，不该被顺手再解一遍。
+        assert!(counts.contains_key("workouts"), "counts = {counts:?}");
+        assert!(!counts.contains_key("workout_detail"), "{counts:?}");
+        assert_eq!(
+            db.conn
+                .query_row("SELECT COUNT(*) FROM workout_samples", [], |row| row
+                    .get::<_, i64>(0),)
+                .unwrap(),
+            0,
+            "选择性重放不能顺手重放 workout_detail"
+        );
+        assert_eq!(
+            db.conn
+                .query_row("SELECT COUNT(*) FROM workout_laps", [], |row| row
+                    .get::<_, i64>(0),)
+                .unwrap(),
+            0,
+            "选择性重放不能顺手重放明细里的圈"
+        );
+        let stored = db.get_workout_detail("same-workout").unwrap().unwrap();
+        assert_eq!(stored.normalized_type, "rucking");
+        assert_eq!(stored.type_source, "numeric_mapped");
+        assert_eq!(stored.user_override.as_deref(), Some("strength"));
+        assert_eq!(stored.effective_type, "strength");
+        let raw_after: (
+            String,
+            Option<Vec<u8>>,
+            String,
+            String,
+            String,
+            Option<String>,
+        ) = db
+            .conn
+            .query_row(
+                "SELECT payload, payload_zip, source_key, source_scope, start_utc, device_id
+                 FROM raw_records WHERE source_key = 'workouts-225'",
+                [],
+                |row| {
+                    Ok((
+                        row.get(0)?,
+                        row.get(1)?,
+                        row.get(2)?,
+                        row.get(3)?,
+                        row.get(4)?,
+                        row.get(5)?,
+                    ))
+                },
+            )
+            .unwrap();
+        assert_eq!(raw_after, raw_before, "原始报文和来源事实不能被重放改写");
+        assert_eq!(
+            db.stored_normalizer_revision().unwrap().as_deref(),
+            Some(NORMALIZER_REVISION)
+        );
+        assert!(db.reprocess_raw_records_if_needed().unwrap().is_none());
+    }
+
+    #[test]
+    fn an_older_revision_still_replays_workout_detail_and_laps() {
+        let db = Database::in_memory().unwrap();
+        insert_workout_with_lap_detail(&db);
+        db.conn
+            .execute(
+                "INSERT INTO app_meta(key, value, updated_at)
+                 VALUES('normalizer_revision', ?1, ?2)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                params!["zepp-normalizer-ancient", ts().to_rfc3339()],
+            )
+            .unwrap();
+
+        let counts = db.reprocess_raw_records_if_needed().unwrap().unwrap();
+        assert!(counts.contains_key("workouts"), "counts = {counts:?}");
         assert!(counts.contains_key("workout_detail"), "counts = {counts:?}");
-        assert!(!counts.contains_key("workouts"), "{counts:?}");
-        // 而且重放确实把圈解出来了：这正是这一版存在的理由——报文里一直有的
-        // 东西，不重放的话只有以后新同步的运动才会有圈。
         assert_eq!(
             db.conn
                 .query_row("SELECT COUNT(*) FROM workout_laps", [], |row| row
                     .get::<_, i64>(0),)
                 .unwrap(),
             2,
-            "两圈都要落库"
+            "更早版本的全量重放仍要补回明细里的圈"
         );
-        // daily_summary / wellness 一个字节都没动过，不该被顺手解一遍：白解
-        // 一遍就是让升级后第一次启动干等。
-        assert!(!counts.contains_key("daily_summary"));
-        assert!(!counts.contains_key("wellness"));
-        assert_eq!(
-            db.normalized_stream_count("daily_summary").unwrap(),
-            Some(0)
-        );
-        assert_eq!(
-            db.conn
-                .query_row(
-                    "SELECT COUNT(*) FROM metric_samples WHERE metric = 'stress'",
-                    [],
-                    |row| row.get::<_, i64>(0),
-                )
-                .unwrap(),
-            0
-        );
-        assert_eq!(
-            db.conn
-                .query_row(
-                    "SELECT COUNT(*) FROM daily_metrics WHERE metric = 'steps'",
-                    [],
-                    |row| row.get::<_, i64>(0),
-                )
-                .unwrap(),
-            0
-        );
-        let revision: String = db
-            .conn
-            .query_row(
-                "SELECT value FROM app_meta WHERE key = 'normalizer_revision'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(revision, NORMALIZER_REVISION);
     }
 
     /// 无头用户的库靠什么知道自己欠一次重放。

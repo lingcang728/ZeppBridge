@@ -95,6 +95,7 @@ mod tests {
         assert_eq!(resolve(52), Some("strength"));
         assert_eq!(resolve(92), Some("badminton"));
         assert_eq!(resolve(130), Some("cross_training"));
+        assert_eq!(resolve(225), Some("rucking"));
         assert_eq!(resolve(105), None);
     }
 
