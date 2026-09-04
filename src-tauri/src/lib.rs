@@ -74,6 +74,45 @@ fn show_main_window(app: &AppHandle) {
     let _ = window.set_always_on_top(false);
 }
 
+/// `tauri.conf.json` 里 `minWidth` / `minHeight` 的那两个数。
+///
+/// 算出来的初始尺寸不能低于它们：低于了窗口会小到点不着，而 Tauri 只在用户
+/// 拖动时才强制最小尺寸，`set_size` 传什么就是什么。
+const MIN_WINDOW_WIDTH: f64 = 520.0;
+const MIN_WINDOW_HEIGHT: f64 = 560.0;
+
+/// 主窗口的初始尺寸，按显示器工作区算。
+///
+/// 这段以前是内联在 `setup()` 里的三行算术，**没有任何下限**：
+///
+/// ```text
+/// let work_w = (work.size.width as f64 / scale) - 24.0;
+/// let width  = (work_w * 0.88).max(1280.0_f64.min(work_w));
+/// ```
+///
+/// `current_monitor()` 返回 `0x0` 的工作区不是假想的状态——远程桌面会话、
+/// 显示器热插拔、以及窗口比显示器先就绪的那一瞬都会给出它。那时
+/// `work_w = -24.0`，宽度算成 `-21.1`，`set_size` 收到一个负数。用户看到的
+/// 正是「托盘图标活着、进程活着、点 Open ZeppBridge 一点反应都没有」——
+/// 窗口在，只是没有可见像素，而重装当然也修不好。
+/// 见 2026-09-04 Reddit u/poseidon1111。
+///
+/// 返回 `None` 表示这台显示器的信息不可信，那就一个字都别改，让
+/// `tauri.conf.json` 里的 1280x800 原样生效。
+fn main_window_size(work_width: u32, work_height: u32, scale: f64) -> Option<(f64, f64)> {
+    if work_width == 0 || work_height == 0 || !scale.is_finite() || scale <= 0.0 {
+        return None;
+    }
+    let work_w = (f64::from(work_width) / scale) - 24.0;
+    let work_h = (f64::from(work_height) / scale) - 32.0;
+    if !work_w.is_finite() || !work_h.is_finite() || work_w <= 0.0 || work_h <= 0.0 {
+        return None;
+    }
+    let width = (work_w * 0.88).max(1280.0_f64.min(work_w));
+    let height = (work_h * 0.88).max(800.0_f64.min(work_h));
+    Some((width.max(MIN_WINDOW_WIDTH), height.max(MIN_WINDOW_HEIGHT)))
+}
+
 /// 托盘菜单的三条文案。原生菜单没法走前端的 i18n，只能在这里备一份。
 struct TrayLabels {
     show: &'static str,
@@ -205,11 +244,36 @@ pub fn run() {
         std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
     }
 
+    // WebView2 的用户数据目录必须在 `Builder` 之前定下来：环境变量是
+    // WebView2 初始化时读的，`setup()` 里再设已经晚了。
+    //
+    // 只有目录**真的建出来了**才设这个变量。以前这里是
+    // `let _ = std::fs::create_dir_all(...)` 之后无条件 `set_var`：受控文件夹
+    // 访问、杀软的目录保护、OneDrive 占用都会让创建失败，而变量照设不误，
+    // 于是 WebView2 拿到一个用不了的路径、初始化失败——窗口和托盘都在，
+    // 里面一片空白。指向坏路径比不指向差：不设的话 WebView2 走系统默认目录，
+    // 至少还能开。
     #[cfg(target_os = "windows")]
-    if let Ok(data_dir) = paths::resolve_data_dir() {
-        let webview_dir = paths::webview_user_data_dir(&data_dir);
-        let _ = std::fs::create_dir_all(&webview_dir);
-        std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &webview_dir);
+    {
+        let resolved = paths::resolve_data_dir();
+        // 日志要先装起来，否则下面这几条 `log` 全部落空——而它们正是
+        // 「窗口一片空白」这一类问题唯一能拿到的证据。`init` 是幂等的。
+        diagnostics::init(resolved.as_deref().ok());
+        match resolved {
+            Ok(data_dir) => {
+                let webview_dir = paths::webview_user_data_dir(&data_dir);
+                match std::fs::create_dir_all(&webview_dir) {
+                    Ok(()) => std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &webview_dir),
+                    Err(error) => diagnostics::log(&format!(
+                        "WebView2 数据目录 {} 建不出来（{error}），改用系统默认目录",
+                        webview_dir.display()
+                    )),
+                }
+            }
+            Err(error) => {
+                diagnostics::log(&format!("数据目录解析失败（{error}），稍后由启动流程报错"));
+            }
+        }
     }
     tauri::Builder::default()
         // Single-instance must be registered first so a second launch never
@@ -243,6 +307,18 @@ pub fn run() {
                     return Err(diagnostics::fatal_startup("无法使用数据文件夹", error).into());
                 }
             };
+            // 本机还有没有第二个库。有的话，用户看到的会是「我的数据不见了」，
+            // 而真相是这次解析到了另一个目录（NSIS 装在 %LOCALAPPDATA%、MSI 装在
+            // Program Files，两者的落点不同）。只记录，不搬动——见
+            // `paths::other_libraries_on_this_machine` 的注释。
+            for other in paths::other_libraries_on_this_machine(&data_dir) {
+                diagnostics::log(&format!(
+                    "注意：{} 里也有一个 zepp.db，本次用的是 {}。要固定用哪一个，请设 {}",
+                    other.display(),
+                    data_dir.display(),
+                    paths::DATA_DIR_ENV
+                ));
+            }
             let webview_dir = paths::webview_user_data_dir(&data_dir);
             if let Err(error) = std::fs::create_dir_all(&webview_dir) {
                 return Err(diagnostics::fatal_startup(
@@ -365,11 +441,20 @@ pub fn run() {
                 if let Ok(Some(monitor)) = window.current_monitor() {
                     let work = monitor.work_area();
                     let scale = monitor.scale_factor();
-                    let work_w = (work.size.width as f64 / scale) - 24.0;
-                    let work_h = (work.size.height as f64 / scale) - 32.0;
-                    let width = (work_w * 0.88).max(1280.0_f64.min(work_w));
-                    let height = (work_h * 0.88).max(800.0_f64.min(work_h));
-                    let _ = window.set_size(tauri::LogicalSize::new(width, height));
+                    match main_window_size(work.size.width, work.size.height, scale) {
+                        Some((width, height)) => {
+                            diagnostics::log(&format!(
+                                "窗口尺寸：工作区 {}x{} @{scale} → {width:.0}x{height:.0}",
+                                work.size.width, work.size.height
+                            ));
+                            let _ = window.set_size(tauri::LogicalSize::new(width, height));
+                        }
+                        // 下一个报「打不开」的人，日志里会有这一行。
+                        None => diagnostics::log(&format!(
+                            "工作区信息不可用（{}x{} @{scale}），沿用配置里的默认尺寸",
+                            work.size.width, work.size.height
+                        )),
+                    }
                 }
                 let hidden = window.clone();
                 let tray_alive = tray_present.clone();
@@ -559,5 +644,53 @@ mod locale_tests {
             "取回来的不像一个语言标记：{name:?}"
         );
         assert!(!name.contains('\0'), "结尾的 NUL 没有去掉：{name:?}");
+    }
+}
+
+#[cfg(test)]
+mod window_size_tests {
+    use super::{main_window_size, MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH};
+
+    /// 一台正常的 1080p 显示器，尺寸落在工作区里面。
+    #[test]
+    fn a_normal_monitor_gets_a_window_that_fits_inside_it() {
+        let (width, height) = main_window_size(1920, 1040, 1.0).expect("正常显示器要给出尺寸");
+        assert!(width <= 1920.0 - 24.0, "宽度不能超出工作区：{width}");
+        assert!(height <= 1040.0 - 32.0, "高度不能超出工作区：{height}");
+        assert!(width >= MIN_WINDOW_WIDTH && height >= MIN_WINDOW_HEIGHT);
+    }
+
+    /// 这条是这次修复的全部理由。
+    ///
+    /// `current_monitor()` 给出 `0x0` 时，旧代码算出的宽度是 -21.1，
+    /// `set_size` 收下一个负数——窗口在、托盘在、点开没有任何反应。
+    #[test]
+    fn a_zero_sized_work_area_falls_back_to_the_configured_size() {
+        assert_eq!(main_window_size(0, 0, 1.0), None);
+        assert_eq!(main_window_size(1920, 0, 1.0), None);
+        assert_eq!(main_window_size(0, 1040, 1.0), None);
+    }
+
+    /// 坏掉的缩放系数同样不能变成一个负数或 NaN。
+    #[test]
+    fn a_broken_scale_factor_falls_back_to_the_configured_size() {
+        assert_eq!(main_window_size(1920, 1040, 0.0), None);
+        assert_eq!(main_window_size(1920, 1040, -1.0), None);
+        assert_eq!(main_window_size(1920, 1040, f64::NAN), None);
+    }
+
+    /// 工作区小到比边距还窄时也不许出负数。
+    #[test]
+    fn a_work_area_smaller_than_the_margins_falls_back() {
+        assert_eq!(main_window_size(20, 20, 1.0), None);
+    }
+
+    /// 小屏 / 高 DPI：算出来的值再小也不能低于 `tauri.conf.json` 的最小尺寸，
+    /// 否则窗口小到点不着，和「打不开」没有区别。
+    #[test]
+    fn a_tiny_work_area_never_goes_below_the_configured_minimum() {
+        let (width, height) = main_window_size(800, 600, 2.0).expect("这仍然是一台可用的显示器");
+        assert!(width >= MIN_WINDOW_WIDTH, "宽度低于最小值：{width}");
+        assert!(height >= MIN_WINDOW_HEIGHT, "高度低于最小值：{height}");
     }
 }
