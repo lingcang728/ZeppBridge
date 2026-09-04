@@ -875,6 +875,7 @@ mod tests {
             route: vec![],
             pauses: vec![],
             splits: vec![],
+            laps: vec![],
             summary: WorkoutSeriesSummary::default(),
         }
     }

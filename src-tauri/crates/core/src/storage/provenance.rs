@@ -134,10 +134,16 @@ impl StageErrorKind {
     /// `auth` 要去重新连接，`network` 值得重试，`not_available` 是这个账号
     /// 本来就没有这条流，重试多少次都没用。
     pub fn classify(error: &crate::models::ZeppBridgeError) -> Self {
+        use crate::models::error::HeadlessProblem;
         use crate::models::ZeppBridgeError as E;
         match error {
             E::Cancelled => StageErrorKind::Cancelled,
             E::NeedsReauth(_) | E::AuthError(_) | E::CredentialStore(_) => StageErrorKind::Auth,
+            // 无头环境的三种：两种是「令牌拿不到」，一种是「库要先升级」。
+            // 前两种按 auth 分类（用户要去把凭据给进来），第三种是本机存储
+            // 的事——重试解决不了，得先跑一次 reprocess。
+            E::Headless(HeadlessProblem::SchemaUpgradeRequired { .. }) => StageErrorKind::Storage,
+            E::Headless(_) => StageErrorKind::Auth,
             E::Unavailable(_) | E::DataUnavailable(_) => StageErrorKind::NotAvailable,
             E::NetworkError(_) | E::RetryExhausted { .. } | E::HttpStatus { .. } => {
                 StageErrorKind::Network

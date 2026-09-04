@@ -681,6 +681,36 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(20, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // v21：手表自己记的圈。
+        //
+        // 和 `workout_splits` 是**两回事**，所以单独一张表而不是加一个
+        // 类型列：splits 是我们本地按每公里切出来的，圈是手表在运动当时
+        // 记下来的——按圈键、按距离自动分段，或者按训练课的间歇。
+        // 一次 5820 m 的跑步可以同时有 5 段公里分段和 14 个 415 m 的圈；
+        // 把它们塞进同一张表，「每公里配速」那张图就会突然变成别的东西。
+        //
+        // 表从空的开始，下一次归一化重放时填上——原始报文里一直有。
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS workout_laps (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                workout_id TEXT NOT NULL,
+                lap_index INTEGER NOT NULL,
+                start_time TEXT NOT NULL,
+                end_time TEXT NOT NULL,
+                distance_m REAL NOT NULL,
+                duration_seconds INTEGER NOT NULL,
+                avg_hr INTEGER,
+                max_hr INTEGER,
+                FOREIGN KEY(workout_id) REFERENCES workouts(workout_id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_workout_laps_workout
+                ON workout_laps(workout_id, lap_index);
+            PRAGMA user_version = 21;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(21, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         // Earlier migrations are intentionally idempotent and still stamp
         // their historical versions on every launch, so the current schema
         // marker is restored only after all of them have run.
