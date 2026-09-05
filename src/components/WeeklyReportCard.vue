@@ -254,35 +254,58 @@ function formatNumber(fact: InsightFact, value: number): string {
   background: var(--surface);
 }
 .weekly-card header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
-.weekly-card h2 { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--ink); font-size: 14px; font-weight: 500; }
-.weekly-window { color: var(--muted); font-size: 11px; }
-.weekly-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; color: var(--muted); font-size: 11px; }
+.weekly-card h2 { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--ink); font-size: var(--fs-lg); font-weight: 600; }
+.weekly-window { color: var(--muted); font-size: var(--fs-xs); }
+.weekly-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; color: var(--muted); font-size: var(--fs-xs); }
 .weekly-legend span { display: inline-flex; align-items: center; gap: 5px; }
-.legend-dot { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 2px; }
+
+/* 好/坏不能只靠绿/红：红绿色觉障碍下这两个状态完全一样。
+   统一加一个前置符号，颜色只作为强化。 */
+.legend-dot {
+  display: grid;
+  place-items: center;
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
+  border-radius: 3px;
+  color: var(--accent-ink);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
 .legend-dot.good { background: var(--accent); }
+.legend-dot.good::before { content: '✓'; }
 .legend-dot.bad { background: var(--danger); }
+.legend-dot.bad::before { content: '!'; }
 .legend-note { color: var(--subtle); }
 
-.weekly-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; align-items: stretch; }
+/* 每格里现在有「上一个 28 天」这种长标签加进度条，210px 一行挤六个放不下，
+   标签会顶到进度条上。加宽下限，常见窗口宽度下自然落成五列。 */
+.weekly-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; align-items: stretch; }
 .weekly-item { display: grid; gap: 2px; align-content: start; padding: 10px 12px; border-radius: 12px; background: var(--surface-raised); }
-.weekly-label { color: var(--muted); font-size: 11px; }
-.weekly-item strong { color: var(--ink); font-size: 16px; font-weight: 500; }
-.weekly-delta { font-size: 11px; line-height: 1.5; }
+.weekly-label { color: var(--muted); font-size: var(--fs-xs); }
+.weekly-item strong { color: var(--ink); font-size: var(--fs-2xl); font-weight: 600; }
+.weekly-delta { font-size: var(--fs-xs); line-height: 1.5; }
 .weekly-delta.good { color: var(--accent); }
+.weekly-delta.good::before { content: '✓\a0'; font-weight: 700; }
 .weekly-delta.bad { color: var(--danger); }
+.weekly-delta.bad::before { content: '!\a0'; font-weight: 700; }
 .weekly-delta.flat, .weekly-delta.muted { color: var(--muted); }
 
 .weekly-bars { display: grid; gap: 5px; margin: 6px 0 2px; }
-.bar-row { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; align-items: center; gap: 7px; }
-.bar-tag { color: var(--subtle); font-size: 10px; white-space: nowrap; }
+.bar-row { display: grid; grid-template-columns: 84px minmax(0, 1fr) auto; align-items: center; gap: 7px; }
+.bar-tag { color: var(--subtle); font-size: var(--fs-2xs); white-space: nowrap; }
 .bar-track { height: 6px; border-radius: 3px; background: rgba(232,238,244,.08); overflow: hidden; }
 .bar-fill { display: block; height: 100%; border-radius: 3px; background: var(--muted); transition: width .4s cubic-bezier(.16,1,.3,1); }
 .bar-fill.good { background: var(--accent); }
-.bar-fill.bad { background: var(--danger); }
+.bar-fill.bad {
+  background: repeating-linear-gradient(
+    -45deg, var(--danger) 0 4px, color-mix(in srgb, var(--danger) 62%, #000) 4px 8px);
+}
 .bar-fill.flat { background: var(--muted); }
 .bar-fill.baseline { background: rgba(232,238,244,.22); }
-.bar-value { color: var(--subtle); font-size: 10px; white-space: nowrap; }
+.bar-value { color: var(--subtle); font-size: var(--fs-2xs); white-space: nowrap; }
 
-.weekly-note { margin: 0; color: var(--subtle); font-size: 11px; line-height: 1.6; }
-.weekly-error { margin: 0; color: var(--danger); font-size: 12px; }
+.weekly-note { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.6; }
+.weekly-error { margin: 0; color: var(--danger); font-size: var(--fs-sm); }
 </style>

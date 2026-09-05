@@ -158,14 +158,14 @@ watch(dataRevision, () => void loadList());
   gap: 6px;
   margin-bottom: 8px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   text-decoration: none;
 }
 .back-link:hover { color: var(--accent); }
 .footnote {
   margin: 12px 0 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .load-more { display: flex; justify-content: center; margin-top: 12px; }
 </style>

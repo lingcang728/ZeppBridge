@@ -55,12 +55,12 @@ withDefaults(defineProps<{
 .device-card:hover { border-color: var(--line-strong); transform: translateY(-1px); }
 .device-card.compact { padding: 8px 10px; gap: 9px; border-radius: var(--radius-sm); }
 .device-card-copy { display: grid; gap: 3px; min-width: 0; align-content: start; }
-.device-card-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 700; }
-.device-display { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11px; }
-.device-state { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11px; }
+.device-card-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); font-weight: 700; }
+.device-display { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: var(--fs-xs); }
+.device-state { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: var(--fs-xs); }
 .dot { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: var(--subtle); }
 .dot.has-data { background: var(--readiness); }
 .dot.identified { background: var(--accent); }
-.device-meta { color: var(--subtle); font-size: 11px; line-height: 1.55; font-variant-numeric: tabular-nums; }
+.device-meta { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.55; font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) { .device-card { transition: none; } .device-card:hover { transform: none; } }
 </style>

@@ -191,7 +191,7 @@ watch(dataRevision, () => void loadList());
   gap: 6px;
   margin-bottom: 8px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   text-decoration: none;
 }
 .back-link:hover { color: var(--accent); }
@@ -199,6 +199,6 @@ watch(dataRevision, () => void loadList());
 .footnote {
   margin: 12px 0 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 </style>

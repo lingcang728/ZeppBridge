@@ -152,19 +152,19 @@ const option = computed(() => {
 }
 .trend-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
 .trend-title { display: grid; gap: 2px; min-width: 0; }
-.trend-title strong { color: var(--ink); font-size: 13px; font-weight: 700; }
-.trend-title small { color: var(--subtle); font-size: 11px; }
+.trend-title strong { color: var(--ink); font-size: var(--fs-md); font-weight: 700; }
+.trend-title small { color: var(--subtle); font-size: var(--fs-xs); }
 .trend-latest { display: flex; align-items: baseline; gap: 4px; white-space: nowrap; }
-.trend-latest strong { font-family: var(--font-mono); font-size: 22px; font-variant-numeric: tabular-nums; }
-.trend-latest small { color: var(--subtle); font-size: 11px; }
-.trend-latest-tag { color: var(--subtle); font-size: 11px; font-style: normal; }
+.trend-latest strong { font-family: var(--font-mono); font-size: 24px; font-variant-numeric: tabular-nums; }
+.trend-latest small { color: var(--subtle); font-size: var(--fs-xs); }
+.trend-latest-tag { color: var(--subtle); font-size: var(--fs-xs); font-style: normal; }
 .trend-meta {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1) var(--space-3);
   margin: var(--space-2) 0 0;
   color: var(--subtle);
-  font-size: 11px;
+  font-size: var(--fs-xs);
 }
 .trend-date { font-family: var(--font-mono); }
 .trend-band { color: var(--muted); }
@@ -175,7 +175,7 @@ const option = computed(() => {
   min-height: 132px;
   margin: var(--space-2) 0 0;
   color: var(--subtle);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .trend-stats {
   display: flex;
@@ -186,13 +186,13 @@ const option = computed(() => {
   border-top: 1px solid var(--line);
 }
 .trend-stats > div { display: flex; align-items: baseline; gap: var(--space-1); }
-.trend-stats dt { color: var(--subtle); font-size: 11px; }
+.trend-stats dt { color: var(--subtle); font-size: var(--fs-xs); }
 .trend-stats dd {
   margin: 0;
   color: var(--muted);
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums;
 }
-.trend-stats dd i { margin-left: 2px; font-size: 10px; font-style: normal; }
+.trend-stats dd i { margin-left: 2px; font-size: var(--fs-2xs); font-style: normal; }
 </style>

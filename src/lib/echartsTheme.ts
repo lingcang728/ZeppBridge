@@ -20,7 +20,7 @@ export const zeppSemanticColors = {
   vo2: '#3DD84C',
   readiness: '#3DD84C',
   sleep: {
-    deep: '#4458B8',
+    deep: '#6477D7',
     light: '#7C8FF0',
     rem: '#8B5CF6',
     awake: '#E8833A',
@@ -43,27 +43,30 @@ const healthSeriesPalette = [
   zeppSemanticColors.sleep.awake,
 ];
 
+/* 坐标轴文字沿用 CSS 的 --muted：11px/#9AA1A9 在正常视距下读不出来。 */
+export const axisInk = '#B4BBC3';
+
 const darkAxis = {
   axisLine: { show: false },
   axisTick: { show: false },
-  axisLabel: { color: '#9AA1A9', fontSize: 11, fontFamily: fonts },
-  splitLine: { show: true, lineStyle: { color: 'rgba(226,234,242,0.07)', type: 'dashed' as const } },
+  axisLabel: { color: axisInk, fontSize: 14.5, fontWeight: 600 as const, fontFamily: fonts },
+  splitLine: { show: true, lineStyle: { color: 'rgba(226,234,242,0.12)', type: 'dashed' as const } },
 };
 
 export const zeppThemeDark = {
   color: healthSeriesPalette,
   backgroundColor: 'transparent',
-  textStyle: { fontFamily: fonts, color: '#9AA1A9' },
+  textStyle: { fontFamily: fonts, color: axisInk },
   categoryAxis: { ...darkAxis },
   valueAxis: { ...darkAxis },
   timeAxis: { ...darkAxis },
   logAxis: { ...darkAxis },
   tooltip: {
-    backgroundColor: '#24272F',
-    borderColor: 'rgba(226,234,242,0.14)',
+    backgroundColor: '#1F232A',
+    borderColor: 'rgba(226,234,242,0.22)',
     borderWidth: 1,
     padding: [8, 12],
-    textStyle: { color: '#F2F4EE', fontSize: 12, fontFamily: fonts },
+    textStyle: { color: '#F2F4EE', fontSize: 15.5, fontFamily: fonts },
     extraCssText: 'border-radius:8px;box-shadow:none;',
   },
   line: {

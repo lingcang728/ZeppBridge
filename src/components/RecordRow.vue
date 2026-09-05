@@ -87,11 +87,11 @@ withDefaults(defineProps<{
 }
 .record-copy small, .record-fact small {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .record-copy strong {
   overflow: hidden;
-  font-size: 14px;
+  font-size: var(--fs-lg);
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -99,7 +99,7 @@ withDefaults(defineProps<{
 .record-mid {
   overflow: hidden;
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--fs-md);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -109,7 +109,7 @@ withDefaults(defineProps<{
 }
 .record-fact strong {
   font-family: 'Inter', var(--font-sans);
-  font-size: 14px;
+  font-size: var(--fs-lg);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
@@ -121,7 +121,7 @@ withDefaults(defineProps<{
   padding: 8px 14px;
 }
 .record-row.compact .record-copy strong {
-  font-size: 13px;
+  font-size: var(--fs-md);
   font-weight: 400;
 }
 .record-row.compact.tone-sleep .record-fact strong {
@@ -130,12 +130,12 @@ withDefaults(defineProps<{
   border-radius: 999px;
   background: var(--surface-raised);
   color: var(--sleep);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   text-align: center;
 }
 .record-row.compact.tone-activity .record-fact strong {
   color: var(--activity);
-  font-size: 13px;
+  font-size: var(--fs-md);
 }
 @media (max-width: 520px) {
   .record-row { grid-template-columns: auto minmax(0, 1fr) auto; }

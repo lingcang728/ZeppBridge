@@ -145,7 +145,7 @@ const syncNow = () => { void runSync('incremental'); };
   border-radius: var(--radius-sm);
   background: var(--surface-raised);
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--fs-md);
   line-height: 1.5;
 }
 .coverage-notice span { flex: 1 1 240px; min-width: 0; }

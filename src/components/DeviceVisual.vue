@@ -115,5 +115,5 @@ const kindLabel = computed(() => {
 .device-visual img { display: block; width: 100%; height: 100%; object-fit: contain; padding: 2px; }
 .device-fallback { display: grid; justify-items: center; gap: 1px; width: 100%; height: 100%; padding: 5px; color: var(--muted); }
 .device-fallback svg { display: block; width: 100%; height: calc(100% - 12px); }
-.device-fallback-label { max-width: 100%; overflow: hidden; color: var(--subtle); font-size: 9px; line-height: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.device-fallback-label { max-width: 100%; overflow: hidden; color: var(--subtle); font-size: var(--fs-2xs); line-height: 11px; text-overflow: ellipsis; white-space: nowrap; }
 </style>

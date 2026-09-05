@@ -33,7 +33,7 @@ defineProps<{
   border-radius: var(--radius-md);
   background: var(--surface);
 }
-.state-panel h2 { margin: 0 0 6px; font-size: 18px; }
+.state-panel h2 { margin: 0 0 6px; font-size: var(--fs-3xl); }
 .state-panel p { margin: 0 0 16px; color: var(--muted); }
 .state-panel p:last-child { margin-bottom: 0; }
 .state-mark {

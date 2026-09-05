@@ -361,30 +361,36 @@ const exclusionSummary = computed(() => {
   background: var(--surface);
 }
 .insight-card header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.insight-card h2 { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--ink); font-size: 14px; font-weight: 500; }
+.insight-card h2 { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--ink); font-size: var(--fs-lg); font-weight: 600; }
 
-.insight-summary { margin: 0; color: var(--ink); font-size: 13px; line-height: 1.7; }
-.delta { margin-right: 10px; font-weight: 500; }
+.insight-summary { margin: 0; color: var(--ink); font-size: var(--fs-md); line-height: 1.7; }
+.delta { margin-right: 10px; font-weight: 600; }
 .delta.good, .fact-delta.good { color: var(--accent); }
 .delta.bad, .fact-delta.bad { color: var(--danger); }
 .delta.flat, .fact-delta.flat { color: var(--muted); }
 
+/* 好/坏不能只靠绿/红：红绿色觉障碍下这两个状态完全一样。
+   统一加一个前置符号，颜色只作为强化。 */
+.delta.good::before, .fact-delta.good::before { content: '✓\a0'; font-weight: 700; }
+.delta.bad::before, .fact-delta.bad::before { content: '!\a0'; font-weight: 700; }
+.delta.flat::before, .fact-delta.flat::before { content: '=\a0'; font-weight: 700; }
+
 .fact-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
 .fact { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; background: var(--surface-raised); }
-.fact-label { color: var(--muted); font-size: 11px; }
-.fact strong { color: var(--ink); font-size: 16px; font-weight: 500; }
-.fact-delta { font-size: 11px; }
+.fact-label { color: var(--muted); font-size: var(--fs-xs); }
+.fact strong { color: var(--ink); font-size: var(--fs-2xl); font-weight: 600; }
+.fact-delta { font-size: var(--fs-xs); }
 .fact-delta.muted { color: var(--muted); }
 
-details summary { color: var(--subtle); font-size: 12px; cursor: pointer; }
+details summary { color: var(--subtle); font-size: var(--fs-sm); cursor: pointer; }
 .baseline-list { display: grid; gap: 2px; margin: 6px 0; padding-left: 18px; }
-.baseline-list a { color: var(--accent); font-size: 11px; }
+.baseline-list a { color: var(--accent); font-size: var(--fs-xs); }
 
-.insight-note { margin: 0; color: var(--subtle); font-size: 11px; line-height: 1.6; }
-.insight-error { margin: 0; color: var(--danger); font-size: 12px; }
+.insight-note { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.6; }
+.insight-error { margin: 0; color: var(--danger); font-size: var(--fs-sm); }
 .drift { margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--line); }
 .drift-head { display: flex; align-items: baseline; gap: 8px; margin: 0 0 4px; }
-.drift-head strong { color: var(--ink); font-size: 13px; }
+.drift-head strong { color: var(--ink); font-size: var(--fs-md); }
 .drift-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 10px 0 0; }
 .insight-note.subtle { color: var(--subtle); }
 </style>
