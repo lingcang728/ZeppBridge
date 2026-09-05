@@ -1,6 +1,6 @@
 {
-  "version": 5,
-  "checked_at": "2026-09-03",
+  "version": 6,
+  "checked_at": "2026-09-04",
   "notes": "Zepp cloud-history observations take precedence where its numeric types differ from the Zepp OS device protocol. Extended identifiers are cross-checked against Gadgetbridge's Zepp OS catalog and user-supplied Zepp App screenshots. A null code means the sport is offered as a manual correction but no Zepp numeric type is known to produce it -- never guess one in to make the entry look complete.",
   "sports": [
     { "code": 1, "key": "run", "label_zh": "户外跑步", "label_en": "Outdoor Running", "source": "cloud_verified" },
@@ -136,6 +136,7 @@
     { "code": 206, "key": "e_bike", "label_zh": "电助力骑行", "label_en": "E-Bike Ride", "source": "extended_catalog" },
     { "code": 211, "key": "road_cycling", "label_zh": "公路骑行", "label_en": "Road Cycling", "source": "user_reported" },
     { "code": 223, "key": "activity", "label_zh": "AI 识别活动", "label_en": "AI-Detected Activity", "source": "cloud_verified" },
+    { "code": 225, "key": "rucking", "label_zh": "负重徒步", "label_en": "Rucking", "source": "user_reported" },
     { "code": null, "key": "trail_running", "label_zh": "越野跑", "label_en": "Trail Running", "source": "correction_only" }
   ]
 }

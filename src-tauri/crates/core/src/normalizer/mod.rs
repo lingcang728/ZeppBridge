@@ -2719,6 +2719,24 @@ mod tests {
     }
 
     #[test]
+    fn code_225_is_normalized_as_rucking_with_numeric_evidence() {
+        let result = Normalizer::normalize_workouts(&json!({
+            "data": { "summary": [{
+                "trackid": 1_700_300_000i64,
+                "end_time": 1_700_303_600i64,
+                "type": 225,
+                "calorie": 120
+            }] }
+        }))
+        .unwrap();
+        assert_eq!(result[0].workout_type, "rucking");
+        assert_eq!(result[0].normalized_type, "rucking");
+        assert_eq!(result[0].type_source, "numeric_mapped");
+        assert_eq!(result[0].effective_type, "rucking");
+        assert_eq!(result[0].zepp_type, Some(225));
+    }
+
+    #[test]
     fn unknown_numeric_workout_never_inherits_endpoint_sport_name() {
         let result = Normalizer::normalize_workouts_with_sport(
             &json!({
