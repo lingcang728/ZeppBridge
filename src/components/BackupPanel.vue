@@ -450,17 +450,17 @@ const cancelRestore = async () => {
 <style scoped>
 /* 与设置页共用的视觉基元。子组件拿不到父组件的 scoped 样式，
    所以这里按同一套 token 重述一遍，保证看起来是同一套东西。 */
-h2 { margin: 0 0 14px; font-size: 15px; font-weight: 700; color: var(--ink); }
+h2 { margin: 0 0 14px; font-size: var(--fs-xl); font-weight: 700; color: var(--ink); }
 .settings-card { padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); min-width: 0; }
-.section-description { margin: 0 0 var(--space-3); color: var(--muted); font-size: 12px; line-height: 1.6; }
+.section-description { margin: 0 0 var(--space-3); color: var(--muted); font-size: var(--fs-sm); line-height: 1.6; }
 .section-description.compare { padding: 10px 12px; border-left: 2px solid var(--line-strong); background: var(--surface-raised); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
-.section-description b { color: var(--ink); font-weight: 500; }
-.section-description code { padding: 1px 5px; border-radius: 5px; background: var(--surface-raised); font-size: 11px; }
-.retain-note { margin: 8px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.section-description b { color: var(--ink); font-weight: 600; }
+.section-description code { padding: 1px 5px; border-radius: 5px; background: var(--surface-raised); font-size: var(--fs-xs); }
+.retain-note { margin: 8px 0 0; color: var(--muted); font-size: var(--fs-sm); line-height: 1.6; }
 .inline-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-.hint-line { display: inline-flex; align-items: center; gap: 6px; margin: 12px 0 0; color: var(--muted); font-size: 12px; }
+.hint-line { display: inline-flex; align-items: center; gap: 6px; margin: 12px 0 0; color: var(--muted); font-size: var(--fs-sm); }
 .hint-line.ok { color: var(--accent); }
-.api-error { margin: 12px 0 0; color: var(--danger); font-size: 12px; line-height: 1.55; }
+.api-error { margin: 12px 0 0; color: var(--danger); font-size: var(--fs-sm); line-height: 1.55; }
 
 .pending-banner {
   display: grid;
@@ -475,8 +475,8 @@ h2 { margin: 0 0 14px; font-size: 15px; font-weight: 700; color: var(--ink); }
 }
 .pending-banner > svg { color: var(--warning); }
 .pending-banner div { display: grid; gap: 2px; min-width: 0; }
-.pending-banner strong { color: var(--ink); font-size: 12px; }
-.pending-banner span { color: var(--subtle); font-size: 11px; line-height: 1.55; }
+.pending-banner strong { color: var(--ink); font-size: var(--fs-sm); }
+.pending-banner span { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.55; }
 
 .backup-list { display: grid; gap: 8px; margin-top: 14px; }
 .backup-row {
@@ -488,17 +488,17 @@ h2 { margin: 0 0 14px; font-size: 15px; font-weight: 700; color: var(--ink); }
   background: var(--surface-raised);
 }
 .backup-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.backup-head strong { color: var(--ink); font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.backup-head strong { color: var(--ink); font-size: var(--fs-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
 .kind-tag {
   padding: 2px 7px;
   border: 1px solid var(--line-strong);
   border-radius: 999px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--fs-2xs);
 }
 .kind-tag.manual { border-color: color-mix(in srgb, var(--accent) 36%, transparent); color: var(--accent); }
-.pin-tag { display: inline-flex; align-items: center; gap: 3px; color: var(--accent); font-size: 10px; }
-.backup-meta { color: var(--subtle); font-size: 11px; line-height: 1.55; }
+.pin-tag { display: inline-flex; align-items: center; gap: 3px; color: var(--accent); font-size: var(--fs-2xs); }
+.backup-meta { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.55; }
 .backup-meta .good { color: var(--accent); }
 .backup-meta .bad { color: var(--danger); font-style: normal; }
 .backup-row .inline-actions { margin-top: 6px; }
@@ -512,12 +512,12 @@ h2 { margin: 0 0 14px; font-size: 15px; font-weight: 700; color: var(--ink); }
   border-radius: var(--radius-sm);
   background: var(--surface-raised);
 }
-.preview-panel > strong { color: var(--ink); font-size: 12px; }
-.preview-panel > p { margin: 0; color: var(--subtle); font-size: 11px; line-height: 1.55; }
-.preview-table { width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 11px; }
+.preview-panel > strong { color: var(--ink); font-size: var(--fs-sm); }
+.preview-panel > p { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.55; }
+.preview-table { width: 100%; border-collapse: collapse; margin-top: 4px; font-size: var(--fs-xs); }
 .preview-table th, .preview-table td { padding: 5px 8px; text-align: right; border-bottom: 1px solid var(--line); }
 .preview-table th:first-child, .preview-table td:first-child { text-align: left; }
-.preview-table th { color: var(--muted); font-weight: 500; }
+.preview-table th { color: var(--muted); font-weight: 600; }
 .preview-table td { color: var(--ink); font-variant-numeric: tabular-nums; }
 .preview-table td.loss { color: var(--danger); }
 </style>

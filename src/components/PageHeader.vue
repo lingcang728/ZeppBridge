@@ -52,7 +52,7 @@ defineProps<{
   justify-self: start;
   gap: 6px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   text-decoration: none;
 }
 .back-link:hover { color: var(--accent); }

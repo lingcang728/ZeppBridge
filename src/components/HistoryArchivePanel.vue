@@ -571,28 +571,28 @@ const resetLedger = async () => {
 .failed-block { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); }
 .failed-list { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
 .failed-list li { display: grid; gap: 2px; }
-.failed-where { color: var(--ink); font-size: 13px; font-weight: 600; }
-.failed-why { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
-.failed-meta { color: var(--subtle); font-size: 11px; }
+.failed-where { color: var(--ink); font-size: var(--fs-md); font-weight: 600; }
+.failed-why { color: var(--muted); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.failed-meta { color: var(--subtle); font-size: var(--fs-xs); }
 .estimate-block { margin-top: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); }
 .estimate-head { display: grid; gap: 3px; }
-.estimate-head strong { color: var(--ink); font-size: 12px; font-weight: 500; }
-.estimate-head span { color: var(--subtle); font-size: 11px; line-height: 1.55; }
+.estimate-head strong { color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
+.estimate-head span { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.55; }
 .estimate-list { display: grid; gap: 3px; margin-top: 8px; }
-.estimate-row { display: grid; grid-template-columns: minmax(0, 88px) minmax(0, 1fr) auto; gap: 10px; align-items: baseline; color: var(--subtle); font-size: 11px; }
+.estimate-row { display: grid; grid-template-columns: minmax(0, 88px) minmax(0, 1fr) auto; gap: 10px; align-items: baseline; color: var(--subtle); font-size: var(--fs-xs); }
 .estimate-row > span:first-child { color: var(--ink); }
 .estimate-total { color: var(--muted); font-variant-numeric: tabular-nums; }
-.estimate-block .retain-note { margin: 8px 0 0; font-size: 11px; }
+.estimate-block .retain-note { margin: 8px 0 0; font-size: var(--fs-xs); }
 
 /* 与设置页共用的视觉基元。子组件拿不到父组件的 scoped 样式，
    所以这里按同一套 token 重述一遍，保证看起来是同一套东西。 */
-h2 { margin: 0 0 14px; font-size: 15px; font-weight: 700; color: var(--ink); }
+h2 { margin: 0 0 14px; font-size: var(--fs-xl); font-weight: 700; color: var(--ink); }
 .settings-card { padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); min-width: 0; }
-.section-description { margin: 0 0 var(--space-3); color: var(--muted); font-size: 12px; }
+.section-description { margin: 0 0 var(--space-3); color: var(--muted); font-size: var(--fs-sm); }
 .toggle-row { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 0; }
 .toggle-copy { flex: 1; min-width: 0; display: grid; gap: 1px; }
-.toggle-copy strong { font-size: 12px; color: var(--ink); }
-.toggle-copy span { color: var(--subtle); font-size: 11px; line-height: 1.55; }
+.toggle-copy strong { font-size: var(--fs-sm); color: var(--ink); }
+.toggle-copy span { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.55; }
 .switch { width: 42px; height: 24px; flex: 0 0 42px; padding: 2px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface-raised); cursor: pointer; }
 .switch span { display: block; width: 18px; height: 18px; border-radius: 50%; background: var(--muted); transition: transform 150ms ease, background-color 150ms ease; }
 .switch[aria-checked='true'] { border-color: var(--accent); background: var(--accent-soft); }
@@ -607,25 +607,25 @@ h2 { margin: 0 0 14px; font-size: 15px; font-weight: 700; color: var(--ink); }
   border-radius: 9px;
   background: var(--surface-raised);
   color: var(--ink);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .field-row .select-menu { min-width: 220px; flex: 0 0 auto; }
-.kv-label { flex: 0 0 96px; color: var(--muted); font-size: 12px; }
-.retain-note { margin: 6px 0 8px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.kv-label { flex: 0 0 96px; color: var(--muted); font-size: var(--fs-sm); }
+.retain-note { margin: 6px 0 8px; color: var(--muted); font-size: var(--fs-sm); line-height: 1.6; }
 .inline-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 /* 「自动跑完」放在按钮正上方：它改变的正是下面那个按钮的行为。 */
 .auto-continue { display: flex; gap: 8px; align-items: flex-start; margin-top: 14px; cursor: pointer; }
 .auto-continue input { margin-top: 3px; flex: none; }
 .auto-continue span { display: flex; flex-direction: column; gap: 2px; }
-.auto-continue em { font-style: normal; font-size: 12px; opacity: .72; line-height: 1.5; }
-.hint-line { display: inline-flex; align-items: center; gap: 6px; margin: 12px 0 0; color: var(--muted); font-size: 12px; }
+.auto-continue em { font-style: normal; font-size: var(--fs-sm); opacity: .72; line-height: 1.5; }
+.hint-line { display: inline-flex; align-items: center; gap: 6px; margin: 12px 0 0; color: var(--muted); font-size: var(--fs-sm); }
 .hint-line.ok { color: var(--accent); }
-.api-error { margin: 12px 0 0; color: var(--danger); font-size: 12px; line-height: 1.55; }
+.api-error { margin: 12px 0 0; color: var(--danger); font-size: var(--fs-sm); line-height: 1.55; }
 
 .archive-toggle { margin: 10px 0; border-bottom: 0; }
 .ledger-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin-top: 14px; }
-.ledger-head strong { color: var(--ink); font-size: 12px; font-weight: 500; }
-.ledger-head span { color: var(--muted); font-size: 11px; }
+.ledger-head strong { color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
+.ledger-head span { color: var(--muted); font-size: var(--fs-xs); }
 .ledger-list { display: grid; gap: 8px; margin-top: 8px; }
 .ledger-row {
   display: grid;
@@ -635,7 +635,7 @@ h2 { margin: 0 0 14px; font-size: 15px; font-weight: 700; color: var(--ink); }
   border-radius: var(--radius-sm);
   background: var(--surface-raised);
 }
-.ledger-row strong { color: var(--ink); font-size: 12px; font-weight: 500; }
-.ledger-stats, .ledger-range { color: var(--subtle); font-size: 11px; }
+.ledger-row strong { color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
+.ledger-stats, .ledger-range { color: var(--subtle); font-size: var(--fs-xs); }
 .ledger-stats em { color: var(--danger); font-style: normal; }
 </style>

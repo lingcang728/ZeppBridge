@@ -256,17 +256,17 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
 .picker-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .filter-chip {
   padding: 4px 12px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-control);
   border-radius: 999px;
   background: transparent;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   cursor: pointer;
 }
 .filter-chip.on { border-color: var(--accent); color: var(--accent); }
 .picker-search { flex: 1 1 160px; min-width: 140px; }
 
-.picker-empty { padding: 24px 12px; color: var(--muted); font-size: 12px; text-align: center; }
+.picker-empty { padding: 24px 12px; color: var(--muted); font-size: var(--fs-sm); text-align: center; }
 
 .picker-stage { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; }
 .picker-arrow {
@@ -274,7 +274,7 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
   place-items: center;
   width: 34px;
   height: 34px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-control);
   border-radius: 50%;
   background: transparent;
   color: var(--ink);
@@ -302,9 +302,9 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
 .picker-hero { display: grid; justify-items: center; gap: 2px; text-align: center; }
 /* 主图给足高度：竖长的表身在正方框里会被上下切掉。 */
 .picker-hero .hero-visual { width: 132px; height: 150px; flex-basis: 150px; border: 0; background: transparent; }
-.hero-name { margin: 6px 0 0; color: var(--ink); font-size: 14px; font-weight: 500; }
-.hero-sub { margin: 0; color: var(--subtle); font-size: 11px; }
-.hero-count { margin: 4px 0 0; color: var(--muted); font-size: 11px; font-family: var(--font-mono); }
+.hero-name { margin: 6px 0 0; color: var(--ink); font-size: var(--fs-lg); font-weight: 600; }
+.hero-sub { margin: 0; color: var(--subtle); font-size: var(--fs-xs); }
+.hero-count { margin: 4px 0 0; color: var(--muted); font-size: var(--fs-xs); font-family: var(--font-mono); }
 
 .picker-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .picker-contribute {
@@ -313,17 +313,17 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
   gap: 8px;
   align-items: start;
   padding: 10px 12px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-control);
   border-radius: 12px;
   background: var(--surface-raised);
   color: var(--subtle);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   line-height: 1.6;
   cursor: pointer;
 }
 .picker-contribute input { margin-top: 2px; }
-.picker-contribute strong { display: block; margin-bottom: 2px; color: var(--ink); font-weight: 500; }
-.picker-note { margin: 0; color: var(--subtle); font-size: 11px; line-height: 1.55; }
+.picker-contribute strong { display: block; margin-bottom: 2px; color: var(--ink); font-weight: 600; }
+.picker-note { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.55; }
 
 @media (prefers-reduced-motion: no-preference) {
   .picker-hero img { animation: picker-in 180ms ease-out; }

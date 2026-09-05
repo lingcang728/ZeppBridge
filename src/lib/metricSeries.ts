@@ -189,10 +189,10 @@ export const buildSeriesOption = (
         const unit = options.unit ? ` ${options.unit}` : '';
         const spread =
           typeof point.min === 'number' && typeof point.max === 'number'
-            ? `<br><span style="color:#9AA1A9">${copy().dayRange(format(point.min), format(point.max), unit)}</span>`
+            ? `<br><span style="color:#B4BBC3">${copy().dayRange(format(point.min), format(point.max), unit)}</span>`
             : '';
         const samples = point.samples
-          ? `<br><span style="color:#6E757D">${copy().samples(point.samples)}</span>`
+          ? `<br><span style="color:#949CA5">${copy().samples(point.samples)}</span>`
           : '';
         return `${point.date}<br><b>${format(point.value)}</b>${unit}${spread}${samples}`;
       },
@@ -201,14 +201,14 @@ export const buildSeriesOption = (
       type: 'category',
       data: dates,
       boundaryGap: bar,
-      axisLabel: { formatter: shortDate, hideOverlap: true, fontSize: 10 },
+      axisLabel: { formatter: shortDate, hideOverlap: true, fontSize: 11 },
       splitLine: { show: false },
     },
     yAxis: {
       type: 'value',
       scale: true,
       splitNumber: 3,
-      axisLabel: { fontSize: 10, formatter: (value: number) => format(value) },
+      axisLabel: { fontSize: 11, formatter: (value: number) => format(value) },
     },
     series: [
       ...(hasSpread

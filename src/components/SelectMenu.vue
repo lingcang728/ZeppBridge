@@ -243,7 +243,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--line-strong, rgba(226, 234, 242, .16));
   border-radius: var(--radius-sm);
   /* 实心背景。半透明会让下面的内容透上来，选项就没法读了。 */
-  background: #24272F;
+  background: var(--surface-raised);
   box-shadow: 0 18px 44px rgba(4, 6, 8, .55);
   list-style: none;
 }
@@ -255,13 +255,13 @@ onBeforeUnmount(() => {
   padding: 8px 10px;
   border-radius: 7px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--fs-md);
   cursor: pointer;
 }
-.select-list .select-option.is-active { background: #2E323B; color: var(--ink); }
+.select-list .select-option.is-active { background: var(--surface-hover); color: var(--ink); }
 .select-list .select-option.is-selected { color: var(--ink); font-weight: 600; }
 .select-list .option-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.select-list .option-hint { grid-column: 1 / -1; color: var(--subtle); font-size: 11px; font-weight: 400; }
+.select-list .option-hint { grid-column: 1 / -1; color: var(--subtle); font-size: var(--fs-xs); font-weight: 400; }
 .select-list .option-tick { color: var(--accent); }
 </style>
 
@@ -276,17 +276,17 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 8px;
   padding: 6px 10px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-control);
   border-radius: var(--radius-sm);
   background: var(--surface-raised);
   color: var(--ink);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--fs-md);
   text-align: left;
   cursor: pointer;
   transition: border-color 140ms ease, background 140ms ease;
 }
-.select-trigger:hover:not(:disabled) { border-color: rgba(221, 231, 239, .22); }
+.select-trigger:hover:not(:disabled) { border-color: var(--line-control); }
 .select-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .is-open .select-trigger { border-color: var(--accent); }
 .is-disabled .select-trigger, .select-trigger:disabled { opacity: .55; cursor: not-allowed; }

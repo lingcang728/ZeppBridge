@@ -2,9 +2,9 @@
 
 [English](ui-guidelines.md)
 
-更新时间：2026-08-25（对齐第二轮 UI：身体状态 / 训练状态两页、心率区间选择器、导出数据流选择器）。ZeppBridge 是用户的穿戴健康数据桥梁，不是臃肿的分析 App。
+更新时间：2026-09-05（对齐无障碍与可读性调整）。ZeppBridge 是用户的穿戴健康数据桥梁，不是臃肿的分析 App。
 
-视觉是**冷灰底 + 橄榄绿**的暗色系统：品牌色 `--brand: #7DA33E`，界面底色 `#131519`（侧栏 `#0F1114`、卡片 `#1D2026`），不使用泛滥的紫色或高饱和荧光色。分类色（心率红、配速蓝、睡眠紫、活动青等）只用于标记数据类别，不作装饰。
+视觉是**冷灰底 + 橄榄绿**的暗色系统：品牌色 `--brand: #7DA33E`，界面底色 `#0C0E11`（侧栏 `#08090C`、卡片 `#16191E`），不使用泛滥的紫色或高饱和荧光色。分类色（心率红、配速蓝、睡眠紫、活动青等）只用于标记数据类别，不作装饰。
 
 界面**只有深色一套**，这是已定的取舍，见下方「只做深色」。
 
@@ -25,12 +25,13 @@
 
 | 用途 | token |
 | --- | --- |
-| 层级底色 | `--bg` `#131519` / `--sidebar` `#0F1114` / `--canvas` `#14161A` / `--surface` `#1D2026` / `--surface-raised` `#24272F` / `--surface-hover` `#2C3039` |
-| 文字 | `--ink` `#F2F4EE` / `--muted` `#9AA1A9` / `--subtle` `#6E757D` / `--faint` `#4B5158` |
-| 描边 | `--line` / `--line-strong`（都是低透明度冷白） |
+| 层级底色 | `--bg` `#0C0E11` / `--sidebar` `#08090C` / `--canvas` `#0D0F12` / `--surface` `#16191E` / `--surface-raised` `#1D2128` / `--surface-hover` `#262B33` |
+| 文字 | `--ink` `#F2F4EE` / `--muted` `#B4BBC3` / `--subtle` `#949CA5` / `--faint` 复用 `--subtle` |
+| 描边 | `--line` / `--line-strong` 用于安静的结构线，`--line-control` 用于交互控件边界 |
+| 字号阶梯 | `--fs-2xs` 13px / `--fs-xs` 14.5px / `--fs-sm` 15.5px / `--fs-md` 16.5px / `--fs-lg` 17.5px / `--fs-xl` 18.5px / `--fs-2xl` 20px / `--fs-3xl` 22px |
 | 品牌与动作 | `--brand` `#7DA33E` = `--accent`，`--accent-hover` `#93B952`、`--accent-soft`、`--accent-ink` `#12170A`、`--action-green` |
 | 分类色 | `--heart` `#F0616A`、`--pace` / `--cadence` `#4AA8E8`、`--calories` `#F5860B`、`--altitude` `#F5C33B`、`--activity` `#2BB3C0`、`--training` / `--readiness` `#3DD84C`，各自配 `*-wash` 半透明底 |
-| 睡眠阶段 | `--sleep-deep` `#4458B8` / `--sleep-light` `#7C8FF0` / `--sleep-rem` `#8B5CF6` / `--sleep-awake` `#E8833A` |
+| 睡眠阶段 | `--sleep-deep` `#6477D7` / `--sleep-light` `#7C8FF0` / `--sleep-rem` `#8B5CF6` / `--sleep-awake` `#E8833A` |
 | 状态 | `--danger` `#F0616A`、`--warning` `#F5C33B`、`--focus` `#7DA33E` |
 | 轨迹配速色谱 | `--route-neutral` / `-mint` / `-cyan` / `-amber` / `-coral` |
 | 间距 / 圆角 | `--space-1…8`、`--radius-sm` 10px / `-md` 14px / `-lg` 18px |
@@ -65,8 +66,8 @@
 
 - 打包字体：MiSans（中文，仅 400 / 700）+ Inter（拉丁与数字，400 / 500 / 600 / 700），定义在 `src/styles/fonts.css`。
 - `--font-sans: 'MiSans', 'Segoe UI', 'Microsoft YaHei UI', sans-serif`；`--font-mono: 'Cascadia Code', ...` 用于所有数值。
-- 中文不使用 500 / 600 中间字重（MiSans 只打包了 400/700，用中间值会触发伪粗体发糊），层级靠字号与明度划分。
-- 数值一律等宽 + `tabular-nums`，避免刷新时跳动。基准 `font-size: 13px`。
+- MiSans 只打包了 400 / 700。正文用 400，强调角色写 600，由字体匹配到已打包的粗体；不要写 500，它会向下匹配到常规体，起不到强调作用。
+- 数值一律等宽 + `tabular-nums`，避免刷新时跳动。正文基准是 `--fs-md: 16.5px`。
 
 ## 页面架构
 

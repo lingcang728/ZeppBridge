@@ -1,15 +1,14 @@
 # ZeppBridge UI design and interaction constraints
 
-Updated 2026-08-25 (aligned with the second UI round: the body-status and
-training-status pages, the heart-rate zone selector, the export data-stream
-selector). ZeppBridge is a bridge to the user's wearable health data, not a
-bloated analytics app.
+Updated 2026-09-05 (aligned with the accessibility and readability pass).
+ZeppBridge is a bridge to the user's wearable health data, not a bloated
+analytics app.
 
 [简体中文](ui-guidelines.zh-CN.md)
 
 The visual system is **cool grey with olive green**, dark throughout: brand
-colour `--brand: #7DA33E`, interface base `#131519` (sidebar `#0F1114`, cards
-`#1D2026`). No ubiquitous purple, no high-saturation neon. Category colours
+colour `--brand: #7DA33E`, interface base `#0C0E11` (sidebar `#08090C`, cards
+`#16191E`). No ubiquitous purple, no high-saturation neon. Category colours
 (heart-rate red, pace blue, sleep violet, activity cyan and so on) mark data
 categories only; they are never decoration.
 
@@ -49,12 +48,13 @@ panel are a deliberate local exception).
 
 | Purpose | Token |
 | --- | --- |
-| Layer backgrounds | `--bg` `#131519` / `--sidebar` `#0F1114` / `--canvas` `#14161A` / `--surface` `#1D2026` / `--surface-raised` `#24272F` / `--surface-hover` `#2C3039` |
-| Text | `--ink` `#F2F4EE` / `--muted` `#9AA1A9` / `--subtle` `#6E757D` / `--faint` `#4B5158` |
-| Strokes | `--line` / `--line-strong` (both low-opacity cool white) |
+| Layer backgrounds | `--bg` `#0C0E11` / `--sidebar` `#08090C` / `--canvas` `#0D0F12` / `--surface` `#16191E` / `--surface-raised` `#1D2128` / `--surface-hover` `#262B33` |
+| Text | `--ink` `#F2F4EE` / `--muted` `#B4BBC3` / `--subtle` `#949CA5` / `--faint` aliases `--subtle` |
+| Strokes | `--line` / `--line-strong` for quiet structure; `--line-control` for interactive boundaries |
+| Type scale | `--fs-2xs` 13px / `--fs-xs` 14.5px / `--fs-sm` 15.5px / `--fs-md` 16.5px / `--fs-lg` 17.5px / `--fs-xl` 18.5px / `--fs-2xl` 20px / `--fs-3xl` 22px |
 | Brand and actions | `--brand` `#7DA33E` = `--accent`, plus `--accent-hover` `#93B952`, `--accent-soft`, `--accent-ink` `#12170A`, `--action-green` |
 | Category colours | `--heart` `#F0616A`, `--pace` / `--cadence` `#4AA8E8`, `--calories` `#F5860B`, `--altitude` `#F5C33B`, `--activity` `#2BB3C0`, `--training` / `--readiness` `#3DD84C`, each with a translucent `*-wash` |
-| Sleep stages | `--sleep-deep` `#4458B8` / `--sleep-light` `#7C8FF0` / `--sleep-rem` `#8B5CF6` / `--sleep-awake` `#E8833A` |
+| Sleep stages | `--sleep-deep` `#6477D7` / `--sleep-light` `#7C8FF0` / `--sleep-rem` `#8B5CF6` / `--sleep-awake` `#E8833A` |
 | Status | `--danger` `#F0616A`, `--warning` `#F5C33B`, `--focus` `#7DA33E` |
 | Route pace spectrum | `--route-neutral` / `-mint` / `-cyan` / `-amber` / `-coral` |
 | Spacing / radius | `--space-1…8`, `--radius-sm` 10px / `-md` 14px / `-lg` 18px |
@@ -115,11 +115,11 @@ forbidden. The provenance of the algorithms and percentages is in the
   400 / 500 / 600 / 700), defined in `src/styles/fonts.css`.
 - `--font-sans: 'MiSans', 'Segoe UI', 'Microsoft YaHei UI', sans-serif`;
   `--font-mono: 'Cascadia Code', ...` for every numeric value.
-- Chinese never uses the 500 / 600 intermediate weights (MiSans ships only
-  400/700, and an intermediate triggers blurry faux-bold). Hierarchy comes from
-  size and brightness instead.
+- MiSans ships only 400 and 700. Use 400 for body copy and request 600 for
+  emphasis roles; font matching resolves 600 to the bundled bold face. Do not
+  use 500 because it resolves down to regular and adds no emphasis.
 - Numbers are always monospaced with `tabular-nums`, so nothing jumps on
-  refresh. The base is `font-size: 13px`.
+  refresh. The body base is `--fs-md: 16.5px`.
 
 ## Page structure
 
