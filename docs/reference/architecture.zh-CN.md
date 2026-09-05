@@ -36,12 +36,12 @@ Zepp 区域云端 → ZeppConnector → Raw provenance → Normalizer → SQLite
 ### SQLite 与数据语义
 
 - SQLite 启用 migration、WAL、foreign keys 和 busy timeout；raw payload 具备 hash、source key 与 canonical `raw_record_id` 回指。
-- 跑步（Zepp `type=1`）在 history 摘要之后按 `trackid` + `source` 拉 `/v1/sport/run/detail.json`，差分解码后写入 `workout_samples` / `route_points` / `workout_pauses`。没有点就不画轨迹或曲线。
+- 每一条带 `zepp_source` 的运动都会在 history 摘要之后按 `trackid` + `source` 拉 `/v1/sport/run/detail.json`，差分解码后写入 `workout_samples` / `route_points` / `workout_pauses`。端点名里的 `run` 是历史遗留，取数已经不限于跑步——`pending_running_details` 没有任何运动类型过滤。非跑步运动是否真的返回可解码的差分串，仍属未验证（见下面的清单）。没有点就不画轨迹或曲线。
 - metric/daily 唯一索引对空设备 ID 使用 `COALESCE`，避免 `NULL` 重复。
 - retention 可由用户在 1–365 天内选择，默认 365 天；清理由健康记录时间决定，并回收无引用 raw。
 - `user_fused`、`device`、`unknown` 来源继续保留。来源不明确时不做静默融合。
 - 编码但未验证的 `band_data` 只保留 raw；没有真实采样或路线时不绘制模拟曲线和地图。
-- schema 版本为 `PRAGMA user_version = 16`。迁移步骤只能追加，已发布的 DDL 永不修改（`storage/migrations.rs`）。v10 给 `workout_samples` 加了跑步功率与跑姿列；v12 加了逐流三阶段 provenance；v13 加了未识别运动编号的用户命名与设备型号指认；v14 加了历史覆盖账本；v15 给 `raw_records` 加了压缩列 `payload_zip`（读的时候两种形态都认，明文行永远可读）；v16 给覆盖账本加了补拉尝试次数与失败码。派生列由 `NORMALIZER_REVISION` 变更触发的本地重放回填，不需要重新联网。
+- schema 版本为 `PRAGMA user_version = 21`。迁移步骤只能追加，已发布的 DDL 永不修改（`storage/migrations.rs`）。v10 给 `workout_samples` 加了跑步功率与跑姿列；v12 加了逐流三阶段 provenance；v13 加了未识别运动编号的用户命名与设备型号指认；v14 加了历史覆盖账本；v15 给 `raw_records` 加了压缩列 `payload_zip`（读的时候两种形态都认，明文行永远可读）；v16 给覆盖账本加了补拉尝试次数与失败码；v17 留下了睡眠阶段的原始 `mode` 值，认不出来的阶段记下云端给的那个数字，而不是归成 `awake`；v18 删掉了以固件版本号为名的幻影设备别名；v19 给运动加了步频与步幅列，并新建 `workout_hr_zones` 表——区间边界和秒数一起存，因为「在 Z2 待了多久」离开当时的边界就没有意义；v20 给 `stream_provenance` 单开了 `last_error_code` 列，让云端拒绝码成为一个可观测的字段，而不是一句话里的子串；v21 新建 `workout_laps`，存手表自己记的圈，与公里分段分开。派生列由 `NORMALIZER_REVISION` 变更触发的本地重放回填，不需要重新联网。
 - 每次 schema 迁移之前自动生成一份一致性备份；备份或完整性校验失败时迁移不会继续。迁移本身在拿到跨进程写锁之后才开始。
 - 重放期间 `storage::replay_in_progress()` 为真，此时发起的云端同步会以 `deferred` 结果让路并在一分钟后自动重试，而不是去抢 SQLite 写锁后报「本地数据库暂时不可用」。`busy_timeout` 同时从 5 秒提到 30 秒。
 
@@ -159,11 +159,15 @@ file:  second_heart_rate/real_data
 - **`Charge/stress_data`** — 已确认是 protobuf，正确解析后是 4 个 repeated float32（2880 / 255 / 8 / 6 个值），没有一组对得上 App 显示的日均与区间。也已经不需要它了：`all_day_stress` 的 `data` 字段里本来就带着当天整条曲线（五分钟一个点），而同一条记录上的日汇总正是从这条曲线算出来的——带这两个字段的 946 条记录里，服务器给的最低/最高值每一次都等于这条序列自己的最低/最高。压力界面和导出都读 `all_day_stress`，这条不接。
 - **`second_heart_rate/real_data`** — `/users/me/fileInfo/events` 确认有数据，但返回的是 COS 文件索引而不是样本，取到逐秒心率还需要再下载文件。当前 host allow-list 只放行 `api-mifit*.zepp.com` / `huami.com`，COS 域名不在其中，接入等于放宽网络边界，未做。
 - **8/16 之后的逐条血氧** — `blood_oxygen/click` 的点测在 2026-08-16 停止，之后只有 `odi` 夜间汇总，但 Zepp App 仍能画出连续曲线。已排除的方向：`/users/me/fileInfo/events`（同接口面 `second_heart_rate` 有数据、血氧没有，是有依据的否定）、`band_data` 的 8 字节块（只有模式/强度/步数/心率）、`blood_oxygen` 的 `auto` / `real_data` 子类型。**剩下的方向只有抓 Zepp App 的真实请求，而本项目明令禁止恢复 MITM / 用户 CA / Wi-Fi 代理路线**，所以这条到此为止。
-- **未接的端点** — `/users/me/bloodPressure`、`/users/{id}/members/-1/weightRecords`、`/huami.health.getUserInfo.json`、`/v1/user/manualData.json`。
-  - **血压与体重：明确不支持，也不计划支持。** 这是 2026-08-30 的产品决定，不是「证据不足、等 fixture 再说」——
+- **未接的端点** — `/users/me/bloodPressure`、`/huami.health.getUserInfo.json`、`/v1/user/manualData.json`。
+  - **血压：明确不支持，也不计划支持。** 这是 2026-08-30 的产品决定，不是「证据不足、等 fixture 再说」——
     早先那版「拿到经过审计的脱敏 fixture 就接」的结论已经作废，不要据此重启接入。
-    具体是：不请求 `/users/me/bloodPressure` 与 `weightRecords`，不归一化上面 v2 事件面里出现的血压 `eventType`，
-    界面和文档不出现体重/血压的卡片、占位或「即将支持」字样。需要体脂秤与血压的用户请继续用 Zepp App 自己看。
+    具体是：不请求 `/users/me/bloodPressure`，不归一化上面 v2 事件面里出现的血压 `eventType`，
+    界面和文档不出现血压的卡片、占位或「即将支持」字样。需要血压的用户请继续用 Zepp App 自己看。
+  - **体重与体成分从 2.2.0 起已经接入**，读的是 `/users/{id}/members/-1/weightRecords`。
+    有秤的账号最多收下十一项，其中只有体重、BMI、身高在真实账号上核对过；
+    其余每一项都要落在只有它才可能出现的数值区间里才会被采用。
+    上面那条 2026-08-30 的决定现在只管血压，不再适用于体重。
   - `getUserInfo` / `manualData`：只有年龄/身高，而年龄**不能**用来估算心率区间（见下），因此不接。
 
 ### 心率区间：三种算法，一个都不预设

@@ -69,9 +69,13 @@ way to tell which one is right.
 - SQLite runs with migrations, WAL, foreign keys and a busy timeout. Raw
   payloads carry a hash and source key, and canonical rows point back through
   `raw_record_id`.
-- Runs (Zepp `type=1`) fetch `/v1/sport/run/detail.json` by `trackid` + `source`
-  after the history summary, then delta-decode into `workout_samples` /
-  `route_points` / `workout_pauses`. With no points, no track or curve is drawn.
+- Every workout carrying a `zepp_source` fetches `/v1/sport/run/detail.json` by
+  `trackid` + `source` after the history summary, then delta-decodes into
+  `workout_samples` / `route_points` / `workout_pauses`. The endpoint keeps its
+  `run` name, but the selection is no longer restricted to running:
+  `pending_running_details` applies no activity-type filter. Whether a
+  non-running activity actually returns a decodable delta string remains
+  unverified (see the list below). With no points, no track or curve is drawn.
 - The metric/daily unique indexes use `COALESCE` for empty device IDs, avoiding
   `NULL` duplicates.
 - Retention is user-selectable between 1 and 365 days, defaulting to 365.
@@ -81,16 +85,25 @@ way to tell which one is right.
   silently fused when the source is ambiguous.
 - Encoded but unverified `band_data` is kept as raw only. No simulated curve or
   map is drawn where there is no real sample or route.
-- The schema version is `PRAGMA user_version = 16`. Migration steps may only be
+- The schema version is `PRAGMA user_version = 21`. Migration steps may only be
   appended; published DDL is never modified (`storage/migrations.rs`). v10 added
   running power and posture columns to `workout_samples`; v12 added per-stream
   three-stage provenance; v13 added user naming for unrecognised workout codes
   and manual device-model assignment; v14 added the history coverage ledger;
   v15 added the compressed `payload_zip` column to `raw_records` (reads accept
   both shapes, so plaintext rows stay readable forever); v16 added the backfill
-  attempt counter and failure code to the coverage ledger. Derived columns are
-  backfilled by a local replay triggered by a `NORMALIZER_REVISION` change, with
-  no network access needed.
+  attempt counter and failure code to the coverage ledger; v17 kept the raw
+  sleep-stage `mode` value, so an unrecognised stage records the number the
+  cloud sent instead of being filed as `awake`; v18 removed phantom device
+  aliases that were firmware version strings; v19 added cadence and stride
+  columns to workouts plus the `workout_hr_zones` table, which stores the zone
+  boundaries alongside the seconds because "how long in Z2" means nothing
+  without the boundaries in force at the time; v20 gave `stream_provenance` its
+  own `last_error_code` column, so a cloud rejection code is an observable
+  field rather than a substring of a sentence; v21 added `workout_laps` for the
+  laps the watch itself recorded, kept apart from kilometre splits. Derived
+  columns are backfilled by a local replay triggered by a `NORMALIZER_REVISION`
+  change, with no network access needed.
 - A consistency backup is created automatically before every schema migration;
   the migration does not proceed if the backup or its integrity check fails. The
   migration itself starts only after acquiring the cross-process write lock.
@@ -367,17 +380,22 @@ Still kept as raw only, marked unverified:
   capturing the Zepp app's real requests, and this project explicitly forbids
   reviving the MITM / user CA / Wi-Fi proxy route**, so this line stops here.
 - **Endpoints not wired up** — `/users/me/bloodPressure`,
-  `/users/{id}/members/-1/weightRecords`, `/huami.health.getUserInfo.json`,
-  `/v1/user/manualData.json`.
-  - **Blood pressure and weight: explicitly unsupported, and not planned.** This
-    is a product decision made on 2026-08-30, not "insufficient evidence, waiting
-    for a fixture" — the earlier conclusion of "we will wire it up once we have
-    an audited redacted fixture" is void, and must not be used to restart the
-    work. Concretely: do not request `/users/me/bloodPressure` or
-    `weightRecords`, do not normalise the blood-pressure `eventType` appearing in
-    the v2 event surface above, and do not put weight/blood-pressure cards,
-    placeholders or "coming soon" text in the interface or documentation. Users
-    who need a body-fat scale or blood pressure should keep using the Zepp app.
+  `/huami.health.getUserInfo.json`, `/v1/user/manualData.json`.
+  - **Blood pressure: explicitly unsupported, and not planned.** This is a
+    product decision made on 2026-08-30, not "insufficient evidence, waiting for
+    a fixture" — the earlier conclusion of "we will wire it up once we have an
+    audited redacted fixture" is void, and must not be used to restart the work.
+    Concretely: do not request `/users/me/bloodPressure`, do not normalise the
+    blood-pressure `eventType` appearing in the v2 event surface above, and do
+    not put blood-pressure cards, placeholders or "coming soon" text in the
+    interface or documentation. Users who need blood pressure should keep using
+    the Zepp app.
+  - **Weight and body composition are wired up as of 2.2.0**, read from
+    `/users/{id}/members/-1/weightRecords`. Up to eleven readings are accepted
+    where a scale reports them; only weight, BMI and height have been confirmed
+    against a live account, and every other reading is gated by a range only
+    that specific reading could plausibly occupy. The 2026-08-30 decision above
+    covers blood pressure only — it no longer applies to weight.
   - `getUserInfo` / `manualData`: only age and height, and age **cannot** be used
     to estimate heart-rate zones (see below), so neither is wired up.
 
