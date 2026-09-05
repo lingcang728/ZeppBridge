@@ -6,6 +6,8 @@
 
 ### Added / 新增
 
+- **Rucking is recognised as a workout.** Zepp activity code `225` now maps to Rucking, and upgrading to this release replays and corrects historical `unknown:225` workouts.
+- **负重徒步现在能被识别了。** Zepp 活动编号 `225` 现在映射为负重徒步，升级重放时已经存成 `unknown:225` 的运动也会一起改正。
 - **The food log has a screen.** Calories, protein, fat and carbs now appear under Body status, alongside a dietary-balance ring showing what share of your calories each macronutrient contributed. Meals are logged by hand in the Zepp App, so the days you did not log stay blank: they get no bar, and are never filled with a zero. The percentages are worked out here from the daily grams using 4/9/4 kcal per gram — they are not sent by the cloud, and may differ by a point or two from the ones in the Zepp App.
 - **饮食有界面了。** 热量、蛋白质、脂肪、碳水现在出现在「身体状态」页里，上面还有一张膳食平衡环，显示三大营养素各自贡献了多少热量。饮食是在 Zepp App 里手动记的，所以没记的日子就留空：不画柱子，也绝不补 0。占比是这里用 4/9/4（每克千卡）从克数推算的，不是云端给的数，和 Zepp App 里的百分比可能差一两个点。
 
@@ -36,8 +38,6 @@
 
 ### Added / 新增
 
-- **Rucking is recognised as a workout.** Zepp activity code `225` now maps to Rucking, and upgrading to this release replays and corrects historical `unknown:225` workouts.
-- **负重徒步现在能被识别了。** Zepp 活动编号 `225` 现在映射为负重徒步，升级重放时已经存成 `unknown:225` 的运动也会一起改正。
 - **Miles.** Distance, pace, ascent and the pace and altitude charts now follow a setting next to the language switch, and default to miles only where the system region actually uses them. Asked for by one person on Reddit, but it was never one person's problem: every non-metric country hit the same wall. Exports do not change — JSON, CSV, GPX and FIT stay metric, because that is what the command line, the MCP server and every third-party platform read them as.
 - **英里。** 距离、配速、爬升，以及配速和海拔两张图，现在跟着语言开关旁边的一个设置走；只有系统地区确实用英里时才默认英里。这是 Reddit 上一个人开口要的，但从来不是一个人的问题：所有不用公制的国家都撞在同一处。导出不变——JSON、CSV、GPX、FIT 仍然是公制，因为命令行、MCP 和所有第三方平台都是按公制读它们的。
 
