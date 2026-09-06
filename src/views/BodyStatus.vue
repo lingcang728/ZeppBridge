@@ -624,11 +624,11 @@ const curveChartOption = computed(() => {
     grid: { left: 40, right: 18, top: 16, bottom: 28 },
     tooltip: {
       trigger: 'axis',
-      backgroundColor: '#22261A',
+      backgroundColor: '#1E221F',
       borderColor: 'rgba(228, 235, 208, 0.16)',
       borderWidth: 1,
       padding: [8, 12],
-      textStyle: { color: '#F3F4EC', fontSize: 12 },
+      textStyle: { color: '#F3F4EC', fontSize: 15.5 },
       extraCssText: 'border-radius:8px;box-shadow:none;',
       formatter: (params: Array<{ value: [number, number | null] }>) => {
         const point = Array.isArray(params) ? params[0] : params;
@@ -641,7 +641,7 @@ const curveChartOption = computed(() => {
       type: 'time',
       min: curve.value[0]?.ts,
       max: curve.value[curve.value.length - 1]?.ts,
-      axisLabel: { formatter: clock, hideOverlap: true, color: '#78818C', fontSize: 10 },
+      axisLabel: { formatter: clock, hideOverlap: true, color: '#B4BBC3', fontSize: 14.5 },
       axisLine: { lineStyle: { color: 'rgba(232,238,244,.12)' } },
       axisTick: { show: false },
       splitLine: { show: false },
@@ -650,7 +650,7 @@ const curveChartOption = computed(() => {
     // 把一个安稳的下午画成剧烈起伏的锯齿。
     yAxis: {
       type: 'value', min: 0, max: 100, splitNumber: 4,
-      axisLabel: { color: '#78818C', fontSize: 10 },
+      axisLabel: { color: '#B4BBC3', fontSize: 14.5 },
       axisLine: { show: false }, axisTick: { show: false },
       splitLine: { lineStyle: { color: 'rgba(232,238,244,.08)', type: 'dashed' } },
     },
@@ -859,24 +859,24 @@ watch(dataRevision, () => { void load(); });
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   cursor: pointer;
 }
 .range-pill:hover { color: var(--ink); }
 .range-pill.is-on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
 .day-card { padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
 .day-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 12px; }
-.day-head h2 { margin: 0 0 2px; font-size: 15px; font-weight: 700; color: var(--ink); }
-.day-head p { margin: 0; color: var(--muted); font-size: 12px; }
+.day-head h2 { margin: 0 0 2px; font-size: var(--fs-xl); font-weight: 700; color: var(--ink); }
+.day-head p { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
 .day-stats { display: flex; gap: 18px; margin: 0; }
 .day-stats div { display: grid; gap: 2px; }
-.day-stats dt { color: var(--subtle); font-size: 11px; }
-.day-stats dd { margin: 0; color: var(--ink); font-size: 18px; font-weight: 700; font-family: var(--font-mono); }
+.day-stats dt { color: var(--subtle); font-size: var(--fs-xs); }
+.day-stats dd { margin: 0; color: var(--ink); font-size: var(--fs-3xl); font-weight: 700; font-family: var(--font-mono); }
 .day-chart { width: 100%; height: 240px; }
 /* 区间边界是手表给的，不是我们算的。不写清楚，它就会被当成又一套自选算法。 */
-.curve-note { margin: 10px 0 0; color: var(--subtle); font-size: 11px; line-height: 1.6; }
+.curve-note { margin: 10px 0 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.6; }
 .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-4); }
-.group-title { margin: var(--space-5) 0 0; font-size: 15px; font-weight: 700; color: var(--ink); }
+.group-title { margin: var(--space-5) 0 0; font-size: var(--fs-xl); font-weight: 700; color: var(--ink); }
 .macro-chart { height: 200px; }
 .inline-alert {
   display: flex;
@@ -888,7 +888,7 @@ watch(dataRevision, () => { void load(); });
   border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .inline-alert[role='alert'] { color: var(--danger); }
 .retry { margin-left: auto; }

@@ -152,11 +152,11 @@ const dayChartOption = computed(() => {
     grid: { left: 40, right: 18, top: 16, bottom: 28 },
     tooltip: {
       trigger: 'axis',
-      backgroundColor: '#22261A',
+      backgroundColor: '#1E221F',
       borderColor: 'rgba(228, 235, 208, 0.16)',
       borderWidth: 1,
       padding: [8, 12],
-      textStyle: { color: '#F3F4EC', fontSize: 12 },
+      textStyle: { color: '#F3F4EC', fontSize: 15.5 },
       extraCssText: 'border-radius:8px;box-shadow:none;',
       formatter: (params: Array<{ value: [number, number] }>) => {
         const point = Array.isArray(params) ? params[0] : params;
@@ -168,14 +168,14 @@ const dayChartOption = computed(() => {
       type: 'time',
       min: data[0]?.[0],
       max: data[data.length - 1]?.[0],
-      axisLabel: { formatter: clock, hideOverlap: true, color: '#78818C', fontSize: 10 },
+      axisLabel: { formatter: clock, hideOverlap: true, color: '#B4BBC3', fontSize: 14.5 },
       axisLine: { lineStyle: { color: 'rgba(232,238,244,.12)' } },
       axisTick: { show: false },
       splitLine: { show: false },
     },
     yAxis: {
       type: 'value', scale: true, splitNumber: 4,
-      axisLabel: { color: '#78818C', fontSize: 10 },
+      axisLabel: { color: '#B4BBC3', fontSize: 14.5 },
       axisLine: { show: false }, axisTick: { show: false },
       splitLine: { lineStyle: { color: 'rgba(232,238,244,.08)', type: 'dashed' } },
     },
@@ -253,7 +253,7 @@ const dailyMaxChartOption = computed(() => {
     legend: {
       data: [t.value.dailyMaxLegendMax, t.value.dailyMaxLegendAvg],
       top: 0,
-      textStyle: { color: '#7E856D', fontSize: 11 },
+      textStyle: { color: '#B4BBC3', fontSize: 14.5 },
     },
     tooltip: {
       trigger: 'axis',
@@ -266,17 +266,17 @@ const dailyMaxChartOption = computed(() => {
     xAxis: {
       type: 'category',
       data: rows.map((row) => row.date.slice(5)),
-      axisLabel: { color: '#7E856D', fontSize: 11, hideOverlap: true },
+      axisLabel: { color: '#B4BBC3', fontSize: 14.5, hideOverlap: true },
       axisTick: { show: false },
       axisLine: { lineStyle: { color: 'rgba(226, 234, 242, .12)' } },
     },
     yAxis: {
       type: 'value',
       scale: true,
-      axisLabel: { color: '#7E856D', fontSize: 11 },
+      axisLabel: { color: '#B4BBC3', fontSize: 14.5 },
       axisLine: { show: false },
       axisTick: { show: false },
-      splitLine: { lineStyle: { color: 'rgba(226, 234, 242, .08)', type: 'dashed' } },
+      splitLine: { lineStyle: { color: 'rgba(226, 234, 242, .12)', type: 'dashed' } },
     },
     series: [
       {
@@ -415,22 +415,22 @@ watch(dataRevision, () => { void load(); });
 .metric-page.page { display: grid; gap: var(--space-4); align-content: start; }
 .stack { display: grid; gap: var(--space-4); }
 .range-switch { display: flex; gap: var(--space-1); padding: 4px; border-radius: var(--radius-sm); background: var(--surface-raised); }
-.range-pill { min-height: 30px; padding: 5px 12px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; }
+.range-pill { min-height: 30px; padding: 5px 12px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--muted); font-size: var(--fs-sm); cursor: pointer; }
 .range-pill:hover { color: var(--ink); }
 .range-pill.is-on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
 .day-card { padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
 .day-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 12px; }
-.day-head h2 { margin: 0 0 2px; font-size: 15px; font-weight: 700; color: var(--ink); }
-.day-head p { margin: 0; color: var(--muted); font-size: 12px; }
+.day-head h2 { margin: 0 0 2px; font-size: var(--fs-xl); font-weight: 700; color: var(--ink); }
+.day-head p { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
 .day-stats { display: flex; gap: 18px; margin: 0; }
 .day-stats div { display: grid; gap: 2px; }
-.day-stats dt { color: var(--subtle); font-size: 11px; }
-.day-stats dd { margin: 0; color: var(--ink); font-size: 18px; font-weight: 700; font-family: var(--font-mono); }
+.day-stats dt { color: var(--subtle); font-size: var(--fs-xs); }
+.day-stats dd { margin: 0; color: var(--ink); font-size: var(--fs-3xl); font-weight: 700; font-family: var(--font-mono); }
 .day-chart { width: 100%; height: 240px; }
 /* 说明为什么这个数字和 Zepp App 里的不一样。少了它，用户只会以为其中一边坏了。 */
-.daily-max-note { margin: 10px 0 0; color: var(--subtle); font-size: 11px; line-height: 1.6; }
+.daily-max-note { margin: 10px 0 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.6; }
 .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-4); }
-.inline-alert { display: flex; align-items: center; gap: var(--space-2); margin: 0; padding: 9px 13px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); color: var(--muted); font-size: 12px; }
+.inline-alert { display: flex; align-items: center; gap: var(--space-2); margin: 0; padding: 9px 13px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); color: var(--muted); font-size: var(--fs-sm); }
 .inline-alert[role='alert'] { color: var(--danger); }
 .retry { margin-left: auto; }
 @media (max-width: 720px) {

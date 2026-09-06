@@ -147,13 +147,15 @@ const thresholdOption = computed(() => {
     source?.points.find((point) => point.date === date)?.value ?? null;
   return {
     animationDuration: 600,
-    grid: { left: 46, right: 52, top: 24, bottom: 28 },
+    // 左边距要放得下 `165 bpm` 这种带单位的刻度：这里不开 containLabel，
+    // 标签是贴着固定的左边距右对齐画的，放不下就直接被画到画布外面去了。
+    grid: { left: 68, right: 52, top: 24, bottom: 28 },
     legend: {
       data: [t.value.thresholdHr, t.value.thresholdPace],
       top: 0,
       itemWidth: 14,
       itemHeight: 8,
-      textStyle: { fontSize: 11 },
+      textStyle: { fontSize: 14.5 },
     },
     tooltip: {
       trigger: 'axis',
@@ -169,9 +171,9 @@ const thresholdOption = computed(() => {
         return [params[0].axisValue, ...lines].join('<br>');
       },
     },
-    xAxis: { type: 'category', data: dates, boundaryGap: false, axisLabel: { fontSize: 10, hideOverlap: true } },
+    xAxis: { type: 'category', data: dates, boundaryGap: false, axisLabel: { fontSize: 14.5, hideOverlap: true } },
     yAxis: [
-      { type: 'value', scale: true, splitNumber: 3, axisLabel: { fontSize: 10, formatter: '{value} bpm' } },
+      { type: 'value', scale: true, splitNumber: 3, axisLabel: { fontSize: 14.5, formatter: '{value} bpm' } },
       {
         type: 'value',
         scale: true,
@@ -180,7 +182,7 @@ const thresholdOption = computed(() => {
         // keep "better" pointing up like every other chart here.
         inverse: true,
         splitLine: { show: false },
-        axisLabel: { fontSize: 10, formatter: (value: number) => formatPaceSeconds(value) },
+        axisLabel: { fontSize: 14.5, formatter: (value: number) => formatPaceSeconds(value) },
       },
     ],
     series: [
@@ -220,7 +222,7 @@ const balanceOption = computed(() => {
       top: 0,
       itemWidth: 14,
       itemHeight: 8,
-      textStyle: { fontSize: 11 },
+      textStyle: { fontSize: 14.5 },
     },
     tooltip: {
       trigger: 'axis',
@@ -239,10 +241,10 @@ const balanceOption = computed(() => {
         ].join('<br>');
       },
     },
-    xAxis: { type: 'category', data: dates, boundaryGap: false, axisLabel: { fontSize: 10, hideOverlap: true } },
+    xAxis: { type: 'category', data: dates, boundaryGap: false, axisLabel: { fontSize: 14.5, hideOverlap: true } },
     yAxis: [
-      { type: 'value', scale: true, splitNumber: 3, axisLabel: { fontSize: 10 } },
-      { type: 'value', scale: true, splitNumber: 3, splitLine: { show: false }, axisLabel: { fontSize: 10 } },
+      { type: 'value', scale: true, splitNumber: 3, axisLabel: { fontSize: 14.5 } },
+      { type: 'value', scale: true, splitNumber: 3, splitLine: { show: false }, axisLabel: { fontSize: 14.5 } },
     ],
     series: [
       {
@@ -445,7 +447,7 @@ watch(dataRevision, () => { void load(); });
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   cursor: pointer;
 }
 .range-pill:hover { color: var(--ink); }
@@ -464,11 +466,11 @@ watch(dataRevision, () => { void load(); });
 .chart-card.wide { padding: var(--space-4) var(--space-6); }
 .chart-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
 .chart-title { display: grid; gap: 2px; min-width: 0; }
-.chart-title strong { color: var(--ink); font-size: 13px; font-weight: 700; }
-.chart-title small { color: var(--subtle); font-size: 11px; }
+.chart-title strong { color: var(--ink); font-size: var(--fs-md); font-weight: 700; }
+.chart-title small { color: var(--subtle); font-size: var(--fs-xs); }
 .chart-latest { display: flex; align-items: baseline; gap: 4px; white-space: nowrap; }
-.chart-latest b { color: var(--ink); font-family: var(--font-mono); font-size: 18px; font-variant-numeric: tabular-nums; }
-.chart-latest i { margin-right: 6px; color: var(--subtle); font-size: 10px; font-style: normal; }
+.chart-latest b { color: var(--ink); font-family: var(--font-mono); font-size: var(--fs-3xl); font-variant-numeric: tabular-nums; }
+.chart-latest i { margin-right: 6px; color: var(--subtle); font-size: var(--fs-2xs); font-style: normal; }
 .chart-body { width: 100%; height: 172px; margin-top: var(--space-2); }
 .chart-body.tall { height: 236px; }
 .chart-empty {
@@ -477,9 +479,9 @@ watch(dataRevision, () => { void load(); });
   min-height: 172px;
   margin: var(--space-2) 0 0;
   color: var(--subtle);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
-.chart-note { margin: var(--space-2) 0 0; color: var(--subtle); font-size: 11px; line-height: 1.7; }
+.chart-note { margin: var(--space-2) 0 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.7; }
 .inline-alert {
   display: flex;
   align-items: center;
@@ -490,7 +492,7 @@ watch(dataRevision, () => { void load(); });
   border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--danger);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .retry { margin-left: auto; }
 @media (max-width: 720px) {

@@ -170,17 +170,17 @@ const weeklyChartOption = computed(() => {
       data: sleepStageLabels(),
       top: 0,
       right: 0,
-      textStyle: { color: '#7E856D', fontSize: 11 },
+      textStyle: { color: '#B4BBC3', fontSize: 14.5 },
       itemWidth: 8,
       itemHeight: 8,
       icon: 'circle',
     },
     tooltip: {
       trigger: 'axis',
-      backgroundColor: '#22261A',
+      backgroundColor: '#1E221F',
       borderColor: 'rgba(228, 235, 208, 0.16)',
       borderWidth: 1,
-      textStyle: { color: '#F3F4EC', fontSize: 12 },
+      textStyle: { color: '#F3F4EC', fontSize: 15.5 },
       formatter: (params: Array<{ seriesName: string; value: number; name: string }>) => {
         if (!params || !params.length) return '';
         const name = params[0].name;
@@ -198,18 +198,18 @@ const weeklyChartOption = computed(() => {
       axisLine: { lineStyle: { color: 'rgba(228, 235, 208, 0.1)' } },
       axisTick: { show: false },
       axisLabel: {
-        color: (_val: string, index: number) => index === currentIndex ? '#7DA33E' : '#7E856D',
-        fontSize: 11,
+        color: (_val: string, index: number) => index === currentIndex ? '#93B952' : '#B4BBC3',
+        fontSize: 14.5,
         fontWeight: (_val: string, index: number) => index === currentIndex ? 'bold' : 'normal',
       },
     },
     yAxis: {
       type: 'value',
       name: t.value.hoursAxis,
-      nameTextStyle: { color: '#7E856D', fontSize: 10, align: 'right' },
+      nameTextStyle: { color: '#B4BBC3', fontSize: 14.5, align: 'right' },
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: '#7E856D', fontSize: 10 },
+      axisLabel: { color: '#B4BBC3', fontSize: 14.5 },
       splitLine: { show: true, lineStyle: { color: 'rgba(228, 235, 208, 0.08)', type: 'dashed' } },
     },
     series: [
@@ -407,7 +407,7 @@ watch([dataRevision, sleepId], () => void loadDetail());
   align-items: center;
   gap: 6px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   text-decoration: none;
 }
 .back-link:hover { color: var(--accent); }
@@ -415,14 +415,14 @@ watch([dataRevision, sleepId], () => void loadDetail());
 .page-heading h1 {
   margin: 0;
   color: var(--ink);
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 .page-heading p {
   margin: 4px 0 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .muted-line { color: var(--muted); }
 .sleep-hero {
@@ -447,19 +447,19 @@ watch([dataRevision, sleepId], () => void loadDetail());
 .score-num {
   margin: 0;
   color: var(--ink);
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
-.score-num small { color: var(--muted); font-size: 13px; font-weight: 500; }
-.score-note { margin: 2px 0 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.score-num small { color: var(--muted); font-size: var(--fs-md); font-weight: 600; }
+.score-note { margin: 2px 0 0; color: var(--muted); font-size: var(--fs-xs); line-height: 1.45; }
 .kicker {
   display: flex;
   align-items: center;
   gap: 8px;
   margin: 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .mark {
   display: grid;
@@ -482,11 +482,11 @@ watch([dataRevision, sleepId], () => void loadDetail());
 .meta {
   margin: 8px 0 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .score-empty {
   color: var(--ink);
-  font-size: 28px;
+  font-size: 31px;
   font-weight: 600;
 }
 .stage-card, .chart-card { margin: 0; padding: 16px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
@@ -498,19 +498,19 @@ watch([dataRevision, sleepId], () => void loadDetail());
   gap: 12px;
   margin-bottom: 12px;
 }
-.stage-head h2 { margin: 0; color: var(--ink); font-size: 15px; font-weight: 700; }
-.stage-head p { margin: 0; color: var(--muted); font-size: 12px; }
+.stage-head h2 { margin: 0; color: var(--ink); font-size: var(--fs-xl); font-weight: 700; }
+.stage-head p { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
 .stage-actions { display: flex; align-items: center; gap: 10px; }
 .stage-help-button {
   border: 1px solid var(--line);
   border-radius: 999px;
   background: transparent;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   padding: 4px 10px;
   cursor: pointer;
 }
-.stage-help { margin: 0 0 12px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.stage-help { margin: 0 0 12px; color: var(--muted); font-size: var(--fs-sm); line-height: 1.55; }
 .meta-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -524,19 +524,19 @@ watch([dataRevision, sleepId], () => void loadDetail());
   gap: 8px;
   margin: 0 0 10px;
   color: var(--ink);
-  font-size: 13px;
+  font-size: var(--fs-md);
   font-weight: 700;
 }
 .meta-title svg { color: var(--sleep); }
 .meta-card dl { display: grid; gap: 8px; margin: 0; }
-.meta-card dt { color: var(--muted); font-size: 12px; }
+.meta-card dt { color: var(--muted); font-size: var(--fs-sm); }
 .meta-card dd {
   margin: 3px 0 0;
   color: var(--ink);
   overflow-wrap: anywhere;
-  font-size: 13px;
+  font-size: var(--fs-md);
 }
-.note { margin: 0; color: var(--muted); font-size: 12px; }
+.note { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
 @media (max-width: 760px) {
   .sleep-hero, .meta-grid { grid-template-columns: 1fr; }
   .hero-score { justify-content: flex-start; }

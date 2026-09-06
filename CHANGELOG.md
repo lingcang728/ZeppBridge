@@ -18,6 +18,9 @@
 
 ### Changed / 变化
 
+- **The interface is readable at a normal desktop viewing distance.** Body text went from 13px to 16.5px and the small print — secondary labels, chart axes, legends, metadata — from 8–11px up to 11–14.5px. Secondary greys were lifted until every one of them clears WCAG AA on every surface it is used on (the darkest tier failed at 2.0:1 and is gone), the neutral surfaces were darkened for a further contrast lift, chart axis labels and grid lines came up with them, and the emphasis weights that the fonts could not actually render are now real. Green and red states — better/worse deltas, connection status — carry a symbol as well as a colour, so they still read without colour vision. If this is now too large, Settings → Interface scale goes back down.
+- **界面在正常的桌面视距下读得清了。** 正文从 13px 提到 16.5px，小字——次要标签、图表坐标轴、图例、元信息——从 8–11px 提到 11–14.5px。次要灰色全部抬到在它实际出现的每一种底色上都过 WCAG AA（最暗的那一档只有 2.0:1，已经删掉），中性底色也调暗来进一步拉开对比，图表的坐标轴文字和网格线一并跟上，字体根本渲染不出来的那几档字重也换成了真能生效的。绿/红状态——变好变坏的差值、连接状态——除了颜色还带一个符号，色觉障碍下照样读得出来。如果觉得反而太大了，设置 →「界面缩放」可以调回去。
+
 - **Cards with nothing in them no longer take up the screen.** Without a body-composition scale, Body status used to show nine identical "no records" cards, and an account that never logged a meal added four more — thirteen cards all saying the same thing, pushing everything that did have data off the screen. Empty cards are now left out, and when a whole group is empty one line explains why. Nothing is filled in with zeros; the missing readings are simply not restated thirteen times.
 - **没有内容的卡片不再占着屏幕。** 没有体脂秤时，「身体状态」页会显示九张一模一样的「无记录」卡片，没记过饮食的账号再加四张——十三张说着同一句话，把真正有数据的东西挤到了屏幕外。现在空卡片直接不显示，整组都空时用一句话说明原因。没有补 0，只是不再把「缺」重复十三遍。
 

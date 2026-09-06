@@ -207,7 +207,7 @@ onMounted(() => {
 .device-page { width: 100%; display: grid; gap: 16px; align-content: start; }
 .detail-loading { display: grid; gap: 12px; }
 .page-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 38px; }
-.back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; text-decoration: none; }
+.back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: var(--fs-sm); text-decoration: none; }
 .back-link:hover { color: var(--accent); }
 
 /* 设备主图比列表里的缩略图大一号，上下留够，别把表带切了。 */
@@ -217,26 +217,26 @@ onMounted(() => {
   border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised);
 }
 .hero-copy { display: grid; gap: 4px; min-width: 0; }
-.hero-eyebrow { margin: 0; color: var(--subtle); font-size: 11px; letter-spacing: .12em; }
-.hero-copy h1 { margin: 0; font-size: 22px; font-weight: 700; color: var(--ink); }
-.hero-sub { margin: 0; color: var(--muted); font-size: 13px; }
-.hero-state { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; color: var(--muted); font-size: 12px; }
+.hero-eyebrow { margin: 0; color: var(--subtle); font-size: var(--fs-xs); letter-spacing: .12em; }
+.hero-copy h1 { margin: 0; font-size: 24px; font-weight: 700; color: var(--ink); }
+.hero-sub { margin: 0; color: var(--muted); font-size: var(--fs-md); }
+.hero-state { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; color: var(--muted); font-size: var(--fs-sm); }
 .hero-state i { width: 7px; height: 7px; border-radius: 50%; background: var(--subtle); }
 .hero-state.on i { background: #7da33e; }
 
 .facts-card, .assign-card { padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
 .facts-card dl { display: grid; gap: 10px; margin: 0; }
 .facts-card dl > div { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
-.facts-card dt { color: var(--muted); font-size: 12px; }
-.facts-card dd { margin: 0; color: var(--ink); font-size: 13px; text-align: right; }
-.facts-note { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; color: var(--subtle); font-size: 11px; }
+.facts-card dt { color: var(--muted); font-size: var(--fs-sm); }
+.facts-card dd { margin: 0; color: var(--ink); font-size: var(--fs-md); text-align: right; }
+.facts-note { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; color: var(--subtle); font-size: var(--fs-xs); }
 
-.assign-card h2 { margin: 0 0 6px; font-size: 15px; font-weight: 700; color: var(--ink); }
-.assign-sub { margin: 0 0 14px; color: var(--muted); font-size: 12px; line-height: 1.65; }
+.assign-card h2 { margin: 0 0 6px; font-size: var(--fs-xl); font-weight: 700; color: var(--ink); }
+.assign-sub { margin: 0 0 14px; color: var(--muted); font-size: var(--fs-sm); line-height: 1.65; }
 .inline-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.hint-line { margin: 10px 0 0; color: var(--muted); font-size: 12px; }
+.hint-line { margin: 10px 0 0; color: var(--muted); font-size: var(--fs-sm); }
 .hint-line.ok { color: #b9da77; }
-.api-error { margin: 10px 0 0; color: #e2856f; font-size: 12px; }
+.api-error { margin: 10px 0 0; color: #e2856f; font-size: var(--fs-sm); }
 
 @media (max-width: 640px) {
   .device-hero { flex-direction: column; align-items: flex-start; }
