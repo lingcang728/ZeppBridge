@@ -174,7 +174,7 @@ const hypnogramOption = computed(() => {
       type: 'time',
       min: current.from,
       max: current.from + current.span,
-      axisLabel: { formatter: clock, hideOverlap: true, color: '#7E856D', fontSize: 11 },
+      axisLabel: { formatter: clock, hideOverlap: true, color: '#B4BBC3', fontSize: 14.5 },
       axisTick: { show: false },
       axisLine: { lineStyle: { color: 'rgba(226, 234, 242, .12)' } },
       splitLine: { show: false },
@@ -186,12 +186,12 @@ const hypnogramOption = computed(() => {
       interval: 1,
       axisLabel: {
         formatter: (value: number) => stageLabels.value[value] ?? '',
-        color: '#7E856D',
-        fontSize: 11,
+        color: '#B4BBC3',
+        fontSize: 14.5,
       },
       axisTick: { show: false },
       axisLine: { show: false },
-      splitLine: { lineStyle: { color: 'rgba(226, 234, 242, .08)', type: 'dashed' } },
+      splitLine: { lineStyle: { color: 'rgba(226, 234, 242, .12)', type: 'dashed' } },
     },
     visualMap: {
       show: false,
@@ -286,7 +286,7 @@ const hypnogramOption = computed(() => {
   gap: 12px;
   margin-top: 8px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums;
 }
 .stage-list {
@@ -303,7 +303,7 @@ const hypnogramOption = computed(() => {
   background: var(--surface);
 }
 .stage-list span, .stage-list strong, .stage-list small { display: block; }
-.stage-list span { color: var(--muted); font-size: 12px; }
+.stage-list span { color: var(--muted); font-size: var(--fs-sm); }
 .stage-list i {
   display: inline-block;
   width: 7px;
@@ -314,11 +314,11 @@ const hypnogramOption = computed(() => {
 .stage-list strong {
   margin-top: 6px;
   color: var(--ink);
-  font-size: 15px;
+  font-size: var(--fs-xl);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
-.stage-list small { margin-top: 4px; color: var(--muted); font-size: 12px; }
+.stage-list small { margin-top: 4px; color: var(--muted); font-size: var(--fs-sm); }
 @media (max-width: 760px) {
   .stage-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

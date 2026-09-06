@@ -317,7 +317,7 @@ function formatDateHint(value: string): string {
   align-items: center;
   gap: 7px;
   margin: 0;
-  font-size: 13px;
+  font-size: var(--fs-md);
   font-weight: 700;
   color: var(--ink);
 }
@@ -329,7 +329,7 @@ function formatDateHint(value: string): string {
   background: var(--surface);
   border: 1px solid var(--line);
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-style: normal;
   font-weight: 400;
   font-family: var(--font-mono);
@@ -339,7 +339,7 @@ function formatDateHint(value: string): string {
   align-items: center;
   gap: 4px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   text-decoration: none;
 }
 .see-all:hover { color: var(--accent); }
@@ -361,12 +361,12 @@ function formatDateHint(value: string): string {
   border-radius: var(--radius-sm);
   background: var(--surface-raised);
   color: var(--subtle);
-  font-size: 11px;
+  font-size: var(--fs-xs);
 }
 .empty-row {
   padding: 18px 16px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--fs-md);
 }
 .partial-warning {
   display: flex;
@@ -378,7 +378,7 @@ function formatDateHint(value: string): string {
   border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--warning);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .partial-warning svg { color: var(--warning); }
 .filter-tabs {
@@ -398,7 +398,7 @@ function formatDateHint(value: string): string {
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   cursor: pointer;
   transition: all 0.2s;
 }
