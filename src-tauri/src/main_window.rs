@@ -160,6 +160,11 @@ fn fit_to_monitor(window: &WebviewWindow, monitor: &Monitor) {
 }
 
 fn recover_geometry(window: &WebviewWindow) {
+    // Fullscreen windows intentionally have no reachable titlebar and can
+    // cover the menu/taskbar area. Let the window manager position those.
+    if checked("is_fullscreen", window.is_fullscreen()) == Some(true) {
+        return;
+    }
     let Some(monitors) = checked("available_monitors", window.available_monitors()) else {
         return;
     };
