@@ -36,6 +36,16 @@ static BANNER_WRITTEN: AtomicBool = AtomicBool::new(false);
 /// `storage::write_lock`，日志不需要那么强。
 static WRITE_LOCK: Mutex<()> = Mutex::new(());
 
+/// Tauri can panic while creating configured windows, before application setup.
+/// Release builds on Windows have no stderr, so retain the panic in our log.
+pub fn install_panic_hook() {
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        log(&format!("Application panic: {info}"));
+        previous(info);
+    }));
+}
+
 /// 日志目录：数据目录旁边的 `logs/`。
 pub fn log_dir(data_dir: &Path) -> PathBuf {
     data_dir.join("logs")

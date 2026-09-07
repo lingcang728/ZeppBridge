@@ -4,6 +4,7 @@ mod diagnostics;
 mod ipc_error;
 mod ipc_types;
 mod local_api;
+mod main_window;
 mod updates;
 
 // The desktop shell is an adapter over the shared core: models, storage,
@@ -41,39 +42,6 @@ use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager};
 use zeppbridge_core::models::RawPayloadCompaction;
 
-fn show_main_window(app: &AppHandle) {
-    let window = match app.get_webview_window("main") {
-        Some(window) => window,
-        // 主窗口不在了。这不是假设出来的状态：WebView2 崩溃、用户的
-        // 显卡驱动重启、或者窗口被系统销毁之后，进程还活着、托盘图标也还
-        // 在，但这里以前是一个 `if let Some(...)`——拿不到就静静 return，
-        // 于是「点 Open ZeppBridge 没任何反应」成了一个没有出口的死局。
-        // 重建一个；建不起来至少还会落一条日志。
-        None => {
-            diagnostics::log("主窗口不在了，正在重建");
-            match tauri::WebviewWindowBuilder::from_config(
-                app,
-                &app.config().app.windows[0].clone(),
-            )
-            .and_then(|builder| builder.build())
-            {
-                Ok(window) => window,
-                Err(error) => {
-                    diagnostics::log(&format!("主窗口重建失败: {error}"));
-                    return;
-                }
-            }
-        }
-    };
-    let _ = window.unminimize();
-    let _ = window.show();
-    // A second launch is the foreground process on Windows; briefly raise
-    // z-order so the existing hidden-to-tray window can steal focus.
-    let _ = window.set_always_on_top(true);
-    let _ = window.set_focus();
-    let _ = window.set_always_on_top(false);
-}
-
 /// `tauri.conf.json` 里 `minWidth` / `minHeight` 的那两个数。
 ///
 /// 算出来的初始尺寸不能低于它们：低于了窗口会小到点不着，而 Tauri 只在用户
@@ -90,12 +58,8 @@ const MIN_WINDOW_HEIGHT: f64 = 560.0;
 /// let width  = (work_w * 0.88).max(1280.0_f64.min(work_w));
 /// ```
 ///
-/// `current_monitor()` 返回 `0x0` 的工作区不是假想的状态——远程桌面会话、
-/// 显示器热插拔、以及窗口比显示器先就绪的那一瞬都会给出它。那时
-/// `work_w = -24.0`，宽度算成 `-21.1`，`set_size` 收到一个负数。用户看到的
-/// 正是「托盘图标活着、进程活着、点 Open ZeppBridge 一点反应都没有」——
-/// 窗口在，只是没有可见像素，而重装当然也修不好。
-/// 见 2026-09-04 Reddit u/poseidon1111。
+/// 零工作区会使旧算法算出负数，因此保留输入检查。但用户提供的日志没有
+/// 记录到这一分支，不能把它当作该用户打不开窗口的已确认原因。
 ///
 /// 返回 `None` 表示这台显示器的信息不可信，那就一个字都别改，让
 /// `tauri.conf.json` 里的 1280x800 原样生效。
@@ -275,11 +239,14 @@ pub fn run() {
             }
         }
     }
-    tauri::Builder::default()
+    diagnostics::install_panic_hook();
+    diagnostics::log("Startup: building Tauri runtime");
+    let app = tauri::Builder::default()
+        .manage(main_window::MainWindowState::default())
         // Single-instance must be registered first so a second launch never
         // reaches tray setup and creates a duplicate icon.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            show_main_window(app);
+            main_window::request_show(app, "second-instance");
         }))
         // Main-window AI handoff links call the opener API explicitly.  Do
         // not inject its `_blank` click interceptor into the Zepp login
@@ -292,7 +259,15 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .on_window_event(main_window::on_window_event)
+        .on_page_load(|webview, payload| {
+            if webview.label() == "main" {
+                // Do not log URLs: the login webview can contain OAuth credentials.
+                diagnostics::log(&format!("Main webview page load: {:?}", payload.event()));
+            }
+        })
         .setup(|app| {
+            diagnostics::log("Startup: entered application setup");
             // 这三步以前都是光秃的 `?`。任一步失败，`setup` 返回 Err，
             // 进程就没了——而 Windows 上既没有终端也没有日志，用户只能看到
             // 通知区里一个点不动的死图标。现在每一条都会写日志、弹对话框，
@@ -355,6 +330,7 @@ pub fn run() {
             }
             app.manage(local_api::LocalApi(local_api.clone()));
             app.manage(state);
+            diagnostics::log("Startup: database and application state ready");
 
             // 解析器修订号变化后，后台一次性重放本地原始报文以纠正派生数据
             // （运动类型、睡眠阶段等）。独立连接 + 后台线程，不阻塞窗口创建。
@@ -434,44 +410,7 @@ pub fn run() {
                 }
             });
 
-            // 托盘到底建起来没有。窗口的关闭行为要看它，所以先声明后赋值。
-            let tray_present = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-
-            if let Some(window) = app.get_webview_window("main") {
-                if let Ok(Some(monitor)) = window.current_monitor() {
-                    let work = monitor.work_area();
-                    let scale = monitor.scale_factor();
-                    match main_window_size(work.size.width, work.size.height, scale) {
-                        Some((width, height)) => {
-                            diagnostics::log(&format!(
-                                "窗口尺寸：工作区 {}x{} @{scale} → {width:.0}x{height:.0}",
-                                work.size.width, work.size.height
-                            ));
-                            let _ = window.set_size(tauri::LogicalSize::new(width, height));
-                        }
-                        // 下一个报「打不开」的人，日志里会有这一行。
-                        None => diagnostics::log(&format!(
-                            "工作区信息不可用（{}x{} @{scale}），沿用配置里的默认尺寸",
-                            work.size.width, work.size.height
-                        )),
-                    }
-                }
-                let hidden = window.clone();
-                let tray_alive = tray_present.clone();
-                window.on_window_event(move |event| {
-                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                        // 没有托盘就不能藏到托盘里：那样窗口关掉之后再也没有
-                        // 入口把它叫回来，进程还活着，看起来就是「点了关闭，
-                        // 应用没了但也没退出」。托盘建不起来时按正常关闭走。
-                        if !tray_alive.load(std::sync::atomic::Ordering::Relaxed) {
-                            return;
-                        }
-                        api.prevent_close();
-                        let _ = hidden.hide();
-                        let _ = hidden.app_handle().emit("app://hidden-to-tray", ());
-                    }
-                });
-            }
+            main_window::initialize(app.handle());
 
             // 托盘菜单是原生的，界面那套 i18n 到不了这里，而它又是英文用户
             // 一定会右键点开的东西。托盘在前端加载之前就要建起来，所以先按
@@ -490,7 +429,7 @@ pub fn run() {
                 .menu(&menu)
                 .tooltip("ZeppBridge")
                 .on_menu_event(|app, event| match event.id.as_ref() {
-                    "show" => show_main_window(app),
+                    "show" => main_window::request_show(app, "tray-menu"),
                     "sync" => {
                         let _ = app.emit("tray://sync", ());
                     }
@@ -504,7 +443,7 @@ pub fn run() {
                         ..
                     } = event
                     {
-                        show_main_window(tray.app_handle());
+                        main_window::request_show(tray.app_handle(), "tray-click");
                     }
                 });
             if let Some(icon) = app.default_window_icon() {
@@ -522,7 +461,9 @@ pub fn run() {
             let built = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| tray.build(app)));
             match built {
                 Ok(Ok(_)) => {
-                    tray_present.store(true, std::sync::atomic::Ordering::Relaxed);
+                    app.state::<main_window::MainWindowState>()
+                        .set_tray_present();
+                    diagnostics::log("Startup: tray ready");
                 }
                 Ok(Err(error)) => {
                     diagnostics::log(&format!(
@@ -539,6 +480,8 @@ pub fn run() {
                     );
                 }
             }
+            app.state::<main_window::MainWindowState>().set_ready();
+            diagnostics::log("Startup: application setup complete");
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -623,10 +566,20 @@ pub fn run() {
             local_api::reveal_local_api_token,
             local_api::rotate_local_api_token,
         ])
-        .run(tauri::generate_context!())
-        .unwrap_or_else(|error| {
-            diagnostics::log(&format!("Tauri application exited with an error: {error}"));
-        });
+        .build(tauri::generate_context!());
+    match app {
+        Ok(app) => app.run(|app, event| {
+            if let tauri::RunEvent::Ready = event {
+                diagnostics::log("Startup: event loop ready");
+                main_window::request_show(app, "startup");
+            }
+        }),
+        Err(error) => {
+            // Builder/plugin failures otherwise disappear in Windows releases.
+            // Configured-window failures inside run() are logged by the panic hook.
+            let _ = diagnostics::fatal_startup("Tauri initialization failed", error);
+        }
+    }
 }
 
 #[cfg(all(test, windows))]
