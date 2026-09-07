@@ -2,14 +2,21 @@
 
 本文件记录每个版本的实际改动。写给使用者看，不是施工日志：只写用户能感知到的变化，以及为什么这么改。
 
-## Unreleased / 未发布
+## 2.2.1
 
 ### Changed / 变化
 
+- **The interface is readable at a normal desktop viewing distance.** Body text went from 13px to 16.5px and the small print — secondary labels, chart axes, legends, metadata — from 8–11px up to 11–14.5px. Secondary greys were lifted until every one of them clears WCAG AA on every surface it is used on (the darkest tier failed at 2.0:1 and is gone), the neutral surfaces were darkened for a further contrast lift, chart axis labels and grid lines came up with them, and the emphasis weights that the fonts could not actually render are now real. Green and red states — better/worse deltas, connection status — carry a symbol as well as a colour, so they still read without colour vision. If this is now too large, Settings → Interface scale goes back down.
+- **界面在正常的桌面视距下读得清了。** 正文从 13px 提到 16.5px，小字——次要标签、图表坐标轴、图例、元信息——从 8–11px 提到 11–14.5px。次要灰色全部抬到在它实际出现的每一种底色上都过 WCAG AA（最暗的那一档只有 2.0:1，已经删掉），中性底色也调暗来进一步拉开对比，图表的坐标轴文字和网格线一并跟上，字体根本渲染不出来的那几档字重也换成了真能生效的。绿/红状态——变好变坏的差值、连接状态——除了颜色还带一个符号，色觉障碍下照样读得出来。如果觉得反而太大了，设置 →「界面缩放」可以调回去。
 - **Read the whole choice.** AI template names, descriptions and dropdown options now wrap, the prompt editor uses the body text size, and missing-data explanations stay readable. Search and editing fields show a clear keyboard focus outline.
 - **选项与说明更好读了。** AI 模板名称、说明和下拉选项可以完整换行，提示词编辑区采用正文字号，缺失数据的说明也保持清晰。键盘进入搜索框和编辑区时，有明确的焦点边框。
 - **Settings dialogs and dropdowns work better from the keyboard.** Dropdowns expose the active option to assistive technology. Privacy and update dialogs keep focus inside, close with Escape, return focus when dismissed, and scroll within short windows. Close buttons and dropdown rows have larger targets.
 - **下拉框和设置弹窗支持更完整的键盘操作。** 下拉框向辅助技术报告当前活动选项；隐私与更新弹窗将焦点留在内部，支持 Esc 关闭并返回原控件，在较矮的窗口中也可滚动阅读。关闭按钮和下拉选项的点击区域更大。
+
+### Fixes / 修复
+
+- **A window that had drifted off the screen comes back.** After 2.2.0 some Windows launches still left a tray icon and nothing to click — including after a reinstall. Restoring from the tray, or from a second launch, could deadlock WebView2 if the window was rebuilt inside a native callback. Recovery now runs on a worker; a window whose title bar is no longer on a current display is moved so it can be dragged again; intentional fullscreen is left alone. If it still fails, `logs/zeppbridge.log` keeps the panic and the recovery steps instead of going silent.
+- **漂出屏幕的窗口会回来。** 2.2.0 之后仍有 Windows 启动只剩托盘图标、点了没窗口——重装也不管用。从托盘或第二次启动去恢复时，如果在系统回调里重建窗口，WebView2 会卡死。现在恢复改到工作线程上做；标题栏已经不在当前显示器上的窗口会被移回拖得动的位置；故意全屏的保持全屏。如果还是失败，`logs/zeppbridge.log` 会留下 panic 和恢复步骤，不再静默。
 
 ## 2.2.0
 
@@ -26,9 +33,6 @@
 - **`.fit` 文件里的东西更全，也更对。** 公里分段现在是真的分段，而不是整条运动只有一圈；手表上你自己按圈键记的圈也一并带出来了——那个字段在 336 条留存的运动明细里有 32 条带着，从来没人解过它。营养和力量训练负荷也进了文件，Strava、Garmin Connect、Intervals.icu 读到的就是它们期待的东西。
 
 ### Changed / 变化
-
-- **The interface is readable at a normal desktop viewing distance.** Body text went from 13px to 16.5px and the small print — secondary labels, chart axes, legends, metadata — from 8–11px up to 11–14.5px. Secondary greys were lifted until every one of them clears WCAG AA on every surface it is used on (the darkest tier failed at 2.0:1 and is gone), the neutral surfaces were darkened for a further contrast lift, chart axis labels and grid lines came up with them, and the emphasis weights that the fonts could not actually render are now real. Green and red states — better/worse deltas, connection status — carry a symbol as well as a colour, so they still read without colour vision. If this is now too large, Settings → Interface scale goes back down.
-- **界面在正常的桌面视距下读得清了。** 正文从 13px 提到 16.5px，小字——次要标签、图表坐标轴、图例、元信息——从 8–11px 提到 11–14.5px。次要灰色全部抬到在它实际出现的每一种底色上都过 WCAG AA（最暗的那一档只有 2.0:1，已经删掉），中性底色也调暗来进一步拉开对比，图表的坐标轴文字和网格线一并跟上，字体根本渲染不出来的那几档字重也换成了真能生效的。绿/红状态——变好变坏的差值、连接状态——除了颜色还带一个符号，色觉障碍下照样读得出来。如果觉得反而太大了，设置 →「界面缩放」可以调回去。
 
 - **Cards with nothing in them no longer take up the screen.** Without a body-composition scale, Body status used to show nine identical "no records" cards, and an account that never logged a meal added four more — thirteen cards all saying the same thing, pushing everything that did have data off the screen. Empty cards are now left out, and when a whole group is empty one line explains why. Nothing is filled in with zeros; the missing readings are simply not restated thirteen times.
 - **没有内容的卡片不再占着屏幕。** 没有体脂秤时，「身体状态」页会显示九张一模一样的「无记录」卡片，没记过饮食的账号再加四张——十三张说着同一句话，把真正有数据的东西挤到了屏幕外。现在空卡片直接不显示，整组都空时用一句话说明原因。没有补 0，只是不再把「缺」重复十三遍。
