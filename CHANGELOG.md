@@ -2,6 +2,15 @@
 
 本文件记录每个版本的实际改动。写给使用者看，不是施工日志：只写用户能感知到的变化，以及为什么这么改。
 
+## Unreleased / 未发布
+
+### Changed / 变化
+
+- **Read the whole choice.** AI template names, descriptions and dropdown options now wrap, the prompt editor uses the body text size, and missing-data explanations stay readable. Search and editing fields show a clear keyboard focus outline.
+- **选项与说明更好读了。** AI 模板名称、说明和下拉选项可以完整换行，提示词编辑区采用正文字号，缺失数据的说明也保持清晰。键盘进入搜索框和编辑区时，有明确的焦点边框。
+- **Settings dialogs and dropdowns work better from the keyboard.** Dropdowns expose the active option to assistive technology. Privacy and update dialogs keep focus inside, close with Escape, return focus when dismissed, and scroll within short windows. Close buttons and dropdown rows have larger targets.
+- **下拉框和设置弹窗支持更完整的键盘操作。** 下拉框向辅助技术报告当前活动选项；隐私与更新弹窗将焦点留在内部，支持 Esc 关闭并返回原控件，在较矮的窗口中也可滚动阅读。关闭按钮和下拉选项的点击区域更大。
+
 ## 2.2.0
 
 ### Added / 新增

@@ -617,7 +617,7 @@ h2 { margin: 0 0 14px; font-size: var(--fs-xl); font-weight: 700; color: var(--i
 .auto-continue { display: flex; gap: 8px; align-items: flex-start; margin-top: 14px; cursor: pointer; }
 .auto-continue input { margin-top: 3px; flex: none; }
 .auto-continue span { display: flex; flex-direction: column; gap: 2px; }
-.auto-continue em { font-style: normal; font-size: var(--fs-sm); opacity: .72; line-height: 1.5; }
+.auto-continue em { color: var(--muted); font-style: normal; font-size: var(--fs-sm); line-height: 1.5; }
 .hint-line { display: inline-flex; align-items: center; gap: 6px; margin: 12px 0 0; color: var(--muted); font-size: var(--fs-sm); }
 .hint-line.ok { color: var(--accent); }
 .api-error { margin: 12px 0 0; color: var(--danger); font-size: var(--fs-sm); line-height: 1.55; }

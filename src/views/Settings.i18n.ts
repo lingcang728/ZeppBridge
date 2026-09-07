@@ -312,6 +312,7 @@ export const settingsMessages = defineMessages(
     privacyPoint5Title: '5. 透明开源：',
     privacyPoint5: '端到端代码开源，无暗中网络回传逻辑。',
     privacyModalOk: '我知道了',
+    closeDialog: '关闭对话框',
 
     // ── 状态与提示 ──
     connExtracting: '正在提取登录信息',
@@ -712,6 +713,7 @@ If you need anything from me (which client I use, where the file lives), just as
     privacyPoint5Title: '5. Open source throughout: ',
     privacyPoint5: 'the whole codebase is open, with no hidden phone-home logic.',
     privacyModalOk: 'Got it',
+    closeDialog: 'Close dialog',
 
     // ── Status and notices ──
     connExtracting: 'Extracting the sign-in details',
