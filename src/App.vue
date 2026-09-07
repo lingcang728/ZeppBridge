@@ -550,6 +550,7 @@ body {
   text-rendering: optimizeLegibility;
 }
 button, input, select, textarea { font: inherit; }
+input::placeholder, textarea::placeholder { color: var(--subtle); opacity: 1; }
 button, select, a { -webkit-tap-highlight-color: transparent; }
 button { color: inherit; }
 a { color: inherit; }

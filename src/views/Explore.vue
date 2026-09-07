@@ -599,6 +599,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
               :key="tpl.id"
               type="button"
               :class="['template-item', { 'is-on': activeTemplateId === tpl.id }]"
+              :aria-pressed="activeTemplateId === tpl.id"
               @click="selectTemplate(tpl)"
             >
               <span class="tpl-icon"><Icon :name="tpl.icon" :size="15" /></span>
@@ -988,17 +989,17 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
  * 页面底边像被啃过。现在三栏拉平到最高的那一栏，各栏最后一块面板补足高度，
  * 内容过长的列表在自己内部滚动，而不是把整页顶长。 */
 .export-layout {
-  display: grid;
-  /* 两侧用比例而不是死宽度。
-     界面缩放调到 80% 时，可用的 CSS 宽度变大，固定的 240px / 290px 侧栏就
-     显得越来越细，中间那栏一个人吃掉多出来的全部空间——三栏看着就散了。
-     用 minmax(下限, 百分比) 让它们跟着一起长，同时保住可读的最小宽度。 */
-  grid-template-columns: minmax(210px, 17%) minmax(0, 1fr) minmax(260px, 22%);
+  display: flex;
+  flex-wrap: wrap;
+  /* Wrap against the available content width, including interface zoom.
+     Viewport media queries alone leave the editor squeezed at 125% scale. */
   gap: 16px;
   align-items: stretch;
 }
 .col-templates, .col-send { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.col-editor { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.col-templates { flex: 1 1 260px; }
+.col-send { flex: 1 1 300px; }
+.col-editor { display: flex; flex: 2 1 360px; flex-direction: column; gap: 12px; min-width: 0; }
 .col-templates > :last-child,
 .col-send > :last-child { flex: 1 1 auto; }
 /* 中间栏撑高的必须是**编辑区那张卡**，不是最后一个元素。
@@ -1049,6 +1050,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
   color: var(--subtle);
 }
 .template-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: var(--fs-sm); }
+.template-search:focus-within, .prompt-editor:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
 .template-list { display: grid; gap: 6px; }
 .template-item {
   display: flex;
@@ -1077,14 +1079,15 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
   color: var(--muted);
 }
 .template-item.is-on .tpl-icon { color: var(--accent); }
-.tpl-copy { display: grid; gap: 1px; min-width: 0; flex: 1; }
-.tpl-copy strong { font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
-.tpl-copy span { color: var(--subtle); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tpl-star { color: var(--accent); }
+.tpl-copy { display: grid; gap: 4px; min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.tpl-copy strong { font-size: var(--fs-md); font-weight: 600; line-height: 1.45; color: var(--ink); }
+.tpl-copy span { color: var(--muted); font-size: var(--fs-xs); line-height: 1.55; }
+.tpl-star { flex: 0 0 auto; color: var(--accent); }
 .empty-note { margin: 4px 0; color: var(--subtle); font-size: var(--fs-sm); }
 
 /* 当前模板与编辑器 */
-.current-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.current-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.current-head > div { min-width: 0; overflow-wrap: anywhere; }
 .current-head .col-title { margin-bottom: 2px; color: var(--muted); font-weight: 400; font-size: var(--fs-sm); }
 .tpl-name { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 4px; color: var(--accent); font-size: 22px; font-weight: 700; }
 .tpl-name svg { color: var(--subtle); }
@@ -1113,6 +1116,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 .prompt-editor { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 190px; border: 1px solid var(--line-control); border-radius: var(--radius-sm); background: var(--surface-raised); overflow: hidden; margin-bottom: 14px; }
 .editor-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
@@ -1136,7 +1140,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
   background: transparent;
   color: var(--ink);
   font-family: var(--font-sans);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-md);
   line-height: 1.8;
 }
 
@@ -1211,10 +1215,12 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 .pack-contents p { margin: 8px 0 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.65; }
 .group-row { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; }
 .group-row .group-label { margin: 0; }
-.format-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 4px; }
+.format-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 110px), 1fr)); gap: 8px; margin-bottom: 4px; }
+.detail-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); }
 .format-card {
   position: relative;
   display: grid;
+  min-width: 0;
   justify-items: center;
   gap: 4px;
   padding: 12px 6px 10px;
@@ -1227,7 +1233,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
   transition: all 140ms ease;
 }
 .format-card strong { color: var(--ink); font-size: var(--fs-sm); }
-.format-card span { color: var(--subtle); font-size: var(--fs-2xs); }
+.format-card span { min-width: 0; overflow-wrap: anywhere; color: var(--muted); font-size: var(--fs-xs); line-height: 1.5; }
 .format-card.is-on { border-color: var(--accent); background: var(--accent-soft); }
 .format-card.is-on svg, .format-card.is-on strong { color: var(--accent); }
 .format-check { position: absolute; top: 6px; right: 6px; }
@@ -1286,16 +1292,14 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 
 /* 响应式 */
 @media (max-width: 1180px) {
-  .export-layout { grid-template-columns: minmax(200px, 24%) minmax(0, 1fr); }
-  .col-send { grid-column: 1 / -1; }
   .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 820px) {
-  .export-layout { grid-template-columns: minmax(0, 1fr); }
-  .format-grid, .tool-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .col-templates, .col-editor, .col-send { flex-basis: 100%; }
+  .tool-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 520px) {
   .summary-grid { grid-template-columns: minmax(0, 1fr); }
-  .format-grid, .tool-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tool-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 </style>

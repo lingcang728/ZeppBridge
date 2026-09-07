@@ -6,6 +6,7 @@ import DesignIcon from '../components/DesignIcon.vue';
 import DeviceVisual from '../components/DeviceVisual.vue';
 import HistoryArchivePanel from '../components/HistoryArchivePanel.vue';
 import Icon from '../components/Icon.vue';
+import ModalDialog from '../components/ModalDialog.vue';
 import SelectMenu from '../components/SelectMenu.vue';
 import { deviceStateLabel, useDeviceAssignment, useDevices } from '../composables/useDevices';
 import { useSyncController } from '../composables/useSyncController';
@@ -1501,7 +1502,7 @@ const runCapabilityProbe = async () => {
           >{{ t.minutes(minutes) }}</button>
         </div>
         <span class="sync-toggle-label">{{ autoSyncEnabled ? t.syncOn : t.syncOff }}</span>
-        <button class="switch" type="button" role="switch" :aria-checked="autoSyncEnabled" @click="setAutoSyncEnabled(!autoSyncEnabled)"><span></span></button>
+        <button class="switch" type="button" role="switch" aria-labelledby="sync-title" :aria-checked="autoSyncEnabled" @click="setAutoSyncEnabled(!autoSyncEnabled)"><span></span></button>
         <button class="button secondary sync-now" type="button" :disabled="isSyncing || !connected" @click="runSync('incremental')">
           <Icon name="sync" :size="14" />{{ isSyncing ? t.syncing : t.syncNow }}
         </button>
@@ -1646,14 +1647,13 @@ const runCapabilityProbe = async () => {
          发现新版本时自动弹一次：只给一个版本号，用户没法判断这次值不值得更新。
          Release 说明是 Markdown，这里按纯文本原样显示（保留换行），不做渲染——
          更新说明是别处写的内容，不该在这里当富文本执行。 -->
-    <div v-if="updateNotesOpen" class="modal-backdrop" @click.self="updateNotesOpen = false">
-      <div class="privacy-modal surface-card pad">
+    <ModalDialog v-if="updateNotesOpen" labelledby="update-dialog-title" @close="updateNotesOpen = false">
         <div class="modal-head">
           <div class="modal-title-row">
             <Icon name="sync" :size="18" class="shield-ic" />
-            <h3>{{ t.updateModalTitle(updateState.version) }}</h3>
+            <h3 id="update-dialog-title">{{ t.updateModalTitle(updateState.version) }}</h3>
           </div>
-          <button type="button" class="close-btn" @click="updateNotesOpen = false"><Icon name="x" :size="16" /></button>
+          <button type="button" class="close-btn" :aria-label="t.closeDialog" @click="updateNotesOpen = false"><Icon name="x" :size="16" /></button>
         </div>
         <p class="modal-sub">
           {{ t.updateModalCurrent(updateState.currentVersion || t.updateModalUnknownVersion) }}
@@ -1701,18 +1701,16 @@ const runCapabilityProbe = async () => {
             @click="installUpdate"
           >{{ updateState.status === 'failed' ? t.updateRetry : t.updateInstall }}</button>
         </div>
-      </div>
-    </div>
+    </ModalDialog>
 
     <!-- 隐私政策弹窗 -->
-    <div v-if="privacyModalOpen" class="modal-backdrop" @click.self="privacyModalOpen = false">
-      <div class="privacy-modal surface-card pad">
+    <ModalDialog v-if="privacyModalOpen" labelledby="privacy-dialog-title" @close="privacyModalOpen = false">
         <div class="modal-head">
           <div class="modal-title-row">
             <Icon name="shield" :size="18" class="shield-ic" />
-            <h3>{{ t.privacyModalTitle }}</h3>
+            <h3 id="privacy-dialog-title">{{ t.privacyModalTitle }}</h3>
           </div>
-          <button type="button" class="close-btn" @click="privacyModalOpen = false"><Icon name="x" :size="16" /></button>
+          <button type="button" class="close-btn" :aria-label="t.closeDialog" @click="privacyModalOpen = false"><Icon name="x" :size="16" /></button>
         </div>
         <div class="modal-body">
           <p><strong>{{ t.privacyPoint1Title }}</strong>{{ t.privacyPoint1 }}</p>
@@ -1724,8 +1722,7 @@ const runCapabilityProbe = async () => {
         <div class="modal-foot">
           <button type="button" class="button primary" @click="privacyModalOpen = false">{{ t.privacyModalOk }}</button>
         </div>
-      </div>
-    </div>
+    </ModalDialog>
 
   </section>
 </template>
@@ -1907,9 +1904,9 @@ h3 { margin-bottom: 4px; font-size: var(--fs-md); font-weight: 700; color: var(-
   background: var(--surface-raised);
   min-width: 0;
 }
-.capability-cell.off { opacity: .62; }
+.capability-cell.off { border-style: dashed; }
 .cell-head { display: flex; align-items: center; gap: 7px; min-width: 0; }
-.cell-head strong { overflow: hidden; color: var(--ink); font-size: var(--fs-md); text-overflow: ellipsis; white-space: nowrap; }
+.cell-head strong { min-width: 0; color: var(--ink); font-size: var(--fs-md); font-weight: 600; overflow-wrap: anywhere; }
 .cell-detail { color: var(--muted); font-size: var(--fs-xs); }
 .cell-note { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.5; }
 @media (max-width: 720px) { .capability-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
@@ -1945,7 +1942,7 @@ h3 { margin-bottom: 4px; font-size: var(--fs-md); font-weight: 700; color: var(-
   background: var(--surface-raised);
 }
 .capability-copy { display: grid; gap: 1px; min-width: 0; flex: 1; }
-.capability-copy strong { color: var(--ink); font-size: var(--fs-md); font-weight: 400; }
+.capability-copy strong { color: var(--ink); font-size: var(--fs-md); font-weight: 600; }
 .capability-copy span { color: var(--subtle); font-size: var(--fs-xs); overflow-wrap: anywhere; }
 .capability-empty {
   padding: 8px 10px;
@@ -2210,21 +2207,21 @@ code { color: var(--muted); font-family: var(--font-mono); font-size: var(--fs-s
 .manual-auth-form .form-group:last-of-type { margin-bottom: 16px; }
 .manual-auth-form label { display: block; margin-bottom: 4px; color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
 .manual-auth-form input { width: 100%; padding: 8px 10px; border: 1px solid var(--line-control); border-radius: 9px; background: var(--surface); color: var(--ink); font-family: var(--font-mono); font-size: var(--fs-sm); }
-.manual-auth-form input:focus { outline: none; border-color: var(--accent); }
+.manual-auth-form input:focus { border-color: var(--accent); }
 .manual-auth-form input:disabled { opacity: 0.5; cursor: not-allowed; }
 .manual-auth-form .form-actions { display: flex; gap: 8px; }
 
 /* 隐私政策弹窗 */
-.modal-backdrop { position: fixed; inset: 0; z-index: 100; background: rgba(0, 0, 0, .7); display: grid; place-items: center; padding: 20px; }
-.privacy-modal { max-width: 520px; width: 100%; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-raised); box-shadow: 0 12px 36px rgba(0, 0, 0, .5); }
 .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
 .modal-title-row { display: flex; align-items: center; gap: 8px; }
 .shield-ic { color: var(--accent); }
-.close-btn { display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; }
+.close-btn { display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; }
 .close-btn:hover { background: var(--surface-hover); color: var(--ink); }
-.modal-body { display: grid; gap: 10px; color: var(--muted); font-size: var(--fs-sm); line-height: 1.6; }
-.modal-body strong { color: var(--ink); }
-.modal-foot { display: flex; justify-content: flex-end; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+.modal-body { display: grid; gap: 14px; color: var(--muted); font-size: var(--fs-md); line-height: 1.7; }
+.modal-body p { margin: 0; }
+.modal-body strong { display: block; margin-bottom: 4px; color: var(--ink); font-weight: 600; }
+.modal-title-row h3 { margin: 0; font-size: var(--fs-xl); line-height: 1.4; }
+.modal-foot { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
 
 @media (max-width: 1080px) {
   .three-col { grid-template-columns: minmax(0, 1fr); }
