@@ -270,3 +270,12 @@ conflicts with the source, the source wins** — and fix this page while you are
 there. Engineering gates are in the [development guide](development.md); product
 boundaries are in the
 [architecture summary](../reference/architecture.md).
+
+
+### Readability follow-up
+
+- Template titles/descriptions and select options wrap instead of hiding meaningful text behind ellipses. Prompt editing and dialog prose use `--fs-md`; supporting copy uses the existing smaller tokens.
+- Do not fade explanatory text with container opacity. Missing-data cards keep readable text and use a dashed border for distinction; disabled actions can still be dimmed.
+- `SelectMenu` keeps focus on the trigger and links its teleported list and active option with `aria-controls` / `aria-activedescendant`. Options and triggers are at least 44px tall.
+- Settings uses `ModalDialog` for privacy and release notes: named dialog, contained Tab/Shift+Tab navigation, Escape dismissal, focus restoration and a scrolling viewport. Keep close buttons labelled in both languages.
+- Search/editor wrappers use `:focus-within` when their inner fields suppress the native outline.

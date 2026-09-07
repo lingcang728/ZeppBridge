@@ -10,7 +10,7 @@
  * 只做「从一列固定选项里挑一个」这一件事。需要搜索或分组的场景（比如设备型号
  * 目录）有它们自己的组件，不要往这里堆。
  */
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue';
 import { defineMessages, useMessages } from '../i18n';
 import { popoverStyle } from '../lib/popoverPosition';
 import Icon from './Icon.vue';
@@ -52,6 +52,10 @@ const activeIndex = ref(-1);
 const root = ref<HTMLElement | null>(null);
 const triggerRef = ref<HTMLElement | null>(null);
 const listRef = ref<HTMLElement | null>(null);
+const listId = `select-${useId()}`;
+const optionId = (index: number) => `${listId}-option-${index}`;
+const activeOptionId = computed(() =>
+  open.value && props.options[activeIndex.value] ? optionId(activeIndex.value) : undefined);
 
 /*
  * 弹层 Teleport 到 body，位置每次打开时按触发按钮的实际位置算。
@@ -95,7 +99,7 @@ const scrollActiveIntoView = () => {
 };
 
 const openMenu = () => {
-  if (props.disabled) return;
+  if (props.disabled || !props.options.length) return;
   measure();
   open.value = true;
   activeIndex.value = selectedIndex.value >= 0 ? selectedIndex.value : 0;
@@ -158,6 +162,11 @@ const onPointerDown = (event: PointerEvent) => {
   closeMenu();
 };
 
+// Focus stays on the combobox while its teleported options are navigated.
+const onFocusOut = (event: FocusEvent) => {
+  if (!root.value?.contains(event.relatedTarget as Node | null)) closeMenu();
+};
+
 /* 弹层已经不在触发按钮旁边了，页面一滚它就会停在原地。跟着重新量比强行
    关掉更不打断人，窗口尺寸变化同理。 */
 const reposition = () => {
@@ -184,13 +193,15 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="root" :class="['select-menu', { 'is-open': open, 'is-disabled': disabled }]">
+  <div ref="root" :class="['select-menu', { 'is-open': open, 'is-disabled': disabled }]" @focusout="onFocusOut">
     <button
       type="button"
       class="select-trigger"
       role="combobox"
       :aria-expanded="open"
       :aria-label="ariaLabel"
+      :aria-controls="open ? listId : undefined"
+      :aria-activedescendant="activeOptionId"
       aria-haspopup="listbox"
       :disabled="disabled"
       ref="triggerRef"
@@ -205,22 +216,25 @@ onBeforeUnmount(() => {
       <ul
         v-if="open"
         ref="listRef"
+        :id="listId"
         class="select-list"
         :style="menuStyle"
         role="listbox"
         :aria-label="ariaLabel"
         @pointerdown.stop
+        @mousedown.prevent
       >
         <li
           v-for="(option, index) in options"
           :key="option.value"
+          :id="optionId(index)"
           role="option"
           :aria-selected="option.value === modelValue"
           :class="['select-option', {
             'is-active': index === activeIndex,
             'is-selected': option.value === modelValue,
           }]"
-          @mouseenter="activeIndex = index"
+          @pointermove="activeIndex = index"
           @click="choose(index)"
         >
           <span class="option-label">{{ option.label }}</span>
@@ -240,7 +254,7 @@ onBeforeUnmount(() => {
   margin: 0;
   padding: 4px;
   overflow-y: auto;
-  border: 1px solid var(--line-strong, rgba(226, 234, 242, .16));
+  border: 1px solid var(--line-control);
   border-radius: var(--radius-sm);
   /* 实心背景。半透明会让下面的内容透上来，选项就没法读了。 */
   background: var(--surface-raised);
@@ -253,16 +267,17 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 2px 8px;
   padding: 8px 10px;
+  min-height: 44px;
   border-radius: 7px;
   color: var(--muted);
   font-size: var(--fs-md);
   cursor: pointer;
 }
-.select-list .select-option.is-active { background: var(--surface-hover); color: var(--ink); }
+.select-list .select-option.is-active { background: var(--surface-hover); color: var(--ink); outline: 2px solid var(--focus); outline-offset: -2px; }
 .select-list .select-option.is-selected { color: var(--ink); font-weight: 600; }
-.select-list .option-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.select-list .option-label { grid-column: 1; grid-row: 1; overflow-wrap: anywhere; }
 .select-list .option-hint { grid-column: 1 / -1; color: var(--subtle); font-size: var(--fs-xs); font-weight: 400; }
-.select-list .option-tick { color: var(--accent); }
+.select-list .option-tick { grid-column: 2; grid-row: 1; color: var(--accent); }
 </style>
 
 <style scoped>
@@ -271,7 +286,7 @@ onBeforeUnmount(() => {
 .select-trigger {
   display: flex;
   width: 100%;
-  min-height: 36px;
+  min-height: 44px;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -291,7 +306,7 @@ onBeforeUnmount(() => {
 .is-open .select-trigger { border-color: var(--accent); }
 .is-disabled .select-trigger, .select-trigger:disabled { opacity: .55; cursor: not-allowed; }
 
-.select-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.select-value { min-width: 0; overflow-wrap: anywhere; }
 .select-value.placeholder { color: var(--subtle); }
 .select-caret { flex: 0 0 auto; color: var(--muted); transition: transform 160ms ease; }
 .is-open .select-caret { transform: rotate(180deg); }
