@@ -414,12 +414,19 @@ fn open_db() -> Result<(Database, u64), (i64, String)> {
 }
 
 fn call_tool(params: &Value) -> Result<Value, (i64, String)> {
+    call_tool_with_db(params, open_db)
+}
+
+fn call_tool_with_db(
+    params: &Value,
+    open: impl FnOnce() -> Result<(Database, u64), (i64, String)>,
+) -> Result<Value, (i64, String)> {
     let name = params
         .get("name")
         .and_then(Value::as_str)
         .ok_or((ERR_INVALID_PARAMS, "缺少工具名".to_string()))?;
     let args = params.get("arguments").cloned().unwrap_or(json!({}));
-    let (db, database_bytes) = open_db()?;
+    let (db, database_bytes) = open()?;
 
     let payload = match name {
         "list_workouts" => {
@@ -493,11 +500,21 @@ fn call_tool(params: &Value) -> Result<Value, (i64, String)> {
                 Some(id) => db
                     .get_sleep_detail(id)
                     .map_err(|error| (ERR_DATABASE, error.user_message()))?,
-                None => db
-                    .get_recent_sleep_sessions(1)
-                    .map_err(|error| (ERR_DATABASE, error.user_message()))?
-                    .into_iter()
-                    .next(),
+                None => {
+                    let latest = db
+                        .get_recent_sleep_sessions(1)
+                        .map_err(|error| (ERR_DATABASE, error.user_message()))?
+                        .into_iter()
+                        .next();
+                    // The list deliberately omits stages; load the same detail
+                    // as an explicit sleepId instead of returning that summary.
+                    match latest {
+                        Some(session) => db
+                            .get_sleep_detail(&session.sleep_id)
+                            .map_err(|error| (ERR_DATABASE, error.user_message()))?,
+                        None => None,
+                    }
+                }
             };
             match session {
                 Some(session) => json!({
@@ -544,6 +561,123 @@ fn call_tool(params: &Value) -> Result<Value, (i64, String)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::{TimeZone, Utc};
+    use std::path::PathBuf;
+    use zeppbridge_core::models::{SleepSession, SleepStageSlice, SourceScope};
+
+    struct TestLibrary(PathBuf);
+
+    impl TestLibrary {
+        fn new(sessions: &[SleepSession]) -> Self {
+            let nonce = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let dir = std::env::temp_dir().join(format!(
+                "zeppbridge-mcp-sleep-{}-{nonce}",
+                std::process::id()
+            ));
+            std::fs::create_dir_all(&dir).unwrap();
+            let library = Self(dir);
+            let db = Database::open_migrated(&library.0.join("zepp.db")).unwrap();
+            for session in sessions {
+                db.insert_sleep_session(session).unwrap();
+            }
+            library
+        }
+
+        fn call_sleep(&self, arguments: Value) -> Value {
+            call_tool_with_db(
+                &json!({ "name": "get_sleep_detail", "arguments": arguments }),
+                || {
+                    let db = Database::open_read_only(self.0.join("zepp.db"))
+                        .map_err(|error| (ERR_DATABASE, error.user_message()))?;
+                    Ok((db, 0))
+                },
+            )
+            .unwrap()
+        }
+    }
+
+    impl Drop for TestLibrary {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn sleep_session(id: &str, day: u32, stage: Option<&str>) -> SleepSession {
+        let start = Utc.with_ymd_and_hms(2026, 1, day, 20, 0, 0).unwrap();
+        let end = start + chrono::Duration::minutes(60);
+        SleepSession {
+            sleep_id: id.into(),
+            start_time: start,
+            end_time: end,
+            score: Some(80),
+            duration_minutes: 60,
+            deep_minutes: 30,
+            light_minutes: 30,
+            rem_minutes: None,
+            awake_minutes: 0,
+            source_scope: SourceScope::Device,
+            device_id: None,
+            synced_at: Some(end + chrono::Duration::hours(1)),
+            time_in_bed_minutes: None,
+            stages: stage
+                .map(|stage| SleepStageSlice {
+                    stage: stage.into(),
+                    start_time: start,
+                    end_time: start + chrono::Duration::minutes(30),
+                    raw_mode: Some(5),
+                })
+                .into_iter()
+                .collect(),
+            wake_count: Some(1),
+        }
+    }
+
+    #[test]
+    fn latest_sleep_returns_the_same_full_detail_as_an_explicit_id() {
+        let older = sleep_session("older", 1, Some("light"));
+        let latest = sleep_session("latest", 2, Some("deep"));
+        let library = TestLibrary::new(&[older, latest.clone()]);
+
+        let implicit = library.call_sleep(json!({}));
+        let explicit = library.call_sleep(json!({ "sleepId": "latest" }));
+        assert_eq!(implicit, explicit);
+        assert_eq!(implicit["isError"], json!(false));
+        assert_eq!(
+            implicit["structuredContent"]["sleep"],
+            serde_json::to_value(latest).unwrap()
+        );
+        let text: Value =
+            serde_json::from_str(implicit["content"][0]["text"].as_str().unwrap()).unwrap();
+        assert_eq!(text, implicit["structuredContent"]);
+
+        let previous = library.call_sleep(json!({ "sleepId": "older" }));
+        assert_eq!(previous["structuredContent"]["sleep"]["sleep_id"], "older");
+        assert_eq!(
+            previous["structuredContent"]["sleep"]["stages"][0]["stage"],
+            "light"
+        );
+    }
+
+    #[test]
+    fn sleep_queries_preserve_missing_sessions_and_missing_stages() {
+        let empty = TestLibrary::new(&[]);
+        let recent = empty.call_sleep(json!({}));
+        assert_eq!(recent["isError"], json!(false));
+        assert_eq!(recent["structuredContent"]["sleep"], Value::Null);
+
+        let library = TestLibrary::new(&[sleep_session("no-stages", 1, None)]);
+        let recent = library.call_sleep(json!({}));
+        assert_eq!(
+            recent["structuredContent"]["sleep"]["sleep_id"],
+            "no-stages"
+        );
+        assert_eq!(recent["structuredContent"]["sleep"]["stages"], json!([]));
+        let missing = library.call_sleep(json!({ "sleepId": "unknown" }));
+        assert_eq!(missing["structuredContent"]["sleep"], Value::Null);
+    }
 
     #[test]
     fn every_tool_declares_units_and_the_missing_value_rule() {
