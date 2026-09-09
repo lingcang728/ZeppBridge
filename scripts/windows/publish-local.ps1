@@ -55,6 +55,22 @@ function Copy-WithRetry([string]$Source, [string]$Destination) {
   }
 }
 
+# v3 worktree 打出来的测试版必须叫这个名字。禁止再产出 ZeppBridge.exe /
+# ZeppBridge.lnk / App Paths\ZeppBridge.exe，那些是 2.x 日常入口。
+$V3ProductName = 'ZeppBridge3'
+
+function Get-ProductName {
+  $conf = Get-Content -LiteralPath $TauriConfig -Encoding UTF8 -Raw | ConvertFrom-Json
+  $name = [string]$conf.productName
+  if ([string]::IsNullOrWhiteSpace($name)) {
+    throw 'tauri.conf.json 缺少 productName'
+  }
+  if ($name -ne $V3ProductName) {
+    throw "v3 worktree 打出来的测试版必须叫 $V3ProductName.exe，当前 productName=$name。改 src-tauri/tauri.conf.json 的 productName，禁止使用 ZeppBridge（会覆盖 2.x 日常入口）。"
+  }
+  return $name
+}
+
 function Get-AppVersion {
   $npmVersion = (Get-Content -LiteralPath $PackageJson -Encoding UTF8 -Raw | ConvertFrom-Json).version
   $tauriVersion = (Get-Content -LiteralPath $TauriConfig -Encoding UTF8 -Raw | ConvertFrom-Json).version
@@ -83,16 +99,16 @@ function Get-CargoTargetDir {
   return [System.IO.Path]::GetFullPath($target)
 }
 
-function Get-VersionedArtifactVersion([string]$Name) {
-  if ($Name -match '^ZeppBridge_(\d+\.\d+\.\d+)_') {
+function Get-VersionedArtifactVersion([string]$Name, [string]$ProductName) {
+  if ($Name -match "^$([regex]::Escape($ProductName))_(\d+\.\d+\.\d+)_") {
     return $Matches[1]
   }
   return $null
 }
 
-function Test-KeepReleaseFile([string]$Name, [string]$Version) {
-  if ($Name -ieq 'ZeppBridge.exe') { return $true }
-  $fileVersion = Get-VersionedArtifactVersion $Name
+function Test-KeepReleaseFile([string]$Name, [string]$Version, [string]$ProductName) {
+  if ($Name -ieq "$ProductName.exe") { return $true }
+  $fileVersion = Get-VersionedArtifactVersion -Name $Name -ProductName $ProductName
   if ($null -eq $fileVersion) { return $true }
   return $fileVersion -eq $Version
 }
@@ -100,15 +116,16 @@ function Test-KeepReleaseFile([string]$Name, [string]$Version) {
 function Remove-OldVersionedArtifacts {
   param(
     [Parameter(Mandatory = $true)][string]$Directory,
-    [Parameter(Mandatory = $true)][string]$Version
+    [Parameter(Mandatory = $true)][string]$Version,
+    [Parameter(Mandatory = $true)][string]$ProductName
   )
   if (-not (Test-Path -LiteralPath $Directory -PathType Container)) { return @() }
   $removed = @()
   $files = [System.IO.Directory]::GetFiles($Directory)
   foreach ($path in $files) {
     $name = [System.IO.Path]::GetFileName($path)
-    if (Test-KeepReleaseFile -Name $name -Version $Version) { continue }
-    $fileVersion = Get-VersionedArtifactVersion $name
+    if (Test-KeepReleaseFile -Name $name -Version $Version -ProductName $ProductName) { continue }
+    $fileVersion = Get-VersionedArtifactVersion -Name $name -ProductName $ProductName
     if ($null -eq $fileVersion) { continue }
     if (Remove-FileSafe $path) {
       $removed += $path
@@ -121,7 +138,8 @@ function Remove-OldVersionedArtifacts {
 function Stop-ProcessesAt([string]$Executable) {
   if (-not (Test-Path -LiteralPath $Executable -PathType Leaf)) { return 0 }
   $target = [System.IO.Path]::GetFullPath($Executable)
-  $running = @(Get-Process -Name 'ZeppBridge', 'zeppbridge' -ErrorAction SilentlyContinue | Where-Object {
+  $procName = [System.IO.Path]::GetFileNameWithoutExtension($Executable)
+  $running = @(Get-Process -Name $procName, 'zeppbridge' -ErrorAction SilentlyContinue | Where-Object {
       try {
         if (-not $_.Path) { return $false }
         return ([System.IO.Path]::GetFullPath($_.Path)).Equals($target, [System.StringComparison]::OrdinalIgnoreCase)
@@ -134,7 +152,7 @@ function Stop-ProcessesAt([string]$Executable) {
     try { [void]$proc.CloseMainWindow() } catch { }
   }
   Start-Sleep -Milliseconds 700
-  $still = @(Get-Process -Name 'ZeppBridge', 'zeppbridge' -ErrorAction SilentlyContinue | Where-Object {
+  $still = @(Get-Process -Name $procName, 'zeppbridge' -ErrorAction SilentlyContinue | Where-Object {
       try {
         if (-not $_.Path) { return $false }
         return ([System.IO.Path]::GetFullPath($_.Path)).Equals($target, [System.StringComparison]::OrdinalIgnoreCase)
@@ -182,20 +200,23 @@ function Get-ShortcutTarget([string]$ShortcutPath) {
   }
 }
 
-function Update-UserEntry([string]$PortableExe, [string]$Version) {
+function Update-UserEntry([string]$PortableExe, [string]$Version, [string]$ProductName) {
+  if ($ProductName -eq 'ZeppBridge') {
+    throw '拒绝把 2.x 日常入口（ZeppBridge.lnk / App Paths\\ZeppBridge.exe）改去指向 v3 测试版。'
+  }
   $desktop = [Environment]::GetFolderPath('DesktopDirectory')
   if ([string]::IsNullOrWhiteSpace($desktop)) {
     $desktop = [Environment]::GetFolderPath('Desktop')
   }
   $startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
-  $desktopLnk = Join-Path $desktop 'ZeppBridge.lnk'
-  $startMenuLnk = Join-Path $startMenu 'ZeppBridge.lnk'
-  $description = "ZeppBridge $Version"
+  $desktopLnk = Join-Path $desktop "$ProductName.lnk"
+  $startMenuLnk = Join-Path $startMenu "$ProductName.lnk"
+  $description = "$ProductName $Version"
 
   Set-Shortcut -ShortcutPath $desktopLnk -TargetPath $PortableExe -Description $description
   Set-Shortcut -ShortcutPath $startMenuLnk -TargetPath $PortableExe -Description $description
 
-  $appPaths = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\App Paths\ZeppBridge.exe'
+  $appPaths = "HKCU:\Software\Microsoft\Windows\CurrentVersion\App Paths\$ProductName.exe"
   if (-not (Test-Path -LiteralPath $appPaths)) {
     New-Item -Path $appPaths -Force | Out-Null
   }
@@ -255,14 +276,16 @@ function Remove-StaleNsisInstall {
 }
 
 $version = Get-AppVersion
+$productName = Get-ProductName
 Write-Host "当前版本：$version"
+Write-Host "产品名：$productName"
 if (-not (Test-Path -LiteralPath $ReleaseDir -PathType Container)) {
   [void][System.IO.Directory]::CreateDirectory($ReleaseDir)
 }
 
-$portableDest = Join-Path $ReleaseDir 'ZeppBridge.exe'
-$nsisName = "ZeppBridge_${version}_x64-setup.exe"
-$msiName = "ZeppBridge_${version}_x64_en-US.msi"
+$portableDest = Join-Path $ReleaseDir "$productName.exe"
+$nsisName = "${productName}_${version}_x64-setup.exe"
+$msiName = "${productName}_${version}_x64_en-US.msi"
 
 if (-not $UserEntryOnly) {
   $targetDir = Get-CargoTargetDir
@@ -271,7 +294,7 @@ if (-not $UserEntryOnly) {
   Write-Host "Bundle 目录：$bundleDir"
 
   $portableSource = $null
-  foreach ($name in @('ZeppBridge.exe', 'zeppbridge.exe')) {
+  foreach ($name in @("$productName.exe", 'zeppbridge.exe')) {
     $candidate = Join-Path $targetDir "release\$name"
     if (Test-Path -LiteralPath $candidate -PathType Leaf) {
       $portableSource = $candidate
@@ -279,7 +302,7 @@ if (-not $UserEntryOnly) {
     }
   }
   if (-not $portableSource) {
-    throw "构建成功但未找到独立 exe：$targetDir\release\ZeppBridge.exe"
+    throw "构建成功但未找到独立 exe：$targetDir\release\$productName.exe"
   }
 
   $nsisSource = $null
@@ -351,7 +374,7 @@ if (-not $UserEntryOnly) {
     (Join-Path $Root 'src-tauri\target\release\bundle\msi')
   )
   foreach ($dir in $pruneDirs) {
-    [void](Remove-OldVersionedArtifacts -Directory $dir -Version $version)
+    [void](Remove-OldVersionedArtifacts -Directory $dir -Version $version -ProductName $productName)
   }
 } else {
   $pruneDirs = @(
@@ -369,7 +392,7 @@ if (-not $UserEntryOnly) {
     Write-Host "跳过 Cargo bundle 清理：$($_.Exception.Message)"
   }
   foreach ($dir in $pruneDirs) {
-    [void](Remove-OldVersionedArtifacts -Directory $dir -Version $version)
+    [void](Remove-OldVersionedArtifacts -Directory $dir -Version $version -ProductName $productName)
   }
 }
 
@@ -378,19 +401,19 @@ if (-not (Test-Path -LiteralPath $portableDest -PathType Leaf)) {
 }
 $portableInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($portableDest)
 if ($portableInfo.FileVersion -ne $version -and $portableInfo.ProductVersion -ne $version) {
-  throw "release\\ZeppBridge.exe 版本是 $($portableInfo.FileVersion)，期望 $version"
+  throw "release\\$productName.exe 版本是 $($portableInfo.FileVersion)，期望 $version"
 }
 
 if (-not $SkipShortcuts) {
-  Update-UserEntry -PortableExe $portableDest -Version $version
+  Update-UserEntry -PortableExe $portableDest -Version $version -ProductName $productName
 }
 
 if (-not $SkipStaleInstall) {
-  [void](Remove-StaleNsisInstall)
+  Write-Host 'v3 跳过 2.x LocalAppData / Uninstall 清理，以免动到正式版残留项。'
 }
 
 $leftover = @(Get-ChildItem -LiteralPath $ReleaseDir -File | Where-Object {
-    $fileVersion = Get-VersionedArtifactVersion $_.Name
+    $fileVersion = Get-VersionedArtifactVersion -Name $_.Name -ProductName $productName
     return ($null -ne $fileVersion -and $fileVersion -ne $version)
   })
 if ($leftover.Count -gt 0) {

@@ -1,6 +1,12 @@
 $ErrorActionPreference = 'Stop'
 $root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $loadedLocalSigningKey = $false
+$env:CARGO_TARGET_DIR = 'G:\build_cache\cargo-target-v3'
+
+$tauriConf = Get-Content -LiteralPath (Join-Path $root 'src-tauri\tauri.conf.json') -Encoding UTF8 -Raw | ConvertFrom-Json
+if ([string]$tauriConf.productName -ne 'ZeppBridge3') {
+  throw "v3 worktree 打出来的测试版必须叫 ZeppBridge3.exe，当前 productName=$($tauriConf.productName)。禁止覆盖 2.x 的 ZeppBridge.exe。"
+}
 
 Push-Location $root
 try {

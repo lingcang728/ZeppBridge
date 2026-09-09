@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "ZeppBridge",
+  "productName": "ZeppBridge3",
   "version": "2.2.2",
   "identifier": "com.zeppbridge.app",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "ZeppBridge",
+        "title": "ZeppBridge3",
         "width": 1280,
         "height": 800,
         "minWidth": 520,

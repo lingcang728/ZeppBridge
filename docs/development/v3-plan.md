@@ -15,6 +15,12 @@ PR 和 origin。在这里正常 `git add` / `commit` / `push`，功能分支往 
 worktree」一节，**动手前先读那一节**，尤其是 cargo target 必须走
 `pwsh scripts\v3-gates.ps1`。
 
+**Windows 测试包必须叫 `ZeppBridge3`。** `tauri.conf.json` 的 `productName`
+是 `ZeppBridge3`，打出来的是 `release\ZeppBridge3.exe`，快捷方式 / Win+R
+是 `ZeppBridge3`。2.x 的 `ZeppBridge.exe`、桌面 `ZeppBridge.lnk`、
+`App Paths\ZeppBridge.exe` 一律不许动。`publish-local.ps1` 看到产品名还是
+`ZeppBridge` 会直接失败。
+
 **接入资料在仓库外**：那批 PDF、与官方对接人的聊天截图、第三方 guide 存放在用户
 桌面的一个本地目录，**一律不得进入本仓库或任何 GitHub 仓库**，3.0.0 发布后删除。
 需要引用时只写结论本身，不要贴原文、截图、审批信息或应用凭据。

@@ -27,8 +27,15 @@ if (-not (Test-Path $manifest)) {
     throw "找不到 $manifest —— 这个脚本必须留在 v3 worktree 的 scripts\ 下运行。"
 }
 
+$tauriConfPath = Join-Path $repoRoot 'src-tauri\tauri.conf.json'
+$tauriConf = Get-Content -LiteralPath $tauriConfPath -Encoding UTF8 -Raw | ConvertFrom-Json
+if ([string]$tauriConf.productName -ne 'ZeppBridge3') {
+    throw "v3 的 productName 必须是 ZeppBridge3（打出来的 exe 才能和 2.x 的 ZeppBridge 分开），当前是 $($tauriConf.productName)。"
+}
+
 Write-Host "CARGO_TARGET_DIR = $env:CARGO_TARGET_DIR" -ForegroundColor Cyan
 Write-Host "manifest         = $manifest" -ForegroundColor Cyan
+Write-Host "productName      = $($tauriConf.productName)" -ForegroundColor Cyan
 Write-Host ''
 
 # 顺序与 .github/workflows/ci.yml 一致。--workspace 不能省：
