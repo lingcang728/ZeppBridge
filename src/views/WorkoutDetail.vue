@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
+import { open as showOpenDialog } from '@tauri-apps/plugin-dialog';
 import { RouterLink, useRoute } from 'vue-router';
 import { VChart } from '../lib/echartsSetup';
 import DesignIcon, { type DesignIconName } from '../components/DesignIcon.vue';
@@ -145,9 +146,12 @@ const messages = defineMessages(
 
     exportAria: '导出与分享',
     exportTitle: '导出与分享',
-    exportSub: '复制本地解码后的结构化数据，不访问地图服务。',
+    exportSub: '复制 JSON、CSV、GPX，或选择文件夹保存这条运动的 FIT 文件。',
     exportFormatAria: '导出格式',
     exportGo: (format: string) => `复制 ${format} 数据`,
+    saveFit: '保存 FIT 文件',
+    savedFit: 'FIT 文件已保存',
+    exportFailed: '导出失败',
 
     handoffAria: '交给 AI',
     handoffTitle: '交给 AI',
@@ -281,9 +285,12 @@ Answer in Markdown.`,
 
     exportAria: 'Export and share',
     exportTitle: 'Export and share',
-    exportSub: 'Copy the locally decoded structured data. No map service is contacted.',
+    exportSub: 'Copy JSON, CSV or GPX, or choose a folder to save this workout as FIT.',
     exportFormatAria: 'Export format',
     exportGo: (format: string) => `Copy ${format} data`,
+    saveFit: 'Save FIT file',
+    savedFit: 'FIT file saved',
+    exportFailed: 'Export failed',
 
     handoffAria: 'Hand to AI',
     handoffTitle: 'Hand to AI',
@@ -344,7 +351,8 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 const actionError = ref<string | null>(null);
 const exportedNote = ref<string | null>(null);
-const activeFormat = ref<'json' | 'csv' | 'gpx'>('json');
+const activeFormat = ref<'json' | 'csv' | 'gpx' | 'fit'>('json');
+const exportBusy = ref(false);
 const workoutId = computed(() => String(route.params.workoutId || ''));
 const displayType = computed(() => workout.value ? workoutDisplayType(workout.value) : 'unknown');
 const insight = ref<WorkoutInsight | null>(null);
@@ -960,13 +968,26 @@ const changeWorkoutOverride = async (value: string | number) => {
 };
 
 const exportRecord = async () => {
-  if (!workout.value) return;
+  if (!workout.value || exportBusy.value) return;
+  const exportWorkoutId = workout.value.workout_id;
   actionError.value = null;
   exportedNote.value = null;
+  exportBusy.value = true;
   try {
+    if (activeFormat.value === 'fit') {
+      const path = await showOpenDialog({ title: t.value.saveFit, directory: true, multiple: false });
+      if (!path || typeof path !== 'string') return;
+      await tauriApi.saveFitExport({
+        scope: { kind: 'workout', workoutId: exportWorkoutId },
+        dataTypes: ['workouts'],
+        detail: 'full',
+      }, path);
+      exportedNote.value = t.value.savedFit;
+      return;
+    }
     const csvCell = (value: unknown): string => `"${String(value ?? '').replace(/"/g, '""')}"`;
     const csv = () => {
-      const fields: Array<keyof WorkoutSeriesSample> = ['timestamp', 'heart_rate', 'speed', 'pace', 'cadence', 'stride_cm', 'altitude_m'];
+      const fields: Array<keyof WorkoutSeriesSample> = ['timestamp', 'heart_rate', 'speed', 'pace', 'cadence', 'stride_cm', 'altitude_m', 'power_watts', 'ground_contact_ms', 'vertical_oscillation_mm', 'vertical_ratio_pct', 'equivalent_pace_s_per_km'];
       return [fields.join(','), ...(series.value?.samples ?? []).map((sample) => fields.map((field) => csvCell(sample[field])).join(','))].join('\r\n');
     };
     const xmlEscape = (value: unknown): string => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[character] ?? character);
@@ -976,7 +997,8 @@ const exportRecord = async () => {
       : activeFormat.value === 'csv' ? csv() : gpx();
     await navigator.clipboard.writeText(payload);
     exportedNote.value = t.value.copied(activeFormat.value.toUpperCase());
-  } catch { actionError.value = t.value.copyFailed; }
+  } catch (cause) { actionError.value = toUserMessage(cause, t.value.exportFailed); }
+  finally { exportBusy.value = false; }
 };
 
 onMounted(() => {
@@ -1129,8 +1151,8 @@ watch([dataRevision, workoutId], () => void loadDetail());
           <section class="surface-card side-card" :aria-label="t.exportAria">
             <div class="section-head compact"><span class="section-icon export-tone"><DesignIcon name="document" :size="32" /></span><div><p class="section-eyebrow">EXPORT</p><h2>{{ t.exportTitle }}</h2></div></div>
             <p class="card-sub">{{ t.exportSub }}</p>
-            <div class="format-row" role="radiogroup" :aria-label="t.exportFormatAria"><button v-for="format in (['json', 'csv', 'gpx'] as const)" :key="format" type="button" role="radio" :aria-checked="activeFormat === format" :class="['format-pill', { 'is-on': activeFormat === format }]" @click="activeFormat = format">{{ format === 'gpx' ? 'GPX' : format.toUpperCase() }}</button></div>
-            <button class="export-go" type="button" @click="exportRecord"><DesignIcon name="cloud-output" :size="27" />{{ t.exportGo(activeFormat.toUpperCase()) }}</button>
+            <div class="format-row" role="radiogroup" :aria-label="t.exportFormatAria"><button v-for="format in (['json', 'csv', 'gpx', 'fit'] as const)" :key="format" type="button" role="radio" :disabled="exportBusy || (format === 'fit' && !isTauri())" :aria-checked="activeFormat === format" :class="['format-pill', { 'is-on': activeFormat === format }]" @click="activeFormat = format">{{ format.toUpperCase() }}</button></div>
+            <button class="export-go" type="button" :disabled="exportBusy" @click="exportRecord"><DesignIcon name="cloud-output" :size="27" />{{ activeFormat === 'fit' ? t.saveFit : t.exportGo(activeFormat.toUpperCase()) }}</button>
             <p v-if="exportedNote" class="action-note ok" role="status"><Icon name="circle-check" :size="13" />{{ exportedNote }}</p><p v-if="actionError" class="action-note bad" role="alert"><Icon name="warning" :size="13" />{{ actionError }}</p>
           </section>
 
