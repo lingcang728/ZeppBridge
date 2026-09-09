@@ -1456,6 +1456,56 @@ mod tests {
         assert_eq!(messages_of(&fit, typedef::MesgNum::ACTIVITY).len(), 1);
     }
 
+    #[test]
+    fn raw_power_survives_storage_and_single_workout_fit_export() {
+        use crate::models::types::{ExportDetail, ExportScope, ExportSelection, Workout};
+        use crate::storage::Database;
+        let db = Database::in_memory().unwrap();
+        let start = DateTime::from_timestamp(1_700_000_000, 0).unwrap();
+        let id = "1700000000";
+        db.insert_workout(&Workout {
+            workout_id: id.into(),
+            workout_type: "run".into(),
+            normalized_type: "run".into(),
+            effective_type: "run".into(),
+            start_time: start,
+            end_time: start + chrono::Duration::seconds(3),
+            ..Default::default()
+        })
+        .unwrap();
+        let payload = json!({
+            "trackid": 1_700_000_000i64,
+            "time": "0;1;1;1;",
+            "heart_rate": "0,120;1,1;1,1;1,1;",
+            "power_meter": "0,200;,250;,0;,300;"
+        });
+        db.normalize_and_persist_raw(
+            0,
+            "workout_detail",
+            "workout_detail:1700000000:run.gps",
+            &payload,
+        )
+        .unwrap();
+        let selection = ExportSelection {
+            scope: Some(ExportScope::Workout {
+                workout_id: id.into(),
+            }),
+            start_date: None,
+            end_date: None,
+            data_types: vec!["workouts".into()],
+            detail: ExportDetail::Full,
+        };
+        let (encoded, _) = db.build_ai_export(&selection).unwrap();
+        let (files, _) = to_fit(&serde_json::from_str(&encoded).unwrap()).unwrap();
+        assert_eq!(files.len(), 1);
+        let fit = decode(&files[0].1);
+        let powers: Vec<_> = messages_of(&fit, typedef::MesgNum::RECORD)
+            .iter()
+            .map(|record| int_of(record, mesgdef::Record::POWER))
+            .collect();
+        assert_eq!(powers, vec![Some(200), Some(250), Some(0), Some(300)]);
+    }
+
     /// 没有 splits 的运动也必须有 lap，且 `num_laps >= 1`。
     ///
     /// 室内运动（跑步机、划船机、瑜伽、自由训练）和距离不足 1 km 的户外运动，
