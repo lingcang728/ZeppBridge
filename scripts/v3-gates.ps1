@@ -1,10 +1,10 @@
-# v3 实验仓专用门禁脚本。
+# v3 worktree 专用门禁脚本。
 #
 # 存在的唯一理由：CARGO_TARGET_DIR 是**全局环境变量**（本机指向
 # G:\build_cache\cargo-target），而 cargo 的优先级是
 #   --target-dir > CARGO_TARGET_DIR 环境变量 > .cargo/config.toml 的 build.target-dir
-# 所以在 v3 里放一个 .cargo/config.toml 是**无效**的，必须在调用前显式覆盖环境变量。
-# 不覆盖的后果：v3 和主仓库共用同一个 target 目录，两棵不同的源码树写同一批
+# 所以在 v3 worktree 里放一个 .cargo/config.toml 是**无效**的，必须在调用前显式覆盖环境变量。
+# 不覆盖的后果：v3 和 main 两个 worktree 共用同一个 target 目录，两棵不同的源码树写同一批
 # 产物指纹，典型症状是 cargo check 过、cargo test 却挂在莫名其妙的地方。
 #
 # 用法：
@@ -24,7 +24,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $manifest = Join-Path $repoRoot 'src-tauri\Cargo.toml'
 
 if (-not (Test-Path $manifest)) {
-    throw "找不到 $manifest —— 这个脚本必须留在 v3 仓库的 scripts\ 下运行。"
+    throw "找不到 $manifest —— 这个脚本必须留在 v3 worktree 的 scripts\ 下运行。"
 }
 
 Write-Host "CARGO_TARGET_DIR = $env:CARGO_TARGET_DIR" -ForegroundColor Cyan

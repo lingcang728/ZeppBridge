@@ -1,16 +1,19 @@
-# ZeppBridge 3.0 施工计划（v3 实验仓交接文档）
+# ZeppBridge 3.0 施工计划（v3 分支交接文档）
 
-> **这是 v3 实验仓的内部工作文档，不是随产品发布的文档**，因此不需要英文对照版
+> **这是 v3 分支的内部工作文档，不是随产品发布的文档**，因此不需要英文对照版
 > （`docs/` 下其余文档的 `*.zh-CN.md` 配对约定不适用于它）。
 >
-> 基线：`main@8dc9cb6` + 本仓库的 `22e2715`。核对日期 2026-09-05。
+> 基线：`main@b0d4b88`（2.2.2）+ v3 文档/门禁提交。核对日期 2026-09-05；
+> 2026-09-09 转为同仓库 `v3` 分支的 git worktree。
 
 ## 0. 接手前必读
 
-本目录是 `MyProject\ZeppBridge` 的独立副本，**没有 git remote**（clone 后已
-`git remote remove origin`），所以这里提不了 PR 也推不出去；要把修复带回主仓库
-用 cherry-pick。其余隔离规则见 `CLAUDE.md` 顶部的「这是 v3 实验仓」一节，**动手前
-先读那一节**，尤其是 cargo target 必须走 `pwsh scripts\v3-gates.ps1`。
+本目录是 `lingcang728/ZeppBridge` 的 git worktree，永远停在 `v3` 分支；旁边的
+`MyProject\ZeppBridge` 永远停在 `main`（2.x）。两边共享完整 Git 历史、Issue、
+PR 和 origin。在这里正常 `git add` / `commit` / `push`，功能分支往 `v3` 提 PR，
+不要往 `main` 提 3.0 的拆建。其余隔离规则见 `CLAUDE.md` 顶部的「这是 v3
+worktree」一节，**动手前先读那一节**，尤其是 cargo target 必须走
+`pwsh scripts\v3-gates.ps1`。
 
 **接入资料在仓库外**：那批 PDF、与官方对接人的聊天截图、第三方 guide 存放在用户
 桌面的一个本地目录，**一律不得进入本仓库或任何 GitHub 仓库**，3.0.0 发布后删除。
@@ -30,7 +33,7 @@ Zepp 开放平台主动邀请 ZeppBridge 注册为正式 partner。开发者身�
 |---|---|
 | 数据源策略 | **官方为主，旧连接器降级为可选补充**——不是二选一，也不是纯替换 |
 | 重构半径 | **前后端都重构** |
-| 仓库形态 | clone 保留历史，删除 origin |
+| 仓库形态 | 同仓库 git worktree，分支 `v3`（2026-09-09 从独立副本迁入） |
 | 开发库 | 主仓库根 `data/` 的 74 MB 开发库副本 |
 
 ## 2. 官方接口的事实基础
@@ -204,7 +207,7 @@ FIT 会同时放大锁持有时间和内存峰值 → 拆成「获取/暂存」�
 
 | 批次 | 内容 | 完成标准 | 状态 |
 |---|---|---|---|
-| **B0 建仓** | clone、删 origin、补 ignored 目录、`npm ci`、独立 target、修文档漂移 | 全部门禁绿；主仓库不受影响 | **已完成**（`22e2715`） |
+| **B0 建仓** | 同仓库 `v3` 分支 + `ZeppBridge-v3` worktree、独立 cargo target、修文档漂移 | `git status` 显示 `On branch v3`；主目录仍在 `main` | **已完成**（2026-09-09 转为 worktree） |
 | **B1 本地 FIT 解码** | 用 `rustyfit` 解 Session/Record/Lap/Event/Length/Set/TimeInZone + developer fields；脱敏 fixture | 能从真实 FIT 还原出可与现有解码器比对的序列；未知 developer field 不导致已知字段全丢 | 下一步 |
 | **B2 provider 抽象 + v22** | 抽 trait、封 `LegacyZeppProvider`、加 provider 维度、重建索引 | 开发库升级后历史、设备指认、自定义运动名全可读；不 bump normalizer revision | |
 | **B3 云端最小闭环** | OAuth + 刷新 + 单安装实例绑定 + 推送持久收件箱 + 领取确认 | 一位测试用户：一条睡眠推送 + 一条 FIT 落本机；重复投递不重复计数；离线可补领 | |
