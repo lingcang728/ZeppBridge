@@ -12,6 +12,31 @@ use std::path::{Path, PathBuf};
 pub const CURRENT_SCHEMA_VERSION: i64 = 21;
 /// 写进备份 manifest 的应用版本。Core 是独立 crate，用它自己的包版本。
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Accepted `ExportSelection::data_types`, shared with callers that validate input.
+pub const EXPORT_DATA_TYPES: [&str; 17] = [
+    "heart_rate",
+    "hrv",
+    "hrv_rmssd",
+    "respiratory_rate",
+    "pai",
+    "lactate_threshold",
+    "daily_activity",
+    "sleep",
+    "workouts",
+    "recovery",
+    "steps",
+    "spo2",
+    "stress",
+    "training_load",
+    "vo2max",
+    "weight",
+    // 饮食一度只登记在能力表（`CapabilityEvidence::DailyPrefix("intake_")`）
+    // 里，却从来没进过这张允许表：`--types food` 被静默丢掉，摄入数据
+    // 入了库、能画图、却导不出来。
+    "food",
+];
+
 /// 解析器修订号。**改了运动目录或任何归一化规则，就必须往前走一格。**
 ///
 /// 它是自动重放的唯一触发条件：启动时发现库里存的修订号和这个不一样，就把
@@ -4623,30 +4648,7 @@ impl Database {
             // 一天吃了什么和某一条运动同样没有关系，理由同上。
             "food",
         ];
-        let allowed: BTreeSet<&str> = [
-            "heart_rate",
-            "hrv",
-            "hrv_rmssd",
-            "respiratory_rate",
-            "pai",
-            "lactate_threshold",
-            "daily_activity",
-            "sleep",
-            "workouts",
-            "recovery",
-            "steps",
-            "spo2",
-            "stress",
-            "training_load",
-            "vo2max",
-            "weight",
-            // 饮食一度只登记在能力表（`CapabilityEvidence::DailyPrefix("intake_")`）
-            // 里，却从来没进过这张允许表：`--types food` 被静默丢掉，摄入数据
-            // 入了库、能画图、却导不出来。
-            "food",
-        ]
-        .into_iter()
-        .collect();
+        let allowed: BTreeSet<&str> = EXPORT_DATA_TYPES.into_iter().collect();
         let selected: BTreeSet<String> = selection
             .data_types
             .iter()
@@ -4673,6 +4675,8 @@ impl Database {
         let mut metric_samples = Vec::new();
         if selected.contains("heart_rate")
             || selected.contains("hrv")
+            || selected.contains("hrv_rmssd")
+            || selected.contains("respiratory_rate")
             || selected.contains("spo2")
             || selected.contains("stress")
             || selected.contains("weight")
@@ -4690,12 +4694,18 @@ impl Database {
                  FROM metric_samples
                  WHERE (?5 IS NULL OR timestamp >= ?5)
                    AND (?6 IS NULL OR timestamp < ?6)
-                   AND date(timestamp, 'localtime') BETWEEN ?1 AND ?2
+                   AND (?3 IS NOT NULL OR date(timestamp, 'localtime') BETWEEN ?1 AND ?2)
                    AND (?3 IS NULL OR timestamp >= ?3)
                    AND (?4 IS NULL OR timestamp <= ?4)
                  ORDER BY timestamp",
             )?;
-            let day_bounds = local_day_range_utc_bounds(&start_text, &end_text);
+            // A workout can cross local midnight. Its actual time window must
+            // not be clipped to the calendar day on which it started.
+            let day_bounds = if single_workout {
+                None
+            } else {
+                local_day_range_utc_bounds(&start_text, &end_text)
+            };
             let (day_lower, day_upper) = match &day_bounds {
                 Some((lower, upper)) => (Some(lower.as_str()), Some(upper.as_str())),
                 None => (None, None),
@@ -4744,6 +4754,9 @@ impl Database {
                 let Some(matched_type) = matched_type else {
                     continue;
                 };
+                if single_workout && DAY_LEVEL_TYPES.contains(&matched_type.as_str()) {
+                    continue;
+                }
                 *produced.entry(matched_type.clone()).or_default() += 1;
                 let device_label = devices.label(device_id.as_deref());
                 if !full && HOURLY_AGGREGATED_METRICS.contains(&metric.as_str()) {
@@ -4804,6 +4817,10 @@ impl Database {
         if !single_workout
             && (selected.contains("daily_activity")
                 || selected.contains("recovery")
+                || selected.contains("respiratory_rate")
+                || selected.contains("lactate_threshold")
+                || selected.contains("pai")
+                || selected.contains("hrv_rmssd")
                 || selected.contains("steps")
                 || selected.contains("spo2")
                 || selected.contains("stress")
@@ -7178,6 +7195,155 @@ mod tests {
         serde_json::from_str(&encoded).unwrap()
     }
 
+    #[test]
+    fn metric_sample_types_export_without_an_unrelated_selection() {
+        let db = Database::in_memory().unwrap();
+        for (metric, value, unit) in [
+            ("hrv_rmssd", 42.0, "ms"),
+            ("respiratory_rate", 16.0, "brpm"),
+        ] {
+            db.insert_metric_sample(&MetricSample {
+                metric: metric.into(),
+                timestamp: ts(),
+                value,
+                unit: unit.into(),
+                source_scope: SourceScope::Device,
+                device_id: None,
+            })
+            .unwrap();
+        }
+
+        for detail in [ExportDetail::Summary, ExportDetail::Full] {
+            for (metric, expected) in [("hrv_rmssd", 42.0), ("respiratory_rate", 16.0)] {
+                let export = parsed_export(&db, &[metric], detail);
+                let samples = export["data"]["metric_samples"].as_array().unwrap();
+                assert_eq!(samples.len(), 1, "{metric}, {detail:?}");
+                assert_eq!(samples[0]["metric"], metric);
+                assert_eq!(samples[0]["value"], expected);
+                assert_eq!(export["record_count"], 1);
+                assert_eq!(export["capabilities"][metric]["status"], "available");
+                assert_eq!(export["capabilities"][metric]["source_records"], 1);
+                assert_eq!(export["capabilities"][metric]["rows_in_export"], 1);
+            }
+        }
+    }
+
+    #[test]
+    fn daily_metric_types_export_alone_but_stay_outside_workout_scope() {
+        let db = Database::in_memory().unwrap();
+        let workout = workout_with_type(None, "run", "string_field");
+        let date = workout
+            .start_time
+            .with_timezone(&Local)
+            .format("%Y-%m-%d")
+            .to_string();
+        db.insert_workout(&workout).unwrap();
+        let cases = [
+            ("respiratory_rate", "respiratory_rate", 16.0, "brpm"),
+            ("lactate_threshold", "lactate_threshold_hr", 170.0, "bpm"),
+            ("pai", "pai_daily", 20.0, "pai"),
+            ("hrv_rmssd", "hrv_rmssd", 42.0, "ms"),
+        ];
+        for (_, metric, value, unit) in cases {
+            db.insert_daily_metric(&DailyMetric {
+                date: date.clone(),
+                metric: metric.into(),
+                value,
+                unit: unit.into(),
+                source_scope: SourceScope::Device,
+                device_id: None,
+            })
+            .unwrap();
+        }
+
+        for detail in [ExportDetail::Summary, ExportDetail::Full] {
+            for (selected_type, metric, value, _) in cases {
+                let export = parsed_export(&db, &[selected_type], detail);
+                let daily = export["data"]["daily_metrics"].as_array().unwrap();
+                assert_eq!(daily.len(), 1, "{selected_type}, {detail:?}");
+                assert_eq!(daily[0]["metric"], metric);
+                assert_eq!(daily[0]["value"], value);
+                assert_eq!(export["record_count"], 1);
+                let capability = &export["capabilities"][selected_type];
+                assert_eq!(capability["status"], "available");
+                assert_eq!(capability["source_records"], 1);
+                assert_eq!(capability["rows_in_export"], 1);
+
+                let mut selection = export_selection(&[selected_type], detail);
+                selection.scope = Some(ExportScope::Workout {
+                    workout_id: workout.workout_id.clone(),
+                });
+                let (encoded, records) = db.build_ai_export(&selection).unwrap();
+                let scoped: serde_json::Value = serde_json::from_str(&encoded).unwrap();
+                assert_eq!(records, 0, "daily {metric} is outside workout scope");
+                assert!(scoped["data"]["daily_metrics"]
+                    .as_array()
+                    .unwrap()
+                    .is_empty());
+                if matches!(selected_type, "lactate_threshold" | "pai") {
+                    assert_eq!(
+                        scoped["capabilities"][selected_type]["status"],
+                        "excluded_by_scope"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn workout_export_excludes_weight_samples_that_overlap_the_workout() {
+        let db = Database::in_memory().unwrap();
+        let workout = workout_with_type(None, "run", "string_field");
+        db.insert_workout(&workout).unwrap();
+        for (metric, value, unit) in [
+            ("weight", 70.0, "kg"),
+            ("body_fat_rate", 18.5, "%"),
+            ("heart_rate", 120.0, "bpm"),
+        ] {
+            db.insert_metric_sample(&MetricSample {
+                metric: metric.into(),
+                timestamp: workout.start_time + chrono::Duration::minutes(5),
+                value,
+                unit: unit.into(),
+                source_scope: SourceScope::Device,
+                device_id: None,
+            })
+            .unwrap();
+        }
+
+        for detail in [ExportDetail::Summary, ExportDetail::Full] {
+            let date_export = parsed_export(&db, &["weight", "heart_rate"], detail);
+            let samples = date_export["data"]["metric_samples"].as_array().unwrap();
+            assert_eq!(samples.len(), 3);
+            for (metric, value) in [("weight", 70.0), ("body_fat_rate", 18.5)] {
+                let sample = samples.iter().find(|row| row["metric"] == metric).unwrap();
+                assert_eq!(sample["value"], value);
+            }
+            assert_eq!(date_export["capabilities"]["weight"]["status"], "available");
+            assert_eq!(date_export["capabilities"]["weight"]["source_records"], 2);
+            assert_eq!(date_export["capabilities"]["weight"]["rows_in_export"], 2);
+
+            let mut selection = export_selection(&["weight", "heart_rate"], detail);
+            selection.scope = Some(ExportScope::Workout {
+                workout_id: workout.workout_id.clone(),
+            });
+            let (encoded, records) = db.build_ai_export(&selection).unwrap();
+            let export: serde_json::Value = serde_json::from_str(&encoded).unwrap();
+            let samples = export["data"]["metric_samples"].as_array().unwrap();
+            assert_eq!(records, 1);
+            assert_eq!(samples.len(), 1);
+            assert_eq!(samples[0]["metric"], "heart_rate");
+            assert_eq!(export["capabilities"]["heart_rate"]["status"], "available");
+            assert_eq!(export["capabilities"]["heart_rate"]["source_records"], 1);
+            assert_eq!(export["capabilities"]["heart_rate"]["rows_in_export"], 1);
+            assert_eq!(
+                export["capabilities"]["weight"]["status"],
+                "excluded_by_scope"
+            );
+            assert_eq!(export["capabilities"]["weight"]["rows_in_export"], 0);
+        }
+    }
+
     /// 饮食能导出，而且不会被「日常活动」兜底扫走。
     ///
     /// `food` 一度只登记在能力表里，从来没进过导出的允许类型表：`--types food`
@@ -7578,6 +7744,72 @@ mod tests {
         assert!(upper.as_str() > "2026-08-29T00:00:00");
         // 日期无效时返回 None，让调用方退回不带边界的查询而不是查空。
         assert!(local_day_range_utc_bounds("not-a-date", "2026-08-29").is_none());
+    }
+
+    #[test]
+    fn workout_export_keeps_samples_after_local_midnight_within_its_window() {
+        let db = Database::in_memory().unwrap();
+        let start = NaiveDate::from_ymd_opt(2023, 11, 15)
+            .unwrap()
+            .and_hms_opt(23, 50, 0)
+            .unwrap()
+            .and_local_timezone(Local)
+            .single()
+            .unwrap()
+            .with_timezone(&Utc);
+        let mut workout = workout_with_type(None, "run", "string_field");
+        workout.start_time = start;
+        workout.end_time = start + chrono::Duration::minutes(20);
+        db.insert_workout(&workout).unwrap();
+        for (minutes, value) in [(-5, 60.0), (5, 100.0), (15, 110.0), (25, 70.0)] {
+            db.insert_metric_sample(&MetricSample {
+                metric: "heart_rate".into(),
+                timestamp: start + chrono::Duration::minutes(minutes),
+                value,
+                unit: "bpm".into(),
+                source_scope: SourceScope::Device,
+                device_id: None,
+            })
+            .unwrap();
+        }
+
+        for detail in [ExportDetail::Summary, ExportDetail::Full] {
+            let mut selection = export_selection(&["heart_rate"], detail);
+            selection.scope = Some(ExportScope::Workout {
+                workout_id: workout.workout_id.clone(),
+            });
+            let (encoded, _) = db.build_ai_export(&selection).unwrap();
+            let export: serde_json::Value = serde_json::from_str(&encoded).unwrap();
+            assert_eq!(export["capabilities"]["heart_rate"]["source_records"], 2);
+            let samples = export["data"]["metric_samples"].as_array().unwrap();
+            if detail.is_full() {
+                assert_eq!(samples.len(), 2);
+                assert_eq!(samples[0]["value"], 100.0);
+                assert_eq!(samples[1]["value"], 110.0);
+            } else {
+                assert_eq!(
+                    samples
+                        .iter()
+                        .map(|sample| sample["samples"].as_u64().unwrap())
+                        .sum::<u64>(),
+                    2
+                );
+                for sample in samples {
+                    assert!(sample["min"].as_f64().unwrap() >= 100.0);
+                    assert!(sample["max"].as_f64().unwrap() <= 110.0);
+                }
+            }
+        }
+
+        let day = start.with_timezone(&Local).format("%Y-%m-%d").to_string();
+        let mut selection = export_selection(&["heart_rate"], ExportDetail::Full);
+        selection.scope = Some(ExportScope::date_range(&day, &day));
+        let (encoded, _) = db.build_ai_export(&selection).unwrap();
+        let export: serde_json::Value = serde_json::from_str(&encoded).unwrap();
+        let samples = export["data"]["metric_samples"].as_array().unwrap();
+        assert_eq!(samples.len(), 2);
+        assert_eq!(samples[0]["value"], 60.0);
+        assert_eq!(samples[1]["value"], 100.0);
     }
 
     #[test]
