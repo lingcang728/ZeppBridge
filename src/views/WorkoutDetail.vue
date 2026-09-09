@@ -766,12 +766,13 @@ const lineOption = (points: { t: number; v: number }[], color: string, unit: str
   const avg = points.reduce((sum, p) => sum + p.v, 0) / points.length;
   return {
     animation: false,
-    grid: { left: 36, right: 12, top: 12, bottom: 22, containLabel: false },
+    grid: { left: 8, right: 18, top: 12, bottom: 8, containLabel: true },
     xAxis: {
       type: 'time',
+      splitNumber: 4,
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: '#B4BBC3', fontSize: 14.5 },
+      axisLabel: { color: '#B4BBC3', fontSize: 14.5, hideOverlap: true, formatter: '{HH}:{mm}' },
       splitLine: { show: false },
     },
     yAxis: {
@@ -1114,7 +1115,7 @@ watch([dataRevision, workoutId], () => void loadDetail());
                   <li v-for="stat in card.stats" :key="stat.label"><em>{{ stat.label }}</em><strong>{{ stat.value }}</strong></li>
                 </ul>
               </div>
-              <VChart class="series-chart" :option="card.option" autoresize role="img" :aria-label="t.chartAria(card.title)" />
+              <VChart class="series-chart" theme="zeppbridge-dark" :option="card.option" autoresize role="img" :aria-label="t.chartAria(card.title)" />
             </section>
           </div>
           <section v-if="!chartCards.length" class="surface-card chart-empty"><DesignIcon name="structured-data" :size="42" /><div><strong>{{ t.chartsEmptyTitle }}</strong><p>{{ t.chartsEmptyBody }}</p></div></section>
@@ -1265,24 +1266,28 @@ watch([dataRevision, workoutId], () => void loadDetail());
 .section-icon.heart-tone { background: rgba(240,97,106,.12); }
 .hr-zone-bar { display: flex; overflow: hidden; height: 15px; border: 1px solid var(--line); border-radius: 999px; background: rgba(11,14,17,.45); }
 .hr-zone-fill { min-width: 0; }
-.hr-zone-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 20px; margin: 13px 0 0; padding: 0; list-style: none; font-variant-numeric: tabular-nums; }
+.hr-zone-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 8px 20px; margin: 13px 0 0; padding: 0; list-style: none; font-variant-numeric: tabular-nums; }
 .hr-zone-list li { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); }
 .hr-zone-list .hr-zone-range { flex: 1 1 auto; color: var(--muted); }
-.hr-zone-list strong { color: var(--ink); font-weight: 600; }
+.hr-zone-list strong { color: var(--ink); font-family: 'Inter', var(--font-sans); font-weight: 600; white-space: nowrap; }
 .hr-zone-list em { min-width: 46px; color: var(--subtle); font-style: normal; text-align: right; }
 .hr-zone-dot { flex: 0 0 auto; width: 9px; height: 9px; border-radius: 3px; }
 /* 六段固定配色：由凉到热，和心率本身的强度方向一致。手表最多下发六段。 */
 .zone-0 { background: #4aa8e8; } .zone-1 { background: #2fa96b; } .zone-2 { background: #b7c944; }
 .zone-3 { background: #f5c33b; } .zone-4 { background: #ef8f4a; } .zone-5 { background: #f0616a; }
 .chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.chart-card { overflow: hidden; padding: 12px 14px; min-width: 0; border-radius: 18px; }
+.chart-card { overflow: hidden; padding: 12px 14px; min-width: 0; border-radius: 18px; container-type: inline-size; }
 .chart-card::before { display: block; height: 2px; margin: -12px -14px 10px; content: ''; background: var(--line); }
 .chart-heart::before { background: linear-gradient(90deg, var(--heart), transparent); } .chart-pace::before { background: linear-gradient(90deg, var(--pace), transparent); } .chart-altitude::before { background: linear-gradient(90deg, var(--warning), transparent); } .chart-cadence::before { background: linear-gradient(90deg, var(--readiness), transparent); }
 .chart-icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 11px; background: rgba(255,255,255,.025); }
 .chart-stats { display: grid; grid-template-columns: repeat(3, max-content); justify-content: end; gap: 8px 16px; margin: 1px 0 0 auto; min-width: 0; padding: 0; list-style: none; color: var(--subtle); font-variant-numeric: tabular-nums; }
 .chart-stats li { display: grid; gap: 1px; min-width: 0; }
 .chart-stats em { color: var(--subtle); font-size: var(--fs-2xs); font-style: normal; line-height: 1.2; }
-.chart-stats strong { color: #E8EBD8; font-size: var(--fs-md); font-weight: 600; line-height: 1.2; white-space: nowrap; }
+.chart-stats strong { color: #E8EBD8; font-family: 'Inter', var(--font-sans); font-size: var(--fs-md); font-weight: 600; line-height: 1.4; white-space: nowrap; }
+@container (max-width: 440px) {
+  .chart-head { flex-wrap: wrap; }
+  .chart-stats { width: 100%; margin-top: 6px; grid-template-columns: repeat(3, minmax(0, 1fr)); justify-content: stretch; gap: 8px 12px; }
+}
 .series-chart { width: 100%; height: 170px; }
 .chart-empty { display: flex; align-items: center; gap: 12px; padding: 20px; color: var(--muted); font-size: var(--fs-sm); }
 .chart-empty strong { color: var(--ink); }

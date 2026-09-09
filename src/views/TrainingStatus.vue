@@ -147,9 +147,7 @@ const thresholdOption = computed(() => {
     source?.points.find((point) => point.date === date)?.value ?? null;
   return {
     animationDuration: 600,
-    // 左边距要放得下 `165 bpm` 这种带单位的刻度：这里不开 containLabel，
-    // 标签是贴着固定的左边距右对齐画的，放不下就直接被画到画布外面去了。
-    grid: { left: 68, right: 52, top: 24, bottom: 28 },
+    grid: { left: 8, right: 12, top: 38, bottom: 8, containLabel: true },
     legend: {
       data: [t.value.thresholdHr, t.value.thresholdPace],
       top: 0,
@@ -216,7 +214,7 @@ const balanceOption = computed(() => {
   const dates = balance.value.map((point) => point.date);
   return {
     animationDuration: 600,
-    grid: { left: 46, right: 46, top: 24, bottom: 28 },
+    grid: { left: 8, right: 12, top: 38, bottom: 8, containLabel: true },
     legend: {
       data: [t.value.acute7d, t.value.chronicWeekly, t.value.acuteChronic],
       top: 0,

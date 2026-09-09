@@ -2,6 +2,17 @@
 
 本文件记录每个版本的实际改动。写给使用者看，不是施工日志：只写用户能感知到的变化，以及为什么这么改。
 
+## 2.2.2
+
+### Fixed / 修复
+
+- 修复运动详情时间轴标签重叠、统计数字拥挤和心率区间时长排版；窄卡片自动分行，数字采用清晰的 Inter 字体。
+- 修复训练状态坐标轴数字裁切。乳酸阈值和运动负荷平衡图例在曲线显示时使用白色，隐藏时使用灰色。
+- 连接设备卡片完整显示设备名称，将状态和操作移到下方，最近数据日期与时间保持完整。
+- Workout charts now avoid overlapping time labels and crowded statistics. Training charts reserve space for axis labels and show active legends in white, hidden legends in grey. Device cards keep names and timestamps readable.
+- 包含已合并的运动 FIT 导出及 CLI/MCP 导出数据完整性修复。
+- Includes the merged workout FIT export and CLI/MCP export data integrity fixes.
+
 ## 2.2.1
 
 ### Changed / 变化

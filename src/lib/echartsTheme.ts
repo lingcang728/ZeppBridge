@@ -3,7 +3,7 @@
    语义色集中定义；品牌色不进入健康数据的默认序列调色板。
    v4 配色：冷调深灰底 + 橄榄军绿主色。 */
 
-const fonts = "'MiSans','Segoe UI','Microsoft YaHei UI',sans-serif";
+const fonts = "'Inter','MiSans','Segoe UI','Microsoft YaHei UI',sans-serif";
 
 /** Stable metric colors shared by charts, legends, and data exports. */
 export const zeppSemanticColors = {
@@ -49,7 +49,7 @@ export const axisInk = '#B4BBC3';
 const darkAxis = {
   axisLine: { show: false },
   axisTick: { show: false },
-  axisLabel: { color: axisInk, fontSize: 14.5, fontWeight: 600 as const, fontFamily: fonts },
+  axisLabel: { color: axisInk, fontSize: 14.5, fontWeight: 400 as const, fontFamily: fonts, hideOverlap: true },
   splitLine: { show: true, lineStyle: { color: 'rgba(226,234,242,0.12)', type: 'dashed' as const } },
 };
 
@@ -57,6 +57,10 @@ export const zeppThemeDark = {
   color: healthSeriesPalette,
   backgroundColor: 'transparent',
   textStyle: { fontFamily: fonts, color: axisInk },
+  legend: {
+    textStyle: { color: '#F2F4EE', fontFamily: fonts },
+    inactiveColor: '#7C838C',
+  },
   categoryAxis: { ...darkAxis },
   valueAxis: { ...darkAxis },
   timeAxis: { ...darkAxis },
