@@ -13,7 +13,7 @@
 //! * **写库一律走跨进程写锁**。桌面应用开着的时候跑 `sync`，这里会拿不到锁
 //!   并以 `EXIT_BUSY` 退出，而不是和 GUI 抢着写同一个库。
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::process::ExitCode;
 use std::sync::atomic::AtomicBool;
@@ -30,7 +30,7 @@ use zeppbridge_core::models::error::HeadlessProblem;
 use zeppbridge_core::models::{error::ZeppBridgeError, ExportDetail, ExportScope, ExportSelection};
 use zeppbridge_core::paths;
 use zeppbridge_core::storage::write_lock::{self, WriteLockError, WritePurpose};
-use zeppbridge_core::storage::{Database, ReplayPlan, NORMALIZER_REVISION};
+use zeppbridge_core::storage::{Database, ReplayPlan, EXPORT_DATA_TYPES, NORMALIZER_REVISION};
 use zeppbridge_core::sync::{SyncManager, SyncReport};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -98,11 +98,15 @@ reprocess options:
 
 export options:
   --format <json|csv|gpx|fit>  Default: json; fit needs --out to point at a directory
-                               (fit always exports full detail: that is what a FIT file is)
+                               (csv, gpx and fit always export full detail)
   --from <YYYY-MM-DD>       Use together with --to
   --to <YYYY-MM-DD>
   --workout <id>            Export one workout; mutually exclusive with --from/--to
-  --types <a,b,c>           Default: workouts,daily,sleep
+  --types <a,b,c>           Default: workouts,daily_activity,sleep
+                            Allowed: heart_rate, hrv, hrv_rmssd, respiratory_rate,
+                            pai, lactate_threshold, daily_activity, sleep, workouts,
+                            recovery, steps, spo2, stress, training_load, vo2max,
+                            weight, food
   --detail <summary|full>   Default: summary
   --out <path>              Default: write to stdout
 
@@ -994,79 +998,122 @@ fn cmd_sync(args: &[String]) -> u8 {
 
 /* ------------------------------ export ------------------------------ */
 
-fn cmd_export(args: &[String]) -> u8 {
-    let flags = match Flags::parse(args) {
-        Ok(flags) => flags,
-        Err(message) => return fail(false, EXIT_USAGE, "usage", &message),
-    };
-    if let Err(message) = flags.reject_unknown(&[
+#[derive(Debug)]
+struct ExportOptions {
+    format: String,
+    out: Option<String>,
+    selection: ExportSelection,
+}
+
+/// 参数必须先通过校验，才能打开数据库或生成输出。
+fn parse_export_args(args: &[String]) -> Result<ExportOptions, String> {
+    let flags = Flags::parse(args)?;
+    flags.reject_unknown(&[
         "json", "format", "from", "to", "workout", "types", "detail", "out",
-    ]) {
-        return fail(false, EXIT_USAGE, "usage", &message);
+    ])?;
+    let mut seen = BTreeSet::new();
+    for (name, value) in &flags.values {
+        if !seen.insert(name.as_str()) {
+            return Err(format!("--{name} must not be repeated"));
+        }
+        if name == "json" {
+            if value.is_some() {
+                return Err("--json does not take a value".into());
+            }
+        } else if value.as_deref().is_none_or(|value| value.trim().is_empty()) {
+            return Err(format!("--{name} needs a non-empty value"));
+        }
     }
-    let json_mode = flags.has("json");
+
     let format = flags.get("format").unwrap_or("json");
     if !matches!(format, "json" | "csv" | "gpx" | "fit") {
-        return fail(
-            json_mode,
-            EXIT_USAGE,
-            "usage",
-            "--format must be json, csv, gpx or fit",
+        return Err("--format must be json, csv, gpx or fit".into());
+    }
+    if format == "fit" && !flags.has("out") {
+        return Err(
+            "--format fit needs --out to point at a directory: FIT is binary and one file per workout, so it cannot go to stdout"
+                .into(),
         );
     }
 
     // 范围互斥：同时给日期和单条运动是矛盾请求，不定优先级，直接报错。
     let scope = match (flags.get("from"), flags.get("to"), flags.get("workout")) {
         (Some(_), _, Some(_)) | (_, Some(_), Some(_)) => {
-            return fail(
-                json_mode,
-                EXIT_USAGE,
-                "usage",
-                "--from/--to and --workout are mutually exclusive ranges; give only one",
+            return Err(
+                "--from/--to and --workout are mutually exclusive ranges; give only one".into(),
             )
         }
         (Some(from), Some(to), None) => ExportScope::date_range(from, to),
         (Some(_), None, None) | (None, Some(_), None) => {
-            return fail(
-                json_mode,
-                EXIT_USAGE,
-                "usage",
-                "--from and --to must be given together",
-            )
+            return Err("--from and --to must be given together".into())
         }
         (None, None, Some(workout)) => ExportScope::Workout {
             workout_id: workout.to_string(),
         },
         (None, None, None) => {
-            return fail(
-                json_mode,
-                EXIT_USAGE,
-                "usage",
-                "An export range is required: --from/--to or --workout",
-            )
+            return Err("An export range is required: --from/--to or --workout".into())
         }
-    };
+    }
+    .validated()?;
 
     let types: Vec<String> = flags
         .get("types")
-        .unwrap_or("workouts,daily,sleep")
+        .unwrap_or("workouts,daily_activity,sleep")
         .split(',')
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .map(str::to_string)
+        .map(str::to_ascii_lowercase)
         .collect();
+    if types.is_empty() {
+        return Err("--types must select at least one data type".into());
+    }
+    let unknown: Vec<&str> = types
+        .iter()
+        .map(String::as_str)
+        .filter(|value| !EXPORT_DATA_TYPES.contains(value))
+        .collect();
+    if !unknown.is_empty() {
+        return Err(format!(
+            "--types does not accept {}; valid types are {}",
+            unknown.join(", "),
+            EXPORT_DATA_TYPES.join(", ")
+        ));
+    }
     let detail = match flags.get("detail").unwrap_or("summary") {
         "summary" => ExportDetail::Summary,
         "full" => ExportDetail::Full,
-        _ => {
-            return fail(
-                json_mode,
-                EXIT_USAGE,
-                "usage",
-                "--detail must be summary or full",
-            )
-        }
+        _ => return Err("--detail must be summary or full".into()),
     };
+    // Summary 会聚合逐点指标，并省略运动轨迹；文件导出需要原始明细。
+    let detail = if matches!(format, "csv" | "gpx" | "fit") {
+        ExportDetail::Full
+    } else {
+        detail
+    };
+
+    Ok(ExportOptions {
+        format: format.to_string(),
+        out: flags.get("out").map(str::to_string),
+        selection: ExportSelection {
+            scope: Some(scope),
+            start_date: None,
+            end_date: None,
+            data_types: types,
+            detail,
+        },
+    })
+}
+
+fn cmd_export(args: &[String]) -> u8 {
+    // 解析也可能失败，所以不能等 Flags 构造成功才决定错误的输出格式。
+    let json_mode = args
+        .iter()
+        .any(|arg| arg == "--json" || arg.starts_with("--json="));
+    let options = match parse_export_args(args) {
+        Ok(options) => options,
+        Err(message) => return fail(json_mode, EXIT_USAGE, "usage", &message),
+    };
+    let format = options.format.as_str();
 
     let db = match open_read_only() {
         Ok(db) => db,
@@ -1083,27 +1130,8 @@ fn cmd_export(args: &[String]) -> u8 {
     {
         eprintln!("Note: {notice}");
     }
-    // FIT 只有 full 一档有意义。
-    //
-    // `--detail` 默认是 summary，而 summary 不带 `samples` / `route`——那正是
-    // FIT 的全部内容。于是 `export --format fit` 在不加 `--detail full` 时**永远**
-    // 导不出任何文件，只回一句「这段时间没有可导出的运动明细」，而那句话在有
-    // 明细的库上完全是误导。桌面端那条路一直是写死 full 的（commands/data.rs），
-    // 只有命令行漏了。
-    let detail = if format == "fit" {
-        ExportDetail::Full
-    } else {
-        detail
-    };
-    let selection = ExportSelection {
-        scope: Some(scope),
-        start_date: None,
-        end_date: None,
-        data_types: types,
-        detail,
-    };
     // 和 GUI 走同一个 builder：导出语义只在 core 里实现一次。
-    let (json_text, records) = match db.build_ai_export(&selection) {
+    let (json_text, records) = match db.build_ai_export(&options.selection) {
         Ok(value) => value,
         Err(error) => {
             let (code, kind) = exit_code_for(&error);
@@ -1112,7 +1140,7 @@ fn cmd_export(args: &[String]) -> u8 {
     };
 
     if format == "fit" {
-        return export_fit_files(json_mode, &json_text, flags.get("out"));
+        return export_fit_files(json_mode, &json_text, options.out.as_deref());
     }
 
     let (body, count) = match format {
@@ -1141,7 +1169,7 @@ fn cmd_export(args: &[String]) -> u8 {
         }
     };
 
-    match flags.get("out") {
+    match options.out.as_deref() {
         Some(path) => {
             if let Err(error) = std::fs::write(path, &body) {
                 return fail(
@@ -1185,8 +1213,8 @@ fn export_fit_files(json_mode: bool, json_text: &str, out: Option<&str>) -> u8 {
     let Some(directory) = out else {
         return fail(
             json_mode,
-            EXIT_FAILED,
-            "failed",
+            EXIT_USAGE,
+            "usage",
             "--format fit needs --out to point at a directory: FIT is binary and one file per workout, so it cannot go to stdout",
         );
     };
@@ -1289,6 +1317,79 @@ mod tests {
     fn a_misspelled_flag_is_a_usage_error_not_a_silent_default() {
         let flags = Flags::parse(&args(&["--form", "csv"])).unwrap();
         assert!(flags.reject_unknown(&["format"]).is_err());
+    }
+
+    #[test]
+    fn export_defaults_include_daily_activity_and_keep_json_summary() {
+        let options =
+            parse_export_args(&args(&["--from", "2026-01-01", "--to", "2026-01-31"])).unwrap();
+        assert_eq!(options.format, "json");
+        assert_eq!(options.out, None);
+        assert_eq!(
+            options.selection.data_types,
+            ["workouts", "daily_activity", "sleep"]
+        );
+        assert_eq!(options.selection.detail, ExportDetail::Summary);
+        assert_eq!(
+            options.selection.scope,
+            Some(ExportScope::date_range("2026-01-01", "2026-01-31"))
+        );
+        for data_type in &options.selection.data_types {
+            assert!(EXPORT_DATA_TYPES.contains(&data_type.as_str()));
+        }
+    }
+
+    #[test]
+    fn archival_formats_always_request_full_detail() {
+        for format in ["csv", "gpx", "fit"] {
+            for detail in [None, Some("summary"), Some("full")] {
+                let mut input = args(&[
+                    "--workout",
+                    "run-1",
+                    "--format",
+                    format,
+                    "--out",
+                    "export-output",
+                ]);
+                if let Some(detail) = detail {
+                    input.extend(args(&["--detail", detail]));
+                }
+                let options = parse_export_args(&input).unwrap();
+                assert_eq!(options.selection.detail, ExportDetail::Full, "{format}");
+                assert_eq!(
+                    options.selection.scope,
+                    Some(ExportScope::Workout {
+                        workout_id: "run-1".into(),
+                    })
+                );
+            }
+        }
+        let options = parse_export_args(&args(&[
+            "--workout",
+            "run-1",
+            "--format",
+            "json",
+            "--detail",
+            "full",
+        ]))
+        .unwrap();
+        assert_eq!(options.selection.detail, ExportDetail::Full);
+    }
+
+    #[test]
+    fn export_type_validation_uses_the_core_names_and_normalization() {
+        let options = parse_export_args(&args(&[
+            "--workout=run-1",
+            "--types= WORKOUTS , HeArt_RaTe ",
+        ]))
+        .unwrap();
+        assert_eq!(options.selection.data_types, ["workouts", "heart_rate"]);
+        for types in ["workouts,typo", "daily", "", "  ", ", ,"] {
+            let input = args(&["--workout", "run-1", "--types", types, "--json"]);
+            let message = parse_export_args(&input).unwrap_err();
+            assert!(message.contains("--types"), "{message}");
+            assert_eq!(cmd_export(&input), EXIT_USAGE);
+        }
     }
 
     #[test]

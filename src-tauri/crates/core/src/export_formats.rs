@@ -13,6 +13,7 @@ use serde_json::Value;
 
 /// CSV 用长表（tidy）而不是宽表：四类记录字段集合完全不同，宽表会逼出大量
 /// 空列，长表则天然表达「这条记录没有这个指标」。
+/// 保留 device_id 列名以兼容现有 CSV；其值使用 builder 的匿名 device_label。
 const CSV_HEADER: &str =
     "record_type,record_id,start_time,end_time,metric,value,unit,source_scope,device_id";
 
@@ -41,8 +42,7 @@ const WORKOUT_METRICS: [(&str, &str); 6] = [
 
 /// 把标准化导出 JSON 转成长表 CSV，返回 `(文本, 数据行数)`。
 ///
-/// 逐点采样与 GPS 轨迹**不进 CSV**：它们是每秒一条的序列，混进汇总表会让
-/// 行数暴涨且语义混乱。需要序列请用 GPX 或 JSON。
+/// 日常指标使用 full payload 中的逐条 value；运动逐秒序列与 GPS 轨迹不进 CSV。
 pub fn to_csv(export: &Value) -> Result<(String, usize), String> {
     let data = export
         .get("data")
@@ -66,7 +66,7 @@ pub fn to_csv(export: &Value) -> Result<(String, usize), String> {
                 &value,
                 text(sample.get("unit")),
                 text(sample.get("source_scope")),
-                text(sample.get("device_id")),
+                text(sample.get("device_label")),
             ],
         );
         count += 1;
@@ -87,7 +87,7 @@ pub fn to_csv(export: &Value) -> Result<(String, usize), String> {
                 &value,
                 text(daily.get("unit")),
                 text(daily.get("source_scope")),
-                text(daily.get("device_id")),
+                text(daily.get("device_label")),
             ],
         );
         count += 1;
@@ -109,7 +109,7 @@ pub fn to_csv(export: &Value) -> Result<(String, usize), String> {
                     &value,
                     unit,
                     text(session.get("source_scope")),
-                    text(session.get("device_id")),
+                    text(session.get("device_label")),
                 ],
             );
             count += 1;
@@ -121,7 +121,7 @@ pub fn to_csv(export: &Value) -> Result<(String, usize), String> {
         let start = text(workout.get("start_time"));
         let end = text(workout.get("end_time"));
         let scope = text(workout.get("source_scope"));
-        let device = text(workout.get("device_id"));
+        let device = text(workout.get("device_label"));
 
         // 运动类型是字符串而不是数值，但丢掉它会让 CSV 无法区分跑步和骑行，
         // 因此单独占一行放进 value 列。
@@ -365,6 +365,8 @@ fn escape_xml(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::{ExportDetail, ExportScope, ExportSelection};
+    use crate::storage::Database;
     use serde_json::json;
 
     fn export_with(data: Value) -> Value {
@@ -426,6 +428,67 @@ mod tests {
         let export = export_with(json!({ "metric_samples": [], "workouts": [] }));
         let error = to_csv(&export).unwrap_err();
         assert!(error.contains("没有可写入 CSV 的记录"), "实际错误：{error}");
+    }
+
+    #[test]
+    fn csv_preserves_anonymous_device_labels_from_the_export_builder() {
+        let db = Database::in_memory().unwrap();
+        db.conn
+            .execute_batch(
+                "INSERT INTO device_identities (alias, serial, device_id, updated_at)
+                 VALUES ('private-device-id', 'private-serial', 'private-device-id',
+                         '2023-11-05T12:00:00+00:00');
+                 INSERT INTO metric_samples
+                     (metric, timestamp, value, unit, source_scope, device_id)
+                 VALUES ('heart_rate', '2023-11-05T12:00:00+00:00', 72, 'bpm',
+                         'device', 'private-device-id');
+                 INSERT INTO daily_metrics
+                     (date, metric, value, unit, source_scope, device_id)
+                 VALUES ('2023-11-05', 'steps', 1234, 'steps', 'device', 'private-device-id');
+                 INSERT INTO sleep_sessions
+                     (sleep_id, start_time, end_time, duration_minutes, deep_minutes,
+                      light_minutes, rem_minutes, awake_minutes, source_scope, device_id)
+                 VALUES ('s1', '2023-11-05T00:00:00+00:00', '2023-11-05T07:00:00+00:00',
+                         420, 60, 360, 0, 0, 'device', 'private-device-id');
+                 INSERT INTO workouts
+                     (workout_id, workout_type, start_time, end_time, source_scope, device_id)
+                 VALUES ('w1', 'run', '2023-11-05T12:00:00+00:00',
+                         '2023-11-05T13:00:00+00:00', 'device', 'private-device-id');",
+            )
+            .unwrap();
+        let selection = ExportSelection {
+            scope: Some(ExportScope::date_range("2023-11-01", "2023-11-30")),
+            start_date: None,
+            end_date: None,
+            data_types: ["heart_rate", "steps", "sleep", "workouts"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
+            detail: ExportDetail::Full,
+        };
+        let (encoded, _) = db.build_ai_export(&selection).unwrap();
+        let export = serde_json::from_str(&encoded).unwrap();
+        let (csv, _) = to_csv(&export).unwrap();
+
+        // Keep the existing column contract, but only put the builder's anonymous
+        // label in it. Raw device identifiers must never return via CSV.
+        assert_eq!(
+            csv.lines().next().unwrap(),
+            format!("{UTF8_BOM}{CSV_HEADER}")
+        );
+        for record_type in ["metric_sample", "daily_metric", "sleep_session", "workout"] {
+            let rows: Vec<_> = csv
+                .lines()
+                .filter(|line| line.starts_with(&format!("{record_type},")))
+                .collect();
+            assert!(!rows.is_empty(), "missing {record_type}");
+            assert!(
+                rows.iter().all(|line| line.ends_with(",device_1")),
+                "missing device label for {record_type}: {rows:?}"
+            );
+        }
+        assert!(!csv.contains("private-device-id"));
+        assert!(!csv.contains("private-serial"));
     }
 
     #[test]
