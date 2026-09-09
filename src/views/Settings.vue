@@ -1108,7 +1108,10 @@ const runCapabilityProbe = async () => {
             <div class="source-copy">
               <strong>{{ source.name }}</strong>
               <span>{{ source.sub }}</span>
-              <span v-if="source.kind === 'device'">{{ t.deviceMeta(source.model.firmware, source.model.lastData) }}</span>
+              <div v-if="source.kind === 'device'" class="source-metadata">
+                <span>{{ t.deviceFirmware(source.model.firmware) }}</span>
+                <span>{{ t.deviceLatestData }} <time>{{ source.model.lastData }}</time></span>
+              </div>
               <span v-if="source.kind === 'device'">{{ t.deviceIdLine(maskIdentifier(source.model.profile.device_id || source.model.profile.serial)) }}</span>
             </div>
             <span :class="['source-state', { on: source.state !== 'unknown' }]"><i class="dot"></i>{{ deviceStateLabel(source.state) }}</span>
@@ -2047,7 +2050,8 @@ h3 { margin-bottom: 4px; font-size: var(--fs-md); font-weight: 700; color: var(-
 /* 数据来源 */
 .source-list { display: grid; gap: 8px; }
 .source-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
   min-width: 0;
@@ -2070,7 +2074,11 @@ h3 { margin-bottom: 4px; font-size: var(--fs-md); font-weight: 700; color: var(-
 .source-icon :deep(.device-visual) { width: 36px; max-width: 100%; height: 36px; max-height: 100%; min-width: 0; min-height: 0; flex: 0 0 36px; border: 0; border-radius: 9px; background: transparent; }
 .source-icon :deep(.device-visual img) { padding: 3px; }
 .source-copy { flex: 1; min-width: 0; display: grid; gap: 1px; }
-.source-copy strong { font-size: var(--fs-md); color: var(--ink); }
+.source-copy strong { font-size: var(--fs-md); color: var(--ink); white-space: normal; overflow-wrap: anywhere; }
+.source-row > .source-state, .source-row > .button { grid-column: 2; justify-self: start; }
+.source-metadata { display: flex; flex-wrap: wrap; gap: 3px 12px; }
+.source-metadata > span { display: inline-flex; flex-wrap: wrap; gap: 0 5px; }
+.source-metadata time { white-space: nowrap; font-family: 'Inter', var(--font-sans); font-variant-numeric: tabular-nums; }
 .source-copy span { color: var(--subtle); font-size: var(--fs-xs); }
 .source-copy span + span { font-family: var(--font-mono); font-size: var(--fs-2xs); }
 .source-state { display: inline-flex; align-items: center; gap: 5px; color: var(--subtle); font-size: var(--fs-sm); }
