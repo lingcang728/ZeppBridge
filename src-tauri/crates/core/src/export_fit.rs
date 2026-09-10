@@ -1397,6 +1397,36 @@ mod tests {
     }
 
     #[test]
+    fn issue_24_cloud_trail_run_exports_as_trail_in_json_gpx_and_fit() {
+        let workouts = crate::normalizer::Normalizer::normalize_workouts(&json!({"data": [{
+            "trackid": 1_700_000_000i64, "end_time": 1_700_000_600i64, "type": 7
+        }]}))
+        .unwrap();
+        let mut workout = serde_json::to_value(&workouts[0]).unwrap();
+        assert_eq!(workout["workout_type"], "trail_running");
+        workout["route"] = json!([{
+            "timestamp": "2023-11-14T22:13:20Z", "latitude": 0.0, "longitude": 0.0
+        }]);
+        let export = export_with(json!({"workouts": [workout]}));
+        let (gpx, points) = crate::export_formats::to_gpx(&export).unwrap();
+        assert_eq!(points, 1);
+        assert!(gpx.contains("<type>trail_running</type>"));
+        assert!(!gpx.contains("swimming"));
+        let (files, _) = to_fit(&export).unwrap();
+        assert!(files[0].0.ends_with("-trail-running.fit"));
+        let fit = decode(&files[0].1);
+        let session = messages_of(&fit, typedef::MesgNum::SESSION);
+        assert_eq!(
+            int_of(session[0], mesgdef::Session::SPORT),
+            Some(i64::from(typedef::Sport::RUNNING.0))
+        );
+        assert_eq!(
+            int_of(session[0], mesgdef::Session::SUB_SPORT),
+            Some(i64::from(typedef::SubSport::TRAIL.0))
+        );
+    }
+
+    #[test]
     fn writes_one_file_per_workout_and_decodes_back() {
         let (files, records) = to_fit(&running_export()).unwrap();
 

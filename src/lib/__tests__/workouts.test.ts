@@ -26,6 +26,24 @@ const base = (overrides: Partial<Workout> = {}): Workout =>
   }) as Workout;
 
 describe('哪些运动可以出现在界面上', () => {
+  it('shows automatically detected trail running in both languages', () => {
+    const trail = base({
+      zepp_type: 7,
+      workout_type: 'trail_running',
+      normalized_type: 'trail_running',
+      effective_type: 'trail_running',
+      type_source: 'numeric_mapped',
+    });
+    setLocale('en');
+    expect(workoutDisplayLabel(trail)).toBe('Trail Running');
+    setLocale('zh');
+    expect(workoutDisplayLabel(trail)).toBe('越野跑');
+    setLocale('en');
+    expect(workoutDisplayLabel(base({
+      ...trail, user_override: 'open_water_swimming', effective_type: 'open_water_swimming',
+    }))).toBe('Open Water Swimming');
+  });
+
   it('解码出来的空壳不算一条运动', () => {
     // 有 id 有时间但一个指标都没有的记录，多半是解码器的空壳。
     // 让它变成列表行，用户会以为那天真的练过。
