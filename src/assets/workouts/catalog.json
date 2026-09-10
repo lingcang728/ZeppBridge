@@ -1,6 +1,6 @@
 {
-  "version": 6,
-  "checked_at": "2026-09-04",
+  "version": 7,
+  "checked_at": "2026-09-10",
   "notes": "Zepp cloud-history observations take precedence where its numeric types differ from the Zepp OS device protocol. Extended identifiers are cross-checked against Gadgetbridge's Zepp OS catalog and user-supplied Zepp App screenshots. A null code means the sport is offered as a manual correction but no Zepp numeric type is known to produce it -- never guess one in to make the entry look complete.",
   "sports": [
     { "code": 1, "key": "run", "label_zh": "户外跑步", "label_en": "Outdoor Running", "source": "cloud_verified" },
@@ -9,7 +9,7 @@
     { "code": 4, "key": "ride", "label_zh": "户外骑行", "label_en": "Outdoor Cycling", "source": "zepp_os_compatible" },
     { "code": 5, "key": "free_training", "label_zh": "自由训练", "label_en": "Free Training", "source": "zepp_os_compatible" },
     { "code": 6, "key": "walking", "label_zh": "健走", "label_en": "Walking", "source": "cloud_verified" },
-    { "code": 7, "key": "open_water_swimming", "label_zh": "公开水域游泳", "label_en": "Open Water Swimming", "source": "zepp_os_compatible" },
+    { "code": 7, "key": "trail_running", "label_zh": "越野跑", "label_en": "Trail Running", "source": "cloud_verified", "evidence": "https://github.com/lingcang728/ZeppBridge/issues/24#issuecomment-5604235159" },
     { "code": 8, "key": "treadmill", "label_zh": "跑步机", "label_en": "Treadmill", "source": "cloud_reference" },
     { "code": 9, "key": "ride", "label_zh": "户外骑行", "label_en": "Outdoor Cycling", "source": "cloud_verified" },
     { "code": 10, "key": "indoor_cycling", "label_zh": "室内骑行", "label_en": "Indoor Cycling", "source": "cloud_reference" },
@@ -137,6 +137,6 @@
     { "code": 211, "key": "road_cycling", "label_zh": "公路骑行", "label_en": "Road Cycling", "source": "user_reported" },
     { "code": 223, "key": "activity", "label_zh": "AI 识别活动", "label_en": "AI-Detected Activity", "source": "cloud_verified" },
     { "code": 225, "key": "rucking", "label_zh": "负重徒步", "label_en": "Rucking", "source": "user_reported" },
-    { "code": null, "key": "trail_running", "label_zh": "越野跑", "label_en": "Trail Running", "source": "correction_only" }
+    { "code": null, "key": "open_water_swimming", "label_zh": "公开水域游泳", "label_en": "Open Water Swimming", "source": "correction_only" }
   ]
 }

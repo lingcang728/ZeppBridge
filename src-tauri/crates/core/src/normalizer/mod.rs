@@ -2719,6 +2719,40 @@ mod tests {
     }
 
     #[test]
+    fn issue_24_cloud_code_7_is_trail_running() {
+        // Reconstructed cloud-shaped input from the public screenshot and
+        // exported summary, not a claim that the full raw response was supplied.
+        // The original workout ID, location and health measurements are omitted.
+        for field in ["type", "sport_mode"] {
+            for code in [json!(7), json!("7")] {
+                let mut item = json!({
+                    "trackid": 1_700_000_000i64,
+                    "end_time": 1_700_000_600i64
+                });
+                item[field] = code;
+                let workouts = Normalizer::normalize_workouts_with_sport(
+                    &json!({"data": {"summary": [item]}}),
+                    Some("run"),
+                )
+                .unwrap();
+                let workout = &workouts[0];
+                assert_eq!(workout.zepp_type, Some(7));
+                assert_eq!(workout.normalized_type, "trail_running");
+                assert_eq!(workout.workout_type, "trail_running");
+                assert_eq!(workout.effective_type, "trail_running");
+                assert_eq!(workout.type_source, "numeric_mapped");
+                assert!(workout.user_override.is_none());
+            }
+        }
+        let swims = Normalizer::normalize_workouts(&json!({"data": [
+            {"trackid": 1_700_001_000i64, "end_time": 1_700_001_600i64, "type": 14},
+            {"trackid": 1_700_002_000i64, "end_time": 1_700_002_600i64, "sport_name": "Open Water Swimming"}
+        ]})).unwrap();
+        assert_eq!(swims[0].normalized_type, "pool_swimming");
+        assert_eq!(swims[1].normalized_type, "open_water_swimming");
+    }
+
+    #[test]
     fn code_225_is_normalized_as_rucking_with_numeric_evidence() {
         let result = Normalizer::normalize_workouts(&json!({
             "data": { "summary": [{
