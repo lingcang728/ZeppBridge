@@ -8,6 +8,7 @@
  */
 import { computed } from 'vue';
 import Icon from './Icon.vue';
+import ComparisonBars from './ComparisonBars.vue';
 import type { InsightFact, WorkoutInsight } from '../types';
 import { defineMessages, useMessages } from '../i18n';
 import {
@@ -22,6 +23,8 @@ const messages = defineMessages(
     title: '跑完怎么样',
     unsupportedWorkoutType: '暂不支持这类运动的洞察。第一版只做已用真实数据验证过的跑步；其他运动仍可正常查看、纠正和导出。',
     handoff: '让 AI 展开分析',
+    currentRun: '本次',
+    baselineRun: '历史基线',
     reading: '正在读取本地记录…',
     comparedTo: (count: number) => `和你自己距离相近的最近 ${count} 次跑步相比：`,
     noComparison: '还没有足够的可比历史记录，所以这次只报数值，不做比较。',
@@ -78,6 +81,8 @@ const messages = defineMessages(
     title: 'How the run went',
     unsupportedWorkoutType: 'Insights for this workout type are not supported yet. The first version covers running only, because that is what has been checked against real data. Every other workout still displays, corrects and exports normally.',
     handoff: 'Let AI dig in',
+    currentRun: 'This run',
+    baselineRun: 'Baseline',
     reading: 'Reading local records…',
     comparedTo: (count: number) => `Against your own ${count} most recent runs of a similar distance:`,
     noComparison: 'Not enough comparable history yet, so this run reports its numbers without comparing them.',
@@ -276,11 +281,6 @@ const exclusionSummary = computed(() => {
       <p class="insight-summary">
         <template v-if="hasAnyComparison">
           {{ t.comparedTo(comparedFacts[0].evidence_count) }}
-          <span
-            v-for="fact in comparedFacts"
-            :key="fact.fact_id"
-            :class="['delta', deltaTone(fact)]"
-          >{{ metricLabel(fact.fact_id, fact.metric) }} {{ deltaText(fact) }}</span>
         </template>
         <template v-else>
           {{ t.noComparison }}
@@ -291,8 +291,11 @@ const exclusionSummary = computed(() => {
         <div v-for="fact in facts" :key="fact.fact_id" class="fact">
           <span class="fact-label">{{ metricLabel(fact.fact_id, fact.metric) }}</span>
           <strong>{{ formatValue(fact) }}</strong>
+          <ComparisonBars v-if="fact.comparison && fact.value !== null" :current="fact.value" :baseline="fact.comparison.baseline_value"
+            :current-label="t.currentRun" :baseline-label="t.baselineRun"
+            :current-text="formatValue(fact)" :baseline-text="formatValue({ ...fact, value: fact.comparison.baseline_value })" :tone="deltaTone(fact)" />
           <span v-if="fact.comparison" :class="['fact-delta', deltaTone(fact)]">
-            {{ t.baselinePrefix(formatValue({ ...fact, value: fact.comparison.baseline_value }), deltaText(fact)) }}
+            {{ deltaText(fact) }}
           </span>
           <span v-else class="fact-delta muted">{{ confidenceLabel(fact.confidence) }}</span>
         </div>
@@ -360,7 +363,7 @@ const exclusionSummary = computed(() => {
   border-radius: 16px;
   background: var(--surface);
 }
-.insight-card header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.insight-card header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 .insight-card h2 { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--ink); font-size: var(--fs-lg); font-weight: 600; }
 
 .insight-summary { margin: 0; color: var(--ink); font-size: var(--fs-md); line-height: 1.7; }
@@ -375,8 +378,8 @@ const exclusionSummary = computed(() => {
 .delta.bad::before, .fact-delta.bad::before { content: '!\a0'; font-weight: 700; }
 .delta.flat::before, .fact-delta.flat::before { content: '=\a0'; font-weight: 700; }
 
-.fact-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
-.fact { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; background: var(--surface-raised); }
+.fact-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 10px; }
+.fact { display: grid; align-content: start; min-width: 0; gap: 6px; padding: 10px 12px; border-radius: 12px; background: var(--surface-raised); }
 .fact-label { color: var(--muted); font-size: var(--fs-xs); }
 .fact strong { color: var(--ink); font-size: var(--fs-2xl); font-weight: 600; }
 .fact-delta { font-size: var(--fs-xs); }

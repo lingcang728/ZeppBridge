@@ -383,6 +383,7 @@ function formatDateHint(value: string): string {
 .partial-warning svg { color: var(--warning); }
 .filter-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 8px;
   padding: 4px;
@@ -391,6 +392,8 @@ function formatDateHint(value: string): string {
 }
 .tab-button {
   display: flex;
+  flex-shrink: 0;
+  white-space: nowrap;
   align-items: center;
   gap: 5px;
   padding: 6px 12px;

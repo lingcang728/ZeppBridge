@@ -9,6 +9,7 @@ import CoverageNotice from '../components/CoverageNotice.vue';
 import DesignIcon, { type DesignIconName } from '../components/DesignIcon.vue';
 import DeviceVisual from '../components/DeviceVisual.vue';
 import Icon from '../components/Icon.vue';
+import ModalDialog from '../components/ModalDialog.vue';
 import RecordRow from '../components/RecordRow.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import WeeklyReportCard from '../components/WeeklyReportCard.vue';
@@ -28,6 +29,11 @@ import { defineMessages, intlLocale, useMessages } from '../i18n';
 
 const messages = defineMessages(
   {
+    collapseHero: '折叠介绍',
+    collapseOnce: '仅折叠这一次',
+    collapseAlways: '从此不再出现',
+    showHero: '展开介绍',
+    cancelCollapse: '取消',
     heroTitleLine1: '你的穿戴数据，',
     heroTitleLine2: '已准备好交给 AI',
     valueSecure: '安全',
@@ -104,6 +110,11 @@ const messages = defineMessages(
     loadVeryHigh: '很高',
   },
   {
+    collapseHero: 'Collapse introduction',
+    collapseOnce: 'Only this time',
+    collapseAlways: 'Do not show again',
+    showHero: 'Show introduction',
+    cancelCollapse: 'Cancel',
     heroTitleLine1: 'Your wearable data,',
     heroTitleLine2: 'ready to hand to an AI',
     valueSecure: 'Secure',
@@ -181,6 +192,18 @@ const messages = defineMessages(
   },
 );
 const t = useMessages(messages);
+const heroPreferenceKey = 'zeppbridge.overview.hideHero';
+const heroChoiceOpen = ref(false);
+const heroHidden = ref(localStorage.getItem(heroPreferenceKey) === 'true');
+const collapseHero = (permanent: boolean) => {
+  if (permanent) localStorage.setItem(heroPreferenceKey, 'true');
+  heroHidden.value = true;
+  heroChoiceOpen.value = false;
+};
+const restoreHero = () => {
+  localStorage.removeItem(heroPreferenceKey);
+  heroHidden.value = false;
+};
 
 const { dataRevision } = useSyncController();
 const { models: deviceModels, error: deviceError, load: loadDevices } = useDevices();
@@ -506,8 +529,18 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
 </script>
 
 <template>
-  <section class="page overview-page" aria-labelledby="overview-title">
-    <header class="hero-card">
+  <section class="page overview-page" :aria-labelledby="heroHidden ? undefined : 'overview-title'">
+    <button v-if="heroHidden" class="hero-restore button button-ghost" @click="restoreHero">{{ t.showHero }}</button>
+    <ModalDialog v-if="heroChoiceOpen" labelledby="hero-choice-title" @close="heroChoiceOpen = false">
+      <h2 id="hero-choice-title">{{ t.collapseHero }}</h2>
+      <div class="hero-choice-actions">
+        <button class="button button-secondary" @click="collapseHero(false)">{{ t.collapseOnce }}</button>
+        <button class="button button-secondary" @click="collapseHero(true)">{{ t.collapseAlways }}</button>
+        <button class="button button-ghost" @click="heroChoiceOpen = false">{{ t.cancelCollapse }}</button>
+      </div>
+    </ModalDialog>
+    <header v-if="!heroHidden" class="hero-card">
+      <button class="hero-collapse" :aria-label="t.collapseHero" :title="t.collapseHero" @click="heroChoiceOpen = true"><Icon name="chevron-down" :size="18" /></button>
       <div class="hero-copy">
         <p class="hero-kicker"><span></span> LOCAL HEALTH DATA BRIDGE</p>
         <h1 id="overview-title">{{ t.heroTitleLine1 }}<br><em>{{ t.heroTitleLine2 }}</em></h1>
@@ -655,6 +688,11 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
 </template>
 
 <style scoped>
+.hero-collapse { position: absolute; top: 12px; right: 12px; z-index: 2; display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--muted); cursor: pointer; }
+.hero-collapse:hover { color: var(--ink); background: var(--surface-raised); }
+.hero-restore { justify-self: end; }
+.hero-choice-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+
 .overview-page { display: grid; gap: 18px; align-content: start; max-width: 1540px; margin: 0 auto; }
 .hero-card { position: relative; display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(440px, .92fr); min-height: 292px; overflow: hidden; border: 1px solid rgba(220,232,239,.1); border-radius: 26px; background: radial-gradient(700px 320px at 92% 20%, rgba(136,164,73,.13), transparent 68%), linear-gradient(135deg, #1A1E24, #15191E 68%); box-shadow: inset 0 1px 0 rgba(255,255,255,.045), 0 20px 48px rgba(5,8,10,.15); }
 .hero-card::before { position: absolute; inset: 0; pointer-events: none; content: ''; background-image: linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px); background-size: 34px 34px; mask-image: linear-gradient(90deg, transparent 35%, black); }
@@ -686,8 +724,8 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
 .panel-head { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 12px; }.panel-title { display: flex; min-width: 0; align-items: center; gap: 8px; }.panel-title > span { display: grid; gap: 1px; }.panel-title strong { color: #EEF1EC; font-size: var(--fs-md); font-weight: 600; }.panel-title small { color: var(--subtle); font-size: var(--fs-xs); }.chart-icon { display: grid; width: 38px; height: 38px; flex: 0 0 38px; place-items: center; overflow: hidden; border-radius: 11px; background: rgba(255,255,255,.025); }.latest-value { display: flex; align-items: baseline; gap: 5px; color: var(--muted); font-size: var(--fs-sm); white-space: nowrap; }.latest-value strong { color: #F1F5EC; font-family: var(--font-mono); font-size: 20px; font-weight: 600; }.latest-value small { font-size: var(--fs-xs); }
 .hr-chart { width: 100%; height: 198px; }.hr-zones { display: flex; flex-wrap: wrap; gap: 8px 12px; margin: 4px 0 0; padding: 0; list-style: none; color: var(--subtle); font-size: var(--fs-xs); }.panel-empty { display: flex; min-height: 190px; align-items: center; justify-content: center; gap: 12px; color: var(--subtle); font-size: var(--fs-xs); text-align: center; }.panel-empty.compact { min-height: 170px; flex-direction: column; }.panel-empty .design-icon { opacity: .7; filter: saturate(.8); }
 .steps-content { display: grid; min-height: 220px; place-items: center; align-content: center; gap: 14px; }
-.steps-inring { display: grid; justify-items: center; gap: 2px; }
-.steps-inring strong { color: #F4F6EF; font-family: var(--font-mono); font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; }
+.steps-inring { display: grid; justify-items: center; gap: 8px; max-width: 116px; }
+.steps-inring strong { color: #F4F6EF; font-family: 'Inter', var(--font-sans); font-size: 30px; font-weight: 600; letter-spacing: -.04em; font-variant-numeric: tabular-nums; line-height: 1; }
 .steps-inring span { color: #8AA894; font-size: var(--fs-xs); }
 .steps-goal { margin: 0; color: var(--muted); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
 .sleep-panel { background: radial-gradient(380px 240px at 90% 0, rgba(104,87,217,.12), transparent 70%), linear-gradient(145deg, #1D1F29, #191C25); }.sleep-score { padding: 4px 10px; border-radius: 999px; background: rgba(131,109,235,.14); color: #A895FF; font-family: var(--font-mono); font-size: var(--fs-sm); }.sleep-total { margin: 16px 0 10px; color: #F4F3FC; font-family: var(--font-mono); font-size: 20px; font-weight: 600; }.sleep-bar { display: flex; gap: 3px; height: 7px; overflow: hidden; border-radius: 999px; }.sleep-bar span { min-width: 3px; border-radius: 999px; }.sleep-stages { display: grid; grid-template-columns: minmax(0,1fr); gap: 9px; margin: 14px 0 0; padding: 0; list-style: none; }.sleep-stages li { display: grid; grid-template-columns: 8px minmax(0,1fr) auto; align-items: center; gap: 8px; min-width: 0; color: var(--subtle); font-size: var(--fs-sm); }.sleep-stages i { width: 6px; height: 6px; border-radius: 50%; }.sleep-stages strong { color: #C4C8D0; font-family: var(--font-mono); font-size: var(--fs-sm); font-weight: 600; white-space: nowrap; }
