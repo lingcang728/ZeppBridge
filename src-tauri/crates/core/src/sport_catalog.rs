@@ -128,22 +128,26 @@ mod tests {
         assert!(is_known_key("elliptical"));
     }
 
-    /// 越野跑能被选，但不会被自动派上。
-    ///
-    /// 有用户报告越野跑被显示成公开水域游泳，并且在纠正列表里找不到越野跑
-    /// （反馈 af3fba3c）。后半句是确定的缺口，补上；前半句不是——那条报告里
-    /// 没有编号信息（未知编号为空、冲突数为 0），而 Gadgetbridge 的 Zepp OS
-    /// 表里 7 确实是公开水域游泳。云端编号是不是另一套，手上没有第二个来源
-    /// 能证实，所以 code 7 的映射一个字都没改。
+    /// Issue #24 supplies code 7, matching Zepp/ZeppBridge screenshots and
+    /// a Zepp GPX labelled Trail running. Cloud history codes are not the
+    /// Zepp OS device-protocol enum. Do not guess a replacement swimming code.
     #[test]
-    fn trail_running_is_selectable_but_never_auto_assigned() {
+    fn cloud_code_7_is_trail_running_and_swimming_remains_selectable() {
+        assert_eq!(resolve(7), Some("trail_running"));
         assert!(is_known_key("trail_running"));
-        assert!(
-            !entries().values().any(|key| key == "trail_running"),
-            "没有编号该派给越野跑——凭空编一个会把一批历史记录改错"
-        );
-        // 反过来也要成立：code 7 仍然是公开水域游泳，没有被顺手改掉。
-        assert_eq!(resolve(7), Some("open_water_swimming"));
+        assert!(is_known_key("open_water_swimming"));
+        assert_eq!(resolve(14), Some("pool_swimming"));
+    }
+
+    #[test]
+    fn numeric_codes_are_unique() {
+        let document: CatalogDocument = serde_json::from_str(CATALOG_JSON).unwrap();
+        let mut codes = HashSet::new();
+        for entry in document.sports {
+            if let Some(code) = entry.code {
+                assert!(codes.insert(code), "duplicate cloud code {code}");
+            }
+        }
     }
 
     #[test]
