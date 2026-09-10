@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 /// 当前 SQLite schema 版本（`PRAGMA user_version`）。加新版本只能追加迁移
 /// 步骤，不要改已有 DDL。
-pub const CURRENT_SCHEMA_VERSION: i64 = 21;
+pub const CURRENT_SCHEMA_VERSION: i64 = 22;
 /// 写进备份 manifest 的应用版本。Core 是独立 crate，用它自己的包版本。
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -43,11 +43,10 @@ pub const EXPORT_DATA_TYPES: [&str; 17] = [
 /// `raw_records` 重新跑一遍。不动它，新加的编号只对以后同步来的记录生效，
 /// 已经存成 `unknown:211` 的那 199 条记录会永远挂着——而报这个问题的人恰恰
 /// 是因为历史记录才来报的。
-pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v23-rucking";
-/// 上一版的修订号。从它升上来时只重放这几条流。
+pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v24-trail-running";
+/// 较早公开版本的修订号。从它升上来时仍需重放这几条流。
 ///
-/// v21 是上一个公开发布版本；v22 的圈解析和 v23 的 Rucking 映射都要在
-/// 这次升级中补到历史数据里。
+/// v21 还没有 v22 的圈解析和 v23 的 Rucking 映射；跳版本升级时要一并补齐。
 const PREVIOUS_RELEASE_NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v21-elliptical";
 /// 从上一版升上来时要重放的流。**改归一化规则时必须一起看这里**：漏掉一条
 /// 流，那条流的历史记录就永远停在旧规则上，而升级看起来是成功的。
@@ -2160,10 +2159,13 @@ impl Database {
         if stored.as_deref() == Some(NORMALIZER_REVISION) {
             return Ok(None);
         }
-        // 从公开 v21 升到 v23 时重放这一版涉及的 workout_detail 和 workouts。
+        // v23 already decoded laps; only the cloud workout catalog changed in v24.
+        // 从公开 v21 升级时仍需补齐 workout_detail 和 workouts。
         // 其他修订号（包括未发布的 v22）仍走整库重放，避免跳过中间版本带来的归一化变化。
         let streams: Vec<String> =
-            if stored.as_deref() == Some(PREVIOUS_RELEASE_NORMALIZER_REVISION) {
+            if stored.as_deref() == Some("zepp-normalizer-2026-09-v23-rucking") {
+                vec!["workouts".to_string()]
+            } else if stored.as_deref() == Some(PREVIOUS_RELEASE_NORMALIZER_REVISION) {
                 PREVIOUS_RELEASE_REPLAY_STREAMS
                     .iter()
                     .map(|stream| (*stream).to_string())
@@ -7044,6 +7046,126 @@ mod tests {
             db.get_recent_workouts(10).unwrap()[0].workout_type,
             "road_cycling"
         );
+    }
+
+    #[test]
+    fn issue_24_migration_repairs_history_without_raw_and_preserves_overrides() {
+        let db = Database::in_memory().unwrap();
+        for (id, code, kind, source) in [
+            ("trail", Some(7), "open_water_swimming", "numeric_mapped"),
+            ("override", Some(7), "open_water_swimming", "numeric_mapped"),
+            (
+                "explicit-swim",
+                Some(7),
+                "open_water_swimming",
+                "string_field",
+            ),
+            ("pool", Some(14), "pool_swimming", "numeric_mapped"),
+            ("no-code", None, "open_water_swimming", "string_field"),
+        ] {
+            let mut workout = workout_with_type(code, kind, source);
+            workout.workout_id = id.into();
+            db.insert_workout(&workout).unwrap();
+        }
+        db.set_workout_type_override("override", Some("open_water_swimming"))
+            .unwrap();
+        assert_eq!(db.raw_record_count().unwrap(), 0);
+        db.conn
+            .execute_batch(
+                "PRAGMA user_version = 21; DELETE FROM schema_migrations WHERE version = 22;",
+            )
+            .unwrap();
+        db.migrate().unwrap();
+        let trail = db.get_workout_detail("trail").unwrap().unwrap();
+        assert_eq!(trail.normalized_type, "trail_running");
+        assert_eq!(trail.effective_type, "trail_running");
+        assert_eq!(trail.zepp_type, Some(7));
+        assert_eq!(trail.calories, Some(100));
+        assert_eq!(trail.start_time, ts());
+        assert_eq!(trail.synced_at, Some(ts() + chrono::Duration::hours(1)));
+        let corrected = db.get_workout_detail("override").unwrap().unwrap();
+        assert_eq!(corrected.normalized_type, "trail_running");
+        assert_eq!(corrected.effective_type, "open_water_swimming");
+        for id in ["explicit-swim", "no-code"] {
+            assert_eq!(
+                db.get_workout_detail(id).unwrap().unwrap().normalized_type,
+                "open_water_swimming"
+            );
+        }
+        assert_eq!(
+            db.get_workout_detail("pool")
+                .unwrap()
+                .unwrap()
+                .normalized_type,
+            "pool_swimming"
+        );
+        let before =
+            parsed_export(&db, &["workouts"], ExportDetail::Full)["data"]["workouts"].clone();
+        db.migrate().unwrap();
+        assert_eq!(
+            parsed_export(&db, &["workouts"], ExportDetail::Full)["data"]["workouts"],
+            before
+        );
+        let exported = before
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|w| w["workout_id"] == "trail")
+            .unwrap();
+        assert_eq!(exported["workout_type"], "trail_running");
+        assert_eq!(exported["normalized_type"], "trail_running");
+        assert_eq!(exported["effective_type"], "trail_running");
+    }
+
+    #[test]
+    fn issue_24_v23_replay_repairs_code_7_without_losing_corrections() {
+        let db = Database::in_memory().unwrap();
+        db.insert_workout(&workout_with_type(
+            Some(7),
+            "open_water_swimming",
+            "numeric_mapped",
+        ))
+        .unwrap();
+        db.set_workout_type_override("same-workout", Some("hiking"))
+            .unwrap();
+        let payload = serde_json::json!({"data": [{
+            "workout_id": "same-workout", "start_time": 1_700_000_000i64,
+            "end_time": 1_700_000_600i64, "type": 7
+        }]});
+        db.insert_raw_record(&RawRecord {
+            stream: "workouts".into(),
+            source_key: "issue-24".into(),
+            source_scope: SourceScope::Device,
+            device_id: None,
+            start_utc: ts(),
+            end_utc: None,
+            payload,
+            capability: CapabilityStatus::Verified,
+        })
+        .unwrap();
+        db.conn.execute(
+            "INSERT INTO app_meta(key, value, updated_at) VALUES('normalizer_revision', ?1, ?2)",
+            params!["zepp-normalizer-2026-09-v23-rucking", ts().to_rfc3339()],
+        ).unwrap();
+        assert_eq!(
+            db.pending_replay_plan().unwrap().unwrap().streams,
+            vec!["workouts"]
+        );
+        db.reprocess_raw_records_if_needed().unwrap().unwrap();
+        let stored = db.get_workout_detail("same-workout").unwrap().unwrap();
+        assert_eq!(stored.normalized_type, "trail_running");
+        assert_eq!(stored.zepp_type, Some(7));
+        assert_eq!(stored.user_override.as_deref(), Some("hiking"));
+        assert_eq!(stored.effective_type, "hiking");
+        db.set_workout_type_override("same-workout", None).unwrap();
+        assert_eq!(
+            db.get_workout_detail("same-workout")
+                .unwrap()
+                .unwrap()
+                .effective_type,
+            "trail_running"
+        );
+        assert!(db.reprocess_raw_records_if_needed().unwrap().is_none());
     }
 
     /// 升级之后，旧的 `unknown:211` 会被重新认成公路骑行。

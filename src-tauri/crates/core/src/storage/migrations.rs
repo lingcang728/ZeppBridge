@@ -711,6 +711,23 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(21, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // Cloud code 7 is trail running (issue #24), not the device-protocol
+        // open-water code. Repair stored interpretations even when retention
+        // has removed their raw payloads. Overrides, metrics and provenance
+        // stay intact; explicitly named swimming records are not affected.
+        if version < 22 {
+            self.conn.execute_batch(
+                "UPDATE workouts SET workout_type = 'trail_running'
+                 WHERE zepp_type = 7
+                   AND workout_type = 'open_water_swimming'
+                   AND workout_type_source = 'numeric_mapped';",
+            )?;
+        }
+        self.conn.execute_batch("PRAGMA user_version = 22;")?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(22, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         // Earlier migrations are intentionally idempotent and still stamp
         // their historical versions on every launch, so the current schema
         // marker is restored only after all of them have run.
