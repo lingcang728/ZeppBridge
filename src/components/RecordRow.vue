@@ -107,7 +107,7 @@ withDefaults(defineProps<{
   min-width: 72px;
   align-items: flex-end;
 }
-.record-fact strong {
+.record-fact strong { max-width: 100%; overflow-wrap: anywhere;
   font-family: 'Inter', var(--font-sans);
   font-size: var(--fs-lg);
   font-variant-numeric: tabular-nums;
@@ -116,7 +116,7 @@ withDefaults(defineProps<{
 .record-row > svg { color: var(--subtle); }
 .record-row.compact {
   min-height: 44px;
-  grid-template-columns: auto minmax(0, 1.2fr) minmax(0, 1fr) auto;
+  grid-template-columns: 8px minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, .9fr);
   gap: 10px;
   padding: 8px 14px;
 }
@@ -124,7 +124,7 @@ withDefaults(defineProps<{
   font-size: var(--fs-md);
   font-weight: 400;
 }
-.record-row.compact.tone-sleep .record-fact strong {
+.record-row.compact.tone-sleep .record-fact strong { max-width: 100%; overflow-wrap: anywhere;
   min-width: 36px;
   padding: 2px 9px;
   border-radius: 999px;
@@ -133,7 +133,7 @@ withDefaults(defineProps<{
   font-size: var(--fs-sm);
   text-align: center;
 }
-.record-row.compact.tone-activity .record-fact strong {
+.record-row.compact.tone-activity .record-fact strong { max-width: 100%; overflow-wrap: anywhere;
   color: var(--activity);
   font-size: var(--fs-md);
 }

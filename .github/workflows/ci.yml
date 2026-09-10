@@ -564,9 +564,17 @@ jobs:
         env:
           APPIMAGE_EXTRACT_AND_RUN: 1
         run: |
-          npm run tauri build -- \
-            --config src-tauri/tauri.linux.conf.json \
-            --bundles deb,rpm,appimage
+          # AppRun downloads can return transient GitHub HTTP 5xx responses.
+          # Reuse the build cache, but fail if all three attempts fail.
+          for attempt in 1 2 3; do
+            if npm run tauri build -- \
+              --config src-tauri/tauri.linux.conf.json \
+              --bundles deb,rpm,appimage; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then sleep 20; fi
+          done
+          exit 1
 
       - name: Collect Linux artifacts
         shell: bash

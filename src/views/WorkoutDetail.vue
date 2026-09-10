@@ -1216,13 +1216,14 @@ watch([dataRevision, workoutId], () => void loadDetail());
 .type-evidence > .type-correct { display: inline-flex; align-items: center; gap: 7px; padding: 0; border: 0; background: none; }
 .type-correct-menu { min-width: 180px; }
 .hero-signal { position: absolute; z-index: 0; top: -8px; right: 3%; opacity: .13; filter: saturate(1.4); transform: rotate(5deg); }
-.metric-list { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(7, minmax(112px, 1fr)); gap: 9px; }
-.metric-tile { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 78px; padding: 10px; border: 1px solid rgba(226,234,242,.08); border-radius: 15px; background: rgba(8,10,13,.42); }
+.metric-list { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 9px; }
+.metric-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; min-height: 116px; padding: 16px; border: 1px solid rgba(226,234,242,.08); border-radius: 15px; background: rgba(8,10,13,.42); }
 .metric-tile > .design-icon { flex: 0 0 auto; }
 .metric-tile.tone-heart { background: linear-gradient(135deg, rgba(240,97,106,.12), rgba(8,10,13,.45)); } .metric-tile.tone-pace { background: linear-gradient(135deg, rgba(74,168,232,.12), rgba(8,10,13,.45)); } .metric-tile.tone-altitude { background: linear-gradient(135deg, rgba(245,195,59,.11), rgba(8,10,13,.45)); } .metric-tile.tone-training { background: linear-gradient(135deg, rgba(125,163,62,.12), rgba(8,10,13,.45)); } .metric-tile.tone-distance { background: linear-gradient(135deg, rgba(47,169,107,.13), rgba(8,10,13,.45)); } .metric-tile.tone-vo2 { background: linear-gradient(135deg, rgba(139,92,246,.12), rgba(8,10,13,.45)); }
+.metric-tile > div { min-width: 0; max-width: 100%; }
 .metric-label { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
 .metric-value { display: flex; align-items: baseline; gap: 5px; margin: 3px 0 0; flex-wrap: wrap; }
-.metric-value strong { color: var(--ink); font-family: var(--font-mono); font-size: var(--fs-xl); font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: -.02em; }
+.metric-value strong { color: var(--ink); font-family: 'Inter', var(--font-sans); font-size: var(--fs-xl); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: -.02em; }
 .metric-value span { color: var(--muted); font-size: var(--fs-xs); }
 .lower { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(310px, .72fr); align-items: start; gap: 16px; }
 .main-col, .side-col { display: grid; gap: 16px; min-width: 0; }
@@ -1264,10 +1265,14 @@ watch([dataRevision, workoutId], () => void loadDetail());
 .route-empty strong { color: var(--muted); }
 .route-empty p { margin: 0; }
 .section-icon.heart-tone { background: rgba(240,97,106,.12); }
+.hr-zone-card { padding: 22px; min-width: 0; }
+.hr-zone-card .section-head { flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+.hr-zone-card .route-note { display: block; white-space: normal; }
+.hr-zone-card .mapping-note { margin-top: 20px; padding: 14px; line-height: 1.7; }
 .hr-zone-bar { display: flex; overflow: hidden; height: 15px; border: 1px solid var(--line); border-radius: 999px; background: rgba(11,14,17,.45); }
 .hr-zone-fill { min-width: 0; }
-.hr-zone-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 8px 20px; margin: 13px 0 0; padding: 0; list-style: none; font-variant-numeric: tabular-nums; }
-.hr-zone-list li { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); }
+.hr-zone-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 14px 24px; margin: 20px 0 0; padding: 0; list-style: none; font-variant-numeric: tabular-nums; }
+.hr-zone-list li { display: grid; grid-template-columns: 9px minmax(0, 1fr) auto 4.5em; align-items: center; gap: 10px; font-size: var(--fs-sm); }
 .hr-zone-list .hr-zone-range { flex: 1 1 auto; color: var(--muted); }
 .hr-zone-list strong { color: var(--ink); font-family: 'Inter', var(--font-sans); font-weight: 600; white-space: nowrap; }
 .hr-zone-list em { min-width: 46px; color: var(--subtle); font-style: normal; text-align: right; }
@@ -1310,7 +1315,7 @@ watch([dataRevision, workoutId], () => void loadDetail());
 .meta-card dl > div { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-width: 0; }
 .meta-card dt { color: var(--muted); font-size: var(--fs-sm); } .meta-card dd { margin: 0; color: var(--ink); font-size: var(--fs-sm); overflow-wrap: anywhere; text-align: right; }
 .page-foot { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 2px 0 0; color: var(--subtle); font-size: var(--fs-xs); }
-@media (max-width: 1320px) { .metric-list { grid-template-columns: repeat(4, minmax(130px, 1fr)); } }
+
 @media (max-width: 1180px) { .lower { grid-template-columns: minmax(0, 1fr); } .side-col { grid-template-columns: repeat(2, minmax(0,1fr)); } .decoded-card { grid-row: span 2; } }
 @media (max-width: 760px) { .page-toolbar { align-items: flex-start; } .ai-action span { display: none; } .workout-hero { padding: 16px; border-radius: 19px; } .hero-copy { align-items: flex-start; gap: 12px; } .hero-device :deep(.device-visual) { width: 78px; height: 78px; flex-basis: 78px; } .device-live { display: none; } .sport-line > .design-icon { width: 45px !important; height: 45px !important; } .sport-line h1 { font-size: 24px; } .source-chip { font-size: var(--fs-2xs); } .metric-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } .metric-tile { min-height: 70px; } .chart-grid, .side-col { grid-template-columns: minmax(0, 1fr); } .decoded-card { grid-row: auto; } .route-wrap { min-height: 240px; } .route-note { display: none; } .chart-head { flex-wrap: wrap; } .chart-stats { width: 100%; justify-content: flex-start; } }
 </style>

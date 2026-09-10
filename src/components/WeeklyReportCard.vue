@@ -8,6 +8,7 @@
  */
 import { computed, onMounted, ref, watch } from 'vue';
 import Icon from './Icon.vue';
+import ComparisonBars from './ComparisonBars.vue';
 import SkeletonBlock from './SkeletonBlock.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
@@ -216,22 +217,9 @@ function formatNumber(fact: InsightFact, value: number): string {
           <strong>{{ formatValue(fact) }}</strong>
 
           <template v-if="chartFor(fact)">
-            <div class="weekly-bars" role="img"
-              :aria-label="t.barsAria(formatValue(fact), chartFor(fact)!.baselineText)">
-              <div class="bar-row">
-                <span class="bar-tag">{{ t.barThisWeek }}</span>
-                <span class="bar-track">
-                  <i :class="['bar-fill', tone(fact)]" :style="{ width: `${chartFor(fact)!.recentPercent}%` }"></i>
-                </span>
-              </div>
-              <div class="bar-row">
-                <span class="bar-tag">{{ t.barBaseline }}</span>
-                <span class="bar-track">
-                  <i class="bar-fill baseline" :style="{ width: `${chartFor(fact)!.baselinePercent}%` }"></i>
-                </span>
-                <span class="bar-value">{{ chartFor(fact)!.baselineText }}</span>
-              </div>
-            </div>
+            <ComparisonBars :current="fact.value!" :baseline="fact.comparison!.baseline_value"
+              :current-label="t.barThisWeek" :baseline-label="t.barBaseline"
+              :current-text="formatValue(fact)" :baseline-text="chartFor(fact)!.baselineText" :tone="tone(fact)" />
             <span :class="['weekly-delta', tone(fact)]">
               {{ fact.comparison!.delta_percent > 0 ? '+' : '' }}{{ fact.comparison!.delta_percent.toFixed(1) }}%
             </span>
@@ -281,7 +269,7 @@ function formatNumber(fact: InsightFact, value: number): string {
 
 /* 每格里现在有「上一个 28 天」这种长标签加进度条，210px 一行挤六个放不下，
    标签会顶到进度条上。加宽下限，常见窗口宽度下自然落成五列。 */
-.weekly-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; align-items: stretch; }
+.weekly-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 10px; align-items: stretch; }
 .weekly-item { display: grid; gap: 2px; align-content: start; padding: 10px 12px; border-radius: 12px; background: var(--surface-raised); }
 .weekly-label { color: var(--muted); font-size: var(--fs-xs); }
 .weekly-item strong { color: var(--ink); font-size: var(--fs-2xl); font-weight: 600; }
@@ -291,20 +279,6 @@ function formatNumber(fact: InsightFact, value: number): string {
 .weekly-delta.bad { color: var(--danger); }
 .weekly-delta.bad::before { content: '!\a0'; font-weight: 700; }
 .weekly-delta.flat, .weekly-delta.muted { color: var(--muted); }
-
-.weekly-bars { display: grid; gap: 5px; margin: 6px 0 2px; }
-.bar-row { display: grid; grid-template-columns: 84px minmax(0, 1fr) auto; align-items: center; gap: 7px; }
-.bar-tag { color: var(--subtle); font-size: var(--fs-2xs); white-space: nowrap; }
-.bar-track { height: 6px; border-radius: 3px; background: rgba(232,238,244,.08); overflow: hidden; }
-.bar-fill { display: block; height: 100%; border-radius: 3px; background: var(--muted); transition: width .4s cubic-bezier(.16,1,.3,1); }
-.bar-fill.good { background: var(--accent); }
-.bar-fill.bad {
-  background: repeating-linear-gradient(
-    -45deg, var(--danger) 0 4px, color-mix(in srgb, var(--danger) 62%, #000) 4px 8px);
-}
-.bar-fill.flat { background: var(--muted); }
-.bar-fill.baseline { background: rgba(232,238,244,.22); }
-.bar-value { color: var(--subtle); font-size: var(--fs-2xs); white-space: nowrap; }
 
 .weekly-note { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.6; }
 .weekly-error { margin: 0; color: var(--danger); font-size: var(--fs-sm); }
