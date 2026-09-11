@@ -14,6 +14,19 @@ export const settingsMessages = defineMessages(
     intro: '管理认证方式、同步行为、隐私与默认导出偏好，确保本地数据安全。',
     retry: '重试',
     distanceUnitLabel: '距离单位',
+    dateFormatLabel: '日期格式',
+    dateFormatOption: {
+      regional: '跟随系统',
+      dmy: '日/月/年',
+      mdy: '月/日/年',
+      ymd: '年-月-日',
+    },
+    timeFormatLabel: '时间格式',
+    timeFormatOption: {
+      regional: '跟随系统',
+      '12h': '12 小时',
+      '24h': '24 小时',
+    },
 
     // ── 1. 认证方式 ──
     authTitle: '1. 认证方式',
@@ -416,6 +429,19 @@ export const settingsMessages = defineMessages(
     intro: 'Authentication, sync behavior, privacy, and the export defaults — all in one place.',
     retry: 'Try again',
     distanceUnitLabel: 'Distance unit',
+    dateFormatLabel: 'Date format',
+    dateFormatOption: {
+      regional: 'System',
+      dmy: 'D/M/Y',
+      mdy: 'M/D/Y',
+      ymd: 'Y-M-D',
+    },
+    timeFormatLabel: 'Time format',
+    timeFormatOption: {
+      regional: 'System',
+      '12h': '12-hour',
+      '24h': '24-hour',
+    },
 
     // ── 1. Authentication ──
     authTitle: '1. Authentication',

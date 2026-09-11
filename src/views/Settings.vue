@@ -33,6 +33,14 @@ import {
   distanceUnitOptionLabel,
   setDistanceUnit,
 } from '../lib/units';
+import {
+  DATE_FORMATS,
+  TIME_FORMATS,
+  dateFormatPreference,
+  setDateFormat,
+  setTimeFormat,
+  timeFormatPreference,
+} from '../lib/datePreferences';
 import { errorTextFor } from '../i18n/errors';
 import { backendText } from '../i18n/backendText';
 import { storageEstimateText } from '../lib/storageEstimateText';
@@ -960,6 +968,34 @@ const runCapabilityProbe = async () => {
             :aria-checked="distanceUnit === option"
             @click="setDistanceUnit(option)"
           >{{ distanceUnitOptionLabel(option) }}</button>
+        </div>
+      </div>
+      <!-- 日期与时间格式同理：和语言、单位一样是纯显示层选择，放在同一排。
+           「跟随系统」跟着 browser/系统地区走，不跟界面语言，见 lib/datePreferences.ts。 -->
+      <div class="locale-switch">
+        <p class="advanced-label">{{ t.dateFormatLabel }}</p>
+        <div class="scale-options" role="radiogroup" :aria-label="t.dateFormatLabel">
+          <button
+            v-for="option in DATE_FORMATS"
+            :key="option"
+            type="button"
+            role="radio"
+            :aria-checked="dateFormatPreference === option"
+            @click="setDateFormat(option)"
+          >{{ t.dateFormatOption[option] }}</button>
+        </div>
+      </div>
+      <div class="locale-switch">
+        <p class="advanced-label">{{ t.timeFormatLabel }}</p>
+        <div class="scale-options" role="radiogroup" :aria-label="t.timeFormatLabel">
+          <button
+            v-for="option in TIME_FORMATS"
+            :key="option"
+            type="button"
+            role="radio"
+            :aria-checked="timeFormatPreference === option"
+            @click="setTimeFormat(option)"
+          >{{ t.timeFormatOption[option] }}</button>
         </div>
       </div>
     </header>
