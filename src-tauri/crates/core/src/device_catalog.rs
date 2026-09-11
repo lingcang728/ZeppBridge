@@ -368,16 +368,38 @@ mod tests {
         })
         .expect("10682625 应当能匹配到 T-Rex 3 Pro");
         assert_eq!(found.entry.catalog_id, "amazfit-t-rex-3-pro-48-44mm");
+    }
 
-        // 相邻的 10682624 仍然只有一份报告，不能跟着邻接性溜进去。
-        assert!(
-            match_catalog(&CatalogMatchInput {
-                device_source_codes: vec![10_682_624],
-                ..CatalogMatchInput::default()
+    #[test]
+    fn september_11_device_contributions_match_without_guessing_conflicts() {
+        for (code, catalog_id) in [
+            (10_551_553, "amazfit-t-rex-3-pro-48-44mm"),
+            (10_682_624, "amazfit-t-rex-3-pro-48-44mm"),
+            (11_141_377, "amazfit-balance-3"),
+            (10_092_803, "amazfit-active-2-44mm"),
+            (8_323_329, "amazfit-active-42mm"),
+            (10_486_019, "amazfit-balance-2-xt"),
+            (9_978_112, "amazfit-cheetah-2-ultra"),
+        ] {
+            let matched = match_catalog(&CatalogMatchInput {
+                device_source_codes: vec![code],
+                ..Default::default()
             })
-            .is_none(),
-            "10682624 还只有一份报告，不该匹配到任何型号"
-        );
+            .expect("accepted contribution must identify a device");
+            assert_eq!(matched.entry.catalog_id, catalog_id);
+        }
+        for code in [
+            92, 102, 104, 254, 8_126_720, 9_765_121, 11_469_059, 11_092_224, 10_682_627,
+        ] {
+            assert!(
+                match_catalog(&CatalogMatchInput {
+                    device_source_codes: vec![code],
+                    ..Default::default()
+                })
+                .is_none(),
+                "unsupported or duplicate-only evidence for {code}"
+            );
+        }
     }
 
     /// Balance 2 XT 能被搜到、能被手动指认，哪怕它还没有产品图。
@@ -399,8 +421,7 @@ mod tests {
             entry.canonical_device_key.as_deref(),
             Some("amazfit-balance-2")
         );
-        // 还没有人从这款表上提交过报告，所以一个编号都不该挂在它名下。
-        assert!(entry.device_source_codes.is_empty());
+        assert_eq!(entry.device_source_codes, vec![10_486_019]);
 
         let matched = match_catalog(&CatalogMatchInput {
             device_names: vec!["Amazfit Balance 2 XT"],

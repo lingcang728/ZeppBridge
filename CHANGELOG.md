@@ -4,6 +4,11 @@
 
 ## Unreleased / 未发布
 
+- **Paused workouts show moving and paused time separately.** Workout details show moving pace alongside pace including pauses; FIT session, lap and activity timer totals exclude recorded pauses. Overlapping intervals count once and intervals are clipped to the activity or lap.
+- **含暂停的运动可分别查看运动用时、暂停用时、运动配速和含暂停配速。** FIT 的运动、圈与活动计时同步扣除已记录的暂停，重复、重叠与越界区间不会重复扣时。
+- Added seven evidence-backed deviceSource mappings for T-Rex 3 Pro, Balance 3, Balance 2 XT, Active, Active 2 and Cheetah 2 Ultra. Refresh the device list to update a previously cached unknown model. User model corrections retain priority.
+- 新增 7 个有反馈证据的设备编号映射，覆盖 T-Rex 3 Pro、Balance 3、Balance 2 XT、Active、Active 2 与 Cheetah 2 Ultra。刷新设备列表即可更新旧的未知型号缓存；用户手动指认仍优先。
+
 - **A managed macOS login keychain no longer has to block sign-in.** macOS can explicitly select file credential storage with `ZEPPBRIDGE_CREDENTIAL_STORE=file`; a saved credential file is reused on normal launches. Keychain remains the default, and a Keychain failure never silently enables plaintext storage. See the [setup guide](docs/guides/macos-credentials.md). This also corrects the error message that incorrectly suggested HAR import or manual entry could bypass the same blocked store. Fixes [#72](https://github.com/lingcang728/ZeppBridge/issues/72).
 - **macOS 登录钥匙串受管理时，可以改用文件存储。** 用 `ZEPPBRIDGE_CREDENTIAL_STORE=file` 显式选择后，令牌保存在权限为 `0600` 的文件中，后续正常启动会继续使用。钥匙串仍为默认，访问失败不会自动降级；[操作指南](docs/guides/macos-credentials.zh-CN.md)说明了保护边界与切换方法。报错提示也已修正：HAR 导入和手填 Token 共用同一个存储，无法绕过存储故障。修复 [#72](https://github.com/lingcang728/ZeppBridge/issues/72)。
 
