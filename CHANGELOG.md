@@ -4,6 +4,10 @@
 
 ## Unreleased / 未发布
 
+## 2.2.4
+
+### Fixed / 修复
+
 - **Paused workouts show moving and paused time separately.** Workout details show moving pace alongside pace including pauses; FIT session, lap and activity timer totals exclude recorded pauses. Overlapping intervals count once and intervals are clipped to the activity or lap.
 - **含暂停的运动可分别查看运动用时、暂停用时、运动配速和含暂停配速。** FIT 的运动、圈与活动计时同步扣除已记录的暂停，重复、重叠与越界区间不会重复扣时。
 - Added seven evidence-backed deviceSource mappings for T-Rex 3 Pro, Balance 3, Balance 2 XT, Active, Active 2 and Cheetah 2 Ultra. Refresh the device list to update a previously cached unknown model. User model corrections retain priority.
