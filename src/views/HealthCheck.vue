@@ -20,7 +20,7 @@ import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import type { DataHealth, HealthAction, StageState, StreamHealth } from '../types';
 import { syncStreamLabel } from '../lib/syncStreams';
-import { formatFullDateTime } from '../lib/format';
+import { formatCalendarDate, formatFullDateTime } from '../lib/format';
 import { defineMessages, intlLocale, useMessages } from '../i18n';
 import { backendText } from '../i18n/backendText';
 
@@ -310,6 +310,9 @@ const setWindow = async (days: number) => {
 const formatDateTime = (value?: string | null): string =>
   formatFullDateTime(value ?? undefined, t.value.noRecords);
 
+/** 覆盖日期是纯日历日期，按本地年月日渲染，不走时刻解析。 */
+const calendarDate = (value: string): string => formatCalendarDate(value);
+
 const formatBytes = (bytes: number): string => {
   if (!Number.isFinite(bytes) || bytes <= 0) return t.value.notProvided;
   if (bytes >= 1_073_741_824) return `${(bytes / 1_073_741_824).toFixed(1)} GB`;
@@ -534,10 +537,10 @@ onMounted(() => void load());
             <p class="coverage-note">
               {{ coverageNote(stream) }}
               <template v-if="stream.coverage.gap_dates.length">
-                {{ t.gapExamples(stream.coverage.gap_dates.join(t.sourceSeparator)) }}<template v-if="stream.coverage.gap_total > stream.coverage.gap_dates.length">{{ t.gapMore }}</template>{{ t.period }}
+                {{ t.gapExamples(stream.coverage.gap_dates.map(calendarDate).join(t.sourceSeparator)) }}<template v-if="stream.coverage.gap_total > stream.coverage.gap_dates.length">{{ t.gapMore }}</template>{{ t.period }}
               </template>
               <template v-if="stream.coverage.latest_observed_at">
-                {{ t.latestObserved(stream.coverage.latest_observed_at) }}
+                {{ t.latestObserved(calendarDate(stream.coverage.latest_observed_at)) }}
               </template>
             </p>
           </article>
@@ -553,7 +556,7 @@ onMounted(() => void load());
             <strong>{{ syncStreamLabel(metric.stream, metric.label) }}</strong>
             <span>{{ t.occasionalLine(metric.canonical_records.toLocaleString(intlLocale()), metric.coverage.observed_days) }}</span>
             <span class="muted">
-              {{ metric.coverage.latest_observed_at ? t.occasionalLatest(metric.coverage.latest_observed_at) : t.occasionalNone }}
+              {{ metric.coverage.latest_observed_at ? t.occasionalLatest(calendarDate(metric.coverage.latest_observed_at)) : t.occasionalNone }}
             </span>
           </div>
         </div>

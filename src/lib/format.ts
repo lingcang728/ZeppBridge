@@ -161,6 +161,26 @@ const toDate = (value?: string | number): Date | null => {
 const CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 /**
+ * 严格解析纯日历日期（`YYYY-MM-DD`）成本地的年月日。
+ *
+ * 本地构造会把 `2026-02-30` 悄悄滚成 3 月 2 日，所以构造之后要核对年月日
+ * 有没有被改写；对不上就是非法日历日期，返回 `null`，而不是一个看似正常的
+ * 错日期。形状不对（含 RFC3339 时刻）不在这里处理，一并返回 `null`。
+ */
+export const parseCalendarDate = (value: string): Date | null => {
+  const match = CALENDAR_DATE.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+    return null;
+  }
+  return date;
+};
+
+/**
  * 纯日历日期（`YYYY-MM-DD`）按本地的年月日构造，绝不走 UTC。
  *
  * `new Date('2026-01-01')` 会按 UTC 午夜解析，在纽约就变成 2025-12-31
@@ -168,13 +188,10 @@ const CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
  */
 const toCalendarDate = (value: string | Date): Date | null => {
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
-  const match = CALENDAR_DATE.exec(value);
-  if (!match) {
-    const fallback = new Date(value);
-    return Number.isNaN(fallback.getTime()) ? null : fallback;
-  }
-  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-  return Number.isNaN(date.getTime()) ? null : date;
+  // 形状像日历日期就必须是合法日历日期：非法日期不接受，也不让它滚到下个月。
+  if (CALENDAR_DATE.test(value)) return parseCalendarDate(value);
+  const fallback = new Date(value);
+  return Number.isNaN(fallback.getTime()) ? null : fallback;
 };
 
 export const formatDateTime = (

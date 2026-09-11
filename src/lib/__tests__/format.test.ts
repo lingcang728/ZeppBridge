@@ -13,6 +13,7 @@ import {
   formatWeekdayNames,
   isFiniteNumber,
   localDateString,
+  parseCalendarDate,
 } from '../format';
 import { setDateFormat, setTimeFormat } from '../datePreferences';
 import { setLocale } from '../../i18n';
@@ -272,6 +273,56 @@ describe('日历日期按本地年月日解析，不做 UTC 位移', () => {
         expect(formatCalendarDate(new Date(2026, 0, 1))).toBe('Thu, Jan 1');
       });
     });
+  });
+});
+
+/*
+ * `parseCalendarDate` 是日期选择器共享的入口：它必须把 `YYYY-MM-DD` 读成
+ * 本地的年月日，并且在输入根本不是一个合法日历日期时说「不知道」，而不是
+ * 用一个被本地构造悄悄滚动过的错日期顶上。
+ */
+describe('严格解析纯日历日期', () => {
+  it('解析出的年月日是本地字段，不做 UTC 位移', () => {
+    withTimeZone('Asia/Shanghai', () => {
+      const date = parseCalendarDate('2026-01-01');
+      expect(date?.getFullYear()).toBe(2026);
+      expect(date?.getMonth()).toBe(0);
+      expect(date?.getDate()).toBe(1);
+    });
+  });
+
+  it('纽约跨年清晨不会退回前一天', () => {
+    withTimeZone('America/New_York', () => {
+      // UTC 解析会得到 2025-12-31 19:00；这里必须仍是 1 月 1 日。
+      const date = parseCalendarDate('2026-01-01');
+      expect(date?.getFullYear()).toBe(2026);
+      expect(date?.getMonth()).toBe(0);
+      expect(date?.getDate()).toBe(1);
+    });
+  });
+
+  it('接受闰日，拒绝平年的 2 月 29 日', () => {
+    expect(parseCalendarDate('2024-02-29')?.getDate()).toBe(29);
+    expect(parseCalendarDate('2026-02-29')).toBeNull();
+    // 百年不闰：2100 不是闰年。
+    expect(parseCalendarDate('2100-02-29')).toBeNull();
+  });
+
+  it('拒绝会被本地构造悄悄滚动的非法日期', () => {
+    expect(parseCalendarDate('2026-04-31')).toBeNull();
+    expect(parseCalendarDate('2026-13-01')).toBeNull();
+    expect(parseCalendarDate('2026-00-10')).toBeNull();
+    expect(parseCalendarDate('2026-01-00')).toBeNull();
+  });
+
+  it('拒绝形状不符的输入', () => {
+    expect(parseCalendarDate('2026-1-1')).toBeNull();
+    expect(parseCalendarDate('not-a-date')).toBeNull();
+    expect(parseCalendarDate('2026-01-01T00:00:00Z')).toBeNull();
+  });
+
+  it('非法日历日期经 formatCalendarDate 渲染成日期未知', () => {
+    expect(formatCalendarDate('2026-02-30')).toBe('日期未知');
   });
 });
 
