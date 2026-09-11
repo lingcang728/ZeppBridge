@@ -20,6 +20,7 @@ import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import type { DataHealth, HealthAction, StageState, StreamHealth } from '../types';
 import { syncStreamLabel } from '../lib/syncStreams';
+import { formatFullDateTime } from '../lib/format';
 import { defineMessages, intlLocale, useMessages } from '../i18n';
 import { backendText } from '../i18n/backendText';
 
@@ -306,14 +307,8 @@ const setWindow = async (days: number) => {
   await load();
 };
 
-const formatDateTime = (value?: string | null): string => {
-  if (!value) return t.value.noRecords;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return t.value.timeUnknown;
-  return new Intl.DateTimeFormat(intlLocale(), {
-    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
-  }).format(date).replace(/\//g, '-');
-};
+const formatDateTime = (value?: string | null): string =>
+  formatFullDateTime(value ?? undefined, t.value.noRecords);
 
 const formatBytes = (bytes: number): string => {
   if (!Number.isFinite(bytes) || bytes <= 0) return t.value.notProvided;

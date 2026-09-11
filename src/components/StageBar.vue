@@ -141,11 +141,6 @@ const segmentStyle = (stage: BarSegment): Record<string, string> => {
   return { width: barPercent(stage.minutes) + '%' };
 };
 
-const clock = (value: number) => {
-  const date = new Date(value);
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-};
-
 const hypnogramOption = computed(() => {
   const current = range.value;
   if (!current || !timeline.value.length) return null;
@@ -167,14 +162,14 @@ const hypnogramOption = computed(() => {
       formatter: (params: Array<{ value: [number, number] }>) => {
         const point = params?.[0]?.value;
         if (!point) return '';
-        return `${clock(point[0])}  ${stageLabels.value[point[1]] ?? ''}`;
+        return `${formatTime(point[0])}  ${stageLabels.value[point[1]] ?? ''}`;
       },
     },
     xAxis: {
       type: 'time',
       min: current.from,
       max: current.from + current.span,
-      axisLabel: { formatter: clock, hideOverlap: true, color: '#B4BBC3', fontSize: 14.5 },
+      axisLabel: { formatter: (value: number) => formatTime(value), hideOverlap: true, color: '#B4BBC3', fontSize: 14.5 },
       axisTick: { show: false },
       axisLine: { lineStyle: { color: 'rgba(226, 234, 242, .12)' } },
       splitLine: { show: false },

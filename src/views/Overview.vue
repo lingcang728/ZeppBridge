@@ -21,11 +21,11 @@ import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { formatDeviceIntro } from '../lib/deviceCopy';
 import { zeppSemanticColors } from '../lib/echartsTheme';
 import { indexSeries, latestValue } from '../lib/metricSeries';
-import { formatDistance, formatDuration, formatMetric, formatTime, isFiniteNumber, type HealthCategory } from '../lib/format';
+import { formatDateTime, formatDistance, formatDuration, formatMetric, formatTime, isFiniteNumber, type HealthCategory } from '../lib/format';
 import { displayableWorkouts, workoutDisplayLabel, workoutDurationMinutes, workoutTypeKey } from '../lib/workouts';
 import type { HealthOverview, HeartRatePoint, MetricSeries, SleepSession, Workout } from '../types';
 import { sleepStageLabel } from '../lib/sleepStages';
-import { defineMessages, intlLocale, useMessages } from '../i18n';
+import { defineMessages, useMessages } from '../i18n';
 
 const messages = defineMessages(
   {
@@ -311,7 +311,7 @@ const hrChartOption = computed(() => {
     data.push([point.ts, point.value]);
   });
   const last = data[data.length - 1];
-  const clock = (value: number) => new Intl.DateTimeFormat(intlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value));
+  const clock = (value: number) => formatTime(value);
   return {
     animationDuration: 900,
     animationEasing: 'cubicOut' as const,
@@ -462,13 +462,7 @@ interface RecentItem {
   fact: string;
   factLabel?: string;
 }
-const shortDateTime = (value: string) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return t.value.timeUnknown;
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const dd = String(date.getDate()).padStart(2, '0');
-  return `${mm}/${dd} ${formatTime(value)}`;
-};
+const shortDateTime = (value: string) => formatDateTime(value, t.value.timeUnknown);
 /* 只按运动的 key 分图标，不看显示名。
    显示名跟着界面语言变，拿它做分支判断，一换语言分类就悄悄失效。 */
 const workoutPresentation = (workout: Workout): Pick<RecentItem, 'category' | 'designIcon'> => {

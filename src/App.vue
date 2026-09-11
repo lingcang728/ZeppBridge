@@ -11,7 +11,8 @@ import { deviceStateLabel, useDevices } from './composables/useDevices';
 import { useUiScale } from './composables/useUiScale';
 import { backend, isDesktop } from './lib/bridge';
 import { checkForDesktopUpdate } from './services/updateService';
-import { defineMessages, intlLocale, locale, useMessages } from './i18n';
+import { formatFullDateTime } from './lib/format';
+import { defineMessages, locale, useMessages } from './i18n';
 
 const messages = defineMessages(
   {
@@ -192,15 +193,8 @@ const statusIcon = computed(() => {
   if (statusTone.value === 'success') return 'circle-check' as const;
   return 'info' as const;
 });
-const lastSyncClock = computed(() => {
-  const raw = appStatus.value?.last_cloud_sync_at;
-  if (!raw) return t.value.notFetchedYet;
-  const date = new Date(raw);
-  if (Number.isNaN(date.getTime())) return t.value.timeUnknown;
-  return new Intl.DateTimeFormat(intlLocale(), {
-    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
-  }).format(date).replace(/\//g, '-');
-});
+const lastSyncClock = computed(() =>
+  formatFullDateTime(appStatus.value?.last_cloud_sync_at, t.value.notFetchedYet));
 const accountLabel = computed(() => appStatus.value?.masked_user_id || t.value.noAccount);
 const browserPreview = computed(() => !desktopRuntime);
 const routeNotice = computed(() => route.query.notice === 'not-found');

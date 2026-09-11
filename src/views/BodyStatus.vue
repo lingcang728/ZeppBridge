@@ -11,7 +11,7 @@ import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { zeppSemanticColors } from '../lib/echartsTheme';
 import { indexSeries, seriesRanges, type SeriesRangeDays } from '../lib/metricSeries';
-import { isFiniteNumber } from '../lib/format';
+import { formatTime, isFiniteNumber } from '../lib/format';
 import {
   bodyHeightUnitLabel,
   bodyMassUnitLabel,
@@ -20,7 +20,7 @@ import {
   toBodyMass,
 } from '../lib/units';
 import type { MetricSeries, MetricSeriesPoint, StressPoint } from '../types';
-import { defineMessages, intlLocale, useMessages } from '../i18n';
+import { defineMessages, useMessages } from '../i18n';
 
 const messages = defineMessages(
   {
@@ -593,9 +593,7 @@ const curveAverage = computed(() => (curve.value.length
   ? Math.round(curve.value.reduce((total, point) => total + point.value, 0) / curve.value.length)
   : null));
 
-const clock = (value: number) => new Intl.DateTimeFormat(intlLocale(), {
-  hour: '2-digit', minute: '2-digit', hour12: false,
-}).format(new Date(value));
+const clock = (value: number) => formatTime(value);
 
 /*
  * 曲线断开的阈值。

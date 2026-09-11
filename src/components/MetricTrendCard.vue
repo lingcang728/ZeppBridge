@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { VChart } from '../lib/echartsSetup';
 import { buildSeriesOption, coverageLabel } from '../lib/metricSeries';
+import { formatCalendarDate } from '../lib/format';
 import type { MetricSeries } from '../types';
 import { defineMessages, useMessages } from '../i18n';
 
@@ -115,7 +116,7 @@ const option = computed(() => {
 
     <p class="trend-meta">
       <span>{{ coverage }}</span>
-      <span v-if="latestDate" class="trend-date">{{ t.measuredOn(latestDate) }}</span>
+      <span v-if="latestDate" class="trend-date">{{ t.measuredOn(formatCalendarDate(latestDate)) }}</span>
       <span v-if="band" class="trend-band">{{ band }}</span>
     </p>
 

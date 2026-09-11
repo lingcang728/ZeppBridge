@@ -19,7 +19,8 @@ import { computed } from 'vue';
 import Icon from './Icon.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { emptyLibraryNotice } from '../lib/emptyLibraryNotice';
-import { defineMessages, intlLocale, useMessages } from '../i18n';
+import { formatCalendarDate } from '../lib/format';
+import { defineMessages, useMessages } from '../i18n';
 
 const props = withDefaults(defineProps<{
   /**
@@ -96,9 +97,7 @@ const isShort = computed(() => {
 const earliestText = computed(() => {
   const day = coverage.value?.earliest_day;
   if (!day) return '';
-  const parsed = new Date(`${day}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) return day;
-  return new Intl.DateTimeFormat(intlLocale(), { dateStyle: 'medium' }).format(parsed);
+  return formatCalendarDate(day, 'long');
 });
 
 /* 补拉到用户当前选的那个范围，而不是某个固定值：他刚刚已经说了想看多远。 */
