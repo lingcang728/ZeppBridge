@@ -727,37 +727,42 @@ const CAPABILITY_PROBE_AT_KEY: &str = "capability_probe_at";
 impl Database {
     /// Build the capability overview: read what the library already proves,
     /// then fold in the stored result of the last probe for the rest.
-    pub fn capability_overview(&self) -> Result<CapabilityOverview> {
+    pub fn capability_overview(&self, today: NaiveDate) -> Result<CapabilityOverview> {
         let mut items = Vec::new();
         for (stream, evidence, window_days) in CAPABILITY_ROWS {
+            // Inclusive local calendar window of exactly `window_days`:
+            // `today - (window_days - 1)` .. `today`.
+            let start = today - Duration::days(window_days - 1);
+            let start_text = start.to_string();
+            let end_text = today.to_string();
             let (records, latest, unit) = match evidence {
                 CapabilityEvidence::DailyPrefix(prefix) => {
                     let pattern = format!("{prefix}%");
                     let row = self.conn.query_row(
                         "SELECT COUNT(DISTINCT date), MAX(date) FROM daily_metrics
-                         WHERE metric LIKE ?1 AND date >= date('now', ?2)",
-                        params![pattern, format!("-{window_days} day")],
+                         WHERE metric LIKE ?1 AND date BETWEEN ?2 AND ?3",
+                        params![pattern, start_text, end_text],
                         |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Option<String>>(1)?)),
                     )?;
                     (row.0, row.1, ("天", "days"))
                 }
                 CapabilityEvidence::Samples(metric) => {
                     let row = self.conn.query_row(
-                        "SELECT COUNT(*), MAX(date(timestamp)) FROM metric_samples
-                         WHERE metric = ?1 AND timestamp >= datetime('now', ?2)",
-                        params![metric, format!("-{window_days} day")],
+                        "SELECT COUNT(*), MAX(date(timestamp, 'localtime')) FROM metric_samples
+                         WHERE metric = ?1 AND date(timestamp, 'localtime') BETWEEN ?2 AND ?3",
+                        params![metric, start_text, end_text],
                         |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Option<String>>(1)?)),
                     )?;
                     (row.0, row.1, ("条", "records"))
                 }
                 CapabilityEvidence::Table(table, column) => {
                     let sql = format!(
-                        "SELECT COUNT(*), MAX(date({column})) FROM {table}
-                         WHERE {column} >= datetime('now', ?1)"
+                        "SELECT COUNT(*), MAX(date({column}, 'localtime')) FROM {table}
+                         WHERE date({column}, 'localtime') BETWEEN ?1 AND ?2"
                     );
                     let row = self.conn.query_row(
                         &sql,
-                        params![format!("-{window_days} day")],
+                        params![start_text, end_text],
                         |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Option<String>>(1)?)),
                     )?;
                     (row.0, row.1, ("条", "records"))
@@ -1816,14 +1821,14 @@ impl Database {
     /// 四张表各问一次最早/最晚，取并集：只看其中一张会在「有运动没有日概览」
     /// 这类账号上少报好几个月。返回的是**天**而不是时间戳，因为它要拿去和界面上
     /// 「最近 7 天 / 30 天 / 6 个月」这些以天为单位的选择直接比较。
-    pub fn local_coverage(&self) -> Result<LocalCoverage> {
+    pub fn local_coverage(&self, today: NaiveDate) -> Result<LocalCoverage> {
         let mut earliest: Option<String> = None;
         let mut latest: Option<String> = None;
         for query in [
             "SELECT MIN(date), MAX(date) FROM daily_metrics",
-            "SELECT MIN(substr(timestamp, 1, 10)), MAX(substr(timestamp, 1, 10)) FROM metric_samples",
-            "SELECT MIN(substr(start_time, 1, 10)), MAX(substr(end_time, 1, 10)) FROM sleep_sessions",
-            "SELECT MIN(substr(start_time, 1, 10)), MAX(substr(end_time, 1, 10)) FROM workouts",
+            "SELECT MIN(date(timestamp, 'localtime')), MAX(date(timestamp, 'localtime')) FROM metric_samples",
+            "SELECT MIN(date(start_time, 'localtime')), MAX(date(end_time, 'localtime')) FROM sleep_sessions",
+            "SELECT MIN(date(start_time, 'localtime')), MAX(date(end_time, 'localtime')) FROM workouts",
         ] {
             let (low, high) = self.conn.query_row(query, [], |row| {
                 Ok((
@@ -1848,7 +1853,7 @@ impl Database {
         let covered_days = earliest
             .as_deref()
             .and_then(|day| NaiveDate::parse_from_str(day, "%Y-%m-%d").ok())
-            .map(|day| (Local::now().date_naive() - day).num_days() + 1)
+            .map(|day| (today - day).num_days() + 1)
             .unwrap_or(0)
             .max(0);
 
@@ -6199,6 +6204,7 @@ mod tests {
         assert!(!hints[0].aliases.iter().any(|a| a == "0.91.20.5"));
     }
     use super::*;
+    use chrono::{Datelike, TimeZone};
 
     fn ts() -> DateTime<Utc> {
         DateTime::from_timestamp(1_700_000_000, 0).unwrap()
@@ -6261,7 +6267,7 @@ mod tests {
         }])
         .unwrap();
 
-        let overview = db.capability_overview().unwrap();
+        let overview = db.capability_overview(Local::now().date_naive()).unwrap();
         let row = overview
             .items
             .iter()
@@ -8508,7 +8514,7 @@ mod tests {
     #[test]
     fn local_coverage_is_empty_on_a_fresh_library() {
         let db = Database::in_memory().unwrap();
-        let coverage = db.local_coverage().unwrap();
+        let coverage = db.local_coverage(Local::now().date_naive()).unwrap();
         assert_eq!(coverage.earliest_day, None);
         assert_eq!(coverage.latest_day, None);
         // 0 而不是「今天到今天 = 1 天」：库里一条都没有，覆盖就是零。
@@ -8528,12 +8534,23 @@ mod tests {
             .unwrap();
         db.conn
             .execute(
-                "INSERT INTO workouts (workout_id, workout_type, start_time, end_time,                  source_scope) VALUES ('w1', 'run', '2026-03-02T07:00:00Z',                  '2026-03-02T08:00:00Z', 'device')",
-                [],
+                "INSERT INTO workouts (workout_id, workout_type, start_time, end_time,                  source_scope) VALUES ('w1', 'run', ?1,                  ?2, 'device')",
+                rusqlite::params![
+                    Local
+                        .with_ymd_and_hms(2026, 3, 2, 7, 0, 0)
+                        .unwrap()
+                        .with_timezone(&Utc)
+                        .to_rfc3339(),
+                    (Local.with_ymd_and_hms(2026, 3, 2, 7, 0, 0).unwrap() + Duration::hours(1))
+                        .with_timezone(&Utc)
+                        .to_rfc3339(),
+                ],
             )
             .unwrap();
 
-        let coverage = db.local_coverage().unwrap();
+        let coverage = db
+            .local_coverage(NaiveDate::from_ymd_opt(2026, 6, 15).unwrap())
+            .unwrap();
         assert_eq!(coverage.earliest_day.as_deref(), Some("2026-03-02"));
         assert_eq!(coverage.latest_day.as_deref(), Some("2026-06-10"));
         assert!(coverage.covered_days > 0);
@@ -8576,7 +8593,8 @@ mod tests {
         // "your watch does not support blood pressure" to someone who simply
         // has not measured would send them shopping for hardware they own.
         let db = Database::in_memory().unwrap();
-        let overview = db.capability_overview().unwrap();
+        let today = Local::now().date_naive();
+        let overview = db.capability_overview(today).unwrap();
         let by_stream: std::collections::BTreeMap<_, _> = overview
             .items
             .iter()
@@ -8595,14 +8613,17 @@ mod tests {
 
         db.insert_metric_sample(&MetricSample {
             metric: "heart_rate".into(),
-            timestamp: Utc::now() - chrono::Duration::hours(2),
+            timestamp: Local
+                .with_ymd_and_hms(today.year(), today.month(), today.day(), 12, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
             value: 60.0,
             unit: "bpm".into(),
             source_scope: SourceScope::Device,
             device_id: None,
         })
         .unwrap();
-        let overview = db.capability_overview().unwrap();
+        let overview = db.capability_overview(today).unwrap();
         let heart_rate = overview
             .items
             .iter()
@@ -8612,6 +8633,41 @@ mod tests {
         assert_eq!(heart_rate.records, 1);
         // Derived from stored rows, so it cost no request.
         assert_eq!(heart_rate.source, "derived");
+    }
+
+    #[test]
+    fn capability_window_is_inclusive_local_calendar_days() {
+        let db = Database::in_memory().unwrap();
+        let today = NaiveDate::from_ymd_opt(2026, 8, 20).unwrap();
+        // heart_rate 的窗口是 30 天：today - 29 .. today，两头都算。
+        let on_start_boundary = today - Duration::days(29);
+        let just_before = today - Duration::days(30);
+        for (day, value) in [(on_start_boundary, 60.0), (just_before, 61.0)] {
+            db.insert_metric_sample(&MetricSample {
+                metric: "heart_rate".into(),
+                timestamp: Local
+                    .with_ymd_and_hms(day.year(), day.month(), day.day(), 12, 0, 0)
+                    .unwrap()
+                    .with_timezone(&Utc),
+                value,
+                unit: "bpm".into(),
+                source_scope: SourceScope::Device,
+                device_id: None,
+            })
+            .unwrap();
+        }
+
+        let overview = db.capability_overview(today).unwrap();
+        let heart_rate = overview
+            .items
+            .iter()
+            .find(|item| item.stream == "heart_rate")
+            .unwrap();
+        assert_eq!(
+            heart_rate.records, 1,
+            "窗口边界那一天要算进来，再往前一天不算"
+        );
+        assert_eq!(heart_rate.latest_date.as_deref(), Some("2026-07-22"));
     }
 
     #[test]
@@ -8631,7 +8687,7 @@ mod tests {
         };
 
         db.save_capability_probe(&[probe("empty")]).unwrap();
-        let overview = db.capability_overview().unwrap();
+        let overview = db.capability_overview(Local::now().date_naive()).unwrap();
         let item = overview
             .items
             .iter()
@@ -8640,7 +8696,7 @@ mod tests {
         assert_eq!(item.status, "no_records", "an empty answer proves nothing");
 
         db.save_capability_probe(&[probe("unavailable")]).unwrap();
-        let overview = db.capability_overview().unwrap();
+        let overview = db.capability_overview(Local::now().date_naive()).unwrap();
         let item = overview
             .items
             .iter()
