@@ -26,6 +26,16 @@ const messages = defineMessages(
     minimum: 'Min',
     maximum: 'Max',
   },
+  {
+    latestTag: 'Último',
+    measuredOn: (date: string) => `medido el ${date}`,
+    trendAria: (label: string) => `Línea de tendencia de ${label}`,
+    onlyOneDay: 'Solo hay un día de datos en este rango, así que todavía no hay tendencia que trazar.',
+    defaultEmpty: 'Esta métrica muestra su tendencia una vez sincronizada.',
+    average: 'Prom.',
+    minimum: 'Mín.',
+    maximum: 'Máx.',
+  },
 );
 const t = useMessages(messages);
 

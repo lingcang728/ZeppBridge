@@ -78,6 +78,37 @@ const messages = defineMessages(
       'weekly.training_load': 'Training load',
     },
   },
+  {
+    title: 'Esta semana',
+    window: (recentStart: string, recentEnd: string, baseStart: string, baseEnd: string) =>
+      `${recentStart} ~ ${recentEnd} · frente a tu propio ${baseStart} ~ ${baseEnd}`,
+    legendGood: 'Verde = mejor para esta métrica',
+    legendBad: 'Rojo = peor',
+    legendNote: 'Comparado solo con tus propios 28 días anteriores, nunca con un promedio de población',
+    desktopOnly: 'El informe semanal necesita la app de escritorio de ZeppBridge.',
+    nothingComparable: 'Todavía no hay nada comparable esta semana. Vuelve después de sincronizar.',
+    loadFailed: 'No se pudo generar el informe semanal local',
+    barsAria: (recent: string, baseline: string) => `Esta semana ${recent}, 28 días anteriores ${baseline}`,
+    barThisWeek: 'Esta semana',
+    barBaseline: '28 días previos',
+    noBaseline: 'No hay suficiente historial detrás, así que solo se muestra el valor actual',
+    thinBaseline: (days: number, found: number, needed: number) =>
+      `Solo ${found} de los ${days} días anteriores tienen esta métrica (se necesitan ${needed}), así que se muestra el valor actual sin comparación.`,
+    noRecentData: 'No hay registros locales de esta métrica en los últimos 7 días.',
+    notProvided: 'Sin datos',
+    sleepDuration: (hours: number, minutes: number) => `${hours} h ${minutes} min`,
+    regularity: (minutes: number) => `±${minutes} min`,
+    workoutCount: (count: number) => `${count} sesiones`,
+    metric: {
+      'weekly.resting_hr': 'FC en reposo',
+      'weekly.hrv': 'VFC',
+      'weekly.stress': 'Estrés',
+      'weekly.sleep_duration': 'Duración del sueño',
+      'weekly.sleep_start_regularity': 'Variación de la hora de dormir',
+      'weekly.workout_count': 'Entrenamientos',
+      'weekly.training_load': 'Carga de entrenamiento',
+    },
+  },
 );
 const t = useMessages(messages);
 

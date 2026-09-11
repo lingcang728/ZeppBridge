@@ -36,6 +36,16 @@ const messages = defineMessages(
     duration: (hours: number, minutes: number) =>
       (hours > 0 ? `${hours} hr ${minutes} min` : `${minutes} min`),
   },
+  {
+    noUpdates: 'Sin actualizaciones',
+    noRecords: 'Aún no hay registros',
+    timeUnknown: 'Hora desconocida',
+    dateUnknown: 'Fecha desconocida',
+    durationUnknown: 'Duración desconocida',
+    notRecorded: 'No registrado',
+    duration: (hours: number, minutes: number) =>
+      (hours > 0 ? `${hours} h ${minutes} min` : `${minutes} min`),
+  },
 );
 
 const copy = () => messagesOf(messages);
