@@ -1,12 +1,18 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  formatCalendarDate,
+  formatDate,
+  formatDateTime,
   formatDistance,
   formatDuration,
+  formatFullDateTime,
   formatMetric,
   formatPace,
+  formatTime,
   isFiniteNumber,
   localDateString,
 } from '../format';
+import { setDateFormat, setTimeFormat } from '../datePreferences';
 import { setLocale } from '../../i18n';
 
 /*
@@ -117,5 +123,158 @@ describe('缺失值的说法跟着界面语言走', () => {
     setLocale('en');
     setLocale('zh');
     expect(formatDuration(125)).toBe('2 小时 5 分');
+  });
+});
+
+/*
+ * 日期时间的格式偏好是纯显示层的：绝对时刻永远按运行时的本地时区渲染，偏好
+ * 只决定年月日顺序和 12 / 24 小时制。下面把同一个 UTC 时刻放进三个时区，
+ * 验证「本地」真的是本地，而不是某个写死的时区。
+ */
+const ZONES = ['Europe/London', 'America/New_York', 'Asia/Shanghai'] as const;
+
+/** 换浏览器地区，跑完恢复：地区由 `navigator.language` 决定，和界面语言无关。 */
+const withNavigatorLanguage = (language: string, run: () => void): void => {
+  const own = Object.getOwnPropertyDescriptor(navigator, 'language');
+  Object.defineProperty(navigator, 'language', { value: language, configurable: true, writable: true });
+  try {
+    run();
+  } finally {
+    if (own) Object.defineProperty(navigator, 'language', own);
+    else delete (navigator as unknown as { language?: string }).language;
+  }
+};
+
+/** 换系统时区，跑完恢复。Node 运行时改 `TZ` 会立即生效，无需新进程。 */
+const nodeEnv = (globalThis as unknown as { process: { env: Record<string, string | undefined> } }).process.env;
+const withTimeZone = (zone: string, run: () => void): void => {
+  const previous = nodeEnv.TZ;
+  nodeEnv.TZ = zone;
+  try {
+    run();
+  } finally {
+    if (previous === undefined) delete nodeEnv.TZ;
+    else nodeEnv.TZ = previous;
+  }
+};
+
+describe('绝对时刻按运行时的系统时区渲染', () => {
+  afterEach(() => {
+    setDateFormat('regional');
+    setTimeFormat('regional');
+    setLocale('zh');
+  });
+
+  const localDateTime: Record<(typeof ZONES)[number], string> = {
+    'Europe/London': '1 Jan, 00:30:00',
+    'America/New_York': '31 Dec, 19:30:00',
+    'Asia/Shanghai': '1 Jan, 08:30:00',
+  };
+
+  it.each(ZONES)('%s 下同一 UTC 时刻落在各自的本地日期时间', (zone) => {
+    withNavigatorLanguage('en-US', () => {
+      setDateFormat('dmy');
+      setTimeFormat('24h');
+      withTimeZone(zone, () => {
+        expect(formatDateTime('2026-01-01T00:30:00Z', '—', { seconds: true })).toBe(localDateTime[zone]);
+      });
+    });
+  });
+
+  it('epoch 毫秒同样按本地时间渲染', () => {
+    withNavigatorLanguage('en-GB', () => {
+      setTimeFormat('24h');
+      withTimeZone('Asia/Shanghai', () => {
+        expect(formatTime(Date.UTC(2026, 0, 1, 0, 30))).toBe('08:30');
+      });
+      setTimeFormat('12h');
+      withTimeZone('Asia/Shanghai', () => {
+        expect(formatTime(Date.UTC(2026, 0, 1, 0, 30))).toBe('08:30 am');
+      });
+    });
+  });
+
+  it('12 / 24 小时制切换小时周期', () => {
+    withNavigatorLanguage('en-US', () => {
+      setDateFormat('mdy');
+      withTimeZone('Europe/London', () => {
+        setTimeFormat('12h');
+        expect(formatDateTime('2026-01-01T00:30:00Z')).toMatch(/^Jan 1, 12:30\sAM$/);
+        setTimeFormat('24h');
+        expect(formatDateTime('2026-01-01T00:30:00Z')).toBe('Jan 1, 00:30');
+      });
+    });
+  });
+
+  it('formatFullDateTime 带年份并可选秒', () => {
+    withNavigatorLanguage('en-US', () => {
+      setDateFormat('dmy');
+      setTimeFormat('24h');
+      withTimeZone('America/New_York', () => {
+        expect(formatFullDateTime('2026-01-01T00:30:00Z', '—', { seconds: true }))
+          .toBe('31 Dec 2025, 19:30:00');
+      });
+    });
+  });
+});
+
+describe('日历日期按本地年月日解析，不做 UTC 位移', () => {
+  afterEach(() => {
+    setDateFormat('regional');
+    setLocale('zh');
+  });
+
+  it.each(ZONES)('%s 下 2026-01-01 仍是 1 月 1 日（星期四）', (zone) => {
+    withNavigatorLanguage('en-US', () => {
+      withTimeZone(zone, () => {
+        expect(formatCalendarDate('2026-01-01')).toBe('Thu, Jan 1');
+      });
+    });
+  });
+
+  it('负时区里不会退回前一天', () => {
+    withNavigatorLanguage('en-US', () => {
+      withTimeZone('America/New_York', () => {
+        // UTC 解析会得到 2025-12-31 19:00，这正是 formatCalendarDate 要避免的。
+        expect(formatCalendarDate('2026-01-01')).toBe('Thu, Jan 1');
+        expect(formatCalendarDate('2025-12-31')).toBe('Wed, Dec 31');
+        // 旧的 formatDate 是「按时刻解析」，负时区里就会错一天。
+        expect(formatDate('2026-01-01')).toBe('Wed, Dec 31');
+      });
+    });
+  });
+
+  it('日期顺序偏好控制年月日排列', () => {
+    withNavigatorLanguage('en-US', () => {
+      withTimeZone('Europe/London', () => {
+        setDateFormat('ymd');
+        expect(formatCalendarDate('2026-01-01', 'long')).toBe('Thursday, 2026 January 1');
+        setDateFormat('dmy');
+        expect(formatCalendarDate('2026-01-01', 'long')).toBe('Thursday, 1 January 2026');
+      });
+    });
+  });
+
+  it('接受本地 Date 对象', () => {
+    withNavigatorLanguage('en-US', () => {
+      withTimeZone('Asia/Shanghai', () => {
+        expect(formatCalendarDate(new Date(2026, 0, 1))).toBe('Thu, Jan 1');
+      });
+    });
+  });
+});
+
+describe('地区不跟界面语言走', () => {
+  afterEach(() => setLocale('zh'));
+
+  it('regional 用 navigator.language，而不是英文界面的 en-US', () => {
+    withNavigatorLanguage('en-GB', () => {
+      setLocale('zh');
+      expect(formatCalendarDate('2026-09-05')).toBe('Sat 5 Sept');
+    });
+    withNavigatorLanguage('en-US', () => {
+      setLocale('zh');
+      expect(formatCalendarDate('2026-09-05')).toBe('Sat, Sep 5');
+    });
   });
 });
