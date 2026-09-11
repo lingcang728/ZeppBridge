@@ -44,6 +44,7 @@
       "checked_at": "2026-08-15",
       "image_key": "amazfit-balance-3",
       "device_source_codes": [
+        11141377,
         11141379,
         11145472
       ]
@@ -149,6 +150,7 @@
       "checked_at": "2026-08-15",
       "image_key": "amazfit-cheetah-2-ultra",
       "device_source_codes": [
+        9978112,
         9978113
       ]
     },
@@ -334,7 +336,9 @@
       "image_key": "amazfit-t-rex-3-pro-48-44mm",
       "device_source_codes": [
         10551552,
+        10551553,
         10551555,
+        10682624,
         10682625
       ]
     },
@@ -449,6 +453,7 @@
       "device_source_codes": [
         10092800,
         10092801,
+        10092803,
         10092807
       ]
     },
@@ -746,7 +751,9 @@
       "asset_hash": "sha256:04AD7D302028FBE17109D3EDCC214DA12C085B2E2F2AF12DCE5C7094256373D2",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-active-42mm",
-      "device_source_codes": []
+      "device_source_codes": [
+        8323329
+      ]
     },
     {
       "catalog_id": "amazfit-bip-5-46mm",
@@ -1860,7 +1867,9 @@
       "image_key": null,
       "status": "active",
       "supported": true,
-      "device_source_codes": []
+      "device_source_codes": [
+        10486019
+      ]
     },
     {
       "catalog_id": "amazfit-smart-scale",

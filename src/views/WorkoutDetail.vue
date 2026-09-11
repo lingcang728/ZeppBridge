@@ -26,6 +26,7 @@ import {
 import { zeppSemanticColors } from '../lib/echartsTheme';
 import { formatPaceSeconds } from '../lib/metricSeries';
 import { workoutDisplayLabel, workoutDisplayType } from '../lib/workouts';
+import { workoutTiming } from '../lib/workoutTiming';
 import { deviceImageFor } from '../lib/deviceCatalog';
 import type { DeviceProfile, SportOption, Workout, WorkoutInsight, WorkoutSeries, WorkoutSeriesSample, WorkoutRoutePoint } from '../types';
 import { defineMessages, intlLocale, useMessages } from '../i18n';
@@ -71,6 +72,10 @@ const messages = defineMessages(
     metricDuration: '运动时间',
     metricAvgHr: '平均心率',
     metricAvgPace: '平均配速',
+    metricMovingTime: '运动用时',
+    metricPausedTime: '暂停用时',
+    metricMovingPace: '运动配速',
+    metricElapsedPace: '含暂停配速',
     metricAscent: '累计爬升',
     metricTrainingLoad: '训练负荷',
     metricTrainingEffect: '有氧训练效果',
@@ -210,6 +215,10 @@ Answer in Markdown.`,
     metricDuration: 'Moving time',
     metricAvgHr: 'Avg heart rate',
     metricAvgPace: 'Avg pace',
+    metricMovingTime: 'Moving time',
+    metricPausedTime: 'Paused time',
+    metricMovingPace: 'Moving pace',
+    metricElapsedPace: 'Elapsed pace',
     metricAscent: 'Ascent',
     metricTrainingLoad: 'Training load',
     metricTrainingEffect: 'Aerobic effect',
@@ -507,11 +516,20 @@ const deviceKind = computed(() => device.value.kind || 'unknown');
 const hasDistance = computed(() => isFiniteNumber(workout.value?.distance_meters)
   && (workout.value?.distance_meters ?? 0) > 0);
 
+const timing = computed(() => workout.value && (series.value || workout.value.moving_seconds != null)
+  ? workoutTiming(workout.value.start_time, workout.value.end_time, workout.value.distance_meters, series.value?.pauses ?? [], workout.value.moving_seconds)
+  : null);
+
 const heroMetrics = computed(() => {
   const item = workout.value;
   if (!item) return [];
   const summary = series.value?.summary;
   const resolvedPace = paceLabel.value !== t.value.notProvided ? paceLabel.value : paceText(summary?.average_pace);
+  const hasPauses = timing.value && timing.value.pausedMinutes > 0;
+  const timingMetrics = hasPauses ? [
+    { label: t.value.metricMovingTime, value: formatClock(timing.value!.movingMinutes), tone: 'training', icon: 'auto-sync' as DesignIconName },
+    { label: t.value.metricPausedTime, value: formatClock(timing.value!.pausedMinutes), tone: 'training', icon: 'auto-sync' as DesignIconName },
+  ] : [];
   /* 强度那一组。Zepp 云端不提供组数、次数和重量——`workouts` 表和它的
      四张子表里都没有这几列，原始报文里也没有。所以这里显示的是**它
      确实给了的**负荷指标，而不是把 per-set 数据编出来。 */
@@ -523,6 +541,7 @@ const heroMetrics = computed(() => {
   if (!hasDistance.value) {
     return [
       { label: t.value.metricDuration, value: formatClock(durationMinutes.value), tone: 'training', icon: 'auto-sync' as DesignIconName },
+      ...timingMetrics,
       { label: t.value.metricAvgHr, value: numberValue(item.avg_hr), unit: isFiniteNumber(item.avg_hr) ? 'bpm' : undefined, tone: 'heart', icon: 'heart-rate' as DesignIconName },
       { label: t.value.metricMaxHr, value: numberValue(item.max_hr), unit: isFiniteNumber(item.max_hr) ? 'bpm' : undefined, tone: 'heart', icon: 'heart-rate' as DesignIconName },
       { label: t.value.metricCalories, value: numberValue(item.calories), unit: isFiniteNumber(item.calories) ? t.value.unitKcal : undefined, tone: 'distance', icon: 'body-activity' as DesignIconName },
@@ -533,8 +552,10 @@ const heroMetrics = computed(() => {
   return [
     { label: t.value.metricDistance, value: distanceLabel.value, tone: 'distance', icon: 'outdoor-run' as DesignIconName },
     { label: t.value.metricDuration, value: formatClock(durationMinutes.value), tone: 'training', icon: 'auto-sync' as DesignIconName },
+    ...timingMetrics,
     { label: t.value.metricAvgHr, value: numberValue(item.avg_hr), unit: isFiniteNumber(item.avg_hr) ? 'bpm' : undefined, tone: 'heart', icon: 'heart-rate' as DesignIconName },
-    { label: t.value.metricAvgPace, value: resolvedPace, tone: 'pace', icon: 'body-activity' as DesignIconName },
+    { label: hasPauses ? t.value.metricMovingPace : t.value.metricAvgPace, value: hasPauses ? paceText(timing.value!.movingPace) : resolvedPace, tone: 'pace', icon: 'body-activity' as DesignIconName },
+    ...(hasPauses ? [{ label: t.value.metricElapsedPace, value: paceText(timing.value!.elapsedPace), tone: 'pace', icon: 'body-activity' as DesignIconName }] : []),
     { label: t.value.metricAscent, value: isFiniteNumber(summary?.elevation_gain_m) ? numberValue(toElevation(summary.elevation_gain_m)) : t.value.notProvided, unit: isFiniteNumber(summary?.elevation_gain_m) ? elevationUnitLabel() : undefined, tone: 'altitude', icon: 'health-watch' as DesignIconName },
     { label: 'VO₂ Max', value: numberValue(item.vo2max), tone: 'vo2', icon: 'vo2-max' as DesignIconName },
     { label: t.value.metricTrainingLoad, value: numberValue(item.training_load), tone: 'training', icon: 'training-load' as DesignIconName },
