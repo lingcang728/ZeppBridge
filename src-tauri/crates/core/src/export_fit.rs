@@ -104,14 +104,26 @@ fn encode_workout(workout: &Value) -> Result<Option<(Vec<u8>, usize)>, String> {
             .or_else(|| workout.get("workout_type")),
     ));
 
-    let start_unix = points
+    let sample_start = points
         .first()
         .map(|(timestamp, _)| *timestamp)
         .expect("points 非空");
-    let end_unix = points
+    let sample_end = points
         .last()
         .map(|(timestamp, _)| *timestamp)
         .expect("points 非空");
+
+    // Retain the full recorded activity span even if the first/last sample is
+    // missing. Cloud moving_seconds describes this span, not just sample coverage.
+    let (start_unix, end_unix) = match (
+        parse_unix(text(workout.get("start_time"))),
+        parse_unix(text(workout.get("end_time"))),
+    ) {
+        (Some(start), Some(end)) if start <= sample_start && end >= sample_end && end > start => {
+            (start, end)
+        }
+        _ => (sample_start, sample_end),
+    };
 
     let mut messages = Vec::new();
 
@@ -148,24 +160,37 @@ fn encode_workout(workout: &Value) -> Result<Option<(Vec<u8>, usize)>, String> {
 
     // 暂停区间：进入暂停写 timer stop，恢复写 timer start。这和 GPX 导出在
     // 暂停两侧切 trkseg 是同一份依据，只是换成 FIT 的说法。
-    let pauses = pause_intervals(workout);
+    let pauses = pause_intervals(workout, start_unix, end_unix);
+    let pause_events: Vec<_> = pauses
+        .iter()
+        .flat_map(|&(start, end)| {
+            [
+                (start, typedef::EventType::STOP),
+                (end, typedef::EventType::START),
+            ]
+        })
+        .collect();
 
     let mut record_count = 0usize;
     let mut pause_cursor = 0usize;
     for (unix, point) in &points {
-        while pause_cursor < pauses.len() && pauses[pause_cursor].0 <= *unix {
-            let (stop_at, resume_at) = pauses[pause_cursor];
-            messages.push(timer_event(stop_at, typedef::EventType::STOP));
-            messages.push(timer_event(resume_at, typedef::EventType::START));
+        while pause_cursor < pause_events.len() && pause_events[pause_cursor].0 <= *unix {
+            let (at, event_type) = pause_events[pause_cursor];
+            messages.push(timer_event(at, event_type));
             pause_cursor += 1;
         }
         messages.push(record_message(*unix, point, sport));
         record_count += 1;
     }
 
+    for &(at, event_type) in &pause_events[pause_cursor..] {
+        messages.push(timer_event(at, event_type));
+    }
+
     messages.push(timer_event(end_unix, typedef::EventType::STOP));
 
     let elapsed_seconds = (end_unix - start_unix).max(0) as f64;
+    let moving_seconds = timer_seconds(workout, start_unix, end_unix);
     // 手表自己记的圈优先于我们按公里切的分段。
     //
     // 「我经常按圈键，如果你的 .fit 里能带上圈数据，那会是我的首选」——
@@ -221,7 +246,7 @@ fn encode_workout(workout: &Value) -> Result<Option<(Vec<u8>, usize)>, String> {
         u32_field(mesgdef::Activity::TIMESTAMP, fit_timestamp(end_unix)),
         u32_field(
             mesgdef::Activity::TOTAL_TIMER_TIME,
-            (elapsed_seconds * 1000.0) as u32,
+            (moving_seconds * 1000.0) as u32,
         ),
         u16_field(mesgdef::Activity::NUM_SESSIONS, 1),
         enum_field(mesgdef::Activity::TYPE, typedef::Activity::MANUAL.0),
@@ -478,6 +503,7 @@ fn push_laps(
             .get("duration_seconds")
             .and_then(Value::as_f64)
             .unwrap_or((end - start).max(0) as f64);
+        let moving_seconds = (duration - paused_seconds(workout, start, end)).max(0.0);
 
         let mut fields = vec![
             u16_field(mesgdef::Lap::MESSAGE_INDEX, count),
@@ -495,7 +521,7 @@ fn push_laps(
             ),
             u32_field(
                 mesgdef::Lap::TOTAL_TIMER_TIME,
-                (duration * 1000.0).max(0.0) as u32,
+                (moving_seconds * 1000.0) as u32,
             ),
         ];
 
@@ -510,9 +536,9 @@ fn push_laps(
         // 这个字段而不是自己从 record 里算，于是分段表整列显示 0。
         if let (Some(distance), true) = (
             split.get("distance_m").and_then(Value::as_f64),
-            duration > 0.0,
+            moving_seconds > 0.0,
         ) {
-            if let Some(speed) = encode_speed(distance / duration) {
+            if let Some(speed) = encode_speed(distance / moving_seconds) {
                 fields.push(u16_field(mesgdef::Lap::AVG_SPEED, speed));
             }
         }
@@ -577,6 +603,7 @@ fn push_whole_activity_lap(
     points: &[(i64, Point)],
 ) {
     let duration_ms = (elapsed_seconds * 1000.0).max(0.0) as u32;
+    let moving_seconds = timer_seconds(workout, start_unix, end_unix);
     let mut fields = vec![
         u16_field(mesgdef::Lap::MESSAGE_INDEX, 0),
         u32_field(mesgdef::Lap::TIMESTAMP, fit_timestamp(end_unix)),
@@ -594,7 +621,10 @@ fn push_whole_activity_lap(
             typedef::LapTrigger::SESSION_END.0,
         ),
         u32_field(mesgdef::Lap::TOTAL_ELAPSED_TIME, duration_ms),
-        u32_field(mesgdef::Lap::TOTAL_TIMER_TIME, duration_ms),
+        u32_field(
+            mesgdef::Lap::TOTAL_TIMER_TIME,
+            (moving_seconds * 1000.0) as u32,
+        ),
     ];
 
     // 起点坐标同 session：取第一个真有定位的点，室内运动本来就没有。
@@ -617,8 +647,8 @@ fn push_whole_activity_lap(
             mesgdef::Lap::TOTAL_DISTANCE,
             (distance * 100.0) as u32,
         ));
-        if elapsed_seconds > 0.0 {
-            if let Some(speed) = encode_speed(distance / elapsed_seconds) {
+        if moving_seconds > 0.0 {
+            if let Some(speed) = encode_speed(distance / moving_seconds) {
                 fields.push(u16_field(mesgdef::Lap::AVG_SPEED, speed));
             }
         }
@@ -677,6 +707,7 @@ fn push_session(
     lap_count: u16,
     points: &[(i64, Point)],
 ) {
+    let moving_seconds = timer_seconds(workout, start_unix, end_unix);
     let mut fields = vec![
         u16_field(mesgdef::Session::MESSAGE_INDEX, 0),
         u32_field(mesgdef::Session::TIMESTAMP, fit_timestamp(end_unix)),
@@ -691,7 +722,7 @@ fn push_session(
         ),
         u32_field(
             mesgdef::Session::TOTAL_TIMER_TIME,
-            (elapsed_seconds * 1000.0) as u32,
+            (moving_seconds * 1000.0) as u32,
         ),
         u16_field(mesgdef::Session::FIRST_LAP_INDEX, 0),
         u16_field(mesgdef::Session::NUM_LAPS, lap_count),
@@ -717,8 +748,8 @@ fn push_session(
             ));
             // 同 lap：距离 ÷ 时间，两个操作数都是刚写进这个文件的实测值。
             // 少了这一条，导入方的「平均速度 / 平均配速」整个是空的。
-            if elapsed_seconds > 0.0 {
-                if let Some(speed) = encode_speed(distance / elapsed_seconds) {
+            if moving_seconds > 0.0 {
+                if let Some(speed) = encode_speed(distance / moving_seconds) {
                     fields.push(u16_field(mesgdef::Session::AVG_SPEED, speed));
                 }
             }
@@ -961,17 +992,43 @@ fn hr_zone_field(workout: &Value) -> Option<Vec<u32>> {
 }
 
 /// `(暂停开始, 恢复)` 的秒级时间戳对，按开始时间排序。
-fn pause_intervals(workout: &Value) -> Vec<(i64, i64)> {
+fn pause_intervals(workout: &Value, from: i64, to: i64) -> Vec<(i64, i64)> {
     let mut intervals: Vec<(i64, i64)> = array(workout, "pauses")
         .iter()
         .filter_map(|pause| {
             let start = parse_unix(text(pause.get("start_time")))?;
             let end = parse_unix(text(pause.get("end_time")))?;
-            Some((start, end))
+            let start = start.max(from);
+            let end = end.min(to);
+            (end > start).then_some((start, end))
         })
         .collect();
     intervals.sort_unstable();
-    intervals
+    let mut merged: Vec<(i64, i64)> = Vec::new();
+    for (start, end) in intervals {
+        if let Some(last) = merged.last_mut().filter(|last| start <= last.1) {
+            last.1 = last.1.max(end);
+        } else {
+            merged.push((start, end));
+        }
+    }
+    merged
+}
+
+fn paused_seconds(workout: &Value, start: i64, end: i64) -> f64 {
+    pause_intervals(workout, start, end)
+        .iter()
+        .map(|(from, to)| (to - from) as f64)
+        .sum()
+}
+
+fn timer_seconds(workout: &Value, start: i64, end: i64) -> f64 {
+    let elapsed = (end - start).max(0) as f64;
+    workout
+        .get("moving_seconds")
+        .and_then(Value::as_f64)
+        .filter(|seconds| seconds.is_finite() && *seconds >= 0.0 && *seconds <= elapsed)
+        .unwrap_or_else(|| (elapsed - paused_seconds(workout, start, end)).max(0.0))
 }
 
 fn timer_event(unix: i64, event_type: typedef::EventType) -> Message {
@@ -1826,6 +1883,63 @@ mod tests {
         let start = Some(i64::from(typedef::EventType::START.0));
         let stop = Some(i64::from(typedef::EventType::STOP.0));
         assert_eq!(types, vec![start, stop, start, stop]);
+        let session = messages_of(&fit, typedef::MesgNum::SESSION)[0];
+        assert_eq!(
+            int_of(session, mesgdef::Session::TOTAL_ELAPSED_TIME),
+            Some(600_000)
+        );
+        assert_eq!(
+            int_of(session, mesgdef::Session::TOTAL_TIMER_TIME),
+            Some(420_000)
+        );
+        let lap = messages_of(&fit, typedef::MesgNum::LAP)[0];
+        assert_eq!(int_of(lap, mesgdef::Lap::TOTAL_TIMER_TIME), Some(420_000));
+        let activity = messages_of(&fit, typedef::MesgNum::ACTIVITY)[0];
+        assert_eq!(
+            int_of(activity, mesgdef::Activity::TOTAL_TIMER_TIME),
+            Some(420_000)
+        );
+    }
+
+    #[test]
+    fn overlapping_and_out_of_bounds_pauses_are_counted_once() {
+        let workout = json!({"pauses": [
+            {"start_time": "2026-09-11T00:01:00Z", "end_time": "2026-09-11T00:04:00Z"},
+            {"start_time": "2026-09-11T00:02:00Z", "end_time": "2026-09-11T00:05:00Z"},
+            {"start_time": "2026-09-10T23:59:00Z", "end_time": "2026-09-11T00:00:30Z"},
+            {"start_time": "2026-09-11T00:09:30Z", "end_time": "2026-09-11T00:12:00Z"},
+            {"start_time": "2026-09-11T00:08:00Z", "end_time": "2026-09-11T00:07:00Z"}
+        ]});
+        let start = parse_unix("2026-09-11T00:00:00Z").unwrap();
+        assert_eq!(timer_seconds(&workout, start, start + 600), 300.0);
+    }
+
+    #[test]
+    fn cloud_moving_time_and_full_activity_bounds_survive_sparse_samples() {
+        let export = export_with(json!({"workouts": [{
+            "workout_id": "moving-time", "effective_type": "run",
+            "start_time": "2026-09-11T00:00:00Z", "end_time": "2026-09-11T00:10:00Z",
+            "moving_seconds": 420, "distance_meters": 1400,
+            "samples": [
+                {"timestamp": "2026-09-11T00:00:10Z", "heart_rate": 100},
+                {"timestamp": "2026-09-11T00:08:00Z", "heart_rate": 110}
+            ],
+            "route": [], "pauses": [], "splits": []
+        }]}));
+        let (files, _) = to_fit(&export).unwrap();
+        let fit = decode(&files[0].1);
+        let session = messages_of(&fit, typedef::MesgNum::SESSION)[0];
+        assert_eq!(
+            int_of(session, mesgdef::Session::TOTAL_ELAPSED_TIME),
+            Some(600_000)
+        );
+        assert_eq!(
+            int_of(session, mesgdef::Session::TOTAL_TIMER_TIME),
+            Some(420_000)
+        );
+        assert_eq!(int_of(session, mesgdef::Session::AVG_SPEED), Some(3333));
+        let lap = messages_of(&fit, typedef::MesgNum::LAP)[0];
+        assert_eq!(int_of(lap, mesgdef::Lap::TOTAL_TIMER_TIME), Some(420_000));
     }
 
     /// 云端给了爬升就用云端的，别再拿分段之和覆盖它。

@@ -281,6 +281,8 @@ export interface Workout {
   start_time: string;
   end_time: string;
   distance_meters?: number;
+  /** Cloud run_time in seconds; excludes pauses. */
+  moving_seconds?: number | null;
   calories?: number;
   avg_hr?: number;
   max_hr?: number;

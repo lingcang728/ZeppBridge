@@ -18,11 +18,6 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-import cv2
-import numpy as np
-from PIL import Image, ImageOps
-
-
 ROOT = Path(__file__).resolve().parents[2]
 SCREENSHOT_DIR = ROOT / "design_picture" / "Product"
 ASSET_DIR = ROOT / "src" / "assets" / "devices"
@@ -68,23 +63,25 @@ DEVICE_SOURCE_CODES: dict[str, list[int]] = {
     # 报告里指认成 Helio Strap 的那 2 份，同一份报告里还指认了另一块表——是
     # 在设备选择器里挑错了那一台，不是这个数字有歧义。
     "amazfit-balance-2": [9568512, 9568513, 9568515, 10486017],
-    "amazfit-active-2-44mm": [10092800, 10092801, 10092807],
+    "amazfit-active-2-44mm": [10092800, 10092801, 10092803, 10092807],
+    "amazfit-active-42mm": [8323329],
+    "amazfit-balance-2-xt": [10486019],
     "amazfit-active-2-square": [10223873],
     "amazfit-bip-6": [10158337],
-    "amazfit-cheetah-2-ultra": [9978113],
+    "amazfit-cheetah-2-ultra": [9978112, 9978113],
     # 10289411 同样是人工裁决：17 份里 14 份 Helio Strap，相邻的 10289410
     # 三份一致，3 份异议同样来自「一个账号两块表、挑错了」。
     "amazfit-helio-strap": [10289410, 10289411],
     # 10551555 是 2026-09-02 那批新增的：2 份报告一致，无异议，且和已经收了
     # 的 10551552 同族。10682625 是 2026-09-03 这一批（反馈库 183 行）：同样
     # 2 份一致、零异议，两份分别来自 v1.1.1 和 v1.1.5，不是同一次提交的重复。
-    # 相邻的 10682624 仍然只有一份，继续等。
-    "amazfit-t-rex-3-pro-48-44mm": [10551552, 10551555, 10682625],
+    # 2026-09-11 又收录 10551553 和 10682624，见本轮反馈裁决记录。
+    "amazfit-t-rex-3-pro-48-44mm": [10551552, 10551553, 10551555, 10682624, 10682625],
     # Helio Ring 的第一个编号：2 份独立报告一致，其中一份来自 2.0.0。
     "amazfit-helio-ring": [8651008],
     # 11145472 是 2026-09-01 那批新增的：3 份报告一致指向 Balance 3，和已经
     # 收了的相邻编号 11141379 同族。
-    "amazfit-balance-3": [11141379, 11145472],
+    "amazfit-balance-3": [11141377, 11141379, 11145472],
     "amazfit-gtr-4-46mm": [7930113],
     # 下面两个上一轮还只有一份报告，这一轮凑够了独立第二份：
     #   10944769 -> Active 3 Premium（3 份，无异议）
@@ -100,6 +97,10 @@ DEVICE_SOURCE_CODES: dict[str, list[int]] = {
     "amazfit-active-max": [10813697],
     "amazfit-bip-max": [11206915],
 }
+# 2026-09-11: seven additional codes accepted from distinct submission contexts;
+# adjacent-time duplicate reports were counted only once. See the dated feedback
+# triage evidence for counts, conflict exclusions and the privacy limitation that
+# these reports deliberately contain no reporter identity.
 # 明确不收（2026-09-03 的 183 行反馈快照上复核过）：
 #   * 10813699 —— Active 2 44mm 4 份 vs Active MAX 3 份。前两轮分别是 2:2 和
 #     3:3，这一轮 Active 2 那边多了一份（v2.1.0 / macOS），平票被打破了，但
@@ -111,8 +112,8 @@ DEVICE_SOURCE_CODES: dict[str, list[int]] = {
 #   * 7930112 —— GTR 4 46mm 2 份 vs T-Rex 3 1 份，同样是单设备报告提出的真实
 #     异议。附带一提，相邻的 7930113 已经收为 GTR 4 46mm，邻接性是支持 GTR 4
 #     的；但邻接性在这里只是旁证，不足以推翻一份明确的异议。
-#   * 只有一份报告的高位编号（11141376、11141377、10223872、10223875、
-#     10682624、8323329、10944768）——等第二份。原来在这一行里的 10813697、
+#   * 只有一份报告的高位编号（11141376、10223872、10223875、
+#     10944768）——等第二份。原来在这一行里的 10813697、
 #     11206915、10944771 在 2026-09-02 那批里凑够了，10682625 在 2026-09-03
 #     这一批里凑够了，都已经收进上表；
 #   * 全部低位段编号和全部 deviceType。低位段不是漏收：同一个 102 被指认成
@@ -836,7 +837,26 @@ def enrich_entry(entry: dict[str, Any], hash_value: str | None) -> dict[str, Any
 def build_catalog() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--refresh-official", action="store_true", help="download the four extra official CDN images")
+    parser.add_argument("--catalog-only", action="store_true", help="update model codes using existing catalog art and metadata")
     args = parser.parse_args()
+
+    if args.catalog_only:
+        document = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
+        document["version"] = 6
+        known_ids = {device["catalog_id"] for device in document["devices"]}
+        if unknown := sorted(set(DEVICE_SOURCE_CODES) - known_ids):
+            raise SystemExit(f"Unknown catalog IDs: {unknown}")
+        for device in document["devices"]:
+            device["device_source_codes"] = DEVICE_SOURCE_CODES.get(device["catalog_id"], [])
+        CATALOG_PATH.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        print(f"DEVICE_CATALOG_UPDATED entries={len(known_ids)}")
+        return
+
+    # Metadata-only maintenance does not need the image-processing runtime.
+    global cv2, np, Image, ImageOps
+    import cv2
+    import numpy as np
+    from PIL import Image, ImageOps
 
     hashes: dict[str, str] = {}
     # One physical image per canonical asset key; the GTR 4 colour card shares
@@ -869,7 +889,7 @@ def build_catalog() -> None:
     if unknown:
         raise SystemExit(f"DEVICE_SOURCE_CODES 指向了目录里没有的型号: {unknown}")
     document = {
-        "version": 5,
+        "version": 6,
         "checked_at": CHECKED_AT,
         "sources": [
             "https://www.amazfit.jp/",
