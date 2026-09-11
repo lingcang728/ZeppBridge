@@ -15,7 +15,7 @@ import {
 import { useSyncController } from '../composables/useSyncController';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { useAiHandoff } from '../composables/useAiHandoff';
-import { localDateString } from '../lib/format';
+import { formatDateTime, localDateString } from '../lib/format';
 import { popoverStyle } from '../lib/popoverPosition';
 import { rangeOptions } from '../lib/rangeOptions';
 import { AI_PROVIDERS, AI_PROVIDER_BY_ID, type AiProviderId } from '../lib/aiProviders';
@@ -151,11 +151,7 @@ const datesValid = computed(() =>
 const scopeRangeText = computed(() => {
   if (focusedWorkoutId.value) {
     if (!previewScope.value) return t.value.thisWorkout;
-    const start = new Date(previewScope.value.startTime);
-    if (Number.isNaN(start.getTime())) return t.value.thisWorkout;
-    return new Intl.DateTimeFormat(intlLocale(), {
-      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
-    }).format(start);
+    return formatDateTime(previewScope.value.startTime, t.value.thisWorkout);
   }
   return datesValid.value ? `${exportStartDate.value} ~ ${exportEndDate.value}` : '—';
 });

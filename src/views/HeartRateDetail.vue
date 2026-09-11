@@ -19,9 +19,9 @@ import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { zeppSemanticColors } from '../lib/echartsTheme';
 import { indexSeries, SERIES_RANGE_DAYS, seriesRanges, type SeriesRangeDays } from '../lib/metricSeries';
-import { isFiniteNumber } from '../lib/format';
+import { formatCalendarDate, formatTime, isFiniteNumber } from '../lib/format';
 import type { DailyHeartRateExtreme, HeartRatePoint, MetricSeries } from '../types';
-import { defineMessages, intlLocale, useMessages } from '../i18n';
+import { defineMessages, useMessages } from '../i18n';
 
 const messages = defineMessages(
   {
@@ -141,9 +141,7 @@ const average = computed(() => (points.value.length
   ? Math.round(points.value.reduce((total, point) => total + point.value, 0) / points.value.length)
   : null));
 
-const clock = (value: number) => new Intl.DateTimeFormat(intlLocale(), {
-  hour: '2-digit', minute: '2-digit', hour12: false,
-}).format(new Date(value));
+const clock = (value: number) => formatTime(value);
 
 const dayChartOption = computed(() => {
   const data = points.value.map((point) => [point.ts, point.value]);
@@ -260,12 +258,12 @@ const dailyMaxChartOption = computed(() => {
       formatter: (params: Array<{ dataIndex: number }>) => {
         const row = rows[params?.[0]?.dataIndex ?? -1];
         if (!row) return '';
-        return t.value.dailyMaxTooltip(row.date, row.max, row.average, row.samples);
+        return t.value.dailyMaxTooltip(formatCalendarDate(row.date), row.max, row.average, row.samples);
       },
     },
     xAxis: {
       type: 'category',
-      data: rows.map((row) => row.date.slice(5)),
+      data: rows.map((row) => formatCalendarDate(row.date)),
       axisLabel: { color: '#B4BBC3', fontSize: 14.5, hideOverlap: true },
       axisTick: { show: false },
       axisLine: { lineStyle: { color: 'rgba(226, 234, 242, .12)' } },

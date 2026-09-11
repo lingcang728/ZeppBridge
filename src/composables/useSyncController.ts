@@ -3,7 +3,8 @@ import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { launchSyncIsDue, readAutoSyncSettings, writeAutoSyncSettings } from '../lib/autoSync';
 import type { AppStatus, LoginStatus, SyncOutcome, SyncProgress, SyncReport } from '../types';
 import { syncStreamLabel } from '../lib/syncStreams';
-import { defineMessages, intlLocale, messagesOf } from '../i18n';
+import { formatDateTime, formatTime } from '../lib/format';
+import { defineMessages, messagesOf } from '../i18n';
 import { errorTextFor } from '../i18n/errors';
 import { backendText } from '../i18n/backendText';
 
@@ -133,25 +134,6 @@ const unlisteners: Array<() => void> = [];
  */
 let autoSyncTimer: number | null = null;
 
-const formatTime = (value?: string): string => {
-  if (!value) return copy().timeUnknown;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return copy().timeUnknown;
-  return new Intl.DateTimeFormat(intlLocale(), {
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-};
-
-const formatClock = (value?: string): string | null => {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat(intlLocale(), { hour: '2-digit', minute: '2-digit' }).format(date);
-};
-
 const latestHeartRateAt = (report?: SyncReport | null): string | undefined =>
   report?.streams.find((stream) => stream.stream === 'heart_rate')?.newest_sample_at
   ?? appStatus.value?.streams.find((stream) => stream.stream === 'heart_rate')?.newest_sample_at;
@@ -163,7 +145,7 @@ const renderReport = (
   backendMessage?: string,
 ): string => {
   const t = copy();
-  const latest = latestAt ? formatTime(latestAt) : null;
+  const latest = latestAt ? formatDateTime(latestAt, copy().timeUnknown) : null;
   if (outcome === 'updated') return latest ? t.updatedWithLatest(latest) : t.updated;
   if (outcome === 'no_new_data') return latest ? t.noNewDataWithLatest(latest) : t.noNewData;
   if (outcome === 'partial') {
@@ -234,8 +216,8 @@ const lastOutcomeLabel = computed(() => {
   const outcome = appStatus.value?.last_cloud_sync_outcome;
   if (!outcome) return null;
   const latest = latestHeartRateAt();
-  if (outcome === 'no_new_data' && latest) return copy().noNewDataWithLatest(formatTime(latest));
-  return copy().lastCloudSync(formatTime(appStatus.value?.last_cloud_sync_at));
+  if (outcome === 'no_new_data' && latest) return copy().noNewDataWithLatest(formatDateTime(latest, copy().timeUnknown));
+  return copy().lastCloudSync(formatDateTime(appStatus.value?.last_cloud_sync_at, copy().timeUnknown));
 });
 
 const applyLoginStatus = (status: LoginStatus) => {
@@ -522,10 +504,8 @@ export const useSyncController = () => ({
   autoSyncInterval: readonly(autoSyncInterval),
   isSyncing: computed(() => syncState.value === 'syncing'),
   canIncrementalSync: computed(() => appStatus.value?.connection_state === 'connected'),
-  lastCloudSyncLabel: computed(() => {
-    const clock = formatClock(appStatus.value?.last_cloud_sync_at);
-    return clock ? copy().cloudSyncClock(clock) : copy().cloudSyncClockUnknown;
-  }),
+  lastCloudSyncLabel: computed(() =>
+    copy().cloudSyncClock(formatTime(appStatus.value?.last_cloud_sync_at ?? ''))),
   lastOutcomeLabel,
   initialize,
   refreshStatus,

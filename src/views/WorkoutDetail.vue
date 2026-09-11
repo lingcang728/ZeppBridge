@@ -15,7 +15,7 @@ import { useSyncController } from '../composables/useSyncController';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { AI_PROVIDERS, AI_PROVIDER_BY_ID, type AiProviderId } from '../lib/aiProviders';
 import { dataProviderLabel, dataScopeLabel, workoutLabel } from '../lib/labels';
-import { formatDate, formatDistance, formatTime, isFiniteNumber } from '../lib/format';
+import { formatDate, formatDistance, formatFullDateTime, formatTime, isFiniteNumber } from '../lib/format';
 import {
   elevationUnitLabel,
   paceAxisLabel,
@@ -793,7 +793,7 @@ const lineOption = (points: { t: number; v: number }[], color: string, unit: str
       splitNumber: 4,
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: '#B4BBC3', fontSize: 14.5, hideOverlap: true, formatter: '{HH}:{mm}' },
+      axisLabel: { color: '#B4BBC3', fontSize: 14.5, hideOverlap: true, formatter: (value: number) => formatTime(value) },
       splitLine: { show: false },
     },
     yAxis: {
@@ -813,7 +813,7 @@ const lineOption = (points: { t: number; v: number }[], color: string, unit: str
       formatter: (params: Array<{ value: [number, number] }>) => {
         const point = Array.isArray(params) ? params[0] : params;
         if (!point) return '';
-        const time = new Intl.DateTimeFormat(intlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(point.value[0]));
+        const time = formatTime(point.value[0]);
         return `${time}　<b>${Math.round(point.value[1] * 10) / 10}</b> ${unit}`;
       },
     },
@@ -939,12 +939,8 @@ const decodedMetrics = computed(() => {
   ];
 });
 
-const syncBadge = computed(() => {
-  const raw = appStatus.value?.last_cloud_sync_at;
-  if (!raw) return t.value.notFetchedYet;
-  const date = new Date(raw);
-  return Number.isNaN(date.getTime()) ? t.value.timeUnknown : new Intl.DateTimeFormat(intlLocale(), { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(date).replace(/\//g, '-');
-});
+const syncBadge = computed(() =>
+  formatFullDateTime(appStatus.value?.last_cloud_sync_at, t.value.notFetchedYet));
 
 let detailSeq = 0;
 const loadDetail = async () => {

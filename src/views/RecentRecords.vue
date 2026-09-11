@@ -10,10 +10,10 @@ import SkeletonBlock from '../components/SkeletonBlock.vue';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { useSyncController } from '../composables/useSyncController';
 import { workoutLabel } from '../lib/labels';
-import { formatDate, formatDistance, formatDuration, isFiniteNumber } from '../lib/format';
+import { formatCalendarDate, formatDate, formatDistance, formatDuration, isFiniteNumber } from '../lib/format';
 import { displayableWorkouts, workoutDisplayLabel, workoutDisplayType, workoutDurationMinutes, workoutTypeKey } from '../lib/workouts';
 import type { SleepSession, Workout } from '../types';
-import { defineMessages, intlLocale, useMessages } from '../i18n';
+import { defineMessages, useMessages } from '../i18n';
 
 const messages = defineMessages(
   {
@@ -153,12 +153,7 @@ const workoutFact = (workout: Workout): string => {
 };
 
 function listDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return t.value.dateUnknown;
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  const weekday = new Intl.DateTimeFormat(intlLocale(), { weekday: 'short' }).format(date);
-  return t.value.listDate(month, day, weekday);
+  return formatCalendarDate(value);
 }
 
 function shortDistance(meters?: number): string {

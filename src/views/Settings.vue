@@ -26,7 +26,7 @@ import type {
 } from '../types';
 import { checkForDesktopUpdate, downloadAndInstallDesktopUpdate, updateState } from '../services/updateService';
 import { settingsMessages } from './Settings.i18n';
-import { intlLocale, locale, LOCALES, LOCALE_LABELS, setLocale, useMessages } from '../i18n';
+import { locale, LOCALES, LOCALE_LABELS, setLocale, useMessages } from '../i18n';
 import {
   DISTANCE_UNITS,
   distanceUnit,
@@ -44,6 +44,7 @@ import {
 import { errorTextFor } from '../i18n/errors';
 import { backendText } from '../i18n/backendText';
 import { storageEstimateText } from '../lib/storageEstimateText';
+import { formatCalendarDate, formatDate, formatFullDateTime } from '../lib/format';
 
 const t = useMessages(settingsMessages);
 
@@ -372,21 +373,15 @@ const accountInitial = computed(() =>
 const regionLabel = computed(() => regionShortName(appStatus.value?.region_host));
 const regionHost = computed(() => appStatus.value?.region_host || t.value.notProvided);
 
-const formatDateTime = (value?: string): string => {
-  if (!value) return t.value.noRecords;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return t.value.timeUnknown;
-  return new Intl.DateTimeFormat(intlLocale(), {
-    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
-  }).format(date).replace(/\//g, '-');
-};
+const formatDateTime = (value?: string): string =>
+  formatFullDateTime(value ?? undefined, t.value.noRecords, { seconds: true });
 
 /* 保留天数是「往回保留最近 N 天」，不是「N 天后清理」，而且清理只在每次成功
    同步之后执行。所以这里显示会被保留的最早日期，不再显示一个算错的未来日期。 */
 const retentionCutoffDate = computed(() => {
   const date = new Date();
   date.setDate(date.getDate() - Number(retentionDays.value || 30));
-  return new Intl.DateTimeFormat(intlLocale(), { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date).replace(/\//g, '-');
+  return formatCalendarDate(date);
 });
 
 const dataSources = computed(() => [
@@ -1696,7 +1691,7 @@ const runCapabilityProbe = async () => {
         </div>
         <p class="modal-sub">
           {{ t.updateModalCurrent(updateState.currentVersion || t.updateModalUnknownVersion) }}
-          <template v-if="updateState.date">{{ t.updateModalReleased(updateState.date.slice(0, 10)) }}</template>
+          <template v-if="updateState.date">{{ t.updateModalReleased(formatDate(updateState.date)) }}</template>
           <template v-if="updateState.sizeBytes"> · {{ formatUpdateBytes(updateState.sizeBytes) }}</template>
         </p>
         <div class="modal-body">

@@ -1,8 +1,9 @@
 import { computed, ref } from 'vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { deviceImageFor } from '../lib/deviceCatalog';
+import { formatFullDateTime } from '../lib/format';
 import type { DeviceCacheMetadata, DeviceProfile, DeviceProfilesResult } from '../types';
-import { defineMessages, intlLocale, messagesOf } from '../i18n';
+import { defineMessages, messagesOf } from '../i18n';
 
 /**
  * The device catalog is deliberately treated as account data, not as a list
@@ -109,19 +110,8 @@ const profileRequests = new Map<boolean, Promise<DeviceProfilesResult>>();
 let backgroundRefreshAttempted = false;
 let backgroundRefreshInFlight: Promise<DeviceProfilesResult> | null = null;
 
-const formatDeviceDate = (value?: string | null): string => {
-  if (!value) return copy().notFetchedYet;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return copy().timeUnknown;
-  return new Intl.DateTimeFormat(intlLocale(), {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date).replace(/\//g, '-');
-};
+const formatDeviceDate = (value?: string | null): string =>
+  formatFullDateTime(value ?? undefined, copy().notFetchedYet);
 
 const stateFor = (profile: DeviceProfile): DeviceState => {
   if (profile.has_local_data) return 'recent_data';
