@@ -64,6 +64,15 @@ pub fn resolve_data_dir() -> io::Result<PathBuf> {
         return Ok(base);
     }
 
+    // macOS：`/Applications` 对 admin 组可写，所以「写得进去」不代表该写。
+    // `.app` 包在更新或重装时会被整体替换，数据放在里面就会跟着消失。
+    #[cfg(target_os = "macos")]
+    if !is_build_artifact_dir(exe_dir) && is_inside_app_bundle(exe_dir) {
+        let base = user_data_dir()?;
+        ensure_writable_dir(&base)?;
+        return Ok(base);
+    }
+
     let data_dir = if is_build_artifact_dir(exe_dir) {
         repository_data_dir().unwrap_or_else(|| exe_dir.join("data"))
     } else {
@@ -153,6 +162,17 @@ fn user_data_dir() -> io::Result<PathBuf> {
     let project = directories::ProjectDirs::from("com", "zeppbridge", "ZeppBridge")
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "无法确定用户数据目录"))?;
     Ok(project.data_dir().join("data"))
+}
+
+/// 可执行文件是不是在某个 `*.app/Contents/MacOS` 里。
+#[cfg(target_os = "macos")]
+fn is_inside_app_bundle(dir: &Path) -> bool {
+    dir.ends_with("Contents/MacOS")
+        && dir
+            .parent()
+            .and_then(Path::parent)
+            .and_then(Path::extension)
+            .is_some_and(|ext| ext == "app")
 }
 
 /// 这个目录是不是「操作系统或包管理器拥有的共享前缀」。
