@@ -19,7 +19,7 @@ use crate::models::{
 use crate::storage::corrections::WorkoutCodeLabel;
 use crate::storage::provenance::{DataHealth, IntegrityCheckResult};
 use crate::storage::{looks_like_firmware_version, NORMALIZER_REVISION};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::BTreeSet;
@@ -52,7 +52,7 @@ pub async fn get_capability_overview(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<CapabilityOverview, AppError> {
     let db = state.db.lock().await;
-    db.capability_overview().map_err(AppError::from)
+    db.capability_overview(Local::now().date_naive()).map_err(AppError::from)
 }
 
 /// 一页记录，外加本机的总条数。
@@ -416,7 +416,7 @@ pub async fn get_weekly_report(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<WeeklyReport, AppError> {
     let db = state.db.lock().await;
-    db.weekly_report(Utc::now()).map_err(AppError::from)
+    db.weekly_report(Local::now()).map_err(AppError::from)
 }
 
 /// 数据健康中心的后端契约。
