@@ -37,6 +37,9 @@ const messages = defineMessages(
     sleepDuration: (hours: number, minutes: number) => `${hours} 小时 ${minutes} 分`,
     regularity: (minutes: number) => `±${minutes} 分`,
     workoutCount: (count: number) => `${count} 次`,
+    /** 后端给的单位码（score / load / bpm / ms）按界面语言写出来；返回空串就只显示数字。 */
+    unitWord: (unit: string) =>
+      ({ score: '分', load: '', bpm: '次/分' } as Record<string, string | undefined>)[unit] ?? unit,
     metric: {
       'weekly.resting_hr': '静息心率',
       'weekly.hrv': 'HRV',
@@ -68,6 +71,7 @@ const messages = defineMessages(
     sleepDuration: (hours: number, minutes: number) => `${hours} hr ${minutes} min`,
     regularity: (minutes: number) => `±${minutes} min`,
     workoutCount: (count: number) => `${count} sessions`,
+    unitWord: (unit: string) => unit,
     metric: {
       'weekly.resting_hr': 'Resting HR',
       'weekly.hrv': 'HRV',
@@ -99,6 +103,8 @@ const messages = defineMessages(
     sleepDuration: (hours: number, minutes: number) => `${hours} h ${minutes} min`,
     regularity: (minutes: number) => `±${minutes} min`,
     workoutCount: (count: number) => `${count} sesiones`,
+    unitWord: (unit: string) =>
+      ({ score: 'pts', load: '', bpm: 'lpm' } as Record<string, string | undefined>)[unit] ?? unit,
     metric: {
       'weekly.resting_hr': 'FC en reposo',
       'weekly.hrv': 'VFC',
@@ -215,7 +221,8 @@ function formatNumber(fact: InsightFact, value: number): string {
   }
   if (fact.metric === 'sleep_start_regularity') return t.value.regularity(Math.round(value));
   if (fact.metric === 'workout_count') return t.value.workoutCount(Math.round(value));
-  return `${Math.round(value)} ${fact.unit}`;
+  const word = t.value.unitWord(fact.unit);
+  return word ? `${Math.round(value)} ${word}` : `${Math.round(value)}`;
 }
 </script>
 
