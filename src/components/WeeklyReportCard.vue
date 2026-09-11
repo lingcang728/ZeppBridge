@@ -12,6 +12,7 @@ import ComparisonBars from './ComparisonBars.vue';
 import SkeletonBlock from './SkeletonBlock.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
+import { formatCalendarDate } from '../lib/format';
 import type { InsightFact, WeeklyReport } from '../types';
 import { defineMessages, useMessages } from '../i18n';
 
@@ -104,6 +105,18 @@ const report = ref<WeeklyReport | null>(null);
 const loading = ref(true);
 const error = ref<string | null>(null);
 
+/** 窗口两端的日期是纯日历日期，按本地年月日渲染。 */
+const windowLabel = computed(() => {
+  const current = report.value;
+  if (!current) return '';
+  return t.value.window(
+    formatCalendarDate(current.recent_start),
+    formatCalendarDate(current.recent_end),
+    formatCalendarDate(current.baseline_start),
+    formatCalendarDate(current.baseline_end),
+  );
+});
+
 /** 数字变小对这个指标意味着「更好」吗？只影响配色，不改变事实。 */
 const LOWER_IS_BETTER = new Set([
   'weekly.resting_hr',
@@ -192,9 +205,7 @@ function formatNumber(fact: InsightFact, value: number): string {
   <section class="weekly-card" aria-labelledby="weekly-title">
     <header>
       <h2 id="weekly-title"><Icon name="activity" :size="15" />{{ t.title }}</h2>
-      <span v-if="report" class="weekly-window">
-        {{ t.window(report.recent_start, report.recent_end, report.baseline_start, report.baseline_end) }}
-      </span>
+      <span v-if="report" class="weekly-window">{{ windowLabel }}</span>
     </header>
 
     <!-- 「静息心率 −3.4% 是绿的、压力 +1.6% 是红的」这件事必须解释一句：

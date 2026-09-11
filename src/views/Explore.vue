@@ -15,7 +15,7 @@ import {
 import { useSyncController } from '../composables/useSyncController';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { useAiHandoff } from '../composables/useAiHandoff';
-import { formatCalendarMonth, formatDateTime, formatWeekdayNames, localDateString } from '../lib/format';
+import { formatCalendarDate, formatCalendarMonth, formatDateTime, formatWeekdayNames, localDateString, parseCalendarDate } from '../lib/format';
 import { popoverStyle } from '../lib/popoverPosition';
 import { rangeOptions } from '../lib/rangeOptions';
 import { AI_PROVIDERS, AI_PROVIDER_BY_ID, type AiProviderId } from '../lib/aiProviders';
@@ -153,7 +153,9 @@ const scopeRangeText = computed(() => {
     if (!previewScope.value) return t.value.thisWorkout;
     return formatDateTime(previewScope.value.startTime, t.value.thisWorkout);
   }
-  return datesValid.value ? `${exportStartDate.value} ~ ${exportEndDate.value}` : '—';
+  return datesValid.value
+    ? `${formatCalendarDate(exportStartDate.value)} ~ ${formatCalendarDate(exportEndDate.value)}`
+    : '—';
 });
 
 const scopeRangeSub = computed(() => {
@@ -341,7 +343,8 @@ const measureDatePicker = () => {
 
 const openDatePicker = (target: 'start' | 'end') => {
   const currentVal = target === 'start' ? exportStartDate.value : exportEndDate.value;
-  const d = currentVal ? new Date(currentVal) : new Date();
+  // 存储值是纯日历日期：按本地年月日解析，解析不出来就退回今天。
+  const d = (currentVal ? parseCalendarDate(currentVal) : null) ?? new Date();
   pickerYear.value = d.getFullYear();
   pickerMonth.value = d.getMonth();
   datePickerOpen.value = target;
@@ -683,7 +686,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
                   @click="datePickerOpen === 'start' ? closeDatePicker() : openDatePicker('start')"
                 >
                   <Icon name="clock" :size="12" />
-                  <span>{{ exportStartDate || t.startDate }}</span>
+                  <span>{{ exportStartDate ? formatCalendarDate(exportStartDate) : t.startDate }}</span>
                 </button>
                 <span>~</span>
                 <button
@@ -696,7 +699,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
                   @click="datePickerOpen === 'end' ? closeDatePicker() : openDatePicker('end')"
                 >
                   <Icon name="clock" :size="12" />
-                  <span>{{ exportEndDate || t.endDate }}</span>
+                  <span>{{ exportEndDate ? formatCalendarDate(exportEndDate) : t.endDate }}</span>
                 </button>
 
                 <!-- 自定义深橄榄底日历弹层。
