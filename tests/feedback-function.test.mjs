@@ -297,6 +297,7 @@ test('cloud rejection time is optional but must carry an explicit offset', () =>
     '2026-04-31T10:00:00Z',
     '2026-09-03T24:00:00Z',
     '2026-09-03T10:60:00Z',
+    '2026-09-03T10:00:00-00:00',
   ]) {
     assert.equal(validateFeedbackReport(withAt(at)), false, `不该接受 ${at}`);
   }

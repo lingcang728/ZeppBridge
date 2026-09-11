@@ -146,7 +146,13 @@ const validCloudRejectionTimestamp = (value) => {
   if (month < 1 || month > 12) return false;
   if (day < 1 || day > daysInMonth(year, month)) return false;
   if (hour > 23 || minute > 59 || second > 59) return false;
-  if (match[7] !== undefined && (Number(match[8]) > 23 || Number(match[9]) > 59)) return false;
+  if (match[7] !== undefined) {
+    const offsetHour = Number(match[8]);
+    const offsetMinute = Number(match[9]);
+    if (offsetHour > 23 || offsetMinute > 59) return false;
+    // RFC 3339 `-00:00` means unknown local offset, not a known instant.
+    if (match[7] === '-' && offsetHour === 0 && offsetMinute === 0) return false;
+  }
   return true;
 };
 const validCloudRejection = (entry) => hasOnlyKeys(entry, ['stream', 'code', 'at'])
