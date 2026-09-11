@@ -419,6 +419,182 @@ Answer in Markdown.`,
       },
     },
   },
+  {
+    title: 'Pasar a la IA',
+    intro: 'Elige una plantilla, revisa qué contiene realmente el paquete y envía los datos de tu reloj a la herramienta de IA que prefieras.',
+
+    workoutScopeBanner: (workoutId: string) =>
+      `Exportando solo el entrenamiento ${workoutId}: el entrenamiento en sí más las métricas punto a punto registradas mientras ocurría. Los flujos diarios como sueño y pasos quedan fuera. El rango de fechas está inactivo.`,
+    backToDateRange: 'Volver a un rango de fechas',
+
+    categoryTitle: 'Categorías',
+    categoryAria: 'Categorías de plantillas',
+    categoryAll: 'Todas las plantillas',
+    categorySummary: 'Resumen',
+    categoryTraining: 'Entrenamiento',
+    categoryRecovery: 'Recuperación',
+    categorySleep: 'Sueño',
+
+    templateListTitle: 'Plantillas',
+    templateSearchPlaceholder: 'Buscar plantillas…',
+    templateSearchAria: 'Buscar plantillas',
+    noTemplates: 'Ninguna plantilla coincide.',
+
+    currentTemplate: 'Plantilla actual',
+    copyPromptTitle: 'Copiar el texto de la instrucción al portapapeles',
+    copyPrompt: 'Copiar instrucción',
+    promptEditor: 'Instrucción',
+    promptEditorHint: ' (los datos se adjuntan automáticamente)',
+    injected: (count: number) => `${count} flujos de datos adjuntos`,
+    promptEditorAria: 'Editor de la instrucción',
+
+    summaryTitle: 'Qué contiene el paquete',
+    summaryHint: 'Solo lo que marques',
+    cellRange: 'Rango de tiempo',
+    cellCount: 'Registros',
+    cellCountSub: 'registros sincronizados',
+    cellTypes: 'Tipos de datos',
+    cellTypesValue: (count: number) => `${count}`,
+    cellTypesSub: 'en el paquete',
+    cellSize: 'Tamaño',
+    cellSizeSub: 'estimado',
+
+    thisWorkout: 'Este entrenamiento',
+    onlyThisWorkout: 'solo este entrenamiento',
+    approxMinutes: (minutes: number) => `(unos ${minutes} min)`,
+    rangeDays: (days: number) => `(${days} días)`,
+
+    quickRange: 'Rango rápido:',
+    range7: '7 días',
+    range30: '30 días',
+    startDate: 'Fecha de inicio',
+    endDate: 'Fecha de fin',
+    datePickerAria: 'Selector de fecha',
+
+    secureNote: 'Todo se arma localmente: los datos estructurados y la instrucción se generan en este equipo.',
+    secureOk: 'Solo local',
+    exportFile: (format: string) => `Exportar archivo ${format}`,
+    copyPromptOnly: 'Copiar solo la instrucción',
+    preparing: 'Preparando…',
+    handTo: (provider: string) => `Pasar a ${provider}`,
+    promptCopied: 'Instrucción copiada (sin datos).',
+    copyFailed: 'No se pudo copiar. Inténtalo de nuevo.',
+    retryOpen: (provider: string) => `Abrir ${provider} de nuevo`,
+
+    packTitle: 'Empaquetar y enviar',
+    packSub: 'Elige el formato de exportación y la herramienta de IA.',
+    packContentsTitle: 'Qué contiene la exportación',
+    packContentsIncluded:
+      'Incluye: resúmenes de entrenamientos (tipo, inicio y fin, distancia, calorías, frecuencia cardíaca media y máxima, '
+      + 'carga de entrenamiento), métricas diarias (pasos, frecuencia cardíaca en reposo, VFC, SpO2, estrés, frecuencia respiratoria, PAI, '
+      + 'VO2máx) y sesiones de sueño con su línea de tiempo de fases. Elegir «Completo» agrega las series por segundo de los entrenamientos '
+      + 'y cada lectura individual de frecuencia cardíaca.',
+    packContentsExcluded:
+      'No incluye: .tcx, datos de la cuenta, tokens ni números de serie del dispositivo. Los recorridos GPS aparecen en los formatos GPX '
+      + 'y FIT, y solo para los entrenamientos que tienen recorrido. FIT escribe un archivo por entrenamiento en una '
+      + 'carpeta que eliges.',
+    formatGroup: 'Formato de exportación',
+    formatAria: 'Formato de exportación',
+    formatJsonSub: 'Datos estructurados completos',
+    formatCsvSub: 'Tabla resumen (sin series punto a punto)',
+    formatGpxSub: 'Solo entrenamientos con recorrido GPS',
+    formatFitSub: 'Un archivo por entrenamiento, guardado en la carpeta que elijas',
+    detailGroup: 'Nivel de detalle',
+    detailAria: 'Nivel de detalle',
+    streamsGroup: 'Flujos de datos',
+    selectedCount: (selected: number, total: number) => `${selected} de ${total} seleccionados`,
+    selectNone: 'Ninguno',
+    selectAll: 'Todos',
+    noTypesSelected: 'No hay ningún tipo de dato seleccionado, así que la exportación se rechazará.',
+    estimatedSize: 'Tamaño estimado del paquete',
+    targetGroup: 'Herramienta de IA de destino',
+    targetAria: 'Herramienta de IA de destino',
+    providerIconAlt: (provider: string) => `Ícono de ${provider}`,
+    sendHint: 'Hasta 2 MiB viajan en el portapapeles junto con la instrucción. Por encima de eso, el JSON se guarda en tu escritorio para que lo arrastres al chat.',
+
+    needDesktop: 'La entrega a la IA necesita la app de escritorio; esta vista previa en el navegador no abre sitios externos.',
+    needValidDates: 'Primero elige un rango de fechas válido.',
+    needDataTypes: 'Elige al menos un tipo de dato.',
+    stillReading: 'Todavía se están leyendo los registros locales. Inténtalo de nuevo en un momento.',
+    nothingInScope: 'No hay nada sincronizado en este rango para entregar.',
+    previewDesktopOnly: 'Abre esto en la app de escritorio de ZeppBridge; la vista previa lee registros locales.',
+    previewFailed: 'No se pudo leer la vista previa de la exportación local',
+    attachmentNotice: 'El paquete de datos se guardó en tu escritorio (zeppbridge-ai-handoff.json): arrástralo al chat de la IA. La instrucción está en tu portapapeles.',
+    attachmentOpened: (notice: string, provider: string) => `${notice} ${provider} está abierto.`,
+    attachmentNotOpened: (notice: string, provider: string) => `${notice} Abre ${provider} en un navegador para analizarlo.`,
+    copiedAndOpened: (provider: string) => `Se copiaron los datos anonimizados y se abrió ${provider}. Pégalos para empezar.`,
+    copiedOnly: (provider: string) => `Se copiaron los datos anonimizados. Abre ${provider} tú mismo y pégalos.`,
+    reopened: (provider: string) => `${provider} está abierto. Pega los datos ahí.`,
+
+    templates: {
+      performance: {
+        name: 'Resumen de rendimiento',
+        sub: 'Una lectura clara de cómo van las cosas',
+        prompt: `Eres un analista de salud deportiva que convierte datos de relojes inteligentes en conclusiones claras y útiles.
+Con los datos de ZeppBridge de abajo (ya en orden cronológico),
+escríbeme un resumen claro y bien estructurado de mi rendimiento general.
+Cubre el panorama general, las tendencias que importan, lo que se destaca, lo que hay que vigilar y lo que puedo hacer.
+Donde los datos sean escasos, dilo claramente y dime qué debería registrar en vez de adivinar.
+
+Responde en español, en Markdown, usando tablas, listas y viñetas donde ayuden.
+Mantén un tono profesional, conciso y constructivo.`,
+      },
+      training: {
+        name: 'Análisis del entrenamiento',
+        sub: 'La carga de entrenamiento y hacia dónde va',
+        prompt: `Eres un entrenador de resistencia con experiencia.
+Con los datos de entrenamiento de ZeppBridge de abajo (frecuencia cardíaca, carga de entrenamiento y VO₂máx),
+analiza la estructura de mi entrenamiento, cómo se distribuye la intensidad y hacia dónde va la carga.
+Señala qué está mal en cómo están organizadas las sesiones y dime qué cambiar en el próximo ciclo.
+
+Responde en español, en Markdown. Sé directo.`,
+      },
+      recovery: {
+        name: 'Recuperación y disposición',
+        sub: 'Recuperación, VFC y disposición para entrenar',
+        prompt: `Eres un fisiólogo especializado en recuperación.
+Con los datos de VFC, frecuencia cardíaca en reposo, sueño y estrés de ZeppBridge de abajo,
+evalúa qué tan recuperado estoy y qué tan listo estoy para entrenar,
+señala las señales de fatiga acumulada y dime qué me ayudaría.
+
+Responde en español, en Markdown.`,
+      },
+      sleep: {
+        name: 'Análisis del sueño',
+        sub: 'Calidad y regularidad del sueño',
+        prompt: `Eres un asesor en salud del sueño.
+Con los datos de fases del sueño, duración y frecuencia cardíaca de ZeppBridge de abajo,
+analiza la calidad y la regularidad de mi sueño y qué parece estar afectándolo,
+y luego dame formas concretas y aplicables de mejorarlo.
+
+Responde en español, en Markdown.`,
+      },
+      activity: {
+        name: 'Panorama de actividad',
+        sub: 'El movimiento diario y su tendencia',
+        prompt: `Eres un asesor de estilo de vida saludable.
+Con los datos de pasos, entrenamientos y frecuencia cardíaca de ZeppBridge de abajo,
+dame un panorama de mi nivel de actividad diaria y su tendencia,
+y luego sugiéreme formas prácticas de moverme más.
+
+Responde en español, en Markdown.`,
+      },
+      weekly: {
+        name: 'Revisión semanal',
+        sub: 'Una mirada semanal con detalles concretos',
+        prompt: `Eres mi entrenador personal de salud y revisas mis datos una vez por semana.
+Con los datos de ZeppBridge de esta semana que están abajo, compárame solo con mis propios registros anteriores.
+Resume qué cambió esta semana, señala qué salió bien y qué merece atención, y dame una lista corta de cosas para hacer la próxima semana.
+
+Restricciones:
+- En estos datos no hay una referencia de población. No me compares con «adultos sanos» ni con ningún promedio.
+- Donde falte algo, di que falta. Nunca rellenes el hueco con un cero o una estimación.
+- Nada de diagnósticos médicos, juicios de riesgo de enfermedad ni consejos de tratamiento.
+
+Responde en español, en Markdown.`,
+      },
+    },
+  },
 );
 
 const copy = () => messagesOf(exploreMessages);

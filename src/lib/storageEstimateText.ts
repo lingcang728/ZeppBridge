@@ -54,6 +54,19 @@ const messages = defineMessages(
       `Based only on the streams that have enough local samples, ${days} days takes about ${add} (the rest are not counted), and ${free} is free on this drive.`,
     unknownEstimate: 'The size of this backfill cannot be estimated right now.',
   },
+  {
+    stopNoSpace: (needed: string, free: string) =>
+      `Esta recuperación necesita unos ${needed} (con margen de seguridad), pero solo hay ${free} libres, así que no se iniciará. Libera espacio o acorta el rango.`,
+    diskUnknown: 'No se pudo leer el espacio libre en disco. Asegúrate de que haya suficiente antes de recuperar el historial.',
+    diskTooSmall: 'Hay menos de 300 MB libres: no se puede recuperar un historial de más de 90 días.',
+    builtinGuess: (days: number, add: string, free: string) =>
+      `Aún no hay suficientes muestras locales, así que es una estimación aproximada: ${days} días ocupan unos ${add}, y hay ${free} libres en este disco.`,
+    measured: (days: number, add: string, free: string) =>
+      `Según el ritmo al que se acumulan tus propios datos, ${days} días ocupan unos ${add}, y hay ${free} libres en este disco.`,
+    partial: (days: number, add: string, free: string) =>
+      `Contando solo los flujos con suficientes muestras locales, ${days} días ocupan unos ${add} (el resto no se cuenta), y hay ${free} libres en este disco.`,
+    unknownEstimate: 'Por ahora no se puede estimar el tamaño de esta recuperación.',
+  },
 );
 
 /** 和面板里显示的一致的字节写法。 */

@@ -546,9 +546,9 @@ interface RecentItem {
 const shortDateTime = (value: string) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return t.value.timeUnknown;
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const dd = String(date.getDate()).padStart(2, '0');
-  return `${mm}/${dd} ${formatTime(value)}`;
+  // 日月顺序跟着界面语言：西语读到 09/10 会理解成 9 月 10 日的反面。
+  const short = new Intl.DateTimeFormat(intlLocale(), { month: '2-digit', day: '2-digit' }).format(date);
+  return `${short} ${formatTime(value)}`;
 };
 /* 只按运动的 key 分图标，不看显示名。
    显示名跟着界面语言变，拿它做分支判断，一换语言分类就悄悄失效。 */
