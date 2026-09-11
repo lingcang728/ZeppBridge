@@ -2694,6 +2694,152 @@ mod tests {
         assert!(result.sleep_sessions[0].stages.is_empty());
     }
 
+    /// 后端心率归一目前只认「固定偏移」，这条用例把该契约按用户要求的三个
+    /// 时区钉死。
+    ///
+    /// `heart_rate_from_band_item` 拿不到来源 IANA 时区：云端 summary 只给当天
+    /// 相对 UTC 的固定 `tz` 秒数，`data_hr` 是按当地零点起的分钟序列。所以第 m
+    /// 分钟的采样落在 `当地零点 - tz + m 分钟`。下面表格只断言这套固定偏移算术，
+    /// 不推断设备/云端在夏令时切换日实际用了哪个偏移：London、New_York 的春、
+    /// 秋切换日都按切换前后的固定偏移分别入库，因为原始字段无法证明哪一侧生效。
+    /// 真要把切换日改成夏令时语义，得先拿到那些天 Zepp 原始报文里实际的 `tz`。
+    #[test]
+    fn heart_rate_from_band_item_uses_the_summary_fixed_utc_offset() {
+        struct Case {
+            name: &'static str,
+            date: &'static str,
+            tz: i64,
+            // 固定偏移下当地第 0 分钟对应的 UTC 时刻。
+            utc_midnight: &'static str,
+        }
+
+        let cases = [
+            // Europe/London：冬 GMT，夏 BST(+3600)。
+            Case {
+                name: "London winter GMT",
+                date: "2026-01-15",
+                tz: 0,
+                utc_midnight: "2026-01-15T00:00:00Z",
+            },
+            Case {
+                name: "London summer BST",
+                date: "2026-07-15",
+                tz: 3600,
+                utc_midnight: "2026-07-14T23:00:00Z",
+            },
+            // America/New_York：冬 EST(-18000)，夏 EDT(-14400)。
+            Case {
+                name: "New York winter EST",
+                date: "2026-01-15",
+                tz: -18_000,
+                utc_midnight: "2026-01-15T05:00:00Z",
+            },
+            Case {
+                name: "New York summer EDT",
+                date: "2026-07-15",
+                tz: -14_400,
+                utc_midnight: "2026-07-15T04:00:00Z",
+            },
+            // Asia/Shanghai（北京）：CST(+28800)，无夏令时。
+            Case {
+                name: "Beijing CST",
+                date: "2026-07-15",
+                tz: 28_800,
+                utc_midnight: "2026-07-14T16:00:00Z",
+            },
+            // London 春切换日(2026-03-29)、秋切换日(2026-10-25)的切换前/后偏移。
+            Case {
+                name: "London switch 2026-03-29 before GMT",
+                date: "2026-03-29",
+                tz: 0,
+                utc_midnight: "2026-03-29T00:00:00Z",
+            },
+            Case {
+                name: "London switch 2026-03-29 after BST",
+                date: "2026-03-29",
+                tz: 3600,
+                utc_midnight: "2026-03-28T23:00:00Z",
+            },
+            Case {
+                name: "London switch 2026-10-25 before BST",
+                date: "2026-10-25",
+                tz: 3600,
+                utc_midnight: "2026-10-24T23:00:00Z",
+            },
+            Case {
+                name: "London switch 2026-10-25 after GMT",
+                date: "2026-10-25",
+                tz: 0,
+                utc_midnight: "2026-10-25T00:00:00Z",
+            },
+            // New York 春切换日(2026-03-08)、秋切换日(2026-11-01)的切换前/后偏移。
+            Case {
+                name: "New York switch 2026-03-08 before EST",
+                date: "2026-03-08",
+                tz: -18_000,
+                utc_midnight: "2026-03-08T05:00:00Z",
+            },
+            Case {
+                name: "New York switch 2026-03-08 after EDT",
+                date: "2026-03-08",
+                tz: -14_400,
+                utc_midnight: "2026-03-08T04:00:00Z",
+            },
+            Case {
+                name: "New York switch 2026-11-01 before EDT",
+                date: "2026-11-01",
+                tz: -14_400,
+                utc_midnight: "2026-11-01T04:00:00Z",
+            },
+            Case {
+                name: "New York switch 2026-11-01 after EST",
+                date: "2026-11-01",
+                tz: -18_000,
+                utc_midnight: "2026-11-01T05:00:00Z",
+            },
+        ];
+
+        // 每个当地日一份 1440 字节 data_hr：第 0/1/1439 分钟各放一个 20..=240
+        // 内的值，其余为 0 会在归一里被过滤掉，用来核对分钟索引与取值。
+        let mut bytes = vec![0_u8; 1440];
+        bytes[0] = 60;
+        bytes[1] = 61;
+        bytes[1439] = 62;
+        let expected = [(0_i64, 60.0_f64), (1, 61.0), (1439, 62.0)];
+
+        for case in cases {
+            let summary = json!({ "tz": case.tz });
+            let result = Normalizer::normalize_band_data(&json!({
+                "data": [{
+                    "uuid": "hr-tz",
+                    "date_time": case.date,
+                    "device_id": "SN-HR",
+                    "data_hr": STANDARD.encode(&bytes),
+                    "summary": STANDARD.encode(serde_json::to_vec(&summary).unwrap())
+                }]
+            }))
+            .unwrap();
+
+            let midnight = DateTime::parse_from_rfc3339(case.utc_midnight)
+                .unwrap()
+                .with_timezone(&Utc);
+            let samples = &result.heart_rate_samples;
+            assert_eq!(samples.len(), 3, "{}：只应留下 3 个采样", case.name);
+            for (sample, (minute, value)) in samples.iter().zip(expected) {
+                assert_eq!(sample.metric, "heart_rate", "{}", case.name);
+                assert_eq!(sample.unit, "bpm", "{}", case.name);
+                assert_eq!(sample.value, value, "{}：第 {minute} 分钟取值", case.name);
+                assert_eq!(
+                    sample.timestamp,
+                    midnight + Duration::minutes(minute),
+                    "{}：第 {minute} 分钟应为 {} 起的第 {minute} 分钟",
+                    case.name,
+                    case.utc_midnight
+                );
+            }
+        }
+    }
+
     #[test]
     fn workout_numeric_type_wins_over_endpoint_sport_name() {
         // /v1/sport/run/history.json 不带过滤会返回全部运动类型；
