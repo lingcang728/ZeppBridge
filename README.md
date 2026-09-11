@@ -308,7 +308,7 @@ Health data, workout details and credentials never leave your machine. Only if y
 
 ## Privacy
 
-- **Credentials** live in the OS credential store (Windows Credential Manager / macOS Keychain / Linux Secret Service), not in a plaintext file. On a machine with no keyring you can explicitly switch to a file or environment store — an acknowledged downgrade, documented in the [Linux guide](docs/guides/linux.md).
+- **Credentials** use the OS credential store by default (Windows Credential Manager / macOS Keychain / Linux Secret Service). If your macOS keychain cannot be unlocked, you can explicitly choose a private plaintext file; see the [macOS credential storage guide](docs/guides/macos-credentials.md). Linux also supports file and environment stores; see the [Linux guide](docs/guides/linux.md). File storage provides less protection than the system store and is never enabled just because that store fails.
 - **Health data** is an unencrypted database file on your computer. If you share the machine, use separate OS accounts.
 - **AI packages are redacted first**: device identifiers, MAC addresses and precise GPS are stripped, and the file lists what was removed. Precise tracks are only included if you opt in.
 - **Maps render locally.** No requests go to any third-party map service.
@@ -331,6 +331,7 @@ npm run tauri dev
 - [CLI and MCP](docs/reference/cli-and-mcp.md) — exit-code contract, read-only tools, scheduling examples
 - [Backup and restore](docs/guides/backup-and-restore.md) — snapshots, restore flow, coverage ledger
 - [Linux](docs/guides/linux.md) — Flatpak, deb/rpm/AppImage, data locations, credential stores
+- [macOS credential storage](docs/guides/macos-credentials.md) — use file storage when the login keychain is unavailable
 - [Docker](docs/guides/docker.md) — headless CLI/MCP image, scheduling, reproducible builds
 - [UI guidelines](docs/development/ui-guidelines.md) — design tokens, page structure, components
 

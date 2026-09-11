@@ -28,7 +28,7 @@ Zepp 区域云端 → ZeppConnector → Raw provenance → Normalizer → SQLite
 - 首次连接走应用内网页登录：独立 `zepp-login` 窗口打开 `watchface.zepp.com`（超时后备用 `user.huami.com`），只允许导航到 `zepp.com` / `huami.com` 的 HTTPS 页面。
 - 后端轮询登录窗口 cookie，解析 `hm-user-login-info` 或 `userid` + `apptoken`，再在允许的区域 host 上用最近心率请求验证。
 - 前端只调用 `start_web_login` / `cancel_web_login` / `get_login_status`，并监听 `login://status`。载荷为 `{ state, message, page_url, code }`。
-- app token 存在平台凭据存储（Windows Credential Manager / macOS 钥匙串）；`auth.json` 只保留非敏感元数据。
+- app token 默认存在平台凭据存储；macOS 和 Linux 可在系统存储不可用时显式选择文件存储，见[凭据边界](security-and-privacy.zh-CN.md#凭据)。`auth.json` 只保留非敏感元数据。
 - 已保存认证在应用重启后直接恢复为「已配置」；启动后会尝试 `verify_auth`。只有明确 401/403 或 `needs_reauth` 才要求重新连接。
 - 首次/历史同步覆盖用户选择的 1–365 天（默认 30）；增量同步带 30 天重叠窗口（契约值 `zeppbridge_core::contract::INCREMENTAL_SYNC_DAYS`，经 `AppStatus.incremental_sync_days` 给界面用——别的地方不许再写死这个数字）。单例同步控制器统一顶部「立即同步」、设置页、启动同步、15 分钟自动检查、并发锁和页面刷新。
 - 同步结果区分 `updated`、`no_new_data`、`partial`、`failed`；云端拉取时间与各数据流最新样本时间分别保存和显示。本地重解析不会改变云端同步时间。

@@ -9,11 +9,17 @@ real accounts and regions has not been fully verified against live services.
 
 ## Credentials
 
-- The app token is stored by Windows Credential Manager under the service name
-  `com.zeppbridge.app`, with the account name keyed by user ID.
-- `auth.json` lives in `data/` next to the program (`{exe_dir}/data`) and holds
-  only authentication metadata (version, user ID, region host, updated-at). A
-  normal save never writes the token to a file. Nothing is written to `%APPDATA%`.
+- The app token uses Windows Credential Manager, macOS Keychain, or Linux
+  Secret Service by default, under `com.zeppbridge.app`, keyed by user ID.
+- macOS and Linux can explicitly opt into a plaintext `credentials.json`
+  protected by file permissions (`0600`, data directory `0700`). It is never
+  silently enabled on a system-store failure. Linux also supports a read-only
+  environment store. See the [macOS](../guides/macos-credentials.md) and
+  [Linux](../guides/linux.md) credential guides before choosing an alternative.
+- `auth.json` lives in the active data directory and holds only authentication
+  metadata (version, user ID, region host, updated-at), even with file storage.
+  File-stored tokens travel with manual copies of that directory, so do not
+  share `credentials.json` with a library copy.
 - Startup recovery rebuilds the sync manager from that metadata plus the
   credential store. When the credential is missing or invalid, Settings says
   re-authentication is needed and the token never appears in a status response.
