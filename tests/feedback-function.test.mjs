@@ -263,6 +263,37 @@ test('a cloud rejection is model-class only, optional, and makes a quiet report 
   assert.equal(bound[18], '2026-09-03T10:00:00Z');
 });
 
+test('cloud rejection time is optional but must carry an explicit offset', () => {
+  // 生产端写的是 `Utc::now().to_rfc3339()`，带 `+00:00` 偏移。
+  const base = {
+    ...report(),
+    lastCloudRejection: { stream: 'workouts', code: -1 },
+  };
+  const withAt = (at) => ({ ...base, lastCloudRejection: { ...base.lastCloudRejection, at } });
+
+  // 可缺省：旧客户端不带这个字段；遇到拒绝但时间戳为空也照收。
+  assert.equal(validateFeedbackReport(base), true);
+
+  for (const at of [
+    '2026-09-03T10:00:00Z',
+    '2026-09-03T10:00:00+00:00',
+    '2026-09-03T10:00:00-05:30',
+    '2026-09-03T10:00:00.123+08:00',
+  ]) {
+    assert.equal(validateFeedbackReport(withAt(at)), true, `应接受 ${at}`);
+  }
+
+  for (const at of [
+    '2026-09-03',
+    '2026-09-03T10:00:00',
+    '2026-09-03 10:00:00Z',
+    '2026-09-03T10:00:00+0800',
+    'not-a-date',
+  ]) {
+    assert.equal(validateFeedbackReport(withAt(at)), false, `不该接受 ${at}`);
+  }
+});
+
 test('a fresh cloud rejection is not deduplicated away by an older note-free report', async () => {
   // 时间戳不进哈希，但 code 和 stream 进。
   const db = fakeDb();

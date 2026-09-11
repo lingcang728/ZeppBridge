@@ -118,10 +118,23 @@ const validWorkoutCode = (entry) => hasOnlyKeys(entry, ['code', 'records'])
 const CLOUD_REJECTION_STREAMS = [
   'workouts', 'workout_detail', 'daily_summary', 'wellness', 'sleep', 'hrv', 'heart_rate',
 ];
+/**
+ * 云端拒绝时间戳的形状：带显式偏移的 RFC3339。
+ *
+ * 客户端用 `Utc::now().to_rfc3339()` 写出这个值，形如
+ * `2026-09-03T10:00:00+00:00`。只靠 `Date.parse` 放行的话，`2026-09-03`
+ * 和 `2026-09-03T10:00:00` 这些不带偏移的写法也会被接受，落库后没法判断它
+ * 到底是哪个时区的时刻。这里先把形状钉死：日期、时间、秒必填，小数秒可选，
+ * 结尾必须是 `Z` 或 `±HH:MM`。
+ */
+const CLOUD_REJECTION_AT = /^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})$/;
 const validCloudRejection = (entry) => hasOnlyKeys(entry, ['stream', 'code', 'at'])
   && CLOUD_REJECTION_STREAMS.includes(entry.stream)
   && boundedInteger(entry.code, -1_000_000_000, 1_000_000_000)
-  && (entry.at === undefined || (boundedString(entry.at, 40) && !Number.isNaN(Date.parse(entry.at))));
+  && (entry.at === undefined
+    || (boundedString(entry.at, 40)
+      && CLOUD_REJECTION_AT.test(entry.at)
+      && !Number.isNaN(Date.parse(entry.at))));
 
 /**
  * 运动 key 的形状。和随包运动目录的 key 一致：小写字母、数字、下划线。
