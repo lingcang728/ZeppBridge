@@ -38,7 +38,8 @@ pub fn extract_from_har(har_path: &Path) -> Result<AuthInfo> {
 }
 
 fn extract_credentials_from_entries(entries: &[Value]) -> Result<AuthInfo> {
-    let user_id_re = Regex::new(r"/users/(\d+)/")
+    // watchface.zepp.com 发的是 `/users/<id>`，后面没有斜杠，也可能直接接 `?`。
+    let user_id_re = Regex::new(r"/users/(\d+)(?:[/?#]|$)")
         .map_err(|e| ZeppBridgeError::ConfigError(format!("正则表达式编译失败: {e}")))?;
 
     let mut app_token: Option<String> = None;
@@ -217,5 +218,49 @@ mod tests {
 
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("未找到user_id"));
+    }
+
+    #[test]
+    fn extracts_user_id_without_trailing_slash() {
+        // watchface.zepp.com 导出的 HAR 就是这个样子。
+        let har_json = serde_json::json!({
+            "log": {
+                "entries": [
+                    {
+                        "request": {
+                            "url": "https://api-mifit-us3.zepp.com/users/7654321",
+                            "headers": [{"name": "apptoken", "value": "tok"}]
+                        }
+                    }
+                ]
+            }
+        });
+
+        let entries = har_json["log"]["entries"].as_array().unwrap();
+        let result = extract_credentials_from_entries(entries).unwrap();
+
+        assert_eq!(result.user_id, "7654321");
+        assert_eq!(result.region_host, "https://api-mifit-us3.zepp.com");
+    }
+
+    #[test]
+    fn extracts_user_id_followed_by_query_string() {
+        let har_json = serde_json::json!({
+            "log": {
+                "entries": [
+                    {
+                        "request": {
+                            "url": "https://api-mifit-us3.zepp.com/users/7654321?r=1",
+                            "headers": [{"name": "apptoken", "value": "tok"}]
+                        }
+                    }
+                ]
+            }
+        });
+
+        let entries = har_json["log"]["entries"].as_array().unwrap();
+        let result = extract_credentials_from_entries(entries).unwrap();
+
+        assert_eq!(result.user_id, "7654321");
     }
 }
