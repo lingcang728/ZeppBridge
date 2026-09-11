@@ -6,8 +6,9 @@
 
 ## 凭据
 
-- app token 由 Windows Credential Manager 保存，服务名为 `com.zeppbridge.app`，账户名按 user ID 区分。
-- `auth.json` 位于程序目录旁的 `data/`（`{exe_dir}/data`），只保存认证元数据（版本、user ID、区域 host、更新时间）；正常保存不会把 token 写入文件。不写入 `%APPDATA%`。
+- app token 默认由 Windows Credential Manager、macOS 钥匙串或 Linux Secret Service 保存，服务名为 `com.zeppbridge.app`，账户名按 user ID 区分。
+- macOS 和 Linux 可显式选用明文 `credentials.json`，文件权限为 `0600`、数据目录为 `0700`；系统存储故障不会自动启用文件存储。Linux 还支持只读环境变量存储。选择前请阅读 [macOS](../guides/macos-credentials.zh-CN.md) 或 [Linux](../guides/linux.zh-CN.md) 凭据指南。
+- `auth.json` 位于实际数据目录，只保存认证元数据（版本、user ID、区域 host、更新时间），文件存储模式也一样。手动复制整个数据目录会带走文件中的令牌，请勿随库副本分享 `credentials.json`。
 - 启动恢复会从元数据和凭据管理器重建同步 manager。凭据缺失或失效时，设置页显示需要重新认证，不把 token 放进状态响应。
 - 网页登录在独立窗口内读取会话 cookie，解析出 user ID 与 app token 后立刻写入凭据管理器。`login://status` 只返回 `state`、`message`、`page_url`，不返回 token。
 - token 仍然是敏感数据。不要记录、复制到 issue、提交到 Git、发送给第三方或公开分享。
