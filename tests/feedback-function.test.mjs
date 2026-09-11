@@ -279,6 +279,7 @@ test('cloud rejection time is optional but must carry an explicit offset', () =>
     '2026-09-03T10:00:00+00:00',
     '2026-09-03T10:00:00-05:30',
     '2026-09-03T10:00:00.123+08:00',
+    '2024-02-29T10:00:00Z',
   ]) {
     assert.equal(validateFeedbackReport(withAt(at)), true, `应接受 ${at}`);
   }
@@ -289,6 +290,13 @@ test('cloud rejection time is optional but must carry an explicit offset', () =>
     '2026-09-03 10:00:00Z',
     '2026-09-03T10:00:00+0800',
     'not-a-date',
+    // 不存在的日历日/时间：`Date.parse` 会归一化后放行，这里必须挡住。
+    '2026-02-30T10:00:00Z',
+    '2026-02-29T10:00:00Z',
+    '2026-13-01T10:00:00Z',
+    '2026-04-31T10:00:00Z',
+    '2026-09-03T24:00:00Z',
+    '2026-09-03T10:60:00Z',
   ]) {
     assert.equal(validateFeedbackReport(withAt(at)), false, `不该接受 ${at}`);
   }
