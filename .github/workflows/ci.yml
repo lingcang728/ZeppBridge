@@ -149,8 +149,8 @@ jobs:
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --locked --all-targets -- -D warnings
 
       # Linux 上跑一遍 Rust 测试，才能真的覆盖到只在这个平台编译的代码：
-      # 凭据存储的三个后端和数据目录的 XDG 回退都是 cfg 门后面的东西，
-      # Windows 和 macOS 的作业根本不会编译它们。
+      # Secret Service、环境变量存储和 XDG 回退都有平台 cfg；文件存储
+      # 同时在 Linux 和 macOS 上测试。
       - name: Test Rust
         run: cargo test --manifest-path src-tauri/Cargo.toml --workspace --locked --jobs 1
 

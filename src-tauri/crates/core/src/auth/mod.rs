@@ -140,17 +140,16 @@ impl CredentialBackend for MacOsCredentialBackend {
     }
 }
 
-/// 选哪个凭据存储。取值：`secret-service`、`file`、`env`。
-///
-/// 只在 Linux 上有意义。Windows 和 macOS 各自只有一个正确答案，多给一个
-/// 旋钮只会多一种配错的方式。
+/// Select credential storage: `keychain` / `file` on macOS, or
+/// `secret-service` / `file` / `env` on Linux. Windows uses Credential Manager.
+/// File storage must be opted into; a locked system store never enables it.
 pub const CREDENTIAL_STORE_ENV: &str = "ZEPPBRIDGE_CREDENTIAL_STORE";
 
 /// 由环境直接给出的令牌（只读存储）。
 pub const APP_TOKEN_ENV: &str = "ZEPPBRIDGE_APP_TOKEN";
 
 /// 文件存储的文件名，放在数据目录里。
-#[cfg(all(unix, not(target_os = "macos")))]
+#[cfg(unix)]
 pub const CREDENTIAL_FILE: &str = "credentials.json";
 
 /// Secret Service（GNOME Keyring / KWallet）。Linux 桌面上的默认选择。
@@ -271,18 +270,18 @@ impl CredentialBackend for EnvCredentialBackend {
 ///
 /// 这是**明摆着的降级**，不是和密钥环平级的选项：文件里的令牌只受文件权限
 /// 保护，能读到这个文件的进程就能拿到它。之所以还是提供，是因为无头 Linux
-/// 上真正的替代品不是「更安全的存储」而是「根本用不了」——而把令牌塞进
+/// 或无法解锁钥匙串的 macOS 上可能根本用不了系统存储——而把令牌塞进
 /// shell 历史或者 `docker inspect` 看得见的地方比这更糟。
 ///
 /// 所以它必须被显式选中（`ZEPPBRIDGE_CREDENTIAL_STORE=file`），不会在密钥环
 /// 不可用时被静默启用。
-#[cfg(all(unix, not(target_os = "macos")))]
+#[cfg(unix)]
 #[derive(Debug)]
 pub struct FileCredentialBackend {
     path: PathBuf,
 }
 
-#[cfg(all(unix, not(target_os = "macos")))]
+#[cfg(unix)]
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct StoredCredentials {
     #[serde(default = "default_credential_file_version")]
@@ -291,12 +290,12 @@ struct StoredCredentials {
     tokens: std::collections::BTreeMap<String, String>,
 }
 
-#[cfg(all(unix, not(target_os = "macos")))]
+#[cfg(unix)]
 fn default_credential_file_version() -> u32 {
     1
 }
 
-#[cfg(all(unix, not(target_os = "macos")))]
+#[cfg(unix)]
 impl FileCredentialBackend {
     pub fn new(data_dir: &Path) -> Self {
         Self {
@@ -332,7 +331,8 @@ impl FileCredentialBackend {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let _ = fs::set_permissions(parent, fs::Permissions::from_mode(0o700));
+            fs::set_permissions(parent, fs::Permissions::from_mode(0o700))
+                .map_err(|error| format!("无法保护凭据目录 {}：{error}", parent.display()))?;
         }
 
         let temp = parent.join(format!(
@@ -366,7 +366,7 @@ impl FileCredentialBackend {
     }
 }
 
-#[cfg(all(unix, not(target_os = "macos")))]
+#[cfg(unix)]
 impl CredentialBackend for FileCredentialBackend {
     fn set(&self, user_id: &str, token: &str) -> std::result::Result<(), String> {
         let mut stored = self.read()?;
@@ -402,23 +402,27 @@ impl CredentialBackend for FileCredentialBackend {
 ///
 /// 不静默回落到默认值：把 `ZEPPBRIDGE_CREDENTIAL_STORE=secretservice` 当成
 /// 「没设」，就等于让一处拼写错误安静地改变令牌存到哪里去。
-#[cfg(all(unix, not(target_os = "macos")))]
+#[cfg(unix)]
 #[derive(Debug)]
 struct InvalidCredentialStoreBackend {
     value: String,
 }
 
-#[cfg(all(unix, not(target_os = "macos")))]
+#[cfg(unix)]
 impl InvalidCredentialStoreBackend {
     fn error(&self) -> String {
+        #[cfg(target_os = "macos")]
+        let choices = "keychain、file";
+        #[cfg(not(target_os = "macos"))]
+        let choices = "secret-service、file、env";
         format!(
-            "{CREDENTIAL_STORE_ENV} 的值无法识别：{}。可用的是 secret-service、file、env",
+            "{CREDENTIAL_STORE_ENV} 的值无法识别：{}。可用的是 {choices}",
             self.value
         )
     }
 }
 
-#[cfg(all(unix, not(target_os = "macos")))]
+#[cfg(unix)]
 impl CredentialBackend for InvalidCredentialStoreBackend {
     fn set(&self, _user_id: &str, _token: &str) -> std::result::Result<(), String> {
         Err(self.error())
@@ -795,9 +799,9 @@ impl AuthManager {
 
 /// 平台默认的凭据存储。
 ///
-/// Windows 和 macOS 上这是一个常量：各自只有一个系统存储。Linux 上不是——
-/// 桌面有 Secret Service，无头服务器和容器没有——所以要看数据目录和环境，
-/// 见 [`CREDENTIAL_STORE_ENV`]。
+/// macOS and Linux can explicitly opt into a file store when the system
+/// store is inaccessible. Reuse an existing credential file after a restart,
+/// but never fall back to a file in response to a system-store error.
 pub fn default_credential_backend_in(data_dir: &Path) -> Arc<dyn CredentialBackend> {
     #[cfg(windows)]
     {
@@ -806,8 +810,10 @@ pub fn default_credential_backend_in(data_dir: &Path) -> Arc<dyn CredentialBacke
     }
     #[cfg(target_os = "macos")]
     {
-        let _ = data_dir;
-        Arc::new(MacOsCredentialBackend)
+        macos_credential_backend(
+            data_dir,
+            std::env::var(CREDENTIAL_STORE_ENV).ok().as_deref(),
+        )
     }
     #[cfg(all(unix, not(target_os = "macos")))]
     {
@@ -817,6 +823,37 @@ pub fn default_credential_backend_in(data_dir: &Path) -> Arc<dyn CredentialBacke
     {
         let _ = data_dir;
         Arc::new(UnavailableCredentialBackend)
+    }
+}
+
+/// Resolve the macOS choice without accessing Keychain or changing process
+/// environment, so the opt-in and restart rules can be tested on every host.
+#[cfg(any(target_os = "macos", test))]
+fn macos_file_store_selected(
+    requested: Option<&str>,
+    credential_file_exists: bool,
+) -> std::result::Result<bool, String> {
+    match requested.map(str::trim).filter(|value| !value.is_empty()) {
+        Some(value) if value.eq_ignore_ascii_case("file") => Ok(true),
+        Some(value)
+            if value.eq_ignore_ascii_case("keychain") || value.eq_ignore_ascii_case("keyring") =>
+        {
+            Ok(false)
+        }
+        Some(value) => Err(value.to_string()),
+        None => Ok(credential_file_exists),
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn macos_credential_backend(
+    data_dir: &Path,
+    requested: Option<&str>,
+) -> Arc<dyn CredentialBackend> {
+    match macos_file_store_selected(requested, data_dir.join(CREDENTIAL_FILE).is_file()) {
+        Ok(true) => Arc::new(FileCredentialBackend::new(data_dir)),
+        Ok(false) => Arc::new(MacOsCredentialBackend),
+        Err(value) => Arc::new(InvalidCredentialStoreBackend { value }),
     }
 }
 
@@ -975,12 +1012,9 @@ fn replace_file(temp: &Path, destination: &Path) -> io::Result<()> {
     fs::rename(temp, destination)
 }
 
-/// Linux 上三个凭据存储的行为。
-///
-/// 单独一个模块而不是塞进下面的 `tests`：这些测试只在 Linux 上编译，混在
-/// 一起会让那个模块的 cfg 门变成一片。
-#[cfg(all(test, unix, not(target_os = "macos")))]
-mod linux_credential_tests {
+/// File-store tests run on both macOS and Linux CI, without system credentials.
+#[cfg(all(test, unix))]
+mod unix_credential_tests {
     use super::*;
 
     /// 每个测试一个自己的目录。共用一个会让「删掉最后一个令牌就删文件」
@@ -1090,13 +1124,18 @@ mod linux_credential_tests {
         ] {
             // 报错必须把可用的值列出来。只说「无法识别」的话，读到它的人
             // 还得去翻源码才知道该写什么。
-            assert!(error.contains("secret-service"), "{error}");
             assert!(error.contains("file"), "{error}");
+            #[cfg(target_os = "macos")]
+            assert!(error.contains("keychain"), "{error}");
+            #[cfg(not(target_os = "macos"))]
+            assert!(error.contains("secret-service"), "{error}");
+            #[cfg(not(target_os = "macos"))]
             assert!(error.contains("env"), "{error}");
         }
     }
 
     #[test]
+    #[cfg(not(target_os = "macos"))]
     fn the_env_store_refuses_writes_but_reports_a_matching_one_as_done() {
         // 不碰真的环境变量：cargo 把测试跑在一个进程的多个线程里，
         // set_var 会让这些测试互相干扰，失败看起来还像是被测代码的问题。
@@ -1121,6 +1160,26 @@ mod linux_credential_tests {
 mod tests {
     use super::*;
     use std::{collections::HashMap, sync::Mutex};
+
+    #[test]
+    fn macos_storage_requires_opt_in_and_remembers_existing_files() {
+        assert_eq!(macos_file_store_selected(None, false), Ok(false));
+        assert_eq!(macos_file_store_selected(Some("  "), false), Ok(false));
+        assert_eq!(macos_file_store_selected(Some(" file "), false), Ok(true));
+        assert_eq!(macos_file_store_selected(Some("FILE"), false), Ok(true));
+        assert_eq!(macos_file_store_selected(None, true), Ok(true));
+        assert_eq!(macos_file_store_selected(Some(""), true), Ok(true));
+        assert_eq!(macos_file_store_selected(Some("KEYCHAIN"), true), Ok(false));
+        assert_eq!(macos_file_store_selected(Some("keyring"), true), Ok(false));
+        for invalid in ["fiel", "env", "secret-service"] {
+            for file_exists in [false, true] {
+                assert_eq!(
+                    macos_file_store_selected(Some(invalid), file_exists),
+                    Err(invalid.to_string()),
+                );
+            }
+        }
+    }
 
     #[derive(Default)]
     struct MemoryCredentials(Mutex<HashMap<String, String>>);
