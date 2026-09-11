@@ -19,6 +19,7 @@ import { syncStreamLabel } from '../lib/syncStreams';
 import { defineMessages, useMessages } from '../i18n';
 import { failedChunkText } from '../lib/failedChunkText';
 import { storageEstimateText, storageStopReasonText } from '../lib/storageEstimateText';
+import { localDateString } from '../lib/format';
 
 const messages = defineMessages(
   {
@@ -218,7 +219,8 @@ const fromDate = computed(() => {
   const back = (years: number) => {
     const date = new Date(today);
     date.setFullYear(date.getFullYear() - years);
-    return date.toISOString().slice(0, 10);
+    // 纯日历日期：用本地年月日，`toISOString()` 会在东八区把清晨推到前一天。
+    return localDateString(date);
   };
   switch (startChoice.value) {
     case '1y': return back(1);
