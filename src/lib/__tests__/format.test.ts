@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   formatCalendarDate,
+  formatCalendarMonth,
   formatDate,
   formatDateTime,
   formatDistance,
@@ -9,6 +10,7 @@ import {
   formatMetric,
   formatPace,
   formatTime,
+  formatWeekdayNames,
   isFiniteNumber,
   localDateString,
 } from '../format';
@@ -94,6 +96,15 @@ describe('本地日期字符串', () => {
   it('月和日补零到两位', () => {
     expect(localDateString(new Date(2026, 8, 5, 12))).toBe('2026-09-05');
   });
+
+  it('北京清晨仍算当天，不是 UTC 的前一天', () => {
+    withTimeZone('Asia/Shanghai', () => {
+      const beijingEarly = new Date(2026, 0, 1, 0, 30);
+      expect(localDateString(beijingEarly)).toBe('2026-01-01');
+      // 组件先前用的 `toISOString().slice(0, 10)` 在这里会得到 2025-12-31。
+      expect(beijingEarly.toISOString().slice(0, 10)).toBe('2025-12-31');
+    });
+  });
 });
 
 /*
@@ -166,9 +177,9 @@ describe('绝对时刻按运行时的系统时区渲染', () => {
   });
 
   const localDateTime: Record<(typeof ZONES)[number], string> = {
-    'Europe/London': '1 Jan, 00:30:00',
-    'America/New_York': '31 Dec, 19:30:00',
-    'Asia/Shanghai': '1 Jan, 08:30:00',
+    'Europe/London': '1/1 00:30:00',
+    'America/New_York': '31/12 19:30:00',
+    'Asia/Shanghai': '1/1 08:30:00',
   };
 
   it.each(ZONES)('%s 下同一 UTC 时刻落在各自的本地日期时间', (zone) => {
@@ -199,9 +210,9 @@ describe('绝对时刻按运行时的系统时区渲染', () => {
       setDateFormat('mdy');
       withTimeZone('Europe/London', () => {
         setTimeFormat('12h');
-        expect(formatDateTime('2026-01-01T00:30:00Z')).toMatch(/^Jan 1, 12:30\sAM$/);
+        expect(formatDateTime('2026-01-01T00:30:00Z')).toMatch(/^1\/1 12:30\sAM$/);
         setTimeFormat('24h');
-        expect(formatDateTime('2026-01-01T00:30:00Z')).toBe('Jan 1, 00:30');
+        expect(formatDateTime('2026-01-01T00:30:00Z')).toBe('1/1 00:30');
       });
     });
   });
@@ -212,7 +223,7 @@ describe('绝对时刻按运行时的系统时区渲染', () => {
       setTimeFormat('24h');
       withTimeZone('America/New_York', () => {
         expect(formatFullDateTime('2026-01-01T00:30:00Z', '—', { seconds: true }))
-          .toBe('31 Dec 2025, 19:30:00');
+          .toBe('31/12/2025 19:30:00');
       });
     });
   });
@@ -248,9 +259,9 @@ describe('日历日期按本地年月日解析，不做 UTC 位移', () => {
     withNavigatorLanguage('en-US', () => {
       withTimeZone('Europe/London', () => {
         setDateFormat('ymd');
-        expect(formatCalendarDate('2026-01-01', 'long')).toBe('Thursday, 2026 January 1');
+        expect(formatCalendarDate('2026-01-01', 'long')).toBe('Thursday 2026/1/1');
         setDateFormat('dmy');
-        expect(formatCalendarDate('2026-01-01', 'long')).toBe('Thursday, 1 January 2026');
+        expect(formatCalendarDate('2026-01-01', 'long')).toBe('Thursday 1/1/2026');
       });
     });
   });
@@ -275,6 +286,62 @@ describe('地区不跟界面语言走', () => {
     withNavigatorLanguage('en-US', () => {
       setLocale('zh');
       expect(formatCalendarDate('2026-09-05')).toBe('Sat, Sep 5');
+    });
+  });
+});
+
+/*
+ * zh-CN 的 Intl 字面量是「年 / 月 / 日」。早先的实现拿它当分隔符，dmy 会拼成
+ * `1年1年2026日`：既重复又错位。显式排列现在一律数字 + `/`，下面把三种顺序都钉住。
+ */
+describe('显式日期排列在 zh-CN 下不再借用地区字面量', () => {
+  afterEach(() => {
+    setDateFormat('regional');
+    setLocale('zh');
+  });
+
+  const explicit: Record<'ymd' | 'dmy' | 'mdy', string> = {
+    ymd: '2026/3/5 星期四',
+    dmy: '5/3/2026 星期四',
+    mdy: '3/5/2026 星期四',
+  };
+
+  it.each(['ymd', 'dmy', 'mdy'] as const)('%s 输出数字年月日，没有中文字面量乱入', (order) => {
+    withNavigatorLanguage('zh-CN', () => {
+      setDateFormat(order);
+      expect(formatCalendarDate('2026-03-05', 'long')).toBe(explicit[order]);
+    });
+  });
+
+  it('datetime 的日期前缀也是数字，时间仍按地区', () => {
+    withNavigatorLanguage('zh-CN', () => {
+      setDateFormat('dmy');
+      setTimeFormat('24h');
+      withTimeZone('Asia/Shanghai', () => {
+        expect(formatDateTime('2026-03-05T10:30:00Z')).toBe('5/3 18:30');
+      });
+    });
+  });
+});
+
+describe('日历月份与星期表头', () => {
+  afterEach(() => setLocale('zh'));
+
+  it('月份标题跟系统地区走，不跟界面语言', () => {
+    withNavigatorLanguage('zh-CN', () => {
+      expect(formatCalendarMonth(2026, 0)).toBe('2026年1月');
+    });
+    withNavigatorLanguage('en-US', () => {
+      expect(formatCalendarMonth(2026, 0)).toBe('January 2026');
+    });
+  });
+
+  it('星期表头从星期日开始，可按需取窄名', () => {
+    withNavigatorLanguage('zh-CN', () => {
+      expect(formatWeekdayNames('narrow')).toEqual(['日', '一', '二', '三', '四', '五', '六']);
+    });
+    withNavigatorLanguage('en-US', () => {
+      expect(formatWeekdayNames('short')).toEqual(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
     });
   });
 });

@@ -15,7 +15,7 @@ import {
 import { useSyncController } from '../composables/useSyncController';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { useAiHandoff } from '../composables/useAiHandoff';
-import { formatDateTime, localDateString } from '../lib/format';
+import { formatCalendarMonth, formatDateTime, formatWeekdayNames, localDateString } from '../lib/format';
 import { popoverStyle } from '../lib/popoverPosition';
 import { rangeOptions } from '../lib/rangeOptions';
 import { AI_PROVIDERS, AI_PROVIDER_BY_ID, type AiProviderId } from '../lib/aiProviders';
@@ -422,21 +422,13 @@ const nextMonth = () => {
   }
 };
 
-/* 月份和星期名交给 Intl，不再写死中文数组：英文界面上「2026年 8月」
-   既不是英文也不是任何人的日期写法。 */
-const calendarTitle = computed(() => new Intl.DateTimeFormat(intlLocale(), {
-  year: 'numeric', month: 'long',
-}).format(new Date(pickerYear.value, pickerMonth.value, 1)));
+/* 月份和星期名交给共享格式化层，地区取自系统（`navigator.language`），
+   和页面上其他日期一致：英文界面上「2026年 8月」既不是英文也不是任何人的
+   日期写法。zh-CN 的表头沿用窄名（日 / 一 / 二…）。 */
+const calendarTitle = computed(() => formatCalendarMonth(pickerYear.value, pickerMonth.value));
 
-const weekdayNames = computed(() => {
-  // 2026-01-04 是星期日，从它数七天就是一周的表头。
-  const sunday = new Date(2026, 0, 4);
-  const formatter = new Intl.DateTimeFormat(intlLocale(), {
-    weekday: locale.value === 'zh' ? 'narrow' : 'short',
-  });
-  return Array.from({ length: 7 }, (_unused, offset) =>
-    formatter.format(new Date(2026, 0, sunday.getDate() + offset)));
-});
+const weekdayNames = computed(() =>
+  formatWeekdayNames(locale.value === 'zh' ? 'narrow' : 'short'));
 
 const calendarDays = computed(() => {
   const firstDay = new Date(pickerYear.value, pickerMonth.value, 1).getDay();
