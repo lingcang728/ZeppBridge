@@ -38,14 +38,12 @@ const messages = defineMessages(
     'err.headless.token_not_in_store':
       '账号信息在，但凭据里没有对应的令牌。数据库能跨机器拷贝，令牌不能——'
       + '它在原来那台机器的凭据管理器里。请重新登录一次。',
-    // 有人报上来的原话就是这一句加一个红条，然后没有下文（反馈 e5fb37a5）：
-    // 登录明明走完了，凭据却存不下，而界面没告诉他还能怎么办。出路本来就
-    // 有——设置里那个「手动填 App Token」——只是没人会想到去找它。
     'err.core.credential_store':
-      '令牌没能存进系统凭据管理器。常见原因：凭据管理器被组策略或安全软件禁用了，'
-      + '或者读到的根本不是 App Token（长得超出了凭据管理器的容量）。'
-      + '出路：到「设置 → 高级 → 手动填写 App Token」直接把令牌填进去，'
-      + '或者用 HAR 导入。两条路都不依赖这次自动保存。',
+      '无法访问凭据存储。请检查钥匙串是否锁定、系统策略、存储配置和文件权限。'
+      + '网页登录、HAR 导入和手填 Token 使用同一个存储，换登录方式不能绕过存储故障。'
+      + '如果 macOS 钥匙串或 Linux 密钥环不可用，可按 README 的凭据存储指南，'
+      + '用 ZEPPBRIDGE_CREDENTIAL_STORE=file 启动应用，再重新登录；'
+      + '此方式会将令牌明文保存到仅当前用户可读写的文件中。',
     'err.core.invalid_host': '不安全的 Zepp 区域地址',
     'err.core.config': '配置有问题，需要先改一下',
     'err.core.busy': '另一个写入操作正在进行，请等它结束',
@@ -175,10 +173,12 @@ const messages = defineMessages(
       + 'database copies between machines; a token does not -- it stays in the credential '
       + 'store of the machine it was created on. Sign in again.',
     'err.core.credential_store':
-      'The token could not be saved to the system credential store. Common causes: the credential store is '
-      + 'disabled by a group policy or security software, or what was read is not an App Token at all '
-      + '(too long for the store to hold). What to do: go to Settings -> Advanced and enter the App Token '
-      + 'manually, or use the HAR import. Neither path depends on this automatic save.',
+      'Could not access the credential store. Check whether it is locked, blocked by system policy, '
+      + 'misconfigured, or has incorrect file permissions. Web sign-in, HAR import and manual entry '
+      + 'all use the same store, so changing the sign-in method cannot bypass a storage failure. '
+      + 'If macOS Keychain or the Linux keyring is unavailable, follow the credential storage guide '
+      + 'linked in the README: launch with ZEPPBRIDGE_CREDENTIAL_STORE=file, then sign in again. '
+      + 'This saves tokens in a plaintext file readable and writable only by your user.',
     'err.core.invalid_host': 'Unsafe Zepp region address',
     'err.core.config': 'Something in the configuration needs changing first',
     'err.core.busy': 'Another write is in progress. Wait for it to finish',

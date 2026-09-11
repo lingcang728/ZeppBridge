@@ -48,8 +48,10 @@ way to tell which one is right.
 - The frontend calls only `start_web_login` / `cancel_web_login` /
   `get_login_status` and listens to `login://status`. The payload is
   `{ state, message, page_url, code }`.
-- The app token is stored in the platform credential store (Windows Credential
-  Manager / macOS Keychain); `auth.json` keeps only non-sensitive metadata.
+- The app token uses the platform credential store by default. macOS and Linux
+  can explicitly choose file storage when the system store is unavailable; see
+  the [credential boundaries](security-and-privacy.md#credentials).
+  `auth.json` keeps only non-sensitive metadata.
 - A saved credential restores straight to "configured" after a restart, and
   `verify_auth` runs at launch. Only an explicit 401/403 or `needs_reauth`
   requires reconnecting.

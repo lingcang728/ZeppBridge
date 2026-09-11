@@ -270,7 +270,7 @@ Windows 上最常见的原因是数据目录写不进去——`.msi` 装到 `Pro
 
 ## 隐私
 
-- **登录凭据**存在系统的凭据管理器里（Windows Credential Manager / macOS 钥匙串 / Linux Secret Service），不是明文文件。没有密钥环的机器上可以显式改用文件或环境变量存储，那是一次明确的降级，见 [Linux 指南](docs/guides/linux.zh-CN.md)。
+- **登录凭据**默认存在系统凭据存储里（Windows Credential Manager / macOS 钥匙串 / Linux Secret Service）。macOS 钥匙串无法解锁时，可显式改用仅当前用户可读写的明文文件，见 [macOS 凭据存储指南](docs/guides/macos-credentials.zh-CN.md)。Linux 也支持文件和环境变量存储，见 [Linux 指南](docs/guides/linux.zh-CN.md)。文件存储的保护弱于系统存储，不会因系统存储故障而自动启用。
 - **健康数据**是你电脑上一个未加密的数据库文件。和别人共用电脑的话，请用各自独立的系统账户。
 - **交给 AI 时会先脱敏**：自动抹掉设备编号、MAC 地址、精确 GPS 等信息，并在文件里列出抹掉了什么。精确轨迹要你主动勾选才会带上。
 - **地图只在本地画**，不会向任何第三方地图服务发请求。
@@ -293,6 +293,7 @@ npm run tauri dev
 - [命令行与 MCP](docs/reference/cli-and-mcp.zh-CN.md) — 退出码契约、只读工具、调度示例
 - [备份、恢复与完整历史](docs/guides/backup-and-restore.zh-CN.md) — 快照、恢复流程、覆盖账本
 - [Linux](docs/guides/linux.zh-CN.md) — Flatpak、deb/rpm/AppImage、数据目录、凭据存储
+- [macOS 凭据存储](docs/guides/macos-credentials.zh-CN.md) — 登录钥匙串不可用时改用文件存储
 - [Docker](docs/guides/docker.zh-CN.md) — 无头 CLI/MCP 镜像、定时同步、可复现构建
 - [UI 约束](docs/development/ui-guidelines.zh-CN.md) — 设计 token、页面结构、组件清单
 
