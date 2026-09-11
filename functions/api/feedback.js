@@ -126,15 +126,35 @@ const CLOUD_REJECTION_STREAMS = [
  * 和 `2026-09-03T10:00:00` 这些不带偏移的写法也会被接受，落库后没法判断它
  * 到底是哪个时区的时刻。这里先把形状钉死：日期、时间、秒必填，小数秒可选，
  * 结尾必须是 `Z` 或 `±HH:MM`。
+ *
+ * 也不能只看形状：`Date.parse` 会把 `2026-02-30T10:00:00Z` 这种不存在的日期
+ * 归一化成 3 月 2 日再放行，所以真伪由 `validCloudRejectionTimestamp` 逐段核对。
  */
-const CLOUD_REJECTION_AT = /^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})$/;
+const CLOUD_REJECTION_AT = /^(\d{4})-(\d{2})-(\d{2})[Tt](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:[Zz]|([+-])(\d{2}):(\d{2}))$/;
+
+/** 该年该月的天数。闰年规则按公历：能被 4 整除，但百年不闰、四百年又闰。 */
+const daysInMonth = (year, month) => {
+  if (month === 2) return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0) ? 29 : 28;
+  return [31, 0, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
+};
+
+/** 带显式偏移的 RFC3339：形状与每段取值范围都要真。缺偏移、日期越界都不收。 */
+const validCloudRejectionTimestamp = (value) => {
+  const match = CLOUD_REJECTION_AT.exec(value);
+  if (!match) return false;
+  const [year, month, day, hour, minute, second] = match.slice(1, 7).map(Number);
+  if (month < 1 || month > 12) return false;
+  if (day < 1 || day > daysInMonth(year, month)) return false;
+  if (hour > 23 || minute > 59 || second > 59) return false;
+  if (match[7] !== undefined && (Number(match[8]) > 23 || Number(match[9]) > 59)) return false;
+  return true;
+};
 const validCloudRejection = (entry) => hasOnlyKeys(entry, ['stream', 'code', 'at'])
   && CLOUD_REJECTION_STREAMS.includes(entry.stream)
   && boundedInteger(entry.code, -1_000_000_000, 1_000_000_000)
   && (entry.at === undefined
     || (boundedString(entry.at, 40)
-      && CLOUD_REJECTION_AT.test(entry.at)
-      && !Number.isNaN(Date.parse(entry.at))));
+      && validCloudRejectionTimestamp(entry.at)));
 
 /**
  * 运动 key 的形状。和随包运动目录的 key 一致：小写字母、数字、下划线。
