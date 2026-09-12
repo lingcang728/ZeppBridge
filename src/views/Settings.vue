@@ -1,5 +1,15 @@
 <script setup lang="ts">
-import { TIME_FORMATS, DATE_ORDERS, timeFormat, dateOrder, setTimeFormat, setDateOrder, dateTimeLabels } from '../lib/dateTime';
+import {
+  TIME_FORMATS,
+  DATE_ORDERS,
+  timeFormat,
+  dateOrder,
+  setTimeFormat,
+  setDateOrder,
+  dateTimeLabels,
+  type TimeFormat,
+  type DateOrder,
+} from '../lib/dateTime';
 import { displayDateTimeFormatter } from '../lib/dateTime';
 
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -35,6 +45,7 @@ import {
   distanceUnit,
   distanceUnitOptionLabel,
   setDistanceUnit,
+  type DistanceUnit,
 } from '../lib/units';
 import { errorTextFor } from '../i18n/errors';
 import { backendText } from '../i18n/backendText';
@@ -194,6 +205,19 @@ const copyMcpConfig = async () => {
     mcpMessage.value = t.value.mcpConfigCopyFailed;
   }
 };
+
+const localeOptions = computed(() =>
+  LOCALES.map((value) => ({ value, label: LOCALE_LABELS[value] })));
+const distanceUnitOptions = computed(() =>
+  DISTANCE_UNITS.map((value) => ({ value, label: distanceUnitOptionLabel(value) })));
+const timeFormatOptions = computed(() =>
+  TIME_FORMATS.map((value) => ({ value, label: dateTimeLabels.value[value] })));
+const dateOrderOptions = computed(() =>
+  DATE_ORDERS.map((value) => ({ value, label: dateTimeLabels.value[value] })));
+const chooseLocale = (value: string | number) => setLocale(String(value) as 'zh' | 'en' | 'es');
+const chooseDistanceUnit = (value: string | number) => setDistanceUnit(String(value) as DistanceUnit);
+const chooseTimeFormat = (value: string | number) => setTimeFormat(String(value) as TimeFormat);
+const chooseDateOrder = (value: string | number) => setDateOrder(String(value) as DateOrder);
 
 const RETENTION_CHOICES = computed(() =>
   [30, 90, 180, 365].map((days) => ({ value: days, label: t.value.days(days) })));
@@ -936,37 +960,49 @@ const runCapabilityProbe = async () => {
         <h1 id="settings-title">{{ t.title }}</h1>
         <p class="page-intro">{{ t.intro }}</p>
       </div>
+    </header>
+
+    <section class="settings-card display-prefs" aria-labelledby="display-prefs-title">
+      <h2 id="display-prefs-title">{{ t.displayPrefsTitle }}</h2>
       <!-- 语言开关标签是双语的，而且不跟着界面语言变：一个看不懂中文的人
            必须能在中文界面上找到它，反过来也一样。 -->
-      <div class="locale-switch">
-        <p class="advanced-label">语言 · Language</p>
-        <div class="scale-options" role="radiogroup" aria-label="语言 · Language">
-          <button
-            v-for="option in LOCALES"
-            :key="option"
-            type="button"
-            role="radio"
-            :aria-checked="locale === option"
-            @click="setLocale(option)"
-          >{{ LOCALE_LABELS[option] }}</button>
-        </div>
+      <div class="field-row">
+        <span class="kv-label">语言 · Language</span>
+        <SelectMenu
+          :model-value="locale"
+          :options="localeOptions"
+          aria-label="语言 · Language"
+          @update:model-value="chooseLocale"
+        />
       </div>
-      <!-- 单位就放在语言旁边：问「怎么把 km 换成 miles」的人（Reddit
-           u/Andrew-Scoggins）第一个会找的就是这里。导出永远是公制，界面才跟着这个走。 -->
-      <div class="locale-switch">
-        <p class="advanced-label">{{ t.distanceUnitLabel }}</p>
-        <div class="scale-options" role="radiogroup" :aria-label="t.distanceUnitLabel">
-          <button
-            v-for="option in DISTANCE_UNITS"
-            :key="option"
-            type="button"
-            role="radio"
-            :aria-checked="distanceUnit === option"
-            @click="setDistanceUnit(option)"
-          >{{ distanceUnitOptionLabel(option) }}</button>
-        </div>
+      <div class="field-row">
+        <span class="kv-label">{{ t.distanceUnitLabel }}</span>
+        <SelectMenu
+          :model-value="distanceUnit"
+          :options="distanceUnitOptions"
+          :aria-label="t.distanceUnitLabel"
+          @update:model-value="chooseDistanceUnit"
+        />
       </div>
-    </header>
+      <div class="field-row">
+        <span class="kv-label">{{ dateTimeLabels.time }}</span>
+        <SelectMenu
+          :model-value="timeFormat"
+          :options="timeFormatOptions"
+          :aria-label="dateTimeLabels.time"
+          @update:model-value="chooseTimeFormat"
+        />
+      </div>
+      <div class="field-row">
+        <span class="kv-label">{{ dateTimeLabels.date }}</span>
+        <SelectMenu
+          :model-value="dateOrder"
+          :options="dateOrderOptions"
+          :aria-label="dateTimeLabels.date"
+          @update:model-value="chooseDateOrder"
+        />
+      </div>
+    </section>
 
     <div v-if="statusError" class="alert danger" role="alert">
       <Icon name="warning" :size="15" />{{ statusError }}
@@ -978,16 +1014,6 @@ const runCapabilityProbe = async () => {
     <div v-if="loginError" class="alert danger" role="alert"><Icon name="warning" :size="15" />{{ loginError }}</div>
     <div v-if="dataMessage" class="alert success"><Icon name="circle-check" :size="15" />{{ dataMessage }}</div>
     <div v-if="dataError" class="alert danger" role="alert"><Icon name="warning" :size="15" />{{ dataError }}</div>
-
-    <section class="settings-card" aria-labelledby="date-time-title">
-      <h2 id="date-time-title">{{ dateTimeLabels.time }} / {{ dateTimeLabels.date }}</h2>
-      <div class="scale-options" role="radiogroup" :aria-label="dateTimeLabels.time">
-        <button v-for="option in TIME_FORMATS" :key="option" type="button" role="radio" :aria-checked="timeFormat === option" @click="setTimeFormat(option)">{{ dateTimeLabels[option] }}</button>
-      </div>
-      <div class="scale-options" role="radiogroup" :aria-label="dateTimeLabels.date">
-        <button v-for="option in DATE_ORDERS" :key="option" type="button" role="radio" :aria-checked="dateOrder === option" @click="setDateOrder(option)">{{ dateTimeLabels[option] }}</button>
-      </div>
-    </section>
 
     <!-- 1. 认证方式 -->
     <section class="settings-card" aria-labelledby="auth-title">
@@ -1748,10 +1774,8 @@ const runCapabilityProbe = async () => {
 .build-stamp { color: var(--subtle); font-size: var(--fs-xs); font-family: var(--font-mono); }
 .page { width: 100%; min-width: 0; margin: 0; display: grid; gap: 14px; }
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 0; min-width: 0; }
-.locale-switch { flex: 0 0 auto; text-align: right; }
-.locale-switch .advanced-label { margin-bottom: 6px; }
-.locale-switch .scale-options { justify-content: flex-end; }
-.locale-switch .scale-options button { min-width: 62px; }
+.display-prefs .kv-label { flex: 0 1 168px; }
+.display-prefs .select-menu { min-width: 200px; flex: 1 1 200px; max-width: 280px; }
 h1, h2, h3, p { margin-top: 0; }
 h1 { font-size: 26.5px; font-weight: 700; color: var(--ink); }
 h2 { margin-bottom: 14px; font-size: var(--fs-xl); font-weight: 700; color: var(--ink); }

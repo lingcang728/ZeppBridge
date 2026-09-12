@@ -11,6 +11,7 @@
  * 「我 2023 年的数据到底有没有」。
  */
 import { computed, onMounted, ref, watch } from 'vue';
+import DatePicker from './DatePicker.vue';
 import SelectMenu from './SelectMenu.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
@@ -534,7 +535,7 @@ const resetLedger = async () => {
     </div>
     <div v-if="startChoice === 'custom'" class="field-row">
       <span class="kv-label">{{ t.customDateLabel }}</span>
-      <input v-model="customFrom" type="date" :aria-label="t.customDateAria" />
+      <DatePicker v-model="customFrom" :aria-label="t.customDateAria" />
     </div>
 
     <div v-if="estimate" class="estimate-block">
@@ -691,6 +692,7 @@ h2 { margin: 0 0 14px; font-size: var(--fs-xl); font-weight: 700; color: var(--i
   font-size: var(--fs-sm);
 }
 .field-row .select-menu { min-width: 220px; flex: 0 0 auto; }
+.field-row .date-picker { min-width: 180px; flex: 1 1 auto; max-width: 280px; }
 .kv-label { flex: 0 0 96px; color: var(--muted); font-size: var(--fs-sm); }
 .retain-note { margin: 6px 0 8px; color: var(--muted); font-size: var(--fs-sm); line-height: 1.6; }
 .inline-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }

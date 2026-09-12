@@ -14,6 +14,7 @@ export const settingsMessages = defineMessages(
     intro: '管理认证方式、同步行为、隐私与默认导出偏好，确保本地数据安全。',
     retry: '重试',
     distanceUnitLabel: '距离单位',
+    displayPrefsTitle: '语言与格式',
 
     // ── 1. 认证方式 ──
     authTitle: '1. 认证方式',
@@ -416,6 +417,7 @@ export const settingsMessages = defineMessages(
     intro: 'Authentication, sync behavior, privacy, and the export defaults — all in one place.',
     retry: 'Try again',
     distanceUnitLabel: 'Distance unit',
+    displayPrefsTitle: 'Language and formats',
 
     // ── 1. Authentication ──
     authTitle: '1. Authentication',
@@ -818,6 +820,7 @@ If you need anything from me (which client I use, where the file lives), just as
     intro: 'Autenticación, sincronización, privacidad y opciones de exportación, todo en un solo lugar.',
     retry: 'Reintentar',
     distanceUnitLabel: 'Unidad de distancia',
+    displayPrefsTitle: 'Idioma y formatos',
 
     // ── 1. Authentication ──
     authTitle: '1. Autenticación',

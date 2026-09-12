@@ -32,6 +32,7 @@ const messages = defineMessages(
     title: '身体状态',
     intro: '恢复、压力、血氧、HRV、呼吸率、静息心率、体重体成分与饮食摄入的本机趋势。全部读自已同步的记录。',
     rangeAria: '时间范围',
+    trendRangeLabel: '趋势范围',
     desktopOnly: '请使用桌面应用；浏览器预览不会读取账户数据。',
     loadFailed: '身体状态数据暂时不可用',
     retry: '重试',
@@ -111,6 +112,7 @@ const messages = defineMessages(
     title: 'Body status',
     intro: 'Local trends for readiness, stress, blood oxygen, HRV, respiratory rate, resting heart rate, body composition and food intake. All read from synced records.',
     rangeAria: 'Time range',
+    trendRangeLabel: 'Trend range',
     desktopOnly: 'Use the desktop app. This browser preview reads no account data.',
     loadFailed: 'Body status data is unavailable right now',
     retry: 'Try again',
@@ -122,7 +124,7 @@ const messages = defineMessages(
     stressLabel: 'Stress',
     stressHint: 'All-day average; the shaded band is that day\'s measured range',
     curveCardAria: '24-hour stress',
-    curveTitle: 'Last 24 hours',
+    curveTitle: 'Last 24 hours of stress',
     curveSub: 'The watch measures every five minutes; individual readings in time order',
     curveChartAria: 'Stress over the last 24 hours',
     curveNoSamples: 'No stress readings in the last 24 hours, so there is no curve to draw. That is what an unworn watch, or all-day monitoring switched off, looks like.',
@@ -190,6 +192,7 @@ const messages = defineMessages(
     title: 'Estado corporal',
     intro: 'Tendencias locales de recuperación, estrés, oxígeno en sangre, VFC, frecuencia respiratoria, frecuencia cardíaca en reposo, composición corporal y alimentación. Todo leído de los registros sincronizados.',
     rangeAria: 'Rango de tiempo',
+    trendRangeLabel: 'Rango de tendencia',
     desktopOnly: 'Usa la app de escritorio. Esta vista previa en el navegador no lee datos de la cuenta.',
     loadFailed: 'Los datos del estado corporal no están disponibles en este momento',
     retry: 'Reintentar',
@@ -201,7 +204,7 @@ const messages = defineMessages(
     stressLabel: 'Estrés',
     stressHint: 'Promedio de todo el día; la banda sombreada es el rango medido ese día',
     curveCardAria: 'Estrés de 24 horas',
-    curveTitle: 'Últimas 24 horas',
+    curveTitle: 'Últimas 24 horas de estrés',
     curveSub: 'El reloj mide cada cinco minutos; lecturas individuales en orden cronológico',
     curveChartAria: 'Estrés de las últimas 24 horas',
     curveNoSamples: 'No hay lecturas de estrés en las últimas 24 horas, así que no hay curva que trazar. Así se ve un reloj que no se usó, o con el monitoreo de todo el día desactivado.',
@@ -791,22 +794,9 @@ watch(dataRevision, () => { void load(); });
       :eyebrow="t.eyebrow"
       :title="t.title"
       :intro="t.intro"
-    >
-      <div class="range-switch" role="radiogroup" :aria-label="t.rangeAria">
-        <button
-          v-for="range in ranges"
-          :key="range.days"
-          type="button"
-          role="radio"
-          :aria-checked="rangeDays === range.days"
-          :class="['range-pill', { 'is-on': rangeDays === range.days }]"
-          @click="rangeDays = range.days"
-        >{{ range.label }}</button>
-      </div>
-    </PageHeader>
+    />
 
     <LifeEventShortcut :days="rangeDays" />
-    <CoverageNotice :requested-days="rangeDays" />
 
     <div v-if="error" class="inline-alert" role="alert">
       <Icon name="warning" :size="14" />{{ error }}
@@ -817,10 +807,6 @@ watch(dataRevision, () => { void load(); });
       <SkeletonBlock v-for="index in 6" :key="index" height="268px" />
     </div>
     <template v-else>
-      <p v-if="!anyData && !error" class="inline-alert" role="status">
-        <Icon name="info" :size="14" />
-        {{ t.noneInRange }}
-      </p>
       <section class="surface-card day-card" :aria-label="t.curveCardAria">
         <header class="day-head">
           <div>
@@ -847,6 +833,28 @@ watch(dataRevision, () => { void load(); });
         </p>
         <p class="curve-note">{{ t.curveNote }}</p>
       </section>
+
+      <!-- 24 小时压力曲线不跟这个开关走。放在曲线下面，才不会让人以为
+           切 7 天 / 1 个月会改那张大图。 -->
+      <div class="range-toolbar">
+        <p class="range-label">{{ t.trendRangeLabel }}</p>
+        <div class="range-switch" role="radiogroup" :aria-label="t.rangeAria">
+          <button
+            v-for="range in ranges"
+            :key="range.days"
+            type="button"
+            role="radio"
+            :aria-checked="rangeDays === range.days"
+            :class="['range-pill', { 'is-on': rangeDays === range.days }]"
+            @click="rangeDays = range.days"
+          >{{ range.label }}</button>
+        </div>
+      </div>
+      <CoverageNotice :requested-days="rangeDays" />
+      <p v-if="!anyData && !error" class="inline-alert" role="status">
+        <Icon name="info" :size="14" />
+        {{ t.noneInRange }}
+      </p>
 
       <div class="card-grid">
         <MetricTrendCard
@@ -934,6 +942,14 @@ watch(dataRevision, () => { void load(); });
 
 <style scoped>
 .body-page.page { display: grid; gap: var(--space-4); align-content: start; }
+.range-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.range-label { margin: 0; color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
 .range-switch { display: flex; gap: var(--space-1); padding: 4px; border-radius: var(--radius-sm); background: var(--surface-raised); }
 .range-pill {
   min-height: 30px;
