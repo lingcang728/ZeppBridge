@@ -28,13 +28,14 @@ const PENDING_RESTORE_FILE: &str = "restore-pending.json";
 /// 迁移前备份滚动保留几份。够回到几个版本以前，又不会把磁盘吃光。
 pub const MIGRATION_BACKUP_KEEP: usize = 5;
 /// manifest 里统计哪几张表。顺序固定，便于 diff。
-const COUNTED_TABLES: [&str; 6] = [
+const COUNTED_TABLES: [&str; 7] = [
     "raw_records",
     "metric_samples",
     "daily_metrics",
     "sleep_sessions",
     "workouts",
     "workout_samples",
+    "life_events",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

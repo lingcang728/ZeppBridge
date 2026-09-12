@@ -731,6 +731,21 @@ impl Database {
         // Earlier migrations are intentionally idempotent and still stamp
         // their historical versions on every launch, so the current schema
         // marker is restored only after all of them have run.
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS life_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL, category TEXT NOT NULL,
+            start_date TEXT NOT NULL, end_date TEXT,
+            notes TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+            CHECK(end_date IS NULL OR end_date >= start_date)
+        );
+        CREATE INDEX IF NOT EXISTS idx_life_events_dates ON life_events(start_date, end_date);
+        PRAGMA user_version = 23;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(23, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }

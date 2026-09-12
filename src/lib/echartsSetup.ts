@@ -19,6 +19,7 @@ import {
   GridComponent,
   LegendComponent,
   MarkLineComponent,
+  MarkPointComponent,
   TooltipComponent,
   VisualMapComponent,
 } from 'echarts/components';
@@ -34,6 +35,7 @@ use([
   TooltipComponent,
   LegendComponent,
   MarkLineComponent,
+  MarkPointComponent,
   VisualMapComponent,
   CanvasRenderer,
 ]);
