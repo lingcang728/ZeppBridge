@@ -39,6 +39,13 @@ const messages = defineMessages(
     awake: 'Awake',
     unknown: 'Unknown',
   },
+  {
+    deep: 'Profundo',
+    light: 'Ligero',
+    rem: 'REM',
+    awake: 'Despierto',
+    unknown: 'Desconocido',
+  },
 );
 
 export const sleepStageLabel = (tone: SleepStageTone): string => messagesOf(messages)[tone];

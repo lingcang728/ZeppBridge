@@ -1,5 +1,5 @@
 import workoutCatalog from '../assets/workouts/catalog.json';
-import { defineMessages, locale, messagesOf } from '../i18n';
+import { defineMessages, locale, messagesOf, type Locale } from '../i18n';
 
 /*
  * 运动名来自随包目录（`src/assets/workouts/catalog.json`），后端也 include! 同
@@ -10,9 +10,14 @@ import { defineMessages, locale, messagesOf } from '../i18n';
  * CLI / MCP 用的，不该跟着界面语言变。界面拿到那份列表之后，**按 key 自己
  * 查名字**，不用后端发来的 label。
  */
-const catalogLabels: Record<'zh' | 'en', Map<string, string>> = {
+const catalogLabels: Record<Locale, Map<string, string>> = {
   zh: new Map(workoutCatalog.sports.map((sport) => [sport.key, sport.label_zh])),
   en: new Map(workoutCatalog.sports.map((sport) => [sport.key, sport.label_en])),
+  // 目录里还没有西语名的运动先用英文名。
+  es: new Map(workoutCatalog.sports.map((sport) => [
+    sport.key,
+    (sport as { label_es?: string }).label_es ?? sport.label_en,
+  ])),
 };
 
 const messages = defineMessages(
@@ -79,6 +84,38 @@ const messages = defineMessages(
     scopeDevice: 'Single device',
     scopeMixed: 'Multiple sources',
     scopeUnknown: 'Scope unconfirmed',
+  },
+  {
+    unknownWithCode: (code: string) => `Entrenamiento no reconocido (código ${code})`,
+    unknownWorkout: 'Entrenamiento no reconocido',
+    workout: 'Entrenamiento',
+    fallback: {
+      run: 'Carrera al aire libre',
+      running: 'Carrera',
+      walking: 'Caminata',
+      walk: 'Caminata',
+      ride: 'Ciclismo al aire libre',
+      cycling: 'Ciclismo al aire libre',
+      indoor_cycling: 'Ciclismo en interior',
+      swimming: 'Natación',
+      treadmill: 'Caminadora',
+      indoor_run: 'Carrera en interior',
+      trail: 'Trail running',
+      hiking: 'Senderismo',
+      strength: 'Entrenamiento de fuerza',
+      elliptical: 'Elíptica',
+      rowing: 'Remo',
+      yoga: 'Yoga',
+      climb: 'Escalada',
+      badminton: 'Bádminton',
+      activity: 'Actividad',
+      unknown: 'Entrenamiento no reconocido',
+    },
+    providerZeppCloud: 'Zepp Cloud',
+    scopeUserFused: 'Combinado del usuario',
+    scopeDevice: 'Un solo dispositivo',
+    scopeMixed: 'Varias fuentes',
+    scopeUnknown: 'Alcance sin confirmar',
   },
 );
 

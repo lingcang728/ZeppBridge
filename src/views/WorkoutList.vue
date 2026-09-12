@@ -53,6 +53,25 @@ const messages = defineMessages(
     loadMore: 'Load more',
     loadingMore: 'Loading…',
   },
+  {
+    backToRecent: 'Volver a registros recientes',
+    backToOverview: 'Volver al resumen',
+    title: 'Entrenamientos',
+    intro: 'Entrenamientos sincronizados en este equipo. Sin recorrido, no hay mapa.',
+    loadFailedTitle: 'No se pudieron leer los entrenamientos',
+    loadFailed: 'La lista de entrenamientos no está disponible en este momento',
+    retry: 'Reintentar',
+    emptyTitle: 'Todavía no hay nada que mostrar',
+    emptyMessage: 'Después de sincronizar, aquí solo aparecen los registros que tienen tipo, hora y al menos una métrica real. Sin GPS ni muestras punto a punto, no se dibuja un gráfico vacío.',
+    labelDistance: 'Distancia',
+    labelBurn: 'Calorías',
+    labelDuration: 'Duración',
+    notProvided: 'Sin datos',
+    footnote: (count: number) => `${count} registros mostrados`,
+    shown: (loaded: number, total: number) => `Cargados ${loaded} de ${total}`,
+    loadMore: 'Cargar más',
+    loadingMore: 'Cargando…',
+  },
 );
 const t = useMessages(messages);
 
