@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 /// 当前 SQLite schema 版本（`PRAGMA user_version`）。加新版本只能追加迁移
 /// 步骤，不要改已有 DDL。
-pub const CURRENT_SCHEMA_VERSION: i64 = 23;
+pub const CURRENT_SCHEMA_VERSION: i64 = 24;
 /// 写进备份 manifest 的应用版本。Core 是独立 crate，用它自己的包版本。
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -55,6 +55,7 @@ const PREVIOUS_RELEASE_REPLAY_STREAMS: [&str; 2] = ["workout_detail", "workouts"
 const LAST_CLOUD_SYNC_AT_KEY: &str = "last_cloud_sync_at";
 const LAST_CLOUD_SYNC_OUTCOME_KEY: &str = "last_cloud_sync_outcome";
 const LAST_LOCAL_REPROCESS_AT_KEY: &str = "last_local_reprocess_at";
+const REPLAY_LAST_FAILURES_KEY: &str = "replay_last_failures";
 const RETENTION_DAYS_KEY: &str = "retention_days";
 const HISTORY_SYNC_DAYS_KEY: &str = "history_sync_days";
 const ARCHIVE_ENABLED_KEY: &str = "archive_enabled";
@@ -1971,9 +1972,8 @@ impl Database {
             }
             // Optional wellness streams. Their payload shapes are not verified
             // field by field yet, so normalization is best-effort and must
-            // never fail: `persist_fetched_record` rolls the raw insert back on
-            // error, and losing the raw response is what would make verifying
-            // those shapes impossible without re-fetching.
+            // never fail. Raw is already committed before this runs; a later
+            // persist error no longer deletes the response.
             "wellness" => {
                 let batch = Normalizer::normalize_wellness(source_key, payload);
                 counts.primary_records =
@@ -1988,8 +1988,8 @@ impl Database {
                 }
             }
             // 体重 / 体成分。和 wellness 一样是尽力而为：`summary` 的字段随
-            // 记录来源变，认不出来的只写进 diagnostics，不让整条流失败——
-            // 原始报文丢了，就再也没法在不重新同步的情况下把它们认出来。
+            // 记录来源变，认不出来的只写进 diagnostics，不让整条流失败。
+            // 原始报文已先提交，归一化失败也不会把它回滚掉。
             "weight" => {
                 let batch = Normalizer::normalize_weight(payload);
                 counts.primary_records = batch.metric_samples.len() as i64;
@@ -2261,15 +2261,26 @@ impl Database {
         let plan: Vec<(i64, String, String)> = if let Some(streams) = stream_filter {
             // 参数个数跟着流的条数走。手拼 IN 列表是这类代码最容易留下 SQL
             // 注入口子的地方，即使这里的值全是编译期常量。
-            let placeholders = (1..=streams.len())
+            // ?1 是当前修订号：已经按这一版隔离过的 raw 不再进计划，否则每次
+            // 启动都会把它们再扫一遍，而盖不了章就会无限重放。
+            let placeholders = (2..=streams.len() + 1)
                 .map(|index| format!("?{index}"))
                 .collect::<Vec<_>>()
                 .join(", ");
             let mut stmt = self.conn.prepare(&format!(
-                "SELECT id, stream, source_key
-                 FROM raw_records WHERE stream IN ({placeholders}) ORDER BY id"
+                "SELECT r.id, r.stream, r.source_key
+                 FROM raw_records r
+                 WHERE NOT EXISTS (
+                     SELECT 1 FROM raw_quarantine q
+                     WHERE q.raw_record_id = r.id AND q.revision = ?1
+                 )
+                   AND r.stream IN ({placeholders})
+                 ORDER BY r.id"
             ))?;
-            let rows = stmt.query_map(rusqlite::params_from_iter(streams.iter()), |row| {
+            let mut bind: Vec<&str> = Vec::with_capacity(streams.len() + 1);
+            bind.push(NORMALIZER_REVISION);
+            bind.extend(streams.iter().copied());
+            let rows = stmt.query_map(rusqlite::params_from_iter(bind.iter()), |row| {
                 Ok((
                     row.get::<_, i64>(0)?,
                     row.get::<_, String>(1)?,
@@ -2278,10 +2289,16 @@ impl Database {
             })?;
             rows.collect::<std::result::Result<Vec<_>, _>>()?
         } else {
-            let mut stmt = self
-                .conn
-                .prepare("SELECT id, stream, source_key FROM raw_records ORDER BY id")?;
-            let rows = stmt.query_map([], |row| {
+            let mut stmt = self.conn.prepare(
+                "SELECT r.id, r.stream, r.source_key
+                 FROM raw_records r
+                 WHERE NOT EXISTS (
+                     SELECT 1 FROM raw_quarantine q
+                     WHERE q.raw_record_id = r.id AND q.revision = ?1
+                 )
+                 ORDER BY r.id",
+            )?;
+            let rows = stmt.query_map(params![NORMALIZER_REVISION], |row| {
                 Ok((
                     row.get::<_, i64>(0)?,
                     row.get::<_, String>(1)?,
@@ -2293,9 +2310,11 @@ impl Database {
 
         let mut counts = BTreeMap::<String, i64>::new();
         let mut band_heart_rate = 0i64;
+        let mut failures = 0i64;
         // 一批一个事务。批的边界落在报文之间，所以「先删掉这条报文的派生行、
         // 再照新规则插一遍」始终在同一个事务里——中途失败不会留下一条被清空
-        // 却没被重建的记录。
+        // 却没被重建的记录。单条 decode / 解析 / 归一化失败写入隔离表后继续，
+        // 不能用 `?` 把整轮打掉；隔离 INSERT 跟这批派生行一起提交。
         for batch in plan.chunks(REPLAY_BATCH_RECORDS) {
             let transaction = ReplayBatch::begin(&self.conn)?;
             for (id, stream, source_key) in batch {
@@ -2303,14 +2322,37 @@ impl Database {
                 let Some((stored_payload, payload_zip)) = self.raw_payload(*id)? else {
                     continue;
                 };
-                let encoded_payload = decode_raw_payload(stored_payload, payload_zip)?;
-                let payload: serde_json::Value = serde_json::from_str(&encoded_payload)
-                    .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
-                if let Ok(result) =
-                    self.normalize_and_persist_raw(*id, stream, source_key, &payload)
-                {
-                    *counts.entry(stream.clone()).or_default() += result.primary_records;
-                    band_heart_rate += result.band_heart_rate_records;
+                let encoded_payload = match decode_raw_payload(stored_payload, payload_zip) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        failures += 1;
+                        self.insert_raw_quarantine(*id, stream, source_key, &error)?;
+                        continue;
+                    }
+                };
+                let payload: serde_json::Value = match serde_json::from_str(&encoded_payload) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        failures += 1;
+                        self.insert_raw_quarantine(
+                            *id,
+                            stream,
+                            source_key,
+                            &ZeppBridgeError::ParseError(error.to_string()),
+                        )?;
+                        continue;
+                    }
+                };
+                match self.normalize_and_persist_raw(*id, stream, source_key, &payload) {
+                    Ok(result) => {
+                        self.clear_raw_quarantine(*id)?;
+                        *counts.entry(stream.clone()).or_default() += result.primary_records;
+                        band_heart_rate += result.band_heart_rate_records;
+                    }
+                    Err(error) => {
+                        failures += 1;
+                        self.insert_raw_quarantine(*id, stream, source_key, &error)?;
+                    }
                 }
             }
             transaction.commit()?;
@@ -2329,12 +2371,17 @@ impl Database {
             }
         }
 
-        self.conn.execute(
-            "INSERT INTO app_meta(key, value, updated_at)
-             VALUES('normalizer_revision', ?1, ?2)
-             ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
-            params![NORMALIZER_REVISION, Utc::now().to_rfc3339()],
-        )?;
+        self.set_app_meta(REPLAY_LAST_FAILURES_KEY, &failures.to_string())?;
+        // 有新失败就不推进修订号，下次启动还会再走一遍（已隔离的会被跳过）。
+        // 空库 0 条 0 失败仍盖章，避免第一次同步之后平白重放。
+        if failures == 0 {
+            self.conn.execute(
+                "INSERT INTO app_meta(key, value, updated_at)
+                 VALUES('normalizer_revision', ?1, ?2)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+                params![NORMALIZER_REVISION, Utc::now().to_rfc3339()],
+            )?;
+        }
         self.set_app_meta(LAST_LOCAL_REPROCESS_AT_KEY, &Utc::now().to_rfc3339())?;
         Ok(counts)
     }
@@ -5697,25 +5744,67 @@ impl Database {
         Ok(())
     }
 
+    fn insert_raw_quarantine(
+        &self,
+        raw_record_id: i64,
+        stream: &str,
+        source_key: &str,
+        error: &ZeppBridgeError,
+    ) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO raw_quarantine(
+                 raw_record_id, stream, source_key, error, revision, quarantined_at
+             )
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(raw_record_id) DO UPDATE SET
+                stream = excluded.stream,
+                source_key = excluded.source_key,
+                error = excluded.error,
+                revision = excluded.revision,
+                quarantined_at = excluded.quarantined_at",
+            params![
+                raw_record_id,
+                stream,
+                source_key,
+                error.to_string(),
+                NORMALIZER_REVISION,
+                Utc::now().to_rfc3339(),
+            ],
+        )?;
+        Ok(())
+    }
+
+    fn clear_raw_quarantine(&self, raw_record_id: i64) -> Result<()> {
+        self.conn.execute(
+            "DELETE FROM raw_quarantine WHERE raw_record_id = ?1",
+            [raw_record_id],
+        )?;
+        Ok(())
+    }
+
+    /// 先提交 raw，再在单独事务里归一化。
+    ///
+    /// 归一化失败会回滚派生行并把 raw 写入隔离表，但云端已经拿到的报文必须留
+    /// 在 `raw_records` 里——以前两者同事务，失败把 raw 一起 ROLLBACK 了。
     pub fn persist_fetched_record(&self, record: &RawRecord) -> Result<(i64, NormalizationCounts)> {
-        self.conn.execute("BEGIN IMMEDIATE", [])?;
-        let outcome = (|| {
-            let raw_id = self.insert_raw_record(record)?;
+        let raw_id = self.insert_raw_record(record)?;
+        let normalized = (|| {
+            let transaction = ReplayBatch::begin(&self.conn)?;
             let counts = self.normalize_and_persist_raw(
                 raw_id,
                 &record.stream,
                 &record.source_key,
                 &record.payload,
             )?;
-            Ok((raw_id, counts))
+            self.clear_raw_quarantine(raw_id)?;
+            transaction.commit()?;
+            Ok(counts)
         })();
-        match outcome {
-            Ok(value) => {
-                self.conn.execute("COMMIT", [])?;
-                Ok(value)
-            }
+        match normalized {
+            Ok(counts) => Ok((raw_id, counts)),
             Err(error) => {
-                let _ = self.conn.execute("ROLLBACK", []);
+                let _ =
+                    self.insert_raw_quarantine(raw_id, &record.stream, &record.source_key, &error);
                 Err(error)
             }
         }
@@ -5970,6 +6059,8 @@ fn workout_id_from_detail_key(source_key: &str) -> Option<String> {
 /// （空响应 `{"items":[]}` 只有 12 字节，压完反而变长）。省下的那点空间不值
 /// 得为它维护「压过但没变小」这种状态。
 const MIN_COMPRESSIBLE_PAYLOAD_BYTES: i64 = 512;
+/// 解压输出上限。被篡改的压缩行不能展开成任意大小。
+const MAX_DECOMPRESSED_PAYLOAD_BYTES: u64 = 32 * 1024 * 1024;
 
 fn compress_payload(payload: &str) -> Result<Vec<u8>> {
     use flate2::write::ZlibEncoder;
@@ -5989,12 +6080,19 @@ fn decompress_payload(bytes: &[u8]) -> Result<String> {
     use flate2::read::ZlibDecoder;
     use std::io::Read;
 
-    let mut decoder = ZlibDecoder::new(bytes);
-    let mut out = String::new();
-    decoder
-        .read_to_string(&mut out)
+    let mut limited =
+        ZlibDecoder::new(bytes).take(MAX_DECOMPRESSED_PAYLOAD_BYTES.saturating_add(1));
+    let mut out = Vec::new();
+    limited
+        .read_to_end(&mut out)
         .map_err(|error| ZeppBridgeError::ParseError(format!("解压原始报文失败: {error}")))?;
-    Ok(out)
+    if out.len() as u64 > MAX_DECOMPRESSED_PAYLOAD_BYTES {
+        return Err(ZeppBridgeError::ParseError(
+            "解压原始报文超过 32 MiB 上限".into(),
+        ));
+    }
+    String::from_utf8(out)
+        .map_err(|error| ZeppBridgeError::ParseError(format!("解压原始报文失败: {error}")))
 }
 
 /// 取出一条原始报文。
@@ -7153,6 +7251,146 @@ mod tests {
         );
     }
 
+    /// 坏 raw 不能吞掉、也不能把整轮重放打成 Err，更不能因此盖章。
+    #[test]
+    fn replay_quarantines_bad_raw_without_stamping_or_aborting() {
+        let db = Database::in_memory().unwrap();
+        db.insert_raw_record(&RawRecord {
+            stream: "workouts".into(),
+            source_key: "sport_history:0:good".into(),
+            source_scope: SourceScope::Device,
+            device_id: None,
+            start_utc: ts(),
+            end_utc: None,
+            payload: serde_json::json!({
+                "data": [{ "trackid": 1_700_000_000i64, "end_time": 1_700_003_600i64, "type": 211 }]
+            }),
+            capability: CapabilityStatus::Verified,
+        })
+        .unwrap();
+        let empty_id = db
+            .insert_raw_record(&RawRecord {
+                stream: "workouts".into(),
+                source_key: "sport_history:0:empty".into(),
+                source_scope: SourceScope::Device,
+                device_id: None,
+                start_utc: ts(),
+                end_utc: None,
+                payload: serde_json::json!({}),
+                capability: CapabilityStatus::Verified,
+            })
+            .unwrap();
+        db.conn
+            .execute(
+                "INSERT INTO raw_records
+                    (stream, source_key, source_scope, device_id, start_utc, end_utc,
+                     payload, payload_hash, fetched_at)
+                 VALUES ('workouts', 'sport_history:0:not-json', 'device', NULL, ?1, NULL, '{', 'hash', ?1)",
+                params![ts().to_rfc3339()],
+            )
+            .unwrap();
+        let not_json_id = db.conn.last_insert_rowid();
+        db.conn
+            .execute(
+                "INSERT INTO app_meta(key, value, updated_at)
+                 VALUES('normalizer_revision', ?1, ?2)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                params!["zepp-normalizer-ancient", ts().to_rfc3339()],
+            )
+            .unwrap();
+
+        let counts = db
+            .reprocess_raw_records_if_needed()
+            .expect("坏报文不能让整轮重放返回 Err")
+            .expect("旧修订号应当触发重放");
+        assert!(
+            counts.get("workouts").copied().unwrap_or(0) >= 1,
+            "好报文必须产出派生行: {counts:?}"
+        );
+        let workouts = db.get_recent_workouts(10).unwrap();
+        assert_eq!(workouts.len(), 1);
+        assert_eq!(workouts[0].workout_type, "road_cycling");
+
+        let quarantined: i64 = db
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM raw_quarantine
+                 WHERE raw_record_id IN (?1, ?2) AND revision = ?3",
+                params![empty_id, not_json_id, NORMALIZER_REVISION],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(quarantined, 2);
+        let failures: i64 = db
+            .conn
+            .query_row(
+                "SELECT value FROM app_meta WHERE key = 'replay_last_failures'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .unwrap()
+            .parse()
+            .unwrap();
+        assert!(failures >= 1, "failures = {failures}");
+        assert_ne!(
+            db.stored_normalizer_revision().unwrap().as_deref(),
+            Some(NORMALIZER_REVISION),
+            "有新失败就不能推进修订号"
+        );
+        let raw_kept: i64 = db
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM raw_records WHERE id IN (?1, ?2)",
+                params![empty_id, not_json_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(raw_kept, 2);
+    }
+
+    /// 归一化失败必须把错误交回去，但不能把已经拿到的 raw 回滚掉。
+    #[test]
+    fn persist_keeps_raw_when_normalization_fails() {
+        let db = Database::in_memory().unwrap();
+        let error = db
+            .persist_fetched_record(&RawRecord {
+                stream: "workouts".into(),
+                source_key: "sport_history:0:unparseable".into(),
+                source_scope: SourceScope::Device,
+                device_id: None,
+                start_utc: ts(),
+                end_utc: None,
+                payload: serde_json::json!({}),
+                capability: CapabilityStatus::Verified,
+            })
+            .unwrap_err();
+        assert!(
+            matches!(
+                error,
+                ZeppBridgeError::ParseError(_) | ZeppBridgeError::DataUnavailable(_)
+            ),
+            "{error}"
+        );
+        let kept: i64 = db
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM raw_records WHERE source_key = 'sport_history:0:unparseable'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(kept, 1);
+        let quarantined: i64 = db
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM raw_quarantine WHERE source_key = 'sport_history:0:unparseable'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(quarantined, 1);
+    }
+
     #[test]
     fn issue_24_migration_repairs_history_without_raw_and_preserves_overrides() {
         let db = Database::in_memory().unwrap();
@@ -7886,6 +8124,21 @@ mod tests {
             decode_raw_payload("{\"legacy\":true}".into(), Some(Vec::new())).unwrap(),
             "{\"legacy\":true}"
         );
+    }
+
+    #[test]
+    fn decompress_payload_rejects_output_over_32_mib() {
+        let oversized = "a".repeat(MAX_DECOMPRESSED_PAYLOAD_BYTES as usize + 1);
+        let zipped = compress_payload(&oversized).unwrap();
+        drop(oversized);
+        let error = decompress_payload(&zipped).expect_err("超过上限必须是 Err");
+        assert!(matches!(error, ZeppBridgeError::ParseError(_)), "{error}");
+    }
+
+    #[test]
+    fn decompress_payload_rejects_corrupt_bytes_without_panic() {
+        let error = decompress_payload(&[0xff, 0x00, 0x01, 0x02]).expect_err("损坏字节必须是 Err");
+        assert!(matches!(error, ZeppBridgeError::ParseError(_)), "{error}");
     }
 
     #[test]

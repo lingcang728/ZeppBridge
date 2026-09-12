@@ -50,6 +50,7 @@ const messages = defineMessages(
     hoursAxis: '小时',
     tooltipTotal: (date: string, hours: string) => `<b>${date} 睡眠合计：${hours} 小时</b><br/>`,
     tooltipRow: (name: string, hours: number) => `${name}: ${hours} 小时<br/>`,
+    tooltipRowMissing: (name: string) => `${name}: 未提供<br/>`,
   },
   {
     backToRecent: 'Back to recent records',
@@ -92,6 +93,7 @@ const messages = defineMessages(
     hoursAxis: 'hours',
     tooltipTotal: (date: string, hours: string) => `<b>${date} — ${hours} h asleep in total</b><br/>`,
     tooltipRow: (name: string, hours: number) => `${name}: ${hours} h<br/>`,
+    tooltipRowMissing: (name: string) => `${name}: Not provided<br/>`,
   },
   {
     backToRecent: 'Volver a registros recientes',
@@ -134,6 +136,7 @@ const messages = defineMessages(
     hoursAxis: 'horas',
     tooltipTotal: (date: string, hours: string) => `<b>${date}: ${hours} h de sueño en total</b><br/>`,
     tooltipRow: (name: string, hours: number) => `${name}: ${hours} h<br/>`,
+    tooltipRowMissing: (name: string) => `${name}: Sin datos<br/>`,
   },
 );
 const t = useMessages(messages);
@@ -143,6 +146,7 @@ import { useDevices } from '../composables/useDevices';
 import { dataProviderLabel, dataScopeLabel } from '../lib/labels';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { formatDate, formatDateTime, formatDuration, formatTime, isFiniteNumber } from '../lib/format';
+import { minutesToHours } from '../lib/missingValues';
 import { zeppSemanticColors } from '../lib/echartsTheme';
 import type { DeviceProfile, SleepSession } from '../types';
 
@@ -195,12 +199,10 @@ const weeklyChartOption = computed(() => {
     return `${d.getMonth() + 1}/${d.getDate()}`;
   });
 
-  const toHours = (mins?: number | null) => (isFiniteNumber(mins) && mins > 0 ? Math.round((mins / 60) * 10) / 10 : 0);
-
-  const deepData = sorted.map((s) => toHours(s.deep_minutes));
-  const lightData = sorted.map((s) => toHours(s.light_minutes));
-  const remData = sorted.map((s) => toHours(s.rem_minutes));
-  const awakeData = sorted.map((s) => toHours(s.awake_minutes));
+  const deepData = sorted.map((s) => minutesToHours(s.deep_minutes));
+  const lightData = sorted.map((s) => minutesToHours(s.light_minutes));
+  const remData = sorted.map((s) => minutesToHours(s.rem_minutes));
+  const awakeData = sorted.map((s) => minutesToHours(s.awake_minutes));
 
   // 标出当前日高亮
   const currentIndex = sorted.findIndex((s) => s.sleep_id === sleepId.value);
@@ -223,13 +225,15 @@ const weeklyChartOption = computed(() => {
       borderColor: 'rgba(228, 235, 208, 0.16)',
       borderWidth: 1,
       textStyle: { color: '#F3F4EC', fontSize: 15.5 },
-      formatter: (params: Array<{ seriesName: string; value: number; name: string }>) => {
+      formatter: (params: Array<{ seriesName: string; value: number | null; name: string }>) => {
         if (!params || !params.length) return '';
         const name = params[0].name;
-        const total = params.reduce((sum, p) => sum + (Number(p.value) || 0), 0);
+        const total = params.reduce((sum, p) => sum + (isFiniteNumber(p.value) ? p.value : 0), 0);
         let text = t.value.tooltipTotal(name, total.toFixed(1));
         params.forEach((p) => {
-          text += t.value.tooltipRow(p.seriesName, p.value);
+          text += isFiniteNumber(p.value)
+            ? t.value.tooltipRow(p.seriesName, p.value)
+            : t.value.tooltipRowMissing(p.seriesName);
         });
         return text;
       },

@@ -757,6 +757,25 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(23, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // 归一化失败的 raw 进隔离表，而不是盖章跳过或连坐回滚整条报文。
+        // 逻辑键是 (raw_record_id, revision=当前解析器修订号)：新修订号对不上
+        // 旧隔离行，会再试一次。
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS raw_quarantine (
+                raw_record_id INTEGER PRIMARY KEY,
+                stream TEXT NOT NULL,
+                source_key TEXT NOT NULL,
+                error TEXT NOT NULL,
+                revision TEXT NOT NULL,
+                quarantined_at TEXT NOT NULL,
+                FOREIGN KEY(raw_record_id) REFERENCES raw_records(id) ON DELETE CASCADE
+            );
+            PRAGMA user_version = 24;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(24, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }

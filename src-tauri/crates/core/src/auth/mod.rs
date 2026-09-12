@@ -527,6 +527,7 @@ impl AuthManager {
         let user_id = validate_user_id(&auth.user_id)?;
         let token = validate_token(&auth.app_token)?;
         let region_host = normalize_region_host(&auth.region_host)?;
+        let previous_user_id = self.read_stored().ok().map(|(stored, _)| stored.user_id);
         let previous = self.credentials.get(&user_id).map_err(credential_error)?;
 
         self.credentials
@@ -543,6 +544,8 @@ impl AuthManager {
         if let Err(error) = self.write_stored(&stored) {
             // Best-effort rollback keeps metadata and the platform store
             // consistent if the atomic file replacement fails.
+            // Do not delete the previous account's credential: the new id
+            // never became current.
             match previous {
                 Some(old) => {
                     let _ = self.credentials.set(&user_id, &old);
@@ -552,6 +555,15 @@ impl AuthManager {
                 }
             }
             return Err(error);
+        }
+
+        // A→B 换账号后 A 的 keyring 条目不能留着：下一轮 clear 只认当前 id。
+        if let Some(raw) = previous_user_id {
+            if let Ok(old_id) = validate_user_id(&raw) {
+                if old_id != user_id {
+                    let _ = self.credentials.delete(&old_id);
+                }
+            }
         }
 
         // The user-id hint is best-effort: a failure here must not roll back
@@ -677,15 +689,12 @@ impl AuthManager {
     /// A corrupt `auth.json` no longer leaves the credential behind: the
     /// best-effort user-id hint file is consulted as a fallback.
     pub fn clear_auth(&self) -> Result<()> {
-        let user_id = if self.auth_file.exists() {
-            self.read_stored()
-                .ok()
-                .map(|(stored, _)| stored.user_id)
-                .filter(|value| !value.trim().is_empty())
-                .or_else(|| self.read_user_id_hint())
-        } else {
-            None
-        };
+        let user_id = self
+            .read_stored()
+            .ok()
+            .map(|(stored, _)| stored.user_id)
+            .filter(|value| !value.trim().is_empty())
+            .or_else(|| self.read_user_id_hint());
 
         if let Some(user_id) = user_id {
             let user_id = validate_user_id(&user_id)?;
@@ -1244,6 +1253,54 @@ mod tests {
         manager.clear_auth().unwrap();
         assert!(!dir.join("auth.json").exists());
         assert_eq!(backend.get("user-1").unwrap(), None);
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn saving_a_different_user_deletes_the_previous_credential() {
+        let dir = temp_dir();
+        let backend = Arc::new(MemoryCredentials::default());
+        let manager = AuthManager::with_credential_backend(dir.clone(), backend.clone());
+        manager
+            .save_auth(&AuthInfo {
+                app_token: "token-a".to_string(),
+                user_id: "user-a".to_string(),
+                region_host: "https://api-mifit.zepp.com".to_string(),
+            })
+            .unwrap();
+        manager
+            .save_auth(&AuthInfo {
+                app_token: "token-b".to_string(),
+                user_id: "user-b".to_string(),
+                region_host: "https://api-mifit.zepp.com".to_string(),
+            })
+            .unwrap();
+
+        assert_eq!(backend.get("user-a").unwrap(), None);
+        assert_eq!(backend.get("user-b").unwrap().as_deref(), Some("token-b"));
+        let loaded = manager.load_auth().unwrap().unwrap();
+        assert_eq!(loaded.user_id, "user-b");
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn clear_auth_uses_hint_when_auth_json_is_gone() {
+        let dir = temp_dir();
+        let backend = Arc::new(MemoryCredentials::default());
+        let manager = AuthManager::with_credential_backend(dir.clone(), backend.clone());
+        manager
+            .save_auth(&AuthInfo {
+                app_token: "token-a".to_string(),
+                user_id: "user-a".to_string(),
+                region_host: "https://api-mifit.zepp.com".to_string(),
+            })
+            .unwrap();
+        fs::remove_file(dir.join("auth.json")).unwrap();
+        assert!(dir.join("auth.user-id").exists());
+
+        manager.clear_auth().unwrap();
+        assert_eq!(backend.get("user-a").unwrap(), None);
+        assert!(!dir.join("auth.user-id").exists());
         let _ = fs::remove_dir_all(dir);
     }
 }

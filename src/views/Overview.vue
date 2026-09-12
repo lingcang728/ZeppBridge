@@ -29,6 +29,7 @@ import { formatDistance, formatDuration, formatMetric, formatTime, isFiniteNumbe
 import { displayableWorkouts, workoutDisplayLabel, workoutDurationMinutes, workoutTypeKey } from '../lib/workouts';
 import type { HealthOverview, HeartRatePoint, MetricSeries, SleepSession, Workout } from '../types';
 import { sleepStageLabel } from '../lib/sleepStages';
+import { stageMinutesForBar } from '../lib/missingValues';
 import { defineMessages, useMessages } from '../i18n';
 
 const messages = defineMessages(
@@ -112,6 +113,7 @@ const messages = defineMessages(
     loadMedium: '中等',
     loadHigh: '较高',
     loadVeryHigh: '很高',
+    loadBandReference: (band: string) => `${band}（参考）`,
   },
   {
     collapseHero: 'Collapse introduction',
@@ -193,6 +195,7 @@ const messages = defineMessages(
     loadMedium: 'moderate',
     loadHigh: 'high',
     loadVeryHigh: 'very high',
+    loadBandReference: (band: string) => `${band} (reference)`,
   },
   {
     collapseHero: 'Contraer introducción',
@@ -274,6 +277,7 @@ const messages = defineMessages(
     loadMedium: 'moderada',
     loadHigh: 'alta',
     loadVeryHigh: 'muy alta',
+    loadBandReference: (band: string) => `${band} (referencia)`,
   },
 );
 const t = useMessages(messages);
@@ -461,16 +465,25 @@ const sleepStages = computed(() => {
   return [
     { key: 'deep', label: sleepStageLabel('deep'), minutes: sleep.deep_minutes, color: 'var(--sleep-deep)' },
     { key: 'light', label: sleepStageLabel('light'), minutes: sleep.light_minutes, color: 'var(--sleep-light)' },
-    { key: 'rem', label: sleepStageLabel('rem'), minutes: sleep.rem_minutes ?? 0, color: 'var(--sleep-rem)' },
+    { key: 'rem', label: sleepStageLabel('rem'), minutes: sleep.rem_minutes, color: 'var(--sleep-rem)' },
     { key: 'awake', label: sleepStageLabel('awake'), minutes: sleep.awake_minutes, color: 'var(--sleep-awake)' },
   ];
 });
+const sleepBarStages = computed(() =>
+  sleepStages.value.flatMap((stage) => {
+    const minutes = stageMinutesForBar(stage.minutes);
+    return minutes === null ? [] : [{ ...stage, minutes }];
+  }),
+);
 
 const DEFAULT_LOAD_SCALE = 600;
 const loadScale = computed(() => {
   const scale = overview.value?.training_load_scale;
   return isFiniteNumber(scale) && scale > 0 ? scale : DEFAULT_LOAD_SCALE;
 });
+const loadScaleIsReference = computed(() =>
+  !(isFiniteNumber(overview.value?.training_load_scale) && (overview.value?.training_load_scale ?? 0) > 0),
+);
 const trainingLoad = computed(() => isFiniteNumber(overview.value?.training_load) ? overview.value.training_load : null);
 const loadBand = computed(() => {
   if (trainingLoad.value === null) return null;
@@ -526,7 +539,7 @@ const trainingEntry = computed(() => ({
       label: t.value.factLoad,
       text: trainingLoad.value === null
         ? null
-        : `${formatMetric(trainingLoad.value)}${loadBand.value ? ` ${loadBand.value}` : ''}`,
+        : `${formatMetric(trainingLoad.value)}${loadBand.value ? ` ${loadScaleIsReference.value ? t.value.loadBandReference(loadBand.value) : loadBand.value}` : ''}`,
     },
   ]),
   spark: seriesValues('training_load'),
@@ -719,7 +732,7 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
         <div class="panel-head"><span class="panel-title"><DesignIcon name="sleep" :size="38" /><span><strong>{{ t.sleepTitle }}</strong><small>{{ t.sleepSub }}</small></span></span><span v-if="lastSleep && isFiniteNumber(lastSleep.score)" class="sleep-score">{{ lastSleep.score }}</span></div>
         <template v-if="lastSleep">
           <p class="sleep-total">{{ hm(lastSleep.duration_minutes) }}</p>
-          <div class="sleep-bar" :aria-label="t.sleepBarAria"><span v-for="stage in sleepStages" :key="stage.key" :style="{ flex: Math.max(1, stage.minutes || 0), background: stage.color }"></span></div>
+          <div class="sleep-bar" :aria-label="t.sleepBarAria"><span v-for="stage in sleepBarStages" :key="stage.key" :style="{ flex: Math.max(1, stage.minutes), background: stage.color }"></span></div>
           <ul class="sleep-stages"><li v-for="stage in sleepStages" :key="stage.key"><i :style="{ background: stage.color }"></i><span>{{ stage.label }}</span><strong>{{ hm(stage.minutes) }}</strong></li></ul>
         </template>
         <div v-else class="panel-empty compact"><DesignIcon name="sleep" :size="50" /><span>{{ t.sleepEmpty }}</span></div>

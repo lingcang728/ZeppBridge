@@ -29,6 +29,10 @@ const MAX_PLAUSIBLE_ALTITUDE_CM: i64 = 1_000_000;
 /// 所以放宽之后这道防线照样有效。
 const MAX_ACTIVITY_SECONDS: i64 = 48 * 60 * 60;
 
+fn add_seconds(base: DateTime<Utc>, seconds: i64) -> Option<DateTime<Utc>> {
+    chrono::Duration::try_seconds(seconds).and_then(|delta| base.checked_add_signed(delta))
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RoutePoint {
     pub timestamp: DateTime<Utc>,
@@ -416,7 +420,9 @@ fn splits_from_kilometre_seconds(
     let mut cursor = start;
     let mut travelled = 0.0f64;
     for (position, duration) in kilometre_seconds.iter().enumerate() {
-        let end = cursor + chrono::Duration::seconds(*duration);
+        let Some(end) = add_seconds(cursor, *duration) else {
+            break;
+        };
         let mut builder = SplitBuilder::new(position as i32 + 1, cursor, travelled);
         for sample in sample_by_second
             .range(cursor.timestamp()..=end.timestamp())
@@ -559,21 +565,33 @@ pub fn decode_workout_detail(
         .map(str::to_owned);
 
     let time_deltas = parse_int_list(data.get("time"));
-    let time_sum: i64 = time_deltas
+    let time_sum = time_deltas
         .iter()
         .map(|value| i64::from(*value.max(&0)))
-        .sum();
-    let time_end = start_time + chrono::Duration::seconds(time_sum);
-    let end_time = match summary_end {
+        .fold(0i64, |acc, value| acc.saturating_add(value))
+        .clamp(0, MAX_ACTIVITY_SECONDS);
+    let time_end = add_seconds(start_time, time_sum)
+        .ok_or_else(|| ZeppBridgeError::ParseError("workout detail 时长溢出".into()))?;
+    let min_end = add_seconds(start_time, 1)
+        .ok_or_else(|| ZeppBridgeError::ParseError("workout detail 时长溢出".into()))?;
+    let uncapped_end = match summary_end {
         Some(summary) if summary > time_end => summary,
-        _ => time_end.max(start_time + chrono::Duration::seconds(1)),
+        _ => time_end.max(min_end),
+    };
+    // 汇总结束时刻可能远在 start 之后；后面还有 DateTime 相减，必须先夹到 48h。
+    let end_time = match add_seconds(start_time, MAX_ACTIVITY_SECONDS) {
+        Some(cap) => uncapped_end.min(cap).max(min_end),
+        None => time_end.max(min_end),
     };
 
-    let duration_secs = (end_time - start_time)
-        .num_seconds()
+    let duration_secs = end_time
+        .timestamp()
+        .saturating_sub(start_time.timestamp())
         .clamp(1, MAX_ACTIVITY_SECONDS);
     let from = track_id;
-    let to = track_id + duration_secs;
+    let to = track_id
+        .checked_add(duration_secs)
+        .ok_or_else(|| ZeppBridgeError::ParseError("workout detail 结束时刻溢出".into()))?;
 
     let (latitudes, longitudes) = parse_coordinate_deltas(data.get("longitude_latitude"));
     let altitudes_cm = parse_altitude_cm(data.get("altitude"));
@@ -659,7 +677,7 @@ pub fn decode_workout_detail(
     if has_pair_altitude {
         let mut cursor = from;
         for (delta, centimetres) in &altitude_pairs {
-            cursor += (*delta).max(0);
+            cursor = cursor.saturating_add((*delta).max(0));
             if let Some(meters) = cm_to_meters(i64::from(*centimetres)) {
                 altitude_by_second.insert(cursor, meters);
             }
@@ -671,7 +689,7 @@ pub fn decode_workout_detail(
         let mut longitude = 0i64;
         let count = time_deltas.len().min(latitudes.len()).min(longitudes.len());
         for index in 0..count {
-            unix_ts += i64::from(time_deltas[index].max(0));
+            unix_ts = unix_ts.saturating_add(i64::from(time_deltas[index].max(0)));
             if let (Some(lat_delta), Some(lon_delta)) = (latitudes[index], longitudes[index]) {
                 latitude += lat_delta;
                 longitude += lon_delta;
@@ -699,7 +717,7 @@ pub fn decode_workout_detail(
     let mut samples = Vec::with_capacity(duration_secs as usize);
     let mut last_altitude = None;
     for offset in 0..=duration_secs {
-        let unix_ts = from + offset;
+        let unix_ts = from.saturating_add(offset);
         let Some(timestamp) = Utc.timestamp_opt(unix_ts, 0).single() else {
             continue;
         };
@@ -733,7 +751,7 @@ pub fn decode_workout_detail(
     {
         let mut cursor = from;
         for (delta, centimetres) in &distance_pairs {
-            cursor += (*delta).max(0);
+            cursor = cursor.saturating_add((*delta).max(0));
             distance_by_second.insert(cursor, f64::from(*centimetres) / 100.0);
         }
     }
@@ -755,11 +773,7 @@ pub fn decode_workout_detail(
     // 或者最后一圈不在运动结束的时刻，就说明列读错了，整份丢掉。
     let laps = {
         let candidate = parse_laps(data.get("lap"), start_time);
-        if laps_agree_with_summary(
-            &candidate,
-            summary_distance_m,
-            (end_time - start_time).num_seconds(),
-        ) {
+        if laps_agree_with_summary(&candidate, summary_distance_m, duration_secs) {
             candidate
         } else {
             Vec::new()
@@ -1521,5 +1535,50 @@ mod tests {
         let decoded = decode_workout_detail(&raw, None, Some(1000.0)).unwrap();
         assert_eq!(decoded.laps.len(), 1);
         assert_eq!(decoded.laps[0].avg_hr, None);
+    }
+
+    /// 坏报文里的 trackid / 时间增量不能把解码器打崩。
+    ///
+    /// `Duration::seconds` 和 `DateTime + Duration` 都会在越界时 panic；这里只
+    /// 允许 ParseError 或把时长夹到 48 小时。
+    #[test]
+    fn huge_track_id_or_time_deltas_do_not_panic() {
+        let huge_id = json!({
+            "trackid": i64::MAX,
+            "time": "1;1;",
+        });
+        let err =
+            decode_workout_detail(&huge_id, None, None).expect_err("i64::MAX 不是合法 unix 时间");
+        assert!(
+            matches!(err, ZeppBridgeError::ParseError(_)),
+            "应当是 ParseError，实际 {err:?}"
+        );
+
+        let huge_time = ["2147483647"; 10].join(";");
+        let huge_deltas = json!({
+            "trackid": 1_700_000_000i64,
+            "time": huge_time,
+        });
+        let decoded =
+            decode_workout_detail(&huge_deltas, None, None).expect("时长应被夹到 48h 而不是 panic");
+        let span = decoded
+            .end_time
+            .timestamp()
+            .saturating_sub(decoded.start_time.timestamp());
+        assert!(span <= MAX_ACTIVITY_SECONDS, "时长 {span} 超过了 48h 上限");
+
+        let near_max = DateTime::<Utc>::MAX_UTC;
+        let result = decode_workout_detail(
+            &json!({
+                "trackid": 1_700_000_000i64,
+                "time": "1;",
+            }),
+            Some(near_max),
+            None,
+        );
+        assert!(
+            result.is_ok() || matches!(result, Err(ZeppBridgeError::ParseError(_))),
+            "汇总结束时刻极大时不得 panic：{result:?}"
+        );
     }
 }

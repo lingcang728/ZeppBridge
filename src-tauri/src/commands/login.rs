@@ -443,6 +443,10 @@ impl LoginFailure {
             retryable: true,
         }
     }
+
+    fn cancelled() -> Self {
+        Self::fatal(AppError::new("err.login.cancelled", "登录已取消"))
+    }
 }
 
 async fn persist_extracted_login(
@@ -467,10 +471,12 @@ async fn persist_extracted_login(
     .await?;
     let RegionWinner { auth, confidence } = winner;
     if !epoch_active(app, epoch) {
-        return Err(LoginFailure::fatal(AppError::new(
-            "err.login.cancelled",
-            "登录已取消",
-        )));
+        return Err(LoginFailure::cancelled());
+    }
+
+    let _command_guard = state.lock_sync_commands().await;
+    if !epoch_active(app, epoch) {
+        return Err(LoginFailure::cancelled());
     }
 
     if let Err(error) = state.auth.save_auth(&auth) {
@@ -479,15 +485,27 @@ async fn persist_extracted_login(
         return Err(LoginFailure::fatal(AppError::from(error)));
     }
 
+    // Disk is the source of truth from here. If the epoch dies after save,
+    // still install the in-memory manager so it matches, then return cancelled
+    // so the poller does not emit `connected`.
+    apply_persisted_login(&state, auth, confidence).await?;
+    if !epoch_active(app, epoch) {
+        return Err(LoginFailure::cancelled());
+    }
+    Ok(())
+}
+
+async fn apply_persisted_login(
+    state: &AppState,
+    auth: AuthInfo,
+    confidence: &'static str,
+) -> std::result::Result<(), LoginFailure> {
     let manager = match AppState::build_sync_manager(auth, &state.data_dir) {
         Ok(manager) => manager,
         Err(error) => {
             let message = error.to_string();
             let _ = state.auth.clear_auth();
-            {
-                let mut sync = state.sync.write().await;
-                *sync = None;
-            }
+            state.replace_sync_manager(None).await;
             {
                 let mut auth_state = state.auth_state.write().await;
                 *auth_state = "unconfigured".to_string();
@@ -503,10 +521,7 @@ async fn persist_extracted_login(
         }
     };
 
-    {
-        let mut sync = state.sync.write().await;
-        *sync = Some(manager);
-    }
+    state.replace_sync_manager(Some(manager)).await;
     {
         let mut auth_state = state.auth_state.write().await;
         *auth_state = "verified".to_string();
@@ -523,7 +538,7 @@ async fn persist_extracted_login(
         let mut region = state.region_confidence.write().await;
         *region = confidence.to_string();
     }
-    super::data::refresh_device_profile(&state).await;
+    super::data::refresh_device_profile(state).await;
     Ok(())
 }
 

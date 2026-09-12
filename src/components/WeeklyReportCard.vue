@@ -14,6 +14,7 @@ import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import type { InsightFact, WeeklyReport } from '../types';
 import { defineMessages, useMessages } from '../i18n';
+import { finiteOrNull } from '../lib/missingValues';
 
 const messages = defineMessages(
   {
@@ -30,6 +31,7 @@ const messages = defineMessages(
     barThisWeek: '本周',
     barBaseline: '此前 28 天',
     noBaseline: '此前的数据不够，这次只报现状',
+    baselineCountUnknown: '基线天数未知，这次只报现状不做比较。',
     thinBaseline: (days: number, found: number, needed: number) =>
       `此前 ${days} 天里只有 ${found} 天有这项数据，不足 ${needed} 天，所以只报现状不做比较。`,
     noRecentData: '最近 7 天本机没有这项数据。',
@@ -64,6 +66,7 @@ const messages = defineMessages(
     barThisWeek: 'This week',
     barBaseline: 'Prev. 28 days',
     noBaseline: 'Not enough history behind it, so this is the current figure only',
+    baselineCountUnknown: 'Baseline days unknown, so this is the current figure without a comparison.',
     thinBaseline: (days: number, found: number, needed: number) =>
       `Only ${found} of the previous ${days} days carry this metric, fewer than the ${needed} needed, so this is the current figure without a comparison.`,
     noRecentData: 'Nothing recorded locally for this metric in the last 7 days.',
@@ -96,6 +99,7 @@ const messages = defineMessages(
     barThisWeek: 'Esta semana',
     barBaseline: '28 días previos',
     noBaseline: 'No hay suficiente historial detrás, así que solo se muestra el valor actual',
+    baselineCountUnknown: 'No se conoce el número de días de la línea base, así que solo se muestra el valor actual sin comparación.',
     thinBaseline: (days: number, found: number, needed: number) =>
       `Solo ${found} de los ${days} días anteriores tienen esta métrica (se necesitan ${needed}), así que se muestra el valor actual sin comparación.`,
     noRecentData: 'No hay registros locales de esta métrica en los últimos 7 días.',
@@ -123,9 +127,11 @@ const t = useMessages(messages);
 const reasonText = (fact: InsightFact): string => {
   if (fact.reason_code === 'weekly_no_recent_data') return t.value.noRecentData;
   if (fact.reason_code === 'weekly_thin_baseline' && fact.baseline_window) {
+    const found = finiteOrNull(fact.baseline_count);
+    if (found === null) return t.value.baselineCountUnknown;
     return t.value.thinBaseline(
       fact.baseline_window.days,
-      fact.baseline_count ?? 0,
+      found,
       fact.baseline_window.min_samples,
     );
   }

@@ -33,9 +33,10 @@ describe('覆盖度要说出来，而不是被曲线抹平', () => {
     expect(coverageLabel(series({ days_with_data: 0 }))).toBe('近 180 天无记录');
   });
 
-  it('还没同步和没有数据是两句不同的话', () => {
-    expect(coverageLabel(null)).toBe('尚未同步');
-    expect(coverageLabel(undefined)).toBe('尚未同步');
+  it('没拿到 series 不断言同步状态', () => {
+    // 调用方没给曲线 ≠ 云端还没同步。那是另一件事，这里只说现在画不出记录。
+    expect(coverageLabel(null)).toBe('没有可显示的记录');
+    expect(coverageLabel(undefined)).toBe('没有可显示的记录');
   });
 });
 

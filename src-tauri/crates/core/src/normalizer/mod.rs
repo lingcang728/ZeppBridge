@@ -404,7 +404,7 @@ impl Normalizer {
                             .and_then(parse_timestamp)
                             .or_else(|| {
                                 let offset_ms = first_number(sample, &["s", "offset"])? as i64;
-                                base.map(|value| value + Duration::milliseconds(offset_ms))
+                                base.and_then(|value| add_milliseconds(value, offset_ms))
                             });
                         let hrv = first_value(sample, &["sdnn", "rmssd", "hrv", "value"])
                             .and_then(parse_number);
@@ -727,8 +727,9 @@ fn sleep_stages_from_band(
                 if stop < start {
                     return None;
                 }
-                let start_time = anchor + Duration::minutes(start);
-                let end_time = anchor + Duration::minutes(stop + 1);
+                let start_time = add_minutes(anchor, start)?;
+                let end_minutes = stop.checked_add(1)?;
+                let end_time = add_minutes(anchor, end_minutes)?;
                 if end_time <= start_time {
                     return None;
                 }
@@ -750,7 +751,10 @@ fn sleep_stages_from_band(
     let session_start =
         first_value(sleep, &["st", "startTime", "start_time"]).and_then(parse_timestamp);
     let session_end = first_value(sleep, &["ed", "endTime", "end_time"]).and_then(parse_timestamp);
-    let prev_day = build(utc_midnight - Duration::days(1));
+    let prev_day = Duration::try_days(1)
+        .and_then(|delta| utc_midnight.checked_sub_signed(delta))
+        .map(build)
+        .unwrap_or_default();
     match (session_start, session_end) {
         (Some(start), Some(end)) => {
             let same_day = build(utc_midnight);
@@ -1313,6 +1317,14 @@ fn parse_heart_range(raw: Option<&str>) -> Vec<HeartRateZoneBucket> {
         return Vec::new();
     }
     buckets
+}
+
+fn add_milliseconds(base: DateTime<Utc>, offset_ms: i64) -> Option<DateTime<Utc>> {
+    Duration::try_milliseconds(offset_ms).and_then(|delta| base.checked_add_signed(delta))
+}
+
+fn add_minutes(base: DateTime<Utc>, minutes: i64) -> Option<DateTime<Utc>> {
+    Duration::try_minutes(minutes).and_then(|delta| base.checked_add_signed(delta))
 }
 
 fn first_number(object: &Map<String, Value>, names: &[&str]) -> Option<f64> {
@@ -1961,8 +1973,7 @@ fn hrv_rmssd_samples(items: &[Value], out: &mut WellnessNormalizedData) {
             let offset_ms = first_number(object, &["s", "offset"])
                 .map(|value| value.round() as i64)
                 .unwrap_or(0);
-            let Some(timestamp) = start.checked_add_signed(Duration::milliseconds(offset_ms))
-            else {
+            let Some(timestamp) = add_milliseconds(start, offset_ms) else {
                 continue;
             };
             out.metric_samples.push(MetricSample {
@@ -2873,6 +2884,59 @@ mod tests {
         // 新固件 REM 编码 mode=11 也要识别
         assert_eq!(session.stages[2].stage, "rem");
         assert_eq!(session.rem_minutes, Some(8));
+    }
+
+    /// 极大的 stage 分钟数不能把解码打崩，这一段直接跳过。
+    #[test]
+    fn huge_sleep_stage_minutes_are_skipped_not_panicked() {
+        let summary = json!({
+            "tz": 28800,
+            "slp": {
+                "st": 1_786_897_200i64,
+                "ed": 1_786_930_620i64,
+                "ss": 80,
+                "stage": [
+                    {"mode": 4, "start": 1e20, "stop": 1e20},
+                    {"mode": 5, "start": 1460, "stop": 1471}
+                ]
+            }
+        });
+        let result = Normalizer::normalize_band_data(&json!({
+            "data": [{
+                "uuid": "sleep-overflow",
+                "date_time": "2026-08-17",
+                "summary": STANDARD.encode(serde_json::to_vec(&summary).unwrap())
+            }]
+        }))
+        .unwrap();
+        let session = &result.sleep_sessions[0];
+        assert_eq!(session.stages.len(), 1);
+        assert_eq!(session.stages[0].stage, "deep");
+    }
+
+    /// HRV 样本上极大的毫秒偏移不能 panic，这一条跳过。
+    #[test]
+    fn huge_hrv_sample_offset_is_skipped_not_panicked() {
+        let raw = json!({
+            "items": [{
+                "value": {
+                    "startTime": 1_700_000_000i64,
+                    "samples": [
+                        {"s": 1e20, "sdnn": 40.0},
+                        {"offset": i64::MAX, "sdnn": 41.0},
+                        {"s": 1000, "sdnn": 42.0}
+                    ]
+                }
+            }]
+        });
+        let batch = Normalizer::normalize_hrv_with_diagnostics(&raw).unwrap();
+        assert_eq!(batch.records.len(), 1);
+        assert_eq!(batch.records[0].value, 42.0);
+        assert!(
+            batch.diagnostics.iter().any(|line| line.contains("HRV")),
+            "越界样本应当记诊断而不是静默丢掉全部：{:?}",
+            batch.diagnostics
+        );
     }
 
     #[test]

@@ -15,7 +15,7 @@ use std::time::Instant;
 const WRITE_LOCK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
 use tokio::sync::Mutex;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum StreamStatus {
     Success,
@@ -48,8 +48,8 @@ pub struct SyncReport {
     /// HRV，那是能力边界，不是错误。
     pub success: bool,
     /// 三个核心流（`heart_rate` / `daily_summary` / `workouts`）有没有全都没
-    /// 失败。用来决定「凭据是否算验证通过」和「要不要跑 retention 清理」这
-    /// 两件事——它们关心的是主干数据通没通，不是每一条支流。
+    /// 失败。用来决定「凭据是否算验证通过」——主干数据通没通。retention
+    /// 清理另看 `success`：任何一条流 `Failed` 都不删旧数据。
     pub core_ok: bool,
     pub streams: Vec<StreamReport>,
     pub records_written: i64,
@@ -132,6 +132,13 @@ impl SyncManager {
 
     pub fn request_cancel(&self) {
         self.cancel.store(true, Ordering::SeqCst);
+    }
+
+    /// Signal cancellation and wait until any in-flight run has released
+    /// `run_lock`. Returns immediately when nothing is running.
+    pub async fn cancel_and_wait(&self) {
+        self.request_cancel();
+        let _guard = self.run_lock.lock().await;
     }
 
     /// Ask the server which optional event streams this account and these
@@ -337,15 +344,7 @@ impl SyncManager {
         check()?;
         match self.fetch_pending_running_details().await {
             Ok(records) if records.is_empty() => {
-                streams.push(StreamReport {
-                    stream: "workout_detail".into(),
-                    status: StreamStatus::Success,
-                    records_written: 0,
-                    raw_records: 0,
-                    capability: CapabilityStatus::Verified,
-                    needs_reauth: false,
-                    message: Some("没有待拉取的跑步明细".into()),
-                });
+                streams.push(self.persist_empty_pending_details().await?);
             }
             Ok(records) => streams.push(self.persist_records("workout_detail", records).await?),
             Err(error) if error.is_cancelled() => return Err(error),
@@ -438,13 +437,25 @@ impl SyncManager {
         // 报「已更新」。
         let success = failed.is_empty();
         let total_written = streams.iter().map(|report| report.records_written).sum();
-        if core_ok {
+        // retention 只在没有任何 Failed 流时跑：支流 Failed 时仍删旧数据，
+        // 会把刚失败、还没补上的那几天一并清掉。Unavailable / Unverified
+        // 不是 Failed，仍允许清理。
+        //
+        // cleanup 失败不得用 `?` 顶掉已经成功的同步报告——数据已经写入了。
+        let mut cleanup_warning = None;
+        if success {
             let db = self.db.lock().await;
             let prefs = db.user_prefs()?;
             // 开了长期归档就不再自动清理。刚补拉回来的历史在下一次成功同步后
             // 被删掉，是这类功能最让人失去信任的行为。
             if !prefs.archive_enabled {
-                db.cleanup_old_data(prefs.retention_days)?;
+                if let Err(error) = db.cleanup_old_data(prefs.retention_days) {
+                    tracing::warn!("同步后清理旧数据失败: {error}");
+                    cleanup_warning = Some(format!(
+                        "数据已同步；清理旧数据失败：{}",
+                        error.user_message()
+                    ));
+                }
             }
         }
         Ok(SyncReport {
@@ -458,7 +469,7 @@ impl SyncManager {
                 // 说清是哪几条。「部分失败」不告诉用户少了什么，等于没说。
                 Some(format!("以下数据流失败：{}", failed.join("、")))
             } else {
-                None
+                cleanup_warning
             },
         })
     }
@@ -534,9 +545,13 @@ impl SyncManager {
                 stream: chunk.stream.clone(),
                 current: processed as u32,
                 total,
-                message: format!("正在补拉 {} · {}", chunk.stream, &chunk.chunk_start[..7]),
+                message: format!(
+                    "正在补拉 {} · {}",
+                    chunk.stream,
+                    chunk_month_label(&chunk.chunk_start)
+                ),
                 code: "backfilling".into(),
-                detail: Some(chunk.chunk_start[..7].to_string()),
+                detail: Some(chunk_month_label(&chunk.chunk_start).to_string()),
             });
 
             let outcome = self.backfill_one_chunk(&chunk, &time_zone).await;
@@ -670,14 +685,34 @@ impl SyncManager {
                 }
             }
         }
-        if records.is_empty() {
-            if let Some(error) = last_error {
-                if error.is_unavailable() {
-                    return Err(error);
-                }
-            }
-        }
-        Ok(records)
+        pending_details_outcome(records, last_error)
+    }
+
+    /// 没有待拉取的明细也要写 sync_state：否则上一轮残留的 failed 会一直挂着。
+    /// `records_written` 沿用上次的计数，这条路径本身没有新写入。
+    async fn persist_empty_pending_details(&self) -> Result<StreamReport> {
+        let previous = self.previous_records_written("workout_detail").await?;
+        let report = StreamReport {
+            stream: "workout_detail".into(),
+            status: StreamStatus::Success,
+            records_written: 0,
+            raw_records: 0,
+            capability: CapabilityStatus::Verified,
+            needs_reauth: false,
+            message: Some("没有待拉取的跑步明细".into()),
+        };
+        let db = self.db.lock().await;
+        db.update_sync_state_details(
+            "workout_detail",
+            None,
+            status_name(&report.status),
+            report.message.as_deref(),
+            report.needs_reauth,
+            previous,
+            report.capability.clone(),
+            report.message.clone(),
+        )?;
+        Ok(report)
     }
 
     async fn persist_records(
@@ -685,38 +720,11 @@ impl SyncManager {
         stream: &str,
         records: Vec<FetchedRecord>,
     ) -> Result<StreamReport> {
-        let mut aggregate = StreamReport {
-            stream: stream.into(),
-            status: StreamStatus::Success,
-            records_written: 0,
-            raw_records: 0,
-            capability: CapabilityStatus::Verified,
-            needs_reauth: false,
-            message: None,
-        };
-        let mut successes = 0usize;
-        let mut notices = 0usize;
+        let mut reports = Vec::with_capacity(records.len());
         for record in records {
-            let one = self.persist_record(record).await?.report;
-            aggregate.records_written += one.records_written;
-            aggregate.raw_records += one.raw_records;
-            aggregate.needs_reauth |= one.needs_reauth;
-            if one.status == StreamStatus::Success {
-                successes += 1;
-            } else {
-                notices += 1;
-                aggregate.status = one.status;
-                aggregate.capability = one.capability;
-                aggregate.message = one.message;
-            }
+            reports.push(self.persist_record(record).await?.report);
         }
-        if successes > 0 && aggregate.records_written > 0 {
-            aggregate.status = StreamStatus::Success;
-            aggregate.capability = CapabilityStatus::Verified;
-            aggregate.needs_reauth = false;
-            aggregate.message = (notices > 0)
-                .then(|| format!("已解析可用数据；{notices} 个可选响应没有可识别记录"));
-        }
+        let aggregate = aggregate_stream_reports(stream, &reports);
         let db = self.db.lock().await;
         db.record_stream_written(stream, aggregate.records_written)?;
         db.update_sync_state_details(
@@ -758,8 +766,8 @@ impl SyncManager {
                 report.status = StreamStatus::Unverified;
                 report.capability = CapabilityStatus::Unverified;
                 report.message = Some(error.user_message());
-                // 拿到了报文但当前 normalizer 不认识它的结构。raw 已保留，
-                // 这是解析阶段的失败，不是网络失败。
+                // 拿到了报文但当前 normalizer 不认识它的结构。raw 已先落库，
+                // 归一化失败不会删 raw；这是解析阶段的失败，不是网络失败。
                 db.record_stream_stage(
                     &stream,
                     Stage::Parse,
@@ -905,6 +913,91 @@ fn status_name(status: &StreamStatus) -> &'static str {
     }
 }
 
+fn chunk_month_label(chunk_start: &str) -> &str {
+    chunk_start.get(..7).unwrap_or(chunk_start)
+}
+
+/// 待拉取明细的最终判定：试过但一条都没拿到，就是失败；
+/// 从来没有待拉取（`last_error` 为 None）才是空成功。
+fn pending_details_outcome(
+    records: Vec<FetchedRecord>,
+    last_error: Option<ZeppBridgeError>,
+) -> Result<Vec<FetchedRecord>> {
+    if records.is_empty() {
+        if let Some(error) = last_error {
+            return Err(error);
+        }
+    }
+    Ok(records)
+}
+
+/// 把同一条流上多条报文的报告合成一条。
+///
+/// 分级：只要有一条 `Failed`，聚合就是 `Failed`，不能因为同时还写出过
+/// 可用记录就升回 `Success`。没有任何 Failed 时，才允许用「有成功写入」
+/// 把 Unverified / Unavailable 收成 Success。
+fn aggregate_stream_reports(stream: &str, reports: &[StreamReport]) -> StreamReport {
+    let mut aggregate = StreamReport {
+        stream: stream.into(),
+        status: StreamStatus::Success,
+        records_written: 0,
+        raw_records: 0,
+        capability: CapabilityStatus::Verified,
+        needs_reauth: false,
+        message: None,
+    };
+    let mut successes = 0usize;
+    let mut notices = 0usize;
+    let mut last_failed: Option<&StreamReport> = None;
+    let mut last_notice: Option<&StreamReport> = None;
+
+    for one in reports {
+        aggregate.records_written += one.records_written;
+        aggregate.raw_records += one.raw_records;
+        aggregate.needs_reauth |= one.needs_reauth;
+        match one.status {
+            StreamStatus::Success => successes += 1,
+            StreamStatus::Failed => {
+                notices += 1;
+                last_failed = Some(one);
+            }
+            StreamStatus::Unavailable | StreamStatus::Unverified => {
+                notices += 1;
+                last_notice = Some(one);
+            }
+        }
+    }
+
+    if let Some(failed_one) = last_failed {
+        aggregate.status = StreamStatus::Failed;
+        aggregate.capability = failed_one.capability.clone();
+        aggregate.message = if successes > 0 && aggregate.records_written > 0 {
+            Some(format!(
+                "已解析可用数据；{notices} 个可选响应没有可识别记录"
+            ))
+        } else {
+            failed_one.message.clone()
+        };
+        return aggregate;
+    }
+
+    if successes > 0 && aggregate.records_written > 0 {
+        aggregate.status = StreamStatus::Success;
+        aggregate.capability = CapabilityStatus::Verified;
+        aggregate.needs_reauth = false;
+        aggregate.message =
+            (notices > 0).then(|| format!("已解析可用数据；{notices} 个可选响应没有可识别记录"));
+        return aggregate;
+    }
+
+    if let Some(notice) = last_notice {
+        aggregate.status = notice.status;
+        aggregate.capability = notice.capability.clone();
+        aggregate.message = notice.message.clone();
+    }
+    aggregate
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -964,6 +1057,159 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(unavailable.records_written, 500);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn cancel_and_wait_sets_the_flag_and_returns_when_idle() {
+        let dir = std::env::temp_dir().join(format!(
+            "zeppbridge-sync-cancel-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = Database::new(dir.join("test.db")).unwrap();
+        let auth = AuthInfo {
+            app_token: "test-token".into(),
+            user_id: "user-1".into(),
+            region_host: "https://api-mifit.zepp.com".into(),
+        };
+        let connector = ZeppConnector::new(auth).unwrap();
+        let fetcher = DataFetcher::new(connector);
+        let manager = SyncManager::new(fetcher, db, Arc::new(AtomicBool::new(false)));
+
+        assert!(!manager.cancel.load(Ordering::SeqCst));
+        manager.cancel_and_wait().await;
+        assert!(manager.cancel.load(Ordering::SeqCst));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    fn sample_report(status: StreamStatus, written: i64, message: Option<&str>) -> StreamReport {
+        StreamReport {
+            stream: "heart_rate".into(),
+            status,
+            records_written: written,
+            raw_records: 1,
+            capability: match status {
+                StreamStatus::Success => CapabilityStatus::Verified,
+                StreamStatus::Unverified => CapabilityStatus::Unverified,
+                StreamStatus::Failed | StreamStatus::Unavailable => CapabilityStatus::Unavailable,
+            },
+            needs_reauth: false,
+            message: message.map(str::to_owned),
+        }
+    }
+
+    #[test]
+    fn a_failed_record_keeps_the_aggregate_failed() {
+        let aggregate = aggregate_stream_reports(
+            "heart_rate",
+            &[
+                sample_report(StreamStatus::Success, 10, None),
+                sample_report(StreamStatus::Failed, 0, Some("写不进去")),
+            ],
+        );
+        assert_eq!(aggregate.status, StreamStatus::Failed);
+        assert_eq!(aggregate.records_written, 10);
+        assert!(
+            aggregate.message.is_some(),
+            "失败时仍要留下说明：{:?}",
+            aggregate.message
+        );
+    }
+
+    #[test]
+    fn unverified_notices_can_fold_into_success_when_nothing_failed() {
+        let aggregate = aggregate_stream_reports(
+            "sleep",
+            &[
+                sample_report(StreamStatus::Success, 3, None),
+                sample_report(StreamStatus::Unverified, 0, Some("响应没有可识别记录")),
+            ],
+        );
+        assert_eq!(aggregate.status, StreamStatus::Success);
+        assert_eq!(aggregate.records_written, 3);
+    }
+
+    #[test]
+    fn pending_details_all_failed_is_an_error() {
+        let http = ZeppBridgeError::HttpStatus {
+            status: 500,
+            message: "boom".into(),
+        };
+        assert!(pending_details_outcome(Vec::new(), Some(http)).is_err());
+
+        let unavailable = ZeppBridgeError::DataUnavailable("gone".into());
+        assert!(pending_details_outcome(Vec::new(), Some(unavailable)).is_err());
+
+        assert!(pending_details_outcome(Vec::new(), None)
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn short_chunk_start_does_not_panic() {
+        assert_eq!(chunk_month_label("2026-08-01"), "2026-08");
+        assert_eq!(chunk_month_label("2026"), "2026");
+        assert_eq!(chunk_month_label(""), "");
+    }
+
+    #[test]
+    fn cleanup_old_data_rejects_out_of_range_days() {
+        // 同步路径用 `if let Err` 接住这条错误，不再 `?` 顶掉整次报告。
+        let db = Database::in_memory().unwrap();
+        assert!(db.cleanup_old_data(0).is_err());
+        assert!(db.cleanup_old_data(366).is_err());
+    }
+
+    #[tokio::test]
+    async fn empty_pending_details_clears_a_stale_failed_status() {
+        let dir = std::env::temp_dir().join(format!(
+            "zeppbridge-sync-empty-pending-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = Database::new(dir.join("test.db")).unwrap();
+        db.update_sync_state_details(
+            "workout_detail",
+            None,
+            "failed",
+            Some("上一轮全败"),
+            false,
+            12,
+            CapabilityStatus::Unavailable,
+            Some("上一轮全败".into()),
+        )
+        .unwrap();
+
+        let auth = AuthInfo {
+            app_token: "test-token".into(),
+            user_id: "user-1".into(),
+            region_host: "https://api-mifit.zepp.com".into(),
+        };
+        let connector = ZeppConnector::new(auth).unwrap();
+        let fetcher = DataFetcher::new(connector);
+        let manager = SyncManager::new(fetcher, db, Arc::new(AtomicBool::new(false)));
+
+        let report = manager.persist_empty_pending_details().await.unwrap();
+        assert_eq!(report.status, StreamStatus::Success);
+        assert_eq!(report.records_written, 0);
+
+        let state = {
+            let db = manager.db.lock().await;
+            db.get_sync_state("workout_detail").unwrap().unwrap()
+        };
+        assert_eq!(state.status, "success");
+        assert_eq!(state.records_written, 12);
 
         let _ = std::fs::remove_dir_all(dir);
     }

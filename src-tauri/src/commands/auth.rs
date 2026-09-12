@@ -28,6 +28,10 @@ pub async fn save_auth(
         region_host,
     };
 
+    // Cancel first so a running start_*_sync can drop this lock; then hold it
+    // across save + manager swap so the old handle cannot keep writing.
+    let _command_guard = state.lock_sync_commands().await;
+
     state.auth.save_auth(&auth)?;
 
     let manager = match AppState::build_sync_manager(auth, &state.data_dir) {
@@ -39,10 +43,7 @@ pub async fn save_auth(
             // actionable result returned to the caller.
             let message = error.to_string();
             let _ = state.auth.clear_auth();
-            {
-                let mut sync = state.sync.write().await;
-                *sync = None;
-            }
+            state.replace_sync_manager(None).await;
             {
                 let mut auth_state = state.auth_state.write().await;
                 *auth_state = "unconfigured".to_string();
@@ -59,10 +60,7 @@ pub async fn save_auth(
         }
     };
 
-    {
-        let mut sync = state.sync.write().await;
-        *sync = Some(manager);
-    }
+    state.replace_sync_manager(Some(manager)).await;
     {
         let mut auth_state = state.auth_state.write().await;
         *auth_state = "configured".to_string();
@@ -105,15 +103,14 @@ pub async fn verify_auth(
         return verify_failure(&state, error).await;
     }
 
+    let _command_guard = state.lock_sync_commands().await;
+
     let manager = match AppState::build_sync_manager(auth, &state.data_dir) {
         Ok(manager) => manager,
         Err(error) => return verify_failure(&state, error).await,
     };
 
-    {
-        let mut sync = state.sync.write().await;
-        *sync = Some(manager);
-    }
+    state.replace_sync_manager(Some(manager)).await;
     {
         let mut auth_state = state.auth_state.write().await;
         *auth_state = "verified".to_string();
@@ -146,12 +143,10 @@ pub async fn clear_auth(
         *login = crate::ipc_types::LoginStatus::idle();
     }
 
-    state.auth.clear_auth()?;
+    let _command_guard = state.lock_sync_commands().await;
+    state.replace_sync_manager(None).await;
 
-    {
-        let mut sync = state.sync.write().await;
-        *sync = None;
-    }
+    state.auth.clear_auth()?;
     {
         let mut auth_state = state.auth_state.write().await;
         *auth_state = "unconfigured".to_string();

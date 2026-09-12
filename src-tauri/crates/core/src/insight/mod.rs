@@ -521,7 +521,20 @@ impl Database {
                 }],
             ));
         };
-        let cutoff = (target.start_time - Duration::days(baseline::WINDOW_DAYS)).to_rfc3339();
+        let Some(cutoff) = Duration::try_days(baseline::WINDOW_DAYS)
+            .and_then(|delta| target.start_time.checked_sub_signed(delta))
+        else {
+            // start 靠近 DateTime::MIN 时 180 天窗口下溢。历史上不可能再有
+            // 更早的可比跑步，当作没有基线，不要 panic。
+            return Ok((
+                Vec::new(),
+                vec![BaselineExclusion {
+                    workout_id: target.workout_id.clone(),
+                    reason: "outside_window".into(),
+                }],
+            ));
+        };
+        let cutoff = cutoff.to_rfc3339();
         let mut stmt = self.conn.prepare(
             "SELECT workout_id, start_time, end_time, distance_meters, avg_hr,
                     training_load, source_scope
@@ -570,9 +583,9 @@ impl Database {
     /// 也不输出诊断、治疗或风险预测。
     pub fn weekly_report(&self, now: DateTime<Utc>) -> Result<WeeklyReport> {
         let today = now.date_naive();
-        let recent_start = today - Duration::days(weekly::RECENT_DAYS - 1);
-        let baseline_end = recent_start - Duration::days(1);
-        let baseline_start = baseline_end - Duration::days(weekly::BASELINE_DAYS - 1);
+        let recent_start = saturating_days_before(today, weekly::RECENT_DAYS - 1);
+        let baseline_end = saturating_days_before(recent_start, 1);
+        let baseline_start = saturating_days_before(baseline_end, weekly::BASELINE_DAYS - 1);
 
         let mut facts = Vec::new();
         for (fact_id, metric, unit) in [
@@ -955,6 +968,12 @@ fn stdev(values: &[f64]) -> Option<f64> {
 
 fn round1(value: f64) -> f64 {
     (value * 10.0).round() / 10.0
+}
+
+fn saturating_days_before(date: NaiveDate, days: i64) -> NaiveDate {
+    Duration::try_days(days)
+        .and_then(|delta| date.checked_sub_signed(delta))
+        .unwrap_or(date)
 }
 
 fn direction_of(delta: f64) -> String {
@@ -1535,6 +1554,44 @@ mod tests {
         assert!(
             spread < 120.0,
             "跨午夜被当成了 23 小时的波动：{spread} 分钟"
+        );
+    }
+
+    /// start_time 靠近时间轴下限时，基线窗口减法不得 panic。
+    #[test]
+    fn a_run_near_datetime_min_does_not_panic_on_baseline_window() {
+        let db = db();
+        let year_one = Utc.with_ymd_and_hms(1, 1, 1, 12, 0, 0).unwrap();
+        let mut workout = run("year-one", 0, Some(5000.0), 30, Some(150));
+        workout.start_time = year_one;
+        workout.end_time = year_one + Duration::minutes(30);
+        db.insert_workout(&workout).unwrap();
+        let insight = db.workout_insight("year-one").unwrap();
+        assert!(insight.supported);
+        assert!(insight.baseline_included.is_empty());
+
+        let target = RunRow {
+            workout_id: "min".into(),
+            start_time: DateTime::<Utc>::MIN_UTC,
+            end_time: DateTime::<Utc>::MIN_UTC
+                .checked_add_signed(Duration::try_minutes(30).unwrap())
+                .expect("MIN + 30 分钟仍在范围内"),
+            distance_meters: Some(5000.0),
+            avg_hr: Some(150),
+            training_load: Some(50.0),
+            source_scope: "device".into(),
+        };
+        let (included, excluded) = db.comparable_runs(&target).unwrap();
+        assert!(included.is_empty());
+        assert!(
+            excluded.iter().any(|row| row.reason == "outside_window"),
+            "下溢应当记 outside_window：{excluded:?}"
+        );
+
+        let report = db.weekly_report(DateTime::<Utc>::MIN_UTC).unwrap();
+        assert_eq!(
+            report.recent_end,
+            DateTime::<Utc>::MIN_UTC.date_naive().to_string()
         );
     }
 }

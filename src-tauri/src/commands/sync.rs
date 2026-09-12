@@ -12,18 +12,17 @@ use std::sync::Arc;
 
 /// Run the first 30-day sync and return per-stream progress to the UI.
 ///
-/// The manager handle is cloned while holding the state read lock, then the
-/// guard is dropped before any network or database work begins.  A report with
-/// failed streams remains a successful IPC response so the UI can render each
-/// stream's actual state; only an underlying transport/database error is
-/// returned as `Err`.
+/// The manager is taken after `sync_command_lock` so a concurrent save/clear
+/// cannot leave this command writing with a credential that was just replaced.
+/// A report with failed streams remains a successful IPC response so the UI
+/// can render each stream's actual state; only an underlying
+/// transport/database error is returned as `Err`.
 #[tauri::command]
 pub async fn start_initial_sync(
     app: AppHandle,
     state: tauri::State<'_, AppState>,
     days: Option<i64>,
 ) -> std::result::Result<UiSyncReport, AppError> {
-    let manager = require_manager(&state).await?;
     let days = match days {
         Some(value) => UserPrefs::clamp_days(value)
             .map_err(|message| AppError::new("err.sync.history_days_out_of_range", message))?,
@@ -35,7 +34,7 @@ pub async fn start_initial_sync(
                 .unwrap_or(UserPrefs::DEFAULT_HISTORY_SYNC_DAYS)
         }
     };
-    run_sync(&app, &state, manager, Some(days)).await
+    run_sync(&app, &state, Some(days)).await
 }
 
 #[tauri::command]
@@ -59,8 +58,7 @@ pub async fn start_incremental_sync(
             "请先完成连接验证，再同步最近数据",
         ));
     }
-    let manager = require_manager(&state).await?;
-    run_sync(&app, &state, manager, None).await
+    run_sync(&app, &state, None).await
 }
 
 /// Probe the optional Zepp event streams and report what answers.
@@ -102,7 +100,6 @@ pub async fn start_history_backfill(
             "请先完成连接验证，再补拉历史",
         ));
     }
-    let manager = require_manager(&state).await?;
     let from = chrono::NaiveDate::parse_from_str(from_date.trim(), "%Y-%m-%d").map_err(|_| {
         AppError::new(
             "err.backfill.bad_start_date",
@@ -117,6 +114,7 @@ pub async fn start_history_backfill(
         ));
     }
     let _command_guard = state.sync_command_lock.lock().await;
+    let manager = require_manager(&state).await?;
     manager
         .history_backfill(from, to, max_chunks.unwrap_or(24), |progress| {
             emit_sync_progress(&app, progress)
@@ -180,10 +178,13 @@ async fn require_manager(state: &AppState) -> std::result::Result<Arc<SyncManage
 async fn run_sync(
     app: &AppHandle,
     state: &AppState,
-    manager: Arc<SyncManager>,
     history_days: Option<i64>,
 ) -> std::result::Result<UiSyncReport, AppError> {
     let _command_guard = state.sync_command_lock.lock().await;
+    // Re-read after the lock: save/clear may have swapped the manager while
+    // this command waited, and the handle cloned beforehand would keep writing
+    // with the old credential.
+    let manager = require_manager(state).await?;
     // A `NORMALIZER_REVISION` bump makes the next launch replay every stored
     // raw payload, which writes in bulk for as long as a quarter of an hour on
     // a large library. A sync starting in the middle of that used to lose the
@@ -373,7 +374,7 @@ mod tests {
                 .enumerate()
                 .map(|(index, status)| StreamReport {
                     stream: format!("stream-{index}"),
-                    status: status.clone(),
+                    status: *status,
                     records_written: 0,
                     raw_records: 0,
                     capability: CapabilityStatus::Verified,
@@ -416,7 +417,7 @@ mod tests {
                 .iter()
                 .map(|(name, status)| StreamReport {
                     stream: (*name).to_string(),
-                    status: status.clone(),
+                    status: *status,
                     records_written: 0,
                     raw_records: 0,
                     capability: CapabilityStatus::Verified,
