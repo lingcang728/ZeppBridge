@@ -15,6 +15,8 @@ import { backend, isDesktop } from './lib/bridge';
 import { checkForDesktopUpdate } from './services/updateService';
 import { defineMessages, locale, useMessages } from './i18n';
 
+const LifeEventEditor = defineAsyncComponent(() => import('./components/LifeEventEditor.vue'));
+
 const messages = defineMessages(
   {
     skipToContent: '跳到主要内容',
@@ -117,7 +119,7 @@ const t = useMessages(messages);
 
 // 桌面端从 Tauri 运行时读取版本（与 tauri.conf.json 单一来源），
 // 浏览器预览环境回退到下面的常量（与 package.json 保持同步）。
-const FALLBACK_APP_VERSION = '2.2.4';
+const FALLBACK_APP_VERSION = '2.3.0';
 /* 构建标识。同一个版本号会构建很多次，光看版本号分不清手上是哪一个。 */
 const BUILD_STAMP = __BUILD_STAMP__;
 const APP_VERSION = ref(FALLBACK_APP_VERSION);
@@ -311,6 +313,7 @@ onUnmounted(() => {
 <template>
   <LandingPage v-if="showLanding" />
   <template v-else>
+    <LifeEventEditor />
     <a class="skip-link" href="#main-content">{{ t.skipToContent }}</a>
 
     <div class="app-shell">

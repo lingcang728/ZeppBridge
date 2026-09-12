@@ -6,6 +6,9 @@ const unavailable = (): never => {
 };
 
 export const webBackend: BridgeBackend = {
+  listLifeEvents: unavailable,
+  saveLifeEvent: unavailable,
+  deleteLifeEvent: unavailable,
   getAppStatus: unavailable,
   saveAuth: unavailable,
   verifyAuth: unavailable,

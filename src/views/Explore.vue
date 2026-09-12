@@ -16,6 +16,7 @@ import {
 } from '../composables/useExport';
 import { useSyncController } from '../composables/useSyncController';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
+import { useLifeEvents } from '../composables/useLifeEvents';
 import { useAiHandoff } from '../composables/useAiHandoff';
 import { localDateString } from '../lib/format';
 import { popoverStyle } from '../lib/popoverPosition';
@@ -26,6 +27,7 @@ import { exploreMessages, promptTemplates, type PromptTemplate } from './Explore
 import { intlLocale, locale, useMessages } from '../i18n';
 
 const t = useMessages(exploreMessages);
+const { events: lifeEvents } = useLifeEvents();
 
 const {
   exportStartDate,
@@ -102,7 +104,7 @@ const selectTemplate = (tpl: PromptTemplate) => {
   activeTemplateId.value = tpl.id;
   editedPrompt.value = tpl.prompt;
   promptEdited.value = false;
-  exportDataTypes.value = [...tpl.types];
+  exportDataTypes.value = [...tpl.types, ...(exportDataTypes.value.includes('life_events') ? ['life_events' as const] : [])];
 };
 
 /* ── 导出格式与目标工具 ────────────────── */
@@ -551,7 +553,7 @@ watch(
   schedulePreview,
   { deep: true, immediate: true },
 );
-watch(dataRevision, () => void loadPreview());
+watch([dataRevision, lifeEvents], () => void loadPreview());
 onBeforeUnmount(() => window.clearTimeout(previewTimer));
 </script>
 
