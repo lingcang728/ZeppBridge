@@ -246,7 +246,7 @@ async fn run_sync(
             // not a failure: report it as `cancelled` so the UI can show a
             // neutral banner instead of a red error.
             let database = state.db.lock().await;
-            database.record_cloud_sync(&finished_at, "cancelled")?;
+            database.record_cloud_sync(&finished_at, "cancelled", 0)?;
             return Ok(ui_sync_report(
                 SyncReport {
                     success: false,
@@ -263,7 +263,7 @@ async fn run_sync(
         }
         Err(error) => {
             let database = state.db.lock().await;
-            database.record_cloud_sync(&finished_at, "failed")?;
+            database.record_cloud_sync(&finished_at, "failed", 0)?;
             if error.needs_reauth() {
                 *state.auth_state.write().await = "needs_reauth".to_string();
             }
@@ -282,7 +282,7 @@ async fn run_sync(
     let outcome = classify_outcome(&report, &before, &after);
     {
         let database = state.db.lock().await;
-        database.record_cloud_sync(&finished_at, outcome)?;
+        database.record_cloud_sync(&finished_at, outcome, report.records_written)?;
     }
 
     if report.streams.iter().any(|stream| stream.needs_reauth) {

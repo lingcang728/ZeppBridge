@@ -11,6 +11,16 @@
 use super::*;
 
 impl Database {
+    pub(super) fn reject_newer_schema(conn: &Connection) -> Result<()> {
+        let version: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+        if version > CURRENT_SCHEMA_VERSION {
+            return Err(ZeppBridgeError::DataUnavailable(format!(
+                "Database schema v{version} is newer than supported v{CURRENT_SCHEMA_VERSION}. Upgrade ZeppBridge before opening this database."
+            )));
+        }
+        Ok(())
+    }
+
     /// 迁移的事务边界。
     ///
     /// 这里面的每一步单独看都是幂等的，但**合起来不是原子的**，而且版本号
@@ -52,6 +62,7 @@ impl Database {
     }
 
     fn migrate_steps(&self) -> Result<()> {
+        Self::reject_newer_schema(&self.conn)?;
         self.conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS schema_migrations (
                 version INTEGER PRIMARY KEY,

@@ -260,8 +260,8 @@ fn encode_workout(workout: &Value) -> Result<Option<(Vec<u8>, usize)>, String> {
     // Garmin Connect 只能退回账号的默认时区——于是北京时间早上六点的跑步会
     // 显示成前一天晚上十点。
     //
-    // 偏移量不用猜：导出 JSON 的 `start_time` 是带偏移的 RFC3339，手表当时在
-    // 哪个时区就写着哪个。读不出来就不写这个字段，而不是假设 UTC。
+    // 入库后的 start_time 已转为 UTC，零偏移不能证明手表所在时区。
+    // 只保留仍明确携带非零偏移的输入；无法确认时省略该字段。
     if let Some(offset) = local_offset_seconds(workout) {
         activity_fields.push(u32_field(
             mesgdef::Activity::LOCAL_TIMESTAMP,
@@ -1263,11 +1263,12 @@ fn semicircles(degrees: f64) -> Option<i32> {
 
 /// 这条运动所在时区相对 UTC 的偏移秒数。
 ///
-/// 导出 JSON 的 `start_time` 是带偏移量的 RFC3339，手表当时在哪个时区就写着
-/// 哪个，所以不用猜。解析不出来就返回 `None`——调用方据此不写本地时间戳，而
-/// 不是假设 UTC。
+/// 入库后的 UTC 时间已丢失原始时区；零偏移和解析失败都返回 `None`。
+/// 非零 RFC3339 偏移仍可保留，调用方在未知时省略本地时间戳。
 fn local_offset_seconds(workout: &Value) -> Option<i32> {
-    parse_time(text(workout.get("start_time"))).map(|time| time.offset().local_minus_utc())
+    parse_time(text(workout.get("start_time")))
+        .map(|time| time.offset().local_minus_utc())
+        .filter(|offset| *offset != 0)
 }
 
 fn encode_altitude(metres: f64) -> Option<u16> {
@@ -1656,6 +1657,20 @@ mod tests {
             int_of(activity[0], mesgdef::Activity::LOCAL_TIMESTAMP).expect("本地时间戳应当写出来");
         // fixture 是 +08:00
         assert_eq!(local - utc, 8 * 3600);
+    }
+
+    #[test]
+    fn utc_normalized_workouts_do_not_claim_a_local_timezone() {
+        for start in ["2026-08-23T22:00:00Z", "2026-08-23T22:00:00+00:00"] {
+            let mut export = running_export();
+            export["data"]["workouts"][0]["start_time"] = json!(start);
+            let (files, _) = to_fit(&export).unwrap();
+            let fit = decode(&files[0].1);
+            let activity = messages_of(&fit, typedef::MesgNum::ACTIVITY);
+            assert_eq!(activity.len(), 1);
+            assert!(int_of(activity[0], mesgdef::Activity::TIMESTAMP).is_some());
+            assert!(raw(activity[0], mesgdef::Activity::LOCAL_TIMESTAMP).is_none());
+        }
     }
 
     /// 经度正好 180.0° 的点不该丢掉坐标。

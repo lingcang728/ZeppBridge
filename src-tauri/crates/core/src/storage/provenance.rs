@@ -1106,7 +1106,7 @@ mod tests {
     #[test]
     fn cloud_sync_local_replay_and_manual_reprocess_are_separate_timelines() {
         let db = db();
-        db.record_cloud_sync("2026-08-20T00:00:00+00:00", "updated")
+        db.record_cloud_sync("2026-08-20T00:00:00+00:00", "updated", 1)
             .unwrap();
         db.record_local_replay(false).unwrap();
 

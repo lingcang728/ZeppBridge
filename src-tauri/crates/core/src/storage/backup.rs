@@ -615,20 +615,24 @@ fn run_restore(data_dir: &Path, pending: &PendingRestore) -> RestoreOutcome {
         ));
     }
     // 换上去之前先确认这个临时文件真的能打开、真的完整。
-    let staged_ok = Database::open_read_only_any_version(staging.clone())
-        .ok()
-        .and_then(|db| {
-            db.conn
-                .query_row("PRAGMA integrity_check(1)", [], |row| {
-                    row.get::<_, String>(0)
-                })
-                .ok()
-        })
-        .map(|value| value.eq_ignore_ascii_case("ok"))
-        .unwrap_or(false);
-    if !staged_ok {
+    let staged_check = Database::open_read_only_any_version(staging.clone()).and_then(|db| {
+        Database::reject_newer_schema(&db.conn)?;
+        let integrity: String = db
+            .conn
+            .query_row("PRAGMA integrity_check(1)", [], |row| row.get(0))?;
+        if !integrity.eq_ignore_ascii_case("ok") {
+            return Err(ZeppBridgeError::DataUnavailable(
+                "临时文件没有通过完整性检查".into(),
+            ));
+        }
+        Ok(())
+    });
+    if let Err(error) = staged_check {
         let _ = std::fs::remove_file(&staging);
-        return fail("恢复未执行，当前库没有改动：临时文件没有通过完整性检查".into());
+        return fail(format!(
+            "恢复未执行，当前库没有改动：{}",
+            error.user_message()
+        ));
     }
 
     // 原子换名。先把现库挪开而不是直接删，这样中途失败还能换回来。
@@ -870,6 +874,30 @@ mod tests {
         assert!(!preview.can_restore);
         assert!(stage_restore(&dir, &manifest.id, "1.0.0").is_err());
         assert!(pending_restore(&dir).is_none(), "被拒绝的恢复不该留下待办");
+    }
+
+    #[test]
+    fn restore_rechecks_actual_schema_even_when_manifest_claims_compatibility() {
+        let dir = temp_dir("future-pending");
+        drop(seed(&dir, 2));
+        let mut manifest = create_backup(&dir, BackupKind::Manual, "1.0.0").unwrap();
+        let pending = stage_restore(&dir, &manifest.id, "1.0.0").unwrap();
+        let snapshot = snapshot_path(&dir, &manifest.id);
+        let conn = rusqlite::Connection::open(&snapshot).unwrap();
+        conn.execute_batch(&format!(
+            "PRAGMA user_version = {};",
+            CURRENT_SCHEMA_VERSION + 1
+        ))
+        .unwrap();
+        drop(conn);
+        manifest.bytes = std::fs::metadata(&snapshot).unwrap().len();
+        manifest.sha256 = file_sha256(&snapshot).unwrap();
+        write_manifest(&dir, &manifest).unwrap();
+        let before = std::fs::read(database_path(&dir)).unwrap();
+        let outcome = run_restore(&dir, &pending);
+        assert!(!outcome.succeeded);
+        assert!(outcome.message.contains("恢复未执行"));
+        assert_eq!(std::fs::read(database_path(&dir)).unwrap(), before);
     }
 
     #[test]

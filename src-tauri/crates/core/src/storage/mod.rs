@@ -1393,6 +1393,7 @@ impl Database {
     }
 
     fn from_connection(conn: Connection) -> Result<Self> {
+        Self::reject_newer_schema(&conn)?;
         // These pragmas are set for every connection, including test databases.
         conn.execute_batch(
             "PRAGMA foreign_keys = ON;
@@ -1405,7 +1406,9 @@ impl Database {
     }
 
     fn ensure_cloud_sync_metadata(&self) -> Result<()> {
-        if self.get_app_meta(LAST_CLOUD_SYNC_AT_KEY)?.is_some() {
+        if self.get_app_meta(LAST_CLOUD_SYNC_AT_KEY)?.is_some()
+            || self.get_app_meta(LAST_CLOUD_SYNC_OUTCOME_KEY)?.is_some()
+        {
             return Ok(());
         }
         let latest_fetch =
@@ -1454,8 +1457,19 @@ impl Database {
         ))
     }
 
-    pub fn record_cloud_sync(&self, finished_at: &str, outcome: &str) -> Result<()> {
-        self.set_app_meta(LAST_CLOUD_SYNC_AT_KEY, finished_at)?;
+    pub fn record_cloud_sync(
+        &self,
+        finished_at: &str,
+        outcome: &str,
+        records_written: i64,
+    ) -> Result<()> {
+        // An attempt is not proof that the initial data fetch succeeded.
+        // Keep failed/cancelled outcomes visible without consuming first-run sync.
+        if matches!(outcome, "updated" | "no_new_data" | "partial")
+            && (records_written > 0 || self.get_app_meta(LAST_CLOUD_SYNC_AT_KEY)?.is_some())
+        {
+            self.set_app_meta(LAST_CLOUD_SYNC_AT_KEY, finished_at)?;
+        }
         self.set_app_meta(LAST_CLOUD_SYNC_OUTCOME_KEY, outcome)
     }
 
@@ -6018,6 +6032,65 @@ fn local_day_range_utc_bounds(start: &str, end: &str) -> Option<(String, String)
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn unsuccessful_first_sync_remains_retryable_after_startup_migration() {
+        for outcome in ["failed", "cancelled", "no_new_data", "partial"] {
+            let db = Database::in_memory().unwrap();
+            db.conn.execute_batch("INSERT INTO raw_records(stream, source_key, source_scope, start_utc, payload, payload_hash, fetched_at) VALUES('workouts', 'first', 'unknown', '2026-09-12T00:00:00Z', '{}', 'test', '2026-09-12T00:00:00Z');").unwrap();
+            db.record_cloud_sync("2026-09-12T00:00:00Z", outcome, 0)
+                .unwrap();
+            db.migrate().unwrap();
+            assert_eq!(
+                db.cloud_sync_metadata().unwrap(),
+                (None, Some(outcome.into()))
+            );
+            db.record_cloud_sync("2026-09-12T01:00:00Z", "updated", 1)
+                .unwrap();
+            db.record_cloud_sync("2026-09-12T02:00:00Z", "cancelled", 0)
+                .unwrap();
+            assert_eq!(
+                db.cloud_sync_metadata().unwrap().0.as_deref(),
+                Some("2026-09-12T01:00:00Z")
+            );
+            db.record_cloud_sync("2026-09-12T03:00:00Z", "no_new_data", 0)
+                .unwrap();
+            assert_eq!(
+                db.cloud_sync_metadata().unwrap().0.as_deref(),
+                Some("2026-09-12T03:00:00Z")
+            );
+        }
+    }
+
+    #[test]
+    fn future_schema_is_refused_without_changing_the_database() {
+        let dir = std::env::temp_dir().join(format!(
+            "zeppbridge-future-schema-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("zepp.db");
+        let conn = Connection::open(&path).unwrap();
+        conn.execute_batch(&format!("CREATE TABLE future_data(value TEXT); INSERT INTO future_data VALUES('keep'); PRAGMA user_version = {};", CURRENT_SCHEMA_VERSION + 1)).unwrap();
+        drop(conn);
+        let before = std::fs::read(&path).unwrap();
+        assert!(Database::open_migrated(&path).is_err());
+        assert!(Database::open_resilient(path.clone()).is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), before);
+        // Also protect direct migration callers inside the transaction.
+        let db = Database {
+            conn: Connection::open(&path).unwrap(),
+        };
+        assert!(db.migrate().is_err());
+        assert!(db.conn.is_autocommit());
+        drop(db);
+        assert_eq!(std::fs::read(&path).unwrap(), before);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 
     /// 云端的业务错误码要能一路走到诊断报告里。
     ///

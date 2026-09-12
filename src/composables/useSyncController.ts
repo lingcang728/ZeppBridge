@@ -397,6 +397,7 @@ const runSync = (
       else if (
         wasFirstSync
         && mode === 'incremental'
+        && report.total_records > 0
         && report.outcome !== 'failed'
         && report.outcome !== 'cancelled'
       ) {
