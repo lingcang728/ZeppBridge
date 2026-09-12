@@ -94,11 +94,28 @@ const REGION_HOST_ALLOWLIST: &[&str] = &[
 ];
 
 /// Credentials parsed from the login webview.  Never logged in full.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub(crate) struct ExtractedLogin {
     pub user_id: String,
     pub app_token: String,
     pub region_hint: Option<String>,
+}
+
+impl std::fmt::Debug for ExtractedLogin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ExtractedLogin")
+            .field("user_id", &self.user_id)
+            .field(
+                "app_token",
+                &if self.app_token.is_empty() {
+                    "<empty>"
+                } else {
+                    "<redacted>"
+                },
+            )
+            .field("region_hint", &self.region_hint)
+            .finish()
+    }
 }
 
 #[tauri::command]
@@ -1473,6 +1490,30 @@ async fn finish_idle_if_active(app: &AppHandle, epoch: u64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn extracted_login_debug_never_prints_the_token() {
+        for token in ["secret-app-token", "unicode-令牌\nwith-escapes"] {
+            let extracted = ExtractedLogin {
+                user_id: "user".into(),
+                app_token: token.into(),
+                region_hint: Some("cn".into()),
+            };
+            for debug in [format!("{extracted:?}"), format!("{extracted:#?}")] {
+                assert!(!debug.contains(token));
+                assert!(!debug.contains("unicode-"));
+                assert!(debug.contains("<redacted>"));
+            }
+            assert_eq!(extracted.clone(), extracted);
+            assert_eq!(extracted.app_token, token);
+        }
+        let empty = ExtractedLogin {
+            user_id: "user".into(),
+            app_token: String::new(),
+            region_hint: None,
+        };
+        assert!(format!("{empty:?}").contains("<empty>"));
+    }
 
     fn probe_auth(host: &str) -> AuthInfo {
         AuthInfo {

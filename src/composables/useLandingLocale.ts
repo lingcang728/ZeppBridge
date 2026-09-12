@@ -50,8 +50,12 @@ const isLandingLocale = (value: string | null): value is LandingLocale =>
  */
 const detectLocale = (): LandingLocale => {
   if (typeof window === 'undefined') return 'zh';
-  const saved = window.localStorage.getItem(STORAGE_KEY);
-  if (isLandingLocale(saved)) return saved;
+  try {
+    const saved = window.localStorage.getItem(STORAGE_KEY);
+    if (isLandingLocale(saved)) return saved;
+  } catch {
+    // Storage may be unavailable; browser language still provides a default.
+  }
   const preferred = window.navigator.languages?.[0] ?? window.navigator.language ?? '';
   return /^zh\b/i.test(preferred) ? 'zh' : 'en';
 };
@@ -84,7 +88,11 @@ let initialized = false;
 
 const setLocale = (value: LandingLocale) => {
   locale.value = value;
-  if (typeof window !== 'undefined') window.localStorage.setItem(STORAGE_KEY, value);
+  try {
+    if (typeof window !== 'undefined') window.localStorage.setItem(STORAGE_KEY, value);
+  } catch {
+    // Keep the chosen language for this page even when persistence is blocked.
+  }
   applyDocumentLanguage(value);
 };
 

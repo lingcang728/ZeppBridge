@@ -30,6 +30,7 @@ const POLL_INTERVAL: Duration = Duration::from_millis(120);
 /// 一次写入动作的用途。等待超时时会把它显示给用户，所以措辞是面向用户的。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WritePurpose {
+    LifeEvent,
     Sync,
     HistoryBackfill,
     Migration,
@@ -48,6 +49,7 @@ pub enum WritePurpose {
 impl WritePurpose {
     pub fn as_str(self) -> &'static str {
         match self {
+            WritePurpose::LifeEvent => "life_event",
             WritePurpose::Sync => "sync",
             WritePurpose::HistoryBackfill => "history_backfill",
             WritePurpose::Migration => "migration",
@@ -61,6 +63,7 @@ impl WritePurpose {
 
     pub fn label(self) -> &'static str {
         match self {
+            WritePurpose::LifeEvent => "编辑生活事件",
             WritePurpose::Sync => "云端同步",
             WritePurpose::HistoryBackfill => "历史补拉",
             WritePurpose::Migration => "数据库升级",

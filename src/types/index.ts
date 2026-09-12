@@ -278,6 +278,7 @@ export interface Workout {
   /** 用户给这个 Zepp 编号起的名字；目录已经认识的编号永远为空。 */
   custom_label?: string | null;
   zepp_type?: number | null;
+  zepp_source?: string | null;
   start_time: string;
   end_time: string;
   distance_meters?: number;
@@ -286,6 +287,11 @@ export interface Workout {
   calories?: number;
   avg_hr?: number;
   max_hr?: number;
+  min_hr?: number | null;
+  elevation_gain_m?: number | null;
+  elevation_loss_m?: number | null;
+  max_altitude_m?: number | null;
+  min_altitude_m?: number | null;
   training_load?: number;
   vo2max?: number;
   /** 有氧训练效果 0.0-5.0。后端一直在返回，只是这里从来没声明过。 */
@@ -295,6 +301,7 @@ export interface Workout {
   /** 主观疲劳度，用户在表上自己选的。 */
   rpe?: number | null;
   avg_cadence_spm?: number | null;
+  max_cadence_spm?: number | null;
   avg_stride_cm?: number | null;
   total_steps?: number | null;
   gps_available?: boolean;
@@ -699,7 +706,19 @@ export interface WorkoutSeries {
   route: WorkoutRoutePoint[];
   pauses: WorkoutPause[];
   splits: WorkoutSplitRow[];
+  laps: WorkoutLapRow[];
   summary: WorkoutSeriesSummary;
+}
+
+/** Laps recorded by the watch, separate from computed kilometre splits. */
+export interface WorkoutLapRow {
+  index: number;
+  start_time: string;
+  end_time: string;
+  distance_m: number;
+  duration_seconds: number;
+  avg_hr: number | null;
+  max_hr: number | null;
 }
 
 /** One kilometre of a workout, cut from the server's cumulative distance. */

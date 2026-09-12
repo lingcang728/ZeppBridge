@@ -97,7 +97,8 @@ const messages = defineMessages(
       raw_records: '原始报文',
       life_events: '生活事件',
       workouts: '运动记录',
-      daily_summaries: '每日概览',
+      daily_metrics: '每日指标',
+      workout_samples: '运动采样点',
       metric_samples: '指标采样',
       sleep_sessions: '睡眠',
     },
@@ -180,7 +181,8 @@ const messages = defineMessages(
       raw_records: 'Raw payloads',
       life_events: 'Life events',
       workouts: 'Workouts',
-      daily_summaries: 'Daily summaries',
+      daily_metrics: 'Daily metrics',
+      workout_samples: 'Workout samples',
       metric_samples: 'Metric samples',
       sleep_sessions: 'Sleep',
     },
@@ -263,7 +265,8 @@ const messages = defineMessages(
       raw_records: 'Registros originales',
       life_events: 'Eventos de vida',
       workouts: 'Entrenamientos',
-      daily_summaries: 'Resúmenes diarios',
+      daily_metrics: 'Métricas diarias',
+      workout_samples: 'Muestras de entrenamiento',
       metric_samples: 'Muestras de métricas',
       sleep_sessions: 'Sueño',
     },
@@ -287,7 +290,7 @@ const compatibilityCopy = (kind: string): string =>
   lookup(t.value.compatibility, kind) ?? t.value.compatibilityUnknown;
 
 /** 只显示真正有意义的几张表，避免把内部表堆到界面上。 */
-const TABLE_KEYS = ['life_events', 'raw_records', 'workouts', 'daily_summaries', 'metric_samples', 'sleep_sessions'];
+const TABLE_KEYS = ['life_events', 'raw_records', 'workouts', 'daily_metrics', 'workout_samples', 'metric_samples', 'sleep_sessions'];
 const tableLabel = (key: string): string => lookup(t.value.table, key) ?? key;
 
 /* 校验失败原因：后端给稳定码，这里按界面语言出文案；
