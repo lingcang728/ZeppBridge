@@ -3,6 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 import { DesktopUnavailableError } from './errors';
 import type { BridgeBackend, UnlistenFn } from './types';
 import type {
+  LifeEvent,
   DailyHeartRateExtreme,
   Page,
   AppStatus,
@@ -62,6 +63,9 @@ const call = async <T>(command: string, args?: UnknownRecord): Promise<T> => {
 };
 
 export const tauriBackend: BridgeBackend = {
+  listLifeEvents(start, end) { return call<LifeEvent[]>('list_life_events', { start: start ?? null, end: end ?? null }); },
+  saveLifeEvent(input) { return call<number>('save_life_event', { input }); },
+  deleteLifeEvent(id) { return call<void>('delete_life_event', { id }); },
   getAppStatus() {
     return call<AppStatus>('get_app_status');
   },

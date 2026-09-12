@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import LifeEventsPanel from '../components/LifeEventsPanel.vue';
+import LifeEventShortcut from '../components/LifeEventShortcut.vue';
 import { displayDateTimeFormatter } from '../lib/dateTime';
 
 defineOptions({ name: 'Overview' });
@@ -676,6 +678,7 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
       「暂无数据」，谁也不解释为什么——而原因往往是登录时没确认对区域。
     -->
     <CoverageNotice />
+    <LifeEventShortcut />
 
     <div v-if="partialWarning" class="inline-alert warning" role="status"><Icon name="info" :size="15" />{{ partialWarning }}</div>
     <div v-if="deviceError" class="inline-alert warning" role="status"><Icon name="info" :size="15" />{{ t.deviceErrorPrefix }}{{ deviceError }}</div>
@@ -767,6 +770,7 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
         <div v-else class="panel-empty recent-empty"><DesignIcon name="document" :size="58" /><span>{{ t.recentEmpty }}</span></div>
       </section>
     </div>
+    <LifeEventsPanel />
   </section>
 </template>
 

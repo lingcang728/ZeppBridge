@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LifeEventShortcut from '../components/LifeEventShortcut.vue';
 import { displayDateTimeFormatter } from '../lib/dateTime';
 
 defineOptions({ name: 'BodyStatus' });
@@ -804,6 +805,7 @@ watch(dataRevision, () => { void load(); });
       </div>
     </PageHeader>
 
+    <LifeEventShortcut :days="rangeDays" />
     <CoverageNotice :requested-days="rangeDays" />
 
     <div v-if="error" class="inline-alert" role="alert">

@@ -15,6 +15,8 @@ import { backend, isDesktop } from './lib/bridge';
 import { checkForDesktopUpdate } from './services/updateService';
 import { defineMessages, locale, useMessages } from './i18n';
 
+const LifeEventEditor = defineAsyncComponent(() => import('./components/LifeEventEditor.vue'));
+
 const messages = defineMessages(
   {
     skipToContent: '跳到主要内容',
@@ -311,6 +313,7 @@ onUnmounted(() => {
 <template>
   <LandingPage v-if="showLanding" />
   <template v-else>
+    <LifeEventEditor />
     <a class="skip-link" href="#main-content">{{ t.skipToContent }}</a>
 
     <div class="app-shell">
