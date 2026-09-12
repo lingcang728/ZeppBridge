@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LifeEventShortcut from '../components/LifeEventShortcut.vue';
 defineOptions({ name: 'TrainingStatus' });
 import { computed, onMounted, ref, watch } from 'vue';
 import { VChart } from '../lib/echartsSetup';
@@ -385,6 +386,7 @@ watch(dataRevision, () => { void load(); });
       </div>
     </PageHeader>
 
+    <LifeEventShortcut :days="rangeDays" />
     <CoverageNotice :requested-days="rangeDays" />
 
     <p v-if="error" class="inline-alert" role="alert">

@@ -17,6 +17,8 @@ export type SaveFormat = 'json' | 'csv' | 'gpx' | 'fit';
 const messages = defineMessages(
   {
     typeSteps: '步数',
+    typeLifeEvents: '生活事件',
+    groupContext: '背景',
     typeDailyActivity: '日常活动',
     typeWorkouts: '运动',
     typeSleep: '睡眠',
@@ -66,6 +68,8 @@ const messages = defineMessages(
   },
   {
     typeSteps: 'Steps',
+    typeLifeEvents: 'Life events',
+    groupContext: 'Context',
     typeDailyActivity: 'Daily activity',
     typeWorkouts: 'Workouts',
     typeSleep: 'Sleep',
@@ -115,6 +119,8 @@ const messages = defineMessages(
   },
   {
     typeSteps: 'Pasos',
+    typeLifeEvents: 'Eventos de vida',
+    groupContext: 'Contexto',
     typeDailyActivity: 'Actividad diaria',
     typeWorkouts: 'Entrenamientos',
     typeSleep: 'Sueño',
@@ -191,6 +197,7 @@ export interface ExportTypeOption {
 export const exportTypeOptions = (): ExportTypeOption[] => {
   const t = copy();
   return [
+    { value: 'life_events', label: t.typeLifeEvents, group: 'context' },
     { value: 'steps', label: t.typeSteps, group: 'activity' },
     { value: 'daily_activity', label: t.typeDailyActivity, group: 'activity' },
     { value: 'workouts', label: t.typeWorkouts, group: 'activity' },
@@ -213,6 +220,7 @@ export const exportTypeOptions = (): ExportTypeOption[] => {
 export const exportTypeGroups = (): Array<{ key: ExportTypeGroup; label: string }> => {
   const t = copy();
   return [
+    { key: 'context', label: t.groupContext },
     { key: 'activity', label: t.groupActivity },
     { key: 'sleep', label: t.groupSleep },
     { key: 'body', label: t.groupBody },

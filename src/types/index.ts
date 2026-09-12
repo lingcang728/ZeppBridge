@@ -748,6 +748,7 @@ export interface LocalApiStatus {
 }
 
 export type ExportDataType =
+  | 'life_events'
   | 'heart_rate'
   | 'sleep'
   | 'workouts'
@@ -767,7 +768,7 @@ export type ExportDataType =
 /** Which section of the export picker a data type belongs to. */
 /* 分组是码，不是中文。写成中文的话界面上到处会出现 `group === '活动'`
    这种判断，一翻译就默默失效。显示交给 useExport 的分组名表。 */
-export type ExportTypeGroup = 'activity' | 'sleep' | 'body' | 'training';
+export type ExportTypeGroup = 'activity' | 'sleep' | 'body' | 'training' | 'context';
 
 export interface DeviceProfile {
   name?: string;
@@ -1052,4 +1053,18 @@ export interface DailyHeartRateExtreme {
   min: number;
   average: number;
   samples: number;
+}
+
+export interface LifeEventInput {
+  id: number | null;
+  title: string;
+  category: 'health' | 'travel' | 'routine' | 'training' | 'other';
+  startDate: string;
+  endDate: string | null;
+  notes: string;
+}
+export interface LifeEvent extends LifeEventInput {
+  id: number;
+  createdAt: string;
+  updatedAt: string;
 }

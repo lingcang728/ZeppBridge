@@ -1,4 +1,5 @@
 import type {
+  LifeEvent, LifeEventInput,
   AppStatus,
   DailyHeartRateExtreme,
   Page,
@@ -47,6 +48,9 @@ import type {
 export type UnlistenFn = () => void;
 
 export interface BridgeBackend {
+  listLifeEvents(start?: string, end?: string): Promise<LifeEvent[]>;
+  saveLifeEvent(input: LifeEventInput): Promise<number>;
+  deleteLifeEvent(id: number): Promise<void>;
   getAppStatus(): Promise<AppStatus>;
   saveAuth(auth: AuthInfo): Promise<AppStatus>;
   verifyAuth(): Promise<AppStatus>;
