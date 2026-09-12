@@ -4,6 +4,26 @@
 
 ## Unreleased / 未发布
 
+## 2.3.0
+
+### Added / 新增
+
+- **ZeppBridge now speaks Spanish.** The desktop interface, detail pages, workout catalogue, tray menu, weekly reports and user-facing unit labels are available in Spanish alongside Chinese and English.
+- **ZeppBridge 现已支持西班牙语。** 桌面界面、详情页、运动目录、托盘菜单、周报与面向用户的单位文本均已提供西语版本，与中文、英文并列可选。
+- **Life events add your own context to health trends.** Record a single day, a date range or an ongoing event; search and manage events from Overview, and use markers and quick entry on trend cards to relate changes in sleep, recovery, activity and other metrics to what was happening in your life.
+- **生活记录为健康趋势补上个人背景。** 可记录单日、日期范围或仍在持续的事件；在概览页搜索和管理，并通过趋势卡片上的标记与快捷入口，把睡眠、恢复、活动等指标变化和当时发生的事情对应起来。
+- Life events can be included explicitly in JSON, CSV and AI handoff exports. Range intersections and cross-midnight workout context are handled without changing the original user-authored dates. Events are stored locally, included in backup and restore, and remain independent from cloud replay and retention.
+- 生活记录可按需加入 JSON、CSV 与 AI 交接导出。日期范围相交和跨午夜运动会正确关联上下文，同时保留用户填写的原始日期；记录存放在本机，支持备份与恢复，不受云端重放和保留策略影响。
+
+### Fixed / 修复
+
+- HAR import now accepts Zepp user endpoints both with and without a trailing slash, so a valid user ID is no longer missed because of URL shape.
+- HAR 导入现在同时接受带或不带末尾斜杠的 Zepp 用户接口，不会再因为 URL 形式差异漏掉有效用户 ID。
+- macOS keeps the user library outside the signed `.app` bundle, preventing app replacement or update from carrying mutable health data inside the application package.
+- macOS 会把用户数据库保存在已签名的 `.app` 包之外，避免替换或更新应用时把可变健康数据夹在应用包内。
+- Recent feedback reconciliation improves device and workout handling where evidence was sufficient, while ambiguous device/source reports remain unassigned instead of being guessed.
+- 最新反馈核对完善了已有充分证据的设备与运动处理；证据冲突或不足的设备来源仍保持未指认，不会用猜测写入健康数据。
+
 ## 2.2.4
 
 ### Fixed / 修复
