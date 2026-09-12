@@ -1,3 +1,4 @@
+import { displayDateTimeFormatter, parseDisplayDate } from './dateTime';
 import { defineMessages, intlLocale, messagesOf } from '../i18n';
 import {
   bigDistanceThresholdMeters,
@@ -62,9 +63,9 @@ export const localDateString = (date: Date): string => {
 
 export const formatDateTime = (value?: string, empty = copy().noUpdates): string => {
   if (!value) return empty;
-  const date = new Date(value);
+  const date = parseDisplayDate(value);
   if (Number.isNaN(date.getTime())) return empty;
-  return new Intl.DateTimeFormat(intlLocale(), {
+  return displayDateTimeFormatter({
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -74,9 +75,9 @@ export const formatDateTime = (value?: string, empty = copy().noUpdates): string
 
 export const formatFullDateTime = (value?: string, empty = copy().noRecords): string => {
   if (!value) return empty;
-  const date = new Date(value);
+  const date = parseDisplayDate(value);
   if (Number.isNaN(date.getTime())) return copy().timeUnknown;
-  return new Intl.DateTimeFormat(intlLocale(), {
+  return displayDateTimeFormatter({
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -86,17 +87,17 @@ export const formatFullDateTime = (value?: string, empty = copy().noRecords): st
 };
 
 export const formatDate = (value: string, style: 'short' | 'long' = 'short'): string => {
-  const date = new Date(value);
+  const date = parseDisplayDate(value);
   if (Number.isNaN(date.getTime())) return copy().dateUnknown;
   if (style === 'long') {
-    return new Intl.DateTimeFormat(intlLocale(), {
+    return displayDateTimeFormatter({
       year: 'numeric',
       month: 'long',
       day: 'numeric',
       weekday: 'long',
     }).format(date);
   }
-  return new Intl.DateTimeFormat(intlLocale(), {
+  return displayDateTimeFormatter({
     month: 'short',
     day: 'numeric',
     weekday: 'short',
@@ -104,10 +105,10 @@ export const formatDate = (value: string, style: 'short' | 'long' = 'short'): st
 };
 
 export const formatTime = (value: string): string => {
-  const date = new Date(value);
+  const date = parseDisplayDate(value);
   return Number.isNaN(date.getTime())
     ? '—'
-    : new Intl.DateTimeFormat(intlLocale(), { hour: '2-digit', minute: '2-digit' }).format(date);
+    : displayDateTimeFormatter({ hour: '2-digit', minute: '2-digit' }).format(date);
 };
 
 export const formatDuration = (minutes?: number | null, empty = copy().durationUnknown): string => {

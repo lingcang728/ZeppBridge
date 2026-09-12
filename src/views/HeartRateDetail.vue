@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { displayDateTimeFormatter } from '../lib/dateTime';
+
 defineOptions({ name: 'HeartRateDetail' });
 /**
  * 心率二级界面。
@@ -21,7 +23,7 @@ import { zeppSemanticColors } from '../lib/echartsTheme';
 import { indexSeries, SERIES_RANGE_DAYS, seriesRanges, type SeriesRangeDays } from '../lib/metricSeries';
 import { isFiniteNumber } from '../lib/format';
 import type { DailyHeartRateExtreme, HeartRatePoint, MetricSeries } from '../types';
-import { defineMessages, intlLocale, useMessages } from '../i18n';
+import { defineMessages, useMessages } from '../i18n';
 
 const messages = defineMessages(
   {
@@ -178,7 +180,7 @@ const average = computed(() => (points.value.length
   ? Math.round(points.value.reduce((total, point) => total + point.value, 0) / points.value.length)
   : null));
 
-const clock = (value: number) => new Intl.DateTimeFormat(intlLocale(), {
+const clock = (value: number) => displayDateTimeFormatter({
   hour: '2-digit', minute: '2-digit', hour12: false,
 }).format(new Date(value));
 

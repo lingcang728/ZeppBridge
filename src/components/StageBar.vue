@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { displayDateTimeFormatter } from '../lib/dateTime';
 import { computed } from 'vue';
 import { VChart } from '../lib/echartsSetup';
 import { formatDuration, formatTime, isFiniteNumber } from '../lib/format';
@@ -149,7 +150,7 @@ const segmentStyle = (stage: BarSegment): Record<string, string> => {
 
 const clock = (value: number) => {
   const date = new Date(value);
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  return displayDateTimeFormatter({ hour: '2-digit', minute: '2-digit' }).format(date);
 };
 
 const hypnogramOption = computed(() => {
