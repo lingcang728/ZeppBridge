@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { displayDateTimeFormatter } from '../lib/dateTime';
+
 defineOptions({ name: 'Explore' });
 import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
@@ -153,7 +155,7 @@ const scopeRangeText = computed(() => {
     if (!previewScope.value) return t.value.thisWorkout;
     const start = new Date(previewScope.value.startTime);
     if (Number.isNaN(start.getTime())) return t.value.thisWorkout;
-    return new Intl.DateTimeFormat(intlLocale(), {
+    return displayDateTimeFormatter({
       year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
     }).format(start);
   }
@@ -428,14 +430,14 @@ const nextMonth = () => {
 
 /* 月份和星期名交给 Intl，不再写死中文数组：英文界面上「2026年 8月」
    既不是英文也不是任何人的日期写法。 */
-const calendarTitle = computed(() => new Intl.DateTimeFormat(intlLocale(), {
+const calendarTitle = computed(() => displayDateTimeFormatter({
   year: 'numeric', month: 'long',
 }).format(new Date(pickerYear.value, pickerMonth.value, 1)));
 
 const weekdayNames = computed(() => {
   // 2026-01-04 是星期日，从它数七天就是一周的表头。
   const sunday = new Date(2026, 0, 4);
-  const formatter = new Intl.DateTimeFormat(intlLocale(), {
+  const formatter = displayDateTimeFormatter({
     weekday: locale.value === 'zh' ? 'narrow' : 'short',
   });
   return Array.from({ length: 7 }, (_unused, offset) =>

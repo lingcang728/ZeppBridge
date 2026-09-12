@@ -1,9 +1,10 @@
+import { displayDateTimeFormatter } from '../lib/dateTime';
 import { computed, readonly, ref } from 'vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { launchSyncIsDue, readAutoSyncSettings, writeAutoSyncSettings } from '../lib/autoSync';
 import type { AppStatus, LoginStatus, SyncOutcome, SyncProgress, SyncReport } from '../types';
 import { syncStreamLabel } from '../lib/syncStreams';
-import { defineMessages, intlLocale, messagesOf } from '../i18n';
+import { defineMessages, messagesOf } from '../i18n';
 import { errorTextFor } from '../i18n/errors';
 import { backendText } from '../i18n/backendText';
 
@@ -167,7 +168,7 @@ const formatTime = (value?: string): string => {
   if (!value) return copy().timeUnknown;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return copy().timeUnknown;
-  return new Intl.DateTimeFormat(intlLocale(), {
+  return displayDateTimeFormatter({
     month: 'numeric',
     day: 'numeric',
     hour: '2-digit',
@@ -179,7 +180,7 @@ const formatClock = (value?: string): string | null => {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat(intlLocale(), { hour: '2-digit', minute: '2-digit' }).format(date);
+  return displayDateTimeFormatter({ hour: '2-digit', minute: '2-digit' }).format(date);
 };
 
 const latestHeartRateAt = (report?: SyncReport | null): string | undefined =>

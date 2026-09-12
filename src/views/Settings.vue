@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { TIME_FORMATS, DATE_ORDERS, timeFormat, dateOrder, setTimeFormat, setDateOrder, dateTimeLabels } from '../lib/dateTime';
+import { displayDateTimeFormatter } from '../lib/dateTime';
+
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import BackupPanel from '../components/BackupPanel.vue';
@@ -26,7 +29,7 @@ import type {
 } from '../types';
 import { checkForDesktopUpdate, downloadAndInstallDesktopUpdate, updateState } from '../services/updateService';
 import { settingsMessages } from './Settings.i18n';
-import { intlLocale, locale, LOCALES, LOCALE_LABELS, setLocale, useMessages } from '../i18n';
+import { locale, LOCALES, LOCALE_LABELS, setLocale, useMessages } from '../i18n';
 import {
   DISTANCE_UNITS,
   distanceUnit,
@@ -368,7 +371,7 @@ const formatDateTime = (value?: string): string => {
   if (!value) return t.value.noRecords;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return t.value.timeUnknown;
-  return new Intl.DateTimeFormat(intlLocale(), {
+  return displayDateTimeFormatter({
     year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
   }).format(date).replace(/\//g, '-');
 };
@@ -378,7 +381,7 @@ const formatDateTime = (value?: string): string => {
 const retentionCutoffDate = computed(() => {
   const date = new Date();
   date.setDate(date.getDate() - Number(retentionDays.value || 30));
-  return new Intl.DateTimeFormat(intlLocale(), { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date).replace(/\//g, '-');
+  return displayDateTimeFormatter({ year: 'numeric', month: '2-digit', day: '2-digit' }).format(date).replace(/\//g, '-');
 });
 
 const dataSources = computed(() => [
@@ -975,6 +978,16 @@ const runCapabilityProbe = async () => {
     <div v-if="loginError" class="alert danger" role="alert"><Icon name="warning" :size="15" />{{ loginError }}</div>
     <div v-if="dataMessage" class="alert success"><Icon name="circle-check" :size="15" />{{ dataMessage }}</div>
     <div v-if="dataError" class="alert danger" role="alert"><Icon name="warning" :size="15" />{{ dataError }}</div>
+
+    <section class="settings-card" aria-labelledby="date-time-title">
+      <h2 id="date-time-title">{{ dateTimeLabels.time }} / {{ dateTimeLabels.date }}</h2>
+      <div class="scale-options" role="radiogroup" :aria-label="dateTimeLabels.time">
+        <button v-for="option in TIME_FORMATS" :key="option" type="button" role="radio" :aria-checked="timeFormat === option" @click="setTimeFormat(option)">{{ dateTimeLabels[option] }}</button>
+      </div>
+      <div class="scale-options" role="radiogroup" :aria-label="dateTimeLabels.date">
+        <button v-for="option in DATE_ORDERS" :key="option" type="button" role="radio" :aria-checked="dateOrder === option" @click="setDateOrder(option)">{{ dateTimeLabels[option] }}</button>
+      </div>
+    </section>
 
     <!-- 1. 认证方式 -->
     <section class="settings-card" aria-labelledby="auth-title">

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { displayDateTimeFormatter } from '../lib/dateTime';
+
 /**
  * 「你选的范围比本机有的多」这句话，说一次。
  *
@@ -19,7 +21,7 @@ import { computed } from 'vue';
 import Icon from './Icon.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { emptyLibraryNotice } from '../lib/emptyLibraryNotice';
-import { defineMessages, intlLocale, useMessages } from '../i18n';
+import { defineMessages, useMessages } from '../i18n';
 
 const props = withDefaults(defineProps<{
   /**
@@ -111,7 +113,7 @@ const earliestText = computed(() => {
   if (!day) return '';
   const parsed = new Date(`${day}T00:00:00`);
   if (Number.isNaN(parsed.getTime())) return day;
-  return new Intl.DateTimeFormat(intlLocale(), { dateStyle: 'medium' }).format(parsed);
+  return displayDateTimeFormatter({ dateStyle: 'medium' }).format(parsed);
 });
 
 /* 补拉到用户当前选的那个范围，而不是某个固定值：他刚刚已经说了想看多远。 */
