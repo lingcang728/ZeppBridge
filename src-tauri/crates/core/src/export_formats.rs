@@ -51,6 +51,35 @@ pub fn to_csv(export: &Value) -> Result<(String, usize), String> {
     let mut rows = String::new();
     let mut count = 0usize;
 
+    for event in array(data, "life_events") {
+        for field in ["title", "category", "notes"] {
+            let value = text(event.get(field));
+            // Free text must remain text when opened in a spreadsheet.
+            let cell = if value.trim_start().starts_with(['=', '+', '-', '@'])
+                || value.starts_with(['\t', '\r'])
+            {
+                format!("'{value}")
+            } else {
+                value.to_owned()
+            };
+            push_row(
+                &mut rows,
+                &[
+                    "life_event",
+                    &event["id"].to_string(),
+                    text(event.get("startDate")),
+                    text(event.get("endDate")),
+                    field,
+                    &cell,
+                    "",
+                    "user_authored",
+                    "",
+                ],
+            );
+            count += 1;
+        }
+    }
+
     for sample in array(data, "metric_samples") {
         let Some(value) = number_text(sample.get("value")) else {
             continue;

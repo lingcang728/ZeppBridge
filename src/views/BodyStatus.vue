@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import LifeEventShortcut from '../components/LifeEventShortcut.vue';
+import { displayDateTimeFormatter } from '../lib/dateTime';
+
 defineOptions({ name: 'BodyStatus' });
 import { computed, onMounted, ref, watch } from 'vue';
 import { VChart } from '../lib/echartsSetup';
@@ -11,7 +14,7 @@ import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { zeppSemanticColors } from '../lib/echartsTheme';
 import { indexSeries, seriesRanges, type SeriesRangeDays } from '../lib/metricSeries';
-import { formatTime, isFiniteNumber } from '../lib/format';
+import { isFiniteNumber } from '../lib/format';
 import {
   bodyHeightUnitLabel,
   bodyMassUnitLabel,
@@ -180,6 +183,85 @@ const messages = defineMessages(
     macroSub: 'Share of calories each macronutrient contributed over this range',
     macroNote: 'Shares are derived here from the daily grams using 4/9/4 kcal per gram (protein / fat / carbs). They are not sent by the cloud and may differ by a point or two from the percentages in the Zepp App. Nothing is drawn unless all three are present.',
     gramsPerDay: (grams: number) => `${grams} g per day on average`,
+  },
+  {
+    backToOverview: 'Volver al resumen',
+    eyebrow: 'Estado corporal',
+    title: 'Estado corporal',
+    intro: 'Tendencias locales de recuperación, estrés, oxígeno en sangre, VFC, frecuencia respiratoria, frecuencia cardíaca en reposo, composición corporal y alimentación. Todo leído de los registros sincronizados.',
+    rangeAria: 'Rango de tiempo',
+    desktopOnly: 'Usa la app de escritorio. Esta vista previa en el navegador no lee datos de la cuenta.',
+    loadFailed: 'Los datos del estado corporal no están disponibles en este momento',
+    retry: 'Reintentar',
+    loadingAria: 'Cargando el estado corporal',
+    noneInRange: 'No hay registros del estado corporal en este rango. Prueba un rango más largo, o sincroniza primero.',
+    emptyCard: 'No hay nada registrado en este rango.',
+    readinessLabel: 'Recuperación',
+    readinessHint: 'El reloj combina sueño, VFC y frecuencia cardíaca en reposo en una sola puntuación',
+    stressLabel: 'Estrés',
+    stressHint: 'Promedio de todo el día; la banda sombreada es el rango medido ese día',
+    curveCardAria: 'Estrés de 24 horas',
+    curveTitle: 'Últimas 24 horas',
+    curveSub: 'El reloj mide cada cinco minutos; lecturas individuales en orden cronológico',
+    curveChartAria: 'Estrés de las últimas 24 horas',
+    curveNoSamples: 'No hay lecturas de estrés en las últimas 24 horas, así que no hay curva que trazar. Así se ve un reloj que no se usó, o con el monitoreo de todo el día desactivado.',
+    curveNote: 'Las bandas (relajado 1-39, normal 40-59, medio 60-79, alto 80-100) son las de Zepp, no nuestras. El tiempo sin lecturas queda en blanco en vez de rellenarse con ceros.',
+    statLatest: 'Última',
+    statAverage: 'Promedio',
+    statLowest: 'Mínimo',
+    statHighest: 'Máximo',
+    stressTooltip: (clock: string, value: number) => `${clock}　<b>${value}</b>`,
+    spo2Label: 'Oxígeno en sangre',
+    spo2Hint: 'Lecturas individuales de SpO2 promediadas por día; la banda es el rango medido ese día',
+    spo2Empty: 'No hay lecturas individuales de SpO2 en este rango.',
+    odiLabel: 'ODI de SpO2 nocturno',
+    odiHint: 'Desaturaciones por hora; cuanto más bajo, mejor',
+    hrvHint: 'Variabilidad de la frecuencia cardíaca, mediciones individuales promediadas por día',
+    rmssdHint: 'Variabilidad de alta frecuencia durante la noche, promediada por día',
+    respiratoryLabel: 'Frecuencia respiratoria',
+    respiratoryHint: 'Respiraciones durante el sueño; la banda es el rango medido ese día',
+    restingLabel: 'Frecuencia cardíaca en reposo',
+    restingHint: 'Frecuencia cardíaca en reposo tal como la calcula ZeppBridge cada día',
+    unitScore: 'pts',
+    unitPerHour: '/h',
+    unitBreathsPerMinute: 'resp/min',
+    weightLabel: 'Peso',
+    weightHint: 'Cada pesaje, promediado por día; la banda es el rango medido ese día',
+    bmiLabel: 'IMC',
+    bmiHint: 'Índice de masa corporal, enviado por la nube junto con el peso',
+    fatLabel: 'Grasa corporal',
+    fatHint: 'Necesita una báscula de composición corporal. Los pesos del reloj o ingresados a mano no traen grasa',
+    muscleLabel: 'Masa muscular',
+    muscleHint: 'Necesita una báscula de composición corporal',
+    waterLabel: 'Agua corporal',
+    waterHint: 'Necesita una báscula de composición corporal',
+    boneLabel: 'Masa ósea',
+    boneHint: 'Necesita una báscula de composición corporal',
+    visceralLabel: 'Grasa visceral',
+    visceralHint: 'Un nivel, no un porcentaje. Zepp lo califica de 1 a 30',
+    bmrLabel: 'Metabolismo basal',
+    bmrHint: 'Necesita una báscula de composición corporal',
+    heightLabel: 'Estatura',
+    heightHint: 'Dato del perfil que vuelve con cada pesaje, no una medición del día',
+    unitGrade: 'nivel',
+    unitKcalPerDay: 'kcal/día',
+    scaleEmpty: 'No hay pesajes en este rango. Las lecturas de la báscula aparecen aquí después de sincronizar.',
+    bodyGroupTitle: 'Peso y composición corporal',
+    bodyGroupEmpty: 'No hay registros de peso ni de composición corporal en este rango. Las lecturas de composición necesitan una báscula de composición corporal; los pesos del reloj o ingresados a mano no las traen.',
+    intakeGroupTitle: 'Alimentación',
+    intakeGroupEmpty: 'No hay registros de comidas en este rango. Las comidas se registran a mano en la app Zepp; una vez registradas, aparecen aquí después de sincronizar.',
+    intakeCaloriesLabel: 'Calorías consumidas',
+    intakeCaloriesHint: 'Total registrado en el día. Los días sin registro no tienen barra, y nunca se rellenan con 0',
+    proteinLabel: 'Proteína',
+    fatIntakeLabel: 'Grasa',
+    carbsLabel: 'Carbohidratos',
+    macroHint: 'Total registrado en el día',
+    unitKcal: 'kcal',
+    unitGram: 'g',
+    macroTitle: 'Equilibrio de la dieta',
+    macroSub: 'Proporción de calorías que aportó cada macronutriente en este rango',
+    macroNote: 'Las proporciones se calculan aquí a partir de los gramos diarios usando 4/9/4 kcal por gramo (proteína / grasa / carbohidratos). No las envía la nube y pueden diferir en un punto o dos de los porcentajes de la app Zepp. No se dibuja nada si no están los tres.',
+    gramsPerDay: (grams: number) => `${grams} g por día en promedio`,
   },
 );
 const t = useMessages(messages);
@@ -593,7 +675,9 @@ const curveAverage = computed(() => (curve.value.length
   ? Math.round(curve.value.reduce((total, point) => total + point.value, 0) / curve.value.length)
   : null));
 
-const clock = (value: number) => formatTime(value);
+const clock = (value: number) => displayDateTimeFormatter({
+  hour: '2-digit', minute: '2-digit', hour12: false,
+}).format(new Date(value));
 
 /*
  * 曲线断开的阈值。
@@ -721,6 +805,7 @@ watch(dataRevision, () => { void load(); });
       </div>
     </PageHeader>
 
+    <LifeEventShortcut :days="rangeDays" />
     <CoverageNotice :requested-days="rangeDays" />
 
     <div v-if="error" class="inline-alert" role="alert">

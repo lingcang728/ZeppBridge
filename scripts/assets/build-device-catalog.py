@@ -263,6 +263,18 @@ CARDS: list[dict[str, Any]] = [
 
 EXTRAS: list[dict[str, Any]] = [
     {
+        "catalog_id": "amazfit-bip", "canonical_name": "Amazfit Bip",
+        "display_name": "Amazfit Bip", "name_zh": "Amazfit 米动手表青春版 Bip",
+        "kind": "watch", "model_codes": [],
+        "aliases": ["Amazfit Bip", "Bip", "Amazfit Bip 1", "Bip 1", "米动手表青春版"],
+        "region": ["global"], "official_page": "https://support.amazfit.com/en/amazfit_bip/user-guide",
+        "official_url": "https://support.amazfit.com/en/amazfit_bip/user-guide",
+        "image_source_url": None, "asset_key": None, "asset_source": "pending-official-art",
+        "canonical_device_key": "amazfit-bip", "checked_at": "2026-09-12",
+        "provenance": "Original Amazfit Bip confirmed by the official Amazfit Bip user manual. Issue #78 requests Bip 1 in the picker; no unverified cloud source number or borrowed product image is assigned.",
+    },
+
+    {
         "catalog_id": "amazfit-helio-strap-pro",
         "canonical_name": "Amazfit Helio Strap Pro",
         "display_name": "Amazfit Helio Strap Pro",
@@ -844,6 +856,12 @@ def build_catalog() -> None:
         document = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
         document["version"] = 6
         known_ids = {device["catalog_id"] for device in document["devices"]}
+        for extra in EXTRAS:
+            if extra["catalog_id"] not in known_ids and extra.get("asset_key") is None:
+                document["devices"].append(enrich_entry(extra, None))
+                known_ids.add(extra["catalog_id"])
+        document["active_supported_count"] = sum(1 for d in document["devices"] if d.get("supported") and d["status"] == "active")
+        document["canonical_device_count"] = len({d["canonical_device_key"] for d in document["devices"] if d.get("supported") and d["status"] == "active"})
         if unknown := sorted(set(DEVICE_SOURCE_CODES) - known_ids):
             raise SystemExit(f"Unknown catalog IDs: {unknown}")
         for device in document["devices"]:

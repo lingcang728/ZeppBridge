@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { displayDateTimeFormatter } from '../lib/dateTime';
+
 defineOptions({ name: 'HeartRateDetail' });
 /**
  * 心率二级界面。
@@ -19,7 +21,7 @@ import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { zeppSemanticColors } from '../lib/echartsTheme';
 import { indexSeries, SERIES_RANGE_DAYS, seriesRanges, type SeriesRangeDays } from '../lib/metricSeries';
-import { formatCalendarDate, formatTime, isFiniteNumber } from '../lib/format';
+import { isFiniteNumber } from '../lib/format';
 import type { DailyHeartRateExtreme, HeartRatePoint, MetricSeries } from '../types';
 import { defineMessages, useMessages } from '../i18n';
 
@@ -98,6 +100,43 @@ const messages = defineMessages(
       `${date}<br/>Peak <b>${max}</b> bpm<br/>Average ${avg} bpm<br/>${samples} samples`,
     dailyMaxNote: 'This uses only the raw per-reading samples stored on this machine. The Zepp daily peak is never sent to us (the device_max_hr in the library is the configured maximum used for zone limits, not a measured peak), so there is nothing to place beside it here — open the Zepp app to compare that day number.',
   },
+  {
+    backToOverview: 'Volver al resumen',
+    eyebrow: 'Frecuencia cardíaca',
+    title: 'Frecuencia cardíaca',
+    intro: 'La curva de frecuencia cardíaca de todo el día de hoy, más la frecuencia en reposo y la VFC día a día. Los tramos sin muestras quedan en blanco, no se rellenan con cero.',
+    rangeAria: 'Rango de tiempo de la tendencia',
+    desktopOnly: 'Usa la app de escritorio. Esta vista previa en el navegador no lee datos de la cuenta.',
+    loadFailed: 'Los datos de frecuencia cardíaca no están disponibles en este momento',
+    retry: 'Reintentar',
+    loadingAria: 'Cargando la frecuencia cardíaca',
+    dayCardAria: 'Frecuencia cardíaca de 24 horas',
+    dayTitle: 'Últimas 24 horas',
+    daySub: 'Lecturas individuales, en orden cronológico',
+    statLatest: 'Última',
+    statAverage: 'Prom.',
+    statLowest: 'Mín.',
+    statHighest: 'Máx.',
+    chartAria: 'Frecuencia cardíaca de las últimas 24 horas',
+    noSamples: 'No hay muestras de frecuencia cardíaca en las últimas 24 horas, así que no hay curva que trazar.',
+    bpmTooltip: (clock: string, value: number) => `${clock}　<b>${value}</b> lpm`,
+    restingLabel: 'Frecuencia cardíaca en reposo',
+    restingHint: 'El reloj reporta una por día; cuanto más estable, mejor',
+    hrvHint: 'Lecturas individuales de VFC, promediadas por día',
+    rmssdHint: 'Otra medida de VFC, no es el mismo número que la de arriba',
+    emptyCard: 'No hay nada registrado en este rango.',
+    dailyMaxTitle: 'Frecuencia cardíaca máxima diaria (muestras originales en este equipo)',
+    dailyMaxSub: 'La app Zepp filtra su máximo diario; esto no. Que los dos números sean distintos es lo esperado.',
+    dailyMaxAria: 'Tendencia de la frecuencia cardíaca máxima diaria',
+    dailyMaxNone: 'No hay muestras de frecuencia cardíaca en este equipo para este rango, así que no hay máximo que comparar.',
+    dailyMaxSparse: (days: number) =>
+      `${days} de estos días tienen muy pocas muestras (menos de 60). En esos días el máximo es el más alto de solo esos puntos, no el máximo real del día; se dibujan con marcadores huecos.`,
+    dailyMaxLegendMax: 'Máximo',
+    dailyMaxLegendAvg: 'Promedio',
+    dailyMaxTooltip: (date: string, max: number, avg: number, samples: number) =>
+      `${date}<br/>Máximo <b>${max}</b> lpm<br/>Promedio ${avg} lpm<br/>${samples} muestras`,
+    dailyMaxNote: 'Esto usa solo las muestras originales de cada lectura guardadas en este equipo. El máximo diario de Zepp nunca nos llega (el device_max_hr de la biblioteca es el máximo configurado para los límites de zonas, no un máximo medido), así que no hay nada que poner al lado aquí: abre la app Zepp para comparar el número de ese día.',
+  },
 );
 const t = useMessages(messages);
 
@@ -141,7 +180,9 @@ const average = computed(() => (points.value.length
   ? Math.round(points.value.reduce((total, point) => total + point.value, 0) / points.value.length)
   : null));
 
-const clock = (value: number) => formatTime(value);
+const clock = (value: number) => displayDateTimeFormatter({
+  hour: '2-digit', minute: '2-digit', hour12: false,
+}).format(new Date(value));
 
 const dayChartOption = computed(() => {
   const data = points.value.map((point) => [point.ts, point.value]);
@@ -258,12 +299,12 @@ const dailyMaxChartOption = computed(() => {
       formatter: (params: Array<{ dataIndex: number }>) => {
         const row = rows[params?.[0]?.dataIndex ?? -1];
         if (!row) return '';
-        return t.value.dailyMaxTooltip(formatCalendarDate(row.date), row.max, row.average, row.samples);
+        return t.value.dailyMaxTooltip(row.date, row.max, row.average, row.samples);
       },
     },
     xAxis: {
       type: 'category',
-      data: rows.map((row) => formatCalendarDate(row.date)),
+      data: rows.map((row) => row.date.slice(5)),
       axisLabel: { color: '#B4BBC3', fontSize: 14.5, hideOverlap: true },
       axisTick: { show: false },
       axisLine: { lineStyle: { color: 'rgba(226, 234, 242, .12)' } },

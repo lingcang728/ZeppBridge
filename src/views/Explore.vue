@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { displayDateTimeFormatter } from '../lib/dateTime';
+
 defineOptions({ name: 'Explore' });
 import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
@@ -14,8 +16,9 @@ import {
 } from '../composables/useExport';
 import { useSyncController } from '../composables/useSyncController';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
+import { useLifeEvents } from '../composables/useLifeEvents';
 import { useAiHandoff } from '../composables/useAiHandoff';
-import { formatCalendarDate, formatCalendarMonth, formatDateTime, formatWeekdayNames, localDateString, parseCalendarDate } from '../lib/format';
+import { localDateString } from '../lib/format';
 import { popoverStyle } from '../lib/popoverPosition';
 import { rangeOptions } from '../lib/rangeOptions';
 import { AI_PROVIDERS, AI_PROVIDER_BY_ID, type AiProviderId } from '../lib/aiProviders';
@@ -24,6 +27,7 @@ import { exploreMessages, promptTemplates, type PromptTemplate } from './Explore
 import { intlLocale, locale, useMessages } from '../i18n';
 
 const t = useMessages(exploreMessages);
+const { events: lifeEvents } = useLifeEvents();
 
 const {
   exportStartDate,
@@ -100,7 +104,7 @@ const selectTemplate = (tpl: PromptTemplate) => {
   activeTemplateId.value = tpl.id;
   editedPrompt.value = tpl.prompt;
   promptEdited.value = false;
-  exportDataTypes.value = [...tpl.types];
+  exportDataTypes.value = [...tpl.types, ...(exportDataTypes.value.includes('life_events') ? ['life_events' as const] : [])];
 };
 
 /* ── 导出格式与目标工具 ────────────────── */
@@ -151,11 +155,13 @@ const datesValid = computed(() =>
 const scopeRangeText = computed(() => {
   if (focusedWorkoutId.value) {
     if (!previewScope.value) return t.value.thisWorkout;
-    return formatDateTime(previewScope.value.startTime, t.value.thisWorkout);
+    const start = new Date(previewScope.value.startTime);
+    if (Number.isNaN(start.getTime())) return t.value.thisWorkout;
+    return displayDateTimeFormatter({
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
+    }).format(start);
   }
-  return datesValid.value
-    ? `${formatCalendarDate(exportStartDate.value)} ~ ${formatCalendarDate(exportEndDate.value)}`
-    : '—';
+  return datesValid.value ? `${exportStartDate.value} ~ ${exportEndDate.value}` : '—';
 });
 
 const scopeRangeSub = computed(() => {
@@ -343,8 +349,7 @@ const measureDatePicker = () => {
 
 const openDatePicker = (target: 'start' | 'end') => {
   const currentVal = target === 'start' ? exportStartDate.value : exportEndDate.value;
-  // 存储值是纯日历日期：按本地年月日解析，解析不出来就退回今天。
-  const d = (currentVal ? parseCalendarDate(currentVal) : null) ?? new Date();
+  const d = currentVal ? new Date(currentVal) : new Date();
   pickerYear.value = d.getFullYear();
   pickerMonth.value = d.getMonth();
   datePickerOpen.value = target;
@@ -425,13 +430,21 @@ const nextMonth = () => {
   }
 };
 
-/* 月份和星期名交给共享格式化层，地区取自系统（`navigator.language`），
-   和页面上其他日期一致：英文界面上「2026年 8月」既不是英文也不是任何人的
-   日期写法。zh-CN 的表头沿用窄名（日 / 一 / 二…）。 */
-const calendarTitle = computed(() => formatCalendarMonth(pickerYear.value, pickerMonth.value));
+/* 月份和星期名交给 Intl，不再写死中文数组：英文界面上「2026年 8月」
+   既不是英文也不是任何人的日期写法。 */
+const calendarTitle = computed(() => displayDateTimeFormatter({
+  year: 'numeric', month: 'long',
+}).format(new Date(pickerYear.value, pickerMonth.value, 1)));
 
-const weekdayNames = computed(() =>
-  formatWeekdayNames(locale.value === 'zh' ? 'narrow' : 'short'));
+const weekdayNames = computed(() => {
+  // 2026-01-04 是星期日，从它数七天就是一周的表头。
+  const sunday = new Date(2026, 0, 4);
+  const formatter = displayDateTimeFormatter({
+    weekday: locale.value === 'zh' ? 'narrow' : 'short',
+  });
+  return Array.from({ length: 7 }, (_unused, offset) =>
+    formatter.format(new Date(2026, 0, sunday.getDate() + offset)));
+});
 
 const calendarDays = computed(() => {
   const firstDay = new Date(pickerYear.value, pickerMonth.value, 1).getDay();
@@ -540,7 +553,7 @@ watch(
   schedulePreview,
   { deep: true, immediate: true },
 );
-watch(dataRevision, () => void loadPreview());
+watch([dataRevision, lifeEvents], () => void loadPreview());
 onBeforeUnmount(() => window.clearTimeout(previewTimer));
 </script>
 
@@ -686,7 +699,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
                   @click="datePickerOpen === 'start' ? closeDatePicker() : openDatePicker('start')"
                 >
                   <Icon name="clock" :size="12" />
-                  <span>{{ exportStartDate ? formatCalendarDate(exportStartDate) : t.startDate }}</span>
+                  <span>{{ exportStartDate || t.startDate }}</span>
                 </button>
                 <span>~</span>
                 <button
@@ -699,7 +712,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
                   @click="datePickerOpen === 'end' ? closeDatePicker() : openDatePicker('end')"
                 >
                   <Icon name="clock" :size="12" />
-                  <span>{{ exportEndDate ? formatCalendarDate(exportEndDate) : t.endDate }}</span>
+                  <span>{{ exportEndDate || t.endDate }}</span>
                 </button>
 
                 <!-- 自定义深橄榄底日历弹层。

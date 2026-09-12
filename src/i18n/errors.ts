@@ -46,6 +46,9 @@ const messages = defineMessages(
       + '此方式会将令牌明文保存到仅当前用户可读写的文件中。',
     'err.core.invalid_host': '不安全的 Zepp 区域地址',
     'err.core.config': '配置有问题，需要先改一下',
+    'err.har.missing_user': 'HAR 中没有找到用户编号。请在登录成功后重新导出网络记录。',
+    'err.har.missing_token': 'HAR 中没有登录令牌。请启用包含敏感数据的 HAR 导出。',
+    'err.har.invalid_file': '无法读取有效的 HAR。请重新选择浏览器导出的 HAR 文件。',
     'err.core.busy': '另一个写入操作正在进行，请等它结束',
     'err.core.parse': 'Zepp 返回的数据无法解析',
     'err.core.database': '本地数据库暂时不可用',
@@ -181,6 +184,9 @@ const messages = defineMessages(
       + 'This saves tokens in a plaintext file readable and writable only by your user.',
     'err.core.invalid_host': 'Unsafe Zepp region address',
     'err.core.config': 'Something in the configuration needs changing first',
+    'err.har.missing_user': 'No user ID found in the HAR. Export network traffic again after signing in.',
+    'err.har.missing_token': 'No login token found in the HAR. Enable export with sensitive data.',
+    'err.har.invalid_file': 'Cannot read a valid HAR. Select a HAR file exported by your browser.',
     'err.core.busy': 'Another write is in progress. Wait for it to finish',
     'err.core.parse': "Zepp's response could not be parsed",
     'err.core.database': 'The local database is temporarily unavailable',
@@ -294,6 +300,156 @@ const messages = defineMessages(
     'err.update.launch_failed': "Couldn't start the updated installed build",
     'err.update.installed_build_missing': 'No new installed ZeppBridge build was found after setup',
     'err.update.portable_windows_only': 'Portable-to-installed migration is Windows only',
+  },
+  {
+    /* —— core —— */
+    'err.core.network': 'No se pudo conectar con la región de Zepp. Revisa tu conexión e inténtalo de nuevo',
+    'err.core.needs_reauth': 'Tu sesión caducó. Vuelve a conectarte a Zepp',
+    'err.core.unavailable': 'Esta cuenta o región no ofrece esos datos',
+    'err.core.retry_exhausted': 'Zepp no está disponible por el momento. Inténtalo de nuevo en un rato',
+    'err.core.http_status': 'Zepp devolvió un error. Inténtalo de nuevo en un rato',
+    'err.core.cloud_rejected':
+      'Zepp recibió la solicitud y la rechazó. Si sigue pasando, vuelve a conectar la cuenta de Zepp en Configuración',
+    'err.core.cancelled': 'Cancelado',
+    'err.core.auth': 'Algo salió mal con la autenticación',
+    'err.headless.no_credential_store':
+      'Este equipo no tiene un almacén de credenciales del sistema (GNOME Keyring / KWallet). '
+      + 'Los servidores sin interfaz y los contenedores normalmente no lo tienen. Define '
+      + 'ZEPPBRIDGE_CREDENTIAL_STORE=file para guardar el token con permisos 0600 en la carpeta de datos, '
+      + 'o ZEPPBRIDGE_CREDENTIAL_STORE=env junto con ZEPPBRIDGE_APP_TOKEN.',
+    'err.headless.schema_upgrade':
+      'Esta biblioteca es más antigua que la versión que la lee, y una conexión de solo lectura no '
+      + 'puede actualizarla. Abre la app de escritorio una vez, o ejecuta zeppbridge-cli reprocess en un '
+      + 'equipo sin interfaz. Ambas opciones hacen una copia de seguridad antes de actualizar.',
+    'err.headless.token_not_in_store':
+      'Los datos de la cuenta están aquí, pero el almacén de credenciales no tiene su token. Una '
+      + 'base de datos se puede copiar entre equipos; un token no: se queda en el almacén de credenciales '
+      + 'del equipo donde se creó. Vuelve a iniciar sesión.',
+    'err.core.credential_store':
+      'No se pudo acceder al almacén de credenciales. Revisa si está bloqueado, restringido por una política del sistema, '
+      + 'mal configurado o con permisos de archivo incorrectos. El inicio de sesión web, la importación de HAR y el ingreso manual '
+      + 'usan el mismo almacén, así que cambiar el método de inicio de sesión no evita un fallo de almacenamiento. '
+      + 'Si el Llavero de macOS o el llavero de Linux no están disponibles, sigue la guía de almacenamiento de credenciales '
+      + 'enlazada en el README: abre la app con ZEPPBRIDGE_CREDENTIAL_STORE=file y vuelve a iniciar sesión. '
+      + 'Así los tokens se guardan en un archivo de texto plano que solo tu usuario puede leer y escribir.',
+    'err.core.invalid_host': 'Dirección de región de Zepp no segura',
+    'err.core.config': 'Primero hay que cambiar algo en la configuración',
+    'err.har.missing_user': 'No se encontró el ID de usuario. Exporta el tráfico después de iniciar sesión.',
+    'err.har.missing_token': 'No se encontró el token. Exporta el HAR con datos sensibles.',
+    'err.har.invalid_file': 'No se puede leer el HAR. Selecciona un archivo exportado por el navegador.',
+    'err.core.busy': 'Hay otra escritura en curso. Espera a que termine',
+    'err.core.parse': 'No se pudo interpretar la respuesta de Zepp',
+    'err.core.database': 'La base de datos local no está disponible por el momento',
+    'err.core.io': 'Falló la lectura o escritura de un archivo local',
+    'err.core.unknown': 'Algo salió mal',
+
+    /* —— connect & auth —— */
+    'err.auth.sync_init_failed': 'No se pudo preparar la sincronización. Revisa la región de la cuenta e inténtalo de nuevo',
+    'err.auth.verify_network':
+      'La verificación falló: no se pudo conectar con Zepp. Revisa tu conexión e inténtalo de nuevo',
+    'err.auth.verify_needs_reauth':
+      'La verificación falló: la credencial ya no es válida. Guárdala de nuevo',
+    'err.auth.verify_failed': 'La verificación falló',
+
+    /* —— web login —— */
+    'err.login.waiting': 'Termina de iniciar sesión en Zepp en la ventana emergente',
+    'err.login.fallback_page': 'Abriendo la página de inicio de sesión alternativa',
+    'err.login.extracting': 'Credenciales leídas. Confirmando tu región',
+    'err.login.verifying': 'Verificando la cuenta',
+    'err.login.connected': 'Conectado a tu cuenta de Zepp',
+    'err.login.timeout': 'El inicio de sesión tardó demasiado. Inténtalo de nuevo',
+    'err.login.credentials_unreadable':
+      'Iniciaste sesión, pero no se pudieron leer las credenciales desde la ventana de inicio de sesión. Prueba la importación de HAR o ingresa un App Token a mano.',
+    'err.login.region_probe_failed':
+      'Se leyeron las credenciales, pero no se pudo confirmar la región de la cuenta. Vuelve a iniciar sesión o importa un archivo HAR.',
+    'err.login.credentials_rejected':
+      'Zepp rechazó estas credenciales. Cierra la sesión en la ventana de inicio de sesión y vuelve a iniciarla',
+    'err.login.region_unreachable':
+      'No se pudo conectar con el servicio de regiones de Zepp. Revisa tu conexión e inténtalo de nuevo',
+    'err.login.region_retrying':
+      'No se puede conectar con el servicio de regiones de Zepp en este momento; reintentando. La ventana de inicio de sesión sigue abierta, así que no hace falta volver a iniciar sesión',
+    'err.login.third_party_stalled':
+      'Este inicio de sesión con un servicio externo parece atascado. Las llaves de acceso de Google suelen quedarse en el paso de verificación dentro de una ventana de la app. Cierra la ventana de inicio de sesión y usa correo + contraseña, o ingresa un App Token a mano en Configuración.',
+    'err.login.bad_url': 'Dirección de inicio de sesión no válida',
+    'err.login.window_failed': 'No se pudo abrir la ventana de inicio de sesión',
+    'err.login.window_busy':
+      'La ventana de inicio de sesión anterior todavía se está cerrando. Espera un momento e inténtalo de nuevo',
+    'err.login.state_unavailable': 'El estado de la aplicación no está disponible',
+    'err.login.cancelled': 'Inicio de sesión cancelado',
+    'err.login.sync_init_failed': 'Iniciaste sesión, pero no se pudo preparar la sincronización',
+
+    /* —— sync & backfill —— */
+    'err.sync.not_connected': 'Todavía no estás conectado a Zepp. Conéctate primero',
+    'err.sync.not_verified': 'Termina de verificar la conexión antes de sincronizar los datos recientes',
+    'err.sync.not_verified_probe': 'Termina de verificar la conexión antes de probar las capacidades',
+    'err.sync.not_verified_backfill': 'Termina de verificar la conexión antes de recuperar el historial',
+    'err.sync.history_days_out_of_range': 'Esa cantidad de días está fuera del rango permitido',
+    'err.sync.deferred_compaction':
+      'Compactando los registros guardados para ahorrar espacio. Esta sincronización se reintentará automáticamente',
+    'err.sync.deferred_replay':
+      'Reconstruyendo los datos derivados a partir de los registros locales. Esta sincronización se reintentará automáticamente',
+    'err.backfill.bad_start_date': 'Fecha de inicio de recuperación no válida; usa AAAA-MM-DD',
+    'err.backfill.no_canonical_records':
+      'La nube devolvió datos, pero no se pudo extraer ningún registro utilizable',
+    'err.backfill.start_in_future': 'El inicio de la recuperación no puede ser posterior a hoy',
+
+    /* —— capabilities —— */
+    'err.capability.not_synced': 'Aún sin sincronizar',
+    'err.capability.needs_reauth': 'Hay que volver a autenticarse',
+    'err.capability.unverified': 'Aún sin verificar',
+    'err.capability.unavailable': 'No disponible',
+    'err.capability.unknown': 'Estado desconocido',
+    'err.capability.other': 'Estado desconocido',
+
+    /* —— export —— */
+    'err.export.empty_range': 'No hay registros en este rango para exportar',
+    'err.export.read_failed': 'No se pudieron leer los datos para exportar',
+    'err.export.convert_failed': 'No se pudo convertir al formato solicitado',
+    'err.export.write_failed': 'No se pudo escribir el archivo de exportación',
+    'err.export.write_json_failed': 'No se pudo escribir la exportación JSON',
+    'err.export.mkdir_failed': 'No se pudo crear la carpeta de exportación',
+    'err.export.path_required': 'Primero elige dónde guardar el archivo',
+    'err.export.path_not_absolute': 'La ubicación de guardado debe ser una ruta absoluta',
+    'err.export.not_a_directory':
+      'Una exportación FIT necesita una carpeta, pero la ruta elegida es un archivo',
+    'err.export.bad_extension': 'El archivo de exportación tiene una extensión incorrecta',
+    'err.export.path_no_parent': 'La ubicación de guardado no tiene una carpeta válida',
+    'err.export.parent_missing': 'La carpeta elegida no existe',
+
+    /* —— hand to AI —— */
+    'err.handoff.prompt_required': 'Primero escribe una instrucción',
+    'err.handoff.empty_range': 'No hay registros en este rango para entregar',
+    'err.handoff.mkdir_failed': 'No se pudo crear la carpeta de entrega',
+    'err.handoff.write_failed': 'No se pudieron escribir los datos anonimizados para la IA',
+    'err.handoff.parse_failed': 'No se pudo interpretar el JSON de exportación para la IA',
+    'err.handoff.encode_failed': 'No se pudo codificar la exportación anonimizada para la IA',
+
+    /* —— feedback —— */
+    'err.diagnostic.nothing_to_submit':
+      'Este dispositivo no tiene un número de modelo que ayude al catálogo, así que no hay nada que enviar',
+    'err.diagnostic.empty_report':
+      'Primero elige un tipo de problema o escribe una frase; si no, el reporte no contiene nada con lo que se pueda trabajar',
+    'err.diagnostic.client_init_failed': 'No se pudo abrir una conexión para el reporte',
+    'err.diagnostic.send_failed': 'No se pudo enviar el reporte. Revisa tu conexión e inténtalo de nuevo',
+    'err.diagnostic.http_error': 'El servicio de reportes devolvió un error',
+    'err.diagnostic.rate_limited':
+      'Demasiados reportes en poco tiempo. Inténtalo de nuevo en un rato; los que ya se enviaron se conservan y no hace falta reenviarlos.',
+    'err.diagnostic.bad_response': 'El servicio de reportes devolvió algo que no se pudo leer',
+
+    /* —— misc —— */
+    'err.workout.not_found': 'Ese entrenamiento ya no existe',
+    'err.prefs.retention_out_of_range': 'La conservación debe estar entre 1 y 365 días',
+    'err.storage.write_busy': 'Hay otra escritura de ZeppBridge en curso. Espera a que termine',
+    'err.storage.write_lock_unavailable':
+      'No se pudo crear el bloqueo de escritura. Revisa los permisos de la carpeta de datos',
+    'err.local_api.token_unavailable': 'No se pudo leer la credencial de la API local',
+    'err.local_api.token_rotate_failed': 'No se pudo regenerar la credencial de la API local',
+    'err.data_folder.open_failed': 'No se pudo abrir la carpeta de datos',
+    'err.data_folder.unsupported_os': 'Abrir la carpeta de datos solo funciona en Windows y macOS',
+    'err.update.localappdata_missing': 'La ruta LOCALAPPDATA de Windows no está disponible',
+    'err.update.launch_failed': 'No se pudo iniciar la versión instalada actualizada',
+    'err.update.installed_build_missing': 'No se encontró una nueva versión instalada de ZeppBridge después de la instalación',
+    'err.update.portable_windows_only': 'La migración de portable a instalada solo existe en Windows',
   },
 );
 

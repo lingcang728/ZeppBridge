@@ -20,26 +20,28 @@ import { computed, ref, type ComputedRef } from 'vue';
  * 落地页（`useLandingLocale.ts`）有自己的一套开关，刻意不合并：那是给全网
  * 访客看的静态页，判定默认语言的规则和应用不一样，而且它整块是懒加载的。
  */
-export type Locale = 'zh' | 'en';
+export type Locale = 'zh' | 'en' | 'es';
 
 /** 语言选择器按这个顺序排。 */
-export const LOCALES: readonly Locale[] = ['zh', 'en'];
+export const LOCALES: readonly Locale[] = ['zh', 'en', 'es'];
 
 /** 每种语言在界面上的自称——不翻译，「English」在中文界面里也写 English。 */
-export const LOCALE_LABELS: Record<Locale, string> = { zh: '中文', en: 'English' };
+export const LOCALE_LABELS: Record<Locale, string> = { zh: '中文', en: 'English', es: 'Español' };
 
 const STORAGE_KEY = 'zeppbridge-locale';
 
 /** `<html lang>` 用的标记。 */
-const HTML_LANG: Record<Locale, string> = { zh: 'zh-CN', en: 'en' };
+const HTML_LANG: Record<Locale, string> = { zh: 'zh-CN', en: 'en', es: 'es' };
 
 /**
  * `Intl` 用的标记。日期、星期、数字分组全跟着它走——只翻文字不换日期格式的话，
  * 英文界面上会出现「2026/8/30」这种一眼就是机翻的东西。
+ * 西语用拉美通用的 `es-419`：日/月/年，24 小时制。
  */
-const INTL_LOCALE: Record<Locale, string> = { zh: 'zh-CN', en: 'en-US' };
+const INTL_LOCALE: Record<Locale, string> = { zh: 'zh-CN', en: 'en-US', es: 'es-419' };
 
-const isLocale = (value: unknown): value is Locale => value === 'zh' || value === 'en';
+const isLocale = (value: unknown): value is Locale =>
+  value === 'zh' || value === 'en' || value === 'es';
 
 /**
  * 首次启动用什么语言：记住的选择优先，其次看系统语言。
@@ -55,7 +57,9 @@ const detectLocale = (): Locale => {
     // 隐私模式下 localStorage 可能直接抛异常，这不该拦住应用启动。
   }
   const preferred = window.navigator.languages?.[0] ?? window.navigator.language ?? '';
-  return /^zh\b/i.test(preferred) ? 'zh' : 'en';
+  if (/^zh\b/i.test(preferred)) return 'zh';
+  if (/^es\b/i.test(preferred)) return 'es';
+  return 'en';
 };
 
 const current = ref<Locale>(detectLocale());
@@ -98,20 +102,49 @@ type MessageLeaf = string | readonly string[] | ((...args: never[]) => string);
 /** 一份文案。可以嵌套，可以带参数（写成函数）。 */
 export type MessageTree = { readonly [key: string]: MessageLeaf | MessageTree };
 
+/** 西语那份的形状：键可以缺，缺的回落到英文；已写的键参数必须对得上。 */
+export type PartialMessages<T> = {
+  readonly [K in keyof T]?: T[K] extends MessageLeaf ? T[K] : PartialMessages<T[K]>;
+};
+
 export interface MessageBundle<T extends MessageTree> {
   readonly zh: T;
   readonly en: T;
+  readonly es: T;
 }
 
+const isBranch = (value: unknown): value is MessageTree =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/** 把西语覆盖到英文上：逐层合并，叶子（字符串、数组、函数）整条替换。 */
+const mergeOver = <T extends MessageTree>(base: T, over: PartialMessages<T> | undefined): T => {
+  if (!over) return base;
+  const out: Record<string, unknown> = { ...base };
+  for (const [key, value] of Object.entries(over)) {
+    if (value === undefined) continue;
+    const baseValue = (base as Record<string, unknown>)[key];
+    out[key] = isBranch(value) && isBranch(baseValue)
+      ? mergeOver(baseValue, value as PartialMessages<MessageTree>)
+      : value;
+  }
+  return out as T;
+};
+
 /**
- * 定义一个模块的两份文案。
+ * 定义一个模块的文案。
  *
  * 形状以中文那份为准（`NoInfer` 让 TypeScript 只从 `zh` 推类型），所以英文
  * **少一个键、多一个键、参数对不上都会编译不过**——这比运行时回退到中文
  * 有用得多：漏翻的字符串在 `npm run build` 就会被拦下，而不是等用户看到。
+ *
+ * 第三份是西语，可以只写一部分：没写的键在西语界面下显示英文。
  */
-export const defineMessages = <T extends MessageTree>(zh: T, en: NoInfer<T>): MessageBundle<T> =>
-  ({ zh, en: en as T });
+export const defineMessages = <T extends MessageTree>(
+  zh: T,
+  en: NoInfer<T>,
+  es?: PartialMessages<NoInfer<T>>,
+): MessageBundle<T> =>
+  ({ zh, en: en as T, es: mergeOver(en as T, es as PartialMessages<T> | undefined) });
 
 /** 在组件或 composable 里取当前语言的文案。切换语言时跟着变。 */
 export const useMessages = <T extends MessageTree>(bundle: MessageBundle<T>): ComputedRef<T> =>

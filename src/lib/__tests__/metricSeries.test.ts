@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import type { MetricSeries } from '../../types';
-import { formatCalendarDate } from '../format';
 import {
   buildSeriesOption,
   coverageLabel,
@@ -130,19 +129,5 @@ describe('手动记录的日子不能被画成连续的', () => {
     expect(bars.type).toBe('bar');
     // 缺的两天是 null，不是 0：没记不等于没吃。
     expect(bars.data).toEqual([2100, 1980, null, null, 2260]);
-  });
-});
-
-describe('日期坐标轴和 tooltip 走共享的日历格式化', () => {
-  it('不把原始 YYYY-MM-DD 直接搬到界面上', () => {
-    const option = buildSeriesOption(series(), { color: '#fff' }) as {
-      xAxis: { axisLabel: { formatter: (value: string) => string } };
-      tooltip: { formatter: (params: Array<{ axisValue: string }>) => string };
-    };
-    const formatted = formatCalendarDate('2026-01-01');
-    // 原始 ISO 字符串和共享格式化结果不同；相等就说明没走共享函数。
-    expect(formatted).not.toBe('2026-01-01');
-    expect(option.xAxis.axisLabel.formatter('2026-01-01')).toBe(formatted);
-    expect(option.tooltip.formatter([{ axisValue: '2026-01-01' }])).toContain(formatted);
   });
 });

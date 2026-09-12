@@ -1,4 +1,5 @@
 <script setup lang="ts">
+
 defineOptions({ name: 'RecentRecords' });
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
@@ -10,7 +11,7 @@ import SkeletonBlock from '../components/SkeletonBlock.vue';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { useSyncController } from '../composables/useSyncController';
 import { workoutLabel } from '../lib/labels';
-import { formatCalendarDate, formatDate, formatDistance, formatDuration, isFiniteNumber } from '../lib/format';
+import { formatDate, formatDistance, formatDuration, isFiniteNumber } from '../lib/format';
 import { displayableWorkouts, workoutDisplayLabel, workoutDisplayType, workoutDurationMinutes, workoutTypeKey } from '../lib/workouts';
 import type { SleepSession, Workout } from '../types';
 import { defineMessages, useMessages } from '../i18n';
@@ -61,6 +62,29 @@ const messages = defineMessages(
     today: 'Today',
     yesterday: 'Yesterday',
     listDate: (month: number, day: number, weekday: string) => `${weekday}, ${month}/${day}`,
+  },
+  {
+    backToOverview: 'Volver al resumen',
+    title: 'Registros recientes',
+    intro: 'Sueño y entrenamientos sincronizados recientemente, uno al lado del otro.',
+    loadingLabel: 'Cargando los registros recientes',
+    loadFailedTitle: 'No se pudieron cargar los registros recientes',
+    retry: 'Reintentar',
+    partialUnavailable: 'Algunos datos no están disponibles en este momento',
+    filterAll: 'Todos',
+    recentSleep: 'Sueño reciente',
+    recentWorkouts: 'Entrenamientos recientes',
+    countBadge: (count: number) => `${count} en total`,
+    seeAll: 'Ver todo',
+    noSleep: 'Aún no hay registros de sueño',
+    noWorkouts: 'No hay nada que mostrar aquí.',
+    noWorkoutsOfType: 'No hay nada que mostrar para este tipo de entrenamiento.',
+    hiddenIncomplete: (count: number) => `${count} registros incompletos ocultos`,
+    notProvided: 'Sin datos',
+    dateUnknown: 'Fecha desconocida',
+    today: 'Hoy',
+    yesterday: 'Ayer',
+    listDate: (month: number, day: number, weekday: string) => `${weekday} ${day}/${month}`,
   },
 );
 const t = useMessages(messages);
@@ -153,7 +177,7 @@ const workoutFact = (workout: Workout): string => {
 };
 
 function listDate(value: string): string {
-  return formatCalendarDate(value);
+  return formatDate(value);
 }
 
 function shortDistance(meters?: number): string {

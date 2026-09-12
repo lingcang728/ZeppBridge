@@ -1,8 +1,17 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import LifeEventShortcut from './LifeEventShortcut.vue';
+import { useLifeEvents } from '../composables/useLifeEvents';
+import { validEventDate, overlapsEvent } from '../lib/lifeEvents';
+const { open: openEvent, events: lifeEvents } = useLifeEvents();
+const chartClick = (event: { name?: string; data?: unknown }) => {
+  const eventId = event.data && typeof event.data === 'object' && 'eventId' in event.data ? event.data.eventId : null;
+  const matching = lifeEvents.value.find(e => e.id === eventId);
+  if (matching) openEvent(matching);
+  else if (event.name && validEventDate(event.name)) openEvent(undefined, event.name);
+};
 import { VChart } from '../lib/echartsSetup';
 import { buildSeriesOption, coverageLabel } from '../lib/metricSeries';
-import { formatCalendarDate } from '../lib/format';
 import type { MetricSeries } from '../types';
 import { defineMessages, useMessages } from '../i18n';
 
@@ -26,6 +35,16 @@ const messages = defineMessages(
     average: 'Avg',
     minimum: 'Min',
     maximum: 'Max',
+  },
+  {
+    latestTag: 'Último',
+    measuredOn: (date: string) => `medido el ${date}`,
+    trendAria: (label: string) => `Línea de tendencia de ${label}`,
+    onlyOneDay: 'Solo hay un día de datos en este rango, así que todavía no hay tendencia que trazar.',
+    defaultEmpty: 'Esta métrica muestra su tendencia una vez sincronizada.',
+    average: 'Prom.',
+    minimum: 'Mín.',
+    maximum: 'Máx.',
   },
 );
 const t = useMessages(messages);
@@ -84,7 +103,7 @@ const stats = computed(() => {
 const option = computed(() => {
   const series = props.series;
   if (!series || !hasTrend.value) return null;
-  return buildSeriesOption(series, {
+  const result = buildSeriesOption(series, {
     color: props.color,
     decimals: props.decimals,
     showSpread: props.showSpread,
@@ -93,6 +112,14 @@ const option = computed(() => {
     chart: props.chart,
     calendarAxis: props.calendarAxis,
   });
+  // Mark every visible calendar day covered by an event, including ongoing spans.
+  const marks = series.points.filter(p => lifeEvents.value.some(e => overlapsEvent(e, p.date, p.date)))
+    .map(p => ({ coord: [p.date, p.value], eventId: lifeEvents.value.find(e => overlapsEvent(e, p.date, p.date))?.id }));
+  const chartSeries = result.series as Array<Record<string, unknown>>;
+  const last = chartSeries[chartSeries.length - 1];
+  Object.assign(last, { markPoint: { symbol: 'circle', symbolSize: 9, label: { show: false },
+    itemStyle: { color: '#D9E99B', borderColor: '#171A18', borderWidth: 2 }, data: marks } });
+  return result;
 });
 </script>
 
@@ -116,7 +143,7 @@ const option = computed(() => {
 
     <p class="trend-meta">
       <span>{{ coverage }}</span>
-      <span v-if="latestDate" class="trend-date">{{ t.measuredOn(formatCalendarDate(latestDate)) }}</span>
+      <span v-if="latestDate" class="trend-date">{{ t.measuredOn(latestDate) }}</span>
       <span v-if="band" class="trend-band">{{ band }}</span>
     </p>
 
@@ -125,12 +152,15 @@ const option = computed(() => {
       class="trend-chart"
       theme="zeppbridge-dark"
       :option="option"
+      @click="chartClick"
       autoresize
       role="img"
       :aria-label="t.trendAria(label)"
     />
     <p v-else-if="hasPoints" class="trend-empty">{{ t.onlyOneDay }}</p>
     <p v-else class="trend-empty">{{ emptyMessage }}</p>
+
+    <LifeEventShortcut :start="series?.points[0]?.date" :end="series?.points[series.points.length - 1]?.date" />
 
     <dl v-if="stats.length" class="trend-stats">
       <div v-for="row in stats" :key="row.label">

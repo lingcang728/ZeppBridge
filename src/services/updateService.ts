@@ -4,6 +4,7 @@ import { defineMessages, messagesOf } from '../i18n';
 const updateMessages = defineMessages(
   { nothingToInstall: '没有可安装的更新，请重新检查。' },
   { nothingToInstall: 'There is no update to install. Check again.' },
+  { nothingToInstall: 'No hay ninguna actualización para instalar. Vuelve a revisar.' },
 );
 
 export type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'installing' | 'failed' | 'upToDate' | 'unmanaged';

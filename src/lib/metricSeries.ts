@@ -1,6 +1,6 @@
+import { displayDateTimeFormatter } from './dateTime';
 import type { MetricSeries, MetricSeriesPoint } from '../types';
 import { paceSecondsPerBigUnit } from './units';
-import { formatCalendarDate } from './format';
 import { defineMessages, messagesOf } from '../i18n';
 import { DISPLAY_RANGE_DAYS, rangeOptions } from './rangeOptions';
 
@@ -18,6 +18,13 @@ const messages = defineMessages(
     coverage: (days: number, withData: number) => `${withData} of ${days} days have records`,
     dayRange: (low: string, high: string, unit: string) => `That day ranged ${low} – ${high}${unit}`,
     samples: (count: number) => `${count} readings`,
+  },
+  {
+    notSyncedYet: 'Aún sin sincronizar',
+    noRecordsInWindow: (days: number) => `Sin registros en los últimos ${days} días`,
+    coverage: (days: number, withData: number) => `${withData} de ${days} días tienen registros`,
+    dayRange: (low: string, high: string, unit: string) => `Ese día varió entre ${low} y ${high}${unit}`,
+    samples: (count: number) => `${count} lecturas`,
   },
 );
 
@@ -66,7 +73,11 @@ export const coverageLabel = (series?: MetricSeries | null): string => {
 
 // 刻意不缓存成模块级常量：那样会把语言钉死在模块加载的那一刻，
 // 切到英文之后坐标轴上的日期还是中文格式。
-const shortDate = (value: string): string => formatCalendarDate(value);
+const shortDate = (value: string): string => {
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return displayDateTimeFormatter({ month: 'numeric', day: 'numeric' }).format(date);
+};
 
 /** Seconds per kilometre as `m:ss`, the unit runners actually read. */
 /**
@@ -191,7 +202,7 @@ export const buildSeriesOption = (
         const samples = point.samples
           ? `<br><span style="color:#949CA5">${copy().samples(point.samples)}</span>`
           : '';
-        return `${formatCalendarDate(point.date)}<br><b>${format(point.value)}</b>${unit}${spread}${samples}`;
+        return `${point.date}<br><b>${format(point.value)}</b>${unit}${spread}${samples}`;
       },
     },
     xAxis: {

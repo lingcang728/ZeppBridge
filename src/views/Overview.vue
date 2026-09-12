@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import LifeEventsPanel from '../components/LifeEventsPanel.vue';
+import LifeEventShortcut from '../components/LifeEventShortcut.vue';
+import { displayDateTimeFormatter } from '../lib/dateTime';
+
 defineOptions({ name: 'Overview' });
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
@@ -21,7 +25,7 @@ import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { formatDeviceIntro } from '../lib/deviceCopy';
 import { zeppSemanticColors } from '../lib/echartsTheme';
 import { indexSeries, latestValue } from '../lib/metricSeries';
-import { formatDateTime, formatDistance, formatDuration, formatMetric, formatTime, isFiniteNumber, type HealthCategory } from '../lib/format';
+import { formatDistance, formatDuration, formatMetric, formatTime, isFiniteNumber, type HealthCategory } from '../lib/format';
 import { displayableWorkouts, workoutDisplayLabel, workoutDurationMinutes, workoutTypeKey } from '../lib/workouts';
 import type { HealthOverview, HeartRatePoint, MetricSeries, SleepSession, Workout } from '../types';
 import { sleepStageLabel } from '../lib/sleepStages';
@@ -190,6 +194,87 @@ const messages = defineMessages(
     loadHigh: 'high',
     loadVeryHigh: 'very high',
   },
+  {
+    collapseHero: 'Contraer introducción',
+    collapseOnce: 'Solo esta vez',
+    collapseAlways: 'No volver a mostrar',
+    showHero: 'Mostrar introducción',
+    cancelCollapse: 'Cancelar',
+    heroTitleLine1: 'Los datos de tu reloj,',
+    heroTitleLine2: 'listos para pasárselos a una IA',
+    valueSecure: 'Seguro',
+    valueSecureSub: 'Los datos se quedan en este equipo',
+    valuePrivate: 'Privado',
+    valuePrivateSub: 'Los registros originales nunca se suben',
+    valueAiReady: 'Listo para IA',
+    valueAiReadySub: 'Estructurado antes de salir',
+    heroVisualAria: 'Datos de los dispositivos reconocidos fluyendo hacia una IA en la nube',
+    aiNodeAria: 'Entrega a una IA en la nube: ChatGPT, Doubao, DeepSeek',
+    cloudAi: 'IA en la nube',
+    unrecognizedSuffix: ' aún no tiene un modelo identificado',
+    unrecognizedCta: 'Elígelo manualmente',
+    deviceErrorPrefix: 'Identificación de dispositivos: ',
+    loadingAria: 'Cargando el resumen',
+    loadFailedTitle: 'No se pudo leer el resumen de datos',
+    retry: 'Reintentar',
+    healthUnavailable: 'Los datos de salud no están disponibles en este momento',
+    partialUnavailable: 'Algunos flujos de datos aún no se han descargado',
+    hrPanelAria: 'Abrir el detalle de frecuencia cardíaca de las 24 horas',
+    hrTitle: 'Frecuencia cardíaca reciente',
+    hrWindow: (hours: number) => `Últimas ${hours} horas`,
+    latest: 'Última',
+    bpm: 'lpm',
+    hrChartAria: 'Curva de frecuencia cardíaca de 24 horas',
+    hrZonesAria: 'Zonas de frecuencia cardíaca (umbrales absolutos)',
+    hrEmpty: 'Tu frecuencia cardíaca real aparece aquí después de sincronizar.',
+    hrMore: '24 horas completas',
+    hrTooltip: (clock: string, value: number) => `${clock}　<b>${value}</b> lpm`,
+    zoneRest: 'Reposo 0–99',
+    zoneFat: 'Quema de grasa 100–139',
+    zoneAerobic: 'Aeróbica 140–169',
+    zoneAnaerobic: 'Anaeróbica 170+',
+    stepsPanelAria: 'Abrir el detalle de actividad diaria',
+    stepsTitle: 'Pasos de hoy',
+    stepsGoalReference: 'Meta de referencia',
+    stepsGoalToday: 'Meta de hoy',
+    stepsUnit: 'pasos',
+    stepsGoalLine: (goal: string, percent: number) => `Meta ${goal} · ${percent}%`,
+    seeMore: 'Ver más',
+    sleepPanelAria: 'Abrir el detalle de sueño',
+    sleepTitle: 'Anoche',
+    sleepSub: 'Estructura del sueño de un vistazo',
+    sleepBarAria: 'Proporción de fases del sueño',
+    sleepEmpty: 'El sueño de anoche aparece aquí después de sincronizar.',
+    bodyPanelAria: 'Abrir el estado corporal',
+    bodyTitle: 'Estado corporal',
+    factRecovery: 'Recuperación',
+    factStress: 'Estrés',
+    factSpo2: 'SpO2',
+    bodySparkLabel: 'Recuperación en los últimos 7 días',
+    bodyThin: 'No hay suficientes registros en los últimos 7 días para trazar una tendencia',
+    bodyEmpty: 'La recuperación, el estrés y el oxígeno en sangre aparecen aquí después de sincronizar',
+    trainingPanelAria: 'Abrir el estado de entrenamiento',
+    trainingTitle: 'Estado de entrenamiento',
+    factLoad: 'Carga',
+    trainingSparkLabel: 'Carga de entrenamiento en los últimos 7 días',
+    trainingThin: 'No hay suficientes registros en los últimos 7 días para trazar una tendencia',
+    trainingEmpty: 'El VO₂máx y la carga de entrenamiento aparecen aquí después de sincronizar',
+    recentAria: 'Registros recientes',
+    recentTitle: 'Registros recientes',
+    recentSub: 'Sueño, carreras y fuerza',
+    seeAll: 'Ver todo',
+    recentEmpty: 'Aún no hay registros. Sincroniza y aparecerán aquí.',
+    sleepRecordTitle: 'Sueño',
+    sleepScore: (score: number) => `Puntuación de sueño ${score}`,
+    avgHr: (value: number) => `FC media ${value}`,
+    timeUnknown: 'Hora desconocida',
+    durationHours: (hours: number, minutes: number) => `${hours} h ${minutes} min`,
+    durationMinutes: (minutes: number) => `${minutes} min`,
+    loadLow: 'baja',
+    loadMedium: 'moderada',
+    loadHigh: 'alta',
+    loadVeryHigh: 'muy alta',
+  },
 );
 const t = useMessages(messages);
 const heroPreferenceKey = 'zeppbridge.overview.hideHero';
@@ -311,7 +396,7 @@ const hrChartOption = computed(() => {
     data.push([point.ts, point.value]);
   });
   const last = data[data.length - 1];
-  const clock = (value: number) => formatTime(value);
+  const clock = (value: number) => displayDateTimeFormatter({ hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value));
   return {
     animationDuration: 900,
     animationEasing: 'cubicOut' as const,
@@ -462,7 +547,13 @@ interface RecentItem {
   fact: string;
   factLabel?: string;
 }
-const shortDateTime = (value: string) => formatDateTime(value, t.value.timeUnknown);
+const shortDateTime = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return t.value.timeUnknown;
+  // 日月顺序跟着界面语言：西语读到 09/10 会理解成 9 月 10 日的反面。
+  const short = displayDateTimeFormatter({ month: '2-digit', day: '2-digit' }).format(date);
+  return `${short} ${formatTime(value)}`;
+};
 /* 只按运动的 key 分图标，不看显示名。
    显示名跟着界面语言变，拿它做分支判断，一换语言分类就悄悄失效。 */
 const workoutPresentation = (workout: Workout): Pick<RecentItem, 'category' | 'designIcon'> => {
@@ -587,6 +678,7 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
       「暂无数据」，谁也不解释为什么——而原因往往是登录时没确认对区域。
     -->
     <CoverageNotice />
+    <LifeEventShortcut />
 
     <div v-if="partialWarning" class="inline-alert warning" role="status"><Icon name="info" :size="15" />{{ partialWarning }}</div>
     <div v-if="deviceError" class="inline-alert warning" role="status"><Icon name="info" :size="15" />{{ t.deviceErrorPrefix }}{{ deviceError }}</div>
@@ -678,6 +770,7 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
         <div v-else class="panel-empty recent-empty"><DesignIcon name="document" :size="58" /><span>{{ t.recentEmpty }}</span></div>
       </section>
     </div>
+    <LifeEventsPanel />
   </section>
 </template>
 

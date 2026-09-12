@@ -46,6 +46,22 @@ const messages = defineMessages(
     loadMore: 'Load more',
     loadingMore: 'Loading…',
   },
+  {
+    backToRecent: 'Volver a registros recientes',
+    backToOverview: 'Volver al resumen',
+    title: 'Sueño',
+    intro: 'Registros de sueño sincronizados en este equipo. Sin una línea de tiempo completa, solo se muestra el resumen.',
+    loadFailedTitle: 'No se pudieron leer los registros de sueño',
+    loadFailed: 'La lista de sueño no está disponible en este momento',
+    retry: 'Reintentar',
+    emptyTitle: 'Aún no hay registros de sueño',
+    emptyMessage: 'Aparecen aquí después de sincronizar. Las fases nunca se inventan.',
+    scoreLabel: 'Puntuación',
+    footnote: (count: number, from: string) => `${count} registros · desde ${from}`,
+    shown: (shown: number, total: number) => `Mostrando ${shown} de ${total}`,
+    loadMore: 'Cargar más',
+    loadingMore: 'Cargando…',
+  },
 );
 const t = useMessages(messages);
 

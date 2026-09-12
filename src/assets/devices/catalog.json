@@ -8,8 +8,8 @@
     "https://amazfit-en.cdn.bcebos.com/smart-scale.html"
   ],
   "audit_baseline": "Official Amazfit Japan store captures in design_picture/Product (12 rows x 4 cards)",
-  "active_supported_count": 54,
-  "canonical_device_count": 52,
+  "active_supported_count": 55,
+  "canonical_device_count": 53,
   "devices": [
     {
       "catalog_id": "amazfit-balance-3",
@@ -1930,6 +1930,36 @@
       "canonical_device_key": "mi-body-composition-scale-2",
       "checked_at": "2026-09-04",
       "provenance": "Asked for twice in GitHub reports (1.1.2 in Chinese, 1.1.5 on macOS: \"still working with the Zepp app but not recognized here\"). A Xiaomi product, so official_url points at Xiaomi's own page and there is no Huami CDN art; none ships and the interface falls back to its inline scale placeholder. Listed because its readings arrive on the same cloud surface as every other weigh-in (/users/{id}/members/-1/weightRecords) -- only the name and picture were missing. No deviceSource is claimed.",
+      "asset_hash": null,
+      "image_key": null,
+      "status": "active",
+      "supported": true,
+      "device_source_codes": []
+    },
+    {
+      "catalog_id": "amazfit-bip",
+      "canonical_name": "Amazfit Bip",
+      "display_name": "Amazfit Bip",
+      "name_zh": "Amazfit 米动手表青春版 Bip",
+      "kind": "watch",
+      "model_codes": [],
+      "aliases": [
+        "Amazfit Bip",
+        "Bip",
+        "Amazfit Bip 1",
+        "Bip 1",
+        "米动手表青春版"
+      ],
+      "region": [
+        "global"
+      ],
+      "official_page": "https://support.amazfit.com/en/amazfit_bip/user-guide",
+      "official_url": "https://support.amazfit.com/en/amazfit_bip/user-guide",
+      "image_source_url": null,
+      "asset_source": "pending-official-art",
+      "canonical_device_key": "amazfit-bip",
+      "checked_at": "2026-09-12",
+      "provenance": "Original Amazfit Bip confirmed by the official Amazfit Bip user manual. Issue #78 requests Bip 1 in the picker; no unverified cloud source number or borrowed product image is assigned.",
       "asset_hash": null,
       "image_key": null,
       "status": "active",

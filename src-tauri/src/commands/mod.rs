@@ -31,3 +31,6 @@ pub(crate) use sync::{
     retry_failed_backfill_chunks, start_history_backfill, start_history_sync,
     start_incremental_sync, start_initial_sync,
 };
+
+mod life_events;
+pub(crate) use life_events::{delete_life_event, list_life_events, save_life_event};

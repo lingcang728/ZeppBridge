@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LifeEventShortcut from '../components/LifeEventShortcut.vue';
 defineOptions({ name: 'TrainingStatus' });
 import { computed, onMounted, ref, watch } from 'vue';
 import { VChart } from '../lib/echartsSetup';
@@ -48,6 +49,8 @@ const messages = defineMessages(
     thresholdOnce: (date: string) => `这段范围只有 1 次阈值测量（${date}），画不出趋势。`,
     thresholdEmpty: '这段范围没有乳酸阈值测量记录。',
     thresholdPaceTooltip: (value: string, unit: string) => `阈值配速 <b>${value}</b> ${unit}`,
+    /** 训练负荷是个无量纲分数，图表上不需要单位字。 */
+    loadUnit: '',
     thresholdHrTooltip: (value: number) => `阈值心率 <b>${value}</b> bpm`,
     balanceLabel: '运动负荷平衡',
     balanceHint: '7 天负荷相对 28 天周均，即急性／慢性负荷比',
@@ -88,6 +91,7 @@ const messages = defineMessages(
     thresholdOnce: (date: string) => `Only one threshold measurement in this range (${date}), so there is no trend to draw.`,
     thresholdEmpty: 'No lactate threshold measurements in this range.',
     thresholdPaceTooltip: (value: string, unit: string) => `Threshold pace <b>${value}</b> ${unit}`,
+    loadUnit: 'load',
     thresholdHrTooltip: (value: number) => `Threshold HR <b>${value}</b> bpm`,
     balanceLabel: 'Training load balance',
     balanceHint: '7-day load against the 28-day weekly average, i.e. the acute-to-chronic ratio',
@@ -101,6 +105,47 @@ const messages = defineMessages(
     acuteTooltip: (value: number, days: number) => `7-day load <b>${value}</b> (${days}/7 days with data)`,
     chronicTooltip: (value: number) => `28-day weekly avg <b>${value}</b>`,
     ratioTooltip: (value: string) => `Acute:chronic <b>${value}</b>`,
+  },
+  {
+    backToOverview: 'Volver al resumen',
+    eyebrow: 'Estado de entrenamiento',
+    title: 'Estado de entrenamiento',
+    intro: 'VO₂máx, umbral de lactato, carga de entrenamiento y zonas de frecuencia cardíaca. Todo leído de los registros sincronizados; sin consejos de entrenamiento.',
+    rangeAria: 'Rango de tiempo',
+    desktopOnly: 'Usa la app de escritorio. Esta vista previa en el navegador no lee datos de la cuenta.',
+    loadFailed: 'Los datos del estado de entrenamiento no están disponibles en este momento',
+    retry: 'Reintentar',
+    loadingAria: 'Cargando el estado de entrenamiento',
+    vo2Hint: 'Consumo máximo de oxígeno, estimado por el reloj después de carreras al aire libre',
+    vo2Empty: 'No hay registros de VO₂máx en este rango; solo se actualiza después de una carrera al aire libre.',
+    loadLabel: 'Carga de entrenamiento',
+    loadHint: 'Puntuación diaria de carga de entrenamiento',
+    loadEmpty: 'No hay registros de carga de entrenamiento en este rango.',
+    loadUnit: '',
+    paiLabel: 'PAI',
+    paiHint: 'Inteligencia de Actividad Personal en los últimos 7 días',
+    paiEmpty: 'No hay registros de PAI en este rango.',
+    thresholdLabel: 'Umbral de lactato',
+    thresholdHint: 'Frecuencia cardíaca y ritmo; solo se actualiza después de una carrera intensa',
+    thresholdHr: 'FC de umbral',
+    thresholdPace: 'Ritmo de umbral',
+    thresholdChartAria: 'Frecuencia cardíaca y ritmo del umbral de lactato',
+    thresholdOnce: (date: string) => `Solo hay una medición de umbral en este rango (${date}), así que no hay tendencia que trazar.`,
+    thresholdEmpty: 'No hay mediciones de umbral de lactato en este rango.',
+    thresholdPaceTooltip: (value: string, unit: string) => `Ritmo de umbral <b>${value}</b> ${unit}`,
+    thresholdHrTooltip: (value: number) => `FC de umbral <b>${value}</b> lpm`,
+    balanceLabel: 'Equilibrio de la carga de entrenamiento',
+    balanceHint: 'Carga de 7 días frente al promedio semanal de 28 días, es decir, la relación aguda:crónica',
+    balanceChartAria: 'Carga de entrenamiento de 7 y 28 días con la relación aguda:crónica',
+    balanceEmpty: 'Todavía no hay suficientes registros de carga de entrenamiento para trazar esta línea.',
+    balanceNote: 'Aguda:crónica = suma de los últimos 7 días ÷ (suma de los últimos 28 días ÷ 4). Cuando la ventana de 28 días cubre menos de 21 días, no se da la relación y la línea se corta ahí. Eso significa sin calcular, no cero.',
+    acute7d: 'Carga de 7 días',
+    chronicWeekly: 'Promedio semanal de 28 días',
+    acuteChronic: 'Aguda:crónica',
+    ratioMissing: (days: number) => `— (solo ${days} días con datos en la ventana de 28 días)`,
+    acuteTooltip: (value: number, days: number) => `Carga de 7 días <b>${value}</b> (${days}/7 días con datos)`,
+    chronicTooltip: (value: number) => `Promedio semanal de 28 días <b>${value}</b>`,
+    ratioTooltip: (value: string) => `Aguda:crónica <b>${value}</b>`,
   },
 );
 const t = useMessages(messages);
@@ -341,6 +386,7 @@ watch(dataRevision, () => { void load(); });
       </div>
     </PageHeader>
 
+    <LifeEventShortcut :days="rangeDays" />
     <CoverageNotice :requested-days="rangeDays" />
 
     <p v-if="error" class="inline-alert" role="alert">
@@ -368,7 +414,7 @@ watch(dataRevision, () => { void load(); });
           :hint="t.loadHint"
           :series="trainingLoad"
           :color="zeppSemanticColors.training"
-          unit="load"
+          :unit="t.loadUnit"
           :empty-text="t.loadEmpty"
         />
         <MetricTrendCard

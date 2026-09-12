@@ -340,7 +340,26 @@ pub async fn import_from_har(
 ) -> std::result::Result<AppStatus, AppError> {
     let path = PathBuf::from(&har_path);
 
-    let auth = extract_from_har(&path)?;
+    let auth = extract_from_har(&path).map_err(|error| {
+        let reason = error.to_string();
+        let (code, message) = if reason.contains("未找到user_id") {
+            (
+                "err.har.missing_user",
+                "HAR 中没有找到用户编号，请在登录成功后重新导出网络记录",
+            )
+        } else if reason.contains("未找到apptoken") {
+            (
+                "err.har.missing_token",
+                "HAR 中没有找到登录令牌，请导出包含敏感数据的 HAR",
+            )
+        } else {
+            (
+                "err.har.invalid_file",
+                "无法读取有效的 HAR，请重新选择浏览器导出的 HAR 文件",
+            )
+        };
+        AppError::new(code, message)
+    })?;
 
     // Use the same save flow as manual entry
     save_auth(state, auth.app_token, auth.user_id, auth.region_host).await

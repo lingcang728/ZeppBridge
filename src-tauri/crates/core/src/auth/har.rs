@@ -38,7 +38,8 @@ pub fn extract_from_har(har_path: &Path) -> Result<AuthInfo> {
 }
 
 fn extract_credentials_from_entries(entries: &[Value]) -> Result<AuthInfo> {
-    let user_id_re = Regex::new(r"/users/(\d+)/")
+    // watchface.zepp.com 发的是 `/users/<id>`，后面没有斜杠，也可能直接接 `?`。
+    let user_id_re = Regex::new(r"/users/(\d+)(?:[/?#]|$)")
         .map_err(|e| ZeppBridgeError::ConfigError(format!("正则表达式编译失败: {e}")))?;
 
     let mut app_token: Option<String> = None;
@@ -56,43 +57,49 @@ fn extract_credentials_from_entries(entries: &[Value]) -> Result<AuthInfo> {
             None => continue,
         };
 
-        // Only process api-mifit requests
-        if !url_str.contains("api-mifit") {
+        let Ok(url) = Url::parse(url_str) else {
+            continue;
+        };
+        let Some(host) = url.host_str() else {
+            continue;
+        };
+        let allowed = host == "api-mifit.huami.com"
+            || host == "api-mifit.zepp.com"
+            || ((host.ends_with(".huami.com") || host.ends_with(".zepp.com"))
+                && host.starts_with("api-mifit-"));
+        if url.scheme() != "https" || !allowed {
             continue;
         }
-
-        // Extract apptoken from headers
-        if let Some(headers) = request.get("headers").and_then(|h| h.as_array()) {
-            for header in headers {
-                let name = header
-                    .get("name")
-                    .and_then(|n| n.as_str())
-                    .unwrap_or("")
-                    .to_lowercase();
-                if name == "apptoken" {
-                    if let Some(value) = header.get("value").and_then(|v| v.as_str()) {
-                        app_token = Some(value.to_string());
-                    }
-                }
-            }
-        }
-
-        // Extract user_id from URL path
-        if let Some(caps) = user_id_re.captures(url_str) {
-            user_id = Some(caps[1].to_string());
-        }
-
-        // Extract regional host from URL
-        if let Ok(parsed_url) = Url::parse(url_str) {
-            if let Some(host) = parsed_url.host_str() {
-                if host.contains("api-mifit") {
-                    region_host = Some(format!(
-                        "https://{}",
-                        host.trim_end_matches('/').to_lowercase()
-                    ));
-                }
-            }
-        }
+        let token = request
+            .get("headers")
+            .and_then(Value::as_array)
+            .and_then(|headers| {
+                headers.iter().find_map(|header| {
+                    let name = header.get("name")?.as_str()?;
+                    let value = header.get("value")?.as_str()?;
+                    (name.eq_ignore_ascii_case("apptoken") && !value.trim().is_empty())
+                        .then(|| value.to_owned())
+                })
+            });
+        let Some(token) = token else {
+            continue;
+        };
+        // Only combine identity and token from the same authenticated request.
+        // Tokenless health checks and other accounts must not replace the region.
+        let id = user_id_re
+            .captures(url.path())
+            .map(|caps| caps[1].to_string())
+            .or_else(|| {
+                url.query_pairs().find_map(|(key, value)| {
+                    (key.eq_ignore_ascii_case("userid")
+                        && !value.is_empty()
+                        && value.bytes().all(|ch| ch.is_ascii_digit()))
+                    .then(|| value.into_owned())
+                })
+            });
+        app_token = Some(token);
+        user_id = id;
+        region_host = Some(format!("https://{host}"));
 
         // Early exit if we have all three
         if app_token.is_some() && user_id.is_some() && region_host.is_some() {
@@ -118,6 +125,19 @@ fn extract_credentials_from_entries(entries: &[Value]) -> Result<AuthInfo> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn query_user_id_keeps_authenticated_region_and_rejects_lookalike_hosts() {
+        let entries = serde_json::json!([
+            {"request":{"url":"https://api-mifit-us3.zepp.com.evil.test/users/999","headers":[{"name":"apptoken","value":"wrong"}]}},
+            {"request":{"url":"https://api-mifit.huami.com/users/888","headers":[]}},
+            {"request":{"url":"https://api-mifit-us3.zepp.com/custom/diy/dial/supports?userid=123","headers":[{"name":"AppToken","value":"correct"}]}}
+        ]);
+        let auth = extract_credentials_from_entries(entries.as_array().unwrap()).unwrap();
+        assert_eq!(auth.user_id, "123");
+        assert_eq!(auth.app_token, "correct");
+        assert_eq!(auth.region_host, "https://api-mifit-us3.zepp.com");
+    }
 
     #[test]
     fn extracts_credentials_from_standard_har() {
@@ -217,5 +237,49 @@ mod tests {
 
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("未找到user_id"));
+    }
+
+    #[test]
+    fn extracts_user_id_without_trailing_slash() {
+        // watchface.zepp.com 导出的 HAR 就是这个样子。
+        let har_json = serde_json::json!({
+            "log": {
+                "entries": [
+                    {
+                        "request": {
+                            "url": "https://api-mifit-us3.zepp.com/users/7654321",
+                            "headers": [{"name": "apptoken", "value": "tok"}]
+                        }
+                    }
+                ]
+            }
+        });
+
+        let entries = har_json["log"]["entries"].as_array().unwrap();
+        let result = extract_credentials_from_entries(entries).unwrap();
+
+        assert_eq!(result.user_id, "7654321");
+        assert_eq!(result.region_host, "https://api-mifit-us3.zepp.com");
+    }
+
+    #[test]
+    fn extracts_user_id_followed_by_query_string() {
+        let har_json = serde_json::json!({
+            "log": {
+                "entries": [
+                    {
+                        "request": {
+                            "url": "https://api-mifit-us3.zepp.com/users/7654321?r=1",
+                            "headers": [{"name": "apptoken", "value": "tok"}]
+                        }
+                    }
+                ]
+            }
+        });
+
+        let entries = har_json["log"]["entries"].as_array().unwrap();
+        let result = extract_credentials_from_entries(entries).unwrap();
+
+        assert_eq!(result.user_id, "7654321");
     }
 }
