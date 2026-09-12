@@ -6,6 +6,8 @@
 
 ## 2.3.0
 
+> **Hola, ya sé hablar español.**
+
 ### Added / 新增
 
 - **ZeppBridge now speaks Spanish.** The desktop interface, detail pages, workout catalogue, tray menu, weekly reports and user-facing unit labels are available in Spanish alongside Chinese and English.
