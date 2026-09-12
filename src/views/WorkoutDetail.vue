@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { displayDateTimeFormatter } from '../lib/dateTime';
+
 import { computed, onMounted, ref, watch } from 'vue';
 import { open as showOpenDialog } from '@tauri-apps/plugin-dialog';
 import { RouterLink, useRoute } from 'vue-router';
@@ -956,7 +958,7 @@ const lineOption = (points: { t: number; v: number }[], color: string, unit: str
       formatter: (params: Array<{ value: [number, number] }>) => {
         const point = Array.isArray(params) ? params[0] : params;
         if (!point) return '';
-        const time = new Intl.DateTimeFormat(intlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(point.value[0]));
+        const time = displayDateTimeFormatter({ hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(point.value[0]));
         return `${time}　<b>${Math.round(point.value[1] * 10) / 10}</b> ${unit}`;
       },
     },
@@ -1086,7 +1088,7 @@ const syncBadge = computed(() => {
   const raw = appStatus.value?.last_cloud_sync_at;
   if (!raw) return t.value.notFetchedYet;
   const date = new Date(raw);
-  return Number.isNaN(date.getTime()) ? t.value.timeUnknown : new Intl.DateTimeFormat(intlLocale(), { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(date).replace(/\//g, '-');
+  return Number.isNaN(date.getTime()) ? t.value.timeUnknown : displayDateTimeFormatter({ year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(date).replace(/\//g, '-');
 });
 
 let detailSeq = 0;

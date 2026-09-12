@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { displayDateTimeFormatter } from '../lib/dateTime';
+
 defineOptions({ name: 'BodyStatus' });
 import { computed, onMounted, ref, watch } from 'vue';
 import { VChart } from '../lib/echartsSetup';
@@ -20,7 +22,7 @@ import {
   toBodyMass,
 } from '../lib/units';
 import type { MetricSeries, MetricSeriesPoint, StressPoint } from '../types';
-import { defineMessages, intlLocale, useMessages } from '../i18n';
+import { defineMessages, useMessages } from '../i18n';
 
 const messages = defineMessages(
   {
@@ -672,7 +674,7 @@ const curveAverage = computed(() => (curve.value.length
   ? Math.round(curve.value.reduce((total, point) => total + point.value, 0) / curve.value.length)
   : null));
 
-const clock = (value: number) => new Intl.DateTimeFormat(intlLocale(), {
+const clock = (value: number) => displayDateTimeFormatter({
   hour: '2-digit', minute: '2-digit', hour12: false,
 }).format(new Date(value));
 

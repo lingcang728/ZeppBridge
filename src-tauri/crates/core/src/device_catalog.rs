@@ -249,6 +249,23 @@ mod tests {
             .any(|entry| entry.catalog_id == "amazfit-helio-ring"));
     }
 
+    #[test]
+    fn original_bip_alias_does_not_capture_later_generations() {
+        for (name, expected) in [
+            ("Bip 1", "amazfit-bip"),
+            ("Amazfit Bip", "amazfit-bip"),
+            ("Bip 3 Pro", "amazfit-bip-3-pro"),
+            ("Amazfit Bip 6", "amazfit-bip-6"),
+        ] {
+            let matched = match_catalog(&CatalogMatchInput {
+                product_names: vec![name],
+                ..CatalogMatchInput::default()
+            })
+            .unwrap();
+            assert_eq!(matched.entry.catalog_id, expected);
+        }
+    }
+
     /// 用户指认汇总出来的 deviceSource 数字能认出表来。
     ///
     /// 这是 issue #4 那类账号唯一的出路：它们的设备响应里一个产品名字段都没有，

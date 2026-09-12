@@ -1,8 +1,9 @@
+import { displayDateTimeFormatter } from '../lib/dateTime';
 import { computed, ref } from 'vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { deviceImageFor } from '../lib/deviceCatalog';
 import type { DeviceCacheMetadata, DeviceProfile, DeviceProfilesResult } from '../types';
-import { defineMessages, intlLocale, messagesOf } from '../i18n';
+import { defineMessages, messagesOf } from '../i18n';
 
 /**
  * The device catalog is deliberately treated as account data, not as a list
@@ -135,7 +136,7 @@ const formatDeviceDate = (value?: string | null): string => {
   if (!value) return copy().notFetchedYet;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return copy().timeUnknown;
-  return new Intl.DateTimeFormat(intlLocale(), {
+  return displayDateTimeFormatter({
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

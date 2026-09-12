@@ -1,6 +1,7 @@
+import { displayDateTimeFormatter } from './dateTime';
 import type { MetricSeries, MetricSeriesPoint } from '../types';
 import { paceSecondsPerBigUnit } from './units';
-import { defineMessages, intlLocale, messagesOf } from '../i18n';
+import { defineMessages, messagesOf } from '../i18n';
 import { DISPLAY_RANGE_DAYS, rangeOptions } from './rangeOptions';
 
 const messages = defineMessages(
@@ -75,7 +76,7 @@ export const coverageLabel = (series?: MetricSeries | null): string => {
 const shortDate = (value: string): string => {
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(intlLocale(), { month: 'numeric', day: 'numeric' }).format(date);
+  return displayDateTimeFormatter({ month: 'numeric', day: 'numeric' }).format(date);
 };
 
 /** Seconds per kilometre as `m:ss`, the unit runners actually read. */
