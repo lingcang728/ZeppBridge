@@ -24,6 +24,17 @@ const messages = defineMessages(
       `Local-first, sources intact: ${first}, ${second} and ${count} devices in all, organized into a health file you can actually read.`,
     notProvided: 'Not provided',
   },
+  {
+    introNoDevice:
+      'Local primero y con las fuentes intactas: tus registros del reloj, organizados en un historial de salud que realmente puedes leer.',
+    introOne: (name: string) =>
+      `Local primero y con las fuentes intactas: los registros de ${name}, organizados en un historial de salud que realmente puedes leer.`,
+    introTwo: (first: string, second: string) =>
+      `Local primero y con las fuentes intactas: los registros de ${first} y ${second}, organizados en un historial de salud que realmente puedes leer.`,
+    introMany: (first: string, second: string, count: number) =>
+      `Local primero y con las fuentes intactas: ${first}, ${second} y ${count} dispositivos en total, organizados en un historial de salud que realmente puedes leer.`,
+    notProvided: 'Sin datos',
+  },
 );
 
 const copy = () => messagesOf(messages);

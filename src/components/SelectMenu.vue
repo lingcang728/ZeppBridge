@@ -42,6 +42,7 @@ const props = withDefaults(defineProps<{
 const messages = defineMessages(
   { placeholder: '请选择' },
   { placeholder: 'Select…' },
+  { placeholder: 'Selecciona…' },
 );
 const t = useMessages(messages);
 

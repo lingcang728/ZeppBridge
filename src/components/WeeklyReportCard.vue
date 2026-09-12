@@ -12,7 +12,6 @@ import ComparisonBars from './ComparisonBars.vue';
 import SkeletonBlock from './SkeletonBlock.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
-import { formatCalendarDate } from '../lib/format';
 import type { InsightFact, WeeklyReport } from '../types';
 import { defineMessages, useMessages } from '../i18n';
 
@@ -38,6 +37,9 @@ const messages = defineMessages(
     sleepDuration: (hours: number, minutes: number) => `${hours} 小时 ${minutes} 分`,
     regularity: (minutes: number) => `±${minutes} 分`,
     workoutCount: (count: number) => `${count} 次`,
+    /** 后端给的单位码（score / load / bpm / ms）按界面语言写出来；返回空串就只显示数字。 */
+    unitWord: (unit: string) =>
+      ({ score: '分', load: '', bpm: '次/分' } as Record<string, string | undefined>)[unit] ?? unit,
     metric: {
       'weekly.resting_hr': '静息心率',
       'weekly.hrv': 'HRV',
@@ -69,6 +71,7 @@ const messages = defineMessages(
     sleepDuration: (hours: number, minutes: number) => `${hours} hr ${minutes} min`,
     regularity: (minutes: number) => `±${minutes} min`,
     workoutCount: (count: number) => `${count} sessions`,
+    unitWord: (unit: string) => unit,
     metric: {
       'weekly.resting_hr': 'Resting HR',
       'weekly.hrv': 'HRV',
@@ -77,6 +80,39 @@ const messages = defineMessages(
       'weekly.sleep_start_regularity': 'Bedtime spread',
       'weekly.workout_count': 'Workouts',
       'weekly.training_load': 'Training load',
+    },
+  },
+  {
+    title: 'Esta semana',
+    window: (recentStart: string, recentEnd: string, baseStart: string, baseEnd: string) =>
+      `${recentStart} ~ ${recentEnd} · frente a tu propio ${baseStart} ~ ${baseEnd}`,
+    legendGood: 'Verde = mejor para esta métrica',
+    legendBad: 'Rojo = peor',
+    legendNote: 'Comparado solo con tus propios 28 días anteriores, nunca con un promedio de población',
+    desktopOnly: 'El informe semanal necesita la app de escritorio de ZeppBridge.',
+    nothingComparable: 'Todavía no hay nada comparable esta semana. Vuelve después de sincronizar.',
+    loadFailed: 'No se pudo generar el informe semanal local',
+    barsAria: (recent: string, baseline: string) => `Esta semana ${recent}, 28 días anteriores ${baseline}`,
+    barThisWeek: 'Esta semana',
+    barBaseline: '28 días previos',
+    noBaseline: 'No hay suficiente historial detrás, así que solo se muestra el valor actual',
+    thinBaseline: (days: number, found: number, needed: number) =>
+      `Solo ${found} de los ${days} días anteriores tienen esta métrica (se necesitan ${needed}), así que se muestra el valor actual sin comparación.`,
+    noRecentData: 'No hay registros locales de esta métrica en los últimos 7 días.',
+    notProvided: 'Sin datos',
+    sleepDuration: (hours: number, minutes: number) => `${hours} h ${minutes} min`,
+    regularity: (minutes: number) => `±${minutes} min`,
+    workoutCount: (count: number) => `${count} sesiones`,
+    unitWord: (unit: string) =>
+      ({ score: 'pts', load: '', bpm: 'lpm' } as Record<string, string | undefined>)[unit] ?? unit,
+    metric: {
+      'weekly.resting_hr': 'FC en reposo',
+      'weekly.hrv': 'VFC',
+      'weekly.stress': 'Estrés',
+      'weekly.sleep_duration': 'Duración del sueño',
+      'weekly.sleep_start_regularity': 'Variación de la hora de dormir',
+      'weekly.workout_count': 'Entrenamientos',
+      'weekly.training_load': 'Carga de entrenamiento',
     },
   },
 );
@@ -104,18 +140,6 @@ const { dataRevision } = useSyncController();
 const report = ref<WeeklyReport | null>(null);
 const loading = ref(true);
 const error = ref<string | null>(null);
-
-/** 窗口两端的日期是纯日历日期，按本地年月日渲染。 */
-const windowLabel = computed(() => {
-  const current = report.value;
-  if (!current) return '';
-  return t.value.window(
-    formatCalendarDate(current.recent_start),
-    formatCalendarDate(current.recent_end),
-    formatCalendarDate(current.baseline_start),
-    formatCalendarDate(current.baseline_end),
-  );
-});
 
 /** 数字变小对这个指标意味着「更好」吗？只影响配色，不改变事实。 */
 const LOWER_IS_BETTER = new Set([
@@ -197,7 +221,8 @@ function formatNumber(fact: InsightFact, value: number): string {
   }
   if (fact.metric === 'sleep_start_regularity') return t.value.regularity(Math.round(value));
   if (fact.metric === 'workout_count') return t.value.workoutCount(Math.round(value));
-  return `${Math.round(value)} ${fact.unit}`;
+  const word = t.value.unitWord(fact.unit);
+  return word ? `${Math.round(value)} ${word}` : `${Math.round(value)}`;
 }
 </script>
 
@@ -205,7 +230,9 @@ function formatNumber(fact: InsightFact, value: number): string {
   <section class="weekly-card" aria-labelledby="weekly-title">
     <header>
       <h2 id="weekly-title"><Icon name="activity" :size="15" />{{ t.title }}</h2>
-      <span v-if="report" class="weekly-window">{{ windowLabel }}</span>
+      <span v-if="report" class="weekly-window">
+        {{ t.window(report.recent_start, report.recent_end, report.baseline_start, report.baseline_end) }}
+      </span>
     </header>
 
     <!-- 「静息心率 −3.4% 是绿的、压力 +1.6% 是红的」这件事必须解释一句：

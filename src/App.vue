@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { displayDateTimeFormatter } from './lib/dateTime';
+
 import { getVersion } from '@tauri-apps/api/app';
 import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, watch } from 'vue';
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router';
@@ -11,8 +13,9 @@ import { deviceStateLabel, useDevices } from './composables/useDevices';
 import { useUiScale } from './composables/useUiScale';
 import { backend, isDesktop } from './lib/bridge';
 import { checkForDesktopUpdate } from './services/updateService';
-import { formatFullDateTime } from './lib/format';
 import { defineMessages, locale, useMessages } from './i18n';
+
+const LifeEventEditor = defineAsyncComponent(() => import('./components/LifeEventEditor.vue'));
 
 const messages = defineMessages(
   {
@@ -79,12 +82,44 @@ const messages = defineMessages(
     browserPreview: 'Use the desktop app. This browser preview reads no account data.',
     routeNotFound: 'That page does not exist, so you are back on the overview.',
   },
+  {
+    skipToContent: 'Saltar al contenido principal',
+    mainNav: 'Navegación principal',
+    mobileNav: 'Navegación móvil',
+    bottomNav: 'Navegación principal móvil',
+    openNav: 'Abrir navegación',
+    navOverview: 'Resumen',
+    navHandoff: 'Pasar a la IA',
+    navSettings: 'Configuración',
+    dataSources: 'Fuentes de datos',
+    identifyingDevices: 'Identificando tus dispositivos…',
+    identifyFailed: (reason: string) => `La identificación de dispositivos no está disponible: ${reason}`,
+    noDevicesYet: 'Aún no se ha identificado ningún dispositivo.',
+    accountPrefix: 'Cuenta: ',
+    manage: 'Gestionar',
+    privacyLink: 'Configuración de seguridad y privacidad',
+    connectionTitle: 'Estado de la conexión con la nube',
+    lastSyncPrefix: 'Última sincronización: ',
+    notFetchedYet: 'Aún sin datos',
+    timeUnknown: 'Hora desconocida',
+    noAccount: 'Ninguna cuenta identificada',
+    syncNow: 'Sincronizar ahora',
+    verifyFirst: 'Primero verifica la conexión',
+    syncing: 'Sincronizando…',
+    cancel: 'Cancelar',
+    compacting: (pending: number) =>
+      `Compactando registros guardados (faltan ${pending}). Esto desaparece solo; la sincronización espera su turno.`,
+    compacted: (saved: string) => `Registros guardados compactados: se liberaron unos ${saved} de disco.`,
+    trayHint: 'Si cierras la ventana, ZeppBridge sigue en la barra de menú y continúa sincronizando automáticamente.',
+    browserPreview: 'Usa la app de escritorio. Esta vista previa en el navegador no lee datos de la cuenta.',
+    routeNotFound: 'Esa página no existe, así que volviste al resumen.',
+  },
 );
 const t = useMessages(messages);
 
 // 桌面端从 Tauri 运行时读取版本（与 tauri.conf.json 单一来源），
 // 浏览器预览环境回退到下面的常量（与 package.json 保持同步）。
-const FALLBACK_APP_VERSION = '2.2.4';
+const FALLBACK_APP_VERSION = '2.3.0';
 /* 构建标识。同一个版本号会构建很多次，光看版本号分不清手上是哪一个。 */
 const BUILD_STAMP = __BUILD_STAMP__;
 const APP_VERSION = ref(FALLBACK_APP_VERSION);
@@ -193,8 +228,15 @@ const statusIcon = computed(() => {
   if (statusTone.value === 'success') return 'circle-check' as const;
   return 'info' as const;
 });
-const lastSyncClock = computed(() =>
-  formatFullDateTime(appStatus.value?.last_cloud_sync_at, t.value.notFetchedYet));
+const lastSyncClock = computed(() => {
+  const raw = appStatus.value?.last_cloud_sync_at;
+  if (!raw) return t.value.notFetchedYet;
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return t.value.timeUnknown;
+  return displayDateTimeFormatter({
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(date).replace(/\//g, '-');
+});
 const accountLabel = computed(() => appStatus.value?.masked_user_id || t.value.noAccount);
 const browserPreview = computed(() => !desktopRuntime);
 const routeNotice = computed(() => route.query.notice === 'not-found');
@@ -271,6 +313,7 @@ onUnmounted(() => {
 <template>
   <LandingPage v-if="showLanding" />
   <template v-else>
+    <LifeEventEditor />
     <a class="skip-link" href="#main-content">{{ t.skipToContent }}</a>
 
     <div class="app-shell">

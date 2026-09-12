@@ -1,9 +1,9 @@
+import { displayDateTimeFormatter } from '../lib/dateTime';
 import { computed, readonly, ref } from 'vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { launchSyncIsDue, readAutoSyncSettings, writeAutoSyncSettings } from '../lib/autoSync';
 import type { AppStatus, LoginStatus, SyncOutcome, SyncProgress, SyncReport } from '../types';
 import { syncStreamLabel } from '../lib/syncStreams';
-import { formatDateTime, formatTime } from '../lib/format';
 import { defineMessages, messagesOf } from '../i18n';
 import { errorTextFor } from '../i18n/errors';
 import { backendText } from '../i18n/backendText';
@@ -72,6 +72,36 @@ const messages = defineMessages(
     syncingStream: (stream: string) => `Syncing ${stream.toLowerCase()}`,
     backfillingStream: (stream: string, month: string) => `Backfilling ${stream.toLowerCase()} · ${month}`,
   },
+  {
+    notSyncedYet: 'Aún sin sincronizar',
+    timeUnknown: 'Hora desconocida',
+    updatedWithLatest: (clock: string) => `Datos nuevos descargados · última frecuencia cardíaca ${clock}`,
+    updated: 'Datos nuevos descargados',
+    noNewDataWithLatest: (clock: string) => `Nada nuevo en la nube · última frecuencia cardíaca: ${clock}`,
+    noNewData: 'Sincronización terminada. No había nada nuevo en la nube',
+    partialWithStreams: (streams: string) => `Algunos flujos fallaron: ${streams}`,
+    partial: 'Sincronización terminada, pero algunos flujos de datos fallaron',
+    cancelled: 'Sincronización cancelada',
+    deferred: 'Reconstruyendo los datos derivados locales. La sincronización se reintentará sola',
+    failed: 'La sincronización falló. Revisa la conexión e inténtalo de nuevo',
+    lastCloudSync: (clock: string) => `Última sincronización con la nube ${clock}`,
+    cloudSyncClock: (clock: string) => `Sincronización con la nube ${clock}`,
+    cloudSyncClockUnknown: 'Sincronización con la nube —',
+    statusUnavailable: 'El estado de la conexión no está disponible en este momento',
+    alreadySyncing: 'Ya hay una sincronización en curso. Inténtalo cuando termine',
+    desktopOnly: 'Usa la app de escritorio',
+    reauthNeeded: 'Tu sesión de Zepp caducó. Vuelve a conectarte',
+    verifyFirst: 'Primero verifica la conexión',
+    connectFirst: 'Primero conéctate a Zepp',
+    syncingRecent: (days: number) => `Sincronizando los últimos ${days} días…`,
+    backfilling: (days: number) => `Recuperando el historial de los últimos ${days} días…`,
+    syncDidNotFinish: 'La sincronización con la nube no terminó',
+    cancelling: 'Cancelando la sincronización…',
+    cancelFailed: 'No se pudo cancelar la sincronización',
+    streamSeparator: ', ',
+    syncingStream: (stream: string) => `Sincronizando ${stream.toLowerCase()}`,
+    backfillingStream: (stream: string, month: string) => `Recuperando ${stream.toLowerCase()} · ${month}`,
+  },
 );
 
 const copy = () => messagesOf(messages);
@@ -134,6 +164,25 @@ const unlisteners: Array<() => void> = [];
  */
 let autoSyncTimer: number | null = null;
 
+const formatTime = (value?: string): string => {
+  if (!value) return copy().timeUnknown;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return copy().timeUnknown;
+  return displayDateTimeFormatter({
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+};
+
+const formatClock = (value?: string): string | null => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return displayDateTimeFormatter({ hour: '2-digit', minute: '2-digit' }).format(date);
+};
+
 const latestHeartRateAt = (report?: SyncReport | null): string | undefined =>
   report?.streams.find((stream) => stream.stream === 'heart_rate')?.newest_sample_at
   ?? appStatus.value?.streams.find((stream) => stream.stream === 'heart_rate')?.newest_sample_at;
@@ -145,7 +194,7 @@ const renderReport = (
   backendMessage?: string,
 ): string => {
   const t = copy();
-  const latest = latestAt ? formatDateTime(latestAt, copy().timeUnknown) : null;
+  const latest = latestAt ? formatTime(latestAt) : null;
   if (outcome === 'updated') return latest ? t.updatedWithLatest(latest) : t.updated;
   if (outcome === 'no_new_data') return latest ? t.noNewDataWithLatest(latest) : t.noNewData;
   if (outcome === 'partial') {
@@ -216,8 +265,8 @@ const lastOutcomeLabel = computed(() => {
   const outcome = appStatus.value?.last_cloud_sync_outcome;
   if (!outcome) return null;
   const latest = latestHeartRateAt();
-  if (outcome === 'no_new_data' && latest) return copy().noNewDataWithLatest(formatDateTime(latest, copy().timeUnknown));
-  return copy().lastCloudSync(formatDateTime(appStatus.value?.last_cloud_sync_at, copy().timeUnknown));
+  if (outcome === 'no_new_data' && latest) return copy().noNewDataWithLatest(formatTime(latest));
+  return copy().lastCloudSync(formatTime(appStatus.value?.last_cloud_sync_at));
 });
 
 const applyLoginStatus = (status: LoginStatus) => {
@@ -504,8 +553,10 @@ export const useSyncController = () => ({
   autoSyncInterval: readonly(autoSyncInterval),
   isSyncing: computed(() => syncState.value === 'syncing'),
   canIncrementalSync: computed(() => appStatus.value?.connection_state === 'connected'),
-  lastCloudSyncLabel: computed(() =>
-    copy().cloudSyncClock(formatTime(appStatus.value?.last_cloud_sync_at ?? ''))),
+  lastCloudSyncLabel: computed(() => {
+    const clock = formatClock(appStatus.value?.last_cloud_sync_at);
+    return clock ? copy().cloudSyncClock(clock) : copy().cloudSyncClockUnknown;
+  }),
   lastOutcomeLabel,
   initialize,
   refreshStatus,

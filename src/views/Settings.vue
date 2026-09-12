@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { TIME_FORMATS, DATE_ORDERS, timeFormat, dateOrder, setTimeFormat, setDateOrder, dateTimeLabels } from '../lib/dateTime';
+import { displayDateTimeFormatter } from '../lib/dateTime';
+
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import BackupPanel from '../components/BackupPanel.vue';
@@ -33,18 +36,9 @@ import {
   distanceUnitOptionLabel,
   setDistanceUnit,
 } from '../lib/units';
-import {
-  DATE_FORMATS,
-  TIME_FORMATS,
-  dateFormatPreference,
-  setDateFormat,
-  setTimeFormat,
-  timeFormatPreference,
-} from '../lib/datePreferences';
 import { errorTextFor } from '../i18n/errors';
 import { backendText } from '../i18n/backendText';
 import { storageEstimateText } from '../lib/storageEstimateText';
-import { formatCalendarDate, formatDate, formatFullDateTime } from '../lib/format';
 
 const t = useMessages(settingsMessages);
 
@@ -373,15 +367,21 @@ const accountInitial = computed(() =>
 const regionLabel = computed(() => regionShortName(appStatus.value?.region_host));
 const regionHost = computed(() => appStatus.value?.region_host || t.value.notProvided);
 
-const formatDateTime = (value?: string): string =>
-  formatFullDateTime(value ?? undefined, t.value.noRecords, { seconds: true });
+const formatDateTime = (value?: string): string => {
+  if (!value) return t.value.noRecords;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return t.value.timeUnknown;
+  return displayDateTimeFormatter({
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).format(date).replace(/\//g, '-');
+};
 
 /* 保留天数是「往回保留最近 N 天」，不是「N 天后清理」，而且清理只在每次成功
    同步之后执行。所以这里显示会被保留的最早日期，不再显示一个算错的未来日期。 */
 const retentionCutoffDate = computed(() => {
   const date = new Date();
   date.setDate(date.getDate() - Number(retentionDays.value || 30));
-  return formatCalendarDate(date);
+  return displayDateTimeFormatter({ year: 'numeric', month: '2-digit', day: '2-digit' }).format(date).replace(/\//g, '-');
 });
 
 const dataSources = computed(() => [
@@ -442,7 +442,8 @@ const startLogin = async () => {
   loginBusy.value = true;
   reconnecting.value = true;
   try {
-    await applyLoginStatus(await backend.startWebLogin(locale.value));
+    // 登录窗口只有中英两种标题，西语界面用英文那个。
+    await applyLoginStatus(await backend.startWebLogin(locale.value === 'zh' ? 'zh' : 'en'));
   } catch (error) {
     loginStatus.value = { state: 'failed', message: toUserMessage(error, t.value.loginWindowFailed), page_url: '' };
     loginError.value = toUserMessage(error, t.value.loginWindowFailed);
@@ -965,34 +966,6 @@ const runCapabilityProbe = async () => {
           >{{ distanceUnitOptionLabel(option) }}</button>
         </div>
       </div>
-      <!-- 日期与时间格式同理：和语言、单位一样是纯显示层选择，放在同一排。
-           「跟随系统」跟着 browser/系统地区走，不跟界面语言，见 lib/datePreferences.ts。 -->
-      <div class="locale-switch">
-        <p class="advanced-label">{{ t.dateFormatLabel }}</p>
-        <div class="scale-options" role="radiogroup" :aria-label="t.dateFormatLabel">
-          <button
-            v-for="option in DATE_FORMATS"
-            :key="option"
-            type="button"
-            role="radio"
-            :aria-checked="dateFormatPreference === option"
-            @click="setDateFormat(option)"
-          >{{ t.dateFormatOption[option] }}</button>
-        </div>
-      </div>
-      <div class="locale-switch">
-        <p class="advanced-label">{{ t.timeFormatLabel }}</p>
-        <div class="scale-options" role="radiogroup" :aria-label="t.timeFormatLabel">
-          <button
-            v-for="option in TIME_FORMATS"
-            :key="option"
-            type="button"
-            role="radio"
-            :aria-checked="timeFormatPreference === option"
-            @click="setTimeFormat(option)"
-          >{{ t.timeFormatOption[option] }}</button>
-        </div>
-      </div>
     </header>
 
     <div v-if="statusError" class="alert danger" role="alert">
@@ -1005,6 +978,16 @@ const runCapabilityProbe = async () => {
     <div v-if="loginError" class="alert danger" role="alert"><Icon name="warning" :size="15" />{{ loginError }}</div>
     <div v-if="dataMessage" class="alert success"><Icon name="circle-check" :size="15" />{{ dataMessage }}</div>
     <div v-if="dataError" class="alert danger" role="alert"><Icon name="warning" :size="15" />{{ dataError }}</div>
+
+    <section class="settings-card" aria-labelledby="date-time-title">
+      <h2 id="date-time-title">{{ dateTimeLabels.time }} / {{ dateTimeLabels.date }}</h2>
+      <div class="scale-options" role="radiogroup" :aria-label="dateTimeLabels.time">
+        <button v-for="option in TIME_FORMATS" :key="option" type="button" role="radio" :aria-checked="timeFormat === option" @click="setTimeFormat(option)">{{ dateTimeLabels[option] }}</button>
+      </div>
+      <div class="scale-options" role="radiogroup" :aria-label="dateTimeLabels.date">
+        <button v-for="option in DATE_ORDERS" :key="option" type="button" role="radio" :aria-checked="dateOrder === option" @click="setDateOrder(option)">{{ dateTimeLabels[option] }}</button>
+      </div>
+    </section>
 
     <!-- 1. 认证方式 -->
     <section class="settings-card" aria-labelledby="auth-title">
@@ -1691,7 +1674,7 @@ const runCapabilityProbe = async () => {
         </div>
         <p class="modal-sub">
           {{ t.updateModalCurrent(updateState.currentVersion || t.updateModalUnknownVersion) }}
-          <template v-if="updateState.date">{{ t.updateModalReleased(formatDate(updateState.date)) }}</template>
+          <template v-if="updateState.date">{{ t.updateModalReleased(updateState.date.slice(0, 10)) }}</template>
           <template v-if="updateState.sizeBytes"> · {{ formatUpdateBytes(updateState.sizeBytes) }}</template>
         </p>
         <div class="modal-body">

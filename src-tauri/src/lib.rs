@@ -19,8 +19,8 @@ pub use zeppbridge_core::{
 use app_state::AppState;
 use commands::{
     cancel_pending_restore, cancel_sync, cancel_web_login, cleanup_old_data, clear_auth,
-    compact_raw_payloads, create_manual_backup, get_app_status, get_capability_overview,
-    get_coverage_ledger, get_daily_heart_rate_extremes, get_data_health,
+    compact_raw_payloads, create_manual_backup, delete_life_event, get_app_status,
+    get_capability_overview, get_coverage_ledger, get_daily_heart_rate_extremes, get_data_health,
     get_device_catalog_options, get_device_profile, get_device_profiles, get_diagnostic_report,
     get_export_json, get_health_overview, get_heart_rate_series, get_heart_rate_zones,
     get_login_status, get_metric_series, get_pending_restore, get_recent_sleep,
@@ -28,11 +28,11 @@ use commands::{
     get_storage_estimate, get_stress_series, get_training_balance, get_training_load_series,
     get_unknown_workout_codes, get_user_prefs, get_weekly_report, get_workout_detail,
     get_workout_insight, get_workout_page, get_workout_series, get_workout_type_options,
-    import_from_har, list_backups, manual_auth, open_data_folder, prepare_ai_handoff,
-    probe_data_capabilities, publish_ai_export, reprocess_local_data, reset_coverage_ledger,
-    retry_failed_backfill_chunks, run_database_integrity_check, save_auth, save_csv_export,
-    save_fit_export, save_gpx_export, save_json_export, set_backup_pinned,
-    set_device_model_override, set_heart_rate_zone_preference, set_user_prefs,
+    import_from_har, list_backups, list_life_events, manual_auth, open_data_folder,
+    prepare_ai_handoff, probe_data_capabilities, publish_ai_export, reprocess_local_data,
+    reset_coverage_ledger, retry_failed_backfill_chunks, run_database_integrity_check, save_auth,
+    save_csv_export, save_fit_export, save_gpx_export, save_json_export, save_life_event,
+    set_backup_pinned, set_device_model_override, set_heart_rate_zone_preference, set_user_prefs,
     set_workout_code_label, set_workout_type_override, stage_restore, start_history_backfill,
     start_history_sync, start_incremental_sync, start_initial_sync, start_web_login,
     submit_device_model_assignment, submit_diagnostic_report, verify_auth, verify_backup,
@@ -100,6 +100,19 @@ fn tray_labels(chinese: bool) -> TrayLabels {
     }
 }
 
+/// 按前端的界面语言取托盘文案。西语单独一份，其余非中文一律英文。
+fn tray_labels_for(locale: &str) -> TrayLabels {
+    let locale = locale.trim().to_ascii_lowercase();
+    if locale.starts_with("es") {
+        return TrayLabels {
+            show: "Abrir ZeppBridge",
+            sync: "Sincronizar ahora",
+            quit: "Salir",
+        };
+    }
+    tray_labels(locale.starts_with("zh"))
+}
+
 /// 托盘建好之后还要能改文案：用户在设置里换语言，托盘不该还留在旧语言上。
 struct TrayMenuItems {
     show: MenuItem<tauri::Wry>,
@@ -159,7 +172,7 @@ fn set_tray_locale(app: AppHandle, locale: String) -> std::result::Result<(), ip
     let Some(items) = app.try_state::<TrayMenuItems>() else {
         return Ok(());
     };
-    let labels = tray_labels(locale.trim().to_ascii_lowercase().starts_with("zh"));
+    let labels = tray_labels_for(&locale);
     let _ = items.show.set_text(labels.show);
     let _ = items.sync.set_text(labels.sync);
     let _ = items.quit.set_text(labels.quit);
@@ -485,6 +498,9 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            list_life_events,
+            save_life_event,
+            delete_life_event,
             save_auth,
             verify_auth,
             clear_auth,

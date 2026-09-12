@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { displayDateTimeFormatter } from '../lib/dateTime';
 import { computed } from 'vue';
 import { VChart } from '../lib/echartsSetup';
 import { formatDuration, formatTime, isFiniteNumber } from '../lib/format';
@@ -19,6 +20,12 @@ const messages = defineMessages(
     zeroMinutes: '0 min',
     hypnogramAria: 'Sleep stage hypnogram',
     summaryAria: 'Sleep stage share',
+  },
+  {
+    notProvided: 'Sin datos',
+    zeroMinutes: '0 min',
+    hypnogramAria: 'Hipnograma de las fases del sueño',
+    summaryAria: 'Proporción de fases del sueño',
   },
 );
 const t = useMessages(messages);
@@ -141,6 +148,11 @@ const segmentStyle = (stage: BarSegment): Record<string, string> => {
   return { width: barPercent(stage.minutes) + '%' };
 };
 
+const clock = (value: number) => {
+  const date = new Date(value);
+  return displayDateTimeFormatter({ hour: '2-digit', minute: '2-digit' }).format(date);
+};
+
 const hypnogramOption = computed(() => {
   const current = range.value;
   if (!current || !timeline.value.length) return null;
@@ -162,14 +174,14 @@ const hypnogramOption = computed(() => {
       formatter: (params: Array<{ value: [number, number] }>) => {
         const point = params?.[0]?.value;
         if (!point) return '';
-        return `${formatTime(point[0])}  ${stageLabels.value[point[1]] ?? ''}`;
+        return `${clock(point[0])}  ${stageLabels.value[point[1]] ?? ''}`;
       },
     },
     xAxis: {
       type: 'time',
       min: current.from,
       max: current.from + current.span,
-      axisLabel: { formatter: (value: number) => formatTime(value), hideOverlap: true, color: '#B4BBC3', fontSize: 14.5 },
+      axisLabel: { formatter: clock, hideOverlap: true, color: '#B4BBC3', fontSize: 14.5 },
       axisTick: { show: false },
       axisLine: { lineStyle: { color: 'rgba(226, 234, 242, .12)' } },
       splitLine: { show: false },
