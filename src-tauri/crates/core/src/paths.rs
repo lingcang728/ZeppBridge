@@ -29,8 +29,8 @@ pub const DATA_DIR_ENV: &str = "ZEPPBRIDGE_DATA_DIR";
 /// Those fall back to the repository `data/` folder so `tauri dev` does not
 /// drop a 1GB library into `G:\build_cache`.
 ///
-/// macOS: `.app` bundles live in `/Applications`, which is not writable, so
-/// the install-local layout falls back to the user Application Support
+/// macOS: `.app` bundles are replaced during updates, so user data lives in
+/// the user Application Support
 /// directory (`~/Library/Application Support/com.zeppbridge.ZeppBridge/data`).
 ///
 /// Linux: a packaged build is installed into a shared, root-owned prefix
@@ -69,6 +69,7 @@ pub fn resolve_data_dir() -> io::Result<PathBuf> {
     #[cfg(target_os = "macos")]
     if !is_build_artifact_dir(exe_dir) && is_inside_app_bundle(exe_dir) {
         let base = user_data_dir()?;
+        migrate_bundle_data(&exe_dir.join("data"), &base)?;
         ensure_writable_dir(&base)?;
         return Ok(base);
     }
@@ -82,6 +83,74 @@ pub fn resolve_data_dir() -> io::Result<PathBuf> {
         Ok(()) => Ok(data_dir),
         Err(error) => fall_back_to_user_data_dir(&data_dir, error),
     }
+}
+
+/// Publish a complete copy before switching libraries. Keep the bundle copy for
+/// recovery, and never combine two accounts' databases or credentials.
+#[cfg(any(target_os = "macos", test))]
+fn migrate_bundle_data(source: &Path, destination: &Path) -> io::Result<()> {
+    if !source.is_dir() || destination.join("zepp.db").is_file() {
+        return Ok(());
+    }
+    if destination.exists() && std::fs::read_dir(destination)?.next().is_some() {
+        return Err(io::Error::new(io::ErrorKind::AlreadyExists,
+            "Application Support data is not empty. Back up both data directories before migrating the app-bundle library."));
+    }
+    let parent = destination
+        .parent()
+        .ok_or_else(|| io::Error::other("missing data parent"))?;
+    std::fs::create_dir_all(parent)?;
+    let staging = parent.join(format!(
+        ".bundle-migration-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    ));
+    std::fs::create_dir(&staging)?;
+    for entry in std::fs::read_dir(source)? {
+        let entry = entry?;
+        let name = entry.file_name();
+        if SQLITE_GROUP.iter().any(|item| name == *item) {
+            continue;
+        }
+        copy_bundle_entry(&entry.path(), &staging.join(name))?;
+    }
+    if source.join("zepp.db").is_file() {
+        let db = rusqlite::Connection::open_with_flags(
+            source.join("zepp.db"),
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )
+        .map_err(io::Error::other)?;
+        db.backup(rusqlite::DatabaseName::Main, staging.join("zepp.db"), None)
+            .map_err(io::Error::other)?;
+    }
+    if destination.exists() {
+        std::fs::remove_dir(destination)?;
+    }
+    std::fs::rename(&staging, destination)?;
+    Ok(())
+}
+
+#[cfg(any(target_os = "macos", test))]
+fn copy_bundle_entry(source: &Path, destination: &Path) -> io::Result<()> {
+    let meta = std::fs::symlink_metadata(source)?;
+    if meta.file_type().is_symlink() {
+        return Err(io::Error::other(
+            "Bundle data contains a symbolic link; migrate it manually before updating.",
+        ));
+    }
+    if meta.is_dir() {
+        std::fs::create_dir(destination)?;
+        for entry in std::fs::read_dir(source)? {
+            let entry = entry?;
+            copy_bundle_entry(&entry.path(), &destination.join(entry.file_name()))?;
+        }
+    } else {
+        std::fs::copy(source, destination)?;
+    }
+    Ok(())
 }
 
 /// 安装目录旁边写不进去时的退路。
@@ -483,6 +552,67 @@ mod tests {
 
     use super::*;
     use std::fs;
+
+    #[test]
+    fn bundle_migration_copies_live_wal_and_preserves_existing_library() {
+        let root = std::env::temp_dir().join(format!(
+            "bundle-copy-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let source = root.join("ZeppBridge.app/Contents/MacOS/data");
+        let destination = root.join("support/data");
+        fs::create_dir_all(&source).unwrap();
+        let db = rusqlite::Connection::open(source.join("zepp.db")).unwrap();
+        db.execute_batch(
+            "PRAGMA journal_mode=WAL; CREATE TABLE sample(value); INSERT INTO sample VALUES (42);",
+        )
+        .unwrap();
+        fs::write(source.join("auth.json"), b"test-account").unwrap();
+        fs::create_dir(source.join("backups")).unwrap();
+        fs::write(source.join("backups/saved"), b"backup").unwrap();
+        migrate_bundle_data(&source, &destination).unwrap();
+        let copied = rusqlite::Connection::open(destination.join("zepp.db")).unwrap();
+        assert_eq!(
+            copied
+                .query_row("SELECT value FROM sample", [], |row| row.get::<_, i64>(0))
+                .unwrap(),
+            42
+        );
+        assert!(source.join("zepp.db").exists());
+        assert_eq!(
+            fs::read(destination.join("backups/saved")).unwrap(),
+            b"backup"
+        );
+        fs::write(source.join("auth.json"), b"different-account").unwrap();
+        migrate_bundle_data(&source, &destination).unwrap();
+        assert_eq!(
+            fs::read(destination.join("auth.json")).unwrap(),
+            b"test-account"
+        );
+        drop(copied);
+        drop(db);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn bundle_migration_refuses_to_mix_partial_destination() {
+        let root = std::env::temp_dir().join(format!("bundle-conflict-{}", std::process::id()));
+        let source = root.join("source");
+        let destination = root.join("destination");
+        fs::create_dir_all(&source).unwrap();
+        fs::create_dir_all(&destination).unwrap();
+        fs::write(destination.join("auth.json"), b"existing-account").unwrap();
+        assert!(migrate_bundle_data(&source, &destination).is_err());
+        assert_eq!(
+            fs::read(destination.join("auth.json")).unwrap(),
+            b"existing-account"
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn a_blocked_empty_data_dir_falls_back_instead_of_failing() {

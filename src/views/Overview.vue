@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { displayDateTimeFormatter } from '../lib/dateTime';
+
 defineOptions({ name: 'Overview' });
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
@@ -25,7 +27,7 @@ import { formatDistance, formatDuration, formatMetric, formatTime, isFiniteNumbe
 import { displayableWorkouts, workoutDisplayLabel, workoutDurationMinutes, workoutTypeKey } from '../lib/workouts';
 import type { HealthOverview, HeartRatePoint, MetricSeries, SleepSession, Workout } from '../types';
 import { sleepStageLabel } from '../lib/sleepStages';
-import { defineMessages, intlLocale, useMessages } from '../i18n';
+import { defineMessages, useMessages } from '../i18n';
 
 const messages = defineMessages(
   {
@@ -392,7 +394,7 @@ const hrChartOption = computed(() => {
     data.push([point.ts, point.value]);
   });
   const last = data[data.length - 1];
-  const clock = (value: number) => new Intl.DateTimeFormat(intlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value));
+  const clock = (value: number) => displayDateTimeFormatter({ hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value));
   return {
     animationDuration: 900,
     animationEasing: 'cubicOut' as const,
@@ -547,7 +549,7 @@ const shortDateTime = (value: string) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return t.value.timeUnknown;
   // 日月顺序跟着界面语言：西语读到 09/10 会理解成 9 月 10 日的反面。
-  const short = new Intl.DateTimeFormat(intlLocale(), { month: '2-digit', day: '2-digit' }).format(date);
+  const short = displayDateTimeFormatter({ month: '2-digit', day: '2-digit' }).format(date);
   return `${short} ${formatTime(value)}`;
 };
 /* 只按运动的 key 分图标，不看显示名。
