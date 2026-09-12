@@ -1275,11 +1275,14 @@ mod tests {
         )
         .unwrap();
         let health = db.data_health(90, 0).unwrap();
-        let ids: Vec<&str> = health
-            .actions
-            .iter()
-            .map(|action| action.id.as_str())
-            .collect();
+        // REPLAY_IN_PROGRESS describes the whole process, not this in-memory
+        // database. Another parallel test can legitimately hold the replay
+        // guard while this assertion runs, so pin that independent input to
+        // the idle state this unit test is meant to exercise.
+        let mut database = health.database.clone();
+        database.replay_in_progress = false;
+        let actions = suggested_actions(&database, &health.timings, &health.streams);
+        let ids: Vec<&str> = actions.iter().map(|action| action.id.as_str()).collect();
         assert!(ids.contains(&"reauth"));
         assert!(
             !ids.contains(&"reprocess"),
