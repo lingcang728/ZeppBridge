@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import DatePicker from './DatePicker.vue';
 import ModalDialog from './ModalDialog.vue';
 import { useLifeEvents } from '../composables/useLifeEvents';
 import { tauriApi } from '../composables/useTauriApi';
@@ -39,8 +40,12 @@ async function remove() {
         <label>{{ t.name }}<input v-model="draft.title" required maxlength="120" :placeholder="t.placeholder" data-event-title></label>
         <label>{{ t.category }}<select v-model="draft.category"><option v-for="category in eventCategories" :key="category" :value="category">{{ t.categories[category] }}</option></select></label>
         <div class="event-dates">
-          <label>{{ t.start }}<input v-model="draft.startDate" type="date" required data-event-start></label>
-          <label v-if="!ongoing">{{ t.end }}<input v-model="draft.endDate" type="date" :min="draft.startDate" required data-event-end></label>
+          <label>{{ t.start }}
+            <DatePicker v-model="draft.startDate" :aria-label="t.start" data-event-start />
+          </label>
+          <label v-if="!ongoing">{{ t.end }}
+            <DatePicker v-model="draft.endDate" :min="draft.startDate" :aria-label="t.end" data-event-end />
+          </label>
         </div>
         <label class="check"><input v-model="ongoing" type="checkbox">{{ t.ongoing }}</label>
         <label>{{ t.notes }}<textarea v-model="draft.notes" maxlength="4000" rows="4" data-event-notes /></label>

@@ -18,6 +18,11 @@ import { useSyncController } from '../composables/useSyncController';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { useLifeEvents } from '../composables/useLifeEvents';
 import { useAiHandoff } from '../composables/useAiHandoff';
+import {
+  calendarCells,
+  calendarMonthTitle,
+  calendarWeekdayNames,
+} from '../lib/calendarLocale';
 import { localDateString } from '../lib/format';
 import { popoverStyle } from '../lib/popoverPosition';
 import { rangeOptions } from '../lib/rangeOptions';
@@ -430,36 +435,11 @@ const nextMonth = () => {
   }
 };
 
-/* 月份和星期名交给 Intl，不再写死中文数组：英文界面上「2026年 8月」
-   既不是英文也不是任何人的日期写法。 */
-const calendarTitle = computed(() => displayDateTimeFormatter({
-  year: 'numeric', month: 'long',
-}).format(new Date(pickerYear.value, pickerMonth.value, 1)));
-
-const weekdayNames = computed(() => {
-  // 2026-01-04 是星期日，从它数七天就是一周的表头。
-  const sunday = new Date(2026, 0, 4);
-  const formatter = displayDateTimeFormatter({
-    weekday: locale.value === 'zh' ? 'narrow' : 'short',
-  });
-  return Array.from({ length: 7 }, (_unused, offset) =>
-    formatter.format(new Date(2026, 0, sunday.getDate() + offset)));
-});
-
-const calendarDays = computed(() => {
-  const firstDay = new Date(pickerYear.value, pickerMonth.value, 1).getDay();
-  const daysInMonth = new Date(pickerYear.value, pickerMonth.value + 1, 0).getDate();
-  const days = [];
-  // 空白占位
-  for (let i = 0; i < firstDay; i++) {
-    days.push({ day: null, dateStr: '' });
-  }
-  for (let i = 1; i <= daysInMonth; i++) {
-    const dateStr = `${pickerYear.value}-${String(pickerMonth.value + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-    days.push({ day: i, dateStr });
-  }
-  return days;
-});
+/* 月份名、星期名、一周起点跟系统地区，不跟界面语言。界面只有三份，
+   系统地区有很多；德语 Windows 上的英文界面仍该看到 März，而不是 September。 */
+const calendarTitle = computed(() => calendarMonthTitle(pickerYear.value, pickerMonth.value));
+const weekdayNames = computed(() => calendarWeekdayNames());
+const calendarDays = computed(() => calendarCells(pickerYear.value, pickerMonth.value));
 
 const selectCalendarDay = (dateStr: string) => {
   if (!dateStr) return;
