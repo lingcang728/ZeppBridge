@@ -52,7 +52,8 @@ pub async fn get_capability_overview(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<CapabilityOverview, AppError> {
     let db = state.db.lock().await;
-    db.capability_overview(Local::now().date_naive()).map_err(AppError::from)
+    db.capability_overview(Local::now().date_naive())
+        .map_err(AppError::from)
 }
 
 /// 一页记录，外加本机的总条数。

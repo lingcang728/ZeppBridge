@@ -762,11 +762,11 @@ impl Database {
                         "SELECT COUNT(*), MAX(date({column}, 'localtime')) FROM {table}
                          WHERE date({column}, 'localtime') BETWEEN ?1 AND ?2"
                     );
-                    let row = self.conn.query_row(
-                        &sql,
-                        params![start_text, end_text],
-                        |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Option<String>>(1)?)),
-                    )?;
+                    let row = self
+                        .conn
+                        .query_row(&sql, params![start_text, end_text], |row| {
+                            Ok((row.get::<_, i64>(0)?, row.get::<_, Option<String>>(1)?))
+                        })?;
                     (row.0, row.1, ("条", "records"))
                 }
             };
