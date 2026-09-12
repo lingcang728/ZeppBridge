@@ -439,7 +439,8 @@ const startLogin = async () => {
   loginBusy.value = true;
   reconnecting.value = true;
   try {
-    await applyLoginStatus(await backend.startWebLogin(locale.value));
+    // 登录窗口只有中英两种标题，西语界面用英文那个。
+    await applyLoginStatus(await backend.startWebLogin(locale.value === 'zh' ? 'zh' : 'en'));
   } catch (error) {
     loginStatus.value = { state: 'failed', message: toUserMessage(error, t.value.loginWindowFailed), page_url: '' };
     loginError.value = toUserMessage(error, t.value.loginWindowFailed);

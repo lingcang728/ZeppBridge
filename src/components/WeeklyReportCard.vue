@@ -37,6 +37,9 @@ const messages = defineMessages(
     sleepDuration: (hours: number, minutes: number) => `${hours} 小时 ${minutes} 分`,
     regularity: (minutes: number) => `±${minutes} 分`,
     workoutCount: (count: number) => `${count} 次`,
+    /** 后端给的单位码（score / load / bpm / ms）按界面语言写出来；返回空串就只显示数字。 */
+    unitWord: (unit: string) =>
+      ({ score: '分', load: '', bpm: '次/分' } as Record<string, string | undefined>)[unit] ?? unit,
     metric: {
       'weekly.resting_hr': '静息心率',
       'weekly.hrv': 'HRV',
@@ -68,6 +71,7 @@ const messages = defineMessages(
     sleepDuration: (hours: number, minutes: number) => `${hours} hr ${minutes} min`,
     regularity: (minutes: number) => `±${minutes} min`,
     workoutCount: (count: number) => `${count} sessions`,
+    unitWord: (unit: string) => unit,
     metric: {
       'weekly.resting_hr': 'Resting HR',
       'weekly.hrv': 'HRV',
@@ -76,6 +80,39 @@ const messages = defineMessages(
       'weekly.sleep_start_regularity': 'Bedtime spread',
       'weekly.workout_count': 'Workouts',
       'weekly.training_load': 'Training load',
+    },
+  },
+  {
+    title: 'Esta semana',
+    window: (recentStart: string, recentEnd: string, baseStart: string, baseEnd: string) =>
+      `${recentStart} ~ ${recentEnd} · frente a tu propio ${baseStart} ~ ${baseEnd}`,
+    legendGood: 'Verde = mejor para esta métrica',
+    legendBad: 'Rojo = peor',
+    legendNote: 'Comparado solo con tus propios 28 días anteriores, nunca con un promedio de población',
+    desktopOnly: 'El informe semanal necesita la app de escritorio de ZeppBridge.',
+    nothingComparable: 'Todavía no hay nada comparable esta semana. Vuelve después de sincronizar.',
+    loadFailed: 'No se pudo generar el informe semanal local',
+    barsAria: (recent: string, baseline: string) => `Esta semana ${recent}, 28 días anteriores ${baseline}`,
+    barThisWeek: 'Esta semana',
+    barBaseline: '28 días previos',
+    noBaseline: 'No hay suficiente historial detrás, así que solo se muestra el valor actual',
+    thinBaseline: (days: number, found: number, needed: number) =>
+      `Solo ${found} de los ${days} días anteriores tienen esta métrica (se necesitan ${needed}), así que se muestra el valor actual sin comparación.`,
+    noRecentData: 'No hay registros locales de esta métrica en los últimos 7 días.',
+    notProvided: 'Sin datos',
+    sleepDuration: (hours: number, minutes: number) => `${hours} h ${minutes} min`,
+    regularity: (minutes: number) => `±${minutes} min`,
+    workoutCount: (count: number) => `${count} sesiones`,
+    unitWord: (unit: string) =>
+      ({ score: 'pts', load: '', bpm: 'lpm' } as Record<string, string | undefined>)[unit] ?? unit,
+    metric: {
+      'weekly.resting_hr': 'FC en reposo',
+      'weekly.hrv': 'VFC',
+      'weekly.stress': 'Estrés',
+      'weekly.sleep_duration': 'Duración del sueño',
+      'weekly.sleep_start_regularity': 'Variación de la hora de dormir',
+      'weekly.workout_count': 'Entrenamientos',
+      'weekly.training_load': 'Carga de entrenamiento',
     },
   },
 );
@@ -184,7 +221,8 @@ function formatNumber(fact: InsightFact, value: number): string {
   }
   if (fact.metric === 'sleep_start_regularity') return t.value.regularity(Math.round(value));
   if (fact.metric === 'workout_count') return t.value.workoutCount(Math.round(value));
-  return `${Math.round(value)} ${fact.unit}`;
+  const word = t.value.unitWord(fact.unit);
+  return word ? `${Math.round(value)} ${word}` : `${Math.round(value)}`;
 }
 </script>
 

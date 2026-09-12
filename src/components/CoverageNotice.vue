@@ -60,6 +60,19 @@ const messages = defineMessages(
     backfilling: 'Backfilling…',
     syncNow: 'Sync now',
   },
+  {
+    empty: 'Todavía no hay nada en este equipo. Sincroniza una vez y los gráficos tendrán qué mostrar.',
+    emptyAfterSync:
+      'La sincronización terminó, pero no trajo nada. O esta cuenta no tiene datos de este periodo en Zepp, o el reloj todavía no ha subido sus datos a la app Zepp. Revisa primero la app Zepp en tu teléfono y luego vuelve a sincronizar aquí.',
+    emptyUnconfirmedRegion:
+      'La sincronización terminó, pero no trajo nada. Al iniciar sesión no se pudo confirmar a qué región de Zepp pertenece tu cuenta, así que ZeppBridge está usando su mejor suposición, y una sincronización dirigida a la región equivocada se comporta exactamente así: funciona y no devuelve nada. Intenta conectar tu cuenta de nuevo.',
+    reconnect: 'Volver a conectar la cuenta',
+    short: (covered: number, earliest: string) =>
+      `Este equipo tiene ${covered} días de datos (el más antiguo: ${earliest}). Todo lo anterior aparece vacío porque aún no se ha descargado de la nube, no porque no hayas registrado nada entonces.`,
+    backfill: 'Recuperar más historial',
+    backfilling: 'Recuperando…',
+    syncNow: 'Sincronizar ahora',
+  },
 );
 const t = useMessages(messages);
 

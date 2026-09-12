@@ -100,6 +100,19 @@ fn tray_labels(chinese: bool) -> TrayLabels {
     }
 }
 
+/// 按前端的界面语言取托盘文案。西语单独一份，其余非中文一律英文。
+fn tray_labels_for(locale: &str) -> TrayLabels {
+    let locale = locale.trim().to_ascii_lowercase();
+    if locale.starts_with("es") {
+        return TrayLabels {
+            show: "Abrir ZeppBridge",
+            sync: "Sincronizar ahora",
+            quit: "Salir",
+        };
+    }
+    tray_labels(locale.starts_with("zh"))
+}
+
 /// 托盘建好之后还要能改文案：用户在设置里换语言，托盘不该还留在旧语言上。
 struct TrayMenuItems {
     show: MenuItem<tauri::Wry>,
@@ -159,7 +172,7 @@ fn set_tray_locale(app: AppHandle, locale: String) -> std::result::Result<(), ip
     let Some(items) = app.try_state::<TrayMenuItems>() else {
         return Ok(());
     };
-    let labels = tray_labels(locale.trim().to_ascii_lowercase().starts_with("zh"));
+    let labels = tray_labels_for(&locale);
     let _ = items.show.set_text(labels.show);
     let _ = items.sync.set_text(labels.sync);
     let _ = items.quit.set_text(labels.quit);
