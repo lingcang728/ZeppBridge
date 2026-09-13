@@ -49,7 +49,15 @@ async function remove() {
       <h2 id="life-event-editor-title">{{ draft.id ? t.edit : t.add }}</h2>
       <fieldset :disabled="busy">
         <label>{{ t.name }}<input v-model="draft.title" required maxlength="120" :placeholder="t.placeholder" data-event-title></label>
-        <label>{{ t.category }}<SelectMenu :model-value="draft.category" :options="categoryOptions" :aria-label="t.category" @update:model-value="setCategory" /></label>
+        <div class="field">
+          <span>{{ t.category }}</span>
+          <SelectMenu
+            :model-value="draft.category"
+            :options="categoryOptions"
+            :aria-label="t.category"
+            @update:model-value="setCategory"
+          />
+        </div>
         <div class="event-dates">
           <label>{{ t.start }}
             <DatePicker v-model="draft.startDate" :aria-label="t.start" data-event-start />
@@ -80,7 +88,7 @@ async function remove() {
 <style scoped>
 .event-form { display:grid; gap:16px; }.event-form h2,.event-form p { margin:0; }
 fieldset { border:0; padding:0; margin:0; min-width:0; display:grid; gap:14px; }
-label { display:grid; gap:6px; font-size:var(--fs-sm); color:var(--muted); }
+label, .field { display:grid; gap:6px; font-size:var(--fs-sm); color:var(--muted); }
 input,select,textarea { min-width:0; width:100%; box-sizing:border-box; padding:10px; border:1px solid var(--line-control); border-radius:8px; background:var(--surface); color:var(--ink); font:inherit; }
 textarea { resize:vertical; }.event-dates { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
 .check { display:flex; align-items:center; gap:8px; }.check input { width:auto; }

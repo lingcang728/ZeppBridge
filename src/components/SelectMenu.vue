@@ -251,7 +251,9 @@ onBeforeUnmount(() => {
      写成非 scoped。类名带 select- 前缀，避免和别处撞车。 -->
 <style>
 .select-list {
-  z-index: 2000;
+  /* ModalDialog 是 2100，DatePicker 是 2200。弹层 Teleport 到 body 之后
+     必须压过对话框，否则生活事件里的分类菜单会画在面板后面，看起来像选不了。 */
+  z-index: 2300;
   margin: 0;
   padding: 4px;
   overflow-y: auto;

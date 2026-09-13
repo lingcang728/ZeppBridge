@@ -1055,10 +1055,13 @@ fn saturating_days_before(date: NaiveDate, days: i64) -> NaiveDate {
         .unwrap_or(date)
 }
 
-/// 变化方向。`f64::EPSILON` 当阈值等于「任何噪声都算趋势」：基线 60 bpm
-/// 差 0.3 就报「升高」是在编造信号。相对变化不超过基线的 2% 视为持平。
-fn direction_of(delta: f64, previous: f64) -> String {
-    if delta.abs() <= 0.02 * previous.abs() {
+/// 变化方向。
+///
+/// 界面把心率等指标四舍五入成整数再显示。用「基线的 2%」当持平门槛时，
+/// 50 vs 51 bpm（−1.3%）会被判成 `same`，于是本周那根条没有颜色，而旁边
+/// 数字明明写着两个不同的值。半个显示单位以下才是噪声。
+fn direction_of(delta: f64, _previous: f64) -> String {
+    if delta.abs() < 0.5 {
         "same".into()
     } else if delta > 0.0 {
         "higher".into()
@@ -1802,14 +1805,13 @@ mod tests {
         assert_eq!(resting.confidence, Confidence::Insufficient);
     }
 
-    /// 相对变化不超过基线的 2% 是持平：EPSILON 级别的噪声不是趋势。
+    /// 半个显示单位以下是噪声；界面会显示成整数的 1 bpm 差必须有方向。
     #[test]
-    fn a_delta_within_two_percent_of_the_baseline_reads_as_flat() {
-        assert_eq!(direction_of(1.0, 60.0), "same");
-        assert_eq!(direction_of(-1.0, 60.0), "same");
-        assert_eq!(direction_of(1.2, 60.0), "same", "恰在边界算持平");
-        assert_eq!(direction_of(2.0, 60.0), "higher");
-        assert_eq!(direction_of(-2.0, 60.0), "lower");
+    fn a_displayed_bpm_difference_is_not_flat() {
+        assert_eq!(direction_of(0.4, 60.0), "same");
+        assert_eq!(direction_of(-0.4, 51.0), "same");
+        assert_eq!(direction_of(1.0, 60.0), "higher");
+        assert_eq!(direction_of(-1.0, 51.0), "lower");
     }
 
     /// wellness 的 `hrvRmssd` 项落库叫 `hrv_rmssd`——周报两个名字都要认，
