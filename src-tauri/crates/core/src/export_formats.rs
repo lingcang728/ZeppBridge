@@ -243,6 +243,11 @@ pub fn to_gpx(export: &Value) -> Result<(String, usize), String> {
             ) else {
                 continue;
             };
+            // 最后一道边界：出域或非有限的坐标不写出。解码侧已经截断过，
+            // 这里是独立校验，不依赖上游一定干净。
+            if !coordinates_in_domain(lat, lon) {
+                continue;
+            }
             let timestamp = text(point.get("timestamp"));
             let parsed = parse_time(timestamp);
 
@@ -354,6 +359,14 @@ fn pause_resume_times(workout: &Value) -> Vec<DateTime<FixedOffset>> {
 
 fn parse_time(value: &str) -> Option<DateTime<FixedOffset>> {
     DateTime::parse_from_rfc3339(value).ok()
+}
+
+/// 坐标域：纬 ±90、经 ±180，且两个都得是有限值。
+fn coordinates_in_domain(latitude: f64, longitude: f64) -> bool {
+    latitude.is_finite()
+        && longitude.is_finite()
+        && latitude.abs() <= 90.0
+        && longitude.abs() <= 180.0
 }
 
 fn push_row(out: &mut String, fields: &[&str; 9]) {
@@ -655,5 +668,31 @@ mod tests {
         assert!(gpx.contains("run &amp; walk"));
         assert!(gpx.contains("a&lt;b&amp;c"));
         assert!(!gpx.contains("a<b&c"), "未转义的 XML 会让轨迹文件打不开");
+    }
+
+    /// 出域坐标是最后一道边界：lat=999 不是地球上的点，不许进 GPX。
+    #[test]
+    fn gpx_drops_points_outside_the_coordinate_domain() {
+        let export = export_with(json!({
+            "workouts": [
+                {
+                    "workout_id": "w1", "workout_type": "outdoor_running",
+                    "route": [
+                        { "timestamp": "2026-08-24T06:00:00+08:00", "latitude": 31.0,
+                          "longitude": 121.0 },
+                        { "timestamp": "2026-08-24T06:00:01+08:00", "latitude": 999.0,
+                          "longitude": 121.0 }
+                    ],
+                    "samples": [],
+                    "pauses": []
+                }
+            ]
+        }));
+
+        let (gpx, points) = to_gpx(&export).unwrap();
+
+        assert_eq!(points, 1, "lat=999 的点必须被丢掉");
+        assert!(gpx.contains("<trkpt lat=\"31.000000\" lon=\"121.000000\">"));
+        assert!(!gpx.contains("999.000000"));
     }
 }

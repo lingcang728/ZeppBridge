@@ -4,7 +4,8 @@ import { displayDateTimeFormatter } from '../lib/dateTime';
 import { computed, onMounted, ref, watch } from 'vue';
 import { open as showOpenDialog } from '@tauri-apps/plugin-dialog';
 import { RouterLink, useRoute } from 'vue-router';
-import { VChart } from '../lib/echartsSetup';
+import { CHART_THEME, VChart } from '../lib/echartsSetup';
+import { createLoadSeq } from '../lib/loadSeq';
 import DesignIcon, { type DesignIconName } from '../components/DesignIcon.vue';
 import DeviceVisual from '../components/DeviceVisual.vue';
 import EmptyState from '../components/EmptyState.vue';
@@ -27,6 +28,7 @@ import {
 } from '../lib/units';
 import { zeppSemanticColors } from '../lib/echartsTheme';
 import { formatPaceSeconds } from '../lib/metricSeries';
+import { readDefaultExportFormat } from '../lib/exportScope';
 import { workoutDisplayLabel, workoutDisplayType } from '../lib/workouts';
 import { workoutTiming } from '../lib/workoutTiming';
 import { deviceImageFor } from '../lib/deviceCatalog';
@@ -43,6 +45,9 @@ const messages = defineMessages(
     notFoundTitle: '找不到这条运动记录',
     notFoundMessage: '它可能已被清理，或尚未同步到本机。',
     insightFailed: '无法生成本次运动的洞察',
+    seriesFailed: '无法读取这次运动的逐点序列',
+    seriesFailedTitle: '逐点序列读取失败',
+    exportNeedsSeries: '逐点序列读取失败，无法导出这条记录。',
     thisWorkout: '这次运动',
     aiPrompt: (label: string) => `你是一位专业的运动分析师。下面是我一次${label}的完整记录（来自 ZeppBridge 本机数据库，已脱敏）。
 请只基于这条记录里的事实分析这次训练：强度、配速与心率的关系、是否有明显的掉速或异常段落，并给出下一次的具体建议。
@@ -125,6 +130,7 @@ const messages = defineMessages(
     metricListAria: '运动表现总结',
 
     routeAria: 'GPS 全轨迹',
+    eyebrowRoute: '路线',
     routeTitle: 'GPS 全轨迹',
     routeNote: '本地画布 · 不请求地图瓦片',
     routeSvgAria: '按时间与最近配速样本着色的本地 GPS 轨迹',
@@ -140,6 +146,7 @@ const messages = defineMessages(
     chartsEmptyBody: '本次未同步心率、配速、海拔或步频序列。',
 
     hrZonesAria: '心率区间分布',
+    eyebrowHrZones: '心率区间',
     hrZonesTitle: '心率区间分布',
     hrZonesNote: '区间边界来自你在手表上的设定，由 Zepp 随这条运动一起下发；ZeppBridge 没有重新划分。训练状态页那套自选区间模型是另一回事，两边的数字对不上属于正常。',
     hrZoneBelow: (upper: number) => `${upper} 以下`,
@@ -148,10 +155,12 @@ const messages = defineMessages(
     hrZoneTotal: (duration: string) => `有心率的时长合计 ${duration}`,
     hrZoneBarAria: '各心率区间的时长占比',
     decodedAria: '已解码参数',
+    eyebrowDecoded: '已解码',
     decodedTitle: '已解码参数',
     decodedNote: '摘要只从本条记录的有效样本计算，异常跳点会被忽略。',
 
     exportAria: '导出与分享',
+    eyebrowExport: '导出',
     exportTitle: '导出与分享',
     exportSub: '复制 JSON、CSV、GPX，或选择文件夹保存这条运动的 FIT 文件。',
     exportFormatAria: '导出格式',
@@ -161,6 +170,7 @@ const messages = defineMessages(
     exportFailed: '导出失败',
 
     handoffAria: '交给 AI',
+    eyebrowHandoff: '交接',
     handoffTitle: '交给 AI',
     handoffSub: '只把这一条运动的脱敏数据和提示词复制到剪贴板，并打开你选的 AI 网站。按天记录的睡眠、步数不在范围内。',
     handoffTarget: '目标工具',
@@ -169,6 +179,7 @@ const messages = defineMessages(
     handTo: (provider: string) => `交给 ${provider}`,
 
     provenanceAria: '来源信息',
+    eyebrowProvenance: '来源',
     provenanceTitle: '来源信息',
     provenanceProvider: '数据来源',
     provenanceScope: '数据范围',
@@ -186,6 +197,9 @@ const messages = defineMessages(
     notFoundTitle: 'This workout is not here',
     notFoundMessage: 'It may have been cleaned up, or it has not been synced to this machine yet.',
     insightFailed: 'Could not build an insight for this workout',
+    seriesFailed: 'Could not read the per-point series for this workout',
+    seriesFailedTitle: 'Per-point series failed to load',
+    exportNeedsSeries: 'The per-point series failed to load, so this record cannot be exported.',
     thisWorkout: 'workout',
     aiPrompt: (label: string) => `You are a sports analyst. Below is the complete record of one ${label} of mine, taken from the ZeppBridge local database and de-identified.
 Analyze this session using only the facts in this record: the intensity, how pace relates to heart rate, whether there is a clear slowdown or an anomalous stretch, and what specifically to do differently next time.
@@ -268,6 +282,7 @@ Answer in Markdown.`,
     metricListAria: 'Workout performance summary',
 
     routeAria: 'Full GPS track',
+    eyebrowRoute: 'Route',
     routeTitle: 'Full GPS track',
     routeNote: 'Drawn locally · no map tiles requested',
     routeSvgAria: 'Local GPS track colored by time and the nearest pace sample',
@@ -283,6 +298,7 @@ Answer in Markdown.`,
     chartsEmptyBody: 'No heart rate, pace, altitude or cadence series was synced for this session.',
 
     hrZonesAria: 'Heart rate zones',
+    eyebrowHrZones: 'HR zones',
     hrZonesTitle: 'Heart rate zones',
     hrZonesNote: 'The zone boundaries come from your own settings on the watch and are sent down by Zepp with this workout; ZeppBridge does not re-cut them. The Training Status page uses a separate model you pick yourself, so the two sets of numbers will not agree.',
     hrZoneBelow: (upper: number) => `Below ${upper}`,
@@ -291,10 +307,12 @@ Answer in Markdown.`,
     hrZoneTotal: (duration: string) => `${duration} with heart rate`,
     hrZoneBarAria: 'Share of time spent in each heart rate zone',
     decodedAria: 'Decoded values',
+    eyebrowDecoded: 'Decoded',
     decodedTitle: 'Decoded values',
     decodedNote: 'The summary is computed only from valid samples in this record; anomalous jumps are ignored.',
 
     exportAria: 'Export and share',
+    eyebrowExport: 'Export',
     exportTitle: 'Export and share',
     exportSub: 'Copy JSON, CSV or GPX, or choose a folder to save this workout as FIT.',
     exportFormatAria: 'Export format',
@@ -304,6 +322,7 @@ Answer in Markdown.`,
     exportFailed: 'Export failed',
 
     handoffAria: 'Hand to AI',
+    eyebrowHandoff: 'Handoff',
     handoffTitle: 'Hand to AI',
     handoffSub: 'Copies the de-identified data for this one workout, plus the prompt, and opens the AI site you pick. Day-level streams such as sleep and steps stay out.',
     handoffTarget: 'Target tool',
@@ -312,6 +331,7 @@ Answer in Markdown.`,
     handTo: (provider: string) => `Hand to ${provider}`,
 
     provenanceAria: 'Provenance',
+    eyebrowProvenance: 'Provenance',
     provenanceTitle: 'Provenance',
     provenanceProvider: 'Provider',
     provenanceScope: 'Scope',
@@ -329,6 +349,9 @@ Answer in Markdown.`,
     notFoundTitle: 'Este entrenamiento no está aquí',
     notFoundMessage: 'Puede que se haya borrado, o que todavía no se haya sincronizado en este equipo.',
     insightFailed: 'No se pudo generar un análisis para este entrenamiento',
+    seriesFailed: 'No se pudo leer la serie punto a punto de este entrenamiento',
+    seriesFailedTitle: 'No se pudo cargar la serie punto a punto',
+    exportNeedsSeries: 'La serie punto a punto no se pudo cargar, así que este registro no se puede exportar.',
     thisWorkout: 'entrenamiento',
     aiPrompt: (label: string) => `Eres un analista deportivo. A continuación está el registro completo de uno de mis entrenamientos de ${label}, tomado de la base de datos local de ZeppBridge y anonimizado.
 Analiza esta sesión usando solo los hechos de este registro: la intensidad, cómo se relaciona el ritmo con la frecuencia cardíaca, si hay una desaceleración clara o un tramo anómalo, y qué hacer concretamente distinto la próxima vez.
@@ -411,6 +434,7 @@ Responde en español, en Markdown.`,
     metricListAria: 'Resumen del rendimiento del entrenamiento',
 
     routeAria: 'Recorrido GPS completo',
+    eyebrowRoute: 'Recorrido',
     routeTitle: 'Recorrido GPS completo',
     routeNote: 'Dibujado localmente · no se piden mapas',
     routeSvgAria: 'Recorrido GPS local coloreado por tiempo y la muestra de ritmo más cercana',
@@ -426,6 +450,7 @@ Responde en español, en Markdown.`,
     chartsEmptyBody: 'No se sincronizó ninguna serie de frecuencia cardíaca, ritmo, altitud ni cadencia para esta sesión.',
 
     hrZonesAria: 'Zonas de frecuencia cardíaca',
+    eyebrowHrZones: 'Zonas FC',
     hrZonesTitle: 'Zonas de frecuencia cardíaca',
     hrZonesNote: 'Los límites de las zonas vienen de tu propia configuración en el reloj y Zepp los envía con este entrenamiento; ZeppBridge no los recalcula. La página de Estado de entrenamiento usa otro modelo que eliges tú, así que los dos conjuntos de números no van a coincidir.',
     hrZoneBelow: (upper: number) => `Menos de ${upper}`,
@@ -434,10 +459,12 @@ Responde en español, en Markdown.`,
     hrZoneTotal: (duration: string) => `${duration} con frecuencia cardíaca`,
     hrZoneBarAria: 'Proporción del tiempo en cada zona de frecuencia cardíaca',
     decodedAria: 'Valores decodificados',
+    eyebrowDecoded: 'Decodificado',
     decodedTitle: 'Valores decodificados',
     decodedNote: 'El resumen se calcula solo con las muestras válidas de este registro; los saltos anómalos se ignoran.',
 
     exportAria: 'Exportar y compartir',
+    eyebrowExport: 'Exportar',
     exportTitle: 'Exportar y compartir',
     exportSub: 'Copia JSON, CSV o GPX, o elige una carpeta para guardar este entrenamiento como FIT.',
     exportFormatAria: 'Formato de exportación',
@@ -447,6 +474,7 @@ Responde en español, en Markdown.`,
     exportFailed: 'La exportación falló',
 
     handoffAria: 'Pasar a la IA',
+    eyebrowHandoff: 'Entrega',
     handoffTitle: 'Pasar a la IA',
     handoffSub: 'Copia los datos anonimizados de solo este entrenamiento, más la instrucción, y abre el sitio de IA que elijas. Los flujos diarios como sueño y pasos quedan fuera.',
     handoffTarget: 'Herramienta de destino',
@@ -455,6 +483,7 @@ Responde en español, en Markdown.`,
     handTo: (provider: string) => `Pasar a ${provider}`,
 
     provenanceAria: 'Procedencia',
+    eyebrowProvenance: 'Procedencia',
     provenanceTitle: 'Procedencia',
     provenanceProvider: 'Proveedor',
     provenanceScope: 'Alcance',
@@ -505,25 +534,38 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 const actionError = ref<string | null>(null);
 const exportedNote = ref<string | null>(null);
-const activeFormat = ref<'json' | 'csv' | 'gpx' | 'fit'>('json');
+const activeFormat = ref<'json' | 'csv' | 'gpx' | 'fit'>(readDefaultExportFormat());
 const exportBusy = ref(false);
 const workoutId = computed(() => String(route.params.workoutId || ''));
 const displayType = computed(() => workout.value ? workoutDisplayType(workout.value) : 'unknown');
 const insight = ref<WorkoutInsight | null>(null);
 const insightLoading = ref(false);
 const insightError = ref<string | null>(null);
+const seriesError = ref<string | null>(null);
+const insightSeq = createLoadSeq();
 
 const loadInsight = async (id: string) => {
-  if (!isTauri()) return;
+  const seq = insightSeq.next();
+  if (!id) return;
+  if (!isTauri()) {
+    if (!insightSeq.isCurrent(seq)) return;
+    insight.value = null;
+    insightError.value = null;
+    insightLoading.value = false;
+    return;
+  }
   insightLoading.value = true;
   insightError.value = null;
   try {
-    insight.value = await tauriApi.getWorkoutInsight(id);
+    const next = await tauriApi.getWorkoutInsight(id);
+    if (!insightSeq.isCurrent(seq)) return;
+    insight.value = next;
   } catch (error) {
+    if (!insightSeq.isCurrent(seq)) return;
     insight.value = null;
     insightError.value = toUserMessage(error, t.value.insightFailed);
   } finally {
-    insightLoading.value = false;
+    if (insightSeq.isCurrent(seq)) insightLoading.value = false;
   }
 };
 
@@ -1096,12 +1138,16 @@ const loadDetail = async () => {
   const seq = ++detailSeq;
   loading.value = true;
   error.value = null;
+  seriesError.value = null;
   if (!isTauri()) { loading.value = false; return; }
   try {
     const emptySeries: WorkoutSeries = { workout_id: workoutId.value, samples: [], route: [], pauses: [], splits: [], laps: [], summary: {} };
-    const [detail, workoutSeries] = await Promise.all([
+    const [detail, seriesResult] = await Promise.all([
       tauriApi.getWorkoutDetail(workoutId.value),
-      tauriApi.getWorkoutSeries(workoutId.value).catch(() => emptySeries),
+      tauriApi.getWorkoutSeries(workoutId.value).then(
+        (value) => ({ ok: true as const, value }),
+        (cause) => ({ ok: false as const, cause }),
+      ),
     ]);
     if (seq !== detailSeq) return;
     const profile = detail
@@ -1109,7 +1155,16 @@ const loadDetail = async () => {
       : {};
     if (seq !== detailSeq) return;
     workout.value = detail as WorkoutMetrics | null;
-    series.value = detail ? workoutSeries : null;
+    if (!detail) {
+      series.value = null;
+      seriesError.value = null;
+    } else if (seriesResult.ok) {
+      series.value = seriesResult.value;
+      seriesError.value = null;
+    } else {
+      series.value = emptySeries;
+      seriesError.value = toUserMessage(seriesResult.cause, t.value.seriesFailed);
+    }
     device.value = profile;
   } catch (cause) {
     if (seq === detailSeq) error.value = toUserMessage(cause, t.value.loadFailed);
@@ -1127,6 +1182,7 @@ const changeWorkoutOverride = async (value: string | number) => {
     const updated = await tauriApi.setWorkoutTypeOverride(workout.value.workout_id, next || null);
     workout.value = updated as WorkoutMetrics;
     exportedNote.value = next ? t.value.overrideSaved : t.value.overrideCleared;
+    void loadInsight(updated.workout_id);
   } catch (cause) {
     actionError.value = toUserMessage(cause, t.value.overrideFailed);
   } finally {
@@ -1139,6 +1195,10 @@ const exportRecord = async () => {
   const exportWorkoutId = workout.value.workout_id;
   actionError.value = null;
   exportedNote.value = null;
+  if (seriesError.value && activeFormat.value !== 'fit') {
+    actionError.value = t.value.exportNeedsSeries;
+    return;
+  }
   exportBusy.value = true;
   try {
     if (activeFormat.value === 'fit') {
@@ -1170,7 +1230,6 @@ const exportRecord = async () => {
 
 onMounted(() => {
   void loadDetail();
-  if (workoutId.value) void loadInsight(workoutId.value);
   if (isTauri()) {
     void tauriApi.getWorkoutTypeOptions()
       .then((options) => { typeOverrideOptions.value = options; })
@@ -1178,6 +1237,7 @@ onMounted(() => {
   }
 });
 watch([dataRevision, workoutId], () => void loadDetail());
+watch(workoutId, (id) => { if (id) void loadInsight(id); }, { immediate: true });
 </script>
 
 <template>
@@ -1250,7 +1310,7 @@ watch([dataRevision, workoutId], () => void loadDetail());
           <section class="surface-card series-card" :aria-label="t.routeAria">
             <div class="section-head">
               <span class="section-icon route-tone"><DesignIcon name="outdoor-run" :size="34" /></span>
-              <div><p class="section-eyebrow">ROUTE</p><h2>{{ t.routeTitle }}</h2></div>
+              <div><p class="section-eyebrow">{{ t.eyebrowRoute }}</p><h2>{{ t.routeTitle }}</h2></div>
               <span class="route-note">{{ t.routeNote }}</span>
             </div>
             <div v-if="routeCanvas" class="route-wrap">
@@ -1281,14 +1341,22 @@ watch([dataRevision, workoutId], () => void loadDetail());
                   <li v-for="stat in card.stats" :key="stat.label"><em>{{ stat.label }}</em><strong>{{ stat.value }}</strong></li>
                 </ul>
               </div>
-              <VChart class="series-chart" theme="zeppbridge-dark" :option="card.option" autoresize role="img" :aria-label="t.chartAria(card.title)" />
+              <VChart class="series-chart" :theme="CHART_THEME" :option="card.option" autoresize role="img" :aria-label="t.chartAria(card.title)" />
             </section>
           </div>
-          <section v-if="!chartCards.length" class="surface-card chart-empty"><DesignIcon name="structured-data" :size="42" /><div><strong>{{ t.chartsEmptyTitle }}</strong><p>{{ t.chartsEmptyBody }}</p></div></section>
+          <section v-if="seriesError" class="surface-card chart-empty" role="alert">
+            <DesignIcon name="structured-data" :size="42" />
+            <div>
+              <strong>{{ t.seriesFailedTitle }}</strong>
+              <p>{{ seriesError }}</p>
+              <button class="button button-secondary" type="button" @click="loadDetail">{{ t.retry }}</button>
+            </div>
+          </section>
+          <section v-else-if="!chartCards.length" class="surface-card chart-empty"><DesignIcon name="structured-data" :size="42" /><div><strong>{{ t.chartsEmptyTitle }}</strong><p>{{ t.chartsEmptyBody }}</p></div></section>
           <section v-if="hrZones" class="surface-card hr-zone-card" :aria-label="t.hrZonesAria">
             <div class="section-head compact">
               <span class="section-icon heart-tone"><DesignIcon name="heart-rate" :size="32" /></span>
-              <div><p class="section-eyebrow">HR ZONES</p><h2>{{ t.hrZonesTitle }}</h2></div>
+              <div><p class="section-eyebrow">{{ t.eyebrowHrZones }}</p><h2>{{ t.hrZonesTitle }}</h2></div>
               <span class="route-note">{{ t.hrZoneTotal(hrZones.totalLabel) }}</span>
             </div>
             <div class="hr-zone-bar" role="img" :aria-label="t.hrZoneBarAria">
@@ -1308,7 +1376,7 @@ watch([dataRevision, workoutId], () => void loadDetail());
 
         <div class="side-col">
           <section class="surface-card side-card decoded-card" :aria-label="t.decodedAria">
-            <div class="section-head compact"><span class="section-icon data-tone"><DesignIcon name="structured-data" :size="32" /></span><div><p class="section-eyebrow">DECODED</p><h2>{{ t.decodedTitle }}</h2></div></div>
+            <div class="section-head compact"><span class="section-icon data-tone"><DesignIcon name="structured-data" :size="32" /></span><div><p class="section-eyebrow">{{ t.eyebrowDecoded }}</p><h2>{{ t.decodedTitle }}</h2></div></div>
             <div class="decoded-list">
               <div v-for="metric in decodedMetrics" :key="metric.label"><DesignIcon :name="metric.icon" :size="29" /><span>{{ metric.label }}</span><strong>{{ metric.value }}</strong></div>
             </div>
@@ -1316,7 +1384,7 @@ watch([dataRevision, workoutId], () => void loadDetail());
           </section>
 
           <section class="surface-card side-card" :aria-label="t.exportAria">
-            <div class="section-head compact"><span class="section-icon export-tone"><DesignIcon name="document" :size="32" /></span><div><p class="section-eyebrow">EXPORT</p><h2>{{ t.exportTitle }}</h2></div></div>
+            <div class="section-head compact"><span class="section-icon export-tone"><DesignIcon name="document" :size="32" /></span><div><p class="section-eyebrow">{{ t.eyebrowExport }}</p><h2>{{ t.exportTitle }}</h2></div></div>
             <p class="card-sub">{{ t.exportSub }}</p>
             <div class="format-row" role="radiogroup" :aria-label="t.exportFormatAria"><button v-for="format in (['json', 'csv', 'gpx', 'fit'] as const)" :key="format" type="button" role="radio" :disabled="exportBusy || (format === 'fit' && !isTauri())" :aria-checked="activeFormat === format" :class="['format-pill', { 'is-on': activeFormat === format }]" @click="activeFormat = format">{{ format.toUpperCase() }}</button></div>
             <button class="export-go" type="button" :disabled="exportBusy" @click="exportRecord"><DesignIcon name="cloud-output" :size="27" />{{ activeFormat === 'fit' ? t.saveFit : t.exportGo(activeFormat.toUpperCase()) }}</button>
@@ -1324,7 +1392,7 @@ watch([dataRevision, workoutId], () => void loadDetail());
           </section>
 
           <section class="surface-card side-card ai-card" :aria-label="t.handoffAria">
-            <div class="section-head compact"><span class="section-icon ai-tone"><DesignIcon name="handoff" :size="32" /></span><div><p class="section-eyebrow">HANDOFF</p><h2>{{ t.handoffTitle }}</h2></div></div>
+            <div class="section-head compact"><span class="section-icon ai-tone"><DesignIcon name="handoff" :size="32" /></span><div><p class="section-eyebrow">{{ t.eyebrowHandoff }}</p><h2>{{ t.handoffTitle }}</h2></div></div>
             <p class="card-sub">{{ t.handoffSub }}</p>
             <label class="ai-provider">
               <span>{{ t.handoffTarget }}</span>
@@ -1343,7 +1411,7 @@ watch([dataRevision, workoutId], () => void loadDetail());
           </section>
 
           <section class="surface-card side-card meta-card" :aria-label="t.provenanceAria">
-            <div class="section-head compact"><span class="section-icon source-tone"><DesignIcon name="database" :size="32" /></span><div><p class="section-eyebrow">PROVENANCE</p><h2>{{ t.provenanceTitle }}</h2></div></div>
+            <div class="section-head compact"><span class="section-icon source-tone"><DesignIcon name="database" :size="32" /></span><div><p class="section-eyebrow">{{ t.eyebrowProvenance }}</p><h2>{{ t.provenanceTitle }}</h2></div></div>
             <dl><div><dt>{{ t.provenanceProvider }}</dt><dd>{{ dataProviderLabel() }}</dd></div><div><dt>{{ t.provenanceScope }}</dt><dd>{{ dataScopeLabel(workout.source_scope) }}</dd></div><div><dt>{{ t.provenanceSynced }}</dt><dd>{{ syncBadge }}</dd></div><div><dt>{{ t.provenanceRecordId }}</dt><dd>{{ workout.workout_id }}</dd></div><div><dt>{{ t.provenanceDevice }}</dt><dd>{{ deviceName }}</dd></div></dl>
           </section>
         </div>

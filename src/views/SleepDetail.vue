@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
-import { VChart } from '../lib/echartsSetup';
+import { CHART_THEME, VChart } from '../lib/echartsSetup';
 import Icon from '../components/Icon.vue';
 import CircularProgress from '../components/CircularProgress.vue';
 import StageBar from '../components/StageBar.vue';
@@ -397,7 +397,7 @@ watch([dataRevision, sleepId], () => void loadDetail());
           <h2>{{ t.weeklyTitle }}</h2>
           <p>{{ t.weeklySub }}</p>
         </div>
-        <VChart class="weekly-sleep-chart" :option="weeklyChartOption" autoresize role="img" :aria-label="t.weeklyChartAria" />
+        <VChart class="weekly-sleep-chart" :theme="CHART_THEME" :option="weeklyChartOption" autoresize role="img" :aria-label="t.weeklyChartAria" />
       </section>
 
       <!-- 元数据与设备 -->

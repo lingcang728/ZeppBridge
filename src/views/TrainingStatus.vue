@@ -2,7 +2,8 @@
 import LifeEventShortcut from '../components/LifeEventShortcut.vue';
 defineOptions({ name: 'TrainingStatus' });
 import { computed, onMounted, ref, watch } from 'vue';
-import { VChart } from '../lib/echartsSetup';
+import { CHART_THEME, VChart } from '../lib/echartsSetup';
+import { createLoadSeq } from '../lib/loadSeq';
 import HeartRateZonePicker from '../components/HeartRateZonePicker.vue';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
 import PageHeader from '../components/PageHeader.vue';
@@ -169,6 +170,7 @@ const rangeDays = ref<SeriesRangeDays>(180);
 const series = ref<Record<string, MetricSeries>>({});
 const balance = ref<TrainingBalancePoint[]>([]);
 const loading = ref(true);
+const loadSeq = createLoadSeq();
 const error = ref<string | null>(null);
 
 const vo2max = computed(() => series.value.vo2max ?? null);
@@ -350,9 +352,11 @@ const latestBalance = computed(() => {
 });
 
 const load = async () => {
+  const seq = loadSeq.next();
   loading.value = true;
   error.value = null;
   if (!isDesktop()) {
+    if (!loadSeq.isCurrent(seq)) return;
     series.value = {};
     balance.value = [];
     loading.value = false;
@@ -365,6 +369,7 @@ const load = async () => {
     // much runway before a ratio exists at all.
     backend.getTrainingBalance(Math.max(28, rangeDays.value)),
   ]);
+  if (!loadSeq.isCurrent(seq)) return;
   const [metrics, trend] = results;
   series.value = metrics.status === 'fulfilled' ? indexSeries(metrics.value) : {};
   balance.value = trend.status === 'fulfilled' ? trend.value : [];
@@ -390,13 +395,12 @@ watch(dataRevision, () => { void load(); });
       :title="t.title"
       :intro="t.intro"
     >
-      <div class="range-switch" role="radiogroup" :aria-label="t.rangeAria">
+      <div class="range-switch" role="group" :aria-label="t.rangeAria">
         <button
           v-for="range in ranges"
           :key="range.days"
           type="button"
-          role="radio"
-          :aria-checked="rangeDays === range.days"
+          :aria-pressed="rangeDays === range.days"
           :class="['range-pill', { 'is-on': rangeDays === range.days }]"
           @click="rangeDays = range.days"
         >{{ range.label }}</button>
@@ -457,7 +461,7 @@ watch(dataRevision, () => { void load(); });
           <VChart
             v-if="thresholdOption"
             class="chart-body"
-            theme="zeppbridge-dark"
+            :theme="CHART_THEME"
             :option="thresholdOption"
             autoresize
             role="img"
@@ -483,7 +487,7 @@ watch(dataRevision, () => { void load(); });
         <VChart
           v-if="balanceOption"
           class="chart-body tall"
-          theme="zeppbridge-dark"
+          :theme="CHART_THEME"
           :option="balanceOption"
           autoresize
           role="img"

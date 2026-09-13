@@ -1187,7 +1187,7 @@ fn cmd_export(args: &[String]) -> u8 {
 
     match options.out.as_deref() {
         Some(path) => {
-            if let Err(error) = std::fs::write(path, &body) {
+            if let Err(error) = paths::write_file_atomically(Path::new(path), body.as_bytes()) {
                 return fail(
                     json_mode,
                     EXIT_FAILED,
@@ -1262,7 +1262,7 @@ fn export_fit_files(json_mode: bool, json_text: &str, out: Option<&str>) -> u8 {
     }
     for (name, bytes) in &files {
         let target = std::path::Path::new(directory).join(name);
-        if let Err(error) = std::fs::write(&target, bytes) {
+        if let Err(error) = paths::write_file_atomically(&target, bytes) {
             return fail(
                 json_mode,
                 EXIT_FAILED,
@@ -1717,5 +1717,14 @@ mod tests {
         assert_eq!(schema, EXIT_SCHEMA);
         assert_eq!(token, EXIT_NOT_CONFIGURED);
         assert_ne!(schema, token);
+
+        let (no_store, kind) = exit_code_for(&ZeppBridgeError::Headless(
+            HeadlessProblem::NoCredentialStore {
+                detail: "no dbus".into(),
+            },
+        ));
+        assert_eq!(no_store, EXIT_NOT_CONFIGURED);
+        assert_eq!(kind, "auth");
+        assert_ne!(no_store, EXIT_FAILED);
     }
 }

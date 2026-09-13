@@ -14,6 +14,7 @@ import {
   useExport,
   type SaveFormat,
 } from '../composables/useExport';
+import { readDefaultExportFormat } from '../lib/exportScope';
 import { useSyncController } from '../composables/useSyncController';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { useLifeEvents } from '../composables/useLifeEvents';
@@ -34,6 +35,7 @@ const {
   exportEndDate,
   exportDataTypes,
   exportDetail,
+  focusedWorkoutId,
   exportBusy,
   exportError,
   exportMessage,
@@ -65,7 +67,6 @@ const categories = computed(() => {
    互斥的 ExportScope 让「日期范围」和「单次运动」不可能同时生效，
    所以这里不需要任何优先级规则。 */
 const route = useRoute();
-const focusedWorkoutId = ref<string | null>(null);
 /* 这一页被 KeepAlive 缓存，第二次进来不会重新挂载，所以锁定范围要在
    activated 时也读一遍 query，否则会沿用上一次的范围。 */
 const readFocusFromRoute = () => {
@@ -114,7 +115,7 @@ const formats = computed<{ key: SaveFormat; label: string; sub: string; icon: Ic
   { key: 'gpx', label: 'GPX', sub: t.value.formatGpxSub, icon: 'map' },
   { key: 'fit', label: 'FIT', sub: t.value.formatFitSub, icon: 'activity' },
 ]);
-const activeFormat = ref<SaveFormat>('json');
+const activeFormat = ref<SaveFormat>(readDefaultExportFormat());
 const activeFormatLabel = computed(
   () => formats.value.find((format) => format.key === activeFormat.value)?.label ?? 'JSON',
 );
@@ -252,22 +253,17 @@ const loadPreview = async () => {
   }
   previewBusy.value = true;
   try {
-    const encoded = await tauriApi.getExportJson({
+    const estimate = await tauriApi.estimateExport({
       scope: currentScope(),
       dataTypes: [...exportDataTypes.value],
       detail: exportDetail.value,
     });
     if (seq !== previewSeq) return;
-    const parsed = JSON.parse(encoded) as {
-      record_count?: number;
-      records?: unknown[];
-      scope?: { kind?: string; start_time?: string; end_time?: string };
-    };
-    previewCount.value = parsed.record_count ?? parsed.records?.length ?? 0;
-    previewBytes.value = new TextEncoder().encode(encoded).length;
+    previewCount.value = estimate.recordCount;
+    previewBytes.value = estimate.estimatedBytes;
     // 摘要里的「时间范围」必须是后端真正用了的范围，而不是页面上那两个日期。
-    previewScope.value = parsed.scope?.kind === 'workout' && parsed.scope.start_time
-      ? { startTime: parsed.scope.start_time, endTime: parsed.scope.end_time ?? null }
+    previewScope.value = estimate.scopeKind === 'workout' && estimate.startTime
+      ? { startTime: estimate.startTime, endTime: estimate.endTime ?? null }
       : null;
   } catch (error) {
     if (seq !== previewSeq) return;
@@ -483,25 +479,43 @@ const copyPrompt = async () => {
 
 const handoffNotice = ref<string | null>(null);
 
+const sendNoticeTone = ref<'ok' | 'bad'>('ok');
+
 const sendToAi = async () => {
   handoffNotice.value = null;
+  sendNoticeTone.value = 'ok';
   if (!isTauri()) {
+    sendNoticeTone.value = 'bad';
     handoffNotice.value = t.value.needDesktop;
     return;
   }
   if (!focusedWorkoutId.value && !datesValid.value) {
+    sendNoticeTone.value = 'bad';
     handoffNotice.value = t.value.needValidDates;
     return;
   }
   if (!exportDataTypes.value.length) {
+    sendNoticeTone.value = 'bad';
     handoffNotice.value = t.value.needDataTypes;
     return;
   }
-  if (previewBusy.value || previewCount.value === null) {
+  if (previewError.value) {
+    sendNoticeTone.value = 'bad';
+    handoffNotice.value = previewError.value;
+    return;
+  }
+  if (previewBusy.value) {
+    sendNoticeTone.value = 'bad';
+    handoffNotice.value = t.value.stillReading;
+    return;
+  }
+  if (previewCount.value === null) {
+    sendNoticeTone.value = 'bad';
     handoffNotice.value = t.value.stillReading;
     return;
   }
   if (previewCount.value <= 0) {
+    sendNoticeTone.value = 'bad';
     handoffNotice.value = t.value.nothingInScope;
     return;
   }
@@ -519,6 +533,7 @@ const sendToAi = async () => {
       false, // includePreciseRoute: 默认 false 隐私优先
     );
     const browserOpened = handoffState.value !== 'copied_only';
+    sendNoticeTone.value = 'ok';
     if (result.mode === 'attachment') {
       const uploadNotice = t.value.attachmentNotice;
       handoffNotice.value = browserOpened
@@ -675,6 +690,12 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
               </div>
             </div>
 
+            <p v-if="previewError" class="preview-error" role="alert">
+              <Icon name="warning" :size="13" />
+              <span>{{ previewError }}</span>
+              <button class="button button-secondary" type="button" :disabled="previewBusy" @click="loadPreview">{{ t.previewRetry }}</button>
+            </p>
+
             <CoverageNotice :requested-days="requestedSpanDays" />
 
             <!-- 范围选择与自定义日期选择器 -->
@@ -780,7 +801,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 
         <p v-if="sendState === 'copied'" class="action-note ok" role="status"><Icon name="circle-check" :size="13" />{{ t.promptCopied }}</p>
         <p v-else-if="sendState === 'failed'" class="action-note bad" role="alert"><Icon name="warning" :size="13" />{{ t.copyFailed }}</p>
-        <p v-if="handoffNotice" class="action-note" :class="handoffState === 'failed' ? 'bad' : 'ok'" role="status">{{ handoffNotice }}</p>
+        <p v-if="handoffNotice" class="action-note" :class="handoffState === 'failed' || sendNoticeTone === 'bad' ? 'bad' : 'ok'" role="status">{{ handoffNotice }}</p>
         <p v-if="handoffError" class="action-note bad" role="alert"><Icon name="warning" :size="13" />{{ handoffError }}</p>
         <button
           v-if="handoffState === 'copied_only'"
@@ -1209,6 +1230,16 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 .action-note { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-size: var(--fs-sm); }
 .action-note.ok { color: var(--accent); }
 .action-note.bad { color: var(--danger); }
+.preview-error {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 0;
+  color: var(--danger);
+  font-size: var(--fs-sm);
+}
+.preview-error span { flex: 1 1 160px; min-width: 0; }
 
 /* 右列 */
 .group-label { margin: 0 0 8px; color: var(--ink); font-size: var(--fs-sm); font-weight: 700; }

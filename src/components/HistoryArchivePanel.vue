@@ -10,10 +10,11 @@
  * 和「失败可重试」。把这四种状态压成一个进度条，用户就没法回答
  * 「我 2023 年的数据到底有没有」。
  */
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import SelectMenu from './SelectMenu.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
+import { isCancelledSyncError, isDeferredSyncError } from '../lib/syncDeferred';
 import type { CoverageLedger, FailedChunk, StorageEstimate, UserPrefs } from '../types';
 import { syncStreamLabel } from '../lib/syncStreams';
 import { defineMessages, useMessages } from '../i18n';
@@ -50,6 +51,7 @@ const messages = defineMessages(
       `已停止，还剩 ${remaining} 个月份块。已经拉回来的历史都在，点「继续补拉」接着做。`,
     stalled: (remaining: number) =>
       `还剩 ${remaining} 个月份块，但这一轮一个都没能推进，已经停下来。多半是这些块反复失败——看下面的失败列表，或者点「重试失败项」。`,
+    deferredRetry: '本地维护进行中，补拉稍后自动继续',
     resetLedger: '清空账本',
     ledgerTitle: '覆盖账本',
     ledgerProgress: (done: number, total: number) => `${done} / ${total} 个月份块已有结论`,
@@ -131,6 +133,7 @@ const messages = defineMessages(
       `Stopped with ${remaining} monthly chunks left. Everything already fetched is kept — press "Continue backfilling" to carry on.`,
     stalled: (remaining: number) =>
       `${remaining} monthly chunks remain, but this round moved none of them, so it stopped. They are most likely failing repeatedly — see the failed list below, or press "Retry failed items".`,
+    deferredRetry: 'Local maintenance is running. The backfill will continue on its own',
     resetLedger: 'Clear the ledger',
     ledgerTitle: 'Coverage ledger',
     ledgerProgress: (done: number, total: number) => `${done} of ${total} monthly chunks resolved`,
@@ -212,6 +215,7 @@ const messages = defineMessages(
       `Detenido con ${remaining} bloques mensuales pendientes. Todo lo ya descargado se conserva; pulsa «Continuar la recuperación» para seguir.`,
     stalled: (remaining: number) =>
       `Quedan ${remaining} bloques mensuales, pero esta ronda no avanzó ninguno, así que se detuvo. Lo más probable es que estén fallando una y otra vez: revisa la lista de fallos abajo, o pulsa «Reintentar los meses fallidos».`,
+    deferredRetry: 'Hay mantenimiento local en curso. La recuperación continuará sola',
     resetLedger: 'Borrar el registro',
     ledgerTitle: 'Registro de cobertura',
     ledgerProgress: (done: number, total: number) => `${done} de ${total} bloques mensuales resueltos`,
@@ -413,9 +417,34 @@ const chunkErrorText = (item: FailedChunk): string => failedChunkText(item);
  */
 const autoContinue = ref(true);
 const stopRequested = ref(false);
+let loopGeneration = 0;
 
-const stopBackfill = () => {
+onUnmounted(() => {
+  loopGeneration += 1;
   stopRequested.value = true;
+  if (busy.value && isDesktop()) void backend.cancelSync();
+});
+
+const sleepBackfill = async (ms: number, gen: number): Promise<boolean> => {
+  const step = 200;
+  let waited = 0;
+  while (waited < ms) {
+    if (stopRequested.value || gen !== loopGeneration) return false;
+    await new Promise((resolve) => window.setTimeout(resolve, step));
+    waited += step;
+  }
+  return !stopRequested.value && gen === loopGeneration;
+};
+
+const stopBackfill = async () => {
+  stopRequested.value = true;
+  loopGeneration += 1;
+  if (!isDesktop()) return;
+  try {
+    await backend.cancelSync();
+  } catch {
+    // 取消令已经立了；命令失败不该挡住「停止」本身。
+  }
 };
 
 const runBackfill = async () => {
@@ -431,15 +460,42 @@ const runBackfill = async () => {
     error.value = t.value.outOfRetention;
     return;
   }
+  const gen = loopGeneration;
   busy.value = true;
   stopRequested.value = false;
   error.value = null;
   message.value = null;
   try {
     for (;;) {
+      if (gen !== loopGeneration || stopRequested.value) {
+        message.value = t.value.stoppedByUser(remaining.value);
+        break;
+      }
       const before = remaining.value;
-      ledger.value = await backend.startHistoryBackfill(fromDate.value);
-      markDataChanged();
+      try {
+        const next = await backend.startHistoryBackfill(fromDate.value);
+        if (gen !== loopGeneration) {
+          message.value = t.value.stoppedByUser(remaining.value);
+          break;
+        }
+        ledger.value = next;
+        markDataChanged();
+      } catch (cause) {
+        if (gen !== loopGeneration || stopRequested.value || isCancelledSyncError(cause)) {
+          message.value = t.value.stoppedByUser(remaining.value);
+          break;
+        }
+        if (isDeferredSyncError(cause) && autoContinue.value) {
+          message.value = t.value.deferredRetry;
+          const keepGoing = await sleepBackfill(15_000, gen);
+          if (!keepGoing) {
+            message.value = t.value.stoppedByUser(remaining.value);
+            break;
+          }
+          continue;
+        }
+        throw cause;
+      }
 
       if (remaining.value <= 0) {
         message.value = t.value.allChunksDone;
@@ -449,7 +505,7 @@ const runBackfill = async () => {
         message.value = t.value.roundDone(remaining.value);
         break;
       }
-      if (stopRequested.value) {
+      if (stopRequested.value || gen !== loopGeneration) {
         message.value = t.value.stoppedByUser(remaining.value);
         break;
       }
@@ -530,11 +586,11 @@ const resetLedger = async () => {
 
     <div class="field-row">
       <span class="kv-label">{{ t.startLabel }}</span>
-      <SelectMenu v-model="startChoice" :options="START_CHOICES" :aria-label="t.startAria" />
+      <SelectMenu v-model="startChoice" :options="START_CHOICES" :aria-label="t.startAria" :disabled="busy" />
     </div>
     <div v-if="startChoice === 'custom'" class="field-row">
       <span class="kv-label">{{ t.customDateLabel }}</span>
-      <input v-model="customFrom" type="date" :aria-label="t.customDateAria" />
+      <input v-model="customFrom" type="date" :aria-label="t.customDateAria" :disabled="busy" />
     </div>
 
     <div v-if="estimate" class="estimate-block">
@@ -578,7 +634,7 @@ const resetLedger = async () => {
         @click="runBackfill"
       >{{ busy ? t.backfilling : (remaining > 0 ? t.continueBackfill : t.startBackfill) }}</button>
       <button
-        v-if="busy && autoContinue"
+        v-if="busy"
         class="button secondary"
         type="button"
         :disabled="stopRequested"

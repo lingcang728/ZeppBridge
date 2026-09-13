@@ -3,13 +3,14 @@ use crate::models::{error::*, *};
 use crate::normalizer::Normalizer;
 use chrono::{DateTime, Duration, Local, NaiveDate, Utc};
 use rusqlite::{params, Connection, OptionalExtension};
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 
 /// 当前 SQLite schema 版本（`PRAGMA user_version`）。加新版本只能追加迁移
 /// 步骤，不要改已有 DDL。
-pub const CURRENT_SCHEMA_VERSION: i64 = 26;
+pub const CURRENT_SCHEMA_VERSION: i64 = 29;
 /// 写进备份 manifest 的应用版本。Core 是独立 crate，用它自己的包版本。
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -44,7 +45,7 @@ pub const EXPORT_DATA_TYPES: [&str; 18] = [
 /// `raw_records` 重新跑一遍。不动它，新加的编号只对以后同步来的记录生效，
 /// 已经存成 `unknown:211` 的那 199 条记录会永远挂着——而报这个问题的人恰恰
 /// 是因为历史记录才来报的。
-pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v26-alias-fallback";
+pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v27-sleep-available";
 /// 较早公开版本的修订号。从它升上来时仍需重放这几条流。
 ///
 /// v21 还没有 v22 的圈解析和 v23 的 Rucking 映射；跳版本升级时要一并补齐。
@@ -69,6 +70,10 @@ const BYTES_PER_HISTORY_DAY: u64 = 800_000;
 /// 部派生数据；按批提交拿到同一个数量级的提速，同时把 WAL 峰值钉在一批之内，
 /// 而这段代码恰恰要在 NAS 和容器上跑。
 const REPLAY_BATCH_RECORDS: usize = 64;
+/// 一次压缩读入内存的明文报文条数。整表装进一个 Vec 会在老库上顶满 RAM。
+const COMPACTION_BATCH_RECORDS: usize = 32;
+const RAW_PAYLOAD_STATS_KEY: &str = "raw_payload_stats_v1";
+const RAW_PAYLOAD_STATS_GEN_KEY: &str = "raw_payload_stats_gen";
 /// 少于这么多天的本机样本，不足以外推占用速率。
 const MIN_OBSERVED_DAYS: i64 = 7;
 /// 估算之外再留 200 MB。刚好填满磁盘和放不下一样糟糕。
@@ -81,6 +86,12 @@ pub mod life_events;
 mod migrations;
 pub mod provenance;
 pub mod write_lock;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CachedPayloadStats {
+    token: String,
+    streams: HashMap<String, (u64, i64)>,
+}
 
 pub struct Database {
     /// crate 内可见：洞察、备份等同属 Core 的模块直接复用这条连接，
@@ -99,52 +110,69 @@ pub struct Database {
 /// 是否正在后台压缩历史报文。
 ///
 /// 和重放同样的做法：界面要能说「正在压缩」，同步也要知道此刻有人在写库。
-static COMPACTION_IN_PROGRESS: std::sync::atomic::AtomicBool =
-    std::sync::atomic::AtomicBool::new(false);
+static COMPACTION_IN_PROGRESS: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+type PayloadStatsMap = HashMap<String, (u64, i64)>;
+static PAYLOAD_STATS_MEM: std::sync::Mutex<Option<(String, PayloadStatsMap)>> =
+    std::sync::Mutex::new(None);
 
 pub fn compaction_in_progress() -> bool {
-    COMPACTION_IN_PROGRESS.load(std::sync::atomic::Ordering::SeqCst)
+    COMPACTION_IN_PROGRESS.load(std::sync::atomic::Ordering::SeqCst) > 0
 }
 
-struct CompactionGuard;
+/// 用计数而不是布尔：启动线程在拿锁之前就会举起旗，压缩函数内部再进一层，
+/// 内层 Drop 不得把外层还在等锁的事实抹掉。
+pub struct CompactionGuard {
+    _private: (),
+}
 
 impl CompactionGuard {
-    fn enter() -> Self {
-        COMPACTION_IN_PROGRESS.store(true, std::sync::atomic::Ordering::SeqCst);
-        CompactionGuard
+    pub fn enter() -> Self {
+        COMPACTION_IN_PROGRESS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Self { _private: () }
     }
 }
 
 impl Drop for CompactionGuard {
     fn drop(&mut self) {
-        COMPACTION_IN_PROGRESS.store(false, std::sync::atomic::Ordering::SeqCst);
+        COMPACTION_IN_PROGRESS.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
     }
 }
 
-static REPLAY_IN_PROGRESS: std::sync::atomic::AtomicBool =
-    std::sync::atomic::AtomicBool::new(false);
+static REPLAY_IN_PROGRESS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 /// Whether a raw-payload replay is running right now.
 pub fn replay_in_progress() -> bool {
-    REPLAY_IN_PROGRESS.load(std::sync::atomic::Ordering::SeqCst)
+    REPLAY_IN_PROGRESS.load(std::sync::atomic::Ordering::SeqCst) > 0
 }
 
 /// Clears the replay flag however the replay ends, including on an early
-/// return or a panic.
-struct ReplayGuard;
+/// return or a panic. Nested enters are counted so an inner Drop cannot hide
+/// an outer wait-for-lock.
+pub struct ReplayGuard {
+    _private: (),
+}
 
 impl ReplayGuard {
-    fn enter() -> Self {
-        REPLAY_IN_PROGRESS.store(true, std::sync::atomic::Ordering::SeqCst);
-        Self
+    pub fn enter() -> Self {
+        REPLAY_IN_PROGRESS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Self { _private: () }
     }
 }
 
 impl Drop for ReplayGuard {
     fn drop(&mut self) {
-        REPLAY_IN_PROGRESS.store(false, std::sync::atomic::Ordering::SeqCst);
+        REPLAY_IN_PROGRESS.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
     }
 }
+
+/// 一次同步最多拉这么多条待拉取的跑步明细。其余留给下一轮，避免把整次同步
+/// 的截止时间耗在几百个永久 404 上。
+pub const PENDING_WORKOUT_DETAIL_LIMIT: usize = 40;
+/// 同一条明细连续失败这么多次之后，暂时移出自动队列。
+pub const MAX_WORKOUT_DETAIL_ATTEMPTS: i64 = 3;
+/// 失败次数过了这么多天就衰减回 0，给后来的云端修复一次再试的机会。
+const WORKOUT_DETAIL_ATTEMPT_DECAY: chrono::Duration = chrono::Duration::days(7);
 
 /// 一批重放的事务边界。
 ///
@@ -1543,7 +1571,19 @@ impl Database {
     ///
     /// 跨度不足 `MIN_OBSERVED_DAYS` 天的流标 `measured: false`，宁可说不知道，
     /// 也不拿一个从几天样本外推出来的速率去乘三年。
-    fn stream_storage_rates(&self, days: i64) -> Result<Vec<StreamStorageEstimate>> {
+    fn payload_stats_token(&self) -> Result<String> {
+        let (count, max_id): (i64, i64) = self.conn.query_row(
+            "SELECT COUNT(*), COALESCE(MAX(id), 0) FROM raw_records",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+        let generation = self
+            .get_app_meta(RAW_PAYLOAD_STATS_GEN_KEY)?
+            .unwrap_or_else(|| "0".into());
+        Ok(format!("{count}:{max_id}:{generation}"))
+    }
+
+    fn compute_raw_payload_stats(&self) -> Result<std::collections::HashMap<String, (u64, i64)>> {
         let mut stmt = self.conn.prepare(
             // 占用要算**实际落盘**的那一份：压过的行按压缩后的字节数算，
             // 否则估算会按明文报价，用户看到的数字比真实占用大好几倍。
@@ -1557,7 +1597,7 @@ impl Database {
              FROM raw_records
              GROUP BY stream",
         )?;
-        let observed: std::collections::HashMap<String, (u64, i64)> = stmt
+        let observed = stmt
             .query_map([], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
@@ -1570,6 +1610,65 @@ impl Database {
             .collect::<std::result::Result<Vec<_>, _>>()?
             .into_iter()
             .collect();
+        Ok(observed)
+    }
+
+    fn raw_payload_stats_by_stream(&self) -> Result<std::collections::HashMap<String, (u64, i64)>> {
+        let token = self.payload_stats_token()?;
+        if let Ok(guard) = PAYLOAD_STATS_MEM.lock() {
+            if let Some((cached_token, stats)) = guard.as_ref() {
+                if cached_token == &token {
+                    return Ok(stats.clone());
+                }
+            }
+        }
+        if let Some(value) = self.get_app_meta(RAW_PAYLOAD_STATS_KEY)? {
+            if let Ok(cached) = serde_json::from_str::<CachedPayloadStats>(&value) {
+                if cached.token == token {
+                    if let Ok(mut guard) = PAYLOAD_STATS_MEM.lock() {
+                        *guard = Some((cached.token.clone(), cached.streams.clone()));
+                    }
+                    return Ok(cached.streams);
+                }
+            }
+        }
+        let computed = self.compute_raw_payload_stats()?;
+        if let Ok(mut guard) = PAYLOAD_STATS_MEM.lock() {
+            *guard = Some((token, computed.clone()));
+        }
+        Ok(computed)
+    }
+
+    fn persist_raw_payload_stats(&self) -> Result<()> {
+        let token = self.payload_stats_token()?;
+        let streams = self.compute_raw_payload_stats()?;
+        let encoded = serde_json::to_string(&CachedPayloadStats {
+            token: token.clone(),
+            streams: streams.clone(),
+        })
+        .unwrap_or_else(|_| "{}".into());
+        self.set_app_meta(RAW_PAYLOAD_STATS_KEY, &encoded)?;
+        if let Ok(mut guard) = PAYLOAD_STATS_MEM.lock() {
+            *guard = Some((token, streams));
+        }
+        Ok(())
+    }
+
+    fn bump_payload_stats_generation(&self) -> Result<()> {
+        let next = self
+            .get_app_meta(RAW_PAYLOAD_STATS_GEN_KEY)?
+            .and_then(|value| value.parse::<u64>().ok())
+            .unwrap_or(0)
+            .saturating_add(1);
+        self.set_app_meta(RAW_PAYLOAD_STATS_GEN_KEY, &next.to_string())?;
+        if let Ok(mut guard) = PAYLOAD_STATS_MEM.lock() {
+            *guard = None;
+        }
+        Ok(())
+    }
+
+    fn stream_storage_rates(&self, days: i64) -> Result<Vec<StreamStorageEstimate>> {
+        let observed = self.raw_payload_stats_by_stream()?;
 
         Ok(coverage::BACKFILL_STREAMS
             .iter()
@@ -1841,11 +1940,17 @@ impl Database {
     pub fn local_coverage(&self) -> Result<LocalCoverage> {
         let mut earliest: Option<String> = None;
         let mut latest: Option<String> = None;
-        for query in [
-            "SELECT MIN(date), MAX(date) FROM daily_metrics",
-            "SELECT MIN(substr(timestamp, 1, 10)), MAX(substr(timestamp, 1, 10)) FROM metric_samples",
-            "SELECT MIN(substr(start_time, 1, 10)), MAX(substr(end_time, 1, 10)) FROM sleep_sessions",
-            "SELECT MIN(substr(start_time, 1, 10)), MAX(substr(end_time, 1, 10)) FROM workouts",
+        for (query, take_date_prefix) in [
+            ("SELECT MIN(date), MAX(date) FROM daily_metrics", false),
+            (
+                "SELECT MIN(timestamp), MAX(timestamp) FROM metric_samples",
+                true,
+            ),
+            (
+                "SELECT MIN(start_time), MAX(end_time) FROM sleep_sessions",
+                true,
+            ),
+            ("SELECT MIN(start_time), MAX(end_time) FROM workouts", true),
         ] {
             let (low, high) = self.conn.query_row(query, [], |row| {
                 Ok((
@@ -1853,13 +1958,29 @@ impl Database {
                     row.get::<_, Option<String>>(1)?,
                 ))
             })?;
+            let low = if take_date_prefix {
+                calendar_day_prefix(low)
+            } else {
+                low
+            };
+            let high = if take_date_prefix {
+                calendar_day_prefix(high)
+            } else {
+                high
+            };
             if let Some(low) = low {
-                if earliest.as_deref().is_none_or(|current| low.as_str() < current) {
+                if earliest
+                    .as_deref()
+                    .is_none_or(|current| low.as_str() < current)
+                {
                     earliest = Some(low);
                 }
             }
             if let Some(high) = high {
-                if latest.as_deref().is_none_or(|current| high.as_str() > current) {
+                if latest
+                    .as_deref()
+                    .is_none_or(|current| high.as_str() > current)
+                {
                     latest = Some(high);
                 }
             }
@@ -2535,22 +2656,30 @@ impl Database {
             .synced_at
             .or_else(|| self.fetched_at_for_raw(raw_record_id))
             .unwrap_or_else(Utc::now);
+        let (deep_minutes, deep_available) = stored_stage_minutes(sleep.deep_minutes);
+        let (light_minutes, light_available) = stored_stage_minutes(sleep.light_minutes);
+        let (rem_minutes, rem_available) = stored_stage_minutes(sleep.rem_minutes);
+        let (awake_minutes, awake_available) = stored_stage_minutes(sleep.awake_minutes);
         self.conn.execute(
             "INSERT INTO sleep_sessions
                 (sleep_id, start_time, end_time, score, duration_minutes,
-                 deep_minutes, light_minutes, rem_minutes, rem_available, awake_minutes,
+                 deep_minutes, deep_available, light_minutes, light_available,
+                 rem_minutes, rem_available, awake_minutes, awake_available,
                  source_scope, device_id, raw_record_id, synced_at, wake_count)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
              ON CONFLICT(sleep_id) DO UPDATE SET
                 start_time = excluded.start_time,
                 end_time = excluded.end_time,
                 score = excluded.score,
                 duration_minutes = excluded.duration_minutes,
                 deep_minutes = excluded.deep_minutes,
+                deep_available = excluded.deep_available,
                 light_minutes = excluded.light_minutes,
+                light_available = excluded.light_available,
                 rem_minutes = excluded.rem_minutes,
                 rem_available = excluded.rem_available,
                 awake_minutes = excluded.awake_minutes,
+                awake_available = excluded.awake_available,
                 wake_count = excluded.wake_count,
                 source_scope = excluded.source_scope,
                 device_id = excluded.device_id,
@@ -2562,11 +2691,14 @@ impl Database {
                 sleep.end_time.to_rfc3339(),
                 sleep.score,
                 sleep.duration_minutes,
-                sleep.deep_minutes,
-                sleep.light_minutes,
-                sleep.rem_minutes.unwrap_or(0),
-                i64::from(sleep.rem_minutes.is_some()),
-                sleep.awake_minutes,
+                deep_minutes,
+                deep_available,
+                light_minutes,
+                light_available,
+                rem_minutes,
+                rem_available,
+                awake_minutes,
+                awake_available,
                 sleep.source_scope.as_str(),
                 sleep.device_id,
                 raw_record_id,
@@ -2883,28 +3015,88 @@ impl Database {
     }
 
     pub fn pending_running_details(&self) -> Result<Vec<PendingWorkoutDetail>> {
+        self.pending_running_details_limited(PENDING_WORKOUT_DETAIL_LIMIT)
+    }
+
+    pub fn pending_running_details_limited(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<PendingWorkoutDetail>> {
+        let decay_before = (Utc::now() - WORKOUT_DETAIL_ATTEMPT_DECAY).to_rfc3339();
         let mut stmt = self.conn.prepare(
-            "SELECT workout_id, zepp_source FROM workouts
-             WHERE zepp_source IS NOT NULL
-               AND TRIM(zepp_source) != ''
+            "SELECT w.workout_id, w.zepp_source
+             FROM workouts w
+             LEFT JOIN workout_detail_fetch_attempts a
+               ON a.workout_id = w.workout_id AND a.source = w.zepp_source
+             WHERE w.zepp_source IS NOT NULL
+               AND TRIM(w.zepp_source) != ''
                AND NOT EXISTS (
                    SELECT 1 FROM raw_records
                    WHERE stream = 'workout_detail'
-                     AND source_key = 'workout_detail:' || workouts.workout_id || ':' || workouts.zepp_source
+                     AND source_key = 'workout_detail:' || w.workout_id || ':' || w.zepp_source
                )
-             ORDER BY start_time DESC",
+               AND (
+                   a.attempts IS NULL
+                   OR a.attempts < ?1
+                   OR a.updated_at < ?2
+               )
+             ORDER BY COALESCE(a.attempts, 0) ASC, w.start_time DESC
+             LIMIT ?3",
         )?;
-        let rows = stmt.query_map([], |row| {
-            Ok(PendingWorkoutDetail {
-                workout_id: row.get(0)?,
-                source: row.get(1)?,
-            })
-        })?;
+        let rows = stmt.query_map(
+            rusqlite::params![MAX_WORKOUT_DETAIL_ATTEMPTS, decay_before, limit as i64],
+            |row| {
+                Ok(PendingWorkoutDetail {
+                    workout_id: row.get(0)?,
+                    source: row.get(1)?,
+                })
+            },
+        )?;
         rows.collect::<std::result::Result<Vec<_>, _>>()
             .map_err(Into::into)
     }
 
+    /// 记下一次跑步明细拉取的结果。成功就清掉失败计数；失败则累加，过了
+    /// [`WORKOUT_DETAIL_ATTEMPT_DECAY`] 的旧计数先衰减再记成第一次。
+    pub fn record_workout_detail_fetch_result(
+        &self,
+        workout_id: &str,
+        source: &str,
+        ok: bool,
+    ) -> Result<()> {
+        if ok {
+            self.conn.execute(
+                "DELETE FROM workout_detail_fetch_attempts
+                 WHERE workout_id = ?1 AND source = ?2",
+                [workout_id, source],
+            )?;
+            return Ok(());
+        }
+        let now = Utc::now().to_rfc3339();
+        let decay_before = (Utc::now() - WORKOUT_DETAIL_ATTEMPT_DECAY).to_rfc3339();
+        self.conn.execute(
+            "INSERT INTO workout_detail_fetch_attempts(workout_id, source, attempts, updated_at)
+             VALUES(?1, ?2, 1, ?3)
+             ON CONFLICT(workout_id, source) DO UPDATE SET
+               attempts = CASE
+                 WHEN workout_detail_fetch_attempts.updated_at < ?4 THEN 1
+                 ELSE workout_detail_fetch_attempts.attempts + 1
+               END,
+               updated_at = excluded.updated_at",
+            rusqlite::params![workout_id, source, now, decay_before],
+        )?;
+        Ok(())
+    }
+
     pub fn replace_workout_series(&self, workout_id: &str, decoded: &DecodedWorkout) -> Result<()> {
+        // 差分链断掉时解码侧会截断轨迹而不是平移它；这里留一条不含坐标的
+        // warn，说明这条轨迹缺了尾巴，方便对照报告排查。
+        if decoded.route_dropped_points > 0 {
+            tracing::warn!(
+                "workout {workout_id} 的轨迹被截断：{} 个后续点位置不可知，未入库",
+                decoded.route_dropped_points
+            );
+        }
         self.conn.execute(
             "DELETE FROM workout_samples WHERE workout_id = ?1",
             [workout_id],
@@ -3419,7 +3611,8 @@ impl Database {
         let offset = i64::try_from(offset).unwrap_or(i64::MAX).max(0);
         let mut stmt = self.conn.prepare(
             "SELECT sleep_id, start_time, end_time, score, duration_minutes,
-                    deep_minutes, light_minutes, rem_minutes, rem_available, awake_minutes,
+                    deep_minutes, deep_available, light_minutes, light_available,
+                    rem_minutes, rem_available, awake_minutes, awake_available,
                     source_scope, device_id, synced_at, wake_count
              FROM sleep_sessions ORDER BY start_time DESC LIMIT ?1 OFFSET ?2",
         )?;
@@ -3431,14 +3624,17 @@ impl Database {
                 row.get::<_, Option<i32>>(3)?,
                 row.get::<_, i32>(4)?,
                 row.get::<_, i32>(5)?,
-                row.get::<_, i32>(6)?,
+                row.get::<_, i64>(6)?,
                 row.get::<_, i32>(7)?,
                 row.get::<_, i64>(8)?,
                 row.get::<_, i32>(9)?,
-                row.get::<_, String>(10)?,
-                row.get::<_, Option<String>>(11)?,
-                row.get::<_, Option<String>>(12)?,
-                row.get::<_, Option<i32>>(13)?,
+                row.get::<_, i64>(10)?,
+                row.get::<_, i32>(11)?,
+                row.get::<_, i64>(12)?,
+                row.get::<_, String>(13)?,
+                row.get::<_, Option<String>>(14)?,
+                row.get::<_, Option<String>>(15)?,
+                row.get::<_, Option<i32>>(16)?,
             ))
         })?;
         let mut sessions = Vec::new();
@@ -3450,10 +3646,13 @@ impl Database {
                 score,
                 duration_minutes,
                 deep_minutes,
+                deep_available,
                 light_minutes,
+                light_available,
                 rem_minutes,
                 rem_available,
                 awake_minutes,
+                awake_available,
                 scope,
                 device_id,
                 synced_at,
@@ -3465,10 +3664,10 @@ impl Database {
                 end_time: parse_datetime(&end, "sleep.end_time")?,
                 score,
                 duration_minutes,
-                deep_minutes,
-                light_minutes,
-                rem_minutes: (rem_available != 0).then_some(rem_minutes),
-                awake_minutes,
+                deep_minutes: loaded_stage_minutes(deep_minutes, deep_available),
+                light_minutes: loaded_stage_minutes(light_minutes, light_available),
+                rem_minutes: loaded_stage_minutes(rem_minutes, rem_available),
+                awake_minutes: loaded_stage_minutes(awake_minutes, awake_available),
                 source_scope: parse_scope(&scope)?,
                 device_id,
                 synced_at: synced_at
@@ -3488,7 +3687,8 @@ impl Database {
             .conn
             .query_row(
                 "SELECT sleep_id, start_time, end_time, score, duration_minutes,
-                        deep_minutes, light_minutes, rem_minutes, rem_available, awake_minutes,
+                        deep_minutes, deep_available, light_minutes, light_available,
+                        rem_minutes, rem_available, awake_minutes, awake_available,
                         source_scope, device_id, synced_at, wake_count
                  FROM sleep_sessions WHERE sleep_id = ?1 LIMIT 1",
                 [sleep_id],
@@ -3500,14 +3700,17 @@ impl Database {
                         row.get::<_, Option<i32>>(3)?,
                         row.get::<_, i32>(4)?,
                         row.get::<_, i32>(5)?,
-                        row.get::<_, i32>(6)?,
+                        row.get::<_, i64>(6)?,
                         row.get::<_, i32>(7)?,
                         row.get::<_, i64>(8)?,
                         row.get::<_, i32>(9)?,
-                        row.get::<_, String>(10)?,
-                        row.get::<_, Option<String>>(11)?,
-                        row.get::<_, Option<String>>(12)?,
-                        row.get::<_, Option<i32>>(13)?,
+                        row.get::<_, i64>(10)?,
+                        row.get::<_, i32>(11)?,
+                        row.get::<_, i64>(12)?,
+                        row.get::<_, String>(13)?,
+                        row.get::<_, Option<String>>(14)?,
+                        row.get::<_, Option<String>>(15)?,
+                        row.get::<_, Option<i32>>(16)?,
                     ))
                 },
             )
@@ -3519,10 +3722,13 @@ impl Database {
             score,
             duration_minutes,
             deep_minutes,
+            deep_available,
             light_minutes,
+            light_available,
             rem_minutes,
             rem_available,
             awake_minutes,
+            awake_available,
             scope,
             device_id,
             synced_at,
@@ -3538,10 +3744,10 @@ impl Database {
             end_time: parse_datetime(&end, "sleep.end_time")?,
             score,
             duration_minutes,
-            deep_minutes,
-            light_minutes,
-            rem_minutes: (rem_available != 0).then_some(rem_minutes),
-            awake_minutes,
+            deep_minutes: loaded_stage_minutes(deep_minutes, deep_available),
+            light_minutes: loaded_stage_minutes(light_minutes, light_available),
+            rem_minutes: loaded_stage_minutes(rem_minutes, rem_available),
+            awake_minutes: loaded_stage_minutes(awake_minutes, awake_available),
             source_scope: parse_scope(&scope)?,
             device_id,
             synced_at: synced_at
@@ -4980,7 +5186,8 @@ impl Database {
         if selected.contains("sleep") && !single_workout {
             let mut stmt = self.conn.prepare(
                 "SELECT sleep_id, start_time, end_time, score, duration_minutes,
-                        deep_minutes, light_minutes, rem_minutes, rem_available, awake_minutes,
+                        deep_minutes, deep_available, light_minutes, light_available,
+                        rem_minutes, rem_available, awake_minutes, awake_available,
                         source_scope, device_id, wake_count
                  FROM sleep_sessions
                  WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2
@@ -4994,13 +5201,16 @@ impl Database {
                     row.get::<_, Option<i32>>(3)?,
                     row.get::<_, i32>(4)?,
                     row.get::<_, i32>(5)?,
-                    row.get::<_, i32>(6)?,
+                    row.get::<_, i64>(6)?,
                     row.get::<_, i32>(7)?,
                     row.get::<_, i64>(8)?,
                     row.get::<_, i32>(9)?,
-                    row.get::<_, String>(10)?,
-                    row.get::<_, Option<String>>(11)?,
-                    row.get::<_, Option<i32>>(12)?,
+                    row.get::<_, i64>(10)?,
+                    row.get::<_, i32>(11)?,
+                    row.get::<_, i64>(12)?,
+                    row.get::<_, String>(13)?,
+                    row.get::<_, Option<String>>(14)?,
+                    row.get::<_, Option<i32>>(15)?,
                 ))
             })?;
             for row in rows {
@@ -5011,10 +5221,13 @@ impl Database {
                     score,
                     duration_minutes,
                     deep_minutes,
+                    deep_available,
                     light_minutes,
+                    light_available,
                     rem_minutes,
                     rem_available,
                     awake_minutes,
+                    awake_available,
                     source_scope,
                     device_id,
                     wake_count,
@@ -5040,10 +5253,10 @@ impl Database {
                     "end_time": end_time,
                     "score": score,
                     "duration_minutes": duration_minutes,
-                    "deep_minutes": deep_minutes,
-                    "light_minutes": light_minutes,
-                    "rem_minutes": (rem_available != 0).then_some(rem_minutes),
-                    "awake_minutes": awake_minutes,
+                    "deep_minutes": loaded_stage_minutes(deep_minutes, deep_available),
+                    "light_minutes": loaded_stage_minutes(light_minutes, light_available),
+                    "rem_minutes": loaded_stage_minutes(rem_minutes, rem_available),
+                    "awake_minutes": loaded_stage_minutes(awake_minutes, awake_available),
                     "wake_count": wake_count,
                     "source_scope": source_scope,
                     "device_label": devices.label(device_id.as_deref()),
@@ -5359,6 +5572,285 @@ impl Database {
         Ok((encoded, record_count))
     }
 
+    /// COUNT/SUM the export without building JSON.
+    pub fn estimate_ai_export(&self, selection: &ExportSelection) -> Result<ExportEstimate> {
+        const DAY_LEVEL_TYPES: [&str; 10] = [
+            "sleep",
+            "steps",
+            "daily_activity",
+            "recovery",
+            "training_load",
+            "vo2max",
+            "lactate_threshold",
+            "pai",
+            "weight",
+            "food",
+        ];
+        const ENVELOPE_BYTES: u64 = 2_048;
+        let scope = selection
+            .resolve_scope()
+            .map_err(ZeppBridgeError::ConfigError)?;
+        let (start_text, end_text, workout_filter, workout_window, scope_kind) = match &scope {
+            ExportScope::DateRange { start, end } => {
+                let start_date = NaiveDate::parse_from_str(start, "%Y-%m-%d")
+                    .map_err(|_| ZeppBridgeError::ConfigError("导出开始日期无效".into()))?;
+                let end_date = NaiveDate::parse_from_str(end, "%Y-%m-%d")
+                    .map_err(|_| ZeppBridgeError::ConfigError("导出结束日期无效".into()))?;
+                let _ = (start_date, end_date);
+                (
+                    start.clone(),
+                    end.clone(),
+                    None,
+                    None,
+                    "date_range".to_string(),
+                )
+            }
+            ExportScope::Workout { workout_id } => {
+                let (day, started_at, ended_at): (String, String, String) = self
+                    .conn
+                    .query_row(
+                        "SELECT date(start_time, 'localtime'), start_time, end_time
+                         FROM workouts WHERE workout_id = ?1",
+                        params![workout_id],
+                        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                    )
+                    .optional()?
+                    .ok_or_else(|| {
+                        ZeppBridgeError::DataUnavailable("本地库里没有这条运动记录".into())
+                    })?;
+                (
+                    day.clone(),
+                    day,
+                    Some(workout_id.clone()),
+                    Some((started_at, ended_at)),
+                    "workout".to_string(),
+                )
+            }
+        };
+        let single_workout = workout_filter.is_some();
+        let allowed: BTreeSet<&str> = EXPORT_DATA_TYPES.into_iter().collect();
+        let selected: BTreeSet<String> = selection
+            .data_types
+            .iter()
+            .map(|value| value.trim().to_ascii_lowercase())
+            .filter(|value| allowed.contains(value.as_str()))
+            .collect();
+        if selected.is_empty() {
+            return Err(ZeppBridgeError::ConfigError(
+                "请至少选择一种导出数据".into(),
+            ));
+        }
+        let full = selection.detail.is_full();
+        let mut record_count: usize = 0;
+        let mut estimated_bytes: u64 = ENVELOPE_BYTES;
+
+        let need_samples = selected.contains("heart_rate")
+            || selected.contains("hrv")
+            || selected.contains("hrv_rmssd")
+            || selected.contains("respiratory_rate")
+            || selected.contains("spo2")
+            || selected.contains("stress")
+            || selected.contains("weight");
+        if need_samples {
+            let (window_start, window_end) = match &workout_window {
+                Some((started_at, ended_at)) => {
+                    (Some(started_at.as_str()), Some(ended_at.as_str()))
+                }
+                None => (None, None),
+            };
+            let day_bounds = if single_workout {
+                None
+            } else {
+                local_day_range_utc_bounds(&start_text, &end_text)
+            };
+            let (day_lower, day_upper) = match &day_bounds {
+                Some((lower, upper)) => (Some(lower.as_str()), Some(upper.as_str())),
+                None => (None, None),
+            };
+            let mut stmt = self.conn.prepare(
+                "SELECT metric,
+                        COUNT(*),
+                        COUNT(DISTINCT strftime('%Y-%m-%dT%H', timestamp)),
+                        COALESCE(SUM(LENGTH(metric) + LENGTH(timestamp) + LENGTH(unit)
+                                     + LENGTH(source_scope) + 48), 0)
+                 FROM metric_samples
+                 WHERE (?5 IS NULL OR timestamp >= ?5)
+                   AND (?6 IS NULL OR timestamp < ?6)
+                   AND (?3 IS NOT NULL OR date(timestamp, 'localtime') BETWEEN ?1 AND ?2)
+                   AND (?3 IS NULL OR timestamp >= ?3)
+                   AND (?4 IS NULL OR timestamp <= ?4)
+                 GROUP BY metric",
+            )?;
+            let rows = stmt.query_map(
+                params![
+                    start_text,
+                    end_text,
+                    window_start,
+                    window_end,
+                    day_lower,
+                    day_upper
+                ],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, i64>(1)?,
+                        row.get::<_, i64>(2)?,
+                        row.get::<_, i64>(3)?,
+                    ))
+                },
+            )?;
+            for row in rows {
+                let (metric, count, hours, bytes) = row?;
+                let matched_type = if selected.contains(&metric) {
+                    Some(metric.clone())
+                } else if metric.contains("spo2") && selected.contains("spo2") {
+                    Some("spo2".to_string())
+                } else if metric.contains("stress") && selected.contains("stress") {
+                    Some("stress".to_string())
+                } else if metric.starts_with("respiratory") && selected.contains("respiratory_rate")
+                {
+                    Some("respiratory_rate".to_string())
+                } else if metric == "hrv_rmssd" && selected.contains("hrv_rmssd") {
+                    Some("hrv_rmssd".to_string())
+                } else if selected.contains("weight")
+                    && BODY_COMPOSITION_METRICS.contains(&metric.as_str())
+                {
+                    Some("weight".to_string())
+                } else {
+                    None
+                };
+                let Some(matched_type) = matched_type else {
+                    continue;
+                };
+                if single_workout && DAY_LEVEL_TYPES.contains(&matched_type.as_str()) {
+                    continue;
+                }
+                if !full && HOURLY_AGGREGATED_METRICS.contains(&metric.as_str()) {
+                    record_count += hours.max(0) as usize;
+                    estimated_bytes += (hours.max(0) as u64).saturating_mul(120);
+                } else {
+                    record_count += count.max(0) as usize;
+                    estimated_bytes += bytes.max(0) as u64;
+                }
+            }
+        }
+
+        if !single_workout
+            && (selected.contains("daily_activity")
+                || selected.contains("recovery")
+                || selected.contains("respiratory_rate")
+                || selected.contains("lactate_threshold")
+                || selected.contains("pai")
+                || selected.contains("hrv_rmssd")
+                || selected.contains("steps")
+                || selected.contains("spo2")
+                || selected.contains("stress")
+                || selected.contains("training_load")
+                || selected.contains("vo2max")
+                || selected.contains("food"))
+        {
+            let mut stmt = self.conn.prepare(
+                "SELECT metric, COUNT(*),
+                        COALESCE(SUM(LENGTH(metric) + LENGTH(date) + LENGTH(unit) + 80), 0)
+                 FROM daily_metrics WHERE date BETWEEN ?1 AND ?2
+                 GROUP BY metric",
+            )?;
+            let rows = stmt.query_map(params![start_text, end_text], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, i64>(2)?,
+                ))
+            })?;
+            for row in rows {
+                let (metric, count, bytes) = row?;
+                if daily_metric_selected_for_export(&metric, &selected) {
+                    record_count += count.max(0) as usize;
+                    estimated_bytes += bytes.max(0) as u64;
+                }
+            }
+        }
+
+        if selected.contains("sleep") && !single_workout {
+            let count: i64 = self.conn.query_row(
+                "SELECT COUNT(*) FROM sleep_sessions
+                 WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2",
+                params![start_text, end_text],
+                |row| row.get(0),
+            )?;
+            record_count += count.max(0) as usize;
+            estimated_bytes += (count.max(0) as u64).saturating_mul(280);
+        }
+
+        if selected.contains("workouts") {
+            let count: i64 = self.conn.query_row(
+                "SELECT COUNT(*) FROM workouts
+                 WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2
+                   AND (?3 IS NULL OR workout_id = ?3)",
+                params![start_text, end_text, workout_filter],
+                |row| row.get(0),
+            )?;
+            record_count += count.max(0) as usize;
+            estimated_bytes += (count.max(0) as u64).saturating_mul(600);
+            if full {
+                let samples: i64 = self.conn.query_row(
+                    "SELECT COUNT(*) FROM workout_samples
+                     WHERE workout_id IN (
+                         SELECT workout_id FROM workouts
+                         WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2
+                           AND (?3 IS NULL OR workout_id = ?3)
+                     )",
+                    params![start_text, end_text, workout_filter],
+                    |row| row.get(0),
+                )?;
+                let route: i64 = self.conn.query_row(
+                    "SELECT COUNT(*) FROM route_points
+                     WHERE workout_id IN (
+                         SELECT workout_id FROM workouts
+                         WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2
+                           AND (?3 IS NULL OR workout_id = ?3)
+                     )",
+                    params![start_text, end_text, workout_filter],
+                    |row| row.get(0),
+                )?;
+                estimated_bytes += (samples.max(0) as u64).saturating_mul(90);
+                estimated_bytes += (route.max(0) as u64).saturating_mul(70);
+            }
+        }
+
+        if selected.contains("life_events") {
+            let context_end = workout_window
+                .as_ref()
+                .and_then(|(_, end)| {
+                    DateTime::parse_from_rfc3339(end)
+                        .ok()
+                        .map(|d| d.with_timezone(&Local).format("%Y-%m-%d").to_string())
+                })
+                .unwrap_or_else(|| end_text.clone());
+            let count: i64 = self.conn.query_row(
+                "SELECT COUNT(*) FROM life_events
+                 WHERE (?1 IS NULL OR end_date IS NULL OR end_date >= ?1)
+                   AND (?2 IS NULL OR start_date <= ?2)",
+                params![start_text, context_end],
+                |row| row.get(0),
+            )?;
+            record_count += count.max(0) as usize;
+            estimated_bytes += (count.max(0) as u64).saturating_mul(200);
+        }
+
+        let (start_time, end_time) = match &workout_window {
+            Some((started_at, ended_at)) => (Some(started_at.clone()), Some(ended_at.clone())),
+            None => (None, None),
+        };
+        Ok(ExportEstimate {
+            record_count,
+            estimated_bytes,
+            scope_kind,
+            start_time,
+            end_time,
+        })
+    }
+
     fn latest_metric_f64(&self, metric: &str) -> Result<Option<f64>> {
         self.conn
             .query_row(
@@ -5617,45 +6109,60 @@ impl Database {
     /// 依据，压坏一条就等于永久丢一条——宁可这一条不压。
     pub fn compact_raw_payloads(&self) -> Result<RawPayloadCompaction> {
         let _guard = CompactionGuard::enter();
-        let pending: Vec<(i64, String)> = {
-            let mut stmt = self.conn.prepare(
-                "SELECT id, payload FROM raw_records
-                 WHERE (payload_zip IS NULL OR LENGTH(payload_zip) = 0)
-                   AND LENGTH(payload) > ?1
-                 ORDER BY id",
-            )?;
-            let rows = stmt.query_map([MIN_COMPRESSIBLE_PAYLOAD_BYTES], |row| {
-                Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
-            })?;
-            rows.collect::<std::result::Result<Vec<_>, _>>()?
-        };
-
         let mut report = RawPayloadCompaction::default();
-        for (id, payload) in pending {
-            let original = payload.len() as u64;
-            let Ok(compressed) = compress_payload(&payload) else {
-                report.skipped += 1;
-                continue;
+        let mut last_id: i64 = 0;
+        loop {
+            let pending: Vec<(i64, String)> = {
+                let mut stmt = self.conn.prepare(
+                    "SELECT id, payload FROM raw_records
+                     WHERE id > ?1
+                       AND (payload_zip IS NULL OR LENGTH(payload_zip) = 0)
+                       AND LENGTH(payload) > ?2
+                     ORDER BY id
+                     LIMIT ?3",
+                )?;
+                let rows = stmt.query_map(
+                    params![
+                        last_id,
+                        MIN_COMPRESSIBLE_PAYLOAD_BYTES,
+                        COMPACTION_BATCH_RECORDS as i64
+                    ],
+                    |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
+                )?;
+                rows.collect::<std::result::Result<Vec<_>, _>>()?
             };
-            // 压不小就别费这个事，也别冒风险。
-            if compressed.len() as u64 >= original {
-                report.skipped += 1;
-                continue;
+            if pending.is_empty() {
+                break;
             }
-            match decompress_payload(&compressed) {
-                Ok(round_tripped) if round_tripped == payload => {}
-                _ => {
+            last_id = pending.last().map(|(id, _)| *id).unwrap_or(last_id);
+            let transaction = self.conn.unchecked_transaction()?;
+            for (id, payload) in pending {
+                let original = payload.len() as u64;
+                let Ok(compressed) = compress_payload(&payload) else {
+                    report.skipped += 1;
+                    continue;
+                };
+                // 压不小就别费这个事，也别冒风险。
+                if compressed.len() as u64 >= original {
                     report.skipped += 1;
                     continue;
                 }
+                match decompress_payload(&compressed) {
+                    Ok(round_tripped) if round_tripped == payload => {}
+                    _ => {
+                        report.skipped += 1;
+                        continue;
+                    }
+                }
+                transaction.execute(
+                    "UPDATE raw_records SET payload = '', payload_zip = ?2 WHERE id = ?1",
+                    params![id, compressed],
+                )?;
+                report.compacted += 1;
+                report.bytes_before += original;
+                report.bytes_after += compressed.len() as u64;
             }
-            self.conn.execute(
-                "UPDATE raw_records SET payload = '', payload_zip = ?2 WHERE id = ?1",
-                params![id, compressed],
-            )?;
-            report.compacted += 1;
-            report.bytes_before += original;
-            report.bytes_after += compressed.len() as u64;
+            transaction.commit()?;
         }
 
         // 压缩腾出来的是**数据库内部**的空闲页：不 VACUUM 的话，磁盘上的文件
@@ -5666,6 +6173,8 @@ impl Database {
             if let Err(error) = self.conn.execute_batch("VACUUM") {
                 tracing::warn!("压缩后 VACUUM 失败，磁盘占用暂时不会下降: {error}");
             }
+            let _ = self.bump_payload_stats_generation();
+            let _ = self.persist_raw_payload_stats();
         }
         Ok(report)
     }
@@ -5695,57 +6204,90 @@ impl Database {
                 "retention 天数必须在 1..=365".into(),
             ));
         }
-        let cutoff = Utc::now() - chrono::Duration::days(days);
-        let cutoff_timestamp = cutoff.to_rfc3339();
-        let cutoff_date = cutoff.date_naive().format("%Y-%m-%d").to_string();
-        self.conn.execute(
-            "DELETE FROM metric_samples WHERE timestamp < ?1",
-            [&cutoff_timestamp],
-        )?;
-        self.conn
-            .execute("DELETE FROM daily_metrics WHERE date < ?1", [&cutoff_date])?;
-        self.conn.execute(
-            "DELETE FROM sleep_sessions WHERE start_time < ?1",
-            [&cutoff_timestamp],
-        )?;
-        self.conn.execute(
-            "DELETE FROM workouts WHERE start_time < ?1",
-            [&cutoff_timestamp],
-        )?;
-        self.conn.execute(
-            "DELETE FROM workout_samples WHERE timestamp < ?1",
-            [&cutoff_timestamp],
-        )?;
-        self.conn.execute(
-            "DELETE FROM route_points WHERE timestamp < ?1",
-            [&cutoff_timestamp],
-        )?;
-        self.conn.execute(
-            "DELETE FROM workout_pauses WHERE start_time < ?1",
-            [&cutoff_timestamp],
-        )?;
-        self.conn.execute(
-            "DELETE FROM workout_laps WHERE start_time < ?1",
-            [&cutoff_timestamp],
-        )?;
-        self.conn.execute(
-            "DELETE FROM workout_splits WHERE start_time < ?1",
-            [&cutoff_timestamp],
-        )?;
-        // Raw responses are retained from their fetch time, not their query
-        // window start. A 30-day request naturally starts near the retention
-        // cutoff and must not be deleted seconds after it is fetched.
-        self.conn.execute(
-            "DELETE FROM raw_records
-             WHERE fetched_at < ?1
-               AND NOT EXISTS (SELECT 1 FROM metric_samples m WHERE m.raw_record_id = raw_records.id)
-               AND NOT EXISTS (SELECT 1 FROM daily_metrics d WHERE d.raw_record_id = raw_records.id)
-               AND NOT EXISTS (SELECT 1 FROM sleep_sessions s WHERE s.raw_record_id = raw_records.id)
-               AND NOT EXISTS (SELECT 1 FROM workouts w WHERE w.raw_record_id = raw_records.id)",
-            [&cutoff_timestamp],
-        )?;
-        self.conn
-            .execute_batch("PRAGMA wal_checkpoint(TRUNCATE); PRAGMA incremental_vacuum;")?;
+        let cutoff_timestamp = (Utc::now() - Duration::days(days)).to_rfc3339();
+        // daily_metrics.date 是本地日历日，切不能拿 UTC 的「今天」去比。
+        let cutoff_date = (Local::now().date_naive() - Duration::days(days))
+            .format("%Y-%m-%d")
+            .to_string();
+        self.conn.execute_batch("BEGIN IMMEDIATE;")?;
+        let deleted = (|| -> Result<()> {
+            self.conn.execute(
+                "DELETE FROM metric_samples WHERE timestamp < ?1",
+                [&cutoff_timestamp],
+            )?;
+            self.conn
+                .execute("DELETE FROM daily_metrics WHERE date < ?1", [&cutoff_date])?;
+            self.conn.execute(
+                "DELETE FROM sleep_sessions WHERE start_time < ?1",
+                [&cutoff_timestamp],
+            )?;
+            self.conn.execute(
+                "DELETE FROM workout_hr_zones
+                 WHERE workout_id IN (SELECT workout_id FROM workouts WHERE start_time < ?1)",
+                [&cutoff_timestamp],
+            )?;
+            self.conn.execute(
+                "DELETE FROM workouts WHERE start_time < ?1",
+                [&cutoff_timestamp],
+            )?;
+            self.conn.execute(
+                "DELETE FROM workout_samples WHERE timestamp < ?1",
+                [&cutoff_timestamp],
+            )?;
+            self.conn.execute(
+                "DELETE FROM route_points WHERE timestamp < ?1",
+                [&cutoff_timestamp],
+            )?;
+            self.conn.execute(
+                "DELETE FROM workout_pauses WHERE start_time < ?1",
+                [&cutoff_timestamp],
+            )?;
+            self.conn.execute(
+                "DELETE FROM workout_laps WHERE start_time < ?1",
+                [&cutoff_timestamp],
+            )?;
+            self.conn.execute(
+                "DELETE FROM workout_splits WHERE start_time < ?1",
+                [&cutoff_timestamp],
+            )?;
+            // Raw responses are retained from their fetch time, not their query
+            // window start. A 30-day request naturally starts near the retention
+            // cutoff and must not be deleted seconds after it is fetched.
+            self.conn.execute(
+                "DELETE FROM raw_records
+                 WHERE fetched_at < ?1
+                   AND NOT EXISTS (SELECT 1 FROM metric_samples m WHERE m.raw_record_id = raw_records.id)
+                   AND NOT EXISTS (SELECT 1 FROM daily_metrics d WHERE d.raw_record_id = raw_records.id)
+                   AND NOT EXISTS (SELECT 1 FROM sleep_sessions s WHERE s.raw_record_id = raw_records.id)
+                   AND NOT EXISTS (SELECT 1 FROM workouts w WHERE w.raw_record_id = raw_records.id)",
+                [&cutoff_timestamp],
+            )?;
+            Ok(())
+        })();
+        match deleted {
+            Ok(()) => {
+                if self.conn.is_autocommit() {
+                    return Err(ZeppBridgeError::DataUnavailable(
+                        "清理被中断，没有任何改动写入。".into(),
+                    ));
+                }
+                self.conn.execute_batch("COMMIT;")?;
+            }
+            Err(error) => {
+                if !self.conn.is_autocommit() {
+                    let _ = self.conn.execute_batch("ROLLBACK;");
+                }
+                return Err(error);
+            }
+        }
+        if let Err(error) = self
+            .conn
+            .execute_batch("PRAGMA wal_checkpoint(TRUNCATE); PRAGMA incremental_vacuum;")
+        {
+            tracing::warn!("清理后 WAL checkpoint 失败，数据已删除: {error}");
+        }
+        let _ = self.bump_payload_stats_generation();
+        let _ = self.persist_raw_payload_stats();
         Ok(())
     }
 
@@ -5948,6 +6490,14 @@ fn device_identity_hints(payload: &serde_json::Value) -> Vec<DeviceIdentityHint>
     hints
 }
 
+fn stored_stage_minutes(minutes: Option<i32>) -> (i32, i64) {
+    (minutes.unwrap_or(0), i64::from(minutes.is_some()))
+}
+
+fn loaded_stage_minutes(minutes: i32, available: i64) -> Option<i32> {
+    (available != 0).then_some(minutes)
+}
+
 fn parse_datetime(value: &str, field: &str) -> Result<DateTime<Utc>> {
     DateTime::parse_from_rfc3339(value)
         .map(|dt| dt.with_timezone(&Utc))
@@ -6121,6 +6671,56 @@ fn decode_raw_payload(payload: String, payload_zip: Option<Vec<u8>>) -> Result<S
 /// 加一层宽松的时间戳边界，索引就能先把范围缩到几天（实测心率 7 天 92ms → 5ms）。
 /// 边界各放宽一天，覆盖任何时区偏移（-12..+14 小时），所以它只负责「少扫一点」，
 /// 不改变结果：真正决定哪一天算哪一天的，仍然是后面那个 `date(...,'localtime')`。
+fn daily_metric_selected_for_export(metric: &str, selected: &BTreeSet<String>) -> bool {
+    const RECOVERY: [&str; 19] = [
+        "resting_hr",
+        "readiness",
+        "bio_charge",
+        "hybrid_charge",
+        "physical_charge",
+        "mental_charge",
+        "physical_readiness",
+        "mental_readiness",
+        "hrv_readiness",
+        "rhr_readiness",
+        "skin_temp_readiness",
+        "afib_readiness",
+        "ahi_readiness",
+        "training_load",
+        "vo2max",
+        "lactate_threshold_hr",
+        "lactate_threshold_pace",
+        "pai_daily",
+        "pai_total",
+    ];
+    if metric.starts_with("intake_") {
+        return selected.contains("food");
+    }
+    let named = (metric == "steps" && selected.contains("steps"))
+        || (metric == "training_load" && selected.contains("training_load"))
+        || (metric == "vo2max" && selected.contains("vo2max"))
+        || ((metric.contains("spo2") || metric == "blood_oxygen") && selected.contains("spo2"))
+        || (metric.contains("stress") && selected.contains("stress"))
+        || (metric.starts_with("respiratory") && selected.contains("respiratory_rate"))
+        || (metric.starts_with("lactate_threshold") && selected.contains("lactate_threshold"))
+        || (metric.starts_with("pai") && selected.contains("pai"))
+        || (metric == "hrv_rmssd" && selected.contains("hrv_rmssd"));
+    if named {
+        return true;
+    }
+    let is_recovery = RECOVERY.contains(&metric);
+    (is_recovery && selected.contains("recovery"))
+        || (!is_recovery && selected.contains("daily_activity"))
+}
+
+fn calendar_day_prefix(value: Option<String>) -> Option<String> {
+    value.and_then(|stamp| {
+        let day = stamp.get(..10)?;
+        (day.as_bytes().get(4) == Some(&b'-') && day.as_bytes().get(7) == Some(&b'-'))
+            .then(|| day.to_string())
+    })
+}
+
 fn local_day_range_utc_bounds(start: &str, end: &str) -> Option<(String, String)> {
     let start = NaiveDate::parse_from_str(start, "%Y-%m-%d").ok()?;
     let end = NaiveDate::parse_from_str(end, "%Y-%m-%d").ok()?;
@@ -8109,10 +8709,10 @@ mod tests {
             end_time: ts() + chrono::Duration::minutes(400),
             score: Some(80),
             duration_minutes: 380,
-            deep_minutes: 80,
-            light_minutes: 240,
+            deep_minutes: Some(80),
+            light_minutes: Some(240),
             rem_minutes: Some(40),
-            awake_minutes: 20,
+            awake_minutes: Some(20),
             source_scope: SourceScope::Device,
             device_id: None,
             synced_at: None,
@@ -8141,10 +8741,10 @@ mod tests {
             end_time: start + chrono::Duration::minutes(400),
             score: Some(80),
             duration_minutes: 380,
-            deep_minutes: 80,
-            light_minutes: 240,
+            deep_minutes: Some(80),
+            light_minutes: Some(240),
             rem_minutes: Some(40),
-            awake_minutes: 20,
+            awake_minutes: Some(20),
             source_scope: SourceScope::Device,
             device_id: Some("SN-ONE".into()),
             synced_at: None,
@@ -8516,10 +9116,10 @@ mod tests {
             end_time: start - chrono::Duration::hours(1),
             score: Some(80),
             duration_minutes: 420,
-            deep_minutes: 90,
-            light_minutes: 280,
+            deep_minutes: Some(90),
+            light_minutes: Some(280),
             rem_minutes: Some(50),
-            awake_minutes: 10,
+            awake_minutes: Some(10),
             source_scope: SourceScope::Device,
             device_id: Some("SN-ONE".into()),
             synced_at: None,
@@ -9040,10 +9640,10 @@ mod tests {
             end_time: ts() + chrono::Duration::minutes(400),
             score: Some(70),
             duration_minutes: 400,
-            deep_minutes: 80,
-            light_minutes: 200,
+            deep_minutes: Some(80),
+            light_minutes: Some(200),
             rem_minutes: None,
-            awake_minutes: 20,
+            awake_minutes: Some(20),
             source_scope: SourceScope::Device,
             device_id: None,
             synced_at: None,
@@ -9059,6 +9659,170 @@ mod tests {
                 .rem_minutes,
             None
         );
+    }
+
+    fn sleep_stage_flags(db: &Database, sleep_id: &str) -> (i64, i64, i64, i64) {
+        db.conn
+            .query_row(
+                "SELECT deep_available, light_available, rem_available, awake_available
+                 FROM sleep_sessions WHERE sleep_id = ?1",
+                [sleep_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .unwrap()
+    }
+
+    #[test]
+    fn missing_sleep_stages_are_stored_as_unavailable_and_query_returns_none() {
+        let db = Database::in_memory().unwrap();
+        let version: i64 = db
+            .conn
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, CURRENT_SCHEMA_VERSION);
+        assert_eq!(CURRENT_SCHEMA_VERSION, 29);
+
+        let start = ts();
+        db.insert_sleep_session(&SleepSession {
+            sleep_id: "sleep-no-stages".into(),
+            start_time: start,
+            end_time: start + chrono::Duration::minutes(400),
+            score: Some(70),
+            duration_minutes: 400,
+            deep_minutes: None,
+            light_minutes: None,
+            rem_minutes: None,
+            awake_minutes: None,
+            source_scope: SourceScope::Device,
+            device_id: None,
+            synced_at: None,
+            time_in_bed_minutes: None,
+            wake_count: None,
+            stages: Vec::new(),
+        })
+        .unwrap();
+
+        assert_eq!(sleep_stage_flags(&db, "sleep-no-stages"), (0, 0, 0, 0));
+        let stored: (i32, i32, i32, i32) = db
+            .conn
+            .query_row(
+                "SELECT deep_minutes, light_minutes, rem_minutes, awake_minutes
+                 FROM sleep_sessions WHERE sleep_id = 'sleep-no-stages'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .unwrap();
+        assert_eq!(stored, (0, 0, 0, 0));
+
+        let detail = db.get_sleep_detail("sleep-no-stages").unwrap().unwrap();
+        assert_eq!(detail.deep_minutes, None);
+        assert_eq!(detail.light_minutes, None);
+        assert_eq!(detail.rem_minutes, None);
+        assert_eq!(detail.awake_minutes, None);
+        assert_eq!(detail.duration_minutes, 400);
+
+        let listed = db.get_recent_sleep_sessions(1).unwrap();
+        assert_eq!(listed[0].deep_minutes, None);
+        assert_eq!(listed[0].awake_minutes, None);
+
+        let export = parsed_export(&db, &["sleep"], ExportDetail::Summary);
+        let session = &export["data"]["sleep_sessions"][0];
+        assert!(session["deep_minutes"].is_null());
+        assert!(session["light_minutes"].is_null());
+        assert!(session["rem_minutes"].is_null());
+        assert!(session["awake_minutes"].is_null());
+        assert_eq!(session["duration_minutes"], 400);
+    }
+
+    #[test]
+    fn present_sleep_stages_round_trip_with_available_flags() {
+        let db = Database::in_memory().unwrap();
+        db.insert_sleep_session(&SleepSession {
+            sleep_id: "sleep-stages-present".into(),
+            start_time: ts(),
+            end_time: ts() + chrono::Duration::minutes(400),
+            score: Some(80),
+            duration_minutes: 380,
+            deep_minutes: Some(80),
+            light_minutes: Some(240),
+            rem_minutes: Some(40),
+            awake_minutes: Some(20),
+            source_scope: SourceScope::Device,
+            device_id: None,
+            synced_at: None,
+            time_in_bed_minutes: None,
+            wake_count: None,
+            stages: Vec::new(),
+        })
+        .unwrap();
+
+        assert_eq!(sleep_stage_flags(&db, "sleep-stages-present"), (1, 1, 1, 1));
+        let detail = db
+            .get_sleep_detail("sleep-stages-present")
+            .unwrap()
+            .unwrap();
+        assert_eq!(detail.deep_minutes, Some(80));
+        assert_eq!(detail.light_minutes, Some(240));
+        assert_eq!(detail.rem_minutes, Some(40));
+        assert_eq!(detail.awake_minutes, Some(20));
+
+        let export = parsed_export(&db, &["sleep"], ExportDetail::Summary);
+        let session = &export["data"]["sleep_sessions"][0];
+        assert_eq!(session["deep_minutes"], 80);
+        assert_eq!(session["light_minutes"], 240);
+        assert_eq!(session["rem_minutes"], 40);
+        assert_eq!(session["awake_minutes"], 20);
+    }
+
+    #[test]
+    fn v26_library_gains_stage_available_columns_at_v27() {
+        let dir = std::env::temp_dir().join(format!(
+            "zeppbridge-v26-sleep-available-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("zepp.db");
+
+        {
+            let db = Database::open_migrated(&path).unwrap();
+            db.conn
+                .execute_batch(
+                    "INSERT INTO sleep_sessions (
+                        sleep_id, start_time, end_time, duration_minutes,
+                        deep_minutes, light_minutes, rem_minutes, rem_available, awake_minutes,
+                        source_scope
+                     ) VALUES (
+                        'legacy', '2026-01-01T00:00:00+00:00', '2026-01-01T08:00:00+00:00', 480,
+                        0, 0, 0, 1, 0, 'device'
+                     );
+                     ALTER TABLE sleep_sessions DROP COLUMN deep_available;
+                     ALTER TABLE sleep_sessions DROP COLUMN light_available;
+                     ALTER TABLE sleep_sessions DROP COLUMN awake_available;
+                     PRAGMA user_version = 26;",
+                )
+                .unwrap();
+        }
+
+        let db = Database::open_migrated(&path).expect("v26 should migrate to current schema");
+        let version: i64 = db
+            .conn
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, CURRENT_SCHEMA_VERSION);
+        assert_eq!(sleep_stage_flags(&db, "legacy"), (1, 1, 1, 1));
+
+        let detail = db.get_sleep_detail("legacy").unwrap().unwrap();
+        assert_eq!(detail.deep_minutes, Some(0));
+        assert_eq!(detail.light_minutes, Some(0));
+        assert_eq!(detail.awake_minutes, Some(0));
+        assert_eq!(detail.rem_minutes, Some(0));
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -9146,6 +9910,177 @@ mod tests {
         let db = Database::in_memory().unwrap();
         assert!(db.cleanup_old_data(0).is_err());
         assert!(db.cleanup_old_data(366).is_err());
+    }
+
+    #[test]
+    fn cleanup_uses_local_day_cutoff_and_drops_workout_hr_zones() {
+        let db = Database::in_memory().unwrap();
+        let local_today = Local::now().date_naive();
+        let old_date = (local_today - Duration::days(40))
+            .format("%Y-%m-%d")
+            .to_string();
+        let kept_date = (local_today - Duration::days(10))
+            .format("%Y-%m-%d")
+            .to_string();
+        db.conn
+            .execute(
+                "INSERT INTO daily_metrics(date, metric, value, unit, source_scope)
+                 VALUES (?1, 'steps', 1, 'count', 'device')",
+                [&old_date],
+            )
+            .unwrap();
+        db.conn
+            .execute(
+                "INSERT INTO daily_metrics(date, metric, value, unit, source_scope)
+                 VALUES (?1, 'steps', 2, 'count', 'device')",
+                [&kept_date],
+            )
+            .unwrap();
+        let old_start = (Utc::now() - Duration::days(40)).to_rfc3339();
+        let old_end = (Utc::now() - Duration::days(40) + Duration::hours(1)).to_rfc3339();
+        db.conn
+            .execute(
+                "INSERT INTO workouts(workout_id, workout_type, start_time, end_time, source_scope)
+                 VALUES ('old', 'run', ?1, ?2, 'device')",
+                [&old_start, &old_end],
+            )
+            .unwrap();
+        db.conn
+            .execute(
+                "INSERT INTO workout_hr_zones(workout_id, zone_index, upper_bound_bpm, seconds)
+                 VALUES ('old', 1, 140, 60)",
+                [],
+            )
+            .unwrap();
+        let new_start = Utc::now().to_rfc3339();
+        let new_end = (Utc::now() + Duration::hours(1)).to_rfc3339();
+        db.conn
+            .execute(
+                "INSERT INTO workouts(workout_id, workout_type, start_time, end_time, source_scope)
+                 VALUES ('kept', 'run', ?1, ?2, 'device')",
+                [&new_start, &new_end],
+            )
+            .unwrap();
+        db.conn
+            .execute(
+                "INSERT INTO workout_hr_zones(workout_id, zone_index, upper_bound_bpm, seconds)
+                 VALUES ('kept', 1, 150, 30)",
+                [],
+            )
+            .unwrap();
+
+        db.cleanup_old_data(30).unwrap();
+
+        let daily: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM daily_metrics", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(daily, 1);
+        let old_zones: i64 = db
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM workout_hr_zones WHERE workout_id = 'old'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(old_zones, 0);
+        let kept_zones: i64 = db
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM workout_hr_zones WHERE workout_id = 'kept'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(kept_zones, 1);
+    }
+
+    #[test]
+    fn v28_dedupes_metric_samples_before_the_unique_index() {
+        let db = Database::in_memory().unwrap();
+        db.conn
+            .execute_batch("DROP INDEX uq_metric_sample_key; PRAGMA user_version = 27;")
+            .unwrap();
+        for value in [70.0_f64, 71.0] {
+            db.conn
+                .execute(
+                    "INSERT INTO metric_samples(metric, timestamp, value, unit, source_scope, device_id)
+                     VALUES ('heart_rate', '2026-01-01T00:00:00Z', ?1, 'bpm', 'device', '')",
+                    [value],
+                )
+                .unwrap();
+        }
+        db.migrate().unwrap();
+        let count: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM metric_samples", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+        let version: i64 = db
+            .conn
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, CURRENT_SCHEMA_VERSION);
+        let duplicate = db.conn.execute(
+            "INSERT INTO metric_samples(metric, timestamp, value, unit, source_scope, device_id)
+             VALUES ('heart_rate', '2026-01-01T00:00:00Z', 72, 'bpm', 'device', '')",
+            [],
+        );
+        assert!(duplicate.is_err());
+    }
+
+    #[test]
+    fn v28_deletes_workout_hr_zones_with_the_parent_workout() {
+        let db = Database::in_memory().unwrap();
+        db.conn
+            .execute(
+                "INSERT INTO workouts(workout_id, workout_type, start_time, end_time, source_scope)
+                 VALUES ('w', 'run', '2026-01-01T00:00:00Z', '2026-01-01T01:00:00Z', 'device')",
+                [],
+            )
+            .unwrap();
+        db.conn
+            .execute(
+                "INSERT INTO workout_hr_zones(workout_id, zone_index, upper_bound_bpm, seconds)
+                 VALUES ('w', 1, 140, 60)",
+                [],
+            )
+            .unwrap();
+        db.conn
+            .execute("DELETE FROM workouts WHERE workout_id = 'w'", [])
+            .unwrap();
+        let leftover: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM workout_hr_zones", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(leftover, 0);
+    }
+
+    #[test]
+    fn estimate_export_counts_without_materializing_json() {
+        let db = Database::in_memory().unwrap();
+        db.insert_metric_sample(&MetricSample {
+            metric: "hrv_rmssd".into(),
+            timestamp: ts(),
+            value: 42.0,
+            unit: "ms".into(),
+            source_scope: SourceScope::Device,
+            device_id: None,
+        })
+        .unwrap();
+        let selection = export_selection(&["hrv_rmssd"], ExportDetail::Full);
+        let (encoded, count) = db.build_ai_export(&selection).unwrap();
+        let estimate = db.estimate_ai_export(&selection).unwrap();
+        assert_eq!(estimate.record_count, count);
+        assert!(estimate.estimated_bytes > 0);
+        assert!(
+            estimate.estimated_bytes < encoded.len() as u64 * 8,
+            "estimate should stay in the same order of magnitude as the JSON"
+        );
+        assert!(!encoded.is_empty());
     }
 
     #[test]
@@ -9237,10 +10172,10 @@ mod tests {
             end_time: end,
             score: Some(80),
             duration_minutes: 380,
-            deep_minutes: 80,
-            light_minutes: 240,
+            deep_minutes: Some(80),
+            light_minutes: Some(240),
             rem_minutes: Some(40),
-            awake_minutes: 20,
+            awake_minutes: Some(20),
             source_scope: SourceScope::Device,
             device_id: Some("SN-ONE".into()),
             synced_at: Some(start + chrono::Duration::hours(10)),
@@ -9340,6 +10275,96 @@ mod tests {
         })
         .unwrap();
         assert!(db.pending_running_details().unwrap().is_empty());
+    }
+
+    fn insert_pending_run(db: &Database, workout_id: &str, start: DateTime<Utc>) {
+        db.insert_workout(&Workout {
+            workout_id: workout_id.into(),
+            workout_type: "run".into(),
+            normalized_type: "run".into(),
+            type_source: "numeric_mapped".into(),
+            user_override: None,
+            effective_type: "run".into(),
+            custom_label: None,
+            start_time: start,
+            end_time: start + chrono::Duration::minutes(10),
+            distance_meters: Some(1000.0),
+            calories: Some(80),
+            avg_hr: Some(140),
+            max_hr: Some(160),
+            training_load: None,
+            vo2max: None,
+            source_scope: SourceScope::Device,
+            device_id: None,
+            synced_at: None,
+            gps_available: false,
+            sample_count: 0,
+            zepp_source: Some("run.gps".into()),
+            zepp_type: Some(1),
+            ..Default::default()
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn pending_running_details_are_capped_so_one_sync_cannot_fetch_the_whole_backlog() {
+        let db = Database::in_memory().unwrap();
+        for index in 0..(PENDING_WORKOUT_DETAIL_LIMIT + 7) {
+            insert_pending_run(
+                &db,
+                &format!("w{index}"),
+                ts() + chrono::Duration::seconds(index as i64),
+            );
+        }
+        let pending = db.pending_running_details().unwrap();
+        assert_eq!(pending.len(), PENDING_WORKOUT_DETAIL_LIMIT);
+        let uncapped = db
+            .pending_running_details_limited(PENDING_WORKOUT_DETAIL_LIMIT + 20)
+            .unwrap();
+        assert_eq!(uncapped.len(), PENDING_WORKOUT_DETAIL_LIMIT + 7);
+    }
+
+    #[test]
+    fn failed_workout_detail_attempts_drop_out_then_decay_back_in() {
+        let db = Database::in_memory().unwrap();
+        insert_pending_run(&db, "stuck", ts());
+        for _ in 0..MAX_WORKOUT_DETAIL_ATTEMPTS {
+            db.record_workout_detail_fetch_result("stuck", "run.gps", false)
+                .unwrap();
+        }
+        assert!(
+            db.pending_running_details().unwrap().is_empty(),
+            "permanent failures must not stay at the front of every sync"
+        );
+        db.conn
+            .execute(
+                "UPDATE workout_detail_fetch_attempts
+                 SET updated_at = ?1
+                 WHERE workout_id = 'stuck'",
+                [(Utc::now() - chrono::Duration::days(8)).to_rfc3339()],
+            )
+            .unwrap();
+        let pending = db.pending_running_details().unwrap();
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].workout_id, "stuck");
+    }
+
+    #[test]
+    fn nested_replay_guards_keep_the_flag_until_the_outer_drops() {
+        // 别的测试也可能在并行重放，所以不能断言进/出时全局计数恰好是 0。
+        // 这条只钉：内层 Drop 不许把外层还举着的旗清掉。
+        let outer = ReplayGuard::enter();
+        assert!(replay_in_progress());
+        {
+            let inner = ReplayGuard::enter();
+            assert!(replay_in_progress());
+            drop(inner);
+            assert!(
+                replay_in_progress(),
+                "inner drop must not hide the outer wait-for-lock"
+            );
+        }
+        drop(outer);
     }
 
     fn temp_dir(label: &str) -> PathBuf {

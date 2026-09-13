@@ -1,8 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { displayDateTimeFormatter, parseDisplayDate, setDateOrder, setTimeFormat } from '../dateTime';
 import { formatTime } from '../format';
+import { setLocale } from '../../i18n';
 
-afterEach(() => { setDateOrder('regional'); setTimeFormat('regional'); });
+afterEach(() => {
+  setDateOrder('regional');
+  setTimeFormat('regional');
+  setLocale('en');
+});
 describe('local display policy', () => {
   it('keeps a calendar date at local midnight and rejects impossible dates', () => {
     const date = parseDisplayDate('2026-09-12');
@@ -20,6 +25,17 @@ describe('local display policy', () => {
   it('respects explicit date order without moving the date', () => {
     setDateOrder('ymd');
     expect(displayDateTimeFormatter({ year: 'numeric', month: 'short', day: 'numeric' }).format(parseDisplayDate('2026-09-12'))).toBe('2026-09-12');
+  });
+  it('weekday names follow the UI language, not the OS language', () => {
+    setDateOrder('regional');
+    const monday = new Date(2026, 0, 5);
+    setLocale('en');
+    expect(displayDateTimeFormatter({ weekday: 'long' }).format(monday).toLowerCase()).toContain('monday');
+    setLocale('zh');
+    expect(displayDateTimeFormatter({ weekday: 'long' }).format(monday)).toMatch(/星期|周一/);
+    setLocale('es');
+    expect(displayDateTimeFormatter({ weekday: 'long' }).format(monday).toLowerCase()).toContain('lunes');
+    setLocale('en');
   });
   it.each([
     ['Europe/London', '2026-03-29T00:30:00Z', '00:30'],

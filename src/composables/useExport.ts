@@ -2,7 +2,12 @@ import { ref } from 'vue';
 import { open as showOpenDialog, save as showSaveDialog } from '@tauri-apps/plugin-dialog';
 import { tauriApi, toUserMessage } from './useTauriApi';
 import { localDateString } from '../lib/format';
-import { buildExportSelection, MAX_EXPORT_RANGE_DAYS, type ExportScopeError } from '../lib/exportScope';
+import {
+  buildExportSelection,
+  exportInputForFocus,
+  MAX_EXPORT_RANGE_DAYS,
+  type ExportScopeError,
+} from '../lib/exportScope';
 import { defineMessages, messagesOf } from '../i18n';
 import type {
   ExportDataType,
@@ -256,6 +261,8 @@ export const useExport = () => {
     'recovery',
   ]);
   const exportDetail = ref<ExportDetail>('summary');
+  /** 从运动详情「锁定该条运动」进来时有值。和日期范围互斥，不能同时进 selection。 */
+  const focusedWorkoutId = ref<string | null>(null);
   const exportBusy = ref<'copy' | 'save' | 'publish' | null>(null);
   const exportError = ref<string | null>(null);
   const exportMessage = ref<string | null>(null);
@@ -271,12 +278,14 @@ export const useExport = () => {
     exportError.value = null;
     exportMessage.value = null;
     // 范围规则在 lib/exportScope.ts 一处实现：CLI 和后端也认同一套。
-    const result = buildExportSelection({
+    // 锁定单条运动时绝不能把页面上的日期范围一起送出去。
+    const result = buildExportSelection(exportInputForFocus({
       startDate: exportStartDate.value,
       endDate: exportEndDate.value,
+      focusedWorkoutId: focusedWorkoutId.value,
       dataTypes: [...exportDataTypes.value],
       detail: exportDetail.value,
-    });
+    }));
     if (!result.ok) {
       exportError.value = scopeErrorText(result.error);
       return null;
@@ -409,6 +418,7 @@ export const useExport = () => {
     exportEndDate,
     exportDataTypes,
     exportDetail,
+    focusedWorkoutId,
     exportBusy,
     exportError,
     exportMessage,

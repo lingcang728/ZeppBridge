@@ -134,6 +134,26 @@ impl SyncManager {
         self.cancel.store(true, Ordering::SeqCst);
     }
 
+    /// 本地维护（重放 / 压缩）正在写库时，不要去抢那把 20 秒超时的写锁。
+    fn stand_aside_if_local_maintenance(&self) -> Result<()> {
+        if crate::storage::compaction_in_progress() || crate::storage::replay_in_progress() {
+            let message = if crate::storage::compaction_in_progress() {
+                "正在压缩历史报文以节省磁盘空间"
+            } else {
+                "正在用本地原始报文重建派生数据"
+            };
+            return Err(ZeppBridgeError::Busy(message.into()));
+        }
+        Ok(())
+    }
+
+    fn abort_if_cancelled(&self) -> Result<()> {
+        if self.cancel.load(Ordering::SeqCst) {
+            return Err(ZeppBridgeError::Cancelled);
+        }
+        Ok(())
+    }
+
     /// Signal cancellation and wait until any in-flight run has released
     /// `run_lock`. Returns immediately when nothing is running.
     pub async fn cancel_and_wait(&self) {
@@ -190,6 +210,7 @@ impl SyncManager {
                 Some(&crate::storage::PROBE_ONLY_CAPABILITIES),
             )
             .await;
+        self.abort_if_cancelled()?;
         if probes.is_empty() {
             return Ok(false);
         }
@@ -276,9 +297,13 @@ impl SyncManager {
     ) -> Result<SyncReport> {
         self.cancel.store(false, Ordering::SeqCst);
         let _run_guard = self.run_lock.lock().await;
+        // 重放/压缩在拿写锁之前就会举旗。这里先看旗，而不是先干等 20 秒再
+        // 报 Busy：调用方才能立刻把这次同步标成 deferred 并自动重试。
+        self.stand_aside_if_local_maintenance()?;
         // 进程内的 run_lock 拦不住第二个进程。CLI 的 `sync` 和桌面应用同时跑
         // 起来时，重复请求和重复清理是最轻的后果。
         let _write_guard = self.acquire_write_lock(WritePurpose::Sync)?;
+        self.abort_if_cancelled()?;
         let window = FetchWindow::days(days)?;
         let mut streams = Vec::new();
         let started = Instant::now();
@@ -305,9 +330,7 @@ impl SyncManager {
         };
 
         let check = || -> Result<()> {
-            if self.cancel.load(Ordering::SeqCst) {
-                return Err(ZeppBridgeError::ConfigError("同步已取消".into()));
-            }
+            self.abort_if_cancelled()?;
             if Instant::now() > deadline {
                 return Err(ZeppBridgeError::ConfigError(
                     "同步超时，已停止后续请求".into(),
@@ -342,7 +365,7 @@ impl SyncManager {
         }
         emit("workout_detail", 4, 8, "正在同步跑步明细");
         check()?;
-        match self.fetch_pending_running_details().await {
+        match self.fetch_pending_running_details(deadline).await {
             Ok(records) if records.is_empty() => {
                 streams.push(self.persist_empty_pending_details().await?);
             }
@@ -494,7 +517,9 @@ impl SyncManager {
     {
         self.cancel.store(false, Ordering::SeqCst);
         let _run_guard = self.run_lock.lock().await;
+        self.stand_aside_if_local_maintenance()?;
         let _write_guard = self.acquire_write_lock(WritePurpose::HistoryBackfill)?;
+        self.abort_if_cancelled()?;
 
         {
             let db = self.db.lock().await;
@@ -617,81 +642,88 @@ impl SyncManager {
                 Ok((ChunkStatus::EmptyFromCloud, 0, None))
             }
             Ok(records) => {
+                let incomplete = records.iter().any(|record| record.incomplete);
                 let report = self.persist_records(&chunk.stream, records).await?;
-                if report.records_written > 0 {
-                    Ok((ChunkStatus::Persisted, report.records_written, None))
-                } else if matches!(
-                    report.status,
-                    StreamStatus::Unavailable | StreamStatus::Unverified | StreamStatus::Success
-                ) {
-                    // 云端返回的报文里没有可识别记录——比如心率接口对这段时间
-                    // 返回 `{"items": []}`，它是在明确回答「这段时间没有」。
-                    //
-                    // 上面那条 `Err(error) if error.is_unavailable()` 早就把同一件
-                    // 事记成 `EmptyFromCloud` 了；差别只在于报文是在取的时候失败，
-                    // 还是取回来之后才发现是空的。对用户来说这没有区别，账本不该
-                    // 因此给出两种结论。
-                    //
-                    // 记成失败会连锁出两个问题：界面把一段本来就没有数据的历史排成
-                    // 一长串红色「失败」，用户以为自己丢了几个月数据；而这些块又会
-                    // 一直排在待办队首，把后面的块全挡住——issue #10 的现场正是如此。
-                    //
-                    // `StreamStatus::Failed` 不在这里：那是真的写不进去或认证挂了。
-                    Ok((ChunkStatus::EmptyFromCloud, 0, None))
-                } else {
-                    // 报文回来了但一条 canonical 都没产出：这不是「云端没有」，
-                    // 记成失败以便重试和排查。
-                    //
-                    // 这一类多半是**确定性**失败——同样的报文再拉一次还是解析
-                    // 不出来。账本里的 attempts 会让它自动重试几次后停下来，
-                    // 不再挡住后面的块。
-                    Ok((
-                        ChunkStatus::Failed,
-                        0,
-                        Some((
-                            "err.backfill.no_canonical_records",
-                            "云端返回了报文，但没有解析出可用记录".to_string(),
-                        )),
-                    ))
-                }
+                Ok(classify_backfill_report(&report, incomplete))
             }
+            Err(error) if error.is_cancelled() || error.needs_reauth() => Err(error),
             Err(error) if error.is_unavailable() => Ok((ChunkStatus::EmptyFromCloud, 0, None)),
             Err(error) => Err(error),
         }
     }
 
-    async fn fetch_pending_running_details(&self) -> Result<Vec<FetchedRecord>> {
+    async fn fetch_pending_running_details(&self, deadline: Instant) -> Result<Vec<FetchedRecord>> {
         let pending = {
             let db = self.db.lock().await;
             db.pending_running_details()?
         };
+        let queue_len = pending.len();
         let mut records = Vec::new();
         let mut last_error = None;
+        let mut attempted = 0usize;
         for item in pending {
             if self.cancel.load(Ordering::SeqCst) {
                 return Err(ZeppBridgeError::Cancelled);
             }
+            if Instant::now() >= deadline {
+                break;
+            }
+            attempted += 1;
             match self
                 .fetcher
                 .fetch_sport_detail_record(&item.workout_id, &item.source, Utc::now(), None)
                 .await
             {
-                Ok(record) => records.push(record),
+                Ok(record) => {
+                    {
+                        let db = self.db.lock().await;
+                        db.record_workout_detail_fetch_result(
+                            &item.workout_id,
+                            &item.source,
+                            true,
+                        )?;
+                    }
+                    records.push(record);
+                }
                 Err(error) if error.is_cancelled() => return Err(error),
                 Err(error) if error.needs_reauth() => return Err(error),
                 Err(error) => {
                     tracing::warn!("拉取运动明细 {} 失败: {}", item.workout_id, error);
+                    {
+                        let db = self.db.lock().await;
+                        let _ = db.record_workout_detail_fetch_result(
+                            &item.workout_id,
+                            &item.source,
+                            false,
+                        );
+                    }
                     last_error = Some(error);
                 }
             }
         }
-        pending_details_outcome(records, last_error)
+        // 截止时间打断这一轮不是整条流失败：剩下的留给下次。只有把这一批
+        // 有限队列都试完、一条都没拿到，才把 last_error 抬上去。
+        let error = if records.is_empty() && attempted >= queue_len {
+            last_error
+        } else {
+            None
+        };
+        pending_details_outcome(records, error)
     }
 
     /// 没有待拉取的明细也要写 sync_state：否则上一轮残留的 failed 会一直挂着。
     /// `records_written` 沿用上次的计数，这条路径本身没有新写入。
     async fn persist_empty_pending_details(&self) -> Result<StreamReport> {
         let previous = self.previous_records_written("workout_detail").await?;
+        let still_pending = {
+            let db = self.db.lock().await;
+            !db.pending_running_details()?.is_empty()
+        };
+        let message = if still_pending {
+            "待拉取的跑步明细将在下次同步继续"
+        } else {
+            "没有待拉取的跑步明细"
+        };
         let report = StreamReport {
             stream: "workout_detail".into(),
             status: StreamStatus::Success,
@@ -699,7 +731,7 @@ impl SyncManager {
             raw_records: 0,
             capability: CapabilityStatus::Verified,
             needs_reauth: false,
-            message: Some("没有待拉取的跑步明细".into()),
+            message: Some(message.into()),
         };
         let db = self.db.lock().await;
         db.update_sync_state_details(
@@ -998,6 +1030,49 @@ fn aggregate_stream_reports(stream: &str, reports: &[StreamReport]) -> StreamRep
     aggregate
 }
 
+fn partial_window_reason() -> (&'static str, String) {
+    (
+        "err.backfill.partial_window",
+        "这一块只写入了部分数据，还需要重试".to_string(),
+    )
+}
+
+fn no_canonical_reason() -> (&'static str, String) {
+    (
+        "err.backfill.no_canonical_records",
+        "云端返回了报文，但没有解析出可用记录".to_string(),
+    )
+}
+
+/// 一块补拉写完之后的账本结论。
+///
+/// 已经进库的行要留着；子切片 404、解析失败或聚合 Failed 都不能把这个月
+/// 画成完整副本。`Unverified` 也不是「云端没有」。
+fn classify_backfill_report(
+    report: &StreamReport,
+    incomplete: bool,
+) -> (ChunkStatus, i64, Option<(&'static str, String)>) {
+    let written = report.records_written;
+    if incomplete {
+        if written > 0 {
+            return (ChunkStatus::Partial, written, Some(partial_window_reason()));
+        }
+        return (ChunkStatus::Failed, 0, Some(partial_window_reason()));
+    }
+    match report.status {
+        StreamStatus::Success if written > 0 => (ChunkStatus::Persisted, written, None),
+        StreamStatus::Success | StreamStatus::Unavailable => (ChunkStatus::EmptyFromCloud, 0, None),
+        StreamStatus::Unverified if written > 0 => {
+            (ChunkStatus::Partial, written, Some(partial_window_reason()))
+        }
+        StreamStatus::Unverified => (ChunkStatus::Failed, 0, Some(no_canonical_reason())),
+        StreamStatus::Failed if written > 0 => {
+            (ChunkStatus::Partial, written, Some(partial_window_reason()))
+        }
+        StreamStatus::Failed => (ChunkStatus::Failed, 0, Some(no_canonical_reason())),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1059,6 +1134,77 @@ mod tests {
         assert_eq!(unavailable.records_written, 500);
 
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn cancel_is_cancelled_not_a_config_error() {
+        let db = Database::in_memory().unwrap();
+        let auth = AuthInfo {
+            app_token: "test-token".into(),
+            user_id: "user-1".into(),
+            region_host: "https://api-mifit.zepp.com".into(),
+        };
+        let connector = ZeppConnector::new(auth).unwrap();
+        let fetcher = DataFetcher::new(connector);
+        let manager = SyncManager::new(fetcher, db, Arc::new(AtomicBool::new(false)));
+        manager.request_cancel();
+        let error = manager.abort_if_cancelled().unwrap_err();
+        assert!(error.is_cancelled(), "{error:?}");
+        assert_eq!(error.code(), "err.core.cancelled");
+        assert!(!matches!(error, ZeppBridgeError::ConfigError(_)));
+    }
+
+    #[test]
+    fn a_partial_fetch_is_not_recorded_as_persisted() {
+        let (status, written, reason) =
+            classify_backfill_report(&sample_report(StreamStatus::Success, 9, None), true);
+        assert_eq!(status, ChunkStatus::Partial);
+        assert_eq!(written, 9);
+        assert_eq!(reason.unwrap().0, "err.backfill.partial_window");
+        assert!(status.needs_work());
+    }
+
+    #[test]
+    fn a_failed_stream_with_writes_stays_retryable() {
+        let (status, written, reason) = classify_backfill_report(
+            &sample_report(StreamStatus::Failed, 4, Some("写不进去")),
+            false,
+        );
+        assert_eq!(status, ChunkStatus::Partial);
+        assert_eq!(written, 4);
+        assert_eq!(reason.unwrap().0, "err.backfill.partial_window");
+    }
+
+    #[test]
+    fn unverified_parse_failure_is_not_empty_from_cloud() {
+        let (status, written, reason) = classify_backfill_report(
+            &sample_report(StreamStatus::Unverified, 0, Some("看不懂")),
+            false,
+        );
+        assert_eq!(status, ChunkStatus::Failed);
+        assert_eq!(written, 0);
+        assert_eq!(reason.unwrap().0, "err.backfill.no_canonical_records");
+        assert!(status.needs_work());
+    }
+
+    #[test]
+    fn empty_success_is_still_empty_from_cloud() {
+        let (status, written, reason) =
+            classify_backfill_report(&sample_report(StreamStatus::Success, 0, None), false);
+        assert_eq!(status, ChunkStatus::EmptyFromCloud);
+        assert_eq!(written, 0);
+        assert!(reason.is_none());
+        assert!(!status.needs_work());
+    }
+
+    #[test]
+    fn true_all_success_is_persisted() {
+        let (status, written, reason) =
+            classify_backfill_report(&sample_report(StreamStatus::Success, 20, None), false);
+        assert_eq!(status, ChunkStatus::Persisted);
+        assert_eq!(written, 20);
+        assert!(reason.is_none());
+        assert!(!status.needs_work());
     }
 
     #[tokio::test]

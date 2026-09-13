@@ -11,6 +11,10 @@ use serde_json::Value;
 use std::path::Path;
 use url::Url;
 
+/// HAR 在完整解析之前的体积上限。浏览器导出的会话可以到几百 MB；先看
+/// `metadata().len()`，超过就拒绝，避免把整份文件读进内存再失败。
+pub const MAX_HAR_BYTES: u64 = 32 * 1024 * 1024;
+
 /// Extract Zepp credentials from a HAR file.
 ///
 /// Parses standard HAR format (`{"log": {"entries": [...]}}`) and looks for
@@ -19,10 +23,28 @@ use url::Url;
 /// - `user_id` from URL path (pattern: `/users/{user_id}/...`)
 /// - `region_host` from request hostname
 ///
-/// Returns `Err` if the file is malformed or no valid credentials are found.
+/// Returns `Err` if the file is malformed, larger than [`MAX_HAR_BYTES`], or
+/// no valid credentials are found.
 pub fn extract_from_har(har_path: &Path) -> Result<AuthInfo> {
+    extract_from_har_limited(har_path, MAX_HAR_BYTES)
+}
+
+fn extract_from_har_limited(har_path: &Path, max_bytes: u64) -> Result<AuthInfo> {
+    let meta = std::fs::metadata(har_path)
+        .map_err(|e| ZeppBridgeError::ConfigError(format!("读取HAR文件失败: {e}")))?;
+    if meta.len() > max_bytes {
+        return Err(ZeppBridgeError::ConfigError(format!(
+            "HAR文件超过大小上限（{max_bytes} 字节）"
+        )));
+    }
+
     let content = std::fs::read_to_string(har_path)
         .map_err(|e| ZeppBridgeError::ConfigError(format!("读取HAR文件失败: {e}")))?;
+    if content.len() as u64 > max_bytes {
+        return Err(ZeppBridgeError::ConfigError(format!(
+            "HAR文件超过大小上限（{max_bytes} 字节）"
+        )));
+    }
 
     let har: Value = serde_json::from_str(&content)
         .map_err(|e| ZeppBridgeError::ConfigError(format!("HAR格式无效: {e}")))?;
@@ -281,5 +303,24 @@ mod tests {
         let result = extract_credentials_from_entries(entries).unwrap();
 
         assert_eq!(result.user_id, "7654321");
+    }
+
+    #[test]
+    fn rejects_a_har_over_the_size_cap_before_parsing() {
+        let dir = std::env::temp_dir().join(format!(
+            "zeppbridge-har-cap-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("oversize.har");
+        std::fs::write(&path, "x".repeat(64)).unwrap();
+        let error = extract_from_har_limited(&path, 32).unwrap_err();
+        let text = error.to_string();
+        assert!(text.contains("超过大小上限"), "{text}");
+        let _ = std::fs::remove_dir_all(dir);
     }
 }

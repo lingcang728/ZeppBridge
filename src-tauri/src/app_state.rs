@@ -66,7 +66,18 @@ impl AppState {
         std::fs::create_dir_all(&data_dir)?;
 
         let migration_warning = paths::relocate_legacy_data(&data_dir);
-        let (db, db_warning) = Database::open_resilient(data_dir.join("zepp.db"))?;
+        let (db, db_warning) = match Database::open_resilient(data_dir.join("zepp.db")) {
+            Ok(opened) => opened,
+            Err(error) if error.is_busy() => {
+                crate::diagnostics::log(&format!(
+                    "Startup: another writer holds the library, opening read-only ({error})"
+                ));
+                // 不重建空库。只读打开失败（文件不在、schema 对不上）才让启动失败。
+                let db = Database::open_read_only(data_dir.join("zepp.db"))?;
+                (db, Some(error.user_message()))
+            }
+            Err(error) => return Err(error),
+        };
         // Do not replay every raw payload during startup. A full reprocess of a
         // large local library blocks window creation and looks like a hang.
         // Settings still has an explicit reprocess action; the next cloud sync

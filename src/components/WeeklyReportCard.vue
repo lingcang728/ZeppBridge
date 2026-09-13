@@ -35,6 +35,7 @@ const messages = defineMessages(
     thinBaseline: (days: number, found: number, needed: number) =>
       `此前 ${days} 天里只有 ${found} 天有这项数据，不足 ${needed} 天，所以只报现状不做比较。`,
     noRecentData: '最近 7 天本机没有这项数据。',
+    zeroBaseline: '此前基线均值是 0，算不出相对变化，这次只报现状不做比较。',
     notProvided: '未提供',
     sleepDuration: (hours: number, minutes: number) => `${hours} 小时 ${minutes} 分`,
     regularity: (minutes: number) => `±${minutes} 分`,
@@ -70,6 +71,8 @@ const messages = defineMessages(
     thinBaseline: (days: number, found: number, needed: number) =>
       `Only ${found} of the previous ${days} days carry this metric, fewer than the ${needed} needed, so this is the current figure without a comparison.`,
     noRecentData: 'Nothing recorded locally for this metric in the last 7 days.',
+    zeroBaseline:
+      'The previous baseline averaged 0, so no relative change can be computed — this is the current figure only.',
     notProvided: 'Not provided',
     sleepDuration: (hours: number, minutes: number) => `${hours} hr ${minutes} min`,
     regularity: (minutes: number) => `±${minutes} min`,
@@ -103,6 +106,8 @@ const messages = defineMessages(
     thinBaseline: (days: number, found: number, needed: number) =>
       `Solo ${found} de los ${days} días anteriores tienen esta métrica (se necesitan ${needed}), así que se muestra el valor actual sin comparación.`,
     noRecentData: 'No hay registros locales de esta métrica en los últimos 7 días.',
+    zeroBaseline:
+      'La línea base anterior promedia 0, así que no se puede calcular un cambio relativo; solo se muestra el valor actual.',
     notProvided: 'Sin datos',
     sleepDuration: (hours: number, minutes: number) => `${hours} h ${minutes} min`,
     regularity: (minutes: number) => `±${minutes} min`,
@@ -126,6 +131,7 @@ const t = useMessages(messages);
    后端那份中文原文是给 CLI / MCP / 导出的，不跟界面语言走。 */
 const reasonText = (fact: InsightFact): string => {
   if (fact.reason_code === 'weekly_no_recent_data') return t.value.noRecentData;
+  if (fact.reason_code === 'weekly_zero_baseline') return t.value.zeroBaseline;
   if (fact.reason_code === 'weekly_thin_baseline' && fact.baseline_window) {
     const found = finiteOrNull(fact.baseline_count);
     if (found === null) return t.value.baselineCountUnknown;

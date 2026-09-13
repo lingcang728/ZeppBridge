@@ -91,19 +91,17 @@ where
         } else {
             None
         };
-        records.push(FetchedRecord {
-            raw: RawRecord {
-                stream: "heart_rate".into(),
-                // A page must not overwrite the legacy merged window payload.
-                source_key: format!("heart_rate_page:{cursor}:{end}"),
-                source_scope: SourceScope::UserFused,
-                device_id: None,
-                start_utc: DateTime::from_timestamp(cursor, 0).unwrap_or(window.start_utc),
-                end_utc: Some(window.end_utc),
-                payload,
-                capability: CapabilityStatus::Verified,
-            },
-        });
+        records.push(FetchedRecord::from_raw(RawRecord {
+            stream: "heart_rate".into(),
+            // A page must not overwrite the legacy merged window payload.
+            source_key: format!("heart_rate_page:{cursor}:{end}"),
+            source_scope: SourceScope::UserFused,
+            device_id: None,
+            start_utc: DateTime::from_timestamp(cursor, 0).unwrap_or(window.start_utc),
+            end_utc: Some(window.end_utc),
+            payload,
+            capability: CapabilityStatus::Verified,
+        }));
         let Some(next) = next else { break };
         cursor = next;
     }
@@ -115,6 +113,52 @@ where
 #[derive(Debug, Clone)]
 pub struct FetchedRecord {
     pub raw: RawRecord,
+    /// 请求窗口里有子切片失败（404 / 不可用），但别的切片已经拿到了报文。
+    ///
+    /// 调用方必须把整段窗口当成未完成：已经拿到的数据可以写库，但不能把
+    /// 这个月记成 persisted / empty_from_cloud。
+    pub incomplete: bool,
+}
+
+impl FetchedRecord {
+    fn from_raw(raw: RawRecord) -> Self {
+        Self {
+            raw,
+            incomplete: false,
+        }
+    }
+}
+
+/// 把按切片抓取的结果收成一次窗口结论。
+///
+/// `Cancelled` / `NeedsReauth` 即使已经有成功切片也必须立刻返回，不能被
+/// 「有几条记录」吞掉。子切片 404 时：有数据就标 `incomplete` 留给补拉重试；
+/// 一条都没有才把原来的不可用错误往上抛。
+fn conclude_slices(
+    mut records: Vec<FetchedRecord>,
+    last_error: Option<ZeppBridgeError>,
+    empty_message: &str,
+) -> Result<Vec<FetchedRecord>> {
+    if let Some(error) = last_error {
+        if error.is_cancelled() || error.needs_reauth() {
+            return Err(error);
+        }
+        if records.is_empty() {
+            return Err(error);
+        }
+        for record in &mut records {
+            record.incomplete = true;
+        }
+        return Ok(records);
+    }
+    if records.is_empty() {
+        return Err(ZeppBridgeError::Unavailable(empty_message.into()));
+    }
+    Ok(records)
+}
+
+fn is_abort_error(error: &ZeppBridgeError) -> bool {
+    error.is_cancelled() || error.needs_reauth()
 }
 
 /// The heartRate endpoint's per-request sample cap.
@@ -230,15 +274,12 @@ impl DataFetcher {
             .await
             {
                 Ok(pages) => records.extend(pages),
+                Err(error) if is_abort_error(&error) => return Err(error),
                 Err(error) if error.is_unavailable() => last_error = Some(error),
                 Err(error) => return Err(error),
             }
         }
-        if records.is_empty() {
-            return Err(last_error
-                .unwrap_or_else(|| ZeppBridgeError::Unavailable("心率窗口没有可识别记录".into())));
-        }
-        Ok(records)
+        conclude_slices(records, last_error, "心率窗口没有可识别记录")
     }
 
     #[allow(dead_code)]
@@ -279,18 +320,16 @@ impl DataFetcher {
             .connector
             .fetch_sport_detail(workout_id, source)
             .await?;
-        Ok(FetchedRecord {
-            raw: RawRecord {
-                stream: "workout_detail".into(),
-                source_key: format!("workout_detail:{workout_id}:{source}"),
-                source_scope: SourceScope::Device,
-                device_id: None,
-                start_utc,
-                end_utc,
-                payload,
-                capability: CapabilityStatus::Verified,
-            },
-        })
+        Ok(FetchedRecord::from_raw(RawRecord {
+            stream: "workout_detail".into(),
+            source_key: format!("workout_detail:{workout_id}:{source}"),
+            source_scope: SourceScope::Device,
+            device_id: None,
+            start_utc,
+            end_utc,
+            payload,
+            capability: CapabilityStatus::Verified,
+        }))
     }
 
     #[allow(dead_code)]
@@ -350,15 +389,12 @@ impl DataFetcher {
         for chunk in window.chunks(7) {
             match self.fetch_sleep_record(chunk).await {
                 Ok(record) => records.push(record),
+                Err(error) if is_abort_error(&error) => return Err(error),
                 Err(error) if error.is_unavailable() => last_error = Some(error),
                 Err(error) => return Err(error),
             }
         }
-        if records.is_empty() {
-            return Err(last_error
-                .unwrap_or_else(|| ZeppBridgeError::Unavailable("睡眠窗口没有可识别记录".into())));
-        }
-        Ok(records)
+        conclude_slices(records, last_error, "睡眠窗口没有可识别记录")
     }
 
     pub async fn fetch_sleep_record(&self, window: FetchWindow) -> Result<FetchedRecord> {
@@ -367,22 +403,20 @@ impl DataFetcher {
             .fetch_band_data(&window.start_day(), &window.end_day(), "detail", 8, 0)
             .await?;
         let capability = crate::normalizer::Normalizer::band_capability(&payload);
-        Ok(FetchedRecord {
-            raw: RawRecord {
-                stream: "sleep".into(),
-                source_key: format!(
-                    "band_data:detail:{}:{}",
-                    window.start_day(),
-                    window.end_day()
-                ),
-                source_scope: SourceScope::Device,
-                device_id: None,
-                start_utc: window.start_utc,
-                end_utc: Some(window.end_utc),
-                payload,
-                capability,
-            },
-        })
+        Ok(FetchedRecord::from_raw(RawRecord {
+            stream: "sleep".into(),
+            source_key: format!(
+                "band_data:detail:{}:{}",
+                window.start_day(),
+                window.end_day()
+            ),
+            source_scope: SourceScope::Device,
+            device_id: None,
+            start_utc: window.start_utc,
+            end_utc: Some(window.end_utc),
+            payload,
+            capability,
+        }))
     }
 
     /// Sport history uses track IDs, not timestamps. The range helper uses the
@@ -414,26 +448,23 @@ impl DataFetcher {
                             .pointer("/data/next")
                             .and_then(Value::as_i64)
                             .unwrap_or(-1);
-                        records.push(FetchedRecord {
-                            raw: RawRecord {
-                                stream: "workouts".into(),
-                                source_key: format!(
-                                    "sport_history:{sport}:{start}:{stop_track_id}"
-                                ),
-                                source_scope: SourceScope::Device,
-                                device_id: None,
-                                start_utc: window.start_utc,
-                                end_utc: Some(window.end_utc),
-                                payload,
-                                capability: CapabilityStatus::Verified,
-                            },
-                        });
+                        records.push(FetchedRecord::from_raw(RawRecord {
+                            stream: "workouts".into(),
+                            source_key: format!("sport_history:{sport}:{start}:{stop_track_id}"),
+                            source_scope: SourceScope::Device,
+                            device_id: None,
+                            start_utc: window.start_utc,
+                            end_utc: Some(window.end_utc),
+                            payload,
+                            capability: CapabilityStatus::Verified,
+                        }));
                         // 游标不再向窗口起点推进时停止，防止服务端异常造成死循环
                         if next <= 0 || next >= stop_track_id || next <= start {
                             break;
                         }
                         stop_track_id = next;
                     }
+                    Err(error) if is_abort_error(&error) => return Err(error),
                     Err(error) if error.is_unavailable() => {
                         last_optional_error = Some(error);
                         break;
@@ -475,31 +506,26 @@ impl DataFetcher {
                 .fetch_hrv(&chunk.start_day(), &chunk.end_day())
                 .await
             {
-                Ok(payload) => records.push(FetchedRecord {
-                    raw: RawRecord {
-                        stream: "hrv".into(),
-                        source_key: format!(
-                            "events:hrv_sdnn:{}:{}",
-                            chunk.start_day(),
-                            chunk.end_day()
-                        ),
-                        source_scope: SourceScope::UserFused,
-                        device_id: None,
-                        start_utc: chunk.start_utc,
-                        end_utc: Some(chunk.end_utc),
-                        payload,
-                        capability: CapabilityStatus::Verified,
-                    },
-                }),
+                Ok(payload) => records.push(FetchedRecord::from_raw(RawRecord {
+                    stream: "hrv".into(),
+                    source_key: format!(
+                        "events:hrv_sdnn:{}:{}",
+                        chunk.start_day(),
+                        chunk.end_day()
+                    ),
+                    source_scope: SourceScope::UserFused,
+                    device_id: None,
+                    start_utc: chunk.start_utc,
+                    end_utc: Some(chunk.end_utc),
+                    payload,
+                    capability: CapabilityStatus::Verified,
+                })),
+                Err(error) if is_abort_error(&error) => return Err(error),
                 Err(error) if error.is_unavailable() => last_error = Some(error),
                 Err(error) => return Err(error),
             }
         }
-        if records.is_empty() {
-            return Err(last_error
-                .unwrap_or_else(|| ZeppBridgeError::Unavailable("HRV 窗口没有可识别记录".into())));
-        }
-        Ok(records)
+        conclude_slices(records, last_error, "HRV 窗口没有可识别记录")
     }
 
     #[allow(dead_code)]
@@ -521,36 +547,33 @@ impl DataFetcher {
             .connector
             .fetch_events("DailyHealth", Some("summary"), from, to, 2000, true)
             .await?;
-        records.push(FetchedRecord {
-            raw: RawRecord {
-                stream: "daily_summary".into(),
-                source_key: format!("events:DailyHealth:summary:{from}:{to}"),
-                source_scope: SourceScope::UserFused,
-                device_id: None,
-                start_utc: window.start_utc,
-                end_utc: Some(window.end_utc),
-                payload: event,
-                capability: CapabilityStatus::Verified,
-            },
-        });
+        records.push(FetchedRecord::from_raw(RawRecord {
+            stream: "daily_summary".into(),
+            source_key: format!("events:DailyHealth:summary:{from}:{to}"),
+            source_scope: SourceScope::UserFused,
+            device_id: None,
+            start_utc: window.start_utc,
+            end_utc: Some(window.end_utc),
+            payload: event,
+            capability: CapabilityStatus::Verified,
+        }));
         for (event_type, sub_type) in [("Charge", "real_data"), ("readiness", "watch_score")] {
             match self
                 .connector
                 .fetch_events(event_type, Some(sub_type), from, to, 2000, true)
                 .await
             {
-                Ok(payload) => records.push(FetchedRecord {
-                    raw: RawRecord {
-                        stream: "daily_summary".into(),
-                        source_key: format!("events:{event_type}:{sub_type}:{from}:{to}"),
-                        source_scope: SourceScope::UserFused,
-                        device_id: None,
-                        start_utc: window.start_utc,
-                        end_utc: Some(window.end_utc),
-                        payload,
-                        capability: CapabilityStatus::Verified,
-                    },
-                }),
+                Ok(payload) => records.push(FetchedRecord::from_raw(RawRecord {
+                    stream: "daily_summary".into(),
+                    source_key: format!("events:{event_type}:{sub_type}:{from}:{to}"),
+                    source_scope: SourceScope::UserFused,
+                    device_id: None,
+                    start_utc: window.start_utc,
+                    end_utc: Some(window.end_utc),
+                    payload,
+                    capability: CapabilityStatus::Verified,
+                })),
+                Err(error) if is_abort_error(&error) => return Err(error),
                 Err(error) if error.is_unavailable() => {}
                 Err(error) => return Err(error),
             }
@@ -567,22 +590,21 @@ impl DataFetcher {
                 )
                 .await
             {
-                Ok(payload) => records.push(FetchedRecord {
-                    raw: RawRecord {
-                        stream: "daily_summary".into(),
-                        source_key: format!(
-                            "WatchSportStatistics:{statistic}:{}:{}",
-                            window.start_day(),
-                            window.end_day()
-                        ),
-                        source_scope: SourceScope::UserFused,
-                        device_id: None,
-                        start_utc: window.start_utc,
-                        end_utc: Some(window.end_utc),
-                        payload,
-                        capability: CapabilityStatus::Verified,
-                    },
-                }),
+                Ok(payload) => records.push(FetchedRecord::from_raw(RawRecord {
+                    stream: "daily_summary".into(),
+                    source_key: format!(
+                        "WatchSportStatistics:{statistic}:{}:{}",
+                        window.start_day(),
+                        window.end_day()
+                    ),
+                    source_scope: SourceScope::UserFused,
+                    device_id: None,
+                    start_utc: window.start_utc,
+                    end_utc: Some(window.end_utc),
+                    payload,
+                    capability: CapabilityStatus::Verified,
+                })),
+                Err(error) if is_abort_error(&error) => return Err(error),
                 Err(error) if error.is_unavailable() => {}
                 Err(error) => return Err(error),
             }
@@ -1053,6 +1075,11 @@ impl DataFetcher {
                     probe.latest_date = probe_latest_date(&items);
                     probe.fields = probe_field_names(&items);
                 }
+                Err(error) if is_abort_error(&error) => {
+                    // 取消 / 需要重新登录不是这条流的能力事实。半截 7 天
+                    // 窗口不能当成一次完整探测写进库。
+                    return Vec::new();
+                }
                 Err(error) if error.is_unavailable() => probe.status = "unavailable".to_string(),
                 // The server's error body can echo request context, so only the
                 // fact of the failure is kept.
@@ -1073,10 +1100,19 @@ impl DataFetcher {
 /// what is recognised rather than invent a mapping.
 /// Days per request for a stream that would otherwise be truncated.
 ///
-/// The server caps a response at 1000 items. Blood oxygen samples every five
-/// minutes, so a month asked for in one go returns barely three days and says
-/// nothing at all about the rest.
+/// The server caps a response at [`WELLNESS_PAGE_LIMIT`] items and does not
+/// page. Blood oxygen samples every five minutes, so a month asked for in one
+/// go returns barely three days and says nothing at all about the rest.
 const WELLNESS_CHUNK_DAYS: i64 = 7;
+/// Blood oxygen at a 5-minute cadence is 288 samples/day. Seven days is 2016
+/// items, over the 1000-item cap, so a week asked for in one request would
+/// look complete while dropping more than half the window. Three days stay
+/// under the cap; a page that still fills it is marked `incomplete`.
+const SPO2_CHUNK_DAYS: i64 = 3;
+/// `/events` and `/fileInfo/events` truncate at this many items.
+const WELLNESS_PAGE_LIMIT: i64 = 1000;
+/// The dateString surface uses 999, matching the live client.
+const WELLNESS_DAY_PAGE_LIMIT: i64 = 999;
 
 /// One optional stream: its label, which surface serves it, the event type and
 /// sub type that name it, and how many days may be asked for at once.
@@ -1144,7 +1180,7 @@ const WELLNESS_STREAMS: [WellnessStream; 10] = [
         ProbeSurface::UserEvents,
         "blood_oxygen",
         None,
-        Some(WELLNESS_CHUNK_DAYS),
+        Some(SPO2_CHUNK_DAYS),
     ),
     ("pai", ProbeSurface::UserEvents, "PaiHealthInfo", None, None),
     (
@@ -1207,35 +1243,29 @@ impl DataFetcher {
                 )
                 .await
             {
-                Ok(payload) => records.push(FetchedRecord {
-                    raw: RawRecord {
-                        stream: "weight".into(),
-                        source_key: format!(
-                            "weight:{SCALE_ACCOUNT_MEMBER}:{}:{}",
-                            slice.start_day(),
-                            slice.end_day()
-                        ),
-                        source_scope: SourceScope::UserFused,
-                        device_id: None,
-                        start_utc: slice.start_utc,
-                        end_utc: Some(slice.end_utc),
-                        payload,
-                        // The reading itself is verified — weight and BMI were
-                        // read off a live account. The body-composition fields a
-                        // scale adds on top are not, so the payload is retained
-                        // and a replay can pick them up without another sync.
-                        capability: CapabilityStatus::Unverified,
-                    },
-                }),
+                Ok(payload) => records.push(FetchedRecord::from_raw(RawRecord {
+                    stream: "weight".into(),
+                    source_key: format!(
+                        "weight:{SCALE_ACCOUNT_MEMBER}:{}:{}",
+                        slice.start_day(),
+                        slice.end_day()
+                    ),
+                    source_scope: SourceScope::UserFused,
+                    device_id: None,
+                    start_utc: slice.start_utc,
+                    end_utc: Some(slice.end_utc),
+                    payload,
+                    // The reading itself is verified — weight and BMI were
+                    // read off a live account. The body-composition fields a
+                    // scale adds on top are not, so the payload is retained
+                    // and a replay can pick them up without another sync.
+                    capability: CapabilityStatus::Unverified,
+                })),
+                Err(error) if is_abort_error(&error) => return Err(error),
                 Err(error) => last_error = Some(error),
             }
         }
-        if records.is_empty() {
-            return Err(last_error.unwrap_or_else(|| {
-                ZeppBridgeError::Unavailable("体重记录接口没有返回任何内容".into())
-            }));
-        }
-        Ok(records)
+        conclude_slices(records, last_error, "体重记录接口没有返回任何内容")
     }
 
     pub async fn fetch_wellness_records(
@@ -1254,15 +1284,16 @@ impl DataFetcher {
             for slice in slices {
                 let from = slice.start_utc.timestamp_millis();
                 let to = slice.end_utc.timestamp_millis();
+                let limit = wellness_request_limit(surface);
                 let outcome = match surface {
                     ProbeSurface::V2Events => {
                         self.connector
-                            .fetch_events(event_type, sub_type, from, to, 1000, true)
+                            .fetch_events(event_type, sub_type, from, to, limit, true)
                             .await
                     }
                     ProbeSurface::UserEvents => {
                         self.connector
-                            .fetch_user_events(event_type, sub_type, from, to, 1000, true)
+                            .fetch_user_events(event_type, sub_type, from, to, limit, true)
                             .await
                     }
                     ProbeSurface::UserEventsDay => {
@@ -1273,7 +1304,7 @@ impl DataFetcher {
                                 &slice.start_utc.to_rfc3339(),
                                 &slice.end_utc.to_rfc3339(),
                                 time_zone,
-                                999,
+                                limit,
                             )
                             .await
                     }
@@ -1289,45 +1320,67 @@ impl DataFetcher {
                                 sub_type.unwrap_or("real_data"),
                                 from,
                                 to,
-                                1000,
+                                limit,
                             )
                             .await
                     }
                 };
                 match outcome {
-                    Ok(payload) => records.push(FetchedRecord {
-                        raw: RawRecord {
-                            stream: "wellness".into(),
-                            source_key: format!(
-                                "wellness:{label}:{}:{}:{}",
-                                surface.as_str(),
-                                slice.start_day(),
-                                slice.end_day()
-                            ),
-                            source_scope: SourceScope::UserFused,
-                            device_id: None,
-                            start_utc: slice.start_utc,
-                            end_utc: Some(slice.end_utc),
-                            payload,
-                            // Shapes verified against a real response are parsed
-                            // by the normalizer; the rest are retained raw so
-                            // they can be verified without another round trip.
-                            capability: CapabilityStatus::Unverified,
-                        },
-                    }),
-                    Err(error) if error.is_unavailable() => last_error = Some(error),
+                    Ok(payload) => records.push(fetched_wellness_record(
+                        label, surface, &slice, payload, limit,
+                    )),
+                    Err(error) if is_abort_error(&error) => return Err(error),
                     Err(error) => last_error = Some(error),
                 }
             }
         }
 
-        if records.is_empty() {
-            return Err(last_error.unwrap_or_else(|| {
-                ZeppBridgeError::Unavailable("没有可用的可选健康数据流".into())
-            }));
-        }
-        Ok(records)
+        conclude_slices(records, last_error, "没有可用的可选健康数据流")
     }
+}
+
+fn wellness_request_limit(surface: ProbeSurface) -> i64 {
+    match surface {
+        ProbeSurface::UserEventsDay => WELLNESS_DAY_PAGE_LIMIT,
+        _ => WELLNESS_PAGE_LIMIT,
+    }
+}
+
+/// Keep the items that arrived, but do not treat a truncated page as the
+/// whole window. The server stops at `limit` instead of paging.
+fn fetched_wellness_record(
+    label: &str,
+    surface: ProbeSurface,
+    slice: &FetchWindow,
+    payload: Value,
+    limit: i64,
+) -> FetchedRecord {
+    let truncated = wellness_page_hits_cap(&payload, limit);
+    let mut record = FetchedRecord::from_raw(RawRecord {
+        stream: "wellness".into(),
+        source_key: format!(
+            "wellness:{label}:{}:{}:{}",
+            surface.as_str(),
+            slice.start_day(),
+            slice.end_day()
+        ),
+        source_scope: SourceScope::UserFused,
+        device_id: None,
+        start_utc: slice.start_utc,
+        end_utc: Some(slice.end_utc),
+        payload,
+        // Shapes verified against a real response are parsed
+        // by the normalizer; the rest are retained raw so
+        // they can be verified without another round trip.
+        capability: CapabilityStatus::Unverified,
+    });
+    record.incomplete = truncated;
+    record
+}
+
+fn wellness_page_hits_cap(payload: &Value, limit: i64) -> bool {
+    let limit = usize::try_from(limit).unwrap_or(usize::MAX);
+    limit > 0 && payload_items(payload).len() >= limit
 }
 
 fn payload_items(payload: &Value) -> Vec<Value> {
@@ -1533,5 +1586,142 @@ mod tests {
     fn payload_items_only_accept_structured_wrappers() {
         assert_eq!(payload_items(&json!({"items": [1, 2]})).len(), 2);
         assert_eq!(payload_items(&json!({"data": "encoded"})).len(), 0);
+    }
+
+    fn sample_fetched() -> FetchedRecord {
+        FetchedRecord::from_raw(RawRecord {
+            stream: "heart_rate".into(),
+            source_key: "heart_rate_page:1:2".into(),
+            source_scope: SourceScope::UserFused,
+            device_id: None,
+            start_utc: DateTime::from_timestamp(1_800_000_000, 0).unwrap(),
+            end_utc: None,
+            payload: json!({"items": []}),
+            capability: CapabilityStatus::Verified,
+        })
+    }
+
+    #[test]
+    fn cancelled_slice_is_not_swallowed_when_other_records_exist() {
+        let error = conclude_slices(
+            vec![sample_fetched()],
+            Some(ZeppBridgeError::Cancelled),
+            "empty",
+        )
+        .unwrap_err();
+        assert!(error.is_cancelled());
+        assert!(!matches!(error, ZeppBridgeError::ConfigError(_)));
+    }
+
+    #[test]
+    fn needs_reauth_slice_is_not_swallowed_when_other_records_exist() {
+        let error = conclude_slices(
+            vec![sample_fetched()],
+            Some(ZeppBridgeError::NeedsReauth("expired".into())),
+            "empty",
+        )
+        .unwrap_err();
+        assert!(error.needs_reauth());
+    }
+
+    #[test]
+    fn a_404_inner_slice_marks_the_window_incomplete() {
+        let records = conclude_slices(
+            vec![sample_fetched()],
+            Some(ZeppBridgeError::Unavailable("HTTP 404".into())),
+            "empty",
+        )
+        .unwrap();
+        assert!(records.iter().all(|record| record.incomplete));
+    }
+
+    #[test]
+    fn an_all_404_window_stays_unavailable() {
+        let error = conclude_slices(
+            Vec::new(),
+            Some(ZeppBridgeError::Unavailable("HTTP 404".into())),
+            "empty",
+        )
+        .unwrap_err();
+        assert!(error.is_unavailable());
+    }
+
+    #[test]
+    fn a_wellness_page_at_the_server_cap_is_incomplete() {
+        let items: Vec<Value> = (0..WELLNESS_PAGE_LIMIT)
+            .map(|index| json!({"timestamp": index, "value": 97}))
+            .collect();
+        assert!(wellness_page_hits_cap(
+            &json!({"items": items}),
+            WELLNESS_PAGE_LIMIT
+        ));
+        let under: Vec<Value> = (0..WELLNESS_PAGE_LIMIT - 1)
+            .map(|index| json!({"timestamp": index}))
+            .collect();
+        assert!(!wellness_page_hits_cap(
+            &json!({"items": under}),
+            WELLNESS_PAGE_LIMIT
+        ));
+    }
+
+    #[test]
+    fn a_truncated_spo2_page_is_not_a_full_window() {
+        let start = DateTime::from_timestamp(1_800_000_000, 0).unwrap();
+        let slice = FetchWindow::between(start, start + Duration::days(SPO2_CHUNK_DAYS)).unwrap();
+        let items: Vec<Value> = (0..WELLNESS_PAGE_LIMIT)
+            .map(|index| json!({"timestamp": start.timestamp() + index, "value": 96}))
+            .collect();
+        let record = fetched_wellness_record(
+            "spo2",
+            ProbeSurface::UserEvents,
+            &slice,
+            json!({"items": items}),
+            WELLNESS_PAGE_LIMIT,
+        );
+        assert!(record.incomplete);
+        assert_eq!(payload_items(&record.raw.payload).len(), 1000);
+
+        let short = fetched_wellness_record(
+            "spo2",
+            ProbeSurface::UserEvents,
+            &slice,
+            json!({"items": [{"timestamp": start.timestamp(), "value": 96}]}),
+            WELLNESS_PAGE_LIMIT,
+        );
+        assert!(!short.incomplete);
+    }
+
+    #[test]
+    fn spo2_chunks_stay_under_the_five_minute_page_cap() {
+        let spo2 = WELLNESS_STREAMS
+            .iter()
+            .find(|stream| stream.0 == "spo2")
+            .expect("spo2 is a wellness stream");
+        assert_eq!(spo2.4, Some(SPO2_CHUNK_DAYS));
+        // 5-minute samples over the chunk must fit in one page; otherwise a
+        // typical week of blood oxygen would always look complete and drop
+        // the rest of the window.
+        const {
+            assert!(SPO2_CHUNK_DAYS * 24 * (60 / 5) < WELLNESS_PAGE_LIMIT);
+        }
+    }
+
+    #[test]
+    fn cancelled_is_still_not_swallowed_by_a_truncated_page() {
+        let start = DateTime::from_timestamp(1_800_000_000, 0).unwrap();
+        let slice = FetchWindow::between(start, start + Duration::days(1)).unwrap();
+        let items: Vec<Value> = (0..WELLNESS_PAGE_LIMIT)
+            .map(|index| json!({"timestamp": index}))
+            .collect();
+        let truncated = fetched_wellness_record(
+            "spo2",
+            ProbeSurface::UserEvents,
+            &slice,
+            json!({"items": items}),
+            WELLNESS_PAGE_LIMIT,
+        );
+        let error = conclude_slices(vec![truncated], Some(ZeppBridgeError::Cancelled), "empty")
+            .unwrap_err();
+        assert!(error.is_cancelled());
     }
 }

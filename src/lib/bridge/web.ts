@@ -78,6 +78,7 @@ export const webBackend: BridgeBackend = {
   submitDiagnosticReport: unavailable,
   submitDeviceModelAssignment: unavailable,
   getExportJson: unavailable,
+  estimateExport: unavailable,
   saveJsonExport: unavailable,
   saveCsvExport: unavailable,
   saveGpxExport: unavailable,

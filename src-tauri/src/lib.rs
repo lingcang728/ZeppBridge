@@ -19,7 +19,7 @@ pub use zeppbridge_core::{
 use app_state::AppState;
 use commands::{
     cancel_pending_restore, cancel_sync, cancel_web_login, cleanup_old_data, clear_auth,
-    compact_raw_payloads, create_manual_backup, delete_life_event, get_app_status,
+    compact_raw_payloads, create_manual_backup, delete_life_event, estimate_export, get_app_status,
     get_capability_overview, get_coverage_ledger, get_daily_heart_rate_extremes, get_data_health,
     get_device_catalog_options, get_device_profile, get_device_profiles, get_diagnostic_report,
     get_export_json, get_health_overview, get_heart_rate_series, get_heart_rate_zones,
@@ -37,10 +37,15 @@ use commands::{
     start_history_sync, start_incremental_sync, start_initial_sync, start_web_login,
     submit_device_model_assignment, submit_diagnostic_report, verify_auth, verify_backup,
 };
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager};
 use zeppbridge_core::models::RawPayloadCompaction;
+use zeppbridge_core::storage::write_lock::{self, WritePurpose};
+
+static EXIT_AFTER_WRITERS: AtomicBool = AtomicBool::new(false);
 
 /// `tauri.conf.json` 里 `minWidth` / `minHeight` 的那两个数。
 ///
@@ -111,6 +116,40 @@ fn tray_labels_for(locale: &str) -> TrayLabels {
         };
     }
     tray_labels(locale.starts_with("zh"))
+}
+
+fn handle_exit_requested(app: &AppHandle, api: &tauri::ExitRequestApi) {
+    if EXIT_AFTER_WRITERS.load(Ordering::SeqCst) {
+        return;
+    }
+    let Some(state) = app.try_state::<AppState>() else {
+        return;
+    };
+    let data_dir = state.data_dir.clone();
+    match write_lock::try_acquire(&data_dir, WritePurpose::Metadata) {
+        Ok(_guard) => {}
+        Err(write_lock::WriteLockError::Busy { .. }) => {
+            EXIT_AFTER_WRITERS.store(true, Ordering::SeqCst);
+            api.prevent_exit();
+            if let Ok(sync) = state.sync.try_read() {
+                if let Some(manager) = sync.as_ref() {
+                    manager.request_cancel();
+                }
+            }
+            let app = app.clone();
+            std::thread::spawn(move || {
+                let _guard = write_lock::acquire_with_timeout(
+                    &data_dir,
+                    WritePurpose::Metadata,
+                    Duration::from_secs(300),
+                );
+                app.exit(0);
+            });
+        }
+        Err(error) => {
+            diagnostics::log(&format!("退出时无法检查写锁: {error}"));
+        }
+    }
 }
 
 /// 托盘建好之后还要能改文案：用户在设置里换语言，托盘不该还留在旧语言上。
@@ -357,27 +396,30 @@ pub fn run() {
                 else {
                     return;
                 };
-                // 重放要拿写锁。这条路以前一把锁都没拿：CLI 或 MCP 正在同步
-                // 时启动桌面应用，两个进程会同时往同一个库写派生数据，而单
-                // 写者保障本来就是为了挡住这件事。拿不到就跳过——重放是幂等的，
-                // 下次启动会再来一遍，不该为它把启动卡住或去和别人抢。
-                match storage::write_lock::acquire_with_timeout(
-                    &compaction_data_dir,
-                    storage::write_lock::WritePurpose::Reprocess,
-                    std::time::Duration::from_secs(30),
-                ) {
-                    Ok(_reprocess_guard) => match db.reprocess_raw_records_if_needed() {
-                        Ok(Some(counts)) => {
-                            let total: i64 = counts.values().sum();
-                            diagnostics::log(&format!(
-                                "normalizer 升级，已重放本地原始报文（{total} 条派生记录）"
-                            ));
+                // 旗必须在拿锁之前举起。以前是拿到锁之后才进 ReplayGuard，于是
+                // 启动后的自动同步会先干等 20 秒写锁，再把「另一个写入操作正在
+                // 进行」画成红条——而库其实只是在自愈。
+                let needs_replay = matches!(db.pending_replay_plan(), Ok(Some(_)));
+                if needs_replay {
+                    let _replay_flag = storage::ReplayGuard::enter();
+                    match storage::write_lock::acquire_with_timeout(
+                        &compaction_data_dir,
+                        storage::write_lock::WritePurpose::Reprocess,
+                        std::time::Duration::from_secs(30),
+                    ) {
+                        Ok(_reprocess_guard) => match db.reprocess_raw_records_if_needed() {
+                            Ok(Some(counts)) => {
+                                let total: i64 = counts.values().sum();
+                                diagnostics::log(&format!(
+                                    "normalizer 升级，已重放本地原始报文（{total} 条派生记录）"
+                                ));
+                            }
+                            Ok(None) => {}
+                            Err(error) => diagnostics::log(&format!("本地报文重放失败: {error}")),
+                        },
+                        Err(error) => {
+                            diagnostics::log(&format!("跳过本次报文重放，没能拿到写锁: {error}"));
                         }
-                        Ok(None) => {}
-                        Err(error) => diagnostics::log(&format!("本地报文重放失败: {error}")),
-                    },
-                    Err(error) => {
-                        diagnostics::log(&format!("跳过本次报文重放，没能拿到写锁: {error}"));
                     }
                 }
 
@@ -390,6 +432,7 @@ pub fn run() {
                 match db.pending_raw_payload_count() {
                     Ok(0) | Err(_) => {}
                     Ok(pending) => {
+                        let _compaction_flag = storage::CompactionGuard::enter();
                         let _ = compaction_handle.emit("compaction://started", pending);
                         // `let _write_guard = acquire_with_timeout(...)` 是把
                         // 整个 `Result` 绑给了变量：30 秒等不到锁时返回的
@@ -549,6 +592,7 @@ pub fn run() {
             get_weekly_report,
             reprocess_local_data,
             get_export_json,
+            estimate_export,
             save_json_export,
             save_csv_export,
             save_fit_export,
@@ -584,11 +628,15 @@ pub fn run() {
         ])
         .build(tauri::generate_context!());
     match app {
-        Ok(app) => app.run(|app, event| {
-            if let tauri::RunEvent::Ready = event {
+        Ok(app) => app.run(|app, event| match event {
+            tauri::RunEvent::Ready => {
                 diagnostics::log("Startup: event loop ready");
                 main_window::request_show(app, "startup");
             }
+            tauri::RunEvent::ExitRequested { api, .. } => {
+                handle_exit_requested(app, &api);
+            }
+            _ => {}
         }),
         Err(error) => {
             // Builder/plugin failures otherwise disappear in Windows releases.

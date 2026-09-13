@@ -239,10 +239,10 @@ export interface SleepSession {
   end_time: string;
   score?: number;
   duration_minutes: number;
-  deep_minutes: number;
-  light_minutes: number;
+  deep_minutes?: number | null;
+  light_minutes?: number | null;
   rem_minutes?: number | null;
-  awake_minutes: number;
+  awake_minutes?: number | null;
   /** Times woken during the night (`wc`). Distinct from awake_minutes. */
   wake_count?: number | null;
   source_scope: SourceScope;
@@ -404,6 +404,8 @@ export interface RestorePreview {
   current_table_counts: Record<string, number>;
   can_restore: boolean;
   blocker: string | null;
+  /** `blocker` 那句话的稳定码。界面按它取自己语言的说法。 */
+  blocker_code?: string | null;
 }
 
 export interface PendingRestore {
@@ -764,6 +766,8 @@ export interface LocalApiStatus {
   /** 是否已生成过访问 token。关闭状态下也可能为真。 */
   token_present: boolean;
   error?: string | null;
+  /** `error` 那句话的稳定码。界面按它取自己语言的说法。 */
+  error_code?: string | null;
 }
 
 export type ExportDataType =
@@ -812,6 +816,8 @@ export interface DeviceCacheMetadata {
   age_seconds?: number | null;
   refreshed: boolean;
   refresh_error?: string | null;
+  /** `refresh_error` 那句话的稳定码。界面按它取自己语言的说法。 */
+  refresh_error_code?: string | null;
 }
 
 export interface DeviceProfilesResult {
@@ -897,6 +903,14 @@ export interface ExportSelection {
   endDate?: string;
   dataTypes: ExportDataType[];
   detail?: ExportDetail;
+}
+
+export interface ExportEstimate {
+  recordCount: number;
+  estimatedBytes: number;
+  scopeKind: string;
+  startTime?: string | null;
+  endTime?: string | null;
 }
 
 export interface ExportResult {

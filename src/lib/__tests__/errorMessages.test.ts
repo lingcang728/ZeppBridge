@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { setLocale } from '../../i18n';
 import { errorTextFor } from '../../i18n/errors';
-import { toUserMessage } from '../bridge/errors';
+import { DesktopUnavailableError, toUserMessage } from '../bridge/errors';
 
 /*
  * 英文界面上不该出现后端的中文。
@@ -42,6 +42,14 @@ describe('backend errors in the English interface', () => {
 
   it('still handles plain string errors from older code paths', () => {
     expect(toUserMessage('plain failure')).toBe('plain failure');
+  });
+
+  it('localises DesktopUnavailableError instead of dropping it at the CJK gate', () => {
+    expect(toUserMessage(new DesktopUnavailableError())).toBe('Use the desktop app');
+    setLocale('es');
+    expect(toUserMessage(new DesktopUnavailableError())).toBe('Usa la app de escritorio');
+    setLocale('zh');
+    expect(toUserMessage(new DesktopUnavailableError())).toBe('请使用桌面应用');
   });
 
   it('switches with the interface language', () => {

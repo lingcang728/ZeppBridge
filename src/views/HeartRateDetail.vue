@@ -12,14 +12,16 @@ defineOptions({ name: 'HeartRateDetail' });
  * 没有采样的时间段不画线，也不补 0——曲线断开就是断开。
  */
 import { computed, onMounted, ref, watch } from 'vue';
-import { VChart } from '../lib/echartsSetup';
+import { CHART_THEME, VChart } from '../lib/echartsSetup';
+import { HR_GAP_BREAK_MS, insertNullBreaks } from '../lib/chartGaps';
+import { createLoadSeq } from '../lib/loadSeq';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
 import PageHeader from '../components/PageHeader.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import Icon from '../components/Icon.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
-import { zeppSemanticColors } from '../lib/echartsTheme';
+import { axisInk, zeppSemanticColors, zeppThemeDark } from '../lib/echartsTheme';
 import { indexSeries, SERIES_RANGE_DAYS, seriesRanges, type SeriesRangeDays } from '../lib/metricSeries';
 import { isFiniteNumber } from '../lib/format';
 import type { DailyHeartRateExtreme, HeartRatePoint, MetricSeries } from '../types';
@@ -34,6 +36,9 @@ const messages = defineMessages(
     rangeAria: '趋势时间范围',
     desktopOnly: '请使用桌面应用；浏览器预览不会读取账户数据。',
     loadFailed: '心率数据暂时不可用',
+    dayFailed: '最近 24 小时心率暂时读不到。',
+    dailyMaxFailed: '每日最高心率暂时读不到。',
+    trendsFailed: '静息心率与 HRV 趋势暂时读不到。',
     retry: '重试',
     loadingAria: '正在加载心率',
     dayCardAria: '24 小时心率',
@@ -71,6 +76,9 @@ const messages = defineMessages(
     rangeAria: 'Trend time range',
     desktopOnly: 'Use the desktop app. This browser preview reads no account data.',
     loadFailed: 'Heart rate data is unavailable right now',
+    dayFailed: 'Could not read the last 24 hours of heart rate.',
+    dailyMaxFailed: 'Could not read daily peak heart rate.',
+    trendsFailed: 'Could not read resting heart rate and HRV trends.',
     retry: 'Try again',
     loadingAria: 'Loading heart rate',
     dayCardAria: '24-hour heart rate',
@@ -108,6 +116,9 @@ const messages = defineMessages(
     rangeAria: 'Rango de tiempo de la tendencia',
     desktopOnly: 'Usa la app de escritorio. Esta vista previa en el navegador no lee datos de la cuenta.',
     loadFailed: 'Los datos de frecuencia cardíaca no están disponibles en este momento',
+    dayFailed: 'No se pudo leer la frecuencia cardíaca de las últimas 24 horas.',
+    dailyMaxFailed: 'No se pudo leer la frecuencia cardíaca máxima diaria.',
+    trendsFailed: 'No se pudieron leer las tendencias de frecuencia en reposo y VFC.',
     retry: 'Reintentar',
     loadingAria: 'Cargando la frecuencia cardíaca',
     dayCardAria: 'Frecuencia cardíaca de 24 horas',
@@ -164,6 +175,10 @@ const sparseDays = computed(
 );
 const loading = ref(true);
 const error = ref<string | null>(null);
+const dayError = ref<string | null>(null);
+const trendsError = ref<string | null>(null);
+const extremesError = ref<string | null>(null);
+const loadSeq = createLoadSeq();
 
 const points = computed(() => dayPoints.value
   .map((point) => ({ ts: new Date(point.timestamp).getTime(), value: point.value }))
@@ -185,21 +200,21 @@ const clock = (value: number) => displayDateTimeFormatter({
 }).format(new Date(value));
 
 const dayChartOption = computed(() => {
-  const data = points.value.map((point) => [point.ts, point.value]);
+  const data = insertNullBreaks(points.value, HR_GAP_BREAK_MS);
   return {
     animationDuration: 700,
     grid: { left: 40, right: 18, top: 16, bottom: 28 },
     tooltip: {
       trigger: 'axis',
-      backgroundColor: '#1E221F',
-      borderColor: 'rgba(228, 235, 208, 0.16)',
+      backgroundColor: zeppThemeDark.tooltip.backgroundColor,
+      borderColor: zeppThemeDark.tooltip.borderColor,
       borderWidth: 1,
       padding: [8, 12],
-      textStyle: { color: '#F3F4EC', fontSize: 15.5 },
+      textStyle: { color: zeppThemeDark.tooltip.textStyle.color, fontSize: 15.5 },
       extraCssText: 'border-radius:8px;box-shadow:none;',
-      formatter: (params: Array<{ value: [number, number] }>) => {
+      formatter: (params: Array<{ value: [number, number | null] }>) => {
         const point = Array.isArray(params) ? params[0] : params;
-        if (!point) return '';
+        if (!point || point.value[1] == null) return '';
         return t.value.bpmTooltip(clock(point.value[0]), Math.round(point.value[1]));
       },
     },
@@ -207,14 +222,14 @@ const dayChartOption = computed(() => {
       type: 'time',
       min: data[0]?.[0],
       max: data[data.length - 1]?.[0],
-      axisLabel: { formatter: clock, hideOverlap: true, color: '#B4BBC3', fontSize: 14.5 },
+      axisLabel: { formatter: clock, hideOverlap: true, color: axisInk, fontSize: 14.5 },
       axisLine: { lineStyle: { color: 'rgba(232,238,244,.12)' } },
       axisTick: { show: false },
       splitLine: { show: false },
     },
     yAxis: {
       type: 'value', scale: true, splitNumber: 4,
-      axisLabel: { color: '#B4BBC3', fontSize: 14.5 },
+      axisLabel: { color: axisInk, fontSize: 14.5 },
       axisLine: { show: false }, axisTick: { show: false },
       splitLine: { lineStyle: { color: 'rgba(232,238,244,.08)', type: 'dashed' } },
     },
@@ -258,11 +273,17 @@ const trendCards = computed(() => [
 ]);
 
 const load = async () => {
+  const seq = loadSeq.next();
   loading.value = true;
   error.value = null;
+  dayError.value = null;
+  trendsError.value = null;
+  extremesError.value = null;
   if (!isDesktop()) {
+    if (!loadSeq.isCurrent(seq)) return;
     series.value = {};
     dayPoints.value = [];
+    dailyExtremes.value = [];
     loading.value = false;
     error.value = t.value.desktopOnly;
     return;
@@ -272,12 +293,14 @@ const load = async () => {
     backend.getMetricSeries([...TREND_METRICS], rangeDays.value),
     backend.getDailyHeartRateExtremes(rangeDays.value),
   ]);
+  if (!loadSeq.isCurrent(seq)) return;
   dayPoints.value = day.status === 'fulfilled' ? day.value : [];
   series.value = trends.status === 'fulfilled' ? indexSeries(trends.value) : {};
   dailyExtremes.value = extremes.status === 'fulfilled' ? extremes.value : [];
-  if (day.status === 'rejected' && trends.status === 'rejected') {
-    error.value = toUserMessage(day.reason, t.value.loadFailed);
-  }
+  dayError.value = day.status === 'rejected' ? toUserMessage(day.reason, t.value.dayFailed) : null;
+  trendsError.value = trends.status === 'rejected' ? toUserMessage(trends.reason, t.value.trendsFailed) : null;
+  extremesError.value = extremes.status === 'rejected' ? toUserMessage(extremes.reason, t.value.dailyMaxFailed) : null;
+  error.value = dayError.value || trendsError.value || extremesError.value;
   loading.value = false;
 };
 
@@ -292,7 +315,7 @@ const dailyMaxChartOption = computed(() => {
     legend: {
       data: [t.value.dailyMaxLegendMax, t.value.dailyMaxLegendAvg],
       top: 0,
-      textStyle: { color: '#B4BBC3', fontSize: 14.5 },
+      textStyle: { color: axisInk, fontSize: 14.5 },
     },
     tooltip: {
       trigger: 'axis',
@@ -305,14 +328,14 @@ const dailyMaxChartOption = computed(() => {
     xAxis: {
       type: 'category',
       data: rows.map((row) => row.date.slice(5)),
-      axisLabel: { color: '#B4BBC3', fontSize: 14.5, hideOverlap: true },
+      axisLabel: { color: axisInk, fontSize: 14.5, hideOverlap: true },
       axisTick: { show: false },
       axisLine: { lineStyle: { color: 'rgba(226, 234, 242, .12)' } },
     },
     yAxis: {
       type: 'value',
       scale: true,
-      axisLabel: { color: '#B4BBC3', fontSize: 14.5 },
+      axisLabel: { color: axisInk, fontSize: 14.5 },
       axisLine: { show: false },
       axisTick: { show: false },
       splitLine: { lineStyle: { color: 'rgba(226, 234, 242, .12)', type: 'dashed' } },
@@ -399,11 +422,15 @@ watch(dataRevision, () => { void load(); });
         <VChart
           v-if="points.length"
           class="day-chart"
+          :theme="CHART_THEME"
           :option="dayChartOption"
           autoresize
           role="img"
           :aria-label="t.chartAria"
         />
+        <p v-else-if="dayError" class="inline-alert" role="alert">
+          <Icon name="warning" :size="14" />{{ dayError }}
+        </p>
         <p v-else class="inline-alert" role="status">
           <Icon name="info" :size="14" />{{ t.noSamples }}
         </p>
@@ -419,11 +446,15 @@ watch(dataRevision, () => { void load(); });
         <VChart
           v-if="dailyExtremes.length"
           class="day-chart"
+          :theme="CHART_THEME"
           :option="dailyMaxChartOption"
           autoresize
           role="img"
           :aria-label="t.dailyMaxAria"
         />
+        <p v-else-if="extremesError" class="inline-alert" role="alert">
+          <Icon name="warning" :size="14" />{{ extremesError }}
+        </p>
         <p v-else class="inline-alert" role="status">
           <Icon name="info" :size="14" />{{ t.dailyMaxNone }}
         </p>
@@ -433,6 +464,9 @@ watch(dataRevision, () => { void load(); });
         <p class="daily-max-note">{{ t.dailyMaxNote }}</p>
       </section>
 
+      <p v-if="trendsError" class="inline-alert" role="alert">
+        <Icon name="warning" :size="14" />{{ trendsError }}
+      </p>
       <div class="card-grid">
         <MetricTrendCard
           v-for="card in trendCards"
@@ -443,7 +477,7 @@ watch(dataRevision, () => { void load(); });
           :color="card.color"
           :unit="card.unit"
           :decimals="0"
-          :empty-text="t.emptyCard"
+          :empty-text="trendsError || t.emptyCard"
         />
       </div>
     </template>

@@ -44,6 +44,8 @@ pub enum WritePurpose {
     /// 进行（清理旧数据）」——压缩一个字节都没删，这句话是假的。用途会原样
     /// 显示给用户，所以它必须说的是实际在做的事。
     Compaction,
+    /// 短写入：偏好、覆盖账本、同步元数据、完整性检查结果。
+    Metadata,
 }
 
 impl WritePurpose {
@@ -58,6 +60,7 @@ impl WritePurpose {
             WritePurpose::Reprocess => "reprocess",
             WritePurpose::Cleanup => "cleanup",
             WritePurpose::Compaction => "compaction",
+            WritePurpose::Metadata => "metadata",
         }
     }
 
@@ -72,6 +75,7 @@ impl WritePurpose {
             WritePurpose::Reprocess => "重新解析本地报文",
             WritePurpose::Cleanup => "清理旧数据",
             WritePurpose::Compaction => "压缩历史报文",
+            WritePurpose::Metadata => "保存本机设置",
         }
     }
 }

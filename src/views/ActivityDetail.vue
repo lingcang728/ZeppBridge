@@ -16,6 +16,7 @@ import Icon from '../components/Icon.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { zeppSemanticColors } from '../lib/echartsTheme';
+import { createLoadSeq } from '../lib/loadSeq';
 import { indexSeries, SERIES_RANGE_DAYS, seriesRanges, type SeriesRangeDays } from '../lib/metricSeries';
 import type { MetricSeries } from '../types';
 import { defineMessages, useMessages } from '../i18n';
@@ -148,28 +149,34 @@ const rangeDays = ref<SeriesRangeDays>(SERIES_RANGE_DAYS[0]);
 const series = ref<Record<string, MetricSeries>>({});
 const loading = ref(true);
 const error = ref<string | null>(null);
+const loadSeq = createLoadSeq();
 
 const cards = computed(() => CARDS.value.map((card) => ({ ...card, series: series.value[card.metric] ?? null })));
 const anyData = computed(() => cards.value.some((card) => (card.series?.points.length ?? 0) > 0));
 
 const load = async () => {
+  const seq = loadSeq.next();
   loading.value = true;
   error.value = null;
   if (!isDesktop()) {
+    if (!loadSeq.isCurrent(seq)) return;
     series.value = {};
     loading.value = false;
     error.value = t.value.desktopOnly;
     return;
   }
   try {
-    series.value = indexSeries(
+    const next = indexSeries(
       await backend.getMetricSeries([...METRICS], rangeDays.value),
     );
+    if (!loadSeq.isCurrent(seq)) return;
+    series.value = next;
   } catch (cause) {
+    if (!loadSeq.isCurrent(seq)) return;
     series.value = {};
     error.value = toUserMessage(cause, t.value.loadFailed);
   } finally {
-    loading.value = false;
+    if (loadSeq.isCurrent(seq)) loading.value = false;
   }
 };
 

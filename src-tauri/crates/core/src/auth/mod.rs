@@ -206,7 +206,7 @@ fn describe_secret_service_error(action: &str, error: &keyring::Error) -> String
         // 只能按码取英文——issue #40 那位 Linux 用户就是在英文命令行上收到了
         // 这一句的中文原文。
         keyring::Error::NoStorageAccess(_) | keyring::Error::PlatformFailure(_) => {
-            HeadlessProblem::NoCredentialStore { detail: base }.to_string()
+            format!("{HEADLESS_NO_STORE_MARKER}{base}")
         }
         _ => base,
     }
@@ -913,11 +913,21 @@ fn linux_credential_backend(data_dir: &Path) -> Arc<dyn CredentialBackend> {
     }
 }
 
+/// Linux Secret Service 在「机器上没有密钥环」时用这个前缀，让
+/// [`credential_error`] 把它还原成 [`HeadlessProblem`]，而不是吞进
+/// 泛化的 `CredentialStore`（命令行会因此变成退出码 1 + 中文原文）。
+const HEADLESS_NO_STORE_MARKER: &str = "\u{1e}headless.no_credential_store\u{1e}";
+
 fn credential_error(error: String) -> ZeppBridgeError {
     // Backends are not allowed to include secret values in their error text.
     //
     // 这是「系统凭据存储不肯配合」，不是「认证信息不对」。分开之后界面才能
     // 给出对得上的说法：一个让人重连，一个让人去看凭据管理器。
+    if let Some(detail) = error.strip_prefix(HEADLESS_NO_STORE_MARKER) {
+        return ZeppBridgeError::Headless(HeadlessProblem::NoCredentialStore {
+            detail: detail.to_string(),
+        });
+    }
     ZeppBridgeError::CredentialStore(error)
 }
 
@@ -1004,21 +1014,29 @@ pub fn mask_token(token: &str) -> String {
     format!("{prefix}…{suffix}")
 }
 
-#[cfg(windows)]
 fn replace_file(temp: &Path, destination: &Path) -> io::Result<()> {
-    // `rename` is atomic when the destination does not exist.  Windows does
-    // not replace an existing file with `rename`, so remove-and-rename is the
-    // conservative fallback; the temporary file is always in the same
-    // directory and never contains a token.
-    if destination.exists() {
-        fs::remove_file(destination)?;
-    }
+    // Windows `std::fs::rename` already replaces (`MoveFileExW` +
+    // `MOVEFILE_REPLACE_EXISTING`). Removing the destination first is not
+    // atomic: a crash in between leaves the target missing.
     fs::rename(temp, destination)
 }
 
-#[cfg(not(windows))]
-fn replace_file(temp: &Path, destination: &Path) -> io::Result<()> {
-    fs::rename(temp, destination)
+#[cfg(test)]
+mod credential_error_tests {
+    use super::*;
+
+    #[test]
+    fn secret_service_absence_stays_headless_not_generic_store() {
+        let error = credential_error(format!("{HEADLESS_NO_STORE_MARKER}cannot talk to dbus"));
+        assert!(matches!(
+            error,
+            ZeppBridgeError::Headless(HeadlessProblem::NoCredentialStore { .. })
+        ));
+        assert_eq!(error.code(), "err.headless.no_credential_store");
+        let generic = credential_error("无法写入 Windows 凭据管理器".into());
+        assert!(matches!(generic, ZeppBridgeError::CredentialStore(_)));
+        assert_eq!(generic.code(), "err.core.credential_store");
+    }
 }
 
 /// File-store tests run on both macOS and Linux CI, without system credentials.

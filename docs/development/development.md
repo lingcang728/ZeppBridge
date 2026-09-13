@@ -207,15 +207,19 @@ Deleted and never to be registered again: `start_capture`,
 
 ## The local REST API
 
-`src-tauri/src/local_api.rs` binds `127.0.0.1:43921` when the desktop process
-starts. Two read-only GET routes are exposed today:
+The local API is **off by default**. The desktop process does not bind
+`127.0.0.1:43921` at startup. Listening starts only after the user turns the
+switch on in Settings; every request then needs `Authorization: Bearer <token>`.
+Implementation lives in `zeppbridge-core` (`crates/core/src/local_api.rs`); the
+Tauri adapter is `src-tauri/src/local_api.rs`. Two read-only GET routes are
+exposed today:
 
 | Route | Description |
 | --- | --- |
 | `/health` | Service state and app version |
 | `/workouts/{id}/series` | Reuses `Database::get_workout_series()` and returns normalised `WorkoutSeries` JSON; an unknown ID returns 404 |
 
-The API does not listen on `0.0.0.0`, offers no CORS, responds with
+The API binds only `127.0.0.1`, offers no CORS, responds with
 `Cache-Control: no-store`, and neither reads nor returns authentication data. If
 the port is taken the desktop app still starts, and Settings surfaces the error
 through `get_local_api_status`. Tests must cover the routes, 404/405, encoded
@@ -239,9 +243,10 @@ IDs, the generic 500, and the no-CORS boundary.
    verified against current real fixtures. Encodings it cannot recognise stay as
    raw only, marked `unverified`.
 6. `Database` uses WAL, foreign keys and schema migrations (`PRAGMA
-   user_version`, currently **16**; migration steps may only be appended, never
+   user_version`; the current number is `CURRENT_SCHEMA_VERSION` in
+   `storage/mod.rs`). Migration steps may only be appended, never
    edit published DDL — existing databases were created with the DDL of their
-   time). Expression unique indexes handle `NULL device_id`, and canonical rows
+   time. Expression unique indexes handle `NULL device_id`, and canonical rows
    keep `raw_record_id`. Migrations start only after the cross-process write
    lock is held and a pre-upgrade backup exists.
 7. `SyncManager` uses a run lock against in-process concurrency and additionally

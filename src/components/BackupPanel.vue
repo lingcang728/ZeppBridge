@@ -53,6 +53,9 @@ const messages = defineMessages(
     problemSha256Mismatch: '备份文件的 SHA-256 和清单不一致，可能已损坏或被修改',
     problemIntegrityFailed: '备份文件没有通过 SQLite 完整性检查',
     problemUnknown: '这份快照没有通过校验，原因未记录。',
+    blockerFutureSchema: (backup: number, current: number) =>
+      `这份备份来自更新版本的 ZeppBridge（schema ${backup}，当前 ${current}）。降级打开会丢字段，所以不恢复，也不会改动当前库。请先升级 ZeppBridge。`,
+    blockerUnknown: '这份快照当前不能恢复，原因未记录。',
     verifyPassed: '刚刚重新校验：文件、大小、SHA-256 与完整性都对得上。',
     integrityOk: (sha: string) => `生成时完整性检查通过 · SHA-256 ${sha}…`,
     integrityBad: '生成时完整性检查未通过，不要用它恢复。',
@@ -137,6 +140,9 @@ const messages = defineMessages(
       "The backup file's SHA-256 does not match the manifest — it may be damaged or altered",
     problemIntegrityFailed: 'The backup file did not pass the SQLite integrity check',
     problemUnknown: 'This snapshot failed verification, and no reason was recorded.',
+    blockerFutureSchema: (backup: number, current: number) =>
+      `This backup comes from a newer ZeppBridge (schema ${backup}, this app is ${current}). Opening it here would drop fields, so it will not be restored and the current library is left alone. Upgrade ZeppBridge first.`,
+    blockerUnknown: 'This snapshot cannot be restored right now, and no reason was recorded.',
     verifyPassed: 'Just re-verified: file, size, SHA-256 and integrity all line up.',
     integrityOk: (sha: string) => `Integrity check passed at creation · SHA-256 ${sha}…`,
     integrityBad: 'The integrity check failed at creation. Do not restore from it.',
@@ -221,6 +227,9 @@ const messages = defineMessages(
       'El SHA-256 del archivo de copia no coincide con el manifiesto; puede estar dañado o alterado',
     problemIntegrityFailed: 'El archivo de copia no pasó la comprobación de integridad de SQLite',
     problemUnknown: 'Esta copia no pasó la verificación, y no se registró el motivo.',
+    blockerFutureSchema: (backup: number, current: number) =>
+      `Esta copia viene de una versión más nueva de ZeppBridge (esquema ${backup}, esta app es ${current}). Abrirla aquí perdería campos, así que no se restaura y la biblioteca actual no se toca. Primero actualiza ZeppBridge.`,
+    blockerUnknown: 'Esta copia no se puede restaurar ahora, y no se registró el motivo.',
     verifyPassed: 'Recién verificada: archivo, tamaño, SHA-256 e integridad coinciden.',
     integrityOk: (sha: string) => `Integridad comprobada al crearla · SHA-256 ${sha}…`,
     integrityBad: 'La comprobación de integridad falló al crearla. No restaures desde ella.',
@@ -305,6 +314,20 @@ const verifyProblemText = (verification: BackupVerification): string => {
   }
 };
 
+const restoreBlockerText = (preview: RestorePreview): string => {
+  if (preview.blocker_code === 'ui.backup.future_schema'
+    || preview.compatibility === 'future_schema_refused') {
+    return t.value.blockerFutureSchema(
+      preview.manifest.schema_version,
+      preview.current_schema_version,
+    );
+  }
+  if (preview.verification.problem_code || preview.verification.problem) {
+    return verifyProblemText(preview.verification);
+  }
+  return backendText(preview.blocker, t.value.blockerUnknown);
+};
+
 const formatBytes = (bytes: number): string => {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
@@ -326,6 +349,7 @@ const previewRows = computed(() => {
 
 const load = async () => {
   if (!isDesktop()) return;
+  error.value = null;
   try {
     const [list, staged] = await Promise.all([backend.listBackups(), backend.getPendingRestore()]);
     backups.value = list;
@@ -459,7 +483,7 @@ const cancelRestore = async () => {
     <p v-if="error" class="api-error" role="alert">{{ error }}</p>
     <p v-else-if="message" class="hint-line ok" role="status"><Icon name="check" :size="13" />{{ message }}</p>
 
-    <p v-if="!backups.length" class="retain-note">{{ t.noSnapshots }}</p>
+    <p v-if="!backups.length && !error" class="retain-note">{{ t.noSnapshots }}</p>
 
     <div v-else class="backup-list">
       <div v-for="item in backups" :key="item.id" class="backup-row">
@@ -521,7 +545,7 @@ const cancelRestore = async () => {
         </tbody>
       </table>
       <p class="retain-note">{{ t.previewNote }}</p>
-      <p v-if="preview.blocker" class="api-error" role="alert">{{ preview.blocker }}</p>
+      <p v-if="!preview.can_restore" class="api-error" role="alert">{{ restoreBlockerText(preview) }}</p>
       <div class="inline-actions">
         <button
           class="button primary"

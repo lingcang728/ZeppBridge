@@ -11,7 +11,7 @@
 import { computed, ref, watch } from 'vue';
 import DesignIcon from './DesignIcon.vue';
 import DeviceVisual from './DeviceVisual.vue';
-import { deviceCatalog, deviceImageFor, type DeviceCatalogEntry } from '../lib/deviceCatalog';
+import { catalogEntryMatchesId, deviceCatalog, deviceImageFor, type DeviceCatalogEntry } from '../lib/deviceCatalog';
 import { defineMessages, locale, useMessages } from '../i18n';
 
 const messages = defineMessages(
@@ -151,13 +151,27 @@ watch([kind, query], () => { index.value = 0; });
 /* 打开时先停在已经指认过的那台上，而不是从头翻。 */
 watch(() => props.modelValue, (value) => {
   if (!value) return;
-  const found = entries.value.findIndex((entry) => entry.catalog_id === value);
+  const found = entries.value.findIndex((entry) => catalogEntryMatchesId(entry, value));
   if (found >= 0) index.value = found;
 }, { immediate: true });
 
 const isCurrentAssigned = computed(() => Boolean(
-  current.value && props.modelValue && current.value.catalog_id === props.modelValue,
+  current.value && catalogEntryMatchesId(current.value, props.modelValue),
 ));
+
+const onPickerKeydown = (event: KeyboardEvent) => {
+  const target = event.target as HTMLElement | null;
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) {
+    return;
+  }
+  if (event.key === 'ArrowLeft') {
+    event.preventDefault();
+    step(-1);
+  } else if (event.key === 'ArrowRight') {
+    event.preventDefault();
+    step(1);
+  }
+};
 
 /* 目录里的中文名只在中文界面下用。英文界面下 name_zh 和 canonical_name
    会是同一个词或一个读不懂的中文名，两行都摆出来只是噪音。 */
@@ -175,8 +189,7 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
     role="group"
     :aria-label="t.pickerAria"
     tabindex="0"
-    @keydown.left.prevent="step(-1)"
-    @keydown.right.prevent="step(1)"
+    @keydown="onPickerKeydown"
   >
     <div class="picker-filters">
       <button

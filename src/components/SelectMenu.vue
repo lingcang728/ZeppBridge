@@ -302,7 +302,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
   transition: border-color 140ms ease, background 140ms ease;
 }
-.select-trigger:hover:not(:disabled) { border-color: var(--line-control); }
+.select-trigger:hover:not(:disabled) { border-color: var(--accent); background: var(--surface-hover); }
 .select-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .is-open .select-trigger { border-color: var(--accent); }
 .is-disabled .select-trigger, .select-trigger:disabled { opacity: .55; cursor: not-allowed; }

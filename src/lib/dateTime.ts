@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import { defineMessages, messagesOf } from '../i18n';
+import { defineMessages, intlLocale, messagesOf } from '../i18n';
 
 export type TimeFormat = 'regional' | '12h' | '24h';
 export type DateOrder = 'regional' | 'ymd' | 'dmy' | 'mdy';
@@ -50,7 +50,7 @@ export function displayDateTimeFormatter(options: Intl.DateTimeFormatOptions = {
   if (adjusted.hour || adjusted.timeStyle) {
     if (time.value !== 'regional') adjusted.hourCycle = time.value === '12h' ? 'h12' : 'h23';
   }
-  let region = typeof navigator === 'undefined' ? undefined : navigator.languages?.[0] || navigator.language;
+  let region: string | undefined = intlLocale();
   if (order.value !== 'regional' && (adjusted.day || adjusted.dateStyle)) {
     region = { ymd: 'sv-SE', dmy: 'en-GB', mdy: 'en-US' }[order.value];
     if (!adjusted.dateStyle) {

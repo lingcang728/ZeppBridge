@@ -240,6 +240,19 @@ impl Database {
             self.ensure_table_columns("raw_records", &[("payload_hash", "TEXT")])?;
         }
 
+        // C9: ancient libraries can carry duplicate metric_samples that make
+        // the historical unique-index CREATE below fail. Dedupe first; do not
+        // rewrite that published DDL.
+        if version < 28 {
+            self.conn.execute_batch(
+                "DELETE FROM metric_samples
+                 WHERE id NOT IN (
+                     SELECT MIN(id) FROM metric_samples
+                     GROUP BY metric, timestamp, unit, source_scope, COALESCE(device_id, '')
+                 );",
+            )?;
+        }
+
         // Expression indexes are needed because SQLite treats NULLs as distinct
         // in ordinary UNIQUE constraints.  COALESCE makes a missing device id a
         // deterministic part of the canonical key.
@@ -819,6 +832,64 @@ impl Database {
         )?;
         self.conn.execute(
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(26, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // v27: 深睡 / 浅睡 / 清醒与 REM 同一套「有没有给」标志。
+        //
+        // 旧行 DEFAULT 1：以前存进去的 0 继续是「测到了，是 0」，不能事后
+        // 改口成「没给」。新写入按 Option::is_some 落标志。
+        self.ensure_table_columns(
+            "sleep_sessions",
+            &[
+                ("deep_available", "INTEGER NOT NULL DEFAULT 1"),
+                ("light_available", "INTEGER NOT NULL DEFAULT 1"),
+                ("awake_available", "INTEGER NOT NULL DEFAULT 1"),
+            ],
+        )?;
+        self.conn.execute_batch("PRAGMA user_version = 27;")?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(27, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // v28: metric_samples were deduped above; give workout_hr_zones the
+        // same ON DELETE CASCADE the other workout children already have.
+        if version < 28 {
+            self.conn.execute_batch(
+                "CREATE TABLE workout_hr_zones_v28 (
+                    workout_id TEXT NOT NULL,
+                    zone_index INTEGER NOT NULL,
+                    upper_bound_bpm INTEGER NOT NULL,
+                    seconds INTEGER NOT NULL,
+                    PRIMARY KEY (workout_id, zone_index),
+                    FOREIGN KEY(workout_id) REFERENCES workouts(workout_id) ON DELETE CASCADE
+                );
+                INSERT INTO workout_hr_zones_v28
+                    SELECT workout_id, zone_index, upper_bound_bpm, seconds
+                    FROM workout_hr_zones
+                    WHERE workout_id IN (SELECT workout_id FROM workouts);
+                DROP TABLE workout_hr_zones;
+                ALTER TABLE workout_hr_zones_v28 RENAME TO workout_hr_zones;",
+            )?;
+        }
+        self.conn.execute_batch("PRAGMA user_version = 28;")?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(28, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // v29: 跑步明细拉取失败次数。没有上限的话，永久 404 的运动会占满
+        // 每一次同步的待拉取队列，把整次同步的截止时间耗光。
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS workout_detail_fetch_attempts (
+                workout_id TEXT NOT NULL,
+                source TEXT NOT NULL,
+                attempts INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (workout_id, source)
+            );
+             PRAGMA user_version = 29;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(29, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
         self.ensure_cloud_sync_metadata()?;

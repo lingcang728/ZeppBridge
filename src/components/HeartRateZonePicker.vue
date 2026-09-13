@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import Icon from './Icon.vue';
 import SkeletonBlock from './SkeletonBlock.vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
+import { createLoadSeq } from '../lib/loadSeq';
 import type { HeartRateBasis, HeartRateZoneOptions } from '../types';
 import { defineMessages, useMessages } from '../i18n';
 
@@ -217,6 +218,7 @@ const options = ref<HeartRateZoneOptions | null>(null);
 const loading = ref(true);
 const saving = ref(false);
 const error = ref<string | null>(null);
+const loadSeq = createLoadSeq();
 
 const preference = computed(() => options.value?.preference ?? {});
 const models = computed(() => options.value?.models ?? []);
@@ -251,20 +253,25 @@ const unavailableReason = (requires: string[]): string => {
 };
 
 const load = async () => {
+  const seq = loadSeq.next();
   loading.value = true;
   error.value = null;
   if (!isDesktop()) {
+    if (!loadSeq.isCurrent(seq)) return;
     options.value = null;
     loading.value = false;
     return;
   }
   try {
-    options.value = await backend.getHeartRateZones(props.days);
+    const next = await backend.getHeartRateZones(props.days);
+    if (!loadSeq.isCurrent(seq)) return;
+    options.value = next;
   } catch (cause) {
+    if (!loadSeq.isCurrent(seq)) return;
     options.value = null;
     error.value = toUserMessage(cause, t.value.zonesUnavailable);
   } finally {
-    loading.value = false;
+    if (loadSeq.isCurrent(seq)) loading.value = false;
   }
 };
 
@@ -374,13 +381,12 @@ watch(() => props.revision, () => { void load(); });
 
     <template v-else>
       <p class="group-label">{{ t.modelGroup }}</p>
-      <div class="model-grid" role="radiogroup" :aria-label="t.modelAria">
+      <div class="model-grid" role="group" :aria-label="t.modelAria">
         <button
           v-for="model in models"
           :key="model.id"
           type="button"
-          role="radio"
-          :aria-checked="preference.model === model.id"
+          :aria-pressed="preference.model === model.id"
           :disabled="!model.available || saving"
           :class="['model-card', { 'is-on': preference.model === model.id }]"
           @click="chooseModel(model.id)"
@@ -400,13 +406,12 @@ watch(() => props.revision, () => { void load(); });
       <template v-if="selectedModel">
         <div v-for="slot in basisSlots" :key="slot.kind" class="basis-block">
           <p class="group-label">{{ slot.label }}</p>
-          <div class="basis-list" role="radiogroup" :aria-label="slot.label">
+          <div class="basis-list" role="group" :aria-label="slot.label">
             <button
               v-for="basis in slot.candidates"
               :key="basis.id"
               type="button"
-              role="radio"
-              :aria-checked="slot.chosen === basis.id"
+              :aria-pressed="slot.chosen === basis.id"
               :disabled="saving"
               :class="['basis-row', { 'is-on': slot.chosen === basis.id }]"
               @click="chooseBasis(slot.kind, basis.id)"
