@@ -6,8 +6,8 @@ defineOptions({ name: 'HeartRateDetail' });
  * 心率二级界面。
  *
  * 首页那张 24 小时心率卡只能回答「刚才是多少」；要判断「这几天是不是偏高」
- * 就得看跨天的趋势。这一页把两件事放在一起：上面是今天的全天曲线，下面是
- * 静息心率与 HRV 的按天趋势。
+ * 就得看跨天的趋势。这一页把两件事放在一起，但时间窗不是同一个：
+ * 上面是固定 24 小时的全天曲线，范围开关在它下面，只管每日最高 / 静息 / HRV。
  *
  * 没有采样的时间段不画线，也不补 0——曲线断开就是断开。
  */
@@ -32,8 +32,9 @@ const messages = defineMessages(
     backToOverview: '返回概览',
     eyebrow: '心率',
     title: '心率',
-    intro: '今天的全天心率曲线，以及静息心率与 HRV 的按天趋势。没有采样的时间不画线，也不补 0。',
+    intro: '上面是最近 24 小时的全天曲线；7 天 / 1 个月 / 6 个月只改下面的按天趋势。没有采样的时间不画线，也不补 0。',
     rangeAria: '趋势时间范围',
+    trendRangeLabel: '趋势范围',
     desktopOnly: '请使用桌面应用；浏览器预览不会读取账户数据。',
     loadFailed: '心率数据暂时不可用',
     dayFailed: '最近 24 小时心率暂时读不到。',
@@ -72,8 +73,9 @@ const messages = defineMessages(
     backToOverview: 'Back to overview',
     eyebrow: 'Heart rate',
     title: 'Heart rate',
-    intro: "Today's full-day heart rate curve, plus resting heart rate and HRV day by day. Stretches without samples are left blank, not filled with a zero.",
+    intro: 'The full-day curve above is always the last 24 hours; 7 days / 1 month / 6 months only change the day-by-day trends below. Stretches without samples are left blank, not filled with a zero.',
     rangeAria: 'Trend time range',
+    trendRangeLabel: 'Trend range',
     desktopOnly: 'Use the desktop app. This browser preview reads no account data.',
     loadFailed: 'Heart rate data is unavailable right now',
     dayFailed: 'Could not read the last 24 hours of heart rate.',
@@ -112,8 +114,9 @@ const messages = defineMessages(
     backToOverview: 'Volver al resumen',
     eyebrow: 'Frecuencia cardíaca',
     title: 'Frecuencia cardíaca',
-    intro: 'La curva de frecuencia cardíaca de todo el día de hoy, más la frecuencia en reposo y la VFC día a día. Los tramos sin muestras quedan en blanco, no se rellenan con cero.',
+    intro: 'La curva de todo el día de arriba es siempre las últimas 24 horas; 7 días / 1 mes / 6 meses solo cambian las tendencias diarias de abajo. Los tramos sin muestras quedan en blanco, no se rellenan con cero.',
     rangeAria: 'Rango de tiempo de la tendencia',
+    trendRangeLabel: 'Rango de tendencia',
     desktopOnly: 'Usa la app de escritorio. Esta vista previa en el navegador no lee datos de la cuenta.',
     loadFailed: 'Los datos de frecuencia cardíaca no están disponibles en este momento',
     dayFailed: 'No se pudo leer la frecuencia cardíaca de las últimas 24 horas.',
@@ -272,32 +275,35 @@ const trendCards = computed(() => [
   },
 ]);
 
-const load = async () => {
+const load = async (opts?: { trendsOnly?: boolean }) => {
   const seq = loadSeq.next();
-  loading.value = true;
+  const trendsOnly = Boolean(opts?.trendsOnly);
+  if (!trendsOnly) loading.value = true;
   error.value = null;
-  dayError.value = null;
+  if (!trendsOnly) dayError.value = null;
   trendsError.value = null;
   extremesError.value = null;
   if (!isDesktop()) {
     if (!loadSeq.isCurrent(seq)) return;
     series.value = {};
-    dayPoints.value = [];
+    if (!trendsOnly) dayPoints.value = [];
     dailyExtremes.value = [];
     loading.value = false;
     error.value = t.value.desktopOnly;
     return;
   }
   const [day, trends, extremes] = await Promise.allSettled([
-    backend.getHeartRateSeries(24),
+    trendsOnly ? Promise.resolve(dayPoints.value) : backend.getHeartRateSeries(24),
     backend.getMetricSeries([...TREND_METRICS], rangeDays.value),
     backend.getDailyHeartRateExtremes(rangeDays.value),
   ]);
   if (!loadSeq.isCurrent(seq)) return;
-  dayPoints.value = day.status === 'fulfilled' ? day.value : [];
+  if (!trendsOnly) {
+    dayPoints.value = day.status === 'fulfilled' ? day.value : [];
+    dayError.value = day.status === 'rejected' ? toUserMessage(day.reason, t.value.dayFailed) : null;
+  }
   series.value = trends.status === 'fulfilled' ? indexSeries(trends.value) : {};
   dailyExtremes.value = extremes.status === 'fulfilled' ? extremes.value : [];
-  dayError.value = day.status === 'rejected' ? toUserMessage(day.reason, t.value.dayFailed) : null;
   trendsError.value = trends.status === 'rejected' ? toUserMessage(trends.reason, t.value.trendsFailed) : null;
   extremesError.value = extremes.status === 'rejected' ? toUserMessage(extremes.reason, t.value.dailyMaxFailed) : null;
   error.value = dayError.value || trendsError.value || extremesError.value;
@@ -369,7 +375,7 @@ const dailyMaxChartOption = computed(() => {
 });
 
 onMounted(() => { void load(); });
-watch(rangeDays, () => { void load(); });
+watch(rangeDays, () => { void load({ trendsOnly: true }); });
 watch(dataRevision, () => { void load(); });
 </script>
 
@@ -382,19 +388,7 @@ watch(dataRevision, () => { void load(); });
       :eyebrow="t.eyebrow"
       :title="t.title"
       :intro="t.intro"
-    >
-      <div class="range-switch" role="radiogroup" :aria-label="t.rangeAria">
-        <button
-          v-for="range in ranges"
-          :key="range.days"
-          type="button"
-          role="radio"
-          :aria-checked="rangeDays === range.days"
-          :class="['range-pill', { 'is-on': rangeDays === range.days }]"
-          @click="rangeDays = range.days"
-        >{{ range.label }}</button>
-      </div>
-    </PageHeader>
+    />
 
     <div v-if="error" class="inline-alert" role="alert">
       <Icon name="warning" :size="14" />{{ error }}
@@ -435,6 +429,23 @@ watch(dataRevision, () => { void load(); });
           <Icon name="info" :size="14" />{{ t.noSamples }}
         </p>
       </section>
+
+      <!-- 24 小时曲线不跟这个开关走。放在大图下面，才不会让人以为
+           切 7 天 / 1 个月会改那张全天图。 -->
+      <div class="range-toolbar">
+        <p class="range-label">{{ t.trendRangeLabel }}</p>
+        <div class="range-switch" role="radiogroup" :aria-label="t.rangeAria">
+          <button
+            v-for="range in ranges"
+            :key="range.days"
+            type="button"
+            role="radio"
+            :aria-checked="rangeDays === range.days"
+            :class="['range-pill', { 'is-on': rangeDays === range.days }]"
+            @click="rangeDays = range.days"
+          >{{ range.label }}</button>
+        </div>
+      </div>
 
       <section class="surface-card day-card" :aria-label="t.dailyMaxAria">
         <header class="day-head">
@@ -487,6 +498,14 @@ watch(dataRevision, () => { void load(); });
 <style scoped>
 .metric-page.page { display: grid; gap: var(--space-4); align-content: start; }
 .stack { display: grid; gap: var(--space-4); }
+.range-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.range-label { margin: 0; color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
 .range-switch { display: flex; gap: var(--space-1); padding: 4px; border-radius: var(--radius-sm); background: var(--surface-raised); }
 .range-pill { min-height: 30px; padding: 5px 12px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--muted); font-size: var(--fs-sm); cursor: pointer; }
 .range-pill:hover { color: var(--ink); }
