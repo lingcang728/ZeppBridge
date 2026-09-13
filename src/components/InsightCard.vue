@@ -10,6 +10,7 @@ import { computed } from 'vue';
 import Icon from './Icon.vue';
 import ComparisonBars from './ComparisonBars.vue';
 import type { InsightFact, WorkoutInsight } from '../types';
+import { formatDate } from '../lib/format';
 import { defineMessages, useMessages } from '../i18n';
 import {
   distanceUnitLabel,
@@ -396,7 +397,7 @@ const exclusionSummary = computed(() => {
         <ul class="baseline-list">
           <li v-for="entry in insight.baseline_included" :key="entry.workout_id">
             <RouterLink :to="`/workouts/${entry.workout_id}`">
-              {{ entry.start_time.slice(0, 10) }} · {{ toBigDistance(entry.distance_meters).toFixed(2) }} {{ distanceUnitLabel() }}
+              {{ formatDate(entry.start_time) }} · {{ toBigDistance(entry.distance_meters).toFixed(2) }} {{ distanceUnitLabel() }}
             </RouterLink>
           </li>
         </ul>

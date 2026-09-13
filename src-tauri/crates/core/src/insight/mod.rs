@@ -15,7 +15,7 @@
 
 use crate::models::error::Result;
 use crate::storage::Database;
-use chrono::{DateTime, Duration, NaiveDate, Utc};
+use chrono::{DateTime, Duration, Local, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 
 /// 单次跑步洞察的基线规则。全部是常量而不是散落在 SQL 里的字面量，
@@ -568,7 +568,7 @@ impl Database {
     ///
     /// 每条结论都带样本数、来源和置信度；不足就说不足。不和任何人群基准比较，
     /// 也不输出诊断、治疗或风险预测。
-    pub fn weekly_report(&self, now: DateTime<Utc>) -> Result<WeeklyReport> {
+    pub fn weekly_report(&self, now: DateTime<Local>) -> Result<WeeklyReport> {
         let today = now.date_naive();
         let recent_start = today - Duration::days(weekly::RECENT_DAYS - 1);
         let baseline_end = recent_start - Duration::days(1);
@@ -700,9 +700,9 @@ impl Database {
         let end_text = end.to_string();
         match metric {
             "sleep_duration" => self.collect_samples(
-                "SELECT substr(end_time, 1, 10), CAST(duration_minutes AS REAL), source_scope
+                "SELECT date(end_time, 'localtime'), CAST(duration_minutes AS REAL), source_scope
                  FROM sleep_sessions
-                 WHERE substr(end_time, 1, 10) BETWEEN ?1 AND ?2",
+                 WHERE date(end_time, 'localtime') BETWEEN ?1 AND ?2",
                 &start_text,
                 &end_text,
             ),
@@ -710,12 +710,12 @@ impl Database {
             // 一个可比的日度值，两段窗口各自取标准差来对比。
             "sleep_start_regularity" => {
                 let samples = self.collect_samples(
-                    "SELECT substr(start_time, 1, 10),
-                            CAST(substr(start_time, 12, 2) AS REAL) * 60
-                              + CAST(substr(start_time, 15, 2) AS REAL),
+                    "SELECT date(start_time, 'localtime'),
+                            CAST(strftime('%H', start_time, 'localtime') AS REAL) * 60
+                              + CAST(strftime('%M', start_time, 'localtime') AS REAL),
                             source_scope
                      FROM sleep_sessions
-                     WHERE substr(start_time, 1, 10) BETWEEN ?1 AND ?2",
+                     WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2",
                     &start_text,
                     &end_text,
                 )?;
@@ -743,9 +743,9 @@ impl Database {
             }
             "workout_count" => {
                 let samples = self.collect_samples(
-                    "SELECT substr(start_time, 1, 10), 1.0, source_scope
+                    "SELECT date(start_time, 'localtime'), 1.0, source_scope
                      FROM workouts
-                     WHERE substr(start_time, 1, 10) BETWEEN ?1 AND ?2",
+                     WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2",
                     &start_text,
                     &end_text,
                 )?;
@@ -779,8 +779,8 @@ impl Database {
                 }
                 self.collect_samples(
                     &format!(
-                        "SELECT substr(timestamp, 1, 10), value, source_scope FROM metric_samples
-                         WHERE metric = '{other}' AND substr(timestamp, 1, 10) BETWEEN ?1 AND ?2"
+                        "SELECT date(timestamp, 'localtime'), value, source_scope FROM metric_samples
+                         WHERE metric = '{other}' AND date(timestamp, 'localtime') BETWEEN ?1 AND ?2"
                     ),
                     &start_text,
                     &end_text,
@@ -975,6 +975,12 @@ mod tests {
 
     fn base() -> DateTime<Utc> {
         Utc.with_ymd_and_hms(2026, 8, 20, 7, 0, 0).unwrap()
+    }
+
+    /// 与 `base()` 同一堵墙上的本地时间。周报按本地日历切窗，测试要从本地墙上
+    /// 时间出发，才能在任何主机时区下都证明同一件事。
+    fn base_local() -> DateTime<Local> {
+        Local.with_ymd_and_hms(2026, 8, 20, 7, 0, 0).unwrap()
     }
 
     fn db() -> Database {
@@ -1406,9 +1412,10 @@ mod tests {
 
     fn sleep(id: &str, days_ago: i64, start_hour: u32, minutes: i64) -> SleepSession {
         let day = (base() - Duration::days(days_ago)).date_naive();
-        let start = Utc
+        let start = Local
             .with_ymd_and_hms(day.year(), day.month(), day.day(), start_hour, 0, 0)
-            .unwrap();
+            .unwrap()
+            .with_timezone(&Utc);
         SleepSession {
             sleep_id: id.into(),
             start_time: start,
@@ -1443,7 +1450,7 @@ mod tests {
                 .unwrap();
         }
 
-        let report = db.weekly_report(base()).unwrap();
+        let report = db.weekly_report(base_local()).unwrap();
         let duration = weekly_fact(&report, "weekly.sleep_duration");
         assert_eq!(duration.value, Some(420.0));
         let comparison = duration.comparison.clone().expect("基线够 28 天");
@@ -1468,7 +1475,7 @@ mod tests {
             db.insert_sleep_session(&sleep(&format!("base-{day}"), day, 23, 360))
                 .unwrap();
         }
-        let report = db.weekly_report(base()).unwrap();
+        let report = db.weekly_report(base_local()).unwrap();
         let duration = weekly_fact(&report, "weekly.sleep_duration");
         assert_eq!(duration.value, Some(420.0));
         assert!(duration.comparison.is_none());
@@ -1479,7 +1486,7 @@ mod tests {
     #[test]
     fn no_data_at_all_says_no_data_instead_of_zero() {
         let db = db();
-        let report = db.weekly_report(base()).unwrap();
+        let report = db.weekly_report(base_local()).unwrap();
         for fact in &report.facts {
             assert_eq!(
                 fact.value, None,
@@ -1498,7 +1505,7 @@ mod tests {
             db.insert_sleep_session(&sleep(&format!("recent-{day}"), day, 23, 420))
                 .unwrap();
         }
-        let report = db.weekly_report(base()).unwrap();
+        let report = db.weekly_report(base_local()).unwrap();
         let encoded = serde_json::to_string(&report).unwrap();
         for forbidden in [
             "人群",
@@ -1529,7 +1536,7 @@ mod tests {
         db.insert_sleep_session(&sleep("a", 1, 23, 400)).unwrap();
         db.insert_sleep_session(&sleep("b", 2, 0, 400)).unwrap();
         db.insert_sleep_session(&sleep("c", 3, 23, 400)).unwrap();
-        let report = db.weekly_report(base()).unwrap();
+        let report = db.weekly_report(base_local()).unwrap();
         let regularity = weekly_fact(&report, "weekly.sleep_start_regularity");
         let spread = regularity.value.expect("三晚足够算出离散度");
         assert!(

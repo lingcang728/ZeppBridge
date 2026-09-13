@@ -13,6 +13,7 @@
 //! * **写库一律走跨进程写锁**。桌面应用开着的时候跑 `sync`，这里会拿不到锁
 //!   并以 `EXIT_BUSY` 退出，而不是和 GUI 抢着写同一个库。
 
+use chrono::Local;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::process::ExitCode;
@@ -744,7 +745,9 @@ fn cmd_status(args: &[String]) -> u8 {
     let workouts = db.get_recent_workouts(1).unwrap_or_default();
     // 「本机有多少历史」是所有出口都要能回答的问题，不只是桌面应用：
     // 一个调度脚本同样需要在导出半年之前知道本机是不是只有 30 天。
-    let coverage = db.local_coverage().unwrap_or_default();
+    let coverage = db
+        .local_coverage(Local::now().date_naive())
+        .unwrap_or_default();
 
     let payload = serde_json::json!({
         "ok": true,

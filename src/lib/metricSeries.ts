@@ -1,4 +1,4 @@
-import { displayDateTimeFormatter } from './dateTime';
+import { displayDateTimeFormatter, parseDisplayDate } from './dateTime';
 import type { MetricSeries, MetricSeriesPoint } from '../types';
 import { paceSecondsPerBigUnit } from './units';
 import { defineMessages, messagesOf } from '../i18n';
@@ -74,7 +74,9 @@ export const coverageLabel = (series?: MetricSeries | null): string => {
 // 刻意不缓存成模块级常量：那样会把语言钉死在模块加载的那一刻，
 // 切到英文之后坐标轴上的日期还是中文格式。
 const shortDate = (value: string): string => {
-  const date = new Date(`${value}T00:00:00`);
+  // 纯日历日期按本地年月日解析：本地构造会把 2026-02-30 滚成 3 月 2 日，
+  // parseDisplayDate 对不上就返回 Invalid Date，这里原样返回，不画假日子。
+  const date = parseDisplayDate(value);
   if (Number.isNaN(date.getTime())) return value;
   return displayDateTimeFormatter({ month: 'numeric', day: 'numeric' }).format(date);
 };
@@ -202,7 +204,7 @@ export const buildSeriesOption = (
         const samples = point.samples
           ? `<br><span style="color:#949CA5">${copy().samples(point.samples)}</span>`
           : '';
-        return `${point.date}<br><b>${format(point.value)}</b>${unit}${spread}${samples}`;
+        return `${shortDate(point.date)}<br><b>${format(point.value)}</b>${unit}${spread}${samples}`;
       },
     },
     xAxis: {
