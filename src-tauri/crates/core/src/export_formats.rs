@@ -54,14 +54,6 @@ pub fn to_csv(export: &Value) -> Result<(String, usize), String> {
     for event in array(data, "life_events") {
         for field in ["title", "category", "notes"] {
             let value = text(event.get(field));
-            // Free text must remain text when opened in a spreadsheet.
-            let cell = if value.trim_start().starts_with(['=', '+', '-', '@'])
-                || value.starts_with(['\t', '\r'])
-            {
-                format!("'{value}")
-            } else {
-                value.to_owned()
-            };
             push_row(
                 &mut rows,
                 &[
@@ -70,7 +62,7 @@ pub fn to_csv(export: &Value) -> Result<(String, usize), String> {
                     text(event.get("startDate")),
                     text(event.get("endDate")),
                     field,
-                    &cell,
+                    value,
                     "",
                     "user_authored",
                     "",
@@ -84,7 +76,7 @@ pub fn to_csv(export: &Value) -> Result<(String, usize), String> {
         let Some(value) = number_text(sample.get("value")) else {
             continue;
         };
-        push_row(
+        push_numeric_row(
             &mut rows,
             &[
                 "metric_sample",
@@ -105,7 +97,7 @@ pub fn to_csv(export: &Value) -> Result<(String, usize), String> {
         let Some(value) = number_text(daily.get("value")) else {
             continue;
         };
-        push_row(
+        push_numeric_row(
             &mut rows,
             &[
                 "daily_metric",
@@ -127,7 +119,7 @@ pub fn to_csv(export: &Value) -> Result<(String, usize), String> {
             let Some(value) = number_text(session.get(metric)) else {
                 continue;
             };
-            push_row(
+            push_numeric_row(
                 &mut rows,
                 &[
                     "sleep_session",
@@ -181,7 +173,7 @@ pub fn to_csv(export: &Value) -> Result<(String, usize), String> {
             let Some(value) = number_text(workout.get(metric)) else {
                 continue;
             };
-            push_row(
+            push_numeric_row(
                 &mut rows,
                 &[
                     "workout", workout_id, start, end, metric, &value, unit, scope, device,
@@ -365,11 +357,30 @@ fn parse_time(value: &str) -> Option<DateTime<FixedOffset>> {
 }
 
 fn push_row(out: &mut String, fields: &[&str; 9]) {
+    push_csv_row(out, fields, false);
+}
+
+// Only value cells produced by number_text may bypass text protection.
+fn push_numeric_row(out: &mut String, fields: &[&str; 9]) {
+    push_csv_row(out, fields, true);
+}
+
+fn push_csv_row(out: &mut String, fields: &[&str; 9], numeric_value: bool) {
     for (index, field) in fields.iter().enumerate() {
         if index > 0 {
             out.push(',');
         }
-        out.push_str(&escape_csv(field));
+        let protected;
+        let value: &str = if !(numeric_value && index == 5)
+            && (field.trim_start().starts_with(['=', '+', '-', '@'])
+                || field.starts_with(['\t', '\r', '\n']))
+        {
+            protected = format!("'{field}");
+            &protected
+        } else {
+            field
+        };
+        out.push_str(&escape_csv(value));
     }
     out.push('\n');
 }
@@ -400,6 +411,40 @@ mod tests {
 
     fn export_with(data: Value) -> Value {
         json!({ "generated_at": "2026-08-24T10:00:00+08:00", "data": data })
+    }
+
+    #[test]
+    fn regression_markdown_csv_protects_all_text_without_changing_numbers() {
+        for dangerous in [
+            "=1+1", "+1+1", "-1+1", "@SUM(A1)", "  =1+1", "\ttext", "\rtext", "\ntext", "=\"a,b\"",
+        ] {
+            let export = export_with(json!({
+                "metric_samples": [{"timestamp": dangerous, "metric": dangerous, "value": -2.5, "unit": dangerous, "source_scope": dangerous, "device_label": dangerous}],
+                "daily_metrics": [{"date": dangerous, "metric": dangerous, "value": -3, "unit": dangerous, "source_scope": dangerous, "device_label": dangerous}],
+                "sleep_sessions": [{"sleep_id": dangerous, "start_time": dangerous, "end_time": dangerous, "score": -4, "source_scope": dangerous, "device_label": dangerous}],
+                "workouts": [{"workout_id": dangerous, "start_time": dangerous, "end_time": dangerous, "effective_type": dangerous, "calories": -5, "source_scope": dangerous, "device_label": dangerous}],
+                "life_events": [{"id": 1, "title": dangerous, "category": dangerous, "notes": dangerous}]
+            }));
+            let (csv, count) = to_csv(&export).unwrap();
+            assert_eq!(count, 8);
+            let safe = escape_csv(&format!("'{dangerous}"));
+            assert!(csv.contains(&format!(
+                "metric_sample,,{safe},,{safe},-2.5,{safe},{safe},{safe}\n"
+            )));
+            assert!(csv.contains(&format!(
+                "daily_metric,,{safe},,{safe},-3,{safe},{safe},{safe}\n"
+            )));
+            assert!(csv.contains(&format!(
+                "sleep_session,{safe},{safe},{safe},score,-4,score,{safe},{safe}\n"
+            )));
+            assert!(csv.contains(&format!(
+                "workout,{safe},{safe},{safe},workout_type,{safe},,{safe},{safe}\n"
+            )));
+            assert!(csv.contains(&format!(
+                "workout,{safe},{safe},{safe},calories,-5,kcal,{safe},{safe}\n"
+            )));
+            assert!(csv.contains(&format!("life_event,1,,,title,{safe},,user_authored,\n")));
+        }
     }
 
     #[test]

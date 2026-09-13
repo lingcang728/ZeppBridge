@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 /// 当前 SQLite schema 版本（`PRAGMA user_version`）。加新版本只能追加迁移
 /// 步骤，不要改已有 DDL。
-pub const CURRENT_SCHEMA_VERSION: i64 = 24;
+pub const CURRENT_SCHEMA_VERSION: i64 = 25;
 /// 写进备份 manifest 的应用版本。Core 是独立 crate，用它自己的包版本。
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -44,7 +44,7 @@ pub const EXPORT_DATA_TYPES: [&str; 18] = [
 /// `raw_records` 重新跑一遍。不动它，新加的编号只对以后同步来的记录生效，
 /// 已经存成 `unknown:211` 的那 199 条记录会永远挂着——而报这个问题的人恰恰
 /// 是因为历史记录才来报的。
-pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v24-trail-running";
+pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v25-heart-range";
 /// 较早公开版本的修订号。从它升上来时仍需重放这几条流。
 ///
 /// v21 还没有 v22 的圈解析和 v23 的 Rucking 映射；跳版本升级时要一并补齐。
@@ -6130,6 +6130,46 @@ fn local_day_range_utc_bounds(start: &str, end: &str) -> Option<(String, String)
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn regression_markdown_v25_indexes_detail_reads_and_deletes() {
+        let db = Database::in_memory().unwrap();
+        db.conn.execute_batch("DROP INDEX idx_sleep_stages_sleep; DROP INDEX idx_workout_pauses_workout; DELETE FROM schema_migrations WHERE version = 25; PRAGMA user_version = 24;").unwrap();
+        for _ in 0..2 {
+            db.migrate().unwrap();
+            assert_eq!(
+                db.conn
+                    .query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0))
+                    .unwrap(),
+                CURRENT_SCHEMA_VERSION
+            );
+            for (table, key, index) in [
+                ("sleep_stages", "sleep_id", "idx_sleep_stages_sleep"),
+                ("workout_pauses", "workout_id", "idx_workout_pauses_workout"),
+            ] {
+                for sql in [
+                    format!("SELECT * FROM {table} WHERE {key} = 'test' ORDER BY start_time, id"),
+                    format!("DELETE FROM {table} WHERE {key} = 'test'"),
+                ] {
+                    let mut stmt = db
+                        .conn
+                        .prepare(&format!("EXPLAIN QUERY PLAN {sql}"))
+                        .unwrap();
+                    let plan = stmt
+                        .query_map([], |row| row.get::<_, String>(3))
+                        .unwrap()
+                        .collect::<std::result::Result<Vec<_>, _>>()
+                        .unwrap()
+                        .join("\n");
+                    assert!(plan.contains(index), "{plan}");
+                    assert!(
+                        !plan.contains("SCAN") && !plan.contains("TEMP B-TREE"),
+                        "{plan}"
+                    );
+                }
+            }
+        }
+    }
 
     #[test]
     fn unsuccessful_first_sync_remains_retryable_after_startup_migration() {

@@ -1295,7 +1295,7 @@ fn parse_heart_range(raw: Option<&str>) -> Vec<HeartRateZoneBucket> {
         return Vec::new();
     };
     let mut buckets = Vec::new();
-    for (index, part) in text.split(';').filter(|part| !part.is_empty()).enumerate() {
+    for (index, part) in text.split(';').enumerate() {
         let mut bits = part.split(',');
         let (Some(seconds), Some(upper)) = (bits.next(), bits.next()) else {
             continue;
@@ -2534,6 +2534,24 @@ mod tests {
         // 骑行确实有心率区间
         assert_eq!(workout.hr_zones.len(), 6);
         assert_eq!(workout.hr_zones[3].seconds, 102);
+    }
+
+    #[test]
+    fn regression_markdown_heart_range_preserves_empty_zone_positions() {
+        for raw in [
+            ";10,141;;20,170;",
+            ";10,141;broken;20,170;",
+            ";10,141; ;20,170;",
+        ] {
+            let zones = parse_heart_range(Some(raw));
+            assert_eq!(
+                zones
+                    .iter()
+                    .map(|zone| (zone.index, zone.upper_bound_bpm, zone.seconds))
+                    .collect::<Vec<_>>(),
+                vec![(1, 141, 10), (3, 170, 20)]
+            );
+        }
     }
 
     /// 全零的心率区间是「这次没有心率」，不是「每个区间待了 0 秒」。

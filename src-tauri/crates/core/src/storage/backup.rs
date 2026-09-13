@@ -315,6 +315,7 @@ pub fn create_backup(
 }
 
 fn write_manifest(data_dir: &Path, manifest: &BackupManifest) -> Result<()> {
+    validate_backup_id(&manifest.id)?;
     let encoded = serde_json::to_vec_pretty(manifest)
         .map_err(|error| ZeppBridgeError::ParseError(format!("无法生成备份清单: {error}")))?;
     std::fs::write(manifest_path(data_dir, &manifest.id), encoded)?;
@@ -355,6 +356,11 @@ pub fn list_backups(data_dir: &Path) -> Result<Vec<BackupManifest>> {
         let Ok(manifest) = serde_json::from_str::<BackupManifest>(&text) else {
             continue;
         };
+        if validate_backup_id(&manifest.id).is_err()
+            || path.file_stem().and_then(|value| value.to_str()) != Some(manifest.id.as_str())
+        {
+            continue;
+        }
         out.push(manifest);
     }
     out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
@@ -364,8 +370,13 @@ pub fn list_backups(data_dir: &Path) -> Result<Vec<BackupManifest>> {
 pub fn load_manifest(data_dir: &Path, id: &str) -> Result<BackupManifest> {
     validate_backup_id(id)?;
     let text = std::fs::read_to_string(manifest_path(data_dir, id))?;
-    serde_json::from_str(&text)
-        .map_err(|error| ZeppBridgeError::ParseError(format!("备份清单无法解析: {error}")))
+    let manifest: BackupManifest = serde_json::from_str(&text)
+        .map_err(|error| ZeppBridgeError::ParseError(format!("备份清单无法解析: {error}")))?;
+    validate_backup_id(&manifest.id)?;
+    if manifest.id != id {
+        return Err(ZeppBridgeError::ConfigError("备份 ID 无效".into()));
+    }
+    Ok(manifest)
 }
 
 /// 用户标记 / 取消标记「不要自动清理」。
@@ -762,6 +773,51 @@ mod tests {
             .unwrap();
         }
         db
+    }
+
+    #[test]
+    fn regression_markdown_manifest_ids_cannot_redirect_pruning_or_pinning() {
+        let dir = temp_dir("manifest-id-boundary");
+        drop(seed(&dir, 1));
+        let mut manifest = create_backup(&dir, BackupKind::PreMigration, "1.0.0").unwrap();
+        let original_id = manifest.id.clone();
+        let original_path = manifest_path(&dir, &original_id);
+        std::fs::write(dir.join("outside.db"), b"keep database").unwrap();
+        std::fs::write(dir.join("outside.json"), b"keep manifest").unwrap();
+        for index in 0..MIGRATION_BACKUP_KEEP {
+            manifest.id = format!("valid-{index}");
+            manifest.created_at = format!("9999-{index}");
+            write_manifest(&dir, &manifest).unwrap();
+        }
+        for invalid in [
+            "../outside",
+            "..\\outside",
+            "/outside",
+            "C:\\outside",
+            "",
+            "valid-0",
+        ] {
+            manifest.id = invalid.into();
+            manifest.created_at = "0000".into();
+            std::fs::write(&original_path, serde_json::to_vec(&manifest).unwrap()).unwrap();
+            assert_eq!(list_backups(&dir).unwrap().len(), MIGRATION_BACKUP_KEEP);
+            assert!(load_manifest(&dir, &original_id).is_err());
+            assert!(set_pinned(&dir, &original_id, true).is_err());
+            assert!(prune_migration_backups(&dir).unwrap().is_empty());
+            assert_eq!(
+                std::fs::read(dir.join("outside.db")).unwrap(),
+                b"keep database"
+            );
+            assert_eq!(
+                std::fs::read(dir.join("outside.json")).unwrap(),
+                b"keep manifest"
+            );
+            assert!(!load_manifest(&dir, "valid-0").unwrap().pinned);
+        }
+        manifest.id = original_id;
+        write_manifest(&dir, &manifest).unwrap();
+        assert_eq!(prune_migration_backups(&dir).unwrap(), vec![manifest.id]);
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

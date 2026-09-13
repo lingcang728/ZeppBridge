@@ -776,6 +776,18 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(24, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // v25: index child rows for detail reads and foreign-key cascades.
+        self.conn.execute_batch(
+            "CREATE INDEX IF NOT EXISTS idx_sleep_stages_sleep
+                ON sleep_stages(sleep_id, start_time);
+             CREATE INDEX IF NOT EXISTS idx_workout_pauses_workout
+                ON workout_pauses(workout_id, start_time);
+             PRAGMA user_version = 25;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(25, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }
