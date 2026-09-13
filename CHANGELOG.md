@@ -4,6 +4,24 @@
 
 ## Unreleased / 未发布
 
+## 2.4.0
+
+### Changed / 变化
+
+- Weekly report, sleep stages, workout tracks and coverage now treat missing or incomplete data as missing — not as zero, a complete copy, or a shifted GPS path.
+- 周报、睡眠阶段、运动轨迹和覆盖账本把缺失或不完整的数据如实标成缺失，不再用 0、完整副本或平移后的 GPS 来填。
+- Heart-rate page matches body status: the last-24-hours curve stays on top; 7-day / 1-month / 6-month only change the trends below.
+- 心率页与身体状态页对齐：最近 24 小时曲线固定在上方，7 天 / 1 个月 / 6 个月只改下面的趋势。
+
+### Fixed / 修复
+
+- Life-event category menu can be opened inside the editor (it was painting behind the dialog). New events still default to Other; Health & recovery, Travel, Routine, Training remain selectable.
+- 生活事件编辑器里可以打开分类菜单（原先画在对话框后面）。新建事件默认仍是「其他」，身体与恢复、旅行、作息、训练都可以选。
+- A 1 bpm resting-heart-rate change in This week is coloured as better/worse instead of a grey “flat” bar.
+- 「这一周」里静息心率差 1 次/分会按更好/更差上色，不再画成灰色持平条。
+- MSI/NSIS installs are no longer treated as the portable build, so an update does not drop a second copy in LocalAppData.
+- MSI/NSIS 安装版不再被当成便携版，更新时不会在 LocalAppData 再装一份。
+
 ## 2.3.0
 
 > **Hola, ya sé hablar español.**
