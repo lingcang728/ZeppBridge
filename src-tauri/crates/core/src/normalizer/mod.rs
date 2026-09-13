@@ -1260,7 +1260,12 @@ fn item_object(value: &Value) -> Option<&Map<String, Value>> {
 }
 
 fn first_value<'a>(object: &'a Map<String, Value>, names: &[&str]) -> Option<&'a Value> {
-    names.iter().find_map(|name| object.get(*name))
+    names
+        .iter()
+        .filter_map(|name| object.get(*name))
+        .find(|value| {
+            !value.is_null() && !value.as_str().is_some_and(|text| text.trim().is_empty())
+        })
 }
 
 fn first_value_from<'a>(
@@ -1272,11 +1277,14 @@ fn first_value_from<'a>(
 }
 
 fn first_string(object: &Map<String, Value>, names: &[&str]) -> Option<String> {
-    first_value(object, names).and_then(|value| match value {
-        Value::String(value) if !value.trim().is_empty() => Some(value.clone()),
-        Value::Number(value) => Some(value.to_string()),
-        _ => None,
-    })
+    names
+        .iter()
+        .filter_map(|name| object.get(*name))
+        .find_map(|value| match value {
+            Value::String(value) if !value.trim().is_empty() => Some(value.clone()),
+            Value::Number(value) => Some(value.to_string()),
+            _ => None,
+        })
 }
 
 /// 解析云端的 `heart_range`：心率区间分布。
@@ -1328,7 +1336,10 @@ fn add_minutes(base: DateTime<Utc>, minutes: i64) -> Option<DateTime<Utc>> {
 }
 
 fn first_number(object: &Map<String, Value>, names: &[&str]) -> Option<f64> {
-    first_value(object, names).and_then(parse_number)
+    names
+        .iter()
+        .filter_map(|name| object.get(*name))
+        .find_map(parse_number)
 }
 
 fn first_number_from(
@@ -1336,7 +1347,7 @@ fn first_number_from(
     nested: Option<&Map<String, Value>>,
     names: &[&str],
 ) -> Option<f64> {
-    first_value_from(object, nested, names).and_then(parse_number)
+    first_number(object, names).or_else(|| nested.and_then(|value| first_number(value, names)))
 }
 
 fn parse_number(value: &Value) -> Option<f64> {
@@ -2426,6 +2437,35 @@ fn duration_to_minutes(value: f64) -> i32 {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn aliases_skip_missing_values_without_inventing_ids_or_losing_samples() {
+        let raw = serde_json::json!({"items":[{"timestamp":null,"time":1800000000,"value":" ","heartRate":72,"device_id":null,"deviceId":"D85403FFFEE4D576"}]});
+        let samples = Normalizer::normalize_heart_rate(&raw).unwrap();
+        assert_eq!(samples.len(), 1);
+        assert_eq!(samples[0].value, 72.0);
+        assert_eq!(samples[0].device_id.as_deref(), Some("D85403FFFEE4D576"));
+        let raw = serde_json::json!({"data":[{"workout_id":" ","workoutId":{},"trackid":"original-id","start_time":null,"startTime":1800000000,"end_time":1800003600,"type":null,"sport_mode":6}]});
+        let workouts = Normalizer::normalize_workouts(&raw).unwrap();
+        assert_eq!(workouts[0].workout_id, "original-id");
+        let outer = serde_json::json!({"value":null,"score":"bad","zero":0,"flag":false});
+        let nested = serde_json::json!({"value":42});
+        assert_eq!(
+            first_number_from(
+                outer.as_object().unwrap(),
+                nested.as_object(),
+                &["value", "score"]
+            ),
+            Some(42.0)
+        );
+        assert_eq!(
+            first_value(outer.as_object().unwrap(), &["zero", "value"]),
+            Some(&serde_json::json!(0))
+        );
+        assert_eq!(
+            first_value(outer.as_object().unwrap(), &["flag", "value"]),
+            Some(&serde_json::json!(false))
+        );
+    }
 
     /// 云端一直在给、以前一个都没取的那批运动汇总字段。
     ///

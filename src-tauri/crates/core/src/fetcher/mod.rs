@@ -71,6 +71,45 @@ impl FetchWindow {
     }
 }
 
+/// Keep each response intact: pagination metadata and unknown fields belong to raw.
+async fn fetch_heart_rate_pages_with<F, Fut>(
+    window: FetchWindow,
+    mut fetch: F,
+) -> Result<Vec<FetchedRecord>>
+where
+    F: FnMut(i64, i64) -> Fut,
+    Fut: std::future::Future<Output = Result<Value>>,
+{
+    let end = window.end_utc.timestamp();
+    let mut cursor = window.start_utc.timestamp();
+    let mut records = Vec::new();
+    loop {
+        let payload = fetch(cursor, end).await?;
+        let items = heart_rate_items(&payload);
+        let next = if items.len() >= HEART_RATE_PAGE_LIMIT as usize {
+            heart_rate_cursor(&items).filter(|next| *next > cursor && *next < end)
+        } else {
+            None
+        };
+        records.push(FetchedRecord {
+            raw: RawRecord {
+                stream: "heart_rate".into(),
+                // A page must not overwrite the legacy merged window payload.
+                source_key: format!("heart_rate_page:{cursor}:{end}"),
+                source_scope: SourceScope::UserFused,
+                device_id: None,
+                start_utc: DateTime::from_timestamp(cursor, 0).unwrap_or(window.start_utc),
+                end_utc: Some(window.end_utc),
+                payload,
+                capability: CapabilityStatus::Verified,
+            },
+        });
+        let Some(next) = next else { break };
+        cursor = next;
+    }
+    Ok(records)
+}
+
 /// A fetch result keeps endpoint/source identity beside its raw payload. This
 /// is what allows sync to retain provenance before normalization.
 #[derive(Debug, Clone)]
@@ -184,8 +223,13 @@ impl DataFetcher {
         let mut records = Vec::new();
         let mut last_error = None;
         for chunk in window.chunks(7) {
-            match self.fetch_heart_rate_record(chunk).await {
-                Ok(record) => records.push(record),
+            match fetch_heart_rate_pages_with(chunk, |cursor, end| {
+                self.connector
+                    .fetch_heart_rate_with_options(cursor, end, HEART_RATE_PAGE_LIMIT, 2)
+            })
+            .await
+            {
+                Ok(pages) => records.extend(pages),
                 Err(error) if error.is_unavailable() => last_error = Some(error),
                 Err(error) => return Err(error),
             }
@@ -195,58 +239,6 @@ impl DataFetcher {
                 .unwrap_or_else(|| ZeppBridgeError::Unavailable("心率窗口没有可识别记录".into())));
         }
         Ok(records)
-    }
-
-    /// Defensive pagination for the heartRate endpoint.
-    ///
-    /// Real captures show the endpoint can return more than one page worth of
-    /// samples for a 7-day window, so a page that comes back full is followed
-    /// up with a cursor request instead of silently truncating the window.
-    pub async fn fetch_heart_rate_record(&self, window: FetchWindow) -> Result<FetchedRecord> {
-        let end = window.end_utc.timestamp();
-        let mut cursor = window.start_utc.timestamp();
-        let mut merged: Vec<Value> = Vec::new();
-        loop {
-            let payload = self
-                .connector
-                .fetch_heart_rate_with_options(cursor, end, HEART_RATE_PAGE_LIMIT, 2)
-                .await?;
-            let items = heart_rate_items(&payload);
-            let page_len = items.len();
-            merged.extend(items);
-            if page_len < HEART_RATE_PAGE_LIMIT as usize {
-                break;
-            }
-            match heart_rate_cursor(&merged) {
-                Some(next) if next > cursor => cursor = next,
-                _ => break, // no progress: avoid an infinite loop
-            }
-        }
-        let payload = if merged.is_empty() {
-            // Keep the original payload so downstream normalization can
-            // surface the endpoint's own "no records" shape.
-            self.connector
-                .fetch_heart_rate(window.start_utc.timestamp(), window.end_utc.timestamp())
-                .await?
-        } else {
-            json!({ "items": merged })
-        };
-        Ok(FetchedRecord {
-            raw: RawRecord {
-                stream: "heart_rate".into(),
-                source_key: format!(
-                    "heart_rate:{}:{}",
-                    window.start_utc.timestamp(),
-                    window.end_utc.timestamp()
-                ),
-                source_scope: SourceScope::UserFused,
-                device_id: None,
-                start_utc: window.start_utc,
-                end_utc: Some(window.end_utc),
-                payload,
-                capability: CapabilityStatus::Verified,
-            },
-        })
     }
 
     #[allow(dead_code)]
@@ -333,8 +325,7 @@ impl DataFetcher {
     /// callers can retain the successful records and report the missing stream.
     #[allow(dead_code)]
     pub async fn fetch_core_window(&self, window: FetchWindow) -> Result<Vec<FetchedRecord>> {
-        let heart_rate = self.fetch_heart_rate_record(window).await?;
-        Ok(vec![heart_rate])
+        self.fetch_heart_rate_records(window).await
     }
 
     /// Compatibility helper used by the original Tauri command.
@@ -1360,6 +1351,94 @@ fn payload_items(payload: &Value) -> Vec<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn empty_heart_rate_page_is_kept_without_a_second_request() {
+        let start = DateTime::from_timestamp(1_800_000_000, 0).unwrap();
+        let window = FetchWindow::between(start, start + Duration::hours(1)).unwrap();
+        let original = json!({"code":200,"data":{"items":[]},"serverNote":"no samples"});
+        let mut calls = 0;
+        let records = fetch_heart_rate_pages_with(window, |_, _| {
+            calls += 1;
+            std::future::ready(if calls == 1 {
+                Ok(original.clone())
+            } else {
+                Err(ZeppBridgeError::Unavailable("unexpected retry".into()))
+            })
+        })
+        .await
+        .unwrap();
+        assert_eq!(calls, 1);
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].raw.payload, original);
+    }
+
+    #[tokio::test]
+    async fn paginated_heart_rate_keeps_each_original_response_and_cursor() {
+        let start = DateTime::from_timestamp(1_800_000_000, 0).unwrap();
+        let window = FetchWindow::between(start, start + Duration::hours(1)).unwrap();
+        let first = json!({"code":200,"items":(0..1000).map(|index| json!({"timestamp":start.timestamp()+index,"value":60})).collect::<Vec<_>>(),"pageMarker":"first"});
+        let second = json!({"data":{"items":[{"timestamp":start.timestamp()+1000,"value":70}]},"pageMarker":"second"});
+        let originals = vec![first, second];
+        let mut pending = std::collections::VecDeque::from(originals.clone());
+        let mut cursors = Vec::new();
+        let records = fetch_heart_rate_pages_with(window, |cursor, end| {
+            cursors.push((cursor, end));
+            std::future::ready(
+                pending
+                    .pop_front()
+                    .ok_or_else(|| ZeppBridgeError::Unknown("unexpected request".into())),
+            )
+        })
+        .await
+        .unwrap();
+        assert_eq!(
+            cursors,
+            vec![
+                (start.timestamp(), window.end_utc.timestamp()),
+                (start.timestamp() + 1000, window.end_utc.timestamp())
+            ]
+        );
+        assert_eq!(
+            records
+                .iter()
+                .map(|record| record.raw.payload.clone())
+                .collect::<Vec<_>>(),
+            originals
+        );
+        assert_ne!(records[0].raw.source_key, records[1].raw.source_key);
+        assert_ne!(
+            records[0].raw.source_key,
+            format!(
+                "heart_rate:{}:{}",
+                window.start_utc.timestamp(),
+                window.end_utc.timestamp()
+            )
+        );
+        let samples = records
+            .iter()
+            .flat_map(|record| {
+                crate::normalizer::Normalizer::normalize_heart_rate(&record.raw.payload).unwrap()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(samples.len(), 1001);
+        assert_eq!(samples.last().unwrap().value, 70.0);
+        let db = crate::storage::Database::in_memory().unwrap();
+        let mut written = 0;
+        for record in &records {
+            written += db
+                .persist_fetched_record(&record.raw)
+                .unwrap()
+                .1
+                .primary_records;
+        }
+        assert_eq!(written, 1001);
+        assert_eq!(db.count_raw_records().unwrap(), 2);
+        assert_eq!(
+            db.reprocess_raw_records().unwrap().get("heart_rate"),
+            Some(&1001)
+        );
+    }
 
     #[test]
     fn exclusive_midnight_does_not_fetch_the_next_day() {

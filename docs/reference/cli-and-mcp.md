@@ -187,6 +187,10 @@ On macOS, cron needs Full Disk Access to read the data directory.
 ## zeppbridge-mcp
 
 Uses stdio transport. It **listens on no port and makes no network requests**.
+Each request line is limited to 1 MiB. Malformed UTF-8/JSON and oversized lines
+receive an error; subsequent lines can still be processed. Tool execution
+failures are returned in `result` with `isError: true` and explanatory text.
+Unknown tools and malformed call envelopes remain JSON-RPC errors.
 Read-only is enforced by the connection layer (`PRAGMA query_only`), not by the
 tool list happening to contain no write operations.
 

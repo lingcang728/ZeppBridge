@@ -78,33 +78,80 @@ const ERR_DATABASE: i64 = -32002;
 /// （-32000..-32019，明确被 grandfather 了）不冲突。
 const ERR_UNSUPPORTED_PROTOCOL_VERSION: i64 = -32022;
 
+const MAX_REQUEST_BYTES: usize = 1024 * 1024;
+
+enum RequestFrame {
+    Message(Vec<u8>),
+    TooLarge,
+}
+
+// Drain oversized lines without retaining them, then resume at the next message.
+fn read_frame(reader: &mut impl BufRead) -> io::Result<Option<RequestFrame>> {
+    let mut bytes = Vec::new();
+    let mut oversized = false;
+    loop {
+        let chunk = reader.fill_buf()?;
+        if chunk.is_empty() {
+            return Ok(if oversized {
+                Some(RequestFrame::TooLarge)
+            } else if bytes.is_empty() {
+                None
+            } else {
+                Some(RequestFrame::Message(bytes))
+            });
+        }
+        let newline = chunk.iter().position(|byte| *byte == b'\n');
+        let count = newline.unwrap_or(chunk.len());
+        if !oversized {
+            if count > MAX_REQUEST_BYTES - bytes.len() {
+                oversized = true;
+                bytes.clear();
+            } else {
+                bytes.extend_from_slice(&chunk[..count]);
+            }
+        }
+        reader.consume(count + usize::from(newline.is_some()));
+        if newline.is_some() {
+            return Ok(Some(if oversized {
+                RequestFrame::TooLarge
+            } else {
+                RequestFrame::Message(bytes)
+            }));
+        }
+    }
+}
+
 fn main() {
     let stdin = io::stdin();
-    let mut stdout = io::stdout();
-    for line in stdin.lock().lines() {
-        let Ok(line) = line else { break };
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-        let request: Value = match serde_json::from_str(trimmed) {
+    let stdout = io::stdout();
+    let _ = serve(&mut stdin.lock(), &mut stdout.lock());
+}
+
+fn serve(reader: &mut impl BufRead, stdout: &mut impl Write) -> io::Result<()> {
+    while let Some(frame) = read_frame(reader)? {
+        let parsed: Result<Value, (i64, &str)> = match frame {
+            RequestFrame::Message(bytes) => {
+                if bytes.iter().all(u8::is_ascii_whitespace) {
+                    continue;
+                }
+                serde_json::from_slice(&bytes)
+                    .map_err(|_| (-32700, "Request is not valid JSON or UTF-8"))
+            }
+            RequestFrame::TooLarge => Err((-32600, "Request exceeds the 1 MiB limit")),
+        };
+        let request = match parsed {
             Ok(value) => value,
-            Err(error) => {
-                // 解析不了的行没有 id，按 JSON-RPC 只能回一个 null id 的错误。
-                let _ = writeln!(
+            Err((code, message)) => {
+                writeln!(
                     stdout,
                     "{}",
-                    json!({
-                        "jsonrpc": "2.0",
-                        "id": Value::Null,
-                        "error": { "code": -32700, "message": format!("无法解析请求：{error}") }
-                    })
-                );
-                let _ = stdout.flush();
+                    json!({"jsonrpc":"2.0", "id":null, "error":{"code":code,"message":message}})
+                )?;
+                stdout.flush()?;
                 continue;
             }
         };
-        // 通知（没有 id）按协议不回复。
+        // Notifications have no response.
         let Some(id) = request.get("id").cloned() else {
             continue;
         };
@@ -117,9 +164,10 @@ fn main() {
             Ok(result) => json!({ "jsonrpc": "2.0", "id": id, "result": result }),
             Err(error) => json!({ "jsonrpc": "2.0", "id": id, "error": error.to_json() }),
         };
-        let _ = writeln!(stdout, "{response}");
-        let _ = stdout.flush();
+        writeln!(stdout, "{response}")?;
+        stdout.flush()?;
     }
+    Ok(())
 }
 
 /// 一个 JSON-RPC 错误。
@@ -425,6 +473,32 @@ fn call_tool_with_db(
         .get("name")
         .and_then(Value::as_str)
         .ok_or((ERR_INVALID_PARAMS, "缺少工具名".to_string()))?;
+    if !tool_definitions()
+        .iter()
+        .any(|tool| tool["name"].as_str() == Some(name))
+    {
+        return Err((ERR_METHOD_NOT_FOUND, format!("Unknown tool: {name}")));
+    }
+    if params
+        .get("arguments")
+        .is_some_and(|args| !args.is_object())
+    {
+        return Err((ERR_INVALID_PARAMS, "arguments must be an object".into()));
+    }
+    match execute_tool_with_db(name, params, open) {
+        Ok(result) => Ok(result),
+        Err((_code, message)) => Ok(json!({
+            "content": [{"type":"text", "text":message}],
+            "isError": true,
+        })),
+    }
+}
+
+fn execute_tool_with_db(
+    name: &str,
+    params: &Value,
+    open: impl FnOnce() -> Result<(Database, u64), (i64, String)>,
+) -> Result<Value, (i64, String)> {
     let args = params.get("arguments").cloned().unwrap_or(json!({}));
     let (db, database_bytes) = open()?;
 
@@ -561,6 +635,64 @@ fn call_tool_with_db(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tool_failures_are_results_but_bad_envelopes_remain_rpc_errors() {
+        for code in [ERR_DATABASE, ERR_NOT_CONFIGURED] {
+            let result = call_tool_with_db(&json!({"name":"list_workouts"}), || {
+                Err((code, "Local data is unavailable".into()))
+            })
+            .unwrap();
+            assert_eq!(result["isError"], true);
+            assert_eq!(result["content"][0]["text"], "Local data is unavailable");
+        }
+        let library = TestLibrary::new(&[]);
+        let invalid = call_tool_with_db(
+            &json!({"name":"get_metric_series","arguments":{"metrics":[]}}),
+            || {
+                Ok((
+                    Database::open_read_only(library.0.join("zepp.db")).unwrap(),
+                    0,
+                ))
+            },
+        )
+        .unwrap();
+        assert_eq!(invalid["isError"], true);
+        for params in [
+            json!({}),
+            json!({"name":"unknown"}),
+            json!({"name":"list_workouts","arguments":[]}),
+        ] {
+            assert!(call_tool_with_db(&params, || panic!(
+                "invalid request must not open the database"
+            ))
+            .is_err());
+        }
+    }
+
+    #[test]
+    fn request_reader_enforces_limit_and_resumes_after_bad_lines() {
+        let mut input = vec![b'x'; MAX_REQUEST_BYTES + 10];
+        input.extend_from_slice(b"\n\xff\n{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"ping\"}\n");
+        let mut reader = io::BufReader::with_capacity(13, input.as_slice());
+        let mut output = Vec::new();
+        serve(&mut reader, &mut output).unwrap();
+        let responses: Vec<Value> = output
+            .split(|byte| *byte == b'\n')
+            .filter(|line| !line.is_empty())
+            .map(|line| serde_json::from_slice(line).unwrap())
+            .collect();
+        assert_eq!(responses.len(), 3);
+        assert_eq!(responses[0]["error"]["code"], -32600);
+        assert_eq!(responses[1]["error"]["code"], -32700);
+        assert_eq!(responses[2]["id"], 9);
+        assert_eq!(responses[2]["result"], json!({}));
+        let at_limit = vec![b' '; MAX_REQUEST_BYTES];
+        let mut reader = io::Cursor::new(at_limit);
+        assert!(
+            matches!(read_frame(&mut reader).unwrap(), Some(RequestFrame::Message(bytes)) if bytes.len()==MAX_REQUEST_BYTES)
+        );
+    }
     use chrono::{TimeZone, Utc};
     use std::path::PathBuf;
     use zeppbridge_core::models::{SleepSession, SleepStageSlice, SourceScope};
