@@ -392,7 +392,7 @@ watch(dataRevision, () => { void load(); });
 
     <div v-if="error" class="inline-alert" role="alert">
       <Icon name="warning" :size="14" />{{ error }}
-      <button v-if="isDesktop()" class="button button-secondary retry" type="button" @click="load">{{ t.retry }}</button>
+      <button v-if="isDesktop()" class="button button-secondary retry" type="button" @click="() => load()">{{ t.retry }}</button>
     </div>
 
     <div v-if="loading" class="stack" aria-live="polite" :aria-label="t.loadingAria">
