@@ -1278,7 +1278,12 @@ impl Database {
                 std::time::Duration::from_secs(30),
             )
             .map(Some)
-            .map_err(|error| ZeppBridgeError::ConfigError(error.to_string()))?,
+            .map_err(|error| match error {
+                error @ write_lock::WriteLockError::Busy { .. } => {
+                    ZeppBridgeError::Busy(error.to_string())
+                }
+                error => ZeppBridgeError::ConfigError(error.to_string()),
+            })?,
             None => None,
         };
         Self::backup_before_schema_change(db_path)?;

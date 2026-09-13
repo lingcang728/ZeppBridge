@@ -137,6 +137,11 @@ meaning of an existing one never changes.
 | 5 | Cloud request failed | Back off and retry |
 | 6 | Local database error | Requires human intervention |
 | 7 | Database version does not match this build | Run `zeppbridge-cli reprocess` (or launch the desktop app once) to upgrade, or update the CLI to the same version |
+| 8 | Sync incomplete: one or more streams failed | Inspect the stream results and retry; successfully written records are retained |
+
+An incomplete sync still emits the full report with `--json`, with `ok: false`
+and `success: false`. Unavailable or unverified optional streams alone do not
+cause this exit code.
 
 4 is separate from 1 because "the desktop app happens to be syncing" and
 "something actually broke" call for completely different responses. If they

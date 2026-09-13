@@ -42,7 +42,12 @@ impl FetchWindow {
     }
 
     pub fn end_day(&self) -> String {
-        self.end_utc.format("%Y-%m-%d").to_string()
+        // Timestamp windows are half-open; day endpoints include both dates.
+        self.end_utc
+            .checked_sub_signed(Duration::nanoseconds(1))
+            .unwrap_or(self.end_utc)
+            .format("%Y-%m-%d")
+            .to_string()
     }
 
     pub fn chunks(self, chunk_days: i64) -> Vec<Self> {
@@ -1355,6 +1360,43 @@ fn payload_items(payload: &Value) -> Vec<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn exclusive_midnight_does_not_fetch_the_next_day() {
+        let date = |value: &str| {
+            DateTime::parse_from_rfc3339(value)
+                .unwrap()
+                .with_timezone(&Utc)
+        };
+        let window =
+            FetchWindow::between(date("2026-01-25T00:00:00Z"), date("2026-02-08T00:00:00Z"))
+                .unwrap();
+        let chunks = window.chunks(7);
+        assert_eq!(
+            chunks
+                .iter()
+                .map(|chunk| (chunk.start_day(), chunk.end_day()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("2026-01-25".into(), "2026-01-31".into()),
+                ("2026-02-01".into(), "2026-02-07".into())
+            ]
+        );
+        for end in ["2026-02-08T00:00:00.000000001Z", "2026-02-08T12:00:00Z"] {
+            assert_eq!(
+                FetchWindow::between(window.start_utc, date(end))
+                    .unwrap()
+                    .end_day(),
+                "2026-02-08"
+            );
+        }
+        assert_eq!(
+            FetchWindow::between(date("2024-02-28T00:00:00Z"), date("2024-03-01T00:00:00Z"))
+                .unwrap()
+                .end_day(),
+            "2024-02-29"
+        );
+    }
 
     #[test]
     fn window_bounds_are_limited() {
