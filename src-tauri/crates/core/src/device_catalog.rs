@@ -339,9 +339,11 @@ mod tests {
     /// 的第一个编号）。
     ///
     /// 同一批里刻意没收的三个，理由记在
-    /// `scripts/assets/build-device-catalog.py` 的注释里：10813699 是 3:3 平票，
-    /// 8913155 和 7930112 各有一份来自单设备报告的真实异议——那种异议用不上
-    /// 「一个账号两块表、在选择器里挑错了」这条既有裁决理由。
+    /// `scripts/assets/build-device-catalog.py` 的注释里；其中 8913155 和
+    /// 7930112 的异议后来在 2026-09-13 那轮被证明是「同一设备集合几分钟后
+    /// 改正」的误指认，已经收录（见
+    /// `the_codes_adjudicated_on_2026_09_13_resolve_to_their_products`），
+    /// 只剩 10813699 因真实分歧继续不收。
     #[test]
     fn the_codes_adjudicated_on_2026_09_02_resolve_to_their_products() {
         for (code, catalog_id) in [
@@ -356,17 +358,16 @@ mod tests {
             assert_eq!(found.entry.catalog_id, catalog_id);
         }
 
-        // 没裁决通过的那三个不能悄悄溜进去。
-        for code in [10_813_699_i64, 8_913_155, 7_930_112] {
-            assert!(
-                match_catalog(&CatalogMatchInput {
-                    device_source_codes: vec![code],
-                    ..CatalogMatchInput::default()
-                })
-                .is_none(),
-                "{code} 还没有裁决通过，不该匹配到任何型号"
-            );
-        }
+        // 没裁决通过的那一个不能悄悄溜进去。
+        let code = 10_813_699_i64;
+        assert!(
+            match_catalog(&CatalogMatchInput {
+                device_source_codes: vec![code],
+                ..CatalogMatchInput::default()
+            })
+            .is_none(),
+            "{code} 还没有裁决通过，不该匹配到任何型号"
+        );
     }
 
     /// 2026-09-03 这一批（反馈库 183 行）唯一裁决通过的：10682625 -> T-Rex 3
@@ -406,7 +407,7 @@ mod tests {
             assert_eq!(matched.entry.catalog_id, catalog_id);
         }
         for code in [
-            92, 102, 104, 254, 8_126_720, 9_765_121, 11_469_059, 11_092_224, 10_682_627,
+            92, 102, 104, 254, 8_126_720, 9_765_121, 11_469_059, 11_092_224,
         ] {
             assert!(
                 match_catalog(&CatalogMatchInput {
@@ -415,6 +416,58 @@ mod tests {
                 })
                 .is_none(),
                 "unsupported or duplicate-only evidence for {code}"
+            );
+        }
+    }
+
+    /// 2026-09-13 这一批（反馈库 279 份报告）裁决通过的三个：
+    ///   * 10682627 -> T-Rex 3 Pro：2 份互相独立、跨版本跨日期的报告
+    ///     （v2.2.2 / v2.2.4 macOS），零异议，与已收录的 10682624 / 10682625
+    ///     同族。
+    ///   * 7930112 -> GTR 4 46mm：6 份报告跨至少 4 个独立提交语境。此前的
+    ///     T-Rex 3 异议在 83 秒后被同一设备集合（7930112 + 8716544）的下一
+    ///     份报告改正——「一个账号两块表、第一次挑错了」，相邻的 7930113
+    ///     早已收为 GTR 4 46mm。
+    ///   * 8913155 -> Active 2 44mm：5 份报告跨 5 个独立语境。唯一的 Helio
+    ///     Strap 异议在 3 分钟后被同一设备集合（10289411 + 8913155）改正；
+    ///     该账号的 10289411 已按名字自动匹配为 Helio Strap，把 8913155 也
+    ///     指认成 Helio Strap 等于说它有两条 Helio Strap——就是挑错了那一台。
+    ///
+    /// 仍然不收：10813699 是 Active 2 44mm 7 份 vs Active MAX 3 份的真实
+    /// 分歧；9765121 / 11092224 / 11469059 的 2 份都是同一分钟内同一设备
+    /// 集合的重复提交，只算一份独立证据；11272451 和 8126720 各自只有一份。
+    #[test]
+    fn the_codes_adjudicated_on_2026_09_13_resolve_to_their_products() {
+        for (code, catalog_id) in [
+            (10_682_627_i64, "amazfit-t-rex-3-pro-48-44mm"),
+            (7_930_112, "amazfit-gtr-4-46mm"),
+            (8_913_155, "amazfit-active-2-44mm"),
+        ] {
+            let found = match_catalog(&CatalogMatchInput {
+                device_source_codes: vec![code],
+                ..CatalogMatchInput::default()
+            })
+            .unwrap_or_else(|| panic!("{code} 应当能匹配到 {catalog_id}"));
+            assert_eq!(found.entry.catalog_id, catalog_id);
+            assert_eq!(found.status, CatalogMatchStatus::Exact);
+        }
+
+        // 分歧仍在、或独立证据仍只有一份的编号不能悄悄溜进去。
+        for code in [
+            10_813_699_i64,
+            9_765_121,
+            11_092_224,
+            11_469_059,
+            11_272_451,
+            8_126_720,
+        ] {
+            assert!(
+                match_catalog(&CatalogMatchInput {
+                    device_source_codes: vec![code],
+                    ..CatalogMatchInput::default()
+                })
+                .is_none(),
+                "{code} 还没有裁决通过，不该匹配到任何型号"
             );
         }
     }
