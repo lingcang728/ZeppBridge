@@ -11,6 +11,7 @@
  * 「我 2023 年的数据到底有没有」。
  */
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import DatePicker from './DatePicker.vue';
 import SelectMenu from './SelectMenu.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
@@ -20,6 +21,7 @@ import { syncStreamLabel } from '../lib/syncStreams';
 import { defineMessages, useMessages } from '../i18n';
 import { failedChunkText } from '../lib/failedChunkText';
 import { storageEstimateText, storageStopReasonText } from '../lib/storageEstimateText';
+import { localDateString } from '../lib/format';
 
 const messages = defineMessages(
   {
@@ -303,7 +305,8 @@ const fromDate = computed(() => {
   const back = (years: number) => {
     const date = new Date(today);
     date.setFullYear(date.getFullYear() - years);
-    return date.toISOString().slice(0, 10);
+    // 纯日历日期：用本地年月日，`toISOString()` 会在东八区把清晨推到前一天。
+    return localDateString(date);
   };
   switch (startChoice.value) {
     case '1y': return back(1);
@@ -590,7 +593,7 @@ const resetLedger = async () => {
     </div>
     <div v-if="startChoice === 'custom'" class="field-row">
       <span class="kv-label">{{ t.customDateLabel }}</span>
-      <input v-model="customFrom" type="date" :aria-label="t.customDateAria" :disabled="busy" />
+      <DatePicker v-model="customFrom" :aria-label="t.customDateAria" :disabled="busy" />
     </div>
 
     <div v-if="estimate" class="estimate-block">
@@ -747,6 +750,7 @@ h2 { margin: 0 0 14px; font-size: var(--fs-xl); font-weight: 700; color: var(--i
   font-size: var(--fs-sm);
 }
 .field-row .select-menu { min-width: 220px; flex: 0 0 auto; }
+.field-row .date-picker { min-width: 180px; flex: 1 1 auto; max-width: 280px; }
 .kv-label { flex: 0 0 96px; color: var(--muted); font-size: var(--fs-sm); }
 .retain-note { margin: 6px 0 8px; color: var(--muted); font-size: var(--fs-sm); line-height: 1.6; }
 .inline-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }

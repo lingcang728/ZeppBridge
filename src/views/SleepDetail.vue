@@ -194,10 +194,7 @@ const weeklyChartOption = computed(() => {
   if (!weekSessions.value.length) return null;
   const sorted = [...weekSessions.value].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
   
-  const dates = sorted.map((s) => {
-    const d = new Date(s.start_time);
-    return `${d.getMonth() + 1}/${d.getDate()}`;
-  });
+  const dates = sorted.map((s) => formatDate(s.start_time));
 
   const deepData = sorted.map((s) => minutesToHours(s.deep_minutes));
   const lightData = sorted.map((s) => minutesToHours(s.light_minutes));

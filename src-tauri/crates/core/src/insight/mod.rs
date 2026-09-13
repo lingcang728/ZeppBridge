@@ -582,10 +582,9 @@ impl Database {
     ///
     /// 每条结论都带样本数、来源和置信度；不足就说不足。不和任何人群基准比较，
     /// 也不输出诊断、治疗或风险预测。
-    pub fn weekly_report(&self, now: DateTime<Utc>) -> Result<WeeklyReport> {
-        // `daily_metrics.date` 是本地日，「今天」必须也按本地日算——拿 UTC 日
-        // 去切窗口，东八区早上 8 点前会把昨天当今天。
-        self.weekly_report_for_day(now.with_timezone(&Local).date_naive(), now)
+    pub fn weekly_report(&self, now: DateTime<Local>) -> Result<WeeklyReport> {
+        // `daily_metrics.date` 是本地日，「今天」必须也按本地日算。
+        self.weekly_report_for_day(now.date_naive(), now.with_timezone(&Utc))
     }
 
     /// 同上，但「今天」由调用方给出；测试用它钉住日期，不受机器时区影响。
@@ -732,9 +731,9 @@ impl Database {
         let end_text = end.to_string();
         match metric {
             "sleep_duration" => self.collect_samples(
-                "SELECT substr(end_time, 1, 10), CAST(duration_minutes AS REAL), source_scope
+                "SELECT date(end_time, 'localtime'), CAST(duration_minutes AS REAL), source_scope
                  FROM sleep_sessions
-                 WHERE substr(end_time, 1, 10) BETWEEN ?1 AND ?2",
+                 WHERE date(end_time, 'localtime') BETWEEN ?1 AND ?2",
                 &start_text,
                 &end_text,
             ),
@@ -742,12 +741,12 @@ impl Database {
             // 一个可比的日度值，两段窗口各自取标准差来对比。
             "sleep_start_regularity" => {
                 let mut raw = self.collect_raw_samples(
-                    "SELECT substr(start_time, 1, 10),
-                            CAST(substr(start_time, 12, 2) AS REAL) * 60
-                              + CAST(substr(start_time, 15, 2) AS REAL),
+                    "SELECT date(start_time, 'localtime'),
+                            CAST(strftime('%H', start_time, 'localtime') AS REAL) * 60
+                              + CAST(strftime('%M', start_time, 'localtime') AS REAL),
                             source_scope
                      FROM sleep_sessions
-                     WHERE substr(start_time, 1, 10) BETWEEN ?1 AND ?2",
+                     WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2",
                     &start_text,
                     &end_text,
                 )?;
@@ -774,9 +773,9 @@ impl Database {
             }
             "workout_count" => {
                 let raw = self.collect_raw_samples(
-                    "SELECT substr(start_time, 1, 10), 1.0, source_scope
+                    "SELECT date(start_time, 'localtime'), 1.0, source_scope
                      FROM workouts
-                     WHERE substr(start_time, 1, 10) BETWEEN ?1 AND ?2",
+                     WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2",
                     &start_text,
                     &end_text,
                 )?;
@@ -812,9 +811,9 @@ impl Database {
                     return Ok(daily);
                 }
                 self.collect_samples(
-                    "SELECT substr(timestamp, 1, 10), value, source_scope FROM metric_samples
+                    "SELECT date(timestamp, 'localtime'), value, source_scope FROM metric_samples
                      WHERE metric IN ('hrv', 'hrv_rmssd')
-                       AND substr(timestamp, 1, 10) BETWEEN ?1 AND ?2",
+                       AND date(timestamp, 'localtime') BETWEEN ?1 AND ?2",
                     &start_text,
                     &end_text,
                 )
@@ -834,8 +833,8 @@ impl Database {
                 }
                 self.collect_samples(
                     &format!(
-                        "SELECT substr(timestamp, 1, 10), value, source_scope FROM metric_samples
-                         WHERE metric = '{other}' AND substr(timestamp, 1, 10) BETWEEN ?1 AND ?2"
+                        "SELECT date(timestamp, 'localtime'), value, source_scope FROM metric_samples
+                         WHERE metric = '{other}' AND date(timestamp, 'localtime') BETWEEN ?1 AND ?2"
                     ),
                     &start_text,
                     &end_text,
@@ -1507,9 +1506,10 @@ mod tests {
 
     fn sleep(id: &str, days_ago: i64, start_hour: u32, minutes: i64) -> SleepSession {
         let day = (base() - Duration::days(days_ago)).date_naive();
-        let start = Utc
+        let start = Local
             .with_ymd_and_hms(day.year(), day.month(), day.day(), start_hour, 0, 0)
-            .unwrap();
+            .unwrap()
+            .with_timezone(&Utc);
         SleepSession {
             sleep_id: id.into(),
             start_time: start,
