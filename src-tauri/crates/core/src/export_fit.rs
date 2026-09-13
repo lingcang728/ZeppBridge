@@ -260,8 +260,8 @@ fn encode_workout(workout: &Value) -> Result<Option<(Vec<u8>, usize)>, String> {
     // Garmin Connect 只能退回账号的默认时区——于是北京时间早上六点的跑步会
     // 显示成前一天晚上十点。
     //
-    // 偏移量不用猜：导出 JSON 的 `start_time` 是带偏移的 RFC3339，手表当时在
-    // 哪个时区就写着哪个。读不出来就不写这个字段，而不是假设 UTC。
+    // 入库后的 start_time 已转为 UTC，零偏移不能证明手表所在时区。
+    // 只保留仍明确携带非零偏移的输入；无法确认时省略该字段。
     if let Some(offset) = local_offset_seconds(workout) {
         activity_fields.push(u32_field(
             mesgdef::Activity::LOCAL_TIMESTAMP,
@@ -318,8 +318,17 @@ fn merge_series(workout: &Value) -> Vec<(i64, Point)> {
             continue;
         };
         let point = merged.entry(unix).or_default();
-        point.latitude = entry.get("latitude").and_then(Value::as_f64);
-        point.longitude = entry.get("longitude").and_then(Value::as_f64);
+        // 坐标必须成对且落在地球表面上；出域的坐标等于没有坐标，
+        // 这条 record 上别的量（心率、功率）不受影响。
+        if let (Some(latitude), Some(longitude)) = (
+            entry.get("latitude").and_then(Value::as_f64),
+            entry.get("longitude").and_then(Value::as_f64),
+        ) {
+            if coordinates_in_domain(latitude, longitude) {
+                point.latitude = Some(latitude);
+                point.longitude = Some(longitude);
+            }
+        }
         if let Some(altitude) = entry.get("altitude_m").and_then(Value::as_f64) {
             point.altitude_m = Some(altitude);
         }
@@ -362,9 +371,11 @@ fn record_message(unix: i64, point: &Point, sport: typedef::Sport) -> Message {
     let mut fields = vec![u32_field(mesgdef::Record::TIMESTAMP, fit_timestamp(unix))];
 
     if let (Some(latitude), Some(longitude)) = (point.latitude, point.longitude) {
-        if let (Some(lat), Some(lon)) = (semicircles(latitude), semicircles(longitude)) {
-            fields.push(i32_field(mesgdef::Record::POSITION_LAT, lat));
-            fields.push(i32_field(mesgdef::Record::POSITION_LONG, lon));
+        if coordinates_in_domain(latitude, longitude) {
+            if let (Some(lat), Some(lon)) = (semicircles(latitude), semicircles(longitude)) {
+                fields.push(i32_field(mesgdef::Record::POSITION_LAT, lat));
+                fields.push(i32_field(mesgdef::Record::POSITION_LONG, lon));
+            }
         }
     }
     if let Some(altitude) = point.altitude_m.and_then(encode_altitude) {
@@ -628,10 +639,11 @@ fn push_whole_activity_lap(
     ];
 
     // 起点坐标同 session：取第一个真有定位的点，室内运动本来就没有。
-    if let Some((latitude, longitude)) = points
-        .iter()
-        .find_map(|(_, point)| Some((point.latitude?, point.longitude?)))
-    {
+    if let Some((latitude, longitude)) = points.iter().find_map(|(_, point)| {
+        let latitude = point.latitude?;
+        let longitude = point.longitude?;
+        coordinates_in_domain(latitude, longitude).then_some((latitude, longitude))
+    }) {
         if let (Some(lat), Some(lon)) = (semicircles(latitude), semicircles(longitude)) {
             fields.push(i32_field(mesgdef::Lap::START_POSITION_LAT, lat));
             fields.push(i32_field(mesgdef::Lap::START_POSITION_LONG, lon));
@@ -730,10 +742,11 @@ fn push_session(
 
     // 起点坐标取第一个真有定位的点，而不是第一条 record——室内运动的第一条
     // record 根本没有坐标。
-    if let Some((latitude, longitude)) = points
-        .iter()
-        .find_map(|(_, point)| Some((point.latitude?, point.longitude?)))
-    {
+    if let Some((latitude, longitude)) = points.iter().find_map(|(_, point)| {
+        let latitude = point.latitude?;
+        let longitude = point.longitude?;
+        coordinates_in_domain(latitude, longitude).then_some((latitude, longitude))
+    }) {
         if let (Some(lat), Some(lon)) = (semicircles(latitude), semicircles(longitude)) {
             fields.push(i32_field(mesgdef::Session::START_POSITION_LAT, lat));
             fields.push(i32_field(mesgdef::Session::START_POSITION_LONG, lon));
@@ -1249,6 +1262,16 @@ fn is_foot_sport(sport: typedef::Sport) -> bool {
     )
 }
 
+/// 坐标域：纬 ±90、经 ±180，且两个都得是有限值。
+/// 这是导出的最后一道边界，独立于解码侧的截断——从这里进来的数据可能
+/// 直接来自构造的导出输入，不经过解码器。
+fn coordinates_in_domain(latitude: f64, longitude: f64) -> bool {
+    latitude.is_finite()
+        && longitude.is_finite()
+        && latitude.abs() <= 90.0
+        && longitude.abs() <= 180.0
+}
+
 fn semicircles(degrees: f64) -> Option<i32> {
     if !degrees.is_finite() || degrees.abs() > 180.0 {
         return None;
@@ -1263,11 +1286,12 @@ fn semicircles(degrees: f64) -> Option<i32> {
 
 /// 这条运动所在时区相对 UTC 的偏移秒数。
 ///
-/// 导出 JSON 的 `start_time` 是带偏移量的 RFC3339，手表当时在哪个时区就写着
-/// 哪个，所以不用猜。解析不出来就返回 `None`——调用方据此不写本地时间戳，而
-/// 不是假设 UTC。
+/// 入库后的 UTC 时间已丢失原始时区；零偏移和解析失败都返回 `None`。
+/// 非零 RFC3339 偏移仍可保留，调用方在未知时省略本地时间戳。
 fn local_offset_seconds(workout: &Value) -> Option<i32> {
-    parse_time(text(workout.get("start_time"))).map(|time| time.offset().local_minus_utc())
+    parse_time(text(workout.get("start_time")))
+        .map(|time| time.offset().local_minus_utc())
+        .filter(|offset| *offset != 0)
 }
 
 fn encode_altitude(metres: f64) -> Option<u16> {
@@ -1656,6 +1680,20 @@ mod tests {
             int_of(activity[0], mesgdef::Activity::LOCAL_TIMESTAMP).expect("本地时间戳应当写出来");
         // fixture 是 +08:00
         assert_eq!(local - utc, 8 * 3600);
+    }
+
+    #[test]
+    fn utc_normalized_workouts_do_not_claim_a_local_timezone() {
+        for start in ["2026-08-23T22:00:00Z", "2026-08-23T22:00:00+00:00"] {
+            let mut export = running_export();
+            export["data"]["workouts"][0]["start_time"] = json!(start);
+            let (files, _) = to_fit(&export).unwrap();
+            let fit = decode(&files[0].1);
+            let activity = messages_of(&fit, typedef::MesgNum::ACTIVITY);
+            assert_eq!(activity.len(), 1);
+            assert!(int_of(activity[0], mesgdef::Activity::TIMESTAMP).is_some());
+            assert!(raw(activity[0], mesgdef::Activity::LOCAL_TIMESTAMP).is_none());
+        }
     }
 
     /// 经度正好 180.0° 的点不该丢掉坐标。
@@ -2191,5 +2229,62 @@ mod tests {
             .fields
             .iter()
             .all(|field| field.num != mesgdef::Session::TIME_IN_HR_ZONE));
+    }
+
+    /// lat=999 不是地球上的点：record 上没有坐标字段（心率照写），
+    /// session/lap 的起点坐标也只能取到合法的那个点。
+    #[test]
+    fn out_of_domain_coordinates_are_dropped_before_semicircle_conversion() {
+        let export = export_with(json!({
+            "workouts": [{
+                "workout_id": "w1",
+                "effective_type": "run",
+                "start_time": "2026-08-24T06:00:00+08:00",
+                "end_time": "2026-08-24T06:00:02+08:00",
+                "route": [
+                    { "timestamp": "2026-08-24T06:00:00+08:00", "latitude": 999.0,
+                      "longitude": 121.0 },
+                    { "timestamp": "2026-08-24T06:00:01+08:00", "latitude": 31.0,
+                      "longitude": 121.0 }
+                ],
+                "samples": [
+                    { "timestamp": "2026-08-24T06:00:00+08:00", "heart_rate": 132 },
+                    { "timestamp": "2026-08-24T06:00:01+08:00", "heart_rate": 134 }
+                ],
+                "splits": [],
+                "pauses": []
+            }]
+        }));
+        let (files, _) = to_fit(&export).expect("导出应当成功");
+        let fit = decode(&files[0].1);
+        let records = messages_of(&fit, typedef::MesgNum::RECORD);
+        assert_eq!(records.len(), 2, "两条采样仍然各写一条 record");
+        assert_eq!(
+            int_of(records[0], mesgdef::Record::POSITION_LAT),
+            None,
+            "lat=999 不许进 record"
+        );
+        assert_eq!(int_of(records[0], mesgdef::Record::POSITION_LONG), None);
+        assert_eq!(
+            int_of(records[0], mesgdef::Record::HEART_RATE),
+            Some(132),
+            "坐标坏了不等于整条采样没了"
+        );
+        let expected = (31.0 * SEMICIRCLES_PER_DEGREE).round() as i64;
+        assert!(
+            (int_of(records[1], mesgdef::Record::POSITION_LAT).unwrap() - expected).abs() <= 1,
+            "合法点的坐标照常写"
+        );
+        let session = messages_of(&fit, typedef::MesgNum::SESSION);
+        assert_eq!(
+            int_of(session[0], mesgdef::Session::START_POSITION_LAT),
+            Some(expected),
+            "起点坐标只能取到合法点，不能是那个 lat=999"
+        );
+        let lap = messages_of(&fit, typedef::MesgNum::LAP);
+        assert_eq!(
+            int_of(lap[0], mesgdef::Lap::START_POSITION_LAT),
+            Some(expected)
+        );
     }
 }

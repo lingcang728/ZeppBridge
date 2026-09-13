@@ -15,6 +15,7 @@ import type {
   DeviceProfilesResult,
   DiagnosticReport,
   FeedbackSubmissionResult,
+  ExportEstimate,
   ExportResult,
   ExportSelection,
   HealthOverview,
@@ -338,6 +339,9 @@ export const tauriBackend: BridgeBackend = {
 
   getExportJson(selection: ExportSelection) {
     return call<string>('get_export_json', { selection });
+  },
+  estimateExport(selection: ExportSelection) {
+    return call<ExportEstimate>('estimate_export', { selection });
   },
 
   saveJsonExport(selection: ExportSelection, path: string) {

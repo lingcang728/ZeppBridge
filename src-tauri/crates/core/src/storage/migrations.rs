@@ -11,6 +11,16 @@
 use super::*;
 
 impl Database {
+    pub(super) fn reject_newer_schema(conn: &Connection) -> Result<()> {
+        let version: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+        if version > CURRENT_SCHEMA_VERSION {
+            return Err(ZeppBridgeError::DataUnavailable(format!(
+                "Database schema v{version} is newer than supported v{CURRENT_SCHEMA_VERSION}. Upgrade ZeppBridge before opening this database."
+            )));
+        }
+        Ok(())
+    }
+
     /// 迁移的事务边界。
     ///
     /// 这里面的每一步单独看都是幂等的，但**合起来不是原子的**，而且版本号
@@ -52,6 +62,7 @@ impl Database {
     }
 
     fn migrate_steps(&self) -> Result<()> {
+        Self::reject_newer_schema(&self.conn)?;
         self.conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS schema_migrations (
                 version INTEGER PRIMARY KEY,
@@ -61,6 +72,23 @@ impl Database {
         let version: i64 = self
             .conn
             .query_row("PRAGMA user_version", [], |row| row.get(0))?;
+
+        // Repair a missing or historical four-column key before the old v4
+        // IF NOT EXISTS statement can recreate it and reject two devices.
+        if version >= 7 {
+            let columns: i64 = self.conn.query_row(
+                "SELECT COUNT(*) FROM pragma_index_info('uq_daily_metric_key')",
+                [],
+                |row| row.get(0),
+            )?;
+            if columns == 0 || columns == 4 {
+                self.conn.execute_batch(
+                    "DROP INDEX IF EXISTS uq_daily_metric_key;
+                     CREATE UNIQUE INDEX uq_daily_metric_key
+                         ON daily_metrics(date, metric, unit, source_scope, COALESCE(device_id, ''));",
+                )?;
+            }
+        }
 
         if version < 1 {
             self.conn.execute_batch(
@@ -210,6 +238,19 @@ impl Database {
                 ],
             )?;
             self.ensure_table_columns("raw_records", &[("payload_hash", "TEXT")])?;
+        }
+
+        // C9: ancient libraries can carry duplicate metric_samples that make
+        // the historical unique-index CREATE below fail. Dedupe first; do not
+        // rewrite that published DDL.
+        if version < 28 {
+            self.conn.execute_batch(
+                "DELETE FROM metric_samples
+                 WHERE id NOT IN (
+                     SELECT MIN(id) FROM metric_samples
+                     GROUP BY metric, timestamp, unit, source_scope, COALESCE(device_id, '')
+                 );",
+            )?;
         }
 
         // Expression indexes are needed because SQLite treats NULLs as distinct
@@ -649,8 +690,10 @@ impl Database {
         //
         // 边界值一起存。区间边界来自用户在表上的设定，会随设定变化，所以
         // 「Z2 待了多久」这句话只有连着当时的边界才有意义。
-        self.conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS workout_hr_zones (
+        // v26 removes the redundant index; do not rebuild it on later launches.
+        if version < 26 {
+            self.conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS workout_hr_zones (
                 workout_id TEXT NOT NULL,
                 zone_index INTEGER NOT NULL,
                 upper_bound_bpm INTEGER NOT NULL,
@@ -659,7 +702,8 @@ impl Database {
             );
             CREATE INDEX IF NOT EXISTS idx_workout_hr_zones_workout
                 ON workout_hr_zones(workout_id);",
-        )?;
+            )?;
+        }
         self.conn.execute_batch("PRAGMA user_version = 19;")?;
         self.conn.execute(
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(19, ?1)",
@@ -744,6 +788,108 @@ impl Database {
         )?;
         self.conn.execute(
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(23, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // 归一化失败的 raw 进隔离表，而不是盖章跳过或连坐回滚整条报文。
+        // 逻辑键是 (raw_record_id, revision=当前解析器修订号)：新修订号对不上
+        // 旧隔离行，会再试一次。
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS raw_quarantine (
+                raw_record_id INTEGER PRIMARY KEY,
+                stream TEXT NOT NULL,
+                source_key TEXT NOT NULL,
+                error TEXT NOT NULL,
+                revision TEXT NOT NULL,
+                quarantined_at TEXT NOT NULL,
+                FOREIGN KEY(raw_record_id) REFERENCES raw_records(id) ON DELETE CASCADE
+            );
+            PRAGMA user_version = 24;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(24, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // v25: index child rows for detail reads and foreign-key cascades.
+        self.conn.execute_batch(
+            "CREATE INDEX IF NOT EXISTS idx_sleep_stages_sleep
+                ON sleep_stages(sleep_id, start_time);
+             CREATE INDEX IF NOT EXISTS idx_workout_pauses_workout
+                ON workout_pauses(workout_id, start_time);
+             PRAGMA user_version = 25;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(25, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // v26: unique-key prefixes already cover these lookup indexes.
+        self.conn.execute_batch(
+            "DROP INDEX IF EXISTS idx_metric_samples_metric_timestamp;
+             DROP INDEX IF EXISTS idx_daily_metrics_date_metric;
+             DROP INDEX IF EXISTS idx_workout_hr_zones_workout;
+             CREATE INDEX IF NOT EXISTS idx_daily_metrics_metric_date
+                 ON daily_metrics(metric, date);
+             PRAGMA user_version = 26;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(26, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // v27: 深睡 / 浅睡 / 清醒与 REM 同一套「有没有给」标志。
+        //
+        // 旧行 DEFAULT 1：以前存进去的 0 继续是「测到了，是 0」，不能事后
+        // 改口成「没给」。新写入按 Option::is_some 落标志。
+        self.ensure_table_columns(
+            "sleep_sessions",
+            &[
+                ("deep_available", "INTEGER NOT NULL DEFAULT 1"),
+                ("light_available", "INTEGER NOT NULL DEFAULT 1"),
+                ("awake_available", "INTEGER NOT NULL DEFAULT 1"),
+            ],
+        )?;
+        self.conn.execute_batch("PRAGMA user_version = 27;")?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(27, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // v28: metric_samples were deduped above; give workout_hr_zones the
+        // same ON DELETE CASCADE the other workout children already have.
+        if version < 28 {
+            self.conn.execute_batch(
+                "CREATE TABLE workout_hr_zones_v28 (
+                    workout_id TEXT NOT NULL,
+                    zone_index INTEGER NOT NULL,
+                    upper_bound_bpm INTEGER NOT NULL,
+                    seconds INTEGER NOT NULL,
+                    PRIMARY KEY (workout_id, zone_index),
+                    FOREIGN KEY(workout_id) REFERENCES workouts(workout_id) ON DELETE CASCADE
+                );
+                INSERT INTO workout_hr_zones_v28
+                    SELECT workout_id, zone_index, upper_bound_bpm, seconds
+                    FROM workout_hr_zones
+                    WHERE workout_id IN (SELECT workout_id FROM workouts);
+                DROP TABLE workout_hr_zones;
+                ALTER TABLE workout_hr_zones_v28 RENAME TO workout_hr_zones;",
+            )?;
+        }
+        self.conn.execute_batch("PRAGMA user_version = 28;")?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(28, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // v29: 跑步明细拉取失败次数。没有上限的话，永久 404 的运动会占满
+        // 每一次同步的待拉取队列，把整次同步的截止时间耗光。
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS workout_detail_fetch_attempts (
+                workout_id TEXT NOT NULL,
+                source TEXT NOT NULL,
+                attempts INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (workout_id, source)
+            );
+             PRAGMA user_version = 29;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(29, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
         self.ensure_cloud_sync_metadata()?;

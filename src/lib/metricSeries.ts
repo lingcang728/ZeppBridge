@@ -6,21 +6,21 @@ import { DISPLAY_RANGE_DAYS, rangeOptions } from './rangeOptions';
 
 const messages = defineMessages(
   {
-    notSyncedYet: '尚未同步',
+    noRecordsToShow: '没有可显示的记录',
     noRecordsInWindow: (days: number) => `近 ${days} 天无记录`,
     coverage: (days: number, withData: number) => `${days} 天里有 ${withData} 天记录`,
     dayRange: (low: string, high: string, unit: string) => `当日区间 ${low} – ${high}${unit}`,
     samples: (count: number) => `${count} 次读数`,
   },
   {
-    notSyncedYet: 'Not synced yet',
+    noRecordsToShow: 'No records to show',
     noRecordsInWindow: (days: number) => `No records in the last ${days} days`,
     coverage: (days: number, withData: number) => `${withData} of ${days} days have records`,
     dayRange: (low: string, high: string, unit: string) => `That day ranged ${low} – ${high}${unit}`,
     samples: (count: number) => `${count} readings`,
   },
   {
-    notSyncedYet: 'Aún sin sincronizar',
+    noRecordsToShow: 'Sin registros que mostrar',
     noRecordsInWindow: (days: number) => `Sin registros en los últimos ${days} días`,
     coverage: (days: number, withData: number) => `${withData} de ${days} días tienen registros`,
     dayRange: (low: string, high: string, unit: string) => `Ese día varió entre ${low} y ${high}${unit}`,
@@ -66,7 +66,8 @@ export const latestValue = (series?: MetricSeries | null): number | null => {
  */
 export const coverageLabel = (series?: MetricSeries | null): string => {
   const t = copy();
-  if (!series) return t.notSyncedYet;
+  // 调用方没给 series ≠ 尚未同步。那是同步状态，这里只谈能不能画出记录。
+  if (!series) return t.noRecordsToShow;
   if (!series.days_with_data) return t.noRecordsInWindow(series.window_days);
   return t.coverage(series.window_days, series.days_with_data);
 };

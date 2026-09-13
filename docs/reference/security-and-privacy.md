@@ -37,12 +37,13 @@ real accounts and regions has not been fully verified against live services.
 - The connector accepts only origins of the form `https://api-mifit*.zepp.com`
   or `https://api-mifit*.huami.com` — no arbitrary domains, paths, queries,
   fragments, embedded credentials or uncontrolled ports.
-- The HTTP client has a 30-second timeout and classifies 401/403, 404, 429/5xx
+- The HTTP client has a 30-second timeout (plus a 10-second connect timeout),
+  does not honour env/system proxies, and classifies 401/403, 404, 429/5xx
   and other non-2xx responses, with a bounded retry budget.
-- The sign-in window may navigate only to `https://*.zepp.com` /
-  `https://*.huami.com` (plus `about`/`data`/`blob` intermediates) and the exact
-  OAuth provider hosts that page uses. Region probing only touches API origins
-  on the allow-list.
+- The sign-in window may navigate only over HTTPS, to `*.zepp.com` /
+  `*.huami.com` and the exact OAuth provider hosts that page uses.
+  `about:`, `data:` and `blob:` URLs are rejected. Region probing only touches
+  API origins on the allow-list.
 - There is no LAN HTTP proxy, and no system or user CA is installed.
 - The local REST API binds only to `127.0.0.1:43921`. It does not listen on LAN
   addresses, offers no CORS, and exposes only a read-only health probe and a

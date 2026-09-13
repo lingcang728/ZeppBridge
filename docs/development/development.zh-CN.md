@@ -150,14 +150,14 @@ Tauri command 在 `src-tauri/src/lib.rs` 注册，前端封装在 `src/lib/bridg
 
 ## 本机 REST API
 
-桌面进程启动时由 `src-tauri/src/local_api.rs` 绑定 `127.0.0.1:43921`。当前公开两个只读 GET 路由：
+本机 API **默认关闭**。桌面进程启动时**不会**绑定 `127.0.0.1:43921`。只有用户在设置页打开开关之后才开始监听，且每个请求都要带 `Authorization: Bearer <token>`。实现在 `zeppbridge-core`（`crates/core/src/local_api.rs`），Tauri 适配层是 `src-tauri/src/local_api.rs`。当前公开两个只读 GET 路由：
 
 | 路由 | 说明 |
 | --- | --- |
 | `/health` | 服务状态和应用版本 |
 | `/workouts/{id}/series` | 复用 `Database::get_workout_series()`，返回标准化 `WorkoutSeries` JSON；未知 ID 返回 404 |
 
-API 不监听 `0.0.0.0`、不提供 CORS、响应 `Cache-Control: no-store`，也不读取或返回认证信息。端口被占用时桌面 App 继续启动，设置页通过 `get_local_api_status` 显示错误。测试必须覆盖路由、404/405、编码 ID、泛化 500 错误以及无 CORS 边界。
+API 只绑定 `127.0.0.1`、不提供 CORS、响应 `Cache-Control: no-store`，也不读取或返回认证信息。端口被占用时桌面 App 继续启动，设置页通过 `get_local_api_status` 显示错误。测试必须覆盖路由、404/405、编码 ID、泛化 500 错误以及无 CORS 边界。
 
 ## 当前数据链路
 
@@ -166,7 +166,7 @@ API 不监听 `0.0.0.0`、不提供 CORS、响应 `Cache-Control: no-store`，�
 3. `ZeppConnector` 只构造 HTTPS origin，host 仅允许 `api-mifit*.zepp.com` / `api-mifit*.huami.com`，HTTP client 超时 30 秒，401/403/404/429/5xx 分类处理。
 4. `DataFetcher` 为每个响应保留 stream/source key/raw payload。连接器有有限重试，但没有通用的 cursor 分页实现；运动 endpoint 使用 track ID 语义，当前窗口 helper 仍是保守范围。
 5. `Normalizer` 只接受能识别的结构化数组/对象，并能解码当前真实 fixture 验证过的 Base64 `band_data` 睡眠/分钟心率结构；无法识别的编码仍只保留 raw 并标记 `unverified`。
-6. `Database` 使用 WAL、外键和 schema migration（`PRAGMA user_version`，当前为 **16**；迁移步骤只能追加，不要改已有 DDL——已发布的库是按当时的 DDL 建的）；表达式唯一索引处理 `NULL device_id`，canonical 行保留 `raw_record_id`。迁移在拿到跨进程写锁并生成升级前备份之后才开始。
+6. `Database` 使用 WAL、外键和 schema migration（`PRAGMA user_version`，当前值见 `storage/mod.rs` 的 `CURRENT_SCHEMA_VERSION`；迁移步骤只能追加，不要改已有 DDL——已发布的库是按当时的 DDL 建的）；表达式唯一索引处理 `NULL device_id`，canonical 行保留 `raw_record_id`。迁移在拿到跨进程写锁并生成升级前备份之后才开始。
 7. `SyncManager` 用 run lock 防止进程内并发，并额外获取跨进程写锁，因此桌面应用和 CLI 不会同时写同一个库；核心流失败时 `success=false`，可选流显示 `unavailable`/`unverified`，成功后再做 retention（长期归档开启时跳过清理）。
 8. 抓取、解析、写入三个阶段分别记进 `stream_provenance`，失败带稳定的机器可读类别，供数据健康页和 MCP 的 `get_data_health` 使用。
 

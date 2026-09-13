@@ -17,7 +17,7 @@ const items = computed(() => deviceCatalog
     name: entry.display_name,
     kind: entry.kind,
     src: deviceThumbnailFor(entry.kind, entry.image_key),
-  })));
+  })).filter((item) => Boolean(item.src)));
 
 const rowA = computed(() => items.value);
 const rowB = computed(() => [...items.value].reverse());

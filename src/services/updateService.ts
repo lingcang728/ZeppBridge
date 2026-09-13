@@ -1,5 +1,6 @@
 import { reactive } from 'vue';
 import { defineMessages, messagesOf } from '../i18n';
+import { toUserMessage } from '../lib/bridge';
 
 const updateMessages = defineMessages(
   { nothingToInstall: '没有可安装的更新，请重新检查。' },
@@ -44,7 +45,8 @@ function isTauriRuntime(): boolean {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  // Tauri 插件经常抛 `{ code, message }`，`String(error)` 会变成 `[object Object]`。
+  return toUserMessage(error);
 }
 
 function positiveNumber(value: unknown): number | null {
@@ -89,8 +91,23 @@ async function isSelfUpdateSupported(): Promise<boolean> {
   return selfUpdateSupported;
 }
 
+let checkInFlight: Promise<void> | null = null;
+
 export async function checkForDesktopUpdate(manual = false): Promise<void> {
   if (!isTauriRuntime()) return;
+  if (
+    updateState.status === 'downloading'
+    || updateState.status === 'installing'
+  ) return;
+  if (checkInFlight) return checkInFlight;
+  const run = doCheckForDesktopUpdate(manual);
+  checkInFlight = run.finally(() => {
+    if (checkInFlight === run) checkInFlight = null;
+  });
+  return checkInFlight;
+}
+
+async function doCheckForDesktopUpdate(manual: boolean): Promise<void> {
   updateState.status = 'checking';
   updateState.error = '';
   try {
@@ -126,12 +143,13 @@ export async function checkForDesktopUpdate(manual = false): Promise<void> {
   } catch (error) {
     pendingUpdate = null;
     updateState.status = 'failed';
-    updateState.error = errorMessage(error);
+    updateState.error = toUserMessage(error, errorMessage(error));
   }
 }
 
 export async function downloadAndInstallDesktopUpdate(): Promise<void> {
-  if (!pendingUpdate || updateState.status !== 'available') {
+  if (updateState.status === 'downloading' || updateState.status === 'installing') return;
+  if (!pendingUpdate) {
     updateState.status = 'failed';
     updateState.error = messagesOf(updateMessages).nothingToInstall;
     return;

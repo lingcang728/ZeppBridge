@@ -239,10 +239,10 @@ export interface SleepSession {
   end_time: string;
   score?: number;
   duration_minutes: number;
-  deep_minutes: number;
-  light_minutes: number;
+  deep_minutes?: number | null;
+  light_minutes?: number | null;
   rem_minutes?: number | null;
-  awake_minutes: number;
+  awake_minutes?: number | null;
   /** Times woken during the night (`wc`). Distinct from awake_minutes. */
   wake_count?: number | null;
   source_scope: SourceScope;
@@ -278,6 +278,7 @@ export interface Workout {
   /** 用户给这个 Zepp 编号起的名字；目录已经认识的编号永远为空。 */
   custom_label?: string | null;
   zepp_type?: number | null;
+  zepp_source?: string | null;
   start_time: string;
   end_time: string;
   distance_meters?: number;
@@ -286,6 +287,11 @@ export interface Workout {
   calories?: number;
   avg_hr?: number;
   max_hr?: number;
+  min_hr?: number | null;
+  elevation_gain_m?: number | null;
+  elevation_loss_m?: number | null;
+  max_altitude_m?: number | null;
+  min_altitude_m?: number | null;
   training_load?: number;
   vo2max?: number;
   /** 有氧训练效果 0.0-5.0。后端一直在返回，只是这里从来没声明过。 */
@@ -295,6 +301,7 @@ export interface Workout {
   /** 主观疲劳度，用户在表上自己选的。 */
   rpe?: number | null;
   avg_cadence_spm?: number | null;
+  max_cadence_spm?: number | null;
   avg_stride_cm?: number | null;
   total_steps?: number | null;
   gps_available?: boolean;
@@ -397,6 +404,8 @@ export interface RestorePreview {
   current_table_counts: Record<string, number>;
   can_restore: boolean;
   blocker: string | null;
+  /** `blocker` 那句话的稳定码。界面按它取自己语言的说法。 */
+  blocker_code?: string | null;
 }
 
 export interface PendingRestore {
@@ -699,7 +708,19 @@ export interface WorkoutSeries {
   route: WorkoutRoutePoint[];
   pauses: WorkoutPause[];
   splits: WorkoutSplitRow[];
+  laps: WorkoutLapRow[];
   summary: WorkoutSeriesSummary;
+}
+
+/** Laps recorded by the watch, separate from computed kilometre splits. */
+export interface WorkoutLapRow {
+  index: number;
+  start_time: string;
+  end_time: string;
+  distance_m: number;
+  duration_seconds: number;
+  avg_hr: number | null;
+  max_hr: number | null;
 }
 
 /** One kilometre of a workout, cut from the server's cumulative distance. */
@@ -745,6 +766,8 @@ export interface LocalApiStatus {
   /** 是否已生成过访问 token。关闭状态下也可能为真。 */
   token_present: boolean;
   error?: string | null;
+  /** `error` 那句话的稳定码。界面按它取自己语言的说法。 */
+  error_code?: string | null;
 }
 
 export type ExportDataType =
@@ -793,6 +816,8 @@ export interface DeviceCacheMetadata {
   age_seconds?: number | null;
   refreshed: boolean;
   refresh_error?: string | null;
+  /** `refresh_error` 那句话的稳定码。界面按它取自己语言的说法。 */
+  refresh_error_code?: string | null;
 }
 
 export interface DeviceProfilesResult {
@@ -878,6 +903,14 @@ export interface ExportSelection {
   endDate?: string;
   dataTypes: ExportDataType[];
   detail?: ExportDetail;
+}
+
+export interface ExportEstimate {
+  recordCount: number;
+  estimatedBytes: number;
+  scopeKind: string;
+  startTime?: string | null;
+  endTime?: string | null;
 }
 
 export interface ExportResult {

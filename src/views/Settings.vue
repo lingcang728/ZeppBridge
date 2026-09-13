@@ -12,8 +12,8 @@ import {
 } from '../lib/dateTime';
 import { displayDateTimeFormatter } from '../lib/dateTime';
 
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { RouterLink } from 'vue-router';
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { RouterLink, useRoute } from 'vue-router';
 import BackupPanel from '../components/BackupPanel.vue';
 import DesignIcon from '../components/DesignIcon.vue';
 import DeviceVisual from '../components/DeviceVisual.vue';
@@ -27,6 +27,11 @@ import { AUTO_SYNC_INTERVALS } from '../lib/autoSync';
 import { UI_SCALES, useUiScale, type UiScale } from '../composables/useUiScale';
 import { backend, toUserMessage } from '../lib/bridge';
 import { regionShortName } from '../lib/deviceCopy';
+import {
+  isDefaultExportFormat,
+  readDefaultExportFormat,
+  writeDefaultExportFormat,
+} from '../lib/exportScope';
 import { BACKFILL_RANGE_DAYS, rangeOptions } from '../lib/rangeOptions';
 import type {
   CapabilityItem,
@@ -52,6 +57,7 @@ import { backendText } from '../i18n/backendText';
 import { storageEstimateText } from '../lib/storageEstimateText';
 
 const t = useMessages(settingsMessages);
+const route = useRoute();
 
 const lookup = (table: unknown, key: string): string | undefined =>
   (table as Record<string, string | undefined>)[key];
@@ -70,6 +76,26 @@ const {
   setAutoSyncEnabled,
   markDataChanged,
 } = useSyncController();
+
+const syncAlertTone = computed(() => {
+  if (syncState.value === 'failed') return 'danger';
+  if (syncState.value === 'partial' || syncState.value === 'cancelled') return 'warning';
+  if (syncState.value === 'syncing') return '';
+  return 'success';
+});
+const syncAlertIcon = computed(() => (
+  syncState.value === 'failed' || syncState.value === 'partial' || syncState.value === 'cancelled'
+    ? 'warning'
+    : 'info'
+));
+
+const focusConnection = () => {
+  if (route.hash !== '#connection' && route.query.focus !== 'connection') return;
+  window.setTimeout(() => {
+    document.getElementById('connection')?.scrollIntoView({ block: 'start' });
+  }, 0);
+};
+watch(() => [route.hash, route.query.focus], focusConnection);
 const { scale, setScale } = useUiScale();
 const {
   models: deviceModels,
@@ -294,10 +320,13 @@ const maskedToken = computed(() => {
   return `${token.slice(0, 8)}${'•'.repeat(16)}${token.slice(-4)}`;
 });
 
-/* 默认导出格式持久化 */
-const defaultExportFormat = ref(window.localStorage.getItem('zeppbridge-default-export-format') || 'json');
-const onExportFormatChange = () => {
-  window.localStorage.setItem('zeppbridge-default-export-format', defaultExportFormat.value);
+/* 默认导出格式持久化，Explore / 运动详情读同一把键。 */
+const defaultExportFormat = ref(readDefaultExportFormat());
+const onExportFormatChange = (value: string | number) => {
+  const format = String(value);
+  if (!isDefaultExportFormat(format)) return;
+  defaultExportFormat.value = format;
+  writeDefaultExportFormat(format);
 };
 
 /* 隐私政策弹窗 */
@@ -380,7 +409,7 @@ const connectionLabel = computed(() => {
     if (loginStatus.value.state === 'verifying') return t.value.connVerifying;
     return t.value.connWaiting;
   }
-  if (loginStatus.value.state === 'failed') return t.value.connFailed;
+  if (loginStatus.value.state === 'failed' && !accountRecognized.value) return t.value.connFailed;
   if (connected.value || configuredOnly.value) return deviceStateLabel('account');
   return deviceStateLabel('unknown');
 });
@@ -431,7 +460,9 @@ const refreshDevices = async () => {
   deviceRefreshError.value = null;
   try {
     await loadDevices(true);
-    const refreshError = deviceCache.value?.refresh_error || deviceError.value;
+    const refreshError = deviceError.value
+      || errorTextFor(deviceCache.value?.refresh_error_code)
+      || backendText(deviceCache.value?.refresh_error, '');
     if (refreshError || deviceCache.value?.status === 'refresh_failed') {
       deviceRefreshError.value = t.value.refreshFailed(
         refreshError ? t.value.refreshFailedReason(refreshError) : t.value.refreshFailedPeriod,
@@ -504,6 +535,8 @@ const importHar = async () => {
       const harPath = typeof selected === 'string' ? selected : (selected as { path: string }).path;
       await backend.importFromHar(harPath);
       await refreshStatus();
+      loginStatus.value = { state: 'idle', message: '', page_url: '' };
+      reconnecting.value = false;
       loginError.value = null;
       dataMessage.value = t.value.harImported;
     } catch (error) {
@@ -531,6 +564,8 @@ const submitManualAuth = async () => {
       manualRegionHost.value.trim(),
     );
     await refreshStatus();
+    loginStatus.value = { state: 'idle', message: '', page_url: '' };
+    reconnecting.value = false;
     showManualAuth.value = false;
     manualAppToken.value = '';
     manualUserId.value = '';
@@ -585,14 +620,26 @@ const reprocessLocalData = async () => {
   }
 };
 
+/** 已写入的保留期。清理和确认取消都读这个，绝不读输入框里还没保存的草稿。 */
+const persistedRetentionDays = () =>
+  userPrefs.value?.retention_days ?? appStatus.value?.retention_days ?? 365;
+const persistedHistoryDays = () =>
+  userPrefs.value?.history_sync_days ?? appStatus.value?.history_sync_days ?? 30;
+
+const revertPrefsDraft = () => {
+  retentionDays.value = persistedRetentionDays();
+  historyDays.value = persistedHistoryDays();
+};
+
 const cleanupData = async () => {
-  if (!window.confirm(t.value.cleanupConfirm(retentionDays.value))) return;
+  const days = persistedRetentionDays();
+  if (!window.confirm(t.value.cleanupConfirm(days))) return;
   dataBusy.value = 'cleanup';
   dataError.value = null;
   try {
-    await backend.cleanupOldData(retentionDays.value);
-    dataMessage.value = t.value.cleanupDone(retentionDays.value);
-    storageEstimate.value = await backend.getStorageEstimate(retentionDays.value).catch(() => null);
+    await backend.cleanupOldData(days);
+    dataMessage.value = t.value.cleanupDone(days);
+    storageEstimate.value = await backend.getStorageEstimate(days).catch(() => null);
     markDataChanged();
   } catch (error) {
     dataError.value = toUserMessage(error, t.value.cleanupFailed);
@@ -624,8 +671,9 @@ const toggleLocalApi = async () => {
   localApiMessage.value = null;
   try {
     localApiStatus.value = await backend.setLocalApiEnabled(next);
-    if (localApiStatus.value.error) {
-      localApiError.value = localApiStatus.value.error;
+    if (localApiStatus.value.error || localApiStatus.value.error_code) {
+      localApiError.value = errorTextFor(localApiStatus.value.error_code)
+        ?? backendText(localApiStatus.value.error, t.value.apiToggleFailed);
     } else if (next) {
       localApiMessage.value = t.value.apiEnabled;
     } else {
@@ -711,30 +759,40 @@ const REPORT_CATEGORIES = computed(() =>
     label: t.value.reportCategory[value].label,
     hint: t.value.reportCategory[value].hint,
   })));
-const diagnosticCategory = ref<string>('');
-const diagnosticNote = ref('');
-const diagnosticResult = ref<{ reportId: string; submittedAt: string } | null>(null);
-const diagnosticError = ref<string | null>(null);
+type DiagnosticFormState = {
+  category: string;
+  note: string;
+  result: { reportId: string; submittedAt: string } | null;
+  error: string | null;
+};
+const emptyDiagnosticForm = (): DiagnosticFormState => ({
+  category: '',
+  note: '',
+  result: null,
+  error: null,
+});
+const deviceDiagnostic = reactive(emptyDiagnosticForm());
+const privacyDiagnostic = reactive(emptyDiagnosticForm());
 
-const submitDiagnosticReport = async () => {
+const submitDiagnosticReport = async (form: DiagnosticFormState) => {
   const confirmed = window.confirm(t.value.reportConfirm);
   if (!confirmed) return;
   diagnosticBusy.value = true;
-  diagnosticError.value = null;
-  diagnosticResult.value = null;
+  form.error = null;
+  form.result = null;
   dataError.value = null;
   dataMessage.value = null;
   try {
-    const note = diagnosticNote.value.trim();
+    const note = form.note.trim();
     const result = await backend.submitDiagnosticReport(
       note || undefined,
-      diagnosticCategory.value || undefined,
+      form.category || undefined,
     );
-    diagnosticResult.value = { reportId: result.reportId, submittedAt: result.submittedAt };
-    diagnosticNote.value = '';
-    diagnosticCategory.value = '';
+    form.result = { reportId: result.reportId, submittedAt: result.submittedAt };
+    form.note = '';
+    form.category = '';
   } catch (error) {
-    diagnosticError.value = toUserMessage(error, t.value.reportFailed);
+    form.error = toUserMessage(error, t.value.reportFailed);
   } finally {
     diagnosticBusy.value = false;
   }
@@ -745,8 +803,11 @@ const savePrefs = async () => {
   const history = clampDays(Number(historyDays.value));
   retentionDays.value = retention;
   historyDays.value = history;
-  if (retention < (appStatus.value?.retention_days ?? 365)) {
-    if (!window.confirm(t.value.retentionConfirm(retention))) return;
+  if (retention < persistedRetentionDays()) {
+    if (!window.confirm(t.value.retentionConfirm(retention))) {
+      revertPrefsDraft();
+      return;
+    }
   }
   prefsBusy.value = true;
   try {
@@ -762,6 +823,7 @@ const savePrefs = async () => {
     dataMessage.value = t.value.prefsSaved;
     await refreshStatus();
   } catch (error) {
+    revertPrefsDraft();
     dataError.value = toUserMessage(error, t.value.prefsSaveFailed);
   } finally {
     prefsBusy.value = false;
@@ -802,12 +864,16 @@ const confirmHistorySync = async () => {
 };
 
 onMounted(async () => {
+  focusConnection();
   clearStalePrivacyPrefs();
   void loadCapabilityOverview();
   void loadDevices();
   void loadCorrections();
   localApiStatus.value = await backend.getLocalApiStatus().catch(() => null);
-  if (localApiStatus.value?.error) localApiError.value = localApiStatus.value.error;
+  if (localApiStatus.value?.error || localApiStatus.value?.error_code) {
+    localApiError.value = errorTextFor(localApiStatus.value.error_code)
+      ?? backendText(localApiStatus.value.error, t.value.apiToggleFailed);
+  }
   const status = await refreshStatus();
   retentionDays.value = status?.retention_days ?? 365;
   historyDays.value = status?.history_sync_days ?? 30;
@@ -1008,15 +1074,15 @@ const runCapabilityProbe = async () => {
       <Icon name="warning" :size="15" />{{ statusError }}
       <button type="button" @click="() => refreshStatus()">{{ t.retry }}</button>
     </div>
-    <div v-if="syncState !== 'idle'" :class="['alert', syncState === 'failed' ? 'danger' : 'success']" role="status">
-      <Icon :name="syncState === 'failed' ? 'warning' : 'info'" :size="15" />{{ syncMessage }}
+    <div v-if="syncState !== 'idle'" :class="['alert', syncAlertTone]" role="status">
+      <Icon :name="syncAlertIcon" :size="15" />{{ syncMessage }}
     </div>
     <div v-if="loginError" class="alert danger" role="alert"><Icon name="warning" :size="15" />{{ loginError }}</div>
     <div v-if="dataMessage" class="alert success"><Icon name="circle-check" :size="15" />{{ dataMessage }}</div>
     <div v-if="dataError" class="alert danger" role="alert"><Icon name="warning" :size="15" />{{ dataError }}</div>
 
     <!-- 1. 认证方式 -->
-    <section class="settings-card" aria-labelledby="auth-title">
+    <section id="connection" class="settings-card" aria-labelledby="auth-title">
       <h2 id="auth-title">{{ t.authTitle }}</h2>
       <div class="auth-grid">
         <div :class="['auth-card', { current: connected || configuredOnly }]">
@@ -1139,7 +1205,7 @@ const runCapabilityProbe = async () => {
           <div v-if="!deviceModels.length" class="device-empty">
             <Icon name="watch" :size="16" />{{ t.noDevices }}
           </div>
-          <template v-for="source in dataSources" :key="source.name">
+          <template v-for="source in dataSources" :key="source.kind === 'device' ? `device:${source.model.deviceKey || source.name}` : 'cloud'">
           <div class="source-row">
             <span class="source-icon">
               <DeviceVisual v-if="source.kind === 'device'" :src="source.model.image" :alt="source.name" :kind="source.model.kind" compact />
@@ -1177,7 +1243,7 @@ const runCapabilityProbe = async () => {
           <div class="diagnostic-note">
             <span>{{ t.reportWhat }}<em>{{ t.reportWhatHint }}</em></span>
             <SelectMenu
-              v-model="diagnosticCategory"
+              v-model="deviceDiagnostic.category"
               :options="REPORT_CATEGORIES"
               :placeholder="t.reportCategoryPlaceholder"
               :aria-label="t.reportCategoryAria"
@@ -1186,22 +1252,22 @@ const runCapabilityProbe = async () => {
           <label class="diagnostic-note">
             <span>{{ t.reportNote }}<em>{{ t.reportNoteHint }}</em></span>
             <textarea
-              v-model="diagnosticNote"
+              v-model="deviceDiagnostic.note"
               rows="3"
               :maxlength="DIAGNOSTIC_NOTE_MAX"
               :placeholder="t.reportNotePlaceholder"
             ></textarea>
-            <small>{{ t.reportNoteCounter(diagnosticNote.length, DIAGNOSTIC_NOTE_MAX) }}</small>
+            <small>{{ t.reportNoteCounter(deviceDiagnostic.note.length, DIAGNOSTIC_NOTE_MAX) }}</small>
           </label>
-          <button class="button secondary" type="button" :disabled="diagnosticBusy" @click="submitDiagnosticReport">
+          <button class="button secondary" type="button" :disabled="diagnosticBusy" @click="submitDiagnosticReport(deviceDiagnostic)">
             <Icon name="send" :size="14" />{{ diagnosticBusy ? t.reportSubmitting : t.reportSubmit }}
           </button>
-          <div v-if="diagnosticResult" class="diagnostic-done" role="status">
+          <div v-if="deviceDiagnostic.result" class="diagnostic-done" role="status">
             <strong><Icon name="circle-check" :size="14" />{{ t.reportDoneTitle }}</strong>
-            <p>{{ t.reportDoneLine(diagnosticResult.reportId, formatDateTime(diagnosticResult.submittedAt)) }}</p>
+            <p>{{ t.reportDoneLine(deviceDiagnostic.result.reportId, formatDateTime(deviceDiagnostic.result.submittedAt)) }}</p>
             <p class="diagnostic-done-note">{{ t.reportDoneNote }}</p>
           </div>
-          <p v-if="diagnosticError" class="api-error" role="alert">{{ diagnosticError }}</p>
+          <p v-if="deviceDiagnostic.error" class="api-error" role="alert">{{ deviceDiagnostic.error }}</p>
         </div>
       </section>
 
@@ -1350,7 +1416,7 @@ const runCapabilityProbe = async () => {
           <div class="diagnostic-note">
             <span>{{ t.reportWhat }}<em>{{ t.reportWhatHint }}</em></span>
             <SelectMenu
-              v-model="diagnosticCategory"
+              v-model="privacyDiagnostic.category"
               :options="REPORT_CATEGORIES"
               :placeholder="t.reportCategoryPlaceholder"
               :aria-label="t.reportCategoryAria"
@@ -1359,22 +1425,22 @@ const runCapabilityProbe = async () => {
           <label class="diagnostic-note">
             <span>{{ t.reportNote }}<em>{{ t.reportNoteHint }}</em></span>
             <textarea
-              v-model="diagnosticNote"
+              v-model="privacyDiagnostic.note"
               rows="3"
               :maxlength="DIAGNOSTIC_NOTE_MAX"
               :placeholder="t.reportNotePlaceholder"
             ></textarea>
-            <small>{{ t.reportNoteCounter(diagnosticNote.length, DIAGNOSTIC_NOTE_MAX) }}</small>
+            <small>{{ t.reportNoteCounter(privacyDiagnostic.note.length, DIAGNOSTIC_NOTE_MAX) }}</small>
           </label>
-          <button class="button secondary" type="button" :disabled="diagnosticBusy" @click="submitDiagnosticReport">
+          <button class="button secondary" type="button" :disabled="diagnosticBusy" @click="submitDiagnosticReport(privacyDiagnostic)">
             <Icon name="send" :size="14" />{{ diagnosticBusy ? t.reportSubmitting : t.reportSubmit }}
           </button>
-          <div v-if="diagnosticResult" class="diagnostic-done" role="status">
+          <div v-if="privacyDiagnostic.result" class="diagnostic-done" role="status">
             <strong><Icon name="circle-check" :size="14" />{{ t.reportDoneTitle }}</strong>
-            <p>{{ t.reportDoneLine(diagnosticResult.reportId, formatDateTime(diagnosticResult.submittedAt)) }}</p>
+            <p>{{ t.reportDoneLine(privacyDiagnostic.result.reportId, formatDateTime(privacyDiagnostic.result.submittedAt)) }}</p>
             <p class="diagnostic-done-note">{{ t.reportDoneNote }}</p>
           </div>
-          <p v-if="diagnosticError" class="api-error" role="alert">{{ diagnosticError }}</p>
+          <p v-if="privacyDiagnostic.error" class="api-error" role="alert">{{ privacyDiagnostic.error }}</p>
         </div>
       </section>
 

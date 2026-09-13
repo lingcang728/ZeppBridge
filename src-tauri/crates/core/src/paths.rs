@@ -1,13 +1,16 @@
-use std::io;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 const SQLITE_GROUP: [&str; 3] = ["zepp.db", "zepp.db-wal", "zepp.db-shm"];
-const LEGACY_FILES: [&str; 5] = [
+const LEGACY_FILES: [&str; 8] = [
     "auth.json",
     "auth.user-id",
     "devices.json",
     "device.json",
     "zeppbridge-ca.cer",
+    "restore-pending.json",
+    "local-api.json",
+    "credentials.json",
 ];
 const LEGACY_OPTIONAL_FILES: [&str; 1] = ["zeppbridge-ca.pem"];
 const LEGACY_DIRS: [&str; 2] = ["exports", "backups"];
@@ -532,6 +535,46 @@ fn path_exists(path: &Path) -> io::Result<bool> {
     }
 }
 
+/// Write `bytes` via a same-directory temp file + rename.
+///
+/// On Windows, `std::fs::rename` already replaces the destination
+/// (`MoveFileExW` + `MOVEFILE_REPLACE_EXISTING`). Do not delete the
+/// destination first: that is not atomic, and a crash in between leaves
+/// the target missing.
+pub fn write_file_atomically(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    let parent = path
+        .parent()
+        .filter(|value| !value.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("file");
+    let temp = parent.join(format!(
+        ".{file_name}.tmp-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    ));
+    let result = (|| {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&temp)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        drop(file);
+        std::fs::rename(&temp, path)
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temp);
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -732,12 +775,24 @@ mod tests {
         fs::write(source.join("zepp.db"), b"db").unwrap();
         fs::write(source.join("zepp.db-wal"), b"wal").unwrap();
         fs::write(source.join("auth.json"), b"{}").unwrap();
+        fs::write(source.join("restore-pending.json"), b"{\"id\":1}").unwrap();
+        fs::write(source.join("local-api.json"), b"{\"enabled\":true}").unwrap();
+        fs::write(source.join("credentials.json"), b"{}").unwrap();
         fs::create_dir_all(source.join("exports")).unwrap();
         fs::write(source.join("exports").join("a.json"), b"[]").unwrap();
 
         relocate_from(&source, &dest).unwrap();
         assert_eq!(fs::read(dest.join("zepp.db")).unwrap(), b"db");
         assert_eq!(fs::read(dest.join("auth.json")).unwrap(), b"{}");
+        assert_eq!(
+            fs::read(dest.join("restore-pending.json")).unwrap(),
+            b"{\"id\":1}"
+        );
+        assert_eq!(
+            fs::read(dest.join("local-api.json")).unwrap(),
+            b"{\"enabled\":true}"
+        );
+        assert_eq!(fs::read(dest.join("credentials.json")).unwrap(), b"{}");
         assert_eq!(
             fs::read(dest.join("exports").join("a.json")).unwrap(),
             b"[]"
@@ -776,5 +831,34 @@ mod tests {
         assert!(!dest.join("zepp.db-shm").exists());
 
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn atomic_write_replaces_an_existing_file() {
+        let dir = std::env::temp_dir().join(format!(
+            "zeppbridge-atomic-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("out.json");
+        fs::write(&path, b"old").unwrap();
+        write_file_atomically(&path, b"new-content").unwrap();
+        assert_eq!(fs::read(&path).unwrap(), b"new-content");
+        let leftovers: Vec<_> = fs::read_dir(&dir)
+            .unwrap()
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| {
+                entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(".out.json.tmp-")
+            })
+            .collect();
+        assert!(leftovers.is_empty(), "temp file was left behind");
+        let _ = fs::remove_dir_all(dir);
     }
 }

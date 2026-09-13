@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildExportSelection } from '../exportScope';
+import {
+  buildExportSelection,
+  exportInputForFocus,
+  isDefaultExportFormat,
+  readDefaultExportFormat,
+} from '../exportScope';
 
 const base = {
   dataTypes: ['workouts'] as const,
@@ -25,6 +30,26 @@ describe('导出范围互斥', () => {
     const result = buildExportSelection({ ...base, dataTypes: ['workouts'], workoutId: 'run-1' });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.selection.scope).toEqual({ kind: 'workout', workoutId: 'run-1' });
+  });
+
+  it('UI 锁定运动时只提交 workoutId，不带页面上的日期范围', () => {
+    const input = exportInputForFocus({
+      startDate: '2026-01-01',
+      endDate: '2026-01-31',
+      focusedWorkoutId: 'run-1',
+      dataTypes: ['workouts'],
+      detail: 'summary',
+    });
+    expect(input.workoutId).toBe('run-1');
+    expect(input.startDate).toBeUndefined();
+    expect(input.endDate).toBeUndefined();
+    const result = buildExportSelection(input);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.selection.scope).toEqual({ kind: 'workout', workoutId: 'run-1' });
+      expect(result.selection.startDate).toBeUndefined();
+      expect(result.selection.endDate).toBeUndefined();
+    }
   });
 
   it('只给日期时范围是这段日期', () => {
@@ -131,5 +156,17 @@ describe('数据类型', () => {
       result.selection.dataTypes.push('sleep');
       expect(types).toEqual(['workouts']);
     }
+  });
+});
+
+describe('默认导出格式', () => {
+  it('只接受 json / csv / gpx', () => {
+    expect(isDefaultExportFormat('json')).toBe(true);
+    expect(isDefaultExportFormat('fit')).toBe(false);
+    expect(isDefaultExportFormat('xml')).toBe(false);
+  });
+
+  it('没有浏览器存储时退回 json', () => {
+    expect(readDefaultExportFormat()).toBe('json');
   });
 });

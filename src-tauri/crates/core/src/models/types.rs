@@ -104,10 +104,10 @@ pub struct SleepSession {
     pub end_time: DateTime<Utc>,
     pub score: Option<i32>,
     pub duration_minutes: i32,
-    pub deep_minutes: i32,
-    pub light_minutes: i32,
+    pub deep_minutes: Option<i32>,
+    pub light_minutes: Option<i32>,
     pub rem_minutes: Option<i32>,
-    pub awake_minutes: i32,
+    pub awake_minutes: Option<i32>,
     pub source_scope: SourceScope,
     pub device_id: Option<String>,
     #[serde(default)]
@@ -856,6 +856,18 @@ impl ExportSelection {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportEstimate {
+    pub record_count: usize,
+    pub estimated_bytes: u64,
+    pub scope_kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start_time: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end_time: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportResult {
     pub path: String,
     pub record_count: usize,
@@ -1110,6 +1122,9 @@ pub struct DeviceCacheMetadata {
     pub refreshed: bool,
     #[serde(default)]
     pub refresh_error: Option<String>,
+    /// `refresh_error` 那句话的稳定码。界面按它取自己语言的说法。
+    #[serde(default)]
+    pub refresh_error_code: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

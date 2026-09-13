@@ -5,17 +5,78 @@ mod login;
 mod status;
 mod sync;
 
+use crate::ipc_error::AppError;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+use tokio::sync::Mutex;
+use zeppbridge_core::storage::write_lock::{self, WritePurpose};
+use zeppbridge_core::storage::Database;
+
+pub(crate) fn join_blocking<T>(result: Result<T, tokio::task::JoinError>) -> Result<T, AppError> {
+    result.map_err(|_| AppError::new("err.storage.worker_failed", "后台数据库任务被中断"))
+}
+
+pub(crate) async fn with_write<T>(
+    data_dir: &Path,
+    database: &Mutex<Database>,
+    purpose: WritePurpose,
+    mutation: impl FnOnce(&Database) -> zeppbridge_core::models::error::Result<T>,
+) -> Result<T, AppError> {
+    let _write_guard = write_lock::try_acquire(data_dir, purpose)?;
+    let db = database.lock().await;
+    Ok(mutation(&db)?)
+}
+
+pub(crate) async fn spawn_independent_write<T, F>(
+    data_dir: PathBuf,
+    purpose: WritePurpose,
+    work: F,
+) -> Result<T, AppError>
+where
+    T: Send + 'static,
+    F: FnOnce(&Database) -> zeppbridge_core::models::error::Result<T> + Send + 'static,
+{
+    join_blocking(
+        tokio::task::spawn_blocking(move || -> Result<T, AppError> {
+            let _replay = matches!(purpose, WritePurpose::Reprocess)
+                .then(zeppbridge_core::storage::ReplayGuard::enter);
+            let _compaction = matches!(purpose, WritePurpose::Compaction)
+                .then(zeppbridge_core::storage::CompactionGuard::enter);
+            let _write_guard =
+                write_lock::acquire_with_timeout(&data_dir, purpose, Duration::from_secs(20))?;
+            let db = Database::open_without_migration(data_dir.join("zepp.db"))?;
+            work(&db).map_err(AppError::from)
+        })
+        .await,
+    )?
+}
+
+pub(crate) async fn spawn_independent_read<T, F>(data_dir: PathBuf, work: F) -> Result<T, AppError>
+where
+    T: Send + 'static,
+    F: FnOnce(&Database) -> zeppbridge_core::models::error::Result<T> + Send + 'static,
+{
+    join_blocking(
+        tokio::task::spawn_blocking(move || {
+            let db = Database::open_read_only(data_dir.join("zepp.db"))?;
+            work(&db)
+        })
+        .await,
+    )?
+    .map_err(AppError::from)
+}
+
 pub(crate) use auth::{clear_auth, import_from_har, manual_auth, save_auth, verify_auth};
 pub(crate) use backup::{
     cancel_pending_restore, create_manual_backup, get_pending_restore, get_restore_preview,
     list_backups, set_backup_pinned, stage_restore, verify_backup,
 };
 pub(crate) use data::{
-    cleanup_old_data, compact_raw_payloads, get_capability_overview, get_daily_heart_rate_extremes,
-    get_data_health, get_device_catalog_options, get_device_profile, get_device_profiles,
-    get_diagnostic_report, get_export_json, get_health_overview, get_heart_rate_series,
-    get_heart_rate_zones, get_metric_series, get_recent_sleep, get_recent_workouts,
-    get_sleep_detail, get_sleep_page, get_storage_estimate, get_stress_series,
+    cleanup_old_data, compact_raw_payloads, estimate_export, get_capability_overview,
+    get_daily_heart_rate_extremes, get_data_health, get_device_catalog_options, get_device_profile,
+    get_device_profiles, get_diagnostic_report, get_export_json, get_health_overview,
+    get_heart_rate_series, get_heart_rate_zones, get_metric_series, get_recent_sleep,
+    get_recent_workouts, get_sleep_detail, get_sleep_page, get_storage_estimate, get_stress_series,
     get_training_balance, get_training_load_series, get_unknown_workout_codes, get_user_prefs,
     get_weekly_report, get_workout_detail, get_workout_insight, get_workout_page,
     get_workout_series, get_workout_type_options, open_data_folder, prepare_ai_handoff,

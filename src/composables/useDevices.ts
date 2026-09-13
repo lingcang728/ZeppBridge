@@ -4,6 +4,8 @@ import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { deviceImageFor } from '../lib/deviceCatalog';
 import type { DeviceCacheMetadata, DeviceProfile, DeviceProfilesResult } from '../types';
 import { defineMessages, messagesOf } from '../i18n';
+import { errorTextFor } from '../i18n/errors';
+import { backendText } from '../i18n/backendText';
 
 /**
  * The device catalog is deliberately treated as account data, not as a list
@@ -182,10 +184,16 @@ const requestProfiles = (refresh: boolean): Promise<DeviceProfilesResult> => {
   return request;
 };
 
+const refreshErrorText = (meta: DeviceCacheMetadata): string | null => {
+  if (!meta.refresh_error && !meta.refresh_error_code) return null;
+  return errorTextFor(meta.refresh_error_code)
+    ?? backendText(meta.refresh_error, copy().identifyUnavailable);
+};
+
 const applyResult = (result: DeviceProfilesResult): void => {
   profiles.value = result.profiles;
   cache.value = result.cache;
-  error.value = result.cache.refresh_error || null;
+  error.value = refreshErrorText(result.cache);
 };
 
 const setLoadFailure = (cause: unknown, refresh: boolean): void => {

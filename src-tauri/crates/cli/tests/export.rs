@@ -1,6 +1,43 @@
 use std::process::Command;
 
 #[test]
+fn missing_local_workout_is_not_a_cloud_failure() {
+    let dir = std::env::temp_dir().join(format!(
+        "zeppbridge-missing-workout-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    drop(zeppbridge_core::storage::Database::open_migrated(&dir.join("zepp.db")).unwrap());
+    for json_mode in [false, true] {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_zeppbridge-cli"));
+        command.env("ZEPPBRIDGE_DATA_DIR", &dir).args([
+            "export",
+            "--workout",
+            "missing-local-workout",
+        ]);
+        if json_mode {
+            command.arg("--json");
+        }
+        let output = command.output().unwrap();
+        assert_eq!(output.status.code(), Some(1));
+        if json_mode {
+            let payload: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+            assert_eq!(payload["ok"], false);
+            assert_eq!(payload["errorKind"], "data_unavailable");
+            assert!(!payload["message"].as_str().unwrap().is_empty());
+        } else {
+            assert!(output.stdout.is_empty());
+            assert!(!output.stderr.is_empty());
+        }
+    }
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
 fn invalid_export_arguments_return_json_usage_errors_before_opening_a_database() {
     let missing_data_dir = std::env::temp_dir().join(format!(
         "zeppbridge-export-usage-{}-{}",

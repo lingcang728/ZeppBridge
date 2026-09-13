@@ -29,6 +29,10 @@ const MAX_PLAUSIBLE_ALTITUDE_CM: i64 = 1_000_000;
 /// 所以放宽之后这道防线照样有效。
 const MAX_ACTIVITY_SECONDS: i64 = 48 * 60 * 60;
 
+fn add_seconds(base: DateTime<Utc>, seconds: i64) -> Option<DateTime<Utc>> {
+    chrono::Duration::try_seconds(seconds).and_then(|delta| base.checked_add_signed(delta))
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RoutePoint {
     pub timestamp: DateTime<Utc>,
@@ -384,7 +388,7 @@ fn kilometre_seconds(value: Option<&Value>) -> Option<Vec<i64>> {
         if !(1..=3600).contains(&duration) {
             return None;
         }
-        elapsed += duration;
+        elapsed = elapsed.checked_add(duration)?;
         // 允许 1 秒的取整误差：这一列在部分记录里是从毫秒四舍五入来的。
         if (cumulative - elapsed).abs() > 2 {
             return None;
@@ -416,7 +420,9 @@ fn splits_from_kilometre_seconds(
     let mut cursor = start;
     let mut travelled = 0.0f64;
     for (position, duration) in kilometre_seconds.iter().enumerate() {
-        let end = cursor + chrono::Duration::seconds(*duration);
+        let Some(end) = add_seconds(cursor, *duration) else {
+            break;
+        };
         let mut builder = SplitBuilder::new(position as i32 + 1, cursor, travelled);
         for sample in sample_by_second
             .range(cursor.timestamp()..=end.timestamp())
@@ -483,7 +489,7 @@ fn compute_splits(
         // Every sample since the previous distance reading belongs to this
         // split, so a distance series coarser than one second still averages
         // heart rate over the whole kilometre.
-        let lower = previous_ts.map_or(unix_ts, |previous| previous + 1);
+        let lower = previous_ts.map_or(unix_ts, |previous| previous.saturating_add(1));
         for sample in sample_by_second
             .range(lower..=unix_ts)
             .map(|(_, item)| *item)
@@ -517,6 +523,12 @@ pub struct DecodedWorkout {
     pub start_time: DateTime<Utc>,
     pub end_time: DateTime<Utc>,
     pub route: Vec<RoutePoint>,
+    /// 轨迹在差分链上断掉时被丢掉的后续点数，0 表示完整。
+    ///
+    /// 坐标是累积差分：某一段增量读不懂、累加溢出、或结果跑出地球表面之后，
+    /// 后面所有点的位置都不可知。继续往下走只会得到一条形状正常但整体平移
+    /// 的假轨迹，所以从那里截断，把没能输出的点数记在这里。
+    pub route_dropped_points: usize,
     pub samples: Vec<WorkoutSample>,
     pub pauses: Vec<PauseInterval>,
     pub splits: Vec<WorkoutSplit>,
@@ -559,21 +571,36 @@ pub fn decode_workout_detail(
         .map(str::to_owned);
 
     let time_deltas = parse_int_list(data.get("time"));
-    let time_sum: i64 = time_deltas
+    // 只累加到第一个读不懂的 delta 之前：那之后的时间戳全都不可知，
+    // 把它们的秒数加进总时长一样是编数据。
+    let time_sum = time_deltas
         .iter()
-        .map(|value| i64::from(*value.max(&0)))
-        .sum();
-    let time_end = start_time + chrono::Duration::seconds(time_sum);
-    let end_time = match summary_end {
+        .take_while(|value| value.is_some())
+        .map(|value| i64::from(value.unwrap_or_default().max(0)))
+        .fold(0i64, |acc, value| acc.saturating_add(value))
+        .clamp(0, MAX_ACTIVITY_SECONDS);
+    let time_end = add_seconds(start_time, time_sum)
+        .ok_or_else(|| ZeppBridgeError::ParseError("workout detail 时长溢出".into()))?;
+    let min_end = add_seconds(start_time, 1)
+        .ok_or_else(|| ZeppBridgeError::ParseError("workout detail 时长溢出".into()))?;
+    let uncapped_end = match summary_end {
         Some(summary) if summary > time_end => summary,
-        _ => time_end.max(start_time + chrono::Duration::seconds(1)),
+        _ => time_end.max(min_end),
+    };
+    // 汇总结束时刻可能远在 start 之后；后面还有 DateTime 相减，必须先夹到 48h。
+    let end_time = match add_seconds(start_time, MAX_ACTIVITY_SECONDS) {
+        Some(cap) => uncapped_end.min(cap).max(min_end),
+        None => time_end.max(min_end),
     };
 
-    let duration_secs = (end_time - start_time)
-        .num_seconds()
+    let duration_secs = end_time
+        .timestamp()
+        .saturating_sub(start_time.timestamp())
         .clamp(1, MAX_ACTIVITY_SECONDS);
     let from = track_id;
-    let to = track_id + duration_secs;
+    let to = track_id
+        .checked_add(duration_secs)
+        .ok_or_else(|| ZeppBridgeError::ParseError("workout detail 结束时刻溢出".into()))?;
 
     let (latitudes, longitudes) = parse_coordinate_deltas(data.get("longitude_latitude"));
     let altitudes_cm = parse_altitude_cm(data.get("altitude"));
@@ -659,47 +686,71 @@ pub fn decode_workout_detail(
     if has_pair_altitude {
         let mut cursor = from;
         for (delta, centimetres) in &altitude_pairs {
-            cursor += (*delta).max(0);
+            cursor = cursor.saturating_add((*delta).max(0));
             if let Some(meters) = cm_to_meters(i64::from(*centimetres)) {
                 altitude_by_second.insert(cursor, meters);
             }
         }
     }
+    let mut route_dropped_points = 0usize;
     if !time_deltas.is_empty() && !latitudes.is_empty() && !longitudes.is_empty() {
         let mut unix_ts = from;
         let mut latitude = 0i64;
         let mut longitude = 0i64;
         let count = time_deltas.len().min(latitudes.len()).min(longitudes.len());
         for index in 0..count {
-            unix_ts += i64::from(time_deltas[index].max(0));
-            if let (Some(lat_delta), Some(lon_delta)) = (latitudes[index], longitudes[index]) {
-                latitude += lat_delta;
-                longitude += lon_delta;
-                let altitude_m = if has_pair_altitude {
-                    altitude_by_second.get(&unix_ts).copied()
-                } else {
-                    let meters = altitudes_cm.get(index).copied().and_then(cm_to_meters);
-                    if let Some(meters) = meters {
-                        altitude_by_second.insert(unix_ts, meters);
-                    }
-                    meters
-                };
-                if let Some(timestamp) = Utc.timestamp_opt(unix_ts, 0).single() {
-                    route.push(RoutePoint {
-                        timestamp,
-                        latitude: latitude as f64 / COORD_FACTOR,
-                        longitude: longitude as f64 / COORD_FACTOR,
-                        altitude_m,
-                    });
-                }
+            // 差分链上任何一环读不懂，「从这一点起位置不可知」——截断，
+            // 而不是跳过去让后面所有点带着平移继续画。
+            let Some(delta_seconds) = time_deltas[index] else {
+                break;
+            };
+            unix_ts = unix_ts.saturating_add(i64::from(delta_seconds.max(0)));
+            let (Some(lat_delta), Some(lon_delta)) = (latitudes[index], longitudes[index]) else {
+                break;
+            };
+            let (Some(next_latitude), Some(next_longitude)) = (
+                latitude.checked_add(lat_delta),
+                longitude.checked_add(lon_delta),
+            ) else {
+                break;
+            };
+            let latitude_deg = next_latitude as f64 / COORD_FACTOR;
+            let longitude_deg = next_longitude as f64 / COORD_FACTOR;
+            if latitude_deg.abs() > 90.0 || longitude_deg.abs() > 180.0 {
+                break;
             }
+            let Some(timestamp) = Utc.timestamp_opt(unix_ts, 0).single() else {
+                break;
+            };
+            latitude = next_latitude;
+            longitude = next_longitude;
+            let altitude_m = if has_pair_altitude {
+                altitude_by_second.get(&unix_ts).copied()
+            } else {
+                let meters = altitudes_cm
+                    .get(index)
+                    .copied()
+                    .flatten()
+                    .and_then(cm_to_meters);
+                if let Some(meters) = meters {
+                    altitude_by_second.insert(unix_ts, meters);
+                }
+                meters
+            };
+            route.push(RoutePoint {
+                timestamp,
+                latitude: latitude_deg,
+                longitude: longitude_deg,
+                altitude_m,
+            });
         }
+        route_dropped_points = count - route.len();
     }
 
     let mut samples = Vec::with_capacity(duration_secs as usize);
     let mut last_altitude = None;
     for offset in 0..=duration_secs {
-        let unix_ts = from + offset;
+        let unix_ts = from.saturating_add(offset);
         let Some(timestamp) = Utc.timestamp_opt(unix_ts, 0).single() else {
             continue;
         };
@@ -713,7 +764,9 @@ pub fn decode_workout_detail(
             heart_rate: heart_rates
                 .as_ref()
                 .and_then(|map| map.get(&unix_ts).copied())
-                .filter(|value| *value > 0),
+                // 和 lap 的 0..=250 同一道界：跳变到 300+ 的读数是传感器坏点，
+                // 不是任何人的心率。
+                .filter(|value| (1..=250).contains(value)),
             speed,
             pace,
             cadence: cadences.as_ref().and_then(|map| map.get(&unix_ts).copied()),
@@ -732,22 +785,56 @@ pub fn decode_workout_detail(
         std::collections::BTreeMap::new();
     {
         let mut cursor = from;
+        // 上一个被留下的读数（秒, 米）。`currentDistance` 是累计值，必须单调
+        // 不减：回退是坏点；相对上一个有效读数每秒超过 200 m 的跳变同样是
+        // 坏点——真实遇到过一次跳变在同一秒里切出两万个 0 时长分段。
+        let mut previous: Option<(i64, f64)> = None;
         for (delta, centimetres) in &distance_pairs {
-            cursor += (*delta).max(0);
-            distance_by_second.insert(cursor, f64::from(*centimetres) / 100.0);
+            cursor = cursor.saturating_add((*delta).max(0));
+            let meters = f64::from(*centimetres) / 100.0;
+            if let Some((previous_ts, previous_m)) = previous {
+                let step = meters - previous_m;
+                let elapsed = (cursor - previous_ts).max(1) as f64;
+                if step < 0.0 || step > 200.0 * elapsed {
+                    continue;
+                }
+            }
+            distance_by_second.insert(cursor, meters);
+            previous = Some((cursor, meters));
         }
     }
     let mut splits = compute_splits(&samples, &distance_by_second);
+    // 对账：分段数超过「汇总距离能容纳的整公里数 +2」，或任何一段时长为 0，
+    // 都说明 `currentDistance` 里的坏点还是混进来了——整份分段当坏数据
+    // 丢掉，走下面的 kilo_pace 兜底。
+    let splits_are_plausible = splits.iter().all(|split| split.duration_seconds > 0)
+        && summary_distance_m
+            .filter(|value| value.is_finite() && *value > 0.0)
+            .is_none_or(|total| (splits.len() as f64) <= total / 1000.0 + 2.0);
+    if !splits_are_plausible {
+        splits = Vec::new();
+    }
     // `currentDistance` 是空的时候（这份库里 336 条明细有 130 条如此），
     // 上面这一步返回空，整条运动就只剩一圈。云端自己的 `kilo_pace` 在这些
     // 记录上恰恰是有的。
     if splits.is_empty() {
         if let Some(seconds) = kilometre_seconds(data.get("kilo_pace")) {
-            let total = summary_distance_m.or_else(|| {
-                // 汇总没给距离时，按整公里数兜底：kilo_pace 每一行就是一公里。
-                (!seconds.is_empty()).then_some(seconds.len() as f64 * 1000.0)
-            });
-            splits = splits_from_kilometre_seconds(&samples, &seconds, start_time, end_time, total);
+            // kilo_pace 一行就是一公里，行数必须和汇总距离对得上（±1 容一截
+            // 零头的舍入）。对不上说明列读错了，拒用——和 laps 的对账同一态度。
+            let count_agrees = summary_distance_m
+                .filter(|value| value.is_finite() && *value > 0.0)
+                .is_none_or(|total| {
+                    let expected = (total / 1000.0).floor() as i64;
+                    (seconds.len() as i64 - expected).abs() <= 1
+                });
+            if count_agrees {
+                let total = summary_distance_m.or_else(|| {
+                    // 汇总没给距离时，按整公里数兜底：kilo_pace 每一行就是一公里。
+                    (!seconds.is_empty()).then_some(seconds.len() as f64 * 1000.0)
+                });
+                splits =
+                    splits_from_kilometre_seconds(&samples, &seconds, start_time, end_time, total);
+            }
         }
     }
 
@@ -755,11 +842,7 @@ pub fn decode_workout_detail(
     // 或者最后一圈不在运动结束的时刻，就说明列读错了，整份丢掉。
     let laps = {
         let candidate = parse_laps(data.get("lap"), start_time);
-        if laps_agree_with_summary(
-            &candidate,
-            summary_distance_m,
-            (end_time - start_time).num_seconds(),
-        ) {
+        if laps_agree_with_summary(&candidate, summary_distance_m, duration_secs) {
             candidate
         } else {
             Vec::new()
@@ -772,6 +855,7 @@ pub fn decode_workout_detail(
         start_time,
         end_time,
         route,
+        route_dropped_points,
         samples,
         pauses,
         splits,
@@ -796,13 +880,15 @@ fn parse_i64(value: Option<&Value>) -> Option<i64> {
     }
 }
 
-fn parse_int_list(value: Option<&Value>) -> Vec<i32> {
+/// 分号段解析失败时保留 `None` 占位，不丢索引——「第几段」在差分格式里是
+/// 位置信息，静默压缩会让后面的增量全部错位。
+fn parse_int_list(value: Option<&Value>) -> Vec<Option<i32>> {
     let Some(text) = value.and_then(Value::as_str) else {
         return Vec::new();
     };
     text.split(';')
         .filter(|part| !part.is_empty())
-        .filter_map(|part| part.parse().ok())
+        .map(|part| part.trim().parse().ok())
         .collect()
 }
 
@@ -822,14 +908,14 @@ fn parse_coordinate_deltas(value: Option<&Value>) -> (Vec<Option<i64>>, Vec<Opti
     (latitudes, longitudes)
 }
 
-fn parse_altitude_cm(value: Option<&Value>) -> Vec<i64> {
+fn parse_altitude_cm(value: Option<&Value>) -> Vec<Option<i64>> {
     let mut values = parse_int_list(value)
         .into_iter()
-        .map(i64::from)
+        .map(|item| item.map(i64::from))
         .collect::<Vec<_>>();
     if let Some(first_valid) = values
         .iter()
-        .position(|value| is_plausible_altitude_cm(*value))
+        .position(|value| value.is_some_and(is_plausible_altitude_cm))
     {
         let fill = values[first_valid];
         for item in values.iter_mut().take(first_valid) {
@@ -1038,7 +1124,10 @@ fn parse_pauses(value: Option<&Value>) -> Vec<PauseInterval> {
         let Some(start_time) = Utc.timestamp_opt(start, 0).single() else {
             continue;
         };
-        let Some(end_time) = Utc.timestamp_opt(start + end_delta.max(0), 0).single() else {
+        let Some(end_unix) = start.checked_add(end_delta.max(0)) else {
+            continue;
+        };
+        let Some(end_time) = Utc.timestamp_opt(end_unix, 0).single() else {
             continue;
         };
         if end_time <= start_time {
@@ -1081,22 +1170,31 @@ fn timed_fill<T: Copy>(
     let mut result = std::collections::HashMap::new();
     let mut working = from;
     let mut value = init;
+    let limit = to.saturating_add(1);
     for (index, (delta, sample)) in elements.iter().enumerate() {
         value = update(value, sample);
         let start = if index == 0 { 0 } else { 1 };
         if *delta >= start {
             for _ in start..=*delta {
                 result.insert(working, value);
-                working += 1;
-                if working > to + 1 {
-                    break;
+                match working.checked_add(1) {
+                    Some(next) => {
+                        working = next;
+                        if working > limit {
+                            break;
+                        }
+                    }
+                    None => break,
                 }
             }
         }
     }
     while working <= to {
         result.insert(working, value);
-        working += 1;
+        match working.checked_add(1) {
+            Some(next) => working = next,
+            None => break,
+        }
     }
     result
 }
@@ -1197,12 +1295,15 @@ mod tests {
     fn splits_come_from_the_servers_cumulative_distance() {
         // Integrating the per-second speed instead is 0.15% out on a run but
         // 12.6% out on a ride, so splits must read `currentDistance`.
+        //
+        // 步长是 5 秒一个读数：每秒 400 m 的「跳变」在单调性过滤里就是坏点，
+        // 那道门必须先过。最后一条原地踏步的读数让零头有真实的结束时刻。
         let raw = json!({
             "trackid": 1_700_000_000i64,
-            "time": "0;1;1;1;1;",
-            "currentDistance": "0,0;1,40000;1,100000;1,160000;1,240000;",
-            "heart_rate": "0,150;1,10;1,0;1,-10;1,0;",
-            "time_delta_altitude": "1,1000;1,1200;1,1100;1,1300;",
+            "time": "0;5;5;5;5;5;",
+            "currentDistance": "0,0;5,40000;5,100000;5,160000;5,240000;5,240000;",
+            "heart_rate": "0,150;5,10;5,0;5,-10;5,0;",
+            "time_delta_altitude": "1,1000;5,1200;5,1100;5,1300;",
         });
         let decoded = decode_workout_detail(&raw, None, None).unwrap();
         let splits = &decoded.splits;
@@ -1374,13 +1475,15 @@ mod tests {
     /// 有 `currentDistance` 时不动它：那条路测得更细，逐秒切，不该被兜底顶掉。
     #[test]
     fn cumulative_distance_still_wins_when_it_is_present() {
+        // 同上的 5 秒步长夹具：分段必须仍由 `currentDistance` 切出来，
+        // kilo_pace 那 999 秒不该出现。
         let raw = json!({
             "trackid": 1_700_000_000i64,
-            "time": "0;1;1;1;1;",
-            "currentDistance": "0,0;1,40000;1,100000;1,160000;1,240000;",
+            "time": "0;5;5;5;5;5;",
+            "currentDistance": "0,0;5,40000;5,100000;5,160000;5,240000;5,240000;",
             // 故意给一份和上面对不上的 kilo_pace：它不该被用到。
             "kilo_pace": "0,999,geo,1,-1,999,999000,69,0,109,0,4,0,164;",
-            "heart_rate": "0,150;1,10;1,0;1,-10;1,0;",
+            "heart_rate": "0,150;5,10;5,0;5,-10;5,0;",
         });
         let decoded = decode_workout_detail(&raw, None, Some(2400.0)).unwrap();
         assert_eq!(decoded.splits.len(), 3);
@@ -1521,5 +1624,211 @@ mod tests {
         let decoded = decode_workout_detail(&raw, None, Some(1000.0)).unwrap();
         assert_eq!(decoded.laps.len(), 1);
         assert_eq!(decoded.laps[0].avg_hr, None);
+    }
+
+    /// 坏报文里的 trackid / 时间增量不能把解码器打崩。
+    ///
+    /// `Duration::seconds` 和 `DateTime + Duration` 都会在越界时 panic；这里只
+    /// 允许 ParseError 或把时长夹到 48 小时。
+    #[test]
+    fn huge_track_id_or_time_deltas_do_not_panic() {
+        let huge_id = json!({
+            "trackid": i64::MAX,
+            "time": "1;1;",
+        });
+        let err =
+            decode_workout_detail(&huge_id, None, None).expect_err("i64::MAX 不是合法 unix 时间");
+        assert!(
+            matches!(err, ZeppBridgeError::ParseError(_)),
+            "应当是 ParseError，实际 {err:?}"
+        );
+
+        let huge_time = ["2147483647"; 10].join(";");
+        let huge_deltas = json!({
+            "trackid": 1_700_000_000i64,
+            "time": huge_time,
+        });
+        let decoded =
+            decode_workout_detail(&huge_deltas, None, None).expect("时长应被夹到 48h 而不是 panic");
+        let span = decoded
+            .end_time
+            .timestamp()
+            .saturating_sub(decoded.start_time.timestamp());
+        assert!(span <= MAX_ACTIVITY_SECONDS, "时长 {span} 超过了 48h 上限");
+
+        let near_max = DateTime::<Utc>::MAX_UTC;
+        let result = decode_workout_detail(
+            &json!({
+                "trackid": 1_700_000_000i64,
+                "time": "1;",
+            }),
+            Some(near_max),
+            None,
+        );
+        assert!(
+            result.is_ok() || matches!(result, Err(ZeppBridgeError::ParseError(_))),
+            "汇总结束时刻极大时不得 panic：{result:?}"
+        );
+    }
+
+    /// 差分链上读不懂的一段 = 从那里起位置不可知：截断，不平移。
+    ///
+    /// 坐标是累积差分，跳过坏段继续累加会得到一条形状正常但整体平移的
+    /// 假轨迹——地图上看不出任何异常，而每一个点都是错的。
+    #[test]
+    fn a_broken_coordinate_delta_truncates_the_route_instead_of_shifting_it() {
+        let raw = json!({
+            "trackid": 1_700_000_000i64,
+            "time": "0;2;2;2;",
+            "longitude_latitude": "4004663552,11629333504;16403,8392;abc,8392;14877,8392;",
+        });
+        let decoded = decode_workout_detail(&raw, None, None).unwrap();
+        assert_eq!(decoded.route.len(), 2, "坏段之后的点一个都不许输出");
+        assert_eq!(decoded.route_dropped_points, 2);
+        // 第 2 点是「原点 + 第一个增量」，没有被坏段平移过。
+        let second = &decoded.route[1];
+        assert!((second.latitude - (40.04663552 + 16403.0 / COORD_FACTOR)).abs() < 1e-8);
+        assert!((second.longitude - (116.29333504 + 8392.0 / COORD_FACTOR)).abs() < 1e-8);
+    }
+
+    /// 累加跑出地球表面同样截断——再往后的坐标都是空中楼阁。
+    #[test]
+    fn a_coordinate_that_leaves_the_earth_truncates_the_route() {
+        let raw = json!({
+            "trackid": 1_700_000_000i64,
+            "time": "0;1;1;",
+            // 第二个增量把纬度推过 90°。
+            "longitude_latitude": "4004663552,11629333504;6000000000,0;1000,1000;",
+        });
+        let decoded = decode_workout_detail(&raw, None, None).unwrap();
+        assert_eq!(decoded.route.len(), 1);
+        assert_eq!(decoded.route_dropped_points, 2);
+        assert!((decoded.route[0].latitude - 40.04663552).abs() < 1e-8);
+    }
+
+    /// `time` 里读不懂的 delta 同理：那之后连时刻都不可知，时长也不许再涨。
+    #[test]
+    fn a_broken_time_delta_truncates_both_route_and_duration() {
+        let raw = json!({
+            "trackid": 1_700_000_000i64,
+            "time": "0;2;oops;2;",
+            "longitude_latitude": "4004663552,11629333504;16403,8392;100,100;100,100;",
+        });
+        let decoded = decode_workout_detail(&raw, None, None).unwrap();
+        assert_eq!(decoded.route.len(), 2);
+        assert_eq!(decoded.route_dropped_points, 2);
+        let span = decoded.end_time.timestamp() - decoded.start_time.timestamp();
+        assert_eq!(span, 2, "时长只累加到第一个坏 delta 之前");
+    }
+
+    /// 逐秒心率沿用 lap 的 0..=250：300 是贴合不良或传感器坏点，不是心率。
+    #[test]
+    fn a_heart_rate_sample_above_the_plausible_ceiling_is_dropped() {
+        let raw = json!({
+            "trackid": 1_700_000_000i64,
+            "time": "0;1;1;",
+            // 累计差分：300 -> 150 -> 151。
+            "heart_rate": "0,300;1,-150;1,1;",
+        });
+        let decoded = decode_workout_detail(&raw, None, None).unwrap();
+        assert_eq!(decoded.samples[0].heart_rate, None, "300 必须被丢掉");
+        assert_eq!(decoded.samples[1].heart_rate, Some(150));
+        assert_eq!(decoded.samples[2].heart_rate, Some(151));
+    }
+
+    /// 累计距离里的回退和巨跳都是坏点：丢掉该点，不许切出上万个 0 时长分段。
+    #[test]
+    fn corrupt_cumulative_distance_points_do_not_create_thousands_of_empty_splits() {
+        let raw = json!({
+            "trackid": 1_700_000_000i64,
+            "time": "0;300;300;300;300;300;",
+            // 一次回退（1500 -> 800）和一次巨跳（800 -> 21,000,000 m），
+            // 两个坏点都该被丢掉，而不是各自切出一段 0 时长的分段。
+            "currentDistance": "0,0;300,150000;300,80000;300,2100000000;300,240000;",
+            // 两个整公里，各 300 秒；行数对得上汇总的 2400 m。
+            "kilo_pace": "0,300,geo,1,-1,300,300266,69,0,109,0,4,0,164;\
+        1,300,geo,1,-1,600,300266,69,0,109,0,4,0,164;",
+            "heart_rate": "0,150;300,2;300,-2;300,1;300,0;",
+        });
+        let decoded = decode_workout_detail(&raw, None, Some(2400.0)).unwrap();
+        assert!(
+            !decoded.splits.is_empty(),
+            "currentDistance 被判坏之后应走 kilo_pace 兜底"
+        );
+        assert!(
+            decoded
+                .splits
+                .iter()
+                .all(|split| split.duration_seconds > 0),
+            "不允许 0 时长分段：{:?}",
+            decoded
+                .splits
+                .iter()
+                .map(|split| split.duration_seconds)
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            decoded.splits.len() <= 2400 / 1000 + 2,
+            "分段数要和汇总距离同量级：{}",
+            decoded.splits.len()
+        );
+    }
+
+    /// kilo_pace 行数和汇总距离对不上就整份拒用，和 laps 的对账同一态度。
+    #[test]
+    fn a_kilo_pace_row_count_that_disagrees_with_the_summary_is_refused() {
+        let raw = json!({
+            "trackid": 1_700_000_000i64,
+            "time": "0;300;300;",
+            "currentDistance": "",
+            // 3 整公里，但汇总只有 1500 m——行数对不上距离，一个都别信。
+            "kilo_pace": "0,300,geo,1,-1,300,300266,69,0,109,0,4,0,164;\
+        1,300,geo,1,-1,600,300266,69,0,109,0,4,0,164;\
+        2,300,geo,1,-1,900,300266,69,0,109,0,4,0,164;",
+            "heart_rate": "0,150;300,2;300,-2;",
+        });
+        let decoded = decode_workout_detail(&raw, None, Some(1500.0)).unwrap();
+        assert!(
+            decoded.splits.is_empty(),
+            "行数和汇总距离对不上就不要：{:?}",
+            decoded.splits.len()
+        );
+    }
+
+    /// 高度和 GPS 共用下标：中间一段读不懂必须留空，不能把后面的高度前移。
+    #[test]
+    fn an_unparseable_altitude_keeps_index_alignment() {
+        let raw = json!({
+            "trackid": 1_700_000_000i64,
+            "time": "0;1;1;",
+            "longitude_latitude": "4004663552,11629333504;16403,8392;14877,8392;",
+            "altitude": "7800;oops;7700;",
+        });
+        let decoded = decode_workout_detail(&raw, None, None).unwrap();
+        assert_eq!(decoded.route.len(), 3, "高度坏了不等于轨迹点没了");
+        assert_eq!(decoded.route[0].altitude_m, Some(78.0));
+        assert_eq!(decoded.route[1].altitude_m, None, "读不懂的那一段就是缺测");
+        assert_eq!(
+            decoded.route[2].altitude_m,
+            Some(77.0),
+            "后面的高度不许前移到坏段上"
+        );
+    }
+
+    /// 坐标累加溢出和跑出地球一样：后面的点位置不可知，截断。
+    #[test]
+    fn a_coordinate_cursor_overflow_truncates_the_route() {
+        let raw = json!({
+            "trackid": 1_700_000_000i64,
+            "time": "0;1;1;",
+            "longitude_latitude": format!(
+                "4004663552,11629333504;{},0;1000,1000;",
+                i64::MAX
+            ),
+        });
+        let decoded = decode_workout_detail(&raw, None, None).unwrap();
+        assert_eq!(decoded.route.len(), 1);
+        assert_eq!(decoded.route_dropped_points, 2);
+        assert!((decoded.route[0].latitude - 40.04663552).abs() < 1e-8);
     }
 }

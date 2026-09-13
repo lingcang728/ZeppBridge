@@ -73,7 +73,6 @@ const props = withDefaults(defineProps<{ name: IconName; size?: number; stroke?:
   stroke: 1.6,
 });
 
-const iconLabel = computed(() => `icon-${props.name}`);
 // Keep the local icon family optically consistent while retaining the public
 // `stroke` prop for callers that need a slightly lighter/heavier outline.
 const stroke = computed(() => Math.min(1.75, Math.max(1.5, props.stroke)));
@@ -86,7 +85,6 @@ const stroke = computed(() => Math.min(1.75, Math.max(1.5, props.stroke)));
     viewBox="0 0 24 24"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
-    :aria-label="iconLabel"
     aria-hidden="true"
     focusable="false"
   >

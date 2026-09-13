@@ -3,13 +3,14 @@ use crate::models::{error::*, *};
 use crate::normalizer::Normalizer;
 use chrono::{DateTime, Duration, Local, NaiveDate, Utc};
 use rusqlite::{params, Connection, OptionalExtension};
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 
 /// 当前 SQLite schema 版本（`PRAGMA user_version`）。加新版本只能追加迁移
 /// 步骤，不要改已有 DDL。
-pub const CURRENT_SCHEMA_VERSION: i64 = 23;
+pub const CURRENT_SCHEMA_VERSION: i64 = 29;
 /// 写进备份 manifest 的应用版本。Core 是独立 crate，用它自己的包版本。
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -44,7 +45,7 @@ pub const EXPORT_DATA_TYPES: [&str; 18] = [
 /// `raw_records` 重新跑一遍。不动它，新加的编号只对以后同步来的记录生效，
 /// 已经存成 `unknown:211` 的那 199 条记录会永远挂着——而报这个问题的人恰恰
 /// 是因为历史记录才来报的。
-pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v24-trail-running";
+pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v27-sleep-available";
 /// 较早公开版本的修订号。从它升上来时仍需重放这几条流。
 ///
 /// v21 还没有 v22 的圈解析和 v23 的 Rucking 映射；跳版本升级时要一并补齐。
@@ -55,6 +56,7 @@ const PREVIOUS_RELEASE_REPLAY_STREAMS: [&str; 2] = ["workout_detail", "workouts"
 const LAST_CLOUD_SYNC_AT_KEY: &str = "last_cloud_sync_at";
 const LAST_CLOUD_SYNC_OUTCOME_KEY: &str = "last_cloud_sync_outcome";
 const LAST_LOCAL_REPROCESS_AT_KEY: &str = "last_local_reprocess_at";
+const REPLAY_LAST_FAILURES_KEY: &str = "replay_last_failures";
 const RETENTION_DAYS_KEY: &str = "retention_days";
 const HISTORY_SYNC_DAYS_KEY: &str = "history_sync_days";
 const ARCHIVE_ENABLED_KEY: &str = "archive_enabled";
@@ -68,6 +70,10 @@ const BYTES_PER_HISTORY_DAY: u64 = 800_000;
 /// 部派生数据；按批提交拿到同一个数量级的提速，同时把 WAL 峰值钉在一批之内，
 /// 而这段代码恰恰要在 NAS 和容器上跑。
 const REPLAY_BATCH_RECORDS: usize = 64;
+/// 一次压缩读入内存的明文报文条数。整表装进一个 Vec 会在老库上顶满 RAM。
+const COMPACTION_BATCH_RECORDS: usize = 32;
+const RAW_PAYLOAD_STATS_KEY: &str = "raw_payload_stats_v1";
+const RAW_PAYLOAD_STATS_GEN_KEY: &str = "raw_payload_stats_gen";
 /// 少于这么多天的本机样本，不足以外推占用速率。
 const MIN_OBSERVED_DAYS: i64 = 7;
 /// 估算之外再留 200 MB。刚好填满磁盘和放不下一样糟糕。
@@ -80,6 +86,12 @@ pub mod life_events;
 mod migrations;
 pub mod provenance;
 pub mod write_lock;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CachedPayloadStats {
+    token: String,
+    streams: HashMap<String, (u64, i64)>,
+}
 
 pub struct Database {
     /// crate 内可见：洞察、备份等同属 Core 的模块直接复用这条连接，
@@ -98,52 +110,69 @@ pub struct Database {
 /// 是否正在后台压缩历史报文。
 ///
 /// 和重放同样的做法：界面要能说「正在压缩」，同步也要知道此刻有人在写库。
-static COMPACTION_IN_PROGRESS: std::sync::atomic::AtomicBool =
-    std::sync::atomic::AtomicBool::new(false);
+static COMPACTION_IN_PROGRESS: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+type PayloadStatsMap = HashMap<String, (u64, i64)>;
+static PAYLOAD_STATS_MEM: std::sync::Mutex<Option<(String, PayloadStatsMap)>> =
+    std::sync::Mutex::new(None);
 
 pub fn compaction_in_progress() -> bool {
-    COMPACTION_IN_PROGRESS.load(std::sync::atomic::Ordering::SeqCst)
+    COMPACTION_IN_PROGRESS.load(std::sync::atomic::Ordering::SeqCst) > 0
 }
 
-struct CompactionGuard;
+/// 用计数而不是布尔：启动线程在拿锁之前就会举起旗，压缩函数内部再进一层，
+/// 内层 Drop 不得把外层还在等锁的事实抹掉。
+pub struct CompactionGuard {
+    _private: (),
+}
 
 impl CompactionGuard {
-    fn enter() -> Self {
-        COMPACTION_IN_PROGRESS.store(true, std::sync::atomic::Ordering::SeqCst);
-        CompactionGuard
+    pub fn enter() -> Self {
+        COMPACTION_IN_PROGRESS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Self { _private: () }
     }
 }
 
 impl Drop for CompactionGuard {
     fn drop(&mut self) {
-        COMPACTION_IN_PROGRESS.store(false, std::sync::atomic::Ordering::SeqCst);
+        COMPACTION_IN_PROGRESS.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
     }
 }
 
-static REPLAY_IN_PROGRESS: std::sync::atomic::AtomicBool =
-    std::sync::atomic::AtomicBool::new(false);
+static REPLAY_IN_PROGRESS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 /// Whether a raw-payload replay is running right now.
 pub fn replay_in_progress() -> bool {
-    REPLAY_IN_PROGRESS.load(std::sync::atomic::Ordering::SeqCst)
+    REPLAY_IN_PROGRESS.load(std::sync::atomic::Ordering::SeqCst) > 0
 }
 
 /// Clears the replay flag however the replay ends, including on an early
-/// return or a panic.
-struct ReplayGuard;
+/// return or a panic. Nested enters are counted so an inner Drop cannot hide
+/// an outer wait-for-lock.
+pub struct ReplayGuard {
+    _private: (),
+}
 
 impl ReplayGuard {
-    fn enter() -> Self {
-        REPLAY_IN_PROGRESS.store(true, std::sync::atomic::Ordering::SeqCst);
-        Self
+    pub fn enter() -> Self {
+        REPLAY_IN_PROGRESS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Self { _private: () }
     }
 }
 
 impl Drop for ReplayGuard {
     fn drop(&mut self) {
-        REPLAY_IN_PROGRESS.store(false, std::sync::atomic::Ordering::SeqCst);
+        REPLAY_IN_PROGRESS.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
     }
 }
+
+/// 一次同步最多拉这么多条待拉取的跑步明细。其余留给下一轮，避免把整次同步
+/// 的截止时间耗在几百个永久 404 上。
+pub const PENDING_WORKOUT_DETAIL_LIMIT: usize = 40;
+/// 同一条明细连续失败这么多次之后，暂时移出自动队列。
+pub const MAX_WORKOUT_DETAIL_ATTEMPTS: i64 = 3;
+/// 失败次数过了这么多天就衰减回 0，给后来的云端修复一次再试的机会。
+const WORKOUT_DETAIL_ATTEMPT_DECAY: chrono::Duration = chrono::Duration::days(7);
 
 /// 一批重放的事务边界。
 ///
@@ -1282,7 +1311,12 @@ impl Database {
                 std::time::Duration::from_secs(30),
             )
             .map(Some)
-            .map_err(|error| ZeppBridgeError::ConfigError(error.to_string()))?,
+            .map_err(|error| match error {
+                error @ write_lock::WriteLockError::Busy { .. } => {
+                    ZeppBridgeError::Busy(error.to_string())
+                }
+                error => ZeppBridgeError::ConfigError(error.to_string()),
+            })?,
             None => None,
         };
         Self::backup_before_schema_change(db_path)?;
@@ -1398,6 +1432,7 @@ impl Database {
     }
 
     fn from_connection(conn: Connection) -> Result<Self> {
+        Self::reject_newer_schema(&conn)?;
         // These pragmas are set for every connection, including test databases.
         conn.execute_batch(
             "PRAGMA foreign_keys = ON;
@@ -1410,7 +1445,9 @@ impl Database {
     }
 
     fn ensure_cloud_sync_metadata(&self) -> Result<()> {
-        if self.get_app_meta(LAST_CLOUD_SYNC_AT_KEY)?.is_some() {
+        if self.get_app_meta(LAST_CLOUD_SYNC_AT_KEY)?.is_some()
+            || self.get_app_meta(LAST_CLOUD_SYNC_OUTCOME_KEY)?.is_some()
+        {
             return Ok(());
         }
         let latest_fetch =
@@ -1459,8 +1496,19 @@ impl Database {
         ))
     }
 
-    pub fn record_cloud_sync(&self, finished_at: &str, outcome: &str) -> Result<()> {
-        self.set_app_meta(LAST_CLOUD_SYNC_AT_KEY, finished_at)?;
+    pub fn record_cloud_sync(
+        &self,
+        finished_at: &str,
+        outcome: &str,
+        records_written: i64,
+    ) -> Result<()> {
+        // An attempt is not proof that the initial data fetch succeeded.
+        // Keep failed/cancelled outcomes visible without consuming first-run sync.
+        if matches!(outcome, "updated" | "no_new_data" | "partial")
+            && (records_written > 0 || self.get_app_meta(LAST_CLOUD_SYNC_AT_KEY)?.is_some())
+        {
+            self.set_app_meta(LAST_CLOUD_SYNC_AT_KEY, finished_at)?;
+        }
         self.set_app_meta(LAST_CLOUD_SYNC_OUTCOME_KEY, outcome)
     }
 
@@ -1528,7 +1576,19 @@ impl Database {
     ///
     /// 跨度不足 `MIN_OBSERVED_DAYS` 天的流标 `measured: false`，宁可说不知道，
     /// 也不拿一个从几天样本外推出来的速率去乘三年。
-    fn stream_storage_rates(&self, days: i64) -> Result<Vec<StreamStorageEstimate>> {
+    fn payload_stats_token(&self) -> Result<String> {
+        let (count, max_id): (i64, i64) = self.conn.query_row(
+            "SELECT COUNT(*), COALESCE(MAX(id), 0) FROM raw_records",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+        let generation = self
+            .get_app_meta(RAW_PAYLOAD_STATS_GEN_KEY)?
+            .unwrap_or_else(|| "0".into());
+        Ok(format!("{count}:{max_id}:{generation}"))
+    }
+
+    fn compute_raw_payload_stats(&self) -> Result<std::collections::HashMap<String, (u64, i64)>> {
         let mut stmt = self.conn.prepare(
             // 占用要算**实际落盘**的那一份：压过的行按压缩后的字节数算，
             // 否则估算会按明文报价，用户看到的数字比真实占用大好几倍。
@@ -1542,7 +1602,7 @@ impl Database {
              FROM raw_records
              GROUP BY stream",
         )?;
-        let observed: std::collections::HashMap<String, (u64, i64)> = stmt
+        let observed = stmt
             .query_map([], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
@@ -1555,6 +1615,65 @@ impl Database {
             .collect::<std::result::Result<Vec<_>, _>>()?
             .into_iter()
             .collect();
+        Ok(observed)
+    }
+
+    fn raw_payload_stats_by_stream(&self) -> Result<std::collections::HashMap<String, (u64, i64)>> {
+        let token = self.payload_stats_token()?;
+        if let Ok(guard) = PAYLOAD_STATS_MEM.lock() {
+            if let Some((cached_token, stats)) = guard.as_ref() {
+                if cached_token == &token {
+                    return Ok(stats.clone());
+                }
+            }
+        }
+        if let Some(value) = self.get_app_meta(RAW_PAYLOAD_STATS_KEY)? {
+            if let Ok(cached) = serde_json::from_str::<CachedPayloadStats>(&value) {
+                if cached.token == token {
+                    if let Ok(mut guard) = PAYLOAD_STATS_MEM.lock() {
+                        *guard = Some((cached.token.clone(), cached.streams.clone()));
+                    }
+                    return Ok(cached.streams);
+                }
+            }
+        }
+        let computed = self.compute_raw_payload_stats()?;
+        if let Ok(mut guard) = PAYLOAD_STATS_MEM.lock() {
+            *guard = Some((token, computed.clone()));
+        }
+        Ok(computed)
+    }
+
+    fn persist_raw_payload_stats(&self) -> Result<()> {
+        let token = self.payload_stats_token()?;
+        let streams = self.compute_raw_payload_stats()?;
+        let encoded = serde_json::to_string(&CachedPayloadStats {
+            token: token.clone(),
+            streams: streams.clone(),
+        })
+        .unwrap_or_else(|_| "{}".into());
+        self.set_app_meta(RAW_PAYLOAD_STATS_KEY, &encoded)?;
+        if let Ok(mut guard) = PAYLOAD_STATS_MEM.lock() {
+            *guard = Some((token, streams));
+        }
+        Ok(())
+    }
+
+    fn bump_payload_stats_generation(&self) -> Result<()> {
+        let next = self
+            .get_app_meta(RAW_PAYLOAD_STATS_GEN_KEY)?
+            .and_then(|value| value.parse::<u64>().ok())
+            .unwrap_or(0)
+            .saturating_add(1);
+        self.set_app_meta(RAW_PAYLOAD_STATS_GEN_KEY, &next.to_string())?;
+        if let Ok(mut guard) = PAYLOAD_STATS_MEM.lock() {
+            *guard = None;
+        }
+        Ok(())
+    }
+
+    fn stream_storage_rates(&self, days: i64) -> Result<Vec<StreamStorageEstimate>> {
+        let observed = self.raw_payload_stats_by_stream()?;
 
         Ok(coverage::BACKFILL_STREAMS
             .iter()
@@ -1839,12 +1958,18 @@ impl Database {
                 ))
             })?;
             if let Some(low) = low {
-                if earliest.as_deref().is_none_or(|current| low.as_str() < current) {
+                if earliest
+                    .as_deref()
+                    .is_none_or(|current| low.as_str() < current)
+                {
                     earliest = Some(low);
                 }
             }
             if let Some(high) = high {
-                if latest.as_deref().is_none_or(|current| high.as_str() > current) {
+                if latest
+                    .as_deref()
+                    .is_none_or(|current| high.as_str() > current)
+                {
                     latest = Some(high);
                 }
             }
@@ -1962,9 +2087,8 @@ impl Database {
             }
             // Optional wellness streams. Their payload shapes are not verified
             // field by field yet, so normalization is best-effort and must
-            // never fail: `persist_fetched_record` rolls the raw insert back on
-            // error, and losing the raw response is what would make verifying
-            // those shapes impossible without re-fetching.
+            // never fail. Raw is already committed before this runs; a later
+            // persist error no longer deletes the response.
             "wellness" => {
                 let batch = Normalizer::normalize_wellness(source_key, payload);
                 counts.primary_records =
@@ -1979,8 +2103,8 @@ impl Database {
                 }
             }
             // 体重 / 体成分。和 wellness 一样是尽力而为：`summary` 的字段随
-            // 记录来源变，认不出来的只写进 diagnostics，不让整条流失败——
-            // 原始报文丢了，就再也没法在不重新同步的情况下把它们认出来。
+            // 记录来源变，认不出来的只写进 diagnostics，不让整条流失败。
+            // 原始报文已先提交，归一化失败也不会把它回滚掉。
             "weight" => {
                 let batch = Normalizer::normalize_weight(payload);
                 counts.primary_records = batch.metric_samples.len() as i64;
@@ -2252,15 +2376,26 @@ impl Database {
         let plan: Vec<(i64, String, String)> = if let Some(streams) = stream_filter {
             // 参数个数跟着流的条数走。手拼 IN 列表是这类代码最容易留下 SQL
             // 注入口子的地方，即使这里的值全是编译期常量。
-            let placeholders = (1..=streams.len())
+            // ?1 是当前修订号：已经按这一版隔离过的 raw 不再进计划，否则每次
+            // 启动都会把它们再扫一遍，而盖不了章就会无限重放。
+            let placeholders = (2..=streams.len() + 1)
                 .map(|index| format!("?{index}"))
                 .collect::<Vec<_>>()
                 .join(", ");
             let mut stmt = self.conn.prepare(&format!(
-                "SELECT id, stream, source_key
-                 FROM raw_records WHERE stream IN ({placeholders}) ORDER BY id"
+                "SELECT r.id, r.stream, r.source_key
+                 FROM raw_records r
+                 WHERE NOT EXISTS (
+                     SELECT 1 FROM raw_quarantine q
+                     WHERE q.raw_record_id = r.id AND q.revision = ?1
+                 )
+                   AND r.stream IN ({placeholders})
+                 ORDER BY r.id"
             ))?;
-            let rows = stmt.query_map(rusqlite::params_from_iter(streams.iter()), |row| {
+            let mut bind: Vec<&str> = Vec::with_capacity(streams.len() + 1);
+            bind.push(NORMALIZER_REVISION);
+            bind.extend(streams.iter().copied());
+            let rows = stmt.query_map(rusqlite::params_from_iter(bind.iter()), |row| {
                 Ok((
                     row.get::<_, i64>(0)?,
                     row.get::<_, String>(1)?,
@@ -2269,10 +2404,16 @@ impl Database {
             })?;
             rows.collect::<std::result::Result<Vec<_>, _>>()?
         } else {
-            let mut stmt = self
-                .conn
-                .prepare("SELECT id, stream, source_key FROM raw_records ORDER BY id")?;
-            let rows = stmt.query_map([], |row| {
+            let mut stmt = self.conn.prepare(
+                "SELECT r.id, r.stream, r.source_key
+                 FROM raw_records r
+                 WHERE NOT EXISTS (
+                     SELECT 1 FROM raw_quarantine q
+                     WHERE q.raw_record_id = r.id AND q.revision = ?1
+                 )
+                 ORDER BY r.id",
+            )?;
+            let rows = stmt.query_map(params![NORMALIZER_REVISION], |row| {
                 Ok((
                     row.get::<_, i64>(0)?,
                     row.get::<_, String>(1)?,
@@ -2284,9 +2425,11 @@ impl Database {
 
         let mut counts = BTreeMap::<String, i64>::new();
         let mut band_heart_rate = 0i64;
+        let mut failures = 0i64;
         // 一批一个事务。批的边界落在报文之间，所以「先删掉这条报文的派生行、
         // 再照新规则插一遍」始终在同一个事务里——中途失败不会留下一条被清空
-        // 却没被重建的记录。
+        // 却没被重建的记录。单条 decode / 解析 / 归一化失败写入隔离表后继续，
+        // 不能用 `?` 把整轮打掉；隔离 INSERT 跟这批派生行一起提交。
         for batch in plan.chunks(REPLAY_BATCH_RECORDS) {
             let transaction = ReplayBatch::begin(&self.conn)?;
             for (id, stream, source_key) in batch {
@@ -2294,14 +2437,37 @@ impl Database {
                 let Some((stored_payload, payload_zip)) = self.raw_payload(*id)? else {
                     continue;
                 };
-                let encoded_payload = decode_raw_payload(stored_payload, payload_zip)?;
-                let payload: serde_json::Value = serde_json::from_str(&encoded_payload)
-                    .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
-                if let Ok(result) =
-                    self.normalize_and_persist_raw(*id, stream, source_key, &payload)
-                {
-                    *counts.entry(stream.clone()).or_default() += result.primary_records;
-                    band_heart_rate += result.band_heart_rate_records;
+                let encoded_payload = match decode_raw_payload(stored_payload, payload_zip) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        failures += 1;
+                        self.insert_raw_quarantine(*id, stream, source_key, &error)?;
+                        continue;
+                    }
+                };
+                let payload: serde_json::Value = match serde_json::from_str(&encoded_payload) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        failures += 1;
+                        self.insert_raw_quarantine(
+                            *id,
+                            stream,
+                            source_key,
+                            &ZeppBridgeError::ParseError(error.to_string()),
+                        )?;
+                        continue;
+                    }
+                };
+                match self.normalize_and_persist_raw(*id, stream, source_key, &payload) {
+                    Ok(result) => {
+                        self.clear_raw_quarantine(*id)?;
+                        *counts.entry(stream.clone()).or_default() += result.primary_records;
+                        band_heart_rate += result.band_heart_rate_records;
+                    }
+                    Err(error) => {
+                        failures += 1;
+                        self.insert_raw_quarantine(*id, stream, source_key, &error)?;
+                    }
                 }
             }
             transaction.commit()?;
@@ -2320,12 +2486,17 @@ impl Database {
             }
         }
 
-        self.conn.execute(
-            "INSERT INTO app_meta(key, value, updated_at)
-             VALUES('normalizer_revision', ?1, ?2)
-             ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
-            params![NORMALIZER_REVISION, Utc::now().to_rfc3339()],
-        )?;
+        self.set_app_meta(REPLAY_LAST_FAILURES_KEY, &failures.to_string())?;
+        // 有新失败就不推进修订号，下次启动还会再走一遍（已隔离的会被跳过）。
+        // 空库 0 条 0 失败仍盖章，避免第一次同步之后平白重放。
+        if failures == 0 {
+            self.conn.execute(
+                "INSERT INTO app_meta(key, value, updated_at)
+                 VALUES('normalizer_revision', ?1, ?2)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+                params![NORMALIZER_REVISION, Utc::now().to_rfc3339()],
+            )?;
+        }
         self.set_app_meta(LAST_LOCAL_REPROCESS_AT_KEY, &Utc::now().to_rfc3339())?;
         Ok(counts)
     }
@@ -2474,22 +2645,30 @@ impl Database {
             .synced_at
             .or_else(|| self.fetched_at_for_raw(raw_record_id))
             .unwrap_or_else(Utc::now);
+        let (deep_minutes, deep_available) = stored_stage_minutes(sleep.deep_minutes);
+        let (light_minutes, light_available) = stored_stage_minutes(sleep.light_minutes);
+        let (rem_minutes, rem_available) = stored_stage_minutes(sleep.rem_minutes);
+        let (awake_minutes, awake_available) = stored_stage_minutes(sleep.awake_minutes);
         self.conn.execute(
             "INSERT INTO sleep_sessions
                 (sleep_id, start_time, end_time, score, duration_minutes,
-                 deep_minutes, light_minutes, rem_minutes, rem_available, awake_minutes,
+                 deep_minutes, deep_available, light_minutes, light_available,
+                 rem_minutes, rem_available, awake_minutes, awake_available,
                  source_scope, device_id, raw_record_id, synced_at, wake_count)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
              ON CONFLICT(sleep_id) DO UPDATE SET
                 start_time = excluded.start_time,
                 end_time = excluded.end_time,
                 score = excluded.score,
                 duration_minutes = excluded.duration_minutes,
                 deep_minutes = excluded.deep_minutes,
+                deep_available = excluded.deep_available,
                 light_minutes = excluded.light_minutes,
+                light_available = excluded.light_available,
                 rem_minutes = excluded.rem_minutes,
                 rem_available = excluded.rem_available,
                 awake_minutes = excluded.awake_minutes,
+                awake_available = excluded.awake_available,
                 wake_count = excluded.wake_count,
                 source_scope = excluded.source_scope,
                 device_id = excluded.device_id,
@@ -2501,11 +2680,14 @@ impl Database {
                 sleep.end_time.to_rfc3339(),
                 sleep.score,
                 sleep.duration_minutes,
-                sleep.deep_minutes,
-                sleep.light_minutes,
-                sleep.rem_minutes.unwrap_or(0),
-                i64::from(sleep.rem_minutes.is_some()),
-                sleep.awake_minutes,
+                deep_minutes,
+                deep_available,
+                light_minutes,
+                light_available,
+                rem_minutes,
+                rem_available,
+                awake_minutes,
+                awake_available,
                 sleep.source_scope.as_str(),
                 sleep.device_id,
                 raw_record_id,
@@ -2822,28 +3004,88 @@ impl Database {
     }
 
     pub fn pending_running_details(&self) -> Result<Vec<PendingWorkoutDetail>> {
+        self.pending_running_details_limited(PENDING_WORKOUT_DETAIL_LIMIT)
+    }
+
+    pub fn pending_running_details_limited(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<PendingWorkoutDetail>> {
+        let decay_before = (Utc::now() - WORKOUT_DETAIL_ATTEMPT_DECAY).to_rfc3339();
         let mut stmt = self.conn.prepare(
-            "SELECT workout_id, zepp_source FROM workouts
-             WHERE zepp_source IS NOT NULL
-               AND TRIM(zepp_source) != ''
+            "SELECT w.workout_id, w.zepp_source
+             FROM workouts w
+             LEFT JOIN workout_detail_fetch_attempts a
+               ON a.workout_id = w.workout_id AND a.source = w.zepp_source
+             WHERE w.zepp_source IS NOT NULL
+               AND TRIM(w.zepp_source) != ''
                AND NOT EXISTS (
                    SELECT 1 FROM raw_records
                    WHERE stream = 'workout_detail'
-                     AND source_key = 'workout_detail:' || workouts.workout_id || ':' || workouts.zepp_source
+                     AND source_key = 'workout_detail:' || w.workout_id || ':' || w.zepp_source
                )
-             ORDER BY start_time DESC",
+               AND (
+                   a.attempts IS NULL
+                   OR a.attempts < ?1
+                   OR a.updated_at < ?2
+               )
+             ORDER BY COALESCE(a.attempts, 0) ASC, w.start_time DESC
+             LIMIT ?3",
         )?;
-        let rows = stmt.query_map([], |row| {
-            Ok(PendingWorkoutDetail {
-                workout_id: row.get(0)?,
-                source: row.get(1)?,
-            })
-        })?;
+        let rows = stmt.query_map(
+            rusqlite::params![MAX_WORKOUT_DETAIL_ATTEMPTS, decay_before, limit as i64],
+            |row| {
+                Ok(PendingWorkoutDetail {
+                    workout_id: row.get(0)?,
+                    source: row.get(1)?,
+                })
+            },
+        )?;
         rows.collect::<std::result::Result<Vec<_>, _>>()
             .map_err(Into::into)
     }
 
+    /// 记下一次跑步明细拉取的结果。成功就清掉失败计数；失败则累加，过了
+    /// [`WORKOUT_DETAIL_ATTEMPT_DECAY`] 的旧计数先衰减再记成第一次。
+    pub fn record_workout_detail_fetch_result(
+        &self,
+        workout_id: &str,
+        source: &str,
+        ok: bool,
+    ) -> Result<()> {
+        if ok {
+            self.conn.execute(
+                "DELETE FROM workout_detail_fetch_attempts
+                 WHERE workout_id = ?1 AND source = ?2",
+                [workout_id, source],
+            )?;
+            return Ok(());
+        }
+        let now = Utc::now().to_rfc3339();
+        let decay_before = (Utc::now() - WORKOUT_DETAIL_ATTEMPT_DECAY).to_rfc3339();
+        self.conn.execute(
+            "INSERT INTO workout_detail_fetch_attempts(workout_id, source, attempts, updated_at)
+             VALUES(?1, ?2, 1, ?3)
+             ON CONFLICT(workout_id, source) DO UPDATE SET
+               attempts = CASE
+                 WHEN workout_detail_fetch_attempts.updated_at < ?4 THEN 1
+                 ELSE workout_detail_fetch_attempts.attempts + 1
+               END,
+               updated_at = excluded.updated_at",
+            rusqlite::params![workout_id, source, now, decay_before],
+        )?;
+        Ok(())
+    }
+
     pub fn replace_workout_series(&self, workout_id: &str, decoded: &DecodedWorkout) -> Result<()> {
+        // 差分链断掉时解码侧会截断轨迹而不是平移它；这里留一条不含坐标的
+        // warn，说明这条轨迹缺了尾巴，方便对照报告排查。
+        if decoded.route_dropped_points > 0 {
+            tracing::warn!(
+                "workout {workout_id} 的轨迹被截断：{} 个后续点位置不可知，未入库",
+                decoded.route_dropped_points
+            );
+        }
         self.conn.execute(
             "DELETE FROM workout_samples WHERE workout_id = ?1",
             [workout_id],
@@ -3358,7 +3600,8 @@ impl Database {
         let offset = i64::try_from(offset).unwrap_or(i64::MAX).max(0);
         let mut stmt = self.conn.prepare(
             "SELECT sleep_id, start_time, end_time, score, duration_minutes,
-                    deep_minutes, light_minutes, rem_minutes, rem_available, awake_minutes,
+                    deep_minutes, deep_available, light_minutes, light_available,
+                    rem_minutes, rem_available, awake_minutes, awake_available,
                     source_scope, device_id, synced_at, wake_count
              FROM sleep_sessions ORDER BY start_time DESC LIMIT ?1 OFFSET ?2",
         )?;
@@ -3370,14 +3613,17 @@ impl Database {
                 row.get::<_, Option<i32>>(3)?,
                 row.get::<_, i32>(4)?,
                 row.get::<_, i32>(5)?,
-                row.get::<_, i32>(6)?,
+                row.get::<_, i64>(6)?,
                 row.get::<_, i32>(7)?,
                 row.get::<_, i64>(8)?,
                 row.get::<_, i32>(9)?,
-                row.get::<_, String>(10)?,
-                row.get::<_, Option<String>>(11)?,
-                row.get::<_, Option<String>>(12)?,
-                row.get::<_, Option<i32>>(13)?,
+                row.get::<_, i64>(10)?,
+                row.get::<_, i32>(11)?,
+                row.get::<_, i64>(12)?,
+                row.get::<_, String>(13)?,
+                row.get::<_, Option<String>>(14)?,
+                row.get::<_, Option<String>>(15)?,
+                row.get::<_, Option<i32>>(16)?,
             ))
         })?;
         let mut sessions = Vec::new();
@@ -3389,10 +3635,13 @@ impl Database {
                 score,
                 duration_minutes,
                 deep_minutes,
+                deep_available,
                 light_minutes,
+                light_available,
                 rem_minutes,
                 rem_available,
                 awake_minutes,
+                awake_available,
                 scope,
                 device_id,
                 synced_at,
@@ -3404,10 +3653,10 @@ impl Database {
                 end_time: parse_datetime(&end, "sleep.end_time")?,
                 score,
                 duration_minutes,
-                deep_minutes,
-                light_minutes,
-                rem_minutes: (rem_available != 0).then_some(rem_minutes),
-                awake_minutes,
+                deep_minutes: loaded_stage_minutes(deep_minutes, deep_available),
+                light_minutes: loaded_stage_minutes(light_minutes, light_available),
+                rem_minutes: loaded_stage_minutes(rem_minutes, rem_available),
+                awake_minutes: loaded_stage_minutes(awake_minutes, awake_available),
                 source_scope: parse_scope(&scope)?,
                 device_id,
                 synced_at: synced_at
@@ -3427,7 +3676,8 @@ impl Database {
             .conn
             .query_row(
                 "SELECT sleep_id, start_time, end_time, score, duration_minutes,
-                        deep_minutes, light_minutes, rem_minutes, rem_available, awake_minutes,
+                        deep_minutes, deep_available, light_minutes, light_available,
+                        rem_minutes, rem_available, awake_minutes, awake_available,
                         source_scope, device_id, synced_at, wake_count
                  FROM sleep_sessions WHERE sleep_id = ?1 LIMIT 1",
                 [sleep_id],
@@ -3439,14 +3689,17 @@ impl Database {
                         row.get::<_, Option<i32>>(3)?,
                         row.get::<_, i32>(4)?,
                         row.get::<_, i32>(5)?,
-                        row.get::<_, i32>(6)?,
+                        row.get::<_, i64>(6)?,
                         row.get::<_, i32>(7)?,
                         row.get::<_, i64>(8)?,
                         row.get::<_, i32>(9)?,
-                        row.get::<_, String>(10)?,
-                        row.get::<_, Option<String>>(11)?,
-                        row.get::<_, Option<String>>(12)?,
-                        row.get::<_, Option<i32>>(13)?,
+                        row.get::<_, i64>(10)?,
+                        row.get::<_, i32>(11)?,
+                        row.get::<_, i64>(12)?,
+                        row.get::<_, String>(13)?,
+                        row.get::<_, Option<String>>(14)?,
+                        row.get::<_, Option<String>>(15)?,
+                        row.get::<_, Option<i32>>(16)?,
                     ))
                 },
             )
@@ -3458,10 +3711,13 @@ impl Database {
             score,
             duration_minutes,
             deep_minutes,
+            deep_available,
             light_minutes,
+            light_available,
             rem_minutes,
             rem_available,
             awake_minutes,
+            awake_available,
             scope,
             device_id,
             synced_at,
@@ -3477,10 +3733,10 @@ impl Database {
             end_time: parse_datetime(&end, "sleep.end_time")?,
             score,
             duration_minutes,
-            deep_minutes,
-            light_minutes,
-            rem_minutes: (rem_available != 0).then_some(rem_minutes),
-            awake_minutes,
+            deep_minutes: loaded_stage_minutes(deep_minutes, deep_available),
+            light_minutes: loaded_stage_minutes(light_minutes, light_available),
+            rem_minutes: loaded_stage_minutes(rem_minutes, rem_available),
+            awake_minutes: loaded_stage_minutes(awake_minutes, awake_available),
             source_scope: parse_scope(&scope)?,
             device_id,
             synced_at: synced_at
@@ -4919,7 +5175,8 @@ impl Database {
         if selected.contains("sleep") && !single_workout {
             let mut stmt = self.conn.prepare(
                 "SELECT sleep_id, start_time, end_time, score, duration_minutes,
-                        deep_minutes, light_minutes, rem_minutes, rem_available, awake_minutes,
+                        deep_minutes, deep_available, light_minutes, light_available,
+                        rem_minutes, rem_available, awake_minutes, awake_available,
                         source_scope, device_id, wake_count
                  FROM sleep_sessions
                  WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2
@@ -4933,13 +5190,16 @@ impl Database {
                     row.get::<_, Option<i32>>(3)?,
                     row.get::<_, i32>(4)?,
                     row.get::<_, i32>(5)?,
-                    row.get::<_, i32>(6)?,
+                    row.get::<_, i64>(6)?,
                     row.get::<_, i32>(7)?,
                     row.get::<_, i64>(8)?,
                     row.get::<_, i32>(9)?,
-                    row.get::<_, String>(10)?,
-                    row.get::<_, Option<String>>(11)?,
-                    row.get::<_, Option<i32>>(12)?,
+                    row.get::<_, i64>(10)?,
+                    row.get::<_, i32>(11)?,
+                    row.get::<_, i64>(12)?,
+                    row.get::<_, String>(13)?,
+                    row.get::<_, Option<String>>(14)?,
+                    row.get::<_, Option<i32>>(15)?,
                 ))
             })?;
             for row in rows {
@@ -4950,10 +5210,13 @@ impl Database {
                     score,
                     duration_minutes,
                     deep_minutes,
+                    deep_available,
                     light_minutes,
+                    light_available,
                     rem_minutes,
                     rem_available,
                     awake_minutes,
+                    awake_available,
                     source_scope,
                     device_id,
                     wake_count,
@@ -4979,10 +5242,10 @@ impl Database {
                     "end_time": end_time,
                     "score": score,
                     "duration_minutes": duration_minutes,
-                    "deep_minutes": deep_minutes,
-                    "light_minutes": light_minutes,
-                    "rem_minutes": (rem_available != 0).then_some(rem_minutes),
-                    "awake_minutes": awake_minutes,
+                    "deep_minutes": loaded_stage_minutes(deep_minutes, deep_available),
+                    "light_minutes": loaded_stage_minutes(light_minutes, light_available),
+                    "rem_minutes": loaded_stage_minutes(rem_minutes, rem_available),
+                    "awake_minutes": loaded_stage_minutes(awake_minutes, awake_available),
                     "wake_count": wake_count,
                     "source_scope": source_scope,
                     "device_label": devices.label(device_id.as_deref()),
@@ -5298,6 +5561,285 @@ impl Database {
         Ok((encoded, record_count))
     }
 
+    /// COUNT/SUM the export without building JSON.
+    pub fn estimate_ai_export(&self, selection: &ExportSelection) -> Result<ExportEstimate> {
+        const DAY_LEVEL_TYPES: [&str; 10] = [
+            "sleep",
+            "steps",
+            "daily_activity",
+            "recovery",
+            "training_load",
+            "vo2max",
+            "lactate_threshold",
+            "pai",
+            "weight",
+            "food",
+        ];
+        const ENVELOPE_BYTES: u64 = 2_048;
+        let scope = selection
+            .resolve_scope()
+            .map_err(ZeppBridgeError::ConfigError)?;
+        let (start_text, end_text, workout_filter, workout_window, scope_kind) = match &scope {
+            ExportScope::DateRange { start, end } => {
+                let start_date = NaiveDate::parse_from_str(start, "%Y-%m-%d")
+                    .map_err(|_| ZeppBridgeError::ConfigError("导出开始日期无效".into()))?;
+                let end_date = NaiveDate::parse_from_str(end, "%Y-%m-%d")
+                    .map_err(|_| ZeppBridgeError::ConfigError("导出结束日期无效".into()))?;
+                let _ = (start_date, end_date);
+                (
+                    start.clone(),
+                    end.clone(),
+                    None,
+                    None,
+                    "date_range".to_string(),
+                )
+            }
+            ExportScope::Workout { workout_id } => {
+                let (day, started_at, ended_at): (String, String, String) = self
+                    .conn
+                    .query_row(
+                        "SELECT date(start_time, 'localtime'), start_time, end_time
+                         FROM workouts WHERE workout_id = ?1",
+                        params![workout_id],
+                        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                    )
+                    .optional()?
+                    .ok_or_else(|| {
+                        ZeppBridgeError::DataUnavailable("本地库里没有这条运动记录".into())
+                    })?;
+                (
+                    day.clone(),
+                    day,
+                    Some(workout_id.clone()),
+                    Some((started_at, ended_at)),
+                    "workout".to_string(),
+                )
+            }
+        };
+        let single_workout = workout_filter.is_some();
+        let allowed: BTreeSet<&str> = EXPORT_DATA_TYPES.into_iter().collect();
+        let selected: BTreeSet<String> = selection
+            .data_types
+            .iter()
+            .map(|value| value.trim().to_ascii_lowercase())
+            .filter(|value| allowed.contains(value.as_str()))
+            .collect();
+        if selected.is_empty() {
+            return Err(ZeppBridgeError::ConfigError(
+                "请至少选择一种导出数据".into(),
+            ));
+        }
+        let full = selection.detail.is_full();
+        let mut record_count: usize = 0;
+        let mut estimated_bytes: u64 = ENVELOPE_BYTES;
+
+        let need_samples = selected.contains("heart_rate")
+            || selected.contains("hrv")
+            || selected.contains("hrv_rmssd")
+            || selected.contains("respiratory_rate")
+            || selected.contains("spo2")
+            || selected.contains("stress")
+            || selected.contains("weight");
+        if need_samples {
+            let (window_start, window_end) = match &workout_window {
+                Some((started_at, ended_at)) => {
+                    (Some(started_at.as_str()), Some(ended_at.as_str()))
+                }
+                None => (None, None),
+            };
+            let day_bounds = if single_workout {
+                None
+            } else {
+                local_day_range_utc_bounds(&start_text, &end_text)
+            };
+            let (day_lower, day_upper) = match &day_bounds {
+                Some((lower, upper)) => (Some(lower.as_str()), Some(upper.as_str())),
+                None => (None, None),
+            };
+            let mut stmt = self.conn.prepare(
+                "SELECT metric,
+                        COUNT(*),
+                        COUNT(DISTINCT strftime('%Y-%m-%dT%H', timestamp)),
+                        COALESCE(SUM(LENGTH(metric) + LENGTH(timestamp) + LENGTH(unit)
+                                     + LENGTH(source_scope) + 48), 0)
+                 FROM metric_samples
+                 WHERE (?5 IS NULL OR timestamp >= ?5)
+                   AND (?6 IS NULL OR timestamp < ?6)
+                   AND (?3 IS NOT NULL OR date(timestamp, 'localtime') BETWEEN ?1 AND ?2)
+                   AND (?3 IS NULL OR timestamp >= ?3)
+                   AND (?4 IS NULL OR timestamp <= ?4)
+                 GROUP BY metric",
+            )?;
+            let rows = stmt.query_map(
+                params![
+                    start_text,
+                    end_text,
+                    window_start,
+                    window_end,
+                    day_lower,
+                    day_upper
+                ],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, i64>(1)?,
+                        row.get::<_, i64>(2)?,
+                        row.get::<_, i64>(3)?,
+                    ))
+                },
+            )?;
+            for row in rows {
+                let (metric, count, hours, bytes) = row?;
+                let matched_type = if selected.contains(&metric) {
+                    Some(metric.clone())
+                } else if metric.contains("spo2") && selected.contains("spo2") {
+                    Some("spo2".to_string())
+                } else if metric.contains("stress") && selected.contains("stress") {
+                    Some("stress".to_string())
+                } else if metric.starts_with("respiratory") && selected.contains("respiratory_rate")
+                {
+                    Some("respiratory_rate".to_string())
+                } else if metric == "hrv_rmssd" && selected.contains("hrv_rmssd") {
+                    Some("hrv_rmssd".to_string())
+                } else if selected.contains("weight")
+                    && BODY_COMPOSITION_METRICS.contains(&metric.as_str())
+                {
+                    Some("weight".to_string())
+                } else {
+                    None
+                };
+                let Some(matched_type) = matched_type else {
+                    continue;
+                };
+                if single_workout && DAY_LEVEL_TYPES.contains(&matched_type.as_str()) {
+                    continue;
+                }
+                if !full && HOURLY_AGGREGATED_METRICS.contains(&metric.as_str()) {
+                    record_count += hours.max(0) as usize;
+                    estimated_bytes += (hours.max(0) as u64).saturating_mul(120);
+                } else {
+                    record_count += count.max(0) as usize;
+                    estimated_bytes += bytes.max(0) as u64;
+                }
+            }
+        }
+
+        if !single_workout
+            && (selected.contains("daily_activity")
+                || selected.contains("recovery")
+                || selected.contains("respiratory_rate")
+                || selected.contains("lactate_threshold")
+                || selected.contains("pai")
+                || selected.contains("hrv_rmssd")
+                || selected.contains("steps")
+                || selected.contains("spo2")
+                || selected.contains("stress")
+                || selected.contains("training_load")
+                || selected.contains("vo2max")
+                || selected.contains("food"))
+        {
+            let mut stmt = self.conn.prepare(
+                "SELECT metric, COUNT(*),
+                        COALESCE(SUM(LENGTH(metric) + LENGTH(date) + LENGTH(unit) + 80), 0)
+                 FROM daily_metrics WHERE date BETWEEN ?1 AND ?2
+                 GROUP BY metric",
+            )?;
+            let rows = stmt.query_map(params![start_text, end_text], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, i64>(2)?,
+                ))
+            })?;
+            for row in rows {
+                let (metric, count, bytes) = row?;
+                if daily_metric_selected_for_export(&metric, &selected) {
+                    record_count += count.max(0) as usize;
+                    estimated_bytes += bytes.max(0) as u64;
+                }
+            }
+        }
+
+        if selected.contains("sleep") && !single_workout {
+            let count: i64 = self.conn.query_row(
+                "SELECT COUNT(*) FROM sleep_sessions
+                 WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2",
+                params![start_text, end_text],
+                |row| row.get(0),
+            )?;
+            record_count += count.max(0) as usize;
+            estimated_bytes += (count.max(0) as u64).saturating_mul(280);
+        }
+
+        if selected.contains("workouts") {
+            let count: i64 = self.conn.query_row(
+                "SELECT COUNT(*) FROM workouts
+                 WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2
+                   AND (?3 IS NULL OR workout_id = ?3)",
+                params![start_text, end_text, workout_filter],
+                |row| row.get(0),
+            )?;
+            record_count += count.max(0) as usize;
+            estimated_bytes += (count.max(0) as u64).saturating_mul(600);
+            if full {
+                let samples: i64 = self.conn.query_row(
+                    "SELECT COUNT(*) FROM workout_samples
+                     WHERE workout_id IN (
+                         SELECT workout_id FROM workouts
+                         WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2
+                           AND (?3 IS NULL OR workout_id = ?3)
+                     )",
+                    params![start_text, end_text, workout_filter],
+                    |row| row.get(0),
+                )?;
+                let route: i64 = self.conn.query_row(
+                    "SELECT COUNT(*) FROM route_points
+                     WHERE workout_id IN (
+                         SELECT workout_id FROM workouts
+                         WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2
+                           AND (?3 IS NULL OR workout_id = ?3)
+                     )",
+                    params![start_text, end_text, workout_filter],
+                    |row| row.get(0),
+                )?;
+                estimated_bytes += (samples.max(0) as u64).saturating_mul(90);
+                estimated_bytes += (route.max(0) as u64).saturating_mul(70);
+            }
+        }
+
+        if selected.contains("life_events") {
+            let context_end = workout_window
+                .as_ref()
+                .and_then(|(_, end)| {
+                    DateTime::parse_from_rfc3339(end)
+                        .ok()
+                        .map(|d| d.with_timezone(&Local).format("%Y-%m-%d").to_string())
+                })
+                .unwrap_or_else(|| end_text.clone());
+            let count: i64 = self.conn.query_row(
+                "SELECT COUNT(*) FROM life_events
+                 WHERE (?1 IS NULL OR end_date IS NULL OR end_date >= ?1)
+                   AND (?2 IS NULL OR start_date <= ?2)",
+                params![start_text, context_end],
+                |row| row.get(0),
+            )?;
+            record_count += count.max(0) as usize;
+            estimated_bytes += (count.max(0) as u64).saturating_mul(200);
+        }
+
+        let (start_time, end_time) = match &workout_window {
+            Some((started_at, ended_at)) => (Some(started_at.clone()), Some(ended_at.clone())),
+            None => (None, None),
+        };
+        Ok(ExportEstimate {
+            record_count,
+            estimated_bytes,
+            scope_kind,
+            start_time,
+            end_time,
+        })
+    }
+
     fn latest_metric_f64(&self, metric: &str) -> Result<Option<f64>> {
         self.conn
             .query_row(
@@ -5556,45 +6098,60 @@ impl Database {
     /// 依据，压坏一条就等于永久丢一条——宁可这一条不压。
     pub fn compact_raw_payloads(&self) -> Result<RawPayloadCompaction> {
         let _guard = CompactionGuard::enter();
-        let pending: Vec<(i64, String)> = {
-            let mut stmt = self.conn.prepare(
-                "SELECT id, payload FROM raw_records
-                 WHERE (payload_zip IS NULL OR LENGTH(payload_zip) = 0)
-                   AND LENGTH(payload) > ?1
-                 ORDER BY id",
-            )?;
-            let rows = stmt.query_map([MIN_COMPRESSIBLE_PAYLOAD_BYTES], |row| {
-                Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
-            })?;
-            rows.collect::<std::result::Result<Vec<_>, _>>()?
-        };
-
         let mut report = RawPayloadCompaction::default();
-        for (id, payload) in pending {
-            let original = payload.len() as u64;
-            let Ok(compressed) = compress_payload(&payload) else {
-                report.skipped += 1;
-                continue;
+        let mut last_id: i64 = 0;
+        loop {
+            let pending: Vec<(i64, String)> = {
+                let mut stmt = self.conn.prepare(
+                    "SELECT id, payload FROM raw_records
+                     WHERE id > ?1
+                       AND (payload_zip IS NULL OR LENGTH(payload_zip) = 0)
+                       AND LENGTH(payload) > ?2
+                     ORDER BY id
+                     LIMIT ?3",
+                )?;
+                let rows = stmt.query_map(
+                    params![
+                        last_id,
+                        MIN_COMPRESSIBLE_PAYLOAD_BYTES,
+                        COMPACTION_BATCH_RECORDS as i64
+                    ],
+                    |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
+                )?;
+                rows.collect::<std::result::Result<Vec<_>, _>>()?
             };
-            // 压不小就别费这个事，也别冒风险。
-            if compressed.len() as u64 >= original {
-                report.skipped += 1;
-                continue;
+            if pending.is_empty() {
+                break;
             }
-            match decompress_payload(&compressed) {
-                Ok(round_tripped) if round_tripped == payload => {}
-                _ => {
+            last_id = pending.last().map(|(id, _)| *id).unwrap_or(last_id);
+            let transaction = self.conn.unchecked_transaction()?;
+            for (id, payload) in pending {
+                let original = payload.len() as u64;
+                let Ok(compressed) = compress_payload(&payload) else {
+                    report.skipped += 1;
+                    continue;
+                };
+                // 压不小就别费这个事，也别冒风险。
+                if compressed.len() as u64 >= original {
                     report.skipped += 1;
                     continue;
                 }
+                match decompress_payload(&compressed) {
+                    Ok(round_tripped) if round_tripped == payload => {}
+                    _ => {
+                        report.skipped += 1;
+                        continue;
+                    }
+                }
+                transaction.execute(
+                    "UPDATE raw_records SET payload = '', payload_zip = ?2 WHERE id = ?1",
+                    params![id, compressed],
+                )?;
+                report.compacted += 1;
+                report.bytes_before += original;
+                report.bytes_after += compressed.len() as u64;
             }
-            self.conn.execute(
-                "UPDATE raw_records SET payload = '', payload_zip = ?2 WHERE id = ?1",
-                params![id, compressed],
-            )?;
-            report.compacted += 1;
-            report.bytes_before += original;
-            report.bytes_after += compressed.len() as u64;
+            transaction.commit()?;
         }
 
         // 压缩腾出来的是**数据库内部**的空闲页：不 VACUUM 的话，磁盘上的文件
@@ -5605,6 +6162,8 @@ impl Database {
             if let Err(error) = self.conn.execute_batch("VACUUM") {
                 tracing::warn!("压缩后 VACUUM 失败，磁盘占用暂时不会下降: {error}");
             }
+            let _ = self.bump_payload_stats_generation();
+            let _ = self.persist_raw_payload_stats();
         }
         Ok(report)
     }
@@ -5634,79 +6193,154 @@ impl Database {
                 "retention 天数必须在 1..=365".into(),
             ));
         }
-        let cutoff = Utc::now() - chrono::Duration::days(days);
-        let cutoff_timestamp = cutoff.to_rfc3339();
-        let cutoff_date = cutoff.date_naive().format("%Y-%m-%d").to_string();
-        self.conn.execute(
-            "DELETE FROM metric_samples WHERE timestamp < ?1",
-            [&cutoff_timestamp],
-        )?;
-        self.conn
-            .execute("DELETE FROM daily_metrics WHERE date < ?1", [&cutoff_date])?;
-        self.conn.execute(
-            "DELETE FROM sleep_sessions WHERE start_time < ?1",
-            [&cutoff_timestamp],
-        )?;
-        self.conn.execute(
-            "DELETE FROM workouts WHERE start_time < ?1",
-            [&cutoff_timestamp],
-        )?;
-        self.conn.execute(
-            "DELETE FROM workout_samples WHERE timestamp < ?1",
-            [&cutoff_timestamp],
-        )?;
-        self.conn.execute(
-            "DELETE FROM route_points WHERE timestamp < ?1",
-            [&cutoff_timestamp],
-        )?;
-        self.conn.execute(
-            "DELETE FROM workout_pauses WHERE start_time < ?1",
-            [&cutoff_timestamp],
-        )?;
-        self.conn.execute(
-            "DELETE FROM workout_laps WHERE start_time < ?1",
-            [&cutoff_timestamp],
-        )?;
-        self.conn.execute(
-            "DELETE FROM workout_splits WHERE start_time < ?1",
-            [&cutoff_timestamp],
-        )?;
-        // Raw responses are retained from their fetch time, not their query
-        // window start. A 30-day request naturally starts near the retention
-        // cutoff and must not be deleted seconds after it is fetched.
-        self.conn.execute(
-            "DELETE FROM raw_records
-             WHERE fetched_at < ?1
-               AND NOT EXISTS (SELECT 1 FROM metric_samples m WHERE m.raw_record_id = raw_records.id)
-               AND NOT EXISTS (SELECT 1 FROM daily_metrics d WHERE d.raw_record_id = raw_records.id)
-               AND NOT EXISTS (SELECT 1 FROM sleep_sessions s WHERE s.raw_record_id = raw_records.id)
-               AND NOT EXISTS (SELECT 1 FROM workouts w WHERE w.raw_record_id = raw_records.id)",
-            [&cutoff_timestamp],
-        )?;
-        self.conn
-            .execute_batch("PRAGMA wal_checkpoint(TRUNCATE); PRAGMA incremental_vacuum;")?;
+        let cutoff_timestamp = (Utc::now() - Duration::days(days)).to_rfc3339();
+        // daily_metrics.date 是本地日历日，切不能拿 UTC 的「今天」去比。
+        let cutoff_date = (Local::now().date_naive() - Duration::days(days))
+            .format("%Y-%m-%d")
+            .to_string();
+        self.conn.execute_batch("BEGIN IMMEDIATE;")?;
+        let deleted = (|| -> Result<()> {
+            self.conn.execute(
+                "DELETE FROM metric_samples WHERE timestamp < ?1",
+                [&cutoff_timestamp],
+            )?;
+            self.conn
+                .execute("DELETE FROM daily_metrics WHERE date < ?1", [&cutoff_date])?;
+            self.conn.execute(
+                "DELETE FROM sleep_sessions WHERE start_time < ?1",
+                [&cutoff_timestamp],
+            )?;
+            self.conn.execute(
+                "DELETE FROM workout_hr_zones
+                 WHERE workout_id IN (SELECT workout_id FROM workouts WHERE start_time < ?1)",
+                [&cutoff_timestamp],
+            )?;
+            self.conn.execute(
+                "DELETE FROM workouts WHERE start_time < ?1",
+                [&cutoff_timestamp],
+            )?;
+            self.conn.execute(
+                "DELETE FROM workout_samples WHERE timestamp < ?1",
+                [&cutoff_timestamp],
+            )?;
+            self.conn.execute(
+                "DELETE FROM route_points WHERE timestamp < ?1",
+                [&cutoff_timestamp],
+            )?;
+            self.conn.execute(
+                "DELETE FROM workout_pauses WHERE start_time < ?1",
+                [&cutoff_timestamp],
+            )?;
+            self.conn.execute(
+                "DELETE FROM workout_laps WHERE start_time < ?1",
+                [&cutoff_timestamp],
+            )?;
+            self.conn.execute(
+                "DELETE FROM workout_splits WHERE start_time < ?1",
+                [&cutoff_timestamp],
+            )?;
+            // Raw responses are retained from their fetch time, not their query
+            // window start. A 30-day request naturally starts near the retention
+            // cutoff and must not be deleted seconds after it is fetched.
+            self.conn.execute(
+                "DELETE FROM raw_records
+                 WHERE fetched_at < ?1
+                   AND NOT EXISTS (SELECT 1 FROM metric_samples m WHERE m.raw_record_id = raw_records.id)
+                   AND NOT EXISTS (SELECT 1 FROM daily_metrics d WHERE d.raw_record_id = raw_records.id)
+                   AND NOT EXISTS (SELECT 1 FROM sleep_sessions s WHERE s.raw_record_id = raw_records.id)
+                   AND NOT EXISTS (SELECT 1 FROM workouts w WHERE w.raw_record_id = raw_records.id)",
+                [&cutoff_timestamp],
+            )?;
+            Ok(())
+        })();
+        match deleted {
+            Ok(()) => {
+                if self.conn.is_autocommit() {
+                    return Err(ZeppBridgeError::DataUnavailable(
+                        "清理被中断，没有任何改动写入。".into(),
+                    ));
+                }
+                self.conn.execute_batch("COMMIT;")?;
+            }
+            Err(error) => {
+                if !self.conn.is_autocommit() {
+                    let _ = self.conn.execute_batch("ROLLBACK;");
+                }
+                return Err(error);
+            }
+        }
+        if let Err(error) = self
+            .conn
+            .execute_batch("PRAGMA wal_checkpoint(TRUNCATE); PRAGMA incremental_vacuum;")
+        {
+            tracing::warn!("清理后 WAL checkpoint 失败，数据已删除: {error}");
+        }
+        let _ = self.bump_payload_stats_generation();
+        let _ = self.persist_raw_payload_stats();
         Ok(())
     }
 
+    fn insert_raw_quarantine(
+        &self,
+        raw_record_id: i64,
+        stream: &str,
+        source_key: &str,
+        error: &ZeppBridgeError,
+    ) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO raw_quarantine(
+                 raw_record_id, stream, source_key, error, revision, quarantined_at
+             )
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(raw_record_id) DO UPDATE SET
+                stream = excluded.stream,
+                source_key = excluded.source_key,
+                error = excluded.error,
+                revision = excluded.revision,
+                quarantined_at = excluded.quarantined_at",
+            params![
+                raw_record_id,
+                stream,
+                source_key,
+                error.to_string(),
+                NORMALIZER_REVISION,
+                Utc::now().to_rfc3339(),
+            ],
+        )?;
+        Ok(())
+    }
+
+    fn clear_raw_quarantine(&self, raw_record_id: i64) -> Result<()> {
+        self.conn.execute(
+            "DELETE FROM raw_quarantine WHERE raw_record_id = ?1",
+            [raw_record_id],
+        )?;
+        Ok(())
+    }
+
+    /// 先提交 raw，再在单独事务里归一化。
+    ///
+    /// 归一化失败会回滚派生行并把 raw 写入隔离表，但云端已经拿到的报文必须留
+    /// 在 `raw_records` 里——以前两者同事务，失败把 raw 一起 ROLLBACK 了。
     pub fn persist_fetched_record(&self, record: &RawRecord) -> Result<(i64, NormalizationCounts)> {
-        self.conn.execute("BEGIN IMMEDIATE", [])?;
-        let outcome = (|| {
-            let raw_id = self.insert_raw_record(record)?;
+        let raw_id = self.insert_raw_record(record)?;
+        let normalized = (|| {
+            let transaction = ReplayBatch::begin(&self.conn)?;
             let counts = self.normalize_and_persist_raw(
                 raw_id,
                 &record.stream,
                 &record.source_key,
                 &record.payload,
             )?;
-            Ok((raw_id, counts))
+            self.clear_raw_quarantine(raw_id)?;
+            transaction.commit()?;
+            Ok(counts)
         })();
-        match outcome {
-            Ok(value) => {
-                self.conn.execute("COMMIT", [])?;
-                Ok(value)
-            }
+        match normalized {
+            Ok(counts) => Ok((raw_id, counts)),
             Err(error) => {
-                let _ = self.conn.execute("ROLLBACK", []);
+                let _ =
+                    self.insert_raw_quarantine(raw_id, &record.stream, &record.source_key, &error);
                 Err(error)
             }
         }
@@ -5845,6 +6479,14 @@ fn device_identity_hints(payload: &serde_json::Value) -> Vec<DeviceIdentityHint>
     hints
 }
 
+fn stored_stage_minutes(minutes: Option<i32>) -> (i32, i64) {
+    (minutes.unwrap_or(0), i64::from(minutes.is_some()))
+}
+
+fn loaded_stage_minutes(minutes: i32, available: i64) -> Option<i32> {
+    (available != 0).then_some(minutes)
+}
+
 fn parse_datetime(value: &str, field: &str) -> Result<DateTime<Utc>> {
     DateTime::parse_from_rfc3339(value)
         .map(|dt| dt.with_timezone(&Utc))
@@ -5961,6 +6603,8 @@ fn workout_id_from_detail_key(source_key: &str) -> Option<String> {
 /// （空响应 `{"items":[]}` 只有 12 字节，压完反而变长）。省下的那点空间不值
 /// 得为它维护「压过但没变小」这种状态。
 const MIN_COMPRESSIBLE_PAYLOAD_BYTES: i64 = 512;
+/// 解压输出上限。被篡改的压缩行不能展开成任意大小。
+const MAX_DECOMPRESSED_PAYLOAD_BYTES: u64 = 32 * 1024 * 1024;
 
 fn compress_payload(payload: &str) -> Result<Vec<u8>> {
     use flate2::write::ZlibEncoder;
@@ -5980,12 +6624,19 @@ fn decompress_payload(bytes: &[u8]) -> Result<String> {
     use flate2::read::ZlibDecoder;
     use std::io::Read;
 
-    let mut decoder = ZlibDecoder::new(bytes);
-    let mut out = String::new();
-    decoder
-        .read_to_string(&mut out)
+    let mut limited =
+        ZlibDecoder::new(bytes).take(MAX_DECOMPRESSED_PAYLOAD_BYTES.saturating_add(1));
+    let mut out = Vec::new();
+    limited
+        .read_to_end(&mut out)
         .map_err(|error| ZeppBridgeError::ParseError(format!("解压原始报文失败: {error}")))?;
-    Ok(out)
+    if out.len() as u64 > MAX_DECOMPRESSED_PAYLOAD_BYTES {
+        return Err(ZeppBridgeError::ParseError(
+            "解压原始报文超过 32 MiB 上限".into(),
+        ));
+    }
+    String::from_utf8(out)
+        .map_err(|error| ZeppBridgeError::ParseError(format!("解压原始报文失败: {error}")))
 }
 
 /// 取出一条原始报文。
@@ -6009,6 +6660,48 @@ fn decode_raw_payload(payload: String, payload_zip: Option<Vec<u8>>) -> Result<S
 /// 加一层宽松的时间戳边界，索引就能先把范围缩到几天（实测心率 7 天 92ms → 5ms）。
 /// 边界各放宽一天，覆盖任何时区偏移（-12..+14 小时），所以它只负责「少扫一点」，
 /// 不改变结果：真正决定哪一天算哪一天的，仍然是后面那个 `date(...,'localtime')`。
+fn daily_metric_selected_for_export(metric: &str, selected: &BTreeSet<String>) -> bool {
+    const RECOVERY: [&str; 19] = [
+        "resting_hr",
+        "readiness",
+        "bio_charge",
+        "hybrid_charge",
+        "physical_charge",
+        "mental_charge",
+        "physical_readiness",
+        "mental_readiness",
+        "hrv_readiness",
+        "rhr_readiness",
+        "skin_temp_readiness",
+        "afib_readiness",
+        "ahi_readiness",
+        "training_load",
+        "vo2max",
+        "lactate_threshold_hr",
+        "lactate_threshold_pace",
+        "pai_daily",
+        "pai_total",
+    ];
+    if metric.starts_with("intake_") {
+        return selected.contains("food");
+    }
+    let named = (metric == "steps" && selected.contains("steps"))
+        || (metric == "training_load" && selected.contains("training_load"))
+        || (metric == "vo2max" && selected.contains("vo2max"))
+        || ((metric.contains("spo2") || metric == "blood_oxygen") && selected.contains("spo2"))
+        || (metric.contains("stress") && selected.contains("stress"))
+        || (metric.starts_with("respiratory") && selected.contains("respiratory_rate"))
+        || (metric.starts_with("lactate_threshold") && selected.contains("lactate_threshold"))
+        || (metric.starts_with("pai") && selected.contains("pai"))
+        || (metric == "hrv_rmssd" && selected.contains("hrv_rmssd"));
+    if named {
+        return true;
+    }
+    let is_recovery = RECOVERY.contains(&metric);
+    (is_recovery && selected.contains("recovery"))
+        || (!is_recovery && selected.contains("daily_activity"))
+}
+
 fn local_day_range_utc_bounds(start: &str, end: &str) -> Option<(String, String)> {
     let start = NaiveDate::parse_from_str(start, "%Y-%m-%d").ok()?;
     let end = NaiveDate::parse_from_str(end, "%Y-%m-%d").ok()?;
@@ -6023,6 +6716,194 @@ fn local_day_range_utc_bounds(start: &str, end: &str) -> Option<(String, String)
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn migration_repairs_missing_and_narrow_daily_keys_without_merging_devices() {
+        for narrow in [false, true] {
+            let db = Database::in_memory().unwrap();
+            db.conn
+                .execute_batch("DROP INDEX uq_daily_metric_key; PRAGMA user_version = 25;")
+                .unwrap();
+            if narrow {
+                db.conn.execute_batch("CREATE UNIQUE INDEX uq_daily_metric_key ON daily_metrics(date, metric, unit, source_scope);").unwrap();
+            }
+            let insert = |device: Option<&str>, value: i64| {
+                db.conn.execute(
+                "INSERT INTO daily_metrics(date,metric,unit,source_scope,device_id,value) VALUES('2026-09-13','steps','count','device',?1,?2)",
+                params![device, value],
+            )
+            };
+            insert(Some("device-a"), 10).unwrap();
+            if !narrow {
+                insert(Some("device-b"), 20).unwrap();
+            }
+            db.migrate().unwrap();
+            if narrow {
+                insert(Some("device-b"), 20).unwrap();
+            }
+            insert(None, 30).unwrap();
+            assert!(insert(Some(""), 99).is_err());
+            assert!(insert(Some("device-a"), 99).is_err());
+            db.migrate().unwrap();
+            assert_eq!(
+                db.conn
+                    .query_row("SELECT COUNT(*) FROM daily_metrics", [], |row| row
+                        .get::<_, i64>(0))
+                    .unwrap(),
+                3
+            );
+            assert_eq!(
+                db.conn
+                    .query_row("SELECT SUM(value) FROM daily_metrics", [], |row| row
+                        .get::<_, f64>(0))
+                    .unwrap(),
+                60.0
+            );
+        }
+    }
+
+    #[test]
+    fn v26_removes_redundant_indexes_and_indexes_metric_date_queries() {
+        let db = Database::in_memory().unwrap();
+        db.conn
+            .execute_batch(
+                "PRAGMA user_version = 25;
+            CREATE INDEX idx_metric_samples_metric_timestamp ON metric_samples(metric,timestamp);
+            CREATE INDEX idx_daily_metrics_date_metric ON daily_metrics(date,metric);
+            CREATE INDEX idx_workout_hr_zones_workout ON workout_hr_zones(workout_id);
+            DROP INDEX idx_daily_metrics_metric_date;",
+            )
+            .unwrap();
+        for pass in 0..2 {
+            let before: i64 = db
+                .conn
+                .query_row("PRAGMA schema_version", [], |row| row.get(0))
+                .unwrap();
+            db.migrate().unwrap();
+            if pass == 1 {
+                let after: i64 = db
+                    .conn
+                    .query_row("PRAGMA schema_version", [], |row| row.get(0))
+                    .unwrap();
+                assert_eq!(
+                    before, after,
+                    "startup must not rebuild and drop obsolete indexes"
+                );
+            }
+            let redundant: i64 = db.conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name IN ('idx_metric_samples_metric_timestamp','idx_daily_metrics_date_metric','idx_workout_hr_zones_workout')", [], |row| row.get(0)).unwrap();
+            assert_eq!(redundant, 0);
+            for (sql, index) in [
+                ("SELECT * FROM daily_metrics WHERE metric='steps' AND date BETWEEN '2026-01-01' AND '2026-09-13' ORDER BY date", "idx_daily_metrics_metric_date"),
+                ("SELECT * FROM daily_metrics WHERE date='2026-09-13'", "uq_daily_metric_key"),
+                ("SELECT * FROM metric_samples WHERE metric='heart_rate' AND timestamp BETWEEN '2026-01-01' AND '2026-09-13' ORDER BY timestamp", "uq_metric_sample_key"),
+                ("SELECT * FROM workout_hr_zones WHERE workout_id='workout' ORDER BY zone_index", "sqlite_autoindex_workout_hr_zones_1"),
+            ] {
+                let mut stmt = db.conn.prepare(&format!("EXPLAIN QUERY PLAN {sql}")).unwrap();
+                let plan = stmt.query_map([], |row| row.get::<_, String>(3)).unwrap().collect::<std::result::Result<Vec<_>,_>>().unwrap().join("\n");
+                assert!(plan.contains(index), "{sql}: {plan}");
+                assert!(!plan.contains("SCAN") && !plan.contains("TEMP B-TREE"), "{plan}");
+            }
+        }
+    }
+
+    #[test]
+    fn regression_markdown_v25_indexes_detail_reads_and_deletes() {
+        let db = Database::in_memory().unwrap();
+        db.conn.execute_batch("DROP INDEX idx_sleep_stages_sleep; DROP INDEX idx_workout_pauses_workout; DELETE FROM schema_migrations WHERE version = 25; PRAGMA user_version = 24;").unwrap();
+        for _ in 0..2 {
+            db.migrate().unwrap();
+            assert_eq!(
+                db.conn
+                    .query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0))
+                    .unwrap(),
+                CURRENT_SCHEMA_VERSION
+            );
+            for (table, key, index) in [
+                ("sleep_stages", "sleep_id", "idx_sleep_stages_sleep"),
+                ("workout_pauses", "workout_id", "idx_workout_pauses_workout"),
+            ] {
+                for sql in [
+                    format!("SELECT * FROM {table} WHERE {key} = 'test' ORDER BY start_time, id"),
+                    format!("DELETE FROM {table} WHERE {key} = 'test'"),
+                ] {
+                    let mut stmt = db
+                        .conn
+                        .prepare(&format!("EXPLAIN QUERY PLAN {sql}"))
+                        .unwrap();
+                    let plan = stmt
+                        .query_map([], |row| row.get::<_, String>(3))
+                        .unwrap()
+                        .collect::<std::result::Result<Vec<_>, _>>()
+                        .unwrap()
+                        .join("\n");
+                    assert!(plan.contains(index), "{plan}");
+                    assert!(
+                        !plan.contains("SCAN") && !plan.contains("TEMP B-TREE"),
+                        "{plan}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn unsuccessful_first_sync_remains_retryable_after_startup_migration() {
+        for outcome in ["failed", "cancelled", "no_new_data", "partial"] {
+            let db = Database::in_memory().unwrap();
+            db.conn.execute_batch("INSERT INTO raw_records(stream, source_key, source_scope, start_utc, payload, payload_hash, fetched_at) VALUES('workouts', 'first', 'unknown', '2026-09-12T00:00:00Z', '{}', 'test', '2026-09-12T00:00:00Z');").unwrap();
+            db.record_cloud_sync("2026-09-12T00:00:00Z", outcome, 0)
+                .unwrap();
+            db.migrate().unwrap();
+            assert_eq!(
+                db.cloud_sync_metadata().unwrap(),
+                (None, Some(outcome.into()))
+            );
+            db.record_cloud_sync("2026-09-12T01:00:00Z", "updated", 1)
+                .unwrap();
+            db.record_cloud_sync("2026-09-12T02:00:00Z", "cancelled", 0)
+                .unwrap();
+            assert_eq!(
+                db.cloud_sync_metadata().unwrap().0.as_deref(),
+                Some("2026-09-12T01:00:00Z")
+            );
+            db.record_cloud_sync("2026-09-12T03:00:00Z", "no_new_data", 0)
+                .unwrap();
+            assert_eq!(
+                db.cloud_sync_metadata().unwrap().0.as_deref(),
+                Some("2026-09-12T03:00:00Z")
+            );
+        }
+    }
+
+    #[test]
+    fn future_schema_is_refused_without_changing_the_database() {
+        let dir = std::env::temp_dir().join(format!(
+            "zeppbridge-future-schema-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("zepp.db");
+        let conn = Connection::open(&path).unwrap();
+        conn.execute_batch(&format!("CREATE TABLE future_data(value TEXT); INSERT INTO future_data VALUES('keep'); PRAGMA user_version = {};", CURRENT_SCHEMA_VERSION + 1)).unwrap();
+        drop(conn);
+        let before = std::fs::read(&path).unwrap();
+        assert!(Database::open_migrated(&path).is_err());
+        assert!(Database::open_resilient(path.clone()).is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), before);
+        // Also protect direct migration callers inside the transaction.
+        let db = Database {
+            conn: Connection::open(&path).unwrap(),
+        };
+        assert!(db.migrate().is_err());
+        assert!(db.conn.is_autocommit());
+        drop(db);
+        assert_eq!(std::fs::read(&path).unwrap(), before);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 
     /// 云端的业务错误码要能一路走到诊断报告里。
     ///
@@ -7086,6 +7967,146 @@ mod tests {
         );
     }
 
+    /// 坏 raw 不能吞掉、也不能把整轮重放打成 Err，更不能因此盖章。
+    #[test]
+    fn replay_quarantines_bad_raw_without_stamping_or_aborting() {
+        let db = Database::in_memory().unwrap();
+        db.insert_raw_record(&RawRecord {
+            stream: "workouts".into(),
+            source_key: "sport_history:0:good".into(),
+            source_scope: SourceScope::Device,
+            device_id: None,
+            start_utc: ts(),
+            end_utc: None,
+            payload: serde_json::json!({
+                "data": [{ "trackid": 1_700_000_000i64, "end_time": 1_700_003_600i64, "type": 211 }]
+            }),
+            capability: CapabilityStatus::Verified,
+        })
+        .unwrap();
+        let empty_id = db
+            .insert_raw_record(&RawRecord {
+                stream: "workouts".into(),
+                source_key: "sport_history:0:empty".into(),
+                source_scope: SourceScope::Device,
+                device_id: None,
+                start_utc: ts(),
+                end_utc: None,
+                payload: serde_json::json!({}),
+                capability: CapabilityStatus::Verified,
+            })
+            .unwrap();
+        db.conn
+            .execute(
+                "INSERT INTO raw_records
+                    (stream, source_key, source_scope, device_id, start_utc, end_utc,
+                     payload, payload_hash, fetched_at)
+                 VALUES ('workouts', 'sport_history:0:not-json', 'device', NULL, ?1, NULL, '{', 'hash', ?1)",
+                params![ts().to_rfc3339()],
+            )
+            .unwrap();
+        let not_json_id = db.conn.last_insert_rowid();
+        db.conn
+            .execute(
+                "INSERT INTO app_meta(key, value, updated_at)
+                 VALUES('normalizer_revision', ?1, ?2)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                params!["zepp-normalizer-ancient", ts().to_rfc3339()],
+            )
+            .unwrap();
+
+        let counts = db
+            .reprocess_raw_records_if_needed()
+            .expect("坏报文不能让整轮重放返回 Err")
+            .expect("旧修订号应当触发重放");
+        assert!(
+            counts.get("workouts").copied().unwrap_or(0) >= 1,
+            "好报文必须产出派生行: {counts:?}"
+        );
+        let workouts = db.get_recent_workouts(10).unwrap();
+        assert_eq!(workouts.len(), 1);
+        assert_eq!(workouts[0].workout_type, "road_cycling");
+
+        let quarantined: i64 = db
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM raw_quarantine
+                 WHERE raw_record_id IN (?1, ?2) AND revision = ?3",
+                params![empty_id, not_json_id, NORMALIZER_REVISION],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(quarantined, 2);
+        let failures: i64 = db
+            .conn
+            .query_row(
+                "SELECT value FROM app_meta WHERE key = 'replay_last_failures'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .unwrap()
+            .parse()
+            .unwrap();
+        assert!(failures >= 1, "failures = {failures}");
+        assert_ne!(
+            db.stored_normalizer_revision().unwrap().as_deref(),
+            Some(NORMALIZER_REVISION),
+            "有新失败就不能推进修订号"
+        );
+        let raw_kept: i64 = db
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM raw_records WHERE id IN (?1, ?2)",
+                params![empty_id, not_json_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(raw_kept, 2);
+    }
+
+    /// 归一化失败必须把错误交回去，但不能把已经拿到的 raw 回滚掉。
+    #[test]
+    fn persist_keeps_raw_when_normalization_fails() {
+        let db = Database::in_memory().unwrap();
+        let error = db
+            .persist_fetched_record(&RawRecord {
+                stream: "workouts".into(),
+                source_key: "sport_history:0:unparseable".into(),
+                source_scope: SourceScope::Device,
+                device_id: None,
+                start_utc: ts(),
+                end_utc: None,
+                payload: serde_json::json!({}),
+                capability: CapabilityStatus::Verified,
+            })
+            .unwrap_err();
+        assert!(
+            matches!(
+                error,
+                ZeppBridgeError::ParseError(_) | ZeppBridgeError::DataUnavailable(_)
+            ),
+            "{error}"
+        );
+        let kept: i64 = db
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM raw_records WHERE source_key = 'sport_history:0:unparseable'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(kept, 1);
+        let quarantined: i64 = db
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM raw_quarantine WHERE source_key = 'sport_history:0:unparseable'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(quarantined, 1);
+    }
+
     #[test]
     fn issue_24_migration_repairs_history_without_raw_and_preserves_overrides() {
         let db = Database::in_memory().unwrap();
@@ -7670,10 +8691,10 @@ mod tests {
             end_time: ts() + chrono::Duration::minutes(400),
             score: Some(80),
             duration_minutes: 380,
-            deep_minutes: 80,
-            light_minutes: 240,
+            deep_minutes: Some(80),
+            light_minutes: Some(240),
             rem_minutes: Some(40),
-            awake_minutes: 20,
+            awake_minutes: Some(20),
             source_scope: SourceScope::Device,
             device_id: None,
             synced_at: None,
@@ -7702,10 +8723,10 @@ mod tests {
             end_time: start + chrono::Duration::minutes(400),
             score: Some(80),
             duration_minutes: 380,
-            deep_minutes: 80,
-            light_minutes: 240,
+            deep_minutes: Some(80),
+            light_minutes: Some(240),
             rem_minutes: Some(40),
-            awake_minutes: 20,
+            awake_minutes: Some(20),
             source_scope: SourceScope::Device,
             device_id: Some("SN-ONE".into()),
             synced_at: None,
@@ -7819,6 +8840,21 @@ mod tests {
             decode_raw_payload("{\"legacy\":true}".into(), Some(Vec::new())).unwrap(),
             "{\"legacy\":true}"
         );
+    }
+
+    #[test]
+    fn decompress_payload_rejects_output_over_32_mib() {
+        let oversized = "a".repeat(MAX_DECOMPRESSED_PAYLOAD_BYTES as usize + 1);
+        let zipped = compress_payload(&oversized).unwrap();
+        drop(oversized);
+        let error = decompress_payload(&zipped).expect_err("超过上限必须是 Err");
+        assert!(matches!(error, ZeppBridgeError::ParseError(_)), "{error}");
+    }
+
+    #[test]
+    fn decompress_payload_rejects_corrupt_bytes_without_panic() {
+        let error = decompress_payload(&[0xff, 0x00, 0x01, 0x02]).expect_err("损坏字节必须是 Err");
+        assert!(matches!(error, ZeppBridgeError::ParseError(_)), "{error}");
     }
 
     #[test]
@@ -8062,10 +9098,10 @@ mod tests {
             end_time: start - chrono::Duration::hours(1),
             score: Some(80),
             duration_minutes: 420,
-            deep_minutes: 90,
-            light_minutes: 280,
+            deep_minutes: Some(90),
+            light_minutes: Some(280),
             rem_minutes: Some(50),
-            awake_minutes: 10,
+            awake_minutes: Some(10),
             source_scope: SourceScope::Device,
             device_id: Some("SN-ONE".into()),
             synced_at: None,
@@ -8597,10 +9633,10 @@ mod tests {
             end_time: ts() + chrono::Duration::minutes(400),
             score: Some(70),
             duration_minutes: 400,
-            deep_minutes: 80,
-            light_minutes: 200,
+            deep_minutes: Some(80),
+            light_minutes: Some(200),
             rem_minutes: None,
-            awake_minutes: 20,
+            awake_minutes: Some(20),
             source_scope: SourceScope::Device,
             device_id: None,
             synced_at: None,
@@ -8616,6 +9652,170 @@ mod tests {
                 .rem_minutes,
             None
         );
+    }
+
+    fn sleep_stage_flags(db: &Database, sleep_id: &str) -> (i64, i64, i64, i64) {
+        db.conn
+            .query_row(
+                "SELECT deep_available, light_available, rem_available, awake_available
+                 FROM sleep_sessions WHERE sleep_id = ?1",
+                [sleep_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .unwrap()
+    }
+
+    #[test]
+    fn missing_sleep_stages_are_stored_as_unavailable_and_query_returns_none() {
+        let db = Database::in_memory().unwrap();
+        let version: i64 = db
+            .conn
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, CURRENT_SCHEMA_VERSION);
+        assert_eq!(CURRENT_SCHEMA_VERSION, 29);
+
+        let start = ts();
+        db.insert_sleep_session(&SleepSession {
+            sleep_id: "sleep-no-stages".into(),
+            start_time: start,
+            end_time: start + chrono::Duration::minutes(400),
+            score: Some(70),
+            duration_minutes: 400,
+            deep_minutes: None,
+            light_minutes: None,
+            rem_minutes: None,
+            awake_minutes: None,
+            source_scope: SourceScope::Device,
+            device_id: None,
+            synced_at: None,
+            time_in_bed_minutes: None,
+            wake_count: None,
+            stages: Vec::new(),
+        })
+        .unwrap();
+
+        assert_eq!(sleep_stage_flags(&db, "sleep-no-stages"), (0, 0, 0, 0));
+        let stored: (i32, i32, i32, i32) = db
+            .conn
+            .query_row(
+                "SELECT deep_minutes, light_minutes, rem_minutes, awake_minutes
+                 FROM sleep_sessions WHERE sleep_id = 'sleep-no-stages'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .unwrap();
+        assert_eq!(stored, (0, 0, 0, 0));
+
+        let detail = db.get_sleep_detail("sleep-no-stages").unwrap().unwrap();
+        assert_eq!(detail.deep_minutes, None);
+        assert_eq!(detail.light_minutes, None);
+        assert_eq!(detail.rem_minutes, None);
+        assert_eq!(detail.awake_minutes, None);
+        assert_eq!(detail.duration_minutes, 400);
+
+        let listed = db.get_recent_sleep_sessions(1).unwrap();
+        assert_eq!(listed[0].deep_minutes, None);
+        assert_eq!(listed[0].awake_minutes, None);
+
+        let export = parsed_export(&db, &["sleep"], ExportDetail::Summary);
+        let session = &export["data"]["sleep_sessions"][0];
+        assert!(session["deep_minutes"].is_null());
+        assert!(session["light_minutes"].is_null());
+        assert!(session["rem_minutes"].is_null());
+        assert!(session["awake_minutes"].is_null());
+        assert_eq!(session["duration_minutes"], 400);
+    }
+
+    #[test]
+    fn present_sleep_stages_round_trip_with_available_flags() {
+        let db = Database::in_memory().unwrap();
+        db.insert_sleep_session(&SleepSession {
+            sleep_id: "sleep-stages-present".into(),
+            start_time: ts(),
+            end_time: ts() + chrono::Duration::minutes(400),
+            score: Some(80),
+            duration_minutes: 380,
+            deep_minutes: Some(80),
+            light_minutes: Some(240),
+            rem_minutes: Some(40),
+            awake_minutes: Some(20),
+            source_scope: SourceScope::Device,
+            device_id: None,
+            synced_at: None,
+            time_in_bed_minutes: None,
+            wake_count: None,
+            stages: Vec::new(),
+        })
+        .unwrap();
+
+        assert_eq!(sleep_stage_flags(&db, "sleep-stages-present"), (1, 1, 1, 1));
+        let detail = db
+            .get_sleep_detail("sleep-stages-present")
+            .unwrap()
+            .unwrap();
+        assert_eq!(detail.deep_minutes, Some(80));
+        assert_eq!(detail.light_minutes, Some(240));
+        assert_eq!(detail.rem_minutes, Some(40));
+        assert_eq!(detail.awake_minutes, Some(20));
+
+        let export = parsed_export(&db, &["sleep"], ExportDetail::Summary);
+        let session = &export["data"]["sleep_sessions"][0];
+        assert_eq!(session["deep_minutes"], 80);
+        assert_eq!(session["light_minutes"], 240);
+        assert_eq!(session["rem_minutes"], 40);
+        assert_eq!(session["awake_minutes"], 20);
+    }
+
+    #[test]
+    fn v26_library_gains_stage_available_columns_at_v27() {
+        let dir = std::env::temp_dir().join(format!(
+            "zeppbridge-v26-sleep-available-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("zepp.db");
+
+        {
+            let db = Database::open_migrated(&path).unwrap();
+            db.conn
+                .execute_batch(
+                    "INSERT INTO sleep_sessions (
+                        sleep_id, start_time, end_time, duration_minutes,
+                        deep_minutes, light_minutes, rem_minutes, rem_available, awake_minutes,
+                        source_scope
+                     ) VALUES (
+                        'legacy', '2026-01-01T00:00:00+00:00', '2026-01-01T08:00:00+00:00', 480,
+                        0, 0, 0, 1, 0, 'device'
+                     );
+                     ALTER TABLE sleep_sessions DROP COLUMN deep_available;
+                     ALTER TABLE sleep_sessions DROP COLUMN light_available;
+                     ALTER TABLE sleep_sessions DROP COLUMN awake_available;
+                     PRAGMA user_version = 26;",
+                )
+                .unwrap();
+        }
+
+        let db = Database::open_migrated(&path).expect("v26 should migrate to current schema");
+        let version: i64 = db
+            .conn
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, CURRENT_SCHEMA_VERSION);
+        assert_eq!(sleep_stage_flags(&db, "legacy"), (1, 1, 1, 1));
+
+        let detail = db.get_sleep_detail("legacy").unwrap().unwrap();
+        assert_eq!(detail.deep_minutes, Some(0));
+        assert_eq!(detail.light_minutes, Some(0));
+        assert_eq!(detail.awake_minutes, Some(0));
+        assert_eq!(detail.rem_minutes, Some(0));
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -8745,6 +9945,177 @@ mod tests {
     }
 
     #[test]
+    fn cleanup_uses_local_day_cutoff_and_drops_workout_hr_zones() {
+        let db = Database::in_memory().unwrap();
+        let local_today = Local::now().date_naive();
+        let old_date = (local_today - Duration::days(40))
+            .format("%Y-%m-%d")
+            .to_string();
+        let kept_date = (local_today - Duration::days(10))
+            .format("%Y-%m-%d")
+            .to_string();
+        db.conn
+            .execute(
+                "INSERT INTO daily_metrics(date, metric, value, unit, source_scope)
+                 VALUES (?1, 'steps', 1, 'count', 'device')",
+                [&old_date],
+            )
+            .unwrap();
+        db.conn
+            .execute(
+                "INSERT INTO daily_metrics(date, metric, value, unit, source_scope)
+                 VALUES (?1, 'steps', 2, 'count', 'device')",
+                [&kept_date],
+            )
+            .unwrap();
+        let old_start = (Utc::now() - Duration::days(40)).to_rfc3339();
+        let old_end = (Utc::now() - Duration::days(40) + Duration::hours(1)).to_rfc3339();
+        db.conn
+            .execute(
+                "INSERT INTO workouts(workout_id, workout_type, start_time, end_time, source_scope)
+                 VALUES ('old', 'run', ?1, ?2, 'device')",
+                [&old_start, &old_end],
+            )
+            .unwrap();
+        db.conn
+            .execute(
+                "INSERT INTO workout_hr_zones(workout_id, zone_index, upper_bound_bpm, seconds)
+                 VALUES ('old', 1, 140, 60)",
+                [],
+            )
+            .unwrap();
+        let new_start = Utc::now().to_rfc3339();
+        let new_end = (Utc::now() + Duration::hours(1)).to_rfc3339();
+        db.conn
+            .execute(
+                "INSERT INTO workouts(workout_id, workout_type, start_time, end_time, source_scope)
+                 VALUES ('kept', 'run', ?1, ?2, 'device')",
+                [&new_start, &new_end],
+            )
+            .unwrap();
+        db.conn
+            .execute(
+                "INSERT INTO workout_hr_zones(workout_id, zone_index, upper_bound_bpm, seconds)
+                 VALUES ('kept', 1, 150, 30)",
+                [],
+            )
+            .unwrap();
+
+        db.cleanup_old_data(30).unwrap();
+
+        let daily: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM daily_metrics", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(daily, 1);
+        let old_zones: i64 = db
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM workout_hr_zones WHERE workout_id = 'old'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(old_zones, 0);
+        let kept_zones: i64 = db
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM workout_hr_zones WHERE workout_id = 'kept'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(kept_zones, 1);
+    }
+
+    #[test]
+    fn v28_dedupes_metric_samples_before_the_unique_index() {
+        let db = Database::in_memory().unwrap();
+        db.conn
+            .execute_batch("DROP INDEX uq_metric_sample_key; PRAGMA user_version = 27;")
+            .unwrap();
+        for value in [70.0_f64, 71.0] {
+            db.conn
+                .execute(
+                    "INSERT INTO metric_samples(metric, timestamp, value, unit, source_scope, device_id)
+                     VALUES ('heart_rate', '2026-01-01T00:00:00Z', ?1, 'bpm', 'device', '')",
+                    [value],
+                )
+                .unwrap();
+        }
+        db.migrate().unwrap();
+        let count: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM metric_samples", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+        let version: i64 = db
+            .conn
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, CURRENT_SCHEMA_VERSION);
+        let duplicate = db.conn.execute(
+            "INSERT INTO metric_samples(metric, timestamp, value, unit, source_scope, device_id)
+             VALUES ('heart_rate', '2026-01-01T00:00:00Z', 72, 'bpm', 'device', '')",
+            [],
+        );
+        assert!(duplicate.is_err());
+    }
+
+    #[test]
+    fn v28_deletes_workout_hr_zones_with_the_parent_workout() {
+        let db = Database::in_memory().unwrap();
+        db.conn
+            .execute(
+                "INSERT INTO workouts(workout_id, workout_type, start_time, end_time, source_scope)
+                 VALUES ('w', 'run', '2026-01-01T00:00:00Z', '2026-01-01T01:00:00Z', 'device')",
+                [],
+            )
+            .unwrap();
+        db.conn
+            .execute(
+                "INSERT INTO workout_hr_zones(workout_id, zone_index, upper_bound_bpm, seconds)
+                 VALUES ('w', 1, 140, 60)",
+                [],
+            )
+            .unwrap();
+        db.conn
+            .execute("DELETE FROM workouts WHERE workout_id = 'w'", [])
+            .unwrap();
+        let leftover: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM workout_hr_zones", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(leftover, 0);
+    }
+
+    #[test]
+    fn estimate_export_counts_without_materializing_json() {
+        let db = Database::in_memory().unwrap();
+        db.insert_metric_sample(&MetricSample {
+            metric: "hrv_rmssd".into(),
+            timestamp: ts(),
+            value: 42.0,
+            unit: "ms".into(),
+            source_scope: SourceScope::Device,
+            device_id: None,
+        })
+        .unwrap();
+        let selection = export_selection(&["hrv_rmssd"], ExportDetail::Full);
+        let (encoded, count) = db.build_ai_export(&selection).unwrap();
+        let estimate = db.estimate_ai_export(&selection).unwrap();
+        assert_eq!(estimate.record_count, count);
+        assert!(estimate.estimated_bytes > 0);
+        assert!(
+            estimate.estimated_bytes < encoded.len() as u64 * 8,
+            "estimate should stay in the same order of magnitude as the JSON"
+        );
+        assert!(!encoded.is_empty());
+    }
+
+    #[test]
     fn null_device_metric_key_deduplicates() {
         let db = Database::in_memory().unwrap();
         let sample = MetricSample {
@@ -8833,10 +10204,10 @@ mod tests {
             end_time: end,
             score: Some(80),
             duration_minutes: 380,
-            deep_minutes: 80,
-            light_minutes: 240,
+            deep_minutes: Some(80),
+            light_minutes: Some(240),
             rem_minutes: Some(40),
-            awake_minutes: 20,
+            awake_minutes: Some(20),
             source_scope: SourceScope::Device,
             device_id: Some("SN-ONE".into()),
             synced_at: Some(start + chrono::Duration::hours(10)),
@@ -8936,6 +10307,96 @@ mod tests {
         })
         .unwrap();
         assert!(db.pending_running_details().unwrap().is_empty());
+    }
+
+    fn insert_pending_run(db: &Database, workout_id: &str, start: DateTime<Utc>) {
+        db.insert_workout(&Workout {
+            workout_id: workout_id.into(),
+            workout_type: "run".into(),
+            normalized_type: "run".into(),
+            type_source: "numeric_mapped".into(),
+            user_override: None,
+            effective_type: "run".into(),
+            custom_label: None,
+            start_time: start,
+            end_time: start + chrono::Duration::minutes(10),
+            distance_meters: Some(1000.0),
+            calories: Some(80),
+            avg_hr: Some(140),
+            max_hr: Some(160),
+            training_load: None,
+            vo2max: None,
+            source_scope: SourceScope::Device,
+            device_id: None,
+            synced_at: None,
+            gps_available: false,
+            sample_count: 0,
+            zepp_source: Some("run.gps".into()),
+            zepp_type: Some(1),
+            ..Default::default()
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn pending_running_details_are_capped_so_one_sync_cannot_fetch_the_whole_backlog() {
+        let db = Database::in_memory().unwrap();
+        for index in 0..(PENDING_WORKOUT_DETAIL_LIMIT + 7) {
+            insert_pending_run(
+                &db,
+                &format!("w{index}"),
+                ts() + chrono::Duration::seconds(index as i64),
+            );
+        }
+        let pending = db.pending_running_details().unwrap();
+        assert_eq!(pending.len(), PENDING_WORKOUT_DETAIL_LIMIT);
+        let uncapped = db
+            .pending_running_details_limited(PENDING_WORKOUT_DETAIL_LIMIT + 20)
+            .unwrap();
+        assert_eq!(uncapped.len(), PENDING_WORKOUT_DETAIL_LIMIT + 7);
+    }
+
+    #[test]
+    fn failed_workout_detail_attempts_drop_out_then_decay_back_in() {
+        let db = Database::in_memory().unwrap();
+        insert_pending_run(&db, "stuck", ts());
+        for _ in 0..MAX_WORKOUT_DETAIL_ATTEMPTS {
+            db.record_workout_detail_fetch_result("stuck", "run.gps", false)
+                .unwrap();
+        }
+        assert!(
+            db.pending_running_details().unwrap().is_empty(),
+            "permanent failures must not stay at the front of every sync"
+        );
+        db.conn
+            .execute(
+                "UPDATE workout_detail_fetch_attempts
+                 SET updated_at = ?1
+                 WHERE workout_id = 'stuck'",
+                [(Utc::now() - chrono::Duration::days(8)).to_rfc3339()],
+            )
+            .unwrap();
+        let pending = db.pending_running_details().unwrap();
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].workout_id, "stuck");
+    }
+
+    #[test]
+    fn nested_replay_guards_keep_the_flag_until_the_outer_drops() {
+        // 别的测试也可能在并行重放，所以不能断言进/出时全局计数恰好是 0。
+        // 这条只钉：内层 Drop 不许把外层还举着的旗清掉。
+        let outer = ReplayGuard::enter();
+        assert!(replay_in_progress());
+        {
+            let inner = ReplayGuard::enter();
+            assert!(replay_in_progress());
+            drop(inner);
+            assert!(
+                replay_in_progress(),
+                "inner drop must not hide the outer wait-for-lock"
+            );
+        }
+        drop(outer);
     }
 
     fn temp_dir(label: &str) -> PathBuf {

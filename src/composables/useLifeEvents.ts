@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import { tauriApi, isDesktop } from './useTauriApi';
+import { backend, isDesktop } from '../lib/bridge';
 import { localDateString } from '../lib/format';
 import type { LifeEvent, LifeEventInput } from '../types';
 
@@ -13,7 +13,7 @@ async function reload() {
   if (pending) return pending;
   loading.value = true;
   failed.value = false;
-  pending = tauriApi.listLifeEvents().then(rows => { events.value = rows; })
+  pending = backend.listLifeEvents().then(rows => { events.value = rows; })
     .catch(() => { failed.value = true; })
     .finally(() => { loading.value = false; pending = null; });
   return pending;

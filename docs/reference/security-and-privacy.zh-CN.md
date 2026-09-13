@@ -17,8 +17,8 @@
 
 - 同步不是离线功能：用户点击验证/同步后，ZeppBridge 会向用户允许的 Zepp 区域 host 发起 HTTPS 请求。
 - 连接器只接受 `https://api-mifit*.zepp.com` 或 `https://api-mifit*.huami.com` 的 origin，不接受任意域名、路径、query、fragment、凭据或不受控端口。
-- HTTP client 有 30 秒 timeout，并对 401/403、404、429/5xx 与其他非 2xx 做分类和有限重试。
-- 登录窗口只允许导航到 `https://*.zepp.com` / `https://*.huami.com`（以及 `about`/`data`/`blob` 中间页）。区域探测只打 allow-list 上的 API origin。
+- HTTP client 有 30 秒 timeout（另加 10 秒连接超时），不认环境变量 / 系统代理，并对 401/403、404、429/5xx 与其他非 2xx 做分类和有限重试。
+- 登录窗口只允许 HTTPS 导航到 `*.zepp.com` / `*.huami.com` 以及官方登录页会用到的那些精确 OAuth 域名。`about:` / `data:` / `blob:` 一律拒绝。区域探测只打 allow-list 上的 API origin。
 - 当前没有局域网 HTTP 代理，也不安装系统或用户 CA。
 - 本机 REST API 只绑定 `127.0.0.1:43921`，不监听局域网地址，不提供 CORS，只暴露只读健康探针和运动序列路由。**默认关闭**；用户在设置页开启后才会监听，且每个请求都要带 token（`zbk_` 前缀，比较用常量时间）。token 可随时轮换，轮换后旧 token 立即失效；关闭开关会释放端口。请求行、单条 header 与 header 总量都有上限，超长请求直接拒绝而不是读进内存。
 - `zeppbridge-mcp` 只用 stdio，**不监听任何端口，也不发出任何网络请求**。它连库用 `PRAGMA query_only`，写操作在 SQLite 层就被拒绝，不依赖工具列表里恰好没有写操作。返回里没有 token、Cookie、完整账号，也没有本机绝对路径。

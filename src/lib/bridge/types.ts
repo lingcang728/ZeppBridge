@@ -7,6 +7,7 @@ import type {
   AuthInfo,
   CapabilityOverview,
   CapabilityProbe,
+  ExportEstimate,
   ExportResult,
   ExportSelection,
   HealthOverview,
@@ -130,6 +131,7 @@ export interface BridgeBackend {
   submitDiagnosticReport(note?: string, category?: string): Promise<FeedbackSubmissionResult>;
   submitDeviceModelAssignment(note?: string): Promise<FeedbackSubmissionResult>;
   getExportJson(selection: ExportSelection): Promise<string>;
+  estimateExport(selection: ExportSelection): Promise<ExportEstimate>;
   saveJsonExport(selection: ExportSelection, path: string): Promise<ExportResult>;
   saveCsvExport(selection: ExportSelection, path: string): Promise<ExportResult>;
   saveGpxExport(selection: ExportSelection, path: string): Promise<ExportResult>;

@@ -7,7 +7,9 @@ defineOptions({ name: 'Overview' });
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import { graphic } from 'echarts/core';
-import { VChart } from '../lib/echartsSetup';
+import { CHART_THEME, VChart } from '../lib/echartsSetup';
+import { HR_GAP_BREAK_MS, insertNullBreaks } from '../lib/chartGaps';
+import { createLoadSeq } from '../lib/loadSeq';
 import CircularProgress from '../components/CircularProgress.vue';
 import CoverageNotice from '../components/CoverageNotice.vue';
 import DesignIcon, { type DesignIconName } from '../components/DesignIcon.vue';
@@ -29,6 +31,7 @@ import { formatDistance, formatDuration, formatMetric, formatTime, isFiniteNumbe
 import { displayableWorkouts, workoutDisplayLabel, workoutDurationMinutes, workoutTypeKey } from '../lib/workouts';
 import type { HealthOverview, HeartRatePoint, MetricSeries, SleepSession, Workout } from '../types';
 import { sleepStageLabel } from '../lib/sleepStages';
+import { stageMinutesForBar } from '../lib/missingValues';
 import { defineMessages, useMessages } from '../i18n';
 
 const messages = defineMessages(
@@ -112,6 +115,7 @@ const messages = defineMessages(
     loadMedium: '中等',
     loadHigh: '较高',
     loadVeryHigh: '很高',
+    loadBandReference: (band: string) => `${band}（参考）`,
   },
   {
     collapseHero: 'Collapse introduction',
@@ -193,6 +197,7 @@ const messages = defineMessages(
     loadMedium: 'moderate',
     loadHigh: 'high',
     loadVeryHigh: 'very high',
+    loadBandReference: (band: string) => `${band} (reference)`,
   },
   {
     collapseHero: 'Contraer introducción',
@@ -274,6 +279,7 @@ const messages = defineMessages(
     loadMedium: 'moderada',
     loadHigh: 'alta',
     loadVeryHigh: 'muy alta',
+    loadBandReference: (band: string) => `${band} (referencia)`,
   },
 );
 const t = useMessages(messages);
@@ -301,6 +307,7 @@ const statusSeries = ref<Record<string, MetricSeries>>({});
 const loading = ref(true);
 const error = ref<string | null>(null);
 const partialWarning = ref<string | null>(null);
+const loadSeq = createLoadSeq();
 
 const num = (value: unknown) => isFiniteNumber(value) ? formatMetric(value) : '—';
 const hm = (minutes?: number | null) => {
@@ -355,8 +362,6 @@ const heroAiProviders = AI_PROVIDERS.filter((provider) => (
  * 有足够的宽度。
  */
 const OVERVIEW_HR_WINDOW_HOURS = 5;
-/** 超过这个间隔就断线。没有采样的时段不画线，不用一根直线把两头连起来。 */
-const HR_GAP_BREAK_MINUTES = 15;
 
 const allHrPoints = computed(() => heartRateSeries.value
   .map((point) => ({ ts: new Date(point.timestamp).getTime(), value: point.value }))
@@ -386,15 +391,7 @@ const hrAverage = computed(() => {
 });
 const hrChartOption = computed(() => {
   // 采样断档处插一个 null，让线断开而不是被直线连起来。
-  const points = hrPoints.value;
-  const data: Array<[number, number] | [number, null]> = [];
-  points.forEach((point, index) => {
-    const previous = points[index - 1];
-    if (previous && point.ts - previous.ts > HR_GAP_BREAK_MINUTES * 60_000) {
-      data.push([previous.ts + 1, null]);
-    }
-    data.push([point.ts, point.value]);
-  });
+  const data = insertNullBreaks(hrPoints.value, HR_GAP_BREAK_MS);
   const last = data[data.length - 1];
   const clock = (value: number) => displayDateTimeFormatter({ hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value));
   return {
@@ -409,9 +406,9 @@ const hrChartOption = computed(() => {
       padding: [8, 12],
       textStyle: { color: '#F3F4EC', fontSize: 15.5 },
       extraCssText: 'border-radius:8px;box-shadow:none;',
-      formatter: (params: Array<{ value: [number, number] }>) => {
+      formatter: (params: Array<{ value: [number, number | null] }>) => {
         const point = Array.isArray(params) ? params[0] : params;
-        if (!point) return '';
+        if (!point || point.value[1] == null) return '';
         return t.value.hrTooltip(clock(point.value[0]), Math.round(point.value[1]));
       },
     },
@@ -426,7 +423,7 @@ const hrChartOption = computed(() => {
       splitLine: { lineStyle: { color: 'rgba(232,238,244,.08)', type: 'dashed' } },
     },
     series: [{
-      type: 'line', data, smooth: .18, showSymbol: false,
+      type: 'line', data, smooth: .18, showSymbol: false, connectNulls: false,
       lineStyle: { width: 2, color: '#F0616A', cap: 'round' },
       areaStyle: { color: new graphic.LinearGradient(0, 0, 0, 1, [
         { offset: 0, color: 'rgba(240,97,106,.22)' },
@@ -461,16 +458,25 @@ const sleepStages = computed(() => {
   return [
     { key: 'deep', label: sleepStageLabel('deep'), minutes: sleep.deep_minutes, color: 'var(--sleep-deep)' },
     { key: 'light', label: sleepStageLabel('light'), minutes: sleep.light_minutes, color: 'var(--sleep-light)' },
-    { key: 'rem', label: sleepStageLabel('rem'), minutes: sleep.rem_minutes ?? 0, color: 'var(--sleep-rem)' },
+    { key: 'rem', label: sleepStageLabel('rem'), minutes: sleep.rem_minutes, color: 'var(--sleep-rem)' },
     { key: 'awake', label: sleepStageLabel('awake'), minutes: sleep.awake_minutes, color: 'var(--sleep-awake)' },
   ];
 });
+const sleepBarStages = computed(() =>
+  sleepStages.value.flatMap((stage) => {
+    const minutes = stageMinutesForBar(stage.minutes);
+    return minutes === null ? [] : [{ ...stage, minutes }];
+  }),
+);
 
 const DEFAULT_LOAD_SCALE = 600;
 const loadScale = computed(() => {
   const scale = overview.value?.training_load_scale;
   return isFiniteNumber(scale) && scale > 0 ? scale : DEFAULT_LOAD_SCALE;
 });
+const loadScaleIsReference = computed(() =>
+  !(isFiniteNumber(overview.value?.training_load_scale) && (overview.value?.training_load_scale ?? 0) > 0),
+);
 const trainingLoad = computed(() => isFiniteNumber(overview.value?.training_load) ? overview.value.training_load : null);
 const loadBand = computed(() => {
   if (trainingLoad.value === null) return null;
@@ -526,7 +532,7 @@ const trainingEntry = computed(() => ({
       label: t.value.factLoad,
       text: trainingLoad.value === null
         ? null
-        : `${formatMetric(trainingLoad.value)}${loadBand.value ? ` ${loadBand.value}` : ''}`,
+        : `${formatMetric(trainingLoad.value)}${loadBand.value ? ` ${loadScaleIsReference.value ? t.value.loadBandReference(loadBand.value) : loadBand.value}` : ''}`,
     },
   ]),
   spark: seriesValues('training_load'),
@@ -581,10 +587,12 @@ const recentItems = computed<RecentItem[]>(() => {
 });
 
 const loadOverview = async () => {
+  const seq = loadSeq.next();
   loading.value = true;
   error.value = null;
   partialWarning.value = null;
   if (!isDesktop()) {
+    if (!loadSeq.isCurrent(seq)) return;
     overview.value = null;
     heartRateSeries.value = [];
     recentSleep.value = [];
@@ -597,6 +605,7 @@ const loadOverview = async () => {
     backend.getHealthOverview(), backend.getHeartRateSeries(24), backend.getRecentSleep(3), backend.getRecentWorkouts(5),
     backend.getMetricSeries(ENTRY_METRICS, 7),
   ]);
+  if (!loadSeq.isCurrent(seq)) return;
   const [health, heartRate, sleep, workouts, status] = results;
   overview.value = health.status === 'fulfilled' ? health.value : null;
   heartRateSeries.value = heartRate.status === 'fulfilled' ? heartRate.value : [];
@@ -615,13 +624,13 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
 
 <template>
   <section class="page overview-page" :aria-labelledby="heroHidden ? undefined : 'overview-title'">
-    <button v-if="heroHidden" class="hero-restore button button-ghost" @click="restoreHero">{{ t.showHero }}</button>
+    <button v-if="heroHidden" class="hero-restore button button-quiet" @click="restoreHero">{{ t.showHero }}</button>
     <ModalDialog v-if="heroChoiceOpen" labelledby="hero-choice-title" @close="heroChoiceOpen = false">
       <h2 id="hero-choice-title">{{ t.collapseHero }}</h2>
       <div class="hero-choice-actions">
         <button class="button button-secondary" @click="collapseHero(false)">{{ t.collapseOnce }}</button>
         <button class="button button-secondary" @click="collapseHero(true)">{{ t.collapseAlways }}</button>
-        <button class="button button-ghost" @click="heroChoiceOpen = false">{{ t.cancelCollapse }}</button>
+        <button class="button button-quiet" @click="heroChoiceOpen = false">{{ t.cancelCollapse }}</button>
       </div>
     </ModalDialog>
     <header v-if="!heroHidden" class="hero-card">
@@ -693,7 +702,7 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
     <div v-else class="dashboard-grid">
       <RouterLink class="metric-panel hr-panel" to="/heart" :aria-label="t.hrPanelAria">
         <div class="panel-head"><span class="panel-title"><span class="chart-icon"><DesignIcon name="heart-rate" :size="34" /></span><span><strong>{{ t.hrTitle }}</strong><small>{{ t.hrWindow(OVERVIEW_HR_WINDOW_HOURS) }}</small></span></span><span class="latest-value">{{ t.latest }} <strong>{{ num(hrLatest) }}</strong><small>{{ t.bpm }}</small></span></div>
-        <VChart v-if="hrPoints.length > 1" class="hr-chart" theme="zeppbridge-dark" :option="hrChartOption" autoresize role="img" :aria-label="t.hrChartAria" />
+        <VChart v-if="hrPoints.length > 1" class="hr-chart" :theme="CHART_THEME" :option="hrChartOption" autoresize role="img" :aria-label="t.hrChartAria" />
         <ul v-if="hrPoints.length > 1" class="hr-zones" :aria-label="t.hrZonesAria">
           <li v-for="zone in HR_ZONES" :key="zone.key">{{ zone.label }}</li>
         </ul>
@@ -719,7 +728,7 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
         <div class="panel-head"><span class="panel-title"><DesignIcon name="sleep" :size="38" /><span><strong>{{ t.sleepTitle }}</strong><small>{{ t.sleepSub }}</small></span></span><span v-if="lastSleep && isFiniteNumber(lastSleep.score)" class="sleep-score">{{ lastSleep.score }}</span></div>
         <template v-if="lastSleep">
           <p class="sleep-total">{{ hm(lastSleep.duration_minutes) }}</p>
-          <div class="sleep-bar" :aria-label="t.sleepBarAria"><span v-for="stage in sleepStages" :key="stage.key" :style="{ flex: Math.max(1, stage.minutes || 0), background: stage.color }"></span></div>
+          <div class="sleep-bar" :aria-label="t.sleepBarAria"><span v-for="stage in sleepBarStages" :key="stage.key" :style="{ flex: Math.max(1, stage.minutes), background: stage.color }"></span></div>
           <ul class="sleep-stages"><li v-for="stage in sleepStages" :key="stage.key"><i :style="{ background: stage.color }"></i><span>{{ stage.label }}</span><strong>{{ hm(stage.minutes) }}</strong></li></ul>
         </template>
         <div v-else class="panel-empty compact"><DesignIcon name="sleep" :size="50" /><span>{{ t.sleepEmpty }}</span></div>

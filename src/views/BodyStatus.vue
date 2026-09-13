@@ -4,7 +4,8 @@ import { displayDateTimeFormatter } from '../lib/dateTime';
 
 defineOptions({ name: 'BodyStatus' });
 import { computed, onMounted, ref, watch } from 'vue';
-import { VChart } from '../lib/echartsSetup';
+import { CHART_THEME, VChart } from '../lib/echartsSetup';
+import { createLoadSeq } from '../lib/loadSeq';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
 import PageHeader from '../components/PageHeader.vue';
 import CoverageNotice from '../components/CoverageNotice.vue';
@@ -532,6 +533,7 @@ const ranges = computed(() => seriesRanges());
 const rangeDays = ref<SeriesRangeDays>(30);
 const series = ref<Record<string, MetricSeries>>({});
 const loading = ref(true);
+const loadSeq = createLoadSeq();
 const error = ref<string | null>(null);
 
 /**
@@ -752,9 +754,11 @@ const curveChartOption = computed(() => {
 });
 
 const load = async () => {
+  const seq = loadSeq.next();
   loading.value = true;
   error.value = null;
   if (!isDesktop()) {
+    if (!loadSeq.isCurrent(seq)) return;
     series.value = {};
     stressPoints.value = [];
     loading.value = false;
@@ -769,14 +773,16 @@ const load = async () => {
       backend.getMetricSeries(METRICS, rangeDays.value),
       backend.getStressSeries(24),
     ]);
+    if (!loadSeq.isCurrent(seq)) return;
     series.value = indexSeries(daily);
     stressPoints.value = stress;
   } catch (cause) {
+    if (!loadSeq.isCurrent(seq)) return;
     series.value = {};
     stressPoints.value = [];
     error.value = toUserMessage(cause, t.value.loadFailed);
   } finally {
-    loading.value = false;
+    if (loadSeq.isCurrent(seq)) loading.value = false;
   }
 };
 
@@ -823,6 +829,7 @@ watch(dataRevision, () => { void load(); });
         <VChart
           v-if="curve.length"
           class="day-chart"
+          :theme="CHART_THEME"
           :option="curveChartOption"
           autoresize
           role="img"
@@ -912,7 +919,7 @@ watch(dataRevision, () => { void load(); });
           </header>
           <VChart
             class="macro-chart"
-            theme="zeppbridge-dark"
+            :theme="CHART_THEME"
             :option="macroChartOption"
             autoresize
             role="img"
@@ -975,7 +982,7 @@ watch(dataRevision, () => { void load(); });
 /* 区间边界是手表给的，不是我们算的。不写清楚，它就会被当成又一套自选算法。 */
 .curve-note { margin: 10px 0 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.6; }
 .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-4); }
-.group-title { margin: var(--space-5) 0 0; font-size: var(--fs-xl); font-weight: 700; color: var(--ink); }
+.group-title { margin: var(--space-6) 0 0; font-size: var(--fs-xl); font-weight: 700; color: var(--ink); }
 .macro-chart { height: 200px; }
 .inline-alert {
   display: flex;

@@ -45,6 +45,31 @@ const dayCount = (start: string, end: string): number | null => {
   return Math.round((to - from) / 86_400_000) + 1;
 };
 
+/**
+ * UI 锁定单条运动时，只提交 workoutId，把日期拿掉。
+ *
+ * 日期和单条运动同时出现会被当成矛盾请求（见 `buildExportSelection`）。
+ * 「锁定该条运动」必须走这条路，不能把页面上还在显示的日期范围一并送出去。
+ */
+export const exportInputForFocus = (input: {
+  startDate?: string | null;
+  endDate?: string | null;
+  focusedWorkoutId?: string | null;
+  dataTypes: ExportDataType[];
+  detail: ExportDetail;
+}): ExportScopeInput => {
+  const workoutId = input.focusedWorkoutId?.trim() || '';
+  if (workoutId) {
+    return { workoutId, dataTypes: input.dataTypes, detail: input.detail };
+  }
+  return {
+    startDate: input.startDate,
+    endDate: input.endDate,
+    dataTypes: input.dataTypes,
+    detail: input.detail,
+  };
+};
+
 export const buildExportSelection = (input: ExportScopeInput): ExportScopeResult => {
   const workoutId = input.workoutId?.trim() || '';
   const hasRange = Boolean(input.startDate || input.endDate);
@@ -82,4 +107,32 @@ export const buildExportSelection = (input: ExportScopeInput): ExportScopeResult
     ok: true,
     selection: { scope, dataTypes: [...input.dataTypes], detail: input.detail },
   };
+};
+
+/** 设置页「默认导出格式」和 Explore / 运动详情共用这一份。 */
+export const DEFAULT_EXPORT_FORMAT_KEY = 'zeppbridge-default-export-format';
+export const DEFAULT_EXPORT_FORMATS = ['json', 'csv', 'gpx'] as const;
+export type DefaultExportFormat = (typeof DEFAULT_EXPORT_FORMATS)[number];
+
+export const isDefaultExportFormat = (value: unknown): value is DefaultExportFormat =>
+  value === 'json' || value === 'csv' || value === 'gpx';
+
+export const readDefaultExportFormat = (): DefaultExportFormat => {
+  if (typeof window === 'undefined') return 'json';
+  try {
+    const raw = window.localStorage.getItem(DEFAULT_EXPORT_FORMAT_KEY);
+    if (isDefaultExportFormat(raw)) return raw;
+  } catch {
+    // 隐私模式读不了 localStorage，退回 JSON。
+  }
+  return 'json';
+};
+
+export const writeDefaultExportFormat = (format: DefaultExportFormat): void => {
+  if (!isDefaultExportFormat(format)) return;
+  try {
+    window.localStorage.setItem(DEFAULT_EXPORT_FORMAT_KEY, format);
+  } catch {
+    // 写失败只影响下次打开的默认值，这次导出不受影响。
+  }
 };

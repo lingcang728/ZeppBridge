@@ -156,7 +156,7 @@ const syncNow = () => { void runSync('incremental'); };
   flex-wrap: wrap;
   margin: 0 0 var(--space-3);
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--surface-raised);
   color: var(--muted);

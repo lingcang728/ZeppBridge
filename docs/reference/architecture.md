@@ -1,6 +1,6 @@
 # ZeppBridge architecture summary
 
-This page describes the product boundaries and current implementation of v2.3.0.
+This page describes the product boundaries and current implementation of v2.4.0.
 For the usage entry point see the project [README](../../README.md); for
 engineering gates see the [development guide](../development/development.md).
 
@@ -83,7 +83,8 @@ way to tell which one is right.
   silently fused when the source is ambiguous.
 - Encoded but unverified `band_data` is kept as raw only. No simulated curve or
   map is drawn where there is no real sample or route.
-- The schema version is `PRAGMA user_version = 16`. Migration steps may only be
+- The live schema version is `PRAGMA user_version = CURRENT_SCHEMA_VERSION`
+  (see `storage/mod.rs`). Migration steps may only be
   appended; published DDL is never modified (`storage/migrations.rs`). v10 added
   running power and posture columns to `workout_samples`; v12 added per-stream
   three-stage provenance; v13 added user naming for unrecognised workout codes

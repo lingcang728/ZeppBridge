@@ -15,11 +15,13 @@ import { displayDateTimeFormatter } from '../lib/dateTime';
  * 稀疏画成故障。
  */
 import { computed, onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import Icon from '../components/Icon.vue';
 import PageHeader from '../components/PageHeader.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
-import { useSyncController } from '../composables/useSyncController';
+import { syncOutcomeLabel, useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
+import { createLoadSeq } from '../lib/loadSeq';
 import type { DataHealth, HealthAction, StageState, StreamHealth } from '../types';
 import { syncStreamLabel } from '../lib/syncStreams';
 import { defineMessages, intlLocale, useMessages } from '../i18n';
@@ -395,7 +397,9 @@ const t = useMessages(messages);
 const lookup = (table: unknown, key: string): string | undefined =>
   (table as Record<string, string | undefined>)[key];
 
-const { runSync, isSyncing, markDataChanged } = useSyncController();
+const { runSync, isSyncing, markDataChanged, syncState, syncMessage } = useSyncController();
+const router = useRouter();
+const loadSeq = createLoadSeq();
 
 const health = ref<DataHealth | null>(null);
 const loading = ref(true);
@@ -412,14 +416,18 @@ const WINDOWS = computed(() => [
 ]);
 
 const load = async () => {
+  const seq = loadSeq.next();
   loading.value = true;
   error.value = null;
   try {
-    health.value = await backend.getDataHealth(windowDays.value);
+    const next = await backend.getDataHealth(windowDays.value);
+    if (!loadSeq.isCurrent(seq)) return;
+    health.value = next;
   } catch (cause) {
+    if (!loadSeq.isCurrent(seq)) return;
     error.value = toUserMessage(cause, t.value.loadFailed);
   } finally {
-    loading.value = false;
+    if (loadSeq.isCurrent(seq)) loading.value = false;
   }
 };
 
@@ -504,8 +512,17 @@ const runAction = async (action: HealthAction) => {
   actionMessage.value = null;
   try {
     if (action.id === 'sync') {
-      await runSync('incremental');
-      actionMessage.value = t.value.actionSynced;
+      const report = await runSync('incremental');
+      const failed = !report
+        || report.outcome === 'failed'
+        || report.outcome === 'cancelled'
+        || syncState.value === 'failed'
+        || syncState.value === 'cancelled';
+      if (failed) {
+        actionError.value = syncMessage.value || t.value.actionFailed(copy.label);
+      } else {
+        actionMessage.value = t.value.actionSynced;
+      }
     } else if (action.id === 'reprocess') {
       const result = await backend.reprocessLocalData();
       actionMessage.value = t.value.actionReplayed(result.total_records.toLocaleString(intlLocale()));
@@ -519,8 +536,9 @@ const runAction = async (action: HealthAction) => {
       await backend.openDataFolder();
       actionMessage.value = t.value.actionFolderOpened;
     } else if (action.id === 'reauth') {
-      window.location.hash = '';
+      await router.push({ path: '/settings', hash: '#connection' });
       actionMessage.value = t.value.actionReconnect;
+      return;
     }
     await load();
   } catch (cause) {
@@ -547,13 +565,12 @@ onMounted(() => void load());
       :title="t.title"
       :intro="t.intro"
     >
-      <div class="range-switch" role="radiogroup" :aria-label="t.rangeAria">
+      <div class="range-switch" role="group" :aria-label="t.rangeAria">
         <button
           v-for="range in WINDOWS"
           :key="range.days"
           type="button"
-          role="radio"
-          :aria-checked="windowDays === range.days"
+          :aria-pressed="windowDays === range.days"
           :class="['range-pill', { 'is-on': windowDays === range.days }]"
           @click="setWindow(range.days)"
         >{{ range.label }}</button>
@@ -582,7 +599,7 @@ onMounted(() => void load());
           <div>
             <span class="timing-label">{{ t.timingCloud }}</span>
             <strong>{{ formatDateTime(health.timings.last_cloud_sync_at) }}</strong>
-            <span class="timing-note">{{ health.timings.last_cloud_sync_outcome || t.timingCloudNote }}</span>
+            <span class="timing-note">{{ syncOutcomeLabel(health.timings.last_cloud_sync_outcome) || t.timingCloudNote }}</span>
           </div>
           <div>
             <span class="timing-label">{{ t.timingReplay }}</span>

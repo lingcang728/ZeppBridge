@@ -49,6 +49,9 @@ const messages = defineMessages(
     'err.har.missing_user': 'HAR 中没有找到用户编号。请在登录成功后重新导出网络记录。',
     'err.har.missing_token': 'HAR 中没有登录令牌。请启用包含敏感数据的 HAR 导出。',
     'err.har.invalid_file': '无法读取有效的 HAR。请重新选择浏览器导出的 HAR 文件。',
+    'err.har.too_large': 'HAR 文件过大。请导出一份更小的网络记录后再导入。',
+    'err.har.unverified':
+      'HAR 里的登录凭据未能通过 Zepp 验证，没有保存。请重新登录后导出，或改用手填 App Token。',
     'err.core.busy': '另一个写入操作正在进行，请等它结束',
     'err.core.parse': 'Zepp 返回的数据无法解析',
     'err.core.database': '本地数据库暂时不可用',
@@ -92,9 +95,13 @@ const messages = defineMessages(
     'err.sync.history_days_out_of_range': '同步天数超出允许范围',
     'err.sync.deferred_compaction': '正在压缩历史报文以节省磁盘空间，本次云端同步稍后自动重试',
     'err.sync.deferred_replay': '正在用本地原始报文重建派生数据，本次云端同步稍后自动重试',
+    'err.sync.deferred_busy': '另一个写入操作正在进行，本次云端同步稍后自动重试',
     'err.backfill.bad_start_date': '补拉起点日期无效，需要 YYYY-MM-DD',
     'err.backfill.no_canonical_records': '云端返回了报文，但没有解析出可用记录',
+    'err.backfill.partial_window': '这一块只写入了部分数据，还需要重试',
     'err.backfill.start_in_future': '补拉起点不能晚于今天',
+    'err.backup.restore_busy': '恢复还没有执行：另一个写入操作正在进行。当前库没有改动，下次启动会再试。',
+    'err.backup.restore_failed': '恢复没有完成，当前库已保持原样。下次启动会再试。',
 
     /* —— 能力状态 —— */
     'err.capability.not_synced': '尚未同步',
@@ -142,8 +149,13 @@ const messages = defineMessages(
     'err.prefs.retention_out_of_range': '保留天数必须在 1 到 365 天之间',
     'err.storage.write_busy': '另一个 ZeppBridge 写入操作正在进行，请等它结束',
     'err.storage.write_lock_unavailable': '无法建立写入锁，请检查数据文件夹的权限',
+    'err.storage.worker_failed': '后台数据库任务被中断',
     'err.local_api.token_unavailable': '无法读取本机 API 凭据',
     'err.local_api.token_rotate_failed': '无法重新生成本机 API 凭据',
+    'err.local_api.port_in_use': '本机 API 端口已被其他程序占用',
+    'err.local_api.bind_failed': '无法启动本机 API',
+    'err.local_api.thread_failed': '无法启动本机 API 线程',
+    'err.local_api.state_write_failed': '无法保存本机 API 开关状态',
     'err.data_folder.open_failed': '打开数据文件夹失败',
     'err.data_folder.unsupported_os': '打开数据文件夹仅支持 Windows/macOS',
     'err.update.localappdata_missing': 'Windows LOCALAPPDATA 路径不可用',
@@ -187,6 +199,9 @@ const messages = defineMessages(
     'err.har.missing_user': 'No user ID found in the HAR. Export network traffic again after signing in.',
     'err.har.missing_token': 'No login token found in the HAR. Enable export with sensitive data.',
     'err.har.invalid_file': 'Cannot read a valid HAR. Select a HAR file exported by your browser.',
+    'err.har.too_large': 'The HAR file is too large. Export a smaller capture and try again.',
+    'err.har.unverified':
+      'The credentials in the HAR did not pass Zepp verification, so nothing was saved. Sign in again and re-export, or enter an App Token by hand.',
     'err.core.busy': 'Another write is in progress. Wait for it to finish',
     'err.core.parse': "Zepp's response could not be parsed",
     'err.core.database': 'The local database is temporarily unavailable',
@@ -238,10 +253,18 @@ const messages = defineMessages(
       'Compacting stored payloads to save disk space. This sync will retry automatically',
     'err.sync.deferred_replay':
       'Rebuilding derived data from local payloads. This sync will retry automatically',
+    'err.sync.deferred_busy':
+      'Another write is in progress. This sync will retry automatically',
     'err.backfill.bad_start_date': 'Invalid backfill start date — use YYYY-MM-DD',
     'err.backfill.no_canonical_records':
       'The cloud returned a payload, but no usable records could be parsed from it',
+    'err.backfill.partial_window':
+      'Only part of this month was written. It still needs a retry',
     'err.backfill.start_in_future': 'The backfill start cannot be later than today',
+    'err.backup.restore_busy':
+      'Restore did not run: another write is in progress. The current library is unchanged and will be retried on the next launch',
+    'err.backup.restore_failed':
+      'Restore did not finish. The current library is unchanged and will be retried on the next launch',
 
     /* —— capabilities —— */
     'err.capability.not_synced': 'Not synced yet',
@@ -292,8 +315,13 @@ const messages = defineMessages(
     'err.storage.write_busy': 'Another ZeppBridge write is in progress. Wait for it to finish',
     'err.storage.write_lock_unavailable':
       "Couldn't create the write lock. Check permissions on the data folder",
+    'err.storage.worker_failed': 'The background database task was interrupted',
     'err.local_api.token_unavailable': "Couldn't read the local API credential",
     'err.local_api.token_rotate_failed': "Couldn't regenerate the local API credential",
+    'err.local_api.port_in_use': 'The local API port is already in use by another program',
+    'err.local_api.bind_failed': "Couldn't start the local API",
+    'err.local_api.thread_failed': "Couldn't start the local API thread",
+    'err.local_api.state_write_failed': "Couldn't save the local API on/off state",
     'err.data_folder.open_failed': "Couldn't open the data folder",
     'err.data_folder.unsupported_os': 'Opening the data folder is supported on Windows and macOS only',
     'err.update.localappdata_missing': 'The Windows LOCALAPPDATA path is unavailable',
@@ -337,6 +365,9 @@ const messages = defineMessages(
     'err.har.missing_user': 'No se encontró el ID de usuario. Exporta el tráfico después de iniciar sesión.',
     'err.har.missing_token': 'No se encontró el token. Exporta el HAR con datos sensibles.',
     'err.har.invalid_file': 'No se puede leer el HAR. Selecciona un archivo exportado por el navegador.',
+    'err.har.too_large': 'El archivo HAR es demasiado grande. Exporta una captura más pequeña e inténtalo de nuevo.',
+    'err.har.unverified':
+      'Las credenciales del HAR no pasaron la verificación de Zepp, así que no se guardó nada. Vuelve a iniciar sesión y exporta, o introduce el App Token a mano.',
     'err.core.busy': 'Hay otra escritura en curso. Espera a que termine',
     'err.core.parse': 'No se pudo interpretar la respuesta de Zepp',
     'err.core.database': 'La base de datos local no está disponible por el momento',
@@ -388,10 +419,18 @@ const messages = defineMessages(
       'Compactando los registros guardados para ahorrar espacio. Esta sincronización se reintentará automáticamente',
     'err.sync.deferred_replay':
       'Reconstruyendo los datos derivados a partir de los registros locales. Esta sincronización se reintentará automáticamente',
+    'err.sync.deferred_busy':
+      'Hay otra escritura en curso. Esta sincronización se reintentará automáticamente',
     'err.backfill.bad_start_date': 'Fecha de inicio de recuperación no válida; usa AAAA-MM-DD',
     'err.backfill.no_canonical_records':
       'La nube devolvió datos, pero no se pudo extraer ningún registro utilizable',
+    'err.backfill.partial_window':
+      'Solo se escribió una parte de este mes. Todavía hay que reintentarlo',
     'err.backfill.start_in_future': 'El inicio de la recuperación no puede ser posterior a hoy',
+    'err.backup.restore_busy':
+      'La restauración no se ejecutó: hay otra escritura en curso. La biblioteca actual no cambió y se reintentará en el próximo arranque',
+    'err.backup.restore_failed':
+      'La restauración no terminó. La biblioteca actual no cambió y se reintentará en el próximo arranque',
 
     /* —— capabilities —— */
     'err.capability.not_synced': 'Aún sin sincronizar',
@@ -442,8 +481,13 @@ const messages = defineMessages(
     'err.storage.write_busy': 'Hay otra escritura de ZeppBridge en curso. Espera a que termine',
     'err.storage.write_lock_unavailable':
       'No se pudo crear el bloqueo de escritura. Revisa los permisos de la carpeta de datos',
+    'err.storage.worker_failed': 'La tarea de base de datos en segundo plano se interrumpió',
     'err.local_api.token_unavailable': 'No se pudo leer la credencial de la API local',
     'err.local_api.token_rotate_failed': 'No se pudo regenerar la credencial de la API local',
+    'err.local_api.port_in_use': 'El puerto de la API local ya lo está usando otro programa',
+    'err.local_api.bind_failed': 'No se pudo iniciar la API local',
+    'err.local_api.thread_failed': 'No se pudo iniciar el hilo de la API local',
+    'err.local_api.state_write_failed': 'No se pudo guardar el estado de encendido de la API local',
     'err.data_folder.open_failed': 'No se pudo abrir la carpeta de datos',
     'err.data_folder.unsupported_os': 'Abrir la carpeta de datos solo funciona en Windows y macOS',
     'err.update.localappdata_missing': 'La ruta LOCALAPPDATA de Windows no está disponible',
