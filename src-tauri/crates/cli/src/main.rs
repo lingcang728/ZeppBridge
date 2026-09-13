@@ -288,8 +288,8 @@ fn exit_code_for(error: &ZeppBridgeError) -> (u8, &'static str) {
         ZeppBridgeError::NetworkError(_)
         | ZeppBridgeError::RetryExhausted { .. }
         | ZeppBridgeError::HttpStatus { .. }
-        | ZeppBridgeError::Unavailable(_)
-        | ZeppBridgeError::DataUnavailable(_) => (EXIT_CLOUD, "cloud"),
+        | ZeppBridgeError::Unavailable(_) => (EXIT_CLOUD, "cloud"),
+        ZeppBridgeError::DataUnavailable(_) => (EXIT_FAILED, "data_unavailable"),
         ZeppBridgeError::Busy(_) => (EXIT_BUSY, "busy"),
         ZeppBridgeError::DatabaseError(_) => (EXIT_DATABASE, "database"),
         ZeppBridgeError::ConfigError(_) | ZeppBridgeError::InvalidHost(_) => (EXIT_USAGE, "usage"),

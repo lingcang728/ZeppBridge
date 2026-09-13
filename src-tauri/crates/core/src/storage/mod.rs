@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 /// 当前 SQLite schema 版本（`PRAGMA user_version`）。加新版本只能追加迁移
 /// 步骤，不要改已有 DDL。
-pub const CURRENT_SCHEMA_VERSION: i64 = 25;
+pub const CURRENT_SCHEMA_VERSION: i64 = 26;
 /// 写进备份 manifest 的应用版本。Core 是独立 crate，用它自己的包版本。
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -6135,6 +6135,95 @@ fn local_day_range_utc_bounds(start: &str, end: &str) -> Option<(String, String)
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn migration_repairs_missing_and_narrow_daily_keys_without_merging_devices() {
+        for narrow in [false, true] {
+            let db = Database::in_memory().unwrap();
+            db.conn
+                .execute_batch("DROP INDEX uq_daily_metric_key; PRAGMA user_version = 25;")
+                .unwrap();
+            if narrow {
+                db.conn.execute_batch("CREATE UNIQUE INDEX uq_daily_metric_key ON daily_metrics(date, metric, unit, source_scope);").unwrap();
+            }
+            let insert = |device: Option<&str>, value: i64| {
+                db.conn.execute(
+                "INSERT INTO daily_metrics(date,metric,unit,source_scope,device_id,value) VALUES('2026-09-13','steps','count','device',?1,?2)",
+                params![device, value],
+            )
+            };
+            insert(Some("device-a"), 10).unwrap();
+            if !narrow {
+                insert(Some("device-b"), 20).unwrap();
+            }
+            db.migrate().unwrap();
+            if narrow {
+                insert(Some("device-b"), 20).unwrap();
+            }
+            insert(None, 30).unwrap();
+            assert!(insert(Some(""), 99).is_err());
+            assert!(insert(Some("device-a"), 99).is_err());
+            db.migrate().unwrap();
+            assert_eq!(
+                db.conn
+                    .query_row("SELECT COUNT(*) FROM daily_metrics", [], |row| row
+                        .get::<_, i64>(0))
+                    .unwrap(),
+                3
+            );
+            assert_eq!(
+                db.conn
+                    .query_row("SELECT SUM(value) FROM daily_metrics", [], |row| row
+                        .get::<_, f64>(0))
+                    .unwrap(),
+                60.0
+            );
+        }
+    }
+
+    #[test]
+    fn v26_removes_redundant_indexes_and_indexes_metric_date_queries() {
+        let db = Database::in_memory().unwrap();
+        db.conn
+            .execute_batch(
+                "PRAGMA user_version = 25;
+            CREATE INDEX idx_metric_samples_metric_timestamp ON metric_samples(metric,timestamp);
+            CREATE INDEX idx_daily_metrics_date_metric ON daily_metrics(date,metric);
+            CREATE INDEX idx_workout_hr_zones_workout ON workout_hr_zones(workout_id);
+            DROP INDEX idx_daily_metrics_metric_date;",
+            )
+            .unwrap();
+        for pass in 0..2 {
+            let before: i64 = db
+                .conn
+                .query_row("PRAGMA schema_version", [], |row| row.get(0))
+                .unwrap();
+            db.migrate().unwrap();
+            if pass == 1 {
+                let after: i64 = db
+                    .conn
+                    .query_row("PRAGMA schema_version", [], |row| row.get(0))
+                    .unwrap();
+                assert_eq!(
+                    before, after,
+                    "startup must not rebuild and drop obsolete indexes"
+                );
+            }
+            let redundant: i64 = db.conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name IN ('idx_metric_samples_metric_timestamp','idx_daily_metrics_date_metric','idx_workout_hr_zones_workout')", [], |row| row.get(0)).unwrap();
+            assert_eq!(redundant, 0);
+            for (sql, index) in [
+                ("SELECT * FROM daily_metrics WHERE metric='steps' AND date BETWEEN '2026-01-01' AND '2026-09-13' ORDER BY date", "idx_daily_metrics_metric_date"),
+                ("SELECT * FROM daily_metrics WHERE date='2026-09-13'", "uq_daily_metric_key"),
+                ("SELECT * FROM metric_samples WHERE metric='heart_rate' AND timestamp BETWEEN '2026-01-01' AND '2026-09-13' ORDER BY timestamp", "uq_metric_sample_key"),
+                ("SELECT * FROM workout_hr_zones WHERE workout_id='workout' ORDER BY zone_index", "sqlite_autoindex_workout_hr_zones_1"),
+            ] {
+                let mut stmt = db.conn.prepare(&format!("EXPLAIN QUERY PLAN {sql}")).unwrap();
+                let plan = stmt.query_map([], |row| row.get::<_, String>(3)).unwrap().collect::<std::result::Result<Vec<_>,_>>().unwrap().join("\n");
+                assert!(plan.contains(index), "{sql}: {plan}");
+                assert!(!plan.contains("SCAN") && !plan.contains("TEMP B-TREE"), "{plan}");
+            }
+        }
+    }
 
     #[test]
     fn regression_markdown_v25_indexes_detail_reads_and_deletes() {

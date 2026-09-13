@@ -73,6 +73,23 @@ impl Database {
             .conn
             .query_row("PRAGMA user_version", [], |row| row.get(0))?;
 
+        // Repair a missing or historical four-column key before the old v4
+        // IF NOT EXISTS statement can recreate it and reject two devices.
+        if version >= 7 {
+            let columns: i64 = self.conn.query_row(
+                "SELECT COUNT(*) FROM pragma_index_info('uq_daily_metric_key')",
+                [],
+                |row| row.get(0),
+            )?;
+            if columns == 0 || columns == 4 {
+                self.conn.execute_batch(
+                    "DROP INDEX IF EXISTS uq_daily_metric_key;
+                     CREATE UNIQUE INDEX uq_daily_metric_key
+                         ON daily_metrics(date, metric, unit, source_scope, COALESCE(device_id, ''));",
+                )?;
+            }
+        }
+
         if version < 1 {
             self.conn.execute_batch(
                 "CREATE TABLE IF NOT EXISTS source_accounts (
@@ -660,8 +677,10 @@ impl Database {
         //
         // 边界值一起存。区间边界来自用户在表上的设定，会随设定变化，所以
         // 「Z2 待了多久」这句话只有连着当时的边界才有意义。
-        self.conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS workout_hr_zones (
+        // v26 removes the redundant index; do not rebuild it on later launches.
+        if version < 26 {
+            self.conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS workout_hr_zones (
                 workout_id TEXT NOT NULL,
                 zone_index INTEGER NOT NULL,
                 upper_bound_bpm INTEGER NOT NULL,
@@ -670,7 +689,8 @@ impl Database {
             );
             CREATE INDEX IF NOT EXISTS idx_workout_hr_zones_workout
                 ON workout_hr_zones(workout_id);",
-        )?;
+            )?;
+        }
         self.conn.execute_batch("PRAGMA user_version = 19;")?;
         self.conn.execute(
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(19, ?1)",
@@ -786,6 +806,19 @@ impl Database {
         )?;
         self.conn.execute(
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(25, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+        // v26: unique-key prefixes already cover these lookup indexes.
+        self.conn.execute_batch(
+            "DROP INDEX IF EXISTS idx_metric_samples_metric_timestamp;
+             DROP INDEX IF EXISTS idx_daily_metrics_date_metric;
+             DROP INDEX IF EXISTS idx_workout_hr_zones_workout;
+             CREATE INDEX IF NOT EXISTS idx_daily_metrics_metric_date
+                 ON daily_metrics(metric, date);
+             PRAGMA user_version = 26;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(26, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
         self.ensure_cloud_sync_metadata()?;

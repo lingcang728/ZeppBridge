@@ -130,7 +130,7 @@ meaning of an existing one never changes.
 | Code | Meaning | What to do |
 |---|---|---|
 | 0 | Success | — |
-| 1 | Other failure | Read the error message |
+| 1 | Other failure, including unavailable local data | Read the error message; a missing local workout uses JSON `errorKind: "data_unavailable"`, not a cloud error |
 | 2 | Usage error | Fix the command |
 | 3 | No Zepp account connected, or the token is not on this machine | Sign in with the desktop app, or set `ZEPPBRIDGE_CREDENTIAL_STORE` |
 | 4 | Another process is writing to the database | **Retry later; this is not a failure** |
