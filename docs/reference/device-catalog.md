@@ -13,8 +13,8 @@ is not counted as a connectable device.
 
 Balance 2 XT, Amazfit Smart Scale and Mi Body Composition Scale 2 are also
 selectable. Their product art is unavailable, so they use the existing placeholder.
-The seven additional source numbers and rejected evidence are recorded in
-[the September 11 triage](../evidence/feedback-triage-2026-09-11.md).
+The accepted source numbers are maintained in `device_source_codes` in the
+catalog and `DEVICE_SOURCE_CODES` in `scripts/assets/build-device-catalog.py`.
 
 The card-by-card mapping is kept in
 [`device-catalog-audit.json`](./device-catalog-audit.json) and
@@ -119,7 +119,7 @@ Pillow/OpenCV are the only image dependencies used by the maintenance script;
 the repository does not install a second copy of either tool.
 
 ```powershell
-py -3 scripts/assets/build-device-catalog.py
+py -3 scripts/assets/build-device-catalog.py --catalog-only
 py -3 scripts/assets/verify-device-assets.py
 ```
 
@@ -128,6 +128,10 @@ from `DEVICE_SOURCE_CODES` while retaining the existing art, hashes and provenan
 it requires only Python's standard library. Device-source matching runs when the
 device list is refreshed, independently of the health-record normalizer revision.
 Existing caches do not retain the source number, so they require that refresh.
+
+The historical `design_picture/Product` captures are no longer retained locally.
+A full image rebuild requires supplying the original captures named in the
+script first; normal application builds use the checked-in images directly.
 
 Use `--refresh-official` only when deliberately refreshing the four official
 CDN extras. The verifier checks the exact catalog/asset counts, card audit
