@@ -14,7 +14,7 @@
 import { computed, onMounted, ref } from 'vue';
 import Icon from './Icon.vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
-import { formatFullDateTime } from '../lib/format';
+import { formatDate, formatFullDateTime } from '../lib/format';
 import type { BackupManifest, BackupVerification, PendingRestore, RestorePreview } from '../types';
 import { backendText } from '../i18n/backendText';
 import { defineMessages, useMessages } from '../i18n';
@@ -468,7 +468,7 @@ const cancelRestore = async () => {
         <div class="backup-meta">
           {{ t.metaLine(formatBytes(item.bytes), item.app_version, item.schema_version) }}
           <template v-if="item.coverage.earliest_sample_at && item.coverage.latest_sample_at">
-            {{ t.coverage(item.coverage.earliest_sample_at.slice(0, 10), item.coverage.latest_sample_at.slice(0, 10)) }}
+            {{ t.coverage(formatDate(item.coverage.earliest_sample_at), formatDate(item.coverage.latest_sample_at)) }}
           </template>
           <template v-else>{{ t.noSamples }}</template>
         </div>

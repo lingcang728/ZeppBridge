@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import type { MetricSeries } from '../../types';
 import {
   buildSeriesOption,
@@ -7,6 +7,7 @@ import {
   indexSeries,
   latestValue,
 } from '../metricSeries';
+import { setDateOrder } from '../dateTime';
 
 const series = (overrides: Partial<MetricSeries> = {}): MetricSeries =>
   ({
@@ -129,5 +130,46 @@ describe('手动记录的日子不能被画成连续的', () => {
     expect(bars.type).toBe('bar');
     // 缺的两天是 null，不是 0：没记不等于没吃。
     expect(bars.data).toEqual([2100, 1980, null, null, 2260]);
+  });
+});
+
+describe('日期标签是本地日历日期，不是时刻', () => {
+  afterEach(() => setDateOrder('regional'));
+
+  type DateChart = {
+    xAxis: { axisLabel: { formatter: (value: string) => string } };
+    tooltip: { formatter: (params: Array<{ axisValue: string }>) => string };
+  };
+
+  const chart = (date: string) =>
+    buildSeriesOption(series({ points: [{ date, value: 52 }] }), { color: '#fff' }) as unknown as DateChart;
+
+  it('不可能存在的 YYYY-MM-DD 不被滚成别的日子', () => {
+    // 本地构造会把 2026-02-30 悄悄滚成 3 月 2 日，画出一个从来没被记录过的
+    // 日子；这里必须原样返回，而不是一个看似正常的错日期。
+    const option = chart('2026-02-30');
+    expect(option.xAxis.axisLabel.formatter('2026-02-30')).toBe('2026-02-30');
+    expect(option.tooltip.formatter([{ axisValue: '2026-02-30' }]))
+      .toBe('2026-02-30<br><b>52</b>');
+  });
+
+  it('坐标轴日期跟着日期顺序设置走', () => {
+    const formatter = chart('2026-11-25').xAxis.axisLabel.formatter;
+    const day = new Date(2026, 10, 25);
+    setDateOrder('mdy');
+    const mdy = formatter('2026-11-25');
+    setDateOrder('dmy');
+    const dmy = formatter('2026-11-25');
+    expect(mdy).toBe(new Intl.DateTimeFormat('en-US', { month: '2-digit', day: '2-digit' }).format(day));
+    expect(dmy).toBe(new Intl.DateTimeFormat('en-GB', { month: '2-digit', day: '2-digit' }).format(day));
+    expect(mdy).not.toBe(dmy);
+  });
+
+  it('tooltip 用同一套日期格式，不再显示原始 ISO 串', () => {
+    setDateOrder('ymd');
+    const option = chart('2026-11-25');
+    const label = option.xAxis.axisLabel.formatter('2026-11-25');
+    expect(label).not.toBe('2026-11-25');
+    expect(option.tooltip.formatter([{ axisValue: '2026-11-25' }])).toBe(`${label}<br><b>52</b>`);
   });
 });
