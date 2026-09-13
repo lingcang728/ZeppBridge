@@ -117,7 +117,7 @@
 
 ## 组件与图表
 
-- 无 UI 框架，组件全部自研，位于 `src/components/`：`BrandMark`、`CategoryMark`、`CircularProgress`、`DesignIcon`、`DeviceCard`、`DeviceMarquee`、`DeviceVisual`、`EmptyState`、`HeartRateZonePicker`、`Icon`、`MetricTrendCard`、`PageHeader`、`RecordRow`、`SkeletonBlock`、`Sparkline`、`StageBar`。新增前先确认这里没有能复用的。
+- 无 UI 框架，组件全部自研，位于 `src/components/`：`BrandMark`、`CategoryMark`、`CircularProgress`、`DesignIcon`、`DeviceMarquee`、`DeviceVisual`、`EmptyState`、`HeartRateZonePicker`、`Icon`、`MetricTrendCard`、`PageHeader`、`RecordRow`、`SkeletonBlock`、`Sparkline`、`StageBar`。新增前先确认这里没有能复用的。
 - 按天趋势一律走 `MetricTrendCard` + `lib/metricSeries.ts` 的 `buildSeriesOption`，不要在页面里各写一套 option；`SERIES_RANGES` 是三档范围的唯一来源。
 - 两套图标各有分工：`Icon.vue` 是内联 SVG 线性图标（UI 控件、小尺寸），`DesignIcon.vue` 是 `src/assets/design-icons/` 的 PNG 设计图标（导航、大号语义图标）。图片必须走 import 让 Vite 产出实体文件——桌面 CSP 不允许 data URL 与外部图源。
 - 图表统一用 `vue-echarts` + `main.ts` 注册的 `zeppbridge-dark` 主题，不要在页面里重复定义配色。

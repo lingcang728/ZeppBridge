@@ -106,10 +106,12 @@ secrets*.json
 *.keystore
 
 # Local agent / design scratch (do not publish)
+.agent_context/
 .claude/
 .grok/
 .omo/
 design_picture/
+docs/design/*.png
 
 # Cloned reference repos / dev scratch
 temp/

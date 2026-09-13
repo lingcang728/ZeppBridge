@@ -229,7 +229,7 @@ diagnostics" section listing per-stream status and cloud sync times.
 ## Components and charts
 
 - No UI framework: every component is in-house, under `src/components/` —
-  `BrandMark`, `CategoryMark`, `CircularProgress`, `DesignIcon`, `DeviceCard`,
+  `BrandMark`, `CategoryMark`, `CircularProgress`, `DesignIcon`,
   `DeviceMarquee`, `DeviceVisual`, `EmptyState`, `HeartRateZonePicker`, `Icon`,
   `MetricTrendCard`, `PageHeader`, `RecordRow`, `SkeletonBlock`, `Sparkline`,
   `StageBar`. Check here for something reusable before adding one.

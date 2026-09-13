@@ -101,10 +101,3 @@ Run `npm run icons:generate` after changing the master. Run
 angular double-rail source (including the absence of legacy curves/points),
 ICO frames, the byte-identical public hash, and the 16/20/24 px previews. Run
 `npm run build` after changing the source or Vue components.
-
-## Visual review
-
-[`zeppbridge-icon-review.png`](./zeppbridge-icon-review.png) is a review board
-for the actual generated assets and Vite-rendered SVGs. It is an inspection
-artifact, not a second source of geometry. The board should be regenerated
-with `python scripts/icon/build-review.py` when a visual comparison is needed.
