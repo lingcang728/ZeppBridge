@@ -1015,18 +1015,6 @@ fn suggested_actions(
     actions
 }
 
-/// 用于测试和 CLI 输出的稳定摘要。
-pub fn summarize_stage(stage: &StageState) -> String {
-    match stage.state.as_str() {
-        "ok" => "正常".into(),
-        "failed" => format!(
-            "失败（{}）",
-            stage.error_kind.as_deref().unwrap_or("unknown")
-        ),
-        _ => "尚未发生".into(),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

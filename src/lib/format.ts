@@ -3,7 +3,6 @@ import { defineMessages, intlLocale, messagesOf } from '../i18n';
 import {
   bigDistanceThresholdMeters,
   distanceUnitLabel,
-  paceUnitLabel,
   shortDistanceUnitLabel,
   toBigDistance,
   toShortDistance,
@@ -122,18 +121,6 @@ export const formatDistance = (meters?: number, empty = copy().notRecorded): str
   return meters >= bigDistanceThresholdMeters()
     ? `${toBigDistance(meters).toFixed(2)} ${distanceUnitLabel()}`
     : `${Math.round(toShortDistance(meters))} ${shortDistanceUnitLabel()}`;
-};
-
-export const formatPace = (
-  distanceMeters?: number,
-  durationMinutes?: number | null,
-): string | null => {
-  if (!isFiniteNumber(distanceMeters) || distanceMeters <= 0) return null;
-  if (!isFiniteNumber(durationMinutes) || durationMinutes <= 0) return null;
-  // 先换算成「每个显示单位多少秒」再取整，不是把公制结果再乘一次：
-  // 先取整再换算会把四舍五入的误差也一并放大 1.6 倍。
-  const totalSeconds = Math.round((durationMinutes * 60) / (toBigDistance(distanceMeters)));
-  return `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, '0')} ${paceUnitLabel()}`;
 };
 
 export const formatMetric = (value: number | undefined, digits = 0): string => {
