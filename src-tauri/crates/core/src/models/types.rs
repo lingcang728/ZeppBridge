@@ -1133,16 +1133,6 @@ pub struct DeviceProfilesResult {
     pub cache: DeviceCacheMetadata,
 }
 
-/// 供界面渲染「这是我的哪台设备」下拉框的一个选项。
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct DeviceCatalogOption {
-    pub catalog_id: String,
-    pub canonical_name: String,
-    pub name_zh: Option<String>,
-    pub kind: String,
-}
-
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct DeviceIdentityHint {
     pub aliases: Vec<String>,

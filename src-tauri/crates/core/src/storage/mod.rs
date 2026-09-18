@@ -1870,27 +1870,6 @@ impl Database {
             .map_err(Into::into)
     }
 
-    pub fn training_load_series(&self, days: i64) -> Result<Vec<DailyPoint>> {
-        let days = days.clamp(1, 365);
-        let cutoff = (Utc::now() - chrono::Duration::days(days))
-            .date_naive()
-            .format("%Y-%m-%d")
-            .to_string();
-        let mut stmt = self.conn.prepare(
-            "SELECT date, value FROM daily_metrics
-             WHERE metric = 'training_load' AND date >= ?1
-             ORDER BY date ASC",
-        )?;
-        let rows = stmt.query_map([cutoff], |row| {
-            Ok(DailyPoint {
-                date: row.get(0)?,
-                value: row.get(1)?,
-            })
-        })?;
-        rows.collect::<std::result::Result<Vec<_>, _>>()
-            .map_err(Into::into)
-    }
-
     pub fn stream_freshness(&self) -> Result<BTreeMap<String, StreamFreshness>> {
         let mut freshness = BTreeMap::<String, StreamFreshness>::new();
         let mut stmt = self.conn.prepare(
