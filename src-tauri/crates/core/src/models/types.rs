@@ -609,14 +609,6 @@ pub struct DataStatus {
     pub message: Option<String>,
 }
 
-#[allow(dead_code)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RecentData {
-    pub metric_samples: Vec<MetricSample>,
-    pub sleep_sessions: Vec<SleepSession>,
-    pub workouts: Vec<Workout>,
-}
-
 /// 健康数据概览
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Coverage {
