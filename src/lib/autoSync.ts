@@ -1,8 +1,3 @@
-export const AUTO_SYNC_SETTINGS_EVENT = 'zeppbridge:auto-sync-settings';
-export const AUTO_SYNC_STATUS_EVENT = 'zeppbridge:auto-sync-status';
-export const MANUAL_SYNC_STATUS_EVENT = 'zeppbridge:manual-sync-status';
-export const DATA_UPDATED_EVENT = 'zeppbridge:data-updated';
-
 const AUTO_SYNC_ENABLED_KEY = 'zeppbridge-auto-sync-enabled';
 const AUTO_SYNC_INTERVAL_KEY = 'zeppbridge-auto-sync-interval-minutes';
 
@@ -11,12 +6,6 @@ export const AUTO_SYNC_INTERVALS = [15, 30, 60] as const;
 export interface AutoSyncSettings {
   enabled: boolean;
   intervalMinutes: number;
-}
-
-export interface AutoSyncStatusDetail {
-  state: 'idle' | 'syncing' | 'success' | 'error';
-  message: string;
-  finishedAt?: string;
 }
 
 const normalizeInterval = (value: unknown): number => {
