@@ -5967,26 +5967,6 @@ impl Database {
         Ok(samples)
     }
 
-    /// Backwards-compatible status update. New sync code should use the richer
-    /// method below so cursor/capability information is not discarded.
-    #[allow(dead_code)]
-    pub fn update_sync_state(&self, stream: &str, status: &str, error: Option<&str>) -> Result<()> {
-        self.update_sync_state_details(
-            stream,
-            None,
-            status,
-            error,
-            error.is_some(),
-            0,
-            if error.is_some() {
-                CapabilityStatus::Unavailable
-            } else {
-                CapabilityStatus::Verified
-            },
-            error.map(str::to_owned),
-        )
-    }
-
     #[allow(clippy::too_many_arguments)]
     pub fn update_sync_state_details(
         &self,

@@ -91,21 +91,6 @@ impl Normalizer {
         })
     }
 
-    #[allow(dead_code)]
-    pub fn normalize_sleep(raw: &Value) -> Result<Vec<SleepSession>> {
-        Self::normalize_sleep_with_diagnostics(raw)?.into_result("sleep")
-    }
-
-    #[allow(dead_code)]
-    pub fn normalize_sleep_with_diagnostics(raw: &Value) -> Result<NormalizedBatch<SleepSession>> {
-        let band = Self::normalize_band_data(raw)?;
-        Ok(NormalizedBatch {
-            records: band.sleep_sessions,
-            diagnostics: band.diagnostics,
-            capability: band.capability,
-        })
-    }
-
     pub fn normalize_band_data(raw: &Value) -> Result<BandNormalizedData> {
         let items = extract_items(raw)?;
         let mut sleep_sessions = Vec::new();
@@ -190,18 +175,8 @@ impl Normalizer {
         })
     }
 
-    #[allow(dead_code)]
-    pub fn normalize_workouts(raw: &Value) -> Result<Vec<Workout>> {
-        Self::normalize_workouts_with_sport(raw, None)
-    }
-
     pub fn normalize_workouts_with_sport(raw: &Value, sport: Option<&str>) -> Result<Vec<Workout>> {
         Self::normalize_workouts_with_diagnostics_and_sport(raw, sport)?.into_result("workouts")
-    }
-
-    #[allow(dead_code)]
-    pub fn normalize_workouts_with_diagnostics(raw: &Value) -> Result<NormalizedBatch<Workout>> {
-        Self::normalize_workouts_with_diagnostics_and_sport(raw, None)
     }
 
     fn normalize_workouts_with_diagnostics_and_sport(
@@ -2639,7 +2614,7 @@ mod tests {
         assert_eq!(samples[0].value, 72.0);
         assert_eq!(samples[0].device_id.as_deref(), Some("D85403FFFEE4D576"));
         let raw = serde_json::json!({"data":[{"workout_id":" ","workoutId":{},"trackid":"original-id","start_time":null,"startTime":1800000000,"end_time":1800003600,"type":null,"sport_mode":6}]});
-        let workouts = Normalizer::normalize_workouts(&raw).unwrap();
+        let workouts = Normalizer::normalize_workouts_with_sport(&raw, None).unwrap();
         assert_eq!(workouts[0].workout_id, "original-id");
         let outer = serde_json::json!({"value":null,"score":"bad","zero":0,"flag":false});
         let nested = serde_json::json!({"value":42});
@@ -2693,7 +2668,7 @@ mod tests {
             }]
         });
 
-        let records = Normalizer::normalize_workouts(&raw).expect("应当能解析");
+        let records = Normalizer::normalize_workouts_with_sport(&raw, None).expect("应当能解析");
         let workout = records.first().expect("应当有一条运动");
 
         assert_eq!(workout.min_hr, Some(83));
@@ -2752,7 +2727,7 @@ mod tests {
             }]
         });
 
-        let records = Normalizer::normalize_workouts(&raw).expect("应当能解析");
+        let records = Normalizer::normalize_workouts_with_sport(&raw, None).expect("应当能解析");
         let workout = records.first().expect("应当有一条运动");
 
         assert_eq!(workout.min_hr, Some(94));
@@ -2810,7 +2785,7 @@ mod tests {
                 "altitude_ascend": 59, "altitude_descend": 59
             }]
         });
-        let records = Normalizer::normalize_workouts(&raw).unwrap();
+        let records = Normalizer::normalize_workouts_with_sport(&raw, None).unwrap();
         let workout = records.first().unwrap();
         assert_eq!(workout.elevation_gain_m, Some(59.0));
         assert_eq!(workout.elevation_loss_m, Some(59.0));
@@ -2839,14 +2814,15 @@ mod tests {
     #[test]
     fn empty_or_wrong_shape_is_not_success() {
         assert!(Normalizer::normalize_heart_rate(&json!({"items": []})).is_err());
-        assert!(Normalizer::normalize_sleep(&json!({"data": "H4sI..."})).is_err());
+        assert!(Normalizer::normalize_band_data(&json!({"data": "H4sI..."}))
+            .map_or(true, |band| band.sleep_sessions.is_empty()));
     }
 
     /// 扁平睡眠报文没有阶段字段时，deep/light/awake/rem 必须是 None，
     /// 不能填 0；时长也不能用「整段减去臆造的 0 分钟清醒」来算。
     #[test]
     fn a_flat_sleep_record_without_stages_does_not_invent_zeros() {
-        let sessions = Normalizer::normalize_sleep(&json!({
+        let sessions = Normalizer::normalize_band_data(&json!({
             "items": [{
                 "sleep_id": "flat-no-stages",
                 "start_time": 1_700_000_000i64,
@@ -2854,7 +2830,8 @@ mod tests {
                 "score": 80
             }]
         }))
-        .unwrap();
+        .unwrap()
+        .sleep_sessions;
         assert_eq!(sessions.len(), 1);
         let sleep = &sessions[0];
         assert_eq!(sleep.deep_minutes, None);
@@ -3176,24 +3153,27 @@ mod tests {
                 assert!(workout.user_override.is_none());
             }
         }
-        let swims = Normalizer::normalize_workouts(&json!({"data": [
+        let swims = Normalizer::normalize_workouts_with_sport(&json!({"data": [
             {"trackid": 1_700_001_000i64, "end_time": 1_700_001_600i64, "type": 14},
             {"trackid": 1_700_002_000i64, "end_time": 1_700_002_600i64, "sport_name": "Open Water Swimming"}
-        ]})).unwrap();
+        ]}), None).unwrap();
         assert_eq!(swims[0].normalized_type, "pool_swimming");
         assert_eq!(swims[1].normalized_type, "open_water_swimming");
     }
 
     #[test]
     fn code_225_is_normalized_as_rucking_with_numeric_evidence() {
-        let result = Normalizer::normalize_workouts(&json!({
-            "data": { "summary": [{
-                "trackid": 1_700_300_000i64,
-                "end_time": 1_700_303_600i64,
-                "type": 225,
-                "calorie": 120
-            }] }
-        }))
+        let result = Normalizer::normalize_workouts_with_sport(
+            &json!({
+                "data": { "summary": [{
+                    "trackid": 1_700_300_000i64,
+                    "end_time": 1_700_303_600i64,
+                    "type": 225,
+                    "calorie": 120
+                }] }
+            }),
+            None,
+        )
         .unwrap();
         assert_eq!(result[0].workout_type, "rucking");
         assert_eq!(result[0].normalized_type, "rucking");
@@ -3245,12 +3225,15 @@ mod tests {
 
     #[test]
     fn extended_cloud_codes_cover_strength_and_cross_training() {
-        let result = Normalizer::normalize_workouts(&json!({
-            "data": { "summary": [
-                {"trackid": 1_700_600_000i64, "end_time": 1_700_603_600i64, "type": 52},
-                {"trackid": 1_700_700_000i64, "end_time": 1_700_703_600i64, "type": 130}
-            ] }
-        }))
+        let result = Normalizer::normalize_workouts_with_sport(
+            &json!({
+                "data": { "summary": [
+                    {"trackid": 1_700_600_000i64, "end_time": 1_700_603_600i64, "type": 52},
+                    {"trackid": 1_700_700_000i64, "end_time": 1_700_703_600i64, "type": 130}
+                ] }
+            }),
+            None,
+        )
         .unwrap();
         assert_eq!(result[0].workout_type, "strength");
         assert_eq!(result[1].workout_type, "cross_training");
@@ -3362,19 +3345,22 @@ mod tests {
 
     #[test]
     fn workout_geohash_location_is_not_gps_track() {
-        let result = Normalizer::normalize_workouts(&json!({
-            "data": {
-                "summary": [{
-                    "trackid": 1_700_000_000i64,
-                    "end_time": 1_700_003_600i64,
-                    "sport": "run",
-                    "dis": 5000,
-                    "location": "ws0fsyhekz4d",
-                    "deviceid": "AABBCCDDEEFF",
-                    "sn": "23229501001311"
-                }]
-            }
-        }))
+        let result = Normalizer::normalize_workouts_with_sport(
+            &json!({
+                "data": {
+                    "summary": [{
+                        "trackid": 1_700_000_000i64,
+                        "end_time": 1_700_003_600i64,
+                        "sport": "run",
+                        "dis": 5000,
+                        "location": "ws0fsyhekz4d",
+                        "deviceid": "AABBCCDDEEFF",
+                        "sn": "23229501001311"
+                    }]
+                }
+            }),
+            None,
+        )
         .unwrap();
         assert!(!result[0].gps_available);
         assert_eq!(result[0].sample_count, 0);

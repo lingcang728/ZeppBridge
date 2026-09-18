@@ -1,7 +1,7 @@
 use crate::connectors::ZeppConnector;
 use crate::models::{error::*, *};
 use chrono::{DateTime, Duration, NaiveDate, Utc};
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, Copy)]
@@ -244,22 +244,6 @@ impl DataFetcher {
         Self { connector }
     }
 
-    #[allow(dead_code)]
-    pub fn connector(&self) -> &ZeppConnector {
-        &self.connector
-    }
-
-    #[allow(dead_code)]
-    pub async fn fetch_heart_rate(
-        &self,
-        start_timestamp: i64,
-        end_timestamp: i64,
-    ) -> Result<Value> {
-        self.connector
-            .fetch_heart_rate(start_timestamp, end_timestamp)
-            .await
-    }
-
     pub async fn fetch_heart_rate_records(
         &self,
         window: FetchWindow,
@@ -280,33 +264,6 @@ impl DataFetcher {
             }
         }
         conclude_slices(records, last_error, "心率窗口没有可识别记录")
-    }
-
-    #[allow(dead_code)]
-    pub async fn fetch_band_data(
-        &self,
-        from_date: &str,
-        to_date: &str,
-        query_type: &str,
-        byte_length: i64,
-        device_type: i64,
-    ) -> Result<Value> {
-        self.connector
-            .fetch_band_data(from_date, to_date, query_type, byte_length, device_type)
-            .await
-    }
-
-    #[allow(dead_code)]
-    pub async fn fetch_sport_history(
-        &self,
-        sport: &str,
-        start_track_id: i64,
-        stop_track_id: i64,
-        need_sub_data: i64,
-    ) -> Result<Value> {
-        self.connector
-            .fetch_sport_history(sport, start_track_id, stop_track_id, need_sub_data)
-            .await
     }
 
     pub async fn fetch_sport_detail_record(
@@ -330,57 +287,6 @@ impl DataFetcher {
             payload,
             capability: CapabilityStatus::Verified,
         }))
-    }
-
-    #[allow(dead_code)]
-    pub async fn fetch_watch_statistics(
-        &self,
-        statistic: &str,
-        start_day: &str,
-        end_day: &str,
-    ) -> Result<Value> {
-        self.connector
-            .fetch_watch_statistics(statistic, start_day, end_day, 900, true)
-            .await
-    }
-
-    #[allow(dead_code)]
-    pub async fn fetch_events(
-        &self,
-        event_type: &str,
-        sub_type: Option<&str>,
-        from_ms: i64,
-        to_ms: i64,
-        limit: i64,
-        reverse: bool,
-    ) -> Result<Value> {
-        self.connector
-            .fetch_events(event_type, sub_type, from_ms, to_ms, limit, reverse)
-            .await
-    }
-
-    /// Fetch the supported core streams for a shared time window. Optional
-    /// capabilities are represented as unavailable errors by their endpoint;
-    /// callers can retain the successful records and report the missing stream.
-    #[allow(dead_code)]
-    pub async fn fetch_core_window(&self, window: FetchWindow) -> Result<Vec<FetchedRecord>> {
-        self.fetch_heart_rate_records(window).await
-    }
-
-    /// Compatibility helper used by the original Tauri command.
-    #[allow(dead_code)]
-    pub async fn fetch_heart_rate_range(&self, days: i64) -> Result<Value> {
-        let window = FetchWindow::days(days)?;
-        self.fetch_heart_rate(window.start_utc.timestamp(), window.end_utc.timestamp())
-            .await
-    }
-
-    #[allow(dead_code)]
-    pub async fn fetch_sleep_range(&self, days: i64) -> Result<Value> {
-        let window = FetchWindow::days(days)?;
-        self.connector
-            .fetch_sleep(&window.start_day(), &window.end_day())
-            .await
     }
 
     pub async fn fetch_sleep_records(&self, window: FetchWindow) -> Result<Vec<FetchedRecord>> {
@@ -481,22 +387,6 @@ impl DataFetcher {
         Ok(records)
     }
 
-    #[allow(dead_code)]
-    pub async fn fetch_workouts_range(&self, days: i64) -> Result<Value> {
-        let window = FetchWindow::days(days)?;
-        let records = self.fetch_workout_records(window).await?;
-        let mut items = Vec::new();
-        for record in records {
-            items.extend(payload_items(&record.raw.payload));
-        }
-        if items.is_empty() {
-            return Err(ZeppBridgeError::Unavailable(
-                "sport history payload 未提供结构化 workout items".into(),
-            ));
-        }
-        Ok(json!({"items": items}))
-    }
-
     pub async fn fetch_hrv_records(&self, window: FetchWindow) -> Result<Vec<FetchedRecord>> {
         let mut records = Vec::new();
         let mut last_error = None;
@@ -526,14 +416,6 @@ impl DataFetcher {
             }
         }
         conclude_slices(records, last_error, "HRV 窗口没有可识别记录")
-    }
-
-    #[allow(dead_code)]
-    pub async fn fetch_daily_summary_range(&self, days: i64) -> Result<Value> {
-        let window = FetchWindow::days(days)?;
-        self.connector
-            .fetch_daily_summary(&window.start_day(), &window.end_day())
-            .await
     }
 
     pub async fn fetch_daily_statistics_records(
@@ -1404,6 +1286,7 @@ fn payload_items(payload: &Value) -> Vec<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[tokio::test]
     async fn empty_heart_rate_page_is_kept_without_a_second_request() {

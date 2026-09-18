@@ -267,11 +267,6 @@ impl ZeppConnector {
         Ok(connector)
     }
 
-    #[allow(dead_code)]
-    pub fn base_url(&self) -> &Url {
-        &self.base_url
-    }
-
     pub fn build_headers(&self) -> Result<header::HeaderMap> {
         let mut headers = header::HeaderMap::new();
         let token = header::HeaderValue::from_str(&self.auth.app_token)
@@ -579,16 +574,6 @@ impl ZeppConnector {
         .await
     }
 
-    /// The people who share this account's scale: `/users/{id}/members`.
-    ///
-    /// Only used to tell "this account has no weight records" apart from "the
-    /// records belong to a family member we never asked about". Nothing from it
-    /// is stored: the other members are other people.
-    pub async fn fetch_scale_members(&self) -> Result<Value> {
-        let path = format!("/users/{}/members", self.auth.user_id);
-        self.get_json(&path, Vec::new()).await
-    }
-
     /// Real raw band synchronization endpoint.  Its payload may be compressed;
     /// callers must not infer sleep from it unless normalization verifies it.
     pub async fn fetch_band_data(
@@ -807,20 +792,6 @@ impl ZeppConnector {
         .await
     }
 
-    // Backwards-compatible wrappers. They now use real endpoints and are not
-    // aliases for the old fabricated `/v1/health/*` paths.
-    #[allow(dead_code)]
-    pub async fn fetch_sleep(&self, start_date: &str, end_date: &str) -> Result<Value> {
-        self.fetch_band_data(start_date, end_date, "detail", 8, 0)
-            .await
-    }
-
-    #[allow(dead_code)]
-    pub async fn fetch_workouts(&self, start_timestamp: i64, end_timestamp: i64) -> Result<Value> {
-        self.fetch_sport_history("run", start_timestamp, end_timestamp, 1)
-            .await
-    }
-
     pub async fn fetch_hrv(&self, start_date: &str, end_date: &str) -> Result<Value> {
         let start = chrono::NaiveDate::parse_from_str(start_date, "%Y-%m-%d")
             .map_err(|_| ZeppBridgeError::ConfigError("start_date 无效".into()))?
@@ -835,24 +806,6 @@ impl ZeppConnector {
             .and_utc()
             .timestamp_millis();
         self.fetch_events("hrv_sdnn", Some("real_data"), start, end, 2000, true)
-            .await
-    }
-
-    #[allow(dead_code)]
-    pub async fn fetch_daily_summary(&self, start_date: &str, end_date: &str) -> Result<Value> {
-        let start = chrono::NaiveDate::parse_from_str(start_date, "%Y-%m-%d")
-            .map_err(|_| ZeppBridgeError::ConfigError("start_date 无效".into()))?
-            .and_hms_opt(0, 0, 0)
-            .ok_or_else(|| ZeppBridgeError::ConfigError("start_date 无效".into()))?
-            .and_utc()
-            .timestamp_millis();
-        let end = chrono::NaiveDate::parse_from_str(end_date, "%Y-%m-%d")
-            .map_err(|_| ZeppBridgeError::ConfigError("end_date 无效".into()))?
-            .and_hms_opt(23, 59, 59)
-            .ok_or_else(|| ZeppBridgeError::ConfigError("end_date 无效".into()))?
-            .and_utc()
-            .timestamp_millis();
-        self.fetch_events("DailyHealth", Some("summary"), start, end, 2000, true)
             .await
     }
 }

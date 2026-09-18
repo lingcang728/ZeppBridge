@@ -1479,9 +1479,12 @@ mod tests {
 
     #[test]
     fn issue_24_cloud_trail_run_exports_as_trail_in_json_gpx_and_fit() {
-        let workouts = crate::normalizer::Normalizer::normalize_workouts(&json!({"data": [{
-            "trackid": 1_700_000_000i64, "end_time": 1_700_000_600i64, "type": 7
-        }]}))
+        let workouts = crate::normalizer::Normalizer::normalize_workouts_with_sport(
+            &json!({"data": [{
+                "trackid": 1_700_000_000i64, "end_time": 1_700_000_600i64, "type": 7
+            }]}),
+            None,
+        )
         .unwrap();
         let mut workout = serde_json::to_value(&workouts[0]).unwrap();
         assert_eq!(workout["workout_type"], "trail_running");
