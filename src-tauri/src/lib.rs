@@ -47,6 +47,20 @@ use zeppbridge_core::storage::write_lock::{self, WritePurpose};
 
 static EXIT_AFTER_WRITERS: AtomicBool = AtomicBool::new(false);
 
+/// 后端（AppState）是否已经就绪。
+///
+/// `AppState::new` 里要给大库做迁移前整库快照，几百 MB 的库要好几秒；
+/// 这些活挪到 `app-init` 工作线程之后，事件循环先把窗口画出来。前端
+/// 每个 `invoke` 都先过 `whenBackendReady` 这道门（轮询本命令 +
+/// 监听 `app://ready`，见 `src/lib/bridge/tauri.ts`），所以除它以外
+/// 不需要再有命令侧的自检。
+static APP_READY: AtomicBool = AtomicBool::new(false);
+
+#[tauri::command]
+fn app_is_ready() -> bool {
+    APP_READY.load(Ordering::SeqCst)
+}
+
 /// `tauri.conf.json` 里 `minWidth` / `minHeight` 的那两个数。
 ///
 /// 算出来的初始尺寸不能低于它们：低于了窗口会小到点不着，而 Tauri 只在用户
@@ -131,6 +145,9 @@ fn handle_exit_requested(app: &AppHandle, api: &tauri::ExitRequestApi) {
         Err(write_lock::WriteLockError::Busy { .. }) => {
             EXIT_AFTER_WRITERS.store(true, Ordering::SeqCst);
             api.prevent_exit();
+            // 重放/压缩在批边界上看到这面旗就收手，写锁尽快交还——退出
+            // 等待线程不用干等整个维护窗口（大库上能到分钟级）。
+            storage::request_background_write_abort();
             if let Ok(sync) = state.sync.try_read() {
                 if let Some(manager) = sync.as_ref() {
                     manager.request_cancel();
@@ -355,116 +372,181 @@ pub fn run() {
                 .into());
             }
             std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &webview_dir);
-            // 排队中的恢复要在这里执行：AppState 一旦建立，桌面命令、同步线程
-            // 和本机 API 就各自持有连接，那时再去换文件必然打架。
-            let restore_notice = zeppbridge_core::storage::backup::apply_pending_restore(&data_dir)
-                .map(|outcome| outcome.message);
-            let state = match AppState::new(data_dir.clone()) {
-                Ok(state) => state,
-                Err(error) => {
-                    return Err(diagnostics::fatal_startup(
-                        &format!("无法打开本机数据库 {}", data_dir.join("zepp.db").display()),
-                        error,
-                    )
-                    .into());
-                }
-            };
-            if let Some(notice) = restore_notice {
-                state.push_startup_warning(notice);
-            }
-            // 本机 API 首次安装默认关闭；`restore` 只恢复用户明确保存过的启用
-            // 状态。端口占用只让 API 进入错误态，不阻止桌面应用启动。
-            let local_api = std::sync::Arc::new(
-                zeppbridge_core::local_api::LocalApiController::new(data_dir.clone()),
-            );
-            if let Some(error) = local_api.restore().error {
-                diagnostics::log(&error);
-            }
-            app.manage(local_api::LocalApi(local_api.clone()));
-            app.manage(state);
-            diagnostics::log("Startup: database and application state ready");
 
-            // 解析器修订号变化后，后台一次性重放本地原始报文以纠正派生数据
-            // （运动类型、睡眠阶段等）。独立连接 + 后台线程，不阻塞窗口创建。
+            // 剩下的初始化可能很慢：排队中的恢复要复制整库，`AppState::new`
+            // 在 schema 迁移前还会给整库做一次快照——几百 MB 的库要好几秒，
+            // 而这几秒以前全部发生在 setup() 里。setup 跑在事件泵所在的线程
+            // 上，它不返回，webview 的资源请求就出不去，窗口就一直是一块
+            // 没有任何说明的黑屏（21:42 那次首启实测 5 秒+）。
             //
-            // 重放之后顺带把存量原始报文压掉。这两件事都要拿写锁，串在同一个
-            // 线程里，省得互相抢；也都不能挡住窗口创建。
-            let compaction_handle = app.handle().clone();
-            let compaction_data_dir = data_dir.clone();
-            std::thread::spawn(move || {
-                let Ok(db) = storage::Database::open_without_migration(data_dir.join("zepp.db"))
-                else {
-                    return;
-                };
-                // 旗必须在拿锁之前举起。以前是拿到锁之后才进 ReplayGuard，于是
-                // 启动后的自动同步会先干等 20 秒写锁，再把「另一个写入操作正在
-                // 进行」画成红条——而库其实只是在自愈。
-                let needs_replay = matches!(db.pending_replay_plan(), Ok(Some(_)));
-                if needs_replay {
-                    let _replay_flag = storage::ReplayGuard::enter();
-                    match storage::write_lock::acquire_with_timeout(
-                        &compaction_data_dir,
-                        storage::write_lock::WritePurpose::Reprocess,
-                        std::time::Duration::from_secs(30),
-                    ) {
-                        Ok(_reprocess_guard) => match db.reprocess_raw_records_if_needed() {
-                            Ok(Some(counts)) => {
-                                let total: i64 = counts.values().sum();
-                                diagnostics::log(&format!(
+            // 现在挪到工作线程：setup 立刻返回，事件循环和页面先起来，
+            // 前端显示「正在准备本地数据」。就绪后广播 `app://ready`，
+            // 前端 invoke 门（`src/lib/bridge/tauri.ts::whenBackendReady`）
+            // 放行，真正的查询才开始。
+            let app_handle = app.handle().clone();
+            let init_data_dir = data_dir.clone();
+            let init_spawned =
+                std::thread::Builder::new()
+                    .name("app-init".into())
+                    .spawn(move || {
+                        let stage_started = std::time::Instant::now();
+                        // 排队中的恢复要在 AppState 建立之前执行：那之后桌面命令、
+                        // 同步线程和本机 API 就各自持有连接，再换文件必然打架。
+                        let restore_notice =
+                            zeppbridge_core::storage::backup::apply_pending_restore(&init_data_dir)
+                                .map(|outcome| outcome.message);
+                        if stage_started.elapsed() >= Duration::from_secs(1) {
+                            diagnostics::log(&format!(
+                                "Startup: pending restore applied in {:.1}s",
+                                stage_started.elapsed().as_secs_f64()
+                            ));
+                        }
+                        let stage_started = std::time::Instant::now();
+                        let state = match AppState::new(init_data_dir.clone()) {
+                            Ok(state) => state,
+                            Err(error) => {
+                                // 窗口这时已经画出来了，但后端起不来，应用照样
+                                // 没法用——同一条 fatal 路径：写 startup-error.log、
+                                // 弹原生框，然后退出。
+                                let _ = diagnostics::fatal_startup(
+                                    &format!(
+                                        "无法打开本机数据库 {}",
+                                        init_data_dir.join("zepp.db").display()
+                                    ),
+                                    error,
+                                );
+                                app_handle.exit(1);
+                                return;
+                            }
+                        };
+                        diagnostics::log(&format!(
+                            "Startup: database and application state ready in {:.1}s",
+                            stage_started.elapsed().as_secs_f64()
+                        ));
+                        if let Some(notice) = restore_notice {
+                            state.push_startup_warning(notice);
+                        }
+                        // 本机 API 首次安装默认关闭；`restore` 只恢复用户明确保存过
+                        // 的启用状态。端口占用只让 API 进入错误态，不阻止桌面应用启动。
+                        let local_api = std::sync::Arc::new(
+                            zeppbridge_core::local_api::LocalApiController::new(
+                                init_data_dir.clone(),
+                            ),
+                        );
+                        if let Some(error) = local_api.restore().error {
+                            diagnostics::log(&error);
+                        }
+                        app_handle.manage(local_api::LocalApi(local_api.clone()));
+                        app_handle.manage(state);
+                        // 先立旗再广播：监听器晚于事件注册的页面靠 `app_is_ready`
+                        // 轮询补上，顺序不能反——反过来就有一个「事件已发、旗还没立」
+                        // 的窗口期，那一页会等到 60 秒超时。
+                        APP_READY.store(true, Ordering::SeqCst);
+                        let _ = app_handle.emit("app://ready", ());
+
+                        // 解析器修订号变化后，后台一次性重放本地原始报文以纠正派生
+                        // 数据（运动类型、睡眠阶段等）。独立连接 + 后台线程，不阻塞
+                        // 窗口创建。
+                        //
+                        // 重放之后顺带把存量原始报文压掉。这两件事都要拿写锁，串在
+                        // 同一个线程里，省得互相抢；也都不能挡住窗口创建。
+                        let compaction_handle = app_handle.clone();
+                        let compaction_data_dir = init_data_dir.clone();
+                        std::thread::spawn(move || {
+                            let Ok(db) = storage::Database::open_without_migration(
+                                init_data_dir.join("zepp.db"),
+                            ) else {
+                                return;
+                            };
+                            // 旗必须在拿锁之前举起。以前是拿到锁之后才进 ReplayGuard，于是
+                            // 启动后的自动同步会先干等 20 秒写锁，再把「另一个写入操作正在
+                            // 进行」画成红条——而库其实只是在自愈。
+                            let needs_replay = matches!(db.pending_replay_plan(), Ok(Some(_)));
+                            if needs_replay {
+                                let _replay_flag = storage::ReplayGuard::enter();
+                                match storage::write_lock::acquire_with_timeout(
+                                    &compaction_data_dir,
+                                    storage::write_lock::WritePurpose::Reprocess,
+                                    std::time::Duration::from_secs(30),
+                                ) {
+                                    Ok(_reprocess_guard) => {
+                                        match db.reprocess_raw_records_if_needed() {
+                                            Ok(Some(counts)) => {
+                                                let total: i64 = counts.values().sum();
+                                                diagnostics::log(&format!(
                                     "normalizer 升级，已重放本地原始报文（{total} 条派生记录）"
                                 ));
+                                            }
+                                            Ok(None) => {}
+                                            Err(error) => diagnostics::log(&format!(
+                                                "本地报文重放失败: {error}"
+                                            )),
+                                        }
+                                    }
+                                    Err(error) => {
+                                        diagnostics::log(&format!(
+                                            "跳过本次报文重放，没能拿到写锁: {error}"
+                                        ));
+                                    }
+                                }
                             }
-                            Ok(None) => {}
-                            Err(error) => diagnostics::log(&format!("本地报文重放失败: {error}")),
-                        },
-                        Err(error) => {
-                            diagnostics::log(&format!("跳过本次报文重放，没能拿到写锁: {error}"));
-                        }
-                    }
-                }
 
-                // 存量报文压缩：默认开着，装完新版本第一次启动时自己做完。
-                // 原始报文是库里最占地方的东西（JSON 文本，压完只剩五分之一），
-                // 让每个人手动去高级设置里点一下，等于绝大多数人永远不会压。
-                //
-                // 界面通过 `compaction_in_progress()` 显示「正在压缩」，压完
-                // 自己消失；这期间同步会像遇到重放一样让路并自动重试。
-                match db.pending_raw_payload_count() {
-                    Ok(0) | Err(_) => {}
-                    Ok(pending) => {
-                        let _compaction_flag = storage::CompactionGuard::enter();
-                        let _ = compaction_handle.emit("compaction://started", pending);
-                        // `let _write_guard = acquire_with_timeout(...)` 是把
-                        // 整个 `Result` 绑给了变量：30 秒等不到锁时返回的
-                        // `Err` 同样是个值，于是压缩照跑不误，写锁形同虚设。
-                        // 必须匹配出 `Ok` 才算真的拿到了。
-                        let Ok(_write_guard) = storage::write_lock::acquire_with_timeout(
-                            &compaction_data_dir,
-                            storage::write_lock::WritePurpose::Compaction,
-                            std::time::Duration::from_secs(30),
-                        ) else {
-                            diagnostics::log("跳过本次报文压缩，没能拿到写锁");
-                            let _ = compaction_handle
-                                .emit("compaction://finished", RawPayloadCompaction::default());
-                            return;
-                        };
-                        match db.compact_raw_payloads() {
-                            Ok(report) => {
-                                diagnostics::log(&format!(
-                                    "已压缩历史报文 {} 条，{} → {} 字节",
-                                    report.compacted, report.bytes_before, report.bytes_after
-                                ));
-                                let _ = compaction_handle.emit("compaction://finished", report);
+                            // 存量报文压缩：默认开着，装完新版本第一次启动时自己做完。
+                            // 原始报文是库里最占地方的东西（JSON 文本，压完只剩五分之一），
+                            // 让每个人手动去高级设置里点一下，等于绝大多数人永远不会压。
+                            //
+                            // 界面通过 `compaction_in_progress()` 显示「正在压缩」，压完
+                            // 自己消失；这期间同步会像遇到重放一样让路并自动重试。
+                            match db.pending_raw_payload_count() {
+                                Ok(0) | Err(_) => {}
+                                Ok(pending) => {
+                                    let _compaction_flag = storage::CompactionGuard::enter();
+                                    let _ = compaction_handle.emit("compaction://started", pending);
+                                    // `let _write_guard = acquire_with_timeout(...)` 是把
+                                    // 整个 `Result` 绑给了变量：30 秒等不到锁时返回的
+                                    // `Err` 同样是个值，于是压缩照跑不误，写锁形同虚设。
+                                    // 必须匹配出 `Ok` 才算真的拿到了。
+                                    let Ok(_write_guard) =
+                                        storage::write_lock::acquire_with_timeout(
+                                            &compaction_data_dir,
+                                            storage::write_lock::WritePurpose::Compaction,
+                                            std::time::Duration::from_secs(30),
+                                        )
+                                    else {
+                                        diagnostics::log("跳过本次报文压缩，没能拿到写锁");
+                                        let _ = compaction_handle.emit(
+                                            "compaction://finished",
+                                            RawPayloadCompaction::default(),
+                                        );
+                                        return;
+                                    };
+                                    match db.compact_raw_payloads() {
+                                        Ok(report) => {
+                                            diagnostics::log(&format!(
+                                                "已压缩历史报文 {} 条，{} → {} 字节",
+                                                report.compacted,
+                                                report.bytes_before,
+                                                report.bytes_after
+                                            ));
+                                            let _ = compaction_handle
+                                                .emit("compaction://finished", report);
+                                        }
+                                        Err(error) => {
+                                            diagnostics::log(&format!("历史报文压缩失败: {error}"));
+                                            let _ = compaction_handle.emit(
+                                                "compaction://finished",
+                                                RawPayloadCompaction::default(),
+                                            );
+                                        }
+                                    }
+                                }
                             }
-                            Err(error) => {
-                                diagnostics::log(&format!("历史报文压缩失败: {error}"));
-                                let _ = compaction_handle
-                                    .emit("compaction://finished", RawPayloadCompaction::default());
-                            }
-                        }
-                    }
-                }
-            });
+                        });
+                    });
+            if let Err(error) = init_spawned {
+                // 初始化线程都派生不出去的话，前端会永远停在「正在准备」。
+                return Err(diagnostics::fatal_startup("无法启动初始化线程", error).into());
+            }
 
             main_window::initialize(app.handle());
 
@@ -541,6 +623,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            app_is_ready,
             list_life_events,
             save_life_event,
             delete_life_event,

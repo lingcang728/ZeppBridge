@@ -23,7 +23,7 @@ database. The data directory is resolved by `paths.rs`:
 | Platform | Data directory |
 |---|---|
 | Windows | `data\` next to `ZeppBridge.exe` |
-| macOS | `data/` next to the executable when it is writable; inside `ZeppBridge.app` it is not, so it falls back to `~/Library/Application Support/com.zeppbridge.ZeppBridge/data` |
+| macOS | `~/Library/Application Support/com.zeppbridge.ZeppBridge/data` inside `ZeppBridge.app` (bundles are replaced whole on update, so data never lives in them — a surviving legacy bundle library is migrated there on first launch); `data/` next to an executable that is not in a bundle |
 | Linux | `~/.local/share/zeppbridge/data` for a packaged install (deb, rpm, Flatpak — those live in a prefix the app does not own); `data/` next to the executable for an AppImage or an unpacked tarball |
 | Any | `$ZEPPBRIDGE_DATA_DIR`, when set to an absolute path, overrides all of the above |
 

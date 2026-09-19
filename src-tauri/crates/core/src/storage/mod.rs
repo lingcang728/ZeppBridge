@@ -144,6 +144,24 @@ pub fn replay_in_progress() -> bool {
     REPLAY_IN_PROGRESS.load(std::sync::atomic::Ordering::SeqCst) > 0
 }
 
+/// 退出请求举起的旗。
+///
+/// 桌面应用在退出前会等写锁清空，而重放/压缩一跑就是几十秒到几分钟——
+/// 没有这面旗，点「退出」的用户要等整个维护窗口跑完。两个循环在每个批
+/// 边界上看它一眼：看见了就提交完当前批收手，写锁交还，剩下的报文
+/// 下次启动接着放（修订号不推进，已提交的批天然不会重做）。
+static BACKGROUND_WRITE_ABORT: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+/// 由退出路径调用。只影响批边界以后的调度，不打断正在提交的事务。
+pub fn request_background_write_abort() {
+    BACKGROUND_WRITE_ABORT.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+fn background_write_abort_requested() -> bool {
+    BACKGROUND_WRITE_ABORT.load(std::sync::atomic::Ordering::SeqCst)
+}
+
 /// Clears the replay flag however the replay ends, including on an early
 /// return or a panic. Nested enters are counted so an inner Drop cannot hide
 /// an outer wait-for-lock.
@@ -2422,6 +2440,12 @@ impl Database {
         // 却没被重建的记录。单条 decode / 解析 / 归一化失败写入隔离表后继续，
         // 不能用 `?` 把整轮打掉；隔离 INSERT 跟这批派生行一起提交。
         for batch in plan.chunks(REPLAY_BATCH_RECORDS) {
+            // 退出请求举着旗就收手：这一批之前的事务都已提交，修订号不
+            // 推进，下一轮启动从断点继续。直接返回 Ok 而不是 Err——这不是
+            // 失败，不该被当成「重放失败」记一笔。
+            if background_write_abort_requested() {
+                return Ok(counts);
+            }
             let transaction = ReplayBatch::begin(&self.conn)?;
             for (id, stream, source_key) in batch {
                 // 报文可能在这次重放开始之后被清理掉，跳过即可，不是错误。
@@ -6029,6 +6053,10 @@ impl Database {
         let mut report = RawPayloadCompaction::default();
         let mut last_id: i64 = 0;
         loop {
+            // 和重放同一个退出信号：批边界收手，把写锁尽快交还。
+            if background_write_abort_requested() {
+                break;
+            }
             let pending: Vec<(i64, String)> = {
                 let mut stmt = self.conn.prepare(
                     "SELECT id, payload FROM raw_records
@@ -6086,7 +6114,9 @@ impl Database {
         // 一个字节都不会小，用户看不到任何变化。VACUUM 会重建整个文件，过程中
         // 需要差不多一倍的临时空间，所以只在真的压过东西时才做，而且失败不算
         // 整件事失败——数据已经压好了，文件没缩只是没拿到那份收益。
-        if report.compacted > 0 {
+        // 退出中止时也跳过：VACUUM 在大库上是最久的一段，而此刻唯一的目标
+        // 是让进程快点走完。
+        if report.compacted > 0 && !background_write_abort_requested() {
             if let Err(error) = self.conn.execute_batch("VACUUM") {
                 tracing::warn!("压缩后 VACUUM 失败，磁盘占用暂时不会下降: {error}");
             }

@@ -10,7 +10,10 @@ pub(crate) fn validate_update_data_location(
         &state.data_dir,
         &std::env::current_exe()?,
     )
-    .map_err(|_| {
+    .map_err(|error| {
+        // 底层那句带路径的英文原因以前被整个吞掉，只留了固定文案——
+        // 排查「为什么拒装」时一个字都拿不到。
+        crate::diagnostics::log(&format!("更新前数据位置校验未通过: {error}"));
         AppError::new(
             "err.update.unsafe_data_location",
             "无法确认数据目录可安全保留，已停止安装更新",
@@ -50,9 +53,13 @@ fn installed_path() -> Result<PathBuf, AppError> {
 /// linux 的条目，`check()` 会抛「响应的 platforms 里找不到 linux-x86_64」。
 /// 那句话会以「更新失败」的样子出现在设置页上，而实际上什么都没坏，用户也
 /// 无事可做。一个说不出所以然的红字比不检查更糟。
+///
+/// macOS 同理收窄到 aarch64：CI 只产 `ZeppBridge_*_aarch64.app.tar.gz`
+/// （`macos-latest` runner 就是 arm64），x86_64 的 mac 调 `check()` 同样会
+/// 撞到「platforms 里找不到 darwin-x86_64」的假失败。
 #[tauri::command]
 pub(crate) fn self_update_supported() -> bool {
-    cfg!(any(windows, target_os = "macos"))
+    cfg!(windows) || cfg!(all(target_os = "macos", target_arch = "aarch64"))
 }
 
 /// Windows 上这份 exe 算不算便携版。

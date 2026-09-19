@@ -15,7 +15,7 @@
 | 平台 | 数据目录 |
 |---|---|
 | Windows | `ZeppBridge.exe` 旁边的 `data\` |
-| macOS | 可执行文件旁的 `data/`；在 `ZeppBridge.app` 里那个位置不可写，于是回退到 `~/Library/Application Support/com.zeppbridge.ZeppBridge/data` |
+| macOS | 在 `ZeppBridge.app` 里是 `~/Library/Application Support/com.zeppbridge.ZeppBridge/data`（更新会整体替换 app 包，数据不放包内——包里幸存的旧版库会在首次启动时迁过去）；不在包里的可执行文件仍用旁边的 `data/` |
 | Linux | 包管理器安装的（deb、rpm、Flatpak）用 `~/.local/share/zeppbridge/data`——那些前缀不属于这个程序；AppImage 和解包的 tarball 用可执行文件旁的 `data/` |
 | 任何平台 | `$ZEPPBRIDGE_DATA_DIR` 设成绝对路径时覆盖以上全部 |
 

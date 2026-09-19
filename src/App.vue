@@ -11,7 +11,7 @@ import Icon from './components/Icon.vue';
 import { useSyncController } from './composables/useSyncController';
 import { deviceStateLabel, useDevices } from './composables/useDevices';
 import { useUiScale } from './composables/useUiScale';
-import { backend, isDesktop } from './lib/bridge';
+import { backend, isDesktop, whenBackendReady } from './lib/bridge';
 import { checkForDesktopUpdate } from './services/updateService';
 import { defineMessages, locale, useMessages } from './i18n';
 
@@ -43,6 +43,7 @@ const messages = defineMessages(
     verifyFirst: '请先完成连接验证',
     syncing: '同步中…',
     cancel: '取消',
+    preparingData: '正在打开本地数据库，升级后的第一次启动可能要十几秒…',
     compacting: (pending: number) =>
       `正在压缩历史报文（${pending} 条），压完会自动消失。这期间同步会稍等一下。`,
     compacted: (saved: string) => `历史报文已压缩，省下约 ${saved} 磁盘空间。`,
@@ -75,6 +76,7 @@ const messages = defineMessages(
     verifyFirst: 'Verify the connection first',
     syncing: 'Syncing…',
     cancel: 'Cancel',
+    preparingData: 'Opening your local database — the first launch after an update can take a few seconds…',
     compacting: (pending: number) =>
       `Compacting stored payloads (${pending} to go). This clears itself; syncing waits its turn.`,
     compacted: (saved: string) => `Stored payloads compacted, about ${saved} of disk reclaimed.`,
@@ -107,6 +109,7 @@ const messages = defineMessages(
     verifyFirst: 'Primero verifica la conexión',
     syncing: 'Sincronizando…',
     cancel: 'Cancelar',
+    preparingData: 'Abriendo tu base de datos local; el primer arranque tras una actualización puede tardar unos segundos…',
     compacting: (pending: number) =>
       `Compactando registros guardados (faltan ${pending}). Esto desaparece solo; la sincronización espera su turno.`,
     compacted: (saved: string) => `Registros guardados compactados: se liberaron unos ${saved} de disco.`,
@@ -119,11 +122,15 @@ const t = useMessages(messages);
 
 // 桌面端从 Tauri 运行时读取版本（与 tauri.conf.json 单一来源），
 // 浏览器预览环境回退到下面的常量（与 package.json 保持同步）。
-const FALLBACK_APP_VERSION = '2.4.0';
+const FALLBACK_APP_VERSION = '2.4.1';
 /* 构建标识。同一个版本号会构建很多次，光看版本号分不清手上是哪一个。 */
 const BUILD_STAMP = __BUILD_STAMP__;
 const APP_VERSION = ref(FALLBACK_APP_VERSION);
 const desktopRuntime = isDesktop();
+/* 后端就绪以前（迁移备份、排队恢复那一小段）顶栏挂一条说明，
+   不然那几秒里窗口画了壳却所有数字都是空的，看起来像卡死。
+   浏览器预览没有后端，直接当真就绪。 */
+const backendReady = ref(!desktopRuntime);
 // 落地页只在非桌面环境渲染（Cloudflare Pages 部署的就是这个分支），
 // 静态 import 会把它连同两份文案一起塞进桌面应用的首屏 chunk。懒加载后
 // 桌面端根本不会下载它。
@@ -274,9 +281,13 @@ onMounted(() => {
   if (showLanding) return;
   syncTrayLocale();
   initializeScale();
+  void whenBackendReady().then(() => {
+    backendReady.value = true;
+    // 更新检查走裸 `invoke`（不过 bridge 的门），得等后端真的管事了再发。
+    void checkForDesktopUpdate(false);
+  });
   void initialize();
   void loadDevices();
-  void checkForDesktopUpdate(false);
   document.addEventListener('keydown', onDocumentKeydown);
   if (route.query.notice === 'not-found') {
     window.setTimeout(() => {
@@ -412,6 +423,10 @@ onUnmounted(() => {
         </div>
       </header>
 
+      <div v-if="!backendReady" class="sync-feedback" role="status" aria-live="polite">
+        <Icon name="database" :size="14" class="spinning" />
+        <span>{{ t.preparingData }}</span>
+      </div>
       <div v-if="statusError" class="sync-feedback tone-failed" role="alert">
         <Icon name="warning" :size="14" />
         <span>{{ statusError }}</span>
