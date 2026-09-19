@@ -601,6 +601,7 @@ pub fn run() {
             compact_raw_payloads,
             open_data_folder,
             updates::self_update_supported,
+            updates::validate_update_data_location,
             updates::is_portable_update,
             updates::launch_migrated_install,
             list_backups,

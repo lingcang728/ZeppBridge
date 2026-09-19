@@ -162,6 +162,7 @@ const messages = defineMessages(
     'err.update.launch_failed': '无法启动更新后的安装版',
     'err.update.installed_build_missing': '安装完成后未找到新的 ZeppBridge 安装版',
     'err.update.portable_windows_only': '便携版安装迁移仅支持 Windows',
+    'err.update.unsafe_data_location': '无法确认数据目录可在更新后保留，已停止安装。请退出 ZeppBridge，将 app 包内的 data 完整复制到用户的 Application Support 目录，并修正 ZEPPBRIDGE_DATA_DIR 后重试。不要删除旧数据。',
   },
   {
     /* —— core —— */
@@ -328,6 +329,7 @@ const messages = defineMessages(
     'err.update.launch_failed': "Couldn't start the updated installed build",
     'err.update.installed_build_missing': 'No new installed ZeppBridge build was found after setup',
     'err.update.portable_windows_only': 'Portable-to-installed migration is Windows only',
+    'err.update.unsafe_data_location': 'Installation stopped because the data location could not be verified as safe for updates. Quit ZeppBridge, copy any in-bundle data folder to your user Application Support folder, and correct ZEPPBRIDGE_DATA_DIR before retrying. Keep the original data.',
   },
   {
     /* —— core —— */
@@ -494,6 +496,7 @@ const messages = defineMessages(
     'err.update.launch_failed': 'No se pudo iniciar la versión instalada actualizada',
     'err.update.installed_build_missing': 'No se encontró una nueva versión instalada de ZeppBridge después de la instalación',
     'err.update.portable_windows_only': 'La migración de portable a instalada solo existe en Windows',
+    'err.update.unsafe_data_location': 'Se detuvo la instalación porque no se pudo verificar que la carpeta de datos se conserve tras actualizar. Cierra ZeppBridge, copia la carpeta data del paquete de la app a Application Support de tu usuario y corrige ZEPPBRIDGE_DATA_DIR antes de reintentar. Conserva los datos originales.',
   },
 );
 
