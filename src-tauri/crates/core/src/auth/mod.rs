@@ -855,19 +855,6 @@ fn macos_credential_backend(
     }
 }
 
-/// 兼容旧签名。数据目录自己解析一次。
-///
-/// 保留它是因为它是公开 API；新代码请用 [`default_credential_backend_in`]，
-/// 那条路上数据目录已经是调用方手里的东西，不必再解析一遍。
-pub fn default_credential_backend() -> Arc<dyn CredentialBackend> {
-    match crate::paths::resolve_data_dir() {
-        Ok(dir) => default_credential_backend_in(&dir),
-        // 解析不出数据目录时，文件存储无处可放，但密钥环那条路和数据目录
-        // 无关，仍然能用。给一个空路径而不是直接失败。
-        Err(_) => default_credential_backend_in(Path::new("")),
-    }
-}
-
 /// Linux 上按环境和现状挑一个存储。
 #[cfg(all(unix, not(target_os = "macos")))]
 fn linux_credential_backend(data_dir: &Path) -> Arc<dyn CredentialBackend> {

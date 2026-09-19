@@ -219,26 +219,6 @@ impl SyncManager {
         Ok(true)
     }
 
-    /// Compatibility command surface. A report containing failed core streams
-    /// is converted to an error, so callers cannot display false success.
-    ///
-    /// 这里看的是 `core_ok` 而不是 `success`：这个入口只有「Ok 或者 Err」两
-    /// 种表达，把一条支流失败升级成硬错误会让调用方以为什么都没拿到。要看
-    /// 完整结果的用 `initial_sync_report`。
-    #[allow(dead_code)]
-    pub async fn initial_sync(&self) -> Result<()> {
-        let report = self.initial_sync_report().await?;
-        if report.core_ok {
-            Ok(())
-        } else {
-            Err(ZeppBridgeError::DataUnavailable(
-                report
-                    .message
-                    .unwrap_or_else(|| "首次同步有核心流失败".into()),
-            ))
-        }
-    }
-
     pub async fn initial_sync_report(&self) -> Result<SyncReport> {
         self.history_sync_report(UserPrefs::DEFAULT_HISTORY_SYNC_DAYS)
             .await
@@ -257,21 +237,6 @@ impl SyncManager {
         F: Fn(SyncProgress) + Send + Sync,
     {
         self.sync_report(days, Some(&on_progress)).await
-    }
-
-    /// 同 `initial_sync`：这个入口只表达核心流通没通。
-    #[allow(dead_code)]
-    pub async fn incremental_sync(&self) -> Result<()> {
-        let report = self.incremental_sync_report().await?;
-        if report.core_ok {
-            Ok(())
-        } else {
-            Err(ZeppBridgeError::DataUnavailable(
-                report
-                    .message
-                    .unwrap_or_else(|| "增量同步有核心流失败".into()),
-            ))
-        }
     }
 
     pub async fn incremental_sync_report(&self) -> Result<SyncReport> {
@@ -927,12 +892,6 @@ impl SyncManager {
             .get_sync_state(stream)?
             .map(|state| state.records_written)
             .unwrap_or(0))
-    }
-
-    #[allow(dead_code)]
-    pub async fn cleanup(&self, days: i64) -> Result<()> {
-        let db = self.db.lock().await;
-        db.cleanup_old_data(days)
     }
 }
 

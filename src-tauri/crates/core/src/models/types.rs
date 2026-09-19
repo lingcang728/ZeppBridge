@@ -538,19 +538,8 @@ pub struct StorageEstimate {
     pub needed_bytes: u64,
 }
 
-/// 同步状态
-#[allow(dead_code)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SyncState {
-    pub stream: String,
-    pub last_sync: Option<DateTime<Utc>>,
-    pub status: String,
-    pub error: Option<String>,
-}
-
-/// The storage representation of a sync stream.  `SyncState` above remains the
-/// small backwards-compatible view used by the original commands; this richer
-/// type carries the cursor/capability bookkeeping needed by the real pipeline.
+/// The storage representation of a sync stream, carrying the cursor/capability
+/// bookkeeping needed by the real pipeline.
 #[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SyncStateInfo {
