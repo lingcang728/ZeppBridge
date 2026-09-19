@@ -3,7 +3,7 @@ import { webBackend } from './web';
 import type { BridgeBackend } from './types';
 
 export type { BridgeBackend, UnlistenFn } from './types';
-export { tauriBackend } from './tauri';
+export { tauriBackend, whenBackendReady } from './tauri';
 export { webBackend } from './web';
 export {
   DesktopUnavailableError,

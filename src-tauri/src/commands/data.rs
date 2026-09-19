@@ -1506,7 +1506,33 @@ async fn refresh_device_profiles_from_cloud(
         return Err(AppError::new("err.core.unavailable", "Zepp 未返回设备"));
     }
 
-    {
+    // 这一段写库以前只拿进程内的 `state.db` 互斥锁，没拿跨进程写锁。
+    // 重放/压缩/同步握着写锁跑的时候，这里的每条 autocommit upsert 都要在
+    // SQLite busy_timeout 里干等——而 `state.db` 一直被占着，后面所有命令
+    // （状态、概览、设置页加载）跟着排队，界面看起来就是「点了没反应」。
+    // 维护窗口里干脆跳过：目录缓存照常写文件，身份行留给下一次刷新补齐。
+    let write_guard =
+        if crate::storage::replay_in_progress() || crate::storage::compaction_in_progress() {
+            None
+        } else {
+            match zeppbridge_core::storage::write_lock::try_acquire(
+                &state.data_dir,
+                WritePurpose::Metadata,
+            ) {
+                Ok(guard) => Some(guard),
+                Err(error @ zeppbridge_core::storage::write_lock::WriteLockError::Busy { .. }) => {
+                    crate::diagnostics::log(&format!("设备身份表这次不更新：{error}"));
+                    None
+                }
+                Err(error) => {
+                    return Err(AppError::new(
+                        "err.core.io",
+                        format!("无法取得写锁: {error}"),
+                    ));
+                }
+            }
+        };
+    if write_guard.is_some() {
         let db = state.db.lock().await;
         for hint in profiles.iter().map(device_hint_from_profile) {
             db.upsert_device_identity(&hint).map_err(AppError::from)?;

@@ -88,6 +88,32 @@ pub fn resolve_data_dir() -> io::Result<PathBuf> {
     }
 }
 
+/// 目标目录里「有东西」不等于「有数据」。
+///
+/// macOS 自己会往 Application Support 里丢 `.DS_Store`；上一版应用也留下
+/// `logs/`、`webview/`、半拉子 `.bundle-migration-*` 这类没有用户数据的
+/// 条目。老代码见非空就报 AlreadyExists 永久拒启——那次启动失败在 macOS
+/// 上还没有对话框，用户看到的只是「图标点了没反应」。只有出现上面这份
+/// 名单之外的条目（比如真躺着一个别人的 `auth.json`）才值得停下来。
+#[cfg(any(target_os = "macos", test))]
+fn destination_only_has_ignorable_entries(destination: &Path) -> io::Result<bool> {
+    const IGNORABLE: [&str; 5] = [".DS_Store", ".localized", "logs", "webview", ".write-probe"];
+    for entry in std::fs::read_dir(destination)? {
+        let name = entry?.file_name();
+        let Some(name) = name.to_str() else {
+            return Ok(false);
+        };
+        let ignorable = IGNORABLE.contains(&name)
+            || name.starts_with(".bundle-migration-")
+            || name.starts_with(".pre-migration-")
+            || (name.starts_with('.') && name.contains(".tmp-"));
+        if !ignorable {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
 /// Publish a complete copy before switching libraries. Keep the bundle copy for
 /// recovery, and never combine two accounts' databases or credentials.
 #[cfg(any(target_os = "macos", test))]
@@ -95,7 +121,7 @@ fn migrate_bundle_data(source: &Path, destination: &Path) -> io::Result<()> {
     if !source.is_dir() || destination.join("zepp.db").is_file() {
         return Ok(());
     }
-    if destination.exists() && std::fs::read_dir(destination)?.next().is_some() {
+    if destination.exists() && !destination_only_has_ignorable_entries(destination)? {
         return Err(io::Error::new(io::ErrorKind::AlreadyExists,
             "Application Support data is not empty. Back up both data directories before migrating the app-bundle library."));
     }
@@ -103,6 +129,18 @@ fn migrate_bundle_data(source: &Path, destination: &Path) -> io::Result<()> {
         .parent()
         .ok_or_else(|| io::Error::other("missing data parent"))?;
     std::fs::create_dir_all(parent)?;
+    // 上一次崩在半路留下的半成品先清掉：它们不含已提交的数据（整体 rename
+    // 之前 staging 对外界不可见），留着只会占地方、还会挡下一次的判定。
+    for entry in std::fs::read_dir(parent)? {
+        let entry = entry?;
+        let name = entry.file_name();
+        if name
+            .to_str()
+            .is_some_and(|name| name.starts_with(".bundle-migration-"))
+        {
+            let _ = remove_recursive(&entry.path());
+        }
+    }
     let staging = parent.join(format!(
         ".bundle-migration-{}-{}",
         std::process::id(),
@@ -112,25 +150,57 @@ fn migrate_bundle_data(source: &Path, destination: &Path) -> io::Result<()> {
             .as_nanos()
     ));
     std::fs::create_dir(&staging)?;
-    for entry in std::fs::read_dir(source)? {
-        let entry = entry?;
-        let name = entry.file_name();
-        if SQLITE_GROUP.iter().any(|item| name == *item) {
-            continue;
+    let staged = (|| -> io::Result<()> {
+        for entry in std::fs::read_dir(source)? {
+            let entry = entry?;
+            let name = entry.file_name();
+            if SQLITE_GROUP.iter().any(|item| name == *item) {
+                continue;
+            }
+            copy_bundle_entry(&entry.path(), &staging.join(name))?;
         }
-        copy_bundle_entry(&entry.path(), &staging.join(name))?;
-    }
-    if source.join("zepp.db").is_file() {
-        let db = rusqlite::Connection::open_with_flags(
-            source.join("zepp.db"),
-            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-        )
-        .map_err(io::Error::other)?;
-        db.backup(rusqlite::DatabaseName::Main, staging.join("zepp.db"), None)
-            .map_err(io::Error::other)?;
+        if source.join("zepp.db").is_file() {
+            match rusqlite::Connection::open_with_flags(
+                source.join("zepp.db"),
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+            )
+            .and_then(|db| db.backup(rusqlite::DatabaseName::Main, staging.join("zepp.db"), None))
+            {
+                Ok(()) => {}
+                Err(error) => {
+                    // 在线备份失败（多半是源库损坏）。文件级拷贝把库原样带
+                    // 过去，open_resilient 的隔离/恢复流程照常接手——比一个
+                    // 只有「打不开」三个字的启动失败强。
+                    tracing::warn!("bundle 迁移: SQLite 在线备份失败（{error}），退回文件级拷贝");
+                    for name in SQLITE_GROUP {
+                        let file = source.join(name);
+                        if file.is_file() {
+                            std::fs::copy(&file, staging.join(name))?;
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    })();
+    if let Err(error) = staged {
+        // 半成品 staging 必须清走：它里面有部分拷贝，留给下一次启动会被
+        // 当成「已迁完的目标」之外的干扰，也会越攒越多。
+        let _ = remove_recursive(&staging);
+        return Err(error);
     }
     if destination.exists() {
-        std::fs::remove_dir(destination)?;
+        // 目标里只剩可忽略条目时也**不删**，整体挪到旁边：`logs/` 里可能
+        // 正躺着用户要发过来的那次崩溃记录。
+        let aside = parent.join(format!(
+            ".pre-migration-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        std::fs::rename(destination, &aside)?;
     }
     std::fs::rename(&staging, destination)?;
     Ok(())
@@ -140,9 +210,20 @@ fn migrate_bundle_data(source: &Path, destination: &Path) -> io::Result<()> {
 fn copy_bundle_entry(source: &Path, destination: &Path) -> io::Result<()> {
     let meta = std::fs::symlink_metadata(source)?;
     if meta.file_type().is_symlink() {
-        return Err(io::Error::other(
-            "Bundle data contains a symbolic link; migrate it manually before updating.",
-        ));
+        // 老版本不拦 symlink，bundle 里躺着的 `backups -> 外置盘` 是真实
+        // 存在的配置。迁过去的是链接本身：目标留在原地，不复制也不吞掉，
+        // 新版启动后照常顺着链接用。
+        #[cfg(unix)]
+        {
+            let target = std::fs::read_link(source)?;
+            return std::os::unix::fs::symlink(&target, destination);
+        }
+        #[cfg(not(unix))]
+        {
+            return Err(io::Error::other(
+                "Bundle data contains a symbolic link; migrate it manually before updating.",
+            ));
+        }
     }
     if meta.is_dir() {
         std::fs::create_dir(destination)?;
@@ -252,10 +333,14 @@ fn is_inside_app_bundle(dir: &Path) -> bool {
 pub fn validate_update_data_location(data_dir: &Path, executable: &Path) -> io::Result<()> {
     let executable = executable.canonicalize()?;
     let data_dir = data_dir.canonicalize()?;
+    // 祖先里名字以 `.app` 结尾的目录**不一定**是 bundle——Windows 上一条
+    // `D:\tools.app\release\ZeppBridge.exe` 就会被误伤，把本来合法的便携
+    // 目录判成「数据在包里」而拒装更新。真 bundle 一定有 `Contents/`。
     if let Some(bundle) = executable.ancestors().find(|ancestor| {
         ancestor
             .extension()
             .is_some_and(|ext| ext.eq_ignore_ascii_case("app"))
+            && ancestor.join("Contents").is_dir()
     }) {
         if data_dir.starts_with(bundle) {
             return Err(io::Error::new(io::ErrorKind::InvalidInput,
@@ -751,6 +836,137 @@ mod tests {
             fs::read(destination.join("auth.json")).unwrap(),
             b"existing-account"
         );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn bundle_migration_tolerates_finder_junk_and_leftover_logs() {
+        // `.DS_Store` / `logs/` / `webview/` / 半拉子 staging 都不是用户数据。
+        // 它们不该把迁移卡死——macOS 那次启动失败连对话框都没有。
+        let root = std::env::temp_dir().join(format!(
+            "bundle-junk-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let source = root.join("source");
+        let destination = root.join("destination");
+        fs::create_dir_all(&source).unwrap();
+        fs::write(source.join("auth.json"), b"account").unwrap();
+        fs::create_dir_all(&destination).unwrap();
+        fs::write(destination.join(".DS_Store"), b"junk").unwrap();
+        fs::create_dir_all(destination.join("logs")).unwrap();
+        fs::write(destination.join("logs/zeppbridge.log"), b"last crash log").unwrap();
+        fs::create_dir_all(destination.join("webview")).unwrap();
+        fs::create_dir_all(root.join(".bundle-migration-999-0")).unwrap();
+        migrate_bundle_data(&source, &destination).unwrap();
+        assert_eq!(fs::read(destination.join("auth.json")).unwrap(), b"account");
+        // 旧目录没删，被挪到了旁边——logs 里的崩溃记录还找得回来。
+        let aside: Vec<_> = fs::read_dir(&root)
+            .unwrap()
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| {
+                entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(".pre-migration-")
+            })
+            .collect();
+        assert_eq!(aside.len(), 1, "旧目标应当整体挪到旁边而不是被删");
+        assert_eq!(
+            fs::read(aside[0].path().join("logs/zeppbridge.log")).unwrap(),
+            b"last crash log"
+        );
+        assert!(
+            !root.join(".bundle-migration-999-0").exists(),
+            "上次崩掉的半成品应当被清走"
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn bundle_migration_falls_back_to_file_copy_when_the_source_db_wont_open() {
+        // 源库损坏不该让整个迁移失败：文件级拷贝把库原样带过去，
+        // open_resilient 的隔离流程照常接手。
+        let root = std::env::temp_dir().join(format!(
+            "bundle-corrupt-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let source = root.join("source");
+        let destination = root.join("destination");
+        fs::create_dir_all(&source).unwrap();
+        fs::write(source.join("zepp.db"), b"this is not sqlite").unwrap();
+        fs::write(source.join("auth.json"), b"account").unwrap();
+        migrate_bundle_data(&source, &destination).unwrap();
+        assert_eq!(
+            fs::read(destination.join("zepp.db")).unwrap(),
+            b"this is not sqlite"
+        );
+        assert_eq!(fs::read(destination.join("auth.json")).unwrap(), b"account");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn bundle_migration_recreates_symlinks_instead_of_failing() {
+        // 老版本允许 `data/backups -> /外置盘/backups` 这种链接，遇到它不能
+        // 整个启动失败；迁过去的是链接本身，目标里的东西原地不动。
+        let root = std::env::temp_dir().join(format!(
+            "bundle-link-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let source = root.join("source");
+        let destination = root.join("destination");
+        let external = root.join("external-backups");
+        fs::create_dir_all(&source).unwrap();
+        fs::create_dir_all(&external).unwrap();
+        fs::write(external.join("saved"), b"backup").unwrap();
+        std::os::unix::fs::symlink(&external, source.join("backups")).unwrap();
+        fs::write(source.join("auth.json"), b"account").unwrap();
+        migrate_bundle_data(&source, &destination).unwrap();
+        let link = destination.join("backups");
+        assert!(
+            fs::symlink_metadata(&link)
+                .unwrap()
+                .file_type()
+                .is_symlink(),
+            "迁过去的应当是链接而不是复制出来的目录"
+        );
+        assert_eq!(fs::read_link(&link).unwrap(), external);
+        assert_eq!(fs::read(link.join("saved")).unwrap(), b"backup");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn an_app_suffixed_directory_without_contents_is_not_a_bundle() {
+        // Windows 上 `D:\tools.app\release\` 这种路径会撞见一个名字以 .app
+        // 结尾的祖先目录——它不是 macOS bundle，不该触发「数据在包里」拒装。
+        let root = std::env::temp_dir().join(format!(
+            "fake-bundle-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let exe_dir = root.join("tools.app").join("release");
+        let data = exe_dir.join("data");
+        fs::create_dir_all(&data).unwrap();
+        let executable = exe_dir.join("zeppbridge.exe");
+        fs::write(&executable, b"exe").unwrap();
+        fs::write(data.join("zepp.db"), b"db").unwrap();
+        validate_update_data_location(&data, &executable)
+            .expect("没有 Contents/ 的 .app 目录不是 bundle，不该拒装");
         fs::remove_dir_all(root).unwrap();
     }
 

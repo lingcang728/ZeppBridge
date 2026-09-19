@@ -55,8 +55,40 @@ const isTauriRuntime = (): boolean => {
   return Boolean(host.__TAURI_INTERNALS__ || host.__TAURI__);
 };
 
+/* 后端就绪门。
+
+   `AppState::new`（含大库迁移前的整库快照）跑在 `app-init` 工作线程上，
+   事件循环先把窗口画出来——页面到达时后端可能还没就绪，那时发出去的命令
+   拿不到 `AppState`，会以「state not managed」一类的错直接失败。
+
+   所以所有走 `call` 的命令先等这道门：`app_is_ready` 每 150ms 轮询一次
+   （比监听 `app://ready` 简单，也没有「事件已发、监听未注册」的缝隙）。
+   60 秒兜底只防死等：超时照常放行，让真实的错误到达界面，而不是一个
+   说不清的悬挂 promise。后端起不来时主进程会走 fatal_startup 退出，
+   那时这个 promise 有没有人接已经无所谓了。 */
+let backendReady: Promise<void> | null = null;
+
+export const whenBackendReady = (): Promise<void> => {
+  if (!isTauriRuntime()) return Promise.resolve();
+  if (backendReady) return backendReady;
+  backendReady = new Promise<void>((resolve) => {
+    const probe = () => {
+      void invoke<boolean>('app_is_ready')
+        .then((ready) => {
+          if (ready) resolve();
+          else window.setTimeout(probe, 150);
+        })
+        .catch(() => window.setTimeout(probe, 500));
+    };
+    window.setTimeout(resolve, 60_000);
+    probe();
+  });
+  return backendReady;
+};
+
 const call = async <T>(command: string, args?: UnknownRecord): Promise<T> => {
   if (!isTauriRuntime()) throw new DesktopUnavailableError();
+  await whenBackendReady();
   return invoke<T>(command, args);
 };
 

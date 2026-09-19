@@ -11,6 +11,14 @@ and copy a surviving legacy bundle library there, including a consistent SQLite
 snapshot. The bundle rule also applies when the app is under a build-cache path.
 The account token remains in the selected credential store.
 
+The migration tolerates Finder leftovers (`.DS_Store`, `logs/`, `webview/`,
+interrupted staging folders) at the destination — those are moved aside, never
+deleted. It stops only when the destination holds real data of its own, because
+two accounts' libraries are never merged. Symbolic links inside the bundle are
+recreated as links rather than followed or refused, and a bundle library whose
+SQLite file will not open for an online backup is copied verbatim so the normal
+corruption-recovery path can take over.
+
 Before downloading and again before installing an in-app update, ZeppBridge
 checks the resolved executable and data locations. An unreadable path or a
 custom data directory inside the bundle, including a symlink into it, stops the
