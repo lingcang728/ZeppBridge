@@ -5924,49 +5924,6 @@ impl Database {
         Ok(statuses)
     }
 
-    #[cfg(test)]
-    #[allow(dead_code)]
-    pub fn get_recent_data(&self, limit: usize) -> Result<RecentData> {
-        Ok(RecentData {
-            metric_samples: self.get_recent_metric_samples(limit)?,
-            sleep_sessions: self.get_recent_sleep_sessions(limit)?,
-            workouts: self.get_recent_workouts(limit)?,
-        })
-    }
-
-    #[cfg(test)]
-    #[allow(dead_code)]
-    fn get_recent_metric_samples(&self, limit: usize) -> Result<Vec<MetricSample>> {
-        let limit = i64::try_from(limit).unwrap_or(i64::MAX).max(0);
-        let mut stmt = self.conn.prepare(
-            "SELECT metric, timestamp, value, unit, source_scope, device_id
-             FROM metric_samples ORDER BY timestamp DESC LIMIT ?1",
-        )?;
-        let rows = stmt.query_map([limit], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, f64>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, String>(4)?,
-                row.get::<_, Option<String>>(5)?,
-            ))
-        })?;
-        let mut samples = Vec::new();
-        for row in rows {
-            let (metric, timestamp, value, unit, scope, device_id) = row?;
-            samples.push(MetricSample {
-                metric,
-                timestamp: parse_datetime(&timestamp, "metric_samples.timestamp")?,
-                value,
-                unit,
-                source_scope: parse_scope(&scope)?,
-                device_id,
-            });
-        }
-        Ok(samples)
-    }
-
     /// Backwards-compatible status update. New sync code should use the richer
     /// method below so cursor/capability information is not discarded.
     #[allow(dead_code)]
