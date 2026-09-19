@@ -1100,9 +1100,10 @@ fn collect_daily_metrics(
     ];
     let mut count = 0;
     for (metric, names, unit) in metric_fields {
-        if let Some(value) =
-            first_number_from(object, parent, names).filter(|value| value.is_finite())
-        {
+        if let Some(value) = first_number_from(object, parent, names).filter(|value| {
+            value.is_finite()
+                && !((metric == "readiness" || metric.ends_with("_readiness")) && *value == 255.0)
+        }) {
             records.push(DailyMetric {
                 date: date.clone(),
                 metric: metric.into(),
@@ -1173,7 +1174,7 @@ fn collect_daily_metrics(
         if let Some((metric, unit)) = mapped_metric {
             if let Some(value) = first_value(object, &["value", "score", "charge"])
                 .and_then(parse_number)
-                .filter(|value| value.is_finite())
+                .filter(|value| value.is_finite() && !(metric == "readiness" && *value == 255.0))
             {
                 records.push(DailyMetric {
                     date,
@@ -3443,6 +3444,36 @@ mod tests {
 
     /// 255 是这条流的「没测到」。`afibScore` 在本机 25 348 条里条条都是 255，
     /// 而 `hrvBaseline` / `rhrBaseline` 各有 7 条是 255。
+    #[test]
+    fn readiness_sentinels_are_absent_but_valid_boundaries_and_charge_survive() {
+        for value in [0, 100, 255] {
+            let mut item = readiness_item();
+            for field in [
+                "rdnsScore",
+                "phyScore",
+                "mentScore",
+                "hrvScore",
+                "rhrScore",
+                "skinTempScore",
+                "afibScore",
+                "ahiScore",
+            ] {
+                item["value"][field] = json!(value);
+            }
+            item["value"]["hybridCharge"] = json!(78);
+            let rows = Normalizer::normalize_daily_summary(&json!({"items": [item]})).unwrap();
+            let scores: Vec<_> = rows
+                .iter()
+                .filter(|row| row.metric == "readiness" || row.metric.ends_with("_readiness"))
+                .collect();
+            assert_eq!(scores.len(), if value == 255 { 0 } else { 8 });
+            assert!(scores.iter().all(|row| row.value == value as f64));
+            assert!(rows
+                .iter()
+                .any(|row| row.metric == "hybrid_charge" && row.value == 78.0));
+        }
+    }
+
     #[test]
     fn a_baseline_of_255_is_dropped_rather_than_stored_as_a_reading() {
         let mut item = readiness_item();

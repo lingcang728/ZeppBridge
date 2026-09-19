@@ -1593,12 +1593,16 @@ mod tests {
             "heart_rate": "0,120;1,1;1,1;1,1;",
             "power_meter": "0,200;,250;,0;,300;"
         });
-        db.normalize_and_persist_raw(
-            0,
-            "workout_detail",
-            "workout_detail:1700000000:run.gps",
-            &payload,
-        )
+        db.persist_fetched_record(&crate::models::RawRecord {
+            stream: "workout_detail".into(),
+            source_key: "workout_detail:1700000000:run.gps".into(),
+            source_scope: crate::models::SourceScope::Device,
+            device_id: None,
+            start_utc: start,
+            end_utc: None,
+            payload,
+            capability: crate::models::CapabilityStatus::Verified,
+        })
         .unwrap();
         let selection = ExportSelection {
             scope: Some(ExportScope::Workout {
