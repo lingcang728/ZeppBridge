@@ -8,12 +8,10 @@ import type {
   Page,
   AppStatus,
   AiHandoffResult,
-  AuthInfo,
   CapabilityOverview,
   CapabilityProbe,
   DeviceProfile,
   DeviceProfilesResult,
-  DiagnosticReport,
   FeedbackSubmissionResult,
   ExportEstimate,
   ExportResult,
@@ -27,7 +25,6 @@ import type {
   BackupVerification,
   CoverageLedger,
   DataHealth,
-  DeviceCatalogOption,
   PendingRestore,
   RawPayloadCompaction,
   RestorePreview,
@@ -71,14 +68,6 @@ export const tauriBackend: BridgeBackend = {
     return call<AppStatus>('get_app_status');
   },
 
-  saveAuth(auth: AuthInfo) {
-    return call<AppStatus>('save_auth', {
-      appToken: auth.appToken,
-      userId: auth.userId,
-      regionHost: auth.regionHost,
-    });
-  },
-
   verifyAuth() {
     return call<AppStatus>('verify_auth');
   },
@@ -105,10 +94,6 @@ export const tauriBackend: BridgeBackend = {
 
   getLoginStatus() {
     return call<LoginStatus>('get_login_status');
-  },
-
-  startInitialSync(days?: number) {
-    return call<SyncReport>('start_initial_sync', days === undefined ? undefined : { days });
   },
 
   startHistorySync(days: number) {
@@ -142,10 +127,6 @@ export const tauriBackend: BridgeBackend = {
   /** 全天压力曲线。默认 24 小时，和心率那条同一个口径。 */
   getStressSeries(hours = 24) {
     return call<StressPoint[]>('get_stress_series', { hours });
-  },
-
-  getTrainingLoadSeries(days = 7) {
-    return call('get_training_load_series', { days });
   },
 
   /** 按天的原始心率极值 + 样本数。见 `DailyHeartRateExtreme` 的说明。 */
@@ -235,9 +216,6 @@ export const tauriBackend: BridgeBackend = {
   setWorkoutCodeLabel(zeppType: number, label: string | null) {
     return call<WorkoutCodeLabel[]>('set_workout_code_label', { zeppType, label });
   },
-  getDeviceCatalogOptions() {
-    return call<DeviceCatalogOption[]>('get_device_catalog_options');
-  },
   setDeviceModelOverride(deviceKey: string, catalogId: string | null) {
     return call<void>('set_device_model_override', { deviceKey, catalogId });
   },
@@ -267,10 +245,6 @@ export const tauriBackend: BridgeBackend = {
 
   reprocessLocalData() {
     return call<ReprocessResult>('reprocess_local_data');
-  },
-
-  getDiagnosticReport() {
-    return call<DiagnosticReport>('get_diagnostic_report');
   },
 
   getWorkoutInsight(workoutId: string) {

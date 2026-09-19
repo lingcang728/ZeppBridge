@@ -609,14 +609,6 @@ export interface SportOption {
   label: string;
 }
 
-/** 随包设备目录里的一个型号，供用户指认自己的设备。 */
-export interface DeviceCatalogOption {
-  catalogId: string;
-  canonicalName: string;
-  nameZh?: string | null;
-  kind: string;
-}
-
 /** 一个还没有名字的 Zepp 运动编号，以及它影响到的记录数。 */
 export interface WorkoutCodeLabel {
   zeppType: number;
