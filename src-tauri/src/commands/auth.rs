@@ -15,7 +15,6 @@ use std::path::PathBuf;
 /// never includes it in a status value or an error message.  Building the
 /// synchronizer opens a separate database connection, so the command-side
 /// database lock is not held while doing setup.
-#[tauri::command]
 pub async fn save_auth(
     state: tauri::State<'_, AppState>,
     app_token: String,

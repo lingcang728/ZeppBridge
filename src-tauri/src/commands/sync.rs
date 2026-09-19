@@ -21,7 +21,6 @@ use super::with_write;
 /// A report with failed streams remains a successful IPC response so the UI
 /// can render each stream's actual state; only an underlying
 /// transport/database error is returned as `Err`.
-#[tauri::command]
 pub async fn start_initial_sync(
     app: AppHandle,
     state: tauri::State<'_, AppState>,

@@ -36,9 +36,6 @@ const document = catalogJson as DeviceCatalogDocument;
 
 /** Versioned snapshot of the official catalog. No runtime network lookup is performed. */
 export const deviceCatalog: readonly DeviceCatalogEntry[] = document.devices;
-export const deviceCatalogVersion = document.version;
-export const deviceCatalogCheckedAt = document.checked_at;
-export const deviceCatalogSources: readonly string[] = document.sources;
 
 /**
  * Assets are discovered at build time. Adding a catalog row only requires an

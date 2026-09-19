@@ -538,19 +538,8 @@ pub struct StorageEstimate {
     pub needed_bytes: u64,
 }
 
-/// 同步状态
-#[allow(dead_code)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SyncState {
-    pub stream: String,
-    pub last_sync: Option<DateTime<Utc>>,
-    pub status: String,
-    pub error: Option<String>,
-}
-
-/// The storage representation of a sync stream.  `SyncState` above remains the
-/// small backwards-compatible view used by the original commands; this richer
-/// type carries the cursor/capability bookkeeping needed by the real pipeline.
+/// The storage representation of a sync stream, carrying the cursor/capability
+/// bookkeeping needed by the real pipeline.
 #[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SyncStateInfo {
@@ -607,14 +596,6 @@ pub struct DataStatus {
     pub capability: String,
     pub needs_reauth: bool,
     pub message: Option<String>,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RecentData {
-    pub metric_samples: Vec<MetricSample>,
-    pub sleep_sessions: Vec<SleepSession>,
-    pub workouts: Vec<Workout>,
 }
 
 /// 健康数据概览
@@ -1131,16 +1112,6 @@ pub struct DeviceCacheMetadata {
 pub struct DeviceProfilesResult {
     pub profiles: Vec<DeviceProfile>,
     pub cache: DeviceCacheMetadata,
-}
-
-/// 供界面渲染「这是我的哪台设备」下拉框的一个选项。
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct DeviceCatalogOption {
-    pub catalog_id: String,
-    pub canonical_name: String,
-    pub name_zh: Option<String>,
-    pub kind: String,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

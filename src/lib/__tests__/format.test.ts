@@ -3,7 +3,6 @@ import {
   formatDistance,
   formatDuration,
   formatMetric,
-  formatPace,
   isFiniteNumber,
   localDateString,
 } from '../format';
@@ -60,21 +59,6 @@ describe('单位换算', () => {
     expect(formatDuration(125)).toBe('2 小时 5 分');
   });
 
-  it('配速是每个显示单位的分秒，秒数补零', () => {
-    // 10 km / 50 分钟 = 5:00 /km
-    expect(formatPace(10_000, 50)).toBe('5:00 /km');
-    // 秒数个位必须补零，不能出现 5:5 /km
-    expect(formatPace(10_000, 50.083)).toBe('5:00 /km');
-    expect(formatPace(1000, 5.1)).toBe('5:06 /km');
-  });
-
-  it('距离或时长缺失时不给配速', () => {
-    // 除以 0 会得到 Infinity，那会渲染成一个荒唐但看起来正常的数字。
-    expect(formatPace(0, 30)).toBeNull();
-    expect(formatPace(5000, 0)).toBeNull();
-    expect(formatPace(undefined, 30)).toBeNull();
-    expect(formatPace(5000, null)).toBeNull();
-  });
 });
 
 describe('本地日期字符串', () => {

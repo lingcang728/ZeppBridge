@@ -249,13 +249,6 @@ pub fn metric_names() -> Vec<&'static str> {
     METRICS.iter().map(|item| item.metric).collect()
 }
 
-pub fn unit_for(metric: &str) -> Option<&'static str> {
-    METRICS
-        .iter()
-        .find(|item| item.metric == metric)
-        .map(|item| item.unit)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

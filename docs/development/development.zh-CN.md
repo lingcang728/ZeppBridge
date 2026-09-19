@@ -112,7 +112,7 @@ Tauri command 在 `src-tauri/src/lib.rs` 注册，前端封装在 `src/lib/bridg
 | `clear_auth` | 作废登录会话并清除认证 | 保留健康数据库 |
 | `import_from_har` | 从用户自己导出的 HAR 里抽取凭据 | 必须含 `api-mifit*` 请求且带 `apptoken`；随后走 `save_auth` 同一条保存路径 |
 | `manual_auth` | 手动输入 token / user id / region host | 只是 `save_auth` 的包装，边界完全相同 |
-| `start_initial_sync` / `start_history_sync` | 按用户选择的 1–365 天补拉 | 默认 30 天；有进度事件和取消 |
+| `start_history_sync` | 按用户选择的 1–365 天补拉 | 默认 30 天；有进度事件和取消 |
 | `start_incremental_sync` | 7 天 overlap 增量 | 仅已验证连接可用；顶栏/自动同步/托盘触发 |
 | `cancel_sync` | 取消进行中的同步 | 原子标记，下一窗口停止 |
 | `set_user_prefs` | 保存保留天数和历史补拉天数 | 1–365 |
@@ -121,7 +121,7 @@ Tauri command 在 `src-tauri/src/lib.rs` 注册，前端封装在 `src/lib/bridg
 | `get_recent_sleep` / `get_recent_workouts` | 读取最近记录 | limit 在后端限制为 `1–500` |
 | `get_sleep_detail` / `get_workout_detail` | 按稳定 ID 读取单条详情 | 找不到返回 `null`；不生成估算字段 |
 | `get_workout_series` | 读取已解码的跑步 samples/route/pauses | 没有点则空数组，不编造 |
-| `get_heart_rate_series` / `get_training_load_series` | 概览折线用的时序点 | 按小时 / 天读本地库；没有样本就是空数组 |
+| `get_heart_rate_series` | 概览折线用的时序点 | 按小时 / 天读本地库；没有样本就是空数组 |
 | `get_metric_series` | `/body` 与 `/training` 的按天曲线 | 只应答 `SERIES_METRICS` 白名单里的指标名，别的直接跳过；返回 `days_with_data`，缺的天不补 0 |
 | `get_training_balance` | 7 天 / 28 天负荷与急慢比 | 与导出 `training_load_balance` 同一个函数；chronic 窗口不足 21 天时 ratio 为 `null` |
 | `get_heart_rate_zones` | 心率区间选择器的全部状态 | 基准全部实测并带出处与测量日期；未选算法时 `report` 为 `null` |

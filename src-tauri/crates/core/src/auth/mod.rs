@@ -636,17 +636,6 @@ impl AuthManager {
         }))
     }
 
-    /// Look up a previously stored token by user id.  The token is never
-    /// logged and the caller must not send it to the frontend.
-    #[allow(dead_code)]
-    pub fn token_for_user(&self, user_id: &str) -> Result<Option<String>> {
-        let user_id = validate_user_id(user_id)?;
-        match self.credentials.get(&user_id).map_err(credential_error)? {
-            Some(value) => Ok(Some(validate_token(&value)?)),
-            None => Ok(None),
-        }
-    }
-
     /// Returns status without exposing the token.  The optional masked value
     /// is deliberately short and suitable for a settings screen.
     pub fn status(&self) -> Result<AuthStatus> {
@@ -863,19 +852,6 @@ fn macos_credential_backend(
         Ok(true) => Arc::new(FileCredentialBackend::new(data_dir)),
         Ok(false) => Arc::new(MacOsCredentialBackend),
         Err(value) => Arc::new(InvalidCredentialStoreBackend { value }),
-    }
-}
-
-/// 兼容旧签名。数据目录自己解析一次。
-///
-/// 保留它是因为它是公开 API；新代码请用 [`default_credential_backend_in`]，
-/// 那条路上数据目录已经是调用方手里的东西，不必再解析一遍。
-pub fn default_credential_backend() -> Arc<dyn CredentialBackend> {
-    match crate::paths::resolve_data_dir() {
-        Ok(dir) => default_credential_backend_in(&dir),
-        // 解析不出数据目录时，文件存储无处可放，但密钥环那条路和数据目录
-        // 无关，仍然能用。给一个空路径而不是直接失败。
-        Err(_) => default_credential_backend_in(Path::new("")),
     }
 }
 
@@ -1262,11 +1238,6 @@ mod tests {
         assert_eq!(loaded.app_token, "secret-token");
         assert_eq!(loaded.region_host, "https://api-mifit.zepp.com");
         assert_eq!(manager.masked_token().unwrap().as_deref(), Some("se…en"));
-        assert_eq!(
-            manager.token_for_user("user-1").unwrap().as_deref(),
-            Some("secret-token")
-        );
-        assert_eq!(manager.token_for_user("other-user").unwrap(), None);
 
         manager.clear_auth().unwrap();
         assert!(!dir.join("auth.json").exists());

@@ -8,15 +8,14 @@ use crate::insight::{WeeklyReport, WorkoutInsight};
 use crate::ipc_error::AppError;
 use crate::ipc_types::CleanupResult;
 use crate::models::{
-    AiHandoffMetadata, AiHandoffResult, CapabilityOverview, DailyHeartRateExtreme, DailyPoint,
-    DeviceCacheMetadata, DeviceCatalogOption, DeviceMatchStatus, DeviceProfile,
-    DeviceProfilesResult, DiagnosticAssignedModel, DiagnosticDeviceCandidate,
-    DiagnosticDeviceEvidence, DiagnosticField, DiagnosticObjectShape, DiagnosticReport,
-    ExportDetail, ExportEstimate, ExportResult, ExportScope, ExportSelection,
-    FeedbackSubmissionResult, HealthOverview, HeartRatePoint, HeartRateZoneOptions,
-    HeartRateZonePreference, MetricSeries, RawPayloadCompaction, SleepSession, StorageEstimate,
-    StressPoint, TrainingBalancePoint, UserPrefs, Workout, WorkoutSeries,
-    DIAGNOSTIC_NOTE_MAX_CHARS,
+    AiHandoffMetadata, AiHandoffResult, CapabilityOverview, DailyHeartRateExtreme,
+    DeviceCacheMetadata, DeviceMatchStatus, DeviceProfile, DeviceProfilesResult,
+    DiagnosticAssignedModel, DiagnosticDeviceCandidate, DiagnosticDeviceEvidence, DiagnosticField,
+    DiagnosticObjectShape, DiagnosticReport, ExportDetail, ExportEstimate, ExportResult,
+    ExportScope, ExportSelection, FeedbackSubmissionResult, HealthOverview, HeartRatePoint,
+    HeartRateZoneOptions, HeartRateZonePreference, MetricSeries, RawPayloadCompaction,
+    SleepSession, StorageEstimate, StressPoint, TrainingBalancePoint, UserPrefs, Workout,
+    WorkoutSeries, DIAGNOSTIC_NOTE_MAX_CHARS,
 };
 use crate::storage::corrections::WorkoutCodeLabel;
 use crate::storage::provenance::{DataHealth, IntegrityCheckResult};
@@ -190,15 +189,6 @@ pub async fn get_stress_series(
 ) -> std::result::Result<Vec<StressPoint>, AppError> {
     let db = state.db.lock().await;
     db.stress_series(hours).map_err(AppError::from)
-}
-
-#[tauri::command]
-pub async fn get_training_load_series(
-    state: tauri::State<'_, AppState>,
-    days: i64,
-) -> std::result::Result<Vec<DailyPoint>, AppError> {
-    let db = state.db.lock().await;
-    db.training_load_series(days).map_err(AppError::from)
 }
 
 /// Daily series for the body and training screens.
@@ -477,23 +467,6 @@ pub async fn set_workout_code_label(
     .await
 }
 
-/// 随包设备目录里可供用户指认的型号。
-#[tauri::command]
-pub fn get_device_catalog_options() -> Vec<DeviceCatalogOption> {
-    let mut options = zeppbridge_core::device_catalog::catalog_entries()
-        .iter()
-        .filter(|entry| entry.supported && entry.status == "active")
-        .map(|entry| DeviceCatalogOption {
-            catalog_id: entry.catalog_id.clone(),
-            canonical_name: entry.canonical_name.clone(),
-            name_zh: entry.name_zh.clone(),
-            kind: entry.kind.clone(),
-        })
-        .collect::<Vec<_>>();
-    options.sort_by(|a, b| a.canonical_name.cmp(&b.canonical_name));
-    options
-}
-
 /// 用户指认某台设备的型号（传 `null` 撤销）。
 ///
 /// 这不是识别结果，是用户纠正：`match_status` 会是 `user_assigned`，界面必须
@@ -522,15 +495,6 @@ pub async fn set_workout_type_override(
     })
     .await?;
     workout.ok_or_else(|| AppError::new("err.workout.not_found", "运动记录不存在"))
-}
-
-/// Build an allowlist-only report. The cloud response is examined
-/// in memory and is never copied into the result or persisted as a diagnostic.
-#[tauri::command]
-pub async fn get_diagnostic_report(
-    state: tauri::State<'_, AppState>,
-) -> std::result::Result<DiagnosticReport, AppError> {
-    build_diagnostic_report(&state, false, None).await
 }
 
 /// 组装诊断报告。
