@@ -1,6 +1,23 @@
 use crate::ipc_error::AppError;
 use tauri::AppHandle;
 
+/// Fail before the updater replaces an app bundle containing a custom library.
+#[tauri::command]
+pub(crate) fn validate_update_data_location(
+    state: tauri::State<'_, crate::app_state::AppState>,
+) -> Result<(), AppError> {
+    zeppbridge_core::paths::validate_update_data_location(
+        &state.data_dir,
+        &std::env::current_exe()?,
+    )
+    .map_err(|_| {
+        AppError::new(
+            "err.update.unsafe_data_location",
+            "无法确认数据目录可安全保留，已停止安装更新",
+        )
+    })
+}
+
 #[cfg(any(windows, test))]
 use std::path::{Path, PathBuf};
 

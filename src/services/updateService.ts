@@ -154,13 +154,14 @@ export async function downloadAndInstallDesktopUpdate(): Promise<void> {
     updateState.error = messagesOf(updateMessages).nothingToInstall;
     return;
   }
+  updateState.status = 'downloading';
   try {
     const { invoke } = await import('@tauri-apps/api/core');
     const portable = await invoke<boolean>('is_portable_update');
-    updateState.status = 'downloading';
     updateState.error = '';
     updateState.downloadedBytes = 0;
-    await pendingUpdate.downloadAndInstall((event) => {
+    await invoke('validate_update_data_location');
+    await pendingUpdate.download((event) => {
       if (event.event === 'Started') {
         updateState.totalBytes = event.data.contentLength ?? updateState.sizeBytes;
       } else if (event.event === 'Progress') {
@@ -170,6 +171,8 @@ export async function downloadAndInstallDesktopUpdate(): Promise<void> {
       }
     });
     updateState.status = 'installing';
+    await invoke('validate_update_data_location');
+    await pendingUpdate.install();
     if (portable) {
       await invoke('launch_migrated_install');
     } else {

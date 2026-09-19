@@ -70,7 +70,7 @@ pub fn resolve_data_dir() -> io::Result<PathBuf> {
     // macOS：`/Applications` 对 admin 组可写，所以「写得进去」不代表该写。
     // `.app` 包在更新或重装时会被整体替换，数据放在里面就会跟着消失。
     #[cfg(target_os = "macos")]
-    if !is_build_artifact_dir(exe_dir) && is_inside_app_bundle(exe_dir) {
+    if is_inside_app_bundle(exe_dir) {
         let base = user_data_dir()?;
         migrate_bundle_data(&exe_dir.join("data"), &base)?;
         ensure_writable_dir(&base)?;
@@ -237,14 +237,32 @@ fn user_data_dir() -> io::Result<PathBuf> {
 }
 
 /// 可执行文件是不是在某个 `*.app/Contents/MacOS` 里。
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", test))]
 fn is_inside_app_bundle(dir: &Path) -> bool {
     dir.ends_with("Contents/MacOS")
         && dir
             .parent()
             .and_then(Path::parent)
             .and_then(Path::extension)
-            .is_some_and(|ext| ext == "app")
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("app"))
+}
+
+/// A custom data directory (including a symlink into the bundle) must never
+/// be removed by the updater. Resolve both paths before testing containment.
+pub fn validate_update_data_location(data_dir: &Path, executable: &Path) -> io::Result<()> {
+    let executable = executable.canonicalize()?;
+    let data_dir = data_dir.canonicalize()?;
+    if let Some(bundle) = executable.ancestors().find(|ancestor| {
+        ancestor
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("app"))
+    }) {
+        if data_dir.starts_with(bundle) {
+            return Err(io::Error::new(io::ErrorKind::InvalidInput,
+                "User data is inside the app bundle. Quit ZeppBridge, copy the data folder to Application Support, and point ZEPPBRIDGE_DATA_DIR there before updating."));
+        }
+    }
+    Ok(())
 }
 
 /// 这个目录是不是「操作系统或包管理器拥有的共享前缀」。
@@ -595,6 +613,85 @@ mod tests {
 
     use super::*;
     use std::fs;
+
+    #[test]
+    fn app_bundle_takes_priority_even_under_a_build_cache() {
+        let path = Path::new("/tmp/target/release/bundle/ZeppBridge.app/Contents/MacOS");
+        assert!(is_build_artifact_dir(path));
+        assert!(is_inside_app_bundle(path));
+        assert!(is_inside_app_bundle(Path::new(
+            "/Applications/ZeppBridge.APP/Contents/MacOS"
+        )));
+        assert!(!is_inside_app_bundle(Path::new(
+            "/Applications/Contents/MacOS"
+        )));
+    }
+
+    #[test]
+    fn replacing_the_bundle_preserves_migrated_account_devices_and_library() {
+        let root = std::env::temp_dir().join(format!(
+            "bundle-update-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let bundle = root.join("ZeppBridge.app");
+        let source = bundle.join("Contents/MacOS/data");
+        let executable = bundle.join("Contents/MacOS/zeppbridge");
+        let destination = root.join("Application Support/data");
+        fs::create_dir_all(&source).unwrap();
+        fs::write(&executable, b"old executable").unwrap();
+        let db = rusqlite::Connection::open(source.join("zepp.db")).unwrap();
+        db.execute_batch("CREATE TABLE sample(value); INSERT INTO sample VALUES (42);")
+            .unwrap();
+        drop(db);
+        fs::write(source.join("auth.json"), b"account metadata").unwrap();
+        fs::write(source.join("auth.user-id"), b"test-account").unwrap();
+        fs::write(source.join("devices.json"), b"paired devices").unwrap();
+        assert!(validate_update_data_location(&source, &executable).is_err());
+        migrate_bundle_data(&source, &destination).unwrap();
+        validate_update_data_location(&destination, &executable).unwrap();
+        fs::remove_dir_all(&bundle).unwrap();
+        fs::create_dir_all(executable.parent().unwrap()).unwrap();
+        fs::write(&executable, b"new executable").unwrap();
+        migrate_bundle_data(&source, &destination).unwrap();
+        validate_update_data_location(&destination, &executable).unwrap();
+        for (name, expected) in [
+            ("auth.json", "account metadata"),
+            ("auth.user-id", "test-account"),
+            ("devices.json", "paired devices"),
+        ] {
+            assert_eq!(
+                fs::read_to_string(destination.join(name)).unwrap(),
+                expected
+            );
+        }
+        let db = rusqlite::Connection::open(destination.join("zepp.db")).unwrap();
+        assert_eq!(
+            db.query_row("SELECT value FROM sample", [], |row| row.get::<_, i64>(0))
+                .unwrap(),
+            42
+        );
+        drop(db);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn updater_rejects_a_data_symlink_into_the_bundle() {
+        let root =
+            std::env::temp_dir().join(format!("bundle-update-symlink-{}", std::process::id()));
+        let executable = root.join("ZeppBridge.app/Contents/MacOS/zeppbridge");
+        let data = executable.parent().unwrap().join("data");
+        fs::create_dir_all(&data).unwrap();
+        fs::write(&executable, b"exe").unwrap();
+        let alias = root.join("external-data");
+        std::os::unix::fs::symlink(&data, &alias).unwrap();
+        assert!(validate_update_data_location(&alias, &executable).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn bundle_migration_copies_live_wal_and_preserves_existing_library() {
