@@ -130,7 +130,6 @@ export const workoutLabel = (value: string): string => {
   return catalogLabels[locale.value].get(normalized) || fallback[normalized] || value || t.workout;
 };
 
-export const sourceLabel = (scope?: string): string => dataScopeLabel(scope);
 
 /** 数据提供方。ZeppBridge 只从 Zepp 云端拉取，不用范围冒充来源。 */
 export const dataProviderLabel = (): string => copy().providerZeppCloud;

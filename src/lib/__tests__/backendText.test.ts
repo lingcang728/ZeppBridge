@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { setLocale } from '../../i18n';
-import { backendText, containsChinese } from '../../i18n/backendText';
+import { backendText } from '../../i18n/backendText';
 import { toUserMessage } from '../bridge/errors';
 
 /*
@@ -50,11 +50,5 @@ describe('backend prose never leaks into the English interface', () => {
   it('still prefers a real code when there is one', () => {
     const shown = toUserMessage({ code: 'err.sync.not_connected', message: '尚未连接 Zepp' });
     expect(shown).toBe('Not connected to Zepp yet. Connect first');
-  });
-
-  it('containsChinese is honest about both cases', () => {
-    expect(containsChinese('已损坏')).toBe(true);
-    expect(containsChinese('damaged')).toBe(false);
-    expect(containsChinese(null)).toBe(false);
   });
 });

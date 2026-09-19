@@ -1,4 +1,4 @@
-import { defineMessages, messagesOf } from '../i18n';
+import { defineMessages } from '../i18n';
 
 /*
  * 设置页的文案。
@@ -1218,5 +1218,3 @@ Si necesitas algo de mí (qué cliente uso, dónde está el archivo), pregúntam
     },
   },
 );
-
-export const settingsCopy = () => messagesOf(settingsMessages);
