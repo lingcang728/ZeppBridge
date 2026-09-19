@@ -892,6 +892,36 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(29, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // v30: normalization is an attempt/result, not ownership of a canonical row.
+        if version < 30 {
+            // Repair retained canonical history even if its raw payload expired.
+            self.conn.execute(
+                "DELETE FROM daily_metrics WHERE value = 255 AND metric IN (
+                    'readiness', 'physical_readiness', 'mental_readiness',
+                    'hrv_readiness', 'rhr_readiness', 'skin_temp_readiness',
+                    'afib_readiness', 'ahi_readiness')",
+                [],
+            )?;
+        }
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS raw_normalization (
+                raw_record_id INTEGER PRIMARY KEY,
+                revision TEXT NOT NULL,
+                records_written INTEGER NOT NULL,
+                FOREIGN KEY(raw_record_id) REFERENCES raw_records(id) ON DELETE CASCADE
+             );
+             CREATE TRIGGER IF NOT EXISTS invalidate_raw_normalization
+             AFTER UPDATE OF payload_hash ON raw_records
+             BEGIN
+                DELETE FROM raw_normalization WHERE raw_record_id = NEW.id;
+                DELETE FROM raw_quarantine WHERE raw_record_id = NEW.id;
+             END;
+             PRAGMA user_version = 30;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(30, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }

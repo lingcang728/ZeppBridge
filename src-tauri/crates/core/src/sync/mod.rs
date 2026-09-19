@@ -309,7 +309,7 @@ impl SyncManager {
         match self.fetcher.fetch_heart_rate_records(window).await {
             Ok(records) => streams.push(self.persist_records("heart_rate", records).await?),
             Err(error) if error.is_cancelled() => return Err(error),
-            Err(error) => streams.push(self.failure_report("heart_rate", &error).await?),
+            Err(error) => streams.push(self.heart_rate_fetch_error(&error).await?),
         }
         emit("daily_summary", 2, 8, "正在同步每日概览");
         check()?;
@@ -854,6 +854,16 @@ impl SyncManager {
         Ok(report)
     }
 
+    async fn heart_rate_fetch_error(&self, error: &ZeppBridgeError) -> Result<StreamReport> {
+        // The independent HR endpoint can be absent while wellness supplies HR.
+        // Keep that absence visible, but never turn network/auth failures neutral.
+        if error.is_unavailable() {
+            self.unavailable_report("heart_rate", error).await
+        } else {
+            self.failure_report("heart_rate", error).await
+        }
+    }
+
     async fn unavailable_report(
         &self,
         stream: &str,
@@ -1086,6 +1096,15 @@ mod tests {
         };
         let report = manager.failure_report("heart_rate", &error).await.unwrap();
         assert_eq!(report.records_written, 500);
+        let report = manager.heart_rate_fetch_error(&error).await.unwrap();
+        assert_eq!(report.status, StreamStatus::Failed);
+        let report = manager
+            .heart_rate_fetch_error(&ZeppBridgeError::DataUnavailable("响应 items 为空".into()))
+            .await
+            .unwrap();
+        assert_eq!(report.status, StreamStatus::Unavailable);
+        assert_eq!(report.records_written, 500);
+        assert!(!report.needs_reauth);
         let unavailable = manager
             .unavailable_report("heart_rate", &error)
             .await

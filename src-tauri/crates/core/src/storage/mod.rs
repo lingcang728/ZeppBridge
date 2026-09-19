@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 
 /// 当前 SQLite schema 版本（`PRAGMA user_version`）。加新版本只能追加迁移
 /// 步骤，不要改已有 DDL。
-pub const CURRENT_SCHEMA_VERSION: i64 = 29;
+pub const CURRENT_SCHEMA_VERSION: i64 = 30;
 /// 写进备份 manifest 的应用版本。Core 是独立 crate，用它自己的包版本。
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -41,18 +41,16 @@ pub const EXPORT_DATA_TYPES: [&str; 18] = [
 
 /// 解析器修订号。**改了运动目录或任何归一化规则，就必须往前走一格。**
 ///
-/// 它是自动重放的唯一触发条件：启动时发现库里存的修订号和这个不一样，就把
+/// 启动时发现库里存的修订号和这个不一样，就把
 /// `raw_records` 重新跑一遍。不动它，新加的编号只对以后同步来的记录生效，
 /// 已经存成 `unknown:211` 的那 199 条记录会永远挂着——而报这个问题的人恰恰
 /// 是因为历史记录才来报的。
-pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v27-sleep-available";
-/// 较早公开版本的修订号。从它升上来时仍需重放这几条流。
+pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v28-readiness-provenance";
+/// 较早公开版本的修订号，用于验证跨版本升级。
 ///
 /// v21 还没有 v22 的圈解析和 v23 的 Rucking 映射；跳版本升级时要一并补齐。
+#[cfg(test)]
 const PREVIOUS_RELEASE_NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v21-elliptical";
-/// 从上一版升上来时要重放的流。**改归一化规则时必须一起看这里**：漏掉一条
-/// 流，那条流的历史记录就永远停在旧规则上，而升级看起来是成功的。
-const PREVIOUS_RELEASE_REPLAY_STREAMS: [&str; 2] = ["workout_detail", "workouts"];
 const LAST_CLOUD_SYNC_AT_KEY: &str = "last_cloud_sync_at";
 const LAST_CLOUD_SYNC_OUTCOME_KEY: &str = "last_cloud_sync_outcome";
 const LAST_LOCAL_REPROCESS_AT_KEY: &str = "last_local_reprocess_at";
@@ -2162,6 +2160,21 @@ impl Database {
             }
             other => return Err(ZeppBridgeError::ConfigError(format!("未知同步流: {other}"))),
         }
+        // Keep the processing result even when another raw payload later
+        // replaces all canonical rows through their natural-key upserts.
+        self.conn.execute(
+            "INSERT INTO raw_normalization(raw_record_id, revision, records_written)
+             VALUES (?1, ?2, ?3)
+             ON CONFLICT(raw_record_id) DO UPDATE SET
+                revision = excluded.revision, records_written = excluded.records_written",
+            params![
+                raw_record_id,
+                NORMALIZER_REVISION,
+                counts.primary_records
+                    + counts.band_heart_rate_records
+                    + counts.supplemental_daily_records
+            ],
+        )?;
         Ok(counts)
     }
 
@@ -2267,22 +2280,21 @@ impl Database {
     pub fn pending_replay_plan(&self) -> Result<Option<ReplayPlan>> {
         let stored = self.stored_normalizer_revision()?;
         if stored.as_deref() == Some(NORMALIZER_REVISION) {
-            return Ok(None);
+            let pending: i64 = self.conn.query_row(
+                "SELECT COUNT(*) FROM raw_records r
+                 WHERE NOT EXISTS (SELECT 1 FROM raw_normalization n
+                                   WHERE n.raw_record_id = r.id AND n.revision = ?1)
+                   AND NOT EXISTS (SELECT 1 FROM raw_quarantine q
+                                   WHERE q.raw_record_id = r.id AND q.revision = ?1)",
+                [NORMALIZER_REVISION],
+                |row| row.get(0),
+            )?;
+            if pending == 0 {
+                return Ok(None);
+            }
         }
-        // v23 already decoded laps; only the cloud workout catalog changed in v24.
-        // 从公开 v21 升级时仍需补齐 workout_detail 和 workouts。
-        // 其他修订号（包括未发布的 v22）仍走整库重放，避免跳过中间版本带来的归一化变化。
-        let streams: Vec<String> =
-            if stored.as_deref() == Some("zepp-normalizer-2026-09-v23-rucking") {
-                vec!["workouts".to_string()]
-            } else if stored.as_deref() == Some(PREVIOUS_RELEASE_NORMALIZER_REVISION) {
-                PREVIOUS_RELEASE_REPLAY_STREAMS
-                    .iter()
-                    .map(|stream| (*stream).to_string())
-                    .collect()
-            } else {
-                Vec::new()
-            };
+        // v28 needs all streams: readiness repair and per-raw attempt history.
+        let streams: Vec<String> = Vec::new();
         let raw_records = self.count_raw_records_for_streams(&streams)?;
         Ok(Some(ReplayPlan {
             stored_revision: stored,
@@ -7586,17 +7598,14 @@ mod tests {
             .unwrap();
 
         let plan = db.pending_replay_plan().unwrap().unwrap();
-        assert_eq!(
-            plan.streams,
-            vec!["workout_detail".to_string(), "workouts".to_string()]
-        );
-        assert_eq!(plan.raw_records, 2, "无关流不应进入选择性重放计划");
+        assert!(plan.streams.is_empty());
+        assert_eq!(plan.raw_records, 3, "all streams need attempt provenance");
 
         let counts = db.reprocess_raw_records_if_needed().unwrap().unwrap();
 
         assert!(counts.contains_key("workouts"), "counts = {counts:?}");
         assert!(counts.contains_key("workout_detail"), "counts = {counts:?}");
-        assert!(!counts.contains_key("daily_summary"), "{counts:?}");
+        assert!(counts.contains_key("daily_summary"), "{counts:?}");
         assert_eq!(
             db.conn
                 .query_row("SELECT COUNT(*) FROM workout_laps", [], |row| row
@@ -7700,9 +7709,8 @@ mod tests {
             Some(PREVIOUS_RELEASE_NORMALIZER_REVISION)
         );
         assert_eq!(plan.target_revision, NORMALIZER_REVISION);
-        assert_eq!(plan.streams, PREVIOUS_RELEASE_REPLAY_STREAMS.to_vec());
-        // 只数要重放的那几条流，不是整库。计划里那个数字会直接显示给用户，
-        // 它得是这次真的要过的报文条数。
+        assert!(plan.streams.is_empty());
+        // 全库重放计划必须包含夹具里的两条原始报文。
         assert_eq!(plan.raw_records, 2);
 
         db.reprocess_raw_records_if_needed().unwrap().unwrap();
@@ -8093,7 +8101,7 @@ mod tests {
     }
 
     #[test]
-    fn issue_24_v23_replay_repairs_code_7_without_losing_corrections() {
+    fn issue_24_upgrade_from_v23_repairs_code_7_without_losing_corrections() {
         let db = Database::in_memory().unwrap();
         db.insert_workout(&workout_with_type(
             Some(7),
@@ -8122,10 +8130,12 @@ mod tests {
             "INSERT INTO app_meta(key, value, updated_at) VALUES('normalizer_revision', ?1, ?2)",
             params!["zepp-normalizer-2026-09-v23-rucking", ts().to_rfc3339()],
         ).unwrap();
-        assert_eq!(
-            db.pending_replay_plan().unwrap().unwrap().streams,
-            vec!["workouts"]
-        );
+        assert!(db
+            .pending_replay_plan()
+            .unwrap()
+            .unwrap()
+            .streams
+            .is_empty());
         db.reprocess_raw_records_if_needed().unwrap().unwrap();
         let stored = db.get_workout_detail("same-workout").unwrap().unwrap();
         assert_eq!(stored.normalized_type, "trail_running");
@@ -9582,6 +9592,67 @@ mod tests {
     }
 
     #[test]
+    fn readiness_migration_removes_sentinels_without_raw_and_replay_keeps_them_absent() {
+        let db = Database::in_memory().unwrap();
+        let raw = RawRecord {
+            stream: "daily_summary".into(),
+            source_key: "readiness".into(),
+            source_scope: SourceScope::Unknown,
+            device_id: None,
+            start_utc: ts(),
+            end_utc: None,
+            payload: serde_json::json!({"data": [{"date": "2026-09-14",
+                "phyScore": 255, "mentScore": 255, "afibScore": 255, "rdnsScore": 80}]}),
+            capability: CapabilityStatus::Verified,
+        };
+        db.insert_raw_record(&raw).unwrap();
+        for (metric, value) in [
+            ("physical_readiness", 255.0),
+            ("mental_readiness", 255.0),
+            ("afib_readiness", 255.0),
+            ("readiness", 80.0),
+            ("steps", 255.0),
+        ] {
+            db.insert_daily_metric(&DailyMetric {
+                date: "2026-09-14".into(),
+                metric: metric.into(),
+                value,
+                unit: "score".into(),
+                source_scope: SourceScope::Unknown,
+                device_id: None,
+            })
+            .unwrap();
+        }
+        db.conn.execute_batch("PRAGMA user_version = 29").unwrap();
+        db.migrate().unwrap();
+        let count = |sql: &str| {
+            db.conn
+                .query_row(sql, [], |row| row.get::<_, i64>(0))
+                .unwrap()
+        };
+        assert_eq!(
+            count("SELECT COUNT(*) FROM daily_metrics WHERE value = 255"),
+            1
+        );
+        db.set_app_meta(
+            "normalizer_revision",
+            "zepp-normalizer-2026-09-v27-sleep-available",
+        )
+        .unwrap();
+        db.reprocess_raw_records_if_needed().unwrap().unwrap();
+        assert_eq!(
+            count(
+                "SELECT COUNT(*) FROM daily_metrics WHERE metric LIKE '%readiness' AND value = 255"
+            ),
+            0
+        );
+        assert_eq!(
+            count("SELECT COUNT(*) FROM daily_metrics WHERE metric = 'readiness' AND value = 80"),
+            1
+        );
+    }
+
+    #[test]
     fn missing_sleep_stages_are_stored_as_unavailable_and_query_returns_none() {
         let db = Database::in_memory().unwrap();
         let version: i64 = db
@@ -9589,7 +9660,7 @@ mod tests {
             .query_row("PRAGMA user_version", [], |row| row.get(0))
             .unwrap();
         assert_eq!(version, CURRENT_SCHEMA_VERSION);
-        assert_eq!(CURRENT_SCHEMA_VERSION, 29);
+        assert_eq!(CURRENT_SCHEMA_VERSION, 30);
 
         let start = ts();
         db.insert_sleep_session(&SleepSession {
@@ -10185,15 +10256,27 @@ mod tests {
             "heart_rate": "1,80;1,2;"
         });
         assert_eq!(db.pending_running_details().unwrap().len(), 1);
+        let raw_id = db
+            .insert_raw_record(&RawRecord {
+                stream: "workout_detail".into(),
+                source_key: "workout_detail:1700000000:run.gps".into(),
+                source_scope: SourceScope::Device,
+                device_id: None,
+                start_utc: ts(),
+                end_utc: None,
+                payload: payload.clone(),
+                capability: CapabilityStatus::Verified,
+            })
+            .unwrap();
         db.normalize_and_persist_raw(
-            1,
+            raw_id,
             "workout_detail",
             "workout_detail:1700000000:run.gps",
             &payload,
         )
         .unwrap();
         db.normalize_and_persist_raw(
-            1,
+            raw_id,
             "workout_detail",
             "workout_detail:1700000000:run.gps",
             &payload,
