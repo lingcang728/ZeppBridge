@@ -45,7 +45,7 @@ pub const EXPORT_DATA_TYPES: [&str; 18] = [
 /// `raw_records` 重新跑一遍。不动它，新加的编号只对以后同步来的记录生效，
 /// 已经存成 `unknown:211` 的那 199 条记录会永远挂着——而报这个问题的人恰恰
 /// 是因为历史记录才来报的。
-pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v28-readiness-provenance";
+pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v29-food-envelopes";
 /// 较早公开版本的修订号，用于验证跨版本升级。
 ///
 /// v21 还没有 v22 的圈解析和 v23 的 Rucking 映射；跳版本升级时要一并补齐。
@@ -775,6 +775,13 @@ impl Database {
     /// Build the capability overview: read what the library already proves,
     /// then fold in the stored result of the last probe for the rest.
     pub fn capability_overview(&self, today: NaiveDate) -> Result<CapabilityOverview> {
+        let probed: BTreeMap<String, CapabilityProbe> = self
+            .get_app_meta(CAPABILITY_PROBE_RESULT_KEY)?
+            .and_then(|raw| serde_json::from_str::<Vec<CapabilityProbe>>(&raw).ok())
+            .unwrap_or_default()
+            .into_iter()
+            .map(|probe| (probe.stream.clone(), probe))
+            .collect();
         let mut items = Vec::new();
         for (stream, evidence, window_days) in CAPABILITY_ROWS {
             // Inclusive local calendar window of exactly `window_days`:
@@ -816,6 +823,32 @@ impl Database {
                 }
             };
             let (unit_label, unit_code) = unit;
+            // A positive Food probe proves records exist even when their
+            // shape is not yet understood. Never turn a parser gap into
+            // "nothing recorded", or present cloud records as local data.
+            if stream == "food" && records == 0 {
+                if let Some(probe) = probed.get(stream).filter(|probe| {
+                    probe.status == "available"
+                        && probe.records > 0
+                        && probe.latest_date.as_deref().is_some_and(|date| {
+                            date >= start_text.as_str() && date <= end_text.as_str()
+                        })
+                }) {
+                    items.push(CapabilityItem {
+                        stream: stream.to_string(),
+                        status: "available".to_string(),
+                        records: probe.records as i64,
+                        records_unit: "条".to_string(),
+                        records_unit_code: "records".to_string(),
+                        window_days: probe.window_days,
+                        latest_date: probe.latest_date.clone(),
+                        note: Some("云端有记录，但本机尚无可用数据。请同步或补拉；若仍未收录，可能需要补充报文格式支持。".to_string()),
+                        source: "probed".to_string(),
+                        ingested: false,
+                    });
+                    continue;
+                }
+            }
             items.push(CapabilityItem {
                 stream: stream.to_string(),
                 status: if records > 0 {
@@ -838,13 +871,6 @@ impl Database {
 
         // Streams that leave no local trace: report the last probe, or say
         // plainly that they have not been checked yet.
-        let probed: BTreeMap<String, CapabilityProbe> = self
-            .get_app_meta(CAPABILITY_PROBE_RESULT_KEY)?
-            .and_then(|raw| serde_json::from_str::<Vec<CapabilityProbe>>(&raw).ok())
-            .unwrap_or_default()
-            .into_iter()
-            .map(|probe| (probe.stream.clone(), probe))
-            .collect();
         for stream in PROBE_ONLY_CAPABILITIES {
             let item = match probed.get(stream) {
                 Some(probe) if probe.status == "available" => CapabilityItem {
@@ -2311,7 +2337,8 @@ impl Database {
                 return Ok(None);
             }
         }
-        // v28 needs all streams: readiness repair and per-raw attempt history.
+        // Revisit all streams: date parsing is shared, and older upgrades
+        // still need readiness repair and per-raw attempt history.
         let streams: Vec<String> = Vec::new();
         let raw_records = self.count_raw_records_for_streams(&streams)?;
         Ok(Some(ReplayPlan {
@@ -7157,6 +7184,101 @@ mod tests {
             .iter()
             .filter(|item| item.source == "derived")
             .all(|item| item.ingested));
+    }
+
+    #[test]
+    fn food_probe_is_cloud_evidence_until_sync_or_replay_imports_it() {
+        let db = Database::in_memory().unwrap();
+        let today = NaiveDate::from_ymd_opt(2026, 9, 20).unwrap();
+        let food = || {
+            db.capability_overview(today)
+                .unwrap()
+                .items
+                .into_iter()
+                .find(|item| item.stream == "food")
+                .unwrap()
+        };
+        assert_eq!(food().status, "no_records");
+        let mut probe = CapabilityProbe {
+            stream: "food".into(),
+            surface: "v2_events".into(),
+            cadence: "episodic".into(),
+            window_days: 365,
+            event_type: "Food".into(),
+            sub_type: String::new(),
+            status: "available".into(),
+            records: 50,
+            latest_date: Some("2026-09-18".into()),
+            fields: Vec::new(),
+        };
+        db.save_capability_probe(&[probe.clone()]).unwrap();
+        let row = food();
+        assert_eq!(row.status, "available");
+        assert_eq!(row.source, "probed");
+        assert!(!row.ingested);
+        assert_eq!(row.records, 50);
+        assert_eq!(row.records_unit_code, "records");
+
+        // Stale, empty, and failed probes must not claim current cloud data.
+        probe.latest_date = Some("2024-01-01".into());
+        db.save_capability_probe(&[probe.clone()]).unwrap();
+        assert_eq!(food().status, "no_records");
+        probe.latest_date = Some("2026-09-18".into());
+        for status in ["empty", "unknown", "unavailable"] {
+            probe.status = status.into();
+            db.save_capability_probe(&[probe.clone()]).unwrap();
+            assert_eq!(food().status, "no_records");
+        }
+        probe.status = "available".into();
+        db.save_capability_probe(&[probe]).unwrap();
+        let raw = RawRecord {
+            stream: "wellness".into(),
+            source_key: "wellness:food:v2_events:2026-09-14:2026-09-20".into(),
+            source_scope: SourceScope::UserFused,
+            device_id: None,
+            start_utc: today.and_hms_opt(0, 0, 0).unwrap().and_utc() - Duration::days(6),
+            end_utc: Some(today.and_hms_opt(0, 0, 0).unwrap().and_utc()),
+            payload: serde_json::json!({"data":{"items":[
+                {"value":{"date":"2026-09-18","calories":500,"protein":20}},
+                {"date":"2026-09-18","calories":300}
+            ]}}),
+            capability: CapabilityStatus::Unverified,
+        };
+        // Simulate a v28 database retaining a response it failed to normalize.
+        db.insert_raw_record(&raw).unwrap();
+        db.set_app_meta(
+            "normalizer_revision",
+            "zepp-normalizer-2026-09-v28-readiness-provenance",
+        )
+        .unwrap();
+        db.set_app_meta(LAST_CLOUD_SYNC_AT_KEY, "2026-09-19T12:00:00Z")
+            .unwrap();
+        assert!(db.pending_replay_plan().unwrap().is_some());
+        db.reprocess_raw_records_if_needed().unwrap().unwrap();
+        assert!(db.reprocess_raw_records_if_needed().unwrap().is_none());
+        // The live sync/backfill path must also be idempotent after replay.
+        db.persist_fetched_record(&raw).unwrap();
+        let row = food();
+        assert_eq!(row.source, "derived");
+        assert_eq!(row.status, "available");
+        assert!(row.ingested);
+        assert_eq!(row.records, 1);
+        assert_eq!(row.records_unit_code, "days");
+        assert_eq!(row.latest_date.as_deref(), Some("2026-09-18"));
+        let (count, calories): (i64, f64) = db
+            .conn
+            .query_row(
+                "SELECT COUNT(*), SUM(value) FROM daily_metrics WHERE metric = 'intake_calories'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!((count, calories), (1, 800.0));
+        assert_eq!(db.raw_record_count().unwrap(), 1);
+        assert_eq!(
+            db.get_app_meta(LAST_CLOUD_SYNC_AT_KEY).unwrap().as_deref(),
+            Some("2026-09-19T12:00:00Z")
+        );
     }
 
     /// 真实旧库的升级演练。默认跳过——它需要一个真实的旧数据库。
