@@ -1407,9 +1407,9 @@ fn parse_date(value: &Value) -> Option<String> {
         if NaiveDate::parse_from_str(text, "%Y-%m-%d").is_ok() {
             return Some(text.to_owned());
         }
-        return DateTime::parse_from_rfc3339(text)
-            .ok()
-            .map(|dt| dt.date_naive().format("%Y-%m-%d").to_string());
+        if let Ok(dt) = DateTime::parse_from_rfc3339(text) {
+            return Some(dt.date_naive().format("%Y-%m-%d").to_string());
+        }
     }
     if let Some(number) = parse_number(value) {
         let compact = number as i64;
@@ -1423,7 +1423,9 @@ fn parse_date(value: &Value) -> Option<String> {
 }
 
 fn parse_date_with_zone(value: &Value, offset_secs: Option<i64>) -> Option<String> {
-    if value.as_str().is_some() {
+    // Numeric strings are epochs too; retain the event's timezone when
+    // assigning meals (and other daily metrics) to a calendar day.
+    if value.as_str().is_some() && parse_number(value).is_none() {
         return parse_date(value);
     }
     if let Some(number) = parse_number(value) {
@@ -1613,7 +1615,14 @@ impl Normalizer {
     pub fn normalize_wellness(source_key: &str, raw: &Value) -> WellnessNormalizedData {
         let label = source_key.split(':').nth(1).unwrap_or_default();
         let mut out = WellnessNormalizedData::default();
-        let Some(items) = raw.get("items").and_then(Value::as_array) else {
+        // Match the envelopes counted by endpoint diagnostics. The connector
+        // preserves the response, so `data.items` is not unwrapped upstream.
+        let Some(items) = raw
+            .get("items")
+            .and_then(Value::as_array)
+            .or_else(|| raw.get("data").and_then(Value::as_array))
+            .or_else(|| raw.get("data")?.get("items")?.as_array())
+        else {
             out.diagnostics
                 .push(format!("{label}: 报文没有 items 数组"));
             return out;
@@ -1716,12 +1725,12 @@ fn food_metrics(items: &[Value], out: &mut WellnessNormalizedData) {
         let Some(object) = item.as_object() else {
             continue;
         };
-        let Some(date) = summary_date(object, None) else {
+        let nested = object.get("value").and_then(Value::as_object);
+        let Some(date) = summary_date(object, nested) else {
             out.diagnostics.push("food: 一条记录没有可用的日期".into());
             continue;
         };
         // 数值可能挂在顶层，也可能在 `value` 里——别的 v2 流两种形状都出现过。
-        let nested = object.get("value").and_then(Value::as_object);
         let mut matched: Vec<&str> = Vec::new();
         for Macro {
             metric,
@@ -2607,6 +2616,93 @@ fn duration_to_minutes(value: f64) -> i32 {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn food_accepts_probe_envelopes_and_nested_dates_without_inventing_macros() {
+        // Synthetic fixtures: the reporter has not supplied a Food response.
+        let items = json!([
+            {"date": "2026-09-18", "calories": 500, "protein": 20},
+            {"value": {"date": "2026-09-18", "calories": "300", "fat": 0}},
+            {"date": "2026-09-19", "value": {"carbs": 40}},
+            {"date": "2026-09-19", "unknownNutrient": 123},
+            {"date": "2026-09-19", "calories": -1, "protein": 99999}
+        ]);
+        for raw in [
+            json!({"items": items}),
+            json!({"data": items}),
+            json!({"code": 200, "data": {"items": items}}),
+        ] {
+            let batch = Normalizer::normalize_wellness("wellness:food:v2_events", &raw);
+            let rows: BTreeMap<_, _> = batch
+                .daily_metrics
+                .iter()
+                .map(|row| {
+                    (
+                        (row.date.as_str(), row.metric.as_str()),
+                        (row.value, row.unit.as_str()),
+                    )
+                })
+                .collect();
+            assert_eq!(
+                rows,
+                BTreeMap::from([
+                    (("2026-09-18", "intake_calories"), (800.0, "kcal")),
+                    (("2026-09-18", "intake_protein_g"), (20.0, "g")),
+                    (("2026-09-18", "intake_fat_g"), (0.0, "g")),
+                    (("2026-09-19", "intake_carbs_g"), (40.0, "g")),
+                ])
+            );
+            assert!(batch.metric_samples.is_empty());
+        }
+    }
+
+    #[test]
+    fn food_epoch_strings_respect_local_day_and_explicit_dates() {
+        let epoch = DateTime::parse_from_rfc3339("2026-09-18T23:30:00Z").unwrap();
+        for time in [
+            json!(epoch.timestamp()),
+            json!(epoch.timestamp().to_string()),
+            json!(epoch.timestamp_millis()),
+            json!(epoch.timestamp_millis().to_string()),
+        ] {
+            let batch = Normalizer::normalize_wellness(
+                "wellness:food:v2_events",
+                &json!({
+                    "items": [{"value": {"time": time, "timeZone": "+02:00", "calories": 100}}]
+                }),
+            );
+            assert_eq!(batch.daily_metrics.len(), 1);
+            assert_eq!(batch.daily_metrics[0].date, "2026-09-19");
+        }
+        assert_eq!(
+            parse_date(&json!("20260918")).as_deref(),
+            Some("2026-09-18")
+        );
+        assert_eq!(parse_date(&json!("not-a-date")), None);
+        let batch = Normalizer::normalize_wellness(
+            "wellness:food:v2_events",
+            &json!({
+                "items": [{"date": "2026-09-17", "time": epoch.timestamp_millis(),
+                           "timeZone": "+02:00", "calories": 100}]
+            }),
+        );
+        assert_eq!(batch.daily_metrics[0].date, "2026-09-17");
+    }
+
+    #[test]
+    fn food_unknown_or_encoded_payloads_remain_unparsed() {
+        for raw in [
+            json!({"data": "encoded"}),
+            json!({"items": []}),
+            json!({"items": [{"date": "2026-09-18", "unknownNutrient": 123}]}),
+            json!({"items": [{"value": "encoded"}]}),
+            json!({"items": [{"calories": 100}]}),
+        ] {
+            let batch = Normalizer::normalize_wellness("wellness:food:v2_events", &raw);
+            assert!(batch.daily_metrics.is_empty());
+            assert!(batch.metric_samples.is_empty());
+        }
+    }
+
     #[test]
     fn aliases_skip_missing_values_without_inventing_ids_or_losing_samples() {
         let raw = serde_json::json!({"items":[{"timestamp":null,"time":1800000000,"value":" ","heartRate":72,"device_id":null,"deviceId":"D85403FFFEE4D576"}]});
