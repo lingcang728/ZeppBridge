@@ -717,12 +717,27 @@ impl SyncManager {
         stream: &str,
         records: Vec<FetchedRecord>,
     ) -> Result<StreamReport> {
+        let incomplete = records.iter().any(|record| record.incomplete);
         let mut reports = Vec::with_capacity(records.len());
         for record in records {
             reports.push(self.persist_record(record).await?.report);
         }
-        let aggregate = aggregate_stream_reports(stream, &reports);
+        let mut aggregate = aggregate_stream_reports(stream, &reports);
+        if incomplete && aggregate.status != StreamStatus::Failed {
+            aggregate.status = StreamStatus::Failed;
+            aggregate.message = Some(partial_window_reason().1);
+        }
         let db = self.db.lock().await;
+        if incomplete {
+            db.record_stream_stage(
+                stream,
+                Stage::Fetch,
+                &StageOutcome::Failed {
+                    kind: StageErrorKind::Unknown,
+                    message: Some(partial_window_reason().1),
+                },
+            )?;
+        }
         db.record_stream_written(stream, aggregate.records_written)?;
         db.update_sync_state_details(
             stream,
@@ -1055,6 +1070,51 @@ mod tests {
     fn status_names_are_not_success_for_optional_states() {
         assert_eq!(status_name(&StreamStatus::Unavailable), "unavailable");
         assert_eq!(status_name(&StreamStatus::Unverified), "unverified");
+    }
+
+    #[tokio::test]
+    async fn incomplete_fetch_persists_data_but_keeps_sync_retryable() {
+        let db = Database::in_memory().unwrap();
+        let connector = ZeppConnector::new(AuthInfo {
+            app_token: "test-token".into(),
+            user_id: "user-1".into(),
+            region_host: "https://api-mifit.zepp.com".into(),
+        })
+        .unwrap();
+        let manager = SyncManager::new(
+            DataFetcher::new(connector),
+            db,
+            Arc::new(AtomicBool::new(false)),
+        );
+        let record = FetchedRecord {
+            incomplete: true,
+            raw: RawRecord {
+                stream: "heart_rate".into(),
+                source_key: "partial-test".into(),
+                source_scope: SourceScope::UserFused,
+                device_id: None,
+                start_utc: Utc::now(),
+                end_utc: None,
+                payload: serde_json::json!({"items": [{"timestamp": 1800000000, "value": 70}]}),
+                capability: CapabilityStatus::Verified,
+            },
+        };
+        let report = manager
+            .persist_records("heart_rate", vec![record])
+            .await
+            .unwrap();
+        assert_eq!(report.status, StreamStatus::Failed);
+        assert_eq!(report.raw_records, 1);
+        assert_eq!(report.records_written, 1);
+        assert_eq!(report.message, Some(partial_window_reason().1));
+        let db = manager.db.lock().await;
+        assert_eq!(
+            db.get_sync_state("heart_rate").unwrap().unwrap().status,
+            "failed"
+        );
+        let (status, written, _) = classify_backfill_report(&report, true);
+        assert_eq!(status, ChunkStatus::Partial);
+        assert_eq!(written, 1);
     }
 
     #[tokio::test]

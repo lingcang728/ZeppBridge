@@ -260,7 +260,7 @@ const messages = defineMessages(
     'err.backfill.no_canonical_records':
       'The cloud returned a payload, but no usable records could be parsed from it',
     'err.backfill.partial_window':
-      'Only part of this month was written. It still needs a retry',
+      'Only part of this date range was written. It still needs a retry',
     'err.backfill.start_in_future': 'The backfill start cannot be later than today',
     'err.backup.restore_busy':
       'Restore did not run: another write is in progress. The current library is unchanged and will be retried on the next launch',
@@ -427,7 +427,7 @@ const messages = defineMessages(
     'err.backfill.no_canonical_records':
       'La nube devolvió datos, pero no se pudo extraer ningún registro utilizable',
     'err.backfill.partial_window':
-      'Solo se escribió una parte de este mes. Todavía hay que reintentarlo',
+      'Solo se escribió una parte de este intervalo de fechas. Todavía hay que reintentarlo',
     'err.backfill.start_in_future': 'El inicio de la recuperación no puede ser posterior a hoy',
     'err.backup.restore_busy':
       'La restauración no se ejecutó: hay otra escritura en curso. La biblioteca actual no cambió y se reintentará en el próximo arranque',
