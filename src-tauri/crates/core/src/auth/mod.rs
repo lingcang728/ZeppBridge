@@ -1250,7 +1250,7 @@ mod tests {
                         .unwrap();
                     assert_eq!(manager.load_auth().unwrap().unwrap().user_id, user_id);
                     manager.clear_auth().unwrap();
-                    fs::remove_dir(dir).unwrap();
+                    fs::remove_dir(&dir).unwrap();
                     dir
                 })
             })
