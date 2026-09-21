@@ -4,6 +4,13 @@
 
 ## Unreleased / 未发布
 
+### Planned for 2.4.3 / 计划纳入 2.4.3
+
+- Isolate parallel authentication tests with exclusively created temporary directories, avoiding intermittent missing `auth.json` failures in CI. Production credential storage is unchanged.
+- 认证并行测试使用独占创建的临时目录，避免 CI 偶发找不到 `auth.json`；不修改正式程序的凭据存储逻辑。
+- Build desktop installers only for release tags or manual CI runs. Pushes to main and pull requests retain verification and Docker checks without repeating installer packaging.
+- 桌面安装包仅在发布标签或手动运行 CI 时构建；main 推送和 PR 保留验证及 Docker 检查，避免重复打包。
+
 ## 2.4.0
 
 ### Changed / 变化
