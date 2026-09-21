@@ -1162,7 +1162,10 @@ mod unix_credential_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{collections::HashMap, sync::Mutex};
+    use std::{
+        collections::HashMap,
+        sync::{atomic::AtomicU64, atomic::Ordering, Barrier, Mutex},
+    };
 
     #[test]
     fn macos_storage_requires_opt_in_and_remembers_existing_files() {
@@ -1207,16 +1210,56 @@ mod tests {
     }
 
     fn temp_dir() -> PathBuf {
-        let path = std::env::temp_dir().join(format!(
-            "zeppbridge-auth-test-{}-{}",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        fs::create_dir_all(&path).unwrap();
-        path
+        // Wall-clock timestamps can repeat across parallel tests. Claim each
+        // directory exclusively, including when a previous process left it behind.
+        static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+        loop {
+            let path = std::env::temp_dir().join(format!(
+                "zeppbridge-auth-test-{}-{}",
+                std::process::id(),
+                NEXT_ID.fetch_add(1, Ordering::Relaxed)
+            ));
+            match fs::create_dir(&path) {
+                Ok(()) => return path,
+                Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+                Err(error) => panic!("cannot create auth test directory: {error}"),
+            }
+        }
+    }
+
+    #[test]
+    fn parallel_auth_roundtrips_keep_separate_files() {
+        let barrier = Arc::new(Barrier::new(16));
+        let workers: Vec<_> = (0..16)
+            .map(|index| {
+                let barrier = barrier.clone();
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    let dir = temp_dir();
+                    let manager = AuthManager::with_credential_backend(
+                        dir.clone(),
+                        Arc::new(MemoryCredentials::default()),
+                    );
+                    let user_id = format!("user-{index}");
+                    manager
+                        .save_auth(&AuthInfo {
+                            app_token: format!("token-{index}"),
+                            user_id: user_id.clone(),
+                            region_host: "https://api-mifit.zepp.com".to_string(),
+                        })
+                        .unwrap();
+                    assert_eq!(manager.load_auth().unwrap().unwrap().user_id, user_id);
+                    manager.clear_auth().unwrap();
+                    fs::remove_dir(dir).unwrap();
+                    dir
+                })
+            })
+            .collect();
+        let paths: std::collections::HashSet<_> = workers
+            .into_iter()
+            .map(|worker| worker.join().unwrap())
+            .collect();
+        assert_eq!(paths.len(), 16);
     }
 
     #[test]
