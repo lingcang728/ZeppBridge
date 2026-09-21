@@ -161,6 +161,34 @@ fn is_abort_error(error: &ZeppBridgeError) -> bool {
     error.is_cancelled() || error.needs_reauth()
 }
 
+/// A failed historical slice must not discard other nights or prevent the
+/// latest slice from being requested. The connector already bounds retries.
+async fn fetch_sleep_slices_with<F, Fut>(
+    window: FetchWindow,
+    mut fetch: F,
+) -> Result<Vec<FetchedRecord>>
+where
+    F: FnMut(FetchWindow) -> Fut,
+    Fut: std::future::Future<Output = Result<FetchedRecord>>,
+{
+    let mut records = Vec::new();
+    let mut last_error = None;
+    for chunk in window.chunks(7) {
+        match fetch(chunk).await {
+            Ok(record) => records.push(record),
+            Err(error) if is_abort_error(&error) => return Err(error),
+            Err(error) => {
+                // Do not downgrade a request failure to unavailable when a
+                // later slice happens to return 404.
+                if !error.is_unavailable() || last_error.is_none() {
+                    last_error = Some(error);
+                }
+            }
+        }
+    }
+    conclude_slices(records, last_error, "睡眠窗口没有可识别记录")
+}
+
 /// The heartRate endpoint's per-request sample cap.
 const HEART_RATE_PAGE_LIMIT: i64 = 1000;
 
@@ -290,17 +318,7 @@ impl DataFetcher {
     }
 
     pub async fn fetch_sleep_records(&self, window: FetchWindow) -> Result<Vec<FetchedRecord>> {
-        let mut records = Vec::new();
-        let mut last_error = None;
-        for chunk in window.chunks(7) {
-            match self.fetch_sleep_record(chunk).await {
-                Ok(record) => records.push(record),
-                Err(error) if is_abort_error(&error) => return Err(error),
-                Err(error) if error.is_unavailable() => last_error = Some(error),
-                Err(error) => return Err(error),
-            }
-        }
-        conclude_slices(records, last_error, "睡眠窗口没有可识别记录")
+        fetch_sleep_slices_with(window, |chunk| self.fetch_sleep_record(chunk)).await
     }
 
     pub async fn fetch_sleep_record(&self, window: FetchWindow) -> Result<FetchedRecord> {
@@ -1482,6 +1500,73 @@ mod tests {
             payload: json!({"items": []}),
             capability: CapabilityStatus::Verified,
         })
+    }
+
+    #[tokio::test]
+    async fn sleep_failure_keeps_successful_slices_and_still_requests_latest() {
+        let window = FetchWindow::days(21).unwrap();
+        let mut calls = 0;
+        let records = fetch_sleep_slices_with(window, |_| {
+            calls += 1;
+            std::future::ready(if calls == 2 {
+                Err(ZeppBridgeError::RetryExhausted {
+                    status: 503,
+                    message: "test".into(),
+                })
+            } else {
+                Ok(sample_fetched())
+            })
+        })
+        .await
+        .unwrap();
+        assert_eq!(calls, 3);
+        assert_eq!(records.len(), 2);
+        assert!(records.iter().all(|record| record.incomplete));
+    }
+
+    #[tokio::test]
+    async fn sleep_auth_and_cancel_abort_without_requesting_more_slices() {
+        for error in [
+            ZeppBridgeError::Cancelled,
+            ZeppBridgeError::NeedsReauth("test".into()),
+        ] {
+            let mut error = Some(error);
+            let mut calls = 0;
+            let result = fetch_sleep_slices_with(FetchWindow::days(21).unwrap(), |_| {
+                calls += 1;
+                std::future::ready(if calls == 1 {
+                    Ok(sample_fetched())
+                } else {
+                    Err(error.take().unwrap())
+                })
+            })
+            .await;
+            assert!(is_abort_error(&result.unwrap_err()));
+            assert_eq!(calls, 2);
+        }
+    }
+
+    #[tokio::test]
+    async fn sleep_all_failed_preserves_request_error_over_later_unavailable() {
+        let mut calls = 0;
+        let error = fetch_sleep_slices_with(FetchWindow::days(14).unwrap(), |_| {
+            calls += 1;
+            std::future::ready(Err(if calls == 1 {
+                ZeppBridgeError::RetryExhausted {
+                    status: 503,
+                    message: "test".into(),
+                }
+            } else {
+                ZeppBridgeError::Unavailable("test".into())
+            }))
+        })
+        .await
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            ZeppBridgeError::RetryExhausted { status: 503, .. }
+        ));
+        assert_eq!(calls, 2);
     }
 
     #[test]

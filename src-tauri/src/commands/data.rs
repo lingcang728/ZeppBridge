@@ -2236,11 +2236,11 @@ pub(crate) fn parse_device_profiles(value: &serde_json::Value) -> Vec<DeviceProf
             // 收 deviceSource 而不误收 deviceType。
             let device_source_codes = device_source_numbers(&item, &extra);
             let device_names = merged_string_values(&item, &extra, &["deviceName", "deviceType"]);
-            let device_id = first_string(
-                &item,
-                &["deviceId", "device_id", "deviceSource", "macAddress"],
-            )
-            .or_else(|| first_string(&extra, &["deviceId", "device_id", "macAddress"]));
+            let device_id = first_string(&item, &["deviceId", "device_id", "macAddress"])
+                .or_else(|| first_string(&extra, &["deviceId", "device_id", "macAddress"]))
+                // Keep the legacy source-only key, but never let a model code
+                // hide an actual device identity in nested metadata.
+                .or_else(|| first_string(&item, &["deviceSource"]));
             if let Some(device_id) = device_id.as_deref() {
                 if device_id.starts_with('A')
                     && device_id.chars().skip(1).all(|c| c.is_ascii_digit())
@@ -2346,7 +2346,10 @@ fn merge_device_metadata(target: &mut Map<String, Value>, value: &Value, depth: 
         return;
     };
     for (key, child) in object {
-        target.entry(key.clone()).or_insert_with(|| child.clone());
+        let entry = target.entry(key.clone()).or_insert(Value::Null);
+        if entry.is_null() || entry.as_str().is_some_and(|text| text.trim().is_empty()) {
+            *entry = child.clone();
+        }
         if matches!(
             key.as_str(),
             "additionalInfo" | "bind_device" | "bindDevice" | "deviceInfo" | "device_info"
@@ -2528,6 +2531,32 @@ mod tests {
     use serde_json::json;
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn nested_identity_and_helio_name_survive_empty_outer_metadata() {
+        let profiles = parse_device_profiles(&json!({"devices": [{
+            "deviceSource": 62, "deviceType": 0,
+            "deviceId": null, "productName": "  ",
+            "additionalInfo": {"deviceId": "REAL-CORE-ID", "productName": "Helio Core"}
+        }]}));
+        assert_eq!(profiles.len(), 1);
+        assert_eq!(profiles[0].device_id.as_deref(), Some("REAL-CORE-ID"));
+        assert_eq!(
+            profiles[0].catalog_id.as_deref(),
+            Some("amazfit-helio-core")
+        );
+    }
+
+    #[test]
+    fn source_number_does_not_hide_nested_identity_or_merge_two_devices() {
+        let profiles = parse_device_profiles(&json!({"devices": [
+            {"deviceSource": 10289411, "additionalInfo": {"deviceId": "STRAP-ONE"}},
+            {"deviceSource": 10289411, "additionalInfo": {"deviceId": "STRAP-TWO"}}
+        ]}));
+        assert_eq!(profiles.len(), 2);
+        assert_eq!(profiles[0].device_id.as_deref(), Some("STRAP-ONE"));
+        assert_eq!(profiles[1].device_id.as_deref(), Some("STRAP-TWO"));
+    }
 
     #[test]
     fn parse_device_profile_reads_additional_info() {

@@ -235,6 +235,30 @@ mod tests {
     use super::*;
 
     #[test]
+    fn feedback_models_match_names_without_promoting_unconfirmed_sources() {
+        for (name, id) in [
+            ("Amazfit Pace", "amazfit-pace"),
+            ("Pace", "amazfit-pace"),
+            ("Helio Core", "amazfit-helio-core"),
+        ] {
+            let matched = match_catalog(&CatalogMatchInput {
+                product_names: vec![name],
+                ..Default::default()
+            })
+            .unwrap();
+            assert_eq!(matched.entry.catalog_id, id);
+            assert!(matched.entry.device_source_codes.is_empty());
+        }
+        for code in [62, 102, 400, 8257793] {
+            assert!(match_catalog(&CatalogMatchInput {
+                device_source_codes: vec![code],
+                ..Default::default()
+            })
+            .is_none());
+        }
+    }
+
+    #[test]
     fn catalog_contains_real_devices_and_version() {
         assert!(document().version >= 1);
         assert!(document().checked_at.starts_with("2026-"));

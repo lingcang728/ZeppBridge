@@ -276,6 +276,17 @@ CARDS: list[dict[str, Any]] = [
 
 EXTRAS: list[dict[str, Any]] = [
     {
+        "catalog_id": "amazfit-pace", "canonical_name": "Amazfit Pace",
+        "display_name": "Amazfit Pace", "name_zh": "Amazfit Pace",
+        "kind": "watch", "model_codes": [],
+        "aliases": ["Amazfit Pace", "Pace"],
+        "region": ["global"], "official_page": "https://support.amazfit.com/it/amazfit_pace/user-guide",
+        "official_url": "https://support.amazfit.com/it/amazfit_pace/user-guide",
+        "image_source_url": None, "asset_key": None, "asset_source": "pending-official-art",
+        "canonical_device_key": "amazfit-pace", "checked_at": "2026-09-21",
+        "provenance": "Amazfit Pace name verified against official Amazfit support on 2026-09-21; requested in feedback 5bf0a448-dec6-40eb-816b-691097cda1f4. Name matching and manual identification only; source 400 is deliberately unmapped. Product art pending verification.",
+    },
+    {
         "catalog_id": "amazfit-bip", "canonical_name": "Amazfit Bip",
         "display_name": "Amazfit Bip", "name_zh": "Amazfit 米动手表青春版 Bip",
         "kind": "watch", "model_codes": [],
@@ -562,11 +573,9 @@ def trim_alpha(image: Image.Image, padding: int = 18) -> Image.Image:
     bbox = image.getchannel("A").getbbox()
     if bbox is None:
         raise ValueError("image has no visible alpha after background removal")
-    left = max(0, bbox[0] - padding)
-    top = max(0, bbox[1] - padding)
-    right = min(image.width, bbox[2] + padding)
-    bottom = min(image.height, bbox[3] + padding)
-    return image.crop((left, top, right, bottom))
+    # Cropping within the input cannot create room when the product touches
+    # an edge. Add real transparent pixels around the visible bounds.
+    return ImageOps.expand(image.crop(bbox), border=padding, fill=(0, 0, 0, 0))
 
 
 def remove_large_white_hole(image: Image.Image) -> Image.Image:
@@ -705,6 +714,7 @@ def normalize_asset(
     preserve_centre_hole: bool = False,
     remove_watch_hole: bool = False,
     decontaminate_halo: bool = False,
+    preserve_alpha: bool = False,
 ) -> Image.Image:
     # All current sources are white-background captures/CDN images. Always use
     # the conservative edge-connected/GrabCut path; the old global near-white
@@ -716,7 +726,7 @@ def normalize_asset(
             (round(source.width * segmentation_scale), round(source.height * segmentation_scale)),
             Image.Resampling.LANCZOS,
         )
-    image = grabcut_foreground(source)
+    image = source if preserve_alpha else grabcut_foreground(source)
     image = trim_alpha(image.convert("RGBA"))
     if keep_largest_component:
         rgba = np.asarray(image).copy()
@@ -820,6 +830,7 @@ def write_asset(
     *,
     use_grabcut: bool = False,
     keep_largest_component: bool = True,
+    preserve_alpha: bool = False,
 ) -> str:
     ASSET_DIR.mkdir(parents=True, exist_ok=True)
     image = normalize_asset(
@@ -829,6 +840,7 @@ def write_asset(
         preserve_centre_hole=key == "amazfit-helio-ring",
         remove_watch_hole=key == "amazfit-gts-4-mini",
         decontaminate_halo=key == "amazfit-helio-strap-pro",
+        preserve_alpha=preserve_alpha,
     )
     webp_path = ASSET_DIR / f"{key}.webp"
     thumb_path = ASSET_DIR / f"{key}-thumb.png"
