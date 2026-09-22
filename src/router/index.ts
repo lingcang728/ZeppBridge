@@ -25,7 +25,6 @@ const routes = [
   {
     path: '/ai',
     name: 'AiComposer',
-    // BETA1-STUB：当前是占位页，S4 在集成时换成真正的 AI 交接台。
     component: () => import('../views/AiComposer.vue'),
   },
   {

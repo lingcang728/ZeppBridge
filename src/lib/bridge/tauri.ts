@@ -1,7 +1,16 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { DesktopUnavailableError } from './errors';
-import type { BridgeBackend, UnlistenFn } from './types';
+import type {
+  AiTask,
+  AiTaskAttachmentStat,
+  AiTaskPrepareResult,
+  AiTaskPreview,
+  AiTaskSummary,
+  AiTaskTemplate,
+  BridgeBackend,
+  UnlistenFn,
+} from './types';
 import type {
   LifeEvent,
   DailyHeartRateExtreme,
@@ -376,6 +385,39 @@ export const tauriBackend: BridgeBackend = {
       prompt,
       includePreciseRoute,
     });
+  },
+
+  /* ---------- Beta1 分析任务（契约见 types.ts 同名单元） ---------- */
+
+  aiTaskList() {
+    return call<AiTaskSummary[]>('ai_task_list');
+  },
+  aiTaskGet(id: string) {
+    return call<AiTask>('ai_task_get', { id });
+  },
+  aiTaskSave(task: AiTask) {
+    return call<AiTask>('ai_task_save', { task });
+  },
+  aiTaskDelete(id: string) {
+    return call<void>('ai_task_delete', { id });
+  },
+  aiTemplateList() {
+    return call<AiTaskTemplate[]>('ai_template_list');
+  },
+  aiTemplateSave(template: AiTaskTemplate) {
+    return call<AiTaskTemplate>('ai_template_save', { template });
+  },
+  aiTemplateDelete(id: string) {
+    return call<void>('ai_template_delete', { id });
+  },
+  aiTaskPreview(task: AiTask) {
+    return call<AiTaskPreview>('ai_task_preview', { task });
+  },
+  aiTaskPrepare(task: AiTask, coverageNote: string) {
+    return call<AiTaskPrepareResult>('ai_task_prepare', { task, coverageNote });
+  },
+  aiTaskAttachmentStat(paths: string[]) {
+    return call<AiTaskAttachmentStat[]>('ai_task_attachment_stat', { paths });
   },
 
   cleanupOldData(days: number) {
