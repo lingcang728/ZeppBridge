@@ -172,12 +172,25 @@ pub enum ZeppBridgeError {
     #[error("IO 错误: {0}")]
     IoError(#[from] std::io::Error),
 
+    /// AI 分析任务/模板这一层的业务失败（`err.ai_task.*` / `err.ai_template.*`）。
+    /// 码与参数由 [`crate::ai_tasks::AiTaskError`] 自己定——命令层不猜实体。
+    #[error("{0}")]
+    AiTask(#[from] crate::ai_tasks::AiTaskError),
+
     #[allow(dead_code)]
     #[error("未知错误: {0}")]
     Unknown(String),
 }
 
 pub type Result<T> = std::result::Result<T, ZeppBridgeError>;
+
+/// `serde_json` 的失败一律落 `ParseError`——载荷序列化/反序列化错误在
+/// 出口语义上和「云端报文解析不了」是同一类。
+impl From<serde_json::Error> for ZeppBridgeError {
+    fn from(error: serde_json::Error) -> Self {
+        Self::ParseError(format!("JSON 处理失败: {error}"))
+    }
+}
 
 impl ZeppBridgeError {
     pub fn needs_reauth(&self) -> bool {
@@ -223,6 +236,7 @@ impl ZeppBridgeError {
             Self::ParseError(_) => "err.core.parse",
             Self::DatabaseError(_) => "err.core.database",
             Self::IoError(_) => "err.core.io",
+            Self::AiTask(inner) => inner.code(),
             Self::Unknown(_) => "err.core.unknown",
         }
     }
@@ -263,6 +277,7 @@ impl ZeppBridgeError {
             Self::ParseError(_) => "Zepp 返回的数据无法解析".into(),
             Self::DatabaseError(_) => "本地数据库暂时不可用".into(),
             Self::IoError(_) => "读写本地文件失败".into(),
+            Self::AiTask(inner) => inner.user_message(),
             Self::Unknown(message) => sanitize_user_text(message),
         }
     }

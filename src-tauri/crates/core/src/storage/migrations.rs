@@ -1025,6 +1025,53 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(31, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // v32：AI 分析任务与模板（BETA1 A7-P1）。
+        //
+        // `payload` 存完整的 AiTask / AiTaskTemplate JSON（schema_version=1）；
+        // 其余列是列表排序、授权筛选（mcp_shared）和预览用的索引列，让
+        // `ai_task_list` 与 MCP 授权路径不必逐行解析 JSON。
+        // 三个内置模板由 `BUILTIN_TEMPLATE_SEEDS` 种入：行内中文只是兜底文案，
+        // 界面按 payload 里的 `name_code` / `prompt_code` 取本地化文本。
+        // 全部是 CREATE IF NOT EXISTS + INSERT OR IGNORE，无 if 守卫，
+        // 每次启动幂等重跑；被删的内置行会自愈回来。
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS ai_tasks (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL DEFAULT '',
+                template_id TEXT,
+                payload TEXT NOT NULL,
+                workout_count INTEGER NOT NULL DEFAULT 0,
+                mcp_shared INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS ai_task_templates (
+                id TEXT PRIMARY KEY,
+                builtin INTEGER NOT NULL DEFAULT 0,
+                name TEXT NOT NULL DEFAULT '',
+                payload TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            PRAGMA user_version = 32;",
+        )?;
+        for seed in crate::ai_tasks::BUILTIN_TEMPLATE_SEEDS.iter() {
+            self.conn.execute(
+                "INSERT OR IGNORE INTO ai_task_templates
+                    (id, builtin, name, payload, created_at, updated_at)
+                 VALUES (?1, 1, ?2, ?3, ?4, ?4)",
+                params![
+                    seed.id,
+                    seed.name,
+                    seed.payload,
+                    crate::ai_tasks::BUILTIN_SEED_TIMESTAMP
+                ],
+            )?;
+        }
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(32, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }

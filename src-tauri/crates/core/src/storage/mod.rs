@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 
 /// 当前 SQLite schema 版本（`PRAGMA user_version`）。加新版本只能追加迁移
 /// 步骤，不要改已有 DDL。
-pub const CURRENT_SCHEMA_VERSION: i64 = 31;
+pub const CURRENT_SCHEMA_VERSION: i64 = 32;
 /// 写进备份 manifest 的应用版本。Core 是独立 crate，用它自己的包版本。
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -420,13 +420,31 @@ const SERIES_METRICS: [(&str, MetricSource, &str); 56] = [
 /// share a name with a daily metric; charted from `metric_samples`.
 const SAMPLE_ONLY_SERIES_METRICS: [(&str, &str); 1] = [("spo2", "%")];
 
-#[derive(Debug, Clone, Copy)]
-enum MetricSource {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum MetricSource {
     /// One row per day in `daily_metrics`, optionally with companion metrics
     /// carrying that day's measured minimum and maximum.
     Daily(Option<(&'static str, &'static str)>),
     /// Individual readings in `metric_samples`, folded to one point per day.
     Samples,
+}
+
+/// `(source, unit)` of a series metric known to `metric_series`.
+///
+/// `ai_tasks` 的类别→指标展开从这里取「这张指标存在哪张表、单位是什么」，
+/// 同一指标的来源表与单位只允许有一份定义。`heart_rate` 不在表里——它走
+/// `heart_rate_series` 的专用语义，ai_tasks 自己给它登记 Samples/bpm。
+pub(crate) fn series_metric_spec(metric: &str) -> Option<(MetricSource, &'static str)> {
+    SERIES_METRICS
+        .iter()
+        .find(|(name, _, _)| *name == metric)
+        .map(|(_, source, unit)| (*source, *unit))
+        .or_else(|| {
+            SAMPLE_ONLY_SERIES_METRICS
+                .iter()
+                .find(|(name, _)| *name == metric)
+                .map(|(_, unit)| (MetricSource::Samples, *unit))
+        })
 }
 
 /// The three ways Zepp itself splits heart rate into zones.
@@ -3458,7 +3476,8 @@ impl Database {
         Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
     }
 
-    fn load_sleep_stages(&self, sleep_id: &str) -> Result<Vec<SleepStageSlice>> {
+    /// `pub(crate)`：ai_tasks 的 detailed 导出要附真实阶段片，同一份查询。
+    pub(crate) fn load_sleep_stages(&self, sleep_id: &str) -> Result<Vec<SleepStageSlice>> {
         let mut stmt = self.conn.prepare(
             "SELECT stage, start_time, end_time, raw_mode FROM sleep_stages
              WHERE sleep_id = ?1 ORDER BY start_time, id",
@@ -4384,7 +4403,10 @@ impl Database {
     /// Where the same day is reported twice — once by the account's own fused
     /// roll-up, once by the watch — the fused reading wins, the same
     /// precedence the export uses, so a chart and an export never disagree.
-    fn daily_metric_points(
+    ///
+    /// `pub(crate)`：ai_tasks 的逐日导出复用它按 P4 窗口取数，不另写一份
+    /// 折日规则。
+    pub(crate) fn daily_metric_points(
         &self,
         metric: &str,
         spread: Option<(&str, &str)>,
@@ -4436,7 +4458,9 @@ impl Database {
     /// The day's value is the mean of its readings and the spread is the
     /// readings' own minimum and maximum — measured, not modelled. A day with
     /// one reading reports no spread rather than a zero-width one.
-    fn sample_metric_points(
+    ///
+    /// `pub(crate)`：同 `daily_metric_points`，ai_tasks 按窗口取数复用。
+    pub(crate) fn sample_metric_points(
         &self,
         metric: &str,
         start: &str,
@@ -6468,7 +6492,8 @@ fn stored_stage_minutes(minutes: Option<i32>) -> (i32, i64) {
     (minutes.unwrap_or(0), i64::from(minutes.is_some()))
 }
 
-fn loaded_stage_minutes(minutes: i32, available: i64) -> Option<i32> {
+/// `pub(crate)`：ai_tasks 导出睡眠窗口数据要按同一规则把「没测到」还原成 None。
+pub(crate) fn loaded_stage_minutes(minutes: i32, available: i64) -> Option<i32> {
     (available != 0).then_some(minutes)
 }
 
@@ -6687,7 +6712,8 @@ fn daily_metric_selected_for_export(metric: &str, selected: &BTreeSet<String>) -
         || (!is_recovery && selected.contains("daily_activity"))
 }
 
-fn local_day_range_utc_bounds(start: &str, end: &str) -> Option<(String, String)> {
+/// `pub(crate)`：ai_tasks 的逐日窗口查询同样要这个宽限边界来走时间索引。
+pub(crate) fn local_day_range_utc_bounds(start: &str, end: &str) -> Option<(String, String)> {
     let start = NaiveDate::parse_from_str(start, "%Y-%m-%d").ok()?;
     let end = NaiveDate::parse_from_str(end, "%Y-%m-%d").ok()?;
     let lower = (start - Duration::days(1))
@@ -9812,7 +9838,7 @@ mod tests {
             .query_row("PRAGMA user_version", [], |row| row.get(0))
             .unwrap();
         assert_eq!(version, CURRENT_SCHEMA_VERSION);
-        assert_eq!(CURRENT_SCHEMA_VERSION, 31);
+        assert_eq!(CURRENT_SCHEMA_VERSION, 32);
 
         let start = ts();
         db.insert_sleep_session(&SleepSession {
