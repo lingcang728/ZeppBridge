@@ -119,3 +119,6 @@ Thumbs.db
 
 # 本机 mock 验收目录：真实库的副本 + 造出来的体成分/饮食数据，不进仓库
 mock-test/
+
+# Local-only V3 integration references (never publish)
+/接入资料（ignore）/
