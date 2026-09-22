@@ -1,15 +1,11 @@
 <script setup lang="ts">
-import { displayDateTimeFormatter } from './lib/dateTime';
-
 import { getVersion } from '@tauri-apps/api/app';
 import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, watch } from 'vue';
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router';
-import BrandMark from './components/BrandMark.vue';
 import DesignIcon, { type DesignIconName } from './components/DesignIcon.vue';
-import DeviceVisual from './components/DeviceVisual.vue';
 import Icon from './components/Icon.vue';
+import AppTopBar from './components/shell/AppTopBar.vue';
 import { useSyncController } from './composables/useSyncController';
-import { deviceStateLabel, useDevices } from './composables/useDevices';
 import { useUiScale } from './composables/useUiScale';
 import { backend, isDesktop, whenBackendReady } from './lib/bridge';
 import { checkForDesktopUpdate } from './services/updateService';
@@ -21,28 +17,10 @@ const messages = defineMessages(
   {
     skipToContent: '跳到主要内容',
     mainNav: '主导航',
-    mobileNav: '移动导航',
     bottomNav: '移动主导航',
-    openNav: '打开导航',
     navOverview: '概览',
     navHandoff: '交给 AI',
     navSettings: '设置',
-    dataSources: '数据来源',
-    identifyingDevices: '正在识别实体设备…',
-    identifyFailed: (reason: string) => `设备识别暂不可用：${reason}`,
-    noDevicesYet: '尚未识别实体设备。',
-    accountPrefix: '账户：',
-    manage: '管理',
-    privacyLink: '安全与隐私设置',
-    connectionTitle: '云端连接状态',
-    lastSyncPrefix: '上次同步：',
-    notFetchedYet: '尚未获取',
-    timeUnknown: '时间未知',
-    noAccount: '未识别账户',
-    syncNow: '立即同步',
-    verifyFirst: '请先完成连接验证',
-    syncing: '同步中…',
-    cancel: '取消',
     preparingData: '正在打开本地数据库，升级后的第一次启动可能要十几秒…',
     compacting: (pending: number) =>
       `正在压缩历史报文（${pending} 条），压完会自动消失。这期间同步会稍等一下。`,
@@ -54,28 +32,10 @@ const messages = defineMessages(
   {
     skipToContent: 'Skip to main content',
     mainNav: 'Main navigation',
-    mobileNav: 'Mobile navigation',
     bottomNav: 'Mobile main navigation',
-    openNav: 'Open navigation',
     navOverview: 'Overview',
     navHandoff: 'Hand to AI',
     navSettings: 'Settings',
-    dataSources: 'Data sources',
-    identifyingDevices: 'Identifying your devices…',
-    identifyFailed: (reason: string) => `Device identification is unavailable: ${reason}`,
-    noDevicesYet: 'No device identified yet.',
-    accountPrefix: 'Account: ',
-    manage: 'Manage',
-    privacyLink: 'Security and privacy settings',
-    connectionTitle: 'Cloud connection state',
-    lastSyncPrefix: 'Last sync: ',
-    notFetchedYet: 'Not fetched yet',
-    timeUnknown: 'Time unknown',
-    noAccount: 'No account identified',
-    syncNow: 'Sync now',
-    verifyFirst: 'Verify the connection first',
-    syncing: 'Syncing…',
-    cancel: 'Cancel',
     preparingData: 'Opening your local database — the first launch after an update can take a few seconds…',
     compacting: (pending: number) =>
       `Compacting stored payloads (${pending} to go). This clears itself; syncing waits its turn.`,
@@ -87,28 +47,10 @@ const messages = defineMessages(
   {
     skipToContent: 'Saltar al contenido principal',
     mainNav: 'Navegación principal',
-    mobileNav: 'Navegación móvil',
     bottomNav: 'Navegación principal móvil',
-    openNav: 'Abrir navegación',
     navOverview: 'Resumen',
     navHandoff: 'Pasar a la IA',
     navSettings: 'Configuración',
-    dataSources: 'Fuentes de datos',
-    identifyingDevices: 'Identificando tus dispositivos…',
-    identifyFailed: (reason: string) => `La identificación de dispositivos no está disponible: ${reason}`,
-    noDevicesYet: 'Aún no se ha identificado ningún dispositivo.',
-    accountPrefix: 'Cuenta: ',
-    manage: 'Gestionar',
-    privacyLink: 'Configuración de seguridad y privacidad',
-    connectionTitle: 'Estado de la conexión con la nube',
-    lastSyncPrefix: 'Última sincronización: ',
-    notFetchedYet: 'Aún sin datos',
-    timeUnknown: 'Hora desconocida',
-    noAccount: 'Ninguna cuenta identificada',
-    syncNow: 'Sincronizar ahora',
-    verifyFirst: 'Primero verifica la conexión',
-    syncing: 'Sincronizando…',
-    cancel: 'Cancelar',
     preparingData: 'Abriendo tu base de datos local; el primer arranque tras una actualización puede tardar unos segundos…',
     compacting: (pending: number) =>
       `Compactando registros guardados (faltan ${pending}). Esto desaparece solo; la sincronización espera su turno.`,
@@ -148,12 +90,11 @@ if (desktopRuntime) {
 
 const route = useRoute();
 const router = useRouter();
-const mobileMenuOpen = ref(false);
 const trayHint = ref(false);
 const {
-  appStatus, statusError, syncState, syncMessage, syncProgress, isSyncing, canIncrementalSync,
+  statusError, syncState, syncMessage, isSyncing,
   compacting, compactionPending, compactionSaved,
-  dataRevision, initialize, runSync, cancelSync, dispose: disposeSyncController,
+  initialize, dispose: disposeSyncController,
 } = useSyncController();
 /* 这个组件自己注册的 Tauri 监听器的解绑函数。
 
@@ -162,21 +103,15 @@ const {
    就会连着弹两次。 */
 const ownUnlisteners: Array<() => void> = [];
 const { initializeScale, bumpScale, resetScale } = useUiScale();
-const {
-  models: deviceModels,
-  loading: devicesLoading,
-  error: devicesError,
-  load: loadDevices,
-} = useDevices();
 
 /* 「数据健康」不在主导航里。
  *
  * 它回答的是「这条数据流为什么没同步过来」，属于出问题时才找的排查工具，
- * 而不是日常四个入口之一。路由 /health-check 仍然有效，入口挪到
+ * 而不是日常三个入口之一。路由 /health-check 仍然有效，入口在
  * 「设置 → 高级与维护」，需要的人找得到，不需要的人不用天天看见它。 */
 const navigation = computed(() => [
   { to: '/', label: t.value.navOverview, icon: 'overview' as DesignIconName },
-  { to: '/explore', label: t.value.navHandoff, icon: 'handoff' as DesignIconName },
+  { to: '/ai', label: t.value.navHandoff, icon: 'handoff' as DesignIconName },
   { to: '/settings', label: t.value.navSettings, icon: 'settings' as DesignIconName },
 ]);
 
@@ -197,54 +132,7 @@ const formatSavedBytes = (bytes: number): string => {
   return `${(bytes / 1073741824).toFixed(2)} GB`;
 };
 
-const connected = computed(() => appStatus.value?.connection_state === 'connected');
-const accountRecognized = computed(() => ['connected', 'configured'].includes(String(appStatus.value?.connection_state || '')));
-
-const dataSources = computed(() => [
-  ...deviceModels.value.map((model) => ({
-    kind: 'device' as const,
-    name: model.canonicalName,
-    model,
-    state: model.state,
-  })),
-  {
-    kind: 'cloud' as const,
-    name: 'Zepp Cloud',
-    state: accountRecognized.value ? ('account' as const) : ('unknown' as const),
-  },
-]);
-
-const statusLabel = computed(() => {
-  // Keep the chip within the same four account/device states used elsewhere.
-  // The browser-preview banner separately explains that no account data is read.
-  if (!isDesktop()) return 'unknown' as const;
-  if (!appStatus.value) return 'unknown' as const;
-  if (appStatus.value.connection_state === 'connected' || appStatus.value.connection_state === 'configured') return 'account' as const;
-  return 'unknown' as const;
-});
-const statusTone = computed(() => {
-  if (appStatus.value?.connection_state === 'needs_reauth' || syncState.value === 'failed') return 'danger';
-  if (syncState.value === 'partial') return 'warning';
-  if (accountRecognized.value) return 'success';
-  return 'neutral';
-});
-// 连接状态不能只用颜色区分：图标跟着 tone 换，红绿色觉障碍下也能读出来。
-const statusIcon = computed(() => {
-  if (statusTone.value === 'danger') return 'warning' as const;
-  if (statusTone.value === 'warning') return 'info' as const;
-  if (statusTone.value === 'success') return 'circle-check' as const;
-  return 'info' as const;
-});
-const lastSyncClock = computed(() => {
-  const raw = appStatus.value?.last_cloud_sync_at;
-  if (!raw) return t.value.notFetchedYet;
-  const date = new Date(raw);
-  if (Number.isNaN(date.getTime())) return t.value.timeUnknown;
-  return displayDateTimeFormatter({
-    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
-  }).format(date).replace(/\//g, '-');
-});
-const accountLabel = computed(() => appStatus.value?.masked_user_id || t.value.noAccount);
+const versionTitle = computed(() => `ZeppBridge v${APP_VERSION.value} · build ${BUILD_STAMP}`);
 const browserPreview = computed(() => !desktopRuntime);
 const routeNotice = computed(() => route.query.notice === 'not-found');
 
@@ -263,7 +151,6 @@ const onDocumentKeydown = (event: KeyboardEvent) => {
     resetScale();
   }
 };
-const closeMobileMenu = () => { mobileMenuOpen.value = false; };
 
 /* 托盘菜单是原生的，建起来的时候前端还没加载，只能先按系统语言猜一次。
    界面语言一确定（以及之后每次切换）就把它校正过来——不然英文用户右键
@@ -287,7 +174,6 @@ onMounted(() => {
     void checkForDesktopUpdate(false);
   });
   void initialize();
-  void loadDevices();
   document.addEventListener('keydown', onDocumentKeydown);
   if (route.query.notice === 'not-found') {
     window.setTimeout(() => {
@@ -309,9 +195,6 @@ onMounted(() => {
     });
   }
 });
-watch(dataRevision, () => {
-  if (!showLanding) void loadDevices();
-});
 onUnmounted(() => {
   document.removeEventListener('keydown', onDocumentKeydown);
   for (const unlisten of ownUnlisteners.splice(0)) unlisten();
@@ -327,101 +210,8 @@ onUnmounted(() => {
     <LifeEventEditor />
     <a class="skip-link" href="#main-content">{{ t.skipToContent }}</a>
 
-    <div class="app-shell">
-    <aside class="sidebar" :aria-label="t.mainNav">
-      <div class="brand-lockup">
-        <span class="brand-badge"><BrandMark /></span>
-        <span class="brand-text">
-          <span class="brand-name">ZeppBridge</span>
-          <span class="brand-sub">Amazfit Data Bridge</span>
-        </span>
-      </div>
-
-      <nav class="desktop-nav" :aria-label="t.mainNav">
-        <RouterLink
-          v-for="item in navigation"
-          :key="item.to"
-          :to="item.to"
-          class="nav-link"
-          active-class="is-active"
-          exact-active-class="is-active"
-          @click="closeMobileMenu"
-        >
-          <DesignIcon :name="item.icon" :size="25" />
-          <span>{{ item.label }}</span>
-        </RouterLink>
-      </nav>
-
-      <div class="sources">
-        <div class="sources-head">
-          <span>{{ t.dataSources }}</span>
-        </div>
-        <div v-if="devicesLoading" class="sources-feedback" role="status">{{ t.identifyingDevices }}</div>
-        <div v-else-if="devicesError" class="sources-feedback error" role="alert">{{ t.identifyFailed(devicesError) }}</div>
-        <div v-else-if="!deviceModels.length" class="sources-feedback" role="status">{{ t.noDevicesYet }}</div>
-        <RouterLink v-for="source in dataSources" :key="source.name" class="source-card" to="/settings">
-          <span class="source-icon">
-            <DeviceVisual v-if="source.kind === 'device'" :src="source.model.image" :alt="source.name" :kind="source.model.kind" compact />
-            <DesignIcon v-else name="zepp-cloud" :size="38" />
-          </span>
-          <span class="source-copy">
-            <strong>{{ source.name }}</strong>
-            <span :class="['source-state', { on: source.state !== 'unknown' }]">
-              <i class="dot"></i>{{ deviceStateLabel(source.state) }}
-            </span>
-          </span>
-          <Icon name="chevron-down" :size="14" class="source-chevron" />
-        </RouterLink>
-      </div>
-
-      <div class="sidebar-footer">
-        <div class="cloud-card">
-          <div class="cloud-row">
-            <DesignIcon name="zepp-cloud" :size="24" />
-            <span>Zepp Cloud · {{ deviceStateLabel(accountRecognized ? 'account' : 'unknown') }}</span>
-            <Icon name="circle-check" :size="15" :class="['cloud-check', { on: connected }]" />
-          </div>
-          <div class="cloud-account">
-            <span>{{ t.accountPrefix }}{{ accountLabel }}</span>
-            <RouterLink to="/settings" class="manage-btn">{{ t.manage }}</RouterLink>
-          </div>
-        </div>
-        <div class="version-row">
-          <span class="version-brand"><BrandMark :size="20" /></span>
-          <span :title="`build ${BUILD_STAMP}`">ZeppBridge　v{{ APP_VERSION }}</span>
-          <RouterLink :to="{ path: '/settings', hash: '#privacy-section' }" class="shield-link" :title="t.privacyLink">
-            <DesignIcon name="secure" :size="20" />
-          </RouterLink>
-        </div>
-      </div>
-    </aside>
-
     <div class="app-body">
-      <header class="topbar">
-        <div class="topbar-leading">
-          <button class="mobile-menu-button" type="button" :aria-label="t.openNav" :aria-expanded="mobileMenuOpen" @click="mobileMenuOpen = !mobileMenuOpen">
-            <Icon :name="mobileMenuOpen ? 'x' : 'sliders'" :size="19" />
-          </button>
-          <span v-if="statusError" class="sr-only" role="status">{{ statusError }}</span>
-          <span :class="['connection-chip', `tone-${statusTone}`]" :title="t.connectionTitle" aria-live="polite">
-            <Icon :name="statusIcon" :size="15" /><span>{{ deviceStateLabel(statusLabel) }}</span>
-          </span>
-          <span class="sync-time">{{ t.lastSyncPrefix }}{{ lastSyncClock }}</span>
-          <button
-            class="refresh-btn"
-            type="button"
-            :disabled="isSyncing || !canIncrementalSync"
-            :title="canIncrementalSync ? t.syncNow : t.verifyFirst"
-            @click="runSync('incremental')"
-          >
-            <DesignIcon name="sync" :size="20" :class="{ spinning: isSyncing }" /><span>{{ t.syncNow }}</span>
-          </button>
-          <span v-if="isSyncing" class="sync-progress-text">
-            {{ syncProgress ? `${syncProgress.current}/${syncProgress.total}` : t.syncing }}
-            <button class="cancel-link" type="button" @click="cancelSync">{{ t.cancel }}</button>
-          </span>
-        </div>
-      </header>
+      <AppTopBar :items="navigation" :nav-aria-label="t.mainNav" :version-title="versionTitle" />
 
       <div v-if="!backendReady" class="sync-feedback" role="status" aria-live="polite">
         <Icon name="database" :size="14" class="spinning" />
@@ -445,14 +235,6 @@ onUnmounted(() => {
         <span>{{ t.compacted(formatSavedBytes(compactionSaved)) }}</span>
       </div>
       <div v-if="trayHint" class="sync-feedback" role="status">{{ t.trayHint }}</div>
-
-      <div v-if="mobileMenuOpen" class="mobile-menu" :aria-label="t.mobileNav">
-        <nav class="mobile-menu-links">
-          <RouterLink v-for="item in navigation" :key="item.to" :to="item.to" class="nav-link" active-class="is-active" exact-active-class="is-active" @click="closeMobileMenu">
-            <DesignIcon :name="item.icon" :size="25" /><span>{{ item.label }}</span>
-          </RouterLink>
-        </nav>
-      </div>
 
       <div v-if="browserPreview" class="preview-banner" role="status">
         <Icon name="terminal" :size="16" />
@@ -485,86 +267,12 @@ onUnmounted(() => {
         </RouterLink>
       </nav>
     </div>
-    </div>
   </template>
 </template>
 
 <style>
-:root {
-  color-scheme: dark;
-  --bg: #0C0E11;
-  --sidebar: #08090C;
-  --canvas: #0D0F12;
-  --surface: #16191E;
-  --surface-raised: #1D2128;
-  --surface-hover: #262B33;
-  --ink: #F2F4EE;
-  --muted: #B4BBC3;
-  --subtle: #949CA5;
-  /* 旧的 --faint 在任何表面上都过不了 WCAG AA，退回 --subtle。 */
-  --faint: var(--subtle);
-  --line: rgba(226, 234, 242, .12);
-  --line-control: rgba(226, 234, 242, .46);
-  --line-strong: rgba(226, 234, 242, .22);
-  --brand: #7DA33E;
-  --accent: var(--brand);
-  --accent-hover: #93B952;
-  --accent-strong: #7DA33E;
-  --accent-ink: #12170A;
-  --accent-soft: rgba(125, 163, 62, .12);
-  --action-green: #55702A;
-  --action-green-hover: #668539;
-  --icon-mint: #2FA96B;
-  --heart: #F0616A;
-  --heart-wash: rgba(240, 97, 106, .12);
-  --pace: #4AA8E8;
-  --pace-wash: rgba(74, 168, 232, .12);
-  --calories: #F5860B;
-  --calories-wash: rgba(245, 134, 11, .12);
-  --altitude: #F5C33B;
-  --altitude-wash: rgba(245, 195, 59, .12);
-  --cadence: #4AA8E8;
-  --training: #3DD84C;
-  --readiness: #3DD84C;
-  --sleep-deep: #6477D7;
-  --sleep-light: #7C8FF0;
-  --sleep-rem: #8B5CF6;
-  --sleep-awake: #E8833A;
-  --sleep: var(--sleep-light);
-  --sleep-wash: rgba(124, 143, 240, .12);
-  --activity: #2BB3C0;
-  --activity-wash: rgba(43, 179, 192, .12);
-  --distance: var(--pace);
-  --danger: #F0616A;
-  --warning: #F5C33B;
-  --focus: #7DA33E;
-  --route-neutral: #9AA1A9;
-  --route-mint: #2FA96B;
-  --route-cyan: #4AA8E8;
-  --route-amber: #F5C33B;
-  --route-coral: #F0616A;
-  --font-sans: 'MiSans', 'Segoe UI', 'Microsoft YaHei UI', sans-serif;
-  --font-mono: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
-  /* 字号阶梯（设计系统 v5）：默认界面缩放为 100%，通过 token 统一抬高 DOM 字号和图表文字。
-     用户仍可在界面缩放中调整整体大小，半像素值也会随所选缩放一起变化。 */
-  --fs-2xs: 13px;
-  --fs-xs: 14.5px;
-  --fs-sm: 15.5px;
-  --fs-md: 16.5px;
-  --fs-lg: 17.5px;
-  --fs-xl: 18.5px;
-  --fs-2xl: 20px;
-  --fs-3xl: 22px;
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-6: 24px;
-  --space-8: 32px;
-  --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 18px;
-}
+/* 设计 token 搬到 src/styles/tokens.css——`:root` 是深色默认值，
+   `html[data-theme="light"]` 覆写同一组变量。这里只留布局与组件无关的全局规则。 */
 
 /* ── 全局自定义细滚动条（覆盖原生灰条） ─────── */
 ::-webkit-scrollbar {
@@ -631,247 +339,9 @@ a { color: inherit; }
   transition: transform 150ms ease;
 }
 .skip-link:focus { transform: translateY(0); }
-.app-shell { display: flex; height: 100%; min-height: 0; min-width: 0; overflow: hidden; background: var(--bg); }
-.app-shell > * { min-width: 0; }
 
-/* ── 侧边栏 ─────────────────────────────── */
-.sidebar {
-  /* 字号抬上去之后 236px 放不下「有近期数据」这类状态文案了，会折成两行。 */
-  width: 280px;
-  flex: 0 0 280px;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  min-width: 0;
-  overflow: hidden auto;
-  padding: 20px 12px 14px;
-  background: var(--sidebar);
-  border-right: 1px solid var(--line);
-}
-.brand-lockup { display: flex; align-items: center; gap: 10px; padding: 0 6px 22px; min-width: 0; }
-.brand-badge {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  flex: 0 0 40px;
-  border-radius: 12px;
-  background: transparent;
-  border: 0;
-  color: var(--accent);
-}
-.brand-text { display: grid; gap: 1px; min-width: 0; }
-.brand-name { font-size: var(--fs-2xl); font-weight: 700; letter-spacing: .01em; }
-.brand-sub { color: var(--subtle); font-size: var(--fs-xs); }
-.desktop-nav { display: grid; gap: 4px; min-width: 0; }
-.nav-link {
-  display: flex;
-  min-height: 40px;
-  min-width: 0;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border: 1px solid transparent;
-  border-radius: 11px;
-  color: var(--muted);
-  font-size: var(--fs-md);
-  text-decoration: none;
-  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
-}
-.nav-link:hover { color: var(--ink); background: var(--surface-hover); }
-.nav-link:active { transform: translateY(1px); }
-.nav-link svg { color: var(--subtle); }
-.nav-link .design-icon { opacity: .7; filter: saturate(.78); transition: opacity 220ms ease, filter 220ms ease, transform 220ms cubic-bezier(.16, 1, .3, 1); }
-.nav-link:hover .design-icon { opacity: .94; transform: translateY(-1px) scale(1.04); }
-.nav-link.is-active {
-  color: var(--accent);
-  background: var(--accent-soft);
-  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
-}
-.nav-link.is-active svg { color: var(--accent); }
-.nav-link.is-active .design-icon { opacity: 1; filter: saturate(1.05); }
-
-.sources { margin-top: 20px; min-width: 0; display: grid; gap: 8px; }
-.sources-feedback { padding: 8px 10px; border: 1px dashed var(--line-strong); border-radius: 9px; color: var(--muted); font-size: var(--fs-xs); line-height: 1.45; }
-.sources-feedback.error { color: var(--danger); border-color: rgba(240, 97, 106, .28); }
-.sources-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 6px;
-  color: var(--subtle);
-  font-size: var(--fs-sm);
-}
-.sources-head button {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--subtle);
-  cursor: pointer;
-}
-.sources-head button:hover { background: var(--surface-hover); color: var(--ink); }
-.source-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  padding: 11px 12px;
-  border: 1px solid var(--line-control);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  text-decoration: none;
-  color: inherit;
-  transition: border-color 150ms ease, background-color 150ms ease;
-}
-.source-card:hover { background: var(--surface-raised); border-color: var(--line-control); }
-.source-card:hover .source-chevron { color: var(--muted); }
-.source-icon {
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  flex: 0 0 42px;
-  border-radius: 11px;
-  background: var(--surface-raised);
-  border: 1px solid var(--line);
-  color: var(--muted);
-}
-.source-icon :deep(.device-visual) { width: 42px; max-width: 100%; height: 42px; max-height: 100%; min-width: 0; min-height: 0; flex: 0 0 42px; border: 0; border-radius: 11px; background: transparent; }
-.source-icon :deep(.device-visual img) { padding: 3px; }
-.source-copy { display: grid; gap: 2px; min-width: 0; flex: 1; }
-.source-copy strong { font-size: var(--fs-md); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.source-state { display: inline-flex; min-width: 0; align-items: center; gap: 5px; overflow: hidden; color: var(--subtle); font-size: var(--fs-xs); white-space: nowrap; text-overflow: ellipsis; }
-.source-state .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--subtle); }
-.source-state.on { color: var(--accent); }
-.source-state.on .dot { background: var(--accent); }
-.source-chevron { transform: rotate(-90deg); color: var(--subtle); }
-
-.sidebar-footer { margin-top: auto; padding-top: 16px; min-width: 0; display: grid; gap: 12px; }
-.cloud-card {
-  min-width: 0;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  padding: 10px 12px;
-  display: grid;
-  gap: 8px;
-}
-.cloud-row { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: var(--fs-sm); color: var(--ink); }
-.cloud-row svg:first-child { color: var(--muted); }
-.cloud-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cloud-check { color: var(--faint); }
-.cloud-check.on { color: var(--accent); }
-.cloud-account {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-width: 0;
-  padding-top: 8px;
-  border-top: 1px solid var(--line);
-  color: var(--subtle);
-  font-size: var(--fs-xs);
-}
-.cloud-account span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.manage-btn {
-  flex: 0 0 auto;
-  padding: 2px 10px;
-  border: 1px solid var(--line-control);
-  border-radius: 7px;
-  color: var(--muted);
-  font-size: var(--fs-xs);
-  text-decoration: none;
-}
-.manage-btn:hover { color: var(--accent); border-color: var(--accent); }
-.version-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  padding: 0 6px;
-  color: var(--subtle);
-  font-size: var(--fs-xs);
-}
-.version-row span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.version-brand { display: grid; place-items: center; width: 18px; height: 18px; opacity: .8; }
-.version-brand svg { width: 18px; height: 18px; }
-.shield-link {
-  display: inline-flex;
-  align-items: center;
-  color: var(--subtle);
-  text-decoration: none;
-  transition: color 150ms ease;
-}
-.shield-link:hover { color: var(--accent); }
-
-/* ── 顶栏 ───────────────────────────────── */
-.app-body { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; height: 100%; overflow: hidden; }
-.topbar {
-  display: flex;
-  height: 60px;
-  min-width: 0;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 28px;
-  background: var(--canvas);
-  border-bottom: 1px solid var(--line);
-}
-.topbar-leading { display: flex; min-width: 0; align-items: center; gap: 10px; }
-.mobile-menu-button { display: none; }
-.connection-chip {
-  display: inline-flex;
-  min-height: 30px;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 13px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--muted);
-  font-size: var(--fs-sm);
-  white-space: nowrap;
-}
-.connection-chip.tone-success { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 34%, transparent); background: var(--accent-soft); }
-.connection-chip.tone-warning { color: var(--warning); }
-.connection-chip.tone-danger { color: var(--danger); }
-.sync-time { color: var(--muted); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.refresh-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 30px;
-  padding: 4px 13px;
-  border: 1px solid var(--line-control);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--muted);
-  font-size: var(--fs-sm);
-  cursor: pointer;
-  white-space: nowrap;
-}
-.refresh-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-.refresh-btn:disabled { opacity: .5; cursor: not-allowed; }
-.sync-progress-text { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: var(--fs-sm); }
-.cancel-link { border: 0; background: transparent; color: var(--accent); font-size: var(--fs-sm); cursor: pointer; padding: 0; }
-.icon-round {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-}
-.icon-round:hover { background: var(--surface-hover); color: var(--ink); }
+/* ── 应用骨架：顶栏 + 内容 + 移动端底部导航（见 shell/AppTopBar.vue） ── */
+.app-body { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; height: 100%; overflow: hidden; background: var(--bg); }
 
 .sync-feedback { display: flex; min-height: 32px; min-width: 0; align-items: center; gap: 7px; padding: 6px 28px; border-bottom: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: var(--fs-sm); }
 .sync-feedback.tone-updated { color: var(--accent); }
@@ -888,7 +358,7 @@ a { color: inherit; }
 .preview-banner svg { color: var(--accent); }
 .route-notice { background: var(--surface); color: var(--warning); }
 .main-content { width: 100%; min-width: 0; min-height: 0; flex: 1; overflow: auto; background: var(--canvas); }
-.bottom-nav, .mobile-menu { display: none; }
+.bottom-nav { display: none; }
 .page-enter-active, .page-leave-active { transition: opacity 150ms ease, transform 150ms ease; }
 .page-enter-from, .page-leave-to { opacity: 0; transform: translateY(4px); }
 
@@ -897,15 +367,7 @@ a { color: inherit; }
 }
 
 @media (max-width: 760px) {
-  .sidebar { display: none; }
-  .topbar { height: 56px; padding: 0 16px; }
-  .mobile-menu-button { display: inline-flex; width: 44px; height: 44px; align-items: center; justify-content: center; border: 1px solid var(--line-control); border-radius: var(--radius-sm); background: transparent; cursor: pointer; }
-  .sync-time { display: none; }
-  .connection-chip { padding-inline: 8px; }
-  .connection-chip span { display: none; }
   .sync-feedback { padding-inline: 16px; }
-  .mobile-menu { display: block; padding: 8px 12px 12px; background: var(--bg); border-bottom: 1px solid var(--line); }
-  .mobile-menu-links { display: grid; gap: 3px; }
   .preview-banner, .route-notice { padding-inline: 16px; }
   .main-content { padding-bottom: 64px; }
   .bottom-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); height: 60px; padding: 5px 8px calc(5px + env(safe-area-inset-bottom)); background: var(--canvas); border-top: 1px solid var(--line); }

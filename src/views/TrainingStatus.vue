@@ -461,6 +461,7 @@ watch(dataRevision, () => { void load(); });
           <VChart
             v-if="thresholdOption"
             class="chart-body"
+            :key="CHART_THEME"
             :theme="CHART_THEME"
             :option="thresholdOption"
             autoresize
@@ -487,6 +488,7 @@ watch(dataRevision, () => { void load(); });
         <VChart
           v-if="balanceOption"
           class="chart-body tall"
+          :key="CHART_THEME"
           :theme="CHART_THEME"
           :option="balanceOption"
           autoresize

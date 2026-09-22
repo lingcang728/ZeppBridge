@@ -25,7 +25,9 @@ import {
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import VChart from 'vue-echarts';
-import { zeppThemeDark } from './echartsTheme';
+import { computed } from 'vue';
+import { resolvedTheme } from '../composables/useTheme';
+import { chartPalettes, zeppThemeDark, zeppThemeLight } from './echartsTheme';
 
 use([
   LineChart,
@@ -40,6 +42,15 @@ use([
   CanvasRenderer,
 ]);
 registerTheme('zeppbridge-dark', zeppThemeDark);
+registerTheme('zeppbridge-light', zeppThemeLight);
 
 export { VChart };
-export const CHART_THEME = 'zeppbridge-dark';
+
+/* 图表主题跟着界面主题走：`<VChart :theme="CHART_THEME" :key="CHART_THEME">`
+   主题一变 key 也变，vue-echarts 整个重建，不会出现半新半旧的画布。
+   option 里需要 chrome 色（轴文字、tooltip、网格线）时用 `chartPalette`，
+   option 必须是 computed 才会在换主题时重算。 */
+export const CHART_THEME = computed(() =>
+  resolvedTheme.value === 'light' ? 'zeppbridge-light' : 'zeppbridge-dark');
+
+export const chartPalette = computed(() => chartPalettes[resolvedTheme.value]);

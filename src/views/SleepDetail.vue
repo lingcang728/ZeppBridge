@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
-import { CHART_THEME, VChart } from '../lib/echartsSetup';
+import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
 import Icon from '../components/Icon.vue';
 import CircularProgress from '../components/CircularProgress.vue';
 import StageBar from '../components/StageBar.vue';
@@ -147,7 +147,6 @@ import { dataProviderLabel, dataScopeLabel } from '../lib/labels';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { formatDate, formatDateTime, formatDuration, formatTime, isFiniteNumber } from '../lib/format';
 import { minutesToHours } from '../lib/missingValues';
-import { zeppSemanticColors } from '../lib/echartsTheme';
 import type { DeviceProfile, SleepSession } from '../types';
 
 const route = useRoute();
@@ -203,6 +202,7 @@ const weeklyChartOption = computed(() => {
 
   // 标出当前日高亮
   const currentIndex = sorted.findIndex((s) => s.sleep_id === sleepId.value);
+  const palette = chartPalette.value;
 
   return {
     animation: false,
@@ -211,17 +211,17 @@ const weeklyChartOption = computed(() => {
       data: sleepStageLabels(),
       top: 0,
       right: 0,
-      textStyle: { color: '#B4BBC3', fontSize: 14.5 },
+      textStyle: { color: palette.axis, fontSize: 14.5 },
       itemWidth: 8,
       itemHeight: 8,
       icon: 'circle',
     },
     tooltip: {
       trigger: 'axis',
-      backgroundColor: '#1E221F',
-      borderColor: 'rgba(228, 235, 208, 0.16)',
+      backgroundColor: palette.tooltipBg,
+      borderColor: palette.tooltipBorder,
       borderWidth: 1,
-      textStyle: { color: '#F3F4EC', fontSize: 15.5 },
+      textStyle: { color: palette.tooltipText, fontSize: 15.5 },
       formatter: (params: Array<{ seriesName: string; value: number | null; name: string }>) => {
         if (!params || !params.length) return '';
         const name = params[0].name;
@@ -238,10 +238,10 @@ const weeklyChartOption = computed(() => {
     xAxis: {
       type: 'category',
       data: dates,
-      axisLine: { lineStyle: { color: 'rgba(228, 235, 208, 0.1)' } },
+      axisLine: { lineStyle: { color: palette.gridSoft } },
       axisTick: { show: false },
       axisLabel: {
-        color: (_val: string, index: number) => index === currentIndex ? '#93B952' : '#B4BBC3',
+        color: (_val: string, index: number) => index === currentIndex ? palette.accent : palette.axis,
         fontSize: 14.5,
         fontWeight: (_val: string, index: number) => index === currentIndex ? 'bold' : 'normal',
       },
@@ -249,11 +249,11 @@ const weeklyChartOption = computed(() => {
     yAxis: {
       type: 'value',
       name: t.value.hoursAxis,
-      nameTextStyle: { color: '#B4BBC3', fontSize: 14.5, align: 'right' },
+      nameTextStyle: { color: palette.axis, fontSize: 14.5, align: 'right' },
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: '#B4BBC3', fontSize: 14.5 },
-      splitLine: { show: true, lineStyle: { color: 'rgba(228, 235, 208, 0.08)', type: 'dashed' } },
+      axisLabel: { color: palette.axis, fontSize: 14.5 },
+      splitLine: { show: true, lineStyle: { color: palette.gridSoft, type: 'dashed' } },
     },
     series: [
       {
@@ -261,7 +261,7 @@ const weeklyChartOption = computed(() => {
         type: 'bar',
         stack: 'sleep',
         data: deepData,
-        itemStyle: { color: zeppSemanticColors.sleep.deep },
+        itemStyle: { color: chartPalette.value.series.sleep.deep },
         barWidth: 20,
       },
       {
@@ -269,14 +269,14 @@ const weeklyChartOption = computed(() => {
         type: 'bar',
         stack: 'sleep',
         data: lightData,
-        itemStyle: { color: zeppSemanticColors.sleep.light },
+        itemStyle: { color: chartPalette.value.series.sleep.light },
       },
       {
         name: sleepStageLabel('rem'),
         type: 'bar',
         stack: 'sleep',
         data: remData,
-        itemStyle: { color: zeppSemanticColors.sleep.rem },
+        itemStyle: { color: chartPalette.value.series.sleep.rem },
       },
       {
         name: sleepStageLabel('awake'),
@@ -284,7 +284,7 @@ const weeklyChartOption = computed(() => {
         stack: 'sleep',
         data: awakeData,
         itemStyle: {
-          color: zeppSemanticColors.sleep.awake,
+          color: chartPalette.value.series.sleep.awake,
           borderRadius: [4, 4, 0, 0],
         },
       },
@@ -394,7 +394,7 @@ watch([dataRevision, sleepId], () => void loadDetail());
           <h2>{{ t.weeklyTitle }}</h2>
           <p>{{ t.weeklySub }}</p>
         </div>
-        <VChart class="weekly-sleep-chart" :theme="CHART_THEME" :option="weeklyChartOption" autoresize role="img" :aria-label="t.weeklyChartAria" />
+        <VChart class="weekly-sleep-chart" :key="CHART_THEME" :theme="CHART_THEME" :option="weeklyChartOption" autoresize role="img" :aria-label="t.weeklyChartAria" />
       </section>
 
       <!-- 元数据与设备 -->

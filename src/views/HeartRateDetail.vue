@@ -12,7 +12,6 @@ defineOptions({ name: 'HeartRateDetail' });
  * 没有采样的时间段不画线，也不补 0——曲线断开就是断开。
  */
 import { computed, onMounted, ref, watch } from 'vue';
-import { CHART_THEME, VChart } from '../lib/echartsSetup';
 import { HR_GAP_BREAK_MS, insertNullBreaks } from '../lib/chartGaps';
 import { createLoadSeq } from '../lib/loadSeq';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
@@ -21,7 +20,7 @@ import SkeletonBlock from '../components/SkeletonBlock.vue';
 import Icon from '../components/Icon.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
-import { axisInk, zeppSemanticColors, zeppThemeDark } from '../lib/echartsTheme';
+import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
 import { indexSeries, SERIES_RANGE_DAYS, seriesRanges, type SeriesRangeDays } from '../lib/metricSeries';
 import { isFiniteNumber } from '../lib/format';
 import type { DailyHeartRateExtreme, HeartRatePoint, MetricSeries } from '../types';
@@ -209,11 +208,11 @@ const dayChartOption = computed(() => {
     grid: { left: 40, right: 18, top: 16, bottom: 28 },
     tooltip: {
       trigger: 'axis',
-      backgroundColor: zeppThemeDark.tooltip.backgroundColor,
-      borderColor: zeppThemeDark.tooltip.borderColor,
+      backgroundColor: chartPalette.value.tooltipBg,
+      borderColor: chartPalette.value.tooltipBorder,
       borderWidth: 1,
       padding: [8, 12],
-      textStyle: { color: zeppThemeDark.tooltip.textStyle.color, fontSize: 15.5 },
+      textStyle: { color: chartPalette.value.tooltipText, fontSize: 15.5 },
       extraCssText: 'border-radius:8px;box-shadow:none;',
       formatter: (params: Array<{ value: [number, number | null] }>) => {
         const point = Array.isArray(params) ? params[0] : params;
@@ -225,24 +224,24 @@ const dayChartOption = computed(() => {
       type: 'time',
       min: data[0]?.[0],
       max: data[data.length - 1]?.[0],
-      axisLabel: { formatter: clock, hideOverlap: true, color: axisInk, fontSize: 14.5 },
-      axisLine: { lineStyle: { color: 'rgba(232,238,244,.12)' } },
+      axisLabel: { formatter: clock, hideOverlap: true, color: chartPalette.value.axis, fontSize: 14.5 },
+      axisLine: { lineStyle: { color: chartPalette.value.grid } },
       axisTick: { show: false },
       splitLine: { show: false },
     },
     yAxis: {
       type: 'value', scale: true, splitNumber: 4,
-      axisLabel: { color: axisInk, fontSize: 14.5 },
+      axisLabel: { color: chartPalette.value.axis, fontSize: 14.5 },
       axisLine: { show: false }, axisTick: { show: false },
-      splitLine: { lineStyle: { color: 'rgba(232,238,244,.08)', type: 'dashed' } },
+      splitLine: { lineStyle: { color: chartPalette.value.gridSoft, type: 'dashed' } },
     },
     series: [{
       type: 'line',
       data,
       smooth: 0.18,
       showSymbol: false,
-      lineStyle: { width: 1.6, color: zeppSemanticColors.heart },
-      areaStyle: { color: 'rgba(240,97,106,.12)' },
+      lineStyle: { width: 1.6, color: chartPalette.value.series.heart },
+      areaStyle: { color: `${chartPalette.value.series.heart}1F` },
       connectNulls: false,
     }],
   };
@@ -253,7 +252,7 @@ const trendCards = computed(() => [
     metric: 'resting_hr',
     label: t.value.restingLabel,
     hint: t.value.restingHint,
-    color: zeppSemanticColors.readiness,
+    color: chartPalette.value.series.readiness,
     unit: 'bpm',
     series: series.value.resting_hr ?? null,
   },
@@ -261,7 +260,7 @@ const trendCards = computed(() => [
     metric: 'hrv',
     label: 'HRV (SDNN)',
     hint: t.value.hrvHint,
-    color: zeppSemanticColors.pace,
+    color: chartPalette.value.series.pace,
     unit: 'ms',
     series: series.value.hrv ?? null,
   },
@@ -269,7 +268,7 @@ const trendCards = computed(() => [
     metric: 'hrv_rmssd',
     label: 'HRV (RMSSD)',
     hint: t.value.rmssdHint,
-    color: zeppSemanticColors.calories,
+    color: chartPalette.value.series.calories,
     unit: 'ms',
     series: series.value.hrv_rmssd ?? null,
   },
@@ -321,7 +320,7 @@ const dailyMaxChartOption = computed(() => {
     legend: {
       data: [t.value.dailyMaxLegendMax, t.value.dailyMaxLegendAvg],
       top: 0,
-      textStyle: { color: axisInk, fontSize: 14.5 },
+      textStyle: { color: chartPalette.value.axis, fontSize: 14.5 },
     },
     tooltip: {
       trigger: 'axis',
@@ -334,17 +333,17 @@ const dailyMaxChartOption = computed(() => {
     xAxis: {
       type: 'category',
       data: rows.map((row) => row.date.slice(5)),
-      axisLabel: { color: axisInk, fontSize: 14.5, hideOverlap: true },
+      axisLabel: { color: chartPalette.value.axis, fontSize: 14.5, hideOverlap: true },
       axisTick: { show: false },
-      axisLine: { lineStyle: { color: 'rgba(226, 234, 242, .12)' } },
+      axisLine: { lineStyle: { color: chartPalette.value.grid } },
     },
     yAxis: {
       type: 'value',
       scale: true,
-      axisLabel: { color: axisInk, fontSize: 14.5 },
+      axisLabel: { color: chartPalette.value.axis, fontSize: 14.5 },
       axisLine: { show: false },
       axisTick: { show: false },
-      splitLine: { lineStyle: { color: 'rgba(226, 234, 242, .12)', type: 'dashed' } },
+      splitLine: { lineStyle: { color: chartPalette.value.grid, type: 'dashed' } },
     },
     series: [
       {
@@ -353,13 +352,13 @@ const dailyMaxChartOption = computed(() => {
         data: rows.map((row) => row.max),
         showSymbol: true,
         symbolSize: 6,
-        lineStyle: { width: 2.2, color: zeppSemanticColors.heart },
+        lineStyle: { width: 2.2, color: chartPalette.value.series.heart },
         itemStyle: {
           color: (params: { dataIndex: number }) =>
             (rows[params.dataIndex]?.samples ?? 0) < SPARSE_SAMPLE_THRESHOLD
               ? 'transparent'
-              : zeppSemanticColors.heart,
-          borderColor: zeppSemanticColors.heart,
+              : chartPalette.value.series.heart,
+          borderColor: chartPalette.value.series.heart,
           borderWidth: 1.6,
         },
       },
@@ -368,7 +367,7 @@ const dailyMaxChartOption = computed(() => {
         type: 'line',
         data: rows.map((row) => row.average),
         showSymbol: false,
-        lineStyle: { width: 1.4, type: 'dashed', color: 'rgba(226, 234, 242, .45)' },
+        lineStyle: { width: 1.4, type: 'dashed', color: chartPalette.value.mark },
       },
     ],
   };
@@ -416,6 +415,7 @@ watch(dataRevision, () => { void load(); });
         <VChart
           v-if="points.length"
           class="day-chart"
+          :key="CHART_THEME"
           :theme="CHART_THEME"
           :option="dayChartOption"
           autoresize
@@ -457,6 +457,7 @@ watch(dataRevision, () => { void load(); });
         <VChart
           v-if="dailyExtremes.length"
           class="day-chart"
+          :key="CHART_THEME"
           :theme="CHART_THEME"
           :option="dailyMaxChartOption"
           autoresize

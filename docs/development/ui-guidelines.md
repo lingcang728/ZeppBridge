@@ -6,14 +6,15 @@ analytics app.
 
 [简体中文](ui-guidelines.zh-CN.md)
 
-The visual system is **cool grey with olive green**, dark throughout: brand
-colour `--brand: #7DA33E`, interface base `#0C0E11` (sidebar `#08090C`, cards
-`#16191E`). No ubiquitous purple, no high-saturation neon. Category colours
-(heart-rate red, pace blue, sleep violet, activity cyan and so on) mark data
-categories only; they are never decoration.
+The visual system is **cool grey with olive green**. Dark is the reference
+scheme: brand colour `--brand: #7DA33E`, interface base `#0C0E11` (surfaces
+`#16191E`). The light scheme keeps the same roles on a warm-white base
+(`--brand: #2F6B4F`, base `#EAEDE5`). No ubiquitous purple, no high-saturation
+neon. Category colours (heart-rate red, pace blue, sleep violet, activity cyan
+and so on) mark data categories only; they are never decoration.
 
-There is **only a dark interface**. That is a settled trade-off — see
-"Dark only" below.
+There are **two interface schemes — dark and light — plus a follow-the-system
+mode**. See "Dual theme" below.
 
 ## Core principles
 
@@ -42,9 +43,10 @@ There is **only a dark interface**. That is a settled trade-off — see
 
 ## Design tokens
 
-**The single source of truth is the `:root` block in `src/App.vue`.** Do not
-hardcode synonymous colour values in pages (the gradient backgrounds on hero and
-panel are a deliberate local exception).
+**The single source of truth is `src/styles/tokens.css`**: `:root` holds the
+dark values and `html[data-theme="light"]` overrides the same set. Do not
+hardcode synonymous colour values in pages (the gradient backgrounds on hero
+and panel are a deliberate local exception).
 
 | Purpose | Token |
 | --- | --- |
@@ -71,17 +73,27 @@ source and measurement date. Estimating with formulas such as 220 − age is
 forbidden. The provenance of the algorithms and percentages is in the
 [architecture summary](../reference/architecture.md).
 
-### Dark only (a settled design trade-off)
+### Dual theme: dark, light and system
 
-- ZeppBridge **offers a dark interface only**. There is no light mode and no
-  follow-the-system mode. `:root` maintains this one token set; do not add
-  `@media (prefers-color-scheme)` or `[data-theme="light"]` branches, and do not
-  add a theme switch.
-- You may therefore assume a dark background when writing styles. No light
-  fallback is needed — but still use tokens rather than hardcoded colours, so
-  the palette stays adjustable as a whole.
-- The light-mode leftovers (`useTheme.ts` and the `zeppbridge-light` ECharts
-  theme) were deleted on 2026-08-24. Do not reintroduce them.
+- ZeppBridge v3 ships **dark, light and follow-the-system schemes**. The user's
+  choice is persisted in `localStorage` under `zeppbridge-theme`
+  (`light` / `dark` / `system`); `src/composables/useTheme.ts` resolves the
+  effective scheme and `initializeTheme()` runs in `main.ts` before first
+  render, so no opposite-scheme flash.
+- The resolved scheme lives on `<html data-theme="light|dark">`
+  (`data-theme-preference` keeps the raw choice for debugging) and
+  `color-scheme` follows it, so scrollbars and native controls repaint. The
+  `theme-color` meta is updated with the scheme.
+- **Components consume tokens and never branch on the scheme.** When a
+  hardcoded dark value genuinely cannot become a token (rare), add a narrowly
+  scoped `html[data-theme="light"] …` override in the patch table at the bottom
+  of `tokens.css` — that table is transitional and should shrink to empty.
+- Category colours keep their hue across schemes and only shift lightness /
+  saturation (light-mode heart red `#C93F49`, brand `#2F6B4F`…). A token keeps
+  the same role in both schemes; semantics do not drift.
+- The landing page keeps its own locally scoped dark palette
+  (`.landing-page { --site-* }`) — it is brand artwork outside the app shell,
+  not a third theme.
 
 ### Interface copy: two languages, never hardcoded
 
@@ -123,9 +135,14 @@ forbidden. The provenance of the algorithms and percentages is in the
 
 ## Page structure
 
-Three main navigation items: **Overview** (`/`), **Hand to AI** (`/explore`) and
-**Settings** (`/settings`). Keep it at three — a new page gets an entry card,
-not a sidebar slot.
+Three main navigation items in the centred pill of the top bar
+(`src/components/shell/AppTopBar.vue`): **Overview** (`/`), **Hand to AI**
+(`/ai`) and **Settings** (`/settings`). Keep it at three — a new page gets an
+entry card, not a navigation slot. The top bar also carries the sync-status
+pill, the theme cycle button and the language `SelectMenu`; below 760px the
+pill hides and a bottom tabbar covers the same three items. `/explore` remains
+as the legacy composer; `/orbit-lab` is a stub route for the orbit composer
+and stays out of the navigation.
 
 Secondary pages stay out of the main navigation: `/body` (body status),
 `/training` (training status), `/recent` (recent records), the `/sleep` and
@@ -134,13 +151,15 @@ pages, reached from Overview's entry cards and its "view all" links.
 
 ### 1. Overview (`/`)
 
-- Hero card: brand line, three value cards (secure / private / AI-ready), and on
-  the right a "recognised device → flowing dashed line → cloud AI" diagram. The
-  device comes from real recognition; with no device, that flow is not drawn.
-- A 12-column dashboard grid: 24-hour heart-rate line (span 6), today's step
-  ring (span 3), last night's sleep structure (span 3), a resting-heart-rate
-  mini card plus the body-status and training-status entry cards (span 4 each),
-  and a two-column recent-records list (full width).
+- There is **no hero card** in v3; the old hero and its "hide intro" preference
+  are gone (Overview clears `zeppbridge.overview.hideHero` on mount). The page
+  opens with the weekly report, coverage notice, `SourcesStrip` (device and
+  account status, extracted from the v2 sidebar) and then the card grid.
+- Cards are modular components under `src/components/overview/`:
+  `HeartRateCard` (24-hour line), `StepsCard` (today's ring), `SleepCard`
+  (last night's structure), two `StatusEntryCard`s (body / training entries)
+  and `RecentCard` (two-column recent records), laid out on the 12-column
+  `dashboard-grid`.
 - Each entry card carries today's value and a 7-day `Sparkline`, leading to
   `/body` and `/training`. They replaced the old training-load / VO₂ Max mini
   cards — the same number is not shown twice on one screen.
@@ -152,7 +171,7 @@ pages, reached from Overview's entry cards and its "view all" links.
   The entry cards give numbers and shapes; interpretation is left to the AI the
   user chose.
 
-### 2. Hand to AI (`/explore`)
+### 2. Hand to AI (`/ai`, legacy composer at `/explore`)
 
 A three-column layout:
 
@@ -241,8 +260,14 @@ diagnostics" section listing per-stream status and cloud sync times.
   `src/assets/design-icons/` (navigation, large semantic icons). Images must be
   imported so Vite emits real files — the desktop CSP allows neither data URLs
   nor external image sources.
-- Charts use `vue-echarts` with the `zeppbridge-dark` theme registered in
-  `main.ts`. Do not redefine the palette per page.
+- Charts use `vue-echarts` through `src/lib/echartsSetup.ts`, which registers
+  both `zeppbridge-dark` and `zeppbridge-light` and exports the reactive
+  `CHART_THEME` / `chartPalette`. Every `VChart` binds `:theme="CHART_THEME"`
+  **and** `:key="CHART_THEME"` so the chart is rebuilt on a scheme switch, and
+  every chart `option` is a `computed` that reads chrome colours (axis labels,
+  grid lines, tooltip, marks, series semantics) from `chartPalette.value` —
+  never a literal hex. The palette's colour values mirror `tokens.css` because
+  CSS variables cannot reach canvas. Do not redefine the palette per page.
 
 ## Interaction and accessibility
 
@@ -253,8 +278,9 @@ diagnostics" section listing per-stream status and cloud sync times.
   its own is forbidden.
 - Touch targets are at least 44px (the mobile menu button, the bottom
   navigation, `RecordRow`).
-- The main breakpoint is 760px: the sidebar becomes a top bar plus a bottom
-  tabbar. Overview additionally drops columns at 1180 and 820.
+- The main breakpoint is 760px: the top bar's pill navigation hides and a
+  bottom tabbar covers the same three items. Overview additionally drops
+  columns at 1180 and 820.
 - Interface scale is 80 / 90 / 100 / 110 / 125% (`UI_SCALES`), reachable from
   Settings → "Advanced and maintenance", with Ctrl + / Ctrl - / Ctrl 0, persisted
   in localStorage.
@@ -264,7 +290,7 @@ diagnostics" section listing per-stream status and cloud sync times.
 ## Maintaining this document
 
 Page structure follows `src/router/index.ts` and the `navigation` array in
-`src/App.vue`; design tokens follow the `:root` block in `App.vue`. Update this
+`src/App.vue`; design tokens follow `src/styles/tokens.css`. Update this
 page when you change navigation, the palette or theme state. **Where it
 conflicts with the source, the source wins** — and fix this page while you are
 there. Engineering gates are in the [development guide](development.md); product

@@ -23,9 +23,21 @@ const routes = [
     component: () => import('../views/RecentRecords.vue'),
   },
   {
+    path: '/ai',
+    name: 'AiComposer',
+    // BETA1-STUB：当前是占位页，S4 在集成时换成真正的 AI 交接台。
+    component: () => import('../views/AiComposer.vue'),
+  },
+  {
     path: '/explore',
     name: 'Explore',
     component: () => import('../views/Explore.vue'),
+  },
+  {
+    path: '/orbit-lab',
+    name: 'OrbitLab',
+    // BETA1-STUB：轨道编排实验场，不进主导航也不做 DEV 门；S3 集成时替换占位页。
+    component: () => import('../views/OrbitLab.vue'),
   },
   {
     path: '/body',
