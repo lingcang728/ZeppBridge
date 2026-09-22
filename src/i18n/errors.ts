@@ -163,6 +163,10 @@ const messages = defineMessages(
     'err.update.installed_build_missing': '安装完成后未找到新的 ZeppBridge 安装版',
     'err.update.portable_windows_only': '便携版安装迁移仅支持 Windows',
     'err.update.unsafe_data_location': '无法确认数据目录可在更新后保留，已停止安装。请退出 ZeppBridge，将 app 包内的 data 完整复制到用户的 Application Support 目录，并修正 ZEPPBRIDGE_DATA_DIR 后重试。不要删除旧数据。',
+
+    /* —— MCP 访问范围（stdio 工具的调用方是模型；这两份是给人看的兜底） —— */
+    'err.mcp.scope_denied': '这条查询超出了开放给 MCP 的任务范围',
+    'err.mcp.scope_no_grants': '还没有任何任务开放给 MCP。在任务页把任务标为「开放给 MCP」之后再试',
   },
   {
     /* —— core —— */
@@ -330,6 +334,10 @@ const messages = defineMessages(
     'err.update.installed_build_missing': 'No new installed ZeppBridge build was found after setup',
     'err.update.portable_windows_only': 'Portable-to-installed migration is Windows only',
     'err.update.unsafe_data_location': 'Installation stopped because the data location could not be verified as safe for updates. Quit ZeppBridge, copy any in-bundle data folder to your user Application Support folder, and correct ZEPPBRIDGE_DATA_DIR before retrying. Keep the original data.',
+
+    /* —— MCP access scope (the caller is a model; these are the human fallback) —— */
+    'err.mcp.scope_denied': 'That request is outside the tasks shared with MCP',
+    'err.mcp.scope_no_grants': 'No task is shared with MCP yet. Mark a task as shared on the Tasks page and try again',
   },
   {
     /* —— core —— */
@@ -497,6 +505,10 @@ const messages = defineMessages(
     'err.update.installed_build_missing': 'No se encontró una nueva versión instalada de ZeppBridge después de la instalación',
     'err.update.portable_windows_only': 'La migración de portable a instalada solo existe en Windows',
     'err.update.unsafe_data_location': 'Se detuvo la instalación porque no se pudo verificar que la carpeta de datos se conserve tras actualizar. Cierra ZeppBridge, copia la carpeta data del paquete de la app a Application Support de tu usuario y corrige ZEPPBRIDGE_DATA_DIR antes de reintentar. Conserva los datos originales.',
+
+    /* —— MCP access scope —— */
+    'err.mcp.scope_denied': 'Esa consulta queda fuera de las tareas compartidas con MCP',
+    'err.mcp.scope_no_grants': 'Todavía ninguna tarea está compartida con MCP. Márcala como compartida en la página de tareas e inténtalo de nuevo',
   },
 );
 

@@ -214,6 +214,54 @@ or environment variable is needed** — the program only reads a local file.
 
 `mcp-config-example.json` in the archive contains the same snippet.
 
+### Access scope (`--scope`)
+
+The process accepts exactly one optional flag:
+
+```json
+{
+  "mcpServers": {
+    "zeppbridge": {
+      "command": "/path/to/zeppbridge-mcp",
+      "args": ["--scope", "task"]
+    }
+  }
+}
+```
+
+- **`full-readonly`** (the default when `--scope` is absent) — the behavior
+  existing configurations already have: read-only access to the whole local
+  database. Configurations without the flag keep working unchanged.
+- **`task`** — still read-only, but limited to what the desktop app marks as
+  *shared with MCP* on its task page: only the listed workout IDs, plus health
+  data inside the per-category date windows those workouts open. Grants are
+  re-read on every call, so flipping the share switch applies to the very next
+  request — no restart needed.
+
+argv parsing is fail-closed: an unrecognized argument, an unknown `--scope`
+value, a missing value, or a repeated flag exits non-zero with a single stderr
+line. A mistyped flag never widens access silently.
+
+Under `task`, requests outside the grants are refused rather than silently
+truncated: `list_workouts` returns only granted workout IDs (even when they are
+not among the most recent), `get_workout_insight` re-computes its baseline over
+granted workouts alone, `get_metric_series` answers only days inside the
+granted windows, `get_sleep_detail` resolves "latest night" within the granted
+sleep windows, and `get_data_health` — a whole-library report that cannot be
+honestly clipped — is refused outright. Responses under `task` also drop
+identity fields such as `device_id`.
+
+Every `tools/call` result carries `"scope": {"mode": ..., "grants": N}` (inside
+`structuredContent` on success and at the top level on errors), and
+`initialize` / `server/discover` report `"scope": {"mode": ...}` plus an
+instructions line, so a client always knows which view it is looking at.
+
+Scope refusals are tool results, not protocol errors: `isError: true` with
+`structuredContent.error.code` set to `err.mcp.scope_denied` (the request is
+outside the grants — `error.permittedRanges` lists the actual
+`{category, start, end}` windows to retry within) or `err.mcp.scope_no_grants`
+(no task is currently shared).
+
 ### Tools
 
 | Tool | Returns |
