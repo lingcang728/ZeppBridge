@@ -316,6 +316,8 @@ const reselectAttachment = async (id: string) => {
   try {
     const { added } = await pickAttachments(t.value.attachPickerTitle, t.value.attachFilterName, false);
     if (added.length) replaceAttachment(id, added[0]);
+  } catch {
+    // 选文件失败（取消/后端不可达）算「没选成」：引用保持原样，用户可再点。
   } finally {
     reselecting.value = null;
   }

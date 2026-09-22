@@ -156,7 +156,7 @@ export const settingsMessages = defineMessages(
 关于它的已知信息：
 - MCP 程序要从 ZeppBridge 的 GitHub Release 页下载 zeppbridge-tools 压缩包，解压后里面有 zeppbridge-mcp 可执行文件。我可能还没下载。
 - 它是 stdio 类型的 MCP server，只读本机数据库，不联网、不监听端口、不需要任何 token 或 API key。
-- 典型配置形状是：{"mcpServers": {"zeppbridge": {"command": "<zeppbridge-mcp 的完整路径>", "args": []}}}
+- 典型配置形状是：{"mcpServers": {"zeppbridge": {"command": "<zeppbridge-mcp 的完整路径>", "args": ["--scope", "task"]}}}
 - 它提供五个只读工具：list_workouts（运动列表）、get_workout_insight（单次运动与个人基线的比较）、get_metric_series（按天的指标序列）、get_sleep_detail（一晚睡眠明细）、get_data_health（每条数据流的抓取/解析/写入状态）。
 
 请告诉我：
@@ -559,7 +559,7 @@ It ships an MCP program (zeppbridge-mcp) and I want to configure it with you, so
 What I know about it:
 - The MCP program comes from the zeppbridge-tools archive on ZeppBridge's GitHub Releases page; unzip it and zeppbridge-mcp is inside. I may not have downloaded it yet.
 - It is a stdio MCP server. It reads the local database, does not use the network, listens on no port, and needs no token or API key.
-- The typical config shape is: {"mcpServers": {"zeppbridge": {"command": "<full path to zeppbridge-mcp>", "args": []}}}
+- The typical config shape is: {"mcpServers": {"zeppbridge": {"command": "<full path to zeppbridge-mcp>", "args": ["--scope", "task"]}}}
 - It exposes five read-only tools: list_workouts, get_workout_insight (one workout against my own baseline), get_metric_series (day-by-day metric series), get_sleep_detail (one night, stage by stage), and get_data_health (fetch/parse/write state per stream).
 
 Please tell me:
@@ -962,7 +962,7 @@ Incluye un programa MCP (zeppbridge-mcp) y quiero configurarlo contigo, para que
 Lo que sé:
 - El programa MCP viene en el archivo zeppbridge-tools de la página de Releases de ZeppBridge en GitHub; al descomprimirlo, zeppbridge-mcp está adentro. Puede que todavía no lo haya descargado.
 - Es un servidor MCP por stdio. Lee la base de datos local, no usa la red, no abre ningún puerto y no necesita token ni clave de API.
-- La forma típica de la configuración es: {"mcpServers": {"zeppbridge": {"command": "<ruta completa a zeppbridge-mcp>", "args": []}}}
+- La forma típica de la configuración es: {"mcpServers": {"zeppbridge": {"command": "<ruta completa a zeppbridge-mcp>", "args": ["--scope", "task"]}}}
 - Ofrece cinco herramientas de solo lectura: list_workouts, get_workout_insight (un entrenamiento frente a mi propia referencia), get_metric_series (series de métricas día a día), get_sleep_detail (una noche, fase por fase) y get_data_health (estado de descarga/análisis/escritura por flujo).
 
 Por favor dime:
