@@ -44,7 +44,7 @@ import type {
 } from '../types';
 import { checkForDesktopUpdate, downloadAndInstallDesktopUpdate, updateState } from '../services/updateService';
 import { settingsMessages } from './Settings.i18n';
-import { locale, LOCALES, LOCALE_LABELS, setLocale, useMessages } from '../i18n';
+import { locale, LOCALES, LOCALE_LABELS, setLocale, useMessages, type Locale } from '../i18n';
 import {
   DISTANCE_UNITS,
   distanceUnit,
@@ -208,7 +208,7 @@ const mcpConfigExample = computed(() => `{
   "mcpServers": {
     "zeppbridge": {
       "command": "${t.value.mcpConfigPathPlaceholder}",
-      "args": []
+      "args": ["--scope", "task"]
     }
   }
 }`);
@@ -240,7 +240,7 @@ const timeFormatOptions = computed(() =>
   TIME_FORMATS.map((value) => ({ value, label: dateTimeLabels.value[value] })));
 const dateOrderOptions = computed(() =>
   DATE_ORDERS.map((value) => ({ value, label: dateTimeLabels.value[value] })));
-const chooseLocale = (value: string | number) => setLocale(String(value) as 'zh' | 'en' | 'es');
+const chooseLocale = (value: string | number) => setLocale(String(value) as Locale);
 const chooseDistanceUnit = (value: string | number) => setDistanceUnit(String(value) as DistanceUnit);
 const chooseTimeFormat = (value: string | number) => setTimeFormat(String(value) as TimeFormat);
 const chooseDateOrder = (value: string | number) => setDateOrder(String(value) as DateOrder);
@@ -497,8 +497,8 @@ const startLogin = async () => {
   loginBusy.value = true;
   reconnecting.value = true;
   try {
-    // 登录窗口只有中英两种标题，西语界面用英文那个。
-    await applyLoginStatus(await backend.startWebLogin(locale.value === 'zh' ? 'zh' : 'en'));
+    // 登录窗标题支持十种界面语言，原样透传；后端认不出的标记回落英文。
+    await applyLoginStatus(await backend.startWebLogin(locale.value));
   } catch (error) {
     loginStatus.value = { state: 'failed', message: toUserMessage(error, t.value.loginWindowFailed), page_url: '' };
     loginError.value = toUserMessage(error, t.value.loginWindowFailed);

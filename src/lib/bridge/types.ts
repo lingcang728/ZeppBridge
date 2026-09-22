@@ -234,7 +234,8 @@ export interface BridgeBackend {
   importFromHar(harPath: string): Promise<AppStatus>;
   manualAuth(appToken: string, userId: string, regionHost: string): Promise<AppStatus>;
 
-  startWebLogin(locale: 'zh' | 'en'): Promise<LoginStatus>;
+  /** 登录窗标题跟随界面语言，后端认十种界面语言标记（认不出回落英文）。 */
+  startWebLogin(locale: string): Promise<LoginStatus>;
   cancelWebLogin(): Promise<LoginStatus>;
   getLoginStatus(): Promise<LoginStatus>;
 

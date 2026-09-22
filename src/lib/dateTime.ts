@@ -43,8 +43,29 @@ export function parseDisplayDate(value: string): Date {
     ? date : new Date(NaN);
 }
 
+/* Intl.DateTimeFormat 的构造在格式化热路径上很贵（locale 谈判 + 选项骨架
+   解析）。键 = 界面语言 | 时间格式偏好 | 日期顺序偏好 | 选项序列化——这三个
+   偏好都在键里，任何一项变化 key 自然换新，不用显式失效。 */
+const formatterCache = new Map<string, Intl.DateTimeFormat>();
+
+/* 选项对象的键序由调用点写法决定；排序后序列化，同一组选项归到同一键。 */
+const optionsKey = (options: Intl.DateTimeFormatOptions): string =>
+  JSON.stringify(
+    Object.keys(options)
+      .sort()
+      .map((name) => [name, (options as Record<string, unknown>)[name]]),
+  );
+
+/* 系统 hour12 只跟 OS 地区有关、与任何偏好无关——探一次记住即可。 */
+let systemHour12: boolean | undefined;
+const probeSystemHour12 = (): boolean | undefined =>
+  (systemHour12 ??= new Intl.DateTimeFormat(undefined, { hour: 'numeric' }).resolvedOptions().hour12);
+
 /** Shared display policy. Never changes exported timestamps or source timezone semantics. */
 export function displayDateTimeFormatter(options: Intl.DateTimeFormatOptions = {}): Intl.DateTimeFormat {
+  const key = `${intlLocale()}|${time.value}|${order.value}|${optionsKey(options)}`;
+  const cached = formatterCache.get(key);
+  if (cached) return cached;
   const adjusted = { ...options };
   delete adjusted.hour12;
   if (adjusted.hour || adjusted.timeStyle) {
@@ -59,8 +80,10 @@ export function displayDateTimeFormatter(options: Intl.DateTimeFormatOptions = {
     }
     // Date order must not choose the hour cycle on behalf of the user.
     if (time.value === 'regional' && (adjusted.hour || adjusted.timeStyle)) {
-      adjusted.hour12 = new Intl.DateTimeFormat(undefined, { hour: 'numeric' }).resolvedOptions().hour12;
+      adjusted.hour12 = probeSystemHour12();
     }
   }
-  return new Intl.DateTimeFormat(region, adjusted);
+  const formatter = new Intl.DateTimeFormat(region, adjusted);
+  formatterCache.set(key, formatter);
+  return formatter;
 }

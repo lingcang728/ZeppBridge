@@ -1,9 +1,11 @@
 import { DesktopUnavailableError } from './errors';
 import type { BridgeBackend, UnlistenFn } from './types';
 
-const unavailable = (): never => {
-  throw new DesktopUnavailableError();
-};
+/* 必须返回 rejected Promise，不能同步 throw：同步 throw 时
+   `backend.X().catch(...)` 的 catch 根本挂不上去——函数还没返回 Promise
+   调用点就中止了（Settings 页 onMounted 曾被这样截断，后面的初始化全没跑）。
+   统一走这一个出口，保证每个方法都是「返回拒绝」而不是「当场抛」。 */
+const unavailable = (): Promise<never> => Promise.reject(new DesktopUnavailableError());
 
 export const webBackend: BridgeBackend = {
   listLifeEvents: unavailable,
