@@ -82,6 +82,12 @@ const routes = [
     name: 'Settings',
     component: () => import('../views/Settings.vue'),
   },
+  // BETA1: orbit lab route (S3)
+  {
+    path: '/orbit-lab',
+    name: 'OrbitLab',
+    component: () => import('../views/OrbitLab.vue'),
+  },
   {
     path: '/:pathMatch(.*)*',
     redirect: { path: '/', query: { notice: 'not-found' } },
