@@ -77,6 +77,37 @@ const messages = defineMessages(
       'weekly.training_load': 'Training load',
     },
   },
+  {
+    title: 'Diese Woche',
+    window: (recentStart: string, recentEnd: string, baseStart: string, baseEnd: string) =>
+      `${recentStart} ~ ${recentEnd} · im Vergleich zu deinen eigenen ${baseStart} ~ ${baseEnd}`,
+    legendGood: 'Grün = besser für diese Kennzahl',
+    legendBad: 'Rot = schlechter',
+    legendNote: 'Nur verglichen mit deinen eigenen letzten 28 Tagen, nie mit einem Bevölkerungsdurchschnitt',
+    desktopOnly: 'Der Wochenbericht benötigt die ZeppBridge-Desktop-App.',
+    nothingComparable: 'Diese Woche gibt es noch nichts Vergleichbares. Nach einer Synchronisierung nochmal schauen.',
+    loadFailed: 'Der lokale Wochenbericht konnte nicht erstellt werden',
+    barsAria: (recent: string, baseline: string) => `Diese Woche ${recent}, vorherige 28 Tage ${baseline}`,
+    barThisWeek: 'Diese Woche',
+    barBaseline: 'Vorh. 28 Tage',
+    noBaseline: 'Nicht genug Historie vorhanden, daher nur der aktuelle Wert',
+    thinBaseline: (days: number, found: number, needed: number) =>
+      `Nur an ${found} von ${days} vorherigen Tagen liegt diese Kennzahl vor, weniger als die benötigten ${needed}, daher nur der aktuelle Wert ohne Vergleich.`,
+    noRecentData: 'In den letzten 7 Tagen lokal nichts für diese Kennzahl aufgezeichnet.',
+    notProvided: 'Nicht angegeben',
+    sleepDuration: (hours: number, minutes: number) => `${hours} Std. ${minutes} Min.`,
+    regularity: (minutes: number) => `±${minutes} Min.`,
+    workoutCount: (count: number) => `${count} Einheiten`,
+    metric: {
+      'weekly.resting_hr': 'Ruheherzfrequenz',
+      'weekly.hrv': 'HRV',
+      'weekly.stress': 'Stress',
+      'weekly.sleep_duration': 'Schlafdauer',
+      'weekly.sleep_start_regularity': 'Schwankung der Einschlafzeit',
+      'weekly.workout_count': 'Trainingseinheiten',
+      'weekly.training_load': 'Trainingsbelastung',
+    },
+  },
 );
 const t = useMessages(messages);
 

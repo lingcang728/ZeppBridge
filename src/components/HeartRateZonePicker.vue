@@ -123,6 +123,63 @@ const messages = defineMessages(
     },
     computedRestingNote: (days: number) => `Average across the ${days} days with data in the last 30.`,
   },
+  {
+    title: 'Herzfrequenzzonen',
+    intro: 'Die drei Modelle berechnen unterschiedliche Zonen, und nur du weisst, welches für dich aussagekräftig ist — deshalb legt ZeppBridge keinen Standard fest und schätzt auch nie mit einer Formel wie 220 minus Lebensalter. Jede Bezugsgrösse unten ist mit Quelle und Messdatum versehen.',
+    clearChoice: 'Auswahl löschen',
+    desktopOnly: 'Öffne diese Ansicht in der ZeppBridge-Desktop-App — Herzfrequenzzonen greifen auf lokale Aufzeichnungen zu.',
+    noBases: 'Auf diesem Rechner liegen noch keine Bezugswerte für die Herzfrequenz vor. Nach der ersten Trainingssynchronisierung erscheinen hier gemessene Werte wie deine höchste erfasste Herzfrequenz.',
+    modelGroup: 'Modell',
+    modelAria: 'Modell für Herzfrequenzzonen',
+    pickModelFirst: 'Wähle zuerst ein Modell — die Zonen werden dann aus den von dir gewählten Bezugswerten berechnet.',
+    pickBasesNext: 'Wähle oben noch die übrigen Bezugswerte aus, um die Zonen und die Zeit in jeder Zone zu erhalten.',
+    window: (days: number, total: string) => `Sekundengenaue Trainings-Herzfrequenz der letzten ${days} Tage · insgesamt ${total}`,
+    outside: (below: string, above: string) => `Ausserhalb der Zonen: unter Z1 ${below} · über Z5 ${above}`,
+    formulaNote: (formula: string, bases: string) =>
+      `${formula}. Grenzwerte werden abgerundet, wie bei der Uhr. Bezugswerte: ${bases}`,
+    missingBases: (list: string) => `Auf diesem Rechner noch nicht vorhanden: ${list}`,
+    basesSeparator: ', ',
+    zonesUnavailable: 'Herzfrequenzzonen sind gerade nicht verfügbar',
+    saveFailed: 'Die Einstellungen für die Herzfrequenzzonen konnten nicht gespeichert werden',
+    zeroMinutes: '0 Min.',
+    durationHours: (hours: number, minutes: number) => `${hours} Std. ${minutes} Min.`,
+    durationMinutes: (minutes: number) => `${minutes} Min.`,
+    kind: {
+      max_hr: 'Basis für maximale Herzfrequenz',
+      resting_hr: 'Basis für Ruheherzfrequenz',
+      threshold_hr: 'Basis für Laktatschwelle',
+    },
+    model: {
+      max_hr: { label: 'Maximalherzfrequenz-Zonen', formula: 'Zonen-Untergrenze = maximale Herzfrequenz x Prozentsatz' },
+      hr_reserve: { label: 'Herzfrequenzreserve-Zonen', formula: 'Zonen-Untergrenze = Ruheherzfrequenz + (maximale Herzfrequenz − Ruheherzfrequenz) x Prozentsatz' },
+      lactate_threshold: { label: 'Laktatschwellen-Zonen', formula: 'Zonen-Untergrenze = Laktatschwellen-Herzfrequenz x Prozentsatz' },
+    },
+    percentBands: ['Aufwärmen', 'Fettverbrennung', 'Aerob', 'Anaerob', 'Maximal'],
+    thresholdBands: ['Locker', 'Ausdauer', 'Tempo', 'Schwelle', 'Anaerob'],
+    basis: {
+      observed_max: {
+        label: 'Höchste erfasste Herzfrequenz',
+        note: 'Die lokal aufgezeichnete höchste Herzfrequenz. Wurde nie wirklich ans Limit gegangen, fallen die Zonen insgesamt zu eng aus.',
+      },
+      device_max: {
+        label: 'Von der Uhr gemeldete maximale Herzfrequenz',
+        note: 'Der Wert, den die Uhr in ihren PAI-Daten meldet — meist aus dem Profil in der Zepp-App übernommen.',
+      },
+      device_resting: {
+        label: 'Von der Uhr gemeldete Ruheherzfrequenz',
+        note: 'Der Wert, den die Uhr in ihren PAI-Daten meldet.',
+      },
+      lactate_threshold: {
+        label: 'Laktatschwellen-Herzfrequenz',
+        note: 'Von der Uhr nach einem intensiven Lauf gemessen.',
+      },
+      computed_resting: {
+        label: 'Lokal berechnete Ruheherzfrequenz',
+        note: '',
+      },
+    },
+    computedRestingNote: (days: number) => `Durchschnitt der ${days} Tage mit Daten innerhalb der letzten 30 Tage.`,
+  },
 );
 const t = useMessages(messages);
 

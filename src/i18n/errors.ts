@@ -7,7 +7,7 @@
  * 上一版没有这一层，`toUserMessage` 把后端的中文字符串原样显示，于是英文界面
  * 上每一个后端错误都是中文——Reddit 上真实走通流程的用户就是被这个绊住的。
  *
- * 加后端错误码时这里必须同时补中英两份，`npm run i18n:check` 会挡住漏掉的
+ * 加后端错误码时这里必须同时补中英德三份，`npm run i18n:check` 会挡住漏掉的
  * 那一半。码本身是契约，不要改名。
  */
 import { defineMessages, messagesOf } from './index';
@@ -263,6 +263,141 @@ const messages = defineMessages(
     'err.update.launch_failed': "Couldn't start the updated installed build",
     'err.update.installed_build_missing': 'No new installed ZeppBridge build was found after setup',
     'err.update.portable_windows_only': 'Portable-to-installed migration is Windows only',
+  },
+  {
+    /* —— core —— */
+    'err.core.network': 'Zepp-Region nicht erreichbar. Netzwerk prüfen und erneut versuchen',
+    'err.core.needs_reauth': 'Anmeldung ist abgelaufen. Erneut mit Zepp verbinden',
+    'err.core.unavailable': 'Dieses Konto oder diese Region stellt diese Daten nicht bereit',
+    'err.core.retry_exhausted': 'Zepp ist vorübergehend nicht erreichbar. In Kürze erneut versuchen',
+    'err.core.http_status': 'Zepp hat einen Fehler zurückgegeben. In Kürze erneut versuchen',
+    'err.core.cancelled': 'Abgebrochen',
+    'err.core.auth': 'Bei der Authentifizierung ist etwas schiefgelaufen',
+    'err.core.credential_store':
+      'Das Token konnte nicht im System-Anmeldeinformationsspeicher gespeichert werden. Häufige Ursachen: '
+      + 'der Speicher ist per Gruppenrichtlinie oder Sicherheitssoftware deaktiviert, oder es wurde gar kein '
+      + 'App-Token gelesen (zu lang für den Speicher). Lösung: unter Einstellungen -> Erweitert das App-Token '
+      + 'manuell eingeben, oder den HAR-Import verwenden. Beide Wege sind von dieser automatischen '
+      + 'Speicherung unabhängig.',
+    'err.core.invalid_host': 'Unsichere Zepp-Regionsadresse',
+    'err.core.config': 'An der Konfiguration muss zuerst etwas geändert werden',
+    'err.core.busy': 'Ein anderer Schreibvorgang läuft noch. Bitte warten, bis er abgeschlossen ist',
+    'err.core.parse': 'Antwort von Zepp konnte nicht verarbeitet werden',
+    'err.core.database': 'Die lokale Datenbank ist vorübergehend nicht verfügbar',
+    'err.core.io': 'Lesen oder Schreiben einer lokalen Datei ist fehlgeschlagen',
+    'err.core.unknown': 'Etwas ist schiefgelaufen',
+
+    /* —— Verbindung & Anmeldung —— */
+    'err.auth.sync_init_failed': 'Synchronisierung konnte nicht eingerichtet werden. Kontoregion prüfen und erneut versuchen',
+    'err.auth.verify_network':
+      'Überprüfung fehlgeschlagen: Zepp nicht erreichbar. Netzwerk prüfen und erneut versuchen',
+    'err.auth.verify_needs_reauth':
+      'Überprüfung fehlgeschlagen: Anmeldedaten sind nicht mehr gültig. Erneut speichern',
+    'err.auth.verify_failed': 'Überprüfung fehlgeschlagen',
+
+    /* —— Web-Anmeldung —— */
+    'err.login.waiting': 'Anmeldung bei Zepp im Popup-Fenster abschliessen',
+    'err.login.fallback_page': 'Alternative Anmeldeseite wird geöffnet',
+    'err.login.extracting': 'Anmeldedaten gelesen. Region wird bestätigt',
+    'err.login.verifying': 'Konto wird überprüft',
+    'err.login.connected': 'Mit Zepp-Konto verbunden',
+    'err.login.timeout': 'Anmeldung hat zu lange gedauert. Erneut versuchen',
+    'err.login.credentials_unreadable':
+      'Anmeldung erfolgt, aber Anmeldedaten konnten nicht aus dem Anmeldefenster gelesen werden. '
+      + 'HAR-Import verwenden oder App-Token manuell eingeben.',
+    'err.login.region_probe_failed':
+      'Anmeldedaten wurden gelesen, aber die Kontoregion konnte nicht bestätigt werden. '
+      + 'Erneut anmelden oder eine HAR-Datei importieren.',
+    'err.login.credentials_rejected':
+      'Zepp hat diese Anmeldedaten abgelehnt. Im Anmeldefenster abmelden und dann erneut anmelden',
+    'err.login.region_unreachable':
+      'Zepp-Regionsdienst vorübergehend nicht erreichbar. Netzwerk prüfen und erneut versuchen',
+    'err.login.region_retrying':
+      'Zepp-Regionsdienst gerade nicht erreichbar — wird automatisch erneut versucht. '
+      + 'Das Anmeldefenster bleibt geöffnet, eine erneute Anmeldung ist nicht nötig',
+    'err.login.third_party_stalled':
+      'Diese Anmeldung über einen Drittanbieter scheint zu hängen. Passkeys von Google bleiben in '
+      + 'einem eingebetteten Fenster häufig beim Überprüfungsschritt stecken. Anmeldefenster schliessen '
+      + 'und stattdessen E-Mail + Passwort verwenden, oder das App-Token manuell in den Einstellungen eingeben.',
+    'err.login.bad_url': 'Ungültige Anmeldeadresse',
+    'err.login.window_failed': 'Anmeldefenster konnte nicht geöffnet werden',
+    'err.login.window_busy':
+      'Das vorherige Anmeldefenster wird noch geschlossen. Kurz warten und erneut versuchen',
+    'err.login.state_unavailable': 'Anwendungsstatus nicht verfügbar',
+    'err.login.cancelled': 'Anmeldung abgebrochen',
+    'err.login.sync_init_failed': 'Angemeldet, aber Synchronisierung konnte nicht initialisiert werden',
+
+    /* —— Synchronisierung & Nachladen —— */
+    'err.sync.not_connected': 'Noch nicht mit Zepp verbunden. Zuerst verbinden',
+    'err.sync.not_verified': 'Verbindung zuerst überprüfen, bevor aktuelle Daten synchronisiert werden',
+    'err.sync.not_verified_probe': 'Verbindung zuerst überprüfen, bevor Funktionen geprüft werden',
+    'err.sync.not_verified_backfill': 'Verbindung zuerst überprüfen, bevor der Verlauf nachgeladen wird',
+    'err.sync.history_days_out_of_range': 'Diese Anzahl Tage liegt ausserhalb des zulässigen Bereichs',
+    'err.sync.deferred_compaction':
+      'Gespeicherte Rohdaten werden komprimiert, um Speicherplatz zu sparen. Diese Synchronisierung wird automatisch erneut versucht',
+    'err.sync.deferred_replay':
+      'Abgeleitete Daten werden aus lokalen Rohdaten neu aufgebaut. Diese Synchronisierung wird automatisch erneut versucht',
+    'err.backfill.bad_start_date': 'Ungültiges Startdatum für das Nachladen — Format JJJJ-MM-TT verwenden',
+    'err.backfill.no_canonical_records':
+      'Die Cloud hat Daten zurückgegeben, aber daraus liessen sich keine verwertbaren Datensätze extrahieren',
+    'err.backfill.start_in_future': 'Der Startzeitpunkt für das Nachladen darf nicht in der Zukunft liegen',
+
+    /* —— Funktionsstatus —— */
+    'err.capability.not_synced': 'Noch nicht synchronisiert',
+    'err.capability.needs_reauth': 'Erneute Authentifizierung erforderlich',
+    'err.capability.unverified': 'Noch nicht überprüft',
+    'err.capability.unavailable': 'Nicht verfügbar',
+    'err.capability.unknown': 'Status unbekannt',
+    'err.capability.other': 'Status unbekannt',
+
+    /* —— Export —— */
+    'err.export.empty_range': 'In diesem Zeitraum gibt es keine exportierbaren Datensätze',
+    'err.export.read_failed': 'Exportdaten konnten nicht gelesen werden',
+    'err.export.convert_failed': 'Umwandlung in das gewünschte Format ist fehlgeschlagen',
+    'err.export.write_failed': 'Exportdatei konnte nicht geschrieben werden',
+    'err.export.write_json_failed': 'JSON-Export konnte nicht geschrieben werden',
+    'err.export.mkdir_failed': 'Exportordner konnte nicht erstellt werden',
+    'err.export.path_required': 'Bitte zuerst einen Speicherort auswählen',
+    'err.export.path_not_absolute': 'Der Speicherort muss ein absoluter Pfad sein',
+    'err.export.not_a_directory': 'Ein FIT-Export benötigt einen Ordner, ausgewählt wurde jedoch eine Datei',
+    'err.export.bad_extension': 'Die Exportdatei hat die falsche Dateiendung',
+    'err.export.path_no_parent': 'Dem Speicherort fehlt ein gültiger übergeordneter Ordner',
+    'err.export.parent_missing': 'Der ausgewählte Ordner existiert nicht',
+
+    /* —— an KI übergeben —— */
+    'err.handoff.prompt_required': 'Bitte zuerst einen Prompt eingeben',
+    'err.handoff.empty_range': 'In diesem Zeitraum gibt es keine übergebbaren Datensätze',
+    'err.handoff.mkdir_failed': 'Übergabeordner konnte nicht erstellt werden',
+    'err.handoff.write_failed': 'Anonymisierte KI-Daten konnten nicht geschrieben werden',
+    'err.handoff.parse_failed': 'JSON-Export für KI konnte nicht verarbeitet werden',
+    'err.handoff.encode_failed': 'Anonymisierter KI-Export konnte nicht kodiert werden',
+
+    /* —— Problemfeedback —— */
+    'err.diagnostic.nothing_to_submit':
+      'Dieses Gerät hat keine Modellnummer, die dem Gerätekatalog weiterhelfen würde — es gibt gerade nichts einzureichen',
+    'err.diagnostic.empty_report':
+      'Bitte zuerst einen Problemtyp auswählen oder einen Satz schreiben — sonst enthält der Bericht nichts Verwertbares',
+    'err.diagnostic.client_init_failed': 'Verbindung für den Bericht konnte nicht hergestellt werden',
+    'err.diagnostic.send_failed': 'Bericht konnte nicht gesendet werden. Netzwerk prüfen und erneut versuchen',
+    'err.diagnostic.http_error': 'Der Berichtsdienst hat einen Fehler zurückgegeben',
+    'err.diagnostic.rate_limited':
+      'Zu viele Berichte in kurzer Zeit. Bitte etwas später erneut versuchen — bereits gesendete Berichte gehen nicht verloren und müssen nicht erneut eingereicht werden.',
+    'err.diagnostic.bad_response': 'Der Berichtsdienst hat eine nicht lesbare Antwort zurückgegeben',
+
+    /* —— sonstiges —— */
+    'err.workout.not_found': 'Dieses Training existiert nicht mehr',
+    'err.prefs.retention_out_of_range': 'Aufbewahrungsdauer muss zwischen 1 und 365 Tagen liegen',
+    'err.storage.write_busy': 'Ein anderer ZeppBridge-Schreibvorgang läuft noch. Bitte warten, bis er abgeschlossen ist',
+    'err.storage.write_lock_unavailable':
+      'Schreibsperre konnte nicht erstellt werden. Berechtigungen des Datenordners prüfen',
+    'err.local_api.token_unavailable': 'Lokale API-Anmeldedaten konnten nicht gelesen werden',
+    'err.local_api.token_rotate_failed': 'Lokale API-Anmeldedaten konnten nicht erneuert werden',
+    'err.data_folder.open_failed': 'Datenordner konnte nicht geöffnet werden',
+    'err.data_folder.unsupported_os': 'Das Öffnen des Datenordners wird nur unter Windows und macOS unterstützt',
+    'err.update.localappdata_missing': 'Der Windows-Pfad LOCALAPPDATA ist nicht verfügbar',
+    'err.update.launch_failed': 'Aktualisierte installierte Version konnte nicht gestartet werden',
+    'err.update.installed_build_missing': 'Nach der Einrichtung wurde keine neue installierte ZeppBridge-Version gefunden',
+    'err.update.portable_windows_only': 'Die Migration von der portablen zur installierten Version ist nur unter Windows möglich',
   },
 );
 

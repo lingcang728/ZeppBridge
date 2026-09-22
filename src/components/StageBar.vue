@@ -20,6 +20,12 @@ const messages = defineMessages(
     hypnogramAria: 'Sleep stage hypnogram',
     summaryAria: 'Sleep stage share',
   },
+  {
+    notProvided: 'Nicht angegeben',
+    zeroMinutes: '0 Min.',
+    hypnogramAria: 'Schlafphasen-Hypnogramm',
+    summaryAria: 'Anteil der Schlafphasen',
+  },
 );
 const t = useMessages(messages);
 

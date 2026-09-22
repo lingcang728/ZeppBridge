@@ -57,6 +57,27 @@ const messages = defineMessages(
     loadMore: 'Load more',
     loadingMore: 'Loading…',
   },
+  {
+    backToRecent: 'Zurück zu den letzten Einträgen',
+    backToOverview: 'Zurück zur Übersicht',
+    title: 'Trainings',
+    intro: 'Auf dieses Gerät synchronisierte Trainings. Keine Strecke, keine Karte.',
+    loadFailedTitle: 'Trainings konnten nicht gelesen werden',
+    loadFailed: 'Die Trainingsliste ist gerade nicht verfügbar',
+    retry: 'Erneut versuchen',
+    emptyTitle: 'Noch nichts anzuzeigen',
+    emptyMessage: 'Nach einer Synchronisierung erscheinen hier nur Einträge mit Typ, Zeit und mindestens einem echten Messwert. Ohne GPS- oder Einzelpunktdaten wird kein leeres Diagramm angezeigt.',
+    kilometres: (value: string) => `${value} km`,
+    metres: (value: number) => `${value} m`,
+    labelDistance: 'Distanz',
+    labelBurn: 'Kalorien',
+    labelDuration: 'Dauer',
+    notProvided: 'Nicht angegeben',
+    footnote: (count: number) => `${count} Einträge angezeigt`,
+    shown: (loaded: number, total: number) => `${loaded} von ${total} geladen`,
+    loadMore: 'Mehr laden',
+    loadingMore: 'Wird geladen…',
+  },
 );
 const t = useMessages(messages);
 

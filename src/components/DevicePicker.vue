@@ -57,6 +57,27 @@ const messages = defineMessages(
     filterRing: 'Rings',
     filterEarbuds: 'Earbuds',
   },
+  {
+    pickerAria: 'Gerätemodell manuell auswählen',
+    searchAria: 'Nach Modellname suchen',
+    searchPlaceholder: 'Modell suchen, z. B. Balance 2',
+    empty: 'Kein passendes Modell gefunden. Versuch einen anderen Suchbegriff, oder setze den Filter zurück auf „Alle".',
+    prev: 'Vorheriges Modell',
+    next: 'Nächstes Modell',
+    alreadyAssigned: 'Bereits ausgewählt',
+    confirm: 'Das ist mein Gerät',
+    clear: 'Auswahl zurücknehmen',
+    later: 'Später',
+    contributeTitle: 'Hilf mit, dass die nächste Version dieses Gerät automatisch erkennt',
+    contributeBody: 'Sendet ZeppBridge das von dir gewählte Modell sowie die Modellnummern dieses Geräts (deviceSource / deviceType, nur Ganzzahlen). Beide geben nur an, um welche Uhr es sich handelt — sonst nichts: kein Konto, keine Seriennummer, keine MAC-Adresse, keine Gesundheitsdaten. Huami veröffentlicht keine Zuordnungstabelle für diese Nummern, daher ist das der einzige Weg, wie der eingebaute Katalog wächst. Sobald ein paar Personen ein Modell bestätigt haben, wird es für alle automatisch erkannt.',
+    note: 'Deine Auswahl wird als „Von dir gewähltes Modell" angezeigt und nie als automatische Erkennung ausgegeben. Bilder und Modellnamen stammen aus dem mitgelieferten Katalog; beim Durchblättern wird keine Netzwerkverbindung hergestellt.',
+    filterAll: 'Alle',
+    filterWatch: 'Uhren',
+    filterBand: 'Bänder',
+    filterStrap: 'Straps',
+    filterRing: 'Ringe',
+    filterEarbuds: 'Ohrhörer',
+  },
 );
 const t = useMessages(messages);
 

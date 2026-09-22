@@ -54,6 +54,19 @@ const messages = defineMessages(
       `Based only on the streams that have enough local samples, ${days} days takes about ${add} (the rest are not counted), and ${free} is free on this drive.`,
     unknownEstimate: 'The size of this backfill cannot be estimated right now.',
   },
+  {
+    stopNoSpace: (needed: string, free: string) =>
+      `Dieses Nachladen benötigt voraussichtlich ${needed} (inklusive Sicherheitsreserve), auf diesem Laufwerk sind aber nur noch ${free} frei — es wird nicht gestartet. Bitte zuerst Speicherplatz freigeben oder den Zeitraum verkürzen.`,
+    diskUnknown: 'Freier Speicherplatz konnte nicht ermittelt werden. Vor dem Nachladen bitte sicherstellen, dass genügend Platz vorhanden ist.',
+    diskTooSmall: 'Weniger als 300 MB frei — ein Verlauf von mehr als 90 Tagen kann nicht nachgeladen werden.',
+    builtinGuess: (days: number, add: string, free: string) =>
+      `Noch nicht genug lokale Stichproben vorhanden, daher eine grobe eingebaute Schätzung: ${days} Tage belegen etwa ${add}, auf diesem Laufwerk sind ${free} frei.`,
+    measured: (days: number, add: string, free: string) =>
+      `Berechnet anhand der tatsächlichen Rate, mit der die eigenen Daten anfallen: ${days} Tage belegen etwa ${add}, auf diesem Laufwerk sind ${free} frei.`,
+    partial: (days: number, add: string, free: string) =>
+      `Nur anhand der Datenströme mit ausreichend lokalen Stichproben berechnet: ${days} Tage belegen etwa ${add} (die übrigen sind nicht mitgezählt), auf diesem Laufwerk sind ${free} frei.`,
+    unknownEstimate: 'Der Umfang dieses Nachladens lässt sich gerade nicht schätzen.',
+  },
 );
 
 /** 和面板里显示的一致的字节写法。 */

@@ -419,6 +419,182 @@ Answer in Markdown.`,
       },
     },
   },
+  {
+    title: 'An KI übergeben',
+    intro: 'Vorlage wählen, prüfen, was das Paket tatsächlich enthält, und die Wearable-Daten an das KI-Tool deiner Wahl senden.',
+
+    workoutScopeBanner: (workoutId: string) =>
+      `Es wird ausschliesslich Training ${workoutId} exportiert: das Training selbst plus die währenddessen aufgezeichneten Einzelmesswerte. Tagesweise Datenströme wie Schlaf und Schritte bleiben aussen vor. Der Zeitraum ist inaktiv.`,
+    backToDateRange: 'Zurück zu einem Zeitraum',
+
+    categoryTitle: 'Kategorien',
+    categoryAria: 'Vorlagenkategorien',
+    categoryAll: 'Alle Vorlagen',
+    categorySummary: 'Zusammenfassung',
+    categoryTraining: 'Training',
+    categoryRecovery: 'Erholung',
+    categorySleep: 'Schlaf',
+
+    templateListTitle: 'Vorlagen',
+    templateSearchPlaceholder: 'Vorlagen durchsuchen …',
+    templateSearchAria: 'Vorlagen durchsuchen',
+    noTemplates: 'Keine passende Vorlage.',
+
+    currentTemplate: 'Aktuelle Vorlage',
+    copyPromptTitle: 'Prompt-Text in die Zwischenablage kopieren',
+    copyPrompt: 'Prompt kopieren',
+    promptEditor: 'Prompt',
+    promptEditorHint: ' (Daten werden automatisch eingefügt)',
+    injected: (count: number) => `${count} Datenströme angehängt`,
+    promptEditorAria: 'Prompt-Editor',
+
+    summaryTitle: 'Was das Paket enthält',
+    summaryHint: 'Nur was ausgewählt ist',
+    cellRange: 'Zeitraum',
+    cellCount: 'Datensätze',
+    cellCountSub: 'synchronisierte Datensätze',
+    cellTypes: 'Datentypen',
+    cellTypesValue: (count: number) => `${count}`,
+    cellTypesSub: 'im Paket',
+    cellSize: 'Grösse',
+    cellSizeSub: 'geschätzt',
+
+    thisWorkout: 'Dieses Training',
+    onlyThisWorkout: 'nur dieses Training',
+    approxMinutes: (minutes: number) => `(ca. ${minutes} Min.)`,
+    rangeDays: (days: number) => `(${days} Tage)`,
+
+    quickRange: 'Schnellauswahl: ',
+    range7: '7 Tage',
+    range30: '30 Tage',
+    startDate: 'Startdatum',
+    endDate: 'Enddatum',
+    datePickerAria: 'Datumsauswahl',
+
+    secureNote: 'Alles wird lokal erstellt: Die strukturierten Daten und der Prompt entstehen auf diesem Rechner.',
+    secureOk: 'Nur lokal',
+    exportFile: (format: string) => `${format}-Datei exportieren`,
+    copyPromptOnly: 'Nur Prompt kopieren',
+    preparing: 'Wird vorbereitet …',
+    handTo: (provider: string) => `An ${provider} übergeben`,
+    promptCopied: 'Prompt kopiert (ohne Daten).',
+    copyFailed: 'Kopieren fehlgeschlagen. Erneut versuchen.',
+    retryOpen: (provider: string) => `${provider} erneut öffnen`,
+
+    packTitle: 'Verpacken und senden',
+    packSub: 'Exportformat und KI-Tool wählen.',
+    packContentsTitle: 'Was der Export enthält',
+    packContentsIncluded:
+      'Enthalten: Trainingszusammenfassungen (Typ, Start und Ende, Distanz, Kalorien, durchschnittliche und '
+      + 'maximale Herzfrequenz, Trainingsbelastung), tägliche Messwerte (Schritte, Ruheherzfrequenz, HRV, SpO2, '
+      + 'Stress, Atemfrequenz, PAI, VO2max) und Schlafphasen mit ihrem Phasenverlauf. Bei „Vollständig" kommen '
+      + 'zusätzlich Sekunden-für-Sekunde-Trainingsreihen und einzelne Herzfrequenzmessungen dazu.',
+    packContentsExcluded:
+      'Nicht enthalten: .tcx, Kontodetails, Tokens oder Geräteseriennummern. GPS-Tracks erscheinen in den '
+      + 'Formaten GPX und FIT, und nur bei Trainings mit Track. FIT schreibt eine Datei pro Training in einen '
+      + 'selbst gewählten Ordner.',
+    formatGroup: 'Exportformat',
+    formatAria: 'Exportformat',
+    formatJsonSub: 'Vollständig strukturierte Daten',
+    formatCsvSub: 'Zusammenfassungstabelle (ohne Einzelpunktreihen)',
+    formatGpxSub: 'Nur Trainings mit GPS-Track',
+    formatFitSub: 'Eine Datei pro Training, gespeichert im gewählten Ordner',
+    detailGroup: 'Detailgrad',
+    detailAria: 'Detailgrad',
+    streamsGroup: 'Datenströme',
+    selectedCount: (selected: number, total: number) => `${selected} von ${total} ausgewählt`,
+    selectNone: 'Keine',
+    selectAll: 'Alle',
+    noTypesSelected: 'Kein Datentyp ausgewählt, der Export wird deshalb abgelehnt.',
+    estimatedSize: 'Geschätzte Paketgrösse',
+    targetGroup: 'Ziel-KI-Tool',
+    targetAria: 'Ziel-KI-Tool',
+    providerIconAlt: (provider: string) => `${provider}-Symbol`,
+    sendHint: 'Bis 2 MiB wird zusammen mit dem Prompt in die Zwischenablage kopiert. Darüber wird die JSON-Datei auf den Desktop geschrieben, zum Hineinziehen in den Chat.',
+
+    needDesktop: 'Die KI-Übergabe benötigt die Desktop-App; diese Browser-Vorschau öffnet keine externen Seiten.',
+    needValidDates: 'Bitte zuerst einen gültigen Zeitraum wählen.',
+    needDataTypes: 'Bitte mindestens einen Datentyp auswählen.',
+    stillReading: 'Lokale Datensätze werden noch gelesen. Gleich erneut versuchen.',
+    nothingInScope: 'In diesem Zeitraum nichts Synchronisiertes zum Übergeben.',
+    previewDesktopOnly: 'Bitte in der ZeppBridge-Desktop-App öffnen; die Vorschau liest lokale Datensätze.',
+    previewFailed: 'Lokale Export-Vorschau konnte nicht gelesen werden',
+    attachmentNotice: 'Das Datenpaket wurde auf den Desktop geschrieben (zeppbridge-ai-handoff.json) — in den KI-Chat ziehen. Der Prompt liegt in der Zwischenablage.',
+    attachmentOpened: (notice: string, provider: string) => `${notice} ${provider} ist geöffnet.`,
+    attachmentNotOpened: (notice: string, provider: string) => `${notice} ${provider} kann im Browser geöffnet werden, um die Daten zu analysieren.`,
+    copiedAndOpened: (provider: string) => `Anonymisierte Daten kopiert und ${provider} geöffnet. Zum Start dort einfügen.`,
+    copiedOnly: (provider: string) => `Anonymisierte Daten kopiert. ${provider} selbst öffnen und dort einfügen.`,
+    reopened: (provider: string) => `${provider} ist geöffnet. Die Daten dort einfügen.`,
+
+    templates: {
+      performance: {
+        name: 'Leistungszusammenfassung',
+        sub: 'Ein klarer Überblick über den aktuellen Stand',
+        prompt: `Du bist ein Sport- und Gesundheitsanalyst, der Wearable-Daten in klare, nutzbare Erkenntnisse übersetzt.
+Erstelle mir anhand der folgenden ZeppBridge-Daten (bereits chronologisch geordnet)
+eine klare, gut strukturierte Zusammenfassung meiner Gesamtleistung.
+Gehe auf das Gesamtbild ein, die wichtigen Trends, was besonders auffällt, worauf ich achten sollte, und was ich konkret tun kann.
+Wo die Datenlage dünn ist, sag das offen und nenne mir, was ich stattdessen erfassen sollte, statt zu raten.
+
+Antworte in Markdown, mit Tabellen, Listen und Aufzählungen, wo sie helfen.
+Halte den Ton professionell, prägnant und konstruktiv.`,
+      },
+      training: {
+        name: 'Trainingsauswertung',
+        sub: 'Trainingsbelastung und ihre Entwicklung',
+        prompt: `Du bist ein erfahrener Ausdauertrainer.
+Analysiere anhand der folgenden ZeppBridge-Trainingsdaten (Herzfrequenz, Trainingsbelastung und VO₂max)
+die Struktur meines Trainings, wie sich die Intensität verteilt, und wohin sich die Belastung entwickelt.
+Zeig auf, was an der Gestaltung meiner Einheiten nicht stimmt, und sag mir, was ich im nächsten Zyklus ändern sollte.
+
+Antworte in Markdown. Sei direkt.`,
+      },
+      recovery: {
+        name: 'Erholung und Bereitschaft',
+        sub: 'Erholung, HRV und Trainingsbereitschaft',
+        prompt: `Du bist ein Physiologe mit Spezialisierung auf Erholung.
+Bewerte anhand der folgenden ZeppBridge-Daten zu HRV, Ruheherzfrequenz, Schlaf und Stress,
+wie erholt ich bin und wie bereit ich fürs Training bin,
+benenne Anzeichen sich aufbauender Ermüdung, und sag mir, was helfen würde.
+
+Antworte in Markdown.`,
+      },
+      sleep: {
+        name: 'Schlafanalyse',
+        sub: 'Schlafqualität und Regelmässigkeit',
+        prompt: `Du bist ein Berater für Schlafgesundheit.
+Analysiere anhand der folgenden ZeppBridge-Daten zu Schlafphasen, Dauer und Herzfrequenz
+die Qualität und Regelmässigkeit meines Schlafs und was ihn offenbar beeinflusst,
+und gib mir konkrete, umsetzbare Wege, ihn zu verbessern.
+
+Antworte in Markdown.`,
+      },
+      activity: {
+        name: 'Aktivitätsübersicht',
+        sub: 'Tägliche Bewegung und ihre Entwicklung',
+        prompt: `Du bist ein Berater für einen gesunden Lebensstil.
+Gib mir anhand der folgenden ZeppBridge-Daten zu Schritten, Training und Herzfrequenz
+einen Überblick über mein tägliches Aktivitätsniveau und seine Entwicklung,
+und schlage praktische Wege vor, mich mehr zu bewegen.
+
+Antworte in Markdown.`,
+      },
+      weekly: {
+        name: 'Wochenrückblick',
+        sub: 'Ein wöchentlicher Rückblick mit konkreten Punkten',
+        prompt: `Du bist mein persönlicher Gesundheitscoach und schaust einmal pro Woche auf meine Daten.
+Vergleiche mich anhand der folgenden ZeppBridge-Daten dieser Woche ausschliesslich mit meinen eigenen früheren Aufzeichnungen.
+Fasse zusammen, was sich diese Woche verändert hat, benenne, was gut lief und was Aufmerksamkeit verdient, und gib mir eine kurze Liste an Dingen für nächste Woche.
+
+Einschränkungen:
+- In diesen Daten gibt es keinen Bevölkerungsdurchschnitt. Vergleiche mich nicht mit „gesunden Erwachsenen" oder irgendeinem Durchschnitt.
+- Wenn etwas fehlt, sag, dass es fehlt. Fülle die Lücke nie mit einer Null oder einer Schätzung.
+- Keine medizinische Diagnose, keine Einschätzung von Krankheitsrisiken, keine Behandlungsempfehlungen.
+
+Antworte in Markdown.`,
+      },
+    },
+  },
 );
 
 const copy = () => messagesOf(exploreMessages);

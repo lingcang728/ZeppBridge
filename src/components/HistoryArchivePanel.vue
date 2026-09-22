@@ -183,6 +183,87 @@ const messages = defineMessages(
       wellness: 'Stress / SpO2 and similar',
     },
   },
+  {
+    title: 'Langzeitarchiv und vollständiger Verlauf',
+    intro: 'Das Archiv sorgt für „ab heute nichts mehr löschen", das Nachladen für „das Frühere noch holen". Erst wenn beides erledigt ist, ist die lokale Kopie wirklich vollständig.',
+    archiveTitle: 'Langzeitarchiv',
+    archiveBody: 'Ist es aktiviert, räumt eine erfolgreiche Synchronisierung den Verlauf nicht mehr nach der Aufbewahrungsfrist auf. Die Datenbank wächst dadurch stetig weiter; du kannst das Archiv jederzeit wieder ausschalten — beim Ausschalten zeigt dir ZeppBridge, was die nächste Synchronisierung dann bereinigen würde.',
+    archiveAria: 'Langzeitarchiv',
+    startLabel: 'Nachladen ab',
+    startAria: 'Startpunkt für das Nachladen des Verlaufs',
+    customDateLabel: 'Startdatum',
+    customDateAria: 'Startdatum für das Nachladen',
+    estimateTitle: 'Erwarteter Speicherbedarf',
+    estimateRate: (days: number, perDay: string) => `${days} Tage lokale Messwerte · etwa ${perDay}/Tag`,
+    unmeasured: (streams: string) =>
+      `Zu wenige lokale Messwerte für eine Schätzung: ${streams}. Diese sind in der Summe oben nicht enthalten — lieber ehrlich sagen, dass wir es nicht wissen, als eine Rate zu erfinden und über Jahre hochzurechnen.`,
+    wouldBeCleanedUp: (requested: number, retention: number) =>
+      `Dieses Nachladen würde ${requested} Tage Verlauf holen, aber dieser Rechner behält nur die letzten ${retention} Tage — was zurückkommt, würde bei der nächsten erfolgreichen Synchronisierung wieder gelöscht. Aktiviere zuerst das Langzeitarchiv, oder erhöhe die Aufbewahrungsfrist.`,
+    backfilling: 'Wird nachgeladen…',
+    continueBackfill: 'Nachladen fortsetzen',
+    startBackfill: 'Nachladen starten',
+    autoContinue: 'Automatisch bis zum Ende',
+    autoContinueHint: 'Jede Runde startet automatisch die nächste, bis der gesamte Zeitraum nachgeladen ist. Du kannst jederzeit anhalten — bereits geholte Daten gehen dabei nicht verloren.',
+    stopBackfill: 'Stoppen',
+    stopping: 'Wird gestoppt…',
+    roundProgress: (done: number, total: number) =>
+      `Wird nachgeladen: ${done} von ${total} Monatsblöcken erledigt. Du kannst jederzeit stoppen.`,
+    stoppedByUser: (remaining: number) =>
+      `Gestoppt, noch ${remaining} Monatsblöcke übrig. Der bereits geholte Verlauf bleibt vollständig erhalten — mit „Nachladen fortsetzen" geht es weiter.`,
+    stalled: (remaining: number) =>
+      `Noch ${remaining} Monatsblöcke offen, aber diese Runde hat keinen davon vorangebracht und wurde deshalb gestoppt. Vermutlich schlagen diese Blöcke wiederholt fehl — sieh dir die Liste der fehlgeschlagenen Blöcke unten an, oder klicke auf „Fehlgeschlagene Monate erneut versuchen".`,
+    resetLedger: 'Protokoll leeren',
+    ledgerTitle: 'Abdeckungsprotokoll',
+    ledgerProgress: (done: number, total: number) => `${done} von ${total} Monatsblöcken abgeschlossen`,
+    ledgerFrom: (from: string) => ` · angefordert ab ${from}`,
+    ledgerComplete: 'Jeder Monatsblock im Protokoll ist abgeschlossen: entweder lokal geschrieben, oder die Cloud hat ausdrücklich gesagt, dass sie für diesen Zeitraum nichts hat.',
+    ledgerIncomplete: (remaining: number) =>
+      `${remaining} Blöcke sind noch offen. Bis alle abgeschlossen sind, ist diese lokale Kopie nur eine Kopie des erfolgreich synchronisierten Bereichs — keine vollständige.`,
+    ledgerStats: (persisted: number, empty: number, pending: number) =>
+      `${persisted} geschrieben · ${empty} von der Cloud leer gemeldet · ${pending} noch offen`,
+    ledgerFailed: (failed: number) => `${failed} fehlgeschlagen`,
+    ledgerRange: (from: string, to: string, records: number) => `${from} ~ ${to} · ${records} Datensätze`,
+    ledgerNothingWritten: 'Noch kein Monat geschrieben',
+
+    range1y: 'Letztes Jahr',
+    range2y: 'Letzte 2 Jahre',
+    range3y: 'Letzte 3 Jahre',
+    rangeAll: (years: number) => `Gesamter verfügbarer Verlauf (bis zu ${years} Jahre)`,
+    rangeCustom: 'Eigener Startpunkt',
+
+    confirmDisableArchive: 'Ist das Langzeitarchiv aus, räumt die nächste erfolgreiche Synchronisierung ältere Daten nach der Aufbewahrungsfrist auf — das lässt sich nicht rückgängig machen.\nWenn du gerade erst Verlauf nachgeladen hast, erstelle vorher am besten eine Datenbank-Sicherung.\nWirklich ausschalten?',
+    archiveEnabled: 'Langzeitarchiv aktiviert: Erfolgreiche Synchronisierungen räumen den Verlauf nicht mehr automatisch auf.',
+    archiveDisabled: 'Langzeitarchiv deaktiviert: Die nächste erfolgreiche Synchronisierung räumt nach der Aufbewahrungsfrist auf.',
+    archiveSaveFailed: 'Die Archiveinstellung konnte nicht gespeichert werden',
+    pickStartFirst: 'Bitte zuerst einen Startpunkt für das Nachladen wählen.',
+    outOfRetention: 'Dieses Nachladen reicht über die lokale Aufbewahrungsfrist hinaus, sodass die geholten Daten bei der nächsten erfolgreichen Synchronisierung wieder bereinigt würden. Aktiviere zuerst das Langzeitarchiv, oder erhöhe die Aufbewahrungsfrist.',
+    roundDone: (remaining: number) =>
+      `Diese Runde ist fertig, noch ${remaining} Monatsblöcke übrig. Klicke erneut auf „Nachladen fortsetzen" — du kannst jederzeit stoppen.`,
+    allChunksDone: 'Jeder Monatsblock im Protokoll ist abgeschlossen.',
+    backfillFailed: 'Das Nachladen des Verlaufs ist fehlgeschlagen',
+    confirmResetLedger: 'Das leert nur das Abdeckungsprotokoll. Es werden keine bereits lokal geschriebenen Daten gelöscht, und du kannst danach ein neues Nachladen planen. Fortfahren?',
+    ledgerReset: 'Das Protokoll wurde geleert. Du kannst jetzt einen neuen Nachlade-Zeitraum planen.',
+    ledgerResetFailed: 'Das Protokoll konnte nicht geleert werden',
+    failedTitle: 'Monate, die nicht abgerufen werden konnten',
+    failedIntro: 'Diese Blöcke sind fehlgeschlagen. Alle übrigen Monate waren davon nicht betroffen und wurden wie gewohnt nachgeladen.',
+    failedRow: (stream: string, month: string) => `${stream} · ${month}`,
+    failedAttempts: (attempts: number) => `${attempts} Versuch${attempts === 1 ? '' : 'e'}`,
+    failedExhausted: 'Die automatischen Wiederholungsversuche sind aufgebraucht. Mit „Fehlgeschlagene Monate erneut versuchen" noch einmal probieren',
+    failedNoReason: 'Kein Grund aufgezeichnet',
+    retryFailed: 'Fehlgeschlagene Monate erneut versuchen',
+    retryFailedDone: 'Die fehlgeschlagenen Monate wurden erneut eingereiht. Du kannst das Nachladen fortsetzen.',
+    retryFailedFailed: 'Die fehlgeschlagenen Monate konnten nicht erneut eingereiht werden',
+    streamSeparator: ', ',
+
+    stream: {
+      heart_rate: 'Herzfrequenz',
+      daily_summary: 'Tagesübersichten',
+      workouts: 'Trainings',
+      sleep: 'Schlaf',
+      hrv: 'Herzfrequenzvariabilität',
+      wellness: 'Stress / Sauerstoffsättigung u. Ä.',
+    },
+  },
 );
 const t = useMessages(messages);
 

@@ -15,6 +15,11 @@ const messages = defineMessages(
     genericFailure: "That didn't go through. Try again in a moment",
     timedOut: 'The request timed out. Check your network and the Zepp region, then try again.',
   },
+  {
+    desktopOnly: 'Desktop-App verwenden',
+    genericFailure: 'Das hat nicht geklappt. Bitte gleich nochmal versuchen',
+    timedOut: 'Zeitüberschreitung bei der Anfrage. Netzwerk und Zepp-Region prüfen und erneut versuchen.',
+  },
 );
 
 const copy = () => messagesOf(messages);

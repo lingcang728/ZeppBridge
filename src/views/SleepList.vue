@@ -46,6 +46,22 @@ const messages = defineMessages(
     loadMore: 'Load more',
     loadingMore: 'Loading…',
   },
+  {
+    backToRecent: 'Zurück zu den letzten Einträgen',
+    backToOverview: 'Zurück zur Übersicht',
+    title: 'Schlaf',
+    intro: 'Auf dieses Gerät synchronisierte Schlafeinträge. Ohne vollständigen Zeitverlauf wird nur die Zusammenfassung angezeigt.',
+    loadFailedTitle: 'Schlafeinträge konnten nicht gelesen werden',
+    loadFailed: 'Die Schlafliste ist gerade nicht verfügbar',
+    retry: 'Erneut versuchen',
+    emptyTitle: 'Noch keine Schlafeinträge',
+    emptyMessage: 'Sie erscheinen hier nach einer Synchronisierung. Phasen werden nie erfunden.',
+    scoreLabel: 'Bewertung',
+    footnote: (count: number, from: string) => `${count} Einträge · seit ${from}`,
+    shown: (shown: number, total: number) => `${shown} von ${total} angezeigt`,
+    loadMore: 'Mehr laden',
+    loadingMore: 'Wird geladen…',
+  },
 );
 const t = useMessages(messages);
 

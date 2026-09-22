@@ -17,6 +17,13 @@ const messages = defineMessages(
     dayRange: (low: string, high: string, unit: string) => `That day ranged ${low} – ${high}${unit}`,
     samples: (count: number) => `${count} readings`,
   },
+  {
+    notSyncedYet: 'Noch nicht synchronisiert',
+    noRecordsInWindow: (days: number) => `Keine Einträge in den letzten ${days} Tagen`,
+    coverage: (days: number, withData: number) => `An ${withData} von ${days} Tagen liegen Einträge vor`,
+    dayRange: (low: string, high: string, unit: string) => `Tagesspanne ${low} – ${high}${unit}`,
+    samples: (count: number) => `${count} Messwerte`,
+  },
 );
 
 const copy = () => messagesOf(messages);

@@ -24,6 +24,17 @@ const messages = defineMessages(
       `Local-first, sources intact: ${first}, ${second} and ${count} devices in all, organized into a health file you can actually read.`,
     notProvided: 'Not provided',
   },
+  {
+    introNoDevice:
+      'Lokal-first, mit erhaltener Datenherkunft: deine Wearable-Aufzeichnungen, aufbereitet zu einer Gesundheitsakte, die sich tatsächlich lesen lässt.',
+    introOne: (name: string) =>
+      `Lokal-first, mit erhaltener Datenherkunft: die Aufzeichnungen von ${name}, aufbereitet zu einer Gesundheitsakte, die sich tatsächlich lesen lässt.`,
+    introTwo: (first: string, second: string) =>
+      `Lokal-first, mit erhaltener Datenherkunft: die Aufzeichnungen von ${first} und ${second}, aufbereitet zu einer Gesundheitsakte, die sich tatsächlich lesen lässt.`,
+    introMany: (first: string, second: string, count: number) =>
+      `Lokal-first, mit erhaltener Datenherkunft: die Aufzeichnungen von ${first}, ${second} und insgesamt ${count} Geräten, aufbereitet zu einer Gesundheitsakte, die sich tatsächlich lesen lässt.`,
+    notProvided: 'Nicht angegeben',
+  },
 );
 
 const copy = () => messagesOf(messages);

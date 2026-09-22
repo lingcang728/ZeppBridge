@@ -11,11 +11,13 @@
   [![Linux](https://img.shields.io/badge/Linux-仅有构建-E95420?logo=linux&logoColor=white)](docs/guides/linux.zh-CN.md)
   [![版本](https://img.shields.io/github/v/release/lingcang728/ZeppBridge?color=8FB348&label=版本)](https://github.com/lingcang728/ZeppBridge/releases)
 
-  <p><a href="README.md">English</a></p>
+  <p><a href="README.md">English</a> · <a href="README.de.md">Deutsch</a></p>
 </div>
 
 > [!IMPORTANT]
 > ZeppBridge 是独立的非官方开源项目，与 Zepp Health、Huami、Amazfit 无隶属或背书关系。只用于你本人有权访问的账号和数据。
+
+> 应用界面支持中文、英文和德文，首次启动时跟随系统语言，设置里也有切换开关。[德文版 README](README.de.md) 是这份文档的翻译，内容以本页和[英文版](README.md)为准。
 
 ## Zepp App 里不是已经有这些数据了吗？
 

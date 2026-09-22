@@ -12,6 +12,10 @@ const messages = defineMessages(
     firmware: (value: string) => `Firmware ${value}`,
     lastData: (value: string) => `Latest data ${value}`,
   },
+  {
+    firmware: (value: string) => `Firmware ${value}`,
+    lastData: (value: string) => `Letzte Daten ${value}`,
+  },
 );
 const t = useMessages(messages);
 

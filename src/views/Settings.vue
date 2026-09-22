@@ -925,11 +925,12 @@ const runCapabilityProbe = async () => {
         <h1 id="settings-title">{{ t.title }}</h1>
         <p class="page-intro">{{ t.intro }}</p>
       </div>
-      <!-- 语言开关标签是双语的，而且不跟着界面语言变：一个看不懂中文的人
-           必须能在中文界面上找到它，反过来也一样。 -->
+      <!-- 语言开关标签是三语的（各语言里「语言」这个词本身），而且不跟着界面
+           语言变：一个只看得懂其中一种语言的人，必须能在任何一种界面语言下
+           找到它。 -->
       <div class="locale-switch">
-        <p class="advanced-label">语言 · Language</p>
-        <div class="scale-options" role="radiogroup" aria-label="语言 · Language">
+        <p class="advanced-label">语言 · Language · Sprache</p>
+        <div class="scale-options" role="radiogroup" aria-label="语言 · Language · Sprache">
           <button
             v-for="option in LOCALES"
             :key="option"

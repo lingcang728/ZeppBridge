@@ -11,13 +11,13 @@
   [![Linux](https://img.shields.io/badge/Linux-builds_only-E95420?logo=linux&logoColor=white)](docs/guides/linux.md)
   [![Version](https://img.shields.io/github/v/release/lingcang728/ZeppBridge?color=8FB348&label=version)](https://github.com/lingcang728/ZeppBridge/releases)
 
-  <p><a href="README.zh-CN.md">简体中文</a></p>
+  <p><a href="README.zh-CN.md">简体中文</a> · <a href="README.de.md">Deutsch</a></p>
 </div>
 
 > [!IMPORTANT]
 > ZeppBridge is an independent, unofficial open-source project. It is not affiliated with or endorsed by Zepp Health, Huami or Amazfit. Use it only with accounts and data you are entitled to access.
 
-> The app ships in English and Chinese; it follows your system language on first launch, and Settings has a switch. This page and [its Chinese counterpart](README.zh-CN.md) are kept in step with each other, and nothing here is described more generously than it is implemented.
+> The app ships in English, Chinese and German; it follows your system language on first launch, and Settings has a switch. This page and [its Chinese counterpart](README.zh-CN.md) are kept in step with each other, and nothing here is described more generously than it is implemented. The [German page](README.de.md) is a translation of this one; where the two disagree, this page is authoritative.
 
 ## Isn't this already in the Zepp app?
 

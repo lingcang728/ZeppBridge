@@ -20,6 +20,13 @@ const messages = defineMessages(
     copiedButCannotOpen: (label: string) => `Copied, but ${label} could not be opened`,
     nothingToRetry: 'There is no AI hand-off to retry',
   },
+  {
+    clipboardUnsupported: 'Diese Umgebung kann nicht in die Zwischenablage schreiben',
+    targetNotAllowed: 'Diese KI-Adresse steht nicht auf der Zulassungsliste',
+    handoffFailed: 'Die Übergabe an die KI ist fehlgeschlagen',
+    copiedButCannotOpen: (label: string) => `Kopiert, aber ${label} konnte nicht geöffnet werden`,
+    nothingToRetry: 'Es gibt keine KI-Übergabe zum Wiederholen',
+  },
 );
 
 const copy = () => messagesOf(messages);

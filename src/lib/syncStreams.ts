@@ -48,6 +48,24 @@ const messages = defineMessages(
     breathing_rate: 'Respiratory rate',
     skin_temperature: 'Skin temperature',
   },
+  {
+    heart_rate: 'Herzfrequenz',
+    daily_summary: 'Tagesübersichten',
+    sleep: 'Schlaf',
+    hrv: 'Herzfrequenzvariabilität',
+    wellness: 'Stress, Sauerstoffsättigung und weitere optionale Werte',
+    workouts: 'Trainings',
+    workout_detail: 'Trainingsdetails und Strecken',
+
+    vo2max: 'Maximale Sauerstoffaufnahme (VO₂max)',
+    lactate_threshold_hr: 'Herzfrequenz an der Laktatschwelle',
+    lactate_threshold_pace: 'Tempo an der Laktatschwelle',
+    resting_heart_rate: 'Ruheherzfrequenz',
+    training_load: 'Trainingsbelastung',
+    blood_oxygen: 'Sauerstoffsättigung',
+    breathing_rate: 'Atemfrequenz',
+    skin_temperature: 'Hauttemperatur',
+  },
 );
 
 /**

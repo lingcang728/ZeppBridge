@@ -6,6 +6,7 @@ import { defineMessages, useMessages } from '../i18n';
 const messages = defineMessages(
   { marqueeAria: '已收录的 Amazfit 在售设备' },
   { marqueeAria: 'Amazfit devices currently in the catalog' },
+  { marqueeAria: 'Aktuell im Katalog geführte Amazfit-Geräte' },
 );
 const t = useMessages(messages);
 

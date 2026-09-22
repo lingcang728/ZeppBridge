@@ -152,14 +152,14 @@ if (findings.length) {
     console.error(`    ${finding.text.slice(0, 120)}`);
   }
   console.error(
-    '\n把它挪进 defineMessages（中英各一份），或者——如果这里的中文确实是对的——'
+    '\n把它挪进 defineMessages（中英德各一份），或者——如果这里的中文确实是对的——'
     + '\n在 scripts/release/check-i18n.mjs 的 ALLOWED 里加一条并写清为什么。',
   );
   process.exit(1);
 }
 
 /*
- * 第二道门：后端每一个错误码都必须有中英两份文案。
+ * 第二道门：后端每一个错误码都必须有中英德三份文案。
  *
  * 后端不按界面语言出文案，只给一个稳定的 `err.*` 码；界面按码取文案，取不到
  * 才回落到后端那句中文原文。回落是兜底，不是常态——漏掉一个码，英文用户就会
@@ -182,7 +182,7 @@ for (const file of walkRust(tauriDir)) {
 }
 
 const errorBundle = readFileSync(ERROR_MESSAGES_FILE, 'utf8');
-// 中英两份都要有：`'err.x.y':` 在文件里出现两次才算齐。
+// 中英德三份都要有：`'err.x.y':` 在文件里出现三次才算齐。
 const translated = new Map();
 for (const match of errorBundle.matchAll(/'(err\.[a-z_]+\.[a-z0-9_]+)':/g)) {
   translated.set(match[1], (translated.get(match[1]) ?? 0) + 1);
@@ -303,7 +303,7 @@ if (proseFindings.length) {
   process.exit(1);
 }
 
-const missingCodes = [...declaredCodes].filter((code) => (translated.get(code) ?? 0) < 2).sort();
+const missingCodes = [...declaredCodes].filter((code) => (translated.get(code) ?? 0) < 3).sort();
 const unusedCodes = [...translated.keys()].filter((code) => !declaredCodes.has(code)).sort();
 
 if (unhandledUiCodes.length) {
@@ -311,17 +311,17 @@ if (unhandledUiCodes.length) {
   console.error('');
   for (const code of unhandledUiCodes) console.error(`  ${code}`);
   console.error('');
-  console.error('在对应组件的 defineMessages 里补中英两份，并在渲染处按码分支。');
+  console.error('在对应组件的 defineMessages 里补中英德三份，并在渲染处按码分支。');
   process.exit(1);
 }
 
 if (missingCodes.length || unusedCodes.length) {
   if (missingCodes.length) {
-    console.error('后端错误码缺少中英文案——英文界面上它会退回成中文：');
+    console.error('后端错误码缺少中英德文案——非中文界面上它会退回成中文：');
     console.error('');
     for (const code of missingCodes) {
       const count = translated.get(code) ?? 0;
-      console.error(`  ${code}  （errors.ts 里出现 ${count} 次，需要 2 次：中文一份、英文一份）`);
+      console.error(`  ${code}  （errors.ts 里出现 ${count} 次，需要 3 次：中文、英文、德文各一份）`);
     }
   }
   if (unusedCodes.length) {
@@ -331,11 +331,11 @@ if (missingCodes.length || unusedCodes.length) {
     for (const code of unusedCodes) console.error(`  ${code}`);
   }
   console.error('');
-  console.error('后端加错误码时，src/i18n/errors.ts 的中英两份都要同时补上。');
+  console.error('后端加错误码时，src/i18n/errors.ts 的中英德三份都要同时补上。');
   process.exit(1);
 }
 
 console.log(
-  `界面文案检查通过：没有硬编码的中文；${declaredCodes.size} 个后端错误码都有中英文案；`
+  `界面文案检查通过：没有硬编码的中文；${declaredCodes.size} 个后端错误码都有中英德文案；`
   + `${declaredUiCodes.size} 个界面文案码都已处理；后端原文字段只在登记过的兜底处使用。`,
 );

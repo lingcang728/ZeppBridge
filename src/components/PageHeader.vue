@@ -6,6 +6,7 @@ import { defineMessages, useMessages } from '../i18n';
 const messages = defineMessages(
   { backToOverview: '返回概览' },
   { backToOverview: 'Back to overview' },
+  { backToOverview: 'Zurück zur Übersicht' },
 );
 const t = useMessages(messages);
 

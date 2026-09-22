@@ -63,6 +63,28 @@ const messages = defineMessages(
     networkUnavailable: 'Network unavailable',
     assignmentFailed: 'Could not save the model pick',
   },
+  {
+    stateAccount: 'Aus Konto bekannt',
+    stateUserAssigned: 'Von dir gewähltes Modell',
+    stateRecentData: 'Hat aktuelle Daten',
+    stateCached: 'Aus Zwischenspeicher',
+    stateUnknown: 'Nicht erkannt',
+    notFetchedYet: 'Noch nicht abgerufen',
+    timeUnknown: 'Zeit unbekannt',
+    unidentifiedDevice: 'Nicht erkanntes Gerät',
+    notProvided: 'Nicht angegeben',
+    identifyUnavailable: 'Geräteerkennung ist gerade nicht verfügbar',
+    cacheUnavailable: 'Der Gerätezwischenspeicher ist gerade nicht verfügbar',
+    noLocalIdentifier: 'Dieses Gerät hat keine lokale Kennung, daher kann die Auswahl nicht gespeichert werden.',
+    assignmentCleared: 'Auswahl zurückgenommen. Zurück zur automatischen Erkennung.',
+    assignmentSaved: 'Deine Auswahl wurde gespeichert. Sie wird als „Von dir gewähltes Modell" angezeigt und nie als automatische Erkennung ausgegeben.',
+    assignmentContributed: (reportId: string) =>
+      `Deine Auswahl wurde gespeichert, und die Modellnummern wurden an ZeppBridge übermittelt (Meldung ${reportId}). Die nächste Katalog-Version wird dieses Modell automatisch erkennen.`,
+    assignmentContributionFailed: (reason: string) =>
+      `Deine Auswahl wurde auf diesem Gerät gespeichert. Das Senden des Katalog-Beitrags ist fehlgeschlagen: ${reason}`,
+    networkUnavailable: 'Netzwerk nicht verfügbar',
+    assignmentFailed: 'Modellauswahl konnte nicht gespeichert werden',
+  },
 );
 
 const copy = () => messagesOf(messages);

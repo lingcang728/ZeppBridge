@@ -29,6 +29,13 @@ const messages = defineMessages(
     d180: '6 months',
     d365: '1 year',
   },
+  {
+    d7: '7 Tage',
+    d30: '1 Monat',
+    d90: '3 Monate',
+    d180: '6 Monate',
+    d365: '1 Jahr',
+  },
 );
 
 const copy = () => messagesOf(messages);

@@ -60,6 +60,19 @@ const messages = defineMessages(
     backfilling: 'Backfilling…',
     syncNow: 'Sync now',
   },
+  {
+    empty: 'Auf diesem Rechner liegen noch keine Daten. Einmal synchronisieren, dann haben die Diagramme etwas zu zeigen.',
+    emptyAfterSync:
+      'Die Synchronisierung ist durchgelaufen, hat aber nichts zurückgebracht. Entweder hat dieses Konto für diesen Zeitraum keine Daten in Zepp, oder die Uhr hat noch nichts an die Zepp-App hochgeladen. Zuerst in der Zepp-App auf deinem Handy nachsehen, dann hier erneut synchronisieren.',
+    emptyUnconfirmedRegion:
+      'Die Synchronisierung ist durchgelaufen, hat aber nichts zurückgebracht. Bei der Anmeldung liess sich nicht bestätigen, zu welcher Zepp-Region dieses Konto gehört — ZeppBridge verwendet daher eine Vermutung, und eine Synchronisierung mit der falschen Region sieht genau so aus: Sie läuft erfolgreich durch und bringt nichts zurück. Versuche, dein Konto erneut zu verbinden.',
+    reconnect: 'Konto neu verbinden',
+    short: (covered: number, earliest: string) =>
+      `Auf diesem Rechner liegen ${covered} Tage (frühester Eintrag ${earliest}). Alles davor ist leer, weil es noch nicht aus der Cloud abgerufen wurde — nicht, weil du in dieser Zeit nichts aufgezeichnet hast.`,
+    backfill: 'Mehr Verlauf nachladen',
+    backfilling: 'Wird nachgeladen …',
+    syncNow: 'Jetzt synchronisieren',
+  },
 );
 const t = useMessages(messages);
 
