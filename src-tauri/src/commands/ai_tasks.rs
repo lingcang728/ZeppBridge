@@ -3,13 +3,15 @@
 //! 分工与协议一致：
 //! - 读命令走 `spawn_independent_read`（只读连接，不占写锁）；
 //! - 写命令走 `with_write(WritePurpose::Metadata)`；
-//! - `ai_task_prepare` 会往 `data_dir/exports/ai-tasks/` 写文件，也归写命令；
-//! - `ai_task_attachment_stat` 纯 stat 不碰库，直接在线程外做。
+//! - `ai_task_prepare` 分两段：bundle 构建走 `spawn_independent_read`，
+//!   落盘是纯文件 IO 走 `spawn_blocking`——写出的是 exports 下的新文件
+//!   而不是 zepp.db，不占 `state.db` 也不需要跨进程写锁；
+//! - `ai_task_attachment_stat` 纯 stat 不碰库，走 `spawn_blocking`。
 //!
 //! 错误码全部来自 core 侧（`err.ai_task.*` / `err.ai_template.*`），
 //! 这层只做薄适配——不在命令层猜实体。
 
-use super::{spawn_independent_read, with_write};
+use super::{join_blocking, spawn_independent_read, with_write};
 use crate::app_state::AppState;
 use crate::ipc_error::AppError;
 use zeppbridge_core::ai_tasks::{
@@ -108,7 +110,9 @@ pub async fn ai_task_preview(
 /// 生成 `health-context.json` + `prompt.txt` 到
 /// `data_dir/exports/ai-tasks/<task_id>/`。`missing` 附件 → `blocked`。
 ///
-/// 写文件所以拿写锁（`Metadata`），同步/备份期间会排队而不是各写各的。
+/// 分两段：构建（校验、锚点、coverage、bundle、序列化）在独立只读连接上
+/// 跑，不占 `state.db`；落盘是纯文件 IO。写出的文件是 exports 下的新文件
+/// 而不是 zepp.db——跨进程写锁管的是库的写者，这里不需要它。
 #[tauri::command]
 pub async fn ai_task_prepare(
     state: tauri::State<'_, AppState>,
@@ -116,10 +120,12 @@ pub async fn ai_task_prepare(
     coverage_note: String,
 ) -> std::result::Result<AiTaskPrepareResult, AppError> {
     let output_root = state.data_dir.join("exports").join("ai-tasks");
-    with_write(&state.data_dir, &state.db, WritePurpose::Metadata, |db| {
-        db.ai_task_prepare(&task, &coverage_note, &output_root)
+    let plan = spawn_independent_read(state.data_dir.clone(), move |db| {
+        db.ai_task_prepare_plan(&task, &coverage_note, &output_root)
     })
-    .await
+    .await?;
+    join_blocking(tokio::task::spawn_blocking(move || plan.finish()).await)
+        .and_then(|result| result.map_err(AppError::from))
 }
 
 /// 批量 stat 用户挑的附件路径——本机核对用，`path` 在这里合法返回。
@@ -133,5 +139,5 @@ pub async fn ai_task_attachment_stat(
             "一次最多检查 256 个附件路径",
         ));
     }
-    Ok(stat_attachment_paths(&paths))
+    join_blocking(tokio::task::spawn_blocking(move || stat_attachment_paths(&paths)).await)
 }

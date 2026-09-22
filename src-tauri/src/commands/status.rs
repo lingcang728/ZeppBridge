@@ -1,3 +1,4 @@
+use super::spawn_independent_read;
 use crate::app_state::{mask_user_id, AppState};
 use crate::ipc_error::AppError;
 use crate::ipc_types::{capability_views, stream_views, AppStatus, StreamStatusView};
@@ -5,13 +6,18 @@ use chrono::Local;
 
 /// Build the non-sensitive snapshot used by the dashboard and settings UI.
 ///
-/// Authentication metadata is read without exposing the credential itself,
-/// while the database lock is held only for the status query.  The resulting
+/// Authentication metadata is read without exposing the credential itself.
+/// The database side runs on an independent read-only connection
+/// (`spawn_independent_read`) instead of `state.db`, so a long write — sync,
+/// migration, compaction — never stalls the status snapshot.  The resulting
 /// snapshot owns all values, so no state lock remains held while it is
 /// assembled or returned to Tauri.
 pub(crate) async fn build_app_status(state: &AppState) -> std::result::Result<AppStatus, AppError> {
     let auth_status = state.auth.status()?;
 
+    let data_dir = state.data_dir.clone();
+    let storage_dir = data_dir.clone();
+    let today = Local::now().date_naive();
     let (
         statuses,
         freshness,
@@ -19,23 +25,23 @@ pub(crate) async fn build_app_status(state: &AppState) -> std::result::Result<Ap
         prefs,
         storage,
         coverage,
-    ) = {
-        let database = state.db.lock().await;
-        let statuses = database.list_data_status()?;
-        let freshness = database.stream_freshness()?;
-        let cloud_metadata = database.cloud_sync_metadata()?;
-        let prefs = database.user_prefs()?;
-        let storage = database.storage_estimate(prefs.history_sync_days, &state.data_dir)?;
-        let coverage = database.local_coverage(Local::now().date_naive())?;
-        (
+    ) = spawn_independent_read(data_dir, move |db| {
+        let statuses = db.list_data_status()?;
+        let freshness = db.stream_freshness()?;
+        let cloud_metadata = db.cloud_sync_metadata()?;
+        let prefs = db.user_prefs()?;
+        let storage = db.storage_estimate(prefs.history_sync_days, &storage_dir)?;
+        let coverage = db.local_coverage(today)?;
+        Ok((
             statuses,
             freshness,
             cloud_metadata,
             prefs,
             storage,
             coverage,
-        )
-    };
+        ))
+    })
+    .await?;
 
     let auth_state = state.auth_state.read().await.clone();
     let startup_warning = state.startup_warning.read().await.clone();

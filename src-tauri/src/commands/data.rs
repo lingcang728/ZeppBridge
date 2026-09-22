@@ -36,11 +36,7 @@ pub(crate) const AI_HANDOFF_INLINE_LIMIT_BYTES: usize = 2 * 1024 * 1024;
 pub async fn get_health_overview(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<HealthOverview, AppError> {
-    let result = {
-        let db = state.db.lock().await;
-        db.get_health_overview().map_err(AppError::from)
-    };
-    result
+    spawn_independent_read(state.data_dir.clone(), |db| db.get_health_overview()).await
 }
 
 /// What this account can actually give an AI, and what it cannot.
@@ -52,9 +48,11 @@ pub async fn get_health_overview(
 pub async fn get_capability_overview(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<CapabilityOverview, AppError> {
-    let db = state.db.lock().await;
-    db.capability_overview(Local::now().date_naive())
-        .map_err(AppError::from)
+    let today = Local::now().date_naive();
+    spawn_independent_read(state.data_dir.clone(), move |db| {
+        db.capability_overview(today)
+    })
+    .await
 }
 
 /// 一页记录，外加本机的总条数。
@@ -217,8 +215,10 @@ pub async fn get_daily_heart_rate_extremes(
     state: tauri::State<'_, AppState>,
     days: i64,
 ) -> std::result::Result<Vec<DailyHeartRateExtreme>, AppError> {
-    let db = state.db.lock().await;
-    db.daily_heart_rate_extremes(days).map_err(AppError::from)
+    spawn_independent_read(state.data_dir.clone(), move |db| {
+        db.daily_heart_rate_extremes(days)
+    })
+    .await
 }
 
 /// Acute (7 day) versus chronic (28 day) training load, day by day.

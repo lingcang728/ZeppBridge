@@ -745,8 +745,9 @@ fn execute_tool_with_db(
         Err((_code, message)) => return tool_error(scope, 0, message),
     };
 
-    // 授权每次调用都重读：连接本来就每请求重开，所以任务页里翻转
-    // 「开放给 MCP」对下一次请求立即生效。task 模式下读不出授权等于
+    // 授权每次调用都重读：连接本来就每请求重开（每次 `tools/call` 都在
+    // `open_db` 新建只读连接），新连接拿到的是新的 WAL 读快照，任务页里
+    // 翻转「开放给 MCP」对下一次请求立即生效。task 模式下读不出授权等于
     // 无法证明有授权——fail closed，不假装它存在。
     let grants = match access::shared_task_grants(&db) {
         Ok(grants) => grants,
@@ -796,8 +797,9 @@ fn execute_tool_with_db(
     }
 
     // MCP 的 content 是给模型读的文本；结构化数据同时放进 structuredContent，
-    // 让能用结构的客户端不必再解析一遍字符串。
-    let text = serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into());
+    // 让能用结构的客户端不必再解析一遍字符串。文本用紧凑序列化——同一份
+    // JSON，客户端 parse 后等价，省去 pretty 的空白开销。
+    let text = payload.to_string();
     json!({
         "content": [{ "type": "text", "text": text }],
         "structuredContent": payload,

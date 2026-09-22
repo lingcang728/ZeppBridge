@@ -11,19 +11,21 @@
 //!   standard=+完整汇总列，detailed=+逐点 samples/pauses/splits/laps。
 //!   上下文 day 序列三种级别都给日度粒度。
 
-use super::coverage::{category_metric_specs, category_windows, AnchorWorkout};
+use super::coverage::{
+    category_metric_specs, category_windows, parse_rfc3339_utc, window_coverage_rows, AnchorWorkout,
+};
 use super::model::*;
 use super::store::normalize_task_draft;
 use super::AiTaskError;
 use crate::models::error::Result;
-use crate::models::Workout;
+use crate::models::{SleepStageSlice, Workout};
 use crate::paths::write_file_atomically;
 use crate::storage::{loaded_stage_minutes, Database, MetricSource};
-use chrono::Utc;
-use rusqlite::params;
+use chrono::{NaiveDate, Utc};
+use rusqlite::{params, params_from_iter};
 use serde_json::{json, Map, Value};
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// preview 与 prepare 共用的构建结果——两边数字必须出自同一份构造。
 pub(crate) struct AiTaskBundle {
@@ -32,6 +34,90 @@ pub(crate) struct AiTaskBundle {
     pub coverage: Vec<AiTaskCoverage>,
     pub attachments: Vec<AiTaskAttachmentStatus>,
     pub warnings: Vec<AiTaskIssue>,
+}
+
+/// 一个锚点窗口的一遍取数结果：coverage 要的 days/sources 与 document
+/// 要的日行出自同一份查询（H4：原来 coverage 与 `gather_category_days`
+/// 对同一窗口各查一遍）。
+///
+/// workout/sleep 类别的 days/sources 直接从行上累计；指标类别的出仓行
+/// 不带 `source_scope`（`daily_metric_points`/`sample_metric_points` 不
+/// 回传），它的 days/sources 仍走 `category_window_days` 的专用查询——
+/// 指标类别因此保持与旧实现相同的查询次数，没有变差。
+pub(crate) struct WindowGather {
+    pub workout_id: String,
+    pub start: NaiveDate,
+    pub end: NaiveDate,
+    /// 窗口内「有数据的本地日」集合与命中的 `source_scope` 集合，
+    /// 去重粒度即 P4 的 `(category, date)`。
+    pub covered_days: BTreeSet<String>,
+    pub sources: BTreeSet<String>,
+    /// document 行：`(本地日, 去重键, 出仓对象)`。去重键是
+    /// `w:<workout_id>` / `s:<sleep_id>` / 指标名，跨窗口合并时用。
+    pub rows: Vec<(String, String, Value)>,
+}
+
+/// `ai_task_prepare_plan` 的产物：读侧全部完成、只差文件落盘。
+/// 命令层先拿它在只读连接上跑构建，再把 `finish()` 放到阻塞线程上——
+/// 写出的文件不占数据库连接，也不需要跨进程写锁。
+pub struct AiTaskPreparePlan {
+    task_id: String,
+    output_dir: PathBuf,
+    prompt_text: String,
+    attachments: Vec<AiTaskAttachmentStatus>,
+    blocked: Vec<AiTaskIssue>,
+    /// ready 时必有；blocked 时为空。
+    json_text: Option<String>,
+}
+
+impl AiTaskPreparePlan {
+    /// 写侧：纯文件 IO，不碰数据库。blocked 时什么都不写（连目录都不建）。
+    pub fn finish(self) -> Result<AiTaskPrepareResult> {
+        let output_dir_text = self.output_dir.to_string_lossy().into_owned();
+        if !self.blocked.is_empty() {
+            return Ok(AiTaskPrepareResult {
+                status: AiTaskPrepareStatus::Blocked,
+                task_id: self.task_id,
+                output_dir: output_dir_text,
+                json_path: None,
+                prompt_path: None,
+                prompt_text: self.prompt_text,
+                byte_len: 0,
+                attachments: self.attachments,
+                blocked: self.blocked,
+            });
+        }
+        // 不变式：blocked 为空 ⇒ plan 一定带了序列化好的文档。
+        let json_text = self
+            .json_text
+            .ok_or_else(|| AiTaskError::write_failed("缺少交接 JSON 内容"))?;
+        let byte_len = json_text.len() as i64;
+
+        std::fs::create_dir_all(&self.output_dir).map_err(|error| {
+            AiTaskError::write_failed(format!(
+                "创建交接目录 {} 失败: {error}",
+                self.output_dir.display()
+            ))
+        })?;
+        let json_path = self.output_dir.join("health-context.json");
+        let prompt_path = self.output_dir.join("prompt.txt");
+        write_file_atomically(&json_path, json_text.as_bytes())
+            .map_err(|error| AiTaskError::write_failed(format!("写入交接 JSON 失败: {error}")))?;
+        write_file_atomically(&prompt_path, self.prompt_text.as_bytes())
+            .map_err(|error| AiTaskError::write_failed(format!("写入提示词文件失败: {error}")))?;
+
+        Ok(AiTaskPrepareResult {
+            status: AiTaskPrepareStatus::Ready,
+            task_id: self.task_id,
+            output_dir: output_dir_text,
+            json_path: Some(json_path.to_string_lossy().into_owned()),
+            prompt_path: Some(prompt_path.to_string_lossy().into_owned()),
+            prompt_text: self.prompt_text,
+            byte_len,
+            attachments: self.attachments,
+            blocked: Vec::new(),
+        })
+    }
 }
 
 /// 未保存草稿走预览/准备时的展示 id 与目录名。
@@ -43,7 +129,8 @@ impl Database {
     pub fn ai_task_preview(&self, task: &AiTask) -> Result<AiTaskPreview> {
         let task = normalize_task_draft(task)?;
         let anchors = self.ai_task_anchors(&task.workout_ids)?;
-        let bundle = self.build_ai_task_bundle(&task, &anchors)?;
+        let attachments = stat_task_attachments(&task.attachments);
+        let bundle = self.build_ai_task_bundle(&task, &anchors, attachments)?;
         // 估算必须和 `ai_task_prepare` 实写用同一种序列化（pretty）——
         // 不然界面预览的字节数跟落盘文件对不上。
         let estimated_bytes = serde_json::to_string_pretty(&bundle.document)?.len() as i64;
@@ -62,12 +149,29 @@ impl Database {
     ///
     /// `output_root` 由命令层传入 `data_dir/exports/ai-tasks`。blocked 时
     /// 一个文件都不写。
+    ///
+    /// 拆成 [`Self::ai_task_prepare_plan`]（读侧）+ [`AiTaskPreparePlan::finish`]
+    /// （写侧）两步：命令层据此只在读侧占数据库连接，文件落盘不持锁。
+    /// 需要一条调用走完的调用方（测试）继续用这个薄封装。
     pub fn ai_task_prepare(
         &self,
         task: &AiTask,
         coverage_note: &str,
         output_root: &Path,
     ) -> Result<AiTaskPrepareResult> {
+        self.ai_task_prepare_plan(task, coverage_note, output_root)?
+            .finish()
+    }
+
+    /// `ai_task_prepare` 的读侧：校验、锚点解析、附件核对、提示词拼装、
+    /// blocked 判定与 bundle 构建（含 JSON 序列化）全部在这里完成；
+    /// 返回的 [`AiTaskPreparePlan`] 只剩纯文件落盘，不再碰库。
+    pub fn ai_task_prepare_plan(
+        &self,
+        task: &AiTask,
+        coverage_note: &str,
+        output_root: &Path,
+    ) -> Result<AiTaskPreparePlan> {
         let task = normalize_task_draft(task)?;
         let anchors = self.ai_task_anchors(&task.workout_ids)?;
         let attachments = stat_task_attachments(&task.attachments);
@@ -107,61 +211,54 @@ impl Database {
 
         let task_id = effective_task_id(&task);
         let output_dir = output_root.join(sanitize_dir_component(&task_id));
-        let output_dir_text = output_dir.to_string_lossy().into_owned();
 
         if !blocked.is_empty() {
-            return Ok(AiTaskPrepareResult {
-                status: AiTaskPrepareStatus::Blocked,
+            return Ok(AiTaskPreparePlan {
                 task_id,
-                output_dir: output_dir_text,
-                json_path: None,
-                prompt_path: None,
+                output_dir,
                 prompt_text,
-                byte_len: 0,
                 attachments,
                 blocked,
+                json_text: None,
             });
         }
 
-        let bundle = self.build_ai_task_bundle(&task, &anchors)?;
+        let bundle = self.build_ai_task_bundle(&task, &anchors, attachments)?;
         let json_text = serde_json::to_string_pretty(&bundle.document)
             .map_err(|error| AiTaskError::write_failed(format!("序列化交接数据失败: {error}")))?;
-        let byte_len = json_text.len() as i64;
 
-        std::fs::create_dir_all(&output_dir).map_err(|error| {
-            AiTaskError::write_failed(format!(
-                "创建交接目录 {} 失败: {error}",
-                output_dir.display()
-            ))
-        })?;
-        let json_path = output_dir.join("health-context.json");
-        let prompt_path = output_dir.join("prompt.txt");
-        write_file_atomically(&json_path, json_text.as_bytes())
-            .map_err(|error| AiTaskError::write_failed(format!("写入交接 JSON 失败: {error}")))?;
-        write_file_atomically(&prompt_path, prompt_text.as_bytes())
-            .map_err(|error| AiTaskError::write_failed(format!("写入提示词文件失败: {error}")))?;
-
-        Ok(AiTaskPrepareResult {
-            status: AiTaskPrepareStatus::Ready,
+        Ok(AiTaskPreparePlan {
             task_id,
-            output_dir: output_dir_text,
-            json_path: Some(json_path.to_string_lossy().into_owned()),
-            prompt_path: Some(prompt_path.to_string_lossy().into_owned()),
+            output_dir,
             prompt_text,
-            byte_len,
             attachments: bundle.attachments,
             blocked: Vec::new(),
+            json_text: Some(json_text),
         })
     }
 
     /// preview/prepare 共用的构造：覆盖事实、附件状态、警告、出仓文档。
+    ///
+    /// `attachments` 由调用方先 stat 好传进来——prepare 的 blocked 判定
+    /// 和 bundle 用的是同一份附件状态，不再各 stat 一遍。
     fn build_ai_task_bundle(
         &self,
         task: &AiTask,
         anchors: &[AnchorWorkout],
+        attachments: Vec<AiTaskAttachmentStatus>,
     ) -> Result<AiTaskBundle> {
-        let coverage = self.ai_task_coverage(task, anchors)?;
-        let attachments = stat_task_attachments(&task.attachments);
+        // 每个 enabled 窗口类别取一遍数：同一份窗口结果先组装 coverage
+        // 事实，再进 document 的 context 日行——两遍查询合并成一遍。
+        let mut coverage = Vec::new();
+        let mut sections: Vec<(AiTaskCategory, Vec<WindowGather>)> = Vec::new();
+        for range in &task.categories {
+            if !range.enabled || !range.category.is_windowed() {
+                continue;
+            }
+            let windows = self.gather_category_windows(task, range, anchors)?;
+            coverage.extend(window_coverage_rows(range.category, &windows));
+            sections.push((range.category, windows));
+        }
         let briefs: Vec<AiTaskWorkoutBrief> = anchors
             .iter()
             .map(|anchor| AiTaskWorkoutBrief {
@@ -177,7 +274,8 @@ impl Database {
             })
             .collect();
         let warnings = task_warnings(task, &coverage, &attachments);
-        let document = self.build_task_document(task, anchors, &coverage, &attachments)?;
+        let document =
+            self.build_task_document(task, anchors, &coverage, &attachments, sections)?;
         Ok(AiTaskBundle {
             document,
             briefs,
@@ -215,12 +313,16 @@ impl Database {
 
     /// `health-context.json` 的完整文档。构造时就是干净的：字段逐个挑，
     /// `device_id`/路径/身份键从不在文档里出现。
+    ///
+    /// `sections` 是 build bundle 时已取好的各窗口类别数据——文档与
+    /// coverage 共用同一遍查询结果，不再自己重查。
     fn build_task_document(
         &self,
         task: &AiTask,
         anchors: &[AnchorWorkout],
         coverage: &[AiTaskCoverage],
         attachments: &[AiTaskAttachmentStatus],
+        sections: Vec<(AiTaskCategory, Vec<WindowGather>)>,
     ) -> Result<Value> {
         let mut document = Map::new();
         document.insert("schema".into(), json!("zeppbridge.ai_task"));
@@ -254,12 +356,10 @@ impl Database {
         document.insert("workouts".into(), Value::Array(workouts));
 
         // 上下文：每个 enabled 窗口类别一组按日条目，(category,date) 已去重。
+        // 空窗类别（全空窗、无行）也会产出 `days: []` 一节——与旧实现一致。
         let mut context = Vec::new();
-        for range in &task.categories {
-            if !range.enabled || !range.category.is_windowed() {
-                continue;
-            }
-            let days = self.gather_category_days(task, range, anchors)?;
+        for (category, gathers) in sections {
+            let days = merge_window_gathers(category, gathers);
             let mut day_entries = Vec::with_capacity(days.len());
             for (date, acc) in days {
                 let mut entry = Map::new();
@@ -280,7 +380,7 @@ impl Database {
                 day_entries.push(Value::Object(entry));
             }
             let mut section = Map::new();
-            section.insert("category".into(), serde_json::to_value(range.category)?);
+            section.insert("category".into(), serde_json::to_value(category)?);
             section.insert("days".into(), Value::Array(day_entries));
             context.push(Value::Object(section));
         }
@@ -420,44 +520,56 @@ impl Database {
         Ok(Value::Object(object))
     }
 
-    /// 一个窗口类别的逐日数据。同一天可能被多个锚点窗口覆盖——
-    /// `(category, date)` 只出现一次，`linked` 记所有覆盖它的锚点；
-    /// 同日同条目（同一 metric / 同一 sleep_id / 同一 workout_id）去重。
-    fn gather_category_days(
+    /// 一个窗口类别在所有锚点窗口上的一遍取数：每个窗口产出一个
+    /// [`WindowGather`]，coverage 的 days/sources 与 document 的日行
+    /// 在这里同时累计，不再让两边各查一遍。
+    fn gather_category_windows(
         &self,
         task: &AiTask,
         range: &AiTaskCategoryRange,
         anchors: &[AnchorWorkout],
-    ) -> Result<BTreeMap<String, DayAcc>> {
-        let mut days: BTreeMap<String, DayAcc> = BTreeMap::new();
-        let mut seen: BTreeSet<(String, String)> = BTreeSet::new();
+    ) -> Result<Vec<WindowGather>> {
+        let mut gathers = Vec::new();
         for (workout_id, start, end) in category_windows(range, anchors) {
             let start_text = start.to_string();
             let end_text = end.to_string();
+            let mut gather = WindowGather {
+                workout_id,
+                start,
+                end,
+                covered_days: BTreeSet::new(),
+                sources: BTreeSet::new(),
+                rows: Vec::new(),
+            };
             match range.category {
                 AiTaskCategory::Workout => {
-                    for (day, row_id, row) in self.workout_day_rows(&start_text, &end_text)? {
-                        let acc = days.entry(day.clone()).or_default();
-                        acc.linked.insert(workout_id.clone());
-                        if seen.insert((day, format!("w:{row_id}"))) {
-                            acc.workouts.push(row);
-                        }
+                    for (day, row_id, source_scope, row) in
+                        self.workout_day_rows(&start_text, &end_text)?
+                    {
+                        gather.covered_days.insert(day.clone());
+                        gather.sources.insert(source_scope);
+                        gather.rows.push((day, format!("w:{row_id}"), row));
                     }
                 }
                 AiTaskCategory::Sleep => {
-                    for (day, row_id, row) in self.sleep_day_rows(
+                    for (day, row_id, source_scope, row) in self.sleep_day_rows(
                         &start_text,
                         &end_text,
                         task.detail_level == AiTaskDetailLevel::Detailed,
                     )? {
-                        let acc = days.entry(day.clone()).or_default();
-                        acc.linked.insert(workout_id.clone());
-                        if seen.insert((day, format!("s:{row_id}"))) {
-                            acc.sleeps.push(row);
-                        }
+                        gather.covered_days.insert(day.clone());
+                        gather.sources.insert(source_scope);
+                        gather.rows.push((day, format!("s:{row_id}"), row));
                     }
                 }
                 _ => {
+                    // 指标类别的出仓行不带 source_scope——coverage 仍走
+                    // `category_window_days` 的 days+sources 查询，与旧实现
+                    // 同式同结果；document 行仍按 spec 取 points。
+                    let (days, sources) =
+                        self.category_window_days(range.category, &start_text, &end_text)?;
+                    gather.covered_days = days;
+                    gather.sources = sources;
                     for spec in category_metric_specs(range.category) {
                         let points = match spec.source {
                             MetricSource::Daily(spread) => self.daily_metric_points(
@@ -471,36 +583,42 @@ impl Database {
                             }
                         };
                         for point in points {
-                            let acc = days.entry(point.date.clone()).or_default();
-                            acc.linked.insert(workout_id.clone());
-                            if seen.insert((point.date.clone(), spec.metric.to_string())) {
-                                let mut metric = Map::new();
-                                metric.insert("metric".into(), json!(spec.metric));
-                                metric.insert("unit".into(), json!(spec.unit));
-                                metric.insert("value".into(), json!(point.value));
-                                if let Some(min) = point.min {
-                                    metric.insert("min".into(), json!(min));
-                                }
-                                if let Some(max) = point.max {
-                                    metric.insert("max".into(), json!(max));
-                                }
-                                if let Some(samples) = point.samples {
-                                    metric.insert("samples".into(), json!(samples));
-                                }
-                                acc.metrics.push(Value::Object(metric));
+                            let mut metric = Map::new();
+                            metric.insert("metric".into(), json!(spec.metric));
+                            metric.insert("unit".into(), json!(spec.unit));
+                            metric.insert("value".into(), json!(point.value));
+                            if let Some(min) = point.min {
+                                metric.insert("min".into(), json!(min));
                             }
+                            if let Some(max) = point.max {
+                                metric.insert("max".into(), json!(max));
+                            }
+                            if let Some(samples) = point.samples {
+                                metric.insert("samples".into(), json!(samples));
+                            }
+                            gather.rows.push((
+                                point.date,
+                                spec.metric.to_string(),
+                                Value::Object(metric),
+                            ));
                         }
                     }
                 }
             }
+            gathers.push(gather);
         }
-        Ok(days)
+        Ok(gathers)
     }
 
-    /// 窗口内的运动日条目，返回 `(本地日, workout_id, 出仓对象)`——
-    /// `workout_id` 单列出来供重叠窗口去重。`workout_type` 取用户修正优先
-    /// 的 effective 值。
-    fn workout_day_rows(&self, start: &str, end: &str) -> Result<Vec<(String, String, Value)>> {
+    /// 窗口内的运动日条目，返回 `(本地日, workout_id, source_scope, 出仓
+    /// 对象)`——`workout_id` 单列出来供重叠窗口去重，`source_scope` 同时
+    /// 进 coverage 的 sources 与出仓对象本身。`workout_type` 取用户修正
+    /// 优先的 effective 值。
+    fn workout_day_rows(
+        &self,
+        start: &str,
+        end: &str,
+    ) -> Result<Vec<(String, String, String, Value)>> {
         let mut stmt = self.conn.prepare(
             "SELECT workout_id, COALESCE(workout_type_override, workout_type),
                     start_time, end_time, distance_meters, moving_seconds,
@@ -512,6 +630,7 @@ impl Database {
         )?;
         let rows = stmt.query_map(params![start, end], |row| {
             let workout_id: String = row.get(0)?;
+            let source_scope: String = row.get(12)?;
             let mut object = Map::new();
             object.insert("workout_id".into(), json!(workout_id));
             object.insert("workout_type".into(), json!(row.get::<_, String>(1)?));
@@ -531,20 +650,25 @@ impl Database {
                     object.insert(key.into(), json!(value));
                 }
             }
-            object.insert("source_scope".into(), json!(row.get::<_, String>(12)?));
-            Ok((row.get::<_, String>(13)?, workout_id, Value::Object(object)))
+            object.insert("source_scope".into(), json!(source_scope.clone()));
+            Ok((
+                row.get::<_, String>(13)?,
+                workout_id,
+                source_scope,
+                Value::Object(object),
+            ))
         })?;
         Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
     }
 
-    /// 窗口内的睡眠日条目（按醒来日归属），返回 `(归属日, sleep_id, 出仓
-    /// 对象)`。`device_id` 不进文档。
+    /// 窗口内的睡眠日条目（按醒来日归属），返回 `(归属日, sleep_id,
+    /// source_scope, 出仓对象)`。`device_id` 不进文档。
     fn sleep_day_rows(
         &self,
         start: &str,
         end: &str,
         include_stages: bool,
-    ) -> Result<Vec<(String, String, Value)>> {
+    ) -> Result<Vec<(String, String, String, Value)>> {
         let mut stmt = self.conn.prepare(
             "SELECT sleep_id, start_time, end_time, score, duration_minutes,
                     deep_minutes, deep_available, light_minutes, light_available,
@@ -554,7 +678,6 @@ impl Database {
              WHERE date(end_time,'localtime') BETWEEN ?1 AND ?2
              ORDER BY end_time",
         )?;
-        let mut rows: Vec<(String, String, Value)> = Vec::new();
         let mapped = stmt.query_map(params![start, end], |row| {
             Ok((
                 row.get::<_, String>(0)?,
@@ -575,25 +698,40 @@ impl Database {
                 row.get::<_, String>(15)?,
             ))
         })?;
+        let mut raw_rows = Vec::new();
         for row in mapped {
-            let (
-                sleep_id,
-                start_time,
-                end_time,
-                score,
-                duration_minutes,
-                deep_minutes,
-                deep_available,
-                light_minutes,
-                light_available,
-                rem_minutes,
-                rem_available,
-                awake_minutes,
-                awake_available,
-                source_scope,
-                wake_count,
-                day,
-            ) = row?;
+            raw_rows.push(row?);
+        }
+        // detailed 的阶段片一遍 IN 取回——逐 session `load_sleep_stages`
+        // 是典型 N+1（窗口内每晚一条查询）。
+        let stage_map = if include_stages {
+            self.load_sleep_stages_batch(
+                &raw_rows.iter().map(|row| row.0.clone()).collect::<Vec<_>>(),
+            )?
+        } else {
+            BTreeMap::new()
+        };
+
+        let mut rows: Vec<(String, String, String, Value)> = Vec::new();
+        for (
+            sleep_id,
+            start_time,
+            end_time,
+            score,
+            duration_minutes,
+            deep_minutes,
+            deep_available,
+            light_minutes,
+            light_available,
+            rem_minutes,
+            rem_available,
+            awake_minutes,
+            awake_available,
+            source_scope,
+            wake_count,
+            day,
+        ) in raw_rows
+        {
             let mut object = Map::new();
             object.insert("sleep_id".into(), json!(sleep_id));
             object.insert("start_time".into(), json!(start_time));
@@ -629,15 +767,79 @@ impl Database {
             }
             object.insert("source_scope".into(), json!(source_scope));
             if include_stages {
-                let stages = self.load_sleep_stages(&sleep_id)?;
-                if !stages.is_empty() {
-                    object.insert("stages".into(), serde_json::to_value(&stages)?);
+                if let Some(stages) = stage_map.get(&sleep_id) {
+                    if !stages.is_empty() {
+                        object.insert("stages".into(), serde_json::to_value(stages)?);
+                    }
                 }
             }
-            rows.push((day, sleep_id, Value::Object(object)));
+            rows.push((day, sleep_id, source_scope, Value::Object(object)));
         }
         Ok(rows)
     }
+
+    /// `load_sleep_stages` 的批量版：`sleep_id IN (...)` 一遍取回后按
+    /// sleep_id 分桶；桶内顺序与单条版一致（`ORDER BY start_time, id`）。
+    fn load_sleep_stages_batch(
+        &self,
+        sleep_ids: &[String],
+    ) -> Result<BTreeMap<String, Vec<SleepStageSlice>>> {
+        let mut map: BTreeMap<String, Vec<SleepStageSlice>> = BTreeMap::new();
+        if sleep_ids.is_empty() {
+            return Ok(map);
+        }
+        let placeholders = sleep_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT sleep_id, stage, start_time, end_time, raw_mode
+             FROM sleep_stages WHERE sleep_id IN ({placeholders})
+             ORDER BY sleep_id, start_time, id"
+        ))?;
+        let rows = stmt.query_map(params_from_iter(sleep_ids.iter()), |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, Option<i64>>(4)?,
+            ))
+        })?;
+        for row in rows {
+            let (sleep_id, stage, start, end, raw_mode) = row?;
+            map.entry(sleep_id).or_default().push(SleepStageSlice {
+                stage,
+                start_time: parse_rfc3339_utc(&start, "sleep_stages.start_time")?,
+                end_time: parse_rfc3339_utc(&end, "sleep_stages.end_time")?,
+                raw_mode,
+            });
+        }
+        Ok(map)
+    }
+}
+
+/// 把一个类别的各锚点窗口行合并成按日桶。同一天可能被多个锚点窗口
+/// 覆盖——`(category, date)` 只出现一次，`linked` 记所有覆盖它的锚点；
+/// 同日同条目（同一 metric / 同一 sleep_id / 同一 workout_id）去重。
+fn merge_window_gathers(
+    category: AiTaskCategory,
+    gathers: Vec<WindowGather>,
+) -> BTreeMap<String, DayAcc> {
+    let mut days: BTreeMap<String, DayAcc> = BTreeMap::new();
+    let mut seen: BTreeSet<(String, String)> = BTreeSet::new();
+    for gather in gathers {
+        for (day, key, row) in gather.rows {
+            let acc = days.entry(day.clone()).or_default();
+            acc.linked.insert(gather.workout_id.clone());
+            if !seen.insert((day, key)) {
+                continue;
+            }
+            match category {
+                AiTaskCategory::Workout => acc.workouts.push(row),
+                AiTaskCategory::Sleep => acc.sleeps.push(row),
+                _ => acc.metrics.push(row),
+            }
+        }
+    }
+    days
 }
 
 /// 一天的窗口数据桶。`linked` 记覆盖这一天的所有锚点运动 id。
@@ -829,4 +1031,92 @@ fn task_warnings(
         }
     }
     warnings
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{SleepSession, SleepStageSlice};
+    use chrono::{DateTime, TimeZone};
+
+    fn at(y: i32, m: u32, d: u32, h: u32, min: u32) -> DateTime<Utc> {
+        Utc.with_ymd_and_hms(y, m, d, h, min, 0).unwrap()
+    }
+
+    fn session(id: &str, end: DateTime<Utc>, stages: Vec<SleepStageSlice>) -> SleepSession {
+        SleepSession {
+            sleep_id: id.to_string(),
+            start_time: end - chrono::Duration::hours(7),
+            end_time: end,
+            score: Some(82),
+            duration_minutes: 400,
+            deep_minutes: Some(90),
+            light_minutes: Some(220),
+            rem_minutes: Some(70),
+            awake_minutes: Some(20),
+            source_scope: crate::models::SourceScope::Device,
+            device_id: None,
+            synced_at: None,
+            time_in_bed_minutes: None,
+            stages,
+            wake_count: Some(2),
+        }
+    }
+
+    /// detailed 的睡眠分期走一遍 `IN` 批量取数：有分期行的 session 带出
+    /// `stages`（按 start_time 升序），没有的不带 `stages` 键——与逐条
+    /// `load_sleep_stages` 的出仓形状完全一致。
+    #[test]
+    fn detailed_sleep_day_rows_batch_stages() {
+        let db = Database::in_memory().unwrap();
+        let end1 = at(2026, 9, 10, 22, 0);
+        let end2 = at(2026, 9, 11, 6, 30);
+        db.insert_sleep_session(&session(
+            "s1",
+            end1,
+            vec![
+                SleepStageSlice {
+                    stage: "light".into(),
+                    start_time: end1 - chrono::Duration::hours(7),
+                    end_time: end1 - chrono::Duration::hours(5),
+                    raw_mode: None,
+                },
+                SleepStageSlice {
+                    stage: "deep".into(),
+                    start_time: end1 - chrono::Duration::hours(5),
+                    end_time: end1 - chrono::Duration::hours(3),
+                    raw_mode: Some(4),
+                },
+            ],
+        ))
+        .unwrap();
+        db.insert_sleep_session(&session("s2", end2, Vec::new()))
+            .unwrap();
+
+        let rows = db.sleep_day_rows("2026-09-01", "2026-09-30", true).unwrap();
+        assert_eq!(rows.len(), 2);
+        let by_id: BTreeMap<&str, &Value> = rows
+            .iter()
+            .map(|(_, id, _, object)| (id.as_str(), object))
+            .collect();
+        let stages = by_id["s1"]["stages"].as_array().unwrap();
+        assert_eq!(stages.len(), 2);
+        assert_eq!(stages[0]["stage"], json!("light"));
+        assert_eq!(stages[1]["stage"], json!("deep"));
+        assert_eq!(stages[1]["raw_mode"], json!(4));
+        // 无分期行的 session：stages 键根本不出现（与单条版 `if !stages.is_empty()` 同语义）。
+        assert!(by_id["s2"].get("stages").is_none());
+        // 归属日还是按 end_time 本地日。
+        for (day, _, _, _) in &rows {
+            assert!(day.as_str() >= "2026-09-01");
+        }
+
+        // standard 不取分期——连批量查询都不发。
+        let standard = db
+            .sleep_day_rows("2026-09-01", "2026-09-30", false)
+            .unwrap();
+        for (_, _, _, object) in &standard {
+            assert!(object.get("stages").is_none());
+        }
+    }
 }
