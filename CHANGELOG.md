@@ -6,6 +6,9 @@
 
 ### Planned for 2.4.3 / 计划纳入 2.4.3
 
+- Fix blood-oxygen ODI requests using calendar dates in the device timezone, avoiding HTTP 400 and false empty responses from timestamp parameters. Keep the failing substream and cause in partial-sync diagnostics.
+- 血氧 ODI 请求改用设备时区下的日期，避免时间戳参数引发 HTTP 400 或错误空结果；部分同步的诊断记录保留具体子指标和失败原因。
+
 - Isolate parallel authentication tests with exclusively created temporary directories, avoiding intermittent missing `auth.json` failures in CI. Production credential storage is unchanged.
 - 认证并行测试使用独占创建的临时目录，避免 CI 偶发找不到 `auth.json`；不修改正式程序的凭据存储逻辑。
 - Build desktop installers only for release tags or manual CI runs. Pushes to main and pull requests retain verification and Docker checks without repeating installer packaging.

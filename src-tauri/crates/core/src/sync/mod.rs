@@ -718,6 +718,16 @@ impl SyncManager {
         records: Vec<FetchedRecord>,
     ) -> Result<StreamReport> {
         let incomplete = records.iter().any(|record| record.incomplete);
+        let reasons: std::collections::BTreeSet<_> = records
+            .iter()
+            .filter(|record| record.incomplete)
+            .filter_map(|record| record.incomplete_reason.as_deref())
+            .collect();
+        let incomplete_message = if reasons.is_empty() {
+            partial_window_reason().1
+        } else {
+            reasons.into_iter().collect::<Vec<_>>().join("; ")
+        };
         let mut reports = Vec::with_capacity(records.len());
         for record in records {
             reports.push(self.persist_record(record).await?.report);
@@ -725,7 +735,7 @@ impl SyncManager {
         let mut aggregate = aggregate_stream_reports(stream, &reports);
         if incomplete && aggregate.status != StreamStatus::Failed {
             aggregate.status = StreamStatus::Failed;
-            aggregate.message = Some(partial_window_reason().1);
+            aggregate.message = Some(incomplete_message.clone());
         }
         let db = self.db.lock().await;
         if incomplete {
@@ -734,7 +744,7 @@ impl SyncManager {
                 Stage::Fetch,
                 &StageOutcome::Failed {
                     kind: StageErrorKind::Unknown,
-                    message: Some(partial_window_reason().1),
+                    message: Some(incomplete_message),
                 },
             )?;
         }
@@ -1038,10 +1048,19 @@ fn classify_backfill_report(
 ) -> (ChunkStatus, i64, Option<(&'static str, String)>) {
     let written = report.records_written;
     if incomplete {
-        if written > 0 {
-            return (ChunkStatus::Partial, written, Some(partial_window_reason()));
-        }
-        return (ChunkStatus::Failed, 0, Some(partial_window_reason()));
+        let reason = (
+            partial_window_reason().0,
+            report
+                .message
+                .clone()
+                .unwrap_or_else(|| partial_window_reason().1),
+        );
+        let status = if written > 0 {
+            ChunkStatus::Partial
+        } else {
+            ChunkStatus::Failed
+        };
+        return (status, written, Some(reason));
     }
     match report.status {
         StreamStatus::Success if written > 0 => (ChunkStatus::Persisted, written, None),
@@ -1088,6 +1107,7 @@ mod tests {
         );
         let record = FetchedRecord {
             incomplete: true,
+            incomplete_reason: Some("spo2_odi: HTTP 400".into()),
             raw: RawRecord {
                 stream: "heart_rate".into(),
                 source_key: "partial-test".into(),
@@ -1106,13 +1126,13 @@ mod tests {
         assert_eq!(report.status, StreamStatus::Failed);
         assert_eq!(report.raw_records, 1);
         assert_eq!(report.records_written, 1);
-        assert_eq!(report.message, Some(partial_window_reason().1));
+        assert_eq!(report.message.as_deref(), Some("spo2_odi: HTTP 400"));
         let db = manager.db.lock().await;
-        assert_eq!(
-            db.get_sync_state("heart_rate").unwrap().unwrap().status,
-            "failed"
-        );
-        let (status, written, _) = classify_backfill_report(&report, true);
+        let state = db.get_sync_state("heart_rate").unwrap().unwrap();
+        assert_eq!(state.status, "failed");
+        assert_eq!(state.message.as_deref(), Some("spo2_odi: HTTP 400"));
+        let (status, written, reason) = classify_backfill_report(&report, true);
+        assert_eq!(reason.unwrap().1, "spo2_odi: HTTP 400");
         assert_eq!(status, ChunkStatus::Partial);
         assert_eq!(written, 1);
     }

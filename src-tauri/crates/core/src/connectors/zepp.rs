@@ -734,16 +734,17 @@ impl ZeppConnector {
         self.get_json(&path, params).await
     }
 
-    /// `/users/{id}/events/dateString` — the same timeline addressed by an
-    /// ISO-8601 window plus an IANA timezone instead of epoch milliseconds.
+    /// `/users/{id}/events/dateString` — the same timeline addressed by a
+    /// calendar-date window plus an IANA timezone instead of epoch milliseconds.
+    /// Timestamp strings can be rejected or silently return an empty page.
     /// The nightly SpO2 desaturation (`odi`) and apnea (`osa_event`) windows
     /// are only served here.
     pub async fn fetch_user_events_date_string(
         &self,
         event_type: &str,
         sub_type: &str,
-        from_iso: &str,
-        to_iso: &str,
+        from_date: chrono::NaiveDate,
+        to_date: chrono::NaiveDate,
         time_zone: &str,
         limit: i64,
     ) -> Result<Value> {
@@ -753,8 +754,8 @@ impl ZeppConnector {
             vec![
                 ("eventType", event_type.to_owned()),
                 ("subType", sub_type.to_owned()),
-                ("from", from_iso.to_owned()),
-                ("to", to_iso.to_owned()),
+                ("from", from_date.to_string()),
+                ("to", to_date.to_string()),
                 ("timeZone", time_zone.to_owned()),
                 ("limit", limit.max(1).to_string()),
                 ("reverse", "0".to_owned()),
