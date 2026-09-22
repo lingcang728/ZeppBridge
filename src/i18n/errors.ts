@@ -163,6 +163,17 @@ const messages = defineMessages(
     'err.update.installed_build_missing': '安装完成后未找到新的 ZeppBridge 安装版',
     'err.update.portable_windows_only': '便携版安装迁移仅支持 Windows',
     'err.update.unsafe_data_location': '无法确认数据目录可在更新后保留，已停止安装。请退出 ZeppBridge，将 app 包内的 data 完整复制到用户的 Application Support 目录，并修正 ZEPPBRIDGE_DATA_DIR 后重试。不要删除旧数据。',
+    /* —— ai_tasks（P3 命令与附件/授权；err.mcp.* 由 S5 的 access.rs 声明） —— */
+    'err.ai_task.invalid': '任务内容不符合要求，请检查输入',
+    'err.ai_task.not_found': '分析任务不存在或已删除',
+    'err.ai_task.workout_not_found': '选中的运动在本机不存在',
+    'err.ai_task.write_failed': '交接文件写入失败',
+    'err.ai_task.attachment_missing': '附件文件已不在原位置',
+    'err.ai_template.invalid': '模板内容不符合要求，请检查输入',
+    'err.ai_template.not_found': '模板不存在或已删除',
+    'err.ai_template.builtin_readonly': '内置模板是只读的，请另存为用户模板',
+    'err.mcp.scope_denied': 'MCP 任务范围不允许这次查询',
+    'err.mcp.scope_no_grants': 'MCP 任务范围内没有任何已共享的任务',
   },
   {
     /* —— core —— */
@@ -330,6 +341,17 @@ const messages = defineMessages(
     'err.update.installed_build_missing': 'No new installed ZeppBridge build was found after setup',
     'err.update.portable_windows_only': 'Portable-to-installed migration is Windows only',
     'err.update.unsafe_data_location': 'Installation stopped because the data location could not be verified as safe for updates. Quit ZeppBridge, copy any in-bundle data folder to your user Application Support folder, and correct ZEPPBRIDGE_DATA_DIR before retrying. Keep the original data.',
+    /* —— ai_tasks (P3 commands & attachment/grant errors; err.mcp.* declared by S5's access.rs) —— */
+    'err.ai_task.invalid': "The task input isn't valid. Check the fields",
+    'err.ai_task.not_found': "The analysis task doesn't exist or was deleted",
+    'err.ai_task.workout_not_found': "Some selected workouts don't exist on this device",
+    'err.ai_task.write_failed': "Couldn't write the handoff files",
+    'err.ai_task.attachment_missing': 'An attachment file is no longer at its original location',
+    'err.ai_template.invalid': "The template input isn't valid. Check the fields",
+    'err.ai_template.not_found': "The template doesn't exist or was deleted",
+    'err.ai_template.builtin_readonly': 'Built-in templates are read-only. Save a copy as your own template',
+    'err.mcp.scope_denied': "The MCP task scope doesn't allow this query",
+    'err.mcp.scope_no_grants': 'No tasks are shared with MCP in the task scope',
   },
   {
     /* —— core —— */
@@ -497,6 +519,17 @@ const messages = defineMessages(
     'err.update.installed_build_missing': 'No se encontró una nueva versión instalada de ZeppBridge después de la instalación',
     'err.update.portable_windows_only': 'La migración de portable a instalada solo existe en Windows',
     'err.update.unsafe_data_location': 'Se detuvo la instalación porque no se pudo verificar que la carpeta de datos se conserve tras actualizar. Cierra ZeppBridge, copia la carpeta data del paquete de la app a Application Support de tu usuario y corrige ZEPPBRIDGE_DATA_DIR antes de reintentar. Conserva los datos originales.',
+    /* —— ai_tasks (comandos P3 y adjuntos/concesiones; err.mcp.* los declara access.rs de S5) —— */
+    'err.ai_task.invalid': 'La tarea no es válida. Revisa los campos',
+    'err.ai_task.not_found': 'La tarea de análisis no existe o fue eliminada',
+    'err.ai_task.workout_not_found': 'Algunos entrenamientos elegidos no existen en este equipo',
+    'err.ai_task.write_failed': 'No se pudieron escribir los archivos de entrega',
+    'err.ai_task.attachment_missing': 'Un adjunto ya no está en su ubicación original',
+    'err.ai_template.invalid': 'La plantilla no es válida. Revisa los campos',
+    'err.ai_template.not_found': 'La plantilla no existe o fue eliminada',
+    'err.ai_template.builtin_readonly': 'Las plantillas integradas son de solo lectura. Guarda una copia como plantilla propia',
+    'err.mcp.scope_denied': 'El ámbito de tarea de MCP no permite esta consulta',
+    'err.mcp.scope_no_grants': 'Ninguna tarea está compartida con MCP en el ámbito de tarea',
   },
 );
 

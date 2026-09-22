@@ -1,3 +1,4 @@
+mod ai_tasks;
 mod auth;
 mod backup;
 mod data;
@@ -66,6 +67,10 @@ where
     .map_err(AppError::from)
 }
 
+pub(crate) use ai_tasks::{
+    ai_task_attachment_stat, ai_task_delete, ai_task_get, ai_task_list, ai_task_prepare,
+    ai_task_preview, ai_task_save, ai_template_delete, ai_template_list, ai_template_save,
+};
 pub(crate) use auth::{clear_auth, import_from_har, manual_auth, verify_auth};
 pub(crate) use backup::{
     cancel_pending_restore, create_manual_backup, get_pending_restore, get_restore_preview,
