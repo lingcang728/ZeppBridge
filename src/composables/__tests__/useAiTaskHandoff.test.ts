@@ -2,7 +2,7 @@
  * 交付状态机的门：哪步失败停在哪步、各步能单独重试、
  * 「打开了网站」永远不是「已发送」。
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AiTaskPrepareResult, AiTaskPreview } from '../../lib/bridge/types';
 import { newTaskDraft } from '../../lib/aiTask/draft';
 
@@ -58,6 +58,10 @@ describe('useAiTaskHandoff', () => {
     copyMock.mockResolvedValue(undefined);
     openMock.mockReset();
     openMock.mockResolvedValue('opened');
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('runAll 全绿：prepare→copy→open，attach 停在 waiting（手动步不会自己完成）', async () => {
@@ -146,6 +150,47 @@ describe('useAiTaskHandoff', () => {
     expect(handoff.isStale(edited)).toBe(true);
     await handoff.runPrepare(edited);
     expect(handoff.isStale(edited)).toBe(false);
+  });
+
+  it('重跑 prepare：上一轮 copy/attach 结果作废，回到各自待办态', async () => {
+    prepareMock.mockResolvedValue(ready());
+    const handoff = useAiTaskHandoff();
+    await handoff.runAll(newTaskDraft(), AI_PROVIDERS[0]);
+    handoff.markAttached();
+    expect(handoff.steps.value.copy.state).toBe('done');
+    expect(handoff.steps.value.attach.state).toBe('done');
+    await handoff.runPrepare(newTaskDraft());
+    expect(handoff.steps.value.prepare.state).toBe('done');
+    expect(handoff.steps.value.copy.state).toBe('idle');
+    expect(handoff.steps.value.attach.state).toBe('waiting');
+  });
+
+  it('lastProvider 持久化：交付过的提供方存起来，新实例按它初始化', async () => {
+    const store = new Map<string, string>();
+    vi.stubGlobal('window', {
+      localStorage: {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => { store.set(key, String(value)); },
+        removeItem: (key: string) => { store.delete(key); },
+      },
+    });
+    const first = useAiTaskHandoff();
+    expect(first.lastProvider.value).toBeNull();
+    await first.runOpen(AI_PROVIDERS[2]); // gemini
+    expect(store.get('zeppbridge.ai.handoff.provider')).toBe('gemini');
+    const second = useAiTaskHandoff();
+    expect(second.lastProvider.value?.id).toBe('gemini');
+  });
+
+  it('localStorage 里的提供方 id 不认识时不恢复', async () => {
+    vi.stubGlobal('window', {
+      localStorage: {
+        getItem: () => 'not-a-provider',
+        setItem: vi.fn(),
+        removeItem: vi.fn(),
+      },
+    });
+    expect(useAiTaskHandoff().lastProvider.value).toBeNull();
   });
 
   it('markAttached 只改用户确认标记', async () => {

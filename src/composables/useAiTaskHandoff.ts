@@ -19,7 +19,7 @@ import type {
 import { taskSnapshot } from '../lib/aiTask/draft';
 import { coverageNoteText } from '../lib/aiTask/copy';
 import { copyTextToClipboard, openProviderSite } from './useAiHandoff';
-import type { AiProvider } from '../lib/aiProviders';
+import { AI_PROVIDER_BY_ID, type AiProvider, type AiProviderId } from '../lib/aiProviders';
 import { defineMessages, messagesOf } from '../i18n';
 
 export type HandoffStepId = 'prepare' | 'copy' | 'attach';
@@ -54,6 +54,35 @@ const copy = () => messagesOf(messages);
 
 const idleStep = (): HandoffStep => ({ state: 'idle', errorText: null });
 
+/** 「上次交付给谁」的持久化键——下次进预览页按它预选提供方。 */
+const LAST_PROVIDER_KEY = 'zeppbridge.ai.handoff.provider';
+
+/** 读持久化的提供方：只认目录里的 id；读不到/环境没有 localStorage 就当没存过。 */
+const readLastProvider = (): AiProvider | null => {
+  try {
+    const raw = window.localStorage.getItem(LAST_PROVIDER_KEY);
+    return raw ? AI_PROVIDER_BY_ID[raw as AiProviderId] ?? null : null;
+  } catch {
+    return null;
+  }
+};
+
+const storeLastProvider = (provider: AiProvider) => {
+  try {
+    window.localStorage.setItem(LAST_PROVIDER_KEY, provider.id);
+  } catch {
+    // 隐私模式写不进就不记——交付本身不受影响。
+  }
+};
+
+const clearLastProvider = () => {
+  try {
+    window.localStorage.removeItem(LAST_PROVIDER_KEY);
+  } catch {
+    // 同上。
+  }
+};
+
 export function useAiTaskHandoff() {
   const preview = ref<AiTaskPreview | null>(null);
   const previewLoading = ref(false);
@@ -73,7 +102,8 @@ export function useAiTaskHandoff() {
   const openOutcome = ref<'opened' | 'skipped' | 'failed' | null>(null);
   const openError = ref<string | null>(null);
 
-  const lastProvider = ref<AiProvider | null>(null);
+  /** 上次真用来交付过的提供方；进页时按持久化值恢复，给提供方选择当预选。 */
+  const lastProvider = ref<AiProvider | null>(readLastProvider());
 
   const setStep = (id: HandoffStepId, state: HandoffStepState, errorText: string | null = null) => {
     steps.value = { ...steps.value, [id]: { state, errorText } };
@@ -111,10 +141,12 @@ export function useAiTaskHandoff() {
       const result = await backend.aiTaskPrepare(task, coverageNoteText());
       prepareResult.value = result;
       preparedSnapshot.value = taskSnapshot(task);
+      // 这一轮 prepare 产出的文件与提示词是新的：上一轮 copy/attach 的结果
+      // 一律作废回到待办态——ready 和 blocked 共用同一套复位。
+      setStep('copy', 'idle');
+      setStep('attach', 'waiting');
       if (result.status === 'blocked') {
         setStep('prepare', 'blocked');
-        setStep('copy', 'idle');
-        setStep('attach', 'waiting');
         return result;
       }
       setStep('prepare', 'done');
@@ -141,6 +173,7 @@ export function useAiTaskHandoff() {
 
   const runOpen = async (provider: AiProvider): Promise<boolean> => {
     lastProvider.value = provider;
+    storeLastProvider(provider);
     try {
       openOutcome.value = await openProviderSite(provider);
       openError.value = null;
@@ -174,6 +207,7 @@ export function useAiTaskHandoff() {
     openOutcome.value = null;
     openError.value = null;
     lastProvider.value = null;
+    clearLastProvider();
   };
 
   return {
@@ -186,6 +220,7 @@ export function useAiTaskHandoff() {
     steps,
     openOutcome,
     openError,
+    lastProvider,
     loadPreview,
     runPrepare,
     runCopy,

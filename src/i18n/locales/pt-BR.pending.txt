@@ -675,6 +675,7 @@ views/AiComposer.attachAdd
 views/AiComposer.attachEmpty
 views/AiComposer.attachFilterName
 views/AiComposer.attachPanelHint
+views/AiComposer.attachPickFailed
 views/AiComposer.attachPickerTitle
 views/AiComposer.attachSkipped
 views/AiComposer.attachTitle

@@ -237,7 +237,7 @@ const t = useMessages(messages);
 const { draft, setPrompt, removeAttachment, replaceAttachment } = useAiTaskDraft();
 const {
   preview, previewLoading, previewError, prepareResult, preparedSnapshot, steps,
-  openOutcome, openError, loadPreview, runPrepare, runCopy, runOpen,
+  openOutcome, openError, lastProvider, loadPreview, runPrepare, runCopy, runOpen,
   runAll, exportOnly, markAttached,
 } = useAiTaskHandoff();
 
@@ -247,7 +247,8 @@ const stale = computed(() =>
   preparedSnapshot.value !== null && preparedSnapshot.value !== taskSnapshot(draft.value));
 
 const desktop = isDesktop();
-const provider = ref<AiProvider>(AI_PROVIDERS[0]);
+// 预选上次真交付过的提供方；没交付过就是列表第一个。
+const provider = ref<AiProvider>(lastProvider.value ?? AI_PROVIDERS[0]);
 const reselecting = ref<string | null>(null);
 
 /* —— 预览刷新：草稿一改就重算，600ms 去抖（提示词打字也算草稿变化） —— */
@@ -302,9 +303,12 @@ const blockedAttachments = computed(() =>
 const changedAttachments = computed(() =>
   attachmentRows.value.filter((row) => row.status === 'changed'));
 
-/** 后端 prepare 回 blocked 时携带的原因清单（附件缺失等）。 */
+/** 后端 prepare 回 blocked 时携带的原因清单（附件缺失等）。
+ *  只在它还描述当前草稿时作数：草稿改过了（修附件、删引用），旧 blocked
+ *  就不再是拦路的理由——能不能跑以实时 preview 的附件体检为准，重跑时
+ *  后端会再验一遍。 */
 const blockedIssues = computed(() =>
-  prepareResult.value?.status === 'blocked' ? prepareResult.value.blocked : []);
+  !stale.value && prepareResult.value?.status === 'blocked' ? prepareResult.value.blocked : []);
 const isBlocked = computed(() => blockedAttachments.value.length > 0 || blockedIssues.value.length > 0);
 
 const reselectAttachment = async (id: string) => {
@@ -351,6 +355,11 @@ const runPrimary = () => {
 const runExportOnly = () => {
   if (!canRun.value) return;
   void exportOnly(draft.value);
+};
+/* 「重新准备」就是字面意思：只重跑 prepare 刷新文件——不复制、不打开网站。 */
+const runReprepare = () => {
+  if (!canRun.value) return;
+  void runPrepare(draft.value);
 };
 const retryOpenSite = () => {
   void runOpen(provider.value);
@@ -521,6 +530,7 @@ const issueText = aiTaskIssueText;
                 v-else-if="id === 'attach' && steps[id].state === 'waiting'"
                 type="button"
                 class="tool-btn"
+                :disabled="steps.prepare.state !== 'done' || !attachmentRows.length"
                 @click="markAttached()"
               >{{ t.attachConfirm }}</button>
               <span v-else-if="id === 'attach' && steps[id].state === 'done'" class="step-ok">{{ t.attachConfirmDone }}</span>
@@ -567,7 +577,7 @@ const issueText = aiTaskIssueText;
             type="button"
             class="button button-secondary"
             :disabled="!canRun"
-            @click="runPrimary"
+            @click="runReprepare"
           >{{ t.reprepare }}</button>
           <p class="honest-note"><Icon name="shield" :size="13" />{{ t.ctaHonestNote }}</p>
           <p v-if="!desktop" class="empty-note">{{ t.desktopOnly }}</p>

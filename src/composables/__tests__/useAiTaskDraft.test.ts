@@ -5,12 +5,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { newTaskDraft } from '../../lib/aiTask/draft';
 import type { AiTask, AiTaskTemplate } from '../../lib/bridge/types';
+import type { Workout } from '../../types';
 
 const listMock = vi.fn(async () => []);
 const getMock = vi.fn();
 const saveMock = vi.fn();
 const workoutsMock = vi.fn(async () => []);
-const templatesMock = vi.fn(async () => []);
+const workoutDetailMock = vi.fn(async (_id: string): Promise<Workout | null> => null);
+const templatesMock = vi.fn(async (): Promise<AiTaskTemplate[]> => []);
 
 vi.mock('../../lib/bridge', () => ({
   backend: {
@@ -20,6 +22,7 @@ vi.mock('../../lib/bridge', () => ({
     aiTaskDelete: vi.fn(async () => {}),
     aiTemplateList: () => templatesMock(),
     getRecentWorkouts: () => workoutsMock(),
+    getWorkoutDetail: (id: string) => workoutDetailMock(id),
   },
   toUserMessage: (_error: unknown, fallback: string) => fallback,
 }));
@@ -51,6 +54,12 @@ describe('useAiTaskDraft', () => {
     listMock.mockClear();
     getMock.mockReset();
     saveMock.mockReset();
+    workoutsMock.mockReset();
+    workoutsMock.mockResolvedValue([]);
+    workoutDetailMock.mockReset();
+    workoutDetailMock.mockResolvedValue(null);
+    templatesMock.mockReset();
+    templatesMock.mockResolvedValue([]);
   });
 
   it('轨道意图进 undo 栈；undo 把节点设回 join/leave 前的状态', () => {
@@ -142,5 +151,52 @@ describe('useAiTaskDraft', () => {
     getMock.mockRejectedValue(new Error('gone'));
     await expect(draft.loadTask('x')).rejects.toThrow('gone');
     expect(draft.lastError.value).toBeTruthy();
+  });
+
+  it('「不使用模板」摘掉 template_id；模板已写入的字段不回退', async () => {
+    templatesMock.mockResolvedValue([template()]);
+    await draft.loadTemplates();
+    draft.setTemplateId('tpl-1');
+    expect(draft.draft.value.template_id).toBe('tpl-1');
+    expect(draft.draft.value.detail_level).toBe('detailed');
+    expect(draft.draft.value.prompt).toBe('seed');
+    draft.setTemplateId(null);
+    expect(draft.draft.value.template_id).toBeNull();
+    // 决策：模板写进草稿的字段不回退——用户可能已经在上面改过。
+    expect(draft.draft.value.detail_level).toBe('detailed');
+    expect(draft.draft.value.prompt).toBe('seed');
+    // '' 与 null 同义（SelectMenu 的「不使用模板」选项值就是 ''）。
+    draft.setTemplateId('tpl-1');
+    draft.setTemplateId('');
+    expect(draft.draft.value.template_id).toBeNull();
+  });
+
+  const beyondWorkout = (id: string) => ({
+    workout_id: id,
+    workout_type: 'running',
+    normalized_type: 'running',
+    type_source: 'numeric_mapped',
+    effective_type: 'running',
+    start_time: '2024-01-01T00:00:00Z',
+    end_time: '2024-01-01T01:00:00Z',
+    source_scope: 'cloud',
+  });
+
+  it('关联运动在最近列表之外：loadTask 后按 id 补取进来', async () => {
+    getMock.mockResolvedValue({ ...newTaskDraft(), id: 't-7', workout_ids: ['w-old'] });
+    workoutDetailMock.mockResolvedValue(beyondWorkout('w-old'));
+    await draft.loadRecentWorkouts();
+    await draft.loadTask('t-7');
+    expect(workoutDetailMock).toHaveBeenCalledWith('w-old');
+    expect(draft.recentWorkouts.value.some((w) => w.workout_id === 'w-old')).toBe(true);
+  });
+
+  it('补取不受加载顺序影响：任务先到、最近列表后覆盖也会补齐', async () => {
+    getMock.mockResolvedValue({ ...newTaskDraft(), id: 't-8', workout_ids: ['w-old2'] });
+    workoutDetailMock.mockResolvedValue(beyondWorkout('w-old2'));
+    // 任务先回来（此时 recentWorkouts 还没有它），随后最近列表覆盖落地。
+    await draft.loadTask('t-8');
+    await draft.loadRecentWorkouts();
+    expect(draft.recentWorkouts.value.some((w) => w.workout_id === 'w-old2')).toBe(true);
   });
 });

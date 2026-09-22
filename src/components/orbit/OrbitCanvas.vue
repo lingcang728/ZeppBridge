@@ -345,17 +345,28 @@ const drag = {
   downX: 0,
   downY: 0,
   moved: false,
+  /**
+   * pointerdown 时量一次的 host rect：拖拽期间它不会变（节点抓着指针，
+   * 页面不会滚动重排），在每次 move 里重新 getBoundingClientRect 等于
+   * 每帧强制一次布局测量。
+   */
+  rect: null as { left: number; top: number; width: number; height: number } | null,
 };
 
 const simNode = (id: string | null): OrbitSimNode | undefined =>
   id === null ? undefined : sim.value.nodes.find((n) => n.id === id);
 
-/** Pointer → world via getBoundingClientRect() ONLY (CSS-zoom safe). */
-const worldFromEvent = (e: { clientX: number; clientY: number }): Vec | null => {
-  const el = hostEl.value;
-  if (!el) return null;
-  const rect = el.getBoundingClientRect();
-  if (rect.width < 1 || rect.height < 1) return null;
+/**
+ * Pointer → world via getBoundingClientRect() ONLY (CSS-zoom safe).
+ * `rectOverride`：拖拽期间复用 pointerdown 量好的那份；pan/zoom 仍取当前值，
+ * 所以缓存的只是「元素在屏幕上的框」，不是变换本身。
+ */
+const worldFromEvent = (
+  e: { clientX: number; clientY: number },
+  rectOverride?: { left: number; top: number; width: number; height: number },
+): Vec | null => {
+  const rect = rectOverride ?? hostEl.value?.getBoundingClientRect();
+  if (!rect || rect.width < 1 || rect.height < 1) return null;
   return pointerToWorld(
     e.clientX,
     e.clientY,
@@ -370,12 +381,16 @@ const worldFromEvent = (e: { clientX: number; clientY: number }): Vec | null => 
 const onNodePointerDown = (e: PointerEvent, id: string) => {
   if (props.readonly || (e.pointerType === 'mouse' && e.button !== 0)) return;
   const sn = simNode(id);
-  const world = worldFromEvent(e);
-  if (!sn || !world) return;
-  const el = e.currentTarget as Element;
-  el.setPointerCapture?.(e.pointerId);
+  const el = hostEl.value;
+  if (!sn || !el) return;
+  // 按下这次量一次，整段拖拽复用（见 drag.rect 注释）。
+  const rect = el.getBoundingClientRect();
+  const world = worldFromEvent(e, rect);
+  if (!world) return;
+  const nodeEl = e.currentTarget as Element;
+  nodeEl.setPointerCapture?.(e.pointerId);
   e.preventDefault();
-  (el as HTMLElement).focus?.();
+  (nodeEl as HTMLElement).focus?.();
   drag.id = id;
   drag.pointerId = e.pointerId;
   drag.grabDX = sn.x - world.x;
@@ -383,6 +398,7 @@ const onNodePointerDown = (e: PointerEvent, id: string) => {
   drag.downX = world.x;
   drag.downY = world.y;
   drag.moved = false;
+  drag.rect = rect;
   sn.dragging = true;
   sn.vx = 0;
   sn.vy = 0;
@@ -394,7 +410,7 @@ const onNodePointerDown = (e: PointerEvent, id: string) => {
 const onPointerMove = (e: PointerEvent) => {
   if (drag.id === null || e.pointerId !== drag.pointerId) return;
   const sn = simNode(drag.id);
-  const world = worldFromEvent(e);
+  const world = worldFromEvent(e, drag.rect ?? undefined);
   if (!sn || !world) return;
   if (!drag.moved && Math.hypot(world.x - drag.downX, world.y - drag.downY) > 3) drag.moved = true;
   sn.x = world.x + drag.grabDX;
@@ -413,6 +429,7 @@ const endDrag = (sn: OrbitSimNode) => {
   sn.vy = 0;
   drag.id = null;
   drag.pointerId = -1;
+  drag.rect = null;
   dragId.value = null;
   dragIntent.value = null;
   if (reduced.value) {
@@ -433,6 +450,7 @@ const onPointerUp = (e: PointerEvent) => {
   const meta = metaById.value.get(id);
   if (!sn || !meta) {
     drag.id = null;
+    drag.rect = null;
     dragId.value = null;
     return;
   }
@@ -454,6 +472,7 @@ const onPointerCancel = (e: PointerEvent) => {
   if (sn) endDrag(sn);
   else {
     drag.id = null;
+    drag.rect = null;
     dragId.value = null;
   }
 };

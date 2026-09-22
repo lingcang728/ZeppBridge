@@ -20,7 +20,7 @@ import OrbitCanvas from '../components/orbit/OrbitCanvas.vue';
 import type { OrbitNode } from '../lib/orbit/types';
 import AiHandoffPreview from './AiHandoffPreview.vue';
 import { useAiTaskDraft } from '../composables/useAiTaskDraft';
-import { isDesktop } from '../lib/bridge';
+import { isDesktop, toUserMessage } from '../lib/bridge';
 import type { AiTaskCategory, AiTaskDetailLevel } from '../lib/bridge/types';
 import {
   AI_TASK_CATEGORY_META,
@@ -62,6 +62,7 @@ const messages = defineMessages(
     attachPickerTitle: '选择要引用的原件',
     attachFilterName: 'PDF 与图片',
     attachSkipped: (count: number) => `${count} 个文件类型不支持，未加入`,
+    attachPickFailed: '附件没有添加成功',
     attachEmpty: '还没有附件。原件只按引用交付，不会复制或脱敏。',
     optionsTitle: '选项',
     preciseGps: '精确路线（GPS 坐标）',
@@ -116,6 +117,7 @@ const messages = defineMessages(
     attachPickerTitle: 'Choose original files to reference',
     attachFilterName: 'PDF and images',
     attachSkipped: (count: number) => `${count} file(s) skipped — unsupported type`,
+    attachPickFailed: 'Could not add the files',
     attachEmpty: 'No attachments yet. Originals are referenced as-is — never copied or redacted.',
     optionsTitle: 'Options',
     preciseGps: 'Precise route (GPS coordinates)',
@@ -170,6 +172,7 @@ const messages = defineMessages(
     attachPickerTitle: 'Elige los originales a referenciar',
     attachFilterName: 'PDF e imágenes',
     attachSkipped: (count: number) => `${count} archivo(s) omitidos — tipo no admitido`,
+    attachPickFailed: 'No se pudieron añadir los archivos',
     attachEmpty: 'Sin adjuntos. Los originales se referencian tal cual: no se copian ni se redactan.',
     optionsTitle: 'Opciones',
     preciseGps: 'Ruta precisa (coordenadas GPS)',
@@ -213,7 +216,7 @@ const stage = computed(() => (route.query.stage === 'preview' ? 'preview' : 'com
 const {
   draft, canUndo, taskList, templates, recentWorkouts, busy, lastError, savedNotice,
   loadTaskList, loadTemplates, loadRecentWorkouts, loadTask, resetDraft, saveDraft,
-  applyTemplate, setCategoryEnabled, setCategoryDays, setIncludeWorkoutDay, undo,
+  setTemplateId, setCategoryEnabled, setCategoryDays, setIncludeWorkoutDay, undo,
   toggleWorkout, setPrompt, setPersonalNote, setTitle, setDetailLevel,
   setPreciseGps, setMcpShared, addAttachments, removeAttachment,
 } = useAiTaskDraft();
@@ -310,10 +313,8 @@ const templateOptions = computed<SelectMenuOption[]>(() => [
 ]);
 const selectedTemplateId = computed({
   get: () => draft.value.template_id ?? '',
-  set: (id: string | number) => {
-    const template = templates.value.find((item) => item.id === id);
-    if (template) applyTemplate(template);
-  },
+  // 「不使用模板」也要真的摘掉 template_id，不是选了等于没选。
+  set: (id: string | number) => setTemplateId(String(id) || null),
 });
 
 const detailOptions = computed<SelectMenuOption[]>(() => [
@@ -342,8 +343,9 @@ const pickMoreAttachments = async () => {
     const { added, skipped } = await pickAttachments(t.value.attachPickerTitle, t.value.attachFilterName);
     addAttachments(added);
     if (skipped.length) attachNotice.value = t.value.attachSkipped(skipped.length);
-  } catch {
-    attachNotice.value = t.value.desktopOnly;
+  } catch (error) {
+    // 「需要桌面应用」只在真不在桌面时成立；桌面上对话框/磁盘错误报真实原因。
+    attachNotice.value = desktop ? toUserMessage(error, t.value.attachPickFailed) : t.value.desktopOnly;
   }
 };
 

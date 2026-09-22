@@ -108,9 +108,37 @@ const loadTemplates = async () => {
   }
 };
 
+/**
+ * 任务里关联的运动可能落在「最近 N 条」之外（老任务、或勾选来自别的入口）。
+ * 窗口预览和勾选框都靠 recentWorkouts 认这些 id——缺的按 id 一条条补进来。
+ * 单条补取失败不拖死整页：预览只是少这一条，不是编一条假的。
+ */
+const ensureLinkedWorkouts = async () => {
+  const known = new Set(recentWorkouts.value.map((workout) => workout.workout_id));
+  const missing = draft.value.workout_ids.filter((id) => !known.has(id));
+  if (!missing.length) return;
+  const fetched = await Promise.all(
+    missing.map(async (id) => {
+      try {
+        return await backend.getWorkoutDetail(id);
+      } catch {
+        return null;
+      }
+    }),
+  );
+  // 补取期间最近列表可能刚被刷过一遍——按此刻的集合再判一次，别重复塞。
+  const have = new Set(recentWorkouts.value.map((workout) => workout.workout_id));
+  const extra = fetched.filter(
+    (workout): workout is WorkoutRow => workout !== null && !have.has(workout.workout_id),
+  );
+  if (extra.length) recentWorkouts.value = [...recentWorkouts.value, ...extra];
+};
+
 const loadRecentWorkouts = async (limit = 60) => {
   try {
     recentWorkouts.value = await backend.getRecentWorkouts(limit);
+    // 覆盖赋值会把上一轮补进来的关联运动冲掉，所以每次落地后都重查一遍。
+    await ensureLinkedWorkouts();
   } catch (error) {
     lastError.value = toUserMessage(error, copy().loadFailed);
   }
@@ -124,6 +152,7 @@ const loadTask = async (id: string) => {
     draft.value = task;
     // 载入的提示词就是用户自己的稿子——模板再套用不许冲掉它。
     promptEdited.value = true;
+    await ensureLinkedWorkouts();
     undoStack.clear();
     syncUndoDepth();
     markBaseline();
@@ -193,6 +222,21 @@ const applyTemplate = (template: AiTaskTemplate) => {
     templatePromptSeed(template),
     promptEdited.value,
   );
+};
+
+/**
+ * 模板下拉的单一入口（''/null = 「不使用模板」）。
+ * 撤模板只摘 `template_id` 标记——快照、预览、保存都不再按模板任务计。
+ * 模板已写进草稿的字段（类别范围、详细程度、提示词初稿）**不回退**：
+ * 用户可能已经在上面改过，回退会把用户内容一起冲掉。
+ */
+const setTemplateId = (id: string | null) => {
+  if (!id) {
+    if (draft.value.template_id !== null) patchDraft({ template_id: null });
+    return;
+  }
+  const template = templates.value.find((item) => item.id === id);
+  if (template) applyTemplate(template);
 };
 
 /* —— 轨道意图（undo 栈只管这个） —— */
@@ -283,6 +327,7 @@ export function useAiTaskDraft() {
     saveDraft,
     deleteTask,
     applyTemplate,
+    setTemplateId,
     setCategoryEnabled,
     setCategoryDays,
     setIncludeWorkoutDay,
