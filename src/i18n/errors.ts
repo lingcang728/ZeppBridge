@@ -531,6 +531,9 @@ const messages = defineMessages(
     'err.mcp.scope_denied': 'El ámbito de tarea de MCP no permite esta consulta',
     'err.mcp.scope_no_grants': 'Ninguna tarea está compartida con MCP en el ámbito de tarea',
   },
+  // 七种新语言的错误文案不往这里塞：语言包 `errors:` 节（即
+  // modules['i18n/errors']）按码覆盖，缺的码回落英文、再回落中文原文。
+  'i18n/errors',
 );
 
 /** 按错误码取当前界面语言的文案。没有这个码就返回 `undefined`。 */
