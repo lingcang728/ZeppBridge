@@ -654,6 +654,74 @@ fn public_export_never_contains_attachment_paths_or_device_ids() {
 }
 
 #[test]
+fn prepare_strips_local_paths_from_user_note_and_prompt() {
+    let db = Database::in_memory().unwrap();
+    insert_workout(&db, "w1", utc(2026, 9, 10, 10));
+    let dir = temp_dir("sanitize-user-text");
+
+    let mut t = task();
+    t.workout_ids = vec!["w1".into()];
+    t.categories = vec![range(AiTaskCategory::Recovery, 3, true)];
+    t.personal_note = "原始报告在 C:\\Users\\me\\secret-note.pdf 里".into();
+    t.prompt = "帮我分析，参考 D:\\private-dir\\old.json".into();
+
+    let result = db.ai_task_prepare(&t, "", &dir).unwrap();
+    assert_eq!(result.status, AiTaskPrepareStatus::Ready);
+
+    // 出仓 JSON 与返回的 prompt_text 都不许再带本机路径。
+    let json_text = std::fs::read_to_string(result.json_path.unwrap()).unwrap();
+    assert!(
+        !json_text.contains("secret-note"),
+        "note 里的文件名不该出仓"
+    );
+    let doc: serde_json::Value = serde_json::from_str(&json_text).unwrap();
+    let note = doc["task"]["personal_note"].as_str().unwrap();
+    assert!(!note.contains("C:\\"));
+    assert!(note.contains("[本地路径已移除]"));
+
+    assert!(!result.prompt_text.contains("private-dir"));
+    assert!(result.prompt_text.contains("[本地路径已移除]"));
+    // URL 不是本地路径——清洗不该误伤。
+    let mut t = task();
+    t.workout_ids = vec!["w1".into()];
+    t.categories = vec![range(AiTaskCategory::Recovery, 3, true)];
+    t.prompt = "参考 https://example.com/report 的方法".into();
+    let result = db.ai_task_prepare(&t, "", &dir).unwrap();
+    assert!(result.prompt_text.contains("https://example.com/report"));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn preview_estimated_bytes_matches_pretty_written_file() {
+    let db = Database::in_memory().unwrap();
+    insert_workout(&db, "w1", utc(2026, 9, 10, 10));
+    let dir = temp_dir("estimate");
+
+    let mut t = task();
+    t.workout_ids = vec!["w1".into()];
+    t.categories = vec![range(AiTaskCategory::Recovery, 3, true)];
+
+    let preview = db.ai_task_preview(&t).unwrap();
+    let prepared = db.ai_task_prepare(&t, "", &dir).unwrap();
+    assert_eq!(prepared.status, AiTaskPrepareStatus::Ready);
+    // 估算与实写必须同量级一致——文档里的 generated_at 时间戳在两次构造间
+    // 可能差几位小数（AutoSi 3/6/9 位），容差留给它，格式差异可不止这几位。
+    let drift = (preview.estimated_bytes - prepared.byte_len).abs();
+    assert!(
+        drift <= 16,
+        "估算与实写只允许时间戳位数漂移（drift={drift}）"
+    );
+    let on_disk = std::fs::metadata(prepared.json_path.unwrap())
+        .unwrap()
+        .len() as i64;
+    assert_eq!(
+        prepared.byte_len, on_disk,
+        "byte_len 必须等于落盘文件实际大小"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn prepare_uses_template_prompt_when_user_prompt_empty() {
     let db = Database::in_memory().unwrap();
     insert_workout(&db, "w1", utc(2026, 9, 10, 10));

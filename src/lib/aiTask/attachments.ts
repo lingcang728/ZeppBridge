@@ -24,10 +24,14 @@ export const attachmentKindFromPath = (path: string): 'pdf' | 'image' | null => 
   return IMAGE_EXTENSIONS.has(ext) ? 'image' : null;
 };
 
-/** 两种分隔符都认：对话框在 Windows 上给 `\`，测试/移植库给 `/`。 */
+/**
+ * 两种分隔符都认：对话框在 Windows 上给 `\`，测试/移植库给 `/`。
+ * basename 为空（路径以分隔符收尾）时回退固定占位名——`display_name`
+ * 会进出仓 JSON，把完整路径兜底塞回去等于漏本机路径。
+ */
 export const attachmentDisplayName = (path: string): string => {
   const name = path.split(/[\\/]/).pop() ?? path;
-  return name.trim() || path;
+  return name.trim() || 'attachment';
 };
 
 /** 新建一条引用。`byte_len` 存当前大小当基线，`changed` 靠它判定。 */

@@ -34,6 +34,13 @@ describe('attachmentDisplayName', () => {
     expect(attachmentDisplayName('C:\\dir\\file.pdf')).toBe('file.pdf');
     expect(attachmentDisplayName('/home/u/file.png')).toBe('file.png');
   });
+
+  it('basename 为空时回退占位名，不把完整路径漏进出仓字段', () => {
+    expect(attachmentDisplayName('C:\\dir\\')).toBe('attachment');
+    expect(attachmentDisplayName('/home/u/')).toBe('attachment');
+    expect(attachmentDisplayName('C:\\dir\\  ')).toBe('attachment');
+    expect(attachmentDisplayName('/')).not.toContain('/');
+  });
 });
 
 describe('attachmentRefFromPath', () => {

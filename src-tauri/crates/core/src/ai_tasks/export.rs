@@ -44,7 +44,9 @@ impl Database {
         let task = normalize_task_draft(task)?;
         let anchors = self.ai_task_anchors(&task.workout_ids)?;
         let bundle = self.build_ai_task_bundle(&task, &anchors)?;
-        let estimated_bytes = serde_json::to_string(&bundle.document)?.len() as i64;
+        // 估算必须和 `ai_task_prepare` 实写用同一种序列化（pretty）——
+        // 不然界面预览的字节数跟落盘文件对不上。
+        let estimated_bytes = serde_json::to_string_pretty(&bundle.document)?.len() as i64;
         Ok(AiTaskPreview {
             task_id: effective_task_id(&task),
             workouts: bundle.briefs,
@@ -198,6 +200,9 @@ impl Database {
                 }
             }
         }
+        // 用户自写文本（自己的 prompt / 用户模板的 prompt_template）出仓前
+        // 先过路径清洗——这份文本会写进交给外部 AI 的 prompt.txt。
+        let mut prompt = sanitize_export_text(&prompt);
         let note = coverage_note.trim();
         if !note.is_empty() {
             if !prompt.is_empty() {
@@ -231,7 +236,10 @@ impl Database {
             serde_json::to_value(task.detail_level)?,
         );
         task_meta.insert("template_id".into(), json!(task.template_id));
-        task_meta.insert("personal_note".into(), json!(task.personal_note));
+        task_meta.insert(
+            "personal_note".into(),
+            json!(sanitize_export_text(&task.personal_note)),
+        );
         task_meta.insert(
             "include_precise_gps".into(),
             json!(task.include_precise_gps),
@@ -649,6 +657,47 @@ fn effective_task_id(task: &AiTask) -> String {
     } else {
         id.to_string()
     }
+}
+
+/// 出仓用户文本的本地路径清洗：Windows 盘符路径、UNC 路径与 Unix 绝对
+/// 路径换成占位符。与命令层 `commands::data::sanitize_clipboard_text`
+/// 同一实现的最小移植——core 不能回拉 Tauri 适配层的函数，行为保持同级：
+/// 只在词边界起步认路径（`https://` 这类 URL 不会被误伤）。
+fn sanitize_export_text(text: &str) -> String {
+    let mut output = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    while let Some(character) = chars.next() {
+        let previous = output.chars().last();
+        let at_boundary = previous.is_none()
+            || previous.is_some_and(|value| {
+                value.is_whitespace() || matches!(value, '"' | '\'' | '(' | '[' | '{' | '=')
+            });
+        let is_windows_drive = at_boundary
+            && character.is_ascii_alphabetic()
+            && chars.peek() == Some(&':')
+            && chars
+                .clone()
+                .nth(1)
+                .is_some_and(|next| next == '\\' || next == '/');
+        let is_unc = at_boundary && character == '\\' && chars.peek() == Some(&'\\');
+        let is_unix =
+            at_boundary && character == '/' && chars.peek().is_some_and(|next| *next != ' ');
+        if is_windows_drive || is_unc || is_unix {
+            output.push_str("[本地路径已移除]");
+            if is_windows_drive {
+                let _ = chars.next();
+            }
+            while let Some(next) = chars.peek() {
+                if next.is_whitespace() || *next == '"' || *next == '\'' || *next == ')' {
+                    break;
+                }
+                let _ = chars.next();
+            }
+        } else {
+            output.push(character);
+        }
+    }
+    output
 }
 
 /// 目录名片段：只留 ASCII 字母数字与 `-_.`，其它折成 `_`；
