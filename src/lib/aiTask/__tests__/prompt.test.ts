@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { templateName, templatePromptSeed, isBuiltinTemplate } from '../prompt';
-import { aiTaskTextFor, coverageNoteText } from '../copy';
+import { aiTaskIssueText, aiTaskTextFor, coverageNoteText } from '../copy';
 import type { AiTaskTemplate } from '../../bridge/types';
 
 const template = (patch: Partial<AiTaskTemplate> = {}): AiTaskTemplate => ({
@@ -50,5 +50,24 @@ describe('copy 表', () => {
 
   it('coverage_note 是传给 ai_task_prepare 的本地化开头语', () => {
     expect(coverageNoteText()).toBe(aiTaskTextFor('ui.ai_task.prompt.coverage_note'));
+  });
+});
+
+describe('aiTaskIssueText', () => {
+  it('后端的 err.ai_task.attachment_missing 按 ui.ai_task.blocked.attachment_missing 取文案', () => {
+    // 后端在 blocked/warnings 里用 err.* 码发这一条（定稿例外）；
+    // 界面文案仍须取 ui.* 表那一份，不能落到中文原文兜底。
+    const text = aiTaskIssueText({
+      code: 'err.ai_task.attachment_missing',
+      message: '附件文件已不在原位置',
+    });
+    expect(text).toBe(aiTaskTextFor('ui.ai_task.blocked.attachment_missing'));
+  });
+
+  it('ui.* 码照常取文案；未知码回落到后端原文', () => {
+    expect(
+      aiTaskIssueText({ code: 'ui.ai_task.blocked.no_workouts', message: 'x' }),
+    ).toBe(aiTaskTextFor('ui.ai_task.blocked.no_workouts'));
+    expect(aiTaskIssueText({ code: 'ui.ai_task.nope', message: '后端原文' })).toBe('后端原文');
   });
 });

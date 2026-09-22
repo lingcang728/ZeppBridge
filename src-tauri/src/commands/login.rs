@@ -1529,12 +1529,39 @@ fn safe_login_page_url(raw: &str) -> String {
     url.to_string()
 }
 
+/// 登录弹窗标题按界面语言走（BETA1 P7：locale 从 `'zh'|'en'` 放宽到十语言）。
+///
+/// 归一规则和 `tray_i18n::tray_labels` 一致：小写、`_`→`-`、去 `.` 后缀，
+/// 先精确匹配再逐段砍地区子标签，认不出一律英文。这里单列一张表是因为
+/// 文案本身不同（「登录 Zepp」），不复用托盘三条。
+///
+/// de/ru/hi 为直译初稿，W4 母语审校时可整体替换——见 W2-S6 报告 §5 的交接。
 fn login_window_title(locale: &str) -> &'static str {
-    if locale.trim().to_ascii_lowercase().starts_with("zh") {
-        "登录 Zepp"
-    } else {
-        "Sign in to Zepp"
+    let mut tag = locale.trim().to_ascii_lowercase().replace('_', "-");
+    if let Some(dot) = tag.find('.') {
+        tag.truncate(dot);
     }
+    while !tag.is_empty() {
+        match tag.as_str() {
+            "zh" => return "登录 Zepp",
+            "es" => return "Iniciar sesión en Zepp",
+            "nl" => return "Inloggen bij Zepp",
+            "pt-br" => return "Entrar no Zepp",
+            // 裸 pt 与未列出的葡语地区一律欧洲葡语，同 tray_i18n 的裁决。
+            "pt" | "pt-pt" => return "Iniciar sessão no Zepp",
+            "de" => return "Bei Zepp anmelden",
+            "ru" => return "Войти в Zepp",
+            "hi" | "hi-in" => return "Zepp में साइन इन करें",
+            "fr" => return "Se connecter à Zepp",
+            "en" => return "Sign in to Zepp",
+            _ => {}
+        }
+        match tag.rfind('-') {
+            Some(cut) => tag.truncate(cut),
+            None => break,
+        }
+    }
+    "Sign in to Zepp"
 }
 
 async fn finish_failed(app: &AppHandle, epoch: u64, code: &str, message: &str, page_url: String) {
@@ -2013,6 +2040,16 @@ mod tests {
         assert_eq!(login_window_title("en-US"), "Sign in to Zepp");
         assert_eq!(login_window_title("zh"), "登录 Zepp");
         assert_eq!(login_window_title("zh-CN"), "登录 Zepp");
+        // P7 十语言：地区变体归到基础语言，认不出的回落英文。
+        assert_eq!(login_window_title("es"), "Iniciar sesión en Zepp");
+        assert_eq!(login_window_title("pt-BR"), "Entrar no Zepp");
+        assert_eq!(login_window_title("pt"), "Iniciar sessão no Zepp");
+        assert_eq!(login_window_title("de-AT"), "Bei Zepp anmelden");
+        assert_eq!(login_window_title("ru"), "Войти в Zepp");
+        assert_eq!(login_window_title("hi-IN"), "Zepp में साइन इन करें");
+        assert_eq!(login_window_title("fr"), "Se connecter à Zepp");
+        assert_eq!(login_window_title("nl"), "Inloggen bij Zepp");
+        assert_eq!(login_window_title("ja-JP"), "Sign in to Zepp");
     }
 
     #[test]

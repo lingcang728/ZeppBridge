@@ -1,6 +1,12 @@
 $ErrorActionPreference = 'Stop'
 $root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $loadedLocalSigningKey = $false
+$env:CARGO_TARGET_DIR = 'G:\build_cache\cargo-target-v3'
+
+$tauriConf = Get-Content -LiteralPath (Join-Path $root 'src-tauri\tauri.conf.json') -Encoding UTF8 -Raw | ConvertFrom-Json
+if ([string]$tauriConf.productName -ne 'ZeppBridge3') {
+  throw "v3 worktree 打出来的测试版必须叫 ZeppBridge3.exe，当前 productName=$($tauriConf.productName)。禁止覆盖 2.x 的 ZeppBridge.exe。"
+}
 
 Push-Location $root
 try {
@@ -28,9 +34,14 @@ try {
     $loadedLocalSigningKey = $true
   }
 
-  tauri build
+  $env:TAURI_CLI_CONFIG = 'src-tauri/tauri.conf.json'
+  npm exec -- tauri build --bundles nsis
   if ($LASTEXITCODE -ne 0) { throw 'Tauri 打包失败。' }
-  & (Join-Path $PSScriptRoot 'publish-local.ps1')
+  $portable = Join-Path $root 'release\ZeppBridge3.exe'
+  $built = Join-Path $env:CARGO_TARGET_DIR 'release\zeppbridge.exe'
+  New-Item -ItemType Directory -Force -Path (Split-Path $portable) | Out-Null
+  Copy-Item -LiteralPath $built -Destination $portable -Force
+  & (Join-Path $PSScriptRoot 'publish-local.ps1') -SkipStaleInstall
   if ($LASTEXITCODE -ne 0) { throw '本机发布同步失败。' }
 } finally {
   if ($loadedLocalSigningKey) {

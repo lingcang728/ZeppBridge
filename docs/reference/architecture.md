@@ -1,6 +1,6 @@
 # ZeppBridge architecture summary
 
-This page describes the product boundaries and current implementation of v2.4.2.
+This page describes the product boundaries and current implementation of [v3.0.0-beta.1](https://github.com/lingcang728/ZeppBridge/releases).
 For the usage entry point see the project [README](../../README.md); for
 engineering gates see the [development guide](../development/development.md).
 

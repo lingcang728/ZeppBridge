@@ -4,6 +4,8 @@
 //! 数据模型、SQLite schema 与迁移、归一化、查询语义、导出、洞察和写入协调全部
 //! 只在这里实现一次，任何出口都不得复制 SQL、单位换算或缺失值规则。
 
+pub mod access;
+pub mod ai_tasks;
 pub mod auth;
 pub mod connectors;
 pub mod contract;

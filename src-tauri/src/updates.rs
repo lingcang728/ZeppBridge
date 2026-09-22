@@ -59,7 +59,12 @@ fn installed_path() -> Result<PathBuf, AppError> {
 /// 撞到「platforms 里找不到 darwin-x86_64」的假失败。
 #[tauri::command]
 pub(crate) fn self_update_supported() -> bool {
-    cfg!(windows) || cfg!(all(target_os = "macos", target_arch = "aarch64"))
+    // v3 beta 硬隔离：updater endpoint 仍指向 2.x 仓库的 latest.json，
+    // `installed_path()` 也硬编码 `%LOCALAPPDATA%\ZeppBridge\ZeppBridge.exe`。
+    // 任何一条链路放行都会把测试版换成 2.x 正式版或拉起 2.x 入口，所以
+    // beta 期间整个自更新通道关闭；前端拿到 false 走 `unmanaged`，不会
+    // 再调 `check()`。正式发布时再决定换 endpoint 还是拆掉插件。
+    false
 }
 
 /// Windows 上这份 exe 算不算便携版。

@@ -272,8 +272,8 @@ const rows = computed(() =>
 
 const workoutBriefTitle = (workoutId: string | null): string => {
   if (!workoutId) return t.value.globalWindow;
-  const brief = preview.value?.workouts.find((item) => item.id === workoutId);
-  return brief ? brief.title : workoutId;
+  const brief = preview.value?.workouts.find((item) => item.workout_id === workoutId);
+  return brief ? brief.workout_type : workoutId;
 };
 
 /* —— 附件：状态按 id 与草稿里的引用对上，名字取草稿里的 display_name —— */

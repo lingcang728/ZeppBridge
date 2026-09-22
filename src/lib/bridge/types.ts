@@ -142,14 +142,20 @@ export interface AiTaskSummary {
   mcp_shared: boolean;
 }
 
+/** `ai_task_preview` 的运动摘要行；字段与 Rust `AiTaskWorkoutBrief` 一一对应。 */
 export interface AiTaskWorkoutBrief {
-  id: string;
-  title: string;
+  workout_id: string;
+  /** `effective_type`：用户改过的名字优先于归一化类型。 */
+  workout_type: string;
+  /** RFC3339 UTC。 */
   start_time: string;
-  sport: string;
-  distance_m: number | null;
-  duration_s: number | null;
-  device?: string | null;
+  end_time: string;
+  /** 本地开始日——窗口锚点。 */
+  start_date: string;
+  distance_meters: number | null;
+  calories: number | null;
+  avg_hr: number | null;
+  max_hr: number | null;
 }
 
 /* ---------- 预览 / 准备结果（A7 P2） ---------- */
