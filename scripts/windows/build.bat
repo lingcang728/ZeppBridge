@@ -26,12 +26,12 @@ if not exist "node_modules\" (
   exit /b 1
 )
 
-echo 正在构建 ZeppBridge Windows 安装包...
+echo 正在构建 ZeppBridge3 Windows 测试包...
 echo   - 图标：src-tauri/icons/icon-source.svg（tauri beforeBuildCommand）
 echo   - 前端：Vite production build
 echo   - 后端：Rust release build
 echo   - 安装包：NSIS 与 MSI
-echo   - 用户入口：项目 release\ZeppBridge.exe（桌面/开始菜单快捷方式会改指向这里）
+echo   - 测试入口：项目 release\ZeppBridge3.exe（快捷方式叫 ZeppBridge3，不会改 2.x 的 ZeppBridge）
 echo.
 REM npm.cmd 本身是 bat。不加 call 的话，父脚本会在 tauri build 结束后直接退出，
 REM 后面的 publish-local（覆盖 release\ 安装包）永远跑不到。
