@@ -106,6 +106,7 @@ secrets*.json
 *.keystore
 
 # Local agent / design scratch (do not publish)
+.agent_context/
 .claude/
 .grok/
 .omo/
@@ -122,3 +123,6 @@ mock-test/
 
 # Local-only V3 integration references (never publish)
 /接入资料（ignore）/
+
+# Local-only Fusion plan and design references
+/BETA/

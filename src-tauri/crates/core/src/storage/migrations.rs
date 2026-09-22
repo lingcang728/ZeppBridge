@@ -711,6 +711,104 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(21, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // v22：为官方/旧连接器双源交付保留来源、账号、原始对象和领取回执。
+        // 官方数据尚未默认写入这些表；字段先建立契约，fixture 与后续 provider 共用。
+        self.ensure_table_columns(
+            "raw_records",
+            &[
+                ("provider", "TEXT NOT NULL DEFAULT 'legacy'"),
+                ("account_id", "TEXT"),
+                ("channel", "TEXT NOT NULL DEFAULT 'legacy_pull'"),
+                ("received_at", "TEXT"),
+                ("parsed_at", "TEXT"),
+                ("persisted_at", "TEXT"),
+            ],
+        )?;
+        self.ensure_table_columns(
+            "metric_samples",
+            &[
+                ("provider", "TEXT NOT NULL DEFAULT 'legacy'"),
+                ("account_id", "TEXT"),
+            ],
+        )?;
+        self.ensure_table_columns(
+            "daily_metrics",
+            &[
+                ("provider", "TEXT NOT NULL DEFAULT 'legacy'"),
+                ("account_id", "TEXT"),
+            ],
+        )?;
+        self.ensure_table_columns(
+            "sleep_sessions",
+            &[
+                ("provider", "TEXT NOT NULL DEFAULT 'legacy'"),
+                ("account_id", "TEXT"),
+                ("rem_seconds", "INTEGER"),
+                ("nap_total_seconds", "INTEGER"),
+                ("unmeasurable_seconds", "INTEGER"),
+                ("validation", "TEXT"),
+            ],
+        )?;
+        self.ensure_table_columns(
+            "workouts",
+            &[
+                ("provider", "TEXT NOT NULL DEFAULT 'legacy'"),
+                ("account_id", "TEXT"),
+            ],
+        )?;
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS raw_objects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                provider TEXT NOT NULL,
+                account_id TEXT,
+                object_key TEXT NOT NULL,
+                content BLOB NOT NULL,
+                sha256 TEXT NOT NULL,
+                byte_len INTEGER NOT NULL,
+                received_at TEXT NOT NULL,
+                parsed_at TEXT,
+                UNIQUE(provider, account_id, object_key, sha256)
+            );
+            CREATE TABLE IF NOT EXISTS delivery_receipts (
+                event_key TEXT PRIMARY KEY,
+                provider TEXT NOT NULL,
+                account_id TEXT,
+                channel TEXT NOT NULL,
+                received_at TEXT NOT NULL,
+                persisted_at TEXT,
+                cursor TEXT,
+                status TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS official_activity_pings (
+                summary_id TEXT PRIMARY KEY,
+                account_id TEXT,
+                received_at TEXT NOT NULL,
+                status TEXT NOT NULL,
+                payload_hash TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS backfill_requests (
+                request_key TEXT PRIMARY KEY,
+                provider TEXT NOT NULL,
+                account_id TEXT,
+                stream TEXT NOT NULL,
+                chunk_start TEXT NOT NULL,
+                chunk_end TEXT NOT NULL,
+                requested_at TEXT,
+                status TEXT NOT NULL,
+                attempts INTEGER NOT NULL DEFAULT 0,
+                error_code TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_raw_objects_provider_received
+                ON raw_objects(provider, received_at);
+            CREATE INDEX IF NOT EXISTS idx_delivery_receipts_status
+                ON delivery_receipts(status, received_at);
+            PRAGMA user_version = 22;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(22, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
+
         // Earlier migrations are intentionally idempotent and still stamp
         // their historical versions on every launch, so the current schema
         // marker is restored only after all of them have run.

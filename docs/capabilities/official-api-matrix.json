@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "lastVerified": "2026-09-09",
+  "capabilities": [
+    {"id":"sleep","documentation":"official", "applicationPermission":"unknown", "realSampleValidation":"none", "source":"official", "deliveryModel":"webhook", "units":"seconds unless documented", "timeSemantics":"sample occurrence separate from receipt"},
+    {"id":"activity_fit","documentation":"official", "applicationPermission":"unknown", "realSampleValidation":"none", "source":"official", "deliveryModel":"ping-pull", "units":"FIT native units", "timeSemantics":"FIT timestamps plus receipt"},
+    {"id":"hrv_last_night_avg","documentation":"official", "applicationPermission":"unknown", "realSampleValidation":"none", "source":"official", "deliveryModel":"webhook", "units":"undocumented", "timeSemantics":"night statistic; window undocumented"},
+    {"id":"legacy_metrics","documentation":"implemented", "applicationPermission":"available", "realSampleValidation":"local database", "source":"legacy", "deliveryModel":"pull", "units":"canonical contract", "timeSemantics":"provider fetch time separate"},
+    {"id":"official_webhook","documentation":"documented unsigned", "applicationPermission":"unknown", "realSampleValidation":"none", "source":"official", "deliveryModel":"push", "units":"payload-defined", "timeSemantics":"event time separate from receipt"},
+    {"id":"backfill","documentation":"documented", "applicationPermission":"unknown", "realSampleValidation":"none", "source":"official", "deliveryModel":"async-202", "units":"30-day maximum window", "timeSemantics":"accepted is not completion"},
+    {"id":"training_plan_write","documentation":"partner access stated", "applicationPermission":"unknown", "realSampleValidation":"none", "source":"official", "deliveryModel":"write", "units":"must validate before publish", "timeSemantics":"seven-day plan window"}
+  ]
+}

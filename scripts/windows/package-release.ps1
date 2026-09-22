@@ -34,9 +34,14 @@ try {
     $loadedLocalSigningKey = $true
   }
 
-  tauri build
+  $env:TAURI_CLI_CONFIG = 'src-tauri/tauri.conf.json'
+  npm exec -- tauri build --bundles nsis
   if ($LASTEXITCODE -ne 0) { throw 'Tauri 打包失败。' }
-  & (Join-Path $PSScriptRoot 'publish-local.ps1')
+  $portable = Join-Path $root 'release\ZeppBridge3.exe'
+  $built = Join-Path $env:CARGO_TARGET_DIR 'release\zeppbridge.exe'
+  New-Item -ItemType Directory -Force -Path (Split-Path $portable) | Out-Null
+  Copy-Item -LiteralPath $built -Destination $portable -Force
+  & (Join-Path $PSScriptRoot 'publish-local.ps1') -SkipStaleInstall
   if ($LASTEXITCODE -ne 0) { throw '本机发布同步失败。' }
 } finally {
   if ($loadedLocalSigningKey) {

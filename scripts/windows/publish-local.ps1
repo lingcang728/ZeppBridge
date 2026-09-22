@@ -82,7 +82,7 @@ function Get-AppVersion {
   if ($npmVersion -ne $tauriVersion -or $cargoVersion -ne $tauriVersion) {
     throw "版本不一致：npm=$npmVersion tauri=$tauriVersion cargo=$cargoVersion"
   }
-  if ($tauriVersion -notmatch '^\d+\.\d+\.\d+$') {
+  if ($tauriVersion -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') {
     throw "无法识别的版本号：$tauriVersion"
   }
   return [string]$tauriVersion
