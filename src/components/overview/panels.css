@@ -1,0 +1,66 @@
+/* 概览卡的共享面板外观（Overview 与其 overview/* 卡片共用，非 scoped）。
+   全部走 token：深浅主题的替换都在 tokens.css 里，这里不写第二套。 */
+
+.metric-panel {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--panel-line);
+  border-radius: 22px;
+  background: var(--panel);
+  box-shadow: var(--panel-glint);
+  transition: transform .28s cubic-bezier(.16, 1, .3, 1), border-color .28s ease;
+}
+.metric-panel:hover { transform: translateY(-2px); border-color: var(--panel-line-hover); }
+
+.panel-head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.panel-title { display: flex; min-width: 0; align-items: center; gap: 8px; }
+.panel-title > span { display: grid; gap: 1px; }
+.panel-title strong { color: var(--ink); font-size: var(--fs-md); font-weight: 600; }
+.panel-title small { color: var(--subtle); font-size: var(--fs-xs); }
+.chart-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 11px;
+  background: var(--surface-raised);
+}
+.latest-value {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+.latest-value strong { color: var(--ink); font-family: var(--font-mono); font-size: 20px; font-weight: 600; }
+.latest-value small { font-size: var(--fs-xs); }
+.panel-empty {
+  display: flex;
+  min-height: 190px;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--subtle);
+  font-size: var(--fs-xs);
+  text-align: center;
+}
+.panel-empty.compact { min-height: 170px; flex-direction: column; }
+.panel-empty .design-icon { opacity: .7; filter: saturate(.8); }
+.panel-more { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; color: var(--subtle); font-size: var(--fs-xs); }
+
+a.metric-panel { display: block; color: inherit; text-decoration: none; }
+
+.text-link { display: inline-flex; align-items: center; gap: 3px; color: var(--accent); font-size: var(--fs-xs); text-decoration: none; }
+.text-link:hover { color: var(--accent-hover); }
+
+@media (prefers-reduced-motion: reduce) { .metric-panel { transition: none; } }

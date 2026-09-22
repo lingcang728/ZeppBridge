@@ -4,7 +4,7 @@ import { displayDateTimeFormatter } from '../lib/dateTime';
 
 defineOptions({ name: 'BodyStatus' });
 import { computed, onMounted, ref, watch } from 'vue';
-import { CHART_THEME, VChart } from '../lib/echartsSetup';
+import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
 import { createLoadSeq } from '../lib/loadSeq';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
 import PageHeader from '../components/PageHeader.vue';
@@ -711,11 +711,11 @@ const curveChartOption = computed(() => {
     grid: { left: 40, right: 18, top: 16, bottom: 28 },
     tooltip: {
       trigger: 'axis',
-      backgroundColor: '#1E221F',
-      borderColor: 'rgba(228, 235, 208, 0.16)',
+      backgroundColor: chartPalette.value.tooltipBg,
+      borderColor: chartPalette.value.tooltipBorder,
       borderWidth: 1,
       padding: [8, 12],
-      textStyle: { color: '#F3F4EC', fontSize: 15.5 },
+      textStyle: { color: chartPalette.value.tooltipText, fontSize: 15.5 },
       extraCssText: 'border-radius:8px;box-shadow:none;',
       formatter: (params: Array<{ value: [number, number | null] }>) => {
         const point = Array.isArray(params) ? params[0] : params;
@@ -728,8 +728,8 @@ const curveChartOption = computed(() => {
       type: 'time',
       min: curve.value[0]?.ts,
       max: curve.value[curve.value.length - 1]?.ts,
-      axisLabel: { formatter: clock, hideOverlap: true, color: '#B4BBC3', fontSize: 14.5 },
-      axisLine: { lineStyle: { color: 'rgba(232,238,244,.12)' } },
+      axisLabel: { formatter: clock, hideOverlap: true, color: chartPalette.value.axis, fontSize: 14.5 },
+      axisLine: { lineStyle: { color: chartPalette.value.grid } },
       axisTick: { show: false },
       splitLine: { show: false },
     },
@@ -737,9 +737,9 @@ const curveChartOption = computed(() => {
     // 把一个安稳的下午画成剧烈起伏的锯齿。
     yAxis: {
       type: 'value', min: 0, max: 100, splitNumber: 4,
-      axisLabel: { color: '#B4BBC3', fontSize: 14.5 },
+      axisLabel: { color: chartPalette.value.axis, fontSize: 14.5 },
       axisLine: { show: false }, axisTick: { show: false },
-      splitLine: { lineStyle: { color: 'rgba(232,238,244,.08)', type: 'dashed' } },
+      splitLine: { lineStyle: { color: chartPalette.value.gridSoft, type: 'dashed' } },
     },
     series: [{
       type: 'line',
@@ -747,7 +747,7 @@ const curveChartOption = computed(() => {
       smooth: 0.18,
       showSymbol: false,
       lineStyle: { width: 1.6, color: zeppSemanticColors.calories },
-      areaStyle: { color: 'rgba(240,168,74,.12)' },
+      areaStyle: { color: `${chartPalette.value.series.calories}1F` },
       connectNulls: false,
     }],
   };
@@ -829,6 +829,7 @@ watch(dataRevision, () => { void load(); });
         <VChart
           v-if="curve.length"
           class="day-chart"
+          :key="CHART_THEME"
           :theme="CHART_THEME"
           :option="curveChartOption"
           autoresize
@@ -919,6 +920,7 @@ watch(dataRevision, () => { void load(); });
           </header>
           <VChart
             class="macro-chart"
+            :key="CHART_THEME"
             :theme="CHART_THEME"
             :option="macroChartOption"
             autoresize

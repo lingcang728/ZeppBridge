@@ -3,6 +3,8 @@ import type { MetricSeries, MetricSeriesPoint } from '../types';
 import { paceSecondsPerBigUnit } from './units';
 import { defineMessages, messagesOf } from '../i18n';
 import { DISPLAY_RANGE_DAYS, rangeOptions } from './rangeOptions';
+import { resolvedTheme } from '../composables/useTheme';
+import { chartPalettes } from './echartsTheme';
 
 const messages = defineMessages(
   {
@@ -198,12 +200,13 @@ export const buildSeriesOption = (
         const point = axisValue ? byDate.get(axisValue) : undefined;
         if (!point) return '';
         const unit = options.unit ? ` ${options.unit}` : '';
+        const palette = chartPalettes[resolvedTheme.value];
         const spread =
           typeof point.min === 'number' && typeof point.max === 'number'
-            ? `<br><span style="color:#B4BBC3">${copy().dayRange(format(point.min), format(point.max), unit)}</span>`
+            ? `<br><span style="color:${palette.tooltipSub}">${copy().dayRange(format(point.min), format(point.max), unit)}</span>`
             : '';
         const samples = point.samples
-          ? `<br><span style="color:#949CA5">${copy().samples(point.samples)}</span>`
+          ? `<br><span style="color:${palette.tooltipDim}">${copy().samples(point.samples)}</span>`
           : '';
         return `${shortDate(point.date)}<br><b>${format(point.value)}</b>${unit}${spread}${samples}`;
       },

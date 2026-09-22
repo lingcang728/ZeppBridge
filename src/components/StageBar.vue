@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { displayDateTimeFormatter } from '../lib/dateTime';
 import { computed } from 'vue';
-import { CHART_THEME, VChart } from '../lib/echartsSetup';
+import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
 import { formatDuration, formatTime, isFiniteNumber } from '../lib/format';
-import { zeppSemanticColors } from '../lib/echartsTheme';
 import { insertSleepStageGaps, sleepStageLabels, sleepStageLabelsWithUnknown, type TimedSleepSlice } from '../lib/sleepStages';
 import type { SleepStageSlice } from '../types';
 import { defineMessages, useMessages } from '../i18n';
@@ -52,14 +51,16 @@ const STAGE_LEVEL: Record<StageItem['tone'], number> = {
   // 归成 awake 的，代价是图上那一段在说一件没人验证过的事。
   unknown: 4,
 };
-const STAGE_COLORS = {
-  deep: zeppSemanticColors.sleep.deep,
-  light: zeppSemanticColors.sleep.light,
-  rem: zeppSemanticColors.sleep.rem,
-  awake: zeppSemanticColors.sleep.awake,
+/* 阶段色与坐标轴色跟主题走——切换深浅时 chartPalette 换套，option 是
+   computed 会自动重算，配合 VChart 上的 :key 整个重建。 */
+const STAGE_COLORS = computed(() => ({
+  deep: chartPalette.value.series.sleep.deep,
+  light: chartPalette.value.series.sleep.light,
+  rem: chartPalette.value.series.sleep.rem,
+  awake: chartPalette.value.series.sleep.awake,
   // 中性灰。四个睡眠色都有含义，未知不该借用其中任何一个。
-  unknown: 'rgba(226, 234, 242, .38)',
-} as const;
+  unknown: chartPalette.value.unknown,
+}));
 
 const props = defineProps<{
   stages: StageItem[];
@@ -194,9 +195,9 @@ const hypnogramOption = computed(() => {
       type: 'time',
       min: current.from,
       max: current.from + current.span,
-      axisLabel: { formatter: clock, hideOverlap: true, color: '#B4BBC3', fontSize: 14.5 },
+      axisLabel: { formatter: clock, hideOverlap: true, color: chartPalette.value.axis, fontSize: 14.5 },
       axisTick: { show: false },
-      axisLine: { lineStyle: { color: 'rgba(226, 234, 242, .12)' } },
+      axisLine: { lineStyle: { color: chartPalette.value.grid } },
       splitLine: { show: false },
     },
     yAxis: {
@@ -206,23 +207,23 @@ const hypnogramOption = computed(() => {
       interval: 1,
       axisLabel: {
         formatter: (value: number) => stageLabels.value[value] ?? '',
-        color: '#B4BBC3',
+        color: chartPalette.value.axis,
         fontSize: 14.5,
       },
       axisTick: { show: false },
       axisLine: { show: false },
-      splitLine: { lineStyle: { color: 'rgba(226, 234, 242, .12)', type: 'dashed' } },
+      splitLine: { lineStyle: { color: chartPalette.value.grid, type: 'dashed' } },
     },
     visualMap: {
       show: false,
       type: 'piecewise',
       dimension: 1,
       pieces: [
-        { min: -0.5, max: 0.5, color: STAGE_COLORS.deep },
-        { min: 0.5, max: 1.5, color: STAGE_COLORS.light },
-        { min: 1.5, max: 2.5, color: STAGE_COLORS.rem },
-        { min: 2.5, max: 3.5, color: STAGE_COLORS.awake },
-        { min: 3.5, max: 4.5, color: STAGE_COLORS.unknown },
+        { min: -0.5, max: 0.5, color: STAGE_COLORS.value.deep },
+        { min: 0.5, max: 1.5, color: STAGE_COLORS.value.light },
+        { min: 1.5, max: 2.5, color: STAGE_COLORS.value.rem },
+        { min: 2.5, max: 3.5, color: STAGE_COLORS.value.awake },
+        { min: 3.5, max: 4.5, color: STAGE_COLORS.value.unknown },
       ],
     },
     series: [
@@ -244,6 +245,7 @@ const hypnogramOption = computed(() => {
     <template v-if="isHypnogram && hypnogramOption">
       <VChart
         class="hypnogram"
+        :key="CHART_THEME"
         :theme="CHART_THEME"
         :option="hypnogramOption"
         autoresize

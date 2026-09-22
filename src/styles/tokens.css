@@ -1,0 +1,244 @@
+/* 设计 token 唯一来源。深色是 `:root` 默认值，`html[data-theme="light"]`
+ * 覆写同一组变量——组件只消费 token，不知道自己在哪一套主题里。
+ * `useTheme` 负责切换 `data-theme`；`color-scheme` 跟着 data-theme 走，
+ * 让滚动条与原生表单控件自动换色。新颜色一律进这个文件。 */
+:root {
+  color-scheme: dark;
+  --bg: #0C0E11;
+  --sidebar: #08090C;
+  --canvas: #0D0F12;
+  --surface: #16191E;
+  --surface-raised: #1D2128;
+  --surface-hover: #262B33;
+  --ink: #F2F4EE;
+  --muted: #B4BBC3;
+  --subtle: #949CA5;
+  /* 旧的 --faint 在任何表面上都过不了 WCAG AA，退回 --subtle。 */
+  --faint: var(--subtle);
+  --line: rgba(226, 234, 242, .12);
+  --line-control: rgba(226, 234, 242, .46);
+  --line-strong: rgba(226, 234, 242, .22);
+  --brand: #7DA33E;
+  --accent: var(--brand);
+  --accent-hover: #93B952;
+  --accent-strong: #7DA33E;
+  --accent-ink: #12170A;
+  --accent-soft: rgba(125, 163, 62, .12);
+  --action-green: #55702A;
+  --action-green-hover: #668539;
+  --icon-mint: #2FA96B;
+  --heart: #F0616A;
+  --heart-wash: rgba(240, 97, 106, .12);
+  --pace: #4AA8E8;
+  --pace-wash: rgba(74, 168, 232, .12);
+  --calories: #F5860B;
+  --calories-wash: rgba(245, 134, 11, .12);
+  --altitude: #F5C33B;
+  --altitude-wash: rgba(245, 195, 59, .12);
+  --cadence: #4AA8E8;
+  --training: #3DD84C;
+  --readiness: #3DD84C;
+  --sleep-deep: #6477D7;
+  --sleep-light: #7C8FF0;
+  --sleep-rem: #8B5CF6;
+  --sleep-awake: #E8833A;
+  --sleep: var(--sleep-light);
+  --sleep-wash: rgba(124, 143, 240, .12);
+  --activity: #2BB3C0;
+  --activity-wash: rgba(43, 179, 192, .12);
+  --distance: var(--pace);
+  --danger: #F0616A;
+  --warning: #F5C33B;
+  --focus: #7DA33E;
+  --route-neutral: #9AA1A9;
+  --route-mint: #2FA96B;
+  --route-cyan: #4AA8E8;
+  --route-amber: #F5C33B;
+  --route-coral: #F0616A;
+  /* 概览卡/工作台的共享面板面：两色渐变只在深色里提供层次，
+     浅色里是纯色白卡 + 实体投影（见下方覆写）。 */
+  --panel: linear-gradient(145deg, rgba(27, 31, 37, .98), rgba(23, 27, 32, .98));
+  --panel-line: rgba(221, 231, 239, .09);
+  --panel-line-hover: rgba(221, 231, 239, .16);
+  --panel-glint: inset 0 1px 0 rgba(255, 255, 255, .035);
+
+  --font-sans: 'MiSans', 'Segoe UI', 'Microsoft YaHei UI', sans-serif;
+  --font-mono: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+  /* 字号阶梯（设计系统 v5）：默认界面缩放为 100%，通过 token 统一抬高 DOM 字号和图表文字。
+     用户仍可在界面缩放中调整整体大小，半像素值也会随所选缩放一起变化。 */
+  --fs-2xs: 13px;
+  --fs-xs: 14.5px;
+  --fs-sm: 15.5px;
+  --fs-md: 16.5px;
+  --fs-lg: 17.5px;
+  --fs-xl: 18.5px;
+  --fs-2xl: 20px;
+  --fs-3xl: 22px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+}
+
+/* 浅色主题：暖白底 + 深绿品牌色。色板方向见
+ * docs/development/ui-guidelines.md 的「双主题」一节；
+ * 原则是每个 token 在浅色下保持同一角色（ink=主文字、line=结构线…），
+ * 分类色只调明度饱和不换色相，语义不漂移。 */
+html[data-theme="light"] {
+  color-scheme: light;
+  --bg: #EAEDE5;
+  --sidebar: #FFFFFF;
+  --canvas: #F4F6F3;
+  --surface: #FFFFFF;
+  --surface-raised: #F3F5EF;
+  --surface-hover: #E5E9E0;
+  --ink: #20261F;
+  --muted: #4C5748;
+  --subtle: #63705C;
+  --faint: var(--subtle);
+  --line: rgba(38, 52, 41, .10);
+  --line-control: rgba(38, 52, 41, .36);
+  --line-strong: rgba(38, 52, 41, .22);
+  --brand: #2F6B4F;
+  --accent: var(--brand);
+  --accent-hover: #3A7E5E;
+  --accent-strong: #27573F;
+  --accent-ink: #FFFFFF;
+  --accent-soft: rgba(47, 107, 79, .10);
+  --action-green: #2F6B4F;
+  --action-green-hover: #27573F;
+  --icon-mint: #22875C;
+  --heart: #C93F49;
+  --heart-wash: rgba(201, 63, 73, .10);
+  --pace: #2E7FC2;
+  --pace-wash: rgba(46, 127, 194, .10);
+  --calories: #C96A05;
+  --calories-wash: rgba(201, 106, 5, .10);
+  --altitude: #A87E0B;
+  --altitude-wash: rgba(168, 126, 11, .12);
+  --cadence: #2E7FC2;
+  --training: #2F9E44;
+  --readiness: #2F9E44;
+  --sleep-deep: #5565C9;
+  --sleep-light: #6B7FE0;
+  --sleep-rem: #7C4DDB;
+  --sleep-awake: #D9732B;
+  --sleep: var(--sleep-light);
+  --sleep-wash: rgba(107, 127, 224, .10);
+  --activity: #1E96A6;
+  --activity-wash: rgba(30, 150, 166, .10);
+  --distance: var(--pace);
+  --danger: #C43742;
+  --warning: #8F6B09;
+  --focus: #2F6B4F;
+  --route-neutral: #6E7670;
+  --route-mint: #22875C;
+  --route-cyan: #2E7FC2;
+  --route-amber: #A87E0B;
+  --route-coral: #C43742;
+  --panel: #FFFFFF;
+  --panel-line: rgba(38, 52, 41, .10);
+  --panel-line-hover: rgba(38, 52, 41, .22);
+  --panel-glint: 0 1px 3px rgba(38, 52, 41, .07), 0 12px 32px rgba(38, 52, 41, .05);
+}
+
+/* ── 浅色主题的局部补丁 ────────────────────────────────────────────
+   只放「深色硬编码值在白底上读不出」的选择器。能用 token 自动换色的
+   组件不需要出现在这里。这是过渡期的集中式补丁表：改对应组件的类名
+   时请同步这里，逐步把硬编码换成 token 后这一节应当变空。 */
+
+/* WorkoutDetail：hero / 指标格 / 轨迹图 / 分区条都是深色硬编码。 */
+html[data-theme="light"] .workout-hero {
+  border-color: var(--line);
+  background: var(--surface);
+  box-shadow: var(--panel-glint);
+}
+html[data-theme="light"] .workout-hero::before {
+  background: linear-gradient(120deg, rgba(47, 107, 79, .06), transparent 40%);
+}
+html[data-theme="light"] .workout-hero .hero-device .device-visual {
+  background: var(--surface-raised);
+  box-shadow: none;
+}
+html[data-theme="light"] .metric-tile {
+  border-color: var(--line);
+  background: var(--surface-raised);
+}
+html[data-theme="light"] .metric-tile.tone-heart { background: linear-gradient(135deg, var(--heart-wash), var(--surface-raised)); }
+html[data-theme="light"] .metric-tile.tone-pace { background: linear-gradient(135deg, var(--pace-wash), var(--surface-raised)); }
+html[data-theme="light"] .metric-tile.tone-calories { background: linear-gradient(135deg, var(--calories-wash), var(--surface-raised)); }
+html[data-theme="light"] .metric-tile.tone-altitude { background: linear-gradient(135deg, var(--altitude-wash), var(--surface-raised)); }
+html[data-theme="light"] .metric-tile.tone-cadence { background: linear-gradient(135deg, var(--pace-wash), var(--surface-raised)); }
+html[data-theme="light"] .metric-tile.tone-activity { background: linear-gradient(135deg, var(--activity-wash), var(--surface-raised)); }
+html[data-theme="light"] .type-evidence > span { background: var(--surface-raised); }
+html[data-theme="light"] .route-wrap {
+  border-color: var(--line);
+  background:
+    radial-gradient(120% 90% at 82% 8%, rgba(47, 107, 79, .08), transparent 52%),
+    radial-gradient(90% 80% at 12% 92%, rgba(46, 127, 194, .07), transparent 55%),
+    var(--surface-raised);
+}
+html[data-theme="light"] .route-legend {
+  border-color: var(--line);
+  background: rgba(255, 255, 255, .92);
+}
+html[data-theme="light"] .ghost-road { stroke: var(--route-mint); }
+html[data-theme="light"] .route-glow { stroke: rgba(47, 107, 79, .20); }
+html[data-theme="light"] .route-dot { stroke: #F4F6F3; }
+html[data-theme="light"] .route-end-mark { stroke: #F4F6F3; }
+html[data-theme="light"] .pause-mark circle { fill: var(--surface); }
+html[data-theme="light"] .hr-zone-bar { background: rgba(38, 52, 41, .10); }
+html[data-theme="light"] .chart-icon { background: var(--surface-raised); }
+html[data-theme="light"] .chart-stats strong { color: var(--ink); }
+html[data-theme="light"] .source-chip {
+  border-color: rgba(47, 107, 79, .30);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+html[data-theme="light"] .mapping-note {
+  border-color: rgba(47, 107, 79, .28);
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+}
+html[data-theme="light"] .export-go { color: var(--accent-ink); }
+
+/* StageBar 的「未知」斜纹在深色里是白 alpha，浅色换成墨色 alpha。 */
+html[data-theme="light"] .stage-bar .unknown {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(38, 52, 41, .22),
+    rgba(38, 52, 41, .22) 4px,
+    rgba(38, 52, 41, .07) 4px,
+    rgba(38, 52, 41, .07) 8px
+  );
+}
+
+/* Settings：进度轨道、状态灯、诊断面板、当前授权卡的深色硬编码。 */
+html[data-theme="light"] .progress-track { background: rgba(38, 52, 41, .12); }
+html[data-theme="light"] .lamp.off { background: rgba(38, 52, 41, .20); }
+html[data-theme="light"] .lamp.on { background: var(--accent); }
+html[data-theme="light"] .lamp.pending { background: var(--warning); }
+html[data-theme="light"] .diagnostic-done strong { color: var(--accent); }
+html[data-theme="light"] .auth-card.current { border-color: rgba(47, 107, 79, .42); }
+html[data-theme="light"] .auth-action.is-current { border-color: rgba(47, 107, 79, .42); }
+html[data-theme="light"] .diagnostic-panel { background: var(--surface-raised); }
+
+/* ComparisonBars：轨道与基线。 */
+html[data-theme="light"] .comparison-track { background: rgba(38, 52, 41, .10); }
+html[data-theme="light"] .comparison-bar .baseline { background: rgba(38, 52, 41, .24); }
+
+/* Explore：两张高亮卡的橄榄色描边是按深色校准的。 */
+html[data-theme="light"] .explore-ai-highlight,
+html[data-theme="light"] .explore-ready {
+  border-color: rgba(47, 107, 79, .30);
+}
+
+/* DeviceDetail：状态灯与提示色。 */
+html[data-theme="light"] .hero-state.on i { background: var(--accent); }
+html[data-theme="light"] .hint-line.ok { color: var(--accent); }
+html[data-theme="light"] .api-error { color: var(--danger); }

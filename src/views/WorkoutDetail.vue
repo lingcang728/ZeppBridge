@@ -4,7 +4,7 @@ import { displayDateTimeFormatter } from '../lib/dateTime';
 import { computed, onMounted, ref, watch } from 'vue';
 import { open as showOpenDialog } from '@tauri-apps/plugin-dialog';
 import { RouterLink, useRoute } from 'vue-router';
-import { CHART_THEME, VChart } from '../lib/echartsSetup';
+import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
 import { createLoadSeq } from '../lib/loadSeq';
 import DesignIcon, { type DesignIconName } from '../components/DesignIcon.vue';
 import DeviceVisual from '../components/DeviceVisual.vue';
@@ -26,7 +26,6 @@ import {
   paceUnitLabel,
   toElevation,
 } from '../lib/units';
-import { zeppSemanticColors } from '../lib/echartsTheme';
 import { formatPaceSeconds } from '../lib/metricSeries';
 import { readDefaultExportFormat } from '../lib/exportScope';
 import { workoutDisplayLabel, workoutDisplayType } from '../lib/workouts';
@@ -972,6 +971,7 @@ const cadencePoints = computed(() => sampleSeries('cadence'));
 const lineOption = (points: { t: number; v: number }[], color: string, unit: string) => {
   if (points.length < 2) return null;
   const avg = points.reduce((sum, p) => sum + p.v, 0) / points.length;
+  const palette = chartPalette.value;
   return {
     animation: false,
     grid: { left: 8, right: 18, top: 12, bottom: 8, containLabel: true },
@@ -980,7 +980,7 @@ const lineOption = (points: { t: number; v: number }[], color: string, unit: str
       splitNumber: 4,
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: '#B4BBC3', fontSize: 14.5, hideOverlap: true, formatter: '{HH}:{mm}' },
+      axisLabel: { color: palette.axis, fontSize: 14.5, hideOverlap: true, formatter: '{HH}:{mm}' },
       splitLine: { show: false },
     },
     yAxis: {
@@ -988,15 +988,15 @@ const lineOption = (points: { t: number; v: number }[], color: string, unit: str
       scale: true,
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: '#B4BBC3', fontSize: 14.5 },
-      splitLine: { show: true, lineStyle: { color: 'rgba(228, 235, 208, 0.08)', type: 'dashed' } },
+      axisLabel: { color: palette.axis, fontSize: 14.5 },
+      splitLine: { show: true, lineStyle: { color: palette.gridSoft, type: 'dashed' } },
     },
     tooltip: {
       trigger: 'axis',
-      backgroundColor: '#1E221F',
-      borderColor: 'rgba(228, 235, 208, 0.16)',
+      backgroundColor: palette.tooltipBg,
+      borderColor: palette.tooltipBorder,
       borderWidth: 1,
-      textStyle: { color: '#F3F4EC', fontSize: 15.5 },
+      textStyle: { color: palette.tooltipText, fontSize: 15.5 },
       formatter: (params: Array<{ value: [number, number] }>) => {
         const point = Array.isArray(params) ? params[0] : params;
         if (!point) return '';
@@ -1028,7 +1028,7 @@ const lineOption = (points: { t: number; v: number }[], color: string, unit: str
         symbol: 'none',
         lineStyle: {
           type: 'dashed',
-          color: 'rgba(243, 244, 236, 0.4)',
+          color: palette.mark,
           width: 1.2,
         },
         data: [{ yAxis: Math.round(avg) }],
@@ -1038,10 +1038,10 @@ const lineOption = (points: { t: number; v: number }[], color: string, unit: str
   };
 };
 
-const heartOption = computed(() => lineOption(heartPoints.value, zeppSemanticColors.heart, 'bpm'));
-const paceOption = computed(() => lineOption(paceChartPoints.value, zeppSemanticColors.pace, paceAxisLabel()));
-const altitudeOption = computed(() => lineOption(altitudeChartPoints.value, zeppSemanticColors.altitude, elevationUnitLabel()));
-const cadenceOption = computed(() => lineOption(cadencePoints.value, zeppSemanticColors.cadence, 'spm'));
+const heartOption = computed(() => lineOption(heartPoints.value, chartPalette.value.series.heart, 'bpm'));
+const paceOption = computed(() => lineOption(paceChartPoints.value, chartPalette.value.series.pace, paceAxisLabel()));
+const altitudeOption = computed(() => lineOption(altitudeChartPoints.value, chartPalette.value.series.altitude, elevationUnitLabel()));
+const cadenceOption = computed(() => lineOption(cadencePoints.value, chartPalette.value.series.cadence, 'spm'));
 
 const statSummary = (points: { v: number }[], mode: 'heart' | 'pace' | 'normal' = 'normal'): ChartStat[] | null => {
   if (points.length < 2) return null;
@@ -1341,7 +1341,7 @@ watch(workoutId, (id) => { if (id) void loadInsight(id); }, { immediate: true })
                   <li v-for="stat in card.stats" :key="stat.label"><em>{{ stat.label }}</em><strong>{{ stat.value }}</strong></li>
                 </ul>
               </div>
-              <VChart class="series-chart" :theme="CHART_THEME" :option="card.option" autoresize role="img" :aria-label="t.chartAria(card.title)" />
+              <VChart class="series-chart" :key="CHART_THEME" :theme="CHART_THEME" :option="card.option" autoresize role="img" :aria-label="t.chartAria(card.title)" />
             </section>
           </div>
           <section v-if="seriesError" class="surface-card chart-empty" role="alert">

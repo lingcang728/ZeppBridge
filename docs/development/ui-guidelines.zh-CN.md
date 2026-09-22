@@ -4,9 +4,9 @@
 
 更新时间：2026-09-05（对齐无障碍与可读性调整）。ZeppBridge 是用户的穿戴健康数据桥梁，不是臃肿的分析 App。
 
-视觉是**冷灰底 + 橄榄绿**的暗色系统：品牌色 `--brand: #7DA33E`，界面底色 `#0C0E11`（侧栏 `#08090C`、卡片 `#16191E`），不使用泛滥的紫色或高饱和荧光色。分类色（心率红、配速蓝、睡眠紫、活动青等）只用于标记数据类别，不作装饰。
+视觉是**冷灰底 + 橄榄绿**的系统。深色是基准套：品牌色 `--brand: #7DA33E`，界面底色 `#0C0E11`（卡片 `#16191E`）；浅色套在暖白底上保持同一组角色（`--brand: #2F6B4F`，底色 `#EAEDE5`）。不使用泛滥的紫色或高饱和荧光色。分类色（心率红、配速蓝、睡眠紫、活动青等）只用于标记数据类别，不作装饰。
 
-界面**只有深色一套**，这是已定的取舍，见下方「只做深色」。
+界面有**深色、浅色两套，外加跟随系统**，见下方「双主题」。
 
 ## 核心原则
 
@@ -21,7 +21,7 @@
 
 ## 设计 token
 
-**唯一来源是 `src/App.vue` 的 `:root` 块**，页面里不要再硬编码同义色值（hero、panel 的渐变背景是有意的局部例外）。
+**唯一来源是 `src/styles/tokens.css`**：`:root` 放深色值，`html[data-theme="light"]` 覆写同一组变量。页面里不要再硬编码同义色值（hero、panel 的渐变背景是有意的局部例外）。
 
 | 用途 | token |
 | --- | --- |
@@ -40,11 +40,13 @@
 
 个体化的心率区间是另一回事，在 `/training` 的选择器里：三种算法（最大心率 / 储备心率 / 乳酸阈值）、五个实测基准，**不预设默认**，每个基准都要标出处和测量日期。禁止用 220−年龄 之类的公式估算。算法与百分比的来源见[架构摘要](../reference/architecture.zh-CN.md)。
 
-### 只做深色（已定的设计取舍）
+### 双主题：深色、浅色、跟随系统
 
-- ZeppBridge **只提供深色界面**，不做浅色模式，也不跟随系统。`:root` 只维护这一套 token，不要新增 `@media (prefers-color-scheme)` 或 `[data-theme="light"]` 分支，也不要加主题切换 UI。
-- 因此写样式时可以直接假定深色底：不需要为浅色兜底，但仍要用 token 而不是硬编码色值，以便整体调色。
-- 浅色模式的残留（`useTheme.ts` 与 `zeppbridge-light` ECharts 主题）已于 2026-08-24 删除，不要再重新引入。
+- ZeppBridge v3 提供**深色、浅色、跟随系统**三套选择。选择持久化在 `localStorage` 的 `zeppbridge-theme`（`light` / `dark` / `system`）；`src/composables/useTheme.ts` 负责解析实际生效的一套，`initializeTheme()` 在 `main.ts` 里于首次渲染前执行，不会先闪一帧另一套。
+- 解析结果写在 `<html data-theme="light|dark">`（`data-theme-preference` 保留原始选择便于排查），`color-scheme` 跟着走，滚动条与原生控件自动换色；`theme-color` meta 也随之更新。
+- **组件只消费 token，不按主题分支。** 个别实在换不成 token 的深色硬编码，在 `tokens.css` 底部的补丁表里加一条窄作用域的 `html[data-theme="light"] …` 覆写——这张表是过渡手段，应当逐渐清空。
+- 分类色两套之间只调明度饱和、不换色相（浅色心率红 `#C93F49`、品牌绿 `#2F6B4F`……）；同一个 token 在两套里角色一致，语义不漂移。
+- 落地页自带一套局部作用域的暗色色板（`.landing-page { --site-* }`）——那是应用外壳之外的品牌美术，不算第三套主题。
 
 ### 界面文案：中英各一份，不许硬编码
 
@@ -71,20 +73,20 @@
 
 ## 页面架构
 
-主导航三项：**概览** (`/`)、**交给 AI** (`/explore`)、**设置** (`/settings`)。导航保持三项——新页面进入口卡片，不进侧栏。
+主导航三项，在顶栏（`src/components/shell/AppTopBar.vue`）居中的胶囊里：**概览** (`/`)、**交给 AI** (`/ai`)、**设置** (`/settings`)。导航保持三项——新页面进入口卡片，不占导航位。顶栏右侧还有同步状态胶囊、主题切换键和语言 `SelectMenu`；760px 以下胶囊收起，底部 tabbar 覆盖同样的三项。`/explore` 保留为旧的编辑器；`/orbit-lab` 是轨道编排的占位路由，不进导航。
 
 二级页面不进主导航：`/body`（身体状态）、`/training`（训练状态）、`/recent`（最近记录）、`/sleep`、`/workouts` 列表，以及 `/sleep/:sleepId`、`/workouts/:workoutId` 详情，由概览的入口卡片与「查看全部」进入。
 
 ### 1. 概览 (`/`)
 
-- Hero 卡：品牌标语 + 三张价值卡（安全 / 私密 / AI-ready）+ 右侧「已识别设备 → 流动虚线 → 云端 AI」示意；设备来自真实识别结果，没有设备就不画这条流。
-- 12 列 dashboard 网格：24 小时心率折线（span 6）、今日步数圆环（span 3）、昨晚睡眠结构（span 3）、静息心率 mini 卡 + 身体状态 / 训练状态两张入口卡（各 span 4）、最近记录两列列表（整行）。
+- v3 **没有 Hero 卡**；旧 Hero 和「不再显示介绍」偏好一并移除（Overview 挂载时清掉 `zeppbridge.overview.hideHero`）。页面自上而下是周报卡、覆盖度提示、`SourcesStrip`（设备与账户状态横带，从 v2 侧栏搬来），然后是卡片网格。
+- 卡片是 `src/components/overview/` 下的模块化组件：`HeartRateCard`（24 小时折线）、`StepsCard`（今日步数圆环）、`SleepCard`（昨晚睡眠结构）、两张 `StatusEntryCard`（身体 / 训练入口）和 `RecentCard`（最近记录两列），排在 12 列 `dashboard-grid` 上。
 - 两张入口卡各带当日数值与 7 天 `Sparkline`，点进 `/body` 与 `/training`。它们取代了原来的训练负荷 / VO₂ Max mini 卡——同一屏不重复展示同一个数字。
 - `Sparkline` 少于两个点时不画：一个读数是数值不是趋势，画成一条平线等于宣称了没测过的稳定性。
 - 每张卡片都有独立空态；加载中用 `SkeletonBlock` 占位，失败给可重试的 `EmptyState`。
 - 不在概览做恢复度、训练建议一类解读。入口卡只给数字和形状，解读留给用户自选的 AI。
 
-### 2. 交给 AI (`/explore`)
+### 2. 交给 AI (`/ai`，旧编辑器仍在 `/explore`)
 
 三列布局：
 
@@ -120,20 +122,20 @@
 - 无 UI 框架，组件全部自研，位于 `src/components/`：`BrandMark`、`CategoryMark`、`CircularProgress`、`DesignIcon`、`DeviceMarquee`、`DeviceVisual`、`EmptyState`、`HeartRateZonePicker`、`Icon`、`MetricTrendCard`、`PageHeader`、`RecordRow`、`SkeletonBlock`、`Sparkline`、`StageBar`。新增前先确认这里没有能复用的。
 - 按天趋势一律走 `MetricTrendCard` + `lib/metricSeries.ts` 的 `buildSeriesOption`，不要在页面里各写一套 option；`SERIES_RANGES` 是三档范围的唯一来源。
 - 两套图标各有分工：`Icon.vue` 是内联 SVG 线性图标（UI 控件、小尺寸），`DesignIcon.vue` 是 `src/assets/design-icons/` 的 PNG 设计图标（导航、大号语义图标）。图片必须走 import 让 Vite 产出实体文件——桌面 CSP 不允许 data URL 与外部图源。
-- 图表统一用 `vue-echarts` + `main.ts` 注册的 `zeppbridge-dark` 主题，不要在页面里重复定义配色。
+- 图表统一走 `src/lib/echartsSetup.ts` 的 `vue-echarts`：注册了 `zeppbridge-dark` 与 `zeppbridge-light` 两套主题，并导出响应式的 `CHART_THEME` / `chartPalette`。每个 `VChart` 都绑 `:theme="CHART_THEME"` **和** `:key="CHART_THEME"`（换主题时整图重建），每个 option 都是 `computed`，chrome 色（轴文字、网格线、tooltip、标记、系列语义色）一律从 `chartPalette.value` 取，不写字面量 hex——CSS 变量进不了 canvas，所以色板色值与 `tokens.css` 对齐维护。不要在页面里重复定义配色。
 
 ## 交互与可访问性
 
 - 顶部有 `跳到主要内容` skip-link；导航、单选组用 `role` / `aria-*` / `aria-pressed` 标注；图表带 `role="img"` 和中文 `aria-label`。
 - 焦点态统一 `:focus-visible` 2px `--focus` 描边，禁止 `outline: none` 了事。
 - 触控目标最小 44px（移动菜单按钮、底部导航、`RecordRow`）。
-- 主断点 760px：侧边栏切换为顶栏 + 底部 tabbar；概览另有 1180 / 820 两级栅格降列。
+- 主断点 760px：顶栏胶囊导航收起，底部 tabbar 覆盖同样的三项；概览另有 1180 / 820 两级栅格降列。
 - 界面缩放 80 / 90 / 100 / 110 / 125%（`UI_SCALES`），入口在设置「高级与维护」，快捷键 Ctrl + / Ctrl - / Ctrl 0，持久化在 localStorage。
 - 时间格式化前先判 `Date.getTime()` 是否有效；错误信息保留可操作内容，不要吞成「加载失败」。
 
 ## 这份文档的维护
 
-页面结构以 `src/router/index.ts` 和 `src/App.vue` 的 `navigation` 为准，设计 token 以 `App.vue` 的 `:root` 为准。改导航、改色板、改主题状态时同步改这里；与源码冲突时**以源码为准**，并顺手修正本文。工程门禁见[开发文档](development.zh-CN.md)，产品边界见[架构摘要](../reference/architecture.zh-CN.md)。
+页面结构以 `src/router/index.ts` 和 `src/App.vue` 的 `navigation` 为准，设计 token 以 `src/styles/tokens.css` 为准。改导航、改色板、改主题状态时同步改这里；与源码冲突时**以源码为准**，并顺手修正本文。工程门禁见[开发文档](development.zh-CN.md)，产品边界见[架构摘要](../reference/architecture.zh-CN.md)。
 
 
 ### 可读性后续优化

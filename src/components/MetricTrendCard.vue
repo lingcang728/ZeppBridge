@@ -10,8 +10,7 @@ const chartClick = (event: { name?: string; data?: unknown }) => {
   if (matching) openEvent(matching);
   else if (event.name && validEventDate(event.name)) openEvent(undefined, event.name);
 };
-import { CHART_THEME, VChart } from '../lib/echartsSetup';
-import { chartSurface, zeppSemanticColors } from '../lib/echartsTheme';
+import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
 import { buildSeriesOption, coverageLabel } from '../lib/metricSeries';
 import type { MetricSeries } from '../types';
 import { defineMessages, useMessages } from '../i18n';
@@ -119,7 +118,7 @@ const option = computed(() => {
   const chartSeries = result.series as Array<Record<string, unknown>>;
   const last = chartSeries[chartSeries.length - 1];
   Object.assign(last, { markPoint: { symbol: 'circle', symbolSize: 9, label: { show: false },
-    itemStyle: { color: zeppSemanticColors.brand, borderColor: chartSurface, borderWidth: 2 }, data: marks } });
+    itemStyle: { color: chartPalette.value.series.brand, borderColor: chartPalette.value.surface, borderWidth: 2 }, data: marks } });
   return result;
 });
 </script>
@@ -151,6 +150,7 @@ const option = computed(() => {
     <VChart
       v-if="option"
       class="trend-chart"
+      :key="CHART_THEME"
       :theme="CHART_THEME"
       :option="option"
       @click="chartClick"
