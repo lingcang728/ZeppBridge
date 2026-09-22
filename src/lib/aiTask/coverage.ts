@@ -36,7 +36,7 @@ export const coverageRows = (
   coverage: AiTaskCoverage[],
   workouts: AiTaskWorkoutBrief[],
 ): CoverageRow[] => {
-  const titles = new Map(workouts.map((workout) => [workout.id, workout.title]));
+  const titles = new Map(workouts.map((workout) => [workout.workout_id, workout.workout_type]));
   return coverage.map((entry, index) => ({
     key: `${entry.category}:${entry.workout_id ?? 'global'}:${index}`,
     category: entry.category,
@@ -77,7 +77,7 @@ export const categoryWindowForWorkout = (
 /**
  * 一个任务（多选运动 × 一个类别）的全部窗口，按开始日排序。
  * `workouts` 传 `{id, start_time}` 形状——`Workout.workout_id` 与
- * `AiTaskWorkoutBrief.id` 在调用处先归一成 `id`。
+ * `AiTaskWorkoutBrief.workout_id` 在调用处先归一成 `id`。
  */
 export const categoryWindows = (
   workoutIds: string[],

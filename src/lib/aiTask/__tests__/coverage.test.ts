@@ -9,8 +9,9 @@ import { localDateString } from '../../format';
 import type { AiTaskCoverage, AiTaskWorkoutBrief } from '../../bridge/types';
 
 const brief = (id: string, title: string): AiTaskWorkoutBrief => ({
-  id, title, start_time: '2026-03-10T08:00:00+08:00',
-  sport: 'run', distance_m: 10000, duration_s: 3600,
+  workout_id: id, workout_type: title, start_time: '2026-03-10T08:00:00+08:00',
+  end_time: '2026-03-10T09:00:00+08:00', start_date: '2026-03-10',
+  distance_meters: 10000, calories: 600, avg_hr: 140, max_hr: 165,
 });
 
 const coverage = (patch: Partial<AiTaskCoverage> = {}): AiTaskCoverage => ({
