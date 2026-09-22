@@ -7,7 +7,7 @@ use super::store::normalize_task;
 use crate::access::{granted_windows, shared_task_grants, AccessCategory};
 use crate::models::error::ZeppBridgeError;
 use crate::models::{DailyMetric, MetricSample, SleepSession, SourceScope, Workout};
-use crate::storage::Database;
+use crate::storage::{Database, CURRENT_SCHEMA_VERSION};
 use chrono::{DateTime, Duration, Local, NaiveDate, TimeZone, Utc};
 
 // ---------- 小工具 ----------
@@ -152,7 +152,7 @@ fn v32_migration_creates_tables_and_seeds_three_builtins() {
         .conn
         .query_row("PRAGMA user_version", [], |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 32);
+    assert_eq!(version, CURRENT_SCHEMA_VERSION);
     db.conn
         .query_row("SELECT COUNT(*) FROM ai_tasks", [], |row| {
             row.get::<_, i64>(0)
@@ -202,11 +202,11 @@ fn v32_upgrade_from_v31_seeds_builtins_and_stays_idempotent() {
         .conn
         .query_row("PRAGMA user_version", [], |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 32);
+    assert_eq!(version, CURRENT_SCHEMA_VERSION);
     assert_eq!(db.list_ai_task_templates().unwrap().len(), 3);
     drop(db);
 
-    // 只读连接接受 v32。
+    // 只读连接接受当前 schema 版本。
     let ro = Database::open_read_only(path.clone()).unwrap();
     assert_eq!(ro.list_ai_task_templates().unwrap().len(), 3);
     drop(ro);
