@@ -60,6 +60,11 @@ impl From<ZeppBridgeError> for AppError {
             | ZeppBridgeError::HttpStatus { status, .. } => {
                 app.params = Some(serde_json::json!({ "status": status }));
             }
+            // ai_task 的参数（缺失的 workout id 等）由 AiTaskError 自己判定
+            // 公开安全，这里原样透传。
+            ZeppBridgeError::AiTask(inner) => {
+                app.params = inner.params();
+            }
             _ => {}
         }
         app

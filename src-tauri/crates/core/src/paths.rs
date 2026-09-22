@@ -409,7 +409,16 @@ pub fn other_libraries_on_this_machine(data_dir: &Path) -> Vec<PathBuf> {
 
 /// Copy-or-move leftover AppData libraries into the install-local folder.
 /// Existing destination files are never overwritten.
+///
+/// v3 注记：`legacy_source_dirs()` 列出的全部是「ZeppBridge」（2.x）产品线
+/// 的目录；本 crate 3.x 构建的是并行测试线 ZeppBridge3，与日常使用的 2.x
+/// 共存于同一台机器。把 2.x 的 AppData 遗留库搬进 v3 的 data/ 等于从还在
+/// 用的产品手里抢数据，所以 3.x 线整体跳过这次搬迁。将来 ZeppBridge3 若
+/// 有自己的历史目录，也不会出现在下面的名单里。
 pub fn relocate_legacy_data(data_dir: &Path) -> Option<String> {
+    if env!("CARGO_PKG_VERSION").starts_with("3.") {
+        return None;
+    }
     let mut failed = Vec::new();
     for source in legacy_source_dirs() {
         if source == data_dir {
@@ -431,8 +440,13 @@ pub fn relocate_legacy_data(data_dir: &Path) -> Option<String> {
 
 pub fn is_build_artifact_dir(dir: &Path) -> bool {
     let norm = normalize_path(dir);
+    // `cargo-target-v3` 是 v3 worktree 的隔离构建目录（scripts\v3-gates.ps1
+    // 固定 CARGO_TARGET_DIR 指向它）；少了它，`tauri dev` 出来的二进制会把
+    // 构建缓存当成安装目录，在旁边新建一个空 data/。
     norm.contains("\\cargo-target\\")
         || norm.contains("/cargo-target/")
+        || norm.contains("\\cargo-target-v3\\")
+        || norm.contains("/cargo-target-v3/")
         || norm.contains("\\target\\debug")
         || norm.contains("/target/debug")
         || norm.contains("\\target\\release")
@@ -1061,6 +1075,9 @@ mod tests {
     fn build_cache_dirs_are_detected() {
         assert!(is_build_artifact_dir(Path::new(
             r"G:\build_cache\cargo-target\release"
+        )));
+        assert!(is_build_artifact_dir(Path::new(
+            r"G:\build_cache\cargo-target-v3\debug"
         )));
         assert!(is_build_artifact_dir(Path::new(
             r"C:\proj\src-tauri\target\debug"

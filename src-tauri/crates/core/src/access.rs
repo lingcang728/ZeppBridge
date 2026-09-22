@@ -1446,26 +1446,17 @@ mod tests {
 
     /* ---------- shared_task_grants / 窗口展开 ---------- */
 
-    /// 造一个带 ai_tasks 表的库。表结构按 P1/P6 约定：
-    /// `payload` JSON 文本 + `mcp_shared` 索引列。S1 若改 schema，
+    /// 造一个带 ai_tasks 行的库。表本身由 v32 迁移建好（S1）；
+    /// `payload` JSON 文本 + `mcp_shared` 索引列的约定若变，
     /// 这里和装载逻辑要一起改。
     fn library_with_tasks(payloads: &[(bool, &str)]) -> (Database, TestDir) {
         let dir = TestDir::new("tasks");
         let db = Database::open_migrated(&dir.0.join("zepp.db")).unwrap();
-        db.conn
-            .execute_batch(
-                "CREATE TABLE ai_tasks(
-                     id TEXT PRIMARY KEY,
-                     payload TEXT NOT NULL,
-                     mcp_shared INTEGER NOT NULL DEFAULT 0,
-                     updated_at TEXT
-                 );",
-            )
-            .unwrap();
         for (index, (shared, payload)) in payloads.iter().enumerate() {
             db.conn
                 .execute(
-                    "INSERT INTO ai_tasks(id, payload, mcp_shared) VALUES(?1, ?2, ?3)",
+                    "INSERT INTO ai_tasks(id, payload, mcp_shared, created_at, updated_at)
+                     VALUES(?1, ?2, ?3, '', '')",
                     rusqlite::params![format!("task-{index}"), payload, *shared as i64],
                 )
                 .unwrap();
@@ -1520,6 +1511,8 @@ mod tests {
     fn missing_ai_tasks_table_means_zero_grants() {
         let dir = TestDir::new("no-tasks");
         let db = Database::open_migrated(&dir.0.join("zepp.db")).unwrap();
+        // v32 起迁移已建表；删掉它来模拟「还没跑到 v32 的旧库」。
+        db.conn.execute_batch("DROP TABLE ai_tasks;").unwrap();
         assert_eq!(shared_task_grants(&db).unwrap(), Vec::new());
     }
 

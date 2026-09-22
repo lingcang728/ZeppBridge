@@ -182,15 +182,8 @@ fn scoped_library() -> PathBuf {
         db.insert_sleep_session(&sleep_session("outside", 1))
             .unwrap();
     }
+    // ai_tasks 表由 v32 迁移建好（S1）；这里只插一行授权任务。
     let conn = rusqlite::Connection::open(dir.join("zepp.db")).unwrap();
-    conn.execute_batch(
-        "CREATE TABLE ai_tasks (
-            id TEXT PRIMARY KEY,
-            payload TEXT NOT NULL,
-            mcp_shared INTEGER NOT NULL DEFAULT 0
-         )",
-    )
-    .unwrap();
     let payload = json!({
         "id": "t1",
         "workout_ids": ["granted"],
@@ -203,7 +196,8 @@ fn scoped_library() -> PathBuf {
     })
     .to_string();
     conn.execute(
-        "INSERT INTO ai_tasks (id, payload, mcp_shared) VALUES ('t1', ?1, 1)",
+        "INSERT INTO ai_tasks (id, payload, mcp_shared, created_at, updated_at)
+         VALUES ('t1', ?1, 1, '', '')",
         [payload],
     )
     .unwrap();

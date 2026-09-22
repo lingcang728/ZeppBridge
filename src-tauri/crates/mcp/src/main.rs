@@ -1135,20 +1135,14 @@ mod tests {
             library
         }
 
-        /// 往库里写一条 `ai_tasks` 行。基线 schema 还没有这张表，这里建的
-        /// 是 S1 v32 的最小形态：id + JSON payload + mcp_shared 开关列。
+        /// 往库里写一条 `ai_tasks` 行。表本身由 v32 迁移建好（S1）；
+        /// `payload` JSON 文本 + `mcp_shared` 索引列的约定若变，
+        /// 这里和 access.rs 的装载逻辑要一起改。
         fn share_task(&self, task_id: &str, payload: &str, shared: bool) {
             let conn = rusqlite::Connection::open(self.0.join("zepp.db")).unwrap();
-            conn.execute_batch(
-                "CREATE TABLE IF NOT EXISTS ai_tasks (
-                    id TEXT PRIMARY KEY,
-                    payload TEXT NOT NULL,
-                    mcp_shared INTEGER NOT NULL DEFAULT 0
-                 )",
-            )
-            .unwrap();
             conn.execute(
-                "INSERT OR REPLACE INTO ai_tasks (id, payload, mcp_shared) VALUES (?1, ?2, ?3)",
+                "INSERT OR REPLACE INTO ai_tasks (id, payload, mcp_shared, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, '', '')",
                 rusqlite::params![task_id, payload, i64::from(shared)],
             )
             .unwrap();
@@ -1572,7 +1566,7 @@ mod tests {
     /// 也不能拿一份空成功结果冒充。
     #[test]
     fn task_scope_with_zero_grants_denies_every_data_call() {
-        let library = TestLibrary::empty(); // 基线 schema 没有 ai_tasks → 零授权
+        let library = TestLibrary::empty(); // v32 建的 ai_tasks 是空表 → 零授权
         for (name, args) in [
             ("list_workouts", json!({})),
             ("get_workout_insight", json!({"workoutId": "w1"})),
