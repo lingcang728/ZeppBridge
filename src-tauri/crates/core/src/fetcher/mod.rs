@@ -50,6 +50,26 @@ impl FetchWindow {
             .to_string()
     }
 
+    /// Convert the half-open timestamp window to inclusive device-local dates.
+    /// Use the zone's rules at each endpoint, including historical DST changes.
+    fn local_days(&self, time_zone: &str) -> Result<(NaiveDate, NaiveDate)> {
+        let zone = jiff::tz::TimeZone::get(time_zone)
+            .map_err(|error| ZeppBridgeError::ConfigError(error.to_string()))?;
+        let date = |instant: DateTime<Utc>| -> Result<NaiveDate> {
+            let timestamp = jiff::Timestamp::from_second(instant.timestamp())
+                .map_err(|error| ZeppBridgeError::ConfigError(error.to_string()))?;
+            NaiveDate::parse_from_str(
+                &timestamp.to_zoned(zone.clone()).date().to_string(),
+                "%Y-%m-%d",
+            )
+            .map_err(|error| ZeppBridgeError::ConfigError(error.to_string()))
+        };
+        Ok((
+            date(self.start_utc)?,
+            date(self.end_utc - Duration::nanoseconds(1))?,
+        ))
+    }
+
     pub fn chunks(self, chunk_days: i64) -> Vec<Self> {
         let chunk_days = chunk_days.max(1);
         let mut chunks = Vec::new();
@@ -118,6 +138,8 @@ pub struct FetchedRecord {
     /// 调用方必须把整段窗口当成未完成：已经拿到的数据可以写库，但不能把
     /// 这个月记成 persisted / empty_from_cloud。
     pub incomplete: bool,
+    /// Diagnostic context for partial fetches; never replaces successfully fetched data.
+    pub incomplete_reason: Option<String>,
 }
 
 impl FetchedRecord {
@@ -125,6 +147,7 @@ impl FetchedRecord {
         Self {
             raw,
             incomplete: false,
+            incomplete_reason: None,
         }
     }
 }
@@ -148,6 +171,7 @@ fn conclude_slices(
         }
         for record in &mut records {
             record.incomplete = true;
+            record.incomplete_reason = Some(error.to_string());
         }
         return Ok(records);
     }
@@ -925,8 +949,8 @@ impl DataFetcher {
                         .fetch_user_events_date_string(
                             event_type,
                             sub_type.unwrap_or("odi"),
-                            &start.and_utc().to_rfc3339(),
-                            &end.and_utc().to_rfc3339(),
+                            start.date(),
+                            end.date(),
                             time_zone,
                             50,
                         )
@@ -1175,6 +1199,7 @@ impl DataFetcher {
     ) -> Result<Vec<FetchedRecord>> {
         let mut records = Vec::new();
         let mut last_error = None;
+        let mut failures = Vec::new();
 
         for (label, surface, event_type, sub_type, chunk_days) in WELLNESS_STREAMS {
             let slices = match chunk_days {
@@ -1196,18 +1221,21 @@ impl DataFetcher {
                             .fetch_user_events(event_type, sub_type, from, to, limit, true)
                             .await
                     }
-                    ProbeSurface::UserEventsDay => {
-                        self.connector
-                            .fetch_user_events_date_string(
-                                event_type,
-                                sub_type.unwrap_or("odi"),
-                                &slice.start_utc.to_rfc3339(),
-                                &slice.end_utc.to_rfc3339(),
-                                time_zone,
-                                limit,
-                            )
-                            .await
-                    }
+                    ProbeSurface::UserEventsDay => match slice.local_days(time_zone) {
+                        Ok((start_date, end_date)) => {
+                            self.connector
+                                .fetch_user_events_date_string(
+                                    event_type,
+                                    sub_type.unwrap_or("odi"),
+                                    start_date,
+                                    end_date,
+                                    time_zone,
+                                    limit,
+                                )
+                                .await
+                        }
+                        Err(error) => Err(error),
+                    },
                     // Not reachable: `WELLNESS_STREAMS` has no weight row, because
                     // weight is not an event stream. It has its own fetcher.
                     ProbeSurface::WeightRecords => Err(ZeppBridgeError::Unavailable(
@@ -1230,12 +1258,32 @@ impl DataFetcher {
                         label, surface, &slice, payload, limit,
                     )),
                     Err(error) if is_abort_error(&error) => return Err(error),
-                    Err(error) => last_error = Some(error),
+                    Err(error) => {
+                        failures.push(format!(
+                            "{label} ({}..{}): {error}",
+                            slice.start_day(),
+                            slice.end_day()
+                        ));
+                        last_error = Some(error);
+                    }
                 }
             }
         }
 
-        conclude_slices(records, last_error, "没有可用的可选健康数据流")
+        // Keep cap diagnostics as well as request errors when both occur.
+        failures.extend(
+            records
+                .iter()
+                .filter_map(|record| record.incomplete_reason.clone()),
+        );
+        let mut records = conclude_slices(records, last_error, "没有可用的可选健康数据流")?;
+        if !failures.is_empty() {
+            let reason = failures.join("; ");
+            for record in &mut records {
+                record.incomplete_reason = Some(reason.clone());
+            }
+        }
+        Ok(records)
     }
 }
 
@@ -1275,6 +1323,10 @@ fn fetched_wellness_record(
         capability: CapabilityStatus::Unverified,
     });
     record.incomplete = truncated;
+    if truncated {
+        record.incomplete_reason =
+            Some(format!("{label}: response reached the {limit}-item limit"));
+    }
     record
 }
 
@@ -1487,6 +1539,76 @@ mod tests {
     fn payload_items_only_accept_structured_wrappers() {
         assert_eq!(payload_items(&json!({"items": [1, 2]})).len(), 2);
         assert_eq!(payload_items(&json!({"data": "encoded"})).len(), 0);
+    }
+
+    #[test]
+    fn odi_dates_use_device_zone_and_exclusive_end() {
+        for (start, end, zone, expected_start, expected_end) in [
+            (
+                "2026-09-14T15:31:25.715671100Z",
+                "2026-09-21T15:31:25.715671100Z",
+                "Asia/Shanghai",
+                "2026-09-14",
+                "2026-09-21",
+            ),
+            (
+                "2026-09-21T16:00:00Z",
+                "2026-09-22T16:00:00Z",
+                "Asia/Shanghai",
+                "2026-09-22",
+                "2026-09-22",
+            ),
+            (
+                "2026-09-22T00:30:00Z",
+                "2026-09-22T01:00:00Z",
+                "America/Los_Angeles",
+                "2026-09-21",
+                "2026-09-21",
+            ),
+            (
+                "2026-03-08T05:00:00Z",
+                "2026-03-09T04:00:00Z",
+                "America/New_York",
+                "2026-03-08",
+                "2026-03-08",
+            ),
+            (
+                "2026-09-21T00:00:00Z",
+                "2026-09-22T00:00:00Z",
+                "UTC",
+                "2026-09-21",
+                "2026-09-21",
+            ),
+        ] {
+            let window =
+                FetchWindow::between(start.parse().unwrap(), end.parse().unwrap()).unwrap();
+            let (from, to) = window.local_days(zone).unwrap();
+            assert_eq!(from.to_string(), expected_start);
+            assert_eq!(to.to_string(), expected_end);
+        }
+        assert!(FetchWindow::days(1)
+            .unwrap()
+            .local_days("Not/AZone")
+            .is_err());
+    }
+
+    #[test]
+    fn partial_fetch_retains_original_error() {
+        let records = conclude_slices(
+            vec![sample_fetched()],
+            Some(ZeppBridgeError::HttpStatus {
+                status: 400,
+                message: "Bad request".into(),
+            }),
+            "empty",
+        )
+        .unwrap();
+        assert!(records[0].incomplete);
+        assert!(records[0]
+            .incomplete_reason
+            .as_deref()
+            .unwrap()
+            .contains("HTTP 400"));
     }
 
     fn sample_fetched() -> FetchedRecord {
