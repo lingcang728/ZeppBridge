@@ -33,18 +33,42 @@ const copy = () => messagesOf(messages);
 
 export type AiHandoffState = 'idle' | 'preparing' | 'opened' | 'copied_only' | 'attachment' | 'failed';
 
+/* ---- 可复用的单步原语 ----
+ *
+ * Beta1 的交付预览页把「复制提示词」和「打开 AI 站点」拆成两个独立步骤，
+ * 各自有自己的状态与重试——所以这两步从 prepareAndCopy 里抽出来做成
+ * 模块级函数。useAiHandoff 原有的状态机行为不变。
+ */
+
+/** 写剪贴板；环境不支持时抛带本地化文案的 Error。 */
+export const copyTextToClipboard = async (text: string): Promise<void> => {
+  if (!navigator.clipboard?.writeText) {
+    throw new Error(copy().clipboardUnsupported);
+  }
+  await navigator.clipboard.writeText(text);
+};
+
+/**
+ * 打开白名单内的 AI 站点。
+ * 'opened' = opener 真的开了浏览器；'skipped' = 非桌面运行时没法开（网页预览
+ * 不许谎称打开了浏览器）。URL 不在固定白名单里直接抛错。
+ */
+export const openProviderSite = async (provider: AiProvider): Promise<'opened' | 'skipped'> => {
+  if (!isFixedAiProviderUrl(provider.url)) {
+    throw new Error(copy().targetNotAllowed);
+  }
+  if (!isTauri()) return 'skipped';
+  await openUrl(provider.url);
+  return 'opened';
+};
+
 export function useAiHandoff() {
   const handoffState = ref<AiHandoffState>('idle');
   const handoffResult = ref<AiHandoffResult | null>(null);
   const handoffError = ref<string | null>(null);
   const preparedProvider = ref<AiProvider | null>(null);
 
-  const copyToClipboard = async (text: string) => {
-    if (!navigator.clipboard?.writeText) {
-      throw new Error(copy().clipboardUnsupported);
-    }
-    await navigator.clipboard.writeText(text);
-  };
+  const copyToClipboard = copyTextToClipboard;
 
   const prepareAndCopy = async (
     provider: AiProvider,
@@ -127,5 +151,8 @@ export function useAiHandoff() {
     preparedProvider,
     prepareAndCopy,
     retryOpen,
+    /* 交付预览页用的单步原语（模块级同名函数的别名）。 */
+    copyText: copyTextToClipboard,
+    openProvider: openProviderSite,
   };
 }
