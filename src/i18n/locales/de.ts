@@ -788,5 +788,4 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       },
     },
   },
-  },
 } satisfies LocalePack;
