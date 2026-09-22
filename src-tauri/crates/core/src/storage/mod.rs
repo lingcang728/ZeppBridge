@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 
 /// 当前 SQLite schema 版本（`PRAGMA user_version`）。加新版本只能追加迁移
 /// 步骤，不要改已有 DDL。
-pub const CURRENT_SCHEMA_VERSION: i64 = 32;
+pub const CURRENT_SCHEMA_VERSION: i64 = 33;
 /// 写进备份 manifest 的应用版本。Core 是独立 crate，用它自己的包版本。
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -514,6 +514,22 @@ const ZONE_MODELS: [ZoneModelSpec; 3] = [
 /// of measuring them.
 const HOURLY_AGGREGATED_METRICS: [&str; 3] = ["heart_rate", "spo2", "stress"];
 
+/// 日级导出类型：一条运动没有「昨晚睡了多久」「当天走了几步」这种字段，
+/// 单条运动范围下这些类型不该出现。`build_ai_export` / `estimate_ai_export`
+/// 与样本指标名展开共用同一张表——曾在函数里各写一份的版本会长歪。
+const EXPORT_DAY_LEVEL_TYPES: [&str; 10] = [
+    "sleep",
+    "steps",
+    "daily_activity",
+    "recovery",
+    "training_load",
+    "vo2max",
+    "lactate_threshold",
+    "pai",
+    "weight",
+    "food",
+];
+
 /// Export types whose raw payloads are fetched but whose field-by-field
 /// normalization has not been verified against a real response yet.
 ///
@@ -807,6 +823,11 @@ impl Database {
             let start = today - Duration::days(window_days - 1);
             let start_text = start.to_string();
             let end_text = today.to_string();
+            // UTC 宽限界先让索引把范围切出来，date() 只做精修：metric_samples
+            // 走 uq 前导 (metric, timestamp)，workouts 走 v33 的
+            // idx_workouts_start。sleep_sessions 还没有 start_time 索引，界对
+            // 它只是无害的附加谓词——形状保持一致，等它有索引那天自动受益。
+            let (utc_lower, utc_upper) = utc_bounds_or_unbounded(&start_text, &end_text);
             let (records, latest, unit) = match evidence {
                 CapabilityEvidence::DailyPrefix(prefix) => {
                     let pattern = format!("{prefix}%");
@@ -821,8 +842,10 @@ impl Database {
                 CapabilityEvidence::Samples(metric) => {
                     let row = self.conn.query_row(
                         "SELECT COUNT(*), MAX(date(timestamp, 'localtime')) FROM metric_samples
-                         WHERE metric = ?1 AND date(timestamp, 'localtime') BETWEEN ?2 AND ?3",
-                        params![metric, start_text, end_text],
+                         WHERE metric = ?1
+                           AND timestamp >= ?4 AND timestamp < ?5
+                           AND date(timestamp, 'localtime') BETWEEN ?2 AND ?3",
+                        params![metric, start_text, end_text, utc_lower, utc_upper],
                         |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Option<String>>(1)?)),
                     )?;
                     (row.0, row.1, ("条", "records"))
@@ -830,13 +853,14 @@ impl Database {
                 CapabilityEvidence::Table(table, column) => {
                     let sql = format!(
                         "SELECT COUNT(*), MAX(date({column}, 'localtime')) FROM {table}
-                         WHERE date({column}, 'localtime') BETWEEN ?1 AND ?2"
+                         WHERE {column} >= ?1 AND {column} < ?2
+                           AND date({column}, 'localtime') BETWEEN ?3 AND ?4"
                     );
-                    let row = self
-                        .conn
-                        .query_row(&sql, params![start_text, end_text], |row| {
-                            Ok((row.get::<_, i64>(0)?, row.get::<_, Option<String>>(1)?))
-                        })?;
+                    let row = self.conn.query_row(
+                        &sql,
+                        params![utc_lower, utc_upper, start_text, end_text],
+                        |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Option<String>>(1)?)),
+                    )?;
                     (row.0, row.1, ("条", "records"))
                 }
             };
@@ -1982,13 +2006,49 @@ impl Database {
     /// 这类账号上少报好几个月。返回的是**天**而不是时间戳，因为它要拿去和界面上
     /// 「最近 7 天 / 30 天 / 6 个月」这些以天为单位的选择直接比较。
     pub fn local_coverage(&self, today: NaiveDate) -> Result<LocalCoverage> {
+        let (earliest, latest) = self.coverage_day_bounds()?;
+
+        // 覆盖天数从最早那天数到**今天**，不是数到 `latest_day`：用户问的是
+        // 「我能往回看多远」，而表没同步的那两天不该让答案变小。
+        let covered_days = earliest
+            .as_deref()
+            .and_then(|day| NaiveDate::parse_from_str(day, "%Y-%m-%d").ok())
+            .map(|day| (today - day).num_days() + 1)
+            .unwrap_or(0)
+            .max(0);
+
+        Ok(LocalCoverage {
+            earliest_day: earliest,
+            latest_day: latest,
+            covered_days,
+        })
+    }
+
+    /// 四张表各自的最早/最晚**本地日**，取并集；空库返回 `(None, None)`。
+    ///
+    /// `date(x, 'localtime')` 对 `x` 单调不减，所以先取原始列的 MIN/MAX 再在
+    /// Rust 里换算成日本地，与「逐行换算再取 MIN/MAX」结果一致——而原始列
+    /// 才有索引可走：daily_metrics 的唯一键以 date 开头，v33 起 workouts
+    /// 也有 idx_workouts_start。metric_samples / sleep_sessions 仍要扫表，
+    /// 但省掉了对每一行各调一次 date() 的开销。
+    ///
+    /// 解析不出的极值行返回 None：以前这类行会被 date() 折成 NULL、自然
+    /// 掉出 MIN/MAX；换算失败让这张表不报边界，和「没数据」同等处理，
+    /// 而不是把整个查询拖下水。
+    fn coverage_day_bounds(&self) -> Result<(Option<String>, Option<String>)> {
         let mut earliest: Option<String> = None;
         let mut latest: Option<String> = None;
-        for query in [
-            "SELECT MIN(date), MAX(date) FROM daily_metrics",
-            "SELECT MIN(date(timestamp, 'localtime')), MAX(date(timestamp, 'localtime')) FROM metric_samples",
-            "SELECT MIN(date(start_time, 'localtime')), MAX(date(end_time, 'localtime')) FROM sleep_sessions",
-            "SELECT MIN(date(start_time, 'localtime')), MAX(date(end_time, 'localtime')) FROM workouts",
+        for (query, is_timestamp) in [
+            ("SELECT MIN(date), MAX(date) FROM daily_metrics", false),
+            (
+                "SELECT MIN(timestamp), MAX(timestamp) FROM metric_samples",
+                true,
+            ),
+            (
+                "SELECT MIN(start_time), MAX(end_time) FROM sleep_sessions",
+                true,
+            ),
+            ("SELECT MIN(start_time), MAX(end_time) FROM workouts", true),
         ] {
             let (low, high) = self.conn.query_row(query, [], |row| {
                 Ok((
@@ -1996,6 +2056,20 @@ impl Database {
                     row.get::<_, Option<String>>(1)?,
                 ))
             })?;
+            let low = low.and_then(|value| {
+                if is_timestamp {
+                    local_day_of_stored(&value)
+                } else {
+                    Some(value)
+                }
+            });
+            let high = high.and_then(|value| {
+                if is_timestamp {
+                    local_day_of_stored(&value)
+                } else {
+                    Some(value)
+                }
+            });
             if let Some(low) = low {
                 if earliest
                     .as_deref()
@@ -2013,21 +2087,7 @@ impl Database {
                 }
             }
         }
-
-        // 覆盖天数从最早那天数到**今天**，不是数到 `latest_day`：用户问的是
-        // 「我能往回看多远」，而表没同步的那两天不该让答案变小。
-        let covered_days = earliest
-            .as_deref()
-            .and_then(|day| NaiveDate::parse_from_str(day, "%Y-%m-%d").ok())
-            .map(|day| (today - day).num_days() + 1)
-            .unwrap_or(0)
-            .max(0);
-
-        Ok(LocalCoverage {
-            earliest_day: earliest,
-            latest_day: latest,
-            covered_days,
-        })
+        Ok((earliest, latest))
     }
 
     pub fn newest_samples(&self) -> Result<BTreeMap<String, Option<String>>> {
@@ -4121,29 +4181,30 @@ impl Database {
 
     fn overview_metadata(&self) -> Result<(Option<String>, Option<Coverage>, Option<String>)> {
         let last_updated = self.get_app_meta(LAST_CLOUD_SYNC_AT_KEY)?;
-        let (start, end, stream_count, scope_count, only_scope) = self.conn.query_row(
-            "SELECT MIN(day), MAX(day), COUNT(DISTINCT stream),
+        // 覆盖的最早/最晚日本地与 local_coverage 同一条链路：对原始列取
+        // MIN/MAX 再换算，能走索引；旧写法是对四张表逐行调 date() 再聚合。
+        let (start, end) = self.coverage_day_bounds()?;
+        // stream / source_scope 的 DISTINCT 计数躲不开扫行，但不再为每一行
+        // 调 date()——那是旧 UNION 里最贵的部分。
+        let (stream_count, scope_count, only_scope) = self.conn.query_row(
+            "SELECT COUNT(DISTINCT stream),
                     COUNT(DISTINCT source_scope), MIN(source_scope)
              FROM (
-                 SELECT date(timestamp, 'localtime') AS day, metric AS stream, source_scope
+                 SELECT metric AS stream, source_scope
                  FROM metric_samples
                  UNION ALL
-                 SELECT date AS day, 'daily_summary' AS stream, source_scope FROM daily_metrics
+                 SELECT 'daily_summary' AS stream, source_scope FROM daily_metrics
                  UNION ALL
-                 SELECT date(start_time, 'localtime') AS day, 'sleep' AS stream, source_scope
-                 FROM sleep_sessions
+                 SELECT 'sleep' AS stream, source_scope FROM sleep_sessions
                  UNION ALL
-                 SELECT date(start_time, 'localtime') AS day, 'workouts' AS stream, source_scope
-                 FROM workouts
-             ) WHERE day IS NOT NULL",
+                 SELECT 'workouts' AS stream, source_scope FROM workouts
+             )",
             [],
             |row| {
                 Ok((
-                    row.get::<_, Option<String>>(0)?,
-                    row.get::<_, Option<String>>(1)?,
-                    row.get::<_, i64>(2)?,
-                    row.get::<_, i64>(3)?,
-                    row.get::<_, Option<String>>(4)?,
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, Option<String>>(2)?,
                 ))
             },
         )?;
@@ -4322,30 +4383,30 @@ impl Database {
         let start = end - Duration::days(window_days - 1);
         // `timestamp` 存的是 RFC 3339（带偏移）。SQLite 的 `localtime` 修饰符
         // 按**本机**时区换算，这正是我们要的分日方式。
+        // UTC 宽限界让 uq_metric_sample_key 按 (metric, timestamp) 切出范围；
+        // date() 仍是本地日的精修谓词。
+        let start_text = start.format("%Y-%m-%d").to_string();
+        let end_text = end.format("%Y-%m-%d").to_string();
+        let (utc_lower, utc_upper) = utc_bounds_or_unbounded(&start_text, &end_text);
         let mut stmt = self.conn.prepare(
             "SELECT date(timestamp, 'localtime') AS day,
                     MAX(value), MIN(value), AVG(value), COUNT(*)
              FROM metric_samples
              WHERE metric = 'heart_rate'
+               AND timestamp >= ?3 AND timestamp < ?4
                AND date(timestamp, 'localtime') BETWEEN ?1 AND ?2
              GROUP BY day
              ORDER BY day",
         )?;
-        let rows = stmt.query_map(
-            [
-                start.format("%Y-%m-%d").to_string(),
-                end.format("%Y-%m-%d").to_string(),
-            ],
-            |row| {
-                Ok(DailyHeartRateExtreme {
-                    date: row.get(0)?,
-                    max: row.get::<_, f64>(1)?.round() as i32,
-                    min: row.get::<_, f64>(2)?.round() as i32,
-                    average: row.get::<_, f64>(3)?.round() as i32,
-                    samples: row.get(4)?,
-                })
-            },
-        )?;
+        let rows = stmt.query_map([start_text, end_text, utc_lower, utc_upper], |row| {
+            Ok(DailyHeartRateExtreme {
+                date: row.get(0)?,
+                max: row.get::<_, f64>(1)?.round() as i32,
+                min: row.get::<_, f64>(2)?.round() as i32,
+                average: row.get::<_, f64>(3)?.round() as i32,
+                samples: row.get(4)?,
+            })
+        })?;
         rows.collect::<std::result::Result<Vec<_>, _>>()
             .map_err(Into::into)
     }
@@ -4894,25 +4955,60 @@ impl Database {
         end: &str,
         workout_id: Option<&str>,
     ) -> Result<BTreeMap<i32, i64>> {
+        // start_time 的 UTC 宽限界让 v33 的 idx_workouts_start 先把运动切到
+        // 范围内再 JOIN；date() 仍是本地日的精修。
+        let (utc_lower, utc_upper) = utc_bounds_or_unbounded(start, end);
         let mut stmt = self.conn.prepare(
             "SELECT workout_samples.heart_rate, COUNT(*)
              FROM workout_samples
              JOIN workouts ON workouts.workout_id = workout_samples.workout_id
              WHERE workout_samples.heart_rate IS NOT NULL
                AND workout_samples.heart_rate > 0
+               AND workouts.start_time >= ?4 AND workouts.start_time < ?5
                AND date(workouts.start_time, 'localtime') BETWEEN ?1 AND ?2
                AND (?3 IS NULL OR workout_samples.workout_id = ?3)
              GROUP BY workout_samples.heart_rate",
         )?;
-        let rows = stmt.query_map(params![start, end, workout_id], |row| {
-            Ok((row.get::<_, i32>(0)?, row.get::<_, i64>(1)?))
-        })?;
+        let rows = stmt.query_map(
+            params![start, end, workout_id, utc_lower, utc_upper],
+            |row| Ok((row.get::<_, i32>(0)?, row.get::<_, i64>(1)?)),
+        )?;
         let mut histogram = BTreeMap::new();
         for row in rows {
             let (heart_rate, seconds) = row?;
             *histogram.entry(heart_rate).or_default() += seconds;
         }
         Ok(histogram)
+    }
+
+    /// 把勾选的导出类型展开成 `metric_samples` 里真实存在的指标名。
+    ///
+    /// `SELECT DISTINCT metric` 只走 uq_metric_sample_key 的前导列（覆盖
+    /// 索引，行数等于指标名个数），换来主查询的 `metric IN (...)` ——这是
+    /// 让导出不再全表扫 metric_samples 的那一步。归型判定与行循环共用
+    /// `export_sample_matched_type`；`single_workout` 在这里就把日级类型的
+    /// 指标名排除掉，行循环里无需再判一次。
+    fn export_sample_metric_names(
+        &self,
+        selected: &BTreeSet<String>,
+        single_workout: bool,
+    ) -> Result<Vec<String>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT DISTINCT metric FROM metric_samples ORDER BY metric")?;
+        let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+        let mut names = Vec::new();
+        for row in rows {
+            let metric = row?;
+            let Some(matched) = export_sample_matched_type(&metric, selected) else {
+                continue;
+            };
+            if single_workout && EXPORT_DAY_LEVEL_TYPES.contains(&matched.as_str()) {
+                continue;
+            }
+            names.push(metric);
+        }
+        Ok(names)
     }
 
     pub fn build_ai_export(&self, selection: &ExportSelection) -> Result<(String, usize)> {
@@ -4961,24 +5057,6 @@ impl Database {
             }
         };
         let single_workout = workout_filter.is_some();
-        // 日级数据流：一条运动没有「昨晚睡了多久」这种字段，硬塞进来就是范围外的数据。
-        // 只在 daily_metrics / sleep_sessions 里出现的类型；心率、HRV、血氧这类
-        // 逐点指标不在其中，它们会按运动时段截取后照常导出。
-        const DAY_LEVEL_TYPES: [&str; 10] = [
-            "sleep",
-            "steps",
-            "daily_activity",
-            "recovery",
-            "training_load",
-            "vo2max",
-            "lactate_threshold",
-            "pai",
-            // 一次称重和某一条运动没有关系。单条运动的导出里不该出现
-            // 「体重：0 条」这样一个只会让人困惑的类型。
-            "weight",
-            // 一天吃了什么和某一条运动同样没有关系，理由同上。
-            "food",
-        ];
         let allowed: BTreeSet<&str> = EXPORT_DATA_TYPES.into_iter().collect();
         let selected: BTreeSet<String> = selection
             .data_types
@@ -5004,7 +5082,10 @@ impl Database {
         let mut emitted: BTreeMap<String, usize> = BTreeMap::new();
 
         let mut metric_samples = Vec::new();
-        if selected.contains("heart_rate")
+        // 选中类型先映回库里真实存在的指标名：WHERE 里有了
+        // `metric IN (...)`，uq_metric_sample_key（前导列 metric）才能把这次
+        // 查询切成索引区间；以前 WHERE 只带时间界，每次都是全表扫。
+        let sample_metric_names = if selected.contains("heart_rate")
             || selected.contains("hrv")
             || selected.contains("hrv_rmssd")
             || selected.contains("respiratory_rate")
@@ -5012,82 +5093,58 @@ impl Database {
             || selected.contains("stress")
             || selected.contains("weight")
         {
+            self.export_sample_metric_names(&selected, single_workout)?
+        } else {
+            Vec::new()
+        };
+        if !sample_metric_names.is_empty() {
             // 单条运动范围下，逐点指标只取这条运动进行期间的采样；日期区间下
-            // 仍然按整天取。两条路径共用一条 SQL，避免两处各自解释范围。
-            let (window_start, window_end) = match &workout_window {
-                Some((started_at, ended_at)) => {
-                    (Some(started_at.as_str()), Some(ended_at.as_str()))
-                }
-                None => (None, None),
-            };
-            let mut stmt = self.conn.prepare(
+            // 仍然按整天取。一条运动可以跨过本地零点，它的实际时间窗口不能
+            // 被切到开始那天。
+            let where_tail =
+                ai_export_samples_where_tail(sample_metric_names.len(), single_workout);
+            let mut stmt = self.conn.prepare(&format!(
                 "SELECT metric, timestamp, value, unit, source_scope, device_id
                  FROM metric_samples
-                 WHERE (?5 IS NULL OR timestamp >= ?5)
-                   AND (?6 IS NULL OR timestamp < ?6)
-                   AND (?3 IS NOT NULL OR date(timestamp, 'localtime') BETWEEN ?1 AND ?2)
-                   AND (?3 IS NULL OR timestamp >= ?3)
-                   AND (?4 IS NULL OR timestamp <= ?4)
-                 ORDER BY timestamp",
-            )?;
-            // A workout can cross local midnight. Its actual time window must
-            // not be clipped to the calendar day on which it started.
-            let day_bounds = if single_workout {
-                None
-            } else {
-                local_day_range_utc_bounds(&start_text, &end_text)
-            };
-            let (day_lower, day_upper) = match &day_bounds {
-                Some((lower, upper)) => (Some(lower.as_str()), Some(upper.as_str())),
-                None => (None, None),
-            };
-            let rows = stmt.query_map(
-                params![
-                    start_text,
-                    end_text,
-                    window_start,
-                    window_end,
-                    day_lower,
-                    day_upper
-                ],
-                |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, String>(1)?,
-                        row.get::<_, f64>(2)?,
-                        row.get::<_, String>(3)?,
-                        row.get::<_, String>(4)?,
-                        row.get::<_, Option<String>>(5)?,
-                    ))
-                },
-            )?;
+                 WHERE {where_tail}
+                 ORDER BY timestamp"
+            ))?;
+            let (utc_lower, utc_upper) = utc_bounds_or_unbounded(&start_text, &end_text);
+            let mut bindings: Vec<&dyn rusqlite::ToSql> =
+                Vec::with_capacity(sample_metric_names.len() + 4);
+            for name in &sample_metric_names {
+                bindings.push(name);
+            }
+            match &workout_window {
+                Some((started_at, ended_at)) => {
+                    bindings.push(started_at);
+                    bindings.push(ended_at);
+                }
+                None => {
+                    bindings.push(&utc_lower);
+                    bindings.push(&utc_upper);
+                    bindings.push(&start_text);
+                    bindings.push(&end_text);
+                }
+            }
+            let rows = stmt.query_map(bindings.as_slice(), |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, f64>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, Option<String>>(5)?,
+                ))
+            })?;
             let mut buckets: BTreeMap<(String, String, String), HourBucket> = BTreeMap::new();
             for row in rows {
                 let (metric, timestamp, value, unit, source_scope, device_id) = row?;
-                let matched_type = if selected.contains(&metric) {
-                    Some(metric.clone())
-                } else if metric.contains("spo2") && selected.contains("spo2") {
-                    Some("spo2".to_string())
-                } else if metric.contains("stress") && selected.contains("stress") {
-                    Some("stress".to_string())
-                } else if metric.starts_with("respiratory") && selected.contains("respiratory_rate")
-                {
-                    Some("respiratory_rate".to_string())
-                } else if metric == "hrv_rmssd" && selected.contains("hrv_rmssd") {
-                    Some("hrv_rmssd".to_string())
-                } else if selected.contains("weight")
-                    && BODY_COMPOSITION_METRICS.contains(&metric.as_str())
-                {
-                    Some("weight".to_string())
-                } else {
-                    None
-                };
-                let Some(matched_type) = matched_type else {
+                // 行级归型与 IN 列表的展开是同一个映射；单条运动时日级
+                // 类型的指标名根本没进 IN 列表，这里无需再判一次。
+                let Some(matched_type) = export_sample_matched_type(&metric, &selected) else {
                     continue;
                 };
-                if single_workout && DAY_LEVEL_TYPES.contains(&matched_type.as_str()) {
-                    continue;
-                }
                 *produced.entry(matched_type.clone()).or_default() += 1;
                 let device_label = devices.label(device_id.as_deref());
                 if !full && HOURLY_AGGREGATED_METRICS.contains(&metric.as_str()) {
@@ -5324,6 +5381,9 @@ impl Database {
 
         let mut workouts = Vec::new();
         if selected.contains("workouts") {
+            // start_time 的 UTC 宽限界走 v33 的 idx_workouts_start；date()
+            // 仍是本地日的精修谓词。
+            let (utc_lower, utc_upper) = utc_bounds_or_unbounded(&start_text, &end_text);
             let mut stmt = self.conn.prepare(
                 "SELECT workout_id, workout_type, start_time, end_time,
                         distance_meters, calories, avg_hr, max_hr,
@@ -5335,44 +5395,48 @@ impl Database {
                         training_effect, anaerobic_training_effect, rpe,
                         avg_cadence_spm, max_cadence_spm, avg_stride_cm
                  FROM workouts
-                 WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2
+                 WHERE start_time >= ?4 AND start_time < ?5
+                   AND date(start_time, 'localtime') BETWEEN ?1 AND ?2
                    AND (?3 IS NULL OR workout_id = ?3)
                  ORDER BY start_time",
             )?;
-            let rows = stmt.query_map(params![start_text, end_text, workout_filter], |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, String>(1)?,
-                    row.get::<_, String>(2)?,
-                    row.get::<_, String>(3)?,
-                    row.get::<_, Option<f64>>(4)?,
-                    row.get::<_, Option<i32>>(5)?,
-                    row.get::<_, Option<i32>>(6)?,
-                    row.get::<_, Option<i32>>(7)?,
-                    row.get::<_, Option<f64>>(8)?,
-                    row.get::<_, Option<f64>>(9)?,
-                    row.get::<_, String>(10)?,
-                    row.get::<_, Option<String>>(11)?,
-                    row.get::<_, Option<i32>>(12)?,
-                    row.get::<_, String>(13)?,
-                    row.get::<_, Option<String>>(14)?,
-                    (
-                        row.get::<_, Option<i32>>(15)?,
-                        row.get::<_, Option<i32>>(16)?,
-                        row.get::<_, Option<i64>>(17)?,
-                        row.get::<_, Option<f64>>(18)?,
-                        row.get::<_, Option<f64>>(19)?,
-                        row.get::<_, Option<f64>>(20)?,
-                        row.get::<_, Option<f64>>(21)?,
-                        row.get::<_, Option<f64>>(22)?,
-                        row.get::<_, Option<f64>>(23)?,
-                        row.get::<_, Option<i32>>(24)?,
-                        row.get::<_, Option<f64>>(25)?,
-                        row.get::<_, Option<f64>>(26)?,
-                        row.get::<_, Option<f64>>(27)?,
-                    ),
-                ))
-            })?;
+            let rows = stmt.query_map(
+                params![start_text, end_text, workout_filter, utc_lower, utc_upper],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, String>(3)?,
+                        row.get::<_, Option<f64>>(4)?,
+                        row.get::<_, Option<i32>>(5)?,
+                        row.get::<_, Option<i32>>(6)?,
+                        row.get::<_, Option<i32>>(7)?,
+                        row.get::<_, Option<f64>>(8)?,
+                        row.get::<_, Option<f64>>(9)?,
+                        row.get::<_, String>(10)?,
+                        row.get::<_, Option<String>>(11)?,
+                        row.get::<_, Option<i32>>(12)?,
+                        row.get::<_, String>(13)?,
+                        row.get::<_, Option<String>>(14)?,
+                        (
+                            row.get::<_, Option<i32>>(15)?,
+                            row.get::<_, Option<i32>>(16)?,
+                            row.get::<_, Option<i64>>(17)?,
+                            row.get::<_, Option<f64>>(18)?,
+                            row.get::<_, Option<f64>>(19)?,
+                            row.get::<_, Option<f64>>(20)?,
+                            row.get::<_, Option<f64>>(21)?,
+                            row.get::<_, Option<f64>>(22)?,
+                            row.get::<_, Option<f64>>(23)?,
+                            row.get::<_, Option<i32>>(24)?,
+                            row.get::<_, Option<f64>>(25)?,
+                            row.get::<_, Option<f64>>(26)?,
+                            row.get::<_, Option<f64>>(27)?,
+                        ),
+                    ))
+                },
+            )?;
             for row in rows {
                 let (
                     workout_id,
@@ -5499,7 +5563,7 @@ impl Database {
                 let count = produced.get(selected_type).copied().unwrap_or(0);
                 // 单条运动范围下被排除的日级数据流：必须说清是「范围之外」，
                 // 而不是让它看起来像「这段时间没有数据」。
-                if single_workout && DAY_LEVEL_TYPES.contains(&selected_type.as_str()) {
+                if single_workout && EXPORT_DAY_LEVEL_TYPES.contains(&selected_type.as_str()) {
                     return (
                         selected_type.clone(),
                         serde_json::json!({
@@ -5629,18 +5693,6 @@ impl Database {
 
     /// COUNT/SUM the export without building JSON.
     pub fn estimate_ai_export(&self, selection: &ExportSelection) -> Result<ExportEstimate> {
-        const DAY_LEVEL_TYPES: [&str; 10] = [
-            "sleep",
-            "steps",
-            "daily_activity",
-            "recovery",
-            "training_load",
-            "vo2max",
-            "lactate_threshold",
-            "pai",
-            "weight",
-            "food",
-        ];
         const ENVELOPE_BYTES: u64 = 2_048;
         let scope = selection
             .resolve_scope()
@@ -5706,80 +5758,56 @@ impl Database {
             || selected.contains("spo2")
             || selected.contains("stress")
             || selected.contains("weight");
-        if need_samples {
-            let (window_start, window_end) = match &workout_window {
-                Some((started_at, ended_at)) => {
-                    (Some(started_at.as_str()), Some(ended_at.as_str()))
-                }
-                None => (None, None),
-            };
-            let day_bounds = if single_workout {
-                None
-            } else {
-                local_day_range_utc_bounds(&start_text, &end_text)
-            };
-            let (day_lower, day_upper) = match &day_bounds {
-                Some((lower, upper)) => (Some(lower.as_str()), Some(upper.as_str())),
-                None => (None, None),
-            };
-            let mut stmt = self.conn.prepare(
+        // 与 build_ai_export 同一条链路：选中类型先映回库里的指标名，
+        // `metric IN (...)` + 时间界让 uq_metric_sample_key 切成索引区间。
+        let sample_metric_names = if need_samples {
+            self.export_sample_metric_names(&selected, single_workout)?
+        } else {
+            Vec::new()
+        };
+        if !sample_metric_names.is_empty() {
+            let where_tail =
+                ai_export_samples_where_tail(sample_metric_names.len(), single_workout);
+            let mut stmt = self.conn.prepare(&format!(
                 "SELECT metric,
                         COUNT(*),
                         COUNT(DISTINCT strftime('%Y-%m-%dT%H', timestamp)),
                         COALESCE(SUM(LENGTH(metric) + LENGTH(timestamp) + LENGTH(unit)
                                      + LENGTH(source_scope) + 48), 0)
                  FROM metric_samples
-                 WHERE (?5 IS NULL OR timestamp >= ?5)
-                   AND (?6 IS NULL OR timestamp < ?6)
-                   AND (?3 IS NOT NULL OR date(timestamp, 'localtime') BETWEEN ?1 AND ?2)
-                   AND (?3 IS NULL OR timestamp >= ?3)
-                   AND (?4 IS NULL OR timestamp <= ?4)
-                 GROUP BY metric",
-            )?;
-            let rows = stmt.query_map(
-                params![
-                    start_text,
-                    end_text,
-                    window_start,
-                    window_end,
-                    day_lower,
-                    day_upper
-                ],
-                |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, i64>(1)?,
-                        row.get::<_, i64>(2)?,
-                        row.get::<_, i64>(3)?,
-                    ))
-                },
-            )?;
+                 WHERE {where_tail}
+                 GROUP BY metric"
+            ))?;
+            let (utc_lower, utc_upper) = utc_bounds_or_unbounded(&start_text, &end_text);
+            let mut bindings: Vec<&dyn rusqlite::ToSql> =
+                Vec::with_capacity(sample_metric_names.len() + 4);
+            for name in &sample_metric_names {
+                bindings.push(name);
+            }
+            match &workout_window {
+                Some((started_at, ended_at)) => {
+                    bindings.push(started_at);
+                    bindings.push(ended_at);
+                }
+                None => {
+                    bindings.push(&utc_lower);
+                    bindings.push(&utc_upper);
+                    bindings.push(&start_text);
+                    bindings.push(&end_text);
+                }
+            }
+            let rows = stmt.query_map(bindings.as_slice(), |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, i64>(3)?,
+                ))
+            })?;
             for row in rows {
                 let (metric, count, hours, bytes) = row?;
-                let matched_type = if selected.contains(&metric) {
-                    Some(metric.clone())
-                } else if metric.contains("spo2") && selected.contains("spo2") {
-                    Some("spo2".to_string())
-                } else if metric.contains("stress") && selected.contains("stress") {
-                    Some("stress".to_string())
-                } else if metric.starts_with("respiratory") && selected.contains("respiratory_rate")
-                {
-                    Some("respiratory_rate".to_string())
-                } else if metric == "hrv_rmssd" && selected.contains("hrv_rmssd") {
-                    Some("hrv_rmssd".to_string())
-                } else if selected.contains("weight")
-                    && BODY_COMPOSITION_METRICS.contains(&metric.as_str())
-                {
-                    Some("weight".to_string())
-                } else {
-                    None
-                };
-                let Some(matched_type) = matched_type else {
-                    continue;
-                };
-                if single_workout && DAY_LEVEL_TYPES.contains(&matched_type.as_str()) {
-                    continue;
-                }
+                // 行级归型与 IN 列表的展开是同一个映射，能查到这里的行
+                // 一定属于某个选中类型（日级类型也没进 IN 列表），无需再判。
                 if !full && HOURLY_AGGREGATED_METRICS.contains(&metric.as_str()) {
                     record_count += hours.max(0) as usize;
                     estimated_bytes += (hours.max(0) as u64).saturating_mul(120);
@@ -5838,11 +5866,15 @@ impl Database {
         }
 
         if selected.contains("workouts") {
+            // start_time 的 UTC 宽限界走 v33 的 idx_workouts_start；date()
+            // 仍是本地日的精修谓词。
+            let (utc_lower, utc_upper) = utc_bounds_or_unbounded(&start_text, &end_text);
             let count: i64 = self.conn.query_row(
                 "SELECT COUNT(*) FROM workouts
-                 WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2
+                 WHERE start_time >= ?4 AND start_time < ?5
+                   AND date(start_time, 'localtime') BETWEEN ?1 AND ?2
                    AND (?3 IS NULL OR workout_id = ?3)",
-                params![start_text, end_text, workout_filter],
+                params![start_text, end_text, workout_filter, utc_lower, utc_upper],
                 |row| row.get(0),
             )?;
             record_count += count.max(0) as usize;
@@ -5852,20 +5884,22 @@ impl Database {
                     "SELECT COUNT(*) FROM workout_samples
                      WHERE workout_id IN (
                          SELECT workout_id FROM workouts
-                         WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2
+                         WHERE start_time >= ?4 AND start_time < ?5
+                           AND date(start_time, 'localtime') BETWEEN ?1 AND ?2
                            AND (?3 IS NULL OR workout_id = ?3)
                      )",
-                    params![start_text, end_text, workout_filter],
+                    params![start_text, end_text, workout_filter, utc_lower, utc_upper],
                     |row| row.get(0),
                 )?;
                 let route: i64 = self.conn.query_row(
                     "SELECT COUNT(*) FROM route_points
                      WHERE workout_id IN (
                          SELECT workout_id FROM workouts
-                         WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2
+                         WHERE start_time >= ?4 AND start_time < ?5
+                           AND date(start_time, 'localtime') BETWEEN ?1 AND ?2
                            AND (?3 IS NULL OR workout_id = ?3)
                      )",
-                    params![start_text, end_text, workout_filter],
+                    params![start_text, end_text, workout_filter, utc_lower, utc_upper],
                     |row| row.get(0),
                 )?;
                 estimated_bytes += (samples.max(0) as u64).saturating_mul(90);
@@ -6725,6 +6759,74 @@ pub(crate) fn local_day_range_utc_bounds(start: &str, end: &str) -> Option<(Stri
     Some((lower, upper))
 }
 
+/// `local_day_range_utc_bounds` 的调用方兜底：这些地方的日期早已按
+/// NaiveDate 验证过，界算不出来只可能是程序内部错误——但即便如此也不能
+/// 让查询缩成空集。退回一个什么都挡不住的界，精修谓词继续兜底，
+/// 代价只是退回全表扫而不是悄悄少给数据。
+fn utc_bounds_or_unbounded(start: &str, end: &str) -> (String, String) {
+    local_day_range_utc_bounds(start, end)
+        .unwrap_or_else(|| ("0000-01-01".to_string(), "9999-12-31".to_string()))
+}
+
+/// 存储时间戳 → 本机日历日，与 SQLite `date(x, 'localtime')` 同一条规则。
+/// 解析不出的行返回 None——以前这类行会被 date() 折成 NULL 而不参与
+/// MIN/MAX，这里是同一语义。
+fn local_day_of_stored(value: &str) -> Option<String> {
+    DateTime::parse_from_rfc3339(value)
+        .ok()
+        .map(|dt| dt.with_timezone(&Local).format("%Y-%m-%d").to_string())
+}
+
+/// 勾选的导出类型 → 这条 `metric_samples` 记到哪个类型下。
+///
+/// 类型是用户的词（"spo2"），库里的指标名是手表的词（"spo2_apnea_low"）。
+/// 这张映射服务两个方向：导出时给每条样本归型，以及反向把选中类型展开
+/// 成 `metric IN (...)`，让样本查询走 (metric, timestamp) 索引。
+fn export_sample_matched_type(metric: &str, selected: &BTreeSet<String>) -> Option<String> {
+    if selected.contains(metric) {
+        Some(metric.to_string())
+    } else if metric.contains("spo2") && selected.contains("spo2") {
+        Some("spo2".to_string())
+    } else if metric.contains("stress") && selected.contains("stress") {
+        Some("stress".to_string())
+    } else if metric.starts_with("respiratory") && selected.contains("respiratory_rate") {
+        Some("respiratory_rate".to_string())
+    } else if metric == "hrv_rmssd" && selected.contains("hrv_rmssd") {
+        Some("hrv_rmssd".to_string())
+    } else if selected.contains("weight") && BODY_COMPOSITION_METRICS.contains(&metric) {
+        Some("weight".to_string())
+    } else {
+        None
+    }
+}
+
+/// `build_ai_export` / `estimate_ai_export` 共用的 WHERE 尾巴。
+///
+/// `metric IN` 是让 uq_metric_sample_key（前导列 metric）生效的关键：
+/// 之前 WHERE 只带时间界，metric 谓词缺位，每次导出都是全表扫。参数排在
+/// IN 列表之后：单条运动取它的真实起止（运动可以跨过本地零点，右端
+/// 用 `<=`），日期区间用 UTC 宽限界收敛、再以本地日谓词精修。
+fn ai_export_samples_where_tail(metric_count: usize, single_workout: bool) -> String {
+    debug_assert!(metric_count > 0);
+    let in_list = (1..=metric_count)
+        .map(|index| format!("?{index}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let lower = metric_count + 1;
+    let upper = metric_count + 2;
+    if single_workout {
+        format!("metric IN ({in_list}) AND timestamp >= ?{lower} AND timestamp <= ?{upper}")
+    } else {
+        let day_start = metric_count + 3;
+        let day_end = metric_count + 4;
+        format!(
+            "metric IN ({in_list})
+               AND timestamp >= ?{lower} AND timestamp < ?{upper}
+               AND date(timestamp, 'localtime') BETWEEN ?{day_start} AND ?{day_end}"
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -7334,23 +7436,39 @@ mod tests {
         std::fs::copy(&source, &path).expect("复制旧库");
 
         // 升级前先记下几张关键表的行数。升级只应当增加结构，不应当减少事实。
+        // daily_metrics 是例外：v4 规范键去重、v30 清 readiness 哨兵行，都是
+        // 有意删除，所以对它比对「不同事实键」而不是裸行数。
         let before = {
             let conn = Connection::open(&path).unwrap();
             let version: i64 = conn
                 .query_row("PRAGMA user_version", [], |row| row.get(0))
                 .unwrap();
-            let counts: Vec<(String, i64)> =
-                ["raw_records", "workouts", "daily_metrics", "metric_samples"]
-                    .iter()
-                    .filter_map(|table| {
-                        conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
-                            row.get::<_, i64>(0)
-                        })
-                        .ok()
-                        .map(|count| ((*table).to_string(), count))
+            let counts: Vec<(String, i64)> = ["raw_records", "workouts", "metric_samples"]
+                .iter()
+                .filter_map(|table| {
+                    conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+                        row.get::<_, i64>(0)
                     })
-                    .collect();
-            (version, counts)
+                    .ok()
+                    .map(|count| ((*table).to_string(), count))
+                })
+                .collect();
+            let daily_keys: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM (
+                        SELECT DISTINCT date, metric, unit, source_scope,
+                            COALESCE(device_id, '')
+                        FROM daily_metrics
+                        WHERE NOT (value = 255 AND metric IN (
+                            'readiness', 'physical_readiness', 'mental_readiness',
+                            'hrv_readiness', 'rhr_readiness', 'skin_temp_readiness',
+                            'afib_readiness', 'ahi_readiness'))
+                    )",
+                    [],
+                    |row| row.get(0),
+                )
+                .unwrap_or(0);
+            (version, counts, daily_keys)
         };
         assert!(
             before.0 < CURRENT_SCHEMA_VERSION,
@@ -7376,6 +7494,28 @@ mod tests {
                 "{table} 从 {count} 掉到了 {after}——升级不该让事实变少"
             );
         }
+        let daily_keys_after: i64 = db
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM (
+                    SELECT DISTINCT date, metric, unit, source_scope,
+                        COALESCE(device_id, '')
+                    FROM daily_metrics
+                    WHERE NOT (value = 255 AND metric IN (
+                        'readiness', 'physical_readiness', 'mental_readiness',
+                        'hrv_readiness', 'rhr_readiness', 'skin_temp_readiness',
+                        'afib_readiness', 'ahi_readiness'))
+                )",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
+        assert!(
+            daily_keys_after >= before.2,
+            "daily_metrics 的不同事实键从 {} 掉到了 {}——升级不该丢事实",
+            before.2,
+            daily_keys_after
+        );
 
         // 升级前必须留下一份可用的备份，否则「升级失败可以退回去」是空话。
         let backups = backup::list_backups(&dir).expect("读备份清单");
@@ -9838,7 +9978,7 @@ mod tests {
             .query_row("PRAGMA user_version", [], |row| row.get(0))
             .unwrap();
         assert_eq!(version, CURRENT_SCHEMA_VERSION);
-        assert_eq!(CURRENT_SCHEMA_VERSION, 32);
+        assert_eq!(CURRENT_SCHEMA_VERSION, 33);
 
         let start = ts();
         db.insert_sleep_session(&SleepSession {
@@ -10278,6 +10418,258 @@ mod tests {
             "estimate should stay in the same order of magnitude as the JSON"
         );
         assert!(!encoded.is_empty());
+    }
+
+    /// H1 回归守护：样本查询必须走 uq_metric_sample_key，而不是全表扫。
+    /// 哪天把 `metric IN` 改丢了，这里立刻红——两种 scope 形态都要查。
+    #[test]
+    fn ai_export_samples_where_tail_seeks_the_metric_timestamp_index() {
+        let db = Database::in_memory().unwrap();
+        for single_workout in [false, true] {
+            let tail = ai_export_samples_where_tail(3, single_workout);
+            let mut stmt = db
+                .conn
+                .prepare(&format!(
+                    "EXPLAIN QUERY PLAN SELECT metric FROM metric_samples WHERE {tail}"
+                ))
+                .unwrap();
+            // EXPLAIN 也要把参数绑齐（workout 形态 3+2 个，日期区间 3+4
+            // 个）；值本身不影响计划形状。
+            let dummies = vec!["x"; if single_workout { 5 } else { 7 }];
+            let plan = stmt
+                .query_map(rusqlite::params_from_iter(dummies.iter()), |row| {
+                    row.get::<_, String>(3)
+                })
+                .unwrap()
+                .collect::<std::result::Result<Vec<_>, _>>()
+                .unwrap()
+                .join("\n");
+            assert!(
+                plan.contains("SEARCH metric_samples"),
+                "single_workout={single_workout} 必须走索引:\n{plan}"
+            );
+            assert!(
+                plan.contains("uq_metric_sample_key"),
+                "single_workout={single_workout} 应当用 uq 前导列:\n{plan}"
+            );
+            assert!(
+                !plan.contains("SCAN metric_samples"),
+                "single_workout={single_workout} 不允许全表扫:\n{plan}"
+            );
+        }
+    }
+
+    /// 选中类型 → 库里的指标名：这正是让 `metric IN` 成立的反向展开。
+    /// 展开错了，导出要么少给数据、要么把没选中的指标扫进来。
+    #[test]
+    fn export_sample_metric_names_maps_selected_types_to_stored_metrics() {
+        let db = Database::in_memory().unwrap();
+        for metric in [
+            "heart_rate",
+            "spo2",
+            "spo2_apnea_low",
+            "weight",
+            "bmi",
+            "unrelated_reading",
+        ] {
+            db.insert_metric_sample(&MetricSample {
+                metric: metric.into(),
+                timestamp: ts(),
+                value: 1.0,
+                unit: "u".into(),
+                source_scope: SourceScope::Device,
+                device_id: None,
+            })
+            .unwrap();
+        }
+        let selected: BTreeSet<String> = ["spo2", "weight"]
+            .iter()
+            .map(|value| value.to_string())
+            .collect();
+        // spo2 家族 + 全部体组成指标；ORDER BY metric 保证顺序稳定。
+        let names = db.export_sample_metric_names(&selected, false).unwrap();
+        assert_eq!(names, vec!["bmi", "spo2", "spo2_apnea_low", "weight"]);
+        // 单条运动范围：weight 是日级类型被排除，spo2 不是。
+        let names = db.export_sample_metric_names(&selected, true).unwrap();
+        assert_eq!(names, vec!["spo2", "spo2_apnea_low"]);
+        // 选中的类型在库里没有任何对应指标 → 空列表 → 主查询整条跳过。
+        let selected: BTreeSet<String> = ["stress"].iter().map(|v| v.to_string()).collect();
+        assert!(db
+            .export_sample_metric_names(&selected, false)
+            .unwrap()
+            .is_empty());
+    }
+
+    /// 端到端：导出只读到选中类型映得到的指标，没选中的一行不进。
+    #[test]
+    fn ai_export_reads_only_the_metrics_the_selection_maps_to() {
+        let db = Database::in_memory().unwrap();
+        for (metric, value) in [("heart_rate", 60.0), ("spo2", 97.0), ("unrelated", 1.0)] {
+            db.insert_metric_sample(&MetricSample {
+                metric: metric.into(),
+                timestamp: ts(),
+                value,
+                unit: "u".into(),
+                source_scope: SourceScope::Device,
+                device_id: None,
+            })
+            .unwrap();
+        }
+        let export = parsed_export(&db, &["heart_rate"], ExportDetail::Full);
+        let samples = export["data"]["metric_samples"].as_array().unwrap();
+        assert_eq!(samples.len(), 1);
+        assert_eq!(samples[0]["metric"], "heart_rate");
+        assert_eq!(export["record_count"], 1);
+    }
+
+    /// 宽限界是「超集」不是「替代」：UTC 日期与本地日期不同的样本不能被
+    /// 界误伤，窗口外的样本仍要被 date() 精修挡住。
+    #[test]
+    fn daily_heart_rate_extremes_keeps_local_day_semantics_with_utc_bounds() {
+        let db = Database::in_memory().unwrap();
+        let today = Local::now().date_naive();
+        let local_at = |day: NaiveDate, hour: u32, minute: u32| {
+            Local
+                .from_local_datetime(&day.and_hms_opt(hour, minute, 0).unwrap())
+                .single()
+                .unwrap()
+                .with_timezone(&Utc)
+        };
+        // 本地 00:30：UTC 日期可能落在前一天，宽限界必须把它留在里面。
+        let inside = local_at(today, 0, 30);
+        let outside = local_at(today - Duration::days(31), 23, 30);
+        for (when, value) in [(inside, 70.0), (outside, 99.0)] {
+            db.insert_metric_sample(&MetricSample {
+                metric: "heart_rate".into(),
+                timestamp: when,
+                value,
+                unit: "bpm".into(),
+                source_scope: SourceScope::Device,
+                device_id: None,
+            })
+            .unwrap();
+        }
+        let extremes = db.daily_heart_rate_extremes(30).unwrap();
+        assert_eq!(extremes.len(), 1, "窗口外的样本不许混进来");
+        assert_eq!(extremes[0].date, today.format("%Y-%m-%d").to_string());
+        assert_eq!(extremes[0].samples, 1);
+        assert_eq!(extremes[0].max, 70);
+    }
+
+    /// 覆盖边界报的是**本地日**：原始列的 MIN/MAX 换算和逐行 date() 必须
+    /// 是同一天，否则时区不为零的机器会把边界报错一天。
+    #[test]
+    fn local_coverage_reports_the_local_day_of_raw_bounds() {
+        let db = Database::in_memory().unwrap();
+        // 本地 2026-03-02 00:30 —— 在非零时区机器上 UTC 日期是 03-01。
+        let when = Local
+            .from_local_datetime(
+                &NaiveDate::from_ymd_opt(2026, 3, 2)
+                    .unwrap()
+                    .and_hms_opt(0, 30, 0)
+                    .unwrap(),
+            )
+            .single()
+            .unwrap()
+            .with_timezone(&Utc);
+        db.insert_metric_sample(&MetricSample {
+            metric: "heart_rate".into(),
+            timestamp: when,
+            value: 60.0,
+            unit: "bpm".into(),
+            source_scope: SourceScope::Device,
+            device_id: None,
+        })
+        .unwrap();
+        let coverage = db
+            .local_coverage(NaiveDate::from_ymd_opt(2026, 6, 15).unwrap())
+            .unwrap();
+        assert_eq!(coverage.earliest_day.as_deref(), Some("2026-03-02"));
+        assert_eq!(coverage.latest_day.as_deref(), Some("2026-03-02"));
+    }
+
+    /// overview_metadata 的覆盖与流计数拆开后语义不变：本地日边界取并集，
+    /// stream / source_scope 的 DISTINCT 照旧。
+    #[test]
+    fn health_overview_coverage_uses_local_days_and_table_union() {
+        let db = Database::in_memory().unwrap();
+        db.conn
+            .execute(
+                "INSERT INTO daily_metrics (date, metric, value, unit, source_scope)
+                 VALUES ('2026-06-10', 'steps', 1000.0, 'count', 'user_fused')",
+                [],
+            )
+            .unwrap();
+        let local_at = |hour: u32| {
+            Local
+                .from_local_datetime(
+                    &NaiveDate::from_ymd_opt(2026, 3, 2)
+                        .unwrap()
+                        .and_hms_opt(hour, 0, 0)
+                        .unwrap(),
+                )
+                .single()
+                .unwrap()
+                .with_timezone(&Utc)
+        };
+        db.insert_workout(&Workout {
+            workout_id: "w-coverage".into(),
+            start_time: local_at(7),
+            end_time: local_at(8),
+            ..workout_with_type(None, "run", "string_field")
+        })
+        .unwrap();
+        let overview = db.get_health_overview().unwrap();
+        let coverage = overview.coverage.expect("有数据就要报覆盖");
+        assert_eq!(coverage.start, "2026-03-02");
+        assert_eq!(coverage.end, "2026-06-10");
+        assert_eq!(coverage.days, 101);
+        // metric_samples 空 + daily_summary + workouts：两条流。
+        assert_eq!(coverage.streams, 2);
+    }
+
+    /// v33：两个新索引落库、workouts 本地日范围能走 idx_workouts_start，
+    /// 迁移再跑一遍幂等。
+    #[test]
+    fn v33_adds_start_and_mcp_indexes_idempotently() {
+        let db = Database::in_memory().unwrap();
+        let found: i64 = db
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master
+                 WHERE type = 'index'
+                   AND name IN ('idx_workouts_start', 'idx_ai_tasks_mcp')",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(found, 2);
+        let mut stmt = db
+            .conn
+            .prepare(
+                "EXPLAIN QUERY PLAN
+                 SELECT workout_id FROM workouts
+                 WHERE start_time >= '2026-01-01' AND start_time < '2026-02-01'
+                   AND date(start_time, 'localtime') BETWEEN '2026-01-02' AND '2026-01-30'",
+            )
+            .unwrap();
+        let plan = stmt
+            .query_map([], |row| row.get::<_, String>(3))
+            .unwrap()
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .unwrap()
+            .join("\n");
+        assert!(
+            plan.contains("SEARCH workouts"),
+            "本地日范围必须走索引:\n{plan}"
+        );
+        assert!(plan.contains("idx_workouts_start"), "{plan}");
+        db.migrate().unwrap();
+        let version: i64 = db
+            .conn
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, CURRENT_SCHEMA_VERSION);
     }
 
     #[test]

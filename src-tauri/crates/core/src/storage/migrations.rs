@@ -1072,6 +1072,24 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(32, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // v33：补上「查询写法能走索引、索引却不存在」的两条边。
+        //
+        // workouts 的本地日范围筛选在配上 `start_time >= ? AND < ?` 宽限界
+        // 之后落在 start_time 上（列表 `ORDER BY start_time` 同样受益）；
+        // 以前没有索引，每一次范围查询和排序都是全表扫。ai_tasks 的
+        // `WHERE mcp_shared = 1` 是 MCP 授权路径每次请求都要跑的过滤。
+        // 两条都是 CREATE IF NOT EXISTS，幂等重跑，不动任何已发布 DDL。
+        self.conn.execute_batch(
+            "CREATE INDEX IF NOT EXISTS idx_workouts_start
+                 ON workouts(start_time);
+             CREATE INDEX IF NOT EXISTS idx_ai_tasks_mcp
+                 ON ai_tasks(mcp_shared);
+             PRAGMA user_version = 33;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(33, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }
