@@ -10,14 +10,26 @@ import { defineMessages, locale, messagesOf, type Locale } from '../i18n';
  * CLI / MCP 用的，不该跟着界面语言变。界面拿到那份列表之后，**按 key 自己
  * 查名字**，不用后端发来的 label。
  */
+const enCatalogLabels = new Map(
+  workoutCatalog.sports.map((sport) => [sport.key, sport.label_en]),
+);
 const catalogLabels: Record<Locale, Map<string, string>> = {
   zh: new Map(workoutCatalog.sports.map((sport) => [sport.key, sport.label_zh])),
-  en: new Map(workoutCatalog.sports.map((sport) => [sport.key, sport.label_en])),
+  en: enCatalogLabels,
   // 目录里还没有西语名的运动先用英文名。
   es: new Map(workoutCatalog.sports.map((sport) => [
     sport.key,
     (sport as { label_es?: string }).label_es ?? sport.label_en,
   ])),
+  // 随包目录只有 zh/en/es 三语运动名（catalog.json 是后端共享的生成物）；
+  // 七种语言包语言先给英文名。界面 fallback 树仍走各自语言包覆盖。
+  nl: enCatalogLabels,
+  'pt-BR': enCatalogLabels,
+  'pt-PT': enCatalogLabels,
+  de: enCatalogLabels,
+  ru: enCatalogLabels,
+  'hi-IN': enCatalogLabels,
+  fr: enCatalogLabels,
 };
 
 const messages = defineMessages(

@@ -1217,4 +1217,6 @@ Si necesitas algo de mí (qué cliente uso, dónde está el archivo), pregúntam
       other: { label: 'Otra cosa', hint: 'descríbelo abajo' },
     },
   },
+  // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
+  'views/Settings',
 );

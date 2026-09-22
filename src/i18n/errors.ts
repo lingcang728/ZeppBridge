@@ -498,6 +498,9 @@ const messages = defineMessages(
     'err.update.portable_windows_only': 'La migración de portable a instalada solo existe en Windows',
     'err.update.unsafe_data_location': 'Se detuvo la instalación porque no se pudo verificar que la carpeta de datos se conserve tras actualizar. Cierra ZeppBridge, copia la carpeta data del paquete de la app a Application Support de tu usuario y corrige ZEPPBRIDGE_DATA_DIR antes de reintentar. Conserva los datos originales.',
   },
+  // 七种新语言的错误文案不往这里塞：语言包 `errors:` 节（即
+  // modules['i18n/errors']）按码覆盖，缺的码回落英文、再回落中文原文。
+  'i18n/errors',
 );
 
 /** 按错误码取当前界面语言的文案。没有这个码就返回 `undefined`。 */

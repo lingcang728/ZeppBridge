@@ -1,0 +1,11 @@
+# 「和英文逐字节相同」豁免清单。
+#
+# 规则：任何非英语语言包里，某个叶子和 en 那份一字不差时，i18n:check 会拦下——
+# 那几乎总是「忘了翻」。但有些东西本来就不该翻：品牌名（ZeppBridge、Zepp、
+# Amazfit）、单位（kg、bpm、/km）、URL。把这些叶子的 `moduleId.键路径` 登记在
+# 这里，一行一条；`#` 开头是注释。
+#
+# 格式与 pending.txt 相同：`moduleId.键路径`。
+#
+# 例：
+# lib/labels.fallbackNameZepp
