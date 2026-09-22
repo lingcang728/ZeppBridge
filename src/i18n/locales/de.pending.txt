@@ -431,6 +431,14 @@ composables/useSyncController.timeUnknown
 composables/useSyncController.updated
 composables/useSyncController.updatedWithLatest
 composables/useSyncController.verifyFirst
+i18n/errors.err.ai_task.attachment_missing
+i18n/errors.err.ai_task.invalid
+i18n/errors.err.ai_task.not_found
+i18n/errors.err.ai_task.workout_not_found
+i18n/errors.err.ai_task.write_failed
+i18n/errors.err.ai_template.builtin_readonly
+i18n/errors.err.ai_template.invalid
+i18n/errors.err.ai_template.not_found
 i18n/errors.err.auth.sync_init_failed
 i18n/errors.err.auth.verify_failed
 i18n/errors.err.auth.verify_needs_reauth
@@ -522,6 +530,8 @@ i18n/errors.err.login.verifying
 i18n/errors.err.login.waiting
 i18n/errors.err.login.window_busy
 i18n/errors.err.login.window_failed
+i18n/errors.err.mcp.scope_denied
+i18n/errors.err.mcp.scope_no_grants
 i18n/errors.err.prefs.retention_out_of_range
 i18n/errors.err.storage.worker_failed
 i18n/errors.err.storage.write_busy
