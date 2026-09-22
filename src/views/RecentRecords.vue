@@ -157,9 +157,12 @@ const loadRecent = async () => {
     error.value = t.value.desktopOnly;
     return;
   }
+  /* 各取最近 150 条：这一页是「最近」而不是全集，完整历史在 /sleep 与
+     /workouts（那里有分页，见 getSleepPage）。以前各 500 条，一次 IPC
+     序列化近千条记录只为填一个滚动列，首屏代价大于价值。 */
   const [sleep, workouts] = await Promise.allSettled([
-    tauriApi.getRecentSleep(500),
-    tauriApi.getRecentWorkouts(500),
+    tauriApi.getRecentSleep(150),
+    tauriApi.getRecentWorkouts(150),
   ]);
   if (!loadSeq.isCurrent(seq)) return;
   recentSleep.value = sleep.status === 'fulfilled' ? sleep.value : [];

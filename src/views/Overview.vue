@@ -3,14 +3,13 @@ import LifeEventsPanel from '../components/LifeEventsPanel.vue';
 import LifeEventShortcut from '../components/LifeEventShortcut.vue';
 
 defineOptions({ name: 'Overview' });
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, defineAsyncComponent, h, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import CoverageNotice from '../components/CoverageNotice.vue';
 import DesignIcon from '../components/DesignIcon.vue';
 import Icon from '../components/Icon.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import WeeklyReportCard from '../components/WeeklyReportCard.vue';
-import HeartRateCard from '../components/overview/HeartRateCard.vue';
 import RecentCard from '../components/overview/RecentCard.vue';
 import SleepCard from '../components/overview/SleepCard.vue';
 import SourcesStrip from '../components/overview/SourcesStrip.vue';
@@ -27,6 +26,16 @@ import { indexSeries, latestValue } from '../lib/metricSeries';
 import { formatMetric, isFiniteNumber } from '../lib/format';
 import type { HealthOverview, HeartRatePoint, MetricSeries, SleepSession, Workout } from '../types';
 import { defineMessages, useMessages } from '../i18n';
+
+/* 心率卡是首屏唯一拖着 ECharts 的组件：静态 import 会把图表引擎（charts
+   chunk，全前端最大的一块）绑进默认路由的关键路径。异步加载后路由壳先渲染，
+   它的 chunk 并行下载；卡片内部在 hrPoints≤1 的空态分支不挂载 VChart，
+   没有心率数据的用户永远不会为图表库付钱。 */
+const HeartRateCard = defineAsyncComponent({
+  loader: () => import('../components/overview/HeartRateCard.vue'),
+  /* chunk 没到之前先给一块同位等高的骨架，免得整排卡片因它迟到重新排版。 */
+  loadingComponent: () => h(SkeletonBlock, { height: '286px' }),
+});
 
 const messages = defineMessages(
   {
@@ -243,8 +252,10 @@ const loadOverview = async () => {
     loading.value = false;
     return;
   }
+  /* 心率卡只画最近 5 小时（OVERVIEW_HR_WINDOW_HOURS），取 6 小时留一小时
+     余量——不再为这张小卡拉一整天的点。 */
   const results = await Promise.allSettled([
-    backend.getHealthOverview(), backend.getHeartRateSeries(24), backend.getRecentSleep(3), backend.getRecentWorkouts(5),
+    backend.getHealthOverview(), backend.getHeartRateSeries(6), backend.getRecentSleep(3), backend.getRecentWorkouts(5),
     backend.getMetricSeries(ENTRY_METRICS, 7),
   ]);
   if (!loadSeq.isCurrent(seq)) return;
@@ -314,7 +325,10 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
     </div>
 
     <div v-else class="dashboard-grid">
-      <HeartRateCard :points="heartRateSeries" :current-hr="overview?.current_hr ?? null" />
+      <!-- 心率卡的格子由外壳持有：卡片是异步 chunk，骨架与本体占同一个格子。 -->
+      <div class="hr-card-slot">
+        <HeartRateCard :points="heartRateSeries" :current-hr="overview?.current_hr ?? null" />
+      </div>
       <StepsCard :steps="stepsToday" :goal="overview?.steps_goal ?? null" />
       <SleepCard :sleep="lastSleep" />
       <StatusEntryCard
@@ -360,6 +374,9 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
 .empty-state { display: grid; max-width: 360px; justify-items: center; gap: 9px; padding: 32px; color: var(--muted); text-align: center; }
 .empty-state strong { color: var(--ink); font-size: var(--fs-2xl); }
 .dashboard-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; }
+/* 异步心率卡的网格位置由这个外壳占位：骨架和加载完成的卡片落在同一个格子里。 */
+.hr-card-slot { grid-column: span 6; min-width: 0; }
+@media (max-width: 1180px) { .hr-card-slot { grid-column: span 8; } }
 
 /* 未识别设备提醒是唯一一块有意的琥珀色——它是提示条，不是装饰。 */
 .unrecognized-banner {
@@ -381,6 +398,7 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
 @media (max-width: 820px) {
   .overview-page { padding-inline: 16px; }
   .dashboard-grid { grid-template-columns: minmax(0, 1fr); }
+  .hr-card-slot { grid-column: 1; }
   .skeleton-grid { grid-template-columns: minmax(0, 1fr); }
 }
 </style>

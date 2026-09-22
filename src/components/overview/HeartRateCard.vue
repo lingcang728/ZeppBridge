@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /* 概览的「最近心率」卡：只画最近几个小时，完整的 24 小时留给心率二级页。 */
-import { computed } from 'vue';
+import { computed, defineAsyncComponent } from 'vue';
 import { RouterLink } from 'vue-router';
-import { graphic } from 'echarts/core';
-import { CHART_THEME, VChart, chartPalette } from '../../lib/echartsSetup';
+import { resolvedTheme } from '../../composables/useTheme';
+import { chartPalettes } from '../../lib/echartsTheme';
 import { HR_GAP_BREAK_MS, insertNullBreaks } from '../../lib/chartGaps';
 import { displayDateTimeFormatter } from '../../lib/dateTime';
 import { formatMetric, isFiniteNumber } from '../../lib/format';
@@ -65,8 +65,21 @@ const messages = defineMessages(
 );
 const t = useMessages(messages);
 
+/* VChart 连同 ECharts 本体按需加载：loader 在组件首次渲染时才执行，
+   hrPoints≤1 的空态分支永远不会去下载 charts chunk（全前端最大的一块）。
+   注册与主题仍只在 echartsSetup 里做一次，这里只是推迟到真要用才 import。 */
+const VChart = defineAsyncComponent(() =>
+  import('../../lib/echartsSetup').then((module) => module.VChart));
+
+/* chartPalette / CHART_THEME 原本从 echartsSetup 拿，但那个模块顶部 import 了
+   ECharts——静态引用会让空态分支也背上图表库。色值源头是 echartsTheme，主题
+   名只跟 resolvedTheme 走，本地重建同一份 computed，行为不变。 */
+const CHART_THEME = computed(() =>
+  resolvedTheme.value === 'light' ? 'zeppbridge-light' : 'zeppbridge-dark');
+const chartPalette = computed(() => chartPalettes[resolvedTheme.value]);
+
 const props = defineProps<{
-  /** `getHeartRateSeries(24)` 的原始点；卡片自己截取窗口和算均值。 */
+  /** `getHeartRateSeries(6)` 的原始点；卡片自己截取窗口和算均值。 */
   points: HeartRatePoint[];
   /** `overview.current_hr`，没有就从序列末尾取。 */
   currentHr?: number | null;
@@ -155,10 +168,15 @@ const hrChartOption = computed(() => {
     series: [{
       type: 'line', data, smooth: .18, showSymbol: false, connectNulls: false,
       lineStyle: { width: 2, color: heart, cap: 'round' },
-      areaStyle: { color: new graphic.LinearGradient(0, 0, 0, 1, [
-        { offset: 0, color: hexToRgba(heart, .22) },
-        { offset: 1, color: hexToRgba(heart, 0) },
-      ]) },
+      /* 线性渐变写成对象字面量，等价于 graphic.LinearGradient——
+         这样就不必为了一个 helper 静态 import 'echarts/core'。 */
+      areaStyle: { color: {
+        type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+        colorStops: [
+          { offset: 0, color: hexToRgba(heart, .22) },
+          { offset: 1, color: hexToRgba(heart, 0) },
+        ],
+      } },
       markLine: hrAverage.value === null ? undefined : {
         silent: true,
         symbol: 'none',
@@ -187,9 +205,9 @@ const hrChartOption = computed(() => {
 </template>
 
 <style scoped>
-.hr-panel { grid-column: span 6; min-height: 286px; padding: 20px 20px 12px; }
+/* 网格位置由父级的 .hr-card-slot 持有：本卡是异步 chunk，
+   外壳要在它到达之前先占住同一个格子。 */
+.hr-panel { min-height: 286px; padding: 20px 20px 12px; }
 .hr-chart { width: 100%; height: 198px; }
 .hr-zones { display: flex; flex-wrap: wrap; gap: 8px 12px; margin: 4px 0 0; padding: 0; list-style: none; color: var(--subtle); font-size: var(--fs-xs); }
-@media (max-width: 1180px) { .hr-panel { grid-column: span 8; } }
-@media (max-width: 820px) { .hr-panel { grid-column: 1; } }
 </style>
