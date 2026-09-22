@@ -41,7 +41,7 @@ const SITES = [
   // 而读到它的人没有任何线索知道那个数字是错的。
   {
     file: 'docs/reference/architecture.md',
-    pattern: /(implementation of v)([0-9][0-9.]*)(\.)/,
+    pattern: /((?:implementation of \[v))([0-9][0-9.]*(?:-[0-9A-Za-z.-]+)?)(?:\])/,
   },
   {
     file: 'docs/reference/architecture.zh-CN.md',
@@ -57,8 +57,8 @@ const SITES = [
 ];
 
 const target = process.argv[2];
-if (target && !/^\d+\.\d+\.\d+$/.test(target)) {
-  console.error(`版本号要写成 x.y.z，收到：${target}`);
+if (target && !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(target)) {
+  console.error(`版本号要写成 x.y.z 或 x.y.z-预发布标识，收到：${target}`);
   process.exit(2);
 }
 

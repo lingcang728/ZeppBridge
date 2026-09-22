@@ -13,7 +13,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 ROOT = Path(__file__).resolve().parents[2]
-EXE_DEFAULT = ROOT / "src-tauri" / "target" / "release" / "ZeppBridge.exe"
+EXE_DEFAULT = ROOT / "src-tauri" / "target" / "release" / "ZeppBridge3.exe"
 ICO = ROOT / "src-tauri" / "icons" / "icon.ico"
 OUT = ROOT / "docs" / "design" / "windows-runtime-icon-check.png"
 
