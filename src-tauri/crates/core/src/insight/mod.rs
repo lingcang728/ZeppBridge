@@ -15,7 +15,7 @@
 
 use crate::models::error::Result;
 use crate::storage::Database;
-use chrono::{DateTime, Duration, NaiveDate, Utc};
+use chrono::{DateTime, Duration, Local, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 
 /// 单次跑步洞察的基线规则。全部是常量而不是散落在 SQL 里的字面量，
@@ -118,7 +118,8 @@ pub struct InsightFact {
     /// `reason_code`，配合 `baseline_window` 和 `baseline_count` 自己写句子。
     pub reason: Option<String>,
     /// 说明的稳定码：`weekly_thin_baseline` / `weekly_no_recent_data` /
-    /// `workout_thin_baseline` / `workout_no_value`。
+    /// `weekly_zero_baseline` / `workout_thin_baseline` / `workout_no_value` /
+    /// `workout_zero_baseline`。
     #[serde(default)]
     pub reason_code: Option<String>,
     /// 基线里实际找到多少个样本。`evidence_count` 数的是本期的样本数，
@@ -521,7 +522,20 @@ impl Database {
                 }],
             ));
         };
-        let cutoff = (target.start_time - Duration::days(baseline::WINDOW_DAYS)).to_rfc3339();
+        let Some(cutoff) = Duration::try_days(baseline::WINDOW_DAYS)
+            .and_then(|delta| target.start_time.checked_sub_signed(delta))
+        else {
+            // start 靠近 DateTime::MIN 时 180 天窗口下溢。历史上不可能再有
+            // 更早的可比跑步，当作没有基线，不要 panic。
+            return Ok((
+                Vec::new(),
+                vec![BaselineExclusion {
+                    workout_id: target.workout_id.clone(),
+                    reason: "outside_window".into(),
+                }],
+            ));
+        };
+        let cutoff = cutoff.to_rfc3339();
         let mut stmt = self.conn.prepare(
             "SELECT workout_id, start_time, end_time, distance_meters, avg_hr,
                     training_load, source_scope
@@ -568,11 +582,20 @@ impl Database {
     ///
     /// 每条结论都带样本数、来源和置信度；不足就说不足。不和任何人群基准比较，
     /// 也不输出诊断、治疗或风险预测。
-    pub fn weekly_report(&self, now: DateTime<Utc>) -> Result<WeeklyReport> {
-        let today = now.date_naive();
-        let recent_start = today - Duration::days(weekly::RECENT_DAYS - 1);
-        let baseline_end = recent_start - Duration::days(1);
-        let baseline_start = baseline_end - Duration::days(weekly::BASELINE_DAYS - 1);
+    pub fn weekly_report(&self, now: DateTime<Local>) -> Result<WeeklyReport> {
+        // `daily_metrics.date` 是本地日，「今天」必须也按本地日算。
+        self.weekly_report_for_day(now.date_naive(), now.with_timezone(&Utc))
+    }
+
+    /// 同上，但「今天」由调用方给出；测试用它钉住日期，不受机器时区影响。
+    pub fn weekly_report_for_day(
+        &self,
+        today: NaiveDate,
+        generated_at: DateTime<Utc>,
+    ) -> Result<WeeklyReport> {
+        let recent_start = saturating_days_before(today, weekly::RECENT_DAYS - 1);
+        let baseline_end = saturating_days_before(recent_start, 1);
+        let baseline_start = saturating_days_before(baseline_end, weekly::BASELINE_DAYS - 1);
 
         let mut facts = Vec::new();
         for (fact_id, metric, unit) in [
@@ -600,7 +623,7 @@ impl Database {
         }
 
         Ok(WeeklyReport {
-            generated_at: now.to_rfc3339(),
+            generated_at: generated_at.to_rfc3339(),
             recent_start: recent_start.to_string(),
             recent_end: today.to_string(),
             baseline_start: baseline_start.to_string(),
@@ -637,8 +660,8 @@ impl Database {
             .or_else(|| baseline.source.clone())
             .unwrap_or_else(|| "unknown".into());
 
-        let enough_baseline = baseline.values.len() as i64 >= weekly::MIN_BASELINE_DAYS;
-        let baseline_count = baseline.values.len() as i64;
+        let enough_baseline = baseline.day_count as i64 >= weekly::MIN_BASELINE_DAYS;
+        let baseline_count = baseline.day_count as i64;
         let (comparison, confidence, reason, reason_code) = match (value, mean(&baseline.values)) {
             (Some(current), Some(previous)) if enough_baseline && previous != 0.0 => {
                 let delta = current - previous;
@@ -647,20 +670,28 @@ impl Database {
                         baseline_value: round1(previous),
                         delta: round1(delta),
                         delta_percent: round1(delta / previous.abs() * 100.0),
-                        direction: direction_of(delta),
+                        direction: direction_of(delta, previous),
                     }),
-                    Confidence::from_samples(baseline.values.len()),
+                    Confidence::from_samples(baseline.day_count),
                     None,
                     None,
                 )
             }
+            // 基线天数够但均值是 0：拿 0 当分母算不出相对变化，这和「样本
+            // 不足」是两回事，单独一个码，别混进 thin_baseline 的说辞里。
+            (Some(_), Some(previous)) if enough_baseline && previous == 0.0 => (
+                None,
+                Confidence::Insufficient,
+                Some("此前基线均值为 0，无法计算相对变化。".into()),
+                Some("weekly_zero_baseline".to_string()),
+            ),
             (Some(_), _) => (
                 None,
                 Confidence::Insufficient,
                 Some(format!(
                     "此前 {} 天里只有 {} 天有这项数据，不足 {} 天，所以只报现状不做比较。",
                     weekly::BASELINE_DAYS,
-                    baseline.values.len(),
+                    baseline.day_count,
                     weekly::MIN_BASELINE_DAYS
                 )),
                 Some("weekly_thin_baseline".to_string()),
@@ -680,7 +711,7 @@ impl Database {
             unit: unit.into(),
             comparison,
             baseline_window: Some(window),
-            evidence_count: recent.values.len() as i64,
+            evidence_count: recent.day_count as i64,
             source,
             confidence,
             reason,
@@ -700,60 +731,62 @@ impl Database {
         let end_text = end.to_string();
         match metric {
             "sleep_duration" => self.collect_samples(
-                "SELECT substr(end_time, 1, 10), CAST(duration_minutes AS REAL), source_scope
+                "SELECT date(end_time, 'localtime'), CAST(duration_minutes AS REAL), source_scope
                  FROM sleep_sessions
-                 WHERE substr(end_time, 1, 10) BETWEEN ?1 AND ?2",
+                 WHERE date(end_time, 'localtime') BETWEEN ?1 AND ?2",
                 &start_text,
                 &end_text,
             ),
             // 入睡时间的规律性：每晚入睡的分钟数（自当地午夜起算）本身就是
             // 一个可比的日度值，两段窗口各自取标准差来对比。
             "sleep_start_regularity" => {
-                let samples = self.collect_samples(
-                    "SELECT substr(start_time, 1, 10),
-                            CAST(substr(start_time, 12, 2) AS REAL) * 60
-                              + CAST(substr(start_time, 15, 2) AS REAL),
+                let mut raw = self.collect_raw_samples(
+                    "SELECT date(start_time, 'localtime'),
+                            CAST(strftime('%H', start_time, 'localtime') AS REAL) * 60
+                              + CAST(strftime('%M', start_time, 'localtime') AS REAL),
                             source_scope
                      FROM sleep_sessions
-                     WHERE substr(start_time, 1, 10) BETWEEN ?1 AND ?2",
+                     WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2",
                     &start_text,
                     &end_text,
                 )?;
                 // 跨午夜的入睡时间会在 0 和 1440 之间跳，直接算标准差会把
                 // 「23:50 和 00:10」看成相差 23 小时。统一折算到以 18:00
-                // 为原点的相对分钟数。
-                let shifted: Vec<f64> = samples
-                    .values
-                    .iter()
-                    .map(|minutes| {
-                        let shifted = minutes - 18.0 * 60.0;
-                        if shifted < -12.0 * 60.0 {
-                            shifted + 24.0 * 60.0
-                        } else {
-                            shifted
-                        }
-                    })
-                    .collect();
-                let spread = stdev(&shifted);
+                // 为原点的相对分钟数。必须先折再按日平均：同日 23:50 和
+                // 00:10 的原始分钟平均是中午，折完才是午夜附近。
+                for (_, minutes) in &mut raw.rows {
+                    let shifted = *minutes - 18.0 * 60.0;
+                    *minutes = if shifted < -12.0 * 60.0 {
+                        shifted + 24.0 * 60.0
+                    } else {
+                        shifted
+                    };
+                }
+                let samples = collapse_per_day(raw);
+                let spread = stdev(&samples.values);
                 Ok(WeeklySamples {
                     values: spread.map(|value| vec![value]).unwrap_or_default(),
+                    day_count: samples.day_count,
                     dates: samples.dates,
                     source: samples.source,
                 })
             }
             "workout_count" => {
-                let samples = self.collect_samples(
-                    "SELECT substr(start_time, 1, 10), 1.0, source_scope
+                let raw = self.collect_raw_samples(
+                    "SELECT date(start_time, 'localtime'), 1.0, source_scope
                      FROM workouts
-                     WHERE substr(start_time, 1, 10) BETWEEN ?1 AND ?2",
+                     WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2",
                     &start_text,
                     &end_text,
                 )?;
-                // 「次数」是一个总量，不是每天的平均。用一个单元素样本表达
-                // 总数，比返回一串 1.0 再去平均要诚实。
-                let total = samples.values.len() as f64;
+                // 「次数」是窗口内的总量，不是每天的平均，也不能在按日折叠
+                // 之后数 values（同日两场会被收成 1.0）。先记下总场次，再
+                // 折叠只为拿去重天数。
+                let total = raw.rows.len() as f64;
+                let samples = collapse_per_day(raw);
                 Ok(WeeklySamples {
                     values: if total > 0.0 { vec![total] } else { Vec::new() },
+                    day_count: samples.day_count,
                     dates: samples.dates,
                     source: samples.source,
                 })
@@ -764,6 +797,27 @@ impl Database {
                 &start_text,
                 &end_text,
             ),
+            // HRV 落库有两个名字：`hrv` 流写 `hrv`，wellness 的
+            // `hrvRmssd` 项写 `hrv_rmssd`——两个都要查，漏一个就等于
+            // 说那些天没有 HRV 数据。
+            "hrv" => {
+                let daily = self.collect_samples(
+                    "SELECT date, value, source_scope FROM daily_metrics
+                     WHERE metric IN ('hrv', 'hrv_rmssd') AND date BETWEEN ?1 AND ?2",
+                    &start_text,
+                    &end_text,
+                )?;
+                if !daily.values.is_empty() {
+                    return Ok(daily);
+                }
+                self.collect_samples(
+                    "SELECT date(timestamp, 'localtime'), value, source_scope FROM metric_samples
+                     WHERE metric IN ('hrv', 'hrv_rmssd')
+                       AND date(timestamp, 'localtime') BETWEEN ?1 AND ?2",
+                    &start_text,
+                    &end_text,
+                )
+            }
             other => {
                 // 先看日度表，没有再回落到采样表。
                 let daily = self.collect_samples(
@@ -779,8 +833,8 @@ impl Database {
                 }
                 self.collect_samples(
                     &format!(
-                        "SELECT substr(timestamp, 1, 10), value, source_scope FROM metric_samples
-                         WHERE metric = '{other}' AND substr(timestamp, 1, 10) BETWEEN ?1 AND ?2"
+                        "SELECT date(timestamp, 'localtime'), value, source_scope FROM metric_samples
+                         WHERE metric = '{other}' AND date(timestamp, 'localtime') BETWEEN ?1 AND ?2"
                     ),
                     &start_text,
                     &end_text,
@@ -790,6 +844,10 @@ impl Database {
     }
 
     fn collect_samples(&self, sql: &str, start: &str, end: &str) -> Result<WeeklySamples> {
+        Ok(collapse_per_day(self.collect_raw_samples(sql, start, end)?))
+    }
+
+    fn collect_raw_samples(&self, sql: &str, start: &str, end: &str) -> Result<RawWeeklySamples> {
         let mut stmt = self.conn.prepare(sql)?;
         let rows = stmt.query_map(rusqlite::params![start, end], |row| {
             Ok((
@@ -798,35 +856,63 @@ impl Database {
                 row.get::<_, String>(2)?,
             ))
         })?;
-        let mut values = Vec::new();
-        let mut dates = Vec::new();
+        let mut samples = Vec::new();
         let mut scopes = std::collections::BTreeSet::new();
         for row in rows {
             let (date, value, scope) = row?;
             if !value.is_finite() {
                 continue;
             }
-            values.push(value);
-            dates.push(date);
+            samples.push((date, value));
             scopes.insert(scope);
         }
-        dates.sort();
-        dates.dedup();
-        Ok(WeeklySamples {
-            values,
-            dates,
-            // 一个窗口里混了多种来源时不挑一个当代表，如实说 mixed。
-            source: match scopes.len() {
-                0 => None,
-                1 => scopes.into_iter().next(),
-                _ => Some("mixed".into()),
-            },
+        Ok(RawWeeklySamples {
+            rows: samples,
+            scopes,
         })
     }
 }
 
+struct RawWeeklySamples {
+    rows: Vec<(String, f64)>,
+    scopes: std::collections::BTreeSet<String>,
+}
+
+/// 每个日历日一个有限值。同日多行（双 scope、hrv + hrv_rmssd、一天多次
+/// 采样）先取当天平均，再拿这些日值去算窗口均值——否则一天两行会把均值
+/// 拉偏，也会把「一天的证据」当成两天。
+fn collapse_per_day(raw: RawWeeklySamples) -> WeeklySamples {
+    let mut by_date: std::collections::BTreeMap<String, Vec<f64>> =
+        std::collections::BTreeMap::new();
+    for (date, value) in raw.rows {
+        by_date.entry(date).or_default().push(value);
+    }
+    let mut values = Vec::with_capacity(by_date.len());
+    let mut dates = Vec::with_capacity(by_date.len());
+    for (date, day_values) in by_date {
+        values.push(day_values.iter().sum::<f64>() / day_values.len() as f64);
+        dates.push(date);
+    }
+    let day_count = dates.len();
+    WeeklySamples {
+        values,
+        day_count,
+        dates,
+        // 一个窗口里混了多种来源时不挑一个当代表，如实说 mixed。
+        source: match raw.scopes.len() {
+            0 => None,
+            1 => raw.scopes.into_iter().next(),
+            _ => Some("mixed".into()),
+        },
+    }
+}
+
 struct WeeklySamples {
+    /// 每个有数据的日历日一个值（同日多行已先取平均）。
+    /// `sleep_start_regularity` / `workout_count` 会再聚合成单值。
     values: Vec<f64>,
+    /// 窗口里有数据的去重日期数。天数判据不能数 values。
+    day_count: usize,
     dates: Vec<String>,
     source: Option<String>,
 }
@@ -889,12 +975,18 @@ where
                     baseline_value: round1(previous),
                     delta: round1(delta),
                     delta_percent: round1(delta / previous.abs() * 100.0),
-                    direction: direction_of(delta),
+                    direction: direction_of(delta, previous),
                 }),
                 None,
                 None,
             )
         }
+        // 基线样本够但均值是 0：拿 0 当分母算不出相对变化。
+        (Some(_), Some(previous)) if enough && previous == 0.0 => (
+            None,
+            Some("此前基线均值为 0，无法计算相对变化。".into()),
+            Some("workout_zero_baseline".to_string()),
+        ),
         (Some(_), _) => (
             None,
             Some(format!(
@@ -957,8 +1049,19 @@ fn round1(value: f64) -> f64 {
     (value * 10.0).round() / 10.0
 }
 
-fn direction_of(delta: f64) -> String {
-    if delta.abs() < f64::EPSILON {
+fn saturating_days_before(date: NaiveDate, days: i64) -> NaiveDate {
+    Duration::try_days(days)
+        .and_then(|delta| date.checked_sub_signed(delta))
+        .unwrap_or(date)
+}
+
+/// 变化方向。
+///
+/// 界面把心率等指标四舍五入成整数再显示。用「基线的 2%」当持平门槛时，
+/// 50 vs 51 bpm（−1.3%）会被判成 `same`，于是本周那根条没有颜色，而旁边
+/// 数字明明写着两个不同的值。半个显示单位以下才是噪声。
+fn direction_of(delta: f64, _previous: f64) -> String {
+    if delta.abs() < 0.5 {
         "same".into()
     } else if delta > 0.0 {
         "higher".into()
@@ -970,7 +1073,7 @@ fn direction_of(delta: f64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{SleepSession, SourceScope, Workout};
+    use crate::models::{DailyMetric, SleepSession, SourceScope, Workout};
     use chrono::{Datelike, TimeZone};
 
     fn base() -> DateTime<Utc> {
@@ -1406,19 +1509,20 @@ mod tests {
 
     fn sleep(id: &str, days_ago: i64, start_hour: u32, minutes: i64) -> SleepSession {
         let day = (base() - Duration::days(days_ago)).date_naive();
-        let start = Utc
+        let start = Local
             .with_ymd_and_hms(day.year(), day.month(), day.day(), start_hour, 0, 0)
-            .unwrap();
+            .unwrap()
+            .with_timezone(&Utc);
         SleepSession {
             sleep_id: id.into(),
             start_time: start,
             end_time: start + Duration::minutes(minutes),
             score: None,
             duration_minutes: minutes as i32,
-            deep_minutes: 0,
-            light_minutes: minutes as i32,
+            deep_minutes: Some(0),
+            light_minutes: Some(minutes as i32),
             rem_minutes: None,
-            awake_minutes: 0,
+            awake_minutes: Some(0),
             synced_at: None,
             time_in_bed_minutes: None,
             wake_count: None,
@@ -1443,7 +1547,9 @@ mod tests {
                 .unwrap();
         }
 
-        let report = db.weekly_report(base()).unwrap();
+        let report = db
+            .weekly_report_for_day(base().date_naive(), base())
+            .unwrap();
         let duration = weekly_fact(&report, "weekly.sleep_duration");
         assert_eq!(duration.value, Some(420.0));
         let comparison = duration.comparison.clone().expect("基线够 28 天");
@@ -1468,7 +1574,9 @@ mod tests {
             db.insert_sleep_session(&sleep(&format!("base-{day}"), day, 23, 360))
                 .unwrap();
         }
-        let report = db.weekly_report(base()).unwrap();
+        let report = db
+            .weekly_report_for_day(base().date_naive(), base())
+            .unwrap();
         let duration = weekly_fact(&report, "weekly.sleep_duration");
         assert_eq!(duration.value, Some(420.0));
         assert!(duration.comparison.is_none());
@@ -1479,7 +1587,9 @@ mod tests {
     #[test]
     fn no_data_at_all_says_no_data_instead_of_zero() {
         let db = db();
-        let report = db.weekly_report(base()).unwrap();
+        let report = db
+            .weekly_report_for_day(base().date_naive(), base())
+            .unwrap();
         for fact in &report.facts {
             assert_eq!(
                 fact.value, None,
@@ -1498,7 +1608,9 @@ mod tests {
             db.insert_sleep_session(&sleep(&format!("recent-{day}"), day, 23, 420))
                 .unwrap();
         }
-        let report = db.weekly_report(base()).unwrap();
+        let report = db
+            .weekly_report_for_day(base().date_naive(), base())
+            .unwrap();
         let encoded = serde_json::to_string(&report).unwrap();
         for forbidden in [
             "人群",
@@ -1529,12 +1641,204 @@ mod tests {
         db.insert_sleep_session(&sleep("a", 1, 23, 400)).unwrap();
         db.insert_sleep_session(&sleep("b", 2, 0, 400)).unwrap();
         db.insert_sleep_session(&sleep("c", 3, 23, 400)).unwrap();
-        let report = db.weekly_report(base()).unwrap();
+        let report = db
+            .weekly_report_for_day(base().date_naive(), base())
+            .unwrap();
         let regularity = weekly_fact(&report, "weekly.sleep_start_regularity");
         let spread = regularity.value.expect("三晚足够算出离散度");
         assert!(
             spread < 120.0,
             "跨午夜被当成了 23 小时的波动：{spread} 分钟"
+        );
+    }
+
+    /// start_time 靠近时间轴下限时，基线窗口减法不得 panic。
+    #[test]
+    fn a_run_near_datetime_min_does_not_panic_on_baseline_window() {
+        let db = db();
+        let year_one = Utc.with_ymd_and_hms(1, 1, 1, 12, 0, 0).unwrap();
+        let mut workout = run("year-one", 0, Some(5000.0), 30, Some(150));
+        workout.start_time = year_one;
+        workout.end_time = year_one + Duration::minutes(30);
+        db.insert_workout(&workout).unwrap();
+        let insight = db.workout_insight("year-one").unwrap();
+        assert!(insight.supported);
+        assert!(insight.baseline_included.is_empty());
+
+        let target = RunRow {
+            workout_id: "min".into(),
+            start_time: DateTime::<Utc>::MIN_UTC,
+            end_time: DateTime::<Utc>::MIN_UTC
+                .checked_add_signed(Duration::try_minutes(30).unwrap())
+                .expect("MIN + 30 分钟仍在范围内"),
+            distance_meters: Some(5000.0),
+            avg_hr: Some(150),
+            training_load: Some(50.0),
+            source_scope: "device".into(),
+        };
+        let (included, excluded) = db.comparable_runs(&target).unwrap();
+        assert!(included.is_empty());
+        assert!(
+            excluded.iter().any(|row| row.reason == "outside_window"),
+            "下溢应当记 outside_window：{excluded:?}"
+        );
+
+        let report = db
+            .weekly_report_for_day(
+                DateTime::<Utc>::MIN_UTC.date_naive(),
+                DateTime::<Utc>::MIN_UTC,
+            )
+            .unwrap();
+        assert_eq!(
+            report.recent_end,
+            DateTime::<Utc>::MIN_UTC.date_naive().to_string()
+        );
+    }
+
+    /// 一条 daily_metrics 行。`source_scope` 可变，用来造「同一天两个来源」。
+    fn daily(days_ago: i64, metric: &str, value: f64, scope: SourceScope) -> DailyMetric {
+        DailyMetric {
+            date: (base() - Duration::days(days_ago)).date_naive().to_string(),
+            metric: metric.into(),
+            value,
+            unit: "bpm".into(),
+            source_scope: scope,
+            device_id: None,
+        }
+    }
+
+    /// 同一天两个来源各落一行是同一天的数据，不是两天；均值按日折叠，
+    /// 不能把多出来的那一行直接丢进窗口平均。
+    #[test]
+    fn the_same_day_from_two_scopes_is_one_day_of_evidence() {
+        let db = db();
+        // 最近 7 天每天都有静息心率，让比较能走到基线判据。
+        for day in 0..7 {
+            db.insert_daily_metric(&daily(day, "resting_hr", 60.0, SourceScope::Device))
+                .unwrap();
+        }
+        // 基线 10 天：其中一天 device 和 user_fused 各一行，依然只算 1 天。
+        // 50 和 100 差得够大，按行平均会得到 54.5，按日折叠才是 52.5。
+        for day in 8..18 {
+            db.insert_daily_metric(&daily(day, "resting_hr", 50.0, SourceScope::Device))
+                .unwrap();
+        }
+        db.insert_daily_metric(&daily(8, "resting_hr", 100.0, SourceScope::UserFused))
+            .unwrap();
+
+        let report = db
+            .weekly_report_for_day(base().date_naive(), base())
+            .unwrap();
+        let resting = weekly_fact(&report, "weekly.resting_hr");
+        assert_eq!(resting.baseline_count, 10, "同日双来源只算一天");
+        let comparison = resting
+            .comparison
+            .clone()
+            .expect("10 天基线够 7 天门，比较必须发生");
+        // 第 8 天 (50+100)/2 = 75，其余 9 天 50 → 日均 52.5。
+        assert_eq!(comparison.baseline_value, 52.5);
+        assert_eq!(resting.value, Some(60.0));
+    }
+
+    /// 「次数」聚合成单值之后，基线判据数的仍是有数据的天数。
+    #[test]
+    fn a_workout_count_baseline_counts_days_with_activity() {
+        let db = db();
+        // 最近 7 天 4 次落在 3 天（第 0 天两场）；此前 10 天每天 1 次。
+        for day in [0, 2, 4] {
+            db.insert_workout(&run(
+                &format!("recent-{day}"),
+                day,
+                Some(5000.0),
+                30,
+                Some(150),
+            ))
+            .unwrap();
+        }
+        db.insert_workout(&run("recent-0b", 0, Some(5000.0), 30, Some(150)))
+            .unwrap();
+        for day in 8..18 {
+            db.insert_workout(&run(
+                &format!("base-{day}"),
+                day,
+                Some(5000.0),
+                30,
+                Some(150),
+            ))
+            .unwrap();
+        }
+        let report = db
+            .weekly_report_for_day(base().date_naive(), base())
+            .unwrap();
+        let count = weekly_fact(&report, "weekly.workout_count");
+        assert_eq!(count.value, Some(4.0), "value 是总场次，不是去重天数");
+        assert_eq!(count.evidence_count, 3, "天数按去重日");
+        assert_eq!(count.baseline_count, 10);
+        let comparison = count
+            .comparison
+            .clone()
+            .expect("10 天基线够 7 天门，不该再报 thin_baseline");
+        assert_eq!(comparison.baseline_value, 10.0);
+        assert_eq!(comparison.direction, "lower");
+    }
+
+    /// 基线均值是 0 时相对变化算不出来——这是另一条理由，不是「样本不足」。
+    #[test]
+    fn a_zero_baseline_reports_no_comparison_instead_of_dividing_by_zero() {
+        let db = db();
+        for day in 0..7 {
+            db.insert_daily_metric(&daily(day, "resting_hr", 60.0, SourceScope::Device))
+                .unwrap();
+        }
+        // 基线 10 天全是 0：这项指标此前一直没测出。
+        for day in 8..18 {
+            db.insert_daily_metric(&daily(day, "resting_hr", 0.0, SourceScope::Device))
+                .unwrap();
+        }
+        let report = db
+            .weekly_report_for_day(base().date_naive(), base())
+            .unwrap();
+        let resting = weekly_fact(&report, "weekly.resting_hr");
+        assert_eq!(resting.value, Some(60.0));
+        assert!(resting.comparison.is_none(), "拿 0 当分母没有意义");
+        assert_eq!(resting.reason_code.as_deref(), Some("weekly_zero_baseline"));
+        assert_eq!(resting.confidence, Confidence::Insufficient);
+    }
+
+    /// 半个显示单位以下是噪声；界面会显示成整数的 1 bpm 差必须有方向。
+    #[test]
+    fn a_displayed_bpm_difference_is_not_flat() {
+        assert_eq!(direction_of(0.4, 60.0), "same");
+        assert_eq!(direction_of(-0.4, 51.0), "same");
+        assert_eq!(direction_of(1.0, 60.0), "higher");
+        assert_eq!(direction_of(-1.0, 51.0), "lower");
+    }
+
+    /// wellness 的 `hrvRmssd` 项落库叫 `hrv_rmssd`——周报两个名字都要认，
+    /// 否则有 HRV 的日子会被报成「没数据」。
+    #[test]
+    fn hrv_samples_stored_under_the_rmssd_name_feed_the_weekly_report() {
+        let db = db();
+        for day in 0..7 {
+            let date = (base() - Duration::days(day)).date_naive();
+            db.conn
+                .execute(
+                    "INSERT INTO metric_samples
+                        (metric, timestamp, value, unit, source_scope)
+                     VALUES ('hrv_rmssd', ?1, 45.0, 'ms', 'device')",
+                    rusqlite::params![format!("{date}T08:00:00+00:00")],
+                )
+                .unwrap();
+        }
+        let report = db
+            .weekly_report_for_day(base().date_naive(), base())
+            .unwrap();
+        let hrv = weekly_fact(&report, "weekly.hrv");
+        assert_eq!(hrv.value, Some(45.0), "hrv_rmssd 落库的样本必须被读到");
+        assert_ne!(
+            hrv.reason_code.as_deref(),
+            Some("weekly_no_recent_data"),
+            "有 HRV 数据的日子不该报「没数据」"
         );
     }
 }

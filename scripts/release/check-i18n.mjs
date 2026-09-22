@@ -218,7 +218,7 @@ const unhandledUiCodes = [...declaredUiCodes]
  * 为什么那里可以碰它（几乎总是「按码取不到时的兜底」）。加新的渲染点会红，
  * 这正是我们要的——它逼你去看一眼有没有走码。
  */
-const PROSE_FIELDS = /\.(message|stop_reason|reason|note|problem)\b/;
+const PROSE_FIELDS = /\.(message|stop_reason|reason|note|problem|error|refresh_error|blocker|display_name)\b/;
 
 /*
  * 放过这三类，它们不是「后端散文」：
@@ -267,6 +267,26 @@ const ALLOWED_PROSE = [
   { file: 'views/HealthCheck.vue', text: 'known.reason', why: 'known 是界面自己的文案对象，不是后端字段。' },
   { file: 'views/HealthCheck.vue', text: 'copy.reason', why: 'copy 是 actionCopy 的结果，已经本地化。' },
   { file: 'views/HealthCheck.vue', text: 'actionCopy(action).reason', why: '同上，已经本地化。' },
+  { file: 'lib/bridge/errors.ts', text: 'candidate.error', why: 'toUserMessage 取错误文本：先查 code，这是原文兜底。' },
+  { file: 'lib/failedChunkText.ts', text: 'chunk.error', why: 'failedChunkText 先查 error_code，未知码才回落。' },
+  { file: 'composables/useDevices.ts', text: 'meta.refresh_error', why: 'refreshErrorText 先查 refresh_error_code，未知码才回落。' },
+  { file: 'composables/useDevices.ts', text: 'profile.display_name', why: '账号里的设备商品名，不是界面文案。' },
+  { file: 'composables/useExport.ts', text: 'result.error', why: '导出范围规则的码（scope_conflict 等），不是后端中文。' },
+  { file: 'views/Settings.vue', text: 'deviceCache.value?.refresh_error', why: '先 errorTextFor(refresh_error_code)，原文只作兜底。' },
+  { file: 'views/Settings.vue', text: 'localApiStatus.value.error', why: '先 errorTextFor(error_code)，原文只作兜底。' },
+  { file: 'views/Settings.vue', text: 'localApiStatus.value?.error', why: '同上。' },
+  { file: 'views/Settings.vue', text: 'updateState.error', why: '更新服务自己的本地化错误，不是后端中文字段。' },
+  { file: 'services/updateService.ts', text: 'updateState.error', why: '更新服务自己写的本地化错误，经 errorMessage/toUserMessage。' },
+  { file: 'components/BackupPanel.vue', text: 'preview.blocker', why: 'restoreBlockerText 按 compatibility / problem_code 分支，原文只作兜底。' },
+  { file: 'components/DeviceMarquee.vue', text: 'entry.display_name', why: '设备目录里的商品名，不是界面文案。' },
+  { file: 'views/Overview.vue', text: 'model.profile.display_name', why: '账号里的设备商品名，不是界面文案。' },
+  { file: 'lib/deviceCatalog.ts', text: 'item.display_name', why: '目录匹配用的商品名，不显示给用户当界面文案。' },
+  { file: 'views/Settings.vue', text: 'form.error', why: '诊断表单本地状态，catch 里已经 toUserMessage。' },
+  { file: 'views/Settings.vue', text: 'form.note', why: '用户自己填的诊断备注，不是后端字段。' },
+  { file: 'views/Settings.vue', text: 'deviceDiagnostic.note', why: '用户自己填的诊断备注，不是后端字段。' },
+  { file: 'views/Settings.vue', text: 'deviceDiagnostic.error', why: '本地 toUserMessage 结果，不是后端中文字段。' },
+  { file: 'views/Settings.vue', text: 'privacyDiagnostic.note', why: '用户自己填的诊断备注，不是后端字段。' },
+  { file: 'views/Settings.vue', text: 'privacyDiagnostic.error', why: '本地 toUserMessage 结果，不是后端中文字段。' },
 ];
 
 const proseFindings = [];

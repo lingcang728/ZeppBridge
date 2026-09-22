@@ -163,7 +163,7 @@ frontend in `src/lib/bridge/` (re-exported through `useTauriApi`):
 | `clear_auth` | Invalidate the sign-in session and clear credentials | The health database is kept |
 | `import_from_har` | Extract credentials from a HAR the user exported | Must contain an `api-mifit*` request carrying `apptoken`; then takes the same save path as `save_auth` |
 | `manual_auth` | Enter token / user id / region host by hand | A wrapper over `save_auth`, with identical boundaries |
-| `start_initial_sync` / `start_history_sync` | Fetch the 1–365 days the user chose | Defaults to 30 days; emits progress events and can be cancelled |
+| `start_history_sync` | Fetch the 1–365 days the user chose | Defaults to 30 days; emits progress events and can be cancelled |
 | `start_incremental_sync` | Incremental with a 30-day overlap (`contract::INCREMENTAL_SYNC_DAYS`) | Only for verified connections; triggered by the top bar, auto-sync or the tray |
 | `cancel_sync` | Cancel an in-flight sync | Atomic flag; stops at the next window |
 | `set_user_prefs` | Save retention days and history backfill days | 1–365 |
@@ -172,7 +172,7 @@ frontend in `src/lib/bridge/` (re-exported through `useTauriApi`):
 | `get_recent_sleep` / `get_recent_workouts` | Read recent records | The limit is clamped to `1–500` in the backend |
 | `get_sleep_detail` / `get_workout_detail` | Read one record by stable ID | Returns `null` when not found; generates no estimated fields |
 | `get_workout_series` | Read decoded run samples/route/pauses | Empty arrays when there are no points; nothing is invented |
-| `get_heart_rate_series` / `get_training_load_series` | Time-series points for the overview charts | Read hourly / daily from the local database; no samples means an empty array |
+| `get_heart_rate_series` | Time-series points for the overview charts | Read hourly / daily from the local database; no samples means an empty array |
 | `get_metric_series` | The per-day curves for `/body` and `/training` | Answers only metric names on the `SERIES_METRICS` allow-list, skipping others; returns `days_with_data` and never pads missing days with 0 |
 | `get_training_balance` | 7-day / 28-day load and the acute:chronic ratio | The same function as the `training_load_balance` export; the ratio is `null` when the chronic window is under 21 days |
 | `get_heart_rate_zones` | Every state of the heart-rate zone selector | All bases are measured and carry their source and measurement date; `report` is `null` until an algorithm is chosen |
@@ -207,15 +207,19 @@ Deleted and never to be registered again: `start_capture`,
 
 ## The local REST API
 
-`src-tauri/src/local_api.rs` binds `127.0.0.1:43921` when the desktop process
-starts. Two read-only GET routes are exposed today:
+The local API is **off by default**. The desktop process does not bind
+`127.0.0.1:43921` at startup. Listening starts only after the user turns the
+switch on in Settings; every request then needs `Authorization: Bearer <token>`.
+Implementation lives in `zeppbridge-core` (`crates/core/src/local_api.rs`); the
+Tauri adapter is `src-tauri/src/local_api.rs`. Two read-only GET routes are
+exposed today:
 
 | Route | Description |
 | --- | --- |
 | `/health` | Service state and app version |
 | `/workouts/{id}/series` | Reuses `Database::get_workout_series()` and returns normalised `WorkoutSeries` JSON; an unknown ID returns 404 |
 
-The API does not listen on `0.0.0.0`, offers no CORS, responds with
+The API binds only `127.0.0.1`, offers no CORS, responds with
 `Cache-Control: no-store`, and neither reads nor returns authentication data. If
 the port is taken the desktop app still starts, and Settings surfaces the error
 through `get_local_api_status`. Tests must cover the routes, 404/405, encoded
@@ -239,9 +243,10 @@ IDs, the generic 500, and the no-CORS boundary.
    verified against current real fixtures. Encodings it cannot recognise stay as
    raw only, marked `unverified`.
 6. `Database` uses WAL, foreign keys and schema migrations (`PRAGMA
-   user_version`, currently **16**; migration steps may only be appended, never
+   user_version`; the current number is `CURRENT_SCHEMA_VERSION` in
+   `storage/mod.rs`). Migration steps may only be appended, never
    edit published DDL — existing databases were created with the DDL of their
-   time). Expression unique indexes handle `NULL device_id`, and canonical rows
+   time. Expression unique indexes handle `NULL device_id`, and canonical rows
    keep `raw_record_id`. Migrations start only after the cross-process write
    lock is held and a pre-upgrade backup exists.
 7. `SyncManager` uses a run lock against in-process concurrency and additionally

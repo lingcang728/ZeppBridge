@@ -197,11 +197,6 @@ impl ZeppBridgeError {
         matches!(self, Self::Cancelled)
     }
 
-    #[allow(dead_code)]
-    pub fn is_retryable(&self) -> bool {
-        matches!(self, Self::RetryExhausted { .. } | Self::NetworkError(_))
-    }
-
     /// 稳定的错误码。
     ///
     /// 界面按码取本地化文案，`user_message()` 只作为取不到时的兜底。这两件事

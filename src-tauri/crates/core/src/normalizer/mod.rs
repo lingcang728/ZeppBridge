@@ -1,6 +1,6 @@
 use crate::models::{error::*, *};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
-use chrono::{DateTime, Duration, NaiveDate, Utc};
+use chrono::{DateTime, Datelike, Duration, NaiveDate, Utc};
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
 
@@ -63,14 +63,14 @@ impl Normalizer {
             let timestamp = object
                 .and_then(|o| first_value(o, &["timestamp", "time", "timeStamp", "startTime"]))
                 .and_then(parse_timestamp);
-            let value = object
-                .and_then(|o| first_value(o, &["value", "heartRate", "heart_rate", "hr"]))
-                .and_then(parse_number);
+            let value =
+                object.and_then(|o| first_number(o, &["value", "heartRate", "heart_rate", "hr"]));
             let (Some(timestamp), Some(value)) = (timestamp, value) else {
                 diagnostics.push(format!("item {index}: 缺少 timestamp/value"));
                 continue;
             };
-            if !value.is_finite() || !(0.0..=300.0).contains(&value) {
+            // 0 bpm 是哨兵「没测到」，不是一次真实心跳。分数类指标的 0 不能走这条规则。
+            if !value.is_finite() || !(1.0..=300.0).contains(&value) {
                 diagnostics.push(format!("item {index}: heart rate 数值无效"));
                 continue;
             }
@@ -88,21 +88,6 @@ impl Normalizer {
             records,
             diagnostics,
             capability: CapabilityStatus::Verified,
-        })
-    }
-
-    #[allow(dead_code)]
-    pub fn normalize_sleep(raw: &Value) -> Result<Vec<SleepSession>> {
-        Self::normalize_sleep_with_diagnostics(raw)?.into_result("sleep")
-    }
-
-    #[allow(dead_code)]
-    pub fn normalize_sleep_with_diagnostics(raw: &Value) -> Result<NormalizedBatch<SleepSession>> {
-        let band = Self::normalize_band_data(raw)?;
-        Ok(NormalizedBatch {
-            records: band.sleep_sessions,
-            diagnostics: band.diagnostics,
-            capability: band.capability,
         })
     }
 
@@ -140,7 +125,20 @@ impl Normalizer {
             if let Some(summary) = decoded_summary.as_ref().and_then(Value::as_object) {
                 if let Some(sleep) = summary.get("slp").and_then(Value::as_object) {
                     match sleep_from_band_item(object, summary, sleep, source_scope.clone()) {
-                        Ok(session) => sleep_sessions.push(session),
+                        Ok(session) => {
+                            if session.stages.is_empty()
+                                && sleep
+                                    .get("stage")
+                                    .and_then(Value::as_array)
+                                    .is_some_and(|stages| !stages.is_empty())
+                                && first_value(summary, &["tz"]).is_none()
+                            {
+                                diagnostics.push(format!(
+                                    "item {index}: 睡眠阶段缺少 tz，未按 UTC 臆造时刻"
+                                ));
+                            }
+                            sleep_sessions.push(session);
+                        }
                         Err(message) => diagnostics.push(format!("item {index}: {message}")),
                     }
                 }
@@ -177,18 +175,8 @@ impl Normalizer {
         })
     }
 
-    #[allow(dead_code)]
-    pub fn normalize_workouts(raw: &Value) -> Result<Vec<Workout>> {
-        Self::normalize_workouts_with_sport(raw, None)
-    }
-
     pub fn normalize_workouts_with_sport(raw: &Value, sport: Option<&str>) -> Result<Vec<Workout>> {
         Self::normalize_workouts_with_diagnostics_and_sport(raw, sport)?.into_result("workouts")
-    }
-
-    #[allow(dead_code)]
-    pub fn normalize_workouts_with_diagnostics(raw: &Value) -> Result<NormalizedBatch<Workout>> {
-        Self::normalize_workouts_with_diagnostics_and_sport(raw, None)
     }
 
     fn normalize_workouts_with_diagnostics_and_sport(
@@ -404,7 +392,7 @@ impl Normalizer {
                             .and_then(parse_timestamp)
                             .or_else(|| {
                                 let offset_ms = first_number(sample, &["s", "offset"])? as i64;
-                                base.map(|value| value + Duration::milliseconds(offset_ms))
+                                base.and_then(|value| add_milliseconds(value, offset_ms))
                             });
                         let hrv = first_value(sample, &["sdnn", "rmssd", "hrv", "value"])
                             .and_then(parse_number);
@@ -469,12 +457,9 @@ impl Normalizer {
     ) -> Result<NormalizedBatch<DailyMetric>> {
         let items = extract_items(raw)?;
         let mut indexed_items = items.iter().enumerate().collect::<Vec<_>>();
-        indexed_items.sort_by_key(|(_, item)| {
-            item.as_object()
-                .and_then(|object| first_number(object, &["timestamp", "time", "startTime"]))
-                .map(|value| value.round() as i64)
-                .unwrap_or(0)
-        });
+        // 有明确日历日的条目排在后面：canonical 按插入覆盖，date-only 不能输给
+        // 仅有 epoch、按 UTC 切日的回退值。
+        indexed_items.sort_by_key(|(_, item)| daily_summary_sort_key(item));
         let mut records = Vec::new();
         let mut diagnostics = Vec::new();
         for (index, item) in indexed_items {
@@ -578,22 +563,21 @@ fn sleep_from_band_item(
         return Err("睡眠结束时间不晚于开始时间".to_string());
     }
 
-    let deep_minutes = first_number(sleep, &["dp", "deepMinutes"])
-        .map(|value| value.round() as i32)
-        .unwrap_or_else(|| band_stage_minutes(sleep, 5));
-    let light_minutes = first_number(sleep, &["lt", "lightMinutes"])
-        .map(|value| value.round() as i32)
-        .unwrap_or_else(|| band_stage_minutes(sleep, 4));
-    let awake_minutes = first_number(sleep, &["wk", "awakeMinutes"])
-        .map(|value| value.round() as i32)
-        .unwrap_or_else(|| band_stage_minutes(sleep, 7));
+    let deep_minutes = optional_band_stage_minutes(sleep, &["dp", "deepMinutes"], &[5]);
+    let light_minutes = optional_band_stage_minutes(sleep, &["lt", "lightMinutes"], &[4]);
+    let awake_minutes = optional_band_stage_minutes(sleep, &["wk", "awakeMinutes"], &[7]);
     let rem_from_field = first_number(sleep, &["rm", "remMinutes", "rem"])
         .map(|value| value.round() as i32)
         .filter(|value| *value >= 0);
     let rem_from_stages = band_stage_minutes(sleep, 8) + band_stage_minutes(sleep, 11);
     let span_minutes = (end_time - start_time).num_minutes().max(0) as i32;
     let rem_minutes = rem_from_field.or_else(|| (rem_from_stages > 0).then_some(rem_from_stages));
-    let duration_minutes = (span_minutes - awake_minutes).max(0);
+    let duration_minutes = first_number(sleep, &["duration", "durationMinutes"])
+        .map(|value| value.round() as i32)
+        .unwrap_or_else(|| match awake_minutes {
+            Some(awake) => (span_minutes - awake).max(0),
+            None => span_minutes,
+        });
     let source_device = device_id(item)
         .or_else(|| first_string(summary, &["sn"]))
         .filter(|value| !value.is_empty());
@@ -639,10 +623,10 @@ fn sleep_from_flat_object(object: &Map<String, Value>) -> Option<SleepSession> {
     if end_time <= start_time {
         return None;
     }
-    let awake_minutes = first_number(object, &["awake_minutes", "awakeMinutes", "awake"])
-        .map(duration_to_minutes)
-        .unwrap_or(0);
+    let awake_minutes =
+        first_number(object, &["awake_minutes", "awakeMinutes", "awake"]).map(duration_to_minutes);
     let source_device = device_id(object);
+    let span_minutes = (end_time - start_time).num_minutes() as i32;
     Some(SleepSession {
         sleep_id,
         start_time,
@@ -653,13 +637,14 @@ fn sleep_from_flat_object(object: &Map<String, Value>) -> Option<SleepSession> {
             &["duration_minutes", "durationMinutes", "duration"],
         )
         .map(duration_to_minutes)
-        .unwrap_or_else(|| ((end_time - start_time).num_minutes() as i32 - awake_minutes).max(0)),
+        .unwrap_or_else(|| match awake_minutes {
+            Some(awake) => (span_minutes - awake).max(0),
+            None => span_minutes.max(0),
+        }),
         deep_minutes: first_number(object, &["deep_minutes", "deepMinutes", "deep"])
-            .map(duration_to_minutes)
-            .unwrap_or(0),
+            .map(duration_to_minutes),
         light_minutes: first_number(object, &["light_minutes", "lightMinutes", "light"])
-            .map(duration_to_minutes)
-            .unwrap_or(0),
+            .map(duration_to_minutes),
         rem_minutes: first_number(object, &["rem_minutes", "remMinutes", "rem"])
             .map(duration_to_minutes),
         awake_minutes,
@@ -700,10 +685,13 @@ fn sleep_stages_from_band(
     else {
         return Vec::new();
     };
-    let timezone_offset = first_number(summary, &["tz"])
-        .map(|value| value.round() as i64)
-        .unwrap_or(0)
-        .clamp(-18 * 3600, 18 * 3600);
+    // 缺 tz 不能当成 UTC 0：旧固件经常不带这个字段，静默用 0 会把阶段整体平移几个时区。
+    let Some(timezone_offset) = first_value(summary, &["tz"])
+        .and_then(timezone_offset_seconds)
+        .map(|value| value.clamp(-18 * 3600, 18 * 3600))
+    else {
+        return Vec::new();
+    };
     let Some(local_midnight) = date.and_hms_opt(0, 0, 0) else {
         return Vec::new();
     };
@@ -727,8 +715,9 @@ fn sleep_stages_from_band(
                 if stop < start {
                     return None;
                 }
-                let start_time = anchor + Duration::minutes(start);
-                let end_time = anchor + Duration::minutes(stop + 1);
+                let start_time = add_minutes(anchor, start)?;
+                let end_minutes = stop.checked_add(1)?;
+                let end_time = add_minutes(anchor, end_minutes)?;
                 if end_time <= start_time {
                     return None;
                 }
@@ -750,7 +739,10 @@ fn sleep_stages_from_band(
     let session_start =
         first_value(sleep, &["st", "startTime", "start_time"]).and_then(parse_timestamp);
     let session_end = first_value(sleep, &["ed", "endTime", "end_time"]).and_then(parse_timestamp);
-    let prev_day = build(utc_midnight - Duration::days(1));
+    let prev_day = Duration::try_days(1)
+        .and_then(|delta| utc_midnight.checked_sub_signed(delta))
+        .map(build)
+        .unwrap_or_default();
     match (session_start, session_end) {
         (Some(start), Some(end)) => {
             let same_day = build(utc_midnight);
@@ -823,6 +815,25 @@ fn workout_sample_count(object: &Map<String, Value>) -> i64 {
         }
     }
     0
+}
+
+/// 阶段分钟：有字段用字段；没有字段但有 stage 数组，按 mode 求和（可以是 0）；
+/// 字段和 stage 都没有则是「未提供」，不是 0。
+fn optional_band_stage_minutes(
+    sleep: &Map<String, Value>,
+    names: &[&str],
+    modes: &[i64],
+) -> Option<i32> {
+    if let Some(value) = first_number(sleep, names) {
+        return Some(value.round() as i32);
+    }
+    sleep.get("stage").and_then(Value::as_array)?;
+    Some(
+        modes
+            .iter()
+            .map(|mode| band_stage_minutes(sleep, *mode))
+            .sum(),
+    )
 }
 
 fn band_stage_minutes(sleep: &Map<String, Value>, expected_mode: i64) -> i32 {
@@ -1089,9 +1100,10 @@ fn collect_daily_metrics(
     ];
     let mut count = 0;
     for (metric, names, unit) in metric_fields {
-        if let Some(value) =
-            first_number_from(object, parent, names).filter(|value| value.is_finite())
-        {
+        if let Some(value) = first_number_from(object, parent, names).filter(|value| {
+            value.is_finite()
+                && !((metric == "readiness" || metric.ends_with("_readiness")) && *value == 255.0)
+        }) {
             records.push(DailyMetric {
                 date: date.clone(),
                 metric: metric.into(),
@@ -1162,7 +1174,7 @@ fn collect_daily_metrics(
         if let Some((metric, unit)) = mapped_metric {
             if let Some(value) = first_value(object, &["value", "score", "charge"])
                 .and_then(parse_number)
-                .filter(|value| value.is_finite())
+                .filter(|value| value.is_finite() && !(metric == "readiness" && *value == 255.0))
             {
                 records.push(DailyMetric {
                     date,
@@ -1256,7 +1268,12 @@ fn item_object(value: &Value) -> Option<&Map<String, Value>> {
 }
 
 fn first_value<'a>(object: &'a Map<String, Value>, names: &[&str]) -> Option<&'a Value> {
-    names.iter().find_map(|name| object.get(*name))
+    names
+        .iter()
+        .filter_map(|name| object.get(*name))
+        .find(|value| {
+            !value.is_null() && !value.as_str().is_some_and(|text| text.trim().is_empty())
+        })
 }
 
 fn first_value_from<'a>(
@@ -1268,11 +1285,14 @@ fn first_value_from<'a>(
 }
 
 fn first_string(object: &Map<String, Value>, names: &[&str]) -> Option<String> {
-    first_value(object, names).and_then(|value| match value {
-        Value::String(value) if !value.trim().is_empty() => Some(value.clone()),
-        Value::Number(value) => Some(value.to_string()),
-        _ => None,
-    })
+    names
+        .iter()
+        .filter_map(|name| object.get(*name))
+        .find_map(|value| match value {
+            Value::String(value) if !value.trim().is_empty() => Some(value.clone()),
+            Value::Number(value) => Some(value.to_string()),
+            _ => None,
+        })
 }
 
 /// 解析云端的 `heart_range`：心率区间分布。
@@ -1291,7 +1311,7 @@ fn parse_heart_range(raw: Option<&str>) -> Vec<HeartRateZoneBucket> {
         return Vec::new();
     };
     let mut buckets = Vec::new();
-    for (index, part) in text.split(';').filter(|part| !part.is_empty()).enumerate() {
+    for (index, part) in text.split(';').enumerate() {
         let mut bits = part.split(',');
         let (Some(seconds), Some(upper)) = (bits.next(), bits.next()) else {
             continue;
@@ -1315,8 +1335,19 @@ fn parse_heart_range(raw: Option<&str>) -> Vec<HeartRateZoneBucket> {
     buckets
 }
 
+fn add_milliseconds(base: DateTime<Utc>, offset_ms: i64) -> Option<DateTime<Utc>> {
+    Duration::try_milliseconds(offset_ms).and_then(|delta| base.checked_add_signed(delta))
+}
+
+fn add_minutes(base: DateTime<Utc>, minutes: i64) -> Option<DateTime<Utc>> {
+    Duration::try_minutes(minutes).and_then(|delta| base.checked_add_signed(delta))
+}
+
 fn first_number(object: &Map<String, Value>, names: &[&str]) -> Option<f64> {
-    first_value(object, names).and_then(parse_number)
+    names
+        .iter()
+        .filter_map(|name| object.get(*name))
+        .find_map(parse_number)
 }
 
 fn first_number_from(
@@ -1324,15 +1355,16 @@ fn first_number_from(
     nested: Option<&Map<String, Value>>,
     names: &[&str],
 ) -> Option<f64> {
-    first_value_from(object, nested, names).and_then(parse_number)
+    first_number(object, names).or_else(|| nested.and_then(|value| first_number(value, names)))
 }
 
 fn parse_number(value: &Value) -> Option<f64> {
-    match value {
-        Value::Number(number) => number.as_f64(),
-        Value::String(text) => text.trim().parse::<f64>().ok(),
-        _ => None,
-    }
+    let number = match value {
+        Value::Number(number) => number.as_f64()?,
+        Value::String(text) => text.trim().parse::<f64>().ok()?,
+        _ => return None,
+    };
+    number.is_finite().then_some(number)
 }
 
 fn parse_timestamp(value: &Value) -> Option<DateTime<Utc>> {
@@ -1343,6 +1375,8 @@ fn parse_timestamp(value: &Value) -> Option<DateTime<Utc>> {
     // Zepp event payloads sometimes carry the calendar day as a compact
     // integer (`dayId: 20260812`).  Guard against interpreting such values
     // as epoch seconds, which would silently produce dates in 1970.
+    // 数字本身就是本地日历日；缺时区时保持 UTC 零点，不编一个偏移。
+    // 有 `timeZone` 的切日走 `summary_date` / `parse_date_with_zone`。
     let compact = number as i64;
     if (19000101..=21001231).contains(&compact) {
         return NaiveDate::parse_from_str(&format!("{compact}"), "%Y%m%d")
@@ -1373,32 +1407,185 @@ fn parse_date(value: &Value) -> Option<String> {
         if NaiveDate::parse_from_str(text, "%Y-%m-%d").is_ok() {
             return Some(text.to_owned());
         }
-        return DateTime::parse_from_rfc3339(text)
-            .ok()
-            .map(|dt| dt.with_timezone(&Utc).format("%Y-%m-%d").to_string());
+        if let Ok(dt) = DateTime::parse_from_rfc3339(text) {
+            return Some(dt.date_naive().format("%Y-%m-%d").to_string());
+        }
+    }
+    if let Some(number) = parse_number(value) {
+        let compact = number as i64;
+        if (19000101..=21001231).contains(&compact) {
+            return NaiveDate::parse_from_str(&format!("{compact}"), "%Y%m%d")
+                .ok()
+                .map(|date| date.format("%Y-%m-%d").to_string());
+        }
     }
     parse_timestamp(value).map(|dt| dt.format("%Y-%m-%d").to_string())
+}
+
+fn parse_date_with_zone(value: &Value, offset_secs: Option<i64>) -> Option<String> {
+    // Numeric strings are epochs too; retain the event's timezone when
+    // assigning meals (and other daily metrics) to a calendar day.
+    if value.as_str().is_some() && parse_number(value).is_none() {
+        return parse_date(value);
+    }
+    if let Some(number) = parse_number(value) {
+        let compact = number as i64;
+        if (19000101..=21001231).contains(&compact) {
+            return parse_date(value);
+        }
+        let utc = parse_timestamp(value)?;
+        let local = match offset_secs {
+            Some(secs) => utc.checked_add_signed(Duration::seconds(secs))?,
+            None => utc,
+        };
+        return Some(local.format("%Y-%m-%d").to_string());
+    }
+    parse_date(value)
 }
 
 fn summary_date(
     object: &Map<String, Value>,
     nested: Option<&Map<String, Value>>,
 ) -> Option<String> {
-    first_value_from(
+    if let Some(value) = first_value_from(
         object,
         nested,
-        &[
-            "date",
-            "day",
-            "dayId",
-            "dateString",
-            "localDate",
-            "timestamp",
-            "time",
-            "startTime",
-        ],
-    )
-    .and_then(parse_date)
+        &["date", "day", "dayId", "dateString", "localDate"],
+    ) {
+        return parse_date(value);
+    }
+    let offset = timezone_offset_from(object, nested);
+    first_value_from(object, nested, &["timestamp", "time", "startTime"])
+        .and_then(|value| parse_date_with_zone(value, offset))
+}
+
+/// Canonical 按插入覆盖：有明确日历日的条目必须排在 epoch 回退之后，
+/// 否则 date-only 永远被 UTC 切日的 timestamp 盖掉。
+fn daily_summary_sort_key(item: &Value) -> (u8, i64) {
+    let Some(object) = item.as_object() else {
+        return (0, 0);
+    };
+    let nested = object.get("value").and_then(Value::as_object);
+    let calendar = ["date", "day", "dayId", "dateString", "localDate"];
+    let explicit = first_value_from(object, nested, &calendar).is_some()
+        || nested
+            .and_then(|value| value.get("samples"))
+            .and_then(Value::as_array)
+            .is_some_and(|samples| {
+                samples.iter().any(|sample| {
+                    sample
+                        .as_object()
+                        .is_some_and(|object| first_value(object, &calendar).is_some())
+                })
+            });
+    let timestamp = first_number_from(object, nested, &["timestamp", "time", "startTime"])
+        .map(|value| value.round() as i64)
+        .unwrap_or(0);
+    (u8::from(explicit), timestamp)
+}
+
+fn timezone_offset_from(
+    object: &Map<String, Value>,
+    nested: Option<&Map<String, Value>>,
+) -> Option<i64> {
+    first_value_from(object, nested, &["timeZone", "time_zone", "tz"])
+        .and_then(timezone_offset_seconds)
+}
+
+fn timezone_offset_seconds(value: &Value) -> Option<i64> {
+    match value {
+        Value::Number(_) => parse_number(value).and_then(offset_from_number),
+        Value::String(text) => parse_timezone_text(text),
+        _ => None,
+    }
+}
+
+fn offset_from_number(value: f64) -> Option<i64> {
+    if !value.is_finite() {
+        return None;
+    }
+    let raw = value.round() as i64;
+    let seconds = if raw.abs() > 18 * 3600 {
+        if raw % 1000 != 0 {
+            return None;
+        }
+        raw / 1000
+    } else {
+        raw
+    };
+    // 真实时区偏移是 15 分钟的倍数。"32" 这种设备时区序号不能当成 32 秒。
+    if seconds % 900 != 0 {
+        return None;
+    }
+    (-18 * 3600..=18 * 3600)
+        .contains(&seconds)
+        .then_some(seconds)
+}
+
+fn parse_timezone_text(text: &str) -> Option<i64> {
+    let text = text.trim();
+    if text.is_empty() {
+        return None;
+    }
+    if let Some((left, right)) = text.split_once(',') {
+        return parse_timezone_text(left).or_else(|| parse_timezone_text(right));
+    }
+    if let Ok(number) = text.parse::<f64>() {
+        return offset_from_number(number);
+    }
+    let clock = text
+        .strip_prefix("GMT")
+        .or_else(|| text.strip_prefix("Utc"))
+        .or_else(|| text.strip_prefix("UTC"))
+        .or_else(|| text.strip_prefix("gmt"))
+        .unwrap_or(text);
+    parse_offset_clock(clock).or_else(|| iana_fixed_offset(text))
+}
+
+fn parse_offset_clock(text: &str) -> Option<i64> {
+    let text = text.trim();
+    let (sign, rest) = if let Some(rest) = text.strip_prefix('+') {
+        (1_i64, rest)
+    } else {
+        let rest = text.strip_prefix('-')?;
+        (-1, rest)
+    };
+    let (hours, minutes) = if let Some((hours, minutes)) = rest.split_once(':') {
+        (hours.parse::<i64>().ok()?, minutes.parse::<i64>().ok()?)
+    } else if rest.len() == 4 && rest.chars().all(|ch| ch.is_ascii_digit()) {
+        (
+            rest[..2].parse::<i64>().ok()?,
+            rest[2..].parse::<i64>().ok()?,
+        )
+    } else {
+        (rest.parse::<i64>().ok()?, 0)
+    };
+    if !(0..=18).contains(&hours) || !(0..60).contains(&minutes) {
+        return None;
+    }
+    let seconds = sign * (hours * 3600 + minutes * 60);
+    (seconds % 900 == 0).then_some(seconds)
+}
+
+fn iana_fixed_offset(name: &str) -> Option<i64> {
+    // 只收录没有夏令时、偏移全年固定的区。有 DST 的名字宁可不套，也不编一个偏移。
+    match name {
+        "Asia/Shanghai" | "Asia/Hong_Kong" | "Asia/Taipei" | "Asia/Chongqing" | "Asia/Harbin"
+        | "PRC" | "Hongkong" => Some(8 * 3600),
+        "Asia/Tokyo" | "Asia/Seoul" | "Japan" => Some(9 * 3600),
+        "UTC" | "Etc/UTC" | "Etc/GMT" | "GMT" | "Zulu" => Some(0),
+        _ => None,
+    }
+}
+
+fn timestamp_not_unreasonably_future(timestamp: DateTime<Utc>) -> bool {
+    if timestamp.year() > 2100 {
+        return false;
+    }
+    match Utc::now().checked_add_signed(Duration::days(1)) {
+        Some(limit) => timestamp <= limit,
+        None => true,
+    }
 }
 
 /// What one wellness raw response yields once parsed.
@@ -1428,7 +1615,14 @@ impl Normalizer {
     pub fn normalize_wellness(source_key: &str, raw: &Value) -> WellnessNormalizedData {
         let label = source_key.split(':').nth(1).unwrap_or_default();
         let mut out = WellnessNormalizedData::default();
-        let Some(items) = raw.get("items").and_then(Value::as_array) else {
+        // Match the envelopes counted by endpoint diagnostics. The connector
+        // preserves the response, so `data.items` is not unwrapped upstream.
+        let Some(items) = raw
+            .get("items")
+            .and_then(Value::as_array)
+            .or_else(|| raw.get("data").and_then(Value::as_array))
+            .or_else(|| raw.get("data")?.get("items")?.as_array())
+        else {
             out.diagnostics
                 .push(format!("{label}: 报文没有 items 数组"));
             return out;
@@ -1531,12 +1725,12 @@ fn food_metrics(items: &[Value], out: &mut WellnessNormalizedData) {
         let Some(object) = item.as_object() else {
             continue;
         };
-        let Some(date) = summary_date(object, None) else {
+        let nested = object.get("value").and_then(Value::as_object);
+        let Some(date) = summary_date(object, nested) else {
             out.diagnostics.push("food: 一条记录没有可用的日期".into());
             continue;
         };
         // 数值可能挂在顶层，也可能在 `value` 里——别的 v2 流两种形状都出现过。
-        let nested = object.get("value").and_then(Value::as_object);
         let mut matched: Vec<&str> = Vec::new();
         for Macro {
             metric,
@@ -1757,12 +1951,20 @@ impl Normalizer {
             // Unix **seconds**, not milliseconds. This endpoint differs from
             // every event surface, and the shared `parse_timestamp` would read a
             // millisecond value as a date fifty thousand years from now.
+            //
+            // `timeZone` 在同一账号上是 IANA / GMT+08:00 / 毫秒偏移的杂烩，
+            // 不能拿它改写这个绝对时刻。日历日只在切日时用可解析的偏移。
             let Some(timestamp) = first_number(object, &["generatedTime", "createTime", "time"])
                 .filter(|value| value.is_finite() && *value > 0.0)
                 .and_then(|seconds| DateTime::from_timestamp(seconds as i64, 0))
             else {
                 out.diagnostics
                     .push("weight: 一条记录没有可用的时间戳".into());
+                continue;
+            };
+            if !timestamp_not_unreasonably_future(timestamp) {
+                out.diagnostics
+                    .push("weight: 一条记录的时间戳超出合理范围，已忽略".into());
                 continue;
             };
             let Some(summary) = object.get("summary").and_then(Value::as_object) else {
@@ -1961,8 +2163,7 @@ fn hrv_rmssd_samples(items: &[Value], out: &mut WellnessNormalizedData) {
             let offset_ms = first_number(object, &["s", "offset"])
                 .map(|value| value.round() as i64)
                 .unwrap_or(0);
-            let Some(timestamp) = start.checked_add_signed(Duration::milliseconds(offset_ms))
-            else {
+            let Some(timestamp) = add_milliseconds(start, offset_ms) else {
                 continue;
             };
             out.metric_samples.push(MetricSample {
@@ -2415,6 +2616,122 @@ fn duration_to_minutes(value: f64) -> i32 {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn food_accepts_probe_envelopes_and_nested_dates_without_inventing_macros() {
+        // Synthetic fixtures: the reporter has not supplied a Food response.
+        let items = json!([
+            {"date": "2026-09-18", "calories": 500, "protein": 20},
+            {"value": {"date": "2026-09-18", "calories": "300", "fat": 0}},
+            {"date": "2026-09-19", "value": {"carbs": 40}},
+            {"date": "2026-09-19", "unknownNutrient": 123},
+            {"date": "2026-09-19", "calories": -1, "protein": 99999}
+        ]);
+        for raw in [
+            json!({"items": items}),
+            json!({"data": items}),
+            json!({"code": 200, "data": {"items": items}}),
+        ] {
+            let batch = Normalizer::normalize_wellness("wellness:food:v2_events", &raw);
+            let rows: BTreeMap<_, _> = batch
+                .daily_metrics
+                .iter()
+                .map(|row| {
+                    (
+                        (row.date.as_str(), row.metric.as_str()),
+                        (row.value, row.unit.as_str()),
+                    )
+                })
+                .collect();
+            assert_eq!(
+                rows,
+                BTreeMap::from([
+                    (("2026-09-18", "intake_calories"), (800.0, "kcal")),
+                    (("2026-09-18", "intake_protein_g"), (20.0, "g")),
+                    (("2026-09-18", "intake_fat_g"), (0.0, "g")),
+                    (("2026-09-19", "intake_carbs_g"), (40.0, "g")),
+                ])
+            );
+            assert!(batch.metric_samples.is_empty());
+        }
+    }
+
+    #[test]
+    fn food_epoch_strings_respect_local_day_and_explicit_dates() {
+        let epoch = DateTime::parse_from_rfc3339("2026-09-18T23:30:00Z").unwrap();
+        for time in [
+            json!(epoch.timestamp()),
+            json!(epoch.timestamp().to_string()),
+            json!(epoch.timestamp_millis()),
+            json!(epoch.timestamp_millis().to_string()),
+        ] {
+            let batch = Normalizer::normalize_wellness(
+                "wellness:food:v2_events",
+                &json!({
+                    "items": [{"value": {"time": time, "timeZone": "+02:00", "calories": 100}}]
+                }),
+            );
+            assert_eq!(batch.daily_metrics.len(), 1);
+            assert_eq!(batch.daily_metrics[0].date, "2026-09-19");
+        }
+        assert_eq!(
+            parse_date(&json!("20260918")).as_deref(),
+            Some("2026-09-18")
+        );
+        assert_eq!(parse_date(&json!("not-a-date")), None);
+        let batch = Normalizer::normalize_wellness(
+            "wellness:food:v2_events",
+            &json!({
+                "items": [{"date": "2026-09-17", "time": epoch.timestamp_millis(),
+                           "timeZone": "+02:00", "calories": 100}]
+            }),
+        );
+        assert_eq!(batch.daily_metrics[0].date, "2026-09-17");
+    }
+
+    #[test]
+    fn food_unknown_or_encoded_payloads_remain_unparsed() {
+        for raw in [
+            json!({"data": "encoded"}),
+            json!({"items": []}),
+            json!({"items": [{"date": "2026-09-18", "unknownNutrient": 123}]}),
+            json!({"items": [{"value": "encoded"}]}),
+            json!({"items": [{"calories": 100}]}),
+        ] {
+            let batch = Normalizer::normalize_wellness("wellness:food:v2_events", &raw);
+            assert!(batch.daily_metrics.is_empty());
+            assert!(batch.metric_samples.is_empty());
+        }
+    }
+
+    #[test]
+    fn aliases_skip_missing_values_without_inventing_ids_or_losing_samples() {
+        let raw = serde_json::json!({"items":[{"timestamp":null,"time":1800000000,"value":" ","heartRate":72,"device_id":null,"deviceId":"D85403FFFEE4D576"}]});
+        let samples = Normalizer::normalize_heart_rate(&raw).unwrap();
+        assert_eq!(samples.len(), 1);
+        assert_eq!(samples[0].value, 72.0);
+        assert_eq!(samples[0].device_id.as_deref(), Some("D85403FFFEE4D576"));
+        let raw = serde_json::json!({"data":[{"workout_id":" ","workoutId":{},"trackid":"original-id","start_time":null,"startTime":1800000000,"end_time":1800003600,"type":null,"sport_mode":6}]});
+        let workouts = Normalizer::normalize_workouts_with_sport(&raw, None).unwrap();
+        assert_eq!(workouts[0].workout_id, "original-id");
+        let outer = serde_json::json!({"value":null,"score":"bad","zero":0,"flag":false});
+        let nested = serde_json::json!({"value":42});
+        assert_eq!(
+            first_number_from(
+                outer.as_object().unwrap(),
+                nested.as_object(),
+                &["value", "score"]
+            ),
+            Some(42.0)
+        );
+        assert_eq!(
+            first_value(outer.as_object().unwrap(), &["zero", "value"]),
+            Some(&serde_json::json!(0))
+        );
+        assert_eq!(
+            first_value(outer.as_object().unwrap(), &["flag", "value"]),
+            Some(&serde_json::json!(false))
+        );
+    }
 
     /// 云端一直在给、以前一个都没取的那批运动汇总字段。
     ///
@@ -2448,7 +2765,7 @@ mod tests {
             }]
         });
 
-        let records = Normalizer::normalize_workouts(&raw).expect("应当能解析");
+        let records = Normalizer::normalize_workouts_with_sport(&raw, None).expect("应当能解析");
         let workout = records.first().expect("应当有一条运动");
 
         assert_eq!(workout.min_hr, Some(83));
@@ -2507,7 +2824,7 @@ mod tests {
             }]
         });
 
-        let records = Normalizer::normalize_workouts(&raw).expect("应当能解析");
+        let records = Normalizer::normalize_workouts_with_sport(&raw, None).expect("应当能解析");
         let workout = records.first().expect("应当有一条运动");
 
         assert_eq!(workout.min_hr, Some(94));
@@ -2523,6 +2840,24 @@ mod tests {
         // 骑行确实有心率区间
         assert_eq!(workout.hr_zones.len(), 6);
         assert_eq!(workout.hr_zones[3].seconds, 102);
+    }
+
+    #[test]
+    fn regression_markdown_heart_range_preserves_empty_zone_positions() {
+        for raw in [
+            ";10,141;;20,170;",
+            ";10,141;broken;20,170;",
+            ";10,141; ;20,170;",
+        ] {
+            let zones = parse_heart_range(Some(raw));
+            assert_eq!(
+                zones
+                    .iter()
+                    .map(|zone| (zone.index, zone.upper_bound_bpm, zone.seconds))
+                    .collect::<Vec<_>>(),
+                vec![(1, 141, 10), (3, 170, 20)]
+            );
+        }
     }
 
     /// 全零的心率区间是「这次没有心率」，不是「每个区间待了 0 秒」。
@@ -2547,7 +2882,7 @@ mod tests {
                 "altitude_ascend": 59, "altitude_descend": 59
             }]
         });
-        let records = Normalizer::normalize_workouts(&raw).unwrap();
+        let records = Normalizer::normalize_workouts_with_sport(&raw, None).unwrap();
         let workout = records.first().unwrap();
         assert_eq!(workout.elevation_gain_m, Some(59.0));
         assert_eq!(workout.elevation_loss_m, Some(59.0));
@@ -2576,7 +2911,31 @@ mod tests {
     #[test]
     fn empty_or_wrong_shape_is_not_success() {
         assert!(Normalizer::normalize_heart_rate(&json!({"items": []})).is_err());
-        assert!(Normalizer::normalize_sleep(&json!({"data": "H4sI..."})).is_err());
+        assert!(Normalizer::normalize_band_data(&json!({"data": "H4sI..."}))
+            .map_or(true, |band| band.sleep_sessions.is_empty()));
+    }
+
+    /// 扁平睡眠报文没有阶段字段时，deep/light/awake/rem 必须是 None，
+    /// 不能填 0；时长也不能用「整段减去臆造的 0 分钟清醒」来算。
+    #[test]
+    fn a_flat_sleep_record_without_stages_does_not_invent_zeros() {
+        let sessions = Normalizer::normalize_band_data(&json!({
+            "items": [{
+                "sleep_id": "flat-no-stages",
+                "start_time": 1_700_000_000i64,
+                "end_time": 1_700_028_800i64,
+                "score": 80
+            }]
+        }))
+        .unwrap()
+        .sleep_sessions;
+        assert_eq!(sessions.len(), 1);
+        let sleep = &sessions[0];
+        assert_eq!(sleep.deep_minutes, None);
+        assert_eq!(sleep.light_minutes, None);
+        assert_eq!(sleep.rem_minutes, None);
+        assert_eq!(sleep.awake_minutes, None);
+        assert_eq!(sleep.duration_minutes, 480);
     }
 
     #[test]
@@ -2641,6 +3000,7 @@ mod tests {
     #[test]
     fn missing_rem_is_not_invented_from_in_bed_subtraction() {
         let summary = json!({
+            "tz": 28800,
             "slp": {
                 "st": 1_700_000_000i64,
                 "ed": 1_700_021_600i64,
@@ -2694,6 +3054,152 @@ mod tests {
         assert!(result.sleep_sessions[0].stages.is_empty());
     }
 
+    /// 后端心率归一目前只认「固定偏移」，这条用例把该契约按用户要求的三个
+    /// 时区钉死。
+    ///
+    /// `heart_rate_from_band_item` 拿不到来源 IANA 时区：云端 summary 只给当天
+    /// 相对 UTC 的固定 `tz` 秒数，`data_hr` 是按当地零点起的分钟序列。所以第 m
+    /// 分钟的采样落在 `当地零点 - tz + m 分钟`。下面表格只断言这套固定偏移算术，
+    /// 不推断设备/云端在夏令时切换日实际用了哪个偏移：London、New_York 的春、
+    /// 秋切换日都按切换前后的固定偏移分别入库，因为原始字段无法证明哪一侧生效。
+    /// 真要把切换日改成夏令时语义，得先拿到那些天 Zepp 原始报文里实际的 `tz`。
+    #[test]
+    fn heart_rate_from_band_item_uses_the_summary_fixed_utc_offset() {
+        struct Case {
+            name: &'static str,
+            date: &'static str,
+            tz: i64,
+            // 固定偏移下当地第 0 分钟对应的 UTC 时刻。
+            utc_midnight: &'static str,
+        }
+
+        let cases = [
+            // Europe/London：冬 GMT，夏 BST(+3600)。
+            Case {
+                name: "London winter GMT",
+                date: "2026-01-15",
+                tz: 0,
+                utc_midnight: "2026-01-15T00:00:00Z",
+            },
+            Case {
+                name: "London summer BST",
+                date: "2026-07-15",
+                tz: 3600,
+                utc_midnight: "2026-07-14T23:00:00Z",
+            },
+            // America/New_York：冬 EST(-18000)，夏 EDT(-14400)。
+            Case {
+                name: "New York winter EST",
+                date: "2026-01-15",
+                tz: -18_000,
+                utc_midnight: "2026-01-15T05:00:00Z",
+            },
+            Case {
+                name: "New York summer EDT",
+                date: "2026-07-15",
+                tz: -14_400,
+                utc_midnight: "2026-07-15T04:00:00Z",
+            },
+            // Asia/Shanghai（北京）：CST(+28800)，无夏令时。
+            Case {
+                name: "Beijing CST",
+                date: "2026-07-15",
+                tz: 28_800,
+                utc_midnight: "2026-07-14T16:00:00Z",
+            },
+            // London 春切换日(2026-03-29)、秋切换日(2026-10-25)的切换前/后偏移。
+            Case {
+                name: "London switch 2026-03-29 before GMT",
+                date: "2026-03-29",
+                tz: 0,
+                utc_midnight: "2026-03-29T00:00:00Z",
+            },
+            Case {
+                name: "London switch 2026-03-29 after BST",
+                date: "2026-03-29",
+                tz: 3600,
+                utc_midnight: "2026-03-28T23:00:00Z",
+            },
+            Case {
+                name: "London switch 2026-10-25 before BST",
+                date: "2026-10-25",
+                tz: 3600,
+                utc_midnight: "2026-10-24T23:00:00Z",
+            },
+            Case {
+                name: "London switch 2026-10-25 after GMT",
+                date: "2026-10-25",
+                tz: 0,
+                utc_midnight: "2026-10-25T00:00:00Z",
+            },
+            // New York 春切换日(2026-03-08)、秋切换日(2026-11-01)的切换前/后偏移。
+            Case {
+                name: "New York switch 2026-03-08 before EST",
+                date: "2026-03-08",
+                tz: -18_000,
+                utc_midnight: "2026-03-08T05:00:00Z",
+            },
+            Case {
+                name: "New York switch 2026-03-08 after EDT",
+                date: "2026-03-08",
+                tz: -14_400,
+                utc_midnight: "2026-03-08T04:00:00Z",
+            },
+            Case {
+                name: "New York switch 2026-11-01 before EDT",
+                date: "2026-11-01",
+                tz: -14_400,
+                utc_midnight: "2026-11-01T04:00:00Z",
+            },
+            Case {
+                name: "New York switch 2026-11-01 after EST",
+                date: "2026-11-01",
+                tz: -18_000,
+                utc_midnight: "2026-11-01T05:00:00Z",
+            },
+        ];
+
+        // 每个当地日一份 1440 字节 data_hr：第 0/1/1439 分钟各放一个 20..=240
+        // 内的值，其余为 0 会在归一里被过滤掉，用来核对分钟索引与取值。
+        let mut bytes = vec![0_u8; 1440];
+        bytes[0] = 60;
+        bytes[1] = 61;
+        bytes[1439] = 62;
+        let expected = [(0_i64, 60.0_f64), (1, 61.0), (1439, 62.0)];
+
+        for case in cases {
+            let summary = json!({ "tz": case.tz });
+            let result = Normalizer::normalize_band_data(&json!({
+                "data": [{
+                    "uuid": "hr-tz",
+                    "date_time": case.date,
+                    "device_id": "SN-HR",
+                    "data_hr": STANDARD.encode(&bytes),
+                    "summary": STANDARD.encode(serde_json::to_vec(&summary).unwrap())
+                }]
+            }))
+            .unwrap();
+
+            let midnight = DateTime::parse_from_rfc3339(case.utc_midnight)
+                .unwrap()
+                .with_timezone(&Utc);
+            let samples = &result.heart_rate_samples;
+            assert_eq!(samples.len(), 3, "{}：只应留下 3 个采样", case.name);
+            for (sample, (minute, value)) in samples.iter().zip(expected) {
+                assert_eq!(sample.metric, "heart_rate", "{}", case.name);
+                assert_eq!(sample.unit, "bpm", "{}", case.name);
+                assert_eq!(sample.value, value, "{}：第 {minute} 分钟取值", case.name);
+                assert_eq!(
+                    sample.timestamp,
+                    midnight + Duration::minutes(minute),
+                    "{}：第 {minute} 分钟应为 {} 起的第 {minute} 分钟",
+                    case.name,
+                    case.utc_midnight
+                );
+            }
+        }
+    }
+
     #[test]
     fn workout_numeric_type_wins_over_endpoint_sport_name() {
         // /v1/sport/run/history.json 不带过滤会返回全部运动类型；
@@ -2719,15 +3225,52 @@ mod tests {
     }
 
     #[test]
+    fn issue_24_cloud_code_7_is_trail_running() {
+        // Reconstructed cloud-shaped input from the public screenshot and
+        // exported summary, not a claim that the full raw response was supplied.
+        // The original workout ID, location and health measurements are omitted.
+        for field in ["type", "sport_mode"] {
+            for code in [json!(7), json!("7")] {
+                let mut item = json!({
+                    "trackid": 1_700_000_000i64,
+                    "end_time": 1_700_000_600i64
+                });
+                item[field] = code;
+                let workouts = Normalizer::normalize_workouts_with_sport(
+                    &json!({"data": {"summary": [item]}}),
+                    Some("run"),
+                )
+                .unwrap();
+                let workout = &workouts[0];
+                assert_eq!(workout.zepp_type, Some(7));
+                assert_eq!(workout.normalized_type, "trail_running");
+                assert_eq!(workout.workout_type, "trail_running");
+                assert_eq!(workout.effective_type, "trail_running");
+                assert_eq!(workout.type_source, "numeric_mapped");
+                assert!(workout.user_override.is_none());
+            }
+        }
+        let swims = Normalizer::normalize_workouts_with_sport(&json!({"data": [
+            {"trackid": 1_700_001_000i64, "end_time": 1_700_001_600i64, "type": 14},
+            {"trackid": 1_700_002_000i64, "end_time": 1_700_002_600i64, "sport_name": "Open Water Swimming"}
+        ]}), None).unwrap();
+        assert_eq!(swims[0].normalized_type, "pool_swimming");
+        assert_eq!(swims[1].normalized_type, "open_water_swimming");
+    }
+
+    #[test]
     fn code_225_is_normalized_as_rucking_with_numeric_evidence() {
-        let result = Normalizer::normalize_workouts(&json!({
-            "data": { "summary": [{
-                "trackid": 1_700_300_000i64,
-                "end_time": 1_700_303_600i64,
-                "type": 225,
-                "calorie": 120
-            }] }
-        }))
+        let result = Normalizer::normalize_workouts_with_sport(
+            &json!({
+                "data": { "summary": [{
+                    "trackid": 1_700_300_000i64,
+                    "end_time": 1_700_303_600i64,
+                    "type": 225,
+                    "calorie": 120
+                }] }
+            }),
+            None,
+        )
         .unwrap();
         assert_eq!(result[0].workout_type, "rucking");
         assert_eq!(result[0].normalized_type, "rucking");
@@ -2779,12 +3322,15 @@ mod tests {
 
     #[test]
     fn extended_cloud_codes_cover_strength_and_cross_training() {
-        let result = Normalizer::normalize_workouts(&json!({
-            "data": { "summary": [
-                {"trackid": 1_700_600_000i64, "end_time": 1_700_603_600i64, "type": 52},
-                {"trackid": 1_700_700_000i64, "end_time": 1_700_703_600i64, "type": 130}
-            ] }
-        }))
+        let result = Normalizer::normalize_workouts_with_sport(
+            &json!({
+                "data": { "summary": [
+                    {"trackid": 1_700_600_000i64, "end_time": 1_700_603_600i64, "type": 52},
+                    {"trackid": 1_700_700_000i64, "end_time": 1_700_703_600i64, "type": 130}
+                ] }
+            }),
+            None,
+        )
         .unwrap();
         assert_eq!(result[0].workout_type, "strength");
         assert_eq!(result[1].workout_type, "cross_training");
@@ -2841,21 +3387,77 @@ mod tests {
         assert_eq!(session.rem_minutes, Some(8));
     }
 
+    /// 极大的 stage 分钟数不能把解码打崩，这一段直接跳过。
+    #[test]
+    fn huge_sleep_stage_minutes_are_skipped_not_panicked() {
+        let summary = json!({
+            "tz": 28800,
+            "slp": {
+                "st": 1_786_897_200i64,
+                "ed": 1_786_930_620i64,
+                "ss": 80,
+                "stage": [
+                    {"mode": 4, "start": 1e20, "stop": 1e20},
+                    {"mode": 5, "start": 1460, "stop": 1471}
+                ]
+            }
+        });
+        let result = Normalizer::normalize_band_data(&json!({
+            "data": [{
+                "uuid": "sleep-overflow",
+                "date_time": "2026-08-17",
+                "summary": STANDARD.encode(serde_json::to_vec(&summary).unwrap())
+            }]
+        }))
+        .unwrap();
+        let session = &result.sleep_sessions[0];
+        assert_eq!(session.stages.len(), 1);
+        assert_eq!(session.stages[0].stage, "deep");
+    }
+
+    /// HRV 样本上极大的毫秒偏移不能 panic，这一条跳过。
+    #[test]
+    fn huge_hrv_sample_offset_is_skipped_not_panicked() {
+        let raw = json!({
+            "items": [{
+                "value": {
+                    "startTime": 1_700_000_000i64,
+                    "samples": [
+                        {"s": 1e20, "sdnn": 40.0},
+                        {"offset": i64::MAX, "sdnn": 41.0},
+                        {"s": 1000, "sdnn": 42.0}
+                    ]
+                }
+            }]
+        });
+        let batch = Normalizer::normalize_hrv_with_diagnostics(&raw).unwrap();
+        assert_eq!(batch.records.len(), 1);
+        assert_eq!(batch.records[0].value, 42.0);
+        assert!(
+            batch.diagnostics.iter().any(|line| line.contains("HRV")),
+            "越界样本应当记诊断而不是静默丢掉全部：{:?}",
+            batch.diagnostics
+        );
+    }
+
     #[test]
     fn workout_geohash_location_is_not_gps_track() {
-        let result = Normalizer::normalize_workouts(&json!({
-            "data": {
-                "summary": [{
-                    "trackid": 1_700_000_000i64,
-                    "end_time": 1_700_003_600i64,
-                    "sport": "run",
-                    "dis": 5000,
-                    "location": "ws0fsyhekz4d",
-                    "deviceid": "AABBCCDDEEFF",
-                    "sn": "23229501001311"
-                }]
-            }
-        }))
+        let result = Normalizer::normalize_workouts_with_sport(
+            &json!({
+                "data": {
+                    "summary": [{
+                        "trackid": 1_700_000_000i64,
+                        "end_time": 1_700_003_600i64,
+                        "sport": "run",
+                        "dis": 5000,
+                        "location": "ws0fsyhekz4d",
+                        "deviceid": "AABBCCDDEEFF",
+                        "sn": "23229501001311"
+                    }]
+                }
+            }),
+            None,
+        )
         .unwrap();
         assert!(!result[0].gps_available);
         assert_eq!(result[0].sample_count, 0);
@@ -2938,6 +3540,36 @@ mod tests {
 
     /// 255 是这条流的「没测到」。`afibScore` 在本机 25 348 条里条条都是 255，
     /// 而 `hrvBaseline` / `rhrBaseline` 各有 7 条是 255。
+    #[test]
+    fn readiness_sentinels_are_absent_but_valid_boundaries_and_charge_survive() {
+        for value in [0, 100, 255] {
+            let mut item = readiness_item();
+            for field in [
+                "rdnsScore",
+                "phyScore",
+                "mentScore",
+                "hrvScore",
+                "rhrScore",
+                "skinTempScore",
+                "afibScore",
+                "ahiScore",
+            ] {
+                item["value"][field] = json!(value);
+            }
+            item["value"]["hybridCharge"] = json!(78);
+            let rows = Normalizer::normalize_daily_summary(&json!({"items": [item]})).unwrap();
+            let scores: Vec<_> = rows
+                .iter()
+                .filter(|row| row.metric == "readiness" || row.metric.ends_with("_readiness"))
+                .collect();
+            assert_eq!(scores.len(), if value == 255 { 0 } else { 8 });
+            assert!(scores.iter().all(|row| row.value == value as f64));
+            assert!(rows
+                .iter()
+                .any(|row| row.metric == "hybrid_charge" && row.value == 78.0));
+        }
+    }
+
     #[test]
     fn a_baseline_of_255_is_dropped_rather_than_stored_as_a_reading() {
         let mut item = readiness_item();
@@ -3345,6 +3977,210 @@ mod tests {
         assert_eq!(
             BODY_METRICS.len(),
             crate::storage::BODY_COMPOSITION_METRICS.len()
+        );
+    }
+
+    #[test]
+    fn parse_number_rejects_nan_and_infinity() {
+        for raw in ["NaN", "nan", "Infinity", "-Infinity", "inf", "+inf"] {
+            assert_eq!(parse_number(&json!(raw)), None, "{raw}");
+        }
+        assert_eq!(parse_number(&json!(72)), Some(72.0));
+        assert_eq!(parse_number(&json!("72.5")), Some(72.5));
+        let batch = Normalizer::normalize_heart_rate_with_diagnostics(&json!({
+            "items": [
+                {"timestamp": 1_800_000_000i64, "value": "NaN"},
+                {"timestamp": 1_800_000_060i64, "heartRate": "Infinity"},
+                {"timestamp": 1_800_000_120i64, "value": 68}
+            ]
+        }))
+        .unwrap();
+        assert_eq!(batch.records.len(), 1);
+        assert_eq!(batch.records[0].value, 68.0);
+        assert!(
+            batch.records.iter().all(|sample| sample.value.is_finite()),
+            "NaN/Infinity 不能进心率记录"
+        );
+    }
+
+    #[test]
+    fn heart_rate_zero_is_a_sentinel_not_a_reading() {
+        let batch = Normalizer::normalize_heart_rate_with_diagnostics(&json!({
+            "items": [
+                {"timestamp": 1_800_000_000i64, "value": 0},
+                {"timestamp": 1_800_000_060i64, "value": 72}
+            ]
+        }))
+        .unwrap();
+        assert_eq!(batch.records.len(), 1);
+        assert_eq!(batch.records[0].value, 72.0);
+        assert!(
+            batch
+                .diagnostics
+                .iter()
+                .any(|line| line.contains("heart rate")),
+            "0 bpm 应当记诊断：{:?}",
+            batch.diagnostics
+        );
+    }
+
+    #[test]
+    fn sleep_stages_without_tz_are_not_staged_as_utc() {
+        let summary = json!({
+            "slp": {
+                "st": 1_786_897_200i64,
+                "ed": 1_786_930_620i64,
+                "ss": 80,
+                "stage": [
+                    {"mode": 4, "start": 1460, "stop": 1471},
+                    {"mode": 5, "start": 1472, "stop": 1484}
+                ]
+            }
+        });
+        let result = Normalizer::normalize_band_data(&json!({
+            "data": [{
+                "uuid": "sleep-no-tz",
+                "date_time": "2026-08-17",
+                "summary": STANDARD.encode(serde_json::to_vec(&summary).unwrap())
+            }]
+        }))
+        .unwrap();
+        assert_eq!(result.sleep_sessions.len(), 1);
+        assert!(
+            result.sleep_sessions[0].stages.is_empty(),
+            "缺 tz 不能按 UTC 零点给阶段打时刻"
+        );
+        assert!(
+            result
+                .diagnostics
+                .iter()
+                .any(|line| line.contains("缺少 tz")),
+            "缺 tz 要记诊断：{:?}",
+            result.diagnostics
+        );
+        let with_explicit_utc = json!({
+            "tz": 0,
+            "slp": {
+                "st": 1_786_897_200i64,
+                "ed": 1_786_930_620i64,
+                "ss": 80,
+                "stage": [
+                    {"mode": 4, "start": 1460, "stop": 1471}
+                ]
+            }
+        });
+        let utc = Normalizer::normalize_band_data(&json!({
+            "data": [{
+                "uuid": "sleep-utc-tz",
+                "date_time": "2026-08-17",
+                "summary": STANDARD.encode(serde_json::to_vec(&with_explicit_utc).unwrap())
+            }]
+        }))
+        .unwrap();
+        assert_eq!(
+            utc.sleep_sessions[0].stages.len(),
+            1,
+            "报文写明 tz=0 才是 UTC"
+        );
+    }
+
+    #[test]
+    fn a_weight_far_in_the_future_is_skipped() {
+        let millis_as_seconds = serde_json::json!({
+            "items": [{
+                "generatedTime": 1_764_743_530_000i64,
+                "summary": { "weight": 68.2 }
+            }]
+        });
+        let batch = Normalizer::normalize_weight(&millis_as_seconds);
+        assert!(
+            samples_named(&batch, "weight").is_empty(),
+            "毫秒当成秒会落到五万年后，必须丢掉"
+        );
+        assert!(
+            batch.diagnostics.iter().any(|line| line.contains("时间戳")),
+            "丢掉了要说出来：{:?}",
+            batch.diagnostics
+        );
+
+        let two_days_out = (Utc::now() + Duration::days(2)).timestamp();
+        let near_future = serde_json::json!({
+            "items": [{
+                "generatedTime": two_days_out,
+                "summary": { "weight": 68.2 }
+            }]
+        });
+        let batch = Normalizer::normalize_weight(&near_future);
+        assert!(samples_named(&batch, "weight").is_empty());
+    }
+
+    #[test]
+    fn date_only_daily_summary_is_not_overwritten_by_epoch_fallback() {
+        let raw = json!({
+            "items": [
+                {
+                    "dateString": "2026-08-12",
+                    "totalSteps": 9999
+                },
+                {
+                    "timestamp": 1_786_492_800_000i64,
+                    "totalSteps": 1
+                }
+            ]
+        });
+        let rows = Normalizer::normalize_daily_summary(&raw).unwrap();
+        let steps = rows
+            .iter()
+            .filter(|row| row.metric == "steps" && row.date == "2026-08-12")
+            .map(|row| row.value)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            steps,
+            vec![9999.0],
+            "date-only 不能输给 epoch 回退：{rows:?}"
+        );
+    }
+
+    #[test]
+    fn epoch_day_uses_payload_timezone_when_present() {
+        assert_eq!(timezone_offset_seconds(&json!("GMT+08:00")), Some(8 * 3600));
+        assert_eq!(
+            timezone_offset_seconds(&json!("Asia/Shanghai")),
+            Some(8 * 3600)
+        );
+        assert_eq!(
+            timezone_offset_seconds(&json!("1,Asia/Shanghai")),
+            Some(8 * 3600)
+        );
+        assert_eq!(timezone_offset_seconds(&json!("28800000")), Some(8 * 3600));
+        assert_eq!(timezone_offset_seconds(&json!("32")), None);
+        assert_eq!(timezone_offset_seconds(&json!(0)), Some(0));
+
+        // 2026-08-12 00:00 UTC = 1786492800000；减 8 小时 = 上海当天零点。
+        let shanghai_midnight_utc_ms = 1_786_492_800_000i64 - 8 * 3_600_000;
+        let shanghai_midnight = json!({
+            "items": [{
+                "timestamp": shanghai_midnight_utc_ms,
+                "timeZone": "GMT+08:00",
+                "totalSteps": 321
+            }]
+        });
+        let rows = Normalizer::normalize_daily_summary(&shanghai_midnight).unwrap();
+        let steps = rows.iter().find(|row| row.metric == "steps").unwrap();
+        assert_eq!(steps.date, "2026-08-12");
+        assert_eq!(steps.value, 321.0);
+
+        let utc_only = json!({
+            "items": [{
+                "timestamp": shanghai_midnight_utc_ms,
+                "totalSteps": 321
+            }]
+        });
+        let rows = Normalizer::normalize_daily_summary(&utc_only).unwrap();
+        let steps = rows.iter().find(|row| row.metric == "steps").unwrap();
+        assert_eq!(
+            steps.date, "2026-08-11",
+            "缺时区保持原来的 UTC 切日，不编一个区"
         );
     }
 }

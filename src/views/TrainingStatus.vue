@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import LifeEventShortcut from '../components/LifeEventShortcut.vue';
 defineOptions({ name: 'TrainingStatus' });
 import { computed, onMounted, ref, watch } from 'vue';
-import { VChart } from '../lib/echartsSetup';
+import { CHART_THEME, VChart } from '../lib/echartsSetup';
+import { createLoadSeq } from '../lib/loadSeq';
 import HeartRateZonePicker from '../components/HeartRateZonePicker.vue';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
 import PageHeader from '../components/PageHeader.vue';
@@ -20,6 +22,7 @@ import {
 import type { MetricSeries, TrainingBalancePoint } from '../types';
 import { defineMessages, useMessages } from '../i18n';
 import { paceUnitLabel } from '../lib/units';
+import { coveredWindowValue } from '../lib/missingValues';
 
 const messages = defineMessages(
   {
@@ -48,6 +51,8 @@ const messages = defineMessages(
     thresholdOnce: (date: string) => `这段范围只有 1 次阈值测量（${date}），画不出趋势。`,
     thresholdEmpty: '这段范围没有乳酸阈值测量记录。',
     thresholdPaceTooltip: (value: string, unit: string) => `阈值配速 <b>${value}</b> ${unit}`,
+    /** 训练负荷是个无量纲分数，图表上不需要单位字。 */
+    loadUnit: '',
     thresholdHrTooltip: (value: number) => `阈值心率 <b>${value}</b> bpm`,
     balanceLabel: '运动负荷平衡',
     balanceHint: '7 天负荷相对 28 天周均，即急性／慢性负荷比',
@@ -58,8 +63,9 @@ const messages = defineMessages(
     chronicWeekly: '28 天周均',
     acuteChronic: '急慢比',
     ratioMissing: (days: number) => `—（28 天窗口只有 ${days} 天有数据）`,
-    acuteTooltip: (value: number, days: number) => `7 天负荷 <b>${value}</b>（${days}/7 天有数据）`,
-    chronicTooltip: (value: number) => `28 天周均 <b>${value}</b>`,
+    notProvided: '未提供',
+    acuteTooltip: (value: string, days: number) => `7 天负荷 <b>${value}</b>（${days}/7 天有数据）`,
+    chronicTooltip: (value: string) => `28 天周均 <b>${value}</b>`,
     ratioTooltip: (value: string) => `急慢比 <b>${value}</b>`,
   },
   {
@@ -88,6 +94,7 @@ const messages = defineMessages(
     thresholdOnce: (date: string) => `Only one threshold measurement in this range (${date}), so there is no trend to draw.`,
     thresholdEmpty: 'No lactate threshold measurements in this range.',
     thresholdPaceTooltip: (value: string, unit: string) => `Threshold pace <b>${value}</b> ${unit}`,
+    loadUnit: 'load',
     thresholdHrTooltip: (value: number) => `Threshold HR <b>${value}</b> bpm`,
     balanceLabel: 'Training load balance',
     balanceHint: '7-day load against the 28-day weekly average, i.e. the acute-to-chronic ratio',
@@ -98,9 +105,52 @@ const messages = defineMessages(
     chronicWeekly: '28-day weekly avg',
     acuteChronic: 'Acute:chronic',
     ratioMissing: (days: number) => `— (only ${days} days of data in the 28-day window)`,
-    acuteTooltip: (value: number, days: number) => `7-day load <b>${value}</b> (${days}/7 days with data)`,
-    chronicTooltip: (value: number) => `28-day weekly avg <b>${value}</b>`,
+    notProvided: 'Not provided',
+    acuteTooltip: (value: string, days: number) => `7-day load <b>${value}</b> (${days}/7 days with data)`,
+    chronicTooltip: (value: string) => `28-day weekly avg <b>${value}</b>`,
     ratioTooltip: (value: string) => `Acute:chronic <b>${value}</b>`,
+  },
+  {
+    backToOverview: 'Volver al resumen',
+    eyebrow: 'Estado de entrenamiento',
+    title: 'Estado de entrenamiento',
+    intro: 'VO₂máx, umbral de lactato, carga de entrenamiento y zonas de frecuencia cardíaca. Todo leído de los registros sincronizados; sin consejos de entrenamiento.',
+    rangeAria: 'Rango de tiempo',
+    desktopOnly: 'Usa la app de escritorio. Esta vista previa en el navegador no lee datos de la cuenta.',
+    loadFailed: 'Los datos del estado de entrenamiento no están disponibles en este momento',
+    retry: 'Reintentar',
+    loadingAria: 'Cargando el estado de entrenamiento',
+    vo2Hint: 'Consumo máximo de oxígeno, estimado por el reloj después de carreras al aire libre',
+    vo2Empty: 'No hay registros de VO₂máx en este rango; solo se actualiza después de una carrera al aire libre.',
+    loadLabel: 'Carga de entrenamiento',
+    loadHint: 'Puntuación diaria de carga de entrenamiento',
+    loadEmpty: 'No hay registros de carga de entrenamiento en este rango.',
+    loadUnit: '',
+    paiLabel: 'PAI',
+    paiHint: 'Inteligencia de Actividad Personal en los últimos 7 días',
+    paiEmpty: 'No hay registros de PAI en este rango.',
+    thresholdLabel: 'Umbral de lactato',
+    thresholdHint: 'Frecuencia cardíaca y ritmo; solo se actualiza después de una carrera intensa',
+    thresholdHr: 'FC de umbral',
+    thresholdPace: 'Ritmo de umbral',
+    thresholdChartAria: 'Frecuencia cardíaca y ritmo del umbral de lactato',
+    thresholdOnce: (date: string) => `Solo hay una medición de umbral en este rango (${date}), así que no hay tendencia que trazar.`,
+    thresholdEmpty: 'No hay mediciones de umbral de lactato en este rango.',
+    thresholdPaceTooltip: (value: string, unit: string) => `Ritmo de umbral <b>${value}</b> ${unit}`,
+    thresholdHrTooltip: (value: number) => `FC de umbral <b>${value}</b> lpm`,
+    balanceLabel: 'Equilibrio de la carga de entrenamiento',
+    balanceHint: 'Carga de 7 días frente al promedio semanal de 28 días, es decir, la relación aguda:crónica',
+    balanceChartAria: 'Carga de entrenamiento de 7 y 28 días con la relación aguda:crónica',
+    balanceEmpty: 'Todavía no hay suficientes registros de carga de entrenamiento para trazar esta línea.',
+    balanceNote: 'Aguda:crónica = suma de los últimos 7 días ÷ (suma de los últimos 28 días ÷ 4). Cuando la ventana de 28 días cubre menos de 21 días, no se da la relación y la línea se corta ahí. Eso significa sin calcular, no cero.',
+    acute7d: 'Carga de 7 días',
+    chronicWeekly: 'Promedio semanal de 28 días',
+    acuteChronic: 'Aguda:crónica',
+    ratioMissing: (days: number) => `— (solo ${days} días con datos en la ventana de 28 días)`,
+    notProvided: 'Sin datos',
+    acuteTooltip: (value: string, days: number) => `Carga de 7 días <b>${value}</b> (${days}/7 días con datos)`,
+    chronicTooltip: (value: string) => `Promedio semanal de 28 días <b>${value}</b>`,
+    ratioTooltip: (value: string) => `Aguda:crónica <b>${value}</b>`,
   },
 );
 const t = useMessages(messages);
@@ -120,6 +170,7 @@ const rangeDays = ref<SeriesRangeDays>(180);
 const series = ref<Record<string, MetricSeries>>({});
 const balance = ref<TrainingBalancePoint[]>([]);
 const loading = ref(true);
+const loadSeq = createLoadSeq();
 const error = ref<string | null>(null);
 
 const vo2max = computed(() => series.value.vo2max ?? null);
@@ -231,10 +282,18 @@ const balanceOption = computed(() => {
         const ratio = typeof point.acute_chronic_ratio === 'number'
           ? `${point.acute_chronic_ratio.toFixed(2)}`
           : t.value.ratioMissing(point.chronic_days_with_data);
+        const acute = coveredWindowValue(point.acute_7d, point.acute_days_with_data);
+        const chronic = coveredWindowValue(
+          Math.round((point.chronic_28d / 4) * 10) / 10,
+          point.chronic_days_with_data,
+        );
         return [
           point.date,
-          t.value.acuteTooltip(Math.round(point.acute_7d), point.acute_days_with_data),
-          t.value.chronicTooltip(Math.round(point.chronic_28d / 4)),
+          t.value.acuteTooltip(
+            acute === null ? t.value.notProvided : String(Math.round(acute)),
+            point.acute_days_with_data,
+          ),
+          t.value.chronicTooltip(chronic === null ? t.value.notProvided : String(Math.round(chronic))),
           t.value.ratioTooltip(ratio),
         ].join('<br>');
       },
@@ -248,7 +307,8 @@ const balanceOption = computed(() => {
       {
         name: t.value.acute7d,
         type: 'line',
-        data: balance.value.map((point) => point.acute_7d),
+        data: balance.value.map((point) => coveredWindowValue(point.acute_7d, point.acute_days_with_data)),
+        connectNulls: false,
         showSymbol: false,
         smooth: 0.2,
         itemStyle: { color: zeppSemanticColors.training },
@@ -257,7 +317,11 @@ const balanceOption = computed(() => {
       {
         name: t.value.chronicWeekly,
         type: 'line',
-        data: balance.value.map((point) => Math.round((point.chronic_28d / 4) * 10) / 10),
+        data: balance.value.map((point) => coveredWindowValue(
+          Math.round((point.chronic_28d / 4) * 10) / 10,
+          point.chronic_days_with_data,
+        )),
+        connectNulls: false,
         showSymbol: false,
         smooth: 0.2,
         itemStyle: { color: zeppSemanticColors.cadence },
@@ -288,9 +352,11 @@ const latestBalance = computed(() => {
 });
 
 const load = async () => {
+  const seq = loadSeq.next();
   loading.value = true;
   error.value = null;
   if (!isDesktop()) {
+    if (!loadSeq.isCurrent(seq)) return;
     series.value = {};
     balance.value = [];
     loading.value = false;
@@ -303,6 +369,7 @@ const load = async () => {
     // much runway before a ratio exists at all.
     backend.getTrainingBalance(Math.max(28, rangeDays.value)),
   ]);
+  if (!loadSeq.isCurrent(seq)) return;
   const [metrics, trend] = results;
   series.value = metrics.status === 'fulfilled' ? indexSeries(metrics.value) : {};
   balance.value = trend.status === 'fulfilled' ? trend.value : [];
@@ -328,19 +395,19 @@ watch(dataRevision, () => { void load(); });
       :title="t.title"
       :intro="t.intro"
     >
-      <div class="range-switch" role="radiogroup" :aria-label="t.rangeAria">
+      <div class="range-switch" role="group" :aria-label="t.rangeAria">
         <button
           v-for="range in ranges"
           :key="range.days"
           type="button"
-          role="radio"
-          :aria-checked="rangeDays === range.days"
+          :aria-pressed="rangeDays === range.days"
           :class="['range-pill', { 'is-on': rangeDays === range.days }]"
           @click="rangeDays = range.days"
         >{{ range.label }}</button>
       </div>
     </PageHeader>
 
+    <LifeEventShortcut :days="rangeDays" />
     <CoverageNotice :requested-days="rangeDays" />
 
     <p v-if="error" class="inline-alert" role="alert">
@@ -368,7 +435,7 @@ watch(dataRevision, () => { void load(); });
           :hint="t.loadHint"
           :series="trainingLoad"
           :color="zeppSemanticColors.training"
-          unit="load"
+          :unit="t.loadUnit"
           :empty-text="t.loadEmpty"
         />
         <MetricTrendCard
@@ -394,7 +461,7 @@ watch(dataRevision, () => { void load(); });
           <VChart
             v-if="thresholdOption"
             class="chart-body"
-            theme="zeppbridge-dark"
+            :theme="CHART_THEME"
             :option="thresholdOption"
             autoresize
             role="img"
@@ -420,7 +487,7 @@ watch(dataRevision, () => { void load(); });
         <VChart
           v-if="balanceOption"
           class="chart-body tall"
-          theme="zeppbridge-dark"
+          :theme="CHART_THEME"
           :option="balanceOption"
           autoresize
           role="img"

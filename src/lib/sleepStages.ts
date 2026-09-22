@@ -9,6 +9,45 @@ import { defineMessages, messagesOf } from '../i18n';
  */
 export type SleepStageTone = 'deep' | 'light' | 'rem' | 'awake' | 'unknown';
 
+export interface TimedSleepSlice {
+  tone: SleepStageTone;
+  start: number;
+  end: number;
+}
+
+/**
+ * Fill holes in a sleep timeline with an explicit unknown band.
+ * `step: 'end'` would otherwise paint the gap as the previous stage.
+ */
+export function insertSleepStageGaps(
+  slices: readonly TimedSleepSlice[],
+  rangeFrom: number,
+  rangeTo: number,
+  minGapMs = 1_000,
+): TimedSleepSlice[] {
+  if (!(rangeTo > rangeFrom)) return slices.filter((slice) => slice.end > slice.start);
+  const ordered = slices
+    .filter((slice) => Number.isFinite(slice.start) && Number.isFinite(slice.end) && slice.end > slice.start)
+    .slice()
+    .sort((a, b) => a.start - b.start || a.end - b.end);
+  const result: TimedSleepSlice[] = [];
+  let cursor = rangeFrom;
+  for (const slice of ordered) {
+    const start = Math.max(slice.start, rangeFrom);
+    const end = Math.min(slice.end, rangeTo);
+    if (end <= start) continue;
+    if (start - cursor >= minGapMs) {
+      result.push({ tone: 'unknown', start: cursor, end: start });
+    }
+    result.push({ tone: slice.tone, start, end });
+    cursor = Math.max(cursor, end);
+  }
+  if (rangeTo - cursor >= minGapMs) {
+    result.push({ tone: 'unknown', start: cursor, end: rangeTo });
+  }
+  return result;
+}
+
 /**
  * 阶段顺序固定：由深到浅再到醒，阶梯图的 y 轴就是这个顺序。
  *
@@ -38,6 +77,13 @@ const messages = defineMessages(
     rem: 'REM',
     awake: 'Awake',
     unknown: 'Unknown',
+  },
+  {
+    deep: 'Profundo',
+    light: 'Ligero',
+    rem: 'REM',
+    awake: 'Despierto',
+    unknown: 'Desconocido',
   },
 );
 

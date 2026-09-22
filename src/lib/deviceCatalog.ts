@@ -2,7 +2,6 @@ import catalogJson from '../assets/devices/catalog.json';
 
 export type DeviceKind = 'watch' | 'strap' | 'ring' | 'band' | 'earbuds' | 'scale' | 'unknown';
 export type DeviceCatalogStatus = 'active' | 'historical';
-export type DeviceMatchStatus = 'exact' | 'alias' | 'unknown';
 
 export interface DeviceCatalogEntry {
   catalog_id: string;
@@ -33,27 +32,10 @@ export interface DeviceCatalogDocument {
   devices: DeviceCatalogEntry[];
 }
 
-export interface DeviceCatalogMatch {
-  entry: DeviceCatalogEntry;
-  status: Exclude<DeviceMatchStatus, 'unknown'>;
-  matched_by: 'model_code' | 'alias';
-  matched_value: string;
-}
-
-export interface DeviceCatalogMatchInput {
-  modelCodes?: string[];
-  productNames?: string[];
-  deviceNames?: string[];
-  displayName?: string;
-}
-
 const document = catalogJson as DeviceCatalogDocument;
 
 /** Versioned snapshot of the official catalog. No runtime network lookup is performed. */
 export const deviceCatalog: readonly DeviceCatalogEntry[] = document.devices;
-export const deviceCatalogVersion = document.version;
-export const deviceCatalogCheckedAt = document.checked_at;
-export const deviceCatalogSources: readonly string[] = document.sources;
 
 /**
  * Assets are discovered at build time. Adding a catalog row only requires an
@@ -115,90 +97,6 @@ export const localDeviceThumbnails: Readonly<Record<string, string>> = Object.fr
   ),
 );
 
-export const normalizeDeviceText = (value: string): string =>
-  value.normalize('NFKC').toLocaleLowerCase().replace(/[\u0000-\u001f]/g, '').replace(/[^\p{L}\p{N}]+/gu, '');
-
-const deviceWords = (value: string): string[] =>
-  value.normalize('NFKC').toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
-
-const containsCompleteAlias = (displayName: string, alias: string): boolean => {
-  const aliasWords = deviceWords(alias);
-  // A single generic word such as "Balance" is intentionally not enough to
-  // infer a product from a nickname. Numbered/two-word aliases are stable.
-  if (aliasWords.length < 2 && !aliasWords.some((word) => /\d/u.test(word))) return false;
-  // User nicknames may put a CJK prefix directly before the Latin product
-  // name (for example, "凌苍的T-Rex 3").  The token matcher merges that
-  // prefix with the first Latin word, so also scan the punctuation-free form
-  // while retaining ASCII boundaries to reject "T-Rex 30".
-  const display = normalizeDeviceText(displayName);
-  const needle = normalizeDeviceText(alias);
-  if (!needle) return false;
-  let offset = 0;
-  while (offset < display.length) {
-    const found = display.indexOf(needle, offset);
-    if (found < 0) break;
-    const start = found;
-    const end = start + needle.length;
-    const before = start > 0 ? display[start - 1] : undefined;
-    const after = end < display.length ? display[end] : undefined;
-    const asciiBoundary = (value: string | undefined) => value === undefined || !/[A-Za-z0-9]/u.test(value);
-    if (asciiBoundary(before) && asciiBoundary(after)) return true;
-    offset = end;
-  }
-  return false;
-};
-
-const unique = (values: readonly (string | undefined | null)[]): string[] =>
-  values.map((value) => value?.trim()).filter((value): value is string => Boolean(value));
-
-/**
- * Match in the same strict order used by the Rust IPC parser:
- * stable model code, exact product/device alias, then a complete alias in a
- * display nickname. Generic fuzzy matching is deliberately not used.
- */
-export function matchDeviceCatalog(input: DeviceCatalogMatchInput): DeviceCatalogMatch | null {
-  const matchable = (item: DeviceCatalogEntry): boolean => item.supported && item.status === 'active';
-  const modelCodes = unique(input.modelCodes ?? []);
-  for (const candidate of modelCodes) {
-    const normalized = normalizeDeviceText(candidate);
-    if (!normalized) continue;
-    const entry = deviceCatalog.find((item) =>
-      matchable(item) && item.model_codes.some((code) => normalizeDeviceText(code) === normalized),
-    );
-    if (entry) {
-      return { entry, status: 'exact', matched_by: 'model_code', matched_value: candidate };
-    }
-  }
-
-  const exactNames = unique([...(input.productNames ?? []), ...(input.deviceNames ?? [])]);
-  for (const candidate of exactNames) {
-    const normalized = normalizeDeviceText(candidate);
-    if (!normalized) continue;
-    const entry = deviceCatalog.find((item) =>
-      matchable(item)
-      && [item.display_name, item.name_zh, ...item.aliases]
-        .filter((alias): alias is string => Boolean(alias))
-        .some((alias) => normalizeDeviceText(alias) === normalized),
-    );
-    if (entry) {
-      return { entry, status: 'alias', matched_by: 'alias', matched_value: candidate };
-    }
-  }
-
-  if (input.displayName) {
-    const entry = deviceCatalog.find((item) =>
-      matchable(item)
-      && [item.display_name, item.name_zh, ...item.aliases]
-        .filter((alias): alias is string => Boolean(alias))
-        .some((alias) => containsCompleteAlias(input.displayName!, alias)),
-    );
-    if (entry) {
-      return { entry, status: 'alias', matched_by: 'alias', matched_value: input.displayName };
-    }
-  }
-  return null;
-}
-
 export function deviceImageFor(kind: DeviceKind | string | undefined, imageKey?: string | null): string {
   if (imageKey && localDeviceAssets[imageKey]) return localDeviceAssets[imageKey];
   return deviceFallbackFor(kind);
@@ -212,4 +110,18 @@ export function deviceFallbackFor(_kind: DeviceKind | string | undefined): strin
 export function deviceThumbnailFor(kind: DeviceKind | string | undefined, imageKey?: string | null): string {
   if (imageKey && localDeviceThumbnails[imageKey]) return localDeviceThumbnails[imageKey];
   return deviceImageFor(kind, imageKey);
+}
+
+/**
+ * 后端 `profile.catalog_id` 有时写的是 `canonical_device_key`，不是目录行的
+ * `catalog_id`。指认选择器两边都对一下，否则已指认的型号打不开对应那一张。
+ */
+export function catalogEntryMatchesId(
+  entry: DeviceCatalogEntry,
+  value?: string | null,
+): boolean {
+  if (!value) return false;
+  return entry.catalog_id === value
+    || entry.canonical_device_key === value
+    || entry.canonical_name === value;
 }

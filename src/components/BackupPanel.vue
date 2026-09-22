@@ -14,7 +14,7 @@
 import { computed, onMounted, ref } from 'vue';
 import Icon from './Icon.vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
-import { formatFullDateTime } from '../lib/format';
+import { formatDate, formatFullDateTime } from '../lib/format';
 import type { BackupManifest, BackupVerification, PendingRestore, RestorePreview } from '../types';
 import { backendText } from '../i18n/backendText';
 import { defineMessages, useMessages } from '../i18n';
@@ -53,6 +53,9 @@ const messages = defineMessages(
     problemSha256Mismatch: '备份文件的 SHA-256 和清单不一致，可能已损坏或被修改',
     problemIntegrityFailed: '备份文件没有通过 SQLite 完整性检查',
     problemUnknown: '这份快照没有通过校验，原因未记录。',
+    blockerFutureSchema: (backup: number, current: number) =>
+      `这份备份来自更新版本的 ZeppBridge（schema ${backup}，当前 ${current}）。降级打开会丢字段，所以不恢复，也不会改动当前库。请先升级 ZeppBridge。`,
+    blockerUnknown: '这份快照当前不能恢复，原因未记录。',
     verifyPassed: '刚刚重新校验：文件、大小、SHA-256 与完整性都对得上。',
     integrityOk: (sha: string) => `生成时完整性检查通过 · SHA-256 ${sha}…`,
     integrityBad: '生成时完整性检查未通过，不要用它恢复。',
@@ -95,8 +98,10 @@ const messages = defineMessages(
     },
     table: {
       raw_records: '原始报文',
+      life_events: '生活事件',
       workouts: '运动记录',
-      daily_summaries: '每日概览',
+      daily_metrics: '每日指标',
+      workout_samples: '运动采样点',
       metric_samples: '指标采样',
       sleep_sessions: '睡眠',
     },
@@ -135,6 +140,9 @@ const messages = defineMessages(
       "The backup file's SHA-256 does not match the manifest — it may be damaged or altered",
     problemIntegrityFailed: 'The backup file did not pass the SQLite integrity check',
     problemUnknown: 'This snapshot failed verification, and no reason was recorded.',
+    blockerFutureSchema: (backup: number, current: number) =>
+      `This backup comes from a newer ZeppBridge (schema ${backup}, this app is ${current}). Opening it here would drop fields, so it will not be restored and the current library is left alone. Upgrade ZeppBridge first.`,
+    blockerUnknown: 'This snapshot cannot be restored right now, and no reason was recorded.',
     verifyPassed: 'Just re-verified: file, size, SHA-256 and integrity all line up.',
     integrityOk: (sha: string) => `Integrity check passed at creation · SHA-256 ${sha}…`,
     integrityBad: 'The integrity check failed at creation. Do not restore from it.',
@@ -177,10 +185,99 @@ const messages = defineMessages(
     },
     table: {
       raw_records: 'Raw payloads',
+      life_events: 'Life events',
       workouts: 'Workouts',
-      daily_summaries: 'Daily summaries',
+      daily_metrics: 'Daily metrics',
+      workout_samples: 'Workout samples',
       metric_samples: 'Metric samples',
       sleep_sessions: 'Sleep',
+    },
+  },
+  {
+    title: 'Copias de la base de datos y restauración',
+    intro1a: 'Una copia es un duplicado completo de todo el archivo ',
+    intro1b: '. Se queda en este equipo y nunca se sube a ningún lado. Se hace una automáticamente antes de actualizar la base de datos, y puedes hacer una cuando quieras.',
+    compareLead: 'Aquí hay tres cosas que se llaman «exportar» y no son lo mismo: ',
+    compareExchange: ' es intercambio de datos con otras herramientas, y solo contiene el rango que elegiste;',
+    compareSnapshotName: 'una copia de la base de datos',
+    compareSnapshot: ' es un duplicado completo para recuperarse de desastres que solo ZeppBridge puede volver a leer;',
+    comparePackName: 'un paquete para IA',
+    comparePack: ' es material que eliges y anonimizas a propósito para un modelo externo. Solo una copia puede dejar la base de datos como estaba.',
+
+    pendingTitle: 'Hay una restauración en cola',
+    pendingBodyA: (stagedAt: string) => `En cola desde ${stagedAt}. La base de datos se reemplazará en el `,
+    pendingNextStart: 'próximo arranque',
+    pendingBodyB: '. La base de datos actual ya quedó guardada como punto de reversión, así que puedes volver a ella.',
+    cancelRestore: 'Cancelar la restauración',
+
+    creating: 'Creando…',
+    createSnapshot: 'Hacer una copia',
+    refreshList: 'Actualizar',
+    noSnapshots: 'Aún no hay copias.',
+
+    pinned: 'Conservada',
+    metaLine: (size: string, appVersion: string, schemaVersion: number) =>
+      `${size} · app ${appVersion} · esquema ${schemaVersion}`,
+    coverage: (from: string, to: string) => ` · muestras ${from} ~ ${to}`,
+    noSamples: ' · sin muestras de salud en esta copia',
+    verifyFailed: (problem: string) => `La verificación falló: ${problem}`,
+    problemFileMissing: 'El archivo de copia ya no está en la carpeta de copias',
+    problemSizeMismatch: 'El tamaño del archivo de copia no coincide con el manifiesto; puede estar dañado',
+    problemSha256Mismatch:
+      'El SHA-256 del archivo de copia no coincide con el manifiesto; puede estar dañado o alterado',
+    problemIntegrityFailed: 'El archivo de copia no pasó la comprobación de integridad de SQLite',
+    problemUnknown: 'Esta copia no pasó la verificación, y no se registró el motivo.',
+    blockerFutureSchema: (backup: number, current: number) =>
+      `Esta copia viene de una versión más nueva de ZeppBridge (esquema ${backup}, esta app es ${current}). Abrirla aquí perdería campos, así que no se restaura y la biblioteca actual no se toca. Primero actualiza ZeppBridge.`,
+    blockerUnknown: 'Esta copia no se puede restaurar ahora, y no se registró el motivo.',
+    verifyPassed: 'Recién verificada: archivo, tamaño, SHA-256 e integridad coinciden.',
+    integrityOk: (sha: string) => `Integridad comprobada al crearla · SHA-256 ${sha}…`,
+    integrityBad: 'La comprobación de integridad falló al crearla. No restaures desde ella.',
+    verifyAgain: 'Verificar de nuevo',
+    unpin: 'Dejar de conservar',
+    pin: 'Conservar',
+    restoreToThis: 'Restaurar a esta',
+
+    previewTitle: 'Vista previa de la restauración',
+    compatibilityUnknown: 'Compatibilidad desconocida.',
+    colContent: 'Contenido',
+    colBackup: 'En la copia',
+    colCurrent: 'Actual',
+    colDelta: 'Diferencia',
+    previewNote: 'Las filas con diferencia negativa tendrán esa cantidad de registros menos después de restaurar. Una restauración nunca vuelve a descargar de la nube, así que si todavía necesitas esos datos, sincroniza de nuevo al terminar.',
+    staging: 'Poniendo en cola…',
+    stageRestore: 'Poner la restauración en cola (se aplica en el próximo arranque)',
+    cancel: 'Cancelar',
+
+    listFailed: 'No se pudo leer la lista de copias',
+    created: (size: string) => `Copia creada: ${size}, la comprobación de integridad pasó.`,
+    createFailed: 'No se pudo crear la copia',
+    verifyError: 'La verificación falló',
+    pinFailed: 'No se pudo cambiar la marca de conservación',
+    previewFailed: 'No se pudo generar la vista previa de la restauración',
+    staged: 'La restauración quedó en cola. En esta sesión no cambia nada; la base de datos se reemplaza la próxima vez que arranque ZeppBridge.',
+    stageFailed: 'No se pudo poner la restauración en cola',
+    cancelled: 'Se canceló la restauración en cola. La base de datos no cambió.',
+    cancelFailed: 'No se pudo cancelar la restauración',
+
+    kind: {
+      manual: 'manual',
+      pre_migration: 'antes de actualizar',
+      pre_restore: 'punto de reversión',
+    },
+    compatibility: {
+      same_schema: 'La copia tiene la misma versión de esquema que esta app, así que se restaura directamente.',
+      older_schema_will_migrate: 'La copia viene de una versión de esquema anterior. Después de restaurarla, se actualiza sola en el próximo arranque.',
+      future_schema_refused: 'La copia viene de una versión más nueva de la app cuya estructura esta app no puede leer, así que no se puede restaurar.',
+    },
+    table: {
+      raw_records: 'Registros originales',
+      life_events: 'Eventos de vida',
+      workouts: 'Entrenamientos',
+      daily_metrics: 'Métricas diarias',
+      workout_samples: 'Muestras de entrenamiento',
+      metric_samples: 'Muestras de métricas',
+      sleep_sessions: 'Sueño',
     },
   },
 );
@@ -202,7 +299,7 @@ const compatibilityCopy = (kind: string): string =>
   lookup(t.value.compatibility, kind) ?? t.value.compatibilityUnknown;
 
 /** 只显示真正有意义的几张表，避免把内部表堆到界面上。 */
-const TABLE_KEYS = ['raw_records', 'workouts', 'daily_summaries', 'metric_samples', 'sleep_sessions'];
+const TABLE_KEYS = ['life_events', 'raw_records', 'workouts', 'daily_metrics', 'workout_samples', 'metric_samples', 'sleep_sessions'];
 const tableLabel = (key: string): string => lookup(t.value.table, key) ?? key;
 
 /* 校验失败原因：后端给稳定码，这里按界面语言出文案；
@@ -215,6 +312,20 @@ const verifyProblemText = (verification: BackupVerification): string => {
     case 'ui.backup.integrity_failed': return t.value.problemIntegrityFailed;
     default: return backendText(verification.problem, t.value.problemUnknown);
   }
+};
+
+const restoreBlockerText = (preview: RestorePreview): string => {
+  if (preview.blocker_code === 'ui.backup.future_schema'
+    || preview.compatibility === 'future_schema_refused') {
+    return t.value.blockerFutureSchema(
+      preview.manifest.schema_version,
+      preview.current_schema_version,
+    );
+  }
+  if (preview.verification.problem_code || preview.verification.problem) {
+    return verifyProblemText(preview.verification);
+  }
+  return backendText(preview.blocker, t.value.blockerUnknown);
 };
 
 const formatBytes = (bytes: number): string => {
@@ -238,6 +349,7 @@ const previewRows = computed(() => {
 
 const load = async () => {
   if (!isDesktop()) return;
+  error.value = null;
   try {
     const [list, staged] = await Promise.all([backend.listBackups(), backend.getPendingRestore()]);
     backups.value = list;
@@ -371,7 +483,7 @@ const cancelRestore = async () => {
     <p v-if="error" class="api-error" role="alert">{{ error }}</p>
     <p v-else-if="message" class="hint-line ok" role="status"><Icon name="check" :size="13" />{{ message }}</p>
 
-    <p v-if="!backups.length" class="retain-note">{{ t.noSnapshots }}</p>
+    <p v-if="!backups.length && !error" class="retain-note">{{ t.noSnapshots }}</p>
 
     <div v-else class="backup-list">
       <div v-for="item in backups" :key="item.id" class="backup-row">
@@ -383,7 +495,7 @@ const cancelRestore = async () => {
         <div class="backup-meta">
           {{ t.metaLine(formatBytes(item.bytes), item.app_version, item.schema_version) }}
           <template v-if="item.coverage.earliest_sample_at && item.coverage.latest_sample_at">
-            {{ t.coverage(item.coverage.earliest_sample_at.slice(0, 10), item.coverage.latest_sample_at.slice(0, 10)) }}
+            {{ t.coverage(formatDate(item.coverage.earliest_sample_at), formatDate(item.coverage.latest_sample_at)) }}
           </template>
           <template v-else>{{ t.noSamples }}</template>
         </div>
@@ -433,7 +545,7 @@ const cancelRestore = async () => {
         </tbody>
       </table>
       <p class="retain-note">{{ t.previewNote }}</p>
-      <p v-if="preview.blocker" class="api-error" role="alert">{{ preview.blocker }}</p>
+      <p v-if="!preview.can_restore" class="api-error" role="alert">{{ restoreBlockerText(preview) }}</p>
       <div class="inline-actions">
         <button
           class="button primary"

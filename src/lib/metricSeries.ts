@@ -1,22 +1,30 @@
+import { displayDateTimeFormatter, parseDisplayDate } from './dateTime';
 import type { MetricSeries, MetricSeriesPoint } from '../types';
 import { paceSecondsPerBigUnit } from './units';
-import { defineMessages, intlLocale, messagesOf } from '../i18n';
+import { defineMessages, messagesOf } from '../i18n';
 import { DISPLAY_RANGE_DAYS, rangeOptions } from './rangeOptions';
 
 const messages = defineMessages(
   {
-    notSyncedYet: '尚未同步',
+    noRecordsToShow: '没有可显示的记录',
     noRecordsInWindow: (days: number) => `近 ${days} 天无记录`,
     coverage: (days: number, withData: number) => `${days} 天里有 ${withData} 天记录`,
     dayRange: (low: string, high: string, unit: string) => `当日区间 ${low} – ${high}${unit}`,
     samples: (count: number) => `${count} 次读数`,
   },
   {
-    notSyncedYet: 'Not synced yet',
+    noRecordsToShow: 'No records to show',
     noRecordsInWindow: (days: number) => `No records in the last ${days} days`,
     coverage: (days: number, withData: number) => `${withData} of ${days} days have records`,
     dayRange: (low: string, high: string, unit: string) => `That day ranged ${low} – ${high}${unit}`,
     samples: (count: number) => `${count} readings`,
+  },
+  {
+    noRecordsToShow: 'Sin registros que mostrar',
+    noRecordsInWindow: (days: number) => `Sin registros en los últimos ${days} días`,
+    coverage: (days: number, withData: number) => `${withData} de ${days} días tienen registros`,
+    dayRange: (low: string, high: string, unit: string) => `Ese día varió entre ${low} y ${high}${unit}`,
+    samples: (count: number) => `${count} lecturas`,
   },
 );
 
@@ -58,7 +66,8 @@ export const latestValue = (series?: MetricSeries | null): number | null => {
  */
 export const coverageLabel = (series?: MetricSeries | null): string => {
   const t = copy();
-  if (!series) return t.notSyncedYet;
+  // 调用方没给 series ≠ 尚未同步。那是同步状态，这里只谈能不能画出记录。
+  if (!series) return t.noRecordsToShow;
   if (!series.days_with_data) return t.noRecordsInWindow(series.window_days);
   return t.coverage(series.window_days, series.days_with_data);
 };
@@ -66,9 +75,11 @@ export const coverageLabel = (series?: MetricSeries | null): string => {
 // 刻意不缓存成模块级常量：那样会把语言钉死在模块加载的那一刻，
 // 切到英文之后坐标轴上的日期还是中文格式。
 const shortDate = (value: string): string => {
-  const date = new Date(`${value}T00:00:00`);
+  // 纯日历日期按本地年月日解析：本地构造会把 2026-02-30 滚成 3 月 2 日，
+  // parseDisplayDate 对不上就返回 Invalid Date，这里原样返回，不画假日子。
+  const date = parseDisplayDate(value);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(intlLocale(), { month: 'numeric', day: 'numeric' }).format(date);
+  return displayDateTimeFormatter({ month: 'numeric', day: 'numeric' }).format(date);
 };
 
 /** Seconds per kilometre as `m:ss`, the unit runners actually read. */
@@ -194,7 +205,7 @@ export const buildSeriesOption = (
         const samples = point.samples
           ? `<br><span style="color:#949CA5">${copy().samples(point.samples)}</span>`
           : '';
-        return `${point.date}<br><b>${format(point.value)}</b>${unit}${spread}${samples}`;
+        return `${shortDate(point.date)}<br><b>${format(point.value)}</b>${unit}${spread}${samples}`;
       },
     },
     xAxis: {

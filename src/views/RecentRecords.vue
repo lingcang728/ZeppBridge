@@ -1,4 +1,5 @@
 <script setup lang="ts">
+
 defineOptions({ name: 'RecentRecords' });
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
@@ -9,11 +10,12 @@ import EmptyState from '../components/EmptyState.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { useSyncController } from '../composables/useSyncController';
+import { createLoadSeq } from '../lib/loadSeq';
 import { workoutLabel } from '../lib/labels';
 import { formatDate, formatDistance, formatDuration, isFiniteNumber } from '../lib/format';
 import { displayableWorkouts, workoutDisplayLabel, workoutDisplayType, workoutDurationMinutes, workoutTypeKey } from '../lib/workouts';
 import type { SleepSession, Workout } from '../types';
-import { defineMessages, intlLocale, useMessages } from '../i18n';
+import { defineMessages, useMessages } from '../i18n';
 
 const messages = defineMessages(
   {
@@ -22,6 +24,7 @@ const messages = defineMessages(
     intro: '最近同步的睡眠与运动记录，合并查看。',
     loadingLabel: '正在加载最近记录',
     loadFailedTitle: '最近记录加载失败',
+    desktopOnly: '请使用桌面应用；浏览器预览不会读取账户数据。',
     retry: '重试',
     partialUnavailable: '部分数据暂时不可用',
     filterAll: '全部',
@@ -45,6 +48,7 @@ const messages = defineMessages(
     intro: 'Recently synced sleep and workouts, side by side.',
     loadingLabel: 'Loading recent records',
     loadFailedTitle: 'Could not load the recent records',
+    desktopOnly: 'Use the desktop app. This browser preview reads no account data.',
     retry: 'Try again',
     partialUnavailable: 'Some data is unavailable right now',
     filterAll: 'All',
@@ -62,6 +66,30 @@ const messages = defineMessages(
     yesterday: 'Yesterday',
     listDate: (month: number, day: number, weekday: string) => `${weekday}, ${month}/${day}`,
   },
+  {
+    backToOverview: 'Volver al resumen',
+    title: 'Registros recientes',
+    intro: 'Sueño y entrenamientos sincronizados recientemente, uno al lado del otro.',
+    loadingLabel: 'Cargando los registros recientes',
+    loadFailedTitle: 'No se pudieron cargar los registros recientes',
+    desktopOnly: 'Usa la app de escritorio. Esta vista previa en el navegador no lee datos de la cuenta.',
+    retry: 'Reintentar',
+    partialUnavailable: 'Algunos datos no están disponibles en este momento',
+    filterAll: 'Todos',
+    recentSleep: 'Sueño reciente',
+    recentWorkouts: 'Entrenamientos recientes',
+    countBadge: (count: number) => `${count} en total`,
+    seeAll: 'Ver todo',
+    noSleep: 'Aún no hay registros de sueño',
+    noWorkouts: 'No hay nada que mostrar aquí.',
+    noWorkoutsOfType: 'No hay nada que mostrar para este tipo de entrenamiento.',
+    hiddenIncomplete: (count: number) => `${count} registros incompletos ocultos`,
+    notProvided: 'Sin datos',
+    dateUnknown: 'Fecha desconocida',
+    today: 'Hoy',
+    yesterday: 'Ayer',
+    listDate: (month: number, day: number, weekday: string) => `${weekday} ${day}/${month}`,
+  },
 );
 const t = useMessages(messages);
 
@@ -71,6 +99,7 @@ const partialWarning = ref<string | null>(null);
 const recentSleep = ref<SleepSession[]>([]);
 const recentWorkouts = ref<Workout[]>([]);
 const { dataRevision } = useSyncController();
+const loadSeq = createLoadSeq();
 
 const activeFilter = ref('all');
 
@@ -116,23 +145,29 @@ function workoutTypeBg(type: string): string {
 }
 
 const loadRecent = async () => {
+  const seq = loadSeq.next();
   loading.value = true;
   error.value = null;
   partialWarning.value = null;
   if (!isTauri()) {
-    loading.value = false;
+    if (!loadSeq.isCurrent(seq)) return;
     recentSleep.value = [];
     recentWorkouts.value = [];
+    loading.value = false;
+    error.value = t.value.desktopOnly;
     return;
   }
   const [sleep, workouts] = await Promise.allSettled([
     tauriApi.getRecentSleep(500),
     tauriApi.getRecentWorkouts(500),
   ]);
+  if (!loadSeq.isCurrent(seq)) return;
   recentSleep.value = sleep.status === 'fulfilled' ? sleep.value : [];
   recentWorkouts.value = workouts.status === 'fulfilled' ? workouts.value : [];
   const rejected = [sleep, workouts].filter((result) => result.status === 'rejected');
-  if (rejected.length) {
+  if (rejected.length === 2) {
+    error.value = toUserMessage(rejected[0].reason, t.value.loadFailedTitle);
+  } else if (rejected.length) {
     partialWarning.value = toUserMessage(rejected[0].reason, t.value.partialUnavailable);
   }
   loading.value = false;
@@ -153,12 +188,7 @@ const workoutFact = (workout: Workout): string => {
 };
 
 function listDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return t.value.dateUnknown;
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  const weekday = new Intl.DateTimeFormat(intlLocale(), { weekday: 'short' }).format(date);
-  return t.value.listDate(month, day, weekday);
+  return formatDate(value);
 }
 
 function shortDistance(meters?: number): string {
@@ -208,7 +238,7 @@ function formatDateHint(value: string): string {
       :title="t.loadFailedTitle"
       :message="error"
     >
-      <button class="button button-secondary" type="button" @click="loadRecent"><Icon name="refresh" :size="15" />{{ t.retry }}</button>
+      <button v-if="isTauri()" class="button button-secondary" type="button" @click="loadRecent"><Icon name="refresh" :size="15" />{{ t.retry }}</button>
     </EmptyState>
 
     <div v-else class="recent-grid">
@@ -383,6 +413,7 @@ function formatDateHint(value: string): string {
 .partial-warning svg { color: var(--warning); }
 .filter-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 8px;
   padding: 4px;
@@ -391,6 +422,8 @@ function formatDateHint(value: string): string {
 }
 .tab-button {
   display: flex;
+  flex-shrink: 0;
+  white-space: nowrap;
   align-items: center;
   gap: 5px;
   padding: 6px 12px;

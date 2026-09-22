@@ -45,6 +45,8 @@ const healthSeriesPalette = [
 
 /* 坐标轴文字沿用 CSS 的 --muted：11px/#9AA1A9 在正常视距下读不出来。 */
 export const axisInk = '#B4BBC3';
+/** 图表标记描边，和 `--surface` 同一色，避免再写一份游离 hex。 */
+export const chartSurface = '#16191E';
 
 const darkAxis = {
   axisLine: { show: false },

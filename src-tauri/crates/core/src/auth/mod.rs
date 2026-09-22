@@ -140,17 +140,16 @@ impl CredentialBackend for MacOsCredentialBackend {
     }
 }
 
-/// 选哪个凭据存储。取值：`secret-service`、`file`、`env`。
-///
-/// 只在 Linux 上有意义。Windows 和 macOS 各自只有一个正确答案，多给一个
-/// 旋钮只会多一种配错的方式。
+/// Select credential storage: `keychain` / `file` on macOS, or
+/// `secret-service` / `file` / `env` on Linux. Windows uses Credential Manager.
+/// File storage must be opted into; a locked system store never enables it.
 pub const CREDENTIAL_STORE_ENV: &str = "ZEPPBRIDGE_CREDENTIAL_STORE";
 
 /// 由环境直接给出的令牌（只读存储）。
 pub const APP_TOKEN_ENV: &str = "ZEPPBRIDGE_APP_TOKEN";
 
 /// 文件存储的文件名，放在数据目录里。
-#[cfg(all(unix, not(target_os = "macos")))]
+#[cfg(unix)]
 pub const CREDENTIAL_FILE: &str = "credentials.json";
 
 /// Secret Service（GNOME Keyring / KWallet）。Linux 桌面上的默认选择。
@@ -207,7 +206,7 @@ fn describe_secret_service_error(action: &str, error: &keyring::Error) -> String
         // 只能按码取英文——issue #40 那位 Linux 用户就是在英文命令行上收到了
         // 这一句的中文原文。
         keyring::Error::NoStorageAccess(_) | keyring::Error::PlatformFailure(_) => {
-            HeadlessProblem::NoCredentialStore { detail: base }.to_string()
+            format!("{HEADLESS_NO_STORE_MARKER}{base}")
         }
         _ => base,
     }
@@ -271,18 +270,18 @@ impl CredentialBackend for EnvCredentialBackend {
 ///
 /// 这是**明摆着的降级**，不是和密钥环平级的选项：文件里的令牌只受文件权限
 /// 保护，能读到这个文件的进程就能拿到它。之所以还是提供，是因为无头 Linux
-/// 上真正的替代品不是「更安全的存储」而是「根本用不了」——而把令牌塞进
+/// 或无法解锁钥匙串的 macOS 上可能根本用不了系统存储——而把令牌塞进
 /// shell 历史或者 `docker inspect` 看得见的地方比这更糟。
 ///
 /// 所以它必须被显式选中（`ZEPPBRIDGE_CREDENTIAL_STORE=file`），不会在密钥环
 /// 不可用时被静默启用。
-#[cfg(all(unix, not(target_os = "macos")))]
+#[cfg(unix)]
 #[derive(Debug)]
 pub struct FileCredentialBackend {
     path: PathBuf,
 }
 
-#[cfg(all(unix, not(target_os = "macos")))]
+#[cfg(unix)]
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct StoredCredentials {
     #[serde(default = "default_credential_file_version")]
@@ -291,12 +290,12 @@ struct StoredCredentials {
     tokens: std::collections::BTreeMap<String, String>,
 }
 
-#[cfg(all(unix, not(target_os = "macos")))]
+#[cfg(unix)]
 fn default_credential_file_version() -> u32 {
     1
 }
 
-#[cfg(all(unix, not(target_os = "macos")))]
+#[cfg(unix)]
 impl FileCredentialBackend {
     pub fn new(data_dir: &Path) -> Self {
         Self {
@@ -332,7 +331,8 @@ impl FileCredentialBackend {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let _ = fs::set_permissions(parent, fs::Permissions::from_mode(0o700));
+            fs::set_permissions(parent, fs::Permissions::from_mode(0o700))
+                .map_err(|error| format!("无法保护凭据目录 {}：{error}", parent.display()))?;
         }
 
         let temp = parent.join(format!(
@@ -366,7 +366,7 @@ impl FileCredentialBackend {
     }
 }
 
-#[cfg(all(unix, not(target_os = "macos")))]
+#[cfg(unix)]
 impl CredentialBackend for FileCredentialBackend {
     fn set(&self, user_id: &str, token: &str) -> std::result::Result<(), String> {
         let mut stored = self.read()?;
@@ -402,23 +402,27 @@ impl CredentialBackend for FileCredentialBackend {
 ///
 /// 不静默回落到默认值：把 `ZEPPBRIDGE_CREDENTIAL_STORE=secretservice` 当成
 /// 「没设」，就等于让一处拼写错误安静地改变令牌存到哪里去。
-#[cfg(all(unix, not(target_os = "macos")))]
+#[cfg(unix)]
 #[derive(Debug)]
 struct InvalidCredentialStoreBackend {
     value: String,
 }
 
-#[cfg(all(unix, not(target_os = "macos")))]
+#[cfg(unix)]
 impl InvalidCredentialStoreBackend {
     fn error(&self) -> String {
+        #[cfg(target_os = "macos")]
+        let choices = "keychain、file";
+        #[cfg(not(target_os = "macos"))]
+        let choices = "secret-service、file、env";
         format!(
-            "{CREDENTIAL_STORE_ENV} 的值无法识别：{}。可用的是 secret-service、file、env",
+            "{CREDENTIAL_STORE_ENV} 的值无法识别：{}。可用的是 {choices}",
             self.value
         )
     }
 }
 
-#[cfg(all(unix, not(target_os = "macos")))]
+#[cfg(unix)]
 impl CredentialBackend for InvalidCredentialStoreBackend {
     fn set(&self, _user_id: &str, _token: &str) -> std::result::Result<(), String> {
         Err(self.error())
@@ -523,6 +527,7 @@ impl AuthManager {
         let user_id = validate_user_id(&auth.user_id)?;
         let token = validate_token(&auth.app_token)?;
         let region_host = normalize_region_host(&auth.region_host)?;
+        let previous_user_id = self.read_stored().ok().map(|(stored, _)| stored.user_id);
         let previous = self.credentials.get(&user_id).map_err(credential_error)?;
 
         self.credentials
@@ -539,6 +544,8 @@ impl AuthManager {
         if let Err(error) = self.write_stored(&stored) {
             // Best-effort rollback keeps metadata and the platform store
             // consistent if the atomic file replacement fails.
+            // Do not delete the previous account's credential: the new id
+            // never became current.
             match previous {
                 Some(old) => {
                     let _ = self.credentials.set(&user_id, &old);
@@ -548,6 +555,15 @@ impl AuthManager {
                 }
             }
             return Err(error);
+        }
+
+        // A→B 换账号后 A 的 keyring 条目不能留着：下一轮 clear 只认当前 id。
+        if let Some(raw) = previous_user_id {
+            if let Ok(old_id) = validate_user_id(&raw) {
+                if old_id != user_id {
+                    let _ = self.credentials.delete(&old_id);
+                }
+            }
         }
 
         // The user-id hint is best-effort: a failure here must not roll back
@@ -620,17 +636,6 @@ impl AuthManager {
         }))
     }
 
-    /// Look up a previously stored token by user id.  The token is never
-    /// logged and the caller must not send it to the frontend.
-    #[allow(dead_code)]
-    pub fn token_for_user(&self, user_id: &str) -> Result<Option<String>> {
-        let user_id = validate_user_id(user_id)?;
-        match self.credentials.get(&user_id).map_err(credential_error)? {
-            Some(value) => Ok(Some(validate_token(&value)?)),
-            None => Ok(None),
-        }
-    }
-
     /// Returns status without exposing the token.  The optional masked value
     /// is deliberately short and suitable for a settings screen.
     pub fn status(&self) -> Result<AuthStatus> {
@@ -673,15 +678,12 @@ impl AuthManager {
     /// A corrupt `auth.json` no longer leaves the credential behind: the
     /// best-effort user-id hint file is consulted as a fallback.
     pub fn clear_auth(&self) -> Result<()> {
-        let user_id = if self.auth_file.exists() {
-            self.read_stored()
-                .ok()
-                .map(|(stored, _)| stored.user_id)
-                .filter(|value| !value.trim().is_empty())
-                .or_else(|| self.read_user_id_hint())
-        } else {
-            None
-        };
+        let user_id = self
+            .read_stored()
+            .ok()
+            .map(|(stored, _)| stored.user_id)
+            .filter(|value| !value.trim().is_empty())
+            .or_else(|| self.read_user_id_hint());
 
         if let Some(user_id) = user_id {
             let user_id = validate_user_id(&user_id)?;
@@ -795,9 +797,9 @@ impl AuthManager {
 
 /// 平台默认的凭据存储。
 ///
-/// Windows 和 macOS 上这是一个常量：各自只有一个系统存储。Linux 上不是——
-/// 桌面有 Secret Service，无头服务器和容器没有——所以要看数据目录和环境，
-/// 见 [`CREDENTIAL_STORE_ENV`]。
+/// macOS and Linux can explicitly opt into a file store when the system
+/// store is inaccessible. Reuse an existing credential file after a restart,
+/// but never fall back to a file in response to a system-store error.
 pub fn default_credential_backend_in(data_dir: &Path) -> Arc<dyn CredentialBackend> {
     #[cfg(windows)]
     {
@@ -806,8 +808,10 @@ pub fn default_credential_backend_in(data_dir: &Path) -> Arc<dyn CredentialBacke
     }
     #[cfg(target_os = "macos")]
     {
-        let _ = data_dir;
-        Arc::new(MacOsCredentialBackend)
+        macos_credential_backend(
+            data_dir,
+            std::env::var(CREDENTIAL_STORE_ENV).ok().as_deref(),
+        )
     }
     #[cfg(all(unix, not(target_os = "macos")))]
     {
@@ -820,16 +824,34 @@ pub fn default_credential_backend_in(data_dir: &Path) -> Arc<dyn CredentialBacke
     }
 }
 
-/// 兼容旧签名。数据目录自己解析一次。
-///
-/// 保留它是因为它是公开 API；新代码请用 [`default_credential_backend_in`]，
-/// 那条路上数据目录已经是调用方手里的东西，不必再解析一遍。
-pub fn default_credential_backend() -> Arc<dyn CredentialBackend> {
-    match crate::paths::resolve_data_dir() {
-        Ok(dir) => default_credential_backend_in(&dir),
-        // 解析不出数据目录时，文件存储无处可放，但密钥环那条路和数据目录
-        // 无关，仍然能用。给一个空路径而不是直接失败。
-        Err(_) => default_credential_backend_in(Path::new("")),
+/// Resolve the macOS choice without accessing Keychain or changing process
+/// environment, so the opt-in and restart rules can be tested on every host.
+#[cfg(any(target_os = "macos", test))]
+fn macos_file_store_selected(
+    requested: Option<&str>,
+    credential_file_exists: bool,
+) -> std::result::Result<bool, String> {
+    match requested.map(str::trim).filter(|value| !value.is_empty()) {
+        Some(value) if value.eq_ignore_ascii_case("file") => Ok(true),
+        Some(value)
+            if value.eq_ignore_ascii_case("keychain") || value.eq_ignore_ascii_case("keyring") =>
+        {
+            Ok(false)
+        }
+        Some(value) => Err(value.to_string()),
+        None => Ok(credential_file_exists),
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn macos_credential_backend(
+    data_dir: &Path,
+    requested: Option<&str>,
+) -> Arc<dyn CredentialBackend> {
+    match macos_file_store_selected(requested, data_dir.join(CREDENTIAL_FILE).is_file()) {
+        Ok(true) => Arc::new(FileCredentialBackend::new(data_dir)),
+        Ok(false) => Arc::new(MacOsCredentialBackend),
+        Err(value) => Arc::new(InvalidCredentialStoreBackend { value }),
     }
 }
 
@@ -867,11 +889,21 @@ fn linux_credential_backend(data_dir: &Path) -> Arc<dyn CredentialBackend> {
     }
 }
 
+/// Linux Secret Service 在「机器上没有密钥环」时用这个前缀，让
+/// [`credential_error`] 把它还原成 [`HeadlessProblem`]，而不是吞进
+/// 泛化的 `CredentialStore`（命令行会因此变成退出码 1 + 中文原文）。
+const HEADLESS_NO_STORE_MARKER: &str = "\u{1e}headless.no_credential_store\u{1e}";
+
 fn credential_error(error: String) -> ZeppBridgeError {
     // Backends are not allowed to include secret values in their error text.
     //
     // 这是「系统凭据存储不肯配合」，不是「认证信息不对」。分开之后界面才能
     // 给出对得上的说法：一个让人重连，一个让人去看凭据管理器。
+    if let Some(detail) = error.strip_prefix(HEADLESS_NO_STORE_MARKER) {
+        return ZeppBridgeError::Headless(HeadlessProblem::NoCredentialStore {
+            detail: detail.to_string(),
+        });
+    }
     ZeppBridgeError::CredentialStore(error)
 }
 
@@ -958,29 +990,34 @@ pub fn mask_token(token: &str) -> String {
     format!("{prefix}…{suffix}")
 }
 
-#[cfg(windows)]
 fn replace_file(temp: &Path, destination: &Path) -> io::Result<()> {
-    // `rename` is atomic when the destination does not exist.  Windows does
-    // not replace an existing file with `rename`, so remove-and-rename is the
-    // conservative fallback; the temporary file is always in the same
-    // directory and never contains a token.
-    if destination.exists() {
-        fs::remove_file(destination)?;
+    // Windows `std::fs::rename` already replaces (`MoveFileExW` +
+    // `MOVEFILE_REPLACE_EXISTING`). Removing the destination first is not
+    // atomic: a crash in between leaves the target missing.
+    fs::rename(temp, destination)
+}
+
+#[cfg(test)]
+mod credential_error_tests {
+    use super::*;
+
+    #[test]
+    fn secret_service_absence_stays_headless_not_generic_store() {
+        let error = credential_error(format!("{HEADLESS_NO_STORE_MARKER}cannot talk to dbus"));
+        assert!(matches!(
+            error,
+            ZeppBridgeError::Headless(HeadlessProblem::NoCredentialStore { .. })
+        ));
+        assert_eq!(error.code(), "err.headless.no_credential_store");
+        let generic = credential_error("无法写入 Windows 凭据管理器".into());
+        assert!(matches!(generic, ZeppBridgeError::CredentialStore(_)));
+        assert_eq!(generic.code(), "err.core.credential_store");
     }
-    fs::rename(temp, destination)
 }
 
-#[cfg(not(windows))]
-fn replace_file(temp: &Path, destination: &Path) -> io::Result<()> {
-    fs::rename(temp, destination)
-}
-
-/// Linux 上三个凭据存储的行为。
-///
-/// 单独一个模块而不是塞进下面的 `tests`：这些测试只在 Linux 上编译，混在
-/// 一起会让那个模块的 cfg 门变成一片。
-#[cfg(all(test, unix, not(target_os = "macos")))]
-mod linux_credential_tests {
+/// File-store tests run on both macOS and Linux CI, without system credentials.
+#[cfg(all(test, unix))]
+mod unix_credential_tests {
     use super::*;
 
     /// 每个测试一个自己的目录。共用一个会让「删掉最后一个令牌就删文件」
@@ -1090,13 +1127,18 @@ mod linux_credential_tests {
         ] {
             // 报错必须把可用的值列出来。只说「无法识别」的话，读到它的人
             // 还得去翻源码才知道该写什么。
-            assert!(error.contains("secret-service"), "{error}");
             assert!(error.contains("file"), "{error}");
+            #[cfg(target_os = "macos")]
+            assert!(error.contains("keychain"), "{error}");
+            #[cfg(not(target_os = "macos"))]
+            assert!(error.contains("secret-service"), "{error}");
+            #[cfg(not(target_os = "macos"))]
             assert!(error.contains("env"), "{error}");
         }
     }
 
     #[test]
+    #[cfg(not(target_os = "macos"))]
     fn the_env_store_refuses_writes_but_reports_a_matching_one_as_done() {
         // 不碰真的环境变量：cargo 把测试跑在一个进程的多个线程里，
         // set_var 会让这些测试互相干扰，失败看起来还像是被测代码的问题。
@@ -1120,7 +1162,30 @@ mod linux_credential_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{collections::HashMap, sync::Mutex};
+    use std::{
+        collections::HashMap,
+        sync::{atomic::AtomicU64, atomic::Ordering, Barrier, Mutex},
+    };
+
+    #[test]
+    fn macos_storage_requires_opt_in_and_remembers_existing_files() {
+        assert_eq!(macos_file_store_selected(None, false), Ok(false));
+        assert_eq!(macos_file_store_selected(Some("  "), false), Ok(false));
+        assert_eq!(macos_file_store_selected(Some(" file "), false), Ok(true));
+        assert_eq!(macos_file_store_selected(Some("FILE"), false), Ok(true));
+        assert_eq!(macos_file_store_selected(None, true), Ok(true));
+        assert_eq!(macos_file_store_selected(Some(""), true), Ok(true));
+        assert_eq!(macos_file_store_selected(Some("KEYCHAIN"), true), Ok(false));
+        assert_eq!(macos_file_store_selected(Some("keyring"), true), Ok(false));
+        for invalid in ["fiel", "env", "secret-service"] {
+            for file_exists in [false, true] {
+                assert_eq!(
+                    macos_file_store_selected(Some(invalid), file_exists),
+                    Err(invalid.to_string()),
+                );
+            }
+        }
+    }
 
     #[derive(Default)]
     struct MemoryCredentials(Mutex<HashMap<String, String>>);
@@ -1145,16 +1210,56 @@ mod tests {
     }
 
     fn temp_dir() -> PathBuf {
-        let path = std::env::temp_dir().join(format!(
-            "zeppbridge-auth-test-{}-{}",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        fs::create_dir_all(&path).unwrap();
-        path
+        // Wall-clock timestamps can repeat across parallel tests. Claim each
+        // directory exclusively, including when a previous process left it behind.
+        static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+        loop {
+            let path = std::env::temp_dir().join(format!(
+                "zeppbridge-auth-test-{}-{}",
+                std::process::id(),
+                NEXT_ID.fetch_add(1, Ordering::Relaxed)
+            ));
+            match fs::create_dir(&path) {
+                Ok(()) => return path,
+                Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+                Err(error) => panic!("cannot create auth test directory: {error}"),
+            }
+        }
+    }
+
+    #[test]
+    fn parallel_auth_roundtrips_keep_separate_files() {
+        let barrier = Arc::new(Barrier::new(16));
+        let workers: Vec<_> = (0..16)
+            .map(|index| {
+                let barrier = barrier.clone();
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    let dir = temp_dir();
+                    let manager = AuthManager::with_credential_backend(
+                        dir.clone(),
+                        Arc::new(MemoryCredentials::default()),
+                    );
+                    let user_id = format!("user-{index}");
+                    manager
+                        .save_auth(&AuthInfo {
+                            app_token: format!("token-{index}"),
+                            user_id: user_id.clone(),
+                            region_host: "https://api-mifit.zepp.com".to_string(),
+                        })
+                        .unwrap();
+                    assert_eq!(manager.load_auth().unwrap().unwrap().user_id, user_id);
+                    manager.clear_auth().unwrap();
+                    fs::remove_dir(&dir).unwrap();
+                    dir
+                })
+            })
+            .collect();
+        let paths: std::collections::HashSet<_> = workers
+            .into_iter()
+            .map(|worker| worker.join().unwrap())
+            .collect();
+        assert_eq!(paths.len(), 16);
     }
 
     #[test]
@@ -1176,15 +1281,58 @@ mod tests {
         assert_eq!(loaded.app_token, "secret-token");
         assert_eq!(loaded.region_host, "https://api-mifit.zepp.com");
         assert_eq!(manager.masked_token().unwrap().as_deref(), Some("se…en"));
-        assert_eq!(
-            manager.token_for_user("user-1").unwrap().as_deref(),
-            Some("secret-token")
-        );
-        assert_eq!(manager.token_for_user("other-user").unwrap(), None);
 
         manager.clear_auth().unwrap();
         assert!(!dir.join("auth.json").exists());
         assert_eq!(backend.get("user-1").unwrap(), None);
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn saving_a_different_user_deletes_the_previous_credential() {
+        let dir = temp_dir();
+        let backend = Arc::new(MemoryCredentials::default());
+        let manager = AuthManager::with_credential_backend(dir.clone(), backend.clone());
+        manager
+            .save_auth(&AuthInfo {
+                app_token: "token-a".to_string(),
+                user_id: "user-a".to_string(),
+                region_host: "https://api-mifit.zepp.com".to_string(),
+            })
+            .unwrap();
+        manager
+            .save_auth(&AuthInfo {
+                app_token: "token-b".to_string(),
+                user_id: "user-b".to_string(),
+                region_host: "https://api-mifit.zepp.com".to_string(),
+            })
+            .unwrap();
+
+        assert_eq!(backend.get("user-a").unwrap(), None);
+        assert_eq!(backend.get("user-b").unwrap().as_deref(), Some("token-b"));
+        let loaded = manager.load_auth().unwrap().unwrap();
+        assert_eq!(loaded.user_id, "user-b");
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn clear_auth_uses_hint_when_auth_json_is_gone() {
+        let dir = temp_dir();
+        let backend = Arc::new(MemoryCredentials::default());
+        let manager = AuthManager::with_credential_backend(dir.clone(), backend.clone());
+        manager
+            .save_auth(&AuthInfo {
+                app_token: "token-a".to_string(),
+                user_id: "user-a".to_string(),
+                region_host: "https://api-mifit.zepp.com".to_string(),
+            })
+            .unwrap();
+        fs::remove_file(dir.join("auth.json")).unwrap();
+        assert!(dir.join("auth.user-id").exists());
+
+        manager.clear_auth().unwrap();
+        assert_eq!(backend.get("user-a").unwrap(), None);
+        assert!(!dir.join("auth.user-id").exists());
         let _ = fs::remove_dir_all(dir);
     }
 }

@@ -21,6 +21,15 @@ const messages = defineMessages(
     scale: 'Scale',
     unknown: 'Device',
   },
+  {
+    watch: 'Reloj',
+    strap: 'Correa',
+    ring: 'Anillo',
+    band: 'Pulsera',
+    earbuds: 'Audífonos',
+    scale: 'Báscula',
+    unknown: 'Dispositivo',
+  },
 );
 const t = useMessages(messages);
 

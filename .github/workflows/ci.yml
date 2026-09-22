@@ -149,8 +149,8 @@ jobs:
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --locked --all-targets -- -D warnings
 
       # Linux 上跑一遍 Rust 测试，才能真的覆盖到只在这个平台编译的代码：
-      # 凭据存储的三个后端和数据目录的 XDG 回退都是 cfg 门后面的东西，
-      # Windows 和 macOS 的作业根本不会编译它们。
+      # Secret Service、环境变量存储和 XDG 回退都有平台 cfg；文件存储
+      # 同时在 Linux 和 macOS 上测试。
       - name: Test Rust
         run: cargo test --manifest-path src-tauri/Cargo.toml --workspace --locked --jobs 1
 
@@ -337,8 +337,8 @@ jobs:
     name: Package Windows installers
     runs-on: windows-latest
     timeout-minutes: 45
-    # Package on pushes to main / release tags and manual dispatch, not on PRs.
-    if: github.event_name != 'pull_request'
+    # Build installers for release tags or explicit manual dispatch only.
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     needs: verify
 
     steps:
@@ -444,8 +444,8 @@ jobs:
     name: Package macOS bundle
     runs-on: macos-latest
     timeout-minutes: 45
-    # Package on pushes to main / release tags and manual dispatch, not on PRs.
-    if: github.event_name != 'pull_request'
+    # Build installers for release tags or explicit manual dispatch only.
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     needs: verify-macos
 
     steps:
@@ -514,8 +514,8 @@ jobs:
     name: Package Linux bundles
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    # Package on pushes to main / release tags and manual dispatch, not on PRs.
-    if: github.event_name != 'pull_request'
+    # Build installers for release tags or explicit manual dispatch only.
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     needs: verify-linux
 
     steps:
@@ -564,9 +564,17 @@ jobs:
         env:
           APPIMAGE_EXTRACT_AND_RUN: 1
         run: |
-          npm run tauri build -- \
-            --config src-tauri/tauri.linux.conf.json \
-            --bundles deb,rpm,appimage
+          # AppRun downloads can return transient GitHub HTTP 5xx responses.
+          # Reuse the build cache, but fail if all three attempts fail.
+          for attempt in 1 2 3; do
+            if npm run tauri build -- \
+              --config src-tauri/tauri.linux.conf.json \
+              --bundles deb,rpm,appimage; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then sleep 20; fi
+          done
+          exit 1
 
       - name: Collect Linux artifacts
         shell: bash
@@ -704,7 +712,7 @@ jobs:
     name: Package Flatpak bundle
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    if: github.event_name != 'pull_request'
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     needs: verify-linux
 
     steps:

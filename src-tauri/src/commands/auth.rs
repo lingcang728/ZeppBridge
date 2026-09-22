@@ -15,7 +15,6 @@ use std::path::PathBuf;
 /// never includes it in a status value or an error message.  Building the
 /// synchronizer opens a separate database connection, so the command-side
 /// database lock is not held while doing setup.
-#[tauri::command]
 pub async fn save_auth(
     state: tauri::State<'_, AppState>,
     app_token: String,
@@ -28,6 +27,10 @@ pub async fn save_auth(
         region_host,
     };
 
+    // Cancel first so a running start_*_sync can drop this lock; then hold it
+    // across save + manager swap so the old handle cannot keep writing.
+    let _command_guard = state.lock_sync_commands().await;
+
     state.auth.save_auth(&auth)?;
 
     let manager = match AppState::build_sync_manager(auth, &state.data_dir) {
@@ -39,10 +42,7 @@ pub async fn save_auth(
             // actionable result returned to the caller.
             let message = error.to_string();
             let _ = state.auth.clear_auth();
-            {
-                let mut sync = state.sync.write().await;
-                *sync = None;
-            }
+            state.replace_sync_manager(None).await;
             {
                 let mut auth_state = state.auth_state.write().await;
                 *auth_state = "unconfigured".to_string();
@@ -59,10 +59,7 @@ pub async fn save_auth(
         }
     };
 
-    {
-        let mut sync = state.sync.write().await;
-        *sync = Some(manager);
-    }
+    state.replace_sync_manager(Some(manager)).await;
     {
         let mut auth_state = state.auth_state.write().await;
         *auth_state = "configured".to_string();
@@ -105,15 +102,14 @@ pub async fn verify_auth(
         return verify_failure(&state, error).await;
     }
 
+    let _command_guard = state.lock_sync_commands().await;
+
     let manager = match AppState::build_sync_manager(auth, &state.data_dir) {
         Ok(manager) => manager,
         Err(error) => return verify_failure(&state, error).await,
     };
 
-    {
-        let mut sync = state.sync.write().await;
-        *sync = Some(manager);
-    }
+    state.replace_sync_manager(Some(manager)).await;
     {
         let mut auth_state = state.auth_state.write().await;
         *auth_state = "verified".to_string();
@@ -146,12 +142,10 @@ pub async fn clear_auth(
         *login = crate::ipc_types::LoginStatus::idle();
     }
 
-    state.auth.clear_auth()?;
+    let _command_guard = state.lock_sync_commands().await;
+    state.replace_sync_manager(None).await;
 
-    {
-        let mut sync = state.sync.write().await;
-        *sync = None;
-    }
+    state.auth.clear_auth()?;
     {
         let mut auth_state = state.auth_state.write().await;
         *auth_state = "unconfigured".to_string();
@@ -340,9 +334,47 @@ pub async fn import_from_har(
 ) -> std::result::Result<AppStatus, AppError> {
     let path = PathBuf::from(&har_path);
 
-    let auth = extract_from_har(&path)?;
+    let auth = extract_from_har(&path).map_err(|error| {
+        let reason = error.to_string();
+        let (code, message) = if reason.contains("超过大小上限") {
+            (
+                "err.har.too_large",
+                "HAR 文件过大，请导出一份更小的网络记录后再导入",
+            )
+        } else if reason.contains("未找到user_id") {
+            (
+                "err.har.missing_user",
+                "HAR 中没有找到用户编号，请在登录成功后重新导出网络记录",
+            )
+        } else if reason.contains("未找到apptoken") {
+            (
+                "err.har.missing_token",
+                "HAR 中没有找到登录令牌，请导出包含敏感数据的 HAR",
+            )
+        } else {
+            (
+                "err.har.invalid_file",
+                "无法读取有效的 HAR，请重新选择浏览器导出的 HAR 文件",
+            )
+        };
+        AppError::new(code, message)
+    })?;
 
-    // Use the same save flow as manual entry
+    // Do not persist a token that Zepp has not accepted. A HAR can contain
+    // leftover headers from another account or an expired session; saving
+    // those would look like a successful import until the next sync fails.
+    if let Err(error) = verify_recent_heart_rate(&auth).await {
+        return Err(match &error {
+            ZeppBridgeError::NetworkError(_) | ZeppBridgeError::RetryExhausted { .. } => {
+                user_facing_verify_error(&error)
+            }
+            _ => AppError::new(
+                "err.har.unverified",
+                "HAR 里的登录凭据未能通过 Zepp 验证，没有保存。请重新登录后导出，或改用手填 App Token。",
+            ),
+        });
+    }
+
     save_auth(state, auth.app_token, auth.user_id, auth.region_host).await
 }
 

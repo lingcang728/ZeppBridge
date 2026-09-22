@@ -3,17 +3,17 @@ import { listen } from '@tauri-apps/api/event';
 import { DesktopUnavailableError } from './errors';
 import type { BridgeBackend, UnlistenFn } from './types';
 import type {
+  LifeEvent,
   DailyHeartRateExtreme,
   Page,
   AppStatus,
   AiHandoffResult,
-  AuthInfo,
   CapabilityOverview,
   CapabilityProbe,
   DeviceProfile,
   DeviceProfilesResult,
-  DiagnosticReport,
   FeedbackSubmissionResult,
+  ExportEstimate,
   ExportResult,
   ExportSelection,
   HealthOverview,
@@ -25,7 +25,6 @@ import type {
   BackupVerification,
   CoverageLedger,
   DataHealth,
-  DeviceCatalogOption,
   PendingRestore,
   RawPayloadCompaction,
   RestorePreview,
@@ -56,22 +55,49 @@ const isTauriRuntime = (): boolean => {
   return Boolean(host.__TAURI_INTERNALS__ || host.__TAURI__);
 };
 
+/* 后端就绪门。
+
+   `AppState::new`（含大库迁移前的整库快照）跑在 `app-init` 工作线程上，
+   事件循环先把窗口画出来——页面到达时后端可能还没就绪，那时发出去的命令
+   拿不到 `AppState`，会以「state not managed」一类的错直接失败。
+
+   所以所有走 `call` 的命令先等这道门：`app_is_ready` 每 150ms 轮询一次
+   （比监听 `app://ready` 简单，也没有「事件已发、监听未注册」的缝隙）。
+   60 秒兜底只防死等：超时照常放行，让真实的错误到达界面，而不是一个
+   说不清的悬挂 promise。后端起不来时主进程会走 fatal_startup 退出，
+   那时这个 promise 有没有人接已经无所谓了。 */
+let backendReady: Promise<void> | null = null;
+
+export const whenBackendReady = (): Promise<void> => {
+  if (!isTauriRuntime()) return Promise.resolve();
+  if (backendReady) return backendReady;
+  backendReady = new Promise<void>((resolve) => {
+    const probe = () => {
+      void invoke<boolean>('app_is_ready')
+        .then((ready) => {
+          if (ready) resolve();
+          else window.setTimeout(probe, 150);
+        })
+        .catch(() => window.setTimeout(probe, 500));
+    };
+    window.setTimeout(resolve, 60_000);
+    probe();
+  });
+  return backendReady;
+};
+
 const call = async <T>(command: string, args?: UnknownRecord): Promise<T> => {
   if (!isTauriRuntime()) throw new DesktopUnavailableError();
+  await whenBackendReady();
   return invoke<T>(command, args);
 };
 
 export const tauriBackend: BridgeBackend = {
+  listLifeEvents(start, end) { return call<LifeEvent[]>('list_life_events', { start: start ?? null, end: end ?? null }); },
+  saveLifeEvent(input) { return call<number>('save_life_event', { input }); },
+  deleteLifeEvent(id) { return call<void>('delete_life_event', { id }); },
   getAppStatus() {
     return call<AppStatus>('get_app_status');
-  },
-
-  saveAuth(auth: AuthInfo) {
-    return call<AppStatus>('save_auth', {
-      appToken: auth.appToken,
-      userId: auth.userId,
-      regionHost: auth.regionHost,
-    });
   },
 
   verifyAuth() {
@@ -100,10 +126,6 @@ export const tauriBackend: BridgeBackend = {
 
   getLoginStatus() {
     return call<LoginStatus>('get_login_status');
-  },
-
-  startInitialSync(days?: number) {
-    return call<SyncReport>('start_initial_sync', days === undefined ? undefined : { days });
   },
 
   startHistorySync(days: number) {
@@ -137,10 +159,6 @@ export const tauriBackend: BridgeBackend = {
   /** 全天压力曲线。默认 24 小时，和心率那条同一个口径。 */
   getStressSeries(hours = 24) {
     return call<StressPoint[]>('get_stress_series', { hours });
-  },
-
-  getTrainingLoadSeries(days = 7) {
-    return call('get_training_load_series', { days });
   },
 
   /** 按天的原始心率极值 + 样本数。见 `DailyHeartRateExtreme` 的说明。 */
@@ -230,9 +248,6 @@ export const tauriBackend: BridgeBackend = {
   setWorkoutCodeLabel(zeppType: number, label: string | null) {
     return call<WorkoutCodeLabel[]>('set_workout_code_label', { zeppType, label });
   },
-  getDeviceCatalogOptions() {
-    return call<DeviceCatalogOption[]>('get_device_catalog_options');
-  },
   setDeviceModelOverride(deviceKey: string, catalogId: string | null) {
     return call<void>('set_device_model_override', { deviceKey, catalogId });
   },
@@ -262,10 +277,6 @@ export const tauriBackend: BridgeBackend = {
 
   reprocessLocalData() {
     return call<ReprocessResult>('reprocess_local_data');
-  },
-
-  getDiagnosticReport() {
-    return call<DiagnosticReport>('get_diagnostic_report');
   },
 
   getWorkoutInsight(workoutId: string) {
@@ -334,6 +345,9 @@ export const tauriBackend: BridgeBackend = {
 
   getExportJson(selection: ExportSelection) {
     return call<string>('get_export_json', { selection });
+  },
+  estimateExport(selection: ExportSelection) {
+    return call<ExportEstimate>('estimate_export', { selection });
   },
 
   saveJsonExport(selection: ExportSelection, path: string) {

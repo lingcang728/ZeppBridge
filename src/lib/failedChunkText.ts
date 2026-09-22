@@ -21,6 +21,10 @@ const messages = defineMessages(
     noCanonical: 'The cloud returned a payload, but no usable records could be parsed from it',
     noReason: 'No reason recorded',
   },
+  {
+    noCanonical: 'La nube devolvió datos, pero no se pudo extraer ningún registro utilizable',
+    noReason: 'No se registró el motivo',
+  },
 );
 
 /** 只声明这里要读的字段，方便直接拿数据库行来测。 */

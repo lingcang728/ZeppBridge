@@ -104,10 +104,10 @@ pub struct SleepSession {
     pub end_time: DateTime<Utc>,
     pub score: Option<i32>,
     pub duration_minutes: i32,
-    pub deep_minutes: i32,
-    pub light_minutes: i32,
+    pub deep_minutes: Option<i32>,
+    pub light_minutes: Option<i32>,
     pub rem_minutes: Option<i32>,
-    pub awake_minutes: i32,
+    pub awake_minutes: Option<i32>,
     pub source_scope: SourceScope,
     pub device_id: Option<String>,
     #[serde(default)]
@@ -538,19 +538,8 @@ pub struct StorageEstimate {
     pub needed_bytes: u64,
 }
 
-/// 同步状态
-#[allow(dead_code)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SyncState {
-    pub stream: String,
-    pub last_sync: Option<DateTime<Utc>>,
-    pub status: String,
-    pub error: Option<String>,
-}
-
-/// The storage representation of a sync stream.  `SyncState` above remains the
-/// small backwards-compatible view used by the original commands; this richer
-/// type carries the cursor/capability bookkeeping needed by the real pipeline.
+/// The storage representation of a sync stream, carrying the cursor/capability
+/// bookkeeping needed by the real pipeline.
 #[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SyncStateInfo {
@@ -607,14 +596,6 @@ pub struct DataStatus {
     pub capability: String,
     pub needs_reauth: bool,
     pub message: Option<String>,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RecentData {
-    pub metric_samples: Vec<MetricSample>,
-    pub sleep_sessions: Vec<SleepSession>,
-    pub workouts: Vec<Workout>,
 }
 
 /// 健康数据概览
@@ -853,6 +834,18 @@ impl ExportSelection {
             (None, None) => Err("导出请求缺少范围：需要日期范围或 workout id".into()),
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportEstimate {
+    pub record_count: usize,
+    pub estimated_bytes: u64,
+    pub scope_kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start_time: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end_time: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1110,22 +1103,15 @@ pub struct DeviceCacheMetadata {
     pub refreshed: bool,
     #[serde(default)]
     pub refresh_error: Option<String>,
+    /// `refresh_error` 那句话的稳定码。界面按它取自己语言的说法。
+    #[serde(default)]
+    pub refresh_error_code: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DeviceProfilesResult {
     pub profiles: Vec<DeviceProfile>,
     pub cache: DeviceCacheMetadata,
-}
-
-/// 供界面渲染「这是我的哪台设备」下拉框的一个选项。
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct DeviceCatalogOption {
-    pub catalog_id: String,
-    pub canonical_name: String,
-    pub name_zh: Option<String>,
-    pub kind: String,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

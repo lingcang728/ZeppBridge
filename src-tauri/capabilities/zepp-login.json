@@ -1,7 +1,10 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "zepp-login",
-  "description": "Minimal capability for the external Zepp account login window",
+  "description": "Minimal capability for the external Zepp account login window. No remote URLs: a page loaded from Zepp/Huami cannot invoke app commands.",
   "windows": ["zepp-login"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:window:allow-close",
+    "core:event:allow-listen"
+  ]
 }

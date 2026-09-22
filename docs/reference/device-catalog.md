@@ -2,14 +2,19 @@
 
 `src/assets/devices/catalog.json` is a maintenance-time snapshot; the model
 list was checked on 2026-08-15 and `device_source_codes` was added on
-2026-09-01. It contains 52 total entries, of which 51 are `active`/`supported`,
-covering 50 canonical model keys. The 48-card baseline is the supplied official
+2026-09-01 and extended on 2026-09-11. It contains 55 total entries, of which 54 are `active`/`supported`,
+covering 52 canonical model keys. The 48-card baseline is the supplied official
 Amazfit Japan store capture set (`design_picture/Product`, 12 rows × 4 cards);
 the duplicate GTR 4 black colour card shares the canonical GTR 4 material and
 is not counted as a second model. Three active official extras (Helio Strap Pro,
 Helio Core, and Helio Ring) bring the canonical count above 48. Helio Armband
 remains listed for provenance as `status=accessory` and `supported=false`, so it
 is not counted as a connectable device.
+
+Balance 2 XT, Amazfit Smart Scale and Mi Body Composition Scale 2 are also
+selectable. Their product art is unavailable, so they use the existing placeholder.
+The accepted source numbers are maintained in `device_source_codes` in the
+catalog and `DEVICE_SOURCE_CODES` in `scripts/assets/build-device-catalog.py`.
 
 The card-by-card mapping is kept in
 [`device-catalog-audit.json`](./device-catalog-audit.json) and
@@ -114,9 +119,19 @@ Pillow/OpenCV are the only image dependencies used by the maintenance script;
 the repository does not install a second copy of either tool.
 
 ```powershell
-py -3 scripts/assets/build-device-catalog.py
+py -3 scripts/assets/build-device-catalog.py --catalog-only
 py -3 scripts/assets/verify-device-assets.py
 ```
+
+For source-number changes alone, use `--catalog-only`. It updates the catalog
+from `DEVICE_SOURCE_CODES` while retaining the existing art, hashes and provenance;
+it requires only Python's standard library. Device-source matching runs when the
+device list is refreshed, independently of the health-record normalizer revision.
+Existing caches do not retain the source number, so they require that refresh.
+
+The historical `design_picture/Product` captures are no longer retained locally.
+A full image rebuild requires supplying the original captures named in the
+script first; normal application builds use the checked-in images directly.
 
 Use `--refresh-official` only when deliberately refreshing the four official
 CDN extras. The verifier checks the exact catalog/asset counts, card audit

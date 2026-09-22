@@ -15,6 +15,11 @@ const messages = defineMessages(
     genericFailure: "That didn't go through. Try again in a moment",
     timedOut: 'The request timed out. Check your network and the Zepp region, then try again.',
   },
+  {
+    desktopOnly: 'Usa la app de escritorio',
+    genericFailure: 'No se pudo completar. Inténtalo de nuevo en un momento',
+    timedOut: 'La solicitud tardó demasiado. Revisa tu conexión y la región de Zepp, e inténtalo de nuevo.',
+  },
 );
 
 const copy = () => messagesOf(messages);
@@ -66,14 +71,20 @@ export const toUserMessage = (error: unknown, fallback = copy().genericFailure):
   const localized = errorTextFor(errorCode(error));
   if (localized) return localized;
 
+  // 桌面不可用必须在 CJK 闸门之前：异常消息是中文标记，英文界面下
+  // `backendText` 会把它当成后端原文丢掉，后面的分支就永远走不到。
+  if (error instanceof DesktopUnavailableError) {
+    return copy().desktopOnly;
+  }
+
   const source = errorText(error).replace(/^Err\((.*)\)$/s, '$1').trim();
   if (!source) return fallback;
+  if (source.includes(DESKTOP_ONLY_MARKER)) {
+    return copy().desktopOnly;
+  }
   // 英文界面下绝不吐后端中文：查不到码时宁可给一句笼统的话。
   if (backendText(source, '') === '') return fallback;
   const lower = source.toLowerCase();
-  if (lower.includes(DESKTOP_ONLY_MARKER) || error instanceof DesktopUnavailableError) {
-    return copy().desktopOnly;
-  }
   if (lower.includes('timed out') || lower.includes('timeout')) {
     return copy().timedOut;
   }

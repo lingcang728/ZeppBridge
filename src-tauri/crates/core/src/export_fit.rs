@@ -104,14 +104,26 @@ fn encode_workout(workout: &Value) -> Result<Option<(Vec<u8>, usize)>, String> {
             .or_else(|| workout.get("workout_type")),
     ));
 
-    let start_unix = points
+    let sample_start = points
         .first()
         .map(|(timestamp, _)| *timestamp)
         .expect("points 非空");
-    let end_unix = points
+    let sample_end = points
         .last()
         .map(|(timestamp, _)| *timestamp)
         .expect("points 非空");
+
+    // Retain the full recorded activity span even if the first/last sample is
+    // missing. Cloud moving_seconds describes this span, not just sample coverage.
+    let (start_unix, end_unix) = match (
+        parse_unix(text(workout.get("start_time"))),
+        parse_unix(text(workout.get("end_time"))),
+    ) {
+        (Some(start), Some(end)) if start <= sample_start && end >= sample_end && end > start => {
+            (start, end)
+        }
+        _ => (sample_start, sample_end),
+    };
 
     let mut messages = Vec::new();
 
@@ -148,24 +160,37 @@ fn encode_workout(workout: &Value) -> Result<Option<(Vec<u8>, usize)>, String> {
 
     // 暂停区间：进入暂停写 timer stop，恢复写 timer start。这和 GPX 导出在
     // 暂停两侧切 trkseg 是同一份依据，只是换成 FIT 的说法。
-    let pauses = pause_intervals(workout);
+    let pauses = pause_intervals(workout, start_unix, end_unix);
+    let pause_events: Vec<_> = pauses
+        .iter()
+        .flat_map(|&(start, end)| {
+            [
+                (start, typedef::EventType::STOP),
+                (end, typedef::EventType::START),
+            ]
+        })
+        .collect();
 
     let mut record_count = 0usize;
     let mut pause_cursor = 0usize;
     for (unix, point) in &points {
-        while pause_cursor < pauses.len() && pauses[pause_cursor].0 <= *unix {
-            let (stop_at, resume_at) = pauses[pause_cursor];
-            messages.push(timer_event(stop_at, typedef::EventType::STOP));
-            messages.push(timer_event(resume_at, typedef::EventType::START));
+        while pause_cursor < pause_events.len() && pause_events[pause_cursor].0 <= *unix {
+            let (at, event_type) = pause_events[pause_cursor];
+            messages.push(timer_event(at, event_type));
             pause_cursor += 1;
         }
         messages.push(record_message(*unix, point, sport));
         record_count += 1;
     }
 
+    for &(at, event_type) in &pause_events[pause_cursor..] {
+        messages.push(timer_event(at, event_type));
+    }
+
     messages.push(timer_event(end_unix, typedef::EventType::STOP));
 
     let elapsed_seconds = (end_unix - start_unix).max(0) as f64;
+    let moving_seconds = timer_seconds(workout, start_unix, end_unix);
     // 手表自己记的圈优先于我们按公里切的分段。
     //
     // 「我经常按圈键，如果你的 .fit 里能带上圈数据，那会是我的首选」——
@@ -221,7 +246,7 @@ fn encode_workout(workout: &Value) -> Result<Option<(Vec<u8>, usize)>, String> {
         u32_field(mesgdef::Activity::TIMESTAMP, fit_timestamp(end_unix)),
         u32_field(
             mesgdef::Activity::TOTAL_TIMER_TIME,
-            (elapsed_seconds * 1000.0) as u32,
+            (moving_seconds * 1000.0) as u32,
         ),
         u16_field(mesgdef::Activity::NUM_SESSIONS, 1),
         enum_field(mesgdef::Activity::TYPE, typedef::Activity::MANUAL.0),
@@ -235,8 +260,8 @@ fn encode_workout(workout: &Value) -> Result<Option<(Vec<u8>, usize)>, String> {
     // Garmin Connect 只能退回账号的默认时区——于是北京时间早上六点的跑步会
     // 显示成前一天晚上十点。
     //
-    // 偏移量不用猜：导出 JSON 的 `start_time` 是带偏移的 RFC3339，手表当时在
-    // 哪个时区就写着哪个。读不出来就不写这个字段，而不是假设 UTC。
+    // 入库后的 start_time 已转为 UTC，零偏移不能证明手表所在时区。
+    // 只保留仍明确携带非零偏移的输入；无法确认时省略该字段。
     if let Some(offset) = local_offset_seconds(workout) {
         activity_fields.push(u32_field(
             mesgdef::Activity::LOCAL_TIMESTAMP,
@@ -293,8 +318,17 @@ fn merge_series(workout: &Value) -> Vec<(i64, Point)> {
             continue;
         };
         let point = merged.entry(unix).or_default();
-        point.latitude = entry.get("latitude").and_then(Value::as_f64);
-        point.longitude = entry.get("longitude").and_then(Value::as_f64);
+        // 坐标必须成对且落在地球表面上；出域的坐标等于没有坐标，
+        // 这条 record 上别的量（心率、功率）不受影响。
+        if let (Some(latitude), Some(longitude)) = (
+            entry.get("latitude").and_then(Value::as_f64),
+            entry.get("longitude").and_then(Value::as_f64),
+        ) {
+            if coordinates_in_domain(latitude, longitude) {
+                point.latitude = Some(latitude);
+                point.longitude = Some(longitude);
+            }
+        }
         if let Some(altitude) = entry.get("altitude_m").and_then(Value::as_f64) {
             point.altitude_m = Some(altitude);
         }
@@ -337,9 +371,11 @@ fn record_message(unix: i64, point: &Point, sport: typedef::Sport) -> Message {
     let mut fields = vec![u32_field(mesgdef::Record::TIMESTAMP, fit_timestamp(unix))];
 
     if let (Some(latitude), Some(longitude)) = (point.latitude, point.longitude) {
-        if let (Some(lat), Some(lon)) = (semicircles(latitude), semicircles(longitude)) {
-            fields.push(i32_field(mesgdef::Record::POSITION_LAT, lat));
-            fields.push(i32_field(mesgdef::Record::POSITION_LONG, lon));
+        if coordinates_in_domain(latitude, longitude) {
+            if let (Some(lat), Some(lon)) = (semicircles(latitude), semicircles(longitude)) {
+                fields.push(i32_field(mesgdef::Record::POSITION_LAT, lat));
+                fields.push(i32_field(mesgdef::Record::POSITION_LONG, lon));
+            }
         }
     }
     if let Some(altitude) = point.altitude_m.and_then(encode_altitude) {
@@ -478,6 +514,7 @@ fn push_laps(
             .get("duration_seconds")
             .and_then(Value::as_f64)
             .unwrap_or((end - start).max(0) as f64);
+        let moving_seconds = (duration - paused_seconds(workout, start, end)).max(0.0);
 
         let mut fields = vec![
             u16_field(mesgdef::Lap::MESSAGE_INDEX, count),
@@ -495,7 +532,7 @@ fn push_laps(
             ),
             u32_field(
                 mesgdef::Lap::TOTAL_TIMER_TIME,
-                (duration * 1000.0).max(0.0) as u32,
+                (moving_seconds * 1000.0) as u32,
             ),
         ];
 
@@ -510,9 +547,9 @@ fn push_laps(
         // 这个字段而不是自己从 record 里算，于是分段表整列显示 0。
         if let (Some(distance), true) = (
             split.get("distance_m").and_then(Value::as_f64),
-            duration > 0.0,
+            moving_seconds > 0.0,
         ) {
-            if let Some(speed) = encode_speed(distance / duration) {
+            if let Some(speed) = encode_speed(distance / moving_seconds) {
                 fields.push(u16_field(mesgdef::Lap::AVG_SPEED, speed));
             }
         }
@@ -577,6 +614,7 @@ fn push_whole_activity_lap(
     points: &[(i64, Point)],
 ) {
     let duration_ms = (elapsed_seconds * 1000.0).max(0.0) as u32;
+    let moving_seconds = timer_seconds(workout, start_unix, end_unix);
     let mut fields = vec![
         u16_field(mesgdef::Lap::MESSAGE_INDEX, 0),
         u32_field(mesgdef::Lap::TIMESTAMP, fit_timestamp(end_unix)),
@@ -594,14 +632,18 @@ fn push_whole_activity_lap(
             typedef::LapTrigger::SESSION_END.0,
         ),
         u32_field(mesgdef::Lap::TOTAL_ELAPSED_TIME, duration_ms),
-        u32_field(mesgdef::Lap::TOTAL_TIMER_TIME, duration_ms),
+        u32_field(
+            mesgdef::Lap::TOTAL_TIMER_TIME,
+            (moving_seconds * 1000.0) as u32,
+        ),
     ];
 
     // 起点坐标同 session：取第一个真有定位的点，室内运动本来就没有。
-    if let Some((latitude, longitude)) = points
-        .iter()
-        .find_map(|(_, point)| Some((point.latitude?, point.longitude?)))
-    {
+    if let Some((latitude, longitude)) = points.iter().find_map(|(_, point)| {
+        let latitude = point.latitude?;
+        let longitude = point.longitude?;
+        coordinates_in_domain(latitude, longitude).then_some((latitude, longitude))
+    }) {
         if let (Some(lat), Some(lon)) = (semicircles(latitude), semicircles(longitude)) {
             fields.push(i32_field(mesgdef::Lap::START_POSITION_LAT, lat));
             fields.push(i32_field(mesgdef::Lap::START_POSITION_LONG, lon));
@@ -617,8 +659,8 @@ fn push_whole_activity_lap(
             mesgdef::Lap::TOTAL_DISTANCE,
             (distance * 100.0) as u32,
         ));
-        if elapsed_seconds > 0.0 {
-            if let Some(speed) = encode_speed(distance / elapsed_seconds) {
+        if moving_seconds > 0.0 {
+            if let Some(speed) = encode_speed(distance / moving_seconds) {
                 fields.push(u16_field(mesgdef::Lap::AVG_SPEED, speed));
             }
         }
@@ -677,6 +719,7 @@ fn push_session(
     lap_count: u16,
     points: &[(i64, Point)],
 ) {
+    let moving_seconds = timer_seconds(workout, start_unix, end_unix);
     let mut fields = vec![
         u16_field(mesgdef::Session::MESSAGE_INDEX, 0),
         u32_field(mesgdef::Session::TIMESTAMP, fit_timestamp(end_unix)),
@@ -691,7 +734,7 @@ fn push_session(
         ),
         u32_field(
             mesgdef::Session::TOTAL_TIMER_TIME,
-            (elapsed_seconds * 1000.0) as u32,
+            (moving_seconds * 1000.0) as u32,
         ),
         u16_field(mesgdef::Session::FIRST_LAP_INDEX, 0),
         u16_field(mesgdef::Session::NUM_LAPS, lap_count),
@@ -699,10 +742,11 @@ fn push_session(
 
     // 起点坐标取第一个真有定位的点，而不是第一条 record——室内运动的第一条
     // record 根本没有坐标。
-    if let Some((latitude, longitude)) = points
-        .iter()
-        .find_map(|(_, point)| Some((point.latitude?, point.longitude?)))
-    {
+    if let Some((latitude, longitude)) = points.iter().find_map(|(_, point)| {
+        let latitude = point.latitude?;
+        let longitude = point.longitude?;
+        coordinates_in_domain(latitude, longitude).then_some((latitude, longitude))
+    }) {
         if let (Some(lat), Some(lon)) = (semicircles(latitude), semicircles(longitude)) {
             fields.push(i32_field(mesgdef::Session::START_POSITION_LAT, lat));
             fields.push(i32_field(mesgdef::Session::START_POSITION_LONG, lon));
@@ -717,8 +761,8 @@ fn push_session(
             ));
             // 同 lap：距离 ÷ 时间，两个操作数都是刚写进这个文件的实测值。
             // 少了这一条，导入方的「平均速度 / 平均配速」整个是空的。
-            if elapsed_seconds > 0.0 {
-                if let Some(speed) = encode_speed(distance / elapsed_seconds) {
+            if moving_seconds > 0.0 {
+                if let Some(speed) = encode_speed(distance / moving_seconds) {
                     fields.push(u16_field(mesgdef::Session::AVG_SPEED, speed));
                 }
             }
@@ -961,17 +1005,43 @@ fn hr_zone_field(workout: &Value) -> Option<Vec<u32>> {
 }
 
 /// `(暂停开始, 恢复)` 的秒级时间戳对，按开始时间排序。
-fn pause_intervals(workout: &Value) -> Vec<(i64, i64)> {
+fn pause_intervals(workout: &Value, from: i64, to: i64) -> Vec<(i64, i64)> {
     let mut intervals: Vec<(i64, i64)> = array(workout, "pauses")
         .iter()
         .filter_map(|pause| {
             let start = parse_unix(text(pause.get("start_time")))?;
             let end = parse_unix(text(pause.get("end_time")))?;
-            Some((start, end))
+            let start = start.max(from);
+            let end = end.min(to);
+            (end > start).then_some((start, end))
         })
         .collect();
     intervals.sort_unstable();
-    intervals
+    let mut merged: Vec<(i64, i64)> = Vec::new();
+    for (start, end) in intervals {
+        if let Some(last) = merged.last_mut().filter(|last| start <= last.1) {
+            last.1 = last.1.max(end);
+        } else {
+            merged.push((start, end));
+        }
+    }
+    merged
+}
+
+fn paused_seconds(workout: &Value, start: i64, end: i64) -> f64 {
+    pause_intervals(workout, start, end)
+        .iter()
+        .map(|(from, to)| (to - from) as f64)
+        .sum()
+}
+
+fn timer_seconds(workout: &Value, start: i64, end: i64) -> f64 {
+    let elapsed = (end - start).max(0) as f64;
+    workout
+        .get("moving_seconds")
+        .and_then(Value::as_f64)
+        .filter(|seconds| seconds.is_finite() && *seconds >= 0.0 && *seconds <= elapsed)
+        .unwrap_or_else(|| (elapsed - paused_seconds(workout, start, end)).max(0.0))
 }
 
 fn timer_event(unix: i64, event_type: typedef::EventType) -> Message {
@@ -1192,6 +1262,16 @@ fn is_foot_sport(sport: typedef::Sport) -> bool {
     )
 }
 
+/// 坐标域：纬 ±90、经 ±180，且两个都得是有限值。
+/// 这是导出的最后一道边界，独立于解码侧的截断——从这里进来的数据可能
+/// 直接来自构造的导出输入，不经过解码器。
+fn coordinates_in_domain(latitude: f64, longitude: f64) -> bool {
+    latitude.is_finite()
+        && longitude.is_finite()
+        && latitude.abs() <= 90.0
+        && longitude.abs() <= 180.0
+}
+
 fn semicircles(degrees: f64) -> Option<i32> {
     if !degrees.is_finite() || degrees.abs() > 180.0 {
         return None;
@@ -1206,11 +1286,12 @@ fn semicircles(degrees: f64) -> Option<i32> {
 
 /// 这条运动所在时区相对 UTC 的偏移秒数。
 ///
-/// 导出 JSON 的 `start_time` 是带偏移量的 RFC3339，手表当时在哪个时区就写着
-/// 哪个，所以不用猜。解析不出来就返回 `None`——调用方据此不写本地时间戳，而
-/// 不是假设 UTC。
+/// 入库后的 UTC 时间已丢失原始时区；零偏移和解析失败都返回 `None`。
+/// 非零 RFC3339 偏移仍可保留，调用方在未知时省略本地时间戳。
 fn local_offset_seconds(workout: &Value) -> Option<i32> {
-    parse_time(text(workout.get("start_time"))).map(|time| time.offset().local_minus_utc())
+    parse_time(text(workout.get("start_time")))
+        .map(|time| time.offset().local_minus_utc())
+        .filter(|offset| *offset != 0)
 }
 
 fn encode_altitude(metres: f64) -> Option<u16> {
@@ -1397,6 +1478,39 @@ mod tests {
     }
 
     #[test]
+    fn issue_24_cloud_trail_run_exports_as_trail_in_json_gpx_and_fit() {
+        let workouts = crate::normalizer::Normalizer::normalize_workouts_with_sport(
+            &json!({"data": [{
+                "trackid": 1_700_000_000i64, "end_time": 1_700_000_600i64, "type": 7
+            }]}),
+            None,
+        )
+        .unwrap();
+        let mut workout = serde_json::to_value(&workouts[0]).unwrap();
+        assert_eq!(workout["workout_type"], "trail_running");
+        workout["route"] = json!([{
+            "timestamp": "2023-11-14T22:13:20Z", "latitude": 0.0, "longitude": 0.0
+        }]);
+        let export = export_with(json!({"workouts": [workout]}));
+        let (gpx, points) = crate::export_formats::to_gpx(&export).unwrap();
+        assert_eq!(points, 1);
+        assert!(gpx.contains("<type>trail_running</type>"));
+        assert!(!gpx.contains("swimming"));
+        let (files, _) = to_fit(&export).unwrap();
+        assert!(files[0].0.ends_with("-trail-running.fit"));
+        let fit = decode(&files[0].1);
+        let session = messages_of(&fit, typedef::MesgNum::SESSION);
+        assert_eq!(
+            int_of(session[0], mesgdef::Session::SPORT),
+            Some(i64::from(typedef::Sport::RUNNING.0))
+        );
+        assert_eq!(
+            int_of(session[0], mesgdef::Session::SUB_SPORT),
+            Some(i64::from(typedef::SubSport::TRAIL.0))
+        );
+    }
+
+    #[test]
     fn writes_one_file_per_workout_and_decodes_back() {
         let (files, records) = to_fit(&running_export()).unwrap();
 
@@ -1479,12 +1593,16 @@ mod tests {
             "heart_rate": "0,120;1,1;1,1;1,1;",
             "power_meter": "0,200;,250;,0;,300;"
         });
-        db.normalize_and_persist_raw(
-            0,
-            "workout_detail",
-            "workout_detail:1700000000:run.gps",
-            &payload,
-        )
+        db.persist_fetched_record(&crate::models::RawRecord {
+            stream: "workout_detail".into(),
+            source_key: "workout_detail:1700000000:run.gps".into(),
+            source_scope: crate::models::SourceScope::Device,
+            device_id: None,
+            start_utc: start,
+            end_utc: None,
+            payload,
+            capability: crate::models::CapabilityStatus::Verified,
+        })
         .unwrap();
         let selection = ExportSelection {
             scope: Some(ExportScope::Workout {
@@ -1569,6 +1687,20 @@ mod tests {
             int_of(activity[0], mesgdef::Activity::LOCAL_TIMESTAMP).expect("本地时间戳应当写出来");
         // fixture 是 +08:00
         assert_eq!(local - utc, 8 * 3600);
+    }
+
+    #[test]
+    fn utc_normalized_workouts_do_not_claim_a_local_timezone() {
+        for start in ["2026-08-23T22:00:00Z", "2026-08-23T22:00:00+00:00"] {
+            let mut export = running_export();
+            export["data"]["workouts"][0]["start_time"] = json!(start);
+            let (files, _) = to_fit(&export).unwrap();
+            let fit = decode(&files[0].1);
+            let activity = messages_of(&fit, typedef::MesgNum::ACTIVITY);
+            assert_eq!(activity.len(), 1);
+            assert!(int_of(activity[0], mesgdef::Activity::TIMESTAMP).is_some());
+            assert!(raw(activity[0], mesgdef::Activity::LOCAL_TIMESTAMP).is_none());
+        }
     }
 
     /// 经度正好 180.0° 的点不该丢掉坐标。
@@ -1796,6 +1928,63 @@ mod tests {
         let start = Some(i64::from(typedef::EventType::START.0));
         let stop = Some(i64::from(typedef::EventType::STOP.0));
         assert_eq!(types, vec![start, stop, start, stop]);
+        let session = messages_of(&fit, typedef::MesgNum::SESSION)[0];
+        assert_eq!(
+            int_of(session, mesgdef::Session::TOTAL_ELAPSED_TIME),
+            Some(600_000)
+        );
+        assert_eq!(
+            int_of(session, mesgdef::Session::TOTAL_TIMER_TIME),
+            Some(420_000)
+        );
+        let lap = messages_of(&fit, typedef::MesgNum::LAP)[0];
+        assert_eq!(int_of(lap, mesgdef::Lap::TOTAL_TIMER_TIME), Some(420_000));
+        let activity = messages_of(&fit, typedef::MesgNum::ACTIVITY)[0];
+        assert_eq!(
+            int_of(activity, mesgdef::Activity::TOTAL_TIMER_TIME),
+            Some(420_000)
+        );
+    }
+
+    #[test]
+    fn overlapping_and_out_of_bounds_pauses_are_counted_once() {
+        let workout = json!({"pauses": [
+            {"start_time": "2026-09-11T00:01:00Z", "end_time": "2026-09-11T00:04:00Z"},
+            {"start_time": "2026-09-11T00:02:00Z", "end_time": "2026-09-11T00:05:00Z"},
+            {"start_time": "2026-09-10T23:59:00Z", "end_time": "2026-09-11T00:00:30Z"},
+            {"start_time": "2026-09-11T00:09:30Z", "end_time": "2026-09-11T00:12:00Z"},
+            {"start_time": "2026-09-11T00:08:00Z", "end_time": "2026-09-11T00:07:00Z"}
+        ]});
+        let start = parse_unix("2026-09-11T00:00:00Z").unwrap();
+        assert_eq!(timer_seconds(&workout, start, start + 600), 300.0);
+    }
+
+    #[test]
+    fn cloud_moving_time_and_full_activity_bounds_survive_sparse_samples() {
+        let export = export_with(json!({"workouts": [{
+            "workout_id": "moving-time", "effective_type": "run",
+            "start_time": "2026-09-11T00:00:00Z", "end_time": "2026-09-11T00:10:00Z",
+            "moving_seconds": 420, "distance_meters": 1400,
+            "samples": [
+                {"timestamp": "2026-09-11T00:00:10Z", "heart_rate": 100},
+                {"timestamp": "2026-09-11T00:08:00Z", "heart_rate": 110}
+            ],
+            "route": [], "pauses": [], "splits": []
+        }]}));
+        let (files, _) = to_fit(&export).unwrap();
+        let fit = decode(&files[0].1);
+        let session = messages_of(&fit, typedef::MesgNum::SESSION)[0];
+        assert_eq!(
+            int_of(session, mesgdef::Session::TOTAL_ELAPSED_TIME),
+            Some(600_000)
+        );
+        assert_eq!(
+            int_of(session, mesgdef::Session::TOTAL_TIMER_TIME),
+            Some(420_000)
+        );
+        assert_eq!(int_of(session, mesgdef::Session::AVG_SPEED), Some(3333));
+        let lap = messages_of(&fit, typedef::MesgNum::LAP)[0];
+        assert_eq!(int_of(lap, mesgdef::Lap::TOTAL_TIMER_TIME), Some(420_000));
     }
 
     /// 云端给了爬升就用云端的，别再拿分段之和覆盖它。
@@ -2047,5 +2236,62 @@ mod tests {
             .fields
             .iter()
             .all(|field| field.num != mesgdef::Session::TIME_IN_HR_ZONE));
+    }
+
+    /// lat=999 不是地球上的点：record 上没有坐标字段（心率照写），
+    /// session/lap 的起点坐标也只能取到合法的那个点。
+    #[test]
+    fn out_of_domain_coordinates_are_dropped_before_semicircle_conversion() {
+        let export = export_with(json!({
+            "workouts": [{
+                "workout_id": "w1",
+                "effective_type": "run",
+                "start_time": "2026-08-24T06:00:00+08:00",
+                "end_time": "2026-08-24T06:00:02+08:00",
+                "route": [
+                    { "timestamp": "2026-08-24T06:00:00+08:00", "latitude": 999.0,
+                      "longitude": 121.0 },
+                    { "timestamp": "2026-08-24T06:00:01+08:00", "latitude": 31.0,
+                      "longitude": 121.0 }
+                ],
+                "samples": [
+                    { "timestamp": "2026-08-24T06:00:00+08:00", "heart_rate": 132 },
+                    { "timestamp": "2026-08-24T06:00:01+08:00", "heart_rate": 134 }
+                ],
+                "splits": [],
+                "pauses": []
+            }]
+        }));
+        let (files, _) = to_fit(&export).expect("导出应当成功");
+        let fit = decode(&files[0].1);
+        let records = messages_of(&fit, typedef::MesgNum::RECORD);
+        assert_eq!(records.len(), 2, "两条采样仍然各写一条 record");
+        assert_eq!(
+            int_of(records[0], mesgdef::Record::POSITION_LAT),
+            None,
+            "lat=999 不许进 record"
+        );
+        assert_eq!(int_of(records[0], mesgdef::Record::POSITION_LONG), None);
+        assert_eq!(
+            int_of(records[0], mesgdef::Record::HEART_RATE),
+            Some(132),
+            "坐标坏了不等于整条采样没了"
+        );
+        let expected = (31.0 * SEMICIRCLES_PER_DEGREE).round() as i64;
+        assert!(
+            (int_of(records[1], mesgdef::Record::POSITION_LAT).unwrap() - expected).abs() <= 1,
+            "合法点的坐标照常写"
+        );
+        let session = messages_of(&fit, typedef::MesgNum::SESSION);
+        assert_eq!(
+            int_of(session[0], mesgdef::Session::START_POSITION_LAT),
+            Some(expected),
+            "起点坐标只能取到合法点，不能是那个 lat=999"
+        );
+        let lap = messages_of(&fit, typedef::MesgNum::LAP);
+        assert_eq!(
+            int_of(lap[0], mesgdef::Lap::START_POSITION_LAT),
+            Some(expected)
+        );
     }
 }

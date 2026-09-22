@@ -8,7 +8,9 @@
  */
 import { computed } from 'vue';
 import Icon from './Icon.vue';
+import ComparisonBars from './ComparisonBars.vue';
 import type { InsightFact, WorkoutInsight } from '../types';
+import { formatDate } from '../lib/format';
 import { defineMessages, useMessages } from '../i18n';
 import {
   distanceUnitLabel,
@@ -22,6 +24,8 @@ const messages = defineMessages(
     title: '跑完怎么样',
     unsupportedWorkoutType: '暂不支持这类运动的洞察。第一版只做已用真实数据验证过的跑步；其他运动仍可正常查看、纠正和导出。',
     handoff: '让 AI 展开分析',
+    currentRun: '本次',
+    baselineRun: '历史基线',
     reading: '正在读取本地记录…',
     comparedTo: (count: number) => `和你自己距离相近的最近 ${count} 次跑步相比：`,
     noComparison: '还没有足够的可比历史记录，所以这次只报数值，不做比较。',
@@ -78,6 +82,8 @@ const messages = defineMessages(
     title: 'How the run went',
     unsupportedWorkoutType: 'Insights for this workout type are not supported yet. The first version covers running only, because that is what has been checked against real data. Every other workout still displays, corrects and exports normally.',
     handoff: 'Let AI dig in',
+    currentRun: 'This run',
+    baselineRun: 'Baseline',
     reading: 'Reading local records…',
     comparedTo: (count: number) => `Against your own ${count} most recent runs of a similar distance:`,
     noComparison: 'Not enough comparable history yet, so this run reports its numbers without comparing them.',
@@ -127,6 +133,63 @@ const messages = defineMessages(
       missing_duration: 'no duration',
       implausible_pace: 'implausible pace',
       beyond_max_samples: 'past the sample cap',
+    },
+  },
+  {
+    title: 'Cómo te fue en la carrera',
+    unsupportedWorkoutType: 'Todavía no hay análisis para este tipo de entrenamiento. La primera versión cubre solo carrera, porque es lo que se ha verificado con datos reales. Los demás entrenamientos se ven, corrigen y exportan con normalidad.',
+    handoff: 'Pedirle a la IA que profundice',
+    currentRun: 'Esta carrera',
+    baselineRun: 'Referencia',
+    reading: 'Leyendo registros locales…',
+    comparedTo: (count: number) => `Frente a tus ${count} carreras más recientes de distancia similar:`,
+    noComparison: 'Todavía no hay suficiente historial comparable, así que esta carrera muestra sus valores sin compararlos.',
+    baselinePrefix: (value: string, delta: string) => `referencia ${value} · ${delta}`,
+    driftTitle: 'Primera mitad vs. segunda',
+    driftSub: 'Divide el entrenamiento en dos mitades por tiempo y compara cuántos latidos costó la misma velocidad.',
+    driftFirst: 'Primera mitad',
+    driftSecond: 'Segunda mitad',
+    driftPerBeat: (metres: string) => `${metres} m/latido`,
+    driftHrSpeed: (hr: number, pace: string) => `${hr} lpm · ${pace}`,
+    driftDelta: (percent: string) => `${percent}%`,
+    driftRising: 'Mantener la misma velocidad costó más latidos en la segunda mitad.',
+    driftFlat: 'Las dos mitades son prácticamente iguales.',
+    driftFalling: 'Cada latido te llevó más lejos en la segunda mitad.',
+    driftNote: 'Esto compara el entrenamiento solo consigo mismo, nunca con otras personas. Semáforos, cuestas, intervalos y desvíos del GPS lo alteran, así que no se muestra ningún número cuando el ritmo no fue estable.',
+    driftUnavailable: (code: string) => ({
+      too_short: 'Demasiado corto para dividirlo. Los primeros diez minutos son sobre todo la frecuencia cardíaca subiendo, así que compararlos con la segunda mitad mide el calentamiento, no la deriva.',
+      pace_too_variable: 'El ritmo varió demasiado (intervalos, semáforos o cuestas se ven así), así que las dos mitades no son comparables y no se muestra ningún número.',
+      not_enough_samples: 'Este entrenamiento no tiene suficientes muestras punto a punto de frecuencia cardíaca y velocidad para dividirlo.',
+      unsupported_workout_type: 'Por ahora la comparación entre mitades cubre solo carrera. Caminata y ciclismo también tienen suficientes muestras, pero sus umbrales aún no se han verificado con datos reales.',
+    } as Record<string, string | undefined>)[code] ?? 'Este entrenamiento no se puede dividir.',
+    baselineSummary: 'De dónde sale la referencia',
+    baselineRule: (days: number, tolerance: number | null | undefined, min: number, max: number) =>
+      `La regla: carreras del mismo tipo de los últimos ${days} días cuya distancia esté dentro de ±${tolerance ?? '—'}% de esta, entre ${min} y ${max} carreras.`,
+    excludedPrefix: 'Excluidas: ',
+    excludedItem: (label: string, count: number) => `${label} ×${count} `,
+    footnote: 'Todas las conclusiones te comparan con tu propio historial, nunca con un promedio de población, y ninguna es un juicio médico. Los datos que faltan aparecen como «Sin datos» en vez de rellenarse con cero.',
+    notProvided: 'Sin datos',
+    durationHours: (hours: number, minutes: number) => `${hours} h ${minutes} min`,
+    durationMinutes: (minutes: number) => `${minutes} min`,
+    metric: {
+      'run.distance': 'Distancia',
+      'run.duration': 'Tiempo',
+      'run.pace': 'Ritmo medio',
+      'run.avg_hr': 'FC media',
+      'run.training_load': 'Carga de entrenamiento',
+    },
+    confidence: {
+      high: 'Evidencia sólida',
+      medium: 'Algo de evidencia',
+      low: 'Poca evidencia',
+      insufficient: 'Evidencia insuficiente',
+    },
+    exclusion: {
+      distance_out_of_tolerance: 'distancia muy distinta',
+      missing_distance: 'sin distancia',
+      missing_duration: 'sin duración',
+      implausible_pace: 'ritmo poco creíble',
+      beyond_max_samples: 'fuera del límite de muestras',
     },
   },
 );
@@ -276,11 +339,6 @@ const exclusionSummary = computed(() => {
       <p class="insight-summary">
         <template v-if="hasAnyComparison">
           {{ t.comparedTo(comparedFacts[0].evidence_count) }}
-          <span
-            v-for="fact in comparedFacts"
-            :key="fact.fact_id"
-            :class="['delta', deltaTone(fact)]"
-          >{{ metricLabel(fact.fact_id, fact.metric) }} {{ deltaText(fact) }}</span>
         </template>
         <template v-else>
           {{ t.noComparison }}
@@ -291,8 +349,11 @@ const exclusionSummary = computed(() => {
         <div v-for="fact in facts" :key="fact.fact_id" class="fact">
           <span class="fact-label">{{ metricLabel(fact.fact_id, fact.metric) }}</span>
           <strong>{{ formatValue(fact) }}</strong>
+          <ComparisonBars v-if="fact.comparison && fact.value !== null" :current="fact.value" :baseline="fact.comparison.baseline_value"
+            :current-label="t.currentRun" :baseline-label="t.baselineRun"
+            :current-text="formatValue(fact)" :baseline-text="formatValue({ ...fact, value: fact.comparison.baseline_value })" :tone="deltaTone(fact)" />
           <span v-if="fact.comparison" :class="['fact-delta', deltaTone(fact)]">
-            {{ t.baselinePrefix(formatValue({ ...fact, value: fact.comparison.baseline_value }), deltaText(fact)) }}
+            {{ deltaText(fact) }}
           </span>
           <span v-else class="fact-delta muted">{{ confidenceLabel(fact.confidence) }}</span>
         </div>
@@ -336,7 +397,7 @@ const exclusionSummary = computed(() => {
         <ul class="baseline-list">
           <li v-for="entry in insight.baseline_included" :key="entry.workout_id">
             <RouterLink :to="`/workouts/${entry.workout_id}`">
-              {{ entry.start_time.slice(0, 10) }} · {{ toBigDistance(entry.distance_meters).toFixed(2) }} {{ distanceUnitLabel() }}
+              {{ formatDate(entry.start_time) }} · {{ toBigDistance(entry.distance_meters).toFixed(2) }} {{ distanceUnitLabel() }}
             </RouterLink>
           </li>
         </ul>
@@ -360,7 +421,7 @@ const exclusionSummary = computed(() => {
   border-radius: 16px;
   background: var(--surface);
 }
-.insight-card header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.insight-card header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 .insight-card h2 { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--ink); font-size: var(--fs-lg); font-weight: 600; }
 
 .insight-summary { margin: 0; color: var(--ink); font-size: var(--fs-md); line-height: 1.7; }
@@ -375,8 +436,8 @@ const exclusionSummary = computed(() => {
 .delta.bad::before, .fact-delta.bad::before { content: '!\a0'; font-weight: 700; }
 .delta.flat::before, .fact-delta.flat::before { content: '=\a0'; font-weight: 700; }
 
-.fact-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
-.fact { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; background: var(--surface-raised); }
+.fact-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 10px; }
+.fact { display: grid; align-content: start; min-width: 0; gap: 6px; padding: 10px 12px; border-radius: 12px; background: var(--surface-raised); }
 .fact-label { color: var(--muted); font-size: var(--fs-xs); }
 .fact strong { color: var(--ink); font-size: var(--fs-2xl); font-weight: 600; }
 .fact-delta { font-size: var(--fs-xs); }

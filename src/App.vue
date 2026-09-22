@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { displayDateTimeFormatter } from './lib/dateTime';
+
 import { getVersion } from '@tauri-apps/api/app';
 import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, watch } from 'vue';
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router';
@@ -9,9 +11,11 @@ import Icon from './components/Icon.vue';
 import { useSyncController } from './composables/useSyncController';
 import { deviceStateLabel, useDevices } from './composables/useDevices';
 import { useUiScale } from './composables/useUiScale';
-import { backend, isDesktop } from './lib/bridge';
+import { backend, isDesktop, whenBackendReady } from './lib/bridge';
 import { checkForDesktopUpdate } from './services/updateService';
-import { defineMessages, intlLocale, locale, useMessages } from './i18n';
+import { defineMessages, locale, useMessages } from './i18n';
+
+const LifeEventEditor = defineAsyncComponent(() => import('./components/LifeEventEditor.vue'));
 
 const messages = defineMessages(
   {
@@ -39,6 +43,7 @@ const messages = defineMessages(
     verifyFirst: '请先完成连接验证',
     syncing: '同步中…',
     cancel: '取消',
+    preparingData: '正在打开本地数据库，升级后的第一次启动可能要十几秒…',
     compacting: (pending: number) =>
       `正在压缩历史报文（${pending} 条），压完会自动消失。这期间同步会稍等一下。`,
     compacted: (saved: string) => `历史报文已压缩，省下约 ${saved} 磁盘空间。`,
@@ -71,12 +76,46 @@ const messages = defineMessages(
     verifyFirst: 'Verify the connection first',
     syncing: 'Syncing…',
     cancel: 'Cancel',
+    preparingData: 'Opening your local database — the first launch after an update can take a few seconds…',
     compacting: (pending: number) =>
       `Compacting stored payloads (${pending} to go). This clears itself; syncing waits its turn.`,
     compacted: (saved: string) => `Stored payloads compacted, about ${saved} of disk reclaimed.`,
     trayHint: 'Closing the window keeps ZeppBridge in the tray, so auto-sync carries on.',
     browserPreview: 'Use the desktop app. This browser preview reads no account data.',
     routeNotFound: 'That page does not exist, so you are back on the overview.',
+  },
+  {
+    skipToContent: 'Saltar al contenido principal',
+    mainNav: 'Navegación principal',
+    mobileNav: 'Navegación móvil',
+    bottomNav: 'Navegación principal móvil',
+    openNav: 'Abrir navegación',
+    navOverview: 'Resumen',
+    navHandoff: 'Pasar a la IA',
+    navSettings: 'Configuración',
+    dataSources: 'Fuentes de datos',
+    identifyingDevices: 'Identificando tus dispositivos…',
+    identifyFailed: (reason: string) => `La identificación de dispositivos no está disponible: ${reason}`,
+    noDevicesYet: 'Aún no se ha identificado ningún dispositivo.',
+    accountPrefix: 'Cuenta: ',
+    manage: 'Gestionar',
+    privacyLink: 'Configuración de seguridad y privacidad',
+    connectionTitle: 'Estado de la conexión con la nube',
+    lastSyncPrefix: 'Última sincronización: ',
+    notFetchedYet: 'Aún sin datos',
+    timeUnknown: 'Hora desconocida',
+    noAccount: 'Ninguna cuenta identificada',
+    syncNow: 'Sincronizar ahora',
+    verifyFirst: 'Primero verifica la conexión',
+    syncing: 'Sincronizando…',
+    cancel: 'Cancelar',
+    preparingData: 'Abriendo tu base de datos local; el primer arranque tras una actualización puede tardar unos segundos…',
+    compacting: (pending: number) =>
+      `Compactando registros guardados (faltan ${pending}). Esto desaparece solo; la sincronización espera su turno.`,
+    compacted: (saved: string) => `Registros guardados compactados: se liberaron unos ${saved} de disco.`,
+    trayHint: 'Si cierras la ventana, ZeppBridge sigue en la barra de menú y continúa sincronizando automáticamente.',
+    browserPreview: 'Usa la app de escritorio. Esta vista previa en el navegador no lee datos de la cuenta.',
+    routeNotFound: 'Esa página no existe, así que volviste al resumen.',
   },
 );
 const t = useMessages(messages);
@@ -88,6 +127,10 @@ const FALLBACK_APP_VERSION = '3.0.0-beta.1';
 const BUILD_STAMP = __BUILD_STAMP__;
 const APP_VERSION = ref(FALLBACK_APP_VERSION);
 const desktopRuntime = isDesktop();
+/* 后端就绪以前（迁移备份、排队恢复那一小段）顶栏挂一条说明，
+   不然那几秒里窗口画了壳却所有数字都是空的，看起来像卡死。
+   浏览器预览没有后端，直接当真就绪。 */
+const backendReady = ref(!desktopRuntime);
 // 落地页只在非桌面环境渲染（Cloudflare Pages 部署的就是这个分支），
 // 静态 import 会把它连同两份文案一起塞进桌面应用的首屏 chunk。懒加载后
 // 桌面端根本不会下载它。
@@ -197,7 +240,7 @@ const lastSyncClock = computed(() => {
   if (!raw) return t.value.notFetchedYet;
   const date = new Date(raw);
   if (Number.isNaN(date.getTime())) return t.value.timeUnknown;
-  return new Intl.DateTimeFormat(intlLocale(), {
+  return displayDateTimeFormatter({
     year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(date).replace(/\//g, '-');
 });
@@ -238,9 +281,13 @@ onMounted(() => {
   if (showLanding) return;
   syncTrayLocale();
   initializeScale();
+  void whenBackendReady().then(() => {
+    backendReady.value = true;
+    // 更新检查走裸 `invoke`（不过 bridge 的门），得等后端真的管事了再发。
+    void checkForDesktopUpdate(false);
+  });
   void initialize();
   void loadDevices();
-  void checkForDesktopUpdate(false);
   document.addEventListener('keydown', onDocumentKeydown);
   if (route.query.notice === 'not-found') {
     window.setTimeout(() => {
@@ -277,6 +324,7 @@ onUnmounted(() => {
 <template>
   <LandingPage v-if="showLanding" />
   <template v-else>
+    <LifeEventEditor />
     <a class="skip-link" href="#main-content">{{ t.skipToContent }}</a>
 
     <div class="app-shell">
@@ -375,6 +423,10 @@ onUnmounted(() => {
         </div>
       </header>
 
+      <div v-if="!backendReady" class="sync-feedback" role="status" aria-live="polite">
+        <Icon name="database" :size="14" class="spinning" />
+        <span>{{ t.preparingData }}</span>
+      </div>
       <div v-if="statusError" class="sync-feedback tone-failed" role="alert">
         <Icon name="warning" :size="14" />
         <span>{{ statusError }}</span>

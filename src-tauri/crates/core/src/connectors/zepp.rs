@@ -240,9 +240,16 @@ impl ZeppConnector {
         // Redirects are disabled so a 3xx can never forward the custom
         // `apptoken` header to a host outside the validated region. Manual,
         // same-origin redirect handling lives in `get_json`.
+        //
+        // Env/system proxies are disabled on purpose. This product talks to
+        // Zepp directly; silently honouring HTTP_PROXY would let a local MITM
+        // see `apptoken`. Embedders that need a proxy must not reuse this
+        // constructor — there is no `with_client` bypass.
         let client = Client::builder()
             .default_headers(defaults)
             .timeout(Duration::from_secs(30))
+            .connect_timeout(Duration::from_secs(10))
+            .no_proxy()
             .cookie_store(true)
             .redirect(reqwest::redirect::Policy::none())
             .build()?;
@@ -258,38 +265,6 @@ impl ZeppConnector {
         // panicking later when the first request is made.
         connector.build_headers()?;
         Ok(connector)
-    }
-
-    /// Construct a connector with a caller-provided client (useful for an
-    /// embedding application that already configures a proxy).  The host and
-    /// credential checks remain identical to `new`.
-    /// Adapter constructor retained for embedders that provide their own
-    /// client/proxy configuration; the desktop commands use `new`.
-    #[allow(dead_code)]
-    pub fn with_client(auth: AuthInfo, client: Client) -> Result<Self> {
-        let base = validate_region_host(&auth.region_host)?;
-        if auth.user_id.trim().is_empty()
-            || !auth
-                .user_id
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
-        {
-            return Err(ZeppBridgeError::ConfigError("user_id 无效".into()));
-        }
-        let connector = Self {
-            client,
-            auth,
-            base_url: Url::parse(&base)
-                .map_err(|_| ZeppBridgeError::InvalidHost("主机 URL 无法解析".into()))?,
-            cancel: Arc::new(AtomicBool::new(false)),
-        };
-        connector.build_headers()?;
-        Ok(connector)
-    }
-
-    #[allow(dead_code)]
-    pub fn base_url(&self) -> &Url {
-        &self.base_url
     }
 
     pub fn build_headers(&self) -> Result<header::HeaderMap> {
@@ -314,12 +289,15 @@ impl ZeppConnector {
     }
 
     fn path_url(&self, path: &str) -> Result<Url> {
-        if !path.starts_with('/') || path.contains('?') || path.contains('#') {
+        validate_api_path(path)?;
+        let url = self
+            .base_url
+            .join(path)
+            .map_err(|_| ZeppBridgeError::ConfigError("API 路径无法构造".into()))?;
+        if !same_region_origin(&url, &self.base_url) {
             return Err(ZeppBridgeError::ConfigError("非法 API 路径".into()));
         }
-        self.base_url
-            .join(path)
-            .map_err(|_| ZeppBridgeError::ConfigError("API 路径无法构造".into()))
+        Ok(url)
     }
 
     /// 退避等待，等的过程中也响应取消。
@@ -448,10 +426,7 @@ impl ZeppConnector {
                     .and_then(|value| value.to_str().ok());
                 match location {
                     Some(location) => match url.join(location) {
-                        Ok(next)
-                            if next.scheme() == "https"
-                                && next.host_str() == self.base_url.host_str() =>
-                        {
+                        Ok(next) if same_region_origin(&next, &self.base_url) => {
                             url = next;
                             continue;
                         }
@@ -472,9 +447,7 @@ impl ZeppConnector {
             }
             match classify_status(status) {
                 None => {
-                    let body = response.json::<Value>().await.map_err(|error| {
-                        ZeppBridgeError::ParseError(format!("JSON 响应无效: {error}"))
-                    })?;
+                    let body = read_json_body(response).await?;
                     if let Some(error) = classify_business_code(&body) {
                         return Err(error);
                     }
@@ -582,6 +555,7 @@ impl ZeppConnector {
         to_seconds: i64,
         limit: i64,
     ) -> Result<Value> {
+        let member_id = validate_member_id(member_id)?;
         let path = format!(
             "/users/{}/members/{member_id}/weightRecords",
             self.auth.user_id
@@ -598,16 +572,6 @@ impl ZeppConnector {
             ],
         )
         .await
-    }
-
-    /// The people who share this account's scale: `/users/{id}/members`.
-    ///
-    /// Only used to tell "this account has no weight records" apart from "the
-    /// records belong to a family member we never asked about". Nothing from it
-    /// is stored: the other members are other people.
-    pub async fn fetch_scale_members(&self) -> Result<Value> {
-        let path = format!("/users/{}/members", self.auth.user_id);
-        self.get_json(&path, Vec::new()).await
     }
 
     /// Real raw band synchronization endpoint.  Its payload may be compressed;
@@ -770,16 +734,17 @@ impl ZeppConnector {
         self.get_json(&path, params).await
     }
 
-    /// `/users/{id}/events/dateString` — the same timeline addressed by an
-    /// ISO-8601 window plus an IANA timezone instead of epoch milliseconds.
+    /// `/users/{id}/events/dateString` — the same timeline addressed by a
+    /// calendar-date window plus an IANA timezone instead of epoch milliseconds.
+    /// Timestamp strings can be rejected or silently return an empty page.
     /// The nightly SpO2 desaturation (`odi`) and apnea (`osa_event`) windows
     /// are only served here.
     pub async fn fetch_user_events_date_string(
         &self,
         event_type: &str,
         sub_type: &str,
-        from_iso: &str,
-        to_iso: &str,
+        from_date: chrono::NaiveDate,
+        to_date: chrono::NaiveDate,
         time_zone: &str,
         limit: i64,
     ) -> Result<Value> {
@@ -789,8 +754,8 @@ impl ZeppConnector {
             vec![
                 ("eventType", event_type.to_owned()),
                 ("subType", sub_type.to_owned()),
-                ("from", from_iso.to_owned()),
-                ("to", to_iso.to_owned()),
+                ("from", from_date.to_string()),
+                ("to", to_date.to_string()),
                 ("timeZone", time_zone.to_owned()),
                 ("limit", limit.max(1).to_string()),
                 ("reverse", "0".to_owned()),
@@ -828,20 +793,6 @@ impl ZeppConnector {
         .await
     }
 
-    // Backwards-compatible wrappers. They now use real endpoints and are not
-    // aliases for the old fabricated `/v1/health/*` paths.
-    #[allow(dead_code)]
-    pub async fn fetch_sleep(&self, start_date: &str, end_date: &str) -> Result<Value> {
-        self.fetch_band_data(start_date, end_date, "detail", 8, 0)
-            .await
-    }
-
-    #[allow(dead_code)]
-    pub async fn fetch_workouts(&self, start_timestamp: i64, end_timestamp: i64) -> Result<Value> {
-        self.fetch_sport_history("run", start_timestamp, end_timestamp, 1)
-            .await
-    }
-
     pub async fn fetch_hrv(&self, start_date: &str, end_date: &str) -> Result<Value> {
         let start = chrono::NaiveDate::parse_from_str(start_date, "%Y-%m-%d")
             .map_err(|_| ZeppBridgeError::ConfigError("start_date 无效".into()))?
@@ -858,24 +809,66 @@ impl ZeppConnector {
         self.fetch_events("hrv_sdnn", Some("real_data"), start, end, 2000, true)
             .await
     }
+}
 
-    #[allow(dead_code)]
-    pub async fn fetch_daily_summary(&self, start_date: &str, end_date: &str) -> Result<Value> {
-        let start = chrono::NaiveDate::parse_from_str(start_date, "%Y-%m-%d")
-            .map_err(|_| ZeppBridgeError::ConfigError("start_date 无效".into()))?
-            .and_hms_opt(0, 0, 0)
-            .ok_or_else(|| ZeppBridgeError::ConfigError("start_date 无效".into()))?
-            .and_utc()
-            .timestamp_millis();
-        let end = chrono::NaiveDate::parse_from_str(end_date, "%Y-%m-%d")
-            .map_err(|_| ZeppBridgeError::ConfigError("end_date 无效".into()))?
-            .and_hms_opt(23, 59, 59)
-            .ok_or_else(|| ZeppBridgeError::ConfigError("end_date 无效".into()))?
-            .and_utc()
-            .timestamp_millis();
-        self.fetch_events("DailyHealth", Some("summary"), start, end, 2000, true)
-            .await
+/// 一次 JSON 响应最多读这么大。没有上限时，一个异常大的报文会在
+/// `.json()` 里把内存顶满；有 `Content-Length` 时先拒，没有时按块累加。
+const MAX_RESPONSE_BODY_BYTES: usize = 32 * 1024 * 1024;
+
+fn validate_api_path(path: &str) -> Result<()> {
+    // `Url::join` treats a path that starts with `//` as a scheme-relative
+    // URL and replaces the host. Reject that, and any query/fragment, before
+    // joining; the origin check after join is the second fence.
+    if !path.starts_with('/')
+        || path.starts_with("//")
+        || path.contains('?')
+        || path.contains('#')
+        || path.contains('\\')
+        || path.contains('\0')
+    {
+        return Err(ZeppBridgeError::ConfigError("非法 API 路径".into()));
     }
+    Ok(())
+}
+
+fn same_region_origin(next: &Url, base: &Url) -> bool {
+    next.scheme() == "https"
+        && base.scheme() == "https"
+        && next.host_str().is_some()
+        && next.host_str() == base.host_str()
+        && next.port_or_known_default() == base.port_or_known_default()
+}
+
+fn validate_member_id(input: &str) -> Result<&str> {
+    let trimmed = input.trim();
+    if trimmed == "-1" {
+        return Ok(trimmed);
+    }
+    if trimmed.is_empty() || trimmed.len() > 32 || !trimmed.chars().all(|c| c.is_ascii_digit()) {
+        return Err(ZeppBridgeError::ConfigError("member_id 无效".into()));
+    }
+    Ok(trimmed)
+}
+
+async fn read_json_body(mut response: reqwest::Response) -> Result<Value> {
+    if let Some(len) = response.content_length() {
+        if len > MAX_RESPONSE_BODY_BYTES as u64 {
+            return Err(ZeppBridgeError::ParseError("JSON 响应过大".into()));
+        }
+    }
+    let mut buf = Vec::new();
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|error| ZeppBridgeError::ParseError(format!("JSON 响应无效: {error}")))?
+    {
+        if buf.len().saturating_add(chunk.len()) > MAX_RESPONSE_BODY_BYTES {
+            return Err(ZeppBridgeError::ParseError("JSON 响应过大".into()));
+        }
+        buf.extend_from_slice(&chunk);
+    }
+    serde_json::from_slice(&buf)
+        .map_err(|error| ZeppBridgeError::ParseError(format!("JSON 响应无效: {error}")))
 }
 
 pub fn validate_track_id(input: &str) -> Result<String> {
@@ -1008,6 +1001,47 @@ mod tests {
         assert!(validate_track_id("../x").is_err());
         assert!(validate_detail_source("run.gps").is_ok());
         assert!(validate_detail_source("a/b").is_err());
+    }
+
+    #[test]
+    fn api_paths_reject_scheme_relative_and_query() {
+        assert!(validate_api_path("/users/1/devices").is_ok());
+        assert!(validate_api_path("//evil.example/users/1").is_err());
+        assert!(validate_api_path("/users/1?x=1").is_err());
+        assert!(validate_api_path("/users/1#frag").is_err());
+        assert!(validate_api_path("users/1").is_err());
+        assert!(validate_api_path("/users\\1").is_err());
+    }
+
+    #[test]
+    fn redirect_origin_compares_scheme_host_and_port() {
+        let base = Url::parse("https://api-mifit.huami.com/").unwrap();
+        assert!(same_region_origin(
+            &Url::parse("https://api-mifit.huami.com/v1/next").unwrap(),
+            &base
+        ));
+        assert!(!same_region_origin(
+            &Url::parse("https://api-mifit.huami.com:8443/v1/next").unwrap(),
+            &base
+        ));
+        assert!(!same_region_origin(
+            &Url::parse("http://api-mifit.huami.com/v1/next").unwrap(),
+            &base
+        ));
+        assert!(!same_region_origin(
+            &Url::parse("https://evil.example/v1/next").unwrap(),
+            &base
+        ));
+    }
+
+    #[test]
+    fn member_id_is_the_account_holder_or_digits() {
+        assert_eq!(validate_member_id("-1").unwrap(), "-1");
+        assert_eq!(validate_member_id("42").unwrap(), "42");
+        assert!(validate_member_id("../x").is_err());
+        assert!(validate_member_id("").is_err());
+        assert!(validate_member_id("1/2").is_err());
+        assert!(validate_member_id("abc").is_err());
     }
 }
 

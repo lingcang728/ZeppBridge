@@ -1,11 +1,13 @@
+import { displayDateTimeFormatter } from '../lib/dateTime';
 import { computed, readonly, ref } from 'vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { launchSyncIsDue, readAutoSyncSettings, writeAutoSyncSettings } from '../lib/autoSync';
 import type { AppStatus, LoginStatus, SyncOutcome, SyncProgress, SyncReport } from '../types';
 import { syncStreamLabel } from '../lib/syncStreams';
-import { defineMessages, intlLocale, messagesOf } from '../i18n';
+import { defineMessages, messagesOf } from '../i18n';
 import { errorTextFor } from '../i18n/errors';
 import { backendText } from '../i18n/backendText';
+import { failedStreamKeys } from '../lib/syncDeferred';
 
 export type SyncUiState = 'idle' | 'syncing' | SyncOutcome;
 
@@ -71,6 +73,36 @@ const messages = defineMessages(
     syncingStream: (stream: string) => `Syncing ${stream.toLowerCase()}`,
     backfillingStream: (stream: string, month: string) => `Backfilling ${stream.toLowerCase()} · ${month}`,
   },
+  {
+    notSyncedYet: 'Aún sin sincronizar',
+    timeUnknown: 'Hora desconocida',
+    updatedWithLatest: (clock: string) => `Datos nuevos descargados · última frecuencia cardíaca ${clock}`,
+    updated: 'Datos nuevos descargados',
+    noNewDataWithLatest: (clock: string) => `Nada nuevo en la nube · última frecuencia cardíaca: ${clock}`,
+    noNewData: 'Sincronización terminada. No había nada nuevo en la nube',
+    partialWithStreams: (streams: string) => `Algunos flujos fallaron: ${streams}`,
+    partial: 'Sincronización terminada, pero algunos flujos de datos fallaron',
+    cancelled: 'Sincronización cancelada',
+    deferred: 'Reconstruyendo los datos derivados locales. La sincronización se reintentará sola',
+    failed: 'La sincronización falló. Revisa la conexión e inténtalo de nuevo',
+    lastCloudSync: (clock: string) => `Última sincronización con la nube ${clock}`,
+    cloudSyncClock: (clock: string) => `Sincronización con la nube ${clock}`,
+    cloudSyncClockUnknown: 'Sincronización con la nube —',
+    statusUnavailable: 'El estado de la conexión no está disponible en este momento',
+    alreadySyncing: 'Ya hay una sincronización en curso. Inténtalo cuando termine',
+    desktopOnly: 'Usa la app de escritorio',
+    reauthNeeded: 'Tu sesión de Zepp caducó. Vuelve a conectarte',
+    verifyFirst: 'Primero verifica la conexión',
+    connectFirst: 'Primero conéctate a Zepp',
+    syncingRecent: (days: number) => `Sincronizando los últimos ${days} días…`,
+    backfilling: (days: number) => `Recuperando el historial de los últimos ${days} días…`,
+    syncDidNotFinish: 'La sincronización con la nube no terminó',
+    cancelling: 'Cancelando la sincronización…',
+    cancelFailed: 'No se pudo cancelar la sincronización',
+    streamSeparator: ', ',
+    syncingStream: (stream: string) => `Sincronizando ${stream.toLowerCase()}`,
+    backfillingStream: (stream: string, month: string) => `Recuperando ${stream.toLowerCase()} · ${month}`,
+  },
 );
 
 const copy = () => messagesOf(messages);
@@ -119,7 +151,6 @@ const compacting = computed(() => compactingEvent.value || appStatus.value?.comp
 const compactionSaved = ref<number | null>(null);
 const autoSyncEnabled = ref(readAutoSyncSettings().enabled);
 const autoSyncInterval = ref(readAutoSyncSettings().intervalMinutes);
-let initialized = false;
 let runningSync: Promise<SyncReport | null> | null = null;
 let autoSyncTickCount = 0;
 const unlisteners: Array<() => void> = [];
@@ -132,12 +163,15 @@ const unlisteners: Array<() => void> = [];
  * 定时器却漏了——这里补上，并由 `dispose()` 统一收口。
  */
 let autoSyncTimer: number | null = null;
+let initializeEpoch = 0;
+let compactionSavedTimer = 0;
+let firstRunTimer = 0;
 
 const formatTime = (value?: string): string => {
   if (!value) return copy().timeUnknown;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return copy().timeUnknown;
-  return new Intl.DateTimeFormat(intlLocale(), {
+  return displayDateTimeFormatter({
     month: 'numeric',
     day: 'numeric',
     hour: '2-digit',
@@ -149,12 +183,27 @@ const formatClock = (value?: string): string | null => {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat(intlLocale(), { hour: '2-digit', minute: '2-digit' }).format(date);
+  return displayDateTimeFormatter({ hour: '2-digit', minute: '2-digit' }).format(date);
 };
 
 const latestHeartRateAt = (report?: SyncReport | null): string | undefined =>
   report?.streams.find((stream) => stream.stream === 'heart_rate')?.newest_sample_at
   ?? appStatus.value?.streams.find((stream) => stream.stream === 'heart_rate')?.newest_sample_at;
+
+const KNOWN_SYNC_OUTCOMES: readonly SyncOutcome[] = [
+  'updated',
+  'no_new_data',
+  'partial',
+  'failed',
+  'cancelled',
+  'deferred',
+];
+
+/** 把后端存的 outcome 码写成当前语言的一句话。不认识的码不原样吐出去。 */
+export const syncOutcomeLabel = (outcome: string | null | undefined): string | null => {
+  if (!outcome || !(KNOWN_SYNC_OUTCOMES as readonly string[]).includes(outcome)) return null;
+  return renderReport(outcome as SyncOutcome, []);
+};
 
 const renderReport = (
   outcome: SyncOutcome,
@@ -220,9 +269,7 @@ const syncMessage = computed(() => renderNotice(notice.value));
 const noticeForReport = (report: SyncReport): SyncNotice => ({
   kind: 'report',
   outcome: report.outcome,
-  failedStreams: report.streams
-    .filter((stream) => ['failed', 'unavailable', 'unverified'].includes(stream.status))
-    .map((stream) => stream.stream),
+  failedStreams: failedStreamKeys(report.streams),
   latestAt: latestHeartRateAt(report),
   // deferred 那句话后端给了稳定码，按界面语言取；取不到才用后端的中文原文。
   backendMessage: report.outcome === 'deferred'
@@ -297,7 +344,8 @@ const scheduleFirstRunBackfill = () => {
   // 空间不够就不要开始。设置页里手动补拉时后端已经会拦（`allow_long_history`），
   // 而这条路径不经过那个对话框——不检查就等于用一条自动任务绕过了同一条规则。
   if (appStatus.value?.storage && !appStatus.value.storage.allow_long_history) return;
-  window.setTimeout(() => {
+  window.clearTimeout(firstRunTimer);
+  firstRunTimer = window.setTimeout(() => {
     void runSync('history', FIRST_RUN_BACKFILL_DAYS, { silent: true });
   }, 0);
 };
@@ -328,16 +376,11 @@ const runSync = (
       notice.value = { kind: 'reauthNeeded' };
       return null;
     }
-    if (mode === 'incremental' && status?.connection_state !== 'connected') {
+    if (status?.connection_state !== 'connected') {
       syncState.value = 'failed';
       notice.value = status?.connection_state === 'configured'
         ? { kind: 'verifyFirst' }
         : { kind: 'connectFirst' };
-      return null;
-    }
-    if (status?.connection_state === 'unconfigured') {
-      syncState.value = 'failed';
-      notice.value = { kind: 'connectFirst' };
       return null;
     }
     syncState.value = 'syncing';
@@ -354,10 +397,11 @@ const runSync = (
       syncState.value = report.outcome;
       notice.value = noticeForReport(report);
       await refreshStatus();
-      // A deferred sync wrote nothing, but the replay it stood aside for is
-      // rewriting derived rows right now — so the screens still need to
-      // reread, and the sync itself has to come back rather than be lost.
-      dataRevision.value += 1;
+      // deferred 且 0 条写入：页面不必为了让路整页重刷。真正写了派生数据
+      // 的重放结束之后，下一次成功同步会再 bump。
+      if (!(report.outcome === 'deferred' && report.total_records === 0)) {
+        dataRevision.value += 1;
+      }
       if (report.outcome === 'deferred') scheduleDeferredRetry(mode, days);
       // 第一次拿到近 30 天之后，接着把 180 天补齐。
       // `deferred` 不算——那次根本没写进任何数据，补拉要等重试真的成功了再排。
@@ -366,6 +410,7 @@ const runSync = (
       else if (
         wasFirstSync
         && mode === 'incremental'
+        && report.total_records > 0
         && report.outcome !== 'failed'
         && report.outcome !== 'cancelled'
       ) {
@@ -415,23 +460,43 @@ const setAutoSyncInterval = (minutes: number) => {
  * 监听器和定时器走同一个出口：分散在两处时，加第三样东西的人只会记得其中
  * 一个。调用它之后再 `initialize()` 是安全的。
  */
-const dispose = () => {
+const clearHeldResources = () => {
   for (const unlisten of unlisteners.splice(0)) unlisten();
+  window.clearTimeout(deferredRetryTimer);
+  deferredRetryTimer = 0;
+  window.clearTimeout(compactionSavedTimer);
+  compactionSavedTimer = 0;
+  window.clearTimeout(firstRunTimer);
+  firstRunTimer = 0;
   if (autoSyncTimer !== null) {
     window.clearInterval(autoSyncTimer);
     autoSyncTimer = null;
   }
-  initialized = false;
+};
+
+const dispose = () => {
+  initializeEpoch += 1;
+  clearHeldResources();
 };
 
 const initialize = async () => {
-  if (initialized) {
-    // 重入：先把上一轮注册的监听器和定时器全部拆掉，再重新注册。
-    dispose();
-  }
-  initialized = true;
+  const myEpoch = ++initializeEpoch;
+  clearHeldResources();
+  const stillMine = () => myEpoch === initializeEpoch;
+  const keepUnlisten = (unlisten: unknown) => {
+    if (typeof unlisten !== 'function') return;
+    const fn = unlisten as () => void;
+    if (!stillMine()) {
+      fn();
+      return;
+    }
+    unlisteners.push(fn);
+  };
   if (isDesktop()) {
     const unlistenProgress = await backend.listen<SyncProgress>('sync://progress', (payload) => {
+      // 设置页的历史补拉也走 sync://progress。顶栏只认控制器自己发起的同步，
+      // 否则一轮补拉会把「已同步」横幅冲掉。
+      if (!runningSync) return;
       syncProgress.value = payload;
       /* 进度这句话由界面按码和 stream 自己写。后端那份中文留作兜底：
          它加了新的一步而界面还不认识时，宁可显示中文也不显示空白。 */
@@ -445,36 +510,41 @@ const initialize = async () => {
         }
         : { kind: 'backend', text: payload.message };
     });
-    if (typeof unlistenProgress === 'function') unlisteners.push(unlistenProgress);
+    keepUnlisten(unlistenProgress);
+    if (!stillMine()) return;
     const unlistenTray = await backend.listen('tray://sync', () => {
       void runSync('incremental');
     });
-    if (typeof unlistenTray === 'function') unlisteners.push(unlistenTray);
+    keepUnlisten(unlistenTray);
+    if (!stillMine()) return;
     const unlistenLogin = await backend.listen<LoginStatus>('login://status', applyLoginStatus);
-    if (typeof unlistenLogin === 'function') unlisteners.push(unlistenLogin);
+    keepUnlisten(unlistenLogin);
+    if (!stillMine()) return;
     const unlistenCompactStart = await backend.listen<number>('compaction://started', (pending) => {
       compactionPending.value = typeof pending === 'number' ? pending : 0;
       compactingEvent.value = true;
       compactionSaved.value = null;
     });
-    if (typeof unlistenCompactStart === 'function') unlisteners.push(unlistenCompactStart);
+    keepUnlisten(unlistenCompactStart);
+    if (!stillMine()) return;
     const unlistenCompactDone = await backend.listen<{ bytesBefore: number; bytesAfter: number }>(
       'compaction://finished',
       (report) => {
         compactingEvent.value = false;
         const saved = (report?.bytesBefore ?? 0) - (report?.bytesAfter ?? 0);
         compactionSaved.value = saved > 0 ? saved : null;
-        // 压完的提示自己退场：这是一次性的后台维护，不该常驻。
-        window.setTimeout(() => { compactionSaved.value = null; }, 12_000);
+        window.clearTimeout(compactionSavedTimer);
+        compactionSavedTimer = window.setTimeout(() => { compactionSaved.value = null; }, 12_000);
       },
     );
-    if (typeof unlistenCompactDone === 'function') unlisteners.push(unlistenCompactDone);
+    keepUnlisten(unlistenCompactDone);
+    if (!stillMine()) return;
     try {
       applyLoginStatus(await backend.getLoginStatus());
     } catch {
       // Login status is optional at startup.
     }
-    // Fixed 1-minute tick; interval changes take effect without rebuilding the timer.
+    if (!stillMine()) return;
     autoSyncTimer = window.setInterval(() => {
       autoSyncTickCount += 1;
       if (autoSyncEnabled.value && appStatus.value?.connection_state === 'connected') {
@@ -488,14 +558,18 @@ const initialize = async () => {
     }, 60_000);
   }
   let status = await refreshStatus();
+  if (!stillMine()) return;
   if (status?.connection_state === 'configured' && isDesktop()) {
     try {
       await backend.verifyAuth();
+      if (!stillMine()) return;
       status = await refreshStatus();
     } catch {
+      if (!stillMine()) return;
       await refreshStatus();
     }
   }
+  if (!stillMine()) return;
   if (autoSyncEnabled.value && status?.connection_state === 'connected'
     && launchSyncIsDue(status?.last_cloud_sync_at, autoSyncInterval.value)) {
     void runSync('incremental', undefined, { silent: true });

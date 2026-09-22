@@ -1,11 +1,12 @@
 import type {
+  LifeEvent, LifeEventInput,
   AppStatus,
   DailyHeartRateExtreme,
   Page,
   AiHandoffResult,
-  AuthInfo,
   CapabilityOverview,
   CapabilityProbe,
+  ExportEstimate,
   ExportResult,
   ExportSelection,
   HealthOverview,
@@ -13,14 +14,12 @@ import type {
   StressPoint,
   HeartRateZoneOptions,
   HeartRateZonePreference,
-  DailyPoint,
   LoginStatus,
   MetricSeries,
   BackupManifest,
   BackupVerification,
   CoverageLedger,
   DataHealth,
-  DeviceCatalogOption,
   PendingRestore,
   RestorePreview,
   WeeklyReport,
@@ -32,7 +31,6 @@ import type {
   ReprocessResult,
   DeviceProfile,
   DeviceProfilesResult,
-  DiagnosticReport,
   FeedbackSubmissionResult,
   SleepSession,
   RawPayloadCompaction,
@@ -47,8 +45,10 @@ import type {
 export type UnlistenFn = () => void;
 
 export interface BridgeBackend {
+  listLifeEvents(start?: string, end?: string): Promise<LifeEvent[]>;
+  saveLifeEvent(input: LifeEventInput): Promise<number>;
+  deleteLifeEvent(id: number): Promise<void>;
   getAppStatus(): Promise<AppStatus>;
-  saveAuth(auth: AuthInfo): Promise<AppStatus>;
   verifyAuth(): Promise<AppStatus>;
   clearAuth(): Promise<AppStatus>;
   importFromHar(harPath: string): Promise<AppStatus>;
@@ -58,7 +58,6 @@ export interface BridgeBackend {
   cancelWebLogin(): Promise<LoginStatus>;
   getLoginStatus(): Promise<LoginStatus>;
 
-  startInitialSync(days?: number): Promise<SyncReport>;
   startHistorySync(days: number): Promise<SyncReport>;
   startIncrementalSync(): Promise<SyncReport>;
   cancelSync(): Promise<void>;
@@ -68,7 +67,6 @@ export interface BridgeBackend {
   getHealthOverview(): Promise<HealthOverview>;
   getHeartRateSeries(hours?: number): Promise<HeartRatePoint[]>;
   getStressSeries(hours?: number): Promise<StressPoint[]>;
-  getTrainingLoadSeries(days?: number): Promise<DailyPoint[]>;
   getMetricSeries(metrics: string[], days: number): Promise<MetricSeries[]>;
   getTrainingBalance(days: number): Promise<TrainingBalancePoint[]>;
   getHeartRateZones(days: number): Promise<HeartRateZoneOptions>;
@@ -92,7 +90,6 @@ export interface BridgeBackend {
   getWorkoutTypeOptions(): Promise<SportOption[]>;
   getUnknownWorkoutCodes(): Promise<WorkoutCodeLabel[]>;
   setWorkoutCodeLabel(zeppType: number, label: string | null): Promise<WorkoutCodeLabel[]>;
-  getDeviceCatalogOptions(): Promise<DeviceCatalogOption[]>;
   setDeviceModelOverride(deviceKey: string, catalogId: string | null): Promise<void>;
   getLocalApiStatus(): Promise<LocalApiStatus>;
   setLocalApiEnabled(enabled: boolean): Promise<LocalApiStatus>;
@@ -102,7 +99,6 @@ export interface BridgeBackend {
   getDeviceProfiles(refresh?: boolean): Promise<DeviceProfilesResult>;
 
   reprocessLocalData(): Promise<ReprocessResult>;
-  getDiagnosticReport(): Promise<DiagnosticReport>;
   getWorkoutInsight(workoutId: string): Promise<WorkoutInsight>;
   getWeeklyReport(): Promise<WeeklyReport>;
   getDataHealth(windowDays?: number): Promise<DataHealth>;
@@ -126,6 +122,7 @@ export interface BridgeBackend {
   submitDiagnosticReport(note?: string, category?: string): Promise<FeedbackSubmissionResult>;
   submitDeviceModelAssignment(note?: string): Promise<FeedbackSubmissionResult>;
   getExportJson(selection: ExportSelection): Promise<string>;
+  estimateExport(selection: ExportSelection): Promise<ExportEstimate>;
   saveJsonExport(selection: ExportSelection, path: string): Promise<ExportResult>;
   saveCsvExport(selection: ExportSelection, path: string): Promise<ExportResult>;
   saveGpxExport(selection: ExportSelection, path: string): Promise<ExportResult>;

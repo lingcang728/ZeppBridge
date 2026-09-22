@@ -111,6 +111,7 @@ secrets*.json
 .grok/
 .omo/
 design_picture/
+docs/design/*.png
 
 # Cloned reference repos / dev scratch
 temp/

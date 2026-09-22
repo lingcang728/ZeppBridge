@@ -239,10 +239,10 @@ export interface SleepSession {
   end_time: string;
   score?: number;
   duration_minutes: number;
-  deep_minutes: number;
-  light_minutes: number;
+  deep_minutes?: number | null;
+  light_minutes?: number | null;
   rem_minutes?: number | null;
-  awake_minutes: number;
+  awake_minutes?: number | null;
   /** Times woken during the night (`wc`). Distinct from awake_minutes. */
   wake_count?: number | null;
   source_scope: SourceScope;
@@ -278,12 +278,20 @@ export interface Workout {
   /** 用户给这个 Zepp 编号起的名字；目录已经认识的编号永远为空。 */
   custom_label?: string | null;
   zepp_type?: number | null;
+  zepp_source?: string | null;
   start_time: string;
   end_time: string;
   distance_meters?: number;
+  /** Cloud run_time in seconds; excludes pauses. */
+  moving_seconds?: number | null;
   calories?: number;
   avg_hr?: number;
   max_hr?: number;
+  min_hr?: number | null;
+  elevation_gain_m?: number | null;
+  elevation_loss_m?: number | null;
+  max_altitude_m?: number | null;
+  min_altitude_m?: number | null;
   training_load?: number;
   vo2max?: number;
   /** 有氧训练效果 0.0-5.0。后端一直在返回，只是这里从来没声明过。 */
@@ -293,6 +301,7 @@ export interface Workout {
   /** 主观疲劳度，用户在表上自己选的。 */
   rpe?: number | null;
   avg_cadence_spm?: number | null;
+  max_cadence_spm?: number | null;
   avg_stride_cm?: number | null;
   total_steps?: number | null;
   gps_available?: boolean;
@@ -395,6 +404,8 @@ export interface RestorePreview {
   current_table_counts: Record<string, number>;
   can_restore: boolean;
   blocker: string | null;
+  /** `blocker` 那句话的稳定码。界面按它取自己语言的说法。 */
+  blocker_code?: string | null;
 }
 
 export interface PendingRestore {
@@ -598,14 +609,6 @@ export interface SportOption {
   label: string;
 }
 
-/** 随包设备目录里的一个型号，供用户指认自己的设备。 */
-export interface DeviceCatalogOption {
-  catalogId: string;
-  canonicalName: string;
-  nameZh?: string | null;
-  kind: string;
-}
-
 /** 一个还没有名字的 Zepp 运动编号，以及它影响到的记录数。 */
 export interface WorkoutCodeLabel {
   zeppType: number;
@@ -697,7 +700,19 @@ export interface WorkoutSeries {
   route: WorkoutRoutePoint[];
   pauses: WorkoutPause[];
   splits: WorkoutSplitRow[];
+  laps: WorkoutLapRow[];
   summary: WorkoutSeriesSummary;
+}
+
+/** Laps recorded by the watch, separate from computed kilometre splits. */
+export interface WorkoutLapRow {
+  index: number;
+  start_time: string;
+  end_time: string;
+  distance_m: number;
+  duration_seconds: number;
+  avg_hr: number | null;
+  max_hr: number | null;
 }
 
 /** One kilometre of a workout, cut from the server's cumulative distance. */
@@ -743,9 +758,12 @@ export interface LocalApiStatus {
   /** 是否已生成过访问 token。关闭状态下也可能为真。 */
   token_present: boolean;
   error?: string | null;
+  /** `error` 那句话的稳定码。界面按它取自己语言的说法。 */
+  error_code?: string | null;
 }
 
 export type ExportDataType =
+  | 'life_events'
   | 'heart_rate'
   | 'sleep'
   | 'workouts'
@@ -765,7 +783,7 @@ export type ExportDataType =
 /** Which section of the export picker a data type belongs to. */
 /* 分组是码，不是中文。写成中文的话界面上到处会出现 `group === '活动'`
    这种判断，一翻译就默默失效。显示交给 useExport 的分组名表。 */
-export type ExportTypeGroup = 'activity' | 'sleep' | 'body' | 'training';
+export type ExportTypeGroup = 'activity' | 'sleep' | 'body' | 'training' | 'context';
 
 export interface DeviceProfile {
   name?: string;
@@ -790,6 +808,8 @@ export interface DeviceCacheMetadata {
   age_seconds?: number | null;
   refreshed: boolean;
   refresh_error?: string | null;
+  /** `refresh_error` 那句话的稳定码。界面按它取自己语言的说法。 */
+  refresh_error_code?: string | null;
 }
 
 export interface DeviceProfilesResult {
@@ -875,6 +895,14 @@ export interface ExportSelection {
   endDate?: string;
   dataTypes: ExportDataType[];
   detail?: ExportDetail;
+}
+
+export interface ExportEstimate {
+  recordCount: number;
+  estimatedBytes: number;
+  scopeKind: string;
+  startTime?: string | null;
+  endTime?: string | null;
 }
 
 export interface ExportResult {
@@ -1050,4 +1078,18 @@ export interface DailyHeartRateExtreme {
   min: number;
   average: number;
   samples: number;
+}
+
+export interface LifeEventInput {
+  id: number | null;
+  title: string;
+  category: 'health' | 'travel' | 'routine' | 'training' | 'other';
+  startDate: string;
+  endDate: string | null;
+  notes: string;
+}
+export interface LifeEvent extends LifeEventInput {
+  id: number;
+  createdAt: string;
+  updatedAt: string;
 }

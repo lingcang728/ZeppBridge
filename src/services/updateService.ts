@@ -1,9 +1,11 @@
 import { reactive } from 'vue';
 import { defineMessages, messagesOf } from '../i18n';
+import { toUserMessage } from '../lib/bridge';
 
 const updateMessages = defineMessages(
   { nothingToInstall: '没有可安装的更新，请重新检查。' },
   { nothingToInstall: 'There is no update to install. Check again.' },
+  { nothingToInstall: 'No hay ninguna actualización para instalar. Vuelve a revisar.' },
 );
 
 export type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'installing' | 'failed' | 'upToDate' | 'unmanaged';
@@ -43,7 +45,8 @@ function isTauriRuntime(): boolean {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  // Tauri 插件经常抛 `{ code, message }`，`String(error)` 会变成 `[object Object]`。
+  return toUserMessage(error);
 }
 
 function positiveNumber(value: unknown): number | null {
@@ -88,8 +91,23 @@ async function isSelfUpdateSupported(): Promise<boolean> {
   return selfUpdateSupported;
 }
 
+let checkInFlight: Promise<void> | null = null;
+
 export async function checkForDesktopUpdate(manual = false): Promise<void> {
   if (!isTauriRuntime()) return;
+  if (
+    updateState.status === 'downloading'
+    || updateState.status === 'installing'
+  ) return;
+  if (checkInFlight) return checkInFlight;
+  const run = doCheckForDesktopUpdate(manual);
+  checkInFlight = run.finally(() => {
+    if (checkInFlight === run) checkInFlight = null;
+  });
+  return checkInFlight;
+}
+
+async function doCheckForDesktopUpdate(manual: boolean): Promise<void> {
   updateState.status = 'checking';
   updateState.error = '';
   try {
@@ -125,23 +143,25 @@ export async function checkForDesktopUpdate(manual = false): Promise<void> {
   } catch (error) {
     pendingUpdate = null;
     updateState.status = 'failed';
-    updateState.error = errorMessage(error);
+    updateState.error = toUserMessage(error, errorMessage(error));
   }
 }
 
 export async function downloadAndInstallDesktopUpdate(): Promise<void> {
-  if (!pendingUpdate || updateState.status !== 'available') {
+  if (updateState.status === 'downloading' || updateState.status === 'installing') return;
+  if (!pendingUpdate) {
     updateState.status = 'failed';
     updateState.error = messagesOf(updateMessages).nothingToInstall;
     return;
   }
+  updateState.status = 'downloading';
   try {
     const { invoke } = await import('@tauri-apps/api/core');
     const portable = await invoke<boolean>('is_portable_update');
-    updateState.status = 'downloading';
     updateState.error = '';
     updateState.downloadedBytes = 0;
-    await pendingUpdate.downloadAndInstall((event) => {
+    await invoke('validate_update_data_location');
+    await pendingUpdate.download((event) => {
       if (event.event === 'Started') {
         updateState.totalBytes = event.data.contentLength ?? updateState.sizeBytes;
       } else if (event.event === 'Progress') {
@@ -151,6 +171,8 @@ export async function downloadAndInstallDesktopUpdate(): Promise<void> {
       }
     });
     updateState.status = 'installing';
+    await invoke('validate_update_data_location');
+    await pendingUpdate.install();
     if (portable) {
       await invoke('launch_migrated_install');
     } else {

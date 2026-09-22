@@ -66,7 +66,18 @@ impl AppState {
         std::fs::create_dir_all(&data_dir)?;
 
         let migration_warning = paths::relocate_legacy_data(&data_dir);
-        let (db, db_warning) = Database::open_resilient(data_dir.join("zepp.db"))?;
+        let (db, db_warning) = match Database::open_resilient(data_dir.join("zepp.db")) {
+            Ok(opened) => opened,
+            Err(error) if error.is_busy() => {
+                crate::diagnostics::log(&format!(
+                    "Startup: another writer holds the library, opening read-only ({error})"
+                ));
+                // 不重建空库。只读打开失败（文件不在、schema 对不上）才让启动失败。
+                let db = Database::open_read_only(data_dir.join("zepp.db"))?;
+                (db, Some(error.user_message()))
+            }
+            Err(error) => return Err(error),
+        };
         // Do not replay every raw payload during startup. A full reprocess of a
         // large local library blocks window creation and looks like a hang.
         // Settings still has an explicit reprocess action; the next cloud sync
@@ -137,6 +148,28 @@ impl AppState {
         Ok(Arc::new(
             SyncManager::new(fetcher, db, cancel).with_data_dir(data_dir.to_path_buf()),
         ))
+    }
+
+    /// Kick any in-flight `start_*_sync` so it can drop `sync_command_lock`,
+    /// then acquire that lock. Hold the guard across the rest of an auth change.
+    pub(crate) async fn lock_sync_commands(&self) -> tokio::sync::MutexGuard<'_, ()> {
+        if let Some(manager) = self.sync.read().await.clone() {
+            manager.request_cancel();
+        }
+        self.sync_command_lock.lock().await
+    }
+
+    /// Wait for the current synchronizer to release its run lock, then replace it.
+    ///
+    /// Callers must already hold `sync_command_lock` (see `lock_sync_commands`)
+    /// so a waiting `start_*_sync` cannot install work against the old handle
+    /// after we swap.
+    pub(crate) async fn replace_sync_manager(&self, next: Option<Arc<SyncManager>>) {
+        let current = self.sync.read().await.clone();
+        if let Some(manager) = current {
+            manager.cancel_and_wait().await;
+        }
+        *self.sync.write().await = next;
     }
 }
 

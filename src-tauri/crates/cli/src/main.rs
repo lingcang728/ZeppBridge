@@ -13,6 +13,7 @@
 //! * **写库一律走跨进程写锁**。桌面应用开着的时候跑 `sync`，这里会拿不到锁
 //!   并以 `EXIT_BUSY` 退出，而不是和 GUI 抢着写同一个库。
 
+use chrono::Local;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::process::ExitCode;
@@ -57,6 +58,8 @@ const EXIT_CLOUD: u8 = 5;
 const EXIT_DATABASE: u8 = 6;
 /// 本机数据库的 schema 版本和这个程序对不上。需要先升级其中一边。
 const EXIT_SCHEMA: u8 = 7;
+/// Sync returned a report with one or more failed streams.
+const EXIT_INCOMPLETE_SYNC: u8 = 8;
 /// 其他失败。
 const EXIT_FAILED: u8 = 1;
 
@@ -117,6 +120,7 @@ Exit codes:
   0 success        1 failure          2 usage error   3 no account connected
   4 another process is writing        5 cloud request failed
   6 local database error             7 database version does not match this binary
+  8 sync incomplete (one or more streams failed)
 
 Parser upgrades:
   When the parser rules change (new workout codes, sleep-stage corrections, the
@@ -285,8 +289,8 @@ fn exit_code_for(error: &ZeppBridgeError) -> (u8, &'static str) {
         ZeppBridgeError::NetworkError(_)
         | ZeppBridgeError::RetryExhausted { .. }
         | ZeppBridgeError::HttpStatus { .. }
-        | ZeppBridgeError::Unavailable(_)
-        | ZeppBridgeError::DataUnavailable(_) => (EXIT_CLOUD, "cloud"),
+        | ZeppBridgeError::Unavailable(_) => (EXIT_CLOUD, "cloud"),
+        ZeppBridgeError::DataUnavailable(_) => (EXIT_FAILED, "data_unavailable"),
         ZeppBridgeError::Busy(_) => (EXIT_BUSY, "busy"),
         ZeppBridgeError::DatabaseError(_) => (EXIT_DATABASE, "database"),
         ZeppBridgeError::ConfigError(_) | ZeppBridgeError::InvalidHost(_) => (EXIT_USAGE, "usage"),
@@ -309,16 +313,12 @@ fn exit_code_for(error: &ZeppBridgeError) -> (u8, &'static str) {
 /// 所以在这里做一次语言边界：认得的错误出英文，认不得的仍然回落到原文——
 /// 看不懂的中文也好过一句空白，而回落的范围会随着核心那边逐条挪走而缩小。
 ///
-/// 回落分支必须是 `Display`（`to_string()`），**不能是 `user_text(other)`**。
-/// 那样写传的是同一个值，条件永远成立，就是一个无条件自递归；release 把尾调用
-/// 优化成循环，于是不是栈溢出而是 100% CPU 空转，整条命令再也不返回。
-/// 它骗过了所有门禁：`unconditional_recursion` 因为上面那支会返回而不报，
-/// 类型和 clippy 都挑不出毛病，而测试从来没有断言过「错误路径会结束」。
-/// 下面 `every_error_renders_and_terminates` 就是补这个洞的。
+/// 回落调用 core 的脱敏方法，不能递归调用本函数，也不能把带请求地址的
+/// Display 原样写到 stdout / stderr。
 fn user_text(error: &ZeppBridgeError) -> String {
     match error {
         ZeppBridgeError::Headless(problem) => problem.english(),
-        other => other.to_string(),
+        other => other.user_message(),
     }
 }
 
@@ -744,7 +744,9 @@ fn cmd_status(args: &[String]) -> u8 {
     let workouts = db.get_recent_workouts(1).unwrap_or_default();
     // 「本机有多少历史」是所有出口都要能回答的问题，不只是桌面应用：
     // 一个调度脚本同样需要在导出半年之前知道本机是不是只有 30 天。
-    let coverage = db.local_coverage().unwrap_or_default();
+    let coverage = db
+        .local_coverage(Local::now().date_naive())
+        .unwrap_or_default();
 
     let payload = serde_json::json!({
         "ok": true,
@@ -957,35 +959,9 @@ fn cmd_sync(args: &[String]) -> u8 {
 
     match result {
         Ok(report) => {
-            let payload = serde_json::json!({
-                "ok": true,
-                "mode": mode,
-                "success": report.success,
-                "recordsWritten": report.records_written,
-                "message": report.message,
-                // 同步前有没有补过重放。null = 没做（不欠，或者 --no-reprocess）。
-                // 调度脚本据此知道这一轮为什么跑了十分钟。
-                "replay": replay.as_ref().map(ReplayOutcome::to_json),
-                "streams": report.streams.iter().map(|stream| serde_json::json!({
-                    "stream": stream.stream,
-                    "status": stream.status,
-                    "recordsWritten": stream.records_written,
-                    "rawRecords": stream.raw_records,
-                    "message": stream.message,
-                })).collect::<Vec<_>>(),
-            });
-            let human = format!(
-                "Sync {}: {} records written. {}",
-                if report.success {
-                    "complete"
-                } else {
-                    "partly failed"
-                },
-                report.records_written,
-                report.message.as_deref().unwrap_or("")
-            );
+            let (code, payload, human) = sync_report_output(&report, mode, replay.as_ref());
             emit(json_mode, payload, &human);
-            EXIT_OK
+            code
         }
         Err(error) => {
             // 写锁冲突不是失败：桌面应用正开着同步，调度脚本稍后重试即可。
@@ -994,6 +970,49 @@ fn cmd_sync(args: &[String]) -> u8 {
             fail(json_mode, code, kind, &user_text(&error))
         }
     }
+}
+
+fn sync_report_output(
+    report: &SyncReport,
+    mode: &str,
+    replay: Option<&ReplayOutcome>,
+) -> (u8, serde_json::Value, String) {
+    let payload = serde_json::json!({
+        "ok": report.success,
+        "mode": mode,
+        "success": report.success,
+        "recordsWritten": report.records_written,
+        "message": report.message,
+        // 同步前有没有补过重放。null = 没做（不欠，或者 --no-reprocess）。
+        // 调度脚本据此知道这一轮为什么跑了十分钟。
+        "replay": replay.map(ReplayOutcome::to_json),
+        "streams": report.streams.iter().map(|stream| serde_json::json!({
+            "stream": stream.stream,
+            "status": stream.status,
+            "recordsWritten": stream.records_written,
+            "rawRecords": stream.raw_records,
+            "message": stream.message,
+        })).collect::<Vec<_>>(),
+    });
+    let human = format!(
+        "Sync {}: {} records written. {}",
+        if report.success {
+            "complete"
+        } else {
+            "partly failed"
+        },
+        report.records_written,
+        report.message.as_deref().unwrap_or("")
+    );
+    (
+        if report.success {
+            EXIT_OK
+        } else {
+            EXIT_INCOMPLETE_SYNC
+        },
+        payload,
+        human,
+    )
 }
 
 /* ------------------------------ export ------------------------------ */
@@ -1171,7 +1190,7 @@ fn cmd_export(args: &[String]) -> u8 {
 
     match options.out.as_deref() {
         Some(path) => {
-            if let Err(error) = std::fs::write(path, &body) {
+            if let Err(error) = paths::write_file_atomically(Path::new(path), body.as_bytes()) {
                 return fail(
                     json_mode,
                     EXIT_FAILED,
@@ -1246,7 +1265,7 @@ fn export_fit_files(json_mode: bool, json_text: &str, out: Option<&str>) -> u8 {
     }
     for (name, bytes) in &files {
         let target = std::path::Path::new(directory).join(name);
-        if let Err(error) = std::fs::write(&target, bytes) {
+        if let Err(error) = paths::write_file_atomically(&target, bytes) {
             return fail(
                 json_mode,
                 EXIT_FAILED,
@@ -1276,6 +1295,79 @@ fn export_fit_files(json_mode: bool, json_text: &str, out: Option<&str>) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cli_error_fallback_redacts_request_urls() {
+        for url in [
+            "https://api-mifit.huami.com/users/private-user?token=private-token",
+            "http://localhost/users/private-user?token=private-token",
+        ] {
+            for error in [
+                ZeppBridgeError::ConfigError(format!("request failed ({url})")),
+                ZeppBridgeError::AuthError(format!("request failed ({url})")),
+                ZeppBridgeError::DataUnavailable(format!("request failed ({url})")),
+                ZeppBridgeError::Unknown(format!("request failed ({url})")),
+                ZeppBridgeError::HttpStatus {
+                    status: 503,
+                    message: url.into(),
+                },
+            ] {
+                let text = user_text(&error);
+                assert!(!text.is_empty());
+                for secret in [url, "private-user", "private-token"] {
+                    assert!(!text.contains(secret), "{text}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn sync_report_output_reports_failed_streams_without_discarding_results() {
+        use zeppbridge_core::models::CapabilityStatus;
+        use zeppbridge_core::sync::{StreamReport, StreamStatus};
+        for status in [
+            StreamStatus::Failed,
+            StreamStatus::Unavailable,
+            StreamStatus::Unverified,
+            StreamStatus::Success,
+        ] {
+            let success = status != StreamStatus::Failed;
+            let report = SyncReport {
+                success,
+                core_ok: true,
+                records_written: 12,
+                message: Some("report detail".into()),
+                streams: vec![
+                    StreamReport {
+                        stream: "sleep".into(),
+                        status,
+                        records_written: 0,
+                        raw_records: 1,
+                        capability: CapabilityStatus::Verified,
+                        needs_reauth: false,
+                        message: Some("stream detail".into()),
+                    },
+                    StreamReport {
+                        stream: "heart_rate".into(),
+                        status: StreamStatus::Success,
+                        records_written: 12,
+                        raw_records: 1,
+                        capability: CapabilityStatus::Verified,
+                        needs_reauth: false,
+                        message: None,
+                    },
+                ],
+            };
+            let (code, payload, human) = sync_report_output(&report, "incremental", None);
+            assert_eq!(code, if success { 0 } else { 8 });
+            assert_eq!(payload["ok"], success);
+            assert_eq!(payload["success"], success);
+            assert_eq!(payload["recordsWritten"], 12);
+            assert_eq!(payload["streams"][0]["message"], "stream detail");
+            assert_eq!(payload["streams"][1]["recordsWritten"], 12);
+            assert_eq!(human.contains("partly failed"), !success);
+        }
+    }
 
     fn args(values: &[&str]) -> Vec<String> {
         values.iter().map(|value| value.to_string()).collect()
@@ -1475,6 +1567,7 @@ mod tests {
             EXIT_CLOUD,
             EXIT_DATABASE,
             EXIT_SCHEMA,
+            EXIT_INCOMPLETE_SYNC,
         ];
         let mut unique = codes.to_vec();
         unique.sort_unstable();
@@ -1493,6 +1586,7 @@ mod tests {
             EXIT_CLOUD,
             EXIT_DATABASE,
             EXIT_SCHEMA,
+            EXIT_INCOMPLETE_SYNC,
         ] {
             assert!(
                 HELP.contains(&code.to_string()),
@@ -1626,5 +1720,14 @@ mod tests {
         assert_eq!(schema, EXIT_SCHEMA);
         assert_eq!(token, EXIT_NOT_CONFIGURED);
         assert_ne!(schema, token);
+
+        let (no_store, kind) = exit_code_for(&ZeppBridgeError::Headless(
+            HeadlessProblem::NoCredentialStore {
+                detail: "no dbus".into(),
+            },
+        ));
+        assert_eq!(no_store, EXIT_NOT_CONFIGURED);
+        assert_eq!(kind, "auth");
+        assert_ne!(no_store, EXIT_FAILED);
     }
 }

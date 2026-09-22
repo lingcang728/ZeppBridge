@@ -51,11 +51,32 @@ pub fn to_csv(export: &Value) -> Result<(String, usize), String> {
     let mut rows = String::new();
     let mut count = 0usize;
 
+    for event in array(data, "life_events") {
+        for field in ["title", "category", "notes"] {
+            let value = text(event.get(field));
+            push_row(
+                &mut rows,
+                &[
+                    "life_event",
+                    &event["id"].to_string(),
+                    text(event.get("startDate")),
+                    text(event.get("endDate")),
+                    field,
+                    value,
+                    "",
+                    "user_authored",
+                    "",
+                ],
+            );
+            count += 1;
+        }
+    }
+
     for sample in array(data, "metric_samples") {
         let Some(value) = number_text(sample.get("value")) else {
             continue;
         };
-        push_row(
+        push_numeric_row(
             &mut rows,
             &[
                 "metric_sample",
@@ -76,7 +97,7 @@ pub fn to_csv(export: &Value) -> Result<(String, usize), String> {
         let Some(value) = number_text(daily.get("value")) else {
             continue;
         };
-        push_row(
+        push_numeric_row(
             &mut rows,
             &[
                 "daily_metric",
@@ -98,7 +119,7 @@ pub fn to_csv(export: &Value) -> Result<(String, usize), String> {
             let Some(value) = number_text(session.get(metric)) else {
                 continue;
             };
-            push_row(
+            push_numeric_row(
                 &mut rows,
                 &[
                     "sleep_session",
@@ -152,7 +173,7 @@ pub fn to_csv(export: &Value) -> Result<(String, usize), String> {
             let Some(value) = number_text(workout.get(metric)) else {
                 continue;
             };
-            push_row(
+            push_numeric_row(
                 &mut rows,
                 &[
                     "workout", workout_id, start, end, metric, &value, unit, scope, device,
@@ -222,6 +243,11 @@ pub fn to_gpx(export: &Value) -> Result<(String, usize), String> {
             ) else {
                 continue;
             };
+            // 最后一道边界：出域或非有限的坐标不写出。解码侧已经截断过，
+            // 这里是独立校验，不依赖上游一定干净。
+            if !coordinates_in_domain(lat, lon) {
+                continue;
+            }
             let timestamp = text(point.get("timestamp"));
             let parsed = parse_time(timestamp);
 
@@ -335,12 +361,39 @@ fn parse_time(value: &str) -> Option<DateTime<FixedOffset>> {
     DateTime::parse_from_rfc3339(value).ok()
 }
 
+/// 坐标域：纬 ±90、经 ±180，且两个都得是有限值。
+fn coordinates_in_domain(latitude: f64, longitude: f64) -> bool {
+    latitude.is_finite()
+        && longitude.is_finite()
+        && latitude.abs() <= 90.0
+        && longitude.abs() <= 180.0
+}
+
 fn push_row(out: &mut String, fields: &[&str; 9]) {
+    push_csv_row(out, fields, false);
+}
+
+// Only value cells produced by number_text may bypass text protection.
+fn push_numeric_row(out: &mut String, fields: &[&str; 9]) {
+    push_csv_row(out, fields, true);
+}
+
+fn push_csv_row(out: &mut String, fields: &[&str; 9], numeric_value: bool) {
     for (index, field) in fields.iter().enumerate() {
         if index > 0 {
             out.push(',');
         }
-        out.push_str(&escape_csv(field));
+        let protected;
+        let value: &str = if !(numeric_value && index == 5)
+            && (field.trim_start().starts_with(['=', '+', '-', '@'])
+                || field.starts_with(['\t', '\r', '\n']))
+        {
+            protected = format!("'{field}");
+            &protected
+        } else {
+            field
+        };
+        out.push_str(&escape_csv(value));
     }
     out.push('\n');
 }
@@ -371,6 +424,40 @@ mod tests {
 
     fn export_with(data: Value) -> Value {
         json!({ "generated_at": "2026-08-24T10:00:00+08:00", "data": data })
+    }
+
+    #[test]
+    fn regression_markdown_csv_protects_all_text_without_changing_numbers() {
+        for dangerous in [
+            "=1+1", "+1+1", "-1+1", "@SUM(A1)", "  =1+1", "\ttext", "\rtext", "\ntext", "=\"a,b\"",
+        ] {
+            let export = export_with(json!({
+                "metric_samples": [{"timestamp": dangerous, "metric": dangerous, "value": -2.5, "unit": dangerous, "source_scope": dangerous, "device_label": dangerous}],
+                "daily_metrics": [{"date": dangerous, "metric": dangerous, "value": -3, "unit": dangerous, "source_scope": dangerous, "device_label": dangerous}],
+                "sleep_sessions": [{"sleep_id": dangerous, "start_time": dangerous, "end_time": dangerous, "score": -4, "source_scope": dangerous, "device_label": dangerous}],
+                "workouts": [{"workout_id": dangerous, "start_time": dangerous, "end_time": dangerous, "effective_type": dangerous, "calories": -5, "source_scope": dangerous, "device_label": dangerous}],
+                "life_events": [{"id": 1, "title": dangerous, "category": dangerous, "notes": dangerous}]
+            }));
+            let (csv, count) = to_csv(&export).unwrap();
+            assert_eq!(count, 8);
+            let safe = escape_csv(&format!("'{dangerous}"));
+            assert!(csv.contains(&format!(
+                "metric_sample,,{safe},,{safe},-2.5,{safe},{safe},{safe}\n"
+            )));
+            assert!(csv.contains(&format!(
+                "daily_metric,,{safe},,{safe},-3,{safe},{safe},{safe}\n"
+            )));
+            assert!(csv.contains(&format!(
+                "sleep_session,{safe},{safe},{safe},score,-4,score,{safe},{safe}\n"
+            )));
+            assert!(csv.contains(&format!(
+                "workout,{safe},{safe},{safe},workout_type,{safe},,{safe},{safe}\n"
+            )));
+            assert!(csv.contains(&format!(
+                "workout,{safe},{safe},{safe},calories,-5,kcal,{safe},{safe}\n"
+            )));
+            assert!(csv.contains(&format!("life_event,1,,,title,{safe},,user_authored,\n")));
+        }
     }
 
     #[test]
@@ -581,5 +668,31 @@ mod tests {
         assert!(gpx.contains("run &amp; walk"));
         assert!(gpx.contains("a&lt;b&amp;c"));
         assert!(!gpx.contains("a<b&c"), "未转义的 XML 会让轨迹文件打不开");
+    }
+
+    /// 出域坐标是最后一道边界：lat=999 不是地球上的点，不许进 GPX。
+    #[test]
+    fn gpx_drops_points_outside_the_coordinate_domain() {
+        let export = export_with(json!({
+            "workouts": [
+                {
+                    "workout_id": "w1", "workout_type": "outdoor_running",
+                    "route": [
+                        { "timestamp": "2026-08-24T06:00:00+08:00", "latitude": 31.0,
+                          "longitude": 121.0 },
+                        { "timestamp": "2026-08-24T06:00:01+08:00", "latitude": 999.0,
+                          "longitude": 121.0 }
+                    ],
+                    "samples": [],
+                    "pauses": []
+                }
+            ]
+        }));
+
+        let (gpx, points) = to_gpx(&export).unwrap();
+
+        assert_eq!(points, 1, "lat=999 的点必须被丢掉");
+        assert!(gpx.contains("<trkpt lat=\"31.000000\" lon=\"121.000000\">"));
+        assert!(!gpx.contains("999.000000"));
     }
 }

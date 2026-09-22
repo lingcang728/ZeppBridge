@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import { displayDateTimeFormatter } from '../lib/dateTime';
 import { computed } from 'vue';
-import { VChart } from '../lib/echartsSetup';
+import { CHART_THEME, VChart } from '../lib/echartsSetup';
 import { formatDuration, formatTime, isFiniteNumber } from '../lib/format';
 import { zeppSemanticColors } from '../lib/echartsTheme';
-import { sleepStageLabels, sleepStageLabelsWithUnknown } from '../lib/sleepStages';
+import { insertSleepStageGaps, sleepStageLabels, sleepStageLabelsWithUnknown, type TimedSleepSlice } from '../lib/sleepStages';
 import type { SleepStageSlice } from '../types';
 import { defineMessages, useMessages } from '../i18n';
 
@@ -19,6 +20,12 @@ const messages = defineMessages(
     zeroMinutes: '0 min',
     hypnogramAria: 'Sleep stage hypnogram',
     summaryAria: 'Sleep stage share',
+  },
+  {
+    notProvided: 'Sin datos',
+    zeroMinutes: '0 min',
+    hypnogramAria: 'Hipnograma de las fases del sueño',
+    summaryAria: 'Proporción de fases del sueño',
   },
 );
 const t = useMessages(messages);
@@ -67,7 +74,7 @@ const toMs = (value?: string): number | null => {
   return Number.isFinite(time) ? time : null;
 };
 
-const timeline = computed<BarSegment[]>(() => {
+const observedSlices = computed<BarSegment[]>(() => {
   const rangeFrom = toMs(props.rangeStart);
   const rangeTo = toMs(props.rangeEnd);
   return (props.slices ?? [])
@@ -98,10 +105,23 @@ const range = computed<{ from: number; span: number } | null>(() => {
   const from = toMs(props.rangeStart);
   const to = toMs(props.rangeEnd);
   if (from !== null && to !== null && to > from) return { from, span: to - from };
-  if (!timeline.value.length) return null;
-  const first = Math.min(...timeline.value.map((slice) => slice.start as number));
-  const last = Math.max(...timeline.value.map((slice) => slice.end as number));
+  if (!observedSlices.value.length) return null;
+  const first = Math.min(...observedSlices.value.map((slice) => slice.start as number));
+  const last = Math.max(...observedSlices.value.map((slice) => slice.end as number));
   return last > first ? { from: first, span: last - first } : null;
+});
+
+const timeline = computed<BarSegment[]>(() => {
+  const current = range.value;
+  const slices = observedSlices.value;
+  if (!current || !slices.length) return slices;
+  return insertSleepStageGaps(slices as TimedSleepSlice[], current.from, current.from + current.span)
+    .map((slice) => ({
+      tone: slice.tone,
+      minutes: (slice.end - slice.start) / 60_000,
+      start: slice.start,
+      end: slice.end,
+    }));
 });
 
 const isHypnogram = computed(() => timeline.value.length > 0 && range.value !== null);
@@ -143,7 +163,7 @@ const segmentStyle = (stage: BarSegment): Record<string, string> => {
 
 const clock = (value: number) => {
   const date = new Date(value);
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  return displayDateTimeFormatter({ hour: '2-digit', minute: '2-digit' }).format(date);
 };
 
 const hypnogramOption = computed(() => {
@@ -224,6 +244,7 @@ const hypnogramOption = computed(() => {
     <template v-if="isHypnogram && hypnogramOption">
       <VChart
         class="hypnogram"
+        :theme="CHART_THEME"
         :option="hypnogramOption"
         autoresize
         role="img"

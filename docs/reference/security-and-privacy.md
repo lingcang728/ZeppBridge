@@ -9,11 +9,17 @@ real accounts and regions has not been fully verified against live services.
 
 ## Credentials
 
-- The app token is stored by Windows Credential Manager under the service name
-  `com.zeppbridge.app`, with the account name keyed by user ID.
-- `auth.json` lives in `data/` next to the program (`{exe_dir}/data`) and holds
-  only authentication metadata (version, user ID, region host, updated-at). A
-  normal save never writes the token to a file. Nothing is written to `%APPDATA%`.
+- The app token uses Windows Credential Manager, macOS Keychain, or Linux
+  Secret Service by default, under `com.zeppbridge.app`, keyed by user ID.
+- macOS and Linux can explicitly opt into a plaintext `credentials.json`
+  protected by file permissions (`0600`, data directory `0700`). It is never
+  silently enabled on a system-store failure. Linux also supports a read-only
+  environment store. See the [macOS](../guides/macos-credentials.md) and
+  [Linux](../guides/linux.md) credential guides before choosing an alternative.
+- `auth.json` lives in the active data directory and holds only authentication
+  metadata (version, user ID, region host, updated-at), even with file storage.
+  File-stored tokens travel with manual copies of that directory, so do not
+  share `credentials.json` with a library copy.
 - Startup recovery rebuilds the sync manager from that metadata plus the
   credential store. When the credential is missing or invalid, Settings says
   re-authentication is needed and the token never appears in a status response.
@@ -31,12 +37,13 @@ real accounts and regions has not been fully verified against live services.
 - The connector accepts only origins of the form `https://api-mifit*.zepp.com`
   or `https://api-mifit*.huami.com` — no arbitrary domains, paths, queries,
   fragments, embedded credentials or uncontrolled ports.
-- The HTTP client has a 30-second timeout and classifies 401/403, 404, 429/5xx
+- The HTTP client has a 30-second timeout (plus a 10-second connect timeout),
+  does not honour env/system proxies, and classifies 401/403, 404, 429/5xx
   and other non-2xx responses, with a bounded retry budget.
-- The sign-in window may navigate only to `https://*.zepp.com` /
-  `https://*.huami.com` (plus `about`/`data`/`blob` intermediates) and the exact
-  OAuth provider hosts that page uses. Region probing only touches API origins
-  on the allow-list.
+- The sign-in window may navigate only over HTTPS, to `*.zepp.com` /
+  `*.huami.com` and the exact OAuth provider hosts that page uses.
+  `about:`, `data:` and `blob:` URLs are rejected. Region probing only touches
+  API origins on the allow-list.
 - There is no LAN HTTP proxy, and no system or user CA is installed.
 - The local REST API binds only to `127.0.0.1:43921`. It does not listen on LAN
   addresses, offers no CORS, and exposes only a read-only health probe and a

@@ -2,6 +2,70 @@
 
 本文件记录每个版本的实际改动。写给使用者看，不是施工日志：只写用户能感知到的变化，以及为什么这么改。
 
+## Unreleased / 未发布
+
+### Planned for 2.4.3 / 计划纳入 2.4.3
+
+- Fix blood-oxygen ODI requests using calendar dates in the device timezone, avoiding HTTP 400 and false empty responses from timestamp parameters. Keep the failing substream and cause in partial-sync diagnostics.
+- 血氧 ODI 请求改用设备时区下的日期，避免时间戳参数引发 HTTP 400 或错误空结果；部分同步的诊断记录保留具体子指标和失败原因。
+
+- Isolate parallel authentication tests with exclusively created temporary directories, avoiding intermittent missing `auth.json` failures in CI. Production credential storage is unchanged.
+- 认证并行测试使用独占创建的临时目录，避免 CI 偶发找不到 `auth.json`；不修改正式程序的凭据存储逻辑。
+- Build desktop installers only for release tags or manual CI runs. Pushes to main and pull requests retain verification and Docker checks without repeating installer packaging.
+- 桌面安装包仅在发布标签或手动运行 CI 时构建；main 推送和 PR 保留验证及 Docker 检查，避免重复打包。
+
+## 2.4.0
+
+### Changed / 变化
+
+- Weekly report, sleep stages, workout tracks and coverage now treat missing or incomplete data as missing — not as zero, a complete copy, or a shifted GPS path.
+- 周报、睡眠阶段、运动轨迹和覆盖账本把缺失或不完整的数据如实标成缺失，不再用 0、完整副本或平移后的 GPS 来填。
+- Heart-rate page matches body status: the last-24-hours curve stays on top; 7-day / 1-month / 6-month only change the trends below.
+- 心率页与身体状态页对齐：最近 24 小时曲线固定在上方，7 天 / 1 个月 / 6 个月只改下面的趋势。
+
+### Fixed / 修复
+
+- Life-event category menu can be opened inside the editor (it was painting behind the dialog). New events still default to Other; Health & recovery, Travel, Routine, Training remain selectable.
+- 生活事件编辑器里可以打开分类菜单（原先画在对话框后面）。新建事件默认仍是「其他」，身体与恢复、旅行、作息、训练都可以选。
+- A 1 bpm resting-heart-rate change in This week is coloured as better/worse instead of a grey “flat” bar.
+- 「这一周」里静息心率差 1 次/分会按更好/更差上色，不再画成灰色持平条。
+- MSI/NSIS installs are no longer treated as the portable build, so an update does not drop a second copy in LocalAppData.
+- MSI/NSIS 安装版不再被当成便携版，更新时不会在 LocalAppData 再装一份。
+
+## 2.3.0
+
+> **Hola, ya sé hablar español.**
+
+### Added / 新增
+
+- **ZeppBridge now speaks Spanish.** The desktop interface, detail pages, workout catalogue, tray menu, weekly reports and user-facing unit labels are available in Spanish alongside Chinese and English.
+- **ZeppBridge 现已支持西班牙语。** 桌面界面、详情页、运动目录、托盘菜单、周报与面向用户的单位文本均已提供西语版本，与中文、英文并列可选。
+- **Life events add your own context to health trends.** Record a single day, a date range or an ongoing event; search and manage events from Overview, and use markers and quick entry on trend cards to relate changes in sleep, recovery, activity and other metrics to what was happening in your life.
+- **生活记录为健康趋势补上个人背景。** 可记录单日、日期范围或仍在持续的事件；在概览页搜索和管理，并通过趋势卡片上的标记与快捷入口，把睡眠、恢复、活动等指标变化和当时发生的事情对应起来。
+- Life events can be included explicitly in JSON, CSV and AI handoff exports. Range intersections and cross-midnight workout context are handled without changing the original user-authored dates. Events are stored locally, included in backup and restore, and remain independent from cloud replay and retention.
+- 生活记录可按需加入 JSON、CSV 与 AI 交接导出。日期范围相交和跨午夜运动会正确关联上下文，同时保留用户填写的原始日期；记录存放在本机，支持备份与恢复，不受云端重放和保留策略影响。
+
+### Fixed / 修复
+
+- HAR import now accepts Zepp user endpoints both with and without a trailing slash, so a valid user ID is no longer missed because of URL shape.
+- HAR 导入现在同时接受带或不带末尾斜杠的 Zepp 用户接口，不会再因为 URL 形式差异漏掉有效用户 ID。
+- macOS keeps the user library outside the signed `.app` bundle, preventing app replacement or update from carrying mutable health data inside the application package.
+- macOS 会把用户数据库保存在已签名的 `.app` 包之外，避免替换或更新应用时把可变健康数据夹在应用包内。
+- Recent feedback reconciliation improves device and workout handling where evidence was sufficient, while ambiguous device/source reports remain unassigned instead of being guessed.
+- 最新反馈核对完善了已有充分证据的设备与运动处理；证据冲突或不足的设备来源仍保持未指认，不会用猜测写入健康数据。
+
+## 2.2.4
+
+### Fixed / 修复
+
+- **Paused workouts show moving and paused time separately.** Workout details show moving pace alongside pace including pauses; FIT session, lap and activity timer totals exclude recorded pauses. Overlapping intervals count once and intervals are clipped to the activity or lap.
+- **含暂停的运动可分别查看运动用时、暂停用时、运动配速和含暂停配速。** FIT 的运动、圈与活动计时同步扣除已记录的暂停，重复、重叠与越界区间不会重复扣时。
+- Added seven evidence-backed deviceSource mappings for T-Rex 3 Pro, Balance 3, Balance 2 XT, Active, Active 2 and Cheetah 2 Ultra. Refresh the device list to update a previously cached unknown model. User model corrections retain priority.
+- 新增 7 个有反馈证据的设备编号映射，覆盖 T-Rex 3 Pro、Balance 3、Balance 2 XT、Active、Active 2 与 Cheetah 2 Ultra。刷新设备列表即可更新旧的未知型号缓存；用户手动指认仍优先。
+
+- **A managed macOS login keychain no longer has to block sign-in.** macOS can explicitly select file credential storage with `ZEPPBRIDGE_CREDENTIAL_STORE=file`; a saved credential file is reused on normal launches. Keychain remains the default, and a Keychain failure never silently enables plaintext storage. See the [setup guide](docs/guides/macos-credentials.md). This also corrects the error message that incorrectly suggested HAR import or manual entry could bypass the same blocked store. Fixes [#72](https://github.com/lingcang728/ZeppBridge/issues/72).
+- **macOS 登录钥匙串受管理时，可以改用文件存储。** 用 `ZEPPBRIDGE_CREDENTIAL_STORE=file` 显式选择后，令牌保存在权限为 `0600` 的文件中，后续正常启动会继续使用。钥匙串仍为默认，访问失败不会自动降级；[操作指南](docs/guides/macos-credentials.zh-CN.md)说明了保护边界与切换方法。报错提示也已修正：HAR 导入和手填 Token 共用同一个存储，无法绕过存储故障。修复 [#72](https://github.com/lingcang728/ZeppBridge/issues/72)。
+
 ## 2.2.2
 
 ### Fixed / 修复

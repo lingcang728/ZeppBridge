@@ -9,21 +9,23 @@ use crate::storage::coverage::CoverageLedger;
 use crate::sync::{StreamStatus, SyncManager, SyncProgress, SyncReport};
 use std::collections::BTreeMap;
 use std::sync::Arc;
+use std::time::Duration;
+use zeppbridge_core::storage::write_lock::{self, WritePurpose};
+
+use super::with_write;
 
 /// Run the first 30-day sync and return per-stream progress to the UI.
 ///
-/// The manager handle is cloned while holding the state read lock, then the
-/// guard is dropped before any network or database work begins.  A report with
-/// failed streams remains a successful IPC response so the UI can render each
-/// stream's actual state; only an underlying transport/database error is
-/// returned as `Err`.
-#[tauri::command]
+/// The manager is taken after `sync_command_lock` so a concurrent save/clear
+/// cannot leave this command writing with a credential that was just replaced.
+/// A report with failed streams remains a successful IPC response so the UI
+/// can render each stream's actual state; only an underlying
+/// transport/database error is returned as `Err`.
 pub async fn start_initial_sync(
     app: AppHandle,
     state: tauri::State<'_, AppState>,
     days: Option<i64>,
 ) -> std::result::Result<UiSyncReport, AppError> {
-    let manager = require_manager(&state).await?;
     let days = match days {
         Some(value) => UserPrefs::clamp_days(value)
             .map_err(|message| AppError::new("err.sync.history_days_out_of_range", message))?,
@@ -35,7 +37,7 @@ pub async fn start_initial_sync(
                 .unwrap_or(UserPrefs::DEFAULT_HISTORY_SYNC_DAYS)
         }
     };
-    run_sync(&app, &state, manager, Some(days)).await
+    run_sync(&app, &state, Some(days)).await
 }
 
 #[tauri::command]
@@ -59,8 +61,7 @@ pub async fn start_incremental_sync(
             "请先完成连接验证，再同步最近数据",
         ));
     }
-    let manager = require_manager(&state).await?;
-    run_sync(&app, &state, manager, None).await
+    run_sync(&app, &state, None).await
 }
 
 /// Probe the optional Zepp event streams and report what answers.
@@ -102,7 +103,6 @@ pub async fn start_history_backfill(
             "请先完成连接验证，再补拉历史",
         ));
     }
-    let manager = require_manager(&state).await?;
     let from = chrono::NaiveDate::parse_from_str(from_date.trim(), "%Y-%m-%d").map_err(|_| {
         AppError::new(
             "err.backfill.bad_start_date",
@@ -117,12 +117,20 @@ pub async fn start_history_backfill(
         ));
     }
     let _command_guard = state.sync_command_lock.lock().await;
-    manager
+    if let Some(kind) = local_maintenance_deferred() {
+        return Err(deferred_app_error(kind));
+    }
+    let manager = require_manager(&state).await?;
+    match manager
         .history_backfill(from, to, max_chunks.unwrap_or(24), |progress| {
             emit_sync_progress(&app, progress)
         })
         .await
-        .map_err(AppError::from)
+    {
+        Ok(ledger) => Ok(ledger),
+        Err(error) if error.is_busy() => Err(deferred_app_error(busy_deferred_kind())),
+        Err(error) => Err(error.into()),
+    }
 }
 
 /// 当前的历史覆盖账本。
@@ -141,9 +149,12 @@ pub async fn get_coverage_ledger(
 pub async fn reset_coverage_ledger(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<CoverageLedger, AppError> {
-    let db = state.db.lock().await;
-    db.reset_coverage_ledger()?;
-    db.coverage_ledger().map_err(AppError::from)
+    let _command_guard = state.sync_command_lock.lock().await;
+    with_write(&state.data_dir, &state.db, WritePurpose::Metadata, |db| {
+        db.reset_coverage_ledger()?;
+        db.coverage_ledger()
+    })
+    .await
 }
 
 /// 让失败的块重新进入自动补拉队列。
@@ -155,9 +166,12 @@ pub async fn reset_coverage_ledger(
 pub async fn retry_failed_backfill_chunks(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<CoverageLedger, AppError> {
-    let db = state.db.lock().await;
-    db.reset_failed_backfill_chunks()?;
-    db.coverage_ledger().map_err(AppError::from)
+    let _command_guard = state.sync_command_lock.lock().await;
+    with_write(&state.data_dir, &state.db, WritePurpose::Metadata, |db| {
+        db.reset_failed_backfill_chunks()?;
+        db.coverage_ledger()
+    })
+    .await
 }
 
 #[tauri::command]
@@ -180,10 +194,13 @@ async fn require_manager(state: &AppState) -> std::result::Result<Arc<SyncManage
 async fn run_sync(
     app: &AppHandle,
     state: &AppState,
-    manager: Arc<SyncManager>,
     history_days: Option<i64>,
 ) -> std::result::Result<UiSyncReport, AppError> {
     let _command_guard = state.sync_command_lock.lock().await;
+    // Re-read after the lock: save/clear may have swapped the manager while
+    // this command waited, and the handle cloned beforehand would keep writing
+    // with the old credential.
+    let manager = require_manager(state).await?;
     // A `NORMALIZER_REVISION` bump makes the next launch replay every stored
     // raw payload, which writes in bulk for as long as a quarter of an hour on
     // a large library. A sync starting in the middle of that used to lose the
@@ -195,34 +212,8 @@ async fn run_sync(
     // 一次——两件事同时开始，同步抢不到写锁，用户看到的是一行红字
     // 「另一个写入操作正在进行」。压缩是我们自己安排的、正常的一次性维护，
     // 不该让它把用户吓一跳。和重放一样让路重试。
-    if crate::storage::replay_in_progress() || crate::storage::compaction_in_progress() {
-        let (code, message) = if crate::storage::compaction_in_progress() {
-            (
-                "err.sync.deferred_compaction",
-                "正在压缩历史报文以节省磁盘空间，本次云端同步稍后自动重试",
-            )
-        } else {
-            (
-                "err.sync.deferred_replay",
-                "正在用本地原始报文重建派生数据，本次云端同步稍后自动重试",
-            )
-        };
-        let now = Utc::now().to_rfc3339();
-        let mut deferred = ui_sync_report(
-            SyncReport {
-                success: false,
-                core_ok: false,
-                streams: Vec::new(),
-                records_written: 0,
-                message: Some(message.into()),
-            },
-            now.clone(),
-            now,
-            "deferred".to_string(),
-            &BTreeMap::new(),
-        );
-        deferred.message_code = Some(code.to_string());
-        return Ok(deferred);
+    if let Some(kind) = local_maintenance_deferred() {
+        return Ok(deferred_ui_report(kind));
     }
     let before = {
         let database = state.db.lock().await;
@@ -241,12 +232,14 @@ async fn run_sync(
     let finished_at = Utc::now().to_rfc3339();
     let report = match report_result {
         Ok(report) => report,
+        Err(error) if error.is_busy() => {
+            return Ok(deferred_ui_report(busy_deferred_kind()));
+        }
         Err(error) if error.is_cancelled() => {
             // A user-initiated cancellation is a deliberate terminal outcome,
             // not a failure: report it as `cancelled` so the UI can show a
             // neutral banner instead of a red error.
-            let database = state.db.lock().await;
-            database.record_cloud_sync(&finished_at, "cancelled")?;
+            record_cloud_sync_locked(state, &finished_at, "cancelled", 0).await?;
             return Ok(ui_sync_report(
                 SyncReport {
                     success: false,
@@ -262,8 +255,7 @@ async fn run_sync(
             ));
         }
         Err(error) => {
-            let database = state.db.lock().await;
-            database.record_cloud_sync(&finished_at, "failed")?;
+            record_cloud_sync_locked(state, &finished_at, "failed", 0).await?;
             if error.needs_reauth() {
                 *state.auth_state.write().await = "needs_reauth".to_string();
             }
@@ -280,10 +272,7 @@ async fn run_sync(
         (freshness, after)
     };
     let outcome = classify_outcome(&report, &before, &after);
-    {
-        let database = state.db.lock().await;
-        database.record_cloud_sync(&finished_at, outcome)?;
-    }
+    record_cloud_sync_locked(state, &finished_at, outcome, report.records_written).await?;
 
     if report.streams.iter().any(|stream| stream.needs_reauth) {
         *state.auth_state.write().await = "needs_reauth".to_string();
@@ -358,6 +347,70 @@ fn emit_sync_progress(app: &AppHandle, progress: SyncProgress) {
     let _ = app.emit("sync://progress", progress);
 }
 
+async fn record_cloud_sync_locked(
+    state: &AppState,
+    finished_at: &str,
+    outcome: &str,
+    records_written: i64,
+) -> std::result::Result<(), AppError> {
+    let _write_guard = write_lock::acquire_with_timeout(
+        &state.data_dir,
+        WritePurpose::Metadata,
+        Duration::from_secs(10),
+    )?;
+    let database = state.db.lock().await;
+    database
+        .record_cloud_sync(finished_at, outcome, records_written)
+        .map_err(AppError::from)
+}
+
+fn local_maintenance_deferred() -> Option<(&'static str, &'static str)> {
+    if crate::storage::compaction_in_progress() {
+        Some((
+            "err.sync.deferred_compaction",
+            "正在压缩历史报文以节省磁盘空间，本次云端同步稍后自动重试",
+        ))
+    } else if crate::storage::replay_in_progress() {
+        Some((
+            "err.sync.deferred_replay",
+            "正在用本地原始报文重建派生数据，本次云端同步稍后自动重试",
+        ))
+    } else {
+        None
+    }
+}
+
+fn busy_deferred_kind() -> (&'static str, &'static str) {
+    local_maintenance_deferred().unwrap_or((
+        "err.sync.deferred_busy",
+        "另一个写入操作正在进行，本次云端同步稍后自动重试",
+    ))
+}
+
+fn deferred_app_error(kind: (&'static str, &'static str)) -> AppError {
+    AppError::new(kind.0, kind.1)
+}
+
+fn deferred_ui_report(kind: (&'static str, &'static str)) -> UiSyncReport {
+    let (code, message) = kind;
+    let now = Utc::now().to_rfc3339();
+    let mut deferred = ui_sync_report(
+        SyncReport {
+            success: false,
+            core_ok: false,
+            streams: Vec::new(),
+            records_written: 0,
+            message: Some(message.into()),
+        },
+        now.clone(),
+        now,
+        "deferred".to_string(),
+        &BTreeMap::new(),
+    );
+    deferred.message_code = Some(code.to_string());
+    deferred
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -373,7 +426,7 @@ mod tests {
                 .enumerate()
                 .map(|(index, status)| StreamReport {
                     stream: format!("stream-{index}"),
-                    status: status.clone(),
+                    status: *status,
                     records_written: 0,
                     raw_records: 0,
                     capability: CapabilityStatus::Verified,
@@ -416,7 +469,7 @@ mod tests {
                 .iter()
                 .map(|(name, status)| StreamReport {
                     stream: (*name).to_string(),
-                    status: status.clone(),
+                    status: *status,
                     records_written: 0,
                     raw_records: 0,
                     capability: CapabilityStatus::Verified,
@@ -479,5 +532,20 @@ mod tests {
             ),
             "failed"
         );
+    }
+
+    #[test]
+    fn a_busy_writer_is_deferred_not_a_failed_red_bar() {
+        let report = deferred_ui_report((
+            "err.sync.deferred_busy",
+            "另一个写入操作正在进行，本次云端同步稍后自动重试",
+        ));
+        assert_eq!(report.outcome, "deferred");
+        assert_eq!(
+            report.message_code.as_deref(),
+            Some("err.sync.deferred_busy")
+        );
+        assert!(!report.success);
+        assert_eq!(report.total_records, 0);
     }
 }

@@ -112,7 +112,7 @@ Tauri command 在 `src-tauri/src/lib.rs` 注册，前端封装在 `src/lib/bridg
 | `clear_auth` | 作废登录会话并清除认证 | 保留健康数据库 |
 | `import_from_har` | 从用户自己导出的 HAR 里抽取凭据 | 必须含 `api-mifit*` 请求且带 `apptoken`；随后走 `save_auth` 同一条保存路径 |
 | `manual_auth` | 手动输入 token / user id / region host | 只是 `save_auth` 的包装，边界完全相同 |
-| `start_initial_sync` / `start_history_sync` | 按用户选择的 1–365 天补拉 | 默认 30 天；有进度事件和取消 |
+| `start_history_sync` | 按用户选择的 1–365 天补拉 | 默认 30 天；有进度事件和取消 |
 | `start_incremental_sync` | 7 天 overlap 增量 | 仅已验证连接可用；顶栏/自动同步/托盘触发 |
 | `cancel_sync` | 取消进行中的同步 | 原子标记，下一窗口停止 |
 | `set_user_prefs` | 保存保留天数和历史补拉天数 | 1–365 |
@@ -121,7 +121,7 @@ Tauri command 在 `src-tauri/src/lib.rs` 注册，前端封装在 `src/lib/bridg
 | `get_recent_sleep` / `get_recent_workouts` | 读取最近记录 | limit 在后端限制为 `1–500` |
 | `get_sleep_detail` / `get_workout_detail` | 按稳定 ID 读取单条详情 | 找不到返回 `null`；不生成估算字段 |
 | `get_workout_series` | 读取已解码的跑步 samples/route/pauses | 没有点则空数组，不编造 |
-| `get_heart_rate_series` / `get_training_load_series` | 概览折线用的时序点 | 按小时 / 天读本地库；没有样本就是空数组 |
+| `get_heart_rate_series` | 概览折线用的时序点 | 按小时 / 天读本地库；没有样本就是空数组 |
 | `get_metric_series` | `/body` 与 `/training` 的按天曲线 | 只应答 `SERIES_METRICS` 白名单里的指标名，别的直接跳过；返回 `days_with_data`，缺的天不补 0 |
 | `get_training_balance` | 7 天 / 28 天负荷与急慢比 | 与导出 `training_load_balance` 同一个函数；chronic 窗口不足 21 天时 ratio 为 `null` |
 | `get_heart_rate_zones` | 心率区间选择器的全部状态 | 基准全部实测并带出处与测量日期；未选算法时 `report` 为 `null` |
@@ -150,14 +150,14 @@ Tauri command 在 `src-tauri/src/lib.rs` 注册，前端封装在 `src/lib/bridg
 
 ## 本机 REST API
 
-桌面进程启动时由 `src-tauri/src/local_api.rs` 绑定 `127.0.0.1:43921`。当前公开两个只读 GET 路由：
+本机 API **默认关闭**。桌面进程启动时**不会**绑定 `127.0.0.1:43921`。只有用户在设置页打开开关之后才开始监听，且每个请求都要带 `Authorization: Bearer <token>`。实现在 `zeppbridge-core`（`crates/core/src/local_api.rs`），Tauri 适配层是 `src-tauri/src/local_api.rs`。当前公开两个只读 GET 路由：
 
 | 路由 | 说明 |
 | --- | --- |
 | `/health` | 服务状态和应用版本 |
 | `/workouts/{id}/series` | 复用 `Database::get_workout_series()`，返回标准化 `WorkoutSeries` JSON；未知 ID 返回 404 |
 
-API 不监听 `0.0.0.0`、不提供 CORS、响应 `Cache-Control: no-store`，也不读取或返回认证信息。端口被占用时桌面 App 继续启动，设置页通过 `get_local_api_status` 显示错误。测试必须覆盖路由、404/405、编码 ID、泛化 500 错误以及无 CORS 边界。
+API 只绑定 `127.0.0.1`、不提供 CORS、响应 `Cache-Control: no-store`，也不读取或返回认证信息。端口被占用时桌面 App 继续启动，设置页通过 `get_local_api_status` 显示错误。测试必须覆盖路由、404/405、编码 ID、泛化 500 错误以及无 CORS 边界。
 
 ## 当前数据链路
 
@@ -166,7 +166,7 @@ API 不监听 `0.0.0.0`、不提供 CORS、响应 `Cache-Control: no-store`，�
 3. `ZeppConnector` 只构造 HTTPS origin，host 仅允许 `api-mifit*.zepp.com` / `api-mifit*.huami.com`，HTTP client 超时 30 秒，401/403/404/429/5xx 分类处理。
 4. `DataFetcher` 为每个响应保留 stream/source key/raw payload。连接器有有限重试，但没有通用的 cursor 分页实现；运动 endpoint 使用 track ID 语义，当前窗口 helper 仍是保守范围。
 5. `Normalizer` 只接受能识别的结构化数组/对象，并能解码当前真实 fixture 验证过的 Base64 `band_data` 睡眠/分钟心率结构；无法识别的编码仍只保留 raw 并标记 `unverified`。
-6. `Database` 使用 WAL、外键和 schema migration（`PRAGMA user_version`，当前为 **16**；迁移步骤只能追加，不要改已有 DDL——已发布的库是按当时的 DDL 建的）；表达式唯一索引处理 `NULL device_id`，canonical 行保留 `raw_record_id`。迁移在拿到跨进程写锁并生成升级前备份之后才开始。
+6. `Database` 使用 WAL、外键和 schema migration（`PRAGMA user_version`，当前值见 `storage/mod.rs` 的 `CURRENT_SCHEMA_VERSION`；迁移步骤只能追加，不要改已有 DDL——已发布的库是按当时的 DDL 建的）；表达式唯一索引处理 `NULL device_id`，canonical 行保留 `raw_record_id`。迁移在拿到跨进程写锁并生成升级前备份之后才开始。
 7. `SyncManager` 用 run lock 防止进程内并发，并额外获取跨进程写锁，因此桌面应用和 CLI 不会同时写同一个库；核心流失败时 `success=false`，可选流显示 `unavailable`/`unverified`，成功后再做 retention（长期归档开启时跳过清理）。
 8. 抓取、解析、写入三个阶段分别记进 `stream_provenance`，失败带稳定的机器可读类别，供数据健康页和 MCP 的 `get_data_health` 使用。
 

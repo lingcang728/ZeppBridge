@@ -10,7 +10,7 @@ use std::time::Duration;
 use zeppbridge_core::storage::backup::{
     self, BackupKind, BackupManifest, BackupVerification, PendingRestore, RestorePreview,
 };
-use zeppbridge_core::storage::write_lock::{acquire_with_timeout, WritePurpose};
+use zeppbridge_core::storage::write_lock::{acquire_with_timeout, try_acquire, WritePurpose};
 
 const LOCK_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -55,7 +55,8 @@ pub async fn set_backup_pinned(
     backup_id: String,
     pinned: bool,
 ) -> std::result::Result<BackupManifest, AppError> {
-    backup::set_pinned(&state.data_dir, &backup_id, pinned).map_err(AppError::from)
+    let _guard = try_acquire(&state.data_dir, WritePurpose::Backup)?;
+    backup::set_pinned_unlocked(&state.data_dir, &backup_id, pinned).map_err(AppError::from)
 }
 
 /// 恢复前的预览：清单、覆盖范围、和当前库的记录数差异、兼容性判断。
@@ -94,5 +95,36 @@ pub async fn get_pending_restore(
 pub async fn cancel_pending_restore(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<(), AppError> {
-    backup::cancel_pending_restore(&state.data_dir).map_err(AppError::from)
+    let _guard = try_acquire(&state.data_dir, WritePurpose::Restore)?;
+    backup::cancel_pending_restore_unlocked(&state.data_dir).map_err(AppError::from)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use zeppbridge_core::storage::write_lock;
+
+    fn temp_dir(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("zeppbridge-cmd-backup-{name}"));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn pin_and_cancel_refuse_to_run_without_the_write_lock() {
+        let dir = temp_dir("lock");
+        let held = write_lock::try_acquire(&dir, WritePurpose::Sync).unwrap();
+        match try_acquire(&dir, WritePurpose::Backup) {
+            Err(write_lock::WriteLockError::Busy { .. }) => {}
+            other => panic!("pin must take the write lock: {other:?}"),
+        }
+        match try_acquire(&dir, WritePurpose::Restore) {
+            Err(write_lock::WriteLockError::Busy { .. }) => {}
+            other => panic!("cancel must take the write lock: {other:?}"),
+        }
+        drop(held);
+        assert!(try_acquire(&dir, WritePurpose::Backup).is_ok());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

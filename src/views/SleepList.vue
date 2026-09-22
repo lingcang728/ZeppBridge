@@ -1,15 +1,14 @@
 <script setup lang="ts">
 defineOptions({ name: 'SleepList' });
 import { computed, onMounted, ref, watch } from 'vue';
-import { RouterLink } from 'vue-router';
-import Icon from '../components/Icon.vue';
 import PageHeader from '../components/PageHeader.vue';
 import RecordRow from '../components/RecordRow.vue';
 import EmptyState from '../components/EmptyState.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
-import { formatDate, formatDuration, formatTime, isFiniteNumber } from '../lib/format';
+import { formatDate, formatDuration, isFiniteNumber } from '../lib/format';
+import { createLoadSeq } from '../lib/loadSeq';
 import type { SleepSession } from '../types';
 import { defineMessages, useMessages } from '../i18n';
 
@@ -46,6 +45,22 @@ const messages = defineMessages(
     loadMore: 'Load more',
     loadingMore: 'Loading…',
   },
+  {
+    backToRecent: 'Volver a registros recientes',
+    backToOverview: 'Volver al resumen',
+    title: 'Sueño',
+    intro: 'Registros de sueño sincronizados en este equipo. Sin una línea de tiempo completa, solo se muestra el resumen.',
+    loadFailedTitle: 'No se pudieron leer los registros de sueño',
+    loadFailed: 'La lista de sueño no está disponible en este momento',
+    retry: 'Reintentar',
+    emptyTitle: 'Aún no hay registros de sueño',
+    emptyMessage: 'Aparecen aquí después de sincronizar. Las fases nunca se inventan.',
+    scoreLabel: 'Puntuación',
+    footnote: (count: number, from: string) => `${count} registros · desde ${from}`,
+    shown: (shown: number, total: number) => `Mostrando ${shown} de ${total}`,
+    loadMore: 'Cargar más',
+    loadingMore: 'Cargando…',
+  },
 );
 const t = useMessages(messages);
 
@@ -66,12 +81,15 @@ const error = ref<string | null>(null);
 const PAGE_SIZE = 200;
 const total = ref(0);
 const loadingMore = ref(false);
+const listEpoch = createLoadSeq();
 const hasMore = computed(() => sessions.value.length < total.value);
 
 const loadList = async () => {
+  const epoch = listEpoch.next();
   loading.value = true;
   error.value = null;
   if (!isTauri()) {
+    if (!listEpoch.isCurrent(epoch)) return;
     loading.value = false;
     sessions.value = [];
     total.value = 0;
@@ -79,30 +97,36 @@ const loadList = async () => {
   }
   try {
     const page = await tauriApi.getSleepPage(PAGE_SIZE, 0);
+    if (!listEpoch.isCurrent(epoch)) return;
     sessions.value = page.items;
     total.value = page.total;
   } catch (cause) {
+    if (!listEpoch.isCurrent(epoch)) return;
     error.value = toUserMessage(cause, t.value.loadFailed);
   } finally {
-    loading.value = false;
+    if (listEpoch.isCurrent(epoch)) loading.value = false;
   }
 };
 
 const loadMore = async () => {
-  if (loadingMore.value || !hasMore.value) return;
+  if (loadingMore.value || loading.value || !hasMore.value) return;
+  const epoch = listEpoch.current();
   loadingMore.value = true;
   try {
     // offset 用已经拿到的条数。同步在翻页途中插进新记录会让边界上出现一条
     // 重复——按 sleep_id 去一次重，比在前端自己维护游标简单，也不会因为
     // 一次同步就把整个列表推翻重来。
-    const page = await tauriApi.getSleepPage(PAGE_SIZE, sessions.value.length);
+    const offset = sessions.value.length;
+    const page = await tauriApi.getSleepPage(PAGE_SIZE, offset);
+    if (!listEpoch.isCurrent(epoch)) return;
     const seen = new Set(sessions.value.map((item) => item.sleep_id));
     sessions.value = [...sessions.value, ...page.items.filter((item) => !seen.has(item.sleep_id))];
     total.value = page.total;
   } catch (cause) {
+    if (!listEpoch.isCurrent(epoch)) return;
     error.value = toUserMessage(cause, t.value.loadFailed);
   } finally {
-    loadingMore.value = false;
+    if (listEpoch.isCurrent(epoch)) loadingMore.value = false;
   }
 };
 
@@ -112,8 +136,7 @@ watch(dataRevision, () => void loadList());
 
 <template>
   <section class="page list-page" aria-labelledby="sleep-list-title">
-    <RouterLink class="back-link" to="/recent"><Icon name="arrow-left" :size="14" />{{ t.backToRecent }}</RouterLink>
-    <PageHeader back="/" :back-label="t.backToOverview" title-id="sleep-list-title" :title="t.title" :intro="t.intro" />
+    <PageHeader back="/recent" :back-label="t.backToRecent" title-id="sleep-list-title" :title="t.title" :intro="t.intro" />
 
     <div v-if="loading" class="surface-card" aria-live="polite">
       <SkeletonBlock height="56px" />
@@ -145,23 +168,13 @@ watch(dataRevision, () => void loadList());
     </div>
     <p v-if="sessions.length" class="footnote">
       {{ t.shown(sessions.length, total) }} ·
-      {{ t.footnote(sessions.length, formatTime(sessions[sessions.length - 1].start_time)) }}
+      {{ t.footnote(sessions.length, formatDate(sessions[sessions.length - 1].start_time)) }}
     </p>
   </section>
 </template>
 
 <style scoped>
 .list-page { width: 100%; }
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 8px;
-  color: var(--muted);
-  font-size: var(--fs-sm);
-  text-decoration: none;
-}
-.back-link:hover { color: var(--accent); }
 .footnote {
   margin: 12px 0 0;
   color: var(--muted);

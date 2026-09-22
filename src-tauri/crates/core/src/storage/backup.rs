@@ -15,6 +15,7 @@
 //! 恢复之所以推迟到启动时，是因为运行中的应用、同步线程和本机 API 都各自持有
 //! 连接。与其在一堆打开的句柄之间抢文件，不如在还没有任何连接的时刻做替换。
 
+use super::write_lock::{self, WritePurpose};
 use super::{Database, CURRENT_SCHEMA_VERSION, NORMALIZER_REVISION};
 use crate::models::{error::Result, ZeppBridgeError};
 use chrono::Utc;
@@ -28,13 +29,14 @@ const PENDING_RESTORE_FILE: &str = "restore-pending.json";
 /// 迁移前备份滚动保留几份。够回到几个版本以前，又不会把磁盘吃光。
 pub const MIGRATION_BACKUP_KEEP: usize = 5;
 /// manifest 里统计哪几张表。顺序固定，便于 diff。
-const COUNTED_TABLES: [&str; 6] = [
+const COUNTED_TABLES: [&str; 7] = [
     "raw_records",
     "metric_samples",
     "daily_metrics",
     "sleep_sessions",
     "workouts",
     "workout_samples",
+    "life_events",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -157,6 +159,9 @@ pub struct RestoreOutcome {
     pub rollback_backup_id: String,
     pub succeeded: bool,
     pub message: String,
+    /// `message` 的稳定码。启动路径目前展示原文兜底。
+    #[serde(default)]
+    pub message_code: Option<String>,
 }
 
 pub fn backup_dir(data_dir: &Path) -> PathBuf {
@@ -314,6 +319,7 @@ pub fn create_backup(
 }
 
 fn write_manifest(data_dir: &Path, manifest: &BackupManifest) -> Result<()> {
+    validate_backup_id(&manifest.id)?;
     let encoded = serde_json::to_vec_pretty(manifest)
         .map_err(|error| ZeppBridgeError::ParseError(format!("无法生成备份清单: {error}")))?;
     std::fs::write(manifest_path(data_dir, &manifest.id), encoded)?;
@@ -354,6 +360,11 @@ pub fn list_backups(data_dir: &Path) -> Result<Vec<BackupManifest>> {
         let Ok(manifest) = serde_json::from_str::<BackupManifest>(&text) else {
             continue;
         };
+        if validate_backup_id(&manifest.id).is_err()
+            || path.file_stem().and_then(|value| value.to_str()) != Some(manifest.id.as_str())
+        {
+            continue;
+        }
         out.push(manifest);
     }
     out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
@@ -363,17 +374,38 @@ pub fn list_backups(data_dir: &Path) -> Result<Vec<BackupManifest>> {
 pub fn load_manifest(data_dir: &Path, id: &str) -> Result<BackupManifest> {
     validate_backup_id(id)?;
     let text = std::fs::read_to_string(manifest_path(data_dir, id))?;
-    serde_json::from_str(&text)
-        .map_err(|error| ZeppBridgeError::ParseError(format!("备份清单无法解析: {error}")))
+    let manifest: BackupManifest = serde_json::from_str(&text)
+        .map_err(|error| ZeppBridgeError::ParseError(format!("备份清单无法解析: {error}")))?;
+    validate_backup_id(&manifest.id)?;
+    if manifest.id != id {
+        return Err(ZeppBridgeError::ConfigError("备份 ID 无效".into()));
+    }
+    Ok(manifest)
 }
 
 /// 用户标记 / 取消标记「不要自动清理」。
+///
+/// 改的是清单文件，必须拿写锁：否则一次清理正在按「未钉住」删快照的同时，
+/// 界面把同一份钉住，两边看到的是两份不同的名单。
 pub fn set_pinned(data_dir: &Path, id: &str, pinned: bool) -> Result<BackupManifest> {
+    let _guard = write_lock::try_acquire(data_dir, WritePurpose::Backup).map_err(map_write_lock)?;
+    set_pinned_unlocked(data_dir, id, pinned)
+}
+
+/// 调用方已经持有写锁时用（Tauri 命令层）。
+pub fn set_pinned_unlocked(data_dir: &Path, id: &str, pinned: bool) -> Result<BackupManifest> {
     validate_backup_id(id)?;
     let mut manifest = load_manifest(data_dir, id)?;
     manifest.pinned = pinned;
     write_manifest(data_dir, &manifest)?;
     Ok(manifest)
+}
+
+fn map_write_lock(error: write_lock::WriteLockError) -> ZeppBridgeError {
+    match error {
+        write_lock::WriteLockError::Busy { .. } => ZeppBridgeError::Busy(error.to_string()),
+        other => ZeppBridgeError::ConfigError(other.to_string()),
+    }
 }
 
 /// 重新校验一份快照：文件在不在、大小对不对、SHA-256 对不对、能不能通过
@@ -555,6 +587,13 @@ pub fn pending_restore(data_dir: &Path) -> Option<PendingRestore> {
 }
 
 pub fn cancel_pending_restore(data_dir: &Path) -> Result<()> {
+    let _guard =
+        write_lock::try_acquire(data_dir, WritePurpose::Restore).map_err(map_write_lock)?;
+    cancel_pending_restore_unlocked(data_dir)
+}
+
+/// 调用方已经持有写锁时用。成功恢复清排队文件也走这里（锁已放下）。
+pub fn cancel_pending_restore_unlocked(data_dir: &Path) -> Result<()> {
     let path = data_dir.join(PENDING_RESTORE_FILE);
     if path.exists() {
         std::fs::remove_file(path)?;
@@ -564,70 +603,148 @@ pub fn cancel_pending_restore(data_dir: &Path) -> Result<()> {
 
 /// 在任何连接打开之前执行排队的恢复。
 ///
-/// 步骤：再校验一次 → 拷到临时文件 → 校验临时文件 → 原子换名 → 清掉旧
-/// WAL/SHM。任何一步失败都把原库换回来，并把失败原因交给调用方显示。
+/// 步骤：拿恢复写锁 → 再校验一次 → 拷到临时文件 → 校验临时文件 → 原子换名
+/// → 清掉旧 WAL/SHM。失败**不**删除排队文件，下次启动再试。
 pub fn apply_pending_restore(data_dir: &Path) -> Option<RestoreOutcome> {
     let pending = pending_restore(data_dir)?;
-    let outcome = run_restore(data_dir, &pending);
-    let _ = cancel_pending_restore(data_dir);
+    let outcome = apply_pending_restore_locked(data_dir, &pending);
+    if outcome.succeeded {
+        // 写锁已经在 `apply_pending_restore_locked` 里放下了（`open_resilient`
+        // 自己还要拿迁移锁，同一把不可重入）。这里只清排队文件。
+        let _ = cancel_pending_restore_unlocked(data_dir);
+    }
     Some(outcome)
 }
 
-fn run_restore(data_dir: &Path, pending: &PendingRestore) -> RestoreOutcome {
-    let fail = |message: String| RestoreOutcome {
+fn apply_pending_restore_locked(data_dir: &Path, pending: &PendingRestore) -> RestoreOutcome {
+    let guard = match write_lock::try_acquire(data_dir, WritePurpose::Restore) {
+        Ok(guard) => guard,
+        Err(write_lock::WriteLockError::Busy { holder }) => {
+            let who = holder.unwrap_or_else(|| "另一个写入操作".to_string());
+            return restore_fail(
+                pending,
+                format!("恢复还没有执行，当前库没有改动：{who}正在进行。下次启动会再试。"),
+                "err.backup.restore_busy",
+            );
+        }
+        Err(write_lock::WriteLockError::Unavailable(error)) => {
+            return restore_fail(
+                pending,
+                format!(
+                    "恢复还没有执行，当前库没有改动：无法建立写入锁（{error}）。下次启动会再试。"
+                ),
+                "err.storage.write_lock_unavailable",
+            );
+        }
+    };
+    // 换文件必须在锁内。`open_resilient` 自己还要拿迁移锁，同一把文件锁
+    // 不可重入，所以打开/迁移确认放在释放之后。
+    let swapped = swap_in_restore(data_dir, pending);
+    drop(guard);
+    match swapped {
+        Err(outcome) => outcome,
+        Ok(displaced) => finish_restore(data_dir, pending, displaced),
+    }
+}
+
+fn restore_fail(pending: &PendingRestore, message: String, code: &str) -> RestoreOutcome {
+    RestoreOutcome {
         backup_id: pending.backup_id.clone(),
         rollback_backup_id: pending.rollback_backup_id.clone(),
         succeeded: false,
         message,
-    };
+        message_code: Some(code.to_string()),
+    }
+}
+
+fn restore_ok(pending: &PendingRestore, message: String) -> RestoreOutcome {
+    RestoreOutcome {
+        backup_id: pending.backup_id.clone(),
+        rollback_backup_id: pending.rollback_backup_id.clone(),
+        succeeded: true,
+        message,
+        message_code: None,
+    }
+}
+
+#[cfg(test)]
+fn run_restore(data_dir: &Path, pending: &PendingRestore) -> RestoreOutcome {
+    match swap_in_restore(data_dir, pending) {
+        Err(outcome) => outcome,
+        Ok(displaced) => finish_restore(data_dir, pending, displaced),
+    }
+}
+
+fn swap_in_restore(
+    data_dir: &Path,
+    pending: &PendingRestore,
+) -> std::result::Result<PathBuf, RestoreOutcome> {
+    let fail = |message: String, code: &str| Err(restore_fail(pending, message, code));
 
     match verify_backup(data_dir, &pending.backup_id) {
         Ok(verification) if verification.is_usable() => {}
         Ok(verification) => {
-            return fail(format!(
-                "恢复未执行，当前库没有改动：{}",
+            return fail(
+                format!(
+                    "恢复未执行，当前库没有改动：{}",
+                    verification
+                        .problem
+                        .unwrap_or_else(|| "备份未通过校验".into())
+                ),
                 verification
-                    .problem
-                    .unwrap_or_else(|| "备份未通过校验".into())
-            ))
+                    .problem_code
+                    .as_deref()
+                    .unwrap_or("err.backup.restore_failed"),
+            );
         }
         Err(error) => {
-            return fail(format!(
-                "恢复未执行，当前库没有改动：{}",
-                error.user_message()
-            ))
+            return fail(
+                format!("恢复未执行，当前库没有改动：{}", error.user_message()),
+                error.code(),
+            );
         }
     }
 
     let live = database_path(data_dir);
     let staging = data_dir.join("zepp.db.restore-staging");
     let displaced = data_dir.join("zepp.db.restore-previous");
-    // 上一次恢复留下的残骸连同它们的 WAL/SHM 一起清掉，否则这一轮挪过去的
-    // 主库会配上一轮的日志。
+    let stale = data_dir.join("zepp.db.restore-previous.stale");
+    // 临时拷贝可以丢。`displaced` 是上一轮挪开的原库，校验通过之前绝不能删：
+    // 中途崩溃后再启动如果先删它，原库就只剩这份半成品了。
     remove_sqlite_group(&staging);
-    remove_sqlite_group(&displaced);
+
+    if displaced.exists() && live.exists() && live_matches_backup_snapshot(data_dir, pending, &live)
+    {
+        // 上一轮已经换上备份、还没跑完 `open_resilient`。接着完成即可。
+        return Ok(displaced);
+    }
 
     if let Err(error) = std::fs::copy(snapshot_path(data_dir, &pending.backup_id), &staging) {
         let _ = std::fs::remove_file(&staging);
-        return fail(format!(
-            "恢复未执行，当前库没有改动：无法准备临时文件（{error}）"
-        ));
+        return fail(
+            format!("恢复未执行，当前库没有改动：无法准备临时文件（{error}）"),
+            "err.backup.restore_failed",
+        );
     }
     // 换上去之前先确认这个临时文件真的能打开、真的完整。
-    let staged_ok = Database::open_read_only_any_version(staging.clone())
-        .ok()
-        .and_then(|db| {
-            db.conn
-                .query_row("PRAGMA integrity_check(1)", [], |row| {
-                    row.get::<_, String>(0)
-                })
-                .ok()
-        })
-        .map(|value| value.eq_ignore_ascii_case("ok"))
-        .unwrap_or(false);
-    if !staged_ok {
+    let staged_check = Database::open_read_only_any_version(staging.clone()).and_then(|db| {
+        Database::reject_newer_schema(&db.conn)?;
+        let integrity: String = db
+            .conn
+            .query_row("PRAGMA integrity_check(1)", [], |row| row.get(0))?;
+        if !integrity.eq_ignore_ascii_case("ok") {
+            return Err(ZeppBridgeError::DataUnavailable(
+                "临时文件没有通过完整性检查".into(),
+            ));
+        }
+        Ok(())
+    });
+    if let Err(error) = staged_check {
         let _ = std::fs::remove_file(&staging);
-        return fail("恢复未执行，当前库没有改动：临时文件没有通过完整性检查".into());
+        return fail(
+            format!("恢复未执行，当前库没有改动：{}", error.user_message()),
+            error.code(),
+        );
     }
 
     // 原子换名。先把现库挪开而不是直接删，这样中途失败还能换回来。
@@ -641,40 +758,75 @@ fn run_restore(data_dir: &Path, pending: &PendingRestore) -> RestoreOutcome {
     // 这两步之间断电，就正好落进上面那个损坏场景。
     //
     // 挪去 `displaced` 旁边而不是直接删，回滚时才能拿回配套的 WAL。
-    if let Err(error) = displace_sqlite_group(&live, &displaced) {
-        let _ = restore_sqlite_group(&displaced, &live);
-        let _ = std::fs::remove_file(&staging);
-        return fail(format!(
-            "恢复未执行，当前库没有改动：无法移开当前库（{error}）"
-        ));
+    // 上一轮回滚留下的 `displaced` 占着这个名字时，挪到 `.stale` 而不是删：
+    // 删是在校验之前做的，中途失败会把原库弄丢。
+    if displaced.exists() && live.exists() {
+        if let Err(error) = park_sqlite_group(&displaced, &stale) {
+            let _ = std::fs::remove_file(&staging);
+            return fail(
+                format!("恢复未执行，当前库没有改动：无法移开上次留下的原库（{error}）"),
+                "err.backup.restore_failed",
+            );
+        }
+    }
+    if live.exists() {
+        if let Err(error) = displace_sqlite_group(&live, &displaced) {
+            let _ = restore_sqlite_group(&displaced, &live);
+            let _ = std::fs::remove_file(&staging);
+            return fail(
+                format!("恢复未执行，当前库没有改动：无法移开当前库（{error}）"),
+                "err.backup.restore_failed",
+            );
+        }
     }
     if let Err(error) = std::fs::rename(&staging, &live) {
         // 换不上去就把原库连同它的 WAL 一起放回原位。
         let _ = restore_sqlite_group(&displaced, &live);
         let _ = std::fs::remove_file(&staging);
-        return fail(format!("恢复失败，已换回原来的数据库：{error}"));
+        return fail(
+            format!("恢复失败，已换回原来的数据库：{error}"),
+            "err.backup.restore_failed",
+        );
     }
 
+    Ok(displaced)
+}
+
+fn rollback_swapped_library(live: &Path, displaced: &Path) {
+    remove_sqlite_group(live);
+    let _ = restore_sqlite_group(displaced, live);
+}
+
+fn finish_restore(data_dir: &Path, pending: &PendingRestore, displaced: PathBuf) -> RestoreOutcome {
+    let live = database_path(data_dir);
     // 换上来的库可能来自更旧的 schema：正常打开一次让迁移跑完。失败就整体回滚。
+    // 警告不能吞：隔离并重建空库会被当成「恢复成功」。
     match Database::open_resilient(live.clone()) {
-        Ok(_) => {
+        Ok((_, None)) => {
             remove_sqlite_group(&displaced);
-            RestoreOutcome {
-                backup_id: pending.backup_id.clone(),
-                rollback_backup_id: pending.rollback_backup_id.clone(),
-                succeeded: true,
-                message: "已从备份恢复。恢复前的数据库已存为回滚备份，可以再换回去。".into(),
-            }
+            remove_sqlite_group(&data_dir.join("zepp.db.restore-previous.stale"));
+            restore_ok(
+                pending,
+                "已从备份恢复。恢复前的数据库已存为回滚备份，可以再换回去。".into(),
+            )
+        }
+        Ok((_, Some(warning))) => {
+            rollback_swapped_library(&live, &displaced);
+            restore_fail(
+                pending,
+                format!("恢复失败，已换回原来的数据库：{warning}"),
+                "err.backup.restore_failed",
+            )
         }
         Err(error) => {
             // 换上来的库自己也可能留下 WAL/SHM（`open_resilient` 走到一半就
             // 会），回滚前必须一并清掉，否则原库换回来又要重放别人的日志。
-            remove_sqlite_group(&live);
-            let _ = restore_sqlite_group(&displaced, &live);
-            fail(format!(
-                "恢复失败，已换回原来的数据库：{}",
-                error.user_message()
-            ))
+            rollback_swapped_library(&live, &displaced);
+            restore_fail(
+                pending,
+                format!("恢复失败，已换回原来的数据库：{}", error.user_message()),
+                error.code(),
+            )
         }
     }
 }
@@ -686,6 +838,23 @@ fn sidecar(path: &Path, suffix: &str) -> PathBuf {
     let mut name = path.as_os_str().to_os_string();
     name.push(suffix);
     PathBuf::from(name)
+}
+
+fn live_matches_backup_snapshot(data_dir: &Path, pending: &PendingRestore, live: &Path) -> bool {
+    let Ok(manifest) = load_manifest(data_dir, &pending.backup_id) else {
+        return false;
+    };
+    file_sha256(live)
+        .ok()
+        .is_some_and(|hash| hash == manifest.sha256)
+}
+
+/// 把占着 `displaced` 名字的上一轮残骸挪到旁边，不删除。
+fn park_sqlite_group(from: &Path, stale: &Path) -> std::io::Result<()> {
+    if stale.exists() {
+        remove_sqlite_group(stale);
+    }
+    displace_sqlite_group(from, stale)
 }
 
 /// 把 `live` 及其 `-wal` / `-shm` 整组挪到 `displaced` 及其同名 sidecar。
@@ -733,6 +902,7 @@ fn remove_sqlite_group(path: &Path) {
 mod tests {
     use super::*;
     use crate::models::{MetricSample, SourceScope};
+    use crate::storage::write_lock::{self, WritePurpose};
     use chrono::TimeZone;
 
     fn temp_dir(name: &str) -> PathBuf {
@@ -757,6 +927,51 @@ mod tests {
             .unwrap();
         }
         db
+    }
+
+    #[test]
+    fn regression_markdown_manifest_ids_cannot_redirect_pruning_or_pinning() {
+        let dir = temp_dir("manifest-id-boundary");
+        drop(seed(&dir, 1));
+        let mut manifest = create_backup(&dir, BackupKind::PreMigration, "1.0.0").unwrap();
+        let original_id = manifest.id.clone();
+        let original_path = manifest_path(&dir, &original_id);
+        std::fs::write(dir.join("outside.db"), b"keep database").unwrap();
+        std::fs::write(dir.join("outside.json"), b"keep manifest").unwrap();
+        for index in 0..MIGRATION_BACKUP_KEEP {
+            manifest.id = format!("valid-{index}");
+            manifest.created_at = format!("9999-{index}");
+            write_manifest(&dir, &manifest).unwrap();
+        }
+        for invalid in [
+            "../outside",
+            "..\\outside",
+            "/outside",
+            "C:\\outside",
+            "",
+            "valid-0",
+        ] {
+            manifest.id = invalid.into();
+            manifest.created_at = "0000".into();
+            std::fs::write(&original_path, serde_json::to_vec(&manifest).unwrap()).unwrap();
+            assert_eq!(list_backups(&dir).unwrap().len(), MIGRATION_BACKUP_KEEP);
+            assert!(load_manifest(&dir, &original_id).is_err());
+            assert!(set_pinned(&dir, &original_id, true).is_err());
+            assert!(prune_migration_backups(&dir).unwrap().is_empty());
+            assert_eq!(
+                std::fs::read(dir.join("outside.db")).unwrap(),
+                b"keep database"
+            );
+            assert_eq!(
+                std::fs::read(dir.join("outside.json")).unwrap(),
+                b"keep manifest"
+            );
+            assert!(!load_manifest(&dir, "valid-0").unwrap().pinned);
+        }
+        manifest.id = original_id;
+        write_manifest(&dir, &manifest).unwrap();
+        assert_eq!(prune_migration_backups(&dir).unwrap(), vec![manifest.id]);
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
@@ -869,6 +1084,30 @@ mod tests {
         assert!(!preview.can_restore);
         assert!(stage_restore(&dir, &manifest.id, "1.0.0").is_err());
         assert!(pending_restore(&dir).is_none(), "被拒绝的恢复不该留下待办");
+    }
+
+    #[test]
+    fn restore_rechecks_actual_schema_even_when_manifest_claims_compatibility() {
+        let dir = temp_dir("future-pending");
+        drop(seed(&dir, 2));
+        let mut manifest = create_backup(&dir, BackupKind::Manual, "1.0.0").unwrap();
+        let pending = stage_restore(&dir, &manifest.id, "1.0.0").unwrap();
+        let snapshot = snapshot_path(&dir, &manifest.id);
+        let conn = rusqlite::Connection::open(&snapshot).unwrap();
+        conn.execute_batch(&format!(
+            "PRAGMA user_version = {};",
+            CURRENT_SCHEMA_VERSION + 1
+        ))
+        .unwrap();
+        drop(conn);
+        manifest.bytes = std::fs::metadata(&snapshot).unwrap().len();
+        manifest.sha256 = file_sha256(&snapshot).unwrap();
+        write_manifest(&dir, &manifest).unwrap();
+        let before = std::fs::read(database_path(&dir)).unwrap();
+        let outcome = run_restore(&dir, &pending);
+        assert!(!outcome.succeeded);
+        assert!(outcome.message.contains("恢复未执行"));
+        assert_eq!(std::fs::read(database_path(&dir)).unwrap(), before);
     }
 
     #[test]
@@ -987,6 +1226,27 @@ mod tests {
     }
 
     #[test]
+    fn a_busy_write_lock_leaves_pending_restore_in_place() {
+        let dir = temp_dir("restore-busy");
+        drop(seed(&dir, 3));
+        let backup = create_backup(&dir, BackupKind::Manual, "1.0.0").unwrap();
+        stage_restore(&dir, &backup.id, "1.0.0").unwrap();
+        let _held = write_lock::try_acquire(&dir, WritePurpose::Sync).unwrap();
+
+        let outcome = apply_pending_restore(&dir).expect("有排队的恢复");
+        assert!(!outcome.succeeded, "{outcome:?}");
+        assert_eq!(
+            outcome.message_code.as_deref(),
+            Some("err.backup.restore_busy")
+        );
+        assert!(
+            pending_restore(&dir).is_some(),
+            "拿不到写锁时排队文件必须留着"
+        );
+        assert!(outcome.message.contains("下次启动会再试"), "{outcome:?}");
+    }
+
+    #[test]
     fn a_missing_snapshot_leaves_the_current_library_untouched() {
         let dir = temp_dir("missing");
         drop(seed(&dir, 6));
@@ -999,6 +1259,10 @@ mod tests {
         let outcome = apply_pending_restore(&dir).expect("有排队的恢复");
         assert!(!outcome.succeeded);
         assert!(outcome.message.contains("当前库没有改动"), "{outcome:?}");
+        assert!(
+            pending_restore(&dir).is_some(),
+            "失败的恢复必须留下排队文件，下次启动再试"
+        );
 
         let db = Database::open_read_only_any_version(database_path(&dir)).unwrap();
         let count: i64 = db
@@ -1006,6 +1270,114 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM metric_samples", [], |row| row.get(0))
             .unwrap();
         assert_eq!(count, 6, "失败的恢复不许动原库");
+    }
+
+    #[test]
+    fn pinning_is_refused_while_another_writer_holds_the_lock() {
+        let dir = temp_dir("pin-busy");
+        drop(seed(&dir, 1));
+        let backup = create_backup(&dir, BackupKind::Manual, "1.0.0").unwrap();
+        let _held = write_lock::try_acquire(&dir, WritePurpose::Sync).unwrap();
+        let error = set_pinned(&dir, &backup.id, true).unwrap_err();
+        assert!(error.is_busy(), "{error:?}");
+        assert!(!load_manifest(&dir, &backup.id).unwrap().pinned);
+        drop(_held);
+        assert!(set_pinned(&dir, &backup.id, true).unwrap().pinned);
+    }
+
+    #[test]
+    fn cancelling_a_restore_is_refused_while_another_writer_holds_the_lock() {
+        let dir = temp_dir("cancel-busy");
+        drop(seed(&dir, 1));
+        let backup = create_backup(&dir, BackupKind::Manual, "1.0.0").unwrap();
+        stage_restore(&dir, &backup.id, "1.0.0").unwrap();
+        let _held = write_lock::try_acquire(&dir, WritePurpose::Sync).unwrap();
+        let error = cancel_pending_restore(&dir).unwrap_err();
+        assert!(error.is_busy(), "{error:?}");
+        assert!(
+            pending_restore(&dir).is_some(),
+            "拿不到写锁时排队文件必须留着"
+        );
+        drop(_held);
+    }
+
+    #[test]
+    fn a_failed_staging_copy_does_not_delete_the_displaced_library() {
+        let dir = temp_dir("displaced-kept");
+        drop(seed(&dir, 6));
+        let backup = create_backup(&dir, BackupKind::Manual, "1.0.0").unwrap();
+        {
+            let db = Database::new(database_path(&dir)).unwrap();
+            db.insert_metric_sample(&MetricSample {
+                metric: "heart_rate".into(),
+                timestamp: Utc.with_ymd_and_hms(2026, 8, 2, 0, 0, 0).unwrap(),
+                value: 70.0,
+                unit: "bpm".into(),
+                source_scope: SourceScope::Device,
+                device_id: Some("device-a".into()),
+            })
+            .unwrap();
+        }
+        stage_restore(&dir, &backup.id, "1.0.0").unwrap();
+
+        let displaced = dir.join("zepp.db.restore-previous");
+        std::fs::write(&displaced, b"ORIGINAL-LIBRARY-BYTES").unwrap();
+        // 让拷到 staging 失败：目标已经是目录。旧实现会在拷贝之前删掉
+        // displaced，原库就只剩这个半成品了。
+        let staging = dir.join("zepp.db.restore-staging");
+        std::fs::create_dir_all(&staging).unwrap();
+        std::fs::write(staging.join("blocker"), b"x").unwrap();
+
+        let outcome = apply_pending_restore(&dir).expect("有排队的恢复");
+        assert!(!outcome.succeeded, "{outcome:?}");
+        assert_eq!(
+            std::fs::read(&displaced).unwrap(),
+            b"ORIGINAL-LIBRARY-BYTES",
+            "校验 / 拷贝失败时不得删掉 displaced 里的原库"
+        );
+        assert!(pending_restore(&dir).is_some());
+        let db = Database::open_read_only_any_version(database_path(&dir)).unwrap();
+        let count: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM metric_samples", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 7, "失败的恢复不许动原库");
+        drop(db);
+    }
+
+    #[test]
+    fn a_completed_swap_is_finished_without_recopying() {
+        let dir = temp_dir("already-swapped");
+        drop(seed(&dir, 6));
+        let backup = create_backup(&dir, BackupKind::Manual, "1.0.0").unwrap();
+        {
+            let db = Database::new(database_path(&dir)).unwrap();
+            db.insert_metric_sample(&MetricSample {
+                metric: "heart_rate".into(),
+                timestamp: Utc.with_ymd_and_hms(2026, 8, 2, 0, 0, 0).unwrap(),
+                value: 70.0,
+                unit: "bpm".into(),
+                source_scope: SourceScope::Device,
+                device_id: Some("device-a".into()),
+            })
+            .unwrap();
+        }
+        stage_restore(&dir, &backup.id, "1.0.0").unwrap();
+
+        let live = database_path(&dir);
+        let displaced = dir.join("zepp.db.restore-previous");
+        std::fs::copy(&live, &displaced).unwrap();
+        std::fs::copy(snapshot_path(&dir, &backup.id), &live).unwrap();
+
+        let outcome = apply_pending_restore(&dir).expect("有排队的恢复");
+        assert!(outcome.succeeded, "{outcome:?}");
+        let db = Database::open_read_only_any_version(database_path(&dir)).unwrap();
+        let count: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM metric_samples", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 6, "应当接着完成已经换上去的备份，而不是再拷一次");
+        drop(db);
     }
 
     #[test]

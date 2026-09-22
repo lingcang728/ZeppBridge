@@ -94,11 +94,28 @@ const REGION_HOST_ALLOWLIST: &[&str] = &[
 ];
 
 /// Credentials parsed from the login webview.  Never logged in full.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub(crate) struct ExtractedLogin {
     pub user_id: String,
     pub app_token: String,
     pub region_hint: Option<String>,
+}
+
+impl std::fmt::Debug for ExtractedLogin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ExtractedLogin")
+            .field("user_id", &self.user_id)
+            .field(
+                "app_token",
+                &if self.app_token.is_empty() {
+                    "<empty>"
+                } else {
+                    "<redacted>"
+                },
+            )
+            .field("region_hint", &self.region_hint)
+            .finish()
+    }
 }
 
 #[tauri::command]
@@ -113,12 +130,18 @@ pub async fn start_web_login(
     // 必须等上一个窗口真的消失，不能只是发出关闭请求，见
     // `close_login_window_and_wait`。
     if !close_login_window_and_wait(&app).await {
+        if state.login.epoch.load(Ordering::SeqCst) != epoch {
+            return Err(AppError::new("err.login.cancelled", "登录已取消"));
+        }
         let error = AppError::new(
             "err.login.window_busy",
             "上一个登录窗口还没有关完，请稍等一下再试",
         );
         publish_failed(&app, &state, &error, &page_url).await;
         return Err(error);
+    }
+    if state.login.epoch.load(Ordering::SeqCst) != epoch {
+        return Err(AppError::new("err.login.cancelled", "登录已取消"));
     }
 
     let status = LoginStatus::new(
@@ -171,6 +194,11 @@ fn build_login_window(
         .parse()
         .map_err(|_| AppError::new("err.login.bad_url", "登录地址无效"))?;
     let app_for_new_window = app.clone();
+    // The zepp-login capability is only window-close + event-listen, and it
+    // has no `remote` URLs. A page loaded from watchface.zepp.com therefore
+    // cannot invoke app commands: Tauri 2 requires an explicit remote
+    // capability for that, and we do not add one. Do not "fix" this isolation
+    // by granting remote IPC.
     WebviewWindowBuilder::new(app, LOGIN_WINDOW_LABEL, WebviewUrl::External(url))
         .title(login_window_title(locale))
         // A login attempt must not inherit a previous account's cookies or
@@ -255,7 +283,7 @@ fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow) {
                     ("err.login.timeout", "登录超时，请重试")
                 };
                 finish_failed(&app, epoch, code, message, current_page_url(&window)).await;
-                close_login_window(&app);
+                close_login_window_for_epoch(&app, epoch);
                 return;
             }
             if app.get_webview_window(LOGIN_WINDOW_LABEL).is_none() {
@@ -363,7 +391,12 @@ fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow) {
                             &page_url,
                         )
                         .await;
-                        close_login_window(&app);
+                        close_login_window_for_epoch(&app, epoch);
+                        // 设备列表在「已连接」之后再拉：区域确认已经够慢，
+                        // 不要让用户盯着 verifying 再等一轮设备请求。
+                        if let Some(state) = app.try_state::<AppState>() {
+                            super::data::refresh_device_profile(&state).await;
+                        }
                         return;
                     }
                     // 网络这会儿不通，凭据本身没问题。关掉登录窗口等于把
@@ -391,7 +424,7 @@ fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow) {
                             page_url,
                         )
                         .await;
-                        close_login_window(&app);
+                        close_login_window_for_epoch(&app, epoch);
                         return;
                     }
                 }
@@ -426,6 +459,10 @@ impl LoginFailure {
             retryable: true,
         }
     }
+
+    fn cancelled() -> Self {
+        Self::fatal(AppError::new("err.login.cancelled", "登录已取消"))
+    }
 }
 
 async fn persist_extracted_login(
@@ -450,10 +487,12 @@ async fn persist_extracted_login(
     .await?;
     let RegionWinner { auth, confidence } = winner;
     if !epoch_active(app, epoch) {
-        return Err(LoginFailure::fatal(AppError::new(
-            "err.login.cancelled",
-            "登录已取消",
-        )));
+        return Err(LoginFailure::cancelled());
+    }
+
+    let _command_guard = state.lock_sync_commands().await;
+    if !epoch_active(app, epoch) {
+        return Err(LoginFailure::cancelled());
     }
 
     if let Err(error) = state.auth.save_auth(&auth) {
@@ -462,15 +501,27 @@ async fn persist_extracted_login(
         return Err(LoginFailure::fatal(AppError::from(error)));
     }
 
+    // Disk is the source of truth from here. If the epoch dies after save,
+    // still install the in-memory manager so it matches, then return cancelled
+    // so the poller does not emit `connected`.
+    apply_persisted_login(&state, auth, confidence).await?;
+    if !epoch_active(app, epoch) {
+        return Err(LoginFailure::cancelled());
+    }
+    Ok(())
+}
+
+async fn apply_persisted_login(
+    state: &AppState,
+    auth: AuthInfo,
+    confidence: &'static str,
+) -> std::result::Result<(), LoginFailure> {
     let manager = match AppState::build_sync_manager(auth, &state.data_dir) {
         Ok(manager) => manager,
         Err(error) => {
             let message = error.to_string();
             let _ = state.auth.clear_auth();
-            {
-                let mut sync = state.sync.write().await;
-                *sync = None;
-            }
+            state.replace_sync_manager(None).await;
             {
                 let mut auth_state = state.auth_state.write().await;
                 *auth_state = "unconfigured".to_string();
@@ -486,10 +537,7 @@ async fn persist_extracted_login(
         }
     };
 
-    {
-        let mut sync = state.sync.write().await;
-        *sync = Some(manager);
-    }
+    state.replace_sync_manager(Some(manager)).await;
     {
         let mut auth_state = state.auth_state.write().await;
         *auth_state = "verified".to_string();
@@ -506,7 +554,6 @@ async fn persist_extracted_login(
         let mut region = state.region_confidence.write().await;
         *region = confidence.to_string();
     }
-    super::data::refresh_device_profile(&state).await;
     Ok(())
 }
 
@@ -1224,8 +1271,10 @@ fn log_blocked_login_url(kind: &str, url: &reqwest::Url) {
 
 /// 这一页看起来已经登录了吗。
 ///
-/// 判断只看两件公开的事：页面是不是已经离开登录页，以及 cookie 里有没有出现
-/// 任何一个「登录之后才会有」的名字。看不到凭据本身也没关系——我们要区分的是
+/// 判断只看两件公开的事：页面是不是已经离开登录页，以及 **Zepp/Huami** cookie
+/// 里有没有出现任何一个「登录之后才会有」的名字。第三方 OAuth（Google /
+/// Facebook / 微信 / 小米）上的 `session` / `token` 不算——那只说明授权页自己
+/// 有会话，不是 Zepp 已经签入。看不到凭据本身也没关系：我们要区分的是
 /// 「用户还没登录」和「用户登录了但我们没读到」，前者该继续等，后者该停下来
 /// 把兜底路径给他。
 fn page_looks_signed_in(page_url: &str, cookies: &[(String, String)]) -> bool {
@@ -1236,13 +1285,15 @@ fn page_looks_signed_in(page_url: &str, cookies: &[(String, String)]) -> bool {
         "user_id",
         "apptoken",
         "app_token",
-        "token",
-        "session",
     ];
-    if cookies.iter().any(|(name, _)| {
-        let lowered = name.to_ascii_lowercase();
-        SIGNED_IN_HINTS.iter().any(|hint| lowered.contains(hint))
-    }) {
+    if page_host_is_zepp_or_huami(page_url)
+        && cookies.iter().any(|(name, _)| {
+            let lowered = name.to_ascii_lowercase();
+            SIGNED_IN_HINTS
+                .iter()
+                .any(|hint| lowered == *hint || lowered.contains(hint))
+        })
+    {
         return true;
     }
     // 表盘站登录成功后会离开 /login 这一层。
@@ -1251,23 +1302,40 @@ fn page_looks_signed_in(page_url: &str, cookies: &[(String, String)]) -> bool {
         && !page_url.contains("account.xiaomi.com")
 }
 
-/// 记下这一轮看到了哪些 cookie **名字**。
+fn page_host_is_zepp_or_huami(page_url: &str) -> bool {
+    let Ok(parsed) = reqwest::Url::parse(page_url) else {
+        return false;
+    };
+    if parsed.scheme() != "https" {
+        return false;
+    }
+    parsed.host_str().is_some_and(|host| {
+        let host = host.to_ascii_lowercase();
+        host == "zepp.com"
+            || host.ends_with(".zepp.com")
+            || host == "huami.com"
+            || host.ends_with(".huami.com")
+    })
+}
+
+/// 调试时记下「这一页看起来已登录」以及看到了多少个 cookie 名字。
 ///
-/// 只有名字和 host。值就是凭据本身，任何情况下都不写出去；query 里可能带
-/// OAuth 的 state/code，同样不写。这份日志的唯一用途是回答「到底有没有那个
-/// cookie」——旧版在这里什么都不说，用户和我们都只能猜。
+/// 发布构建不写。即使开着 debug，也只写 host 和数量，不写名字——名字本身
+/// 有时就是账号相关的标识。值、query、fragment 任何情况下都不写。
+#[cfg(debug_assertions)]
 fn log_credential_probe(page_url: &str, cookies: &[(String, String)]) {
     let host = reqwest::Url::parse(page_url)
         .ok()
         .and_then(|url| url.host_str().map(str::to_string))
         .unwrap_or_else(|| "unknown".to_string());
-    let mut names: Vec<&str> = cookies.iter().map(|(name, _)| name.as_str()).collect();
-    names.sort_unstable();
     eprintln!(
-        "Zepp login: page looks signed in (host={host}); cookie names seen: [{}]",
-        names.join(", ")
+        "Zepp login: page looks signed in (host={host}); {} cookie name(s) seen",
+        cookies.len()
     );
 }
+
+#[cfg(not(debug_assertions))]
+fn log_credential_probe(_page_url: &str, _cookies: &[(String, String)]) {}
 
 /// 备用页的时间前提。
 ///
@@ -1336,6 +1404,19 @@ fn current_page_url(window: &WebviewWindow) -> String {
 fn close_login_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(LOGIN_WINDOW_LABEL) {
         let _ = window.close();
+    }
+}
+
+fn closer_epoch_owns_the_window(closer: u64, active: u64) -> bool {
+    closer == active
+}
+
+fn close_login_window_for_epoch(app: &AppHandle, epoch: u64) {
+    let Some(state) = app.try_state::<AppState>() else {
+        return;
+    };
+    if closer_epoch_owns_the_window(epoch, state.login.epoch.load(Ordering::SeqCst)) {
+        close_login_window(app);
     }
 }
 
@@ -1474,6 +1555,30 @@ async fn finish_idle_if_active(app: &AppHandle, epoch: u64) {
 mod tests {
     use super::*;
 
+    #[test]
+    fn extracted_login_debug_never_prints_the_token() {
+        for token in ["secret-app-token", "unicode-令牌\nwith-escapes"] {
+            let extracted = ExtractedLogin {
+                user_id: "user".into(),
+                app_token: token.into(),
+                region_hint: Some("cn".into()),
+            };
+            for debug in [format!("{extracted:?}"), format!("{extracted:#?}")] {
+                assert!(!debug.contains(token));
+                assert!(!debug.contains("unicode-"));
+                assert!(debug.contains("<redacted>"));
+            }
+            assert_eq!(extracted.clone(), extracted);
+            assert_eq!(extracted.app_token, token);
+        }
+        let empty = ExtractedLogin {
+            user_id: "user".into(),
+            app_token: String::new(),
+            region_hint: None,
+        };
+        assert!(format!("{empty:?}").contains("<empty>"));
+    }
+
     fn probe_auth(host: &str) -> AuthInfo {
         AuthInfo {
             app_token: "token".to_string(),
@@ -1608,6 +1713,13 @@ mod tests {
         assert!(!is_third_party_auth_page("not a url"));
     }
 
+    #[test]
+    fn a_stale_login_epoch_must_not_close_a_newer_window() {
+        assert!(!closer_epoch_owns_the_window(1, 2));
+        assert!(closer_epoch_owns_the_window(7, 7));
+        assert!(!closer_epoch_owns_the_window(8, 7));
+    }
+
     /// 旧窗口还占着标签时，绝不能去建新窗口。
     ///
     /// `close()` 之后标签不会当场交还（原因见 `close_login_window_and_wait`），
@@ -1736,6 +1848,23 @@ mod tests {
         assert!(page_looks_signed_in(
             "https://user.huami.com/privacy2/index.html",
             &[("apptoken".to_string(), "whatever".to_string())]
+        ));
+
+        // 第三方 OAuth 页上的通用 cookie 名不能当成 Zepp 已登录。
+        assert!(!page_looks_signed_in(
+            "https://accounts.google.com/o/oauth2/auth",
+            &[
+                ("session".to_string(), "google-session".to_string()),
+                ("token".to_string(), "google-token".to_string()),
+                ("SID".to_string(), "x".to_string()),
+            ]
+        ));
+        assert!(!page_looks_signed_in(
+            "https://www.facebook.com/dialog/oauth",
+            &[
+                ("xs".to_string(), "fb".to_string()),
+                ("c_user".to_string(), "1".to_string())
+            ]
         ));
     }
 
@@ -2020,11 +2149,17 @@ mod tests {
         let login: serde_json::Value =
             serde_json::from_str(include_str!("../../capabilities/zepp-login.json")).unwrap();
         assert_eq!(login["windows"], serde_json::json!(["zepp-login"]));
+        assert_eq!(
+            login["permissions"],
+            serde_json::json!(["core:window:allow-close", "core:event:allow-listen"])
+        );
+        assert!(login.get("remote").is_none());
         assert!(login["permissions"]
             .as_array()
             .unwrap()
             .iter()
-            .all(|permission| permission.as_str() != Some("opener:default")
+            .all(|permission| permission.as_str() != Some("core:default")
+                && permission.as_str() != Some("opener:default")
                 && permission["identifier"] != "opener:allow-open-url"));
     }
 }

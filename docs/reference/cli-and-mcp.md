@@ -23,7 +23,7 @@ database. The data directory is resolved by `paths.rs`:
 | Platform | Data directory |
 |---|---|
 | Windows | `data\` next to `ZeppBridge.exe` |
-| macOS | `data/` next to the executable when it is writable; inside `ZeppBridge.app` it is not, so it falls back to `~/Library/Application Support/com.zeppbridge.ZeppBridge/data` |
+| macOS | `~/Library/Application Support/com.zeppbridge.ZeppBridge/data` inside `ZeppBridge.app` (bundles are replaced whole on update, so data never lives in them — a surviving legacy bundle library is migrated there on first launch); `data/` next to an executable that is not in a bundle |
 | Linux | `~/.local/share/zeppbridge/data` for a packaged install (deb, rpm, Flatpak — those live in a prefix the app does not own); `data/` next to the executable for an AppImage or an unpacked tarball |
 | Any | `$ZEPPBRIDGE_DATA_DIR`, when set to an absolute path, overrides all of the above |
 
@@ -130,13 +130,18 @@ meaning of an existing one never changes.
 | Code | Meaning | What to do |
 |---|---|---|
 | 0 | Success | — |
-| 1 | Other failure | Read the error message |
+| 1 | Other failure, including unavailable local data | Read the error message; a missing local workout uses JSON `errorKind: "data_unavailable"`, not a cloud error |
 | 2 | Usage error | Fix the command |
 | 3 | No Zepp account connected, or the token is not on this machine | Sign in with the desktop app, or set `ZEPPBRIDGE_CREDENTIAL_STORE` |
 | 4 | Another process is writing to the database | **Retry later; this is not a failure** |
 | 5 | Cloud request failed | Back off and retry |
 | 6 | Local database error | Requires human intervention |
 | 7 | Database version does not match this build | Run `zeppbridge-cli reprocess` (or launch the desktop app once) to upgrade, or update the CLI to the same version |
+| 8 | Sync incomplete: one or more streams failed | Inspect the stream results and retry; successfully written records are retained |
+
+An incomplete sync still emits the full report with `--json`, with `ok: false`
+and `success: false`. Unavailable or unverified optional streams alone do not
+cause this exit code.
 
 4 is separate from 1 because "the desktop app happens to be syncing" and
 "something actually broke" call for completely different responses. If they
@@ -182,6 +187,10 @@ On macOS, cron needs Full Disk Access to read the data directory.
 ## zeppbridge-mcp
 
 Uses stdio transport. It **listens on no port and makes no network requests**.
+Each request line is limited to 1 MiB. Malformed UTF-8/JSON and oversized lines
+receive an error; subsequent lines can still be processed. Tool execution
+failures are returned in `result` with `isError: true` and explanatory text.
+Unknown tools and malformed call envelopes remain JSON-RPC errors.
 Read-only is enforced by the connection layer (`PRAGMA query_only`), not by the
 tool list happening to contain no write operations.
 

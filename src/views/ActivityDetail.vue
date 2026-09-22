@@ -16,6 +16,7 @@ import Icon from '../components/Icon.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { zeppSemanticColors } from '../lib/echartsTheme';
+import { createLoadSeq } from '../lib/loadSeq';
 import { indexSeries, SERIES_RANGE_DAYS, seriesRanges, type SeriesRangeDays } from '../lib/metricSeries';
 import type { MetricSeries } from '../types';
 import { defineMessages, useMessages } from '../i18n';
@@ -71,6 +72,31 @@ const messages = defineMessages(
     minutesHint: 'Minutes the watch counted as active',
     minutesUnit: 'min',
   },
+  {
+    backToOverview: 'Volver al resumen',
+    eyebrow: 'Actividad diaria',
+    title: 'Actividad diaria',
+    intro: 'Pasos, distancia, calorías activas y minutos activos día a día. Comparado solo con tus propios registros anteriores; los días sin datos quedan vacíos en vez de rellenarse con cero.',
+    rangeAria: 'Rango de tiempo',
+    desktopOnly: 'Usa la app de escritorio. Esta vista previa en el navegador no lee datos de la cuenta.',
+    loadFailed: 'Los datos de actividad no están disponibles en este momento',
+    retry: 'Reintentar',
+    loadingAria: 'Cargando la actividad diaria',
+    noneInRange: 'No hay registros de actividad en este rango. Prueba un rango más largo, o sincroniza primero.',
+    emptyCard: 'No hay nada registrado en este rango.',
+    stepsLabel: 'Pasos',
+    stepsHint: 'Total diario de pasos del reloj',
+    stepsUnit: 'pasos',
+    distanceLabel: 'Distancia',
+    distanceHint: 'Distancia recorrida ese día',
+    distanceUnit: 'm',
+    caloriesLabel: 'Calorías activas',
+    caloriesHint: 'Solo actividad, sin el metabolismo basal',
+    caloriesUnit: 'kcal',
+    minutesLabel: 'Minutos activos',
+    minutesHint: 'Minutos que el reloj contó como activos',
+    minutesUnit: 'min',
+  },
 );
 const t = useMessages(messages);
 
@@ -123,28 +149,34 @@ const rangeDays = ref<SeriesRangeDays>(SERIES_RANGE_DAYS[0]);
 const series = ref<Record<string, MetricSeries>>({});
 const loading = ref(true);
 const error = ref<string | null>(null);
+const loadSeq = createLoadSeq();
 
 const cards = computed(() => CARDS.value.map((card) => ({ ...card, series: series.value[card.metric] ?? null })));
 const anyData = computed(() => cards.value.some((card) => (card.series?.points.length ?? 0) > 0));
 
 const load = async () => {
+  const seq = loadSeq.next();
   loading.value = true;
   error.value = null;
   if (!isDesktop()) {
+    if (!loadSeq.isCurrent(seq)) return;
     series.value = {};
     loading.value = false;
     error.value = t.value.desktopOnly;
     return;
   }
   try {
-    series.value = indexSeries(
+    const next = indexSeries(
       await backend.getMetricSeries([...METRICS], rangeDays.value),
     );
+    if (!loadSeq.isCurrent(seq)) return;
+    series.value = next;
   } catch (cause) {
+    if (!loadSeq.isCurrent(seq)) return;
     series.value = {};
     error.value = toUserMessage(cause, t.value.loadFailed);
   } finally {
-    loading.value = false;
+    if (loadSeq.isCurrent(seq)) loading.value = false;
   }
 };
 

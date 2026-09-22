@@ -26,6 +26,10 @@ pub enum ChunkStatus {
     Persisted,
     /// 请求过，云端明确没有这段时间的数据。**这不是失败**，也不该重试。
     EmptyFromCloud,
+    /// 窗口里有一部分写入了，但整块还不完整（子切片 404、解析失败等）。
+    ///
+    /// 已经进库的数据留着；`needs_work()` 为真，不能算「完整本地副本」。
+    Partial,
     /// 请求或写入失败，可以重试。
     Failed,
 }
@@ -36,6 +40,7 @@ impl ChunkStatus {
             ChunkStatus::Pending => "pending",
             ChunkStatus::Persisted => "persisted",
             ChunkStatus::EmptyFromCloud => "empty_from_cloud",
+            ChunkStatus::Partial => "partial",
             ChunkStatus::Failed => "failed",
         }
     }
@@ -44,14 +49,19 @@ impl ChunkStatus {
         match value {
             "persisted" => ChunkStatus::Persisted,
             "empty_from_cloud" => ChunkStatus::EmptyFromCloud,
+            "partial" => ChunkStatus::Partial,
             "failed" => ChunkStatus::Failed,
             _ => ChunkStatus::Pending,
         }
     }
 
     /// 还需要做吗。已写入和云端确认为空的块都不再重复请求。
+    /// 部分写入不是完整结论，必须再拉。
     pub fn needs_work(self) -> bool {
-        matches!(self, ChunkStatus::Pending | ChunkStatus::Failed)
+        matches!(
+            self,
+            ChunkStatus::Pending | ChunkStatus::Failed | ChunkStatus::Partial
+        )
     }
 }
 
@@ -209,7 +219,7 @@ impl Database {
                     persisted_at, records, error, attempts
              FROM coverage_ledger
              WHERE status = 'pending'
-                OR (status = 'failed' AND attempts < ?2)
+                OR (status IN ('failed', 'partial') AND attempts < ?2)
              ORDER BY chunk_start DESC, stream ASC
              LIMIT ?1",
         )?;
@@ -229,7 +239,7 @@ impl Database {
         let mut stmt = self.conn.prepare(
             "SELECT stream, chunk_start, error, attempts, error_code
              FROM coverage_ledger
-             WHERE status = 'failed'
+             WHERE status IN ('failed', 'partial')
              ORDER BY chunk_start DESC, stream ASC",
         )?;
         let rows = stmt.query_map([], |row| {
@@ -248,13 +258,13 @@ impl Database {
 
     /// 把失败块的尝试次数清零，让它们重新进入自动补拉队列。
     ///
-    /// 只碰 `failed`：已写入和云端确认为空的块不该被这个动作打回重来，
-    /// 否则「重试失败项」就变成了偷偷的「重拉一切」。
+    /// 只碰 `failed` / `partial`：已写入和云端确认为空的块不该被这个动作
+    /// 打回重来，否则「重试失败项」就变成了偷偷的「重拉一切」。
     pub fn reset_failed_backfill_chunks(&self) -> Result<usize> {
         let changed = self.conn.execute(
             "UPDATE coverage_ledger
                 SET attempts = 0, updated_at = ?1
-              WHERE status = 'failed'",
+              WHERE status IN ('failed', 'partial')",
             [Utc::now().to_rfc3339()],
         )?;
         Ok(changed)
@@ -274,21 +284,28 @@ impl Database {
         error_code: Option<&str>,
     ) -> Result<()> {
         let now = Utc::now().to_rfc3339();
-        let fetched_at = matches!(status, ChunkStatus::Persisted | ChunkStatus::EmptyFromCloud)
-            .then(|| now.clone());
-        let persisted_at = (status == ChunkStatus::Persisted).then(|| now.clone());
-        let failed = status == ChunkStatus::Failed;
+        let fetched_at = matches!(
+            status,
+            ChunkStatus::Persisted | ChunkStatus::EmptyFromCloud | ChunkStatus::Partial
+        )
+        .then(|| now.clone());
+        let is_persisted = status == ChunkStatus::Persisted;
+        let retryable = matches!(status, ChunkStatus::Failed | ChunkStatus::Partial);
         self.conn.execute(
             "UPDATE coverage_ledger
                 SET status = ?3,
                     records = ?4,
                     error = ?5,
                     fetched_at = COALESCE(?6, fetched_at),
-                    persisted_at = COALESCE(?7, persisted_at),
+                    persisted_at = CASE
+                        WHEN ?8 THEN ?7
+                        WHEN ?9 THEN NULL
+                        ELSE persisted_at
+                    END,
                     error_code = ?10,
                     attempts = CASE WHEN ?9 THEN attempts + 1 ELSE 0 END,
-                    last_attempt_at = ?8,
-                    updated_at = ?8
+                    last_attempt_at = ?7,
+                    updated_at = ?7
               WHERE stream = ?1 AND chunk_start = ?2",
             rusqlite::params![
                 stream,
@@ -297,9 +314,9 @@ impl Database {
                 records,
                 error,
                 fetched_at,
-                persisted_at,
                 now,
-                failed,
+                is_persisted,
+                retryable,
                 error_code
             ],
         )?;
@@ -369,7 +386,10 @@ impl Database {
                             coverage.empty_months.push(chunk.chunk_start.clone());
                         }
                     }
-                    ChunkStatus::Failed => coverage.failed_chunks += 1,
+                    ChunkStatus::Failed | ChunkStatus::Partial => {
+                        coverage.failed_chunks += 1;
+                        coverage.records += chunk.records;
+                    }
                     ChunkStatus::Pending => coverage.pending_chunks += 1,
                 }
             }
@@ -886,5 +906,67 @@ mod tests {
                 .all(|chunk| chunk.chunk_start == "2026-03-01"),
             "补拉随时可能被取消，最近的月份要先拿回来"
         );
+    }
+
+    #[test]
+    fn chunk_status_round_trips_including_partial() {
+        for status in [
+            ChunkStatus::Pending,
+            ChunkStatus::Persisted,
+            ChunkStatus::EmptyFromCloud,
+            ChunkStatus::Partial,
+            ChunkStatus::Failed,
+        ] {
+            assert_eq!(ChunkStatus::parse(status.as_str()), status);
+        }
+        assert!(ChunkStatus::Partial.needs_work());
+        assert!(ChunkStatus::Failed.needs_work());
+        assert!(!ChunkStatus::Persisted.needs_work());
+        assert!(!ChunkStatus::EmptyFromCloud.needs_work());
+    }
+
+    /// 子切片 404 / 解析失败后仍写出过数据：库里的行要留着，但不能把这个月
+    /// 画成「已经完整落盘」。
+    #[test]
+    fn a_partial_write_is_not_a_complete_local_copy() {
+        let db = db();
+        db.plan_backfill(date("2026-01-01"), date("2026-01-31"))
+            .unwrap();
+        db.record_backfill_chunk(
+            "heart_rate",
+            "2026-01-01",
+            ChunkStatus::Partial,
+            12,
+            Some("这一块只写入了部分数据，还需要重试"),
+            Some("err.backfill.partial_window"),
+        )
+        .unwrap();
+
+        let pending = db.pending_backfill_chunks(100).unwrap();
+        let chunk = pending
+            .iter()
+            .find(|chunk| chunk.stream == "heart_rate")
+            .expect("部分写入的块还要再拉");
+        assert_eq!(chunk.records, 12);
+        assert!(chunk.persisted_at.is_none(), "部分写入不能记 persisted_at");
+        assert!(ChunkStatus::parse(&chunk.status).needs_work());
+
+        let ledger = db.coverage_ledger().unwrap();
+        assert!(!ledger.complete, "有洞的月份不能叫完整副本");
+        let heart_rate = ledger
+            .streams
+            .iter()
+            .find(|stream| stream.stream == "heart_rate")
+            .unwrap();
+        assert_eq!(heart_rate.persisted_chunks, 0);
+        assert_eq!(heart_rate.failed_chunks, 1);
+        assert_eq!(heart_rate.records, 12);
+        assert_eq!(
+            ledger.failed_chunks_detail[0].error_code.as_deref(),
+            Some("err.backfill.partial_window")
+        );
+
+        let json = serde_json::to_value(&ledger).unwrap();
+        assert_chinese_carries_a_code(&json, "ledger");
     }
 }

@@ -21,13 +21,12 @@ ROOT = Path(__file__).resolve().parents[2]
 CATALOG_PATH = ROOT / "src" / "assets" / "devices" / "catalog.json"
 ASSET_DIR = CATALOG_PATH.parent
 AUDIT_PATH = ROOT / "docs" / "reference" / "device-catalog-audit.json"
-EXPECTED_ENTRY_COUNT = 53
-EXPECTED_SUPPORTED_COUNT = 52
-EXPECTED_CANONICAL_COUNT = 50
-# 资源数比条目数少两个：GTR 4 的配色卡和标准款共用一张图（见 audit 里的
-# merge relation），而 Balance 2 XT 还没有产品图（issue #42，见下面的
-# `image_key is None` 分支）。
-EXPECTED_ASSET_COUNT = 51
+EXPECTED_ENTRY_COUNT = 57
+EXPECTED_SUPPORTED_COUNT = 56
+EXPECTED_CANONICAL_COUNT = 54
+# Colour variants share art; name-only additions such as Pace have no art.
+# Their paired null image_key/asset_hash is checked below.
+EXPECTED_ASSET_COUNT = 52
 
 
 def normalized(value: str) -> str:

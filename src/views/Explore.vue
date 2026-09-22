@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { displayDateTimeFormatter } from '../lib/dateTime';
+
 defineOptions({ name: 'Explore' });
 import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
@@ -12,9 +14,16 @@ import {
   useExport,
   type SaveFormat,
 } from '../composables/useExport';
+import { readDefaultExportFormat } from '../lib/exportScope';
 import { useSyncController } from '../composables/useSyncController';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
+import { useLifeEvents } from '../composables/useLifeEvents';
 import { useAiHandoff } from '../composables/useAiHandoff';
+import {
+  calendarCells,
+  calendarMonthTitle,
+  calendarWeekdayNames,
+} from '../lib/calendarLocale';
 import { localDateString } from '../lib/format';
 import { popoverStyle } from '../lib/popoverPosition';
 import { rangeOptions } from '../lib/rangeOptions';
@@ -24,12 +33,14 @@ import { exploreMessages, promptTemplates, type PromptTemplate } from './Explore
 import { intlLocale, locale, useMessages } from '../i18n';
 
 const t = useMessages(exploreMessages);
+const { events: lifeEvents } = useLifeEvents();
 
 const {
   exportStartDate,
   exportEndDate,
   exportDataTypes,
   exportDetail,
+  focusedWorkoutId,
   exportBusy,
   exportError,
   exportMessage,
@@ -61,7 +72,6 @@ const categories = computed(() => {
    互斥的 ExportScope 让「日期范围」和「单次运动」不可能同时生效，
    所以这里不需要任何优先级规则。 */
 const route = useRoute();
-const focusedWorkoutId = ref<string | null>(null);
 /* 这一页被 KeepAlive 缓存，第二次进来不会重新挂载，所以锁定范围要在
    activated 时也读一遍 query，否则会沿用上一次的范围。 */
 const readFocusFromRoute = () => {
@@ -100,7 +110,7 @@ const selectTemplate = (tpl: PromptTemplate) => {
   activeTemplateId.value = tpl.id;
   editedPrompt.value = tpl.prompt;
   promptEdited.value = false;
-  exportDataTypes.value = [...tpl.types];
+  exportDataTypes.value = [...tpl.types, ...(exportDataTypes.value.includes('life_events') ? ['life_events' as const] : [])];
 };
 
 /* ── 导出格式与目标工具 ────────────────── */
@@ -110,7 +120,7 @@ const formats = computed<{ key: SaveFormat; label: string; sub: string; icon: Ic
   { key: 'gpx', label: 'GPX', sub: t.value.formatGpxSub, icon: 'map' },
   { key: 'fit', label: 'FIT', sub: t.value.formatFitSub, icon: 'activity' },
 ]);
-const activeFormat = ref<SaveFormat>('json');
+const activeFormat = ref<SaveFormat>(readDefaultExportFormat());
 const activeFormatLabel = computed(
   () => formats.value.find((format) => format.key === activeFormat.value)?.label ?? 'JSON',
 );
@@ -153,7 +163,7 @@ const scopeRangeText = computed(() => {
     if (!previewScope.value) return t.value.thisWorkout;
     const start = new Date(previewScope.value.startTime);
     if (Number.isNaN(start.getTime())) return t.value.thisWorkout;
-    return new Intl.DateTimeFormat(intlLocale(), {
+    return displayDateTimeFormatter({
       year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
     }).format(start);
   }
@@ -248,22 +258,17 @@ const loadPreview = async () => {
   }
   previewBusy.value = true;
   try {
-    const encoded = await tauriApi.getExportJson({
+    const estimate = await tauriApi.estimateExport({
       scope: currentScope(),
       dataTypes: [...exportDataTypes.value],
       detail: exportDetail.value,
     });
     if (seq !== previewSeq) return;
-    const parsed = JSON.parse(encoded) as {
-      record_count?: number;
-      records?: unknown[];
-      scope?: { kind?: string; start_time?: string; end_time?: string };
-    };
-    previewCount.value = parsed.record_count ?? parsed.records?.length ?? 0;
-    previewBytes.value = new TextEncoder().encode(encoded).length;
+    previewCount.value = estimate.recordCount;
+    previewBytes.value = estimate.estimatedBytes;
     // 摘要里的「时间范围」必须是后端真正用了的范围，而不是页面上那两个日期。
-    previewScope.value = parsed.scope?.kind === 'workout' && parsed.scope.start_time
-      ? { startTime: parsed.scope.start_time, endTime: parsed.scope.end_time ?? null }
+    previewScope.value = estimate.scopeKind === 'workout' && estimate.startTime
+      ? { startTime: estimate.startTime, endTime: estimate.endTime ?? null }
       : null;
   } catch (error) {
     if (seq !== previewSeq) return;
@@ -426,36 +431,11 @@ const nextMonth = () => {
   }
 };
 
-/* 月份和星期名交给 Intl，不再写死中文数组：英文界面上「2026年 8月」
-   既不是英文也不是任何人的日期写法。 */
-const calendarTitle = computed(() => new Intl.DateTimeFormat(intlLocale(), {
-  year: 'numeric', month: 'long',
-}).format(new Date(pickerYear.value, pickerMonth.value, 1)));
-
-const weekdayNames = computed(() => {
-  // 2026-01-04 是星期日，从它数七天就是一周的表头。
-  const sunday = new Date(2026, 0, 4);
-  const formatter = new Intl.DateTimeFormat(intlLocale(), {
-    weekday: locale.value === 'zh' ? 'narrow' : 'short',
-  });
-  return Array.from({ length: 7 }, (_unused, offset) =>
-    formatter.format(new Date(2026, 0, sunday.getDate() + offset)));
-});
-
-const calendarDays = computed(() => {
-  const firstDay = new Date(pickerYear.value, pickerMonth.value, 1).getDay();
-  const daysInMonth = new Date(pickerYear.value, pickerMonth.value + 1, 0).getDate();
-  const days = [];
-  // 空白占位
-  for (let i = 0; i < firstDay; i++) {
-    days.push({ day: null, dateStr: '' });
-  }
-  for (let i = 1; i <= daysInMonth; i++) {
-    const dateStr = `${pickerYear.value}-${String(pickerMonth.value + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-    days.push({ day: i, dateStr });
-  }
-  return days;
-});
+/* 月份名、星期名、一周起点跟系统地区，不跟界面语言。界面只有三份，
+   系统地区有很多；德语 Windows 上的英文界面仍该看到 März，而不是 September。 */
+const calendarTitle = computed(() => calendarMonthTitle(pickerYear.value, pickerMonth.value));
+const weekdayNames = computed(() => calendarWeekdayNames());
+const calendarDays = computed(() => calendarCells(pickerYear.value, pickerMonth.value));
 
 const selectCalendarDay = (dateStr: string) => {
   if (!dateStr) return;
@@ -479,25 +459,43 @@ const copyPrompt = async () => {
 
 const handoffNotice = ref<string | null>(null);
 
+const sendNoticeTone = ref<'ok' | 'bad'>('ok');
+
 const sendToAi = async () => {
   handoffNotice.value = null;
+  sendNoticeTone.value = 'ok';
   if (!isTauri()) {
+    sendNoticeTone.value = 'bad';
     handoffNotice.value = t.value.needDesktop;
     return;
   }
   if (!focusedWorkoutId.value && !datesValid.value) {
+    sendNoticeTone.value = 'bad';
     handoffNotice.value = t.value.needValidDates;
     return;
   }
   if (!exportDataTypes.value.length) {
+    sendNoticeTone.value = 'bad';
     handoffNotice.value = t.value.needDataTypes;
     return;
   }
-  if (previewBusy.value || previewCount.value === null) {
+  if (previewError.value) {
+    sendNoticeTone.value = 'bad';
+    handoffNotice.value = previewError.value;
+    return;
+  }
+  if (previewBusy.value) {
+    sendNoticeTone.value = 'bad';
+    handoffNotice.value = t.value.stillReading;
+    return;
+  }
+  if (previewCount.value === null) {
+    sendNoticeTone.value = 'bad';
     handoffNotice.value = t.value.stillReading;
     return;
   }
   if (previewCount.value <= 0) {
+    sendNoticeTone.value = 'bad';
     handoffNotice.value = t.value.nothingInScope;
     return;
   }
@@ -515,6 +513,7 @@ const sendToAi = async () => {
       false, // includePreciseRoute: 默认 false 隐私优先
     );
     const browserOpened = handoffState.value !== 'copied_only';
+    sendNoticeTone.value = 'ok';
     if (result.mode === 'attachment') {
       const uploadNotice = t.value.attachmentNotice;
       handoffNotice.value = browserOpened
@@ -549,7 +548,7 @@ watch(
   schedulePreview,
   { deep: true, immediate: true },
 );
-watch(dataRevision, () => void loadPreview());
+watch([dataRevision, lifeEvents], () => void loadPreview());
 onBeforeUnmount(() => window.clearTimeout(previewTimer));
 </script>
 
@@ -671,6 +670,12 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
               </div>
             </div>
 
+            <p v-if="previewError" class="preview-error" role="alert">
+              <Icon name="warning" :size="13" />
+              <span>{{ previewError }}</span>
+              <button class="button button-secondary" type="button" :disabled="previewBusy" @click="loadPreview">{{ t.previewRetry }}</button>
+            </p>
+
             <CoverageNotice :requested-days="requestedSpanDays" />
 
             <!-- 范围选择与自定义日期选择器 -->
@@ -776,7 +781,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 
         <p v-if="sendState === 'copied'" class="action-note ok" role="status"><Icon name="circle-check" :size="13" />{{ t.promptCopied }}</p>
         <p v-else-if="sendState === 'failed'" class="action-note bad" role="alert"><Icon name="warning" :size="13" />{{ t.copyFailed }}</p>
-        <p v-if="handoffNotice" class="action-note" :class="handoffState === 'failed' ? 'bad' : 'ok'" role="status">{{ handoffNotice }}</p>
+        <p v-if="handoffNotice" class="action-note" :class="handoffState === 'failed' || sendNoticeTone === 'bad' ? 'bad' : 'ok'" role="status">{{ handoffNotice }}</p>
         <p v-if="handoffError" class="action-note bad" role="alert"><Icon name="warning" :size="13" />{{ handoffError }}</p>
         <button
           v-if="handoffState === 'copied_only'"
@@ -1205,6 +1210,16 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 .action-note { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-size: var(--fs-sm); }
 .action-note.ok { color: var(--accent); }
 .action-note.bad { color: var(--danger); }
+.preview-error {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 0;
+  color: var(--danger);
+  font-size: var(--fs-sm);
+}
+.preview-error span { flex: 1 1 160px; min-width: 0; }
 
 /* 右列 */
 .group-label { margin: 0 0 8px; color: var(--ink); font-size: var(--fs-sm); font-weight: 700; }

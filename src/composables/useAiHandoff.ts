@@ -20,6 +20,13 @@ const messages = defineMessages(
     copiedButCannotOpen: (label: string) => `Copied, but ${label} could not be opened`,
     nothingToRetry: 'There is no AI hand-off to retry',
   },
+  {
+    clipboardUnsupported: 'Este entorno no puede escribir en el portapapeles',
+    targetNotAllowed: 'Esa dirección de IA no está en la lista permitida',
+    handoffFailed: 'No se pudo completar la entrega a la IA',
+    copiedButCannotOpen: (label: string) => `Copiado, pero no se pudo abrir ${label}`,
+    nothingToRetry: 'No hay ninguna entrega a la IA para reintentar',
+  },
 );
 
 const copy = () => messagesOf(messages);

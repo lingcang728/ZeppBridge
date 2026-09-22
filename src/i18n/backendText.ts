@@ -35,7 +35,3 @@ export const backendText = (
   if (locale.value === 'zh') return value;
   return CJK.test(value) ? fallback : value;
 };
-
-/** 只做判断，不做替换。给需要自己决定怎么处理的调用方用。 */
-export const containsChinese = (text: string | null | undefined): boolean =>
-  CJK.test(text ?? '');

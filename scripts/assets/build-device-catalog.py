@@ -18,11 +18,6 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-import cv2
-import numpy as np
-from PIL import Image, ImageOps
-
-
 ROOT = Path(__file__).resolve().parents[2]
 SCREENSHOT_DIR = ROOT / "design_picture" / "Product"
 ASSET_DIR = ROOT / "src" / "assets" / "devices"
@@ -68,24 +63,27 @@ DEVICE_SOURCE_CODES: dict[str, list[int]] = {
     # 报告里指认成 Helio Strap 的那 2 份，同一份报告里还指认了另一块表——是
     # 在设备选择器里挑错了那一台，不是这个数字有歧义。
     "amazfit-balance-2": [9568512, 9568513, 9568515, 10486017],
-    "amazfit-active-2-44mm": [10092800, 10092801, 10092807],
+    "amazfit-active-2-44mm": [8913155, 10092800, 10092801, 10092803, 10092807],
+    "amazfit-active-42mm": [8323329],
+    "amazfit-balance-2-xt": [10486019],
     "amazfit-active-2-square": [10223873],
     "amazfit-bip-6": [10158337],
-    "amazfit-cheetah-2-ultra": [9978113],
+    "amazfit-cheetah-2-ultra": [9978112, 9978113],
     # 10289411 同样是人工裁决：17 份里 14 份 Helio Strap，相邻的 10289410
     # 三份一致，3 份异议同样来自「一个账号两块表、挑错了」。
     "amazfit-helio-strap": [10289410, 10289411],
     # 10551555 是 2026-09-02 那批新增的：2 份报告一致，无异议，且和已经收了
     # 的 10551552 同族。10682625 是 2026-09-03 这一批（反馈库 183 行）：同样
     # 2 份一致、零异议，两份分别来自 v1.1.1 和 v1.1.5，不是同一次提交的重复。
-    # 相邻的 10682624 仍然只有一份，继续等。
-    "amazfit-t-rex-3-pro-48-44mm": [10551552, 10551555, 10682625],
+    # 2026-09-11 又收录 10551553 和 10682624，见本轮反馈裁决记录。
+    # 10682627 是 2026-09-13 收录的，见下方裁决记录。
+    "amazfit-t-rex-3-pro-48-44mm": [10551552, 10551553, 10551555, 10682624, 10682625, 10682627],
     # Helio Ring 的第一个编号：2 份独立报告一致，其中一份来自 2.0.0。
     "amazfit-helio-ring": [8651008],
     # 11145472 是 2026-09-01 那批新增的：3 份报告一致指向 Balance 3，和已经
     # 收了的相邻编号 11141379 同族。
-    "amazfit-balance-3": [11141379, 11145472],
-    "amazfit-gtr-4-46mm": [7930113],
+    "amazfit-balance-3": [11141377, 11141379, 11145472],
+    "amazfit-gtr-4-46mm": [7930112, 7930113],
     # 下面两个上一轮还只有一份报告，这一轮凑够了独立第二份：
     #   10944769 -> Active 3 Premium（3 份，无异议）
     #   10879233 -> T-Rex Ultra 2（2 份，无异议）
@@ -100,24 +98,40 @@ DEVICE_SOURCE_CODES: dict[str, list[int]] = {
     "amazfit-active-max": [10813697],
     "amazfit-bip-max": [11206915],
 }
-# 明确不收（2026-09-03 的 183 行反馈快照上复核过）：
-#   * 10813699 —— Active 2 44mm 4 份 vs Active MAX 3 份。前两轮分别是 2:2 和
-#     3:3，这一轮 Active 2 那边多了一份（v2.1.0 / macOS），平票被打破了，但
-#     4:3 仍然是分歧，不是证据。多数票在这张表上从来不算数：收错一个编号，
-#     所有同款用户的设备名都会错，而且是静默地错。
-#   * 8913155 —— Active 2 44mm 3 份 vs Helio Strap 1 份（这一轮 Active 2 那边
-#     多了一份 v2.1.0 / macOS）。异议那份报告里只指认了这一台设备，所以
-#     「一个账号两块表、在选择器里挑错了」那条裁决理由用不上，这是真实分歧。
-#   * 7930112 —— GTR 4 46mm 2 份 vs T-Rex 3 1 份，同样是单设备报告提出的真实
-#     异议。附带一提，相邻的 7930113 已经收为 GTR 4 46mm，邻接性是支持 GTR 4
-#     的；但邻接性在这里只是旁证，不足以推翻一份明确的异议。
-#   * 只有一份报告的高位编号（11141376、11141377、10223872、10223875、
-#     10682624、8323329、10944768）——等第二份。原来在这一行里的 10813697、
-#     11206915、10944771 在 2026-09-02 那批里凑够了，10682625 在 2026-09-03
-#     这一批里凑够了，都已经收进上表；
+# 2026-09-11: seven additional codes accepted from distinct submission contexts;
+# adjacent-time duplicate reports were counted only once. See the dated feedback
+# triage evidence for counts, conflict exclusions and the privacy limitation that
+# these reports deliberately contain no reporter identity.
+# 明确不收：
+#   * 10813699 —— Active 2 44mm 7 份 vs Active MAX 3 份（2026-09-13 复核）。
+#     前几轮分别是 2:2、3:3、4:3，多数票在这张表上从来不算数：收错一个
+#     编号，所有同款用户的设备名都会错，而且是静默地错。
 #   * 全部低位段编号和全部 deviceType。低位段不是漏收：同一个 102 被指认成
 #     balance-46mm / t-rex-3 / balance-3 / balance-2 / t-rex-3-pro / up 等多个
 #     型号，说明 deviceSource 在低位段根本不唯一标识型号，再多报告也收不出来。
+#
+# 2026-09-13 裁决记录（反馈库 279 份报告）：
+#   * 10682627 -> T-Rex 3 Pro：2 份互相独立的报告（3454a4a9 v2.2.2 macOS
+#     2026-09-10、4c94b421 v2.2.4 macOS 2026-09-11），不同版本不同日期、
+#     零异议，且与已收录的 10682624 / 10682625 同族——和当年收 10682625
+#     的标准一致（两份分别来自不同版本，不是同一次提交的重复）。
+#   * 7930112 -> GTR 4 46mm：6 份 GTR 4 46mm 报告（v1.1.5 ×2、v2.1.0 ×3、
+#     v2.2.2 ×1，至少 4 个独立提交语境）。此前拒收是因为 bbcbafff
+#     （2026-09-02T00:23）把它指认成 T-Rex 3；但 83 秒后同一设备集合
+#     （7930112 + 8716544）的 be7d1466 把 7930112 改指认为 GTR 4 46mm、
+#     把 8716544 指认为 T-Rex 3——是「一个账号两块表、第一次挑错了、马上
+#     改正」，不是真实异议。相邻的 7930113 早已收为 GTR 4 46mm。
+#   * 8913155 -> Active 2 44mm：5 份 Active 2 44mm 报告（v1.1.1、v2.0.0、
+#     v2.1.0 macOS、v2.1.1、v2.1.2，5 个独立语境）。此前拒收的唯一异议
+#     34220252（2026-09-01T18:29 指认 Helio Strap）在 3 分钟后被同一设备
+#     集合（10289411 + 8913155）的 b405ac43 改正为 Active 2 44mm；且该账号
+#     的 10289411 已按名字自动匹配为 Helio Strap，把 8913155 也指认成
+#     Helio Strap 等于说这个账号有两条 Helio Strap——就是挑错了那一台。
+#   * 继续等第二份的编号：9765121、11092224、11469059 各 2 份，但都是同一
+#     分钟内、同一设备集合的重复提交，只算 1 份独立证据；只有一份报告的
+#     高位编号 11272451、8126720、10223872、10223875、10944768、11141376。
+#     原来在这一行里的 10813697、11206915、10944771 在 2026-09-02 那批里
+#     凑够了，10682625 在 2026-09-03 这一批里凑够了，都已经收进上表。
 
 
 def card(
@@ -261,6 +275,29 @@ CARDS: list[dict[str, Any]] = [
 
 
 EXTRAS: list[dict[str, Any]] = [
+    {
+        "catalog_id": "amazfit-pace", "canonical_name": "Amazfit Pace",
+        "display_name": "Amazfit Pace", "name_zh": "Amazfit Pace",
+        "kind": "watch", "model_codes": [],
+        "aliases": ["Amazfit Pace", "Pace"],
+        "region": ["global"], "official_page": "https://support.amazfit.com/it/amazfit_pace/user-guide",
+        "official_url": "https://support.amazfit.com/it/amazfit_pace/user-guide",
+        "image_source_url": None, "asset_key": None, "asset_source": "pending-official-art",
+        "canonical_device_key": "amazfit-pace", "checked_at": "2026-09-21",
+        "provenance": "Amazfit Pace name verified against official Amazfit support on 2026-09-21; requested in feedback 5bf0a448-dec6-40eb-816b-691097cda1f4. Name matching and manual identification only; source 400 is deliberately unmapped. Product art pending verification.",
+    },
+    {
+        "catalog_id": "amazfit-bip", "canonical_name": "Amazfit Bip",
+        "display_name": "Amazfit Bip", "name_zh": "Amazfit 米动手表青春版 Bip",
+        "kind": "watch", "model_codes": [],
+        "aliases": ["Amazfit Bip", "Bip", "Amazfit Bip 1", "Bip 1", "米动手表青春版"],
+        "region": ["global"], "official_page": "https://support.amazfit.com/en/amazfit_bip/user-guide",
+        "official_url": "https://support.amazfit.com/en/amazfit_bip/user-guide",
+        "image_source_url": None, "asset_key": None, "asset_source": "pending-official-art",
+        "canonical_device_key": "amazfit-bip", "checked_at": "2026-09-12",
+        "provenance": "Original Amazfit Bip confirmed by the official Amazfit Bip user manual. Issue #78 requests Bip 1 in the picker; no unverified cloud source number or borrowed product image is assigned.",
+    },
+
     {
         "catalog_id": "amazfit-helio-strap-pro",
         "canonical_name": "Amazfit Helio Strap Pro",
@@ -536,11 +573,9 @@ def trim_alpha(image: Image.Image, padding: int = 18) -> Image.Image:
     bbox = image.getchannel("A").getbbox()
     if bbox is None:
         raise ValueError("image has no visible alpha after background removal")
-    left = max(0, bbox[0] - padding)
-    top = max(0, bbox[1] - padding)
-    right = min(image.width, bbox[2] + padding)
-    bottom = min(image.height, bbox[3] + padding)
-    return image.crop((left, top, right, bottom))
+    # Cropping within the input cannot create room when the product touches
+    # an edge. Add real transparent pixels around the visible bounds.
+    return ImageOps.expand(image.crop(bbox), border=padding, fill=(0, 0, 0, 0))
 
 
 def remove_large_white_hole(image: Image.Image) -> Image.Image:
@@ -679,6 +714,7 @@ def normalize_asset(
     preserve_centre_hole: bool = False,
     remove_watch_hole: bool = False,
     decontaminate_halo: bool = False,
+    preserve_alpha: bool = False,
 ) -> Image.Image:
     # All current sources are white-background captures/CDN images. Always use
     # the conservative edge-connected/GrabCut path; the old global near-white
@@ -690,7 +726,7 @@ def normalize_asset(
             (round(source.width * segmentation_scale), round(source.height * segmentation_scale)),
             Image.Resampling.LANCZOS,
         )
-    image = grabcut_foreground(source)
+    image = source if preserve_alpha else grabcut_foreground(source)
     image = trim_alpha(image.convert("RGBA"))
     if keep_largest_component:
         rgba = np.asarray(image).copy()
@@ -794,6 +830,7 @@ def write_asset(
     *,
     use_grabcut: bool = False,
     keep_largest_component: bool = True,
+    preserve_alpha: bool = False,
 ) -> str:
     ASSET_DIR.mkdir(parents=True, exist_ok=True)
     image = normalize_asset(
@@ -803,6 +840,7 @@ def write_asset(
         preserve_centre_hole=key == "amazfit-helio-ring",
         remove_watch_hole=key == "amazfit-gts-4-mini",
         decontaminate_halo=key == "amazfit-helio-strap-pro",
+        preserve_alpha=preserve_alpha,
     )
     webp_path = ASSET_DIR / f"{key}.webp"
     thumb_path = ASSET_DIR / f"{key}-thumb.png"
@@ -836,7 +874,32 @@ def enrich_entry(entry: dict[str, Any], hash_value: str | None) -> dict[str, Any
 def build_catalog() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--refresh-official", action="store_true", help="download the four extra official CDN images")
+    parser.add_argument("--catalog-only", action="store_true", help="update model codes using existing catalog art and metadata")
     args = parser.parse_args()
+
+    if args.catalog_only:
+        document = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
+        document["version"] = 6
+        known_ids = {device["catalog_id"] for device in document["devices"]}
+        for extra in EXTRAS:
+            if extra["catalog_id"] not in known_ids and extra.get("asset_key") is None:
+                document["devices"].append(enrich_entry(extra, None))
+                known_ids.add(extra["catalog_id"])
+        document["active_supported_count"] = sum(1 for d in document["devices"] if d.get("supported") and d["status"] == "active")
+        document["canonical_device_count"] = len({d["canonical_device_key"] for d in document["devices"] if d.get("supported") and d["status"] == "active"})
+        if unknown := sorted(set(DEVICE_SOURCE_CODES) - known_ids):
+            raise SystemExit(f"Unknown catalog IDs: {unknown}")
+        for device in document["devices"]:
+            device["device_source_codes"] = DEVICE_SOURCE_CODES.get(device["catalog_id"], [])
+        CATALOG_PATH.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        print(f"DEVICE_CATALOG_UPDATED entries={len(known_ids)}")
+        return
+
+    # Metadata-only maintenance does not need the image-processing runtime.
+    global cv2, np, Image, ImageOps
+    import cv2
+    import numpy as np
+    from PIL import Image, ImageOps
 
     hashes: dict[str, str] = {}
     # One physical image per canonical asset key; the GTR 4 colour card shares
@@ -869,7 +932,7 @@ def build_catalog() -> None:
     if unknown:
         raise SystemExit(f"DEVICE_SOURCE_CODES 指向了目录里没有的型号: {unknown}")
     document = {
-        "version": 5,
+        "version": 6,
         "checked_at": CHECKED_AT,
         "sources": [
             "https://www.amazfit.jp/",

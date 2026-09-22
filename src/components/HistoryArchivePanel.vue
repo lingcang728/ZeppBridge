@@ -10,15 +10,18 @@
  * 和「失败可重试」。把这四种状态压成一个进度条，用户就没法回答
  * 「我 2023 年的数据到底有没有」。
  */
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import DatePicker from './DatePicker.vue';
 import SelectMenu from './SelectMenu.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
+import { isCancelledSyncError, isDeferredSyncError } from '../lib/syncDeferred';
 import type { CoverageLedger, FailedChunk, StorageEstimate, UserPrefs } from '../types';
 import { syncStreamLabel } from '../lib/syncStreams';
 import { defineMessages, useMessages } from '../i18n';
 import { failedChunkText } from '../lib/failedChunkText';
 import { storageEstimateText, storageStopReasonText } from '../lib/storageEstimateText';
+import { localDateString } from '../lib/format';
 
 const messages = defineMessages(
   {
@@ -50,6 +53,7 @@ const messages = defineMessages(
       `已停止，还剩 ${remaining} 个月份块。已经拉回来的历史都在，点「继续补拉」接着做。`,
     stalled: (remaining: number) =>
       `还剩 ${remaining} 个月份块，但这一轮一个都没能推进，已经停下来。多半是这些块反复失败——看下面的失败列表，或者点「重试失败项」。`,
+    deferredRetry: '本地维护进行中，补拉稍后自动继续',
     resetLedger: '清空账本',
     ledgerTitle: '覆盖账本',
     ledgerProgress: (done: number, total: number) => `${done} / ${total} 个月份块已有结论`,
@@ -131,6 +135,7 @@ const messages = defineMessages(
       `Stopped with ${remaining} monthly chunks left. Everything already fetched is kept — press "Continue backfilling" to carry on.`,
     stalled: (remaining: number) =>
       `${remaining} monthly chunks remain, but this round moved none of them, so it stopped. They are most likely failing repeatedly — see the failed list below, or press "Retry failed items".`,
+    deferredRetry: 'Local maintenance is running. The backfill will continue on its own',
     resetLedger: 'Clear the ledger',
     ledgerTitle: 'Coverage ledger',
     ledgerProgress: (done: number, total: number) => `${done} of ${total} monthly chunks resolved`,
@@ -183,6 +188,88 @@ const messages = defineMessages(
       wellness: 'Stress / SpO2 and similar',
     },
   },
+  {
+    title: 'Archivo a largo plazo e historial completo',
+    intro: 'El archivo cubre «dejar de borrar de hoy en adelante»; la recuperación cubre «ir a buscar lo anterior». Solo con ambos la copia local queda realmente completa.',
+    archiveTitle: 'Archivo a largo plazo',
+    archiveBody: 'Con esto activado, una sincronización exitosa ya no borra historial según el periodo de conservación. La base de datos sigue creciendo; puedes desactivarlo cuando quieras, y al hacerlo te dice qué borraría la próxima sincronización.',
+    archiveAria: 'Archivo a largo plazo',
+    startLabel: 'Recuperar desde',
+    startAria: 'Inicio de la recuperación de historial',
+    customDateLabel: 'Fecha de inicio',
+    customDateAria: 'Fecha de inicio de la recuperación',
+    estimateTitle: 'Crecimiento estimado',
+    estimateRate: (days: number, perDay: string) => `${days} días de muestras locales · unos ${perDay}/día`,
+    unmeasured: (streams: string) =>
+      `No hay suficientes muestras locales para estimar: ${streams}. Quedan fuera del total de arriba; es mejor decir que no lo sabemos que inventar una tasa y multiplicarla por años.`,
+    wouldBeCleanedUp: (requested: number, retention: number) =>
+      `Esta recuperación traería ${requested} días de historial, pero este equipo solo conserva los últimos ${retention} días: lo que llegue se borraría en la próxima sincronización exitosa. Activa primero el archivo a largo plazo, o amplía el periodo de conservación.`,
+    backfilling: 'Recuperando…',
+    continueBackfill: 'Continuar la recuperación',
+    startBackfill: 'Iniciar la recuperación',
+    autoContinue: 'Hasta terminar',
+    autoContinueHint: 'Cada ronda inicia la siguiente automáticamente hasta recuperar todo el rango. Detente cuando quieras: no se pierde nada de lo ya descargado.',
+    stopBackfill: 'Detener',
+    stopping: 'Deteniendo…',
+    roundProgress: (done: number, total: number) =>
+      `Recuperando: ${done} de ${total} bloques mensuales listos. Puedes detenerte cuando quieras.`,
+    stoppedByUser: (remaining: number) =>
+      `Detenido con ${remaining} bloques mensuales pendientes. Todo lo ya descargado se conserva; pulsa «Continuar la recuperación» para seguir.`,
+    stalled: (remaining: number) =>
+      `Quedan ${remaining} bloques mensuales, pero esta ronda no avanzó ninguno, así que se detuvo. Lo más probable es que estén fallando una y otra vez: revisa la lista de fallos abajo, o pulsa «Reintentar los meses fallidos».`,
+    deferredRetry: 'Hay mantenimiento local en curso. La recuperación continuará sola',
+    resetLedger: 'Borrar el registro',
+    ledgerTitle: 'Registro de cobertura',
+    ledgerProgress: (done: number, total: number) => `${done} de ${total} bloques mensuales resueltos`,
+    ledgerFrom: (from: string) => ` · solicitado desde ${from}`,
+    ledgerComplete: 'Todos los bloques mensuales del registro están resueltos: o se escribieron localmente, o la nube dijo claramente que no tiene nada de ese periodo.',
+    ledgerIncomplete: (remaining: number) =>
+      `Todavía hay ${remaining} bloques sin resolver. Hasta que terminen todos, esta copia local es una copia del rango sincronizado con éxito, no una completa.`,
+    ledgerStats: (persisted: number, empty: number, pending: number) =>
+      `${persisted} escritos · ${empty} vacíos en la nube · ${pending} pendientes`,
+    ledgerFailed: (failed: number) => `${failed} fallidos`,
+    ledgerRange: (from: string, to: string, records: number) => `${from} ~ ${to} · ${records} registros`,
+    ledgerNothingWritten: 'Todavía no se ha escrito ningún mes',
+
+    range1y: 'Último año',
+    range2y: 'Últimos 2 años',
+    range3y: 'Últimos 3 años',
+    rangeAll: (years: number) => `Todo el historial disponible (hasta ${years} años)`,
+    rangeCustom: 'Inicio personalizado',
+
+    confirmDisableArchive: 'Con el archivo a largo plazo desactivado, la próxima sincronización exitosa borra los datos antiguos según el periodo de conservación, y eso no se puede deshacer.\nSi acabas de recuperar historial, haz primero una copia de la base de datos.\n¿Desactivarlo?',
+    archiveEnabled: 'Archivo a largo plazo activado: las sincronizaciones exitosas ya no borran historial.',
+    archiveDisabled: 'Archivo a largo plazo desactivado: la próxima sincronización exitosa borra según el periodo de conservación.',
+    archiveSaveFailed: 'No se pudo guardar la configuración del archivo',
+    pickStartFirst: 'Primero elige desde dónde empieza la recuperación.',
+    outOfRetention: 'Esta recuperación va más allá del periodo de conservación local, así que lo que llegue se borraría en la próxima sincronización exitosa. Activa primero el archivo a largo plazo, o amplía el periodo de conservación.',
+    roundDone: (remaining: number) =>
+      `Esta ronda terminó; quedan ${remaining} bloques mensuales. Pulsa «Continuar la recuperación» para seguir; puedes detenerte cuando quieras.`,
+    allChunksDone: 'Todos los bloques mensuales del registro están resueltos.',
+    backfillFailed: 'La recuperación de historial falló',
+    confirmResetLedger: 'Esto solo borra el registro de cobertura. No se borra nada de lo ya escrito localmente, y después puedes planear una nueva recuperación. ¿Continuar?',
+    ledgerReset: 'El registro quedó borrado. Puedes planear un nuevo rango de recuperación.',
+    ledgerResetFailed: 'No se pudo borrar el registro',
+    failedTitle: 'Meses que no se pudieron descargar',
+    failedIntro: 'Estos bloques fallaron. Los demás meses no se vieron afectados y se recuperaron con normalidad.',
+    failedRow: (stream: string, month: string) => `${stream} · ${month}`,
+    failedAttempts: (attempts: number) => `${attempts} intento${attempts === 1 ? '' : 's'}`,
+    failedExhausted: 'Se agotaron los reintentos automáticos. Usa «Reintentar los meses fallidos» para volver a intentarlo',
+    failedNoReason: 'No se registró el motivo',
+    retryFailed: 'Reintentar los meses fallidos',
+    retryFailedDone: 'Los meses fallidos volvieron a la cola. Puedes continuar la recuperación.',
+    retryFailedFailed: 'No se pudieron volver a poner en cola los meses fallidos',
+    streamSeparator: ', ',
+
+    stream: {
+      heart_rate: 'Frecuencia cardíaca',
+      daily_summary: 'Resúmenes diarios',
+      workouts: 'Entrenamientos',
+      sleep: 'Sueño',
+      hrv: 'Variabilidad de la frecuencia cardíaca',
+      wellness: 'Estrés / SpO2 y similares',
+    },
+  },
 );
 const t = useMessages(messages);
 
@@ -218,7 +305,8 @@ const fromDate = computed(() => {
   const back = (years: number) => {
     const date = new Date(today);
     date.setFullYear(date.getFullYear() - years);
-    return date.toISOString().slice(0, 10);
+    // 纯日历日期：用本地年月日，`toISOString()` 会在东八区把清晨推到前一天。
+    return localDateString(date);
   };
   switch (startChoice.value) {
     case '1y': return back(1);
@@ -332,9 +420,34 @@ const chunkErrorText = (item: FailedChunk): string => failedChunkText(item);
  */
 const autoContinue = ref(true);
 const stopRequested = ref(false);
+let loopGeneration = 0;
 
-const stopBackfill = () => {
+onUnmounted(() => {
+  loopGeneration += 1;
   stopRequested.value = true;
+  if (busy.value && isDesktop()) void backend.cancelSync();
+});
+
+const sleepBackfill = async (ms: number, gen: number): Promise<boolean> => {
+  const step = 200;
+  let waited = 0;
+  while (waited < ms) {
+    if (stopRequested.value || gen !== loopGeneration) return false;
+    await new Promise((resolve) => window.setTimeout(resolve, step));
+    waited += step;
+  }
+  return !stopRequested.value && gen === loopGeneration;
+};
+
+const stopBackfill = async () => {
+  stopRequested.value = true;
+  loopGeneration += 1;
+  if (!isDesktop()) return;
+  try {
+    await backend.cancelSync();
+  } catch {
+    // 取消令已经立了；命令失败不该挡住「停止」本身。
+  }
 };
 
 const runBackfill = async () => {
@@ -350,15 +463,42 @@ const runBackfill = async () => {
     error.value = t.value.outOfRetention;
     return;
   }
+  const gen = loopGeneration;
   busy.value = true;
   stopRequested.value = false;
   error.value = null;
   message.value = null;
   try {
     for (;;) {
+      if (gen !== loopGeneration || stopRequested.value) {
+        message.value = t.value.stoppedByUser(remaining.value);
+        break;
+      }
       const before = remaining.value;
-      ledger.value = await backend.startHistoryBackfill(fromDate.value);
-      markDataChanged();
+      try {
+        const next = await backend.startHistoryBackfill(fromDate.value);
+        if (gen !== loopGeneration) {
+          message.value = t.value.stoppedByUser(remaining.value);
+          break;
+        }
+        ledger.value = next;
+        markDataChanged();
+      } catch (cause) {
+        if (gen !== loopGeneration || stopRequested.value || isCancelledSyncError(cause)) {
+          message.value = t.value.stoppedByUser(remaining.value);
+          break;
+        }
+        if (isDeferredSyncError(cause) && autoContinue.value) {
+          message.value = t.value.deferredRetry;
+          const keepGoing = await sleepBackfill(15_000, gen);
+          if (!keepGoing) {
+            message.value = t.value.stoppedByUser(remaining.value);
+            break;
+          }
+          continue;
+        }
+        throw cause;
+      }
 
       if (remaining.value <= 0) {
         message.value = t.value.allChunksDone;
@@ -368,7 +508,7 @@ const runBackfill = async () => {
         message.value = t.value.roundDone(remaining.value);
         break;
       }
-      if (stopRequested.value) {
+      if (stopRequested.value || gen !== loopGeneration) {
         message.value = t.value.stoppedByUser(remaining.value);
         break;
       }
@@ -449,11 +589,11 @@ const resetLedger = async () => {
 
     <div class="field-row">
       <span class="kv-label">{{ t.startLabel }}</span>
-      <SelectMenu v-model="startChoice" :options="START_CHOICES" :aria-label="t.startAria" />
+      <SelectMenu v-model="startChoice" :options="START_CHOICES" :aria-label="t.startAria" :disabled="busy" />
     </div>
     <div v-if="startChoice === 'custom'" class="field-row">
       <span class="kv-label">{{ t.customDateLabel }}</span>
-      <input v-model="customFrom" type="date" :aria-label="t.customDateAria" />
+      <DatePicker v-model="customFrom" :aria-label="t.customDateAria" :disabled="busy" />
     </div>
 
     <div v-if="estimate" class="estimate-block">
@@ -497,7 +637,7 @@ const resetLedger = async () => {
         @click="runBackfill"
       >{{ busy ? t.backfilling : (remaining > 0 ? t.continueBackfill : t.startBackfill) }}</button>
       <button
-        v-if="busy && autoContinue"
+        v-if="busy"
         class="button secondary"
         type="button"
         :disabled="stopRequested"
@@ -610,6 +750,7 @@ h2 { margin: 0 0 14px; font-size: var(--fs-xl); font-weight: 700; color: var(--i
   font-size: var(--fs-sm);
 }
 .field-row .select-menu { min-width: 220px; flex: 0 0 auto; }
+.field-row .date-picker { min-width: 180px; flex: 1 1 auto; max-width: 280px; }
 .kv-label { flex: 0 0 96px; color: var(--muted); font-size: var(--fs-sm); }
 .retain-note { margin: 6px 0 8px; color: var(--muted); font-size: var(--fs-sm); line-height: 1.6; }
 .inline-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }

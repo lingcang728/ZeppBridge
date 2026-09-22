@@ -8,8 +8,8 @@
     "https://amazfit-en.cdn.bcebos.com/smart-scale.html"
   ],
   "audit_baseline": "Official Amazfit Japan store captures in design_picture/Product (12 rows x 4 cards)",
-  "active_supported_count": 54,
-  "canonical_device_count": 52,
+  "active_supported_count": 56,
+  "canonical_device_count": 54,
   "devices": [
     {
       "catalog_id": "amazfit-balance-3",
@@ -44,6 +44,7 @@
       "checked_at": "2026-08-15",
       "image_key": "amazfit-balance-3",
       "device_source_codes": [
+        11141377,
         11141379,
         11145472
       ]
@@ -149,6 +150,7 @@
       "checked_at": "2026-08-15",
       "image_key": "amazfit-cheetah-2-ultra",
       "device_source_codes": [
+        9978112,
         9978113
       ]
     },
@@ -334,8 +336,11 @@
       "image_key": "amazfit-t-rex-3-pro-48-44mm",
       "device_source_codes": [
         10551552,
+        10551553,
         10551555,
-        10682625
+        10682624,
+        10682625,
+        10682627
       ]
     },
     {
@@ -447,8 +452,10 @@
       "checked_at": "2026-08-15",
       "image_key": "amazfit-active-2-44mm",
       "device_source_codes": [
+        8913155,
         10092800,
         10092801,
+        10092803,
         10092807
       ]
     },
@@ -746,7 +753,9 @@
       "asset_hash": "sha256:04AD7D302028FBE17109D3EDCC214DA12C085B2E2F2AF12DCE5C7094256373D2",
       "checked_at": "2026-08-15",
       "image_key": "amazfit-active-42mm",
-      "device_source_codes": []
+      "device_source_codes": [
+        8323329
+      ]
     },
     {
       "catalog_id": "amazfit-bip-5-46mm",
@@ -1058,6 +1067,7 @@
       "checked_at": "2026-08-15",
       "image_key": "amazfit-gtr-4-46mm",
       "device_source_codes": [
+        7930112,
         7930113
       ]
     },
@@ -1860,7 +1870,9 @@
       "image_key": null,
       "status": "active",
       "supported": true,
-      "device_source_codes": []
+      "device_source_codes": [
+        10486019
+      ]
     },
     {
       "catalog_id": "amazfit-smart-scale",
@@ -1884,11 +1896,11 @@
       "official_page": "https://amazfit-en.cdn.bcebos.com/smart-scale.html",
       "official_url": "https://amazfit-en.cdn.bcebos.com/smart-scale.html",
       "image_source_url": "https://site-cdn.huami.com/files/amazfit/amazfit-en/mobile/smart-scale/1-1.jpg",
-      "asset_source": "official-cdn",
+      "asset_source": "official-cdn-ai-assisted",
       "canonical_device_key": "amazfit-smart-scale",
       "checked_at": "2026-09-04",
-      "provenance": "First scale in the catalog: `kind == 'scale'` matched zero rows while four people asked for body-composition support (Reddit u/T1beriu and u/DPShiro, GitHub reports on 2.1.0 / 1.1.2 / 1.1.5). Amazfit no longer sells it and www.amazfit.com has no page, but Huami's CDN still serves the original: page snapshot at amazfit-en.cdn.bcebos.com/smart-scale.html, hero shot at site-cdn.huami.com/files/amazfit/amazfit-en/mobile/smart-scale/1-1.jpg -- the art here is that shot, cut out of its studio background. Officially 16 body-composition metrics over Bluetooth 5.0 and 2.4 GHz Wi-Fi, paired with the Zepp app. No deviceSource is claimed: nobody has reported from one, and an invented number would mislabel some other device.",
-      "asset_hash": "sha256:C76CEC1FD8BB404ECD7219073E8027FDC33CF8B3C54FF57E672E2843C32285B3",
+      "provenance": "First scale in the catalog: `kind == 'scale'` matched zero rows while four people asked for body-composition support (Reddit u/T1beriu and u/DPShiro, GitHub reports on 2.1.0 / 1.1.2 / 1.1.5). Amazfit no longer sells it and www.amazfit.com has no page, but Huami's CDN still serves the original: page snapshot at amazfit-en.cdn.bcebos.com/smart-scale.html, hero shot at site-cdn.huami.com/files/amazfit/amazfit-en/mobile/smart-scale/1-1.jpg -- the art here is that shot, cut out of its studio background. Officially 16 body-composition metrics over Bluetooth 5.0 and 2.4 GHz Wi-Fi, paired with the Zepp app. No deviceSource is claimed: nobody has reported from one, and an invented number would mislabel some other device. On 2026-09-21 the existing cutout was edited with imagegen to add transparent breathing room, then normalized by the repository asset pipeline; this is an AI-assisted derivative, not an untouched official photograph.",
+      "asset_hash": "sha256:41154D6B0A3339FF5CAEB28D8EBBBA34A87E2557C04653A8F7EF84BE888C6817",
       "image_key": "amazfit-smart-scale",
       "status": "active",
       "supported": true,
@@ -1921,6 +1933,63 @@
       "canonical_device_key": "mi-body-composition-scale-2",
       "checked_at": "2026-09-04",
       "provenance": "Asked for twice in GitHub reports (1.1.2 in Chinese, 1.1.5 on macOS: \"still working with the Zepp app but not recognized here\"). A Xiaomi product, so official_url points at Xiaomi's own page and there is no Huami CDN art; none ships and the interface falls back to its inline scale placeholder. Listed because its readings arrive on the same cloud surface as every other weigh-in (/users/{id}/members/-1/weightRecords) -- only the name and picture were missing. No deviceSource is claimed.",
+      "asset_hash": null,
+      "image_key": null,
+      "status": "active",
+      "supported": true,
+      "device_source_codes": []
+    },
+    {
+      "catalog_id": "amazfit-bip",
+      "canonical_name": "Amazfit Bip",
+      "display_name": "Amazfit Bip",
+      "name_zh": "Amazfit 米动手表青春版 Bip",
+      "kind": "watch",
+      "model_codes": [],
+      "aliases": [
+        "Amazfit Bip",
+        "Bip",
+        "Amazfit Bip 1",
+        "Bip 1",
+        "米动手表青春版"
+      ],
+      "region": [
+        "global"
+      ],
+      "official_page": "https://support.amazfit.com/en/amazfit_bip/user-guide",
+      "official_url": "https://support.amazfit.com/en/amazfit_bip/user-guide",
+      "image_source_url": null,
+      "asset_source": "pending-official-art",
+      "canonical_device_key": "amazfit-bip",
+      "checked_at": "2026-09-12",
+      "provenance": "Original Amazfit Bip confirmed by the official Amazfit Bip user manual. Issue #78 requests Bip 1 in the picker; no unverified cloud source number or borrowed product image is assigned.",
+      "asset_hash": null,
+      "image_key": null,
+      "status": "active",
+      "supported": true,
+      "device_source_codes": []
+    },
+    {
+      "catalog_id": "amazfit-pace",
+      "canonical_name": "Amazfit Pace",
+      "display_name": "Amazfit Pace",
+      "name_zh": "Amazfit Pace",
+      "kind": "watch",
+      "model_codes": [],
+      "aliases": [
+        "Amazfit Pace",
+        "Pace"
+      ],
+      "region": [
+        "global"
+      ],
+      "official_page": "https://support.amazfit.com/it/amazfit_pace/user-guide",
+      "official_url": "https://support.amazfit.com/it/amazfit_pace/user-guide",
+      "image_source_url": null,
+      "asset_source": "pending-official-art",
+      "canonical_device_key": "amazfit-pace",
+      "checked_at": "2026-09-21",
+      "provenance": "Amazfit Pace name verified against official Amazfit support on 2026-09-21; requested in feedback 5bf0a448-dec6-40eb-816b-691097cda1f4. Name matching and manual identification only; source 400 is deliberately unmapped. Product art pending verification.",
       "asset_hash": null,
       "image_key": null,
       "status": "active",

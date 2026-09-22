@@ -239,7 +239,7 @@ pub struct DatabaseHealth {
     /// 只有命令行的人没有那次启动，这两个值可以差上好几个版本。
     #[serde(default)]
     pub stored_normalizer_revision: Option<String>,
-    /// 库里存着报文，而它们是另一版解析器归一化的——欠一次重放。
+    /// 库里有旧版或尚未处理的报文，需要本地重放。
     #[serde(default)]
     pub normalizer_replay_pending: bool,
     /// 后台重放正在进行。此时云端同步会以 `deferred` 让路，这不是失败。
@@ -247,11 +247,47 @@ pub struct DatabaseHealth {
     pub database_bytes: u64,
     pub raw_records: i64,
     pub canonical_records: i64,
-    /// 已保留但当前 normalizer 还没能产出任何 canonical 行的 raw 报文数。
+    /// Raw records without a successful attempt or quarantine at the current revision.
     pub pending_normalization: i64,
+    /// Per-stream processing outcomes. `processed_without_output` means the
+    /// parser returned no rows; it does not claim the payload is understood.
+    #[serde(default)]
+    pub normalization_by_stream: Vec<NormalizationHealth>,
     /// 最近一次 `PRAGMA integrity_check` 的结果，`None` = 从没跑过。
     /// 这是显式动作，不在每次打开页面时自动跑。
     pub last_integrity_check: Option<IntegrityCheckResult>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NormalizationHealth {
+    pub stream: String,
+    pub state: String,
+    pub records: i64,
+}
+
+impl Database {
+    fn normalization_health(&self) -> Result<Vec<NormalizationHealth>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT r.stream,
+                CASE WHEN q.revision = ?1 THEN 'quarantined'
+                     WHEN n.revision = ?1 AND n.records_written > 0 THEN 'normalized'
+                     WHEN n.revision = ?1 THEN 'processed_without_output'
+                     ELSE 'pending' END AS state,
+                COUNT(*)
+             FROM raw_records r
+             LEFT JOIN raw_normalization n ON n.raw_record_id = r.id
+             LEFT JOIN raw_quarantine q ON q.raw_record_id = r.id
+             GROUP BY r.stream, state ORDER BY r.stream, state",
+        )?;
+        let rows = stmt.query_map([NORMALIZER_REVISION], |row| {
+            Ok(NormalizationHealth {
+                stream: row.get(0)?,
+                state: row.get(1)?,
+                records: row.get(2)?,
+            })
+        })?;
+        Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -604,37 +640,14 @@ impl Database {
                   + (SELECT COUNT(*) FROM sleep_sessions)
                   + (SELECT COUNT(*) FROM workouts)",
         )?;
-        // 「待归一化」= 留着的报文一条标准化记录都没产出。
-        //
-        // `workout_detail` 的产物落在 `workout_samples` / `route_points` /
-        // `workout_pauses`，这三张表按 `workout_id` 关联，**没有 raw_record_id**
-        // 这一列——所以只按 raw_record_id 查那四张表，会把每一条解析得好好的
-        // 运动详情都算成「没归一化」，数字只增不减，用户重放多少次也降不下来。
-        // 这里按 source_key（`workout_detail:{workout_id}:{source}`）把它认回来。
-        let pending_normalization = self.scalar_i64(
-            "WITH detail AS (
-                 SELECT r.id AS raw_id,
-                        substr(r.source_key, 16, instr(substr(r.source_key, 16), ':') - 1)
-                            AS workout_id
-                 FROM raw_records r
-                 WHERE r.stream = 'workout_detail'
-                   AND instr(substr(r.source_key, 16), ':') > 1
-             )
-             SELECT COUNT(*) FROM raw_records r
-             WHERE NOT EXISTS (SELECT 1 FROM metric_samples WHERE raw_record_id = r.id)
-               AND NOT EXISTS (SELECT 1 FROM daily_metrics  WHERE raw_record_id = r.id)
-               AND NOT EXISTS (SELECT 1 FROM sleep_sessions WHERE raw_record_id = r.id)
-               AND NOT EXISTS (SELECT 1 FROM workouts       WHERE raw_record_id = r.id)
-               AND NOT EXISTS (
-                     SELECT 1 FROM detail d
-                     WHERE d.raw_id = r.id
-                       AND (EXISTS (SELECT 1 FROM workout_samples s
-                                    WHERE s.workout_id = d.workout_id)
-                         OR EXISTS (SELECT 1 FROM route_points p
-                                    WHERE p.workout_id = d.workout_id)
-                         OR EXISTS (SELECT 1 FROM workout_pauses w
-                                    WHERE w.workout_id = d.workout_id)))",
-        )?;
+        // Canonical rows are upserted by natural keys: losing ownership does
+        // not undo a successful normalization attempt.
+        let normalization_by_stream = self.normalization_health()?;
+        let pending_normalization = normalization_by_stream
+            .iter()
+            .filter(|row| row.state == "pending")
+            .map(|row| row.records)
+            .sum();
 
         let (last_cloud_sync_at, last_cloud_sync_outcome) = self.cloud_sync_metadata()?;
         let newest_sample_at = freshness
@@ -658,6 +671,7 @@ impl Database {
             raw_records: raw_total,
             canonical_records: canonical_total,
             pending_normalization,
+            normalization_by_stream,
             last_integrity_check: self.last_integrity_check()?,
         };
         let timings = HealthTimings {
@@ -954,7 +968,9 @@ fn suggested_actions(
     {
         // 两个理由要分开说。「有报文没产出记录」和「记录是旧规则产出的」
         // 对用户是两件不同的事，混成一句话会让第二种情况看起来像数据丢了。
-        let reason = if database.normalizer_replay_pending {
+        let reason = if database.normalizer_replay_pending
+            && database.stored_normalizer_revision.as_deref() != Some(NORMALIZER_REVISION)
+        {
             format!(
                 "本机派生数据还是 {} 产出的，当前解析器是 {}。重放不触网，也不会改写云端同步时间。",
                 database
@@ -965,7 +981,7 @@ fn suggested_actions(
             )
         } else {
             format!(
-                "有 {} 份已保留的报文还没产出任何标准化记录。重放不触网，也不会改写云端同步时间。",
+                "有 {} 份已保留的报文尚未完成归一化处理。重放不触网，也不会改写云端同步时间。",
                 database.pending_normalization
             )
         };
@@ -1013,18 +1029,6 @@ fn suggested_actions(
     });
     actions.dedup_by(|a, b| a.id == b.id);
     actions
-}
-
-/// 用于测试和 CLI 输出的稳定摘要。
-pub fn summarize_stage(stage: &StageState) -> String {
-    match stage.state.as_str() {
-        "ok" => "正常".into(),
-        "failed" => format!(
-            "失败（{}）",
-            stage.error_kind.as_deref().unwrap_or("unknown")
-        ),
-        _ => "尚未发生".into(),
-    }
 }
 
 #[cfg(test)]
@@ -1106,7 +1110,7 @@ mod tests {
     #[test]
     fn cloud_sync_local_replay_and_manual_reprocess_are_separate_timelines() {
         let db = db();
-        db.record_cloud_sync("2026-08-20T00:00:00+00:00", "updated")
+        db.record_cloud_sync("2026-08-20T00:00:00+00:00", "updated", 1)
             .unwrap();
         db.record_local_replay(false).unwrap();
 
@@ -1275,17 +1279,89 @@ mod tests {
         )
         .unwrap();
         let health = db.data_health(90, 0).unwrap();
-        let ids: Vec<&str> = health
-            .actions
-            .iter()
-            .map(|action| action.id.as_str())
-            .collect();
+        // REPLAY_IN_PROGRESS describes the whole process, not this in-memory
+        // database. Another parallel test can legitimately hold the replay
+        // guard while this assertion runs, so pin that independent input to
+        // the idle state this unit test is meant to exercise.
+        let mut database = health.database.clone();
+        database.replay_in_progress = false;
+        let actions = suggested_actions(&database, &health.timings, &health.streams);
+        let ids: Vec<&str> = actions.iter().map(|action| action.id.as_str()).collect();
         assert!(ids.contains(&"reauth"));
         assert!(
             !ids.contains(&"reprocess"),
             "没有待归一化的报文就不该建议重放"
         );
     }
+    #[test]
+    fn normalization_health_tracks_attempts_not_canonical_ownership() {
+        let db = db();
+        let mut raw = RawRecord {
+            stream: "daily_summary".into(),
+            source_key: "first-page".into(),
+            source_scope: SourceScope::UserFused,
+            device_id: None,
+            start_utc: day(0),
+            end_utc: None,
+            payload: serde_json::json!({"data": [{"date": "2026-09-14", "steps": 1234}]}),
+            capability: CapabilityStatus::Verified,
+        };
+        db.persist_fetched_record(&raw).unwrap();
+        raw.source_key = "overlapping-page".into();
+        db.persist_fetched_record(&raw).unwrap();
+        let health = db.data_health(14, 0).unwrap();
+        assert_eq!(health.database.canonical_records, 1);
+        assert_eq!(health.database.pending_normalization, 0);
+        assert_eq!(health.database.normalization_by_stream[0].records, 2);
+
+        raw.stream = "wellness".into();
+        raw.source_key = "unsupported-wellness".into();
+        raw.payload = serde_json::json!({"items": []});
+        db.persist_fetched_record(&raw).unwrap();
+        raw.stream = "heart_rate".into();
+        raw.source_key = "empty-heart-rate".into();
+        assert!(db.persist_fetched_record(&raw).is_err());
+        let health = db.data_health(14, 0).unwrap();
+        assert_eq!(health.database.pending_normalization, 0);
+        assert!(health
+            .database
+            .normalization_by_stream
+            .iter()
+            .any(|r| r.stream == "wellness"
+                && r.state == "processed_without_output"
+                && r.records == 1));
+        assert!(health
+            .database
+            .normalization_by_stream
+            .iter()
+            .any(|r| r.stream == "heart_rate" && r.state == "quarantined" && r.records == 1));
+
+        // An interrupted sync leaves raw pending even at the current revision.
+        db.set_app_meta("normalizer_revision", NORMALIZER_REVISION)
+            .unwrap();
+        raw.stream = "daily_summary".into();
+        raw.source_key = "first-page".into();
+        raw.payload = serde_json::json!({"data": [{"date": "2026-09-14", "steps": 5678}]});
+        db.insert_raw_record(&raw).unwrap();
+        assert_eq!(
+            db.data_health(14, 0)
+                .unwrap()
+                .database
+                .pending_normalization,
+            1
+        );
+        assert!(db.pending_replay_plan().unwrap().is_some());
+        db.reprocess_raw_records_if_needed().unwrap().unwrap();
+        assert_eq!(
+            db.data_health(14, 0)
+                .unwrap()
+                .database
+                .pending_normalization,
+            0
+        );
+        assert!(db.pending_replay_plan().unwrap().is_none());
+    }
+
     #[test]
     fn a_replayed_workout_detail_is_not_pending_normalization() {
         // 运动详情的产物落在 workout_samples / route_points / workout_pauses，

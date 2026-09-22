@@ -15,7 +15,7 @@
 | 平台 | 数据目录 |
 |---|---|
 | Windows | `ZeppBridge.exe` 旁边的 `data\` |
-| macOS | 可执行文件旁的 `data/`；在 `ZeppBridge.app` 里那个位置不可写，于是回退到 `~/Library/Application Support/com.zeppbridge.ZeppBridge/data` |
+| macOS | 在 `ZeppBridge.app` 里是 `~/Library/Application Support/com.zeppbridge.ZeppBridge/data`（更新会整体替换 app 包，数据不放包内——包里幸存的旧版库会在首次启动时迁过去）；不在包里的可执行文件仍用旁边的 `data/` |
 | Linux | 包管理器安装的（deb、rpm、Flatpak）用 `~/.local/share/zeppbridge/data`——那些前缀不属于这个程序；AppImage 和解包的 tarball 用可执行文件旁的 `data/` |
 | 任何平台 | `$ZEPPBRIDGE_DATA_DIR` 设成绝对路径时覆盖以上全部 |
 
@@ -92,13 +92,16 @@ zeppbridge-cli help
 | 码 | 含义 | 该怎么办 |
 |---|---|---|
 | 0 | 成功 | — |
-| 1 | 其他失败 | 看错误消息 |
+| 1 | 其他失败，包括本地数据不可用 | 看错误消息；查无本地运动时 JSON 的 `errorKind` 为 `data_unavailable`，不再报云端错误 |
 | 2 | 用法错误 | 改命令 |
 | 3 | 未连接 Zepp 账号，或者令牌不在这台机器上 | 打开桌面应用登录，或设 `ZEPPBRIDGE_CREDENTIAL_STORE` |
 | 4 | 另一个进程正在写库 | **稍后重试，这不是失败** |
 | 5 | 云端请求失败 | 退避后重试 |
 | 6 | 本机数据库错误 | 需要人介入 |
 | 7 | 数据库版本与本程序不匹配 | 跑一次 `zeppbridge-cli reprocess`（或启动一次桌面应用）完成升级，或把命令行升到同一版本 |
+| 8 | 同步未完整成功：至少一个数据流失败 | 查看逐流结果后重试；已成功写入的数据保留 |
+
+同步未完整成功时，`--json` 仍输出完整报告，但 `ok` 和 `success` 均为 `false`。仅可选数据流 unavailable / unverified 不触发此退出码。
 
 4 和 1 分开，是因为「桌面应用正开着同步」和「真的出错了」需要完全不同的应对；把它们并成一个码，重试逻辑就没法写。
 
@@ -141,6 +144,7 @@ macOS 下 cron 需要「完全磁盘访问权限」才能读到数据目录。
 ## zeppbridge-mcp
 
 stdio 传输，**不监听任何端口，不发出任何网络请求**。只读由连接层保证（`PRAGMA query_only`），不是靠工具列表里恰好没有写操作。
+每行请求上限为 1 MiB；非法 UTF-8/JSON 和超长行会收到错误响应，后续行仍可继续处理。工具执行失败通过 `result` 返回 `isError: true` 和说明文字；未知工具及调用结构错误仍使用 JSON-RPC 错误。
 
 ### 配置示例
 

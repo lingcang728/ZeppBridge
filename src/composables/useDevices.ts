@@ -1,8 +1,11 @@
+import { displayDateTimeFormatter } from '../lib/dateTime';
 import { computed, ref } from 'vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { deviceImageFor } from '../lib/deviceCatalog';
 import type { DeviceCacheMetadata, DeviceProfile, DeviceProfilesResult } from '../types';
-import { defineMessages, intlLocale, messagesOf } from '../i18n';
+import { defineMessages, messagesOf } from '../i18n';
+import { errorTextFor } from '../i18n/errors';
+import { backendText } from '../i18n/backendText';
 
 /**
  * The device catalog is deliberately treated as account data, not as a list
@@ -63,6 +66,28 @@ const messages = defineMessages(
     networkUnavailable: 'Network unavailable',
     assignmentFailed: 'Could not save the model pick',
   },
+  {
+    stateAccount: 'Conocido por la cuenta',
+    stateUserAssigned: 'Modelo que elegiste',
+    stateRecentData: 'Tiene datos recientes',
+    stateCached: 'Desde la caché',
+    stateUnknown: 'Sin identificar',
+    notFetchedYet: 'Aún sin datos',
+    timeUnknown: 'Hora desconocida',
+    unidentifiedDevice: 'Dispositivo sin identificar',
+    notProvided: 'Sin datos',
+    identifyUnavailable: 'La identificación de dispositivos no está disponible en este momento',
+    cacheUnavailable: 'La caché de dispositivos no está disponible en este momento',
+    noLocalIdentifier: 'Este dispositivo no tiene un identificador local, así que no se puede guardar la elección.',
+    assignmentCleared: 'Elección retirada. Se vuelve a la coincidencia automática.',
+    assignmentSaved: 'Tu elección quedó guardada. Aparece como «Modelo que elegiste», nunca como una coincidencia automática.',
+    assignmentContributed: (reportId: string) =>
+      `Tu elección quedó guardada, y los números de modelo se enviaron a ZeppBridge (reporte ${reportId}). La próxima versión del catálogo identificará este modelo sola.`,
+    assignmentContributionFailed: (reason: string) =>
+      `Tu elección quedó guardada en este equipo. No se pudo enviar el aporte al catálogo: ${reason}`,
+    networkUnavailable: 'Sin conexión a la red',
+    assignmentFailed: 'No se pudo guardar el modelo elegido',
+  },
 );
 
 const copy = () => messagesOf(messages);
@@ -113,7 +138,7 @@ const formatDeviceDate = (value?: string | null): string => {
   if (!value) return copy().notFetchedYet;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return copy().timeUnknown;
-  return new Intl.DateTimeFormat(intlLocale(), {
+  return displayDateTimeFormatter({
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -159,10 +184,16 @@ const requestProfiles = (refresh: boolean): Promise<DeviceProfilesResult> => {
   return request;
 };
 
+const refreshErrorText = (meta: DeviceCacheMetadata): string | null => {
+  if (!meta.refresh_error && !meta.refresh_error_code) return null;
+  return errorTextFor(meta.refresh_error_code)
+    ?? backendText(meta.refresh_error, copy().identifyUnavailable);
+};
+
 const applyResult = (result: DeviceProfilesResult): void => {
   profiles.value = result.profiles;
   cache.value = result.cache;
-  error.value = result.cache.refresh_error || null;
+  error.value = refreshErrorText(result.cache);
 };
 
 const setLoadFailure = (cause: unknown, refresh: boolean): void => {

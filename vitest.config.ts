@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config';
+import vue from '@vitejs/plugin-vue';
 
 /*
  * 只跑纯函数层：`src/lib/` 里的格式化、序列整形、运动可见性和导出范围。
@@ -8,6 +9,7 @@ import { defineConfig } from 'vitest/config';
  * 「缺失值不能变成 0」「时长为负要拒绝」这类会直接骗到用户的规则。
  */
 export default defineConfig({
+  plugins: [vue()],
   test: {
     include: ['src/**/__tests__/**/*.test.ts'],
     environment: 'node',

@@ -49,6 +49,8 @@ const ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(50);
 /// 有上限是关键：thread-per-connection 没有上限时，本机上任何一个进程都能
 /// 靠不断建连接把线程数顶爆。
 const WORKER_THREADS: usize = 4;
+/// accept 队列上限。无界 channel 时本机任意进程都能靠不断建连接把内存顶满。
+const ACCEPT_QUEUE: usize = WORKER_THREADS * 2;
 
 const TOKEN_PREFIX: &str = "zbk_";
 const TOKEN_RANDOM_BYTES: usize = 32;
@@ -68,10 +70,19 @@ pub struct LocalApiStatus {
     pub token_present: bool,
     /// 只影响 API 本身的可解释错误（端口占用、凭据存储不可用等）。
     pub error: Option<String>,
+    /// `error` 那句话的稳定码。界面按它取自己语言的说法。
+    #[serde(default)]
+    pub error_code: Option<String>,
 }
 
 impl LocalApiStatus {
-    fn new(enabled: bool, running: bool, token_present: bool, error: Option<String>) -> Self {
+    fn new(
+        enabled: bool,
+        running: bool,
+        token_present: bool,
+        error: Option<String>,
+        error_code: Option<String>,
+    ) -> Self {
         Self {
             enabled,
             running,
@@ -80,6 +91,7 @@ impl LocalApiStatus {
             workout_series_path: "/workouts/{id}/series".to_string(),
             token_present,
             error,
+            error_code,
         }
     }
 }
@@ -96,7 +108,14 @@ struct RunningServer {
 }
 
 impl RunningServer {
-    /// 停止接受连接、回收后台线程，并保证返回时 43921 已经释放。
+    fn is_alive(&self) -> bool {
+        self.handle
+            .as_ref()
+            .is_some_and(|handle| !handle.is_finished())
+    }
+
+    /// 停止接受连接。accept 循环最多再睡一轮 poll 间隔就会放下 listener，
+    /// 所以这里 join 它不会把 UI 线程卡住去等慢客户端的读超时。
     fn shutdown(mut self) {
         self.stop.store(true, Ordering::SeqCst);
         if let Some(handle) = self.handle.take() {
@@ -109,6 +128,19 @@ struct ControllerInner {
     enabled: bool,
     server: Option<RunningServer>,
     error: Option<String>,
+    error_code: Option<String>,
+}
+
+impl ControllerInner {
+    fn set_fault(&mut self, code: &'static str, message: String) {
+        self.error_code = Some(code.to_string());
+        self.error = Some(message);
+    }
+
+    fn clear_fault(&mut self) {
+        self.error = None;
+        self.error_code = None;
+    }
 }
 
 /// 本机 API 的唯一生命周期管理者。
@@ -150,9 +182,9 @@ impl LocalApiController {
         bind_address: String,
         credentials: Arc<dyn CredentialBackend>,
     ) -> Self {
-        debug_assert!(
-            bind_address.starts_with("127.0.0.1:"),
-            "本机 API 只允许绑定 loopback"
+        assert!(
+            is_loopback_bind_address(&bind_address),
+            "本机 API 只允许绑定 127.0.0.1，收到：{bind_address}"
         );
         Self {
             data_dir,
@@ -162,6 +194,7 @@ impl LocalApiController {
                 enabled: false,
                 server: None,
                 error: None,
+                error_code: None,
             }),
         }
     }
@@ -175,6 +208,7 @@ impl LocalApiController {
         let enabled = read_enabled_flag(&self.data_dir);
         let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         inner.enabled = enabled;
+        self.reap_dead_server(&mut inner);
         if enabled {
             self.spawn_locked(&mut inner);
         }
@@ -182,7 +216,8 @@ impl LocalApiController {
     }
 
     pub fn status(&self) -> LocalApiStatus {
-        let inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        self.reap_dead_server(&mut inner);
         self.status_locked(&inner)
     }
 
@@ -190,7 +225,8 @@ impl LocalApiController {
     pub fn set_enabled(&self, enabled: bool) -> LocalApiStatus {
         let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         inner.enabled = enabled;
-        inner.error = None;
+        inner.clear_fault();
+        self.reap_dead_server(&mut inner);
         if enabled {
             if inner.server.is_none() {
                 self.spawn_locked(&mut inner);
@@ -201,7 +237,7 @@ impl LocalApiController {
         // 存不下就说出来。这个开关的意义是「下次启动还开着」，存不下时它
         // 只是这一次进程里有效，而用户有权知道这件事。
         if let Err(error) = write_enabled_flag(&self.data_dir, enabled) {
-            inner.error = Some(error);
+            inner.set_fault("err.local_api.state_write_failed", error);
         }
         self.status_locked(&inner)
     }
@@ -241,9 +277,10 @@ impl LocalApiController {
         );
         let mut status = LocalApiStatus::new(
             inner.enabled,
-            inner.server.is_some(),
+            inner.server.as_ref().is_some_and(RunningServer::is_alive),
             token_present,
             inner.error.clone(),
+            inner.error_code.clone(),
         );
         if let Some(server) = inner.server.as_ref() {
             status.address = server.local_addr.to_string();
@@ -272,26 +309,42 @@ impl LocalApiController {
         let token = match self.ensure_token() {
             Ok(token) => token,
             Err(error) => {
-                inner.error = Some(error);
+                inner.set_fault("err.local_api.token_unavailable", error);
                 return;
             }
         };
         let listener = match TcpListener::bind(self.bind_address.as_str()) {
             Ok(listener) => listener,
             Err(error) => {
-                inner.error = Some(bind_error_message(&self.bind_address, &error));
+                inner.set_fault(
+                    bind_error_code(&error),
+                    bind_error_message(&self.bind_address, &error),
+                );
                 return;
             }
         };
         let local_addr = match listener.local_addr() {
             Ok(address) => address,
             Err(error) => {
-                inner.error = Some(bind_error_message(&self.bind_address, &error));
+                inner.set_fault(
+                    bind_error_code(&error),
+                    bind_error_message(&self.bind_address, &error),
+                );
                 return;
             }
         };
+        if !local_addr.ip().is_loopback() {
+            inner.set_fault(
+                "err.local_api.bind_failed",
+                "本机 API 只允许绑定 loopback".to_string(),
+            );
+            return;
+        }
         if let Err(error) = listener.set_nonblocking(true) {
-            inner.error = Some(bind_error_message(&self.bind_address, &error));
+            inner.set_fault(
+                bind_error_code(&error),
+                bind_error_message(&self.bind_address, &error),
+            );
             return;
         }
 
@@ -305,7 +358,7 @@ impl LocalApiController {
             .spawn(move || serve(listener, data_dir, thread_stop, thread_token))
         {
             Ok(handle) => {
-                inner.error = None;
+                inner.clear_fault();
                 inner.server = Some(RunningServer {
                     stop,
                     token,
@@ -314,9 +367,41 @@ impl LocalApiController {
                 });
             }
             Err(error) => {
-                inner.error = Some(format!("无法启动本机 API 线程：{error}"));
+                inner.set_fault(
+                    "err.local_api.thread_failed",
+                    format!("无法启动本机 API 线程：{error}"),
+                );
             }
         }
+    }
+
+    fn reap_dead_server(&self, inner: &mut ControllerInner) {
+        if inner.server.as_ref().is_some_and(RunningServer::is_alive) {
+            return;
+        }
+        if let Some(mut server) = inner.server.take() {
+            if let Some(handle) = server.handle.take() {
+                let _ = handle.join();
+            }
+            if inner.enabled && inner.error.is_none() {
+                inner.set_fault(
+                    "err.local_api.thread_failed",
+                    "本机 API 监听线程已退出".to_string(),
+                );
+            }
+        }
+    }
+}
+
+fn is_loopback_bind_address(address: &str) -> bool {
+    address.starts_with("127.0.0.1:")
+}
+
+fn bind_error_code(error: &io::Error) -> &'static str {
+    if error.kind() == io::ErrorKind::AddrInUse {
+        "err.local_api.port_in_use"
+    } else {
+        "err.local_api.bind_failed"
     }
 }
 
@@ -397,7 +482,7 @@ fn serve(
 ) {
     // 接进来的连接交给一个固定大小的工作池。accept 这条线程只负责接，
     // 接完立刻回到 accept——一个慢客户端最多占住一个 worker，堵不住其他人。
-    let (sender, receiver) = mpsc::channel::<TcpStream>();
+    let (sender, receiver) = mpsc::sync_channel::<TcpStream>(ACCEPT_QUEUE);
     // `Receiver` 不是 `Sync`，所以几个 worker 共享一把锁轮流取。锁只在
     // `recv` 期间持有，真正的请求处理在锁外面。
     let receiver = Arc::new(Mutex::new(receiver));
@@ -425,13 +510,19 @@ fn serve(
 
     while !stop.load(Ordering::SeqCst) {
         match listener.accept() {
-            Ok((stream, _)) => {
+            Ok((stream, peer)) => {
+                if !peer.ip().is_loopback() {
+                    continue;
+                }
                 if stream.set_nonblocking(false).is_err() {
                     continue;
                 }
-                if sender.send(stream).is_err() {
-                    // 一个 worker 都没有了，再接也没人处理。
-                    break;
+                match sender.try_send(stream) {
+                    Ok(()) => {}
+                    Err(mpsc::TrySendError::Full(_)) => {
+                        // 队列已满：丢掉这条连接，保持 accept 循环能响应 stop。
+                    }
+                    Err(mpsc::TrySendError::Disconnected(_)) => break,
                 }
             }
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
@@ -444,13 +535,12 @@ fn serve(
         }
     }
 
-    // 关掉发送端，worker 处理完手上的连接后自行退出；join 一遍再返回，
-    // 这样 `set_enabled(false)` 回来时端口是真的没人用了。
+    // 先放下 listener，端口立刻释放。worker 处理完手上的连接后自行退出，
+    // 不在这里 join——`set_enabled(false)` 拿着 controller 锁，join 读超时
+    // 会把设置页冻住。
+    drop(listener);
     drop(sender);
-    for worker in workers {
-        let _ = worker.join();
-    }
-    // listener 在这里 drop，端口随之释放。
+    drop(workers);
 }
 
 fn handle_connection(stream: &mut TcpStream, data_dir: &Path, token: &str) -> io::Result<()> {
@@ -1162,6 +1252,35 @@ mod tests {
     }
 
     #[test]
+    fn disabling_does_not_wait_for_a_silent_client() {
+        let dir = temp_dir("disable-fast");
+        let address = ephemeral_address();
+        let controller = controller_at(&dir, address.clone());
+        controller.set_enabled(true);
+        let _silent = ClientStream::connect(address.as_str()).unwrap();
+        let started = std::time::Instant::now();
+        let disabled = controller.set_enabled(false);
+        let elapsed = started.elapsed();
+        assert!(!disabled.running);
+        assert!(
+            elapsed < Duration::from_millis(800),
+            "关闭本机 API 等了 {elapsed:?}——shutdown 仍在 UI 线程 join worker"
+        );
+        assert!(ClientStream::connect(address.as_str()).is_err());
+    }
+
+    #[test]
+    #[should_panic(expected = "本机 API 只允许绑定 127.0.0.1")]
+    fn refuses_a_non_loopback_bind_address() {
+        let dir = temp_dir("not-loopback");
+        let _ = LocalApiController::with_bind_address(
+            dir,
+            "0.0.0.0:43921".to_string(),
+            Arc::new(MemoryCredentials::default()),
+        );
+    }
+
+    #[test]
     fn rotating_the_token_invalidates_the_previous_one_immediately() {
         let dir = temp_dir("rotate");
         let controller = controller(&dir);
@@ -1189,6 +1308,10 @@ mod tests {
         assert!(!status.running, "端口占用时不得谎报正在运行");
         let message = status.error.expect("端口占用必须有可解释的错误");
         assert!(message.contains(&port), "{message}");
+        assert_eq!(
+            status.error_code.as_deref(),
+            Some("err.local_api.port_in_use")
+        );
         drop(squatter);
     }
 }

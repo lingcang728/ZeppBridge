@@ -1,8 +1,8 @@
+import { displayDateTimeFormatter, parseDisplayDate } from './dateTime';
 import { defineMessages, intlLocale, messagesOf } from '../i18n';
 import {
   bigDistanceThresholdMeters,
   distanceUnitLabel,
-  paceUnitLabel,
   shortDistanceUnitLabel,
   toBigDistance,
   toShortDistance,
@@ -36,6 +36,16 @@ const messages = defineMessages(
     duration: (hours: number, minutes: number) =>
       (hours > 0 ? `${hours} hr ${minutes} min` : `${minutes} min`),
   },
+  {
+    noUpdates: 'Sin actualizaciones',
+    noRecords: 'Aún no hay registros',
+    timeUnknown: 'Hora desconocida',
+    dateUnknown: 'Fecha desconocida',
+    durationUnknown: 'Duración desconocida',
+    notRecorded: 'No registrado',
+    duration: (hours: number, minutes: number) =>
+      (hours > 0 ? `${hours} h ${minutes} min` : `${minutes} min`),
+  },
 );
 
 const copy = () => messagesOf(messages);
@@ -52,9 +62,9 @@ export const localDateString = (date: Date): string => {
 
 export const formatDateTime = (value?: string, empty = copy().noUpdates): string => {
   if (!value) return empty;
-  const date = new Date(value);
+  const date = parseDisplayDate(value);
   if (Number.isNaN(date.getTime())) return empty;
-  return new Intl.DateTimeFormat(intlLocale(), {
+  return displayDateTimeFormatter({
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -64,9 +74,9 @@ export const formatDateTime = (value?: string, empty = copy().noUpdates): string
 
 export const formatFullDateTime = (value?: string, empty = copy().noRecords): string => {
   if (!value) return empty;
-  const date = new Date(value);
+  const date = parseDisplayDate(value);
   if (Number.isNaN(date.getTime())) return copy().timeUnknown;
-  return new Intl.DateTimeFormat(intlLocale(), {
+  return displayDateTimeFormatter({
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -76,17 +86,17 @@ export const formatFullDateTime = (value?: string, empty = copy().noRecords): st
 };
 
 export const formatDate = (value: string, style: 'short' | 'long' = 'short'): string => {
-  const date = new Date(value);
+  const date = parseDisplayDate(value);
   if (Number.isNaN(date.getTime())) return copy().dateUnknown;
   if (style === 'long') {
-    return new Intl.DateTimeFormat(intlLocale(), {
+    return displayDateTimeFormatter({
       year: 'numeric',
       month: 'long',
       day: 'numeric',
       weekday: 'long',
     }).format(date);
   }
-  return new Intl.DateTimeFormat(intlLocale(), {
+  return displayDateTimeFormatter({
     month: 'short',
     day: 'numeric',
     weekday: 'short',
@@ -94,10 +104,10 @@ export const formatDate = (value: string, style: 'short' | 'long' = 'short'): st
 };
 
 export const formatTime = (value: string): string => {
-  const date = new Date(value);
+  const date = parseDisplayDate(value);
   return Number.isNaN(date.getTime())
     ? '—'
-    : new Intl.DateTimeFormat(intlLocale(), { hour: '2-digit', minute: '2-digit' }).format(date);
+    : displayDateTimeFormatter({ hour: '2-digit', minute: '2-digit' }).format(date);
 };
 
 export const formatDuration = (minutes?: number | null, empty = copy().durationUnknown): string => {
@@ -111,18 +121,6 @@ export const formatDistance = (meters?: number, empty = copy().notRecorded): str
   return meters >= bigDistanceThresholdMeters()
     ? `${toBigDistance(meters).toFixed(2)} ${distanceUnitLabel()}`
     : `${Math.round(toShortDistance(meters))} ${shortDistanceUnitLabel()}`;
-};
-
-export const formatPace = (
-  distanceMeters?: number,
-  durationMinutes?: number | null,
-): string | null => {
-  if (!isFiniteNumber(distanceMeters) || distanceMeters <= 0) return null;
-  if (!isFiniteNumber(durationMinutes) || durationMinutes <= 0) return null;
-  // 先换算成「每个显示单位多少秒」再取整，不是把公制结果再乘一次：
-  // 先取整再换算会把四舍五入的误差也一并放大 1.6 倍。
-  const totalSeconds = Math.round((durationMinutes * 60) / (toBigDistance(distanceMeters)));
-  return `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, '0')} ${paceUnitLabel()}`;
 };
 
 export const formatMetric = (value: number | undefined, digits = 0): string => {

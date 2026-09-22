@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
-import { VChart } from '../lib/echartsSetup';
+import { CHART_THEME, VChart } from '../lib/echartsSetup';
 import Icon from '../components/Icon.vue';
 import CircularProgress from '../components/CircularProgress.vue';
 import StageBar from '../components/StageBar.vue';
@@ -50,6 +50,7 @@ const messages = defineMessages(
     hoursAxis: '小时',
     tooltipTotal: (date: string, hours: string) => `<b>${date} 睡眠合计：${hours} 小时</b><br/>`,
     tooltipRow: (name: string, hours: number) => `${name}: ${hours} 小时<br/>`,
+    tooltipRowMissing: (name: string) => `${name}: 未提供<br/>`,
   },
   {
     backToRecent: 'Back to recent records',
@@ -92,6 +93,50 @@ const messages = defineMessages(
     hoursAxis: 'hours',
     tooltipTotal: (date: string, hours: string) => `<b>${date} — ${hours} h asleep in total</b><br/>`,
     tooltipRow: (name: string, hours: number) => `${name}: ${hours} h<br/>`,
+    tooltipRowMissing: (name: string) => `${name}: Not provided<br/>`,
+  },
+  {
+    backToRecent: 'Volver a registros recientes',
+    title: 'Registro de sueño',
+    loadingDetail: 'Leyendo el registro de sueño…',
+    loadFailedTitle: 'No se pudo leer este registro de sueño',
+    loadFailed: 'El detalle del sueño no está disponible en este momento',
+    retry: 'Reintentar',
+    notFoundTitle: 'Este registro de sueño no está aquí',
+    notFoundMessage: 'Puede que se haya borrado, o que todavía no se haya sincronizado en este equipo.',
+    heroAria: 'Duración y puntuación del sueño',
+    durationKicker: 'Tiempo dormido',
+    heroMeta: (fellAsleep: string, wokeUp: string, inBed: string) =>
+      `Te dormiste ${fellAsleep} · despertaste ${wokeUp} · en cama ${inBed}`,
+    scoreKicker: 'Puntuación de sueño',
+    scoreNote: 'Reportada por el dispositivo; se muestra tal como se registró, nada más.',
+    stagesAria: 'Fases del sueño',
+    stagesTitle: 'Fases del sueño',
+    stageHelpButton: 'Qué significan las fases',
+    stageHelp: 'Profundo: el tramo reparador. Ligero: la fase de transición que ocupa la mayor parte de la noche. REM: movimiento ocular rápido, asociado a la memoria y los sueños. Despierto: despertares o ratos despierto durante la noche. Son definiciones, no un diagnóstico de salud.',
+    weeklyAria: 'Sueño de los últimos 7 días',
+    weeklyTitle: 'Estructura del sueño, últimos 7 días',
+    weeklySub: 'Fases apiladas por noche',
+    weeklyChartAria: 'Gráfico de barras apiladas con la estructura del sueño de los últimos 7 días',
+    metaAria: 'Fuente y dispositivo',
+    sourceTitle: 'Fuente',
+    sourceProvider: 'Proveedor',
+    sourceScope: 'Alcance',
+    syncedAt: 'Sincronizado',
+    timezone: 'Zona horaria',
+    deviceTitle: 'Dispositivo',
+    deviceName: 'Nombre',
+    deviceFirmware: 'Firmware',
+    deviceId: 'ID del dispositivo',
+    footnote: 'Solo el resumen de fases que realmente dio la nube. Cuando no hay campo de REM aparece «Sin datos» (nunca se calcula restando), y nunca se dibuja una línea de tiempo que no se recibió.',
+    notProvided: 'Sin datos',
+    syncTimeMissing: 'Hora de sincronización no disponible',
+    lastCloudSync: (clock: string) => `Última sincronización con la nube ${clock}`,
+    deviceUndetermined: 'Dispositivo sin determinar',
+    hoursAxis: 'horas',
+    tooltipTotal: (date: string, hours: string) => `<b>${date}: ${hours} h de sueño en total</b><br/>`,
+    tooltipRow: (name: string, hours: number) => `${name}: ${hours} h<br/>`,
+    tooltipRowMissing: (name: string) => `${name}: Sin datos<br/>`,
   },
 );
 const t = useMessages(messages);
@@ -101,6 +146,7 @@ import { useDevices } from '../composables/useDevices';
 import { dataProviderLabel, dataScopeLabel } from '../lib/labels';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { formatDate, formatDateTime, formatDuration, formatTime, isFiniteNumber } from '../lib/format';
+import { minutesToHours } from '../lib/missingValues';
 import { zeppSemanticColors } from '../lib/echartsTheme';
 import type { DeviceProfile, SleepSession } from '../types';
 
@@ -148,17 +194,12 @@ const weeklyChartOption = computed(() => {
   if (!weekSessions.value.length) return null;
   const sorted = [...weekSessions.value].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
   
-  const dates = sorted.map((s) => {
-    const d = new Date(s.start_time);
-    return `${d.getMonth() + 1}/${d.getDate()}`;
-  });
+  const dates = sorted.map((s) => formatDate(s.start_time));
 
-  const toHours = (mins?: number | null) => (isFiniteNumber(mins) && mins > 0 ? Math.round((mins / 60) * 10) / 10 : 0);
-
-  const deepData = sorted.map((s) => toHours(s.deep_minutes));
-  const lightData = sorted.map((s) => toHours(s.light_minutes));
-  const remData = sorted.map((s) => toHours(s.rem_minutes));
-  const awakeData = sorted.map((s) => toHours(s.awake_minutes));
+  const deepData = sorted.map((s) => minutesToHours(s.deep_minutes));
+  const lightData = sorted.map((s) => minutesToHours(s.light_minutes));
+  const remData = sorted.map((s) => minutesToHours(s.rem_minutes));
+  const awakeData = sorted.map((s) => minutesToHours(s.awake_minutes));
 
   // 标出当前日高亮
   const currentIndex = sorted.findIndex((s) => s.sleep_id === sleepId.value);
@@ -181,13 +222,15 @@ const weeklyChartOption = computed(() => {
       borderColor: 'rgba(228, 235, 208, 0.16)',
       borderWidth: 1,
       textStyle: { color: '#F3F4EC', fontSize: 15.5 },
-      formatter: (params: Array<{ seriesName: string; value: number; name: string }>) => {
+      formatter: (params: Array<{ seriesName: string; value: number | null; name: string }>) => {
         if (!params || !params.length) return '';
         const name = params[0].name;
-        const total = params.reduce((sum, p) => sum + (Number(p.value) || 0), 0);
+        const total = params.reduce((sum, p) => sum + (isFiniteNumber(p.value) ? p.value : 0), 0);
         let text = t.value.tooltipTotal(name, total.toFixed(1));
         params.forEach((p) => {
-          text += t.value.tooltipRow(p.seriesName, p.value);
+          text += isFiniteNumber(p.value)
+            ? t.value.tooltipRow(p.seriesName, p.value)
+            : t.value.tooltipRowMissing(p.seriesName);
         });
         return text;
       },
@@ -351,7 +394,7 @@ watch([dataRevision, sleepId], () => void loadDetail());
           <h2>{{ t.weeklyTitle }}</h2>
           <p>{{ t.weeklySub }}</p>
         </div>
-        <VChart class="weekly-sleep-chart" :option="weeklyChartOption" autoresize role="img" :aria-label="t.weeklyChartAria" />
+        <VChart class="weekly-sleep-chart" :theme="CHART_THEME" :option="weeklyChartOption" autoresize role="img" :aria-label="t.weeklyChartAria" />
       </section>
 
       <!-- 元数据与设备 -->

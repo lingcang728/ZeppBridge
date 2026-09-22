@@ -1,6 +1,7 @@
 use crate::app_state::{mask_user_id, AppState};
 use crate::ipc_error::AppError;
 use crate::ipc_types::{capability_views, stream_views, AppStatus, StreamStatusView};
+use chrono::Local;
 
 /// Build the non-sensitive snapshot used by the dashboard and settings UI.
 ///
@@ -25,7 +26,7 @@ pub(crate) async fn build_app_status(state: &AppState) -> std::result::Result<Ap
         let cloud_metadata = database.cloud_sync_metadata()?;
         let prefs = database.user_prefs()?;
         let storage = database.storage_estimate(prefs.history_sync_days, &state.data_dir)?;
-        let coverage = database.local_coverage()?;
+        let coverage = database.local_coverage(Local::now().date_naive())?;
         (
             statuses,
             freshness,

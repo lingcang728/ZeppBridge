@@ -1,8 +1,6 @@
 <script setup lang="ts">
 defineOptions({ name: 'WorkoutList' });
 import { computed, onMounted, ref, watch } from 'vue';
-import { RouterLink } from 'vue-router';
-import Icon from '../components/Icon.vue';
 import PageHeader from '../components/PageHeader.vue';
 import RecordRow from '../components/RecordRow.vue';
 import EmptyState from '../components/EmptyState.vue';
@@ -12,6 +10,7 @@ import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { formatDate, formatDistance, formatDuration, isFiniteNumber } from '../lib/format';
 import { displayableWorkouts, workoutDisplayLabel, workoutDisplayType, workoutDurationMinutes } from '../lib/workouts';
 import type { Workout } from '../types';
+import { createLoadSeq } from '../lib/loadSeq';
 import { defineMessages, useMessages } from '../i18n';
 
 const messages = defineMessages(
@@ -53,6 +52,25 @@ const messages = defineMessages(
     loadMore: 'Load more',
     loadingMore: 'Loading…',
   },
+  {
+    backToRecent: 'Volver a registros recientes',
+    backToOverview: 'Volver al resumen',
+    title: 'Entrenamientos',
+    intro: 'Entrenamientos sincronizados en este equipo. Sin recorrido, no hay mapa.',
+    loadFailedTitle: 'No se pudieron leer los entrenamientos',
+    loadFailed: 'La lista de entrenamientos no está disponible en este momento',
+    retry: 'Reintentar',
+    emptyTitle: 'Todavía no hay nada que mostrar',
+    emptyMessage: 'Después de sincronizar, aquí solo aparecen los registros que tienen tipo, hora y al menos una métrica real. Sin GPS ni muestras punto a punto, no se dibuja un gráfico vacío.',
+    labelDistance: 'Distancia',
+    labelBurn: 'Calorías',
+    labelDuration: 'Duración',
+    notProvided: 'Sin datos',
+    footnote: (count: number) => `${count} registros mostrados`,
+    shown: (loaded: number, total: number) => `Cargados ${loaded} de ${total}`,
+    loadMore: 'Cargar más',
+    loadingMore: 'Cargando…',
+  },
 );
 const t = useMessages(messages);
 
@@ -72,6 +90,7 @@ const displayableList = computed(() => displayableWorkouts(workouts.value));
 const PAGE_SIZE = 200;
 const total = ref(0);
 const loadingMore = ref(false);
+const listEpoch = createLoadSeq();
 const hasMore = computed(() => workouts.value.length < total.value);
 
 function workoutTypeBg(type: string): string {
@@ -104,9 +123,11 @@ const workoutFact = (workout: Workout): { fact: string; label: string } => {
 };
 
 const loadList = async () => {
+  const epoch = listEpoch.next();
   loading.value = true;
   error.value = null;
   if (!isTauri()) {
+    if (!listEpoch.isCurrent(epoch)) return;
     loading.value = false;
     workouts.value = [];
     total.value = 0;
@@ -114,29 +135,35 @@ const loadList = async () => {
   }
   try {
     const page = await tauriApi.getWorkoutPage(PAGE_SIZE, 0);
+    if (!listEpoch.isCurrent(epoch)) return;
     // 过滤留给 `displayableList`：这里保留原始条数，否则 offset 会和后端
     // 的行号对不上，越翻越漏。
     workouts.value = page.items;
     total.value = page.total;
   } catch (cause) {
+    if (!listEpoch.isCurrent(epoch)) return;
     error.value = toUserMessage(cause, t.value.loadFailed);
   } finally {
-    loading.value = false;
+    if (listEpoch.isCurrent(epoch)) loading.value = false;
   }
 };
 
 const loadMore = async () => {
-  if (loadingMore.value || !hasMore.value) return;
+  if (loadingMore.value || loading.value || !hasMore.value) return;
+  const epoch = listEpoch.current();
   loadingMore.value = true;
   try {
-    const page = await tauriApi.getWorkoutPage(PAGE_SIZE, workouts.value.length);
+    const offset = workouts.value.length;
+    const page = await tauriApi.getWorkoutPage(PAGE_SIZE, offset);
+    if (!listEpoch.isCurrent(epoch)) return;
     const seen = new Set(workouts.value.map((item) => item.workout_id));
     workouts.value = [...workouts.value, ...page.items.filter((item) => !seen.has(item.workout_id))];
     total.value = page.total;
   } catch (cause) {
+    if (!listEpoch.isCurrent(epoch)) return;
     error.value = toUserMessage(cause, t.value.loadFailed);
   } finally {
-    loadingMore.value = false;
+    if (listEpoch.isCurrent(epoch)) loadingMore.value = false;
   }
 };
 
@@ -146,8 +173,7 @@ watch(dataRevision, () => void loadList());
 
 <template>
   <section class="page list-page" aria-labelledby="workout-list-title">
-    <RouterLink class="back-link" to="/recent"><Icon name="arrow-left" :size="14" />{{ t.backToRecent }}</RouterLink>
-    <PageHeader back="/" :back-label="t.backToOverview" title-id="workout-list-title" :title="t.title" :intro="t.intro" />
+    <PageHeader back="/recent" :back-label="t.backToRecent" title-id="workout-list-title" :title="t.title" :intro="t.intro" />
 
     <div v-if="loading" class="surface-card" aria-live="polite">
       <SkeletonBlock height="56px" />
@@ -185,16 +211,6 @@ watch(dataRevision, () => void loadList());
 
 <style scoped>
 .list-page { width: 100%; }
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 8px;
-  color: var(--muted);
-  font-size: var(--fs-sm);
-  text-decoration: none;
-}
-.back-link:hover { color: var(--accent); }
 .load-more { display: flex; justify-content: center; margin-top: 12px; }
 .footnote {
   margin: 12px 0 0;

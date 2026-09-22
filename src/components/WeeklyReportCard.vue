@@ -8,11 +8,13 @@
  */
 import { computed, onMounted, ref, watch } from 'vue';
 import Icon from './Icon.vue';
+import ComparisonBars from './ComparisonBars.vue';
 import SkeletonBlock from './SkeletonBlock.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import type { InsightFact, WeeklyReport } from '../types';
 import { defineMessages, useMessages } from '../i18n';
+import { finiteOrNull } from '../lib/missingValues';
 
 const messages = defineMessages(
   {
@@ -29,13 +31,18 @@ const messages = defineMessages(
     barThisWeek: '本周',
     barBaseline: '此前 28 天',
     noBaseline: '此前的数据不够，这次只报现状',
+    baselineCountUnknown: '基线天数未知，这次只报现状不做比较。',
     thinBaseline: (days: number, found: number, needed: number) =>
       `此前 ${days} 天里只有 ${found} 天有这项数据，不足 ${needed} 天，所以只报现状不做比较。`,
     noRecentData: '最近 7 天本机没有这项数据。',
+    zeroBaseline: '此前基线均值是 0，算不出相对变化，这次只报现状不做比较。',
     notProvided: '未提供',
     sleepDuration: (hours: number, minutes: number) => `${hours} 小时 ${minutes} 分`,
     regularity: (minutes: number) => `±${minutes} 分`,
     workoutCount: (count: number) => `${count} 次`,
+    /** 后端给的单位码（score / load / bpm / ms）按界面语言写出来；返回空串就只显示数字。 */
+    unitWord: (unit: string) =>
+      ({ score: '分', load: '', bpm: '次/分' } as Record<string, string | undefined>)[unit] ?? unit,
     metric: {
       'weekly.resting_hr': '静息心率',
       'weekly.hrv': 'HRV',
@@ -60,13 +67,17 @@ const messages = defineMessages(
     barThisWeek: 'This week',
     barBaseline: 'Prev. 28 days',
     noBaseline: 'Not enough history behind it, so this is the current figure only',
+    baselineCountUnknown: 'Baseline days unknown, so this is the current figure without a comparison.',
     thinBaseline: (days: number, found: number, needed: number) =>
       `Only ${found} of the previous ${days} days carry this metric, fewer than the ${needed} needed, so this is the current figure without a comparison.`,
     noRecentData: 'Nothing recorded locally for this metric in the last 7 days.',
+    zeroBaseline:
+      'The previous baseline averaged 0, so no relative change can be computed — this is the current figure only.',
     notProvided: 'Not provided',
     sleepDuration: (hours: number, minutes: number) => `${hours} hr ${minutes} min`,
     regularity: (minutes: number) => `±${minutes} min`,
     workoutCount: (count: number) => `${count} sessions`,
+    unitWord: (unit: string) => unit,
     metric: {
       'weekly.resting_hr': 'Resting HR',
       'weekly.hrv': 'HRV',
@@ -77,6 +88,42 @@ const messages = defineMessages(
       'weekly.training_load': 'Training load',
     },
   },
+  {
+    title: 'Esta semana',
+    window: (recentStart: string, recentEnd: string, baseStart: string, baseEnd: string) =>
+      `${recentStart} ~ ${recentEnd} · frente a tu propio ${baseStart} ~ ${baseEnd}`,
+    legendGood: 'Verde = mejor para esta métrica',
+    legendBad: 'Rojo = peor',
+    legendNote: 'Comparado solo con tus propios 28 días anteriores, nunca con un promedio de población',
+    desktopOnly: 'El informe semanal necesita la app de escritorio de ZeppBridge.',
+    nothingComparable: 'Todavía no hay nada comparable esta semana. Vuelve después de sincronizar.',
+    loadFailed: 'No se pudo generar el informe semanal local',
+    barsAria: (recent: string, baseline: string) => `Esta semana ${recent}, 28 días anteriores ${baseline}`,
+    barThisWeek: 'Esta semana',
+    barBaseline: '28 días previos',
+    noBaseline: 'No hay suficiente historial detrás, así que solo se muestra el valor actual',
+    baselineCountUnknown: 'No se conoce el número de días de la línea base, así que solo se muestra el valor actual sin comparación.',
+    thinBaseline: (days: number, found: number, needed: number) =>
+      `Solo ${found} de los ${days} días anteriores tienen esta métrica (se necesitan ${needed}), así que se muestra el valor actual sin comparación.`,
+    noRecentData: 'No hay registros locales de esta métrica en los últimos 7 días.',
+    zeroBaseline:
+      'La línea base anterior promedia 0, así que no se puede calcular un cambio relativo; solo se muestra el valor actual.',
+    notProvided: 'Sin datos',
+    sleepDuration: (hours: number, minutes: number) => `${hours} h ${minutes} min`,
+    regularity: (minutes: number) => `±${minutes} min`,
+    workoutCount: (count: number) => `${count} sesiones`,
+    unitWord: (unit: string) =>
+      ({ score: 'pts', load: '', bpm: 'lpm' } as Record<string, string | undefined>)[unit] ?? unit,
+    metric: {
+      'weekly.resting_hr': 'FC en reposo',
+      'weekly.hrv': 'VFC',
+      'weekly.stress': 'Estrés',
+      'weekly.sleep_duration': 'Duración del sueño',
+      'weekly.sleep_start_regularity': 'Variación de la hora de dormir',
+      'weekly.workout_count': 'Entrenamientos',
+      'weekly.training_load': 'Carga de entrenamiento',
+    },
+  },
 );
 const t = useMessages(messages);
 
@@ -84,10 +131,13 @@ const t = useMessages(messages);
    后端那份中文原文是给 CLI / MCP / 导出的，不跟界面语言走。 */
 const reasonText = (fact: InsightFact): string => {
   if (fact.reason_code === 'weekly_no_recent_data') return t.value.noRecentData;
+  if (fact.reason_code === 'weekly_zero_baseline') return t.value.zeroBaseline;
   if (fact.reason_code === 'weekly_thin_baseline' && fact.baseline_window) {
+    const found = finiteOrNull(fact.baseline_count);
+    if (found === null) return t.value.baselineCountUnknown;
     return t.value.thinBaseline(
       fact.baseline_window.days,
-      fact.baseline_count ?? 0,
+      found,
       fact.baseline_window.min_samples,
     );
   }
@@ -183,7 +233,8 @@ function formatNumber(fact: InsightFact, value: number): string {
   }
   if (fact.metric === 'sleep_start_regularity') return t.value.regularity(Math.round(value));
   if (fact.metric === 'workout_count') return t.value.workoutCount(Math.round(value));
-  return `${Math.round(value)} ${fact.unit}`;
+  const word = t.value.unitWord(fact.unit);
+  return word ? `${Math.round(value)} ${word}` : `${Math.round(value)}`;
 }
 </script>
 
@@ -216,22 +267,9 @@ function formatNumber(fact: InsightFact, value: number): string {
           <strong>{{ formatValue(fact) }}</strong>
 
           <template v-if="chartFor(fact)">
-            <div class="weekly-bars" role="img"
-              :aria-label="t.barsAria(formatValue(fact), chartFor(fact)!.baselineText)">
-              <div class="bar-row">
-                <span class="bar-tag">{{ t.barThisWeek }}</span>
-                <span class="bar-track">
-                  <i :class="['bar-fill', tone(fact)]" :style="{ width: `${chartFor(fact)!.recentPercent}%` }"></i>
-                </span>
-              </div>
-              <div class="bar-row">
-                <span class="bar-tag">{{ t.barBaseline }}</span>
-                <span class="bar-track">
-                  <i class="bar-fill baseline" :style="{ width: `${chartFor(fact)!.baselinePercent}%` }"></i>
-                </span>
-                <span class="bar-value">{{ chartFor(fact)!.baselineText }}</span>
-              </div>
-            </div>
+            <ComparisonBars :current="fact.value!" :baseline="fact.comparison!.baseline_value"
+              :current-label="t.barThisWeek" :baseline-label="t.barBaseline"
+              :current-text="formatValue(fact)" :baseline-text="chartFor(fact)!.baselineText" :tone="tone(fact)" />
             <span :class="['weekly-delta', tone(fact)]">
               {{ fact.comparison!.delta_percent > 0 ? '+' : '' }}{{ fact.comparison!.delta_percent.toFixed(1) }}%
             </span>
@@ -281,7 +319,7 @@ function formatNumber(fact: InsightFact, value: number): string {
 
 /* 每格里现在有「上一个 28 天」这种长标签加进度条，210px 一行挤六个放不下，
    标签会顶到进度条上。加宽下限，常见窗口宽度下自然落成五列。 */
-.weekly-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; align-items: stretch; }
+.weekly-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 10px; align-items: stretch; }
 .weekly-item { display: grid; gap: 2px; align-content: start; padding: 10px 12px; border-radius: 12px; background: var(--surface-raised); }
 .weekly-label { color: var(--muted); font-size: var(--fs-xs); }
 .weekly-item strong { color: var(--ink); font-size: var(--fs-2xl); font-weight: 600; }
@@ -291,20 +329,6 @@ function formatNumber(fact: InsightFact, value: number): string {
 .weekly-delta.bad { color: var(--danger); }
 .weekly-delta.bad::before { content: '!\a0'; font-weight: 700; }
 .weekly-delta.flat, .weekly-delta.muted { color: var(--muted); }
-
-.weekly-bars { display: grid; gap: 5px; margin: 6px 0 2px; }
-.bar-row { display: grid; grid-template-columns: 84px minmax(0, 1fr) auto; align-items: center; gap: 7px; }
-.bar-tag { color: var(--subtle); font-size: var(--fs-2xs); white-space: nowrap; }
-.bar-track { height: 6px; border-radius: 3px; background: rgba(232,238,244,.08); overflow: hidden; }
-.bar-fill { display: block; height: 100%; border-radius: 3px; background: var(--muted); transition: width .4s cubic-bezier(.16,1,.3,1); }
-.bar-fill.good { background: var(--accent); }
-.bar-fill.bad {
-  background: repeating-linear-gradient(
-    -45deg, var(--danger) 0 4px, color-mix(in srgb, var(--danger) 62%, #000) 4px 8px);
-}
-.bar-fill.flat { background: var(--muted); }
-.bar-fill.baseline { background: rgba(232,238,244,.22); }
-.bar-value { color: var(--subtle); font-size: var(--fs-2xs); white-space: nowrap; }
 
 .weekly-note { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.6; }
 .weekly-error { margin: 0; color: var(--danger); font-size: var(--fs-sm); }

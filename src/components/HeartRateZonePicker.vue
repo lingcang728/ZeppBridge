@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import Icon from './Icon.vue';
 import SkeletonBlock from './SkeletonBlock.vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
+import { createLoadSeq } from '../lib/loadSeq';
 import type { HeartRateBasis, HeartRateZoneOptions } from '../types';
 import { defineMessages, useMessages } from '../i18n';
 
@@ -123,6 +124,63 @@ const messages = defineMessages(
     },
     computedRestingNote: (days: number) => `Average across the ${days} days with data in the last 30.`,
   },
+  {
+    title: 'Zonas de frecuencia cardíaca',
+    intro: 'Los tres modelos dibujan zonas distintas, y solo tú sabes cuál tiene sentido para ti; por eso ZeppBridge no elige uno por defecto ni estima con una fórmula como 220 menos tu edad. Cada base de abajo indica su origen y la fecha en que se midió.',
+    clearChoice: 'Borrar selección',
+    desktopOnly: 'Abre esto en la app de escritorio de ZeppBridge; las zonas de frecuencia cardíaca leen registros locales.',
+    noBases: 'Todavía no hay ninguna base de frecuencia cardíaca en este equipo. Después de sincronizar un entrenamiento, aquí aparecen valores medidos como tu frecuencia cardíaca más alta registrada.',
+    modelGroup: 'Modelo',
+    modelAria: 'Modelo de zonas de frecuencia cardíaca',
+    pickModelFirst: 'Elige un modelo y las zonas se calculan con las bases que escojas.',
+    pickBasesNext: 'Elige las bases que faltan arriba para obtener las zonas y el tiempo en cada una.',
+    window: (days: number, total: string) => `Frecuencia cardíaca segundo a segundo de los entrenamientos en ${days} días · ${total} en total`,
+    outside: (below: string, above: string) => `Fuera de las zonas: por debajo de Z1 ${below} · por encima de Z5 ${above}`,
+    formulaNote: (formula: string, bases: string) =>
+      `${formula}. Los límites se redondean hacia abajo, igual que en el reloj. Bases: ${bases}`,
+    missingBases: (list: string) => `Todavía no están en este equipo: ${list}`,
+    basesSeparator: ', ',
+    zonesUnavailable: 'Las zonas de frecuencia cardíaca no están disponibles en este momento',
+    saveFailed: 'No se pudo guardar la configuración de zonas de frecuencia cardíaca',
+    zeroMinutes: '0 min',
+    durationHours: (hours: number, minutes: number) => `${hours} h ${minutes} min`,
+    durationMinutes: (minutes: number) => `${minutes} min`,
+    kind: {
+      max_hr: 'Base de FC máxima',
+      resting_hr: 'Base de FC en reposo',
+      threshold_hr: 'Base de FC de umbral',
+    },
+    model: {
+      max_hr: { label: 'Zonas por FC máxima', formula: 'Límite inferior de la zona = FC máxima x porcentaje' },
+      hr_reserve: { label: 'Zonas por FC de reserva', formula: 'Límite inferior de la zona = FC en reposo + (FC máxima - FC en reposo) x porcentaje' },
+      lactate_threshold: { label: 'Zonas por umbral de lactato', formula: 'Límite inferior de la zona = FC de umbral x porcentaje' },
+    },
+    percentBands: ['Calentamiento', 'Quema de grasa', 'Aeróbica', 'Anaeróbica', 'Máxima'],
+    thresholdBands: ['Suave', 'Resistencia', 'Tempo', 'Umbral', 'Anaeróbica'],
+    basis: {
+      observed_max: {
+        label: 'Frecuencia cardíaca más alta registrada',
+        note: 'La frecuencia cardíaca más alta registrada localmente. Si nunca llegaste a un límite real, las zonas salen estrechas.',
+      },
+      device_max: {
+        label: 'Frecuencia cardíaca máxima reportada por el reloj',
+        note: 'Lo que el reloj reporta en sus datos de PAI, normalmente tomado de tu perfil en la app Zepp.',
+      },
+      device_resting: {
+        label: 'Frecuencia cardíaca en reposo reportada por el reloj',
+        note: 'Lo que el reloj reporta en sus datos de PAI.',
+      },
+      lactate_threshold: {
+        label: 'Frecuencia cardíaca de umbral de lactato',
+        note: 'Medida por el reloj después de una carrera intensa.',
+      },
+      computed_resting: {
+        label: 'Frecuencia cardíaca en reposo calculada localmente',
+        note: '',
+      },
+    },
+    computedRestingNote: (days: number) => `Promedio de los ${days} días con datos en los últimos 30.`,
+  },
 );
 const t = useMessages(messages);
 
@@ -160,6 +218,7 @@ const options = ref<HeartRateZoneOptions | null>(null);
 const loading = ref(true);
 const saving = ref(false);
 const error = ref<string | null>(null);
+const loadSeq = createLoadSeq();
 
 const preference = computed(() => options.value?.preference ?? {});
 const models = computed(() => options.value?.models ?? []);
@@ -194,20 +253,25 @@ const unavailableReason = (requires: string[]): string => {
 };
 
 const load = async () => {
+  const seq = loadSeq.next();
   loading.value = true;
   error.value = null;
   if (!isDesktop()) {
+    if (!loadSeq.isCurrent(seq)) return;
     options.value = null;
     loading.value = false;
     return;
   }
   try {
-    options.value = await backend.getHeartRateZones(props.days);
+    const next = await backend.getHeartRateZones(props.days);
+    if (!loadSeq.isCurrent(seq)) return;
+    options.value = next;
   } catch (cause) {
+    if (!loadSeq.isCurrent(seq)) return;
     options.value = null;
     error.value = toUserMessage(cause, t.value.zonesUnavailable);
   } finally {
-    loading.value = false;
+    if (loadSeq.isCurrent(seq)) loading.value = false;
   }
 };
 
@@ -317,13 +381,12 @@ watch(() => props.revision, () => { void load(); });
 
     <template v-else>
       <p class="group-label">{{ t.modelGroup }}</p>
-      <div class="model-grid" role="radiogroup" :aria-label="t.modelAria">
+      <div class="model-grid" role="group" :aria-label="t.modelAria">
         <button
           v-for="model in models"
           :key="model.id"
           type="button"
-          role="radio"
-          :aria-checked="preference.model === model.id"
+          :aria-pressed="preference.model === model.id"
           :disabled="!model.available || saving"
           :class="['model-card', { 'is-on': preference.model === model.id }]"
           @click="chooseModel(model.id)"
@@ -343,13 +406,12 @@ watch(() => props.revision, () => { void load(); });
       <template v-if="selectedModel">
         <div v-for="slot in basisSlots" :key="slot.kind" class="basis-block">
           <p class="group-label">{{ slot.label }}</p>
-          <div class="basis-list" role="radiogroup" :aria-label="slot.label">
+          <div class="basis-list" role="group" :aria-label="slot.label">
             <button
               v-for="basis in slot.candidates"
               :key="basis.id"
               type="button"
-              role="radio"
-              :aria-checked="slot.chosen === basis.id"
+              :aria-pressed="slot.chosen === basis.id"
               :disabled="saving"
               :class="['basis-row', { 'is-on': slot.chosen === basis.id }]"
               @click="chooseBasis(slot.kind, basis.id)"

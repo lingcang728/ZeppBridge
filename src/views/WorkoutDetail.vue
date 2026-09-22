@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { displayDateTimeFormatter } from '../lib/dateTime';
+
 import { computed, onMounted, ref, watch } from 'vue';
 import { open as showOpenDialog } from '@tauri-apps/plugin-dialog';
 import { RouterLink, useRoute } from 'vue-router';
-import { VChart } from '../lib/echartsSetup';
+import { CHART_THEME, VChart } from '../lib/echartsSetup';
+import { createLoadSeq } from '../lib/loadSeq';
 import DesignIcon, { type DesignIconName } from '../components/DesignIcon.vue';
 import DeviceVisual from '../components/DeviceVisual.vue';
 import EmptyState from '../components/EmptyState.vue';
@@ -25,7 +28,9 @@ import {
 } from '../lib/units';
 import { zeppSemanticColors } from '../lib/echartsTheme';
 import { formatPaceSeconds } from '../lib/metricSeries';
+import { readDefaultExportFormat } from '../lib/exportScope';
 import { workoutDisplayLabel, workoutDisplayType } from '../lib/workouts';
+import { workoutTiming } from '../lib/workoutTiming';
 import { deviceImageFor } from '../lib/deviceCatalog';
 import type { DeviceProfile, SportOption, Workout, WorkoutInsight, WorkoutSeries, WorkoutSeriesSample, WorkoutRoutePoint } from '../types';
 import { defineMessages, intlLocale, useMessages } from '../i18n';
@@ -40,6 +45,9 @@ const messages = defineMessages(
     notFoundTitle: '找不到这条运动记录',
     notFoundMessage: '它可能已被清理，或尚未同步到本机。',
     insightFailed: '无法生成本次运动的洞察',
+    seriesFailed: '无法读取这次运动的逐点序列',
+    seriesFailedTitle: '逐点序列读取失败',
+    exportNeedsSeries: '逐点序列读取失败，无法导出这条记录。',
     thisWorkout: '这次运动',
     aiPrompt: (label: string) => `你是一位专业的运动分析师。下面是我一次${label}的完整记录（来自 ZeppBridge 本机数据库，已脱敏）。
 请只基于这条记录里的事实分析这次训练：强度、配速与心率的关系、是否有明显的掉速或异常段落，并给出下一次的具体建议。
@@ -71,6 +79,10 @@ const messages = defineMessages(
     metricDuration: '运动时间',
     metricAvgHr: '平均心率',
     metricAvgPace: '平均配速',
+    metricMovingTime: '运动用时',
+    metricPausedTime: '暂停用时',
+    metricMovingPace: '运动配速',
+    metricElapsedPace: '含暂停配速',
     metricAscent: '累计爬升',
     metricTrainingLoad: '训练负荷',
     metricTrainingEffect: '有氧训练效果',
@@ -118,6 +130,7 @@ const messages = defineMessages(
     metricListAria: '运动表现总结',
 
     routeAria: 'GPS 全轨迹',
+    eyebrowRoute: '路线',
     routeTitle: 'GPS 全轨迹',
     routeNote: '本地画布 · 不请求地图瓦片',
     routeSvgAria: '按时间与最近配速样本着色的本地 GPS 轨迹',
@@ -133,6 +146,7 @@ const messages = defineMessages(
     chartsEmptyBody: '本次未同步心率、配速、海拔或步频序列。',
 
     hrZonesAria: '心率区间分布',
+    eyebrowHrZones: '心率区间',
     hrZonesTitle: '心率区间分布',
     hrZonesNote: '区间边界来自你在手表上的设定，由 Zepp 随这条运动一起下发；ZeppBridge 没有重新划分。训练状态页那套自选区间模型是另一回事，两边的数字对不上属于正常。',
     hrZoneBelow: (upper: number) => `${upper} 以下`,
@@ -141,10 +155,12 @@ const messages = defineMessages(
     hrZoneTotal: (duration: string) => `有心率的时长合计 ${duration}`,
     hrZoneBarAria: '各心率区间的时长占比',
     decodedAria: '已解码参数',
+    eyebrowDecoded: '已解码',
     decodedTitle: '已解码参数',
     decodedNote: '摘要只从本条记录的有效样本计算，异常跳点会被忽略。',
 
     exportAria: '导出与分享',
+    eyebrowExport: '导出',
     exportTitle: '导出与分享',
     exportSub: '复制 JSON、CSV、GPX，或选择文件夹保存这条运动的 FIT 文件。',
     exportFormatAria: '导出格式',
@@ -154,6 +170,7 @@ const messages = defineMessages(
     exportFailed: '导出失败',
 
     handoffAria: '交给 AI',
+    eyebrowHandoff: '交接',
     handoffTitle: '交给 AI',
     handoffSub: '只把这一条运动的脱敏数据和提示词复制到剪贴板，并打开你选的 AI 网站。按天记录的睡眠、步数不在范围内。',
     handoffTarget: '目标工具',
@@ -162,6 +179,7 @@ const messages = defineMessages(
     handTo: (provider: string) => `交给 ${provider}`,
 
     provenanceAria: '来源信息',
+    eyebrowProvenance: '来源',
     provenanceTitle: '来源信息',
     provenanceProvider: '数据来源',
     provenanceScope: '数据范围',
@@ -179,6 +197,9 @@ const messages = defineMessages(
     notFoundTitle: 'This workout is not here',
     notFoundMessage: 'It may have been cleaned up, or it has not been synced to this machine yet.',
     insightFailed: 'Could not build an insight for this workout',
+    seriesFailed: 'Could not read the per-point series for this workout',
+    seriesFailedTitle: 'Per-point series failed to load',
+    exportNeedsSeries: 'The per-point series failed to load, so this record cannot be exported.',
     thisWorkout: 'workout',
     aiPrompt: (label: string) => `You are a sports analyst. Below is the complete record of one ${label} of mine, taken from the ZeppBridge local database and de-identified.
 Analyze this session using only the facts in this record: the intensity, how pace relates to heart rate, whether there is a clear slowdown or an anomalous stretch, and what specifically to do differently next time.
@@ -210,6 +231,10 @@ Answer in Markdown.`,
     metricDuration: 'Moving time',
     metricAvgHr: 'Avg heart rate',
     metricAvgPace: 'Avg pace',
+    metricMovingTime: 'Moving time',
+    metricPausedTime: 'Paused time',
+    metricMovingPace: 'Moving pace',
+    metricElapsedPace: 'Elapsed pace',
     metricAscent: 'Ascent',
     metricTrainingLoad: 'Training load',
     metricTrainingEffect: 'Aerobic effect',
@@ -257,6 +282,7 @@ Answer in Markdown.`,
     metricListAria: 'Workout performance summary',
 
     routeAria: 'Full GPS track',
+    eyebrowRoute: 'Route',
     routeTitle: 'Full GPS track',
     routeNote: 'Drawn locally · no map tiles requested',
     routeSvgAria: 'Local GPS track colored by time and the nearest pace sample',
@@ -272,6 +298,7 @@ Answer in Markdown.`,
     chartsEmptyBody: 'No heart rate, pace, altitude or cadence series was synced for this session.',
 
     hrZonesAria: 'Heart rate zones',
+    eyebrowHrZones: 'HR zones',
     hrZonesTitle: 'Heart rate zones',
     hrZonesNote: 'The zone boundaries come from your own settings on the watch and are sent down by Zepp with this workout; ZeppBridge does not re-cut them. The Training Status page uses a separate model you pick yourself, so the two sets of numbers will not agree.',
     hrZoneBelow: (upper: number) => `Below ${upper}`,
@@ -280,10 +307,12 @@ Answer in Markdown.`,
     hrZoneTotal: (duration: string) => `${duration} with heart rate`,
     hrZoneBarAria: 'Share of time spent in each heart rate zone',
     decodedAria: 'Decoded values',
+    eyebrowDecoded: 'Decoded',
     decodedTitle: 'Decoded values',
     decodedNote: 'The summary is computed only from valid samples in this record; anomalous jumps are ignored.',
 
     exportAria: 'Export and share',
+    eyebrowExport: 'Export',
     exportTitle: 'Export and share',
     exportSub: 'Copy JSON, CSV or GPX, or choose a folder to save this workout as FIT.',
     exportFormatAria: 'Export format',
@@ -293,6 +322,7 @@ Answer in Markdown.`,
     exportFailed: 'Export failed',
 
     handoffAria: 'Hand to AI',
+    eyebrowHandoff: 'Handoff',
     handoffTitle: 'Hand to AI',
     handoffSub: 'Copies the de-identified data for this one workout, plus the prompt, and opens the AI site you pick. Day-level streams such as sleep and steps stay out.',
     handoffTarget: 'Target tool',
@@ -301,6 +331,7 @@ Answer in Markdown.`,
     handTo: (provider: string) => `Hand to ${provider}`,
 
     provenanceAria: 'Provenance',
+    eyebrowProvenance: 'Provenance',
     provenanceTitle: 'Provenance',
     provenanceProvider: 'Provider',
     provenanceScope: 'Scope',
@@ -308,6 +339,158 @@ Answer in Markdown.`,
     provenanceRecordId: 'Record ID',
     provenanceDevice: 'Device',
     pageFoot: 'Decoded on this machine. The track is drawn on a local canvas and never sent to a map service.',
+  },
+  {
+    notProvided: 'Sin datos',
+    backToRecent: 'Volver a registros recientes',
+    loadFailedTitle: 'No se pudo leer este entrenamiento',
+    loadFailed: 'El detalle del entrenamiento no está disponible en este momento',
+    retry: 'Reintentar',
+    notFoundTitle: 'Este entrenamiento no está aquí',
+    notFoundMessage: 'Puede que se haya borrado, o que todavía no se haya sincronizado en este equipo.',
+    insightFailed: 'No se pudo generar un análisis para este entrenamiento',
+    seriesFailed: 'No se pudo leer la serie punto a punto de este entrenamiento',
+    seriesFailedTitle: 'No se pudo cargar la serie punto a punto',
+    exportNeedsSeries: 'La serie punto a punto no se pudo cargar, así que este registro no se puede exportar.',
+    thisWorkout: 'entrenamiento',
+    aiPrompt: (label: string) => `Eres un analista deportivo. A continuación está el registro completo de uno de mis entrenamientos de ${label}, tomado de la base de datos local de ZeppBridge y anonimizado.
+Analiza esta sesión usando solo los hechos de este registro: la intensidad, cómo se relaciona el ritmo con la frecuencia cardíaca, si hay una desaceleración clara o un tramo anómalo, y qué hacer concretamente distinto la próxima vez.
+
+Restricciones:
+- En estos datos no hay una referencia de población. No me compares con «adultos sanos» ni con ningún promedio.
+- Donde falte algo, di que falta. Nunca rellenes el hueco con un cero o una estimación.
+- Nada de diagnósticos médicos, juicios de riesgo de enfermedad ni consejos de tratamiento.
+
+Responde en español, en Markdown.`,
+    needDesktop: 'La entrega a la IA necesita la app de escritorio; esta vista previa en el navegador no abre sitios externos.',
+    attachmentOpened: (provider: string) =>
+      `El paquete de datos se guardó en tu escritorio (zeppbridge-ai-handoff.json): arrástralo a ${provider}. La instrucción está en tu portapapeles.`,
+    attachmentNotOpened: (provider: string) =>
+      `El paquete de datos se guardó en tu escritorio (zeppbridge-ai-handoff.json). La instrucción está en tu portapapeles; abre ${provider} tú mismo.`,
+    copiedAndOpened: (provider: string) => `Se copiaron los datos anonimizados de este entrenamiento y se abrió ${provider}. Pégalos ahí.`,
+    copiedOnly: (provider: string) => `Se copiaron los datos anonimizados de este entrenamiento. Abre ${provider} tú mismo y pégalos.`,
+    noCorrection: 'Sin corrección',
+    deviceNameMissing: 'Nombre del dispositivo no disponible',
+    notFetchedYet: 'Aún sin datos',
+    timeUnknown: 'Hora desconocida',
+    overrideSaved: 'La corrección del tipo de entrenamiento quedó guardada localmente.',
+    overrideCleared: 'Corrección borrada. Se vuelve a la coincidencia de ZeppBridge.',
+    overrideFailed: 'No se pudo guardar la corrección del tipo de entrenamiento',
+    copied: (format: string) => `Datos en ${format} copiados al portapapeles.`,
+    copyFailed: 'No se pudo copiar este registro',
+
+    metricDistance: 'Distancia',
+    metricDuration: 'Tiempo en movimiento',
+    metricAvgHr: 'Frecuencia cardíaca media',
+    metricAvgPace: 'Ritmo medio',
+    metricMovingTime: 'Tiempo en movimiento',
+    metricPausedTime: 'Tiempo en pausa',
+    metricMovingPace: 'Ritmo en movimiento',
+    metricElapsedPace: 'Ritmo total',
+    metricAscent: 'Ascenso',
+    metricTrainingLoad: 'Carga de entrenamiento',
+    metricTrainingEffect: 'Efecto aeróbico',
+    metricAnaerobicEffect: 'Efecto anaeróbico',
+    metricRpe: 'Esfuerzo percibido',
+    metricMaxHr: 'Frecuencia cardíaca máxima',
+    metricCalories: 'Calorías',
+    unitKcal: 'kcal',
+
+    statFastest: 'Más rápido',
+    statAverage: 'Prom.',
+    statSlowest: 'Más lento',
+    statMin: 'Mín.',
+    statMax: 'Máx.',
+
+    chartHeart: 'Frecuencia cardíaca',
+    chartPace: 'Ritmo',
+    chartAltitude: 'Altitud',
+    chartCadence: 'Cadencia',
+    chartAria: (title: string) => `${title} durante la sesión`,
+
+    decodedRoutePoints: 'Puntos del recorrido GPS',
+    decodedSamples: 'Muestras de la serie de tiempo',
+    decodedPauses: 'Intervalos de pausa',
+    decodedAvgCadence: 'Cadencia media',
+    decodedMaxCadence: 'Cadencia máxima',
+    decodedAvgStride: 'Zancada media',
+    decodedDescent: 'Descenso',
+    decodedMaxHr: 'Frecuencia cardíaca máxima',
+    decodedAvgPower: 'Potencia media',
+    decodedMaxPower: 'Potencia máxima',
+    decodedGroundContact: 'Contacto con el suelo medio',
+    decodedVerticalOscillation: 'Oscilación vertical media',
+    decodedVerticalRatio: 'Relación vertical',
+    decodedBestEquivalentPace: 'Mejor ritmo equivalente',
+
+    heroAria: 'Resumen del entrenamiento',
+    decodedLocally: 'Decodificado localmente',
+    typeEvidenceAria: 'Cómo se decidió el tipo de entrenamiento',
+    zeppRawCode: (code: string) => `Código original de Zepp: ${code}`,
+    zeppBridgeMatch: (label: string) => `ZeppBridge lo interpreta como: ${label}`,
+    customName: (code: string, name: string) => `Tu nombre para el código ${code}: ${name}`,
+    myCorrection: 'Mi corrección',
+    correctionAria: 'Mi corrección para este tipo de entrenamiento',
+    metricListAria: 'Resumen del rendimiento del entrenamiento',
+
+    routeAria: 'Recorrido GPS completo',
+    eyebrowRoute: 'Recorrido',
+    routeTitle: 'Recorrido GPS completo',
+    routeNote: 'Dibujado localmente · no se piden mapas',
+    routeSvgAria: 'Recorrido GPS local coloreado por tiempo y la muestra de ritmo más cercana',
+    routeLegendPace: (count: number) => `${count} puntos de ritmo válidos · P10–P90`,
+    routeLegendNoPace: 'Menos de 3 puntos de ritmo válidos · sin color por velocidad',
+    legendFast: 'Rápido',
+    legendSteady: 'Constante',
+    legendWarm: 'Más lento',
+    legendSlow: 'Lento',
+    routeEmptyTitle: 'Sin recorrido utilizable',
+    routeEmptyBody: 'Este registro no tiene suficientes puntos GPS, así que no se dibuja ninguna ruta.',
+    chartsEmptyTitle: 'Sin curvas punto a punto',
+    chartsEmptyBody: 'No se sincronizó ninguna serie de frecuencia cardíaca, ritmo, altitud ni cadencia para esta sesión.',
+
+    hrZonesAria: 'Zonas de frecuencia cardíaca',
+    eyebrowHrZones: 'Zonas FC',
+    hrZonesTitle: 'Zonas de frecuencia cardíaca',
+    hrZonesNote: 'Los límites de las zonas vienen de tu propia configuración en el reloj y Zepp los envía con este entrenamiento; ZeppBridge no los recalcula. La página de Estado de entrenamiento usa otro modelo que eliges tú, así que los dos conjuntos de números no van a coincidir.',
+    hrZoneBelow: (upper: number) => `Menos de ${upper}`,
+    hrZoneBetween: (low: number, high: number) => `${low}-${high}`,
+    hrZoneShare: (percent: string) => `${percent}%`,
+    hrZoneTotal: (duration: string) => `${duration} con frecuencia cardíaca`,
+    hrZoneBarAria: 'Proporción del tiempo en cada zona de frecuencia cardíaca',
+    decodedAria: 'Valores decodificados',
+    eyebrowDecoded: 'Decodificado',
+    decodedTitle: 'Valores decodificados',
+    decodedNote: 'El resumen se calcula solo con las muestras válidas de este registro; los saltos anómalos se ignoran.',
+
+    exportAria: 'Exportar y compartir',
+    eyebrowExport: 'Exportar',
+    exportTitle: 'Exportar y compartir',
+    exportSub: 'Copia JSON, CSV o GPX, o elige una carpeta para guardar este entrenamiento como FIT.',
+    exportFormatAria: 'Formato de exportación',
+    exportGo: (format: string) => `Copiar datos en ${format}`,
+    saveFit: 'Guardar archivo FIT',
+    savedFit: 'Archivo FIT guardado',
+    exportFailed: 'La exportación falló',
+
+    handoffAria: 'Pasar a la IA',
+    eyebrowHandoff: 'Entrega',
+    handoffTitle: 'Pasar a la IA',
+    handoffSub: 'Copia los datos anonimizados de solo este entrenamiento, más la instrucción, y abre el sitio de IA que elijas. Los flujos diarios como sueño y pasos quedan fuera.',
+    handoffTarget: 'Herramienta de destino',
+    handoffTargetAria: 'A qué herramienta de IA entregarlo',
+    preparing: 'Preparando…',
+    handTo: (provider: string) => `Pasar a ${provider}`,
+
+    provenanceAria: 'Procedencia',
+    eyebrowProvenance: 'Procedencia',
+    provenanceTitle: 'Procedencia',
+    provenanceProvider: 'Proveedor',
+    provenanceScope: 'Alcance',
+    provenanceSynced: 'Última sincronización',
+    provenanceRecordId: 'ID del registro',
+    provenanceDevice: 'Dispositivo',
+    pageFoot: 'Decodificado en este equipo. El recorrido se dibuja en un lienzo local y nunca se envía a un servicio de mapas.',
   },
 );
 const t = useMessages(messages);
@@ -351,25 +534,38 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 const actionError = ref<string | null>(null);
 const exportedNote = ref<string | null>(null);
-const activeFormat = ref<'json' | 'csv' | 'gpx' | 'fit'>('json');
+const activeFormat = ref<'json' | 'csv' | 'gpx' | 'fit'>(readDefaultExportFormat());
 const exportBusy = ref(false);
 const workoutId = computed(() => String(route.params.workoutId || ''));
 const displayType = computed(() => workout.value ? workoutDisplayType(workout.value) : 'unknown');
 const insight = ref<WorkoutInsight | null>(null);
 const insightLoading = ref(false);
 const insightError = ref<string | null>(null);
+const seriesError = ref<string | null>(null);
+const insightSeq = createLoadSeq();
 
 const loadInsight = async (id: string) => {
-  if (!isTauri()) return;
+  const seq = insightSeq.next();
+  if (!id) return;
+  if (!isTauri()) {
+    if (!insightSeq.isCurrent(seq)) return;
+    insight.value = null;
+    insightError.value = null;
+    insightLoading.value = false;
+    return;
+  }
   insightLoading.value = true;
   insightError.value = null;
   try {
-    insight.value = await tauriApi.getWorkoutInsight(id);
+    const next = await tauriApi.getWorkoutInsight(id);
+    if (!insightSeq.isCurrent(seq)) return;
+    insight.value = next;
   } catch (error) {
+    if (!insightSeq.isCurrent(seq)) return;
     insight.value = null;
     insightError.value = toUserMessage(error, t.value.insightFailed);
   } finally {
-    insightLoading.value = false;
+    if (insightSeq.isCurrent(seq)) insightLoading.value = false;
   }
 };
 
@@ -507,11 +703,20 @@ const deviceKind = computed(() => device.value.kind || 'unknown');
 const hasDistance = computed(() => isFiniteNumber(workout.value?.distance_meters)
   && (workout.value?.distance_meters ?? 0) > 0);
 
+const timing = computed(() => workout.value && (series.value || workout.value.moving_seconds != null)
+  ? workoutTiming(workout.value.start_time, workout.value.end_time, workout.value.distance_meters, series.value?.pauses ?? [], workout.value.moving_seconds)
+  : null);
+
 const heroMetrics = computed(() => {
   const item = workout.value;
   if (!item) return [];
   const summary = series.value?.summary;
   const resolvedPace = paceLabel.value !== t.value.notProvided ? paceLabel.value : paceText(summary?.average_pace);
+  const hasPauses = timing.value && timing.value.pausedMinutes > 0;
+  const timingMetrics = hasPauses ? [
+    { label: t.value.metricMovingTime, value: formatClock(timing.value!.movingMinutes), tone: 'training', icon: 'auto-sync' as DesignIconName },
+    { label: t.value.metricPausedTime, value: formatClock(timing.value!.pausedMinutes), tone: 'training', icon: 'auto-sync' as DesignIconName },
+  ] : [];
   /* 强度那一组。Zepp 云端不提供组数、次数和重量——`workouts` 表和它的
      四张子表里都没有这几列，原始报文里也没有。所以这里显示的是**它
      确实给了的**负荷指标，而不是把 per-set 数据编出来。 */
@@ -523,6 +728,7 @@ const heroMetrics = computed(() => {
   if (!hasDistance.value) {
     return [
       { label: t.value.metricDuration, value: formatClock(durationMinutes.value), tone: 'training', icon: 'auto-sync' as DesignIconName },
+      ...timingMetrics,
       { label: t.value.metricAvgHr, value: numberValue(item.avg_hr), unit: isFiniteNumber(item.avg_hr) ? 'bpm' : undefined, tone: 'heart', icon: 'heart-rate' as DesignIconName },
       { label: t.value.metricMaxHr, value: numberValue(item.max_hr), unit: isFiniteNumber(item.max_hr) ? 'bpm' : undefined, tone: 'heart', icon: 'heart-rate' as DesignIconName },
       { label: t.value.metricCalories, value: numberValue(item.calories), unit: isFiniteNumber(item.calories) ? t.value.unitKcal : undefined, tone: 'distance', icon: 'body-activity' as DesignIconName },
@@ -533,8 +739,10 @@ const heroMetrics = computed(() => {
   return [
     { label: t.value.metricDistance, value: distanceLabel.value, tone: 'distance', icon: 'outdoor-run' as DesignIconName },
     { label: t.value.metricDuration, value: formatClock(durationMinutes.value), tone: 'training', icon: 'auto-sync' as DesignIconName },
+    ...timingMetrics,
     { label: t.value.metricAvgHr, value: numberValue(item.avg_hr), unit: isFiniteNumber(item.avg_hr) ? 'bpm' : undefined, tone: 'heart', icon: 'heart-rate' as DesignIconName },
-    { label: t.value.metricAvgPace, value: resolvedPace, tone: 'pace', icon: 'body-activity' as DesignIconName },
+    { label: hasPauses ? t.value.metricMovingPace : t.value.metricAvgPace, value: hasPauses ? paceText(timing.value!.movingPace) : resolvedPace, tone: 'pace', icon: 'body-activity' as DesignIconName },
+    ...(hasPauses ? [{ label: t.value.metricElapsedPace, value: paceText(timing.value!.elapsedPace), tone: 'pace', icon: 'body-activity' as DesignIconName }] : []),
     { label: t.value.metricAscent, value: isFiniteNumber(summary?.elevation_gain_m) ? numberValue(toElevation(summary.elevation_gain_m)) : t.value.notProvided, unit: isFiniteNumber(summary?.elevation_gain_m) ? elevationUnitLabel() : undefined, tone: 'altitude', icon: 'health-watch' as DesignIconName },
     { label: 'VO₂ Max', value: numberValue(item.vo2max), tone: 'vo2', icon: 'vo2-max' as DesignIconName },
     { label: t.value.metricTrainingLoad, value: numberValue(item.training_load), tone: 'training', icon: 'training-load' as DesignIconName },
@@ -792,7 +1000,7 @@ const lineOption = (points: { t: number; v: number }[], color: string, unit: str
       formatter: (params: Array<{ value: [number, number] }>) => {
         const point = Array.isArray(params) ? params[0] : params;
         if (!point) return '';
-        const time = new Intl.DateTimeFormat(intlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(point.value[0]));
+        const time = displayDateTimeFormatter({ hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(point.value[0]));
         return `${time}　<b>${Math.round(point.value[1] * 10) / 10}</b> ${unit}`;
       },
     },
@@ -922,7 +1130,7 @@ const syncBadge = computed(() => {
   const raw = appStatus.value?.last_cloud_sync_at;
   if (!raw) return t.value.notFetchedYet;
   const date = new Date(raw);
-  return Number.isNaN(date.getTime()) ? t.value.timeUnknown : new Intl.DateTimeFormat(intlLocale(), { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(date).replace(/\//g, '-');
+  return Number.isNaN(date.getTime()) ? t.value.timeUnknown : displayDateTimeFormatter({ year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(date).replace(/\//g, '-');
 });
 
 let detailSeq = 0;
@@ -930,12 +1138,16 @@ const loadDetail = async () => {
   const seq = ++detailSeq;
   loading.value = true;
   error.value = null;
+  seriesError.value = null;
   if (!isTauri()) { loading.value = false; return; }
   try {
-    const emptySeries = { workout_id: workoutId.value, samples: [], route: [], pauses: [], splits: [], summary: {} };
-    const [detail, workoutSeries] = await Promise.all([
+    const emptySeries: WorkoutSeries = { workout_id: workoutId.value, samples: [], route: [], pauses: [], splits: [], laps: [], summary: {} };
+    const [detail, seriesResult] = await Promise.all([
       tauriApi.getWorkoutDetail(workoutId.value),
-      tauriApi.getWorkoutSeries(workoutId.value).catch(() => emptySeries),
+      tauriApi.getWorkoutSeries(workoutId.value).then(
+        (value) => ({ ok: true as const, value }),
+        (cause) => ({ ok: false as const, cause }),
+      ),
     ]);
     if (seq !== detailSeq) return;
     const profile = detail
@@ -943,7 +1155,16 @@ const loadDetail = async () => {
       : {};
     if (seq !== detailSeq) return;
     workout.value = detail as WorkoutMetrics | null;
-    series.value = detail ? workoutSeries : null;
+    if (!detail) {
+      series.value = null;
+      seriesError.value = null;
+    } else if (seriesResult.ok) {
+      series.value = seriesResult.value;
+      seriesError.value = null;
+    } else {
+      series.value = emptySeries;
+      seriesError.value = toUserMessage(seriesResult.cause, t.value.seriesFailed);
+    }
     device.value = profile;
   } catch (cause) {
     if (seq === detailSeq) error.value = toUserMessage(cause, t.value.loadFailed);
@@ -961,6 +1182,7 @@ const changeWorkoutOverride = async (value: string | number) => {
     const updated = await tauriApi.setWorkoutTypeOverride(workout.value.workout_id, next || null);
     workout.value = updated as WorkoutMetrics;
     exportedNote.value = next ? t.value.overrideSaved : t.value.overrideCleared;
+    void loadInsight(updated.workout_id);
   } catch (cause) {
     actionError.value = toUserMessage(cause, t.value.overrideFailed);
   } finally {
@@ -973,6 +1195,10 @@ const exportRecord = async () => {
   const exportWorkoutId = workout.value.workout_id;
   actionError.value = null;
   exportedNote.value = null;
+  if (seriesError.value && activeFormat.value !== 'fit') {
+    actionError.value = t.value.exportNeedsSeries;
+    return;
+  }
   exportBusy.value = true;
   try {
     if (activeFormat.value === 'fit') {
@@ -1004,7 +1230,6 @@ const exportRecord = async () => {
 
 onMounted(() => {
   void loadDetail();
-  if (workoutId.value) void loadInsight(workoutId.value);
   if (isTauri()) {
     void tauriApi.getWorkoutTypeOptions()
       .then((options) => { typeOverrideOptions.value = options; })
@@ -1012,6 +1237,7 @@ onMounted(() => {
   }
 });
 watch([dataRevision, workoutId], () => void loadDetail());
+watch(workoutId, (id) => { if (id) void loadInsight(id); }, { immediate: true });
 </script>
 
 <template>
@@ -1084,7 +1310,7 @@ watch([dataRevision, workoutId], () => void loadDetail());
           <section class="surface-card series-card" :aria-label="t.routeAria">
             <div class="section-head">
               <span class="section-icon route-tone"><DesignIcon name="outdoor-run" :size="34" /></span>
-              <div><p class="section-eyebrow">ROUTE</p><h2>{{ t.routeTitle }}</h2></div>
+              <div><p class="section-eyebrow">{{ t.eyebrowRoute }}</p><h2>{{ t.routeTitle }}</h2></div>
               <span class="route-note">{{ t.routeNote }}</span>
             </div>
             <div v-if="routeCanvas" class="route-wrap">
@@ -1115,14 +1341,22 @@ watch([dataRevision, workoutId], () => void loadDetail());
                   <li v-for="stat in card.stats" :key="stat.label"><em>{{ stat.label }}</em><strong>{{ stat.value }}</strong></li>
                 </ul>
               </div>
-              <VChart class="series-chart" theme="zeppbridge-dark" :option="card.option" autoresize role="img" :aria-label="t.chartAria(card.title)" />
+              <VChart class="series-chart" :theme="CHART_THEME" :option="card.option" autoresize role="img" :aria-label="t.chartAria(card.title)" />
             </section>
           </div>
-          <section v-if="!chartCards.length" class="surface-card chart-empty"><DesignIcon name="structured-data" :size="42" /><div><strong>{{ t.chartsEmptyTitle }}</strong><p>{{ t.chartsEmptyBody }}</p></div></section>
+          <section v-if="seriesError" class="surface-card chart-empty" role="alert">
+            <DesignIcon name="structured-data" :size="42" />
+            <div>
+              <strong>{{ t.seriesFailedTitle }}</strong>
+              <p>{{ seriesError }}</p>
+              <button class="button button-secondary" type="button" @click="loadDetail">{{ t.retry }}</button>
+            </div>
+          </section>
+          <section v-else-if="!chartCards.length" class="surface-card chart-empty"><DesignIcon name="structured-data" :size="42" /><div><strong>{{ t.chartsEmptyTitle }}</strong><p>{{ t.chartsEmptyBody }}</p></div></section>
           <section v-if="hrZones" class="surface-card hr-zone-card" :aria-label="t.hrZonesAria">
             <div class="section-head compact">
               <span class="section-icon heart-tone"><DesignIcon name="heart-rate" :size="32" /></span>
-              <div><p class="section-eyebrow">HR ZONES</p><h2>{{ t.hrZonesTitle }}</h2></div>
+              <div><p class="section-eyebrow">{{ t.eyebrowHrZones }}</p><h2>{{ t.hrZonesTitle }}</h2></div>
               <span class="route-note">{{ t.hrZoneTotal(hrZones.totalLabel) }}</span>
             </div>
             <div class="hr-zone-bar" role="img" :aria-label="t.hrZoneBarAria">
@@ -1142,7 +1376,7 @@ watch([dataRevision, workoutId], () => void loadDetail());
 
         <div class="side-col">
           <section class="surface-card side-card decoded-card" :aria-label="t.decodedAria">
-            <div class="section-head compact"><span class="section-icon data-tone"><DesignIcon name="structured-data" :size="32" /></span><div><p class="section-eyebrow">DECODED</p><h2>{{ t.decodedTitle }}</h2></div></div>
+            <div class="section-head compact"><span class="section-icon data-tone"><DesignIcon name="structured-data" :size="32" /></span><div><p class="section-eyebrow">{{ t.eyebrowDecoded }}</p><h2>{{ t.decodedTitle }}</h2></div></div>
             <div class="decoded-list">
               <div v-for="metric in decodedMetrics" :key="metric.label"><DesignIcon :name="metric.icon" :size="29" /><span>{{ metric.label }}</span><strong>{{ metric.value }}</strong></div>
             </div>
@@ -1150,7 +1384,7 @@ watch([dataRevision, workoutId], () => void loadDetail());
           </section>
 
           <section class="surface-card side-card" :aria-label="t.exportAria">
-            <div class="section-head compact"><span class="section-icon export-tone"><DesignIcon name="document" :size="32" /></span><div><p class="section-eyebrow">EXPORT</p><h2>{{ t.exportTitle }}</h2></div></div>
+            <div class="section-head compact"><span class="section-icon export-tone"><DesignIcon name="document" :size="32" /></span><div><p class="section-eyebrow">{{ t.eyebrowExport }}</p><h2>{{ t.exportTitle }}</h2></div></div>
             <p class="card-sub">{{ t.exportSub }}</p>
             <div class="format-row" role="radiogroup" :aria-label="t.exportFormatAria"><button v-for="format in (['json', 'csv', 'gpx', 'fit'] as const)" :key="format" type="button" role="radio" :disabled="exportBusy || (format === 'fit' && !isTauri())" :aria-checked="activeFormat === format" :class="['format-pill', { 'is-on': activeFormat === format }]" @click="activeFormat = format">{{ format.toUpperCase() }}</button></div>
             <button class="export-go" type="button" :disabled="exportBusy" @click="exportRecord"><DesignIcon name="cloud-output" :size="27" />{{ activeFormat === 'fit' ? t.saveFit : t.exportGo(activeFormat.toUpperCase()) }}</button>
@@ -1158,7 +1392,7 @@ watch([dataRevision, workoutId], () => void loadDetail());
           </section>
 
           <section class="surface-card side-card ai-card" :aria-label="t.handoffAria">
-            <div class="section-head compact"><span class="section-icon ai-tone"><DesignIcon name="handoff" :size="32" /></span><div><p class="section-eyebrow">HANDOFF</p><h2>{{ t.handoffTitle }}</h2></div></div>
+            <div class="section-head compact"><span class="section-icon ai-tone"><DesignIcon name="handoff" :size="32" /></span><div><p class="section-eyebrow">{{ t.eyebrowHandoff }}</p><h2>{{ t.handoffTitle }}</h2></div></div>
             <p class="card-sub">{{ t.handoffSub }}</p>
             <label class="ai-provider">
               <span>{{ t.handoffTarget }}</span>
@@ -1177,7 +1411,7 @@ watch([dataRevision, workoutId], () => void loadDetail());
           </section>
 
           <section class="surface-card side-card meta-card" :aria-label="t.provenanceAria">
-            <div class="section-head compact"><span class="section-icon source-tone"><DesignIcon name="database" :size="32" /></span><div><p class="section-eyebrow">PROVENANCE</p><h2>{{ t.provenanceTitle }}</h2></div></div>
+            <div class="section-head compact"><span class="section-icon source-tone"><DesignIcon name="database" :size="32" /></span><div><p class="section-eyebrow">{{ t.eyebrowProvenance }}</p><h2>{{ t.provenanceTitle }}</h2></div></div>
             <dl><div><dt>{{ t.provenanceProvider }}</dt><dd>{{ dataProviderLabel() }}</dd></div><div><dt>{{ t.provenanceScope }}</dt><dd>{{ dataScopeLabel(workout.source_scope) }}</dd></div><div><dt>{{ t.provenanceSynced }}</dt><dd>{{ syncBadge }}</dd></div><div><dt>{{ t.provenanceRecordId }}</dt><dd>{{ workout.workout_id }}</dd></div><div><dt>{{ t.provenanceDevice }}</dt><dd>{{ deviceName }}</dd></div></dl>
           </section>
         </div>
@@ -1216,13 +1450,14 @@ watch([dataRevision, workoutId], () => void loadDetail());
 .type-evidence > .type-correct { display: inline-flex; align-items: center; gap: 7px; padding: 0; border: 0; background: none; }
 .type-correct-menu { min-width: 180px; }
 .hero-signal { position: absolute; z-index: 0; top: -8px; right: 3%; opacity: .13; filter: saturate(1.4); transform: rotate(5deg); }
-.metric-list { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(7, minmax(112px, 1fr)); gap: 9px; }
-.metric-tile { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 78px; padding: 10px; border: 1px solid rgba(226,234,242,.08); border-radius: 15px; background: rgba(8,10,13,.42); }
+.metric-list { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 9px; }
+.metric-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; min-height: 116px; padding: 16px; border: 1px solid rgba(226,234,242,.08); border-radius: 15px; background: rgba(8,10,13,.42); }
 .metric-tile > .design-icon { flex: 0 0 auto; }
 .metric-tile.tone-heart { background: linear-gradient(135deg, rgba(240,97,106,.12), rgba(8,10,13,.45)); } .metric-tile.tone-pace { background: linear-gradient(135deg, rgba(74,168,232,.12), rgba(8,10,13,.45)); } .metric-tile.tone-altitude { background: linear-gradient(135deg, rgba(245,195,59,.11), rgba(8,10,13,.45)); } .metric-tile.tone-training { background: linear-gradient(135deg, rgba(125,163,62,.12), rgba(8,10,13,.45)); } .metric-tile.tone-distance { background: linear-gradient(135deg, rgba(47,169,107,.13), rgba(8,10,13,.45)); } .metric-tile.tone-vo2 { background: linear-gradient(135deg, rgba(139,92,246,.12), rgba(8,10,13,.45)); }
+.metric-tile > div { min-width: 0; max-width: 100%; }
 .metric-label { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
 .metric-value { display: flex; align-items: baseline; gap: 5px; margin: 3px 0 0; flex-wrap: wrap; }
-.metric-value strong { color: var(--ink); font-family: var(--font-mono); font-size: var(--fs-xl); font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: -.02em; }
+.metric-value strong { color: var(--ink); font-family: 'Inter', var(--font-sans); font-size: var(--fs-xl); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: -.02em; }
 .metric-value span { color: var(--muted); font-size: var(--fs-xs); }
 .lower { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(310px, .72fr); align-items: start; gap: 16px; }
 .main-col, .side-col { display: grid; gap: 16px; min-width: 0; }
@@ -1264,10 +1499,14 @@ watch([dataRevision, workoutId], () => void loadDetail());
 .route-empty strong { color: var(--muted); }
 .route-empty p { margin: 0; }
 .section-icon.heart-tone { background: rgba(240,97,106,.12); }
+.hr-zone-card { padding: 22px; min-width: 0; }
+.hr-zone-card .section-head { flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+.hr-zone-card .route-note { display: block; white-space: normal; }
+.hr-zone-card .mapping-note { margin-top: 20px; padding: 14px; line-height: 1.7; }
 .hr-zone-bar { display: flex; overflow: hidden; height: 15px; border: 1px solid var(--line); border-radius: 999px; background: rgba(11,14,17,.45); }
 .hr-zone-fill { min-width: 0; }
-.hr-zone-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 8px 20px; margin: 13px 0 0; padding: 0; list-style: none; font-variant-numeric: tabular-nums; }
-.hr-zone-list li { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); }
+.hr-zone-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 14px 24px; margin: 20px 0 0; padding: 0; list-style: none; font-variant-numeric: tabular-nums; }
+.hr-zone-list li { display: grid; grid-template-columns: 9px minmax(0, 1fr) auto 4.5em; align-items: center; gap: 10px; font-size: var(--fs-sm); }
 .hr-zone-list .hr-zone-range { flex: 1 1 auto; color: var(--muted); }
 .hr-zone-list strong { color: var(--ink); font-family: 'Inter', var(--font-sans); font-weight: 600; white-space: nowrap; }
 .hr-zone-list em { min-width: 46px; color: var(--subtle); font-style: normal; text-align: right; }
@@ -1310,7 +1549,7 @@ watch([dataRevision, workoutId], () => void loadDetail());
 .meta-card dl > div { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-width: 0; }
 .meta-card dt { color: var(--muted); font-size: var(--fs-sm); } .meta-card dd { margin: 0; color: var(--ink); font-size: var(--fs-sm); overflow-wrap: anywhere; text-align: right; }
 .page-foot { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 2px 0 0; color: var(--subtle); font-size: var(--fs-xs); }
-@media (max-width: 1320px) { .metric-list { grid-template-columns: repeat(4, minmax(130px, 1fr)); } }
+
 @media (max-width: 1180px) { .lower { grid-template-columns: minmax(0, 1fr); } .side-col { grid-template-columns: repeat(2, minmax(0,1fr)); } .decoded-card { grid-row: span 2; } }
 @media (max-width: 760px) { .page-toolbar { align-items: flex-start; } .ai-action span { display: none; } .workout-hero { padding: 16px; border-radius: 19px; } .hero-copy { align-items: flex-start; gap: 12px; } .hero-device :deep(.device-visual) { width: 78px; height: 78px; flex-basis: 78px; } .device-live { display: none; } .sport-line > .design-icon { width: 45px !important; height: 45px !important; } .sport-line h1 { font-size: 24px; } .source-chip { font-size: var(--fs-2xs); } .metric-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } .metric-tile { min-height: 70px; } .chart-grid, .side-col { grid-template-columns: minmax(0, 1fr); } .decoded-card { grid-row: auto; } .route-wrap { min-height: 240px; } .route-note { display: none; } .chart-head { flex-wrap: wrap; } .chart-stats { width: 100%; justify-content: flex-start; } }
 </style>

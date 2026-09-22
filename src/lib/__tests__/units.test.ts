@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { formatDistance, formatPace } from '../format';
+import { formatDistance } from '../format';
 import { formatPaceSeconds } from '../metricSeries';
 import {
   METRES_PER_FOOT,
@@ -42,11 +42,8 @@ describe('英制显示的是同一段距离，只是换了单位', () => {
     expect(formatDistance(1500)).toContain('英尺');
   });
 
-  it('配速换算成每英里，后缀跟着换', () => {
-    // 10 km / 50 分钟 = 5:00 /km = 8:03 /mi
-    expect(formatPace(10_000, 50)).toBe('5:00 /km');
+  it('配速后缀跟着换', () => {
     setDistanceUnit('imperial');
-    expect(formatPace(10_000, 50)).toBe('8:03 /mi');
     expect(paceUnitLabel()).toBe('/mi');
   });
 
@@ -67,7 +64,6 @@ describe('英制显示的是同一段距离，只是换了单位', () => {
     setDistanceUnit('imperial');
     expect(formatDistance(undefined)).toBe('未记录');
     expect(formatDistance(0)).toBe('未记录');
-    expect(formatPace(0, 30)).toBeNull();
   });
 
   it('单位名跟着界面语言，英文界面用符号', () => {

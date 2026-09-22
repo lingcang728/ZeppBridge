@@ -30,6 +30,7 @@ const POLL_INTERVAL: Duration = Duration::from_millis(120);
 /// 一次写入动作的用途。等待超时时会把它显示给用户，所以措辞是面向用户的。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WritePurpose {
+    LifeEvent,
     Sync,
     HistoryBackfill,
     Migration,
@@ -43,11 +44,14 @@ pub enum WritePurpose {
     /// 进行（清理旧数据）」——压缩一个字节都没删，这句话是假的。用途会原样
     /// 显示给用户，所以它必须说的是实际在做的事。
     Compaction,
+    /// 短写入：偏好、覆盖账本、同步元数据、完整性检查结果。
+    Metadata,
 }
 
 impl WritePurpose {
     pub fn as_str(self) -> &'static str {
         match self {
+            WritePurpose::LifeEvent => "life_event",
             WritePurpose::Sync => "sync",
             WritePurpose::HistoryBackfill => "history_backfill",
             WritePurpose::Migration => "migration",
@@ -56,11 +60,13 @@ impl WritePurpose {
             WritePurpose::Reprocess => "reprocess",
             WritePurpose::Cleanup => "cleanup",
             WritePurpose::Compaction => "compaction",
+            WritePurpose::Metadata => "metadata",
         }
     }
 
     pub fn label(self) -> &'static str {
         match self {
+            WritePurpose::LifeEvent => "编辑生活事件",
             WritePurpose::Sync => "云端同步",
             WritePurpose::HistoryBackfill => "历史补拉",
             WritePurpose::Migration => "数据库升级",
@@ -69,6 +75,7 @@ impl WritePurpose {
             WritePurpose::Reprocess => "重新解析本地报文",
             WritePurpose::Cleanup => "清理旧数据",
             WritePurpose::Compaction => "压缩历史报文",
+            WritePurpose::Metadata => "保存本机设置",
         }
     }
 }

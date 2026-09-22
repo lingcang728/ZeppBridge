@@ -1,7 +1,7 @@
 use crate::connectors::ZeppConnector;
 use crate::models::{error::*, *};
 use chrono::{DateTime, Duration, NaiveDate, Utc};
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, Copy)]
@@ -42,7 +42,32 @@ impl FetchWindow {
     }
 
     pub fn end_day(&self) -> String {
-        self.end_utc.format("%Y-%m-%d").to_string()
+        // Timestamp windows are half-open; day endpoints include both dates.
+        self.end_utc
+            .checked_sub_signed(Duration::nanoseconds(1))
+            .unwrap_or(self.end_utc)
+            .format("%Y-%m-%d")
+            .to_string()
+    }
+
+    /// Convert the half-open timestamp window to inclusive device-local dates.
+    /// Use the zone's rules at each endpoint, including historical DST changes.
+    fn local_days(&self, time_zone: &str) -> Result<(NaiveDate, NaiveDate)> {
+        let zone = jiff::tz::TimeZone::get(time_zone)
+            .map_err(|error| ZeppBridgeError::ConfigError(error.to_string()))?;
+        let date = |instant: DateTime<Utc>| -> Result<NaiveDate> {
+            let timestamp = jiff::Timestamp::from_second(instant.timestamp())
+                .map_err(|error| ZeppBridgeError::ConfigError(error.to_string()))?;
+            NaiveDate::parse_from_str(
+                &timestamp.to_zoned(zone.clone()).date().to_string(),
+                "%Y-%m-%d",
+            )
+            .map_err(|error| ZeppBridgeError::ConfigError(error.to_string()))
+        };
+        Ok((
+            date(self.start_utc)?,
+            date(self.end_utc - Duration::nanoseconds(1))?,
+        ))
     }
 
     pub fn chunks(self, chunk_days: i64) -> Vec<Self> {
@@ -66,11 +91,126 @@ impl FetchWindow {
     }
 }
 
+/// Keep each response intact: pagination metadata and unknown fields belong to raw.
+async fn fetch_heart_rate_pages_with<F, Fut>(
+    window: FetchWindow,
+    mut fetch: F,
+) -> Result<Vec<FetchedRecord>>
+where
+    F: FnMut(i64, i64) -> Fut,
+    Fut: std::future::Future<Output = Result<Value>>,
+{
+    let end = window.end_utc.timestamp();
+    let mut cursor = window.start_utc.timestamp();
+    let mut records = Vec::new();
+    loop {
+        let payload = fetch(cursor, end).await?;
+        let items = heart_rate_items(&payload);
+        let next = if items.len() >= HEART_RATE_PAGE_LIMIT as usize {
+            heart_rate_cursor(&items).filter(|next| *next > cursor && *next < end)
+        } else {
+            None
+        };
+        records.push(FetchedRecord::from_raw(RawRecord {
+            stream: "heart_rate".into(),
+            // A page must not overwrite the legacy merged window payload.
+            source_key: format!("heart_rate_page:{cursor}:{end}"),
+            source_scope: SourceScope::UserFused,
+            device_id: None,
+            start_utc: DateTime::from_timestamp(cursor, 0).unwrap_or(window.start_utc),
+            end_utc: Some(window.end_utc),
+            payload,
+            capability: CapabilityStatus::Verified,
+        }));
+        let Some(next) = next else { break };
+        cursor = next;
+    }
+    Ok(records)
+}
+
 /// A fetch result keeps endpoint/source identity beside its raw payload. This
 /// is what allows sync to retain provenance before normalization.
 #[derive(Debug, Clone)]
 pub struct FetchedRecord {
     pub raw: RawRecord,
+    /// 请求窗口里有子切片失败（404 / 不可用），但别的切片已经拿到了报文。
+    ///
+    /// 调用方必须把整段窗口当成未完成：已经拿到的数据可以写库，但不能把
+    /// 这个月记成 persisted / empty_from_cloud。
+    pub incomplete: bool,
+    /// Diagnostic context for partial fetches; never replaces successfully fetched data.
+    pub incomplete_reason: Option<String>,
+}
+
+impl FetchedRecord {
+    fn from_raw(raw: RawRecord) -> Self {
+        Self {
+            raw,
+            incomplete: false,
+            incomplete_reason: None,
+        }
+    }
+}
+
+/// 把按切片抓取的结果收成一次窗口结论。
+///
+/// `Cancelled` / `NeedsReauth` 即使已经有成功切片也必须立刻返回，不能被
+/// 「有几条记录」吞掉。子切片 404 时：有数据就标 `incomplete` 留给补拉重试；
+/// 一条都没有才把原来的不可用错误往上抛。
+fn conclude_slices(
+    mut records: Vec<FetchedRecord>,
+    last_error: Option<ZeppBridgeError>,
+    empty_message: &str,
+) -> Result<Vec<FetchedRecord>> {
+    if let Some(error) = last_error {
+        if error.is_cancelled() || error.needs_reauth() {
+            return Err(error);
+        }
+        if records.is_empty() {
+            return Err(error);
+        }
+        for record in &mut records {
+            record.incomplete = true;
+            record.incomplete_reason = Some(error.to_string());
+        }
+        return Ok(records);
+    }
+    if records.is_empty() {
+        return Err(ZeppBridgeError::Unavailable(empty_message.into()));
+    }
+    Ok(records)
+}
+
+fn is_abort_error(error: &ZeppBridgeError) -> bool {
+    error.is_cancelled() || error.needs_reauth()
+}
+
+/// A failed historical slice must not discard other nights or prevent the
+/// latest slice from being requested. The connector already bounds retries.
+async fn fetch_sleep_slices_with<F, Fut>(
+    window: FetchWindow,
+    mut fetch: F,
+) -> Result<Vec<FetchedRecord>>
+where
+    F: FnMut(FetchWindow) -> Fut,
+    Fut: std::future::Future<Output = Result<FetchedRecord>>,
+{
+    let mut records = Vec::new();
+    let mut last_error = None;
+    for chunk in window.chunks(7) {
+        match fetch(chunk).await {
+            Ok(record) => records.push(record),
+            Err(error) if is_abort_error(&error) => return Err(error),
+            Err(error) => {
+                // Do not downgrade a request failure to unavailable when a
+                // later slice happens to return 404.
+                if !error.is_unavailable() || last_error.is_none() {
+                    last_error = Some(error);
+                }
+            }
+        }
+    }
+    conclude_slices(records, last_error, "睡眠窗口没有可识别记录")
 }
 
 /// The heartRate endpoint's per-request sample cap.
@@ -156,22 +296,6 @@ impl DataFetcher {
         Self { connector }
     }
 
-    #[allow(dead_code)]
-    pub fn connector(&self) -> &ZeppConnector {
-        &self.connector
-    }
-
-    #[allow(dead_code)]
-    pub async fn fetch_heart_rate(
-        &self,
-        start_timestamp: i64,
-        end_timestamp: i64,
-    ) -> Result<Value> {
-        self.connector
-            .fetch_heart_rate(start_timestamp, end_timestamp)
-            .await
-    }
-
     pub async fn fetch_heart_rate_records(
         &self,
         window: FetchWindow,
@@ -179,96 +303,19 @@ impl DataFetcher {
         let mut records = Vec::new();
         let mut last_error = None;
         for chunk in window.chunks(7) {
-            match self.fetch_heart_rate_record(chunk).await {
-                Ok(record) => records.push(record),
+            match fetch_heart_rate_pages_with(chunk, |cursor, end| {
+                self.connector
+                    .fetch_heart_rate_with_options(cursor, end, HEART_RATE_PAGE_LIMIT, 2)
+            })
+            .await
+            {
+                Ok(pages) => records.extend(pages),
+                Err(error) if is_abort_error(&error) => return Err(error),
                 Err(error) if error.is_unavailable() => last_error = Some(error),
                 Err(error) => return Err(error),
             }
         }
-        if records.is_empty() {
-            return Err(last_error
-                .unwrap_or_else(|| ZeppBridgeError::Unavailable("心率窗口没有可识别记录".into())));
-        }
-        Ok(records)
-    }
-
-    /// Defensive pagination for the heartRate endpoint.
-    ///
-    /// Real captures show the endpoint can return more than one page worth of
-    /// samples for a 7-day window, so a page that comes back full is followed
-    /// up with a cursor request instead of silently truncating the window.
-    pub async fn fetch_heart_rate_record(&self, window: FetchWindow) -> Result<FetchedRecord> {
-        let end = window.end_utc.timestamp();
-        let mut cursor = window.start_utc.timestamp();
-        let mut merged: Vec<Value> = Vec::new();
-        loop {
-            let payload = self
-                .connector
-                .fetch_heart_rate_with_options(cursor, end, HEART_RATE_PAGE_LIMIT, 2)
-                .await?;
-            let items = heart_rate_items(&payload);
-            let page_len = items.len();
-            merged.extend(items);
-            if page_len < HEART_RATE_PAGE_LIMIT as usize {
-                break;
-            }
-            match heart_rate_cursor(&merged) {
-                Some(next) if next > cursor => cursor = next,
-                _ => break, // no progress: avoid an infinite loop
-            }
-        }
-        let payload = if merged.is_empty() {
-            // Keep the original payload so downstream normalization can
-            // surface the endpoint's own "no records" shape.
-            self.connector
-                .fetch_heart_rate(window.start_utc.timestamp(), window.end_utc.timestamp())
-                .await?
-        } else {
-            json!({ "items": merged })
-        };
-        Ok(FetchedRecord {
-            raw: RawRecord {
-                stream: "heart_rate".into(),
-                source_key: format!(
-                    "heart_rate:{}:{}",
-                    window.start_utc.timestamp(),
-                    window.end_utc.timestamp()
-                ),
-                source_scope: SourceScope::UserFused,
-                device_id: None,
-                start_utc: window.start_utc,
-                end_utc: Some(window.end_utc),
-                payload,
-                capability: CapabilityStatus::Verified,
-            },
-        })
-    }
-
-    #[allow(dead_code)]
-    pub async fn fetch_band_data(
-        &self,
-        from_date: &str,
-        to_date: &str,
-        query_type: &str,
-        byte_length: i64,
-        device_type: i64,
-    ) -> Result<Value> {
-        self.connector
-            .fetch_band_data(from_date, to_date, query_type, byte_length, device_type)
-            .await
-    }
-
-    #[allow(dead_code)]
-    pub async fn fetch_sport_history(
-        &self,
-        sport: &str,
-        start_track_id: i64,
-        stop_track_id: i64,
-        need_sub_data: i64,
-    ) -> Result<Value> {
-        self.connector
-            .fetch_sport_history(sport, start_track_id, stop_track_id, need_sub_data)
-            .await
+        conclude_slices(records, last_error, "心率窗口没有可识别记录")
     }
 
     pub async fn fetch_sport_detail_record(
@@ -282,87 +329,20 @@ impl DataFetcher {
             .connector
             .fetch_sport_detail(workout_id, source)
             .await?;
-        Ok(FetchedRecord {
-            raw: RawRecord {
-                stream: "workout_detail".into(),
-                source_key: format!("workout_detail:{workout_id}:{source}"),
-                source_scope: SourceScope::Device,
-                device_id: None,
-                start_utc,
-                end_utc,
-                payload,
-                capability: CapabilityStatus::Verified,
-            },
-        })
-    }
-
-    #[allow(dead_code)]
-    pub async fn fetch_watch_statistics(
-        &self,
-        statistic: &str,
-        start_day: &str,
-        end_day: &str,
-    ) -> Result<Value> {
-        self.connector
-            .fetch_watch_statistics(statistic, start_day, end_day, 900, true)
-            .await
-    }
-
-    #[allow(dead_code)]
-    pub async fn fetch_events(
-        &self,
-        event_type: &str,
-        sub_type: Option<&str>,
-        from_ms: i64,
-        to_ms: i64,
-        limit: i64,
-        reverse: bool,
-    ) -> Result<Value> {
-        self.connector
-            .fetch_events(event_type, sub_type, from_ms, to_ms, limit, reverse)
-            .await
-    }
-
-    /// Fetch the supported core streams for a shared time window. Optional
-    /// capabilities are represented as unavailable errors by their endpoint;
-    /// callers can retain the successful records and report the missing stream.
-    #[allow(dead_code)]
-    pub async fn fetch_core_window(&self, window: FetchWindow) -> Result<Vec<FetchedRecord>> {
-        let heart_rate = self.fetch_heart_rate_record(window).await?;
-        Ok(vec![heart_rate])
-    }
-
-    /// Compatibility helper used by the original Tauri command.
-    #[allow(dead_code)]
-    pub async fn fetch_heart_rate_range(&self, days: i64) -> Result<Value> {
-        let window = FetchWindow::days(days)?;
-        self.fetch_heart_rate(window.start_utc.timestamp(), window.end_utc.timestamp())
-            .await
-    }
-
-    #[allow(dead_code)]
-    pub async fn fetch_sleep_range(&self, days: i64) -> Result<Value> {
-        let window = FetchWindow::days(days)?;
-        self.connector
-            .fetch_sleep(&window.start_day(), &window.end_day())
-            .await
+        Ok(FetchedRecord::from_raw(RawRecord {
+            stream: "workout_detail".into(),
+            source_key: format!("workout_detail:{workout_id}:{source}"),
+            source_scope: SourceScope::Device,
+            device_id: None,
+            start_utc,
+            end_utc,
+            payload,
+            capability: CapabilityStatus::Verified,
+        }))
     }
 
     pub async fn fetch_sleep_records(&self, window: FetchWindow) -> Result<Vec<FetchedRecord>> {
-        let mut records = Vec::new();
-        let mut last_error = None;
-        for chunk in window.chunks(7) {
-            match self.fetch_sleep_record(chunk).await {
-                Ok(record) => records.push(record),
-                Err(error) if error.is_unavailable() => last_error = Some(error),
-                Err(error) => return Err(error),
-            }
-        }
-        if records.is_empty() {
-            return Err(last_error
-                .unwrap_or_else(|| ZeppBridgeError::Unavailable("睡眠窗口没有可识别记录".into())));
-        }
-        Ok(records)
+        fetch_sleep_slices_with(window, |chunk| self.fetch_sleep_record(chunk)).await
     }
 
     pub async fn fetch_sleep_record(&self, window: FetchWindow) -> Result<FetchedRecord> {
@@ -371,22 +351,20 @@ impl DataFetcher {
             .fetch_band_data(&window.start_day(), &window.end_day(), "detail", 8, 0)
             .await?;
         let capability = crate::normalizer::Normalizer::band_capability(&payload);
-        Ok(FetchedRecord {
-            raw: RawRecord {
-                stream: "sleep".into(),
-                source_key: format!(
-                    "band_data:detail:{}:{}",
-                    window.start_day(),
-                    window.end_day()
-                ),
-                source_scope: SourceScope::Device,
-                device_id: None,
-                start_utc: window.start_utc,
-                end_utc: Some(window.end_utc),
-                payload,
-                capability,
-            },
-        })
+        Ok(FetchedRecord::from_raw(RawRecord {
+            stream: "sleep".into(),
+            source_key: format!(
+                "band_data:detail:{}:{}",
+                window.start_day(),
+                window.end_day()
+            ),
+            source_scope: SourceScope::Device,
+            device_id: None,
+            start_utc: window.start_utc,
+            end_utc: Some(window.end_utc),
+            payload,
+            capability,
+        }))
     }
 
     /// Sport history uses track IDs, not timestamps. The range helper uses the
@@ -418,26 +396,23 @@ impl DataFetcher {
                             .pointer("/data/next")
                             .and_then(Value::as_i64)
                             .unwrap_or(-1);
-                        records.push(FetchedRecord {
-                            raw: RawRecord {
-                                stream: "workouts".into(),
-                                source_key: format!(
-                                    "sport_history:{sport}:{start}:{stop_track_id}"
-                                ),
-                                source_scope: SourceScope::Device,
-                                device_id: None,
-                                start_utc: window.start_utc,
-                                end_utc: Some(window.end_utc),
-                                payload,
-                                capability: CapabilityStatus::Verified,
-                            },
-                        });
+                        records.push(FetchedRecord::from_raw(RawRecord {
+                            stream: "workouts".into(),
+                            source_key: format!("sport_history:{sport}:{start}:{stop_track_id}"),
+                            source_scope: SourceScope::Device,
+                            device_id: None,
+                            start_utc: window.start_utc,
+                            end_utc: Some(window.end_utc),
+                            payload,
+                            capability: CapabilityStatus::Verified,
+                        }));
                         // 游标不再向窗口起点推进时停止，防止服务端异常造成死循环
                         if next <= 0 || next >= stop_track_id || next <= start {
                             break;
                         }
                         stop_track_id = next;
                     }
+                    Err(error) if is_abort_error(&error) => return Err(error),
                     Err(error) if error.is_unavailable() => {
                         last_optional_error = Some(error);
                         break;
@@ -454,22 +429,6 @@ impl DataFetcher {
         Ok(records)
     }
 
-    #[allow(dead_code)]
-    pub async fn fetch_workouts_range(&self, days: i64) -> Result<Value> {
-        let window = FetchWindow::days(days)?;
-        let records = self.fetch_workout_records(window).await?;
-        let mut items = Vec::new();
-        for record in records {
-            items.extend(payload_items(&record.raw.payload));
-        }
-        if items.is_empty() {
-            return Err(ZeppBridgeError::Unavailable(
-                "sport history payload 未提供结构化 workout items".into(),
-            ));
-        }
-        Ok(json!({"items": items}))
-    }
-
     pub async fn fetch_hrv_records(&self, window: FetchWindow) -> Result<Vec<FetchedRecord>> {
         let mut records = Vec::new();
         let mut last_error = None;
@@ -479,39 +438,26 @@ impl DataFetcher {
                 .fetch_hrv(&chunk.start_day(), &chunk.end_day())
                 .await
             {
-                Ok(payload) => records.push(FetchedRecord {
-                    raw: RawRecord {
-                        stream: "hrv".into(),
-                        source_key: format!(
-                            "events:hrv_sdnn:{}:{}",
-                            chunk.start_day(),
-                            chunk.end_day()
-                        ),
-                        source_scope: SourceScope::UserFused,
-                        device_id: None,
-                        start_utc: chunk.start_utc,
-                        end_utc: Some(chunk.end_utc),
-                        payload,
-                        capability: CapabilityStatus::Verified,
-                    },
-                }),
+                Ok(payload) => records.push(FetchedRecord::from_raw(RawRecord {
+                    stream: "hrv".into(),
+                    source_key: format!(
+                        "events:hrv_sdnn:{}:{}",
+                        chunk.start_day(),
+                        chunk.end_day()
+                    ),
+                    source_scope: SourceScope::UserFused,
+                    device_id: None,
+                    start_utc: chunk.start_utc,
+                    end_utc: Some(chunk.end_utc),
+                    payload,
+                    capability: CapabilityStatus::Verified,
+                })),
+                Err(error) if is_abort_error(&error) => return Err(error),
                 Err(error) if error.is_unavailable() => last_error = Some(error),
                 Err(error) => return Err(error),
             }
         }
-        if records.is_empty() {
-            return Err(last_error
-                .unwrap_or_else(|| ZeppBridgeError::Unavailable("HRV 窗口没有可识别记录".into())));
-        }
-        Ok(records)
-    }
-
-    #[allow(dead_code)]
-    pub async fn fetch_daily_summary_range(&self, days: i64) -> Result<Value> {
-        let window = FetchWindow::days(days)?;
-        self.connector
-            .fetch_daily_summary(&window.start_day(), &window.end_day())
-            .await
+        conclude_slices(records, last_error, "HRV 窗口没有可识别记录")
     }
 
     pub async fn fetch_daily_statistics_records(
@@ -525,36 +471,33 @@ impl DataFetcher {
             .connector
             .fetch_events("DailyHealth", Some("summary"), from, to, 2000, true)
             .await?;
-        records.push(FetchedRecord {
-            raw: RawRecord {
-                stream: "daily_summary".into(),
-                source_key: format!("events:DailyHealth:summary:{from}:{to}"),
-                source_scope: SourceScope::UserFused,
-                device_id: None,
-                start_utc: window.start_utc,
-                end_utc: Some(window.end_utc),
-                payload: event,
-                capability: CapabilityStatus::Verified,
-            },
-        });
+        records.push(FetchedRecord::from_raw(RawRecord {
+            stream: "daily_summary".into(),
+            source_key: format!("events:DailyHealth:summary:{from}:{to}"),
+            source_scope: SourceScope::UserFused,
+            device_id: None,
+            start_utc: window.start_utc,
+            end_utc: Some(window.end_utc),
+            payload: event,
+            capability: CapabilityStatus::Verified,
+        }));
         for (event_type, sub_type) in [("Charge", "real_data"), ("readiness", "watch_score")] {
             match self
                 .connector
                 .fetch_events(event_type, Some(sub_type), from, to, 2000, true)
                 .await
             {
-                Ok(payload) => records.push(FetchedRecord {
-                    raw: RawRecord {
-                        stream: "daily_summary".into(),
-                        source_key: format!("events:{event_type}:{sub_type}:{from}:{to}"),
-                        source_scope: SourceScope::UserFused,
-                        device_id: None,
-                        start_utc: window.start_utc,
-                        end_utc: Some(window.end_utc),
-                        payload,
-                        capability: CapabilityStatus::Verified,
-                    },
-                }),
+                Ok(payload) => records.push(FetchedRecord::from_raw(RawRecord {
+                    stream: "daily_summary".into(),
+                    source_key: format!("events:{event_type}:{sub_type}:{from}:{to}"),
+                    source_scope: SourceScope::UserFused,
+                    device_id: None,
+                    start_utc: window.start_utc,
+                    end_utc: Some(window.end_utc),
+                    payload,
+                    capability: CapabilityStatus::Verified,
+                })),
+                Err(error) if is_abort_error(&error) => return Err(error),
                 Err(error) if error.is_unavailable() => {}
                 Err(error) => return Err(error),
             }
@@ -571,22 +514,21 @@ impl DataFetcher {
                 )
                 .await
             {
-                Ok(payload) => records.push(FetchedRecord {
-                    raw: RawRecord {
-                        stream: "daily_summary".into(),
-                        source_key: format!(
-                            "WatchSportStatistics:{statistic}:{}:{}",
-                            window.start_day(),
-                            window.end_day()
-                        ),
-                        source_scope: SourceScope::UserFused,
-                        device_id: None,
-                        start_utc: window.start_utc,
-                        end_utc: Some(window.end_utc),
-                        payload,
-                        capability: CapabilityStatus::Verified,
-                    },
-                }),
+                Ok(payload) => records.push(FetchedRecord::from_raw(RawRecord {
+                    stream: "daily_summary".into(),
+                    source_key: format!(
+                        "WatchSportStatistics:{statistic}:{}:{}",
+                        window.start_day(),
+                        window.end_day()
+                    ),
+                    source_scope: SourceScope::UserFused,
+                    device_id: None,
+                    start_utc: window.start_utc,
+                    end_utc: Some(window.end_utc),
+                    payload,
+                    capability: CapabilityStatus::Verified,
+                })),
+                Err(error) if is_abort_error(&error) => return Err(error),
                 Err(error) if error.is_unavailable() => {}
                 Err(error) => return Err(error),
             }
@@ -1007,8 +949,8 @@ impl DataFetcher {
                         .fetch_user_events_date_string(
                             event_type,
                             sub_type.unwrap_or("odi"),
-                            &start.and_utc().to_rfc3339(),
-                            &end.and_utc().to_rfc3339(),
+                            start.date(),
+                            end.date(),
                             time_zone,
                             50,
                         )
@@ -1057,6 +999,11 @@ impl DataFetcher {
                     probe.latest_date = probe_latest_date(&items);
                     probe.fields = probe_field_names(&items);
                 }
+                Err(error) if is_abort_error(&error) => {
+                    // 取消 / 需要重新登录不是这条流的能力事实。半截 7 天
+                    // 窗口不能当成一次完整探测写进库。
+                    return Vec::new();
+                }
                 Err(error) if error.is_unavailable() => probe.status = "unavailable".to_string(),
                 // The server's error body can echo request context, so only the
                 // fact of the failure is kept.
@@ -1077,10 +1024,19 @@ impl DataFetcher {
 /// what is recognised rather than invent a mapping.
 /// Days per request for a stream that would otherwise be truncated.
 ///
-/// The server caps a response at 1000 items. Blood oxygen samples every five
-/// minutes, so a month asked for in one go returns barely three days and says
-/// nothing at all about the rest.
+/// The server caps a response at [`WELLNESS_PAGE_LIMIT`] items and does not
+/// page. Blood oxygen samples every five minutes, so a month asked for in one
+/// go returns barely three days and says nothing at all about the rest.
 const WELLNESS_CHUNK_DAYS: i64 = 7;
+/// Blood oxygen at a 5-minute cadence is 288 samples/day. Seven days is 2016
+/// items, over the 1000-item cap, so a week asked for in one request would
+/// look complete while dropping more than half the window. Three days stay
+/// under the cap; a page that still fills it is marked `incomplete`.
+const SPO2_CHUNK_DAYS: i64 = 3;
+/// `/events` and `/fileInfo/events` truncate at this many items.
+const WELLNESS_PAGE_LIMIT: i64 = 1000;
+/// The dateString surface uses 999, matching the live client.
+const WELLNESS_DAY_PAGE_LIMIT: i64 = 999;
 
 /// One optional stream: its label, which surface serves it, the event type and
 /// sub type that name it, and how many days may be asked for at once.
@@ -1148,7 +1104,7 @@ const WELLNESS_STREAMS: [WellnessStream; 10] = [
         ProbeSurface::UserEvents,
         "blood_oxygen",
         None,
-        Some(WELLNESS_CHUNK_DAYS),
+        Some(SPO2_CHUNK_DAYS),
     ),
     ("pai", ProbeSurface::UserEvents, "PaiHealthInfo", None, None),
     (
@@ -1211,35 +1167,29 @@ impl DataFetcher {
                 )
                 .await
             {
-                Ok(payload) => records.push(FetchedRecord {
-                    raw: RawRecord {
-                        stream: "weight".into(),
-                        source_key: format!(
-                            "weight:{SCALE_ACCOUNT_MEMBER}:{}:{}",
-                            slice.start_day(),
-                            slice.end_day()
-                        ),
-                        source_scope: SourceScope::UserFused,
-                        device_id: None,
-                        start_utc: slice.start_utc,
-                        end_utc: Some(slice.end_utc),
-                        payload,
-                        // The reading itself is verified — weight and BMI were
-                        // read off a live account. The body-composition fields a
-                        // scale adds on top are not, so the payload is retained
-                        // and a replay can pick them up without another sync.
-                        capability: CapabilityStatus::Unverified,
-                    },
-                }),
+                Ok(payload) => records.push(FetchedRecord::from_raw(RawRecord {
+                    stream: "weight".into(),
+                    source_key: format!(
+                        "weight:{SCALE_ACCOUNT_MEMBER}:{}:{}",
+                        slice.start_day(),
+                        slice.end_day()
+                    ),
+                    source_scope: SourceScope::UserFused,
+                    device_id: None,
+                    start_utc: slice.start_utc,
+                    end_utc: Some(slice.end_utc),
+                    payload,
+                    // The reading itself is verified — weight and BMI were
+                    // read off a live account. The body-composition fields a
+                    // scale adds on top are not, so the payload is retained
+                    // and a replay can pick them up without another sync.
+                    capability: CapabilityStatus::Unverified,
+                })),
+                Err(error) if is_abort_error(&error) => return Err(error),
                 Err(error) => last_error = Some(error),
             }
         }
-        if records.is_empty() {
-            return Err(last_error.unwrap_or_else(|| {
-                ZeppBridgeError::Unavailable("体重记录接口没有返回任何内容".into())
-            }));
-        }
-        Ok(records)
+        conclude_slices(records, last_error, "体重记录接口没有返回任何内容")
     }
 
     pub async fn fetch_wellness_records(
@@ -1249,6 +1199,7 @@ impl DataFetcher {
     ) -> Result<Vec<FetchedRecord>> {
         let mut records = Vec::new();
         let mut last_error = None;
+        let mut failures = Vec::new();
 
         for (label, surface, event_type, sub_type, chunk_days) in WELLNESS_STREAMS {
             let slices = match chunk_days {
@@ -1258,29 +1209,33 @@ impl DataFetcher {
             for slice in slices {
                 let from = slice.start_utc.timestamp_millis();
                 let to = slice.end_utc.timestamp_millis();
+                let limit = wellness_request_limit(surface);
                 let outcome = match surface {
                     ProbeSurface::V2Events => {
                         self.connector
-                            .fetch_events(event_type, sub_type, from, to, 1000, true)
+                            .fetch_events(event_type, sub_type, from, to, limit, true)
                             .await
                     }
                     ProbeSurface::UserEvents => {
                         self.connector
-                            .fetch_user_events(event_type, sub_type, from, to, 1000, true)
+                            .fetch_user_events(event_type, sub_type, from, to, limit, true)
                             .await
                     }
-                    ProbeSurface::UserEventsDay => {
-                        self.connector
-                            .fetch_user_events_date_string(
-                                event_type,
-                                sub_type.unwrap_or("odi"),
-                                &slice.start_utc.to_rfc3339(),
-                                &slice.end_utc.to_rfc3339(),
-                                time_zone,
-                                999,
-                            )
-                            .await
-                    }
+                    ProbeSurface::UserEventsDay => match slice.local_days(time_zone) {
+                        Ok((start_date, end_date)) => {
+                            self.connector
+                                .fetch_user_events_date_string(
+                                    event_type,
+                                    sub_type.unwrap_or("odi"),
+                                    start_date,
+                                    end_date,
+                                    time_zone,
+                                    limit,
+                                )
+                                .await
+                        }
+                        Err(error) => Err(error),
+                    },
                     // Not reachable: `WELLNESS_STREAMS` has no weight row, because
                     // weight is not an event stream. It has its own fetcher.
                     ProbeSurface::WeightRecords => Err(ZeppBridgeError::Unavailable(
@@ -1293,45 +1248,91 @@ impl DataFetcher {
                                 sub_type.unwrap_or("real_data"),
                                 from,
                                 to,
-                                1000,
+                                limit,
                             )
                             .await
                     }
                 };
                 match outcome {
-                    Ok(payload) => records.push(FetchedRecord {
-                        raw: RawRecord {
-                            stream: "wellness".into(),
-                            source_key: format!(
-                                "wellness:{label}:{}:{}:{}",
-                                surface.as_str(),
-                                slice.start_day(),
-                                slice.end_day()
-                            ),
-                            source_scope: SourceScope::UserFused,
-                            device_id: None,
-                            start_utc: slice.start_utc,
-                            end_utc: Some(slice.end_utc),
-                            payload,
-                            // Shapes verified against a real response are parsed
-                            // by the normalizer; the rest are retained raw so
-                            // they can be verified without another round trip.
-                            capability: CapabilityStatus::Unverified,
-                        },
-                    }),
-                    Err(error) if error.is_unavailable() => last_error = Some(error),
-                    Err(error) => last_error = Some(error),
+                    Ok(payload) => records.push(fetched_wellness_record(
+                        label, surface, &slice, payload, limit,
+                    )),
+                    Err(error) if is_abort_error(&error) => return Err(error),
+                    Err(error) => {
+                        failures.push(format!(
+                            "{label} ({}..{}): {error}",
+                            slice.start_day(),
+                            slice.end_day()
+                        ));
+                        last_error = Some(error);
+                    }
                 }
             }
         }
 
-        if records.is_empty() {
-            return Err(last_error.unwrap_or_else(|| {
-                ZeppBridgeError::Unavailable("没有可用的可选健康数据流".into())
-            }));
+        // Keep cap diagnostics as well as request errors when both occur.
+        failures.extend(
+            records
+                .iter()
+                .filter_map(|record| record.incomplete_reason.clone()),
+        );
+        let mut records = conclude_slices(records, last_error, "没有可用的可选健康数据流")?;
+        if !failures.is_empty() {
+            let reason = failures.join("; ");
+            for record in &mut records {
+                record.incomplete_reason = Some(reason.clone());
+            }
         }
         Ok(records)
     }
+}
+
+fn wellness_request_limit(surface: ProbeSurface) -> i64 {
+    match surface {
+        ProbeSurface::UserEventsDay => WELLNESS_DAY_PAGE_LIMIT,
+        _ => WELLNESS_PAGE_LIMIT,
+    }
+}
+
+/// Keep the items that arrived, but do not treat a truncated page as the
+/// whole window. The server stops at `limit` instead of paging.
+fn fetched_wellness_record(
+    label: &str,
+    surface: ProbeSurface,
+    slice: &FetchWindow,
+    payload: Value,
+    limit: i64,
+) -> FetchedRecord {
+    let truncated = wellness_page_hits_cap(&payload, limit);
+    let mut record = FetchedRecord::from_raw(RawRecord {
+        stream: "wellness".into(),
+        source_key: format!(
+            "wellness:{label}:{}:{}:{}",
+            surface.as_str(),
+            slice.start_day(),
+            slice.end_day()
+        ),
+        source_scope: SourceScope::UserFused,
+        device_id: None,
+        start_utc: slice.start_utc,
+        end_utc: Some(slice.end_utc),
+        payload,
+        // Shapes verified against a real response are parsed
+        // by the normalizer; the rest are retained raw so
+        // they can be verified without another round trip.
+        capability: CapabilityStatus::Unverified,
+    });
+    record.incomplete = truncated;
+    if truncated {
+        record.incomplete_reason =
+            Some(format!("{label}: response reached the {limit}-item limit"));
+    }
+    record
+}
+
+fn wellness_page_hits_cap(payload: &Value, limit: i64) -> bool {
+    let limit = usize::try_from(limit).unwrap_or(usize::MAX);
+    limit > 0 && payload_items(payload).len() >= limit
 }
 
 fn payload_items(payload: &Value) -> Vec<Value> {
@@ -1355,6 +1356,132 @@ fn payload_items(payload: &Value) -> Vec<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
+
+    #[tokio::test]
+    async fn empty_heart_rate_page_is_kept_without_a_second_request() {
+        let start = DateTime::from_timestamp(1_800_000_000, 0).unwrap();
+        let window = FetchWindow::between(start, start + Duration::hours(1)).unwrap();
+        let original = json!({"code":200,"data":{"items":[]},"serverNote":"no samples"});
+        let mut calls = 0;
+        let records = fetch_heart_rate_pages_with(window, |_, _| {
+            calls += 1;
+            std::future::ready(if calls == 1 {
+                Ok(original.clone())
+            } else {
+                Err(ZeppBridgeError::Unavailable("unexpected retry".into()))
+            })
+        })
+        .await
+        .unwrap();
+        assert_eq!(calls, 1);
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].raw.payload, original);
+    }
+
+    #[tokio::test]
+    async fn paginated_heart_rate_keeps_each_original_response_and_cursor() {
+        let start = DateTime::from_timestamp(1_800_000_000, 0).unwrap();
+        let window = FetchWindow::between(start, start + Duration::hours(1)).unwrap();
+        let first = json!({"code":200,"items":(0..1000).map(|index| json!({"timestamp":start.timestamp()+index,"value":60})).collect::<Vec<_>>(),"pageMarker":"first"});
+        let second = json!({"data":{"items":[{"timestamp":start.timestamp()+1000,"value":70}]},"pageMarker":"second"});
+        let originals = vec![first, second];
+        let mut pending = std::collections::VecDeque::from(originals.clone());
+        let mut cursors = Vec::new();
+        let records = fetch_heart_rate_pages_with(window, |cursor, end| {
+            cursors.push((cursor, end));
+            std::future::ready(
+                pending
+                    .pop_front()
+                    .ok_or_else(|| ZeppBridgeError::Unknown("unexpected request".into())),
+            )
+        })
+        .await
+        .unwrap();
+        assert_eq!(
+            cursors,
+            vec![
+                (start.timestamp(), window.end_utc.timestamp()),
+                (start.timestamp() + 1000, window.end_utc.timestamp())
+            ]
+        );
+        assert_eq!(
+            records
+                .iter()
+                .map(|record| record.raw.payload.clone())
+                .collect::<Vec<_>>(),
+            originals
+        );
+        assert_ne!(records[0].raw.source_key, records[1].raw.source_key);
+        assert_ne!(
+            records[0].raw.source_key,
+            format!(
+                "heart_rate:{}:{}",
+                window.start_utc.timestamp(),
+                window.end_utc.timestamp()
+            )
+        );
+        let samples = records
+            .iter()
+            .flat_map(|record| {
+                crate::normalizer::Normalizer::normalize_heart_rate(&record.raw.payload).unwrap()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(samples.len(), 1001);
+        assert_eq!(samples.last().unwrap().value, 70.0);
+        let db = crate::storage::Database::in_memory().unwrap();
+        let mut written = 0;
+        for record in &records {
+            written += db
+                .persist_fetched_record(&record.raw)
+                .unwrap()
+                .1
+                .primary_records;
+        }
+        assert_eq!(written, 1001);
+        assert_eq!(db.count_raw_records().unwrap(), 2);
+        assert_eq!(
+            db.reprocess_raw_records().unwrap().get("heart_rate"),
+            Some(&1001)
+        );
+    }
+
+    #[test]
+    fn exclusive_midnight_does_not_fetch_the_next_day() {
+        let date = |value: &str| {
+            DateTime::parse_from_rfc3339(value)
+                .unwrap()
+                .with_timezone(&Utc)
+        };
+        let window =
+            FetchWindow::between(date("2026-01-25T00:00:00Z"), date("2026-02-08T00:00:00Z"))
+                .unwrap();
+        let chunks = window.chunks(7);
+        assert_eq!(
+            chunks
+                .iter()
+                .map(|chunk| (chunk.start_day(), chunk.end_day()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("2026-01-25".into(), "2026-01-31".into()),
+                ("2026-02-01".into(), "2026-02-07".into())
+            ]
+        );
+        for end in ["2026-02-08T00:00:00.000000001Z", "2026-02-08T12:00:00Z"] {
+            assert_eq!(
+                FetchWindow::between(window.start_utc, date(end))
+                    .unwrap()
+                    .end_day(),
+                "2026-02-08"
+            );
+        }
+        assert_eq!(
+            FetchWindow::between(date("2024-02-28T00:00:00Z"), date("2024-03-01T00:00:00Z"))
+                .unwrap()
+                .end_day(),
+            "2024-02-29"
+        );
+    }
 
     #[test]
     fn window_bounds_are_limited() {
@@ -1412,5 +1539,279 @@ mod tests {
     fn payload_items_only_accept_structured_wrappers() {
         assert_eq!(payload_items(&json!({"items": [1, 2]})).len(), 2);
         assert_eq!(payload_items(&json!({"data": "encoded"})).len(), 0);
+    }
+
+    #[test]
+    fn odi_dates_use_device_zone_and_exclusive_end() {
+        for (start, end, zone, expected_start, expected_end) in [
+            (
+                "2026-09-14T15:31:25.715671100Z",
+                "2026-09-21T15:31:25.715671100Z",
+                "Asia/Shanghai",
+                "2026-09-14",
+                "2026-09-21",
+            ),
+            (
+                "2026-09-21T16:00:00Z",
+                "2026-09-22T16:00:00Z",
+                "Asia/Shanghai",
+                "2026-09-22",
+                "2026-09-22",
+            ),
+            (
+                "2026-09-22T00:30:00Z",
+                "2026-09-22T01:00:00Z",
+                "America/Los_Angeles",
+                "2026-09-21",
+                "2026-09-21",
+            ),
+            (
+                "2026-03-08T05:00:00Z",
+                "2026-03-09T04:00:00Z",
+                "America/New_York",
+                "2026-03-08",
+                "2026-03-08",
+            ),
+            (
+                "2026-09-21T00:00:00Z",
+                "2026-09-22T00:00:00Z",
+                "UTC",
+                "2026-09-21",
+                "2026-09-21",
+            ),
+        ] {
+            let window =
+                FetchWindow::between(start.parse().unwrap(), end.parse().unwrap()).unwrap();
+            let (from, to) = window.local_days(zone).unwrap();
+            assert_eq!(from.to_string(), expected_start);
+            assert_eq!(to.to_string(), expected_end);
+        }
+        assert!(FetchWindow::days(1)
+            .unwrap()
+            .local_days("Not/AZone")
+            .is_err());
+    }
+
+    #[test]
+    fn partial_fetch_retains_original_error() {
+        let records = conclude_slices(
+            vec![sample_fetched()],
+            Some(ZeppBridgeError::HttpStatus {
+                status: 400,
+                message: "Bad request".into(),
+            }),
+            "empty",
+        )
+        .unwrap();
+        assert!(records[0].incomplete);
+        assert!(records[0]
+            .incomplete_reason
+            .as_deref()
+            .unwrap()
+            .contains("HTTP 400"));
+    }
+
+    fn sample_fetched() -> FetchedRecord {
+        FetchedRecord::from_raw(RawRecord {
+            stream: "heart_rate".into(),
+            source_key: "heart_rate_page:1:2".into(),
+            source_scope: SourceScope::UserFused,
+            device_id: None,
+            start_utc: DateTime::from_timestamp(1_800_000_000, 0).unwrap(),
+            end_utc: None,
+            payload: json!({"items": []}),
+            capability: CapabilityStatus::Verified,
+        })
+    }
+
+    #[tokio::test]
+    async fn sleep_failure_keeps_successful_slices_and_still_requests_latest() {
+        let window = FetchWindow::days(21).unwrap();
+        let mut calls = 0;
+        let records = fetch_sleep_slices_with(window, |_| {
+            calls += 1;
+            std::future::ready(if calls == 2 {
+                Err(ZeppBridgeError::RetryExhausted {
+                    status: 503,
+                    message: "test".into(),
+                })
+            } else {
+                Ok(sample_fetched())
+            })
+        })
+        .await
+        .unwrap();
+        assert_eq!(calls, 3);
+        assert_eq!(records.len(), 2);
+        assert!(records.iter().all(|record| record.incomplete));
+    }
+
+    #[tokio::test]
+    async fn sleep_auth_and_cancel_abort_without_requesting_more_slices() {
+        for error in [
+            ZeppBridgeError::Cancelled,
+            ZeppBridgeError::NeedsReauth("test".into()),
+        ] {
+            let mut error = Some(error);
+            let mut calls = 0;
+            let result = fetch_sleep_slices_with(FetchWindow::days(21).unwrap(), |_| {
+                calls += 1;
+                std::future::ready(if calls == 1 {
+                    Ok(sample_fetched())
+                } else {
+                    Err(error.take().unwrap())
+                })
+            })
+            .await;
+            assert!(is_abort_error(&result.unwrap_err()));
+            assert_eq!(calls, 2);
+        }
+    }
+
+    #[tokio::test]
+    async fn sleep_all_failed_preserves_request_error_over_later_unavailable() {
+        let mut calls = 0;
+        let error = fetch_sleep_slices_with(FetchWindow::days(14).unwrap(), |_| {
+            calls += 1;
+            std::future::ready(Err(if calls == 1 {
+                ZeppBridgeError::RetryExhausted {
+                    status: 503,
+                    message: "test".into(),
+                }
+            } else {
+                ZeppBridgeError::Unavailable("test".into())
+            }))
+        })
+        .await
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            ZeppBridgeError::RetryExhausted { status: 503, .. }
+        ));
+        assert_eq!(calls, 2);
+    }
+
+    #[test]
+    fn cancelled_slice_is_not_swallowed_when_other_records_exist() {
+        let error = conclude_slices(
+            vec![sample_fetched()],
+            Some(ZeppBridgeError::Cancelled),
+            "empty",
+        )
+        .unwrap_err();
+        assert!(error.is_cancelled());
+        assert!(!matches!(error, ZeppBridgeError::ConfigError(_)));
+    }
+
+    #[test]
+    fn needs_reauth_slice_is_not_swallowed_when_other_records_exist() {
+        let error = conclude_slices(
+            vec![sample_fetched()],
+            Some(ZeppBridgeError::NeedsReauth("expired".into())),
+            "empty",
+        )
+        .unwrap_err();
+        assert!(error.needs_reauth());
+    }
+
+    #[test]
+    fn a_404_inner_slice_marks_the_window_incomplete() {
+        let records = conclude_slices(
+            vec![sample_fetched()],
+            Some(ZeppBridgeError::Unavailable("HTTP 404".into())),
+            "empty",
+        )
+        .unwrap();
+        assert!(records.iter().all(|record| record.incomplete));
+    }
+
+    #[test]
+    fn an_all_404_window_stays_unavailable() {
+        let error = conclude_slices(
+            Vec::new(),
+            Some(ZeppBridgeError::Unavailable("HTTP 404".into())),
+            "empty",
+        )
+        .unwrap_err();
+        assert!(error.is_unavailable());
+    }
+
+    #[test]
+    fn a_wellness_page_at_the_server_cap_is_incomplete() {
+        let items: Vec<Value> = (0..WELLNESS_PAGE_LIMIT)
+            .map(|index| json!({"timestamp": index, "value": 97}))
+            .collect();
+        assert!(wellness_page_hits_cap(
+            &json!({"items": items}),
+            WELLNESS_PAGE_LIMIT
+        ));
+        let under: Vec<Value> = (0..WELLNESS_PAGE_LIMIT - 1)
+            .map(|index| json!({"timestamp": index}))
+            .collect();
+        assert!(!wellness_page_hits_cap(
+            &json!({"items": under}),
+            WELLNESS_PAGE_LIMIT
+        ));
+    }
+
+    #[test]
+    fn a_truncated_spo2_page_is_not_a_full_window() {
+        let start = DateTime::from_timestamp(1_800_000_000, 0).unwrap();
+        let slice = FetchWindow::between(start, start + Duration::days(SPO2_CHUNK_DAYS)).unwrap();
+        let items: Vec<Value> = (0..WELLNESS_PAGE_LIMIT)
+            .map(|index| json!({"timestamp": start.timestamp() + index, "value": 96}))
+            .collect();
+        let record = fetched_wellness_record(
+            "spo2",
+            ProbeSurface::UserEvents,
+            &slice,
+            json!({"items": items}),
+            WELLNESS_PAGE_LIMIT,
+        );
+        assert!(record.incomplete);
+        assert_eq!(payload_items(&record.raw.payload).len(), 1000);
+
+        let short = fetched_wellness_record(
+            "spo2",
+            ProbeSurface::UserEvents,
+            &slice,
+            json!({"items": [{"timestamp": start.timestamp(), "value": 96}]}),
+            WELLNESS_PAGE_LIMIT,
+        );
+        assert!(!short.incomplete);
+    }
+
+    #[test]
+    fn spo2_chunks_stay_under_the_five_minute_page_cap() {
+        let spo2 = WELLNESS_STREAMS
+            .iter()
+            .find(|stream| stream.0 == "spo2")
+            .expect("spo2 is a wellness stream");
+        assert_eq!(spo2.4, Some(SPO2_CHUNK_DAYS));
+        // 5-minute samples over the chunk must fit in one page; otherwise a
+        // typical week of blood oxygen would always look complete and drop
+        // the rest of the window.
+        const {
+            assert!(SPO2_CHUNK_DAYS * 24 * (60 / 5) < WELLNESS_PAGE_LIMIT);
+        }
+    }
+
+    #[test]
+    fn cancelled_is_still_not_swallowed_by_a_truncated_page() {
+        let start = DateTime::from_timestamp(1_800_000_000, 0).unwrap();
+        let slice = FetchWindow::between(start, start + Duration::days(1)).unwrap();
+        let items: Vec<Value> = (0..WELLNESS_PAGE_LIMIT)
+            .map(|index| json!({"timestamp": index}))
+            .collect();
+        let truncated = fetched_wellness_record(
+            "spo2",
+            ProbeSurface::UserEvents,
+            &slice,
+            json!({"items": items}),
+            WELLNESS_PAGE_LIMIT,
+        );
+        let error = conclude_slices(vec![truncated], Some(ZeppBridgeError::Cancelled), "empty")
+            .unwrap_err();
+        assert!(error.is_cancelled());
     }
 }

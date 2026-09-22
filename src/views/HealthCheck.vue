@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { displayDateTimeFormatter } from '../lib/dateTime';
+
 /**
  * 数据健康中心。
  *
@@ -13,11 +15,13 @@
  * 稀疏画成故障。
  */
 import { computed, onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import Icon from '../components/Icon.vue';
 import PageHeader from '../components/PageHeader.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
-import { useSyncController } from '../composables/useSyncController';
+import { syncOutcomeLabel, useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
+import { createLoadSeq } from '../lib/loadSeq';
 import type { DataHealth, HealthAction, StageState, StreamHealth } from '../types';
 import { syncStreamLabel } from '../lib/syncStreams';
 import { defineMessages, intlLocale, useMessages } from '../i18n';
@@ -267,13 +271,135 @@ const messages = defineMessages(
       unknown: 'source unknown',
     },
   },
+  {
+    window30: 'Últimos 30 días',
+    window90: 'Últimos 90 días',
+    window365: 'Último año',
+    loadFailed: 'No se pudo leer el estado de los datos',
+    retry: 'Reintentar',
+    noRecords: 'Aún no hay registros',
+    timeUnknown: 'Hora desconocida',
+    notProvided: 'Sin datos',
+    backToSettings: 'Volver a configuración',
+    eyebrow: 'Estado de los datos',
+    title: 'Revisión del estado de los datos',
+    intro: 'Para cada flujo de datos: hasta dónde llegó en la descarga desde la nube, el análisis y la escritura local; qué fechas cubre; y de dónde vino. Lo que falta, falta: nunca se rellena con cero.',
+    rangeAria: 'Periodo de cobertura',
+    loadingAria: 'Leyendo el estado de los datos',
+    replayInProgress: 'Reprocesando los registros locales con el nuevo analizador. Mientras tanto, las sincronizaciones con la nube esperan y se reintentan solas; no es un fallo.',
+
+    timingsTitle: 'Tres «últimas veces» distintas',
+    timingCloud: 'Última descarga desde la nube',
+    timingCloudNote: 'Aún sin resultado',
+    timingReplay: 'Último reprocesamiento local',
+    timingReplayNote: 'Vuelve a leer los registros locales con el analizador actual. Sin red, y no cambia la hora de arriba.',
+    timingManual: 'Último reprocesamiento manual',
+    timingManualNote: 'El que pulsaste tú',
+    timingNewest: 'Muestra de salud más reciente',
+    timingNewestNote: 'Cuándo ocurrió el registro en el reloj',
+
+    dbTitle: 'Base de datos local',
+    dbSize: 'Tamaño del archivo',
+    dbRaw: 'Registros originales',
+    dbCanonical: 'Registros normalizados',
+    dbPending: 'Pendientes de normalizar',
+    dbSchema: 'Versión del esquema',
+    dbNormalizer: 'Revisión del analizador',
+    integrityPassed: 'correcta',
+    integrityFailed: (detail: string) => `falló (${detail})`,
+    integrityDetailBelow: 'detalles abajo',
+    integrityLine: (verdict: string, checkedAt: string) => `Comprobación de integridad: ${verdict} · ${checkedAt}`,
+    integrityNeverRun: 'No se ha hecho ninguna comprobación de integridad. Revisa toda la base de datos, lo que tarda en una grande, así que solo se hace cuando la pides.',
+
+    streamsTitle: 'Hasta dónde llegó cada flujo',
+    streamsNote: 'Descargar, analizar y escribir son tres cosas que fallan por separado. Si se juntaran en un solo punto rojo, no sabrías si reintentar, volver a conectar, o si esta cuenta simplemente no tiene ese flujo.',
+    stageFetch: 'Descarga',
+    stageParse: 'Análisis',
+    stageWrite: 'Escritura',
+    stageLine: (stage: string, state: string) => `${stage}: ${state}`,
+    factRaw: 'Registros originales',
+    factCanonical: 'Registros normalizados',
+    factSources: 'Fuentes',
+    factObservedDays: 'Días observados',
+    days: (count: number) => `${count} días`,
+    gapExamples: (dates: string) => `Los huecos incluyen: ${dates}`,
+    gapMore: ' y más',
+    period: '.',
+    latestObserved: (date: string) => `El más reciente: ${date}.`,
+    noRecordsYet: 'Aún no hay registros',
+    sourceSeparator: ', ',
+
+    occasionalTitle: 'Métricas que solo aparecen de vez en cuando',
+    occasionalNote: 'Métricas como el VO₂máx y el umbral de lactato no se reportan a diario por diseño. Esta sección muestra los días observados y el más reciente, y nunca cuenta huecos diarios: pintar de rojo una escasez normal sería lo engañoso.',
+    occasionalLine: (records: string, days: number) => `${records} registros · observados en ${days} días`,
+    occasionalLatest: (date: string) => `el más reciente: ${date}`,
+    occasionalNone: 'Nada observado en este rango',
+
+    actionsTitle: 'Qué puedes hacer',
+    actionRunning: 'Ejecutando…',
+    actionRun: 'Ejecutar',
+    confirmDestructive: (label: string, reason: string) => `${label}: ${reason}\n¿Continuar?`,
+    actionSynced: 'Se sincronizó y el estado se actualizó.',
+    actionReplayed: (count: string) => `Los registros locales se reprocesaron con el analizador actual (${count} registros derivados). La hora de sincronización con la nube no cambió.`,
+    actionIntegrityOk: 'La base de datos pasó la comprobación de integridad.',
+    actionIntegrityFailed: (detail: string) => `La base de datos no pasó la comprobación de integridad: ${detail}`,
+    actionIntegrityFallback: 'Haz una copia de la carpeta de datos y vuelve a sincronizar',
+    actionFolderOpened: 'Carpeta de datos abierta.',
+    actionReconnect: 'Ve a Configuración y vuelve a conectar la cuenta de Zepp.',
+    actionFailed: (label: string) => `${label} falló`,
+
+    coveragePerEvent: 'Se produce por evento: si no hay registro es que no pasó nada en ese momento, no que falte algo.',
+    coverageOccasional: 'El reloj solo reporta esto de vez en cuando; los días en blanco son normales y no significan que se haya perdido algo.',
+    coverageNoData: 'Todavía no hay datos locales de este periodo. Sincroniza primero.',
+    coverageNoGaps: 'No se observan huecos desde el primer día con datos.',
+    coverageGaps: (days: number) =>
+      `${days} días sin datos desde el primer día con datos. No usar el reloj, no sincronizar o que la nube no devuelva nada causan huecos.`,
+
+    action: {
+      reauth: { label: 'Volver a conectar la cuenta de Zepp', reason: 'Algunos flujos no pueden descargarse porque las credenciales caducaron.' },
+      reprocess: { label: 'Reprocesar los registros locales con el analizador actual', reason: '' },
+      sync_retry: { label: 'Sincronizar de nuevo', reason: 'Algunos flujos no se pudieron descargar de la nube la última vez.' },
+      sync_first: { label: 'Hacer la primera sincronización', reason: 'Este equipo todavía no tiene ninguna sincronización exitosa con la nube.' },
+      integrity_check: { label: 'Comprobar la integridad de la base de datos', reason: 'Ejecuta un integrity_check de SQLite sobre toda la base de datos; tarda en una grande.' },
+      open_data_folder: { label: 'Abrir la carpeta de datos', reason: 'La base de datos local, las copias y las exportaciones están aquí.' },
+    },
+    reprocessReason: (pending: number) =>
+      `${pending} registros guardados todavía no han producido ningún registro normalizado. Reprocesar no usa la red y no cambia la hora de sincronización con la nube.`,
+
+    cadence: {
+      continuous: 'muchas veces al día',
+      daily: 'una vez al día',
+      nightly: 'una vez por noche',
+      per_event: 'solo cuando ocurre',
+      occasional: 'solo de vez en cuando',
+    },
+    stage: { ok: 'correcto', failed: 'falló', never: 'nunca ocurrió' },
+    errorKind: {
+      network: 'no se pudo conectar con la nube',
+      auth: 'hay que volver a conectar la cuenta',
+      not_available: 'esta cuenta no tiene ese flujo',
+      unrecognized_payload: 'llegaron datos pero no se pudieron leer',
+      cloud_rejected: 'la nube recibió la solicitud y la rechazó',
+      storage: 'falló la escritura en la base de datos local',
+      busy: 'otra operación estaba escribiendo, así que esta esperó',
+      cancelled: 'cancelado',
+      unknown: 'fallo sin clasificar',
+    },
+    source: {
+      device: 'un solo dispositivo',
+      user_fused: 'combinado del usuario',
+      unknown: 'fuente desconocida',
+    },
+  },
 );
 const t = useMessages(messages);
 
 const lookup = (table: unknown, key: string): string | undefined =>
   (table as Record<string, string | undefined>)[key];
 
-const { runSync, isSyncing, markDataChanged } = useSyncController();
+const { runSync, isSyncing, markDataChanged, syncState, syncMessage } = useSyncController();
+const router = useRouter();
+const loadSeq = createLoadSeq();
 
 const health = ref<DataHealth | null>(null);
 const loading = ref(true);
@@ -290,14 +416,18 @@ const WINDOWS = computed(() => [
 ]);
 
 const load = async () => {
+  const seq = loadSeq.next();
   loading.value = true;
   error.value = null;
   try {
-    health.value = await backend.getDataHealth(windowDays.value);
+    const next = await backend.getDataHealth(windowDays.value);
+    if (!loadSeq.isCurrent(seq)) return;
+    health.value = next;
   } catch (cause) {
+    if (!loadSeq.isCurrent(seq)) return;
     error.value = toUserMessage(cause, t.value.loadFailed);
   } finally {
-    loading.value = false;
+    if (loadSeq.isCurrent(seq)) loading.value = false;
   }
 };
 
@@ -310,7 +440,7 @@ const formatDateTime = (value?: string | null): string => {
   if (!value) return t.value.noRecords;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return t.value.timeUnknown;
-  return new Intl.DateTimeFormat(intlLocale(), {
+  return displayDateTimeFormatter({
     year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(date).replace(/\//g, '-');
 };
@@ -382,8 +512,17 @@ const runAction = async (action: HealthAction) => {
   actionMessage.value = null;
   try {
     if (action.id === 'sync') {
-      await runSync('incremental');
-      actionMessage.value = t.value.actionSynced;
+      const report = await runSync('incremental');
+      const failed = !report
+        || report.outcome === 'failed'
+        || report.outcome === 'cancelled'
+        || syncState.value === 'failed'
+        || syncState.value === 'cancelled';
+      if (failed) {
+        actionError.value = syncMessage.value || t.value.actionFailed(copy.label);
+      } else {
+        actionMessage.value = t.value.actionSynced;
+      }
     } else if (action.id === 'reprocess') {
       const result = await backend.reprocessLocalData();
       actionMessage.value = t.value.actionReplayed(result.total_records.toLocaleString(intlLocale()));
@@ -397,8 +536,9 @@ const runAction = async (action: HealthAction) => {
       await backend.openDataFolder();
       actionMessage.value = t.value.actionFolderOpened;
     } else if (action.id === 'reauth') {
-      window.location.hash = '';
+      await router.push({ path: '/settings', hash: '#connection' });
       actionMessage.value = t.value.actionReconnect;
+      return;
     }
     await load();
   } catch (cause) {
@@ -425,13 +565,12 @@ onMounted(() => void load());
       :title="t.title"
       :intro="t.intro"
     >
-      <div class="range-switch" role="radiogroup" :aria-label="t.rangeAria">
+      <div class="range-switch" role="group" :aria-label="t.rangeAria">
         <button
           v-for="range in WINDOWS"
           :key="range.days"
           type="button"
-          role="radio"
-          :aria-checked="windowDays === range.days"
+          :aria-pressed="windowDays === range.days"
           :class="['range-pill', { 'is-on': windowDays === range.days }]"
           @click="setWindow(range.days)"
         >{{ range.label }}</button>
@@ -460,7 +599,7 @@ onMounted(() => void load());
           <div>
             <span class="timing-label">{{ t.timingCloud }}</span>
             <strong>{{ formatDateTime(health.timings.last_cloud_sync_at) }}</strong>
-            <span class="timing-note">{{ health.timings.last_cloud_sync_outcome || t.timingCloudNote }}</span>
+            <span class="timing-note">{{ syncOutcomeLabel(health.timings.last_cloud_sync_outcome) || t.timingCloudNote }}</span>
           </div>
           <div>
             <span class="timing-label">{{ t.timingReplay }}</span>

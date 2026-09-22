@@ -2,7 +2,12 @@ import { ref } from 'vue';
 import { open as showOpenDialog, save as showSaveDialog } from '@tauri-apps/plugin-dialog';
 import { tauriApi, toUserMessage } from './useTauriApi';
 import { localDateString } from '../lib/format';
-import { buildExportSelection, MAX_EXPORT_RANGE_DAYS, type ExportScopeError } from '../lib/exportScope';
+import {
+  buildExportSelection,
+  exportInputForFocus,
+  MAX_EXPORT_RANGE_DAYS,
+  type ExportScopeError,
+} from '../lib/exportScope';
 import { defineMessages, messagesOf } from '../i18n';
 import type {
   ExportDataType,
@@ -17,6 +22,8 @@ export type SaveFormat = 'json' | 'csv' | 'gpx' | 'fit';
 const messages = defineMessages(
   {
     typeSteps: '步数',
+    typeLifeEvents: '生活事件',
+    groupContext: '背景',
     typeDailyActivity: '日常活动',
     typeWorkouts: '运动',
     typeSleep: '睡眠',
@@ -66,6 +73,8 @@ const messages = defineMessages(
   },
   {
     typeSteps: 'Steps',
+    typeLifeEvents: 'Life events',
+    groupContext: 'Context',
     typeDailyActivity: 'Daily activity',
     typeWorkouts: 'Workouts',
     typeSleep: 'Sleep',
@@ -113,6 +122,57 @@ const messages = defineMessages(
     feedUpdated: (count: number) => `The local AI feed now holds ${count} records.`,
     feedFailed: 'Could not update the local AI feed',
   },
+  {
+    typeSteps: 'Pasos',
+    typeLifeEvents: 'Eventos de vida',
+    groupContext: 'Contexto',
+    typeDailyActivity: 'Actividad diaria',
+    typeWorkouts: 'Entrenamientos',
+    typeSleep: 'Sueño',
+    typeHeartRate: 'Frecuencia cardíaca',
+    typeSpo2: 'Oxígeno en sangre',
+    typeStress: 'Estrés',
+    typeRespiratoryRate: 'Frecuencia respiratoria',
+    typeRecovery: 'Recuperación',
+    typeTrainingLoad: 'Carga de entrenamiento',
+    typeLactateThreshold: 'Umbral de lactato',
+    typePai: 'PAI',
+    groupActivity: 'Actividad',
+    groupSleep: 'Sueño',
+    groupBody: 'Estado corporal',
+    groupTraining: 'Entrenamiento',
+    detailSummary: 'Resumen',
+    detailSummaryHint: 'Frecuencia cardíaca agregada por hora y sin las series por segundo de los entrenamientos. Las métricas estructuradas quedan completas y el tamaño es adecuado para pasárselo a una IA.',
+    detailFull: 'Completo',
+    detailFullHint: 'Conserva las series por segundo de los entrenamientos y cada lectura de frecuencia cardíaca. Es grande y está pensado para archivar.',
+    scopeConflict: 'Un rango de fechas y un solo entrenamiento son alcances excluyentes. Elige uno.',
+    noDataTypes: 'Elige al menos un tipo de dato.',
+    invalidDates: 'Elige una fecha de inicio y de fin válidas.',
+    endBeforeStart: 'La fecha de fin no puede ser anterior a la de inicio.',
+    rangeTooLong: (days: number) => `Una exportación cubre como máximo ${days} días. Para un historial más largo, usa la copia de la base de datos en Configuración.`,
+    nothingToExport: 'No hay nada que exportar en este periodo.',
+    jsonTooLarge: 'El JSON pesa más de 1 MB. Usa «Guardar archivo» en su lugar.',
+    copied: (count: number) => `Se copiaron ${count} registros normalizados.`,
+    copyFailed: 'No se pudo copiar el JSON',
+    saveJsonTitle: 'Guardar JSON de ZeppBridge',
+    saveCsvTitle: 'Guardar CSV de ZeppBridge (tabla resumen)',
+    saveGpxTitle: 'Guardar GPX de ZeppBridge (recorrido GPS)',
+    saveFitTitle: 'Elige una carpeta para la exportación FIT (un archivo por entrenamiento)',
+    jsonFilter: 'Archivo JSON',
+    csvFilter: 'Tabla CSV',
+    gpxFilter: 'Recorrido GPX',
+    fitFilter: 'Archivos de actividad FIT',
+    unitRecords: 'registros',
+    unitRows: 'filas',
+    unitTrackPoints: 'puntos del recorrido',
+    unitSamplePoints: 'puntos de muestra',
+    saved: (count: number, unit: string) => `Se guardaron ${count} ${unit}.`,
+    savedFiles: (files: number, count: number, unit: string) =>
+      `Se guardaron ${files} archivos FIT, ${count} ${unit} en total.`,
+    saveFailed: (format: string) => `No se pudo guardar el ${format}`,
+    feedUpdated: (count: number) => `La fuente local para IA ahora tiene ${count} registros.`,
+    feedFailed: 'No se pudo actualizar la fuente local para IA',
+  },
 );
 
 const copy = () => messagesOf(messages);
@@ -142,6 +202,7 @@ export interface ExportTypeOption {
 export const exportTypeOptions = (): ExportTypeOption[] => {
   const t = copy();
   return [
+    { value: 'life_events', label: t.typeLifeEvents, group: 'context' },
     { value: 'steps', label: t.typeSteps, group: 'activity' },
     { value: 'daily_activity', label: t.typeDailyActivity, group: 'activity' },
     { value: 'workouts', label: t.typeWorkouts, group: 'activity' },
@@ -164,6 +225,7 @@ export const exportTypeOptions = (): ExportTypeOption[] => {
 export const exportTypeGroups = (): Array<{ key: ExportTypeGroup; label: string }> => {
   const t = copy();
   return [
+    { key: 'context', label: t.groupContext },
     { key: 'activity', label: t.groupActivity },
     { key: 'sleep', label: t.groupSleep },
     { key: 'body', label: t.groupBody },
@@ -199,6 +261,8 @@ export const useExport = () => {
     'recovery',
   ]);
   const exportDetail = ref<ExportDetail>('summary');
+  /** 从运动详情「锁定该条运动」进来时有值。和日期范围互斥，不能同时进 selection。 */
+  const focusedWorkoutId = ref<string | null>(null);
   const exportBusy = ref<'copy' | 'save' | 'publish' | null>(null);
   const exportError = ref<string | null>(null);
   const exportMessage = ref<string | null>(null);
@@ -214,12 +278,14 @@ export const useExport = () => {
     exportError.value = null;
     exportMessage.value = null;
     // 范围规则在 lib/exportScope.ts 一处实现：CLI 和后端也认同一套。
-    const result = buildExportSelection({
+    // 锁定单条运动时绝不能把页面上的日期范围一起送出去。
+    const result = buildExportSelection(exportInputForFocus({
       startDate: exportStartDate.value,
       endDate: exportEndDate.value,
+      focusedWorkoutId: focusedWorkoutId.value,
       dataTypes: [...exportDataTypes.value],
       detail: exportDetail.value,
-    });
+    }));
     if (!result.ok) {
       exportError.value = scopeErrorText(result.error);
       return null;
@@ -352,6 +418,7 @@ export const useExport = () => {
     exportEndDate,
     exportDataTypes,
     exportDetail,
+    focusedWorkoutId,
     exportBusy,
     exportError,
     exportMessage,

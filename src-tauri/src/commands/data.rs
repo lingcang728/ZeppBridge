@@ -1,3 +1,4 @@
+use super::{spawn_independent_read, spawn_independent_write, with_write};
 use crate::app_state::AppState;
 use crate::connectors::ZeppConnector;
 use crate::device_catalog::{match_catalog, CatalogMatchInput, CatalogMatchStatus};
@@ -7,25 +8,25 @@ use crate::insight::{WeeklyReport, WorkoutInsight};
 use crate::ipc_error::AppError;
 use crate::ipc_types::CleanupResult;
 use crate::models::{
-    AiHandoffMetadata, AiHandoffResult, CapabilityOverview, DailyHeartRateExtreme, DailyPoint,
-    DeviceCacheMetadata, DeviceCatalogOption, DeviceMatchStatus, DeviceProfile,
-    DeviceProfilesResult, DiagnosticAssignedModel, DiagnosticDeviceCandidate,
-    DiagnosticDeviceEvidence, DiagnosticField, DiagnosticObjectShape, DiagnosticReport,
-    ExportDetail, ExportResult, ExportScope, ExportSelection, FeedbackSubmissionResult,
-    HealthOverview, HeartRatePoint, HeartRateZoneOptions, HeartRateZonePreference, MetricSeries,
-    RawPayloadCompaction, SleepSession, StorageEstimate, StressPoint, TrainingBalancePoint,
-    UserPrefs, Workout, WorkoutSeries, DIAGNOSTIC_NOTE_MAX_CHARS,
+    AiHandoffMetadata, AiHandoffResult, CapabilityOverview, DailyHeartRateExtreme,
+    DeviceCacheMetadata, DeviceMatchStatus, DeviceProfile, DeviceProfilesResult,
+    DiagnosticAssignedModel, DiagnosticDeviceCandidate, DiagnosticDeviceEvidence, DiagnosticField,
+    DiagnosticObjectShape, DiagnosticReport, ExportDetail, ExportEstimate, ExportResult,
+    ExportScope, ExportSelection, FeedbackSubmissionResult, HealthOverview, HeartRatePoint,
+    HeartRateZoneOptions, HeartRateZonePreference, MetricSeries, RawPayloadCompaction,
+    SleepSession, StorageEstimate, StressPoint, TrainingBalancePoint, UserPrefs, Workout,
+    WorkoutSeries, DIAGNOSTIC_NOTE_MAX_CHARS,
 };
 use crate::storage::corrections::WorkoutCodeLabel;
 use crate::storage::provenance::{DataHealth, IntegrityCheckResult};
 use crate::storage::{looks_like_firmware_version, NORMALIZER_REVISION};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::BTreeSet;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
+use zeppbridge_core::storage::write_lock::WritePurpose;
 
 const DEVICE_CACHE_MAX_AGE_SECONDS: i64 = 24 * 60 * 60;
 pub(crate) const AI_HANDOFF_INLINE_LIMIT_BYTES: usize = 2 * 1024 * 1024;
@@ -52,7 +53,8 @@ pub async fn get_capability_overview(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<CapabilityOverview, AppError> {
     let db = state.db.lock().await;
-    db.capability_overview().map_err(AppError::from)
+    db.capability_overview(Local::now().date_naive())
+        .map_err(AppError::from)
 }
 
 /// 一页记录，外加本机的总条数。
@@ -189,15 +191,6 @@ pub async fn get_stress_series(
     db.stress_series(hours).map_err(AppError::from)
 }
 
-#[tauri::command]
-pub async fn get_training_load_series(
-    state: tauri::State<'_, AppState>,
-    days: i64,
-) -> std::result::Result<Vec<DailyPoint>, AppError> {
-    let db = state.db.lock().await;
-    db.training_load_series(days).map_err(AppError::from)
-}
-
 /// Daily series for the body and training screens.
 ///
 /// One round trip fills a whole screen: the caller names the metrics it wants
@@ -266,14 +259,16 @@ pub async fn set_heart_rate_zone_preference(
     threshold_basis: Option<String>,
     days: i64,
 ) -> std::result::Result<HeartRateZoneOptions, AppError> {
-    let db = state.db.lock().await;
-    db.set_heart_rate_zone_preference(&HeartRateZonePreference {
-        model,
-        max_basis,
-        resting_basis,
-        threshold_basis,
-    })?;
-    db.heart_rate_zone_options(days).map_err(AppError::from)
+    with_write(&state.data_dir, &state.db, WritePurpose::Metadata, |db| {
+        db.set_heart_rate_zone_preference(&HeartRateZonePreference {
+            model,
+            max_basis,
+            resting_basis,
+            threshold_basis,
+        })?;
+        db.heart_rate_zone_options(days)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -305,21 +300,22 @@ pub async fn set_user_prefs(
     history_sync_days: i64,
     archive_enabled: Option<bool>,
 ) -> std::result::Result<UserPrefs, AppError> {
-    let db = state.db.lock().await;
-    // 没传归档开关的旧调用方保持原状，不会被静默关掉归档。
-    let archive_enabled = match archive_enabled {
-        Some(value) => value,
-        None => db
-            .user_prefs()
-            .map(|prefs| prefs.archive_enabled)
-            .unwrap_or(false),
-    };
-    db.set_user_prefs(&UserPrefs {
-        retention_days,
-        history_sync_days,
-        archive_enabled,
+    with_write(&state.data_dir, &state.db, WritePurpose::Metadata, |db| {
+        // 没传归档开关的旧调用方保持原状，不会被静默关掉归档。
+        let archive_enabled = match archive_enabled {
+            Some(value) => value,
+            None => db
+                .user_prefs()
+                .map(|prefs| prefs.archive_enabled)
+                .unwrap_or(false),
+        };
+        db.set_user_prefs(&UserPrefs {
+            retention_days,
+            history_sync_days,
+            archive_enabled,
+        })
     })
-    .map_err(AppError::from)
+    .await
 }
 
 /// Remove records older than the requested retention window.
@@ -332,13 +328,10 @@ pub async fn set_user_prefs(
 pub async fn compact_raw_payloads(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<RawPayloadCompaction, AppError> {
-    let _write_guard = zeppbridge_core::storage::write_lock::acquire_with_timeout(
-        &state.data_dir,
-        zeppbridge_core::storage::write_lock::WritePurpose::Compaction,
-        std::time::Duration::from_secs(20),
-    )?;
-    let db = state.db.lock().await;
-    db.compact_raw_payloads().map_err(AppError::from)
+    spawn_independent_write(state.data_dir.clone(), WritePurpose::Compaction, |db| {
+        db.compact_raw_payloads()
+    })
+    .await
 }
 
 #[tauri::command]
@@ -353,16 +346,10 @@ pub async fn cleanup_old_data(
         ));
     }
 
-    let result = {
-        let _write_guard = zeppbridge_core::storage::write_lock::acquire_with_timeout(
-            &state.data_dir,
-            zeppbridge_core::storage::write_lock::WritePurpose::Cleanup,
-            std::time::Duration::from_secs(20),
-        )?;
-        let db = state.db.lock().await;
-        db.cleanup_old_data(days).map_err(AppError::from)
-    };
-    result?;
+    spawn_independent_write(state.data_dir.clone(), WritePurpose::Cleanup, move |db| {
+        db.cleanup_old_data(days)
+    })
+    .await?;
 
     Ok(CleanupResult {
         days,
@@ -374,19 +361,13 @@ pub async fn cleanup_old_data(
 pub async fn reprocess_local_data(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<serde_json::Value, AppError> {
-    let streams = {
-        // 重放会重写全部派生数据，必须和同步、迁移、恢复互斥。
-        let _write_guard = zeppbridge_core::storage::write_lock::acquire_with_timeout(
-            &state.data_dir,
-            zeppbridge_core::storage::write_lock::WritePurpose::Reprocess,
-            std::time::Duration::from_secs(20),
-        )?;
-        let db = state.db.lock().await;
+    let streams = spawn_independent_write(state.data_dir.clone(), WritePurpose::Reprocess, |db| {
         let streams = db.reprocess_raw_records()?;
         // 手动重新解析记在自己的时间线上，云端同步时间原样不动。
         db.record_local_replay(true)?;
-        streams
-    };
+        Ok(streams)
+    })
+    .await?;
     let total_records: i64 = streams.values().sum();
     Ok(serde_json::json!({
         "total_records": total_records,
@@ -416,7 +397,7 @@ pub async fn get_weekly_report(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<WeeklyReport, AppError> {
     let db = state.db.lock().await;
-    db.weekly_report(Utc::now()).map_err(AppError::from)
+    db.weekly_report(Local::now()).map_err(AppError::from)
 }
 
 /// 数据健康中心的后端契约。
@@ -444,8 +425,10 @@ pub async fn get_data_health(
 pub async fn run_database_integrity_check(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<IntegrityCheckResult, AppError> {
-    let db = state.db.lock().await;
-    db.run_integrity_check().map_err(AppError::from)
+    spawn_independent_write(state.data_dir.clone(), WritePurpose::Metadata, |db| {
+        db.run_integrity_check()
+    })
+    .await
 }
 
 /// 随包运动目录里的全部可选项，供纠正下拉框渲染。
@@ -477,26 +460,11 @@ pub async fn set_workout_code_label(
     zepp_type: i32,
     label: Option<String>,
 ) -> std::result::Result<Vec<WorkoutCodeLabel>, AppError> {
-    let db = state.db.lock().await;
-    db.set_workout_code_label(zepp_type, label.as_deref())?;
-    db.unknown_workout_code_labels().map_err(AppError::from)
-}
-
-/// 随包设备目录里可供用户指认的型号。
-#[tauri::command]
-pub fn get_device_catalog_options() -> Vec<DeviceCatalogOption> {
-    let mut options = zeppbridge_core::device_catalog::catalog_entries()
-        .iter()
-        .filter(|entry| entry.supported && entry.status == "active")
-        .map(|entry| DeviceCatalogOption {
-            catalog_id: entry.catalog_id.clone(),
-            canonical_name: entry.canonical_name.clone(),
-            name_zh: entry.name_zh.clone(),
-            kind: entry.kind.clone(),
-        })
-        .collect::<Vec<_>>();
-    options.sort_by(|a, b| a.canonical_name.cmp(&b.canonical_name));
-    options
+    with_write(&state.data_dir, &state.db, WritePurpose::Metadata, |db| {
+        db.set_workout_code_label(zepp_type, label.as_deref())?;
+        db.unknown_workout_code_labels()
+    })
+    .await
 }
 
 /// 用户指认某台设备的型号（传 `null` 撤销）。
@@ -509,9 +477,10 @@ pub async fn set_device_model_override(
     device_key: String,
     catalog_id: Option<String>,
 ) -> std::result::Result<(), AppError> {
-    let db = state.db.lock().await;
-    db.set_device_model_override(&device_key, catalog_id.as_deref())
-        .map_err(AppError::from)
+    with_write(&state.data_dir, &state.db, WritePurpose::Metadata, |db| {
+        db.set_device_model_override(&device_key, catalog_id.as_deref())
+    })
+    .await
 }
 
 #[tauri::command]
@@ -520,19 +489,12 @@ pub async fn set_workout_type_override(
     workout_id: String,
     user_override: Option<String>,
 ) -> std::result::Result<Workout, AppError> {
-    let db = state.db.lock().await;
-    db.set_workout_type_override(&workout_id, user_override.as_deref())?;
-    db.get_workout_detail(&workout_id)?
-        .ok_or_else(|| AppError::new("err.workout.not_found", "运动记录不存在"))
-}
-
-/// Build an allowlist-only report. The cloud response is examined
-/// in memory and is never copied into the result or persisted as a diagnostic.
-#[tauri::command]
-pub async fn get_diagnostic_report(
-    state: tauri::State<'_, AppState>,
-) -> std::result::Result<DiagnosticReport, AppError> {
-    build_diagnostic_report(&state, false, None).await
+    let workout = with_write(&state.data_dir, &state.db, WritePurpose::Metadata, |db| {
+        db.set_workout_type_override(&workout_id, user_override.as_deref())?;
+        db.get_workout_detail(&workout_id)
+    })
+    .await?;
+    workout.ok_or_else(|| AppError::new("err.workout.not_found", "运动记录不存在"))
 }
 
 /// 组装诊断报告。
@@ -825,11 +787,21 @@ pub async fn get_export_json(
     state: tauri::State<'_, AppState>,
     selection: ExportSelection,
 ) -> std::result::Result<String, AppError> {
-    let result = {
-        let db = state.db.lock().await;
-        db.build_ai_export(&selection).map_err(AppError::from)
-    }?;
-    Ok(result.0)
+    spawn_independent_read(state.data_dir.clone(), move |db| {
+        db.build_ai_export(&selection).map(|(encoded, _)| encoded)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn estimate_export(
+    state: tauri::State<'_, AppState>,
+    selection: ExportSelection,
+) -> std::result::Result<ExportEstimate, AppError> {
+    spawn_independent_read(state.data_dir.clone(), move |db| {
+        db.estimate_ai_export(&selection)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -1379,45 +1351,8 @@ fn sanitize_clipboard_text(text: &str) -> String {
     output
 }
 
-/// Write via a same-directory temporary file + rename so an interrupted
-/// export (crash, disk full) never leaves a truncated JSON at the target
-/// path — in particular the stable AI feed file that is overwritten in place.
 fn write_file_atomically(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    let parent = path
-        .parent()
-        .filter(|value| !value.as_os_str().is_empty())
-        .unwrap_or_else(|| Path::new("."));
-    let file_name = path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("export.json");
-    let temp_path = parent.join(format!(
-        ".{file_name}.tmp-{}-{}",
-        std::process::id(),
-        chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
-    ));
-    let result = (|| {
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(&temp_path)?;
-        file.write_all(bytes)?;
-        file.sync_all()?;
-        drop(file);
-        // Windows cannot rename over an existing file.
-        #[cfg(windows)]
-        {
-            if path.exists() {
-                std::fs::remove_file(path)?;
-            }
-        }
-        std::fs::rename(&temp_path, path)
-    })();
-    if result.is_err() {
-        let _ = std::fs::remove_file(&temp_path);
-    }
-    result
+    crate::paths::write_file_atomically(path, bytes)
 }
 
 async fn write_export(
@@ -1502,6 +1437,7 @@ pub async fn get_device_profiles(
     let mut cached_at = cached.cached_at;
     let mut refreshed = false;
     let mut refresh_error = None;
+    let mut refresh_error_code = None;
 
     if refresh.unwrap_or(false) {
         match refresh_device_profiles_from_cloud(&state).await {
@@ -1512,8 +1448,9 @@ pub async fn get_device_profiles(
             }
             Err(error) => {
                 // Keep the last good cache and expose a safe, non-secret error
-                // string for the settings surface.
-                refresh_error = Some(error);
+                // string plus its stable code for the settings surface.
+                refresh_error = Some(error.message.clone());
+                refresh_error_code = Some(error.code.clone());
             }
         }
     }
@@ -1545,6 +1482,7 @@ pub async fn get_device_profiles(
             age_seconds,
             refreshed,
             refresh_error,
+            refresh_error_code,
         },
     })
 }
@@ -1555,27 +1493,49 @@ pub(crate) async fn refresh_device_profile(state: &AppState) {
 
 async fn refresh_device_profiles_from_cloud(
     state: &AppState,
-) -> std::result::Result<(Vec<DeviceProfile>, DateTime<Utc>), String> {
+) -> std::result::Result<(Vec<DeviceProfile>, DateTime<Utc>), AppError> {
     let auth = state
         .auth
         .load_auth()
-        .map_err(|_| "当前认证不可用".to_string())?
-        .ok_or_else(|| "尚未配置 Zepp 认证".to_string())?;
-    let connector = ZeppConnector::new(auth).map_err(|_| "无法建立 Zepp 连接".to_string())?;
-    let payload = connector
-        .fetch_devices()
-        .await
-        .map_err(|_| "设备目录刷新失败".to_string())?;
+        .map_err(AppError::from)?
+        .ok_or_else(|| AppError::new("err.sync.not_connected", "尚未配置 Zepp 认证"))?;
+    let connector = ZeppConnector::new(auth).map_err(AppError::from)?;
+    let payload = connector.fetch_devices().await.map_err(AppError::from)?;
     let profiles = parse_device_profiles(&payload);
     if profiles.is_empty() {
-        return Err("Zepp 未返回设备".to_string());
+        return Err(AppError::new("err.core.unavailable", "Zepp 未返回设备"));
     }
 
-    {
+    // 这一段写库以前只拿进程内的 `state.db` 互斥锁，没拿跨进程写锁。
+    // 重放/压缩/同步握着写锁跑的时候，这里的每条 autocommit upsert 都要在
+    // SQLite busy_timeout 里干等——而 `state.db` 一直被占着，后面所有命令
+    // （状态、概览、设置页加载）跟着排队，界面看起来就是「点了没反应」。
+    // 维护窗口里干脆跳过：目录缓存照常写文件，身份行留给下一次刷新补齐。
+    let write_guard =
+        if crate::storage::replay_in_progress() || crate::storage::compaction_in_progress() {
+            None
+        } else {
+            match zeppbridge_core::storage::write_lock::try_acquire(
+                &state.data_dir,
+                WritePurpose::Metadata,
+            ) {
+                Ok(guard) => Some(guard),
+                Err(error @ zeppbridge_core::storage::write_lock::WriteLockError::Busy { .. }) => {
+                    crate::diagnostics::log(&format!("设备身份表这次不更新：{error}"));
+                    None
+                }
+                Err(error) => {
+                    return Err(AppError::new(
+                        "err.core.io",
+                        format!("无法取得写锁: {error}"),
+                    ));
+                }
+            }
+        };
+    if write_guard.is_some() {
         let db = state.db.lock().await;
         for hint in profiles.iter().map(device_hint_from_profile) {
-            db.upsert_device_identity(&hint)
-                .map_err(|_| "本地设备索引写入失败".to_string())?;
+            db.upsert_device_identity(&hint).map_err(AppError::from)?;
         }
     }
 
@@ -1585,10 +1545,11 @@ async fn refresh_device_profiles_from_cloud(
         cached_at,
         profiles: profiles.clone(),
     };
-    let encoded =
-        serde_json::to_vec_pretty(&cache_file).map_err(|_| "设备目录缓存编码失败".to_string())?;
+    let encoded = serde_json::to_vec_pretty(&cache_file).map_err(|error| {
+        AppError::new("err.core.parse", format!("设备目录缓存编码失败: {error}"))
+    })?;
     write_file_atomically(&state.data_dir.join("devices.json"), &encoded)
-        .map_err(|_| "设备目录缓存写入失败".to_string())?;
+        .map_err(|error| AppError::new("err.core.io", format!("设备目录缓存写入失败: {error}")))?;
     Ok((profiles, cached_at))
 }
 
@@ -2275,11 +2236,11 @@ pub(crate) fn parse_device_profiles(value: &serde_json::Value) -> Vec<DeviceProf
             // 收 deviceSource 而不误收 deviceType。
             let device_source_codes = device_source_numbers(&item, &extra);
             let device_names = merged_string_values(&item, &extra, &["deviceName", "deviceType"]);
-            let device_id = first_string(
-                &item,
-                &["deviceId", "device_id", "deviceSource", "macAddress"],
-            )
-            .or_else(|| first_string(&extra, &["deviceId", "device_id", "macAddress"]));
+            let device_id = first_string(&item, &["deviceId", "device_id", "macAddress"])
+                .or_else(|| first_string(&extra, &["deviceId", "device_id", "macAddress"]))
+                // Keep the legacy source-only key, but never let a model code
+                // hide an actual device identity in nested metadata.
+                .or_else(|| first_string(&item, &["deviceSource"]));
             if let Some(device_id) = device_id.as_deref() {
                 if device_id.starts_with('A')
                     && device_id.chars().skip(1).all(|c| c.is_ascii_digit())
@@ -2385,7 +2346,10 @@ fn merge_device_metadata(target: &mut Map<String, Value>, value: &Value, depth: 
         return;
     };
     for (key, child) in object {
-        target.entry(key.clone()).or_insert_with(|| child.clone());
+        let entry = target.entry(key.clone()).or_insert(Value::Null);
+        if entry.is_null() || entry.as_str().is_some_and(|text| text.trim().is_empty()) {
+            *entry = child.clone();
+        }
         if matches!(
             key.as_str(),
             "additionalInfo" | "bind_device" | "bindDevice" | "deviceInfo" | "device_info"
@@ -2569,6 +2533,32 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
+    fn nested_identity_and_helio_name_survive_empty_outer_metadata() {
+        let profiles = parse_device_profiles(&json!({"devices": [{
+            "deviceSource": 62, "deviceType": 0,
+            "deviceId": null, "productName": "  ",
+            "additionalInfo": {"deviceId": "REAL-CORE-ID", "productName": "Helio Core"}
+        }]}));
+        assert_eq!(profiles.len(), 1);
+        assert_eq!(profiles[0].device_id.as_deref(), Some("REAL-CORE-ID"));
+        assert_eq!(
+            profiles[0].catalog_id.as_deref(),
+            Some("amazfit-helio-core")
+        );
+    }
+
+    #[test]
+    fn source_number_does_not_hide_nested_identity_or_merge_two_devices() {
+        let profiles = parse_device_profiles(&json!({"devices": [
+            {"deviceSource": 10289411, "additionalInfo": {"deviceId": "STRAP-ONE"}},
+            {"deviceSource": 10289411, "additionalInfo": {"deviceId": "STRAP-TWO"}}
+        ]}));
+        assert_eq!(profiles.len(), 2);
+        assert_eq!(profiles[0].device_id.as_deref(), Some("STRAP-ONE"));
+        assert_eq!(profiles[1].device_id.as_deref(), Some("STRAP-TWO"));
+    }
+
+    #[test]
     fn parse_device_profile_reads_additional_info() {
         let value = json!({
             "items": [{
@@ -2637,18 +2627,21 @@ mod tests {
     /// 这个用例钉住两件事：目录里没有对应编号时必须诚实地判为未识别（不能
     /// 靠猜一个型号来「修好」），以及诊断报告必须带上型号类数字，否则内置
     /// 目录永远补不全，这台表对每个用户都会一直是未识别。
+    ///
+    /// `10813699` 是 2026-09-13 仍因真实分歧没收进目录的编号；`7930112`
+    /// 已经裁决为 GTR 4，不能再当「未知编号」用。
     #[test]
     fn a_device_response_with_no_product_name_stays_unknown_and_reports_model_numbers() {
         let payload = json!({
             "items": [{
                 "deviceId": "0123456789abcdef",
-                "deviceSource": 7930112,
+                "deviceSource": 10813699,
                 "deviceType": 5,
                 "macAddress": "AA:BB:CC:DD:EE:FF",
                 "sn": "SERIAL-PRIVATE-998877",
                 "firmwareVersion": "6.2.208.7",
                 "additionalInfo": serde_json::to_string(&json!({
-                    "productId": "8290304",
+                    "productId": "10813699",
                     "productVersion": "6.2.208.7",
                     "hardwareVersion": "1.0",
                     "btmac": "AA:BB:CC:DD:EE:FF",
@@ -2672,7 +2665,7 @@ mod tests {
         assert!(
             report
                 .model_identifier_hints
-                .contains(&"deviceSource:7930112".to_string()),
+                .contains(&"deviceSource:10813699".to_string()),
             "缺了型号编号，内置目录就永远补不上: {:?}",
             report.model_identifier_hints
         );
@@ -2693,9 +2686,9 @@ mod tests {
 
     /// 反馈汇总出来的 deviceSource 一旦进了目录，同款设备就自动认得出来。
     ///
-    /// 这是上面那条用例的另一半：`7930112` 没有第二份报告，所以仍然是未识别；
-    /// `8716547` 有七份用户指认，所以现在直接就是 T-Rex 3——用户不必再手动指认
-    /// 一次。整条回路（用户指认 → 反馈库 → 目录 → 自动识别）就是靠这个闭上的。
+    /// 这是上面那条用例的另一半：未进目录的编号保持未识别；`8716547` 有七份
+    /// 用户指认，所以现在直接就是 T-Rex 3——用户不必再手动指认一次。整条回路
+    /// （用户指认 → 反馈库 → 目录 → 自动识别）就是靠这个闭上的。
     #[test]
     fn a_contributed_device_source_number_is_recognised_without_any_product_name() {
         let payload = json!({
