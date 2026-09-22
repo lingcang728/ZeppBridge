@@ -34,12 +34,6 @@ const routes = [
     component: () => import('../views/Explore.vue'),
   },
   {
-    path: '/orbit-lab',
-    name: 'OrbitLab',
-    // BETA1-STUB：轨道编排实验场，不进主导航也不做 DEV 门；S3 集成时替换占位页。
-    component: () => import('../views/OrbitLab.vue'),
-  },
-  {
     path: '/body',
     name: 'BodyStatus',
     component: () => import('../views/BodyStatus.vue'),
@@ -93,6 +87,12 @@ const routes = [
     path: '/settings',
     name: 'Settings',
     component: () => import('../views/Settings.vue'),
+  },
+  // BETA1: orbit lab route (S3)
+  {
+    path: '/orbit-lab',
+    name: 'OrbitLab',
+    component: () => import('../views/OrbitLab.vue'),
   },
   {
     path: '/:pathMatch(.*)*',
