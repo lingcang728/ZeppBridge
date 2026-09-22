@@ -6297,6 +6297,7 @@ name = "zeppbridge-mcp"
 version = "3.0.0-beta.1"
 dependencies = [
  "chrono",
+ "rusqlite",
  "serde",
  "serde_json",
  "zeppbridge-core",

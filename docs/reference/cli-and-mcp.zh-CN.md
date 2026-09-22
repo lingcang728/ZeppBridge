@@ -165,6 +165,32 @@ stdio 传输，**不监听任何端口，不发出任何网络请求**。只读�
 
 压缩包里的 `mcp-config-example.json` 是同一段内容。
 
+### 访问范围（`--scope`）
+
+进程只接受一个可选参数：
+
+```json
+{
+  "mcpServers": {
+    "zeppbridge": {
+      "command": "/path/to/zeppbridge-mcp",
+      "args": ["--scope", "task"]
+    }
+  }
+}
+```
+
+- **`full-readonly`**（缺省值）——已有配置的既有行为：本机数据库的只读全量视图。不带 `--scope` 的旧配置行为完全不变。
+- **`task`**——仍然只读，但只看得到桌面端任务页里标为「开放给 MCP」的任务所授权的内容：仅列出的运动 id，以及这些运动按类别展开的日期窗口内的健康数据。授权在每次调用时重新读取，所以任务页里翻转开关对下一次请求立即生效，不用重启进程。
+
+argv 解析是 fail-closed 的：不认识的参数、未知的 `--scope` 值、缺值、重复传参都会让进程以非零退出并只写一行 stderr——拼错的参数绝不会静默放宽成更大范围。
+
+`task` 范围下，授权外的请求会被拒绝而不是悄悄截断：`list_workouts` 只回授权的运动 id（哪怕它们不在最近 N 条里）；`get_workout_insight` 的基线只按授权运动重算；`get_metric_series` 只回授权窗口内的日期；`get_sleep_detail` 的「最近一晚」只在授权睡眠窗里找；`get_data_health` 是整库口径的报表、裁不出诚实子集，整体拒绝。`task` 范围的响应还会剥掉 `device_id` 这类身份字段。
+
+每个 `tools/call` 结果都带 `"scope": {"mode": ..., "grants": N}`（成功时在 `structuredContent` 里，出错时在顶层）；`initialize` 与 `server/discover` 也会报告 `"scope": {"mode": ...}` 并在说明文字里写当前范围，客户端始终知道自己在看哪一种视图。
+
+范围拒绝是工具结果而非协议错误：`isError: true`，`structuredContent.error.code` 为 `err.mcp.scope_denied`（请求超出授权——`error.permittedRanges` 列出实际授权的 `{category, start, end}` 窗口供重试）或 `err.mcp.scope_no_grants`（当前没有任何任务开放给 MCP）。
+
 ### 工具
 
 | 工具 | 返回 |
