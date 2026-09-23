@@ -929,7 +929,7 @@ fn run_metric_series(
     permit: &Permit,
 ) -> Result<Value, CallFailure> {
     let metrics = metric_args(args).map_err(CallFailure::plain)?;
-    let days = args.get("days").and_then(Value::as_i64).unwrap_or(90);
+    let days = args.get("days").and_then(Value::as_i64).unwrap_or(90).clamp(1, 1825);
     let mut series = db
         .metric_series(&metrics, days)
         .map_err(|error| CallFailure::plain(error.user_message()))?;

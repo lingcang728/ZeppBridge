@@ -494,14 +494,22 @@ const initialize = async () => {
     }
     unlisteners.push(fn);
   };
+  // 一个事件注册失败（启动早期的 IPC 抖动等）不该拖垮整个 initialize()：
+  // 后面还有别的监听器、refreshStatus()、auto-sync 定时器要设置。
+  const safeListen = async <T>(event: string, handler: (payload: T) => void) => {
+    try {
+      keepUnlisten(await backend.listen<T>(event, handler));
+    } catch {
+      // 这一个事件监听不上，其它启动步骤仍要继续。
+    }
+  };
   if (isDesktop()) {
     /* 五个事件监听彼此没有依赖，登录态查询也不等任何人——串行 await 是六趟
-       IPC 往返，一把 Promise.all 只等最慢的那趟。每个 listen 一落地就进
-       keepUnlisten：epoch 翻掉时它当场解绑；某个 listen 失败让整批拒绝时，
-       已成功的注册也已经收进 unlisteners，不会漏成野监听器。 */
+       IPC 往返，一把 Promise.all 只等最慢的那趟。单个 listen 走 safeListen：
+       启动早期 IPC 抖动时这一路失败，其它监听器和 refreshStatus 仍要继续。 */
     const [initialLogin] = await Promise.all([
       backend.getLoginStatus().catch(() => null),
-      backend.listen<SyncProgress>('sync://progress', (payload) => {
+      safeListen<SyncProgress>('sync://progress', (payload) => {
         if (payload.completed) {
           streamUpdate.value = { stream: payload.stream, revision: streamUpdate.value.revision + 1 };
           return;
@@ -521,17 +529,17 @@ const initialize = async () => {
             text: payload.message,
           }
           : { kind: 'backend', text: payload.message };
-      }).then(keepUnlisten),
-      backend.listen('tray://sync', () => {
+      }),
+      safeListen('tray://sync', () => {
         void runSync('incremental');
-      }).then(keepUnlisten),
-      backend.listen<LoginStatus>('login://status', applyLoginStatus).then(keepUnlisten),
-      backend.listen<number>('compaction://started', (pending) => {
+      }),
+      safeListen<LoginStatus>('login://status', applyLoginStatus),
+      safeListen<number>('compaction://started', (pending) => {
         compactionPending.value = typeof pending === 'number' ? pending : 0;
         compactingEvent.value = true;
         compactionSaved.value = null;
-      }).then(keepUnlisten),
-      backend.listen<{ bytesBefore: number; bytesAfter: number }>(
+      }),
+      safeListen<{ bytesBefore: number; bytesAfter: number }>(
         'compaction://finished',
         (report) => {
           compactingEvent.value = false;
@@ -540,12 +548,9 @@ const initialize = async () => {
           window.clearTimeout(compactionSavedTimer);
           compactionSavedTimer = window.setTimeout(() => { compactionSaved.value = null; }, 12_000);
         },
-      ).then(keepUnlisten),
+      ),
     ]);
     if (!stillMine()) return;
-    // 登录态查询与 login://status 监听是并行发出的，两者谁先到都行——
-    // applyLoginStatus 幂等，同一状态重复应用没有副作用。
-    // 启动时拿不到登录态不算失败（catch 已落成 null），照旧跳过。
     if (initialLogin) applyLoginStatus(initialLogin);
     if (!stillMine()) return;
     autoSyncTimer = window.setInterval(() => {

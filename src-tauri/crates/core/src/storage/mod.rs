@@ -2604,13 +2604,23 @@ impl Database {
                         continue;
                     }
                 };
+                // `normalize_and_persist_raw` 先清空这条报文的旧派生行、再按新
+                // 规则一条条插回去——中间可能有好几条 INSERT。它本身不是一条
+                // 语句，插到一半失败时，之前已经执行的清空/插入不能留在这批
+                // 事务里跟着一起提交，否则就是「删了没建全」。单开一个内层
+                // savepoint 把这一条报文的写入独立出来，失败就只回滚这一条，
+                // 这一批里其它已经处理成功的报文不受影响。
+                self.conn.execute("SAVEPOINT reprocess_record", [])?;
                 match self.normalize_and_persist_raw(*id, stream, source_key, &payload) {
                     Ok(result) => {
+                        self.conn.execute("RELEASE reprocess_record", [])?;
                         self.clear_raw_quarantine(*id)?;
                         *counts.entry(stream.clone()).or_default() += result.primary_records;
                         band_heart_rate += result.band_heart_rate_records;
                     }
                     Err(error) => {
+                        self.conn.execute("ROLLBACK TO reprocess_record", [])?;
+                        self.conn.execute("RELEASE reprocess_record", [])?;
                         failures += 1;
                         self.insert_raw_quarantine(*id, stream, source_key, &error)?;
                     }

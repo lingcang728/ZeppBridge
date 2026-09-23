@@ -117,6 +117,19 @@ pub async fn start_history_backfill(
             "补拉起点不能晚于今天",
         ));
     }
+    // 没有下限的话，一个异常早的起点（哪怕只是笔误）会让 `plan_backfill`
+    // 按自然月对六条流展开成几十万个同步块，卡住整个 app（同时占着写锁）。
+    // 和其它所有时间窗口一样，上限是 `MAX_HISTORY_SYNC_DAYS`：再早 Zepp
+    // 也不会有记录。
+    if (to - from).num_days() > UserPrefs::MAX_HISTORY_SYNC_DAYS {
+        return Err(AppError::new(
+            "err.backfill.bad_start_date",
+            format!(
+                "补拉起点太早：最多只能补拉最近 {} 天",
+                UserPrefs::MAX_HISTORY_SYNC_DAYS
+            ),
+        ));
+    }
     let _command_guard = state.sync_command_lock.lock().await;
     if let Some(kind) = local_maintenance_deferred() {
         return Err(deferred_app_error(kind));

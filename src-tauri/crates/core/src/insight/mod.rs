@@ -782,10 +782,25 @@ impl Database {
                 // 「次数」是窗口内的总量，不是每天的平均，也不能在按日折叠
                 // 之后数 values（同日两场会被收成 1.0）。先记下总场次，再
                 // 折叠只为拿去重天数。
+                //
+                // 基线窗口（28 天）比当前窗口（7 天）长，两边的总量不能直接
+                // 相减/相除——否则同样的训练频率会被读成「下降了」。按窗口
+                // 实际天数换算成「每 RECENT_DAYS 天」的等效场次，当前窗口
+                // 本身正好是 RECENT_DAYS 天，换算后数值不变。
+                let window_days = (end - start).num_days() + 1;
                 let total = raw.rows.len() as f64;
+                let scaled_total = if window_days > 0 {
+                    total * weekly::RECENT_DAYS as f64 / window_days as f64
+                } else {
+                    total
+                };
                 let samples = collapse_per_day(raw);
                 Ok(WeeklySamples {
-                    values: if total > 0.0 { vec![total] } else { Vec::new() },
+                    values: if total > 0.0 {
+                        vec![scaled_total]
+                    } else {
+                        Vec::new()
+                    },
                     day_count: samples.day_count,
                     dates: samples.dates,
                     source: samples.source,
@@ -1778,8 +1793,11 @@ mod tests {
             .comparison
             .clone()
             .expect("10 天基线够 7 天门，不该再报 thin_baseline");
-        assert_eq!(comparison.baseline_value, 10.0);
-        assert_eq!(comparison.direction, "lower");
+        // 10 次分布在整个 28 天基线窗口里，换算成「每 7 天」的等效场次是
+        // 10 * 7 / 28 = 2.5——不是原始的 10（那是拿 7 天总量硬比 28 天总量，
+        // 同样的训练频率会被算成「下降了」）。4 对 2.5 才是「变多了」。
+        assert_eq!(comparison.baseline_value, 2.5);
+        assert_eq!(comparison.direction, "higher");
     }
 
     /// 基线均值是 0 时相对变化算不出来——这是另一条理由，不是「样本不足」。
