@@ -152,6 +152,8 @@ const messages = defineMessages(
     chronicTooltip: (value: string) => `Promedio semanal de 28 días <b>${value}</b>`,
     ratioTooltip: (value: string) => `Aguda:crónica <b>${value}</b>`,
   },
+  // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
+  'views/TrainingStatus',
 );
 const t = useMessages(messages);
 

@@ -150,6 +150,8 @@ const messages = defineMessages(
       `${date}<br/>Máximo <b>${max}</b> lpm<br/>Promedio ${avg} lpm<br/>${samples} muestras`,
     dailyMaxNote: 'Esto usa solo las muestras originales de cada lectura guardadas en este equipo. El máximo diario de Zepp nunca nos llega (el device_max_hr de la biblioteca es el máximo configurado para los límites de zonas, no un máximo medido), así que no hay nada que poner al lado aquí: abre la app Zepp para comparar el número de ese día.',
   },
+  // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
+  'views/HeartRateDetail',
 );
 const t = useMessages(messages);
 

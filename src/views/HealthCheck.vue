@@ -391,6 +391,8 @@ const messages = defineMessages(
       unknown: 'fuente desconocida',
     },
   },
+  // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
+  'views/HealthCheck',
 );
 const t = useMessages(messages);
 

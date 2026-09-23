@@ -108,6 +108,8 @@ const messages = defineMessages(
     originCatalog: 'Coincide con el catálogo integrado',
     originNoMatch: 'Sin coincidencia',
   },
+  // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
+  'views/DeviceDetail',
 );
 const t = useMessages(messages);
 

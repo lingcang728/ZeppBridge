@@ -138,6 +138,8 @@ const messages = defineMessages(
     tooltipRow: (name: string, hours: number) => `${name}: ${hours} h<br/>`,
     tooltipRowMissing: (name: string) => `${name}: Sin datos<br/>`,
   },
+  // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
+  'views/SleepDetail',
 );
 const t = useMessages(messages);
 import EmptyState from '../components/EmptyState.vue';

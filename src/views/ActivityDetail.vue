@@ -97,6 +97,8 @@ const messages = defineMessages(
     minutesHint: 'Minutos que el reloj contó como activos',
     minutesUnit: 'min',
   },
+  // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
+  'views/ActivityDetail',
 );
 const t = useMessages(messages);
 
