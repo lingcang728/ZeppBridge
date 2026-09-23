@@ -1604,6 +1604,7 @@ fn timestamp_not_unreasonably_future(timestamp: DateTime<Utc>) -> bool {
 /// error: the raw response has to survive so its shape can be verified later.
 #[derive(Debug, Clone, Default)]
 pub struct WellnessNormalizedData {
+    pub food_entries: Vec<FoodEntry>,
     pub daily_metrics: Vec<DailyMetric>,
     pub metric_samples: Vec<MetricSample>,
     pub diagnostics: Vec<String>,
@@ -1762,6 +1763,26 @@ fn food_metrics(items: &[Value], out: &mut WellnessNormalizedData) {
         }
 
         for (meal, value_object, date, is_sample) in entries {
+            let text = |key: &str| {
+                first_value_from(meal, value_object, &[key]).and_then(|value| match value {
+                    Value::String(text) if !text.trim().is_empty() => Some(text.clone()),
+                    Value::Number(number) => Some(number.to_string()),
+                    _ => None,
+                })
+            };
+            let mut detail = FoodEntry {
+                date: date.clone(),
+                food_log_id: text("foodLogId"),
+                food_name: text("foodName"),
+                food_text: text("foodText"),
+                meal_type: text("mealType"),
+                mealtime: first_value_from(meal, value_object, &["mealtime", "timestamp", "time"])
+                    .and_then(parse_timestamp)
+                    .map(|time| time.to_rfc3339()),
+                measure_weight: first_number_from(meal, value_object, &["measureWeight"])
+                    .filter(|weight| weight.is_finite() && *weight >= 0.0),
+                nutrients: BTreeMap::new(),
+            };
             let mut matched: Vec<&str> = Vec::new();
             for Macro {
                 metric,
@@ -1787,8 +1808,22 @@ fn food_metrics(items: &[Value], out: &mut WellnessNormalizedData) {
                     ));
                     continue;
                 }
+                detail.nutrients.insert(metric.to_string(), value);
                 let entry = per_day.entry((date.clone(), metric)).or_insert((0.0, unit));
                 entry.0 += value;
+            }
+            if let Some(fiber) = first_number_from(meal, value_object, &["fiber"])
+                .filter(|fiber| fiber.is_finite() && (0.0..=1000.0).contains(fiber))
+            {
+                detail.nutrients.insert("fiber_g".into(), fiber);
+            }
+            // A day aggregate alone must not be presented as an individual meal.
+            if is_sample
+                || detail.food_name.is_some()
+                || detail.food_text.is_some()
+                || detail.food_log_id.is_some()
+            {
+                out.food_entries.push(detail);
             }
             let ignored = if is_sample {
                 &FOOD_SAMPLE_FIELDS_NOT_MACROS[..]
