@@ -169,11 +169,30 @@ stdio 传输，**不监听任何端口，不发出任何网络请求**。只读�
 
 | 工具 | 返回 |
 |---|---|
-| `list_workouts` | 运动记录列表，最新在前。距离米、心率 bpm |
+| `list_workouts` | 分页运动记录，最新在前。距离米、心率 bpm |
 | `get_workout_insight` | 一次运动与个人基线的比较、基线窗口、样本数、置信度 |
+| `get_workout_detail` | 单次运动已保存的完整汇总字段和心率区间 |
+| `get_workout_series` | 分页运动采样、GPS 轨迹、暂停、分段和记圈；仅选择 `section: "route"` 才返回精确坐标 |
 | `get_metric_series` | 按天的指标序列，每条带 `unit` |
+| `get_food_data` | Food 饮食的每日摄入热量、蛋白质、脂肪和碳水总量 |
+| `list_available_metrics` | 本机实际入库的指标名称、来源表、单位、记录数和日期范围 |
+| `get_metric_records` | 分页读取任一已发现指标的每日值或逐次测量值 |
+| `list_sleep_sessions` | 分页列出睡眠摘要和 ID |
 | `get_sleep_detail` | 一晚睡眠的明细，分期时长单位分钟 |
+| `list_life_events` | 指定日期窗口内的本机生活事件 |
 | `get_data_health` | 每条流的抓取/解析/写入状态与覆盖情况 |
+
+查询 Food 可直接调用 `get_food_data`，或用 `get_metric_series` 查询
+`intake_calories`、`intake_protein_g`、`intake_fat_g`、`intake_carbs_g`。
+这些是**每日总量**。逐餐名称、餐次和食用时间没有结构化入库，MCP 目前无法返回；
+`get_food_data` 会明确说明这个限制。
+把 `food` 当作 `get_metric_series` 的指标名时，现在会得到明确错误和查询提示，
+不再静默返回空列表。
+
+其他未列出的类型先用 `list_available_metrics` 查看本机实际有哪些指标，再用
+`get_metric_records` 按入库粒度读取。它也支持图表固定指标名单之外的已归一化数据，
+以及存放在 `sleep_sessions` 中的 `sleep_score`。
+列表只代表本机成功入库的数据，不等于 Zepp 云端每个端点都已解析。MCP 不返回任意原始云端报文。
 
 `get_data_health` 值得单独说：它让模型能区分「这个问题查不到」是因为没同步，还是因为那段时间本来就没数据。
 
