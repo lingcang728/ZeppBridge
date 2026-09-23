@@ -9,3 +9,41 @@
 #
 # 例：
 # lib/labels.fallbackNameZepp
+
+# pt-BR
+components/HeartRateZonePicker.basesSeparator
+components/HeartRateZonePicker.zeroMinutes
+components/HistoryArchivePanel.streamSeparator
+components/StageBar.zeroMinutes
+components/WeeklyReportCard.metric.weekly.hrv
+components/overview/HeartRateCard.bpm
+composables/useExport.typePai
+composables/useSyncController.streamSeparator
+lib/labels.fallback.badminton
+lib/sleepStages.rem
+lib/syncStreams.vo2max
+lib/units.big
+lib/units.bigImperial
+lib/units.short
+lib/units.shortImperial
+views/ActivityDetail.caloriesUnit
+views/AiHandoffPreview.promptTitle
+views/ActivityDetail.distanceUnit
+views/ActivityDetail.minutesUnit
+views/BodyStatus.unitGram
+views/BodyStatus.unitKcal
+views/BodyStatus.unitScore
+views/DeviceDetail.factFirmware
+views/HealthCheck.period
+views/HealthCheck.sourceSeparator
+views/HealthCheck.stage.ok
+views/Overview.factSpo2
+views/Settings.refreshFailedPeriod
+views/Settings.stream.hrv
+views/Settings.stream.hrv_rmssd
+views/Settings.stream.pai
+views/Settings.stream.vo2max
+views/SleepDetail.deviceFirmware
+views/TrainingStatus.paiLabel
+views/WorkoutDetail.chartAltitude
+views/WorkoutDetail.unitKcal
