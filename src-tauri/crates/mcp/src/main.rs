@@ -351,7 +351,8 @@ fn tool_definitions() -> Vec<Value> {
                         "maximum": 200,
                         "default": 20,
                         "description": "返回多少条，最多 200。"
-                    }
+                    },
+                    "offset": {"type":"integer","minimum":0,"maximum":1000000,"default":0}
                 },
                 "additionalProperties": false
             }
@@ -375,7 +376,7 @@ fn tool_definitions() -> Vec<Value> {
         json!({
             "name": "get_metric_series",
             "description": format!(
-                "按天取一条或多条指标序列。单位见每个 series 的 unit 字段。{missing} {time}"
+                "按天取指标序列。Food 可查 intake_calories、intake_protein_g、intake_fat_g、intake_carbs_g；这是每日总量，不含逐餐名称。其他已存指标可用 list_available_metrics 发现，再用 get_metric_records 读取。单位见每个 series 的 unit 字段。{missing} {time}"
             ),
             "inputSchema": {
                 "type": "object",
@@ -384,7 +385,7 @@ fn tool_definitions() -> Vec<Value> {
                         "type": "array",
                         "items": { "type": "string", "enum": contract::metric_names() },
                         "minItems": 1,
-                        "description": "指标名。未知指标会被忽略而不是报错。"
+                        "description": "指标名；不支持的名称会报错。其他已入库指标用 get_metric_records 查询。"
                     },
                     "days": {
                         "type": "integer",
@@ -397,6 +398,65 @@ fn tool_definitions() -> Vec<Value> {
                 "required": ["metrics"],
                 "additionalProperties": false
             }
+        }),
+        json!({
+            "name": "get_food_data",
+            "description": format!("取本机 Food 饮食记录的每日热量、蛋白质、脂肪、碳水总量。未入库的指标返回空 points；未保存逐餐名称、餐次和食用时间。食物热量是摄入，不是运动消耗。{missing}"),
+            "inputSchema": {"type":"object","properties":{
+                "days":{"type":"integer","minimum":1,"maximum":1825,"default":90}
+            },"additionalProperties":false}
+        }),
+        json!({
+            "name": "list_available_metrics",
+            "description": format!("列出本机已归一化入库的所有指标，包括图表契约之外的新指标；返回表名、单位、记录数和日期范围。不代表云端所有端点都已成功解析。{missing}"),
+            "inputSchema": {"type":"object","properties":{},"additionalProperties":false}
+        }),
+        json!({
+            "name": "get_metric_records",
+            "description": format!("按原始入库粒度分页读取一个指标；daily_metrics 是日值，metric_samples 是逐次读数，sleep_sessions 是每晚睡眠评分。先用 list_available_metrics 找名称和 source。不会返回原始云端报文或设备标识。单位见 unit。{missing}"),
+            "inputSchema": {"type":"object","properties":{
+                "metric":{"type":"string"},
+                "source":{"type":"string","enum":["daily_metrics","metric_samples","sleep_sessions"]},
+                "startDate":{"type":"string","description":"YYYY-MM-DD，含当天"},
+                "endDate":{"type":"string","description":"YYYY-MM-DD，含当天"},
+                "limit":{"type":"integer","minimum":1,"maximum":200,"default":50},
+                "offset":{"type":"integer","minimum":0,"maximum":1000000,"default":0}
+            },"required":["metric","source"],"additionalProperties":false}
+        }),
+        json!({
+            "name": "list_sleep_sessions",
+            "description": format!("列出最近睡眠会话及 sleepId；按需用 get_sleep_detail 查询阶段时间片。时长单位分钟。{missing}"),
+            "inputSchema": {"type":"object","properties":{
+                "limit":{"type":"integer","minimum":1,"maximum":100,"default":20},
+                "offset":{"type":"integer","minimum":0,"maximum":1000000,"default":0}
+            },"additionalProperties":false}
+        }),
+        json!({
+            "name": "get_workout_detail",
+            "description": format!("按 workoutId 读取运动全部已保存的汇总字段及心率区间；不含轨迹和逐秒采样。距离米、心率 bpm、热量 kcal、时长秒。{missing}"),
+            "inputSchema": {"type":"object","properties":{
+                "workoutId":{"type":"string"}
+            },"required":["workoutId"],"additionalProperties":false}
+        }),
+        json!({
+            "name": "get_workout_series",
+            "description": format!("按 workoutId 查询运动摘要、逐点采样、GPS 轨迹、暂停、分段或手表记圈。GPS 轨迹包含精确坐标，仅在选择 route 时返回。逐点数据分页，单位随字段名给出。{missing}"),
+            "inputSchema": {"type":"object","properties":{
+                "workoutId":{"type":"string"},
+                "section":{"type":"string","enum":["summary","samples","route","pauses","splits","laps"],"default":"summary"},
+                "limit":{"type":"integer","minimum":1,"maximum":200,"default":100},
+                "offset":{"type":"integer","minimum":0,"maximum":1000000,"default":0}
+            },"required":["workoutId"],"additionalProperties":false}
+        }),
+        json!({
+            "name": "list_life_events",
+            "description": format!("读取用户在本机记录的生活事件；日期窗口与事件有交集即返回。{missing}"),
+            "inputSchema": {"type":"object","properties":{
+                "startDate":{"type":"string","description":"YYYY-MM-DD"},
+                "endDate":{"type":"string","description":"YYYY-MM-DD"},
+                "limit":{"type":"integer","minimum":1,"maximum":100,"default":50},
+                "offset":{"type":"integer","minimum":0,"maximum":1000000,"default":0}
+            },"additionalProperties":false}
         }),
         json!({
             "name": "get_sleep_detail",
@@ -513,11 +573,17 @@ fn execute_tool_with_db(
                 .and_then(Value::as_u64)
                 .unwrap_or(20)
                 .clamp(1, 200) as usize;
+            let offset = args
+                .get("offset")
+                .and_then(Value::as_u64)
+                .unwrap_or(0)
+                .min(1_000_000) as usize;
             let workouts = db
-                .get_recent_workouts(limit)
+                .workouts_page(limit + 1, offset)
                 .map_err(|error| (ERR_DATABASE, error.user_message()))?;
+            let has_more = workouts.len() > limit;
             json!({
-                "workouts": workouts.iter().map(|workout| json!({
+                "workouts": workouts.iter().take(limit).map(|workout| json!({
                     "workoutId": workout.workout_id,
                     "type": workout.effective_type,
                     "customLabel": workout.custom_label,
@@ -532,6 +598,7 @@ fn execute_tool_with_db(
                     "sampleCount": workout.sample_count,
                 })).collect::<Vec<_>>(),
                 "units": { "distance": "m", "heartRate": "bpm", "calories": "kcal" },
+                "limit": limit, "offset": offset, "hasMore": has_more,
                 "missingValues": contract::MISSING_VALUE_CONVENTION,
             })
         }
@@ -561,6 +628,15 @@ fn execute_tool_with_db(
             if metrics.is_empty() {
                 return Err((ERR_INVALID_PARAMS, "metrics 不能为空".into()));
             }
+            let known = contract::metric_names();
+            if let Some(unknown) = metrics
+                .iter()
+                .find(|metric| !known.contains(&metric.as_str()))
+            {
+                return Err((ERR_INVALID_PARAMS, format!(
+                    "不支持的每日序列指标：{unknown}。可先调用 list_available_metrics，再用 get_metric_records 查询已入库指标。"
+                )));
+            }
             let days = args
                 .get("days")
                 .and_then(Value::as_i64)
@@ -576,6 +652,182 @@ fn execute_tool_with_db(
                 "missingValues": contract::MISSING_VALUE_CONVENTION,
                 "time": contract::TIME_CONVENTION,
             })
+        }
+        "get_food_data" => {
+            let days = args
+                .get("days")
+                .and_then(Value::as_i64)
+                .unwrap_or(90)
+                .clamp(1, 1825);
+            let metrics = [
+                "intake_calories",
+                "intake_protein_g",
+                "intake_fat_g",
+                "intake_carbs_g",
+            ]
+            .map(str::to_string);
+            let series = db
+                .metric_series(&metrics, days)
+                .map_err(|error| (ERR_DATABASE, error.user_message()))?;
+            json!({
+                "series": series,
+                "granularity": "daily_totals",
+                "mealDetailsAvailable": false,
+                "note": "Food 的逐餐名称、餐次和时间未结构化入库；这里仅有已同步的每日营养总量。",
+                "missingValues": contract::MISSING_VALUE_CONVENTION,
+            })
+        }
+        "list_available_metrics" => json!({
+            "metrics": db.stored_metrics()
+                .map_err(|error| (ERR_DATABASE, error.user_message()))?,
+            "scope": "normalized_local_data",
+        }),
+        "get_metric_records" => {
+            for field in ["startDate", "endDate"] {
+                if args.get(field).is_some_and(|value| !value.is_string()) {
+                    return Err((ERR_INVALID_PARAMS, format!("{field} must be YYYY-MM-DD")));
+                }
+            }
+            let metric = args
+                .get("metric")
+                .and_then(Value::as_str)
+                .ok_or((ERR_INVALID_PARAMS, "缺少 metric".to_string()))?;
+            let source = args
+                .get("source")
+                .and_then(Value::as_str)
+                .ok_or((ERR_INVALID_PARAMS, "缺少 source".to_string()))?;
+            let limit = args
+                .get("limit")
+                .and_then(Value::as_u64)
+                .unwrap_or(50)
+                .clamp(1, 200) as usize;
+            let offset = args
+                .get("offset")
+                .and_then(Value::as_u64)
+                .unwrap_or(0)
+                .min(1_000_000) as usize;
+            let records = db
+                .stored_metric_records(
+                    metric,
+                    source,
+                    args.get("startDate").and_then(Value::as_str),
+                    args.get("endDate").and_then(Value::as_str),
+                    limit + 1,
+                    offset,
+                )
+                .map_err(|error| (ERR_INVALID_PARAMS, error.user_message()))?;
+            let has_more = records.len() > limit;
+            json!({"metric":metric,"source":source,"records":records.into_iter().take(limit).collect::<Vec<_>>(),"limit":limit,"offset":offset,
+                "hasMore":has_more,"missingValues":contract::MISSING_VALUE_CONVENTION})
+        }
+        "list_sleep_sessions" => {
+            let limit = args
+                .get("limit")
+                .and_then(Value::as_u64)
+                .unwrap_or(20)
+                .clamp(1, 100) as usize;
+            let offset = args
+                .get("offset")
+                .and_then(Value::as_u64)
+                .unwrap_or(0)
+                .min(1_000_000) as usize;
+            let sessions = db
+                .sleep_sessions_page(limit + 1, offset)
+                .map_err(|error| (ERR_DATABASE, error.user_message()))?;
+            let has_more = sessions.len() > limit;
+            json!({"sessions":sessions.into_iter().take(limit).map(|session| json!({
+                "sleepId":session.sleep_id,"startTime":session.start_time,
+                "endTime":session.end_time,"score":session.score,
+                "durationMinutes":session.duration_minutes,"sourceScope":session.source_scope
+            })).collect::<Vec<_>>(),"limit":limit,"offset":offset,"hasMore":has_more})
+        }
+        "get_workout_detail" => {
+            let id = args
+                .get("workoutId")
+                .and_then(Value::as_str)
+                .ok_or((ERR_INVALID_PARAMS, "缺少 workoutId".to_string()))?;
+            let workout = db
+                .get_workout_detail(id)
+                .map_err(|error| (ERR_DATABASE, error.user_message()))?;
+            json!({"workout":workout,"missingValues":contract::MISSING_VALUE_CONVENTION})
+        }
+        "get_workout_series" => {
+            let id = args
+                .get("workoutId")
+                .and_then(Value::as_str)
+                .ok_or((ERR_INVALID_PARAMS, "缺少 workoutId".to_string()))?;
+            let section = args
+                .get("section")
+                .and_then(Value::as_str)
+                .unwrap_or("summary");
+            if !["summary", "samples", "route", "pauses", "splits", "laps"].contains(&section) {
+                return Err((ERR_INVALID_PARAMS, "未知的 section".into()));
+            }
+            if db
+                .get_workout_detail(id)
+                .map_err(|error| (ERR_DATABASE, error.user_message()))?
+                .is_none()
+            {
+                json!({"workoutId":id,"section":section,"reason":"本机没有匹配的运动记录。"})
+            } else {
+                let series = db
+                    .get_workout_series(id)
+                    .map_err(|error| (ERR_DATABASE, error.user_message()))?;
+                if section == "summary" {
+                    json!({"workoutId":id,"section":section,"summary":series.summary})
+                } else {
+                    let limit = args
+                        .get("limit")
+                        .and_then(Value::as_u64)
+                        .unwrap_or(100)
+                        .clamp(1, 200) as usize;
+                    let offset = args
+                        .get("offset")
+                        .and_then(Value::as_u64)
+                        .unwrap_or(0)
+                        .min(1_000_000) as usize;
+                    let items = match section {
+                        "samples" => serde_json::to_value(series.samples),
+                        "route" => serde_json::to_value(series.route),
+                        "pauses" => serde_json::to_value(series.pauses),
+                        "splits" => serde_json::to_value(series.splits),
+                        "laps" => serde_json::to_value(series.laps),
+                        _ => unreachable!(),
+                    }
+                    .map_err(|error| (ERR_DATABASE, format!("序列化失败：{error}")))?;
+                    let items = items.as_array().expect("workout section is an array");
+                    json!({"workoutId":id,"section":section,
+                        "items":items.iter().skip(offset).take(limit).collect::<Vec<_>>(),
+                        "total":items.len(),"limit":limit,"offset":offset,
+                        "hasMore":items.len()>offset.saturating_add(limit)})
+                }
+            }
+        }
+        "list_life_events" => {
+            for field in ["startDate", "endDate"] {
+                if args.get(field).is_some_and(|value| !value.is_string()) {
+                    return Err((ERR_INVALID_PARAMS, format!("{field} must be YYYY-MM-DD")));
+                }
+            }
+            let limit = args
+                .get("limit")
+                .and_then(Value::as_u64)
+                .unwrap_or(50)
+                .clamp(1, 100) as usize;
+            let offset = args
+                .get("offset")
+                .and_then(Value::as_u64)
+                .unwrap_or(0)
+                .min(1_000_000) as usize;
+            let events = db
+                .list_life_events(
+                    args.get("startDate").and_then(Value::as_str),
+                    args.get("endDate").and_then(Value::as_str),
+                )
+                .map_err(|error| (ERR_INVALID_PARAMS, error.user_message()))?;
+            let total = events.len();
+            json!({"events":events.into_iter().skip(offset).take(limit).collect::<Vec<_>>(),
+                "limit":limit,"offset":offset,"hasMore":total>offset.saturating_add(limit)})
         }
         "get_sleep_detail" => {
             let session = match args.get("sleepId").and_then(Value::as_str) {
@@ -703,7 +955,9 @@ mod tests {
     }
     use chrono::{TimeZone, Utc};
     use std::path::PathBuf;
-    use zeppbridge_core::models::{SleepSession, SleepStageSlice, SourceScope};
+    use zeppbridge_core::models::{
+        DailyMetric, MetricSample, SleepSession, SleepStageSlice, SourceScope,
+    };
 
     struct TestLibrary(PathBuf);
 
@@ -726,16 +980,17 @@ mod tests {
             library
         }
 
-        fn call_sleep(&self, arguments: Value) -> Value {
-            call_tool_with_db(
-                &json!({ "name": "get_sleep_detail", "arguments": arguments }),
-                || {
-                    let db = Database::open_read_only(self.0.join("zepp.db"))
-                        .map_err(|error| (ERR_DATABASE, error.user_message()))?;
-                    Ok((db, 0))
-                },
-            )
+        fn call(&self, name: &str, arguments: Value) -> Value {
+            call_tool_with_db(&json!({ "name": name, "arguments": arguments }), || {
+                let db = Database::open_read_only(self.0.join("zepp.db"))
+                    .map_err(|error| (ERR_DATABASE, error.user_message()))?;
+                Ok((db, 0))
+            })
             .unwrap()
+        }
+
+        fn call_sleep(&self, arguments: Value) -> Value {
+            self.call("get_sleep_detail", arguments)
         }
     }
 
@@ -817,6 +1072,137 @@ mod tests {
         assert_eq!(recent["structuredContent"]["sleep"]["stages"], json!([]));
         let missing = library.call_sleep(json!({ "sleepId": "unknown" }));
         assert_eq!(missing["structuredContent"]["sleep"], Value::Null);
+        let scores = library.call(
+            "get_metric_series",
+            json!({"metrics":["sleep_score"],"days":1825}),
+        );
+        assert_eq!(
+            scores["structuredContent"]["series"][0]["source"],
+            "sleep_sessions"
+        );
+        assert_eq!(
+            scores["structuredContent"]["series"][0]["points"][0]["value"],
+            80.0
+        );
+        let inventory = library.call("list_available_metrics", json!({}));
+        assert!(inventory["structuredContent"]["metrics"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(
+                |metric| metric["metric"] == "sleep_score" && metric["source"] == "sleep_sessions"
+            ));
+        let records = library.call(
+            "get_metric_records",
+            json!({"metric":"sleep_score","source":"sleep_sessions"}),
+        );
+        assert_eq!(records["structuredContent"]["records"][0]["value"], 80.0);
+    }
+
+    #[test]
+    fn food_and_unlisted_metrics_are_discoverable_and_readable() {
+        let library = TestLibrary::new(&[]);
+        let db = Database::open_migrated(&library.0.join("zepp.db")).unwrap();
+        for (date, value) in [("2026-01-01", 500.0), ("2026-01-02", 800.0)] {
+            db.insert_daily_metric_with_raw(
+                &DailyMetric {
+                    date: date.into(),
+                    metric: "intake_calories".into(),
+                    value,
+                    unit: "kcal".into(),
+                    source_scope: SourceScope::UserFused,
+                    device_id: None,
+                },
+                None,
+            )
+            .unwrap();
+        }
+        db.insert_daily_metric_with_raw(
+            &DailyMetric {
+                date: "2026-01-02".into(),
+                metric: "new_recovery_metric".into(),
+                value: 42.0,
+                unit: "score".into(),
+                source_scope: SourceScope::Device,
+                device_id: Some("private-device".into()),
+            },
+            None,
+        )
+        .unwrap();
+        db.insert_metric_sample_with_raw(
+            &MetricSample {
+                metric: "new_sample_metric".into(),
+                timestamp: Utc.with_ymd_and_hms(2026, 1, 2, 12, 0, 0).unwrap(),
+                value: 7.0,
+                unit: "ms".into(),
+                source_scope: SourceScope::Device,
+                device_id: Some("private-device".into()),
+            },
+            None,
+        )
+        .unwrap();
+        drop(db);
+
+        let catalog = library.call("list_available_metrics", json!({}));
+        let metrics = catalog["structuredContent"]["metrics"].as_array().unwrap();
+        assert!(metrics
+            .iter()
+            .any(|m| m["metric"] == "intake_calories" && m["records"] == 2));
+        assert!(metrics.iter().any(|m| m["metric"] == "new_recovery_metric"));
+        assert!(metrics.iter().any(|m| m["metric"] == "new_sample_metric"));
+
+        let food = library.call("get_food_data", json!({"days": 1825}));
+        assert_eq!(food["isError"], false);
+        assert_eq!(food["structuredContent"]["mealDetailsAvailable"], false);
+        assert_eq!(
+            food["structuredContent"]["series"][0]["metric"],
+            "intake_calories"
+        );
+        assert_eq!(
+            food["structuredContent"]["series"][0]["points"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
+
+        let page = library.call(
+            "get_metric_records",
+            json!({
+                "metric":"intake_calories","source":"daily_metrics","limit":1
+            }),
+        );
+        assert_eq!(page["structuredContent"]["records"][0]["value"], 800.0);
+        assert_eq!(page["structuredContent"]["hasMore"], true);
+        let next = library.call(
+            "get_metric_records",
+            json!({
+                "metric":"intake_calories","source":"daily_metrics","limit":1,"offset":1
+            }),
+        );
+        assert_eq!(next["structuredContent"]["records"][0]["value"], 500.0);
+        assert_eq!(next["structuredContent"]["hasMore"], false);
+        let samples = library.call(
+            "get_metric_records",
+            json!({
+                "metric":"new_sample_metric","source":"metric_samples"
+            }),
+        );
+        assert_eq!(samples["structuredContent"]["records"][0]["value"], 7.0);
+        assert!(!samples.to_string().contains("private-device"));
+        let bad_date = library.call(
+            "get_metric_records",
+            json!({
+                "metric":"intake_calories","source":"daily_metrics","startDate":"not-a-date"
+            }),
+        );
+        assert_eq!(bad_date["isError"], true);
+        let unknown_series = library.call("get_metric_series", json!({"metrics":["food"]}));
+        assert_eq!(unknown_series["isError"], true);
+        assert!(unknown_series["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .contains("get_metric_records"));
     }
 
     #[test]
@@ -853,7 +1239,7 @@ mod tests {
                 );
             }
         }
-        assert_eq!(names.len(), 5);
+        assert_eq!(names.len(), 12);
     }
 
     #[test]
@@ -913,7 +1299,7 @@ mod tests {
         assert_eq!(result["resultType"], json!("complete"));
         assert!(result["ttlMs"].as_i64().unwrap() > 0);
         assert_eq!(result["cacheScope"], json!("public"));
-        assert_eq!(result["tools"].as_array().unwrap().len(), 5);
+        assert_eq!(result["tools"].as_array().unwrap().len(), 12);
     }
 
     /// 认不出来的版本必须明确拒绝，并**把我们支持的版本列出来**——客户端就
