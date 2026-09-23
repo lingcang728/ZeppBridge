@@ -495,7 +495,10 @@ impl DataFetcher {
             .await
     }
 
-    async fn fetch_daily_statistics_slice(&self, window: FetchWindow) -> Result<Vec<FetchedRecord>> {
+    async fn fetch_daily_statistics_slice(
+        &self,
+        window: FetchWindow,
+    ) -> Result<Vec<FetchedRecord>> {
         let mut records = Vec::new();
         let mut last_error = None;
         let from = window.start_utc.timestamp_millis();
@@ -1665,7 +1668,9 @@ mod tests {
         let records = fetch_daily_summary_slices_with(window, |slice| {
             slices.push(slice);
             std::future::ready(if slices.len() == 2 {
-                Err(ZeppBridgeError::ParseError("bad historical response".into()))
+                Err(ZeppBridgeError::ParseError(
+                    "bad historical response".into(),
+                ))
             } else {
                 let mut record = sample_fetched();
                 record.raw.stream = "daily_summary".into();
@@ -1679,11 +1684,19 @@ mod tests {
         assert_eq!(slices.len(), 13);
         assert_eq!(slices[0].start_utc, window.start_utc);
         assert_eq!(slices.last().unwrap().end_utc, window.end_utc);
-        assert!(slices.iter().all(|slice| slice.end_utc - slice.start_utc <= Duration::days(30)));
-        assert!(slices.windows(2).all(|pair| pair[0].end_utc == pair[1].start_utc));
+        assert!(slices
+            .iter()
+            .all(|slice| slice.end_utc - slice.start_utc <= Duration::days(30)));
+        assert!(slices
+            .windows(2)
+            .all(|pair| pair[0].end_utc == pair[1].start_utc));
         assert_eq!(records.len(), 12);
         assert!(records.iter().all(|record| record.incomplete));
-        assert!(records.iter().all(|record| record.incomplete_reason.as_deref().unwrap().contains("bad historical response")));
+        assert!(records.iter().all(|record| record
+            .incomplete_reason
+            .as_deref()
+            .unwrap()
+            .contains("bad historical response")));
     }
 
     #[tokio::test]
