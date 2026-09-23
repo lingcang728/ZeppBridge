@@ -40,6 +40,8 @@ const messages = defineMessages(
     manage: 'Gestionar',
     sourcesAria: 'Fuentes de datos y estado de la cuenta',
   },
+  // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
+  'components/overview/SourcesStrip',
 );
 const t = useMessages(messages);
 

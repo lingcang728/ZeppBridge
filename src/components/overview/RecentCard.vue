@@ -46,6 +46,8 @@ const messages = defineMessages(
     avgHr: (value: number) => `FC media ${value}`,
     timeUnknown: 'Hora desconocida',
   },
+  // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
+  'components/overview/RecentCard',
 );
 const t = useMessages(messages);
 

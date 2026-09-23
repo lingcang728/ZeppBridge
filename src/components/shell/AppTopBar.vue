@@ -69,6 +69,8 @@ const messages = defineMessages(
     themeSystem: 'Sistema',
     localeLabel: 'Idioma de la interfaz',
   },
+  // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
+  'components/shell/AppTopBar',
 );
 const t = useMessages(messages);
 

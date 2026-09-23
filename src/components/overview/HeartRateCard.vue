@@ -62,6 +62,8 @@ const messages = defineMessages(
     zoneAerobic: 'Aeróbica 140–169',
     zoneAnaerobic: 'Anaeróbica 170+',
   },
+  // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
+  'components/overview/HeartRateCard',
 );
 const t = useMessages(messages);
 

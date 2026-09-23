@@ -42,6 +42,8 @@ const messages = defineMessages(
     durationHours: (hours: number, minutes: number) => `${hours} h ${minutes} min`,
     durationMinutes: (minutes: number) => `${minutes} min`,
   },
+  // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
+  'components/overview/SleepCard',
 );
 const t = useMessages(messages);
 

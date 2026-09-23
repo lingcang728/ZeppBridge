@@ -46,6 +46,8 @@ const messages = defineMessages(
     minimum: 'Mín.',
     maximum: 'Máx.',
   },
+  // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
+  'components/MetricTrendCard',
 );
 const t = useMessages(messages);
 

@@ -59,6 +59,8 @@ const messages = defineMessages(
     browserPreview: 'Usa la app de escritorio. Esta vista previa en el navegador no lee datos de la cuenta.',
     routeNotFound: 'Esa página no existe, así que volviste al resumen.',
   },
+  // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
+  'App',
 );
 const t = useMessages(messages);
 
