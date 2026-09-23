@@ -637,7 +637,11 @@ fn execute_tool_with_db(
                     "不支持的每日序列指标：{unknown}。可先调用 list_available_metrics，再用 get_metric_records 查询已入库指标。"
                 )));
             }
-            let days = args.get("days").and_then(Value::as_i64).unwrap_or(90);
+            let days = args
+                .get("days")
+                .and_then(Value::as_i64)
+                .unwrap_or(90)
+                .clamp(1, 1825);
             let series = db
                 .metric_series(&metrics, days)
                 .map_err(|error| (ERR_DATABASE, error.user_message()))?;
