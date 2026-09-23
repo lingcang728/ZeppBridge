@@ -174,7 +174,7 @@ stdio 传输，**不监听任何端口，不发出任何网络请求**。只读�
 | `get_workout_detail` | 单次运动已保存的完整汇总字段和心率区间 |
 | `get_workout_series` | 分页运动采样、GPS 轨迹、暂停、分段和记圈；仅选择 `section: "route"` 才返回精确坐标 |
 | `get_metric_series` | 按天的指标序列，每条带 `unit` |
-| `get_food_data` | Food 饮食的每日摄入热量、蛋白质、脂肪和碳水总量 |
+| `get_food_data` | 食物名称、描述、餐次、时间和营养明细，以及每日饮食摄入：热量（kcal）、蛋白质、脂肪和碳水（g）；可选 `days`（默认 90，最多 1825） |
 | `list_available_metrics` | 本机实际入库的指标名称、来源表、单位、记录数和日期范围 |
 | `get_metric_records` | 分页读取任一已发现指标的每日值或逐次测量值 |
 | `list_sleep_sessions` | 分页列出睡眠摘要和 ID |
@@ -184,8 +184,10 @@ stdio 传输，**不监听任何端口，不发出任何网络请求**。只读�
 
 查询 Food 可直接调用 `get_food_data`，或用 `get_metric_series` 查询
 `intake_calories`、`intake_protein_g`、`intake_fat_g`、`intake_carbs_g`。
-这些是**每日总量**。逐餐名称、餐次和食用时间没有结构化入库，MCP 目前无法返回；
-`get_food_data` 会明确说明这个限制。
+每日序列保留总量；`entries` 从保留的原始饮食记录中读取食物名称、描述、餐次、时间、重量和营养明细（含纤维）。
+重量单位尚未验证，餐次代码按原值返回。缺失字段不估算。明细按日期倒序，`limit` 默认 200、最多 1000；
+`totalEntries` 和 `truncated` 表示总条数和截断状态，`mealDetailsAvailable` 表示当前窗口是否有明细。
+没有保留原始记录时仍可能有每日总量。不会返回账户字段或任意原始报文。
 把 `food` 当作 `get_metric_series` 的指标名时，现在会得到明确错误和查询提示，
 不再静默返回空列表。
 

@@ -4394,6 +4394,44 @@ impl Database {
             .map_err(Into::into)
     }
 
+    /// Read meal details from retained food payloads without a migration or replay.
+    /// Newest snapshots win when overlapping sync windows contain the same log ID.
+    pub fn food_entries(&self, days: i64) -> Result<Vec<FoodEntry>> {
+        let end = Local::now().date_naive();
+        let start = (end - Duration::days(days.clamp(1, 1825) - 1)).to_string();
+        let end = end.to_string();
+        let mut stmt = self.conn.prepare(
+            "SELECT source_key, payload, payload_zip FROM raw_records
+             WHERE stream = 'wellness' AND source_key LIKE 'wellness:food:%'
+             ORDER BY fetched_at DESC, id DESC",
+        )?;
+        let mut rows = stmt.query([])?;
+        let mut seen = BTreeSet::new();
+        let mut entries = Vec::new();
+        while let Some(row) = rows.next()? {
+            let key: String = row.get(0)?;
+            let payload = decode_raw_payload(row.get(1)?, row.get(2)?)?;
+            let payload = serde_json::from_str(&payload)
+                .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
+            for entry in Normalizer::normalize_wellness(&key, &payload).food_entries {
+                let identity = match &entry.food_log_id {
+                    Some(id) => format!("id:{id}"),
+                    None => serde_json::to_string(&entry)
+                        .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?,
+                };
+                if seen.insert(identity) && entry.date >= start && entry.date <= end {
+                    entries.push(entry);
+                }
+            }
+        }
+        entries.sort_by(|a, b| {
+            b.date
+                .cmp(&a.date)
+                .then_with(|| b.mealtime.cmp(&a.mealtime))
+        });
+        Ok(entries)
+    }
+
     pub fn metric_series(&self, metrics: &[String], days: i64) -> Result<Vec<MetricSeries>> {
         let window_days = days.clamp(1, 1825);
         let end = Local::now().date_naive();

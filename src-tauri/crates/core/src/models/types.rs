@@ -1408,3 +1408,18 @@ pub struct DailyHeartRateExtreme {
     /// 这一天本机存了多少个原始心率样本。
     pub samples: i64,
 }
+
+/// Allowlisted food-log details, never the raw account response.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct FoodEntry {
+    pub date: String,
+    pub food_log_id: Option<String>,
+    pub food_name: Option<String>,
+    pub food_text: Option<String>,
+    pub meal_type: Option<String>,
+    pub mealtime: Option<String>,
+    /// Original reported weight; the source does not establish a unit.
+    pub measure_weight: Option<f64>,
+    pub nutrients: std::collections::BTreeMap<String, f64>,
+}
