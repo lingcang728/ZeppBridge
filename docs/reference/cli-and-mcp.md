@@ -223,7 +223,7 @@ or environment variable is needed** — the program only reads a local file.
 | `get_workout_detail` | All stored summary fields and heart-rate zones for one workout |
 | `get_workout_series` | Paged workout samples, GPS route, pauses, splits and laps; precise coordinates are returned only for `section: "route"` |
 | `get_metric_series` | A per-day metric series, each carrying its `unit` |
-| `get_food_data` | Daily Food intake totals: calories, protein, fat and carbohydrates |
+| `get_food_data` | Food entries plus daily intake: calories (kcal), protein, fat and carbohydrates (g); optional `days` (default 90, maximum 1825) |
 | `list_available_metrics` | Actual local metrics, with source, unit, count and date range |
 | `get_metric_records` | Paged stored daily values or individual readings for any discovered metric |
 | `list_sleep_sessions` | Paged sleep summaries and IDs |
@@ -231,11 +231,18 @@ or environment variable is needed** — the program only reads a local file.
 | `list_life_events` | Locally authored life events in a date window |
 | `get_data_health` | Fetch/parse/write state and coverage per stream |
 
-For Food, call `get_food_data` or request `intake_calories`,
-`intake_protein_g`, `intake_fat_g`, and `intake_carbs_g` from
-`get_metric_series`. These are **daily totals**, not individual meals. Meal
-names, meal types and times are not stored as structured records, so the MCP
-server cannot return them. `get_food_data` reports this limit explicitly.
+`get_food_data` returns daily totals and available food-log details: names, descriptions,
+meal types, timestamps, reported weight, and nutrients (including fiber). Reported
+weight has no verified unit; meal type codes are preserved as stored. Unknown fields
+and account metadata are excluded. Entries are newest first, limited by `limit`
+(default 200, maximum 1000), with `totalEntries` and `truncated` indicating omitted
+entries. Daily totals are unaffected by this limit. Details require retained raw
+food logs; daily totals may still exist without them. For example,
+call it with `{"days": 30}` for the past month. Missing days and nutrients stay
+missing, and intake calories are separate from calories burned. Sync food records
+with the desktop app first; this read-only tool cannot fetch them from Zepp.
+The same four `intake_*` metrics remain available through `get_metric_series`.
+
 Passing `food` as a `get_metric_series` metric now returns a clear error with
 the discovery path instead of an empty result.
 
