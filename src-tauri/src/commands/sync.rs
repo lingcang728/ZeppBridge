@@ -69,12 +69,13 @@ pub async fn start_incremental_sync(
 /// This exists because "another tool can read HRV, so ZeppBridge should too"
 /// is not a fact about *this* account: stream availability varies by device
 /// and region, and the endpoint offers no discovery call. The probe makes a
-/// handful of one-day requests and reports status plus field names, writing
-/// nothing to the database and logging nothing.
+/// handful of requests and reports status plus field names. It saves only
+/// probe metadata so the capability board can reflect the same result.
 #[tauri::command]
 pub async fn probe_data_capabilities(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<Vec<CapabilityProbe>, AppError> {
+    let _command_guard = state.sync_command_lock.lock().await;
     if state.auth_state.read().await.as_str() != "verified" {
         return Err(AppError::new(
             "err.sync.not_verified_probe",
@@ -82,7 +83,7 @@ pub async fn probe_data_capabilities(
         ));
     }
     let manager = require_manager(&state).await?;
-    Ok(manager.probe_capabilities().await)
+    manager.probe_capabilities().await.map_err(AppError::from)
 }
 
 /// 完整历史补拉。

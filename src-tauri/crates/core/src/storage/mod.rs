@@ -939,7 +939,33 @@ impl Database {
     }
 
     pub fn save_capability_probe(&self, probes: &[CapabilityProbe]) -> Result<()> {
-        let encoded = serde_json::to_string(probes)
+        // The scheduled sync probes only request-only streams, while the
+        // diagnostics button probes every stream. Replacing the whole list
+        // here used to erase a positive Food result on the next sync.
+        let mut merged: BTreeMap<String, CapabilityProbe> = self
+            .get_app_meta(CAPABILITY_PROBE_RESULT_KEY)?
+            .and_then(|raw| serde_json::from_str::<Vec<CapabilityProbe>>(&raw).ok())
+            .unwrap_or_default()
+            .into_iter()
+            .map(|probe| (probe.stream.clone(), probe))
+            .collect();
+        let mut updated = false;
+        for probe in probes {
+            // A transient request failure does not refute an earlier result.
+            if probe.status != "error" {
+                let mut saved = probe.clone();
+                // Field names are useful in the immediate diagnostic result,
+                // but the board needs only the count and date. Do not retain
+                // schema from a user's health response unnecessarily.
+                saved.fields.clear();
+                merged.insert(probe.stream.clone(), saved);
+                updated = true;
+            }
+        }
+        if !updated {
+            return Ok(());
+        }
+        let encoded = serde_json::to_string(&merged.into_values().collect::<Vec<_>>())
             .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
         self.set_app_meta(CAPABILITY_PROBE_RESULT_KEY, &encoded)?;
         self.set_app_meta(CAPABILITY_PROBE_AT_KEY, &Utc::now().to_rfc3339())
@@ -7279,6 +7305,59 @@ mod tests {
             db.get_app_meta(LAST_CLOUD_SYNC_AT_KEY).unwrap().as_deref(),
             Some("2026-09-19T12:00:00Z")
         );
+    }
+
+    #[test]
+    fn partial_capability_refresh_keeps_food_evidence_and_failures_do_not_erase_it() {
+        let db = Database::in_memory().unwrap();
+        let today = NaiveDate::from_ymd_opt(2026, 9, 22).unwrap();
+        let food = CapabilityProbe {
+            stream: "food".into(),
+            surface: "v2_events".into(),
+            cadence: "episodic".into(),
+            window_days: 365,
+            event_type: "Food".into(),
+            sub_type: String::new(),
+            status: "available".into(),
+            records: 12,
+            latest_date: Some("2026-09-02".into()),
+            fields: vec!["value.foodName".into()],
+        };
+        db.save_capability_probe(&[food.clone()]).unwrap();
+        let saved: Vec<CapabilityProbe> = serde_json::from_str(
+            &db.get_app_meta(CAPABILITY_PROBE_RESULT_KEY)
+                .unwrap()
+                .unwrap(),
+        )
+        .unwrap();
+        assert!(saved[0].fields.is_empty());
+        let mut blood_pressure = food.clone();
+        blood_pressure.stream = "blood_pressure".into();
+        blood_pressure.event_type = "blood_pressure".into();
+        blood_pressure.status = "empty".into();
+        blood_pressure.records = 0;
+        blood_pressure.latest_date = None;
+        db.save_capability_probe(&[blood_pressure]).unwrap();
+
+        let food_row = || {
+            db.capability_overview(today)
+                .unwrap()
+                .items
+                .into_iter()
+                .find(|item| item.stream == "food")
+                .unwrap()
+        };
+        assert_eq!(food_row().status, "available");
+        assert_eq!(food_row().records, 12);
+        assert_eq!(food_row().source, "probed");
+        assert!(!food_row().ingested);
+
+        let mut failed_food = food;
+        failed_food.status = "error".into();
+        failed_food.records = 0;
+        failed_food.latest_date = None;
+        db.save_capability_probe(&[failed_food]).unwrap();
+        assert_eq!(food_row().records, 12);
     }
 
     /// 真实旧库的升级演练。默认跳过——它需要一个真实的旧数据库。
