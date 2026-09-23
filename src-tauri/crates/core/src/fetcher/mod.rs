@@ -185,6 +185,33 @@ fn is_abort_error(error: &ZeppBridgeError) -> bool {
     error.is_cancelled() || error.needs_reauth()
 }
 
+/// A year of daily events can exceed the response limit or contain one bad
+/// historical slice. Keep every successful response and leave failed slices
+/// marked incomplete so backfill can retry them.
+async fn fetch_daily_summary_slices_with<F, Fut>(
+    window: FetchWindow,
+    mut fetch: F,
+) -> Result<Vec<FetchedRecord>>
+where
+    F: FnMut(FetchWindow) -> Fut,
+    Fut: std::future::Future<Output = Result<Vec<FetchedRecord>>>,
+{
+    let mut records = Vec::new();
+    let mut last_error = None;
+    for chunk in window.chunks(30) {
+        match fetch(chunk).await {
+            Ok(slice) => records.extend(slice),
+            Err(error) if is_abort_error(&error) => return Err(error),
+            Err(error) => {
+                if !error.is_unavailable() || last_error.is_none() {
+                    last_error = Some(error);
+                }
+            }
+        }
+    }
+    conclude_slices(records, last_error, "每日概览窗口没有可识别记录")
+}
+
 /// A failed historical slice must not discard other nights or prevent the
 /// latest slice from being requested. The connector already bounds retries.
 async fn fetch_sleep_slices_with<F, Fut>(
@@ -464,7 +491,16 @@ impl DataFetcher {
         &self,
         window: FetchWindow,
     ) -> Result<Vec<FetchedRecord>> {
+        fetch_daily_summary_slices_with(window, |slice| self.fetch_daily_statistics_slice(slice))
+            .await
+    }
+
+    async fn fetch_daily_statistics_slice(
+        &self,
+        window: FetchWindow,
+    ) -> Result<Vec<FetchedRecord>> {
         let mut records = Vec::new();
+        let mut last_error = None;
         let from = window.start_utc.timestamp_millis();
         let to = window.end_utc.timestamp_millis();
         let event = self
@@ -499,7 +535,7 @@ impl DataFetcher {
                 })),
                 Err(error) if is_abort_error(&error) => return Err(error),
                 Err(error) if error.is_unavailable() => {}
-                Err(error) => return Err(error),
+                Err(error) => last_error = Some(error),
             }
         }
         for statistic in ["SPORT_LOAD", "VO2_MAX"] {
@@ -530,10 +566,10 @@ impl DataFetcher {
                 })),
                 Err(error) if is_abort_error(&error) => return Err(error),
                 Err(error) if error.is_unavailable() => {}
-                Err(error) => return Err(error),
+                Err(error) => last_error = Some(error),
             }
         }
-        Ok(records)
+        conclude_slices(records, last_error, "每日概览窗口没有可识别记录")
     }
 }
 
@@ -1622,6 +1658,61 @@ mod tests {
             payload: json!({"items": []}),
             capability: CapabilityStatus::Verified,
         })
+    }
+
+    #[tokio::test]
+    async fn daily_summary_history_keeps_good_months_and_marks_bad_month_for_retry() {
+        let start = DateTime::from_timestamp(1_735_689_600, 0).unwrap();
+        let window = FetchWindow::between(start, start + Duration::days(365)).unwrap();
+        let mut slices = Vec::new();
+        let records = fetch_daily_summary_slices_with(window, |slice| {
+            slices.push(slice);
+            std::future::ready(if slices.len() == 2 {
+                Err(ZeppBridgeError::ParseError(
+                    "bad historical response".into(),
+                ))
+            } else {
+                let mut record = sample_fetched();
+                record.raw.stream = "daily_summary".into();
+                record.raw.source_key = format!("daily:{}", slice.start_utc.timestamp());
+                Ok(vec![record])
+            })
+        })
+        .await
+        .unwrap();
+
+        assert_eq!(slices.len(), 13);
+        assert_eq!(slices[0].start_utc, window.start_utc);
+        assert_eq!(slices.last().unwrap().end_utc, window.end_utc);
+        assert!(slices
+            .iter()
+            .all(|slice| slice.end_utc - slice.start_utc <= Duration::days(30)));
+        assert!(slices
+            .windows(2)
+            .all(|pair| pair[0].end_utc == pair[1].start_utc));
+        assert_eq!(records.len(), 12);
+        assert!(records.iter().all(|record| record.incomplete));
+        assert!(records.iter().all(|record| record
+            .incomplete_reason
+            .as_deref()
+            .unwrap()
+            .contains("bad historical response")));
+    }
+
+    #[tokio::test]
+    async fn daily_summary_auth_failure_stops_after_the_failing_slice() {
+        let mut calls = 0;
+        let result = fetch_daily_summary_slices_with(FetchWindow::days(90).unwrap(), |_| {
+            calls += 1;
+            std::future::ready(if calls == 1 {
+                Ok(vec![sample_fetched()])
+            } else {
+                Err(ZeppBridgeError::NeedsReauth("expired".into()))
+            })
+        })
+        .await;
+        assert!(matches!(result, Err(ZeppBridgeError::NeedsReauth(_))));
+        assert_eq!(calls, 2);
     }
 
     #[tokio::test]
