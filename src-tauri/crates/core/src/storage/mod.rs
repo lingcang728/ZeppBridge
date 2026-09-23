@@ -46,6 +46,30 @@ pub const EXPORT_DATA_TYPES: [&str; 18] = [
 /// 已经存成 `unknown:211` 的那 199 条记录会永远挂着——而报这个问题的人恰恰
 /// 是因为历史记录才来报的。
 pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v30-food-samples";
+
+/// A metric actually present in the local library. This inventory deliberately
+/// includes names outside the chart contract so new normalized data is findable.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoredMetric {
+    pub metric: String,
+    pub source: String,
+    pub unit: String,
+    pub records: i64,
+    pub first_date: String,
+    pub last_date: String,
+}
+
+/// One stored reading, without device identifiers or raw cloud payloads.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoredMetricRecord {
+    pub date: String,
+    pub timestamp: Option<String>,
+    pub value: f64,
+    pub unit: String,
+    pub source_scope: String,
+}
 /// 较早公开版本的修订号，用于验证跨版本升级。
 ///
 /// v21 还没有 v22 的圈解析和 v23 的 Rucking 映射；跳版本升级时要一并补齐。
@@ -335,7 +359,8 @@ fn merge_workout_type(
 /// `metric_samples` metrics are aggregated to one point per local day; the
 /// spread of that day's samples becomes `min` / `max`, which is real rather
 /// than derived.
-const SERIES_METRICS: [(&str, MetricSource, &str); 56] = [
+const SERIES_METRICS: [(&str, MetricSource, &str); 57] = [
+    ("sleep_score", MetricSource::SleepScores, "score"),
     ("readiness", MetricSource::Daily(None), "score"),
     ("physical_readiness", MetricSource::Daily(None), "score"),
     ("mental_readiness", MetricSource::Daily(None), "score"),
@@ -427,6 +452,8 @@ enum MetricSource {
     Daily(Option<(&'static str, &'static str)>),
     /// Individual readings in `metric_samples`, folded to one point per day.
     Samples,
+    /// Sleep scores are stored with sessions rather than daily_metrics.
+    SleepScores,
 }
 
 /// The three ways Zepp itself splits heart rate into zones.
@@ -4383,6 +4410,7 @@ impl Database {
                     self.daily_metric_points(name, spread, &start_text, &end_text)?
                 }
                 MetricSource::Samples => self.sample_metric_points(name, &start_text, &end_text)?,
+                MetricSource::SleepScores => self.sleep_score_points(&start_text, &end_text)?,
             };
 
             let values: Vec<f64> = points.iter().map(|point| point.value).collect();
@@ -4392,6 +4420,7 @@ impl Database {
                 source: match source {
                     MetricSource::Daily(_) => "daily_metrics".to_string(),
                     MetricSource::Samples => "metric_samples".to_string(),
+                    MetricSource::SleepScores => "sleep_sessions".to_string(),
                 },
                 latest: points.last().cloned(),
                 average: average_finite(values.iter().copied()).map(round1),
@@ -4403,6 +4432,114 @@ impl Database {
             });
         }
         Ok(result)
+    }
+
+    /// A night's score belongs to its local wake date. If more than one
+    /// session ends on a date, prefer the fused session then the latest end.
+    fn sleep_score_points(&self, start: &str, end: &str) -> Result<Vec<MetricSeriesPoint>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT date(s.end_time, 'localtime'), s.score
+             FROM sleep_sessions s
+             WHERE s.score IS NOT NULL
+               AND date(s.end_time, 'localtime') BETWEEN ?1 AND ?2
+               AND s.id = (
+                   SELECT s2.id FROM sleep_sessions s2
+                   WHERE s2.score IS NOT NULL
+                     AND date(s2.end_time, 'localtime') = date(s.end_time, 'localtime')
+                   ORDER BY CASE s2.source_scope
+                       WHEN 'user_fused' THEN 0 WHEN 'device' THEN 1 ELSE 2 END,
+                       s2.end_time DESC, s2.id DESC LIMIT 1)
+             ORDER BY date(s.end_time, 'localtime')",
+        )?;
+        let rows = stmt.query_map(params![start, end], |row| {
+            Ok(MetricSeriesPoint {
+                date: row.get(0)?,
+                value: row.get::<_, i32>(1)? as f64,
+                min: None,
+                max: None,
+                samples: None,
+            })
+        })?;
+        rows.collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(Into::into)
+    }
+
+    /// Inventory both normalized metric tables, including metrics not exposed
+    /// by the chart contract. Never inspect raw cloud responses here.
+    pub fn stored_metrics(&self) -> Result<Vec<StoredMetric>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT metric, 'daily_metrics', unit, COUNT(*), MIN(date), MAX(date)
+             FROM daily_metrics GROUP BY metric, unit
+             UNION ALL
+             SELECT metric, 'metric_samples', unit, COUNT(*),
+                    MIN(date(timestamp, 'localtime')),
+                    MAX(date(timestamp, 'localtime'))
+             FROM metric_samples GROUP BY metric, unit
+             ORDER BY metric, 2, unit",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(StoredMetric {
+                metric: row.get(0)?,
+                source: row.get(1)?,
+                unit: row.get(2)?,
+                records: row.get(3)?,
+                first_date: row.get(4)?,
+                last_date: row.get(5)?,
+            })
+        })?;
+        rows.collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(Into::into)
+    }
+
+    /// Page exact stored values for any discovered metric. The source is
+    /// explicit because some names occur in both tables with different meaning.
+    pub fn stored_metric_records(
+        &self,
+        metric: &str,
+        source: &str,
+        start: Option<&str>,
+        end: Option<&str>,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<StoredMetricRecord>> {
+        let valid_date = |value: &str| {
+            NaiveDate::parse_from_str(value, "%Y-%m-%d")
+                .is_ok_and(|date| date.format("%Y-%m-%d").to_string() == value)
+        };
+        if metric.is_empty()
+            || start.is_some_and(|value| !valid_date(value))
+            || end.is_some_and(|value| !valid_date(value))
+            || matches!((start, end), (Some(a), Some(b)) if a > b)
+            || !["daily_metrics", "metric_samples"].contains(&source)
+        {
+            return Err(ZeppBridgeError::ConfigError("Invalid metric query".into()));
+        }
+        let limit = limit.clamp(1, 201) as i64;
+        let offset = offset.min(1_000_000) as i64;
+        let query = if source == "daily_metrics" {
+            "SELECT date, NULL, value, unit, source_scope FROM daily_metrics
+             WHERE metric = ?1 AND (?2 IS NULL OR date >= ?2)
+               AND (?3 IS NULL OR date <= ?3)
+             ORDER BY date DESC, id DESC LIMIT ?4 OFFSET ?5"
+        } else {
+            "SELECT date(timestamp, 'localtime'), timestamp, value, unit, source_scope
+             FROM metric_samples WHERE metric = ?1
+               AND (?2 IS NULL OR date(timestamp, 'localtime') >= ?2)
+               AND (?3 IS NULL OR date(timestamp, 'localtime') <= ?3)
+             ORDER BY timestamp DESC, id DESC LIMIT ?4 OFFSET ?5"
+        };
+        let mut stmt = self.conn.prepare(query)?;
+        let rows = stmt.query_map(params![metric, start, end, limit, offset], |row| {
+            Ok(StoredMetricRecord {
+                date: row.get(0)?,
+                timestamp: row.get(1)?,
+                value: row.get(2)?,
+                unit: row.get(3)?,
+                source_scope: row.get(4)?,
+            })
+        })?;
+        rows.collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(Into::into)
     }
 
     /// One point per calendar day from `daily_metrics`.
@@ -6727,6 +6864,19 @@ fn local_day_range_utc_bounds(start: &str, end: &str) -> Option<(String, String)
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn every_advertised_metric_has_a_series_reader() {
+        for name in crate::contract::metric_names() {
+            assert!(
+                SERIES_METRICS.iter().any(|(series, _, _)| *series == name)
+                    || SAMPLE_ONLY_SERIES_METRICS
+                        .iter()
+                        .any(|(series, _)| *series == name),
+                "{name} is advertised to MCP but cannot be read as a series"
+            );
+        }
+    }
 
     #[test]
     fn migration_repairs_missing_and_narrow_daily_keys_without_merging_devices() {
