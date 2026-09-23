@@ -1645,15 +1645,12 @@ impl Normalizer {
 
 /// 饮食记录：`/v2/users/me/events?eventType=Food`，没有 subType。
 ///
-/// **这条流没有对着真实数据核对过，而这里说清楚为什么。** 饮食记录是大陆以外
-/// 的 Zepp 应用才有的功能，而手头能验证的账号在 `api-mifit-cn.huami.com` 上——
-/// 那个区域的应用里根本没有这个入口，所以它返回的永远是空页。要么按已知契约
-/// 写出来等有饭记录的人来验，要么继续挂在探针上什么都不做；后者已经挂了一个
-/// 版本，而问的人还在问。
-///
-/// 因此解析写成**宽容**的：认得的宏量营养素落到 `daily_metrics`，认不得的字段
-/// 名按出现次数记进诊断，原始报文本来就整份留着——真实样本一到，重放一次就能
-/// 把它们认出来，不必让任何人重新同步。
+/// The day-bucket `value.samples[]` shape and its nutrient fields are documented
+/// from a captured Zepp response at
+/// https://github.com/lcanis/zepp-food-extractor/blob/main/docs/api-notes.md.
+/// We still have no raw
+/// response from the #103 reporter, so other regional or Health Connect shapes
+/// remain unverified. Unknown fields are diagnosed and raw responses retained.
 ///
 /// 写 `daily_metrics` 而不是 `metric_samples`：一天吃几餐，但有意义的是「今天
 /// 摄入了多少」。逐餐的热量单独看不构成一条能和活动量对照的曲线，而
@@ -1705,7 +1702,7 @@ fn food_metrics(items: &[Value], out: &mut WellnessNormalizedData) {
         },
         Macro {
             metric: "intake_fat_g",
-            names: &["fat", "fats"],
+            names: &["fatTotal", "fat", "fats"],
             unit: "g",
             range: (0.0, 1000.0),
         },
@@ -1726,43 +1723,74 @@ fn food_metrics(items: &[Value], out: &mut WellnessNormalizedData) {
             continue;
         };
         let nested = object.get("value").and_then(Value::as_object);
-        let Some(date) = summary_date(object, nested) else {
-            out.diagnostics.push("food: 一条记录没有可用的日期".into());
-            continue;
-        };
-        // 数值可能挂在顶层，也可能在 `value` 里——别的 v2 流两种形状都出现过。
-        let mut matched: Vec<&str> = Vec::new();
-        for Macro {
-            metric,
-            names,
-            unit,
-            range,
-        } in MACROS
-        {
-            for name in names {
-                if object.contains_key(*name)
-                    || nested.is_some_and(|inner| inner.contains_key(*name))
-                {
-                    matched.push(name);
+        // Captured Food responses put meals under value.samples[]. Treat each
+        // sample as a meal; the enclosing item is only a day bucket. Reading
+        // both would double-count if the bucket later gains aggregate fields.
+        let mut entries = Vec::new();
+        if let Some((value, samples)) = nested.and_then(|value| {
+            value
+                .get("samples")
+                .and_then(Value::as_array)
+                .filter(|samples| !samples.is_empty())
+                .map(|samples| (value, samples))
+        }) {
+            for sample in samples {
+                let Some(meal) = sample.as_object() else {
+                    continue;
+                };
+                if let Some(date) = food_sample_date(meal, object, value) {
+                    entries.push((meal, None, date, true));
+                } else {
+                    out.diagnostics.push("food: 一餐记录没有可用的日期".into());
                 }
             }
-            let Some(value) = first_number_from(object, nested, names) else {
-                continue;
-            };
-            if !value.is_finite() || value < range.0 || value > range.1 {
-                out.diagnostics.push(format!(
-                    "food: {metric} 的读数 {value} 不在 {range:?} 内，已忽略"
-                ));
-                continue;
-            }
-            let entry = per_day.entry((date.clone(), metric)).or_insert((0.0, unit));
-            entry.0 += value;
+        } else if let Some(date) = summary_date(object, nested) {
+            // Keep the earlier direct-item and value-level formats.
+            entries.push((object, nested, date, false));
+        } else {
+            out.diagnostics.push("food: 一条记录没有可用的日期".into());
         }
-        for key in object.keys() {
-            if matched.contains(&key.as_str()) || FOOD_FIELDS_NOT_MACROS.contains(&key.as_str()) {
-                continue;
+
+        for (meal, value_object, date, is_sample) in entries {
+            let mut matched: Vec<&str> = Vec::new();
+            for Macro {
+                metric,
+                names,
+                unit,
+                range,
+            } in MACROS
+            {
+                for name in names {
+                    if meal.contains_key(*name)
+                        || value_object
+                            .is_some_and(|inner: &Map<String, Value>| inner.contains_key(*name))
+                    {
+                        matched.push(name);
+                    }
+                }
+                let Some(value) = first_number_from(meal, value_object, names) else {
+                    continue;
+                };
+                if !value.is_finite() || value < range.0 || value > range.1 {
+                    out.diagnostics.push(format!(
+                        "food: {metric} 的读数 {value} 不在 {range:?} 内，已忽略"
+                    ));
+                    continue;
+                }
+                let entry = per_day.entry((date.clone(), metric)).or_insert((0.0, unit));
+                entry.0 += value;
             }
-            *unknown.entry(key.clone()).or_default() += 1;
+            let ignored = if is_sample {
+                &FOOD_SAMPLE_FIELDS_NOT_MACROS[..]
+            } else {
+                &FOOD_FIELDS_NOT_MACROS[..]
+            };
+            for key in meal.keys() {
+                if matched.contains(&key.as_str()) || ignored.contains(&key.as_str()) {
+                    continue;
+                }
+                *unknown.entry(key.clone()).or_default() += 1;
+            }
         }
     }
 
@@ -1787,6 +1815,41 @@ fn food_metrics(items: &[Value], out: &mut WellnessNormalizedData) {
     }
 }
 
+fn food_sample_date(
+    sample: &Map<String, Value>,
+    bucket: &Map<String, Value>,
+    value: &Map<String, Value>,
+) -> Option<String> {
+    let date_keys = ["date", "day", "dayId", "dateString", "localDate"];
+    if let Some(date) = first_value(sample, &date_keys).and_then(parse_date) {
+        return Some(date);
+    }
+    if let Some(mealtime) = sample.get("mealtime").and_then(parse_timestamp) {
+        let zone_keys = ["timeZone", "time_zone", "tz"];
+        let zone = first_value_from(sample, Some(value), &zone_keys)
+            .or_else(|| first_value(bucket, &zone_keys));
+        if let Some(zone) = zone {
+            if let Some(name) = zone
+                .as_str()
+                .map(|text| text.rsplit(',').next().unwrap_or(text).trim())
+            {
+                if let (Ok(zone), Ok(timestamp)) = (
+                    jiff::tz::TimeZone::get(name),
+                    jiff::Timestamp::from_second(mealtime.timestamp()),
+                ) {
+                    return Some(timestamp.to_zoned(zone).date().to_string());
+                }
+            }
+            if let Some(offset) = timezone_offset_seconds(zone) {
+                if let Some(local) = mealtime.checked_add_signed(Duration::seconds(offset)) {
+                    return Some(local.format("%Y-%m-%d").to_string());
+                }
+            }
+        }
+    }
+    summary_date(bucket, Some(value))
+}
+
 /// 饮食记录里属于「记录本身」而不是营养读数的字段。
 ///
 /// 排除它们，是为了让上面那条「尚未解析的字段」诊断里剩下的都是真正的新东西
@@ -1802,6 +1865,22 @@ const FOOD_FIELDS_NOT_MACROS: [&str; 10] = [
     "timeZone",
     "userId",
     "value",
+];
+
+const FOOD_SAMPLE_FIELDS_NOT_MACROS: [&str; 13] = [
+    "foodLogId",
+    "foodName",
+    "fiber",
+    "measureWeight",
+    "mealType",
+    "mealtime",
+    "emoji",
+    "labels",
+    "foodText",
+    "timeZone",
+    "date",
+    "dateString",
+    "timestamp",
 ];
 
 /// Everything one weigh-in can carry.
@@ -2616,6 +2695,44 @@ fn duration_to_minutes(value: f64) -> i32 {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn food_day_buckets_sum_meal_samples_on_their_local_days() {
+        // Shape and field names come from zepp-food-extractor's captured Food
+        // response. Values here are synthetic. Berlin changes to UTC+2 on
+        // 2026-03-29, so the second meal falls on the next local day.
+        let early = DateTime::parse_from_rfc3339("2026-03-29T21:30:00Z")
+            .unwrap()
+            .timestamp_millis();
+        let late = DateTime::parse_from_rfc3339("2026-03-29T22:30:00Z")
+            .unwrap()
+            .timestamp_millis();
+        let raw = json!({"code": 0, "items": [{
+            "timestamp": 1774742400000_i64,
+            "value": {
+                "timeZone": "1,Europe/Berlin",
+                "energy": 9999,
+                "samples": [
+                    {"mealtime": early, "energy": 95, "carbohydrates": 25,
+                     "protein": 1, "fatTotal": 2, "foodLogId": "one"},
+                    {"mealtime": late, "energy": "50", "carbohydrates": 10,
+                     "protein": 3, "fatTotal": 4, "foodLogId": "two"}
+                ]
+            }
+        }]});
+        let batch = Normalizer::normalize_wellness("wellness:food:v2_events", &raw);
+        let rows: BTreeMap<_, _> = batch
+            .daily_metrics
+            .iter()
+            .map(|row| ((row.date.as_str(), row.metric.as_str()), row.value))
+            .collect();
+        assert_eq!(rows.len(), 8);
+        assert_eq!(rows[&("2026-03-29", "intake_calories")], 95.0);
+        assert_eq!(rows[&("2026-03-30", "intake_calories")], 50.0);
+        assert_eq!(rows[&("2026-03-29", "intake_carbs_g")], 25.0);
+        assert_eq!(rows[&("2026-03-30", "intake_fat_g")], 4.0);
+        assert!(batch.metric_samples.is_empty());
+    }
+
     #[test]
     fn food_accepts_probe_envelopes_and_nested_dates_without_inventing_macros() {
         // Synthetic fixtures: the reporter has not supplied a Food response.
