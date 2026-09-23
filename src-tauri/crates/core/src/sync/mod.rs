@@ -167,11 +167,11 @@ impl SyncManager {
     /// Ask the server which optional event streams this account and these
     /// devices actually expose.
     ///
-    /// Read-only by construction: results are returned to the caller and never
-    /// persisted, so a probe cannot pollute the library with guesses. The day
-    /// probed is yesterday, which is the most recent day a watch has certainly
+    /// Only probe metadata is saved for the capability board; no health
+    /// readings or raw responses are imported by this action. The day probed
+    /// is yesterday, which is the most recent day a watch has certainly
     /// finished syncing.
-    pub async fn probe_capabilities(&self) -> Vec<CapabilityProbe> {
+    pub async fn probe_capabilities(&self) -> Result<Vec<CapabilityProbe>> {
         let day = (Utc::now() - Duration::days(1)).date_naive();
         // The dateString surface wants an IANA zone name; the devices already
         // told us theirs, so ask them rather than assuming UTC.
@@ -180,9 +180,15 @@ impl SyncManager {
             database.device_time_zone().unwrap_or(None)
         }
         .unwrap_or_else(|| "UTC".to_string());
-        self.fetcher
+        let probes = self
+            .fetcher
             .probe_event_streams(day, &time_zone, None)
-            .await
+            .await;
+        if !probes.is_empty() {
+            let database = self.db.lock().await;
+            database.save_capability_probe(&probes)?;
+        }
+        Ok(probes)
     }
 
     /// Check only the streams that leave no local trace, and remember the answer.

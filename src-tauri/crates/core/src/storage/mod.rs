@@ -45,7 +45,7 @@ pub const EXPORT_DATA_TYPES: [&str; 18] = [
 /// `raw_records` 重新跑一遍。不动它，新加的编号只对以后同步来的记录生效，
 /// 已经存成 `unknown:211` 的那 199 条记录会永远挂着——而报这个问题的人恰恰
 /// 是因为历史记录才来报的。
-pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v29-food-envelopes";
+pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v30-food-samples";
 /// 较早公开版本的修订号，用于验证跨版本升级。
 ///
 /// v21 还没有 v22 的圈解析和 v23 的 Rucking 映射；跳版本升级时要一并补齐。
@@ -981,7 +981,33 @@ impl Database {
     }
 
     pub fn save_capability_probe(&self, probes: &[CapabilityProbe]) -> Result<()> {
-        let encoded = serde_json::to_string(probes)
+        // The scheduled sync probes only request-only streams, while the
+        // diagnostics button probes every stream. Replacing the whole list
+        // here used to erase a positive Food result on the next sync.
+        let mut merged: BTreeMap<String, CapabilityProbe> = self
+            .get_app_meta(CAPABILITY_PROBE_RESULT_KEY)?
+            .and_then(|raw| serde_json::from_str::<Vec<CapabilityProbe>>(&raw).ok())
+            .unwrap_or_default()
+            .into_iter()
+            .map(|probe| (probe.stream.clone(), probe))
+            .collect();
+        let mut updated = false;
+        for probe in probes {
+            // A transient request failure does not refute an earlier result.
+            if probe.status != "error" {
+                let mut saved = probe.clone();
+                // Field names are useful in the immediate diagnostic result,
+                // but the board needs only the count and date. Do not retain
+                // schema from a user's health response unnecessarily.
+                saved.fields.clear();
+                merged.insert(probe.stream.clone(), saved);
+                updated = true;
+            }
+        }
+        if !updated {
+            return Ok(());
+        }
+        let encoded = serde_json::to_string(&merged.into_values().collect::<Vec<_>>())
             .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
         self.set_app_meta(CAPABILITY_PROBE_RESULT_KEY, &encoded)?;
         self.set_app_meta(CAPABILITY_PROBE_AT_KEY, &Utc::now().to_rfc3339())
@@ -7366,17 +7392,21 @@ mod tests {
             device_id: None,
             start_utc: today.and_hms_opt(0, 0, 0).unwrap().and_utc() - Duration::days(6),
             end_utc: Some(today.and_hms_opt(0, 0, 0).unwrap().and_utc()),
-            payload: serde_json::json!({"data":{"items":[
-                {"value":{"date":"2026-09-18","calories":500,"protein":20}},
-                {"date":"2026-09-18","calories":300}
-            ]}}),
+            payload: serde_json::json!({"data":{"items":[{
+                "timestamp": 1789689600000_i64,
+                "value": {"timeZone":"UTC","samples":[
+                    {"mealtime":1789718400000_i64,"energy":500,"protein":20},
+                    {"mealtime":1789732800000_i64,"energy":300,"fatTotal":10}
+                ]}
+            }]}}),
             capability: CapabilityStatus::Unverified,
         };
-        // Simulate a v28 database retaining a response it failed to normalize.
+        // A v29 database retained this day-bucket response but could not read
+        // value.samples[]. The v30 replay should recover it without a fetch.
         db.insert_raw_record(&raw).unwrap();
         db.set_app_meta(
             "normalizer_revision",
-            "zepp-normalizer-2026-09-v28-readiness-provenance",
+            "zepp-normalizer-2026-09-v29-food-envelopes",
         )
         .unwrap();
         db.set_app_meta(LAST_CLOUD_SYNC_AT_KEY, "2026-09-19T12:00:00Z")
@@ -7407,6 +7437,60 @@ mod tests {
             db.get_app_meta(LAST_CLOUD_SYNC_AT_KEY).unwrap().as_deref(),
             Some("2026-09-19T12:00:00Z")
         );
+    }
+
+    #[test]
+    fn partial_capability_refresh_keeps_food_evidence_and_failures_do_not_erase_it() {
+        let db = Database::in_memory().unwrap();
+        let today = NaiveDate::from_ymd_opt(2026, 9, 22).unwrap();
+        let food = CapabilityProbe {
+            stream: "food".into(),
+            surface: "v2_events".into(),
+            cadence: "episodic".into(),
+            window_days: 365,
+            event_type: "Food".into(),
+            sub_type: String::new(),
+            status: "available".into(),
+            records: 12,
+            latest_date: Some("2026-09-02".into()),
+            fields: vec!["value.foodName".into()],
+        };
+        db.save_capability_probe(std::slice::from_ref(&food))
+            .unwrap();
+        let saved: Vec<CapabilityProbe> = serde_json::from_str(
+            &db.get_app_meta(CAPABILITY_PROBE_RESULT_KEY)
+                .unwrap()
+                .unwrap(),
+        )
+        .unwrap();
+        assert!(saved[0].fields.is_empty());
+        let mut blood_pressure = food.clone();
+        blood_pressure.stream = "blood_pressure".into();
+        blood_pressure.event_type = "blood_pressure".into();
+        blood_pressure.status = "empty".into();
+        blood_pressure.records = 0;
+        blood_pressure.latest_date = None;
+        db.save_capability_probe(&[blood_pressure]).unwrap();
+
+        let food_row = || {
+            db.capability_overview(today)
+                .unwrap()
+                .items
+                .into_iter()
+                .find(|item| item.stream == "food")
+                .unwrap()
+        };
+        assert_eq!(food_row().status, "available");
+        assert_eq!(food_row().records, 12);
+        assert_eq!(food_row().source, "probed");
+        assert!(!food_row().ingested);
+
+        let mut failed_food = food;
+        failed_food.status = "error".into();
+        failed_food.records = 0;
+        failed_food.latest_date = None;
+        db.save_capability_probe(&[failed_food]).unwrap();
+        assert_eq!(food_row().records, 12);
     }
 
     /// 真实旧库的升级演练。默认跳过——它需要一个真实的旧数据库。

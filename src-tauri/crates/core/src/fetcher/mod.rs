@@ -808,8 +808,8 @@ const CONTROL_NEGATIVE: &str = "control_negative";
 const MAX_PROBE_FIELDS: usize = 24;
 
 /// Collect the field *names* a payload uses. Names are schema, not readings —
-/// no measured value is ever read out of the payload here, and nothing the
-/// probe returns is written to the database or to a log.
+/// no measured value is ever read out of the payload here. Field names are
+/// returned to diagnostics but not saved with the capability summary.
 fn probe_field_names(items: &[Value]) -> Vec<String> {
     let mut names = BTreeSet::new();
     for item in items.iter().take(4) {

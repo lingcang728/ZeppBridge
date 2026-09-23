@@ -975,6 +975,10 @@ const loadCapabilityOverview = async () => {
   }
 };
 
+watch(syncState, (current, previous) => {
+  if (previous === 'syncing' && current !== 'syncing') void loadCapabilityOverview();
+});
+
 /** One line per probed endpoint — for diagnosing, not for reading. */
 const probeDiagnostics = computed(() => {
   if (!probeResults.value) return [];
