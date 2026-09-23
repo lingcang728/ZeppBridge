@@ -124,6 +124,8 @@ const messages = defineMessages(
       'weekly.training_load': 'Carga de entrenamiento',
     },
   },
+  // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
+  'components/WeeklyReportCard',
 );
 const t = useMessages(messages);
 
