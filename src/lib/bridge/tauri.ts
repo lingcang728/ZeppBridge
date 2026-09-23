@@ -72,15 +72,27 @@ export const whenBackendReady = (): Promise<void> => {
   if (!isTauriRuntime()) return Promise.resolve();
   if (backendReady) return backendReady;
   backendReady = new Promise<void>((resolve) => {
+    // `settled` 停掉递归的 probe 链：60 秒兜底一到就不再排下一次
+    // setTimeout，不然后端一直不报 ready 时，这个轮询会跟着进程一直跑下去。
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
     const probe = () => {
+      if (settled) return;
       void invoke<boolean>('app_is_ready')
         .then((ready) => {
-          if (ready) resolve();
+          if (settled) return;
+          if (ready) finish();
           else window.setTimeout(probe, 150);
         })
-        .catch(() => window.setTimeout(probe, 500));
+        .catch(() => {
+          if (!settled) window.setTimeout(probe, 500);
+        });
     };
-    window.setTimeout(resolve, 60_000);
+    window.setTimeout(finish, 60_000);
     probe();
   });
   return backendReady;
