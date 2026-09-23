@@ -768,6 +768,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       capabilityNoRecords: (days: number) => `In den letzten ${days} Tagen nichts aufgezeichnet`,
       capabilityNotIngested:
         'Die Cloud hat Daten, aber lokal ist noch nichts Verwertbares gespeichert. Versuche zu synchronisieren oder nachzuladen; wenn weiterhin nichts auftaucht, braucht ihr Datenformat eventuell zusätzliche Unterstützung.',
+      capabilityFoodHistoryHint: 'In der Cloud sind Ernährungseinträge vorhanden, lokal aber noch nicht. Liegen sie vor dem Zeitraum der inkrementellen Synchronisierung, synchronisiere den Verlauf für diese Daten. Falls sie dann weiter fehlen, melde das Datenformat.',
       capabilityUnsupported: 'Dein Konto oder Gerät liefert das nicht',
       capabilityNoneProbed: (days: number) => `Keine Messung in den letzten ${days} Tagen`,
       capabilityNotProbed: 'Noch nicht geprüft',

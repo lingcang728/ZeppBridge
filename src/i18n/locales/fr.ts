@@ -522,6 +522,7 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       unitRecords: 'enregistrements',
       capabilityNoRecords: (days: number) => `Rien d’enregistré sur les ${days} derniers jours`,
       capabilityNotIngested: 'Le cloud a des enregistrements, mais rien d’exploitable n’est encore stocké en local. Essayez de synchroniser ou de rattraper ; si rien n’apparaît encore, leur format de message aura peut-être besoin d’un support supplémentaire.',
+      capabilityFoodHistoryHint: 'Des repas sont présents dans le cloud, mais pas encore en local. S’ils précèdent la période de synchronisation incrémentale, synchronisez l’historique couvrant ces dates. S’ils manquent toujours, signalez le format des données.',
       capabilityUnsupported: 'Votre compte ou votre appareil ne fournit pas ceci',
       capabilityNoneProbed: (days: number) => `Aucune mesure sur les ${days} derniers jours`,
       capabilityNotProbed: 'Pas encore sondé',
