@@ -241,7 +241,7 @@ the discovery path instead of an empty result.
 
 Use `list_available_metrics` before querying less familiar types.
 `get_metric_records` can read any name actually present in `daily_metrics` or
-`metric_samples`, including metrics outside `get_metric_series`' fixed chart
+`metric_samples`, plus `sleep_score` from `sleep_sessions`, including metrics outside `get_metric_series`' fixed chart
 list. The inventory reflects normalized local data, not every endpoint the
 cloud might offer. No tool returns arbitrary raw cloud payloads.
 

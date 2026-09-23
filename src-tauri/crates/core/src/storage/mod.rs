@@ -4464,8 +4464,8 @@ impl Database {
             .map_err(Into::into)
     }
 
-    /// Inventory both normalized metric tables, including metrics not exposed
-    /// by the chart contract. Never inspect raw cloud responses here.
+    /// Inventory normalized metrics, including sleep scores stored with sessions
+    /// and names not exposed by the chart contract. Never inspect raw payloads.
     pub fn stored_metrics(&self) -> Result<Vec<StoredMetric>> {
         let mut stmt = self.conn.prepare(
             "SELECT metric, 'daily_metrics', unit, COUNT(*), MIN(date), MAX(date)
@@ -4475,6 +4475,11 @@ impl Database {
                     MIN(date(timestamp, 'localtime')),
                     MAX(date(timestamp, 'localtime'))
              FROM metric_samples GROUP BY metric, unit
+             UNION ALL
+             SELECT 'sleep_score', 'sleep_sessions', 'score', COUNT(*),
+                    MIN(date(end_time, 'localtime')),
+                    MAX(date(end_time, 'localtime'))
+             FROM sleep_sessions WHERE score IS NOT NULL HAVING COUNT(*) > 0
              ORDER BY metric, 2, unit",
         )?;
         let rows = stmt.query_map([], |row| {
@@ -4492,7 +4497,7 @@ impl Database {
     }
 
     /// Page exact stored values for any discovered metric. The source is
-    /// explicit because some names occur in both tables with different meaning.
+    /// explicit because some names occur in multiple tables with different meaning.
     pub fn stored_metric_records(
         &self,
         metric: &str,
@@ -4510,7 +4515,8 @@ impl Database {
             || start.is_some_and(|value| !valid_date(value))
             || end.is_some_and(|value| !valid_date(value))
             || matches!((start, end), (Some(a), Some(b)) if a > b)
-            || !["daily_metrics", "metric_samples"].contains(&source)
+            || !["daily_metrics", "metric_samples", "sleep_sessions"].contains(&source)
+            || (source == "sleep_sessions" && metric != "sleep_score")
         {
             return Err(ZeppBridgeError::ConfigError("Invalid metric query".into()));
         }
@@ -4521,12 +4527,19 @@ impl Database {
              WHERE metric = ?1 AND (?2 IS NULL OR date >= ?2)
                AND (?3 IS NULL OR date <= ?3)
              ORDER BY date DESC, id DESC LIMIT ?4 OFFSET ?5"
-        } else {
+        } else if source == "metric_samples" {
             "SELECT date(timestamp, 'localtime'), timestamp, value, unit, source_scope
              FROM metric_samples WHERE metric = ?1
                AND (?2 IS NULL OR date(timestamp, 'localtime') >= ?2)
                AND (?3 IS NULL OR date(timestamp, 'localtime') <= ?3)
              ORDER BY timestamp DESC, id DESC LIMIT ?4 OFFSET ?5"
+        } else {
+            "SELECT date(end_time, 'localtime'), end_time, CAST(score AS REAL),
+                    'score', source_scope FROM sleep_sessions
+             WHERE ?1 = 'sleep_score' AND score IS NOT NULL
+               AND (?2 IS NULL OR date(end_time, 'localtime') >= ?2)
+               AND (?3 IS NULL OR date(end_time, 'localtime') <= ?3)
+             ORDER BY end_time DESC, id DESC LIMIT ?4 OFFSET ?5"
         };
         let mut stmt = self.conn.prepare(query)?;
         let rows = stmt.query_map(params![metric, start, end, limit, offset], |row| {

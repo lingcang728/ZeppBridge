@@ -413,10 +413,10 @@ fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "get_metric_records",
-            "description": format!("按原始入库粒度分页读取一个指标；daily_metrics 是日值，metric_samples 是逐次读数。先用 list_available_metrics 找名称和 source。不会返回原始云端报文或设备标识。单位见 unit。{missing}"),
+            "description": format!("按原始入库粒度分页读取一个指标；daily_metrics 是日值，metric_samples 是逐次读数，sleep_sessions 是每晚睡眠评分。先用 list_available_metrics 找名称和 source。不会返回原始云端报文或设备标识。单位见 unit。{missing}"),
             "inputSchema": {"type":"object","properties":{
                 "metric":{"type":"string"},
-                "source":{"type":"string","enum":["daily_metrics","metric_samples"]},
+                "source":{"type":"string","enum":["daily_metrics","metric_samples","sleep_sessions"]},
                 "startDate":{"type":"string","description":"YYYY-MM-DD，含当天"},
                 "endDate":{"type":"string","description":"YYYY-MM-DD，含当天"},
                 "limit":{"type":"integer","minimum":1,"maximum":200,"default":50},
@@ -1080,6 +1080,19 @@ mod tests {
             scores["structuredContent"]["series"][0]["points"][0]["value"],
             80.0
         );
+        let inventory = library.call("list_available_metrics", json!({}));
+        assert!(inventory["structuredContent"]["metrics"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(
+                |metric| metric["metric"] == "sleep_score" && metric["source"] == "sleep_sessions"
+            ));
+        let records = library.call(
+            "get_metric_records",
+            json!({"metric":"sleep_score","source":"sleep_sessions"}),
+        );
+        assert_eq!(records["structuredContent"]["records"][0]["value"], 80.0);
     }
 
     #[test]
