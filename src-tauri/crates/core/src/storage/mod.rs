@@ -45,7 +45,7 @@ pub const EXPORT_DATA_TYPES: [&str; 18] = [
 /// `raw_records` 重新跑一遍。不动它，新加的编号只对以后同步来的记录生效，
 /// 已经存成 `unknown:211` 的那 199 条记录会永远挂着——而报这个问题的人恰恰
 /// 是因为历史记录才来报的。
-pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v29-food-envelopes";
+pub const NORMALIZER_REVISION: &str = "zepp-normalizer-2026-09-v30-food-samples";
 /// 较早公开版本的修订号，用于验证跨版本升级。
 ///
 /// v21 还没有 v22 的圈解析和 v23 的 Rucking 映射；跳版本升级时要一并补齐。
@@ -7264,17 +7264,21 @@ mod tests {
             device_id: None,
             start_utc: today.and_hms_opt(0, 0, 0).unwrap().and_utc() - Duration::days(6),
             end_utc: Some(today.and_hms_opt(0, 0, 0).unwrap().and_utc()),
-            payload: serde_json::json!({"data":{"items":[
-                {"value":{"date":"2026-09-18","calories":500,"protein":20}},
-                {"date":"2026-09-18","calories":300}
-            ]}}),
+            payload: serde_json::json!({"data":{"items":[{
+                "timestamp": 1789689600000_i64,
+                "value": {"timeZone":"UTC","samples":[
+                    {"mealtime":1789718400000_i64,"energy":500,"protein":20},
+                    {"mealtime":1789732800000_i64,"energy":300,"fatTotal":10}
+                ]}
+            }]}}),
             capability: CapabilityStatus::Unverified,
         };
-        // Simulate a v28 database retaining a response it failed to normalize.
+        // A v29 database retained this day-bucket response but could not read
+        // value.samples[]. The v30 replay should recover it without a fetch.
         db.insert_raw_record(&raw).unwrap();
         db.set_app_meta(
             "normalizer_revision",
-            "zepp-normalizer-2026-09-v28-readiness-provenance",
+            "zepp-normalizer-2026-09-v29-food-envelopes",
         )
         .unwrap();
         db.set_app_meta(LAST_CLOUD_SYNC_AT_KEY, "2026-09-19T12:00:00Z")
@@ -7323,7 +7327,8 @@ mod tests {
             latest_date: Some("2026-09-02".into()),
             fields: vec!["value.foodName".into()],
         };
-        db.save_capability_probe(&[food.clone()]).unwrap();
+        db.save_capability_probe(std::slice::from_ref(&food))
+            .unwrap();
         let saved: Vec<CapabilityProbe> = serde_json::from_str(
             &db.get_app_meta(CAPABILITY_PROBE_RESULT_KEY)
                 .unwrap()
