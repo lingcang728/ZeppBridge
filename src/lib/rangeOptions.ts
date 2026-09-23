@@ -36,6 +36,7 @@ const messages = defineMessages(
     d180: '6 meses',
     d365: '1 año',
   },
+  'lib/rangeOptions',
 );
 
 const copy = () => messagesOf(messages);

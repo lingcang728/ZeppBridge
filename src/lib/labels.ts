@@ -129,6 +129,7 @@ const messages = defineMessages(
     scopeMixed: 'Varias fuentes',
     scopeUnknown: 'Alcance sin confirmar',
   },
+  'lib/labels',
 );
 
 const copy = () => messagesOf(messages);

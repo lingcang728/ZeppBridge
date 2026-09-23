@@ -132,6 +132,7 @@ const messages = defineMessages(
 
     fallbackIssue: 'No se pudo reconocer una nota de estado',
   },
+  'lib/aiTask/copy',
 );
 
 const copy = () => messagesOf(messages) as Record<string, string>;

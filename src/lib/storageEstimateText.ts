@@ -67,6 +67,7 @@ const messages = defineMessages(
       `Contando solo los flujos con suficientes muestras locales, ${days} días ocupan unos ${add} (el resto no se cuenta), y hay ${free} libres en este disco.`,
     unknownEstimate: 'Por ahora no se puede estimar el tamaño de esta recuperación.',
   },
+  'lib/storageEstimateText',
 );
 
 /** 和面板里显示的一致的字节写法。 */
