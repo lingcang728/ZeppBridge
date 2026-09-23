@@ -1139,7 +1139,7 @@ const runCapabilityProbe = async () => {
         <p class="form-hint">{{ t.manualFormHint }}</p>
         <div class="form-group">
           <label for="manual-apptoken">App Token *</label>
-          <input id="manual-apptoken" v-model="manualAppToken" type="text" :placeholder="t.manualTokenPlaceholder" :disabled="manualAuthBusy" />
+          <input id="manual-apptoken" v-model="manualAppToken" type="password" autocomplete="off" :placeholder="t.manualTokenPlaceholder" :disabled="manualAuthBusy" />
         </div>
         <div class="form-group">
           <label for="manual-userid">User ID *</label>
