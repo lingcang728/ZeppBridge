@@ -39,6 +39,7 @@ const messages = defineMessages(
   { placeholder: '选择日期', aria: '选择日期', prev: '上个月', next: '下个月' },
   { placeholder: 'Pick a date', aria: 'Choose a date', prev: 'Previous month', next: 'Next month' },
   { placeholder: 'Elige una fecha', aria: 'Elegir fecha', prev: 'Mes anterior', next: 'Mes siguiente' },
+  'components/DatePicker',
 );
 const t = useMessages(messages);
 

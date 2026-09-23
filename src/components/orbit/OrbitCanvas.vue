@@ -80,6 +80,7 @@ const messages = defineMessages(
     zoomOut: 'Alejar',
     resetView: 'Restablecer vista',
   },
+  'components/orbit/OrbitCanvas',
 );
 const t = useMessages(messages);
 

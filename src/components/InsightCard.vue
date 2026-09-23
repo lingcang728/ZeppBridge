@@ -192,6 +192,7 @@ const messages = defineMessages(
       beyond_max_samples: 'fuera del límite de muestras',
     },
   },
+  'components/InsightCard',
 );
 const t = useMessages(messages);
 

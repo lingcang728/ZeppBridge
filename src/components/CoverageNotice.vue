@@ -75,6 +75,7 @@ const messages = defineMessages(
     backfilling: 'Recuperando…',
     syncNow: 'Sincronizar ahora',
   },
+  'components/CoverageNotice',
 );
 const t = useMessages(messages);
 
