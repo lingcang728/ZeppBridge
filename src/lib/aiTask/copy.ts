@@ -145,6 +145,15 @@ export const aiTaskTextFor = (code: string | null | undefined): string | undefin
 };
 
 /**
+ * 后端在 `warnings`/`blocked` 里定稿的例外码：这一条以 `err.*` 发出
+ * （它同时是命令层的真实错误码），但界面文案仍取 `ui.*` 表那一份。
+ * 码表契约不能改，所以在入口做别名，不新增重复文案。
+ */
+const ISSUE_CODE_ALIAS: Record<string, string> = {
+  'err.ai_task.attachment_missing': 'ui.ai_task.blocked.attachment_missing',
+};
+
+/**
  * `warnings`/`blocked` 元素的渲染口径：先按 `code` 取界面文案，取不到才过
  * `backendText` 闸门回落到后端原文（英文界面下中文原文会被闸门换掉）。
  *
@@ -154,12 +163,8 @@ export const aiTaskTextFor = (code: string | null | undefined): string | undefin
  */
 export const aiTaskIssueText = (issue: AiTaskIssue, fallback = copy().fallbackIssue): string => {
   const { code, message: backendFallback } = issue;
-  // 接缝映射（W3 集成者加）：后端按协议 231 行在 blocked 里发
-  // `err.ai_task.attachment_missing`，本表挂的是 `ui.*` 同义键——
-  // 先映射再查码，否则非中文界面只剩通用兜底。
-  const key =
-    code === 'err.ai_task.attachment_missing' ? 'ui.ai_task.blocked.attachment_missing' : code;
-  return aiTaskTextFor(key) ?? backendText(backendFallback, fallback);
+  const lookupCode = code ? (ISSUE_CODE_ALIAS[code] ?? code) : code;
+  return aiTaskTextFor(lookupCode) ?? backendText(backendFallback, fallback);
 };
 
 /** `ai_task_prepare` 要的 `coverage_note` 参数：本地化、由前端提供。 */
