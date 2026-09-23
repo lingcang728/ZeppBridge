@@ -40,7 +40,7 @@ pub async fn save_auth(
             // when the connector/database cannot be initialized.  Clearing is
             // deliberately best effort; the original setup error is the
             // actionable result returned to the caller.
-            let message = error.to_string();
+            let message = error.user_message();
             let _ = state.auth.clear_auth();
             state.replace_sync_manager(None).await;
             {
@@ -290,7 +290,10 @@ fn user_facing_verify_error(error: &ZeppBridgeError) -> AppError {
             "err.auth.verify_needs_reauth",
             "认证验证失败：认证已失效，请重新保存认证信息",
         ),
-        _ => AppError::new("err.auth.verify_failed", format!("认证验证失败：{error}")),
+        _ => AppError::new(
+            "err.auth.verify_failed",
+            format!("认证验证失败：{}", error.user_message()),
+        ),
     }
 }
 

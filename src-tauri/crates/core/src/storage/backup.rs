@@ -792,9 +792,12 @@ fn swap_in_restore(
     Ok(displaced)
 }
 
-fn rollback_swapped_library(live: &Path, displaced: &Path) {
+/// 把 `live` 换回 `displaced` 里的原库。返回换回是否真的成功——调用方必须
+/// 用这个结果决定给用户的话，不能假定「删了就等于换回来了」。
+#[must_use]
+fn rollback_swapped_library(live: &Path, displaced: &Path) -> bool {
     remove_sqlite_group(live);
-    let _ = restore_sqlite_group(displaced, live);
+    restore_sqlite_group(displaced, live).is_ok()
 }
 
 fn finish_restore(data_dir: &Path, pending: &PendingRestore, displaced: PathBuf) -> RestoreOutcome {
@@ -811,22 +814,29 @@ fn finish_restore(data_dir: &Path, pending: &PendingRestore, displaced: PathBuf)
             )
         }
         Ok((_, Some(warning))) => {
-            rollback_swapped_library(&live, &displaced);
-            restore_fail(
-                pending,
-                format!("恢复失败，已换回原来的数据库：{warning}"),
-                "err.backup.restore_failed",
-            )
+            let message = if rollback_swapped_library(&live, &displaced) {
+                format!("恢复失败，已换回原来的数据库：{warning}")
+            } else {
+                format!(
+                    "恢复失败，且未能自动换回原来的数据库（{warning}）。原数据库文件仍完整保留在 {}，请勿删除，可联系支持或手动换回。",
+                    displaced.display()
+                )
+            };
+            restore_fail(pending, message, "err.backup.restore_failed")
         }
         Err(error) => {
             // 换上来的库自己也可能留下 WAL/SHM（`open_resilient` 走到一半就
             // 会），回滚前必须一并清掉，否则原库换回来又要重放别人的日志。
-            rollback_swapped_library(&live, &displaced);
-            restore_fail(
-                pending,
-                format!("恢复失败，已换回原来的数据库：{}", error.user_message()),
-                error.code(),
-            )
+            let message = if rollback_swapped_library(&live, &displaced) {
+                format!("恢复失败，已换回原来的数据库：{}", error.user_message())
+            } else {
+                format!(
+                    "恢复失败，且未能自动换回原来的数据库（{}）。原数据库文件仍完整保留在 {}，请勿删除，可联系支持或手动换回。",
+                    error.user_message(),
+                    displaced.display()
+                )
+            };
+            restore_fail(pending, message, error.code())
         }
     }
 }

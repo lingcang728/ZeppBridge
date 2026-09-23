@@ -493,8 +493,17 @@ const initialize = async () => {
     }
     unlisteners.push(fn);
   };
+  // 一个事件注册失败（启动早期的 IPC 抖动等）不该拖垮整个 initialize()：
+  // 后面还有别的监听器、refreshStatus()、auto-sync 定时器要设置。
+  const safeListen = async <T>(event: string, handler: (payload: T) => void) => {
+    try {
+      keepUnlisten(await backend.listen<T>(event, handler));
+    } catch {
+      // 这一个事件监听不上，其它启动步骤仍要继续。
+    }
+  };
   if (isDesktop()) {
-    const unlistenProgress = await backend.listen<SyncProgress>('sync://progress', (payload) => {
+    await safeListen<SyncProgress>('sync://progress', (payload) => {
       // 设置页的历史补拉也走 sync://progress。顶栏只认控制器自己发起的同步，
       // 否则一轮补拉会把「已同步」横幅冲掉。
       if (!runningSync) return;
@@ -511,24 +520,20 @@ const initialize = async () => {
         }
         : { kind: 'backend', text: payload.message };
     });
-    keepUnlisten(unlistenProgress);
     if (!stillMine()) return;
-    const unlistenTray = await backend.listen('tray://sync', () => {
+    await safeListen('tray://sync', () => {
       void runSync('incremental');
     });
-    keepUnlisten(unlistenTray);
     if (!stillMine()) return;
-    const unlistenLogin = await backend.listen<LoginStatus>('login://status', applyLoginStatus);
-    keepUnlisten(unlistenLogin);
+    await safeListen<LoginStatus>('login://status', applyLoginStatus);
     if (!stillMine()) return;
-    const unlistenCompactStart = await backend.listen<number>('compaction://started', (pending) => {
+    await safeListen<number>('compaction://started', (pending) => {
       compactionPending.value = typeof pending === 'number' ? pending : 0;
       compactingEvent.value = true;
       compactionSaved.value = null;
     });
-    keepUnlisten(unlistenCompactStart);
     if (!stillMine()) return;
-    const unlistenCompactDone = await backend.listen<{ bytesBefore: number; bytesAfter: number }>(
+    await safeListen<{ bytesBefore: number; bytesAfter: number }>(
       'compaction://finished',
       (report) => {
         compactingEvent.value = false;
@@ -538,7 +543,6 @@ const initialize = async () => {
         compactionSavedTimer = window.setTimeout(() => { compactionSaved.value = null; }, 12_000);
       },
     );
-    keepUnlisten(unlistenCompactDone);
     if (!stillMine()) return;
     try {
       applyLoginStatus(await backend.getLoginStatus());

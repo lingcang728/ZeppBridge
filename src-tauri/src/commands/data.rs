@@ -1390,7 +1390,17 @@ async fn write_export(
             // 文件名跟着范围走，所以单次运动导出不会和当天的整段导出撞名。
             let label = match selection.resolve_scope() {
                 Ok(ExportScope::DateRange { start, end }) => format!("{start}-{end}"),
-                Ok(ExportScope::Workout { workout_id }) => format!("workout-{workout_id}"),
+                Ok(ExportScope::Workout { workout_id }) => {
+                    // workout_id comes straight from the IPC-supplied ExportSelection, so
+                    // it must never reach a file path unsanitized (same rule as
+                    // export_fit.rs's file_name_for): anything but ASCII alnum becomes
+                    // `-`, which also rules out `/`, `\` and `..`.
+                    let safe: String = workout_id
+                        .chars()
+                        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+                        .collect();
+                    format!("workout-{safe}")
+                }
                 Err(_) => "export".to_string(),
             };
             format!(

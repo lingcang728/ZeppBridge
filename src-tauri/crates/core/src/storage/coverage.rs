@@ -292,9 +292,12 @@ impl Database {
         let is_persisted = status == ChunkStatus::Persisted;
         let retryable = matches!(status, ChunkStatus::Failed | ChunkStatus::Partial);
         self.conn.execute(
+            // records 只能往上走：一个块可能先 Partial(12) 再重试整段失败
+            // (0)，重试没写进任何新数据不代表那 12 条凭空消失了——它们仍在
+            // 通过自然键 upsert 落库的表里，账本不该把它们的计数抹掉。
             "UPDATE coverage_ledger
                 SET status = ?3,
-                    records = ?4,
+                    records = MAX(records, ?4),
                     error = ?5,
                     fetched_at = COALESCE(?6, fetched_at),
                     persisted_at = CASE

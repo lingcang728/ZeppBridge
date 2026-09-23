@@ -260,16 +260,22 @@ impl Normalizer {
                     object,
                     &["distance_meters", "distanceMeters", "distance", "dis"],
                 ),
-                calories: first_number(object, &["calories", "calorie"]).map(|v| v as i32),
+                // 和下面 min_hr/total_steps 等字段同一条规则：负数是「没测到」
+                // 的哨兵，不是真实读数，滤掉而不是原样存进去。
+                calories: first_number(object, &["calories", "calorie"])
+                    .filter(|value| *value >= 0.0)
+                    .map(|v| v as i32),
                 avg_hr: first_number(
                     object,
                     &["avg_hr", "avgHr", "averageHeartRate", "avg_heart_rate"],
                 )
+                .filter(|value| *value > 0.0)
                 .map(|v| v as i32),
                 max_hr: first_number(
                     object,
                     &["max_hr", "maxHr", "maximumHeartRate", "max_heart_rate"],
                 )
+                .filter(|value| *value > 0.0)
                 .map(|v| v as i32),
                 // Zepp reports "not measured" as a negative sentinel, and only
                 // running-type activities produce VO2 max at all: `-1` covers
@@ -872,12 +878,16 @@ fn heart_rate_from_band_item(
     let bytes = STANDARD
         .decode(encoded.trim())
         .map_err(|error| format!("data_hr Base64 无效: {error}"))?;
-    let timezone_offset = decoded_summary
+    // 缺 tz 不能当成 UTC 0：旧固件经常不带这个字段，静默用 0 会把这一天的
+    // 心率样本整体平移几个时区（同一坑见 sleep_stages_from_band）。
+    let Some(timezone_offset) = decoded_summary
         .and_then(Value::as_object)
-        .and_then(|summary| first_number(summary, &["tz"]))
-        .map(|value| value.round() as i64)
-        .unwrap_or(0)
-        .clamp(-18 * 3600, 18 * 3600);
+        .and_then(|summary| first_value(summary, &["tz"]))
+        .and_then(timezone_offset_seconds)
+        .map(|value| value.clamp(-18 * 3600, 18 * 3600))
+    else {
+        return Ok(Vec::new());
+    };
     let local_midnight = day
         .and_hms_opt(0, 0, 0)
         .ok_or_else(|| "data_hr 日期无法构造".to_string())?;

@@ -519,7 +519,7 @@ async fn apply_persisted_login(
     let manager = match AppState::build_sync_manager(auth, &state.data_dir) {
         Ok(manager) => manager,
         Err(error) => {
-            let message = error.to_string();
+            let message = error.user_message();
             let _ = state.auth.clear_auth();
             state.replace_sync_manager(None).await;
             {

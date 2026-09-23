@@ -469,13 +469,13 @@ const cancelRestore = async () => {
           {{ t.pendingBodyA(formatFullDateTime(pending.staged_at)) }}<b>{{ t.pendingNextStart }}</b>{{ t.pendingBodyB }}
         </span>
       </div>
-      <button class="button secondary" type="button" :disabled="busy === 'cancel'" @click="cancelRestore">
+      <button class="button secondary" type="button" :disabled="Boolean(busy)" @click="cancelRestore">
         {{ t.cancelRestore }}
       </button>
     </div>
 
     <div class="inline-actions">
-      <button class="button primary" type="button" :disabled="busy === 'create'" @click="createBackup">
+      <button class="button primary" type="button" :disabled="Boolean(busy)" @click="createBackup">
         {{ busy === 'create' ? t.creating : t.createSnapshot }}
       </button>
       <button class="button secondary" type="button" :disabled="Boolean(busy)" @click="load">{{ t.refreshList }}</button>

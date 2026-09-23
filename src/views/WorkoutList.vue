@@ -164,7 +164,10 @@ const loadMore = async () => {
     if (!listEpoch.isCurrent(epoch)) return;
     error.value = toUserMessage(cause, t.value.loadFailed);
   } finally {
-    if (listEpoch.isCurrent(epoch)) loadingMore.value = false;
+    // loadingMore is this call's own flag, not something a newer loadList()
+    // call takes over — unlike `loading`, nothing else will ever clear it,
+    // so it must reset here even if the epoch went stale while we awaited.
+    loadingMore.value = false;
   }
 };
 

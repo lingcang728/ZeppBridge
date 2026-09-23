@@ -561,7 +561,11 @@ fn execute_tool_with_db(
             if metrics.is_empty() {
                 return Err((ERR_INVALID_PARAMS, "metrics 不能为空".into()));
             }
-            let days = args.get("days").and_then(Value::as_i64).unwrap_or(90);
+            let days = args
+                .get("days")
+                .and_then(Value::as_i64)
+                .unwrap_or(90)
+                .clamp(1, 1825);
             let series = db
                 .metric_series(&metrics, days)
                 .map_err(|error| (ERR_DATABASE, error.user_message()))?;
