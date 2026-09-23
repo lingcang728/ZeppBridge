@@ -171,6 +171,7 @@ const messages = defineMessages(
     subItems: (n: number) => `${n} elementos`,
     subNone: 'sin datos',
   },
+  'views/OrbitLab',
 );
 const t = useMessages(messages);
 

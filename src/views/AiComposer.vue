@@ -206,6 +206,7 @@ const messages = defineMessages(
     generalWindow: 'Ventana común',
     eachWorkoutWindow: 'Ventana por entrenamiento',
   },
+  'views/AiComposer',
 );
 const t = useMessages(messages);
 

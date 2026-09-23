@@ -49,6 +49,7 @@ const messages = defineMessages(
     openFailed: 'No se pudo abrir el sitio de IA',
     previewFailed: 'No se pudo generar la vista previa',
   },
+  'composables/useAiTaskHandoff',
 );
 const copy = () => messagesOf(messages);
 

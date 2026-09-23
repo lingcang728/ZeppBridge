@@ -49,6 +49,7 @@ const messages = defineMessages(
     deleteFailed: 'No se pudo eliminar la tarea',
     untitled: 'Tarea sin nombre',
   },
+  'composables/useAiTaskDraft',
 );
 const copy = () => messagesOf(messages);
 

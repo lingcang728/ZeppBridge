@@ -231,6 +231,7 @@ const messages = defineMessages(
     taskUntitled: 'Tarea sin nombre',
     estimatedSize: 'Tamaño estimado de la exportación',
   },
+  'views/AiHandoffPreview',
 );
 const t = useMessages(messages);
 

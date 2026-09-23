@@ -90,6 +90,7 @@ const messages = defineMessages(
     yesterday: 'Ayer',
     listDate: (month: number, day: number, weekday: string) => `${weekday} ${day}/${month}`,
   },
+  'views/RecentRecords',
 );
 const t = useMessages(messages);
 

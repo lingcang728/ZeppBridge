@@ -103,6 +103,7 @@ const messages = defineMessages(
     syncingStream: (stream: string) => `Sincronizando ${stream.toLowerCase()}`,
     backfillingStream: (stream: string, month: string) => `Recuperando ${stream.toLowerCase()} · ${month}`,
   },
+  'composables/useSyncController',
 );
 
 const copy = () => messagesOf(messages);

@@ -61,6 +61,7 @@ const messages = defineMessages(
     loadMore: 'Cargar más',
     loadingMore: 'Cargando…',
   },
+  'views/SleepList',
 );
 const t = useMessages(messages);
 
