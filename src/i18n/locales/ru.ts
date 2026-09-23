@@ -3,16 +3,40 @@ import { plural, type LocalePack } from '../index';
 /**
  * Русский（ru）语言包。
  *
- * 覆盖已绑定 moduleId 的模块（defineMessages 第四参数）：i18n/errors、
- * views/Explore、views/Settings。其余模块尚未绑定 id，语言包对它们不生效
- * （门禁会拦），对应键留在 ru.pending.txt。
+ * 覆盖全部已绑定 moduleId 的模块（defineMessages 第四参数）。
  * 俄语复数有三个桶（one/few/many），函数叶里用 `plural(n, {...})`。
+ * 源模块里带点号的扁平键（如 lib/aiTask/copy 的 'ui.ai_task.x'、
+ * InsightCard 的 'metric.run.x'）按原样保留扁平键，不能改成嵌套。
  *
  * 形状：
  *   modules: { '<moduleId>': { <键路径>: '译文' | (参数) => `...` } }
  *   errors: { 'err.x.y': '译文' }        // 等价 modules['i18n/errors']
  *   backendText: { 'ui.x.y': '译文' }    // 后端散文码的兜底表
  */
+
+/**
+ * ru 专用：useExport 的 saved/savedFiles 把计量单位词作为参数传进来，
+ * 俄语里名词要随数字变格，所以把已知的 unit 叶子换回正确词形；
+ * 没登记的 unit 原样拼接（与 zh/en 行为一致）。
+ */
+const RU_COUNT_FORMS: Record<string, { one: string; few: string; many: string; other: string }> = {
+  записей: { one: 'запись', few: 'записи', many: 'записей', other: 'записи' },
+  строк: { one: 'строка', few: 'строки', many: 'строк', other: 'строки' },
+  'точек трека': { one: 'точка трека', few: 'точки трека', many: 'точек трека', other: 'точки трека' },
+  отсчётов: { one: 'отсчёт', few: 'отсчёта', many: 'отсчётов', other: 'отсчёта' },
+};
+
+const countedUnit = (count: number, unit: string): string => {
+  const forms = RU_COUNT_FORMS[unit];
+  if (!forms) return `${count} ${unit}`;
+  return plural(count, {
+    one: `${count} ${forms.one}`,
+    few: `${count} ${forms.few}`,
+    many: `${count} ${forms.many}`,
+    other: `${count} ${forms.other}`,
+  });
+};
+
 export default {
   modules: {
     'views/Explore': {
@@ -558,6 +582,7 @@ export default {
 
       refreshFailed: (reason: string) => `Определение не удалось; показан локальный кэш${reason}`,
       refreshFailedReason: (reason: string) => `: ${reason}`,
+      refreshFailedPeriod: '.',
       refreshDone: (count: number) => plural(count, {
         one: `Определение завершено; найдено ${count} физическое устройство.`,
         few: `Определение завершено; найдено ${count} физических устройства.`,
@@ -652,6 +677,1848 @@ export default {
         data: { label: 'Цифры не сходятся', hint: 'что-то всегда пусто или отличается от Zepp App' },
         other: { label: 'Что-то другое', hint: 'опишите ниже' },
       },
+    },
+
+    'App': {
+      skipToContent: 'Перейти к основному содержимому',
+      mainNav: 'Основная навигация',
+      bottomNav: 'Мобильная основная навигация',
+      navOverview: 'Обзор',
+      navHandoff: 'Передать ИИ',
+      navSettings: 'Настройки',
+      preparingData: 'Открывается локальная база данных — первый запуск после обновления может занять десяток секунд…',
+      compacting: (pending: number) =>
+        `Сжимаются сохранённые пакеты (осталось ${pending}). Сообщение исчезнет само; синхронизация пока подождёт.`,
+      compacted: (saved: string) => `Сохранённые пакеты сжаты — освобождено примерно ${saved} на диске.`,
+      trayHint: 'После закрытия окна ZeppBridge остаётся в трее и продолжает автосинхронизацию.',
+      browserPreview: 'Используйте настольное приложение. Этот предпросмотр в браузере не читает данные аккаунта.',
+      routeNotFound: 'Такой страницы нет, поэтому вы вернулись на обзор.',
+    },
+
+    'components/BackupPanel': {
+      title: 'Снимки базы данных и восстановление',
+      intro1a: 'Снимок — это полная копия всего файла ',
+      intro1b:
+        '. Он остаётся на этом устройстве и никуда не выгружается. Один создаётся автоматически '
+        + 'перед обновлением базы, а сделать вручную можно в любой момент.',
+      compareLead: 'Три разные вещи здесь называются «экспортом»: ',
+      compareExchange: ' — обмен данными для других инструментов, содержит только выбранный диапазон;',
+      compareSnapshotName: 'снимок базы данных',
+      compareSnapshot: ' — копия всей базы для аварийного восстановления, которую может прочитать только ZeppBridge;',
+      comparePackName: 'пакет данных для ИИ',
+      comparePack: ' — материал, который вы сами выбираете и обезличиваете для внешней модели. Вернуть базу в прежнее состояние способен только снимок.',
+      pendingTitle: 'В очереди стоит восстановление',
+      pendingBodyA: (stagedAt: string) => `Поставлено в очередь ${stagedAt}. База будет заменена при `,
+      pendingNextStart: 'следующем запуске',
+      pendingBodyB: '. Текущая база уже сохранена как точка отката, так что при проблемах можно вернуться к ней.',
+      cancelRestore: 'Отменить восстановление',
+      creating: 'Создаётся…',
+      createSnapshot: 'Сделать снимок',
+      refreshList: 'Обновить',
+      noSnapshots: 'Снимков пока нет.',
+      pinned: 'Закреплён',
+      metaLine: (size: string, appVersion: string, schemaVersion: number) =>
+        `${size} · приложение ${appVersion} · схема ${schemaVersion}`,
+      coverage: (from: string, to: string) => ` · отсчёты: ${from} — ${to}`,
+      noSamples: ' · в снимке нет отсчётов здоровья',
+      verifyFailed: (problem: string) => `Проверка не пройдена: ${problem}`,
+      problemFileMissing: 'Файл резервной копии больше не находится в папке резервных копий',
+      problemSizeMismatch: 'Размер файла резервной копии не совпадает с манифестом — он может быть повреждён',
+      problemSha256Mismatch: 'SHA-256 файла резервной копии не совпадает с манифестом — он может быть повреждён или изменён',
+      problemIntegrityFailed: 'Файл резервной копии не прошёл проверку целостности SQLite',
+      problemUnknown: 'Этот снимок не прошёл проверку; причина не записана.',
+      blockerFutureSchema: (backup: number, current: number) =>
+        `Эта резервная копия создана более новой версией ZeppBridge (схема ${backup}, в приложении — ${current}). `
+        + 'Открытие здесь потеряло бы поля, поэтому восстановление не выполняется и текущая база не тронута. '
+        + 'Сначала обновите ZeppBridge.',
+      blockerUnknown: 'Этот снимок сейчас восстановить нельзя; причина не записана.',
+      verifyPassed: 'Только что проверено заново: файл, размер, SHA-256 и целостность — всё сходится.',
+      integrityOk: (sha: string) => `Проверка целостности при создании пройдена · SHA-256 ${sha}…`,
+      integrityBad: 'Проверка целостности при создании не пройдена. Не восстанавливайте из него.',
+      verifyAgain: 'Проверить ещё раз',
+      unpin: 'Открепить',
+      pin: 'Закрепить',
+      restoreToThis: 'Восстановить до этого снимка',
+      previewTitle: 'Предпросмотр восстановления',
+      compatibilityUnknown: 'Совместимость неизвестна.',
+      colContent: 'Содержимое',
+      colBackup: 'В снимке',
+      colCurrent: 'Сейчас в базе',
+      colDelta: 'Разница',
+      previewNote:
+        'Строки с отрицательной разницей после восстановления будут содержать на столько записей меньше. '
+        + 'Восстановление ничего не тянет из облака — если эти данные ещё нужны, синхронизируйтесь ещё раз, когда оно завершится.',
+      staging: 'Ставится в очередь…',
+      stageRestore: 'Поставить восстановление в очередь (сработает при следующем запуске)',
+      cancel: 'Отмена',
+      listFailed: 'Не удалось прочитать список снимков',
+      created: (size: string) => `Снимок создан: ${size}; проверка целостности пройдена.`,
+      createFailed: 'Не удалось создать снимок',
+      verifyError: 'Проверка не удалась',
+      pinFailed: 'Не удалось изменить флаг закрепления',
+      previewFailed: 'Не удалось построить предпросмотр восстановления',
+      staged: 'Восстановление поставлено в очередь. В этом запуске ничего не меняется; база заменится при следующем старте ZeppBridge.',
+      stageFailed: 'Не удалось поставить восстановление в очередь',
+      cancelled: 'Восстановление из очереди отменено. База не изменилась.',
+      cancelFailed: 'Не удалось отменить восстановление',
+      kind: {
+        manual: 'вручную',
+        pre_migration: 'перед обновлением',
+        pre_restore: 'точка отката перед восстановлением',
+      },
+      compatibility: {
+        same_schema: 'Схема снимка совпадает с версией этого приложения — восстановление прямое.',
+        older_schema_will_migrate: 'Снимок создан на более старой версии схемы. После восстановления он обновится сам при следующем запуске.',
+        future_schema_refused: 'Снимок создан более новой версией приложения, чья структура здесь не читается, — восстановить нельзя.',
+      },
+      table: {
+        raw_records: 'Сырые пакеты',
+        life_events: 'Жизненные события',
+        workouts: 'Тренировки',
+        daily_metrics: 'Дневные метрики',
+        workout_samples: 'Отсчёты тренировок',
+        metric_samples: 'Отсчёты метрик',
+        sleep_sessions: 'Сон',
+      },
+    },
+
+    'components/CoverageNotice': {
+      empty: 'На этом устройстве пока ничего нет. Сделайте одну синхронизацию — и графикам будет что рисовать.',
+      emptyAfterSync:
+        'Синхронизация прошла, но не принесла ни одной записи. Либо у этого аккаунта в Zepp нет данных '
+        + 'за этот период, либо часы ещё не выгрузили их в Zepp App. Сначала откройте Zepp на телефоне и '
+        + 'убедитесь, что данные там есть, затем синхронизируйте здесь ещё раз.',
+      emptyUnconfirmedRegion:
+        'Синхронизация прошла, но не принесла ни одной записи. При входе не удалось подтвердить, к какому '
+        + 'региону Zepp относится ваш аккаунт, поэтому ZeppBridge использует наиболее вероятный — а '
+        + 'синхронизация в неверный регион выглядит именно так: успешно и пусто. Попробуйте подключить '
+        + 'аккаунт заново.',
+      reconnect: 'Переподключить аккаунт',
+      short: (covered: number, earliest: string) =>
+        `На этом устройстве данные только за ${plural(covered, { one: `${covered} день`, few: `${covered} дня`, many: `${covered} дней`, other: `${covered} дня` })} (самая ранняя — ${earliest}). Всё более раннее пусто, потому что ещё не дозагружено из облака, — а не потому, что тогда ничего не записывалось.`,
+      backfill: 'Дозагрузить ещё истории',
+      backfilling: 'Дозагружается…',
+      syncNow: 'Синхронизировать сейчас',
+    },
+
+    'components/DatePicker': {
+      placeholder: 'Выберите дату',
+      aria: 'Выбор даты',
+      prev: 'Предыдущий месяц',
+      next: 'Следующий месяц',
+    },
+
+    'components/DeviceMarquee': {
+      marqueeAria: 'Модели Amazfit, уже есть в каталоге',
+    },
+
+    'components/DevicePicker': {
+      pickerAria: 'Указать модель устройства вручную',
+      searchAria: 'Поиск по названию модели',
+      searchPlaceholder: 'Поиск модели, например Balance 2',
+      empty: 'Подходящей модели нет. Попробуйте другое слово или верните фильтр на «Все».',
+      prev: 'Предыдущая модель',
+      next: 'Следующая модель',
+      alreadyAssigned: 'Уже выбрано оно',
+      confirm: 'Это моё устройство',
+      clear: 'Отозвать выбор',
+      later: 'Не сейчас',
+      contributeTitle: 'Заодно помогите следующей версии узнавать это устройство самой',
+      contributeBody:
+        'ZeppBridge отправляются выбранная вами модель и номера модели этого устройства '
+        + '(deviceSource / deviceType — только целые числа). Оба говорят лишь, какая это модель часов, и '
+        + 'ничего больше: ни аккаунта, ни серийника, ни MAC, ни данных здоровья. Huami не публикует таблицу '
+        + 'соответствия этих номеров, поэтому это единственный способ роста встроенного каталога — после '
+        + 'того как несколько человек укажут модель, она начнёт распознаваться автоматически у всех.',
+      note:
+        'Ваш выбор будет помечен как «Модель указана вами» и никогда не выдаётся за автоматическое '
+        + 'совпадение. Картинки и названия моделей берутся из встроенного каталога — листание не трогает сеть.',
+      filterAll: 'Все',
+      filterWatch: 'Часы',
+      filterBand: 'Браслеты',
+      filterStrap: 'Ремешки',
+      filterRing: 'Кольца',
+      filterEarbuds: 'Наушники',
+    },
+
+    'components/DeviceVisual': {
+      watch: 'Часы',
+      strap: 'Ремешок',
+      ring: 'Кольцо',
+      band: 'Браслет',
+      earbuds: 'Наушники',
+      scale: 'Весы',
+      unknown: 'Устройство',
+    },
+
+    'components/HeartRateZonePicker': {
+      title: 'Пульсовые зоны',
+      intro:
+        'Три модели считают зоны по-разному, и только вы знаете, какая из них что-то значит для вас, — '
+        + 'поэтому ZeppBridge не задаёт модель по умолчанию и ничего не оценивает по формулам вроде '
+        + '«220 минус возраст». У каждого базиса ниже указаны его источник и дата замера.',
+      clearChoice: 'Сбросить выбор',
+      desktopOnly: 'Откройте это в настольном приложении ZeppBridge — пульсовые зоны читают локальные записи.',
+      noBases:
+        'На этом устройстве пока нет пульсовых базисов. После первой синхронизации тренировок здесь '
+        + 'появятся измеренные значения — например, ваш наивысший зафиксированный пульс.',
+      modelGroup: 'Модель',
+      modelAria: 'Модель пульсовых зон',
+      pickModelFirst: 'Сначала выберите модель — ниже зоны посчитаются по выбранным вами базисам.',
+      pickBasesNext: 'Теперь выберите оставшиеся базисы выше — получите зоны и время в каждой.',
+      window: (days: number, total: string) =>
+        `Посекундный пульс тренировок за ${plural(days, { one: `${days} день`, few: `${days} дня`, many: `${days} дней`, other: `${days} дня` })} · всего ${total}`,
+      outside: (below: string, above: string) => `Вне зон: ниже Z1 ${below} · выше Z5 ${above}`,
+      formulaNote: (formula: string, bases: string) =>
+        `${formula}. Границы округляются вниз, как на часах. Базисы: ${bases}`,
+      missingBases: (list: string) => `На этом устройстве ещё нет: ${list}`,
+      basesSeparator: ', ',
+      zonesUnavailable: 'Пульсовые зоны сейчас недоступны',
+      saveFailed: 'Не удалось сохранить настройки пульсовых зон',
+      zeroMinutes: '0 мин',
+      durationHours: (hours: number, minutes: number) => `${hours} ч ${minutes} мин`,
+      durationMinutes: (minutes: number) => `${minutes} мин`,
+      kind: {
+        max_hr: 'Базис: макс. пульс',
+        resting_hr: 'Базис: пульс покоя',
+        threshold_hr: 'Базис: пороговый пульс',
+      },
+      model: {
+        max_hr: {
+          label: 'Зоны от максимального пульса',
+          formula: 'Низ зоны = максимальный пульс × процент',
+        },
+        hr_reserve: {
+          label: 'Зоны по резерву пульса',
+          formula: 'Низ зоны = пульс покоя + (макс. пульс − пульс покоя) × процент',
+        },
+        lactate_threshold: {
+          label: 'Зоны от лактатного порога',
+          formula: 'Низ зоны = пороговый пульс × процент',
+        },
+      },
+      percentBands: ['Разминка', 'Жиросжигание', 'Аэробная выносливость', 'Анаэробная выносливость', 'Предел'],
+      thresholdBands: ['Лёгкая', 'Выносливость', 'Темповая', 'Пороговая', 'Анаэробная'],
+      basis: {
+        observed_max: {
+          label: 'Наивысший зафиксированный пульс',
+          note: 'Максимальный пульс, записанный локально. Если вы ни разу не выходили на настоящий предел, зоны выходят уже.',
+        },
+        device_max: {
+          label: 'Макс. пульс по данным часов',
+          note: 'Максимальный пульс, который часы сообщают в пакете PAI, — обычно из вашего профиля в Zepp App.',
+        },
+        device_resting: {
+          label: 'Пульс покоя по данным часов',
+          note: 'Пульс покоя, который часы сообщают в пакете PAI.',
+        },
+        lactate_threshold: {
+          label: 'Пульс лактатного порога',
+          note: 'Измерен часами после высокоинтенсивной пробежки.',
+        },
+        computed_resting: {
+          label: 'Пульс покоя, посчитанный локально',
+          note: 'Считается по локальным записям.',
+        },
+      },
+      computedRestingNote: (days: number) => `Среднее за дни с данными — ${days} из последних 30.`,
+    },
+
+    'components/HistoryArchivePanel': {
+      title: 'Долгосрочный архив и полная история',
+      intro:
+        'Архив отвечает за «с сегодняшнего дня больше не удалять», дозагрузка — за «вернуть то, что было '
+        + 'раньше». Только с обоими локальная копия действительно полная.',
+      archiveTitle: 'Долгосрочный архив',
+      archiveBody:
+        'Когда включён, успешная синхронизация больше не подчищает историю по сроку хранения. База будет '
+        + 'расти; выключить можно в любой момент — при выключении будет показано, что подчистит следующая '
+        + 'синхронизация.',
+      archiveAria: 'Долгосрочный архив',
+      startLabel: 'Начало дозагрузки',
+      startAria: 'Откуда начинать дозагрузку истории',
+      customDateLabel: 'Начальная дата',
+      customDateAria: 'Начальная дата дозагрузки',
+      estimateTitle: 'Ожидаемый рост',
+      estimateRate: (days: number, perDay: string) =>
+        `Замеры на этом устройстве за ${plural(days, { one: `${days} день`, few: `${days} дня`, many: `${days} дней`, other: `${days} дня` })} · примерно ${perDay}/день`,
+      unmeasured: (streams: string) =>
+        `Локальных замеров не хватает, оценки нет: ${streams}. Эти потоки не входят в сумму выше — честнее `
+        + 'сказать «не знаем», чем выдумать темп и умножить его на годы.',
+      wouldBeCleanedUp: (requested: number, retention: number) =>
+        `Эта дозагрузка вернёт ${plural(requested, { one: `${requested} день`, few: `${requested} дня`, many: `${requested} дней`, other: `${requested} дня` })} истории, но устройство хранит только последние ${plural(retention, { one: `${retention} день`, few: `${retention} дня`, many: `${retention} дней`, other: `${retention} дня` })} — возвращённое будет удалено при следующей успешной синхронизации. Сначала включите долгосрочный архив или увеличьте срок хранения.`,
+      backfilling: 'Дозагружается…',
+      continueBackfill: 'Продолжить дозагрузку',
+      startBackfill: 'Начать дозагрузку',
+      autoContinue: 'Довести до конца автоматически',
+      autoContinueHint:
+        'Каждый заход автоматически запускает следующий, пока весь диапазон не будет дозагружен. '
+        + 'Остановить можно в любой момент — уже полученное не потеряется.',
+      stopBackfill: 'Остановить',
+      stopping: 'Останавливается…',
+      roundProgress: (done: number, total: number) =>
+        `Дозагрузка: готово ${done} из ${total} месячных блоков. Остановить можно в любой момент.`,
+      stoppedByUser: (remaining: number) =>
+        `Остановлено; осталось ${plural(remaining, { one: `${remaining} месячный блок`, few: `${remaining} месячных блока`, many: `${remaining} месячных блоков`, other: `${remaining} месячных блока` })}. Уже полученная история на месте — нажмите «Продолжить дозагрузку», чтобы идти дальше.`,
+      stalled: (remaining: number) =>
+        `Осталось ${plural(remaining, { one: `${remaining} месячный блок`, few: `${remaining} месячных блока`, many: `${remaining} месячных блоков`, other: `${remaining} месячных блока` })}, но этот заход не продвинул ни одного, поэтому остановился. Скорее всего, они сбоят повторно — смотрите список неудач ниже или нажмите «Повторить неудачные».`,
+      deferredRetry: 'Идёт локальное обслуживание — дозагрузка продолжится сама чуть позже',
+      resetLedger: 'Очистить журнал',
+      ledgerTitle: 'Журнал покрытия',
+      ledgerProgress: (done: number, total: number) => `Решено ${done} из ${total} месячных блоков`,
+      ledgerFrom: (from: string) => ` · запрошено с ${from}`,
+      ledgerComplete:
+        'По каждому месячному блоку в журнале есть итог: либо записан локально, либо облако прямо '
+        + 'ответило, что за этот период данных нет.',
+      ledgerIncomplete: (remaining: number) =>
+        `Без итога ещё ${plural(remaining, { one: `${remaining} блок`, few: `${remaining} блока`, many: `${remaining} блоков`, other: `${remaining} блока` })}. Пока они не завершены, эта локальная копия — лишь «копия успешно синхронизированного диапазона», а не полная.`,
+      ledgerStats: (persisted: number, empty: number, pending: number) =>
+        `записано ${persisted} · пусто из облака ${empty} · в очереди ${pending}`,
+      ledgerFailed: (failed: number) => `неудачно ${failed}`,
+      ledgerRange: (from: string, to: string, records: number) =>
+        `${from} — ${to} · ${plural(records, { one: `${records} запись`, few: `${records} записи`, many: `${records} записей`, other: `${records} записи` })}`,
+      ledgerNothingWritten: 'Пока не записан ни один месяц',
+      range1y: 'Последний год',
+      range2y: 'Последние 2 года',
+      range3y: 'Последние 3 года',
+      rangeAll: (years: number) =>
+        `Вся доступная история (не более ${plural(years, { one: `${years} года`, few: `${years} лет`, many: `${years} лет`, other: `${years} года` })})`,
+      rangeCustom: 'Своя дата начала',
+      confirmDisableArchive:
+        'После выключения долгосрочного архива следующая успешная синхронизация подчистит более старые '
+        + 'данные по сроку хранения, и это необратимо.\nЕсли вы только что дозагрузили историю, сначала '
+        + 'сделайте снимок базы.\nВыключить?',
+      archiveEnabled: 'Долгосрочный архив включён: успешные синхронизации больше не подчищают историю.',
+      archiveDisabled: 'Долгосрочный архив выключен: следующая успешная синхронизация подчистит по сроку хранения.',
+      archiveSaveFailed: 'Не удалось сохранить настройку архива',
+      pickStartFirst: 'Сначала выберите, откуда начинать дозагрузку.',
+      outOfRetention:
+        'Эта дозагрузка выходит за пределы локального срока хранения — возвращённое будет подчищено при '
+        + 'следующей успешной синхронизации. Сначала включите долгосрочный архив или увеличьте срок хранения.',
+      roundDone: (remaining: number) =>
+        `Этот заход завершён; осталось ${plural(remaining, { one: `${remaining} месячный блок`, few: `${remaining} месячных блока`, many: `${remaining} месячных блоков`, other: `${remaining} месячных блока` })}. Нажмите «Продолжить дозагрузку» ещё раз — остановиться можно когда угодно.`,
+      allChunksDone: 'По каждому месячному блоку в журнале есть итог.',
+      backfillFailed: 'Дозагрузка истории не удалась',
+      confirmResetLedger:
+        'Очищается только журнал покрытия; уже записанные локально данные не трогаются. После этого можно '
+        + 'заново спланировать дозагрузку. Продолжить?',
+      ledgerReset: 'Журнал очищен — можно планировать новый диапазон дозагрузки.',
+      ledgerResetFailed: 'Не удалось очистить журнал',
+      failedTitle: 'Месяцы, которые не удалось получить',
+      failedIntro: 'Эти блоки завершились неудачей. Остальные месяцы не пострадали и дозагружены как обычно.',
+      failedRow: (stream: string, month: string) => `${stream} · ${month}`,
+      failedAttempts: (attempts: number) => `попыток: ${attempts}`,
+      failedExhausted: 'Автоматические повторы исчерпаны — нажмите «Повторить неудачные», чтобы попробовать снова',
+      failedNoReason: 'Причина не записана',
+      retryFailed: 'Повторить неудачные',
+      retryFailedDone: 'Неудачные месяцы снова в очереди — дозагрузку можно продолжить.',
+      retryFailedFailed: 'Не удалось снова поставить в очередь неудачные месяцы',
+      streamSeparator: ', ',
+      stream: {
+        heart_rate: 'Пульс',
+        daily_summary: 'Дневные сводки',
+        workouts: 'Тренировки',
+        sleep: 'Сон',
+        hrv: 'Вариабельность пульса',
+        wellness: 'Стресс / SpO2 и т. п.',
+      },
+    },
+
+    'components/InsightCard': {
+      title: 'Как прошла пробежка',
+      unsupportedWorkoutType:
+        'Для этого типа тренировки разбор пока не поддерживается. Первая версия работает только с бегом — '
+        + 'только он проверен на реальных данных; остальные тренировки по-прежнему нормально просматриваются, '
+        + 'исправляются и экспортируются.',
+      handoff: 'Попросить ИИ копнуть глубже',
+      currentRun: 'Этот раз',
+      baselineRun: 'База по истории',
+      reading: 'Читаются локальные записи…',
+      comparedTo: (count: number) =>
+        `В сравнении с ${plural(count, { one: `${count} вашей последней пробежкой`, few: `${count} вашими последними пробежками`, many: `${count} вашими последними пробежками`, other: `${count} вашими последними пробежками` })} похожей дистанции:`,
+      noComparison: 'Сопоставимой истории пока не хватает, поэтому здесь просто приводятся числа без сравнения.',
+      baselinePrefix: (value: string, delta: string) => `база ${value} · ${delta}`,
+      driftTitle: 'Первая и вторая половины',
+      driftSub: 'Делит эту тренировку по времени пополам и сравнивает, сколько ударов пульса стоила та же скорость.',
+      driftFirst: 'Первая половина',
+      driftSecond: 'Вторая половина',
+      driftPerBeat: (metres: string) => `${metres} м/удар`,
+      driftHrSpeed: (hr: number, pace: string) => `${hr} уд/мин · ${pace}`,
+      driftDelta: (percent: string) => `${percent}%`,
+      driftRising: 'Удержание той же скорости во второй половине обошлось дороже в ударах пульса.',
+      driftFlat: 'Обе половины практически одинаковы.',
+      driftFalling: 'Каждый удар пульса во второй половине проносил вас дальше.',
+      driftNote:
+        'Это сравнение тренировки только с самой собой, ни с кем больше. Светофоры, подъёмы, интервалы '
+        + 'и дрейф GPS всё это засоряют, поэтому при нестабильном темпе число не показывается.',
+      driftUnavailable: (code: string) => ({
+        too_short: 'Слишком коротко, чтобы делить пополам: первые десять минут пульс в основном ещё растёт, и сравнение их со второй половиной измерит разминку, а не дрейф.',
+        pace_too_variable: 'Темп в этот раз гулял слишком сильно (так выглядят интервалы, светофоры и подъёмы), поэтому половины несопоставимы и числа не будет.',
+        not_enough_samples: 'В этой тренировке недостаточно поточечных отсчётов пульса и скорости, чтобы делить её пополам.',
+        unsupported_workout_type: 'Сравнение половин пока работает только для бега — у ходьбы и велосипеда отсчётов тоже хватает, но пороги ещё не проверены на реальных данных.',
+      } as Record<string, string | undefined>)[code] ?? 'Для этой тренировки сравнение половин посчитать нельзя.',
+      baselineSummary: 'Откуда берётся база сравнения',
+      baselineRule: (days: number, tolerance: number | null | undefined, min: number, max: number) =>
+        `Правило: пробежки того же типа за последние ${plural(days, { one: `${days} день`, few: `${days} дня`, many: `${days} дней`, other: `${days} дня` })} с дистанцией в пределах ±${tolerance ?? '—'}% от этой — минимум ${min} и максимум ${max} из них.`,
+      excludedPrefix: 'Исключены: ',
+      excludedItem: (label: string, count: number) => `${label} ×${count} `,
+      footnote:
+        'Все выводы здесь сравнивают вас только с вашей же историей — никогда с популяционной базой — и '
+        + 'ни один из них не является медицинским заключением. Отсутствующие данные показываются как '
+        + '«Нет данных», а не заполняются нулём.',
+      notProvided: 'Нет данных',
+      durationHours: (hours: number, minutes: number) => `${hours} ч ${minutes} мин`,
+      durationMinutes: (minutes: number) => `${minutes} мин`,
+      metric: {
+        'run.distance': 'Дистанция',
+        'run.duration': 'Время',
+        'run.pace': 'Средний темп',
+        'run.avg_hr': 'Средний пульс',
+        'run.training_load': 'Тренировочная нагрузка',
+      },
+      confidence: {
+        high: 'Хорошо подтверждено',
+        medium: 'Частично подтверждено',
+        low: 'Слабо подтверждено',
+        insufficient: 'Подтверждений не хватает',
+      },
+      exclusion: {
+        distance_out_of_tolerance: 'дистанция слишком отличается',
+        missing_distance: 'нет дистанции',
+        missing_duration: 'нет длительности',
+        implausible_pace: 'неправдоподобный темп',
+        beyond_max_samples: 'за пределом лимита выборки',
+      },
+    },
+
+    'components/MetricTrendCard': {
+      latestTag: 'Последнее',
+      measuredOn: (date: string) => `замерено ${date}`,
+      trendAria: (label: string) => `${label}: кривая тренда`,
+      onlyOneDay: 'В этом диапазоне данные только за один день — тренд пока нечем рисовать.',
+      defaultEmpty: 'Тренд этой метрики появится после синхронизации.',
+      average: 'Среднее',
+      minimum: 'Мин',
+      maximum: 'Макс',
+    },
+
+    'components/PageHeader': {
+      backToOverview: 'Назад к обзору',
+    },
+
+    'components/SelectMenu': {
+      placeholder: 'Выберите…',
+    },
+
+    'components/StageBar': {
+      notProvided: 'Нет данных',
+      zeroMinutes: '0 мин',
+      hypnogramAria: 'Ступенчатый график фаз сна',
+      summaryAria: 'Доля фаз сна',
+    },
+
+    'components/WeeklyReportCard': {
+      title: 'Эта неделя',
+      window: (recentStart: string, recentEnd: string, baseStart: string, baseEnd: string) =>
+        `${recentStart} — ${recentEnd} · в сравнении с вашими же ${baseStart} — ${baseEnd}`,
+      legendGood: 'Зелёный = лучше для этой метрики',
+      legendBad: 'Красный = хуже',
+      legendNote: 'Сравнение только с вашими же предыдущими 28 днями, никогда с популяционной базой',
+      desktopOnly: 'Еженедельный отчёт нужно открывать в настольном приложении ZeppBridge.',
+      nothingComparable: 'На этой неделе сравнивать пока не с чем. Вернитесь после синхронизации.',
+      loadFailed: 'Не удалось построить локальный еженедельный отчёт',
+      barsAria: (recent: string, baseline: string) => `На этой неделе ${recent}, за предыдущие 28 дней ${baseline}`,
+      barThisWeek: 'Эта неделя',
+      barBaseline: 'Предыдущие 28 дн.',
+      noBaseline: 'Истории за спиной не хватает — показывается только текущее значение',
+      baselineCountUnknown: 'Число дней базы неизвестно — показывается текущее значение без сравнения.',
+      thinBaseline: (days: number, found: number, needed: number) =>
+        `Из предыдущих ${plural(days, { one: `${days} дня`, few: `${days} дней`, many: `${days} дней`, other: `${days} дней` })} эту метрику несут лишь ${found} — меньше нужных ${needed}, поэтому показывается текущее значение без сравнения.`,
+      noRecentData: 'За последние 7 дней этой метрики на устройстве нет.',
+      zeroBaseline: 'Среднее предыдущей базы равно 0, относительное изменение не посчитать — показывается только текущее значение.',
+      notProvided: 'Нет данных',
+      sleepDuration: (hours: number, minutes: number) => `${hours} ч ${minutes} мин`,
+      regularity: (minutes: number) => `±${minutes} мин`,
+      workoutCount: (count: number) => plural(count, {
+        one: `${count} тренировка`,
+        few: `${count} тренировки`,
+        many: `${count} тренировок`,
+        other: `${count} тренировки`,
+      }),
+      unitWord: (unit: string) =>
+        ({ score: 'баллов', load: '', bpm: 'уд/мин' } as Record<string, string | undefined>)[unit] ?? unit,
+      metric: {
+        'weekly.resting_hr': 'Пульс покоя',
+        'weekly.hrv': 'HRV',
+        'weekly.stress': 'Стресс',
+        'weekly.sleep_duration': 'Длительность сна',
+        'weekly.sleep_start_regularity': 'Разброс времени отхода ко сну',
+        'weekly.workout_count': 'Тренировки',
+        'weekly.training_load': 'Тренировочная нагрузка',
+      },
+    },
+
+    'components/orbit/OrbitCanvas': {
+      canvasLabel: (center: string) => `Граф задачи: ${center}`,
+      canvasHint:
+        'Tab — к узлу; Enter открывает; Space или J переключает участие; Delete выводит; стрелки влево/'
+        + 'вправо двигают фокус по кольцу; +/- — масштаб; 0 сбрасывает вид; Ctrl+Z отменяет',
+      stateMember: 'включён',
+      stateCandidate: 'кандидат',
+      stateDisabled: 'недоступен',
+      nodeAria: (label: string, state: string, count: number | null) =>
+        count === null
+          ? `${label}, ${state}`
+          : `${label}, ${state}, ${plural(count, { one: `${count} элемент`, few: `${count} элемента`, many: `${count} элементов`, other: `${count} элемента` })}`,
+      zoomIn: 'Приблизить',
+      zoomOut: 'Отдалить',
+      resetView: 'Сбросить вид',
+    },
+
+    'components/overview/HeartRateCard': {
+      hrPanelAria: 'Открыть детали пульса за полные 24 часа',
+      hrTitle: 'Недавний пульс',
+      hrWindow: (hours: number) =>
+        `Последние ${plural(hours, { one: `${hours} час`, few: `${hours} часа`, many: `${hours} часов`, other: `${hours} часа` })}`,
+      latest: 'Последний',
+      bpm: 'уд/мин',
+      hrChartAria: 'Кривая пульса за 24 часа',
+      hrZonesAria: 'Пульсовые зоны (абсолютные пороги)',
+      hrEmpty: 'Реальная динамика пульса появится здесь после синхронизации.',
+      hrMore: 'Полные 24 часа',
+      hrTooltip: (clock: string, value: number) => `${clock} <b>${value}</b> уд/мин`,
+      zoneRest: 'Покой 0–99',
+      zoneFat: 'Жиросжигание 100–139',
+      zoneAerobic: 'Аэробная 140–169',
+      zoneAnaerobic: 'Анаэробная 170+',
+    },
+
+    'components/overview/RecentCard': {
+      recentAria: 'Недавние записи',
+      recentTitle: 'Недавние записи',
+      recentSub: 'Сон, пробежки и силовые',
+      seeAll: 'Показать все',
+      recentEmpty: 'Записей пока нет. Сделайте синхронизацию — они появятся здесь.',
+      sleepRecordTitle: 'Сон',
+      sleepScore: (score: number) => `Оценка сна ${score}`,
+      avgHr: (value: number) => `средний пульс ${value}`,
+      timeUnknown: 'Время неизвестно',
+    },
+
+    'components/overview/SleepCard': {
+      sleepPanelAria: 'Открыть детали сна',
+      sleepTitle: 'Сон прошлой ночи',
+      sleepSub: 'Структура сна вкратце',
+      sleepBarAria: 'Доля фаз сна',
+      sleepEmpty: 'Сон прошлой ночи появится здесь после синхронизации.',
+      seeMore: 'Подробнее',
+      durationHours: (hours: number, minutes: number) => `${hours} ч ${minutes} мин`,
+      durationMinutes: (minutes: number) => `${minutes} мин`,
+    },
+
+    'components/overview/StepsCard': {
+      stepsPanelAria: 'Открыть детали дневной активности',
+      stepsTitle: 'Шаги сегодня',
+      stepsGoalReference: 'Ориентировочная цель',
+      stepsGoalToday: 'Цель на сегодня',
+      stepsUnit: 'шагов',
+      stepsGoalLine: (goal: string, percent: number) => `Цель ${goal} · ${percent}%`,
+      seeMore: 'Подробнее',
+    },
+
+    'components/overview/SourcesStrip': {
+      dataSources: 'Источники данных',
+      identifyingDevices: 'Определяются ваши устройства…',
+      identifyFailed: (reason: string) => `Определение устройств недоступно: ${reason}`,
+      noDevicesYet: 'Устройство ещё не определено.',
+      manage: 'Управление',
+      sourcesAria: 'Источники данных и состояние аккаунта',
+    },
+
+    'components/shell/AppTopBar': {
+      mainNav: 'Основная навигация',
+      brandHome: 'ZeppBridge 3 · Обзор',
+      connectionTitle: 'Состояние связи с облаком',
+      lastSyncPrefix: 'Последняя синхронизация: ',
+      notFetchedYet: 'Ещё не получено',
+      timeUnknown: 'Время неизвестно',
+      syncNow: 'Синхронизировать сейчас',
+      verifyFirst: 'Сначала подтвердите подключение',
+      syncing: 'Синхронизация…',
+      syncFailed: 'Синхронизация не удалась',
+      syncPartial: 'Синхронизировано частично',
+      cancel: 'Отмена',
+      themeTitle: 'Сменить тему',
+      themeLight: 'Светлая',
+      themeDark: 'Тёмная',
+      themeSystem: 'Как в системе',
+      localeLabel: 'Язык интерфейса',
+    },
+
+    'composables/useAiHandoff': {
+      clipboardUnsupported: 'В этой среде запись в буфер обмена недоступна',
+      targetNotAllowed: 'Этот адрес ИИ не входит в список разрешённых',
+      handoffFailed: 'Передача ИИ не удалась',
+      copiedButCannotOpen: (label: string) => `Скопировано, но открыть ${label} не удалось`,
+      nothingToRetry: 'Нет передачи ИИ, которую можно было бы повторить',
+    },
+
+    'composables/useAiTaskDraft': {
+      loadFailed: 'Не удалось прочитать задачу',
+      saveFailed: 'Не удалось сохранить задачу',
+      deleteFailed: 'Не удалось удалить задачу',
+      untitled: 'Задача без названия',
+    },
+
+    'composables/useAiTaskHandoff': {
+      prepareFailed: 'Не удалось подготовить файлы',
+      copyFailed: 'Не удалось скопировать промпт',
+      openFailed: 'Не удалось открыть сайт ИИ',
+      previewFailed: 'Не удалось построить предпросмотр',
+    },
+
+    'composables/useDevices': {
+      stateAccount: 'Известно из аккаунта',
+      stateUserAssigned: 'Модель указана вами',
+      stateRecentData: 'Есть свежие данные',
+      stateCached: 'Из кэша',
+      stateUnknown: 'Не определено',
+      notFetchedYet: 'Ещё не получено',
+      timeUnknown: 'Время неизвестно',
+      unidentifiedDevice: 'Неопознанное устройство',
+      notProvided: 'Нет данных',
+      identifyUnavailable: 'Определение устройств сейчас недоступно',
+      cacheUnavailable: 'Кэш устройств сейчас недоступен',
+      noLocalIdentifier: 'У этого устройства нет пригодного локального идентификатора — выбор сохранить нельзя.',
+      assignmentCleared: 'Выбор модели отозван — снова действует автоматическое совпадение.',
+      assignmentSaved: 'Ваш выбор модели записан. Он показывается как «Модель указана вами» и не выдаётся за автоматическое совпадение.',
+      assignmentContributed: (reportId: string) =>
+        `Ваш выбор модели записан, а номера модели отправлены ZeppBridge (отчёт ${reportId}). В следующем выпуске каталога эта модель будет распознаваться сама.`,
+      assignmentContributionFailed: (reason: string) =>
+        `Ваш выбор модели записан (только на этом устройстве). Отправить пополнение каталога не удалось: ${reason}`,
+      networkUnavailable: 'Сеть недоступна',
+      assignmentFailed: 'Не удалось сохранить выбор модели',
+    },
+
+    'composables/useExport': {
+      typeSteps: 'Шаги',
+      typeLifeEvents: 'Жизненные события',
+      groupContext: 'Контекст',
+      typeDailyActivity: 'Дневная активность',
+      typeWorkouts: 'Тренировки',
+      typeSleep: 'Сон',
+      typeHeartRate: 'Пульс',
+      typeSpo2: 'Кислород в крови',
+      typeStress: 'Стресс',
+      typeRespiratoryRate: 'Частота дыхания',
+      typeRecovery: 'Готовность',
+      typeTrainingLoad: 'Тренировочная нагрузка',
+      typeLactateThreshold: 'Лактатный порог',
+      typePai: 'Индекс PAI',
+      groupActivity: 'Активность',
+      groupSleep: 'Сон',
+      groupBody: 'Состояние тела',
+      groupTraining: 'Тренировка',
+      detailSummary: 'Сводка',
+      detailSummaryHint:
+        'Пульс агрегируется по часам, посекундные ряды тренировок опускаются; структурированные '
+        + 'метрики сохраняются полностью — объём подходит для передачи ИИ.',
+      detailFull: 'Полный',
+      detailFullHint:
+        'Сохраняет посекундные ряды тренировок и отдельные отсчёты пульса. Большой объём; предназначен '
+        + 'для архивации.',
+      scopeConflict: 'Диапазон дат и отдельная тренировка — взаимоисключающие области экспорта; выберите что-то одно.',
+      noDataTypes: 'Выберите хотя бы один тип данных.',
+      invalidDates: 'Выберите корректные даты начала и конца.',
+      endBeforeStart: 'Дата конца не может быть раньше даты начала.',
+      rangeTooLong: (days: number) =>
+        `Один экспорт охватывает не более ${plural(days, { one: `${days} дня`, few: `${days} дней`, many: `${days} дней`, other: `${days} дней` })}. Для более длинной истории используйте снимок базы данных в настройках.`,
+      nothingToExport: 'За этот период нет данных для экспорта.',
+      jsonTooLarge: 'JSON больше 1 МБ — используйте «Сохранить файл».',
+      copied: (count: number) =>
+        `Скопировано ${plural(count, { one: `${count} нормализованная запись`, few: `${count} нормализованные записи`, many: `${count} нормализованных записей`, other: `${count} нормализованные записи` })}.`,
+      copyFailed: 'Не удалось скопировать JSON',
+      saveJsonTitle: 'Сохранить JSON ZeppBridge',
+      saveCsvTitle: 'Сохранить CSV ZeppBridge (сводная таблица)',
+      saveGpxTitle: 'Сохранить GPX ZeppBridge (трек GPS)',
+      saveFitTitle: 'Выберите папку для экспорта FIT (по файлу на тренировку)',
+      jsonFilter: 'Файл JSON',
+      csvFilter: 'Таблица CSV',
+      gpxFilter: 'Трек GPX',
+      fitFilter: 'Файлы тренировок FIT',
+      unitRecords: 'записей',
+      unitRows: 'строк',
+      unitTrackPoints: 'точек трека',
+      unitSamplePoints: 'отсчётов',
+      saved: (count: number, unit: string) => `Сохранено: ${countedUnit(count, unit)}.`,
+      savedFiles: (files: number, count: number, unit: string) =>
+        `Сохранено ${plural(files, { one: `${files} файл FIT`, few: `${files} файла FIT`, many: `${files} файлов FIT`, other: `${files} файла FIT` })}, всего ${countedUnit(count, unit)}.`,
+      saveFailed: (format: string) => `Не удалось сохранить ${format}`,
+      feedUpdated: (count: number) =>
+        `Локальный источник данных для ИИ обновлён — ${plural(count, { one: `${count} запись`, few: `${count} записи`, many: `${count} записей`, other: `${count} записи` })}.`,
+      feedFailed: 'Не удалось обновить локальный источник данных для ИИ',
+    },
+
+    'composables/useSyncController': {
+      notSyncedYet: 'Ещё не синхронизировалось',
+      timeUnknown: 'Время неизвестно',
+      updatedWithLatest: (clock: string) => `Получены новые данные · последний пульс в ${clock}`,
+      updated: 'Получены новые данные',
+      noNewDataWithLatest: (clock: string) => `В облаке пока нет нового · последний пульс всё ещё в ${clock}`,
+      noNewData: 'Синхронизация завершена — в облаке ничего нового',
+      partialWithStreams: (streams: string) => `Часть потоков не синхронизировалась: ${streams}`,
+      partial: 'Синхронизация завершена, но часть потоков не удалась',
+      cancelled: 'Синхронизация отменена',
+      deferred: 'Идёт перестройка локальных производных данных — синхронизация повторится сама',
+      failed: 'Синхронизация не удалась; проверьте соединение и повторите',
+      lastCloudSync: (clock: string) => `Последняя облачная синхронизация ${clock}`,
+      cloudSyncClock: (clock: string) => `Облачная синхронизация ${clock}`,
+      cloudSyncClockUnknown: 'Облачная синхронизация —',
+      statusUnavailable: 'Состояние связи сейчас недоступно',
+      alreadySyncing: 'Синхронизация уже идёт — повторите, когда она завершится',
+      desktopOnly: 'Используйте настольное приложение',
+      reauthNeeded: 'Сессия Zepp истекла — подключитесь заново',
+      verifyFirst: 'Сначала подтвердите подключение',
+      connectFirst: 'Сначала подключите Zepp',
+      syncingRecent: (days: number) =>
+        `Синхронизируются последние ${plural(days, { one: `${days} день`, few: `${days} дня`, many: `${days} дней`, other: `${days} дня` })}…`,
+      backfilling: (days: number) =>
+        `Дозагружаются последние ${plural(days, { one: `${days} день`, few: `${days} дня`, many: `${days} дней`, other: `${days} дня` })}…`,
+      syncDidNotFinish: 'Облачная синхронизация не завершилась',
+      cancelling: 'Синхронизация отменяется…',
+      cancelFailed: 'Не удалось отменить синхронизацию',
+      streamSeparator: ', ',
+      syncingStream: (stream: string) => `Синхронизируется ${stream.toLowerCase()}`,
+      backfillingStream: (stream: string, month: string) => `Дозагружается ${stream.toLowerCase()} · ${month}`,
+    },
+
+    'lib/aiTask/copy': {
+      'ui.ai_task.cat.workout': 'Тренировки',
+      'ui.ai_task.cat.sleep': 'Сон',
+      'ui.ai_task.cat.recovery': 'Готовность',
+      'ui.ai_task.cat.heart_rate': 'Пульс',
+      'ui.ai_task.cat.training': 'Тренировочная нагрузка',
+      'ui.ai_task.cat.body': 'Состояние тела',
+      'ui.ai_task.cat.personal_note': 'Личная заметка',
+      'ui.ai_task.cat.attachment': 'Вложения',
+      'ui.ai_task.prompt.coverage_note':
+        'Приведённое ниже покрытие измерено ZeppBridge на этом устройстве. Дни без данных честно помечены '
+        + 'как отсутствующие — не додумывайте и не выдумывайте их.',
+      'ui.ai_task.blocked.attachment_missing':
+        'Оригинал одного из вложений больше не находится. Выберите файл заново или явно уберите эту ссылку.',
+      'ui.ai_task.blocked.no_workouts': 'К задаче ещё не привязана ни одна тренировка. Вернитесь и выберите хотя бы одну.',
+      'ui.ai_task.blocked.empty': 'Текущий выбор не покрывает никаких данных. Сначала скорректируйте категории или тренировки.',
+      'ui.ai_task.warn.attachment_changed': 'Размер вложения отличается от момента добавления — перед передачей убедитесь, что это тот же файл.',
+      'ui.ai_task.warn.category_missing': 'В выбранном окне у этой категории нет данных; экспорт честно пометит её как отсутствующую.',
+      'ui.ai_task.warn.partial_coverage': 'Данные есть лишь за часть окна. Подробности покрытия — в таблице ниже.',
+      'ui.ai_task.unknown': 'Нераспознанное пояснение состояния',
+      'ui.ai_task.attach.no_redaction':
+        'Оригиналы передаются по ссылке как есть и не обезличиваются. Подтвердите, что готовы сами '
+        + 'приложить этот файл к выбранному ИИ.',
+      'ui.ai_template.recovery_run.name': 'Восстановительная пробежка',
+      'ui.ai_template.recovery_run.prompt':
+        'Это была тренировка в восстановительной фазе. С учётом сна, готовности и фона пульса за две '
+        + 'недели до неё оцените, соответствовала ли интенсивность моему уровню восстановления, и '
+        + 'предложите тренировки на ближайшие 48 часов.',
+      'ui.ai_template.long_run_compare.name': 'Сравнение длинных пробежек',
+      'ui.ai_template.long_run_compare.prompt':
+        'Сравните эти длинные пробежки: дрейф темпа и пульса, субъективные ощущения и контекст '
+        + 'восстановления. Какая сессия была самой эффективной по нагрузке и как задать интенсивность '
+        + 'следующей?',
+      'ui.ai_template.hr_drift.name': 'Дрейф пульса',
+      'ui.ai_template.hr_drift.prompt':
+        'Проанализируйте дрейф пульса в этой тренировке: рост пульса при постоянном темпе на фоне двух '
+        + 'недель сна и тренировочной нагрузки — усталость, погода или изменение формы?',
+      fallbackIssue: 'Одно из пояснений состояния распознать не удалось',
+    },
+
+    'lib/bridge/errors': {
+      desktopOnly: 'Используйте настольное приложение',
+      genericFailure: 'Не получилось. Повторите через мгновение',
+      timedOut: 'Запрос превысил время ожидания. Проверьте сеть и регион Zepp, затем повторите.',
+    },
+
+    'lib/dateTime': {
+      time: 'Формат времени',
+      date: 'Формат даты',
+      regional: 'Как в системе',
+      '12h': '12-часовой',
+      '24h': '24-часовой',
+      ymd: 'Год/месяц/день',
+      dmy: 'День/месяц/год',
+      mdy: 'Месяц/день/год',
+    },
+
+    'lib/deviceCopy': {
+      introNoDevice:
+        'Локально в первую очередь, с сохранением источников: ваши записи с носимых устройств, собранные '
+        + 'в понятный и пригодный архив здоровья.',
+      introOne: (name: string) =>
+        `Локально в первую очередь, с сохранением источников: записи ${name}, собранные в понятный и пригодный архив здоровья.`,
+      introTwo: (first: string, second: string) =>
+        `Локально в первую очередь, с сохранением источников: записи ${first} и ${second}, собранные в понятный и пригодный архив здоровья.`,
+      introMany: (first: string, second: string, count: number) =>
+        `Локально в первую очередь, с сохранением источников: записи ${first}, ${second} и других устройств (всего ${count}), собранные в понятный и пригодный архив здоровья.`,
+      notProvided: 'Нет данных',
+    },
+
+    'lib/failedChunkText': {
+      noCanonical: 'Облако вернуло пакет, но пригодных записей из него разобрать не удалось',
+      noReason: 'Причина не записана',
+    },
+
+    'lib/format': {
+      noUpdates: 'Обновлений пока нет',
+      noRecords: 'Записей пока нет',
+      timeUnknown: 'Время неизвестно',
+      dateUnknown: 'Дата неизвестна',
+      durationUnknown: 'Длительность неизвестна',
+      notRecorded: 'Не записано',
+      duration: (hours: number, minutes: number) =>
+        (hours > 0 ? `${hours} ч ${minutes} мин` : `${minutes} мин`),
+    },
+
+    'lib/labels': {
+      unknownWithCode: (code: string) => `Неопознанная тренировка (код ${code})`,
+      unknownWorkout: 'Неопознанная тренировка',
+      workout: 'Тренировка',
+      fallback: {
+        run: 'Бег на улице',
+        running: 'Бег',
+        walking: 'Ходьба',
+        walk: 'Прогулка',
+        ride: 'Велосипед на улице',
+        cycling: 'Велосипед на улице',
+        indoor_cycling: 'Велосипед в помещении',
+        swimming: 'Плавание',
+        treadmill: 'Беговая дорожка',
+        indoor_run: 'Бег в помещении',
+        trail: 'Трейл-раннинг',
+        hiking: 'Пеший поход',
+        strength: 'Силовая тренировка',
+        elliptical: 'Эллиптический тренажёр',
+        rowing: 'Гребля',
+        yoga: 'Йога',
+        climb: 'Скалолазание',
+        badminton: 'Бадминтон',
+        activity: 'Активность',
+        unknown: 'Неопознанная тренировка',
+      },
+      providerZeppCloud: 'Облако Zepp',
+      scopeUserFused: 'Слияние по аккаунту',
+      scopeDevice: 'Одно устройство',
+      scopeMixed: 'Несколько источников',
+      scopeUnknown: 'Охват не подтверждён',
+    },
+
+    'lib/lifeEvents': {
+      title: 'Жизненные события',
+      intro: 'Отмечайте, что происходило в это время, — чтобы у данных здоровья был контекст.',
+      add: 'Добавить событие',
+      edit: 'Изменить событие',
+      empty: 'Жизненных событий пока нет. Начните с простуды, поездки или изменения в тренировках.',
+      name: 'Название',
+      category: 'Категория',
+      start: 'Дата начала',
+      end: 'Дата конца',
+      ongoing: 'Ещё идёт',
+      notes: 'Заметки (необязательно)',
+      placeholder: 'Например: простуда, тренировки на паузе пару дней',
+      save: 'Сохранить',
+      cancel: 'Отмена',
+      remove: 'Удалить',
+      deleteTitle: 'Удалить это событие?',
+      deleteHint: 'Заметка будет убрана из локальной базы.',
+      invalid: 'Введите название и корректные даты — дата конца не может быть раньше даты начала.',
+      failed: 'Действие не выполнено. Повторите.',
+      saved: 'Событие сохранено.',
+      deleted: 'Событие удалено.',
+      loading: 'Загружаются события…',
+      retry: 'Повторить',
+      all: 'Все',
+      active: 'Идущие',
+      search: 'Поиск событий',
+      noMatch: 'Подходящих событий нет.',
+      previous: 'Назад',
+      next: 'Вперёд',
+      manage: 'Управление событиями',
+      related: 'Связанные события',
+      local: 'Хранится локально и входит в резервные копии базы. При передаче данных ИИ события можно включить.',
+      categories: {
+        health: 'Здоровье и восстановление',
+        travel: 'Поездки и командировки',
+        routine: 'Режим и быт',
+        training: 'Тренировки и старты',
+        other: 'Прочее',
+      },
+    },
+
+    'lib/metricSeries': {
+      noRecordsToShow: 'Нет записей для показа',
+      noRecordsInWindow: (days: number) =>
+        `Нет записей за последние ${plural(days, { one: `${days} день`, few: `${days} дня`, many: `${days} дней`, other: `${days} дня` })}`,
+      coverage: (days: number, withData: number) =>
+        `Записи есть за ${withData} из ${plural(days, { one: `${days} дня`, few: `${days} дней`, many: `${days} дней`, other: `${days} дней` })}`,
+      dayRange: (low: string, high: string, unit: string) => `В тот день: ${low}–${high}${unit}`,
+      samples: (count: number) =>
+        plural(count, { one: `${count} отсчёт`, few: `${count} отсчёта`, many: `${count} отсчётов`, other: `${count} отсчёта` }),
+    },
+
+    'lib/rangeOptions': {
+      d7: '7 дней',
+      d30: '1 месяц',
+      d90: '3 месяца',
+      d180: '6 месяцев',
+      d365: '1 год',
+    },
+
+    'lib/sleepStages': {
+      deep: 'Глубокий',
+      light: 'Лёгкий',
+      rem: 'REM',
+      awake: 'Бодрствование',
+      unknown: 'Неизвестно',
+    },
+
+    'lib/storageEstimateText': {
+      stopNoSpace: (needed: string, free: string) =>
+        `Для этой дозагрузки нужно примерно ${needed} (с запасом), а свободно только ${free}, поэтому она не начнётся. Освободите место или сократите диапазон.`,
+      diskUnknown: 'Не удалось прочитать свободное место на диске. Перед дозагрузкой убедитесь, что места достаточно.',
+      diskTooSmall: 'Свободно меньше 300 МБ — историю длиннее 90 дней дозагрузить нельзя.',
+      builtinGuess: (days: number, add: string, free: string) =>
+        `Локальных замеров пока мало, поэтому это грубая встроенная оценка: ${plural(days, { one: `за ${days} день`, few: `за ${days} дня`, many: `за ${days} дней`, other: `за ${days} дня` })} накопится примерно ${add}; на диске свободно ${free}.`,
+      measured: (days: number, add: string, free: string) =>
+        `По фактической скорости накопления ваших данных ${plural(days, { one: `за ${days} день`, few: `за ${days} дня`, many: `за ${days} дней`, other: `за ${days} дня` })} накопится примерно ${add}; на диске свободно ${free}.`,
+      partial: (days: number, add: string, free: string) =>
+        `По потокам с достаточным числом локальных замеров ${plural(days, { one: `за ${days} день`, few: `за ${days} дня`, many: `за ${days} дней`, other: `за ${days} дня` })} накопится примерно ${add} (остальные потоки не учтены); на диске свободно ${free}.`,
+      unknownEstimate: 'Оценить размер этой дозагрузки сейчас нельзя.',
+    },
+
+    'lib/syncStreams': {
+      heart_rate: 'Пульс',
+      daily_summary: 'Дневные сводки',
+      sleep: 'Сон',
+      hrv: 'Вариабельность пульса',
+      wellness: 'Стресс, SpO2 и прочие дополнительные метрики',
+      workouts: 'Тренировки',
+      workout_detail: 'Детали и треки тренировок',
+      weight: 'Вес и состав тела',
+      vo2max: 'МПК (VO₂max)',
+      lactate_threshold_hr: 'Пульс лактатного порога',
+      lactate_threshold_pace: 'Темп лактатного порога',
+      resting_heart_rate: 'Пульс покоя',
+      training_load: 'Тренировочная нагрузка',
+      blood_oxygen: 'Кислород в крови',
+      breathing_rate: 'Частота дыхания',
+      skin_temperature: 'Температура кожи',
+    },
+
+    'lib/units': {
+      big: 'км',
+      short: 'м',
+      bigImperial: 'миль',
+      shortImperial: 'фт',
+    },
+
+    'services/updateService': {
+      nothingToInstall: 'Устанавливать нечего — обновления нет. Проверьте ещё раз.',
+    },
+
+    'views/ActivityDetail': {
+      backToOverview: 'Назад к обзору',
+      eyebrow: 'Дневная активность',
+      title: 'Дневная активность',
+      intro:
+        'Динамика шагов, дистанции, активного расхода и минут активности по дням. Сравнение только с '
+        + 'вашими же прошлыми записями; дни без данных остаются пустыми и нулём не заполняются.',
+      rangeAria: 'Временной диапазон',
+      desktopOnly: 'Используйте настольное приложение. Этот предпросмотр в браузере не читает данные аккаунта.',
+      loadFailed: 'Данные об активности сейчас недоступны',
+      retry: 'Повторить',
+      loadingAria: 'Загружается дневная активность',
+      noneInRange: 'В этом диапазоне записей активности нет. Попробуйте диапазон подлиннее или сначала синхронизируйтесь.',
+      emptyCard: 'В этом диапазоне нет записей.',
+      stepsLabel: 'Шаги',
+      stepsHint: 'Дневной итог шагов по данным часов',
+      stepsUnit: 'шагов',
+      distanceLabel: 'Дистанция',
+      distanceHint: 'Пройденное за день расстояние',
+      distanceUnit: 'м',
+      caloriesLabel: 'Активный расход',
+      caloriesHint: 'Только активность, без базового метаболизма',
+      caloriesUnit: 'ккал',
+      minutesLabel: 'Минуты активности',
+      minutesHint: 'Минуты, которые часы засчитали как активные',
+      minutesUnit: 'мин',
+    },
+
+    'views/AiComposer': {
+      pageTitle: 'Передать ИИ',
+      pageIntro: 'Соберите задачу анализа из локальных данных здоровья, а затем сами отправьте её ИИ.',
+      savedTasks: 'Сохранённые задачи',
+      newTask: 'Новая задача',
+      taskTitle: 'Название задачи',
+      taskTitlePlaceholder: 'Назовите этот анализ',
+      workoutsTitle: 'Связанные тренировки',
+      workoutsEmpty: 'На этом устройстве пока нет тренировок',
+      templateTitle: 'Шаблон',
+      noTemplate: 'Без шаблона',
+      categoriesTitle: 'Содержимое анализа',
+      categoriesEmpty: 'Перетащите или щёлкните категории, чтобы включить их в анализ',
+      promptTitle: 'Ваш вопрос',
+      promptPlaceholder: 'Что должен разобрать ИИ? Например: была ли у восстановительной пробежки правильная интенсивность?',
+      promptCounter: (used: number, max: number) => `${used}/${max}`,
+      attachTitle: 'Оригиналы вложений',
+      attachAdd: 'Добавить файлы',
+      attachPickerTitle: 'Выберите файлы-оригиналы для ссылки',
+      attachFilterName: 'PDF и изображения',
+      attachSkipped: (count: number) =>
+        `Пропущено ${plural(count, { one: `${count} файл`, few: `${count} файла`, many: `${count} файлов`, other: `${count} файла` })} — неподдерживаемый тип`,
+      attachPickFailed: 'Файлы не добавились',
+      attachEmpty: 'Вложений пока нет. Оригиналы передаются по ссылке как есть — не копируются и не обезличиваются.',
+      optionsTitle: 'Параметры',
+      preciseGps: 'Точный трек (координаты GPS)',
+      preciseGpsHint: 'По умолчанию выключено. Когда включено, экспортированные треки сохраняют сырые координаты.',
+      detailLevel: 'Уровень детализации',
+      detailSummary: 'Сводка',
+      detailStandard: 'Стандартный',
+      detailDetailed: 'Подробный (включая поточечные ряды)',
+      mcpShared: 'Доступно MCP в рамках задачи',
+      mcpSharedHint: 'Локальный инструмент MCP может запрашивать только то, что покрывает эта задача.',
+      saveTask: 'Сохранить задачу',
+      savedOk: 'Сохранено',
+      previewHandoff: 'Предпросмотр передачи',
+      undoAction: 'Отменить',
+      resetView: 'Сбросить вид',
+      zoomIn: 'Приблизить',
+      zoomOut: 'Отдалить',
+      cardFallback: 'Список категорий (запасной вход)',
+      cardJoin: 'Включить',
+      cardLeave: 'Убрать',
+      daysBefore: 'Дней назад',
+      daysOption: (days: number) =>
+        plural(days, { one: `${days} день`, few: `${days} дня`, many: `${days} дней`, other: `${days} дня` }),
+      includeWorkoutDay: 'Включить день тренировки',
+      windowPreview: 'Окно для каждой тренировки',
+      noteEditor: 'Личная заметка',
+      notePlaceholder: 'Контекст для ИИ: травмы, цели, недавняя форма. Уезжает вместе с данными.',
+      attachPanelHint: 'Добавьте или уберите оригиналы вложений.',
+      panelClose: 'Закрыть',
+      desktopOnly: 'Подключите настольный бэкенд, чтобы сохранять и просматривать',
+      removeAttachment: 'Убрать',
+      generalWindow: 'Общее окно',
+      eachWorkoutWindow: 'Свой период для каждой тренировки',
+    },
+
+    'views/AiHandoffPreview': {
+      pageTitle: 'Предпросмотр передачи',
+      backToCompose: 'Назад к редактированию',
+      refreshPreview: 'Обновить предпросмотр',
+      coverageTitle: 'Покрытие данных',
+      coverageEmpty: 'Текущий выбор не покрывает ни одной категории',
+      colCategory: 'Категория',
+      colWorkout: 'Тренировка',
+      colWindow: 'Окно',
+      colCoverage: 'Покрытие',
+      colSources: 'Источники',
+      colUnits: 'Единицы',
+      colState: 'Состояние',
+      coverageCount: (withData: number, inRange: number) => `${withData}/${inRange} дн.`,
+      stateMissing: 'Нет',
+      stateOk: 'Есть данные',
+      globalWindow: 'Все записи',
+      attachTitle: 'Оригиналы вложений',
+      attachMissingTitle: 'С вложениями нужно разобраться',
+      attachMissingBody:
+        'Эти оригиналы на устройстве больше не находятся. Выберите файл заново или уберите ссылку — '
+        + 'передача с пропавшими файлами не продолжится молча.',
+      attachChangedBody: 'У этих оригиналов изменился размер. Убедитесь, что это тот же файл, или выберите заново.',
+      attachReselect: 'Выбрать заново',
+      attachRemove: 'Убрать',
+      attachPickerTitle: 'Выберите файл-оригинал заново',
+      attachFilterName: 'PDF и изображения',
+      attachStatusOk: 'На месте',
+      attachStatusMissing: 'Не найден',
+      attachStatusChanged: 'Изменён',
+      attachManualNote: 'Эти файлы никогда не выгружаются. После подготовки добавьте их в диалог с ИИ сами.',
+      gpsTitle: 'Точный трек',
+      gpsOff: 'Координаты GPS не включены (по умолчанию)',
+      gpsOn: 'Будут включены сырые координаты GPS',
+      promptTitle: 'Промпт',
+      promptHint: 'Здесь его ещё можно поправить — копируется именно этот текст.',
+      promptCounter: (used: number, max: number) => `${used}/${max}`,
+      providerTitle: 'Кому передать',
+      stepsTitle: 'Шаги передачи',
+      stepPrepare: 'Подготовить файлы',
+      stepCopy: 'Скопировать промпт',
+      stepAttach: 'Добавить вложения вручную',
+      stepIdle: 'Не начат',
+      stepDoing: 'В работе',
+      stepDone: 'Готово',
+      stepFailed: 'Неудача',
+      stepBlocked: 'Заблокирован',
+      stepWaiting: 'Ждёт вашего подтверждения',
+      retry: 'Повторить',
+      attachConfirm: 'Я добавил вложения в диалог с ИИ',
+      attachConfirmDone: 'Добавление подтверждено',
+      openOutcomeOpened: (label: string) => `${label} открыт в браузере — ничего ещё не отправлено`,
+      openOutcomeSkipped: 'Веб-предпросмотр не может открыть браузер за вас; файлы и промпт готовы',
+      openOutcomeFailed: 'Браузер не открылся — можно повторить',
+      outputTitle: 'Созданные файлы',
+      outputDir: 'Папка вывода',
+      outputSize: 'Размер',
+      ctaMain: (label: string) => `Подготовить файлы и открыть ${label}`,
+      ctaExportOnly: 'Только экспортировать файлы',
+      ctaHonestNote: 'Открыть сайт — ещё не отправить: файлы остаются на вашем устройстве; что передать, вы решаете на странице ИИ.',
+      staleNotice: 'Черновик менялся после подготовки — перечисленные ниже файлы устарели. Подготовьте заново перед передачей.',
+      reprepare: 'Подготовить заново',
+      previewLoadingText: 'Измеряется покрытие…',
+      previewFailedTitle: 'Не удалось построить предпросмотр',
+      desktopOnly: 'Подключите настольный бэкенд, чтобы подготавливать файлы передачи',
+      unsavedNote: 'Это несохранённый черновик — предпросмотр работает и так; сохраните, чтобы он остался в списке задач.',
+      taskUntitled: 'Задача без названия',
+      estimatedSize: 'Ожидаемый размер экспорта',
+    },
+
+    'views/BodyStatus': {
+      backToOverview: 'Назад к обзору',
+      eyebrow: 'Состояние тела',
+      title: 'Состояние тела',
+      intro:
+        'Локальные тренды готовности, стресса, кислорода в крови, ВСР, частоты дыхания, пульса покоя, '
+        + 'состава тела и приёма пищи. Всё читается из синхронизированных записей.',
+      rangeAria: 'Временной диапазон',
+      trendRangeLabel: 'Диапазон тренда',
+      desktopOnly: 'Используйте настольное приложение. Этот предпросмотр в браузере не читает данные аккаунта.',
+      loadFailed: 'Данные о состоянии тела сейчас недоступны',
+      retry: 'Повторить',
+      loadingAria: 'Загружается состояние тела',
+      noneInRange: 'В этом диапазоне записей состояния тела нет. Попробуйте диапазон подлиннее или сначала синхронизируйтесь.',
+      emptyCard: 'В этом диапазоне нет записей.',
+      readinessLabel: 'Готовность',
+      readinessHint: 'Часы сводят сон, ВСР и пульс покоя в один балл',
+      stressLabel: 'Стресс',
+      stressHint: 'Среднее за весь день; полоса — измеренный в тот день диапазон',
+      curveCardAria: 'Стресс за 24 часа',
+      curveTitle: 'Стресс за последние 24 часа',
+      curveSub: 'Часы измеряют раз в пять минут; отдельные отсчёты по времени',
+      curveChartAria: 'Стресс за последние 24 часа',
+      curveNoSamples:
+        'За последние 24 часа отсчётов стресса нет — кривую рисовать нечего. Так выглядит снятые '
+        + 'часы или выключенный круглосуточный мониторинг.',
+      curveNote:
+        'Полосы (расслаблен 1–39, норма 40–59, средний 60–79, высокий 80–100) — собственная шкала Zepp, '
+        + 'не наша. Время без отсчётов остаётся пустым и нулём не заполняется.',
+      statLatest: 'Последний',
+      statAverage: 'Средний',
+      statLowest: 'Мин',
+      statHighest: 'Макс',
+      stressTooltip: (clock: string, value: number) => `${clock} <b>${value}</b>`,
+      spo2Label: 'Кислород в крови',
+      spo2Hint: 'Отдельные отсчёты SpO2, усреднённые по дням; полоса — измеренный в тот день диапазон',
+      spo2Empty: 'В этом диапазоне отдельных отсчётов SpO2 нет.',
+      odiLabel: 'Ночной ODI по SpO2',
+      odiHint: 'Десатураций в час; чем меньше, тем лучше',
+      hrvHint: 'Вариабельность пульса; отдельные замеры усреднены по дням',
+      rmssdHint: 'Ночная высокочастотная вариабельность, усреднённая по дням',
+      respiratoryLabel: 'Частота дыхания',
+      respiratoryHint: 'Частота дыхания во сне; полоса — измеренный в тот день диапазон',
+      restingLabel: 'Пульс покоя',
+      restingHint: 'Пульс покоя, как его считает ZeppBridge по дням',
+      unitScore: 'баллов',
+      unitPerHour: '/час',
+      unitBreathsPerMinute: 'вдохов/мин',
+      weightLabel: 'Вес',
+      weightHint: 'Каждое взвешивание, усреднённое по дням; полоса — измеренный в тот день диапазон',
+      bmiLabel: 'ИМТ',
+      bmiHint: 'Индекс массы тела, приходит из облака вместе с весом',
+      fatLabel: 'Доля жира',
+      fatHint: 'Нужны весы с анализом состава тела. У часов и ручного веса этого показателя нет',
+      muscleLabel: 'Мышечная масса',
+      muscleHint: 'Нужны весы с анализом состава тела',
+      waterLabel: 'Доля воды',
+      waterHint: 'Нужны весы с анализом состава тела',
+      boneLabel: 'Костная масса',
+      boneHint: 'Нужны весы с анализом состава тела',
+      visceralLabel: 'Висцеральный жир',
+      visceralHint: 'Оценка, а не процент. Шкала Zepp — от 1 до 30',
+      bmrLabel: 'Базовый метаболизм',
+      bmrHint: 'Нужны весы с анализом состава тела',
+      heightLabel: 'Рост',
+      heightHint: 'Значение из профиля, приходит с каждым взвешиванием, — не замер этого дня',
+      unitGrade: 'уровень',
+      unitKcalPerDay: 'ккал/день',
+      scaleEmpty: 'В этом диапазоне взвешиваний нет. Показания весов появятся здесь после синхронизации.',
+      bodyGroupTitle: 'Вес и состав тела',
+      bodyGroupEmpty:
+        'В этом диапазоне записей веса или состава тела нет. Показатели состава появляются только '
+        + 'с весами-анализаторами; у часов и ручного веса их нет.',
+      intakeGroupTitle: 'Приём пищи',
+      intakeGroupEmpty:
+        'В этом диапазоне записей питания нет. Приёмы пищи вносятся вручную в Zepp App; после записи '
+        + 'они появятся здесь при синхронизации.',
+      intakeCaloriesLabel: 'Съеденные калории',
+      intakeCaloriesHint: 'Всего записано за день. Дни без записей не рисуют столбик и нулём не заполняются',
+      proteinLabel: 'Белок',
+      fatIntakeLabel: 'Жиры',
+      carbsLabel: 'Углеводы',
+      macroHint: 'Всего записано за день',
+      unitKcal: 'ккал',
+      unitGram: 'г',
+      macroTitle: 'Баланс рациона',
+      macroSub: 'Доля калорий от каждого из трёх макронутриентов за этот диапазон',
+      macroNote:
+        'Доли вычисляются здесь из дневных граммов по схеме 4/9/4 ккал на грамм (белок / жиры / '
+        + 'углеводы). Облако их не присылает, и от процентов в Zepp App они могут отличаться на '
+        + 'пункт-два. Если не хватает хотя бы одного из трёх — ничего не рисуется.',
+      gramsPerDay: (grams: number) => `в среднем ${grams} г в день`,
+    },
+
+    'views/DeviceDetail': {
+      backToSettings: 'Назад к настройкам',
+      notFoundTitle: 'Этого устройства здесь нет',
+      notFoundMessage: 'Возможно, оно удалено из аккаунта, или это устройство его ещё не опознало.',
+      reidentify: 'Определить устройства заново',
+      factsAria: 'Информация об устройстве',
+      factOrigin: 'Откуда взялась модель',
+      factFirmware: 'Прошивка',
+      factLastData: 'Свежие данные',
+      factHasLocal: 'Есть ли локальные данные',
+      factDeviceId: 'ID устройства',
+      hasLocalYes: 'Да',
+      hasLocalNo: 'Пока нет',
+      factsNote:
+        'ID устройства используется только на этом устройстве; на экране видны лишь его последние '
+        + 'четыре знака, и он никогда не попадает в экспорт или отчёт об ошибке.',
+      assignAria: 'Определение модели',
+      assignTitle: 'Определено верно?',
+      assignSub:
+        'Если совпадение неверно — скажем, на самом деле это Balance 2, а здесь указано другое, — '
+        + 'правильную модель можно указать самому. Ваш выбор хранится на этом устройстве, показывается '
+        + 'как «Модель указана вами» и не выдаёт себя за автоматическое совпадение; отозвать его можно '
+        + 'в любой момент.',
+      changeModel: 'Выбрать другую',
+      pickModel: 'Не так — укажу сам',
+      clearAssignment: 'Отозвать выбор и вернуть автоматическое',
+      noLocalIdentifier: 'У этого устройства нет пригодного локального идентификатора — выбор сохранить нельзя.',
+      originUnknown: 'Неизвестно',
+      originUserAssigned: 'Вы указали её в прошлый раз',
+      originExact: 'Точное совпадение во встроенном каталоге',
+      originAlias: 'Совпадение по псевдониму во встроенном каталоге',
+      originNoMatchCloud: 'Совпадений нет (облако не дало распознаваемого названия продукта)',
+      originCatalog: 'Совпадение во встроенном каталоге',
+      originNoMatch: 'Совпадений нет',
+    },
+
+    'views/HealthCheck': {
+      window30: 'Последние 30 дней',
+      window90: 'Последние 90 дней',
+      window365: 'Последний год',
+      loadFailed: 'Не удалось прочитать состояние данных',
+      retry: 'Повторить',
+      noRecords: 'Записей пока нет',
+      timeUnknown: 'Время неизвестно',
+      notProvided: 'Нет данных',
+      backToSettings: 'Назад к настройкам',
+      eyebrow: 'Здоровье данных',
+      title: 'Проверка здоровья данных',
+      intro:
+        'Для каждого потока данных: как далеко он дошёл по стадиям получения из облака, разбора и '
+        + 'локальной записи; какие даты покрыты; и откуда данные пришли. Отсутствует — значит отсутствует, '
+        + 'нулём не подбивается.',
+      rangeAria: 'Окно покрытия',
+      loadingAria: 'Читается состояние данных',
+      replayInProgress:
+        'Локальные пакеты переигрываются новым парсером. Облачные синхронизации в это время '
+        + 'уступают дорогу и повторяются сами — это не сбой.',
+      timingsTitle: 'Три разных «последних раза»',
+      timingCloud: 'Последнее получение из облака',
+      timingCloudNote: 'Результата ещё нет',
+      timingReplay: 'Последняя локальная переигровка',
+      timingReplayNote: 'Перечитывает локальные пакеты текущим парсером. Сеть не трогается и время выше не переписывается.',
+      timingManual: 'Последний ручной переразбор',
+      timingManualNote: 'Тот, который вы нажимали сами',
+      timingNewest: 'Новейший отсчёт здоровья',
+      timingNewestNote: 'Когда сама эта запись произошла на часах',
+      dbTitle: 'Локальная база данных',
+      dbSize: 'Размер файла',
+      dbRaw: 'Сырые пакеты',
+      dbCanonical: 'Нормализованные записи',
+      dbPending: 'Ждут нормализации',
+      dbSchema: 'Версия схемы',
+      dbNormalizer: 'Ревизия парсера',
+      integrityPassed: 'пройдена',
+      integrityFailed: (detail: string) => `не пройдена (${detail})`,
+      integrityDetailBelow: 'подробности ниже',
+      integrityLine: (verdict: string, checkedAt: string) => `Проверка целостности: ${verdict} · ${checkedAt}`,
+      integrityNeverRun:
+        'Проверка целостности ещё не запускалась. Она сканирует всю базу — на большой это занимает '
+        + 'время, поэтому выполняется только по вашему запросу.',
+      streamsTitle: 'До какой стадии дошёл каждый поток',
+      streamsNote:
+        'Получение, разбор и запись — три вещи, которые сбоят по отдельности. Сложи их в одну красную '
+        + 'точку — и не понять, повторять ли, переподключаться ли, или у этого аккаунта просто нет '
+        + 'такого потока.',
+      stageFetch: 'Получение',
+      stageParse: 'Разбор',
+      stageWrite: 'Запись',
+      stageLine: (stage: string, state: string) => `${stage}: ${state}`,
+      factRaw: 'Сырые пакеты',
+      factCanonical: 'Нормализованные записи',
+      factSources: 'Источники',
+      factObservedDays: 'Наблюдавшиеся дни',
+      days: (count: number) =>
+        plural(count, { one: `${count} день`, few: `${count} дня`, many: `${count} дней`, other: `${count} дня` }),
+      gapExamples: (dates: string) => `Примеры пропусков: ${dates}`,
+      gapMore: ' и др.',
+      period: '.',
+      latestObserved: (date: string) => `Последний раз ${date}.`,
+      noRecordsYet: 'Записей пока нет',
+      sourceSeparator: ', ',
+      occasionalTitle: 'Метрики, которые приходят лишь иногда',
+      occasionalNote:
+        'Метрики вроде МПК и лактатного порога часы по замыслу выдают не каждый день. Здесь сообщаются '
+        + 'наблюдавшиеся дни и последний из них, без подсчёта дневных пропусков — красить нормальную '
+        + 'редкость в красный было бы введением в заблуждение.',
+      occasionalLine: (records: string, days: number) =>
+        `${records} · наблюдалось в течение ${plural(days, { one: `${days} дня`, few: `${days} дней`, many: `${days} дней`, other: `${days} дней` })}`,
+      occasionalLatest: (date: string) => `последний раз ${date}`,
+      occasionalNone: 'В этом диапазоне не наблюдалось',
+      actionsTitle: 'Что можно сделать',
+      actionRunning: 'Выполняется…',
+      actionRun: 'Выполнить',
+      confirmDestructive: (label: string, reason: string) => `${label}: ${reason}\nПродолжить?`,
+      actionSynced: 'Синхронизация выполнена, состояние обновлено.',
+      actionReplayed: (count: string) =>
+        `Локальные пакеты переиграны текущим парсером (${count} производных записей). Время облачной синхронизации не переписано.`,
+      actionIntegrityOk: 'База прошла проверку целостности.',
+      actionIntegrityFailed: (detail: string) => `База не прошла проверку целостности: ${detail}`,
+      actionIntegrityFallback: 'Сделайте резервную копию папки данных и синхронизируйтесь заново',
+      actionFolderOpened: 'Папка данных открыта.',
+      actionReconnect: 'Откройте настройки и подключите аккаунт Zepp заново.',
+      actionFailed: (label: string) => `Не удалось: ${label}`,
+      coveragePerEvent: 'Создаётся по событию: нет записи — значит, тогда ничего не происходило, а не пропуск.',
+      coverageOccasional: 'Часы сообщают это лишь изредка; пустые дни — норма, ничего не потеряно.',
+      coverageNoData: 'За этот период локальных данных ещё нет — сначала сделайте синхронизацию.',
+      coverageNoGaps: 'С первого дня с данными пропусков не наблюдалось.',
+      coverageGaps: (days: number) =>
+        `С первого дня с данными не наблюдалось данных ${plural(days, { one: `${days} день`, few: `${days} дня`, many: `${days} дней`, other: `${days} дня` })}. Пропуски дают снятые часы, пропущенная синхронизация или молчание облака.`,
+      action: {
+        reauth: {
+          label: 'Подключить аккаунт Zepp заново',
+          reason: 'Часть потоков не может получать данные — срок действия учётных данных истёк.',
+        },
+        reprocess: {
+          label: 'Переиграть локальные пакеты текущим парсером',
+          reason: 'Перечитывает сохранённые локальные пакеты текущим парсером.',
+        },
+        sync_retry: {
+          label: 'Синхронизировать ещё раз',
+          reason: 'В прошлый раз часть потоков не смогла получить данные из облака.',
+        },
+        sync_first: {
+          label: 'Сделать первую синхронизацию',
+          reason: 'На этом устройстве ещё нет ни одной успешной облачной синхронизации.',
+        },
+        integrity_check: {
+          label: 'Проверить целостность базы',
+          reason: 'Один SQLite integrity_check по всей базе; на большой занимает время.',
+        },
+        open_data_folder: {
+          label: 'Открыть папку данных',
+          reason: 'Локальная база, резервные копии и экспорты живут здесь.',
+        },
+      },
+      reprocessReason: (pending: number) =>
+        `${plural(pending, { one: `${pending} сохранённый пакет`, few: `${pending} сохранённых пакета`, many: `${pending} сохранённых пакетов`, other: `${pending} сохранённых пакета` })} пока не дал ни одной нормализованной записи. Переигровка не трогает сеть и не переписывает время облачной синхронизации.`,
+      cadence: {
+        continuous: 'несколько раз в день',
+        daily: 'раз в день',
+        nightly: 'раз в ночь',
+        per_event: 'только когда происходит',
+        occasional: 'лишь изредка',
+      },
+      stage: {
+        ok: 'в норме',
+        failed: 'неудача',
+        never: 'ещё не случалось',
+      },
+      errorKind: {
+        network: 'не удалось связаться с облаком',
+        auth: 'аккаунт нужно переподключить',
+        not_available: 'у этого аккаунта такого потока нет',
+        unrecognized_payload: 'пакет пришёл, но разобрать его не вышло',
+        cloud_rejected: 'облако получило запрос и отказало',
+        storage: 'запись в локальную базу не удалась',
+        busy: 'другая операция писала в базу, эта уступила',
+        cancelled: 'отменено',
+        unknown: 'неклассифицированная неудача',
+      },
+      source: {
+        device: 'одно устройство',
+        user_fused: 'слито по пользователю',
+        unknown: 'источник неизвестен',
+      },
+    },
+
+    'views/HeartRateDetail': {
+      backToOverview: 'Назад к обзору',
+      eyebrow: 'Пульс',
+      title: 'Пульс',
+      intro:
+        'Верхняя кривая всегда показывает последние 24 часа; «7 дней / 1 месяц / 6 месяцев» меняют '
+        + 'только дневные тренды ниже. Интервалы без отсчётов остаются пустыми и нулём не заполняются.',
+      rangeAria: 'Диапазон трендов',
+      trendRangeLabel: 'Диапазон тренда',
+      desktopOnly: 'Используйте настольное приложение. Этот предпросмотр в браузере не читает данные аккаунта.',
+      loadFailed: 'Данные пульса сейчас недоступны',
+      dayFailed: 'Пульс за последние 24 часа сейчас не читается.',
+      dailyMaxFailed: 'Дневные пики пульса сейчас не читаются.',
+      trendsFailed: 'Тренды пульса покоя и вариабельности сейчас не читаются.',
+      retry: 'Повторить',
+      loadingAria: 'Загружается пульс',
+      dayCardAria: 'Пульс за 24 часа',
+      dayTitle: 'Последние 24 часа',
+      daySub: 'Отдельные отсчёты по времени',
+      statLatest: 'Последний',
+      statAverage: 'Средний',
+      statLowest: 'Мин',
+      statHighest: 'Макс',
+      chartAria: 'Пульс за последние 24 часа',
+      noSamples: 'За последние 24 часа отсчётов пульса нет — кривую рисовать нечего.',
+      bpmTooltip: (clock: string, value: number) => `${clock} <b>${value}</b> уд/мин`,
+      restingLabel: 'Пульс покоя',
+      restingHint: 'Часы сообщают одно значение в день; чем стабильнее, тем лучше',
+      hrvHint: 'Отдельные отсчёты ВСР, усреднённые по дням',
+      rmssdHint: 'Другая мера вариабельности пульса — не то же число, что выше',
+      emptyCard: 'В этом диапазоне нет записей.',
+      dailyMaxTitle: 'Дневной пик пульса (сырые отсчёты этого устройства)',
+      dailyMaxSub: 'Дневной пик в Zepp App отфильтрован, здесь — нет. Разница между этими числами ожидаема.',
+      dailyMaxAria: 'Тренд дневных пиков пульса',
+      dailyMaxNone: 'В этом диапазоне на устройстве нет отсчётов пульса — сравнивать пики нечего.',
+      dailyMaxSparse: (days: number) =>
+        `${days} из этих дней содержат очень мало отсчётов (меньше 60). В такие дни «пик» — лишь наибольшая `
+        + 'из этих точек, а не настоящий максимум дня; на графике они отмечены полыми маркерами.',
+      dailyMaxLegendMax: 'Пик',
+      dailyMaxLegendAvg: 'Средний',
+      dailyMaxTooltip: (date: string, max: number, avg: number, samples: number) =>
+        `${date}<br/>Пик <b>${max}</b> уд/мин<br/>Средний ${avg} уд/мин<br/>отсчётов: ${samples}`,
+      dailyMaxNote:
+        'Здесь используются только сырые поточечные отсчёты, хранящиеся на этом устройстве. Дневной пик '
+        + 'из Zepp нам не передаётся (device_max_hr в библиотеке — настроенный максимум для границ зон, '
+        + 'а не измеренный пик), поэтому поставить рядом нечего — для сверки откройте число этого дня '
+        + 'в Zepp App.',
+    },
+
+    'views/OrbitLab': {
+      title: 'Лаборатория орбит',
+      intro:
+        'Страница приёмки графа-орбиты на синтетических данных: перетаскивание внутрь добавляет, за '
+        + 'внешнее кольцо — удаляет; зум колесом, клавиатура, уменьшенная анимация.',
+      centerLabel: 'Задача анализа',
+      centerSub: 'синтетические данные',
+      modeGraph: 'Граф',
+      modeList: 'Список',
+      addNode: 'Добавить узел-кандидат',
+      removeSelected: 'Убрать выбранные',
+      undoN: (n: number) => `Отменить (${n})`,
+      motionLabel: 'Анимация',
+      motionSystem: 'Как в системе',
+      motionReduced: 'Уменьшенная',
+      motionFull: 'Полная',
+      frameMs: (last: string, avg: string, max: string) =>
+        `Кадр симуляции: текущий ${last} мс · средний за 60 кадров ${avg} мс · пик ${max} мс`,
+      simSettled: 'Раскладка устоялась',
+      simRunning: 'Раскладка считается…',
+      focusedNone: 'Фокус: нет',
+      focusedNode: (label: string) => `Фокус: ${label}`,
+      lastEvent: (text: string) => `Последнее событие: ${text}`,
+      noEvent: 'Событий пока нет',
+      inspectorTitle: 'Выбранный узел',
+      inspectorEmpty: 'Щёлкните или нажмите Enter на узле, чтобы посмотреть детали.',
+      stateLabel: 'Участие',
+      stateMember: 'Включён',
+      stateCandidate: 'Кандидат',
+      stateDisabled: 'Недоступен',
+      slotLabel: 'Переопределение orbitSlot (пусто = авто)',
+      open: 'Открыть',
+      join: 'Включить',
+      leave: 'Вывести',
+      remove: 'Удалить',
+      listTitle: 'Список карточек (запасной вход)',
+      listIntro: 'Все действия работают и без графа: включить, вывести, открыть, удалить.',
+      listEmpty: 'Узлов нет.',
+      categories: {
+        workout: 'Тренировки',
+        sleep: 'Сон',
+        recovery: 'Восстановление',
+        heart_rate: 'Пульс',
+        training: 'Тренировочная нагрузка',
+        body: 'Состав тела',
+        personal_note: 'Заметки',
+        attachment: 'Вложения',
+      },
+      subDays: (n: number) =>
+        plural(n, { one: `последний ${n} день`, few: `последние ${n} дня`, many: `последние ${n} дней`, other: `последние ${n} дня` }),
+      subItems: (n: number) =>
+        plural(n, { one: `${n} элемент`, few: `${n} элемента`, many: `${n} элементов`, other: `${n} элемента` }),
+      subNone: 'нет данных',
+    },
+
+    'views/Overview': {
+      overviewTitle: 'Обзор',
+      unrecognizedSuffix: ' — модель ещё не определена',
+      unrecognizedCta: 'Укажите её вручную',
+      deviceErrorPrefix: 'Определение устройств: ',
+      loadingAria: 'Загружается обзор',
+      loadFailedTitle: 'Не удалось прочитать обзор данных',
+      retry: 'Повторить',
+      healthUnavailable: 'Данные здоровья сейчас недоступны',
+      partialUnavailable: 'Часть потоков ещё не получена',
+      bodyPanelAria: 'Открыть состояние тела',
+      bodyTitle: 'Состояние тела',
+      factRecovery: 'Готовность',
+      factStress: 'Стресс',
+      factSpo2: 'SpO2',
+      bodySparkLabel: 'Готовность за последние 7 дней',
+      bodyThin: 'За последние 7 дней записей не хватает для тренда',
+      bodyEmpty: 'Готовность, стресс и кислород в крови появятся здесь после синхронизации',
+      trainingPanelAria: 'Открыть тренировочный статус',
+      trainingTitle: 'Тренировочный статус',
+      factLoad: 'Нагрузка',
+      trainingSparkLabel: 'Тренировочная нагрузка за последние 7 дней',
+      trainingThin: 'За последние 7 дней записей не хватает для тренда',
+      trainingEmpty: 'МПК (VO₂max) и тренировочная нагрузка появятся здесь после синхронизации',
+      loadLow: 'низкая',
+      loadMedium: 'умеренная',
+      loadHigh: 'высокая',
+      loadVeryHigh: 'очень высокая',
+      loadBandReference: (band: string) => `${band} (ориентир)`,
+    },
+
+    'views/RecentRecords': {
+      backToOverview: 'Назад к обзору',
+      title: 'Недавние записи',
+      intro: 'Недавно синхронизированные записи сна и тренировок — рядом.',
+      loadingLabel: 'Загружаются недавние записи',
+      loadFailedTitle: 'Не удалось загрузить недавние записи',
+      desktopOnly: 'Используйте настольное приложение. Этот предпросмотр в браузере не читает данные аккаунта.',
+      retry: 'Повторить',
+      partialUnavailable: 'Часть данных сейчас недоступна',
+      filterAll: 'Все',
+      recentSleep: 'Недавний сон',
+      recentWorkouts: 'Недавние тренировки',
+      countBadge: (count: number) => `Всего ${count}`,
+      seeAll: 'Показать все',
+      noSleep: 'Записей сна пока нет',
+      noWorkouts: 'Здесь пока нечего показать.',
+      noWorkoutsOfType: 'Для этого типа тренировок показать нечего.',
+      hiddenIncomplete: (count: number) =>
+        plural(count, {
+          one: `Скрыта ${count} неполная запись`,
+          few: `Скрыто ${count} неполные записи`,
+          many: `Скрыто ${count} неполных записей`,
+          other: `Скрыто ${count} неполные записи`,
+        }),
+      notProvided: 'Нет данных',
+      dateUnknown: 'Дата неизвестна',
+      today: 'Сегодня',
+      yesterday: 'Вчера',
+      listDate: (month: number, day: number, weekday: string) => `${weekday}, ${day}.${month}`,
+    },
+
+    'views/SleepDetail': {
+      backToRecent: 'Назад к недавним записям',
+      title: 'Запись сна',
+      loadingDetail: 'Читается запись сна…',
+      loadFailedTitle: 'Не удалось прочитать эту запись сна',
+      loadFailed: 'Детали сна сейчас недоступны',
+      retry: 'Повторить',
+      notFoundTitle: 'Этой записи сна здесь нет',
+      notFoundMessage: 'Возможно, она удалена при очистке или ещё не синхронизирована на это устройство.',
+      heroAria: 'Длительность сна и оценка',
+      durationKicker: 'Время сна',
+      heroMeta: (fellAsleep: string, wokeUp: string, inBed: string) =>
+        `заснул в ${fellAsleep} · проснулся в ${wokeUp} · в постели ${inBed}`,
+      scoreKicker: 'Оценка сна',
+      scoreNote: 'Присвоена устройством; показана как записана, не более того.',
+      stagesAria: 'Фазы сна',
+      stagesTitle: 'Фазы сна',
+      stageHelpButton: 'Что значат фазы',
+      stageHelp:
+        'Глубокий: восстанавливающий отрезок. Лёгкий: переходная фаза, занимающая бо́льшую часть ночи. '
+        + 'REM: фаза быстрых движений глаз, связанная с памятью и сновидениями. Бодрствование: пробуждения '
+        + 'или лежание без сна ночью. Это определения, а не медицинское заключение.',
+      weeklyAria: 'Сон за последние 7 дней',
+      weeklyTitle: 'Структура сна за последние 7 дней',
+      weeklySub: 'Фазы по ночам, стеком',
+      weeklyChartAria: 'Столбчатая диаграмма структуры сна за последние 7 дней',
+      metaAria: 'Источник и устройство',
+      sourceTitle: 'Источник',
+      sourceProvider: 'Провайдер',
+      sourceScope: 'Охват',
+      syncedAt: 'Синхронизировано',
+      timezone: 'Часовой пояс',
+      deviceTitle: 'Устройство',
+      deviceName: 'Название',
+      deviceFirmware: 'Прошивка',
+      deviceId: 'ID устройства',
+      footnote:
+        'Показана только сводка фаз, которую реально прислало облако. Когда поля REM нет, пишется '
+        + '«Нет данных» — оно никогда не вычисляется вычитанием, — а не предоставленная временная '
+        + 'шкала не рисуется.',
+      notProvided: 'Нет данных',
+      syncTimeMissing: 'Время синхронизации не указано',
+      lastCloudSync: (clock: string) => `Последняя облачная синхронизация ${clock}`,
+      deviceUndetermined: 'Устройство не определено',
+      hoursAxis: 'часы',
+      tooltipTotal: (date: string, hours: string) => `<b>${date} — всего сна: ${hours} ч</b><br/>`,
+      tooltipRow: (name: string, hours: number) => `${name}: ${hours} ч<br/>`,
+      tooltipRowMissing: (name: string) => `${name}: нет данных<br/>`,
+    },
+
+    'views/SleepList': {
+      backToRecent: 'Назад к недавним записям',
+      backToOverview: 'Назад к обзору',
+      title: 'Сон',
+      intro: 'Записи сна, синхронизированные на это устройство. Если полной шкалы нет, показывается только сводка.',
+      loadFailedTitle: 'Не удалось прочитать записи сна',
+      loadFailed: 'Список сна сейчас недоступен',
+      retry: 'Повторить',
+      emptyTitle: 'Записей сна пока нет',
+      emptyMessage: 'Они появятся здесь после синхронизации. Фазы никогда не выдумываются.',
+      scoreLabel: 'Оценка',
+      footnote: (count: number, from: string) =>
+        `${plural(count, { one: `${count} запись`, few: `${count} записи`, many: `${count} записей`, other: `${count} записи` })} · с ${from}`,
+      shown: (shown: number, total: number) => `Показано ${shown} из ${total}`,
+      loadMore: 'Показать ещё',
+      loadingMore: 'Загрузка…',
+    },
+
+    'views/TrainingStatus': {
+      backToOverview: 'Назад к обзору',
+      eyebrow: 'Тренировочный статус',
+      title: 'Тренировочный статус',
+      intro:
+        'МПК (VO₂max), лактатный порог, тренировочная нагрузка и пульсовые зоны. Всё читается из '
+        + 'синхронизированных записей; тренировочных советов нет.',
+      rangeAria: 'Временной диапазон',
+      desktopOnly: 'Используйте настольное приложение. Этот предпросмотр в браузере не читает данные аккаунта.',
+      loadFailed: 'Данные тренировочного статуса сейчас недоступны',
+      retry: 'Повторить',
+      loadingAria: 'Загружается тренировочный статус',
+      vo2Hint: 'Максимальное потребление кислорода, оценённое часами после пробежек на улице',
+      vo2Empty: 'В этом диапазоне записей МПК нет — он обновляется только после пробежки на улице.',
+      loadLabel: 'Тренировочная нагрузка',
+      loadHint: 'Дневной балл тренировочной нагрузки',
+      loadEmpty: 'В этом диапазоне записей нагрузки нет.',
+      paiLabel: 'Индекс PAI',
+      paiHint: 'Personal Activity Intelligence по скользящим 7 дням',
+      paiEmpty: 'В этом диапазоне записей PAI нет.',
+      thresholdLabel: 'Лактатный порог',
+      thresholdHint: 'Пульс и темп; обновляется только после высокоинтенсивной пробежки',
+      thresholdHr: 'Пороговый пульс',
+      thresholdPace: 'Пороговый темп',
+      thresholdChartAria: 'Кривые пульса и темпа лактатного порога',
+      thresholdOnce: (date: string) => `В этом диапазоне лишь один замер порога (${date}) — тренд не построить.`,
+      thresholdEmpty: 'В этом диапазоне замеров лактатного порога нет.',
+      thresholdPaceTooltip: (value: string, unit: string) => `Пороговый темп <b>${value}</b> ${unit}`,
+      loadUnit: 'баллов',
+      thresholdHrTooltip: (value: number) => `Пороговый пульс <b>${value}</b> уд/мин`,
+      balanceLabel: 'Баланс тренировочной нагрузки',
+      balanceHint: 'Нагрузка за 7 дней относительно недельного среднего за 28 дней — отношение острой нагрузки к хронической',
+      balanceChartAria: 'Нагрузка за 7 и 28 дней с отношением острой к хронической',
+      balanceEmpty: 'Записей нагрузки пока не хватает, чтобы провести эту линию.',
+      balanceNote:
+        'Острая:хроническая = сумма последних 7 дней ÷ (сумма последних 28 дней ÷ 4). Если 28-дневное '
+        + 'окно покрывает меньше 21 дня, отношение не считается и линия там прерывается — это '
+        + '«не посчитано», а не ноль.',
+      acute7d: 'Нагрузка за 7 дней',
+      chronicWeekly: 'Среднее за 28 дней',
+      acuteChronic: 'Острая:хроническая',
+      ratioMissing: (days: number) =>
+        `— (в 28-дневном окне данные только за ${plural(days, { one: `${days} день`, few: `${days} дня`, many: `${days} дней`, other: `${days} дня` })})`,
+      notProvided: 'Нет данных',
+      acuteTooltip: (value: string, days: number) => `Нагрузка за 7 дней <b>${value}</b> (данные за ${days}/7 дн.)`,
+      chronicTooltip: (value: string) => `Среднее за 28 дней <b>${value}</b>`,
+      ratioTooltip: (value: string) => `Острая:хроническая <b>${value}</b>`,
+    },
+
+    'views/WorkoutDetail': {
+      notProvided: 'Нет данных',
+      backToRecent: 'Назад к недавним записям',
+      loadFailedTitle: 'Не удалось прочитать эту тренировку',
+      loadFailed: 'Детали тренировки сейчас недоступны',
+      retry: 'Повторить',
+      notFoundTitle: 'Этой тренировки здесь нет',
+      notFoundMessage: 'Возможно, она удалена при очистке или ещё не синхронизирована на это устройство.',
+      insightFailed: 'Не удалось построить разбор этой тренировки',
+      seriesFailed: 'Не удалось прочитать поточечные ряды этой тренировки',
+      seriesFailedTitle: 'Поточечные ряды не загрузились',
+      exportNeedsSeries: 'Поточечные ряды не загрузились, поэтому эту запись экспортировать нельзя.',
+      thisWorkout: 'тренировка',
+      aiPrompt: (label: string) => `Ты — спортивный аналитик. Ниже — полная запись одной моей тренировки (${label}), взятая из локальной базы ZeppBridge и обезличенная.
+    Разбери это занятие только по фактам из записи: интенсивность, как темп соотносится с пульсом, есть ли явное падение темпа или аномальный участок, и что конкретно сделать иначе в следующий раз.
+
+    Ограничения:
+    - В этих данных нет популяционной базы. Не сравнивай меня со «здоровыми взрослыми» или со средними.
+    - Если чего-то нет — так и скажи. Никогда не заполняй пропуск нулём или оценкой.
+    - Никаких медицинских диагнозов, оценок риска болезней и советов по лечению.
+
+    Ответь в Markdown.`,
+      needDesktop: 'Передача ИИ требует настольного приложения; этот предпросмотр в браузере не открывает внешние сайты.',
+      attachmentOpened: (provider: string) =>
+        `Пакет данных записан на рабочий стол (zeppbridge-ai-handoff.json) — перетащите его в ${provider}. Промпт уже в буфере обмена.`,
+      attachmentNotOpened: (provider: string) =>
+        `Пакет данных записан на рабочий стол (zeppbridge-ai-handoff.json). Промпт в буфере обмена; откройте ${provider} сами.`,
+      copiedAndOpened: (provider: string) => `Обезличенные данные этой тренировки скопированы, ${provider} открыт — вставьте их.`,
+      copiedOnly: (provider: string) => `Обезличенные данные этой тренировки скопированы. Откройте ${provider} сами и вставьте их.`,
+      noCorrection: 'Без исправления',
+      deviceNameMissing: 'Название устройства не указано',
+      notFetchedYet: 'Ещё не получено',
+      timeUnknown: 'Время неизвестно',
+      overrideSaved: 'Исправление типа тренировки сохранено локально.',
+      overrideCleared: 'Исправление снято — снова действует распознавание ZeppBridge.',
+      overrideFailed: 'Не удалось сохранить исправление типа тренировки',
+      copied: (format: string) => `Данные ${format} скопированы в буфер обмена.`,
+      copyFailed: 'Не удалось скопировать эту запись',
+      metricDistance: 'Дистанция',
+      metricDuration: 'Время тренировки',
+      metricAvgHr: 'Средний пульс',
+      metricAvgPace: 'Средний темп',
+      metricMovingTime: 'Время в движении',
+      metricPausedTime: 'Время на паузах',
+      metricMovingPace: 'Темп в движении',
+      metricElapsedPace: 'Темп с паузами',
+      metricAscent: 'Набор высоты',
+      metricTrainingLoad: 'Тренировочная нагрузка',
+      metricTrainingEffect: 'Аэробный эффект',
+      metricAnaerobicEffect: 'Анаэробный эффект',
+      metricRpe: 'Субъективная нагрузка',
+      metricMaxHr: 'Макс. пульс',
+      metricCalories: 'Расход',
+      unitKcal: 'ккал',
+      statFastest: 'Самый быстрый',
+      statAverage: 'Средний',
+      statSlowest: 'Самый медленный',
+      statMin: 'Мин',
+      statMax: 'Макс',
+      chartHeart: 'Пульс',
+      chartPace: 'Темп',
+      chartAltitude: 'Высота',
+      chartCadence: 'Каденс',
+      chartAria: (title: string) => `${title} за занятие`,
+      decodedRoutePoints: 'Точки трека GPS',
+      decodedSamples: 'Отсчёты временных рядов',
+      decodedPauses: 'Интервалы пауз',
+      decodedAvgCadence: 'Средний каденс',
+      decodedMaxCadence: 'Макс. каденс',
+      decodedAvgStride: 'Средняя длина шага',
+      decodedDescent: 'Суммарный спуск',
+      decodedMaxHr: 'Макс. пульс',
+      decodedAvgPower: 'Средняя мощность',
+      decodedMaxPower: 'Макс. мощность',
+      decodedGroundContact: 'Среднее время контакта с землёй',
+      decodedVerticalOscillation: 'Средняя вертикальная осцилляция',
+      decodedVerticalRatio: 'Отношение осцилляции к шагу',
+      decodedBestEquivalentPace: 'Лучший эквивалентный темп',
+      heroAria: 'Обзор тренировки',
+      decodedLocally: 'Декодировано локально',
+      typeEvidenceAria: 'Как определён тип тренировки',
+      zeppRawCode: (code: string) => `Сырой код Zepp: ${code}`,
+      zeppBridgeMatch: (label: string) => `ZeppBridge читает как: ${label}`,
+      customName: (code: string, name: string) => `Ваше название для кода ${code}: ${name}`,
+      myCorrection: 'Моё исправление',
+      correctionAria: 'Моё исправление типа этой тренировки',
+      metricListAria: 'Сводка показателей тренировки',
+      routeAria: 'Полный трек GPS',
+      eyebrowRoute: 'Маршрут',
+      routeTitle: 'Полный трек GPS',
+      routeNote: 'Рисуется локально · тайлы карты не запрашиваются',
+      routeSvgAria: 'Локальный трек GPS, окрашенный по времени и ближайшему отсчёту темпа',
+      routeLegendPace: (count: number) =>
+        `${plural(count, { one: `${count} действительная точка темпа`, few: `${count} действительные точки темпа`, many: `${count} действительных точек темпа`, other: `${count} действительные точки темпа` })} · P10–P90`,
+      routeLegendNoPace: 'Действительных точек темпа меньше 3 · без окраски по скорости',
+      legendFast: 'Быстро',
+      legendSteady: 'Ровно',
+      legendWarm: 'Медленнее',
+      legendSlow: 'Медленно',
+      routeEmptyTitle: 'Пригодного трека нет',
+      routeEmptyBody: 'В этой записи недостаточно точек GPS — маршрут не рисуется.',
+      chartsEmptyTitle: 'Поточечных кривых нет',
+      chartsEmptyBody: 'Для этого занятия не синхронизированы ряды пульса, темпа, высоты или каденса.',
+      hrZonesAria: 'Пульсовые зоны',
+      eyebrowHrZones: 'Пульсовые зоны',
+      hrZonesTitle: 'Распределение по пульсовым зонам',
+      hrZonesNote:
+        'Границы зон взяты из ваших настроек на часах и присылаются Zepp вместе с этой тренировкой; '
+        + 'ZeppBridge их не пересчитывает. На странице «Тренировочный статус» — отдельная модель зон, '
+        + 'которую выбираете вы, поэтому числа там и тут не обязаны совпадать.',
+      hrZoneBelow: (upper: number) => `Ниже ${upper}`,
+      hrZoneBetween: (low: number, high: number) => `${low}–${high}`,
+      hrZoneShare: (percent: string) => `${percent}%`,
+      hrZoneTotal: (duration: string) => `С пульсом: ${duration}`,
+      hrZoneBarAria: 'Доля времени в каждой пульсовой зоне',
+      decodedAria: 'Декодированные значения',
+      eyebrowDecoded: 'Декодировано',
+      decodedTitle: 'Декодированные параметры',
+      decodedNote: 'Сводка считается только по действительным отсчётам этой записи; аномальные скачки игнорируются.',
+      exportAria: 'Экспорт и отправка',
+      eyebrowExport: 'Экспорт',
+      exportTitle: 'Экспорт и отправка',
+      exportSub: 'Скопируйте JSON, CSV или GPX либо выберите папку, чтобы сохранить эту тренировку как FIT.',
+      exportFormatAria: 'Формат экспорта',
+      exportGo: (format: string) => `Скопировать данные ${format}`,
+      saveFit: 'Сохранить файл FIT',
+      savedFit: 'Файл FIT сохранён',
+      exportFailed: 'Экспорт не удался',
+      handoffAria: 'Передать ИИ',
+      eyebrowHandoff: 'Передача',
+      handoffTitle: 'Передать ИИ',
+      handoffSub:
+        'Копирует в буфер обмена обезличенные данные только этой тренировки вместе с промптом и открывает '
+        + 'выбранный вами сайт ИИ. Подневные потоки вроде сна и шагов не входят.',
+      handoffTarget: 'Целевой инструмент',
+      handoffTargetAria: 'Какому инструменту ИИ передать',
+      preparing: 'Подготовка…',
+      handTo: (provider: string) => `Передать в ${provider}`,
+      provenanceAria: 'Происхождение',
+      eyebrowProvenance: 'Источник',
+      provenanceTitle: 'Происхождение данных',
+      provenanceProvider: 'Провайдер',
+      provenanceScope: 'Охват данных',
+      provenanceSynced: 'Последняя синхронизация',
+      provenanceRecordId: 'ID записи',
+      provenanceDevice: 'Устройство',
+      pageFoot: 'Данные декодируются на этом устройстве; трек рисуется на локальном холсте и никогда не отправляется картографическому сервису.',
+    },
+
+    'views/WorkoutList': {
+      backToRecent: 'Назад к недавним записям',
+      backToOverview: 'Назад к обзору',
+      title: 'Тренировки',
+      intro: 'Тренировки, синхронизированные на это устройство. Нет трека — нет карты.',
+      loadFailedTitle: 'Не удалось прочитать тренировки',
+      loadFailed: 'Список тренировок сейчас недоступен',
+      retry: 'Повторить',
+      emptyTitle: 'Пока нечего показать',
+      emptyMessage:
+        'После синхронизации здесь появятся только записи с типом, временем и хотя бы одной настоящей '
+        + 'метрикой. Без GPS или поточечных отсчётов пустой график не рисуется.',
+      labelDistance: 'Дистанция',
+      labelBurn: 'Расход',
+      labelDuration: 'Длительность',
+      notProvided: 'Нет данных',
+      footnote: (count: number) =>
+        plural(count, {
+          one: `Можно показать ${count} запись`,
+          few: `Можно показать ${count} записи`,
+          many: `Можно показать ${count} записей`,
+          other: `Можно показать ${count} записи`,
+        }),
+      shown: (loaded: number, total: number) => `Прочитано ${loaded} из ${total}`,
+      loadMore: 'Показать ещё',
+      loadingMore: 'Загрузка…',
     },
   },
 

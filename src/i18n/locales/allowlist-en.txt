@@ -193,3 +193,14 @@ views/SleepDetail.deviceFirmware
 views/TrainingStatus.paiLabel
 views/WorkoutDetail.unitKcal
 views/WorkoutDetail.chartAltitude
+
+# ru
+components/HeartRateZonePicker.basesSeparator
+components/HistoryArchivePanel.streamSeparator
+components/WeeklyReportCard.metric.weekly.hrv
+composables/useSyncController.streamSeparator
+lib/sleepStages.rem
+views/HealthCheck.period
+views/HealthCheck.sourceSeparator
+views/Overview.factSpo2
+views/Settings.refreshFailedPeriod
