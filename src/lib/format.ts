@@ -46,6 +46,7 @@ const messages = defineMessages(
     duration: (hours: number, minutes: number) =>
       (hours > 0 ? `${hours} h ${minutes} min` : `${minutes} min`),
   },
+  'lib/format',
 );
 
 const copy = () => messagesOf(messages);

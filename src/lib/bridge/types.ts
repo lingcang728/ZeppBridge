@@ -54,7 +54,7 @@ export interface BridgeBackend {
   importFromHar(harPath: string): Promise<AppStatus>;
   manualAuth(appToken: string, userId: string, regionHost: string): Promise<AppStatus>;
 
-  startWebLogin(locale: 'zh' | 'en'): Promise<LoginStatus>;
+  startWebLogin(locale: string): Promise<LoginStatus>;
   cancelWebLogin(): Promise<LoginStatus>;
   getLoginStatus(): Promise<LoginStatus>;
 

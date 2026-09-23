@@ -280,6 +280,7 @@ const messages = defineMessages(
       sleep_sessions: 'Sueño',
     },
   },
+  'components/BackupPanel',
 );
 const t = useMessages(messages);
 

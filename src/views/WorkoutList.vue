@@ -71,6 +71,7 @@ const messages = defineMessages(
     loadMore: 'Cargar más',
     loadingMore: 'Cargando…',
   },
+  'views/WorkoutList',
 );
 const t = useMessages(messages);
 

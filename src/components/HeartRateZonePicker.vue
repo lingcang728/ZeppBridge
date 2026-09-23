@@ -181,6 +181,7 @@ const messages = defineMessages(
     },
     computedRestingNote: (days: number) => `Promedio de los ${days} días con datos en los últimos 30.`,
   },
+  'components/HeartRateZonePicker',
 );
 const t = useMessages(messages);
 

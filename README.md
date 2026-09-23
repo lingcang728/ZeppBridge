@@ -11,13 +11,13 @@
   [![Linux](https://img.shields.io/badge/Linux-builds_only-E95420?logo=linux&logoColor=white)](docs/guides/linux.md)
   [![Version](https://img.shields.io/github/v/release/lingcang728/ZeppBridge?color=8FB348&label=version)](https://github.com/lingcang728/ZeppBridge/releases)
 
-  <p><a href="README.zh-CN.md">简体中文</a></p>
+  <p><strong>English</strong> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.es.md">Español</a> · <a href="README.nl.md">Nederlands</a> · <a href="README.pt-BR.md">Português (Brasil)</a> · <a href="README.pt-PT.md">Português</a> · <a href="README.de.md">Deutsch</a> · <a href="README.ru.md">Русский</a> · <a href="README.hi-IN.md">हिन्दी</a> · <a href="README.fr.md">Français</a></p>
 </div>
 
 > [!IMPORTANT]
 > ZeppBridge is an independent, unofficial open-source project. It is not affiliated with or endorsed by Zepp Health, Huami or Amazfit. Use it only with accounts and data you are entitled to access.
 
-> The app ships in English and Chinese; it follows your system language on first launch, and Settings has a switch. This page and [its Chinese counterpart](README.zh-CN.md) are kept in step with each other, and nothing here is described more generously than it is implemented.
+> The app ships in ten languages — English, 简体中文, Español, Nederlands, Português (Brasil), Português, Deutsch, Русский, हिन्दी and Français; it follows your system language on first launch, and Settings has a switch. This page is the reference text the translated READMEs are kept in step with, and nothing here is described more generously than it is implemented.
 
 ## Isn't this already in the Zepp app?
 

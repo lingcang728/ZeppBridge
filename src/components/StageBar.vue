@@ -27,6 +27,7 @@ const messages = defineMessages(
     hypnogramAria: 'Hipnograma de las fases del sueño',
     summaryAria: 'Proporción de fases del sueño',
   },
+  'components/StageBar',
 );
 const t = useMessages(messages);
 

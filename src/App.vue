@@ -117,6 +117,7 @@ const messages = defineMessages(
     browserPreview: 'Usa la app de escritorio. Esta vista previa en el navegador no lee datos de la cuenta.',
     routeNotFound: 'Esa página no existe, así que volviste al resumen.',
   },
+  'App',
 );
 const t = useMessages(messages);
 

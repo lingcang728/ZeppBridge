@@ -270,6 +270,7 @@ const messages = defineMessages(
       wellness: 'Estrés / SpO2 y similares',
     },
   },
+  'components/HistoryArchivePanel',
 );
 const t = useMessages(messages);
 

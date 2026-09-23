@@ -30,6 +30,7 @@ const messages = defineMessages(
     scale: 'Báscula',
     unknown: 'Dispositivo',
   },
+  'components/DeviceVisual',
 );
 const t = useMessages(messages);
 

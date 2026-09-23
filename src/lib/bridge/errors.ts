@@ -20,6 +20,7 @@ const messages = defineMessages(
     genericFailure: 'No se pudo completar. Inténtalo de nuevo en un momento',
     timedOut: 'La solicitud tardó demasiado. Revisa tu conexión y la región de Zepp, e inténtalo de nuevo.',
   },
+  'lib/bridge/errors',
 );
 
 const copy = () => messagesOf(messages);

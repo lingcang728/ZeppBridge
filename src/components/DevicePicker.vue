@@ -78,6 +78,7 @@ const messages = defineMessages(
     filterRing: 'Anillos',
     filterEarbuds: 'Audífonos',
   },
+  'components/DevicePicker',
 );
 const t = useMessages(messages);
 

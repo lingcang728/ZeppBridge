@@ -7,6 +7,7 @@ const messages = defineMessages(
   { backToOverview: '返回概览' },
   { backToOverview: 'Back to overview' },
   { backToOverview: 'Volver al resumen' },
+  'components/PageHeader',
 );
 const t = useMessages(messages);
 

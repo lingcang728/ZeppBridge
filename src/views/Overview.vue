@@ -281,6 +281,7 @@ const messages = defineMessages(
     loadVeryHigh: 'muy alta',
     loadBandReference: (band: string) => `${band} (referencia)`,
   },
+  'views/Overview',
 );
 const t = useMessages(messages);
 const heroPreferenceKey = 'zeppbridge.overview.hideHero';

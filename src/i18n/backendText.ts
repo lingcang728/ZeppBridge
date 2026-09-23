@@ -15,7 +15,7 @@
  * 代价是英文用户偶尔会看到一句笼统的「原因未记录」而不是具体原因。这个代价
  * 是值得的：看不懂的中文对他既没有信息量，也没法反馈给我们。
  */
-import { locale } from './index';
+import { activeLocalePack, locale } from './index';
 
 /** 中日韩统一表意文字。够覆盖这个项目里会出现的中文。 */
 const CJK = /[一-鿿]/;
@@ -34,4 +34,17 @@ export const backendText = (
   if (!value) return fallback;
   if (locale.value === 'zh') return value;
   return CJK.test(value) ? fallback : value;
+};
+
+/**
+ * 按 `ui.*` 散文码取当前语言包的兜底文案。没有就返回 `undefined`。
+ *
+ * 组件自己的 `ui.*` 文案走模块覆盖（`modules['<moduleId>']`），不经过这里；
+ * 这张平铺表是给「后端出了新码而组件还没分支」的兜底——语言包的
+ * `backendText:` 节按码查询。zh/en/es 不查包：它们的 `ui.*` 本来就该在
+ * 组件文案里写全（`i18n:check` 保证每个 `ui.*` 码都被处理过）。
+ */
+export const uiTextFor = (code: string | null | undefined): string | undefined => {
+  if (!code) return undefined;
+  return activeLocalePack()?.backendText?.[code];
 };

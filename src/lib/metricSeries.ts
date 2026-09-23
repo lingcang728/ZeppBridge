@@ -26,6 +26,7 @@ const messages = defineMessages(
     dayRange: (low: string, high: string, unit: string) => `Ese día varió entre ${low} y ${high}${unit}`,
     samples: (count: number) => `${count} lecturas`,
   },
+  'lib/metricSeries',
 );
 
 const copy = () => messagesOf(messages);

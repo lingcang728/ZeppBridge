@@ -108,6 +108,7 @@ const messages = defineMessages(
     originCatalog: 'Coincide con el catálogo integrado',
     originNoMatch: 'Sin coincidencia',
   },
+  'views/DeviceDetail',
 );
 const t = useMessages(messages);
 

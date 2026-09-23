@@ -88,6 +88,7 @@ const messages = defineMessages(
     networkUnavailable: 'Sin conexión a la red',
     assignmentFailed: 'No se pudo guardar el modelo elegido',
   },
+  'composables/useDevices',
 );
 
 const copy = () => messagesOf(messages);

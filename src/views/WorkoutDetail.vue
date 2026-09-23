@@ -492,6 +492,7 @@ Responde en español, en Markdown.`,
     provenanceDevice: 'Dispositivo',
     pageFoot: 'Decodificado en este equipo. El recorrido se dibuja en un lienzo local y nunca se envía a un servicio de mapas.',
   },
+  'views/WorkoutDetail',
 );
 const t = useMessages(messages);
 

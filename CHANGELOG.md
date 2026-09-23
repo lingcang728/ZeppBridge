@@ -6,6 +6,9 @@
 
 ### Planned for 2.4.3 / 计划纳入 2.4.3
 
+- The interface now ships in ten languages: 中文, English, Español, Nederlands, Português (Brasil), Português, Deutsch, Русский, हिन्दी and Français. The seven new languages load on demand, the tray menu and the sign-in window follow the same choice, and the landing page offers the same list as a dropdown.
+- 界面现在有十种语言：中文、English、Español、Nederlands、Português (Brasil)、Português、Deutsch、Русский、हिन्दी、Français。七种新语言按需加载，托盘菜单和登录窗口跟随同一选择，落地页也换成了同款下拉菜单。
+
 - Fix blood-oxygen ODI requests using calendar dates in the device timezone, avoiding HTTP 400 and false empty responses from timestamp parameters. Keep the failing substream and cause in partial-sync diagnostics.
 - 血氧 ODI 请求改用设备时区下的日期，避免时间戳参数引发 HTTP 400 或错误空结果；部分同步的诊断记录保留具体子指标和失败原因。
 

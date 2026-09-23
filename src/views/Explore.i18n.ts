@@ -598,6 +598,7 @@ Responde en español, en Markdown.`,
       },
     },
   },
+  'views/Explore',
 );
 
 const copy = () => messagesOf(exploreMessages);

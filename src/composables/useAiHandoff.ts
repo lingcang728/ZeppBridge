@@ -27,6 +27,7 @@ const messages = defineMessages(
     copiedButCannotOpen: (label: string) => `Copiado, pero no se pudo abrir ${label}`,
     nothingToRetry: 'No hay ninguna entrega a la IA para reintentar',
   },
+  'composables/useAiHandoff',
 );
 
 const copy = () => messagesOf(messages);
