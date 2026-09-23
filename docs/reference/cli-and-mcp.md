@@ -266,11 +266,32 @@ outside the grants — `error.permittedRanges` lists the actual
 
 | Tool | Returns |
 |---|---|
-| `list_workouts` | Workouts, newest first. Distance in metres, heart rate in bpm |
+| `list_workouts` | Paged workouts, newest first. Distance in metres, heart rate in bpm |
 | `get_workout_insight` | One workout compared against your own baseline, with the baseline window, sample count and confidence |
+| `get_workout_detail` | All stored summary fields and heart-rate zones for one workout |
+| `get_workout_series` | Paged workout samples, GPS route, pauses, splits and laps; precise coordinates are returned only for `section: "route"` |
 | `get_metric_series` | A per-day metric series, each carrying its `unit` |
+| `get_food_data` | Daily Food intake totals: calories, protein, fat and carbohydrates |
+| `list_available_metrics` | Actual local metrics, with source, unit, count and date range |
+| `get_metric_records` | Paged stored daily values or individual readings for any discovered metric |
+| `list_sleep_sessions` | Paged sleep summaries and IDs |
 | `get_sleep_detail` | One night in detail, stage durations in minutes |
+| `list_life_events` | Locally authored life events in a date window |
 | `get_data_health` | Fetch/parse/write state and coverage per stream |
+
+For Food, call `get_food_data` or request `intake_calories`,
+`intake_protein_g`, `intake_fat_g`, and `intake_carbs_g` from
+`get_metric_series`. These are **daily totals**, not individual meals. Meal
+names, meal types and times are not stored as structured records, so the MCP
+server cannot return them. `get_food_data` reports this limit explicitly.
+Passing `food` as a `get_metric_series` metric now returns a clear error with
+the discovery path instead of an empty result.
+
+Use `list_available_metrics` before querying less familiar types.
+`get_metric_records` can read any name actually present in `daily_metrics` or
+`metric_samples`, plus `sleep_score` from `sleep_sessions`, including metrics outside `get_metric_series`' fixed chart
+list. The inventory reflects normalized local data, not every endpoint the
+cloud might offer. No tool returns arbitrary raw cloud payloads.
 
 `get_data_health` deserves a mention of its own: it lets a model tell the
 difference between "this question cannot be answered because nothing was synced"
