@@ -142,7 +142,7 @@ export default {
     'err.update.installed_build_missing': 'Nach der Installation wurde kein neuer installierter ZeppBridge-Build gefunden',
     'err.update.portable_windows_only': 'Die Migration von portabel zu installiert gibt es nur unter Windows',
     'err.update.unsafe_data_location':
-      'Die Installation wurde gestoppt, weil der Datenort nicht als sicher für Updates verifiziert werden konnte. Beende ZeppBridge, kopiere einen im Paket enthaltenen data-Ordner in deinen Benutzer-Ordner „Application Support" und korrigiere ZEPPBRIDGE_DATA_DIR, bevor du es erneut versuchst. Behalte die Originaldaten.',
+      'Die Installation wurde gestoppt, weil der Datenort nicht als sicher für Updates verifiziert werden konnte. Beende ZeppBridge, kopiere einen im Paket enthaltenen data-Ordner in deinen Benutzer-Ordner „Application Support“ und korrigiere ZEPPBRIDGE_DATA_DIR, bevor du es erneut versuchst. Behalte die Originaldaten.',
   },
 
   // ── 后端 ui.* 散文码的兜底表 ──
@@ -164,7 +164,7 @@ export default {
   modules: {
     // ── views/Explore ──
     // cellTypesValue / categoryTraining: mit en identisch und in allowlist-en.txt
-    // eingetragen (nackte Zahl bzw. das Lehnwort „Training").
+    // eingetragen (nackte Zahl bzw. das Lehnwort „Training“).
     'views/Explore': {
       title: 'An KI übergeben',
       intro:
@@ -224,7 +224,7 @@ export default {
       packSub: 'Exportformat und KI-Werkzeug wählen.',
       packContentsTitle: 'Was der Export enthält',
       packContentsIncluded:
-        'Enthalten: Trainings-Zusammenfassungen (Art, Beginn und Ende, Distanz, Kalorien, durchschnittliche und maximale Herzfrequenz, Trainingsbelastung), Tagesmetriken (Schritte, Ruheherzfrequenz, HRV, SpO₂, Stress, Atemfrequenz, PAI, VO₂max) und Schlafsitzungen mit ihrem Phasen-Zeitverlauf. Die Option „Full" fügt die Sekunden-Serien der Trainings und einzelne Herzfrequenz-Messungen hinzu.',
+        'Enthalten: Trainings-Zusammenfassungen (Art, Beginn und Ende, Distanz, Kalorien, durchschnittliche und maximale Herzfrequenz, Trainingsbelastung), Tagesmetriken (Schritte, Ruheherzfrequenz, HRV, SpO₂, Stress, Atemfrequenz, PAI, VO₂max) und Schlafsitzungen mit ihrem Phasen-Zeitverlauf. Die Option „Full“ fügt die Sekunden-Serien der Trainings und einzelne Herzfrequenz-Messungen hinzu.',
       packContentsExcluded:
         'Nicht enthalten: .tcx, Kontodaten, Token oder Geräte-Seriennummern. GPS-Tracks erscheinen in den Formaten GPX und FIT, und nur bei Trainings mit aufgezeichneter Strecke. FIT schreibt pro Training eine Datei in den Ordner, den du wählst.',
       formatGroup: 'Exportformat',
@@ -327,7 +327,7 @@ Vergleiche mich anhand der untenstehenden ZeppBridge-Daten dieser Woche nur mit 
 Fass zusammen, was sich diese Woche geändert hat, nenne, was gut lief und was Beachtung verdient, und gib mir eine kurze Liste für die nächste Woche.
 
 Regeln:
-- Es gibt keine Vergleichsgruppe in diesen Daten. Vergleiche mich nicht mit „gesunden Erwachsenen" oder irgendeinem Durchschnitt.
+- Es gibt keine Vergleichsgruppe in diesen Daten. Vergleiche mich nicht mit „gesunden Erwachsenen“ oder irgendeinem Durchschnitt.
 - Wo etwas fehlt, sag, dass es fehlt. Fülle die Lücke nie mit einer Null oder einer Schätzung.
 - Keine medizinische Diagnose, keine Krankheitsrisiko-Einschätzung, keine Behandlungsempfehlung.
 
@@ -337,8 +337,8 @@ Antworte auf Deutsch in Markdown.`,
     },
     // ── views/Settings ──
     // Mit en identisch und in allowlist-en.txt eingetragen:
-    // unidentifiedInitial („?"), refreshFailedPeriod („."),
-    // stream.pai / hrv / hrv_rmssd / vo2max / stress (Kurzformen wie „PAI", „Stress").
+    // unidentifiedInitial („?“), refreshFailedPeriod („.“),
+    // stream.pai / hrv / hrv_rmssd / vo2max / stress (Kurzformen wie „PAI“, „Stress“).
     'views/Settings': {
       title: 'Einstellungen',
       intro:
@@ -364,7 +364,7 @@ Antworte auf Deutsch in Markdown.`,
       manualFormTitle: 'Anmeldedaten eingeben',
       manualFormHint:
         'Aus einem Mitschnitt von mitmproxy/Charles oder den Browser-Entwicklerwerkzeugen übernehmen. Drei Felder:',
-      manualTokenPlaceholder: 'Aus dem HTTP-Header „apptoken" kopieren',
+      manualTokenPlaceholder: 'Aus dem HTTP-Header „apptoken“ kopieren',
       manualUserIdPlaceholder: 'Aus dem URL-Pfad /users/{user_id}/ übernehmen',
       manualSaving: 'Wird gespeichert…',
       manualSave: 'Anmeldedaten speichern',
@@ -390,7 +390,7 @@ Antworte auf Deutsch in Markdown.`,
       unknownDeviceBodyA: 'Manche Zepp-Konten liefern Geräteeinträge mit ',
       unknownDeviceNoName: 'gar keinem Produktnamen-Feld',
       unknownDeviceBodyB:
-        ' – nur interne Nummern, aus denen sich kein Modell ableiten lässt. „Geräte erneut erkennen" zu drücken ändert daran nie etwas. Du kannst oben selbst das Modell auswählen: Es wird als „Von dir gewähltes Modell" gekennzeichnet und nie als automatische Zuordnung ausgegeben.',
+        ' – nur interne Nummern, aus denen sich kein Modell ableiten lässt. „Geräte erneut erkennen“ zu drücken ändert daran nie etwas. Du kannst oben selbst das Modell auswählen: Es wird als „Von dir gewähltes Modell“ gekennzeichnet und nie als automatische Zuordnung ausgegeben.',
       unknownDeviceReport:
         'Einen Fehlerbericht zu senden hilft, die Nummern dieses Geräts in den eingebauten Katalog zu bekommen, sodass es danach niemand mehr von Hand auswählen muss. Der Bericht enthält eine feste Whitelist von Feldern und braucht kein GitHub-Konto.',
       reportWhat: 'Was ist nicht in Ordnung',
@@ -422,7 +422,7 @@ Antworte auf Deutsch in Markdown.`,
       capabilityEmptyBody: 'Nach einer Synchronisierung leuchten sie auf.',
       probeSummary: 'Endpunkt-Diagnose',
       probeNote:
-        '„Nicht abgerufen" heißt nicht, dass das Gerät es nicht hat: Zepps Endpunkte antworten auf nicht vorhandene Datenströme einfach leer; nur eine klare Weigerung wird als „dein Gerät liefert das nicht" gemeldet.',
+        '„Nicht abgerufen“ heißt nicht, dass das Gerät es nicht hat: Zepps Endpunkte antworten auf nicht vorhandene Datenströme einfach leer; nur eine klare Weigerung wird als „dein Gerät liefert das nicht“ gemeldet.',
       probing: 'Prüfung läuft…',
       probeRun: 'Jetzt erneut prüfen',
       probedToday: 'heute geprüft',
@@ -439,15 +439,15 @@ Antworte auf Deutsch in Markdown.`,
       codeNumber: (code: number) => `Zepp-Code ${code}`,
       codeRecords: (count: number) =>
         `${count} ${count === 1 ? 'lokaler Eintrag bekommt' : 'lokale Einträge bekommen'} diesen Namen`,
-      codeShownAs: (label: string) => `Wird derzeit als „${label}" angezeigt`,
-      codeShownAsUnknown: (code: number) => `Wird derzeit als „Nicht erkanntes Training (Code ${code})" angezeigt`,
+      codeShownAs: (label: string) => `Wird derzeit als „${label}“ angezeigt`,
+      codeShownAsUnknown: (code: number) => `Wird derzeit als „Nicht erkanntes Training (Code ${code})“ angezeigt`,
       codeInputAria: (code: number) => `Eigener Name für Code ${code}`,
-      codeInputPlaceholder: 'Gib ihm einen Namen, z. B. „Meine Core-Einheit"',
+      codeInputPlaceholder: 'Gib ihm einen Namen, z. B. „Meine Core-Einheit“',
       codeSaving: 'Wird gespeichert…',
       codeSave: 'Speichern',
       codeFootnote:
         'Der Name bleibt auf diesem Rechner, wird nie zu Zepp zurückgeschickt und überlebt ein Neueinlesen. Leer speichern löscht ihn.',
-      codeSaved: (code: number, label: string) => `Code ${code} wird jetzt als „${label}" angezeigt.`,
+      codeSaved: (code: number, label: string) => `Code ${code} wird jetzt als „${label}“ angezeigt.`,
       codeCleared: (code: number) => `Der eigene Name für Code ${code} wurde gelöscht.`,
       codeSaveFailed: 'Der eigene Trainingsname konnte nicht gespeichert werden',
       codeSuggestions: ['Kraft', 'Core', 'HIIT', 'Dehnen', 'Reha', 'Eigene Einheit'],
@@ -462,7 +462,7 @@ Antworte auf Deutsch in Markdown.`,
         'Standard sind Windows-Anmeldeinformationsverwaltung / macOS-Schlüsselbund / Linux-Schlüsselring. macOS und Linux können ausdrücklich eine Klartext-Anmeldedatei nutzen, die nur dein Benutzer lesen und schreiben darf; Linux unterstützt zusätzlich Umgebungsvariablen. auth.json enthält nur Konto- und Regions-Metadaten. Token landen nie in Logs, Datenexporten oder Fehlerberichten.',
       privacyTelemetryTitle: 'Keine Telemetrie, keine Nutzungsstatistik',
       privacyTelemetryBody:
-        'Die App meldet von sich aus kein Nutzungsverhalten. Nur wenn du selbst „Fehlerbericht senden" drückst, gehen die unten aufgeführten anonymisierten Felder raus.',
+        'Die App meldet von sich aus kein Nutzungsverhalten. Nur wenn du selbst „Fehlerbericht senden“ drückst, gehen die unten aufgeführten anonymisierten Felder raus.',
       privacyModalLink: 'Die lokalen Datenschutz-Prinzipien lesen',
       privacyReportTitle: 'Ein Gerät oder Training nicht erkannt?',
       privacyReportBody:
@@ -472,10 +472,10 @@ Antworte auf Deutsch in Markdown.`,
       mcpTitle: '5. MCP (KI-Werkzeuge fragen direkt deine lokalen Daten)',
       mcpBadge: 'Nur lesend · hört auf keinem Port',
       mcpSkip: 'Wenn dir MCP nichts sagt, überspringe diesen Abschnitt – er ändert nichts an ZeppBridges Funktionen.',
-      mcpCompareA: 'Kurz gesagt: „An KI übergeben" heißt, du exportierst und fügst ein; MCP heißt, ',
+      mcpCompareA: 'Kurz gesagt: „An KI übergeben“ heißt, du exportierst und fügst ein; MCP heißt, ',
       mcpCompareStrong: 'die KI fragt selbst nach',
       mcpCompareB:
-        ' – einmal eingerichtet sagst du „wie habe ich diesen Monat geschlafen", und sie fragt deine lokale Datenbank. Nützlich nur für KI-Programmierwerkzeuge auf deinem Rechner (Claude Code, Codex, Grok und Ähnliche).',
+        ' – einmal eingerichtet sagst du „wie habe ich diesen Monat geschlafen“, und sie fragt deine lokale Datenbank. Nützlich nur für KI-Programmierwerkzeuge auf deinem Rechner (Claude Code, Codex, Grok und Ähnliche).',
       mcpAskA: 'Die Einrichtung ist je nach Werkzeug verschieden; statt hier einen Aufsatz zu schreiben, ',
       mcpAskStrong: 'kopiere den Text unten in die KI, die du wirklich benutzt',
       mcpAskB: ', und lass dich von ihr auf deinem Rechner durch die Einrichtung führen.',
@@ -533,7 +533,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       defaultFormatAria: 'Standard-Exportformat',
       historyRangeLabel: 'Zeitraum des Historie-Nachladens',
       historyRangeAria: 'Tage für das Historie-Nachladen',
-      exportNote: 'Legt das Standardformat auf der Seite „An KI übergeben" und das Fenster des Cloud-Nachladens fest.',
+      exportNote: 'Legt das Standardformat auf der Seite „An KI übergeben“ und das Fenster des Cloud-Nachladens fest.',
       startBackfill: 'Ein Historie-Nachladen starten',
       formatJsonHint: 'Strukturierte Daten',
       formatCsvHint: 'Tabellendaten',
@@ -651,7 +651,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       apiDisabled: 'Die lokale API ist aus, der Port ist frei.',
       apiToggleFailed: 'Die lokale API konnte nicht umgeschaltet werden',
       apiTokenCopied: 'Zugriffstoken in die Zwischenablage kopiert.',
-      apiTokenCopyFailed: 'Konnte nicht in die Zwischenablage schreiben. Drücke „Anzeigen" und kopiere ihn von Hand.',
+      apiTokenCopyFailed: 'Konnte nicht in die Zwischenablage schreiben. Drücke „Anzeigen“ und kopiere ihn von Hand.',
       apiRegenerateConfirm:
         'Neu erzeugen macht den alten Token sofort ungültig, und jedes lokale Programm, das ihn nutzt, muss aktualisiert werden. Fortfahren?',
       apiTokenRegenerated: 'Ein neuer Zugriffstoken wurde erzeugt. Der alte ist ungültig.',
@@ -673,7 +673,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         'GPS-Koordinaten gehen standardmäßig nie in die KI-Zwischenablage – dein Zuhause und deine üblichen Strecken bleiben privat.',
       privacyPoint4Title: '4. Fehlerberichte entscheidest du: ',
       privacyPoint4:
-        'erst nachdem du „Fehlerbericht senden" gedrückt und bestätigt hast, geht eine feste Whitelist produktbezogener Diagnosen raus. Nie gehen dein Konto, Geräte-IDs, Trainingsdetails oder Gesundheitsdaten raus, und es wird nie ein GitHub-Issue für dich geöffnet.',
+        'erst nachdem du „Fehlerbericht senden“ gedrückt und bestätigt hast, geht eine feste Whitelist produktbezogener Diagnosen raus. Nie gehen dein Konto, Geräte-IDs, Trainingsdetails oder Gesundheitsdaten raus, und es wird nie ein GitHub-Issue für dich geöffnet.',
       privacyPoint5Title: '5. Durchgehend Open Source: ',
       privacyPoint5: 'die gesamte Codebasis ist offen, ohne versteckte Logik, die nach Hause funkt.',
       privacyModalOk: 'Verstanden',
@@ -780,7 +780,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       reportCategory: {
         device: {
           label: 'Ein Gerät wurde nicht erkannt',
-          hint: 'das Modell ist falsch, oder es zeigt „Nicht erkannt"',
+          hint: 'das Modell ist falsch, oder es zeigt „Nicht erkannt“',
         },
         workout: {
           label: 'Ein Trainingstyp wurde nicht erkannt',
@@ -851,7 +851,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       compareExchange:
         ' ist Datenaustausch für andere Werkzeuge und enthält nur den gewählten Zeitraum; ',
       compareLead:
-        'Drei Dinge heißen hier „Export" und sind nicht dasselbe: ',
+        'Drei Dinge heißen hier „Export“ und sind nicht dasselbe: ',
       comparePack:
         ' ist Material, das du bewusst auswählst und für ein externes Modell anonymisierst. Nur ein Snapshot versetzt die Datenbank in den früheren Zustand zurück.',
       comparePackName: 'ein KI-Paket',
@@ -967,7 +967,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         'Sendet an ZeppBridge das von dir gewählte Modell plus die Modellnummern dieses Geräts (deviceSource / deviceType, nur Ganzzahlen). Beides sagt nur, welche Uhr es ist – nichts weiter: kein Konto, keine Seriennummer, keine MAC, keine Gesundheitsdaten. Huami veröffentlicht keine Zuordnungstabelle für diese Nummern, deshalb wächst der eingebaute Katalog nur so. Sobald ein paar Leute auf ein Modell gezeigt haben, wird es für alle automatisch erkannt.',
       contributeTitle: 'Hilf der nächsten Version, dieses Gerät selbst zu erkennen',
       empty:
-        'Kein Modell passt. Versuche einen anderen Suchbegriff oder stelle den Filter zurück auf „Alle".',
+        'Kein Modell passt. Versuche einen anderen Suchbegriff oder stelle den Filter zurück auf „Alle“.',
       filterAll: 'Alle',
       filterBand: 'Fitnessbänder',
       filterEarbuds: 'Ohrhörer',
@@ -977,7 +977,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       later: 'Nicht jetzt',
       next: 'Nächstes Modell',
       note:
-        'Deine Auswahl erscheint als „Von dir gewähltes Modell" und wird nie als automatische Zuordnung ausgegeben. Bilder und Modellnamen kommen aus dem mitgelieferten Katalog; das Blättern braucht kein Netz.',
+        'Deine Auswahl erscheint als „Von dir gewähltes Modell“ und wird nie als automatische Zuordnung ausgegeben. Bilder und Modellnamen kommen aus dem mitgelieferten Katalog; das Blättern braucht kein Netz.',
       pickerAria: 'Gerätemodell von Hand auswählen',
       prev: 'Voriges Modell',
       searchAria: 'Nach Modellname suchen',
@@ -1099,14 +1099,14 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
           other: `${attempts} Versuche`,
         }),
       failedExhausted:
-        'Die automatischen Wiederholungen sind aufgebraucht. Nutze „Fehlgeschlagene Monate erneut versuchen"',
+        'Die automatischen Wiederholungen sind aufgebraucht. Nutze „Fehlgeschlagene Monate erneut versuchen“',
       failedIntro:
         'Diese Blöcke sind fehlgeschlagen. Alle anderen Monate waren unbetroffen und wurden wie üblich nachgeladen.',
       failedNoReason: 'Kein Grund aufgezeichnet',
       failedRow: (stream: string, month: string) => `${stream} · ${month}`,
       failedTitle: 'Monate, die nicht geholt werden konnten',
       intro:
-        'Das Archiv deckt „ab heute nichts mehr löschen" ab, das Nachladen deckt „hole, was früher war". Erst mit beidem ist die lokale Kopie wirklich vollständig.',
+        'Das Archiv deckt „ab heute nichts mehr löschen“ ab, das Nachladen deckt „hole, was früher war“. Erst mit beidem ist die lokale Kopie wirklich vollständig.',
       ledgerComplete:
         'Jeder Monatsblock im Protokoll ist erledigt: entweder lokal geschrieben, oder die Cloud hat klar gesagt, dass sie für diesen Zeitraum nichts hat.',
       ledgerFailed: (failed: number) => `${failed} fehlgeschlagen`,
@@ -1139,17 +1139,17 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         'Die fehlgeschlagenen Monate sind wieder eingereiht. Du kannst weiter nachladen.',
       retryFailedFailed: 'Die fehlgeschlagenen Monate ließen sich nicht wieder einreihen',
       roundDone: (remaining: number) =>
-        `Diese Runde ist fertig; ${remaining} Monatsblöcke bleiben. Drücke „Weiter nachladen", um fortzufahren – du kannst jederzeit stoppen.`,
+        `Diese Runde ist fertig; ${remaining} Monatsblöcke bleiben. Drücke „Weiter nachladen“, um fortzufahren – du kannst jederzeit stoppen.`,
       roundProgress: (done: number, total: number) =>
         `Nachladen: ${done} von ${total} Monatsblöcken fertig. Du kannst jederzeit stoppen.`,
       stalled: (remaining: number) =>
-        `${remaining} Monatsblöcke bleiben, aber diese Runde hat keinen vorangebracht und wurde gestoppt. Vermutlich scheitern diese Blöcke wiederholt – sieh dir die Fehlerliste unten an oder drücke „Fehlgeschlagene Monate erneut versuchen".`,
+        `${remaining} Monatsblöcke bleiben, aber diese Runde hat keinen vorangebracht und wurde gestoppt. Vermutlich scheitern diese Blöcke wiederholt – sieh dir die Fehlerliste unten an oder drücke „Fehlgeschlagene Monate erneut versuchen“.`,
       startAria: 'Start des Historie-Nachladens',
       startBackfill: 'Nachladen starten',
       startLabel: 'Nachladen ab',
       stopBackfill: 'Stopp',
       stoppedByUser: (remaining: number) =>
-        `Gestoppt, ${remaining} Monatsblöcke bleiben. Alles bereits Geholte bleibt – drücke „Weiter nachladen", um fortzufahren.`,
+        `Gestoppt, ${remaining} Monatsblöcke bleiben. Alles bereits Geholte bleibt – drücke „Weiter nachladen“, um fortzufahren.`,
       stopping: 'Wird gestoppt…',
       stream: {
         daily_summary: 'Tagesübersichten',
@@ -1162,7 +1162,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       streamSeparator: ', ',
       title: 'Langzeitarchiv und vollständige Historie',
       unmeasured: (streams: string) =>
-        `Zu wenig lokale Messwerte für eine Schätzung: ${streams}. Diese zählen nicht in die Summe oben – lieber „wir wissen es nicht" sagen als eine Rate zu erfinden und sie über Jahre zu multiplizieren.`,
+        `Zu wenig lokale Messwerte für eine Schätzung: ${streams}. Diese zählen nicht in die Summe oben – lieber „wir wissen es nicht“ sagen als eine Rate zu erfinden und sie über Jahre zu multiplizieren.`,
       wouldBeCleanedUp: (requested: number, retention: number) =>
         `Dieses Nachladen würde ${requested} Tage Historie holen, aber dieser Rechner behält nur die letzten ${retention} Tage – was zurückkommt, würde bei der nächsten erfolgreichen Synchronisierung gelöscht. Schalte zuerst das Langzeitarchiv ein oder verlängere die Aufbewahrungsfrist.`,
     },
@@ -1217,7 +1217,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         missing_duration: 'keine Dauer',
       },
       footnote:
-        'Alle Schlüsse hier vergleichen dich mit deiner eigenen Historie – nie mit einem Bevölkerungsmaßstab – und nichts davon ist eine medizinische Beurteilung. Fehlende Daten stehen als „Nicht angegeben" da, statt mit einer Null gefüllt zu werden.',
+        'Alle Schlüsse hier vergleichen dich mit deiner eigenen Historie – nie mit einem Bevölkerungsmaßstab – und nichts davon ist eine medizinische Beurteilung. Fehlende Daten stehen als „Nicht angegeben“ da, statt mit einer Null gefüllt zu werden.',
       handoff: 'KI vertiefen lassen',
       metric: {
         'run.avg_hr': 'Ø HF',
@@ -1321,7 +1321,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         `Deine Modellauswahl ist auf diesem Rechner gespeichert. Der Katalogbeitrag konnte nicht gesendet werden: ${reason}`,
       assignmentFailed: 'Die Modellauswahl konnte nicht gespeichert werden',
       assignmentSaved:
-        'Deine Auswahl ist gespeichert. Sie erscheint als „Von dir gewähltes Modell" – nie als automatische Zuordnung.',
+        'Deine Auswahl ist gespeichert. Sie erscheint als „Von dir gewähltes Modell“ – nie als automatische Zuordnung.',
       cacheUnavailable: 'Der Geräte-Cache ist gerade nicht verfügbar',
       identifyUnavailable: 'Die Geräteerkennung ist gerade nicht verfügbar',
       networkUnavailable: 'Netzwerk nicht verfügbar',
@@ -1367,7 +1367,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       groupTraining: 'Training',
       invalidDates: 'Wähle ein gültiges Start- und Enddatum.',
       jsonFilter: 'JSON-Datei',
-      jsonTooLarge: 'Das JSON ist über 1 MB. Nutze stattdessen „Datei speichern".',
+      jsonTooLarge: 'Das JSON ist über 1 MB. Nutze stattdessen „Datei speichern“.',
       noDataTypes: 'Wähle mindestens einen Datentyp.',
       nothingToExport: 'In diesem Zeitraum gibt es nichts zu exportieren.',
       rangeTooLong: (days: number) =>
@@ -1748,7 +1748,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
     'views/DeviceDetail': {
       assignAria: 'Modellerkennung',
       assignSub:
-        'Wenn die Zuordnung falsch ist – etwa ist es wirklich eine Balance 2 und hier steht ein anderes Modell –, kannst du selbst auf das richtige Modell zeigen. Deine Auswahl bleibt auf diesem Rechner, erscheint als „Von dir gewähltes Modell" statt sich als automatische Zuordnung auszugeben, und lässt sich jederzeit zurücknehmen.',
+        'Wenn die Zuordnung falsch ist – etwa ist es wirklich eine Balance 2 und hier steht ein anderes Modell –, kannst du selbst auf das richtige Modell zeigen. Deine Auswahl bleibt auf diesem Rechner, erscheint als „Von dir gewähltes Modell“ statt sich als automatische Zuordnung auszugeben, und lässt sich jederzeit zurücknehmen.',
       assignTitle: 'Stimmt das?',
       backToSettings: 'Zurück zu den Einstellungen',
       changeModel: 'Anderes wählen',
@@ -1792,7 +1792,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         },
         reauth: {
           label: 'Zepp-Konto erneut verbinden',
-          reason: 'Manche Datenströme können nicht abrufen, weil die Anmeldedaten abgelaufen sind.',
+          reason: 'Manche Datenströme lassen sich nicht abrufen, weil die Anmeldedaten abgelaufen sind.',
         },
         reprocess: {
           label: 'Lokale Rohdaten mit dem aktuellen Parser neu einlesen',
@@ -1928,7 +1928,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       timingReplay: 'Letztes lokales Neueinlesen',
       timingReplayNote:
         'Liest lokale Rohdaten mit dem aktuellen Parser neu. Kein Netz, und es überschreibt nicht die Zeit oben.',
-      timingsTitle: 'Drei verschiedene „letzte Male"',
+      timingsTitle: 'Drei verschiedene „letzte Male“',
       title: 'Datenzustandsprüfung',
       window30: 'Letzte 30 Tage',
       window365: 'Letztes Jahr',
@@ -1947,7 +1947,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       dailyMaxNote:
         'Hier zählen nur die rohen Einzelmesswerte auf diesem Rechner. Zepps Tageshöchstwert wird uns nie gesendet (das device_max_hr in der Bibliothek ist das eingestellte Maximum für die Zonengrenzen, keine gemessene Spitze), also gibt es hier nichts danebenzustellen – öffne die Zepp-App, um den Wert des Tages zu vergleichen.',
       dailyMaxSparse: (days: number) =>
-        `${days} dieser Tage haben sehr wenige Messwerte (unter 60). An diesen Tagen ist die „Spitze" nur der höchste dieser wenigen Punkte, nicht die echte Tages-Spitze – sie sind als hohle Markierungen gezeichnet.`,
+        `${days} dieser Tage haben sehr wenige Messwerte (unter 60). An diesen Tagen ist die „Spitze“ nur der höchste dieser wenigen Punkte, nicht die echte Tages-Spitze – sie sind als hohle Markierungen gezeichnet.`,
       dailyMaxSub:
         'Die Zepp-App filtert ihre Tages-Spitze; hier wird nicht gefiltert. Dass die Zahlen abweichen, ist erwartbar.',
       dailyMaxTitle: 'Tägliche Spitzenherzfrequenz (Roh-Messwerte dieses Rechners)',
@@ -2106,7 +2106,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       deviceUndetermined: 'Gerät unbestimmt',
       durationKicker: 'Schlafdauer',
       footnote:
-        'Nur die Phasen-Zusammenfassung, die die Cloud wirklich geliefert hat. Gibt es kein REM-Feld, steht „Nicht angegeben" – nie per Subtraktion errechnet – und eine nicht gelieferte Zeitachse wird nie gezeichnet.',
+        'Nur die Phasen-Zusammenfassung, die die Cloud wirklich geliefert hat. Gibt es kein REM-Feld, steht „Nicht angegeben“ – nie per Subtraktion errechnet – und eine nicht gelieferte Zeitachse wird nie gezeichnet.',
       heroAria: 'Schlafdauer und Score',
       heroMeta: (fellAsleep: string, wokeUp: string, inBed: string) =>
         `Eingeschlafen ${fellAsleep} · aufgewacht ${wokeUp} · im Bett ${inBed}`,
@@ -2221,11 +2221,11 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
 Analysiere diese Einheit nur anhand der Fakten in diesem Eintrag: die Intensität, wie Tempo und Herzfrequenz zusammenhängen, ob es einen deutlichen Einbruch oder einen auffälligen Abschnitt gibt, und was ich beim nächsten Mal konkret anders machen soll.
 
 Regeln:
-- Diese Daten enthalten keinen Bevölkerungsmaßstab. Vergleiche mich nicht mit „gesunden Erwachsenen" oder einem Durchschnitt.
+- Diese Daten enthalten keinen Bevölkerungsmaßstab. Vergleiche mich nicht mit „gesunden Erwachsenen“ oder einem Durchschnitt.
 - Wo etwas fehlt, sag, dass es fehlt. Fülle die Lücke nie mit einer Null oder einer Schätzung.
 - Keine medizinische Diagnose, keine Krankheitsrisiko-Einschätzung, keine Behandlungsempfehlung.
 
-Antworte in Markdown.`,
+Antworte auf Deutsch in Markdown.`,
       attachmentNotOpened: (provider: string) =>
         `Das Datenpaket wurde auf deinen Desktop geschrieben (zeppbridge-ai-handoff.json). Der Prompt liegt in deiner Zwischenablage; öffne ${provider} selbst.`,
       attachmentOpened: (provider: string) =>
