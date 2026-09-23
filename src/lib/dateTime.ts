@@ -30,6 +30,7 @@ const words = defineMessages(
   { time: '时间格式', date: '日期格式', regional: '跟随系统地区', '12h': '12 小时', '24h': '24 小时', ymd: '年/月/日', dmy: '日/月/年', mdy: '月/日/年' },
   { time: 'Time format', date: 'Date format', regional: 'System region', '12h': '12-hour', '24h': '24-hour', ymd: 'Year/month/day', dmy: 'Day/month/year', mdy: 'Month/day/year' },
   { time: 'Formato de hora', date: 'Formato de fecha', regional: 'Región del sistema', '12h': '12 horas', '24h': '24 horas', ymd: 'Año/mes/día', dmy: 'Día/mes/año', mdy: 'Mes/día/año' },
+  'lib/dateTime',
 );
 export const dateTimeLabels = computed(() => messagesOf(words));
 

@@ -138,6 +138,7 @@ const messages = defineMessages(
     tooltipRow: (name: string, hours: number) => `${name}: ${hours} h<br/>`,
     tooltipRowMissing: (name: string) => `${name}: Sin datos<br/>`,
   },
+  'views/SleepDetail',
 );
 const t = useMessages(messages);
 import EmptyState from '../components/EmptyState.vue';

@@ -42,6 +42,7 @@ export const lifeEventMessages = defineMessages(
     local: 'Se guardan localmente y se incluyen en las copias de seguridad. Puedes incluirlos al compartir datos con la IA.',
     categories: { health: 'Salud y recuperación', travel: 'Viajes', routine: 'Rutina y estilo de vida', training: 'Entrenamiento y carreras', other: 'Otros' },
   },
+  'lib/lifeEvents',
 );
 
 export function validEventDate(date: string): boolean {

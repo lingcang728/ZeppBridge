@@ -152,6 +152,7 @@ const messages = defineMessages(
     chronicTooltip: (value: string) => `Promedio semanal de 28 días <b>${value}</b>`,
     ratioTooltip: (value: string) => `Aguda:crónica <b>${value}</b>`,
   },
+  'views/TrainingStatus',
 );
 const t = useMessages(messages);
 

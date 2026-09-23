@@ -124,6 +124,7 @@ const messages = defineMessages(
       'weekly.training_load': 'Carga de entrenamiento',
     },
   },
+  'components/WeeklyReportCard',
 );
 const t = useMessages(messages);
 

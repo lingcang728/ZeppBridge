@@ -35,6 +35,7 @@ const messages = defineMessages(
       `Local primero y con las fuentes intactas: ${first}, ${second} y ${count} dispositivos en total, organizados en un historial de salud que realmente puedes leer.`,
     notProvided: 'Sin datos',
   },
+  'lib/deviceCopy',
 );
 
 const copy = () => messagesOf(messages);

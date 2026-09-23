@@ -25,6 +25,7 @@ const messages = defineMessages(
     noCanonical: 'La nube devolvió datos, pero no se pudo extraer ningún registro utilizable',
     noReason: 'No se registró el motivo',
   },
+  'lib/failedChunkText',
 );
 
 /** 只声明这里要读的字段，方便直接拿数据库行来测。 */

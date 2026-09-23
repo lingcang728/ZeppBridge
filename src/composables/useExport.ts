@@ -173,6 +173,7 @@ const messages = defineMessages(
     feedUpdated: (count: number) => `La fuente local para IA ahora tiene ${count} registros.`,
     feedFailed: 'No se pudo actualizar la fuente local para IA',
   },
+  'composables/useExport',
 );
 
 const copy = () => messagesOf(messages);

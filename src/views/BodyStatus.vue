@@ -267,6 +267,7 @@ const messages = defineMessages(
     macroNote: 'Las proporciones se calculan aquí a partir de los gramos diarios usando 4/9/4 kcal por gramo (proteína / grasa / carbohidratos). No las envía la nube y pueden diferir en un punto o dos de los porcentajes de la app Zepp. No se dibuja nada si no están los tres.',
     gramsPerDay: (grams: number) => `${grams} g por día en promedio`,
   },
+  'views/BodyStatus',
 );
 const t = useMessages(messages);
 

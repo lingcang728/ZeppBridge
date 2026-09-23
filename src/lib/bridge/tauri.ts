@@ -116,7 +116,7 @@ export const tauriBackend: BridgeBackend = {
     return call<AppStatus>('manual_auth', { appToken, userId, regionHost });
   },
 
-  startWebLogin(locale: 'zh' | 'en') {
+  startWebLogin(locale: string) {
     return call<LoginStatus>('start_web_login', { locale });
   },
 

@@ -97,6 +97,7 @@ const messages = defineMessages(
     minutesHint: 'Minutos que el reloj contó como activos',
     minutesUnit: 'min',
   },
+  'views/ActivityDetail',
 );
 const t = useMessages(messages);
 

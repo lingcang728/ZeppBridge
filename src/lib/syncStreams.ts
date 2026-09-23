@@ -69,6 +69,7 @@ const messages = defineMessages(
     breathing_rate: 'Frecuencia respiratoria',
     skin_temperature: 'Temperatura de la piel',
   },
+  'lib/syncStreams',
 );
 
 /**

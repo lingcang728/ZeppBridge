@@ -11,7 +11,7 @@
   [![Linux](https://img.shields.io/badge/Linux-仅有构建-E95420?logo=linux&logoColor=white)](docs/guides/linux.zh-CN.md)
   [![版本](https://img.shields.io/github/v/release/lingcang728/ZeppBridge?color=8FB348&label=版本)](https://github.com/lingcang728/ZeppBridge/releases)
 
-  <p><a href="README.md">English</a></p>
+  <p><a href="README.md">English</a> · <strong>简体中文</strong> · <a href="README.es.md">Español</a> · <a href="README.nl.md">Nederlands</a> · <a href="README.pt-BR.md">Português (Brasil)</a> · <a href="README.pt-PT.md">Português</a> · <a href="README.de.md">Deutsch</a> · <a href="README.ru.md">Русский</a> · <a href="README.hi-IN.md">हिन्दी</a> · <a href="README.fr.md">Français</a></p>
 </div>
 
 > [!IMPORTANT]
@@ -28,7 +28,7 @@
 - **想导出就能导出。** JSON、CSV、GPX 三种格式，随便丢进 Excel、Strava 或你自己的脚本。
 - **想让 AI 分析，一键就走。** 挑好时间范围和数据类型，自动打包成 AI 读得懂的格式并去掉敏感信息，复制粘贴给 ChatGPT、DeepSeek、豆包都行。
 - **也能不开窗口用。** 附带一个无交互命令行（可以挂到任务计划或 cron）和一个只读 MCP 服务（让 AI 直接查你的本机数据，不必先把数据交出去）。
-- **中英双语界面。** 首次启动跟随系统语言，设置页随时可以切；日期和数字格式也跟着走。
+- **界面有十种语言。** 首次启动跟随系统语言，设置页随时可以切；日期和数字格式也跟着走。
 
 还有一件事值得单独说：**它不会替你把数据补漂亮。**
 

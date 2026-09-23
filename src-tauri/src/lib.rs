@@ -5,6 +5,7 @@ mod ipc_error;
 mod ipc_types;
 mod local_api;
 mod main_window;
+mod tray_i18n;
 mod updates;
 
 // The desktop shell is an adapter over the shared core: models, storage,
@@ -96,41 +97,8 @@ fn main_window_size(work_width: u32, work_height: u32, scale: f64) -> Option<(f6
     Some((width.max(MIN_WINDOW_WIDTH), height.max(MIN_WINDOW_HEIGHT)))
 }
 
-/// 托盘菜单的三条文案。原生菜单没法走前端的 i18n，只能在这里备一份。
-struct TrayLabels {
-    show: &'static str,
-    sync: &'static str,
-    quit: &'static str,
-}
-
-fn tray_labels(chinese: bool) -> TrayLabels {
-    if chinese {
-        TrayLabels {
-            show: "打开窗口",
-            sync: "立即同步",
-            quit: "退出",
-        }
-    } else {
-        TrayLabels {
-            show: "Open ZeppBridge",
-            sync: "Sync now",
-            quit: "Quit",
-        }
-    }
-}
-
-/// 按前端的界面语言取托盘文案。西语单独一份，其余非中文一律英文。
-fn tray_labels_for(locale: &str) -> TrayLabels {
-    let locale = locale.trim().to_ascii_lowercase();
-    if locale.starts_with("es") {
-        return TrayLabels {
-            show: "Abrir ZeppBridge",
-            sync: "Sincronizar ahora",
-            quit: "Salir",
-        };
-    }
-    tray_labels(locale.starts_with("zh"))
-}
+// 托盘文案表在 `tray_i18n.rs`（S6 的十语言表）：本文件只留调用点。
+// `tray_i18n::tray_labels` 自己归一语言码，`pt-BR`/`de-AT`/env 形参都收。
 
 fn handle_exit_requested(app: &AppHandle, api: &tauri::ExitRequestApi) {
     if EXIT_AFTER_WRITERS.load(Ordering::SeqCst) {
@@ -176,16 +144,19 @@ struct TrayMenuItems {
     quit: MenuItem<tauri::Wry>,
 }
 
-/// 系统语言是不是中文。
+/// 系统的界面语言码，形如 `zh-CN` / `de_DE.UTF-8`。取不到返回 `None`。
 ///
-/// 只在前端还没告诉我们语言之前用一次。判断标准和前端 `detectLocale` 一致：
-/// 明确以 `zh` 开头才算中文，其余一律英文。
-fn system_prefers_chinese() -> bool {
+/// 只在前端还没告诉我们语言之前用一次（托盘首建）。`tray_i18n::tray_labels`
+/// 负责归一与回落，这里把原始语言码原样交出去。
+fn system_ui_locale() -> Option<String> {
     for key in ["LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"] {
         if let Some(value) = std::env::var_os(key) {
-            let value = value.to_string_lossy().to_ascii_lowercase();
-            if !value.is_empty() {
-                return value.starts_with("zh");
+            let value = value.to_string_lossy();
+            // `LANGUAGE` 可以是 `zh_CN:en` 这样的偏好列表，只取首项；
+            // 其余变量没有冒号，split 是无害的恒等操作。
+            let first = value.split(':').next().unwrap_or_default().trim();
+            if !first.is_empty() {
+                return Some(first.to_string());
             }
         }
     }
@@ -198,10 +169,10 @@ fn system_prefers_chinese() -> bool {
         // 的机器上要 0.5~2 秒——主界面就干等这么久，且这段等待没有任何界面
         // 反馈。`GetUserDefaultLocaleName` 是同一件事的原生写法，微秒级。
         if let Some(name) = windows_ui_locale() {
-            return name.to_ascii_lowercase().starts_with("zh");
+            return Some(name);
         }
     }
-    false
+    None
 }
 
 /// 用户的界面语言，形如 `zh-CN` / `en-US`。取不到就返回 `None`。
@@ -228,7 +199,7 @@ fn set_tray_locale(app: AppHandle, locale: String) -> std::result::Result<(), ip
     let Some(items) = app.try_state::<TrayMenuItems>() else {
         return Ok(());
     };
-    let labels = tray_labels_for(&locale);
+    let labels = tray_i18n::tray_labels(&locale);
     let _ = items.show.set_text(labels.show);
     let _ = items.sync.set_text(labels.sync);
     let _ = items.quit.set_text(labels.quit);
@@ -553,7 +524,7 @@ pub fn run() {
             // 托盘菜单是原生的，界面那套 i18n 到不了这里，而它又是英文用户
             // 一定会右键点开的东西。托盘在前端加载之前就要建起来，所以先按
             // 系统语言给一份，前端确定语言后再用 `set_tray_locale` 校正。
-            let labels = tray_labels(system_prefers_chinese());
+            let labels = tray_i18n::tray_labels(&system_ui_locale().unwrap_or_default());
             let show = MenuItem::with_id(app, "show", labels.show, true, None::<&str>)?;
             let sync = MenuItem::with_id(app, "sync", labels.sync, true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", labels.quit, true, None::<&str>)?;

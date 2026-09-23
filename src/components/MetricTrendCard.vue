@@ -47,6 +47,7 @@ const messages = defineMessages(
     minimum: 'Mín.',
     maximum: 'Máx.',
   },
+  'components/MetricTrendCard',
 );
 const t = useMessages(messages);
 

@@ -197,20 +197,27 @@ way to tell which one is right.
   mode and no theme switch. The only adjustable dimension is interface scale
   (80%–125%, in Settings → "Advanced and maintenance", or Ctrl + / Ctrl - /
   Ctrl 0).
-- The interface is **bilingual, Chinese and English**. On first launch it
-  follows the system language (Chinese only when the system explicitly says so);
-  the Settings page header switches it at any time, and the choice is stored in
+- The interface ships in **ten languages**: zh, en and es are defined inline
+  with the code that uses them; nl, pt-BR, pt-PT, de, ru, hi-IN and fr are
+  lazy-loaded language packs. On first launch it follows the system language
+  (Chinese only when the system explicitly says so); the Settings page header
+  switches it at any time, and the choice is stored in
   `localStorage['zeppbridge-locale']`. Dates, weekday names and number grouping
   follow the language too (`i18n/intlLocale()`), not just the words.
   - **vue-i18n is deliberately not used.** It was measured: wiring it up
     (runtime build included, before translating a single string) grew the
     first-screen gzip from 73.0 kB to 91.6 kB, 7.6 kB over the size budget. The
     hand-rolled layer is under a screenful of code and adds 0.4 kB.
-  - Copy lives with the module that uses it (`defineMessages(zh, en)` inline,
-    with a matching `*.i18n.ts` for large pages) rather than in one global
-    dictionary, so a lazily loaded page's chunk still carries only its own copy.
+  - Copy lives with the module that uses it (`defineMessages(zh, en, es?, moduleId?)`
+    inline, with a matching `*.i18n.ts` for large pages) rather than in one
+    global dictionary, so a lazily loaded page's chunk still carries only its
+    own copy. The seven pack languages never touch call sites: a bundle that
+    sets `moduleId` gets its copy overlaid by
+    `src/i18n/locales/<locale>.ts`, one file per language, `import()`ed at most
+    once when that language is picked — so they stay out of the first screen.
   - `defineMessages` uses `NoInfer` to pin the shape to the Chinese half, so a
-    missing English key, an extra key or a mismatched parameter fails to compile.
+    missing English key, an extra key or a mismatched parameter fails to
+    compile. The Spanish half may be partial; keys left out render in English.
   - **The backend does not produce copy per locale.** The four outlets (GUI,
     CLI, MCP, export) must answer the same question the same way, so the backend
     emits stable codes (`recordsUnitCode`, `HealthAction.code`,
@@ -221,8 +228,11 @@ way to tell which one is right.
     are never translated — they are a contract external scripts read.
   - CI runs `npm run i18n:check`: hardcoded Chinese in the interface turns it
     red, as does a backend code with no English copy, or the interface rendering
-    a backend original where a code was available. Per-line exemptions live in
-    `ALLOWED` / `ALLOWED_PROSE` in `scripts/release/check-i18n.mjs`.
+    a backend original where a code was available. The same gate audits the
+    language packs — a missing key must be registered in
+    `locales/<locale>.pending.txt`, and a pending entry that is already
+    translated or points at a removed key fails the build. Per-line exemptions
+    live in `ALLOWED` / `ALLOWED_PROSE` in `scripts/release/check-i18n.mjs`.
 - Overview is organised as "latest heart rate → Hand to AI entry → recent
   sleep/workouts"; sync time and heart-rate sample time are kept visibly
   separate. Recovery and training analysis do not happen on Overview.

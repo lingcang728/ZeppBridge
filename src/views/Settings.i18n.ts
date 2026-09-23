@@ -1217,4 +1217,5 @@ Si necesitas algo de mí (qué cliente uso, dónde está el archivo), pregúntam
       other: { label: 'Otra cosa', hint: 'descríbelo abajo' },
     },
   },
+  'views/Settings',
 );

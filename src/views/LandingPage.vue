@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import BrandMark from '../components/BrandMark.vue';
-import DesignIcon, { type DesignIconName } from '../components/DesignIcon.vue';
+import DesignIcon from '../components/DesignIcon.vue';
 import DeviceMarquee from '../components/DeviceMarquee.vue';
 import { useLandingLocale } from '../composables/useLandingLocale';
 import { isUsableReleasePayload } from '../lib/releaseAssets';
+import LocaleMenu from './landing/LocaleMenu.vue';
+import type { LandingCopy } from './landing/types';
 
 const githubUrl = 'https://github.com/lingcang728/ZeppBridge';
 const releaseUrl = `${githubUrl}/releases/latest`;
 const releaseEndpoint = '/api/release';
 
-const { locale, initializeLocale, toggleLocale } = useLandingLocale();
+const { locale, initializeLocale, setLocale, landingCopyFor } = useLandingLocale();
 
 // 访客系统探测：Mac 用户默认看到 macOS 版按钮，其余一律 Windows。
 // 只做一次静态判断——探测不到就退回 Windows，绝不隐藏另一个平台的入口。
@@ -21,8 +23,6 @@ const isMacVisitor = (): boolean => {
   return /Mac|iPad|iPhone|iPod/i.test(platform);
 };
 
-type IconEntry = { icon: DesignIconName; title: string; copy: string };
-type TaggedEntry = IconEntry & { tag: string };
 type DownloadPlatform = 'windows' | 'macos';
 
 interface ReleaseAsset {
@@ -57,44 +57,10 @@ interface LatestRelease {
   };
 }
 
-interface LandingCopy {
-  nav: { home: string; site: string; features: string; local: string; connect: string; privacy: string; star: string };
-  /** 切到另一种语言的按钮文字，所以写的是目标语言的名字。 */
-  languageToggle: string;
-  downloads: {
-    windows: { label: string; hint: string; msi: string };
-    macos: { label: string; hint: string };
-    linux: { label: string; previewBadge: string; note: string };
-    status: { loading: string; ready: string; fallback: string };
-  };
-  hero: {
-    headlineLead: string;
-    headlineAccent: string;
-    lead: string;
-    starNudge: { title: string; copy: string; action: string; dismiss: string };
-    trust: Array<{ icon: DesignIconName; label: string }>;
-    stageLabel: string;
-    coreCaption: string;
-    outputs: [{ title: string; copy: string }, { title: string; copy: string }];
-    status: { title: string; copy: string };
-  };
-  principlesLabel: string;
-  principles: Array<{ icon: DesignIconName; title: string; copy: string }>;
-  features: { overline: string; heading: string; lead: string; items: Array<IconEntry & { tone: string }> };
-  local: { overline: string; heading: string; lead: string; items: TaggedEntry[] };
-  connect: { overline: string; heading: string; lead: string; items: TaggedEntry[] };
-  privacy: {
-    overline: string;
-    heading: string;
-    lead: string;
-    points: Array<{ icon: DesignIconName; label: string }>;
-    vault: string;
-  };
-  footer: { tagline: string; disclaimer: string; download: string };
-}
-
+// LandingCopy 的形状在 ./landing/types.ts——其余八种语言的语言包按同一份契约写。
 // 英文版是重写，不是翻译。中文文案的语气（「缺就是缺，不用 0 补」）直译会全废，
-// 所以两边各自按自己的语言写，只保证说的是同一件事。
+// 所以两边各自按自己的语言写，只保证说的是同一件事。语言包同样按英文的措辞
+// 自由度来，意思到位即可。
 const COPY: Record<'zh' | 'en', LandingCopy> = {
   zh: {
     nav: {
@@ -105,8 +71,8 @@ const COPY: Record<'zh' | 'en', LandingCopy> = {
       connect: '连接方式',
       privacy: '隐私',
       star: '给个 Star',
+      language: '界面语言',
     },
-    languageToggle: 'English',
     downloads: {
       windows: { label: '下载 Windows 版', hint: '推荐 · x64 EXE 安装包', msi: '企业 / 批量部署：下载 MSI' },
       macos: { label: '下载 macOS 版', hint: 'Apple Silicon · DMG 安装包' },
@@ -224,8 +190,8 @@ const COPY: Record<'zh' | 'en', LandingCopy> = {
       connect: 'Connect',
       privacy: 'Privacy',
       star: 'Star on GitHub',
+      language: 'Language',
     },
-    languageToggle: '中文',
     downloads: {
       windows: { label: 'Download for Windows', hint: 'Recommended · x64 EXE installer', msi: 'Managed deployment: download MSI' },
       macos: { label: 'Download for macOS', hint: 'Apple Silicon · DMG installer' },
@@ -335,7 +301,12 @@ const COPY: Record<'zh' | 'en', LandingCopy> = {
   },
 };
 
-const t = computed(() => COPY[locale.value]);
+const t = computed(() => {
+  const value = locale.value;
+  if (value === 'zh' || value === 'en') return COPY[value];
+  // 语言包没到的时候先给英文——比白屏或半生不熟的另一种语言强。
+  return landingCopyFor(value) ?? COPY.en;
+});
 
 const latestRelease = ref<LatestRelease | null>(null);
 const releaseState = ref<'loading' | 'ready' | 'fallback'>('loading');
@@ -424,7 +395,7 @@ const revealStarNudge = () => {
       <a class="landing-brand" href="#top" :aria-label="t.nav.home"><span><BrandMark :size="34" /></span><strong>ZeppBridge</strong></a>
       <nav :aria-label="t.nav.site"><a href="#features">{{ t.nav.features }}</a><a href="#local">{{ t.nav.local }}</a><a href="#connect">{{ t.nav.connect }}</a><a href="#privacy">{{ t.nav.privacy }}</a></nav>
       <div class="nav-actions">
-        <button type="button" class="lang-toggle" @click="toggleLocale"><DesignIcon name="handoff" :size="19" />{{ t.languageToggle }}</button>
+        <LocaleMenu :model-value="locale" :aria-label="t.nav.language" @update:model-value="setLocale" />
         <a class="nav-github" :href="githubUrl" target="_blank" rel="noopener">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.8 2.7 5.47 6.04.88-4.37 4.26 1.03 6.02L12 16.58l-5.4 2.85 1.03-6.02-4.37-4.26 6.04-.88L12 2.8Z" /></svg>
           {{ t.nav.star }}
@@ -535,8 +506,6 @@ const revealStarNudge = () => {
 .landing-nav nav a { color: #9ca892; font-size: var(--fs-sm); text-decoration: none; }
 .landing-nav nav a:hover { color: #d6e99e; }
 .nav-actions { display: inline-flex; align-items: center; gap: 10px; }
-.lang-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px 7px 8px; border: 1px solid var(--site-line); border-radius: 11px; background: rgba(255,255,255,.02); color: #9ca892; font: inherit; font-size: var(--fs-sm); font-weight: 700; white-space: nowrap; cursor: pointer; }
-.lang-toggle:hover { color: #d6e99e; border-color: rgba(185,220,112,.5); }
 .nav-github { display: inline-flex; align-items: center; gap: 7px; padding: 8px 12px 8px 10px; border: 1px solid rgba(185,220,112,.28); border-radius: 11px; background: rgba(185,220,112,.07); color: #dce7cb; font-size: var(--fs-sm); font-weight: 700; text-decoration: none; white-space: nowrap; }
 .nav-github svg { width: 17px; height: 17px; fill: none; stroke: #b9dc70; stroke-width: 1.65; stroke-linejoin: round; }
 main, footer { position: relative; z-index: 1; }
@@ -559,9 +528,9 @@ main, footer { position: relative; z-index: 1; }
 .alt-cta { transition: transform .2s ease, border-color .2s ease; }
 .format-link { justify-self: center; color: #788474; font-size: var(--fs-2xs); text-underline-offset: 3px; }
 .format-link:hover { color: #b9ce9c; }
-.primary-cta, .nav-github, .lang-toggle { transition: transform .2s ease, border-color .2s ease, color .2s ease; }
+.primary-cta, .nav-github { transition: transform .2s ease, border-color .2s ease, color .2s ease; }
 .primary-cta:hover, .nav-github:hover { transform: translateY(-2px); border-color: rgba(185,220,112,.5); }
-.primary-cta:active, .alt-cta:active, .nav-github:active, .lang-toggle:active { transform: translateY(1px) scale(.99); }
+.primary-cta:active, .alt-cta:active, .nav-github:active { transform: translateY(1px) scale(.99); }
 /* Linux 一行，四个包并排。刻意不做成第三个大按钮：它还没有经过实机验证，
    和 Windows / macOS 并列会暗示同等成熟度。 */
 .linux-row { margin-top: 16px; }
@@ -651,5 +620,5 @@ footer { display: flex; align-items: center; flex-wrap: wrap; gap: 18px; width: 
 @media (max-width: 1080px) { .hero-section { grid-template-columns: 1fr; padding-top: 56px; } .hero-stage { min-height: 500px; } .capability-grid { grid-template-columns: repeat(2,1fr); } .connect-section { grid-template-columns: 1fr; } .privacy-section { grid-template-columns: 1fr; } }
 @media (max-width: 720px) { .landing-nav { width: min(100% - 28px,1240px); }.landing-nav nav { display: none; }.nav-github { padding-right: 9px; }.hero-section, .content-section, .principle-strip, footer { width: min(100% - 28px,1240px); }.hero-section { min-height: auto; padding: 48px 0 64px; }.hero-copy h1 { font-size: 44px; }.hero-actions { align-items: stretch; flex-direction: column; }.download-choice, .primary-cta, .alt-cta { width: 100%; }.primary-cta { min-width: 0; }.star-nudge { grid-template-columns: auto minmax(0,1fr); }.star-nudge a, .star-nudge button { grid-column: 2; justify-self: start; }.trust-row { flex-wrap: wrap; }.hero-stage { min-height: auto; }.output-stack { grid-template-columns: 1fr 1fr; }.principle-strip { grid-template-columns: repeat(2,1fr); }.principle-strip > div:nth-child(2) { border-right: 0; }.principle-strip > div:nth-child(-n+2) { border-bottom: 1px solid var(--site-line); }.content-section { padding: 84px 0; }.capability-grid, .auth-grid { grid-template-columns: 1fr; }.capability-card { min-height: 210px; }.auth-grid article { min-height: 245px; }.privacy-section { padding: 80px 20px; }.privacy-vault { align-items: flex-start; flex-direction: column; }.privacy-vault > .design-icon { width: 78px !important; height: 78px !important; } footer { align-items: flex-start; flex-wrap: wrap; padding: 28px 0; } footer p { width: 100%; order: 3; } }
 @media (max-width: 480px) { .landing-nav > .landing-brand strong { display: none; }.nav-actions { gap: 6px; } }
-@media (prefers-reduced-motion: reduce) { .landing-page { scroll-behavior: auto; } .primary-cta, .alt-cta, .nav-github, .lang-toggle, .star-nudge-enter-active, .star-nudge-leave-active { transition: none; } .release-status.is-loading i { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .landing-page { scroll-behavior: auto; } .primary-cta, .alt-cta, .nav-github, .star-nudge-enter-active, .star-nudge-leave-active { transition: none; } .release-status.is-loading i { animation: none; } }
 </style>

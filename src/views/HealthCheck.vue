@@ -391,6 +391,7 @@ const messages = defineMessages(
       unknown: 'fuente desconocida',
     },
   },
+  'views/HealthCheck',
 );
 const t = useMessages(messages);
 
