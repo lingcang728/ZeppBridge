@@ -921,7 +921,9 @@ const unitLabel = (item: CapabilityItem): string =>
 
 const capabilityNote = (item: CapabilityItem): string => {
   const windowDays = item.windowDays ?? 0;
-  if (item.status === 'available' && item.ingested === false) return t.value.capabilityNotIngested;
+  if (item.status === 'available' && item.ingested === false) {
+    return item.stream === 'food' ? t.value.capabilityFoodHistoryHint : t.value.capabilityNotIngested;
+  }
   if (item.status === 'unsupported') return t.value.capabilityUnsupported;
   if (item.status === 'unknown') return t.value.capabilityNotProbed;
   if (item.status === 'no_records') {

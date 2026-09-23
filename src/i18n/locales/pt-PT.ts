@@ -555,6 +555,7 @@ export default {
       capabilityNoRecords: (days: number) => `Nada registado nos últimos ${days} dias`,
       capabilityNotIngested:
         'A nuvem tem registos, mas ainda não há dados utilizáveis guardados localmente. Tenta sincronizar ou repor; se os registos continuarem sem aparecer, o formato do pacote pode precisar de suporte adicional.',
+      capabilityFoodHistoryHint: 'Há registos alimentares na nuvem, mas ainda não estão guardados localmente. Se forem anteriores ao período da sincronização incremental, sincroniza o histórico que inclua essas datas. Se continuarem sem aparecer, comunica o formato dos dados.',
       capabilityUnsupported: 'A tua conta ou dispositivo não fornece isto',
       capabilityNoneProbed: (days: number) => `Nenhuma medição nos últimos ${days} dias`,
       capabilityNotProbed: 'Ainda não sondado',
