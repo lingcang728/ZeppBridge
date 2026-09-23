@@ -1065,6 +1065,7 @@ Antwoord in Markdown.`,
       capabilityNoneProbed: (days: number) => `Geen meting in de afgelopen ${days} dagen`,
       capabilityNotIngested:
         'De cloud heeft records, maar er is nog geen bruikbare data lokaal opgeslagen. Probeer te synchroniseren of op te halen; als records dan nog niet verschijnen, heeft hun payloadformaat mogelijk extra ondersteuning nodig.',
+      capabilityFoodHistoryHint: 'Er staan voedingsrecords in de cloud, maar nog niet lokaal. Zijn ze ouder dan het venster voor incrementele synchronisatie, synchroniseer dan de geschiedenis voor die datums. Verschijnen ze daarna nog niet, meld dan het gegevensformaat.',
       capabilityNotProbed: 'Nog niet getest',
       capabilityTitle: 'Wat je apparaten kunnen leveren',
       capabilityUnsupported: 'Je account of apparaat levert dit niet',
