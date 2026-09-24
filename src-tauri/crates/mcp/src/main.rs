@@ -593,7 +593,10 @@ fn reject_unknown_arguments(name: &str, args: &Value) -> Result<(), (i64, String
     let tool = tool_definitions()
         .into_iter()
         .find(|tool| tool["name"].as_str() == Some(name));
-    let Some(properties) = tool.as_ref().and_then(|tool| tool["inputSchema"]["properties"].as_object()) else {
+    let Some(properties) = tool
+        .as_ref()
+        .and_then(|tool| tool["inputSchema"]["properties"].as_object())
+    else {
         return Ok(());
     };
     for key in args_obj.keys() {

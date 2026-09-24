@@ -355,8 +355,12 @@ fn translate_export_scope_error(message: String) -> String {
     match message.as_str() {
         "导出开始日期无效" => "Invalid export start date",
         "导出结束日期无效" => "Invalid export end date",
-        "导出结束日期不能早于开始日期" => "Export end date cannot be before the start date",
-        "单次导出范围不能超过 366 天" => "A single export cannot span more than 366 days",
+        "导出结束日期不能早于开始日期" => {
+            "Export end date cannot be before the start date"
+        }
+        "单次导出范围不能超过 366 天" => {
+            "A single export cannot span more than 366 days"
+        }
         "workout id 不能为空" => "Workout id cannot be empty",
         _ => return message,
     }
