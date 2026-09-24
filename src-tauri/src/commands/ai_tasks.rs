@@ -107,21 +107,30 @@ pub async fn ai_task_preview(
     spawn_independent_read(state.data_dir.clone(), move |db| db.ai_task_preview(&task)).await
 }
 
-/// 生成 `health-context.json` + `prompt.txt` 到
-/// `data_dir/exports/ai-tasks/<task_id>/`。`missing` 附件 → `blocked`。
+/// 生成 `health-context.json` + `prompt.txt`（+ 附件原件副本）到
+/// 桌面 `ZeppBridge AI/<任务名>_<时间>/`，用户直接从桌面拖进 AI 对话框；
+/// 取不到桌面时回落 `data_dir/exports/ai-tasks/`。`missing` 附件 → `blocked`。
 ///
 /// 分两段：构建（校验、锚点、coverage、bundle、序列化）在独立只读连接上
-/// 跑，不占 `state.db`；落盘是纯文件 IO。写出的文件是 exports 下的新文件
-/// 而不是 zepp.db——跨进程写锁管的是库的写者，这里不需要它。
+/// 跑，不占 `state.db`；落盘是纯文件 IO。写出的是新文件而不是
+/// zepp.db——跨进程写锁管的是库的写者，这里不需要它。
 #[tauri::command]
 pub async fn ai_task_prepare(
     state: tauri::State<'_, AppState>,
     task: AiTask,
     coverage_note: String,
+    direction_text: Option<String>,
 ) -> std::result::Result<AiTaskPrepareResult, AppError> {
-    let output_root = state.data_dir.join("exports").join("ai-tasks");
+    let output_root = directories::UserDirs::new()
+        .and_then(|dirs| dirs.desktop_dir().map(|path| path.join("ZeppBridge AI")))
+        .unwrap_or_else(|| state.data_dir.join("exports").join("ai-tasks"));
     let plan = spawn_independent_read(state.data_dir.clone(), move |db| {
-        db.ai_task_prepare_plan(&task, &coverage_note, &output_root)
+        db.ai_task_prepare_plan(
+            &task,
+            &coverage_note,
+            direction_text.as_deref(),
+            &output_root,
+        )
     })
     .await?;
     join_blocking(tokio::task::spawn_blocking(move || plan.finish()).await)

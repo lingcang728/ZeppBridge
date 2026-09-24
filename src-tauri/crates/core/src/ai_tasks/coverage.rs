@@ -300,10 +300,18 @@ impl Database {
 
 /// 一个 enabled 窗口类别在各锚点上的窗口集合：
 /// `(workout_id, start, end)`，本地日、两端含。空窗不产出。
+///
+/// 任务没有关联运动时只有一个窗口：`[today - days_before, today]`，
+/// `workout_id` 为 `None`——「最近 N 天」本身就是分析对象，
+/// `include_workout_day` 在这里没有意义，今天总是算进去。
 pub(crate) fn category_windows(
     range: &AiTaskCategoryRange,
     anchors: &[AnchorWorkout],
-) -> Vec<(String, NaiveDate, NaiveDate)> {
+    today: NaiveDate,
+) -> Vec<(Option<String>, NaiveDate, NaiveDate)> {
+    if anchors.is_empty() {
+        return vec![(None, today - Duration::days(range.days_before), today)];
+    }
     anchors
         .iter()
         .filter_map(|anchor| {
@@ -313,7 +321,7 @@ pub(crate) fn category_windows(
                 anchor.local_start_day - Duration::days(1)
             };
             let start = anchor.local_start_day - Duration::days(range.days_before);
-            (start <= end).then(|| (anchor.workout.workout_id.clone(), start, end))
+            (start <= end).then(|| (Some(anchor.workout.workout_id.clone()), start, end))
         })
         .collect()
 }
@@ -450,12 +458,13 @@ impl Database {
     /// 一个窗口内「有数据的本地日」集合 + 命中的 `source_scope` 集合。
     ///
     /// 去重粒度就是 P4 的 `(category, date)`：这一天有任何一条该类别数据
-    /// （任一指标、任一来源）就算 covered。
+    /// （任一**未被排除的**指标、任一来源）就算 covered。
     pub(crate) fn category_window_days(
         &self,
         category: AiTaskCategory,
         start: &str,
         end: &str,
+        excluded: &[String],
     ) -> Result<(BTreeSet<String>, BTreeSet<String>)> {
         let mut days = BTreeSet::new();
         let mut sources = BTreeSet::new();
@@ -491,6 +500,9 @@ impl Database {
             }
             _ => {
                 for spec in category_metric_specs(category) {
+                    if excluded.iter().any(|metric| metric == spec.metric) {
+                        continue;
+                    }
                     match spec.source {
                         MetricSource::Daily(_) => {
                             let mut stmt = self.conn.prepare(
@@ -557,24 +569,37 @@ pub(crate) fn window_coverage_rows(
     let mut union_days = BTreeSet::new();
     let mut union_covered = BTreeSet::new();
     let mut union_sources = BTreeSet::new();
+    let mut union_metric_days: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut merged_start: Option<NaiveDate> = None;
     let mut merged_end: Option<NaiveDate> = None;
+    let day_counts = |days: &BTreeMap<String, BTreeSet<String>>| -> BTreeMap<String, i64> {
+        days.iter()
+            .map(|(metric, set)| (metric.clone(), set.len() as i64))
+            .collect()
+    };
 
     for gather in gathers {
         union_days.extend(day_set(gather.start, gather.end));
         union_covered.extend(gather.covered_days.iter().cloned());
         union_sources.extend(gather.sources.iter().cloned());
+        for (metric, days) in &gather.metric_days {
+            union_metric_days
+                .entry(metric.clone())
+                .or_default()
+                .extend(days.iter().cloned());
+        }
         merged_start = Some(merged_start.map_or(gather.start, |d: NaiveDate| d.min(gather.start)));
         merged_end = Some(merged_end.map_or(gather.end, |d: NaiveDate| d.max(gather.end)));
         rows.push(AiTaskCoverage {
             category,
-            workout_id: Some(gather.workout_id.clone()),
+            workout_id: gather.workout_id.clone(),
             start_date: gather.start.to_string(),
             end_date: gather.end.to_string(),
             days_in_range: (gather.end - gather.start).num_days() + 1,
             days_with_data: gather.covered_days.len() as i64,
             sources: gather.sources.iter().cloned().collect(),
             units: units.clone(),
+            metric_days: day_counts(&gather.metric_days),
             missing: gather.covered_days.is_empty(),
         });
     }
@@ -591,6 +616,7 @@ pub(crate) fn window_coverage_rows(
                 days_with_data: union_covered.len() as i64,
                 sources: union_sources.into_iter().collect(),
                 units,
+                metric_days: day_counts(&union_metric_days),
                 missing: union_covered.is_empty(),
             });
         }

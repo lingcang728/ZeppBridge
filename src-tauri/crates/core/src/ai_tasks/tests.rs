@@ -96,6 +96,7 @@ fn range(category: AiTaskCategory, days_before: i64, include_day: bool) -> AiTas
         enabled: true,
         days_before,
         include_workout_day: include_day,
+        excluded_metrics: Vec::new(),
     }
 }
 
@@ -591,15 +592,189 @@ fn prepare_blocks_on_missing_attachment_and_writes_nothing() {
 }
 
 #[test]
-fn prepare_blocks_when_no_workouts() {
+fn no_workouts_means_recent_days_ending_today() {
     let db = Database::in_memory().unwrap();
+    let today = Local::now().date_naive();
+    insert_daily(&db, "resting_hr", today - Duration::days(1), 52.0);
+    insert_daily(&db, "resting_hr", today - Duration::days(30), 60.0);
     let dir = temp_dir("noworkout");
+
     let mut t = task();
-    t.categories = vec![range(AiTaskCategory::Sleep, 3, true)];
+    t.categories = vec![range(AiTaskCategory::Recovery, 6, false)];
+    let preview = db.ai_task_preview(&t).unwrap();
+    assert!(preview
+        .warnings
+        .iter()
+        .all(|w| w.code != "ui.ai_task.blocked.no_workouts"));
+    assert_eq!(preview.coverage.len(), 1);
+    let row = &preview.coverage[0];
+    assert_eq!(row.workout_id, None);
+    // 没有运动时 include_workout_day 不起作用：今天总在窗口里。
+    assert_eq!(row.end_date, today.to_string());
+    assert_eq!(row.start_date, (today - Duration::days(6)).to_string());
+    assert_eq!(row.days_in_range, 7);
+    assert_eq!(row.days_with_data, 1, "30 天前那条不在最近 7 天里");
+
     let result = db.ai_task_prepare(&t, "", &dir).unwrap();
-    assert_eq!(result.status, AiTaskPrepareStatus::Blocked);
-    assert_eq!(result.blocked[0].code, "ui.ai_task.blocked.no_workouts");
+    assert_eq!(result.status, AiTaskPrepareStatus::Ready);
+    let doc: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(result.json_path.unwrap()).unwrap()).unwrap();
+    assert_eq!(doc["task"]["window_anchor"], "today");
+    assert!(doc["workouts"].as_array().unwrap().is_empty());
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn excluded_metrics_are_counted_but_not_exported() {
+    let db = Database::in_memory().unwrap();
+    let start = utc(2026, 9, 10, 10);
+    insert_workout(&db, "w1", start);
+    let anchor_day = local_day(start);
+    insert_daily(&db, "resting_hr", anchor_day, 51.0);
+    insert_daily(&db, "stress", anchor_day - Duration::days(1), 30.0);
+    insert_sleep(&db, "s1", utc(2026, 9, 10, 6));
+    let dir = temp_dir("exclude");
+
+    let mut recovery = range(AiTaskCategory::Recovery, 3, true);
+    recovery.excluded_metrics = vec!["stress".into(), " stress ".into()];
+    let mut sleep = range(AiTaskCategory::Sleep, 3, true);
+    sleep.excluded_metrics = vec!["rem_minutes".into()];
+    let mut t = task();
+    t.workout_ids = vec!["w1".into()];
+    t.categories = vec![recovery, sleep];
+
+    // 归一化：去空白、去重。
+    let normalized = normalize_task(&t).unwrap();
+    assert_eq!(
+        normalized.categories[0].excluded_metrics,
+        vec!["stress".to_string()]
+    );
+
+    let preview = db.ai_task_preview(&t).unwrap();
+    let rec = preview
+        .coverage
+        .iter()
+        .find(|r| r.category == AiTaskCategory::Recovery)
+        .unwrap();
+    // 被排除的指标仍给出天数（界面要显示「拖回来有几天」），但不算覆盖。
+    assert_eq!(rec.metric_days.get("stress"), Some(&1));
+    assert_eq!(rec.metric_days.get("resting_hr"), Some(&1));
+    assert_eq!(rec.days_with_data, 1);
+    let sl = preview
+        .coverage
+        .iter()
+        .find(|r| r.category == AiTaskCategory::Sleep)
+        .unwrap();
+    assert!(sl.metric_days.get("rem_minutes").copied().unwrap_or(0) >= 1);
+
+    let result = db.ai_task_prepare(&t, "", &dir).unwrap();
+    let json_text = std::fs::read_to_string(result.json_path.unwrap()).unwrap();
+    let doc: serde_json::Value = serde_json::from_str(&json_text).unwrap();
+    let context = doc["context"].as_array().unwrap();
+    let metrics: Vec<String> = context
+        .iter()
+        .find(|c| c["category"] == "recovery")
+        .unwrap()["days"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|d| d["metrics"].as_array().cloned().unwrap_or_default())
+        .map(|m| m["metric"].as_str().unwrap().to_string())
+        .collect();
+    assert!(metrics.iter().any(|m| m == "resting_hr"));
+    assert!(!metrics.iter().any(|m| m == "stress"));
+    let sleep_days = context.iter().find(|c| c["category"] == "sleep").unwrap()["days"]
+        .as_array()
+        .unwrap();
+    for day in sleep_days {
+        for session in day["sleeps"].as_array().unwrap() {
+            assert!(session.get("rem_minutes").is_none(), "排除的字段不出仓");
+            assert!(session.get("deep_minutes").is_some(), "其他字段照常");
+        }
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn template_direction_and_question_are_combined() {
+    let db = Database::in_memory().unwrap();
+    insert_workout(&db, "w1", utc(2026, 9, 10, 10));
+    let dir = temp_dir("direction");
+    let mut t = task();
+    t.workout_ids = vec!["w1".into()];
+    t.categories = vec![range(AiTaskCategory::Sleep, 3, true)];
+    t.template_id = Some("recovery_run".into());
+    t.prompt = "重点看周三那次".into();
+
+    // 前端给了本地化方向段：它和问题都在，顺序是 方向 → 问题 → 覆盖说明。
+    let result = db
+        .ai_task_prepare_plan(&t, "覆盖段", Some("Direction: recovery"), &dir)
+        .unwrap()
+        .finish()
+        .unwrap();
+    let text = &result.prompt_text;
+    let (d, q, c) = (
+        text.find("Direction: recovery").unwrap(),
+        text.find("重点看周三那次").unwrap(),
+        text.find("覆盖段").unwrap(),
+    );
+    assert!(d < q && q < c, "{text}");
+
+    // 没传方向段（CLI）时回落到模板自带的中文，问题照样保留。
+    let result = db.ai_task_prepare(&t, "", &dir).unwrap();
+    assert!(result.prompt_text.contains("恢复跑"));
+    assert!(result.prompt_text.contains("重点看周三那次"));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn prepare_writes_a_named_folder_and_copies_attachments() {
+    let db = Database::in_memory().unwrap();
+    insert_workout(&db, "w1", utc(2026, 9, 10, 10));
+    let dir = temp_dir("folder");
+    let source_dir = temp_dir("folder-src");
+    let pdf = source_dir.join("a.pdf");
+    let png = source_dir.join("b.png");
+    std::fs::write(&pdf, b"pdf-bytes").unwrap();
+    std::fs::write(&png, b"png").unwrap();
+    let attachment = |id: &str, path: &std::path::Path, name: &str, len: i64| AiTaskAttachmentRef {
+        id: id.into(),
+        path: path.to_string_lossy().into_owned(),
+        display_name: name.into(),
+        kind: AiTaskAttachmentKind::Pdf,
+        byte_len: Some(len),
+        added_at: "2026-09-01T00:00:00Z".into(),
+    };
+
+    let mut t = task();
+    t.title = "恢复跑: 9/24?".into();
+    t.workout_ids = vec!["w1".into()];
+    t.categories = vec![range(AiTaskCategory::Recovery, 3, true)];
+    t.attachments = vec![
+        attachment("a1", &pdf, "体检报告.pdf", 9),
+        attachment("a2", &png, "体检报告.pdf", 3),
+    ];
+    let result = db.ai_task_prepare(&t, "", &dir).unwrap();
+    assert_eq!(result.status, AiTaskPrepareStatus::Ready);
+    let folder = std::path::Path::new(&result.output_dir);
+    let name = folder.file_name().unwrap().to_string_lossy().into_owned();
+    assert!(
+        name.starts_with("恢复跑_ 9_24_"),
+        "中文保留、非法字符折成 _：{name}"
+    );
+    assert_eq!(folder.parent().unwrap(), dir.as_path());
+    assert_eq!(result.copied_attachments, 2);
+    let copied = folder.join("attachments");
+    assert_eq!(
+        std::fs::read(copied.join("体检报告.pdf")).unwrap(),
+        b"pdf-bytes"
+    );
+    assert_eq!(
+        std::fs::read(copied.join("体检报告 (2).pdf")).unwrap(),
+        b"png"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::remove_dir_all(&source_dir);
 }
 
 #[test]

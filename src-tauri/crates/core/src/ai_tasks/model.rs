@@ -72,6 +72,11 @@ pub struct AiTaskCategoryRange {
     /// 默认 true。
     #[serde(default = "default_true")]
     pub include_workout_day: bool,
+    /// 用户在关系网里单独拖出去的指标名（指标类类别）或字段名
+    /// （运动/睡眠类别，取 `units` 里的键）。导出时跳过它们；
+    /// 覆盖统计 `metric_days` 仍然给出它们的天数，界面才能显示「拖回来会有多少」。
+    #[serde(default)]
+    pub excluded_metrics: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -207,7 +212,8 @@ pub struct AiTaskSummary {
 pub struct AiTaskCoverage {
     pub category: AiTaskCategory,
     /// 每次运动一行；类别有多个运动窗口时另加一行 `null` 的合并视图
-    /// （窗口并集、日期去重后的总数）。
+    /// （窗口并集、日期去重后的总数）。任务没有关联运动时窗口锚在今天，
+    /// 唯一一行也是 `null`。
     pub workout_id: Option<String>,
     /// 本地日 `YYYY-MM-DD`，含端点。
     pub start_date: String,
@@ -218,6 +224,9 @@ pub struct AiTaskCoverage {
     pub sources: Vec<String>,
     /// 该类别会查的指标→单位映射（对 workout/sleep 是固定字段单位）。
     pub units: std::collections::BTreeMap<String, String>,
+    /// 逐指标（或逐字段）有数据的天数，含被排除的指标。
+    #[serde(default)]
+    pub metric_days: std::collections::BTreeMap<String, i64>,
     /// 窗口内一天数据都没有。
     pub missing: bool,
 }
@@ -310,6 +319,9 @@ pub struct AiTaskPrepareResult {
     pub prompt_text: String,
     /// `health-context.json` 的字节数；blocked 时为 0。
     pub byte_len: i64,
+    /// 复制进 `<output_dir>/attachments/` 的附件原件个数。
+    #[serde(default)]
+    pub copied_attachments: i64,
     pub attachments: Vec<AiTaskAttachmentStatus>,
     pub blocked: Vec<AiTaskIssue>,
 }
@@ -371,6 +383,7 @@ fn builtin_categories(entries: &[(AiTaskCategory, bool, i64)]) -> Vec<AiTaskCate
             enabled,
             days_before,
             include_workout_day: true,
+            excluded_metrics: Vec::new(),
         }
     })
     .collect()

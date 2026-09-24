@@ -71,6 +71,8 @@ export interface AiTaskCategoryRange {
   days_before: number;
   /** 默认 true；false 时窗口右端是运动开始日的前一日。 */
   include_workout_day: boolean;
+  /** 单独拖出去、不交给 AI 的指标名（或运动/睡眠的字段名）。 */
+  excluded_metrics?: string[];
 }
 
 /** 存储形态：带本机绝对路径。绝不出现在导出/MCP 输出里。 */
@@ -171,6 +173,8 @@ export interface AiTaskCoverage {
   sources: string[];
   /** 指标 → 单位。 */
   units: Record<string, string>;
+  /** 指标 → 有数据的天数（含被排除的指标）。 */
+  metric_days?: Record<string, number>;
   missing: boolean;
 }
 
@@ -212,13 +216,15 @@ export interface AiTaskPreview {
 export interface AiTaskPrepareResult {
   status: 'ready' | 'blocked';
   task_id: string;
-  /** 固定为 `data_dir/exports/ai-tasks/<task_id>/`。 */
+  /** 桌面 `ZeppBridge AI/<任务名>_<时间>/`（取不到桌面时在 data 目录下）。 */
   output_dir: string;
   json_path: string | null;
   prompt_path: string | null;
-  /** 完整提示词全文（模板/用户提示词 + 覆盖说明段），供剪贴板复制。 */
+  /** 完整提示词全文（分析方向 + 问题 + 覆盖说明段），供剪贴板复制。 */
   prompt_text: string;
   byte_len: number;
+  /** 复制进 `attachments/` 的附件原件个数。 */
+  copied_attachments?: number;
   attachments: AiTaskAttachmentStatus[];
   /** 非空即 `status='blocked'`：附件缺失等必须先处理。 */
   blocked: AiTaskIssue[];
@@ -331,9 +337,10 @@ export interface BridgeBackend {
   aiTaskPreview(task: AiTask): Promise<AiTaskPreview>;
   /**
    * `coverageNote` 是前端按界面语言提供的「数据范围与缺失说明」段开头文本
-   * （码 `ui.ai_task.prompt.coverage_note`）；后端不产界面文案。
+   * （码 `ui.ai_task.prompt.coverage_note`）；`directionText` 是本地化好的
+   * 「分析方向」段（模板）。后端只拼接，不产界面文案。
    */
-  aiTaskPrepare(task: AiTask, coverageNote: string): Promise<AiTaskPrepareResult>;
+  aiTaskPrepare(task: AiTask, coverageNote: string, directionText?: string | null): Promise<AiTaskPrepareResult>;
   aiTaskAttachmentStat(paths: string[]): Promise<AiTaskAttachmentStat[]>;
 
   cleanupOldData(days: number): Promise<Record<string, unknown>>;

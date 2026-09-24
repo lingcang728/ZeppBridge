@@ -12,7 +12,8 @@
 //!   上下文 day 序列三种级别都给日度粒度。
 
 use super::coverage::{
-    category_metric_specs, category_windows, parse_rfc3339_utc, window_coverage_rows, AnchorWorkout,
+    category_metric_specs, category_units, category_windows, parse_rfc3339_utc,
+    window_coverage_rows, AnchorWorkout,
 };
 use super::model::*;
 use super::store::normalize_task_draft;
@@ -21,7 +22,7 @@ use crate::models::error::Result;
 use crate::models::{SleepStageSlice, Workout};
 use crate::paths::write_file_atomically;
 use crate::storage::{loaded_stage_minutes, Database, MetricSource};
-use chrono::{NaiveDate, Utc};
+use chrono::{DateTime, Local, NaiveDate, Utc};
 use rusqlite::{params, params_from_iter};
 use serde_json::{json, Map, Value};
 use std::collections::{BTreeMap, BTreeSet};
@@ -45,13 +46,16 @@ pub(crate) struct AiTaskBundle {
 /// 回传），它的 days/sources 仍走 `category_window_days` 的专用查询——
 /// 指标类别因此保持与旧实现相同的查询次数，没有变差。
 pub(crate) struct WindowGather {
-    pub workout_id: String,
+    /// `None` = 任务没有关联运动，窗口锚在今天。
+    pub workout_id: Option<String>,
     pub start: NaiveDate,
     pub end: NaiveDate,
     /// 窗口内「有数据的本地日」集合与命中的 `source_scope` 集合，
     /// 去重粒度即 P4 的 `(category, date)`。
     pub covered_days: BTreeSet<String>,
     pub sources: BTreeSet<String>,
+    /// 逐指标（运动/睡眠为逐字段）有数据的本地日，含被排除的指标。
+    pub metric_days: BTreeMap<String, BTreeSet<String>>,
     /// document 行：`(本地日, 去重键, 出仓对象)`。去重键是
     /// `w:<workout_id>` / `s:<sleep_id>` / 指标名，跨窗口合并时用。
     pub rows: Vec<(String, String, Value)>,
@@ -68,6 +72,8 @@ pub struct AiTaskPreparePlan {
     blocked: Vec<AiTaskIssue>,
     /// ready 时必有；blocked 时为空。
     json_text: Option<String>,
+    /// 要复制进 `attachments/` 的原件：`(本机源路径, 展示名)`。
+    attachment_sources: Vec<(PathBuf, String)>,
 }
 
 impl AiTaskPreparePlan {
@@ -83,6 +89,7 @@ impl AiTaskPreparePlan {
                 prompt_path: None,
                 prompt_text: self.prompt_text,
                 byte_len: 0,
+                copied_attachments: 0,
                 attachments: self.attachments,
                 blocked: self.blocked,
             });
@@ -105,6 +112,7 @@ impl AiTaskPreparePlan {
             .map_err(|error| AiTaskError::write_failed(format!("写入交接 JSON 失败: {error}")))?;
         write_file_atomically(&prompt_path, self.prompt_text.as_bytes())
             .map_err(|error| AiTaskError::write_failed(format!("写入提示词文件失败: {error}")))?;
+        let copied_attachments = copy_attachments(&self.output_dir, &self.attachment_sources)?;
 
         Ok(AiTaskPrepareResult {
             status: AiTaskPrepareStatus::Ready,
@@ -114,10 +122,45 @@ impl AiTaskPreparePlan {
             prompt_path: Some(prompt_path.to_string_lossy().into_owned()),
             prompt_text: self.prompt_text,
             byte_len,
+            copied_attachments,
             attachments: self.attachments,
             blocked: Vec::new(),
         })
     }
+}
+
+/// 把附件原件复制进 `<output_dir>/attachments/`，让用户一次拖完。
+/// 文件名取展示名（清洗掉 Windows 不允许的字符），重名追加 ` (2)`。
+fn copy_attachments(output_dir: &Path, sources: &[(PathBuf, String)]) -> Result<i64> {
+    if sources.is_empty() {
+        return Ok(0);
+    }
+    let dir = output_dir.join("attachments");
+    std::fs::create_dir_all(&dir)
+        .map_err(|error| AiTaskError::write_failed(format!("创建附件目录失败: {error}")))?;
+    let mut used = BTreeSet::new();
+    for (source, display_name) in sources {
+        let name = unique_file_name(&sanitize_file_name(display_name, "attachment"), &mut used);
+        std::fs::copy(source, dir.join(&name)).map_err(|error| {
+            AiTaskError::write_failed(format!("复制附件 {display_name} 失败: {error}"))
+        })?;
+    }
+    Ok(sources.len() as i64)
+}
+
+fn unique_file_name(name: &str, used: &mut BTreeSet<String>) -> String {
+    let lower = |value: &str| value.to_lowercase();
+    if used.insert(lower(name)) {
+        return name.to_string();
+    }
+    let (stem, ext) = match name.rfind('.') {
+        Some(index) if index > 0 => (&name[..index], &name[index..]),
+        _ => (name, ""),
+    };
+    (2..)
+        .map(|n| format!("{stem} ({n}){ext}"))
+        .find(|candidate| used.insert(lower(candidate)))
+        .expect("总能找到不重名的文件名")
 }
 
 /// 未保存草稿走预览/准备时的展示 id 与目录名。
@@ -145,10 +188,10 @@ impl Database {
     }
 
     /// P3 `ai_task_prepare`：把交接文件写到
-    /// `<output_root>/<task_id>/{health-context.json, prompt.txt}`。
+    /// `<output_root>/<任务名>_<yyyyMMdd-HHmm>/{health-context.json, prompt.txt, attachments/}`。
     ///
-    /// `output_root` 由命令层传入 `data_dir/exports/ai-tasks`。blocked 时
-    /// 一个文件都不写。
+    /// `output_root` 由命令层决定（桌面 `ZeppBridge AI`，取不到时
+    /// `data_dir/exports/ai-tasks`）。blocked 时一个文件都不写。
     ///
     /// 拆成 [`Self::ai_task_prepare_plan`]（读侧）+ [`AiTaskPreparePlan::finish`]
     /// （写侧）两步：命令层据此只在读侧占数据库连接，文件落盘不持锁。
@@ -159,31 +202,30 @@ impl Database {
         coverage_note: &str,
         output_root: &Path,
     ) -> Result<AiTaskPrepareResult> {
-        self.ai_task_prepare_plan(task, coverage_note, output_root)?
+        self.ai_task_prepare_plan(task, coverage_note, None, output_root)?
             .finish()
     }
 
     /// `ai_task_prepare` 的读侧：校验、锚点解析、附件核对、提示词拼装、
     /// blocked 判定与 bundle 构建（含 JSON 序列化）全部在这里完成；
     /// 返回的 [`AiTaskPreparePlan`] 只剩纯文件落盘，不再碰库。
+    ///
+    /// `direction_text`：前端按界面语言整理好的「分析方向」段（模板），
+    /// 与 `coverage_note` 同一种做法——后端不产文案，只拼接。
     pub fn ai_task_prepare_plan(
         &self,
         task: &AiTask,
         coverage_note: &str,
+        direction_text: Option<&str>,
         output_root: &Path,
     ) -> Result<AiTaskPreparePlan> {
         let task = normalize_task_draft(task)?;
         let anchors = self.ai_task_anchors(&task.workout_ids)?;
         let attachments = stat_task_attachments(&task.attachments);
-        let prompt_text = self.assemble_task_prompt(&task, coverage_note)?;
+        let prompt_text = self.assemble_task_prompt(&task, coverage_note, direction_text)?;
 
+        // 没有关联运动不再拦：窗口锚在今天，分析的就是「最近 N 天」。
         let mut blocked: Vec<AiTaskIssue> = Vec::new();
-        if anchors.is_empty() {
-            blocked.push(AiTaskIssue::new(
-                "ui.ai_task.blocked.no_workouts",
-                "任务还没有关联任何运动",
-            ));
-        }
         for (attachment, status) in task.attachments.iter().zip(attachments.iter()) {
             if status.status == AiTaskAttachmentState::Missing {
                 // P2 定稿点名的码：`missing` 附件在 blocked 里列
@@ -202,7 +244,7 @@ impl Database {
         let nothing_to_export = !task.categories.iter().any(|range| range.enabled)
             && task.attachments.is_empty()
             && task.personal_note.trim().is_empty();
-        if nothing_to_export && !anchors.is_empty() {
+        if nothing_to_export {
             blocked.push(AiTaskIssue::new(
                 "ui.ai_task.blocked.empty",
                 "当前选择覆盖不到任何数据，请先调整类别或运动范围",
@@ -210,7 +252,7 @@ impl Database {
         }
 
         let task_id = effective_task_id(&task);
-        let output_dir = output_root.join(sanitize_dir_component(&task_id));
+        let output_dir = output_root.join(export_folder_name(&task, &task_id, Local::now()));
 
         if !blocked.is_empty() {
             return Ok(AiTaskPreparePlan {
@@ -220,12 +262,23 @@ impl Database {
                 attachments,
                 blocked,
                 json_text: None,
+                attachment_sources: Vec::new(),
             });
         }
 
         let bundle = self.build_ai_task_bundle(&task, &anchors, attachments)?;
         let json_text = serde_json::to_string_pretty(&bundle.document)
             .map_err(|error| AiTaskError::write_failed(format!("序列化交接数据失败: {error}")))?;
+        let attachment_sources = task
+            .attachments
+            .iter()
+            .map(|reference| {
+                (
+                    PathBuf::from(&reference.path),
+                    reference.display_name.clone(),
+                )
+            })
+            .collect();
 
         Ok(AiTaskPreparePlan {
             task_id,
@@ -234,6 +287,7 @@ impl Database {
             attachments: bundle.attachments,
             blocked: Vec::new(),
             json_text: Some(json_text),
+            attachment_sources,
         })
     }
 
@@ -285,30 +339,43 @@ impl Database {
         })
     }
 
-    /// 提示词拼装：用户提示词为空时回落到模板的 `prompt_template`
-    /// （`prompt_code` 是界面词条句柄，后端拿不到本地化文本，模板自带的
-    /// 中文是这层唯一可用的兜底）；再 verbatim 附加前端本地化好的
-    /// `coverage_note` 段。后端不产文案。
-    fn assemble_task_prompt(&self, task: &AiTask, coverage_note: &str) -> Result<String> {
-        let mut prompt = task.prompt.trim().to_string();
-        if prompt.is_empty() {
-            if let Some(template_id) = task.template_id.as_deref() {
-                if let Some(template) = self.get_ai_task_template(template_id)? {
-                    prompt = template.prompt_template.trim().to_string();
-                }
-            }
-        }
+    /// 提示词拼装：分析方向（模板）+ 用户的问题 + 覆盖说明，三段各自可空。
+    ///
+    /// 模板是全局方向、问题是这次的侧重点，两者**并存**，不再二选一。
+    /// 方向段优先用前端本地化好的 `direction_text`；没传（CLI 等旧调用方）
+    /// 时回落到模板自带的 `prompt_template` 中文兜底。后端不产文案。
+    fn assemble_task_prompt(
+        &self,
+        task: &AiTask,
+        coverage_note: &str,
+        direction_text: Option<&str>,
+    ) -> Result<String> {
+        let direction = match direction_text
+            .map(str::trim)
+            .filter(|text| !text.is_empty())
+        {
+            Some(text) => text.to_string(),
+            None => match task.template_id.as_deref() {
+                Some(template_id) => self
+                    .get_ai_task_template(template_id)?
+                    .map(|template| template.prompt_template.trim().to_string())
+                    .unwrap_or_default(),
+                None => String::new(),
+            },
+        };
         // 用户自写文本（自己的 prompt / 用户模板的 prompt_template）出仓前
         // 先过路径清洗——这份文本会写进交给外部 AI 的 prompt.txt。
-        let mut prompt = sanitize_export_text(&prompt);
-        let note = coverage_note.trim();
-        if !note.is_empty() {
-            if !prompt.is_empty() {
-                prompt.push_str("\n\n");
-            }
-            prompt.push_str(note);
-        }
-        Ok(prompt)
+        let parts = [
+            sanitize_export_text(&direction),
+            sanitize_export_text(task.prompt.trim()),
+            coverage_note.trim().to_string(),
+        ];
+        Ok(parts
+            .iter()
+            .filter(|part| !part.is_empty())
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n\n"))
     }
 
     /// `health-context.json` 的完整文档。构造时就是干净的：字段逐个挑，
@@ -345,6 +412,16 @@ impl Database {
         task_meta.insert(
             "include_precise_gps".into(),
             json!(task.include_precise_gps),
+        );
+        // 窗口锚点：`workouts` = 按每次运动开始日回溯；`today` = 没关联运动，
+        // 分析的是截至今天的最近 N 天。
+        task_meta.insert(
+            "window_anchor".into(),
+            json!(if anchors.is_empty() {
+                "today"
+            } else {
+                "workouts"
+            }),
         );
         document.insert("task".into(), Value::Object(task_meta));
 
@@ -530,7 +607,11 @@ impl Database {
         anchors: &[AnchorWorkout],
     ) -> Result<Vec<WindowGather>> {
         let mut gathers = Vec::new();
-        for (workout_id, start, end) in category_windows(range, anchors) {
+        let excluded = &range.excluded_metrics;
+        let is_excluded = |name: &str| excluded.iter().any(|metric| metric == name);
+        let field_units = category_units(range.category);
+        for (workout_id, start, end) in category_windows(range, anchors, Local::now().date_naive())
+        {
             let start_text = start.to_string();
             let end_text = end.to_string();
             let mut gather = WindowGather {
@@ -539,16 +620,40 @@ impl Database {
                 end,
                 covered_days: BTreeSet::new(),
                 sources: BTreeSet::new(),
+                metric_days: BTreeMap::new(),
                 rows: Vec::new(),
+            };
+            // 运动/睡眠：一行是一条记录，指标是它的字段。逐字段记天数，
+            // 被排除的字段从出仓对象里删掉（记录本身仍在）。
+            let push_record = |gather: &mut WindowGather,
+                               day: String,
+                               key: String,
+                               source_scope: String,
+                               mut row: Value| {
+                if let Value::Object(object) = &mut row {
+                    for field in field_units.keys() {
+                        if object.contains_key(field) {
+                            gather
+                                .metric_days
+                                .entry(field.clone())
+                                .or_default()
+                                .insert(day.clone());
+                        }
+                        if is_excluded(field) {
+                            object.remove(field);
+                        }
+                    }
+                }
+                gather.covered_days.insert(day.clone());
+                gather.sources.insert(source_scope);
+                gather.rows.push((day, key, row));
             };
             match range.category {
                 AiTaskCategory::Workout => {
                     for (day, row_id, source_scope, row) in
                         self.workout_day_rows(&start_text, &end_text)?
                     {
-                        gather.covered_days.insert(day.clone());
-                        gather.sources.insert(source_scope);
-                        gather.rows.push((day, format!("w:{row_id}"), row));
+                        push_record(&mut gather, day, format!("w:{row_id}"), source_scope, row);
                     }
                 }
                 AiTaskCategory::Sleep => {
@@ -557,17 +662,19 @@ impl Database {
                         &end_text,
                         task.detail_level == AiTaskDetailLevel::Detailed,
                     )? {
-                        gather.covered_days.insert(day.clone());
-                        gather.sources.insert(source_scope);
-                        gather.rows.push((day, format!("s:{row_id}"), row));
+                        push_record(&mut gather, day, format!("s:{row_id}"), source_scope, row);
                     }
                 }
                 _ => {
                     // 指标类别的出仓行不带 source_scope——coverage 仍走
                     // `category_window_days` 的 days+sources 查询，与旧实现
                     // 同式同结果；document 行仍按 spec 取 points。
-                    let (days, sources) =
-                        self.category_window_days(range.category, &start_text, &end_text)?;
+                    let (days, sources) = self.category_window_days(
+                        range.category,
+                        &start_text,
+                        &end_text,
+                        excluded,
+                    )?;
                     gather.covered_days = days;
                     gather.sources = sources;
                     for spec in category_metric_specs(range.category) {
@@ -583,6 +690,14 @@ impl Database {
                             }
                         };
                         for point in points {
+                            gather
+                                .metric_days
+                                .entry(spec.metric.to_string())
+                                .or_default()
+                                .insert(point.date.clone());
+                            if is_excluded(spec.metric) {
+                                continue;
+                            }
                             let mut metric = Map::new();
                             metric.insert("metric".into(), json!(spec.metric));
                             metric.insert("unit".into(), json!(spec.unit));
@@ -828,7 +943,9 @@ fn merge_window_gathers(
     for gather in gathers {
         for (day, key, row) in gather.rows {
             let acc = days.entry(day.clone()).or_default();
-            acc.linked.insert(gather.workout_id.clone());
+            if let Some(workout_id) = &gather.workout_id {
+                acc.linked.insert(workout_id.clone());
+            }
             if !seen.insert((day, key)) {
                 continue;
             }
@@ -902,25 +1019,59 @@ fn sanitize_export_text(text: &str) -> String {
     output
 }
 
-/// 目录名片段：只留 ASCII 字母数字与 `-_.`，其它折成 `_`；
-/// 两端去 `.`（`..`/尾随点在 Windows 上有特殊含义），空了回退 `task`。
-fn sanitize_dir_component(id: &str) -> String {
-    let cleaned: String = id
+/// 文件/目录名片段：保留中文等可读字符，只把 Windows 不允许的
+/// `<>:"/\|?*` 与控制字符折成 `_`；两端去空格和 `.`（尾随点在 Windows
+/// 上会被吞掉），保留设备名（CON、COM1…）前加 `_`，截到 60 个字符，
+/// 空了回退 `fallback`。
+fn sanitize_file_name(name: &str, fallback: &str) -> String {
+    let cleaned: String = name
         .chars()
         .map(|c| {
-            if c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.') {
-                c
-            } else {
+            if c.is_control() || matches!(c, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*') {
                 '_'
+            } else {
+                c
             }
         })
         .collect();
-    let trimmed = cleaned.trim_matches('.');
+    let trimmed: String = cleaned
+        .trim_matches(|c: char| c == '.' || c.is_whitespace())
+        .chars()
+        .take(60)
+        .collect();
+    let trimmed = trimmed.trim_end_matches(|c: char| c == '.' || c.is_whitespace());
     if trimmed.is_empty() {
-        "task".to_string()
+        return fallback.to_string();
+    }
+    let stem = trimmed
+        .split('.')
+        .next()
+        .unwrap_or_default()
+        .to_ascii_uppercase();
+    let reserved = matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || ((stem.starts_with("COM") || stem.starts_with("LPT"))
+            && stem.len() == 4
+            && stem.as_bytes()[3].is_ascii_digit());
+    if reserved {
+        format!("_{trimmed}")
     } else {
         trimmed.to_string()
     }
+}
+
+/// 导出文件夹名：`<任务名>_<yyyyMMdd-HHmm>`。每次导出一个新文件夹，
+/// 不覆盖上一次交给 AI 的那份；标题为空时用任务 id（草稿是 `draft`）。
+fn export_folder_name(task: &AiTask, task_id: &str, now: DateTime<Local>) -> String {
+    let base = if task.title.trim().is_empty() {
+        task_id
+    } else {
+        task.title.trim()
+    };
+    format!(
+        "{}_{}",
+        sanitize_file_name(base, "task"),
+        now.format("%Y%m%d-%H%M")
+    )
 }
 
 /// preview/prepare 共用的附件核对：`missing`（找不到）、`changed`
@@ -965,12 +1116,6 @@ fn task_warnings(
     attachments: &[AiTaskAttachmentStatus],
 ) -> Vec<AiTaskIssue> {
     let mut warnings = Vec::new();
-    if task.workout_ids.is_empty() {
-        warnings.push(AiTaskIssue::new(
-            "ui.ai_task.blocked.no_workouts",
-            "任务还没有关联任何运动",
-        ));
-    }
     for (attachment, status) in task.attachments.iter().zip(attachments.iter()) {
         let name = attachment.display_name.clone();
         let params = || serde_json::json!({ "display_name": name });

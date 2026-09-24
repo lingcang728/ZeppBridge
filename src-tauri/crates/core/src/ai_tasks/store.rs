@@ -25,6 +25,7 @@ const MAX_ATTACHMENTS: usize = 16;
 const MAX_PATH_CHARS: usize = 1_024;
 const MAX_CATEGORIES: usize = 16;
 const MAX_DAYS_BEFORE: i64 = 365;
+const MAX_EXCLUDED_METRICS: usize = 64;
 
 fn random_hex(bytes: usize) -> String {
     let mut buffer = vec![0u8; bytes];
@@ -143,7 +144,21 @@ fn normalize_categories(
     }
     let mut seen = BTreeSet::new();
     let mut deduped = Vec::with_capacity(categories.len());
-    for range in categories.drain(..) {
+    for mut range in categories.drain(..) {
+        if range.excluded_metrics.len() > MAX_EXCLUDED_METRICS {
+            return Err("排除的指标过多".to_string());
+        }
+        let mut seen_metrics = BTreeSet::new();
+        range.excluded_metrics = range
+            .excluded_metrics
+            .iter()
+            .map(|metric| metric.trim().to_string())
+            .filter(|metric| {
+                !metric.is_empty()
+                    && metric.chars().count() <= MAX_ID_CHARS
+                    && seen_metrics.insert(metric.clone())
+            })
+            .collect();
         if !(0..=MAX_DAYS_BEFORE).contains(&range.days_before) {
             return Err(format!(
                 "回溯天数必须在 0–{MAX_DAYS_BEFORE} 之间（{:?} = {}）",
