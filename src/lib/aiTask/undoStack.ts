@@ -1,19 +1,7 @@
 /**
- * 容量 50 的撤销栈（A7 P5：图谱只发意图，栈归父级）。
- *
- * 栈里存的是「反悔需要的最小事实」：节点 id + 它之前的状态。撤销时父级把
- * 节点设回 `prevState`，组件按 props 重排——栈自己不碰布局。
+ * 容量 50 的撤销栈。栈只存「反悔需要的事实」，怎么恢复由调用方决定——
+ * 任务草稿存的是动作前那一刻的选择快照（见 `useAiTaskDraft`）。
  */
-import type { AiTaskCategory } from '../bridge/types';
-
-export type OrbitNodeState = 'member' | 'candidate' | 'disabled';
-
-export interface OrbitUndoOp {
-  type: 'join' | 'leave';
-  nodeId: AiTaskCategory | string;
-  prevState: OrbitNodeState;
-}
-
 export const UNDO_CAP = 50;
 
 export interface UndoStack<T> {
@@ -49,12 +37,3 @@ export const createUndoStack = <T>(cap: number = UNDO_CAP): UndoStack<T> => {
     entries: () => ops,
   };
 };
-
-/**
- * 一条撤销操作要恢复的目标：撤销 join/leave 都是把节点设回 `prevState`
- * （存的就是动作发生前的状态，方向不用在这里猜）。
- */
-export const orbitUndoTarget = (op: OrbitUndoOp): { nodeId: string; state: OrbitNodeState } => ({
-  nodeId: String(op.nodeId),
-  state: op.prevState,
-});

@@ -62,6 +62,7 @@ export type IconName =
   | 'sync'
   | 'terminal'
   | 'trash'
+  | 'undo'
   | 'vo2'
   | 'warning'
   | 'watch'
@@ -193,6 +194,7 @@ const stroke = computed(() => Math.min(1.75, Math.max(1.5, props.stroke)));
     </g>
     <path v-else-if="name === 'wifi'" d="M3.5 8.8a13.4 13.4 0 0 1 17 0M6.5 12a8.6 8.6 0 0 1 11 0M9.4 15.2a4 4 0 0 1 5.2 0M12 18.7v.1" :stroke-width="stroke" />
     <path v-else-if="name === 'x'" d="m6 6 12 12M18 6 6 18" :stroke-width="stroke" />
+    <path v-else-if="name === 'undo'" d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11" :stroke-width="stroke" />
     <path v-else-if="name === 'bell'" d="M18 9a6 6 0 1 0-12 0c0 5-2 6-2 6h16s-2-1-2-6Zm-8 9a2.2 2.2 0 0 0 4 0" :stroke-width="stroke" />
     <g v-else-if="name === 'help'">
       <circle cx="12" cy="12" r="8.5" :stroke-width="stroke" />

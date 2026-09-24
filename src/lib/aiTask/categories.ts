@@ -51,6 +51,7 @@ export const defaultCategoryRanges = (): AiTaskCategoryRange[] =>
     enabled: AI_TASK_CATEGORY_META[category].hasWindow,
     days_before: AI_TASK_CATEGORY_META[category].defaultDaysBefore,
     include_workout_day: true,
+    excluded_metrics: [],
   }));
 
 export const categoryLabel = (category: AiTaskCategory): string =>
@@ -71,6 +72,7 @@ export const categoryRangeOf = (
     enabled: AI_TASK_CATEGORY_META[category].hasWindow,
     days_before: AI_TASK_CATEGORY_META[category].defaultDaysBefore,
     include_workout_day: true,
+    excluded_metrics: [],
   };
 
 export const withCategoryRange = (

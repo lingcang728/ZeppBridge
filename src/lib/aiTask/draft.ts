@@ -36,24 +36,30 @@ export const newTaskDraft = (): AiTask => ({
 });
 
 /**
- * 套用模板。模板只携带规则：类别范围、详细程度、提示词初稿——
- * 不携带运动、附件、数据快照（B3 硬要求），所以这些字段一律原样保留。
+ * 套用模板。模板是「分析方向」：带推荐的类别范围与详细程度，方向正文在
+ * 交付时单独拼进提示词（见 `prompt.ts`）。
  *
- * `promptEdited`：用户是否亲手改过提示词。改过就不冲掉——模板只提供初稿，
- * 用户写了的东西比模板大。
+ * 模板**不碰** `prompt`——那是用户这次的问题，和方向并存；也不携带运动、
+ * 附件、数据快照（B3 硬要求）。内容类别（个人说明、附件）的开关跟着内容走，
+ * 模板不覆盖它们。
  */
-export const applyTemplateToDraft = (
-  task: AiTask,
-  template: AiTaskTemplate,
-  promptSeed: string,
-  promptEdited: boolean,
-): AiTask => ({
-  ...task,
-  template_id: template.id,
-  categories: template.categories.map((range) => ({ ...range })),
-  detail_level: template.detail_level,
-  prompt: promptEdited ? task.prompt : promptSeed,
-});
+export const applyTemplateToDraft = (task: AiTask, template: AiTaskTemplate): AiTask => {
+  const contentEnabled = new Map(
+    task.categories
+      .filter((range) => range.category === 'personal_note' || range.category === 'attachment')
+      .map((range) => [range.category, range.enabled]),
+  );
+  return {
+    ...task,
+    template_id: template.id,
+    categories: template.categories.map((range) => ({
+      ...range,
+      excluded_metrics: [...(range.excluded_metrics ?? [])],
+      enabled: contentEnabled.get(range.category) ?? range.enabled,
+    })),
+    detail_level: template.detail_level,
+  };
+};
 
 /**
  * 稳定序列化，用于脏标记比对。字段顺序固定写死，不依赖构造顺序——
@@ -70,6 +76,7 @@ export const taskSnapshot = (task: AiTask): string =>
         enabled: range.enabled,
         days_before: range.days_before,
         include_workout_day: range.include_workout_day,
+        excluded_metrics: [...(range.excluded_metrics ?? [])].sort(),
       }))
       .sort((a, b) => a.category.localeCompare(b.category)),
     detail_level: task.detail_level,

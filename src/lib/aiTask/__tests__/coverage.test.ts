@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  categoryCoverage,
   categoryWindowForWorkout,
   categoryWindows,
   coverageRows,
@@ -85,6 +86,30 @@ describe('coverageRows', () => {
   it('运动名对不上时给 null，界面自己兜底', () => {
     const rows = coverageRows([coverage({ workout_id: 'w-x' })], []);
     expect(rows[0].workoutTitle).toBeNull();
+  });
+});
+
+describe('categoryCoverage', () => {
+  const preview = (rows: AiTaskCoverage[]) => ({
+    task_id: 'draft', workouts: [], coverage: rows, attachments: [], estimated_bytes: 0, warnings: [],
+  });
+
+  it('多窗口取合并行（workout_id=null），单窗口取唯一行；没有就 null', () => {
+    expect(categoryCoverage(null, 'sleep')).toBeNull();
+    expect(categoryCoverage(preview([]), 'sleep')).toBeNull();
+    const merged = categoryCoverage(preview([
+      coverage({ days_with_data: 3 }),
+      coverage({ workout_id: null, days_with_data: 9, metric_days: { score: 9 } }),
+    ]), 'sleep');
+    expect(merged?.daysWithData).toBe(9);
+    expect(merged?.metricDays).toEqual({ score: 9 });
+    expect(merged?.metrics).toEqual(['score', 'score2']);
+  });
+
+  it('来源范围和单位按界面语言显示，不露内部码', () => {
+    const [row] = coverageRows([coverage({ sources: ['user_fused'], units: { a: 'count' } })], []);
+    expect(row.sources[0]).not.toBe('user_fused');
+    expect(row.units[0]).not.toBe('count');
   });
 });
 

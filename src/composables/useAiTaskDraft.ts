@@ -1,11 +1,13 @@
 /**
  * 任务草稿控制器（全局单例，和 useSyncController 一个形态）。
  *
- * 单例的理由：AiComposer（`/ai?stage=compose`）和 AiHandoffPreview
- * （`/ai?stage=preview`）是同一份草稿的两个视图——查询参数切换时组件会
- * 卸载重建，模块级状态才能把工作区留住。
+ * 只管「这份草稿是什么、怎么改、怎么存」。后端资料（任务列表、模板、
+ * 运动）归 `useAiTaskLibrary`；预览覆盖归 `useAiTaskPreview`；交付归
+ * `useAiTaskHandoff`。
  *
- * 撤销栈只管轨道 join/leave 意图（A7 P5）；范围天数这类配置不进栈。
+ * 撤销栈管「选择」：类别进出、指标排除、运动勾选、模板套用。每次存的是
+ * 动作前那一刻的选择快照，撤销就是整块还原——不用为每种动作写反向操作。
+ * 天数、文字这类连续编辑不进栈。
  */
 import { computed, ref } from 'vue';
 import { backend, toUserMessage } from '../lib/bridge';
@@ -15,67 +17,51 @@ import type {
   AiTaskCategory,
   AiTaskCategoryRange,
   AiTaskDetailLevel,
-  AiTaskSummary,
   AiTaskTemplate,
 } from '../lib/bridge/types';
-import type { Workout as WorkoutRow } from '../types';
-import {
-  applyTemplateToDraft,
-  isTaskDirty,
-  newTaskDraft,
-  taskSnapshot,
-} from '../lib/aiTask/draft';
+import { applyTemplateToDraft, isTaskDirty, newTaskDraft, taskSnapshot } from '../lib/aiTask/draft';
 import { categoryRangeOf, withCategoryRange } from '../lib/aiTask/categories';
-import { createUndoStack, orbitUndoTarget, type OrbitUndoOp } from '../lib/aiTask/undoStack';
-import { templatePromptSeed } from '../lib/aiTask/prompt';
+import { createUndoStack } from '../lib/aiTask/undoStack';
+import { useAiTaskLibrary } from './useAiTaskLibrary';
 import { defineMessages, messagesOf } from '../i18n';
 
 const messages = defineMessages(
-  {
-    loadFailed: '任务读取失败',
-    saveFailed: '任务保存失败',
-    deleteFailed: '任务删除失败',
-    untitled: '未命名任务',
-  },
-  {
-    loadFailed: 'Could not load the task',
-    saveFailed: 'Could not save the task',
-    deleteFailed: 'Could not delete the task',
-    untitled: 'Untitled task',
-  },
-  {
-    loadFailed: 'No se pudo cargar la tarea',
-    saveFailed: 'No se pudo guardar la tarea',
-    deleteFailed: 'No se pudo eliminar la tarea',
-    untitled: 'Tarea sin nombre',
-  },
+  { loadFailed: '任务读取失败', saveFailed: '任务保存失败', deleteFailed: '任务删除失败', untitled: '未命名任务' },
+  { loadFailed: 'Could not load the task', saveFailed: 'Could not save the task', deleteFailed: 'Could not delete the task', untitled: 'Untitled task' },
+  { loadFailed: 'No se pudo cargar la tarea', saveFailed: 'No se pudo guardar la tarea', deleteFailed: 'No se pudo eliminar la tarea', untitled: 'Tarea sin nombre' },
   'composables/useAiTaskDraft',
 );
 const copy = () => messagesOf(messages);
 
-/* —— 单例状态 —— */
+type Selection = Pick<AiTask, 'categories' | 'workout_ids' | 'template_id' | 'detail_level'>;
+
+const library = useAiTaskLibrary();
 const draft = ref<AiTask>(newTaskDraft());
 /** 上次保存/加载时的快照；脏标记 = 现在 ≠ 基线。 */
 const baseline = ref(taskSnapshot(draft.value));
-/** 用户是否亲手改过提示词（模板套用时的保护闸）。 */
-const promptEdited = ref(false);
-const taskList = ref<AiTaskSummary[]>([]);
-const templates = ref<AiTaskTemplate[]>([]);
-const recentWorkouts = ref<WorkoutRow[]>([]);
-type DraftUndoOp = OrbitUndoOp | { type: 'workout'; workoutId: string; prevSelected: boolean };
-const undoStack = createUndoStack<DraftUndoOp>();
+const undoStack = createUndoStack<Selection>();
+/* undoStack 是普通数组不是响应式；undoDepth 是它的响应式影子。 */
+const undoDepth = ref(0);
 const busy = ref<false | 'load' | 'save' | 'delete'>(false);
 const lastError = ref<string | null>(null);
 const savedNotice = ref(false);
 let savedNoticeTimer: ReturnType<typeof setTimeout> | undefined;
 
 const dirty = computed(() => isTaskDirty(draft.value, baseline.value));
-/* undoStack 是纯数组不是响应式——computed 包它只会缓存第一次求值。
-   用 undoDepth 做响应式影子，栈每次变动都同步它。 */
-const undoDepth = ref(0);
 const canUndo = computed(() => undoDepth.value > 0);
-const syncUndoDepth = () => {
+
+const cloneRanges = (ranges: AiTaskCategoryRange[]) =>
+  ranges.map((range) => ({ ...range, excluded_metrics: [...(range.excluded_metrics ?? [])] }));
+
+const rememberSelection = () => {
+  const { categories, workout_ids, template_id, detail_level } = draft.value;
+  undoStack.push({ categories: cloneRanges(categories), workout_ids: [...workout_ids], template_id, detail_level });
   undoDepth.value = undoStack.size;
+};
+
+const clearUndo = () => {
+  undoStack.clear();
+  undoDepth.value = 0;
 };
 
 const markBaseline = () => {
@@ -88,62 +74,14 @@ const patchDraft = (patch: Partial<AiTask>) => {
 
 const patchRange = (category: AiTaskCategory, patch: Partial<AiTaskCategoryRange>) => {
   const next = { ...categoryRangeOf(draft.value.categories, category), ...patch };
-  draft.value = {
-    ...draft.value,
-    categories: withCategoryRange(draft.value.categories, next),
-  };
+  patchDraft({ categories: withCategoryRange(draft.value.categories, next) });
 };
 
-const loadTaskList = async () => {
-  try {
-    taskList.value = await backend.aiTaskList();
-  } catch (error) {
-    lastError.value = toUserMessage(error, copy().loadFailed);
-  }
-};
-
-const loadTemplates = async () => {
-  try {
-    templates.value = await backend.aiTemplateList();
-  } catch (error) {
-    lastError.value = toUserMessage(error, copy().loadFailed);
-  }
-};
-
-/**
- * 任务里关联的运动可能落在「最近 N 条」之外（老任务、或勾选来自别的入口）。
- * 窗口预览和勾选框都靠 recentWorkouts 认这些 id——缺的按 id 一条条补进来。
- * 单条补取失败不拖死整页：预览只是少这一条，不是编一条假的。
- */
-const ensureLinkedWorkouts = async () => {
-  const known = new Set(recentWorkouts.value.map((workout) => workout.workout_id));
-  const missing = draft.value.workout_ids.filter((id) => !known.has(id));
-  if (!missing.length) return;
-  const fetched = await Promise.all(
-    missing.map(async (id) => {
-      try {
-        return await backend.getWorkoutDetail(id);
-      } catch {
-        return null;
-      }
-    }),
-  );
-  // 补取期间最近列表可能刚被刷过一遍——按此刻的集合再判一次，别重复塞。
-  const have = new Set(recentWorkouts.value.map((workout) => workout.workout_id));
-  const extra = fetched.filter(
-    (workout): workout is WorkoutRow => workout !== null && !have.has(workout.workout_id),
-  );
-  if (extra.length) recentWorkouts.value = [...recentWorkouts.value, ...extra];
-};
-
-const loadRecentWorkouts = async (limit = 60) => {
-  try {
-    recentWorkouts.value = await backend.getRecentWorkouts(limit);
-    // 覆盖赋值会把上一轮补进来的关联运动冲掉，所以每次落地后都重查一遍。
-    await ensureLinkedWorkouts();
-  } catch (error) {
-    lastError.value = toUserMessage(error, copy().loadFailed);
-  }
+const replaceDraft = (task: AiTask) => {
+  draft.value = task;
+  clearUndo();
+  markBaseline();
+  savedNotice.value = false;
 };
 
 const loadTask = async (id: string) => {
@@ -151,14 +89,8 @@ const loadTask = async (id: string) => {
   lastError.value = null;
   try {
     const task = await backend.aiTaskGet(id);
-    draft.value = task;
-    // 载入的提示词就是用户自己的稿子——模板再套用不许冲掉它。
-    promptEdited.value = true;
-    await ensureLinkedWorkouts();
-    undoStack.clear();
-    syncUndoDepth();
-    markBaseline();
-    savedNotice.value = false;
+    replaceDraft(task);
+    await library.ensureWorkouts(task.workout_ids);
   } catch (error) {
     lastError.value = toUserMessage(error, copy().loadFailed);
     throw error;
@@ -168,21 +100,17 @@ const loadTask = async (id: string) => {
 };
 
 const resetDraft = () => {
-  draft.value = newTaskDraft();
-  promptEdited.value = false;
-  undoStack.clear();
-  syncUndoDepth();
-  markBaseline();
+  replaceDraft(newTaskDraft());
   lastError.value = null;
-  savedNotice.value = false;
 };
 
-const saveDraft = async (): Promise<AiTask> => {
+/** `fallbackTitle`：标题为空时存成什么（页面按模板和运动自动生成）。 */
+const saveDraft = async (fallbackTitle?: string): Promise<AiTask> => {
   busy.value = 'save';
   lastError.value = null;
   try {
     const task = { ...draft.value };
-    if (!task.title.trim()) task.title = copy().untitled;
+    if (!task.title.trim()) task.title = fallbackTitle?.trim() || copy().untitled;
     const saved = await backend.aiTaskSave(task);
     draft.value = saved;
     markBaseline();
@@ -191,7 +119,7 @@ const saveDraft = async (): Promise<AiTask> => {
     savedNoticeTimer = setTimeout(() => {
       savedNotice.value = false;
     }, 4000);
-    void loadTaskList();
+    void library.loadTaskList();
     return saved;
   } catch (error) {
     lastError.value = toUserMessage(error, copy().saveFailed);
@@ -207,7 +135,7 @@ const deleteTask = async (id: string) => {
   try {
     await backend.aiTaskDelete(id);
     if (draft.value.id === id) resetDraft();
-    await loadTaskList();
+    await library.loadTaskList();
   } catch (error) {
     lastError.value = toUserMessage(error, copy().deleteFailed);
     throw error;
@@ -216,86 +144,44 @@ const deleteTask = async (id: string) => {
   }
 };
 
-/** 套用模板：只动规则字段；用户改过的提示词、已选运动和附件全部保留。 */
-const applyTemplate = (template: AiTaskTemplate) => {
-  draft.value = applyTemplateToDraft(
-    draft.value,
-    template,
-    templatePromptSeed(template),
-    promptEdited.value,
-  );
+/** 选模板 = 选分析方向（带推荐数据范围）；null = 不用模板。问题不受影响。 */
+const setTemplate = (template: AiTaskTemplate | null) => {
+  if ((template?.id ?? null) === draft.value.template_id) return;
+  rememberSelection();
+  draft.value = template ? applyTemplateToDraft(draft.value, template) : { ...draft.value, template_id: null };
 };
 
-/**
- * 模板下拉的单一入口（''/null = 「不使用模板」）。
- * 撤模板只摘 `template_id` 标记——快照、预览、保存都不再按模板任务计。
- * 模板已写进草稿的字段（类别范围、详细程度、提示词初稿）**不回退**：
- * 用户可能已经在上面改过，回退会把用户内容一起冲掉。
- */
-const setTemplateId = (id: string | null) => {
-  if (!id) {
-    if (draft.value.template_id !== null) patchDraft({ template_id: null });
-    return;
-  }
-  const template = templates.value.find((item) => item.id === id);
-  if (template) applyTemplate(template);
-};
-
-/* —— 轨道意图（undo 栈只管这个） —— */
 const setCategoryEnabled = (category: AiTaskCategory, enabled: boolean) => {
-  const current = categoryRangeOf(draft.value.categories, category).enabled;
-  if (current === enabled) return;
-  undoStack.push({
-    type: enabled ? 'join' : 'leave',
-    nodeId: category,
-    prevState: current ? 'member' : 'candidate',
-  });
-  syncUndoDepth();
+  if (categoryRangeOf(draft.value.categories, category).enabled === enabled) return;
+  rememberSelection();
   patchRange(category, { enabled });
 };
 
-const undo = () => {
-  const op = undoStack.pop();
-  if (!op) return;
-  syncUndoDepth();
-  if (op.type === 'workout') {
-    setWorkoutSelected(op.workoutId, op.prevSelected, false);
-    return;
-  }
-  const target = orbitUndoTarget(op);
-  patchRange(target.nodeId as AiTaskCategory, { enabled: target.state === 'member' });
-};
-
-const setCategoryDays = (category: AiTaskCategory, daysBefore: number) => {
-  patchRange(category, { days_before: Math.max(0, Math.floor(daysBefore)) });
-};
-
-const setIncludeWorkoutDay = (category: AiTaskCategory, include: boolean) => {
-  patchRange(category, { include_workout_day: include });
-};
-
-const setWorkoutSelected = (workoutId: string, selected: boolean, recordUndo = true) => {
-  const ids = draft.value.workout_ids;
-  const previous = ids.includes(workoutId);
-  if (previous === selected) return;
-  if (recordUndo) {
-    undoStack.push({ type: 'workout', workoutId, prevSelected: previous });
-    syncUndoDepth();
-  }
-  patchDraft({
-    workout_ids: selected ? [...ids, workoutId] : ids.filter((id) => id !== workoutId),
+const setMetricExcluded = (category: AiTaskCategory, metric: string, excluded: boolean) => {
+  const current = categoryRangeOf(draft.value.categories, category).excluded_metrics ?? [];
+  if (current.includes(metric) === excluded) return;
+  rememberSelection();
+  patchRange(category, {
+    excluded_metrics: excluded ? [...current, metric] : current.filter((name) => name !== metric),
   });
 };
-const toggleWorkout = (workoutId: string) => setWorkoutSelected(workoutId, !draft.value.workout_ids.includes(workoutId));
 
-const setPrompt = (text: string) => {
-  promptEdited.value = true;
-  patchDraft({ prompt: text });
+const setWorkoutSelected = (workoutId: string, selected: boolean) => {
+  const ids = draft.value.workout_ids;
+  if (ids.includes(workoutId) === selected) return;
+  rememberSelection();
+  patchDraft({ workout_ids: selected ? [...ids, workoutId] : ids.filter((id) => id !== workoutId) });
+};
+
+const undo = () => {
+  const previous = undoStack.pop();
+  undoDepth.value = undoStack.size;
+  if (previous) patchDraft(previous);
 };
 
 const setPersonalNote = (text: string) => {
+  // 写了内容就把这个类别算进交付范围；清空不动开关——留/走是显式动作。
   patchDraft({ personal_note: text });
-  // 写了内容就自动把这个类别算进交付范围；清空不动开关——成员的留/走是显式动作。
   if (text.trim()) patchRange('personal_note', { enabled: true });
 };
 
@@ -311,11 +197,9 @@ const removeAttachment = (id: string) => {
   if (!attachments.length) patchRange('attachment', { enabled: false });
 };
 
-/** 重新选择原件：保住 id，这样预览/准备返回的状态还能对上这条引用。 */
+/** 重新选择原件：保住 id，预览/准备返回的状态还能对上这条引用。 */
 const replaceAttachment = (id: string, next: AiTaskAttachmentRef) => {
-  patchDraft({
-    attachments: draft.value.attachments.map((ref) => (ref.id === id ? { ...next, id } : ref)),
-  });
+  patchDraft({ attachments: draft.value.attachments.map((ref) => (ref.id === id ? { ...next, id } : ref)) });
 };
 
 export function useAiTaskDraft() {
@@ -323,29 +207,24 @@ export function useAiTaskDraft() {
     draft,
     dirty,
     canUndo,
-    promptEdited,
-    taskList,
-    templates,
-    recentWorkouts,
     busy,
     lastError,
     savedNotice,
-    loadTaskList,
-    loadTemplates,
-    loadRecentWorkouts,
     loadTask,
     resetDraft,
     saveDraft,
     deleteTask,
-    applyTemplate,
-    setTemplateId,
+    setTemplate,
     setCategoryEnabled,
-    setCategoryDays,
-    setIncludeWorkoutDay,
-    undo,
-    toggleWorkout,
+    setCategoryDays: (category: AiTaskCategory, days: number) =>
+      patchRange(category, { days_before: Math.max(0, Math.floor(days)) }),
+    setIncludeWorkoutDay: (category: AiTaskCategory, include: boolean) =>
+      patchRange(category, { include_workout_day: include }),
+    setMetricExcluded,
     setWorkoutSelected,
-    setPrompt,
+    toggleWorkout: (workoutId: string) => setWorkoutSelected(workoutId, !draft.value.workout_ids.includes(workoutId)),
+    undo,
+    setPrompt: (prompt: string) => patchDraft({ prompt }),
     setPersonalNote,
     setTitle: (title: string) => patchDraft({ title }),
     setDetailLevel: (detail_level: AiTaskDetailLevel) => patchDraft({ detail_level }),

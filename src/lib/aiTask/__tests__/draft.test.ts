@@ -48,9 +48,10 @@ describe('newTaskDraft', () => {
 });
 
 describe('applyTemplateToDraft', () => {
-  it('模板只携带规则：类别范围、detail_level、提示词初稿；运动与附件原样保留', () => {
+  it('模板带方向与推荐范围；问题、运动、附件原样保留', () => {
     const task = {
       ...newTaskDraft(),
+      prompt: 'my own question',
       workout_ids: ['w-1'],
       attachments: [{
         id: 'a-1', path: 'C:\\x\\report.pdf', display_name: 'report.pdf',
@@ -58,21 +59,27 @@ describe('applyTemplateToDraft', () => {
       }],
       personal_note: 'keep me',
     };
-    const next = applyTemplateToDraft(task, template(), 'seed prompt', false);
+    const next = applyTemplateToDraft(task, template());
     expect(next.template_id).toBe('tpl-1');
     expect(next.detail_level).toBe('detailed');
-    expect(next.prompt).toBe('seed prompt');
+    expect(next.prompt).toBe('my own question');
     expect(next.workout_ids).toEqual(['w-1']);
     expect(next.attachments).toHaveLength(1);
     expect(next.personal_note).toBe('keep me');
     expect(next.categories.find((range) => range.category === 'sleep')?.days_before).toBe(30);
   });
 
-  it('用户改过提示词后，模板不再覆盖它', () => {
-    const task = { ...newTaskDraft(), prompt: 'my own question' };
-    const next = applyTemplateToDraft(task, template(), 'seed prompt', true);
-    expect(next.prompt).toBe('my own question');
-    expect(next.template_id).toBe('tpl-1');
+  it('内容类别（附件、个人说明）的开关跟内容走，不被模板覆盖', () => {
+    const task = {
+      ...newTaskDraft(),
+      categories: newTaskDraft().categories.map((range) =>
+        range.category === 'attachment' ? { ...range, enabled: true } : range),
+    };
+    const next = applyTemplateToDraft(task, template({
+      categories: defaultCategoryRanges().map((range) =>
+        range.category === 'attachment' ? { ...range, enabled: false } : range),
+    }));
+    expect(next.categories.find((range) => range.category === 'attachment')?.enabled).toBe(true);
   });
 });
 

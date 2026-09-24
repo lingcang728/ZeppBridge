@@ -1,5 +1,5 @@
 /**
- * 草稿控制器：单例状态、undo 栈只管轨道意图、模板套用保留用户稿。
+ * 草稿控制器：单例状态、撤销栈还原选择快照、模板只设方向不碰问题。
  * 本文件里模块单例状态是跨用例共享的，用例顺序别拆开重排。
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -28,6 +28,7 @@ vi.mock('../../lib/bridge', () => ({
 }));
 
 import { useAiTaskDraft } from '../useAiTaskDraft';
+import { useAiTaskLibrary } from '../useAiTaskLibrary';
 
 const template = (patch: Partial<AiTaskTemplate> = {}): AiTaskTemplate => ({
   schema_version: 1,
@@ -48,6 +49,7 @@ const template = (patch: Partial<AiTaskTemplate> = {}): AiTaskTemplate => ({
 
 describe('useAiTaskDraft', () => {
   const draft = useAiTaskDraft();
+  const library = useAiTaskLibrary();
 
   beforeEach(() => {
     draft.resetDraft();
@@ -62,7 +64,7 @@ describe('useAiTaskDraft', () => {
     templatesMock.mockResolvedValue([]);
   });
 
-  it('轨道意图进 undo 栈；undo 把节点设回 join/leave 前的状态', () => {
+  it('类别进出进撤销栈；undo 还原到动作前', () => {
     draft.setCategoryEnabled('sleep', false);
     expect(draft.canUndo.value).toBe(true);
     draft.undo();
@@ -96,15 +98,23 @@ describe('useAiTaskDraft', () => {
     expect(draft.draft.value.workout_ids).toEqual([]);
   });
 
-  it('用户改过提示词 → 套模板不覆盖；没改过 → 模板初稿进入', () => {
+  it('套模板只设方向与推荐范围，用户的问题保留；可以撤销', () => {
     draft.setPrompt('my own words');
-    draft.applyTemplate(template());
+    draft.setTemplate(template());
     expect(draft.draft.value.prompt).toBe('my own words');
-    draft.resetDraft();
-    draft.applyTemplate(template());
-    expect(draft.draft.value.prompt).toBe('seed');
     expect(draft.draft.value.template_id).toBe('tpl-1');
     expect(draft.draft.value.detail_level).toBe('detailed');
+    draft.undo();
+    expect(draft.draft.value.template_id).toBeNull();
+    expect(draft.draft.value.detail_level).toBe('standard');
+  });
+
+  it('单独排除一个指标，撤销后恢复', () => {
+    draft.setMetricExcluded('recovery', 'stress', true);
+    draft.setMetricExcluded('recovery', 'stress', true);
+    expect(draft.draft.value.categories.find((r) => r.category === 'recovery')?.excluded_metrics).toEqual(['stress']);
+    draft.undo();
+    expect(draft.draft.value.categories.find((r) => r.category === 'recovery')?.excluded_metrics).toEqual([]);
   });
 
   it('写个人说明自动把 personal_note 类别带进任务', () => {
@@ -165,22 +175,17 @@ describe('useAiTaskDraft', () => {
     expect(draft.lastError.value).toBeTruthy();
   });
 
-  it('「不使用模板」摘掉 template_id；模板已写入的字段不回退', async () => {
-    templatesMock.mockResolvedValue([template()]);
-    await draft.loadTemplates();
-    draft.setTemplateId('tpl-1');
-    expect(draft.draft.value.template_id).toBe('tpl-1');
-    expect(draft.draft.value.detail_level).toBe('detailed');
-    expect(draft.draft.value.prompt).toBe('seed');
-    draft.setTemplateId(null);
+  it('「不使用模板」摘掉 template_id；模板已写入的范围不回退', () => {
+    draft.setTemplate(template());
+    draft.setTemplate(null);
     expect(draft.draft.value.template_id).toBeNull();
-    // 决策：模板写进草稿的字段不回退——用户可能已经在上面改过。
     expect(draft.draft.value.detail_level).toBe('detailed');
-    expect(draft.draft.value.prompt).toBe('seed');
-    // '' 与 null 同义（SelectMenu 的「不使用模板」选项值就是 ''）。
-    draft.setTemplateId('tpl-1');
-    draft.setTemplateId('');
-    expect(draft.draft.value.template_id).toBeNull();
+  });
+
+  it('saveDraft 用调用方给的自动标题兜底', async () => {
+    saveMock.mockImplementation(async (task: AiTask) => ({ ...task, id: 's-2' }));
+    const saved = await draft.saveDraft('恢复跑 · 9/24');
+    expect(saved.title).toBe('恢复跑 · 9/24');
   });
 
   const beyondWorkout = (id: string) => ({
@@ -197,10 +202,10 @@ describe('useAiTaskDraft', () => {
   it('关联运动在最近列表之外：loadTask 后按 id 补取进来', async () => {
     getMock.mockResolvedValue({ ...newTaskDraft(), id: 't-7', workout_ids: ['w-old'] });
     workoutDetailMock.mockResolvedValue(beyondWorkout('w-old'));
-    await draft.loadRecentWorkouts();
+    await library.loadRecentWorkouts();
     await draft.loadTask('t-7');
     expect(workoutDetailMock).toHaveBeenCalledWith('w-old');
-    expect(draft.recentWorkouts.value.some((w) => w.workout_id === 'w-old')).toBe(true);
+    expect(library.recentWorkouts.value.some((w) => w.workout_id === 'w-old')).toBe(true);
   });
 
   it('补取不受加载顺序影响：任务先到、最近列表后覆盖也会补齐', async () => {
@@ -208,7 +213,7 @@ describe('useAiTaskDraft', () => {
     workoutDetailMock.mockResolvedValue(beyondWorkout('w-old2'));
     // 任务先回来（此时 recentWorkouts 还没有它），随后最近列表覆盖落地。
     await draft.loadTask('t-8');
-    await draft.loadRecentWorkouts();
-    expect(draft.recentWorkouts.value.some((w) => w.workout_id === 'w-old2')).toBe(true);
+    await library.loadRecentWorkouts();
+    expect(library.recentWorkouts.value.some((w) => w.workout_id === 'w-old2')).toBe(true);
   });
 });

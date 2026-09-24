@@ -16,7 +16,7 @@ import type { AiTaskIssue } from '../bridge/types';
 const messages = defineMessages(
   {
     /* —— 类别名（ui.ai_task.cat.*） —— */
-    'ui.ai_task.cat.workout': '运动',
+    'ui.ai_task.cat.workout': '期间运动记录',
     'ui.ai_task.cat.sleep': '睡眠',
     'ui.ai_task.cat.recovery': '恢复状态',
     'ui.ai_task.cat.heart_rate': '心率',
@@ -37,12 +37,12 @@ const messages = defineMessages(
     /* —— 预览警告（preview.warnings 的 ui 码） —— */
     'ui.ai_task.warn.attachment_changed': '附件大小和添加时不一样——交付前请确认还是同一份原件。',
     'ui.ai_task.warn.category_missing': '这一类别在所选时间窗内没有数据，导出里会如实标注缺失。',
-    'ui.ai_task.warn.partial_coverage': '时间窗内只有部分日期有数据，覆盖详情见下表。',
+    'ui.ai_task.warn.partial_coverage': '时间窗内只有部分日期有数据。',
     'ui.ai_task.unknown': '未识别的状态说明',
 
     /* —— 附件区提示 —— */
     'ui.ai_task.attach.no_redaction':
-      '原件只按引用交付，不会自动脱敏。请确认你愿意把这份原文件手动发给所选 AI。',
+      '导出时会把原件复制到桌面的交付文件夹里（不做脱敏）。请确认你愿意把它交给所选 AI。',
 
     /* —— 内置模板（ui.ai_template.<id>.name / .prompt） —— */
     'ui.ai_template.recovery_run.name': '恢复跑',
@@ -59,7 +59,7 @@ const messages = defineMessages(
     fallbackIssue: '有一条状态说明无法识别',
   },
   {
-    'ui.ai_task.cat.workout': 'Workouts',
+    'ui.ai_task.cat.workout': 'Workouts in window',
     'ui.ai_task.cat.sleep': 'Sleep',
     'ui.ai_task.cat.recovery': 'Readiness',
     'ui.ai_task.cat.heart_rate': 'Heart rate',
@@ -77,11 +77,11 @@ const messages = defineMessages(
 
     'ui.ai_task.warn.attachment_changed': 'An attachment\'s size differs from when it was added — confirm it is still the same original before handing off.',
     'ui.ai_task.warn.category_missing': 'This category has no data in the selected window; the export marks it as missing.',
-    'ui.ai_task.warn.partial_coverage': 'Only part of the window has data. See the coverage table below.',
+    'ui.ai_task.warn.partial_coverage': 'Only part of the window has data.',
     'ui.ai_task.unknown': 'Unrecognized status note',
 
     'ui.ai_task.attach.no_redaction':
-      'Originals are referenced as-is and are not redacted. Confirm you are willing to attach this file to the chosen AI yourself.',
+      'On export the original is copied into the hand-off folder on your desktop, unredacted. Make sure you are happy to give it to the chosen AI.',
 
     'ui.ai_template.recovery_run.name': 'Recovery run',
     'ui.ai_template.recovery_run.prompt':
@@ -96,7 +96,7 @@ const messages = defineMessages(
     fallbackIssue: 'A status note could not be recognized',
   },
   {
-    'ui.ai_task.cat.workout': 'Entrenamientos',
+    'ui.ai_task.cat.workout': 'Entrenamientos del periodo',
     'ui.ai_task.cat.sleep': 'Sueño',
     'ui.ai_task.cat.recovery': 'Recuperación',
     'ui.ai_task.cat.heart_rate': 'Frecuencia cardíaca',
@@ -114,11 +114,11 @@ const messages = defineMessages(
 
     'ui.ai_task.warn.attachment_changed': 'El tamaño de un adjunto difiere del que tenía al añadirse: confirma que sigue siendo el mismo original.',
     'ui.ai_task.warn.category_missing': 'Esta categoría no tiene datos en la ventana elegida; la exportación lo marca como faltante.',
-    'ui.ai_task.warn.partial_coverage': 'Solo parte de la ventana tiene datos. Revisa la tabla de cobertura.',
+    'ui.ai_task.warn.partial_coverage': 'Solo parte de la ventana tiene datos.',
     'ui.ai_task.unknown': 'Nota de estado no reconocida',
 
     'ui.ai_task.attach.no_redaction':
-      'Los originales se entregan por referencia y sin redacción automática. Confirma que quieres adjuntar este archivo a la IA elegida.',
+      'Al exportar, el original se copia sin redactar en la carpeta de entrega del escritorio. Confirma que quieres dárselo a la IA elegida.',
 
     'ui.ai_template.recovery_run.name': 'Carrera de recuperación',
     'ui.ai_template.recovery_run.prompt':

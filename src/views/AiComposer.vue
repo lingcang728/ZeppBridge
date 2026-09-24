@@ -1,794 +1,154 @@
 <script setup lang="ts">
 /**
- * 交给 AI —— 任务编排页（Beta1）。
+ * 交给 AI —— 一页三步。
  *
- * 布局（02-orbit-composer / 05-dark-composer）：左上是圆球工作台
- * （OrbitCanvas，P5 契约，S3 实现已在 W3 集成接入），
- * 其下是类别卡片列表备用入口；右栏是任务配置面板。
+ *   左：关系网（TaskGraph）。中心是分析对象（某次运动或「最近 N 天」），
+ *       圈内外就是交不交给 AI，展开的类别能看到逐指标排除。
+ *   右：① 选运动（可以不选） ② 方向（模板）+ 你的问题 + 背景
+ *       ③ 交付（导出到桌面 → 复制提示词 → 打开 AI）。
  *
- * 点 member 节点 → 右侧滑出类别配置面板（03-orbit-drag）：窗口天数
- * 7/14/30、是否含运动当天、逐运动窗口预览。
- *
- * 「预览交付」走 `?stage=preview` 查询参数切换（/ai 路由归 S2，本页
- * 内部托管预览子状态，不需要新路由）。
+ * 本组件只做编排：状态归 useAiTaskDraft / useAiTaskLibrary / useAiTaskPreview /
+ * useAiTaskHandoff 四个 composable，纯逻辑归 src/lib/aiTask/*。
  */
-import { computed, onMounted, ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import Icon from '../components/Icon.vue';
-import SelectMenu, { type SelectMenuOption } from '../components/SelectMenu.vue';
-import OrbitCanvas from '../components/orbit/OrbitCanvas.vue';
-import type { OrbitNode } from '../lib/orbit/types';
-import AiHandoffPreview from './AiHandoffPreview.vue';
+import { computed, onMounted, reactive, watch } from 'vue';
+import { useRoute } from 'vue-router';
+import '../styles/ai-task.css';
+import AiTaskHeader from '../components/ai/AiTaskHeader.vue';
+import TaskGraph from '../components/ai/TaskGraph.vue';
+import WorkoutPicker from '../components/ai/WorkoutPicker.vue';
+import DirectionPanel from '../components/ai/DirectionPanel.vue';
+import TaskExtras from '../components/ai/TaskExtras.vue';
+import HandoffPanel from '../components/ai/HandoffPanel.vue';
 import { useAiTaskDraft } from '../composables/useAiTaskDraft';
-import { isDesktop, toUserMessage } from '../lib/bridge';
-import type { AiTaskCategory, AiTaskDetailLevel } from '../lib/bridge/types';
-import {
-  AI_TASK_CATEGORY_META,
-  AI_TASK_CATEGORY_ORDER,
-  CATEGORY_DAY_CHOICES,
-  categoryLabel,
-  categoryRangeOf,
-} from '../lib/aiTask/categories';
-import { categoryWindows } from '../lib/aiTask/coverage';
-import { pickAttachments } from '../lib/aiTask/attachments';
-import { attachmentPlainReferenceNote } from '../lib/aiTask/copy';
-import { AI_TASK_PROMPT_MAX } from '../lib/aiTask/draft';
-import { templateName } from '../lib/aiTask/prompt';
-import { formatDateTime, formatDistance } from '../lib/format';
+import { useAiTaskLibrary } from '../composables/useAiTaskLibrary';
+import { useAiTaskPreview } from '../composables/useAiTaskPreview';
+import type { AiTaskCategory } from '../lib/bridge/types';
+import { buildGraph } from '../lib/aiTask/graph/model';
+import { directionText } from '../lib/aiTask/prompt';
+import { autoTaskTitle, recentWindowDays } from '../lib/aiTask/title';
 import { displayableWorkouts, workoutDisplayLabel } from '../lib/workouts';
+import { formatDate } from '../lib/format';
 import { defineMessages, useMessages } from '../i18n';
 
 defineOptions({ name: 'AiComposer' });
 
-const messages = defineMessages(
+const t = useMessages(defineMessages(
   {
-    pageTitle: '交给 AI',
-    pageIntro: '把本地健康数据整理成任务，准备好文件后自己发给 AI。',
-    savedTasks: '已保存的任务',
-    newTask: '新建任务',
-    taskTitle: '任务名称',
-    taskTitlePlaceholder: '给这次分析起个名字',
-    workoutsTitle: '关联运动',
-    workoutsEmpty: '本机还没有运动记录',
-    availableWorkouts: '待选运动', linkedWorkouts: '已关联', dragHint: '拖放或点击来加入、移除',
-    templateTitle: '模板',
-    noTemplate: '不使用模板',
-    categoriesTitle: '分析内容',
-    categoriesEmpty: '拖入或点击类别，把它们加入这次分析',
-    promptTitle: '你的问题',
-    promptPlaceholder: '想让 AI 分析什么？例如：这次恢复跑的强度合适吗？',
-    promptCounter: (used: number, max: number) => `${used}/${max}`,
-    attachTitle: '附件原件',
-    attachAdd: '添加文件',
-    attachPickerTitle: '选择要引用的原件',
-    attachFilterName: 'PDF 与图片',
-    attachSkipped: (count: number) => `${count} 个文件类型不支持，未加入`,
-    attachPickFailed: '附件没有添加成功',
-    attachEmpty: '还没有附件。原件只按引用交付，不会复制或脱敏。',
-    optionsTitle: '选项',
-    preciseGps: '精确路线（GPS 坐标）',
-    preciseGpsHint: '默认关闭。打开后导出的轨迹保留原始坐标。',
-    detailLevel: '详细程度',
-    detailSummary: '摘要',
-    detailStandard: '标准',
-    detailDetailed: '详细（含逐点序列）',
-    mcpShared: '开放给任务限定 MCP',
-    mcpSharedHint: '本机 MCP 工具只能查这个任务覆盖的范围。',
-    saveTask: '保存任务',
-    savedOk: '已保存',
-    previewHandoff: '预览交付',
-    undoAction: '撤销',
-    resetView: '重置视图',
-    zoomIn: '放大',
-    zoomOut: '缩小',
-    cardFallback: '类别列表（备用入口）',
-    cardJoin: '加入',
-    cardLeave: '移除',
-    daysBefore: '回溯天数',
     daysOption: (days: number) => `${days} 天`,
-    includeWorkoutDay: '包含运动当天',
-    windowPreview: '各运动的窗口',
-    noteEditor: '个人说明',
-    notePlaceholder: '写给 AI 看的背景：伤病史、目标、近期状态。会和数据一起进导出。',
-    attachPanelHint: '添加或移除附件原件。',
-    panelClose: '关闭',
-    desktopOnly: '连接桌面后端后可保存与预览',
-    removeAttachment: '移除',
-    generalWindow: '统一窗口',
-    eachWorkoutWindow: '按运动分别回溯',
+    recentDays: (days: number) => `最近 ${days} 天`,
+    andMore: (count: number) => `等 ${count} 次`,
   },
   {
-    pageTitle: 'Hand to AI',
-    pageIntro: 'Compose an analysis task from local health data, then deliver it to an AI yourself.',
-    savedTasks: 'Saved tasks',
-    newTask: 'New task',
-    taskTitle: 'Task name',
-    taskTitlePlaceholder: 'Name this analysis',
-    workoutsTitle: 'Linked workouts',
-    workoutsEmpty: 'No workouts on this machine yet',
-    availableWorkouts: 'Available', linkedWorkouts: 'Linked', dragHint: 'Drag or click to add and remove',
-    templateTitle: 'Template',
-    noTemplate: 'No template',
-    categoriesTitle: 'Analysis contents',
-    categoriesEmpty: 'Drag in or click categories to include them',
-    promptTitle: 'Your question',
-    promptPlaceholder: 'What should the AI analyze? E.g. was this recovery run the right intensity?',
-    promptCounter: (used: number, max: number) => `${used}/${max}`,
-    attachTitle: 'Original attachments',
-    attachAdd: 'Add files',
-    attachPickerTitle: 'Choose original files to reference',
-    attachFilterName: 'PDF and images',
-    attachSkipped: (count: number) => `${count} file(s) skipped — unsupported type`,
-    attachPickFailed: 'Could not add the files',
-    attachEmpty: 'No attachments yet. Originals are referenced as-is — never copied or redacted.',
-    optionsTitle: 'Options',
-    preciseGps: 'Precise route (GPS coordinates)',
-    preciseGpsHint: 'Off by default. When on, exported tracks keep raw coordinates.',
-    detailLevel: 'Detail level',
-    detailSummary: 'Summary',
-    detailStandard: 'Standard',
-    detailDetailed: 'Detailed (includes per-point series)',
-    mcpShared: 'Share with task-scoped MCP',
-    mcpSharedHint: 'The local MCP tool may only query what this task covers.',
-    saveTask: 'Save task',
-    savedOk: 'Saved',
-    previewHandoff: 'Preview hand-off',
-    undoAction: 'Undo',
-    resetView: 'Reset view',
-    zoomIn: 'Zoom in',
-    zoomOut: 'Zoom out',
-    cardFallback: 'Category list (fallback)',
-    cardJoin: 'Add',
-    cardLeave: 'Remove',
-    daysBefore: 'Days before',
     daysOption: (days: number) => `${days} days`,
-    includeWorkoutDay: 'Include workout day',
-    windowPreview: 'Window per workout',
-    noteEditor: 'Personal note',
-    notePlaceholder: 'Context for the AI: injury history, goals, recent form. Ships with the data.',
-    attachPanelHint: 'Add or remove original attachments.',
-    panelClose: 'Close',
-    desktopOnly: 'Connect the desktop backend to save and preview',
-    removeAttachment: 'Remove',
-    generalWindow: 'Shared window',
-    eachWorkoutWindow: 'Per-workout lookback',
+    recentDays: (days: number) => `Last ${days} days`,
+    andMore: (count: number) => `and ${count - 1} more`,
   },
   {
-    pageTitle: 'Pasar a la IA',
-    pageIntro: 'Compón una tarea de análisis con tus datos locales y entrégala a la IA tú mismo.',
-    savedTasks: 'Tareas guardadas',
-    newTask: 'Nueva tarea',
-    taskTitle: 'Nombre de la tarea',
-    taskTitlePlaceholder: 'Ponle nombre a este análisis',
-    workoutsTitle: 'Entrenamientos vinculados',
-    workoutsEmpty: 'Aún no hay entrenamientos en este equipo',
-    availableWorkouts: 'Disponibles', linkedWorkouts: 'Vinculados', dragHint: 'Arrastra o pulsa para añadir y quitar',
-    templateTitle: 'Plantilla',
-    noTemplate: 'Sin plantilla',
-    categoriesTitle: 'Contenido del análisis',
-    categoriesEmpty: 'Arrastra o pulsa categorías para incluirlas',
-    promptTitle: 'Tu pregunta',
-    promptPlaceholder: '¿Qué debe analizar la IA? Por ejemplo: ¿fue adecuada la intensidad de esta recuperación?',
-    promptCounter: (used: number, max: number) => `${used}/${max}`,
-    attachTitle: 'Adjuntos originales',
-    attachAdd: 'Añadir archivos',
-    attachPickerTitle: 'Elige los originales a referenciar',
-    attachFilterName: 'PDF e imágenes',
-    attachSkipped: (count: number) => `${count} archivo(s) omitidos — tipo no admitido`,
-    attachPickFailed: 'No se pudieron añadir los archivos',
-    attachEmpty: 'Sin adjuntos. Los originales se referencian tal cual: no se copian ni se redactan.',
-    optionsTitle: 'Opciones',
-    preciseGps: 'Ruta precisa (coordenadas GPS)',
-    preciseGpsHint: 'Desactivado por defecto. Al activarlo, las trazas conservan las coordenadas.',
-    detailLevel: 'Nivel de detalle',
-    detailSummary: 'Resumen',
-    detailStandard: 'Estándar',
-    detailDetailed: 'Detallado (incluye series por punto)',
-    mcpShared: 'Compartir con MCP de tarea',
-    mcpSharedHint: 'La herramienta MCP local solo consulta lo que cubre esta tarea.',
-    saveTask: 'Guardar tarea',
-    savedOk: 'Guardado',
-    previewHandoff: 'Vista de entrega',
-    undoAction: 'Deshacer',
-    resetView: 'Restablecer vista',
-    zoomIn: 'Acercar',
-    zoomOut: 'Alejar',
-    cardFallback: 'Lista de categorías (alternativa)',
-    cardJoin: 'Añadir',
-    cardLeave: 'Quitar',
-    daysBefore: 'Días previos',
     daysOption: (days: number) => `${days} días`,
-    includeWorkoutDay: 'Incluir el día del entrenamiento',
-    windowPreview: 'Ventana por entrenamiento',
-    noteEditor: 'Nota personal',
-    notePlaceholder: 'Contexto para la IA: lesiones, objetivos, estado reciente. Se exporta con los datos.',
-    attachPanelHint: 'Añade o quita adjuntos originales.',
-    panelClose: 'Cerrar',
-    desktopOnly: 'Conecta el backend de escritorio para guardar y previsualizar',
-    removeAttachment: 'Quitar',
-    generalWindow: 'Ventana común',
-    eachWorkoutWindow: 'Ventana por entrenamiento',
+    recentDays: (days: number) => `Últimos ${days} días`,
   },
   'views/AiComposer',
-);
-const t = useMessages(messages);
+));
 
 const route = useRoute();
-const router = useRouter();
-const stage = computed(() => (route.query.stage === 'preview' ? 'preview' : 'compose'));
+const draftCtl = useAiTaskDraft();
+const library = useAiTaskLibrary();
+const previewCtl = useAiTaskPreview();
 
-const {
-  draft, canUndo, taskList, templates, recentWorkouts, busy, lastError, savedNotice,
-  loadTaskList, loadTemplates, loadRecentWorkouts, loadTask, resetDraft, saveDraft,
-  setTemplateId, setCategoryEnabled, setCategoryDays, setIncludeWorkoutDay, undo,
-  setWorkoutSelected, setPrompt, setPersonalNote, setTitle, setDetailLevel,
-  setPreciseGps, setMcpShared, addAttachments, removeAttachment,
-} = useAiTaskDraft();
+const { draft, canUndo } = draftCtl;
+const { templates, recentWorkouts } = library;
+const { preview, previewError } = previewCtl;
 
-const zoom = ref(1);
-const activeCategory = ref<AiTaskCategory | null>(null);
-const attachNotice = ref<string | null>(null);
-const desktop = isDesktop();
-
-/* —— 轨道节点：一个类别一个节点；member = 已启用 —— */
-const orbitNodes = computed<OrbitNode[]>(() =>
-  AI_TASK_CATEGORY_ORDER.map((category) => {
-    const meta = AI_TASK_CATEGORY_META[category];
-    const range = categoryRangeOf(draft.value.categories, category);
-    return {
-      id: category,
-      category,
-      label: categoryLabel(category),
-      sublabel: meta.hasWindow && range.enabled ? t.value.daysOption(range.days_before) : undefined,
-      icon: meta.icon,
-      state: range.enabled ? 'member' : 'candidate',
-      count: category === 'attachment' && draft.value.attachments.length
-        ? draft.value.attachments.length
-        : undefined,
-    };
-  }),
-);
-
-const orbitCenter = computed(() => ({
-  label: draft.value.title.trim() || t.value.taskTitle,
-  sublabel: draft.value.workout_ids.length
-    ? `${draft.value.workout_ids.length} ${categoryLabel('workout')}`
-    : undefined,
-}));
-
-const asCategory = (id: string): AiTaskCategory | null =>
-  (AI_TASK_CATEGORY_ORDER as readonly string[]).includes(id) ? (id as AiTaskCategory) : null;
-
-const onNodeJoin = (id: string) => {
-  const category = asCategory(id);
-  if (category) setCategoryEnabled(category, true);
-};
-const onNodeLeave = (id: string) => {
-  const category = asCategory(id);
-  if (category) setCategoryEnabled(category, false);
-};
-const onNodeOpen = (id: string) => {
-  const category = asCategory(id);
-  activeCategory.value = category;
-};
-const onNodeFocus = () => undefined;
-const onUndo = () => undo();
-const onZoom = (value: number) => {
-  zoom.value = Math.min(1.8, Math.max(0.6, value));
+/* —— 关系网 —— */
+const expanded = reactive(new Set<AiTaskCategory>());
+const toggleExpand = (category: AiTaskCategory) => {
+  if (expanded.has(category)) expanded.delete(category);
+  else expanded.add(category);
 };
 
-/* 侧栏里的回调：activeCategory 在脚本层就是 AiTaskCategory，不做模板窄化。 */
-const setActiveDays = (days: number) => {
-  if (activeCategory.value) setCategoryDays(activeCategory.value, days);
-};
-const setActiveIncludeDay = (include: boolean) => {
-  if (activeCategory.value) setIncludeWorkoutDay(activeCategory.value, include);
-};
-
-/* —— 类别配置侧栏 —— */
-const activeRange = computed(() =>
-  activeCategory.value ? categoryRangeOf(draft.value.categories, activeCategory.value) : null);
-const activeMeta = computed(() =>
-  activeCategory.value ? AI_TASK_CATEGORY_META[activeCategory.value] : null);
-
-const windowPreview = computed(() => {
-  if (!activeCategory.value || !activeRange.value) return [];
-  const workouts = draft.value.workout_ids
-    .map((id) => recentWorkouts.value.find((workout) => workout.workout_id === id))
-    .filter((workout): workout is NonNullable<typeof workout> => Boolean(workout))
-    .map((workout) => ({ id: workout.workout_id, start_time: workout.start_time }));
-  return categoryWindows(draft.value.workout_ids, workouts, activeRange.value);
-});
-
-const workoutTitle = (workoutId: string): string => {
-  const workout = recentWorkouts.value.find((item) => item.workout_id === workoutId);
-  return workout ? workoutDisplayLabel(workout) : workoutId;
-};
-
-/* —— 右栏数据 —— */
 const workoutChoices = computed(() => displayableWorkouts(recentWorkouts.value));
-const linkedWorkouts = computed(() => workoutChoices.value.filter((workout) => draft.value.workout_ids.includes(workout.workout_id)));
-const availableWorkouts = computed(() => workoutChoices.value.filter((workout) => !draft.value.workout_ids.includes(workout.workout_id)));
-const dragStart = (event: DragEvent, type: 'category' | 'workout', id: string) => {
-  event.dataTransfer?.setData(`application/x-zepp-${type}`, id);
-  if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
-};
-const dropCategory = (event: DragEvent, enabled: boolean) => {
-  const category = asCategory(event.dataTransfer?.getData('application/x-zepp-category') ?? '');
-  if (category) setCategoryEnabled(category, enabled);
-};
-const dropWorkout = (event: DragEvent, selected: boolean) => {
-  const id = event.dataTransfer?.getData('application/x-zepp-workout');
-  if (id && workoutChoices.value.some((workout) => workout.workout_id === id)) setWorkoutSelected(id, selected);
-};
+const selectedWorkouts = computed(() =>
+  workoutChoices.value.filter((workout) => draft.value.workout_ids.includes(workout.workout_id)));
 
-const templateOptions = computed<SelectMenuOption[]>(() => [
-  { value: '', label: t.value.noTemplate },
-  ...templates.value.map((template) => ({
-    value: template.id,
-    label: templateName(template),
-  })),
-]);
-const selectedTemplateId = computed({
-  get: () => draft.value.template_id ?? '',
-  // 「不使用模板」也要真的摘掉 template_id，不是选了等于没选。
-  set: (id: string | number) => setTemplateId(String(id) || null),
+/** 中心节点：选了运动就是那次运动，没选就是「最近 N 天」。 */
+const center = computed(() => {
+  const [first] = [...selectedWorkouts.value].sort((a, b) => a.start_time.localeCompare(b.start_time));
+  if (first) {
+    const extra = selectedWorkouts.value.length > 1 ? ` ${t.value.andMore(selectedWorkouts.value.length)}` : '';
+    return {
+      label: `${workoutDisplayLabel(first)}${extra}`,
+      sublabel: formatDate(first.start_time, 'long'),
+      icon: 'run' as const,
+    };
+  }
+  return { label: t.value.recentDays(recentWindowDays(draft.value)), sublabel: null, icon: 'clock' as const };
 });
 
-const detailOptions = computed<SelectMenuOption[]>(() => [
-  { value: 'summary', label: t.value.detailSummary },
-  { value: 'standard', label: t.value.detailStandard },
-  { value: 'detailed', label: t.value.detailDetailed },
-]);
-const detailLevel = computed({
-  get: () => draft.value.detail_level,
-  set: (value: string | number) => setDetailLevel(value as AiTaskDetailLevel),
-});
+const graphModel = computed(() =>
+  buildGraph({
+    task: draft.value,
+    preview: preview.value,
+    expanded,
+    centerLabel: center.value.label,
+    centerSublabel: center.value.sublabel,
+    centerIcon: center.value.icon,
+    daysLabel: t.value.daysOption,
+  }));
 
-/* 附件视图模型：display_name 是用户文件名——不进模板字段直取，
-   这里改名成 name 再渲染。 */
-const attachmentRows = computed(() =>
-  draft.value.attachments.map(({ display_name: name, ...rest }) => ({ ...rest, name })));
+const selectedTemplate = computed(() => templates.value.find((template) => template.id === draft.value.template_id) ?? null);
+const direction = computed(() => directionText(selectedTemplate.value));
+const fallbackTitle = computed(() => autoTaskTitle(draft.value, selectedWorkouts.value, selectedTemplate.value ? selectedTemplate.value.name : null));
+const recentDays = computed(() => recentWindowDays(draft.value));
 
-const pickMoreAttachments = async () => {
-  attachNotice.value = null;
-  try {
-    const { added, skipped } = await pickAttachments(t.value.attachPickerTitle, t.value.attachFilterName);
-    addAttachments(added);
-    if (skipped.length) attachNotice.value = t.value.attachSkipped(skipped.length);
-  } catch (error) {
-    // 「需要桌面应用」只在真不在桌面时成立；桌面上对话框/磁盘错误报真实原因。
-    attachNotice.value = desktop ? toUserMessage(error, t.value.attachPickFailed) : t.value.desktopOnly;
-  }
-};
-
-const save = async () => {
-  try {
-    await saveDraft();
-  } catch {
-    // lastError 已写好，界面底部会显示。
-  }
-};
-
-const openPreview = () => {
-  const query = { ...route.query, stage: 'preview' };
-  void router.push({ path: route.path, query });
-};
-const exitPreview = () => {
-  const query = { ...route.query };
-  delete query.stage;
-  void router.replace({ path: route.path, query });
-};
-
+/* —— 载入 —— */
+previewCtl.watchDraft(draft);
 onMounted(() => {
-  void loadTemplates();
-  void loadTaskList();
-  void loadRecentWorkouts();
-  const taskId = route.query.task;
-  if (typeof taskId === 'string' && taskId) {
-    void loadTask(taskId).catch(() => undefined);
-  }
+  void library.loadTemplates();
+  void library.loadTaskList();
+  void library.loadRecentWorkouts();
 });
-
-/* 换路由里的 task 参数时载入对应草稿（任务列表点进来的场景）。 */
 watch(
   () => route.query.task,
   (taskId) => {
     if (typeof taskId === 'string' && taskId && taskId !== draft.value.id) {
-      void loadTask(taskId).catch(() => undefined);
+      void draftCtl.loadTask(taskId).catch(() => undefined);
     }
   },
+  { immediate: true },
 );
 </script>
 
 <template>
-  <section class="page ai-composer" aria-labelledby="ai-composer-title">
-    <AiHandoffPreview v-if="stage === 'preview'" @back="exitPreview" />
-    <template v-else>
-      <header class="page-head">
-        <h1 id="ai-composer-title">{{ t.pageTitle }}</h1>
-        <p class="page-intro">{{ t.pageIntro }}</p>
-      </header>
+  <section class="page ai-page" aria-labelledby="ai-page-title">
+    <AiTaskHeader :fallback-title="fallbackTitle" />
 
-      <div class="composer-layout">
-        <!-- 左列：圆环工作台 + 可拖放类别 -->
-        <div class="composer-main">
-          <div class="orbit-host surface-card" data-no-page-swipe @dragover.prevent @drop.prevent="dropCategory($event, true)">
-            <div class="orbit-toolbar">
-              <button type="button" class="tool-btn" :disabled="!canUndo" @click="onUndo">
-                <Icon name="refresh" :size="14" />{{ t.undoAction }}
-              </button>
-              <span class="toolbar-gap" />
-              <div class="zoom-cluster" role="group" :aria-label="t.resetView">
-                <button type="button" class="tool-btn" :aria-label="t.zoomOut" @click="onZoom(zoom - 0.1)">
-                  <span aria-hidden="true">−</span>
-                </button>
-                <button type="button" class="tool-btn" @click="onZoom(1)">{{ t.resetView }}</button>
-                <button type="button" class="tool-btn" :aria-label="t.zoomIn" @click="onZoom(zoom + 0.1)">
-                  <span aria-hidden="true">+</span>
-                </button>
-              </div>
-            </div>
-            <OrbitCanvas
-              :center="orbitCenter"
-              :nodes="orbitNodes"
-              :zoom="zoom"
-              :active-id="activeCategory"
-              @update:zoom="onZoom"
-              @node-join="onNodeJoin"
-              @node-leave="onNodeLeave"
-              @node-open="onNodeOpen"
-              @node-focus="onNodeFocus"
-              @undo="onUndo"
-            />
-
-            <!-- 类别配置侧栏（03-orbit-drag） -->
-            <aside v-if="activeCategory && activeRange && activeMeta" class="cat-panel" role="dialog" :aria-label="categoryLabel(activeCategory)">
-              <div class="cat-panel-head">
-                <Icon :name="activeMeta.icon" :size="16" />
-                <strong>{{ categoryLabel(activeCategory) }}</strong>
-                <span class="toolbar-gap" />
-                <button type="button" class="tool-btn" :aria-label="t.panelClose" @click="activeCategory = null">
-                  <Icon name="x" :size="14" />
-                </button>
-              </div>
-
-              <template v-if="activeMeta.hasWindow">
-                <p class="cat-label">{{ t.daysBefore }}</p>
-                <div class="seg" role="radiogroup" :aria-label="t.daysBefore">
-                  <button
-                    v-for="days in CATEGORY_DAY_CHOICES"
-                    :key="days"
-                    type="button"
-                    role="radio"
-                    :aria-checked="activeRange.days_before === days"
-                    :class="['seg-item', { 'is-on': activeRange.days_before === days }]"
-                    @click="setActiveDays(days)"
-                  >{{ t.daysOption(days) }}</button>
-                </div>
-                <label class="check-row">
-                  <input
-                    type="checkbox"
-                    :checked="activeRange.include_workout_day"
-                    @change="setActiveIncludeDay(($event.target as HTMLInputElement).checked)"
-                  />
-                  <span>{{ t.includeWorkoutDay }}</span>
-                </label>
-                <template v-if="windowPreview.length">
-                  <p class="cat-label">{{ t.windowPreview }}</p>
-                  <ul class="window-list">
-                    <li v-for="win in windowPreview" :key="win.workoutId">
-                      <span class="win-title">{{ workoutTitle(win.workoutId) }}</span>
-                      <span class="win-range">{{ win.start }} ~ {{ win.end }}</span>
-                    </li>
-                  </ul>
-                </template>
-              </template>
-
-              <template v-else-if="activeCategory === 'personal_note'">
-                <p class="cat-label">{{ t.noteEditor }}</p>
-                <textarea
-                  class="note-input"
-                  :value="draft.personal_note"
-                  :placeholder="t.notePlaceholder"
-                  rows="6"
-                  @input="setPersonalNote(($event.target as HTMLTextAreaElement).value)"
-                ></textarea>
-              </template>
-
-              <template v-else-if="activeCategory === 'attachment'">
-                <p class="cat-label">{{ t.attachPanelHint }}</p>
-                <ul v-if="attachmentRows.length" class="attach-list">
-                  <li v-for="att in attachmentRows" :key="att.id">
-                    <Icon :name="att.kind === 'pdf' ? 'file' : 'pin'" :size="14" />
-                    <span class="att-name">{{ att.name }}</span>
-                    <button type="button" class="tool-btn" @click="removeAttachment(att.id)">{{ t.removeAttachment }}</button>
-                  </li>
-                </ul>
-                <button type="button" class="button button-secondary" @click="pickMoreAttachments">
-                  <Icon name="plus" :size="14" />{{ t.attachAdd }}
-                </button>
-              </template>
-            </aside>
-          </div>
-
-          <!-- 类别既能点选，也能拖进圆环或拖回这里 -->
-          <section class="surface-card pad category-palette" data-no-page-swipe @dragover.prevent @drop.prevent="dropCategory($event, false)">
-            <p class="col-title">{{ t.categoriesTitle }} <small>{{ t.dragHint }}</small></p>
-            <div class="cat-cards">
-              <div
-                v-for="category in AI_TASK_CATEGORY_ORDER"
-                :key="category"
-                :class="['cat-card', { 'is-on': categoryRangeOf(draft.categories, category).enabled }]"
-                draggable="true"
-                @dragstart="dragStart($event, 'category', category)"
-              >
-                <button type="button" class="cat-card-open" @click="activeCategory = category">
-                  <Icon :name="AI_TASK_CATEGORY_META[category].icon" :size="16" />
-                  <span class="cat-card-label">{{ categoryLabel(category) }}</span>
-                  <span v-if="AI_TASK_CATEGORY_META[category].hasWindow && categoryRangeOf(draft.categories, category).enabled" class="cat-card-sub">
-                    {{ t.daysOption(categoryRangeOf(draft.categories, category).days_before) }}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  class="tool-btn"
-                  @click="categoryRangeOf(draft.categories, category).enabled ? onNodeLeave(category) : onNodeJoin(category)"
-                >{{ categoryRangeOf(draft.categories, category).enabled ? t.cardLeave : t.cardJoin }}</button>
-              </div>
-            </div>
-          </section>
-        </div>
-
-        <!-- 右栏：任务配置 -->
-        <aside class="composer-side">
-          <section v-if="taskList.length" class="surface-card pad">
-            <div class="side-head">
-              <p class="col-title">{{ t.savedTasks }}</p>
-              <button type="button" class="tool-btn" @click="resetDraft()">{{ t.newTask }}</button>
-            </div>
-            <div class="task-list">
-              <button
-                v-for="task in taskList"
-                :key="task.id"
-                type="button"
-                :class="['task-item', { 'is-on': task.id === draft.id }]"
-                @click="loadTask(task.id).catch(() => undefined)"
-              >
-                <span class="task-name">{{ task.title }}</span>
-                <span class="task-sub">{{ task.workout_count }} · {{ task.updated_at.slice(0, 10) }}</span>
-              </button>
-            </div>
-          </section>
-          <section v-else class="surface-card pad">
-            <button type="button" class="tool-btn" @click="resetDraft()">{{ t.newTask }}</button>
-          </section>
-
-          <section class="surface-card pad">
-            <label class="field-label" for="task-title">{{ t.taskTitle }}</label>
-            <input
-              id="task-title"
-              class="text-input"
-              type="text"
-              :value="draft.title"
-              :placeholder="t.taskTitlePlaceholder"
-              @input="setTitle(($event.target as HTMLInputElement).value)"
-            />
-
-            <p class="col-title">{{ t.workoutsTitle }}</p>
-            <div v-if="workoutChoices.length" class="workout-zones" data-no-page-swipe>
-              <div class="workout-zone" @dragover.prevent @drop.prevent="dropWorkout($event, true)">
-                <span class="zone-title">{{ t.linkedWorkouts }} · {{ linkedWorkouts.length }}</span>
-                <div class="workout-list">
-                  <button v-for="workout in linkedWorkouts" :key="workout.workout_id" type="button" class="workout-item is-linked"
-                    draggable="true" @dragstart="dragStart($event, 'workout', workout.workout_id)"
-                    @click="setWorkoutSelected(workout.workout_id, false)">
-                    <Icon name="circle-check" :size="16" />
-                    <span class="workout-copy"><span>{{ workoutDisplayLabel(workout) }}</span><span class="workout-sub">{{ formatDateTime(workout.start_time) }}</span></span>
-                  </button>
-                </div>
-              </div>
-              <div class="workout-zone" @dragover.prevent @drop.prevent="dropWorkout($event, false)">
-                <span class="zone-title">{{ t.availableWorkouts }} · {{ availableWorkouts.length }}</span>
-                <div class="workout-list">
-                  <button v-for="workout in availableWorkouts" :key="workout.workout_id" type="button" class="workout-item"
-                    draggable="true" @dragstart="dragStart($event, 'workout', workout.workout_id)"
-                    @click="setWorkoutSelected(workout.workout_id, true)">
-                    <Icon name="plus" :size="16" />
-                    <span class="workout-copy">
-                      <span>{{ workoutDisplayLabel(workout) }}</span>
-                      <span class="workout-sub">
-                        {{ formatDateTime(workout.start_time) }}<template v-if="workout.distance_meters"> · {{ formatDistance(workout.distance_meters) }}</template>
-                      </span>
-                    </span>
-                  </button>
-                </div>
-              </div>
-            </div>
-            <p v-else class="empty-note">{{ t.workoutsEmpty }}</p>
-
-            <p class="col-title">{{ t.templateTitle }}</p>
-            <SelectMenu v-model="selectedTemplateId" :options="templateOptions" :aria-label="t.templateTitle" />
-
-            <p class="col-title">{{ t.promptTitle }}</p>
-            <textarea
-              class="prompt-input"
-              :value="draft.prompt"
-              :maxlength="AI_TASK_PROMPT_MAX"
-              :placeholder="t.promptPlaceholder"
-              rows="4"
-              @input="setPrompt(($event.target as HTMLTextAreaElement).value)"
-            ></textarea>
-            <p class="prompt-counter">{{ t.promptCounter(draft.prompt.length, AI_TASK_PROMPT_MAX) }}</p>
-
-            <p class="col-title">{{ t.attachTitle }}</p>
-            <ul v-if="attachmentRows.length" class="attach-list">
-              <li v-for="att in attachmentRows" :key="att.id">
-                <Icon :name="att.kind === 'pdf' ? 'file' : 'pin'" :size="14" />
-                <span class="att-name">{{ att.name }}</span>
-                <button type="button" class="tool-btn" @click="removeAttachment(att.id)">{{ t.removeAttachment }}</button>
-              </li>
-            </ul>
-            <p v-else class="empty-note">{{ t.attachEmpty }}</p>
-            <button type="button" class="button button-secondary" @click="pickMoreAttachments">
-              <Icon name="plus" :size="14" />{{ t.attachAdd }}
-            </button>
-            <p class="attach-note"><Icon name="shield" :size="13" />{{ attachmentPlainReferenceNote() }}</p>
-            <p v-if="attachNotice" class="empty-note" role="status">{{ attachNotice }}</p>
-
-            <p class="col-title">{{ t.optionsTitle }}</p>
-            <label class="check-row">
-              <input type="checkbox" :checked="draft.include_precise_gps" @change="setPreciseGps(($event.target as HTMLInputElement).checked)" />
-              <span>{{ t.preciseGps }}</span>
-            </label>
-            <p class="field-hint">{{ t.preciseGpsHint }}</p>
-            <label class="check-row">
-              <input type="checkbox" :checked="draft.mcp_shared" @change="setMcpShared(($event.target as HTMLInputElement).checked)" />
-              <span>{{ t.mcpShared }}</span>
-            </label>
-            <p class="field-hint">{{ t.mcpSharedHint }}</p>
-            <p class="field-label">{{ t.detailLevel }}</p>
-            <SelectMenu v-model="detailLevel" :options="detailOptions" :aria-label="t.detailLevel" />
-          </section>
-
-          <section class="surface-card pad actions">
-            <button type="button" class="button button-secondary" :disabled="busy === 'save' || !desktop" @click="save">
-              <Icon name="check" :size="14" />{{ t.saveTask }}
-            </button>
-            <button type="button" class="button button-primary" :disabled="!desktop" @click="openPreview">
-              <Icon name="send" :size="14" />{{ t.previewHandoff }}
-            </button>
-            <p v-if="savedNotice" class="action-note ok" role="status"><Icon name="circle-check" :size="13" />{{ t.savedOk }}</p>
-            <p v-if="lastError" class="action-note bad" role="alert"><Icon name="warning" :size="13" />{{ lastError }}</p>
-            <p v-if="!desktop" class="empty-note">{{ t.desktopOnly }}</p>
-          </section>
-        </aside>
+    <div class="layout">
+      <div class="graph-side">
+        <TaskGraph :model="graphModel" :can-undo="canUndo" @undo="draftCtl.undo()"
+          @set-category="draftCtl.setCategoryEnabled"
+          @set-metric="(category, metric, included) => draftCtl.setMetricExcluded(category, metric, !included)"
+          @set-days="draftCtl.setCategoryDays" @set-include-day="draftCtl.setIncludeWorkoutDay"
+          @toggle-expand="toggleExpand" />
       </div>
-    </template>
+
+      <div class="steps">
+        <WorkoutPicker :workouts="workoutChoices" :selected-ids="draft.workout_ids" :recent-days="recentDays"
+          @toggle="draftCtl.toggleWorkout" />
+        <DirectionPanel :templates="templates" />
+        <TaskExtras :preview="preview" />
+        <HandoffPanel :preview="preview" :preview-error="previewError" :direction="direction" :fallback-title="fallbackTitle" />
+      </div>
+    </div>
   </section>
 </template>
 
 <style scoped>
-.page { padding: 24px; min-width: 0; }
-.page-head { margin-bottom: 16px; }
-.page-head h1 { margin: 0 0 4px; font-size: var(--fs-3xl); }
-.page-intro { margin: 0; color: var(--muted); }
-
-.composer-layout { display: grid; grid-template-columns: minmax(460px, 620px) minmax(360px, 1fr); gap: 16px; align-items: start; max-width: 1480px; margin-inline: auto; }
-.composer-main { display: grid; gap: 16px; min-width: 0; }
-.composer-side { display: grid; gap: 16px; min-width: 0; }
-.surface-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 7%, transparent), 0 8px 28px rgba(0, 0, 0, .08); }
-.pad { padding: 16px; }
-
-.orbit-host { position: relative; height: clamp(640px, 74vh, 760px); display: flex; flex-direction: column; overflow: hidden; }
-.orbit-toolbar { display: flex; align-items: center; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--surface-raised) 55%, var(--surface)); }
-.zoom-cluster { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--line-control); border-radius: 12px; background: var(--surface); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 7%, transparent), 0 2px 8px rgba(0,0,0,.08); }
-.zoom-cluster .tool-btn { border-color: transparent; background: transparent; box-shadow: none; }
-.toolbar-gap { flex: 1; }
-.tool-btn {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 5px 10px; border: 1px solid var(--line-control); border-radius: 9px;
-  background: color-mix(in srgb, var(--surface-raised) 70%, var(--surface)); color: var(--muted); font-size: var(--fs-sm); cursor: pointer;
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 7%, transparent);
-}
-.tool-btn:hover:not(:disabled) { color: var(--ink); border-color: var(--accent); background: var(--surface-hover); }
-.tool-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.tool-btn:disabled { opacity: .45; cursor: not-allowed; }
-
-.cat-panel {
-  position: absolute; top: 48px; right: 12px; width: 300px; max-height: calc(100% - 60px);
-  overflow-y: auto; padding: 14px;
-  background: var(--surface-raised); border: 1px solid var(--line-strong); border-radius: var(--radius-md);
-  box-shadow: 0 18px 44px rgba(4, 6, 8, .55); z-index: 5;
-}
-.cat-panel-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--ink); }
-.cat-label { margin: 12px 0 6px; color: var(--muted); font-size: var(--fs-sm); }
-.seg { display: flex; gap: 6px; }
-.seg-item {
-  flex: 1; padding: 7px 0; border: 1px solid var(--line-control); border-radius: 8px;
-  background: var(--surface); color: var(--muted); font-size: var(--fs-sm); cursor: pointer;
-}
-.seg-item.is-on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
-.check-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; color: var(--ink); font-size: var(--fs-sm); cursor: pointer; }
-.check-row input { accent-color: var(--accent); width: 16px; height: 16px; }
-.window-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
-.window-list li { display: grid; gap: 2px; padding: 8px 10px; background: var(--surface); border-radius: 8px; }
-.win-title { color: var(--ink); font-size: var(--fs-sm); }
-.win-range { color: var(--subtle); font-size: var(--fs-xs); font-family: var(--font-mono); }
-.note-input, .prompt-input, .text-input {
-  width: 100%; padding: 9px 11px; border: 1px solid var(--line-control); border-radius: var(--radius-sm);
-  background: var(--surface-raised); color: var(--ink); font: inherit; font-size: var(--fs-md); resize: vertical;
-}
-.note-input:focus, .prompt-input:focus, .text-input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
-
-.cat-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 7px; }
-.cat-card {
-  display: flex; align-items: center; gap: 8px; padding: 6px 8px;
-  border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--muted);
-  background: var(--surface-raised); cursor: grab;
-}
-.cat-card.is-on { border-color: color-mix(in srgb, var(--accent) 40%, transparent); color: var(--ink); }
-.cat-card-open { display: flex; flex: 1; min-width: 0; align-items: center; gap: 6px; padding: 2px 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
-.cat-card-open svg { flex: 0 0 auto; color: var(--accent); }
-.cat-card-open .cat-card-sub { white-space: nowrap; }
-.cat-card-label { flex: 1; min-width: 0; font-size: var(--fs-sm); }
-.cat-card-sub { color: var(--subtle); font-size: var(--fs-xs); }
-
-.col-title { margin: 14px 0 8px; color: var(--muted); font-size: var(--fs-sm); font-weight: 600; }
-.col-title small { margin-left: 6px; color: var(--subtle); font-weight: 400; }
-.col-title:first-child { margin-top: 0; }
-.field-label { display: block; margin: 0 0 6px; color: var(--muted); font-size: var(--fs-sm); font-weight: 600; }
-.field-hint { margin: 4px 0 10px; color: var(--subtle); font-size: var(--fs-xs); }
-.side-head { display: flex; align-items: center; justify-content: space-between; }
-.side-head .col-title { margin: 0; }
-.task-list { display: grid; gap: 6px; margin-top: 10px; max-height: 200px; overflow-y: auto; }
-.task-item { display: grid; gap: 2px; padding: 8px 10px; text-align: left; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-raised); color: var(--ink); cursor: pointer; }
-.task-item.is-on { border-color: var(--accent); }
-.task-name { font-size: var(--fs-sm); overflow-wrap: anywhere; }
-.task-sub { color: var(--subtle); font-size: var(--fs-xs); }
-
-.workout-zones { display: grid; gap: 8px; }
-.workout-zone { min-height: 64px; padding: 8px; border: 1px dashed var(--line-control); border-radius: var(--radius-sm); background: var(--surface-raised); }
-.zone-title { display: block; margin-bottom: 5px; color: var(--subtle); font-size: var(--fs-xs); }
-.workout-list { display: grid; gap: 4px; max-height: 170px; overflow-y: auto; }
-.workout-item { display: flex; width: 100%; align-items: center; gap: 9px; padding: 7px 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; text-align: left; cursor: grab; }
-.workout-item:hover { background: var(--surface-hover); }
-.workout-item.is-linked { border-color: color-mix(in srgb, var(--accent) 35%, transparent); background: var(--accent-soft); }
-.workout-item svg { flex: 0 0 auto; color: var(--accent); }
-.workout-copy { display: grid; min-width: 0; font-size: var(--fs-sm); color: var(--ink); }
-.workout-sub { color: var(--subtle); font-size: var(--fs-xs); }
-
-.prompt-counter { margin: 4px 0 0; text-align: right; color: var(--subtle); font-size: var(--fs-xs); }
-.attach-list { margin: 0 0 8px; padding: 0; list-style: none; display: grid; gap: 6px; }
-.attach-list li { display: flex; align-items: center; gap: 8px; padding: 7px 9px; background: var(--surface-raised); border-radius: 8px; }
-.att-name { flex: 1; min-width: 0; font-size: var(--fs-sm); color: var(--ink); overflow-wrap: anywhere; }
-.attach-note { display: flex; align-items: flex-start; gap: 6px; margin: 8px 0 0; color: var(--subtle); font-size: var(--fs-xs); }
-.empty-note { margin: 6px 0; color: var(--subtle); font-size: var(--fs-sm); }
-
-.actions { display: grid; gap: 10px; }
-.actions .button { justify-content: center; }
-.button {
-  display: inline-flex; align-items: center; gap: 7px; padding: 9px 16px;
-  border: 1px solid var(--line-control); border-radius: var(--radius-sm);
-  font-size: var(--fs-md); cursor: pointer;
-}
-.button-secondary { background: var(--surface-raised); color: var(--ink); }
-.button-secondary:hover:not(:disabled) { border-color: var(--accent); }
-.button-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
-.button-primary:hover:not(:disabled) { background: var(--accent-hover); }
-.button:disabled { opacity: .5; cursor: not-allowed; }
-.action-note { display: flex; align-items: center; gap: 6px; margin: 0; font-size: var(--fs-sm); }
-.action-note.ok { color: var(--accent); }
-.action-note.bad { color: var(--danger); }
-
-@media (max-width: 940px) {
-  .composer-layout { grid-template-columns: 1fr; }
-  .composer-main { width: 100%; max-width: 600px; justify-self: center; }
-  .orbit-host { height: 640px; }
-}
-@media (max-width: 700px) {
-  .orbit-host { height: min(78vh, 620px); min-height: 470px; }
-  .cat-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .cat-card { flex-wrap: wrap; }
+.ai-page { padding-bottom: 32px; }
+.layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(380px, 1fr); gap: 18px; align-items: start; }
+.graph-side { position: sticky; top: 16px; height: calc(100vh - 120px); min-height: 480px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); overflow: hidden; }
+.steps { display: grid; gap: 14px; min-width: 0; }
+@media (max-width: 1100px) {
+  .layout { grid-template-columns: 1fr; }
+  .graph-side { position: static; height: 520px; }
 }
 </style>

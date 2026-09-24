@@ -1,4 +1,4 @@
-import { openUrl } from '@tauri-apps/plugin-opener';
+import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
 import { ref } from 'vue';
 import { isTauri, tauriApi, toUserMessage } from './useTauriApi';
 import type { AiHandoffResult, ExportSelection } from '../types';
@@ -61,6 +61,12 @@ export const openProviderSite = async (provider: AiProvider): Promise<'opened' |
   if (!isTauri()) return 'skipped';
   await openUrl(provider.url);
   return 'opened';
+};
+
+/** 在资源管理器里选中导出的文件夹；非桌面运行时什么都不做。 */
+export const revealInFolder = async (path: string): Promise<void> => {
+  if (!isTauri() || !path) return;
+  await revealItemInDir(path);
 };
 
 export function useAiHandoff() {

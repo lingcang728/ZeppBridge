@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { templateName, templatePromptSeed, isBuiltinTemplate } from '../prompt';
+import { composePromptPreview, directionText, templateName, templatePromptSeed, isBuiltinTemplate } from '../prompt';
 import { aiTaskIssueText, aiTaskTextFor, coverageNoteText } from '../copy';
 import type { AiTaskTemplate } from '../../bridge/types';
 
@@ -37,6 +37,22 @@ describe('templateName / templatePromptSeed', () => {
   it('isBuiltinTemplate 只是 builtin 字段的直通', () => {
     expect(isBuiltinTemplate(template({ builtin: true }))).toBe(true);
     expect(isBuiltinTemplate(template())).toBe(false);
+  });
+});
+
+describe('directionText / composePromptPreview', () => {
+  it('没选模板没有方向段；选了模板方向段带标题且包含模板正文', () => {
+    expect(directionText(null)).toBeNull();
+    expect(directionText(template({ prompt_template: '  ' }))).toBeNull();
+    const text = directionText(template());
+    expect(text).toContain('stored prompt');
+    expect(text).not.toBe('stored prompt');
+  });
+
+  it('方向和问题并存，顺序是 方向 → 问题 → 覆盖说明，空段不留空行', () => {
+    const composed = composePromptPreview({ direction: 'D', question: '  Q  ', coverageNote: 'C' });
+    expect(composed).toBe('D\n\nQ\n\nC');
+    expect(composePromptPreview({ direction: null, question: '', coverageNote: 'C' })).toBe('C');
   });
 });
 
