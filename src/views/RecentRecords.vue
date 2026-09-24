@@ -281,7 +281,7 @@ function formatDateHint(value: string): string {
           <RouterLink class="see-all" to="/workouts">{{ t.seeAll }}<Icon name="arrow-right" :size="13" /></RouterLink>
         </div>
         <div class="surface-card list-card workout-list-card">
-        <div class="filter-tabs" data-no-page-swipe>
+        <div class="filter-tabs">
           <button
             v-for="tab in workoutFilters"
             :key="tab.value"

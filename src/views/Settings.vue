@@ -1823,10 +1823,13 @@ const runCapabilityProbe = async () => {
 .build-stamp { color: var(--subtle); font-size: var(--fs-xs); font-family: var(--font-mono); }
 .page { width: 100%; min-width: 0; margin: 0; display: grid; gap: 14px; }
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 0; min-width: 0; }
-.display-prefs .kv-label { flex: 0 1 168px; }
-.display-prefs .select-menu { min-width: 200px; flex: 1 1 200px; max-width: 280px; }
-.display-prefs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 28px; }
+/* 标签与下拉紧挨着：两组并排但不被拉满整列，否则标签在最左、下拉在最右，
+   中间一大片空白（field-row 默认 space-between）。 */
+.display-prefs { display: grid; grid-template-columns: repeat(2, max-content); column-gap: 56px; justify-content: start; }
 .display-prefs > h2 { grid-column: 1 / -1; }
+.display-prefs .field-row { justify-content: flex-start; gap: 16px; }
+.display-prefs .kv-label { flex: 0 0 8.5em; }
+.display-prefs .select-menu { flex: 0 0 220px; width: 220px; min-width: 0; }
 h1, h2, h3, p { margin-top: 0; }
 h1 { font-size: 26.5px; font-weight: 700; color: var(--ink); }
 h2 { margin-bottom: 14px; font-size: var(--fs-xl); font-weight: 700; color: var(--ink); }
@@ -1887,8 +1890,8 @@ h3 { margin-bottom: 4px; font-size: var(--fs-md); font-weight: 700; color: var(-
 .diagnostic-done strong { display: inline-flex; align-items: center; gap: 6px; color: #b9da77; }
 .diagnostic-done code { font-family: var(--font-mono); font-size: var(--fs-xs); }
 .diagnostic-done-note { color: var(--muted); }
-.section-heading-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.section-heading-row h2 { margin-bottom: 14px; }
+.section-heading-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 12px; margin-bottom: 14px; }
+.section-heading-row h2 { min-width: 0; margin-bottom: 0; }
 .identify-button { flex: 0 0 auto; }
 .device-alert { margin: 0 0 10px; }
 .account-card h2 { margin-bottom: 10px; }
@@ -2139,11 +2142,13 @@ h3 { margin-bottom: 4px; font-size: var(--fs-md); font-weight: 700; color: var(-
 .kv-btn:hover:not(:disabled) { border-color: var(--accent); }
 
 /* 数据来源 */
-.source-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 8px; }
+/* align-items:start —— 每张来源卡按自己的内容高，不被同一行最高的那张撑开
+   （Zepp Cloud 只有两行，被设备卡拉高后中间空出一大块）。 */
+.source-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 8px; align-items: start; }
 .source-row {
   display: grid;
   grid-template-columns: 36px minmax(0, 1fr);
-  align-items: center;
+  align-items: start;
   gap: 10px;
   min-width: 0;
   padding: 8px 10px;
@@ -2164,7 +2169,7 @@ h3 { margin-bottom: 4px; font-size: var(--fs-md); font-weight: 700; color: var(-
 }
 .source-icon :deep(.device-visual) { width: 36px; max-width: 100%; height: 36px; max-height: 100%; min-width: 0; min-height: 0; flex: 0 0 36px; border: 0; border-radius: 9px; background: transparent; }
 .source-icon :deep(.device-visual img) { padding: 3px; }
-.source-copy { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.source-copy { grid-column: 2; flex: 1; min-width: 0; display: grid; gap: 1px; }
 .source-copy strong { font-size: var(--fs-md); color: var(--ink); white-space: normal; overflow-wrap: anywhere; }
 .source-row > .source-state, .source-row > .button { grid-column: 2; justify-self: start; }
 .source-metadata { display: flex; flex-wrap: wrap; gap: 3px 12px; }
@@ -2329,6 +2334,7 @@ code { color: var(--muted); font-family: var(--font-mono); font-size: var(--fs-s
 @media (max-width: 860px) {
   .two-col { grid-template-columns: minmax(0, 1fr); }
   .display-prefs { grid-template-columns: minmax(0, 1fr); }
+  .display-prefs .select-menu { flex: 1 1 auto; width: auto; max-width: 280px; }
   .auth-grid { grid-template-columns: minmax(0, 1fr); }
   .account-strip { flex-wrap: wrap; }
   .account-meta { flex: 1 1 160px; }

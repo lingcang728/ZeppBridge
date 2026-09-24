@@ -91,13 +91,22 @@ let dragging: { id: number; x: number; left: number; width: number } | null = nu
 let suppressClick = false;
 
 const navLinks = () => Array.from(nav.value?.querySelectorAll<HTMLElement>('.pill-link') ?? []);
+/* 滑块的位置用布局坐标（offsetLeft/offsetWidth，相对 nav），不用
+   getBoundingClientRect：后者在任何缩放下都是屏幕像素，再写回 translateX
+   会被缩放第二次，80% 时滑块就会偏到链接左边、比链接窄。 */
+const activeLink = () => navLinks().find((item) => item.dataset.to === route.path);
+const linkCenter = (link: HTMLElement) => link.offsetLeft + link.offsetWidth / 2;
+/** 屏幕像素 → 布局像素（CSS zoom 回退路径下两者不同）。 */
+const layoutScale = () => {
+  const el = nav.value;
+  if (!el || !el.offsetWidth) return 1;
+  return el.getBoundingClientRect().width / el.offsetWidth || 1;
+};
 const measureThumb = () => {
   if (dragging || !nav.value) return;
-  const link = navLinks().find((item) => item.dataset.to === route.path);
+  const link = activeLink();
   if (!link) { thumb.value = { ...thumb.value, visible: false }; return; }
-  const rail = nav.value.getBoundingClientRect();
-  const rect = link.getBoundingClientRect();
-  thumb.value = { left: rect.left - rail.left, width: rect.width, visible: true };
+  thumb.value = { left: link.offsetLeft, width: link.offsetWidth, visible: true };
 };
 const onNavDown = (event: PointerEvent) => {
   const link = (event.target as Element).closest<HTMLElement>('.pill-link');
@@ -107,21 +116,17 @@ const onNavDown = (event: PointerEvent) => {
 };
 const onNavMove = (event: PointerEvent) => {
   if (pending?.id === event.pointerId && Math.abs(event.clientX - pending.x) > 6) {
-    const rail = nav.value?.getBoundingClientRect();
-    if (rail) {
-      const current = navLinks().find((link) => link.dataset.to === route.path) ?? pending.link;
-      const rect = current.getBoundingClientRect();
-      dragging = { id: event.pointerId, x: pending.x, left: rect.left - rail.left, width: rect.width };
-      pending = null;
-      suppressClick = true;
-      thumb.value = { left: dragging.left, width: dragging.width, visible: true };
-    }
+    const current = activeLink() ?? pending.link;
+    dragging = { id: event.pointerId, x: pending.x, left: current.offsetLeft, width: current.offsetWidth };
+    pending = null;
+    suppressClick = true;
+    thumb.value = { left: dragging.left, width: dragging.width, visible: true };
   }
   if (!dragging || dragging.id !== event.pointerId || !nav.value) return;
   const links = navLinks();
-  const rail = nav.value.getBoundingClientRect();
-  const max = Math.max(0, Math.max(...links.map((link) => link.getBoundingClientRect().right - rail.left)) - dragging.width);
-  thumb.value = { left: Math.min(max, Math.max(0, dragging.left + event.clientX - dragging.x)), width: dragging.width, visible: true };
+  const max = Math.max(0, Math.max(...links.map((link) => link.offsetLeft + link.offsetWidth)) - dragging.width);
+  const dx = (event.clientX - dragging.x) / layoutScale();
+  thumb.value = { left: Math.min(max, Math.max(0, dragging.left + dx)), width: dragging.width, visible: true };
   event.preventDefault();
 };
 const onNavEnd = (event: PointerEvent) => {
@@ -130,12 +135,9 @@ const onNavEnd = (event: PointerEvent) => {
   const wasCancelled = event.type === 'pointercancel';
   dragging = null;
   if (wasCancelled) { measureThumb(); return; }
-  const rail = nav.value?.getBoundingClientRect();
-  if (!rail) return;
-  const center = rail.left + thumb.value.left + thumb.value.width / 2;
+  const center = thumb.value.left + thumb.value.width / 2;
   const target = navLinks().reduce<HTMLElement | null>((best, link) =>
-    !best || Math.abs(link.getBoundingClientRect().left + link.offsetWidth / 2 - center)
-      < Math.abs(best.getBoundingClientRect().left + best.offsetWidth / 2 - center) ? link : best, null);
+    !best || Math.abs(linkCenter(link) - center) < Math.abs(linkCenter(best) - center) ? link : best, null);
   if (target?.dataset.to) void router.push(target.dataset.to).finally(() => nextTick(measureThumb));
   else measureThumb();
 };

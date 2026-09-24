@@ -9,7 +9,6 @@ import { useSyncController } from './composables/useSyncController';
 import { useUiScale } from './composables/useUiScale';
 import { backend, isDesktop, whenBackendReady } from './lib/bridge';
 import { checkForDesktopUpdate } from './services/updateService';
-import { canStartPageSwipe, swipeDestination } from './lib/pageSwipe';
 import { defineMessages, locale, useMessages } from './i18n';
 
 const LifeEventEditor = defineAsyncComponent(() => import('./components/LifeEventEditor.vue'));
@@ -144,31 +143,6 @@ const formatSavedBytes = (bytes: number): string => {
 const versionTitle = computed(() => `ZeppBridge v${APP_VERSION.value} · build ${BUILD_STAMP}`);
 const browserPreview = computed(() => !desktopRuntime);
 const routeNotice = computed(() => route.query.notice === 'not-found');
-let pageDrag: { pointerId: number; x: number; y: number } | null = null;
-const onPagePointerDown = (event: PointerEvent) => {
-  const main = event.currentTarget as HTMLElement;
-  pageDrag = event.pointerType === 'mouse' && event.button === 0 && canStartPageSwipe(event.target, main)
-    ? { pointerId: event.pointerId, x: event.clientX, y: event.clientY }
-    : null;
-  if (pageDrag) main.setPointerCapture(event.pointerId);
-};
-const onPagePointerMove = (event: PointerEvent) => {
-  if (!pageDrag || event.pointerId !== pageDrag.pointerId) return;
-  const dx = event.clientX - pageDrag.x;
-  const dy = event.clientY - pageDrag.y;
-  if (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.35) {
-    (event.currentTarget as HTMLElement).classList.add('is-page-swiping');
-    event.preventDefault();
-  }
-};
-const onPagePointerUp = (event: PointerEvent) => {
-  (event.currentTarget as HTMLElement).classList.remove('is-page-swiping');
-  const start = pageDrag;
-  pageDrag = null;
-  if (!start || event.pointerId !== start.pointerId) return;
-  const next = swipeDestination(route.path, event.clientX - start.x, event.clientY - start.y);
-  if (next) void router.push(next);
-};
 
 const onDocumentKeydown = (event: KeyboardEvent) => {
   const target = event.target as HTMLElement | null;
@@ -278,9 +252,7 @@ onUnmounted(() => {
         <Icon name="info" :size="16" />{{ t.routeNotFound }}
       </div>
 
-      <main id="main-content" class="main-content" tabindex="-1"
-        @pointerdown="onPagePointerDown" @pointermove="onPagePointerMove" @pointerup="onPagePointerUp"
-        @pointercancel="pageDrag = null; ($event.currentTarget as HTMLElement).classList.remove('is-page-swiping')">
+      <main id="main-content" class="main-content" tabindex="-1">
         <!-- 主要页面缓存起来，切回去不再重新查库。
              以前每次切页都重新挂载一遍组件，于是每次都把那一页的全部查询重跑
              一遍——首页一次就是六条命令，而命令侧共用一把数据库锁，它们只能
@@ -394,7 +366,6 @@ a { color: inherit; }
 .preview-banner svg { color: var(--accent); }
 .route-notice { background: var(--surface); color: var(--warning); }
 .main-content { width: 100%; min-width: 0; min-height: 0; flex: 1; overflow: auto; background: var(--canvas); }
-.main-content.is-page-swiping { user-select: none; cursor: grabbing; }
 .bottom-nav { display: none; }
 .page-enter-active, .page-leave-active { transition: opacity 150ms ease, transform 150ms ease; }
 .page-enter-from, .page-leave-to { opacity: 0; transform: translateY(4px); }

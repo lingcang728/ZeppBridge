@@ -161,7 +161,7 @@ const timelineTitle = (slice: BarSegment) =>
 <template>
   <div class="stage-block">
     <template v-if="isHypnogram">
-      <div class="sleep-timeline" role="img" :aria-label="t.hypnogramAria" data-no-page-swipe>
+      <div class="sleep-timeline" role="img" :aria-label="t.hypnogramAria">
         <div class="timeline-legend"><span v-for="(label, index) in stageLabels" :key="label"><i :class="STAGE_TONES[index]"></i>{{ label }}</span></div>
         <div class="timeline-tracks">
           <span v-for="(slice, index) in timeline" :key="index" :class="['timeline-slice', slice.tone]"
