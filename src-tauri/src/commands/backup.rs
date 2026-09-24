@@ -26,17 +26,24 @@ pub async fn list_backups(
 ///
 /// 走 SQLite Backup API，生成后立刻 `integrity_check` 并算 SHA-256；
 /// 校验不过会报错并删掉半成品，而不是留下一份看起来成功的坏备份。
+///
+/// 拿锁和实际拷贝/哈希都是阻塞操作，可能因为另一个写者占着锁而卡满
+/// `LOCK_TIMEOUT`：放进 `spawn_blocking`，不然会占住 Tokio 工作线程，拖慢
+/// 这段时间里所有其他 IPC 命令（同 `crate::commands::spawn_independent_write`
+/// 已经对普通写操作做的处理）。
 #[tauri::command]
 pub async fn create_manual_backup(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<BackupManifest, AppError> {
-    let _guard = acquire_with_timeout(&state.data_dir, WritePurpose::Backup, LOCK_TIMEOUT)?;
-    backup::create_backup(
-        &state.data_dir,
-        BackupKind::Manual,
-        env!("CARGO_PKG_VERSION"),
-    )
-    .map_err(AppError::from)
+    let data_dir = state.data_dir.clone();
+    crate::commands::join_blocking(
+        tokio::task::spawn_blocking(move || -> std::result::Result<BackupManifest, AppError> {
+            let _guard = acquire_with_timeout(&data_dir, WritePurpose::Backup, LOCK_TIMEOUT)?;
+            backup::create_backup(&data_dir, BackupKind::Manual, env!("CARGO_PKG_VERSION"))
+                .map_err(AppError::from)
+        })
+        .await,
+    )?
 }
 
 /// 重新校验一份已有快照：文件、大小、SHA-256 和完整性。
@@ -72,14 +79,23 @@ pub async fn get_restore_preview(
 ///
 /// 排队时就完成全部校验并生成回滚快照；真正的文件替换在下次启动、任何连接
 /// 打开之前执行，那是唯一能做到原子替换的时刻。
+///
+/// 同 `create_manual_backup`：拿锁和快照校验都是阻塞操作，放进
+/// `spawn_blocking` 避免占住 Tokio 工作线程。
 #[tauri::command]
 pub async fn stage_restore(
     state: tauri::State<'_, AppState>,
     backup_id: String,
 ) -> std::result::Result<PendingRestore, AppError> {
-    let _guard = acquire_with_timeout(&state.data_dir, WritePurpose::Restore, LOCK_TIMEOUT)?;
-    backup::stage_restore(&state.data_dir, &backup_id, env!("CARGO_PKG_VERSION"))
-        .map_err(AppError::from)
+    let data_dir = state.data_dir.clone();
+    crate::commands::join_blocking(
+        tokio::task::spawn_blocking(move || -> std::result::Result<PendingRestore, AppError> {
+            let _guard = acquire_with_timeout(&data_dir, WritePurpose::Restore, LOCK_TIMEOUT)?;
+            backup::stage_restore(&data_dir, &backup_id, env!("CARGO_PKG_VERSION"))
+                .map_err(AppError::from)
+        })
+        .await,
+    )?
 }
 
 /// 当前是否有排队中的恢复。

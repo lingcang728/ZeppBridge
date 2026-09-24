@@ -266,8 +266,11 @@ impl SyncManager {
         days: i64,
         on_progress: Option<&(dyn Fn(SyncProgress) + Send + Sync)>,
     ) -> Result<SyncReport> {
-        self.cancel.store(false, Ordering::SeqCst);
+        // 拿到 `run_lock` 之后再清 cancel 旗标：`cancel_and_wait()` 是先举旗
+        // 再等这把锁，旗标在拿锁之前被清掉的话，一次和它撞上的并发调用会把
+        // 刚举起的取消请求原地抹掉，而调用方还以为取消成功了。
         let _run_guard = self.run_lock.lock().await;
+        self.cancel.store(false, Ordering::SeqCst);
         // 重放/压缩在拿写锁之前就会举旗。这里先看旗，而不是先干等 20 秒再
         // 报 Busy：调用方才能立刻把这次同步标成 deferred 并自动重试。
         self.stand_aside_if_local_maintenance()?;
@@ -278,14 +281,14 @@ impl SyncManager {
         let window = FetchWindow::days(days)?;
         let mut streams = Vec::new();
         let started = Instant::now();
-        let deadline = if days <= 7 {
-            started + std::time::Duration::from_secs(90)
-        } else {
-            let budget = 45u64
-                .saturating_add((days as u64).saturating_mul(3))
-                .min(20 * 60);
-            started + std::time::Duration::from_secs(budget)
-        };
+        // 两段公式在 days=7/8 的边界上曾经不连续：8~14 天的预算（45+3*days）
+        // 比 7 天以内的固定 90 秒还短，天数变多反而给的时间更少。改成一条
+        // 单调的公式，用 `.max(90)` 保证任何天数都至少有 90 秒。
+        let budget = 45u64
+            .saturating_add((days.max(0) as u64).saturating_mul(3))
+            .max(90)
+            .min(20 * 60);
+        let deadline = started + std::time::Duration::from_secs(budget);
 
         let emit = |stream: &str, current: u32, total: u32, message: &str| {
             if let Some(callback) = on_progress {
@@ -486,8 +489,10 @@ impl SyncManager {
     where
         F: Fn(SyncProgress) + Send + Sync,
     {
-        self.cancel.store(false, Ordering::SeqCst);
+        // 见 `sync_report` 里的同一处注释：先拿 `run_lock` 再清 cancel 旗标，
+        // 否则会和 `cancel_and_wait()` 的「先举旗再等锁」顺序反过来竞态。
         let _run_guard = self.run_lock.lock().await;
+        self.cancel.store(false, Ordering::SeqCst);
         self.stand_aside_if_local_maintenance()?;
         let _write_guard = self.acquire_write_lock(WritePurpose::HistoryBackfill)?;
         self.abort_if_cancelled()?;
@@ -562,6 +567,10 @@ impl SyncManager {
                     reason.as_ref().map(|(code, _)| *code),
                 )?,
                 Err(error) if error.is_cancelled() => break,
+                // 过期的会话让队列里剩下的每一块都注定失败：继续跑只会把整批
+                // 额度耗在必然失败的请求上，还漏掉了让用户重新登录的信号——
+                // 不像 `sync_report`，这里原来完全没把 needs_reauth 往上抛。
+                Err(error) if error.needs_reauth() => return Err(error),
                 Err(error) => db.record_backfill_chunk(
                     &chunk.stream,
                     &chunk.chunk_start,

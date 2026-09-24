@@ -385,7 +385,9 @@ fn tool_definitions() -> Vec<Value> {
                         "type": "array",
                         "items": { "type": "string", "enum": contract::metric_names() },
                         "minItems": 1,
-                        "description": "指标名；不支持的名称会报错。其他已入库指标用 get_metric_records 查询。"
+                        "maxItems": contract::metric_names().len(),
+                        "uniqueItems": true,
+                        "description": "指标名，不重复；不支持的名称会报错。其他已入库指标用 get_metric_records 查询。"
                     },
                     "days": {
                         "type": "integer",
@@ -577,12 +579,41 @@ fn call_tool_with_db(
     }
 }
 
+/// Every tool schema declares `additionalProperties: false` (asserted by a
+/// test below) to tell a caller that a typoed argument name is a mistake, not
+/// a silently-ignored no-op. But nothing actually checked that promise here —
+/// `args.get("...")` just returns `None` for any key it doesn't recognize,
+/// so a mistyped parameter silently fell back to that tool's default instead
+/// of erroring, which is exactly the failure mode the schema flag exists to
+/// prevent.
+fn reject_unknown_arguments(name: &str, args: &Value) -> Result<(), (i64, String)> {
+    let Some(args_obj) = args.as_object() else {
+        return Ok(());
+    };
+    let tool = tool_definitions()
+        .into_iter()
+        .find(|tool| tool["name"].as_str() == Some(name));
+    let Some(properties) = tool.as_ref().and_then(|tool| tool["inputSchema"]["properties"].as_object()) else {
+        return Ok(());
+    };
+    for key in args_obj.keys() {
+        if !properties.contains_key(key) {
+            return Err((
+                ERR_INVALID_PARAMS,
+                format!("Unknown argument for {name}: {key}"),
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn execute_tool_with_db(
     name: &str,
     params: &Value,
     open: impl FnOnce() -> Result<(Database, u64), (i64, String)>,
 ) -> Result<Value, (i64, String)> {
     let args = params.get("arguments").cloned().unwrap_or(json!({}));
+    reject_unknown_arguments(name, &args)?;
     let (db, database_bytes) = open()?;
 
     let payload = match name {
@@ -633,24 +664,38 @@ fn execute_tool_with_db(
                 .map_err(|error| (ERR_DATABASE, format!("序列化失败：{error}")))?
         }
         "get_metric_series" => {
-            let metrics: Vec<String> = args
+            let known_metrics = contract::metric_names();
+            let raw_items = args
                 .get("metrics")
                 .and_then(Value::as_array)
-                .map(|items| {
-                    items
-                        .iter()
-                        .filter_map(Value::as_str)
-                        .map(str::to_string)
-                        .collect()
-                })
+                .cloned()
                 .unwrap_or_default();
+            // `enum` in the schema already restricts each entry to a known
+            // metric name, so a well-formed request never needs more entries
+            // than there are known metrics. Reject oversized/duplicated
+            // arrays up front instead of letting each entry trigger its own
+            // DB scan — a client sending tens of thousands of (repeated)
+            // entries could otherwise block this single-threaded stdio
+            // server for an extended period.
+            if raw_items.len() > known_metrics.len() {
+                return Err((
+                    ERR_INVALID_PARAMS,
+                    format!("metrics 最多 {} 项，且不应重复", known_metrics.len()),
+                ));
+            }
+            let mut seen = std::collections::HashSet::new();
+            let metrics: Vec<String> = raw_items
+                .iter()
+                .filter_map(Value::as_str)
+                .filter(|value| seen.insert(*value))
+                .map(str::to_string)
+                .collect();
             if metrics.is_empty() {
                 return Err((ERR_INVALID_PARAMS, "metrics 不能为空".into()));
             }
-            let known = contract::metric_names();
             if let Some(unknown) = metrics
                 .iter()
-                .find(|metric| !known.contains(&metric.as_str()))
+                .find(|metric| !known_metrics.contains(&metric.as_str()))
             {
                 return Err((ERR_INVALID_PARAMS, format!(
                     "不支持的每日序列指标：{unknown}。可先调用 list_available_metrics，再用 get_metric_records 查询已入库指标。"

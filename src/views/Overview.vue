@@ -57,6 +57,7 @@ const messages = defineMessages(
     deviceErrorPrefix: '设备识别：',
     loadingAria: '正在加载概览',
     loadFailedTitle: '无法读取数据概览',
+    desktopOnly: '请使用桌面应用；浏览器预览不会读取账户数据。',
     retry: '重试',
     healthUnavailable: '健康数据暂时不可用',
     partialUnavailable: '部分数据流尚未获取',
@@ -139,6 +140,7 @@ const messages = defineMessages(
     deviceErrorPrefix: 'Device identification: ',
     loadingAria: 'Loading the overview',
     loadFailedTitle: 'Could not read the data overview',
+    desktopOnly: 'Use the desktop app. This browser preview reads no account data.',
     retry: 'Try again',
     healthUnavailable: 'Health data is unavailable right now',
     partialUnavailable: 'Some data streams have not been fetched yet',
@@ -221,6 +223,7 @@ const messages = defineMessages(
     deviceErrorPrefix: 'Identificación de dispositivos: ',
     loadingAria: 'Cargando el resumen',
     loadFailedTitle: 'No se pudo leer el resumen de datos',
+    desktopOnly: 'Usa la app de escritorio. Esta vista previa en el navegador no lee datos de la cuenta.',
     retry: 'Reintentar',
     healthUnavailable: 'Los datos de salud no están disponibles en este momento',
     partialUnavailable: 'Algunos flujos de datos aún no se han descargado',
@@ -600,6 +603,7 @@ const loadOverview = async () => {
     recentWorkouts.value = [];
     statusSeries.value = {};
     loading.value = false;
+    error.value = t.value.desktopOnly;
     return;
   }
   const results = await Promise.allSettled([

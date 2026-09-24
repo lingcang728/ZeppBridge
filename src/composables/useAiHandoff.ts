@@ -4,6 +4,7 @@ import { isTauri, tauriApi, toUserMessage } from './useTauriApi';
 import type { AiHandoffResult, ExportSelection } from '../types';
 import { isFixedAiProviderUrl, type AiProvider } from '../lib/aiProviders';
 import { defineMessages, messagesOf } from '../i18n';
+import { createLoadSeq } from '../lib/loadSeq';
 
 const messages = defineMessages(
   {
@@ -39,6 +40,7 @@ export function useAiHandoff() {
   const handoffResult = ref<AiHandoffResult | null>(null);
   const handoffError = ref<string | null>(null);
   const preparedProvider = ref<AiProvider | null>(null);
+  const loadSeq = createLoadSeq();
 
   const copyToClipboard = async (text: string) => {
     if (!navigator.clipboard?.writeText) {
@@ -53,6 +55,13 @@ export function useAiHandoff() {
     prompt: string,
     includePreciseRoute: boolean,
   ) => {
+    // A second call (user picked a different provider before the first
+    // one's backend round-trip returned) must not let the *older* call's
+    // clipboard write / browser navigation fire after the newer one's —
+    // otherwise whichever happens to resolve last wins, even if it was the
+    // stale request, and the clipboard silently ends up holding the wrong
+    // provider's exported health data.
+    const seq = loadSeq.next();
     handoffState.value = 'preparing';
     handoffError.value = null;
     handoffResult.value = null;
@@ -60,37 +69,49 @@ export function useAiHandoff() {
 
     if (!isFixedAiProviderUrl(provider.url)) {
       const error = new Error(copy().targetNotAllowed);
-      handoffState.value = 'failed';
-      handoffError.value = error.message;
+      if (loadSeq.isCurrent(seq)) {
+        handoffState.value = 'failed';
+        handoffError.value = error.message;
+      }
       throw error;
     }
 
     let result: AiHandoffResult;
     try {
       result = await tauriApi.prepareAiHandoff(selection, prompt, includePreciseRoute);
+      if (!loadSeq.isCurrent(seq)) return result;
       handoffResult.value = result;
       await copyToClipboard(result.clipboardText);
     } catch (error) {
-      handoffState.value = 'failed';
-      handoffError.value = toUserMessage(error, copy().handoffFailed);
+      if (loadSeq.isCurrent(seq)) {
+        handoffState.value = 'failed';
+        handoffError.value = toUserMessage(error, copy().handoffFailed);
+      }
       throw error;
     }
 
     if (!isTauri()) {
       // A web preview can copy text, but it must not claim that a desktop
       // browser was opened by the Tauri opener plugin.
-      handoffState.value = result.mode === 'attachment' ? 'attachment' : 'copied_only';
+      if (loadSeq.isCurrent(seq)) {
+        handoffState.value = result.mode === 'attachment' ? 'attachment' : 'copied_only';
+      }
       return result;
     }
 
+    if (!loadSeq.isCurrent(seq)) return result;
     try {
       await openUrl(provider.url);
-      handoffState.value = result.mode === 'attachment' ? 'attachment' : 'opened';
+      if (loadSeq.isCurrent(seq)) {
+        handoffState.value = result.mode === 'attachment' ? 'attachment' : 'opened';
+      }
     } catch (error) {
-      // Clipboard succeeded; keep that fact and allow a retry without
-      // pretending that the browser navigation succeeded.
-      handoffState.value = 'copied_only';
-      handoffError.value = toUserMessage(error, copy().copiedButCannotOpen(provider.label));
+      if (loadSeq.isCurrent(seq)) {
+        // Clipboard succeeded; keep that fact and allow a retry without
+        // pretending that the browser navigation succeeded.
+        handoffState.value = 'copied_only';
+        handoffError.value = toUserMessage(error, copy().copiedButCannotOpen(provider.label));
+      }
     }
     return result;
   };
