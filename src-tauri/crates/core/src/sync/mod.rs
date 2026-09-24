@@ -283,11 +283,10 @@ impl SyncManager {
         let started = Instant::now();
         // 两段公式在 days=7/8 的边界上曾经不连续：8~14 天的预算（45+3*days）
         // 比 7 天以内的固定 90 秒还短，天数变多反而给的时间更少。改成一条
-        // 单调的公式，用 `.max(90)` 保证任何天数都至少有 90 秒。
+        // 单调的公式，用 `.clamp(90, ..)` 保证任何天数都至少有 90 秒。
         let budget = 45u64
             .saturating_add((days.max(0) as u64).saturating_mul(3))
-            .max(90)
-            .min(20 * 60);
+            .clamp(90, 20 * 60);
         let deadline = started + std::time::Duration::from_secs(budget);
 
         let emit = |stream: &str, current: u32, total: u32, message: &str| {
