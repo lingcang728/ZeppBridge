@@ -62,7 +62,8 @@ const promptEdited = ref(false);
 const taskList = ref<AiTaskSummary[]>([]);
 const templates = ref<AiTaskTemplate[]>([]);
 const recentWorkouts = ref<WorkoutRow[]>([]);
-const undoStack = createUndoStack<OrbitUndoOp>();
+type DraftUndoOp = OrbitUndoOp | { type: 'workout'; workoutId: string; prevSelected: boolean };
+const undoStack = createUndoStack<DraftUndoOp>();
 const busy = ref<false | 'load' | 'save' | 'delete'>(false);
 const lastError = ref<string | null>(null);
 const savedNotice = ref(false);
@@ -257,6 +258,10 @@ const undo = () => {
   const op = undoStack.pop();
   if (!op) return;
   syncUndoDepth();
+  if (op.type === 'workout') {
+    setWorkoutSelected(op.workoutId, op.prevSelected, false);
+    return;
+  }
   const target = orbitUndoTarget(op);
   patchRange(target.nodeId as AiTaskCategory, { enabled: target.state === 'member' });
 };
@@ -269,14 +274,19 @@ const setIncludeWorkoutDay = (category: AiTaskCategory, include: boolean) => {
   patchRange(category, { include_workout_day: include });
 };
 
-const toggleWorkout = (workoutId: string) => {
+const setWorkoutSelected = (workoutId: string, selected: boolean, recordUndo = true) => {
   const ids = draft.value.workout_ids;
+  const previous = ids.includes(workoutId);
+  if (previous === selected) return;
+  if (recordUndo) {
+    undoStack.push({ type: 'workout', workoutId, prevSelected: previous });
+    syncUndoDepth();
+  }
   patchDraft({
-    workout_ids: ids.includes(workoutId)
-      ? ids.filter((id) => id !== workoutId)
-      : [...ids, workoutId],
+    workout_ids: selected ? [...ids, workoutId] : ids.filter((id) => id !== workoutId),
   });
 };
+const toggleWorkout = (workoutId: string) => setWorkoutSelected(workoutId, !draft.value.workout_ids.includes(workoutId));
 
 const setPrompt = (text: string) => {
   promptEdited.value = true;
@@ -334,6 +344,7 @@ export function useAiTaskDraft() {
     setIncludeWorkoutDay,
     undo,
     toggleWorkout,
+    setWorkoutSelected,
     setPrompt,
     setPersonalNote,
     setTitle: (title: string) => patchDraft({ title }),

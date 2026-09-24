@@ -138,6 +138,8 @@ export default {
     },
 
     'App': {
+      quickReturn: (page: string) => `Voltar para ${page}`,
+      navRecent: 'registros recentes',
       skipToContent: 'Ir para o conteúdo principal',
       mainNav: 'Navegação principal',
       bottomNav: 'Navegação principal móvel',
@@ -1029,6 +1031,9 @@ export default {
     },
 
     'views/AiComposer': {
+      availableWorkouts: 'Disponíveis',
+      linkedWorkouts: 'Vinculados',
+      dragHint: 'Arraste ou clique para adicionar e remover',
       pageTitle: 'Enviar para IA',
       pageIntro: 'Monte uma tarefa de análise a partir dos dados de saúde locais e entregue-a você mesmo a uma IA.',
       savedTasks: 'Tarefas salvas',

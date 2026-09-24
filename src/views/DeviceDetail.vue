@@ -177,7 +177,7 @@ onMounted(() => {
 
     <template v-else>
       <section class="device-hero">
-        <DeviceVisual :src="model.image" :alt="model.canonicalName" :kind="model.kind" />
+        <DeviceVisual v-if="model.image" :src="model.image" :alt="model.canonicalName" :kind="model.kind" />
         <div class="hero-copy">
           <p class="hero-eyebrow">DEVICE</p>
           <h1 id="device-detail-title">{{ model.canonicalName }}</h1>

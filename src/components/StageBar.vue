@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { displayDateTimeFormatter } from '../lib/dateTime';
 import { computed } from 'vue';
-import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
 import { formatDuration, formatTime, isFiniteNumber } from '../lib/format';
 import { insertSleepStageGaps, sleepStageLabels, sleepStageLabelsWithUnknown, type TimedSleepSlice } from '../lib/sleepStages';
 import type { SleepStageSlice } from '../types';
@@ -11,19 +9,19 @@ const messages = defineMessages(
   {
     notProvided: '未提供',
     zeroMinutes: '0 分钟',
-    hypnogramAria: '睡眠阶段阶梯图',
+  hypnogramAria: '睡眠阶段时间轴',
     summaryAria: '睡眠阶段汇总比例',
   },
   {
     notProvided: 'Not provided',
     zeroMinutes: '0 min',
-    hypnogramAria: 'Sleep stage hypnogram',
+    hypnogramAria: 'Sleep stage timeline',
     summaryAria: 'Sleep stage share',
   },
   {
     notProvided: 'Sin datos',
     zeroMinutes: '0 min',
-    hypnogramAria: 'Hipnograma de las fases del sueño',
+    hypnogramAria: 'Cronología de las fases del sueño',
     summaryAria: 'Proporción de fases del sueño',
   },
   'components/StageBar',
@@ -52,17 +50,7 @@ const STAGE_LEVEL: Record<StageItem['tone'], number> = {
   // 归成 awake 的，代价是图上那一段在说一件没人验证过的事。
   unknown: 4,
 };
-/* 阶段色与坐标轴色跟主题走——切换深浅时 chartPalette 换套，option 是
-   computed 会自动重算，配合 VChart 上的 :key 整个重建。 */
-const STAGE_COLORS = computed(() => ({
-  deep: chartPalette.value.series.sleep.deep,
-  light: chartPalette.value.series.sleep.light,
-  rem: chartPalette.value.series.sleep.rem,
-  awake: chartPalette.value.series.sleep.awake,
-  // 中性灰。四个睡眠色都有含义，未知不该借用其中任何一个。
-  unknown: chartPalette.value.unknown,
-}));
-
+const STAGE_TONES = ['deep', 'light', 'rem', 'awake', 'unknown'] as const;
 const props = defineProps<{
   stages: StageItem[];
   slices?: SleepStageSlice[] | null;
@@ -137,7 +125,6 @@ const hasUnknownStage = computed(() => timeline.value.some((slice) => slice.tone
 const stageLabels = computed(() =>
   hasUnknownStage.value ? sleepStageLabelsWithUnknown() : sleepStageLabels(),
 );
-const topLevel = computed(() => (hasUnknownStage.value ? 4 : 3));
 const axisLabels = computed(() => ({
   start: props.rangeStart ? formatTime(props.rangeStart) : '',
   end: props.rangeEnd ? formatTime(props.rangeEnd) : '',
@@ -163,96 +150,25 @@ const segmentStyle = (stage: BarSegment): Record<string, string> => {
   return { width: barPercent(stage.minutes) + '%' };
 };
 
-const clock = (value: number) => {
-  const date = new Date(value);
-  return displayDateTimeFormatter({ hour: '2-digit', minute: '2-digit' }).format(date);
-};
-
-const hypnogramOption = computed(() => {
-  const current = range.value;
-  if (!current || !timeline.value.length) return null;
-  const points: [number, number][] = [];
-  for (const slice of timeline.value) {
-    if (typeof slice.start !== 'number') continue;
-    points.push([slice.start, STAGE_LEVEL[slice.tone]]);
-  }
-  const last = timeline.value[timeline.value.length - 1];
-  if (last && typeof last.end === 'number') {
-    points.push([last.end, STAGE_LEVEL[last.tone]]);
-  }
-  if (points.length < 2) return null;
-  return {
-    animation: false,
-    grid: { left: 44, right: 12, top: 12, bottom: 24 },
-    tooltip: {
-      trigger: 'axis',
-      formatter: (params: Array<{ value: [number, number] }>) => {
-        const point = params?.[0]?.value;
-        if (!point) return '';
-        return `${clock(point[0])}  ${stageLabels.value[point[1]] ?? ''}`;
-      },
-    },
-    xAxis: {
-      type: 'time',
-      min: current.from,
-      max: current.from + current.span,
-      axisLabel: { formatter: clock, hideOverlap: true, color: chartPalette.value.axis, fontSize: 14.5 },
-      axisTick: { show: false },
-      axisLine: { lineStyle: { color: chartPalette.value.grid } },
-      splitLine: { show: false },
-    },
-    yAxis: {
-      type: 'value',
-      min: -0.45,
-      max: topLevel.value + 0.45,
-      interval: 1,
-      axisLabel: {
-        formatter: (value: number) => stageLabels.value[value] ?? '',
-        color: chartPalette.value.axis,
-        fontSize: 14.5,
-      },
-      axisTick: { show: false },
-      axisLine: { show: false },
-      splitLine: { lineStyle: { color: chartPalette.value.grid, type: 'dashed' } },
-    },
-    visualMap: {
-      show: false,
-      type: 'piecewise',
-      dimension: 1,
-      pieces: [
-        { min: -0.5, max: 0.5, color: STAGE_COLORS.value.deep },
-        { min: 0.5, max: 1.5, color: STAGE_COLORS.value.light },
-        { min: 1.5, max: 2.5, color: STAGE_COLORS.value.rem },
-        { min: 2.5, max: 3.5, color: STAGE_COLORS.value.awake },
-        { min: 3.5, max: 4.5, color: STAGE_COLORS.value.unknown },
-      ],
-    },
-    series: [
-      {
-        type: 'line',
-        step: 'end',
-        data: points,
-        showSymbol: false,
-        lineStyle: { width: 2.4 },
-        areaStyle: { opacity: 0.16 },
-      },
-    ],
-  };
+const timelineStyle = (slice: BarSegment) => ({
+  left: `${(((slice.start ?? 0) - (range.value?.from ?? 0)) / (range.value?.span ?? 1)) * 100}%`,
+  width: `${(((slice.end ?? 0) - (slice.start ?? 0)) / (range.value?.span ?? 1)) * 100}%`,
 });
+const timelineTitle = (slice: BarSegment) =>
+  `${stageLabels.value[STAGE_LEVEL[slice.tone]]} · ${formatTime(new Date(slice.start ?? 0).toISOString())}–${formatTime(new Date(slice.end ?? 0).toISOString())}`;
 </script>
 
 <template>
   <div class="stage-block">
-    <template v-if="isHypnogram && hypnogramOption">
-      <VChart
-        class="hypnogram"
-        :key="CHART_THEME"
-        :theme="CHART_THEME"
-        :option="hypnogramOption"
-        autoresize
-        role="img"
-        :aria-label="t.hypnogramAria"
-      />
+    <template v-if="isHypnogram">
+      <div class="sleep-timeline" role="img" :aria-label="t.hypnogramAria" data-no-page-swipe>
+        <div class="timeline-legend"><span v-for="(label, index) in stageLabels" :key="label"><i :class="STAGE_TONES[index]"></i>{{ label }}</span></div>
+        <div class="timeline-tracks">
+          <span v-for="(slice, index) in timeline" :key="index" :class="['timeline-slice', slice.tone]"
+            :style="timelineStyle(slice)" :title="timelineTitle(slice)" tabindex="0" />
+        </div>
+      </div>
+      <div class="stage-axis"><span>{{ axisLabels.start }}</span><span>{{ axisLabels.end }}</span></div>
     </template>
     <template v-else>
       <div class="stage-bar" :aria-label="t.summaryAria">
@@ -280,7 +196,13 @@ const hypnogramOption = computed(() => {
 
 <style scoped>
 .stage-block { min-width: 0; }
-.hypnogram { width: 100%; height: 180px; }
+.sleep-timeline { display: grid; gap: 10px; margin-top: 12px; }
+.timeline-legend { display: flex; flex-wrap: wrap; gap: 7px 18px; color: var(--muted); font-size: var(--fs-xs); }
+.timeline-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.timeline-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; }
+.timeline-tracks { position: relative; min-width: 0; height: 32px; overflow: hidden; border-radius: 8px; background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--line); }
+.timeline-slice { position: absolute; top: 0; height: 100%; min-width: 1px; border-right: 1px solid var(--surface); cursor: help; }
+.timeline-slice:focus-visible { outline: 2px solid var(--focus); z-index: 1; }
 .stage-bar {
   position: relative;
   display: flex;

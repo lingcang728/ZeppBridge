@@ -84,6 +84,18 @@ describe('useAiTaskDraft', () => {
     expect(draft.draft.value.workout_ids).toEqual([]);
   });
 
+  it('拖放运动选择幂等且可逐步撤销', () => {
+    draft.setWorkoutSelected('w-1', true);
+    draft.setWorkoutSelected('w-1', true);
+    expect(draft.draft.value.workout_ids).toEqual(['w-1']);
+    draft.setWorkoutSelected('w-1', false);
+    expect(draft.draft.value.workout_ids).toEqual([]);
+    draft.undo();
+    expect(draft.draft.value.workout_ids).toEqual(['w-1']);
+    draft.undo();
+    expect(draft.draft.value.workout_ids).toEqual([]);
+  });
+
   it('用户改过提示词 → 套模板不覆盖；没改过 → 模板初稿进入', () => {
     draft.setPrompt('my own words');
     draft.applyTemplate(template());

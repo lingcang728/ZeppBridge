@@ -13,13 +13,14 @@
 import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue';
 import { defineMessages, useMessages } from '../i18n';
 import { popoverStyle } from '../lib/popoverPosition';
-import Icon from './Icon.vue';
+import Icon, { type IconName } from './Icon.vue';
 
 export interface SelectMenuOption {
   value: string | number;
   label: string;
   /** 选项下面的一行小字，可选。 */
   hint?: string;
+  icon?: IconName;
 }
 
 const props = withDefaults(defineProps<{
@@ -30,6 +31,7 @@ const props = withDefaults(defineProps<{
   ariaLabel?: string;
   /** 弹层向上展开——按钮靠近视口底部时用。 */
   dropUp?: boolean;
+  menuMinWidth?: number;
 }>(), {
   disabled: false,
   // 空串表示「用默认文案」：withDefaults 的默认值在 props 解析时求值，
@@ -82,7 +84,7 @@ const measure = () => {
   menuStyle.value = popoverStyle(
     { top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width },
     { width: window.innerWidth, height: window.innerHeight },
-    { maxHeight: MENU_MAX_HEIGHT, width: rect.width, preferUp: props.dropUp },
+    { maxHeight: MENU_MAX_HEIGHT, width: Math.min(window.innerWidth - 16, Math.max(rect.width, props.menuMinWidth ?? 0)), preferUp: props.dropUp },
   ) as unknown as Record<string, string>;
 };
 
@@ -90,6 +92,7 @@ const selectedIndex = computed(() =>
   props.options.findIndex((option) => option.value === props.modelValue));
 const selectedLabel = computed(() =>
   (selectedIndex.value >= 0 ? props.options[selectedIndex.value].label : (props.placeholder || t.value.placeholder)));
+const selectedIcon = computed(() => selectedIndex.value >= 0 ? props.options[selectedIndex.value].icon : undefined);
 
 const scrollActiveIntoView = () => {
   void nextTick(() => {
@@ -210,6 +213,7 @@ onBeforeUnmount(() => {
       @click="toggle"
       @keydown="onKeydown"
     >
+      <Icon v-if="selectedIcon" :name="selectedIcon" :size="16" class="select-icon" />
       <span :class="['select-value', { placeholder: selectedIndex < 0 }]">{{ selectedLabel }}</span>
       <Icon name="chevron-down" :size="14" class="select-caret" />
     </button>
@@ -239,6 +243,7 @@ onBeforeUnmount(() => {
           @pointermove="activeIndex = index"
           @click="choose(index)"
         >
+          <Icon v-if="option.icon" :name="option.icon" :size="16" class="option-icon" />
           <span class="option-label">{{ option.label }}</span>
           <span v-if="option.hint" class="option-hint">{{ option.hint }}</span>
           <Icon v-if="option.value === modelValue" name="circle-check" :size="14" class="option-tick" />
@@ -267,7 +272,7 @@ onBeforeUnmount(() => {
 }
 .select-list .select-option {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 2px 8px;
   padding: 8px 10px;
@@ -279,9 +284,10 @@ onBeforeUnmount(() => {
 }
 .select-list .select-option.is-active { background: var(--surface-hover); color: var(--ink); outline: 2px solid var(--focus); outline-offset: -2px; }
 .select-list .select-option.is-selected { color: var(--ink); font-weight: 600; }
-.select-list .option-label { grid-column: 1; grid-row: 1; overflow-wrap: anywhere; }
+.select-list .option-icon { grid-column: 1; grid-row: 1; color: var(--muted); }
+.select-list .option-label { grid-column: 2; grid-row: 1; overflow-wrap: anywhere; }
 .select-list .option-hint { grid-column: 1 / -1; color: var(--subtle); font-size: var(--fs-xs); font-weight: 400; }
-.select-list .option-tick { grid-column: 2; grid-row: 1; color: var(--accent); }
+.select-list .option-tick { grid-column: 3; grid-row: 1; color: var(--accent); }
 </style>
 
 <style scoped>
@@ -311,6 +317,7 @@ onBeforeUnmount(() => {
 .is-disabled .select-trigger, .select-trigger:disabled { opacity: .55; cursor: not-allowed; }
 
 .select-value { min-width: 0; overflow-wrap: anywhere; }
+.select-icon { flex: 0 0 auto; color: var(--muted); }
 .select-value.placeholder { color: var(--subtle); }
 .select-caret { flex: 0 0 auto; color: var(--muted); transition: transform 160ms ease; }
 .is-open .select-caret { transform: rotate(180deg); }

@@ -65,8 +65,6 @@ const lookup = (table: unknown, key: string): string | undefined =>
 const {
   appStatus,
   statusError,
-  syncState,
-  syncMessage,
   isSyncing,
   autoSyncEnabled,
   autoSyncInterval,
@@ -76,18 +74,6 @@ const {
   setAutoSyncEnabled,
   markDataChanged,
 } = useSyncController();
-
-const syncAlertTone = computed(() => {
-  if (syncState.value === 'failed') return 'danger';
-  if (syncState.value === 'partial' || syncState.value === 'cancelled') return 'warning';
-  if (syncState.value === 'syncing') return '';
-  return 'success';
-});
-const syncAlertIcon = computed(() => (
-  syncState.value === 'failed' || syncState.value === 'partial' || syncState.value === 'cancelled'
-    ? 'warning'
-    : 'info'
-));
 
 const focusConnection = () => {
   if (route.hash !== '#connection' && route.query.focus !== 'connection') return;
@@ -1074,9 +1060,6 @@ const runCapabilityProbe = async () => {
       <Icon name="warning" :size="15" />{{ statusError }}
       <button type="button" @click="() => refreshStatus()">{{ t.retry }}</button>
     </div>
-    <div v-if="syncState !== 'idle'" :class="['alert', syncAlertTone]" role="status">
-      <Icon :name="syncAlertIcon" :size="15" />{{ syncMessage }}
-    </div>
     <div v-if="loginError" class="alert danger" role="alert"><Icon name="warning" :size="15" />{{ loginError }}</div>
     <div v-if="dataMessage" class="alert success"><Icon name="circle-check" :size="15" />{{ dataMessage }}</div>
     <div v-if="dataError" class="alert danger" role="alert"><Icon name="warning" :size="15" />{{ dataError }}</div>
@@ -1154,8 +1137,8 @@ const runCapabilityProbe = async () => {
       </div>
     </section>
 
-    <!-- 2 列网格：账户与区域 + 连接设备 -->
-    <div class="two-col">
+    <!-- 宽屏并列：账户摘要和数据来源各占一列，设备列表在右侧自适应排列。 -->
+    <div class="connection-stack">
       <!-- 2. 账户与区域 -->
       <section id="account-section" class="settings-card account-card" aria-labelledby="account-title">
         <h2 id="account-title">{{ t.accountTitle }}</h2>
@@ -1207,7 +1190,7 @@ const runCapabilityProbe = async () => {
           </div>
           <template v-for="source in dataSources" :key="source.kind === 'device' ? `device:${source.model.deviceKey || source.name}` : 'cloud'">
           <div class="source-row">
-            <span class="source-icon">
+            <span v-if="source.kind === 'cloud' || (source.kind === 'device' && source.model.image)" class="source-icon">
               <DeviceVisual v-if="source.kind === 'device'" :src="source.model.image" :alt="source.name" :kind="source.model.kind" compact />
               <DesignIcon v-else name="zepp-cloud" :size="32" />
             </span>
@@ -1842,6 +1825,8 @@ const runCapabilityProbe = async () => {
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 0; min-width: 0; }
 .display-prefs .kv-label { flex: 0 1 168px; }
 .display-prefs .select-menu { min-width: 200px; flex: 1 1 200px; max-width: 280px; }
+.display-prefs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 28px; }
+.display-prefs > h2 { grid-column: 1 / -1; }
 h1, h2, h3, p { margin-top: 0; }
 h1 { font-size: 26.5px; font-weight: 700; color: var(--ink); }
 h2 { margin-bottom: 14px; font-size: var(--fs-xl); font-weight: 700; color: var(--ink); }
@@ -2073,7 +2058,9 @@ h3 { margin-bottom: 4px; font-size: var(--fs-md); font-weight: 700; color: var(-
 /* 成对的两块卡片等高对齐；高度由内容较多的一块决定，而不是被第三块撑开。 */
 .two-col.paired { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
 .one-col { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
-.wide-panels { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.wide-panels { grid-template-columns: minmax(0, 1fr); }
+.connection-stack { display: grid; grid-template-columns: minmax(320px, .8fr) minmax(0, 1.4fr); gap: 14px; align-items: start; }
+.connection-stack > * { min-width: 0; }
 .three-col { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .two-col > *, .three-col > * { min-width: 0; }
 
@@ -2081,8 +2068,8 @@ h3 { margin-bottom: 4px; font-size: var(--fs-md); font-weight: 700; color: var(-
 .auth-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .auth-card {
   display: grid;
+  grid-template-rows: 1fr auto;
   gap: 12px;
-  align-content: start;
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
@@ -2152,7 +2139,7 @@ h3 { margin-bottom: 4px; font-size: var(--fs-md); font-weight: 700; color: var(-
 .kv-btn:hover:not(:disabled) { border-color: var(--accent); }
 
 /* 数据来源 */
-.source-list { display: grid; gap: 8px; }
+.source-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 8px; }
 .source-row {
   display: grid;
   grid-template-columns: 36px minmax(0, 1fr);
@@ -2319,7 +2306,7 @@ code { color: var(--muted); font-family: var(--font-mono); font-size: var(--fs-s
 .manual-auth-form .form-group:last-of-type { margin-bottom: 16px; }
 .manual-auth-form label { display: block; margin-bottom: 4px; color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
 .manual-auth-form input { width: 100%; padding: 8px 10px; border: 1px solid var(--line-control); border-radius: 9px; background: var(--surface); color: var(--ink); font-family: var(--font-mono); font-size: var(--fs-sm); }
-.manual-auth-form input:focus { border-color: var(--accent); }
+.manual-auth-form input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
 .manual-auth-form input:disabled { opacity: 0.5; cursor: not-allowed; }
 .manual-auth-form .form-actions { display: flex; gap: 8px; }
 
@@ -2337,9 +2324,11 @@ code { color: var(--muted); font-family: var(--font-mono); font-size: var(--fs-s
 
 @media (max-width: 1080px) {
   .three-col { grid-template-columns: minmax(0, 1fr); }
+  .connection-stack { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 860px) {
   .two-col { grid-template-columns: minmax(0, 1fr); }
+  .display-prefs { grid-template-columns: minmax(0, 1fr); }
   .auth-grid { grid-template-columns: minmax(0, 1fr); }
   .account-strip { flex-wrap: wrap; }
   .account-meta { flex: 1 1 160px; }

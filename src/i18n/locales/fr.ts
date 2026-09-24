@@ -552,6 +552,8 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
     },
 
     'App': {
+      quickReturn: (page: string) => `Retour à ${page}`,
+      navRecent: 'historique récent',
       bottomNav: 'Navigation principale mobile',
       browserPreview: 'Utilisez l’application de bureau. Cet aperçu navigateur ne lit aucune donnée de compte.',
       compacted: (saved: string) => `Messages historiques compactés, environ ${saved} de disque récupérés.`,
@@ -1778,6 +1780,9 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
     },
 
     'views/AiComposer': {
+      availableWorkouts: 'Disponibles',
+      linkedWorkouts: 'Associées',
+      dragHint: 'Glissez ou cliquez pour ajouter et retirer',
       pageTitle: 'Remettre à l’IA',
       pageIntro: 'Composez une tâche d’analyse à partir de vos données de santé locales, puis remettez-la vous-même à une IA.',
       newTask: 'Nouvelle tâche',

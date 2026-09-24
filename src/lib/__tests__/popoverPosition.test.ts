@@ -43,6 +43,17 @@ describe('popover positioning', () => {
     expect(left + 240).toBeLessThanOrEqual(viewport.width - VIEWPORT_MARGIN);
   });
 
+  it('positions a language menu wider than its trigger within a narrow window', () => {
+    const width = 224;
+    const style = popoverStyle(
+      { top: 70, bottom: 105, left: 390, width: 84 },
+      { width: 480, height: 640 },
+      { maxHeight: 268, width },
+    );
+    expect(style.width).toBe(`${width}px`);
+    expect(Number.parseInt(style.left, 10) + width).toBeLessThanOrEqual(480 - VIEWPORT_MARGIN);
+  });
+
   it('never lets it run off the left edge either', () => {
     const trigger = { top: 100, bottom: 130, left: -40, width: 60 };
     const style = popoverStyle(trigger, viewport, sizing);

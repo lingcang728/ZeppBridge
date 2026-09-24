@@ -810,6 +810,8 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
     },
 
     'App': {
+      quickReturn: (page: string) => `Zurück zu ${page}`,
+      navRecent: 'letzten Einträgen',
       bottomNav: 'Mobile Hauptnavigation',
       browserPreview:
         'Bitte nutze die Desktop-App. Diese Browser-Vorschau liest keine Kontodaten.',
@@ -1785,6 +1787,9 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       title: 'Tägliche Aktivität',
     },
     'views/AiComposer': {
+      availableWorkouts: 'Verfügbar',
+      linkedWorkouts: 'Verknüpft',
+      dragHint: 'Ziehen oder klicken zum Hinzufügen und Entfernen',
       attachAdd: 'Dateien hinzufügen',
       attachEmpty:
         'Noch keine Anhänge. Originale werden unverändert referenziert – nie kopiert oder anonymisiert.',

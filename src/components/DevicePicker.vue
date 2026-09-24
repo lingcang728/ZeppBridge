@@ -223,16 +223,15 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
 
       <div class="picker-frame">
         <DeviceVisual
-          v-if="neighbours.prev"
+          v-if="neighbours.prev?.src"
           class="peek left"
           :src="neighbours.prev.src"
           :alt="neighbours.prev.entry.canonical_name"
           :kind="neighbours.prev.entry.kind"
         />
         <div class="picker-hero">
-          <!-- 目录里偶尔缺一张图。用 DeviceVisual 是为了走它的 SVG 兜底，
-               而不是把一个破图图标和 alt 文字摆在用户面前。 -->
           <DeviceVisual
+            v-if="currentImage"
             :key="current!.catalog_id"
             class="hero-visual"
             :src="currentImage"
@@ -244,7 +243,7 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
           <p class="hero-count">{{ index + 1 }} / {{ entries.length }}</p>
         </div>
         <DeviceVisual
-          v-if="neighbours.next"
+          v-if="neighbours.next?.src"
           class="peek right"
           :src="neighbours.next.src"
           :alt="neighbours.next.entry.canonical_name"
@@ -299,7 +298,8 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
   cursor: pointer;
 }
 .filter-chip.on { border-color: var(--accent); color: var(--accent); }
-.picker-search { flex: 1 1 160px; min-width: 140px; }
+.picker-search { flex: 1 1 190px; min-width: 140px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--line-control); border-radius: var(--radius-sm); background: var(--surface-raised); color: var(--ink); outline: none; }
+.picker-search:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 
 .picker-empty { padding: 24px 12px; color: var(--muted); font-size: var(--fs-sm); text-align: center; }
 
@@ -320,7 +320,7 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
 
 .picker-frame {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr);
   align-items: center;
   justify-items: center;
   gap: 4px;
@@ -331,10 +331,10 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
   overflow: hidden;
 }
 .peek { width: 56px; height: 56px; flex-basis: 56px; border: 0; background: transparent; opacity: .28; }
-.peek.left { justify-self: end; }
-.peek.right { justify-self: start; }
+.peek.left { grid-column: 1; grid-row: 1; justify-self: end; }
+.peek.right { grid-column: 3; grid-row: 1; justify-self: start; }
 
-.picker-hero { display: grid; justify-items: center; gap: 2px; text-align: center; }
+.picker-hero { grid-column: 2; grid-row: 1; display: grid; justify-items: center; gap: 2px; text-align: center; }
 /* 主图给足高度：竖长的表身在正方框里会被上下切掉。 */
 .picker-hero .hero-visual { width: 132px; height: 150px; flex-basis: 150px; border: 0; background: transparent; }
 .hero-name { margin: 6px 0 0; color: var(--ink); font-size: var(--fs-lg); font-weight: 600; }

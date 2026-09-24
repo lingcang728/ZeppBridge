@@ -82,7 +82,7 @@ const chips = computed(() => [
       <span v-else-if="devicesError" class="sources-feedback error" role="alert">{{ t.identifyFailed(devicesError) }}</span>
       <span v-else-if="!deviceModels.length" class="sources-feedback" role="status">{{ t.noDevicesYet }}</span>
       <RouterLink v-for="chip in chips" :key="chip.key" class="source-chip" :to="chip.to">
-        <span class="chip-icon">
+        <span v-if="chip.kind === 'cloud' || (chip.kind === 'device' && chip.model.image)" class="chip-icon">
           <DeviceVisual v-if="chip.kind === 'device'" :src="chip.model.image" :alt="chip.name" :kind="chip.model.kind" compact />
           <DesignIcon v-else name="zepp-cloud" :size="22" />
         </span>

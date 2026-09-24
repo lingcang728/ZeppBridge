@@ -728,7 +728,13 @@ const resetLedger = async () => {
 /* 与设置页共用的视觉基元。子组件拿不到父组件的 scoped 样式，
    所以这里按同一套 token 重述一遍，保证看起来是同一套东西。 */
 h2 { margin: 0 0 14px; font-size: var(--fs-xl); font-weight: 700; color: var(--ink); }
-.settings-card { padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); min-width: 0; }
+.settings-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 28px; padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); min-width: 0; }
+.settings-card > h2, .settings-card > .section-description, .settings-card > .ledger-head,
+.settings-card > .ledger-list, .settings-card > .failed-block,
+.settings-card > .api-error, .settings-card > .hint-line { grid-column: 1 / -1; }
+.settings-card > .archive-toggle { grid-column: 1; grid-row: 3 / span 4; align-self: start; }
+.settings-card > .field-row, .settings-card > .estimate-block,
+.settings-card > .auto-continue, .settings-card > .inline-actions { grid-column: 2; }
 .section-description { margin: 0 0 var(--space-3); color: var(--muted); font-size: var(--fs-sm); }
 .toggle-row { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 0; }
 .toggle-copy { flex: 1; min-width: 0; display: grid; gap: 1px; }
@@ -768,7 +774,7 @@ h2 { margin: 0 0 14px; font-size: var(--fs-xl); font-weight: 700; color: var(--i
 .ledger-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin-top: 14px; }
 .ledger-head strong { color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
 .ledger-head span { color: var(--muted); font-size: var(--fs-xs); }
-.ledger-list { display: grid; gap: 8px; margin-top: 8px; }
+.ledger-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
 .ledger-row {
   display: grid;
   gap: 2px;
@@ -780,4 +786,8 @@ h2 { margin: 0 0 14px; font-size: var(--fs-xl); font-weight: 700; color: var(--i
 .ledger-row strong { color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
 .ledger-stats, .ledger-range { color: var(--subtle); font-size: var(--fs-xs); }
 .ledger-stats em { color: var(--danger); font-style: normal; }
+@media (max-width: 880px) {
+  .settings-card { display: block; }
+  .ledger-list { grid-template-columns: minmax(0, 1fr); }
+}
 </style>

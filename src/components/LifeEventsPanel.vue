@@ -18,13 +18,13 @@ onMounted(reload); onActivated(reload);
 </script>
 <template>
   <section id="life-events" class="life-events" aria-labelledby="life-events-title">
-    <header><div><h2 id="life-events-title">{{ t.title }}</h2><p>{{ t.intro }}</p></div><button class="button button-secondary" @click="open()">+ {{ t.add }}</button></header>
+    <header><div><h2 id="life-events-title">{{ t.title }}</h2><p v-if="events.length">{{ t.intro }}</p></div><button class="button button-secondary" @click="open()">+ {{ t.add }}</button></header>
     <div v-if="events.length" class="filters"><input v-model="search" type="search" :placeholder="t.search" :aria-label="t.search"><label><input v-model="active" type="checkbox">{{ t.active }}</label></div>
     <p v-if="failed" role="alert">{{ t.failed }} <button class="button button-quiet" @click="reload">{{ t.retry }}</button></p>
     <p v-else-if="loading && !events.length" role="status">{{ t.loading }}</p>
     <p v-else-if="!rows.length" class="empty">{{ events.length ? t.noMatch : t.empty }}</p>
     <ul v-if="rows.length"><li v-for="event in rows" :key="event.id"><button class="event-row" @click="open(event)"><span class="event-category">{{ t.categories[event.category] }}</span><strong>{{ event.title }}</strong><span class="event-date">{{ date(event.startDate) }}<template v-if="event.endDate !== event.startDate"> — {{ event.endDate ? date(event.endDate) : t.active }}</template></span><span v-if="event.notes" class="event-notes">{{ event.notes }}</span></button></li></ul>
-    <footer><small>{{ t.local }}</small><div v-if="filtered.length > 6"><button class="button button-quiet" :disabled="page === 0" @click="page--">{{ t.previous }}</button><button class="button button-quiet" :disabled="(page + 1) * 6 >= filtered.length" @click="page++">{{ t.next }}</button></div></footer>
+    <footer v-if="filtered.length > 6"><div><button class="button button-quiet" :disabled="page === 0" @click="page--">{{ t.previous }}</button><button class="button button-quiet" :disabled="(page + 1) * 6 >= filtered.length" @click="page++">{{ t.next }}</button></div></footer>
   </section>
 </template>
 <style scoped>

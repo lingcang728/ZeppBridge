@@ -184,7 +184,7 @@ const option = computed(() => {
   border-radius: var(--radius-md);
   background: var(--surface);
 }
-.trend-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
+.trend-head { display: flex; min-height: 70px; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
 .trend-title { display: grid; gap: 2px; min-width: 0; }
 .trend-title strong { color: var(--ink); font-size: var(--fs-md); font-weight: 700; }
 .trend-title small { color: var(--subtle); font-size: var(--fs-xs); }
@@ -199,6 +199,7 @@ const option = computed(() => {
   margin: var(--space-2) 0 0;
   color: var(--subtle);
   font-size: var(--fs-xs);
+  min-height: 38px;
 }
 .trend-date { font-family: var(--font-mono); }
 .trend-band { color: var(--muted); }

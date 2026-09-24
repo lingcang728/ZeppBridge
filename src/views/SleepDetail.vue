@@ -159,7 +159,6 @@ const weekSessions = ref<SleepSession[]>([]);
 const device = ref<DeviceProfile>({});
 const loading = ref(true);
 const error = ref<string | null>(null);
-const stageHelpOpen = ref(false);
 const sleepId = computed(() => String(route.params.sleepId || ''));
 
 const stages = computed(() => session.value ? [
@@ -378,10 +377,12 @@ watch([dataRevision, sleepId], () => void loadDetail());
           <h2>{{ t.stagesTitle }}</h2>
           <div class="stage-actions">
             <p>{{ formatTime(session.start_time) }} – {{ formatTime(session.end_time) }}</p>
-            <button class="stage-help-button" type="button" @click="stageHelpOpen = !stageHelpOpen">{{ t.stageHelpButton }}</button>
+            <span class="stage-help-anchor">
+              <button class="stage-help-button" type="button" aria-describedby="stage-help-note">{{ t.stageHelpButton }}</button>
+              <span id="stage-help-note" class="stage-help" role="note">{{ t.stageHelp }}</span>
+            </span>
           </div>
         </div>
-        <p v-if="stageHelpOpen" class="stage-help">{{ t.stageHelp }}</p>
         <StageBar
           :stages="stages"
           :slices="session.stages"
@@ -555,7 +556,11 @@ watch([dataRevision, sleepId], () => void loadDetail());
   padding: 4px 10px;
   cursor: pointer;
 }
-.stage-help { margin: 0 0 12px; color: var(--muted); font-size: var(--fs-sm); line-height: 1.55; }
+.stage-help-anchor { position: relative; display: inline-flex; }
+.stage-card { overflow: visible; }
+.stage-help { position: absolute; z-index: 30; top: calc(100% + 8px); right: 0; width: min(340px, calc(100vw - 48px)); padding: 12px 14px; border: 1px solid var(--line-control); border-radius: var(--radius-md); background: var(--surface-raised); box-shadow: 0 14px 32px rgba(0,0,0,.28); color: var(--muted); font-size: var(--fs-sm); line-height: 1.55; opacity: 0; visibility: hidden; transform: translateY(-4px); pointer-events: none; transition: opacity 150ms ease, transform 150ms ease, visibility 150ms; }
+.stage-help-anchor:hover .stage-help, .stage-help-anchor:focus-within .stage-help { opacity: 1; visibility: visible; transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) { .stage-help { transition: none; } }
 .meta-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

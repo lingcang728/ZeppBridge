@@ -13,6 +13,8 @@ import { plural, type LocalePack } from '../index';
 export default {
   modules: {
     App: {
+      quickReturn: (page: string) => `Terug naar ${page}`,
+      navRecent: 'recente records',
       skipToContent: 'Naar de hoofdinhoud',
       mainNav: 'Hoofdnavigatie',
       bottomNav: 'Mobiele hoofdnavigatie',
@@ -1575,6 +1577,9 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       minutesUnit: 'min',
     },
     'views/AiComposer': {
+      availableWorkouts: 'Beschikbaar',
+      linkedWorkouts: 'Gekoppeld',
+      dragHint: 'Sleep of klik om toe te voegen of te verwijderen',
       pageTitle: 'Doorgeven aan AI',
       pageIntro:
         'Stel een analysetaak samen uit lokale gezondheidsgegevens en lever die daarna zelf af bij een AI.',

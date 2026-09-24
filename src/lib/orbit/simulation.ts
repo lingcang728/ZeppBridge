@@ -17,8 +17,8 @@ export type { CollisionRect } from './labels';
  * object per animation frame; tests drive the same `step()` in a for-loop.
  *
  * Model (contract P5 / W0-S3):
- *  - Each node is springed toward its deterministic ring anchor (k = 0.04).
- *  - Semi-implicit Euler, per-frame damping 0.88, dt is the real frame gap
+ *  - Each node is springed toward its deterministic ring anchor (k = 0.055).
+ *  - Semi-implicit Euler, per-frame damping 0.90, dt is the real frame gap
  *    clamped to ≤33 ms so a backgrounded tab doesn't catapult nodes.
  *  - Collisions use positional correction on AABBs that include the label
  *    box — cheaper than impulse forces and it cannot oscillate. A node being
@@ -26,8 +26,8 @@ export type { CollisionRect } from './labels';
  *  - "Settled" = total kinetic energy Σv² < 0.02 for 30 consecutive frames.
  */
 
-export const SPRING_K = 0.04;
-export const DAMPING = 0.88;
+export const SPRING_K = 0.055;
+export const DAMPING = 0.90;
 export const SETTLE_ENERGY = 0.02;
 export const SETTLE_FRAMES = 30;
 /** Speed cap, px per 60 fps frame. */

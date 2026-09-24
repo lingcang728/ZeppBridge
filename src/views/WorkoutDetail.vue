@@ -1256,7 +1256,7 @@ watch(workoutId, (id) => { if (id) void loadInsight(id); }, { immediate: true })
       <section class="workout-hero" :aria-label="t.heroAria">
         <div class="hero-copy">
           <div class="hero-device">
-            <DeviceVisual :src="deviceImage" :alt="deviceName" :kind="deviceKind" />
+            <DeviceVisual v-if="deviceImage" :src="deviceImage" :alt="deviceName" :kind="deviceKind" />
             <span class="device-live"><i></i>{{ deviceName }}</span>
           </div>
           <div class="hero-title-group">

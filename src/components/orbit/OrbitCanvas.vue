@@ -109,6 +109,13 @@ const centerPx = computed<Vec>(() => ({ x: viewSize.value.w / 2, y: viewSize.val
 const rootTransform = computed(
   () => `translate(${centerPx.value.x + pan.value.x} ${centerPx.value.y + pan.value.y}) scale(${props.zoom})`,
 );
+const centerLines = computed(() => {
+  const label = props.center.label.trim();
+  if (label.length <= 9) return [label];
+  const split = label.lastIndexOf(' ', 11);
+  if (split > 2 && split < 12) return [label.slice(0, split), `${label.slice(split + 1, split + 10)}${label.length > split + 10 ? '…' : ''}`];
+  return [label.slice(0, 8), `${label.slice(8, 16)}${label.length > 16 ? '…' : ''}`];
+});
 
 /* ── Simulation lifecycle ─────────────────────────────────────────── */
 
@@ -353,6 +360,16 @@ const drag = {
    */
   rect: null as { left: number; top: number; width: number; height: number } | null,
 };
+let panDrag: { pointerId: number; x: number; y: number; origin: Vec; width: number; height: number } | null = null;
+const onCanvasPointerDown = (e: PointerEvent) => {
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  if ((e.target as Element).closest('[data-node-id], .orbit-tools')) return;
+  const host = hostEl.value;
+  if (!host) return;
+  const rect = host.getBoundingClientRect();
+  panDrag = { pointerId: e.pointerId, x: e.clientX, y: e.clientY, origin: { ...pan.value }, width: rect.width, height: rect.height };
+  host.setPointerCapture(e.pointerId);
+};
 
 const simNode = (id: string | null): OrbitSimNode | undefined =>
   id === null ? undefined : sim.value.nodes.find((n) => n.id === id);
@@ -409,6 +426,13 @@ const onNodePointerDown = (e: PointerEvent, id: string) => {
 };
 
 const onPointerMove = (e: PointerEvent) => {
+  if (panDrag && e.pointerId === panDrag.pointerId) {
+    pan.value = {
+      x: panDrag.origin.x + (e.clientX - panDrag.x) * viewSize.value.w / panDrag.width,
+      y: panDrag.origin.y + (e.clientY - panDrag.y) * viewSize.value.h / panDrag.height,
+    };
+    return;
+  }
   if (drag.id === null || e.pointerId !== drag.pointerId) return;
   const sn = simNode(drag.id);
   const world = worldFromEvent(e, drag.rect ?? undefined);
@@ -445,6 +469,7 @@ const endDrag = (sn: OrbitSimNode) => {
 };
 
 const onPointerUp = (e: PointerEvent) => {
+  if (panDrag && e.pointerId === panDrag.pointerId) { panDrag = null; return; }
   if (drag.id === null || e.pointerId !== drag.pointerId) return;
   const id = drag.id;
   const sn = simNode(id);
@@ -468,6 +493,7 @@ const onPointerUp = (e: PointerEvent) => {
 };
 
 const onPointerCancel = (e: PointerEvent) => {
+  if (panDrag && e.pointerId === panDrag.pointerId) { panDrag = null; return; }
   if (drag.id === null || e.pointerId !== drag.pointerId) return;
   const sn = simNode(drag.id);
   if (sn) endDrag(sn);
@@ -569,6 +595,7 @@ const onWheel = (e: WheelEvent) => {
     :aria-describedby="`orbit-hint-${hintId}`"
     @keydown="onCanvasKeydown"
     @wheel="onWheel"
+    @pointerdown="onCanvasPointerDown"
     @pointermove="onPointerMove"
     @pointerup="onPointerUp"
     @pointercancel="onPointerCancel"
@@ -633,8 +660,8 @@ const onWheel = (e: WheelEvent) => {
         </g>
         <g class="orbit-center">
           <circle class="center-disc" :r="CENTER_RADIUS" />
-          <text class="center-label" y="-3" text-anchor="middle">{{ props.center.label }}</text>
-          <text v-if="props.center.sublabel" class="center-sublabel" y="15" text-anchor="middle">
+          <text v-for="(line, index) in centerLines" :key="index" class="center-label" :y="centerLines.length === 1 ? -3 : -10 + index * 14" text-anchor="middle">{{ line }}</text>
+          <text v-if="props.center.sublabel" class="center-sublabel" y="22" text-anchor="middle">
             {{ props.center.sublabel }}
           </text>
         </g>
@@ -724,19 +751,25 @@ const onWheel = (e: WheelEvent) => {
   right: 10px;
   bottom: 10px;
   display: flex;
-  gap: 4px;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line-control);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 7%, transparent), 0 3px 12px rgba(0,0,0,.12);
 }
 .orbit-tool {
   min-width: 30px;
   min-height: 30px;
   padding: 0 8px;
-  border: 1px solid var(--line-control);
+  border: 1px solid transparent;
   border-radius: 8px;
-  background: var(--surface-raised);
+  background: transparent;
   color: var(--muted);
   font-size: var(--fs-sm);
   cursor: pointer;
 }
-.orbit-tool:hover { color: var(--accent); border-color: var(--accent); }
+.orbit-tool:hover { color: var(--accent); background: var(--surface-hover); }
+.orbit-tool:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .orbit-tool.zoom-value { min-width: 46px; font-variant-numeric: tabular-nums; }
 </style>

@@ -55,8 +55,9 @@ function Copy-WithRetry([string]$Source, [string]$Destination) {
   }
 }
 
-# v3 worktree 打出来的测试版必须叫这个名字。禁止再产出 ZeppBridge.exe /
-# ZeppBridge.lnk / App Paths\ZeppBridge.exe，那些是 2.x 日常入口。
+# v3 worktree 打出来的测试版必须叫这个名字。禁止新建或重新指向
+# ZeppBridge.exe / ZeppBridge.lnk / App Paths\ZeppBridge.exe 这些旧入口。
+# 用户已手动指向 v3 的旧名称快捷方式只允许刷新版本描述。
 $V3ProductName = 'ZeppBridge3'
 
 function Get-ProductName {
@@ -215,6 +216,16 @@ function Update-UserEntry([string]$PortableExe, [string]$Version, [string]$Produ
 
   Set-Shortcut -ShortcutPath $desktopLnk -TargetPath $PortableExe -Description $description
   Set-Shortcut -ShortcutPath $startMenuLnk -TargetPath $PortableExe -Description $description
+
+  # 用户可能已将旧名称快捷方式手动指向 v3。只更新确实指向本次 exe 的
+  # 描述文字，绝不改写仍指向 2.x 的快捷方式或目标路径。
+  foreach ($dir in @($desktop, $startMenu)) {
+    $alias = Join-Path $dir 'ZeppBridge.lnk'
+    $target = Get-ShortcutTarget $alias
+    if ($target -and [string]::Equals($target, $PortableExe, [StringComparison]::OrdinalIgnoreCase)) {
+      Set-Shortcut -ShortcutPath $alias -TargetPath $PortableExe -Description "ZeppBridge $Version"
+    }
+  }
 
   $appPaths = "HKCU:\Software\Microsoft\Windows\CurrentVersion\App Paths\$ProductName.exe"
   if (-not (Test-Path -LiteralPath $appPaths)) {
@@ -423,5 +434,9 @@ if ($leftover.Count -gt 0) {
 
 Write-Host "用户入口：$portableDest"
 Write-Host "release 目录：$ReleaseDir"
-Write-Host "已覆盖本盘安装包：独立 exe + 当前版本 NSIS/MSI（编译缓存仍在 Cargo target-dir，不给用户双击）"
+if ($UserEntryOnly) {
+  Write-Host '已核对本地 exe 与快捷方式版本。'
+} else {
+  Write-Host '已覆盖本盘安装包：独立 exe + 当前版本 NSIS/MSI（编译缓存仍在 Cargo target-dir，不给用户双击）'
+}
 exit 0

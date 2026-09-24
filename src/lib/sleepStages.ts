@@ -17,7 +17,7 @@ export interface TimedSleepSlice {
 
 /**
  * Fill holes in a sleep timeline with an explicit unknown band.
- * `step: 'end'` would otherwise paint the gap as the previous stage.
+ * The interval renderer uses this explicit band instead of extending the previous stage.
  */
 export function insertSleepStageGaps(
   slices: readonly TimedSleepSlice[],
@@ -25,7 +25,7 @@ export function insertSleepStageGaps(
   rangeTo: number,
   minGapMs = 1_000,
 ): TimedSleepSlice[] {
-  if (!(rangeTo > rangeFrom)) return slices.filter((slice) => slice.end > slice.start);
+  if (!(rangeTo > rangeFrom)) return [];
   const ordered = slices
     .filter((slice) => Number.isFinite(slice.start) && Number.isFinite(slice.end) && slice.end > slice.start)
     .slice()
@@ -33,14 +33,18 @@ export function insertSleepStageGaps(
   const result: TimedSleepSlice[] = [];
   let cursor = rangeFrom;
   for (const slice of ordered) {
-    const start = Math.max(slice.start, rangeFrom);
+    // Earlier slices own their covered time. Clip later overlaps so a minute
+    // cannot be painted twice or make the time axis run backwards.
+    const start = Math.max(slice.start, rangeFrom, cursor);
     const end = Math.min(slice.end, rangeTo);
     if (end <= start) continue;
     if (start - cursor >= minGapMs) {
       result.push({ tone: 'unknown', start: cursor, end: start });
     }
-    result.push({ tone: slice.tone, start, end });
-    cursor = Math.max(cursor, end);
+    const previous = result[result.length - 1];
+    if (previous?.tone === slice.tone && start - previous.end < minGapMs) previous.end = end;
+    else result.push({ tone: slice.tone, start, end });
+    cursor = end;
   }
   if (rangeTo - cursor >= minGapMs) {
     result.push({ tone: 'unknown', start: cursor, end: rangeTo });

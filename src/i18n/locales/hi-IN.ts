@@ -601,6 +601,8 @@ Markdown में जवाब दें।`,
     },
 
     'App': {
+      quickReturn: (page: string) => `${page} पर वापस जाएँ`,
+      navRecent: 'हाल के रिकॉर्ड',
       skipToContent: 'मुख्य कंटेंट पर जाएँ',
       mainNav: 'मुख्य नेविगेशन',
       bottomNav: 'मोबाइल मुख्य नेविगेशन',
@@ -1502,6 +1504,9 @@ Markdown में जवाब दें।`,
     },
 
     'views/AiComposer': {
+      availableWorkouts: 'उपलब्ध',
+      linkedWorkouts: 'जुड़े हुए',
+      dragHint: 'जोड़ने या हटाने के लिए खींचें या क्लिक करें',
       attachAdd: 'फ़ाइलें जोड़ें',
       attachEmpty: 'अभी कोई अटैचमेंट नहीं। मूल फ़ाइलें जैसी हैं संदर्भित होती हैं — कभी कॉपी या पहचान-रहित नहीं होतीं।',
       attachFilterName: 'PDF और तस्वीरें',

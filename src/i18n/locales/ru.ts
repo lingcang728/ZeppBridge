@@ -680,6 +680,8 @@ export default {
     },
 
     'App': {
+      quickReturn: (page: string) => `Вернуться к ${page}`,
+      navRecent: 'последним записям',
       skipToContent: 'Перейти к основному содержимому',
       mainNav: 'Основная навигация',
       bottomNav: 'Мобильная основная навигация',
@@ -1653,6 +1655,9 @@ export default {
     },
 
     'views/AiComposer': {
+      availableWorkouts: 'Доступные',
+      linkedWorkouts: 'Связанные',
+      dragHint: 'Перетащите или нажмите, чтобы добавить или удалить',
       pageTitle: 'Передать ИИ',
       pageIntro: 'Соберите задачу анализа из локальных данных здоровья, а затем сами отправьте её ИИ.',
       savedTasks: 'Сохранённые задачи',

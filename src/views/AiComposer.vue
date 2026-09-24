@@ -50,6 +50,7 @@ const messages = defineMessages(
     taskTitlePlaceholder: '给这次分析起个名字',
     workoutsTitle: '关联运动',
     workoutsEmpty: '本机还没有运动记录',
+    availableWorkouts: '待选运动', linkedWorkouts: '已关联', dragHint: '拖放或点击来加入、移除',
     templateTitle: '模板',
     noTemplate: '不使用模板',
     categoriesTitle: '分析内容',
@@ -105,6 +106,7 @@ const messages = defineMessages(
     taskTitlePlaceholder: 'Name this analysis',
     workoutsTitle: 'Linked workouts',
     workoutsEmpty: 'No workouts on this machine yet',
+    availableWorkouts: 'Available', linkedWorkouts: 'Linked', dragHint: 'Drag or click to add and remove',
     templateTitle: 'Template',
     noTemplate: 'No template',
     categoriesTitle: 'Analysis contents',
@@ -160,6 +162,7 @@ const messages = defineMessages(
     taskTitlePlaceholder: 'Ponle nombre a este análisis',
     workoutsTitle: 'Entrenamientos vinculados',
     workoutsEmpty: 'Aún no hay entrenamientos en este equipo',
+    availableWorkouts: 'Disponibles', linkedWorkouts: 'Vinculados', dragHint: 'Arrastra o pulsa para añadir y quitar',
     templateTitle: 'Plantilla',
     noTemplate: 'Sin plantilla',
     categoriesTitle: 'Contenido del análisis',
@@ -218,7 +221,7 @@ const {
   draft, canUndo, taskList, templates, recentWorkouts, busy, lastError, savedNotice,
   loadTaskList, loadTemplates, loadRecentWorkouts, loadTask, resetDraft, saveDraft,
   setTemplateId, setCategoryEnabled, setCategoryDays, setIncludeWorkoutDay, undo,
-  toggleWorkout, setPrompt, setPersonalNote, setTitle, setDetailLevel,
+  setWorkoutSelected, setPrompt, setPersonalNote, setTitle, setDetailLevel,
   setPreciseGps, setMcpShared, addAttachments, removeAttachment,
 } = useAiTaskDraft();
 
@@ -304,6 +307,20 @@ const workoutTitle = (workoutId: string): string => {
 
 /* —— 右栏数据 —— */
 const workoutChoices = computed(() => displayableWorkouts(recentWorkouts.value));
+const linkedWorkouts = computed(() => workoutChoices.value.filter((workout) => draft.value.workout_ids.includes(workout.workout_id)));
+const availableWorkouts = computed(() => workoutChoices.value.filter((workout) => !draft.value.workout_ids.includes(workout.workout_id)));
+const dragStart = (event: DragEvent, type: 'category' | 'workout', id: string) => {
+  event.dataTransfer?.setData(`application/x-zepp-${type}`, id);
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+};
+const dropCategory = (event: DragEvent, enabled: boolean) => {
+  const category = asCategory(event.dataTransfer?.getData('application/x-zepp-category') ?? '');
+  if (category) setCategoryEnabled(category, enabled);
+};
+const dropWorkout = (event: DragEvent, selected: boolean) => {
+  const id = event.dataTransfer?.getData('application/x-zepp-workout');
+  if (id && workoutChoices.value.some((workout) => workout.workout_id === id)) setWorkoutSelected(id, selected);
+};
 
 const templateOptions = computed<SelectMenuOption[]>(() => [
   { value: '', label: t.value.noTemplate },
@@ -327,11 +344,6 @@ const detailLevel = computed({
   get: () => draft.value.detail_level,
   set: (value: string | number) => setDetailLevel(value as AiTaskDetailLevel),
 });
-
-const enabledCategories = computed(() =>
-  AI_TASK_CATEGORY_ORDER.filter(
-    (category) => categoryRangeOf(draft.value.categories, category).enabled,
-  ));
 
 /* 附件视图模型：display_name 是用户文件名——不进模板字段直取，
    这里改名成 name 再渲染。 */
@@ -399,21 +411,23 @@ watch(
       </header>
 
       <div class="composer-layout">
-        <!-- 左列：圆球工作台 + 备用类别列表 -->
+        <!-- 左列：圆环工作台 + 可拖放类别 -->
         <div class="composer-main">
-          <div class="orbit-host surface-card">
+          <div class="orbit-host surface-card" data-no-page-swipe @dragover.prevent @drop.prevent="dropCategory($event, true)">
             <div class="orbit-toolbar">
               <button type="button" class="tool-btn" :disabled="!canUndo" @click="onUndo">
                 <Icon name="refresh" :size="14" />{{ t.undoAction }}
               </button>
               <span class="toolbar-gap" />
-              <button type="button" class="tool-btn" :aria-label="t.zoomOut" @click="onZoom(zoom - 0.1)">
-                <span aria-hidden="true">−</span>
-              </button>
-              <button type="button" class="tool-btn" @click="onZoom(1)">{{ t.resetView }}</button>
-              <button type="button" class="tool-btn" :aria-label="t.zoomIn" @click="onZoom(zoom + 0.1)">
-                <span aria-hidden="true">+</span>
-              </button>
+              <div class="zoom-cluster" role="group" :aria-label="t.resetView">
+                <button type="button" class="tool-btn" :aria-label="t.zoomOut" @click="onZoom(zoom - 0.1)">
+                  <span aria-hidden="true">−</span>
+                </button>
+                <button type="button" class="tool-btn" @click="onZoom(1)">{{ t.resetView }}</button>
+                <button type="button" class="tool-btn" :aria-label="t.zoomIn" @click="onZoom(zoom + 0.1)">
+                  <span aria-hidden="true">+</span>
+                </button>
+              </div>
             </div>
             <OrbitCanvas
               :center="orbitCenter"
@@ -498,14 +512,16 @@ watch(
             </aside>
           </div>
 
-          <!-- 备用入口：类别卡片列表 -->
-          <section class="surface-card pad">
-            <p class="col-title">{{ t.cardFallback }}</p>
+          <!-- 类别既能点选，也能拖进圆环或拖回这里 -->
+          <section class="surface-card pad category-palette" data-no-page-swipe @dragover.prevent @drop.prevent="dropCategory($event, false)">
+            <p class="col-title">{{ t.categoriesTitle }} <small>{{ t.dragHint }}</small></p>
             <div class="cat-cards">
               <div
                 v-for="category in AI_TASK_CATEGORY_ORDER"
                 :key="category"
                 :class="['cat-card', { 'is-on': categoryRangeOf(draft.categories, category).enabled }]"
+                draggable="true"
+                @dragstart="dragStart($event, 'category', category)"
               >
                 <button type="button" class="cat-card-open" @click="activeCategory = category">
                   <Icon :name="AI_TASK_CATEGORY_META[category].icon" :size="16" />
@@ -560,40 +576,39 @@ watch(
             />
 
             <p class="col-title">{{ t.workoutsTitle }}</p>
-            <div v-if="workoutChoices.length" class="workout-list">
-              <label v-for="workout in workoutChoices" :key="workout.workout_id" class="workout-item">
-                <input
-                  type="checkbox"
-                  :checked="draft.workout_ids.includes(workout.workout_id)"
-                  @change="toggleWorkout(workout.workout_id)"
-                />
-                <span class="workout-copy">
-                  <span>{{ workoutDisplayLabel(workout) }}</span>
-                  <span class="workout-sub">
-                    {{ formatDateTime(workout.start_time) }}<template v-if="workout.distance_meters"> · {{ formatDistance(workout.distance_meters) }}</template>
-                  </span>
-                </span>
-              </label>
+            <div v-if="workoutChoices.length" class="workout-zones" data-no-page-swipe>
+              <div class="workout-zone" @dragover.prevent @drop.prevent="dropWorkout($event, true)">
+                <span class="zone-title">{{ t.linkedWorkouts }} · {{ linkedWorkouts.length }}</span>
+                <div class="workout-list">
+                  <button v-for="workout in linkedWorkouts" :key="workout.workout_id" type="button" class="workout-item is-linked"
+                    draggable="true" @dragstart="dragStart($event, 'workout', workout.workout_id)"
+                    @click="setWorkoutSelected(workout.workout_id, false)">
+                    <Icon name="circle-check" :size="16" />
+                    <span class="workout-copy"><span>{{ workoutDisplayLabel(workout) }}</span><span class="workout-sub">{{ formatDateTime(workout.start_time) }}</span></span>
+                  </button>
+                </div>
+              </div>
+              <div class="workout-zone" @dragover.prevent @drop.prevent="dropWorkout($event, false)">
+                <span class="zone-title">{{ t.availableWorkouts }} · {{ availableWorkouts.length }}</span>
+                <div class="workout-list">
+                  <button v-for="workout in availableWorkouts" :key="workout.workout_id" type="button" class="workout-item"
+                    draggable="true" @dragstart="dragStart($event, 'workout', workout.workout_id)"
+                    @click="setWorkoutSelected(workout.workout_id, true)">
+                    <Icon name="plus" :size="16" />
+                    <span class="workout-copy">
+                      <span>{{ workoutDisplayLabel(workout) }}</span>
+                      <span class="workout-sub">
+                        {{ formatDateTime(workout.start_time) }}<template v-if="workout.distance_meters"> · {{ formatDistance(workout.distance_meters) }}</template>
+                      </span>
+                    </span>
+                  </button>
+                </div>
+              </div>
             </div>
             <p v-else class="empty-note">{{ t.workoutsEmpty }}</p>
 
             <p class="col-title">{{ t.templateTitle }}</p>
             <SelectMenu v-model="selectedTemplateId" :options="templateOptions" :aria-label="t.templateTitle" />
-
-            <p class="col-title">{{ t.categoriesTitle }}</p>
-            <div v-if="enabledCategories.length" class="chip-list">
-              <button
-                v-for="category in enabledCategories"
-                :key="category"
-                type="button"
-                class="chip"
-                @click="activeCategory = category"
-              >
-                <Icon :name="AI_TASK_CATEGORY_META[category].icon" :size="13" />
-                {{ categoryLabel(category) }}
-              </button>
-            </div>
-            <p v-else class="empty-note">{{ t.categoriesEmpty }}</p>
 
             <p class="col-title">{{ t.promptTitle }}</p>
             <textarea
@@ -659,21 +674,25 @@ watch(
 .page-head h1 { margin: 0 0 4px; font-size: var(--fs-3xl); }
 .page-intro { margin: 0; color: var(--muted); }
 
-.composer-layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: start; }
+.composer-layout { display: grid; grid-template-columns: minmax(460px, 620px) minmax(360px, 1fr); gap: 16px; align-items: start; max-width: 1480px; margin-inline: auto; }
 .composer-main { display: grid; gap: 16px; min-width: 0; }
 .composer-side { display: grid; gap: 16px; min-width: 0; }
-.surface-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.surface-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 7%, transparent), 0 8px 28px rgba(0, 0, 0, .08); }
 .pad { padding: 16px; }
 
-.orbit-host { position: relative; min-height: 480px; display: flex; flex-direction: column; overflow: hidden; }
-.orbit-toolbar { display: flex; align-items: center; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.orbit-host { position: relative; height: clamp(640px, 74vh, 760px); display: flex; flex-direction: column; overflow: hidden; }
+.orbit-toolbar { display: flex; align-items: center; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--surface-raised) 55%, var(--surface)); }
+.zoom-cluster { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--line-control); border-radius: 12px; background: var(--surface); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 7%, transparent), 0 2px 8px rgba(0,0,0,.08); }
+.zoom-cluster .tool-btn { border-color: transparent; background: transparent; box-shadow: none; }
 .toolbar-gap { flex: 1; }
 .tool-btn {
   display: inline-flex; align-items: center; gap: 5px;
-  padding: 5px 10px; border: 1px solid var(--line-control); border-radius: 8px;
-  background: var(--surface-raised); color: var(--muted); font-size: var(--fs-sm); cursor: pointer;
+  padding: 5px 10px; border: 1px solid var(--line-control); border-radius: 9px;
+  background: color-mix(in srgb, var(--surface-raised) 70%, var(--surface)); color: var(--muted); font-size: var(--fs-sm); cursor: pointer;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 7%, transparent);
 }
-.tool-btn:hover:not(:disabled) { color: var(--ink); border-color: var(--accent); }
+.tool-btn:hover:not(:disabled) { color: var(--ink); border-color: var(--accent); background: var(--surface-hover); }
+.tool-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .tool-btn:disabled { opacity: .45; cursor: not-allowed; }
 
 .cat-panel {
@@ -700,18 +719,23 @@ watch(
   width: 100%; padding: 9px 11px; border: 1px solid var(--line-control); border-radius: var(--radius-sm);
   background: var(--surface-raised); color: var(--ink); font: inherit; font-size: var(--fs-md); resize: vertical;
 }
-.note-input:focus, .prompt-input:focus, .text-input:focus { border-color: var(--accent); outline: none; }
+.note-input:focus, .prompt-input:focus, .text-input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
 
-.cat-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.cat-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 7px; }
 .cat-card {
-  display: flex; align-items: center; gap: 8px; padding: 10px 12px;
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px;
   border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--muted);
+  background: var(--surface-raised); cursor: grab;
 }
 .cat-card.is-on { border-color: color-mix(in srgb, var(--accent) 40%, transparent); color: var(--ink); }
+.cat-card-open { display: flex; flex: 1; min-width: 0; align-items: center; gap: 6px; padding: 2px 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.cat-card-open svg { flex: 0 0 auto; color: var(--accent); }
+.cat-card-open .cat-card-sub { white-space: nowrap; }
 .cat-card-label { flex: 1; min-width: 0; font-size: var(--fs-sm); }
 .cat-card-sub { color: var(--subtle); font-size: var(--fs-xs); }
 
 .col-title { margin: 14px 0 8px; color: var(--muted); font-size: var(--fs-sm); font-weight: 600; }
+.col-title small { margin-left: 6px; color: var(--subtle); font-weight: 400; }
 .col-title:first-child { margin-top: 0; }
 .field-label { display: block; margin: 0 0 6px; color: var(--muted); font-size: var(--fs-sm); font-weight: 600; }
 .field-hint { margin: 4px 0 10px; color: var(--subtle); font-size: var(--fs-xs); }
@@ -723,20 +747,16 @@ watch(
 .task-name { font-size: var(--fs-sm); overflow-wrap: anywhere; }
 .task-sub { color: var(--subtle); font-size: var(--fs-xs); }
 
-.workout-list { display: grid; gap: 4px; max-height: 220px; overflow-y: auto; }
-.workout-item { display: flex; align-items: center; gap: 9px; padding: 7px 8px; border-radius: 8px; cursor: pointer; }
+.workout-zones { display: grid; gap: 8px; }
+.workout-zone { min-height: 64px; padding: 8px; border: 1px dashed var(--line-control); border-radius: var(--radius-sm); background: var(--surface-raised); }
+.zone-title { display: block; margin-bottom: 5px; color: var(--subtle); font-size: var(--fs-xs); }
+.workout-list { display: grid; gap: 4px; max-height: 170px; overflow-y: auto; }
+.workout-item { display: flex; width: 100%; align-items: center; gap: 9px; padding: 7px 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; text-align: left; cursor: grab; }
 .workout-item:hover { background: var(--surface-hover); }
-.workout-item input { accent-color: var(--accent); width: 16px; height: 16px; flex: 0 0 auto; }
+.workout-item.is-linked { border-color: color-mix(in srgb, var(--accent) 35%, transparent); background: var(--accent-soft); }
+.workout-item svg { flex: 0 0 auto; color: var(--accent); }
 .workout-copy { display: grid; min-width: 0; font-size: var(--fs-sm); color: var(--ink); }
 .workout-sub { color: var(--subtle); font-size: var(--fs-xs); }
-
-.chip-list { display: flex; flex-wrap: wrap; gap: 6px; }
-.chip {
-  display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px;
-  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); border-radius: 999px;
-  background: var(--accent-soft); color: var(--ink); font-size: var(--fs-sm); cursor: pointer;
-}
-.chip:hover { border-color: var(--accent); }
 
 .prompt-counter { margin: 4px 0 0; text-align: right; color: var(--subtle); font-size: var(--fs-xs); }
 .attach-list { margin: 0 0 8px; padding: 0; list-style: none; display: grid; gap: 6px; }
@@ -761,7 +781,14 @@ watch(
 .action-note.ok { color: var(--accent); }
 .action-note.bad { color: var(--danger); }
 
-@media (max-width: 1100px) {
+@media (max-width: 940px) {
   .composer-layout { grid-template-columns: 1fr; }
+  .composer-main { width: 100%; max-width: 600px; justify-self: center; }
+  .orbit-host { height: 640px; }
+}
+@media (max-width: 700px) {
+  .orbit-host { height: min(78vh, 620px); min-height: 470px; }
+  .cat-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cat-card { flex-wrap: wrap; }
 }
 </style>

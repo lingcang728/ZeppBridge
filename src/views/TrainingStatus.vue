@@ -521,7 +521,8 @@ watch(dataRevision, () => { void load(); });
 }
 .range-pill:hover { color: var(--ink); }
 .range-pill.is-on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
-.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-4); }
+.card-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); align-items: start; }
+@media (min-width: 1500px) { .card-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 
 .chart-card {
   display: flex;

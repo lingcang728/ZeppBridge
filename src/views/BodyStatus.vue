@@ -985,7 +985,7 @@ watch(dataRevision, () => { void load(); });
 .day-chart { width: 100%; height: 240px; }
 /* 区间边界是手表给的，不是我们算的。不写清楚，它就会被当成又一套自选算法。 */
 .curve-note { margin: 10px 0 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.6; }
-.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-4); }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-4); align-items: start; }
 .group-title { margin: var(--space-6) 0 0; font-size: var(--fs-xl); font-weight: 700; color: var(--ink); }
 .macro-chart { height: 200px; }
 .inline-alert {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import { RouterLink } from 'vue-router';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 import BrandMark from '../BrandMark.vue';
 import Icon, { type IconName } from '../Icon.vue';
 import SelectMenu from '../SelectMenu.vue';
@@ -81,12 +81,85 @@ const props = defineProps<{
   navAriaLabel?: string;
   versionTitle?: string;
 }>();
+const route = useRoute();
+const router = useRouter();
+const nav = ref<HTMLElement | null>(null);
+const thumb = ref({ left: 0, width: 0, visible: false });
+let navObserver: ResizeObserver | null = null;
+let pending: { id: number; x: number; link: HTMLElement } | null = null;
+let dragging: { id: number; x: number; left: number; width: number } | null = null;
+let suppressClick = false;
+
+const navLinks = () => Array.from(nav.value?.querySelectorAll<HTMLElement>('.pill-link') ?? []);
+const measureThumb = () => {
+  if (dragging || !nav.value) return;
+  const link = navLinks().find((item) => item.dataset.to === route.path);
+  if (!link) { thumb.value = { ...thumb.value, visible: false }; return; }
+  const rail = nav.value.getBoundingClientRect();
+  const rect = link.getBoundingClientRect();
+  thumb.value = { left: rect.left - rail.left, width: rect.width, visible: true };
+};
+const onNavDown = (event: PointerEvent) => {
+  const link = (event.target as Element).closest<HTMLElement>('.pill-link');
+  if (!link || event.pointerType !== 'mouse' || event.button !== 0 || !event.isPrimary) return;
+  pending = { id: event.pointerId, x: event.clientX, link };
+  link.setPointerCapture(event.pointerId);
+};
+const onNavMove = (event: PointerEvent) => {
+  if (pending?.id === event.pointerId && Math.abs(event.clientX - pending.x) > 6) {
+    const rail = nav.value?.getBoundingClientRect();
+    if (rail) {
+      const current = navLinks().find((link) => link.dataset.to === route.path) ?? pending.link;
+      const rect = current.getBoundingClientRect();
+      dragging = { id: event.pointerId, x: pending.x, left: rect.left - rail.left, width: rect.width };
+      pending = null;
+      suppressClick = true;
+      thumb.value = { left: dragging.left, width: dragging.width, visible: true };
+    }
+  }
+  if (!dragging || dragging.id !== event.pointerId || !nav.value) return;
+  const links = navLinks();
+  const rail = nav.value.getBoundingClientRect();
+  const max = Math.max(0, Math.max(...links.map((link) => link.getBoundingClientRect().right - rail.left)) - dragging.width);
+  thumb.value = { left: Math.min(max, Math.max(0, dragging.left + event.clientX - dragging.x)), width: dragging.width, visible: true };
+  event.preventDefault();
+};
+const onNavEnd = (event: PointerEvent) => {
+  if (pending?.id === event.pointerId) pending = null;
+  if (!dragging || dragging.id !== event.pointerId) return;
+  const wasCancelled = event.type === 'pointercancel';
+  dragging = null;
+  if (wasCancelled) { measureThumb(); return; }
+  const rail = nav.value?.getBoundingClientRect();
+  if (!rail) return;
+  const center = rail.left + thumb.value.left + thumb.value.width / 2;
+  const target = navLinks().reduce<HTMLElement | null>((best, link) =>
+    !best || Math.abs(link.getBoundingClientRect().left + link.offsetWidth / 2 - center)
+      < Math.abs(best.getBoundingClientRect().left + best.offsetWidth / 2 - center) ? link : best, null);
+  if (target?.dataset.to) void router.push(target.dataset.to).finally(() => nextTick(measureThumb));
+  else measureThumb();
+};
+const onNavClick = (event: MouseEvent) => {
+  if (!suppressClick) return;
+  suppressClick = false;
+  event.preventDefault();
+  event.stopPropagation();
+};
+watch(() => route.path, () => nextTick(measureThumb));
+watch(() => props.items, () => nextTick(measureThumb), { deep: true });
+onMounted(() => {
+  nextTick(measureThumb);
+  if (nav.value) { navObserver = new ResizeObserver(measureThumb); navObserver.observe(nav.value); }
+  document.fonts?.ready.then(measureThumb).catch(() => {});
+  window.addEventListener('resize', measureThumb);
+});
+onBeforeUnmount(() => { navObserver?.disconnect(); window.removeEventListener('resize', measureThumb); });
 
 const {
   appStatus, statusError, syncState, syncProgress,
   isSyncing, canIncrementalSync, runSync, cancelSync,
 } = useSyncController();
-const { themeMode, resolvedTheme, cycleTheme } = useTheme();
+const { themeMode, setTheme } = useTheme();
 
 const accountRecognized = computed(() =>
   ['connected', 'configured'].includes(String(appStatus.value?.connection_state || '')));
@@ -137,18 +210,12 @@ const onSyncClick = () => {
   }
 };
 
-const themeIcon = computed<IconName>(() => {
-  if (themeMode.value === 'system') return 'monitor';
-  return resolvedTheme.value === 'dark' ? 'moon' : 'sun';
-});
-const themeLabel = computed(() => {
-  const names: Record<ThemeMode, string> = {
-    light: t.value.themeLight,
-    dark: t.value.themeDark,
-    system: t.value.themeSystem,
-  };
-  return `${t.value.themeTitle} · ${names[themeMode.value]}`;
-});
+const themeOptions = computed<{ value: ThemeMode; label: string; icon: IconName }[]>(() => [
+  { value: 'system', label: t.value.themeSystem, icon: 'monitor' },
+  { value: 'dark', label: t.value.themeDark, icon: 'moon' },
+  { value: 'light', label: t.value.themeLight, icon: 'sun' },
+]);
+const onThemeChange = (value: string | number) => setTheme(value as ThemeMode);
 
 /* 语言列表跟着 LOCALES 注册表走——S6 扩到十种语言时这里自动变长。 */
 const localeOptions = computed(() =>
@@ -163,11 +230,16 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
       <span class="wordmark">ZeppBridge&nbsp;<b>3</b></span>
     </RouterLink>
 
-    <nav class="pill-nav" :aria-label="navAriaLabel || t.mainNav">
+    <nav ref="nav" class="pill-nav" :class="{ 'is-dragging': dragging }" :aria-label="navAriaLabel || t.mainNav"
+      @pointerdown="onNavDown" @pointermove="onNavMove" @pointerup="onNavEnd" @pointercancel="onNavEnd"
+      @click.capture="onNavClick" @dragstart.prevent>
+      <span class="pill-thumb" aria-hidden="true" :style="{ transform: `translateX(${thumb.left}px)`, width: `${thumb.width}px`, opacity: thumb.visible ? 1 : 0 }" />
       <RouterLink
         v-for="item in props.items"
         :key="item.to"
         :to="item.to"
+        :data-to="item.to"
+        draggable="false"
         class="pill-link"
         active-class="is-active"
         exact-active-class="is-active"
@@ -189,21 +261,15 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
         <Icon v-if="isSyncing" name="x" :size="13" class="sync-cancel" />
       </button>
 
-      <button
-        class="icon-btn"
-        type="button"
-        :title="themeLabel"
-        :aria-label="themeLabel"
-        @click="cycleTheme"
-      >
-        <Icon :name="themeIcon" :size="17" />
-      </button>
+      <SelectMenu class="theme-menu" :model-value="themeMode" :options="themeOptions"
+        :aria-label="t.themeTitle" :menu-min-width="156" @update:model-value="onThemeChange" />
 
       <SelectMenu
         class="locale-menu"
         :model-value="locale"
         :options="localeOptions"
         :aria-label="t.localeLabel"
+        :menu-min-width="224"
         @update:model-value="onLocaleChange"
       />
     </div>
@@ -254,8 +320,14 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--surface);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 10%, transparent), 0 5px 18px rgba(0, 0, 0, .14);
+  user-select: none;
 }
+.pill-thumb { position: absolute; left: 0; top: 3px; bottom: 3px; border-radius: 999px; background: var(--accent); box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 2px 8px color-mix(in srgb, var(--accent) 22%, transparent); transition: transform 340ms cubic-bezier(.18,1.35,.3,1), width 280ms cubic-bezier(.2,.9,.3,1); pointer-events: none; }
+.pill-nav.is-dragging .pill-thumb { transition: none; }
 .pill-link {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   min-height: 32px;
   align-items: center;
@@ -265,18 +337,20 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
   font-size: var(--fs-sm);
   text-decoration: none;
   white-space: nowrap;
-  transition: color 150ms ease, background-color 150ms ease;
+  transition: color 150ms ease;
+  cursor: grab;
 }
-.pill-link:hover { color: var(--ink); background: var(--surface-hover); }
+.pill-link:hover { color: var(--ink); }
+.pill-nav.is-dragging .pill-link { cursor: grabbing; }
 .pill-link.is-active {
   color: var(--accent-ink);
-  background: var(--accent);
   font-weight: 600;
 }
+@media (prefers-reduced-motion: reduce) { .pill-thumb { transition: none; } }
 
 .topbar-actions {
   display: flex;
-  min-width: 0;
+  flex: 0 0 auto;
   align-items: center;
   gap: 10px;
 }
@@ -318,28 +392,22 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
 .sync-text { font-variant-numeric: tabular-nums; max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
 .sync-cancel { color: var(--subtle); }
 
-.icon-btn {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: var(--surface);
-  color: var(--muted);
-  cursor: pointer;
-}
-.icon-btn:hover { border-color: var(--accent); color: var(--accent); }
-
-.locale-menu :deep(.select-trigger) {
+.theme-menu { width: 136px; }
+.locale-menu { width: 100px; }
+.theme-menu :deep(.select-trigger), .locale-menu :deep(.select-trigger) {
   min-height: 34px;
   border-radius: 999px;
   font-size: var(--fs-sm);
 }
+.theme-menu :deep(.select-trigger) { padding-inline: 10px; }
+.theme-menu :deep(.select-value), .locale-menu :deep(.select-value) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* 窄屏降级：先让胶囊回到文档流避免和按钮组重叠，再小到手机上藏掉
    （底部 tabbar 已经覆盖同一组导航）。语言选择在 520px 以下也让位给
    设置页里的同一个开关。 */
+@media (max-width: 1100px) {
+  .brand .wordmark { display: none; }
+}
 @media (max-width: 980px) {
   .pill-nav { position: static; transform: none; }
 }
@@ -347,9 +415,17 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
   .app-topbar { height: 56px; padding: 0 14px; gap: 10px; }
   .pill-nav { display: none; }
   .sync-text { max-width: 92px; }
+  .theme-menu :deep(.select-icon) { display: none; }
 }
 @media (max-width: 520px) {
-  .locale-menu { display: none; }
+  .locale-menu { width: 100px; }
+  .theme-menu { width: 110px; }
+  .topbar-actions { gap: 5px; }
+  .sync-text { display: none; }
+  .sync-pill { padding-inline: 10px; }
   .wordmark { font-size: var(--fs-md); }
+}
+@media (max-width: 380px) {
+  .brand { display: none; }
 }
 </style>
