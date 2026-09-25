@@ -1888,6 +1888,8 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       overviewTitle: 'Overzicht',
       unrecognizedSuffix: ' heeft nog geen herkend model',
       unrecognizedCta: 'Wijs het met de hand aan',
+      desktopOnly:
+        'Gebruik de desktop-app. Deze browserpreview leest geen accountgegevens.',
       deviceErrorPrefix: 'Apparaatherkenning: ',
       loadingAria: 'Het overzicht wordt geladen',
       loadFailedTitle: 'Het gegevensoverzicht kon niet worden gelezen',

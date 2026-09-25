@@ -1977,6 +1977,8 @@ export default {
       overviewTitle: 'Обзор',
       unrecognizedSuffix: ' — модель ещё не определена',
       unrecognizedCta: 'Укажите её вручную',
+      desktopOnly:
+        'Используйте настольное приложение. Этот предпросмотр в браузере не читает данные аккаунта.',
       deviceErrorPrefix: 'Определение устройств: ',
       loadingAria: 'Загружается обзор',
       loadFailedTitle: 'Не удалось прочитать обзор данных',

@@ -1539,6 +1539,7 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       loadMedium: 'modérée',
       loadHigh: 'élevée',
       loadVeryHigh: 'très élevée',
+      desktopOnly: 'Utilisez l’application de bureau. Cet aperçu navigateur ne lit aucune donnée de compte.',
       deviceErrorPrefix: 'Identification des appareils : ',
       unrecognizedSuffix: ' n’a pas encore de modèle identifié',
       unrecognizedCta: 'Le désigner à la main',

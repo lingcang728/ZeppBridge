@@ -184,6 +184,7 @@ const dayError = ref<string | null>(null);
 const trendsError = ref<string | null>(null);
 const extremesError = ref<string | null>(null);
 const loadSeq = createLoadSeq();
+const dayLoadSeq = createLoadSeq();
 
 const points = computed(() => dayPoints.value
   .map((point) => ({ ts: new Date(point.timestamp).getTime(), value: point.value }))
@@ -280,17 +281,24 @@ const trendCards = computed(() => [
 const load = async (opts?: { trendsOnly?: boolean }) => {
   const seq = loadSeq.next();
   const trendsOnly = Boolean(opts?.trendsOnly);
-  if (!trendsOnly) loading.value = true;
+  // trendsOnly's `day` slot resolves synchronously (Promise.resolve below),
+  // so it can settle before an in-flight full load's real network fetch
+  // does. The day/loading state must only ever be owned and cleared by a
+  // full load, tracked on its own sequence, or a fast trends-only refresh
+  // clears `loading` out from under the real fetch and the 24h chart goes
+  // blank until the next remount.
+  const daySeq = trendsOnly ? null : dayLoadSeq.next();
+  if (daySeq !== null) loading.value = true;
   error.value = null;
-  if (!trendsOnly) dayError.value = null;
+  if (daySeq !== null) dayError.value = null;
   trendsError.value = null;
   extremesError.value = null;
   if (!isDesktop()) {
     if (!loadSeq.isCurrent(seq)) return;
     series.value = {};
-    if (!trendsOnly) dayPoints.value = [];
+    if (daySeq !== null) dayPoints.value = [];
     dailyExtremes.value = [];
-    loading.value = false;
+    if (daySeq !== null) loading.value = false;
     error.value = t.value.desktopOnly;
     return;
   }
@@ -299,17 +307,22 @@ const load = async (opts?: { trendsOnly?: boolean }) => {
     backend.getMetricSeries([...TREND_METRICS], rangeDays.value),
     backend.getDailyHeartRateExtremes(rangeDays.value),
   ]);
-  if (!loadSeq.isCurrent(seq)) return;
-  if (!trendsOnly) {
+  const dayCommitted = daySeq !== null && dayLoadSeq.isCurrent(daySeq);
+  if (dayCommitted) {
     dayPoints.value = day.status === 'fulfilled' ? day.value : [];
     dayError.value = day.status === 'rejected' ? toUserMessage(day.reason, t.value.dayFailed) : null;
+    loading.value = false;
   }
-  series.value = trends.status === 'fulfilled' ? indexSeries(trends.value) : {};
-  dailyExtremes.value = extremes.status === 'fulfilled' ? extremes.value : [];
-  trendsError.value = trends.status === 'rejected' ? toUserMessage(trends.reason, t.value.trendsFailed) : null;
-  extremesError.value = extremes.status === 'rejected' ? toUserMessage(extremes.reason, t.value.dailyMaxFailed) : null;
-  error.value = dayError.value || trendsError.value || extremesError.value;
-  loading.value = false;
+  const trendsCommitted = loadSeq.isCurrent(seq);
+  if (trendsCommitted) {
+    series.value = trends.status === 'fulfilled' ? indexSeries(trends.value) : {};
+    dailyExtremes.value = extremes.status === 'fulfilled' ? extremes.value : [];
+    trendsError.value = trends.status === 'rejected' ? toUserMessage(trends.reason, t.value.trendsFailed) : null;
+    extremesError.value = extremes.status === 'rejected' ? toUserMessage(extremes.reason, t.value.dailyMaxFailed) : null;
+  }
+  if (dayCommitted || trendsCommitted) {
+    error.value = dayError.value || trendsError.value || extremesError.value;
+  }
 };
 
 /* 样本稀疏的那一天画成空心点。用不同的标记而不是干脆不画：那一天确实有

@@ -959,17 +959,24 @@ pub fn normalize_region_host(raw: &str) -> Result<String> {
         .host_str()
         .ok_or_else(|| ZeppBridgeError::AuthError("区域主机地址无效".to_string()))?
         .to_ascii_lowercase();
-    let host = if host.contains(':') {
-        format!("[{host}]")
-    } else {
-        host
-    };
-    let port = parsed
-        .port()
-        .filter(|port| *port != 443)
-        .map(|port| format!(":{port}"))
-        .unwrap_or_default();
-    Ok(format!("https://{host}{port}"))
+    // 这里存进凭据文件的地址，最终要喂给 `connectors::zepp::validate_region_host`
+    // 去真正建连接；那边不允许端口、只认 `api-mifit*.zepp.com` /
+    // `api-mifit*.huami.com`。这里如果比那边松，会出现「保存登录时通过、
+    // 状态显示已连接，但每次同步都在连接层被拒绝」的死结，而且只能靠清除
+    // 凭据重新登录才能摆脱。两处规则必须一致。
+    if parsed.port().is_some() {
+        return Err(ZeppBridgeError::AuthError(
+            "区域主机不允许携带端口".to_string(),
+        ));
+    }
+    let valid_zepp = host.starts_with("api-mifit") && host.ends_with(".zepp.com");
+    let valid_huami = host.starts_with("api-mifit") && host.ends_with(".huami.com");
+    if !(valid_zepp || valid_huami) {
+        return Err(ZeppBridgeError::AuthError(
+            "区域主机只能是 api-mifit*.zepp.com 或 api-mifit*.huami.com".to_string(),
+        ));
+    }
+    Ok(format!("https://{host}"))
 }
 
 pub fn mask_token(token: &str) -> String {

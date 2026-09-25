@@ -2113,6 +2113,8 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       bodySparkLabel: 'Bereitschaft der letzten 7 Tage',
       bodyThin: 'Zu wenig Einträge in den letzten 7 Tagen für einen Trend',
       bodyTitle: 'Körperstatus',
+      desktopOnly:
+        'Nutze die Desktop-App. Diese Browser-Vorschau liest keine Kontodaten.',
       deviceErrorPrefix: 'Geräteerkennung: ',
       factLoad: 'Belastung',
       factRecovery: 'Bereitschaft',
