@@ -22,6 +22,7 @@ import { defineMessages, useMessages } from '../i18n';
 import { failedChunkText } from '../lib/failedChunkText';
 import { storageEstimateText, storageStopReasonText } from '../lib/storageEstimateText';
 import { localDateString } from '../lib/format';
+import { createLoadSeq } from '../lib/loadSeq';
 
 const messages = defineMessages(
   {
@@ -348,13 +349,23 @@ const formatBytes = (bytes: number): string => {
 const measuredStreams = computed(() => estimate.value?.streams.filter((item) => item.measured) ?? []);
 const unmeasuredStreams = computed(() => estimate.value?.streams.filter((item) => !item.measured) ?? []);
 
+const estimateLoadSeq = createLoadSeq();
+
 const loadEstimate = async () => {
   if (!isDesktop() || !requestedDays.value) return;
+  const seq = estimateLoadSeq.next();
+  const days = requestedDays.value;
+  let result: StorageEstimate | null;
   try {
-    estimate.value = await backend.getStorageEstimate(requestedDays.value);
+    result = await backend.getStorageEstimate(days);
   } catch {
-    estimate.value = null;
+    result = null;
   }
+  // `requestedDays` can change again while this request is in flight; an
+  // out-of-order response must not overwrite the estimate for whatever
+  // range is currently selected with a stale one from an earlier range.
+  if (!estimateLoadSeq.isCurrent(seq)) return;
+  estimate.value = result;
 };
 
 const loadLedger = async () => {

@@ -236,8 +236,14 @@ impl LocalApiController {
         }
         // 存不下就说出来。这个开关的意义是「下次启动还开着」，存不下时它
         // 只是这一次进程里有效，而用户有权知道这件事。
+        //
+        // 但如果 `spawn_locked` 已经报过一个更具体的故障（比如端口被占），
+        // 这里不能顺手把它覆盖掉：两个都失败时，用户需要看到的是「端口被
+        // 占用」这个真正原因，而不是碰巧后发生的磁盘写入失败。
         if let Err(error) = write_enabled_flag(&self.data_dir, enabled) {
-            inner.set_fault("err.local_api.state_write_failed", error);
+            if inner.error_code.is_none() {
+                inner.set_fault("err.local_api.state_write_failed", error);
+            }
         }
         self.status_locked(&inner)
     }

@@ -1997,6 +1997,8 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       collapseAlways: 'Nicht mehr anzeigen',
       collapseHero: 'Einführung einklappen',
       collapseOnce: 'Nur dieses Mal',
+      desktopOnly:
+        'Nutze die Desktop-App. Diese Browser-Vorschau liest keine Kontodaten.',
       deviceErrorPrefix: 'Geräteerkennung: ',
       durationHours: (hours: number, minutes: number) => `${hours} Std. ${minutes} Min.`,
       durationMinutes: (minutes: number) => `${minutes} Min.`,

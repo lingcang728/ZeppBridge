@@ -788,7 +788,10 @@ pub fn decode_workout_detail(
         // 上一个被留下的读数（秒, 米）。`currentDistance` 是累计值，必须单调
         // 不减：回退是坏点；相对上一个有效读数每秒超过 200 m 的跳变同样是
         // 坏点——真实遇到过一次跳变在同一秒里切出两万个 0 时长分段。
-        let mut previous: Option<(i64, f64)> = None;
+        //
+        // 起点按「运动开始时距离为 0」处理，而不是留空：否则第一条读数完全
+        // 绕过这个检查，一个坏掉的首个读数就能让 splits 直接爆炸。
+        let mut previous: Option<(i64, f64)> = Some((from, 0.0));
         for (delta, centimetres) in &distance_pairs {
             cursor = cursor.saturating_add((*delta).max(0));
             let meters = f64::from(*centimetres) / 100.0;
@@ -1172,6 +1175,13 @@ fn timed_fill<T: Copy>(
     let mut value = init;
     let limit = to.saturating_add(1);
     for (index, (delta, sample)) in elements.iter().enumerate() {
+        if *delta < 0 {
+            // 负的时间跨度不可能合法——不管累计值是不是走 `update`（比如
+            // 心率、步数），都不能让它悄悄并进去，否则后面所有点的基数
+            // 都会被这一条坏点带偏，而且毫无痕迹。`delta == 0`（同一秒的
+            // 补充读数）是正常情况，仍然照常并入。
+            continue;
+        }
         value = update(value, sample);
         let start = if index == 0 { 0 } else { 1 };
         if *delta >= start {
