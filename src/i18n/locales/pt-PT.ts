@@ -1748,6 +1748,8 @@ export default {
       cloudAi: 'IA na nuvem',
       unrecognizedSuffix: ' ainda não tem modelo identificado',
       unrecognizedCta: 'Escolher à mão',
+      desktopOnly:
+        'Usa a aplicação de desktop. Esta pré-visualização no browser não lê dados da conta.',
       deviceErrorPrefix: 'Identificação de dispositivos: ',
       loadingAria: 'A carregar a visão geral',
       loadFailedTitle: 'Não foi possível ler a visão geral de dados',

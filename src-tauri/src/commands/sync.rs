@@ -143,7 +143,12 @@ pub async fn start_history_backfill(
     {
         Ok(ledger) => Ok(ledger),
         Err(error) if error.is_busy() => Err(deferred_app_error(busy_deferred_kind())),
-        Err(error) => Err(error.into()),
+        Err(error) => {
+            if error.needs_reauth() {
+                *state.auth_state.write().await = "needs_reauth".to_string();
+            }
+            Err(error.into())
+        }
     }
 }
 

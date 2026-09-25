@@ -1300,7 +1300,18 @@ impl DataFetcher {
                             slice.start_day(),
                             slice.end_day()
                         ));
-                        last_error = Some(error);
+                        // A stream this account simply doesn't have (404 /
+                        // Unavailable) is an expected fact about the account,
+                        // not evidence that the *other*, unrelated streams in
+                        // this window are incomplete. Only a genuine request
+                        // failure should hold the whole window back from
+                        // being marked persisted — otherwise an account
+                        // missing just one optional stream (e.g. no
+                        // lactate-threshold readings) never finishes
+                        // backfilling any wellness stream.
+                        if !error.is_unavailable() {
+                            last_error = Some(error);
+                        }
                     }
                 }
             }

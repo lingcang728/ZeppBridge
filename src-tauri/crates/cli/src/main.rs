@@ -231,6 +231,28 @@ impl Flags {
         }
         Ok(())
     }
+
+    /// 重复的开关一律报错，而不是悄悄用第一个出现的那个。
+    ///
+    /// `--mode incremental --mode history` 静默选中 `incremental`：脚本拼接
+    /// 命令行、在末尾追加覆盖参数时，很容易以为后面那个才是生效的。
+    fn reject_duplicates(&self) -> Result<(), String> {
+        let mut seen = BTreeSet::new();
+        for (name, _) in &self.values {
+            if !seen.insert(name.as_str()) {
+                return Err(format!("--{name} must not be repeated"));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// `--json` 的值要在参数真正解析成功之前就知道：解析或校验本身失败时，
+/// 错误也要按调用方要的格式吐出来（`--json` 一旦失效，机器可读输出的契约
+/// 就没有意义了），不能因为解析失败就悄悄退回人读文本。
+fn scan_json_flag(args: &[String]) -> bool {
+    args.iter()
+        .any(|arg| arg == "--json" || arg.starts_with("--json="))
 }
 
 /* ------------------------------ 输出 ------------------------------ */
@@ -320,6 +342,29 @@ fn user_text(error: &ZeppBridgeError) -> String {
         ZeppBridgeError::Headless(problem) => problem.english(),
         other => other.user_message(),
     }
+}
+
+/// `ExportScope::validated()` 活在 core 里，给 GUI 用，按现有约定回中文——
+/// 界面按 `code()` 取本地化文案，中文原文只是取不到时的兜底（参见它自己的
+/// 文档注释）。但 CLI 没有那层，直接把它塞进 usage 错误里，就会在这份英文
+/// 命令行输出里冒出中文，和 `user_text()` 顶上要解决的是同一个问题。
+///
+/// 消息集合比 `ZeppBridgeError` 的变体小得多，这里直接按原文匹配；认不出
+/// 的（原文改了、或者以后新增了分支）照样原样透传，不瞎猜，不递归。
+fn translate_export_scope_error(message: String) -> String {
+    match message.as_str() {
+        "导出开始日期无效" => "Invalid export start date",
+        "导出结束日期无效" => "Invalid export end date",
+        "导出结束日期不能早于开始日期" => {
+            "Export end date cannot be before the start date"
+        }
+        "单次导出范围不能超过 366 天" => {
+            "A single export cannot span more than 366 days"
+        }
+        "workout id 不能为空" => "Workout id cannot be empty",
+        _ => return message,
+    }
+    .to_string()
 }
 
 /// 退出码对应的机器可读错误类型，供 `--json` 输出使用。
@@ -602,14 +647,17 @@ fn open_writable() -> Result<(std::path::PathBuf, Database), (u8, String)> {
 /* ---------------------------- reprocess ---------------------------- */
 
 fn cmd_reprocess(args: &[String]) -> u8 {
+    let json_mode = scan_json_flag(args);
     let flags = match Flags::parse(args) {
         Ok(flags) => flags,
-        Err(message) => return fail(false, EXIT_USAGE, "usage", &message),
+        Err(message) => return fail(json_mode, EXIT_USAGE, "usage", &message),
     };
     if let Err(message) = flags.reject_unknown(&["json", "all"]) {
-        return fail(false, EXIT_USAGE, "usage", &message);
+        return fail(json_mode, EXIT_USAGE, "usage", &message);
     }
-    let json_mode = flags.has("json");
+    if let Err(message) = flags.reject_duplicates() {
+        return fail(json_mode, EXIT_USAGE, "usage", &message);
+    }
     let force_all = flags.has("all");
 
     let (dir, db) = match open_writable() {
@@ -699,14 +747,17 @@ fn cmd_reprocess(args: &[String]) -> u8 {
 /* ------------------------------ status ------------------------------ */
 
 fn cmd_status(args: &[String]) -> u8 {
+    let json_mode = scan_json_flag(args);
     let flags = match Flags::parse(args) {
         Ok(flags) => flags,
-        Err(message) => return fail(false, EXIT_USAGE, "usage", &message),
+        Err(message) => return fail(json_mode, EXIT_USAGE, "usage", &message),
     };
     if let Err(message) = flags.reject_unknown(&["json"]) {
-        return fail(false, EXIT_USAGE, "usage", &message);
+        return fail(json_mode, EXIT_USAGE, "usage", &message);
     }
-    let json_mode = flags.has("json");
+    if let Err(message) = flags.reject_duplicates() {
+        return fail(json_mode, EXIT_USAGE, "usage", &message);
+    }
 
     let dir = match data_dir() {
         Ok(dir) => dir,
@@ -822,14 +873,17 @@ fn cmd_status(args: &[String]) -> u8 {
 /* ------------------------------ sync ------------------------------ */
 
 fn cmd_sync(args: &[String]) -> u8 {
+    let json_mode = scan_json_flag(args);
     let flags = match Flags::parse(args) {
         Ok(flags) => flags,
-        Err(message) => return fail(false, EXIT_USAGE, "usage", &message),
+        Err(message) => return fail(json_mode, EXIT_USAGE, "usage", &message),
     };
     if let Err(message) = flags.reject_unknown(&["json", "mode", "days", "no-reprocess"]) {
-        return fail(false, EXIT_USAGE, "usage", &message);
+        return fail(json_mode, EXIT_USAGE, "usage", &message);
     }
-    let json_mode = flags.has("json");
+    if let Err(message) = flags.reject_duplicates() {
+        return fail(json_mode, EXIT_USAGE, "usage", &message);
+    }
     let mode = flags.get("mode").unwrap_or("incremental");
     if !matches!(mode, "incremental" | "initial" | "history") {
         return fail(
@@ -1073,7 +1127,8 @@ fn parse_export_args(args: &[String]) -> Result<ExportOptions, String> {
             return Err("An export range is required: --from/--to or --workout".into())
         }
     }
-    .validated()?;
+    .validated()
+    .map_err(translate_export_scope_error)?;
 
     let types: Vec<String> = flags
         .get("types")
@@ -1125,9 +1180,7 @@ fn parse_export_args(args: &[String]) -> Result<ExportOptions, String> {
 
 fn cmd_export(args: &[String]) -> u8 {
     // 解析也可能失败，所以不能等 Flags 构造成功才决定错误的输出格式。
-    let json_mode = args
-        .iter()
-        .any(|arg| arg == "--json" || arg.starts_with("--json="));
+    let json_mode = scan_json_flag(args);
     let options = match parse_export_args(args) {
         Ok(options) => options,
         Err(message) => return fail(json_mode, EXIT_USAGE, "usage", &message),
