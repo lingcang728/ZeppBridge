@@ -14,6 +14,7 @@ describe('navigation gestures', () => {
     expect(navigationBranch('/ai')).toBe('/ai');
     expect(navigationBranch('/health-check')).toBe('/settings');
     expect(navigationBranch('/devices/2')).toBe('/settings');
+    expect(navigationBranch('/settings/archive')).toBe('/settings');
   });
   it('interpolates width between unequal labels and contains both edges', () => {
     expect(dragThumb(stops, 84).width).toBeCloseTo(90);

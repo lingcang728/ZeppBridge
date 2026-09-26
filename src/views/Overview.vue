@@ -159,7 +159,7 @@ const unrecognizedDevices = computed(() => deviceModels.value
   .map((model) => ({
     key: model.deviceKey || model.canonicalName,
     name: model.profile.display_name?.trim() || model.canonicalName,
-    to: model.deviceKey ? `/devices/${encodeURIComponent(model.deviceKey)}` : '/settings',
+    to: model.deviceKey ? `/devices/${encodeURIComponent(model.deviceKey)}` : '/settings/account',
   })));
 
 const stepsToday = computed(() => isFiniteNumber(overview.value?.steps_today) ? overview.value.steps_today : null);

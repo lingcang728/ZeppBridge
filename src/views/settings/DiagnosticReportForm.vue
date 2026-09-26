@@ -32,6 +32,7 @@ const form = props.form;
     <span>{{ t.reportNote }}<em>{{ t.reportNoteHint }}</em></span>
     <textarea
       v-model="form.note"
+      class="mat-field"
       rows="3"
       :maxlength="DIAGNOSTIC_NOTE_MAX"
       :placeholder="t.reportNotePlaceholder"

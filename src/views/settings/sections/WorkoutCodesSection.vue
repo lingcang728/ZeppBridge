@@ -3,8 +3,10 @@ import { onMounted } from 'vue';
 import { useUnknownCodes } from '../../../composables/settings/useUnknownCodes';
 import { useMessages } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
+import { deckMessages } from '../deck.i18n';
 
 const t = useMessages(settingsMessages);
+const d = useMessages(deckMessages);
 const {
   unknownCodes,
   codeDrafts,
@@ -22,12 +24,12 @@ onMounted(() => { void loadCorrections(); });
 </script>
 
 <template>
-  <section v-if="unknownCodes.length" class="settings-card" aria-labelledby="codes-title">
-    <div class="section-heading-row">
-      <h2 id="codes-title">{{ t.codesTitle }}</h2>
-      <span v-if="unnamedCodeCount" class="capability-checked">{{ t.codesUnnamed(unnamedCodeCount) }}</span>
+  <section v-if="unknownCodes.length" class="s-section" aria-labelledby="codes-title">
+    <div class="s-section-head">
+      <h3 id="codes-title">{{ d.secCodes }}</h3>
+      <span v-if="unnamedCodeCount" class="s-meta">{{ t.codesUnnamed(unnamedCodeCount) }}</span>
     </div>
-    <p class="section-description">{{ t.codesIntro }}</p>
+    <p class="s-note">{{ t.codesIntro }}</p>
     <div class="code-list">
       <div v-for="entry in unknownCodes" :key="entry.zeppType" class="code-row">
         <div class="code-head">
@@ -42,6 +44,7 @@ onMounted(() => { void loadCorrections(); });
         <div class="code-input-row">
           <input
             v-model="codeDrafts[entry.zeppType]"
+            class="mat-field"
             type="text"
             maxlength="24"
             :aria-label="t.codeInputAria(entry.zeppType)"
@@ -70,16 +73,16 @@ onMounted(() => { void loadCorrections(); });
     </div>
     <p v-if="codeError" class="api-error" role="alert">{{ codeError }}</p>
     <p v-else-if="codeMessage" class="hint-line ok">{{ codeMessage }}</p>
-    <p class="retain-note">{{ t.codeFootnote }}</p>
+    <p class="s-note">{{ t.codeFootnote }}</p>
   </section>
 </template>
 
 <style scoped src="../settings-base.css"></style>
 <style scoped>
-.code-list { display: grid; gap: 10px; margin-top: 12px; }
-.code-row { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-raised); }
+.code-list { display: grid; gap: 10px; }
+.code-row { display: grid; gap: 10px; padding: 12px 14px; border: 1px solid var(--mat-line); border-radius: var(--radius-md); background: color-mix(in srgb, var(--ink) 2.5%, transparent); }
 .code-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; }
-.code-badge { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); font-family: var(--font-mono); font-size: var(--fs-xs); }
+.code-badge { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); color: var(--muted); font-family: var(--font-mono); font-size: var(--fs-xs); }
 .code-meta { display: grid; gap: 2px; }
 .code-meta strong { color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
 .code-meta span { color: var(--subtle); font-size: var(--fs-xs); }

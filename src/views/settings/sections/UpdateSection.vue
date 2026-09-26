@@ -5,8 +5,10 @@ import ModalDialog from '../../../components/ModalDialog.vue';
 import { checkForDesktopUpdate, downloadAndInstallDesktopUpdate, updateState } from '../../../services/updateService';
 import { useMessages } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
+import { deckMessages } from '../deck.i18n';
 
 const t = useMessages(settingsMessages);
+const d = useMessages(deckMessages);
 const BUILD_STAMP = __BUILD_STAMP__;
 const updateNotesOpen = ref(false);
 
@@ -55,44 +57,46 @@ const installUpdate = async () => {
 </script>
 
 <template>
-  <section class="settings-card update-card" aria-labelledby="update-title">
-    <div class="update-head">
-      <div>
-        <h2 id="update-title">{{ t.updateTitle }}</h2>
-        <p>{{ t.updateSub }}</p>
+  <section class="s-section update-card" aria-labelledby="update-title">
+    <div class="s-section-head"><h3 id="update-title">{{ d.secUpdate }}</h3></div>
+    <div class="s-list">
+      <div :class="['s-row', 'update-state', `is-${updateState.status}`]" role="status" aria-live="polite">
+        <div class="s-row-main">
+          <span class="s-row-title">{{ updateStatusLabel }}</span>
+          <span v-if="updateState.status === 'failed'" class="s-row-sub">{{ updateState.error }}</span>
+          <span v-else-if="updateState.status === 'unmanaged'" class="s-row-sub">{{ t.updateUnmanagedHint(updateState.currentVersion || t.updateVersionLoading) }}</span>
+          <span v-else-if="updateState.status === 'available'" class="s-row-sub">{{ t.updateCurrent(updateState.currentVersion) }}<template v-if="updateState.sizeBytes"> · {{ formatUpdateBytes(updateState.sizeBytes) }}</template></span>
+          <span v-else class="s-row-sub">{{ t.updateVersion(updateState.currentVersion || t.updateVersionLoading) }}</span>
+          <!-- 同一个版本号会构建很多次；报问题时把这一行带上，就不用猜手上是哪个包了。 -->
+          <span class="s-row-sub build-stamp">{{ t.buildStamp(BUILD_STAMP) }}</span>
+        </div>
+        <!-- 更新由包管理器管的渠道上不摆这个按钮：按下去只能得到一句
+             「这里不管更新」，不如一开始就别给。 -->
+        <div class="s-row-control">
+          <button
+            v-if="updateState.status !== 'unmanaged'"
+            class="button secondary"
+            type="button"
+            :disabled="updateBusy"
+            @click="checkForDesktopUpdate(true)"
+          >
+            <Icon name="sync" :size="14" :class="{ spinning: updateState.status === 'checking' }" />
+            {{ updateState.status === 'checking' ? t.updateChecking : t.updateCheck }}
+          </button>
+        </div>
       </div>
-      <!-- 更新由包管理器管的渠道上不摆这个按钮：按下去只能得到一句
-           「这里不管更新」，不如一开始就别给。 -->
-      <button
-        v-if="updateState.status !== 'unmanaged'"
-        class="button secondary"
-        type="button"
-        :disabled="updateBusy"
-        @click="checkForDesktopUpdate(true)"
-      >
-        <Icon name="sync" :size="14" :class="{ spinning: updateState.status === 'checking' }" />
-        {{ updateState.status === 'checking' ? t.updateChecking : t.updateCheck }}
-      </button>
-    </div>
-    <div :class="['update-state', `is-${updateState.status}`]" role="status" aria-live="polite">
-      <i aria-hidden="true"></i>
-      <div>
-        <strong>{{ updateStatusLabel }}</strong>
-        <p v-if="updateState.status === 'failed'">{{ updateState.error }}</p>
-        <p v-else-if="updateState.status === 'unmanaged'">{{ t.updateUnmanagedHint(updateState.currentVersion || t.updateVersionLoading) }}</p>
-        <p v-else-if="updateState.status === 'available'">{{ t.updateCurrent(updateState.currentVersion) }}<template v-if="updateState.sizeBytes"> · {{ formatUpdateBytes(updateState.sizeBytes) }}</template></p>
-        <p v-else>{{ t.updateVersion(updateState.currentVersion || t.updateVersionLoading) }}</p>
-        <!-- 同一个版本号会构建很多次；报问题时把这一行带上，就不用猜手上是哪个包了。 -->
-        <p class="build-stamp">{{ t.buildStamp(BUILD_STAMP) }}</p>
+      <div v-if="updateState.status === 'downloading' && updateProgress !== null" class="s-row">
+        <progress :value="updateProgress" max="100">{{ updateProgress }}%</progress>
       </div>
-    </div>
-    <progress v-if="updateState.status === 'downloading' && updateProgress !== null" :value="updateProgress" max="100">{{ updateProgress }}%</progress>
-    <div v-if="updateState.status === 'available'" class="update-release">
-      <div>
-        <strong>ZeppBridge {{ updateState.version }}</strong>
-        <p class="release-teaser">{{ releaseTeaser }}</p>
+      <div v-if="updateState.status === 'available'" class="s-row">
+        <div class="s-row-main">
+          <span class="s-row-title">ZeppBridge {{ updateState.version }}</span>
+          <span class="s-row-sub release-teaser">{{ releaseTeaser }}</span>
+        </div>
+        <div class="s-row-control">
+          <button class="button primary" type="button" @click="updateNotesOpen = true">{{ t.updateSeeNotes }}</button>
+        </div>
       </div>
-      <button class="button primary" type="button" @click="updateNotesOpen = true">{{ t.updateSeeNotes }}</button>
     </div>
 
     <!-- 更新说明弹窗。
@@ -159,23 +163,17 @@ const installUpdate = async () => {
 
 <style scoped src="../settings-base.css"></style>
 <style scoped>
-.build-stamp { color: var(--subtle); font-size: var(--fs-xs); font-family: var(--font-mono); }
-.update-head, .update-release { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px; }
-.update-head h2 { margin-bottom: 4px; }
-.update-head p, .update-state p, .update-release p { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.5; }
-.update-state { display: grid; grid-template-columns: 7px minmax(0, 1fr); align-items: center; gap: 11px; margin-top: 14px; padding: 11px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); }
-.update-state i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
-.update-state.is-available i, .update-state.is-upToDate i { background: var(--accent); }
-.update-state.is-checking i, .update-state.is-downloading i, .update-state.is-installing i { background: var(--warning); }
-.update-state.is-failed i { background: var(--danger); }
-.update-state strong, .update-release strong { color: var(--ink); font-size: var(--fs-sm); }
-.update-card progress { width: 100%; height: 6px; margin-top: 10px; accent-color: var(--accent); }
-.update-release { margin-top: 10px; padding: 11px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); }
+.build-stamp { font-family: var(--font-mono); }
+.update-state .s-row-title::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: var(--muted); vertical-align: middle; }
+.update-state.is-available .s-row-title::before, .update-state.is-upToDate .s-row-title::before { background: var(--accent); }
+.update-state.is-checking .s-row-title::before, .update-state.is-downloading .s-row-title::before, .update-state.is-installing .s-row-title::before { background: var(--warning); }
+.update-state.is-failed .s-row-title::before { background: var(--danger); }
+.update-card progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .release-teaser { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .update-progress { display: grid; gap: 7px; margin-top: 14px; }
 .progress-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; color: var(--ink); font-size: var(--fs-md); }
 .progress-head span { color: var(--accent); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-.progress-track { height: 6px; overflow: hidden; border-radius: 3px; background: rgba(232, 238, 244, .1); }
+.progress-track { height: 6px; overflow: hidden; border-radius: 3px; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); }
 .progress-track i { display: block; height: 100%; border-radius: 3px; background: var(--accent); transition: width 220ms ease; }
 /* 拿不到总大小时用一条来回跑的条，而不是假装一个百分比。 */
 .progress-track i.indeterminate { width: 40%; animation: progress-slide 1.2s ease-in-out infinite; }
@@ -194,9 +192,9 @@ const installUpdate = async () => {
   padding: 14px 16px;
   max-height: 46vh;
   overflow: auto;
-  border: 1px solid var(--line);
+  border: 1px solid var(--mat-line);
   border-radius: var(--radius-sm);
-  background: var(--surface-raised);
+  background: var(--mat-inset);
   color: var(--ink);
   font-family: var(--font-sans);
   font-size: var(--fs-sm);

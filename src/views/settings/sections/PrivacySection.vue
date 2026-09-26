@@ -6,8 +6,10 @@ import DiagnosticReportForm from '../DiagnosticReportForm.vue';
 import { createDiagnosticForm } from '../../../composables/settings/useDiagnosticReport';
 import { useMessages } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
+import { deckMessages } from '../deck.i18n';
 
 const t = useMessages(settingsMessages);
+const d = useMessages(deckMessages);
 const privacyDiagnostic = createDiagnosticForm();
 const privacyModalOpen = ref(false);
 
@@ -26,38 +28,47 @@ onMounted(() => {
 </script>
 
 <template>
-  <section id="privacy-section" class="settings-card" aria-labelledby="privacy-title">
-    <h2 id="privacy-title">{{ t.privacyTitle }}</h2>
-    <ul class="fact-list">
-      <li>
-        <span class="toggle-icon"><Icon name="lock" :size="14" /></span>
-        <div>
-          <strong>{{ t.privacyDbTitle }}</strong>
-          <span>{{ t.privacyDbBody }}</span>
+  <section id="privacy-section" class="privacy" aria-labelledby="privacy-title">
+    <div class="s-section">
+      <div class="s-section-head">
+        <h3 id="privacy-title">{{ d.secLocalData }}</h3>
+        <button class="link-btn" type="button" @click="privacyModalOpen = true">
+          <Icon name="shield" :size="13" />{{ t.privacyModalLink }}
+        </button>
+      </div>
+      <div class="s-list">
+      <div class="s-row">
+        <span class="fact-icon"><Icon name="lock" :size="15" /></span>
+        <div class="s-row-main">
+          <span class="s-row-title">{{ t.privacyDbTitle }}</span>
+          <span class="s-row-sub">{{ t.privacyDbBody }}</span>
         </div>
-      </li>
-      <li>
-        <span class="toggle-icon"><Icon name="shield" :size="14" /></span>
-        <div>
-          <strong>{{ t.privacyTokenTitle }}</strong>
-          <span>{{ t.privacyTokenBody }}</span>
+      </div>
+      <div class="s-row">
+        <span class="fact-icon"><Icon name="shield" :size="15" /></span>
+        <div class="s-row-main">
+          <span class="s-row-title">{{ t.privacyTokenTitle }}</span>
+          <span class="s-row-sub">{{ t.privacyTokenBody }}</span>
         </div>
-      </li>
-      <li>
-        <span class="toggle-icon"><Icon name="user" :size="14" /></span>
-        <div>
-          <strong>{{ t.privacyTelemetryTitle }}</strong>
-          <span>{{ t.privacyTelemetryBody }}</span>
+      </div>
+      <div class="s-row">
+        <span class="fact-icon"><Icon name="user" :size="15" /></span>
+        <div class="s-row-main">
+          <span class="s-row-title">{{ t.privacyTelemetryTitle }}</span>
+          <span class="s-row-sub">{{ t.privacyTelemetryBody }}</span>
         </div>
-      </li>
-    </ul>
-    <button class="privacy-link-btn" type="button" @click="privacyModalOpen = true">
-      <Icon name="shield" :size="13" />{{ t.privacyModalLink }}
-    </button>
-    <div class="diagnostic-panel">
-      <strong>{{ t.privacyReportTitle }}</strong>
-      <p>{{ t.privacyReportBody }}</p>
-      <DiagnosticReportForm :form="privacyDiagnostic" />
+      </div>
+      </div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-head"><h3>{{ d.secFeedback }}</h3></div>
+      <div class="s-list">
+        <div class="diagnostic-panel">
+          <strong>{{ t.privacyReportTitle }}</strong>
+          <p>{{ t.privacyReportBody }}</p>
+          <DiagnosticReportForm :form="privacyDiagnostic" />
+        </div>
+      </div>
     </div>
 
     <!-- 隐私政策弹窗（Teleport 到 body，放在这里只是为了跟着这一块的作用域样式） -->
@@ -85,22 +96,9 @@ onMounted(() => {
 
 <style scoped src="../settings-base.css"></style>
 <style scoped>
-.fact-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
-.fact-list li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; }
-.fact-list strong { display: block; margin-bottom: 3px; color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
-.fact-list span { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.55; }
-.privacy-link-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 10px;
-  padding: 6px 0;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  font-size: var(--fs-sm);
-  cursor: pointer;
-  transition: color 140ms ease;
-}
-.privacy-link-btn:hover { color: var(--accent); }
+.privacy { display: grid; gap: 22px; }
+.privacy > .s-section + .s-section { margin-top: 0; }
+.fact-icon { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border-radius: 10px; background: var(--accent-soft); color: var(--accent); }
+.link-btn { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: transparent; color: var(--accent); font-size: var(--fs-sm); cursor: pointer; }
+.link-btn:hover { text-decoration: underline; }
 </style>

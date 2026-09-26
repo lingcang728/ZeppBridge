@@ -329,17 +329,17 @@ onBeforeUnmount(() => {
 }
 .select-trigger:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 60%, transparent); background: var(--mat-raised-hover); }
 .select-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.is-open .select-trigger { border-color: var(--accent); }
-.is-disabled .select-trigger, .select-trigger:disabled { opacity: .55; cursor: not-allowed; }
+.select-menu.is-open .select-trigger { border-color: var(--accent); }
+.select-menu.is-disabled .select-trigger, .select-trigger:disabled { opacity: .55; cursor: not-allowed; }
 
-.select-value { min-width: 0; overflow-wrap: anywhere; }
+.select-value { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .select-icon { flex: 0 0 auto; color: var(--muted); }
 .select-value.placeholder { color: var(--subtle); }
 .select-caret { flex: 0 0 auto; color: var(--muted); transition: transform 160ms ease; }
-.is-open .select-caret { transform: rotate(180deg); }
-.is-icon-only .select-trigger { width: 36px; min-height: 36px; height: 36px; justify-content: center; padding: 0; border-radius: 50%; }
-.is-icon-only .select-icon { color: var(--muted); }
-.is-icon-only .select-trigger:hover:not(:disabled) .select-icon { color: var(--ink); }
+.select-menu.is-open .select-caret { transform: rotate(180deg); }
+.select-menu.is-icon-only .select-trigger { width: 36px; min-height: 36px; height: 36px; justify-content: center; padding: 0; border-radius: 50%; }
+.select-menu.is-icon-only .select-icon { color: var(--muted); }
+.select-menu.is-icon-only .select-trigger:hover:not(:disabled) .select-icon { color: var(--ink); }
 
 
 </style>

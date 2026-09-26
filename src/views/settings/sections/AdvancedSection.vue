@@ -67,86 +67,84 @@ const openDataFolder = async () => {
 </script>
 
 <template>
-  <details class="advanced settings-card">
-    <summary>
-      <span>
-        <strong>{{ t.advancedTitle }}</strong>
-        <em>{{ t.advancedSub }}</em>
-      </span>
-      <Icon name="chevron-down" :size="16" />
-    </summary>
-    <div class="advanced-content">
-      <div class="advanced-block">
-        <p class="advanced-label">{{ t.dataAuthLabel }}</p>
-        <p class="section-description">{{ t.dataAuthNote(retentionDays) }}</p>
-        <div class="inline-actions">
-          <button class="button secondary" type="button" @click="openDataFolder"><Icon name="folder" :size="15" />{{ t.openDataFolder }}</button>
-          <button class="button danger-button" type="button" @click="clearAuth">{{ t.logout }}</button>
-        </div>
-      </div>
-      <div class="advanced-block">
-        <p class="advanced-label">{{ t.healthCheckLabel }}</p>
-        <p class="section-description">{{ t.healthCheckNote }}</p>
-        <div class="inline-actions">
-          <RouterLink class="button secondary" to="/health-check"><Icon name="database" :size="15" />{{ t.healthCheckOpen }}</RouterLink>
-        </div>
-      </div>
-      <div class="advanced-block">
-        <p class="advanced-label">{{ t.compactLabel }}</p>
-        <p class="section-description">
-          {{ t.compactNoteA }}
-          <strong>{{ t.compactNoteStrong }}</strong>{{ t.compactNoteB }}
-        </p>
-        <div class="inline-actions">
-          <button class="button secondary" type="button" :disabled="compactBusy" @click="runCompactPayloads">
-            {{ compactBusy ? t.compacting : t.compactRun }}
-          </button>
-        </div>
-        <p v-if="compactError" class="api-error" role="alert">{{ compactError }}</p>
-        <p v-else-if="compactMessage" class="hint-line ok" role="status">{{ compactMessage }}</p>
-      </div>
-      <div class="advanced-block">
-        <p class="advanced-label">{{ t.backupLabel }}</p>
-        <p class="section-description">{{ t.backupNote }}</p>
-        <BackupPanel />
-      </div>
-      <div class="advanced-block">
-        <p class="advanced-label">{{ t.localApiLabel }}</p>
-        <p class="section-description">{{ t.localApiNote }}</p>
-        <LocalApiPanel />
-      </div>
-      <details class="diag-fold">
-        <summary>{{ t.syncDiagnostics }}</summary>
-        <div class="stream-list">
-          <div v-for="stream in appStatus?.streams" :key="stream.stream" class="stream-row">
-            <strong>{{ stream.stream }}</strong>
-            <span>{{ stream.status }}</span>
-            <span>{{ formatDateTime(stream.last_cloud_sync_at) }}</span>
+  <div class="advanced">
+    <section class="s-section">
+      <div class="s-section-head"><h3>{{ t.dataAuthLabel }}</h3></div>
+      <div class="s-list">
+        <div class="s-row">
+          <div class="s-row-main"><span class="s-row-sub">{{ t.dataAuthNote(retentionDays) }}</span></div>
+          <div class="s-row-control">
+            <button class="button secondary" type="button" @click="openDataFolder"><Icon name="folder" :size="15" />{{ t.openDataFolder }}</button>
+            <button class="button danger-button" type="button" @click="clearAuth">{{ t.logout }}</button>
           </div>
-          <p v-if="!appStatus?.streams?.length" class="section-description">{{ t.noSyncDiagnostics }}</p>
         </div>
-      </details>
-    </div>
-  </details>
+      </div>
+    </section>
+
+    <section class="s-section">
+      <div class="s-section-head"><h3>{{ t.healthCheckLabel }}</h3></div>
+      <div class="s-list">
+        <div class="s-row">
+          <div class="s-row-main"><span class="s-row-sub">{{ t.healthCheckNote }}</span></div>
+          <div class="s-row-control">
+            <RouterLink class="button secondary" to="/health-check"><Icon name="database" :size="15" />{{ t.healthCheckOpen }}</RouterLink>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="s-section">
+      <div class="s-section-head"><h3>{{ t.compactLabel }}</h3></div>
+      <div class="s-list">
+        <div class="s-row">
+          <div class="s-row-main">
+            <span class="s-row-sub">{{ t.compactNoteA }}<strong>{{ t.compactNoteStrong }}</strong>{{ t.compactNoteB }}</span>
+          </div>
+          <div class="s-row-control">
+            <button class="button secondary" type="button" :disabled="compactBusy" @click="runCompactPayloads">
+              {{ compactBusy ? t.compacting : t.compactRun }}
+            </button>
+          </div>
+        </div>
+      </div>
+      <p v-if="compactError" class="api-error" role="alert">{{ compactError }}</p>
+      <p v-else-if="compactMessage" class="hint-line ok" role="status">{{ compactMessage }}</p>
+    </section>
+
+    <section class="s-section">
+      <div class="s-section-head"><h3>{{ t.backupLabel }}</h3></div>
+      <BackupPanel />
+    </section>
+
+    <section class="s-section">
+      <div class="s-section-head"><h3>{{ t.localApiLabel }}</h3></div>
+      <p class="s-note">{{ t.localApiNote }}</p>
+      <LocalApiPanel />
+    </section>
+
+    <details class="s-list diag-fold">
+      <summary class="s-row">
+        <span class="s-row-main"><span class="s-row-title">{{ t.syncDiagnostics }}</span></span>
+        <Icon name="chevron-down" :size="16" class="fold-caret" />
+      </summary>
+      <div v-for="stream in appStatus?.streams" :key="stream.stream" class="s-row stream-row">
+        <strong>{{ stream.stream }}</strong>
+        <span>{{ stream.status }}</span>
+        <span>{{ formatDateTime(stream.last_cloud_sync_at) }}</span>
+      </div>
+      <div v-if="!appStatus?.streams?.length" class="s-row"><span class="s-row-sub">{{ t.noSyncDiagnostics }}</span></div>
+    </details>
+  </div>
 </template>
 
 <style scoped src="../settings-base.css"></style>
 <style scoped>
-.advanced > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; list-style: none; }
-.advanced > summary::-webkit-details-marker { display: none; }
-.advanced > summary span { display: grid; gap: 2px; min-width: 0; }
-.advanced > summary strong { font-size: var(--fs-lg); font-weight: 700; color: var(--ink); }
-.advanced > summary em { color: var(--muted); font-size: var(--fs-sm); font-style: normal; }
-.advanced[open] > summary > svg { transform: rotate(180deg); }
-.advanced-content { display: grid; gap: 16px; margin-top: 12px; border-top: 1px solid var(--line); padding-top: 12px; }
-.advanced-block { display: grid; gap: 6px; }
-.advanced-label { margin: 0; color: var(--ink); font-size: var(--fs-md); font-weight: 600; }
-.diag-fold { border-top: 1px solid var(--line); padding-top: 8px; }
-.diag-fold > summary { cursor: pointer; color: var(--muted); font-size: var(--fs-sm); list-style: none; }
+.advanced { display: grid; gap: 22px; min-width: 0; }
+.advanced > .s-section + .s-section { margin-top: 0; }
+.diag-fold > summary { cursor: pointer; list-style: none; }
 .diag-fold > summary::-webkit-details-marker { display: none; }
-.diag-fold[open] > summary { color: var(--ink); }
-
-.stream-list { display: grid; gap: 2px; margin-top: 6px; }
-.stream-row { display: grid; grid-template-columns: 110px minmax(0, 1fr) auto; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: var(--fs-sm); }
+.fold-caret { color: var(--subtle); transition: transform var(--dur-base) var(--ease-out); }
+.diag-fold[open] .fold-caret { transform: rotate(180deg); }
+.stream-row { display: grid; grid-template-columns: 140px minmax(0, 1fr) auto; min-height: 44px; color: var(--muted); font-size: var(--fs-sm); }
 .stream-row strong { font-weight: 600; color: var(--ink); }
 </style>

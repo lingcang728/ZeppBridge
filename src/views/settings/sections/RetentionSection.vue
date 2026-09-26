@@ -4,8 +4,10 @@ import SelectMenu from '../../../components/SelectMenu.vue';
 import { useSettingsContext } from '../../../composables/settings/context';
 import { useMessages } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
+import { deckMessages } from '../deck.i18n';
 
 const t = useMessages(settingsMessages);
+const d = useMessages(deckMessages);
 const {
   retentionDays, dataBusy, estimateText, retentionCutoffDate,
   savePrefs, cleanupData, reprocessLocalData,
@@ -16,28 +18,41 @@ const RETENTION_CHOICES = computed(() =>
 </script>
 
 <template>
-  <section class="settings-card" aria-labelledby="retention-title">
-    <h2 id="retention-title">{{ t.retentionTitle }}</h2>
-    <div class="field-row">
-      <span class="kv-label">{{ t.retentionLabel }}</span>
-      <SelectMenu
-        v-model="retentionDays"
-        :options="RETENTION_CHOICES"
-        :aria-label="t.retentionAria"
-        @update:model-value="savePrefs"
-      />
-    </div>
-    <p class="retain-note">{{ t.retentionNote(retentionDays) }}<strong>{{ t.retentionNoteStrong }}</strong>{{ t.retentionNoteTail }}</p>
-    <p class="hint-line">{{ estimateText || t.retentionCutoff(retentionCutoffDate) }}</p>
-    <div class="inline-actions">
-      <button class="button secondary" type="button" :disabled="Boolean(dataBusy)" @click="cleanupData">
-        {{ dataBusy === 'cleanup' ? t.cleaningUp : t.cleanupNow }}
-      </button>
-      <button class="button secondary" type="button" :disabled="Boolean(dataBusy)" @click="reprocessLocalData">
-        {{ dataBusy === 'reprocess' ? t.reprocessing : t.reprocessNow }}
-      </button>
+  <section class="s-section" aria-labelledby="retention-title">
+    <div class="s-section-head"><h3 id="retention-title">{{ d.secRetention }}</h3></div>
+    <div class="s-list">
+      <div class="s-row">
+        <div class="s-row-main">
+          <span class="s-row-title">{{ t.retentionLabel }}</span>
+          <span class="s-row-sub">{{ d.retentionSub }}</span>
+        </div>
+        <div class="s-row-control">
+          <SelectMenu
+            v-model="retentionDays"
+            :options="RETENTION_CHOICES"
+            :aria-label="t.retentionAria"
+            @update:model-value="savePrefs"
+          />
+        </div>
+      </div>
+      <div class="s-row is-block">
+        <p class="s-row-sub">{{ t.retentionNote(retentionDays) }}<strong>{{ t.retentionNoteStrong }}</strong>{{ t.retentionNoteTail }}</p>
+        <p class="s-row-sub">{{ estimateText || t.retentionCutoff(retentionCutoffDate) }}</p>
+        <div class="s-actions">
+          <button class="button secondary" type="button" :disabled="Boolean(dataBusy)" @click="cleanupData">
+            {{ dataBusy === 'cleanup' ? t.cleaningUp : t.cleanupNow }}
+          </button>
+          <button class="button secondary" type="button" :disabled="Boolean(dataBusy)" @click="reprocessLocalData">
+            {{ dataBusy === 'reprocess' ? t.reprocessing : t.reprocessNow }}
+          </button>
+        </div>
+      </div>
     </div>
   </section>
 </template>
 
 <style scoped src="../settings-base.css"></style>
+<style scoped>
+.is-block { gap: 8px; }
+.is-block p { margin: 0; }
+</style>

@@ -3,6 +3,7 @@ import { createAuthFlow, type AuthFlow } from './useAuthFlow';
 import { createDiagnosticReport, type DiagnosticReport } from './useDiagnosticReport';
 import { createSettingsFeedback, type SettingsFeedback } from './useSettingsFeedback';
 import { createUserPrefs, type UserPrefsState } from './useUserPrefs';
+import { useCapabilityBoard } from './useCapabilityBoard';
 
 /**
  * 设置页各区块共享的状态。
@@ -15,6 +16,7 @@ export interface SettingsContext {
   auth: AuthFlow;
   prefs: UserPrefsState;
   diagnostics: DiagnosticReport;
+  capability: ReturnType<typeof useCapabilityBoard>;
 }
 
 const SETTINGS_CONTEXT: InjectionKey<SettingsContext> = Symbol('settings-context');
@@ -26,6 +28,7 @@ export const provideSettingsContext = (): SettingsContext => {
     auth: createAuthFlow(feedback),
     prefs: createUserPrefs(feedback),
     diagnostics: createDiagnosticReport(feedback),
+    capability: useCapabilityBoard(),
   };
   provide(SETTINGS_CONTEXT, context);
   return context;

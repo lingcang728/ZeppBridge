@@ -13,12 +13,16 @@ const clampDays = (value: number) => Math.min(365, Math.max(1, Math.round(value)
 /**
  * 保留期、补拉窗口、存储估算，以及读写它们的几个动作。
  *
- * 数据保留、导出默认值、长期归档、高级维护四个区块都读这一份：归档面板改了偏好
+ * 数据保留、长期归档、高级维护几个区块都读这一份：归档面板改了偏好
  * 要回写到这里，压缩完要刷新这里的估算——各拿一份就会各说各话。
+ *
+ * 以前这里还有一个按 history_sync_days 跑的「历史补拉」，和归档卡里的账本补拉
+ * 是同一件事的两个入口；现在只留账本补拉。history_sync_days 这个偏好仍然保存
+ * （首次同步还会用），只是不再单独放一个按钮。
  */
 export const createUserPrefs = (feedback: SettingsFeedback) => {
   const t = useMessages(settingsMessages);
-  const { appStatus, isSyncing, refreshStatus, runSync, markDataChanged } = useSyncController();
+  const { appStatus, refreshStatus, markDataChanged } = useSyncController();
   const { dataMessage, dataError } = feedback;
 
   const retentionDays = ref(appStatus.value?.retention_days ?? 365);
@@ -90,31 +94,6 @@ export const createUserPrefs = (feedback: SettingsFeedback) => {
     void refreshStatus();
   };
 
-  const confirmHistorySync = async () => {
-    if (isSyncing.value) {
-      dataError.value = t.value.syncInProgress;
-      return;
-    }
-    const days = clampDays(Number(historyDays.value));
-    historyDays.value = days;
-    if (days >= 90) {
-      const minutes = Math.max(2, Math.round(0.75 + days * 0.05));
-      const extra = days >= 365 ? t.value.backfillYearCap : '';
-      if (!window.confirm(t.value.backfillConfirm(days, minutes, minutes + 3, extra))) return;
-    }
-    // 这两句原本直接显示后端的 `message`——那是中文原文，英文界面上就这么露出来了。
-    // 文案实现只有 lib/storageEstimateText.ts 一份，不要在这里再抄一遍。
-    if (storageEstimate.value && !storageEstimate.value.allow_long_history && days >= 90) {
-      dataError.value = storageEstimateText(storageEstimate.value);
-      return;
-    }
-    if (storageEstimate.value?.warn_tight_space
-      && !window.confirm(
-        t.value.backfillTightSpace(storageEstimateText(storageEstimate.value), days),
-      )) return;
-    await runSync('history', days);
-  };
-
   const cleanupData = async () => {
     const days = persistedRetentionDays();
     if (!window.confirm(t.value.cleanupConfirm(days))) return;
@@ -168,7 +147,6 @@ export const createUserPrefs = (feedback: SettingsFeedback) => {
     retentionCutoffDate,
     savePrefs,
     applyPrefsChange,
-    confirmHistorySync,
     cleanupData,
     reprocessLocalData,
     load,

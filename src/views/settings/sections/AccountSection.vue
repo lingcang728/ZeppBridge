@@ -1,13 +1,18 @@
 <script setup lang="ts">
+/* 账号：一行账号本身（打码 ID、区域、上次同步、状态、重新验证），
+   一行 Zepp Cloud——它是账号的数据来源，不是一台设备，所以放在这里而不是设备列表里。 */
 import { computed } from 'vue';
+import DesignIcon from '../../../components/DesignIcon.vue';
 import { useSettingsContext } from '../../../composables/settings/context';
 import { useSettingsFormat } from '../../../composables/settings/useSettingsFormat';
 import { useSyncController } from '../../../composables/useSyncController';
 import { regionShortName } from '../../../lib/deviceCopy';
 import { useMessages } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
+import { deckMessages } from '../deck.i18n';
 
 const t = useMessages(settingsMessages);
+const d = useMessages(deckMessages);
 const { appStatus, isSyncing } = useSyncController();
 const { formatDateTime } = useSettingsFormat();
 const {
@@ -23,80 +28,65 @@ const regionHost = computed(() => appStatus.value?.region_host || t.value.notPro
 </script>
 
 <template>
-  <section id="account-section" class="settings-card account-card" aria-labelledby="account-title">
-    <h2 id="account-title">{{ t.accountTitle }}</h2>
-    <div class="account-strip">
-      <span class="account-avatar">{{ accountInitial }}</span>
-      <div class="account-meta">
-        <strong>{{ accountLabel }}</strong>
-        <span :title="regionHost">{{ t.accountLine(regionLabel, formatDateTime(appStatus?.last_cloud_sync_at)) }}</span>
+  <section id="account-section" class="s-section" aria-labelledby="account-title">
+    <div class="s-section-head"><h3 id="account-title">{{ d.secAccount }}</h3></div>
+    <div class="s-list">
+      <div class="s-row">
+        <span class="account-avatar" aria-hidden="true">{{ accountInitial }}</span>
+        <div class="s-row-main">
+          <span class="s-row-title mono">{{ accountLabel }}</span>
+          <span class="s-row-sub" :title="regionHost">{{ t.accountLine(regionLabel, formatDateTime(appStatus?.last_cloud_sync_at)) }}</span>
+        </div>
+        <div class="s-row-control">
+          <span :class="['state-dot', { on: accountRecognized }]">{{ connectionLabel }}</span>
+          <button v-if="configuredOnly" class="button secondary" type="button" :disabled="isSyncing" @click="verifyAndSync">{{ t.verifyAndSync }}</button>
+          <button v-else class="button secondary" type="button" :disabled="loginBusy" @click="startLogin">{{ t.reauthenticate }}</button>
+        </div>
       </div>
-      <span :class="['account-state', { on: accountRecognized }]"><i class="dot"></i>{{ connectionLabel }}</span>
-      <button v-if="configuredOnly" class="kv-btn" type="button" :disabled="isSyncing" @click="verifyAndSync">{{ t.verifyAndSync }}</button>
-      <button v-else class="kv-btn" type="button" :disabled="loginBusy" @click="startLogin">{{ t.reauthenticate }}</button>
-    </div>
-    <!--
-      「退出账号」放在这里，而不是继续埋在「高级 → 清除认证」里。
-
-      两个人在 Reddit 上问同一句话：「我怎么退出？找不到 logout 按钮。」
-      （p71rsj2、p7497lq）后端 `clear_auth` 的行为本来就是对的——只清凭据、
-      保留本机历史——错的是它叫「清除认证」，还藏在高级设置的最里面：
-      没人会为了退出账号去点一个听起来像会删数据的按钮。
-    -->
-    <div v-if="appStatus?.configured" class="account-logout">
-      <button class="link-button" type="button" @click="clearAuth">{{ t.logout }}</button>
-      <p class="account-logout-hint">{{ t.logoutHint }}</p>
-      <p class="account-logout-hint warn">{{ t.logoutNoMultiAccount }}</p>
+      <div class="s-row">
+        <DesignIcon name="zepp-cloud" :size="36" class="cloud-mark" />
+        <div class="s-row-main">
+          <span class="s-row-title">Zepp Cloud</span>
+          <span class="s-row-sub">{{ d.cloudSourceSub }}</span>
+        </div>
+        <div class="s-row-control">
+          <span :class="['state-dot', { on: accountRecognized }]">{{ connectionLabel }}</span>
+        </div>
+      </div>
+      <!--
+        「退出账号」放在这里，而不是继续埋在「高级 → 清除认证」里。
+        两个人在 Reddit 上问同一句话：「我怎么退出？找不到 logout 按钮。」
+        （p71rsj2、p7497lq）后端 `clear_auth` 本来就只清凭据、保留本机历史。
+      -->
+      <div v-if="appStatus?.configured" class="s-row">
+        <div class="s-row-main">
+          <span class="s-row-sub">{{ t.logoutHint }}</span>
+          <span class="s-row-sub">{{ t.logoutNoMultiAccount }}</span>
+        </div>
+        <div class="s-row-control">
+          <button class="button danger-button" type="button" @click="clearAuth">{{ t.logout }}</button>
+        </div>
+      </div>
     </div>
   </section>
 </template>
 
 <style scoped src="../settings-base.css"></style>
 <style scoped>
-.account-card h2 { margin-bottom: 10px; }
-.account-strip {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  min-height: 58px;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface-raised);
-}
-.account-logout { margin-top: 10px; }
-.account-logout .link-button {
-  padding: 0;
-  border: 0;
-  background: none;
+.account-avatar {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  place-items: center;
+  border-radius: 11px;
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
   color: var(--accent);
-  font-size: var(--fs-md);
-  font-weight: 600;
-  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--fs-lg);
+  font-weight: 700;
 }
-.account-logout .link-button:hover { text-decoration: underline; }
-.account-logout-hint { margin: 4px 0 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.55; }
-.account-logout-hint.warn { color: var(--muted); }
-.account-avatar { display: grid; width: 36px; height: 36px; flex: 0 0 36px; place-items: center; border-radius: 9px; background: var(--accent-soft); color: var(--accent); font-family: var(--font-mono); font-size: var(--fs-xl); font-weight: 700; }
-.account-meta { display: grid; min-width: 0; gap: 1px; flex: 1; }
-.account-meta strong { overflow: hidden; color: var(--ink); font-family: var(--font-mono); font-size: var(--fs-md); text-overflow: ellipsis; white-space: nowrap; }
-.account-meta span { overflow: hidden; color: var(--subtle); font-size: var(--fs-xs); text-overflow: ellipsis; white-space: nowrap; }
-.account-state { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: var(--fs-sm); white-space: nowrap; }
-.account-state.on { color: var(--accent); }
-.account-state .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.kv-btn {
-  padding: 5px 14px;
-  border: 1px solid var(--line-control);
-  border-radius: 8px;
-  background: var(--surface-raised);
-  color: var(--accent);
-  font-size: var(--fs-sm);
-  cursor: pointer;
-}
-.kv-btn:hover:not(:disabled) { border-color: var(--accent); }
-@media (max-width: 860px) {
-  .account-strip { flex-wrap: wrap; }
-  .account-meta { flex: 1 1 160px; }
-}
+.mono { font-family: var(--font-mono); }
+.cloud-mark { flex: 0 0 auto; border-radius: 11px; }
 </style>

@@ -1,17 +1,33 @@
 <script setup lang="ts">
-/* 设置页只负责布局和组装。
+/* 设置页：钱包式卡叠。
  *
- * 每一块的界面和逻辑住在 views/settings/sections/ 下各自的组件里；几块之间
- * 共享的状态（全页提示、登录进度、保留期与补拉窗口、诊断报告的提交中）由这里
- * provide 一份，见 composables/settings/context.ts。 */
-import { onMounted, onUnmounted, watch } from 'vue';
-import { useRoute } from 'vue-router';
+ * 总览（/settings）是八张叠着的卡，每张只露出卡头和一句实时状态；点开（/settings/:card）
+ * 那张升到最上面摊开，展开后可以左右拖、按按钮或方向键翻到相邻的一张，Esc 回到总览。
+ * 各区块的界面和逻辑在 views/settings/sections/，共享状态在 composables/settings/context.ts。 */
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import CardDeck from '../components/deck/CardDeck.vue';
+import GlyphTile from '../components/GlyphTile.vue';
 import HistoryArchivePanel from '../components/HistoryArchivePanel.vue';
 import Icon from '../components/Icon.vue';
 import { provideSettingsContext } from '../composables/settings/context';
+import { useDevices } from '../composables/useDevices';
 import { useSyncController } from '../composables/useSyncController';
-import { useMessages } from '../i18n';
+import { useUiScale } from '../composables/useUiScale';
+import { withViewTransition } from '../lib/deck/viewTransition';
+import { readDefaultExportFormat } from '../lib/exportScope';
+import { distanceUnit, distanceUnitOptionLabel } from '../lib/units';
+import { locale, LOCALE_LABELS, useMessages } from '../i18n';
 import { settingsMessages } from './Settings.i18n';
+import { deckMessages } from './settings/deck.i18n';
+import {
+  SETTINGS_CARD_ICONS,
+  SETTINGS_CARD_TONES,
+  SETTINGS_CARD_IDS,
+  isSettingsCardId,
+  legacySettingsTarget,
+  type SettingsCardId,
+} from './settings/cards';
 import AccountSection from './settings/sections/AccountSection.vue';
 import AdvancedSection from './settings/sections/AdvancedSection.vue';
 import AuthSection from './settings/sections/AuthSection.vue';
@@ -26,24 +42,82 @@ import RetentionSection from './settings/sections/RetentionSection.vue';
 import UpdateSection from './settings/sections/UpdateSection.vue';
 import WorkoutCodesSection from './settings/sections/WorkoutCodesSection.vue';
 
-const t = useMessages(settingsMessages);
-const route = useRoute();
-const { statusError, refreshStatus } = useSyncController();
-const { feedback, auth, prefs } = provideSettingsContext();
-const { dataMessage, dataError } = feedback;
-const { loginError } = auth;
-const { userPrefs, applyPrefsChange } = prefs;
+defineOptions({ name: 'Settings' });
 
-const focusConnection = () => {
-  if (route.hash !== '#connection' && route.query.focus !== 'connection') return;
-  window.setTimeout(() => {
-    document.getElementById('connection')?.scrollIntoView({ block: 'start' });
-  }, 0);
+const t = useMessages(settingsMessages);
+const d = useMessages(deckMessages);
+const route = useRoute();
+const router = useRouter();
+const { statusError, refreshStatus, autoSyncEnabled, autoSyncInterval, setAutoSyncEnabled } = useSyncController();
+const { feedback, auth, prefs, capability } = provideSettingsContext();
+const { dataMessage, dataError } = feedback;
+const { loginError, accountRecognized, connectionLabel } = auth;
+const { userPrefs, retentionDays, applyPrefsChange } = prefs;
+const { models: deviceModels, load: loadDevices } = useDevices();
+const { scale } = useUiScale();
+
+const activeId = computed<SettingsCardId | null>(() =>
+  (isSettingsCardId(route.params.card) ? route.params.card : null));
+
+const exportFormat = ref(readDefaultExportFormat());
+watch(activeId, () => { exportFormat.value = readDefaultExportFormat(); });
+
+const titles = computed<Record<SettingsCardId, string>>(() => ({
+  account: d.value.cardAccount,
+  sync: d.value.cardSync,
+  archive: d.value.cardArchive,
+  data: d.value.cardData,
+  ai: d.value.cardAi,
+  display: d.value.cardDisplay,
+  privacy: d.value.cardPrivacy,
+  advanced: d.value.cardAdvanced,
+}));
+
+/* 卡头上那一句状态：不点开也能看出每一块现在是什么样。 */
+const summaries = computed<Record<SettingsCardId, string>>(() => {
+  const overview = capability.capabilityOverview.value;
+  return {
+    account: accountRecognized.value ? d.value.sumAccount(connectionLabel.value, deviceModels.value.length) : d.value.sumAccountOff,
+    sync: autoSyncEnabled.value ? d.value.sumSyncOn(autoSyncInterval.value) : d.value.sumSyncOff,
+    archive: userPrefs.value?.archive_enabled ? d.value.sumArchiveOn : d.value.sumArchiveOff(retentionDays.value),
+    data: overview ? d.value.sumData(capability.capabilityAvailable.value.length, overview.items.length) : d.value.sumDataLoading,
+    ai: d.value.sumAi(exportFormat.value.toUpperCase()),
+    display: d.value.sumDisplay(LOCALE_LABELS[locale.value], distanceUnitOptionLabel(distanceUnit.value), scale.value),
+    privacy: d.value.sumPrivacy,
+    advanced: d.value.sumAdvanced,
+  };
+});
+
+const toneColor = (tone: string) => (tone === 'neutral' ? 'var(--glyph-neutral)' : `var(--${tone})`);
+const cards = computed(() => SETTINGS_CARD_IDS.map((id) => ({
+  id,
+  icon: SETTINGS_CARD_ICONS[id],
+  glyphTone: SETTINGS_CARD_TONES[id],
+  tone: toneColor(SETTINGS_CARD_TONES[id]),
+  title: titles.value[id],
+  summary: summaries.value[id],
+})));
+
+const openCard = (id: string) => withViewTransition(() => router.push(`/settings/${id}`));
+const closeDeck = () => withViewTransition(() => router.push('/settings'));
+const changeCard = async (id: string, done: () => void) => {
+  await router.replace(`/settings/${id}`);
+  await nextTick();
+  done();
 };
-watch(() => [route.hash, route.query.focus], focusConnection);
+
+/* 旧链接（数据健康页的「去重新连接」等）指向 #connection，现在它在「账号与设备」卡里。 */
+const redirectLegacy = () => {
+  const target = legacySettingsTarget(route.hash, route.query.focus);
+  if (target) void router.replace(`/settings/${target}`);
+  else if (route.params.card && !activeId.value) void router.replace('/settings');
+};
+watch(() => [route.hash, route.query.focus, route.params.card], redirectLegacy);
 
 onMounted(async () => {
-  focusConnection();
+  redirectLegacy();
+  void capability.loadCapabilityOverview();
+  void loadDevices();
   await prefs.load();
   await auth.attach();
 });
@@ -57,11 +131,9 @@ onUnmounted(() => {
     <header class="page-header">
       <div>
         <h1 id="settings-title">{{ t.title }}</h1>
-        <p class="page-intro">{{ t.intro }}</p>
+        <p class="page-intro">{{ d.pageIntro }}</p>
       </div>
     </header>
-
-    <DisplayPrefsSection />
 
     <div v-if="statusError" class="alert danger" role="alert">
       <Icon name="warning" :size="15" />{{ statusError }}
@@ -71,78 +143,75 @@ onUnmounted(() => {
     <div v-if="dataMessage" class="alert success"><Icon name="circle-check" :size="15" />{{ dataMessage }}</div>
     <div v-if="dataError" class="alert danger" role="alert"><Icon name="warning" :size="15" />{{ dataError }}</div>
 
-    <!-- 1. 认证方式 -->
-    <AuthSection />
+    <CardDeck :cards="cards" :active-id="activeId" @open="openCard" @close="closeDeck" @change="changeCard">
+      <template #head="{ card, expanded }">
+        <GlyphTile :name="card.icon" :tone="card.glyphTone" :size="expanded ? 44 : 46" />
+        <div class="card-copy">
+          <component :is="expanded ? 'h2' : 'strong'" class="card-title">{{ card.title }}</component>
+          <span class="card-summary">{{ card.summary }}</span>
+        </div>
+      </template>
 
-    <!-- 宽屏并列：账户摘要和数据来源各占一列，设备列表在右侧自适应排列。 -->
-    <div class="connection-stack">
-      <!-- 2. 账户与区域 -->
-      <AccountSection />
-      <!-- 3. 连接设备 / 数据来源 -->
-      <DevicesSection />
-    </div>
+      <template #quick="{ card }">
+        <button
+          v-if="card.id === 'sync'"
+          class="mat-switch"
+          type="button"
+          role="switch"
+          :aria-label="d.autoSyncToggle"
+          :aria-checked="autoSyncEnabled"
+          @click.stop="setAutoSyncEnabled(!autoSyncEnabled)"
+        ></button>
+      </template>
 
-    <CapabilitySection />
-    <WorkoutCodesSection />
-
-    <!-- 隐私与安全这一块最高，早先和「本地数据保留」「导出偏好」并排在三栏里，
-         网格拉平行高，右边两张卡片下面就空出小半屏没有意义的留白。
-         现在它单独一行，另外两块自己配一对。 -->
-    <div class="one-col">
-      <!-- 4. 隐私安全 -->
-      <PrivacySection />
-    </div>
-
-    <!-- 5. MCP -->
-    <McpSection />
-
-    <div class="two-col paired">
-      <!-- 6. 数据保留 -->
-      <RetentionSection />
-      <!-- 7. 导出默认值 -->
-      <ExportDefaultsSection />
-    </div>
-
-    <!-- 历史补拉的账本要和「补拉范围」一起看，所以留在正文；
-         数据库快照是灾难恢复工具，进「高级与维护」。 -->
-    <div class="one-col wide-panels">
-      <HistoryArchivePanel :prefs="userPrefs" @prefs-changed="applyPrefsChange" />
-    </div>
-
-    <!-- 8. 软件更新 -->
-    <UpdateSection />
-
-    <!-- 9. 自动同步 -->
-    <AutoSyncSection />
-
-    <!-- 高级维护 -->
-    <AdvancedSection />
+      <template #body="{ card }">
+        <div class="card-body">
+          <template v-if="card.id === 'account'">
+            <AccountSection />
+            <DevicesSection />
+            <AuthSection />
+          </template>
+          <template v-else-if="card.id === 'sync'">
+            <AutoSyncSection />
+            <UpdateSection />
+          </template>
+          <template v-else-if="card.id === 'archive'">
+            <HistoryArchivePanel :prefs="userPrefs" @prefs-changed="applyPrefsChange" />
+            <RetentionSection />
+          </template>
+          <template v-else-if="card.id === 'data'">
+            <CapabilitySection />
+            <WorkoutCodesSection />
+          </template>
+          <template v-else-if="card.id === 'ai'">
+            <McpSection />
+            <ExportDefaultsSection />
+          </template>
+          <DisplayPrefsSection v-else-if="card.id === 'display'" />
+          <PrivacySection v-else-if="card.id === 'privacy'" />
+          <AdvancedSection v-else-if="card.id === 'advanced'" />
+        </div>
+      </template>
+    </CardDeck>
   </section>
 </template>
 
 <style scoped>
-.page { width: 100%; min-width: 0; margin: 0; display: grid; gap: 14px; }
-.page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 0; min-width: 0; }
+/* 行宽收在 1000px 以内：设置是一行一行的「标签 — 控件」，拉满 1400px 时标签和
+   控件隔着半个屏幕，就是之前那种「留白过多」。 */
+.page { display: grid; width: 100%; max-width: 1040px; min-width: 0; margin: 0 auto; gap: 16px; }
+.page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; min-width: 0; }
 h1, p { margin-top: 0; }
 h1 { font-size: 26.5px; font-weight: 700; color: var(--ink); }
 .page-intro { margin-bottom: 0; color: var(--muted); font-size: var(--fs-sm); }
-.alert { display: flex; align-items: flex-start; gap: 7px; padding: 9px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--muted); font-size: var(--fs-sm); }
+.alert { display: flex; align-items: flex-start; gap: 7px; padding: 9px 12px; border: 1px solid var(--mat-line); border-radius: var(--radius-sm); background: var(--mat-card); color: var(--muted); font-size: var(--fs-sm); }
 .alert.success { color: var(--accent); }
 .alert.danger { color: var(--danger); }
 .alert button { margin-left: auto; border: 0; background: transparent; color: inherit; cursor: pointer; font-size: var(--fs-sm); }
-.two-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 14px; align-items: start; }
-/* 成对的两块卡片等高对齐；高度由内容较多的一块决定，而不是被第三块撑开。 */
-.two-col.paired { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
-.one-col { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
-.wide-panels { grid-template-columns: minmax(0, 1fr); }
-.connection-stack { display: grid; grid-template-columns: minmax(320px, .8fr) minmax(0, 1.4fr); gap: 14px; align-items: start; }
-.connection-stack > * { min-width: 0; }
-.two-col > * { min-width: 0; }
 
-@media (max-width: 1080px) {
-  .connection-stack { grid-template-columns: minmax(0, 1fr); }
-}
-@media (max-width: 860px) {
-  .two-col { grid-template-columns: minmax(0, 1fr); }
-}
+.card-copy { display: grid; flex: 1 1 auto; min-width: 0; gap: 2px; }
+.card-title { margin: 0; color: var(--ink); font-size: var(--fs-lg); font-weight: 650; line-height: 1.3; }
+.card-summary { overflow: hidden; color: var(--subtle); font-size: var(--fs-sm); text-overflow: ellipsis; white-space: nowrap; }
+.card-body { display: grid; gap: 22px; min-width: 0; }
+.card-body > :deep(.s-section + .s-section) { margin-top: 0; }
 </style>

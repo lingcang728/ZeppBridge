@@ -62,14 +62,14 @@ const chips = computed(() => [
     name: model.displayName || model.canonicalName,
     model,
     state: model.state,
-    to: model.deviceKey ? `/devices/${encodeURIComponent(model.deviceKey)}` : '/settings',
+    to: model.deviceKey ? `/devices/${encodeURIComponent(model.deviceKey)}` : '/settings/account',
   })),
   {
     key: 'cloud',
     kind: 'cloud' as const,
     name: 'Zepp Cloud',
     state: accountRecognized.value ? ('account' as const) : ('unknown' as const),
-    to: '/settings',
+    to: '/settings/account',
   },
 ]);
 </script>

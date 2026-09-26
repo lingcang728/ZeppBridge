@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
 import Icon from '../../../components/Icon.vue';
-import { useCapabilityBoard } from '../../../composables/settings/useCapabilityBoard';
+import { useSettingsContext } from '../../../composables/settings/context';
 import { useMessages } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
+import { deckMessages } from '../deck.i18n';
 
 const t = useMessages(settingsMessages);
+const d = useMessages(deckMessages);
 const {
   capabilityOverview,
   capabilityError,
@@ -16,21 +17,18 @@ const {
   capabilityBoard,
   capabilityCheckedAt,
   probeDiagnostics,
-  loadCapabilityOverview,
   runCapabilityProbe,
-} = useCapabilityBoard();
-
-onMounted(() => { void loadCapabilityOverview(); });
+} = useSettingsContext().capability;
 </script>
 
 <template>
-  <section class="settings-card" aria-labelledby="capability-title">
-    <div class="section-heading-row">
-      <h2 id="capability-title">{{ t.capabilityTitle }}</h2>
-      <span v-if="capabilityCheckedAt" class="capability-checked">{{ capabilityCheckedAt }}</span>
+  <section class="s-section" aria-labelledby="capability-title">
+    <div class="s-section-head">
+      <h3 id="capability-title">{{ d.secCapability }}</h3>
+      <span v-if="capabilityCheckedAt" class="s-meta">{{ capabilityCheckedAt }}</span>
     </div>
-    <p class="section-description">{{ t.capabilityIntro }}</p>
-    <div v-if="capabilityError" class="alert danger device-alert" role="alert">
+    <p class="s-note">{{ t.capabilityIntro }}</p>
+    <div v-if="capabilityError" class="alert danger" role="alert">
       <Icon name="warning" :size="14" />{{ capabilityError }}
     </div>
 
@@ -67,7 +65,7 @@ onMounted(() => { void loadCapabilityOverview(); });
     <details class="probe-diagnostics">
       <summary>{{ t.probeSummary }}</summary>
       <p class="probe-selfcheck">{{ t.probeNote }}</p>
-      <button class="button secondary identify-button" type="button" :disabled="probeBusy" @click="runCapabilityProbe">
+      <button class="button secondary" type="button" :disabled="probeBusy" @click="runCapabilityProbe">
         <Icon name="sync" :size="14" :class="{ spinning: probeBusy }" />
         {{ probeBusy ? t.probing : t.probeRun }}
       </button>
@@ -84,9 +82,9 @@ onMounted(() => { void loadCapabilityOverview(); });
 .capability-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; color: var(--muted); font-size: var(--fs-sm); }
 .legend-item { display: inline-flex; align-items: center; gap: 6px; }
 .lamp { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: var(--subtle); }
-.lamp.on { background: #7da33e; box-shadow: 0 0 0 3px rgba(125,163,62,.16); }
-.lamp.pending { background: #f5c33b; box-shadow: 0 0 0 3px rgba(245,195,59,.14); }
-.lamp.off { background: rgba(232,238,244,.18); }
+.lamp.on { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.lamp.pending { background: var(--warning); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warning) 16%, transparent); }
+.lamp.off { background: color-mix(in srgb, var(--ink) 18%, transparent); }
 
 .capability-grid {
   display: grid;
@@ -101,9 +99,9 @@ onMounted(() => { void loadCapabilityOverview(); });
   align-content: start;
   gap: 3px;
   padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface-raised);
+  border: 1px solid var(--mat-line);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--ink) 2.5%, transparent);
   min-width: 0;
 }
 .capability-cell.off { border-style: dashed; }
@@ -112,7 +110,7 @@ onMounted(() => { void loadCapabilityOverview(); });
 .cell-detail { color: var(--muted); font-size: var(--fs-xs); }
 .cell-note { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.5; }
 @media (max-width: 720px) { .capability-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
-.probe-diagnostics { margin-top: 16px; }
+.probe-diagnostics { padding: 0 4px; }
 .probe-diagnostics > summary { color: var(--muted); font-size: var(--fs-sm); cursor: pointer; }
 .probe-diagnostics ul { margin: 8px 0 0; padding-left: 18px; }
 .probe-diagnostics li,

@@ -75,6 +75,8 @@
   --mat-rim: inset 0 1px 0 rgba(255, 255, 255, .055);
   --mat-shadow: 0 1px 2px rgba(0, 0, 0, .32), 0 12px 30px -14px rgba(0, 0, 0, .6);
   --mat-shadow-lift: 0 2px 4px rgba(0, 0, 0, .3), 0 20px 40px -16px rgba(0, 0, 0, .65);
+  /* 叠放时落在前一张卡上的向上阴影。 */
+  --mat-stack-shadow: 0 -10px 24px -14px rgba(0, 0, 0, .55);
   --mat-raised: linear-gradient(180deg, #272C34 0%, #20252C 100%);
   --mat-raised-hover: linear-gradient(180deg, #2E343D 0%, #262B33 100%);
   --mat-raised-rim: inset 0 1px 0 rgba(255, 255, 255, .075), 0 1px 2px rgba(0, 0, 0, .35);
@@ -189,6 +191,7 @@ html[data-theme="light"] {
   --mat-rim: inset 0 1px 0 rgba(255, 255, 255, .9);
   --mat-shadow: 0 1px 3px rgba(38, 52, 41, .08), 0 12px 32px -14px rgba(38, 52, 41, .16);
   --mat-shadow-lift: 0 2px 6px rgba(38, 52, 41, .1), 0 22px 44px -18px rgba(38, 52, 41, .22);
+  --mat-stack-shadow: 0 -6px 16px -12px rgba(38, 52, 41, .18);
   --mat-raised: linear-gradient(180deg, #FFFFFF 0%, #F1F4EE 100%);
   --mat-raised-hover: linear-gradient(180deg, #FFFFFF 0%, #E9EEE5 100%);
   --mat-raised-rim: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(38, 52, 41, .12);

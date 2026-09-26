@@ -539,7 +539,7 @@ const runAction = async (action: HealthAction) => {
       await backend.openDataFolder();
       actionMessage.value = t.value.actionFolderOpened;
     } else if (action.id === 'reauth') {
-      await router.push({ path: '/settings', hash: '#connection' });
+      await router.push('/settings/account');
       actionMessage.value = t.value.actionReconnect;
       return;
     }

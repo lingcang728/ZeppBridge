@@ -1,10 +1,17 @@
 <script setup lang="ts">
+/* MCP：一句话说清是什么，两个按钮，工具名做成小标签。
+ *
+ * 以前这里有六段说明（跳过提示、和「交给 AI」的比较、为什么不写教程、工具列表、
+ * 分发方式…），配置步骤本来就是让用户把提示词丢给 AI 去问的，界面上不用再讲一遍。
+ * 将复制的提示词默认收起，想先看看的人点开就行。 */
 import { computed, ref } from 'vue';
 import Icon from '../../../components/Icon.vue';
 import { useMessages } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
+import { deckMessages } from '../deck.i18n';
 
 const t = useMessages(settingsMessages);
+const d = useMessages(deckMessages);
 
 const MCP_TOOLS = computed(() => [
   { name: 'list_workouts', detail: t.value.mcpToolListWorkouts },
@@ -14,10 +21,6 @@ const MCP_TOOLS = computed(() => [
   { name: 'get_data_health', detail: t.value.mcpToolDataHealth },
 ]);
 
-/* 与其在界面上写一大篇配置教程，不如给用户一段能直接丢给 AI 的话。
-   配置细节因工具、因操作系统、因安装路径而异，AI 看着他的实际情况给指引，
-   比这里写死的四步准得多；用户本来也就是要截图去问 AI 的。
-   两种语言的提示词都在 Settings.i18n.ts 里。 */
 const mcpConfigExample = computed(() => `{
   "mcpServers": {
     "zeppbridge": {
@@ -28,75 +31,63 @@ const mcpConfigExample = computed(() => `{
 }`);
 
 const mcpMessage = ref<string | null>(null);
-const copyMcpPrompt = async () => {
+const copy = async (text: string, done: string, failed: string) => {
   try {
-    await navigator.clipboard.writeText(t.value.mcpSetupPrompt);
-    mcpMessage.value = t.value.mcpPromptCopied;
+    await navigator.clipboard.writeText(text);
+    mcpMessage.value = done;
   } catch {
-    mcpMessage.value = t.value.mcpPromptCopyFailed;
+    mcpMessage.value = failed;
   }
 };
-
-const copyMcpConfig = async () => {
-  try {
-    await navigator.clipboard.writeText(mcpConfigExample.value);
-    mcpMessage.value = t.value.mcpConfigCopied;
-  } catch {
-    mcpMessage.value = t.value.mcpConfigCopyFailed;
-  }
-};
+const copyMcpPrompt = () => copy(t.value.mcpSetupPrompt, t.value.mcpPromptCopied, t.value.mcpPromptCopyFailed);
+const copyMcpConfig = () => copy(mcpConfigExample.value, t.value.mcpConfigCopied, t.value.mcpConfigCopyFailed);
 </script>
 
 <template>
-  <section class="settings-card mcp-card" aria-labelledby="mcp-title">
-    <div class="section-heading-row">
-      <h2 id="mcp-title">{{ t.mcpTitle }}</h2>
-      <span class="capability-checked">{{ t.mcpBadge }}</span>
+  <section class="s-section" aria-labelledby="mcp-title">
+    <div class="s-section-head">
+      <h3 id="mcp-title">{{ d.secMcp }}</h3>
+      <span class="s-meta">{{ t.mcpBadge }}</span>
     </div>
-    <p class="section-description">
-      <strong>{{ t.mcpSkip }}</strong>
-      {{ t.mcpCompareA }}<strong>{{ t.mcpCompareStrong }}</strong>{{ t.mcpCompareB }}
-    </p>
-
-    <div class="mcp-handoff">
-      <p class="mcp-sub">
-        {{ t.mcpAskA }}<strong>{{ t.mcpAskStrong }}</strong>{{ t.mcpAskB }}
-      </p>
-      <pre class="mcp-config"><code>{{ t.mcpSetupPrompt }}</code></pre>
-      <div class="inline-actions">
-        <button class="button primary" type="button" @click="copyMcpPrompt">
-          <Icon name="copy" :size="14" />{{ t.mcpCopyPrompt }}
-        </button>
-        <button class="button secondary" type="button" @click="copyMcpConfig">
-          <Icon name="copy" :size="14" />{{ t.mcpCopyConfig }}
-        </button>
+    <div class="s-list">
+      <div class="s-row">
+        <div class="s-row-main">
+          <span class="s-row-title">{{ d.mcpLead }}</span>
+        </div>
       </div>
-      <p v-if="mcpMessage" class="hint-line ok" role="status">{{ mcpMessage }}</p>
-    </div>
-
-    <p class="mcp-sub">{{ t.mcpToolsLead }}</p>
-    <div class="mcp-tools">
-      <div v-for="tool in MCP_TOOLS" :key="tool.name" class="mcp-tool">
-        <code>{{ tool.name }}</code>
-        <span>{{ tool.detail }}</span>
+      <div class="s-row">
+        <div class="s-actions">
+          <button class="button primary" type="button" @click="copyMcpPrompt">
+            <Icon name="copy" :size="14" />{{ t.mcpCopyPrompt }}
+          </button>
+          <button class="button secondary" type="button" @click="copyMcpConfig">
+            <Icon name="copy" :size="14" />{{ t.mcpCopyConfig }}
+          </button>
+          <span v-if="mcpMessage" class="hint-line ok" role="status">{{ mcpMessage }}</span>
+        </div>
+      </div>
+      <details class="s-row is-block prompt-fold">
+        <summary>{{ d.mcpPreview }}</summary>
+        <pre class="mcp-config"><code>{{ t.mcpSetupPrompt }}</code></pre>
+      </details>
+      <div class="s-row is-block">
+        <div class="s-row-main">
+          <span class="s-row-title">{{ d.mcpToolsLabel }}</span>
+          <span class="s-row-sub">{{ d.mcpTools }}</span>
+        </div>
+        <div class="mcp-tools">
+          <code v-for="tool in MCP_TOOLS" :key="tool.name" class="chip" :title="tool.detail">{{ tool.name }}</code>
+        </div>
       </div>
     </div>
-
-    <p class="retain-note">
-      <code>zeppbridge-mcp</code>{{ t.mcpFootA }}
-    </p>
   </section>
 </template>
 
 <style scoped src="../settings-base.css"></style>
 <style scoped>
-.mcp-handoff { margin-bottom: var(--space-4); }
-.mcp-handoff .mcp-config { max-height: 200px; overflow: auto; white-space: pre-wrap; font-size: var(--fs-xs); line-height: 1.75; }
-.mcp-handoff .inline-actions { margin-top: 10px; }
-.mcp-tools { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--space-2); margin-bottom: var(--space-3); }
-.mcp-tool { display: grid; gap: 2px; padding: 9px 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); min-width: 0; }
-.mcp-tool code { color: var(--ink); font-family: var(--font-mono); font-size: var(--fs-sm); }
-.mcp-tool span { color: var(--muted); font-size: var(--fs-xs); }
-.mcp-sub { margin: 0 0 6px; color: var(--muted); font-size: var(--fs-sm); }
-.mcp-config { margin: 0; padding: 12px 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); color: var(--ink); font-family: var(--font-mono); font-size: var(--fs-sm); line-height: 1.6; }
+.prompt-fold > summary { color: var(--accent); font-size: var(--fs-sm); cursor: pointer; }
+.mcp-config { max-height: 220px; margin: 10px 0 0; padding: 12px 14px; overflow: auto; border-radius: var(--radius-sm); background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); color: var(--ink); font-family: var(--font-mono); font-size: var(--fs-xs); line-height: 1.7; white-space: pre-wrap; }
+.mcp-config code { color: inherit; font-size: inherit; }
+.mcp-tools { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.mcp-tools .chip { color: var(--ink); font-family: var(--font-mono); cursor: help; }
 </style>

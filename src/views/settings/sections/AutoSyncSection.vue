@@ -7,8 +7,10 @@ import { useSyncController } from '../../../composables/useSyncController';
 import { AUTO_SYNC_INTERVALS } from '../../../lib/autoSync';
 import { useMessages } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
+import { deckMessages } from '../deck.i18n';
 
 const t = useMessages(settingsMessages);
+const d = useMessages(deckMessages);
 const {
   isSyncing, autoSyncEnabled, autoSyncInterval, setAutoSyncInterval, setAutoSyncEnabled, runSync,
 } = useSyncController();
@@ -17,50 +19,44 @@ const intervalItems = computed(() => AUTO_SYNC_INTERVALS.map((minutes) => ({ val
 </script>
 
 <template>
-  <section class="settings-card sync-card" aria-labelledby="sync-title">
-    <div class="sync-lead">
-      <span class="sync-icon"><Icon name="monitor" :size="20" /></span>
-      <div>
-        <h2 id="sync-title">{{ t.syncTitle }}</h2>
-        <p class="sync-desc">{{ t.syncDescA(autoSyncInterval) }}<br />{{ t.syncDescB }}</p>
+  <section class="s-section" aria-labelledby="sync-title">
+    <div class="s-section-head"><h3>{{ d.secAutoSync }}</h3></div>
+    <div class="s-list">
+      <div class="s-row">
+        <div class="s-row-main">
+          <span id="sync-title" class="s-row-title">{{ d.autoSyncToggle }}</span>
+          <span class="s-row-sub">{{ t.syncDescA(autoSyncInterval) }} {{ t.syncDescB }}</span>
+        </div>
+        <div class="s-row-control">
+          <button class="mat-switch" type="button" role="switch" aria-labelledby="sync-title" :aria-checked="autoSyncEnabled" @click="setAutoSyncEnabled(!autoSyncEnabled)"></button>
+        </div>
       </div>
-    </div>
-    <div class="sync-controls">
-      <SegmentTrack
-        compact
-        :items="intervalItems"
-        :model-value="autoSyncInterval"
-        :disabled="!autoSyncEnabled"
-        :aria-label="t.syncIntervalAria"
-        @update:model-value="(value) => setAutoSyncInterval(Number(value))"
-      />
-      <span class="sync-toggle-label">{{ autoSyncEnabled ? t.syncOn : t.syncOff }}</span>
-      <button class="switch" type="button" role="switch" aria-labelledby="sync-title" :aria-checked="autoSyncEnabled" @click="setAutoSyncEnabled(!autoSyncEnabled)"><span></span></button>
-      <button class="button secondary sync-now" type="button" :disabled="isSyncing || !connected" @click="runSync('incremental')">
-        <Icon name="sync" :size="14" />{{ isSyncing ? t.syncing : t.syncNow }}
-      </button>
+      <div class="s-row">
+        <div class="s-row-main"><span class="s-row-title">{{ d.syncIntervalLabel }}</span></div>
+        <div class="s-row-control">
+          <SegmentTrack
+            compact
+            :items="intervalItems"
+            :model-value="autoSyncInterval"
+            :disabled="!autoSyncEnabled"
+            :aria-label="t.syncIntervalAria"
+            @update:model-value="(value) => setAutoSyncInterval(Number(value))"
+          />
+        </div>
+      </div>
+      <div class="s-row">
+        <div class="s-row-main">
+          <span class="s-row-title">{{ d.syncNowLabel }}</span>
+          <span class="s-row-sub">{{ d.syncNowSub }}</span>
+        </div>
+        <div class="s-row-control">
+          <button class="button secondary" type="button" :disabled="isSyncing || !connected" @click="runSync('incremental')">
+            <Icon name="sync" :size="14" :class="{ spinning: isSyncing }" />{{ isSyncing ? t.syncing : t.syncNow }}
+          </button>
+        </div>
+      </div>
     </div>
   </section>
 </template>
 
 <style scoped src="../settings-base.css"></style>
-<style scoped>
-.sync-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-.sync-lead { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
-.sync-lead h2 { margin-bottom: 4px; }
-.sync-icon {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  flex: 0 0 44px;
-  border-radius: 11px;
-  border: 1px solid var(--line);
-  background: var(--surface-raised);
-  color: var(--accent);
-}
-.sync-desc { margin: 0; color: var(--muted); font-size: var(--fs-sm); line-height: 1.6; }
-.sync-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.sync-toggle-label { color: var(--muted); font-size: var(--fs-sm); }
-.sync-now { min-height: 36px; border-radius: 10px; }
-</style>

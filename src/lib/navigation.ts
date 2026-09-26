@@ -1,7 +1,7 @@
 /** Detail routes keep the tab they were opened from. */
 export const navigationBranch = (path: string): string => {
   if (path === '/ai' || path.startsWith('/ai/')) return '/ai';
-  if (path === '/settings' || path === '/health-check' || path.startsWith('/devices')) return '/settings';
+  if (path === '/settings' || path.startsWith('/settings/') || path === '/health-check' || path.startsWith('/devices')) return '/settings';
   return '/';
 };
 
