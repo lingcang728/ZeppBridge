@@ -68,7 +68,7 @@ test('the scan finds the dialog call sites at all', () => {
   const used = dialogMethodsUsed();
   assert.deepEqual([...used.keys()].sort(), ['open', 'save']);
   assert.ok(used.get('open').includes('src/composables/useExport.ts'), 'FIT 导出的目录选择');
-  assert.ok(used.get('open').includes('src/views/Settings.vue'), 'HAR 导入的文件选择');
+  assert.ok(used.get('open').includes('src/composables/settings/useAuthFlow.ts'), 'HAR 导入的文件选择');
   assert.ok(used.get('save').includes('src/composables/useExport.ts'), 'JSON/CSV/GPX 导出的保存');
 });
 
