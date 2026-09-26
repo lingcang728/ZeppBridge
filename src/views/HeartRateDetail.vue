@@ -381,35 +381,4 @@ watch(dataRevision, () => { void load(); });
   </section>
 </template>
 
-<style scoped>
-.metric-page.page { display: grid; gap: var(--space-4); align-content: start; }
-.stack { display: grid; gap: var(--space-4); }
-.range-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.range-label { margin: 0; color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
-
-.day-card { padding: 18px 20px; border: 1px solid var(--mat-line); border-radius: var(--radius-md); background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow); }
-.day-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 12px; }
-.day-head h2 { margin: 0 0 2px; font-size: var(--fs-xl); font-weight: 700; color: var(--ink); }
-.day-head p { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
-.day-stats { display: flex; gap: 18px; margin: 0; }
-.day-stats div { display: grid; gap: 2px; }
-.day-stats dt { color: var(--subtle); font-size: var(--fs-xs); }
-.day-stats dd { margin: 0; color: var(--ink); font-size: var(--fs-3xl); font-weight: 700; font-family: var(--font-mono); }
-.day-chart { width: 100%; height: 240px; }
-/* 说明为什么这个数字和 Zepp App 里的不一样。少了它，用户只会以为其中一边坏了。 */
-.daily-max-note { margin: 10px 0 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.6; }
-.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-4); align-items: start; }
-.inline-alert { display: flex; align-items: center; gap: var(--space-2); margin: 0; padding: 9px 13px; border: 1px solid var(--mat-line); border-radius: var(--radius-md); background: var(--mat-card); color: var(--muted); font-size: var(--fs-sm); box-shadow: var(--mat-rim), var(--mat-shadow); }
-.inline-alert[role='alert'] { color: var(--danger); }
-.retry { margin-left: auto; }
-@media (max-width: 720px) {
-  .card-grid { grid-template-columns: minmax(0, 1fr); }
-  .day-stats { gap: 12px; }
-}
-</style>
+<style scoped src="./HeartRateDetail.css"></style>
