@@ -121,7 +121,7 @@ const facts = (workout: Workout): string => {
 .chosen { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
 .chosen-count { color: var(--subtle); font-size: var(--fs-xs); margin-right: 4px; }
 .list { display: grid; gap: 2px; margin-top: 10px; padding-right: 4px; overflow: visible; }
-.day { margin: 6px 0 2px; padding: 2px 0; background: var(--surface); color: var(--subtle); font-size: var(--fs-xs); font-weight: 600; }
+.day { margin: 6px 0 2px; padding: 2px 0; background: var(--mat-card-solid); color: var(--subtle); font-size: var(--fs-xs); font-weight: 600; }
 .row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--muted); text-align: left; cursor: pointer; }
 .row:hover { background: var(--surface-hover); }
 .row.is-on { border-color: color-mix(in srgb, var(--accent) 40%, transparent); background: var(--accent-soft); color: var(--accent); }

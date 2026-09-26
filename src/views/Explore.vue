@@ -924,12 +924,12 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
   /* 实心背景。半透明会让下面的内容透上来，日期就没法读了。 */
-  background: var(--surface);
+  background: var(--mat-card-solid);
   box-shadow: 0 18px 44px rgba(4, 6, 8, .55);
 }
 .calendar-popover .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .calendar-popover .cal-title { font-size: var(--fs-sm); font-weight: 600; color: var(--ink); }
-.calendar-popover .cal-nav-btn { display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 4px; background: var(--surface-raised); color: var(--muted); cursor: pointer; }
+.calendar-popover .cal-nav-btn { display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 4px; background: var(--mat-raised); color: var(--muted); cursor: pointer; box-shadow: var(--mat-raised-rim); }
 .calendar-popover .cal-nav-btn:hover { color: var(--accent); }
 .calendar-popover .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: var(--fs-2xs); color: var(--subtle); margin-bottom: 4px; }
 .calendar-popover .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
@@ -981,12 +981,12 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
   font-size: var(--fs-sm);
   cursor: pointer;
 }
-.stream-row:hover { background: var(--surface-raised); }
-.stream-row.is-on { border-color: var(--line-strong); background: var(--surface-raised); color: var(--ink); }
+.stream-row:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+.stream-row.is-on { border-color: var(--line-strong); background: var(--mat-inset); color: var(--ink); box-shadow: var(--mat-inset-shadow); }
 .stream-row input { width: 13px; height: 13px; margin: 0; accent-color: var(--accent); cursor: pointer; }
 .page-head h1 { margin-bottom: 6px; font-size: 26.5px; font-weight: 700; color: var(--ink); }
 
-.workout-scope-banner { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-raised); color: var(--subtle); font-size: var(--fs-sm); }
+.workout-scope-banner { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--mat-line); border-radius: 12px; background: var(--mat-inset); color: var(--subtle); font-size: var(--fs-sm); box-shadow: var(--mat-inset-shadow); }
 .workout-scope-banner code { color: var(--ink); font-family: var(--font-mono); font-size: var(--fs-xs); }
 .workout-scope-banner .button { margin-left: auto; }
 /* 三栏底部对齐。
@@ -1052,8 +1052,8 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
   padding: 7px 10px;
   border: 1px solid var(--line-control);
   border-radius: 9px;
-  background: var(--surface-raised);
-  color: var(--subtle);
+  background: var(--mat-inset);
+  color: var(--subtle); box-shadow: var(--mat-inset-shadow);
 }
 .template-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: var(--fs-sm); }
 .template-search:focus-within, .prompt-editor:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
@@ -1066,10 +1066,10 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
   padding: 10px;
   border: 1px solid var(--line-control);
   border-radius: 11px;
-  background: var(--surface-raised);
+  background: var(--mat-raised);
   text-align: left;
   cursor: pointer;
-  transition: border-color 140ms ease, background 140ms ease;
+  transition: border-color 140ms ease, background 140ms ease; box-shadow: var(--mat-raised-rim);
 }
 .template-item:hover { border-color: var(--line-control); }
 .template-item.is-on { border-color: rgba(205, 220, 124, .4); background: var(--accent-soft); }
@@ -1080,9 +1080,9 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
   height: 30px;
   flex: 0 0 30px;
   border-radius: 8px;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--muted);
+  border: 1px solid var(--mat-line);
+  background: var(--mat-card);
+  color: var(--muted); box-shadow: var(--mat-rim), var(--mat-shadow);
 }
 .template-item.is-on .tpl-icon { color: var(--accent); }
 .tpl-copy { display: grid; gap: 4px; min-width: 0; flex: 1; overflow-wrap: anywhere; }
@@ -1106,11 +1106,11 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
   padding: 6px 12px;
   border: 1px solid var(--line-control);
   border-radius: 8px;
-  background: var(--surface-raised);
+  background: var(--mat-raised);
   color: var(--muted);
   font-size: var(--fs-sm);
   cursor: pointer;
-  transition: all 140ms ease;
+  transition: all 140ms ease; box-shadow: var(--mat-raised-rim);
 }
 .mini-btn:hover { color: var(--accent); border-color: var(--accent); }
 
@@ -1119,7 +1119,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
    让提示词编辑框吃掉：多出来的空间变成更大的编辑区，是有用的。 */
 .col-editor > .current-template { display: flex; flex-direction: column; min-height: 0; }
 .col-editor > .current-template .summary-block { flex: 0 0 auto; }
-.prompt-editor { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 190px; border: 1px solid var(--line-control); border-radius: var(--radius-sm); background: var(--surface-raised); overflow: hidden; margin-bottom: 14px; }
+.prompt-editor { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 190px; border: 1px solid var(--line-control); border-radius: var(--radius-sm); background: var(--mat-inset); overflow: hidden; margin-bottom: 14px; box-shadow: var(--mat-inset-shadow); }
 .editor-head {
   display: flex;
   flex-wrap: wrap;
@@ -1151,12 +1151,12 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 }
 
 /* 数据感知摘要（四格卡片） */
-.summary-block { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 0; background: var(--surface-raised); position: relative; }
+.summary-block { border: 1px solid var(--mat-line); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 0; background: var(--mat-inset); position: relative; box-shadow: var(--mat-inset-shadow); }
 .summary-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: var(--fs-sm); font-weight: 600; color: var(--ink); }
 .summary-head span:first-child { display: inline-flex; align-items: center; gap: 5px; }
 .see-more { color: var(--subtle); font-size: var(--fs-xs); font-weight: 400; }
-.summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; background: var(--line); }
-.summary-cell { display: grid; gap: 3px; padding: 10px 12px; background: var(--surface); min-width: 0; }
+.summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; border: 1px solid var(--mat-line); border-radius: 9px; overflow: hidden; background: var(--line); }
+.summary-cell { display: grid; gap: 3px; padding: 10px 12px; background: var(--mat-card-solid); min-width: 0; }
 .cell-label { display: inline-flex; align-items: center; gap: 5px; color: var(--subtle); font-size: var(--fs-xs); }
 .cell-value { color: var(--ink); font-size: var(--fs-xl); font-weight: 600; }
 .cell-value.small { font-size: var(--fs-sm); }
@@ -1176,7 +1176,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
   padding: 4px 10px;
   border: 1px solid var(--line-control);
   border-radius: 7px;
-  background: var(--surface);
+  background: var(--mat-card-solid);
   color: var(--ink);
   font-size: var(--fs-xs);
   font-family: var(--font-mono);
@@ -1233,11 +1233,11 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
   padding: 12px 6px 10px;
   border: 1px solid var(--line-control);
   border-radius: 11px;
-  background: var(--surface-raised);
+  background: var(--mat-raised);
   color: var(--muted);
   font-size: var(--fs-xs);
   cursor: pointer;
-  transition: all 140ms ease;
+  transition: all 140ms ease; box-shadow: var(--mat-raised-rim);
 }
 .format-card strong { color: var(--ink); font-size: var(--fs-sm); }
 .format-card span { min-width: 0; overflow-wrap: anywhere; color: var(--muted); font-size: var(--fs-xs); line-height: 1.5; }
@@ -1253,11 +1253,11 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
   justify-content: space-between;
   margin: 14px 0 16px;
   padding: 10px 12px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--mat-line);
   border-radius: 9px;
-  background: var(--surface-raised);
+  background: var(--mat-inset);
   color: var(--muted);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-sm); box-shadow: var(--mat-inset-shadow);
 }
 .size-row strong { color: var(--accent); font-variant-numeric: tabular-nums; }
 
@@ -1271,11 +1271,11 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
   padding: 8px 10px;
   border: 1px solid var(--line-control);
   border-radius: 10px;
-  background: var(--surface-raised);
+  background: var(--mat-raised);
   color: var(--ink);
   font-size: var(--fs-sm);
   cursor: pointer;
-  transition: border-color 140ms ease;
+  transition: border-color 140ms ease; box-shadow: var(--mat-raised-rim);
 }
 .tool-card.is-on { border-color: var(--accent); background: var(--accent-soft); }
 .tool-logo {
@@ -1285,9 +1285,9 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
   height: 24px;
   flex: 0 0 24px;
   border-radius: 50%;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--muted);
+  border: 1px solid var(--mat-line);
+  background: var(--mat-card);
+  color: var(--muted); box-shadow: var(--mat-rim), var(--mat-shadow);
 }
 .tool-logo img { width: 16px; height: 16px; object-fit: contain; }
 .tool-fallback { color: var(--muted); font-size: var(--fs-sm); font-weight: 700; line-height: 1; }

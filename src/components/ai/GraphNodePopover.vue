@@ -125,7 +125,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 .toggle { width: 100%; justify-content: center; margin-top: 10px; }
 .toggle.on { border-color: var(--accent); color: var(--accent); }
 .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
-.seg-item { padding: 4px 0; border: 1px solid var(--line-control); border-radius: 7px; background: var(--surface-raised); color: var(--muted); font-size: var(--fs-xs); cursor: pointer; }
+.seg-item { padding: 4px 0; border: 1px solid var(--line-control); border-radius: 7px; background: var(--mat-raised); color: var(--muted); font-size: var(--fs-xs); cursor: pointer; box-shadow: var(--mat-raised-rim); }
 .seg-item.is-on { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
 .pop-check { display: flex; align-items: center; gap: 7px; margin: 8px 0; color: var(--ink); font-size: var(--fs-xs); cursor: pointer; }
 .pop-check input { accent-color: var(--accent); }

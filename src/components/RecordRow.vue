@@ -55,7 +55,7 @@ withDefaults(defineProps<{
   text-decoration: none;
 }
 .record-row:last-child { border-bottom: 0; }
-.record-row:hover { background: var(--surface-raised); }
+.record-row:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
 /* 底座由 GlyphTile 画；这里只占位，颜色按记录类别给。 */
 .record-art { display: grid; flex: 0 0 48px; place-items: center; }
 .record-art.tone-sleep { color: var(--sleep); }
@@ -119,10 +119,10 @@ withDefaults(defineProps<{
   min-width: 36px;
   padding: 2px 9px;
   border-radius: 999px;
-  background: var(--surface-raised);
+  background: var(--mat-inset);
   color: var(--sleep);
   font-size: var(--fs-sm);
-  text-align: center;
+  text-align: center; box-shadow: var(--mat-inset-shadow);
 }
 .record-row.compact.tone-activity .record-fact strong { max-width: 100%; overflow-wrap: anywhere;
   color: var(--activity);

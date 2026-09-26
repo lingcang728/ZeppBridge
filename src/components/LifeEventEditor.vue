@@ -89,7 +89,7 @@ async function remove() {
 .event-form { display:grid; gap:16px; }.event-form h2,.event-form p { margin:0; }
 fieldset { border:0; padding:0; margin:0; min-width:0; display:grid; gap:14px; }
 label, .field { display:grid; gap:6px; font-size:var(--fs-sm); color:var(--muted); }
-input,select,textarea { min-width:0; width:100%; box-sizing:border-box; padding:10px; border:1px solid var(--line-control); border-radius:8px; background:var(--surface); color:var(--ink); font:inherit; }
+input,select,textarea { min-width:0; width:100%; box-sizing:border-box; padding:10px; border:1px solid var(--line-control); border-radius:8px; background: var(--mat-card-solid); color:var(--ink); font:inherit; }
 textarea { resize:vertical; }.event-dates { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
 .check { display:flex; align-items:center; gap:8px; }.check input { width:auto; }
 .event-hint { color:var(--subtle); font-size:var(--fs-xs); line-height:1.6; }

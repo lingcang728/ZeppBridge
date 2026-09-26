@@ -289,9 +289,9 @@ function formatNumber(fact: InsightFact, value: number): string {
   display: grid;
   gap: 10px;
   padding: 16px 18px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--mat-line);
   border-radius: 16px;
-  background: var(--surface);
+  background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow);
 }
 .weekly-card header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
 .weekly-card h2 { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--ink); font-size: var(--fs-lg); font-weight: 600; }
@@ -322,7 +322,7 @@ function formatNumber(fact: InsightFact, value: number): string {
 /* 每格里现在有「上一个 28 天」这种长标签加进度条，210px 一行挤六个放不下，
    标签会顶到进度条上。加宽下限，常见窗口宽度下自然落成五列。 */
 .weekly-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 10px; align-items: stretch; }
-.weekly-item { display: grid; gap: 2px; align-content: start; padding: 10px 12px; border-radius: 12px; background: var(--surface-raised); }
+.weekly-item { display: grid; gap: 2px; align-content: start; padding: 10px 12px; border-radius: 12px; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); }
 .weekly-label { color: var(--muted); font-size: var(--fs-xs); }
 .weekly-item strong { color: var(--ink); font-size: var(--fs-2xl); font-weight: 600; }
 .weekly-delta { font-size: var(--fs-xs); line-height: 1.5; }

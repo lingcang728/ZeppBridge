@@ -19,7 +19,7 @@ const emit = defineEmits<{ (event: 'update:modelValue', value: AiProvider): void
 
 <style scoped>
 .providers { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 6px; }
-.provider { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border: 1px solid var(--line-control); border-radius: 10px; background: var(--surface-raised); color: var(--ink); font-size: var(--fs-sm); cursor: pointer; }
+.provider { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border: 1px solid var(--line-control); border-radius: 10px; background: var(--mat-raised); color: var(--ink); font-size: var(--fs-sm); cursor: pointer; box-shadow: var(--mat-raised-rim); }
 .provider:hover { border-color: var(--accent); }
 .provider.is-on { border-color: var(--accent); background: var(--accent-soft); }
 .provider:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }

@@ -212,12 +212,12 @@ const tooltip = computed(() => {
 
 <style scoped>
 .stage-block { position: relative; min-width: 0; }
-.stage-tooltip { position: absolute; top: 8px; z-index: 5; transform: translateX(-50%); max-width: 90%; padding: 8px 12px; border: 1px solid var(--line-control); border-radius: 10px; background: var(--surface-raised); color: var(--ink); font-size: var(--fs-sm); box-shadow: 0 4px 12px rgba(0,0,0,.2); pointer-events: none; }
+.stage-tooltip { position: absolute; top: 8px; z-index: 5; transform: translateX(-50%); max-width: 90%; padding: 8px 12px; border: 1px solid var(--line-control); border-radius: 10px; background: var(--mat-glass-strong); color: var(--ink); font-size: var(--fs-sm); box-shadow: 0 4px 12px rgba(0,0,0,.2); pointer-events: none; }
 .sleep-timeline { display: grid; gap: 10px; margin-top: 12px; }
 .timeline-legend { display: flex; flex-wrap: wrap; gap: 7px 18px; color: var(--muted); font-size: var(--fs-xs); }
 .timeline-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .timeline-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; }
-.timeline-tracks { position: relative; min-width: 0; height: 32px; overflow: hidden; border-radius: 8px; background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--line); }
+.timeline-tracks { position: relative; min-width: 0; height: 32px; overflow: hidden; border-radius: 8px; background: var(--mat-inset); box-shadow: inset 0 0 0 1px var(--line); }
 .timeline-slice { position: absolute; top: 0; height: 100%; min-width: 1px; border-right: 1px solid var(--surface); cursor: help; }
 .timeline-slice:focus-visible { outline: 2px solid var(--focus); z-index: 1; }
 .stage-bar {
@@ -226,7 +226,7 @@ const tooltip = computed(() => {
   height: 10px;
   overflow: hidden;
   border-radius: 999px;
-  background: var(--surface-raised);
+  background: var(--mat-inset); box-shadow: var(--mat-inset-shadow);
 }
 .stage-bar span { display: block; min-width: 0; }
 .deep, i.deep { background: var(--sleep-deep); }
@@ -261,9 +261,9 @@ const tooltip = computed(() => {
 .stage-list > div {
   min-width: 0;
   padding: 12px 14px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--mat-line);
   border-radius: var(--radius-md);
-  background: var(--surface);
+  background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow);
 }
 .stage-list span, .stage-list strong, .stage-list small { display: block; }
 .stage-list span { color: var(--muted); font-size: var(--fs-sm); }

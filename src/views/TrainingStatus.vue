@@ -384,9 +384,9 @@ watch(dataRevision, () => { void load(); });
   flex-direction: column;
   min-width: 0;
   padding: var(--space-4);
-  border: 1px solid var(--line);
+  border: 1px solid var(--mat-line);
   border-radius: var(--radius-md);
-  background: var(--surface);
+  background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow);
 }
 .chart-card.wide { padding: var(--space-4) var(--space-6); }
 .chart-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
@@ -413,11 +413,11 @@ watch(dataRevision, () => { void load(); });
   gap: var(--space-2);
   margin: 0;
   padding: 9px 13px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--mat-line);
   border-radius: var(--radius-md);
-  background: var(--surface);
+  background: var(--mat-card);
   color: var(--danger);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-sm); box-shadow: var(--mat-rim), var(--mat-shadow);
 }
 .retry { margin-left: auto; }
 @media (max-width: 720px) {

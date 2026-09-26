@@ -244,9 +244,9 @@ const exclusionSummary = computed(() => {
   display: grid;
   gap: 10px;
   padding: 16px 18px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--mat-line);
   border-radius: 16px;
-  background: var(--surface);
+  background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow);
 }
 .insight-card header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 .insight-card h2 { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--ink); font-size: var(--fs-lg); font-weight: 600; }
@@ -264,7 +264,7 @@ const exclusionSummary = computed(() => {
 .delta.flat::before, .fact-delta.flat::before { content: '=\a0'; font-weight: 700; }
 
 .fact-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 10px; }
-.fact { display: grid; align-content: start; min-width: 0; gap: 6px; padding: 10px 12px; border-radius: 12px; background: var(--surface-raised); }
+.fact { display: grid; align-content: start; min-width: 0; gap: 6px; padding: 10px 12px; border-radius: 12px; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); }
 .fact-label { color: var(--muted); font-size: var(--fs-xs); }
 .fact strong { color: var(--ink); font-size: var(--fs-2xl); font-weight: 600; }
 .fact-delta { font-size: var(--fs-xs); }

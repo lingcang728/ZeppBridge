@@ -368,9 +368,9 @@ onMounted(() => void load());
   display: grid;
   gap: 10px;
   padding: 18px 20px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--mat-line);
   border-radius: 16px;
-  background: var(--surface);
+  background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow);
 }
 .health-card h2 { margin: 0; color: var(--ink); font-size: var(--fs-lg); font-weight: 600; }
 .health-note { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.6; }
@@ -393,9 +393,9 @@ onMounted(() => void load());
   display: grid;
   gap: 8px;
   padding: 12px 14px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--mat-line);
   border-radius: 12px;
-  background: var(--surface-raised);
+  background: var(--mat-inset); box-shadow: var(--mat-inset-shadow);
 }
 .stream-row header { display: flex; align-items: baseline; gap: 8px; }
 .stream-row header strong { color: var(--ink); font-size: var(--fs-md); font-weight: 600; }

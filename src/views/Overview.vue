@@ -386,7 +386,7 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
 .overview-header { margin-bottom: 0; }
 .overview-header h1 { margin-bottom: 0; }
 
-.inline-alert { display: flex; align-items: center; gap: 8px; padding: 9px 13px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--muted); font-size: var(--fs-sm); }
+.inline-alert { display: flex; align-items: center; gap: 8px; padding: 9px 13px; border: 1px solid var(--mat-line); border-radius: 12px; background: var(--mat-card); color: var(--muted); font-size: var(--fs-sm); box-shadow: var(--mat-rim), var(--mat-shadow); }
 .inline-alert.warning { color: var(--warning); }
 .overview-skeleton { display: grid; gap: 16px; }
 .skeleton-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }

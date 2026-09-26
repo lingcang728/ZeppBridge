@@ -286,13 +286,13 @@ function formatDateHint(value: string): string {
 .col-label em {
   padding: 1px 8px;
   border-radius: 999px;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: var(--mat-card);
+  border: 1px solid var(--mat-line);
   color: var(--muted);
   font-size: var(--fs-xs);
   font-style: normal;
   font-weight: 400;
-  font-family: var(--font-mono);
+  font-family: var(--font-mono); box-shadow: var(--mat-rim), var(--mat-shadow);
 }
 .see-all {
   display: inline-flex;
@@ -308,9 +308,9 @@ function formatDateHint(value: string): string {
   min-height: 0;
   overflow-y: auto;
   padding: 6px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  background: var(--mat-card);
+  border: 1px solid var(--mat-line);
+  border-radius: var(--radius-md); box-shadow: var(--mat-rim), var(--mat-shadow);
 }
 .filter-note {
   display: flex;
@@ -319,9 +319,9 @@ function formatDateHint(value: string): string {
   padding: 6px 12px;
   margin-bottom: 4px;
   border-radius: var(--radius-sm);
-  background: var(--surface-raised);
+  background: var(--mat-inset);
   color: var(--subtle);
-  font-size: var(--fs-xs);
+  font-size: var(--fs-xs); box-shadow: var(--mat-inset-shadow);
 }
 .empty-row {
   padding: 18px 16px;
@@ -334,11 +334,11 @@ function formatDateHint(value: string): string {
   gap: 8px;
   margin-bottom: 12px;
   padding: 9px 12px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--mat-line);
   border-radius: var(--radius-md);
-  background: var(--surface);
+  background: var(--mat-card);
   color: var(--warning);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-sm); box-shadow: var(--mat-rim), var(--mat-shadow);
 }
 .partial-warning svg { color: var(--warning); }
 .filter-tabs {
@@ -347,8 +347,8 @@ function formatDateHint(value: string): string {
   gap: 6px;
   margin-bottom: 8px;
   padding: 4px;
-  background: var(--surface-raised);
-  border-radius: var(--radius-sm);
+  background: var(--mat-inset);
+  border-radius: var(--radius-sm); box-shadow: var(--mat-inset-shadow);
 }
 .tab-button {
   display: flex;

@@ -240,7 +240,7 @@ watch(dataRevision, () => { void load(); });
 .metric-page.page { display: grid; gap: var(--space-4); align-content: start; }
 
 .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-4); }
-.inline-alert { display: flex; align-items: center; gap: var(--space-2); margin: 0; padding: 9px 13px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); color: var(--muted); font-size: var(--fs-sm); }
+.inline-alert { display: flex; align-items: center; gap: var(--space-2); margin: 0; padding: 9px 13px; border: 1px solid var(--mat-line); border-radius: var(--radius-md); background: var(--mat-card); color: var(--muted); font-size: var(--fs-sm); box-shadow: var(--mat-rim), var(--mat-shadow); }
 .inline-alert[role='alert'] { color: var(--danger); }
 .retry { margin-left: auto; }
 @media (max-width: 720px) {

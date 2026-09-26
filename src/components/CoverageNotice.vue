@@ -157,12 +157,12 @@ const syncNow = () => { void runSync('incremental'); };
   flex-wrap: wrap;
   margin: 0 0 var(--space-3);
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--line);
+  border: 1px solid var(--mat-line);
   border-radius: var(--radius-sm);
-  background: var(--surface-raised);
+  background: var(--mat-inset);
   color: var(--muted);
   font-size: var(--fs-md);
-  line-height: 1.5;
+  line-height: 1.5; box-shadow: var(--mat-inset-shadow);
 }
 .coverage-notice span { flex: 1 1 240px; min-width: 0; }
 .coverage-notice .button { flex: 0 0 auto; }

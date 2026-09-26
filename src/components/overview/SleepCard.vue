@@ -138,5 +138,5 @@ html[data-theme="light"] .sleep-panel.metric-panel {
 @media (max-width: 820px) { .sleep-panel { grid-column: 1; } }
 .sleep-panel .panel-more { margin-top: auto; padding-top: 10px; }
 .sleep-bar-hit { position: relative; padding: 8px 0; margin: -8px 0; }
-.sleep-tooltip { position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); z-index: 2; white-space: nowrap; padding: 7px 10px; border: 1px solid var(--line-control); border-radius: 9px; background: var(--surface-raised); color: var(--ink); font-size: var(--fs-sm); pointer-events: none; }
+.sleep-tooltip { position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); z-index: 2; white-space: nowrap; padding: 7px 10px; border: 1px solid var(--line-control); border-radius: 9px; background: var(--mat-glass-strong); color: var(--ink); font-size: var(--fs-sm); pointer-events: none; box-shadow: var(--mat-glass-shadow); }
 </style>

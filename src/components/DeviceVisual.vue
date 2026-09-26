@@ -55,9 +55,9 @@ const onImageError = (): void => {
      要让整表显示完整，得把框放大或调比例，不是让内容跑出去。 */
   overflow: hidden;
   flex: 0 0 76px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--mat-line);
   border-radius: var(--radius-md);
-  background: var(--surface-raised);
+  background: var(--mat-inset); box-shadow: var(--mat-inset-shadow);
 }
 .device-visual.compact { width: 48px; height: 48px; flex-basis: 48px; border-radius: var(--radius-sm); }
 /* 表壳加表带是竖长的，塞进正方框再留 5px 内边距，上下就会顶到边。

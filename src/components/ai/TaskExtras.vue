@@ -140,7 +140,7 @@ const pick = async (replaceId?: string) => {
 
 <style scoped>
 .files { display: grid; gap: 6px; margin: 0 0 8px; padding: 0; list-style: none; }
-.files li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; background: var(--surface-raised); }
+.files li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); }
 .files li.is-missing { outline: 1px solid color-mix(in srgb, var(--danger) 45%, transparent); }
 .file-name { flex: 1; min-width: 0; color: var(--ink); font-size: var(--fs-sm); overflow-wrap: anywhere; }
 .file-size { color: var(--subtle); font-size: var(--fs-xs); font-family: var(--font-mono); }

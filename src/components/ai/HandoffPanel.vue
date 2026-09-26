@@ -145,8 +145,8 @@ const retry = (id: HandoffStepId) => {
 <style scoped>
 .prompt {
   max-height: 180px; margin: 0; padding: 10px 12px; overflow: auto;
-  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised);
-  color: var(--ink); font-family: inherit; font-size: var(--fs-sm); line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere;
+  border: 1px solid var(--mat-line); border-radius: var(--radius-sm); background: var(--mat-inset);
+  color: var(--ink); font-family: inherit; font-size: var(--fs-sm); line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; box-shadow: var(--mat-inset-shadow);
 }
 .issues { margin: 8px 0 0; padding: 0; list-style: none; }
 .actions { display: grid; gap: 8px; margin-top: 14px; }

@@ -180,9 +180,9 @@ const option = computed(() => {
   flex-direction: column;
   min-width: 0;
   padding: var(--space-4);
-  border: 1px solid var(--line);
+  border: 1px solid var(--mat-line);
   border-radius: var(--radius-md);
-  background: var(--surface);
+  background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow);
 }
 .trend-head { display: flex; min-height: 70px; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
 .trend-title { display: grid; gap: 2px; min-width: 0; }

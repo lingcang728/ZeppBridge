@@ -241,7 +241,7 @@ onMounted(() => {
 .device-hero :deep(.device-visual) { width: 104px; height: 124px; flex-basis: 104px; }
 .device-hero {
   display: flex; align-items: center; gap: 20px; padding: 22px;
-  border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised);
+  border: 1px solid var(--mat-line); border-radius: var(--radius-md); background: var(--mat-inset); box-shadow: var(--mat-inset-shadow);
 }
 .hero-copy { display: grid; gap: 4px; min-width: 0; }
 .hero-eyebrow { margin: 0; color: var(--subtle); font-size: var(--fs-xs); letter-spacing: .12em; }
@@ -251,7 +251,7 @@ onMounted(() => {
 .hero-state i { width: 7px; height: 7px; border-radius: 50%; background: var(--subtle); }
 .hero-state.on i { background: #7da33e; }
 
-.facts-card, .assign-card { padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+.facts-card, .assign-card { padding: 18px 20px; border: 1px solid var(--mat-line); border-radius: var(--radius-md); background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow); }
 .facts-card dl { display: grid; gap: 10px; margin: 0; }
 .facts-card dl > div { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
 .facts-card dt { color: var(--muted); font-size: var(--fs-sm); }

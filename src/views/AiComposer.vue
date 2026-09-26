@@ -145,7 +145,7 @@ watch(
 <style scoped>
 .ai-page { padding-bottom: 32px; }
 .layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(380px, 1fr); gap: 18px; align-items: start; }
-.graph-side { position: sticky; top: 16px; height: calc(100vh - 120px); min-height: 480px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); overflow: hidden; }
+.graph-side { position: sticky; top: 16px; height: calc(100vh - 120px); min-height: 480px; border: 1px solid var(--mat-line); border-radius: var(--radius-md); background: var(--mat-card); overflow: hidden; box-shadow: var(--mat-rim), var(--mat-shadow); }
 .steps { display: grid; gap: 14px; min-width: 0; }
 @media (max-width: 1100px) {
   .layout { grid-template-columns: 1fr; }

@@ -90,7 +90,7 @@ const chips = computed(() => [
         <i :class="['dot', { on: chip.state !== 'unknown' }]"></i>
         <span class="chip-state">{{ deviceStateLabel(chip.state) }}</span>
       </RouterLink>
-      <RouterLink class="source-chip manage" to="/settings">
+      <RouterLink class="source-chip manage" to="/settings/account">
         <Icon name="sliders" :size="14" />
         <span>{{ t.manage }}</span>
       </RouterLink>
@@ -137,16 +137,16 @@ const chips = computed(() => [
   align-items: center;
   gap: 7px;
   padding: 5px 10px 5px 6px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--mat-line);
   border-radius: 999px;
-  background: var(--surface);
+  background: var(--mat-card);
   color: inherit;
   font-size: var(--fs-xs);
   text-decoration: none;
   white-space: nowrap;
-  transition: border-color 150ms ease, background-color 150ms ease;
+  transition: border-color 150ms ease, background-color 150ms ease; box-shadow: var(--mat-rim), var(--mat-shadow);
 }
-.source-chip:hover { border-color: var(--line-control); background: var(--surface-raised); }
+.source-chip:hover { border-color: var(--line-control); background: color-mix(in srgb, var(--ink) 5%, transparent); }
 .chip-icon {
   display: grid;
   width: 26px;
@@ -155,8 +155,8 @@ const chips = computed(() => [
   place-items: center;
   overflow: hidden;
   border-radius: 50%;
-  background: var(--surface-raised);
-  color: var(--muted);
+  background: var(--mat-inset);
+  color: var(--muted); box-shadow: var(--mat-inset-shadow);
 }
 .chip-icon :deep(.device-visual) {
   width: 26px;

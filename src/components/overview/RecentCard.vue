@@ -113,7 +113,7 @@ const recentItems = computed<RecentItem[]>(() => {
 
 <style scoped>
 .recent-panel { grid-column: 1 / -1; padding: 18px; }
-.recent-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 12px; overflow: hidden; border: 1px solid var(--line); border-radius: 16px; }
+.recent-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 12px; overflow: hidden; border: 1px solid var(--mat-line); border-radius: 16px; }
 .recent-list :deep(.record-row:nth-child(odd)) { border-right: 1px solid var(--line); }
 .recent-list :deep(.record-row) { min-height: 72px; transition: background .2s ease, transform .2s ease; }
 .recent-list :deep(.record-row:hover) { transform: translateX(2px); }

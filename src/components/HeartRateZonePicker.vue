@@ -287,10 +287,10 @@ watch(() => props.revision, () => { void load(); });
   gap: var(--space-3);
   align-content: start;
   padding: var(--space-4) var(--space-6);
-  border: 1px solid var(--line);
+  border: 1px solid var(--mat-line);
   border-radius: var(--radius-md);
-  background: var(--surface);
-  min-width: 0;
+  background: var(--mat-card);
+  min-width: 0; box-shadow: var(--mat-rim), var(--mat-shadow);
 }
 .zone-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
 .zone-head h2 { margin: 0 0 4px; color: var(--ink); font-size: var(--fs-xl); font-weight: 700; }
@@ -307,10 +307,10 @@ watch(() => props.revision, () => { void load(); });
   padding: var(--space-3);
   border: 1px solid var(--line-control);
   border-radius: var(--radius-sm);
-  background: var(--surface-raised);
+  background: var(--mat-raised);
   color: var(--muted);
   text-align: left;
-  cursor: pointer;
+  cursor: pointer; box-shadow: var(--mat-raised-rim);
 }
 .model-card:hover:not(:disabled) { border-color: var(--accent); }
 .model-card:disabled { opacity: .55; cursor: not-allowed; }
@@ -332,9 +332,9 @@ watch(() => props.revision, () => { void load(); });
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--line-control);
   border-radius: var(--radius-sm);
-  background: var(--surface-raised);
+  background: var(--mat-raised);
   text-align: left;
-  cursor: pointer;
+  cursor: pointer; box-shadow: var(--mat-raised-rim);
 }
 .basis-row:hover:not(:disabled) { border-color: var(--accent); }
 .basis-row.is-on { border-color: var(--accent); background: var(--accent-soft); }
@@ -359,7 +359,7 @@ watch(() => props.revision, () => { void load(); });
 .zone-name { color: var(--ink); }
 .zone-range, .zone-time { color: var(--muted); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .zone-time { text-align: right; white-space: nowrap; flex-shrink: 0; }
-.zone-bar { height: 8px; overflow: hidden; border-radius: 999px; background: var(--surface-raised); }
+.zone-bar { height: 8px; overflow: hidden; border-radius: 999px; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); }
 .zone-bar i { display: block; height: 100%; border-radius: 999px; background: var(--heart); }
 .zone-outside, .zone-formula { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.7; }
 @media (max-width: 720px) {

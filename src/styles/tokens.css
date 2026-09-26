@@ -213,61 +213,6 @@ html[data-theme="light"] {
    组件不需要出现在这里。这是过渡期的集中式补丁表：改对应组件的类名
    时请同步这里，逐步把硬编码换成 token 后这一节应当变空。 */
 
-/* WorkoutDetail：hero / 指标格 / 轨迹图 / 分区条都是深色硬编码。 */
-html[data-theme="light"] .workout-hero {
-  border-color: var(--line);
-  background: var(--surface);
-  box-shadow: var(--panel-glint);
-}
-html[data-theme="light"] .workout-hero::before {
-  background: linear-gradient(120deg, rgba(47, 107, 79, .06), transparent 40%);
-}
-html[data-theme="light"] .workout-hero .hero-device .device-visual {
-  background: var(--surface-raised);
-  box-shadow: none;
-}
-html[data-theme="light"] .metric-tile {
-  border-color: var(--line);
-  background: var(--surface-raised);
-}
-html[data-theme="light"] .metric-tile.tone-heart { background: linear-gradient(135deg, var(--heart-wash), var(--surface-raised)); }
-html[data-theme="light"] .metric-tile.tone-pace { background: linear-gradient(135deg, var(--pace-wash), var(--surface-raised)); }
-html[data-theme="light"] .metric-tile.tone-calories { background: linear-gradient(135deg, var(--calories-wash), var(--surface-raised)); }
-html[data-theme="light"] .metric-tile.tone-altitude { background: linear-gradient(135deg, var(--altitude-wash), var(--surface-raised)); }
-html[data-theme="light"] .metric-tile.tone-cadence { background: linear-gradient(135deg, var(--pace-wash), var(--surface-raised)); }
-html[data-theme="light"] .metric-tile.tone-activity { background: linear-gradient(135deg, var(--activity-wash), var(--surface-raised)); }
-html[data-theme="light"] .type-evidence > span { background: var(--surface-raised); }
-html[data-theme="light"] .route-wrap {
-  border-color: var(--line);
-  background:
-    radial-gradient(120% 90% at 82% 8%, rgba(47, 107, 79, .08), transparent 52%),
-    radial-gradient(90% 80% at 12% 92%, rgba(46, 127, 194, .07), transparent 55%),
-    var(--surface-raised);
-}
-html[data-theme="light"] .route-legend {
-  border-color: var(--line);
-  background: rgba(255, 255, 255, .92);
-}
-html[data-theme="light"] .ghost-road { stroke: var(--route-mint); }
-html[data-theme="light"] .route-glow { stroke: rgba(47, 107, 79, .20); }
-html[data-theme="light"] .route-dot { stroke: #F4F6F3; }
-html[data-theme="light"] .route-end-mark { stroke: #F4F6F3; }
-html[data-theme="light"] .pause-mark circle { fill: var(--surface); }
-html[data-theme="light"] .hr-zone-bar { background: rgba(38, 52, 41, .10); }
-html[data-theme="light"] .chart-icon { background: var(--surface-raised); }
-html[data-theme="light"] .chart-stats strong { color: var(--ink); }
-html[data-theme="light"] .source-chip {
-  border-color: rgba(47, 107, 79, .30);
-  color: var(--accent);
-  background: var(--accent-soft);
-}
-html[data-theme="light"] .mapping-note {
-  border-color: rgba(47, 107, 79, .28);
-  color: var(--accent-strong);
-  background: var(--accent-soft);
-}
-html[data-theme="light"] .export-go { color: var(--accent-ink); }
-
 /* StageBar 的「未知」斜纹在深色里是白 alpha，浅色换成墨色 alpha。 */
 html[data-theme="light"] .stage-bar .unknown {
   background: repeating-linear-gradient(
@@ -278,16 +223,6 @@ html[data-theme="light"] .stage-bar .unknown {
     rgba(38, 52, 41, .07) 8px
   );
 }
-
-/* Settings：进度轨道、状态灯、诊断面板、当前授权卡的深色硬编码。 */
-html[data-theme="light"] .progress-track { background: rgba(38, 52, 41, .12); }
-html[data-theme="light"] .lamp.off { background: rgba(38, 52, 41, .20); }
-html[data-theme="light"] .lamp.on { background: var(--accent); }
-html[data-theme="light"] .lamp.pending { background: var(--warning); }
-html[data-theme="light"] .diagnostic-done strong { color: var(--accent); }
-html[data-theme="light"] .auth-card.current { border-color: rgba(47, 107, 79, .42); }
-html[data-theme="light"] .auth-action.is-current { border-color: rgba(47, 107, 79, .42); }
-html[data-theme="light"] .diagnostic-panel { background: var(--surface-raised); }
 
 /* ComparisonBars：轨道与基线。 */
 html[data-theme="light"] .comparison-track { background: rgba(38, 52, 41, .10); }
