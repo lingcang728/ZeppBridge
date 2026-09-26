@@ -67,6 +67,7 @@ const {
   appStatus,
   statusError,
   isSyncing,
+  syncState,
   autoSyncEnabled,
   autoSyncInterval,
   setAutoSyncInterval,
