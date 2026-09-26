@@ -1221,6 +1221,7 @@ export default {
     },
 
     'components/shell/AppTopBar': {
+      today: 'Сегодня',
       mainNav: 'Основная навигация',
       brandHome: 'ZeppBridge 3 · Обзор',
       connectionTitle: 'Состояние связи с облаком',

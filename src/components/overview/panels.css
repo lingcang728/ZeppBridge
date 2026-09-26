@@ -24,16 +24,7 @@
 .panel-title > span { display: grid; gap: 1px; }
 .panel-title strong { color: var(--ink); font-size: var(--fs-md); font-weight: 600; }
 .panel-title small { color: var(--subtle); font-size: var(--fs-xs); }
-.chart-icon {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  flex: 0 0 38px;
-  place-items: center;
-  overflow: hidden;
-  border-radius: 11px;
-  background: var(--surface-raised);
-}
+.chart-icon { display: grid; width: 38px; height: 38px; flex: 0 0 38px; place-items: center; }
 .latest-value {
   display: flex;
   align-items: baseline;
@@ -55,7 +46,7 @@
   text-align: center;
 }
 .panel-empty.compact { min-height: 170px; flex-direction: column; }
-.panel-empty .design-icon { opacity: .7; filter: saturate(.8); }
+.panel-empty .glyph-tile { opacity: .75; }
 .panel-more { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; color: var(--subtle); font-size: var(--fs-xs); }
 
 a.metric-panel { display: block; color: inherit; text-decoration: none; }

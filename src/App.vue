@@ -2,7 +2,8 @@
 import { getVersion } from '@tauri-apps/api/app';
 import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, watch } from 'vue';
 import { RouterView, useRoute, useRouter } from 'vue-router';
-import DesignIcon, { type DesignIconName } from './components/DesignIcon.vue';
+import type { DesignIconName } from './components/DesignIcon.vue';
+import GlyphTile from './components/GlyphTile.vue';
 import Icon from './components/Icon.vue';
 import { navigationBranch } from './lib/navigation';
 import AppTopBar from './components/shell/AppTopBar.vue';
@@ -221,36 +222,39 @@ onUnmounted(() => {
     <a class="skip-link" href="#main-content">{{ t.skipToContent }}</a>
 
     <div class="app-body">
-      <AppTopBar :items="navigation" :nav-aria-label="t.mainNav" :version-title="versionTitle" :back-to="!['/', '/ai', '/settings'].includes(route.path) ? navigationBranch(route.path) : undefined" :back-label="t.quickReturn(navigationBranch(route.path) === '/settings' ? t.navSettings : t.navOverview)" />
-
-      <div v-if="!backendReady" class="sync-feedback" role="status" aria-live="polite">
-        <Icon name="database" :size="14" class="spinning" />
-        <span>{{ t.preparingData }}</span>
-      </div>
-      <div v-if="statusError" class="sync-feedback tone-failed" role="alert">
-        <Icon name="warning" :size="14" />
-        <span>{{ statusError }}</span>
-      </div>
-      <!-- 装完新版本第一次启动时的一次性后台维护。压的时候说一声，压完自己走。 -->
-      <div v-if="compacting" class="sync-feedback" role="status" aria-live="polite">
-        <Icon name="database" :size="14" class="spinning" />
-        <span>{{ t.compacting(compactionPending) }}</span>
-      </div>
-      <div v-else-if="compactionSaved" class="sync-feedback tone-updated" role="status">
-        <Icon name="circle-check" :size="14" />
-        <span>{{ t.compacted(formatSavedBytes(compactionSaved)) }}</span>
-      </div>
-      <div v-if="trayHint" class="sync-feedback" role="status">{{ t.trayHint }}</div>
-
-      <div v-if="browserPreview" class="preview-banner" role="status">
-        <Icon name="terminal" :size="16" />
-        <span>{{ t.browserPreview }}</span>
-      </div>
-      <div v-if="routeNotice" class="route-notice" role="status">
-        <Icon name="info" :size="16" />{{ t.routeNotFound }}
-      </div>
-
       <main id="main-content" class="main-content" tabindex="-1">
+        <!-- 顶栏和提示条粘在滚动区顶上：页面内容从玻璃顶栏下面滚过去。 -->
+        <div class="shell-head">
+          <AppTopBar :items="navigation" :nav-aria-label="t.mainNav" :version-title="versionTitle" :back-to="!['/', '/ai', '/settings'].includes(route.path) ? navigationBranch(route.path) : undefined" :back-label="t.quickReturn(navigationBranch(route.path) === '/settings' ? t.navSettings : t.navOverview)" />
+
+          <div v-if="!backendReady" class="sync-feedback" role="status" aria-live="polite">
+            <Icon name="database" :size="14" class="spinning" />
+            <span>{{ t.preparingData }}</span>
+          </div>
+          <div v-if="statusError" class="sync-feedback tone-failed" role="alert">
+            <Icon name="warning" :size="14" />
+            <span>{{ statusError }}</span>
+          </div>
+          <!-- 装完新版本第一次启动时的一次性后台维护。压的时候说一声，压完自己走。 -->
+          <div v-if="compacting" class="sync-feedback" role="status" aria-live="polite">
+            <Icon name="database" :size="14" class="spinning" />
+            <span>{{ t.compacting(compactionPending) }}</span>
+          </div>
+          <div v-else-if="compactionSaved" class="sync-feedback tone-updated" role="status">
+            <Icon name="circle-check" :size="14" />
+            <span>{{ t.compacted(formatSavedBytes(compactionSaved)) }}</span>
+          </div>
+          <div v-if="trayHint" class="sync-feedback" role="status">{{ t.trayHint }}</div>
+
+          <div v-if="browserPreview" class="preview-banner" role="status">
+            <Icon name="terminal" :size="16" />
+            <span>{{ t.browserPreview }}</span>
+          </div>
+          <div v-if="routeNotice" class="route-notice" role="status">
+            <Icon name="info" :size="16" />{{ t.routeNotFound }}
+          </div>
+        </div>
+
         <!-- 主要页面缓存起来，切回去不再重新查库。
              以前每次切页都重新挂载一遍组件，于是每次都把那一页的全部查询重跑
              一遍——首页一次就是六条命令，而命令侧共用一把数据库锁，它们只能
@@ -258,6 +262,7 @@ onUnmounted(() => {
              变化，各页都在监听）时才重新读库。
 
              详情页不缓存：它们按 URL 参数取数，缓存一堆实例既没收益又占内存。 -->
+        <div class="page-host">
         <RouterView v-slot="{ Component }">
           <Transition name="page" mode="out-in">
             <KeepAlive :include="CACHED_PAGES" :max="6">
@@ -265,18 +270,21 @@ onUnmounted(() => {
             </KeepAlive>
           </Transition>
         </RouterView>
+        </div>
       </main>
 
       <nav class="bottom-nav" :aria-label="t.bottomNav">
         <SegmentTrack
           class="bottom-track"
+          variant="glass"
+          fill
           :items="navigation.map((item) => ({ value: item.to, label: item.label }))"
           :model-value="navigationBranch(route.path)"
           :aria-label="t.bottomNav"
           @update:model-value="(to) => router.push(String(to))"
         >
           <template #default="{ item }">
-            <DesignIcon :name="navigation.find((entry) => entry.to === String(item.value))?.icon ?? 'overview'" :size="22" />
+            <GlyphTile :name="navigation.find((entry) => entry.to === String(item.value))?.icon ?? 'overview'" :size="22" />
             <span>{{ item.label }}</span>
           </template>
         </SegmentTrack>
@@ -374,6 +382,9 @@ a { color: inherit; }
 .route-notice { background: var(--surface); color: var(--warning); }
 .main-content { position: relative; width: 100%; min-width: 0; min-height: 0; flex: 1; overflow: auto; overflow-x: hidden; background: var(--canvas); }
 .bottom-nav { display: none; }
+.shell-head { position: sticky; top: 0; z-index: 30; }
+/* 离场页面绝对定位时相对这一层，而不是相对整个滚动区——否则会盖到顶栏上。 */
+.page-host { position: relative; min-width: 0; }
 .page-enter-active, .page-leave-active { transition: opacity 150ms ease; }
 .page-leave-active { position: absolute; inset: 0 auto auto 0; width: 100%; pointer-events: none; }
 .page-enter-from, .page-leave-to { opacity: 0; }
@@ -386,9 +397,9 @@ a { color: inherit; }
   .sync-feedback { padding-inline: 16px; }
   .preview-banner, .route-notice { padding-inline: 16px; }
   .main-content { padding-bottom: 64px; }
-  .bottom-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: flex; height: auto; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: var(--canvas); border-top: 1px solid var(--line); }
+  .bottom-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: flex; height: auto; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: transparent; }
   .bottom-track { width: 100%; }
-  .bottom-track :deep(.segment-item) { flex: 1; min-height: 48px; flex-direction: column; gap: 2px; font-size: var(--fs-xs); }
+  .bottom-track .segment-item, .bottom-track .segment-ink-item { min-height: 48px; flex-direction: column; gap: 2px; font-size: var(--fs-xs); }
 }
 
 /* ── 页面通用 ───────────────────────────── */
@@ -398,14 +409,7 @@ a { color: inherit; }
 h1, h2, p { margin-top: 0; }
 .page h1 { margin-bottom: 6px; font-size: 28.5px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; }
 .page-intro { margin-bottom: 0; color: var(--muted); font-size: var(--fs-md); }
-.button { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; gap: 6px; padding: 6px 14px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; font-size: var(--fs-sm); text-decoration: none; cursor: pointer; }
-.button:disabled { opacity: .5; cursor: not-allowed; }
-.button-primary, .button.primary { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
-.button-primary:hover:not(:disabled), .button.primary:hover:not(:disabled) { background: var(--accent-hover); }
-.button-secondary, .button.secondary, .button-quiet, .button.quiet { border-color: var(--line-control); color: var(--muted); background: var(--surface-raised); }
-.button-secondary:hover:not(:disabled), .button.secondary:hover:not(:disabled), .button-quiet:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-.button-danger, .button.danger-button { border-color: rgba(240, 97, 106, .35); color: var(--danger); }
-.surface-card { border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); overflow: hidden; min-width: 0; }
+/* 按钮与卡片的全局样式在 styles/material.css。 */
 .section-label { margin: 0 0 8px; padding: 0 2px; color: var(--ink); font-size: var(--fs-md); font-weight: 700; }
 @media (max-width: 760px) {
   .page { padding: 24px 16px 38px; }

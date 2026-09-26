@@ -9,7 +9,7 @@
  * 这里选出来的结果会被如实标注成「你指认的型号」，不会伪装成自动识别。
  */
 import { computed, ref, watch } from 'vue';
-import DesignIcon from './DesignIcon.vue';
+import GlyphTile from './GlyphTile.vue';
 import DeviceVisual from './DeviceVisual.vue';
 import { catalogEntryMatchesId, deviceCatalog, deviceImageFor, type DeviceCatalogEntry } from '../lib/deviceCatalog';
 import { defineMessages, locale, useMessages } from '../i18n';
@@ -219,7 +219,7 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
         :aria-label="t.prev"
         :disabled="entries.length < 2"
         @click="step(-1)"
-      ><DesignIcon name="chevron-right" :size="20" class="flip" /></button>
+      ><GlyphTile name="chevron-right" :size="20" class="flip" /></button>
 
       <div class="picker-frame">
         <DeviceVisual
@@ -257,7 +257,7 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
         :aria-label="t.next"
         :disabled="entries.length < 2"
         @click="step(1)"
-      ><DesignIcon name="chevron-right" :size="20" /></button>
+      ><GlyphTile name="chevron-right" :size="20" /></button>
     </div>
 
     <div class="picker-actions">

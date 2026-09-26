@@ -3,6 +3,10 @@ import { computed } from 'vue';
 
 export type IconName =
   | 'activity'
+  | 'bike'
+  | 'chevron-right'
+  | 'gauge'
+  | 'heart-refresh'
   | 'arrow-left'
   | 'arrow-right'
   | 'bars'
@@ -193,6 +197,21 @@ const stroke = computed(() => Math.min(1.75, Math.max(1.5, props.stroke)));
       <path d="M9 6.5V4.2h6V6.5M9 17.5v2.3h6V17.5" :stroke-width="stroke" />
     </g>
     <path v-else-if="name === 'wifi'" d="M3.5 8.8a13.4 13.4 0 0 1 17 0M6.5 12a8.6 8.6 0 0 1 11 0M9.4 15.2a4 4 0 0 1 5.2 0M12 18.7v.1" :stroke-width="stroke" />
+    <path v-else-if="name === 'chevron-right'" d="m9 6 6 6-6 6" :stroke-width="stroke" />
+    <g v-else-if="name === 'bike'">
+      <circle cx="6" cy="16" r="3.6" :stroke-width="stroke" />
+      <circle cx="18" cy="16" r="3.6" :stroke-width="stroke" />
+      <path d="M6 16 9.5 9h6L18 16M9.5 9 12 16h-6m6.5-10h2.5m-5 3-1-3" :stroke-width="stroke" />
+    </g>
+    <g v-else-if="name === 'gauge'">
+      <path d="M4.2 17.5a8.5 8.5 0 1 1 15.6 0" :stroke-width="stroke" />
+      <path d="m12 13.5 4-5" :stroke-width="stroke" />
+      <circle cx="12" cy="13.8" r="1.4" fill="currentColor" stroke="none" />
+    </g>
+    <g v-else-if="name === 'heart-refresh'">
+      <path d="M19.6 9.2C19.6 13.6 12 18 12 18s-7.6-4.4-7.6-8.8A4.1 4.1 0 0 1 12 7a4.1 4.1 0 0 1 7.6 2.2Z" fill="currentColor" stroke="none" opacity=".9" />
+      <path d="M20.6 15.2a3.4 3.4 0 1 1-1.2-2.6m1.2-1v2h-2" :stroke-width="stroke" />
+    </g>
     <path v-else-if="name === 'x'" d="m6 6 12 12M18 6 6 18" :stroke-width="stroke" />
     <path v-else-if="name === 'undo'" d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11" :stroke-width="stroke" />
     <path v-else-if="name === 'bell'" d="M18 9a6 6 0 1 0-12 0c0 5-2 6-2 6h16s-2-1-2-6Zm-8 9a2.2 2.2 0 0 0 4 0" :stroke-width="stroke" />

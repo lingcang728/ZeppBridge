@@ -11,7 +11,7 @@
  */
 import { computed, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
-import DesignIcon from '../components/DesignIcon.vue';
+import GlyphTile from '../components/GlyphTile.vue';
 import DevicePicker from '../components/DevicePicker.vue';
 import DeviceVisual from '../components/DeviceVisual.vue';
 import EmptyState from '../components/EmptyState.vue';
@@ -191,7 +191,7 @@ onMounted(() => {
           <div><dt>{{ t.factDeviceId }}</dt><dd>{{ maskIdentifier(model.profile.device_id || model.profile.serial) }}</dd></div>
         </dl>
         <p class="facts-note">
-          <DesignIcon name="secure" :size="20" />
+          <GlyphTile name="secure" :size="20" />
           {{ t.factsNote }}
         </p>
       </section>

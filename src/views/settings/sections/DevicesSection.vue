@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
-import DesignIcon from '../../../components/DesignIcon.vue';
+import GlyphTile from '../../../components/GlyphTile.vue';
 import DeviceVisual from '../../../components/DeviceVisual.vue';
 import Icon from '../../../components/Icon.vue';
 import DiagnosticReportForm from '../DiagnosticReportForm.vue';
@@ -111,7 +111,7 @@ onMounted(() => { void loadDevices(); });
       <div class="source-row">
         <span v-if="source.kind === 'cloud' || (source.kind === 'device' && source.model.image)" class="source-icon">
           <DeviceVisual v-if="source.kind === 'device'" :src="source.model.image" :alt="source.name" :kind="source.model.kind" compact />
-          <DesignIcon v-else name="zepp-cloud" :size="32" />
+          <GlyphTile v-else name="zepp-cloud" :size="32" />
         </span>
         <div class="source-copy">
           <strong>{{ source.name }}</strong>

@@ -5,6 +5,7 @@ import { initializeLocale } from "./i18n";
 import { initializeTheme } from "./composables/useTheme";
 import "./styles/fonts.css";
 import "./styles/tokens.css";
+import "./styles/material.css";
 
 // ECharts 的注册刻意不在这里：见 lib/echartsSetup.ts。放在入口会把整个图表
 // 引擎钉进首屏 bundle，连只看落地页的访客也要下载一遍。

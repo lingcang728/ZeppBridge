@@ -21,6 +21,7 @@ const messages = defineMessages(
     lastSyncPrefix: '上次同步：',
     notFetchedYet: '尚未获取',
     timeUnknown: '时间未知',
+    today: '今天',
     syncNow: '立即同步',
     verifyFirst: '请先完成连接验证',
     syncing: '同步中…',
@@ -40,6 +41,7 @@ const messages = defineMessages(
     lastSyncPrefix: 'Last sync: ',
     notFetchedYet: 'Not fetched yet',
     timeUnknown: 'Time unknown',
+    today: 'Today',
     syncNow: 'Sync now',
     verifyFirst: 'Verify the connection first',
     syncing: 'Syncing…',
@@ -59,6 +61,7 @@ const messages = defineMessages(
     lastSyncPrefix: 'Última sincronización: ',
     notFetchedYet: 'Aún sin datos',
     timeUnknown: 'Hora desconocida',
+    today: 'Hoy',
     syncNow: 'Sincronizar ahora',
     verifyFirst: 'Primero verifica la conexión',
     syncing: 'Sincronizando…',
@@ -109,14 +112,32 @@ const statusTone = computed(() => {
   return 'neutral';
 });
 
-const lastSyncClock = computed(() => {
+const lastSyncDate = computed(() => {
   const raw = appStatus.value?.last_cloud_sync_at;
-  if (!raw) return t.value.notFetchedYet;
+  if (!raw) return null;
   const date = new Date(raw);
-  if (Number.isNaN(date.getTime())) return t.value.timeUnknown;
+  return Number.isNaN(date.getTime()) ? undefined : date;
+});
+/** 完整时间：放在 title / aria-label 里。 */
+const lastSyncClock = computed(() => {
+  const date = lastSyncDate.value;
+  if (date === null) return t.value.notFetchedYet;
+  if (!date) return t.value.timeUnknown;
   return displayDateTimeFormatter({
     year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(date).replace(/\//g, '-');
+});
+/* 胶囊里放短格式：今天只写「今天 15:22」，别的日子写「09-26 15:22」。
+   完整的年月日时分放不下，以前会被截成「2026-09-26 15:…」。 */
+const lastSyncShort = computed(() => {
+  const date = lastSyncDate.value;
+  if (!date) return lastSyncClock.value;
+  const time = displayDateTimeFormatter({ hour: '2-digit', minute: '2-digit', hour12: false }).format(date);
+  const now = new Date();
+  const sameDay = date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
+  if (sameDay) return `${t.value.today} ${time}`;
+  const day = displayDateTimeFormatter({ month: '2-digit', day: '2-digit' }).format(date).replace(/\//g, '-');
+  return `${day} ${time}`;
 });
 
 /* 胶囊里只放一行短文字：同步中给进度，失败给结果，空闲给上次同步时间。 */
@@ -128,7 +149,7 @@ const syncText = computed(() => {
   }
   if (syncState.value === 'failed') return t.value.syncFailed;
   if (syncState.value === 'partial') return t.value.syncPartial;
-  return lastSyncClock.value;
+  return lastSyncShort.value;
 });
 
 const syncTitle = computed(() => {
@@ -171,6 +192,7 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
 
     <SegmentTrack
       class="pill-nav"
+      variant="glass"
       :items="navItems"
       :model-value="activeBranch"
       :aria-label="navAriaLabel || t.mainNav"
@@ -192,11 +214,13 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
         <Icon v-if="isSyncing" name="x" :size="13" class="sync-cancel" />
       </button>
 
-      <SelectMenu class="theme-menu" :model-value="themeMode" :options="themeOptions"
+      <SelectMenu class="theme-menu" icon-only :model-value="themeMode" :options="themeOptions"
         :aria-label="t.themeTitle" :menu-min-width="156" @update:model-value="onThemeChange" />
 
       <SelectMenu
         class="locale-menu"
+        icon-only
+        trigger-icon="globe"
         :model-value="locale"
         :options="localeOptions"
         :aria-label="t.localeLabel"
@@ -208,7 +232,11 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
 </template>
 
 <style scoped>
+/* 顶栏是玻璃：它粘在滚动区顶上，页面内容从它下面滚过去、被模糊透出来。 */
 .app-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   height: 60px;
@@ -217,8 +245,13 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
   align-items: center;
   gap: 12px;
   padding: 0 20px;
-  background: var(--canvas);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--mat-glass-line);
+  background: var(--mat-glass);
+  -webkit-backdrop-filter: var(--mat-glass-blur);
+  backdrop-filter: var(--mat-glass-blur);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .app-topbar { background: var(--mat-glass-strong); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 
 .quick-back { display: inline-flex; width: 38px; height: 38px; align-items: center; justify-content: center; justify-self: start; flex: 0 0 38px;
@@ -256,19 +289,20 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
 
 .sync-pill {
   display: inline-flex;
-  min-height: 34px;
+  min-height: 36px;
   align-items: center;
   gap: 7px;
-  padding: 5px 13px;
-  border: 1px solid var(--line);
+  padding: 5px 14px;
+  border: 1px solid var(--mat-line-hover);
   border-radius: 999px;
-  background: var(--surface);
+  background: var(--mat-raised);
+  box-shadow: var(--mat-raised-rim);
   color: var(--muted);
   font-size: var(--fs-sm);
   cursor: pointer;
   white-space: nowrap;
 }
-.sync-pill:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.sync-pill:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 60%, transparent); color: var(--ink); background: var(--mat-raised-hover); }
 .sync-pill:disabled { cursor: not-allowed; opacity: .6; }
 .sync-pill .dot {
   width: 8px;
@@ -288,18 +322,10 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
   0%, 100% { opacity: 1; }
   50% { opacity: .3; }
 }
-.sync-text { font-variant-numeric: tabular-nums; max-width: 132px; overflow: hidden; text-overflow: ellipsis; }
+.sync-text { font-variant-numeric: tabular-nums; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
 .sync-cancel { color: var(--subtle); }
 
-.theme-menu { width: 136px; }
-.locale-menu { width: 100px; }
-.theme-menu :deep(.select-trigger), .locale-menu :deep(.select-trigger) {
-  min-height: 34px;
-  border-radius: 999px;
-  font-size: var(--fs-sm);
-}
-.theme-menu :deep(.select-trigger) { padding-inline: 10px; }
-.theme-menu :deep(.select-value), .locale-menu :deep(.select-value) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.theme-menu, .locale-menu { flex: 0 0 auto; }
 
 /* 窄屏降级：先让胶囊回到文档流避免和按钮组重叠，再小到手机上藏掉
    （底部 tabbar 已经覆盖同一组导航）。语言选择在 520px 以下也让位给
@@ -313,12 +339,9 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
 @media (max-width: 760px) {
   .app-topbar { height: 56px; padding: 0 14px; gap: 10px; }
   .pill-nav { display: none; }
-  .sync-text { max-width: 92px; }
-  .theme-menu :deep(.select-icon) { display: none; }
+  .sync-text { max-width: 120px; }
 }
 @media (max-width: 520px) {
-  .locale-menu { width: 100px; }
-  .theme-menu { width: 110px; }
   .topbar-actions { gap: 5px; }
   .sync-text { display: none; }
   .sync-pill { padding-inline: 10px; }

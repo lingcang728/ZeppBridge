@@ -67,6 +67,6 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.dialog-backdrop { position: fixed; inset: 0; z-index: 2100; display: grid; place-items: center; padding: 20px; background: rgba(0, 0, 0, .7); }
-.dialog-panel { width: 100%; max-width: 560px; min-width: 0; max-height: calc(100vh / var(--ui-scale, 1) - 40px); overflow-y: auto; overscroll-behavior: contain; padding: 20px; border: 1px solid var(--line-control); border-radius: var(--radius-md); background: var(--surface-raised); color: var(--ink); box-shadow: 0 12px 36px rgba(0, 0, 0, .5); overflow-wrap: anywhere; }
+.dialog-backdrop { position: fixed; inset: 0; z-index: 2100; display: grid; place-items: center; padding: 20px; background: rgba(0, 0, 0, .55); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.dialog-panel { width: 100%; max-width: 560px; min-width: 0; max-height: calc(100vh / var(--ui-scale, 1) - 40px); overflow-y: auto; overscroll-behavior: contain; padding: 20px; border: 1px solid var(--mat-glass-line); border-radius: var(--radius-lg); background: var(--mat-glass-strong); -webkit-backdrop-filter: var(--mat-glass-blur); backdrop-filter: var(--mat-glass-blur); color: var(--ink); box-shadow: var(--mat-glass-shadow); overflow-wrap: anywhere; }
 </style>

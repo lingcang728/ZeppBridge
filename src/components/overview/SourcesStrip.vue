@@ -6,7 +6,7 @@
  * 账户状态；点进去落到对应设备页或设置。 */
 import { computed, onMounted } from 'vue';
 import { RouterLink } from 'vue-router';
-import DesignIcon from '../DesignIcon.vue';
+import GlyphTile from '../GlyphTile.vue';
 import DeviceVisual from '../DeviceVisual.vue';
 import Icon from '../Icon.vue';
 import { deviceStateLabel, useDevices } from '../../composables/useDevices';
@@ -84,7 +84,7 @@ const chips = computed(() => [
       <RouterLink v-for="chip in chips" :key="chip.key" class="source-chip" :to="chip.to">
         <span v-if="chip.kind === 'cloud' || (chip.kind === 'device' && chip.model.image)" class="chip-icon">
           <DeviceVisual v-if="chip.kind === 'device'" :src="chip.model.image" :alt="chip.name" :kind="chip.model.kind" compact />
-          <DesignIcon v-else name="zepp-cloud" :size="22" />
+          <GlyphTile v-else name="zepp-cloud" :size="22" />
         </span>
         <span class="chip-name">{{ chip.name }}</span>
         <i :class="['dot', { on: chip.state !== 'unknown' }]"></i>

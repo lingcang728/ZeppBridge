@@ -1085,6 +1085,7 @@ Markdown में जवाब दें।`,
     },
 
     'components/shell/AppTopBar': {
+      today: 'आज',
       brandHome: 'ZeppBridge 3 · ओवरव्यू',
       mainNav: 'मुख्य नेविगेशन',
       syncNow: 'अभी सिंक करें',

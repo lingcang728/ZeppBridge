@@ -30,3 +30,18 @@ export function snapStop<T>(stops: SegmentStop<T>[], center: number, velocity: n
   return stops.reduce((best, stop) =>
     Math.abs(stop.left + stop.width / 2 - projected) < Math.abs(best.left + best.width / 2 - projected) ? stop : best);
 }
+
+/**
+ * 上层「选中字」的裁剪框：正好是滑块覆盖的那一段（上下各留轨道内边距）。
+ * 滑块还没量出来时整层藏掉，免得第一帧所有标签都是选中色。
+ */
+export function segmentClip(
+  thumb: { left: number; width: number; visible: boolean },
+  trackWidth: number,
+  pad = 3,
+): string {
+  if (!thumb.visible || thumb.width <= 0 || trackWidth <= 0) return 'inset(50%)';
+  const left = Math.max(0, thumb.left);
+  const right = Math.max(0, trackWidth - (thumb.left + thumb.width));
+  return `inset(${pad}px ${right}px ${pad}px ${left}px round 999px)`;
+}

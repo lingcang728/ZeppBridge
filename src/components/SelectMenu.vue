@@ -32,7 +32,13 @@ const props = withDefaults(defineProps<{
   /** 弹层向上展开——按钮靠近视口底部时用。 */
   dropUp?: boolean;
   menuMinWidth?: number;
+  /** 只显示图标的圆形触发器（顶栏用）：当前值只在 aria-label / title 里。 */
+  iconOnly?: boolean;
+  /** iconOnly 且选中项没有图标时用的图标。 */
+  triggerIcon?: IconName;
 }>(), {
+  iconOnly: false,
+  triggerIcon: undefined,
   disabled: false,
   // 空串表示「用默认文案」：withDefaults 的默认值在 props 解析时求值，
   // 那时还拿不到当前语言。
@@ -198,13 +204,14 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="root" :class="['select-menu', { 'is-open': open, 'is-disabled': disabled }]" @focusout="onFocusOut">
+  <div ref="root" :class="['select-menu', { 'is-open': open, 'is-disabled': disabled, 'is-icon-only': iconOnly }]" @focusout="onFocusOut">
     <button
       type="button"
       class="select-trigger"
       role="combobox"
       :aria-expanded="open"
-      :aria-label="ariaLabel"
+      :aria-label="iconOnly && ariaLabel ? `${ariaLabel}: ${selectedLabel}` : ariaLabel"
+      :title="iconOnly ? selectedLabel : undefined"
       :aria-controls="open ? listId : undefined"
       :aria-activedescendant="activeOptionId"
       aria-haspopup="listbox"
@@ -213,9 +220,14 @@ onBeforeUnmount(() => {
       @click="toggle"
       @keydown="onKeydown"
     >
-      <Icon v-if="selectedIcon" :name="selectedIcon" :size="16" class="select-icon" />
-      <span :class="['select-value', { placeholder: selectedIndex < 0 }]">{{ selectedLabel }}</span>
-      <Icon name="chevron-down" :size="14" class="select-caret" />
+      <template v-if="iconOnly">
+        <Icon :name="selectedIcon || triggerIcon || 'sliders'" :size="17" class="select-icon" />
+      </template>
+      <template v-else>
+        <Icon v-if="selectedIcon" :name="selectedIcon" :size="16" class="select-icon" />
+        <span :class="['select-value', { placeholder: selectedIndex < 0 }]">{{ selectedLabel }}</span>
+        <Icon name="chevron-down" :size="14" class="select-caret" />
+      </template>
     </button>
 
     <Teleport to="body">
@@ -263,11 +275,13 @@ onBeforeUnmount(() => {
   margin: 0;
   padding: 4px;
   overflow-y: auto;
-  border: 1px solid var(--line-control);
-  border-radius: var(--radius-sm);
-  /* 实心背景。半透明会让下面的内容透上来，选项就没法读了。 */
-  background: var(--surface-raised);
-  box-shadow: 0 18px 44px rgba(4, 6, 8, .55);
+  border: 1px solid var(--mat-glass-line);
+  border-radius: var(--radius-md);
+  /* 玻璃，但用高不透明度那一档：下面的内容只透一点颜色，选项文字照样读得清。 */
+  background: var(--mat-glass-strong);
+  -webkit-backdrop-filter: var(--mat-glass-blur);
+  backdrop-filter: var(--mat-glass-blur);
+  box-shadow: var(--mat-glass-shadow);
   list-style: none;
 }
 .select-list .select-option {
@@ -282,7 +296,8 @@ onBeforeUnmount(() => {
   font-size: var(--fs-md);
   cursor: pointer;
 }
-.select-list .select-option.is-active { background: var(--surface-hover); color: var(--ink); outline: 2px solid var(--focus); outline-offset: -2px; }
+.select-list .select-option.is-active { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); outline: 2px solid var(--focus); outline-offset: -2px; }
+.select-list .select-option:not(.is-active):hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
 .select-list .select-option.is-selected { color: var(--ink); font-weight: 600; }
 .select-list .option-icon { grid-column: 1; grid-row: 1; color: var(--muted); }
 .select-list .option-label { grid-column: 2; grid-row: 1; overflow-wrap: anywhere; }
@@ -301,9 +316,10 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 8px;
   padding: 6px 10px;
-  border: 1px solid var(--line-control);
+  border: 1px solid var(--mat-line-hover);
   border-radius: var(--radius-sm);
-  background: var(--surface-raised);
+  background: var(--mat-raised);
+  box-shadow: var(--mat-raised-rim);
   color: var(--ink);
   font: inherit;
   font-size: var(--fs-md);
@@ -311,7 +327,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
   transition: border-color 140ms ease, background 140ms ease;
 }
-.select-trigger:hover:not(:disabled) { border-color: var(--accent); background: var(--surface-hover); }
+.select-trigger:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 60%, transparent); background: var(--mat-raised-hover); }
 .select-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .is-open .select-trigger { border-color: var(--accent); }
 .is-disabled .select-trigger, .select-trigger:disabled { opacity: .55; cursor: not-allowed; }
@@ -321,6 +337,9 @@ onBeforeUnmount(() => {
 .select-value.placeholder { color: var(--subtle); }
 .select-caret { flex: 0 0 auto; color: var(--muted); transition: transform 160ms ease; }
 .is-open .select-caret { transform: rotate(180deg); }
+.is-icon-only .select-trigger { width: 36px; min-height: 36px; height: 36px; justify-content: center; padding: 0; border-radius: 50%; }
+.is-icon-only .select-icon { color: var(--muted); }
+.is-icon-only .select-trigger:hover:not(:disabled) .select-icon { color: var(--ink); }
 
 
 </style>

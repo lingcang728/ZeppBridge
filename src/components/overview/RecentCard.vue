@@ -2,7 +2,8 @@
 /* 概览的「最近记录」卡：睡眠与运动混排的两列列表。 */
 import { computed } from 'vue';
 import { RouterLink } from 'vue-router';
-import DesignIcon, { type DesignIconName } from '../DesignIcon.vue';
+import type { DesignIconName } from '../DesignIcon.vue';
+import GlyphTile from '../GlyphTile.vue';
 import RecordRow from '../RecordRow.vue';
 import { displayDateTimeFormatter } from '../../lib/dateTime';
 import { formatDistance, formatDuration, formatTime, isFiniteNumber, type HealthCategory } from '../../lib/format';
@@ -104,9 +105,9 @@ const recentItems = computed<RecentItem[]>(() => {
 
 <template>
   <section class="metric-panel recent-panel" :aria-label="t.recentAria">
-    <div class="panel-head"><span class="panel-title"><DesignIcon name="document" :size="38" /><span><strong>{{ t.recentTitle }}</strong><small>{{ t.recentSub }}</small></span></span><RouterLink class="text-link" to="/recent">{{ t.seeAll }} <DesignIcon name="chevron-right" :size="22" /></RouterLink></div>
+    <div class="panel-head"><span class="panel-title"><GlyphTile name="document" :size="38" /><span><strong>{{ t.recentTitle }}</strong><small>{{ t.recentSub }}</small></span></span><RouterLink class="text-link" to="/recent">{{ t.seeAll }} <GlyphTile name="chevron-right" :size="22" /></RouterLink></div>
     <div v-if="recentItems.length" class="recent-list"><RecordRow v-for="item in recentItems" :key="item.key" :to="item.to" :category="item.category" :icon="item.icon" :design-icon="item.designIcon" :kicker="item.kicker" :title="item.title" :fact="item.fact" :fact-label="item.factLabel" /></div>
-    <div v-else class="panel-empty recent-empty"><DesignIcon name="document" :size="58" /><span>{{ t.recentEmpty }}</span></div>
+    <div v-else class="panel-empty recent-empty"><GlyphTile name="document" :size="58" /><span>{{ t.recentEmpty }}</span></div>
   </section>
 </template>
 

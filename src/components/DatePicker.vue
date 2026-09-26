@@ -239,10 +239,12 @@ onBeforeUnmount(() => {
   z-index: 2200;
   overflow-y: auto;
   padding: 10px;
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--mat-glass-line);
   border-radius: var(--radius-sm);
-  background: var(--surface-raised);
-  box-shadow: 0 18px 44px rgba(4, 6, 8, .55);
+  background: var(--mat-glass-strong);
+  -webkit-backdrop-filter: var(--mat-glass-blur);
+  backdrop-filter: var(--mat-glass-blur);
+  box-shadow: var(--mat-glass-shadow);
 }
 .date-picker-header {
   display: flex;

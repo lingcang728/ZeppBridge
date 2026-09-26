@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dragThumb, navigationBranch, snapStop } from '../navigation';
+import { dragThumb, navigationBranch, segmentClip, snapStop } from '../navigation';
 
 const stops = [
   { left: 3, width: 70, value: '/' },
@@ -25,5 +25,19 @@ describe('navigation gestures', () => {
     expect(snapStop(stops, 70, 0).value).toBe('/');
     expect(snapStop(stops, 70, 0.8).value).toBe('/ai');
     expect(snapStop(stops, 195, -0.7).value).toBe('/ai');
+  });
+});
+
+describe('segment ink clip', () => {
+  it('reveals exactly the span the thumb covers', () => {
+    // 选中字只在滑块底下露出来：左边界 = 滑块左沿，右边界 = 轨道宽 − 滑块右沿。
+    expect(segmentClip({ left: 75, width: 110, visible: true }, 260)).toBe('inset(3px 75px 3px 75px round 999px)');
+  });
+  it('hides the ink layer until the thumb has been measured', () => {
+    expect(segmentClip({ left: 0, width: 0, visible: false }, 260)).toBe('inset(50%)');
+    expect(segmentClip({ left: 10, width: 40, visible: true }, 0)).toBe('inset(50%)');
+  });
+  it('never produces a negative inset while the thumb overshoots', () => {
+    expect(segmentClip({ left: -4, width: 280, visible: true }, 260)).toBe('inset(3px 0px 3px 0px round 999px)');
   });
 });

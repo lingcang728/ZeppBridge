@@ -6,7 +6,7 @@ defineOptions({ name: 'Overview' });
 import { computed, defineAsyncComponent, h, onActivated, onDeactivated, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import CoverageNotice from '../components/CoverageNotice.vue';
-import DesignIcon from '../components/DesignIcon.vue';
+import GlyphTile from '../components/GlyphTile.vue';
 import Icon from '../components/Icon.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import WeeklyReportCard from '../components/WeeklyReportCard.vue';
@@ -215,7 +215,7 @@ const bodyEntry = computed(() => ({
     { key: 'spo2', label: t.value.factSpo2, text: entryFigure('spo2', '%') },
   ]),
   spark: seriesValues('readiness'),
-  sparkColor: palette.value.series.readiness,
+  sparkColor: palette.value.series.heart,
   // Say what the sparkline is, rather than leaving a shape with no caption.
   sparkLabel: t.value.bodySparkLabel,
   measured: Boolean(statusSeries.value.readiness?.days_with_data
@@ -319,7 +319,7 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
     >
       <Icon name="warning" :size="15" />
       <span><strong>{{ device.name }}</strong>{{ t.unrecognizedSuffix }}</span>
-      <em>{{ t.unrecognizedCta }} <DesignIcon name="chevron-right" :size="16" /></em>
+      <em>{{ t.unrecognizedCta }} <GlyphTile name="chevron-right" :size="16" /></em>
     </RouterLink>
 
     <WeeklyReportCard />
@@ -341,7 +341,7 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
       <div class="skeleton-grid"><SkeletonBlock v-for="index in 6" :key="index" height="188px" /></div>
     </div>
     <div v-else-if="error && !overview && !heartRateSeries.length && !recentSleep.length" class="empty-wrap">
-      <div class="empty-state" role="alert"><DesignIcon name="cloud-output" :size="72" /><strong>{{ t.loadFailedTitle }}</strong><span>{{ error }}</span><button class="button button-secondary" type="button" @click="loadOverview">{{ t.retry }}</button></div>
+      <div class="empty-state" role="alert"><GlyphTile name="cloud-output" :size="72" /><strong>{{ t.loadFailedTitle }}</strong><span>{{ error }}</span><button class="button button-secondary" type="button" @click="loadOverview">{{ t.retry }}</button></div>
     </div>
 
     <div v-else class="dashboard-grid">

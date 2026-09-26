@@ -8,7 +8,7 @@ import { HR_GAP_BREAK_MS, insertNullBreaks } from '../../lib/chartGaps';
 import { displayDateTimeFormatter } from '../../lib/dateTime';
 import { formatMetric, isFiniteNumber } from '../../lib/format';
 import type { HeartRatePoint } from '../../types';
-import DesignIcon from '../DesignIcon.vue';
+import GlyphTile from '../GlyphTile.vue';
 import { defineMessages, useMessages } from '../../i18n';
 
 defineOptions({ name: 'OverviewHeartRateCard' });
@@ -196,13 +196,13 @@ const hrChartOption = computed(() => {
 
 <template>
   <RouterLink class="metric-panel hr-panel" to="/heart" :aria-label="t.hrPanelAria">
-    <div class="panel-head"><span class="panel-title"><span class="chart-icon"><DesignIcon name="heart-rate" :size="34" /></span><span><strong>{{ t.hrTitle }}</strong><small>{{ t.hrWindow(OVERVIEW_HR_WINDOW_HOURS) }}</small></span></span><span class="latest-value">{{ t.latest }} <strong>{{ num(hrLatest) }}</strong><small>{{ t.bpm }}</small></span></div>
+    <div class="panel-head"><span class="panel-title"><span class="chart-icon"><GlyphTile name="heart-rate" :size="38" /></span><span><strong>{{ t.hrTitle }}</strong><small>{{ t.hrWindow(OVERVIEW_HR_WINDOW_HOURS) }}</small></span></span><span class="latest-value">{{ t.latest }} <strong>{{ num(hrLatest) }}</strong><small>{{ t.bpm }}</small></span></div>
     <VChart v-if="hrPoints.length > 1" :key="CHART_THEME" class="hr-chart" :theme="CHART_THEME" :option="hrChartOption" autoresize role="img" :aria-label="t.hrChartAria" />
     <ul v-if="hrPoints.length > 1" class="hr-zones" :aria-label="t.hrZonesAria">
       <li v-for="zone in HR_ZONES" :key="zone.key">{{ zone.label }}</li>
     </ul>
-    <div v-else class="panel-empty"><DesignIcon name="heart-rate" :size="56" /><span>{{ t.hrEmpty }}</span></div>
-    <span class="panel-more">{{ t.hrMore }} <DesignIcon name="chevron-right" :size="18" /></span>
+    <div v-else class="panel-empty"><GlyphTile name="heart-rate" :size="56" /><span>{{ t.hrEmpty }}</span></div>
+    <span class="panel-more">{{ t.hrMore }} <GlyphTile name="chevron-right" :size="18" /></span>
   </RouterLink>
 </template>
 

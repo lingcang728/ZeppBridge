@@ -6,7 +6,8 @@ import { open as showOpenDialog } from '@tauri-apps/plugin-dialog';
 import { useRoute } from 'vue-router';
 import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
 import { createLoadSeq } from '../lib/loadSeq';
-import DesignIcon, { type DesignIconName } from '../components/DesignIcon.vue';
+import type { DesignIconName } from '../components/DesignIcon.vue';
+import GlyphTile from '../components/GlyphTile.vue';
 import DeviceVisual from '../components/DeviceVisual.vue';
 import EmptyState from '../components/EmptyState.vue';
 import InsightCard from '../components/InsightCard.vue';
@@ -1256,9 +1257,9 @@ watch(workoutId, (id) => { if (id) void loadInsight(id); }, { immediate: true })
             <span class="device-live"><i></i>{{ deviceName }}</span>
           </div>
           <div class="hero-title-group">
-            <span class="source-chip"><DesignIcon name="verified" :size="20" />{{ t.decodedLocally }} · {{ dataScopeLabel(workout.source_scope) }}</span>
+            <span class="source-chip"><GlyphTile name="verified" :size="20" />{{ t.decodedLocally }} · {{ dataScopeLabel(workout.source_scope) }}</span>
             <div class="sport-line">
-              <DesignIcon :name="workoutArt" :size="64" />
+              <GlyphTile :name="workoutArt" :size="64" />
               <div>
                 <p class="hero-kicker">WORKOUT DETAIL</p>
                 <h1 id="workout-detail-title">{{ workout ? workoutDisplayLabel(workout) : workoutLabel(displayType) }}</h1>
@@ -1283,11 +1284,11 @@ watch(workoutId, (id) => { if (id) void loadInsight(id); }, { immediate: true })
             </div>
           </div>
         </div>
-        <div class="hero-signal" aria-hidden="true"><DesignIcon name="health-watch" :size="124" /></div>
+        <div class="hero-signal" aria-hidden="true"><GlyphTile name="health-watch" :size="124" /></div>
 
         <div class="metric-list" :aria-label="t.metricListAria">
           <div v-for="metric in heroMetrics" :key="metric.label" :class="['metric-tile', `tone-${metric.tone}`]">
-            <DesignIcon :name="metric.icon" :size="36" />
+            <GlyphTile :name="metric.icon" :size="36" />
             <div><p class="metric-label">{{ metric.label }}</p><p class="metric-value"><strong>{{ metric.value }}</strong><span v-if="metric.unit">{{ metric.unit }}</span></p></div>
           </div>
         </div>
@@ -1307,7 +1308,7 @@ watch(workoutId, (id) => { if (id) void loadInsight(id); }, { immediate: true })
         <div class="main-col">
           <section class="surface-card series-card" :aria-label="t.routeAria">
             <div class="section-head">
-              <span class="section-icon route-tone"><DesignIcon name="outdoor-run" :size="34" /></span>
+              <span class="section-icon route-tone"><GlyphTile name="outdoor-run" :size="34" /></span>
               <div><p class="section-eyebrow">{{ t.eyebrowRoute }}</p><h2>{{ t.routeTitle }}</h2></div>
               <span class="route-note">{{ t.routeNote }}</span>
             </div>
@@ -1327,13 +1328,13 @@ watch(workoutId, (id) => { if (id) void loadInsight(id); }, { immediate: true })
               </svg>
               <div class="route-legend"><span><i class="neutral-dot"></i>{{ routeCanvas.enoughPace ? t.routeLegendPace(routeCanvas.validPaceCount) : t.routeLegendNoPace }}</span><template v-if="routeCanvas.enoughPace"><span><i class="fast-dot"></i>{{ t.legendFast }}</span><span><i class="steady-dot"></i>{{ t.legendSteady }}</span><span><i class="warm-dot"></i>{{ t.legendWarm }}</span><span><i class="slow-dot"></i>{{ t.legendSlow }}</span></template></div>
             </div>
-            <div v-else class="route-empty"><DesignIcon name="outdoor-run" :size="58" /><strong>{{ t.routeEmptyTitle }}</strong><p>{{ t.routeEmptyBody }}</p></div>
+            <div v-else class="route-empty"><GlyphTile name="outdoor-run" :size="58" /><strong>{{ t.routeEmptyTitle }}</strong><p>{{ t.routeEmptyBody }}</p></div>
           </section>
 
           <div class="chart-grid">
             <section v-for="card in chartCards" :key="card.key" :class="['surface-card', 'chart-card', `chart-${card.tone}`]" :aria-label="card.title">
               <div class="chart-head">
-                <span class="chart-icon"><DesignIcon :name="card.icon" :size="34" /></span>
+                <span class="chart-icon"><GlyphTile :name="card.icon" :size="34" /></span>
                 <p class="card-title">{{ card.title }} <em>{{ card.unit }}</em></p>
                 <ul v-if="card.stats" class="chart-stats">
                   <li v-for="stat in card.stats" :key="stat.label"><em>{{ stat.label }}</em><strong>{{ stat.value }}</strong></li>
@@ -1343,17 +1344,17 @@ watch(workoutId, (id) => { if (id) void loadInsight(id); }, { immediate: true })
             </section>
           </div>
           <section v-if="seriesError" class="surface-card chart-empty" role="alert">
-            <DesignIcon name="structured-data" :size="42" />
+            <GlyphTile name="structured-data" :size="42" />
             <div>
               <strong>{{ t.seriesFailedTitle }}</strong>
               <p>{{ seriesError }}</p>
               <button class="button button-secondary" type="button" @click="loadDetail">{{ t.retry }}</button>
             </div>
           </section>
-          <section v-else-if="!chartCards.length" class="surface-card chart-empty"><DesignIcon name="structured-data" :size="42" /><div><strong>{{ t.chartsEmptyTitle }}</strong><p>{{ t.chartsEmptyBody }}</p></div></section>
+          <section v-else-if="!chartCards.length" class="surface-card chart-empty"><GlyphTile name="structured-data" :size="42" /><div><strong>{{ t.chartsEmptyTitle }}</strong><p>{{ t.chartsEmptyBody }}</p></div></section>
           <section v-if="hrZones" class="surface-card hr-zone-card" :aria-label="t.hrZonesAria">
             <div class="section-head compact">
-              <span class="section-icon heart-tone"><DesignIcon name="heart-rate" :size="32" /></span>
+              <span class="section-icon heart-tone"><GlyphTile name="heart-rate" :size="32" /></span>
               <div><p class="section-eyebrow">{{ t.eyebrowHrZones }}</p><h2>{{ t.hrZonesTitle }}</h2></div>
               <span class="route-note">{{ t.hrZoneTotal(hrZones.totalLabel) }}</span>
             </div>
@@ -1368,29 +1369,29 @@ watch(workoutId, (id) => { if (id) void loadInsight(id); }, { immediate: true })
                 <em>{{ row.percentLabel }}</em>
               </li>
             </ul>
-            <p class="mapping-note"><DesignIcon name="verified" :size="20" />{{ t.hrZonesNote }}</p>
+            <p class="mapping-note"><GlyphTile name="verified" :size="20" />{{ t.hrZonesNote }}</p>
           </section>
         </div>
 
         <div class="side-col">
           <section class="surface-card side-card decoded-card" :aria-label="t.decodedAria">
-            <div class="section-head compact"><span class="section-icon data-tone"><DesignIcon name="structured-data" :size="32" /></span><div><p class="section-eyebrow">{{ t.eyebrowDecoded }}</p><h2>{{ t.decodedTitle }}</h2></div></div>
+            <div class="section-head compact"><span class="section-icon data-tone"><GlyphTile name="structured-data" :size="32" /></span><div><p class="section-eyebrow">{{ t.eyebrowDecoded }}</p><h2>{{ t.decodedTitle }}</h2></div></div>
             <div class="decoded-list">
-              <div v-for="metric in decodedMetrics" :key="metric.label"><DesignIcon :name="metric.icon" :size="29" /><span>{{ metric.label }}</span><strong>{{ metric.value }}</strong></div>
+              <div v-for="metric in decodedMetrics" :key="metric.label"><GlyphTile :name="metric.icon" :size="29" /><span>{{ metric.label }}</span><strong>{{ metric.value }}</strong></div>
             </div>
-            <p class="mapping-note"><DesignIcon name="verified" :size="20" />{{ t.decodedNote }}</p>
+            <p class="mapping-note"><GlyphTile name="verified" :size="20" />{{ t.decodedNote }}</p>
           </section>
 
           <section class="surface-card side-card" :aria-label="t.exportAria">
-            <div class="section-head compact"><span class="section-icon export-tone"><DesignIcon name="document" :size="32" /></span><div><p class="section-eyebrow">{{ t.eyebrowExport }}</p><h2>{{ t.exportTitle }}</h2></div></div>
+            <div class="section-head compact"><span class="section-icon export-tone"><GlyphTile name="document" :size="32" /></span><div><p class="section-eyebrow">{{ t.eyebrowExport }}</p><h2>{{ t.exportTitle }}</h2></div></div>
             <p class="card-sub">{{ t.exportSub }}</p>
             <div class="format-row" role="radiogroup" :aria-label="t.exportFormatAria"><button v-for="format in (['json', 'csv', 'gpx', 'fit'] as const)" :key="format" type="button" role="radio" :disabled="exportBusy || (format === 'fit' && !isTauri())" :aria-checked="activeFormat === format" :class="['format-pill', { 'is-on': activeFormat === format }]" @click="activeFormat = format">{{ format.toUpperCase() }}</button></div>
-            <button class="export-go" type="button" :disabled="exportBusy" @click="exportRecord"><DesignIcon name="cloud-output" :size="27" />{{ activeFormat === 'fit' ? t.saveFit : t.exportGo(activeFormat.toUpperCase()) }}</button>
+            <button class="export-go" type="button" :disabled="exportBusy" @click="exportRecord"><GlyphTile name="cloud-output" :size="27" />{{ activeFormat === 'fit' ? t.saveFit : t.exportGo(activeFormat.toUpperCase()) }}</button>
             <p v-if="exportedNote" class="action-note ok" role="status"><Icon name="circle-check" :size="13" />{{ exportedNote }}</p><p v-if="actionError" class="action-note bad" role="alert"><Icon name="warning" :size="13" />{{ actionError }}</p>
           </section>
 
           <section class="surface-card side-card ai-card" :aria-label="t.handoffAria">
-            <div class="section-head compact"><span class="section-icon ai-tone"><DesignIcon name="handoff" :size="32" /></span><div><p class="section-eyebrow">{{ t.eyebrowHandoff }}</p><h2>{{ t.handoffTitle }}</h2></div></div>
+            <div class="section-head compact"><span class="section-icon ai-tone"><GlyphTile name="handoff" :size="32" /></span><div><p class="section-eyebrow">{{ t.eyebrowHandoff }}</p><h2>{{ t.handoffTitle }}</h2></div></div>
             <p class="card-sub">{{ t.handoffSub }}</p>
             <label class="ai-provider">
               <span>{{ t.handoffTarget }}</span>
@@ -1402,19 +1403,19 @@ watch(workoutId, (id) => { if (id) void loadInsight(id); }, { immediate: true })
               />
             </label>
             <button class="export-go" type="button" :disabled="handoffState === 'preparing'" @click="sendWorkoutToAi">
-              <DesignIcon name="handoff" :size="27" />{{ handoffState === 'preparing' ? t.preparing : t.handTo(aiProvider.label) }}
+              <GlyphTile name="handoff" :size="27" />{{ handoffState === 'preparing' ? t.preparing : t.handTo(aiProvider.label) }}
             </button>
             <p v-if="aiNote" class="action-note ok" role="status"><Icon name="circle-check" :size="13" />{{ aiNote }}</p>
             <p v-if="handoffError" class="action-note bad" role="alert"><Icon name="warning" :size="13" />{{ handoffError }}</p>
           </section>
 
           <section class="surface-card side-card meta-card" :aria-label="t.provenanceAria">
-            <div class="section-head compact"><span class="section-icon source-tone"><DesignIcon name="database" :size="32" /></span><div><p class="section-eyebrow">{{ t.eyebrowProvenance }}</p><h2>{{ t.provenanceTitle }}</h2></div></div>
+            <div class="section-head compact"><span class="section-icon source-tone"><GlyphTile name="database" :size="32" /></span><div><p class="section-eyebrow">{{ t.eyebrowProvenance }}</p><h2>{{ t.provenanceTitle }}</h2></div></div>
             <dl><div><dt>{{ t.provenanceProvider }}</dt><dd>{{ dataProviderLabel() }}</dd></div><div><dt>{{ t.provenanceScope }}</dt><dd>{{ dataScopeLabel(workout.source_scope) }}</dd></div><div><dt>{{ t.provenanceSynced }}</dt><dd>{{ syncBadge }}</dd></div><div><dt>{{ t.provenanceRecordId }}</dt><dd>{{ workout.workout_id }}</dd></div><div><dt>{{ t.provenanceDevice }}</dt><dd>{{ deviceName }}</dd></div></dl>
           </section>
         </div>
       </div>
-      <p class="page-foot"><DesignIcon name="secure" :size="20" />{{ t.pageFoot }}</p>
+      <p class="page-foot"><GlyphTile name="secure" :size="20" />{{ t.pageFoot }}</p>
     </template>
   </section>
 </template>
@@ -1450,7 +1451,7 @@ watch(workoutId, (id) => { if (id) void loadInsight(id); }, { immediate: true })
 .hero-signal { position: absolute; z-index: 0; top: -8px; right: 3%; opacity: .13; filter: saturate(1.4); transform: rotate(5deg); }
 .metric-list { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 9px; }
 .metric-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; min-height: 116px; padding: 16px; border: 1px solid rgba(226,234,242,.08); border-radius: 15px; background: rgba(8,10,13,.42); }
-.metric-tile > .design-icon { flex: 0 0 auto; }
+.metric-tile > .glyph-tile { flex: 0 0 auto; }
 .metric-tile.tone-heart { background: linear-gradient(135deg, rgba(240,97,106,.12), rgba(8,10,13,.45)); } .metric-tile.tone-pace { background: linear-gradient(135deg, rgba(74,168,232,.12), rgba(8,10,13,.45)); } .metric-tile.tone-altitude { background: linear-gradient(135deg, rgba(245,195,59,.11), rgba(8,10,13,.45)); } .metric-tile.tone-training { background: linear-gradient(135deg, rgba(125,163,62,.12), rgba(8,10,13,.45)); } .metric-tile.tone-distance { background: linear-gradient(135deg, rgba(47,169,107,.13), rgba(8,10,13,.45)); } .metric-tile.tone-vo2 { background: linear-gradient(135deg, rgba(139,92,246,.12), rgba(8,10,13,.45)); }
 .metric-tile > div { min-width: 0; max-width: 100%; }
 .metric-label { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
@@ -1535,7 +1536,7 @@ watch(workoutId, (id) => { if (id) void loadInsight(id); }, { immediate: true })
 .decoded-list span { color: var(--muted); font-size: var(--fs-xs); }
 .decoded-list strong { color: var(--ink); font-family: var(--font-mono); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 .mapping-note { display: flex; align-items: flex-start; gap: 7px; margin: 12px 0 0; padding: 9px; border-radius: 10px; background: rgba(125,163,62,.08); color: #aeb99b; font-size: var(--fs-2xs); }
-.mapping-note .design-icon { flex: 0 0 auto; }
+.mapping-note .glyph-tile { flex: 0 0 auto; }
 .format-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .format-pill { flex: 1; min-width: 58px; padding: 7px 10px; border: 1px solid var(--line-control); border-radius: 9px; background: var(--surface-raised); color: var(--muted); font-size: var(--fs-xs); cursor: pointer; }
 .format-pill.is-on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
@@ -1549,5 +1550,5 @@ watch(workoutId, (id) => { if (id) void loadInsight(id); }, { immediate: true })
 .page-foot { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 2px 0 0; color: var(--subtle); font-size: var(--fs-xs); }
 
 @media (max-width: 1180px) { .lower { grid-template-columns: minmax(0, 1fr); } .side-col { grid-template-columns: repeat(2, minmax(0,1fr)); } .decoded-card { grid-row: span 2; } }
-@media (max-width: 760px) { .page-toolbar { align-items: flex-start; } .ai-action span { display: none; } .workout-hero { padding: 16px; border-radius: 19px; } .hero-copy { align-items: flex-start; gap: 12px; } .hero-device :deep(.device-visual) { width: 78px; height: 78px; flex-basis: 78px; } .device-live { display: none; } .sport-line > .design-icon { width: 45px !important; height: 45px !important; } .sport-line h1 { font-size: 24px; } .source-chip { font-size: var(--fs-2xs); } .metric-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } .metric-tile { min-height: 70px; } .chart-grid, .side-col { grid-template-columns: minmax(0, 1fr); } .decoded-card { grid-row: auto; } .route-wrap { min-height: 240px; } .route-note { display: none; } .chart-head { flex-wrap: wrap; } .chart-stats { width: 100%; justify-content: flex-start; } }
+@media (max-width: 760px) { .page-toolbar { align-items: flex-start; } .ai-action span { display: none; } .workout-hero { padding: 16px; border-radius: 19px; } .hero-copy { align-items: flex-start; gap: 12px; } .hero-device :deep(.device-visual) { width: 78px; height: 78px; flex-basis: 78px; } .device-live { display: none; } .sport-line > .glyph-tile { width: 45px !important; height: 45px !important; } .sport-line h1 { font-size: 24px; } .source-chip { font-size: var(--fs-2xs); } .metric-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } .metric-tile { min-height: 70px; } .chart-grid, .side-col { grid-template-columns: minmax(0, 1fr); } .decoded-card { grid-row: auto; } .route-wrap { min-height: 240px; } .route-note { display: none; } .chart-head { flex-wrap: wrap; } .chart-stats { width: 100%; justify-content: flex-start; } }
 </style>

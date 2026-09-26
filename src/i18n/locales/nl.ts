@@ -546,6 +546,7 @@ export default {
       seeMore: 'Meer zien',
     },
     'components/shell/AppTopBar': {
+      today: 'Vandaag',
       mainNav: 'Hoofdnavigatie',
       brandHome: 'ZeppBridge 3 · Overzicht',
       connectionTitle: 'Status van de cloudverbinding',

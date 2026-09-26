@@ -1113,6 +1113,7 @@ export default {
       seeMore: 'Ver mais',
     },
     'components/shell/AppTopBar': {
+      today: 'Hoje',
       mainNav: 'Navegação principal',
       brandHome: 'ZeppBridge 3 · Visão geral',
       connectionTitle: 'Estado da ligação à nuvem',

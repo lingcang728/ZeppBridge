@@ -576,6 +576,7 @@ export default {
     },
 
     'components/shell/AppTopBar': {
+      today: 'Hoje',
       mainNav: 'Navegação principal',
       brandHome: 'ZeppBridge 3 · Visão geral',
       connectionTitle: 'Estado da conexão com a nuvem',

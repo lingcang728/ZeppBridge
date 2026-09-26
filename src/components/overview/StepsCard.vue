@@ -3,7 +3,7 @@
 import { computed } from 'vue';
 import { RouterLink } from 'vue-router';
 import CircularProgress from '../CircularProgress.vue';
-import DesignIcon from '../DesignIcon.vue';
+import GlyphTile from '../GlyphTile.vue';
 import { resolvedTheme } from '../../composables/useTheme';
 import { chartPalettes } from '../../lib/echartsTheme';
 import { formatMetric, isFiniteNumber } from '../../lib/format';
@@ -72,7 +72,7 @@ const ringTrack = computed(() => resolvedTrack(ringColor.value));
 
 <template>
   <RouterLink class="metric-panel steps-panel" to="/activity" :aria-label="t.stepsPanelAria">
-    <div class="panel-head"><span class="panel-title"><DesignIcon name="steps" :size="34" /><span><strong>{{ t.stepsTitle }}</strong><small>{{ stepGoalIsReference ? t.stepsGoalReference : t.stepsGoalToday }}</small></span></span></div>
+    <div class="panel-head"><span class="panel-title"><GlyphTile name="steps" :size="38" /><span><strong>{{ t.stepsTitle }}</strong><small>{{ stepGoalIsReference ? t.stepsGoalReference : t.stepsGoalToday }}</small></span></span></div>
     <div class="steps-content">
       <CircularProgress :value="stepsPercent" :size="148" :stroke-width="9" :color="ringColor" :track-color="ringTrack" :show-label="false">
         <div class="steps-inring">
@@ -81,7 +81,7 @@ const ringTrack = computed(() => resolvedTrack(ringColor.value));
       </CircularProgress>
       <p class="steps-goal">{{ t.stepsGoalLine(formatMetric(stepGoal), stepsPercent) }}</p>
     </div>
-    <span class="panel-more">{{ t.seeMore }} <DesignIcon name="chevron-right" :size="18" /></span>
+    <span class="panel-more">{{ t.seeMore }} <GlyphTile name="chevron-right" :size="18" /></span>
   </RouterLink>
 </template>
 

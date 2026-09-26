@@ -1069,6 +1069,7 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
     },
 
     'components/shell/AppTopBar': {
+      today: 'Aujourd’hui',
       brandHome: 'ZeppBridge 3 · Aperçu',
       mainNav: 'Navigation principale',
       connectionTitle: 'État de la connexion au cloud',

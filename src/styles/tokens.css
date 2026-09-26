@@ -36,8 +36,9 @@
   --altitude: #F5C33B;
   --altitude-wash: rgba(245, 195, 59, .12);
   --cadence: #4AA8E8;
-  --training: #3DD84C;
-  --readiness: #3DD84C;
+  /* 训练 / 准备度：和品牌青柠同一家族，不再用荧光绿。 */
+  --training: #A3CC5C;
+  --readiness: #A3CC5C;
   --sleep-deep: #6477D7;
   --sleep-light: #7C8FF0;
   --sleep-rem: #8B5CF6;
@@ -57,10 +58,45 @@
   --route-coral: #F0616A;
   /* 概览卡/工作台的共享面板面：两色渐变只在深色里提供层次，
      浅色里是纯色白卡 + 实体投影（见下方覆写）。 */
-  --panel: linear-gradient(145deg, rgba(27, 31, 37, .98), rgba(23, 27, 32, .98));
-  --panel-line: rgba(221, 231, 239, .09);
-  --panel-line-hover: rgba(221, 231, 239, .16);
-  --panel-glint: inset 0 1px 0 rgba(255, 255, 255, .035);
+  --panel: var(--mat-card);
+  --panel-line: var(--mat-line);
+  --panel-line-hover: var(--mat-line-hover);
+  --panel-glint: var(--mat-rim), var(--mat-shadow);
+
+  /* ── 材质（「克制玻璃」）──────────────────────────────────────
+     卡片：一种材质——145° 两色渐变 + 顶边 1px 高光 + 两层柔和投影。
+     凸起（按钮 / 控件头）：稍亮的纵向渐变 + 顶边高光。
+     凹槽（输入框 / 轨道 / 进度条）：比卡片更暗 + 内阴影。
+     玻璃：只给浮在上层的东西（顶栏、导航胶囊、下拉、弹窗）。 */
+  --mat-card: linear-gradient(145deg, #1C2027 0%, #171A20 100%);
+  --mat-card-solid: #191C22;
+  --mat-line: rgba(226, 234, 242, .085);
+  --mat-line-hover: rgba(226, 234, 242, .17);
+  --mat-rim: inset 0 1px 0 rgba(255, 255, 255, .055);
+  --mat-shadow: 0 1px 2px rgba(0, 0, 0, .32), 0 12px 30px -14px rgba(0, 0, 0, .6);
+  --mat-shadow-lift: 0 2px 4px rgba(0, 0, 0, .3), 0 20px 40px -16px rgba(0, 0, 0, .65);
+  --mat-raised: linear-gradient(180deg, #272C34 0%, #20252C 100%);
+  --mat-raised-hover: linear-gradient(180deg, #2E343D 0%, #262B33 100%);
+  --mat-raised-rim: inset 0 1px 0 rgba(255, 255, 255, .075), 0 1px 2px rgba(0, 0, 0, .35);
+  --mat-inset: #121419;
+  --mat-inset-shadow: inset 0 1px 2px rgba(0, 0, 0, .5), inset 0 0 0 1px rgba(226, 234, 242, .06);
+  --mat-glass: rgba(24, 27, 33, .72);
+  --mat-glass-strong: rgba(24, 27, 33, .88);
+  --mat-glass-line: rgba(255, 255, 255, .1);
+  --mat-glass-blur: blur(22px) saturate(1.5);
+  --mat-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, .09), 0 18px 44px -14px rgba(0, 0, 0, .7);
+  /* 图标底座：同一种材质，颜色由 --tile-tone 决定。 */
+  --mat-tile-top: #2A2F37;
+  --mat-tile-bottom: #16191E;
+  --mat-tile-rim: inset 0 1px 0 rgba(255, 255, 255, .12), inset 0 -1px 0 rgba(0, 0, 0, .35);
+  --glyph-neutral: #C9D0D8;
+
+  /* 动效 */
+  --dur-fast: 140ms;
+  --dur-base: 240ms;
+  --dur-slow: 420ms;
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-spring: cubic-bezier(.2, 1.15, .32, 1);
 
   --font-sans: 'MiSans', 'Segoe UI', 'Microsoft YaHei UI', sans-serif;
   --font-mono: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
@@ -122,8 +158,8 @@ html[data-theme="light"] {
   --altitude: #A87E0B;
   --altitude-wash: rgba(168, 126, 11, .12);
   --cadence: #2E7FC2;
-  --training: #2F9E44;
-  --readiness: #2F9E44;
+  --training: #4E8A2E;
+  --readiness: #4E8A2E;
   --sleep-deep: #5565C9;
   --sleep-light: #6B7FE0;
   --sleep-rem: #7C4DDB;
@@ -141,10 +177,32 @@ html[data-theme="light"] {
   --route-cyan: #2E7FC2;
   --route-amber: #A87E0B;
   --route-coral: #C43742;
-  --panel: #FFFFFF;
-  --panel-line: rgba(38, 52, 41, .10);
-  --panel-line-hover: rgba(38, 52, 41, .22);
-  --panel-glint: 0 1px 3px rgba(38, 52, 41, .07), 0 12px 32px rgba(38, 52, 41, .05);
+  --panel: var(--mat-card);
+  --panel-line: var(--mat-line);
+  --panel-line-hover: var(--mat-line-hover);
+  --panel-glint: var(--mat-rim), var(--mat-shadow);
+
+  --mat-card: linear-gradient(160deg, #FFFFFF 0%, #FAFBF8 100%);
+  --mat-card-solid: #FFFFFF;
+  --mat-line: rgba(38, 52, 41, .10);
+  --mat-line-hover: rgba(38, 52, 41, .22);
+  --mat-rim: inset 0 1px 0 rgba(255, 255, 255, .9);
+  --mat-shadow: 0 1px 3px rgba(38, 52, 41, .08), 0 12px 32px -14px rgba(38, 52, 41, .16);
+  --mat-shadow-lift: 0 2px 6px rgba(38, 52, 41, .1), 0 22px 44px -18px rgba(38, 52, 41, .22);
+  --mat-raised: linear-gradient(180deg, #FFFFFF 0%, #F1F4EE 100%);
+  --mat-raised-hover: linear-gradient(180deg, #FFFFFF 0%, #E9EEE5 100%);
+  --mat-raised-rim: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(38, 52, 41, .12);
+  --mat-inset: #EDF0EA;
+  --mat-inset-shadow: inset 0 1px 2px rgba(38, 52, 41, .12), inset 0 0 0 1px rgba(38, 52, 41, .07);
+  --mat-glass: rgba(250, 251, 248, .74);
+  --mat-glass-strong: rgba(250, 251, 248, .9);
+  --mat-glass-line: rgba(38, 52, 41, .1);
+  --mat-glass-blur: blur(22px) saturate(1.6);
+  --mat-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, .8), 0 18px 44px -16px rgba(38, 52, 41, .28);
+  --mat-tile-top: #FFFFFF;
+  --mat-tile-bottom: #EEF1EA;
+  --mat-tile-rim: inset 0 1px 0 #FFFFFF, inset 0 -1px 0 rgba(38, 52, 41, .08);
+  --glyph-neutral: #4C5748;
 }
 
 /* ── 浅色主题的局部补丁 ────────────────────────────────────────────

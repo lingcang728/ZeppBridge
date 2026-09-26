@@ -2,7 +2,7 @@
 /* 概览的「昨晚睡眠」卡：总时长 + 阶段比例条。 */
 import { computed, ref } from 'vue';
 import { RouterLink } from 'vue-router';
-import DesignIcon from '../DesignIcon.vue';
+import GlyphTile from '../GlyphTile.vue';
 import { isFiniteNumber } from '../../lib/format';
 import { sleepStageLabel } from '../../lib/sleepStages';
 import { stageMinutesForBar } from '../../lib/missingValues';
@@ -90,14 +90,14 @@ const hoverStage = (event: PointerEvent) => {
 
 <template>
   <RouterLink class="metric-panel sleep-panel" :to="sleep ? `/sleep/${sleep.sleep_id}` : '/sleep'" :aria-label="t.sleepPanelAria">
-    <div class="panel-head"><span class="panel-title"><DesignIcon name="sleep" :size="38" /><span><strong>{{ t.sleepTitle }}</strong><small>{{ t.sleepSub }}</small></span></span><span v-if="sleep && isFiniteNumber(sleep.score)" class="sleep-score">{{ sleep.score }}</span></div>
+    <div class="panel-head"><span class="panel-title"><GlyphTile name="sleep" :size="38" /><span><strong>{{ t.sleepTitle }}</strong><small>{{ t.sleepSub }}</small></span></span><span v-if="sleep && isFiniteNumber(sleep.score)" class="sleep-score">{{ sleep.score }}</span></div>
     <template v-if="sleep">
       <p class="sleep-total">{{ hm(sleep.duration_minutes) }}</p>
       <div class="sleep-bar-hit" @pointermove="hoverStage" @pointerdown.stop.prevent="hoverStage" @click.stop.prevent @pointerleave="activeStage = null"><div class="sleep-bar" :aria-label="t.sleepBarAria"><span v-for="stage in sleepBarStages" :key="stage.key" :style="{ flex: Math.max(1, stage.minutes), background: stage.color }"></span></div><span v-if="activeStage" class="sleep-tooltip" role="tooltip" :style="{ left: `${hoverLeft}%` }">{{ activeStage.label }} · {{ hm(activeStage.minutes) }}</span></div>
       <ul class="sleep-stages"><li v-for="stage in sleepStages" :key="stage.key"><i :style="{ background: stage.color }"></i><span>{{ stage.label }}</span><strong>{{ hm(stage.minutes) }}</strong></li></ul>
     </template>
-    <div v-else class="panel-empty compact"><DesignIcon name="sleep" :size="50" /><span>{{ t.sleepEmpty }}</span></div>
-    <span class="panel-more">{{ t.seeMore }} <DesignIcon name="chevron-right" :size="18" /></span>
+    <div v-else class="panel-empty compact"><GlyphTile name="sleep" :size="50" /><span>{{ t.sleepEmpty }}</span></div>
+    <span class="panel-more">{{ t.seeMore }} <GlyphTile name="chevron-right" :size="18" /></span>
   </RouterLink>
 </template>
 

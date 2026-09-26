@@ -1358,6 +1358,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       stepsUnit: 'Schritte',
     },
     'components/shell/AppTopBar': {
+      today: 'Heute',
       brandHome: 'ZeppBridge 3 · Übersicht',
       cancel: 'Abbrechen',
       connectionTitle: 'Cloud-Verbindungsstatus',

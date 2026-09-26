@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router';
 import CategoryMark from './CategoryMark.vue';
-import DesignIcon, { type DesignIconName } from './DesignIcon.vue';
+import type { DesignIconName } from './DesignIcon.vue';
+import GlyphTile from './GlyphTile.vue';
 import Icon from './Icon.vue';
 import type { HealthCategory } from '../lib/format';
 
@@ -24,7 +25,7 @@ withDefaults(defineProps<{
   <RouterLink :class="['record-row', `tone-${category}`, { compact }]" :to="to">
     <span v-if="compact" class="record-dot" aria-hidden="true"></span>
     <span v-if="!compact && designIcon" :class="['record-art', `tone-${category}`]" aria-hidden="true">
-      <DesignIcon :name="designIcon" :size="48" />
+      <GlyphTile :name="designIcon" :size="48" :tone="category" />
     </span>
     <CategoryMark v-else-if="!compact" :category="category" :icon="icon" :size="16" :bg="iconBg" />
     <span class="record-copy">
@@ -55,18 +56,8 @@ withDefaults(defineProps<{
 }
 .record-row:last-child { border-bottom: 0; }
 .record-row:hover { background: var(--surface-raised); }
-.record-art {
-  display: grid;
-  width: 48px;
-  height: 48px;
-  flex: 0 0 48px;
-  place-items: center;
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
-  border-radius: 14px;
-  background: color-mix(in srgb, currentColor 10%, var(--surface-raised));
-}
-.record-art .design-icon { transform: scale(1.18); }
+/* 底座由 GlyphTile 画；这里只占位，颜色按记录类别给。 */
+.record-art { display: grid; flex: 0 0 48px; place-items: center; }
 .record-art.tone-sleep { color: var(--sleep); }
 .record-art.tone-activity { color: var(--activity); }
 .record-art.tone-heart { color: var(--heart); }
