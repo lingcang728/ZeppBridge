@@ -4564,7 +4564,11 @@ impl Database {
 
     /// A night's score belongs to its local wake date. If more than one
     /// session ends on a date, prefer the fused session then the latest end.
-    fn sleep_score_points(&self, start: &str, end: &str) -> Result<Vec<MetricSeriesPoint>> {
+    pub(crate) fn sleep_score_points(
+        &self,
+        start: &str,
+        end: &str,
+    ) -> Result<Vec<MetricSeriesPoint>> {
         let mut stmt = self.conn.prepare(
             "SELECT date(s.end_time, 'localtime'), s.score
              FROM sleep_sessions s

@@ -688,6 +688,9 @@ impl Database {
                             MetricSource::Samples => {
                                 self.sample_metric_points(spec.metric, &start_text, &end_text)?
                             }
+                            MetricSource::SleepScores => {
+                                self.sleep_score_points(&start_text, &end_text)?
+                            }
                         };
                         for point in points {
                             gather

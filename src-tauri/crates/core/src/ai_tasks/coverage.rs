@@ -546,6 +546,20 @@ impl Database {
                                 sources.insert(source);
                             }
                         }
+                        MetricSource::SleepScores => {
+                            let mut stmt = self.conn.prepare(
+                                "SELECT date(end_time,'localtime'), source_scope FROM sleep_sessions
+                                 WHERE score IS NOT NULL AND date(end_time,'localtime') BETWEEN ?1 AND ?2",
+                            )?;
+                            let rows = stmt.query_map(params![start, end], |row| {
+                                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                            })?;
+                            for row in rows {
+                                let (day, source) = row?;
+                                days.insert(day);
+                                sources.insert(source);
+                            }
+                        }
                     }
                 }
             }
