@@ -71,3 +71,5 @@ mod metrics;
 mod queries;
 mod replay;
 mod schema;
+
+mod open;
