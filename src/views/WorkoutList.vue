@@ -1,6 +1,7 @@
 <script setup lang="ts">
 defineOptions({ name: 'WorkoutList' });
 import { computed, onMounted, ref, watch } from 'vue';
+import { useFirstLoad } from '../composables/useFirstLoad';
 import PageHeader from '../components/PageHeader.vue';
 import RecordRow from '../components/RecordRow.vue';
 import EmptyState from '../components/EmptyState.vue';
@@ -78,6 +79,7 @@ const t = useMessages(messages);
 const { dataRevision } = useSyncController();
 const workouts = ref<Workout[]>([]);
 const loading = ref(true);
+const initialLoading = useFirstLoad(loading);
 const error = ref<string | null>(null);
 const displayableList = computed(() => displayableWorkouts(workouts.value));
 /*
@@ -179,7 +181,7 @@ watch(dataRevision, () => void loadList());
   <section class="page list-page" aria-labelledby="workout-list-title">
     <PageHeader back="/recent" :back-label="t.backToRecent" title-id="workout-list-title" :title="t.title" :intro="t.intro" />
 
-    <div v-if="loading" class="surface-card" aria-live="polite">
+    <div v-if="initialLoading" class="surface-card" aria-live="polite">
       <SkeletonBlock height="56px" />
       <SkeletonBlock height="56px" />
       <SkeletonBlock height="56px" />

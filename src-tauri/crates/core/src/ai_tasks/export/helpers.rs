@@ -49,45 +49,9 @@ pub(super) fn effective_task_id(task: &AiTask) -> String {
     }
 }
 
-/// 出仓用户文本的本地路径清洗：Windows 盘符路径、UNC 路径与 Unix 绝对
-/// 路径换成占位符。与命令层 `commands::data::sanitize_clipboard_text`
-/// 同一实现的最小移植——core 不能回拉 Tauri 适配层的函数，行为保持同级：
-/// 只在词边界起步认路径（`https://` 这类 URL 不会被误伤）。
+/// 出仓用户文本的本地路径清洗：和交给 AI 的导出共用 `crate::redact` 里的同一份实现。
 pub(super) fn sanitize_export_text(text: &str) -> String {
-    let mut output = String::with_capacity(text.len());
-    let mut chars = text.chars().peekable();
-    while let Some(character) = chars.next() {
-        let previous = output.chars().last();
-        let at_boundary = previous.is_none()
-            || previous.is_some_and(|value| {
-                value.is_whitespace() || matches!(value, '"' | '\'' | '(' | '[' | '{' | '=')
-            });
-        let is_windows_drive = at_boundary
-            && character.is_ascii_alphabetic()
-            && chars.peek() == Some(&':')
-            && chars
-                .clone()
-                .nth(1)
-                .is_some_and(|next| next == '\\' || next == '/');
-        let is_unc = at_boundary && character == '\\' && chars.peek() == Some(&'\\');
-        let is_unix =
-            at_boundary && character == '/' && chars.peek().is_some_and(|next| *next != ' ');
-        if is_windows_drive || is_unc || is_unix {
-            output.push_str("[本地路径已移除]");
-            if is_windows_drive {
-                let _ = chars.next();
-            }
-            while let Some(next) = chars.peek() {
-                if next.is_whitespace() || *next == '"' || *next == '\'' || *next == ')' {
-                    break;
-                }
-                let _ = chars.next();
-            }
-        } else {
-            output.push(character);
-        }
-    }
-    output
+    crate::redact::sanitize_local_paths(text)
 }
 
 /// 文件/目录名片段：保留中文等可读字符，只把 Windows 不允许的

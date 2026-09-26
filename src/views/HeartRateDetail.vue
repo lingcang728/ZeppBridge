@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { displayDateTimeFormatter } from '../lib/dateTime';
+import { useFirstLoad } from '../composables/useFirstLoad';
 
 defineOptions({ name: 'HeartRateDetail' });
 /**
@@ -53,6 +54,7 @@ const sparseDays = computed(
   () => dailyExtremes.value.filter((day) => day.samples < SPARSE_SAMPLE_THRESHOLD).length,
 );
 const loading = ref(true);
+const initialLoading = useFirstLoad(loading);
 const error = ref<string | null>(null);
 const dayError = ref<string | null>(null);
 const trendsError = ref<string | null>(null);
@@ -274,7 +276,6 @@ watch(dataRevision, () => { void load(); });
       back="/"
       :back-label="t.backToOverview"
       title-id="hr-title"
-      :eyebrow="t.eyebrow"
       :title="t.title"
       :intro="t.intro"
     />
@@ -284,7 +285,7 @@ watch(dataRevision, () => { void load(); });
       <button v-if="isDesktop()" class="button button-secondary retry" type="button" @click="() => load()">{{ t.retry }}</button>
     </div>
 
-    <div v-if="loading" class="stack" aria-live="polite" :aria-label="t.loadingAria">
+    <div v-if="initialLoading" class="stack" aria-live="polite" :aria-label="t.loadingAria">
       <SkeletonBlock height="280px" /><SkeletonBlock height="268px" />
     </div>
 

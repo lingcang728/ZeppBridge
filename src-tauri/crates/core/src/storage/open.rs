@@ -63,6 +63,18 @@ pub(super) fn salvage_truncated_page_count(path: &Path) -> std::io::Result<bool>
     Ok(true)
 }
 
+/// 可写连接的公共设置。
+///
+/// - WAL 下 `synchronous = NORMAL` 是 SQLite 官方推荐的组合：只在检查点时 fsync，
+///   断电最多丢最后一个事务，库本身不会坏。同步一次写几万行时省下的是每个事务一次 fsync。
+/// - `journal_size_limit`：检查点之后把 WAL 截回 32 MB。不设的话 WAL 只增不减，
+///   用户库上见过 76 MB 的 `zepp.db-wal`。
+const WRITABLE_PRAGMAS: &str = "PRAGMA foreign_keys = ON;
+     PRAGMA busy_timeout = 30000;
+     PRAGMA journal_mode = WAL;
+     PRAGMA synchronous = NORMAL;
+     PRAGMA journal_size_limit = 33554432;";
+
 impl Database {
     #[cfg(test)]
     pub fn new(db_path: PathBuf) -> Result<Self> {
@@ -179,11 +191,7 @@ impl Database {
     /// DDL locks (SQLITE_BUSY on ALTER/CREATE INDEX while writing).
     pub fn open_without_migration(db_path: PathBuf) -> Result<Self> {
         let conn = Connection::open(db_path)?;
-        conn.execute_batch(
-            "PRAGMA foreign_keys = ON;
-             PRAGMA busy_timeout = 30000;
-             PRAGMA journal_mode = WAL;",
-        )?;
+        conn.execute_batch(WRITABLE_PRAGMAS)?;
         Ok(Self { conn })
     }
 
@@ -247,11 +255,7 @@ impl Database {
     pub(super) fn from_connection(conn: Connection) -> Result<Self> {
         Self::reject_newer_schema(&conn)?;
         // These pragmas are set for every connection, including test databases.
-        conn.execute_batch(
-            "PRAGMA foreign_keys = ON;
-             PRAGMA busy_timeout = 30000;
-             PRAGMA journal_mode = WAL;",
-        )?;
+        conn.execute_batch(WRITABLE_PRAGMAS)?;
         let db = Self { conn };
         db.migrate()?;
         Ok(db)

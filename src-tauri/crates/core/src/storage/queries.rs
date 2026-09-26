@@ -528,30 +528,72 @@ impl Database {
         // 覆盖的最早/最晚日本地与 local_coverage 同一条链路：对原始列取
         // MIN/MAX 再换算，能走索引；旧写法是对四张表逐行调 date() 再聚合。
         let (start, end) = self.coverage_day_bounds()?;
-        // stream / source_scope 的 DISTINCT 计数躲不开扫行，但不再为每一行
-        // 调 date()——那是旧 UNION 里最贵的部分。
-        let (stream_count, scope_count, only_scope) = self.conn.query_row(
-            "SELECT COUNT(DISTINCT stream),
-                    COUNT(DISTINCT source_scope), MIN(source_scope)
-             FROM (
-                 SELECT metric AS stream, source_scope
-                 FROM metric_samples
-                 UNION ALL
-                 SELECT 'daily_summary' AS stream, source_scope FROM daily_metrics
-                 UNION ALL
-                 SELECT 'sleep' AS stream, source_scope FROM sleep_sessions
-                 UNION ALL
-                 SELECT 'workouts' AS stream, source_scope FROM workouts
-             )",
-            [],
-            |row| {
-                Ok((
-                    row.get::<_, i64>(0)?,
-                    row.get::<_, i64>(1)?,
-                    row.get::<_, Option<String>>(2)?,
-                ))
-            },
-        )?;
+        // 数据流 = 样本表里的各指标 + 另外三张表各算一条。以前是把四张表的
+        // 每一行 UNION 起来再 COUNT(DISTINCT)，真实库上约 90 ms；现在指标名走
+        // 跳跃扫描，另外三张表只问「有没有」。
+        let mut streams: BTreeSet<String> = self.sample_metric_names()?.into_iter().collect();
+        for (stream, table) in [
+            ("daily_summary", "daily_metrics"),
+            ("sleep", "sleep_sessions"),
+            ("workouts", "workouts"),
+        ] {
+            let present: bool = self.conn.query_row(
+                &format!("SELECT EXISTS(SELECT 1 FROM {table})"),
+                [],
+                |row| row.get(0),
+            )?;
+            if present {
+                streams.insert(stream.to_string());
+            }
+        }
+        let stream_count = streams.len() as i64;
+        // 来源：只需要知道是 0 种、1 种（哪一种）还是「混合」。先看三张小表，
+        // 已经见到两种就不必再碰样本表；否则只找一行「和已见来源不同」的样本。
+        let mut scopes = BTreeSet::<String>::new();
+        for table in ["daily_metrics", "sleep_sessions", "workouts"] {
+            let mut statement = self.conn.prepare(&format!(
+                "SELECT DISTINCT source_scope FROM {table} WHERE source_scope IS NOT NULL"
+            ))?;
+            for scope in statement.query_map([], |row| row.get::<_, String>(0))? {
+                scopes.insert(scope?);
+            }
+        }
+        if scopes.len() < 2 {
+            let other: Option<String> = match scopes.iter().next() {
+                Some(seen) => self.conn.query_row(
+                    "SELECT source_scope FROM metric_samples
+                     WHERE source_scope IS NOT NULL AND source_scope <> ?1 LIMIT 1",
+                    [seen],
+                    |row| row.get(0),
+                ),
+                None => self.conn.query_row(
+                    "SELECT source_scope FROM metric_samples
+                     WHERE source_scope IS NOT NULL LIMIT 1",
+                    [],
+                    |row| row.get(0),
+                ),
+            }
+            .optional()?;
+            if let Some(other) = other {
+                scopes.insert(other);
+                if scopes.len() < 2 {
+                    // 前三张表都空、样本表只见到一种：再确认样本表里没有第二种。
+                    let seen = scopes.iter().next().cloned().unwrap_or_default();
+                    let second: Option<String> = self
+                        .conn
+                        .query_row(
+                            "SELECT source_scope FROM metric_samples
+                             WHERE source_scope IS NOT NULL AND source_scope <> ?1 LIMIT 1",
+                            [&seen],
+                            |row| row.get(0),
+                        )
+                        .optional()?;
+                    scopes.extend(second);
+                }
+            }
+        }
+        let scope_count = scopes.len() as i64;
+        let only_scope = scopes.iter().next().cloned();
         let coverage = match (start, end) {
             (Some(start), Some(end)) => {
                 let start_date = NaiveDate::parse_from_str(&start, "%Y-%m-%d")

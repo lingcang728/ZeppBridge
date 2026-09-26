@@ -155,12 +155,8 @@ export default {
     },
     'views/Settings': {
       title: 'Definições',
-      intro:
-        'Autenticação, comportamento da sincronização, privacidade e as predefinições de exportação — tudo num só sítio.',
       retry: 'Tentar novamente',
       distanceUnitLabel: 'Unidade de distância',
-      displayPrefsTitle: 'Idioma e formatos',
-      authTitle: '1. Autenticação',
       authWebTitle: 'Início de sessão web oficial',
       authWebSub: 'Inicia sessão na página oficial; o appToken é recolhido por ti',
       authCancelLogin: 'Cancelar o início de sessão',
@@ -173,7 +169,6 @@ export default {
       authManualTitle: 'Introduzir manualmente',
       authManualSub: 'Escreve o appToken, o user_id e o host da região',
       authCollapse: 'Fechar',
-      manualFormTitle: 'Introduz as credenciais',
       manualFormHint:
         'Tira-as de uma captura do mitmproxy/Charles ou das devtools do teu browser. Três campos:',
       manualTokenPlaceholder: 'Copiar do cabeçalho HTTP apptoken',
@@ -181,21 +176,16 @@ export default {
       manualSaving: 'A guardar…',
       manualSave: 'Guardar credenciais',
       cancel: 'Cancelar',
-      accountTitle: '2. Conta e região',
       accountLine: (region: string, lastSync: string) =>
         `Região ${region} · última sincronização ${lastSync}`,
       verifyAndSync: 'Verificar e sincronizar',
       reauthenticate: 'Iniciar sessão novamente',
-      devicesTitle: '3. Dispositivos ligados / origens de dados',
       identifying: 'A identificar…',
       identifyDevices: 'Identificar dispositivos novamente',
       deviceErrorPrefix: 'Identificação de dispositivos: ',
       noDevices:
         'Ainda não foi identificado nenhum dispositivo físico; o Zepp Cloud continua a sincronizar como origem na nuvem.',
       deviceFirmware: (firmware: string) => `Firmware ${firmware}`,
-      deviceLatestData: 'Dados mais recentes',
-      deviceIdLine: (masked: string) => `ID do dispositivo ${masked}`,
-      viewOrChange: 'Ver / mudar modelo',
       unknownDeviceTitle: 'Um dispositivo não identificado',
       unknownDeviceBodyA: 'Algumas contas Zepp devolvem registos de dispositivo com ',
       unknownDeviceNoName: 'nenhum campo de nome de produto',
@@ -223,7 +213,6 @@ export default {
       reportConfirm:
         'Isto envia a versão da app, o tipo de SO, a revisão do parser, sugestões ao nível do produto e formas de campos para dispositivos não identificados, a versão de firmware, números ao nível do modelo (deviceSource / deviceType — inteiros que dizem qual o modelo, não qual a unidade), códigos de treino desconhecidos e as suas contagens, o código de erro numérico do pedido mais recente que a nuvem recusou (só o número, qual o fluxo de dados e quando — nunca texto que a nuvem tenha devolvido), e a nota que escreveste acima (com caminhos locais, endereços de email e identificadores longos removidos). Nunca envia a tua conta Zepp, tokens, números de série, IDs de dispositivo, endereços MAC, GPS, valores de saúde ou respostas em bruto. Enviar?',
       reportFailed: 'Não foi possível enviar o relatório de erro',
-      capabilityTitle: 'O que os teus dispositivos conseguem fornecer',
       capabilityIntro:
         'O que o ZeppBridge consegue ler atualmente da tua conta. Esta lista atualiza-se durante uma sincronização; não há nada para premir.',
       lampOn: (count: number) => `Obtidos ${count}`,
@@ -243,7 +232,6 @@ export default {
       probeEmpty: 'sem dados',
       probeRefused: 'endpoint recusado',
       probeFailed: 'o pedido falhou',
-      codesTitle: 'Códigos de treino não identificados',
       codesUnnamed: (count: number) => `${count} ainda sem nome`,
       codesIntro:
         'Os modelos de treino personalizados da Zepp dão um número sem nome, e o catálogo incorporado também não tem nada para eles. Em vez de adivinhar um desporto e servir-to, dá um nome ao código uma vez tu mesmo — cada registo com esse código passa a usar o teu nome, e a página do treino diz claramente que é teu.',
@@ -262,7 +250,6 @@ export default {
       codeCleared: (code: number) => `O nome personalizado do código ${code} foi limpo.`,
       codeSaveFailed: 'Não foi possível guardar o nome de treino personalizado',
       codeSuggestions: ['Força', 'Core', 'HIIT', 'Alongamentos', 'Reabilitação', 'Sessão personalizada'],
-      privacyTitle: '4. Privacidade e segurança',
       privacyDbTitle: 'A base de dados local não é cifrada',
       privacyDbBody:
         'Os dados de saúde são guardados como SQLite em texto simples na pasta de dados da app, protegidos pela tua conta Windows / macOS e pela cifragem do disco. O ZeppBridge não cifra a base de dados inteira, e não finge que o faz.',
@@ -276,22 +263,9 @@ export default {
       privacyReportTitle: 'Um dispositivo ou treino não reconhecido?',
       privacyReportBody:
         'Sem conta GitHub, sem copiar dados. Ao confirmar envia apenas formas de campos ao nível do produto, a versão de firmware, números ao nível do modelo (inteiros, que dizem só qual o modelo) e códigos de treino desconhecidos com as suas contagens, para o armazenamento privado de relatórios de erro do ZeppBridge. Nunca envia a tua conta, tokens, números de série, IDs de dispositivo, endereços MAC, GPS, valores de saúde, respostas em bruto ou caminhos locais.',
-      mcpTitle: '5. MCP (deixa as ferramentas de IA consultarem os teus dados locais)',
       mcpBadge: 'Só de leitura · não escuta em nenhuma porta',
-      mcpSkip:
-        'Se MCP não te diz nada, salta esta secção — não afeta nenhuma funcionalidade do ZeppBridge.',
-      mcpCompareA: 'Em uma linha: «Entregar à IA» és tu a exportar e colar; MCP é ',
-      mcpCompareStrong: 'a IA a pedir por ela',
-      mcpCompareB:
-        ' — uma vez configurado, dizes «como dormi este mês» e ela consulta a tua base de dados local. Só é útil para ferramentas de IA de programação instaladas no teu computador (Claude Code, Codex, Grok e afins).',
-      mcpAskA: 'A configuração muda de ferramenta para ferramenta, por isso, em vez de escrever um testamento aqui, ',
-      mcpAskStrong: 'copia o texto abaixo para a IA que realmente usas',
-      mcpAskB: ' e deixa que ela te guie na tua própria máquina.',
       mcpCopyPrompt: 'Copiar isto e perguntar à tua IA',
       mcpCopyConfig: 'Copiar só o excerto de configuração',
-      mcpToolsLead: 'Uma vez configurada, a IA consegue perguntar sobre estas cinco coisas:',
-      mcpFootA:
-        ' vai incluído no pacote de ferramentas em cada Release, na mesma versão que a aplicação de desktop. Lê a mesma base de dados local, por isso o que vê é exatamente o que vês aqui.',
       mcpPromptCopied:
         'Copiado. Cola-o na IA que usas e ela dá-te os passos de configuração para a tua máquina.',
       mcpPromptCopyFailed: 'A cópia falhou. Seleciona o texto acima à mão.',
@@ -306,7 +280,6 @@ export default {
       mcpSetupPrompt:
         'Uso uma aplicação de desktop para Windows chamada ZeppBridge que sincroniza os dados do meu relógio Amazfit / Zepp para uma base de dados SQLite local.\r\nEla traz um programa MCP (zeppbridge-mcp) e quero configurá-lo contigo, para poderes consultar os meus treinos e dados de saúde diretamente em vez de eu estar sempre a exportar e colar.\r\n\r\nO que sei sobre ele:\r\n- O programa MCP vem no pacote zeppbridge-tools na página de GitHub Releases do ZeppBridge; descompacta-o e o zeppbridge-mcp está lá dentro. Posso ainda não o ter transferido.\r\n- É um servidor MCP stdio. Lê a base de dados local, não usa a rede, não escuta em nenhuma porta e não precisa de token nem de API key.\r\n- A forma típica da configuração é: {"mcpServers": {"zeppbridge": {"command": "<caminho completo para o zeppbridge-mcp>", "args": []}}}\r\n- Expõe cinco ferramentas só de leitura: list_workouts, get_workout_insight (um treino contra a minha própria referência), get_metric_series (séries de métricas dia a dia), get_sleep_detail (uma noite, fase a fase) e get_data_health (estado de obtenção/interpretação/escrita por fluxo).\r\n\r\nDiz-me por favor:\r\n1. Para ti em concreto — a ferramenta com quem estou a falar agora — em que ficheiro vai a configuração, ou que comando a adiciona;\r\n2. Como escrever um caminho do Windows (as barras invertidas precisam de escape?);\r\n3. Como verificar que funciona depois de configurado.\r\n\r\nSe precisares de algo meu (que cliente uso, onde fica o ficheiro), pergunta.',
       mcpConfigPathPlaceholder: '<caminho para o zeppbridge-mcp>',
-      retentionTitle: '6. Retenção de dados locais',
       retentionLabel: 'Guardar durante',
       retentionAria: 'Retenção de dados locais em dias',
       retentionNote: (days: number) =>
@@ -320,20 +293,11 @@ export default {
       reprocessing: 'A reinterpretar…',
       reprocessNow: 'Reinterpretar',
       days: (days: number) => `${days} dias`,
-      lastDays: (days: number) => `Últimos ${days} dias`,
-      exportTitle: '7. Predefinições de exportação e reposição',
       defaultFormatLabel: 'Formato de exportação predefinido',
       defaultFormatAria: 'Formato de exportação predefinido',
-      historyRangeLabel: 'Intervalo da reposição de histórico',
-      historyRangeAria: 'Dias da reposição de histórico',
-      exportNote:
-        'Define o formato predefinido na página «Entregar à IA» e a janela de reposição da nuvem.',
-      startBackfill: 'Começar uma reposição de histórico',
       formatJsonHint: 'Dados estruturados',
       formatCsvHint: 'Dados tabulares',
       formatGpxHint: 'Trajetos de treinos',
-      updateTitle: '8. Atualizações de software',
-      updateSub: 'Verifica discretamente no máximo uma vez por dia; também podes verificar à mão.',
       updateChecking: 'A verificar…',
       updateCheck: 'Procurar atualizações',
       updateCurrent: (version: string) => `Atualmente ${version}`,
@@ -372,20 +336,14 @@ export default {
       updateLater: 'Agora não',
       updateRetry: 'Tentar novamente',
       updateInstall: 'Transferir e instalar',
-      syncTitle: '9. Sincronização automática',
       syncDescA: (minutes: number) =>
         `Sincroniza os registos da nuvem a cada ${minutes} minutos enquanto a app está aberta`,
       syncDescB: 'Deixá-la ligada mantém as séries temporais contínuas.',
       syncIntervalAria: 'Intervalo da sincronização automática',
       minutes: (minutes: number) => `${minutes} min`,
-      syncOn: 'A sincronização está ligada',
-      syncOff: 'A sincronização está desligada',
       syncing: 'A sincronizar…',
       syncNow: 'Sincronizar agora',
-      advancedTitle: 'Avançado e manutenção',
-      advancedSub: 'Escala, a pasta de dados e limpar credenciais. Só quando precisares.',
       scaleLabel: 'Escala da interface',
-      scaleNote: '100% é a referência do design. Ctrl + / Ctrl - também funcionam.',
       dataAuthLabel: 'Dados e credenciais',
       dataAuthNote: (days: number) =>
         `Os dados vivem na pasta de dados da app; atualmente a guardar ${days} dias.`,
@@ -409,16 +367,11 @@ export default {
       compacting: 'A compactar… (uns minutos numa base de dados grande)',
       compactRun: 'Compactar pacotes guardados',
       backupLabel: 'Snapshots da base de dados e restauro',
-      backupNote:
-        'Uma cópia da base de dados inteira para recuperação de desastre, legível só pelo ZeppBridge. Uma é criada automaticamente antes de uma atualização da base de dados; raramente precisas de o fazer à mão.',
       localApiLabel: 'API REST local',
       localApiNote:
         'Para outros programas neste computador — scripts, dashboards, as tuas ferramentas — lerem séries de treinos normalizadas como JSON. Se não tens essa necessidade, deixa desligada.',
       syncDiagnostics: 'Diagnósticos de sincronização',
       noSyncDiagnostics: 'Ainda sem diagnósticos de sincronização.',
-      apiTitle: 'API REST local',
-      apiSub:
-        'Permite que outros programas neste computador leiam séries de treinos normalizadas como JSON. Desligada por predefinição; ligas-la explicitamente.',
       apiListening: 'A escutar',
       apiEnabledNotListening: 'Ligada mas sem escutar',
       apiOff: 'Desligada',
@@ -477,7 +430,6 @@ export default {
       notProvided: 'Não fornecido',
       noRecords: 'Ainda sem registos',
       timeUnknown: 'Hora desconhecida',
-      cloudService: 'Serviço na nuvem',
       refreshFailed: (reason: string) => `A identificação falhou; voltou à cache local${reason}`,
       refreshFailedReason: (reason: string) => `: ${reason}`,
       refreshFailedPeriod: '.',
@@ -520,13 +472,6 @@ export default {
         'Definições guardadas, mas a estimativa de espaço em disco está indisponível neste momento',
       prefsSaved: 'Definições de retenção e reposição guardadas.',
       prefsSaveFailed: 'Não foi possível guardar as definições',
-      syncInProgress: 'Há uma sincronização a decorrer. Repõe quando terminar',
-      backfillYearCap:
-        '\nUm ano é o limite; registos da nuvem mais antigos que isso não vêm para este computador.',
-      backfillConfirm: (days: number, low: number, high: number, extra: string) =>
-        `Repor ${days} dias demora cerca de ${low}–${high} minutos (estimativa). Mantém a app aberta; podes cancelar a qualquer momento.${extra}`,
-      backfillTightSpace: (message: string, days: number) =>
-        `${message}\nAinda queres repôr ${days} dias? Considera primeiro 30 dias.`,
       stream: {
         heart_rate: 'Frequência cardíaca',
         sleep: 'Sono',
@@ -584,7 +529,6 @@ export default {
     },
     App: {
       quickReturn: (page: string) => `Voltar a ${page}`,
-      navRecent: 'registos recentes',
       skipToContent: 'Saltar para o conteúdo principal',
       mainNav: 'Navegação principal',
       bottomNav: 'Navegação principal móvel',
@@ -941,7 +885,6 @@ export default {
         `Contra as tuas ${count} corridas mais recentes de distância semelhante:`,
       noComparison:
         'Ainda não há histórico comparável suficiente, por isso esta corrida reporta os seus números sem os comparar.',
-      baselinePrefix: (value: string, delta: string) => `referência ${value} · ${delta}`,
       driftTitle: 'Primeira metade vs segunda',
       driftSub:
         'Divide este treino em duas metades pelo tempo e compara quantos batimentos a mesma velocidade custou.',
@@ -1028,8 +971,6 @@ export default {
       desktopOnly: 'O relatório semanal precisa da aplicação de desktop do ZeppBridge.',
       nothingComparable: 'Ainda nada comparável esta semana. Volta depois de uma sincronização.',
       loadFailed: 'Não foi possível construir o relatório semanal local',
-      barsAria: (recent: string, baseline: string) =>
-        `Esta semana ${recent}, 28 dias anteriores ${baseline}`,
       barThisWeek: 'Esta semana',
       barBaseline: '28 dias ant.',
       noBaseline: 'Não há histórico suficiente por trás, por isso isto é só o valor atual',
@@ -1344,7 +1285,6 @@ export default {
     },
     'lib/labels': {
       unknownWithCode: (code: string) => `Treino não reconhecido (código ${code})`,
-      unknownWorkout: 'Treino não reconhecido',
       workout: 'Treino',
       fallback: {
         run: 'Corrida ao ar livre',
@@ -1396,11 +1336,9 @@ export default {
       invalid:
         'Introduz um título e datas válidas. A data de fim não pode ser anterior à data de início.',
       failed: 'Não foi possível concluir a ação. Tenta novamente.',
-      saved: 'Acontecimento de vida guardado.',
       deleted: 'Acontecimento de vida eliminado.',
       loading: 'A carregar acontecimentos de vida…',
       retry: 'Tentar novamente',
-      all: 'Todos',
       active: 'A decorrer',
       search: 'Procurar acontecimentos de vida',
       noMatch: 'Sem acontecimentos correspondentes.',
@@ -1485,7 +1423,6 @@ export default {
     },
     'views/ActivityDetail': {
       backToOverview: 'Voltar à visão geral',
-      eyebrow: 'Atividade diária',
       title: 'Atividade diária',
       intro:
         'Passos, distância, gasto ativo e minutos ativos, dia a dia. Comparado só com os teus próprios registos anteriores; os dias sem dados ficam vazios em vez de serem preenchidos com zero.',
@@ -1517,7 +1454,6 @@ export default {
     },
     'views/BodyStatus': {
       backToOverview: 'Voltar à visão geral',
-      eyebrow: 'Estado corporal',
       title: 'Estado corporal',
       intro:
         'Tendências locais de prontidão, stress, oxigénio no sangue, HRV, frequência respiratória, frequência cardíaca em repouso, composição corporal e ingestão alimentar. Tudo lido de registos sincronizados.',
@@ -1656,7 +1592,6 @@ export default {
       timeUnknown: 'Hora desconhecida',
       notProvided: 'Não fornecido',
       backToSettings: 'Voltar às definições',
-      eyebrow: 'Saúde dos dados',
       title: 'Verificação da saúde dos dados',
       intro:
         'Para cada fluxo de dados: até onde chegou a obter da nuvem, interpretar e escrever localmente; que datas cobre; e de onde veio. Em falta é em falta — nunca preenchido com um zero.',
@@ -1792,7 +1727,6 @@ export default {
     },
     'views/HeartRateDetail': {
       backToOverview: 'Voltar à visão geral',
-      eyebrow: 'Frequência cardíaca',
       title: 'Frequência cardíaca',
       intro:
         'A curva do dia inteiro acima é sempre das últimas 24 horas; 7 dias / 1 mês / 6 meses só mudam as tendências dia a dia abaixo. Os trechos sem amostras ficam em branco, não preenchidos com zero.',
@@ -1800,7 +1734,6 @@ export default {
       trendRangeLabel: 'Intervalo da tendência',
       desktopOnly:
         'Usa a aplicação de desktop. Esta pré-visualização no browser não lê dados da conta.',
-      loadFailed: 'Os dados de frequência cardíaca estão indisponíveis neste momento',
       dayFailed: 'Não foi possível ler as últimas 24 horas de frequência cardíaca.',
       dailyMaxFailed: 'Não foi possível ler o pico diário de frequência cardíaca.',
       trendsFailed:
@@ -1895,14 +1828,10 @@ export default {
           other: `${count} registos incompletos escondidos`,
         }),
       notProvided: 'Não fornecido',
-      dateUnknown: 'Data desconhecida',
       today: 'Hoje',
       yesterday: 'Ontem',
-      listDate: (month: number, day: number, weekday: string) =>
-        `${weekday}, ${day}/${month}`,
     },
     'views/SleepDetail': {
-      backToRecent: 'Voltar aos registos recentes',
       title: 'Registo de sono',
       loadingDetail: 'A ler o registo de sono…',
       loadFailedTitle: 'Não foi possível ler este registo de sono',
@@ -1968,7 +1897,6 @@ export default {
     },
     'views/TrainingStatus': {
       backToOverview: 'Voltar à visão geral',
-      eyebrow: 'Estado de treino',
       title: 'Estado de treino',
       intro:
         'VO₂max, limiar de lactato, carga de treino e zonas de frequência cardíaca. Tudo lido de registos sincronizados; sem conselhos de treino.',
@@ -2020,7 +1948,6 @@ export default {
     },
     'views/WorkoutDetail': {
       notProvided: 'Não fornecido',
-      backToRecent: 'Voltar aos registos recentes',
       loadFailedTitle: 'Não foi possível ler este treino',
       loadFailed: 'O detalhe do treino está indisponível neste momento',
       retry: 'Tentar novamente',
@@ -2032,7 +1959,6 @@ export default {
       seriesFailedTitle: 'A leitura das séries ponto a ponto falhou',
       exportNeedsSeries:
         'As séries ponto a ponto falharam a leitura, por isso este registo não pode ser exportado.',
-      thisWorkout: 'treino',
       aiPrompt: (label: string) => `És um analista de desporto. Abaixo está o registo completo de um ${label} meu, tirado da base de dados local do ZeppBridge e desidentificado.
 Analisa esta sessão usando apenas os factos deste registo: a intensidade, como o ritmo se relaciona com a frequência cardíaca, se há um abrandamento claro ou um trecho anómalo, e o que fazer concretamente de diferente da próxima vez.
 
@@ -2060,7 +1986,6 @@ Responde em Markdown.`,
       overrideCleared: 'Correção limpa. De volta à correspondência do próprio ZeppBridge.',
       overrideFailed: 'Não foi possível guardar a correção do tipo de treino',
       copied: (format: string) => `Dados ${format} copiados para a área de transferência.`,
-      copyFailed: 'Não foi possível copiar este registo',
       metricDistance: 'Distância',
       metricDuration: 'Tempo em movimento',
       metricAvgHr: 'FC média',
@@ -2294,7 +2219,6 @@ Responde em Markdown.`,
     'err.capability.unknown': 'Estado desconhecido',
     'err.capability.other': 'Estado desconhecido',
     'err.export.empty_range': 'Não há registos neste intervalo para exportar',
-    'err.export.read_failed': 'Não foi possível ler os dados de exportação',
     'err.export.convert_failed': 'Não foi possível converter para o formato pedido',
     'err.export.write_failed': 'Não foi possível escrever o ficheiro de exportação',
     'err.export.write_json_failed': 'Não foi possível escrever a exportação JSON',
@@ -2310,7 +2234,6 @@ Responde em Markdown.`,
     'err.handoff.empty_range': 'Não há registos neste intervalo para entregar',
     'err.handoff.mkdir_failed': 'Não foi possível criar a pasta de entrega',
     'err.handoff.write_failed': 'Não foi possível escrever os dados de IA desidentificados',
-    'err.handoff.parse_failed': 'Não foi possível interpretar o JSON de exportação para IA',
     'err.handoff.encode_failed': 'Não foi possível codificar a exportação de IA desidentificada',
     'err.diagnostic.nothing_to_submit':
       'Este dispositivo não tem um número de modelo que ajude o catálogo, por isso não há nada para enviar',

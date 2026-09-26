@@ -30,6 +30,10 @@ const unlisteners: Array<() => void> = [];
 let autoSyncTimer: number | null = null;
 let initializeEpoch = 0;
 let compactionSavedTimer = 0;
+/* 启动同步推迟到首屏画完之后：同步要抓网、要写库、要跑归一化，和首屏的
+   查询与渲染抢同一个 CPU 和同一把库锁，打开时的「重」一大半来自这里。 */
+let launchSyncTimer = 0;
+const LAUNCH_SYNC_DELAY_MS = 4_000;
 
 const setAutoSyncEnabled = (enabled: boolean) => {
   autoSyncEnabled.value = Boolean(enabled);
@@ -52,6 +56,8 @@ const clearHeldResources = () => {
   clearRunTimers();
   window.clearTimeout(compactionSavedTimer);
   compactionSavedTimer = 0;
+  window.clearTimeout(launchSyncTimer);
+  launchSyncTimer = 0;
   if (autoSyncTimer !== null) {
     window.clearInterval(autoSyncTimer);
     autoSyncTimer = null;
@@ -162,7 +168,9 @@ const initialize = async () => {
   if (!stillMine()) return;
   if (autoSyncEnabled.value && status?.connection_state === 'connected'
     && launchSyncIsDue(status?.last_cloud_sync_at, autoSyncInterval.value)) {
-    void runSync('incremental', undefined, { silent: true });
+    launchSyncTimer = window.setTimeout(() => {
+      if (stillMine()) void runSync('incremental', undefined, { silent: true });
+    }, LAUNCH_SYNC_DELAY_MS);
   }
 };
 

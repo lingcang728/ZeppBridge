@@ -253,6 +253,7 @@ impl Database {
                 self.collect_samples(
                     "SELECT date(timestamp, 'localtime'), value, source_scope FROM metric_samples
                      WHERE metric IN ('hrv', 'hrv_rmssd')
+                       AND timestamp >= ?3 AND timestamp < ?4
                        AND date(timestamp, 'localtime') BETWEEN ?1 AND ?2",
                     &start_text,
                     &end_text,
@@ -274,7 +275,8 @@ impl Database {
                 self.collect_samples(
                     &format!(
                         "SELECT date(timestamp, 'localtime'), value, source_scope FROM metric_samples
-                         WHERE metric = '{other}' AND date(timestamp, 'localtime') BETWEEN ?1 AND ?2"
+                         WHERE metric = '{other}' AND timestamp >= ?3 AND timestamp < ?4
+                           AND date(timestamp, 'localtime') BETWEEN ?1 AND ?2"
                     ),
                     &start_text,
                     &end_text,
@@ -299,13 +301,25 @@ impl Database {
         end: &str,
     ) -> Result<RawWeeklySamples> {
         let mut stmt = self.conn.prepare(sql)?;
-        let rows = stmt.query_map(rusqlite::params![start, end], |row| {
+        // 样本表的查询多带一对 UTC 时间界（?3 / ?4）：`date(timestamp, 'localtime')`
+        // 套在列上用不上索引，要把这个指标的全部行扫一遍；先按时间界在索引上
+        // 圈出范围，再由 date() 精确筛到本地日，结果不变。
+        let (lower, upper) = crate::storage::local_day_range_utc_bounds(start, end)
+            .unwrap_or_else(|| ("0000".to_string(), "9999".to_string()));
+        let mapper = |row: &rusqlite::Row<'_>| {
             Ok((
                 row.get::<_, String>(0)?,
                 row.get::<_, f64>(1)?,
                 row.get::<_, String>(2)?,
             ))
-        })?;
+        };
+        let rows: Vec<_> = if sql.contains("?3") {
+            stmt.query_map(rusqlite::params![start, end, lower, upper], mapper)?
+                .collect()
+        } else {
+            stmt.query_map(rusqlite::params![start, end], mapper)?
+                .collect()
+        };
         let mut samples = Vec::new();
         let mut scopes = std::collections::BTreeSet::new();
         for row in rows {

@@ -34,6 +34,10 @@ describe('segment ink clip', () => {
     // 选中字只在滑块底下露出来：左边界 = 滑块左沿，右边界 = 轨道宽 − 滑块右沿。
     expect(segmentClip({ left: 75, width: 110, visible: true }, 260)).toBe('inset(3px 75px 3px 75px round 999px)');
   });
+  it('grows with the drag lens so no ring of plain text shows around it', () => {
+    // 透镜横向放大 1.1 倍：110px 宽的滑块两边各多出 5.5px，纵向顶满轨道。
+    expect(segmentClip({ left: 75, width: 110, visible: true }, 260, 3, 1.1)).toBe('inset(0px 69.5px 0px 69.5px round 999px)');
+  });
   it('hides the ink layer until the thumb has been measured', () => {
     expect(segmentClip({ left: 0, width: 0, visible: false }, 260)).toBe('inset(50%)');
     expect(segmentClip({ left: 10, width: 40, visible: true }, 0)).toBe('inset(50%)');

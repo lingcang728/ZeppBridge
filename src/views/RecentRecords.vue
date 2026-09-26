@@ -2,6 +2,7 @@
 
 defineOptions({ name: 'RecentRecords' });
 import { computed, onMounted, ref, watch } from 'vue';
+import { useFirstLoad } from '../composables/useFirstLoad';
 import { RouterLink } from 'vue-router';
 import Icon from '../components/Icon.vue';
 import PageHeader from '../components/PageHeader.vue';
@@ -21,6 +22,7 @@ import { recentRecordsMessages as messages } from './RecentRecords.i18n';
 const t = useMessages(messages);
 
 const loading = ref(true);
+const initialLoading = useFirstLoad(loading);
 const error = ref<string | null>(null);
 const partialWarning = ref<string | null>(null);
 const recentSleep = ref<SleepSession[]>([]);
@@ -154,7 +156,7 @@ function formatDateHint(value: string): string {
       <span>{{ partialWarning }}</span>
     </div>
 
-    <div v-if="loading" class="recent-skeleton" :aria-label="t.loadingLabel" aria-live="polite">
+    <div v-if="initialLoading" class="recent-skeleton" :aria-label="t.loadingLabel" aria-live="polite">
       <div class="recent-grid">
         <SkeletonBlock height="100%" />
         <SkeletonBlock height="100%" />

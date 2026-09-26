@@ -4,7 +4,6 @@ import { defineMessages } from '../i18n';
 export const bodyStatusMessages = defineMessages(
   {
     backToOverview: '返回概览',
-    eyebrow: '身体状态',
     title: '身体状态',
     intro: '恢复、压力、血氧、HRV、呼吸率、静息心率、体重体成分与饮食摄入的本机趋势。全部读自已同步的记录。',
     rangeAria: '时间范围',
@@ -84,7 +83,6 @@ export const bodyStatusMessages = defineMessages(
   },
   {
     backToOverview: 'Back to overview',
-    eyebrow: 'Body status',
     title: 'Body status',
     intro: 'Local trends for readiness, stress, blood oxygen, HRV, respiratory rate, resting heart rate, body composition and food intake. All read from synced records.',
     rangeAria: 'Time range',
@@ -164,7 +162,6 @@ export const bodyStatusMessages = defineMessages(
   },
   {
     backToOverview: 'Volver al resumen',
-    eyebrow: 'Estado corporal',
     title: 'Estado corporal',
     intro: 'Tendencias locales de recuperación, estrés, oxígeno en sangre, VFC, frecuencia respiratoria, frecuencia cardíaca en reposo, composición corporal y alimentación. Todo leído de los registros sincronizados.',
     rangeAria: 'Rango de tiempo',

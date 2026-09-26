@@ -82,7 +82,9 @@ const observeItems = () => {
   for (const el of buttons()) observer.observe(el);
 };
 
-const clip = computed(() => segmentClip(thumb.value, trackWidth.value));
+/* 透镜横向放大的倍数，和样式里 .is-dragging .segment-thumb 的 scale 保持一致。 */
+const LENS_GROW = 1.08;
+const clip = computed(() => segmentClip(thumb.value, trackWidth.value, 3, dragging.value ? LENS_GROW : 1));
 
 const focusActive = () => {
   if (!track.value?.contains(document.activeElement)) return;
@@ -283,12 +285,22 @@ onBeforeUnmount(() => {
   touch-action: none;
 }
 .segment-track.is-inset { background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); }
+/* 浮在内容之上的导航：用浮动控件的玻璃（见 material.css 的 .glass-control）。
+   选中的那一格不再是一块品牌绿，而是玻璃里一块中性的亮底、字用品牌色——
+   导航里的颜色只用来点出「你在哪」，大块的颜色留给内容。 */
 .segment-track.is-glass {
-  border: 1px solid var(--mat-glass-line);
-  background: var(--mat-glass);
-  -webkit-backdrop-filter: var(--mat-glass-blur);
-  backdrop-filter: var(--mat-glass-blur);
-  box-shadow: var(--mat-glass-shadow);
+  background: linear-gradient(180deg, var(--glass-sheen), transparent 60%), var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-rim), var(--glass-shadow);
+}
+.segment-track.is-glass .segment-thumb {
+  background: color-mix(in srgb, var(--ink) 13%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent);
+}
+.segment-track.is-glass .segment-ink { color: var(--accent); }
+@media (prefers-reduced-transparency: reduce) {
+  .segment-track.is-glass { background: var(--mat-glass-strong); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 .segment-track.is-fill { display: flex; }
 .segment-track.is-fill .segment-item { flex: 1 1 0; }
@@ -359,17 +371,17 @@ onBeforeUnmount(() => {
 }
 .segment-track.is-settled .segment-ink { transition: clip-path var(--seg-dur) var(--seg-ease), color var(--seg-dur) ease; }
 
-/* 拖动时滑块变成玻璃透镜：半透明、边缘高光、略放大，底下的字透出来。 */
+/* 拖动时滑块临时变成清透的透镜：放大一点、边缘高光、几乎无色，透过它能看清
+   底下的标签。不做模糊——透镜是聚光，不是磨砂；模糊会把底下的字糊成一圈光晕。
+   两层字在拖动时用同一字重，叠在一起才是一个字而不是重影。 */
 .segment-track.is-dragging .segment-thumb {
   scale: 1.08 1.16;
-  background: color-mix(in srgb, var(--accent) 30%, transparent);
-  -webkit-backdrop-filter: blur(3px) saturate(1.6);
-  backdrop-filter: blur(3px) saturate(1.6);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), inset 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent),
-    0 6px 18px -6px rgba(0, 0, 0, .5);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5), inset 0 -1px 0 rgba(255, 255, 255, .12),
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent), 0 8px 20px -8px rgba(0, 0, 0, .45);
   transition: scale var(--seg-dur) var(--seg-ease), background var(--seg-dur) ease, box-shadow var(--seg-dur) ease;
 }
-.segment-track.is-dragging .segment-ink { color: var(--ink); transition: color var(--seg-dur) ease; }
+.segment-track.is-dragging .segment-ink { color: var(--ink); font-weight: 500; transition: color var(--seg-dur) ease; }
 
 .segment-track:has(.segment-item:focus-visible) .segment-thumb {
   box-shadow: 0 0 0 2px var(--canvas), 0 0 0 4px var(--focus);

@@ -7,6 +7,7 @@
  * 这里不做诊断、治疗或风险预测。
  */
 import { computed, onMounted, ref, watch } from 'vue';
+import { useFirstLoad } from '../composables/useFirstLoad';
 import Icon from './Icon.vue';
 import ComparisonBars from './ComparisonBars.vue';
 import SkeletonBlock from './SkeletonBlock.vue';
@@ -27,7 +28,6 @@ const messages = defineMessages(
     desktopOnly: '周报需要从 ZeppBridge 桌面应用打开。',
     nothingComparable: '这一周还没有可比较的记录。完成一次同步后再看。',
     loadFailed: '无法生成本地周报',
-    barsAria: (recent: string, baseline: string) => `本周 ${recent}，此前 28 天 ${baseline}`,
     barThisWeek: '本周',
     barBaseline: '此前 28 天',
     noBaseline: '此前的数据不够，这次只报现状',
@@ -63,7 +63,6 @@ const messages = defineMessages(
     desktopOnly: 'The weekly report needs the ZeppBridge desktop app.',
     nothingComparable: 'Nothing comparable this week yet. Come back after a sync.',
     loadFailed: 'Could not build the local weekly report',
-    barsAria: (recent: string, baseline: string) => `This week ${recent}, previous 28 days ${baseline}`,
     barThisWeek: 'This week',
     barBaseline: 'Prev. 28 days',
     noBaseline: 'Not enough history behind it, so this is the current figure only',
@@ -98,7 +97,6 @@ const messages = defineMessages(
     desktopOnly: 'El informe semanal necesita la app de escritorio de ZeppBridge.',
     nothingComparable: 'Todavía no hay nada comparable esta semana. Vuelve después de sincronizar.',
     loadFailed: 'No se pudo generar el informe semanal local',
-    barsAria: (recent: string, baseline: string) => `Esta semana ${recent}, 28 días anteriores ${baseline}`,
     barThisWeek: 'Esta semana',
     barBaseline: '28 días previos',
     noBaseline: 'No hay suficiente historial detrás, así que solo se muestra el valor actual',
@@ -153,6 +151,7 @@ const { dataRevision } = useSyncController();
 
 const report = ref<WeeklyReport | null>(null);
 const loading = ref(true);
+const initialLoading = useFirstLoad(loading);
 const error = ref<string | null>(null);
 
 /** 数字变小对这个指标意味着「更好」吗？只影响配色，不改变事实。 */
@@ -256,7 +255,7 @@ function formatNumber(fact: InsightFact, value: number): string {
       <span><i class="legend-dot bad"></i>{{ t.legendBad }}</span>
       <span class="legend-note">{{ t.legendNote }}</span>
     </p>
-    <SkeletonBlock v-if="loading" height="120px" />
+    <SkeletonBlock v-if="initialLoading" height="120px" />
     <p v-else-if="error" class="weekly-error" role="alert">{{ error }}</p>
     <p v-else-if="!report" class="weekly-note">{{ t.desktopOnly }}</p>
 

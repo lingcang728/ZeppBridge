@@ -20,8 +20,10 @@ pub async fn list_life_events(
     start: Option<String>,
     end: Option<String>,
 ) -> Result<Vec<LifeEvent>, AppError> {
-    let db = state.db.lock().await;
-    Ok(db.list_life_events(start.as_deref(), end.as_deref())?)
+    super::spawn_independent_read(state.data_dir.clone(), move |db| {
+        db.list_life_events(start.as_deref(), end.as_deref())
+    })
+    .await
 }
 
 #[tauri::command]

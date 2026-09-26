@@ -21,10 +21,8 @@ export const recentRecordsMessages = defineMessages(
     noWorkoutsOfType: '该运动类型没有可展示记录。',
     hiddenIncomplete: (count: number) => `${count} 条数据不完整已隐藏`,
     notProvided: '未提供',
-    dateUnknown: '日期未知',
     today: '今天',
     yesterday: '昨天',
-    listDate: (month: number, day: number, weekday: string) => `${month}月${day}日（${weekday}）`,
   },
   {
     backToOverview: 'Back to overview',
@@ -45,10 +43,8 @@ export const recentRecordsMessages = defineMessages(
     noWorkoutsOfType: 'Nothing to show for this workout type.',
     hiddenIncomplete: (count: number) => `${count} incomplete records hidden`,
     notProvided: 'Not provided',
-    dateUnknown: 'Date unknown',
     today: 'Today',
     yesterday: 'Yesterday',
-    listDate: (month: number, day: number, weekday: string) => `${weekday}, ${month}/${day}`,
   },
   {
     backToOverview: 'Volver al resumen',
@@ -69,10 +65,8 @@ export const recentRecordsMessages = defineMessages(
     noWorkoutsOfType: 'No hay nada que mostrar para este tipo de entrenamiento.',
     hiddenIncomplete: (count: number) => `${count} registros incompletos ocultos`,
     notProvided: 'Sin datos',
-    dateUnknown: 'Fecha desconocida',
     today: 'Hoy',
     yesterday: 'Ayer',
-    listDate: (month: number, day: number, weekday: string) => `${weekday} ${day}/${month}`,
   },
   'views/RecentRecords',
 );

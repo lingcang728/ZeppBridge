@@ -4,7 +4,6 @@ import { defineMessages } from '../i18n';
 export const workoutDetailMessages = defineMessages(
   {
     notProvided: '未提供',
-    backToRecent: '返回最近记录',
     loadFailedTitle: '无法读取这条运动',
     loadFailed: '训练数据包详情暂时不可用',
     retry: '重试',
@@ -14,7 +13,6 @@ export const workoutDetailMessages = defineMessages(
     seriesFailed: '无法读取这次运动的逐点序列',
     seriesFailedTitle: '逐点序列读取失败',
     exportNeedsSeries: '逐点序列读取失败，无法导出这条记录。',
-    thisWorkout: '这次运动',
     aiPrompt: (label: string) => `你是一位专业的运动分析师。下面是我一次${label}的完整记录（来自 ZeppBridge 本机数据库，已脱敏）。
 请只基于这条记录里的事实分析这次训练：强度、配速与心率的关系、是否有明显的掉速或异常段落，并给出下一次的具体建议。
 
@@ -39,7 +37,6 @@ export const workoutDetailMessages = defineMessages(
     overrideCleared: '已清除纠正，恢复 ZeppBridge 识别结果。',
     overrideFailed: '保存运动类型纠正失败',
     copied: (format: string) => `已复制 ${format} 数据到剪贴板。`,
-    copyFailed: '复制这条记录失败',
 
     metricDistance: '距离',
     metricDuration: '运动时间',
@@ -156,7 +153,6 @@ export const workoutDetailMessages = defineMessages(
   },
   {
     notProvided: 'Not provided',
-    backToRecent: 'Back to recent records',
     loadFailedTitle: 'Could not read this workout',
     loadFailed: 'Workout detail is unavailable right now',
     retry: 'Try again',
@@ -166,7 +162,6 @@ export const workoutDetailMessages = defineMessages(
     seriesFailed: 'Could not read the per-point series for this workout',
     seriesFailedTitle: 'Per-point series failed to load',
     exportNeedsSeries: 'The per-point series failed to load, so this record cannot be exported.',
-    thisWorkout: 'workout',
     aiPrompt: (label: string) => `You are a sports analyst. Below is the complete record of one ${label} of mine, taken from the ZeppBridge local database and de-identified.
 Analyze this session using only the facts in this record: the intensity, how pace relates to heart rate, whether there is a clear slowdown or an anomalous stretch, and what specifically to do differently next time.
 
@@ -191,7 +186,6 @@ Answer in Markdown.`,
     overrideCleared: "Correction cleared. Back to ZeppBridge's own match.",
     overrideFailed: 'Could not save the workout type correction',
     copied: (format: string) => `${format} data copied to the clipboard.`,
-    copyFailed: 'Could not copy this record',
 
     metricDistance: 'Distance',
     metricDuration: 'Moving time',
@@ -308,7 +302,6 @@ Answer in Markdown.`,
   },
   {
     notProvided: 'Sin datos',
-    backToRecent: 'Volver a registros recientes',
     loadFailedTitle: 'No se pudo leer este entrenamiento',
     loadFailed: 'El detalle del entrenamiento no está disponible en este momento',
     retry: 'Reintentar',
@@ -318,7 +311,6 @@ Answer in Markdown.`,
     seriesFailed: 'No se pudo leer la serie punto a punto de este entrenamiento',
     seriesFailedTitle: 'No se pudo cargar la serie punto a punto',
     exportNeedsSeries: 'La serie punto a punto no se pudo cargar, así que este registro no se puede exportar.',
-    thisWorkout: 'entrenamiento',
     aiPrompt: (label: string) => `Eres un analista deportivo. A continuación está el registro completo de uno de mis entrenamientos de ${label}, tomado de la base de datos local de ZeppBridge y anonimizado.
 Analiza esta sesión usando solo los hechos de este registro: la intensidad, cómo se relaciona el ritmo con la frecuencia cardíaca, si hay una desaceleración clara o un tramo anómalo, y qué hacer concretamente distinto la próxima vez.
 
@@ -343,7 +335,6 @@ Responde en español, en Markdown.`,
     overrideCleared: 'Corrección borrada. Se vuelve a la coincidencia de ZeppBridge.',
     overrideFailed: 'No se pudo guardar la corrección del tipo de entrenamiento',
     copied: (format: string) => `Datos en ${format} copiados al portapapeles.`,
-    copyFailed: 'No se pudo copiar este registro',
 
     metricDistance: 'Distancia',
     metricDuration: 'Tiempo en movimiento',

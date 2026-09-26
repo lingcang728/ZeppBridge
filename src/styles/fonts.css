@@ -3,19 +3,40 @@
    Inter（Rasmus Andersson）：OFL 1.1。
    许可证文件见 src/assets/fonts/。 */
 
+/* MiSans 按字符切成两片（scripts/assets/subset-fonts.py 生成，完整字体在 scripts/assets/fonts/）。
+   CJK 那片只含源码里出现过的汉字，并用 unicode-range 声明：没有中文的页面根本不会去下载它；
+   切片里没有的字（用户自己起的昵称之类）按字回落到下一个字体。改了中文文案后重跑脚本。 */
 @font-face {
   font-family: 'MiSans';
-  src: url('../assets/fonts/MiSans-Regular.woff2') format('woff2');
+  src: url('../assets/fonts/MiSans-Latin-400.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
+  unicode-range: U+0000-024F, U+0300-036F, U+0400-04FF, U+2000-206F, U+20A0-20BF, U+2100-214F, U+2190-22FF, U+2460-24FF, U+25A0-25FF;
 }
 @font-face {
   font-family: 'MiSans';
-  src: url('../assets/fonts/MiSans-Bold.woff2') format('woff2');
+  src: url('../assets/fonts/MiSans-Latin-700.woff2') format('woff2');
   font-weight: 700;
   font-style: normal;
   font-display: swap;
+  unicode-range: U+0000-024F, U+0300-036F, U+0400-04FF, U+2000-206F, U+20A0-20BF, U+2100-214F, U+2190-22FF, U+2460-24FF, U+25A0-25FF;
+}
+@font-face {
+  font-family: 'MiSans';
+  src: url('../assets/fonts/MiSans-CJK-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+2E80-2FFF, U+3000-31FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'MiSans';
+  src: url('../assets/fonts/MiSans-CJK-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+2E80-2FFF, U+3000-31FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF;
 }
 @font-face {
   font-family: 'Inter';

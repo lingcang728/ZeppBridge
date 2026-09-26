@@ -71,7 +71,10 @@ a { color: inherit; }
 /* ── 应用骨架：顶栏 + 内容 + 移动端底部导航（见 shell/AppTopBar.vue） ── */
 .app-body { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; height: 100%; overflow: hidden; background: var(--bg); }
 
-.sync-feedback { display: flex; min-height: 32px; min-width: 0; align-items: center; gap: 7px; padding: 6px 28px; border-bottom: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: var(--fs-sm); }
+/* 状态提示是浮在顶栏下方的小胶囊，不再是一条带分界线的横幅。 */
+.sync-feedback { display: flex; width: fit-content; max-width: calc(100% - 32px); min-height: 32px; min-width: 0; align-items: center; gap: 7px; margin: 2px auto 6px; padding: 6px 16px; border-radius: 999px;
+  background: linear-gradient(180deg, var(--glass-sheen), transparent 60%), var(--glass); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-rim), var(--glass-shadow); color: var(--muted); font-size: var(--fs-sm); }
 .sync-feedback.tone-updated { color: var(--accent); }
 .sync-feedback.tone-partial { color: var(--warning); }
 .sync-feedback.tone-no_new_data { color: var(--muted); }
@@ -81,13 +84,34 @@ a { color: inherit; }
 .sync-feedback a { color: inherit; }
 .spinning { animation: spin 900ms linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.preview-banner, .route-notice { display: flex; align-items: center; gap: 8px; padding: 9px 28px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: var(--fs-sm); }
+.preview-banner, .route-notice { display: flex; width: fit-content; max-width: calc(100% - 32px); align-items: center; gap: 8px; margin: 2px auto 6px; padding: 7px 16px; border-radius: 999px; box-shadow: var(--glass-rim); color: var(--muted); font-size: var(--fs-sm); }
 .preview-banner { background: var(--accent-soft); }
 .preview-banner svg { color: var(--accent); }
 .route-notice { background: var(--surface); color: var(--warning); }
 .main-content { position: relative; width: 100%; min-width: 0; min-height: 0; flex: 1; overflow: auto; overflow-x: hidden; background: var(--canvas); }
 .bottom-nav { display: none; }
 .shell-head { position: sticky; top: 0; z-index: 30; }
+/* 滚动边缘效果（对应 iOS 26 的 soft scroll edge）：内容滚到浮动控件下面时，
+   被轻轻模糊、向下淡出，代替硬分界线。页面在顶部静止时不出现——那时没有
+   内容在控件底下，它就没有要做的事。 */
+.shell-head::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 -28px 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(to bottom, var(--edge-fade) 0%, var(--edge-fade) 40%, transparent 100%);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  -webkit-mask-image: linear-gradient(to bottom, #000 45%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 45%, transparent 100%);
+  opacity: 0;
+  transition: opacity var(--dur-base, 220ms) ease;
+}
+.shell-head.is-scrolled::before { opacity: 1; }
+@media (prefers-reduced-transparency: reduce) {
+  .shell-head::before { -webkit-backdrop-filter: none; backdrop-filter: none; background: linear-gradient(to bottom, var(--canvas) 60%, transparent); }
+}
 /* 离场页面绝对定位时相对这一层，而不是相对整个滚动区——否则会盖到顶栏上。 */
 .page-host { position: relative; min-width: 0; }
 .page-enter-active, .page-leave-active { transition: opacity 150ms ease; }

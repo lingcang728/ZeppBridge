@@ -30,7 +30,6 @@ export const deckMessages = defineMessages(
     sumPrivacy: '数据只存在本机，不上传',
     sumAdvanced: '数据库快照 · 本机 API · 数据健康',
     autoSyncToggle: '自动同步',
-    archiveToggle: '长期归档',
 
     secAccount: '账号',
     secDevices: '设备',
@@ -97,7 +96,6 @@ export const deckMessages = defineMessages(
     sumPrivacy: 'Your data stays on this computer',
     sumAdvanced: 'Database snapshots · local API · data health',
     autoSyncToggle: 'Auto sync',
-    archiveToggle: 'Long-term archive',
 
     secAccount: 'Account',
     secDevices: 'Devices',
@@ -164,7 +162,6 @@ export const deckMessages = defineMessages(
     sumPrivacy: 'Tus datos se quedan en este equipo',
     sumAdvanced: 'Instantáneas de la base de datos · API local · estado de los datos',
     autoSyncToggle: 'Sincronización automática',
-    archiveToggle: 'Archivo a largo plazo',
 
     secAccount: 'Cuenta',
     secDevices: 'Dispositivos',

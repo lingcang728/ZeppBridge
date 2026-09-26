@@ -4,7 +4,6 @@ import { defineMessages } from '../i18n';
 export const trainingStatusMessages = defineMessages(
   {
     backToOverview: '返回概览',
-    eyebrow: '训练状态',
     title: '训练状态',
     intro: 'VO₂max、乳酸阈值、训练负荷与心率区间。全部读自已同步的记录，不做训练建议。',
     rangeAria: '时间范围',
@@ -47,7 +46,6 @@ export const trainingStatusMessages = defineMessages(
   },
   {
     backToOverview: 'Back to overview',
-    eyebrow: 'Training status',
     title: 'Training status',
     intro: 'VO₂max, lactate threshold, training load and heart rate zones. All read from synced records; no coaching advice.',
     rangeAria: 'Time range',
@@ -89,7 +87,6 @@ export const trainingStatusMessages = defineMessages(
   },
   {
     backToOverview: 'Volver al resumen',
-    eyebrow: 'Estado de entrenamiento',
     title: 'Estado de entrenamiento',
     intro: 'VO₂máx, umbral de lactato, carga de entrenamiento y zonas de frecuencia cardíaca. Todo leído de los registros sincronizados; sin consejos de entrenamiento.',
     rangeAria: 'Rango de tiempo',

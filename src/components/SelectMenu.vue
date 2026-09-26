@@ -283,6 +283,15 @@ onBeforeUnmount(() => {
   backdrop-filter: var(--mat-glass-blur);
   box-shadow: var(--mat-glass-shadow);
   list-style: none;
+  /* 菜单从按钮那里「弹开」，而不是凭空出现在别处。 */
+  transform-origin: top center;
+  animation: select-pop var(--dur-base, 200ms) var(--ease-spring, cubic-bezier(.2, 1.15, .32, 1)) both;
+}
+@keyframes select-pop {
+  from { opacity: 0; transform: scale(.94) translateY(-4px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .select-list { animation: none; }
 }
 .select-list .select-option {
   display: grid;

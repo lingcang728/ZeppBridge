@@ -11,13 +11,10 @@ export const settingsMessages = defineMessages(
   {
     // ── 页头 ──
     title: '设置',
-    intro: '管理认证方式、同步行为、隐私与默认导出偏好，确保本地数据安全。',
     retry: '重试',
     distanceUnitLabel: '距离单位',
-    displayPrefsTitle: '语言与格式',
 
     // ── 1. 认证方式 ──
-    authTitle: '1. 认证方式',
     authWebTitle: '官方网页登录',
     authWebSub: '通过官方页面登录，自动抓取 appToken',
     authCancelLogin: '取消登录',
@@ -30,7 +27,6 @@ export const settingsMessages = defineMessages(
     authManualTitle: '手动填写',
     authManualSub: '手动填写 appToken、user_id 等信息',
     authCollapse: '收起',
-    manualFormTitle: '手动输入认证信息',
     manualFormHint: '从 mitmproxy/Charles 抓包或浏览器开发者工具获取。需要三个字段：',
     manualTokenPlaceholder: '从 HTTP 请求头 apptoken 字段复制',
     manualUserIdPlaceholder: '从 URL 路径 /users/{user_id}/ 提取',
@@ -39,21 +35,16 @@ export const settingsMessages = defineMessages(
     cancel: '取消',
 
     // ── 2. 账户与区域 ──
-    accountTitle: '2. 账户与区域',
     accountLine: (region: string, lastSync: string) => `区域 ${region} · 上次同步 ${lastSync}`,
     verifyAndSync: '验证并同步',
     reauthenticate: '重新认证',
 
     // ── 3. 设备 ──
-    devicesTitle: '3. 连接设备 / 数据来源',
     identifying: '正在识别…',
     identifyDevices: '重新识别设备',
     deviceErrorPrefix: '设备识别：',
     noDevices: '尚未识别实体设备；Zepp Cloud 仍可作为云服务同步。',
     deviceFirmware: (firmware: string) => `固件 ${firmware}`,
-    deviceLatestData: '最近数据',
-    deviceIdLine: (masked: string) => `设备 ID ${masked}`,
-    viewOrChange: '查看 / 换型号',
     unknownDeviceTitle: '检测到未识别设备',
     unknownDeviceBodyA: '有些 Zepp 账号的设备响应里',
     unknownDeviceNoName: '没有任何产品名字段',
@@ -79,7 +70,6 @@ export const settingsMessages = defineMessages(
     reportFailed: '错误报告提交失败',
 
     // ── 能力清单 ──
-    capabilityTitle: '你的设备能提供什么',
     capabilityIntro: '以下是 ZeppBridge 目前能从你的账号读到的数据。这份清单在同步时自动更新，无需手动操作。',
     lampOn: (count: number) => `已获取 ${count}`,
     lampPending: (count: number) => `云端有、本机未收录 ${count}`,
@@ -98,7 +88,6 @@ export const settingsMessages = defineMessages(
     probeFailed: '请求失败',
 
     // ── 未识别运动编号 ──
-    codesTitle: '未识别的运动编号',
     codesUnnamed: (count: number) => `${count} 个还没有名字`,
     codesIntro: 'Zepp 的自定义训练模板只给编号、不给名字，内置目录里也查不到它们。与其猜一个运动名塞给你，不如你给这个编号起一次名字——之后所有同编号的记录都会用它，并且在运动详情里如实标注成「你起的名字」。',
     codeNumber: (code: number) => `Zepp 编号 ${code}`,
@@ -116,7 +105,6 @@ export const settingsMessages = defineMessages(
     codeSuggestions: ['力量训练', '核心训练', 'HIIT', '拉伸放松', '康复训练', '自定义训练'],
 
     // ── 4. 隐私与安全 ──
-    privacyTitle: '4. 隐私与安全',
     privacyDbTitle: '本地数据库未加密',
     privacyDbBody: '健康数据以明文 SQLite 保存在程序目录的 data 文件夹，依赖 Windows / macOS 的账户与磁盘加密保护。ZeppBridge 不提供整库加密，也不会假装提供。',
     privacyTokenTitle: 'Zepp 令牌默认保存在系统凭据存储',
@@ -128,19 +116,9 @@ export const settingsMessages = defineMessages(
     privacyReportBody: '无需注册 GitHub 或复制数据。确认后只把产品级字段结构、固件版本、型号类编号（整数，只说明是哪一款表）、未知运动编号和数量发送到 ZeppBridge 的私有错误报告库；绝不发送账号、Token、序列号、设备 ID、MAC 地址、GPS、健康数值、原始响应或本机路径。',
 
     // ── 5. MCP ──
-    mcpTitle: '5. MCP（让 AI 工具直接问本机数据）',
     mcpBadge: '只读 · 不监听端口',
-    mcpSkip: '不知道 MCP 是什么可以跳过，它不影响 ZeppBridge 的任何功能。',
-    mcpCompareA: '一句话说：「交给 AI」是你导出数据粘给 AI；MCP 是',
-    mcpCompareStrong: '让 AI 自己来问',
-    mcpCompareB: '——配好之后直接对它说「看看我最近一个月的睡眠」，它自己去你本机的库里查。只对装在你电脑上的 AI 编程工具有用（Claude Code、Codex、Grok 这类）。',
-    mcpAskA: '配置步骤因工具而异，与其在这里写一大篇，不如',
-    mcpAskStrong: '把下面这段复制给你正在用的 AI',
-    mcpAskB: '，让它照着你的机器给你指引。',
     mcpCopyPrompt: '复制这段去问 AI',
     mcpCopyConfig: '只复制配置片段',
-    mcpToolsLead: '配好之后，AI 能问到这五件事：',
-    mcpFootA: ' 随 Release 的工具压缩包一起分发，和桌面应用同一个版本。它读的是同一个本机数据库，所以看到的数据和你在这个界面里看到的完全一致。',
     mcpPromptCopied: '已复制。粘给你正在用的 AI，它会照着你的机器给出配置步骤。',
     mcpPromptCopyFailed: '复制失败，请手动选中上面那段文字。',
     mcpConfigCopied: '配置已复制。把 command 换成你本机 zeppbridge-mcp 的实际路径。',
@@ -168,7 +146,6 @@ export const settingsMessages = defineMessages(
     mcpConfigPathPlaceholder: '<zeppbridge-mcp 的路径>',
 
     // ── 6. 本地数据保留 ──
-    retentionTitle: '6. 本地数据保留',
     retentionLabel: '保留时长',
     retentionAria: '本地数据保留天数',
     retentionNote: (days: number) => `保留最近 ${days} 天的本地数据；清理在每次`,
@@ -180,23 +157,15 @@ export const settingsMessages = defineMessages(
     reprocessing: '正在解析…',
     reprocessNow: '重新解析',
     days: (days: number) => `${days} 天`,
-    lastDays: (days: number) => `最近 ${days} 天`,
 
     // ── 7. 导出与补拉偏好 ──
-    exportTitle: '7. 导出与补拉偏好',
     defaultFormatLabel: '默认导出格式',
     defaultFormatAria: '默认导出格式',
-    historyRangeLabel: '历史补拉范围',
-    historyRangeAria: '历史补拉天数',
-    exportNote: '设置「交给 AI」页面的默认格式与云端补拉窗口。',
-    startBackfill: '开始历史补拉',
     formatJsonHint: '结构化数据',
     formatCsvHint: '表格数据',
     formatGpxHint: '运动轨迹',
 
     // ── 8. 软件更新 ──
-    updateTitle: '8. 软件更新',
-    updateSub: '每天最多静默检查一次，也可随时手动检查。',
     updateChecking: '检查中…',
     updateCheck: '检查更新',
     updateCurrent: (version: string) => `当前 ${version}`,
@@ -233,21 +202,15 @@ export const settingsMessages = defineMessages(
     updateInstall: '下载并安装',
 
     // ── 9. 自动同步 ──
-    syncTitle: '9. 自动同步',
     syncDescA: (minutes: number) => `应用打开期间每 ${minutes} 分钟自动同步云端记录`,
     syncDescB: '保持开启可获得连续的时序数据。',
     syncIntervalAria: '自动同步间隔',
     minutes: (minutes: number) => `${minutes} 分钟`,
-    syncOn: '同步已开启',
-    syncOff: '同步已关闭',
     syncing: '正在同步…',
     syncNow: '立即同步',
 
     // ── 高级与维护 ──
-    advancedTitle: '高级与维护',
-    advancedSub: '数据文件夹、认证清除与维护工具，仅在需要时使用。',
     scaleLabel: '界面缩放',
-    scaleNote: '100% 为设计基准，也可使用 Ctrl + / Ctrl -。',
     dataAuthLabel: '数据与认证',
     dataAuthNote: (days: number) => `数据保存在程序目录的 data 文件夹，当前保留 ${days} 天。`,
     openDataFolder: '打开数据文件夹',
@@ -265,15 +228,12 @@ export const settingsMessages = defineMessages(
     compacting: '正在压缩…（大库需要几分钟）',
     compactRun: '压缩历史报文',
     backupLabel: '数据库快照与恢复',
-    backupNote: '灾难恢复用的整库副本，只能由 ZeppBridge 自己读回来。数据库升级前会自动生成一份，平时不需要手动做。',
     localApiLabel: '本机 REST API',
     localApiNote: '给本机上的其他程序（脚本、看板、自建工具）读取已标准化的运动序列 JSON 用。如果你没有这类需求，保持关闭即可。',
     syncDiagnostics: '同步诊断',
     noSyncDiagnostics: '尚无同步诊断。',
 
     // ── 本机 REST API ──
-    apiTitle: '本机 REST API',
-    apiSub: '让本机上的其他程序读取已标准化的运动序列 JSON。默认关闭，需要你显式启用。',
     apiListening: '正在监听',
     apiEnabledNotListening: '已启用但未监听',
     apiOff: '已关闭',
@@ -326,7 +286,6 @@ export const settingsMessages = defineMessages(
     notProvided: '未提供',
     noRecords: '尚无记录',
     timeUnknown: '时间未知',
-    cloudService: '云服务',
     refreshFailed: (reason: string) => `重新识别失败，已回退到本机缓存${reason}`,
     refreshFailedReason: (reason: string) => `：${reason}`,
     refreshFailedPeriod: '。',
@@ -361,12 +320,6 @@ export const settingsMessages = defineMessages(
     prefsSavedNoEstimate: '设置已保存，但磁盘空间估算暂时不可用',
     prefsSaved: '已保存本地保留与历史补拉设置。',
     prefsSaveFailed: '无法保存设置',
-    syncInProgress: '当前有同步进行中，请稍后再补拉',
-    backfillYearCap: '\n一年是上限，更早的云端记录不会进入本机。',
-    backfillConfirm: (days: number, low: number, high: number, extra: string) =>
-      `补拉 ${days} 天大约需要 ${low}–${high} 分钟（估算）。请保持应用打开，可随时取消。${extra}`,
-    backfillTightSpace: (message: string, days: number) =>
-      `${message}\n仍要按 ${days} 天补拉吗？建议先选 30 天。`,
 
     // ── 能力清单标签 ──
     stream: {
@@ -415,13 +368,10 @@ export const settingsMessages = defineMessages(
   {
     // ── Header ──
     title: 'Settings',
-    intro: 'Authentication, sync behavior, privacy, and the export defaults — all in one place.',
     retry: 'Try again',
     distanceUnitLabel: 'Distance unit',
-    displayPrefsTitle: 'Language and formats',
 
     // ── 1. Authentication ──
-    authTitle: '1. Authentication',
     authWebTitle: 'Official web sign-in',
     authWebSub: 'Sign in on the official page; the appToken is picked up for you',
     authCancelLogin: 'Cancel sign-in',
@@ -434,7 +384,6 @@ export const settingsMessages = defineMessages(
     authManualTitle: 'Enter it yourself',
     authManualSub: 'Type in the appToken, user_id and region host',
     authCollapse: 'Collapse',
-    manualFormTitle: 'Enter the credentials',
     manualFormHint: 'Take them from a mitmproxy/Charles capture or your browser devtools. Three fields:',
     manualTokenPlaceholder: 'Copy from the apptoken HTTP header',
     manualUserIdPlaceholder: 'Take from the URL path /users/{user_id}/',
@@ -443,21 +392,16 @@ export const settingsMessages = defineMessages(
     cancel: 'Cancel',
 
     // ── 2. Account ──
-    accountTitle: '2. Account and region',
     accountLine: (region: string, lastSync: string) => `Region ${region} · last sync ${lastSync}`,
     verifyAndSync: 'Verify and sync',
     reauthenticate: 'Sign in again',
 
     // ── 3. Devices ──
-    devicesTitle: '3. Connected devices / data sources',
     identifying: 'Identifying…',
     identifyDevices: 'Identify devices again',
     deviceErrorPrefix: 'Device identification: ',
     noDevices: 'No physical device identified yet; Zepp Cloud still syncs as a cloud source.',
     deviceFirmware: (firmware: string) => `Firmware ${firmware}`,
-    deviceLatestData: 'Latest data',
-    deviceIdLine: (masked: string) => `Device ID ${masked}`,
-    viewOrChange: 'View / change model',
     unknownDeviceTitle: 'An unidentified device',
     unknownDeviceBodyA: 'Some Zepp accounts return device records with ',
     unknownDeviceNoName: 'no product-name field at all',
@@ -483,7 +427,6 @@ export const settingsMessages = defineMessages(
     reportFailed: 'The error report could not be submitted',
 
     // ── Capability board ──
-    capabilityTitle: 'What your devices can provide',
     capabilityIntro: 'What ZeppBridge can currently read from your account. This list updates itself during a sync; there is nothing to press.',
     lampOn: (count: number) => `Fetched ${count}`,
     lampPending: (count: number) => `In the cloud, not stored locally ${count}`,
@@ -502,7 +445,6 @@ export const settingsMessages = defineMessages(
     probeFailed: 'request failed',
 
     // ── Unknown workout codes ──
-    codesTitle: 'Unidentified workout codes',
     codesUnnamed: (count: number) => `${count} still unnamed`,
     codesIntro: "Zepp's custom training templates give a number and no name, and the built-in catalog has nothing for them either. Rather than guess a sport and hand it to you, name the code once yourself — every record with that code then uses your name, and the workout page says plainly that it is yours.",
     codeNumber: (code: number) => `Zepp code ${code}`,
@@ -520,7 +462,6 @@ export const settingsMessages = defineMessages(
     codeSuggestions: ['Strength', 'Core', 'HIIT', 'Stretching', 'Rehab', 'Custom session'],
 
     // ── 4. Privacy ──
-    privacyTitle: '4. Privacy and security',
     privacyDbTitle: 'The local database is not encrypted',
     privacyDbBody: 'Health data is stored as plain SQLite in the app\'s data folder, protected by your Windows / macOS account and disk encryption. ZeppBridge does not encrypt the whole database, and does not pretend to.',
     privacyTokenTitle: 'Zepp tokens use the system credential store by default',
@@ -532,19 +473,9 @@ export const settingsMessages = defineMessages(
     privacyReportBody: 'No GitHub account, no copying data. On confirmation it sends only product-level field shapes, firmware version, model-level numbers (integers, saying only which model), and unknown workout codes with their counts, to ZeppBridge\'s private error-report store. It never sends your account, tokens, serial numbers, device IDs, MAC addresses, GPS, health values, raw responses or local paths.',
 
     // ── 5. MCP ──
-    mcpTitle: '5. MCP (let AI tools query your local data)',
     mcpBadge: 'Read-only · listens on no port',
-    mcpSkip: 'If MCP means nothing to you, skip this section — it affects none of ZeppBridge\'s features.',
-    mcpCompareA: 'In one line: "Hand to AI" is you exporting and pasting; MCP is ',
-    mcpCompareStrong: 'the AI asking for itself',
-    mcpCompareB: ' — once configured, you say "how did I sleep this month" and it queries your local database. Only useful for AI coding tools installed on your computer (Claude Code, Codex, Grok and the like).',
-    mcpAskA: 'The setup differs per tool, so rather than write an essay here, ',
-    mcpAskStrong: 'copy the text below to the AI you actually use',
-    mcpAskB: ' and let it walk you through it on your own machine.',
     mcpCopyPrompt: 'Copy this and ask your AI',
     mcpCopyConfig: 'Copy just the config snippet',
-    mcpToolsLead: 'Once configured, the AI can ask about these five things:',
-    mcpFootA: ' ships in the tools archive on each Release, at the same version as the desktop app. It reads the same local database, so what it sees is exactly what you see here.',
     mcpPromptCopied: 'Copied. Paste it to the AI you use and it will give you setup steps for your machine.',
     mcpPromptCopyFailed: 'Copying failed. Select the text above by hand.',
     mcpConfigCopied: 'Config copied. Replace command with the real path to zeppbridge-mcp on your machine.',
@@ -572,7 +503,6 @@ If you need anything from me (which client I use, where the file lives), just as
     mcpConfigPathPlaceholder: '<path to zeppbridge-mcp>',
 
     // ── 6. Retention ──
-    retentionTitle: '6. Local data retention',
     retentionLabel: 'Keep for',
     retentionAria: 'Local data retention in days',
     retentionNote: (days: number) => `Keeps the last ${days} days locally. Pruning happens `,
@@ -584,23 +514,15 @@ If you need anything from me (which client I use, where the file lives), just as
     reprocessing: 'Reparsing…',
     reprocessNow: 'Reparse',
     days: (days: number) => `${days} days`,
-    lastDays: (days: number) => `Last ${days} days`,
 
     // ── 7. Export ──
-    exportTitle: '7. Export and backfill defaults',
     defaultFormatLabel: 'Default export format',
     defaultFormatAria: 'Default export format',
-    historyRangeLabel: 'History backfill range',
-    historyRangeAria: 'History backfill days',
-    exportNote: 'Sets the default format on the "Hand to AI" page and the cloud backfill window.',
-    startBackfill: 'Start a history backfill',
     formatJsonHint: 'Structured data',
     formatCsvHint: 'Tabular data',
     formatGpxHint: 'Workout tracks',
 
     // ── 8. Updates ──
-    updateTitle: '8. Software updates',
-    updateSub: 'Checks quietly at most once a day; you can also check by hand.',
     updateChecking: 'Checking…',
     updateCheck: 'Check for updates',
     updateCurrent: (version: string) => `Currently ${version}`,
@@ -637,21 +559,15 @@ If you need anything from me (which client I use, where the file lives), just as
     updateInstall: 'Download and install',
 
     // ── 9. Auto sync ──
-    syncTitle: '9. Automatic sync',
     syncDescA: (minutes: number) => `Syncs cloud records every ${minutes} minutes while the app is open`,
     syncDescB: 'Leaving it on keeps the time series continuous.',
     syncIntervalAria: 'Automatic sync interval',
     minutes: (minutes: number) => `${minutes} min`,
-    syncOn: 'Sync is on',
-    syncOff: 'Sync is off',
     syncing: 'Syncing…',
     syncNow: 'Sync now',
 
     // ── Advanced ──
-    advancedTitle: 'Advanced and maintenance',
-    advancedSub: 'The data folder, clearing credentials and maintenance tools. Only when you need them.',
     scaleLabel: 'Interface scale',
-    scaleNote: '100% is the design baseline. Ctrl + / Ctrl - work too.',
     dataAuthLabel: 'Data and credentials',
     dataAuthNote: (days: number) => `Data lives in the app\'s data folder; currently keeping ${days} days.`,
     openDataFolder: 'Open the data folder',
@@ -669,15 +585,12 @@ If you need anything from me (which client I use, where the file lives), just as
     compacting: 'Compacting… (a few minutes on a large database)',
     compactRun: 'Compact stored payloads',
     backupLabel: 'Database snapshots and restore',
-    backupNote: 'A whole-database copy for disaster recovery, readable only by ZeppBridge. One is taken automatically before a database upgrade; you rarely need to do it by hand.',
     localApiLabel: 'Local REST API',
     localApiNote: 'For other programs on this machine — scripts, dashboards, your own tools — to read normalized workout series as JSON. If you have no such need, leave it off.',
     syncDiagnostics: 'Sync diagnostics',
     noSyncDiagnostics: 'No sync diagnostics yet.',
 
     // ── Local REST API ──
-    apiTitle: 'Local REST API',
-    apiSub: 'Lets other programs on this machine read normalized workout series as JSON. Off by default; you turn it on explicitly.',
     apiListening: 'Listening',
     apiEnabledNotListening: 'Enabled but not listening',
     apiOff: 'Off',
@@ -730,7 +643,6 @@ If you need anything from me (which client I use, where the file lives), just as
     notProvided: 'Not provided',
     noRecords: 'No records yet',
     timeUnknown: 'Time unknown',
-    cloudService: 'Cloud service',
     refreshFailed: (reason: string) => `Identification failed; fell back to the local cache${reason}`,
     refreshFailedReason: (reason: string) => `: ${reason}`,
     refreshFailedPeriod: '.',
@@ -765,12 +677,6 @@ If you need anything from me (which client I use, where the file lives), just as
     prefsSavedNoEstimate: 'Settings saved, but the disk space estimate is unavailable right now',
     prefsSaved: 'Retention and backfill settings saved.',
     prefsSaveFailed: 'Could not save the settings',
-    syncInProgress: 'A sync is running. Backfill once it finishes',
-    backfillYearCap: '\nOne year is the cap; cloud records older than that do not come to this machine.',
-    backfillConfirm: (days: number, low: number, high: number, extra: string) =>
-      `Backfilling ${days} days takes roughly ${low}–${high} minutes (estimated). Keep the app open; you can cancel at any time.${extra}`,
-    backfillTightSpace: (message: string, days: number) =>
-      `${message}\nStill backfill ${days} days? Consider 30 days first.`,
 
     // ── Capability labels ──
     stream: {
@@ -819,13 +725,10 @@ If you need anything from me (which client I use, where the file lives), just as
   {
     // ── Header ──
     title: 'Configuración',
-    intro: 'Autenticación, sincronización, privacidad y opciones de exportación, todo en un solo lugar.',
     retry: 'Reintentar',
     distanceUnitLabel: 'Unidad de distancia',
-    displayPrefsTitle: 'Idioma y formatos',
 
     // ── 1. Authentication ──
-    authTitle: '1. Autenticación',
     authWebTitle: 'Inicio de sesión web oficial',
     authWebSub: 'Inicia sesión en la página oficial; el appToken se obtiene automáticamente',
     authCancelLogin: 'Cancelar inicio de sesión',
@@ -838,7 +741,6 @@ If you need anything from me (which client I use, where the file lives), just as
     authManualTitle: 'Ingresarlo a mano',
     authManualSub: 'Escribe el appToken, el user_id y el host de la región',
     authCollapse: 'Contraer',
-    manualFormTitle: 'Ingresa las credenciales',
     manualFormHint: 'Tómalas de una captura de mitmproxy/Charles o de las herramientas de desarrollador del navegador. Son tres campos:',
     manualTokenPlaceholder: 'Cópialo del encabezado HTTP apptoken',
     manualUserIdPlaceholder: 'Tómalo de la ruta de la URL /users/{user_id}/',
@@ -847,21 +749,16 @@ If you need anything from me (which client I use, where the file lives), just as
     cancel: 'Cancelar',
 
     // ── 2. Account ──
-    accountTitle: '2. Cuenta y región',
     accountLine: (region: string, lastSync: string) => `Región ${region} · última sincronización ${lastSync}`,
     verifyAndSync: 'Verificar y sincronizar',
     reauthenticate: 'Volver a iniciar sesión',
 
     // ── 3. Devices ──
-    devicesTitle: '3. Dispositivos conectados / fuentes de datos',
     identifying: 'Identificando…',
     identifyDevices: 'Volver a identificar dispositivos',
     deviceErrorPrefix: 'Identificación de dispositivos: ',
     noDevices: 'Aún no se ha identificado ningún dispositivo físico; Zepp Cloud sigue sincronizando como fuente en la nube.',
     deviceFirmware: (firmware: string) => `Firmware ${firmware}`,
-    deviceLatestData: 'Últimos datos',
-    deviceIdLine: (masked: string) => `ID del dispositivo ${masked}`,
-    viewOrChange: 'Ver / cambiar modelo',
     unknownDeviceTitle: 'Un dispositivo sin identificar',
     unknownDeviceBodyA: 'Algunas cuentas de Zepp devuelven registros de dispositivos ',
     unknownDeviceNoName: 'sin ningún campo con el nombre del producto',
@@ -887,7 +784,6 @@ If you need anything from me (which client I use, where the file lives), just as
     reportFailed: 'No se pudo enviar el reporte de error',
 
     // ── Capability board ──
-    capabilityTitle: 'Qué pueden aportar tus dispositivos',
     capabilityIntro: 'Lo que ZeppBridge puede leer actualmente de tu cuenta. Esta lista se actualiza sola durante una sincronización; no hay nada que pulsar.',
     lampOn: (count: number) => `Descargados ${count}`,
     lampPending: (count: number) => `En la nube, sin guardar localmente ${count}`,
@@ -906,7 +802,6 @@ If you need anything from me (which client I use, where the file lives), just as
     probeFailed: 'la solicitud falló',
 
     // ── Unknown workout codes ──
-    codesTitle: 'Códigos de entrenamiento sin identificar',
     codesUnnamed: (count: number) => `${count} aún sin nombre`,
     codesIntro: 'Las plantillas de entrenamiento personalizadas de Zepp dan un número sin nombre, y el catálogo integrado tampoco tiene nada para ellas. En lugar de adivinar un deporte y dártelo, ponle nombre al código una sola vez: todos los registros con ese código usarán tu nombre, y la página del entrenamiento dirá claramente que es tuyo.',
     codeNumber: (code: number) => `Código de Zepp ${code}`,
@@ -924,7 +819,6 @@ If you need anything from me (which client I use, where the file lives), just as
     codeSuggestions: ['Fuerza', 'Core', 'HIIT', 'Estiramiento', 'Rehabilitación', 'Sesión personalizada'],
 
     // ── 4. Privacy ──
-    privacyTitle: '4. Privacidad y seguridad',
     privacyDbTitle: 'La base de datos local no está cifrada',
     privacyDbBody: 'Los datos de salud se guardan como SQLite sin cifrar en la carpeta de datos de la app, protegidos por tu cuenta de Windows / macOS y el cifrado del disco. ZeppBridge no cifra la base de datos completa, y no pretende hacerlo.',
     privacyTokenTitle: 'Los tokens de Zepp usan el almacén de credenciales del sistema por defecto',
@@ -936,19 +830,9 @@ If you need anything from me (which client I use, where the file lives), just as
     privacyReportBody: 'Sin cuenta de GitHub y sin copiar datos. Al confirmar, envía solo la forma de los campos a nivel de producto, la versión de firmware, números a nivel de modelo (enteros que solo indican qué modelo) y los códigos de entrenamiento desconocidos con cuántas veces aparecen, al almacén privado de reportes de error de ZeppBridge. Nunca envía tu cuenta, tokens, números de serie, IDs de dispositivo, direcciones MAC, GPS, valores de salud, respuestas originales ni rutas locales.',
 
     // ── 5. MCP ──
-    mcpTitle: '5. MCP (deja que herramientas de IA consulten tus datos locales)',
     mcpBadge: 'Solo lectura · no abre ningún puerto',
-    mcpSkip: 'Si MCP no te dice nada, sáltate esta sección: no afecta ninguna función de ZeppBridge.',
-    mcpCompareA: 'En una línea: «Pasar a la IA» es exportar y pegar tú mismo; MCP es ',
-    mcpCompareStrong: 'la IA pidiendo los datos por su cuenta',
-    mcpCompareB: ': una vez configurado, dices «¿cómo dormí este mes?» y consulta tu base de datos local. Solo sirve con herramientas de IA para programar instaladas en tu computador (Claude Code, Codex, Grok y similares).',
-    mcpAskA: 'La configuración cambia según la herramienta, así que en vez de escribir un ensayo aquí, ',
-    mcpAskStrong: 'copia el texto de abajo en la IA que realmente usas',
-    mcpAskB: ' y deja que te guíe en tu propio equipo.',
     mcpCopyPrompt: 'Copiar esto y preguntarle a tu IA',
     mcpCopyConfig: 'Copiar solo el fragmento de configuración',
-    mcpToolsLead: 'Una vez configurado, la IA puede preguntar por estas cinco cosas:',
-    mcpFootA: ' viene en el archivo de herramientas de cada versión publicada, con la misma versión que la app de escritorio. Lee la misma base de datos local, así que ve exactamente lo mismo que ves aquí.',
     mcpPromptCopied: 'Copiado. Pégalo en la IA que usas y te dará los pasos de configuración para tu equipo.',
     mcpPromptCopyFailed: 'No se pudo copiar. Selecciona el texto de arriba a mano.',
     mcpConfigCopied: 'Configuración copiada. Reemplaza command por la ruta real de zeppbridge-mcp en tu equipo.',
@@ -976,7 +860,6 @@ Si necesitas algo de mí (qué cliente uso, dónde está el archivo), pregúntam
     mcpConfigPathPlaceholder: '<ruta a zeppbridge-mcp>',
 
     // ── 6. Retention ──
-    retentionTitle: '6. Conservación de datos locales',
     retentionLabel: 'Conservar durante',
     retentionAria: 'Días de conservación de datos locales',
     retentionNote: (days: number) => `Conserva localmente los últimos ${days} días. La limpieza ocurre `,
@@ -988,23 +871,15 @@ Si necesitas algo de mí (qué cliente uso, dónde está el archivo), pregúntam
     reprocessing: 'Volviendo a analizar…',
     reprocessNow: 'Volver a analizar',
     days: (days: number) => `${days} días`,
-    lastDays: (days: number) => `Últimos ${days} días`,
 
     // ── 7. Export ──
-    exportTitle: '7. Opciones de exportación y recuperación de historial',
     defaultFormatLabel: 'Formato de exportación predeterminado',
     defaultFormatAria: 'Formato de exportación predeterminado',
-    historyRangeLabel: 'Rango de recuperación de historial',
-    historyRangeAria: 'Días de recuperación de historial',
-    exportNote: 'Define el formato predeterminado de la página «Pasar a la IA» y el periodo de recuperación desde la nube.',
-    startBackfill: 'Recuperar historial',
     formatJsonHint: 'Datos estructurados',
     formatCsvHint: 'Datos en tabla',
     formatGpxHint: 'Recorridos de entrenamientos',
 
     // ── 8. Updates ──
-    updateTitle: '8. Actualizaciones',
-    updateSub: 'Revisa en silencio como máximo una vez al día; también puedes revisar a mano.',
     updateChecking: 'Revisando…',
     updateCheck: 'Buscar actualizaciones',
     updateCurrent: (version: string) => `Versión actual ${version}`,
@@ -1041,21 +916,15 @@ Si necesitas algo de mí (qué cliente uso, dónde está el archivo), pregúntam
     updateInstall: 'Descargar e instalar',
 
     // ── 9. Auto sync ──
-    syncTitle: '9. Sincronización automática',
     syncDescA: (minutes: number) => `Sincroniza los registros de la nube cada ${minutes} minutos mientras la app está abierta`,
     syncDescB: 'Dejarla activada mantiene continuas las series de tiempo.',
     syncIntervalAria: 'Intervalo de sincronización automática',
     minutes: (minutes: number) => `${minutes} min`,
-    syncOn: 'Sincronización activada',
-    syncOff: 'Sincronización desactivada',
     syncing: 'Sincronizando…',
     syncNow: 'Sincronizar ahora',
 
     // ── Advanced ──
-    advancedTitle: 'Avanzado y mantenimiento',
-    advancedSub: 'Carpeta de datos, borrado de credenciales y herramientas de mantenimiento. Solo cuando lo necesites.',
     scaleLabel: 'Escala de la interfaz',
-    scaleNote: '100% es la base del diseño. Ctrl + / Ctrl - también funcionan.',
     dataAuthLabel: 'Datos y credenciales',
     dataAuthNote: (days: number) => `Los datos están en la carpeta de datos de la app; actualmente se conservan ${days} días.`,
     openDataFolder: 'Abrir la carpeta de datos',
@@ -1073,15 +942,12 @@ Si necesitas algo de mí (qué cliente uso, dónde está el archivo), pregúntam
     compacting: 'Compactando… (unos minutos en una base de datos grande)',
     compactRun: 'Compactar registros guardados',
     backupLabel: 'Copias de la base de datos y restauración',
-    backupNote: 'Una copia completa de la base de datos para recuperarse de desastres, legible solo por ZeppBridge. Se hace una automáticamente antes de actualizar la base de datos; rara vez necesitas hacerla a mano.',
     localApiLabel: 'API REST local',
     localApiNote: 'Para que otros programas de este equipo (scripts, tableros, tus propias herramientas) lean series de entrenamientos normalizadas en JSON. Si no lo necesitas, déjala desactivada.',
     syncDiagnostics: 'Diagnóstico de sincronización',
     noSyncDiagnostics: 'Aún no hay diagnóstico de sincronización.',
 
     // ── Local REST API ──
-    apiTitle: 'API REST local',
-    apiSub: 'Permite que otros programas de este equipo lean series de entrenamientos normalizadas en JSON. Desactivada por defecto; la activas tú de forma explícita.',
     apiListening: 'Escuchando',
     apiEnabledNotListening: 'Activada pero sin escuchar',
     apiOff: 'Desactivada',
@@ -1134,7 +1000,6 @@ Si necesitas algo de mí (qué cliente uso, dónde está el archivo), pregúntam
     notProvided: 'Sin datos',
     noRecords: 'Aún no hay registros',
     timeUnknown: 'Hora desconocida',
-    cloudService: 'Servicio en la nube',
     refreshFailed: (reason: string) => `La identificación falló; se usó la caché local${reason}`,
     refreshFailedReason: (reason: string) => `: ${reason}`,
     refreshFailedPeriod: '.',
@@ -1169,12 +1034,6 @@ Si necesitas algo de mí (qué cliente uso, dónde está el archivo), pregúntam
     prefsSavedNoEstimate: 'Configuración guardada, pero la estimación de espacio en disco no está disponible en este momento',
     prefsSaved: 'Configuración de conservación y recuperación guardada.',
     prefsSaveFailed: 'No se pudo guardar la configuración',
-    syncInProgress: 'Hay una sincronización en curso. Recupera el historial cuando termine',
-    backfillYearCap: '\nEl límite es un año; los registros de la nube más antiguos no llegan a este equipo.',
-    backfillConfirm: (days: number, low: number, high: number, extra: string) =>
-      `Recuperar ${days} días toma aproximadamente ${low}–${high} minutos (estimado). Mantén la app abierta; puedes cancelar en cualquier momento.${extra}`,
-    backfillTightSpace: (message: string, days: number) =>
-      `${message}\n¿Recuperar igual ${days} días? Considera empezar con 30 días.`,
 
     // ── Capability labels ──
     stream: {

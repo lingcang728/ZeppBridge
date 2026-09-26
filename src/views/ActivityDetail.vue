@@ -9,6 +9,7 @@ defineOptions({ name: 'ActivityDetail' });
  * 没有记录的日期就是没有记录：曲线断开，不用 0 冒充「那天没动」。
  */
 import { computed, onMounted, ref, watch } from 'vue';
+import { useFirstLoad } from '../composables/useFirstLoad';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
 import PageHeader from '../components/PageHeader.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
@@ -25,7 +26,6 @@ import { defineMessages, useMessages } from '../i18n';
 const messages = defineMessages(
   {
     backToOverview: '返回概览',
-    eyebrow: '日常活动',
     title: '日常活动',
     intro: '步数、距离、活动热量与活动时长的按天趋势。只和你自己此前的记录比较，没有记录的日期不补 0。',
     rangeAria: '时间范围',
@@ -50,7 +50,6 @@ const messages = defineMessages(
   },
   {
     backToOverview: 'Back to overview',
-    eyebrow: 'Daily activity',
     title: 'Daily activity',
     intro: 'Day-by-day steps, distance, active burn and active minutes. Compared only against your own past records; days without data stay empty rather than being filled with a zero.',
     rangeAria: 'Time range',
@@ -75,7 +74,6 @@ const messages = defineMessages(
   },
   {
     backToOverview: 'Volver al resumen',
-    eyebrow: 'Actividad diaria',
     title: 'Actividad diaria',
     intro: 'Pasos, distancia, calorías activas y minutos activos día a día. Comparado solo con tus propios registros anteriores; los días sin datos quedan vacíos en vez de rellenarse con cero.',
     rangeAria: 'Rango de tiempo',
@@ -151,6 +149,7 @@ const ranges = computed(() => seriesRanges());
 const rangeDays = ref<SeriesRangeDays>(SERIES_RANGE_DAYS[0]);
 const series = ref<Record<string, MetricSeries>>({});
 const loading = ref(true);
+const initialLoading = useFirstLoad(loading);
 const error = ref<string | null>(null);
 const loadSeq = createLoadSeq();
 
@@ -194,7 +193,6 @@ watch(dataRevision, () => { void load(); });
       back="/"
       :back-label="t.backToOverview"
       title-id="activity-title"
-      :eyebrow="t.eyebrow"
       :title="t.title"
       :intro="t.intro"
     >
@@ -211,7 +209,7 @@ watch(dataRevision, () => { void load(); });
       <button v-if="isDesktop()" class="button button-secondary retry" type="button" @click="load">{{ t.retry }}</button>
     </div>
 
-    <div v-if="loading" class="card-grid" aria-live="polite" :aria-label="t.loadingAria">
+    <div v-if="initialLoading" class="card-grid" aria-live="polite" :aria-label="t.loadingAria">
       <SkeletonBlock v-for="index in 4" :key="index" height="268px" />
     </div>
     <template v-else>

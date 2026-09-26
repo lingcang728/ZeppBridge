@@ -32,7 +32,6 @@ const messages = defineMessages(
     browserPreview: '请使用桌面应用。浏览器预览不会读取账户数据。',
     routeNotFound: '页面不存在，已返回概览。',
     quickReturn: (page: string) => `返回${page}`,
-    navRecent: '最近记录',
   },
   {
     skipToContent: 'Skip to main content',
@@ -49,7 +48,6 @@ const messages = defineMessages(
     browserPreview: 'Use the desktop app. This browser preview reads no account data.',
     routeNotFound: 'That page does not exist, so you are back on the overview.',
     quickReturn: (page: string) => `Back to ${page}`,
-    navRecent: 'recent records',
   },
   {
     skipToContent: 'Saltar al contenido principal',
@@ -66,7 +64,6 @@ const messages = defineMessages(
     browserPreview: 'Usa la app de escritorio. Esta vista previa en el navegador no lee datos de la cuenta.',
     routeNotFound: 'Esa página no existe, así que volviste al resumen.',
     quickReturn: (page: string) => `Volver a ${page}`,
-    navRecent: 'registros recientes',
   },
   // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
   'App',
@@ -126,13 +123,20 @@ const navigation = computed(() => [
   { to: '/settings', label: t.value.navSettings, icon: 'settings' as DesignIconName },
 ]);
 
-/* 组件名要和 defineOptions({ name }) 对得上，KeepAlive 才认得出来。 */
+/* 只在内容真的滚到顶栏下面时才显示滚动边缘效果。只在越过阈值时写一次 ref，
+   滚动本身不触发渲染。 */
+const contentUnderBar = ref(false);
+const onMainScroll = (event: Event) => {
+  const under = (event.target as HTMLElement).scrollTop > 2;
+  if (under !== contentUnderBar.value) contentUnderBar.value = under;
+};
+
+/* 组件名要和 defineOptions({ name }) 对得上，KeepAlive 才认得出来。
+   只缓存没有图表的页面：身体 / 训练页各有十几张 ECharts 画布，缓存着就一直占着
+   内存，而它们从本机库重读只要几十毫秒。列表页缓存是为了返回时保住滚动位置。 */
 const CACHED_PAGES = [
   'Overview',
   'RecentRecords',
-  'Explore',
-  'BodyStatus',
-  'TrainingStatus',
   'SleepList',
   'WorkoutList',
 ];
@@ -222,9 +226,9 @@ onUnmounted(() => {
     <a class="skip-link" href="#main-content">{{ t.skipToContent }}</a>
 
     <div class="app-body">
-      <main id="main-content" class="main-content" tabindex="-1">
+      <main id="main-content" class="main-content" tabindex="-1" @scroll.passive="onMainScroll">
         <!-- 顶栏和提示条粘在滚动区顶上：页面内容从玻璃顶栏下面滚过去。 -->
-        <div class="shell-head">
+        <div :class="['shell-head', { 'is-scrolled': contentUnderBar }]">
           <AppTopBar :items="navigation" :nav-aria-label="t.mainNav" :version-title="versionTitle" :back-to="!['/', '/ai', '/settings'].includes(route.path) ? navigationBranch(route.path) : undefined" :back-label="t.quickReturn(navigationBranch(route.path) === '/settings' ? t.navSettings : t.navOverview)" />
 
           <div v-if="!backendReady" class="sync-feedback" role="status" aria-live="polite">
@@ -265,7 +269,7 @@ onUnmounted(() => {
         <div class="page-host">
         <RouterView v-slot="{ Component }">
           <Transition name="page" mode="out-in">
-            <KeepAlive :include="CACHED_PAGES" :max="6">
+            <KeepAlive :include="CACHED_PAGES" :max="4">
               <component :is="Component" />
             </KeepAlive>
           </Transition>

@@ -165,24 +165,28 @@ impl Database {
     pub(super) fn coverage_day_bounds(&self) -> Result<(Option<String>, Option<String>)> {
         let mut earliest: Option<String> = None;
         let mut latest: Option<String> = None;
+        // 样本表的两端逐指标在唯一索引上取（见 `sample_timestamp_bounds`），
+        // 其余三张表本来就走索引或很小。
+        let samples = self.sample_timestamp_bounds()?;
         for (query, is_timestamp) in [
             ("SELECT MIN(date), MAX(date) FROM daily_metrics", false),
-            (
-                "SELECT MIN(timestamp), MAX(timestamp) FROM metric_samples",
-                true,
-            ),
+            ("", true),
             (
                 "SELECT MIN(start_time), MAX(end_time) FROM sleep_sessions",
                 true,
             ),
             ("SELECT MIN(start_time), MAX(end_time) FROM workouts", true),
         ] {
-            let (low, high) = self.conn.query_row(query, [], |row| {
-                Ok((
-                    row.get::<_, Option<String>>(0)?,
-                    row.get::<_, Option<String>>(1)?,
-                ))
-            })?;
+            let (low, high) = if query.is_empty() {
+                samples.clone()
+            } else {
+                self.conn.query_row(query, [], |row| {
+                    Ok((
+                        row.get::<_, Option<String>>(0)?,
+                        row.get::<_, Option<String>>(1)?,
+                    ))
+                })?
+            };
             let low = low.and_then(|value| {
                 if is_timestamp {
                     local_day_of_stored(&value)
@@ -215,6 +219,63 @@ impl Database {
             }
         }
         Ok((earliest, latest))
+    }
+
+    /// 样本表里出现过的指标名，升序。
+    ///
+    /// 手写的跳跃扫描：每一步在唯一索引 `(metric, timestamp, …)` 上找「比上一个
+    /// 大的下一个指标」，只做「指标个数 + 1」次索引查找。`SELECT DISTINCT`
+    /// 会把三十多万行的索引从头读到尾。
+    pub(super) fn sample_metric_names(&self) -> Result<Vec<String>> {
+        let mut statement = self.conn.prepare_cached(
+            "SELECT metric FROM metric_samples WHERE metric > ?1 ORDER BY metric LIMIT 1",
+        )?;
+        let mut names = Vec::new();
+        let mut cursor = String::new();
+        while let Some(next) = statement
+            .query_row([&cursor], |row| row.get::<_, String>(0))
+            .optional()?
+        {
+            cursor.clone_from(&next);
+            names.push(next);
+        }
+        Ok(names)
+    }
+
+    /// 整张样本表最早 / 最晚的时间戳，逐指标在索引两端各取一次。
+    /// 以前一句 `MIN(timestamp), MAX(timestamp)` 要扫完整个索引（真实库约 50 ms）。
+    pub(super) fn sample_timestamp_bounds(&self) -> Result<(Option<String>, Option<String>)> {
+        let mut low: Option<String> = None;
+        let mut high: Option<String> = None;
+        // MIN 和 MAX 必须分成两句：SQLite 的 min/max 优化只认「整句只有一个
+        // MIN 或 MAX」，写在同一句里就退化成把这个指标的所有行扫一遍。
+        let mut first_of = self
+            .conn
+            .prepare_cached("SELECT MIN(timestamp) FROM metric_samples WHERE metric = ?1")?;
+        let mut last_of = self
+            .conn
+            .prepare_cached("SELECT MAX(timestamp) FROM metric_samples WHERE metric = ?1")?;
+        for metric in self.sample_metric_names()? {
+            let first: Option<String> = first_of.query_row([&metric], |row| row.get(0))?;
+            let last: Option<String> = last_of.query_row([&metric], |row| row.get(0))?;
+            if let Some(first) = first {
+                if low
+                    .as_deref()
+                    .is_none_or(|current| first.as_str() < current)
+                {
+                    low = Some(first);
+                }
+            }
+            if let Some(last) = last {
+                if high
+                    .as_deref()
+                    .is_none_or(|current| last.as_str() > current)
+                {
+                    high = Some(last);
+                }
+            }
+        }
+        Ok((low, high))
     }
 
     pub fn newest_samples(&self) -> Result<BTreeMap<String, Option<String>>> {

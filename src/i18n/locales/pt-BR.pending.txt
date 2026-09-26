@@ -183,7 +183,6 @@ lib/aiTask/title.andMore
 lib/aiTask/title.recentDays
 views/AiComposer.andMore
 views/AiComposer.recentDays
-views/settings/deck.archiveToggle
 views/settings/deck.autoSyncToggle
 views/settings/deck.cardAccount
 views/settings/deck.cardAdvanced

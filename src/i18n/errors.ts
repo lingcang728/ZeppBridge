@@ -113,7 +113,6 @@ const messages = defineMessages(
 
     /* —— 导出 —— */
     'err.export.empty_range': '这段时间没有可导出的记录',
-    'err.export.read_failed': '读取导出数据失败',
     'err.export.convert_failed': '转换导出格式失败',
     'err.export.write_failed': '写入导出文件失败',
     'err.export.write_json_failed': '写入 JSON 导出失败',
@@ -130,7 +129,6 @@ const messages = defineMessages(
     'err.handoff.empty_range': '这段时间没有可交接的记录',
     'err.handoff.mkdir_failed': '创建数据包导出目录失败',
     'err.handoff.write_failed': '写入脱敏 AI 数据失败',
-    'err.handoff.parse_failed': '解析 AI 导出 JSON 失败',
     'err.handoff.encode_failed': '编码脱敏 AI 导出失败',
 
     /* —— 问题反馈 —— */
@@ -290,7 +288,6 @@ const messages = defineMessages(
 
     /* —— export —— */
     'err.export.empty_range': 'No records in this range to export',
-    'err.export.read_failed': "Couldn't read the export data",
     'err.export.convert_failed': "Couldn't convert to the requested format",
     'err.export.write_failed': "Couldn't write the export file",
     'err.export.write_json_failed': "Couldn't write the JSON export",
@@ -308,7 +305,6 @@ const messages = defineMessages(
     'err.handoff.empty_range': 'No records in this range to hand off',
     'err.handoff.mkdir_failed': "Couldn't create the hand-off folder",
     'err.handoff.write_failed': "Couldn't write the redacted AI data",
-    'err.handoff.parse_failed': "Couldn't parse the AI export JSON",
     'err.handoff.encode_failed': "Couldn't encode the redacted AI export",
 
     /* —— feedback —— */
@@ -470,7 +466,6 @@ const messages = defineMessages(
 
     /* —— export —— */
     'err.export.empty_range': 'No hay registros en este rango para exportar',
-    'err.export.read_failed': 'No se pudieron leer los datos para exportar',
     'err.export.convert_failed': 'No se pudo convertir al formato solicitado',
     'err.export.write_failed': 'No se pudo escribir el archivo de exportación',
     'err.export.write_json_failed': 'No se pudo escribir la exportación JSON',
@@ -488,7 +483,6 @@ const messages = defineMessages(
     'err.handoff.empty_range': 'No hay registros en este rango para entregar',
     'err.handoff.mkdir_failed': 'No se pudo crear la carpeta de entrega',
     'err.handoff.write_failed': 'No se pudieron escribir los datos anonimizados para la IA',
-    'err.handoff.parse_failed': 'No se pudo interpretar el JSON de exportación para la IA',
     'err.handoff.encode_failed': 'No se pudo codificar la exportación anonimizada para la IA',
 
     /* —— feedback —— */

@@ -207,12 +207,9 @@ export default {
 
     'views/Settings': {
       title: 'Настройки',
-      intro: 'Аутентификация, поведение синхронизации, приватность и настройки экспорта по умолчанию — всё в одном месте.',
       retry: 'Повторить',
       distanceUnitLabel: 'Единицы расстояния',
-      displayPrefsTitle: 'Язык и форматы',
 
-      authTitle: '1. Аутентификация',
       authWebTitle: 'Официальный вход через веб',
       authWebSub: 'Войдите на официальной странице; appToken подхватывается автоматически',
       authCancelLogin: 'Отменить вход',
@@ -225,7 +222,6 @@ export default {
       authManualTitle: 'Ввести вручную',
       authManualSub: 'Впишите appToken, user_id и хост региона',
       authCollapse: 'Свернуть',
-      manualFormTitle: 'Введите учётные данные',
       manualFormHint: 'Возьмите их из захвата mitmproxy/Charles или из инструментов разработчика браузера. Три поля:',
       manualTokenPlaceholder: 'Скопируйте из HTTP-заголовка apptoken',
       manualUserIdPlaceholder: 'Возьмите из пути URL /users/{user_id}/',
@@ -233,20 +229,15 @@ export default {
       manualSave: 'Сохранить учётные данные',
       cancel: 'Отмена',
 
-      accountTitle: '2. Аккаунт и регион',
       accountLine: (region: string, lastSync: string) => `Регион ${region} · последняя синхронизация ${lastSync}`,
       verifyAndSync: 'Проверить и синхронизировать',
       reauthenticate: 'Войти снова',
 
-      devicesTitle: '3. Подключённые устройства / источники данных',
       identifying: 'Определение…',
       identifyDevices: 'Определить устройства заново',
       deviceErrorPrefix: 'Определение устройств: ',
       noDevices: 'Физическое устройство пока не определено; Zepp Cloud продолжает синхронизироваться как облачный источник.',
       deviceFirmware: (firmware: string) => `Прошивка ${firmware}`,
-      deviceLatestData: 'Последние данные',
-      deviceIdLine: (masked: string) => `ID устройства ${masked}`,
-      viewOrChange: 'Смотреть / сменить модель',
       unknownDeviceTitle: 'Неопознанное устройство',
       unknownDeviceBodyA: 'Некоторые аккаунты Zepp возвращают записи об устройствах ',
       unknownDeviceNoName: 'вообще без поля названия продукта',
@@ -283,7 +274,6 @@ export default {
         + 'здоровья или сырые ответы. Отправить?',
       reportFailed: 'Не удалось отправить отчёт об ошибке',
 
-      capabilityTitle: 'Что могут предоставить ваши устройства',
       capabilityIntro: 'Что ZeppBridge сейчас может прочитать из вашего аккаунта. Список обновляется сам при синхронизации; нажимать ничего не нужно.',
       lampOn: (count: number) => `Получено: ${count}`,
       lampPending: (count: number) => `В облаке есть, локально не сохранено: ${count}`,
@@ -304,7 +294,6 @@ export default {
       probeRefused: 'эндпоинт отказал',
       probeFailed: 'запрос не удался',
 
-      codesTitle: 'Нераспознанные коды тренировок',
       codesUnnamed: (count: number) => `ещё без названия: ${count}`,
       codesIntro:
         'Пользовательские шаблоны тренировок Zepp дают номер без названия, и во встроенном каталоге их тоже нет. '
@@ -329,7 +318,6 @@ export default {
       codeSaveFailed: 'Не удалось сохранить своё название тренировки',
       codeSuggestions: ['Силовая', 'Корпус', 'HIIT', 'Растяжка', 'Реабилитация', 'Своя тренировка'],
 
-      privacyTitle: '4. Приватность и безопасность',
       privacyDbTitle: 'Локальная база данных не зашифрована',
       privacyDbBody:
         'Данные о здоровье хранятся как обычный SQLite в папке данных приложения, под защитой вашей учётной записи '
@@ -352,23 +340,9 @@ export default {
         + '(целые числа, говорящие только какая модель) и неизвестные коды тренировок с их количеством. Никогда не '
         + 'отправляются аккаунт, токены, серийные номера, ID устройств, MAC-адреса, GPS, значения здоровья, сырые '
         + 'ответы или локальные пути.',
-      mcpTitle: '5. MCP (дайте ИИ-инструментам спрашивать ваши локальные данные)',
       mcpBadge: 'Только чтение · не слушает порт',
-      mcpSkip: 'Если MCP вам ни о чём не говорит, пропустите этот раздел — на функции ZeppBridge он не влияет.',
-      mcpCompareA: 'Одной строкой: «Передать ИИ» — это вы сами экспортируете и вставляете; MCP — это ',
-      mcpCompareStrong: 'ИИ спрашивает сам',
-      mcpCompareB:
-        ' — после настройки вы говорите «как я спал в этом месяце», и он запрашивает вашу локальную базу. Полезно '
-        + 'только для ИИ-инструментов разработки на вашем компьютере (Claude Code, Codex, Grok и т. п.).',
-      mcpAskA: 'Настройка различается по инструментам, поэтому вместо длинного текста здесь лучше ',
-      mcpAskStrong: 'скопируйте текст ниже тому ИИ, которым пользуетесь',
-      mcpAskB: ' — пусть он проведёт вас по шагам на вашей же машине.',
       mcpCopyPrompt: 'Скопировать и спросить свой ИИ',
       mcpCopyConfig: 'Скопировать только фрагмент конфига',
-      mcpToolsLead: 'После настройки ИИ сможет спрашивать эти пять вещей:',
-      mcpFootA:
-        ' поставляется в архиве инструментов каждого Release, той же версии, что и настольное приложение. Он читает '
-        + 'ту же локальную базу, поэтому видит ровно то, что видите здесь вы.',
       mcpPromptCopied: 'Скопировано. Вставьте вашему ИИ — он даст шаги настройки под вашу машину.',
       mcpPromptCopyFailed: 'Не удалось скопировать. Выделите текст выше вручную.',
       mcpConfigCopied: 'Конфиг скопирован. Замените command на реальный путь к zeppbridge-mcp на вашей машине.',
@@ -395,7 +369,6 @@ export default {
 Если тебе что-то нужно от меня (каким клиентом я пользуюсь, где лежит файл), просто спроси.`,
       mcpConfigPathPlaceholder: '<путь к zeppbridge-mcp>',
 
-      retentionTitle: '6. Срок хранения локальных данных',
       retentionLabel: 'Хранить',
       retentionAria: 'Срок хранения локальных данных в днях',
       retentionNote: (days: number) => plural(days, {
@@ -412,26 +385,13 @@ export default {
       reprocessing: 'Переобработка…',
       reprocessNow: 'Переобработать',
       days: (days: number) => plural(days, { one: `${days} день`, few: `${days} дня`, many: `${days} дней`, other: `${days} дня` }),
-      lastDays: (days: number) => plural(days, {
-        one: `Последний ${days} день`,
-        few: `Последние ${days} дня`,
-        many: `Последние ${days} дней`,
-        other: `Последние ${days} дня`,
-      }),
 
-      exportTitle: '7. Экспорт и дозагрузка по умолчанию',
       defaultFormatLabel: 'Формат экспорта по умолчанию',
       defaultFormatAria: 'Формат экспорта по умолчанию',
-      historyRangeLabel: 'Диапазон дозагрузки истории',
-      historyRangeAria: 'Дней дозагрузки истории',
-      exportNote: 'Задаёт формат по умолчанию на странице «Передать ИИ» и окно облачной дозагрузки.',
-      startBackfill: 'Начать дозагрузку истории',
       formatJsonHint: 'Структурированные данные',
       formatCsvHint: 'Табличные данные',
       formatGpxHint: 'Треки тренировок',
 
-      updateTitle: '8. Обновления программы',
-      updateSub: 'Тихая проверка не чаще раза в день; можно проверить и вручную.',
       updateChecking: 'Проверка…',
       updateCheck: 'Проверить обновления',
       updateCurrent: (version: string) => `Сейчас ${version}`,
@@ -468,20 +428,14 @@ export default {
       updateRetry: 'Повторить',
       updateInstall: 'Скачать и установить',
 
-      syncTitle: '9. Автоматическая синхронизация',
       syncDescA: (minutes: number) => `Пока приложение открыто, облачные записи синхронизируются каждые ${minutes} мин`,
       syncDescB: 'Держите включённой — тогда ряды данных будут непрерывными.',
       syncIntervalAria: 'Интервал автоматической синхронизации',
       minutes: (minutes: number) => `${minutes} мин`,
-      syncOn: 'Синхронизация включена',
-      syncOff: 'Синхронизация выключена',
       syncing: 'Синхронизация…',
       syncNow: 'Синхронизировать',
 
-      advancedTitle: 'Дополнительно и обслуживание',
-      advancedSub: 'Масштаб, папка данных и сброс учётных данных. Только когда нужно.',
       scaleLabel: 'Масштаб интерфейса',
-      scaleNote: '100% — проектная база. Работают также Ctrl + и Ctrl −.',
       dataAuthLabel: 'Данные и учётные данные',
       dataAuthNote: (days: number) => plural(days, {
         one: `Данные лежат в папке данных приложения; сейчас хранится последний ${days} день.`,
@@ -512,9 +466,6 @@ export default {
       compacting: 'Сжатие… (на большой базе — несколько минут)',
       compactRun: 'Сжать сохранённые пакеты',
       backupLabel: 'Снимки базы данных и восстановление',
-      backupNote:
-        'Копия всей базы для аварийного восстановления, читаемая только ZeppBridge. Одна делается автоматически '
-        + 'перед обновлением базы; вручную это почти никогда не нужно.',
       localApiLabel: 'Локальный REST API',
       localApiNote:
         'Чтобы другие программы на этом устройстве — скрипты, дашборды, ваши инструменты — читали нормализованные '
@@ -522,8 +473,6 @@ export default {
       syncDiagnostics: 'Диагностика синхронизации',
       noSyncDiagnostics: 'Диагностики синхронизации пока нет.',
 
-      apiTitle: 'Локальный REST API',
-      apiSub: 'Позволяет другим программам на этом устройстве читать нормализованные ряды тренировок как JSON. По умолчанию выключен; включается явно вами.',
       apiListening: 'Прослушивается',
       apiEnabledNotListening: 'Включён, но не прослушивается',
       apiOff: 'Выключен',
@@ -579,7 +528,6 @@ export default {
       notProvided: 'Нет данных',
       noRecords: 'Записей пока нет',
       timeUnknown: 'Время неизвестно',
-      cloudService: 'Облачный сервис',
 
       refreshFailed: (reason: string) => `Определение не удалось; показан локальный кэш${reason}`,
       refreshFailedReason: (reason: string) => `: ${reason}`,
@@ -628,12 +576,6 @@ export default {
       prefsSavedNoEstimate: 'Настройки сохранены, но оценка свободного места сейчас недоступна',
       prefsSaved: 'Настройки хранения и дозагрузки сохранены.',
       prefsSaveFailed: 'Не удалось сохранить настройки',
-      syncInProgress: 'Синхронизация выполняется. Дождитесь её окончания, потом дозагружайте',
-      backfillYearCap: '\nГод — это предел; более старые облачные записи на это устройство не попадают.',
-      backfillConfirm: (days: number, low: number, high: number, extra: string) =>
-        `Дозагрузка ${plural(days, { one: `${days} дня`, few: `${days} дней`, many: `${days} дней`, other: `${days} дней` })} займёт примерно ${low}–${high} мин (оценка). Держите приложение открытым; отменить можно в любой момент.${extra}`,
-      backfillTightSpace: (message: string, days: number) =>
-        `${message}\nВсё равно дозагружать ${plural(days, { one: `${days} день`, few: `${days} дня`, many: `${days} дней`, other: `${days} дня` })}? Сначала лучше 30 дней.`,
 
       stream: {
         heart_rate: 'Пульс',
@@ -683,7 +625,6 @@ export default {
 
     'App': {
       quickReturn: (page: string) => `Вернуться к ${page}`,
-      navRecent: 'последним записям',
       skipToContent: 'Перейти к основному содержимому',
       mainNav: 'Основная навигация',
       bottomNav: 'Мобильная основная навигация',
@@ -1041,7 +982,6 @@ export default {
       comparedTo: (count: number) =>
         `В сравнении с ${plural(count, { one: `${count} вашей последней пробежкой`, few: `${count} вашими последними пробежками`, many: `${count} вашими последними пробежками`, other: `${count} вашими последними пробежками` })} похожей дистанции:`,
       noComparison: 'Сопоставимой истории пока не хватает, поэтому здесь просто приводятся числа без сравнения.',
-      baselinePrefix: (value: string, delta: string) => `база ${value} · ${delta}`,
       driftTitle: 'Первая и вторая половины',
       driftSub: 'Делит эту тренировку по времени пополам и сравнивает, сколько ударов пульса стоила та же скорость.',
       driftFirst: 'Первая половина',
@@ -1128,7 +1068,6 @@ export default {
       desktopOnly: 'Еженедельный отчёт нужно открывать в настольном приложении ZeppBridge.',
       nothingComparable: 'На этой неделе сравнивать пока не с чем. Вернитесь после синхронизации.',
       loadFailed: 'Не удалось построить локальный еженедельный отчёт',
-      barsAria: (recent: string, baseline: string) => `На этой неделе ${recent}, за предыдущие 28 дней ${baseline}`,
       barThisWeek: 'Эта неделя',
       barBaseline: 'Предыдущие 28 дн.',
       noBaseline: 'Истории за спиной не хватает — показывается только текущее значение',
@@ -1465,7 +1404,6 @@ export default {
 
     'lib/labels': {
       unknownWithCode: (code: string) => `Неопознанная тренировка (код ${code})`,
-      unknownWorkout: 'Неопознанная тренировка',
       workout: 'Тренировка',
       fallback: {
         run: 'Бег на улице',
@@ -1516,11 +1454,9 @@ export default {
       deleteHint: 'Заметка будет убрана из локальной базы.',
       invalid: 'Введите название и корректные даты — дата конца не может быть раньше даты начала.',
       failed: 'Действие не выполнено. Повторите.',
-      saved: 'Событие сохранено.',
       deleted: 'Событие удалено.',
       loading: 'Загружаются события…',
       retry: 'Повторить',
-      all: 'Все',
       active: 'Идущие',
       search: 'Поиск событий',
       noMatch: 'Подходящих событий нет.',
@@ -1611,7 +1547,6 @@ export default {
 
     'views/ActivityDetail': {
       backToOverview: 'Назад к обзору',
-      eyebrow: 'Дневная активность',
       title: 'Дневная активность',
       intro:
         'Динамика шагов, дистанции, активного расхода и минут активности по дням. Сравнение только с '
@@ -1645,7 +1580,6 @@ export default {
 
     'views/BodyStatus': {
       backToOverview: 'Назад к обзору',
-      eyebrow: 'Состояние тела',
       title: 'Состояние тела',
       intro:
         'Локальные тренды готовности, стресса, кислорода в крови, ВСР, частоты дыхания, пульса покоя, '
@@ -1783,7 +1717,6 @@ export default {
       timeUnknown: 'Время неизвестно',
       notProvided: 'Нет данных',
       backToSettings: 'Назад к настройкам',
-      eyebrow: 'Здоровье данных',
       title: 'Проверка здоровья данных',
       intro:
         'Для каждого потока данных: как далеко он дошёл по стадиям получения из облака, разбора и '
@@ -1926,7 +1859,6 @@ export default {
 
     'views/HeartRateDetail': {
       backToOverview: 'Назад к обзору',
-      eyebrow: 'Пульс',
       title: 'Пульс',
       intro:
         'Верхняя кривая всегда показывает последние 24 часа; «7 дней / 1 месяц / 6 месяцев» меняют '
@@ -1934,7 +1866,6 @@ export default {
       rangeAria: 'Диапазон трендов',
       trendRangeLabel: 'Диапазон тренда',
       desktopOnly: 'Используйте настольное приложение. Этот предпросмотр в браузере не читает данные аккаунта.',
-      loadFailed: 'Данные пульса сейчас недоступны',
       dayFailed: 'Пульс за последние 24 часа сейчас не читается.',
       dailyMaxFailed: 'Дневные пики пульса сейчас не читаются.',
       trendsFailed: 'Тренды пульса покоя и вариабельности сейчас не читаются.',
@@ -2032,14 +1963,11 @@ export default {
           other: `Скрыто ${count} неполные записи`,
         }),
       notProvided: 'Нет данных',
-      dateUnknown: 'Дата неизвестна',
       today: 'Сегодня',
       yesterday: 'Вчера',
-      listDate: (month: number, day: number, weekday: string) => `${weekday}, ${day}.${month}`,
     },
 
     'views/SleepDetail': {
-      backToRecent: 'Назад к недавним записям',
       title: 'Запись сна',
       loadingDetail: 'Читается запись сна…',
       loadFailedTitle: 'Не удалось прочитать эту запись сна',
@@ -2108,7 +2036,6 @@ export default {
 
     'views/TrainingStatus': {
       backToOverview: 'Назад к обзору',
-      eyebrow: 'Тренировочный статус',
       title: 'Тренировочный статус',
       intro:
         'МПК (VO₂max), лактатный порог, тренировочная нагрузка и пульсовые зоны. Всё читается из '
@@ -2157,7 +2084,6 @@ export default {
 
     'views/WorkoutDetail': {
       notProvided: 'Нет данных',
-      backToRecent: 'Назад к недавним записям',
       loadFailedTitle: 'Не удалось прочитать эту тренировку',
       loadFailed: 'Детали тренировки сейчас недоступны',
       retry: 'Повторить',
@@ -2167,7 +2093,6 @@ export default {
       seriesFailed: 'Не удалось прочитать поточечные ряды этой тренировки',
       seriesFailedTitle: 'Поточечные ряды не загрузились',
       exportNeedsSeries: 'Поточечные ряды не загрузились, поэтому эту запись экспортировать нельзя.',
-      thisWorkout: 'тренировка',
       aiPrompt: (label: string) => `Ты — спортивный аналитик. Ниже — полная запись одной моей тренировки (${label}), взятая из локальной базы ZeppBridge и обезличенная.
     Разбери это занятие только по фактам из записи: интенсивность, как темп соотносится с пульсом, есть ли явное падение темпа или аномальный участок, и что конкретно сделать иначе в следующий раз.
 
@@ -2192,7 +2117,6 @@ export default {
       overrideCleared: 'Исправление снято — снова действует распознавание ZeppBridge.',
       overrideFailed: 'Не удалось сохранить исправление типа тренировки',
       copied: (format: string) => `Данные ${format} скопированы в буфер обмена.`,
-      copyFailed: 'Не удалось скопировать эту запись',
       metricDistance: 'Дистанция',
       metricDuration: 'Время тренировки',
       metricAvgHr: 'Средний пульс',
@@ -2435,7 +2359,6 @@ export default {
 
     /* —— 导出 —— */
     'err.export.empty_range': 'В этом диапазоне нет записей для экспорта',
-    'err.export.read_failed': 'Не удалось прочитать данные для экспорта',
     'err.export.convert_failed': 'Не удалось преобразовать в нужный формат',
     'err.export.write_failed': 'Не удалось записать файл экспорта',
     'err.export.write_json_failed': 'Не удалось записать экспорт JSON',
@@ -2452,7 +2375,6 @@ export default {
     'err.handoff.empty_range': 'В этом диапазоне нет записей для передачи',
     'err.handoff.mkdir_failed': 'Не удалось создать папку передачи',
     'err.handoff.write_failed': 'Не удалось записать обезличенные данные для ИИ',
-    'err.handoff.parse_failed': 'Не удалось разобрать JSON экспорта для ИИ',
     'err.handoff.encode_failed': 'Не удалось закодировать обезличенный экспорт для ИИ',
 
     /* —— 问题反馈 —— */

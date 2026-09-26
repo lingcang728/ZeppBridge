@@ -35,7 +35,6 @@ const catalogLabels: Record<Locale, Map<string, string>> = {
 const messages = defineMessages(
   {
     unknownWithCode: (code: string) => `未识别运动（编号 ${code}）`,
-    unknownWorkout: '未识别运动',
     workout: '运动',
     fallback: {
       run: '户外跑步',
@@ -67,7 +66,6 @@ const messages = defineMessages(
   },
   {
     unknownWithCode: (code: string) => `Unrecognized workout (code ${code})`,
-    unknownWorkout: 'Unrecognized workout',
     workout: 'Workout',
     fallback: {
       run: 'Outdoor Running',
@@ -99,7 +97,6 @@ const messages = defineMessages(
   },
   {
     unknownWithCode: (code: string) => `Entrenamiento no reconocido (código ${code})`,
-    unknownWorkout: 'Entrenamiento no reconocido',
     workout: 'Entrenamiento',
     fallback: {
       run: 'Carrera al aire libre',

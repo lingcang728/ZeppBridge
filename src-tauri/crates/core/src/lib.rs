@@ -19,6 +19,7 @@ pub mod local_api;
 pub mod models;
 pub mod normalizer;
 pub mod paths;
+pub mod redact;
 pub mod sport_catalog;
 pub mod sync;
 

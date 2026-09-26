@@ -87,6 +87,16 @@
   --mat-glass-line: rgba(255, 255, 255, .1);
   --mat-glass-blur: blur(22px) saturate(1.5);
   --mat-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, .09), 0 18px 44px -14px rgba(0, 0, 0, .7);
+  /* 浮动控件的玻璃（Liquid Glass「regular」的网页近似）：清透的底，靠顶边高光
+     和一圈细亮边界定形状，而不是靠厚底色和粗边框；阴影小而软。 */
+  --glass: rgba(30, 34, 41, .5);
+  --glass-sheen: rgba(255, 255, 255, .07);
+  --glass-blur: blur(16px) saturate(1.7) brightness(1.04);
+  --glass-rim: inset 0 1px 0 rgba(255, 255, 255, .16), inset 0 0 0 1px rgba(255, 255, 255, .07);
+  --glass-shadow: 0 6px 18px -8px rgba(0, 0, 0, .55);
+  --glass-press: rgba(255, 255, 255, .08);
+  /* 滚动边缘：内容滚到浮动控件下面时被轻轻模糊、淡出，代替硬分界线。 */
+  --edge-fade: rgba(13, 15, 18, .78);
   /* 图标底座：同一种材质，颜色由 --tile-tone 决定。 */
   --mat-tile-top: #2A2F37;
   --mat-tile-bottom: #16191E;
@@ -202,6 +212,13 @@ html[data-theme="light"] {
   --mat-glass-line: rgba(38, 52, 41, .1);
   --mat-glass-blur: blur(22px) saturate(1.6);
   --mat-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, .8), 0 18px 44px -16px rgba(38, 52, 41, .28);
+  --glass: rgba(255, 255, 255, .56);
+  --glass-sheen: rgba(255, 255, 255, .5);
+  --glass-blur: blur(16px) saturate(1.8);
+  --glass-rim: inset 0 1px 0 rgba(255, 255, 255, .95), inset 0 0 0 1px rgba(38, 52, 41, .08);
+  --glass-shadow: 0 6px 18px -10px rgba(38, 52, 41, .3);
+  --glass-press: rgba(38, 52, 41, .06);
+  --edge-fade: rgba(246, 247, 243, .8);
   --mat-tile-top: #FFFFFF;
   --mat-tile-bottom: #EEF1EA;
   --mat-tile-rim: inset 0 1px 0 #FFFFFF, inset 0 -1px 0 rgba(38, 52, 41, .08);

@@ -3,7 +3,6 @@ import { defineMessages } from '../i18n';
 /* SleepDetail 的文案。单独一个文件，免得三种语言的文案把逻辑挤出视野；moduleId 不变，语言包不用跟着搬家。 */
 export const sleepDetailMessages = defineMessages(
   {
-    backToRecent: '返回最近记录',
     title: '睡眠记录详情',
     loadingDetail: '正在读取睡眠详情…',
     loadFailedTitle: '无法读取这条睡眠',
@@ -46,7 +45,6 @@ export const sleepDetailMessages = defineMessages(
     tooltipRowMissing: (name: string) => `${name}: 未提供<br/>`,
   },
   {
-    backToRecent: 'Back to recent records',
     title: 'Sleep record',
     loadingDetail: 'Reading the sleep record…',
     loadFailedTitle: 'Could not read this sleep record',
@@ -89,7 +87,6 @@ export const sleepDetailMessages = defineMessages(
     tooltipRowMissing: (name: string) => `${name}: Not provided<br/>`,
   },
   {
-    backToRecent: 'Volver a registros recientes',
     title: 'Registro de sueño',
     loadingDetail: 'Leyendo el registro de sueño…',
     loadFailedTitle: 'No se pudo leer este registro de sueño',

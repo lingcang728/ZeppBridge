@@ -263,10 +263,14 @@ pub(in crate::storage) fn daily_metric_selected_for_export(
 pub(crate) fn local_day_range_utc_bounds(start: &str, end: &str) -> Option<(String, String)> {
     let start = NaiveDate::parse_from_str(start, "%Y-%m-%d").ok()?;
     let end = NaiveDate::parse_from_str(end, "%Y-%m-%d").ok()?;
-    let lower = (start - Duration::days(1))
+    // 用检查溢出的加减：日期贴着 NaiveDate::MIN / MAX 时直接算不出界，交给调用方兜底，
+    // 而不是在这里 panic。
+    let lower = start
+        .checked_sub_signed(Duration::days(1))?
         .format("%Y-%m-%dT00:00:00")
         .to_string();
-    let upper = (end + Duration::days(2))
+    let upper = end
+        .checked_add_signed(Duration::days(2))?
         .format("%Y-%m-%dT00:00:00")
         .to_string();
     Some((lower, upper))

@@ -11,7 +11,7 @@
     "build": "vue-tsc --noEmit && vite build",
     "build:web": "vite build",
     "test:feedback": "node --test tests/feedback-function.test.mjs",
-    "test:functions": "node --test tests/dialog-capability.test.mjs tests/feedback-function.test.mjs tests/release-function.test.mjs tests/zepp-callback-functions.test.mjs",
+    "test:functions": "node --test tests/font-subset.test.mjs tests/dialog-capability.test.mjs tests/feedback-function.test.mjs tests/release-function.test.mjs tests/zepp-callback-functions.test.mjs",
     "preview": "vite preview",
     "tauri": "tauri",
     "package:release": "pwsh -NoProfile -File scripts/windows/package-release.ps1",
@@ -28,6 +28,7 @@
     "docs:check": "node scripts/release/check-doc-links.mjs",
     "i18n:check": "node scripts/release/check-i18n.mjs",
     "feedback:triage": "node scripts/feedback/triage.mjs",
+    "fonts:subset": "python scripts/assets/subset-fonts.py || py -3 scripts/assets/subset-fonts.py",
     "verify:login-probe": "python scripts/verify/login-activity-probe.py || py -3 scripts/verify/login-activity-probe.py"
   },
   "dependencies": {

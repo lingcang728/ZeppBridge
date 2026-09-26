@@ -52,6 +52,35 @@ where
     )?
 }
 
+/// 闲置的只读连接，按库路径归还复用。
+///
+/// 只读命令以前全挤在 `AppState::db` 那一把锁后面，启动时概览的十来个查询
+/// 只能排队一个一个跑，而且是在异步运行时的线程上跑阻塞的 SQLite。WAL 下读
+/// 本来就能并发：现在每个只读命令在阻塞线程池里拿一条自己的只读连接。连接
+/// 留几条复用，省掉每次约 2.5 ms 的打开和冷的页缓存。闲置连接不持有任何读
+/// 快照，不妨碍检查点和写入。
+static READ_POOL: std::sync::Mutex<Vec<(PathBuf, Database)>> = std::sync::Mutex::new(Vec::new());
+const READ_POOL_IDLE_MAX: usize = 4;
+
+fn take_read_connection(path: &Path) -> zeppbridge_core::models::error::Result<Database> {
+    let pooled = READ_POOL.lock().ok().and_then(|mut pool| {
+        let index = pool.iter().position(|(p, _)| p == path)?;
+        Some(pool.swap_remove(index).1)
+    });
+    match pooled {
+        Some(db) => Ok(db),
+        None => Database::open_read_only(path.to_path_buf()),
+    }
+}
+
+fn return_read_connection(path: PathBuf, db: Database) {
+    if let Ok(mut pool) = READ_POOL.lock() {
+        if pool.len() < READ_POOL_IDLE_MAX {
+            pool.push((path, db));
+        }
+    }
+}
+
 pub(crate) async fn spawn_independent_read<T, F>(data_dir: PathBuf, work: F) -> Result<T, AppError>
 where
     T: Send + 'static,
@@ -59,8 +88,14 @@ where
 {
     join_blocking(
         tokio::task::spawn_blocking(move || {
-            let db = Database::open_read_only(data_dir.join("zepp.db"))?;
-            work(&db)
+            let path = data_dir.join("zepp.db");
+            let db = take_read_connection(&path)?;
+            let result = work(&db);
+            // 出错的连接不回池：库被恢复 / 换掉之后，旧连接会一直报同一个错。
+            if result.is_ok() {
+                return_read_connection(path, db);
+            }
+            result
         })
         .await,
     )?

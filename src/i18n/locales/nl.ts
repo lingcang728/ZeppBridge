@@ -15,7 +15,6 @@ export default {
     'components/ai/WorkoutPicker': { previous: 'Vorige', next: 'Volgende' },
     App: {
       quickReturn: (page: string) => `Terug naar ${page}`,
-      navRecent: 'recente records',
       skipToContent: 'Naar de hoofdinhoud',
       mainNav: 'Hoofdnavigatie',
       bottomNav: 'Mobiele hoofdnavigatie',
@@ -372,7 +371,6 @@ export default {
         `Tegenover je eigen ${count} meest recente runs van vergelijkbare afstand:`,
       noComparison:
         'Nog niet genoeg vergelijkbare historie, dus deze run meldt zijn cijfers zonder ze te vergelijken.',
-      baselinePrefix: (value: string, delta: string) => `basislijn ${value} · ${delta}`,
       driftTitle: 'Eerste helft tegenover tweede',
       driftSub:
         'Splitst deze training in tweeën op tijd en vergelijkt hoeveel slagen dezelfde snelheid kostte.',
@@ -460,8 +458,6 @@ export default {
       nothingComparable:
         'Deze week is nog niets vergelijkbaars. Kom terug na een synchronisatie.',
       loadFailed: 'Het lokale weekrapport kon niet worden opgebouwd',
-      barsAria: (recent: string, baseline: string) =>
-        `Deze week ${recent}, afgelopen 28 dagen ${baseline}`,
       barThisWeek: 'Deze week',
       barBaseline: 'Afgelopen 28 dagen',
       noBaseline:
@@ -780,7 +776,6 @@ export default {
     },
     'lib/labels': {
       unknownWithCode: (code: string) => `Niet-herkende training (code ${code})`,
-      unknownWorkout: 'Niet-herkende training',
       workout: 'Training',
       fallback: {
         run: 'Buiten hardlopen',
@@ -832,11 +827,9 @@ export default {
       invalid:
         'Voer een titel en geldige datums in. De einddatum kan niet voor de begindatum liggen.',
       failed: 'De actie kon niet worden voltooid. Probeer het opnieuw.',
-      saved: 'Levensgebeurtenis opgeslagen.',
       deleted: 'Levensgebeurtenis verwijderd.',
       loading: 'Levensgebeurtenissen laden…',
       retry: 'Opnieuw proberen',
-      all: 'Allemaal',
       active: 'Lopend',
       search: 'Levensgebeurtenissen zoeken',
       noMatch: 'Geen passende gebeurtenissen.',
@@ -1092,10 +1085,6 @@ Antwoord in Markdown.`,
     'views/Settings': {
       accountLine: (region: string, lastSync: string) =>
         `Regio ${region} · laatste sync ${lastSync}`,
-      accountTitle: '2. Account en regio',
-      advancedSub:
-        'Schaling, de gegevensmap en het wissen van inloggegevens. Alleen als je ze nodig hebt.',
-      advancedTitle: 'Geavanceerd en onderhoud',
       apiAuthNoteA: 'Elk verzoek moet ',
       apiAuthNoteB:
         ' meedragen, anders krijgt het een 401. Opnieuw genereren maakt het oude token direct ongeldig.',
@@ -1118,9 +1107,6 @@ Antwoord in Markdown.`,
         'Opnieuw genereren maakt het oude token direct ongeldig, en elk lokaal programma dat ermee is geconfigureerd moet worden bijgewerkt. Doorgaan?',
       apiRegenerateFailed: 'Het toegangstoken kon niet opnieuw worden gegenereerd',
       apiShow: 'Tonen',
-      apiSub:
-        "Laat andere programma's op deze machine genormaliseerde trainingsreeksen als JSON lezen. Standaard uit; je zet het zelf expliciet aan.",
-      apiTitle: 'Lokale REST-API',
       apiToggleAria: 'De lokale REST-API inschakelen',
       apiToggleFailed: 'De lokale API kon niet worden omgeschakeld',
       apiToggleSub: (address: string) =>
@@ -1143,19 +1129,10 @@ Antwoord in Markdown.`,
       authManualTitle: 'Zelf invoeren',
       authOpening: 'Openen…',
       authRetry: 'Opnieuw proberen te koppelen',
-      authTitle: '1. Inloggen',
       authUse: 'Gebruiken',
       authWebSub: 'Log in op de officiële pagina; het appToken wordt voor je opgepikt',
       authWebTitle: 'Officiële web-login',
-      backfillConfirm: (days: number, low: number, high: number, extra: string) =>
-        `${days} dagen ophalen duurt grofweg ${low}–${high} minuten (geschat). Houd de app open; annuleren kan altijd.${extra}`,
-      backfillTightSpace: (message: string, days: number) =>
-        `${message}\nToch ${days} dagen ophalen? Overweeg eerst 30 dagen.`,
-      backfillYearCap:
-        '\nEén jaar is de limiet; oudere cloudgegevens komen niet naar deze machine.',
       backupLabel: 'Databasemomentopnamen en herstel',
-      backupNote:
-        'Een kopie van de hele database voor noodherstel, alleen door ZeppBridge terug te lezen. Voor een database-upgrade wordt er automatisch een gemaakt; handmatig hoeft het zelden.',
       buildStamp: (stamp: string) => `Build ${stamp}`,
       cancel: 'Annuleren',
       capabilityCloud: (records: number, unit: string, latest: string) =>
@@ -1172,7 +1149,6 @@ Antwoord in Markdown.`,
         'De cloud heeft records, maar er is nog geen bruikbare data lokaal opgeslagen. Probeer te synchroniseren of op te halen; als records dan nog niet verschijnen, heeft hun payloadformaat mogelijk extra ondersteuning nodig.',
       capabilityFoodHistoryHint: 'Er staan voedingsrecords in de cloud, maar nog niet lokaal. Zijn ze ouder dan het venster voor incrementele synchronisatie, synchroniseer dan de geschiedenis voor die datums. Verschijnen ze daarna nog niet, meld dan het gegevensformaat.',
       capabilityNotProbed: 'Nog niet getest',
-      capabilityTitle: 'Wat je apparaten kunnen leveren',
       capabilityUnsupported: 'Je account of apparaat levert dit niet',
       cleaningUp: 'Opschonen…',
       cleanupConfirm: (days: number) =>
@@ -1185,7 +1161,6 @@ Antwoord in Markdown.`,
         'Uitloggen van dit account?\n\nAlleen de inloggegevens worden gewist; alles wat al naar deze machine is gesynchroniseerd blijft bewaard.\n\nLet op: wisselen tussen accounts wordt nog niet ondersteund — inloggen met een ander account schrijft beide accounts in dezelfde lokale database.',
       clearAuthFailed: 'De inloggegevens konden niet worden gewist',
       closeDialog: 'Dialoog sluiten',
-      cloudService: 'Clouddienst',
       codeCleared: (code: number) => `De eigen naam voor code ${code} is gewist.`,
       codeFootnote:
         'De naam blijft op deze machine, wordt nooit teruggestuurd naar Zepp, en blijft bestaan bij opnieuw parseren. Sla leeg op om hem te wissen.',
@@ -1203,7 +1178,6 @@ Antwoord in Markdown.`,
       codeSuggestions: ['Krachttraining', 'Core', 'HIIT', 'Rekken', 'Revalidatie', 'Eigen sessie'],
       codesIntro:
         'De aangepaste trainingssjablonen van Zepp geven een nummer en geen naam, en de ingebouwde catalogus heeft er ook niets voor. In plaats van een sport te gokken en aan je voor te schotelen, geef je de code eenmalig zelf een naam — elk record met die code gebruikt dan jouw naam, en de trainingspagina zegt er eerlijk bij dat die van jou is.',
-      codesTitle: 'Niet-herkende trainingscodes',
       codesUnnamed: (count: number) => `${count} nog zonder naam`,
       compactDone: (count: number, before: string, after: string, saved: string, skipped: string) =>
         `${count} payloads gecomprimeerd, ${before} → ${after}, ${saved} bespaard${skipped}.`,
@@ -1230,14 +1204,7 @@ Antwoord in Markdown.`,
       defaultFormatLabel: 'Standaard exportformaat',
       deviceErrorPrefix: 'Apparaatherkenning: ',
       deviceFirmware: (firmware: string) => `Firmware ${firmware}`,
-      deviceIdLine: (masked: string) => `Apparaat-id ${masked}`,
-      deviceLatestData: 'Laatste gegevens',
-      devicesTitle: '3. Verbonden apparaten / gegevensbronnen',
-      displayPrefsTitle: 'Taal en notaties',
       distanceUnitLabel: 'Afstandseenheid',
-      exportNote:
-        'Stelt het standaardformaat op de pagina "Doorgeven aan AI" en het venster voor ophalen uit de cloud in.',
-      exportTitle: '7. Export- en ophaalvoorkeuren',
       filePickerFailed: 'De bestandskiezer kon niet worden geopend',
       fillAllFields: 'Vul elk verplicht veld in',
       formatCsvHint: 'Tabelgegevens',
@@ -1250,15 +1217,11 @@ Antwoord in Markdown.`,
       healthCheckNote:
         'Hoe ver elke gegevensstroom kwam met ophalen uit de cloud, parsen en lokaal schrijven; welke datums het dekt; waar het vandaan kwam. Niet om dagelijks te bekijken — kom hier als een synchronisatieresultaat niet klopt met wat je verwachtte.',
       healthCheckOpen: 'De gegevensgezondheidscontrole openen',
-      historyRangeAria: 'Aantal dagen historie ophalen',
-      historyRangeLabel: 'Bereik voor ophalen van historie',
       identifyDevices: 'Apparaten opnieuw herkennen',
       identifying: 'Herkennen…',
-      intro: 'Inloggen, synchronisatiegedrag, privacy en de exportvoorkeuren — alles op één plek.',
       lampOff: (count: number) => `Niet opgehaald ${count}`,
       lampOn: (count: number) => `Opgehaald ${count}`,
       lampPending: (count: number) => `In de cloud, niet lokaal opgeslagen ${count}`,
-      lastDays: (days: number) => `Afgelopen ${days} dagen`,
       localApiLabel: 'Lokale REST-API',
       localApiNote:
         "Voor andere programma's op deze machine — scripts, dashboards, je eigen tools — om genormaliseerde trainingsreeksen als JSON te lezen. Heb je dat niet nodig, laat het dan uit.",
@@ -1274,28 +1237,17 @@ Antwoord in Markdown.`,
       manualAuthFailed: 'Handmatig inloggen mislukt',
       manualFormHint:
         'Haal ze uit een mitmproxy/Charles-opname of de devtools van je browser. Drie velden:',
-      manualFormTitle: 'De inloggegevens invoeren',
       manualSave: 'Inloggegevens opslaan',
       manualSaving: 'Opslaan…',
       manualTokenPlaceholder: 'Kopiëren uit de apptoken-HTTP-header',
       manualUserIdPlaceholder: 'Halen uit het URL-pad /users/{user_id}/',
-      mcpAskA: 'De setup verschilt per tool, dus in plaats van hier een essay te schrijven: ',
-      mcpAskB: ' en laat die je op je eigen machine erdoorheen lopen.',
-      mcpAskStrong: 'kopieer de tekst hieronder naar de AI die je echt gebruikt',
       mcpBadge: 'Alleen-lezen · luistert op geen poort',
-      mcpCompareA:
-        'In één zin: "Doorgeven aan AI" is dat jij exporteert en plakt; MCP is ',
-      mcpCompareB:
-        ' — eenmaal geconfigureerd zeg jij "hoe heb ik deze maand geslapen" en het bevraagt je lokale database. Alleen nuttig voor AI-codetools die op je computer zijn geïnstalleerd (Claude Code, Codex, Grok e.d.).',
-      mcpCompareStrong: 'de AI die zelf vraagt',
       mcpConfigCopied:
         'Config gekopieerd. Vervang command door het echte pad naar zeppbridge-mcp op je machine.',
       mcpConfigCopyFailed: 'Kopiëren mislukt. Selecteer de config hierboven handmatig.',
       mcpConfigPathPlaceholder: '<pad naar zeppbridge-mcp>',
       mcpCopyConfig: 'Alleen het config-fragment kopiëren',
       mcpCopyPrompt: 'Kopieer dit en vraag het je AI',
-      mcpFootA:
-        ' wordt meegeleverd in het tools-archief bij elke release, in dezelfde versie als de desktop-app. Het leest dezelfde lokale database, dus wat het ziet is precies wat jij hier ziet.',
       mcpPromptCopied:
         'Gekopieerd. Plak het bij de AI die je gebruikt en hij geeft je de stappen voor jouw machine.',
       mcpPromptCopyFailed: 'Kopiëren mislukt. Selecteer de tekst hierboven handmatig.',
@@ -1314,15 +1266,11 @@ Vertel me:
 3. Hoe ik controleer dat het werkt zodra het is geconfigureerd.
 
 Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat), vraag het gewoon.`,
-      mcpSkip:
-        'Zegt MCP je niets, sla dit deel dan over — het raakt geen enkele functie van ZeppBridge.',
-      mcpTitle: '5. MCP (laat AI-tools je lokale gegevens bevragen)',
       mcpToolDataHealth: 'Status van ophalen/parsen/schrijven per stroom',
       mcpToolListWorkouts: 'Trainingslijst, nieuwste eerst',
       mcpToolMetricSeries: 'Metriekreeksen per dag, elk met zijn eenheid',
       mcpToolSleepDetail: 'Eén nacht slaap, stadium voor stadium',
       mcpToolWorkoutInsight: 'Eén training tegenover je eigen basislijn',
-      mcpToolsLead: 'Eenmaal geconfigureerd kan de AI naar deze vijf dingen vragen:',
       minutes: (minutes: number) => `${minutes} min`,
       noDevices:
         'Nog geen fysiek apparaat herkend; Zepp-cloud synchroniseert nog steeds als cloudbron.',
@@ -1364,7 +1312,6 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       privacyTelemetryBody:
         'De app meldt zelf geen gebruiksgedrag. Alleen als jij zelf "Een foutrapport versturen" indrukt, verstuurt het de geanonimiseerde velden die hieronder staan.',
       privacyTelemetryTitle: 'Geen telemetrie, geen gebruiksstatistieken',
-      privacyTitle: '4. Privacy en beveiliging',
       privacyTokenBody:
         'De standaard is Windows Credential Manager / macOS Keychain / Linux-sleutelring. macOS en Linux kunnen expliciet een gewoon-tekst-inlogbestand gebruiken dat alleen door jouw gebruiker lees- en schrijfbaar is; Linux ondersteunt ook omgevingsvariabelen. auth.json bevat alleen account- en regio-metadata. Tokens komen nooit in logs, data-exports of foutrapporten terecht.',
       privacyTokenTitle:
@@ -1438,11 +1385,8 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
         `Bewaart de laatste ${days} dagen lokaal. Snoeien gebeurt `,
       retentionNoteStrong: 'na een geslaagde synchronisatie',
       retentionNoteTail: ', nooit zelfstandig op de achtergrond.',
-      retentionTitle: '6. Lokale gegevensbewaring',
       retry: 'Opnieuw proberen',
       scaleLabel: 'Interface-schaling',
-      scaleNote: '100% is de ontwerpbasislijn. Ctrl + / Ctrl - werken ook.',
-      startBackfill: 'Begin met ophalen van historie',
       stream: {
         blood_pressure: 'Bloeddruk',
         daily_activity: 'Dagelijkse activiteit',
@@ -1470,12 +1414,8 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
         `Synchroniseert cloudgegevens elke ${minutes} minuten terwijl de app open is`,
       syncDescB: 'Aan laten staan houdt de tijdreeksen doorlopend.',
       syncDiagnostics: 'Synchronisatiediagnostiek',
-      syncInProgress: 'Er loopt een synchronisatie. Haal op zodra die klaar is',
       syncIntervalAria: 'Interval voor automatisch synchroniseren',
       syncNow: 'Nu synchroniseren',
-      syncOff: 'Synchroniseren is uit',
-      syncOn: 'Synchroniseren is aan',
-      syncTitle: '9. Automatisch synchroniseren',
       syncing: 'Synchroniseren…',
       timeUnknown: 'Tijd onbekend',
       title: 'Instellingen',
@@ -1522,19 +1462,15 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       updateStatusInstalling: 'Installeren; de app herstart als het klaar is',
       updateStatusUnmanaged: 'Updates komen van je pakketbeheerder',
       updateStatusUpToDate: 'Je hebt de nieuwste versie',
-      updateSub: 'Controleert stilletjes maximaal een keer per dag; je kunt ook zelf controleren.',
-      updateTitle: '8. Software-updates',
       updateUnmanagedHint: (version: string) =>
         `Op ${version}. Deze build wordt bijgewerkt via Flatpak of de pakketbeheerder van je distributie: voer flatpak update com.zeppbridge.app uit, of werk het pakket bij.`,
       updateVersion: (version: string) => `Versie ${version}`,
       updateVersionLoading: 'laden',
       verifyAndSync: 'Verifiëren en synchroniseren',
       verifyFailed: 'Verificatie is niet afgerond',
-      viewOrChange: 'Bekijk / wijzig model',
     },
     'views/ActivityDetail': {
       backToOverview: 'Terug naar overzicht',
-      eyebrow: 'Dagelijkse activiteit',
       title: 'Dagelijkse activiteit',
       intro:
         'Stappen, afstand, actieve verbranding en actieve minuten per dag. Alleen vergeleken met je eigen eerdere records; dagen zonder gegevens blijven leeg in plaats van met een nul te worden gevuld.',
@@ -1565,7 +1501,6 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
     },
     'views/BodyStatus': {
       backToOverview: 'Terug naar overzicht',
-      eyebrow: 'Lichaamsstatus',
       title: 'Lichaamsstatus',
       intro:
         'Lokale trends voor gereedheid, stress, bloedzuurstof, HRV, ademhalingsfrequentie, rusthartslag, lichaamssamenstelling en voedselinname. Alles gelezen uit gesynchroniseerde records.',
@@ -1702,7 +1637,6 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       timeUnknown: 'Tijd onbekend',
       notProvided: 'Niet verstrekt',
       backToSettings: 'Terug naar instellingen',
-      eyebrow: 'Gegevensgezondheid',
       title: 'Gegevensgezondheidscontrole',
       intro:
         'Per gegevensstroom: hoe ver hij kwam met ophalen uit de cloud, parsen en lokaal schrijven; welke datums hij dekt; en waar hij vandaan kwam. Ontbrekend is ontbrekend — nooit opgevuld met een nul.',
@@ -1840,7 +1774,6 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
     },
     'views/HeartRateDetail': {
       backToOverview: 'Terug naar overzicht',
-      eyebrow: 'Hartslag',
       title: 'Hartslag',
       intro:
         'De heledag-curve hierboven is altijd de afgelopen 24 uur; 7 dagen / 1 maand / 6 maanden veranderen alleen de trends per dag hieronder. Stukken zonder metingen blijven leeg, niet gevuld met een nul.',
@@ -1848,7 +1781,6 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       trendRangeLabel: 'Trendbereik',
       desktopOnly:
         'Gebruik de desktop-app. Deze browserpreview leest geen accountgegevens.',
-      loadFailed: 'Hartslaggegevens zijn nu niet beschikbaar',
       dayFailed: 'De afgelopen 24 uur hartslag konden niet worden gelezen.',
       dailyMaxFailed: 'De dagelijkse piekhartslag kon niet worden gelezen.',
       trendsFailed: 'Rusthartslag- en HRV-trends konden niet worden gelezen.',
@@ -1944,14 +1876,10 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
           other: `${count} incomplete records verborgen`,
         }),
       notProvided: 'Niet verstrekt',
-      dateUnknown: 'Datum onbekend',
       today: 'Vandaag',
       yesterday: 'Gisteren',
-      listDate: (month: number, day: number, weekday: string) =>
-        `${weekday} ${day}/${month}`,
     },
     'views/SleepDetail': {
-      backToRecent: 'Terug naar recente records',
       title: 'Slaaprecord',
       loadingDetail: 'Het slaaprecord wordt gelezen…',
       loadFailedTitle: 'Dit slaaprecord kon niet worden gelezen',
@@ -2022,7 +1950,6 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
     },
     'views/TrainingStatus': {
       backToOverview: 'Terug naar overzicht',
-      eyebrow: 'Trainingsstatus',
       title: 'Trainingsstatus',
       intro:
         'VO₂max, lactaatdrempel, trainingsbelasting en hartslagzones. Alles gelezen uit gesynchroniseerde records; geen trainingsadvies.',
@@ -2075,7 +2002,6 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
     },
     'views/WorkoutDetail': {
       notProvided: 'Niet verstrekt',
-      backToRecent: 'Terug naar recente records',
       loadFailedTitle: 'Deze training kon niet worden gelezen',
       loadFailed: 'Trainingsdetail is nu niet beschikbaar',
       retry: 'Opnieuw proberen',
@@ -2087,7 +2013,6 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       seriesFailedTitle: 'De reeksen per punt konden niet worden geladen',
       exportNeedsSeries:
         'De reeksen per punt konden niet worden geladen, dus dit record kan niet worden geëxporteerd.',
-      thisWorkout: 'training',
       aiPrompt: (label: string) => `Je bent een sportanalist. Hieronder staat het complete record van één ${label} van mij, uit de lokale ZeppBridge-database en geanonimiseerd.
 Analyseer deze sessie alleen aan de hand van de feiten in dit record: de intensiteit, hoe tempo zich verhoudt tot hartslag, of er een duidelijke vertraging of een afwijkend stuk is, en wat er volgende keer concreet anders moet.
 
@@ -2115,7 +2040,6 @@ Antwoord in Markdown.`,
       overrideCleared: 'Correctie gewist. Terug naar de eigen match van ZeppBridge.',
       overrideFailed: 'De correctie van het trainingstype kon niet worden opgeslagen',
       copied: (format: string) => `${format}-gegevens naar het klembord gekopieerd.`,
-      copyFailed: 'Dit record kon niet worden gekopieerd',
       metricDistance: 'Afstand',
       metricDuration: 'Bewegingstijd',
       metricAvgHr: 'Gem. hartslag',
@@ -2334,13 +2258,11 @@ Antwoord in Markdown.`,
     'err.export.path_no_parent': 'De opslaglocatie heeft geen geldige map',
     'err.export.path_not_absolute': 'De opslaglocatie moet een absoluut pad zijn',
     'err.export.path_required': 'Kies eerst waar het bestand moet worden opgeslagen',
-    'err.export.read_failed': 'De exportgegevens konden niet worden gelezen',
     'err.export.write_failed': 'Het exportbestand kon niet worden geschreven',
     'err.export.write_json_failed': 'De JSON-export kon niet worden geschreven',
     'err.handoff.empty_range': 'Geen records in deze periode om over te dragen',
     'err.handoff.encode_failed': 'De geanonimiseerde AI-export kon niet worden gecodeerd',
     'err.handoff.mkdir_failed': 'De map voor de overdracht kon niet worden aangemaakt',
-    'err.handoff.parse_failed': 'De AI-export-JSON kon niet worden gelezen',
     'err.handoff.prompt_required': 'Schrijf eerst een prompt',
     'err.handoff.write_failed': 'De geanonimiseerde AI-gegevens konden niet worden geschreven',
     'err.har.invalid_file':

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
+import { useFirstLoad } from '../composables/useFirstLoad';
 import Icon from './Icon.vue';
 import SkeletonBlock from './SkeletonBlock.vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
@@ -42,6 +43,7 @@ const props = defineProps<{ days: number; revision: number }>();
 
 const options = ref<HeartRateZoneOptions | null>(null);
 const loading = ref(true);
+const initialLoading = useFirstLoad(loading);
 const saving = ref(false);
 const error = ref<string | null>(null);
 const loadSeq = createLoadSeq();
@@ -198,7 +200,7 @@ watch(() => props.revision, () => { void load(); });
 
     <p v-if="error" class="zone-alert" role="alert"><Icon name="warning" :size="14" />{{ error }}</p>
 
-    <SkeletonBlock v-if="loading" height="220px" />
+    <SkeletonBlock v-if="initialLoading" height="220px" />
     <p v-else-if="!isDesktop()" class="zone-empty">{{ t.desktopOnly }}</p>
     <p v-else-if="!bases.length" class="zone-empty">{{ t.noBases }}</p>
 

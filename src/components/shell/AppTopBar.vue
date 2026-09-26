@@ -182,7 +182,7 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
 
 <template>
   <header class="app-topbar">
-    <RouterLink v-if="backTo" class="quick-back" :to="backTo" :title="backLabel" :aria-label="backLabel">
+    <RouterLink v-if="backTo" class="quick-back glass-control" :to="backTo" :title="backLabel" :aria-label="backLabel">
       <Icon name="arrow-left" :size="20" />
     </RouterLink>
     <RouterLink v-else to="/" class="brand" :title="versionTitle || t.brandHome">
@@ -202,7 +202,7 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
     <div class="topbar-actions">
       <span v-if="statusError" class="sr-only" role="status">{{ statusError }}</span>
       <button
-        :class="['sync-pill', `tone-${statusTone}`, { syncing: isSyncing }]"
+        :class="['sync-pill', 'glass-control', `tone-${statusTone}`, { syncing: isSyncing }]"
         type="button"
         :disabled="!isSyncing && !canIncrementalSync"
         :title="syncTitle"
@@ -214,25 +214,29 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
         <Icon v-if="isSyncing" name="x" :size="13" class="sync-cancel" />
       </button>
 
-      <SelectMenu class="theme-menu" icon-only :model-value="themeMode" :options="themeOptions"
-        :aria-label="t.themeTitle" :menu-min-width="156" @update:model-value="onThemeChange" />
-
-      <SelectMenu
-        class="locale-menu"
-        icon-only
-        trigger-icon="globe"
-        :model-value="locale"
-        :options="localeOptions"
-        :aria-label="t.localeLabel"
-        :menu-min-width="224"
-        @update:model-value="onLocaleChange"
-      />
+      <!-- 两个图标按钮共用一个玻璃底座（相关的图标放一组，文字按钮单独一个容器）。 -->
+      <div class="icon-group glass-control">
+        <SelectMenu class="theme-menu" icon-only :model-value="themeMode" :options="themeOptions"
+          :aria-label="t.themeTitle" :menu-min-width="156" @update:model-value="onThemeChange" />
+        <SelectMenu
+          class="locale-menu"
+          icon-only
+          trigger-icon="globe"
+          :model-value="locale"
+          :options="localeOptions"
+          :aria-label="t.localeLabel"
+          :menu-min-width="224"
+          @update:model-value="onLocaleChange"
+        />
+      </div>
     </div>
   </header>
 </template>
 
 <style scoped>
-/* 顶栏是玻璃：它粘在滚动区顶上，页面内容从它下面滚过去、被模糊透出来。 */
+/* 顶栏本身透明、没有分界线：浮在内容上的是一个个玻璃控件（返回、导航胶囊、
+   同步状态、图标组），内容滚到下面时由 .shell-head 的滚动边缘效果负责可读性。
+   整条再套一层玻璃就成了「玻璃叠玻璃」。 */
 .app-topbar {
   position: sticky;
   top: 0;
@@ -245,20 +249,12 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
   align-items: center;
   gap: 12px;
   padding: 0 20px;
-  border-bottom: 1px solid var(--mat-glass-line);
-  background: var(--mat-glass);
-  -webkit-backdrop-filter: var(--mat-glass-blur);
-  backdrop-filter: var(--mat-glass-blur);
-}
-@media (prefers-reduced-transparency: reduce) {
-  .app-topbar { background: var(--mat-glass-strong); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 
-.quick-back { display: inline-flex; width: 38px; height: 38px; align-items: center; justify-content: center; justify-self: start; flex: 0 0 38px;
-  border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent); border-radius: 50%; color: var(--ink); text-decoration: none;
-  background: color-mix(in srgb, var(--surface) 72%, transparent); backdrop-filter: blur(16px) saturate(1.4);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 18%, transparent), 0 4px 14px rgba(0,0,0,.22); }
-.quick-back:hover { border-color: color-mix(in srgb, var(--ink) 32%, transparent); }
+.quick-back { display: inline-flex; width: 40px; height: 40px; align-items: center; justify-content: center; justify-self: start; flex: 0 0 40px;
+  border-radius: 50%; color: var(--ink); text-decoration: none; transition: scale var(--dur-fast, 140ms) var(--ease-out, ease); }
+.quick-back:hover { background-color: var(--glass-press); }
+.quick-back:active { scale: .94; }
 .brand {
   display: inline-flex;
   min-width: 0;
@@ -293,16 +289,14 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
   align-items: center;
   gap: 7px;
   padding: 5px 14px;
-  border: 1px solid var(--mat-line-hover);
   border-radius: 999px;
-  background: var(--mat-raised);
-  box-shadow: var(--mat-raised-rim);
   color: var(--muted);
   font-size: var(--fs-sm);
   cursor: pointer;
   white-space: nowrap;
 }
-.sync-pill:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 60%, transparent); color: var(--ink); background: var(--mat-raised-hover); }
+.sync-pill:hover:not(:disabled) { color: var(--ink); }
+.sync-pill:active:not(:disabled) { scale: .97; }
 .sync-pill:disabled { cursor: not-allowed; opacity: .6; }
 .sync-pill .dot {
   width: 8px;
@@ -326,6 +320,10 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
 .sync-cancel { color: var(--subtle); }
 
 .theme-menu, .locale-menu { flex: 0 0 auto; }
+.icon-group { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border-radius: 999px; }
+/* 组里的按钮不再各自有底（不叠玻璃），只在悬停 / 按下时亮一下。 */
+.icon-group :deep(.select-trigger) { border: 0; background: transparent; box-shadow: none; }
+.icon-group :deep(.select-trigger:hover:not(:disabled)) { background: var(--glass-press); }
 
 /* 窄屏降级：先让胶囊回到文档流避免和按钮组重叠，再小到手机上藏掉
    （底部 tabbar 已经覆盖同一组导航）。语言选择在 520px 以下也让位给

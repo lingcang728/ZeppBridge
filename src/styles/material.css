@@ -135,9 +135,24 @@
   box-shadow: var(--mat-glass-shadow);
 }
 
+/* 浮动控件的玻璃：顶栏上的返回键、导航胶囊、同步状态、主题与语言按钮组。
+   只给浮在内容之上的功能层用，不给内容层的卡片；控件里面的元素不再各自
+   套玻璃（不叠玻璃），用填充和颜色区分。按下时从内部亮一下作为反馈。 */
+.glass-control {
+  border: 0;
+  background: linear-gradient(180deg, var(--glass-sheen), transparent 60%), var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-rim), var(--glass-shadow);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .button, .mat-switch, .mat-switch::after { transition: none; }
 }
+/* 系统设置「提高对比度」：玻璃加一圈实边。 */
+@media (prefers-contrast: more) {
+  .glass-control { box-shadow: inset 0 0 0 1px var(--ink), var(--glass-shadow); }
+}
 @media (prefers-reduced-transparency: reduce) {
-  .glass { background: var(--mat-glass-strong); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .glass, .glass-control { background: var(--mat-glass-strong); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }

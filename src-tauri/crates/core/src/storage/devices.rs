@@ -218,49 +218,54 @@ impl Database {
     /// Derive local-data presence from normalized records without introducing
     /// a product-specific table. User-level fused records are deliberately
     /// excluded: they cannot be attributed to one physical device.
-    pub fn device_data_summary(&self, aliases: &[String]) -> Result<(bool, Option<String>)> {
-        let mut normalized_aliases = Vec::new();
-        for alias in aliases {
-            let trimmed = alias.trim();
-            if trimmed.is_empty()
-                || normalized_aliases
-                    .iter()
-                    .any(|existing: &String| existing.eq_ignore_ascii_case(trimmed))
-            {
-                continue;
-            }
-            normalized_aliases.push(trimmed.to_string());
-        }
-        if normalized_aliases.is_empty() {
-            return Ok((false, None));
-        }
-
-        let mut latest: Option<String> = None;
-        for alias in &normalized_aliases {
-            for (table, column) in [
-                ("metric_samples", "timestamp"),
-                ("daily_metrics", "date"),
-                ("sleep_sessions", "start_time"),
-                ("workouts", "start_time"),
-            ] {
-                let sql = format!(
-                    "SELECT MAX({column}) FROM {table}
-                     WHERE lower(device_id) = lower(?1)
-                       AND lower(source_scope) = 'device'"
-                );
-                let value: Option<String> = self.conn.query_row(&sql, [alias], |row| row.get(0))?;
-                if let Some(value) = value {
-                    if latest
-                        .as_ref()
-                        .map(|current| value.as_str() > current.as_str())
-                        .unwrap_or(true)
-                    {
-                        latest = Some(value);
+    /// 每台设备（按小写 device_id）在本机最近一条数据的时间，跨样本、日指标、
+    /// 睡眠、运动四张表取最大值。
+    ///
+    /// 以前是每台设备、每个别名、每张表各查一次 `lower(device_id) = lower(?)`：
+    /// 列上套了函数，索引用不上，于是两台设备就是十几次全表扫描，而且期间一直
+    /// 占着命令侧的库锁，启动时概览的查询全排在它后面。现在四张表各扫一次，
+    /// 所有设备共用这张表。
+    pub fn device_latest_data_index(&self) -> Result<HashMap<String, String>> {
+        let mut latest: HashMap<String, String> = HashMap::new();
+        for (table, column) in [
+            ("metric_samples", "timestamp"),
+            ("daily_metrics", "date"),
+            ("sleep_sessions", "start_time"),
+            ("workouts", "start_time"),
+        ] {
+            let sql = format!(
+                "SELECT lower(device_id), MAX({column}) FROM {table}
+                 WHERE device_id IS NOT NULL AND lower(source_scope) = 'device'
+                 GROUP BY lower(device_id)"
+            );
+            let mut statement = self.conn.prepare(&sql)?;
+            let rows = statement.query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?))
+            })?;
+            for row in rows {
+                let (device, value) = row?;
+                let Some(value) = value else { continue };
+                match latest.get_mut(&device) {
+                    Some(current) if value.as_str() <= current.as_str() => {}
+                    Some(current) => *current = value,
+                    None => {
+                        latest.insert(device, value);
                     }
                 }
             }
         }
-        Ok((latest.is_some(), latest))
+        Ok(latest)
+    }
+
+    /// 单台设备的本机数据摘要：有没有数据、最近一条的时间。别名大小写不敏感。
+    pub fn device_data_summary(&self, aliases: &[String]) -> Result<(bool, Option<String>)> {
+        if aliases.iter().all(|alias| alias.trim().is_empty()) {
+            return Ok((false, None));
+        }
+        Ok(device_summary_from_index(
+            &self.device_latest_data_index()?,
+            aliases,
+        ))
     }
 
     pub(super) fn harvest_device_identities(&self, payload: &serde_json::Value) -> Result<()> {
@@ -285,4 +290,19 @@ impl Database {
             .optional()?;
         Ok(value.map(|(value, timestamp)| (value.round() as i32, timestamp)))
     }
+}
+
+/// 在 `Database::device_latest_data_index` 里按别名（大小写不敏感）查一台设备的摘要。
+pub fn device_summary_from_index(
+    index: &HashMap<String, String>,
+    aliases: &[String],
+) -> (bool, Option<String>) {
+    let latest = aliases
+        .iter()
+        .map(|alias| alias.trim())
+        .filter(|alias| !alias.is_empty())
+        .filter_map(|alias| index.get(&alias.to_lowercase()))
+        .max()
+        .cloned();
+    (latest.is_some(), latest)
 }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { displayDateTimeFormatter } from '../lib/dateTime';
+import { useFirstLoad } from '../composables/useFirstLoad';
 
 /**
  * 数据健康中心。
@@ -40,6 +41,7 @@ const loadSeq = createLoadSeq();
 
 const health = ref<DataHealth | null>(null);
 const loading = ref(true);
+const initialLoading = useFirstLoad(loading);
 const error = ref<string | null>(null);
 const busyAction = ref<string | null>(null);
 const actionMessage = ref<string | null>(null);
@@ -198,7 +200,6 @@ onMounted(() => void load());
       back="/settings"
       :back-label="t.backToSettings"
       title-id="health-title"
-      :eyebrow="t.eyebrow"
       :title="t.title"
       :intro="t.intro"
     >
@@ -215,7 +216,7 @@ onMounted(() => void load());
       <button v-if="isDesktop()" class="button button-secondary retry" type="button" @click="load">{{ t.retry }}</button>
     </div>
 
-    <div v-if="loading" class="health-grid" aria-live="polite" :aria-label="t.loadingAria">
+    <div v-if="initialLoading" class="health-grid" aria-live="polite" :aria-label="t.loadingAria">
       <SkeletonBlock v-for="index in 4" :key="index" height="180px" />
     </div>
 

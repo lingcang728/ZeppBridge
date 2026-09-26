@@ -3,7 +3,20 @@
 use super::*;
 
 impl Database {
+    /// 导出成 JSON 字符串（CLI、MCP、交给 AI 的「只复制」都用这个）。
     pub fn build_ai_export(&self, selection: &ExportSelection) -> Result<(String, usize)> {
+        let (export, record_count) = self.build_ai_export_value(selection)?;
+        let encoded = serde_json::to_string_pretty(&export)
+            .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
+        Ok((encoded, record_count))
+    }
+
+    /// 导出成 JSON 树。要接着转格式（CSV / GPX / FIT）或脱敏的调用方用这个：
+    /// 以前它们拿字符串再解析一遍，大导出的内存峰值因此翻了两三倍。
+    pub fn build_ai_export_value(
+        &self,
+        selection: &ExportSelection,
+    ) -> Result<(serde_json::Value, usize)> {
         let scope = selection
             .resolve_scope()
             .map_err(ZeppBridgeError::ConfigError)?;
@@ -678,8 +691,6 @@ impl Database {
                 "workouts": workouts,
             }
         });
-        let encoded = serde_json::to_string_pretty(&export)
-            .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
-        Ok((encoded, record_count))
+        Ok((export, record_count))
     }
 }

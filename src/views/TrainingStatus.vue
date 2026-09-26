@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import LifeEventShortcut from '../components/LifeEventShortcut.vue';
+import { useFirstLoad } from '../composables/useFirstLoad';
 defineOptions({ name: 'TrainingStatus' });
 import { computed, onMounted, ref, watch } from 'vue';
 import { CHART_THEME, VChart } from '../lib/echartsSetup';
@@ -43,6 +44,7 @@ const rangeDays = ref<SeriesRangeDays>(180);
 const series = ref<Record<string, MetricSeries>>({});
 const balance = ref<TrainingBalancePoint[]>([]);
 const loading = ref(true);
+const initialLoading = useFirstLoad(loading);
 const loadSeq = createLoadSeq();
 const error = ref<string | null>(null);
 
@@ -264,7 +266,6 @@ watch(dataRevision, () => { void load(); });
       back="/"
       :back-label="t.backToOverview"
       title-id="training-title"
-      :eyebrow="t.eyebrow"
       :title="t.title"
       :intro="t.intro"
     >
@@ -284,7 +285,7 @@ watch(dataRevision, () => { void load(); });
       <button v-if="isDesktop()" class="button button-secondary retry" type="button" @click="load">{{ t.retry }}</button>
     </p>
 
-    <div v-if="loading" class="card-grid" aria-live="polite" :aria-label="t.loadingAria">
+    <div v-if="initialLoading" class="card-grid" aria-live="polite" :aria-label="t.loadingAria">
       <SkeletonBlock v-for="index in 4" :key="index" height="268px" />
     </div>
 

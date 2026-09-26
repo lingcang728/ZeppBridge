@@ -69,3 +69,9 @@ normaliseIcns(join(output, 'icon.icns'));
 
 copyFileSync(join(output, 'icon.png'), publicIcon);
 console.log(`Copied ${join(output, 'icon.png')} -> ${publicIcon}`);
+
+// 标签页小图标单独一份 64px 的：桌面版每次启动都会去取 favicon，
+// 用 512px 的 icon.png（约 200 KB）当 favicon 是白白解码一张大图。
+const publicFavicon = join(root, 'public', 'favicon.png');
+copyFileSync(join(output, '64x64.png'), publicFavicon);
+console.log(`Copied ${join(output, '64x64.png')} -> ${publicFavicon}`);
