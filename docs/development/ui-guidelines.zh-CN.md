@@ -17,7 +17,7 @@
   - 导出到 AI 时默认执行不可逆脱敏（`redact_ai_export`，抹除 device_id、MAC、IMEI、精确 GPS 等字段，并在 JSON 里回写 `redactions` 清单）；精确轨迹需用户显式勾选 `include_precise_route` 才注入；
   - 数据包 > 2 MiB（`AI_HANDOFF_INLINE_LIMIT_BYTES`）时自动写入系统桌面 `zeppbridge-ai-handoff.json`，剪贴板只放拖入提示；
   - GPS 轨迹仅在本地用内联 SVG 绘制（`WorkoutDetail.vue` 的 `routeCanvas`），绝不请求第三方在线地图瓦片。
-- **渐进披露**：日常使用展示核心指标与快捷导出；界面缩放、数据文件夹、清除认证、同步诊断收进设置页底部的「高级与维护」折叠区。
+- **渐进披露**：日常使用展示核心指标与快捷导出；界面缩放放在设置的「显示与语言」卡，数据文件夹、清除认证、同步诊断收进「高级与维护」卡。
 
 ## 设计 token
 
@@ -30,7 +30,7 @@
 | 描边 | `--line` / `--line-strong` 用于安静的结构线，`--line-control` 用于交互控件边界 |
 | 字号阶梯 | `--fs-2xs` 13px / `--fs-xs` 14.5px / `--fs-sm` 15.5px / `--fs-md` 16.5px / `--fs-lg` 17.5px / `--fs-xl` 18.5px / `--fs-2xl` 20px / `--fs-3xl` 22px |
 | 品牌与动作 | `--brand` `#7DA33E` = `--accent`，`--accent-hover` `#93B952`、`--accent-soft`、`--accent-ink` `#12170A`、`--action-green` |
-| 分类色 | `--heart` `#F0616A`、`--pace` / `--cadence` `#4AA8E8`、`--calories` `#F5860B`、`--altitude` `#F5C33B`、`--activity` `#2BB3C0`、`--training` / `--readiness` `#3DD84C`，各自配 `*-wash` 半透明底 |
+| 分类色 | `--heart` `#F0616A`、`--pace` / `--cadence` `#4AA8E8`、`--calories` `#F5860B`、`--altitude` `#F5C33B`、`--activity` `#2BB3C0`、`--training` / `--readiness` `#A3CC5C`（浅色 `#4E8A2E`，与品牌青柠同一家族），各自配 `*-wash` 半透明底 |
 | 睡眠阶段 | `--sleep-deep` `#6477D7` / `--sleep-light` `#7C8FF0` / `--sleep-rem` `#8B5CF6` / `--sleep-awake` `#E8833A` |
 | 状态 | `--danger` `#F0616A`、`--warning` `#F5C33B`、`--focus` `#7DA33E` |
 | 轨迹配速色谱 | `--route-neutral` / `-mint` / `-cyan` / `-amber` / `-coral` |
@@ -46,6 +46,13 @@
 - 解析结果写在 `<html data-theme="light|dark">`（`data-theme-preference` 保留原始选择便于排查），`color-scheme` 跟着走，滚动条与原生控件自动换色；`theme-color` meta 也随之更新。
 - **组件只消费 token，不按主题分支。** 个别实在换不成 token 的深色硬编码，在 `tokens.css` 底部的补丁表里加一条窄作用域的 `html[data-theme="light"] …` 覆写——这张表是过渡手段，应当逐渐清空。
 - 分类色两套之间只调明度饱和、不换色相（浅色心率红 `#C93F49`、品牌绿 `#2F6B4F`……）；同一个 token 在两套里角色一致，语义不漂移。
+### 材质：克制玻璃（2026-09-26）
+
+- 全应用只有**一种卡片材质**：两色渐变底 + 顶边高光（`inset 0 1px 0`）+ 两层柔和投影。token 在 `tokens.css` 的 `--mat-*`（`--mat-card`、`--mat-line`、`--mat-rim`、`--mat-shadow`，凸起件 `--mat-raised*`，凹槽 `--mat-inset*`，浮层 `--mat-glass*`），深浅各一份；基元类在 `src/styles/material.css`：`.surface-card` / `.mat-card`、`.button` 各变体（按下沉 1px）、`.mat-inset`、`.mat-field`、`.mat-switch`、`.chip`、`.glass`。
+- **真正的毛玻璃（`backdrop-filter`）只给浮在上层的东西**：顶栏、导航胶囊、下拉菜单、日期选择、弹窗。普通卡片不模糊。
+- 类别色只在卡片角落留一点微光（`color-mix` 约 5%，`--entry-tone` / `--card-tone`），**不给卡片写死背景色**；卡片里图形和曲线用同一个类别色（身体 = 心率红、训练 = 青柠、睡眠 = 靛紫、活动 = 青）。
+- 动效用 `--dur-*` / `--ease-*`，并尊重 `prefers-reduced-motion`。
+- 导航胶囊（`SegmentTrack.vue`）的文字画两层：底层普通字，上层「选中字」按滑块形状裁切，所以拖到一半也不会出现半截深色字；焦点环画在滑块上，←/→/Home/End 可用；拖动时滑块变成玻璃透镜。
 - 落地页自带一套局部作用域的暗色色板（`.landing-page { --site-* }`）——那是应用外壳之外的品牌美术，不算第三套主题。
 
 ### 界面文案：中英各一份，不许硬编码
@@ -113,15 +120,19 @@
 
 ### 5. 设置 (`/settings`)
 
-按编号分区，自上而下：1 认证方式（官方网页登录 / HAR 导入 / 手动输入）→ 2 账户与区域 → 3 连接设备与数据来源 → 4 隐私与安全（含隐私原则弹窗）→ 5 本地数据保留 → 6 导出与补拉偏好 → 7 本机 REST API 状态 → 8 软件更新 → 9 自动同步。
+**钱包式卡叠**，不做左侧目录。八张卡（`views/settings/cards.ts`）：账号与设备 · 同步与更新 · 归档与存储 · 数据内容 · 交给 AI 工具 · 显示与语言 · 隐私与安全 · 高级与维护。
 
-底部「高级与维护」折叠：界面缩放、打开数据文件夹、清除认证，内嵌「同步诊断」二级折叠（按 stream 列出状态与云端同步时间）。
+- `/settings` 是总览：卡片纵向叠放，每张露出卡头（图标、标题、一句实时状态），悬停抬起。
+- `/settings/:card` 展开一张：它升到最上面展开全部内容，其余缩成身后两层模糊的压底卡。翻卡可以按住卡头拖动甩出（过阈值或快速一甩），也可以用上一张 / 下一张按钮（按住连翻）、←/→、PageUp/PageDown；Esc 回到总览；开了减少动效就直接切换。
+- 实现分三层：`lib/deck/physics.ts`（纯函数，有 vitest）→ `composables/useCardDeck.ts`（手势状态机）→ `components/deck/CardDeck.vue`。各卡内容在 `views/settings/sections/`，共享状态经 `composables/settings/context.ts` 注入。
+- 卡内排版统一用 `settings-base.css` 的列表行：标签在左、控件在右、行间细线。
+- 历史补拉只有一个入口，在「归档与存储」卡里（长期归档开关 → 起点与开始补拉 → 预计体积 → 覆盖账本）。
 
 ## 组件与图表
 
-- 无 UI 框架，组件全部自研，位于 `src/components/`：`BrandMark`、`CategoryMark`、`CircularProgress`、`DesignIcon`、`DeviceMarquee`、`DeviceVisual`、`EmptyState`、`HeartRateZonePicker`、`Icon`、`MetricTrendCard`、`PageHeader`、`RecordRow`、`SkeletonBlock`、`Sparkline`、`StageBar`。新增前先确认这里没有能复用的。
+- 无 UI 框架，组件全部自研，位于 `src/components/`：`BrandMark`、`CategoryMark`、`CircularProgress`、`CardDeck`（`deck/`）、`DatePicker`、`DeviceMarquee`、`DeviceVisual`、`EmptyState`、`GlyphTile`、`HeartRateZonePicker`、`Icon`、`MetricTrendCard`、`ModalDialog`、`PageHeader`、`RecordRow`、`SegmentTrack`、`SelectMenu`、`SkeletonBlock`、`Sparkline`、`StageBar`；按页面分的子组件在 `components/<页面>/`（`overview/`、`workout/`、`explore/`、`archive/`、`ai/`、`shell/`）。新增前先确认这里没有能复用的。
 - 按天趋势一律走 `MetricTrendCard` + `lib/metricSeries.ts` 的 `buildSeriesOption`，不要在页面里各写一套 option；`SERIES_RANGES` 是三档范围的唯一来源。
-- 两套图标各有分工：`Icon.vue` 是内联 SVG 线性图标（UI 控件、小尺寸），`DesignIcon.vue` 是 `src/assets/design-icons/` 的 PNG 设计图标（导航、大号语义图标）。图片必须走 import 让 Vite 产出实体文件——桌面 CSP 不允许 data URL 与外部图源。
+- 图标：`Icon.vue` 是内联 SVG 线性图标；大号语义图标用 `GlyphTile.vue`——CSS 材质底座 + `Icon.vue` 的图形，颜色按 `tone` 取类别 token（名称到图形的映射在 `lib/glyphs.ts`），深浅两套主题共用。不要再加 PNG 3D 图标；只有品牌图（app-icon、brand-mark、zepp-cloud）仍是图片。图片必须走 import 让 Vite 产出实体文件——桌面 CSP 不允许 data URL 与外部图源。
 - 图表统一走 `src/lib/echartsSetup.ts` 的 `vue-echarts`：注册了 `zeppbridge-dark` 与 `zeppbridge-light` 两套主题，并导出响应式的 `CHART_THEME` / `chartPalette`。每个 `VChart` 都绑 `:theme="CHART_THEME"` **和** `:key="CHART_THEME"`（换主题时整图重建），每个 option 都是 `computed`，chrome 色（轴文字、网格线、tooltip、标记、系列语义色）一律从 `chartPalette.value` 取，不写字面量 hex——CSS 变量进不了 canvas，所以色板色值与 `tokens.css` 对齐维护。不要在页面里重复定义配色。
 
 ## 交互与可访问性
@@ -130,7 +141,7 @@
 - 焦点态统一 `:focus-visible` 2px `--focus` 描边，禁止 `outline: none` 了事。
 - 触控目标最小 44px（移动菜单按钮、底部导航、`RecordRow`）。
 - 主断点 760px：顶栏胶囊导航收起，底部 tabbar 覆盖同样的三项；概览另有 1180 / 820 两级栅格降列。
-- 界面缩放 80 / 90 / 100 / 110 / 125%（`UI_SCALES`），入口在设置「高级与维护」，快捷键 Ctrl + / Ctrl - / Ctrl 0，持久化在 localStorage。
+- 界面缩放 80 / 90 / 100 / 110 / 125%（`UI_SCALES`），入口在设置「显示与语言」卡，快捷键 Ctrl + / Ctrl - / Ctrl 0，持久化在 localStorage。
 - 时间格式化前先判 `Date.getTime()` 是否有效；错误信息保留可操作内容，不要吞成「加载失败」。
 
 ## 这份文档的维护

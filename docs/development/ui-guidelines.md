@@ -38,8 +38,9 @@ mode**. See "Dual theme" below.
   - GPS tracks are drawn locally with inline SVG (`routeCanvas` in
     `WorkoutDetail.vue`) and never request third-party online map tiles.
 - **Progressive disclosure**: everyday use shows core metrics and quick export;
-  interface scale, the data folder, clearing credentials and sync diagnostics
-  are folded into "Advanced and maintenance" at the bottom of Settings.
+  interface scale lives in the "Display and language" settings card; the data
+  folder, clearing credentials and sync diagnostics live in "Advanced and
+  maintenance".
 
 ## Design tokens
 
@@ -55,7 +56,7 @@ and panel are a deliberate local exception).
 | Strokes | `--line` / `--line-strong` for quiet structure; `--line-control` for interactive boundaries |
 | Type scale | `--fs-2xs` 13px / `--fs-xs` 14.5px / `--fs-sm` 15.5px / `--fs-md` 16.5px / `--fs-lg` 17.5px / `--fs-xl` 18.5px / `--fs-2xl` 20px / `--fs-3xl` 22px |
 | Brand and actions | `--brand` `#7DA33E` = `--accent`, plus `--accent-hover` `#93B952`, `--accent-soft`, `--accent-ink` `#12170A`, `--action-green` |
-| Category colours | `--heart` `#F0616A`, `--pace` / `--cadence` `#4AA8E8`, `--calories` `#F5860B`, `--altitude` `#F5C33B`, `--activity` `#2BB3C0`, `--training` / `--readiness` `#3DD84C`, each with a translucent `*-wash` |
+| Category colours | `--heart` `#F0616A`, `--pace` / `--cadence` `#4AA8E8`, `--calories` `#F5860B`, `--altitude` `#F5C33B`, `--activity` `#2BB3C0`, `--training` / `--readiness` `#A3CC5C` (light `#4E8A2E`, same family as the brand lime), each with a translucent `*-wash` |
 | Sleep stages | `--sleep-deep` `#6477D7` / `--sleep-light` `#7C8FF0` / `--sleep-rem` `#8B5CF6` / `--sleep-awake` `#E8833A` |
 | Status | `--danger` `#F0616A`, `--warning` `#F5C33B`, `--focus` `#7DA33E` |
 | Route pace spectrum | `--route-neutral` / `-mint` / `-cyan` / `-amber` / `-coral` |
@@ -91,6 +92,28 @@ forbidden. The provenance of the algorithms and percentages is in the
 - Category colours keep their hue across schemes and only shift lightness /
   saturation (light-mode heart red `#C93F49`, brand `#2F6B4F`…). A token keeps
   the same role in both schemes; semantics do not drift.
+### Material: restrained glass (2026-09-26)
+
+- The whole app has **one card material**: a two-stop gradient, a top-edge
+  highlight (`inset 0 1px 0`) and two soft shadows. Tokens are the `--mat-*`
+  set in `tokens.css` (`--mat-card`, `--mat-line`, `--mat-rim`,
+  `--mat-shadow`, raised `--mat-raised*`, inset `--mat-inset*`, floating
+  `--mat-glass*`), defined for both schemes. Primitives live in
+  `src/styles/material.css`: `.surface-card` / `.mat-card`, `.button`
+  variants (sink 1px when pressed), `.mat-inset`, `.mat-field`,
+  `.mat-switch`, `.chip`, `.glass`.
+- **Real frosted glass (`backdrop-filter`) is only for floating layers**: the
+  top bar, the navigation capsule, dropdowns, the date picker and dialogs.
+  Ordinary cards are not blurred.
+- A category colour only leaves a faint corner glow on a card (about 5% via
+  `color-mix`, `--entry-tone` / `--card-tone`); **never hardcode a card
+  background**. A card's glyph and its curve share one category colour
+  (body = heart red, training = lime, sleep = indigo, activity = cyan).
+- Motion uses `--dur-*` / `--ease-*` and honours `prefers-reduced-motion`.
+- The navigation capsule (`SegmentTrack.vue`) draws its labels twice: plain
+  ink underneath and "selected" ink on top, clipped to the thumb's shape, so a
+  label is never half dark mid-drag. The focus ring is drawn on the thumb,
+  arrow / Home / End keys work, and dragging turns the thumb into a glass lens.
 - The landing page keeps its own locally scoped dark palette
   (`.landing-page { --site-* }`) — it is brand artwork outside the app shell,
   not a third theme.
@@ -235,29 +258,47 @@ A three-column layout:
 
 ### 5. Settings (`/settings`)
 
-Numbered sections, top to bottom: 1 authentication method (official web sign-in
-/ HAR import / manual entry) → 2 account and region → 3 connected devices and
-data sources → 4 privacy and security (including the privacy-principles modal)
-→ 5 local data retention → 6 export and backfill preferences → 7 local REST API
-status → 8 software updates → 9 automatic sync.
+A **wallet-style card stack**, with no sidebar. Eight cards
+(`views/settings/cards.ts`): account and devices · sync and updates · archive
+and storage · data content · hand to AI tools · display and language · privacy
+and security · advanced and maintenance.
 
-An "Advanced and maintenance" section at the bottom folds in interface scale,
-opening the data folder and clearing credentials, with a nested "sync
-diagnostics" section listing per-stream status and cloud sync times.
+- `/settings` is the overview: cards stack vertically, each showing its header
+  (glyph, title, one live status line), lifting on hover.
+- `/settings/:card` opens one card: it rises to the top and expands, the rest
+  shrink into two blurred layers behind it. Flip by dragging the header past a
+  threshold or flinging it, or with the previous / next buttons (hold to
+  repeat), ←/→ and PageUp/PageDown; Esc returns to the overview; reduced motion
+  switches instantly.
+- Three layers: `lib/deck/physics.ts` (pure, with vitest) →
+  `composables/useCardDeck.ts` (gesture state machine) →
+  `components/deck/CardDeck.vue`. Card contents live in
+  `views/settings/sections/`; shared state is injected through
+  `composables/settings/context.ts`.
+- Inside a card, rows use `settings-base.css`: label left, control right,
+  hairlines between rows.
+- History backfill has exactly one entry point, in "archive and storage"
+  (long-term archive switch → start date and run → estimated size → coverage
+  ledger).
 
 ## Components and charts
 
 - No UI framework: every component is in-house, under `src/components/` —
-  `BrandMark`, `CategoryMark`, `CircularProgress`, `DesignIcon`,
-  `DeviceMarquee`, `DeviceVisual`, `EmptyState`, `HeartRateZonePicker`, `Icon`,
-  `MetricTrendCard`, `PageHeader`, `RecordRow`, `SkeletonBlock`, `Sparkline`,
-  `StageBar`. Check here for something reusable before adding one.
+  `BrandMark`, `CategoryMark`, `CircularProgress`, `CardDeck` (`deck/`),
+  `DatePicker`, `DeviceMarquee`, `DeviceVisual`, `EmptyState`, `GlyphTile`,
+  `HeartRateZonePicker`, `Icon`, `MetricTrendCard`, `ModalDialog`,
+  `PageHeader`, `RecordRow`, `SegmentTrack`, `SelectMenu`, `SkeletonBlock`,
+  `Sparkline`, `StageBar`; page-specific pieces live in `components/<page>/`
+  (`overview/`, `workout/`, `explore/`, `archive/`, `ai/`, `shell/`). Check
+  here for something reusable before adding one.
 - Per-day trends always go through `MetricTrendCard` plus `buildSeriesOption`
   from `lib/metricSeries.ts`; do not write a separate option object per page.
   `SERIES_RANGES` is the single source for the three ranges.
-- The two icon sets have distinct jobs: `Icon.vue` is inline linear SVG (UI
-  controls, small sizes), `DesignIcon.vue` renders the PNG design icons in
-  `src/assets/design-icons/` (navigation, large semantic icons). Images must be
+- Icons: `Icon.vue` is inline linear SVG; large semantic icons use
+  `GlyphTile.vue` — a CSS material base plus an `Icon.vue` glyph, coloured by a
+  `tone` category token (name → glyph map in `lib/glyphs.ts`), shared by both
+  schemes. Do not add PNG 3D icons; only brand artwork (app-icon, brand-mark,
+  zepp-cloud) stays as images. Images must be
   imported so Vite emits real files — the desktop CSP allows neither data URLs
   nor external image sources.
 - Charts use `vue-echarts` through `src/lib/echartsSetup.ts`, which registers
@@ -282,7 +323,7 @@ diagnostics" section listing per-stream status and cloud sync times.
   bottom tabbar covers the same three items. Overview additionally drops
   columns at 1180 and 820.
 - Interface scale is 80 / 90 / 100 / 110 / 125% (`UI_SCALES`), reachable from
-  Settings → "Advanced and maintenance", with Ctrl + / Ctrl - / Ctrl 0, persisted
+  the "Display and language" settings card, with Ctrl + / Ctrl - / Ctrl 0, persisted
   in localStorage.
 - Check that `Date.getTime()` is valid before formatting a time. Error messages
   keep actionable content rather than collapsing into "failed to load".

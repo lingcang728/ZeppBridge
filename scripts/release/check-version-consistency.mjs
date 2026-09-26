@@ -41,7 +41,7 @@ const SITES = [
   // 而读到它的人没有任何线索知道那个数字是错的。
   {
     file: 'docs/reference/architecture.md',
-    pattern: /((?:implementation of \[v))([0-9][0-9.]*(?:-[0-9A-Za-z.-]+)?)(?:\])/,
+    pattern: /((?:implementation of \[v))([0-9][0-9.]*(?:-[0-9A-Za-z.-]+)?)(\])/,
   },
   {
     file: 'docs/reference/architecture.zh-CN.md',
