@@ -1,0 +1,121 @@
+/* App.vue 的外壳样式（非 scoped，经 <style src> 引入）：侧栏、顶栏容器、页面宿主、底部导航。 */
+/* 设计 token 搬到 src/styles/tokens.css——`:root` 是深色默认值，
+   `html[data-theme="light"]` 覆写同一组变量。这里只留布局与组件无关的全局规则。 */
+
+/* ── 全局自定义细滚动条（覆盖原生灰条） ─────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--surface-hover);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--subtle);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-hover) transparent;
+}
+
+* { box-sizing: border-box; }
+html, body, #app { height: 100%; min-height: 100%; margin: 0; overflow: hidden; }
+body {
+  min-width: 320px;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--fs-md);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+button, input, select, textarea { font: inherit; }
+input::placeholder, textarea::placeholder { color: var(--subtle); opacity: 1; }
+button, select, a { -webkit-tap-highlight-color: transparent; }
+button { color: inherit; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 100;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--accent-ink);
+  transform: translateY(-150%);
+  transition: transform 150ms ease;
+}
+.skip-link:focus { transform: translateY(0); }
+
+/* ── 应用骨架：顶栏 + 内容 + 移动端底部导航（见 shell/AppTopBar.vue） ── */
+.app-body { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; height: 100%; overflow: hidden; background: var(--bg); }
+
+.sync-feedback { display: flex; min-height: 32px; min-width: 0; align-items: center; gap: 7px; padding: 6px 28px; border-bottom: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: var(--fs-sm); }
+.sync-feedback.tone-updated { color: var(--accent); }
+.sync-feedback.tone-partial { color: var(--warning); }
+.sync-feedback.tone-no_new_data { color: var(--muted); }
+.sync-feedback.tone-cancelled { color: var(--muted); }
+.sync-feedback.tone-deferred { color: var(--muted); }
+.sync-feedback.tone-failed { color: var(--danger); }
+.sync-feedback a { color: inherit; }
+.spinning { animation: spin 900ms linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.preview-banner, .route-notice { display: flex; align-items: center; gap: 8px; padding: 9px 28px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: var(--fs-sm); }
+.preview-banner { background: var(--accent-soft); }
+.preview-banner svg { color: var(--accent); }
+.route-notice { background: var(--surface); color: var(--warning); }
+.main-content { position: relative; width: 100%; min-width: 0; min-height: 0; flex: 1; overflow: auto; overflow-x: hidden; background: var(--canvas); }
+.bottom-nav { display: none; }
+.shell-head { position: sticky; top: 0; z-index: 30; }
+/* 离场页面绝对定位时相对这一层，而不是相对整个滚动区——否则会盖到顶栏上。 */
+.page-host { position: relative; min-width: 0; }
+.page-enter-active, .page-leave-active { transition: opacity 150ms ease; }
+.page-leave-active { position: absolute; inset: 0 auto auto 0; width: 100%; pointer-events: none; }
+.page-enter-from, .page-leave-to { opacity: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}
+
+@media (max-width: 760px) {
+  .sync-feedback { padding-inline: 16px; }
+  .preview-banner, .route-notice { padding-inline: 16px; }
+  .main-content { padding-bottom: 64px; }
+  .bottom-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: flex; height: auto; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: transparent; }
+  .bottom-track { width: 100%; }
+  .bottom-track .segment-item, .bottom-track .segment-ink-item { min-height: 48px; flex-direction: column; gap: 2px; font-size: var(--fs-xs); }
+}
+
+/* ── 页面通用 ───────────────────────────── */
+.page { width: 100%; max-width: none; min-width: 0; margin: 0; padding: 20px 28px 24px; overflow-x: clip; }
+.page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 16px; min-width: 0; }
+.eyebrow { margin: 0 0 6px; color: var(--muted); font-size: var(--fs-sm); letter-spacing: .06em; }
+h1, h2, p { margin-top: 0; }
+.page h1 { margin-bottom: 6px; font-size: 28.5px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; }
+.page-intro { margin-bottom: 0; color: var(--muted); font-size: var(--fs-md); }
+/* 按钮与卡片的全局样式在 styles/material.css。 */
+.section-label { margin: 0 0 8px; padding: 0 2px; color: var(--ink); font-size: var(--fs-md); font-weight: 700; }
+@media (max-width: 760px) {
+  .page { padding: 24px 16px 38px; }
+}

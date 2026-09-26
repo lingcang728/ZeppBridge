@@ -1,37 +1,5 @@
 /* Explore.vue 的样式（scoped，经 <style scoped src> 引入，只作用于这个组件）。 */
 .export-page.page { display: grid; gap: 16px; }
-.stream-picker { display: grid; gap: 10px; margin-bottom: 14px; }
-.stream-group { display: grid; gap: 3px; }
-.stream-group-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 3px 2px;
-  border: 0;
-  background: transparent;
-  color: var(--subtle);
-  font-size: var(--fs-xs);
-  cursor: pointer;
-}
-.stream-group-head:hover em { color: var(--accent); }
-.stream-group-head em { color: var(--faint); font-style: normal; }
-.stream-row {
-  display: grid;
-  grid-template-columns: 15px minmax(0, 1fr) 14px;
-  align-items: center;
-  gap: 8px;
-  min-height: 30px;
-  padding: 4px 8px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  color: var(--muted);
-  font-size: var(--fs-sm);
-  cursor: pointer;
-}
-.stream-row:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
-.stream-row.is-on { border-color: var(--line-strong); background: var(--mat-inset); color: var(--ink); box-shadow: var(--mat-inset-shadow); }
-.stream-row input { width: 13px; height: 13px; margin: 0; accent-color: var(--accent); cursor: pointer; }
 .page-head h1 { margin-bottom: 6px; font-size: 26.5px; font-weight: 700; color: var(--ink); }
 
 .workout-scope-banner { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--mat-line); border-radius: 12px; background: var(--mat-inset); color: var(--subtle); font-size: var(--fs-sm); box-shadow: var(--mat-inset-shadow); }
@@ -54,90 +22,14 @@
 .col-templates { flex: 1 1 260px; }
 .col-send { flex: 1 1 300px; }
 .col-editor { display: flex; flex: 2 1 360px; flex-direction: column; gap: 12px; min-width: 0; }
-.col-templates > :last-child,
-.col-send > :last-child { flex: 1 1 auto; }
 /* 中间栏撑高的必须是**编辑区那张卡**，不是最后一个元素。
    按「最后一个」拉伸时，被拉伸的是底部那条操作栏（里面只有一句安全说明和
    三个按钮），于是它被抻成大半屏空白，说明文字孤零零浮在正中间。 */
 .col-editor > .current-template { flex: 1 1 auto; }
 .col-editor > .editor-footer { flex: 0 0 auto; }
-.col-templates > :last-child { display: flex; flex-direction: column; min-height: 0; }
-.col-templates > :last-child .template-list { overflow-y: auto; min-height: 0; }
 .pad { padding: 16px; }
 .col-title { margin: 0 0 10px; color: var(--ink); font-size: var(--fs-md); font-weight: 700; }
-.col-title.big { font-size: var(--fs-xl); margin-bottom: 4px; }
-.col-sub { margin: 0 0 14px; color: var(--muted); font-size: var(--fs-sm); }
 
-/* 模板分类 */
-.category-list { display: grid; gap: 4px; }
-.category-item {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  min-height: 36px;
-  padding: 7px 10px;
-  border: 1px solid transparent;
-  border-radius: 9px;
-  background: transparent;
-  color: var(--muted);
-  font-size: var(--fs-md);
-  text-align: left;
-  cursor: pointer;
-  transition: all 140ms ease;
-}
-.category-item:hover { background: var(--surface-hover); color: var(--ink); }
-.category-item.is-on { background: var(--accent-soft); border-color: rgba(205, 220, 124, .2); color: var(--accent); font-weight: 600; }
-.category-item span { flex: 1; }
-.category-item em { font-style: normal; font-size: var(--fs-xs); color: var(--subtle); font-family: var(--font-mono); }
-.category-item.is-on em { color: var(--accent); }
-
-/* 模板列表 */
-.template-search {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin-bottom: 10px;
-  padding: 7px 10px;
-  border: 1px solid var(--line-control);
-  border-radius: 9px;
-  background: var(--mat-inset);
-  color: var(--subtle); box-shadow: var(--mat-inset-shadow);
-}
-.template-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: var(--fs-sm); }
-.template-search:focus-within, .prompt-editor:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
-.template-list { display: grid; gap: 6px; }
-.template-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  padding: 10px;
-  border: 1px solid var(--line-control);
-  border-radius: 11px;
-  background: var(--mat-raised);
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 140ms ease, background 140ms ease; box-shadow: var(--mat-raised-rim);
-}
-.template-item:hover { border-color: var(--line-control); }
-.template-item.is-on { border-color: rgba(205, 220, 124, .4); background: var(--accent-soft); }
-.tpl-icon {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  flex: 0 0 30px;
-  border-radius: 8px;
-  border: 1px solid var(--mat-line);
-  background: var(--mat-card);
-  color: var(--muted); box-shadow: var(--mat-rim), var(--mat-shadow);
-}
-.template-item.is-on .tpl-icon { color: var(--accent); }
-.tpl-copy { display: grid; gap: 4px; min-width: 0; flex: 1; overflow-wrap: anywhere; }
-.tpl-copy strong { font-size: var(--fs-md); font-weight: 600; line-height: 1.45; color: var(--ink); }
-.tpl-copy span { color: var(--muted); font-size: var(--fs-xs); line-height: 1.55; }
-.tpl-star { flex: 0 0 auto; color: var(--accent); }
-.empty-note { margin: 4px 0; color: var(--subtle); font-size: var(--fs-sm); }
 
 /* 当前模板与编辑器 */
 .current-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
@@ -165,6 +57,7 @@
 /* 中间这一栏被拉到和最高的一栏齐平（三栏底边要对齐）。多出来的高度必须
    有人吃掉，否则就是一大片空白卡片——空白比参差更难看。
    让提示词编辑框吃掉：多出来的空间变成更大的编辑区，是有用的。 */
+.prompt-editor:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
 .col-editor > .current-template { display: flex; flex-direction: column; min-height: 0; }
 .col-editor > .current-template .summary-block { flex: 0 0 auto; }
 .prompt-editor { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 190px; border: 1px solid var(--line-control); border-radius: var(--radius-sm); background: var(--mat-inset); overflow: hidden; margin-bottom: 14px; box-shadow: var(--mat-inset-shadow); }
@@ -211,27 +104,6 @@
 .cell-sub { color: var(--subtle); font-size: var(--fs-xs); }
 .font-mono { font-family: var(--font-mono); }
 
-/* 快捷范围与深色日期选择器 */
-.range-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; color: var(--subtle); font-size: var(--fs-sm); position: relative; }
-.range-label { color: var(--subtle); font-size: var(--fs-xs); }
-
-
-.custom-date-picker-wrap { display: inline-flex; align-items: center; gap: 6px; position: relative; }
-.date-trigger-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border: 1px solid var(--line-control);
-  border-radius: 7px;
-  background: var(--mat-card-solid);
-  color: var(--ink);
-  font-size: var(--fs-xs);
-  font-family: var(--font-mono);
-  cursor: pointer;
-}
-.date-trigger-btn.is-open { border-color: var(--accent); }
-.date-trigger-btn:hover { border-color: var(--line-control); }
 
 /* 底部操作条 */
 .editor-footer {
@@ -261,89 +133,8 @@
 }
 .preview-error span { flex: 1 1 160px; min-width: 0; }
 
-/* 右列 */
-.group-label { margin: 0 0 8px; color: var(--ink); font-size: var(--fs-sm); font-weight: 700; }
-/* 折叠而不是常驻：大多数人不需要读它，但需要读的时候必须在按下导出**之前**
-   就能找到（issue #28）。 */
-.pack-contents { margin: 0 0 14px; }
-.pack-contents summary { color: var(--accent); cursor: pointer; font-size: var(--fs-sm); font-weight: 600; }
-.pack-contents p { margin: 8px 0 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.65; }
-.group-row { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; }
-.group-row .group-label { margin: 0; }
-.format-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 110px), 1fr)); gap: 8px; margin-bottom: 4px; }
-.detail-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); }
-.format-card {
-  position: relative;
-  display: grid;
-  min-width: 0;
-  justify-items: center;
-  gap: 4px;
-  padding: 12px 6px 10px;
-  border: 1px solid var(--line-control);
-  border-radius: 11px;
-  background: var(--mat-raised);
-  color: var(--muted);
-  font-size: var(--fs-xs);
-  cursor: pointer;
-  transition: all 140ms ease; box-shadow: var(--mat-raised-rim);
-}
-.format-card strong { color: var(--ink); font-size: var(--fs-sm); }
-.format-card span { min-width: 0; overflow-wrap: anywhere; color: var(--muted); font-size: var(--fs-xs); line-height: 1.5; }
-.format-card.is-on { border-color: var(--accent); background: var(--accent-soft); }
-.format-card.is-on svg, .format-card.is-on strong { color: var(--accent); }
-.format-check { position: absolute; top: 6px; right: 6px; }
-
-.content-check { color: var(--accent); }
-
-.size-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 14px 0 16px;
-  padding: 10px 12px;
-  border: 1px solid var(--mat-line);
-  border-radius: 9px;
-  background: var(--mat-inset);
-  color: var(--muted);
-  font-size: var(--fs-sm); box-shadow: var(--mat-inset-shadow);
-}
-.size-row strong { color: var(--accent); font-variant-numeric: tabular-nums; }
-
-.tool-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.tool-card {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 42px;
-  padding: 8px 10px;
-  border: 1px solid var(--line-control);
-  border-radius: 10px;
-  background: var(--mat-raised);
-  color: var(--ink);
-  font-size: var(--fs-sm);
-  cursor: pointer;
-  transition: border-color 140ms ease; box-shadow: var(--mat-raised-rim);
-}
-.tool-card.is-on { border-color: var(--accent); background: var(--accent-soft); }
-.tool-logo {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  flex: 0 0 24px;
-  border-radius: 50%;
-  border: 1px solid var(--mat-line);
-  background: var(--mat-card);
-  color: var(--muted); box-shadow: var(--mat-rim), var(--mat-shadow);
-}
-.tool-logo img { width: 16px; height: 16px; object-fit: contain; }
-.tool-fallback { color: var(--muted); font-size: var(--fs-sm); font-weight: 700; line-height: 1; }
-.tool-card.is-on .tool-logo { color: var(--accent); }
-.tool-check { position: absolute; top: 5px; right: 6px; color: var(--accent); }
-
-.send-hint { display: flex; align-items: flex-start; gap: 6px; margin: 14px 0 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.45; }
 .retry-open { width: fit-content; margin-top: 2px; }
+
 
 /* 响应式 */
 @media (max-width: 1180px) {
@@ -351,9 +142,7 @@
 }
 @media (max-width: 820px) {
   .col-templates, .col-editor, .col-send { flex-basis: 100%; }
-  .tool-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 520px) {
   .summary-grid { grid-template-columns: minmax(0, 1fr); }
-  .tool-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

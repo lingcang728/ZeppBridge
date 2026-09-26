@@ -1,37 +1,28 @@
 <script setup lang="ts">
-import { displayDateTimeFormatter } from '../lib/dateTime';
-
-defineOptions({ name: 'Explore' });
-import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+/* 交给 AI（探索版）：左列模板 → 中列提示词与数据摘要 → 右列打包选项。
+ *
+ * 三列里的左右两列和日期范围行在 components/explore/，数据摘要的估算在
+ * composables/useExplorePreview.ts。 */
+import { computed, onActivated, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import Icon from '../components/Icon.vue';
-import SegmentTrack from '../components/SegmentTrack.vue';
 import CoverageNotice from '../components/CoverageNotice.vue';
-import type { IconName } from '../components/Icon.vue';
-import {
-  exportDetailOptions,
-  exportTypeGroups,
-  exportTypeOptions,
-  useExport,
-  type SaveFormat,
-} from '../composables/useExport';
+import ExploreDateRange from '../components/explore/ExploreDateRange.vue';
+import ExplorePackPanel from '../components/explore/ExplorePackPanel.vue';
+import ExploreTemplatePicker from '../components/explore/ExploreTemplatePicker.vue';
+import { useExport, type SaveFormat } from '../composables/useExport';
+import { formatBytes, useExplorePreview } from '../composables/useExplorePreview';
 import { readDefaultExportFormat } from '../lib/exportScope';
 import { useSyncController } from '../composables/useSyncController';
-import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
+import { isTauri } from '../composables/useTauriApi';
 import { useLifeEvents } from '../composables/useLifeEvents';
 import { useAiHandoff } from '../composables/useAiHandoff';
-import {
-  calendarCells,
-  calendarMonthTitle,
-  calendarWeekdayNames,
-} from '../lib/calendarLocale';
-import { localDateString } from '../lib/format';
-import { popoverStyle } from '../lib/popoverPosition';
-import { rangeOptions } from '../lib/rangeOptions';
-import { AI_PROVIDERS, AI_PROVIDER_BY_ID, type AiProviderId } from '../lib/aiProviders';
-import type { ExportDataType, ExportScope, ExportSelection, ExportTypeGroup } from '../types';
+import { AI_PROVIDER_BY_ID, type AiProviderId } from '../lib/aiProviders';
+import type { ExportScope, ExportSelection } from '../types';
 import { exploreMessages, promptTemplates, type PromptTemplate } from './Explore.i18n';
 import { intlLocale, locale, useMessages } from '../i18n';
+
+defineOptions({ name: 'Explore' });
 
 const t = useMessages(exploreMessages);
 const { events: lifeEvents } = useLifeEvents();
@@ -51,23 +42,8 @@ const {
 
 const { dataRevision } = useSyncController();
 
-/** 导出快捷范围。比图表多一档 3 个月，因为导出常按季度来。 */
-const EXPORT_RANGE_DAYS = [7, 30, 90, 180] as const;
-
 /* 模板文案（含六段提示词）在 Explore.i18n.ts。 */
 const templates = computed<PromptTemplate[]>(() => promptTemplates());
-
-const categories = computed(() => {
-  const list = templates.value;
-  const count = (key: string) => list.filter((tpl) => tpl.category === key).length;
-  return [
-    { key: 'all', label: t.value.categoryAll, icon: 'grid' as IconName, count: list.length },
-    { key: 'summary', label: t.value.categorySummary, icon: 'file' as IconName, count: count('summary') },
-    { key: 'training', label: t.value.categoryTraining, icon: 'activity' as IconName, count: count('training') },
-    { key: 'recovery', label: t.value.categoryRecovery, icon: 'heart' as IconName, count: count('recovery') },
-    { key: 'sleep', label: t.value.categorySleep, icon: 'moon' as IconName, count: count('sleep') },
-  ];
-});
 
 /* 从运动详情点「让 AI 展开分析」过来时，范围锁定在那一条记录上。
    互斥的 ExportScope 让「日期范围」和「单次运动」不可能同时生效，
@@ -85,8 +61,6 @@ const currentScope = (): ExportScope => (focusedWorkoutId.value
   ? { kind: 'workout', workoutId: focusedWorkoutId.value }
   : { kind: 'dateRange', start: exportStartDate.value, end: exportEndDate.value });
 
-const activeCategory = ref('all');
-const templateQuery = ref('');
 const activeTemplateId = ref(templates.value[0].id);
 const activeTemplate = computed(() =>
   templates.value.find((tpl) => tpl.id === activeTemplateId.value) ?? templates.value[0]);
@@ -100,13 +74,6 @@ watch(locale, () => {
   if (!promptEdited.value) editedPrompt.value = activeTemplate.value.prompt;
 });
 
-const filteredTemplates = computed(() =>
-  templates.value.filter((tpl) =>
-    (activeCategory.value === 'all' || tpl.category === activeCategory.value)
-    && (!templateQuery.value.trim() || tpl.name.includes(templateQuery.value.trim()) || tpl.sub.includes(templateQuery.value.trim())),
-  ),
-);
-
 const selectTemplate = (tpl: PromptTemplate) => {
   activeTemplateId.value = tpl.id;
   editedPrompt.value = tpl.prompt;
@@ -115,338 +82,28 @@ const selectTemplate = (tpl: PromptTemplate) => {
 };
 
 /* ── 导出格式与目标工具 ────────────────── */
-const formats = computed<{ key: SaveFormat; label: string; sub: string; icon: IconName }[]>(() => [
-  { key: 'json', label: 'JSON', sub: t.value.formatJsonSub, icon: 'braces' },
-  { key: 'csv', label: 'CSV', sub: t.value.formatCsvSub, icon: 'table' },
-  { key: 'gpx', label: 'GPX', sub: t.value.formatGpxSub, icon: 'map' },
-  { key: 'fit', label: 'FIT', sub: t.value.formatFitSub, icon: 'activity' },
-]);
 const activeFormat = ref<SaveFormat>(readDefaultExportFormat());
-const activeFormatLabel = computed(
-  () => formats.value.find((format) => format.key === activeFormat.value)?.label ?? 'JSON',
-);
-const detailOptions = computed(() => exportDetailOptions());
+const activeFormatLabel = computed(() => activeFormat.value.toUpperCase());
 
 const activeProviderId = ref<AiProviderId>('chatgpt');
 const activeProvider = computed(() => AI_PROVIDER_BY_ID[activeProviderId.value]);
-const providerIconFailed = ref<Partial<Record<AiProviderId, boolean>>>({});
-const markProviderIconFailed = (id: AiProviderId) => {
-  providerIconFailed.value[id] = true;
-};
 
 const { handoffState, handoffError, preparedProvider, prepareAndCopy, retryOpen } = useAiHandoff();
 
 /* ── 数据感知摘要 ─────────────────────── */
-const previewBusy = ref(false);
-const previewError = ref<string | null>(null);
-const previewCount = ref<number | null>(null);
-const previewBytes = ref<number | null>(null);
-const previewScope = ref<{ startTime: string; endTime: string | null } | null>(null);
+const {
+  previewBusy, previewError, previewCount, previewBytes,
+  datesValid, scopeRangeText, scopeRangeSub, requestedSpanDays, loadPreview,
+} = useExplorePreview({
+  startDate: exportStartDate,
+  endDate: exportEndDate,
+  dataTypes: exportDataTypes,
+  detail: exportDetail,
+  focusedWorkoutId,
+  currentScope,
+  reloadOn: [dataRevision, lifeEvents],
+});
 const sendState = ref<'idle' | 'copied' | 'failed'>('idle');
-let previewTimer = 0;
-let previewSeq = 0;
-
-const rangeDays = computed(() => {
-  const start = new Date(exportStartDate.value).getTime();
-  const end = new Date(exportEndDate.value).getTime();
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
-  return Math.round((end - start) / 86400000) + 1;
-});
-
-const datesValid = computed(() =>
-  Boolean(exportStartDate.value && exportEndDate.value && exportStartDate.value <= exportEndDate.value),
-);
-
-/* 摘要里显示的范围来自后端真正用了的范围。锁定单条运动时显示这条运动的
-   起止时刻，而不是页面上那两个和它无关的日期。 */
-const scopeRangeText = computed(() => {
-  if (focusedWorkoutId.value) {
-    if (!previewScope.value) return t.value.thisWorkout;
-    const start = new Date(previewScope.value.startTime);
-    if (Number.isNaN(start.getTime())) return t.value.thisWorkout;
-    return displayDateTimeFormatter({
-      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
-    }).format(start);
-  }
-  return datesValid.value ? `${exportStartDate.value} ~ ${exportEndDate.value}` : '—';
-});
-
-const scopeRangeSub = computed(() => {
-  if (focusedWorkoutId.value) {
-    if (!previewScope.value?.endTime) return t.value.onlyThisWorkout;
-    const start = new Date(previewScope.value.startTime).getTime();
-    const end = new Date(previewScope.value.endTime).getTime();
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return t.value.onlyThisWorkout;
-    return t.value.approxMinutes(Math.max(1, Math.round((end - start) / 60000)));
-  }
-  return rangeDays.value ? t.value.rangeDays(rangeDays.value) : '';
-});
-
-/**
- * The picker is grouped because it holds fifteen entries: a flat list that
- * long is hard to scan, and the four sections match how the data is actually
- * organised elsewhere in the app.
- *
- * A template seeds the selection; it does not lock it. Whatever is ticked here
- * is exactly what the export carries, so the summary counts below always
- * describe the file the user is about to get.
- */
-const typeOptions = computed(() => exportTypeOptions());
-
-const groupedTypes = computed(() =>
-  exportTypeGroups()
-    .map((group) => ({
-      key: group.key,
-      label: group.label,
-      options: typeOptions.value.filter((option) => option.group === group.key),
-    }))
-    .filter((section) => section.options.length > 0),
-);
-
-const isTypeSelected = (value: ExportDataType) => exportDataTypes.value.includes(value);
-
-const toggleType = (value: ExportDataType) => {
-  const next = new Set(exportDataTypes.value);
-  if (next.has(value)) next.delete(value);
-  else next.add(value);
-  // Keep the picker's own order so the list never reshuffles as it is used.
-  exportDataTypes.value = typeOptions.value
-    .map((option) => option.value)
-    .filter((option) => next.has(option));
-};
-
-const toggleGroup = (group: ExportTypeGroup) => {
-  const options = typeOptions.value.filter((option) => option.group === group).map((option) => option.value);
-  const allOn = options.every((option) => exportDataTypes.value.includes(option));
-  const next = new Set(exportDataTypes.value);
-  for (const option of options) {
-    if (allOn) next.delete(option);
-    else next.add(option);
-  }
-  exportDataTypes.value = typeOptions.value
-    .map((option) => option.value)
-    .filter((option) => next.has(option));
-};
-
-const groupIsFull = (group: ExportTypeGroup) =>
-  typeOptions.value
-    .filter((option) => option.group === group)
-    .every((option) => exportDataTypes.value.includes(option.value));
-
-const formatBytes = (bytes: number | null) => {
-  if (bytes === null) return '—';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-};
-
-const loadPreview = async () => {
-  const seq = ++previewSeq;
-  previewError.value = null;
-  if ((!datesValid.value && !focusedWorkoutId.value) || !exportDataTypes.value.length) {
-    previewCount.value = null;
-    previewBytes.value = null;
-    previewBusy.value = false;
-    previewError.value = exportDataTypes.value.length ? null : t.value.needDataTypes;
-    return;
-  }
-  if (!isTauri()) {
-    previewCount.value = null;
-    previewBytes.value = null;
-    previewBusy.value = false;
-    previewError.value = t.value.previewDesktopOnly;
-    return;
-  }
-  previewBusy.value = true;
-  try {
-    const estimate = await tauriApi.estimateExport({
-      scope: currentScope(),
-      dataTypes: [...exportDataTypes.value],
-      detail: exportDetail.value,
-    });
-    if (seq !== previewSeq) return;
-    previewCount.value = estimate.recordCount;
-    previewBytes.value = estimate.estimatedBytes;
-    // 摘要里的「时间范围」必须是后端真正用了的范围，而不是页面上那两个日期。
-    previewScope.value = estimate.scopeKind === 'workout' && estimate.startTime
-      ? { startTime: estimate.startTime, endTime: estimate.endTime ?? null }
-      : null;
-  } catch (error) {
-    if (seq !== previewSeq) return;
-    previewCount.value = null;
-    previewBytes.value = null;
-    previewError.value = toUserMessage(error, t.value.previewFailed);
-  } finally {
-    if (seq === previewSeq) previewBusy.value = false;
-  }
-};
-
-const schedulePreview = () => {
-  window.clearTimeout(previewTimer);
-  previewTimer = window.setTimeout(() => { void loadPreview(); }, 280);
-};
-
-/* 和训练/身体页用同一条梯子（lib/rangeOptions.ts）。以前这里只有 7 天和 30 天，
-   想导出半年只能手点日历两下，而图表页明明就摆着一个「6 个月」按钮——
-   两处对不上，是「我选了 6 个月却只拿到 30 天」这类误会的一半来源。 */
-const ranges = computed(() => rangeOptions(EXPORT_RANGE_DAYS));
-/* 选中的范围往回够到多少天。给 CoverageNotice 用：导出读的也是本机库，
-   选了半年而库里只有 30 天时，导出文件会安静地只装 30 天。 */
-const requestedSpanDays = computed(() => {
-  if (focusedWorkoutId.value) return 0;
-  if (!exportStartDate.value) return 0;
-  const start = Date.parse(`${exportStartDate.value}T00:00:00`);
-  if (!Number.isFinite(start)) return 0;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return Math.round((today.getTime() - start) / 86_400_000) + 1;
-});
-
-const activeRangeDays = computed(() => {
-  for (const range of ranges.value) {
-    const end = new Date();
-    const start = new Date(end);
-    start.setDate(start.getDate() - Math.max(0, range.days - 1));
-    if (localDateString(start) === exportStartDate.value && localDateString(end) === exportEndDate.value) return range.days;
-  }
-  return null;
-});
-
-/* ── 自定义日期选择器弹层逻辑 ─────────────── */
-/*
- * 日历 Teleport 到 body 并用 fixed 定位。
- *
- * 上一版是 `position: absolute; top: calc(100% + 6px); right: 0`，钉死向下
- * 展开。「快捷范围」这一行本来就靠近面板底部，于是日历整块落到窗口下沿之外，
- * 既看不见也滚不到 —— 这就是 issue #9。只调 z-index 或 overflow 都救不回来：
- * 绝对定位的浮层出不了它的包含块。
- *
- * 翻转和夹取的算法与 SelectMenu 共用 `lib/popoverPosition.ts`，两个浮层不该
- * 各写一套、各错一次。
- */
-const CALENDAR_WIDTH = 220;
-const CALENDAR_MAX_HEIGHT = 300;
-
-const datePickerOpen = ref<'start' | 'end' | null>(null);
-const pickerYear = ref(new Date().getFullYear());
-const pickerMonth = ref(new Date().getMonth()); // 0-indexed
-const startTriggerRef = ref<HTMLElement | null>(null);
-const endTriggerRef = ref<HTMLElement | null>(null);
-const calendarRef = ref<HTMLElement | null>(null);
-const calendarStyle = ref<Record<string, string>>({});
-
-const activeTrigger = () =>
-  (datePickerOpen.value === 'start' ? startTriggerRef.value : endTriggerRef.value);
-
-const measureDatePicker = () => {
-  const trigger = activeTrigger();
-  if (!trigger) return;
-  const rect = trigger.getBoundingClientRect();
-  calendarStyle.value = popoverStyle(
-    { top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width },
-    { width: window.innerWidth, height: window.innerHeight },
-    { maxHeight: CALENDAR_MAX_HEIGHT, width: CALENDAR_WIDTH },
-  ) as unknown as Record<string, string>;
-};
-
-const openDatePicker = (target: 'start' | 'end') => {
-  const currentVal = target === 'start' ? exportStartDate.value : exportEndDate.value;
-  const d = currentVal ? new Date(currentVal) : new Date();
-  pickerYear.value = d.getFullYear();
-  pickerMonth.value = d.getMonth();
-  datePickerOpen.value = target;
-  // 触发按钮的位置要在 DOM 更新后才准，但 v-if 的浮层还没挂上来，
-  // 先按当前按钮量一次，挂上之后 watch 里再量一次。
-  void nextTick(measureDatePicker);
-};
-
-const closeDatePicker = (restoreFocus = false) => {
-  const trigger = activeTrigger();
-  datePickerOpen.value = null;
-  if (restoreFocus) trigger?.focus();
-};
-
-/* 浮层已经不在按钮旁边了，页面一滚它就会停在原地；跟着重新量比强行关掉
-   更不打断人，窗口尺寸变化同理。和 SelectMenu 的处理保持一致。 */
-const repositionDatePicker = () => {
-  if (!datePickerOpen.value) return;
-  measureDatePicker();
-};
-
-const onDatePickerKeydown = (event: KeyboardEvent) => {
-  if (event.key === 'Escape' && datePickerOpen.value) {
-    event.preventDefault();
-    closeDatePicker(true);
-  }
-};
-
-/* 捕获阶段监听：日历被 Teleport 到 body 之后已经不在 `.range-row` 里，
-   只判断触发按钮会让「点日期」在 click 落地前就被关掉，于是怎么点都选不中。
-   两边都要放行。 */
-const onDatePickerPointerDown = (event: PointerEvent) => {
-  if (!datePickerOpen.value) return;
-  const target = event.target as Node;
-  if (calendarRef.value?.contains(target)) return;
-  if (startTriggerRef.value?.contains(target)) return;
-  if (endTriggerRef.value?.contains(target)) return;
-  closeDatePicker();
-};
-
-watch(datePickerOpen, (open) => {
-  if (open) {
-    void nextTick(measureDatePicker);
-    window.addEventListener('pointerdown', onDatePickerPointerDown, true);
-    window.addEventListener('scroll', repositionDatePicker, true);
-    window.addEventListener('resize', repositionDatePicker);
-    window.addEventListener('keydown', onDatePickerKeydown);
-  } else {
-    window.removeEventListener('pointerdown', onDatePickerPointerDown, true);
-    window.removeEventListener('scroll', repositionDatePicker, true);
-    window.removeEventListener('resize', repositionDatePicker);
-    window.removeEventListener('keydown', onDatePickerKeydown);
-  }
-});
-
-onBeforeUnmount(() => {
-  window.removeEventListener('pointerdown', onDatePickerPointerDown, true);
-  window.removeEventListener('scroll', repositionDatePicker, true);
-  window.removeEventListener('resize', repositionDatePicker);
-  window.removeEventListener('keydown', onDatePickerKeydown);
-});
-
-const prevMonth = () => {
-  if (pickerMonth.value === 0) {
-    pickerMonth.value = 11;
-    pickerYear.value -= 1;
-  } else {
-    pickerMonth.value -= 1;
-  }
-};
-
-const nextMonth = () => {
-  if (pickerMonth.value === 11) {
-    pickerMonth.value = 0;
-    pickerYear.value += 1;
-  } else {
-    pickerMonth.value += 1;
-  }
-};
-
-/* 月份名、星期名、一周起点跟系统地区，不跟界面语言。界面只有三份，
-   系统地区有很多；德语 Windows 上的英文界面仍该看到 März，而不是 September。 */
-const calendarTitle = computed(() => calendarMonthTitle(pickerYear.value, pickerMonth.value));
-const weekdayNames = computed(() => calendarWeekdayNames());
-const calendarDays = computed(() => calendarCells(pickerYear.value, pickerMonth.value));
-
-const selectCalendarDay = (dateStr: string) => {
-  if (!dateStr) return;
-  if (datePickerOpen.value === 'start') {
-    exportStartDate.value = dateStr;
-  } else if (datePickerOpen.value === 'end') {
-    exportEndDate.value = dateStr;
-  }
-  closeDatePicker(true);
-};
 
 const copyPrompt = async () => {
   try {
@@ -544,13 +201,6 @@ const runExport = async () => {
   await saveExportAs(activeFormat.value);
 };
 
-watch(
-  [exportStartDate, exportEndDate, exportDataTypes, exportDetail, focusedWorkoutId],
-  schedulePreview,
-  { deep: true, immediate: true },
-);
-watch([dataRevision, lifeEvents], () => void loadPreview());
-onBeforeUnmount(() => window.clearTimeout(previewTimer));
 </script>
 
 <template>
@@ -568,51 +218,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 
     <div class="export-layout">
       <!-- 左列：模板列表 -->
-      <aside class="col-templates">
-        <section class="surface-card pad">
-          <p class="col-title">{{ t.categoryTitle }}</p>
-          <div class="category-list" role="group" :aria-label="t.categoryAria">
-            <button
-              v-for="cat in categories"
-              :key="cat.key"
-              type="button"
-              :class="['category-item', { 'is-on': activeCategory === cat.key }]"
-              :aria-pressed="activeCategory === cat.key"
-              @click="activeCategory = cat.key"
-            >
-              <Icon :name="cat.icon" :size="15" />
-              <span>{{ cat.label }}</span>
-              <em>{{ cat.count }}</em>
-            </button>
-          </div>
-        </section>
-
-        <section class="surface-card pad">
-          <p class="col-title">{{ t.templateListTitle }}</p>
-          <div class="template-search">
-            <Icon name="search" :size="14" />
-            <input v-model="templateQuery" type="search" :placeholder="t.templateSearchPlaceholder" :aria-label="t.templateSearchAria" />
-          </div>
-          <div class="template-list">
-            <button
-              v-for="tpl in filteredTemplates"
-              :key="tpl.id"
-              type="button"
-              :class="['template-item', { 'is-on': activeTemplateId === tpl.id }]"
-              :aria-pressed="activeTemplateId === tpl.id"
-              @click="selectTemplate(tpl)"
-            >
-              <span class="tpl-icon"><Icon :name="tpl.icon" :size="15" /></span>
-              <span class="tpl-copy">
-                <strong>{{ tpl.name }}</strong>
-                <span>{{ tpl.sub }}</span>
-              </span>
-              <Icon v-if="activeTemplateId === tpl.id" name="star" :size="14" class="tpl-star" />
-            </button>
-            <p v-if="!filteredTemplates.length" class="empty-note">{{ t.noTemplates }}</p>
-          </div>
-        </section>
-      </aside>
+      <ExploreTemplatePicker :templates="templates" :active-id="activeTemplateId" @select="selectTemplate" />
 
       <!-- 中列：提示词编辑与数据感知摘要 -->
       <div class="col-editor">
@@ -680,81 +286,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
             <CoverageNotice :requested-days="requestedSpanDays" />
 
             <!-- 范围选择与自定义日期选择器 -->
-            <div class="range-row">
-              <span class="range-label">{{ t.quickRange }}</span>
-              <SegmentTrack
-                compact
-                :items="ranges.map((range) => ({ value: range.days, label: range.label }))"
-                :model-value="activeRangeDays ?? 0"
-                :aria-label="t.quickRange"
-                @update:model-value="(value) => applyExportRange(Number(value))"
-              />
-
-              <div class="custom-date-picker-wrap">
-                <button
-                  ref="startTriggerRef"
-                  type="button"
-                  class="date-trigger-btn"
-                  :class="{ 'is-open': datePickerOpen === 'start' }"
-                  :aria-expanded="datePickerOpen === 'start'"
-                  aria-haspopup="dialog"
-                  @click="datePickerOpen === 'start' ? closeDatePicker() : openDatePicker('start')"
-                >
-                  <Icon name="clock" :size="12" />
-                  <span>{{ exportStartDate || t.startDate }}</span>
-                </button>
-                <span>~</span>
-                <button
-                  ref="endTriggerRef"
-                  type="button"
-                  class="date-trigger-btn"
-                  :class="{ 'is-open': datePickerOpen === 'end' }"
-                  :aria-expanded="datePickerOpen === 'end'"
-                  aria-haspopup="dialog"
-                  @click="datePickerOpen === 'end' ? closeDatePicker() : openDatePicker('end')"
-                >
-                  <Icon name="clock" :size="12" />
-                  <span>{{ exportEndDate || t.endDate }}</span>
-                </button>
-
-                <!-- 自定义深橄榄底日历弹层。
-                     Teleport 到 body：留在原地就会被祖先的包含块裁掉（issue #9）。 -->
-                <Teleport to="body">
-                  <div
-                    v-if="datePickerOpen"
-                    ref="calendarRef"
-                    class="calendar-popover"
-                    :style="calendarStyle"
-                    role="dialog"
-                    :aria-label="t.datePickerAria"
-                  >
-                    <div class="cal-header">
-                      <button type="button" class="cal-nav-btn" @click="prevMonth"><Icon name="arrow-left" :size="12" /></button>
-                      <span class="cal-title">{{ calendarTitle }}</span>
-                      <button type="button" class="cal-nav-btn" @click="nextMonth"><Icon name="arrow-right" :size="12" /></button>
-                    </div>
-                    <div class="cal-weekdays">
-                      <span v-for="name in weekdayNames" :key="name">{{ name }}</span>
-                    </div>
-                    <div class="cal-grid">
-                      <button
-                        v-for="(item, idx) in calendarDays"
-                        :key="idx"
-                        type="button"
-                        :disabled="!item.day"
-                        :class="['cal-day', {
-                          'is-empty': !item.day,
-                          'is-selected': item.dateStr === (datePickerOpen === 'start' ? exportStartDate : exportEndDate)
-                        }]"
-                        @click="selectCalendarDay(item.dateStr)"
-                      >
-                        {{ item.day || '' }}
-                      </button>
-                    </div>
-                  </div>
-                </Teleport>
-              </div>
-            </div>
+            <ExploreDateRange v-model:start="exportStartDate" v-model:end="exportEndDate" @range="applyExportRange" />
           </div>
         </section>
 
@@ -795,159 +327,15 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
       </div>
 
       <!-- 右列：打包选项与目标 AI -->
-      <aside class="col-send">
-        <section class="surface-card pad">
-          <p class="col-title big">{{ t.packTitle }}</p>
-          <p class="col-sub">{{ t.packSub }}</p>
-
-          <details class="pack-contents">
-            <summary>{{ t.packContentsTitle }}</summary>
-            <p>{{ t.packContentsIncluded }}</p>
-            <p>{{ t.packContentsExcluded }}</p>
-          </details>
-
-          <p class="group-label">{{ t.formatGroup }}</p>
-          <div class="format-grid" role="radiogroup" :aria-label="t.formatAria">
-            <button
-              v-for="format in formats"
-              :key="format.key"
-              type="button"
-              role="radio"
-              :aria-checked="activeFormat === format.key"
-              :class="['format-card', { 'is-on': activeFormat === format.key }]"
-              @click="activeFormat = format.key"
-            >
-              <Icon v-if="activeFormat === format.key" name="circle-check" :size="14" class="format-check" />
-              <Icon :name="format.icon" :size="20" />
-              <strong>{{ format.label }}</strong>
-              <span>{{ format.sub }}</span>
-            </button>
-          </div>
-
-          <p class="group-label">{{ t.detailGroup }}</p>
-          <div class="format-grid detail-grid" role="radiogroup" :aria-label="t.detailAria">
-            <button
-              v-for="option in detailOptions"
-              :key="option.value"
-              type="button"
-              role="radio"
-              :aria-checked="exportDetail === option.value"
-              :class="['format-card', { 'is-on': exportDetail === option.value }]"
-              @click="exportDetail = option.value"
-            >
-              <Icon v-if="exportDetail === option.value" name="circle-check" :size="14" class="format-check" />
-              <strong>{{ option.label }}</strong>
-              <span>{{ option.hint }}</span>
-            </button>
-          </div>
-
-          <div class="group-row">
-            <p class="group-label">{{ t.streamsGroup }}</p>
-            <span class="see-more">{{ t.selectedCount(exportDataTypes.length, typeOptions.length) }}</span>
-          </div>
-          <div class="stream-picker">
-            <div v-for="section in groupedTypes" :key="section.key" class="stream-group">
-              <button
-                type="button"
-                class="stream-group-head"
-                :aria-pressed="groupIsFull(section.key)"
-                @click="toggleGroup(section.key)"
-              >
-                <span>{{ section.label }}</span>
-                <em>{{ groupIsFull(section.key) ? t.selectNone : t.selectAll }}</em>
-              </button>
-              <label
-                v-for="option in section.options"
-                :key="option.value"
-                :class="['stream-row', { 'is-on': isTypeSelected(option.value) }]"
-              >
-                <input
-                  type="checkbox"
-                  :checked="isTypeSelected(option.value)"
-                  @change="toggleType(option.value)"
-                />
-                <span>{{ option.label }}</span>
-                <Icon v-if="isTypeSelected(option.value)" name="circle-check" :size="14" class="content-check" />
-              </label>
-            </div>
-            <p v-if="!exportDataTypes.length" class="empty-note">{{ t.noTypesSelected }}</p>
-          </div>
-
-          <div class="size-row">
-            <span>{{ t.estimatedSize }}</span>
-            <strong class="font-mono">{{ previewBusy ? '…' : formatBytes(previewBytes) }}</strong>
-          </div>
-
-          <p class="group-label">{{ t.targetGroup }}</p>
-          <div class="tool-grid" role="radiogroup" :aria-label="t.targetAria">
-            <button
-              v-for="tool in AI_PROVIDERS"
-              :key="tool.id"
-              type="button"
-              role="radio"
-              :aria-checked="activeProviderId === tool.id"
-              :class="['tool-card', { 'is-on': activeProviderId === tool.id }]"
-              @click="activeProviderId = tool.id"
-            >
-              <Icon v-if="activeProviderId === tool.id" name="circle-check" :size="13" class="tool-check" />
-              <span class="tool-logo">
-                <img
-                  v-if="!providerIconFailed[tool.id]"
-                  :src="tool.localIcon"
-                  :alt="t.providerIconAlt(tool.label)"
-                  @error="markProviderIconFailed(tool.id)"
-                />
-                <span v-else class="tool-fallback" aria-hidden="true">{{ tool.fallback }}</span>
-              </span>
-              <span>{{ tool.label }}</span>
-            </button>
-          </div>
-
-          <p class="send-hint">
-            <Icon name="info" :size="13" />
-            {{ t.sendHint }}
-          </p>
-        </section>
-      </aside>
+      <ExplorePackPanel
+        v-model:format="activeFormat"
+        v-model:detail="exportDetail"
+        v-model:data-types="exportDataTypes"
+        v-model:provider="activeProviderId"
+        :size-text="previewBusy ? '…' : formatBytes(previewBytes)"
+      />
     </div>
   </section>
 </template>
-
-<!-- 日历弹层被 Teleport 到 body，已经不在这个组件的作用域里，样式必须
-     写成非 scoped。位置由 lib/popoverPosition.ts 算好后以内联样式套上，
-     这里只管长相，不再写死 top / right。 -->
-<style>
-.calendar-popover {
-  z-index: 2000;
-  overflow-y: auto;
-  padding: 10px;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
-  /* 实心背景。半透明会让下面的内容透上来，日期就没法读了。 */
-  background: var(--mat-card-solid);
-  box-shadow: 0 18px 44px rgba(4, 6, 8, .55);
-}
-.calendar-popover .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.calendar-popover .cal-title { font-size: var(--fs-sm); font-weight: 600; color: var(--ink); }
-.calendar-popover .cal-nav-btn { display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 4px; background: var(--mat-raised); color: var(--muted); cursor: pointer; box-shadow: var(--mat-raised-rim); }
-.calendar-popover .cal-nav-btn:hover { color: var(--accent); }
-.calendar-popover .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: var(--fs-2xs); color: var(--subtle); margin-bottom: 4px; }
-.calendar-popover .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
-.calendar-popover .cal-day {
-  display: grid;
-  place-items: center;
-  height: 24px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--ink);
-  font-size: var(--fs-xs);
-  font-family: var(--font-mono);
-  cursor: pointer;
-}
-.calendar-popover .cal-day:hover:not(:disabled) { background: var(--surface-hover); }
-.calendar-popover .cal-day.is-selected { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
-.calendar-popover .cal-day.is-empty { cursor: default; }
-</style>
 
 <style scoped src="./Explore.css"></style>

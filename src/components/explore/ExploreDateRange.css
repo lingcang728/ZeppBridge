@@ -1,0 +1,22 @@
+/* ExploreDateRange.vue 的样式（scoped，经 <style scoped src> 引入）。从 Explore.css 原样拆出。 */
+/* 快捷范围与深色日期选择器 */
+.range-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; color: var(--subtle); font-size: var(--fs-sm); position: relative; }
+.range-label { color: var(--subtle); font-size: var(--fs-xs); }
+
+
+.custom-date-picker-wrap { display: inline-flex; align-items: center; gap: 6px; position: relative; }
+.date-trigger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--line-control);
+  border-radius: 7px;
+  background: var(--mat-card-solid);
+  color: var(--ink);
+  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+.date-trigger-btn.is-open { border-color: var(--accent); }
+.date-trigger-btn:hover { border-color: var(--line-control); }
