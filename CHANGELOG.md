@@ -2,6 +2,22 @@
 
 本文件记录每个版本的实际改动。写给使用者看，不是施工日志：只写用户能感知到的变化，以及为什么这么改。
 
+## 2.4.4
+
+### Added / 新增
+
+- Claude and other MCP clients can query Food daily calories and macros, plus meal names, descriptions and times when present in retained food logs. Additional tools expose available local metrics and their records. Update the matching CLI/MCP tools package alongside the desktop app.
+- Claude 等 MCP 客户端可查询饮食每日热量与宏量营养素，以及已保留原始记录中存在的逐餐名称、描述和时间；新增工具可列出本地可用指标并查询记录。请同时更新桌面应用与对应版本的 CLI/MCP 工具包。
+
+### Fixed / 修复
+
+- Long history sync fetches daily summaries in 30-day windows, preserves successful data when another request fails, and keeps incomplete ranges retryable. Optional streams that are unavailable no longer prevent other streams from completing; expired sessions stop backfill and request reconnection.
+- 长历史同步按 30 天分段获取每日汇总，部分请求失败时保留已成功获取的数据，并允许重试未完成范围。不可用的可选数据流不再阻止其他流完成；会话过期时停止补拉并提示重新连接。
+- Improved backup recovery and raw-data reprocessing safety, workout distance and timing validation, weekly activity comparisons, and historical coverage counts.
+- 改进备份恢复与原始数据重新解析的安全性、运动距离与时间校验、每周活动对比，以及历史覆盖记录计数。
+- Fixed loading and request-order issues in heart-rate charts, workout/sleep lists, archive estimates and AI handoff. Hardened MCP argument validation, login validation and credential display, and CLI error output.
+- 修复心率图表、运动与睡眠列表、归档估算及 AI 交接中的加载和请求顺序问题；完善 MCP 参数校验、登录校验与凭据显示，以及 CLI 错误输出。
+
 ## 2.4.3
 
 ### Added / 新增

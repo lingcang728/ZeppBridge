@@ -109,8 +109,15 @@ zeppbridge-mcp
   stdio 传输，不监听任何端口。配置示例见 mcp-config-example.json，
   把 <解压目录> 换成实际路径即可。
 
-  工具：list_workouts、get_workout_insight、get_metric_series、
-  get_sleep_detail、get_data_health。全部只读。
+  工具包括：list_workouts、get_workout_insight、get_metric_series、
+  get_sleep_detail、get_data_health、get_food_data、list_available_metrics、
+  get_metric_records。完整列表由 MCP tools/list 返回，全部只读。
+
+  get_food_data returns daily nutrition totals and available meal details from
+  retained Food logs. Update this tools package along with the desktop app.
+  Keep zeppbridge-mcp at the configured path, then restart the MCP client.
+  饮食查询返回每日营养总量与已保留原始记录中的逐餐详情。请与桌面应用一起
+  更新本工具包；替换原配置路径的 zeppbridge-mcp 后重启 MCP 客户端。
 
 隐私
   两个程序都只读写本机数据目录，不上传任何数据，不返回 token、Cookie
