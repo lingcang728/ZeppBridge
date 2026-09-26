@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { formatDuration, formatTime, isFiniteNumber } from '../lib/format';
 import { insertSleepStageGaps, sleepStageLabels, sleepStageLabelsWithUnknown, type TimedSleepSlice } from '../lib/sleepStages';
 import type { SleepStageSlice } from '../types';
@@ -156,22 +156,37 @@ const timelineStyle = (slice: BarSegment) => ({
 });
 const timelineTitle = (slice: BarSegment) =>
   `${stageLabels.value[STAGE_LEVEL[slice.tone]]} · ${formatTime(new Date(slice.start ?? 0).toISOString())}–${formatTime(new Date(slice.end ?? 0).toISOString())}`;
+const hovered = ref<BarSegment | null>(null);
+const hoverLeft = ref(50);
+const showSegment = (event: PointerEvent, segments: BarSegment[]) => {
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  const fraction = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+  hoverLeft.value = Math.max(15, Math.min(85, fraction * 100));
+  let end = 0;
+  hovered.value = segments.find(segment => { end += segment.minutes / (barTotal.value || 1); return fraction <= end; }) ?? segments[segments.length - 1] ?? null;
+};
+const tooltip = computed(() => {
+  const slice = hovered.value;
+  if (!slice) return '';
+  return slice.start !== undefined ? `${timelineTitle(slice)} · ${labelFor(slice.minutes)}`
+    : `${stageLabels.value[STAGE_LEVEL[slice.tone]]} · ${labelFor(slice.minutes)}`;
+});
 </script>
 
 <template>
-  <div class="stage-block">
+  <div class="stage-block" @pointerleave="hovered = null" @focusout="hovered = null">
     <template v-if="isHypnogram">
       <div class="sleep-timeline" role="img" :aria-label="t.hypnogramAria">
         <div class="timeline-legend"><span v-for="(label, index) in stageLabels" :key="label"><i :class="STAGE_TONES[index]"></i>{{ label }}</span></div>
-        <div class="timeline-tracks">
+        <div class="timeline-tracks" @pointermove="showSegment($event, timeline)" @pointerdown.prevent="showSegment($event, timeline)">
           <span v-for="(slice, index) in timeline" :key="index" :class="['timeline-slice', slice.tone]"
-            :style="timelineStyle(slice)" :title="timelineTitle(slice)" tabindex="0" />
+            :style="timelineStyle(slice)" :aria-label="timelineTitle(slice)" @focus="hovered = slice; hoverLeft = 50" tabindex="0" />
         </div>
       </div>
       <div class="stage-axis"><span>{{ axisLabels.start }}</span><span>{{ axisLabels.end }}</span></div>
     </template>
     <template v-else>
-      <div class="stage-bar" :aria-label="t.summaryAria">
+      <div class="stage-bar" :aria-label="t.summaryAria" @pointermove="showSegment($event, barSegments)" @pointerdown.prevent="showSegment($event, barSegments)">
         <span
           v-for="(stage, index) in barSegments"
           :key="`${stage.tone}-${index}`"
@@ -184,6 +199,7 @@ const timelineTitle = (slice: BarSegment) =>
         <span>{{ axisLabels.end }}</span>
       </div>
     </template>
+    <div v-if="hovered" class="stage-tooltip" role="tooltip" :style="{ left: `${hoverLeft}%` }">{{ tooltip }}</div>
     <div class="stage-list">
       <div v-for="stage in stages" :key="stage.label">
         <span><i :class="stage.tone"></i>{{ stage.label }}</span>
@@ -195,7 +211,8 @@ const timelineTitle = (slice: BarSegment) =>
 </template>
 
 <style scoped>
-.stage-block { min-width: 0; }
+.stage-block { position: relative; min-width: 0; }
+.stage-tooltip { position: absolute; top: 8px; z-index: 5; transform: translateX(-50%); max-width: 90%; padding: 8px 12px; border: 1px solid var(--line-control); border-radius: 10px; background: var(--surface-raised); color: var(--ink); font-size: var(--fs-sm); box-shadow: 0 4px 12px rgba(0,0,0,.2); pointer-events: none; }
 .sleep-timeline { display: grid; gap: 10px; margin-top: 12px; }
 .timeline-legend { display: flex; flex-wrap: wrap; gap: 7px 18px; color: var(--muted); font-size: var(--fs-xs); }
 .timeline-legend span { display: inline-flex; align-items: center; gap: 6px; }

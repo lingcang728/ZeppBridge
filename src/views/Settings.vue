@@ -21,6 +21,7 @@ import HistoryArchivePanel from '../components/HistoryArchivePanel.vue';
 import Icon from '../components/Icon.vue';
 import ModalDialog from '../components/ModalDialog.vue';
 import SelectMenu from '../components/SelectMenu.vue';
+import SegmentTrack from '../components/SegmentTrack.vue';
 import { deviceStateLabel, useDeviceAssignment, useDevices } from '../composables/useDevices';
 import { useSyncController } from '../composables/useSyncController';
 import { AUTO_SYNC_INTERVALS } from '../lib/autoSync';
@@ -83,6 +84,8 @@ const focusConnection = () => {
 };
 watch(() => [route.hash, route.query.focus], focusConnection);
 const { scale, setScale } = useUiScale();
+const scaleItems = computed(() => UI_SCALES.map((option) => ({ value: option, label: `${option}%` })));
+const intervalItems = computed(() => AUTO_SYNC_INTERVALS.map((minutes) => ({ value: minutes, label: t.value.minutes(minutes) })));
 const {
   models: deviceModels,
   cache: deviceCache,
@@ -1054,6 +1057,18 @@ const runCapabilityProbe = async () => {
           @update:model-value="chooseDateOrder"
         />
       </div>
+      <div class="scale-row">
+        <div class="scale-copy">
+          <span class="kv-label">{{ t.scaleLabel }}</span>
+          <p class="section-description">{{ t.scaleNote }}</p>
+        </div>
+        <SegmentTrack
+          :items="scaleItems"
+          :model-value="scale"
+          :aria-label="t.scaleLabel"
+          @update:model-value="(value) => setScale(Number(value) as UiScale)"
+        />
+      </div>
     </section>
 
     <div v-if="statusError" class="alert danger" role="alert">
@@ -1582,17 +1597,14 @@ const runCapabilityProbe = async () => {
         </div>
       </div>
       <div class="sync-controls">
-        <div class="interval-options" role="radiogroup" :aria-label="t.syncIntervalAria" :class="{ 'is-disabled': !autoSyncEnabled }">
-          <button
-            v-for="minutes in AUTO_SYNC_INTERVALS"
-            :key="minutes"
-            type="button"
-            role="radio"
-            :aria-checked="autoSyncInterval === minutes"
-            :disabled="!autoSyncEnabled"
-            @click="setAutoSyncInterval(minutes)"
-          >{{ t.minutes(minutes) }}</button>
-        </div>
+        <SegmentTrack
+          compact
+          :items="intervalItems"
+          :model-value="autoSyncInterval"
+          :disabled="!autoSyncEnabled"
+          :aria-label="t.syncIntervalAria"
+          @update:model-value="(value) => setAutoSyncInterval(Number(value))"
+        />
         <span class="sync-toggle-label">{{ autoSyncEnabled ? t.syncOn : t.syncOff }}</span>
         <button class="switch" type="button" role="switch" aria-labelledby="sync-title" :aria-checked="autoSyncEnabled" @click="setAutoSyncEnabled(!autoSyncEnabled)"><span></span></button>
         <button class="button secondary sync-now" type="button" :disabled="isSyncing || !connected" @click="runSync('incremental')">
@@ -1611,20 +1623,6 @@ const runCapabilityProbe = async () => {
         <Icon name="chevron-down" :size="16" />
       </summary>
       <div class="advanced-content">
-        <div class="advanced-block">
-          <p class="advanced-label">{{ t.scaleLabel }}</p>
-          <p class="section-description">{{ t.scaleNote }}</p>
-          <div class="scale-options" role="radiogroup" :aria-label="t.scaleLabel">
-            <button
-              v-for="option in UI_SCALES"
-              :key="option"
-              type="button"
-              role="radio"
-              :aria-checked="scale === option"
-              @click="setScale(option as UiScale)"
-            >{{ option }}%</button>
-          </div>
-        </div>
         <div class="advanced-block">
           <p class="advanced-label">{{ t.dataAuthLabel }}</p>
           <p class="section-description">{{ t.dataAuthNote(retentionDays) }}</p>
@@ -1825,11 +1823,14 @@ const runCapabilityProbe = async () => {
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 0; min-width: 0; }
 /* 标签与下拉紧挨着：两组并排但不被拉满整列，否则标签在最左、下拉在最右，
    中间一大片空白（field-row 默认 space-between）。 */
-.display-prefs { display: grid; grid-template-columns: repeat(2, max-content); column-gap: 56px; justify-content: start; }
+.display-prefs { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 32px; row-gap: 6px; }
 .display-prefs > h2 { grid-column: 1 / -1; }
-.display-prefs .field-row { justify-content: flex-start; gap: 16px; }
+.display-prefs .field-row { justify-content: flex-start; gap: 16px; min-width: 0; }
 .display-prefs .kv-label { flex: 0 0 8.5em; }
-.display-prefs .select-menu { flex: 0 0 220px; width: 220px; min-width: 0; }
+.display-prefs .select-menu { flex: 1 1 auto; width: auto; min-width: 0; max-width: 280px; }
+.scale-row { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(12em, 0.7fr) minmax(280px, 1fr); align-items: center; gap: 16px 24px; padding-top: 10px; margin-top: 6px; border-top: 1px solid var(--line); }
+.scale-copy { display: grid; gap: 4px; min-width: 0; }
+.scale-copy .kv-label { flex: none; }
 h1, h2, h3, p { margin-top: 0; }
 h1 { font-size: 26.5px; font-weight: 700; color: var(--ink); }
 h2 { margin-bottom: 14px; font-size: var(--fs-xl); font-weight: 700; color: var(--ink); }
@@ -2161,6 +2162,7 @@ h3 { margin-bottom: 4px; font-size: var(--fs-md); font-weight: 700; color: var(-
   place-items: center;
   width: 36px;
   height: 36px;
+  overflow: hidden;
   flex: 0 0 36px;
   border-radius: 9px;
   border: 1px solid var(--line);
@@ -2272,11 +2274,7 @@ h3 { margin-bottom: 4px; font-size: var(--fs-md); font-weight: 700; color: var(-
 .sync-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .sync-toggle-label { color: var(--muted); font-size: var(--fs-sm); }
 .sync-now { min-height: 36px; border-radius: 10px; }
-.interval-options { display: flex; flex-wrap: wrap; gap: 6px; }
-.interval-options button { min-width: 58px; min-height: 28px; padding: 3px 10px; border: 1px solid var(--line-control); border-radius: 8px; background: transparent; color: var(--ink); font-size: var(--fs-sm); cursor: pointer; }
-.interval-options button[aria-checked='true'] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
-.interval-options.is-disabled { opacity: .5; }
-.interval-options.is-disabled button { cursor: not-allowed; }
+
 
 /* 高级 */
 .advanced > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; list-style: none; }
@@ -2292,9 +2290,7 @@ h3 { margin-bottom: 4px; font-size: var(--fs-md); font-weight: 700; color: var(-
 .diag-fold > summary { cursor: pointer; color: var(--muted); font-size: var(--fs-sm); list-style: none; }
 .diag-fold > summary::-webkit-details-marker { display: none; }
 .diag-fold[open] > summary { color: var(--ink); }
-.scale-options { display: flex; flex-wrap: wrap; gap: 6px; }
-.scale-options button { min-width: 48px; min-height: 30px; padding: 4px 8px; border: 1px solid var(--line-control); border-radius: 8px; background: transparent; color: var(--ink); font-variant-numeric: tabular-nums; font-family: 'Inter', var(--font-sans); font-size: var(--fs-sm); cursor: pointer; }
-.scale-options button[aria-checked='true'] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
 .stream-list { display: grid; gap: 2px; margin-top: 6px; }
 .stream-row { display: grid; grid-template-columns: 110px minmax(0, 1fr) auto; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: var(--fs-sm); }
 .stream-row strong { font-weight: 600; color: var(--ink); }
@@ -2335,6 +2331,7 @@ code { color: var(--muted); font-family: var(--font-mono); font-size: var(--fs-s
   .two-col { grid-template-columns: minmax(0, 1fr); }
   .display-prefs { grid-template-columns: minmax(0, 1fr); }
   .display-prefs .select-menu { flex: 1 1 auto; width: auto; max-width: 280px; }
+  .scale-row { grid-template-columns: minmax(0, 1fr); }
   .auth-grid { grid-template-columns: minmax(0, 1fr); }
   .account-strip { flex-wrap: wrap; }
   .account-meta { flex: 1 1 160px; }

@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { getVersion } from '@tauri-apps/api/app';
 import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, watch } from 'vue';
-import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router';
+import { RouterView, useRoute, useRouter } from 'vue-router';
 import DesignIcon, { type DesignIconName } from './components/DesignIcon.vue';
 import Icon from './components/Icon.vue';
+import { navigationBranch } from './lib/navigation';
 import AppTopBar from './components/shell/AppTopBar.vue';
+import SegmentTrack from './components/SegmentTrack.vue';
 import { useSyncController } from './composables/useSyncController';
 import { useUiScale } from './composables/useUiScale';
 import { backend, isDesktop, whenBackendReady } from './lib/bridge';
@@ -100,7 +102,7 @@ const route = useRoute();
 const router = useRouter();
 const trayHint = ref(false);
 const {
-  statusError, syncState, syncMessage, isSyncing,
+  statusError,
   compacting, compactionPending, compactionSaved,
   initialize, dispose: disposeSyncController,
 } = useSyncController();
@@ -219,7 +221,7 @@ onUnmounted(() => {
     <a class="skip-link" href="#main-content">{{ t.skipToContent }}</a>
 
     <div class="app-body">
-      <AppTopBar :items="navigation" :nav-aria-label="t.mainNav" :version-title="versionTitle" />
+      <AppTopBar :items="navigation" :nav-aria-label="t.mainNav" :version-title="versionTitle" :back-to="!['/', '/ai', '/settings'].includes(route.path) ? navigationBranch(route.path) : undefined" :back-label="t.quickReturn(navigationBranch(route.path) === '/settings' ? t.navSettings : t.navOverview)" />
 
       <div v-if="!backendReady" class="sync-feedback" role="status" aria-live="polite">
         <Icon name="database" :size="14" class="spinning" />
@@ -228,10 +230,6 @@ onUnmounted(() => {
       <div v-if="statusError" class="sync-feedback tone-failed" role="alert">
         <Icon name="warning" :size="14" />
         <span>{{ statusError }}</span>
-      </div>
-      <div v-if="['/', '/ai', '/settings'].includes(route.path) && syncState !== 'idle'" :class="['sync-feedback', `tone-${syncState}`]" role="status" aria-live="polite">
-        <Icon :name="syncState === 'failed' ? 'warning' : syncState === 'updated' ? 'circle-check' : 'info'" :size="14" :class="{ spinning: isSyncing || syncState === 'deferred' }" />
-        <span>{{ syncMessage }}</span>
       </div>
       <!-- 装完新版本第一次启动时的一次性后台维护。压的时候说一声，压完自己走。 -->
       <div v-if="compacting" class="sync-feedback" role="status" aria-live="polite">
@@ -270,9 +268,18 @@ onUnmounted(() => {
       </main>
 
       <nav class="bottom-nav" :aria-label="t.bottomNav">
-        <RouterLink v-for="item in navigation" :key="item.to" :to="item.to" class="bottom-nav-link" active-class="is-active" exact-active-class="is-active">
-          <DesignIcon :name="item.icon" :size="26" /><span>{{ item.label }}</span>
-        </RouterLink>
+        <SegmentTrack
+          class="bottom-track"
+          :items="navigation.map((item) => ({ value: item.to, label: item.label }))"
+          :model-value="navigationBranch(route.path)"
+          :aria-label="t.bottomNav"
+          @update:model-value="(to) => router.push(String(to))"
+        >
+          <template #default="{ item }">
+            <DesignIcon :name="navigation.find((entry) => entry.to === String(item.value))?.icon ?? 'overview'" :size="22" />
+            <span>{{ item.label }}</span>
+          </template>
+        </SegmentTrack>
       </nav>
     </div>
   </template>
@@ -365,10 +372,11 @@ a { color: inherit; }
 .preview-banner { background: var(--accent-soft); }
 .preview-banner svg { color: var(--accent); }
 .route-notice { background: var(--surface); color: var(--warning); }
-.main-content { width: 100%; min-width: 0; min-height: 0; flex: 1; overflow: auto; background: var(--canvas); }
+.main-content { position: relative; width: 100%; min-width: 0; min-height: 0; flex: 1; overflow: auto; overflow-x: hidden; background: var(--canvas); }
 .bottom-nav { display: none; }
-.page-enter-active, .page-leave-active { transition: opacity 150ms ease, transform 150ms ease; }
-.page-enter-from, .page-leave-to { opacity: 0; transform: translateY(4px); }
+.page-enter-active, .page-leave-active { transition: opacity 150ms ease; }
+.page-leave-active { position: absolute; inset: 0 auto auto 0; width: 100%; pointer-events: none; }
+.page-enter-from, .page-leave-to { opacity: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
@@ -378,13 +386,13 @@ a { color: inherit; }
   .sync-feedback { padding-inline: 16px; }
   .preview-banner, .route-notice { padding-inline: 16px; }
   .main-content { padding-bottom: 64px; }
-  .bottom-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); height: 60px; padding: 5px 8px calc(5px + env(safe-area-inset-bottom)); background: var(--canvas); border-top: 1px solid var(--line); }
-  .bottom-nav-link { display: flex; min-width: 0; min-height: 44px; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-radius: var(--radius-sm); color: var(--muted); font-size: var(--fs-xs); text-decoration: none; }
-  .bottom-nav-link.is-active { color: var(--accent); background: var(--accent-soft); }
+  .bottom-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: flex; height: auto; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: var(--canvas); border-top: 1px solid var(--line); }
+  .bottom-track { width: 100%; }
+  .bottom-track :deep(.segment-item) { flex: 1; min-height: 48px; flex-direction: column; gap: 2px; font-size: var(--fs-xs); }
 }
 
 /* ── 页面通用 ───────────────────────────── */
-.page { width: 100%; max-width: none; min-width: 0; margin: 0; padding: 20px 28px 24px; }
+.page { width: 100%; max-width: none; min-width: 0; margin: 0; padding: 20px 28px 24px; overflow-x: clip; }
 .page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 16px; min-width: 0; }
 .eyebrow { margin: 0 0 6px; color: var(--muted); font-size: var(--fs-sm); letter-spacing: .06em; }
 h1, h2, p { margin-top: 0; }

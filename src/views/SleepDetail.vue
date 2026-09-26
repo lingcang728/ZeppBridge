@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { RouterLink, useRoute } from 'vue-router';
+import { useRoute } from 'vue-router';
 import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
 import Icon from '../components/Icon.vue';
 import CircularProgress from '../components/CircularProgress.vue';
@@ -218,7 +218,8 @@ const weeklyChartOption = computed(() => {
       icon: 'circle',
     },
     tooltip: {
-      trigger: 'axis',
+      trigger: 'axis', triggerOn: 'mousemove|click', showDelay: 0, hideDelay: 0, transitionDuration: 0,
+      axisPointer: { type: 'shadow', animation: false },
       backgroundColor: palette.tooltipBg,
       borderColor: palette.tooltipBorder,
       borderWidth: 1,
@@ -333,7 +334,6 @@ watch([dataRevision, sleepId], () => void loadDetail());
 
 <template>
   <section class="page sleep-page" aria-labelledby="sleep-detail-title">
-    <RouterLink class="back-link" to="/recent"><Icon name="arrow-left" :size="14" />{{ t.backToRecent }}</RouterLink>
     <header class="page-heading">
       <h1 id="sleep-detail-title">{{ t.title }}</h1>
       <p v-if="session">{{ formatDate(session.start_time, 'long') }}</p>

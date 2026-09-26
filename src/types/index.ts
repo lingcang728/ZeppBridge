@@ -141,6 +141,7 @@ export interface DailyPoint {
 }
 
 export interface SyncProgress {
+  completed?: boolean;
   stream: string;
   current: number;
   total: number;

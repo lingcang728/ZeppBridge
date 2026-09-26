@@ -39,6 +39,7 @@ const countedUnit = (count: number, unit: string): string => {
 
 export default {
   modules: {
+    'components/ai/WorkoutPicker': { previous: 'Назад', next: 'Далее' },
     'views/Explore': {
       title: 'Передать ИИ',
       intro: 'Выберите шаблон, проверьте, что именно войдёт в пакет, и отправьте данные носимого устройства выбранному ИИ-инструменту.',
@@ -1104,9 +1105,6 @@ export default {
       maximum: 'Макс',
     },
 
-    'components/PageHeader': {
-      backToOverview: 'Назад к обзору',
-    },
 
     'components/SelectMenu': {
       placeholder: 'Выберите…',

@@ -12,6 +12,7 @@ import { plural, type LocalePack } from '../index';
  */
 export default {
   modules: {
+    'components/ai/WorkoutPicker': { previous: 'Anterior', next: 'Seguinte' },
     'views/Explore': {
       title: 'Entregar à IA',
       intro:
@@ -1005,9 +1006,6 @@ export default {
       average: 'Média',
       minimum: 'Mín',
       maximum: 'Máx',
-    },
-    'components/PageHeader': {
-      backToOverview: 'Voltar à visão geral',
     },
     'components/SelectMenu': {
       placeholder: 'Selecionar…',

@@ -7,7 +7,7 @@
  *   - 把类别拖进虚线圈 = 交给 AI；拖出去 = 不交。
  *   - 把指标拖离父类别 = 排除；拖回来 = 保留。
  *   - 点节点 = 弹小面板（天数、含当天、展开指标都在里面）。
- *   - 拖空白 = 平移；滚轮 = 缩放；Ctrl+Z = 撤销。
+ *   - 拖空白 = 平移；滚轮 = 页面滚动；Ctrl+Z = 撤销。
  *
  * 为什么这次拖拽稳：拖动时只改节点的世界坐标，DOM 顺序和层级一概不动；
  * 指针事件挂在 window 上（不靠 setPointerCapture——旧版就是 DOM 重排把
@@ -41,20 +41,21 @@ const t = useMessages(defineMessages(
   {
     label: '任务数据关系网',
     zone: '交给 AI',
-    hint: '拖节点进圈 = 交给，拖出 = 移出 · 点节点看选项 · 拖空白平移，滚轮缩放',
+    hint: '拖入圆圈以选用，拖出以移除 · 点击节点查看选项 · 拖动空白处平移',
     undo: '撤销', fit: '适应画布', zoomIn: '放大', zoomOut: '缩小', resetView: '重置视图',
     includeNode: '交给 AI', excludeNode: '不交给 AI',
   },
   {
     label: 'Task data graph',
     zone: 'To the AI',
-    hint: 'Drag a node inside the circle to include, out to exclude · click for options · drag empty space to pan, scroll to zoom',
+    hint: 'Drag into the circle to include, out to remove · Click for options · Drag empty space to pan',
     undo: 'Undo', fit: 'Fit', zoomIn: 'Zoom in', zoomOut: 'Zoom out', resetView: 'Reset view',
     includeNode: 'Include', excludeNode: 'Exclude',
   },
   {
     label: 'Grafo de datos',
     zone: 'A la IA',
+    hint: 'Arrastra al círculo para incluir, fuera para quitar · Haz clic para ver opciones · Arrastra el fondo para desplazar',
     undo: 'Deshacer', fit: 'Ajustar', zoomIn: 'Acercar', zoomOut: 'Alejar', resetView: 'Restablecer',
   },
   'components/ai/TaskGraph',
@@ -211,7 +212,8 @@ const onDragMove = (event: PointerEvent) => {
   updateDropHint();
   frame.value += 1;
 };
-const onDragEnd = () => {
+const onDragEnd = (event?: Event) => {
+  window.removeEventListener('pointerup', onDragEnd);
   window.removeEventListener('pointermove', onDragMove);
   window.removeEventListener('pointercancel', onDragEnd);
   const active = drag.value;
@@ -222,6 +224,7 @@ const onDragEnd = () => {
   const item = pos(active.id);
   item.dragging = false;
   if (!node) return;
+  if (event && event.type !== 'pointerup') { wake(); return; }
   if (!active.moved) {
     openId.value = active.id === openId.value ? null : active.id;
     wake();
@@ -246,6 +249,7 @@ const onBackgroundDown = (event: PointerEvent) => {
   pan = { x: local.x, y: local.y, camX: camera.value.x, camY: camera.value.y };
   window.addEventListener('pointermove', onPanMove);
   window.addEventListener('pointerup', onPanEnd, { once: true });
+  window.addEventListener('pointercancel', onPanEnd, { once: true });
 };
 const onPanMove = (event: PointerEvent) => {
   if (!pan) return;
@@ -257,6 +261,8 @@ const onPanMove = (event: PointerEvent) => {
   };
 };
 const onPanEnd = () => {
+  window.removeEventListener('pointerup', onPanEnd);
+  window.removeEventListener('pointercancel', onPanEnd);
   window.removeEventListener('pointermove', onPanMove);
   pan = null;
 };
@@ -275,7 +281,7 @@ const zoomTo = (zoom: number, local?: { x: number; y: number }) => {
     y: camera.value.y + (local.y - center.y) * (1 / camera.value.zoom - 1 / next),
   };
 };
-const onWheel = (event: WheelEvent) => zoomTo(camera.value.zoom * Math.exp(-event.deltaY * 0.0012), toLocal(event));
+
 const fit = () => {
   camera.value = { x: 0, y: 0, zoom: 1 };
   zoomTo(fitZoom(layout, size.value.width, size.value.height));
@@ -301,8 +307,12 @@ const onNodeKey = (event: KeyboardEvent, node: GraphNode) => {
   }
 };
 
+const onBlur = (event: Event) => { onDragEnd(event); onPanEnd(); };
+const onVisibility = () => { if (document.hidden) onBlur(new Event('blur')); };
 let observer: ResizeObserver | undefined;
 onMounted(() => {
+  window.addEventListener('blur', onBlur);
+  document.addEventListener('visibilitychange', onVisibility);
   if (!viewport.value) return;
   observer = new ResizeObserver((entries) => {
     const box = entries[0]?.contentRect;
@@ -313,6 +323,9 @@ onMounted(() => {
 });
 onBeforeUnmount(() => {
   observer?.disconnect();
+  onBlur(new Event('blur'));
+  window.removeEventListener('blur', onBlur);
+  document.removeEventListener('visibilitychange', onVisibility);
   cancelAnimationFrame(raf);
   window.removeEventListener('pointermove', onDragMove);
   window.removeEventListener('pointermove', onPanMove);
@@ -320,8 +333,18 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="viewport" class="graph" role="application" :aria-label="t.label" tabindex="0" @keydown="onKeydown">
-    <svg class="canvas" :width="size.width" :height="size.height" @pointerdown="onBackgroundDown" @wheel.prevent="onWheel">
+  <div class="graph" role="application" :aria-label="t.label" tabindex="0" @keydown="onKeydown">
+    <div class="toolbar">
+      <button type="button" class="ai-tool" :disabled="!canUndo" @click="emit('undo')"><Icon name="undo" :size="13" />{{ t.undo }}</button>
+      <span class="gap" />
+      <button type="button" class="ai-tool" :aria-label="t.zoomOut" @click="zoomTo(camera.zoom - 0.15)">−</button>
+      <button type="button" class="ai-tool" @click="zoomTo(1); camera.x = 0; camera.y = 0">{{ t.resetView }}</button>
+      <button type="button" class="ai-tool" :aria-label="t.zoomIn" @click="zoomTo(camera.zoom + 0.15)">+</button>
+      <button type="button" class="ai-tool" @click="fit">{{ t.fit }}</button>
+    </div>
+    <p class="hint">{{ t.hint }}</p>
+    <div ref="viewport" class="canvas-wrap">
+    <svg class="canvas" :width="size.width" :height="size.height" @pointerdown="onBackgroundDown">
       <g :transform="cameraTransform">
         <circle class="zone" :r="radii.boundary" />
         <circle class="ring-inner" :r="radii.inner" />
@@ -338,30 +361,21 @@ onBeforeUnmount(() => {
           :drop-hint="dropHint" class="ghost" />
       </g>
     </svg>
-
-    <div class="toolbar">
-      <button type="button" class="ai-tool" :disabled="!canUndo" @click="emit('undo')"><Icon name="undo" :size="13" />{{ t.undo }}</button>
-      <span class="gap" />
-      <button type="button" class="ai-tool" :aria-label="t.zoomOut" @click="zoomTo(camera.zoom - 0.15)">−</button>
-      <button type="button" class="ai-tool" @click="zoomTo(1); camera.x = 0; camera.y = 0">{{ t.resetView }}</button>
-      <button type="button" class="ai-tool" :aria-label="t.zoomIn" @click="zoomTo(camera.zoom + 0.15)">+</button>
-      <button type="button" class="ai-tool" @click="fit">{{ t.fit }}</button>
-    </div>
-    <p class="hint">{{ t.hint }}</p>
-
     <GraphNodePopover v-if="openNode" :node="openNode" :anchor="openAnchor" :viewport="size"
       @close="openId = null" @set-category="emit('set-category', openNode!.category!, $event)"
       @set-metric="emit('set-metric', openNode!.category!, openNode!.metric!, $event)"
       @set-days="emit('set-days', openNode!.category!, $event)"
       @set-include-day="emit('set-include-day', openNode!.category!, $event)"
       @toggle-expand="emit('toggle-expand', openNode!.category!)" />
+    </div>
   </div>
 </template>
 
 <style scoped>
-.graph { position: relative; height: 100%; min-height: 480px; overflow: hidden; border-radius: var(--radius-md); outline: none; touch-action: none; }
+.graph { display: grid; grid-template-rows: auto auto minmax(0, 1fr); height: 100%; min-height: 480px; overflow: hidden; border-radius: var(--radius-md); outline: none; touch-action: pan-y; }
 .graph:focus-visible { box-shadow: 0 0 0 2px var(--focus); }
-.canvas { display: block; cursor: grab; }
+.canvas-wrap { position: relative; min-height: 0; overflow: hidden; }
+.canvas { display: block; width: 100%; height: 100%; cursor: grab; }
 .canvas:active { cursor: grabbing; }
 .zone { fill: color-mix(in srgb, var(--accent) 4%, transparent); stroke: var(--accent); stroke-width: 1.4; stroke-dasharray: 7 6; opacity: .8; }
 .ring-inner { fill: none; stroke: var(--line); stroke-dasharray: 2 6; }
@@ -371,8 +385,8 @@ onBeforeUnmount(() => {
 .ghost { pointer-events: none; }
 .gnode:focus-visible { outline: none; }
 .gnode:focus-visible .body { stroke: var(--focus); stroke-width: 2.5; }
-.toolbar { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; gap: 6px; pointer-events: none; }
-.toolbar .ai-tool { pointer-events: auto; background: color-mix(in srgb, var(--surface) 88%, transparent); }
+.toolbar { display: flex; gap: 6px; padding: 10px 12px 4px; }
+.toolbar .ai-tool { background: color-mix(in srgb, var(--surface) 88%, transparent); }
 .gap { flex: 1; }
-.hint { position: absolute; left: 12px; right: 12px; bottom: 8px; margin: 0; color: var(--subtle); font-size: var(--fs-xs); text-align: center; pointer-events: none; }
+.hint { margin: 0 12px 14px; padding: 10px 14px; border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent); border-radius: 10px; background: color-mix(in srgb, var(--surface) 92%, transparent); color: var(--ink); font-size: var(--fs-sm); line-height: 1.55; text-align: center; }
 </style>

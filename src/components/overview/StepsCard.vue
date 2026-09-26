@@ -77,7 +77,6 @@ const ringTrack = computed(() => resolvedTrack(ringColor.value));
       <CircularProgress :value="stepsPercent" :size="148" :stroke-width="9" :color="ringColor" :track-color="ringTrack" :show-label="false">
         <div class="steps-inring">
           <strong>{{ num(steps) }}</strong>
-          <span>{{ t.stepsUnit }}</span>
         </div>
       </CircularProgress>
       <p class="steps-goal">{{ t.stepsGoalLine(formatMetric(stepGoal), stepsPercent) }}</p>
@@ -87,12 +86,12 @@ const ringTrack = computed(() => resolvedTrack(ringColor.value));
 </template>
 
 <style scoped>
-.steps-panel { grid-column: span 3; min-height: 286px; padding: 18px; }
-.steps-content { display: grid; min-height: 220px; place-items: center; align-content: center; gap: 14px; }
-.steps-inring { display: grid; justify-items: center; gap: 8px; max-width: 116px; }
-.steps-inring strong { color: var(--ink); font-family: 'Inter', var(--font-sans); font-size: 30px; font-weight: 600; letter-spacing: -.04em; font-variant-numeric: tabular-nums; line-height: 1; }
-.steps-inring span { color: var(--subtle); font-size: var(--fs-xs); }
+.steps-panel.metric-panel { display: flex; flex-direction: column; grid-column: span 3; height: 100%; min-height: 286px; padding: 18px; }
+.steps-content { flex: 1; display: grid; min-height: 0; place-items: center; align-content: center; gap: 14px; }
+.steps-inring { display: grid; place-items: center; text-align: center; }
+.steps-inring strong { color: var(--ink); font-family: 'Inter', var(--font-sans); font-size: 30px; font-weight: 600; letter-spacing: 0; font-variant-numeric: tabular-nums; line-height: 1; text-align: center; }
 .steps-goal { margin: 0; color: var(--muted); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
-@media (max-width: 1180px) { .steps-panel { grid-column: span 4; } }
-@media (max-width: 820px) { .steps-panel { grid-column: 1; } }
+@media (max-width: 1180px) { .steps-panel.metric-panel { display: flex; flex-direction: column; grid-column: span 4; } }
+@media (max-width: 820px) { .steps-panel.metric-panel { display: flex; flex-direction: column; grid-column: 1; } }
+.steps-panel .panel-more { margin-top: auto; padding-top: 10px; }
 </style>

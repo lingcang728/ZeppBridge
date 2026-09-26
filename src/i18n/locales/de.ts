@@ -174,6 +174,7 @@ export default {
   },
 
   modules: {
+    'components/ai/WorkoutPicker': { previous: 'Zurück', next: 'Weiter' },
     // ── views/Explore ──
     // cellTypesValue / categoryTraining: mit en identisch und in allowlist-en.txt
     // eingetragen (nackte Zahl bzw. das Lehnwort „Training").
@@ -1241,9 +1242,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       onlyOneDay:
         'Nur ein Tag mit Daten in diesem Zeitraum – es gibt noch keinen Trend zu zeichnen.',
       trendAria: (label: string) => `${label}-Trendlinie`,
-    },
-    'components/PageHeader': {
-      backToOverview: 'Zurück zur Übersicht',
     },
     'components/SelectMenu': {
       placeholder: 'Auswählen…',

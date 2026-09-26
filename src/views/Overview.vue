@@ -3,7 +3,7 @@ import LifeEventsPanel from '../components/LifeEventsPanel.vue';
 import LifeEventShortcut from '../components/LifeEventShortcut.vue';
 
 defineOptions({ name: 'Overview' });
-import { computed, defineAsyncComponent, h, onMounted, ref, watch } from 'vue';
+import { computed, defineAsyncComponent, h, onActivated, onDeactivated, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import CoverageNotice from '../components/CoverageNotice.vue';
 import DesignIcon from '../components/DesignIcon.vue';
@@ -132,7 +132,7 @@ const messages = defineMessages(
 );
 const t = useMessages(messages);
 
-const { dataRevision } = useSyncController();
+const { dataRevision, streamUpdate } = useSyncController();
 const { models: deviceModels, error: deviceError, load: loadDevices } = useDevices();
 
 const overview = ref<HealthOverview | null>(null);
@@ -238,39 +238,55 @@ const trainingEntry = computed(() => ({
     || statusSeries.value.vo2max?.days_with_data),
 }));
 
-const loadOverview = async () => {
-  const seq = loadSeq.next();
-  loading.value = true;
-  error.value = null;
-  partialWarning.value = null;
-  if (!isDesktop()) {
-    if (!loadSeq.isCurrent(seq)) return;
-    overview.value = null;
-    heartRateSeries.value = [];
-    recentSleep.value = [];
-    recentWorkouts.value = [];
-    statusSeries.value = {};
+// Each query publishes as soon as it resolves. Stream updates never clear visible cards.
+const queryVersions = new Map<string, number>();
+let active = true;
+let refreshOnActivate = false;
+const publish = async <T,>(key: string, query: () => Promise<T>, apply: (value: T) => void) => {
+  const version = (queryVersions.get(key) ?? 0) + 1;
+  queryVersions.set(key, version);
+  const value = await query();
+  if (queryVersions.get(key) === version) {
+    apply(value);
     loading.value = false;
-    return;
+    error.value = null;
   }
-  /* 心率卡只画最近 5 小时（OVERVIEW_HR_WINDOW_HOURS），取 6 小时留一小时
-     余量——不再为这张小卡拉一整天的点。 */
-  const results = await Promise.allSettled([
-    backend.getHealthOverview(), backend.getHeartRateSeries(6), backend.getRecentSleep(3), backend.getRecentWorkouts(5),
-    backend.getMetricSeries(ENTRY_METRICS, 7),
-  ]);
+};
+const queries = () => ({
+  health: () => publish('health', () => backend.getHealthOverview(), value => { overview.value = value; }),
+  heart: () => publish('heart', () => backend.getHeartRateSeries(6), value => { heartRateSeries.value = value; }),
+  sleep: () => publish('sleep', () => backend.getRecentSleep(3), value => { recentSleep.value = value; }),
+  workouts: () => publish('workouts', () => backend.getRecentWorkouts(5), value => { recentWorkouts.value = value; }),
+  status: () => publish('status', () => backend.getMetricSeries(ENTRY_METRICS, 7), value => { statusSeries.value = indexSeries(value); }),
+});
+const loadOverview = async () => {
+  if (!active) { refreshOnActivate = true; return; }
+  const seq = loadSeq.next();
+  if (!isDesktop()) { loading.value = false; return; }
+  partialWarning.value = null;
+  const q = queries();
+  const results = await Promise.allSettled([q.heart(), q.health(), q.sleep(), q.workouts(), q.status()]);
   if (!loadSeq.isCurrent(seq)) return;
-  const [health, heartRate, sleep, workouts, status] = results;
-  overview.value = health.status === 'fulfilled' ? health.value : null;
-  heartRateSeries.value = heartRate.status === 'fulfilled' ? heartRate.value : [];
-  recentSleep.value = sleep.status === 'fulfilled' ? sleep.value : [];
-  recentWorkouts.value = workouts.status === 'fulfilled' ? workouts.value : [];
-  statusSeries.value = status.status === 'fulfilled' ? indexSeries(status.value) : {};
-  const rejected = results.filter((result) => result.status === 'rejected');
+  const rejected = results.filter(result => result.status === 'rejected');
   if (rejected.length === results.length) error.value = toUserMessage(rejected[0].reason, t.value.healthUnavailable);
   else if (rejected.length) partialWarning.value = toUserMessage(rejected[0].reason, t.value.partialUnavailable);
   loading.value = false;
 };
+const refreshStream = async (stream: string) => {
+  if (!active) { refreshOnActivate = true; return; }
+  if (!isDesktop()) return;
+  const q = queries();
+  const tasks = stream === 'heart_rate' ? [q.heart(), q.health()]
+    : stream === 'sleep' ? [q.sleep()]
+    : stream === 'workouts' || stream === 'workout_detail' ? [q.workouts()]
+    : [q.health(), q.status()];
+  const results = await Promise.allSettled(tasks);
+  const failure = results.find(result => result.status === 'rejected');
+  if (failure?.status === 'rejected') partialWarning.value = toUserMessage(failure.reason, t.value.partialUnavailable);
+};
+onDeactivated(() => { active = false; });
+onActivated(() => { active = true; if (refreshOnActivate) { refreshOnActivate = false; void loadOverview(); } });
+watch(streamUpdate, update => { if (update.stream) void refreshStream(update.stream); });
 
 onMounted(() => {
   // v3 起没有 Hero 卡，旧的「不再显示介绍」偏好也就没有对象了——
@@ -318,10 +334,10 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
     <div v-if="partialWarning" class="inline-alert warning" role="status"><Icon name="info" :size="15" />{{ partialWarning }}</div>
     <div v-if="deviceError" class="inline-alert warning" role="status"><Icon name="info" :size="15" />{{ t.deviceErrorPrefix }}{{ deviceError }}</div>
 
-    <div v-if="loading" class="overview-skeleton" aria-live="polite" :aria-label="t.loadingAria">
+    <div v-if="loading && !overview && !heartRateSeries.length && !recentSleep.length" class="overview-skeleton" aria-live="polite" :aria-label="t.loadingAria">
       <div class="skeleton-grid"><SkeletonBlock v-for="index in 6" :key="index" height="188px" /></div>
     </div>
-    <div v-else-if="error" class="empty-wrap">
+    <div v-else-if="error && !overview && !heartRateSeries.length && !recentSleep.length" class="empty-wrap">
       <div class="empty-state" role="alert"><DesignIcon name="cloud-output" :size="72" /><strong>{{ t.loadFailedTitle }}</strong><span>{{ error }}</span><button class="button button-secondary" type="button" @click="loadOverview">{{ t.retry }}</button></div>
     </div>
 

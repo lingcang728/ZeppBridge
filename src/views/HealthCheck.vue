@@ -18,6 +18,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import Icon from '../components/Icon.vue';
 import PageHeader from '../components/PageHeader.vue';
+import SegmentTrack from '../components/SegmentTrack.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import { syncOutcomeLabel, useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
@@ -567,16 +568,12 @@ onMounted(() => void load());
       :title="t.title"
       :intro="t.intro"
     >
-      <div class="range-switch" role="group" :aria-label="t.rangeAria">
-        <button
-          v-for="range in WINDOWS"
-          :key="range.days"
-          type="button"
-          :aria-pressed="windowDays === range.days"
-          :class="['range-pill', { 'is-on': windowDays === range.days }]"
-          @click="setWindow(range.days)"
-        >{{ range.label }}</button>
-      </div>
+      <SegmentTrack
+        :items="WINDOWS.map((range) => ({ value: range.days, label: range.label }))"
+        :model-value="windowDays"
+        :aria-label="t.rangeAria"
+        @update:model-value="(value) => setWindow(Number(value))"
+      />
     </PageHeader>
 
     <div v-if="error" class="inline-alert" role="alert">

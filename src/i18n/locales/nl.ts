@@ -12,6 +12,7 @@ import { plural, type LocalePack } from '../index';
  */
 export default {
   modules: {
+    'components/ai/WorkoutPicker': { previous: 'Vorige', next: 'Volgende' },
     App: {
       quickReturn: (page: string) => `Terug naar ${page}`,
       navRecent: 'recente records',
@@ -437,9 +438,6 @@ export default {
       average: 'Gem.',
       minimum: 'Min',
       maximum: 'Max',
-    },
-    'components/PageHeader': {
-      backToOverview: 'Terug naar overzicht',
     },
     'components/SelectMenu': {
       placeholder: 'Selecteer…',

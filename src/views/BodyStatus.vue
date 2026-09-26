@@ -11,6 +11,7 @@ import PageHeader from '../components/PageHeader.vue';
 import CoverageNotice from '../components/CoverageNotice.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import Icon from '../components/Icon.vue';
+import SegmentTrack from '../components/SegmentTrack.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { zeppSemanticColors } from '../lib/echartsTheme';
@@ -848,17 +849,12 @@ watch(dataRevision, () => { void load(); });
            切 7 天 / 1 个月会改那张大图。 -->
       <div class="range-toolbar">
         <p class="range-label">{{ t.trendRangeLabel }}</p>
-        <div class="range-switch" role="radiogroup" :aria-label="t.rangeAria">
-          <button
-            v-for="range in ranges"
-            :key="range.days"
-            type="button"
-            role="radio"
-            :aria-checked="rangeDays === range.days"
-            :class="['range-pill', { 'is-on': rangeDays === range.days }]"
-            @click="rangeDays = range.days"
-          >{{ range.label }}</button>
-        </div>
+        <SegmentTrack
+          :items="ranges.map((range) => ({ value: range.days, label: range.label }))"
+          :model-value="rangeDays"
+          :aria-label="t.rangeAria"
+          @update:model-value="(value) => rangeDays = Number(value) as SeriesRangeDays"
+        />
       </div>
       <CoverageNotice :requested-days="rangeDays" />
       <p v-if="!anyData && !error" class="inline-alert" role="status">
@@ -961,19 +957,7 @@ watch(dataRevision, () => { void load(); });
   gap: 12px;
 }
 .range-label { margin: 0; color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
-.range-switch { display: flex; gap: var(--space-1); padding: 4px; border-radius: var(--radius-sm); background: var(--surface-raised); }
-.range-pill {
-  min-height: 30px;
-  padding: 5px 12px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--muted);
-  font-size: var(--fs-sm);
-  cursor: pointer;
-}
-.range-pill:hover { color: var(--ink); }
-.range-pill.is-on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+
 .day-card { padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
 .day-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 12px; }
 .day-head h2 { margin: 0 0 2px; font-size: var(--fs-xl); font-weight: 700; color: var(--ink); }

@@ -3,7 +3,7 @@ import { displayDateTimeFormatter } from '../lib/dateTime';
 
 import { computed, onMounted, ref, watch } from 'vue';
 import { open as showOpenDialog } from '@tauri-apps/plugin-dialog';
-import { RouterLink, useRoute } from 'vue-router';
+import { useRoute } from 'vue-router';
 import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
 import { createLoadSeq } from '../lib/loadSeq';
 import DesignIcon, { type DesignIconName } from '../components/DesignIcon.vue';
@@ -1244,10 +1244,6 @@ watch(workoutId, (id) => { if (id) void loadInsight(id); }, { immediate: true })
 
 <template>
   <section class="page workout-page" aria-labelledby="workout-detail-title">
-    <div class="page-toolbar">
-      <RouterLink class="back-link" to="/recent"><Icon name="arrow-left" :size="14" />{{ t.backToRecent }}</RouterLink>
-    </div>
-
     <div v-if="loading" class="detail-loading" aria-live="polite"><SkeletonBlock height="118px" /><SkeletonBlock height="280px" /></div>
     <EmptyState v-else-if="error" tone="error" icon="warning" :title="t.loadFailedTitle" :message="error"><button class="button button-secondary" type="button" @click="loadDetail">{{ t.retry }}</button></EmptyState>
     <EmptyState v-else-if="!workout" icon="steps" :title="t.notFoundTitle" :message="t.notFoundMessage" />

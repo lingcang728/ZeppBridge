@@ -18,6 +18,7 @@ import MetricTrendCard from '../components/MetricTrendCard.vue';
 import PageHeader from '../components/PageHeader.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import Icon from '../components/Icon.vue';
+import SegmentTrack from '../components/SegmentTrack.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
@@ -66,7 +67,7 @@ const messages = defineMessages(
     dailyMaxLegendAvg: '平均',
     dailyMaxTooltip: (date: string, max: number, avg: number, samples: number) =>
       `${date}<br/>最高 <b>${max}</b> 次/分<br/>平均 ${avg} 次/分<br/>${samples} 个样本`,
-    dailyMaxNote: '这里只用本机存着的原始逐条读数。Zepp 自己的日最高心率没有被采集进来（库里那个 device_max_hr 是手表的最大心率设定值，用来划分区间，不是当天实测峰值），所以无法在应用内并排对照——要核对请打开 Zepp App 看那一天的数字。',
+    dailyMaxNote: '按本机采集的心率样本计算；可能与 Zepp App 的每日峰值不同。',
   },
   {
     backToOverview: 'Back to overview',
@@ -107,7 +108,7 @@ const messages = defineMessages(
     dailyMaxLegendAvg: 'Average',
     dailyMaxTooltip: (date: string, max: number, avg: number, samples: number) =>
       `${date}<br/>Peak <b>${max}</b> bpm<br/>Average ${avg} bpm<br/>${samples} samples`,
-    dailyMaxNote: 'This uses only the raw per-reading samples stored on this machine. The Zepp daily peak is never sent to us (the device_max_hr in the library is the configured maximum used for zone limits, not a measured peak), so there is nothing to place beside it here — open the Zepp app to compare that day number.',
+    dailyMaxNote: 'Calculated from locally recorded samples; daily peaks may differ from the Zepp app.',
   },
   {
     backToOverview: 'Volver al resumen',
@@ -148,7 +149,7 @@ const messages = defineMessages(
     dailyMaxLegendAvg: 'Promedio',
     dailyMaxTooltip: (date: string, max: number, avg: number, samples: number) =>
       `${date}<br/>Máximo <b>${max}</b> lpm<br/>Promedio ${avg} lpm<br/>${samples} muestras`,
-    dailyMaxNote: 'Esto usa solo las muestras originales de cada lectura guardadas en este equipo. El máximo diario de Zepp nunca nos llega (el device_max_hr de la biblioteca es el máximo configurado para los límites de zonas, no un máximo medido), así que no hay nada que poner al lado aquí: abre la app Zepp para comparar el número de ese día.',
+    dailyMaxNote: 'Calculado con las muestras locales; los máximos diarios pueden diferir de la app Zepp.',
   },
   // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
   'views/HeartRateDetail',
@@ -436,17 +437,12 @@ watch(dataRevision, () => { void load(); });
            切 7 天 / 1 个月会改那张全天图。 -->
       <div class="range-toolbar">
         <p class="range-label">{{ t.trendRangeLabel }}</p>
-        <div class="range-switch" role="radiogroup" :aria-label="t.rangeAria">
-          <button
-            v-for="range in ranges"
-            :key="range.days"
-            type="button"
-            role="radio"
-            :aria-checked="rangeDays === range.days"
-            :class="['range-pill', { 'is-on': rangeDays === range.days }]"
-            @click="rangeDays = range.days"
-          >{{ range.label }}</button>
-        </div>
+        <SegmentTrack
+          :items="ranges.map((range) => ({ value: range.days, label: range.label }))"
+          :model-value="rangeDays"
+          :aria-label="t.rangeAria"
+          @update:model-value="(value) => rangeDays = Number(value) as SeriesRangeDays"
+        />
       </div>
 
       <section class="surface-card day-card" :aria-label="t.dailyMaxAria">
@@ -509,10 +505,7 @@ watch(dataRevision, () => { void load(); });
   gap: 12px;
 }
 .range-label { margin: 0; color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
-.range-switch { display: flex; gap: var(--space-1); padding: 4px; border-radius: var(--radius-sm); background: var(--surface-raised); }
-.range-pill { min-height: 30px; padding: 5px 12px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--muted); font-size: var(--fs-sm); cursor: pointer; }
-.range-pill:hover { color: var(--ink); }
-.range-pill.is-on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+
 .day-card { padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
 .day-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 12px; }
 .day-head h2 { margin: 0 0 2px; font-size: var(--fs-xl); font-weight: 700; color: var(--ink); }

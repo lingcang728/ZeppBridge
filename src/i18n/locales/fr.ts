@@ -11,6 +11,7 @@ import { plural, type LocalePack } from '../index';
 
 export default {
   modules: {
+    'components/ai/WorkoutPicker': { previous: 'Précédent', next: 'Suivant' },
     'views/Explore': {
       title: 'Confier à l’IA',
       intro: 'Choisissez un modèle de prompt, vérifiez ce que le paquet contient vraiment, et envoyez vos données de montre à l’outil IA de votre choix.',
@@ -711,9 +712,6 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       unknown: 'Appareil',
     },
 
-    'components/PageHeader': {
-      backToOverview: 'Retour à l’aperçu',
-    },
 
     'components/SelectMenu': {
       placeholder: 'Sélectionner…',

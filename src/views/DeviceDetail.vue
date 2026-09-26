@@ -10,7 +10,7 @@
  * 标注成「你指认的型号」，不会伪装成自动识别。
  */
 import { computed, onMounted, ref } from 'vue';
-import { RouterLink, useRoute } from 'vue-router';
+import { useRoute } from 'vue-router';
 import DesignIcon from '../components/DesignIcon.vue';
 import DevicePicker from '../components/DevicePicker.vue';
 import DeviceVisual from '../components/DeviceVisual.vue';
@@ -158,10 +158,6 @@ onMounted(() => {
 
 <template>
   <section class="page device-page" aria-labelledby="device-detail-title">
-    <div class="page-toolbar">
-      <RouterLink class="back-link" to="/settings"><Icon name="arrow-left" :size="14" />{{ t.backToSettings }}</RouterLink>
-    </div>
-
     <div v-if="loading && !model" class="detail-loading" aria-live="polite">
       <SkeletonBlock height="150px" /><SkeletonBlock height="200px" />
     </div>

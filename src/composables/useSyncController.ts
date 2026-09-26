@@ -141,6 +141,7 @@ const syncReport = ref<SyncReport | null>(null);
 const syncProgress = ref<SyncProgress | null>(null);
 const loginStatus = ref<LoginStatus>({ state: 'idle', message: '', page_url: '' });
 const dataRevision = ref(0);
+const streamUpdate = ref({ stream: '', revision: 0 });
 /* 装完新版本第一次启动时，后台会把存量原始报文压掉（默认开启）。
    这期间界面要说一句「正在压缩」，压完自己消失——不然用户只会觉得
    「刚装完怎么有点卡」。 */
@@ -248,7 +249,7 @@ const renderNotice = (value: SyncNotice): string => {
       const stream = syncStreamLabel(value.stream);
       if (value.code === 'backfilling' && value.month) return t.backfillingStream(stream, value.month);
       if (value.code === 'backfilling') return t.syncingStream(stream);
-      if (value.code === 'syncing') return t.syncingStream(stream);
+      if (value.code === 'syncing' || value.code === 'stream_completed') return t.syncingStream(stream);
       // 后端加了新的一步而界面还不认识它：英文界面下不吐中文，给一句笼统的。
       return backendText(value.text, t.syncingRecent(incrementalSyncDays()));
     }
@@ -501,6 +502,10 @@ const initialize = async () => {
     const [initialLogin] = await Promise.all([
       backend.getLoginStatus().catch(() => null),
       backend.listen<SyncProgress>('sync://progress', (payload) => {
+        if (payload.completed) {
+          streamUpdate.value = { stream: payload.stream, revision: streamUpdate.value.revision + 1 };
+          return;
+        }
         // 设置页的历史补拉也走 sync://progress。顶栏只认控制器自己发起的同步，
         // 否则一轮补拉会把「已同步」横幅冲掉。
         if (!runningSync) return;
@@ -587,6 +592,7 @@ export const useSyncController = () => ({
   syncProgress: readonly(syncProgress),
   loginStatus: readonly(loginStatus),
   dataRevision: readonly(dataRevision),
+  streamUpdate: readonly(streamUpdate),
   compacting,
   compactionPending: readonly(compactionPending),
   compactionSaved: readonly(compactionSaved),

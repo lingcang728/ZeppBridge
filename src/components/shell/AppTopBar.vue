@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import BrandMark from '../BrandMark.vue';
 import Icon, { type IconName } from '../Icon.vue';
 import SelectMenu from '../SelectMenu.vue';
+import SegmentTrack from '../SegmentTrack.vue';
 import { useSyncController } from '../../composables/useSyncController';
 import { useTheme } from '../../composables/useTheme';
 import { displayDateTimeFormatter } from '../../lib/dateTime';
 import { defineMessages, locale, LOCALES, LOCALE_LABELS, setLocale, useMessages } from '../../i18n';
+import { navigationBranch } from '../../lib/navigation';
 import type { Locale } from '../../i18n';
 import type { ThemeMode } from '../../composables/useTheme';
 
@@ -80,85 +82,17 @@ const props = defineProps<{
   items: { to: string; label: string }[];
   navAriaLabel?: string;
   versionTitle?: string;
+  backTo?: string;
+  backLabel?: string;
 }>();
 const route = useRoute();
 const router = useRouter();
-const nav = ref<HTMLElement | null>(null);
-const thumb = ref({ left: 0, width: 0, visible: false });
-let navObserver: ResizeObserver | null = null;
-let pending: { id: number; x: number; link: HTMLElement } | null = null;
-let dragging: { id: number; x: number; left: number; width: number } | null = null;
-let suppressClick = false;
-
-const navLinks = () => Array.from(nav.value?.querySelectorAll<HTMLElement>('.pill-link') ?? []);
-/* 滑块的位置用布局坐标（offsetLeft/offsetWidth，相对 nav），不用
-   getBoundingClientRect：后者在任何缩放下都是屏幕像素，再写回 translateX
-   会被缩放第二次，80% 时滑块就会偏到链接左边、比链接窄。 */
-const activeLink = () => navLinks().find((item) => item.dataset.to === route.path);
-const linkCenter = (link: HTMLElement) => link.offsetLeft + link.offsetWidth / 2;
-/** 屏幕像素 → 布局像素（CSS zoom 回退路径下两者不同）。 */
-const layoutScale = () => {
-  const el = nav.value;
-  if (!el || !el.offsetWidth) return 1;
-  return el.getBoundingClientRect().width / el.offsetWidth || 1;
-};
-const measureThumb = () => {
-  if (dragging || !nav.value) return;
-  const link = activeLink();
-  if (!link) { thumb.value = { ...thumb.value, visible: false }; return; }
-  thumb.value = { left: link.offsetLeft, width: link.offsetWidth, visible: true };
-};
-const onNavDown = (event: PointerEvent) => {
-  const link = (event.target as Element).closest<HTMLElement>('.pill-link');
-  if (!link || event.pointerType !== 'mouse' || event.button !== 0 || !event.isPrimary) return;
-  pending = { id: event.pointerId, x: event.clientX, link };
-  link.setPointerCapture(event.pointerId);
-};
-const onNavMove = (event: PointerEvent) => {
-  if (pending?.id === event.pointerId && Math.abs(event.clientX - pending.x) > 6) {
-    const current = activeLink() ?? pending.link;
-    dragging = { id: event.pointerId, x: pending.x, left: current.offsetLeft, width: current.offsetWidth };
-    pending = null;
-    suppressClick = true;
-    thumb.value = { left: dragging.left, width: dragging.width, visible: true };
-  }
-  if (!dragging || dragging.id !== event.pointerId || !nav.value) return;
-  const links = navLinks();
-  const max = Math.max(0, Math.max(...links.map((link) => link.offsetLeft + link.offsetWidth)) - dragging.width);
-  const dx = (event.clientX - dragging.x) / layoutScale();
-  thumb.value = { left: Math.min(max, Math.max(0, dragging.left + dx)), width: dragging.width, visible: true };
-  event.preventDefault();
-};
-const onNavEnd = (event: PointerEvent) => {
-  if (pending?.id === event.pointerId) pending = null;
-  if (!dragging || dragging.id !== event.pointerId) return;
-  const wasCancelled = event.type === 'pointercancel';
-  dragging = null;
-  if (wasCancelled) { measureThumb(); return; }
-  const center = thumb.value.left + thumb.value.width / 2;
-  const target = navLinks().reduce<HTMLElement | null>((best, link) =>
-    !best || Math.abs(linkCenter(link) - center) < Math.abs(linkCenter(best) - center) ? link : best, null);
-  if (target?.dataset.to) void router.push(target.dataset.to).finally(() => nextTick(measureThumb));
-  else measureThumb();
-};
-const onNavClick = (event: MouseEvent) => {
-  if (!suppressClick) return;
-  suppressClick = false;
-  event.preventDefault();
-  event.stopPropagation();
-};
-watch(() => route.path, () => nextTick(measureThumb));
-watch(() => props.items, () => nextTick(measureThumb), { deep: true });
-onMounted(() => {
-  nextTick(measureThumb);
-  if (nav.value) { navObserver = new ResizeObserver(measureThumb); navObserver.observe(nav.value); }
-  document.fonts?.ready.then(measureThumb).catch(() => {});
-  window.addEventListener('resize', measureThumb);
-});
-onBeforeUnmount(() => { navObserver?.disconnect(); window.removeEventListener('resize', measureThumb); });
+const activeBranch = computed(() => navigationBranch(route.path));
+const navItems = computed(() => props.items.map((item) => ({ value: item.to, label: item.label })));
+const goTo = (to: string | number) => { void router.push(String(to)); };
 
 const {
-  appStatus, statusError, syncState, syncProgress,
+  appStatus, statusError, syncState, syncProgress, syncMessage,
   isSyncing, canIncrementalSync, runSync, cancelSync,
 } = useSyncController();
 const { themeMode, setTheme } = useTheme();
@@ -198,7 +132,7 @@ const syncText = computed(() => {
 });
 
 const syncTitle = computed(() => {
-  if (isSyncing.value) return t.value.cancel;
+  if (isSyncing.value) return `${syncMessage.value} · ${t.value.cancel}`;
   return `${t.value.connectionTitle} · ${t.value.lastSyncPrefix}${lastSyncClock.value}`
     + ` — ${canIncrementalSync.value ? t.value.syncNow : t.value.verifyFirst}`;
 });
@@ -227,26 +161,21 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
 
 <template>
   <header class="app-topbar">
-    <RouterLink to="/" class="brand" :title="versionTitle || t.brandHome">
+    <RouterLink v-if="backTo" class="quick-back" :to="backTo" :title="backLabel" :aria-label="backLabel">
+      <Icon name="arrow-left" :size="20" />
+    </RouterLink>
+    <RouterLink v-else to="/" class="brand" :title="versionTitle || t.brandHome">
       <BrandMark :size="30" />
       <span class="wordmark">ZeppBridge&nbsp;<b>3</b></span>
     </RouterLink>
 
-    <nav ref="nav" class="pill-nav" :class="{ 'is-dragging': dragging }" :aria-label="navAriaLabel || t.mainNav"
-      @pointerdown="onNavDown" @pointermove="onNavMove" @pointerup="onNavEnd" @pointercancel="onNavEnd"
-      @click.capture="onNavClick" @dragstart.prevent>
-      <span class="pill-thumb" aria-hidden="true" :style="{ transform: `translateX(${thumb.left}px)`, width: `${thumb.width}px`, opacity: thumb.visible ? 1 : 0 }" />
-      <RouterLink
-        v-for="item in props.items"
-        :key="item.to"
-        :to="item.to"
-        :data-to="item.to"
-        draggable="false"
-        class="pill-link"
-        active-class="is-active"
-        exact-active-class="is-active"
-      >{{ item.label }}</RouterLink>
-    </nav>
+    <SegmentTrack
+      class="pill-nav"
+      :items="navItems"
+      :model-value="activeBranch"
+      :aria-label="navAriaLabel || t.mainNav"
+      @update:model-value="goTo"
+    />
 
     <div class="topbar-actions">
       <span v-if="statusError" class="sr-only" role="status">{{ statusError }}</span>
@@ -280,22 +209,27 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
 
 <style scoped>
 .app-topbar {
-  position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   height: 60px;
   min-width: 0;
   flex: 0 0 auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
   padding: 0 20px;
   background: var(--canvas);
   border-bottom: 1px solid var(--line);
 }
 
+.quick-back { display: inline-flex; width: 38px; height: 38px; align-items: center; justify-content: center; justify-self: start; flex: 0 0 38px;
+  border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent); border-radius: 50%; color: var(--ink); text-decoration: none;
+  background: color-mix(in srgb, var(--surface) 72%, transparent); backdrop-filter: blur(16px) saturate(1.4);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 18%, transparent), 0 4px 14px rgba(0,0,0,.22); }
+.quick-back:hover { border-color: color-mix(in srgb, var(--ink) 32%, transparent); }
 .brand {
   display: inline-flex;
   min-width: 0;
+  justify-self: start;
   align-items: center;
   gap: 10px;
   color: var(--ink);
@@ -310,51 +244,14 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
 }
 .wordmark b { font-weight: 700; color: var(--accent); }
 
-/* 胶囊导航：相对顶栏水平居中，左右两组宽度不对称也不偏。 */
-.pill-nav {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 3px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--surface);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 10%, transparent), 0 5px 18px rgba(0, 0, 0, .14);
-  user-select: none;
-}
-.pill-thumb { position: absolute; left: 0; top: 3px; bottom: 3px; border-radius: 999px; background: var(--accent); box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 2px 8px color-mix(in srgb, var(--accent) 22%, transparent); transition: transform 340ms cubic-bezier(.18,1.35,.3,1), width 280ms cubic-bezier(.2,.9,.3,1); pointer-events: none; }
-.pill-nav.is-dragging .pill-thumb { transition: none; }
-.pill-link {
-  position: relative;
-  z-index: 1;
-  display: inline-flex;
-  min-height: 32px;
-  align-items: center;
-  padding: 5px 16px;
-  border-radius: 999px;
-  color: var(--muted);
-  font-size: var(--fs-sm);
-  text-decoration: none;
-  white-space: nowrap;
-  transition: color 150ms ease;
-  cursor: grab;
-}
-.pill-link:hover { color: var(--ink); }
-.pill-nav.is-dragging .pill-link { cursor: grabbing; }
-.pill-link.is-active {
-  color: var(--accent-ink);
-  font-weight: 600;
-}
-@media (prefers-reduced-motion: reduce) { .pill-thumb { transition: none; } }
+.pill-nav { justify-self: center; max-width: 100%; }
 
 .topbar-actions {
   display: flex;
-  flex: 0 0 auto;
+  min-width: 0;
+  justify-self: end;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .sync-pill {
@@ -391,7 +288,7 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
   0%, 100% { opacity: 1; }
   50% { opacity: .3; }
 }
-.sync-text { font-variant-numeric: tabular-nums; max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+.sync-text { font-variant-numeric: tabular-nums; max-width: 132px; overflow: hidden; text-overflow: ellipsis; }
 .sync-cancel { color: var(--subtle); }
 
 .theme-menu { width: 136px; }
@@ -411,7 +308,7 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
   .brand .wordmark { display: none; }
 }
 @media (max-width: 980px) {
-  .pill-nav { position: static; transform: none; }
+  .app-topbar { grid-template-columns: auto minmax(0, 1fr) auto; }
 }
 @media (max-width: 760px) {
   .app-topbar { height: 56px; padding: 0 14px; gap: 10px; }

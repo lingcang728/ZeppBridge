@@ -329,10 +329,7 @@ const clearChoice = () => void save({
   thresholdBasis: null,
 });
 
-const basisSummary = (basis: HeartRateBasis): string => {
-  const measured = basis.measuredAt ? ` · ${basis.measuredAt}` : '';
-  return `${basis.source}${measured}`;
-};
+const basisSummary = (basis: HeartRateBasis): string => basis.measuredAt ?? '';
 
 const duration = (seconds: number): string => {
   if (!Number.isFinite(seconds) || seconds <= 0) return t.value.zeroMinutes;
@@ -420,7 +417,7 @@ watch(() => props.revision, () => { void load(); });
               <span class="basis-value">{{ Math.round(basis.value) }}<i>{{ basis.unit }}</i></span>
               <span class="basis-copy">
                 <strong>{{ basisLabel(basis) }}</strong>
-                <span class="basis-source">{{ basisSummary(basis) }}</span>
+                <span v-if="basisSummary(basis)" class="basis-source">{{ basisSummary(basis) }}</span>
                 <span v-if="basisNote(basis)" class="basis-note">{{ basisNote(basis) }}</span>
               </span>
               <Icon v-if="slot.chosen === basis.id" name="circle-check" :size="15" class="basis-check" />
@@ -529,14 +526,14 @@ watch(() => props.revision, () => { void load(); });
 .zone-list { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
 .zone-list li {
   display: grid;
-  grid-template-columns: 108px 74px minmax(60px, 1fr) 86px;
+  grid-template-columns: 108px 74px minmax(60px, 1fr) max-content;
   align-items: center;
   gap: var(--space-3);
   font-size: var(--fs-sm);
 }
 .zone-name { color: var(--ink); }
 .zone-range, .zone-time { color: var(--muted); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-.zone-time { text-align: right; }
+.zone-time { text-align: right; white-space: nowrap; flex-shrink: 0; }
 .zone-bar { height: 8px; overflow: hidden; border-radius: 999px; background: var(--surface-raised); }
 .zone-bar i { display: block; height: 100%; border-radius: 999px; background: var(--heart); }
 .zone-outside, .zone-formula { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.7; }

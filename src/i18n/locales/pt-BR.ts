@@ -13,6 +13,7 @@ import { plural, type LocalePack } from '../index';
  */
 export default {
   modules: {
+    'components/ai/WorkoutPicker': { previous: 'Anterior', next: 'Próxima' },
     'views/Explore': {
       title: 'Enviar para IA',
       intro: 'Escolha um modelo, confira o que o pacote realmente contém e envie seus dados do vestível para a ferramenta de IA da sua preferência.',
@@ -569,9 +570,6 @@ export default {
       seeMore: 'Ver mais',
     },
 
-    'components/PageHeader': {
-      backToOverview: 'Voltar à visão geral',
-    },
 
     'components/SelectMenu': {
       placeholder: 'Selecione…',

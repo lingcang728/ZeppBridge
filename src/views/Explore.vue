@@ -5,6 +5,7 @@ defineOptions({ name: 'Explore' });
 import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import Icon from '../components/Icon.vue';
+import SegmentTrack from '../components/SegmentTrack.vue';
 import CoverageNotice from '../components/CoverageNotice.vue';
 import type { IconName } from '../components/Icon.vue';
 import {
@@ -681,13 +682,13 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
             <!-- 范围选择与自定义日期选择器 -->
             <div class="range-row">
               <span class="range-label">{{ t.quickRange }}</span>
-              <button
-                v-for="range in ranges"
-                :key="range.days"
-                type="button"
-                :class="['range-pill', { 'is-on': activeRangeDays === range.days }]"
-                @click="applyExportRange(range.days)"
-              >{{ range.label }}</button>
+              <SegmentTrack
+                compact
+                :items="ranges.map((range) => ({ value: range.days, label: range.label }))"
+                :model-value="activeRangeDays ?? 0"
+                :aria-label="t.quickRange"
+                @update:model-value="(value) => applyExportRange(Number(value))"
+              />
 
               <div class="custom-date-picker-wrap">
                 <button
@@ -1165,16 +1166,7 @@ onBeforeUnmount(() => window.clearTimeout(previewTimer));
 /* 快捷范围与深色日期选择器 */
 .range-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; color: var(--subtle); font-size: var(--fs-sm); position: relative; }
 .range-label { color: var(--subtle); font-size: var(--fs-xs); }
-.range-pill {
-  padding: 3px 10px;
-  border: 1px solid var(--line-control);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--muted);
-  font-size: var(--fs-xs);
-  cursor: pointer;
-}
-.range-pill.is-on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+
 
 .custom-date-picker-wrap { display: inline-flex; align-items: center; gap: 6px; position: relative; }
 .date-trigger-btn {

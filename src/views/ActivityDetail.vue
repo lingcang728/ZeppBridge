@@ -13,6 +13,7 @@ import MetricTrendCard from '../components/MetricTrendCard.vue';
 import PageHeader from '../components/PageHeader.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import Icon from '../components/Icon.vue';
+import SegmentTrack from '../components/SegmentTrack.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { zeppSemanticColors } from '../lib/echartsTheme';
@@ -197,17 +198,12 @@ watch(dataRevision, () => { void load(); });
       :title="t.title"
       :intro="t.intro"
     >
-      <div class="range-switch" role="radiogroup" :aria-label="t.rangeAria">
-        <button
-          v-for="range in ranges"
-          :key="range.days"
-          type="button"
-          role="radio"
-          :aria-checked="rangeDays === range.days"
-          :class="['range-pill', { 'is-on': rangeDays === range.days }]"
-          @click="rangeDays = range.days"
-        >{{ range.label }}</button>
-      </div>
+      <SegmentTrack
+        :items="ranges.map((range) => ({ value: range.days, label: range.label }))"
+        :model-value="rangeDays"
+        :aria-label="t.rangeAria"
+        @update:model-value="(value) => rangeDays = Number(value) as SeriesRangeDays"
+      />
     </PageHeader>
 
     <div v-if="error" class="inline-alert" role="alert">
@@ -242,10 +238,7 @@ watch(dataRevision, () => { void load(); });
 
 <style scoped>
 .metric-page.page { display: grid; gap: var(--space-4); align-content: start; }
-.range-switch { display: flex; gap: var(--space-1); padding: 4px; border-radius: var(--radius-sm); background: var(--surface-raised); }
-.range-pill { min-height: 30px; padding: 5px 12px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--muted); font-size: var(--fs-sm); cursor: pointer; }
-.range-pill:hover { color: var(--ink); }
-.range-pill.is-on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+
 .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-4); }
 .inline-alert { display: flex; align-items: center; gap: var(--space-2); margin: 0; padding: 9px 13px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); color: var(--muted); font-size: var(--fs-sm); }
 .inline-alert[role='alert'] { color: var(--danger); }

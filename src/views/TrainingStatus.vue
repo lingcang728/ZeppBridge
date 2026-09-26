@@ -10,6 +10,7 @@ import PageHeader from '../components/PageHeader.vue';
 import CoverageNotice from '../components/CoverageNotice.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import Icon from '../components/Icon.vue';
+import SegmentTrack from '../components/SegmentTrack.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { zeppSemanticColors } from '../lib/echartsTheme';
@@ -397,16 +398,12 @@ watch(dataRevision, () => { void load(); });
       :title="t.title"
       :intro="t.intro"
     >
-      <div class="range-switch" role="group" :aria-label="t.rangeAria">
-        <button
-          v-for="range in ranges"
-          :key="range.days"
-          type="button"
-          :aria-pressed="rangeDays === range.days"
-          :class="['range-pill', { 'is-on': rangeDays === range.days }]"
-          @click="rangeDays = range.days"
-        >{{ range.label }}</button>
-      </div>
+      <SegmentTrack
+        :items="ranges.map((range) => ({ value: range.days, label: range.label }))"
+        :model-value="rangeDays"
+        :aria-label="t.rangeAria"
+        @update:model-value="(value) => rangeDays = Number(value) as SeriesRangeDays"
+      />
     </PageHeader>
 
     <LifeEventShortcut :days="rangeDays" />
@@ -508,19 +505,7 @@ watch(dataRevision, () => { void load(); });
 
 <style scoped>
 .training-page.page { display: grid; gap: var(--space-4); align-content: start; }
-.range-switch { display: flex; gap: var(--space-1); padding: 4px; border-radius: var(--radius-sm); background: var(--surface-raised); }
-.range-pill {
-  min-height: 30px;
-  padding: 5px 12px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--muted);
-  font-size: var(--fs-sm);
-  cursor: pointer;
-}
-.range-pill:hover { color: var(--ink); }
-.range-pill.is-on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+
 .card-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); align-items: start; }
 @media (min-width: 1500px) { .card-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 

@@ -245,7 +245,7 @@ export const settingsMessages = defineMessages(
 
     // ── 高级与维护 ──
     advancedTitle: '高级与维护',
-    advancedSub: '缩放、数据文件夹与认证清除，仅在需要时使用。',
+    advancedSub: '数据文件夹、认证清除与维护工具，仅在需要时使用。',
     scaleLabel: '界面缩放',
     scaleNote: '100% 为设计基准，也可使用 Ctrl + / Ctrl -。',
     dataAuthLabel: '数据与认证',
@@ -648,7 +648,7 @@ If you need anything from me (which client I use, where the file lives), just as
 
     // ── Advanced ──
     advancedTitle: 'Advanced and maintenance',
-    advancedSub: 'Scaling, the data folder and clearing credentials. Only when you need them.',
+    advancedSub: 'The data folder, clearing credentials and maintenance tools. Only when you need them.',
     scaleLabel: 'Interface scale',
     scaleNote: '100% is the design baseline. Ctrl + / Ctrl - work too.',
     dataAuthLabel: 'Data and credentials',
@@ -1051,7 +1051,7 @@ Si necesitas algo de mí (qué cliente uso, dónde está el archivo), pregúntam
 
     // ── Advanced ──
     advancedTitle: 'Avanzado y mantenimiento',
-    advancedSub: 'Escala, carpeta de datos y borrado de credenciales. Solo cuando lo necesites.',
+    advancedSub: 'Carpeta de datos, borrado de credenciales y herramientas de mantenimiento. Solo cuando lo necesites.',
     scaleLabel: 'Escala de la interfaz',
     scaleNote: '100% es la base del diseño. Ctrl + / Ctrl - también funcionan.',
     dataAuthLabel: 'Datos y credenciales',

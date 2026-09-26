@@ -78,6 +78,9 @@ pub struct SyncManager {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncProgress {
+    /// True only after this stream has finished persisting and released its DB lock.
+    #[serde(default)]
+    pub completed: bool,
     pub stream: String,
     pub current: u32,
     pub total: u32,
@@ -284,11 +287,26 @@ impl SyncManager {
         let emit = |stream: &str, current: u32, total: u32, message: &str| {
             if let Some(callback) = on_progress {
                 callback(SyncProgress {
+                    completed: false,
                     stream: stream.into(),
                     current,
                     total,
                     message: message.into(),
                     code: "syncing".into(),
+                    detail: None,
+                });
+            }
+        };
+
+        let completed = |stream: &str, current: u32| {
+            if let Some(callback) = on_progress {
+                callback(SyncProgress {
+                    completed: true,
+                    stream: stream.into(),
+                    current,
+                    total: 8,
+                    message: String::new(),
+                    code: "stream_completed".into(),
                     detail: None,
                 });
             }
@@ -311,6 +329,7 @@ impl SyncManager {
             Err(error) if error.is_cancelled() => return Err(error),
             Err(error) => streams.push(self.heart_rate_fetch_error(&error).await?),
         }
+        completed("heart_rate", 1);
         emit("daily_summary", 2, 8, "正在同步每日概览");
         check()?;
         match self.fetcher.fetch_daily_statistics_records(window).await {
@@ -318,7 +337,21 @@ impl SyncManager {
             Err(error) if error.is_cancelled() => return Err(error),
             Err(error) => streams.push(self.failure_report("daily_summary", &error).await?),
         }
-        emit("workouts", 3, 8, "正在同步运动");
+        completed("daily_summary", 2);
+        // Optional streams are retained and reported, never promoted to a
+        // verified empty success.
+        emit("sleep", 3, 8, "正在同步睡眠");
+        check()?;
+        match self.fetcher.fetch_sleep_records(window).await {
+            Ok(records) => streams.push(self.persist_records("sleep", records).await?),
+            Err(error) if error.is_cancelled() => return Err(error),
+            Err(error) if error.is_unavailable() => {
+                streams.push(self.unavailable_report("sleep", &error).await?)
+            }
+            Err(error) => streams.push(self.failure_report("sleep", &error).await?),
+        }
+        completed("sleep", 3);
+        emit("workouts", 4, 8, "正在同步运动");
         check()?;
         match self.fetcher.fetch_workout_records(window).await {
             Ok(records) => streams.push(self.persist_records("workouts", records).await?),
@@ -328,7 +361,8 @@ impl SyncManager {
             }
             Err(error) => streams.push(self.failure_report("workouts", &error).await?),
         }
-        emit("workout_detail", 4, 8, "正在同步跑步明细");
+        completed("workouts", 4);
+        emit("workout_detail", 5, 8, "正在同步跑步明细");
         check()?;
         match self.fetch_pending_running_details(deadline).await {
             Ok(records) if records.is_empty() => {
@@ -342,18 +376,7 @@ impl SyncManager {
             Err(error) => streams.push(self.failure_report("workout_detail", &error).await?),
         }
 
-        // Optional streams are retained and reported, never promoted to a
-        // verified empty success.
-        emit("sleep", 5, 8, "正在同步睡眠");
-        check()?;
-        match self.fetcher.fetch_sleep_records(window).await {
-            Ok(records) => streams.push(self.persist_records("sleep", records).await?),
-            Err(error) if error.is_cancelled() => return Err(error),
-            Err(error) if error.is_unavailable() => {
-                streams.push(self.unavailable_report("sleep", &error).await?)
-            }
-            Err(error) => streams.push(self.failure_report("sleep", &error).await?),
-        }
+        completed("workout_detail", 5);
         emit("hrv", 6, 8, "正在同步心率变异性");
         check()?;
         match self.fetcher.fetch_hrv_records(window).await {
@@ -364,6 +387,7 @@ impl SyncManager {
             }
             Err(error) => streams.push(self.failure_report("hrv", &error).await?),
         }
+        completed("hrv", 6);
         emit("wellness", 7, 8, "正在同步压力、血氧等可选指标");
         check()?;
         // The dateString surface needs an IANA zone name, and the devices
@@ -392,6 +416,7 @@ impl SyncManager {
         //
         // 没有秤的账号在这里同样会有记录（Zepp App 里手填的体重也走这条），
         // 所以它不是「有秤才有用」的一条流。
+        completed("wellness", 7);
         emit("weight", 8, 8, "正在同步体重与体成分");
         check()?;
         match self.fetcher.fetch_weight_records(window).await {
@@ -402,6 +427,8 @@ impl SyncManager {
             }
             Err(error) => streams.push(self.failure_report("weight", &error).await?),
         }
+
+        completed("weight", 8);
 
         // Learned quietly, alongside everything else the sync brings back. A
         // failure here must not colour the sync outcome: it is a convenience,
@@ -532,6 +559,7 @@ impl SyncManager {
             processed += 1;
 
             on_progress(SyncProgress {
+                completed: false,
                 stream: chunk.stream.clone(),
                 current: processed as u32,
                 total,
@@ -565,6 +593,16 @@ impl SyncManager {
                     Some(error.code()),
                 )?,
             }
+            drop(db);
+            on_progress(SyncProgress {
+                completed: true,
+                stream: chunk.stream.clone(),
+                current: processed as u32,
+                total,
+                message: String::new(),
+                code: "stream_completed".into(),
+                detail: Some(chunk_month_label(&chunk.chunk_start).to_string()),
+            });
         }
 
         let db = self.db.lock().await;

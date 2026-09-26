@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* 概览的「昨晚睡眠」卡：总时长 + 阶段比例条。 */
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import DesignIcon from '../DesignIcon.vue';
 import { isFiniteNumber } from '../../lib/format';
@@ -76,6 +76,16 @@ const sleepBarStages = computed(() =>
     return minutes === null ? [] : [{ ...stage, minutes }];
   }),
 );
+const activeStage = ref<{ label: string; minutes: number } | null>(null);
+const hoverLeft = ref(50);
+const hoverStage = (event: PointerEvent) => {
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  const fraction = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+  hoverLeft.value = Math.max(14, Math.min(86, fraction * 100));
+  const total = sleepBarStages.value.reduce((sum, stage) => sum + stage.minutes, 0);
+  let end = 0;
+  activeStage.value = sleepBarStages.value.find(stage => { end += stage.minutes / (total || 1); return fraction <= end; }) ?? null;
+};
 </script>
 
 <template>
@@ -83,7 +93,7 @@ const sleepBarStages = computed(() =>
     <div class="panel-head"><span class="panel-title"><DesignIcon name="sleep" :size="38" /><span><strong>{{ t.sleepTitle }}</strong><small>{{ t.sleepSub }}</small></span></span><span v-if="sleep && isFiniteNumber(sleep.score)" class="sleep-score">{{ sleep.score }}</span></div>
     <template v-if="sleep">
       <p class="sleep-total">{{ hm(sleep.duration_minutes) }}</p>
-      <div class="sleep-bar" :aria-label="t.sleepBarAria"><span v-for="stage in sleepBarStages" :key="stage.key" :style="{ flex: Math.max(1, stage.minutes), background: stage.color }"></span></div>
+      <div class="sleep-bar-hit" @pointermove="hoverStage" @pointerdown.stop.prevent="hoverStage" @click.stop.prevent @pointerleave="activeStage = null"><div class="sleep-bar" :aria-label="t.sleepBarAria"><span v-for="stage in sleepBarStages" :key="stage.key" :style="{ flex: Math.max(1, stage.minutes), background: stage.color }"></span></div><span v-if="activeStage" class="sleep-tooltip" role="tooltip" :style="{ left: `${hoverLeft}%` }">{{ activeStage.label }} · {{ hm(activeStage.minutes) }}</span></div>
       <ul class="sleep-stages"><li v-for="stage in sleepStages" :key="stage.key"><i :style="{ background: stage.color }"></i><span>{{ stage.label }}</span><strong>{{ hm(stage.minutes) }}</strong></li></ul>
     </template>
     <div v-else class="panel-empty compact"><DesignIcon name="sleep" :size="50" /><span>{{ t.sleepEmpty }}</span></div>
@@ -93,15 +103,18 @@ const sleepBarStages = computed(() =>
 
 <style scoped>
 /* 睡眠卡带一层紫色的环境光，浅色里换成白卡 + 同色系淡影。 */
-.sleep-panel {
+.sleep-panel.metric-panel {
+  display: flex; flex-direction: column;
   grid-column: span 3;
+  height: 100%;
   min-height: 286px;
   padding: 18px;
   background:
     radial-gradient(380px 240px at 90% 0, rgba(104, 87, 217, .12), transparent 70%),
     linear-gradient(145deg, #1D1F29, #191C25);
 }
-html[data-theme="light"] .sleep-panel {
+html[data-theme="light"] .sleep-panel.metric-panel {
+  display: flex; flex-direction: column;
   background:
     radial-gradient(380px 240px at 90% 0, var(--sleep-wash), transparent 70%),
     var(--panel);
@@ -123,4 +136,7 @@ html[data-theme="light"] .sleep-panel {
 .sleep-stages strong { color: var(--muted); font-family: var(--font-mono); font-size: var(--fs-sm); font-weight: 600; white-space: nowrap; }
 @media (max-width: 1180px) { .sleep-panel { grid-column: span 6; } }
 @media (max-width: 820px) { .sleep-panel { grid-column: 1; } }
+.sleep-panel .panel-more { margin-top: auto; padding-top: 10px; }
+.sleep-bar-hit { position: relative; padding: 8px 0; margin: -8px 0; }
+.sleep-tooltip { position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); z-index: 2; white-space: nowrap; padding: 7px 10px; border: 1px solid var(--line-control); border-radius: 9px; background: var(--surface-raised); color: var(--ink); font-size: var(--fs-sm); pointer-events: none; }
 </style>

@@ -5,7 +5,7 @@
  * 同名的运动很多（「AI 识别活动」能有几十条），所以每行都带上时间、
  * 时长、距离和平均心率，按日期分组，一眼能分清。
  */
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import Icon from '../Icon.vue';
 import type { Workout } from '../../types';
 import { formatDate, formatDistance, formatDuration, formatTime } from '../../lib/format';
@@ -18,6 +18,7 @@ const emit = defineEmits<{ (event: 'toggle', id: string): void }>();
 const t = useMessages(defineMessages(
   {
     title: '分析哪次运动',
+    previous: '上一页', next: '下一页',
     hint: '可多选，也可以不选',
     noneSelected: (days: number) => `没选运动：分析截至今天的最近 ${days} 天。`,
     selectedCount: (count: number) => `已选 ${count} 次`,
@@ -27,6 +28,7 @@ const t = useMessages(defineMessages(
   },
   {
     title: 'Which workout',
+    previous: 'Previous', next: 'Next',
     hint: 'Pick one or more, or none',
     noneSelected: (days: number) => `No workout selected: the last ${days} days up to today are analysed.`,
     selectedCount: (count: number) => `${count} selected`,
@@ -36,6 +38,7 @@ const t = useMessages(defineMessages(
   },
   {
     title: 'Qué entrenamiento',
+    previous: 'Anterior', next: 'Siguiente',
     hint: 'Elige uno o varios, o ninguno',
     noneSelected: (days: number) => `Sin entrenamiento: se analizan los últimos ${days} días hasta hoy.`,
     selectedCount: (count: number) => `${count} seleccionados`,
@@ -48,9 +51,13 @@ const t = useMessages(defineMessages(
 
 const selected = computed(() => props.workouts.filter((workout) => props.selectedIds.includes(workout.workout_id)));
 
+const page = ref(0);
+const pageSize = 5;
+const pageCount = computed(() => Math.max(1, Math.ceil(props.workouts.length / pageSize)));
+watch(pageCount, count => { page.value = Math.min(page.value, count - 1); });
 const groups = computed(() => {
   const byDay = new Map<string, Workout[]>();
-  for (const workout of props.workouts) {
+  for (const workout of props.workouts.slice(page.value * pageSize, (page.value + 1) * pageSize)) {
     const day = formatDate(workout.start_time, 'long');
     byDay.set(day, [...(byDay.get(day) ?? []), workout]);
   }
@@ -102,19 +109,25 @@ const facts = (workout: Workout): string => {
       </template>
     </div>
     <p v-else class="ai-note">{{ t.empty }}</p>
+    <div v-if="pageCount > 1" class="pagination">
+      <button type="button" class="ai-tool" :disabled="page === 0" @click="page--">{{ t.previous }}</button>
+      <span>{{ page + 1 }} / {{ pageCount }}</span>
+      <button type="button" class="ai-tool" :disabled="page + 1 === pageCount" @click="page++">{{ t.next }}</button>
+    </div>
   </section>
 </template>
 
 <style scoped>
 .chosen { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
 .chosen-count { color: var(--subtle); font-size: var(--fs-xs); margin-right: 4px; }
-.list { display: grid; gap: 2px; max-height: 260px; margin-top: 10px; overflow-y: auto; padding-right: 4px; }
-.day { position: sticky; top: 0; margin: 6px 0 2px; padding: 2px 0; background: var(--surface); color: var(--subtle); font-size: var(--fs-xs); font-weight: 600; }
+.list { display: grid; gap: 2px; margin-top: 10px; padding-right: 4px; overflow: visible; }
+.day { margin: 6px 0 2px; padding: 2px 0; background: var(--surface); color: var(--subtle); font-size: var(--fs-xs); font-weight: 600; }
 .row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--muted); text-align: left; cursor: pointer; }
 .row:hover { background: var(--surface-hover); }
 .row.is-on { border-color: color-mix(in srgb, var(--accent) 40%, transparent); background: var(--accent-soft); color: var(--accent); }
 .row:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
-.row-copy { display: grid; min-width: 0; }
+.row-copy { display: grid; min-width: 0; gap: 3px; overflow-wrap: anywhere; }
 .row-name { color: var(--ink); font-size: var(--fs-sm); }
 .row-facts { color: var(--subtle); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.pagination { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; color: var(--muted); font-size: var(--fs-sm); }
 </style>

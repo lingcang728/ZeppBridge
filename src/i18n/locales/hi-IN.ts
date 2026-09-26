@@ -14,6 +14,7 @@ import { plural, type LocalePack } from '../index';
  */
 export default {
   modules: {
+    'components/ai/WorkoutPicker': { previous: 'पिछला', next: 'अगला' },
     'views/Explore': {
       title: 'AI को सौंपें',
       intro: 'टेम्पलेट चुनें, पैकेज में असल में क्या है देखें, और अपना वियरेबल डेटा अपनी पसंद के AI टूल को भेजें।',
@@ -972,9 +973,6 @@ Markdown में जवाब दें।`,
       defaultEmpty: 'यह मेट्रिक सिंक होने के बाद अपना ट्रेंड दिखाता है।',
     },
 
-    'components/PageHeader': {
-      backToOverview: 'ओवरव्यू पर वापस',
-    },
 
     'components/SelectMenu': {
       placeholder: 'चुनें…',
