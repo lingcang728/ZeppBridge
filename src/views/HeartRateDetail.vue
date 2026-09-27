@@ -23,7 +23,7 @@ import SegmentTrack from '../components/SegmentTrack.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
-import { indexSeries, SERIES_RANGE_DAYS, seriesRanges, type SeriesRangeDays } from '../lib/metricSeries';
+import { indexSeries, SERIES_RANGE_DAYS, SMOOTH_CHART_UPDATE, seriesRanges, type SeriesRangeDays } from '../lib/metricSeries';
 import { isFiniteNumber } from '../lib/format';
 import type { DailyHeartRateExtreme, HeartRatePoint, MetricSeries } from '../types';
 import { useMessages } from '../i18n';
@@ -208,6 +208,8 @@ const dailyMaxChartOption = computed(() => {
   const rows = dailyExtremes.value;
   return {
     animationDuration: 700,
+    animationDurationUpdate: 520,
+    animationEasingUpdate: 'cubicInOut' as const,
     grid: { left: 40, right: 12, top: 28, bottom: 26 },
     legend: {
       data: [t.value.dailyMaxLegendMax, t.value.dailyMaxLegendAvg],
@@ -346,6 +348,7 @@ watch(dataRevision, () => { void load(); });
           :key="CHART_THEME"
           :theme="CHART_THEME"
           :option="dailyMaxChartOption"
+          :update-options="SMOOTH_CHART_UPDATE"
           autoresize
           role="img"
           :aria-label="t.dailyMaxAria"

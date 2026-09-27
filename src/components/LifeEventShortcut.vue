@@ -1,8 +1,9 @@
 <script setup lang="ts">
 /**
- * 页面顶上的一排生活事件胶囊：「+ 添加事件」、这段时间里的事件（带分类色点，点开编辑）、
- * 「管理」跳到概览的生活事件时间线。以前是一行散落的纯文字链接，每张趋势卡里还各有
- * 一份，和页面上的胶囊、玻璃不是一种东西；现在每页只有这一排。
+ * 页面顶上的一排生活事件胶囊：「+ 添加事件」和这段时间里的事件（带分类色点，点开编辑）；
+ * 超过三件时多一枚「相关事件 · N」跳到概览的生活事件时间线。以前是一行散落的纯文字
+ * 链接，右边还挂着一个「管理生活事件」小标题，每张趋势卡里又各有一份——和页面上的胶囊、
+ * 玻璃不是一种东西；现在每页只有这一排。
  */
 import { computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
@@ -31,7 +32,6 @@ onMounted(reload);
       <i aria-hidden="true"></i><span>{{ event.title }}</span>
     </button>
     <button v-if="related.length > 3" type="button" class="pill-button quiet" @click="manage">{{ t.related }} · {{ related.length }}</button>
-    <button type="button" class="pill-button quiet manage" @click="manage">{{ t.manage }}<Icon name="chevron-right" :size="14" /></button>
   </div>
 </template>
 
@@ -42,5 +42,4 @@ onMounted(reload);
 .event-chip i { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: var(--event-tone); }
 .event-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .event-chip:hover { background: color-mix(in srgb, var(--event-tone) 22%, transparent); }
-.manage { margin-left: auto; }
 </style>
