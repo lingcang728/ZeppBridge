@@ -100,8 +100,10 @@ function Get-CargoTargetDir {
   return [System.IO.Path]::GetFullPath($target)
 }
 
+# 版本号可以带预发布后缀（3.0.0-beta.4）。以前只认 x.y.z，于是 v3 的每一个
+# beta 安装包都认不出版本、永远不会被当成旧包清掉，release\ 里越积越多。
 function Get-VersionedArtifactVersion([string]$Name, [string]$ProductName) {
-  if ($Name -match "^$([regex]::Escape($ProductName))_(\d+\.\d+\.\d+)_") {
+  if ($Name -match "^$([regex]::Escape($ProductName))_(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)_") {
     return $Matches[1]
   }
   return $null
