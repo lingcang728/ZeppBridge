@@ -5,7 +5,7 @@
  * 三块，从上到下：归档开关 → 补拉以前的历史 → 覆盖账本。
  * 状态和动作在 composables/useHistoryBackfill.ts，账本视图在 archive/CoverageLedger.vue。
  */
-import DatePicker from './DatePicker.vue';
+import WheelDatePicker from './WheelDatePicker.vue';
 import SegmentTrack from './SegmentTrack.vue';
 import CoverageLedger from './archive/CoverageLedger.vue';
 import { useHistoryBackfill } from '../composables/useHistoryBackfill';
@@ -61,7 +61,7 @@ const {
         <div v-if="startChoice === 'custom'" class="s-row">
           <div class="s-row-main"><span class="s-row-title">{{ t.customDateLabel }}</span></div>
           <div class="s-row-control">
-            <DatePicker v-model="customFrom" :aria-label="t.customDateAria" :disabled="busy" />
+            <WheelDatePicker v-model="customFrom" :aria-label="t.customDateAria" />
           </div>
         </div>
         <div class="s-row">

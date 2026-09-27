@@ -479,12 +479,6 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       reconnect: 'Reconnecter le compte',
     },
 
-    'components/DatePicker': {
-      aria: 'Choisir une date',
-      next: 'Mois suivant',
-      placeholder: 'Choisir une date',
-      prev: 'Mois précédent',
-    },
 
     'components/DeviceMarquee': {
       marqueeAria: 'Appareils Amazfit actuellement au catalogue',

@@ -576,12 +576,6 @@ export default {
       syncNow: 'Синхронизировать сейчас',
     },
 
-    'components/DatePicker': {
-      placeholder: 'Выберите дату',
-      aria: 'Выбор даты',
-      prev: 'Предыдущий месяц',
-      next: 'Следующий месяц',
-    },
 
     'components/DeviceMarquee': {
       marqueeAria: 'Модели Amazfit, уже есть в каталоге',

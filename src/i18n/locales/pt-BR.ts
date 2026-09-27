@@ -149,12 +149,6 @@ export default {
       syncNow: 'Sincronizar agora',
     },
 
-    'components/DatePicker': {
-      placeholder: 'Escolha uma data',
-      aria: 'Escolher uma data',
-      prev: 'Mês anterior',
-      next: 'Próximo mês',
-    },
 
     'components/DeviceMarquee': {
       marqueeAria: 'Dispositivos Amazfit atualmente no catálogo',

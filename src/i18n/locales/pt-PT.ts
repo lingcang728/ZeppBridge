@@ -534,12 +534,6 @@ export default {
       backfilling: 'A repôr…',
       syncNow: 'Sincronizar agora',
     },
-    'components/DatePicker': {
-      placeholder: 'Escolhe uma data',
-      aria: 'Escolher uma data',
-      prev: 'Mês anterior',
-      next: 'Mês seguinte',
-    },
     'components/DeviceMarquee': {
       marqueeAria: 'Dispositivos Amazfit atualmente no catálogo',
     },

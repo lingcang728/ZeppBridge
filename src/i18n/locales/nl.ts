@@ -159,12 +159,6 @@ export default {
       backfilling: 'Historie ophalen…',
       syncNow: 'Nu synchroniseren',
     },
-    'components/DatePicker': {
-      placeholder: 'Kies een datum',
-      aria: 'Kies een datum',
-      prev: 'Vorige maand',
-      next: 'Volgende maand',
-    },
     'components/DeviceMarquee': {
       marqueeAria: 'Amazfit-apparaten die nu in de catalogus staan',
     },

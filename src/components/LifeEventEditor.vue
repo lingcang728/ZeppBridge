@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import DatePicker from './DatePicker.vue';
+import WheelDatePicker from './WheelDatePicker.vue';
 import ModalDialog from './ModalDialog.vue';
 import SegmentTrack from './SegmentTrack.vue';
 import { useLifeEvents } from '../composables/useLifeEvents';
@@ -16,6 +16,10 @@ const categoryOptions = computed(() =>
   eventCategories.map((category) => ({ value: category, label: t.value.categories[category] })),
 );
 watch(draft, () => { error.value = ''; confirmingDelete.value = false; });
+// 开始日期滚过了结束日期：结束日期跟着走，不让两者倒挂（保存时才报错太晚了）。
+watch(() => draft.value?.startDate, (start) => {
+  if (draft.value && start && draft.value.endDate && draft.value.endDate < start) draft.value.endDate = start;
+});
 const ongoing = computed({ get: () => draft.value?.endDate === null, set: value => {
   if (draft.value) draft.value.endDate = value ? null : draft.value.startDate;
 } });
@@ -61,10 +65,10 @@ async function remove() {
         </div>
         <div class="event-dates">
           <label>{{ t.start }}
-            <DatePicker v-model="draft.startDate" :aria-label="t.start" data-event-start />
+            <WheelDatePicker v-model="draft.startDate" :aria-label="t.start" data-event-start />
           </label>
           <label v-if="!ongoing">{{ t.end }}
-            <DatePicker v-model="draft.endDate" :min="draft.startDate" :aria-label="t.end" data-event-end />
+            <WheelDatePicker v-model="draft.endDate" :min="draft.startDate" :aria-label="t.end" data-event-end />
           </label>
         </div>
         <div class="check">

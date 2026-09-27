@@ -727,12 +727,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         `Dieser Rechner hat ${covered} Tage Daten (früheste ${earliest}). Alles davor ist leer, weil es noch nicht aus der Cloud geholt wurde – nicht weil du damals nichts aufgezeichnet hast.`,
       syncNow: 'Jetzt synchronisieren',
     },
-    'components/DatePicker': {
-      aria: 'Wähle ein Datum',
-      next: 'Nächster Monat',
-      placeholder: 'Datum wählen',
-      prev: 'Voriger Monat',
-    },
     'components/DeviceMarquee': {
       marqueeAria: 'Derzeit im Katalog geführte Amazfit-Geräte',
     },

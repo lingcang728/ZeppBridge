@@ -498,12 +498,6 @@ export default {
       reconnect: 'खाता फिर से जोड़ें',
     },
 
-    'components/DatePicker': {
-      aria: 'तारीख़ चुनें',
-      placeholder: 'तारीख़ चुनें',
-      prev: 'पिछला महीना',
-      next: 'अगला महीना',
-    },
 
     'components/DeviceMarquee': {
       marqueeAria: 'कैटलॉग में मौजूद Amazfit डिवाइस',
