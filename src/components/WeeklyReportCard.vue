@@ -6,6 +6,7 @@
  * 不足就说不足。**只和你自己的历史比**——项目没有人群基准数据，也不打算有；
  * 这里不做诊断、治疗或风险预测。
  */
+import { RouterLink } from 'vue-router';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useFirstLoad } from '../composables/useFirstLoad';
 import Icon from './Icon.vue';
@@ -144,6 +145,18 @@ const reasonText = (fact: InsightFact): string => {
   return fact.reason || t.value.noBaseline;
 };
 
+/* 每一格都能点进对应的详情页：有悬停反馈的东西就该能点进去。 */
+const DETAIL_ROUTE: Record<string, string> = {
+  'weekly.resting_hr': '/heart',
+  'weekly.hrv': '/body',
+  'weekly.stress': '/body',
+  'weekly.sleep_duration': '/sleep',
+  'weekly.sleep_start_regularity': '/sleep',
+  'weekly.workout_count': '/workouts',
+  'weekly.training_load': '/training',
+};
+const detailRoute = (factId: string): string => DETAIL_ROUTE[factId] ?? '/recent';
+
 const metricLabel = (factId: string, fallback: string): string =>
   (t.value.metric as Record<string, string | undefined>)[factId] ?? fallback;
 
@@ -263,7 +276,7 @@ function formatNumber(fact: InsightFact, value: number): string {
 
     <template v-else>
       <div class="weekly-grid">
-        <div v-for="fact in facts" :key="fact.fact_id" class="weekly-item">
+        <RouterLink v-for="fact in facts" :key="fact.fact_id" class="weekly-item" :to="detailRoute(fact.fact_id)">
           <span class="weekly-label">{{ metricLabel(fact.fact_id, fact.metric) }}</span>
           <strong>{{ formatValue(fact) }}</strong>
 
@@ -277,7 +290,7 @@ function formatNumber(fact: InsightFact, value: number): string {
           </template>
 
           <span v-else class="weekly-delta muted">{{ reasonText(fact) }}</span>
-        </div>
+        </RouterLink>
       </div>
     </template>
   </section>
@@ -323,7 +336,7 @@ function formatNumber(fact: InsightFact, value: number): string {
 .weekly-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 10px; align-items: stretch; }
 /* 每一项是一块凸起的小板（以前是凹下去的平面磁贴）：亮一点的底、顶边高光、柔和投影，
    悬停时浮起来一点。 */
-.weekly-item { display: grid; gap: 2px; align-content: start; padding: 12px 14px; border-radius: 20px;
+.weekly-item { display: grid; gap: 2px; color: inherit; text-decoration: none; align-content: start; padding: 12px 14px; border-radius: 20px;
   background: linear-gradient(180deg, color-mix(in srgb, var(--ink) 6%, transparent), color-mix(in srgb, var(--ink) 2.5%, transparent));
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 9%, transparent), inset 0 -1px 0 rgba(0, 0, 0, .18), 0 6px 16px -10px rgba(0, 0, 0, .5);
   transition: translate var(--dur-base) var(--ease-out), box-shadow var(--dur-base) ease; }

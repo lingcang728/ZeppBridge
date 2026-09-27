@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import LifeEventsPanel from '../components/LifeEventsPanel.vue';
-import LifeEventShortcut from '../components/LifeEventShortcut.vue';
 
 defineOptions({ name: 'Overview' });
 import { computed, onActivated, onDeactivated, onMounted, ref, watch } from 'vue';
@@ -11,13 +9,11 @@ import Icon from '../components/Icon.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 /* 心率曲线是 SVG（HrMiniChart），首页不再加载 ECharts，所以这张卡可以静态引入。 */
 import HeartRateCard from '../components/overview/HeartRateCard.vue';
-import WeeklyReportCard from '../components/WeeklyReportCard.vue';
 import RecentCard from '../components/overview/RecentCard.vue';
 import SleepCard from '../components/overview/SleepCard.vue';
 import DataReadyCapsule from '../components/overview/DataReadyCapsule.vue';
-import SourcesStrip from '../components/overview/SourcesStrip.vue';
-import StatusEntryCard from '../components/overview/StatusEntryCard.vue';
 import StepsCard from '../components/overview/StepsCard.vue';
+import OverviewMore from '../components/overview/OverviewMore.vue';
 import '../components/overview/panels.css';
 import { useDevices } from '../composables/useDevices';
 import { useSyncController } from '../composables/useSyncController';
@@ -318,17 +314,11 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
       <em>{{ t.unrecognizedCta }} <GlyphTile name="chevron-right" :size="16" /></em>
     </RouterLink>
 
-    <WeeklyReportCard />
-
     <!--
       同步跑通却一条记录都没有，最先看到的是这一页。上面每个面板各自说一句
       「暂无数据」，谁也不解释为什么——而原因往往是登录时没确认对区域。
     -->
     <CoverageNotice />
-    <LifeEventShortcut />
-
-    <!-- v2 左侧栏的「数据来源」搬到了这里：一条横带列出设备和账户状态。 -->
-    <SourcesStrip />
 
     <div v-if="partialWarning" class="inline-alert warning" role="status"><Icon name="info" :size="15" />{{ partialWarning }}</div>
     <div v-if="deviceError" class="inline-alert warning" role="status"><Icon name="info" :size="15" />{{ t.deviceErrorPrefix }}{{ deviceError }}</div>
@@ -347,35 +337,17 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
       </div>
       <StepsCard v-tilt :steps="stepsToday" :goal="overview?.steps_goal ?? null" :latest-at="overview?.latest_heart_rate_at ?? null" />
       <SleepCard v-tilt :sleep="lastSleep" />
-      <StatusEntryCard
-        v-tilt
-        to="/body"
-        tone="body"
-        icon="recovery"
-        :aria-label="t.bodyPanelAria"
-        :title="t.bodyTitle"
-        :facts="bodyEntry.facts"
-        :spark="bodyEntry.spark"
-        :spark-color="bodyEntry.sparkColor"
-        :spark-label="bodyEntry.sparkLabel"
-        :note="bodyEntry.measured ? t.bodyThin : t.bodyEmpty"
-      />
-      <StatusEntryCard
-        v-tilt
-        to="/training"
-        tone="training"
-        icon="training-load"
-        :aria-label="t.trainingPanelAria"
-        :title="t.trainingTitle"
-        :facts="trainingEntry.facts"
-        :spark="trainingEntry.spark"
-        :spark-color="trainingEntry.sparkColor"
-        :spark-label="trainingEntry.sparkLabel"
-        :note="trainingEntry.measured ? t.trainingThin : t.trainingEmpty"
-      />
       <RecentCard v-tilt :sleep="recentSleep" :workouts="recentWorkouts" />
     </div>
-    <LifeEventsPanel />
+
+    <!-- 首屏只留心率、步数、睡眠、最近记录四张常看的主卡；这一周、身体、训练、生活事件、
+         数据来源收进卡包，按需点开飞出来（和设置页一样：初始简洁，细节自己展开）。 -->
+    <OverviewMore
+      :body="{ ...bodyEntry, caption: bodyEntry.measured ? t.bodyThin : t.bodyEmpty }"
+      :training="{ ...trainingEntry, caption: trainingEntry.measured ? t.trainingThin : t.trainingEmpty }"
+      :body-title="t.bodyTitle" :training-title="t.trainingTitle"
+      :body-aria="t.bodyPanelAria" :training-aria="t.trainingPanelAria"
+    />
   </section>
 </template>
 

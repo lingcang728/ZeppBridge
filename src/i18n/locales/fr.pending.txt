@@ -19,6 +19,17 @@ components/ai/HandoffPanel.editHint
 components/ai/HandoffPanel.edited
 components/ai/HandoffPanel.fixedTail
 components/ai/HandoffPanel.resetPrompt
+components/deck/FoldDeck.close
+components/deck/FoldDeck.collapseAll
+components/deck/FoldDeck.expandAll
+components/deck/FoldDeck.open
+components/overview/OverviewMore.label
+components/overview/OverviewMore.life
+components/overview/OverviewMore.lifeSub
+components/overview/OverviewMore.sources
+components/overview/OverviewMore.sourcesSub
+components/overview/OverviewMore.weekly
+components/overview/OverviewMore.weeklySub
 lib/aiTask/brief.defaultPlan
 lib/aiTask/brief.fileAttachments
 lib/aiTask/brief.fileData
