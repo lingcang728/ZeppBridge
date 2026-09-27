@@ -200,7 +200,15 @@ fn template_direction_and_question_are_combined() {
 
     // 前端给了本地化方向段：它和问题都在，顺序是 方向 → 问题 → 覆盖说明。
     let result = db
-        .ai_task_prepare_plan(&t, "覆盖段", Some("Direction: recovery"), &dir)
+        .ai_task_prepare_plan(
+            &t,
+            "覆盖段",
+            &crate::ai_tasks::export::AiTaskPromptParts {
+                direction: Some("Direction: recovery"),
+                ..Default::default()
+            },
+            &dir,
+        )
         .unwrap()
         .finish()
         .unwrap();
@@ -216,6 +224,67 @@ fn template_direction_and_question_are_combined() {
     let result = db.ai_task_prepare(&t, "", &dir).unwrap();
     assert!(result.prompt_text.contains("恢复跑"));
     assert!(result.prompt_text.contains("重点看周三那次"));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn brief_leads_the_prompt_and_files_take_the_given_names() {
+    use crate::ai_tasks::export::AiTaskPromptParts;
+    let db = Database::in_memory().unwrap();
+    insert_workout(&db, "w1", utc(2026, 9, 10, 10));
+    let dir = temp_dir("brief");
+    let mut t = task();
+    t.categories = vec![range(AiTaskCategory::Sleep, 3, true)];
+
+    // 没写问题、没选模板：任务说明必须在最前，覆盖说明在最后——交出去的提示词
+    // 自己就说清楚要 AI 做什么。文件名按前端给的主名走，非法字符被清洗。
+    let parts = AiTaskPromptParts {
+        brief: Some("任务说明：直接开始分析"),
+        data_stem: Some("ZeppBridge_0914-0927_睡眠:心率"),
+        prompt_stem: Some("ZeppBridge_0914-0927_睡眠:心率_提示词"),
+        ..Default::default()
+    };
+    let result = db
+        .ai_task_prepare_plan(&t, "覆盖段", &parts, &dir)
+        .unwrap()
+        .finish()
+        .unwrap();
+    let text = &result.prompt_text;
+    assert!(
+        text.find("任务说明").unwrap() < text.find("覆盖段").unwrap(),
+        "{text}"
+    );
+    let json = result.json_path.unwrap();
+    let prompt = result.prompt_path.unwrap();
+    assert!(
+        json.ends_with("ZeppBridge_0914-0927_睡眠_心率.json"),
+        "{json}"
+    );
+    assert!(
+        prompt.ends_with("ZeppBridge_0914-0927_睡眠_心率_提示词.txt"),
+        "{prompt}"
+    );
+    assert_eq!(std::fs::read_to_string(&prompt).unwrap(), *text);
+
+    // 手改过的最终提示词替换 说明 + 方向 + 问题，覆盖说明仍附在后面。
+    t.prompt = "原来的问题".into();
+    let edited = AiTaskPromptParts {
+        brief: Some("任务说明"),
+        override_text: Some("我自己改过的整段"),
+        ..Default::default()
+    };
+    let result = db
+        .ai_task_prepare_plan(&t, "覆盖段", &edited, &dir)
+        .unwrap()
+        .finish()
+        .unwrap();
+    assert_eq!(
+        result.prompt_text,
+        "我自己改过的整段
+
+覆盖段"
+    );
+    assert!(result.json_path.unwrap().ends_with("health-context.json"));
     let _ = std::fs::remove_dir_all(&dir);
 }
 

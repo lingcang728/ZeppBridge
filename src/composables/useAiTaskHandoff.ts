@@ -1,7 +1,7 @@
 /**
  * 交付区的状态机：三步各自有状态、各自可重试。
  *
- *   1. `prepare` 后端把 health-context.json、prompt.txt 和附件原件写到桌面
+ *   1. `prepare` 后端把数据 JSON、提示词 txt（按命名规则起名）和附件原件写到桌面
  *                `ZeppBridge AI\<任务名>_<时间>\`（ai_task_prepare）。
  *   2. `copy`    前端把最终提示词写进剪贴板。
  *   3. `open`    打开所选 AI 的网站，并在资源管理器里选中那个文件夹。
@@ -11,7 +11,7 @@
  */
 import { ref } from 'vue';
 import { backend, toUserMessage } from '../lib/bridge';
-import type { AiTask, AiTaskPrepareResult } from '../lib/bridge/types';
+import type { AiTask, AiTaskPrepareOptions, AiTaskPrepareResult } from '../lib/bridge/types';
 import { taskSnapshot } from '../lib/aiTask/draft';
 import { coverageNoteText } from '../lib/aiTask/copy';
 import { copyTextToClipboard, openProviderSite, revealInFolder } from './useAiHandoff';
@@ -72,10 +72,10 @@ export function useAiTaskHandoff() {
   const isStale = (task: AiTask): boolean =>
     preparedSnapshot.value !== null && taskSnapshot(task) !== preparedSnapshot.value;
 
-  const runPrepare = async (task: AiTask, direction: string | null = null) => {
+  const runPrepare = async (task: AiTask, direction: string | null = null, options?: AiTaskPrepareOptions) => {
     steps.value = { ...freshSteps(), prepare: { state: 'doing', errorText: null } };
     try {
-      const result = await backend.aiTaskPrepare(task, coverageNoteText(), direction);
+      const result = await backend.aiTaskPrepare(task, coverageNoteText(), direction, options);
       prepareResult.value = result;
       preparedSnapshot.value = taskSnapshot(task);
       setStep('prepare', result.status === 'blocked' ? 'blocked' : 'done');
@@ -120,8 +120,8 @@ export function useAiTaskHandoff() {
   };
 
   /** 主按钮：导出 → 复制 → 打开网站 + 选中文件夹。哪步失败停在哪步。 */
-  const runAll = async (task: AiTask, provider: AiProvider, direction: string | null = null) => {
-    const prepared = await runPrepare(task, direction);
+  const runAll = async (task: AiTask, provider: AiProvider, direction: string | null = null, options?: AiTaskPrepareOptions) => {
+    const prepared = await runPrepare(task, direction, options);
     if (!prepared || prepared.status !== 'ready') return;
     if (!(await runCopy())) return;
     await runOpen(provider);
@@ -129,8 +129,8 @@ export function useAiTaskHandoff() {
   };
 
   /** 「只导出到桌面」：导出并选中文件夹，不复制、不打开网站。 */
-  const exportOnly = async (task: AiTask, direction: string | null = null) => {
-    const prepared = await runPrepare(task, direction);
+  const exportOnly = async (task: AiTask, direction: string | null = null, options?: AiTaskPrepareOptions) => {
+    const prepared = await runPrepare(task, direction, options);
     if (prepared?.status === 'ready') await revealOutput();
   };
 

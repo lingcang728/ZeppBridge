@@ -29,6 +29,9 @@ const props = withDefaults(defineProps<{
   disabled?: boolean;
   /** 首尾相接。 */
   loop?: boolean;
+  /** 胶囊宽度跟着选中项走：镜片 + 两侧各露出这么多像素的邻项。给了它 `span` 只作初值。
+   *  顶栏语言用它：「中文」一枚小胶囊，「Português (Portugal)」就撑宽，不再挤在一起。 */
+  fitPeek?: number;
   /** 固定画在正中镜片左侧的图标（顶栏语言的地球）：图标和当前项贴在一起，读起来是一枚胶囊。 */
   lensIcon?: IconName;
   /** `inset` 表单里的凹槽底；`bare` 放进已经是玻璃的按钮组里（没有自己的底）。 */
@@ -40,6 +43,7 @@ const props = withDefaults(defineProps<{
   disabled: false,
   loop: false,
   lensIcon: undefined,
+  fitPeek: undefined,
   variant: 'inset',
 });
 
@@ -124,8 +128,13 @@ const posAt = (arc: number): number => {
   while (lo < last - 1 && list[lo + 1]! < arc) lo += 1;
   return lo + (arc - list[lo]!) / (list[lo + 1]! - list[lo]!);
 };
+/** 胶囊实际的可视宽度：固定 span，或（fitPeek）跟着镜片伸缩。 */
+const liveSpan = computed(() => {
+  if (props.fitPeek === undefined || vertical.value || !sizes.value.length) return props.span;
+  return Math.round(lensSize.value + 22 + props.fitPeek * 2);
+});
 /** 圆柱半径：比胶囊可视宽度的一半略大，边缘那一项转过拐角但仍认得出来。 */
-const radius = computed(() => props.span * 0.62);
+const radius = computed(() => liveSpan.value * 0.62);
 
 const clampPos = (value: number) => (looping() ? value : Math.min(count() - 1, Math.max(0, value)));
 /** 拖过两端时的橡皮筋：越界部分只走三分之一。首尾相接时没有两端。 */
@@ -340,9 +349,9 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
   <div
     ref="root"
     :class="['capsule-wheel', `is-${orientation}`, `is-${variant}`, {
-      'is-dragging': dragging, 'is-animating': animating, 'is-icon-only': iconOnly, 'is-disabled': disabled, 'has-lens-icon': lensIcon,
+      'is-dragging': dragging, 'is-animating': animating, 'is-fit': fitPeek !== undefined, 'is-icon-only': iconOnly, 'is-disabled': disabled, 'has-lens-icon': lensIcon,
     }]"
-    :style="vertical ? { height: `${span}px` } : { width: `${span}px` }"
+    :style="vertical ? { height: `${span}px` } : { width: `${liveSpan}px` }"
     role="slider"
     tabindex="0"
     :aria-label="ariaLabel"
@@ -408,6 +417,8 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
   -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 25%, #000 75%, transparent 100%);
   mask-image: linear-gradient(180deg, transparent 0, #000 25%, #000 75%, transparent 100%);
 }
+.capsule-wheel.is-fit { transition: width var(--dur-base) var(--ease-out); }
+.capsule-wheel.is-fit.is-dragging, .capsule-wheel.is-fit.is-animating { transition: none; }
 .capsule-wheel.is-dragging { cursor: grabbing; }
 .capsule-wheel.is-disabled { opacity: .5; cursor: not-allowed; }
 .capsule-wheel:focus-visible .wheel-lens { box-shadow: 0 0 0 2px var(--focus), var(--cap-thumb-rim); }

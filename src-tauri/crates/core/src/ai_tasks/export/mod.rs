@@ -66,12 +66,31 @@ pub(crate) struct WindowGather {
     pub rows: Vec<(String, String, Value)>,
 }
 
+/// 提示词与文件名里由前端按界面语言整理好的几段——后端不产文案，只拼接和清洗。
+/// 全部可空：CLI 等旧调用方什么都不传，行为与以前一致。
+#[derive(Debug, Default, Clone, Copy)]
+pub struct AiTaskPromptParts<'a> {
+    /// 「任务说明」段：数据是什么、文件怎么读、没写问题时默认做什么、直接开始分析。放最前。
+    pub brief: Option<&'a str>,
+    /// 「分析方向」段（模板）。没传时回落到模板自带的 prompt_template。
+    pub direction: Option<&'a str>,
+    /// 用户在最终提示词里手改过的整段：替换 任务说明 + 方向 + 问题 三段，覆盖说明仍追加在后。
+    pub override_text: Option<&'a str>,
+    /// 数据文件主名（不含扩展名）；空 = 旧名 `health-context`。
+    pub data_stem: Option<&'a str>,
+    /// 提示词文件主名（不含扩展名）；空 = 旧名 `prompt`。
+    pub prompt_stem: Option<&'a str>,
+}
+
 /// `ai_task_prepare_plan` 的产物：读侧全部完成、只差文件落盘。
 /// 命令层先拿它在只读连接上跑构建，再把 `finish()` 放到阻塞线程上——
 /// 写出的文件不占数据库连接，也不需要跨进程写锁。
 pub struct AiTaskPreparePlan {
     task_id: String,
     output_dir: PathBuf,
+    /// 数据文件与提示词文件的文件名（已清洗、带扩展名）。
+    json_name: String,
+    prompt_name: String,
     prompt_text: String,
     attachments: Vec<AiTaskAttachmentStatus>,
     blocked: Vec<AiTaskIssue>,
@@ -111,8 +130,8 @@ impl AiTaskPreparePlan {
                 self.output_dir.display()
             ))
         })?;
-        let json_path = self.output_dir.join("health-context.json");
-        let prompt_path = self.output_dir.join("prompt.txt");
+        let json_path = self.output_dir.join(&self.json_name);
+        let prompt_path = self.output_dir.join(&self.prompt_name);
         write_file_atomically(&json_path, json_text.as_bytes())
             .map_err(|error| AiTaskError::write_failed(format!("写入交接 JSON 失败: {error}")))?;
         write_file_atomically(&prompt_path, self.prompt_text.as_bytes())
@@ -151,6 +170,24 @@ fn copy_attachments(output_dir: &Path, sources: &[(PathBuf, String)]) -> Result<
         })?;
     }
     Ok(sources.len() as i64)
+}
+
+/// 数据文件与提示词文件的最终文件名：前端给的主名按 Windows 规则清洗；
+/// 没给就用旧名；两个主名清洗后撞了，提示词那个加后缀，不会互相覆盖。
+fn export_file_names(parts: &AiTaskPromptParts<'_>) -> (String, String) {
+    let stem = |value: Option<&str>, fallback: &str| {
+        value
+            .map(str::trim)
+            .filter(|text| !text.is_empty())
+            .map(|text| sanitize_file_name(text, fallback))
+            .unwrap_or_else(|| fallback.to_string())
+    };
+    let data = stem(parts.data_stem, "health-context");
+    let mut prompt = stem(parts.prompt_stem, "prompt");
+    if prompt.to_lowercase() == data.to_lowercase() {
+        prompt = format!("{data}_prompt");
+    }
+    (format!("{data}.json"), format!("{prompt}.txt"))
 }
 
 fn unique_file_name(name: &str, used: &mut BTreeSet<String>) -> String {
@@ -207,27 +244,33 @@ impl Database {
         coverage_note: &str,
         output_root: &Path,
     ) -> Result<AiTaskPrepareResult> {
-        self.ai_task_prepare_plan(task, coverage_note, None, output_root)?
-            .finish()
+        self.ai_task_prepare_plan(
+            task,
+            coverage_note,
+            &AiTaskPromptParts::default(),
+            output_root,
+        )?
+        .finish()
     }
 
     /// `ai_task_prepare` 的读侧：校验、锚点解析、附件核对、提示词拼装、
     /// blocked 判定与 bundle 构建（含 JSON 序列化）全部在这里完成；
     /// 返回的 [`AiTaskPreparePlan`] 只剩纯文件落盘，不再碰库。
     ///
-    /// `direction_text`：前端按界面语言整理好的「分析方向」段（模板），
-    /// 与 `coverage_note` 同一种做法——后端不产文案，只拼接。
+    /// `parts`：前端按界面语言整理好的任务说明 / 方向 / 手改全文与文件名，
+    /// 与 `coverage_note` 同一种做法——后端不产文案，只拼接和清洗。
     pub fn ai_task_prepare_plan(
         &self,
         task: &AiTask,
         coverage_note: &str,
-        direction_text: Option<&str>,
+        parts: &AiTaskPromptParts<'_>,
         output_root: &Path,
     ) -> Result<AiTaskPreparePlan> {
         let task = normalize_task_draft(task)?;
         let anchors = self.ai_task_anchors(&task.workout_ids)?;
         let attachments = stat_task_attachments(&task.attachments);
-        let prompt_text = self.assemble_task_prompt(&task, coverage_note, direction_text)?;
+        let prompt_text = self.assemble_task_prompt(&task, coverage_note, parts)?;
+        let (json_name, prompt_name) = export_file_names(parts);
 
         // 没有关联运动不再拦：窗口锚在今天，分析的就是「最近 N 天」。
         let mut blocked: Vec<AiTaskIssue> = Vec::new();
@@ -263,6 +306,8 @@ impl Database {
             return Ok(AiTaskPreparePlan {
                 task_id,
                 output_dir,
+                json_name,
+                prompt_name,
                 prompt_text,
                 attachments,
                 blocked,
@@ -288,6 +333,8 @@ impl Database {
         Ok(AiTaskPreparePlan {
             task_id,
             output_dir,
+            json_name,
+            prompt_name,
             prompt_text,
             attachments: bundle.attachments,
             blocked: Vec::new(),

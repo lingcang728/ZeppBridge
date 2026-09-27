@@ -23,6 +23,7 @@ import { AI_PROVIDERS, type AiProvider, type AiProviderId } from '../../lib/aiPr
 import { aiTaskIssueText } from '../../lib/aiTask/copy';
 import { formatBytes } from '../../lib/aiTask/coverage';
 import { composePromptPreview } from '../../lib/aiTask/prompt';
+import { handoffParts } from '../../lib/aiTask/handoffParts';
 import { useAiTaskDraft } from '../../composables/useAiTaskDraft';
 import { useAiTaskHandoff, type HandoffStepId } from '../../composables/useAiTaskHandoff';
 import { useSyncController } from '../../composables/useSyncController';
@@ -158,7 +159,9 @@ const groupedWarnings = computed(() => {
 });
 const issueTotal = computed(() => groupedWarnings.value.length + (props.previewError ? 1 : 0));
 
-const finalPrompt = computed(() => composePromptPreview({ direction: props.direction, question: draft.value.prompt }));
+/** 任务说明与文件名：预览和导出同一个函数，「复制出去的就是这段」才成立。 */
+const parts = computed(() => handoffParts(exportTask(), props.preview, { hasDirection: Boolean(props.direction) }));
+const finalPrompt = computed(() => composePromptPreview({ brief: parts.value.brief, direction: props.direction, question: draft.value.prompt }));
 const blocked = computed(() => (prepareResult.value?.status === 'blocked' && !stale.value ? prepareResult.value.blocked : []));
 const ready = computed(() => (prepareResult.value?.status === 'ready' ? prepareResult.value : null));
 const stale = computed(() => handoff.isStale(exportTask()));
@@ -178,8 +181,11 @@ const run = async (openSite: boolean) => {
   details.value = false;
   progressDismissed.value = false;
   await saveDraft(props.fallbackTitle).catch(() => undefined);
-  if (openSite) await handoff.runAll(exportTask(), provider.value, props.direction);
-  else await handoff.exportOnly(exportTask(), props.direction);
+  const task = exportTask();
+  const now = handoffParts(task, props.preview, { hasDirection: Boolean(props.direction), now: new Date() });
+  const options = { briefText: now.brief, dataFileStem: now.dataStem, promptFileStem: now.promptStem };
+  if (openSite) await handoff.runAll(task, provider.value, props.direction, options);
+  else await handoff.exportOnly(task, props.direction, options);
 };
 
 const retry = (id: HandoffStepId) => {

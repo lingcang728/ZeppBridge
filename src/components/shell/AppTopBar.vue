@@ -319,7 +319,7 @@ watch([locale, () => (readyToHand.value ? t.value.readyPill : syncText.value), (
         <SegmentTrack ref="themeTrack" class="theme-toggle" variant="bare" icon-only :items="themeOptions"
           :model-value="resolvedTheme" :aria-label="t.themeTitle" @update:model-value="onThemeChange" />
         <span class="group-divider" aria-hidden="true"></span>
-        <CapsuleWheel class="locale-wheel" variant="bare" loop :span="fit >= FIT_SHORT_LOCALE ? 76 : 168" :items="localeOptions"
+        <CapsuleWheel class="locale-wheel" variant="bare" loop :span="168" :fit-peek="fit >= FIT_SHORT_LOCALE ? 12 : 26" :items="localeOptions"
           :model-value="locale" :aria-label="t.localeLabel" @update:model-value="onLocaleChange" />
       </div>
     </div>

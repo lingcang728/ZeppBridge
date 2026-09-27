@@ -1,5 +1,5 @@
 /**
- * 提示词组装：分析方向（模板）+ 我的问题 + 覆盖说明。
+ * 提示词组装：任务说明 + 分析方向（模板）+ 我的问题 + 覆盖说明。
  *
  * 模板是全局方向，问题是这次的侧重点——两者并存，不再二选一。
  * 最终交给 AI 的 `prompt_text` 由后端在 `ai_task_prepare` 里拼，方向段和覆盖
@@ -36,11 +36,12 @@ export const directionText = (template: AiTaskTemplate | null | undefined): stri
 
 /** 与后端 `assemble_task_prompt` 同一规则：非空段落用空行连接。 */
 export const composePromptPreview = (parts: {
+  brief?: string | null;
   direction: string | null;
   question: string;
   coverageNote?: string;
 }): string =>
-  [parts.direction ?? '', parts.question.trim(), (parts.coverageNote ?? coverageNoteText()).trim()]
+  [(parts.brief ?? '').trim(), parts.direction ?? '', parts.question.trim(), (parts.coverageNote ?? coverageNoteText()).trim()]
     .filter((part) => part.length > 0)
     .join('\n\n');
 

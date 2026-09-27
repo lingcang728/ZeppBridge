@@ -4,6 +4,7 @@ import { DesktopUnavailableError } from './errors';
 import type {
   AiTask,
   AiTaskAttachmentStat,
+  AiTaskPrepareOptions,
   AiTaskPrepareResult,
   AiTaskPreview,
   AiTaskSummary,
@@ -401,8 +402,8 @@ export const tauriBackend: BridgeBackend = {
   aiTaskPreview(task: AiTask) {
     return call<AiTaskPreview>('ai_task_preview', { task });
   },
-  aiTaskPrepare(task: AiTask, coverageNote: string, directionText?: string | null) {
-    return call<AiTaskPrepareResult>('ai_task_prepare', { task, coverageNote, directionText: directionText || null });
+  aiTaskPrepare(task: AiTask, coverageNote: string, directionText?: string | null, options?: AiTaskPrepareOptions) {
+    return call<AiTaskPrepareResult>('ai_task_prepare', { task, coverageNote, directionText: directionText || null, options: options ?? null });
   },
   aiTaskAttachmentStat(paths: string[]) {
     return call<AiTaskAttachmentStat[]>('ai_task_attachment_stat', { paths });

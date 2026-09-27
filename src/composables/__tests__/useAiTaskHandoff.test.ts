@@ -56,7 +56,7 @@ describe('useAiTaskHandoff', () => {
     prepareMock.mockResolvedValue(ready());
     const handoff = useAiTaskHandoff();
     await handoff.runAll(newTaskDraft(), AI_PROVIDERS[0], 'Direction');
-    expect(prepareMock).toHaveBeenCalledWith(expect.anything(), expect.any(String), 'Direction');
+    expect(prepareMock).toHaveBeenCalledWith(expect.anything(), expect.any(String), 'Direction', undefined);
     expect(copyMock).toHaveBeenCalledWith('prompt body');
     expect(openMock).toHaveBeenCalledWith(AI_PROVIDERS[0]);
     expect(revealMock).toHaveBeenCalledWith(ready().output_dir);

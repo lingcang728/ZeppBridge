@@ -115,6 +115,14 @@ export interface AiTask {
   updated_at: string;
 }
 
+/** `ai_task_prepare` 的可选段：本地化好的任务说明、手改的最终提示词、两个文件主名。 */
+export interface AiTaskPrepareOptions {
+  briefText?: string | null;
+  promptOverride?: string | null;
+  dataFileStem?: string | null;
+  promptFileStem?: string | null;
+}
+
 export interface AiTaskTemplate {
   schema_version: 1;
   id: string;
@@ -333,7 +341,7 @@ export interface BridgeBackend {
    * （码 `ui.ai_task.prompt.coverage_note`）；`directionText` 是本地化好的
    * 「分析方向」段（模板）。后端只拼接，不产界面文案。
    */
-  aiTaskPrepare(task: AiTask, coverageNote: string, directionText?: string | null): Promise<AiTaskPrepareResult>;
+  aiTaskPrepare(task: AiTask, coverageNote: string, directionText?: string | null, options?: AiTaskPrepareOptions): Promise<AiTaskPrepareResult>;
   aiTaskAttachmentStat(paths: string[]): Promise<AiTaskAttachmentStat[]>;
 
   cleanupOldData(days: number): Promise<Record<string, unknown>>;

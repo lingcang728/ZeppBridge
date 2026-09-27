@@ -14,6 +14,7 @@
 use super::{join_blocking, spawn_independent_read, with_write};
 use crate::app_state::AppState;
 use crate::ipc_error::AppError;
+use zeppbridge_core::ai_tasks::export::AiTaskPromptParts;
 use zeppbridge_core::ai_tasks::{
     stat_attachment_paths, AiTask, AiTaskAttachmentStat, AiTaskPrepareResult, AiTaskPreview,
     AiTaskSummary, AiTaskTemplate,
@@ -107,30 +108,45 @@ pub async fn ai_task_preview(
     spawn_independent_read(state.data_dir.clone(), move |db| db.ai_task_preview(&task)).await
 }
 
-/// 生成 `health-context.json` + `prompt.txt`（+ 附件原件副本）到
+/// 生成数据 JSON + 提示词 txt（+ 附件原件副本；文件名由前端按命名规则给）到
 /// 桌面 `ZeppBridge AI/<任务名>_<时间>/`，用户直接从桌面拖进 AI 对话框；
 /// 取不到桌面时回落 `data_dir/exports/ai-tasks/`。`missing` 附件 → `blocked`。
 ///
 /// 分两段：构建（校验、锚点、coverage、bundle、序列化）在独立只读连接上
 /// 跑，不占 `state.db`；落盘是纯文件 IO。写出的是新文件而不是
 /// zepp.db——跨进程写锁管的是库的写者，这里不需要它。
+/// `ai_task_prepare` 的可选段：前端按界面语言整理好的任务说明、用户手改的
+/// 最终提示词、两个文件的主名。缺省（旧前端 / 不传）时行为与以前一致。
+#[derive(Debug, Default, serde::Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct AiTaskPrepareOptions {
+    brief_text: Option<String>,
+    prompt_override: Option<String>,
+    data_file_stem: Option<String>,
+    prompt_file_stem: Option<String>,
+}
+
 #[tauri::command]
 pub async fn ai_task_prepare(
     state: tauri::State<'_, AppState>,
     task: AiTask,
     coverage_note: String,
     direction_text: Option<String>,
+    options: Option<AiTaskPrepareOptions>,
 ) -> std::result::Result<AiTaskPrepareResult, AppError> {
     let output_root = directories::UserDirs::new()
         .and_then(|dirs| dirs.desktop_dir().map(|path| path.join("ZeppBridge AI")))
         .unwrap_or_else(|| state.data_dir.join("exports").join("ai-tasks"));
     let plan = spawn_independent_read(state.data_dir.clone(), move |db| {
-        db.ai_task_prepare_plan(
-            &task,
-            &coverage_note,
-            direction_text.as_deref(),
-            &output_root,
-        )
+        let options = options.unwrap_or_default();
+        let parts = AiTaskPromptParts {
+            brief: options.brief_text.as_deref(),
+            direction: direction_text.as_deref(),
+            override_text: options.prompt_override.as_deref(),
+            data_stem: options.data_file_stem.as_deref(),
+            prompt_stem: options.prompt_file_stem.as_deref(),
+        };
+        db.ai_task_prepare_plan(&task, &coverage_note, &parts, &output_root)
     })
     .await?;
     join_blocking(tokio::task::spawn_blocking(move || plan.finish()).await)

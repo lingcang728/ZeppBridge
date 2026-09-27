@@ -51,18 +51,41 @@ impl Database {
         })
     }
 
-    /// 提示词拼装：分析方向（模板）+ 用户的问题 + 覆盖说明，三段各自可空。
+    /// 提示词拼装：任务说明 + 分析方向（模板）+ 用户的问题 + 覆盖说明，各段可空。
+    ///
+    /// 任务说明放最前：没写问题、没选模板时，交出去的提示词也得自己说清楚
+    /// 要 AI 做什么（以前只剩一句「不要推测缺失」，AI 只能反问）。用户在最终
+    /// 提示词里手改过（`override_text`）就用手改的全文替换前三段，覆盖说明照旧追加。
     ///
     /// 模板是全局方向、问题是这次的侧重点，两者**并存**，不再二选一。
-    /// 方向段优先用前端本地化好的 `direction_text`；没传（CLI 等旧调用方）
+    /// 方向段优先用前端本地化好的 `parts.direction`；没传（CLI 等旧调用方）
     /// 时回落到模板自带的 `prompt_template` 中文兜底。后端不产文案。
     pub(super) fn assemble_task_prompt(
         &self,
         task: &AiTask,
         coverage_note: &str,
-        direction_text: Option<&str>,
+        parts: &AiTaskPromptParts<'_>,
     ) -> Result<String> {
-        let direction = match direction_text
+        let join = |sections: &[String]| {
+            sections
+                .iter()
+                .filter(|part| !part.is_empty())
+                .cloned()
+                .collect::<Vec<_>>()
+                .join("\n\n")
+        };
+        if let Some(text) = parts
+            .override_text
+            .map(str::trim)
+            .filter(|text| !text.is_empty())
+        {
+            return Ok(join(&[
+                sanitize_export_text(text),
+                coverage_note.trim().to_string(),
+            ]));
+        }
+        let direction = match parts
+            .direction
             .map(str::trim)
             .filter(|text| !text.is_empty())
         {
@@ -77,17 +100,13 @@ impl Database {
         };
         // 用户自写文本（自己的 prompt / 用户模板的 prompt_template）出仓前
         // 先过路径清洗——这份文本会写进交给外部 AI 的 prompt.txt。
-        let parts = [
+        let sections = [
+            parts.brief.map(str::trim).unwrap_or_default().to_string(),
             sanitize_export_text(&direction),
             sanitize_export_text(task.prompt.trim()),
             coverage_note.trim().to_string(),
         ];
-        Ok(parts
-            .iter()
-            .filter(|part| !part.is_empty())
-            .cloned()
-            .collect::<Vec<_>>()
-            .join("\n\n"))
+        Ok(join(&sections))
     }
 
     /// `health-context.json` 的完整文档。构造时就是干净的：字段逐个挑，
