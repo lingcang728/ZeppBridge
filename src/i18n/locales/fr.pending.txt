@@ -59,6 +59,10 @@ lib/aiTask/fileName.manyCategories
 lib/aiTask/fileName.noData
 lib/aiTask/fileName.promptSuffix
 lib/aiTask/fileName.twoCategories
+views/TrainingStatus.latestTag
+views/TrainingStatus.moreLabel
+views/TrainingStatus.zonesLabel
+views/TrainingStatus.zonesSummary
 views/settings/sections/ExportDefaultsSection.example
 views/settings/sections/ExportDefaultsSection.exampleTitle
 views/settings/sections/ExportDefaultsSection.nameSub

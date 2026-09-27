@@ -137,6 +137,8 @@ onBeforeUnmount(() => {
   transition: translate .42s var(--ease-out);
 }
 .fold-card.is-closed + .fold-card.is-closed { margin-top: calc(var(--fold-peek) - var(--fold-card)); }
+/* 后面没有卡压着（下一张是开着的、或它是最后一张）：只留卡头高度，不空出一截卡身。 */
+.fold-card.is-closed:has(+ .fold-card.is-open), .fold-card.is-closed:last-child { min-height: var(--fold-peek); }
 .fold-card.is-open + .fold-card, .fold-card + .fold-card.is-open { margin-top: 16px; }
 .fold-card.is-closed:last-child { box-shadow: var(--mat-shadow); }
 .fold-card.is-closed:hover ~ .fold-card.is-closed { translate: 0 34px; }

@@ -201,7 +201,7 @@ const option = computed(() => {
   font-size: var(--fs-xs);
   min-height: 38px;
 }
-.trend-date { font-family: var(--font-mono); }
+.trend-date { font-variant-numeric: tabular-nums; }
 .trend-band { color: var(--muted); }
 .trend-chart { width: 100%; height: 132px; margin-top: var(--space-2); }
 .trend-empty {
@@ -229,5 +229,5 @@ const option = computed(() => {
   font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums;
 }
-.trend-stats dd i { margin-left: 2px; font-size: var(--fs-2xs); font-style: normal; }
+.trend-stats dd i { margin-left: 4px; color: var(--subtle); font-family: var(--font-sans, inherit); font-size: var(--fs-2xs); font-style: normal; }
 </style>

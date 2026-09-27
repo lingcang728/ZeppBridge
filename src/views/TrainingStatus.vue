@@ -6,6 +6,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { CHART_THEME, VChart } from '../lib/echartsSetup';
 import { createLoadSeq } from '../lib/loadSeq';
 import HeartRateZonePicker from '../components/HeartRateZonePicker.vue';
+import FoldDeck from '../components/deck/FoldDeck.vue';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
 import PageHeader from '../components/PageHeader.vue';
 import CoverageNotice from '../components/CoverageNotice.vue';
@@ -76,7 +77,7 @@ const thresholdOption = computed(() => {
     animationDuration: 600,
     animationDurationUpdate: 520,
     animationEasingUpdate: 'cubicInOut' as const,
-    grid: { left: 8, right: 12, top: 38, bottom: 8, containLabel: true },
+    grid: { left: 8, right: 12, top: 34, bottom: 8, containLabel: true },
     legend: {
       data: [t.value.thresholdHr, t.value.thresholdPace],
       top: 0,
@@ -100,11 +101,13 @@ const thresholdOption = computed(() => {
     },
     xAxis: { type: 'category', data: dates, boundaryGap: false, axisLabel: { fontSize: 14.5, hideOverlap: true } },
     yAxis: [
-      { type: 'value', scale: true, splitNumber: 3, axisLabel: { fontSize: 14.5, formatter: '{value} bpm' } },
+      // 两根轴刻度对齐（alignTicks）：左右两列数字落在同一条网格线上，不再一边 5 格一边 4 格。
+      { type: 'value', scale: true, splitNumber: 3, alignTicks: true, axisLabel: { fontSize: 14.5, formatter: '{value} bpm' } },
       {
         type: 'value',
         scale: true,
         splitNumber: 3,
+        alignTicks: true,
         // Faster is a smaller number of seconds, so the axis is inverted to
         // keep "better" pointing up like every other chart here.
         inverse: true,
@@ -263,6 +266,19 @@ const load = async () => {
 onMounted(() => { void load(); });
 watch(rangeDays, () => { void load(); });
 watch(dataRevision, () => { void load(); });
+
+const foldCards = computed(() => [
+  {
+    id: 'balance',
+    title: t.value.balanceLabel,
+    summary: latestBalance.value?.acute_chronic_ratio != null
+      ? `${t.value.acuteChronic} ${latestBalance.value.acute_chronic_ratio.toFixed(2)}`
+      : t.value.balanceHint,
+    icon: 'training-load' as const,
+    tone: 'training' as const,
+  },
+  { id: 'zones', title: t.value.zonesLabel, summary: t.value.zonesSummary, icon: 'heart-rate' as const, tone: 'heart' as const },
+]);
 </script>
 
 <template>
@@ -329,8 +345,9 @@ watch(dataRevision, () => { void load(); });
               <small>{{ t.thresholdHint }}</small>
             </span>
             <span v-if="thresholdHr?.latest || thresholdPace?.latest" class="chart-latest">
-              <b>{{ thresholdHr?.latest ? Math.round(thresholdHr.latest.value) : '—' }}</b><i>bpm</i>
-              <b>{{ formatPaceSeconds(thresholdPace?.latest?.value) }}</b><i>{{ paceUnitLabel() }}</i>
+              <em class="latest-tag">{{ t.latestTag }}</em>
+              <b class="hr">{{ thresholdHr?.latest ? Math.round(thresholdHr.latest.value) : '—' }}</b><i>bpm</i>
+              <b class="pace">{{ formatPaceSeconds(thresholdPace?.latest?.value) }}</b><i>{{ paceUnitLabel() }}</i>
             </span>
           </header>
           <VChart
@@ -351,32 +368,36 @@ watch(dataRevision, () => { void load(); });
         </section>
       </div>
 
-      <section class="chart-card wide" :aria-label="t.balanceLabel">
-        <header class="chart-head">
-          <span class="chart-title">
-            <strong>{{ t.balanceLabel }}</strong>
-            <small>{{ t.balanceHint }}</small>
-          </span>
-          <span v-if="latestBalance" class="chart-latest">
-            <b>{{ latestBalance.acute_chronic_ratio?.toFixed(2) ?? '—' }}</b><i>{{ t.acuteChronic }}</i>
-          </span>
-        </header>
-        <VChart
-          v-if="balanceOption"
-          class="chart-body tall"
-          :key="CHART_THEME"
-          :theme="CHART_THEME"
-          :option="balanceOption"
-            :update-options="SMOOTH_CHART_UPDATE"
-          autoresize
-          role="img"
-          :aria-label="t.balanceChartAria"
-        />
-        <p v-else class="chart-empty">{{ t.balanceEmpty }}</p>
-        <p class="chart-note">{{ t.balanceNote }}</p>
-      </section>
-
-      <HeartRateZonePicker :days="Math.max(30, rangeDays)" :revision="dataRevision" />
+      <!-- 负荷平衡与心率区间是长区块：收进卡包，只露卡头和一句摘要，点开飞出来（和概览同一种）。 -->
+      <FoldDeck :cards="foldCards" :label="t.moreLabel">
+        <template #balance>
+          <section class="chart-card wide" :aria-label="t.balanceLabel">
+            <header class="chart-head">
+              <span class="chart-title">
+                <strong>{{ t.balanceLabel }}</strong>
+                <small>{{ t.balanceHint }}</small>
+              </span>
+              <span v-if="latestBalance" class="chart-latest">
+                <b>{{ latestBalance.acute_chronic_ratio?.toFixed(2) ?? '—' }}</b><i>{{ t.acuteChronic }}</i>
+              </span>
+            </header>
+            <VChart
+              v-if="balanceOption"
+              class="chart-body tall"
+              :key="CHART_THEME"
+              :theme="CHART_THEME"
+              :option="balanceOption"
+                :update-options="SMOOTH_CHART_UPDATE"
+              autoresize
+              role="img"
+              :aria-label="t.balanceChartAria"
+            />
+            <p v-else class="chart-empty">{{ t.balanceEmpty }}</p>
+            <p class="chart-note">{{ t.balanceNote }}</p>
+          </section>
+        </template>
+        <template #zones><HeartRateZonePicker :days="Math.max(30, rangeDays)" :revision="dataRevision" /></template>
+      </FoldDeck>
     </template>
   </section>
 </template>
