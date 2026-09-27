@@ -3,7 +3,7 @@ import { defineMessages } from '../i18n';
 /* BodyStatus 的文案。单独一个文件，免得三种语言的文案把逻辑挤出视野；moduleId 不变，语言包不用跟着搬家。 */
 export const bodyStatusMessages = defineMessages(
   {
-    vitalsGroupTitle: '恢复与生命体征',
+    vitalsGroupTitle: '恢复与身体指标',
     backToOverview: '返回概览',
     title: '身体状态',
     intro: '恢复、压力、血氧、HRV、呼吸率、静息心率、体重体成分与饮食摄入的本机趋势。全部读自已同步的记录。',
