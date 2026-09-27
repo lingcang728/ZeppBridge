@@ -55,6 +55,15 @@
 - 导航胶囊（`SegmentTrack.vue`）的文字画两层：底层普通字，上层「选中字」按滑块形状裁切，所以拖到一半也不会出现半截深色字；焦点环画在滑块上，←/→/Home/End 可用；拖动时滑块变成玻璃透镜。
 - 落地页自带一套局部作用域的暗色色板（`.landing-page { --site-* }`）——那是应用外壳之外的品牌美术，不算第三套主题。
 
+### 景深、胶囊与动效（v3 重设计，2026-09-27）
+
+- **圆角给足**：`--radius-sm/md/lg/xl` = 12 / 20 / 26 / 34 px。卡片是有厚度的一块板：`--mat-rim` 顶边高光 + 底边暗线，`--mat-shadow` 多一层远投影。画布有一层固定的淡色环境光（`--ambient`，由 `.app-body::before` 画），毛玻璃才有东西可折射；浮层玻璃（`--glass-rim`）带镜面顶边和底部回光。
+- **舞台没有硬边**：卡组、滚轮用横向 `mask-image` 渐隐进背景，不在一条边线上戛然而止。
+- **选项是胶囊，不是下拉。** 两三项 → 可拖的 `SegmentTrack` 胶囊；更长的列表（语言、日期格式、AI 服务商）→ `CapsuleWheel.vue`：选项按各自宽度排在一个圆柱面上（弧长布局），选中项永远在正中的镜片下，两边像传送带转过拐角一样侧转；拖动（临界阻尼吸附）、滚轮、方向键、点邻项都可以。值在滚轮停稳后才提交（切语言会重绘整页）。
+- **主题只有深 / 浅两格**：默认跟随系统；拨到与系统一致的那一格即回到跟随系统（`useTheme.pickTheme`），「跟随系统」不必作为一个可见选项。
+- **切页永远不经过空白帧**：新旧两页同时在场（不用 `out-in`）。`lib/navigation.ts#pageMotion` 决定方向——`forward` 聚焦进详情、`back` 退出来、`left` / `right` 按导航胶囊的顺序横移，都带模糊。离场页钉在它当时的滚动位置，不会先跳回顶部。
+- **`.ready-glow`**（沿边流动的品牌渐变细环 + 会呼吸的外光）只留给一个时刻：「数据好了，去交给 AI」。同一屏不许有第二样东西发光。玻璃控件本身是层叠上下文，所以环用 mask 只留边、外光用外阴影——都不许把胶囊内部染色。
+
 ### 界面文案：中英各一份，不许硬编码
 
 - **界面上出现的每一个字都要有中英两份。** 写法是在用它的模块里 `defineMessages(zh, en)`，
@@ -92,16 +101,17 @@
 - `Sparkline` 少于两个点时不画：一个读数是数值不是趋势，画成一条平线等于宣称了没测过的稳定性。
 - 每张卡片都有独立空态；加载中用 `SkeletonBlock` 占位，失败给可重试的 `EmptyState`。
 - 不在概览做恢复度、训练建议一类解读。入口卡只给数字和形状，解读留给用户自选的 AI。
+- 概览是启动同步期间的**等候区**。`components/overview/DataReadyCapsule.vue` 放在页头行本来空着的右半边（行高固定 58px，下面的内容不会动）：同步在跑时是「正在从云端取回你的数据 · 3/8」加进度环；用户在等的那次同步落地后，变成发光的「数据已备好 · 新增 N 条 · 交给 AI」。顶栏同步胶囊同一时刻变成同一句话。只有用户在等的同步会喊（启动、顶栏、托盘、设置），每十五分钟的后台自动同步不喊；deferred 继续等；失败、取消、根本没跑起来一律不说「已备好」（`lib/dataReady.ts`）。进 `/ai` 或点 × 即熄灭。
 
 ### 2. 交给 AI (`/ai`)
 
-一屏一个分析任务（`views/AiComposer.vue`，子组件在 `components/ai/`）：
+应用的核心页。一屏一个分析任务，布局是**一块舞台 + 三层浮动玻璃**（`views/AiComposer.vue`，子组件在 `components/ai/`）：
 
-- `AiTaskHeader`：任务标题（用户改过之前自动起名）和已保存任务库。
-- `TaskGraph`：`WorkoutPicker` 里选中的运动和围绕它们的数据类别画成节点；每个类别有自己的窗口（7 / 14 / 30 天），可以单独关掉。`CoverageDetails` 说明本机库在这个窗口里实际有什么——缺的天就显示缺，不显示 0。
-- `DirectionPanel` + `TaskExtras`：要问 AI 的问题和可选附件。
-- `HandoffPanel`：目标 AI 走 `AI_PROVIDERS` 白名单（ChatGPT、Claude、Gemini、Kimi、豆包、DeepSeek、Grok，别的地址直接拒绝），再由 `ai_task_prepare` 生成脱敏数据包。精确 GPS 默认不带，用户显式打开才带。
-- 预览是异步的，计算中显示 `…` 而不是 `0`。
+- **舞台——`TaskGraph`** 铺满整页（画布右侧让出步骤栏，镜头中心落在可见区域正中）。虚线圈内的类别交给 AI，每个类别有自己的窗口（7 / 14 / 30 天）。展开某一类时**镜头从上方俯冲进去**（`useGraphCamera`、`layout.ts#focusFrame`），其余退成模糊的背景，左上角玻璃面包屑「全部类别 / 睡眠」或 Esc 飞回全景。悬停聚焦要停稳 160ms 并带过渡——以前一碰就把整张图压暗，鼠标扫过密集的指标点时整张图频闪。每个节点有一圈看不见的点击区，起拖门槛 9px。撤销与镜头控件是浮在画布上的玻璃胶囊。
+- **左上——`AiTaskHeader`**：一枚玻璃胶囊，里面是可直接改的任务名、已保存任务、新建、保存（有未保存修改时点亮）。
+- **右侧——`AiStepRail`**：① 分析对象（`WorkoutPicker`）② 你想问什么（`DirectionPanel`）③ 附件与选项（`TaskExtras`），一次只展开一步；收起的步骤只露一行摘要，整个任务一屏看完不用滚。
+- **底部——`HandoffPanel` 交付坞**：整页唯一的主按钮「交给 ChatGPT」、服务商 `CapsuleWheel`（只认 `AI_PROVIDERS` 白名单）、就绪度胶囊（几类数据 · 平均多少天有数据 · 数据包大小 · 提醒数），点开是最终提示词、去重后的提醒和 `CoverageDetails`。预览出错一直露在坞上方。用户在等的同步还没落地时，就绪度胶囊说「最新数据还在路上」；页面跟着 `dataRevision` 重新取运动列表和预览。
+- `ai_task_prepare` 生成脱敏数据包；精确 GPS 默认不带，用户显式打开才带。预览是异步的，计算中显示 `…` 而不是 `0`。
 
 ### 3. 最近记录与详情 (`/recent`, `/sleep`, `/workouts`, `/sleep/:id`, `/workouts/:id`)
 
@@ -119,11 +129,12 @@
 
 ### 5. 设置 (`/settings`)
 
-**钱包式卡叠**，不做左侧目录。八张卡（`views/settings/cards.ts`）：账号与设备 · 同步与更新 · 归档与存储 · 数据内容 · 交给 AI 工具 · 显示与语言 · 隐私与安全 · 高级与维护。
+**三种形态的卡组**，不做左侧目录。八张卡（`views/settings/cards.ts`）：账号与设备 · 同步与更新 · 归档与存储 · 数据内容 · 交给 AI 工具 · 显示与语言 · 隐私与安全 · 高级与维护。同一批卡在形态之间用 View Transitions 形变（每张卡一个 `view-transition-name`）。
 
-- `/settings` 是总览：卡片纵向叠放，每张露出卡头（图标、标题、一句实时状态），悬停抬起。
-- `/settings/:card` 展开一张：它升到最上面展开全部内容，其余缩成身后两层模糊的压底卡。翻卡可以按住卡头拖动甩出（过阈值或快速一甩），也可以用上一张 / 下一张按钮（按住连翻）、←/→、PageUp/PageDown；Esc 回到总览；开了减少动效就直接切换。
-- 实现分三层：`lib/deck/physics.ts`（纯函数，有 vitest）→ `composables/useCardDeck.ts`（手势状态机）→ `components/deck/CardDeck.vue`。各卡内容在 `views/settings/sections/`，共享状态经 `composables/settings/context.ts` 注入。
+- `/settings` 默认是 **coverflow**（`DeckCoverflow.vue`，摆位来自纯函数 `lib/deck/coverflow.ts`）：正中一张立着，两侧的卡侧转约 46° 紧紧叠在两边，越远越小、越糊、越淡；卡组首尾相接，两边永远有卡；舞台两端渐隐进背景。拖动（`useSpringIndex` 按速度吸附）、滚轮、←/→、点侧卡转到正中；点正中那张或回车打开。
+- **「展开全部」**把卡从正中往两边依次抽出、纵向平铺成两列；底部浮着醒目的**「收起」**胶囊，按相反顺序插回卡组。用哪种形态记在本机。
+- `/settings/:card` 打开一张：它放大成整页，其余的卡下沉、变糊、淡出（`::view-transition-old(*):only-child`），关掉时再浮回来。打开后仍可按住卡头拖动甩出、上一张 / 下一张（按住连翻）、←/→、PageUp/PageDown；Esc 回到总览；开了减少动效就直接切换。卡片都没有描边——边界靠顶边高光和投影。
+- 分层：`lib/deck/physics.ts` + `lib/deck/coverflow.ts`（纯函数，有 vitest）→ `composables/useCardDeck.ts` / `useSpringIndex.ts` → `components/deck/`。各卡内容在 `views/settings/sections/`，共享状态经 `composables/settings/context.ts` 注入。
 - 卡内排版统一用 `settings-base.css` 的列表行：标签在左、控件在右、行间细线。
 - 历史补拉只有一个入口，在「归档与存储」卡里（长期归档开关 → 起点与开始补拉 → 预计体积 → 覆盖账本）。
 

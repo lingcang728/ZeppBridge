@@ -118,6 +118,37 @@ forbidden. The provenance of the algorithms and percentages is in the
   (`.landing-page { --site-* }`) — it is brand artwork outside the app shell,
   not a third theme.
 
+### Depth, capsules and motion (v3 redesign, 2026-09-27)
+
+- **Radii are generous**: `--radius-sm/md/lg/xl` = 12 / 20 / 26 / 34 px. Cards
+  read as slabs with thickness: `--mat-rim` is a top highlight *and* a bottom
+  dark line, `--mat-shadow` has a third, far shadow. The canvas carries a fixed,
+  faint ambient light (`--ambient`, painted by `.app-body::before`) so frosted
+  glass has something to refract; floating glass (`--glass-rim`) has a
+  specular top edge and a return light at the bottom.
+- **No hard edges on stages**: carousels and wheels fade into the background
+  with a horizontal `mask-image` instead of ending at a border.
+- **Choices are capsules, not dropdowns.** Two or three options → the
+  draggable `SegmentTrack` capsule. Longer lists (language, date order, AI
+  provider) → `CapsuleWheel.vue`: options laid out on a cylinder by their own
+  widths (arc-length layout), the selection always centred under a lens,
+  neighbours turning away like a conveyor round a corner; drag with a
+  critically damped snap, wheel, arrows, click a neighbour. The value is
+  committed only when the wheel settles (a locale switch re-renders the page).
+- **Theme has two cells, dark and light.** It follows the system by default;
+  picking the cell that matches the system goes back to following it
+  (`useTheme.pickTheme`), so "system" never needs to be a visible option.
+- **Page transitions never pass through a blank frame**: old and new page are
+  on stage together (no `out-in`). `lib/navigation.ts#pageMotion` picks the
+  direction — `forward` focuses into a detail page, `back` backs out, `left` /
+  `right` slide between tabs in nav-capsule order — all with blur. The leaving
+  page is pinned at its scroll position so it does not jump to the top.
+- **`.ready-glow`** (rotating brand-gradient ring + breathing outer light) is
+  reserved for one moment: "your data is ready — go hand it to the AI". Never
+  two glowing things on one screen. Glass controls are stacking contexts, so
+  the ring is masked to the edge and the light is an outer `box-shadow`;
+  neither may tint the inside of the capsule.
+
 ### Interface copy: two languages, never hardcoded
 
 - **Every word on screen needs a Chinese and an English version.** Write it as
@@ -191,24 +222,48 @@ pages, reached from Overview's entry cards and its "view all" links.
 - Overview does no interpretation such as recovery scoring or training advice.
   The entry cards give numbers and shapes; interpretation is left to the AI the
   user chose.
+- Overview is **the waiting room** while the launch sync pulls from the cloud.
+  `components/overview/DataReadyCapsule.vue` sits in the otherwise empty right
+  half of the header row (fixed 58px, so nothing below moves): "fetching your
+  data · 3/8" with a progress ring, then a glowing "your data is ready · N new
+  records · hand to AI" once the sync the user was waiting for lands. The top
+  bar's sync capsule turns into the same call at the same moment. Only
+  awaited syncs light it (launch, top bar, tray, settings) — never the
+  15-minute background auto-sync; deferred keeps waiting; failure, cancel or
+  a sync that never ran never claim readiness (`lib/dataReady.ts`). Entering
+  `/ai` or pressing × puts it out.
 
 ### 2. Hand to AI (`/ai`)
 
-One analysis task per screen (`views/AiComposer.vue`, pieces in `components/ai/`):
+The core page of the app. One analysis task per screen, laid out as **one stage
+with three floating glass layers** (`views/AiComposer.vue`, pieces in
+`components/ai/`):
 
-- `AiTaskHeader`: task title (auto-titled until the user edits it) and the
-  saved-task library.
-- `TaskGraph`: the workouts picked in `WorkoutPicker` and the data categories
-  around them as nodes; each category carries its own window (7 / 14 / 30 days)
-  and can be switched off. `CoverageDetails` says what the local library
-  actually has for that window — missing days show as missing, never as 0.
-- `DirectionPanel` + `TaskExtras`: the question for the AI and optional
-  attachments.
-- `HandoffPanel`: target AI from the `AI_PROVIDERS` allow-list (ChatGPT,
-  Claude, Gemini, Kimi, Doubao, DeepSeek, Grok — any other address is refused),
-  then `ai_task_prepare` builds the redacted package. Precise GPS stays out
-  unless the user opts in.
-- Previews are asynchronous; while computing they show `…`, never `0`.
+- **Stage — `TaskGraph`** fills the page (its canvas leaves room for the rail so
+  the camera centre sits in the visible area). Categories inside the dashed
+  circle go to the AI; each carries its own window (7 / 14 / 30 days).
+  Expanding a category **flies the camera down into it** (`useGraphCamera`,
+  `layout.ts#focusFrame`): the rest recede into a blurred backdrop, a glass
+  breadcrumb "All categories / Sleep" (or Esc) flies back. Hover focus waits
+  160ms and fades — instant full-graph dimming strobed when the pointer swept
+  across dense metric dots. Every node has an invisible hit halo; the drag
+  threshold is 9px. Undo and camera controls float as glass capsules.
+- **Top left — `AiTaskHeader`**: one glass capsule with the editable title,
+  saved tasks, new and save (lit when there are unsaved changes).
+- **Right — `AiStepRail`**: ① what to analyse (`WorkoutPicker`) ② what to ask
+  (`DirectionPanel`) ③ attachments and options (`TaskExtras`), one open at a
+  time; collapsed steps show a one-line summary so the whole task fits one
+  screen without scrolling.
+- **Bottom — `HandoffPanel` dock**: the page's only primary button ("Hand to
+  ChatGPT"), the provider `CapsuleWheel` (`AI_PROVIDERS` allow-list only), and
+  a readiness chip (categories · % of days covered · package size · notes)
+  that opens the final prompt, de-duplicated notes and `CoverageDetails`.
+  Preview errors stay visible above the dock. While an awaited sync is still
+  running the chip says the latest data is on its way; the page reloads its
+  workouts and preview on `dataRevision`.
+- `ai_task_prepare` builds the redacted package; precise GPS stays out unless
+  the user opts in. Previews are asynchronous; while computing they show `…`,
+  never `0`.
 
 ### 3. Recent records and detail (`/recent`, `/sleep`, `/workouts`, `/sleep/:id`, `/workouts/:id`)
 
@@ -248,21 +303,31 @@ One analysis task per screen (`views/AiComposer.vue`, pieces in `components/ai/`
 
 ### 5. Settings (`/settings`)
 
-A **wallet-style card stack**, with no sidebar. Eight cards
+A **card deck with three forms**, no sidebar. Eight cards
 (`views/settings/cards.ts`): account and devices · sync and updates · archive
 and storage · data content · hand to AI tools · display and language · privacy
-and security · advanced and maintenance.
+and security · advanced and maintenance. The same cards morph between forms
+through View Transitions (one `view-transition-name` per card).
 
-- `/settings` is the overview: cards stack vertically, each showing its header
-  (glyph, title, one live status line), lifting on hover.
-- `/settings/:card` opens one card: it rises to the top and expands, the rest
-  shrink into two blurred layers behind it. Flip by dragging the header past a
-  threshold or flinging it, or with the previous / next buttons (hold to
-  repeat), ←/→ and PageUp/PageDown; Esc returns to the overview; reduced motion
-  switches instantly.
-- Three layers: `lib/deck/physics.ts` (pure, with vitest) →
-  `composables/useCardDeck.ts` (gesture state machine) →
-  `components/deck/CardDeck.vue`. Card contents live in
+- `/settings`, default — **coverflow** (`DeckCoverflow.vue`, poses from the
+  pure `lib/deck/coverflow.ts`): the centre card stands upright; neighbours
+  turn ~46° and stack tightly on both sides, smaller, blurrier and fainter with
+  distance; the deck wraps around so both sides are always populated, and the
+  stage edges dissolve into the background. Drag (velocity snap via
+  `useSpringIndex`), wheel, ←/→, or click a side card to turn it to the centre;
+  click the centre card or Enter to open.
+- **"Show all"** unboxes the deck: cards leave one by one (staggered from the
+  centre outwards) into a two-column vertical list; a prominent floating
+  **"Collapse"** capsule puts them back in reverse order. The choice is
+  remembered per viewer.
+- `/settings/:card` opens one card: it grows into the page while the rest
+  sink, blur and fade (`::view-transition-old(*):only-child`), and rise back on
+  close. Inside, flip by dragging the header or flinging it, previous / next
+  (hold to repeat), ←/→ and PageUp/PageDown; Esc returns to the overview;
+  reduced motion switches instantly. No card has a border — edges come from the
+  rim highlight and shadow.
+- Layers: `lib/deck/physics.ts` + `lib/deck/coverflow.ts` (pure, with vitest) →
+  `composables/useCardDeck.ts` / `useSpringIndex.ts` → `components/deck/`. Card contents live in
   `views/settings/sections/`; shared state is injected through
   `composables/settings/context.ts`.
 - Inside a card, rows use `settings-base.css`: label left, control right,
