@@ -1,7 +1,11 @@
 import { backend, isDesktop, toUserMessage } from '../../lib/bridge';
 import type { SyncReport } from '../../types';
+import { readyOnReport, readyOnStart } from '../../lib/dataReady';
+import { failedStreamKeys } from '../../lib/syncDeferred';
 import { noticeForReport, syncMessage } from './notice';
-import { appStatus, copy, dataRevision, notice, refreshStatus, statusError, syncProgress, syncReport, syncState } from './state';
+import {
+  appStatus, copy, dataReady, dataRevision, notice, refreshStatus, statusError, syncProgress, syncReport, syncState,
+} from './state';
 
 /* 发起一次同步：前置检查、让路后的重试、首次连接后的历史补齐（从 useSyncController.ts 搬出来）。 */
 
@@ -55,12 +59,26 @@ const scheduleFirstRunBackfill = () => {
   }, 0);
 };
 
+/** 用户在等的同步有了结果：亮起「数据已备好」，或者灭掉等待。 */
+const settleReady = (report: SyncReport | null) => {
+  dataReady.value = readyOnReport(dataReady.value, report, report ? failedStreamKeys(report.streams) : []);
+};
+
+/**
+ * @param opts.silent 后台发起：不弹「已有同步进行中」。
+ * @param opts.waited 用户在等这次同步的结果（启动同步、用户自己点的同步）。
+ *   默认跟着 silent 走：不静默的都是用户点的。启动同步虽然静默，但用户就是
+ *   在等它——由 useSyncController 显式传 true。
+ */
 export const runSync = (
   mode: 'incremental' | 'initial' | 'history' = 'incremental',
   days?: number,
-  opts?: { silent?: boolean },
+  opts?: { silent?: boolean; waited?: boolean },
 ): Promise<SyncReport | null> => {
+  const waited = opts?.waited ?? !opts?.silent;
   if (runningSync) {
+    // 后台同步正跑着，用户又点了一下：他现在就是在等这一次，跑完照样喊他。
+    if (waited) dataReady.value = readyOnStart(dataReady.value, true);
     if (!opts?.silent) {
       notice.value = { kind: 'alreadySyncing' };
       return Promise.resolve(null);
@@ -70,6 +88,7 @@ export const runSync = (
   const promise = (async () => {
     if (!isDesktop()) {
       statusError.value = copy().desktopOnly;
+      settleReady(null);
       return null;
     }
     const status = appStatus.value ?? await refreshStatus();
@@ -79,6 +98,7 @@ export const runSync = (
     if (status?.connection_state === 'needs_reauth') {
       syncState.value = 'failed';
       notice.value = { kind: 'reauthNeeded' };
+      settleReady(null);
       return null;
     }
     if (status?.connection_state !== 'connected') {
@@ -86,8 +106,10 @@ export const runSync = (
       notice.value = status?.connection_state === 'configured'
         ? { kind: 'verifyFirst' }
         : { kind: 'connectFirst' };
+      settleReady(null);
       return null;
     }
+    dataReady.value = readyOnStart(dataReady.value, waited);
     syncState.value = 'syncing';
     syncProgress.value = null;
     notice.value = mode === 'incremental'
@@ -102,6 +124,8 @@ export const runSync = (
       syncState.value = report.outcome;
       notice.value = noticeForReport(report);
       await refreshStatus();
+      // 放在 refreshStatus 之后：「好了」亮起时，顶栏的同步时间和各页的数据已经是新的。
+      settleReady(report);
       // deferred 且 0 条写入：页面不必为了让路整页重刷。真正写了派生数据
       // 的重放结束之后，下一次成功同步会再 bump。
       if (!(report.outcome === 'deferred' && report.total_records === 0)) {
@@ -127,6 +151,7 @@ export const runSync = (
       notice.value = { kind: 'backend', text: toUserMessage(error, copy().syncDidNotFinish) };
       statusError.value = syncMessage.value;
       await refreshStatus({ preserveError: true });
+      settleReady(null);
       return null;
     } finally {
       syncProgress.value = null;

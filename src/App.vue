@@ -102,8 +102,19 @@ const trayHint = ref(false);
 const {
   statusError,
   compacting, compactionPending, compactionSaved,
+  dataReady, pickUpReady,
   initialize, dispose: disposeSyncController,
 } = useSyncController();
+
+/* 「数据已备好」一进交给 AI 就算取走了：不管是点胶囊进来的、点导航进来的，
+   还是同步落地时人本来就在这一页。 */
+watch(
+  () => [route.path, dataReady.value.phase] as const,
+  ([path, phase]) => {
+    if (phase === 'ready' && navigationBranch(path) === '/ai') pickUpReady('pickup');
+  },
+  { immediate: true },
+);
 /* 这个组件自己注册的 Tauri 监听器的解绑函数。
 
    `backend.listen` 返回的是一个 unlisten——以前这里直接 `void` 掉了。单次

@@ -14,6 +14,7 @@ import HeartRateCard from '../components/overview/HeartRateCard.vue';
 import WeeklyReportCard from '../components/WeeklyReportCard.vue';
 import RecentCard from '../components/overview/RecentCard.vue';
 import SleepCard from '../components/overview/SleepCard.vue';
+import DataReadyCapsule from '../components/overview/DataReadyCapsule.vue';
 import SourcesStrip from '../components/overview/SourcesStrip.vue';
 import StatusEntryCard from '../components/overview/StatusEntryCard.vue';
 import StepsCard from '../components/overview/StepsCard.vue';
@@ -299,6 +300,8 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
       <div>
         <h1 id="overview-title">{{ t.overviewTitle }}</h1>
       </div>
+      <!-- 取餐胶囊：同步在跑时报进度，用户等的那次同步落地后发光喊「交给 AI」。 -->
+      <DataReadyCapsule />
     </header>
 
     <!-- 认不出型号不是「坏了」，是可以自己指认的。不说这一句，用户只会以为
@@ -375,7 +378,8 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
 
 <style scoped>
 .overview-page { display: grid; gap: 18px; align-content: start; max-width: 1540px; margin: 0 auto; }
-.overview-header { margin-bottom: 0; }
+/* 页头行固定高度：取餐胶囊出现、消失都在这一行里，不推动下面的内容。 */
+.overview-header { min-height: 58px; align-items: center; margin-bottom: 0; }
 .overview-header h1 { margin-bottom: 0; }
 
 .inline-alert { display: flex; align-items: center; gap: 8px; padding: 9px 13px; border: 1px solid var(--mat-line); border-radius: 12px; background: var(--mat-card); color: var(--muted); font-size: var(--fs-sm); box-shadow: var(--mat-rim), var(--mat-shadow); }

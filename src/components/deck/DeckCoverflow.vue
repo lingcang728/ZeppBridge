@@ -15,7 +15,7 @@ import { defineMessages, useMessages } from '../../i18n';
 
 const t = useMessages(defineMessages(
   {
-    label: '设置卡组，左右拨动挑一张',
+    label: '设置卡组，左右滑动挑一张',
     previous: '上一张',
     next: '下一张',
     open: (title: string) => `打开「${title}」`,

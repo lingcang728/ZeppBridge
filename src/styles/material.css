@@ -156,3 +156,39 @@
 @media (prefers-reduced-transparency: reduce) {
   .glass, .glass-control { background: var(--mat-glass-strong); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
+
+/* ── 发光（「数据已备好」）──────────────────
+   一圈沿边缘流动的品牌渐变细环 + 一圈会呼吸的外光。只给「该去取了」这一种
+   时刻用：同一屏上不该有第二样东西在发光。
+   玻璃控件带 backdrop-filter，本身就是层叠上下文：z-index:-1 的伪元素会画在
+   它的底色之上——所以环用 mask 挖空只留一道边，外光用 box-shadow（外阴影
+   从不画进盒子里面），都不会把胶囊内部染成彩色。 */
+@property --glow-angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+.ready-glow { position: relative; }
+.ready-glow::before, .ready-glow::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.ready-glow::before {
+  inset: -1.5px;
+  padding: 1.5px;
+  background: conic-gradient(from var(--glow-angle), var(--accent), var(--activity), var(--pace), var(--training), var(--accent));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation: glow-spin 3.6s linear infinite;
+}
+.ready-glow::after {
+  inset: 0;
+  box-shadow: 0 0 18px 1px color-mix(in srgb, var(--accent) 50%, transparent),
+    0 0 44px 6px color-mix(in srgb, var(--activity) 24%, transparent);
+  animation: glow-breathe 2.6s ease-in-out infinite;
+}
+@keyframes glow-spin { to { --glow-angle: 360deg; } }
+@keyframes glow-breathe { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) {
+  .ready-glow::before, .ready-glow::after { animation: none; }
+}

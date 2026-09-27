@@ -2,16 +2,17 @@
  *
  * 状态在 sync/state.ts，文案渲染在 sync/notice.ts，发起同步在 sync/run.ts；
  * 这里负责事件监听、自动同步定时器和对外的只读视图。 */
-import { computed, readonly } from 'vue';
+import { computed, readonly, ref } from 'vue';
 import { backend, isDesktop } from '../lib/bridge';
 import { launchSyncIsDue, writeAutoSyncSettings } from '../lib/autoSync';
 import type { LoginStatus, SyncProgress } from '../types';
+import { readyOnPickUp } from '../lib/dataReady';
 import { formatClock, lastOutcomeLabel, syncMessage } from './sync/notice';
 import { cancelSync, clearRunTimers, isRunningSync, runSync } from './sync/run';
 import {
   appStatus, applyLoginStatus, autoSyncEnabled, autoSyncInterval, compacting, compactingEvent, compactionPending,
-  compactionSaved, copy, dataRevision, loginStatus, notice, refreshStatus, statusError, streamUpdate, syncProgress,
-  syncReport, syncState,
+  compactionSaved, copy, dataReady, dataRevision, loginStatus, notice, refreshStatus, statusError, streamUpdate,
+  syncProgress, syncReport, syncState,
 } from './sync/state';
 
 export type { SyncUiState } from './sync/state';
@@ -168,14 +169,26 @@ const initialize = async () => {
   if (!stillMine()) return;
   if (autoSyncEnabled.value && status?.connection_state === 'connected'
     && launchSyncIsDue(status?.last_cloud_sync_at, autoSyncInterval.value)) {
+    // 启动同步是静默的（不弹「已有同步进行中」），但用户就是在等它：
+    // 跑完要亮「数据已备好」，所以显式标 waited。
     launchSyncTimer = window.setTimeout(() => {
-      if (stillMine()) void runSync('incremental', undefined, { silent: true });
+      if (stillMine()) void runSync('incremental', undefined, { silent: true, waited: true });
     }, LAUNCH_SYNC_DELAY_MS);
   }
 };
 
 const markDataChanged = () => {
   dataRevision.value += 1;
+};
+
+/** 上一次「取走」的时刻。交给 AI 页据此在刚到达时把主按钮点亮一下。 */
+const lastPickupAt = ref(0);
+
+/** 「数据已备好」被取走（进了交给 AI）或者用户说先不用（dismiss 不算到达）。 */
+const pickUpReady = (reason: 'pickup' | 'dismiss' = 'pickup') => {
+  const wasReady = dataReady.value.phase === 'ready';
+  dataReady.value = readyOnPickUp(dataReady.value);
+  if (wasReady && reason === 'pickup') lastPickupAt.value = Date.now();
 };
 
 export const useSyncController = () => ({
@@ -187,6 +200,8 @@ export const useSyncController = () => ({
   syncProgress: readonly(syncProgress),
   loginStatus: readonly(loginStatus),
   dataRevision: readonly(dataRevision),
+  dataReady: readonly(dataReady),
+  lastPickupAt: readonly(lastPickupAt),
   streamUpdate: readonly(streamUpdate),
   compacting,
   compactionPending: readonly(compactionPending),
@@ -207,5 +222,6 @@ export const useSyncController = () => ({
   setAutoSyncEnabled,
   setAutoSyncInterval,
   markDataChanged,
+  pickUpReady,
   dispose,
 });

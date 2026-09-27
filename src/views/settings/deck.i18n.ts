@@ -7,7 +7,7 @@ import { defineMessages } from '../../i18n';
 export const deckMessages = defineMessages(
   {
     pageIntro: '点开一张卡来调整；展开后按住卡头左右拖，可以直接翻到下一张。',
-    pageIntroDeck: '左右拨动挑一张，点正中那张打开；想一眼看完就「展开全部」。',
+    pageIntroDeck: '左右滑动挑一张，点正中那张打开；想一眼看完就「展开全部」。',
     openCard: '打开',
 
     cardAccount: '账号与设备',

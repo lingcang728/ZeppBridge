@@ -2,6 +2,7 @@ import { computed, ref } from 'vue';
 import { backend, isDesktop, toUserMessage } from '../../lib/bridge';
 import { readAutoSyncSettings } from '../../lib/autoSync';
 import type { AppStatus, LoginStatus, SyncOutcome, SyncProgress, SyncReport } from '../../types';
+import { IDLE, type DataReady } from '../../lib/dataReady';
 import { messagesOf } from '../../i18n';
 import { syncControllerMessages } from '../useSyncController.i18n';
 
@@ -55,6 +56,8 @@ export const compactionPending = ref(0);
 export const compactingEvent = ref(false);
 export const compacting = computed(() => compactingEvent.value || appStatus.value?.compacting === true);
 export const compactionSaved = ref<number | null>(null);
+/* 用户在等的那次同步有没有结果（「奶茶好了」）。转换规则在 lib/dataReady.ts。 */
+export const dataReady = ref<DataReady>(IDLE);
 export const autoSyncEnabled = ref(readAutoSyncSettings().enabled);
 export const autoSyncInterval = ref(readAutoSyncSettings().intervalMinutes);
 

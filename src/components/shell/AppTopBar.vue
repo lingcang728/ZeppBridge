@@ -33,6 +33,8 @@ const messages = defineMessages(
     themeDark: '深色',
     themeSystem: '跟随系统',
     localeLabel: '界面语言',
+    readyPill: '数据已备好 · 交给 AI',
+    readyTitle: '同步完成，本机数据已是最新。点一下去交给 AI。',
   },
   {
     mainNav: 'Main navigation',
@@ -53,6 +55,8 @@ const messages = defineMessages(
     themeDark: 'Dark',
     themeSystem: 'System',
     localeLabel: 'Interface language',
+    readyPill: 'Data ready · hand to AI',
+    readyTitle: 'Sync finished and the local data is current. Click to hand it to the AI.',
   },
   {
     mainNav: 'Navegación principal',
@@ -73,6 +77,8 @@ const messages = defineMessages(
     themeDark: 'Oscuro',
     themeSystem: 'Sistema',
     localeLabel: 'Idioma de la interfaz',
+    readyPill: 'Datos listos · pasar a la IA',
+    readyTitle: 'Sincronización terminada: los datos locales están al día. Haz clic para pasarlos a la IA.',
   },
   // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
   'components/shell/AppTopBar',
@@ -96,8 +102,12 @@ const goTo = (to: string | number) => { void router.push(String(to)); };
 
 const {
   appStatus, statusError, syncState, syncProgress, syncMessage,
-  isSyncing, canIncrementalSync, runSync, cancelSync,
+  isSyncing, canIncrementalSync, runSync, cancelSync, dataReady,
 } = useSyncController();
+
+/* 用户在等的那次同步落地了：同步胶囊变成发光的「数据已备好 · 交给 AI」，
+   点一下去取。又开始同步时让位给进度；进了交给 AI 就恢复成上次同步时间。 */
+const readyToHand = computed(() => dataReady.value.phase === 'ready' && !isSyncing.value);
 const { resolvedTheme, pickTheme } = useTheme();
 
 const accountRecognized = computed(() =>
@@ -153,6 +163,7 @@ const syncText = computed(() => {
 });
 
 const syncTitle = computed(() => {
+  if (readyToHand.value) return t.value.readyTitle;
   if (isSyncing.value) return `${syncMessage.value} · ${t.value.cancel}`;
   return `${t.value.connectionTitle} · ${t.value.lastSyncPrefix}${lastSyncClock.value}`
     + ` — ${canIncrementalSync.value ? t.value.syncNow : t.value.verifyFirst}`;
@@ -160,7 +171,9 @@ const syncTitle = computed(() => {
 
 /* 点击行为和旧的同步按钮相同：能增量同步就发起；同步中点击则是取消。 */
 const onSyncClick = () => {
-  if (isSyncing.value) {
+  if (readyToHand.value) {
+    void router.push('/ai');
+  } else if (isSyncing.value) {
     cancelSync();
   } else if (canIncrementalSync.value) {
     void runSync('incremental');
@@ -202,16 +215,17 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
     <div class="topbar-actions">
       <span v-if="statusError" class="sr-only" role="status">{{ statusError }}</span>
       <button
-        :class="['sync-pill', 'glass-control', `tone-${statusTone}`, { syncing: isSyncing }]"
+        :class="['sync-pill', 'glass-control', `tone-${statusTone}`, { syncing: isSyncing, 'is-ready': readyToHand, 'ready-glow': readyToHand }]"
         type="button"
-        :disabled="!isSyncing && !canIncrementalSync"
+        :disabled="!readyToHand && !isSyncing && !canIncrementalSync"
         :title="syncTitle"
         :aria-label="syncTitle"
         @click="onSyncClick"
       >
         <i class="dot" :class="{ spinning: isSyncing }" aria-hidden="true"></i>
-        <span class="sync-text" aria-live="polite">{{ syncText }}</span>
+        <span class="sync-text" aria-live="polite">{{ readyToHand ? t.readyPill : syncText }}</span>
         <Icon v-if="isSyncing" name="x" :size="13" class="sync-cancel" />
+        <Icon v-else-if="readyToHand" name="arrow-right" :size="14" class="ready-arrow" />
       </button>
 
       <!-- 主题和语言都是拖着转的胶囊传送带，共用一个玻璃底座；不再弹下拉。 -->
@@ -311,6 +325,9 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
   50% { opacity: .3; }
 }
 .sync-text { font-variant-numeric: tabular-nums; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.sync-pill.is-ready { color: var(--ink); font-weight: 600; }
+.sync-pill.is-ready .dot { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+.ready-arrow { color: var(--accent); }
 .sync-cancel { color: var(--subtle); }
 
 .icon-group { display: inline-flex; align-items: center; gap: 2px; padding: 2px 4px 2px 2px; border-radius: 999px; }

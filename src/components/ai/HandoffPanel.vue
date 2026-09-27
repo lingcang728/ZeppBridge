@@ -12,7 +12,7 @@
  * → 打开所选 AI → 在资源管理器里选中导出的文件夹。按下以后坞向上长出一截，
  * 显示每一步的进度和导出位置。导出前顺手保存任务。
  */
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Icon from '../Icon.vue';
 import CapsuleWheel from '../CapsuleWheel.vue';
 import HandoffSteps from './HandoffSteps.vue';
@@ -25,6 +25,7 @@ import { formatBytes } from '../../lib/aiTask/coverage';
 import { composePromptPreview } from '../../lib/aiTask/prompt';
 import { useAiTaskDraft } from '../../composables/useAiTaskDraft';
 import { useAiTaskHandoff, type HandoffStepId } from '../../composables/useAiTaskHandoff';
+import { useSyncController } from '../../composables/useSyncController';
 import { defineMessages, useMessages } from '../../i18n';
 
 const props = defineProps<{
@@ -61,6 +62,9 @@ const t = useMessages(defineMessages(
     repeat: (count: number) => `×${count}`,
     closePanel: '收起',
     packageSize: (bytes: string) => `数据包约 ${bytes}`,
+    readinessWaiting: '最新数据还在路上',
+    readinessWaitingStep: (current: number, total: number) => `同步 ${current}/${total} · 完成后这里自动刷新`,
+    readinessWaitingSub: '同步完成后这里自动刷新',
   },
   {
     title: 'Hand to the AI',
@@ -82,6 +86,9 @@ const t = useMessages(defineMessages(
     repeat: (count: number) => `×${count}`,
     closePanel: 'Close',
     packageSize: (bytes: string) => `Package ≈ ${bytes}`,
+    readinessWaiting: 'The latest data is still on its way',
+    readinessWaitingStep: (current: number, total: number) => `Sync ${current}/${total} · this refreshes when it lands`,
+    readinessWaitingSub: 'This refreshes on its own when the sync lands',
   },
   {
     title: 'Entregar a la IA',
@@ -97,9 +104,29 @@ const t = useMessages(defineMessages(
     issueCount: (count: number) => (count === 1 ? '1 aviso' : `${count} avisos`),
     closePanel: 'Cerrar',
     packageSize: (bytes: string) => `Paquete ≈ ${bytes}`,
+    readinessWaiting: 'Los datos más recientes aún están llegando',
+    readinessWaitingStep: (current: number, total: number) => `Sincronización ${current}/${total} · se actualiza al terminar`,
+    readinessWaitingSub: 'Se actualiza sola cuando termine la sincronización',
   },
   'components/ai/HandoffPanel',
 ));
+
+/* —— 用户在等的那次同步还没落地：就绪度胶囊说「最新数据还在路上」。
+   同步落地后页面按 dataRevision 重新取预览，这里的数字自己会变。 —— */
+const { dataReady, isSyncing, syncProgress, lastPickupAt } = useSyncController();
+const waitingForData = computed(() => dataReady.value.phase === 'waiting');
+
+/* 从「数据已备好」取走、来到这一页的那一刻（或者人本来就在这一页、同步刚好落地）：
+   主按钮亮一圈，告诉人下一步按哪儿。几秒后自己熄掉。 */
+const ARRIVAL_WINDOW_MS = 4000;
+const arrived = ref(false);
+let arrivedTimer = 0;
+const flashArrival = () => {
+  arrived.value = true;
+  window.clearTimeout(arrivedTimer);
+  arrivedTimer = window.setTimeout(() => { arrived.value = false; }, ARRIVAL_WINDOW_MS);
+};
+watch(lastPickupAt, (at) => { if (at) flashArrival(); });
 
 /* —— 交给谁：传送带胶囊，带各家的图标 —— */
 const providerItems = computed(() => AI_PROVIDERS.map((item) => ({ value: item.id, label: item.label, image: item.localIcon })));
@@ -166,10 +193,12 @@ const onDocKey = (event: KeyboardEvent) => {
 onMounted(() => {
   document.addEventListener('pointerdown', onDocPointer);
   document.addEventListener('keydown', onDocKey);
+  if (lastPickupAt.value && Date.now() - lastPickupAt.value < ARRIVAL_WINDOW_MS) flashArrival();
 });
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', onDocPointer);
   document.removeEventListener('keydown', onDocKey);
+  window.clearTimeout(arrivedTimer);
 });
 </script>
 
@@ -215,9 +244,13 @@ onBeforeUnmount(() => {
     <p v-if="previewError" class="ai-note bad alert-pill" role="alert"><Icon name="warning" :size="13" />{{ previewError }}</p>
 
     <div class="bar glass-control">
-      <button type="button" :class="['ready-chip', { 'has-issues': issueTotal }]" :aria-expanded="details" @click="details = !details">
+      <button type="button" :class="['ready-chip', { 'has-issues': issueTotal, 'is-waiting': waitingForData }]" :aria-expanded="details" @click="details = !details">
         <i class="ready-dot" aria-hidden="true"></i>
-        <span class="ready-copy">
+        <span v-if="waitingForData" class="ready-copy" role="status">
+          <span>{{ t.readinessWaiting }}</span>
+          <small>{{ syncProgress && isSyncing ? t.readinessWaitingStep(syncProgress.current, syncProgress.total) : t.readinessWaitingSub }}</small>
+        </span>
+        <span v-else class="ready-copy">
           <span>{{ readiness ? t.readiness(readiness.categories, readiness.percent) : t.readinessLoading }}</span>
           <small v-if="preview">{{ t.packageSize(formatBytes(preview.estimated_bytes)) }}<template v-if="issueTotal"> · {{ t.issueCount(issueTotal) }}</template></small>
         </span>
@@ -227,7 +260,7 @@ onBeforeUnmount(() => {
       <CapsuleWheel class="provider-wheel" :span="210" :items="providerItems" :model-value="provider.id"
         :aria-label="t.who" @update:model-value="pickProvider" />
 
-      <button type="button" class="go cta" :disabled="!desktop || busy" :title="t.run(provider.label)" @click="run(true)">
+      <button type="button" :class="['go', 'cta', { 'ready-glow': arrived }]" :disabled="!desktop || busy" :title="t.run(provider.label)" @click="run(true)">
         <Icon name="send" :size="17" />
         <span class="go-copy"><strong>{{ t.go(provider.label) }}</strong><small>{{ t.goSub }}</small></span>
       </button>
@@ -267,6 +300,14 @@ onBeforeUnmount(() => {
 .ready-chip:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); }
 .ready-dot { width: 9px; height: 9px; flex: 0 0 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
 .ready-chip.has-issues .ready-dot { background: var(--warning); box-shadow: 0 0 10px var(--warning); }
+/* 等数据：点变成一个转着的小环。 */
+.ready-chip.is-waiting .ready-dot {
+  background: none;
+  box-shadow: none;
+  border: 2px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-top-color: var(--accent);
+  animation: spin 900ms linear infinite;
+}
 .ready-copy { display: grid; min-width: 0; line-height: 1.25; font-size: var(--fs-sm); font-weight: 600; }
 .ready-copy span, .ready-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ready-copy small { color: var(--subtle); font-size: var(--fs-2xs); font-weight: 500; }

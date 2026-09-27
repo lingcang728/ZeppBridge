@@ -25,6 +25,7 @@ import AiStepRail, { type RailStep } from '../components/ai/AiStepRail.vue';
 import { useAiTaskDraft } from '../composables/useAiTaskDraft';
 import { useAiTaskLibrary } from '../composables/useAiTaskLibrary';
 import { useAiTaskPreview } from '../composables/useAiTaskPreview';
+import { useSyncController } from '../composables/useSyncController';
 import type { AiTaskCategory } from '../lib/bridge/types';
 import { buildGraph } from '../lib/aiTask/graph/model';
 import { directionText } from '../lib/aiTask/prompt';
@@ -157,6 +158,13 @@ const railSteps = computed<RailStep[]>(() => {
 
 /* —— 载入 —— */
 previewCtl.watchDraft(draft);
+/* 同步写进了新数据：运动列表和覆盖预览都重新取。以前人在这一页等同步，
+   同步完了这里还是旧的，要切出去再切回来才会变。 */
+const { dataRevision } = useSyncController();
+watch(dataRevision, () => {
+  void library.loadRecentWorkouts();
+  void previewCtl.loadPreview(draft.value);
+});
 onMounted(() => {
   void library.loadTemplates();
   void library.loadTaskList();
