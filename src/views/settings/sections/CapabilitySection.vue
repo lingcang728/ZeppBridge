@@ -46,7 +46,7 @@ const {
         <li
           v-for="row in capabilityBoard"
           :key="row.key"
-          :class="['capability-cell', row.state]"
+          :class="['capability-cell', 's-tile', row.state, { 'is-sunken': row.state === 'off' }]"
         >
           <span class="cell-head">
             <i :class="['lamp', row.lamp]" aria-hidden="true"></i>
@@ -55,7 +55,7 @@ const {
           <span class="cell-detail">{{ row.detail }}</span>
           <span v-if="row.note" class="cell-note">{{ row.note }}</span>
         </li>
-        <li v-if="!capabilityBoard.length" class="capability-cell off">
+        <li v-if="!capabilityBoard.length" class="capability-cell s-tile is-sunken off">
           <span class="cell-head"><i class="lamp off" aria-hidden="true"></i><strong>{{ t.capabilityEmptyTitle }}</strong></span>
           <span class="cell-detail">{{ t.capabilityEmptyBody }}</span>
         </li>
@@ -79,8 +79,8 @@ const {
 <style scoped src="../settings-base.css"></style>
 <style scoped>
 .capability-board { display: grid; gap: var(--space-3); }
-.capability-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; color: var(--muted); font-size: var(--fs-sm); }
-.legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.capability-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; color: var(--muted); font-size: var(--fs-sm); }
+.legend-item { display: inline-flex; min-height: 28px; align-items: center; gap: 7px; padding: 0 12px; border-radius: 999px; background: var(--cap-track); box-shadow: var(--cap-track-shadow); }
 .lamp { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: var(--subtle); }
 .lamp.on { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .lamp.pending { background: var(--warning); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warning) 16%, transparent); }
@@ -98,13 +98,9 @@ const {
   display: grid;
   align-content: start;
   gap: 3px;
-  padding: 10px 12px;
-  border: 1px solid var(--mat-line);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--ink) 2.5%, transparent);
+  padding: 12px 14px;
   min-width: 0;
 }
-.capability-cell.off { border-style: dashed; }
 .cell-head { display: flex; align-items: center; gap: 7px; min-width: 0; }
 .cell-head strong { min-width: 0; color: var(--ink); font-size: var(--fs-md); font-weight: 600; overflow-wrap: anywhere; }
 .cell-detail { color: var(--muted); font-size: var(--fs-xs); }

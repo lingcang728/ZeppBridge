@@ -1,20 +1,27 @@
 <script setup lang="ts">
-
+/* 最近记录：睡眠和运动排在同一条竖着的时间线上，按天分组，最上面是最新的。
+ *
+ * 以前是两列贴片（睡眠一列、运动一列），看不出它们在时间上的先后——昨晚睡得短、
+ * 今早跑得慢，这两件事隔着一整屏。现在它们挨在一起。上面一枚胶囊切「全部 / 睡眠 /
+ * 运动」，选运动时再多一个运动类型的滚轮；完整历史在「全部睡眠」「全部运动」。 */
 defineOptions({ name: 'RecentRecords' });
 import { computed, onMounted, ref, watch } from 'vue';
-import { useFirstLoad } from '../composables/useFirstLoad';
 import { RouterLink } from 'vue-router';
+import { useFirstLoad } from '../composables/useFirstLoad';
+import CapsuleWheel from '../components/CapsuleWheel.vue';
+import EmptyState from '../components/EmptyState.vue';
+import GlyphTile from '../components/GlyphTile.vue';
 import Icon from '../components/Icon.vue';
 import PageHeader from '../components/PageHeader.vue';
-import RecordRow from '../components/RecordRow.vue';
-import EmptyState from '../components/EmptyState.vue';
+import SegmentTrack from '../components/SegmentTrack.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
+import type { DesignIconName } from '../components/DesignIcon.vue';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { useSyncController } from '../composables/useSyncController';
 import { createLoadSeq } from '../lib/loadSeq';
 import { workoutLabel } from '../lib/labels';
-import { formatDate, formatDistance, formatDuration, isFiniteNumber } from '../lib/format';
-import { displayableWorkouts, workoutDisplayLabel, workoutDisplayType, workoutDurationMinutes, workoutTypeKey } from '../lib/workouts';
+import { formatDate, formatDistance, formatDuration, formatTime, isFiniteNumber, type HealthCategory } from '../lib/format';
+import { displayableWorkouts, workoutDisplayLabel, workoutDurationMinutes, workoutTypeKey } from '../lib/workouts';
 import type { SleepSession, Workout } from '../types';
 import { useMessages } from '../i18n';
 import { recentRecordsMessages as messages } from './RecentRecords.i18n';
@@ -30,48 +37,109 @@ const recentWorkouts = ref<Workout[]>([]);
 const { dataRevision } = useSyncController();
 const loadSeq = createLoadSeq();
 
-const activeFilter = ref('all');
+type Kind = 'all' | 'sleep' | 'workout';
+const kind = ref<Kind>('all');
+const workoutType = ref('all');
 
 const displayableRecentWorkouts = computed(() => displayableWorkouts(recentWorkouts.value));
-const hiddenWorkoutsCount = computed(() => {
-  return Math.max(0, recentWorkouts.value.length - displayableRecentWorkouts.value.length);
-});
+const hiddenWorkoutsCount = computed(() => Math.max(0, recentWorkouts.value.length - displayableRecentWorkouts.value.length));
 
-const workoutFilters = computed(() => {
+const kindItems = computed(() => [
+  { value: 'all' as const, label: t.value.filterAll },
+  { value: 'sleep' as const, label: t.value.filterSleep(recentSleep.value.length), icon: 'moon' as const },
+  { value: 'workout' as const, label: t.value.filterWorkouts(displayableRecentWorkouts.value.length), icon: 'run' as const },
+]);
+const typeItems = computed(() => {
   const seen = new Set<string>();
-  const types = displayableRecentWorkouts.value
-    .map(workoutTypeKey)
-    .filter((type) => {
-      if (!type || seen.has(type)) return false;
-      seen.add(type);
-      return true;
-    });
-  return [
-    { label: t.value.filterAll, value: 'all', icon: 'grid' as const },
-    ...types.map((type) => ({ label: workoutLabel(type), value: type, icon: 'run' as const })),
-  ];
+  const types = displayableRecentWorkouts.value.map(workoutTypeKey).filter((type) => {
+    if (!type || seen.has(type)) return false;
+    seen.add(type);
+    return true;
+  });
+  return [{ value: 'all', label: t.value.filterAll }, ...types.map((type) => ({ value: type, label: workoutLabel(type) }))];
+});
+watch(typeItems, (items) => { if (!items.some((item) => item.value === workoutType.value)) workoutType.value = 'all'; });
+watch(kind, () => { workoutType.value = 'all'; });
+
+interface Entry {
+  key: string;
+  to: object;
+  category: HealthCategory;
+  icon: DesignIconName;
+  /** 用来排序和分组的时刻：睡眠按醒来那一刻（归到醒来那天），运动按开始。 */
+  at: number;
+  day: string;
+  time: string;
+  title: string;
+  fact: string;
+  extra: string | null;
+}
+
+const dayKey = (date: Date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+const dayLabel = (date: Date) => {
+  const today = new Date();
+  const start = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diff = Math.round((start(today) - start(date)) / 86_400_000);
+  if (diff === 0) return t.value.today;
+  if (diff === 1) return t.value.yesterday;
+  return formatDate(date.toISOString(), 'long');
+};
+
+const workoutIcon = (workout: Workout): DesignIconName => {
+  const key = workoutTypeKey(workout);
+  if (/strength|weight|core|hiit|gym/.test(key)) return 'body-activity';
+  if (/cycl|ride|bike|bmx|spinning/.test(key)) return 'outdoor-cycling';
+  return 'outdoor-run';
+};
+const workoutFact = (workout: Workout): string => {
+  if (isFiniteNumber(workout.distance_meters) && workout.distance_meters > 0) return formatDistance(workout.distance_meters);
+  const minutes = workoutDurationMinutes(workout);
+  if (minutes) return formatDuration(minutes);
+  if (isFiniteNumber(workout.calories)) return `${Math.round(workout.calories)} kcal`;
+  return t.value.notProvided;
+};
+
+const entries = computed<Entry[]>(() => {
+  const list: Entry[] = [];
+  if (kind.value !== 'workout') {
+    for (const sleep of recentSleep.value) {
+      const at = new Date(sleep.end_time || sleep.start_time);
+      if (Number.isNaN(at.getTime())) continue;
+      list.push({
+        key: `s-${sleep.sleep_id}`, to: { name: 'SleepDetail', params: { sleepId: sleep.sleep_id } }, category: 'sleep', icon: 'sleep',
+        at: at.getTime(), day: dayKey(at), time: formatTime(sleep.start_time), title: t.value.sleepTitle,
+        fact: formatDuration(sleep.duration_minutes, t.value.notProvided),
+        extra: isFiniteNumber(sleep.score) ? t.value.sleepScore(Math.round(sleep.score)) : null,
+      });
+    }
+  }
+  if (kind.value !== 'sleep') {
+    for (const workout of displayableRecentWorkouts.value) {
+      if (workoutType.value !== 'all' && workoutTypeKey(workout) !== workoutType.value) continue;
+      const at = new Date(workout.start_time);
+      if (Number.isNaN(at.getTime())) continue;
+      list.push({
+        key: `w-${workout.workout_id}`, to: { name: 'WorkoutDetail', params: { workoutId: workout.workout_id } }, category: 'activity',
+        icon: workoutIcon(workout), at: at.getTime(), day: dayKey(at), time: formatTime(workout.start_time), title: workoutDisplayLabel(workout),
+        fact: workoutFact(workout), extra: isFiniteNumber(workout.avg_hr) ? t.value.avgHr(Math.round(workout.avg_hr)) : null,
+      });
+    }
+  }
+  return list.sort((a, b) => b.at - a.at);
 });
 
-const filteredWorkouts = computed(() => activeFilter.value === 'all'
-  ? displayableRecentWorkouts.value
-  : displayableRecentWorkouts.value.filter((workout) => workoutTypeKey(workout) === activeFilter.value));
-
-function workoutTypeBg(type: string): string {
-  const map: Record<string, string> = {
-    run: 'var(--route-mint)',
-    running: 'var(--route-mint)',
-    trail: 'var(--route-mint)',
-    walk: 'var(--route-cyan)',
-    walking: 'var(--route-cyan)',
-    hiking: 'var(--route-cyan)',
-    treadmill: 'var(--route-amber)',
-    indoor_run: 'var(--route-amber)',
-    ride: 'var(--route-cyan)',
-    cycling: 'var(--route-cyan)',
-    swimming: 'var(--route-cyan)',
-  };
-  return map[type?.trim().toLowerCase()] ?? 'var(--route-mint)';
-}
+const STEP = 30;
+const visible = ref(STEP);
+watch([kind, workoutType], () => { visible.value = STEP; });
+const groups = computed(() => {
+  const out: { day: string; label: string; items: Entry[] }[] = [];
+  for (const entry of entries.value.slice(0, visible.value)) {
+    const last = out[out.length - 1];
+    if (last && last.day === entry.day) last.items.push(entry);
+    else out.push({ day: entry.day, label: dayLabel(new Date(entry.at)), items: [entry] });
+  }
+  return out;
+});
 
 const loadRecent = async () => {
   const seq = loadSeq.next();
@@ -87,8 +155,7 @@ const loadRecent = async () => {
     return;
   }
   /* 各取最近 150 条：这一页是「最近」而不是全集，完整历史在 /sleep 与
-     /workouts（那里有分页，见 getSleepPage）。以前各 500 条，一次 IPC
-     序列化近千条记录只为填一个滚动列，首屏代价大于价值。 */
+     /workouts（那里有分页，见 getSleepPage）。 */
   const [sleep, workouts] = await Promise.allSettled([
     tauriApi.getRecentSleep(150),
     tauriApi.getRecentWorkouts(150),
@@ -97,286 +164,61 @@ const loadRecent = async () => {
   recentSleep.value = sleep.status === 'fulfilled' ? sleep.value : [];
   recentWorkouts.value = workouts.status === 'fulfilled' ? workouts.value : [];
   const rejected = [sleep, workouts].filter((result) => result.status === 'rejected');
-  if (rejected.length === 2) {
-    error.value = toUserMessage(rejected[0].reason, t.value.loadFailedTitle);
-  } else if (rejected.length) {
-    partialWarning.value = toUserMessage(rejected[0].reason, t.value.partialUnavailable);
-  }
+  if (rejected.length === 2) error.value = toUserMessage(rejected[0].reason, t.value.loadFailedTitle);
+  else if (rejected.length) partialWarning.value = toUserMessage(rejected[0].reason, t.value.partialUnavailable);
   loading.value = false;
 };
 
 onMounted(() => void loadRecent());
 watch(dataRevision, () => void loadRecent());
-watch(workoutFilters, (filters) => {
-  if (!filters.some((filter) => filter.value === activeFilter.value)) activeFilter.value = 'all';
-});
-
-const workoutFact = (workout: Workout): string => {
-  const distance = shortDistance(workout.distance_meters);
-  if (distance) return distance;
-  if (isFiniteNumber(workout.calories)) return `${Math.round(workout.calories)} kcal`;
-  const minutes = workoutDurationMinutes(workout);
-  return formatDuration(minutes, t.value.notProvided);
-};
-
-function listDate(value: string): string {
-  return formatDate(value);
-}
-
-function shortDistance(meters?: number): string {
-  if (!isFiniteNumber(meters) || meters <= 0) return '';
-  return formatDistance(meters, '');
-}
-
-function formatDateHint(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return formatDate(value);
-  const nowDate = new Date();
-  const startOfToday = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate()).getTime();
-  const startOfThat = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-  const diff = Math.round((startOfToday - startOfThat) / 86400000);
-  if (diff === 0) return t.value.today;
-  if (diff === 1) return t.value.yesterday;
-  return listDate(value);
-}
 </script>
 
 <template>
   <section class="page recent-page" aria-labelledby="recent-title">
-    <PageHeader
-      back="/"
-      :back-label="t.backToOverview"
-      title-id="recent-title"
-      :title="t.title"
-      :intro="t.intro"
-    />
+    <PageHeader back="/" :back-label="t.backToOverview" title-id="recent-title" :title="t.title" :intro="t.introTimeline" />
 
-    <div v-if="partialWarning" class="partial-warning" role="status">
-      <Icon name="info" :size="15" />
-      <span>{{ partialWarning }}</span>
-    </div>
+    <div v-if="partialWarning" class="partial-warning" role="status"><Icon name="info" :size="15" /><span>{{ partialWarning }}</span></div>
 
     <div v-if="initialLoading" class="recent-skeleton" :aria-label="t.loadingLabel" aria-live="polite">
-      <div class="recent-grid">
-        <SkeletonBlock height="100%" />
-        <SkeletonBlock height="100%" />
-      </div>
+      <SkeletonBlock v-for="index in 4" :key="index" height="72px" />
     </div>
 
-    <EmptyState
-      v-else-if="error"
-      tone="error"
-      icon="warning"
-      :title="t.loadFailedTitle"
-      :message="error"
-    >
+    <EmptyState v-else-if="error" tone="error" icon="warning" :title="t.loadFailedTitle" :message="error">
       <button v-if="isTauri()" class="button button-secondary" type="button" @click="loadRecent"><Icon name="refresh" :size="15" />{{ t.retry }}</button>
     </EmptyState>
 
-    <div v-else class="recent-grid">
-      <!-- 睡眠列 -->
-      <section class="recent-col" aria-labelledby="recent-sleep-title">
-        <div class="group-head">
-          <h2 id="recent-sleep-title" class="col-label">
-            <Icon name="moon" :size="15" /><span>{{ t.recentSleep }}</span>
-            <em v-if="recentSleep.length">{{ t.countBadge(recentSleep.length) }}</em>
-          </h2>
-          <RouterLink class="see-all" to="/sleep">{{ t.seeAll }}<Icon name="arrow-right" :size="13" /></RouterLink>
-        </div>
-        <div class="surface-card list-card">
-          <RecordRow
-            v-for="session in recentSleep"
-            :key="session.sleep_id"
-            compact
-            :to="{ name: 'SleepDetail', params: { sleepId: session.sleep_id } }"
-            category="sleep"
-            icon="moon"
-            :kicker="formatDateHint(session.start_time)"
-            :title="formatDuration(session.duration_minutes)"
-            :fact="isFiniteNumber(session.score) ? String(Math.round(session.score)) : t.notProvided"
-          />
-          <div v-if="!recentSleep.length" class="empty-row">{{ t.noSleep }}</div>
-        </div>
-      </section>
+    <template v-else>
+      <div class="recent-toolbar">
+        <SegmentTrack v-model="kind" :items="kindItems" :aria-label="t.title" />
+        <CapsuleWheel v-if="kind === 'workout' && typeItems.length > 2" v-model="workoutType" loop :span="220"
+          :items="typeItems" :aria-label="t.workoutTypeAria" />
+        <span class="toolbar-gap" />
+        <RouterLink class="pill-button quiet" to="/sleep"><Icon name="moon" :size="14" />{{ t.allSleep }}<Icon name="chevron-right" :size="14" /></RouterLink>
+        <RouterLink class="pill-button quiet" to="/workouts"><Icon name="run" :size="14" />{{ t.allWorkouts }}<Icon name="chevron-right" :size="14" /></RouterLink>
+      </div>
+      <p v-if="kind !== 'sleep' && hiddenWorkoutsCount > 0" class="hidden-note"><Icon name="info" :size="13" />{{ t.hiddenIncomplete(hiddenWorkoutsCount) }}</p>
 
-      <!-- 运动列 -->
-      <section class="recent-col" aria-labelledby="recent-workout-title">
-        <div class="group-head">
-          <h2 id="recent-workout-title" class="col-label">
-            <Icon name="run" :size="15" /><span>{{ t.recentWorkouts }}</span>
-            <em v-if="displayableRecentWorkouts.length">{{ t.countBadge(displayableRecentWorkouts.length) }}</em>
-          </h2>
-          <RouterLink class="see-all" to="/workouts">{{ t.seeAll }}<Icon name="arrow-right" :size="13" /></RouterLink>
+      <p v-if="!entries.length" class="hidden-note">{{ kind === 'sleep' ? t.noSleep : kind === 'workout' ? (workoutType === 'all' ? t.noWorkouts : t.noWorkoutsOfType) : t.noRecords }}</p>
+
+      <div v-else class="timeline">
+        <section v-for="group in groups" :key="group.day" class="tl-day">
+          <h2 class="tl-day-label">{{ group.label }}</h2>
+          <RouterLink v-for="entry in group.items" :key="entry.key" :to="entry.to" :class="['tl-row', `tone-${entry.category}`]">
+            <span class="tl-time">{{ entry.time }}</span>
+            <span class="tl-node" aria-hidden="true"><GlyphTile :name="entry.icon" :size="34" :tone="entry.category" /></span>
+            <span class="tl-card">
+              <strong>{{ entry.title }}</strong>
+              <span class="tl-facts"><b>{{ entry.fact }}</b><template v-if="entry.extra"> · {{ entry.extra }}</template></span>
+            </span>
+            <Icon name="chevron-right" :size="16" class="tl-go" />
+          </RouterLink>
+        </section>
+        <div v-if="entries.length > visible" class="tl-more">
+          <button type="button" class="pill-button" @click="visible += STEP"><Icon name="chevron-down" :size="14" />{{ t.showMore(Math.min(STEP, entries.length - visible)) }}</button>
         </div>
-        <div class="surface-card list-card workout-list-card">
-        <div class="filter-tabs">
-          <button
-            v-for="tab in workoutFilters"
-            :key="tab.value"
-            :class="['tab-button', { active: activeFilter === tab.value }]"
-            type="button"
-            @click="activeFilter = tab.value"
-          >
-            <Icon :name="tab.icon" :size="14" />
-            <span>{{ tab.label }}</span>
-          </button>
-        </div>
-          <div v-if="hiddenWorkoutsCount > 0" class="filter-note">
-            <Icon name="info" :size="12" />
-            <span>{{ t.hiddenIncomplete(hiddenWorkoutsCount) }}</span>
-          </div>
-          <RecordRow
-            v-for="workout in filteredWorkouts"
-            :key="workout.workout_id"
-            compact
-            :to="{ name: 'WorkoutDetail', params: { workoutId: workout.workout_id } }"
-            category="activity"
-            icon="run"
-            :icon-bg="workoutTypeBg(workoutDisplayType(workout))"
-            :kicker="formatDateHint(workout.start_time)"
-            :title="workoutDisplayLabel(workout)"
-            :fact="workoutFact(workout)"
-          />
-          <div v-if="!filteredWorkouts.length" class="empty-row">{{ activeFilter === 'all' ? t.noWorkouts : t.noWorkoutsOfType }}</div>
-        </div>
-      </section>
-    </div>
+      </div>
+    </template>
   </section>
 </template>
 
-<style scoped>
-.recent-page.page {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-.recent-skeleton { flex: 1; min-height: 0; }
-.recent-grid {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-.recent-col {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-}
-.group-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 8px;
-  flex: 0 0 auto;
-}
-.col-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  margin: 0;
-  font-size: var(--fs-md);
-  font-weight: 700;
-  color: var(--ink);
-}
-.col-label svg { color: var(--sleep); }
-.recent-col:last-child .col-label svg { color: var(--activity); }
-.col-label em {
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: var(--mat-card);
-  border: 1px solid var(--mat-line);
-  color: var(--muted);
-  font-size: var(--fs-xs);
-  font-style: normal;
-  font-weight: 400;
-  font-family: var(--font-mono); box-shadow: var(--mat-rim), var(--mat-shadow);
-}
-.see-all {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--muted);
-  font-size: var(--fs-sm);
-  text-decoration: none;
-}
-.see-all:hover { color: var(--accent); }
-.list-card {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 6px;
-  background: var(--mat-card);
-  border: 1px solid var(--mat-line);
-  border-radius: var(--radius-md); box-shadow: var(--mat-rim), var(--mat-shadow);
-}
-.filter-note {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  margin-bottom: 4px;
-  border-radius: var(--radius-sm);
-  background: var(--mat-inset);
-  color: var(--subtle);
-  font-size: var(--fs-xs); box-shadow: var(--mat-inset-shadow);
-}
-.empty-row {
-  padding: 18px 16px;
-  color: var(--muted);
-  font-size: var(--fs-md);
-}
-.partial-warning {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  padding: 9px 12px;
-  border: 1px solid var(--mat-line);
-  border-radius: var(--radius-md);
-  background: var(--mat-card);
-  color: var(--warning);
-  font-size: var(--fs-sm); box-shadow: var(--mat-rim), var(--mat-shadow);
-}
-.partial-warning svg { color: var(--warning); }
-.filter-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 8px;
-  padding: 4px;
-  background: var(--mat-inset);
-  border-radius: var(--radius-sm); box-shadow: var(--mat-inset-shadow);
-}
-.tab-button {
-  display: flex;
-  flex-shrink: 0;
-  white-space: nowrap;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 12px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--muted);
-  font-size: var(--fs-sm);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.tab-button:hover {
-  background: var(--surface);
-  color: var(--ink);
-}
-.tab-button.active {
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-weight: 600;
-}
-@media (max-width: 860px) {
-  .recent-grid { grid-template-columns: minmax(0, 1fr); }
-}
-</style>
+<style scoped src="./RecentRecords.css"></style>

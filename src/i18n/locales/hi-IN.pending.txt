@@ -29,6 +29,7 @@ components/overview/DataReadyCapsule.waitingHint
 components/overview/HeartRateCard.cloudLag
 components/overview/HeartRateCard.hrStale
 components/overview/HeartRateCard.latestAt
+components/overview/RecentCard.newest
 components/overview/SourcesStrip.latestData
 components/overview/StepsCard.stepsLatest
 components/overview/StepsCard.stepsNotYet
@@ -36,6 +37,9 @@ components/shell/AppTopBar.readyPill
 components/shell/AppTopBar.readyTitle
 lib/format.today
 lib/format.yesterday
+lib/lifeEvents.all
+lib/lifeEvents.showLess
+lib/lifeEvents.showMore
 views/AiComposer.askEmpty
 views/AiComposer.askTemplate
 views/AiComposer.extrasFiles
@@ -51,3 +55,14 @@ views/AiComposer.undoKept
 views/AiComposer.undoPicked
 views/AiComposer.undoRemoved
 views/AiComposer.undoUnpicked
+views/RecentRecords.allSleep
+views/RecentRecords.allWorkouts
+views/RecentRecords.avgHr
+views/RecentRecords.filterSleep
+views/RecentRecords.filterWorkouts
+views/RecentRecords.introTimeline
+views/RecentRecords.noRecords
+views/RecentRecords.showMore
+views/RecentRecords.sleepScore
+views/RecentRecords.sleepTitle
+views/RecentRecords.workoutTypeAria

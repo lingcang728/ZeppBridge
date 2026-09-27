@@ -1153,8 +1153,6 @@ export default {
       active: 'A decorrer',
       search: 'Procurar acontecimentos de vida',
       noMatch: 'Sem acontecimentos correspondentes.',
-      previous: 'Anterior',
-      next: 'Seguinte',
       manage: 'Gerir acontecimentos de vida',
       related: 'Acontecimentos relacionados',
       local:
@@ -1620,7 +1618,6 @@ export default {
     'views/RecentRecords': {
       backToOverview: 'Voltar à visão geral',
       title: 'Registos recentes',
-      intro: 'Sono e treinos sincronizados recentemente, lado a lado.',
       loadingLabel: 'A carregar os registos recentes',
       loadFailedTitle: 'Não foi possível carregar os registos recentes',
       desktopOnly:
@@ -1628,10 +1625,6 @@ export default {
       retry: 'Tentar novamente',
       partialUnavailable: 'Alguns dados estão indisponíveis neste momento',
       filterAll: 'Todos',
-      recentSleep: 'Sono recente',
-      recentWorkouts: 'Treinos recentes',
-      countBadge: (count: number) => `${count} no total`,
-      seeAll: 'Ver tudo',
       noSleep: 'Ainda sem registos de sono',
       noWorkouts: 'Nada para mostrar aqui.',
       noWorkoutsOfType: 'Nada para mostrar deste tipo de treino.',

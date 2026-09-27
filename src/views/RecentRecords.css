@@ -1,0 +1,39 @@
+.recent-page.page { display: grid; width: 100%; max-width: 1080px; min-width: 0; margin: 0 auto; gap: 16px; align-content: start; }
+.recent-skeleton { display: grid; gap: 10px; }
+
+.recent-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.toolbar-gap { flex: 1; }
+.hidden-note { display: inline-flex; align-items: center; gap: 7px; justify-self: start; margin: 0; padding: 7px 14px; border-radius: 999px;
+  background: var(--cap-track); box-shadow: var(--cap-track-shadow); color: var(--subtle); font-size: var(--fs-xs); }
+.partial-warning { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 999px; background: var(--mat-card);
+  box-shadow: var(--mat-rim), var(--mat-shadow); color: var(--warning); font-size: var(--fs-sm); }
+
+/* 竖着的时间线：一根渐隐的细线串起每一天；左边是时刻，线上是节点，右边一枚胶囊。 */
+.timeline { position: relative; display: grid; gap: 22px; padding: 18px 20px 22px; border-radius: 28px; background: var(--mat-card);
+  box-shadow: var(--mat-rim), var(--mat-shadow); }
+.tl-day { position: relative; display: grid; gap: 6px; }
+.tl-day::before { content: ''; position: absolute; top: 34px; bottom: 16px; left: 89px; width: 2px; border-radius: 2px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ink) 16%, transparent), color-mix(in srgb, var(--ink) 4%, transparent)); }
+.tl-day-label { position: sticky; top: 64px; z-index: 2; justify-self: start; margin: 0 0 4px; padding: 3px 12px; border-radius: 999px;
+  background: color-mix(in srgb, var(--mat-card-solid) 88%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  color: var(--muted); font-size: var(--fs-xs); font-weight: 650; }
+
+.tl-row { position: relative; display: grid; grid-template-columns: 58px 44px minmax(0, 1fr) auto; align-items: center; gap: 10px;
+  padding: 4px 10px 4px 0; border-radius: 22px; color: inherit; text-decoration: none; transition: background var(--dur-fast) ease, translate var(--dur-base) var(--ease-out); }
+.tl-row:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); translate: 3px 0; }
+.tl-row:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.tl-time { color: var(--subtle); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; text-align: right; }
+.tl-node { position: relative; z-index: 1; display: grid; place-items: center; padding: 3px; border-radius: 14px; background: var(--mat-card-solid); }
+.tl-card { display: grid; min-width: 0; gap: 2px; padding: 10px 16px; border-radius: 18px;
+  background: color-mix(in srgb, var(--ink) 4%, transparent); box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 5%, transparent); }
+.tl-card strong { overflow: hidden; color: var(--ink); font-size: var(--fs-md); font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.tl-facts { color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.tl-facts b { color: var(--ink); font-weight: 600; }
+.tl-go { color: var(--subtle); }
+.tl-more { display: flex; justify-content: center; }
+
+@media (max-width: 640px) {
+  .tl-row { grid-template-columns: 46px 40px minmax(0, 1fr); }
+  .tl-day::before { left: 75px; }
+  .tl-go { display: none; }
+}

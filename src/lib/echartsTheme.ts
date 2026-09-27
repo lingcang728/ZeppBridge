@@ -141,8 +141,8 @@ const darkPalette: ChartPalette = {
   axis: axisInk,
   grid: 'rgba(226, 234, 242, 0.12)',
   gridSoft: 'rgba(226, 234, 242, 0.08)',
-  tooltipBg: '#1F232A',
-  tooltipBorder: 'rgba(226, 234, 242, 0.22)',
+  tooltipBg: 'rgba(28, 32, 39, 0.86)',
+  tooltipBorder: 'rgba(255, 255, 255, 0.1)',
   tooltipText: '#F2F4EE',
   tooltipSub: '#B4BBC3',
   tooltipDim: '#949CA5',
@@ -160,8 +160,8 @@ const lightPalette: ChartPalette = {
   axis: '#4C5748',
   grid: 'rgba(38, 52, 41, 0.14)',
   gridSoft: 'rgba(38, 52, 41, 0.08)',
-  tooltipBg: '#FFFFFF',
-  tooltipBorder: 'rgba(38, 52, 41, 0.18)',
+  tooltipBg: 'rgba(255, 255, 255, 0.9)',
+  tooltipBorder: 'rgba(38, 52, 41, 0.1)',
   tooltipText: '#20261F',
   tooltipSub: '#4C5748',
   tooltipDim: '#63705C',
@@ -179,6 +179,19 @@ export type ChartThemeName = 'dark' | 'light';
 export const chartPalettes: Record<ChartThemeName, ChartPalette> = {
   dark: darkPalette,
   light: lightPalette,
+};
+
+/* tooltip 是一块浮在图上的玻璃：圆角、背景模糊、柔和投影——和应用里其余浮层同一种材质。 */
+const TOOLTIP_GLASS_DARK = 'border-radius:14px;backdrop-filter:blur(14px) saturate(1.6);-webkit-backdrop-filter:blur(14px) saturate(1.6);box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 14px 32px -14px rgba(0,0,0,.7);';
+const TOOLTIP_GLASS_LIGHT = 'border-radius:14px;backdrop-filter:blur(14px) saturate(1.6);-webkit-backdrop-filter:blur(14px) saturate(1.6);box-shadow:inset 0 1px 0 #fff,0 14px 32px -16px rgba(38,52,41,.35);';
+/* 悬停时的指示线：一根细虚线；柱状图的「阴影」指示只是极淡的一层，不再是一个灰框。 */
+const AXIS_POINTER_DARK = {
+  lineStyle: { color: 'rgba(242, 244, 238, 0.28)', width: 1, type: 'dashed' as const },
+  shadowStyle: { color: 'rgba(242, 244, 238, 0.035)' },
+};
+const AXIS_POINTER_LIGHT = {
+  lineStyle: { color: 'rgba(32, 38, 31, 0.3)', width: 1, type: 'dashed' as const },
+  shadowStyle: { color: 'rgba(32, 38, 31, 0.04)' },
 };
 
 const darkAxis = {
@@ -211,9 +224,10 @@ export const zeppThemeDark = {
     backgroundColor: darkPalette.tooltipBg,
     borderColor: darkPalette.tooltipBorder,
     borderWidth: 1,
-    padding: [8, 12],
+    padding: [10, 14],
     textStyle: { color: darkPalette.tooltipText, fontSize: 15.5, fontFamily: fonts },
-    extraCssText: 'border-radius:8px;box-shadow:none;',
+    extraCssText: TOOLTIP_GLASS_DARK,
+    axisPointer: AXIS_POINTER_DARK,
   },
   line: {
     symbol: 'circle',
@@ -241,7 +255,8 @@ export const zeppThemeLight = {
     borderWidth: 1,
     padding: [8, 12],
     textStyle: { color: lightPalette.tooltipText, fontSize: 15.5, fontFamily: fonts },
-    extraCssText: 'border-radius:8px;box-shadow:0 10px 28px rgba(38,52,41,.16);',
+    extraCssText: TOOLTIP_GLASS_LIGHT,
+    axisPointer: AXIS_POINTER_LIGHT,
   },
   line: {
     symbol: 'circle',

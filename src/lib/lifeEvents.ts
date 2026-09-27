@@ -12,7 +12,7 @@ export const lifeEventMessages = defineMessages(
     invalid: '请输入标题和有效日期，结束日期不能早于开始日期。', failed: '操作失败，请重试。',
     deleted: '生活事件已删除。', loading: '正在读取生活事件…', retry: '重试',
     active: '持续中', search: '搜索生活事件', noMatch: '没有符合条件的事件。',
-    previous: '上一页', next: '下一页', manage: '管理生活事件', related: '相关事件',
+    all: '全部', showMore: (count: number) => `再看 ${count} 件`, showLess: '收起', manage: '管理生活事件', related: '相关事件',
     local: '保存在本机，随数据库备份。交给 AI 时可勾选包含生活事件。',
     categories: { health: '身体与恢复', travel: '旅行与出差', routine: '作息与生活', training: '训练与比赛', other: '其他' },
   },
@@ -25,7 +25,7 @@ export const lifeEventMessages = defineMessages(
     invalid: 'Enter a title and valid dates. The end date cannot be before the start date.', failed: 'Could not complete the action. Please retry.',
     deleted: 'Life event deleted.', loading: 'Loading life events…', retry: 'Retry',
     active: 'Ongoing', search: 'Search life events', noMatch: 'No matching events.',
-    previous: 'Previous', next: 'Next', manage: 'Manage life events', related: 'Related events',
+    all: 'All', showMore: (count: number) => `Show ${count} more`, showLess: 'Show fewer', manage: 'Manage life events', related: 'Related events',
     local: 'Saved locally and included in database backups. You can include life events when handing data to AI.',
     categories: { health: 'Health & recovery', travel: 'Travel', routine: 'Routine & lifestyle', training: 'Training & races', other: 'Other' },
   },
@@ -38,7 +38,7 @@ export const lifeEventMessages = defineMessages(
     invalid: 'Ingresa un título y fechas válidas. La fecha de fin no puede ser anterior a la de inicio.', failed: 'No se pudo completar la acción. Inténtalo de nuevo.',
     deleted: 'Evento eliminado.', loading: 'Cargando eventos…', retry: 'Reintentar',
     active: 'En curso', search: 'Buscar eventos', noMatch: 'No hay eventos que coincidan.',
-    previous: 'Anterior', next: 'Siguiente', manage: 'Administrar eventos', related: 'Eventos relacionados',
+    all: 'Todos', showMore: (count: number) => `Ver ${count} más`, showLess: 'Ver menos', manage: 'Administrar eventos', related: 'Eventos relacionados',
     local: 'Se guardan localmente y se incluyen en las copias de seguridad. Puedes incluirlos al compartir datos con la IA.',
     categories: { health: 'Salud y recuperación', travel: 'Viajes', routine: 'Rutina y estilo de vida', training: 'Entrenamiento y carreras', other: 'Otros' },
   },
@@ -55,5 +55,21 @@ export function validLifeEvent(event: LifeEventInput): boolean {
     && Array.from(event.notes).length <= 4000 && validEventDate(event.startDate)
     && (event.endDate === null || (validEventDate(event.endDate) && event.endDate >= event.startDate));
 }
-export const overlapsEvent = (event: LifeEventInput, start: string, end: string): boolean =>
+/** 生活事件分类的颜色（CSS 变量）：时间线上的节点、胶囊的底色。 */
+export const eventTone = (category: string): string => ({
+  health: 'var(--heart)',
+  travel: 'var(--pace)',
+  routine: 'var(--sleep)',
+  training: 'var(--training)',
+}[category] ?? 'var(--subtle)');
+
+/** 生活事件分类的图标（Icon.vue 的名字）。 */
+export const eventIcon = (category: string): 'heart' | 'map' | 'moon' | 'run' | 'star' => ({
+  health: 'heart' as const,
+  travel: 'map' as const,
+  routine: 'moon' as const,
+  training: 'run' as const,
+}[category] ?? 'star');
+
+export const overlapsEvent =(event: LifeEventInput, start: string, end: string): boolean =>
   event.startDate <= end && (event.endDate === null || event.endDate >= start);

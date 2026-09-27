@@ -286,11 +286,11 @@ function formatNumber(fact: InsightFact, value: number): string {
 <style scoped>
 .weekly-card {
   display: grid;
-  gap: 10px;
-  padding: 16px 18px;
-  border: 1px solid var(--mat-line);
-  border-radius: 16px;
-  background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow);
+  gap: 12px;
+  padding: 18px 20px 20px;
+  border-radius: 28px;
+  background: var(--mat-card);
+  box-shadow: var(--mat-rim), var(--mat-shadow);
 }
 .weekly-card header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
 .weekly-card h2 { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--ink); font-size: var(--fs-lg); font-weight: 600; }
@@ -321,10 +321,19 @@ function formatNumber(fact: InsightFact, value: number): string {
 /* 每格里现在有「上一个 28 天」这种长标签加进度条，210px 一行挤六个放不下，
    标签会顶到进度条上。加宽下限，常见窗口宽度下自然落成五列。 */
 .weekly-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 10px; align-items: stretch; }
-.weekly-item { display: grid; gap: 2px; align-content: start; padding: 10px 12px; border-radius: 12px; background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); }
+/* 每一项是一块凸起的小板（以前是凹下去的平面磁贴）：亮一点的底、顶边高光、柔和投影，
+   悬停时浮起来一点。 */
+.weekly-item { display: grid; gap: 2px; align-content: start; padding: 12px 14px; border-radius: 20px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ink) 6%, transparent), color-mix(in srgb, var(--ink) 2.5%, transparent));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 9%, transparent), inset 0 -1px 0 rgba(0, 0, 0, .18), 0 6px 16px -10px rgba(0, 0, 0, .5);
+  transition: translate var(--dur-base) var(--ease-out), box-shadow var(--dur-base) ease; }
+.weekly-item:hover { translate: 0 -2px; box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 11%, transparent), inset 0 -1px 0 rgba(0, 0, 0, .18), 0 12px 22px -12px rgba(0, 0, 0, .55); }
 .weekly-label { color: var(--muted); font-size: var(--fs-xs); }
 .weekly-item strong { color: var(--ink); font-size: var(--fs-2xl); font-weight: 600; }
-.weekly-delta { font-size: var(--fs-xs); line-height: 1.5; }
+.weekly-delta { justify-self: start; margin-top: 4px; padding: 1px 9px; border-radius: 999px; font-size: var(--fs-xs); line-height: 1.5; }
+.weekly-delta.good { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.weekly-delta.bad { background: color-mix(in srgb, var(--danger) 14%, transparent); }
+.weekly-delta.muted { padding: 0; background: none; }
 .weekly-delta.good { color: var(--accent); }
 .weekly-delta.good::before { content: '✓\a0'; font-weight: 700; }
 .weekly-delta.bad { color: var(--danger); }

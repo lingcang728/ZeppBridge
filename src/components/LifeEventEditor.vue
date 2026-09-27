@@ -67,7 +67,10 @@ async function remove() {
             <DatePicker v-model="draft.endDate" :min="draft.startDate" :aria-label="t.end" data-event-end />
           </label>
         </div>
-        <label class="check"><input v-model="ongoing" type="checkbox">{{ t.ongoing }}</label>
+        <div class="check">
+          <span>{{ t.ongoing }}</span>
+          <button type="button" class="mat-switch" role="switch" :aria-checked="ongoing" :aria-label="t.ongoing" @click="ongoing = !ongoing"></button>
+        </div>
         <label>{{ t.notes }}<textarea v-model="draft.notes" maxlength="4000" rows="4" data-event-notes /></label>
       </fieldset>
       <p class="event-hint">{{ t.local }}</p>
@@ -90,9 +93,11 @@ async function remove() {
 .event-form { display:grid; gap:16px; }.event-form h2,.event-form p { margin:0; }
 fieldset { border:0; padding:0; margin:0; min-width:0; display:grid; gap:14px; }
 label, .field { display:grid; gap:6px; font-size:var(--fs-sm); color:var(--muted); }
-input,select,textarea { min-width:0; width:100%; box-sizing:border-box; padding:10px; border:1px solid var(--line-control); border-radius:8px; background: var(--mat-card-solid); color:var(--ink); font:inherit; }
+/* 输入框和页面上的胶囊同一种凹槽：没有描边，焦点时一圈品牌色。 */
+input,textarea { min-width:0; width:100%; box-sizing:border-box; padding:10px 14px; border:0; border-radius:14px; background: var(--cap-track); box-shadow: var(--cap-track-shadow); color:var(--ink); font:inherit; outline:none; }
+input:focus,textarea:focus { box-shadow: var(--cap-track-shadow), 0 0 0 2px var(--focus); }
 textarea { resize:vertical; }.event-dates { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
-.check { display:flex; align-items:center; gap:8px; }.check input { width:auto; }
+.check { display:flex; align-items:center; justify-content:space-between; gap:12px; color:var(--ink); font-size:var(--fs-sm); }
 .event-hint { color:var(--subtle); font-size:var(--fs-xs); line-height:1.6; }
 footer { display:flex; flex-wrap:wrap; gap:8px; }footer span { flex:1; }.delete-confirm { display:grid; gap:10px; }
 @media(max-width:480px) { .event-dates { grid-template-columns:1fr; } }

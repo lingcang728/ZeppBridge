@@ -159,7 +159,7 @@ const clock = (value: number) =>
 /* 网格位置由父级的 .hr-card-slot 持有：本卡是异步 chunk，
    外壳要在它到达之前先占住同一个格子。 */
 .hr-panel { min-height: 286px; padding: 20px 20px 12px; }
-.latest-when { display: block; margin-top: 2px; color: var(--subtle); font-size: var(--fs-2xs); font-style: normal; text-align: right; }
+.latest-when { display: block; flex-basis: 100%; margin-top: 2px; color: var(--subtle); font-size: var(--fs-2xs); font-style: normal; text-align: right; }
 .empty-copy { display: grid; gap: 6px; max-width: 380px; }
 .empty-copy small { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.5; }
 .hr-zones { display: flex; flex-wrap: wrap; gap: 8px 12px; margin: 4px 0 0; padding: 0; list-style: none; color: var(--subtle); font-size: var(--fs-xs); }

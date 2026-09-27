@@ -68,48 +68,35 @@ const openDataFolder = async () => {
 
 <template>
   <div class="advanced">
-    <section class="s-section">
-      <div class="s-section-head"><h3>{{ t.dataAuthLabel }}</h3></div>
-      <div class="s-list">
-        <div class="s-row">
-          <div class="s-row-main"><span class="s-row-sub">{{ t.dataAuthNote(retentionDays) }}</span></div>
-          <div class="s-row-control">
-            <button class="button secondary" type="button" @click="openDataFolder"><Icon name="folder" :size="15" />{{ t.openDataFolder }}</button>
-            <button class="button danger-button" type="button" @click="clearAuth">{{ t.logout }}</button>
-          </div>
+    <!-- 三件互不相干的小工具横着排：数据文件夹与认证、数据健康检查、压缩历史报文。 -->
+    <div class="s-tiles">
+      <section class="s-tile s-fact">
+        <span class="s-fact-head"><span class="s-fact-icon"><Icon name="folder" :size="15" /></span><strong>{{ t.dataAuthLabel }}</strong></span>
+        <p>{{ t.dataAuthNote(retentionDays) }}</p>
+        <div class="s-fact-actions">
+          <button class="pill-button" type="button" @click="openDataFolder"><Icon name="folder" :size="14" />{{ t.openDataFolder }}</button>
+          <button class="button danger-button" type="button" @click="clearAuth">{{ t.logout }}</button>
         </div>
-      </div>
-    </section>
-
-    <section class="s-section">
-      <div class="s-section-head"><h3>{{ t.healthCheckLabel }}</h3></div>
-      <div class="s-list">
-        <div class="s-row">
-          <div class="s-row-main"><span class="s-row-sub">{{ t.healthCheckNote }}</span></div>
-          <div class="s-row-control">
-            <RouterLink class="button secondary" to="/health-check"><Icon name="database" :size="15" />{{ t.healthCheckOpen }}</RouterLink>
-          </div>
+      </section>
+      <section class="s-tile s-fact">
+        <span class="s-fact-head"><span class="s-fact-icon"><Icon name="database" :size="15" /></span><strong>{{ t.healthCheckLabel }}</strong></span>
+        <p>{{ t.healthCheckNote }}</p>
+        <div class="s-fact-actions">
+          <RouterLink class="pill-button" to="/health-check"><Icon name="database" :size="14" />{{ t.healthCheckOpen }}</RouterLink>
         </div>
-      </div>
-    </section>
-
-    <section class="s-section">
-      <div class="s-section-head"><h3>{{ t.compactLabel }}</h3></div>
-      <div class="s-list">
-        <div class="s-row">
-          <div class="s-row-main">
-            <span class="s-row-sub">{{ t.compactNoteA }}<strong>{{ t.compactNoteStrong }}</strong>{{ t.compactNoteB }}</span>
-          </div>
-          <div class="s-row-control">
-            <button class="button secondary" type="button" :disabled="compactBusy" @click="runCompactPayloads">
-              {{ compactBusy ? t.compacting : t.compactRun }}
-            </button>
-          </div>
+      </section>
+      <section class="s-tile s-fact">
+        <span class="s-fact-head"><span class="s-fact-icon"><Icon name="box" :size="15" /></span><strong>{{ t.compactLabel }}</strong></span>
+        <p class="clamp">{{ t.compactNoteA }}<strong>{{ t.compactNoteStrong }}</strong>{{ t.compactNoteB }}</p>
+        <div class="s-fact-actions">
+          <button class="pill-button" type="button" :disabled="compactBusy" @click="runCompactPayloads">
+            <Icon name="box" :size="14" />{{ compactBusy ? t.compacting : t.compactRun }}
+          </button>
         </div>
-      </div>
-      <p v-if="compactError" class="api-error" role="alert">{{ compactError }}</p>
-      <p v-else-if="compactMessage" class="hint-line ok" role="status">{{ compactMessage }}</p>
-    </section>
+        <p v-if="compactError" class="api-error" role="alert">{{ compactError }}</p>
+        <p v-else-if="compactMessage" class="hint-line ok" role="status">{{ compactMessage }}</p>
+      </section>
+    </div>
 
     <section class="s-section">
       <div class="s-section-head"><h3>{{ t.backupLabel }}</h3></div>
@@ -141,6 +128,10 @@ const openDataFolder = async () => {
 <style scoped>
 .advanced { display: grid; gap: 22px; min-width: 0; }
 .advanced > .s-section + .s-section { margin-top: 0; }
+/* 压缩说明很长：小板里先露五行，悬停或聚焦时全展开。 */
+.clamp { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 5; -webkit-box-orient: vertical; }
+.s-tile:hover .clamp, .s-tile:focus-within .clamp { display: block; }
+.s-fact-actions .danger-button { min-height: 34px; border-radius: 999px; }
 .diag-fold > summary { cursor: pointer; list-style: none; }
 .diag-fold > summary::-webkit-details-marker { display: none; }
 .fold-caret { color: var(--subtle); transition: transform var(--dur-base) var(--ease-out); }

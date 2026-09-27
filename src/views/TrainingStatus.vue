@@ -20,6 +20,7 @@ import {
   indexSeries,
   seriesRanges,
   type SeriesRangeDays,
+  SMOOTH_CHART_UPDATE,
 } from '../lib/metricSeries';
 import type { MetricSeries, TrainingBalancePoint } from '../types';
 import { useMessages } from '../i18n';
@@ -73,6 +74,8 @@ const thresholdOption = computed(() => {
     source?.points.find((point) => point.date === date)?.value ?? null;
   return {
     animationDuration: 600,
+    animationDurationUpdate: 520,
+    animationEasingUpdate: 'cubicInOut' as const,
     grid: { left: 8, right: 12, top: 38, bottom: 8, containLabel: true },
     legend: {
       data: [t.value.thresholdHr, t.value.thresholdPace],
@@ -140,6 +143,8 @@ const balanceOption = computed(() => {
   const dates = balance.value.map((point) => point.date);
   return {
     animationDuration: 600,
+    animationDurationUpdate: 520,
+    animationEasingUpdate: 'cubicInOut' as const,
     grid: { left: 8, right: 12, top: 38, bottom: 8, containLabel: true },
     legend: {
       data: [t.value.acute7d, t.value.chronicWeekly, t.value.acuteChronic],
@@ -334,6 +339,7 @@ watch(dataRevision, () => { void load(); });
             :key="CHART_THEME"
             :theme="CHART_THEME"
             :option="thresholdOption"
+            :update-options="SMOOTH_CHART_UPDATE"
             autoresize
             role="img"
             :aria-label="t.thresholdChartAria"
@@ -361,6 +367,7 @@ watch(dataRevision, () => { void load(); });
           :key="CHART_THEME"
           :theme="CHART_THEME"
           :option="balanceOption"
+            :update-options="SMOOTH_CHART_UPDATE"
           autoresize
           role="img"
           :aria-label="t.balanceChartAria"

@@ -12,8 +12,8 @@
 .mat-card {
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--mat-line);
-  border-radius: var(--radius-md);
+  border: 0;
+  border-radius: var(--radius-lg);
   background: var(--mat-card);
   box-shadow: var(--mat-rim), var(--mat-shadow);
 }
@@ -60,6 +60,21 @@
   background: var(--mat-raised-hover);
 }
 .button-danger, .button.danger-button { border-color: color-mix(in srgb, var(--danger) 40%, transparent); color: var(--danger); }
+
+/* ── 胶囊按钮 ─────────────────────────
+   次要动作和跳转（「添加事件」「查看全部」「管理」）全应用一个样子：和胶囊选择器里
+   选中的那块同一种凸起胶囊，图标用品牌色。quiet 是不需要底的那一档。 */
+.pill-button {
+  display: inline-flex; min-height: 34px; align-items: center; gap: 6px; padding: 0 15px;
+  border: 0; border-radius: 999px; background: var(--cap-thumb); box-shadow: var(--cap-thumb-rim);
+  color: var(--ink); font-size: var(--fs-xs); font-weight: 600; text-decoration: none; white-space: nowrap; cursor: pointer;
+  transition: scale var(--dur-fast) var(--ease-out), filter var(--dur-fast) ease;
+}
+.pill-button:hover { filter: brightness(1.1); }
+.pill-button:active { scale: .96; }
+.pill-button > svg:first-child { color: var(--accent); }
+.pill-button.quiet { background: transparent; box-shadow: none; color: var(--muted); }
+.pill-button.quiet:hover { background: var(--glass-press); color: var(--ink); filter: none; }
 
 /* ── 凹槽 ─────────────────────────── */
 .mat-inset {

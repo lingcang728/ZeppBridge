@@ -52,7 +52,7 @@ const share = (count: number, total: number) => (total > 0 ? `${(count / total) 
     <p class="s-note">{{ ledger.complete ? t.ledgerComplete : t.ledgerIncomplete(remaining) }}</p>
 
     <ul class="ledger-grid">
-      <li v-for="stream in ledger.streams" :key="stream.stream" class="ledger-cell">
+      <li v-for="stream in ledger.streams" :key="stream.stream" class="ledger-cell s-tile">
         <strong>{{ streamLabel(stream.stream) }}</strong>
         <dl class="ledger-stats">
           <div><dt>{{ t.statPersisted }}</dt><dd>{{ stream.persisted_chunks }}</dd></div>
@@ -102,10 +102,7 @@ const share = (count: number, total: number) => (total > 0 ? `${(count / total) 
   display: grid;
   gap: 8px;
   min-width: 0;
-  padding: 12px 14px;
-  border: 1px solid var(--mat-line);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--ink) 2.5%, transparent);
+  padding: 14px 16px;
 }
 .ledger-cell > strong { color: var(--ink); font-size: var(--fs-md); font-weight: 600; }
 .ledger-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin: 0; }

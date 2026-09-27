@@ -75,7 +75,7 @@ const weeklyChartOption = computed(() => {
 
   return {
     animation: false,
-    grid: { left: 34, right: 12, top: 24, bottom: 24, containLabel: false },
+    grid: { left: 34, right: 12, top: 46, bottom: 24, containLabel: false },
     legend: {
       data: sleepStageLabels(),
       top: 0,
@@ -87,7 +87,9 @@ const weeklyChartOption = computed(() => {
     },
     tooltip: {
       trigger: 'axis', triggerOn: 'mousemove|click', showDelay: 0, hideDelay: 0, transitionDuration: 0,
-      axisPointer: { type: 'shadow', animation: false },
+      // 不画指示框：以前这里是一个灰色的阴影框，把整根柱子框起来，看着多余。
+      // 悬停的那一天由 tooltip 说明，柱子本身不动。
+      axisPointer: { type: 'none' },
       backgroundColor: palette.tooltipBg,
       borderColor: palette.tooltipBorder,
       borderWidth: 1,
@@ -132,7 +134,7 @@ const weeklyChartOption = computed(() => {
         stack: 'sleep',
         data: deepData,
         itemStyle: { color: chartPalette.value.series.sleep.deep },
-        barWidth: 20,
+        barWidth: 22,
       },
       {
         name: sleepStageLabel('light'),

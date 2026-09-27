@@ -26,12 +26,18 @@ export const sampleSeries = (samples: WorkoutSeriesSample[] | undefined, key: Se
 export const lineOption = (points: ChartPoint[], color: string, unit: string, palette: ChartPalette) => {
   if (points.length < 2) return null;
   const avg = points.reduce((sum, p) => sum + p.v, 0) / points.length;
+  // 时间轴的刻度间隔钉在「整分钟、大约四格」：短短几分钟的记录里 ECharts 会按秒
+  // 切刻度，「19:44 19:46 19:48」挤成一串，hideOverlap 管不到时间轴的两级标签。
+  const span = points[points.length - 1]!.t - points[0]!.t;
+  const tick = Math.max(60_000, Math.ceil(span / 4 / 60_000) * 60_000);
   return {
     animation: false,
     grid: { left: 8, right: 18, top: 12, bottom: 8, containLabel: true },
     xAxis: {
       type: 'time',
       splitNumber: 4,
+      minInterval: tick,
+      maxInterval: tick,
       axisLine: { show: false },
       axisTick: { show: false },
       axisLabel: { color: palette.axis, fontSize: 14.5, hideOverlap: true, formatter: '{HH}:{mm}' },

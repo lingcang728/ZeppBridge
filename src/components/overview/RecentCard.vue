@@ -1,10 +1,14 @@
 <script setup lang="ts">
-/* 概览的「最近记录」卡：睡眠与运动混排的两列列表。 */
+/* 概览的「最近记录」卡：一条横着的时间线。
+ *
+ * 最近五条睡眠和运动按时间从左排到右（最右是最新的一条），每条是线上的一个节点
+ * 加一枚小卡：什么时候、是什么、多长 / 多远。以前是两列贴片，看不出先后，也看不出
+ * 它们在时间上隔了多久；现在一眼就是「这几天做了什么」。 */
 import { computed } from 'vue';
 import { RouterLink } from 'vue-router';
 import type { DesignIconName } from '../DesignIcon.vue';
 import GlyphTile from '../GlyphTile.vue';
-import RecordRow from '../RecordRow.vue';
+import Icon from '../Icon.vue';
 import { displayDateTimeFormatter } from '../../lib/dateTime';
 import { formatDistance, formatDuration, formatTime, isFiniteNumber, type HealthCategory } from '../../lib/format';
 import { displayableWorkouts, workoutDisplayLabel, workoutDurationMinutes, workoutTypeKey } from '../../lib/workouts';
@@ -19,6 +23,7 @@ const messages = defineMessages(
     recentTitle: '最近记录',
     recentSub: '睡眠、跑步与力量训练',
     seeAll: '查看全部',
+    newest: '最新',
     recentEmpty: '暂无记录，完成一次同步后展示。',
     sleepRecordTitle: '睡眠',
     sleepScore: (score: number) => `睡眠评分 ${score}`,
@@ -30,6 +35,7 @@ const messages = defineMessages(
     recentTitle: 'Recent records',
     recentSub: 'Sleep, runs and strength work',
     seeAll: 'See all',
+    newest: 'Latest',
     recentEmpty: 'Nothing recorded yet. Run a sync and it shows up here.',
     sleepRecordTitle: 'Sleep',
     sleepScore: (score: number) => `Sleep score ${score}`,
@@ -41,6 +47,7 @@ const messages = defineMessages(
     recentTitle: 'Registros recientes',
     recentSub: 'Sueño, carreras y fuerza',
     seeAll: 'Ver todo',
+    newest: 'Más reciente',
     recentEmpty: 'Aún no hay registros. Sincroniza y aparecerán aquí.',
     sleepRecordTitle: 'Sueño',
     sleepScore: (score: number) => `Puntuación de sueño ${score}`,
@@ -99,28 +106,48 @@ const recentItems = computed<RecentItem[]>(() => {
       factLabel: isFiniteNumber(workout.avg_hr) ? t.value.avgHr(Math.round(workout.avg_hr)) : undefined,
     });
   }
-  return items.sort((a, b) => b.time - a.time).slice(0, 5);
+  // 取最近五条，再按时间从旧到新排：时间线从左往右读。
+  return items.sort((a, b) => b.time - a.time).slice(0, 5).reverse();
 });
 </script>
 
 <template>
   <section class="metric-panel recent-panel" :aria-label="t.recentAria">
-    <div class="panel-head"><span class="panel-title"><GlyphTile name="document" :size="38" /><span><strong>{{ t.recentTitle }}</strong><small>{{ t.recentSub }}</small></span></span><RouterLink class="text-link" to="/recent">{{ t.seeAll }} <GlyphTile name="chevron-right" :size="22" /></RouterLink></div>
-    <div v-if="recentItems.length" class="recent-list"><RecordRow v-for="item in recentItems" :key="item.key" :to="item.to" :category="item.category" :icon="item.icon" :design-icon="item.designIcon" :kicker="item.kicker" :title="item.title" :fact="item.fact" :fact-label="item.factLabel" /></div>
+    <div class="panel-head"><span class="panel-title"><GlyphTile name="document" :size="38" /><span><strong>{{ t.recentTitle }}</strong><small>{{ t.recentSub }}</small></span></span><RouterLink class="pill-button" to="/recent">{{ t.seeAll }}<Icon name="chevron-right" :size="14" /></RouterLink></div>
+    <ol v-if="recentItems.length" class="timeline">
+      <li v-for="(item, index) in recentItems" :key="item.key" :class="['tl-item', `tone-${item.category}`, { newest: index === recentItems.length - 1 }]">
+        <RouterLink :to="item.to" class="tl-link">
+          <span class="tl-when">{{ item.kicker }}<em v-if="index === recentItems.length - 1">{{ t.newest }}</em></span>
+          <span class="tl-node" aria-hidden="true"><GlyphTile :name="item.designIcon" :size="40" :tone="item.category" /></span>
+          <strong class="tl-title">{{ item.title }}</strong>
+          <span class="tl-fact">{{ item.fact }}<template v-if="item.factLabel"> · {{ item.factLabel }}</template></span>
+        </RouterLink>
+      </li>
+    </ol>
     <div v-else class="panel-empty recent-empty"><GlyphTile name="document" :size="58" /><span>{{ t.recentEmpty }}</span></div>
   </section>
 </template>
 
 <style scoped>
-.recent-panel { grid-column: 1 / -1; padding: 18px; }
-.recent-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 12px; overflow: hidden; border: 1px solid var(--mat-line); border-radius: 16px; }
-.recent-list :deep(.record-row:nth-child(odd)) { border-right: 1px solid var(--line); }
-.recent-list :deep(.record-row) { min-height: 72px; transition: background .2s ease, transform .2s ease; }
-.recent-list :deep(.record-row:hover) { transform: translateX(2px); }
+.recent-panel { grid-column: 1 / -1; padding: 18px 20px 20px; }
+
+/* 横着的时间线：一根从左到右渐亮的细线穿过每个节点，节点上方是时间，下方是内容。 */
+.timeline { position: relative; display: grid; grid-auto-columns: minmax(150px, 1fr); grid-auto-flow: column; gap: 8px; margin: 16px 0 0; padding: 0 0 4px; overflow-x: auto; list-style: none; }
+.timeline::before { content: ''; position: absolute; top: 50px; right: 6%; left: 6%; height: 2px; border-radius: 2px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--ink) 16%, transparent) 12%, color-mix(in srgb, var(--accent) 55%, transparent)); }
+.tl-link { position: relative; display: grid; justify-items: center; gap: 6px; padding: 4px 8px 12px; border-radius: 22px; color: inherit; text-align: center; text-decoration: none;
+  transition: background var(--dur-base) ease, translate var(--dur-base) var(--ease-out); }
+.tl-link:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); translate: 0 -2px; }
+.tl-link:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.tl-when { display: inline-flex; min-height: 20px; align-items: center; gap: 6px; color: var(--subtle); font-size: var(--fs-2xs); font-variant-numeric: tabular-nums; }
+.tl-when em { padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-style: normal; font-weight: 600; }
+/* 节点压在线上：底下垫一圈卡片底色，线从节点背后穿过去而不是从中间切开它。 */
+.tl-node { display: grid; padding: 3px; border-radius: 16px; background: var(--mat-card-solid); }
+.tl-item.newest .tl-node { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent), 0 0 18px -2px color-mix(in srgb, var(--accent) 45%, transparent); }
+.tl-title { max-width: 100%; overflow: hidden; color: var(--ink); font-size: var(--fs-sm); font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.tl-fact { color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 .recent-empty { min-height: 120px; }
 @media (max-width: 820px) {
   .recent-panel { grid-column: 1; }
-  .recent-list { grid-template-columns: minmax(0, 1fr); }
-  .recent-list :deep(.record-row:nth-child(odd)) { border-right: 0; }
 }
 </style>

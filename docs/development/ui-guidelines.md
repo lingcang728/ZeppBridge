@@ -1,6 +1,6 @@
 # ZeppBridge UI design and interaction constraints
 
-Updated 2026-09-05 (aligned with the accessibility and readability pass).
+Updated 2026-09-27 (batches four to seven: one capsule control, interruptible deck morphs, 3D overview and timelines).
 ZeppBridge is a bridge to the user's wearable health data, not a bloated
 analytics app.
 
@@ -110,10 +110,23 @@ forbidden. The provenance of the algorithms and percentages is in the
   background**. A card's glyph and its curve share one category colour
   (body = heart red, training = lime, sleep = indigo, activity = cyan).
 - Motion uses `--dur-*` / `--ease-*` and honours `prefers-reduced-motion`.
-- The navigation capsule (`SegmentTrack.vue`) draws its labels twice: plain
-  ink underneath and "selected" ink on top, clipped to the thumb's shape, so a
-  label is never half dark mid-drag. The focus ring is drawn on the thumb,
-  arrow / Home / End keys work, and dragging turns the thumb into a glass lens.
+- The capsule control (`SegmentTrack.vue`) draws its labels twice: plain ink
+  underneath and "selected" ink on top, clipped to the thumb. The thumb
+  position is two registered CSS lengths (`--thumb-l` / `--thumb-w`,
+  `@property` in `material.css`) transitioned on the track, so the thumb, the
+  top ink's clip and a mask that **hides the plain label under the thumb** move
+  in lockstep. (A translucent glass thumb used to show the regular-weight label
+  under the bold one — every Latin label ghosted after switching to German.)
+  The focus ring is drawn on the thumb, arrow / Home / End keys work, and
+  dragging turns the thumb into a glass lens.
+- **Secondary actions are `.pill-button`** ("Add event", "See all", "Manage",
+  "Show 6 more"): the same raised capsule as a selected segment, icon in the
+  brand colour; `.pill-button.quiet` has no fill. No bare text links, no
+  outlined rectangles.
+- **Grids of facts are raised tiles, not flat outlined boxes**: weekly report
+  items, the capability board, the coverage ledger and the settings "fact"
+  tiles (`settings-base.css` `.s-tile`) are lighter slabs with a rim and a
+  soft shadow; an absent item sinks into the groove instead (`.is-sunken`).
 - The landing page keeps its own locally scoped dark palette
   (`.landing-page { --site-* }`) — it is brand artwork outside the app shell,
   not a third theme.
@@ -128,16 +141,27 @@ forbidden. The provenance of the algorithms and percentages is in the
   specular top edge and a return light at the bottom.
 - **No hard edges on stages**: carousels and wheels fade into the background
   with a horizontal `mask-image` instead of ending at a border.
-- **Choices are capsules, not dropdowns.** Two or three options → the
-  draggable `SegmentTrack` capsule. Longer lists (language, date order, AI
-  provider) → `CapsuleWheel.vue`: options laid out on a cylinder by their own
-  widths (arc-length layout), the selection always centred under a lens,
-  neighbours turning away like a conveyor round a corner; drag with a
-  critically damped snap, wheel, arrows, click a neighbour. The value is
-  committed only when the wheel settles (a locale switch re-renders the page).
-- **Theme has two cells, dark and light.** It follows the system by default;
-  picking the cell that matches the system goes back to following it
-  (`useTheme.pickTheme`), so "system" never needs to be a visible option.
+- **Choices are capsules, not dropdowns — and there is one look.** A groove
+  (`--cap-track`) holding a raised capsule (`--cap-thumb`) with the
+  selected label in `--cap-ink`; floating on glass (nav, top bar) the capsule
+  is a brighter pane of glass (`--cap-glass-thumb`). Two to five options →
+  the draggable `SegmentTrack` (also icon-only, e.g. the moon / sun theme).
+  Longer lists (language, workout type, AI provider) → `CapsuleWheel.vue`:
+  options on a cylinder by their own widths, the selection always centred
+  under the lens, neighbours turning away like a conveyor round a corner;
+  `loop` wraps first and last so the wheel is never half empty; `lens-icon`
+  pins an icon inside the lens (the globe next to the language). Drag with a
+  critically damped snap, wheel, arrows, click a neighbour; the value is
+  committed only when the wheel settles. `SelectMenu` is gone.
+- **Theme is two icon cells, moon and sun**, in the top bar and in Display
+  settings alike. It follows the system by default; picking the cell that
+  matches the system goes back to following it (`useTheme.pickTheme`). The
+  new theme **spreads from the icon that was pressed**: a View Transition
+  with a feathered radial mask on the new snapshot (`html[data-theme-morph]`
+  in `material.css`), never a hard full-screen cut.
+- **Width changes animate.** When a capsule's text changes (sync pill
+  "Today 10:30" → "Data ready · hand to AI", the undo pill), `useWidthMorph`
+  tweens the width instead of jumping.
 - **Page transitions never pass through a blank frame**: old and new page are
   on stage together (no `out-in`). `lib/navigation.ts#pageMotion` picks the
   direction — `forward` focuses into a detail page, `back` backs out, `left` /
@@ -193,8 +217,16 @@ Three main navigation items in the centred pill of the top bar
 (`src/components/shell/AppTopBar.vue`): **Overview** (`/`), **Hand to AI**
 (`/ai`) and **Settings** (`/settings`). Keep it at three — a new page gets an
 entry card, not a navigation slot. The top bar also carries the sync-status
-pill, the theme cycle button and the language `SelectMenu`; below 760px the
-pill hides and a bottom tabbar covers the same three items.
+pill, the moon / sun theme toggle and the looping language wheel (globe in
+its lens); below 760px the pill hides and a bottom tabbar covers the same three
+items.
+
+**Back goes where you came from.** The top-left back button and a settings
+card's × / Esc use the history entry vue-router keeps in
+`history.state.back` (`lib/navigation.ts#backDestination`,
+`cardCloseDestination`): Overview → "Manage" → the account card → back lands
+on Overview, not on the settings deck. Only a deep link with no origin falls
+back to the tab root.
 
 Secondary pages stay out of the main navigation: `/body` (body status),
 `/training` (training status), `/recent` (recent records), the `/sleep` and
@@ -208,10 +240,25 @@ pages, reached from Overview's entry cards and its "view all" links.
   opens with the weekly report, coverage notice, `SourcesStrip` (device and
   account status, extracted from the v2 sidebar) and then the card grid.
 - Cards are modular components under `src/components/overview/`:
-  `HeartRateCard` (24-hour line), `StepsCard` (today's ring), `SleepCard`
+  `HeartRateCard` (recent hours), `StepsCard` (today's ring), `SleepCard`
   (last night's structure), two `StatusEntryCard`s (body / training entries)
-  and `RecentCard` (two-column recent records), laid out on the 12-column
-  `dashboard-grid`.
+  and `RecentCard`, laid out on the 12-column `dashboard-grid`.
+- **Panels are slabs, not flat boxes** (`overview/panels.css`): 28px radius,
+  rim highlight and shadow, no border; the `v-tilt` directive
+  (`lib/tilt.ts`) leans a card toward the pointer (a degree or three, less
+  on wide cards) with a specular highlight following it. Off for touch and
+  reduced motion.
+- `RecentCard` is a **horizontal timeline**: the last five sleeps and
+  workouts from left (oldest) to right (newest), each a node on one line with
+  its time above and title / duration below. Life events at the bottom are a
+  **vertical timeline** (category colour + icon per node, ongoing events
+  breathe), with an "all / ongoing" capsule and a capsule search field.
+- **Fetch time is not sample time.** When the cloud has nothing for the last
+  hours, the heart-rate card says so and names the newest reading ("the newest
+  reading is from yesterday 22:20 — watch data reaches the cloud through the
+  Zepp app first"), never "shows up after a sync" right after a sync. Steps
+  say "today's steps haven't reached the cloud yet"; the sources strip shows
+  each device's newest data time instead of "has recent data".
 - Each entry card carries today's value and a 7-day `Sparkline`, leading to
   `/body` and `/training`. They replaced the old training-load / VO₂ Max mini
   cards — the same number is not shown twice on one screen.
@@ -248,9 +295,25 @@ with three floating glass layers** (`views/AiComposer.vue`, pieces in
   160ms and fades — instant full-graph dimming strobed when the pointer swept
   across dense metric dots. Every node has an invisible hit halo; the drag
   threshold is 9px. Undo and camera controls float as glass capsules.
+  Categories with many metrics (recovery has 20+) lay them out on **concentric
+  arcs** (`layout.ts#metricSlot`): each ring holds as many as its arc length
+  allows at one label width, inner rings fill first; drop-to-exclude follows
+  each metric's own ring.
+- **Node popover** measures its own height and stays inside the visible part
+  of the canvas: the page tells the graph which edges are covered through
+  `--graph-safe-top/-bottom` (task capsule above; the dock and the undo /
+  zoom row below). It flips above the node when needed and scrolls when even
+  that is not enough. Controls are a switch and a `SegmentTrack` for days.
+- **Camera dock** reads "⛶ 100%": the current zoom; clicking fits the graph
+  (or the focused category) and bounces when already there. **Undo** shows
+  what the last step did for five seconds ("Removed “Sleep” · Undo") from
+  `useAiTaskDraft.lastChange`.
 - **Top left — `AiTaskHeader`**: one glass capsule with the editable title,
-  saved tasks, new and save (lit when there are unsaved changes).
-- **Right — `AiStepRail`**: ① what to analyse (`WorkoutPicker`) ② what to ask
+  a folder button with the saved-task count (opens a glass list; the current
+  task is ticked — the title is never repeated in a dropdown next to itself),
+  new and save (lit when there are unsaved changes).
+- **Right — `AiStepRail`**: ① what to analyse (`WorkoutPicker`, a day-grouped
+  timeline of workout capsules with "show 6 more" instead of pages) ② what to ask
   (`DirectionPanel`) ③ attachments and options (`TaskExtras`), one open at a
   time; collapsed steps show a one-line summary so the whole task fits one
   screen without scrolling.
@@ -267,10 +330,12 @@ with three floating glass layers** (`views/AiComposer.vue`, pieces in
 
 ### 3. Recent records and detail (`/recent`, `/sleep`, `/workouts`, `/sleep/:id`, `/workouts/:id`)
 
-- `/recent` is two columns (sleep / workouts) with "N total" in each column
-  header and a type filter tab on the workout column. Incomplete records that
-  were filtered out must be announced explicitly — "N incomplete records
-  hidden" — never silently disappear.
+- `/recent` is **one vertical timeline** grouped by day, sleep (placed on the
+  day you woke up) and workouts together, newest first. A capsule switches
+  all / sleep / workouts; with workouts a wheel filters by type; "all sleep"
+  and "all workouts" lead to the full lists. Incomplete records that were
+  filtered out must be announced explicitly — "N incomplete records hidden" —
+  never silently disappear.
 - Workout detail: a metric matrix, ECharts heart-rate/pace curves, a local SVG
   track (mapped onto the `--route-*` spectrum by pace) and pause intervals. No
   track points means no map; no per-point samples means no curve.
@@ -293,6 +358,12 @@ with three floating glass layers** (`views/AiComposer.vue`, pieces in
   threshold heart-rate plus pace card (the pace axis is `inverse`, so "faster"
   points up), a load-balance card (7-day load, 28-day weekly average and the
   acute:chronic ratio as three lines), and the `HeartRateZonePicker`.
+- Life events appear **once per page** as a capsule row (add / the events in
+  range / manage); trend cards no longer repeat "+ Add event · Manage" under
+  every chart. Event dots on a chart still open the event.
+- **Switching range morphs the lines** instead of clearing and redrawing:
+  trend charts update in merge mode (`metricSeries.ts#SMOOTH_CHART_UPDATE`,
+  `notMerge: false, replaceMerge: ['series']`) with a 520ms update animation.
 - Every card states its coverage: "12 of 30 days have records". **Days without
   data break the line** (`connectNulls: false`) — no interpolation, no zero
   padding. With only one day of data no chart is drawn; it simply says a trend
@@ -307,7 +378,12 @@ A **card deck with three forms**, no sidebar. Eight cards
 (`views/settings/cards.ts`): account and devices · sync and updates · archive
 and storage · data content · hand to AI tools · display and language · privacy
 and security · advanced and maintenance. The same cards morph between forms
-through View Transitions (one `view-transition-name` per card).
+with Web Animations on the real elements (FLIP; geometry in the pure
+`lib/deck/morph.ts`, orchestration in `composables/useDeckMorph.ts`) — so
+every morph can be **interrupted**: closing a card half-way plays the opening
+backwards (`Animation.reverse()`), collapsing mid-unbox flies each card back
+from where it is on screen. (View Transitions froze input for the duration and
+re-rendered blurred snapshots, which stuttered on collapse.)
 
 - `/settings`, default — **coverflow** (`DeckCoverflow.vue`, poses from the
   pure `lib/deck/coverflow.ts`): the centre card stands upright; neighbours
@@ -315,19 +391,26 @@ through View Transitions (one `view-transition-name` per card).
   distance; the deck wraps around so both sides are always populated, and the
   stage edges dissolve into the background. Drag (velocity snap via
   `useSpringIndex`), wheel, ←/→, or click a side card to turn it to the centre;
-  click the centre card or Enter to open.
-- **"Show all"** unboxes the deck: cards leave one by one (staggered from the
-  centre outwards) into a two-column vertical list; a prominent floating
+  click the centre card or Enter to open. There are no arrow buttons — dragging
+  is flipping. Side cards have no hard edges: their outer half dissolves into
+  the background with distance (`coverflowPose().dissolve`).
+- **"Show all"** unboxes the deck: cards leave one by one (16ms apart from the
+  centre outwards, 420ms each) into a two-column vertical list; a prominent floating
   **"Collapse"** capsule puts them back in reverse order. The choice is
   remembered per viewer.
-- `/settings/:card` opens one card: it grows into the page while the rest
-  sink, blur and fade (`::view-transition-old(*):only-child`), and rise back on
-  close. Inside, flip by dragging the header or flinging it, previous / next
-  (hold to repeat), ←/→ and PageUp/PageDown; Esc returns to the overview;
-  reduced motion switches instantly. No card has a border — edges come from the
-  rim highlight and shadow.
-- Layers: `lib/deck/physics.ts` + `lib/deck/coverflow.ts` (pure, with vitest) →
-  `composables/useCardDeck.ts` / `useSpringIndex.ts` → `components/deck/`. Card contents live in
+- `/settings/:card` opens one card: it grows out of its source card (top-left
+  aligned scale plus a bottom clip to the source's proportions) while the
+  overview recedes around its top centre, blurs and fades; closing lands it
+  exactly back on the source. Inside, flip by dragging the header or flinging
+  it (a drag interrupts a running flip), ←/→ and PageUp/PageDown, or the dots;
+  × / Esc go back where the card was opened from; reduced motion switches
+  instantly. No card has a border or a highlight line — edges come from depth.
+- Unrelated small tools or facts sit **side by side** as tiles (`.s-tiles`):
+  the three privacy facts, and data folder / data health / compaction under
+  Advanced.
+- Layers: `lib/deck/physics.ts` + `lib/deck/coverflow.ts` + `lib/deck/morph.ts`
+  (pure, with vitest) → `composables/useCardDeck.ts` / `useSpringIndex.ts` /
+  `useDeckMorph.ts` → `components/deck/`. Card contents live in
   `views/settings/sections/`; shared state is injected through
   `composables/settings/context.ts`.
 - Inside a card, rows use `settings-base.css`: label left, control right,
@@ -339,10 +422,10 @@ through View Transitions (one `view-transition-name` per card).
 ## Components and charts
 
 - No UI framework: every component is in-house, under `src/components/` —
-  `BrandMark`, `CategoryMark`, `CircularProgress`, `CardDeck` (`deck/`),
-  `DatePicker`, `DeviceMarquee`, `DeviceVisual`, `EmptyState`, `GlyphTile`,
-  `HeartRateZonePicker`, `Icon`, `MetricTrendCard`, `ModalDialog`,
-  `PageHeader`, `RecordRow`, `SegmentTrack`, `SelectMenu`, `SkeletonBlock`,
+  `BrandMark`, `CapsuleWheel`, `CategoryMark`, `CircularProgress`, `CardDeck`
+  (`deck/`), `DatePicker`, `DeviceMarquee`, `DeviceVisual`, `EmptyState`,
+  `GlyphTile`, `HeartRateZonePicker`, `Icon`, `MetricTrendCard`,
+  `ModalDialog`, `PageHeader`, `RecordRow`, `SegmentTrack`, `SkeletonBlock`,
   `Sparkline`, `StageBar`; page-specific pieces live in `components/<page>/`
   (`overview/`, `workout/`, `archive/`, `ai/`, `deck/`, `shell/`). Check
   here for something reusable before adding one.
@@ -364,6 +447,10 @@ through View Transitions (one `view-transition-name` per card).
   grid lines, tooltip, marks, series semantics) from `chartPalette.value` —
   never a literal hex. The palette's colour values mirror `tokens.css` because
   CSS variables cannot reach canvas. Do not redefine the palette per page.
+- Chart chrome follows the glass material: tooltips are rounded, blurred glass
+  panes; the axis pointer is a thin dashed line, and bar charts do not draw the
+  grey shadow box (the sleep chart turned it off entirely). Line series carry a
+  soft gradient under the line unless a measured range is shaded.
 - **Overview never loads ECharts.** Its heart-rate curve is
   `components/overview/HrMiniChart.vue` (SVG, geometry in `lib/miniChart.ts`)
   and the entry cards use `Sparkline`. The chart engine is 580 KB and belongs to
@@ -403,6 +490,6 @@ boundaries are in the
 
 - Template titles/descriptions and select options wrap instead of hiding meaningful text behind ellipses. Prompt editing and dialog prose use `--fs-md`; supporting copy uses the existing smaller tokens.
 - Do not fade explanatory text with container opacity. Missing-data cards keep readable text and use a dashed border for distinction; disabled actions can still be dimmed.
-- `SelectMenu` keeps focus on the trigger and links its teleported list and active option with `aria-controls` / `aria-activedescendant`. Options and triggers are at least 44px tall.
+- Capsule choices are a `role="radiogroup"` (`SegmentTrack`) or a `role="slider"` (`CapsuleWheel`, with `aria-valuetext` naming the current item); arrows and Home/End work.
 - Settings uses `ModalDialog` for privacy and release notes: named dialog, contained Tab/Shift+Tab navigation, Escape dismissal, focus restoration and a scrolling viewport. Keep close buttons labelled in both languages.
 - Search/editor wrappers use `:focus-within` when their inner fields suppress the native outline.

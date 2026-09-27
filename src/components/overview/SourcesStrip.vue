@@ -112,10 +112,9 @@ const chips = computed(() => [
   align-items: center;
   gap: 14px;
   padding: 10px 16px;
-  border: 1px solid var(--panel-line);
-  border-radius: var(--radius-md);
+  border-radius: 24px;
   background: var(--panel);
-  box-shadow: var(--panel-glint);
+  box-shadow: var(--mat-rim), var(--mat-shadow);
 }
 .sources-label { flex: 0 0 auto; color: var(--subtle); font-size: var(--fs-xs); }
 .sources-row {

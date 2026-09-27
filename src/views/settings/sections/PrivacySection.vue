@@ -32,32 +32,23 @@ onMounted(() => {
     <div class="s-section">
       <div class="s-section-head">
         <h3 id="privacy-title">{{ d.secLocalData }}</h3>
-        <button class="link-btn" type="button" @click="privacyModalOpen = true">
-          <Icon name="shield" :size="13" />{{ t.privacyModalLink }}
+        <button class="pill-button quiet" type="button" @click="privacyModalOpen = true">
+          <Icon name="shield" :size="14" />{{ t.privacyModalLink }}
         </button>
       </div>
-      <div class="s-list">
-      <div class="s-row">
-        <span class="fact-icon"><Icon name="lock" :size="15" /></span>
-        <div class="s-row-main">
-          <span class="s-row-title">{{ t.privacyDbTitle }}</span>
-          <span class="s-row-sub">{{ t.privacyDbBody }}</span>
+      <div class="s-tiles">
+        <div class="s-tile s-fact">
+          <span class="s-fact-head"><span class="s-fact-icon"><Icon name="lock" :size="15" /></span><strong>{{ t.privacyDbTitle }}</strong></span>
+          <p>{{ t.privacyDbBody }}</p>
         </div>
-      </div>
-      <div class="s-row">
-        <span class="fact-icon"><Icon name="shield" :size="15" /></span>
-        <div class="s-row-main">
-          <span class="s-row-title">{{ t.privacyTokenTitle }}</span>
-          <span class="s-row-sub">{{ t.privacyTokenBody }}</span>
+        <div class="s-tile s-fact">
+          <span class="s-fact-head"><span class="s-fact-icon"><Icon name="shield" :size="15" /></span><strong>{{ t.privacyTokenTitle }}</strong></span>
+          <p>{{ t.privacyTokenBody }}</p>
         </div>
-      </div>
-      <div class="s-row">
-        <span class="fact-icon"><Icon name="user" :size="15" /></span>
-        <div class="s-row-main">
-          <span class="s-row-title">{{ t.privacyTelemetryTitle }}</span>
-          <span class="s-row-sub">{{ t.privacyTelemetryBody }}</span>
+        <div class="s-tile s-fact">
+          <span class="s-fact-head"><span class="s-fact-icon"><Icon name="user" :size="15" /></span><strong>{{ t.privacyTelemetryTitle }}</strong></span>
+          <p>{{ t.privacyTelemetryBody }}</p>
         </div>
-      </div>
       </div>
     </div>
     <div class="s-section">
@@ -98,7 +89,4 @@ onMounted(() => {
 <style scoped>
 .privacy { display: grid; gap: 22px; }
 .privacy > .s-section + .s-section { margin-top: 0; }
-.fact-icon { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border-radius: 10px; background: var(--accent-soft); color: var(--accent); }
-.link-btn { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: transparent; color: var(--accent); font-size: var(--fs-sm); cursor: pointer; }
-.link-btn:hover { text-decoration: underline; }
 </style>

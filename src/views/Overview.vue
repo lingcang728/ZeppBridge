@@ -26,6 +26,7 @@ import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { chartPalettes } from '../lib/echartsTheme';
 import { createLoadSeq } from '../lib/loadSeq';
 import { indexSeries, latestValue } from '../lib/metricSeries';
+import { vTilt } from '../lib/tilt';
 import { formatMetric, isFiniteNumber } from '../lib/format';
 import type { HealthOverview, HeartRatePoint, MetricSeries, SleepSession, Workout } from '../types';
 import { defineMessages, useMessages } from '../i18n';
@@ -342,11 +343,12 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
     <div v-else class="dashboard-grid">
       <!-- 心率卡的格子由外壳持有：卡片是异步 chunk，骨架与本体占同一个格子。 -->
       <div class="hr-card-slot">
-        <HeartRateCard :points="heartRateSeries" :current-hr="overview?.current_hr ?? null" :latest-at="overview?.latest_heart_rate_at ?? null" />
+        <HeartRateCard v-tilt :points="heartRateSeries" :current-hr="overview?.current_hr ?? null" :latest-at="overview?.latest_heart_rate_at ?? null" />
       </div>
-      <StepsCard :steps="stepsToday" :goal="overview?.steps_goal ?? null" :latest-at="overview?.latest_heart_rate_at ?? null" />
-      <SleepCard :sleep="lastSleep" />
+      <StepsCard v-tilt :steps="stepsToday" :goal="overview?.steps_goal ?? null" :latest-at="overview?.latest_heart_rate_at ?? null" />
+      <SleepCard v-tilt :sleep="lastSleep" />
       <StatusEntryCard
+        v-tilt
         to="/body"
         tone="body"
         icon="recovery"
@@ -359,6 +361,7 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
         :note="bodyEntry.measured ? t.bodyThin : t.bodyEmpty"
       />
       <StatusEntryCard
+        v-tilt
         to="/training"
         tone="training"
         icon="training-load"
@@ -370,7 +373,7 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
         :spark-label="trainingEntry.sparkLabel"
         :note="trainingEntry.measured ? t.trainingThin : t.trainingEmpty"
       />
-      <RecentCard :sleep="recentSleep" :workouts="recentWorkouts" />
+      <RecentCard v-tilt :sleep="recentSleep" :workouts="recentWorkouts" />
     </div>
     <LifeEventsPanel />
   </section>

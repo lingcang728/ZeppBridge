@@ -157,6 +157,12 @@ const hexToRgba = (hex: string, alpha: number): string => {
  * absent, and the line closes over it as if the days were adjacent. Anything
  * recorded by hand should pass `calendarAxis: true`.
  */
+/**
+ * 趋势图换数据（切范围、同步来了新数据）时的更新方式：合并而不是整张重建，
+ * 系列按顺序替换——ECharts 于是把旧线形平滑变成新线形，不会先清空再从左边画一遍。
+ */
+export const SMOOTH_CHART_UPDATE = { notMerge: false, replaceMerge: ['series'] };
+
 export const buildSeriesOption = (
   series: MetricSeries,
   options: SeriesChartOptions,
@@ -193,6 +199,10 @@ export const buildSeriesOption = (
 
   return {
     animationDuration: 600,
+    // 切 7 天 / 1 个月 / 6 个月：线从旧形状平滑过渡到新形状，而不是整张图清空重画
+    // （MetricTrendCard 用合并模式更新，见 SMOOTH_CHART_UPDATE）。
+    animationDurationUpdate: 520,
+    animationEasingUpdate: 'cubicInOut' as const,
     grid: { left: 42, right: 14, top: 16, bottom: 26 },
     tooltip: {
       trigger: 'axis',
@@ -254,7 +264,7 @@ export const buildSeriesOption = (
             type: 'bar',
             data: values,
             barMaxWidth: 14,
-            itemStyle: { color: options.color, borderRadius: [2, 2, 0, 0] },
+            itemStyle: { color: options.color, borderRadius: [4, 4, 1, 1] },
           }
         : {
             type: 'line',
@@ -264,7 +274,16 @@ export const buildSeriesOption = (
             showSymbol: series.points.length <= 14,
             symbolSize: 5,
             itemStyle: { color: options.color },
-            lineStyle: { width: 2, color: options.color, cap: 'round' },
+            lineStyle: { width: 2.2, color: options.color, cap: 'round' },
+            // 线下一层从上到下淡掉的光：有体积感，又不会被读成「面积」数据。有区间阴影时不叠。
+            ...(hasSpread ? {} : {
+              areaStyle: {
+                color: {
+                  type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                  colorStops: [{ offset: 0, color: hexToRgba(options.color, 0.2) }, { offset: 1, color: hexToRgba(options.color, 0) }],
+                },
+              },
+            }),
           },
     ],
   };

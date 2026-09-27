@@ -2,7 +2,7 @@
 
 [English](ui-guidelines.md)
 
-更新时间：2026-09-05（对齐无障碍与可读性调整）。ZeppBridge 是用户的穿戴健康数据桥梁，不是臃肿的分析 App。
+更新时间：2026-09-27（第四到七批：胶囊统一、卡组可打断形变、立体概览与时间线）。ZeppBridge 是用户的穿戴健康数据桥梁，不是臃肿的分析 App。
 
 视觉是**冷灰底 + 橄榄绿**的系统。深色是基准套：品牌色 `--brand: #7DA33E`，界面底色 `#0C0E11`（卡片 `#16191E`）；浅色套在暖白底上保持同一组角色（`--brand: #2F6B4F`，底色 `#EAEDE5`）。不使用泛滥的紫色或高饱和荧光色。分类色（心率红、配速蓝、睡眠紫、活动青等）只用于标记数据类别，不作装饰。
 
@@ -52,15 +52,18 @@
 - **真正的毛玻璃（`backdrop-filter`）只给浮在上层的东西**：顶栏、导航胶囊、下拉菜单、日期选择、弹窗。普通卡片不模糊。
 - 类别色只在卡片角落留一点微光（`color-mix` 约 5%，`--entry-tone` / `--card-tone`），**不给卡片写死背景色**；卡片里图形和曲线用同一个类别色（身体 = 心率红、训练 = 青柠、睡眠 = 靛紫、活动 = 青）。
 - 动效用 `--dur-*` / `--ease-*`，并尊重 `prefers-reduced-motion`。
-- 导航胶囊（`SegmentTrack.vue`）的文字画两层：底层普通字，上层「选中字」按滑块形状裁切，所以拖到一半也不会出现半截深色字；焦点环画在滑块上，←/→/Home/End 可用；拖动时滑块变成玻璃透镜。
+- 胶囊控件（`SegmentTrack.vue`）的文字画两层：底层普通字，上层「选中字」按滑块裁切。滑块位置是两个注册过的 CSS 长度（`--thumb-l` / `--thumb-w`，`@property` 在 `material.css`），过渡只写在轨道上，滑块、上层裁切、以及**把滑块下面那段底层字挖掉**的遮罩逐帧同步。（以前玻璃滑块是半透明的，底下的常规体和上面的粗体叠在一起，切成德语后每个拉丁字母标签都有重影。）焦点环画在滑块上，←/→/Home/End 可用；拖动时滑块变成玻璃透镜。
+- **次要动作一律是 `.pill-button`**（「添加事件」「查看全部」「管理」「再看 6 条」）：和选中的那格同一种凸起胶囊，图标用品牌色；`.pill-button.quiet` 不带底。不再有裸文字链接和描边方块。
+- **一格一格的信息是凸起的小板，不是描边的平面磁贴**：周报的每一项、数据内容、覆盖账本、设置里的事实小板（`settings-base.css` 的 `.s-tile`）都是亮一点的板 + 顶边高光 + 柔和投影；没有数据的那一格反过来凹进槽里（`.is-sunken`）。
 - 落地页自带一套局部作用域的暗色色板（`.landing-page { --site-* }`）——那是应用外壳之外的品牌美术，不算第三套主题。
 
 ### 景深、胶囊与动效（v3 重设计，2026-09-27）
 
 - **圆角给足**：`--radius-sm/md/lg/xl` = 12 / 20 / 26 / 34 px。卡片是有厚度的一块板：`--mat-rim` 顶边高光 + 底边暗线，`--mat-shadow` 多一层远投影。画布有一层固定的淡色环境光（`--ambient`，由 `.app-body::before` 画），毛玻璃才有东西可折射；浮层玻璃（`--glass-rim`）带镜面顶边和底部回光。
 - **舞台没有硬边**：卡组、滚轮用横向 `mask-image` 渐隐进背景，不在一条边线上戛然而止。
-- **选项是胶囊，不是下拉。** 两三项 → 可拖的 `SegmentTrack` 胶囊；更长的列表（语言、日期格式、AI 服务商）→ `CapsuleWheel.vue`：选项按各自宽度排在一个圆柱面上（弧长布局），选中项永远在正中的镜片下，两边像传送带转过拐角一样侧转；拖动（临界阻尼吸附）、滚轮、方向键、点邻项都可以。值在滚轮停稳后才提交（切语言会重绘整页）。
-- **主题只有深 / 浅两格**：默认跟随系统；拨到与系统一致的那一格即回到跟随系统（`useTheme.pickTheme`），「跟随系统」不必作为一个可见选项。
+- **选项是胶囊，不是下拉——而且只有一种样子。** 凹槽（`--cap-track`）里托一块凸起胶囊（`--cap-thumb`），选中字用 `--cap-ink`；浮在玻璃上时（导航、顶栏）胶囊是一块更亮的玻璃（`--cap-glass-thumb`）。两到五项 → 可拖的 `SegmentTrack`（也可以只放图标，比如月亮 / 太阳）；更长的列表（语言、运动类型、AI 服务商）→ `CapsuleWheel.vue`：选项按各自宽度排在圆柱面上，选中项永远在正中的镜片下，两边像传送带转过拐角一样侧转；`loop` 首尾相接，停在第一项时左边也不空；`lens-icon` 把图标钉在镜片里（语言旁的地球）。拖动（临界阻尼吸附）、滚轮、方向键、点邻项都可以；值在停稳后才提交。`SelectMenu` 已删除。
+- **主题是月亮 / 太阳两枚图标**，顶栏和「显示与语言」里同一个样子：默认跟随系统，拨到与系统一致的那一格即回到跟随系统（`useTheme.pickTheme`）。新主题**从被点的那枚图标处扩散开**：View Transition 给新快照套一个羽化的圆形遮罩（`material.css` 的 `html[data-theme-morph]`），不再整屏硬切。
+- **宽度变化要有过渡**：胶囊里的字一变（同步胶囊「今天 10:30」→「数据已备好 · 交给 AI」、撤销胶囊），`useWidthMorph` 让宽度平滑伸缩，不跳。
 - **切页永远不经过空白帧**：新旧两页同时在场（不用 `out-in`）。`lib/navigation.ts#pageMotion` 决定方向——`forward` 聚焦进详情、`back` 退出来、`left` / `right` 按导航胶囊的顺序横移，都带模糊。离场页钉在它当时的滚动位置，不会先跳回顶部。
 - **`.ready-glow`**（沿边流动的品牌渐变细环 + 会呼吸的外光）只留给一个时刻：「数据好了，去交给 AI」。同一屏不许有第二样东西发光。玻璃控件本身是层叠上下文，所以环用 mask 只留边、外光用外阴影——都不许把胶囊内部染色。
 
@@ -89,14 +92,19 @@
 
 ## 页面架构
 
-主导航三项，在顶栏（`src/components/shell/AppTopBar.vue`）居中的胶囊里：**概览** (`/`)、**交给 AI** (`/ai`)、**设置** (`/settings`)。导航保持三项——新页面进入口卡片，不占导航位。顶栏右侧还有同步状态胶囊、主题切换键和语言 `SelectMenu`；760px 以下胶囊收起，底部 tabbar 覆盖同样的三项。
+主导航三项，在顶栏（`src/components/shell/AppTopBar.vue`）居中的胶囊里：**概览** (`/`)、**交给 AI** (`/ai`)、**设置** (`/settings`)。导航保持三项——新页面进入口卡片，不占导航位。顶栏右侧还有同步状态胶囊、月亮 / 太阳主题切换和首尾相接的语言滚轮（地球在镜片里）；760px 以下胶囊收起，底部 tabbar 覆盖同样的三项。
+
+**返回回到来处。** 左上角返回、设置卡的 × / Esc 都读 vue-router 记在 `history.state.back` 里的上一页（`lib/navigation.ts#backDestination`、`cardCloseDestination`）：概览 →「管理」→ 账号卡 → 返回，回到概览，而不是设置首页。只有没有来处的深链接才退到所在入口的根。
 
 二级页面不进主导航：`/body`（身体状态）、`/training`（训练状态）、`/recent`（最近记录）、`/sleep`、`/workouts` 列表，以及 `/sleep/:sleepId`、`/workouts/:workoutId` 详情，由概览的入口卡片与「查看全部」进入。
 
 ### 1. 概览 (`/`)
 
 - v3 **没有 Hero 卡**；旧 Hero 和「不再显示介绍」偏好一并移除（Overview 挂载时清掉 `zeppbridge.overview.hideHero`）。页面自上而下是周报卡、覆盖度提示、`SourcesStrip`（设备与账户状态横带，从 v2 侧栏搬来），然后是卡片网格。
-- 卡片是 `src/components/overview/` 下的模块化组件：`HeartRateCard`（24 小时折线）、`StepsCard`（今日步数圆环）、`SleepCard`（昨晚睡眠结构）、两张 `StatusEntryCard`（身体 / 训练入口）和 `RecentCard`（最近记录两列），排在 12 列 `dashboard-grid` 上。
+- 卡片是 `src/components/overview/` 下的模块化组件：`HeartRateCard`（最近几小时）、`StepsCard`（今日步数圆环）、`SleepCard`（昨晚睡眠结构）、两张 `StatusEntryCard`（身体 / 训练入口）和 `RecentCard`，排在 12 列 `dashboard-grid` 上。
+- **面板是有厚度的板，不是平面**（`overview/panels.css`）：圆角 28px、顶边高光和投影、不描边；`v-tilt`（`lib/tilt.ts`）让卡朝指针微微倾斜（一到三度，越宽越小），一层镜面高光跟着指针走。触屏和减少动效时不启用。
+- `RecentCard` 是一条**横着的时间线**：最近五条睡眠和运动从左（旧）排到右（新），每条是线上的一个节点，上面是时间，下面是名字和时长。底部的生活事件是一条**竖着的时间线**（每个节点是分类色 + 图标，持续中的会呼吸），上面是「全部 / 持续中」胶囊和胶囊形搜索框。
+- **拉取时间不等于样本时间。** 云端最近几小时还没有数据时，心率卡说清楚「最新一条在昨天 22:20，手表的数据要先经 Zepp App 传到云端」，而不是刚同步完还说「同步后展示」；步数卡说「今天的步数还没到云端」；数据来源条显示每台设备最新数据的时间，而不是一句「最近有数据」。
 - 两张入口卡各带当日数值与 7 天 `Sparkline`，点进 `/body` 与 `/training`。它们取代了原来的训练负荷 / VO₂ Max mini 卡——同一屏不重复展示同一个数字。
 - `Sparkline` 少于两个点时不画：一个读数是数值不是趋势，画成一条平线等于宣称了没测过的稳定性。
 - 每张卡片都有独立空态；加载中用 `SkeletonBlock` 占位，失败给可重试的 `EmptyState`。
@@ -107,15 +115,17 @@
 
 应用的核心页。一屏一个分析任务，布局是**一块舞台 + 三层浮动玻璃**（`views/AiComposer.vue`，子组件在 `components/ai/`）：
 
-- **舞台——`TaskGraph`** 铺满整页（画布右侧让出步骤栏，镜头中心落在可见区域正中）。虚线圈内的类别交给 AI，每个类别有自己的窗口（7 / 14 / 30 天）。展开某一类时**镜头从上方俯冲进去**（`useGraphCamera`、`layout.ts#focusFrame`），其余退成模糊的背景，左上角玻璃面包屑「全部类别 / 睡眠」或 Esc 飞回全景。悬停聚焦要停稳 160ms 并带过渡——以前一碰就把整张图压暗，鼠标扫过密集的指标点时整张图频闪。每个节点有一圈看不见的点击区，起拖门槛 9px。撤销与镜头控件是浮在画布上的玻璃胶囊。
-- **左上——`AiTaskHeader`**：一枚玻璃胶囊，里面是可直接改的任务名、已保存任务、新建、保存（有未保存修改时点亮）。
-- **右侧——`AiStepRail`**：① 分析对象（`WorkoutPicker`）② 你想问什么（`DirectionPanel`）③ 附件与选项（`TaskExtras`），一次只展开一步；收起的步骤只露一行摘要，整个任务一屏看完不用滚。
+- **舞台——`TaskGraph`** 铺满整页（画布右侧让出步骤栏，镜头中心落在可见区域正中）。虚线圈内的类别交给 AI，每个类别有自己的窗口（7 / 14 / 30 天）。展开某一类时**镜头从上方俯冲进去**（`useGraphCamera`、`layout.ts#focusFrame`），其余退成模糊的背景，左上角玻璃面包屑「全部类别 / 睡眠」或 Esc 飞回全景。悬停聚焦要停稳 160ms 并带过渡——以前一碰就把整张图压暗，鼠标扫过密集的指标点时整张图频闪。每个节点有一圈看不见的点击区，起拖门槛 9px。撤销与镜头控件是浮在画布上的玻璃胶囊。指标多的类别（恢复状态二十多个）排成**几层同心弧**（`layout.ts#metricSlot`）：每圈能放几个由弧长 ÷ 一个标签宽决定，内圈放满再放外圈；拖出排除的判定跟着各自那一圈走。
+- **节点弹层**量自己的真实高度，只摆在画布看得见的那一块里：页面用 `--graph-safe-top/-bottom` 告诉关系网哪几边被挡住（上：任务名胶囊；下：交付坞和撤销 / 缩放那一排）。下面放不下就翻到节点上方，再放不下就自己滚动。控件是开关和回溯天数的 `SegmentTrack`。
+- **镜头胶囊**写着「⛶ 100%」：当前缩放比例，点一下适应画布（聚焦时是这一类），已经是全景就弹一下。**撤销胶囊**改完一步亮出「已移出『睡眠』· 撤销」5 秒（`useAiTaskDraft.lastChange`）。
+- **左上——`AiTaskHeader`**：一枚玻璃胶囊，里面是可直接改的任务名、带数字的「已保存任务」文件夹按钮（点开是一张玻璃清单，当前任务打勾——不再在任务名旁边的下拉里把它再写一遍）、新建、保存（有未保存修改时点亮）。
+- **右侧——`AiStepRail`**：① 分析对象（`WorkoutPicker`，按天的时间线胶囊，「再看 6 条」代替翻页）② 你想问什么（`DirectionPanel`）③ 附件与选项（`TaskExtras`），一次只展开一步；收起的步骤只露一行摘要，整个任务一屏看完不用滚。
 - **底部——`HandoffPanel` 交付坞**：整页唯一的主按钮「交给 ChatGPT」、服务商 `CapsuleWheel`（只认 `AI_PROVIDERS` 白名单）、就绪度胶囊（几类数据 · 平均多少天有数据 · 数据包大小 · 提醒数），点开是最终提示词、去重后的提醒和 `CoverageDetails`。预览出错一直露在坞上方。用户在等的同步还没落地时，就绪度胶囊说「最新数据还在路上」；页面跟着 `dataRevision` 重新取运动列表和预览。
 - `ai_task_prepare` 生成脱敏数据包；精确 GPS 默认不带，用户显式打开才带。预览是异步的，计算中显示 `…` 而不是 `0`。
 
 ### 3. 最近记录与详情 (`/recent`, `/sleep`, `/workouts`, `/sleep/:id`, `/workouts/:id`)
 
-- `/recent` 两列（睡眠 / 运动），列头标注「共 N 条」，运动列有类型过滤 tab；被过滤掉的不完整记录必须显式提示「N 条数据不完整已隐藏」，不能静默消失。
+- `/recent` 是**一条按天分组的竖向时间线**，睡眠（归到醒来那天）和运动排在一起，最新的在上面。胶囊切「全部 / 睡眠 / 运动」，选运动时多一个运动类型滚轮；「全部睡眠」「全部运动」进完整列表。被过滤掉的不完整记录必须显式提示「N 条数据不完整已隐藏」，不能静默消失。
 - 运动详情：指标矩阵 + ECharts 心率/配速曲线 + 本地 SVG 轨迹（按配速映射 `--route-*` 色谱）+ 暂停区间。没有轨迹点就不画地图，没有逐点采样就不画曲线。
 - 睡眠详情：`StageBar` 阶段构成（用 `--sleep-*` 四色）+「阶段说明」折叠 + 近 7 天睡眠结构堆叠柱状图；时长、评分、来源、设备如实展示，缺失即 `未提供`。
 
@@ -124,26 +134,30 @@
 - 两页同构：`PageHeader` 右侧是 7 天 / 1 个月 / 6 个月的 `range-switch`，主体是 `minmax(320px, 1fr)` 自适应卡片网格。
 - 身体状态八张 `MetricTrendCard`：恢复、压力、血氧、夜间血氧 ODI、HRV (SDNN)、HRV (RMSSD)、呼吸率、静息心率。有实测区间的（压力、血氧、HRV、呼吸率）在折线后面画当日 min–max 阴影；**没测出区间的当天不画零宽阴影**。
 - 训练状态：VO₂max / 训练负荷 / PAI 三张趋势卡，乳酸阈值心率+配速双轴卡（配速轴 `inverse`，让「更快」朝上），运动负荷平衡卡（7 天负荷、28 天周均、急慢比三条线），以及 `HeartRateZonePicker`。
+- 生活事件**每页只出现一次**：一排胶囊（添加 / 这段时间里的事件 / 管理）；趋势卡下面不再每张都重复「+ 添加事件 · 管理生活事件」。图上的事件圆点仍可点开。
+- **切范围时线条平滑变形**，不清空重画：趋势图用合并模式更新（`metricSeries.ts#SMOOTH_CHART_UPDATE`：`notMerge: false, replaceMerge: ['series']`），更新动画 520ms。
 - 每张卡片都写明覆盖度：「30 天里有 12 天记录」。**缺的天曲线直接断开**（`connectNulls: false`），不插值、不补零。只有 1 天数据时不画图，直接说「画不出趋势」。
 - 6 个月这一档不是装饰：VO₂max 与乳酸阈值一年只测几次，30 天窗口会把库里已有的数据显示成空。
 
 ### 5. 设置 (`/settings`)
 
-**三种形态的卡组**，不做左侧目录。八张卡（`views/settings/cards.ts`）：账号与设备 · 同步与更新 · 归档与存储 · 数据内容 · 交给 AI 工具 · 显示与语言 · 隐私与安全 · 高级与维护。同一批卡在形态之间用 View Transitions 形变（每张卡一个 `view-transition-name`）。
+**三种形态的卡组**，不做左侧目录。八张卡（`views/settings/cards.ts`）：账号与设备 · 同步与更新 · 归档与存储 · 数据内容 · 交给 AI 工具 · 显示与语言 · 隐私与安全 · 高级与维护。同一批卡在形态之间用 Web Animations 直接动真实元素（FLIP；几何是纯函数 `lib/deck/morph.ts`，编排在 `composables/useDeckMorph.ts`），所以**随时可以打断**：打开到一半关掉就原路倒回（`Animation.reverse()`），展开到一半收起就从半路飞回去。（View Transitions 过渡期间点什么都不算数，快照带模糊逐帧重绘，收起时一顿一顿的。）
 
-- `/settings` 默认是 **coverflow**（`DeckCoverflow.vue`，摆位来自纯函数 `lib/deck/coverflow.ts`）：正中一张立着，两侧的卡侧转约 46° 紧紧叠在两边，越远越小、越糊、越淡；卡组首尾相接，两边永远有卡；舞台两端渐隐进背景。拖动（`useSpringIndex` 按速度吸附）、滚轮、←/→、点侧卡转到正中；点正中那张或回车打开。
-- **「展开全部」**把卡从正中往两边依次抽出、纵向平铺成两列；底部浮着醒目的**「收起」**胶囊，按相反顺序插回卡组。用哪种形态记在本机。
-- `/settings/:card` 打开一张：它放大成整页，其余的卡下沉、变糊、淡出（`::view-transition-old(*):only-child`），关掉时再浮回来。打开后仍可按住卡头拖动甩出、上一张 / 下一张（按住连翻）、←/→、PageUp/PageDown；Esc 回到总览；开了减少动效就直接切换。卡片都没有描边——边界靠顶边高光和投影。
-- 分层：`lib/deck/physics.ts` + `lib/deck/coverflow.ts`（纯函数，有 vitest）→ `composables/useCardDeck.ts` / `useSpringIndex.ts` → `components/deck/`。各卡内容在 `views/settings/sections/`，共享状态经 `composables/settings/context.ts` 注入。
+- `/settings` 默认是 **coverflow**（`DeckCoverflow.vue`，摆位来自纯函数 `lib/deck/coverflow.ts`）：正中一张立着，两侧的卡侧转约 46° 紧紧叠在两边，越远越小、越糊、越淡；卡组首尾相接，两边永远有卡；舞台两端渐隐进背景。拖动（`useSpringIndex` 按速度吸附）、滚轮、←/→、点侧卡转到正中；点正中那张或回车打开。没有左右箭头按钮——拖就是翻。侧卡没有硬边：外侧那一半按离正中的远近渐隐进背景（`coverflowPose().dissolve`）。
+- **「展开全部」**把卡从正中往两边依次抽出（每张相隔 16ms、各 420ms）、纵向平铺成两列；底部浮着醒目的**「收起」**胶囊，按相反顺序插回卡组。用哪种形态记在本机。
+- `/settings/:card` 打开一张：它从总览里那张卡的位置长成整页（左上角对齐缩放 + 底部裁成源卡的比例），总览绕顶边中点往后退、变糊、淡出；关掉时准确落回源卡的位置。打开后仍可按住卡头拖动甩出（拖动可以打断正在进行的翻页）、←/→、PageUp/PageDown 或下面的圆点；× / Esc 回到打开它的地方；开了减少动效就直接切换。卡片没有描边、也没有高光线——边界靠厚度和投影。
+- 互不相干的几件小事**横着排**成小板（`.s-tiles`）：隐私的三条事实，高级里的数据文件夹 / 数据健康 / 压缩报文。
+- 分层：`lib/deck/physics.ts` + `lib/deck/coverflow.ts` + `lib/deck/morph.ts`（纯函数，有 vitest）→ `composables/useCardDeck.ts` / `useSpringIndex.ts` / `useDeckMorph.ts` → `components/deck/`。各卡内容在 `views/settings/sections/`，共享状态经 `composables/settings/context.ts` 注入。
 - 卡内排版统一用 `settings-base.css` 的列表行：标签在左、控件在右、行间细线。
 - 历史补拉只有一个入口，在「归档与存储」卡里（长期归档开关 → 起点与开始补拉 → 预计体积 → 覆盖账本）。
 
 ## 组件与图表
 
-- 无 UI 框架，组件全部自研，位于 `src/components/`：`BrandMark`、`CategoryMark`、`CircularProgress`、`CardDeck`（`deck/`）、`DatePicker`、`DeviceMarquee`、`DeviceVisual`、`EmptyState`、`GlyphTile`、`HeartRateZonePicker`、`Icon`、`MetricTrendCard`、`ModalDialog`、`PageHeader`、`RecordRow`、`SegmentTrack`、`SelectMenu`、`SkeletonBlock`、`Sparkline`、`StageBar`；按页面分的子组件在 `components/<页面>/`（`overview/`、`workout/`、`archive/`、`ai/`、`deck/`、`shell/`）。新增前先确认这里没有能复用的。
+- 无 UI 框架，组件全部自研，位于 `src/components/`：`BrandMark`、`CategoryMark`、`CircularProgress`、`CardDeck`（`deck/`）、`DatePicker`、`DeviceMarquee`、`DeviceVisual`、`EmptyState`、`GlyphTile`、`HeartRateZonePicker`、`Icon`、`MetricTrendCard`、`ModalDialog`、`PageHeader`、`RecordRow`、`SegmentTrack`、`CapsuleWheel`、`SkeletonBlock`、`Sparkline`、`StageBar`；按页面分的子组件在 `components/<页面>/`（`overview/`、`workout/`、`archive/`、`ai/`、`deck/`、`shell/`）。新增前先确认这里没有能复用的。
 - 按天趋势一律走 `MetricTrendCard` + `lib/metricSeries.ts` 的 `buildSeriesOption`，不要在页面里各写一套 option；`SERIES_RANGES` 是三档范围的唯一来源。
 - 图标：`Icon.vue` 是内联 SVG 线性图标；大号语义图标用 `GlyphTile.vue`——CSS 材质底座 + `Icon.vue` 的图形，颜色按 `tone` 取类别 token（名称到图形的映射在 `lib/glyphs.ts`），深浅两套主题共用。不要再加 PNG 3D 图标；只有品牌图（app-icon、brand-mark、zepp-cloud）仍是图片。图片必须走 import 让 Vite 产出实体文件——桌面 CSP 不允许 data URL 与外部图源。
 - 图表统一走 `src/lib/echartsSetup.ts` 的 `vue-echarts`：注册了 `zeppbridge-dark` 与 `zeppbridge-light` 两套主题，并导出响应式的 `CHART_THEME` / `chartPalette`。每个 `VChart` 都绑 `:theme="CHART_THEME"` **和** `:key="CHART_THEME"`（换主题时整图重建），每个 option 都是 `computed`，chrome 色（轴文字、网格线、tooltip、标记、系列语义色）一律从 `chartPalette.value` 取，不写字面量 hex——CSS 变量进不了 canvas，所以色板色值与 `tokens.css` 对齐维护。不要在页面里重复定义配色。
+- 图表的外观跟着玻璃材质走：tooltip 是圆角、带背景模糊的玻璃；悬停指示是一根细虚线，柱状图不画灰色阴影框（睡眠图完全关掉了）；折线下面垫一层从上往下淡掉的光，有实测区间阴影时不叠。
 - **首页（概览）不加载 ECharts。** 概览的心率曲线是 `components/overview/HrMiniChart.vue`（SVG，几何在 `lib/miniChart.ts`），入口卡的 7 天走势是 `Sparkline`。图表引擎 580 KB，只给二级页的交互图表用；往概览里加 `VChart` 等于让每次冷启动都多解析一遍它。
 
 ## 交互与可访问性
@@ -164,6 +178,6 @@
 
 - 模板标题、说明与下拉选项完整换行，不用省略号隐藏选择所需的信息。提示词编辑区与弹窗正文使用 `--fs-md`，辅助说明沿用现有字号阶梯。
 - 不对说明文字所在容器整体降低透明度。缺失数据卡片保留清晰文字，用虚线边框区分；禁用操作仍可变淡。
-- `SelectMenu` 将焦点留在触发按钮，通过 `aria-controls` / `aria-activedescendant` 关联弹层和当前活动选项。选项与触发按钮至少高 44px。
+- 胶囊选择器是 `role="radiogroup"`（`SegmentTrack`）或 `role="slider"`（`CapsuleWheel`，`aria-valuetext` 报当前项），方向键、Home/End 可用。
 - 设置页的隐私和更新说明共用 `ModalDialog`：包含可访问名称、Tab/Shift+Tab 焦点循环、Esc 关闭、关闭后焦点返回，以及受视口约束的滚动区域。关闭按钮保留中英文名称。
 - 搜索框与编辑区内部取消原生轮廓时，由外框的 `:focus-within` 提供可见焦点。

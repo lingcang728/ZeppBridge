@@ -40,6 +40,30 @@ h2, h3, p { margin-top: 0; }
 .s-row-control .select-menu { width: 210px; }
 .s-row.is-block { display: grid; align-items: stretch; }
 .s-note { margin: 0; padding: 0 4px; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.6; }
+
+/* 一格一格的信息（数据内容、覆盖账本）：凸起的小板，不是描边的平面磁贴。
+   亮一点的底、顶边高光、底边暗线、柔和投影；没有数据的那一格反过来凹下去。 */
+.s-tile {
+  border: 0;
+  border-radius: 20px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ink) 6.5%, transparent), color-mix(in srgb, var(--ink) 2.5%, transparent));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 9%, transparent), inset 0 -1px 0 rgba(0, 0, 0, .18), 0 6px 16px -10px rgba(0, 0, 0, .5);
+  transition: translate var(--dur-base) var(--ease-out), box-shadow var(--dur-base) ease;
+}
+.s-tile:hover { translate: 0 -2px; box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 11%, transparent), inset 0 -1px 0 rgba(0, 0, 0, .18), 0 12px 22px -12px rgba(0, 0, 0, .55); }
+.s-tile.is-sunken { background: var(--cap-track); box-shadow: var(--cap-track-shadow); }
+.s-tile.is-sunken:hover { translate: none; box-shadow: var(--cap-track-shadow); }
+
+/* 几件并列的小事（隐私的三条事实、高级里的三个工具）横着排成一行小板，
+   不再一条压一条地竖着排——它们之间没有先后。窄了自动折行。 */
+.s-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 12px; }
+.s-fact { display: grid; align-content: start; gap: 8px; min-width: 0; padding: 16px; }
+.s-fact-head { display: flex; align-items: center; gap: 10px; }
+.s-fact-head strong { color: var(--ink); font-size: var(--fs-md); font-weight: 650; }
+.s-fact-icon { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border-radius: 50%; background: var(--cap-thumb); box-shadow: var(--cap-thumb-rim); color: var(--accent); }
+.s-fact p { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.6; }
+.s-fact-actions { display: flex; flex-wrap: wrap; align-self: end; gap: 8px; margin-top: 4px; }
+.report-kind { justify-self: start; max-width: 100%; overflow-x: auto; }
 .s-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .state-dot { display: inline-flex; align-items: center; gap: 6px; color: var(--subtle); font-size: var(--fs-sm); white-space: nowrap; }

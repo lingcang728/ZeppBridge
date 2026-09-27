@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import LifeEventShortcut from './LifeEventShortcut.vue';
 import { useLifeEvents } from '../composables/useLifeEvents';
 import { validEventDate, overlapsEvent } from '../lib/lifeEvents';
 const { open: openEvent, events: lifeEvents } = useLifeEvents();
@@ -11,7 +10,7 @@ const chartClick = (event: { name?: string; data?: unknown }) => {
   else if (event.name && validEventDate(event.name)) openEvent(undefined, event.name);
 };
 import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
-import { buildSeriesOption, coverageLabel } from '../lib/metricSeries';
+import { SMOOTH_CHART_UPDATE, buildSeriesOption, coverageLabel } from '../lib/metricSeries';
 import type { MetricSeries } from '../types';
 import { defineMessages, useMessages } from '../i18n';
 
@@ -155,6 +154,7 @@ const option = computed(() => {
       :key="CHART_THEME"
       :theme="CHART_THEME"
       :option="option"
+      :update-options="SMOOTH_CHART_UPDATE"
       @click="chartClick"
       autoresize
       role="img"
@@ -163,7 +163,6 @@ const option = computed(() => {
     <p v-else-if="hasPoints" class="trend-empty">{{ t.onlyOneDay }}</p>
     <p v-else class="trend-empty">{{ emptyMessage }}</p>
 
-    <LifeEventShortcut :start="series?.points[0]?.date" :end="series?.points[series.points.length - 1]?.date" />
 
     <dl v-if="stats.length" class="trend-stats">
       <div v-for="row in stats" :key="row.label">
@@ -175,14 +174,15 @@ const option = computed(() => {
 </template>
 
 <style scoped>
+/* 和概览卡同一种有厚度的板：不描边，边界靠顶边高光、底边暗线和投影。 */
 .trend-card {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: var(--space-4);
-  border: 1px solid var(--mat-line);
-  border-radius: var(--radius-md);
-  background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow);
+  padding: 18px 18px 16px;
+  border-radius: var(--radius-lg);
+  background: var(--mat-card);
+  box-shadow: var(--mat-rim), var(--mat-shadow);
 }
 .trend-head { display: flex; min-height: 70px; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
 .trend-title { display: grid; gap: 2px; min-width: 0; }
