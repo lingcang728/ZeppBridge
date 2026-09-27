@@ -145,7 +145,10 @@ watch(
 <style scoped>
 .ai-page { padding-bottom: 32px; }
 .layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(380px, 1fr); gap: 18px; align-items: start; }
-.graph-side { position: sticky; top: 16px; height: calc(100vh - 120px); min-height: 480px; border: 1px solid var(--mat-line); border-radius: var(--radius-md); background: var(--mat-card); overflow: hidden; box-shadow: var(--mat-rim), var(--mat-shadow); }
+/* 关系网是这一页的主舞台：没有描边，只有更大的圆角和投影；高度贴满视口，底部的浮动控件不被裁掉。 */
+.graph-side { position: sticky; top: 76px; height: calc(100vh - 196px); min-height: 480px; border-radius: var(--radius-xl); background:
+  radial-gradient(120% 80% at 50% 45%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 70%), var(--mat-card);
+  overflow: hidden; box-shadow: var(--mat-rim), var(--mat-shadow-lift); }
 .steps { display: grid; gap: 14px; min-width: 0; }
 @media (max-width: 1100px) {
   .layout { grid-template-columns: 1fr; }

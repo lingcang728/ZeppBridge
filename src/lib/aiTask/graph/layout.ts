@@ -197,3 +197,34 @@ export const fitZoom = (state: LayoutState, width: number, height: number): numb
   for (const item of state.nodes.values()) extent = Math.max(extent, Math.abs(item.x) + 60, Math.abs(item.y) + 50);
   return Math.min(1.6, Math.max(0.5, Math.min(width, height) / 2 / extent));
 };
+
+/**
+ * 聚焦某一类时镜头该停在哪儿：框住这一类和它展开的全部指标（按目标位置算，
+ * 不等弹簧跑完），留出标签的余量，放大到正好装下——但至少放大到 1.15 倍，
+ * 不然「俯冲进去」就没有进去的感觉。
+ */
+export const focusFrame = (
+  model: GraphModel,
+  categoryId: string,
+  radii: GraphRadii,
+  size: { width: number; height: number },
+): { x: number; y: number; zoom: number } | null => {
+  const byId = new Map(model.nodes.map((node) => [node.id, node]));
+  const parentNode = byId.get(categoryId);
+  if (!parentNode) return null;
+  const parentTarget = targetOf(parentNode, undefined, radii);
+  const points = [parentTarget];
+  for (const node of model.nodes) {
+    if (node.parentId !== categoryId) continue;
+    points.push(targetOf(node, { id: categoryId, ...parentTarget, vx: 0, vy: 0, dragging: false }, radii, parentNode));
+  }
+  const pad = 70;
+  const xs = points.map((p) => p.x);
+  const ys = points.map((p) => p.y);
+  const minX = Math.min(...xs) - pad;
+  const maxX = Math.max(...xs) + pad;
+  const minY = Math.min(...ys) - pad;
+  const maxY = Math.max(...ys) + pad * 0.8;
+  const zoom = Math.min(size.width / (maxX - minX), size.height / (maxY - minY));
+  return { x: (minX + maxX) / 2, y: (minY + maxY) / 2, zoom: Math.min(1.6, Math.max(1.15, zoom)) };
+};

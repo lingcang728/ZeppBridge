@@ -13,6 +13,7 @@ import { buildGraph, type GraphModel, type GraphNode } from '../model';
 import {
   createLayout,
   fitZoom,
+  focusFrame,
   graphRadii,
   snapLayout,
   stepLayout,
@@ -208,5 +209,25 @@ describe('wakeLayout / fitZoom', () => {
     const zoom = fitZoom(normal, 800, 600);
     expect(zoom).toBeGreaterThanOrEqual(0.5);
     expect(zoom).toBeLessThanOrEqual(1.6);
+  });
+});
+
+describe('focusFrame', () => {
+  const size = { width: 900, height: 640 };
+
+  it('flies toward the expanded category, never staying at the overview zoom', () => {
+    const model = modelOf(['sleep']);
+    const radii = graphRadii(size.width, size.height);
+    const frame = focusFrame(model, 'cat:sleep', radii, size)!;
+    const sleep = model.nodes.find((node) => node.id === 'cat:sleep')!;
+    const home = targetOf(sleep, undefined, radii);
+    expect(frame.zoom).toBeGreaterThanOrEqual(1.15);
+    // 镜头中心落在这一类的那一侧（不是还停在原点）。
+    expect(frame.x * home.x + frame.y * home.y).toBeGreaterThan(0);
+  });
+
+  it('returns null for a node that is not in the graph', () => {
+    const size2 = { width: 900, height: 640 };
+    expect(focusFrame(modelOf(), 'cat:nope', graphRadii(900, 640), size2)).toBeNull();
   });
 });

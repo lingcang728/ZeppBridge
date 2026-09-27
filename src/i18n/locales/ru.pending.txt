@@ -249,3 +249,5 @@ components/deck/DeckCoverflow.open
 components/deck/DeckCoverflow.position
 views/settings/deck.pageIntroDeck
 views/settings/deck.openCard
+components/ai/TaskGraph.backToAll
+components/ai/TaskGraph.dismissHint

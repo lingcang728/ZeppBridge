@@ -19,7 +19,14 @@ const props = withDefaults(defineProps<{
   ghosted?: boolean;
   /** 拖动提示：松手会加入还是移出。 */
   dropHint?: 'include' | 'exclude' | null;
-}>(), { hovered: false, dimmed: false, ghosted: false, dropHint: null });
+  /** 聚焦别的类别时，它退成模糊的背景。 */
+  backdrop?: boolean;
+  /** 聚焦的这一类和它的指标：放大一点、标签全部亮出来。 */
+  emphasis?: boolean;
+}>(), { hovered: false, dimmed: false, ghosted: false, dropHint: null, backdrop: false, emphasis: false });
+
+/** 看不见的点击区：比画出来的圆大一圈。指标点只有 9px 半径，以前点歪一点就点到了背景或者邻居。 */
+const HIT_PAD = { center: 6, category: 10, metric: 12 } as const;
 
 const radius = computed(() => NODE_RADIUS[props.node.kind]);
 /** 覆盖弧的周长，按覆盖比例截取。 */
@@ -34,15 +41,16 @@ const coverDash = computed(() => {
 });
 /** 指标多的时候平时藏标签，悬停才出现，免得糊成一团。 */
 const showLabel = computed(() =>
-  props.node.kind !== 'metric' || props.node.siblings <= 8 || props.hovered || props.ghosted);
+  props.node.kind !== 'metric' || props.node.siblings <= 8 || props.hovered || props.ghosted || props.emphasis);
 </script>
 
 <template>
   <g :class="['gnode', `kind-${node.kind}`, {
     'is-included': node.included, 'is-effective': node.effective,
     'is-missing': node.missing, 'is-hovered': hovered, 'is-dimmed': dimmed,
-    'is-ghosted': ghosted, 'is-expanded': node.expanded,
+    'is-ghosted': ghosted, 'is-expanded': node.expanded, 'is-backdrop': backdrop, 'is-emphasis': emphasis,
   }]" :transform="`translate(${x} ${y})`" :aria-label="node.label">
+    <circle class="hit" :r="radius + HIT_PAD[node.kind]" />
     <!-- 覆盖弧：类别/指标的外圈进度环 -->
     <circle v-if="node.coverage !== null" class="cover" :r="radius + COVER_GAP" fill="none"
       :stroke-dasharray="coverDash" transform="rotate(-90)" />
@@ -65,7 +73,8 @@ const showLabel = computed(() =>
 </template>
 
 <style scoped>
-.gnode { cursor: pointer; }
+.gnode { cursor: pointer; transition: opacity .28s ease, filter .4s ease; }
+.hit { fill: transparent; stroke: none; }
 .body { fill: var(--surface-raised); stroke: var(--line-control); stroke-width: 1.2; transition: stroke .15s, fill .15s, opacity .15s; }
 .glyph { color: var(--muted); }
 .label, .sublabel, .badge-text { text-anchor: middle; pointer-events: none; user-select: none; }
@@ -94,6 +103,11 @@ const showLabel = computed(() =>
 .kind-metric .label { font-size: 10px; fill: var(--muted); }
 .is-missing .body { stroke: var(--warning); stroke-dasharray: 3 3; }
 .is-hovered .body { stroke: var(--accent); stroke-width: 2; }
-.is-dimmed { opacity: .22; }
+.is-dimmed { opacity: .38; }
+/* 背景：退远、变糊，但仍能点（点背景里的另一类会飞过去）。 */
+.is-backdrop { opacity: .3; filter: blur(1.6px); }
+.is-backdrop:hover { opacity: .6; filter: blur(.4px); }
+.is-emphasis.kind-metric .label { fill: var(--ink); font-size: 10.5px; }
+.is-emphasis.kind-category .body { stroke-width: 2.2; }
 .is-ghosted { opacity: .25; }
 </style>
