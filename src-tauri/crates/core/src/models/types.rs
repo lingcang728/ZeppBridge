@@ -1164,12 +1164,11 @@ pub struct MetricSeries {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TrainingBalancePoint {
     pub date: String,
-    pub acute_7d: f64,
+    pub acute_7d: Option<f64>,
     pub acute_days_with_data: i64,
-    pub chronic_28d: f64,
+    pub chronic_28d: Option<f64>,
     pub chronic_days_with_data: i64,
-    /// Absent until the chronic window is mostly covered -- a ratio against a
-    /// half-empty window reads as a spike that never happened.
+    /// Absent unless both windows are complete and chronic load is positive.
     pub acute_chronic_ratio: Option<f64>,
 }
 

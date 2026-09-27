@@ -1926,7 +1926,7 @@ export default {
       vo2Empty:
         'Sem registos de VO₂max neste intervalo; só atualiza depois de uma corrida ao ar livre.',
       loadLabel: 'Carga de treino',
-      loadHint: 'Pontuação diária de carga de treino',
+      loadHint: 'Carga de treino dos últimos 7 dias indicada pelo Zepp',
       loadEmpty: 'Sem registos de carga de treino neste intervalo.',
       paiLabel: 'PAI',
       paiHint: 'Personal Activity Intelligence numa janela móvel de 7 dias',
@@ -1950,7 +1950,7 @@ export default {
       balanceEmpty:
         'Ainda não há registos de carga de treino suficientes para desenhar esta linha.',
       balanceNote:
-        'Aguda:crónica = soma dos últimos 7 dias ÷ (soma dos últimos 28 dias ÷ 4). Quando a janela de 28 dias cobre menos de 21 dias, não é dado rácio e a linha quebra aí. Isso é não calculado, não zero.',
+        'As cargas são somadas pela data local de início. Um dia só está completo quando todas as atividades foram sincronizadas e têm carga válida; apenas dias confirmados sem atividades contam como zero. Janelas incompletas de 7 ou 28 dias ficam sem valor. A relação exige ambas as janelas completas e carga crónica positiva.',
       acute7d: 'Carga de 7 dias',
       chronicWeekly: 'Média semanal de 28 dias',
       acuteChronic: 'Aguda:crónica',
