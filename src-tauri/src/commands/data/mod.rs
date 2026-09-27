@@ -8,8 +8,6 @@ use crate::device_catalog::{match_catalog, CatalogMatchInput, CatalogMatchStatus
 
 use crate::export_fit;
 
-use crate::export_formats;
-
 use crate::insight::{WeeklyReport, WorkoutInsight};
 
 use crate::ipc_error::AppError;
@@ -20,11 +18,11 @@ use crate::models::{
     AiHandoffMetadata, AiHandoffResult, CapabilityOverview, DailyHeartRateExtreme,
     DeviceCacheMetadata, DeviceMatchStatus, DeviceProfile, DeviceProfilesResult,
     DiagnosticAssignedModel, DiagnosticDeviceCandidate, DiagnosticDeviceEvidence, DiagnosticField,
-    DiagnosticObjectShape, DiagnosticReport, ExportDetail, ExportEstimate, ExportResult,
-    ExportScope, ExportSelection, FeedbackSubmissionResult, HealthOverview, HeartRatePoint,
-    HeartRateZoneOptions, HeartRateZonePreference, MetricSeries, RawPayloadCompaction,
-    SleepSession, StorageEstimate, StressPoint, TrainingBalancePoint, UserPrefs, Workout,
-    WorkoutSeries, DIAGNOSTIC_NOTE_MAX_CHARS,
+    DiagnosticObjectShape, DiagnosticReport, ExportDetail, ExportResult, ExportSelection,
+    FeedbackSubmissionResult, HealthOverview, HeartRatePoint, HeartRateZoneOptions,
+    HeartRateZonePreference, MetricSeries, RawPayloadCompaction, SleepSession, StorageEstimate,
+    StressPoint, TrainingBalancePoint, UserPrefs, Workout, WorkoutSeries,
+    DIAGNOSTIC_NOTE_MAX_CHARS,
 };
 
 use crate::storage::corrections::WorkoutCodeLabel;

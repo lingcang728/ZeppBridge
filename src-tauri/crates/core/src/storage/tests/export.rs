@@ -645,30 +645,6 @@ fn a_single_workout_export_carries_only_that_workout() {
     assert_eq!(export["scope"]["workout_id"], "target-workout");
 }
 
-#[test]
-fn estimate_export_counts_without_materializing_json() {
-    let db = Database::in_memory().unwrap();
-    db.insert_metric_sample(&MetricSample {
-        metric: "hrv_rmssd".into(),
-        timestamp: ts(),
-        value: 42.0,
-        unit: "ms".into(),
-        source_scope: SourceScope::Device,
-        device_id: None,
-    })
-    .unwrap();
-    let selection = export_selection(&["hrv_rmssd"], ExportDetail::Full);
-    let (encoded, count) = db.build_ai_export(&selection).unwrap();
-    let estimate = db.estimate_ai_export(&selection).unwrap();
-    assert_eq!(estimate.record_count, count);
-    assert!(estimate.estimated_bytes > 0);
-    assert!(
-        estimate.estimated_bytes < encoded.len() as u64 * 8,
-        "estimate should stay in the same order of magnitude as the JSON"
-    );
-    assert!(!encoded.is_empty());
-}
-
 /// H1 回归守护：样本查询必须走 uq_metric_sample_key，而不是全表扫。
 /// 哪天把 `metric IN` 改丢了，这里立刻红——两种 scope 形态都要查。
 #[test]

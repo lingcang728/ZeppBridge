@@ -22,6 +22,6 @@ SHA-256 固定，校验脚本为 `scripts/assets/verify-ai-assets.py`。
 | DeepSeek | `src/assets/ai/deepseek.png` (PNG 180×180) | [DeepSeek 官方 chat app icon](https://fe-static.deepseek.com/chat/icon-180.png) | `547EAD56DCB71424315BA53BF8F4C35E745EFEAECE106B9FB7E4DCDFA19C1A7A` | DeepSeek 官方应用图标；版权/商标归 DeepSeek，限于指向 DeepSeek 服务的识别用途 |
 | Grok | `src/assets/ai/grok.png` (PNG 512×512) | [Grok 官方站点 app icon](https://grok.com/images/android-chrome-512x512.png) | `3A462C3C2524733C173BB05C431DE737812F8219DB8FA115B0025D12A347E086` | Grok 产品站点图标（不是 xAI corporate 标志）；版权/商标归 Grok/xAI，限于指向 Grok 服务的识别用途 |
 
-图标加载失败时，Explore 选择器才显示无障碍首字母/汉字 fallback；正常路径始终
+图标加载失败时，AI 选择器才显示无障碍首字母/汉字 fallback；正常路径始终
 渲染上述七个本地产品图标。设备卡片在商品 WebP 加载失败时使用代码内原创轮廓，
 不会让折行的 `alt` 文本冒充图片。

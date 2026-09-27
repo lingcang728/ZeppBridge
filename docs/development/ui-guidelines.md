@@ -122,7 +122,7 @@ forbidden. The provenance of the algorithms and percentages is in the
 
 - **Every word on screen needs a Chinese and an English version.** Write it as
   `defineMessages(zh, en)` in the module that uses it; large pages (Settings,
-  Explore) get a matching `*.i18n.ts`. Do not build one global dictionary — a
+  Overview) get a matching `*.i18n.ts`. Do not build one global dictionary — a
   lazily loaded page's chunk should carry only its own copy.
 - `defineMessages` uses `NoInfer` to pin the shape to the Chinese half: a
   missing English key, an extra key or a mismatched parameter fails to compile.
@@ -163,9 +163,7 @@ Three main navigation items in the centred pill of the top bar
 (`/ai`) and **Settings** (`/settings`). Keep it at three — a new page gets an
 entry card, not a navigation slot. The top bar also carries the sync-status
 pill, the theme cycle button and the language `SelectMenu`; below 760px the
-pill hides and a bottom tabbar covers the same three items. `/explore` remains
-as the legacy composer; `/orbit-lab` is a stub route for the orbit composer
-and stays out of the navigation.
+pill hides and a bottom tabbar covers the same three items.
 
 Secondary pages stay out of the main navigation: `/body` (body status),
 `/training` (training status), `/recent` (recent records), the `/sleep` and
@@ -194,31 +192,23 @@ pages, reached from Overview's entry cards and its "view all" links.
   The entry cards give numbers and shapes; interpretation is left to the AI the
   user chose.
 
-### 2. Hand to AI (`/ai`, legacy composer at `/explore`)
+### 2. Hand to AI (`/ai`)
 
-A three-column layout:
+One analysis task per screen (`views/AiComposer.vue`, pieces in `components/ai/`):
 
-- Left: template categories and a searchable prompt-template list.
-- Middle: the current template's prompt editor (editable, copyable), a
-  four-cell data-awareness summary (date range / record count / data-type count
-  / estimated size), quick-range pills and a hand-drawn calendar popover (not a
-  native date input).
-- Right: export format, target AI (seven: ChatGPT, Claude, Gemini, Kimi,
-  Doubao, DeepSeek, Grok, via the `AI_PROVIDERS` allow-list — a non-listed
-  address is simply refused), and the save / copy prompt / send actions.
-- Each of the three formats runs its own real conversion, and the card subtitle
-  must state the difference. "Choose CSV, actually get JSON" is not allowed:
-  JSON = fully structured; CSV = long-format summary (no per-point samples or
-  tracks); GPX = only workouts that have a GPS track. With nothing to export it
-  errors rather than writing an empty file.
-- Fifteen selectable data types (`exportTypeOptions`) are presented in the right
-  column in the four groups of `exportTypeGroups`: activity / sleep / body
-  status / training. A group heading selects or clears the whole group;
-  individual items are checkboxes. A template only **pre-fills** the selection
-  and never locks it — what you ticked is what gets exported, and the count and
-  size in the summary always describe the file you are about to receive.
-- Size and count are an asynchronous preview; while computing they show `…`,
-  never `0`.
+- `AiTaskHeader`: task title (auto-titled until the user edits it) and the
+  saved-task library.
+- `TaskGraph`: the workouts picked in `WorkoutPicker` and the data categories
+  around them as nodes; each category carries its own window (7 / 14 / 30 days)
+  and can be switched off. `CoverageDetails` says what the local library
+  actually has for that window — missing days show as missing, never as 0.
+- `DirectionPanel` + `TaskExtras`: the question for the AI and optional
+  attachments.
+- `HandoffPanel`: target AI from the `AI_PROVIDERS` allow-list (ChatGPT,
+  Claude, Gemini, Kimi, Doubao, DeepSeek, Grok — any other address is refused),
+  then `ai_task_prepare` builds the redacted package. Precise GPS stays out
+  unless the user opts in.
+- Previews are asynchronous; while computing they show `…`, never `0`.
 
 ### 3. Recent records and detail (`/recent`, `/sleep`, `/workouts`, `/sleep/:id`, `/workouts/:id`)
 
@@ -289,7 +279,7 @@ and security · advanced and maintenance.
   `HeartRateZonePicker`, `Icon`, `MetricTrendCard`, `ModalDialog`,
   `PageHeader`, `RecordRow`, `SegmentTrack`, `SelectMenu`, `SkeletonBlock`,
   `Sparkline`, `StageBar`; page-specific pieces live in `components/<page>/`
-  (`overview/`, `workout/`, `explore/`, `archive/`, `ai/`, `shell/`). Check
+  (`overview/`, `workout/`, `archive/`, `ai/`, `deck/`, `shell/`). Check
   here for something reusable before adding one.
 - Per-day trends always go through `MetricTrendCard` plus `buildSeriesOption`
   from `lib/metricSeries.ts`; do not write a separate option object per page.
@@ -309,6 +299,11 @@ and security · advanced and maintenance.
   grid lines, tooltip, marks, series semantics) from `chartPalette.value` —
   never a literal hex. The palette's colour values mirror `tokens.css` because
   CSS variables cannot reach canvas. Do not redefine the palette per page.
+- **Overview never loads ECharts.** Its heart-rate curve is
+  `components/overview/HrMiniChart.vue` (SVG, geometry in `lib/miniChart.ts`)
+  and the entry cards use `Sparkline`. The chart engine is 580 KB and belongs to
+  the interactive charts on detail pages; a `VChart` on Overview makes every cold
+  start parse it again.
 
 ## Interaction and accessibility
 

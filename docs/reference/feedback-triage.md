@@ -81,7 +81,7 @@ an unverified hunch.
 
 The moment a non-empty row appears here, map that specific code to
 `NeedsReauth` in
-[`src-tauri/crates/core/src/connectors/zepp.rs`](../../src-tauri/crates/core/src/connectors/zepp.rs)
+[`src-tauri/crates/core/src/connectors/zepp/mod.rs`](../../src-tauri/crates/core/src/connectors/zepp/mod.rs)
 and record the report id next to it. Until then, people whose account looks
 empty ("All my readings are showing empty") get neither a prompt to reconnect
 nor any data — that dead end is what this column exists to end.

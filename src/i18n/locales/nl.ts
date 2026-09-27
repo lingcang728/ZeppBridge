@@ -6,7 +6,7 @@ import { plural, type LocalePack } from '../index';
  * Overrides the inline zh/en/es copy per moduleId; missing keys fall back
  * to en (then zh) and stay listed in `nl.pending.txt` until translated.
  * Only modules whose `defineMessages` call declares a moduleId can be
- * overridden here — currently `views/Explore`, `views/Settings` and the
+ * overridden here — for example `views/Settings` and the
  * `i18n/errors` pack (`errors:` section), plus the flat `backendText:`
  * fallback map for backend-declared `ui.*` prose codes.
  */
@@ -495,7 +495,6 @@ export default {
       hrZonesAria: 'Hartslagzones (absolute grenzen)',
       hrEmpty: 'Echte hartslagbeweging verschijnt hier na een synchronisatie.',
       hrMore: 'Volle 24 uur',
-      hrTooltip: (clock: string, value: number) => `${clock} <b>${value}</b> bpm`,
       zoneRest: 'Rust 0–99',
       zoneFat: 'Vetverbranding 100–139',
       zoneAerobic: 'Aeroob 140–169',
@@ -604,62 +603,6 @@ export default {
       networkUnavailable: 'Netwerk niet beschikbaar',
       assignmentFailed: 'De modelkeuze kon niet worden opgeslagen',
     },
-    'composables/useExport': {
-      typeSteps: 'Stappen',
-      typeLifeEvents: 'Levensgebeurtenissen',
-      groupContext: 'Context',
-      typeDailyActivity: 'Dagelijkse activiteit',
-      typeWorkouts: 'Trainingen',
-      typeSleep: 'Slaap',
-      typeHeartRate: 'Hartslag',
-      typeSpo2: 'Bloedzuurstof',
-      typeStress: 'Stress',
-      typeRespiratoryRate: 'Ademhalingsfrequentie',
-      typeRecovery: 'Gereedheid',
-      typeTrainingLoad: 'Trainingsbelasting',
-      typeLactateThreshold: 'Lactaatdrempel',
-      typePai: 'PAI',
-      groupActivity: 'Activiteit',
-      groupSleep: 'Slaap',
-      groupBody: 'Lichaamsstatus',
-      groupTraining: 'Training',
-      detailSummary: 'Samenvatting',
-      detailSummaryHint:
-        'Hartslag per uur samengevoegd, reeksen per seconde van trainingen weggelaten. Gestructureerde metrieken blijven compleet, en de grootte past bij doorgeven aan een AI.',
-      detailFull: 'Volledig',
-      detailFullHint:
-        'Behoudt reeksen per seconde van trainingen en individuele hartslagmetingen. Groot, en bedoeld om te archiveren.',
-      scopeConflict:
-        'Een datumbereik en één enkele training sluiten elkaar uit als bereik. Kies er een.',
-      noDataTypes: 'Kies minstens één gegevenstype.',
-      invalidDates: 'Kies een geldige begin- en einddatum.',
-      endBeforeStart: 'De einddatum kan niet eerder liggen dan de begindatum.',
-      rangeTooLong: (days: number) =>
-        `Eén export dekt maximaal ${days} dagen. Gebruik voor langere historie de databasemomentopname in Instellingen.`,
-      nothingToExport: 'Niets te exporteren in deze periode.',
-      jsonTooLarge: 'De JSON is groter dan 1 MB. Gebruik in plaats daarvan "Bestand opslaan".',
-      copied: (count: number) => `${count} genormaliseerde records gekopieerd.`,
-      copyFailed: 'De JSON kon niet worden gekopieerd',
-      saveJsonTitle: 'ZeppBridge-JSON opslaan',
-      saveCsvTitle: 'ZeppBridge-CSV opslaan (samenvattingstabel)',
-      saveGpxTitle: 'ZeppBridge-GPX opslaan (GPS-track)',
-      saveFitTitle: 'Kies een map voor de FIT-export (één bestand per training)',
-      jsonFilter: 'JSON-bestand',
-      csvFilter: 'CSV-tabel',
-      gpxFilter: 'GPX-track',
-      fitFilter: 'FIT-activiteitsbestanden',
-      unitRecords: 'records',
-      unitRows: 'rijen',
-      unitTrackPoints: 'trackpunten',
-      unitSamplePoints: 'meetpunten',
-      saved: (count: number, unit: string) => `${count} ${unit} opgeslagen.`,
-      savedFiles: (files: number, count: number, unit: string) =>
-        `${files} FIT-bestanden opgeslagen, ${count} ${unit} in totaal.`,
-      saveFailed: (format: string) => `De ${format} kon niet worden opgeslagen`,
-      feedUpdated: (count: number) =>
-        `De lokale AI-feed bevat nu ${count} records.`,
-      feedFailed: 'De lokale AI-feed kon niet worden bijgewerkt',
-    },
     'composables/useSyncController': {
       notSyncedYet: 'Nog niet gesynchroniseerd',
       timeUnknown: 'Tijd onbekend',
@@ -749,14 +692,6 @@ export default {
       mdy: 'Maand/dag/jaar',
     },
     'lib/deviceCopy': {
-      introNoDevice:
-        'Lokaal eerst, bronnen intact: je wearable-records, georganiseerd in een gezondheidsbestand dat je echt kunt lezen.',
-      introOne: (name: string) =>
-        `Lokaal eerst, bronnen intact: ${name}-records, georganiseerd in een gezondheidsbestand dat je echt kunt lezen.`,
-      introTwo: (first: string, second: string) =>
-        `Lokaal eerst, bronnen intact: ${first}- en ${second}-records, georganiseerd in een gezondheidsbestand dat je echt kunt lezen.`,
-      introMany: (first: string, second: string, count: number) =>
-        `Lokaal eerst, bronnen intact: records van ${first}, ${second} en ${count} apparaten in totaal, georganiseerd in een gezondheidsbestand dat je echt kunt lezen.`,
       notProvided: 'Niet verstrekt',
     },
     'lib/failedChunkText': {
@@ -912,175 +847,6 @@ export default {
     },
     'services/updateService': {
       nothingToInstall: 'Er is geen update om te installeren. Controleer opnieuw.',
-    },
-    'views/Explore': {
-      approxMinutes: (minutes: number) => `(ongeveer ${minutes} min)`,
-      attachmentNotOpened: (notice: string, provider: string) =>
-        `${notice} Open ${provider} in een browser om het te analyseren.`,
-      attachmentNotice:
-        'Het gegevenspakket is naar je bureaublad geschreven (zeppbridge-ai-handoff.json) — sleep het in de AI-chat. De prompt staat op je klembord.',
-      attachmentOpened: (notice: string, provider: string) => `${notice} ${provider} is geopend.`,
-      backToDateRange: 'Terug naar een datumbereik',
-      categoryAll: 'Alle sjablonen',
-      categoryAria: 'Sjablooncategorieën',
-      categoryRecovery: 'Herstel',
-      categorySleep: 'Slaap',
-      categorySummary: 'Samenvatting',
-      categoryTitle: 'Categorieën',
-      categoryTraining: 'Trainingen',
-      cellCount: 'Aantal records',
-      cellCountSub: 'gesynchroniseerde records',
-      cellRange: 'Tijdsperiode',
-      cellSize: 'Grootte',
-      cellSizeSub: 'geschat',
-      cellTypes: 'Gegevenstypen',
-      cellTypesSub: 'in het pakket',
-      cellTypesValue: (count: number) => `${count}`,
-      copiedAndOpened: (provider: string) =>
-        `Geanonimiseerde gegevens gekopieerd en ${provider} geopend. Plak het erin om te beginnen.`,
-      copiedOnly: (provider: string) =>
-        `Geanonimiseerde gegevens gekopieerd. Open ${provider} zelf en plak het erin.`,
-      copyFailed: 'Kopiëren is mislukt. Probeer het opnieuw.',
-      copyPrompt: 'Prompt kopiëren',
-      copyPromptOnly: 'Alleen prompt kopiëren',
-      copyPromptTitle: 'Kopieer de prompttekst naar het klembord',
-      currentTemplate: 'Huidig sjabloon',
-      datePickerAria: 'Datumkiezer',
-      detailAria: 'Detailniveau',
-      detailGroup: 'Detailniveau',
-      endDate: 'Einddatum',
-      estimatedSize: 'Geschatte pakketgrootte',
-      exportFile: (format: string) => `Exporteer ${format}-bestand`,
-      formatAria: 'Exportformaat',
-      formatCsvSub: 'Samenvattingstabel (geen reeksen per punt)',
-      formatFitSub: 'Eén bestand per training, opgeslagen in de map die je kiest',
-      formatGpxSub: 'Alleen trainingen met een GPS-track',
-      formatGroup: 'Exportformaat',
-      formatJsonSub: 'Volledige gestructureerde gegevens',
-      handTo: (provider: string) => `Doorgeven aan ${provider}`,
-      injected: (count: number) => `${count} gegevensstromen bijgevoegd`,
-      intro:
-        'Kies een sjabloon, controleer wat het pakket echt bevat, en stuur je draagbare gegevens naar de AI-tool van je keuze.',
-      needDataTypes: 'Kies minstens één gegevenstype.',
-      needDesktop:
-        'De AI-overdracht heeft de desktop-app nodig; deze browserpreview opent geen externe sites.',
-      needValidDates: 'Kies eerst een geldige datumperiode.',
-      noTemplates: 'Geen passend sjabloon.',
-      noTypesSelected: 'Geen gegevenstype geselecteerd, dus de export wordt geweigerd.',
-      nothingInScope: 'Niets gesynchroniseerd in deze periode om over te dragen.',
-      onlyThisWorkout: 'alleen deze training',
-      packContentsExcluded:
-        'Niet inbegrepen: .tcx, accountgegevens, tokens of apparaatserienummers. GPS-tracks verschijnen in de GPX- en FIT-formaten, en alleen voor trainingen die een track hebben. FIT schrijft één bestand per training naar een map die je kiest.',
-      packContentsIncluded:
-        'Inbegrepen: trainingssamenvattingen (type, begin en einde, afstand, calorieën, gemiddelde en piekhartslag, trainingsbelasting), dagelijkse metrieken (stappen, rusthartslag, HRV, SpO2, stress, ademhalingsfrequentie, PAI, VO2max) en slaapsessies met hun stadiumtijdlijn. "Volledig" voegt trainingsreeksen per seconde en afzonderlijke hartslagmetingen toe.',
-      packContentsTitle: 'Wat de export bevat',
-      packSub: 'Kies het exportformaat en de AI-tool.',
-      packTitle: 'Verpakken en versturen',
-      preparing: 'Voorbereiden…',
-      previewDesktopOnly: 'Open dit in de ZeppBridge-desktop-app; de preview leest lokale gegevens.',
-      previewFailed: 'De lokale exportpreview kon niet worden gelezen',
-      previewRetry: 'Opnieuw proberen',
-      promptCopied: 'Prompt gekopieerd (zonder gegevens).',
-      promptEditor: 'Prompteditor',
-      promptEditorAria: 'Promptbewerker',
-      promptEditorHint: ' (gegevens worden automatisch uitgelijnd)',
-      providerIconAlt: (provider: string) => `${provider}-icoon`,
-      quickRange: 'Snelle periode:',
-      range30: '30 dagen',
-      range7: '7 dagen',
-      rangeDays: (days: number) => `(${days} dagen)`,
-      reopened: (provider: string) => `${provider} is geopend. Plak de gegevens daar.`,
-      retryOpen: (provider: string) => `Open ${provider} opnieuw`,
-      secureNote:
-        'Alles wordt lokaal opgebouwd: de gestructureerde gegevens en de prompt worden op deze machine gegenereerd.',
-      secureOk: 'Alleen lokaal',
-      selectAll: 'Alles',
-      selectNone: 'Niets',
-      selectedCount: (selected: number, total: number) => `${selected} van ${total} geselecteerd`,
-      sendHint:
-        'Tot 2 MiB gaat automatisch mee op het klembord met de prompt. Daarboven wordt de JSON naar je bureaublad geschreven om in de chat te slepen.',
-      startDate: 'Startdatum',
-      stillReading: 'Lokale gegevens worden nog gelezen. Probeer het zo opnieuw.',
-      streamsGroup: 'Gegevensstromen',
-      summaryHint: 'Alleen wat je aanvinkt',
-      summaryTitle: 'Wat het pakket bevat',
-      targetAria: 'AI-tool van bestemming',
-      targetGroup: 'AI-tool van bestemming',
-      templateListTitle: 'Sjablonen',
-      templateSearchAria: 'Sjablonen zoeken',
-      templateSearchPlaceholder: 'Sjablonen zoeken…',
-      templates: {
-        activity: {
-          name: 'Activiteitsoverzicht',
-          prompt: `Je bent een adviseur voor een gezonde levensstijl.
-Analyseer aan de hand van de ZeppBridge-gegevens over stappen, trainingen en hartslag hieronder
-mijn dagelijkse activiteitsniveau en hoe dat zich ontwikkelt,
-en geef daarna praktische manieren om meer te bewegen.
-
-Antwoord in Markdown.`,
-          sub: 'Dagelijkse beweging en de trend daarin',
-        },
-        performance: {
-          name: 'Prestatiesamenvatting',
-          prompt: `Je bent een sport- en gezondheidsanalist die gegevens van draagbare apparaten omzet in helder, bruikbaar inzicht.
-Schrijf aan de hand van de ZeppBridge-gegevens hieronder (al in chronologische volgorde)
-een duidelijke, goed gestructureerde samenvatting van mijn algehele prestaties.
-Behandel het totaalbeeld, de trends die ertoe doen, wat opvalt, waar ik op moet letten en waar ik iets aan kan doen.
-Waar de gegevens dun zijn, zeg dat ronduit en vertel wat ik moet verzamelen in plaats van te gokken.
-
-Antwoord in Markdown, met tabellen, lijsten en opsommingen waar die helpen.
-Houd de toon professioneel, beknopt en constructief.`,
-          sub: 'Een heldere lezing van hoe het gaat',
-        },
-        recovery: {
-          name: 'Herstel en gereedheid',
-          prompt: `Je bent een fysioloog gespecialiseerd in herstel.
-Beoordeel aan de hand van de ZeppBridge-gegevens over HRV, rusthartslag, slaap en stress hieronder
-hoe hersteld ik ben en hoe klaar ik ben om te trainen,
-noem de signalen van opeenhoppende vermoeidheid en vertel wat zou helpen.
-
-Antwoord in Markdown.`,
-          sub: 'Herstel, HRV en trainingsgereedheid',
-        },
-        sleep: {
-          name: 'Slaapanalyse',
-          prompt: `Je bent een slaapgezondheidsadviseur.
-Analyseer aan de hand van de ZeppBridge-gegevens over slaapstadia, -duren en hartslag hieronder
-de kwaliteit en regelmaat van mijn slaap en wat die lijkt te beïnvloeden,
-en geef me daarna concrete, uitvoerbare manieren om die te verbeteren.
-
-Antwoord in Markdown.`,
-          sub: 'Slaapkwaliteit en regelmaat',
-        },
-        training: {
-          name: 'Trainingsinzicht',
-          prompt: `Je bent een ervaren duurtrainer.
-Analyseer aan de hand van de ZeppBridge-trainingsgegevens hieronder (hartslag, trainingsbelasting en VO₂max)
-de structuur van mijn training, hoe de intensiteit is verdeeld en waarheen de belasting gaat.
-Wijs aan wat er mis is met hoe de sessies zijn gerangschikt, en vertel wat ik volgende cyclus moet veranderen.
-
-Antwoord in Markdown. Wees direct.`,
-          sub: 'Trainingsbelasting en waar die heen gaat',
-        },
-        weekly: {
-          name: 'Weekterugblik',
-          prompt: `Je bent mijn persoonlijke gezondheidscoach en bekijkt mijn gegevens een keer per week.
-Vergelijk me aan de hand van de ZeppBridge-gegevens van deze week hieronder alleen met mijn eigen eerdere gegevens.
-Vat samen wat er deze week veranderde, noem wat goed ging en wat aandacht verdient, en geef me een korte lijst met dingen om volgende week te doen.
-
-Randvoorwaarden:
-- Deze gegevens bevatten geen populatiebasislijn. Vergelijk me niet met "gezonde volwassenen" of met een gemiddelde.
-- Waar iets ontbreekt, zeg dat het ontbreekt. Vul het gat nooit met een nul of een schatting.
-- Geen medische diagnose, geen oordeel over ziekterisico, geen behandeladvies.
-
-Antwoord in Markdown.`,
-          sub: 'Een wekelijkse terugblik met details',
-        },
-      },
-      thisWorkout: 'Deze training',
-      title: 'Doorgeven aan AI',
-      workoutScopeBanner: (workoutId: string) =>
-        `Er wordt alleen training ${workoutId} geëxporteerd: de training zelf plus de per-punt-metingen die tijdens het lopen zijn vastgelegd. Stromen per dag zoals slaap en stappen blijven erbuiten. Het datumbereik is niet actief.`,
     },
     'views/Settings': {
       accountLine: (region: string, lastSync: string) =>
@@ -2248,18 +2014,13 @@ Antwoord in Markdown.`,
       'Te veel rapporten in korte tijd. Probeer het over een tijdje opnieuw — de al verstuurde blijven bewaard en hoeven niet opnieuw te worden verzonden.',
     'err.diagnostic.send_failed':
       'Het rapport kon niet worden verzonden. Controleer je netwerk en probeer het opnieuw',
-    'err.export.bad_extension': 'Het exportbestand heeft de verkeerde extensie',
     'err.export.convert_failed': 'Converteren naar het gevraagde formaat is mislukt',
     'err.export.empty_range': 'Geen records in deze periode om te exporteren',
-    'err.export.mkdir_failed': 'De exportmap kon niet worden aangemaakt',
     'err.export.not_a_directory':
       'Een FIT-export heeft een map nodig, maar het gekozen pad is een bestand',
-    'err.export.parent_missing': 'De gekozen map bestaat niet',
-    'err.export.path_no_parent': 'De opslaglocatie heeft geen geldige map',
     'err.export.path_not_absolute': 'De opslaglocatie moet een absoluut pad zijn',
     'err.export.path_required': 'Kies eerst waar het bestand moet worden opgeslagen',
     'err.export.write_failed': 'Het exportbestand kon niet worden geschreven',
-    'err.export.write_json_failed': 'De JSON-export kon niet worden geschreven',
     'err.handoff.empty_range': 'Geen records in deze periode om over te dragen',
     'err.handoff.encode_failed': 'De geanonimiseerde AI-export kon niet worden gecodeerd',
     'err.handoff.mkdir_failed': 'De map voor de overdracht kon niet worden aangemaakt',

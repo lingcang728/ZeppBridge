@@ -115,14 +115,9 @@ const messages = defineMessages(
     'err.export.empty_range': '这段时间没有可导出的记录',
     'err.export.convert_failed': '转换导出格式失败',
     'err.export.write_failed': '写入导出文件失败',
-    'err.export.write_json_failed': '写入 JSON 导出失败',
-    'err.export.mkdir_failed': '创建导出目录失败',
     'err.export.path_required': '请先选择保存位置',
     'err.export.path_not_absolute': '保存位置必须是绝对路径',
     'err.export.not_a_directory': 'FIT 导出需要一个目录，这里选中的是一个文件',
-    'err.export.bad_extension': '导出文件的扩展名不对',
-    'err.export.path_no_parent': '保存位置缺少有效的文件夹',
-    'err.export.parent_missing': '所选保存文件夹不存在',
 
     /* —— 交给 AI —— */
     'err.handoff.prompt_required': '请先填写提示词',
@@ -290,15 +285,10 @@ const messages = defineMessages(
     'err.export.empty_range': 'No records in this range to export',
     'err.export.convert_failed': "Couldn't convert to the requested format",
     'err.export.write_failed': "Couldn't write the export file",
-    'err.export.write_json_failed': "Couldn't write the JSON export",
-    'err.export.mkdir_failed': "Couldn't create the export folder",
     'err.export.path_required': 'Choose where to save the file first',
     'err.export.path_not_absolute': 'The save location must be an absolute path',
     'err.export.not_a_directory':
       'A FIT export needs a folder, but the selected path is a file',
-    'err.export.bad_extension': 'The export file has the wrong extension',
-    'err.export.path_no_parent': 'The save location has no valid folder',
-    'err.export.parent_missing': "The chosen folder doesn't exist",
 
     /* —— hand to AI —— */
     'err.handoff.prompt_required': 'Write a prompt first',
@@ -468,15 +458,10 @@ const messages = defineMessages(
     'err.export.empty_range': 'No hay registros en este rango para exportar',
     'err.export.convert_failed': 'No se pudo convertir al formato solicitado',
     'err.export.write_failed': 'No se pudo escribir el archivo de exportación',
-    'err.export.write_json_failed': 'No se pudo escribir la exportación JSON',
-    'err.export.mkdir_failed': 'No se pudo crear la carpeta de exportación',
     'err.export.path_required': 'Primero elige dónde guardar el archivo',
     'err.export.path_not_absolute': 'La ubicación de guardado debe ser una ruta absoluta',
     'err.export.not_a_directory':
       'Una exportación FIT necesita una carpeta, pero la ruta elegida es un archivo',
-    'err.export.bad_extension': 'El archivo de exportación tiene una extensión incorrecta',
-    'err.export.path_no_parent': 'La ubicación de guardado no tiene una carpeta válida',
-    'err.export.parent_missing': 'La carpeta elegida no existe',
 
     /* —— hand to AI —— */
     'err.handoff.prompt_required': 'Primero escribe una instrucción',

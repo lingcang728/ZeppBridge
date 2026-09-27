@@ -3,12 +3,14 @@ import LifeEventsPanel from '../components/LifeEventsPanel.vue';
 import LifeEventShortcut from '../components/LifeEventShortcut.vue';
 
 defineOptions({ name: 'Overview' });
-import { computed, defineAsyncComponent, h, onActivated, onDeactivated, onMounted, ref, watch } from 'vue';
+import { computed, onActivated, onDeactivated, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import CoverageNotice from '../components/CoverageNotice.vue';
 import GlyphTile from '../components/GlyphTile.vue';
 import Icon from '../components/Icon.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
+/* 心率曲线是 SVG（HrMiniChart），首页不再加载 ECharts，所以这张卡可以静态引入。 */
+import HeartRateCard from '../components/overview/HeartRateCard.vue';
 import WeeklyReportCard from '../components/WeeklyReportCard.vue';
 import RecentCard from '../components/overview/RecentCard.vue';
 import SleepCard from '../components/overview/SleepCard.vue';
@@ -26,16 +28,6 @@ import { indexSeries, latestValue } from '../lib/metricSeries';
 import { formatMetric, isFiniteNumber } from '../lib/format';
 import type { HealthOverview, HeartRatePoint, MetricSeries, SleepSession, Workout } from '../types';
 import { defineMessages, useMessages } from '../i18n';
-
-/* 心率卡是首屏唯一拖着 ECharts 的组件：静态 import 会把图表引擎（charts
-   chunk，全前端最大的一块）绑进默认路由的关键路径。异步加载后路由壳先渲染，
-   它的 chunk 并行下载；卡片内部在 hrPoints≤1 的空态分支不挂载 VChart，
-   没有心率数据的用户永远不会为图表库付钱。 */
-const HeartRateCard = defineAsyncComponent({
-  loader: () => import('../components/overview/HeartRateCard.vue'),
-  /* chunk 没到之前先给一块同位等高的骨架，免得整排卡片因它迟到重新排版。 */
-  loadingComponent: () => h(SkeletonBlock, { height: '286px' }),
-});
 
 const messages = defineMessages(
   {

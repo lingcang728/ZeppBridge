@@ -180,11 +180,7 @@ frontend in `src/lib/bridge/` (re-exported through `useTauriApi`):
 | `get_device_profile` / `get_device_profiles` | Read recognised device profiles | From `catalog.json` compiled into the binary; an unrecognised device is never guessed |
 | `get_storage_estimate` | Estimate local database size and reclaimable space | Read-only, computed per day |
 | `reprocess_local_data` | Replay local raw with the current parser | No network, and the cloud sync time is unchanged; returns per-stream replay counts |
-| `get_export_json` | Produce the export JSON string | Reads local data only, per `ExportSelection` |
-| `save_json_export` | Save the export to a file | The path is checked by `validate_export_path(.., "json")` |
-| `save_csv_export` | Save a long-format summary CSV | Reuses the same normalised JSON and converts it; `record_count` is the number of data rows; excludes per-point series and tracks |
-| `save_gpx_export` | Save a GPX 1.1 track | Only workouts with a decoded route become tracks; with no points at all it errors rather than writing an empty file; heart rate is written only when timestamps match exactly |
-| `publish_ai_export` | Update the local `exports/zeppbridge-ai-feed.json` | Fixed path, atomic write |
+| `save_fit_export` | Save the selected workouts as FIT files in a folder | One file per workout; always reads the full per-second series; no series at all is an error, not an empty folder. JSON / CSV / GPX file export lives in the CLI (`zeppbridge-cli export`) |
 | `prepare_ai_handoff` | Build the redacted package for an external AI | Reuses the same export builder, then redacts recursively; over 2 MiB it writes a desktop file instead; precise tracks require an explicit opt-in |
 | `get_local_api_status` | Read the local REST API state and fixed address | A port conflict does not stop the desktop app from starting |
 | `cleanup_old_data` | Clean up old data by day count | `1–365` days; spans canonical tables and reclaims unreferenced raw |

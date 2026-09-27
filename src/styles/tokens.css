@@ -245,12 +245,6 @@ html[data-theme="light"] .stage-bar .unknown {
 html[data-theme="light"] .comparison-track { background: rgba(38, 52, 41, .10); }
 html[data-theme="light"] .comparison-bar .baseline { background: rgba(38, 52, 41, .24); }
 
-/* Explore：两张高亮卡的橄榄色描边是按深色校准的。 */
-html[data-theme="light"] .explore-ai-highlight,
-html[data-theme="light"] .explore-ready {
-  border-color: rgba(47, 107, 79, .30);
-}
-
 /* DeviceDetail：状态灯与提示色。 */
 html[data-theme="light"] .hero-state.on i { background: var(--accent); }
 html[data-theme="light"] .hint-line.ok { color: var(--accent); }

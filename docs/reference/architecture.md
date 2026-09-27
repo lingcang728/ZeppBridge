@@ -190,8 +190,7 @@ way to tell which one is right.
 
 ### Desktop interface
 
-- The main navigation is Overview, Hand to AI (`/explore`), Data health
-  (`/health-check`) and Settings. The top bar carries connection status and a
+- The main navigation is Overview, Hand to AI (`/ai`) and Settings. The top bar carries connection status and a
   global sync.
 - The interface is **dark only**: by design there is no light or follow-system
   mode and no theme switch. The only adjustable dimension is interface scale
@@ -239,8 +238,9 @@ way to tell which one is right.
   and VO₂max, computing pace only when both distance and duration are valid. A
   run draws a polyline if a track or heart-rate points were decoded, and
   otherwise still says "not provided".
-- JSON export lives in `/explore` (Hand to AI): choose a prompt template, copy,
-  save a file, or hand off directly to an allow-listed AI site. Settings expands
+- Hand to AI (`/ai`) builds one redacted package per analysis task and hands
+  it to an allow-listed AI site; JSON / CSV / GPX files come from
+  `zeppbridge-cli export`, FIT from the workout detail page. Settings expands
   by numbered section into connection, account, devices, privacy, retention,
   export preferences, local API, updates and automatic sync; interface scale,
   the data folder, clearing credentials and sync diagnostics are tucked into

@@ -157,8 +157,8 @@ pub async fn start_history_backfill(
 pub async fn get_coverage_ledger(
     state: tauri::State<'_, AppState>,
 ) -> std::result::Result<CoverageLedger, AppError> {
-    let db = state.db.lock().await;
-    db.coverage_ledger().map_err(AppError::from)
+    // 补拉进行时界面会反复拉它：走独立只读连接，不和同步收尾抢命令侧的锁。
+    super::spawn_independent_read(state.data_dir.clone(), |db| db.coverage_ledger()).await
 }
 
 /// 清空账本，重新规划一次补拉。

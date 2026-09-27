@@ -1,76 +1,9 @@
-//! 导出命令：JSON / CSV / GPX / FIT 写盘、交给 AI 的打包、导出路径校验（从 commands/data.rs 拆出）。
+//! 导出命令：运动详情的 FIT 写盘、交给 AI 的打包、导出目录校验。
+//!
+//! JSON / CSV / GPX 的写盘命令只有旧 Explore 页在用，随它一起删了；CLI 的
+//! `export` 直接调 core，不经过这里。
 
 use super::*;
-
-#[tauri::command]
-pub async fn get_export_json(
-    state: tauri::State<'_, AppState>,
-    selection: ExportSelection,
-) -> std::result::Result<String, AppError> {
-    spawn_independent_read(state.data_dir.clone(), move |db| {
-        db.build_ai_export(&selection).map(|(encoded, _)| encoded)
-    })
-    .await
-}
-
-#[tauri::command]
-pub async fn estimate_export(
-    state: tauri::State<'_, AppState>,
-    selection: ExportSelection,
-) -> std::result::Result<ExportEstimate, AppError> {
-    spawn_independent_read(state.data_dir.clone(), move |db| {
-        db.estimate_ai_export(&selection)
-    })
-    .await
-}
-
-#[tauri::command]
-pub async fn save_json_export(
-    state: tauri::State<'_, AppState>,
-    selection: ExportSelection,
-    path: String,
-) -> std::result::Result<ExportResult, AppError> {
-    let path = validate_json_export_path(&path)?;
-    write_export(&state, selection, Some(path), false).await
-}
-
-#[tauri::command]
-pub async fn publish_ai_export(
-    state: tauri::State<'_, AppState>,
-    selection: ExportSelection,
-) -> std::result::Result<ExportResult, AppError> {
-    write_export(&state, selection, None, true).await
-}
-
-/// Save the selection as a tidy CSV table.
-///
-/// `record_count` is the number of data rows, not the number of source
-/// records: one sleep session or workout expands into one row per metric it
-/// actually has.
-#[tauri::command]
-pub async fn save_csv_export(
-    state: tauri::State<'_, AppState>,
-    selection: ExportSelection,
-    path: String,
-) -> std::result::Result<ExportResult, AppError> {
-    let path = validate_export_path(&path, "csv")?;
-    write_converted_export(&state, selection, path, export_formats::to_csv, "CSV").await
-}
-
-/// Save the GPS tracks of the selection as GPX 1.1.
-///
-/// `record_count` is the number of track points. Workouts without decoded
-/// route points contribute nothing, and a selection with no points at all is
-/// an error rather than an empty file.
-#[tauri::command]
-pub async fn save_gpx_export(
-    state: tauri::State<'_, AppState>,
-    selection: ExportSelection,
-    path: String,
-) -> std::result::Result<ExportResult, AppError> {
-    let path = validate_export_path(&path, "gpx")?;
-    write_converted_export(&state, selection, path, export_formats::to_gpx, "GPX").await
-}
 
 /// 把选中的运动写成 FIT，一次运动一个文件，全部落在 `directory` 下。
 ///
@@ -92,13 +25,14 @@ pub async fn save_fit_export(
     // 类型，编译期报成 never-type fallback。在函数体里重新绑定。
     let mut selection = selection;
 
-    // 和 CSV / GPX 一样：逐秒序列是这些归档格式的全部意义，所以不管界面上
-    // 勾的是什么，这里都读完整载荷。
+    // 逐秒序列是 FIT 这种归档格式的全部意义，所以不管界面上勾的是什么，
+    // 这里都读完整载荷。
     selection.detail = ExportDetail::Full;
-    let (export, record_count) = {
-        let db = state.db.lock().await;
-        db.build_ai_export_value(&selection)?
-    };
+    // 只读：走独立只读连接，不排在命令侧写连接的锁后面。
+    let (export, record_count) = spawn_independent_read(state.data_dir.clone(), move |db| {
+        db.build_ai_export_value(&selection)
+    })
+    .await?;
     if record_count == 0 {
         return Err(AppError::new(
             "err.export.empty_range",
@@ -141,58 +75,10 @@ pub async fn save_fit_export(
     })
 }
 
-/// Shared body for the non-JSON exports: build the same canonical payload the
-/// JSON export uses, convert it, then write atomically. Conversion failures
-/// (including "nothing to write") happen before any file is touched.
-pub(super) async fn write_converted_export(
-    state: &AppState,
-    mut selection: ExportSelection,
-    path: PathBuf,
-    convert: fn(&Value) -> std::result::Result<(String, usize), String>,
-    label: &str,
-) -> std::result::Result<ExportResult, AppError> {
-    // CSV rows and GPX track points come from the per-second series, which the
-    // summary export omits by design. These formats are archival, so they
-    // always read the full payload regardless of what the UI has selected.
-    selection.detail = ExportDetail::Full;
-    let (export, record_count) = {
-        let db = state.db.lock().await;
-        db.build_ai_export_value(&selection)?
-    };
-    if record_count == 0 {
-        return Err(AppError::new(
-            "err.export.empty_range",
-            "这段时间没有可导出的记录",
-        ));
-    }
-    let (converted, converted_count) = convert(&export).map_err(|message| {
-        AppError::new("err.export.convert_failed", message)
-            .with_params(serde_json::json!({ "format": label }))
-    })?;
-
-    let generated_at = Utc::now();
-    write_file_atomically(&path, converted.as_bytes()).map_err(|error| {
-        AppError::new(
-            "err.export.write_failed",
-            format!("写入 {label} 导出失败: {error}"),
-        )
-        .with_params(serde_json::json!({ "format": label }))
-    })?;
-    Ok(ExportResult {
-        path: path.to_string_lossy().into_owned(),
-        record_count: converted_count,
-        bytes: converted.len(),
-        generated_at: generated_at.to_rfc3339(),
-        file_count: None,
-    })
-}
-
 /// Prepare a privacy-preserving payload for an external AI provider.
 ///
-/// This deliberately calls the same database export builder as the normal
-/// local export paths, then applies a second, recursive redaction pass. The
-/// existing `get_export_json`, `save_json_export`, and `publish_ai_export`
-/// commands remain unchanged so local exports retain their current semantics.
+/// This deliberately calls the same database export builder as the FIT export
+/// and the CLI, then applies a second, recursive redaction pass.
 #[tauri::command]
 pub async fn prepare_ai_handoff(
     state: tauri::State<'_, AppState>,
@@ -208,10 +94,10 @@ pub async fn prepare_ai_handoff(
         ));
     }
 
-    let (export, record_count) = {
-        let db = state.db.lock().await;
-        db.build_ai_export_value(&selection)?
-    };
+    let (export, record_count) = spawn_independent_read(state.data_dir.clone(), move |db| {
+        db.build_ai_export_value(&selection)
+    })
+    .await?;
     if record_count == 0 {
         return Err(AppError::new(
             "err.handoff.empty_range",
@@ -278,87 +164,9 @@ pub(super) fn write_file_atomically(path: &Path, bytes: &[u8]) -> std::io::Resul
     crate::paths::write_file_atomically(path, bytes)
 }
 
-pub(super) async fn write_export(
-    state: &AppState,
-    selection: ExportSelection,
-    selected_path: Option<PathBuf>,
-    stable_ai_feed: bool,
-) -> std::result::Result<ExportResult, AppError> {
-    let (encoded, record_count) = {
-        let db = state.db.lock().await;
-        db.build_ai_export(&selection)?
-    };
-    // A zero-record export must not leave a misleading empty file on disk:
-    // report an error before anything is written.
-    if record_count == 0 {
-        return Err(AppError::new(
-            "err.export.empty_range",
-            "这段时间没有可导出的记录",
-        ));
-    }
-    let generated_at = Utc::now();
-    let path = if let Some(path) = selected_path {
-        path
-    } else {
-        let export_dir = state.data_dir.join("exports");
-        std::fs::create_dir_all(&export_dir).map_err(|error| {
-            AppError::new(
-                "err.export.mkdir_failed",
-                format!("创建导出目录失败: {error}"),
-            )
-        })?;
-        let file_name = if stable_ai_feed {
-            "zeppbridge-ai-feed.json".to_string()
-        } else {
-            // 文件名跟着范围走，所以单次运动导出不会和当天的整段导出撞名。
-            let label = match selection.resolve_scope() {
-                Ok(ExportScope::DateRange { start, end }) => format!("{start}-{end}"),
-                Ok(ExportScope::Workout { workout_id }) => {
-                    // workout_id comes straight from the IPC-supplied ExportSelection, so
-                    // it must never reach a file path unsanitized (same rule as
-                    // export_fit.rs's file_name_for): anything but ASCII alnum becomes
-                    // `-`, which also rules out `/`, `\` and `..`.
-                    let safe: String = workout_id
-                        .chars()
-                        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
-                        .collect();
-                    format!("workout-{safe}")
-                }
-                Err(_) => "export".to_string(),
-            };
-            format!(
-                "zeppbridge-{label}-{}.json",
-                generated_at.format("%Y%m%d-%H%M%S")
-            )
-        };
-        export_dir.join(file_name)
-    };
-    write_file_atomically(&path, encoded.as_bytes()).map_err(|error| {
-        AppError::new(
-            "err.export.write_json_failed",
-            format!("写入 JSON 导出失败: {error}"),
-        )
-    })?;
-    Ok(ExportResult {
-        path: path.to_string_lossy().into_owned(),
-        record_count,
-        bytes: encoded.len(),
-        generated_at: generated_at.to_rfc3339(),
-        file_count: None,
-    })
-}
-
-pub(super) fn validate_json_export_path(value: &str) -> std::result::Result<PathBuf, AppError> {
-    validate_export_path(value, "json")
-}
-
-/// Validate a user-picked export destination for one concrete format.
-///
-/// The extension check is not cosmetic: it keeps a mistyped destination from
-/// silently producing a file whose contents do not match its name.
 /// FIT 导出的目标目录。
 ///
-/// 和 `validate_export_path` 一样只做「说得清」的检查：非空、绝对路径。刻意
+/// 只做「说得清」的检查：非空、绝对路径、不是文件。刻意
 /// 不要求目录已经存在——保存对话框里新建一个文件夹是很正常的用法，目录由写入
 /// 时创建。
 pub(super) fn validate_export_directory(value: &str) -> std::result::Result<PathBuf, AppError> {
@@ -380,54 +188,6 @@ pub(super) fn validate_export_directory(value: &str) -> std::result::Result<Path
         return Err(AppError::new(
             "err.export.not_a_directory",
             "FIT 导出需要一个目录，这里选中的是一个文件",
-        ));
-    }
-    Ok(path)
-}
-
-pub(super) fn validate_export_path(
-    value: &str,
-    extension: &str,
-) -> std::result::Result<PathBuf, AppError> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return Err(AppError::new(
-            "err.export.path_required",
-            format!("请选择 {} 文件的保存位置", extension.to_ascii_uppercase()),
-        )
-        .with_params(serde_json::json!({ "format": extension.to_ascii_uppercase() })));
-    }
-    let path = PathBuf::from(trimmed);
-    if !path.is_absolute() {
-        return Err(AppError::new(
-            "err.export.path_not_absolute",
-            "保存位置必须是绝对路径",
-        ));
-    }
-    let matches_extension = path
-        .extension()
-        .and_then(|value| value.to_str())
-        .is_some_and(|value| value.eq_ignore_ascii_case(extension));
-    if !matches_extension {
-        return Err(AppError::new(
-            "err.export.bad_extension",
-            format!("导出文件必须使用 .{extension} 扩展名"),
-        )
-        .with_params(serde_json::json!({ "extension": extension })));
-    }
-    let Some(parent) = path
-        .parent()
-        .filter(|parent| !parent.as_os_str().is_empty())
-    else {
-        return Err(AppError::new(
-            "err.export.path_no_parent",
-            "保存位置缺少有效的文件夹",
-        ));
-    };
-    if !parent.is_dir() {
-        return Err(AppError::new(
-            "err.export.parent_missing",
-            "所选保存文件夹不存在",
         ));
     }
     Ok(path)

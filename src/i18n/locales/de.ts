@@ -100,14 +100,9 @@ export default {
     'err.export.empty_range': 'In diesem Zeitraum gibt es keine Einträge zum Exportieren',
     'err.export.convert_failed': 'Die Umwandlung in das gewünschte Format ist fehlgeschlagen',
     'err.export.write_failed': 'Die Exportdatei konnte nicht geschrieben werden',
-    'err.export.write_json_failed': 'Der JSON-Export konnte nicht geschrieben werden',
-    'err.export.mkdir_failed': 'Der Exportordner konnte nicht erstellt werden',
     'err.export.path_required': 'Wähle zuerst, wo die Datei gespeichert wird',
     'err.export.path_not_absolute': 'Der Speicherort muss ein absoluter Pfad sein',
     'err.export.not_a_directory': 'Ein FIT-Export braucht einen Ordner, aber der gewählte Pfad ist eine Datei',
-    'err.export.bad_extension': 'Die Exportdatei hat die falsche Erweiterung',
-    'err.export.path_no_parent': 'Der Speicherort hat keinen gültigen Ordner',
-    'err.export.parent_missing': 'Der gewählte Ordner existiert nicht',
     'err.handoff.prompt_required': 'Schreibe zuerst einen Prompt',
     'err.handoff.empty_range': 'In diesem Zeitraum gibt es keine Einträge zum Übergeben',
     'err.handoff.mkdir_failed': 'Der Übergabeordner konnte nicht erstellt werden',
@@ -173,179 +168,6 @@ export default {
 
   modules: {
     'components/ai/WorkoutPicker': { previous: 'Zurück', next: 'Weiter' },
-    // ── views/Explore ──
-    // cellTypesValue / categoryTraining: mit en identisch und in allowlist-en.txt
-    // eingetragen (nackte Zahl bzw. das Lehnwort „Training").
-    'views/Explore': {
-      title: 'An KI übergeben',
-      intro:
-        'Wähle eine Vorlage, prüfe, was das Paket wirklich enthält, und sende deine Wearable-Daten an das KI-Werkzeug deiner Wahl.',
-      workoutScopeBanner: (workoutId: string) =>
-        `Es wird nur Training ${workoutId} exportiert: das Training selbst plus die Punkt-für-Punkt-Metriken, die währenddessen aufgezeichnet wurden. Tagesbasierte Datenströme wie Schlaf und Schritte bleiben draußen. Der Zeitraum ist inaktiv.`,
-      backToDateRange: 'Zurück zum Zeitraum',
-      categoryTitle: 'Kategorien',
-      categoryAria: 'Vorlagenkategorien',
-      categoryAll: 'Alle Vorlagen',
-      categorySummary: 'Zusammenfassung',
-      categoryRecovery: 'Erholung',
-      categorySleep: 'Schlaf',
-      categoryTraining: 'Training',
-      cellTypesValue: (count: number) => `${count}`,
-      templateListTitle: 'Vorlagen',
-      templateSearchPlaceholder: 'Vorlagen suchen…',
-      templateSearchAria: 'Vorlagen suchen',
-      noTemplates: 'Keine passende Vorlage.',
-      currentTemplate: 'Aktuelle Vorlage',
-      copyPromptTitle: 'Prompt-Text in die Zwischenablage kopieren',
-      copyPrompt: 'Prompt kopieren',
-      promptEditor: 'Prompttext',
-      promptEditorHint: ' (Daten werden automatisch angehängt)',
-      injected: (count: number) => `${count} Datenströme angehängt`,
-      promptEditorAria: 'Prompt-Editor',
-      summaryTitle: 'Was das Paket enthält',
-      summaryHint: 'Nur was du anhakst',
-      cellRange: 'Zeitraum',
-      cellCount: 'Einträge',
-      cellCountSub: 'synchronisierte Einträge',
-      cellTypes: 'Datentypen',
-      cellTypesSub: 'im Paket',
-      cellSize: 'Größe',
-      cellSizeSub: 'geschätzt',
-      thisWorkout: 'Dieses Training',
-      onlyThisWorkout: 'nur dieses Training',
-      approxMinutes: (minutes: number) => `(ca. ${minutes} Min.)`,
-      rangeDays: (days: number) => `(${days} Tage)`,
-      quickRange: 'Schnellauswahl:',
-      range7: '7 Tage',
-      range30: '30 Tage',
-      startDate: 'Startdatum',
-      endDate: 'Enddatum',
-      datePickerAria: 'Datumsauswahl',
-      secureNote:
-        'Alles entsteht lokal: Die strukturierten Daten und der Prompt werden auf diesem Rechner erzeugt.',
-      secureOk: 'Nur lokal',
-      exportFile: (format: string) => `${format}-Datei exportieren`,
-      copyPromptOnly: 'Nur den Prompt kopieren',
-      preparing: 'Wird vorbereitet…',
-      handTo: (provider: string) => `An ${provider} übergeben`,
-      promptCopied: 'Prompt kopiert (keine Daten enthalten).',
-      copyFailed: 'Kopieren fehlgeschlagen. Versuche es erneut.',
-      retryOpen: (provider: string) => `${provider} erneut öffnen`,
-      packTitle: 'Paket erstellen und senden',
-      packSub: 'Exportformat und KI-Werkzeug wählen.',
-      packContentsTitle: 'Was der Export enthält',
-      packContentsIncluded:
-        'Enthalten: Trainings-Zusammenfassungen (Art, Beginn und Ende, Distanz, Kalorien, durchschnittliche und maximale Herzfrequenz, Trainingsbelastung), Tagesmetriken (Schritte, Ruheherzfrequenz, HRV, SpO₂, Stress, Atemfrequenz, PAI, VO₂max) und Schlafsitzungen mit ihrem Phasen-Zeitverlauf. Die Option „Full" fügt die Sekunden-Serien der Trainings und einzelne Herzfrequenz-Messungen hinzu.',
-      packContentsExcluded:
-        'Nicht enthalten: .tcx, Kontodaten, Token oder Geräte-Seriennummern. GPS-Tracks erscheinen in den Formaten GPX und FIT, und nur bei Trainings mit aufgezeichneter Strecke. FIT schreibt pro Training eine Datei in den Ordner, den du wählst.',
-      formatGroup: 'Exportformat',
-      formatAria: 'Exportformat',
-      formatJsonSub: 'Vollständige strukturierte Daten',
-      formatCsvSub: 'Zusammenfassungstabelle (keine Punkt-für-Punkt-Serien)',
-      formatGpxSub: 'Nur Trainings mit GPS-Track',
-      formatFitSub: 'Eine Datei pro Training, gespeichert in den Ordner, den du wählst',
-      detailGroup: 'Detailgrad',
-      detailAria: 'Detailgrad',
-      streamsGroup: 'Datenströme',
-      selectedCount: (selected: number, total: number) => `${selected} von ${total} ausgewählt`,
-      selectNone: 'Keine',
-      selectAll: 'Alle',
-      noTypesSelected: 'Kein Datentyp ausgewählt – der Export wird abgelehnt.',
-      estimatedSize: 'Geschätzte Paketgröße',
-      targetGroup: 'Ziel-KI-Werkzeug',
-      targetAria: 'Ziel-KI-Werkzeug',
-      providerIconAlt: (provider: string) => `${provider}-Icon`,
-      sendHint:
-        'Bis zu 2 MiB reisen mit dem Prompt in der Zwischenablage mit. Darüber wird das JSON auf deinen Desktop geschrieben, damit du es in den Chat ziehst.',
-      needDesktop:
-        'Die KI-Übergabe braucht die Desktop-App; diese Browser-Vorschau öffnet keine externen Seiten.',
-      needValidDates: 'Wähle zuerst einen gültigen Zeitraum.',
-      needDataTypes: 'Wähle mindestens einen Datentyp.',
-      stillReading: 'Die lokalen Einträge werden noch gelesen. Versuche es gleich noch einmal.',
-      nothingInScope: 'In diesem Zeitraum ist nichts Synchronisiertes zum Übergeben da.',
-      previewDesktopOnly:
-        'Öffne dies in der ZeppBridge-Desktop-App; die Vorschau liest lokale Einträge.',
-      previewFailed: 'Die lokale Export-Vorschau konnte nicht gelesen werden',
-      previewRetry: 'Erneut versuchen',
-      attachmentNotice:
-        'Das Datenpaket wurde auf deinen Desktop geschrieben (zeppbridge-ai-handoff.json) – ziehe es in den KI-Chat. Der Prompt liegt in deiner Zwischenablage.',
-      attachmentOpened: (notice: string, provider: string) => `${notice} ${provider} ist geöffnet.`,
-      attachmentNotOpened: (notice: string, provider: string) =>
-        `${notice} Öffne ${provider} im Browser, um es zu analysieren.`,
-      copiedAndOpened: (provider: string) =>
-        `Anonymisierte Daten kopiert und ${provider} geöffnet. Einfügen, dann kann es losgehen.`,
-      copiedOnly: (provider: string) =>
-        `Anonymisierte Daten kopiert. Öffne ${provider} selbst und füge sie ein.`,
-      reopened: (provider: string) => `${provider} ist geöffnet. Füge die Daten dort ein.`,
-      templates: {
-        performance: {
-          name: 'Leistungs-Überblick',
-          sub: 'Ein klarer Blick darauf, wie es läuft',
-          prompt: `Du bist ein Sport- und Gesundheitsanalyst, der Wearable-Daten in klare, nutzbare Erkenntnisse übersetzt.
-Schreib mir aus den untenstehenden ZeppBridge-Daten (schon chronologisch geordnet)
-eine klare, gut strukturierte Zusammenfassung meiner Gesamtleistung.
-Behandle das Gesamtbild, die wichtigen Trends, was heraussticht, was im Blick zu behalten ist und was ich tun kann.
-Wo die Daten dünn sind, sag es offen und nenne, was ich stattdessen sammeln soll, statt zu raten.
-
-Antworte auf Deutsch in Markdown, mit Tabellen, Listen und Aufzählungen, wo sie helfen.
-Ton: professionell, knapp, konstruktiv.`,
-        },
-        training: {
-          name: 'Trainings-Einblick',
-          sub: 'Trainingsbelastung und ihre Richtung',
-          prompt: `Du bist ein erfahrener Ausdauertrainer.
-Analysiere anhand der untenstehenden ZeppBridge-Trainingsdaten (Herzfrequenz, Trainingsbelastung und VO₂max)
-die Struktur meines Trainings, wie die Intensität verteilt ist und wohin die Belastung geht.
-Zeig, was an der Anordnung der Einheiten nicht stimmt, und sag mir, was ich im nächsten Zyklus ändern soll.
-
-Antworte auf Deutsch in Markdown. Sei direkt.`,
-        },
-        recovery: {
-          name: 'Erholung und Bereitschaft',
-          sub: 'Erholung, HRV und Trainingsbereitschaft',
-          prompt: `Du bist ein auf Erholung spezialisierter Physiologe.
-Bewerte anhand der untenstehenden ZeppBridge-Daten zu HRV, Ruheherzfrequenz, Schlaf und Stress,
-wie erholt ich bin und wie bereit ich für Training bin,
-nenne die Zeichen sich aufbauender Ermüdung und sag mir, was helfen würde.
-
-Antworte auf Deutsch in Markdown.`,
-        },
-        sleep: {
-          name: 'Schlaf-Analyse',
-          sub: 'Schlafqualität und Regelmäßigkeit',
-          prompt: `Du bist ein Berater für Schlafgesundheit.
-Analysiere anhand der untenstehenden ZeppBridge-Daten zu Schlafphasen, Dauer und Herzfrequenz
-die Qualität und Regelmäßigkeit meines Schlafs und was ihn offenbar beeinflusst,
-und gib mir konkrete, umsetzbare Wege, ihn zu verbessern.
-
-Antworte auf Deutsch in Markdown.`,
-        },
-        activity: {
-          name: 'Aktivitäts-Überblick',
-          sub: 'Tägliche Bewegung und ihre Tendenz',
-          prompt: `Du bist ein Berater für einen gesunden Lebensstil.
-Gib mir anhand der untenstehenden ZeppBridge-Daten zu Schritten, Trainings und Herzfrequenz
-einen Überblick über mein tägliches Aktivitätsniveau und seine Tendenz,
-und schlage praktische Wege vor, mich mehr zu bewegen.
-
-Antworte auf Deutsch in Markdown.`,
-        },
-        weekly: {
-          name: 'Wochen-Rückblick',
-          sub: 'Ein wöchentlicher Rückblick mit konkreten Punkten',
-          prompt: `Du bist mein persönlicher Gesundheitscoach und siehst meine Daten einmal pro Woche durch.
-Vergleiche mich anhand der untenstehenden ZeppBridge-Daten dieser Woche nur mit meinen eigenen früheren Werten.
-Fass zusammen, was sich diese Woche geändert hat, nenne, was gut lief und was Beachtung verdient, und gib mir eine kurze Liste für die nächste Woche.
-
-Regeln:
-- Es gibt keine Vergleichsgruppe in diesen Daten. Vergleiche mich nicht mit „gesunden Erwachsenen" oder irgendeinem Durchschnitt.
-- Wo etwas fehlt, sag, dass es fehlt. Fülle die Lücke nie mit einer Null oder einer Schätzung.
-- Keine medizinische Diagnose, keine Krankheitsrisiko-Einschätzung, keine Behandlungsempfehlung.
-
-Antworte auf Deutsch in Markdown.`,
-        },
-      },
-    },
     // ── views/Settings ──
     // Mit en identisch und in allowlist-en.txt eingetragen:
     // unidentifiedInitial („?"), refreshFailedPeriod („."),
@@ -1250,7 +1072,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       hrMore: 'Volle 24 Stunden',
       hrPanelAria: 'Herzfrequenz-Details für die vollen 24 Stunden öffnen',
       hrTitle: 'Aktuelle Herzfrequenz',
-      hrTooltip: (clock: string, value: number) => `${clock}　<b>${value}</b> bpm`,
       hrWindow: (hours: number) => `Letzte ${hours} Stunden`,
       hrZonesAria: 'Herzfrequenzzonen (absolute Schwellen)',
       latest: 'Neueste',
@@ -1361,72 +1182,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       timeUnknown: 'Zeit unbekannt',
       unidentifiedDevice: 'Nicht erkanntes Gerät',
     },
-    'composables/useExport': {
-      copied: (count: number) =>
-        plural(count, {
-          one: `${count} normalisierter Eintrag kopiert.`,
-          other: `${count} normalisierte Einträge kopiert.`,
-        }),
-      copyFailed: 'Das JSON konnte nicht kopiert werden',
-      csvFilter: 'CSV-Tabelle',
-      detailFull: 'Vollständig',
-      detailFullHint:
-        'Behält Sekunden-Serien der Trainings und einzelne Herzfrequenz-Messungen. Groß und zum Archivieren gedacht.',
-      detailSummary: 'Zusammenfassung',
-      detailSummaryHint:
-        'Herzfrequenz stündlich aggregiert, Sekunden-Serien der Trainings weggelassen. Strukturierte Metriken bleiben vollständig, und die Größe passt zur Übergabe an eine KI.',
-      endBeforeStart: 'Das Enddatum kann nicht vor dem Startdatum liegen.',
-      feedFailed: 'Der lokale KI-Datenfeed konnte nicht aktualisiert werden',
-      feedUpdated: (count: number) =>
-        plural(count, {
-          one: `Der lokale KI-Datenfeed enthält jetzt ${count} Eintrag.`,
-          other: `Der lokale KI-Datenfeed enthält jetzt ${count} Einträge.`,
-        }),
-      fitFilter: 'FIT-Trainingsdateien',
-      gpxFilter: 'GPX-Track',
-      groupActivity: 'Aktivität',
-      groupBody: 'Körperstatus',
-      groupContext: 'Kontext',
-      groupSleep: 'Schlaf',
-      groupTraining: 'Training',
-      invalidDates: 'Wähle ein gültiges Start- und Enddatum.',
-      jsonFilter: 'JSON-Datei',
-      jsonTooLarge: 'Das JSON ist über 1 MB. Nutze stattdessen „Datei speichern".',
-      noDataTypes: 'Wähle mindestens einen Datentyp.',
-      nothingToExport: 'In diesem Zeitraum gibt es nichts zu exportieren.',
-      rangeTooLong: (days: number) =>
-        `Ein Export deckt höchstens ${days} Tage ab. Für längere Historie nutze den Datenbank-Snapshot in den Einstellungen.`,
-      saveCsvTitle: 'ZeppBridge-CSV speichern (Zusammenfassungstabelle)',
-      saveFailed: (format: string) => `${format} konnte nicht gespeichert werden`,
-      saveFitTitle: 'Ordner für den FIT-Export wählen (eine Datei pro Training)',
-      saveGpxTitle: 'ZeppBridge-GPX speichern (GPS-Track)',
-      saveJsonTitle: 'ZeppBridge-JSON speichern',
-      saved: (count: number, unit: string) => `${count} ${unit} gespeichert.`,
-      savedFiles: (files: number, count: number, unit: string) =>
-        `${plural(files, {
-          one: `${files} FIT-Datei`,
-          other: `${files} FIT-Dateien`,
-        })} gespeichert, insgesamt ${count} ${unit}.`,
-      scopeConflict:
-        'Ein Zeitraum und ein einzelnes Training schließen sich als Export-Umfang aus. Wähle eines.',
-      typeDailyActivity: 'Tägliche Aktivität',
-      typeHeartRate: 'Herzfrequenz',
-      typeLactateThreshold: 'Laktatschwelle',
-      typeLifeEvents: 'Lebensereignisse',
-      typePai: 'PAI',
-      typeRecovery: 'Bereitschaft',
-      typeRespiratoryRate: 'Atemfrequenz',
-      typeSleep: 'Schlaf',
-      typeSpo2: 'Blutsauerstoff',
-      typeSteps: 'Schritte',
-      typeStress: 'Stress',
-      typeTrainingLoad: 'Trainingsbelastung',
-      typeWorkouts: 'Trainings',
-      unitRecords: 'Einträge',
-      unitRows: 'Zeilen',
-      unitSamplePoints: 'Messpunkte',
-      unitTrackPoints: 'Trackpunkte',
-    },
     'composables/useSyncController': {
       alreadySyncing:
         'Eine Synchronisierung läuft bereits. Versuche es erneut, wenn sie fertig ist',
@@ -1516,14 +1271,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       ymd: 'Jahr/Monat/Tag',
     },
     'lib/deviceCopy': {
-      introMany: (first: string, second: string, count: number) =>
-        `Lokal zuerst, Quellen erhalten: Aufzeichnungen von ${first}, ${second} und ${count} Geräten insgesamt, zu einem wirklich lesbaren Gesundheitsarchiv geordnet.`,
-      introNoDevice:
-        'Lokal zuerst, Quellen erhalten: deine Wearable-Aufzeichnungen, zu einem wirklich lesbaren Gesundheitsarchiv geordnet.',
-      introOne: (name: string) =>
-        `Lokal zuerst, Quellen erhalten: Aufzeichnungen von ${name}, zu einem wirklich lesbaren Gesundheitsarchiv geordnet.`,
-      introTwo: (first: string, second: string) =>
-        `Lokal zuerst, Quellen erhalten: Aufzeichnungen von ${first} und ${second}, zu einem wirklich lesbaren Gesundheitsarchiv geordnet.`,
       notProvided: 'Nicht angegeben',
     },
     'lib/failedChunkText': {

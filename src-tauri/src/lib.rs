@@ -22,22 +22,20 @@ use commands::{
     ai_task_attachment_stat, ai_task_delete, ai_task_get, ai_task_list, ai_task_prepare,
     ai_task_preview, ai_task_save, ai_template_delete, ai_template_list, ai_template_save,
     cancel_pending_restore, cancel_sync, cancel_web_login, cleanup_old_data, clear_auth,
-    compact_raw_payloads, create_manual_backup, delete_life_event, estimate_export, get_app_status,
+    compact_raw_payloads, create_manual_backup, delete_life_event, get_app_status,
     get_capability_overview, get_coverage_ledger, get_daily_heart_rate_extremes, get_data_health,
-    get_device_profile, get_device_profiles, get_export_json, get_health_overview,
-    get_heart_rate_series, get_heart_rate_zones, get_login_status, get_metric_series,
-    get_pending_restore, get_recent_sleep, get_recent_workouts, get_restore_preview,
-    get_sleep_detail, get_sleep_page, get_storage_estimate, get_stress_series,
-    get_training_balance, get_unknown_workout_codes, get_user_prefs, get_weekly_report,
-    get_workout_detail, get_workout_insight, get_workout_page, get_workout_series,
-    get_workout_type_options, import_from_har, list_backups, list_life_events, manual_auth,
-    open_data_folder, prepare_ai_handoff, probe_data_capabilities, publish_ai_export,
+    get_device_profile, get_device_profiles, get_health_overview, get_heart_rate_series,
+    get_heart_rate_zones, get_login_status, get_metric_series, get_pending_restore,
+    get_recent_sleep, get_recent_workouts, get_restore_preview, get_sleep_detail, get_sleep_page,
+    get_storage_estimate, get_stress_series, get_training_balance, get_unknown_workout_codes,
+    get_user_prefs, get_weekly_report, get_workout_detail, get_workout_insight, get_workout_page,
+    get_workout_series, get_workout_type_options, import_from_har, list_backups, list_life_events,
+    manual_auth, open_data_folder, prepare_ai_handoff, probe_data_capabilities,
     reprocess_local_data, reset_coverage_ledger, retry_failed_backfill_chunks,
-    run_database_integrity_check, save_csv_export, save_fit_export, save_gpx_export,
-    save_json_export, save_life_event, set_backup_pinned, set_device_model_override,
-    set_heart_rate_zone_preference, set_user_prefs, set_workout_code_label,
-    set_workout_type_override, stage_restore, start_history_backfill, start_history_sync,
-    start_incremental_sync, start_web_login, submit_device_model_assignment,
+    run_database_integrity_check, save_fit_export, save_life_event, set_backup_pinned,
+    set_device_model_override, set_heart_rate_zone_preference, set_user_prefs,
+    set_workout_code_label, set_workout_type_override, stage_restore, start_history_backfill,
+    start_history_sync, start_incremental_sync, start_web_login, submit_device_model_assignment,
     submit_diagnostic_report, verify_auth, verify_backup,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -54,8 +52,8 @@ static EXIT_AFTER_WRITERS: AtomicBool = AtomicBool::new(false);
 ///
 /// `AppState::new` 里要给大库做迁移前整库快照，几百 MB 的库要好几秒；
 /// 这些活挪到 `app-init` 工作线程之后，事件循环先把窗口画出来。前端
-/// 每个 `invoke` 都先过 `whenBackendReady` 这道门（轮询本命令 +
-/// 监听 `app://ready`，见 `src/lib/bridge/tauri.ts`），所以除它以外
+/// 每个 `invoke` 都先过 `whenBackendReady` 这道门（先监听 `app://ready`，
+/// 再问一次本命令，见 `src/lib/bridge/tauri.ts`），所以除它以外
 /// 不需要再有命令侧的自检。
 static APP_READY: AtomicBool = AtomicBool::new(false);
 
@@ -411,8 +409,8 @@ pub fn run() {
                         }
                         app_handle.manage(local_api::LocalApi(local_api.clone()));
                         app_handle.manage(state);
-                        // 先立旗再广播：监听器晚于事件注册的页面靠 `app_is_ready`
-                        // 轮询补上，顺序不能反——反过来就有一个「事件已发、旗还没立」
+                        // 先立旗再广播：前端先注册监听、再问一次 `app_is_ready`，
+                        // 顺序不能反——反过来就有一个「事件已发、旗还没立」
                         // 的窗口期，那一页会等到 60 秒超时。
                         APP_READY.store(true, Ordering::SeqCst);
                         let _ = app_handle.emit("app://ready", ());
@@ -642,13 +640,7 @@ pub fn run() {
             get_workout_insight,
             get_weekly_report,
             reprocess_local_data,
-            get_export_json,
-            estimate_export,
-            save_json_export,
-            save_csv_export,
             save_fit_export,
-            save_gpx_export,
-            publish_ai_export,
             prepare_ai_handoff,
             ai_task_list,
             ai_task_get,

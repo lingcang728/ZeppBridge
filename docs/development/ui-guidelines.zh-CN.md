@@ -58,7 +58,7 @@
 ### 界面文案：中英各一份，不许硬编码
 
 - **界面上出现的每一个字都要有中英两份。** 写法是在用它的模块里 `defineMessages(zh, en)`，
-  大页面（Settings、Explore）放同名的 `*.i18n.ts`。不要建全局大字典：懒加载页面的 chunk
+  大页面（Settings、Overview）放同名的 `*.i18n.ts`。不要建全局大字典：懒加载页面的 chunk
   应该只带自己那份文案。
 - `defineMessages` 用 `NoInfer` 把形状钉在中文那份上——英文漏一个键、多一个键、参数对不上
   都会编译不过。漏翻在 `npm run build` 就会红，不用等用户看到。
@@ -80,7 +80,7 @@
 
 ## 页面架构
 
-主导航三项，在顶栏（`src/components/shell/AppTopBar.vue`）居中的胶囊里：**概览** (`/`)、**交给 AI** (`/ai`)、**设置** (`/settings`)。导航保持三项——新页面进入口卡片，不占导航位。顶栏右侧还有同步状态胶囊、主题切换键和语言 `SelectMenu`；760px 以下胶囊收起，底部 tabbar 覆盖同样的三项。`/explore` 保留为旧的编辑器；`/orbit-lab` 是轨道编排的占位路由，不进导航。
+主导航三项，在顶栏（`src/components/shell/AppTopBar.vue`）居中的胶囊里：**概览** (`/`)、**交给 AI** (`/ai`)、**设置** (`/settings`)。导航保持三项——新页面进入口卡片，不占导航位。顶栏右侧还有同步状态胶囊、主题切换键和语言 `SelectMenu`；760px 以下胶囊收起，底部 tabbar 覆盖同样的三项。
 
 二级页面不进主导航：`/body`（身体状态）、`/training`（训练状态）、`/recent`（最近记录）、`/sleep`、`/workouts` 列表，以及 `/sleep/:sleepId`、`/workouts/:workoutId` 详情，由概览的入口卡片与「查看全部」进入。
 
@@ -93,16 +93,15 @@
 - 每张卡片都有独立空态；加载中用 `SkeletonBlock` 占位，失败给可重试的 `EmptyState`。
 - 不在概览做恢复度、训练建议一类解读。入口卡只给数字和形状，解读留给用户自选的 AI。
 
-### 2. 交给 AI (`/ai`，旧编辑器仍在 `/explore`)
+### 2. 交给 AI (`/ai`)
 
-三列布局：
+一屏一个分析任务（`views/AiComposer.vue`，子组件在 `components/ai/`）：
 
-- 左列：模板分类 + 可搜索的提示词模板列表。
-- 中列：当前模板的提示词编辑框（可改、可复制）、数据感知摘要四格（时间范围 / 记录条数 / 数据类型数 / 预估体积）、快捷范围 pill 与自绘日历弹层（不用原生 date input）。
-- 右列：导出格式、目标 AI（7 家：ChatGPT、Claude、Gemini、Kimi、豆包、DeepSeek、Grok，走 `AI_PROVIDERS` 白名单，非白名单地址直接拒绝打开）、另存 / 复制提示词 / 发送三个动作。
-- 三种格式各走各自真实的转换，卡片副标题必须说明差异，不允许「选了 CSV 实际给 JSON」：JSON = 完整结构化；CSV = 长表汇总（不含逐点采样与轨迹）；GPX = 只含有 GPS 轨迹的运动。没有可导出内容时报错，不落空文件。
-- 可选数据类型 15 项（`exportTypeOptions`），在右列按 `exportTypeGroups` 的四组呈现：活动 / 睡眠 / 身体状态 / 训练。组标题可整组全选或全不选，单项是复选框。模板只负责**预填**选择，不锁定它——勾了什么，导出就是什么，摘要里的条数与体积始终描述用户马上会拿到的那个文件。
-- 体积与条数是异步预览，计算中显示 `…` 而不是 `0`。
+- `AiTaskHeader`：任务标题（用户改过之前自动起名）和已保存任务库。
+- `TaskGraph`：`WorkoutPicker` 里选中的运动和围绕它们的数据类别画成节点；每个类别有自己的窗口（7 / 14 / 30 天），可以单独关掉。`CoverageDetails` 说明本机库在这个窗口里实际有什么——缺的天就显示缺，不显示 0。
+- `DirectionPanel` + `TaskExtras`：要问 AI 的问题和可选附件。
+- `HandoffPanel`：目标 AI 走 `AI_PROVIDERS` 白名单（ChatGPT、Claude、Gemini、Kimi、豆包、DeepSeek、Grok，别的地址直接拒绝），再由 `ai_task_prepare` 生成脱敏数据包。精确 GPS 默认不带，用户显式打开才带。
+- 预览是异步的，计算中显示 `…` 而不是 `0`。
 
 ### 3. 最近记录与详情 (`/recent`, `/sleep`, `/workouts`, `/sleep/:id`, `/workouts/:id`)
 
@@ -130,10 +129,11 @@
 
 ## 组件与图表
 
-- 无 UI 框架，组件全部自研，位于 `src/components/`：`BrandMark`、`CategoryMark`、`CircularProgress`、`CardDeck`（`deck/`）、`DatePicker`、`DeviceMarquee`、`DeviceVisual`、`EmptyState`、`GlyphTile`、`HeartRateZonePicker`、`Icon`、`MetricTrendCard`、`ModalDialog`、`PageHeader`、`RecordRow`、`SegmentTrack`、`SelectMenu`、`SkeletonBlock`、`Sparkline`、`StageBar`；按页面分的子组件在 `components/<页面>/`（`overview/`、`workout/`、`explore/`、`archive/`、`ai/`、`shell/`）。新增前先确认这里没有能复用的。
+- 无 UI 框架，组件全部自研，位于 `src/components/`：`BrandMark`、`CategoryMark`、`CircularProgress`、`CardDeck`（`deck/`）、`DatePicker`、`DeviceMarquee`、`DeviceVisual`、`EmptyState`、`GlyphTile`、`HeartRateZonePicker`、`Icon`、`MetricTrendCard`、`ModalDialog`、`PageHeader`、`RecordRow`、`SegmentTrack`、`SelectMenu`、`SkeletonBlock`、`Sparkline`、`StageBar`；按页面分的子组件在 `components/<页面>/`（`overview/`、`workout/`、`archive/`、`ai/`、`deck/`、`shell/`）。新增前先确认这里没有能复用的。
 - 按天趋势一律走 `MetricTrendCard` + `lib/metricSeries.ts` 的 `buildSeriesOption`，不要在页面里各写一套 option；`SERIES_RANGES` 是三档范围的唯一来源。
 - 图标：`Icon.vue` 是内联 SVG 线性图标；大号语义图标用 `GlyphTile.vue`——CSS 材质底座 + `Icon.vue` 的图形，颜色按 `tone` 取类别 token（名称到图形的映射在 `lib/glyphs.ts`），深浅两套主题共用。不要再加 PNG 3D 图标；只有品牌图（app-icon、brand-mark、zepp-cloud）仍是图片。图片必须走 import 让 Vite 产出实体文件——桌面 CSP 不允许 data URL 与外部图源。
 - 图表统一走 `src/lib/echartsSetup.ts` 的 `vue-echarts`：注册了 `zeppbridge-dark` 与 `zeppbridge-light` 两套主题，并导出响应式的 `CHART_THEME` / `chartPalette`。每个 `VChart` 都绑 `:theme="CHART_THEME"` **和** `:key="CHART_THEME"`（换主题时整图重建），每个 option 都是 `computed`，chrome 色（轴文字、网格线、tooltip、标记、系列语义色）一律从 `chartPalette.value` 取，不写字面量 hex——CSS 变量进不了 canvas，所以色板色值与 `tokens.css` 对齐维护。不要在页面里重复定义配色。
+- **首页（概览）不加载 ECharts。** 概览的心率曲线是 `components/overview/HrMiniChart.vue`（SVG，几何在 `lib/miniChart.ts`），入口卡的 7 天走势是 `Sparkline`。图表引擎 580 KB，只给二级页的交互图表用；往概览里加 `VChart` 等于让每次冷启动都多解析一遍它。
 
 ## 交互与可访问性
 

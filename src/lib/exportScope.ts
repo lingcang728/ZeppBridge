@@ -109,7 +109,7 @@ export const buildExportSelection = (input: ExportScopeInput): ExportScopeResult
   };
 };
 
-/** 设置页「默认导出格式」和 Explore / 运动详情共用这一份。 */
+/** 设置页「默认导出格式」和运动详情共用这一份。 */
 export const DEFAULT_EXPORT_FORMAT_KEY = 'zeppbridge-default-export-format';
 export const DEFAULT_EXPORT_FORMATS = ['json', 'csv', 'gpx'] as const;
 export type DefaultExportFormat = (typeof DEFAULT_EXPORT_FORMATS)[number];

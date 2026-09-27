@@ -1,0 +1,131 @@
+<script setup lang="ts">
+/* 首页心率卡的曲线：轴、均值虚线、渐变面积、最新点、悬停读数。
+   只画这些，所以不用 ECharts——首屏因此不必加载图表引擎（见 lib/miniChart.ts）。 */
+import { computed, onBeforeUnmount, onMounted, ref, useId } from 'vue';
+import type { TimedValue } from '../../lib/chartGaps';
+import type { ChartPalette } from '../../lib/echartsTheme';
+import { nearestByX, niceTicks, smoothPath, splitAtGaps, timeTicks, type PlotPoint } from '../../lib/miniChart';
+
+const props = defineProps<{
+  points: TimedValue[];
+  color: string;
+  chrome: ChartPalette;
+  gapMs: number;
+  average: number | null;
+  /** 横轴与读数的钟面时间。 */
+  clock: (ts: number) => string;
+  unit: string;
+  label: string;
+}>();
+
+const HEIGHT = 198;
+const PAD = { left: 36, right: 16, top: 14, bottom: 24 };
+const host = ref<HTMLElement | null>(null);
+const width = ref(0);
+const hover = ref<(PlotPoint & TimedValue) | null>(null);
+const fillId = `hr-fill-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
+let observer: ResizeObserver | null = null;
+
+const plotWidth = computed(() => Math.max(width.value - PAD.left - PAD.right, 1));
+const plotBottom = HEIGHT - PAD.bottom;
+const range = computed(() => {
+  const pts = props.points;
+  return { start: pts[0]?.ts ?? 0, end: pts[pts.length - 1]?.ts ?? 1 };
+});
+const yTicks = computed(() => {
+  const values = props.points.map((p) => p.value);
+  // 和原来的 ECharts 配置一致：下限不高于 40，免得静息心率贴着底边。
+  return niceTicks(Math.min(40, ...values), Math.max(...values), 3);
+});
+const x = (ts: number) => PAD.left + ((ts - range.value.start) / Math.max(range.value.end - range.value.start, 1)) * plotWidth.value;
+const y = (value: number) => {
+  const ticks = yTicks.value;
+  const lo = ticks[0] ?? 0;
+  const hi = ticks[ticks.length - 1] ?? 1;
+  return plotBottom - ((value - lo) / Math.max(hi - lo, 1)) * (plotBottom - PAD.top);
+};
+
+const plotted = computed(() => props.points.map((p) => ({ ...p, x: x(p.ts), y: y(p.value) })));
+const segments = computed(() => splitAtGaps(plotted.value, props.gapMs) as Array<Array<PlotPoint & TimedValue>>);
+const lines = computed(() => segments.value.map((segment) => smoothPath(segment)));
+const areas = computed(() => segments.value.map((segment, index) => {
+  const first = segment[0];
+  const last = segment[segment.length - 1];
+  return `${lines.value[index]} L${last.x.toFixed(1)} ${plotBottom} L${first.x.toFixed(1)} ${plotBottom} Z`;
+}));
+const latest = computed(() => plotted.value[plotted.value.length - 1] ?? null);
+const xTicks = computed(() => (width.value ? timeTicks(range.value.start, range.value.end, plotWidth.value) : []));
+
+const onMove = (event: PointerEvent) => {
+  const rect = host.value?.getBoundingClientRect();
+  if (!rect || !rect.width) return;
+  // 用本地坐标，而不是 clientX：界面缩放下两者不是一回事。
+  const localX = ((event.clientX - rect.left) / rect.width) * width.value;
+  hover.value = nearestByX(plotted.value, localX);
+};
+
+onMounted(() => {
+  if (!host.value) return;
+  const apply = () => { width.value = Math.round(host.value?.clientWidth ?? 0); };
+  apply();
+  observer = new ResizeObserver(apply);
+  observer.observe(host.value);
+});
+onBeforeUnmount(() => observer?.disconnect());
+</script>
+
+<template>
+  <div ref="host" class="hr-mini" @pointermove="onMove" @pointerleave="hover = null">
+    <svg v-if="width" :viewBox="`0 0 ${width} ${HEIGHT}`" role="img" :aria-label="label">
+      <defs>
+        <linearGradient :id="fillId" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" :stop-color="color" stop-opacity="0.22" />
+          <stop offset="100%" :stop-color="color" stop-opacity="0" />
+        </linearGradient>
+      </defs>
+      <g class="axis">
+        <line v-for="tick in yTicks.slice(1)" :key="`g${tick}`" :x1="PAD.left" :x2="width - PAD.right" :y1="y(tick)" :y2="y(tick)"
+          :stroke="chrome.gridSoft" stroke-dasharray="4 4" />
+        <line :x1="PAD.left" :x2="width - PAD.right" :y1="plotBottom" :y2="plotBottom" :stroke="chrome.grid" />
+        <text v-for="tick in yTicks" :key="`y${tick}`" :x="PAD.left - 8" :y="y(tick)" text-anchor="end" dominant-baseline="middle" :fill="chrome.axis">{{ tick }}</text>
+        <text v-for="tick in xTicks" :key="`x${tick}`" :x="x(tick)" :y="HEIGHT - 4" text-anchor="middle" :fill="chrome.axis">{{ clock(tick) }}</text>
+      </g>
+      <path v-for="(d, i) in areas" :key="`a${i}`" class="area" :d="d" :fill="`url(#${fillId})`" />
+      <path v-for="(d, i) in lines" :key="`l${i}`" class="line" :d="d" pathLength="1" fill="none" :stroke="color" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+      <line v-if="average !== null" :x1="PAD.left" :x2="width - PAD.right" :y1="y(average)" :y2="y(average)"
+        :stroke="chrome.mark" stroke-width="1.1" stroke-dasharray="5 4" />
+      <circle v-if="latest" :cx="latest.x" :cy="latest.y" r="3.5" :fill="color" :stroke="chrome.spot" stroke-width="2" />
+      <g v-if="hover">
+        <line :x1="hover.x" :x2="hover.x" :y1="PAD.top" :y2="plotBottom" :stroke="chrome.grid" />
+        <circle :cx="hover.x" :cy="hover.y" r="4" :fill="color" :stroke="chrome.spot" stroke-width="2" />
+      </g>
+    </svg>
+    <div v-if="hover" class="hr-tip" :style="{ left: `${hover.x}px`, top: `${hover.y}px`, background: chrome.tooltipBg, borderColor: chrome.tooltipBorder, color: chrome.tooltipText }">
+      {{ clock(hover.ts) }}　<b>{{ Math.round(hover.value) }}</b> {{ unit }}
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.hr-mini { position: relative; width: 100%; height: 198px; }
+.hr-mini svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.axis text { font-size: 14.5px; font-variant-numeric: tabular-nums; }
+.line { stroke-dasharray: 1; stroke-dashoffset: 0; animation: hr-draw 900ms cubic-bezier(.22, 1, .36, 1) both; }
+.area { animation: hr-fade 900ms ease both; }
+@keyframes hr-draw { from { stroke-dashoffset: 1; } }
+@keyframes hr-fade { from { opacity: 0; } }
+.hr-tip {
+  position: absolute;
+  z-index: 2;
+  padding: 8px 12px;
+  border: 1px solid;
+  border-radius: 8px;
+  font-size: 15.5px;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 12px));
+}
+@media (prefers-reduced-motion: reduce) {
+  .line, .area { animation: none; }
+}
+</style>

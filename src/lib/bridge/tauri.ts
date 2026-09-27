@@ -22,7 +22,6 @@ import type {
   DeviceProfile,
   DeviceProfilesResult,
   FeedbackSubmissionResult,
-  ExportEstimate,
   ExportResult,
   ExportSelection,
   HealthOverview,
@@ -55,7 +54,8 @@ import type {
 
 type UnknownRecord = Record<string, unknown>;
 
-const isTauriRuntime = (): boolean => {
+/** 是否跑在 Tauri 里。整个 bridge 只有这一份判断（`index.ts` 的 isDesktop 就是它）。 */
+export const isTauriRuntime = (): boolean => {
   if (typeof window === 'undefined') return false;
   const host = window as Window & {
     __TAURI_INTERNALS__?: unknown;
@@ -70,47 +70,46 @@ const isTauriRuntime = (): boolean => {
    事件循环先把窗口画出来——页面到达时后端可能还没就绪，那时发出去的命令
    拿不到 `AppState`，会以「state not managed」一类的错直接失败。
 
-   所以所有走 `call` 的命令先等这道门：`app_is_ready` 每 40ms 轮询一次
-   （比监听 `app://ready` 简单，也没有「事件已发、监听未注册」的缝隙）。
-   60 秒兜底只防死等：超时照常放行，让真实的错误到达界面，而不是一个
-   说不清的悬挂 promise。后端起不来时主进程会走 fatal_startup 退出，
-   那时这个 promise 有没有人接已经无所谓了。 */
+   先注册 `app://ready` 监听，注册完再问一次 `app_is_ready`：后端是「先立旗
+   再广播」，所以要么这一问看到旗，要么之后收到事件，没有漏掉的缝隙，也不用
+   轮询 IPC。就绪以后 `ready` 置真，之后的命令直接 invoke，不再排队等 promise。
+   60 秒兜底只防死等：超时照常放行，让真实的错误到达界面，而不是一个说不清的
+   悬挂 promise。 */
+let ready = false;
 let backendReady: Promise<void> | null = null;
 
 export const whenBackendReady = (): Promise<void> => {
-  if (!isTauriRuntime()) return Promise.resolve();
+  if (ready || !isTauriRuntime()) return Promise.resolve();
   if (backendReady) return backendReady;
   backendReady = new Promise<void>((resolve) => {
-    // `settled` 停掉递归的 probe 链：60 秒兜底一到就不再排下一次
-    // setTimeout，不然后端一直不报 ready 时，这个轮询会跟着进程一直跑下去。
-    let settled = false;
+    let unlisten: UnlistenFn | null = null;
     const finish = () => {
-      if (settled) return;
-      settled = true;
+      if (ready) return;
+      ready = true;
+      window.clearTimeout(fallback);
       resolve();
+      // 退订失败不影响放行，放在 resolve 之后。
+      try { unlisten?.(); } catch { /* ignore */ }
     };
-    const probe = () => {
-      if (settled) return;
-      void invoke<boolean>('app_is_ready')
-        .then((ready) => {
-          if (settled) return;
-          if (ready) finish();
-          else window.setTimeout(probe, 40);
-        })
-        .catch(() => {
-          if (!settled) window.setTimeout(probe, 500);
-        });
-    };
-    window.setTimeout(finish, 60_000);
-    probe();
+    const fallback = window.setTimeout(finish, 60_000);
+    void listen('app://ready', finish)
+      .then((stop) => {
+        if (ready) { try { stop(); } catch { /* ignore */ } }
+        else unlisten = stop;
+      })
+      // 监听注册失败也不要紧：下面这一问和 60 秒兜底都还在。
+      .catch(() => undefined)
+      .then(() => invoke<boolean>('app_is_ready'))
+      .then((isReady) => { if (isReady) finish(); })
+      .catch(() => undefined);
   });
   return backendReady;
 };
 
-const call = async <T>(command: string, args?: UnknownRecord): Promise<T> => {
-  if (!isTauriRuntime()) throw new DesktopUnavailableError();
-  await whenBackendReady();
-  return invoke<T>(command, args);
+const call = <T>(command: string, args?: UnknownRecord): Promise<T> => {
+  if (ready) return invoke<T>(command, args);
+  if (!isTauriRuntime()) return Promise.reject(new DesktopUnavailableError());
+  return whenBackendReady().then(() => invoke<T>(command, args));
 };
 
 export const tauriBackend: BridgeBackend = {
@@ -364,31 +363,8 @@ export const tauriBackend: BridgeBackend = {
     return call<FeedbackSubmissionResult>('submit_device_model_assignment', { note: note ?? null });
   },
 
-  getExportJson(selection: ExportSelection) {
-    return call<string>('get_export_json', { selection });
-  },
-  estimateExport(selection: ExportSelection) {
-    return call<ExportEstimate>('estimate_export', { selection });
-  },
-
-  saveJsonExport(selection: ExportSelection, path: string) {
-    return call<ExportResult>('save_json_export', { selection, path });
-  },
-
-  saveCsvExport(selection: ExportSelection, path: string) {
-    return call<ExportResult>('save_csv_export', { selection, path });
-  },
-
-  saveGpxExport(selection: ExportSelection, path: string) {
-    return call<ExportResult>('save_gpx_export', { selection, path });
-  },
-
   saveFitExport(selection: ExportSelection, directory: string) {
     return call<ExportResult>('save_fit_export', { selection, directory });
-  },
-
-  publishAiExport(selection: ExportSelection) {
-    return call<ExportResult>('publish_ai_export', { selection });
   },
 
   prepareAiHandoff(selection: ExportSelection, prompt: string, includePreciseRoute = false) {

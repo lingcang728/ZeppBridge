@@ -26,7 +26,6 @@ const ERROR_MESSAGES_FILE = join(srcDir, 'i18n', 'errors.ts');
 
 /** 整份文件都是文案，或者自带一套双语机制。 */
 const SKIP_FILES = [
-  'views/Explore.i18n.ts',
   'views/Settings.i18n.ts',
   'views/LandingPage.vue',
   'composables/useLandingLocale.ts',

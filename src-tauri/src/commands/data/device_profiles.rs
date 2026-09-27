@@ -173,8 +173,11 @@ pub(super) async fn resolve_device_profile(
         });
     };
     let from_db = {
-        let db = state.db.lock().await;
-        db.lookup_device_profile(device_id)?
+        let device_id = device_id.to_string();
+        spawn_independent_read(state.data_dir.clone(), move |db| {
+            db.lookup_device_profile(&device_id)
+        })
+        .await?
     };
     let cached_profile = read_device_profile_cache(&state.data_dir)
         .profiles

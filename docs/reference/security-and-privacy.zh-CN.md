@@ -55,7 +55,7 @@
 
 ## 外部 AI 交接
 
-Explore 的「发送到 AI」先通过本地 `prepare_ai_handoff` 生成当前日期范围和数据类型的结构化导出，再递归移除认证字段（token、cookie、authorization、credential 等）以及账户、设备、序列号和睡眠/训练记录标识。默认完全删除 `route`、纬度/经度和其他精确坐标；只有用户主动打开「包含精确 GPS 路线」并通过第二次确认后才保留这些字段。认证信息始终不会导出，`redactions` 和 `metadata` 会记录本次策略。
+「发送到 AI」（运动详情页，或 `/ai` 的分析任务）先在本地（`prepare_ai_handoff` / `ai_task_prepare`）生成所选范围和数据类型的结构化导出，再递归移除认证字段（token、cookie、authorization、credential 等）以及账户、设备、序列号和睡眠/训练记录标识。默认完全删除 `route`、纬度/经度和其他精确坐标；只有用户主动打开「包含精确 GPS 路线」并通过第二次确认后才保留这些字段。认证信息始终不会导出，`redactions` 和 `metadata` 会记录本次策略。
 
 小于等于 2 MiB 的脱敏 JSON 会和提示词一起放进剪贴板；超过阈值时只把提示词和「请上传已生成文件」说明放进剪贴板，脱敏 JSON 写入桌面的 `zeppbridge-ai-handoff.json`；解析不到桌面目录时才回退到应用数据目录的 `exports/`。剪贴板失败不会打开浏览器；浏览器打开失败时保留已复制内容并允许重试。目标 URL 是代码内固定的七家提供商地址，不能从用户输入或提示词改变，也不会带 query 参数、健康数据或提示词。
 

@@ -8,7 +8,6 @@
 import type {
   AiTask,
   AiTaskCategoryRange,
-  AiTaskDetailLevel,
   AiTaskTemplate,
 } from '../bridge/types';
 import { defaultCategoryRanges } from './categories';
@@ -107,5 +106,3 @@ export const isTaskDirty = (task: AiTask, baselineSnapshot: string): boolean =>
 
 export const cloneRanges = (ranges: AiTaskCategoryRange[]): AiTaskCategoryRange[] =>
   ranges.map((range) => ({ ...range }));
-
-export const DETAIL_LEVELS: readonly AiTaskDetailLevel[] = ['summary', 'standard', 'detailed'];

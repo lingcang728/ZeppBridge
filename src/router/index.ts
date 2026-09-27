@@ -28,11 +28,6 @@ const routes = [
     component: () => import('../views/AiComposer.vue'),
   },
   {
-    path: '/explore',
-    name: 'Explore',
-    component: () => import('../views/Explore.vue'),
-  },
-  {
     path: '/body',
     name: 'BodyStatus',
     component: () => import('../views/BodyStatus.vue'),

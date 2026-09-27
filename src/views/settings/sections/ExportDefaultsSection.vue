@@ -24,7 +24,7 @@ const EXPORT_FORMAT_CHOICES = computed(() => [
   { value: 'gpx', label: 'GPX', hint: t.value.formatGpxHint },
 ]);
 
-/* 默认导出格式持久化，Explore / 运动详情读同一把键。 */
+/* 默认导出格式持久化，运动详情读同一把键。 */
 const defaultExportFormat = ref(readDefaultExportFormat());
 const onExportFormatChange = (value: string | number) => {
   const format = String(value);

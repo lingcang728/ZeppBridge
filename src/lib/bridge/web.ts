@@ -1,100 +1,16 @@
 import { DesktopUnavailableError } from './errors';
 import type { BridgeBackend, UnlistenFn } from './types';
 
-/* 必须返回 rejected Promise，不能同步 throw：同步 throw 时
+/* 浏览器里（落地页、`?app-preview=1`）没有后端：每个方法都返回拒绝。
+
+   必须返回 rejected Promise，不能同步 throw：同步 throw 时
    `backend.X().catch(...)` 的 catch 根本挂不上去——函数还没返回 Promise
    调用点就中止了（Settings 页 onMounted 曾被这样截断，后面的初始化全没跑）。
-   统一走这一个出口，保证每个方法都是「返回拒绝」而不是「当场抛」。 */
+   用 Proxy 而不是逐个列方法：新增 command 时这里不用跟着改，也不可能漏。
+   `listen` 是唯一的例外——订阅事件在浏览器里是无害的空操作。 */
 const unavailable = (): Promise<never> => Promise.reject(new DesktopUnavailableError());
+const noopListen = (): Promise<UnlistenFn> => Promise.resolve(() => undefined);
 
-export const webBackend: BridgeBackend = {
-  listLifeEvents: unavailable,
-  saveLifeEvent: unavailable,
-  deleteLifeEvent: unavailable,
-  getAppStatus: unavailable,
-  verifyAuth: unavailable,
-  clearAuth: unavailable,
-  importFromHar: unavailable,
-  manualAuth: unavailable,
-  startWebLogin: unavailable,
-  cancelWebLogin: unavailable,
-  getLoginStatus: unavailable,
-  startHistorySync: unavailable,
-  startIncrementalSync: unavailable,
-  cancelSync: unavailable,
-  probeDataCapabilities: unavailable,
-  getCapabilityOverview: unavailable,
-  getHealthOverview: unavailable,
-  getHeartRateSeries: unavailable,
-  getStressSeries: unavailable,
-  getMetricSeries: unavailable,
-  getTrainingBalance: unavailable,
-  getHeartRateZones: unavailable,
-  setHeartRateZonePreference: unavailable,
-  getStorageEstimate: unavailable,
-  setUserPrefs: unavailable,
-  getUserPrefs: unavailable,
-  getDailyHeartRateExtremes: unavailable,
-  getRecentSleep: unavailable,
-  getSleepPage: unavailable,
-  getSleepDetail: unavailable,
-  getRecentWorkouts: unavailable,
-  getWorkoutPage: unavailable,
-  getWorkoutDetail: unavailable,
-  getWorkoutSeries: unavailable,
-  setWorkoutTypeOverride: unavailable,
-  getWorkoutTypeOptions: unavailable,
-  getUnknownWorkoutCodes: unavailable,
-  setWorkoutCodeLabel: unavailable,
-  setDeviceModelOverride: unavailable,
-  getLocalApiStatus: unavailable,
-  setLocalApiEnabled: unavailable,
-  revealLocalApiToken: unavailable,
-  rotateLocalApiToken: unavailable,
-  getDeviceProfile: unavailable,
-  getDeviceProfiles: unavailable,
-  reprocessLocalData: unavailable,
-  getWorkoutInsight: unavailable,
-  getWeeklyReport: unavailable,
-  startHistoryBackfill: unavailable,
-  getCoverageLedger: unavailable,
-  resetCoverageLedger: unavailable,
-  retryFailedBackfillChunks: unavailable,
-  setTrayLocale: unavailable,
-  listBackups: unavailable,
-  createManualBackup: unavailable,
-  verifyBackup: unavailable,
-  setBackupPinned: unavailable,
-  getRestorePreview: unavailable,
-  stageRestore: unavailable,
-  getPendingRestore: unavailable,
-  cancelPendingRestore: unavailable,
-  getDataHealth: unavailable,
-  runDatabaseIntegrityCheck: unavailable,
-  compactRawPayloads: unavailable,
-  submitDiagnosticReport: unavailable,
-  submitDeviceModelAssignment: unavailable,
-  getExportJson: unavailable,
-  estimateExport: unavailable,
-  saveJsonExport: unavailable,
-  saveCsvExport: unavailable,
-  saveGpxExport: unavailable,
-  saveFitExport: unavailable,
-  publishAiExport: unavailable,
-  prepareAiHandoff: unavailable,
-  aiTaskList: unavailable,
-  aiTaskGet: unavailable,
-  aiTaskSave: unavailable,
-  aiTaskDelete: unavailable,
-  aiTemplateList: unavailable,
-  aiTemplateSave: unavailable,
-  aiTemplateDelete: unavailable,
-  aiTaskPreview: unavailable,
-  aiTaskPrepare: unavailable,
-  aiTaskAttachmentStat: unavailable,
-  cleanupOldData: unavailable,
-  openDataFolder: unavailable,
-  listen<T>(_event: string, _handler: (payload: T) => void): Promise<UnlistenFn> {
-    return Promise.resolve(() => undefined);
-  },
-};
+export const webBackend = new Proxy({} as BridgeBackend, {
+  get: (_target, key) => (key === 'listen' ? noopListen : key === 'then' ? undefined : unavailable),
+});

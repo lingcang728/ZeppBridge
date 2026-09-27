@@ -14,196 +14,9 @@ import { plural, type LocalePack } from '../index';
  *   backendText: { 'ui.x.y': '译文' }    // 后端散文码的兜底表
  */
 
-/**
- * ru 专用：useExport 的 saved/savedFiles 把计量单位词作为参数传进来，
- * 俄语里名词要随数字变格，所以把已知的 unit 叶子换回正确词形；
- * 没登记的 unit 原样拼接（与 zh/en 行为一致）。
- */
-const RU_COUNT_FORMS: Record<string, { one: string; few: string; many: string; other: string }> = {
-  записей: { one: 'запись', few: 'записи', many: 'записей', other: 'записи' },
-  строк: { one: 'строка', few: 'строки', many: 'строк', other: 'строки' },
-  'точек трека': { one: 'точка трека', few: 'точки трека', many: 'точек трека', other: 'точки трека' },
-  отсчётов: { one: 'отсчёт', few: 'отсчёта', many: 'отсчётов', other: 'отсчёта' },
-};
-
-const countedUnit = (count: number, unit: string): string => {
-  const forms = RU_COUNT_FORMS[unit];
-  if (!forms) return `${count} ${unit}`;
-  return plural(count, {
-    one: `${count} ${forms.one}`,
-    few: `${count} ${forms.few}`,
-    many: `${count} ${forms.many}`,
-    other: `${count} ${forms.other}`,
-  });
-};
-
 export default {
   modules: {
     'components/ai/WorkoutPicker': { previous: 'Назад', next: 'Далее' },
-    'views/Explore': {
-      title: 'Передать ИИ',
-      intro: 'Выберите шаблон, проверьте, что именно войдёт в пакет, и отправьте данные носимого устройства выбранному ИИ-инструменту.',
-      workoutScopeBanner: (workoutId: string) =>
-        `Экспортируется только тренировка ${workoutId}: она сама и поточечные метрики, записанные во время неё. Дневные потоки вроде сна и шагов не входят. Диапазон дат пока не действует.`,
-      backToDateRange: 'Вернуться к диапазону дат',
-      categoryTitle: 'Категории',
-      categoryAria: 'Категории шаблонов',
-      categoryAll: 'Все шаблоны',
-      categorySummary: 'Сводка',
-      categoryTraining: 'Тренировки',
-      categoryRecovery: 'Восстановление',
-      categorySleep: 'Сон',
-      templateListTitle: 'Шаблоны',
-      templateSearchPlaceholder: 'Поиск шаблонов…',
-      templateSearchAria: 'Поиск шаблонов',
-      noTemplates: 'Подходящих шаблонов нет.',
-      currentTemplate: 'Текущий шаблон',
-      copyPromptTitle: 'Скопировать текст промпта в буфер обмена',
-      copyPrompt: 'Скопировать промпт',
-      promptEditor: 'Промпт',
-      promptEditorHint: '(данные подставляются автоматически)',
-      injected: (count: number) => `Подключено потоков данных: ${count}`,
-      promptEditorAria: 'Редактор промпта',
-      summaryTitle: 'Что входит в пакет',
-      summaryHint: 'Только отмеченное вами',
-      cellRange: 'Период',
-      cellCount: 'Записи',
-      cellCountSub: 'синхронизированных записей',
-      cellTypes: 'Типы данных',
-      cellTypesValue: (count: number) => `${count}`,
-      cellTypesSub: 'в пакете',
-      cellSize: 'Размер',
-      cellSizeSub: 'оценочно',
-      thisWorkout: 'Эта тренировка',
-      onlyThisWorkout: 'только эта тренировка',
-      approxMinutes: (minutes: number) => `(примерно ${minutes} мин)`,
-      rangeDays: (days: number) => `(${plural(days, { one: `${days} день`, few: `${days} дня`, many: `${days} дней`, other: `${days} дня` })})`,
-      quickRange: 'Быстрый выбор:',
-      range7: '7 дней',
-      range30: '30 дней',
-      startDate: 'Начальная дата',
-      endDate: 'Конечная дата',
-      datePickerAria: 'Выбор даты',
-      secureNote: 'Всё собирается локально: структурированные данные и промпт генерируются на этом устройстве.',
-      secureOk: 'Только локально',
-      exportFile: (format: string) => `Экспортировать файл ${format}`,
-      copyPromptOnly: 'Скопировать только промпт',
-      preparing: 'Подготовка…',
-      handTo: (provider: string) => `Передать в ${provider}`,
-      promptCopied: 'Промпт скопирован (без данных).',
-      copyFailed: 'Не удалось скопировать. Повторите попытку.',
-      retryOpen: (provider: string) => `Открыть ${provider} ещё раз`,
-      packTitle: 'Собрать и отправить',
-      packSub: 'Выберите формат экспорта и ИИ-инструмент.',
-      packContentsTitle: 'Что входит в экспорт',
-      packContentsIncluded:
-        'Входит: сводки тренировок (тип, начало и конец, дистанция, калории, средний и пиковый пульс, тренировочная нагрузка), '
-        + 'дневные метрики (шаги, пульс в покое, HRV, SpO2, стресс, частота дыхания, PAI, VO2max) и сеансы сна с их шкалой фаз. '
-        + 'В режиме «Полный» добавляются посекундные ряды тренировок и отдельные отсчёты пульса.',
-      packContentsExcluded:
-        'Не входит: .tcx, данные аккаунта, токены и серийные номера устройств. Треки GPS есть в форматах GPX и FIT, '
-        + 'и только для тренировок с треком. FIT записывает по одному файлу на тренировку в выбранную вами папку.',
-      formatGroup: 'Формат экспорта',
-      formatAria: 'Формат экспорта',
-      formatJsonSub: 'Полные структурированные данные',
-      formatCsvSub: 'Сводная таблица (без поточечных рядов)',
-      formatGpxSub: 'Только тренировки с треком GPS',
-      formatFitSub: 'По одному файлу на тренировку, в выбранную папку',
-      detailGroup: 'Степень детализации',
-      detailAria: 'Степень детализации',
-      streamsGroup: 'Потоки данных',
-      selectedCount: (selected: number, total: number) => `Выбрано ${selected} из ${total}`,
-      selectNone: 'Снять выбор',
-      selectAll: 'Выбрать все',
-      noTypesSelected: 'Тип данных не выбран — экспорт будет отклонён.',
-      estimatedSize: 'Примерный размер пакета',
-      targetGroup: 'Целевой ИИ-инструмент',
-      targetAria: 'Целевой ИИ-инструмент',
-      providerIconAlt: (provider: string) => `Значок ${provider}`,
-      sendHint: 'До 2 МиБ данные копируются в буфер обмена вместе с промптом. Если больше — JSON записывается на рабочий стол, чтобы перетащить его в чат.',
-      needDesktop: 'Передача ИИ требует настольного приложения; браузерный предпросмотр не открывает внешние сайты.',
-      needValidDates: 'Сначала выберите корректный диапазон дат.',
-      needDataTypes: 'Выберите хотя бы один тип данных.',
-      stillReading: 'Локальные записи ещё читаются. Повторите чуть позже.',
-      nothingInScope: 'В этом диапазоне нет синхронизированных записей для передачи.',
-      previewDesktopOnly: 'Откройте в настольном приложении ZeppBridge — предпросмотр читает локальные записи.',
-      previewFailed: 'Не удалось прочитать локальный предпросмотр экспорта',
-      previewRetry: 'Повторить',
-      attachmentNotice: 'Пакет данных записан на рабочий стол (zeppbridge-ai-handoff.json) — перетащите его в чат ИИ. Промпт уже в буфере обмена.',
-      attachmentOpened: (notice: string, provider: string) => `${notice} ${provider} открыт.`,
-      attachmentNotOpened: (notice: string, provider: string) => `${notice} Откройте ${provider} в браузере для анализа.`,
-      copiedAndOpened: (provider: string) => `Обезличенные данные скопированы, ${provider} открыт. Вставьте их, чтобы начать.`,
-      copiedOnly: (provider: string) => `Обезличенные данные скопированы. Откройте ${provider} и вставьте их.`,
-      reopened: (provider: string) => `${provider} открыт. Вставьте данные на сайте.`,
-      templates: {
-        performance: {
-          name: 'Сводка результатов',
-          sub: 'Ясная картина того, как идут дела',
-          prompt: `Ты — аналитик спортивного здоровья, который превращает данные носимых устройств в понятные и применимые выводы.
-На основе данных ZeppBridge ниже (уже в хронологическом порядке)
-напиши мне ясную, хорошо структурированную сводку моих общих результатов.
-Охвати общую картину, важные тренды, что выделяется, за чем следить и что можно сделать.
-Где данных мало — скажи прямо и посоветуй, что собирать, вместо угадывания.
-
-Ответь в Markdown, используя таблицы, списки и пункты там, где это помогает.
-Тон — профессиональный, краткий и конструктивный.`,
-        },
-        training: {
-          name: 'Анализ тренировок',
-          sub: 'Тренировочная нагрузка и её динамика',
-          prompt: `Ты — опытный тренер по выносливости.
-На основе данных ZeppBridge о тренировках ниже (пульс, тренировочная нагрузка и VO₂max)
-проанализируй структуру моих тренировок, распределение интенсивности и динамику нагрузки.
-Укажи, что не так в построении занятий, и скажи, что поменять в следующем цикле.
-
-Ответь в Markdown. Пиши прямо.`,
-        },
-        recovery: {
-          name: 'Восстановление и готовность',
-          sub: 'Восстановление, HRV и готовность к тренировкам',
-          prompt: `Ты — физиолог, специализирующийся на восстановлении.
-На основе данных ZeppBridge ниже — HRV, пульс в покое, сон и стресс —
-оцени, насколько я восстановился и насколько готов к тренировке,
-назови признаки накапливающейся усталости и скажи, что помогло бы.
-
-Ответь в Markdown.`,
-        },
-        sleep: {
-          name: 'Анализ сна',
-          sub: 'Качество и регулярность сна',
-          prompt: `Ты — консультант по здоровью сна.
-На основе данных ZeppBridge ниже — фазы сна, длительность и пульс —
-проанализируй качество и регулярность моего сна и что, судя по всему, на него влияет,
-затем дай конкретные, выполнимые способы его улучшить.
-
-Ответь в Markdown.`,
-        },
-        activity: {
-          name: 'Обзор активности',
-          sub: 'Ежедневная активность и её тренд',
-          prompt: `Ты — консультант по здоровому образу жизни.
-На основе данных ZeppBridge ниже — шаги, тренировки и пульс —
-дай обзор моей ежедневной активности и её динамики,
-затем предложи практичные способы больше двигаться.
-
-Ответь в Markdown.`,
-        },
-        weekly: {
-          name: 'Недельный обзор',
-          sub: 'Еженедельный разбор с конкретикой',
-          prompt: `Ты — мой личный тренер по здоровью, раз в неделю разбирающий мои данные.
-На основе данных ZeppBridge за эту неделю сравнивай меня только с моими же прошлыми записями.
-Подведи итог изменений недели, назови, что получилось хорошо и что заслуживает внимания, и дай короткий список дел на следующую неделю.
-
-Ограничения:
-- В этих данных нет популяционной базы. Не сравнивай меня со «здоровыми взрослыми» или со средними.
-- Если чего-то нет — так и скажи. Никогда не заполняй пропуск нулём или оценкой.
-- Никаких медицинских диагнозов, оценок риска болезней и советов по лечению.
-
-Ответь в Markdown.`,
-        },
-      },
-    },
 
     'views/Settings': {
       title: 'Настройки',
@@ -1110,7 +923,6 @@ export default {
       hrZonesAria: 'Пульсовые зоны (абсолютные пороги)',
       hrEmpty: 'Реальная динамика пульса появится здесь после синхронизации.',
       hrMore: 'Полные 24 часа',
-      hrTooltip: (clock: string, value: number) => `${clock} <b>${value}</b> уд/мин`,
       zoneRest: 'Покой 0–99',
       zoneFat: 'Жиросжигание 100–139',
       zoneAerobic: 'Аэробная 140–169',
@@ -1224,64 +1036,6 @@ export default {
       assignmentFailed: 'Не удалось сохранить выбор модели',
     },
 
-    'composables/useExport': {
-      typeSteps: 'Шаги',
-      typeLifeEvents: 'Жизненные события',
-      groupContext: 'Контекст',
-      typeDailyActivity: 'Дневная активность',
-      typeWorkouts: 'Тренировки',
-      typeSleep: 'Сон',
-      typeHeartRate: 'Пульс',
-      typeSpo2: 'Кислород в крови',
-      typeStress: 'Стресс',
-      typeRespiratoryRate: 'Частота дыхания',
-      typeRecovery: 'Готовность',
-      typeTrainingLoad: 'Тренировочная нагрузка',
-      typeLactateThreshold: 'Лактатный порог',
-      typePai: 'Индекс PAI',
-      groupActivity: 'Активность',
-      groupSleep: 'Сон',
-      groupBody: 'Состояние тела',
-      groupTraining: 'Тренировка',
-      detailSummary: 'Сводка',
-      detailSummaryHint:
-        'Пульс агрегируется по часам, посекундные ряды тренировок опускаются; структурированные '
-        + 'метрики сохраняются полностью — объём подходит для передачи ИИ.',
-      detailFull: 'Полный',
-      detailFullHint:
-        'Сохраняет посекундные ряды тренировок и отдельные отсчёты пульса. Большой объём; предназначен '
-        + 'для архивации.',
-      scopeConflict: 'Диапазон дат и отдельная тренировка — взаимоисключающие области экспорта; выберите что-то одно.',
-      noDataTypes: 'Выберите хотя бы один тип данных.',
-      invalidDates: 'Выберите корректные даты начала и конца.',
-      endBeforeStart: 'Дата конца не может быть раньше даты начала.',
-      rangeTooLong: (days: number) =>
-        `Один экспорт охватывает не более ${plural(days, { one: `${days} дня`, few: `${days} дней`, many: `${days} дней`, other: `${days} дней` })}. Для более длинной истории используйте снимок базы данных в настройках.`,
-      nothingToExport: 'За этот период нет данных для экспорта.',
-      jsonTooLarge: 'JSON больше 1 МБ — используйте «Сохранить файл».',
-      copied: (count: number) =>
-        `Скопировано ${plural(count, { one: `${count} нормализованная запись`, few: `${count} нормализованные записи`, many: `${count} нормализованных записей`, other: `${count} нормализованные записи` })}.`,
-      copyFailed: 'Не удалось скопировать JSON',
-      saveJsonTitle: 'Сохранить JSON ZeppBridge',
-      saveCsvTitle: 'Сохранить CSV ZeppBridge (сводная таблица)',
-      saveGpxTitle: 'Сохранить GPX ZeppBridge (трек GPS)',
-      saveFitTitle: 'Выберите папку для экспорта FIT (по файлу на тренировку)',
-      jsonFilter: 'Файл JSON',
-      csvFilter: 'Таблица CSV',
-      gpxFilter: 'Трек GPX',
-      fitFilter: 'Файлы тренировок FIT',
-      unitRecords: 'записей',
-      unitRows: 'строк',
-      unitTrackPoints: 'точек трека',
-      unitSamplePoints: 'отсчётов',
-      saved: (count: number, unit: string) => `Сохранено: ${countedUnit(count, unit)}.`,
-      savedFiles: (files: number, count: number, unit: string) =>
-        `Сохранено ${plural(files, { one: `${files} файл FIT`, few: `${files} файла FIT`, many: `${files} файлов FIT`, other: `${files} файла FIT` })}, всего ${countedUnit(count, unit)}.`,
-      saveFailed: (format: string) => `Не удалось сохранить ${format}`,
-      feedUpdated: (count: number) =>
-        `Локальный источник данных для ИИ обновлён — ${plural(count, { one: `${count} запись`, few: `${count} записи`, many: `${count} записей`, other: `${count} записи` })}.`,
-      feedFailed: 'Не удалось обновить локальный источник данных для ИИ',
-    },
 
     'composables/useSyncController': {
       notSyncedYet: 'Ещё не синхронизировалось',
@@ -1374,15 +1128,6 @@ export default {
     },
 
     'lib/deviceCopy': {
-      introNoDevice:
-        'Локально в первую очередь, с сохранением источников: ваши записи с носимых устройств, собранные '
-        + 'в понятный и пригодный архив здоровья.',
-      introOne: (name: string) =>
-        `Локально в первую очередь, с сохранением источников: записи ${name}, собранные в понятный и пригодный архив здоровья.`,
-      introTwo: (first: string, second: string) =>
-        `Локально в первую очередь, с сохранением источников: записи ${first} и ${second}, собранные в понятный и пригодный архив здоровья.`,
-      introMany: (first: string, second: string, count: number) =>
-        `Локально в первую очередь, с сохранением источников: записи ${first}, ${second} и других устройств (всего ${count}), собранные в понятный и пригодный архив здоровья.`,
       notProvided: 'Нет данных',
     },
 
@@ -2361,14 +2106,9 @@ export default {
     'err.export.empty_range': 'В этом диапазоне нет записей для экспорта',
     'err.export.convert_failed': 'Не удалось преобразовать в нужный формат',
     'err.export.write_failed': 'Не удалось записать файл экспорта',
-    'err.export.write_json_failed': 'Не удалось записать экспорт JSON',
-    'err.export.mkdir_failed': 'Не удалось создать папку экспорта',
     'err.export.path_required': 'Сначала выберите, куда сохранить файл',
     'err.export.path_not_absolute': 'Место сохранения должно быть абсолютным путём',
     'err.export.not_a_directory': 'Для экспорта FIT нужна папка, но выбранный путь — файл',
-    'err.export.bad_extension': 'У файла экспорта неправильное расширение',
-    'err.export.path_no_parent': 'У места сохранения нет допустимой папки',
-    'err.export.parent_missing': 'Выбранная папка не существует',
 
     /* —— 交给 AI —— */
     'err.handoff.prompt_required': 'Сначала напишите промпт',

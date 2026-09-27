@@ -112,15 +112,14 @@ pub(crate) use backup::{
     list_backups, set_backup_pinned, stage_restore, verify_backup,
 };
 pub(crate) use data::{
-    cleanup_old_data, compact_raw_payloads, estimate_export, get_capability_overview,
-    get_daily_heart_rate_extremes, get_data_health, get_device_profile, get_device_profiles,
-    get_export_json, get_health_overview, get_heart_rate_series, get_heart_rate_zones,
-    get_metric_series, get_recent_sleep, get_recent_workouts, get_sleep_detail, get_sleep_page,
-    get_storage_estimate, get_stress_series, get_training_balance, get_unknown_workout_codes,
-    get_user_prefs, get_weekly_report, get_workout_detail, get_workout_insight, get_workout_page,
-    get_workout_series, get_workout_type_options, open_data_folder, prepare_ai_handoff,
-    publish_ai_export, reprocess_local_data, run_database_integrity_check, save_csv_export,
-    save_fit_export, save_gpx_export, save_json_export, set_device_model_override,
+    cleanup_old_data, compact_raw_payloads, get_capability_overview, get_daily_heart_rate_extremes,
+    get_data_health, get_device_profile, get_device_profiles, get_health_overview,
+    get_heart_rate_series, get_heart_rate_zones, get_metric_series, get_recent_sleep,
+    get_recent_workouts, get_sleep_detail, get_sleep_page, get_storage_estimate, get_stress_series,
+    get_training_balance, get_unknown_workout_codes, get_user_prefs, get_weekly_report,
+    get_workout_detail, get_workout_insight, get_workout_page, get_workout_series,
+    get_workout_type_options, open_data_folder, prepare_ai_handoff, reprocess_local_data,
+    run_database_integrity_check, save_fit_export, set_device_model_override,
     set_heart_rate_zone_preference, set_user_prefs, set_workout_code_label,
     set_workout_type_override, submit_device_model_assignment, submit_diagnostic_report,
 };

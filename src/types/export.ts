@@ -18,18 +18,13 @@ export type ExportDataType =
   | 'daily_activity'
   | 'recovery';
 
-/** Which section of the export picker a data type belongs to. */
-/* 分组是码，不是中文。写成中文的话界面上到处会出现 `group === '活动'`
-   这种判断，一翻译就默默失效。显示交给 useExport 的分组名表。 */
-export type ExportTypeGroup = 'activity' | 'sleep' | 'body' | 'training' | 'context';
-
 /**
  * How much of each stream an export carries.
  *
  * `summary` aggregates the two streams that dominate an export's size
  * (per-minute heart rate, per-second workout series) and keeps every
  * structured metric intact, so a month of data stays small enough to hand to a
- * model. `full` keeps the raw series and is what the CSV/GPX converters use.
+ * model. `full` keeps the raw series and is what the FIT export uses.
  */
 export type ExportDetail = 'summary' | 'full';
 
@@ -48,14 +43,6 @@ export interface ExportSelection {
   endDate?: string;
   dataTypes: ExportDataType[];
   detail?: ExportDetail;
-}
-
-export interface ExportEstimate {
-  recordCount: number;
-  estimatedBytes: number;
-  scopeKind: string;
-  startTime?: string | null;
-  endTime?: string | null;
 }
 
 export interface ExportResult {

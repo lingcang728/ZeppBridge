@@ -60,8 +60,6 @@ export const categoryLabel = (category: AiTaskCategory): string =>
 /** 类别配置面板里的窗口选项（03-orbit-drag：7 / 14 / 30 天）。 */
 export const CATEGORY_DAY_CHOICES: readonly number[] = [7, 14, 30];
 
-export const isCategoryDayChoice = (days: number): boolean => CATEGORY_DAY_CHOICES.includes(days);
-
 /** 取/改某类别的范围行；任务里缺这一行时按默认补一条。 */
 export const categoryRangeOf = (
   categories: AiTaskCategoryRange[],

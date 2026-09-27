@@ -113,8 +113,9 @@ share the sign-in URL with anyone you do not trust.
 
 ## Handing data to an external AI
 
-"Send to AI" in Explore first calls the local `prepare_ai_handoff` to build a
-structured export for the current date range and data types, then recursively
+"Send to AI" (a workout's detail page, or an analysis task on `/ai`) first
+builds a structured export locally (`prepare_ai_handoff` / `ai_task_prepare`)
+for the chosen range and data types, then recursively
 removes authentication fields (token, cookie, authorization, credential and
 other authentication keys) along with account, device and serial identifiers and sleep/training
 record IDs. `route`, latitude/longitude and other precise coordinates are

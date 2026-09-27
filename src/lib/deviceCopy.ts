@@ -4,35 +4,12 @@ import { defineMessages, messagesOf } from '../i18n';
 
 const messages = defineMessages(
   {
-    introNoDevice: '本地优先，保留数据来源，将你的穿戴记录整理成清晰、可用的健康档案。',
-    introOne: (name: string) =>
-      `本地优先，保留数据来源，将 ${name} 的记录整理成清晰、可用的健康档案。`,
-    introTwo: (first: string, second: string) =>
-      `本地优先，保留数据来源，将 ${first} 与 ${second} 的记录整理成清晰、可用的健康档案。`,
-    introMany: (first: string, second: string, count: number) =>
-      `本地优先，保留数据来源，将 ${first}、${second} 等 ${count} 台设备的记录整理成清晰、可用的健康档案。`,
     notProvided: '未提供',
   },
   {
-    introNoDevice:
-      'Local-first, sources intact: your wearable records, organized into a health file you can actually read.',
-    introOne: (name: string) =>
-      `Local-first, sources intact: ${name} records, organized into a health file you can actually read.`,
-    introTwo: (first: string, second: string) =>
-      `Local-first, sources intact: ${first} and ${second} records, organized into a health file you can actually read.`,
-    introMany: (first: string, second: string, count: number) =>
-      `Local-first, sources intact: ${first}, ${second} and ${count} devices in all, organized into a health file you can actually read.`,
     notProvided: 'Not provided',
   },
   {
-    introNoDevice:
-      'Local primero y con las fuentes intactas: tus registros del reloj, organizados en un historial de salud que realmente puedes leer.',
-    introOne: (name: string) =>
-      `Local primero y con las fuentes intactas: los registros de ${name}, organizados en un historial de salud que realmente puedes leer.`,
-    introTwo: (first: string, second: string) =>
-      `Local primero y con las fuentes intactas: los registros de ${first} y ${second}, organizados en un historial de salud que realmente puedes leer.`,
-    introMany: (first: string, second: string, count: number) =>
-      `Local primero y con las fuentes intactas: ${first}, ${second} y ${count} dispositivos en total, organizados en un historial de salud que realmente puedes leer.`,
     notProvided: 'Sin datos',
   },
   'lib/deviceCopy',
@@ -42,15 +19,6 @@ const copy = () => messagesOf(messages);
 
 export const shortDeviceName = (name: string): string =>
   name.replace(/^Amazfit\s+/i, '').replace(/^跃我\s+/u, '').trim() || name;
-
-export const formatDeviceIntro = (names: string[]): string => {
-  const short = names.map(shortDeviceName).filter(Boolean);
-  const t = copy();
-  if (short.length === 0) return t.introNoDevice;
-  if (short.length === 1) return t.introOne(short[0]);
-  if (short.length === 2) return t.introTwo(short[0], short[1]);
-  return t.introMany(short[0], short[1], short.length);
-};
 
 /** `https://api-mifit-cn3.zepp.com` → `CN3`. Full host stays on title/tooltip. */
 export const regionShortName = (host?: string | null): string => {

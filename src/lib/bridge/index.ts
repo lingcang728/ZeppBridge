@@ -1,4 +1,4 @@
-import { tauriBackend } from './tauri';
+import { isTauriRuntime, tauriBackend } from './tauri';
 import { webBackend } from './web';
 import type { BridgeBackend } from './types';
 
@@ -11,23 +11,12 @@ export {
   toUserMessage,
 } from './errors';
 
-export const isDesktop = (): boolean => {
-  if (typeof window === 'undefined') return false;
-  const host = window as Window & {
-    __TAURI_INTERNALS__?: unknown;
-    __TAURI__?: unknown;
-  };
-  return Boolean(host.__TAURI_INTERNALS__ || host.__TAURI__);
-};
-
+export const isDesktop = isTauriRuntime;
 export const isTauri = isDesktop;
 
 export const getBackend = (): BridgeBackend => (isDesktop() ? tauriBackend : webBackend);
 
+/* 两个实现的方法都不用 `this`，取到就能直接调，不必每次 bind 出一个新函数。 */
 export const backend: BridgeBackend = new Proxy({} as BridgeBackend, {
-  get(_target, key) {
-    const api = getBackend() as unknown as Record<string | symbol, unknown>;
-    const value = api[key];
-    return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(api) : value;
-  },
+  get: (_target, key) => (getBackend() as unknown as Record<string | symbol, unknown>)[key],
 });

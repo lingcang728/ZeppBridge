@@ -66,10 +66,10 @@ const grantedPermissions = () =>
 test('the scan finds the dialog call sites at all', () => {
   // 正则一旦被改坏，下面两条会因为「一个调用点都没找到」而空过。
   const used = dialogMethodsUsed();
-  assert.deepEqual([...used.keys()].sort(), ['open', 'save']);
-  assert.ok(used.get('open').includes('src/composables/useExport.ts'), 'FIT 导出的目录选择');
+  // save() 随旧 Explore 页的 JSON/CSV/GPX 另存一起删了，dialog:allow-save 也随之收回。
+  assert.deepEqual([...used.keys()].sort(), ['open']);
+  assert.ok(used.get('open').includes('src/composables/useWorkoutDetail.ts'), 'FIT 导出的目录选择');
   assert.ok(used.get('open').includes('src/composables/settings/useAuthFlow.ts'), 'HAR 导入的文件选择');
-  assert.ok(used.get('save').includes('src/composables/useExport.ts'), 'JSON/CSV/GPX 导出的保存');
 });
 
 test('the capability grants one permission per dialog method the interface calls', () => {

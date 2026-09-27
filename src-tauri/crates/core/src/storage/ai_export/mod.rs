@@ -1,7 +1,6 @@
 //! 交给 AI 的导出：共享类型、设备标签与辅助查询（从 storage/mod.rs 按领域拆出，逻辑不变）。
 
 mod build;
-mod estimate;
 
 use super::*;
 
@@ -214,51 +213,7 @@ impl DailyMetricGroup {
 /// 加一层宽松的时间戳边界，索引就能先把范围缩到几天（实测心率 7 天 92ms → 5ms）。
 /// 边界各放宽一天，覆盖任何时区偏移（-12..+14 小时），所以它只负责「少扫一点」，
 /// 不改变结果：真正决定哪一天算哪一天的，仍然是后面那个 `date(...,'localtime')`。
-pub(in crate::storage) fn daily_metric_selected_for_export(
-    metric: &str,
-    selected: &BTreeSet<String>,
-) -> bool {
-    const RECOVERY: [&str; 19] = [
-        "resting_hr",
-        "readiness",
-        "bio_charge",
-        "hybrid_charge",
-        "physical_charge",
-        "mental_charge",
-        "physical_readiness",
-        "mental_readiness",
-        "hrv_readiness",
-        "rhr_readiness",
-        "skin_temp_readiness",
-        "afib_readiness",
-        "ahi_readiness",
-        "training_load",
-        "vo2max",
-        "lactate_threshold_hr",
-        "lactate_threshold_pace",
-        "pai_daily",
-        "pai_total",
-    ];
-    if metric.starts_with("intake_") {
-        return selected.contains("food");
-    }
-    let named = (metric == "steps" && selected.contains("steps"))
-        || (metric == "training_load" && selected.contains("training_load"))
-        || (metric == "vo2max" && selected.contains("vo2max"))
-        || ((metric.contains("spo2") || metric == "blood_oxygen") && selected.contains("spo2"))
-        || (metric.contains("stress") && selected.contains("stress"))
-        || (metric.starts_with("respiratory") && selected.contains("respiratory_rate"))
-        || (metric.starts_with("lactate_threshold") && selected.contains("lactate_threshold"))
-        || (metric.starts_with("pai") && selected.contains("pai"))
-        || (metric == "hrv_rmssd" && selected.contains("hrv_rmssd"));
-    if named {
-        return true;
-    }
-    let is_recovery = RECOVERY.contains(&metric);
-    (is_recovery && selected.contains("recovery"))
-        || (!is_recovery && selected.contains("daily_activity"))
-}
-
+///
 /// `pub(crate)`：ai_tasks 的逐日窗口查询同样要这个宽限边界来走时间索引。
 pub(crate) fn local_day_range_utc_bounds(start: &str, end: &str) -> Option<(String, String)> {
     let start = NaiveDate::parse_from_str(start, "%Y-%m-%d").ok()?;

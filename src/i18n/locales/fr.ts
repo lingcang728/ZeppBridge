@@ -5,172 +5,13 @@ import { plural, type LocalePack } from '../index';
  *
  * 约定：按钮用动词不定式（« Exporter »），状态说结果，错误说发生了什么 + 怎么恢复；
  * 法语双标点（: ; ! ?）前用不换行空格，引号用 « »，撇号用排版撇号 ’。
- * 只有绑定了 moduleId 的模块（i18n/errors、views/Explore、views/Settings）
+ * 只有绑定了 moduleId 的模块（例如 i18n/errors、views/Settings）
  * 才会被语言包覆盖——其余模块的键暂时留在 fr.pending.txt，等绑定后再翻。
  */
 
 export default {
   modules: {
     'components/ai/WorkoutPicker': { previous: 'Précédent', next: 'Suivant' },
-    'views/Explore': {
-      title: 'Confier à l’IA',
-      intro: 'Choisissez un modèle de prompt, vérifiez ce que le paquet contient vraiment, et envoyez vos données de montre à l’outil IA de votre choix.',
-      workoutScopeBanner: (workoutId: string) =>
-        `Export de la séance ${workoutId} et de rien d’autre : la séance elle-même plus les métriques point par point enregistrées pendant qu’elle tournait. Les flux journaliers comme le sommeil et les pas restent dehors. La plage de dates est inactive.`,
-      backToDateRange: 'Revenir à une plage de dates',
-      categoryTitle: 'Catégories',
-      categoryAria: 'Catégories de modèles',
-      categoryAll: 'Tous les modèles',
-      categorySummary: 'Résumé',
-      categoryTraining: 'Entraînement',
-      categoryRecovery: 'Récupération',
-      categorySleep: 'Sommeil',
-      templateListTitle: 'Modèles',
-      templateSearchPlaceholder: 'Rechercher un modèle…',
-      templateSearchAria: 'Rechercher un modèle',
-      noTemplates: 'Aucun modèle ne correspond.',
-      currentTemplate: 'Modèle actuel',
-      copyPromptTitle: 'Copier le texte du prompt dans le presse-papiers',
-      copyPrompt: 'Copier le prompt',
-      promptEditor: 'Éditeur de prompt',
-      promptEditorHint: ' (les données sont alignées automatiquement)',
-      injected: (count: number) => plural(count, { one: `${count} flux de données attaché`, other: `${count} flux de données attachés` }),
-      promptEditorAria: 'Éditeur de prompt',
-      summaryTitle: 'Ce que contient le paquet',
-      summaryHint: 'Seulement ce que vous cochez',
-      cellRange: 'Plage de temps',
-      cellCount: 'Enregistrements',
-      cellCountSub: 'enregistrements synchronisés',
-      cellTypes: 'Types de données',
-      cellTypesValue: (count: number) => `${count}`,
-      cellTypesSub: 'dans le paquet',
-      cellSize: 'Taille',
-      cellSizeSub: 'estimée',
-      thisWorkout: 'Cette séance',
-      onlyThisWorkout: 'cette séance uniquement',
-      approxMinutes: (minutes: number) => `(environ ${minutes} min)`,
-      rangeDays: (days: number) => `(${days} jours)`,
-      quickRange: 'Plage rapide :',
-      range7: '7 jours',
-      range30: '30 jours',
-      startDate: 'Date de début',
-      endDate: 'Date de fin',
-      datePickerAria: 'Sélecteur de date',
-      secureNote: 'Tout est construit localement : les données structurées et le prompt sont générés sur cette machine.',
-      secureOk: 'Local uniquement',
-      exportFile: (format: string) => `Exporter le fichier ${format}`,
-      copyPromptOnly: 'Copier seulement le prompt',
-      preparing: 'Préparation…',
-      handTo: (provider: string) => `Confier à ${provider}`,
-      promptCopied: 'Prompt copié (sans les données).',
-      copyFailed: 'La copie a échoué. Réessayez.',
-      retryOpen: (provider: string) => `Ouvrir ${provider} à nouveau`,
-      packTitle: 'Empaqueter et envoyer',
-      packSub: 'Choisissez le format d’export et l’outil IA.',
-      packContentsTitle: 'Ce que contient l’export',
-      packContentsIncluded: 'Inclus : résumés de séances (type, début et fin, distance, calories, fréquence cardiaque moyenne et maximale, charge d’entraînement), métriques quotidiennes (pas, fréquence cardiaque de repos, VFC, SpO₂, stress, fréquence respiratoire, PAI, VO₂ max), et sessions de sommeil avec leur frise de phases. « Complet » ajoute les séries de séances à la seconde et les relevés de fréquence cardiaque individuels.',
-      packContentsExcluded: 'Non inclus : .tcx, détails du compte, jetons, numéros de série d’appareil. Les traces GPS n’apparaissent qu’en GPX et FIT, et seulement pour les séances qui en portent une. FIT écrit un fichier par séance dans un dossier que vous choisissez.',
-      formatGroup: 'Format d’export',
-      formatAria: 'Format d’export',
-      formatJsonSub: 'Données structurées complètes',
-      formatCsvSub: 'Tableau récapitulatif (sans séries point par point)',
-      formatGpxSub: 'Seulement les séances portant une trace GPS',
-      formatFitSub: 'Un fichier par séance, enregistré dans le dossier choisi',
-      detailGroup: 'Niveau de détail',
-      detailAria: 'Niveau de détail',
-      streamsGroup: 'Flux de données',
-      selectedCount: (selected: number, total: number) => `${selected} sur ${total} sélectionnés`,
-      selectNone: 'Tout décocher',
-      selectAll: 'Tout cocher',
-      noTypesSelected: 'Aucun type de données sélectionné : l’export sera refusé.',
-      estimatedSize: 'Taille estimée du paquet',
-      targetGroup: 'Outil IA cible',
-      targetAria: 'Outil IA cible',
-      providerIconAlt: (provider: string) => `Icône ${provider}`,
-      sendHint: 'Jusqu’à 2 Mio, le paquet suit le prompt dans le presse-papiers. Au-delà, le JSON est écrit sur votre bureau pour être glissé dans la conversation.',
-      needDesktop: 'La remise à l’IA requiert l’application de bureau ; cet aperçu navigateur n’ouvre pas de site externe.',
-      needValidDates: 'Choisissez d’abord une plage de dates valide.',
-      needDataTypes: 'Choisissez au moins un type de données.',
-      stillReading: 'Lecture des enregistrements locaux encore en cours. Réessayez dans un instant.',
-      nothingInScope: 'Rien de synchronisé à remettre sur cette plage.',
-      previewDesktopOnly: 'Ouvrez ceci dans l’application de bureau ZeppBridge ; l’aperçu lit les enregistrements locaux.',
-      previewFailed: 'Impossible de lire l’aperçu d’export local',
-      previewRetry: 'Réessayer',
-      attachmentNotice: 'Le paquet de données a été écrit sur votre bureau (zeppbridge-ai-handoff.json) — glissez-le dans la conversation IA. Le prompt est dans votre presse-papiers.',
-      attachmentOpened: (notice: string, provider: string) => `${notice} ${provider} est ouvert.`,
-      attachmentNotOpened: (notice: string, provider: string) => `${notice} Ouvrez ${provider} dans un navigateur pour l’analyser.`,
-      copiedAndOpened: (provider: string) => `Données anonymisées copiées et ${provider} ouvert. Collez-les pour commencer.`,
-      copiedOnly: (provider: string) => `Données anonymisées copiées. Ouvrez ${provider} vous-même et collez-les.`,
-      reopened: (provider: string) => `${provider} est ouvert. Collez-y les données.`,
-      templates: {
-        performance: {
-          name: 'Bilan de performance',
-          sub: 'Une lecture claire de la situation',
-          prompt: `Tu es un analyste en santé sportive qui transforme les données de montre connectée en enseignements simples et utilisables.
-À partir des données ZeppBridge ci-dessous (déjà en ordre chronologique),
-rédige un bilan clair et bien structuré de mes performances globales.
-Couvre le tableau d'ensemble, les tendances qui comptent, ce qui se démarque, ce qu'il faut surveiller et ce sur quoi je peux agir.
-Là où les données sont minces, dis-le franchement et dis-moi quoi collecter plutôt que de deviner.
-
-Réponds en Markdown, en utilisant tableaux, listes et puces quand cela aide.
-Garde un ton professionnel, concis et constructif.`,
-        },
-        training: {
-          name: 'Analyse d’entraînement',
-          sub: 'Charge d’entraînement et sa direction',
-          prompt: `Tu es un entraîneur d'endurance expérimenté.
-À partir des données d'entraînement ZeppBridge ci-dessous (fréquence cardiaque, charge d'entraînement et VO₂ max),
-analyse la structure de mon entraînement, la répartition des intensités et la direction de la charge.
-Signale ce qui cloche dans l'agencement des séances et dis-moi quoi changer au prochain cycle.
-
-Réponds en Markdown. Sois direct.`,
-        },
-        recovery: {
-          name: 'Récupération et forme',
-          sub: 'Récupération, VFC et aptitude à s’entraîner',
-          prompt: `Tu es un physiologiste spécialisé dans la récupération.
-À partir des données ZeppBridge de VFC, fréquence cardiaque de repos, sommeil et stress ci-dessous,
-évalue mon niveau de récupération et mon aptitude à m'entraîner,
-nomme les signes de fatigue qui s'accumule et dis-moi ce qui aiderait.
-
-Réponds en Markdown.`,
-        },
-        sleep: {
-          name: 'Analyse du sommeil',
-          sub: 'Qualité et régularité du sommeil',
-          prompt: `Tu es un conseiller en santé du sommeil.
-À partir des données ZeppBridge de phases de sommeil, durées et fréquence cardiaque ci-dessous,
-analyse la qualité et la régularité de mon sommeil et ce qui semble l'affecter,
-puis donne-moi des moyens concrets et réalisables de l'améliorer.
-
-Réponds en Markdown.`,
-        },
-        activity: {
-          name: 'Vue d’ensemble de l’activité',
-          sub: 'Mouvement quotidien et sa tendance',
-          prompt: `Tu es un conseiller en mode de vie sain.
-À partir des données ZeppBridge de pas, séances et fréquence cardiaque ci-dessous,
-donne-moi une vue d'ensemble de mon niveau d'activité quotidien et de sa tendance,
-puis suggère des façons pratiques de bouger davantage.
-
-Réponds en Markdown.`,
-        },
-        weekly: {
-          name: 'Revue hebdomadaire',
-          sub: 'Un regard en arrière sur la semaine, avec du concret',
-          prompt: `Tu es mon coach santé personnel, et tu passes mes données en revue une fois par semaine.
-À partir des données ZeppBridge de cette semaine ci-dessous, compare-moi uniquement à mes propres enregistrements passés.
-Résume ce qui a changé cette semaine, nomme ce qui s'est bien passé et ce qui mérite de l'attention, et donne-moi une courte liste de choses à faire la semaine prochaine.
-
-Contraintes :
-- Il n'y a aucune référence de population dans ces données. Ne me compare ni à des « adultes en bonne santé » ni à aucune moyenne.
-- Quand quelque chose manque, dis qu'il manque. Ne combles jamais le vide par un zéro ou une estimation.
-- Pas de diagnostic médical, pas de jugement de risque de maladie, pas de conseil de traitement.
-
-Réponds en Markdown.`,
-        },
-      },
-    },
 
     'views/Settings': {
       title: 'Paramètres',
@@ -778,13 +619,6 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
     },
 
     'lib/deviceCopy': {
-      introNoDevice: 'Local d’abord, sources intactes : vos enregistrements d’objets connectés, organisés en un dossier de santé réellement lisible.',
-      introOne: (name: string) =>
-        `Local d’abord, sources intactes : les enregistrements de ${name}, organisés en un dossier de santé réellement lisible.`,
-      introTwo: (first: string, second: string) =>
-        `Local d’abord, sources intactes : les enregistrements de ${first} et ${second}, organisés en un dossier de santé réellement lisible.`,
-      introMany: (first: string, second: string, count: number) =>
-        `Local d’abord, sources intactes : ${first}, ${second} et ${count} appareils au total, organisés en un dossier de santé réellement lisible.`,
       notProvided: 'Non renseigné',
     },
 
@@ -934,57 +768,6 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
         `Votre choix est enregistré (sur cette machine seulement). L’envoi de la contribution au catalogue a échoué : ${reason}`,
     },
 
-    'composables/useExport': {
-      groupTraining: 'Entraînement',
-      groupActivity: 'Activité',
-      groupSleep: 'Sommeil',
-      groupBody: 'État du corps',
-      groupContext: 'Contexte',
-      typeWorkouts: 'Séances',
-      typeDailyActivity: 'Activité quotidienne',
-      typeSteps: 'Pas',
-      typeHeartRate: 'Fréquence cardiaque',
-      typeSleep: 'Sommeil',
-      typeStress: 'Stress',
-      typeSpo2: 'SpO₂',
-      typePai: 'PAI',
-      typeRecovery: 'Récupération',
-      typeTrainingLoad: 'Charge d’entraînement',
-      typeLactateThreshold: 'Seuil de lactate',
-      typeRespiratoryRate: 'Fréquence respiratoire',
-      typeLifeEvents: 'Événements de vie',
-      detailSummary: 'Résumé',
-      detailSummaryHint: 'Fréquence cardiaque agrégée par heure, séries de séances à la seconde omises. Les métriques structurées restent complètes, et la taille convient à une remise à l’IA.',
-      detailFull: 'Complet',
-      detailFullHint: 'Garde les séries de séances à la seconde et les relevés de fréquence cardiaque individuels. Volumineux, pensé pour l’archivage.',
-      invalidDates: 'Choisissez une date de début et de fin valides.',
-      endBeforeStart: 'La date de fin ne peut pas précéder la date de début.',
-      noDataTypes: 'Choisissez au moins un type de données.',
-      rangeTooLong: (days: number) => `Un export couvre au plus ${days} jours. Pour un historique plus long, utilisez l’instantané de la base dans les Paramètres.`,
-      nothingToExport: 'Rien à exporter sur cette période.',
-      scopeConflict: 'Une plage de dates et une séance unique sont deux portées mutuellement exclusives. Choisissez-en une.',
-      jsonFilter: 'Fichier JSON',
-      csvFilter: 'Tableau CSV',
-      gpxFilter: 'Trace GPX',
-      fitFilter: 'Fichiers d’activité FIT',
-      saveJsonTitle: 'Enregistrer le JSON ZeppBridge',
-      saveCsvTitle: 'Enregistrer le CSV ZeppBridge (tableau récapitulatif)',
-      saveGpxTitle: 'Enregistrer le GPX ZeppBridge (trace GPS)',
-      saveFitTitle: 'Choisir un dossier pour l’export FIT (un fichier par séance)',
-      jsonTooLarge: 'Le JSON dépasse 1 Mo. Utilisez plutôt « Enregistrer le fichier ».',
-      copied: (count: number) => `${count} enregistrements normalisés copiés.`,
-      copyFailed: 'Impossible de copier le JSON',
-      saved: (count: number, unit: string) => `Enregistré : ${count} ${unit}.`,
-      savedFiles: (files: number, count: number, unit: string) =>
-        `${files} fichiers FIT enregistrés, ${count} ${unit} au total.`,
-      saveFailed: (format: string) => `Impossible d’enregistrer le ${format}`,
-      feedUpdated: (count: number) => `La source IA locale contient désormais ${count} enregistrements.`,
-      feedFailed: 'Impossible de mettre à jour la source IA locale',
-      unitRecords: 'enregistrements',
-      unitRows: 'lignes',
-      unitSamplePoints: 'points de mesure',
-      unitTrackPoints: 'points de trace',
-    },
 
     'composables/useSyncController': {
       notSyncedYet: 'Pas encore synchronisé',
@@ -1294,7 +1077,6 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       hrZonesAria: 'Zones de fréquence cardiaque (seuils absolus)',
       hrEmpty: 'Les vraies variations de fréquence cardiaque apparaissent ici après une synchro.',
       hrMore: 'Les 24 h complètes',
-      hrTooltip: (clock: string, value: number) => `${clock} <b>${value}</b> bpm`,
       latest: 'Dernière',
       bpm: 'bpm',
       zoneRest: 'Repos 0–99',
@@ -2080,14 +1862,9 @@ Répondez en Markdown.`,
     'err.export.empty_range': 'Aucun enregistrement à exporter sur cette plage',
     'err.export.convert_failed': 'Impossible de convertir vers le format demandé',
     'err.export.write_failed': 'Impossible d’écrire le fichier d’export',
-    'err.export.write_json_failed': 'Impossible d’écrire l’export JSON',
-    'err.export.mkdir_failed': 'Impossible de créer le dossier d’export',
     'err.export.path_required': 'Choisissez d’abord où enregistrer le fichier',
     'err.export.path_not_absolute': 'L’emplacement d’enregistrement doit être un chemin absolu',
     'err.export.not_a_directory': 'Un export FIT demande un dossier, mais le chemin choisi est un fichier',
-    'err.export.bad_extension': 'Le fichier d’export a une mauvaise extension',
-    'err.export.path_no_parent': 'L’emplacement d’enregistrement n’a pas de dossier valide',
-    'err.export.parent_missing': 'Le dossier choisi n’existe pas',
     'err.handoff.prompt_required': 'Écrivez d’abord un prompt',
     'err.handoff.empty_range': 'Aucun enregistrement à remettre sur cette plage',
     'err.handoff.mkdir_failed': 'Impossible de créer le dossier de remise',

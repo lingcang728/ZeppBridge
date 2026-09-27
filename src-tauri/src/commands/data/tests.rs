@@ -475,25 +475,6 @@ fn fused_and_unknown_profiles_never_claim_a_catalog_device() {
 }
 
 #[test]
-fn export_path_requires_absolute_json_in_existing_folder() {
-    let temp = std::env::temp_dir();
-    let valid = temp.join("zeppbridge-export.JSON");
-    assert_eq!(
-        validate_json_export_path(valid.to_string_lossy().as_ref()).unwrap(),
-        valid
-    );
-    assert!(validate_json_export_path("relative.json").is_err());
-    assert!(validate_json_export_path(temp.join("export.txt").to_string_lossy().as_ref()).is_err());
-    assert!(validate_json_export_path(
-        temp.join("missing-folder")
-            .join("export.json")
-            .to_string_lossy()
-            .as_ref()
-    )
-    .is_err());
-}
-
-#[test]
 fn ai_handoff_redacts_nested_identifiers_and_precise_route_by_default() {
     let source = json!({
         "user": { "id": "user-secret", "name": "private" },

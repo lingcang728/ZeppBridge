@@ -128,18 +128,6 @@ impl ExportSelection {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ExportEstimate {
-    pub record_count: usize,
-    pub estimated_bytes: u64,
-    pub scope_kind: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub start_time: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub end_time: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportResult {
     pub path: String,
     pub record_count: usize,

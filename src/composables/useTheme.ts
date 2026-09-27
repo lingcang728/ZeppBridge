@@ -19,8 +19,6 @@ export type ResolvedTheme = 'light' | 'dark';
 
 const STORAGE_KEY = 'zeppbridge-theme';
 
-export const THEME_MODES: readonly ThemeMode[] = ['light', 'dark', 'system'];
-
 const isThemeMode = (value: unknown): value is ThemeMode =>
   value === 'light' || value === 'dark' || value === 'system';
 

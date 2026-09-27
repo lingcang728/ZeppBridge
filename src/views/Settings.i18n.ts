@@ -3,7 +3,7 @@ import { defineMessages } from '../i18n';
 /*
  * 设置页的文案。
  *
- * 单独放一个文件的理由和 `Explore.i18n.ts` 一样：这一页本来就有两千行，
+ * 单独放一个文件：这一页本来就有两千行，
  * 再往 `<script setup>` 里塞四百行文案，逻辑会被推到看不见的地方。
  * 只被 Settings.vue import，所以跟着它的 chunk 走，不进首屏。
  */

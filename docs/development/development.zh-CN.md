@@ -129,11 +129,7 @@ Tauri command 在 `src-tauri/src/lib.rs` 注册，前端封装在 `src/lib/bridg
 | `get_device_profile` / `get_device_profiles` | 读取识别到的设备档案 | 来自编译进二进制的 `catalog.json`；认不出的设备不猜型号 |
 | `get_storage_estimate` | 估算本地库体积与可清理量 | 只读，按天计算 |
 | `reprocess_local_data` | 用当前解析器重放本地 raw | 不触网，不改云端同步时间；返回各 stream 重放条数 |
-| `get_export_json` | 生成导出 JSON 字符串 | 只按 `ExportSelection` 取本地数据 |
-| `save_json_export` | 另存导出文件 | 路径经 `validate_export_path(.., "json")` 校验 |
-| `save_csv_export` | 另存长表 CSV（汇总） | 复用同一份标准化 JSON 再转换；`record_count` 是数据行数；不含逐点序列与轨迹 |
-| `save_gpx_export` | 另存 GPX 1.1 轨迹 | 只有解码出 route 的运动才成轨；一个点都没有时报错而不是写空文件；心率仅在时间戳完全一致时写入 |
-| `publish_ai_export` | 更新本机 `exports/zeppbridge-ai-feed.json` | 固定路径，原子写 |
+| `save_fit_export` | 把选中的运动写成 FIT，一次运动一个文件 | 总是读完整逐秒序列；一条序列都没有时报错而不是留空目录。JSON / CSV / GPX 落盘走 CLI（`zeppbridge-cli export`） |
 | `prepare_ai_handoff` | 生成交给外部 AI 的脱敏数据包 | 复用同一 export builder 后再做递归脱敏；> 2 MiB 改写桌面文件；精确轨迹需显式开启 |
 | `get_local_api_status` | 读取本机 REST API 启动状态与固定地址 | 端口冲突不会阻止桌面 App 启动 |
 | `cleanup_old_data` | 按天清理旧数据 | `1–365` 天；跨 canonical 表并清理无引用 raw |

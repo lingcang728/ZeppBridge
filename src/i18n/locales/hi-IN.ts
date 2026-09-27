@@ -15,185 +15,6 @@ import { plural, type LocalePack } from '../index';
 export default {
   modules: {
     'components/ai/WorkoutPicker': { previous: 'पिछला', next: 'अगला' },
-    'views/Explore': {
-      title: 'AI को सौंपें',
-      intro: 'टेम्पलेट चुनें, पैकेज में असल में क्या है देखें, और अपना वियरेबल डेटा अपनी पसंद के AI टूल को भेजें।',
-
-      workoutScopeBanner: (workoutId: string) =>
-        `अभी सिर्फ़ वर्कआउट ${workoutId} एक्सपोर्ट होगा: ख़ुद वर्कआउट और उसके दौरान रिकॉर्ड हुए पॉइंट-दर-पॉइंट मेट्रिक्स। नींद और कदम जैसी दैनिक स्ट्रीम बाहर रहती हैं। तारीख़-सीमा निष्क्रिय है।`,
-      backToDateRange: 'तारीख़-सीमा पर वापस',
-
-      categoryTitle: 'श्रेणियाँ',
-      categoryAria: 'टेम्पलेट श्रेणियाँ',
-      categoryAll: 'सारे टेम्पलेट',
-      categorySummary: 'सारांश',
-      categoryTraining: 'ट्रेनिंग',
-      categoryRecovery: 'रिकवरी',
-      categorySleep: 'नींद',
-
-      templateListTitle: 'टेम्पलेट',
-      templateSearchPlaceholder: 'टेम्पलेट खोजें…',
-      templateSearchAria: 'टेम्पलेट खोजें',
-      noTemplates: 'कोई टेम्पलेट नहीं मिला।',
-
-      currentTemplate: 'मौजूदा टेम्पलेट',
-      copyPromptTitle: 'प्रॉम्प्ट टेक्स्ट क्लिपबोर्ड पर कॉपी करें',
-      copyPrompt: 'प्रॉम्प्ट कॉपी करें',
-      promptEditor: 'प्रॉम्प्ट',
-      promptEditorHint: ' (डेटा अपने आप जुड़ जाता है)',
-      injected: (count: number) =>
-        plural(count, { one: `${count} डेटा स्ट्रीम जुड़ी`, other: `${count} डेटा स्ट्रीम जुड़ीं` }),
-      promptEditorAria: 'प्रॉम्प्ट एडिटर',
-
-      summaryTitle: 'पैकेज में क्या है',
-      summaryHint: 'सिर्फ़ जो आप टिक करें',
-      cellRange: 'समय-सीमा',
-      cellCount: 'रिकॉर्ड्स',
-      cellCountSub: 'सिंक हुए रिकॉर्ड्स',
-      cellTypes: 'डेटा टाइप',
-      cellTypesValue: (count: number) => `${count} प्रकार`,
-      cellTypesSub: 'पैकेज में',
-      cellSize: 'साइज़',
-      cellSizeSub: 'अनुमानित',
-
-      thisWorkout: 'यह वर्कआउट',
-      onlyThisWorkout: 'सिर्फ़ यह वर्कआउट',
-      approxMinutes: (minutes: number) => `(करीब ${minutes} मिनट)`,
-      rangeDays: (days: number) => `(${days} दिन)`,
-
-      quickRange: 'क्विक रेंज:',
-      range7: '7 दिन',
-      range30: '30 दिन',
-      startDate: 'शुरुआती तारीख़',
-      endDate: 'आख़िरी तारीख़',
-      datePickerAria: 'तारीख़ चुनने वाला',
-
-      secureNote: 'सब कुछ लोकल बनता है: स्ट्रक्चर्ड डेटा और प्रॉम्प्ट इसी मशीन पर बनते हैं।',
-      secureOk: 'सिर्फ़ लोकल',
-      exportFile: (format: string) => `${format} फ़ाइल एक्सपोर्ट करें`,
-      copyPromptOnly: 'सिर्फ़ प्रॉम्प्ट कॉपी करें',
-      preparing: 'तैयार हो रहा है…',
-      handTo: (provider: string) => `${provider} को सौंपें`,
-      promptCopied: 'प्रॉम्प्ट कॉपी हो गया (कोई डेटा शामिल नहीं)।',
-      copyFailed: 'कॉपी नहीं हुआ। फिर कोशिश करें।',
-      retryOpen: (provider: string) => `${provider} फिर से खोलें`,
-
-      packTitle: 'पैक करके भेजें',
-      packSub: 'एक्सपोर्ट फ़ॉर्मैट और AI टूल चुनें।',
-      // issue #28 的教训：按下导出之前就该说清会拿到什么。
-      packContentsTitle: 'एक्सपोर्ट में क्या है',
-      packContentsIncluded:
-        'शामिल है: वर्कआउट सारांश (टाइप, शुरुआत और अंत, दूरी, कैलोरी, औसत और अधिकतम हार्ट रेट, '
-        + 'ट्रेनिंग लोड), दैनिक मेट्रिक्स (कदम, रेस्टिंग हार्ट रेट, HRV, SpO2, स्ट्रेस, श्वास दर, PAI, '
-        + 'VO2max), और स्टेज टाइमलाइन सहित नींद सेशन। "पूरा" चुनने पर प्रति-सेकंड वर्कआउट सीरीज़ '
-        + 'और हर अलग हार्ट रेट रीडिंग जुड़ती है।',
-      packContentsExcluded:
-        'शामिल नहीं: .tcx, खाते की जानकारी, टोकन, या डिवाइस सीरियल नंबर। GPS ट्रैक GPX और FIT '
-        + 'फ़ॉर्मैट में आते हैं, और सिर्फ़ उन वर्कआउट के लिए जिनमें ट्रैक है। FIT हर वर्कआउट की एक '
-        + 'फ़ाइल आपके चुने फ़ोल्डर में लिखता है।',
-      formatGroup: 'एक्सपोर्ट फ़ॉर्मैट',
-      formatAria: 'एक्सपोर्ट फ़ॉर्मैट',
-      formatJsonSub: 'पूरा स्ट्रक्चर्ड डेटा',
-      formatCsvSub: 'सारांश तालिका (पॉइंट-दर-पॉइंट सीरीज़ के बिना)',
-      formatGpxSub: 'सिर्फ़ GPS ट्रैक वाले वर्कआउट',
-      formatFitSub: 'हर वर्कआउट एक फ़ाइल, आपके चुने फ़ोल्डर में सेव',
-      detailGroup: 'विवरण का स्तर',
-      detailAria: 'विवरण का स्तर',
-      streamsGroup: 'डेटा स्ट्रीम्स',
-      selectedCount: (selected: number, total: number) => `${selected} / ${total} चुने गए`,
-      selectNone: 'सब हटाएँ',
-      selectAll: 'सब चुनें',
-      noTypesSelected: 'कोई डेटा टाइप नहीं चुना, इसलिए एक्सपोर्ट मना कर दिया जाएगा।',
-      estimatedSize: 'पैकेज का अनुमानित साइज़',
-      targetGroup: 'लक्ष्य AI टूल',
-      targetAria: 'लक्ष्य AI टूल',
-      providerIconAlt: (provider: string) => `${provider} आइकन`,
-      sendHint: '2 MiB तक प्रॉम्प्ट के साथ क्लिपबोर्ड पर जाता है। उससे बड़ा होने पर JSON आपके डेस्कटॉप पर लिखा जाता है — चैट में खींचकर डालें।',
-
-      needDesktop: 'AI हैंड-ऑफ़ के लिए डेस्कटॉप ऐप चाहिए; यह ब्राउज़र प्रीव्यू बाहरी साइट नहीं खोलेगा।',
-      needValidDates: 'पहले एक मान्य तारीख़-सीमा चुनें।',
-      needDataTypes: 'कम से कम एक डेटा टाइप चुनें।',
-      stillReading: 'लोकल रिकॉर्ड्स अभी पढ़े जा रहे हैं। थोड़ी देर में फिर कोशिश करें।',
-      nothingInScope: 'इस सीमा में सौंपने लायक कोई सिंक हुआ रिकॉर्ड नहीं।',
-      previewDesktopOnly: 'इसे ZeppBridge डेस्कटॉप ऐप में खोलें; प्रीव्यू लोकल रिकॉर्ड्स पढ़ता है।',
-      previewFailed: 'लोकल एक्सपोर्ट प्रीव्यू नहीं पढ़ा जा सका',
-      previewRetry: 'फिर कोशिश करें',
-      attachmentNotice: 'डेटा पैकेज आपके डेस्कटॉप पर लिखा गया (zeppbridge-ai-handoff.json) — उसे AI चैट में खींचकर डालें। प्रॉम्प्ट आपके क्लिपबोर्ड पर है।',
-      attachmentOpened: (notice: string, provider: string) => `${notice} ${provider} खुल गया है।`,
-      attachmentNotOpened: (notice: string, provider: string) => `${notice} विश्लेषण के लिए ब्राउज़र में ${provider} खोलें।`,
-      copiedAndOpened: (provider: string) => `पहचान-रहित डेटा कॉपी हुआ और ${provider} खुल गया। चिपकाकर शुरू करें।`,
-      copiedOnly: (provider: string) => `पहचान-रहित डेटा कॉपी हुआ। ${provider} ख़ुद खोलकर चिपकाएँ।`,
-      reopened: (provider: string) => `${provider} खुल गया है। उसमें डेटा चिपकाएँ।`,
-
-      templates: {
-        performance: {
-          name: 'परफ़ॉर्मेंस सारांश',
-          sub: 'चीज़ें कैसी चल रही हैं, साफ़ नज़रिया',
-          prompt: `आप एक खेल-स्वास्थ्य विश्लेषक हैं जो वियरेबल डेटा को सीधी, काम आने वाली समझ में बदलते हैं।
-नीचे दिए ZeppBridge डेटा (पहले से समय-क्रम में) के आधार पर,
-मेरे कुल प्रदर्शन का साफ़, सुव्यवस्थित सारांश लिखें।
-कुल तस्वीर, मायने रखने वाले रुझान, क्या निखरा, किस पर ध्यान देना चाहिए और क्या किया जा सकता है — सब शामिल करें।
-जहाँ डेटा पतला है, साफ़ कहें और अंदाज़ा लगाने के बजाय बताएँ कि क्या जुटाना चाहिए।
-
-Markdown में जवाब दें, जहाँ मदद करें वहाँ तालिका, सूची और बुलेट इस्तेमाल करें।
-लहजा पेशेवर, संक्षिप्त और रचनात्मक रखें।`,
-        },
-        training: {
-          name: 'ट्रेनिंग इनसाइट',
-          sub: 'ट्रेनिंग लोड और उसकी दिशा',
-          prompt: `आप एक अनुभवी एंड्योरेंस कोच हैं।
-नीचे दिए ZeppBridge ट्रेनिंग डेटा (हार्ट रेट, ट्रेनिंग लोड और VO₂max) के आधार पर,
-मेरी ट्रेनिंग की संरचना, तीव्रता का वितरण और लोड किस दिशा में जा रहा है — इसका विश्लेषण करें।
-सेशन किस तरह सजाए गए हैं उसमें क्या गड़बड़ है बताएँ, और अगले चक्र में क्या बदलना चाहिए बताएँ।
-
-Markdown में जवाब दें। सीधे बोलें।`,
-        },
-        recovery: {
-          name: 'रिकवरी और तैयारी',
-          sub: 'रिकवरी, HRV और ट्रेनिंग की तैयारी',
-          prompt: `आप रिकवरी में माहिर एक शरीर-विज्ञानी हैं।
-नीचे दिए ZeppBridge HRV, रेस्टिंग हार्ट रेट, नींद और स्ट्रेस डेटा के आधार पर,
-आंकलन करें कि मैं कितना रिकवर हुआ हूँ और ट्रेनिंग के लिए कितना तैयार हूँ,
-जमा होती थकान के संकेत बताएँ, और क्या मदद करेगा यह बताएँ।
-
-Markdown में जवाब दें।`,
-        },
-        sleep: {
-          name: 'नींद विश्लेषण',
-          sub: 'नींद की गुणवत्ता और नियमितता',
-          prompt: `आप नींद-स्वास्थ्य सलाहकार हैं।
-नीचे दिए ZeppBridge नींद स्टेज, अवधि और हार्ट रेट डेटा के आधार पर,
-मेरी नींद की गुणवत्ता और नियमितता और उसे क्या प्रभावित करता दिखता है — इसका विश्लेषण करें,
-फिर उसे सुधारने के ठोस, काम में आने वाले तरीके बताएँ।
-
-Markdown में जवाब दें।`,
-        },
-        activity: {
-          name: 'एक्टिविटी ओवरव्यू',
-          sub: 'रोज़ की हलचल और उसका रुझान',
-          prompt: `आप स्वस्थ-जीवनशैली सलाहकार हैं।
-नीचे दिए ZeppBridge कदम, वर्कआउट और हार्ट रेट डेटा के आधार पर,
-मेरी दैनिक एक्टिविटी का स्तर और उसका रुझान दिखाएँ,
-फिर ज़्यादा हिलने-डुलने के व्यावहारिक तरीके सुझाएँ।
-
-Markdown में जवाब दें।`,
-        },
-        weekly: {
-          name: 'साप्ताहिक समीक्षा',
-          sub: 'बारीकियों के साथ हफ़्ते की झलक',
-          prompt: `आप मेरे निजी स्वास्थ्य कोच हैं, हफ़्ते में एक बार मेरा डेटा देखते हैं।
-नीचे दिए इस हफ़्ते के ZeppBridge डेटा के आधार पर, मेरी तुलना सिर्फ़ मेरे अपने पुराने रिकॉर्ड्स से करें।
-इस हफ़्ते क्या बदला सारांशित करें, क्या अच्छा रहा और किस पर ध्यान देना चाहिए बताएँ, और अगले हफ़्ते के लिए कामों की छोटी सूची दें।
-
-शर्तें:
-- इस डेटा में कोई जनसंख्या-आधार नहीं है। मेरी तुलना "स्वस्थ वयस्कों" या किसी औसत से न करें।
-- जहाँ कुछ मौजूद नहीं है, वहाँ लिखें कि मौजूद नहीं है। खाली जगह कभी 0 या अनुमान से न भरें।
-- कोई चिकित्सा निदान नहीं, कोई बीमारी-जोखिम निर्णय नहीं, कोई इलाज-सलाह नहीं।
-
-Markdown में जवाब दें।`,
-        },
-      },
-    },
 
     'views/Settings': {
       // ── 页头 ──
@@ -981,7 +802,6 @@ Markdown में जवाब दें।`,
       hrPanelAria: 'पूरे 24 घंटे के लिए हार्ट रेट डिटेल खोलें',
       hrChartAria: '24 घंटे की हार्ट रेट कर्व',
       hrWindow: (hours: number) => `पिछले ${hours} घंटे`,
-      hrTooltip: (clock: string, value: number) => `${clock} <b>${value}</b> bpm`,
       hrMore: 'पूरे 24 घंटे',
       hrZonesAria: 'हार्ट रेट ज़ोन (पूर्ण थ्रेशोल्ड)',
       zoneRest: 'आराम 0–99',
@@ -1098,57 +918,6 @@ Markdown में जवाब दें।`,
       unidentifiedDevice: 'न पहचाना डिवाइस',
     },
 
-    'composables/useExport': {
-      copied: (count: number) => `${count} नॉर्मलाइज़्ड रिकॉर्ड कॉपी हुए।`,
-      copyFailed: 'JSON कॉपी नहीं हो सका',
-      csvFilter: 'CSV तालिका',
-      detailFull: 'पूरा',
-      detailFullHint: 'प्रति-सेकंड वर्कआउट सीरीज़ और हर अलग हार्ट रेट रीडिंग रखता है। बड़ा होता है, आर्काइव के लिए बना है।',
-      detailSummary: 'सारांश',
-      detailSummaryHint: 'हार्ट रेट घंटे-दर-घंटे एग्रीगेट होता है, प्रति-सेकंड वर्कआउट सीरीज़ छूटती है। स्ट्रक्चर्ड मेट्रिक्स पूरे रहते हैं, और साइज़ AI को देने लायक रहता है।',
-      endBeforeStart: 'आख़िरी तारीख़ शुरुआती तारीख़ से पहले की नहीं हो सकती।',
-      feedFailed: 'लोकल AI फ़ीड अपडेट नहीं हो सका',
-      feedUpdated: (count: number) => `लोकल AI फ़ीड में अब ${count} रिकॉर्ड हैं।`,
-      fitFilter: 'FIT एक्टिविटी फ़ाइलें',
-      gpxFilter: 'GPX ट्रैक',
-      groupActivity: 'एक्टिविटी',
-      groupBody: 'बॉडी स्टेटस',
-      groupContext: 'पृष्ठभूमि',
-      groupSleep: 'नींद',
-      groupTraining: 'ट्रेनिंग',
-      invalidDates: 'मान्य शुरुआती और आख़िरी तारीख़ चुनें।',
-      jsonFilter: 'JSON फ़ाइल',
-      jsonTooLarge: 'JSON 1 MB से बड़ा है। इसके बजाय "फ़ाइल सेव करें" इस्तेमाल करें।',
-      noDataTypes: 'कम से कम एक डेटा टाइप चुनें।',
-      nothingToExport: 'इस दौरान एक्सपोर्ट करने लायक कुछ नहीं।',
-      rangeTooLong: (days: number) =>
-        `एक एक्सपोर्ट में ज़्यादा से ज़्यादा ${days} दिन आते हैं। लंबे इतिहास के लिए सेटिंग्स का डेटाबेस स्नैपशॉट इस्तेमाल करें।`,
-      saveCsvTitle: 'ZeppBridge CSV (सारांश तालिका) सेव करें',
-      saveFailed: (format: string) => `${format} सेव नहीं हो सका`,
-      saveFitTitle: 'FIT एक्सपोर्ट के लिए फ़ोल्डर चुनें (हर वर्कआउट एक फ़ाइल)',
-      saveGpxTitle: 'ZeppBridge GPX (GPS ट्रैक) सेव करें',
-      saveJsonTitle: 'ZeppBridge JSON सेव करें',
-      saved: (count: number, unit: string) => `${count} ${unit} सेव हुए।`,
-      savedFiles: (files: number, count: number, unit: string) => `${files} FIT फ़ाइलें सेव हुईं, कुल ${count} ${unit}।`,
-      scopeConflict: 'तारीख़-सीमा और एक वर्कआउट — दोनों एक्सपोर्ट दायरे परस्पर अलग हैं। एक चुनें।',
-      typeDailyActivity: 'दैनिक एक्टिविटी',
-      typeHeartRate: 'हार्ट रेट',
-      typeLactateThreshold: 'लैक्टेट थ्रेशोल्ड',
-      typeLifeEvents: 'लाइफ़ इवेंट्स',
-      typePai: 'पीएआई',
-      typeRecovery: 'तैयारी',
-      typeRespiratoryRate: 'श्वास दर',
-      typeSleep: 'नींद',
-      typeSpo2: 'ब्लड ऑक्सीजन',
-      typeSteps: 'कदम',
-      typeStress: 'स्ट्रेस',
-      typeTrainingLoad: 'ट्रेनिंग लोड',
-      typeWorkouts: 'वर्कआउट',
-      unitRecords: 'रिकॉर्ड',
-      unitRows: 'पंक्तियाँ',
-      unitSamplePoints: 'सैम्पल पॉइंट',
-      unitTrackPoints: 'ट्रैक पॉइंट',
-    },
 
     'composables/useSyncController': {
       alreadySyncing: 'एक सिंक पहले से चल रहा है। ख़त्म होने के बाद फिर कोशिश करें',
@@ -1248,11 +1017,6 @@ Markdown में जवाब दें।`,
     },
 
     'lib/deviceCopy': {
-      introMany: (first: string, second: string, count: number) =>
-        `लोकल-फ़र्स्ट, स्रोत सलामत: कुल ${count} डिवाइस — ${first}, ${second} आदि — के रिकॉर्ड एक साफ़, पढ़ने लायक हेल्थ फ़ाइल में।`,
-      introNoDevice: 'लोकल-फ़र्स्ट, स्रोत सलामत: आपके वियरेबल के रिकॉर्ड एक साफ़, पढ़ने लायक हेल्थ फ़ाइल में।',
-      introOne: (name: string) => `लोकल-फ़र्स्ट, स्रोत सलामत: ${name} के रिकॉर्ड एक साफ़, पढ़ने लायक हेल्थ फ़ाइल में।`,
-      introTwo: (first: string, second: string) => `लोकल-फ़र्स्ट, स्रोत सलामत: ${first} और ${second} के रिकॉर्ड एक साफ़, पढ़ने लायक हेल्थ फ़ाइल में।`,
       notProvided: 'उपलब्ध नहीं',
     },
 
@@ -2141,14 +1905,9 @@ Markdown में जवाब दें।`,
     'err.export.empty_range': 'इस सीमा में एक्सपोर्ट के लिए कोई रिकॉर्ड नहीं',
     'err.export.convert_failed': 'माँगे गए फ़ॉर्मैट में बदला नहीं जा सका',
     'err.export.write_failed': 'एक्सपोर्ट फ़ाइल नहीं लिखी जा सकी',
-    'err.export.write_json_failed': 'JSON एक्सपोर्ट नहीं लिखा जा सका',
-    'err.export.mkdir_failed': 'एक्सपोर्ट फ़ोल्डर नहीं बन सका',
     'err.export.path_required': 'पहले सेव करने की जगह चुनें',
     'err.export.path_not_absolute': 'सेव करने की जगह पूरा (एब्सोल्यूट) पाथ होना चाहिए',
     'err.export.not_a_directory': 'FIT एक्सपोर्ट को फ़ोल्डर चाहिए, पर चुना गया पाथ एक फ़ाइल है',
-    'err.export.bad_extension': 'एक्सपोर्ट फ़ाइल का एक्सटेंशन गलत है',
-    'err.export.path_no_parent': 'सेव करने की जगह में कोई मान्य फ़ोल्डर नहीं है',
-    'err.export.parent_missing': 'चुना गया फ़ोल्डर मौजूद नहीं है',
 
     /* —— 交给 AI —— */
     'err.handoff.prompt_required': 'पहले एक प्रॉम्प्ट लिखें',

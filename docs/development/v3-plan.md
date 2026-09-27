@@ -205,9 +205,9 @@ FIT 会同时放大锁持有时间和内存峰值 → 拆成「获取/暂存」�
    模式，抽成共享 composable。
 4. **优雅降级**：`/body` 与 `/training` 在只有官方源时会大面积空——按「生理测量 /
    体成分 / 饮食」分组，整组为空时一句话说明原因，**不铺 Upcoming 占位卡**。
-5. **bridge 分组**：95 个方法按域重组。**新增 command 仍要同时改四处**：
-   `commands/` → `lib.rs` 的 `invoke_handler` → `lib/bridge/types.ts` →
-   `tauri.ts` 与 `web.ts`（接口是全量的，漏一个 `npm run build` 就挂）。
+5. **bridge 分组**：95 个方法按域重组。**新增 command 要同时改三处**：
+   `commands/` → `lib.rs` 的 `invoke_handler` → `lib/bridge/types.ts` +
+   `tauri.ts`（接口是全量的，漏一个 `npm run build` 就挂；`web.ts` 是 Proxy，不用动）。
 
 ## 8. 分批
 

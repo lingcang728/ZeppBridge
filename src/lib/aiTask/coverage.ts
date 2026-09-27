@@ -12,7 +12,6 @@ import type {
   AiTaskPreview,
   AiTaskWorkoutBrief,
 } from '../bridge/types';
-import { parseDisplayDate } from '../dateTime';
 import { localDateString } from '../format';
 import { dataScopeLabel, workoutLabel } from '../labels';
 import { categoryLabel } from './categories';
@@ -136,6 +135,3 @@ export const formatBytes = (bytes: number | null | undefined): string => {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 };
-
-export const isValidDateString = (value: string): boolean =>
-  !Number.isNaN(parseDisplayDate(value).getTime());

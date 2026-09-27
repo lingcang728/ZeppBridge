@@ -6,7 +6,6 @@ import type {
   AiHandoffResult,
   CapabilityOverview,
   CapabilityProbe,
-  ExportEstimate,
   ExportResult,
   ExportSelection,
   HealthOverview,
@@ -308,14 +307,8 @@ export interface BridgeBackend {
   compactRawPayloads(): Promise<RawPayloadCompaction>;
   submitDiagnosticReport(note?: string, category?: string): Promise<FeedbackSubmissionResult>;
   submitDeviceModelAssignment(note?: string): Promise<FeedbackSubmissionResult>;
-  getExportJson(selection: ExportSelection): Promise<string>;
-  estimateExport(selection: ExportSelection): Promise<ExportEstimate>;
-  saveJsonExport(selection: ExportSelection, path: string): Promise<ExportResult>;
-  saveCsvExport(selection: ExportSelection, path: string): Promise<ExportResult>;
-  saveGpxExport(selection: ExportSelection, path: string): Promise<ExportResult>;
   /** FIT 一次运动一个文件，所以收的是目录而不是文件路径。 */
   saveFitExport(selection: ExportSelection, directory: string): Promise<ExportResult>;
-  publishAiExport(selection: ExportSelection): Promise<ExportResult>;
   prepareAiHandoff(
     selection: ExportSelection,
     prompt: string,
