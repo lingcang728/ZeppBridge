@@ -99,7 +99,7 @@ onActivated(reload);
 .le-timeline li { position: relative; display: flex; align-items: flex-start; gap: 14px; }
 .le-node { position: relative; z-index: 1; display: grid; width: 30px; height: 30px; flex: 0 0 30px; place-items: center; margin-top: 8px; border-radius: 50%;
   background: color-mix(in srgb, var(--event-tone) 22%, var(--mat-card-solid)); box-shadow: 0 0 0 4px var(--mat-card-solid); color: var(--event-tone); }
-.le-node.ongoing::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; box-shadow: 0 0 0 2px var(--event-tone); animation: le-breathe 2.4s ease-in-out infinite; }
+.le-node.ongoing::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; box-shadow: 0 0 0 2px var(--event-tone); animation: le-breathe 2.4s ease-in-out 3; }
 @keyframes le-breathe { 50% { opacity: .2; scale: 1.15; } }
 .le-card { display: grid; flex: 1; min-width: 0; gap: 4px; padding: 12px 16px; border: 0; border-radius: 20px;
   background: color-mix(in srgb, var(--ink) 4%, transparent); box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 5%, transparent);

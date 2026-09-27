@@ -27,9 +27,13 @@ const percent = (value: number) => `${Math.max(0, value) / maximum.value * 100}%
 .comparison-number { text-align: right; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .comparison-track { grid-column: 1 / -1; height: 6px; border-radius: 6px; overflow: hidden; background: rgba(232,238,244,.08); }
 .comparison-track i { display: block; height: 100%; border-radius: inherit; background: var(--muted); }
-.comparison-track .good, .comparison-track .bad { background-color: var(--accent); background-image: repeating-linear-gradient(-45deg, transparent 0 6px, rgba(255,255,255,.28) 6px 10px, transparent 10px 16px); background-size: 24px 24px; animation: comparison-flow 1.8s linear infinite; }
+/* 斜纹流动：条纹画在伪元素上、整层平移一格（24px）循环——只走合成器。以前动的是
+   background-position，每帧都要把「这一周」十几条进度条重画一遍，静止时也不停。
+   流四圈就停：合成器动画也要整窗重新合成，页面静止时不该还在出帧。 */
+.comparison-track .good, .comparison-track .bad { position: relative; overflow: hidden; background-color: var(--accent); }
+.comparison-track .good::before, .comparison-track .bad::before { content: ""; position: absolute; top: 0; bottom: 0; left: -24px; width: calc(100% + 24px); background-image: repeating-linear-gradient(-45deg, transparent 0 6px, rgba(255,255,255,.28) 6px 10px, transparent 10px 16px); background-size: 24px 24px; animation: comparison-flow 1.8s linear 4; }
 .comparison-track .bad { background-color: var(--danger); }
 .comparison-track .baseline { background: rgba(232,238,244,.24); }
-@keyframes comparison-flow { to { background-position: 24px 0; } }
-@media (prefers-reduced-motion: reduce) { .comparison-track .good, .comparison-track .bad { animation: none; } }
+@keyframes comparison-flow { to { transform: translateX(24px); } }
+@media (prefers-reduced-motion: reduce) { .comparison-track .good::before, .comparison-track .bad::before { animation: none; } }
 </style>

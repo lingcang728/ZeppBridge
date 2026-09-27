@@ -197,7 +197,9 @@ html[data-theme-morph]::view-transition-new(root) {
    时刻用：同一屏上不该有第二样东西在发光。
    玻璃控件带 backdrop-filter，本身就是层叠上下文：z-index:-1 的伪元素会画在
    它的底色之上——所以环用 mask 挖空只留一道边，外光用 box-shadow（外阴影
-   从不画进盒子里面），都不会把胶囊内部染成彩色。 */
+   从不画进盒子里面），都不会把胶囊内部染成彩色。
+   环转的是注册属性（每帧重画渐变）：转三圈、呼吸四次就停在静止的彩环上——
+   提示已经送到，「数据已备好」可能挂上几个小时，不能一直占着 GPU。 */
 @property --glow-angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
 .ready-glow { position: relative; }
 .ready-glow::before, .ready-glow::after {
@@ -214,16 +216,22 @@ html[data-theme-morph]::view-transition-new(root) {
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
-  animation: glow-spin 3.6s linear infinite;
+  animation: glow-spin 3.6s linear 3;
 }
 .ready-glow::after {
   inset: 0;
   box-shadow: 0 0 18px 1px color-mix(in srgb, var(--accent) 50%, transparent),
     0 0 44px 6px color-mix(in srgb, var(--activity) 24%, transparent);
-  animation: glow-breathe 2.6s ease-in-out infinite;
+  animation: glow-breathe 2.6s ease-in-out 4;
 }
 @keyframes glow-spin { to { --glow-angle: 360deg; } }
 @keyframes glow-breathe { 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) {
   .ready-glow::before, .ready-glow::after { animation: none; }
 }
+
+/* 窗口切到后台（最小化或失焦）时，装饰性的循环动画一律暂停；转圈类进度指示不停，
+   免得人在别的窗口看着它以为卡住了。开关由 main.ts 维护。 */
+html.is-backgrounded :not(.spinning, .ring-arc, .indeterminate),
+html.is-backgrounded :not(.spinning, .ring-arc, .indeterminate)::before,
+html.is-backgrounded :not(.spinning, .ring-arc, .indeterminate)::after { animation-play-state: paused !important; }

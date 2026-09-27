@@ -60,6 +60,8 @@ let velocity = 0;
 let raf = 0;
 let lastTs = 0;
 const dragging = ref(false);
+/** 吸附动画进行中：只有动着的时候才给每一项单独开合成层。 */
+const animating = ref(false);
 
 /** 相邻两项之间的空隙（沿圆柱表面量），px。 */
 const GAP = 12;
@@ -189,6 +191,7 @@ const tick = (ts: number) => {
     velocity = 0;
     raf = 0;
     lastTs = 0;
+    animating.value = false;
     settle();
     return;
   }
@@ -201,7 +204,10 @@ const animateTo = (index: number) => {
     settle();
     return;
   }
-  if (!raf) raf = requestAnimationFrame(tick);
+  if (!raf) {
+    animating.value = true;
+    raf = requestAnimationFrame(tick);
+  }
 };
 /** 转到第 index 项；首尾相接时走最近的那条路。 */
 const turnTo = (index: number) => {
@@ -231,6 +237,7 @@ const onDown = (event: PointerEvent) => {
   if (props.disabled || event.button !== 0 || !event.isPrimary || !root.value) return;
   cancelAnimationFrame(raf);
   raf = 0;
+  animating.value = false;
   lastTs = 0;
   velocity = 0;
   // 按下时就记住点的是哪一项：抓住指针以后，pointerup 的 target 会变成整个胶囊。
@@ -333,7 +340,7 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
   <div
     ref="root"
     :class="['capsule-wheel', `is-${orientation}`, `is-${variant}`, {
-      'is-dragging': dragging, 'is-icon-only': iconOnly, 'is-disabled': disabled, 'has-lens-icon': lensIcon,
+      'is-dragging': dragging, 'is-animating': animating, 'is-icon-only': iconOnly, 'is-disabled': disabled, 'has-lens-icon': lensIcon,
     }]"
     :style="vertical ? { height: `${span}px` } : { width: `${span}px` }"
     role="slider"
@@ -440,9 +447,9 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
   line-height: 1;
   white-space: nowrap;
   backface-visibility: hidden;
-  will-change: transform;
   transition: color var(--dur-fast) ease;
 }
+.capsule-wheel.is-dragging .wheel-item, .capsule-wheel.is-animating .wheel-item { will-change: transform; }
 .is-icon-only .wheel-item { padding: 0 7px; }
 /* 镜片里固定着一枚图标时，每一项左边多留出图标的位置：转到正中的那一项，
    字正好落在图标右边；两侧的项之间也就多了同样的间距，不会压到图标上。 */

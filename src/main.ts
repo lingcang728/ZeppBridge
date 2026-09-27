@@ -19,3 +19,12 @@ initializeTheme();
 
 const app = createApp(App);
 app.use(router).mount("#app");
+
+/* 窗口在后台（最小化 / 被切走）时给 <html> 挂一个类，material.css 据此暂停装饰性循环动画。 */
+const syncBackgrounded = () => {
+  document.documentElement.classList.toggle("is-backgrounded", document.hidden || !document.hasFocus());
+};
+document.addEventListener("visibilitychange", syncBackgrounded);
+window.addEventListener("blur", syncBackgrounded);
+window.addEventListener("focus", syncBackgrounded);
+syncBackgrounded();
