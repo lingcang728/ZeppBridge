@@ -23,6 +23,8 @@ export default {
       empty: 'इस मशीन पर अभी कोई वर्कआउट नहीं',
       remove: 'चुनाव हटाएँ',
       avgHr: (bpm: number) => `औसत HR ${bpm}`,
+      showMore: (count: number) => `${count} और दिखाएँ`,
+      showLess: 'कम दिखाएँ',
     },
 
     'views/Settings': {
@@ -387,6 +389,7 @@ export default {
 
     'App': {
       quickReturn: (page: string) => `${page} पर वापस जाएँ`,
+      previousPage: 'पिछले पेज',
       skipToContent: 'मुख्य कंटेंट पर जाएँ',
       mainNav: 'मुख्य नेविगेशन',
       bottomNav: 'मोबाइल मुख्य नेविगेशन',
@@ -810,6 +813,19 @@ export default {
     },
 
 
+    'components/overview/DataReadyCapsule': {
+      waitingEyebrow: 'क्लाउड से आपका डेटा लाया जा रहा है',
+      waitingHint: 'तैयार होते ही यहीं बता देंगे — तब तक इधर-उधर देख लीजिए',
+      step: (current: number, total: number) => `${current}/${total}`,
+      readyTitle: 'डेटा तैयार है',
+      readyNew: (records: string, clock: string) => `${records} नए रिकॉर्ड · ${clock} तक`,
+      readyFresh: (clock: string) => `पहले से नवीनतम · ${clock} तक`,
+      readyPartial: (streams: string, clock: string) => `${streams} नहीं मिला, बाकी सब अपडेट हुआ · ${clock} तक`,
+      cta: 'AI को सौंपें',
+      dismiss: 'अभी नहीं',
+      streamSeparator: ', ',
+    },
+
     'components/overview/HeartRateCard': {
       hrTitle: 'हाल का हार्ट रेट',
       hrEmpty: 'सिंक के बाद असली हार्ट रेट उतार-चढ़ाव यहाँ दिखता है।',
@@ -824,6 +840,9 @@ export default {
       zoneAnaerobic: 'एनारोबिक 170+',
       latest: 'नवीनतम',
       bpm: 'bpm',
+      cloudLag: 'घड़ी का डेटा पहले Zepp ऐप से क्लाउड पहुँचता है, तभी ZeppBridge उसे ला पाता है — लाने का समय डेटा का समय नहीं होता।',
+      hrStale: (hours: number, when: string) => `पिछले ${hours} घंटों में क्लाउड पर अभी कोई हार्ट रेट नहीं; नवीनतम रीडिंग ${when} की है।`,
+      latestAt: (when: string) => `नवीनतम रीडिंग · ${when}`,
     },
 
     'components/overview/RecentCard': {
@@ -836,6 +855,7 @@ export default {
       avgHr: (value: number) => `औसत HR ${value}`,
       timeUnknown: 'समय अज्ञात',
       seeAll: 'सब देखें',
+      newest: 'नवीनतम',
     },
 
     'components/overview/SleepCard': {
@@ -856,6 +876,7 @@ export default {
       identifyingDevices: 'आपके डिवाइस पहचाने जा रहे हैं…',
       identifyFailed: (reason: string) => `डिवाइस पहचान अभी उपलब्ध नहीं: ${reason}`,
       manage: 'मैनेज करें',
+      latestData: (when: string) => `नवीनतम डेटा ${when}`,
     },
 
     'components/overview/StepsCard': {
@@ -866,6 +887,8 @@ export default {
       stepsGoalReference: 'संदर्भ लक्ष्य',
       stepsGoalLine: (goal: string, percent: number) => `लक्ष्य ${goal} · ${percent}%`,
       seeMore: 'और देखें',
+      stepsLatest: (when: string) => `क्लाउड का नवीनतम डेटा ${when} का है`,
+      stepsNotYet: 'आज के कदम अभी क्लाउड तक नहीं पहुँचे',
     },
 
     'components/shell/AppTopBar': {
@@ -887,6 +910,8 @@ export default {
       themeDark: 'डार्क',
       localeLabel: 'इंटरफ़ेस भाषा',
       cancel: 'रद्द करें',
+      readyPill: 'डेटा तैयार · AI को सौंपें',
+      readyTitle: 'सिंक पूरा हुआ और लोकल डेटा नवीनतम है। AI को सौंपने के लिए क्लिक करें।',
     },
     'composables/useAiHandoff': {
       clipboardUnsupported: 'यह एनवायरनमेंट क्लिपबोर्ड में नहीं लिख सकता',
@@ -1048,6 +1073,8 @@ export default {
       noUpdates: 'अभी कोई अपडेट नहीं',
       notRecorded: 'रिकॉर्ड नहीं हुआ',
       timeUnknown: 'समय अज्ञात',
+      today: 'आज',
+      yesterday: 'कल',
     },
 
     'lib/labels': {
@@ -1083,6 +1110,7 @@ export default {
     },
 
     'lib/lifeEvents': {
+      all: 'सभी',
       active: 'जारी',
       add: 'इवेंट जोड़ें',
       cancel: 'रद्द करें',
@@ -1116,6 +1144,8 @@ export default {
       retry: 'फिर कोशिश करें',
       save: 'सेव करें',
       search: 'लाइफ़ इवेंट्स खोजें',
+      showLess: 'कम दिखाएँ',
+      showMore: (count: number) => `${count} और दिखाएँ`,
       start: 'शुरुआती तारीख़',
       title: 'लाइफ़ इवेंट्स',
     },
@@ -1216,6 +1246,21 @@ export default {
       daysOption: (days: number) => `${days} दिन`,
       recentDays: (days: number) => `पिछले ${days} दिन`,
       andMore: (count: number) => `और ${count - 1} अन्य`,
+      stepTarget: 'किसका विश्लेषण',
+      stepAsk: 'क्या पूछना है',
+      stepExtras: 'अटैचमेंट और विकल्प',
+      targetRecent: (days: number) => `कोई वर्कआउट नहीं चुना · पिछले ${days} दिन`,
+      askEmpty: 'अभी कोई सवाल नहीं · अकेली दिशा भी चलेगी',
+      askTemplate: (name: string) => `दिशा: ${name}`,
+      extrasNone: 'कोई अटैचमेंट नहीं · डिफ़ॉल्ट विकल्प',
+      extrasFiles: (count: number) => (count === 1 ? '1 अटैचमेंट' : `${count} अटैचमेंट`),
+      undoAdded: (name: string) => `“${name}” जोड़ा गया`,
+      undoRemoved: (name: string) => `“${name}” हटाया गया`,
+      undoKept: (name: string) => `“${name}” रखा गया`,
+      undoExcluded: (name: string) => `“${name}” बाहर किया गया`,
+      undoPicked: (name: string) => `“${name}” चुना गया`,
+      undoUnpicked: (name: string) => `“${name}” का चुनाव हटा गया`,
+      undoDirection: 'दिशा बदली गई',
     },
 
 
@@ -1549,6 +1594,17 @@ export default {
       title: 'हाल के रिकॉर्ड्स',
       today: 'आज',
       yesterday: 'कल',
+      introTimeline: 'हाल ही में सिंक हुई नींद और वर्कआउट एक ही टाइमलाइन पर, सबसे नया ऊपर।',
+      filterSleep: (count: number) => `नींद ${count}`,
+      filterWorkouts: (count: number) => `वर्कआउट ${count}`,
+      workoutTypeAria: 'वर्कआउट टाइप',
+      allSleep: 'सारी नींद',
+      allWorkouts: 'सारे वर्कआउट',
+      sleepTitle: 'नींद',
+      sleepScore: (score: number) => `स्कोर ${score}`,
+      avgHr: (bpm: number) => `औसत HR ${bpm}`,
+      showMore: (count: number) => `${count} और दिखाएँ`,
+      noRecords: 'इस अवधि में अभी कोई नींद या वर्कआउट रिकॉर्ड नहीं।',
     },
 
     'views/SleepDetail': {
@@ -1819,6 +1875,7 @@ Markdown में जवाब दें।`,
       save: 'सेव करें',
       saved: 'सेव हुआ',
       unsaved: 'न सेव किए गए बदलाव',
+      savedCount: (count: number) => `सेव किए टास्क (${count})`,
     },
 
     'components/ai/CoverageDetails': {
@@ -1875,6 +1932,17 @@ Markdown में जवाब दें।`,
       dragHint: 'इस फ़ोल्डर की फ़ाइलें AI चैट में खींचकर डालें, फिर प्रॉम्प्ट चिपकाएँ। साइट खोलना भेजा जाना नहीं है।',
       stale: 'एक्सपोर्ट के बाद टास्क बदल गया — डेस्कटॉप की फ़ाइलें पुरानी हो गई हैं। फिर से एक्सपोर्ट करें।',
       desktopOnly: 'एक्सपोर्ट के लिए डेस्कटॉप ऐप जोड़ें',
+      go: (label: string) => `${label} को सौंपें`,
+      goSub: 'एक्सपोर्ट · प्रॉम्प्ट कॉपी · साइट खोलें',
+      readiness: (categories: number, percent: number) => `${categories} डेटा प्रकार · ${percent}% दिनों में डेटा`,
+      readinessLoading: 'आपका डेटा गिना जा रहा है…',
+      issueCount: (count: number) => (count === 1 ? '1 नोट' : `${count} नोट`),
+      repeat: (count: number) => `×${count}`,
+      closePanel: 'बंद करें',
+      packageSize: (bytes: string) => `पैकेज करीब ${bytes}`,
+      readinessWaiting: 'नवीनतम डेटा अभी रास्ते में है',
+      readinessWaitingStep: (current: number, total: number) => `सिंक ${current}/${total} · पूरा होते ही यहाँ अपने आप रीफ़्रेश होता है`,
+      readinessWaitingSub: 'सिंक पूरा होते ही यह अपने आप रीफ़्रेश हो जाता है',
     },
 
     'components/ai/HandoffSteps': {
@@ -1930,6 +1998,7 @@ Markdown में जवाब दें।`,
       excludeNode: 'AI को न सौंपें',
       backToAll: 'सभी श्रेणियाँ',
       dismissHint: 'समझ गया',
+      zoomLevel: (percent: number) => `ज़ूम ${percent}% — पूरा ग्राफ़ कैनवस में समाने के लिए क्लिक करें`,
     },
 
     'components/deck/CardDeck': {

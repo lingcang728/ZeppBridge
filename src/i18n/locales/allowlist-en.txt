@@ -56,6 +56,7 @@ lib/aiTask/metrics.unit_s
 lib/aiTask/metrics.unit_score
 lib/aiTask/metrics.vo2max
 views/settings/deck.secMcp
+components/overview/DataReadyCapsule.streamSeparator
 
 # nl
 components/DevicePicker.filterBand
@@ -78,6 +79,7 @@ views/WorkoutDetail.statMin
 views/WorkoutDetail.statMax
 views/WorkoutDetail.eyebrowRoute
 views/WorkoutDetail.eyebrowExport
+components/overview/DataReadyCapsule.streamSeparator
 
 # de
 components/DeviceVisual.ring
@@ -147,6 +149,7 @@ lib/aiTask/metrics.vo2max
 views/settings/deck.secMcp
 views/settings/deck.themeLabel
 views/settings/deck.themeSystem
+components/overview/DataReadyCapsule.streamSeparator
 
 # fr
 views/Settings.unidentifiedInitial
@@ -166,6 +169,7 @@ views/WorkoutDetail.chartCadence
 views/WorkoutDetail.eyebrowProvenance
 views/WorkoutDetail.provenanceTitle
 views/WorkoutDetail.provenanceAria
+components/overview/DataReadyCapsule.streamSeparator
 
 # pt-PT
 components/BackupPanel.kind.manual
@@ -219,6 +223,7 @@ lib/aiTask/metrics.unit_min
 lib/aiTask/metrics.unit_s
 lib/aiTask/metrics.vo2max
 views/settings/deck.secMcp
+components/overview/DataReadyCapsule.streamSeparator
 
 # ru
 components/HeartRateZonePicker.basesSeparator
@@ -230,3 +235,7 @@ views/HealthCheck.period
 views/HealthCheck.sourceSeparator
 views/Overview.factSpo2
 views/Settings.refreshFailedPeriod
+components/overview/DataReadyCapsule.streamSeparator
+
+# hi-IN
+components/overview/DataReadyCapsule.streamSeparator

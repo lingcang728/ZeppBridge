@@ -22,6 +22,8 @@ export default {
       empty: 'Ainda não há treinos nesta máquina',
       remove: 'Retirar a seleção',
       avgHr: (bpm: number) => `FC média ${bpm}`,
+      showMore: (count: number) => `Ver mais ${count}`,
+      showLess: 'Ver menos',
     },
     'views/Settings': {
       title: 'Definições',
@@ -399,6 +401,7 @@ export default {
     },
     App: {
       quickReturn: (page: string) => `Voltar a ${page}`,
+      previousPage: 'a página anterior',
       skipToContent: 'Saltar para o conteúdo principal',
       mainNav: 'Navegação principal',
       bottomNav: 'Navegação principal móvel',
@@ -872,6 +875,20 @@ export default {
         'weekly.training_load': 'Carga de treino',
       },
     },
+    'components/overview/DataReadyCapsule': {
+      waitingEyebrow: 'A obter os teus dados da nuvem',
+      waitingHint: 'recebes um aviso aqui — entretanto, explora à vontade',
+      step: (current: number, total: number) => `${current}/${total}`,
+      readyTitle: 'Os teus dados estão prontos',
+      readyNew: (records: string, clock: string) =>
+        `${records} registos novos · às ${clock}`,
+      readyFresh: (clock: string) => `Já está tudo atualizado · às ${clock}`,
+      readyPartial: (streams: string, clock: string) =>
+        `${streams} em falta; o resto está atualizado · às ${clock}`,
+      cta: 'Entregar à IA',
+      dismiss: 'Agora não',
+      streamSeparator: ', ',
+    },
     'components/overview/HeartRateCard': {
       hrPanelAria: 'Abrir o detalhe de frequência cardíaca das 24 horas completas',
       hrTitle: 'Frequência cardíaca recente',
@@ -887,6 +904,11 @@ export default {
       zoneFat: 'Queima de gordura 100–139',
       zoneAerobic: 'Aeróbica 140–169',
       zoneAnaerobic: 'Anaeróbica 170+',
+      cloudLag:
+        'Os dados do relógio têm de chegar à nuvem através da app Zepp antes de o ZeppBridge os conseguir obter — a hora da obtenção não é a hora dos dados.',
+      hrStale: (hours: number, when: string) =>
+        `Ainda sem frequência cardíaca na nuvem nas últimas ${hours} horas; a leitura mais recente é de ${when}.`,
+      latestAt: (when: string) => `Leitura mais recente · ${when}`,
     },
     'components/overview/RecentCard': {
       recentAria: 'Registos recentes',
@@ -898,6 +920,7 @@ export default {
       sleepScore: (score: number) => `Pontuação de sono ${score}`,
       avgHr: (value: number) => `FC média ${value}`,
       timeUnknown: 'Hora desconhecida',
+      newest: 'Mais recente',
     },
     'components/overview/SleepCard': {
       sleepPanelAria: 'Abrir o detalhe de sono',
@@ -917,6 +940,7 @@ export default {
       noDevicesYet: 'Ainda não foi identificado nenhum dispositivo.',
       manage: 'Gerir',
       sourcesAria: 'Origens de dados e estado da conta',
+      latestData: (when: string) => `Dados mais recentes ${when}`,
     },
     'components/overview/StepsCard': {
       stepsPanelAria: 'Abrir o detalhe de atividade diária',
@@ -926,6 +950,8 @@ export default {
       stepsUnit: 'passos',
       stepsGoalLine: (goal: string, percent: number) => `Meta ${goal} · ${percent}%`,
       seeMore: 'Ver mais',
+      stepsLatest: (when: string) => `Os dados mais recentes na nuvem são de ${when}`,
+      stepsNotYet: 'Os passos de hoje ainda não chegaram à nuvem',
     },
     'components/shell/AppTopBar': {
       today: 'Hoje',
@@ -946,6 +972,9 @@ export default {
       themeDark: 'Escuro',
       themeSystem: 'Sistema',
       localeLabel: 'Idioma da interface',
+      readyPill: 'Dados prontos · entregar à IA',
+      readyTitle:
+        'Sincronização concluída: os dados locais estão em dia. Clica para os entregar à IA.',
     },
     'composables/useAiHandoff': {
       clipboardUnsupported:
@@ -1093,6 +1122,8 @@ export default {
       notRecorded: 'Não registado',
       duration: (hours: number, minutes: number) =>
         (hours > 0 ? `${hours} h ${minutes} min` : `${minutes} min`),
+      today: 'Hoje',
+      yesterday: 'Ontem',
     },
     'lib/labels': {
       unknownWithCode: (code: string) => `Treino não reconhecido (código ${code})`,
@@ -1164,6 +1195,9 @@ export default {
         training: 'Treino e provas',
         other: 'Outro',
       },
+      all: 'Todos',
+      showMore: (count: number) => `Ver mais ${count}`,
+      showLess: 'Ver menos',
     },
     'lib/metricSeries': {
       noRecordsToShow: 'Sem registos para mostrar',
@@ -1262,6 +1296,21 @@ export default {
         plural(days, { one: `${days} dia`, other: `${days} dias` }),
       andMore: (count: number) => `e mais ${count - 1}`,
       recentDays: (days: number) => `Últimos ${days} dias`,
+      stepTarget: 'O que analisar',
+      stepAsk: 'O que perguntar',
+      stepExtras: 'Anexos e opções',
+      targetRecent: (days: number) => `Sem treino selecionado · os últimos ${days} dias`,
+      askEmpty: 'Ainda sem pergunta · basta escolher uma direção',
+      askTemplate: (name: string) => `Direção: ${name}`,
+      extrasNone: 'Sem anexos · opções predefinidas',
+      extrasFiles: (count: number) => (count === 1 ? '1 anexo' : `${count} anexos`),
+      undoAdded: (name: string) => `Adicionaste «${name}»`,
+      undoRemoved: (name: string) => `Removeste «${name}»`,
+      undoKept: (name: string) => `Mantiveste «${name}»`,
+      undoExcluded: (name: string) => `Excluíste «${name}»`,
+      undoPicked: (name: string) => `Escolheste «${name}»`,
+      undoUnpicked: (name: string) => `Anulaste a escolha de «${name}»`,
+      undoDirection: 'Direção de análise alterada',
     },
     'views/BodyStatus': {
       backToOverview: 'Voltar à visão geral',
@@ -1636,6 +1685,18 @@ export default {
       notProvided: 'Não fornecido',
       today: 'Hoje',
       yesterday: 'Ontem',
+      introTimeline:
+        'Sono e treinos sincronizados recentemente numa só linha temporal — os mais recentes em cima.',
+      filterSleep: (count: number) => `Sono ${count}`,
+      filterWorkouts: (count: number) => `Treinos ${count}`,
+      workoutTypeAria: 'Tipo de treino',
+      allSleep: 'Todo o sono',
+      allWorkouts: 'Todos os treinos',
+      sleepTitle: 'Sono',
+      sleepScore: (score: number) => `Pontuação ${score}`,
+      avgHr: (bpm: number) => `FC média ${bpm}`,
+      showMore: (count: number) => `Ver mais ${count}`,
+      noRecords: 'Ainda sem registos de sono ou treinos neste período.',
     },
     'views/SleepDetail': {
       title: 'Registo de sono',
@@ -1933,6 +1994,7 @@ Responde em Markdown.`,
         'Escolhe um treino, escolhe os dados e diz o que queres saber — exporta para o ambiente de trabalho e arrasta o resultado para a IA.',
       titleLabel: 'Nome da tarefa',
       savedTasks: 'Tarefas guardadas',
+      savedCount: (count: number) => `Tarefas guardadas (${count})`,
       newTask: 'Nova',
       save: 'Guardar',
       saved: 'Guardada',
@@ -1997,6 +2059,19 @@ Responde em Markdown.`,
       stale:
         'A tarefa mudou depois da exportação — os ficheiros no ambiente de trabalho estão desatualizados. Exporta outra vez.',
       reveal: 'Mostrar no Explorador de Ficheiros',
+      go: (label: string) => `Entregar a ${label}`,
+      goSub: 'Exportar · copiar o prompt · abrir o site',
+      readiness: (categories: number, percent: number) =>
+        `${categories} tipos de dados · ${percent}% dos dias com dados`,
+      readinessLoading: 'A contar os teus dados…',
+      issueCount: (count: number) => (count === 1 ? '1 aviso' : `${count} avisos`),
+      repeat: (count: number) => `×${count}`,
+      closePanel: 'Fechar',
+      packageSize: (bytes: string) => `Pacote ≈ ${bytes}`,
+      readinessWaiting: 'Os dados mais recentes ainda estão a caminho',
+      readinessWaitingStep: (current: number, total: number) =>
+        `Sincronização ${current}/${total} · atualiza-se quando terminar`,
+      readinessWaitingSub: 'Atualiza-se sozinho quando a sincronização terminar',
     },
     'components/ai/HandoffSteps': {
       prepare: 'Exportar para o ambiente de trabalho',
@@ -2051,6 +2126,8 @@ Responde em Markdown.`,
       resetView: 'Repor a vista',
       backToAll: 'Todas as categorias',
       dismissHint: 'Percebido',
+      zoomLevel: (percent: number) =>
+        `Zoom ${percent}% — clica para ajustar o grafo inteiro`,
     },
     'components/deck/CardDeck': {
       stackLabel: 'Grupos de definições',

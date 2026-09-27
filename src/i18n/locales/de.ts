@@ -175,6 +175,8 @@ export default {
         `Kein Training gewählt: die letzten ${days} Tage bis heute werden analysiert.`,
       remove: 'Auswahl aufheben',
       selectedCount: (count: number) => `${count} ausgewählt`,
+      showLess: 'Weniger anzeigen',
+      showMore: (count: number) => `${count} weitere anzeigen`,
       title: 'Welches Training',
     },
     // ── views/Settings ──
@@ -603,6 +605,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       navSettings: 'Einstellungen',
       preparingData:
         'Die lokale Datenbank wird geöffnet – der erste Start nach einem Update kann ein paar Sekunden dauern…',
+      previousPage: 'der vorherigen Seite',
       routeNotFound: 'Diese Seite existiert nicht – du bist wieder auf der Übersicht.',
       skipToContent: 'Zum Hauptinhalt springen',
       trayHint:
@@ -1079,16 +1082,34 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       zeroBaseline:
         'Die frühere Baseline lag im Schnitt bei 0 – keine relative Änderung berechenbar, also nur der aktuelle Wert.',
     },
+    'components/overview/DataReadyCapsule': {
+      cta: 'An KI übergeben',
+      dismiss: 'Nicht jetzt',
+      readyFresh: (clock: string) => `Schon aktuell · Stand ${clock}`,
+      readyNew: (records: string, clock: string) => `${records} neue Einträge · Stand ${clock}`,
+      readyPartial: (streams: string, clock: string) =>
+        `${streams} nicht angekommen, Rest aktualisiert · Stand ${clock}`,
+      readyTitle: 'Deine Daten sind bereit',
+      step: (current: number, total: number) => `${current}/${total}`,
+      streamSeparator: ', ',
+      waitingEyebrow: 'Deine Daten werden aus der Cloud geholt',
+      waitingHint: 'Hier bekommst du Bescheid, sobald alles da ist – schau dich gern schon um',
+    },
     'components/overview/HeartRateCard': {
       bpm: 'bpm',
+      cloudLag:
+        'Die Daten der Uhr müssen über die Zepp-App in die Cloud, bevor ZeppBridge sie holen kann – der Abrufzeitpunkt ist nicht der Zeitpunkt der Daten.',
       hrChartAria: '24-Stunden-Herzfrequenzkurve',
       hrEmpty: 'Nach einer Synchronisierung zeigt sich hier der echte Herzfrequenzverlauf.',
       hrMore: 'Volle 24 Stunden',
       hrPanelAria: 'Herzfrequenz-Details für die vollen 24 Stunden öffnen',
+      hrStale: (hours: number, when: string) =>
+        `In den letzten ${hours} Stunden noch keine Herzfrequenz in der Cloud; der neueste Messwert ist von ${when}.`,
       hrTitle: 'Aktuelle Herzfrequenz',
       hrWindow: (hours: number) => `Letzte ${hours} Stunden`,
       hrZonesAria: 'Herzfrequenzzonen (absolute Schwellen)',
       latest: 'Neueste',
+      latestAt: (when: string) => `Neuester Messwert · ${when}`,
       zoneAerobic: 'Aerob 140–169',
       zoneAnaerobic: 'Anaerob 170+',
       zoneFat: 'Fettverbrennung 100–139',
@@ -1096,6 +1117,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
     },
     'components/overview/RecentCard': {
       avgHr: (value: number) => `Ø HF ${value}`,
+      newest: 'Neueste',
       recentAria: 'Letzte Einträge',
       recentEmpty:
         'Noch nichts aufgezeichnet. Führe eine Synchronisierung aus, dann erscheint es hier.',
@@ -1121,6 +1143,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       dataSources: 'Datenquellen',
       identifyFailed: (reason: string) => `Geräteerkennung ist nicht verfügbar: ${reason}`,
       identifyingDevices: 'Deine Geräte werden erkannt…',
+      latestData: (when: string) => `Neueste Daten ${when}`,
       manage: 'Verwalten',
       noDevicesYet: 'Noch kein Gerät erkannt.',
       sourcesAria: 'Datenquellen und Kontostatus',
@@ -1130,6 +1153,8 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       stepsGoalLine: (goal: string, percent: string) => `Ziel ${goal} · ${percent} %`,
       stepsGoalReference: 'Referenzziel',
       stepsGoalToday: 'Heutiges Ziel',
+      stepsLatest: (when: string) => `Die neuesten Daten in der Cloud sind von ${when}`,
+      stepsNotYet: 'Die heutigen Schritte sind noch nicht in der Cloud',
       stepsPanelAria: 'Details zur täglichen Aktivität öffnen',
       stepsTitle: 'Schritte heute',
       stepsUnit: 'Schritte',
@@ -1143,6 +1168,9 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       localeLabel: 'Oberflächensprache',
       mainNav: 'Hauptnavigation',
       notFetchedYet: 'Noch nicht abgerufen',
+      readyPill: 'Daten bereit · an KI übergeben',
+      readyTitle:
+        'Synchronisierung abgeschlossen, die lokalen Daten sind aktuell. Klicke, um sie an die KI zu übergeben.',
       syncFailed: 'Synchronisierung fehlgeschlagen',
       syncNow: 'Jetzt synchronisieren',
       syncPartial: 'Teilweise synchronisiert',
@@ -1301,6 +1329,8 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       noUpdates: 'Noch keine Updates',
       notRecorded: 'Nicht aufgezeichnet',
       timeUnknown: 'Zeit unbekannt',
+      today: 'Heute',
+      yesterday: 'Gestern',
     },
     'lib/labels': {
       fallback: {
@@ -1336,6 +1366,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
     'lib/lifeEvents': {
       active: 'Laufend',
       add: 'Ereignis hinzufügen',
+      all: 'Alle',
       cancel: 'Abbrechen',
       categories: {
         health: 'Gesundheit & Erholung',
@@ -1370,6 +1401,8 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       retry: 'Erneut versuchen',
       save: 'Speichern',
       search: 'Lebensereignisse suchen',
+      showLess: 'Weniger anzeigen',
+      showMore: (count: number) => `${count} weitere anzeigen`,
       start: 'Startdatum',
       title: 'Lebensereignisse',
     },
@@ -1471,12 +1504,31 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
     },
     'views/AiComposer': {
       andMore: (count: number) => `und ${count - 1} weitere`,
+      askEmpty: 'Noch keine Frage · eine Richtung allein reicht',
+      askTemplate: (name: string) => `Richtung: ${name}`,
       daysOption: (days: number) =>
         plural(days, {
           one: `${days} Tag`,
           other: `${days} Tage`,
         }),
+      extrasFiles: (count: number) =>
+        plural(count, {
+          one: `${count} Anhang`,
+          other: `${count} Anhänge`,
+        }),
+      extrasNone: 'Keine Anhänge · Standardoptionen',
       recentDays: (days: number) => `Letzte ${days} Tage`,
+      stepAsk: 'Was fragen',
+      stepExtras: 'Anhänge und Optionen',
+      stepTarget: 'Was analysieren',
+      targetRecent: (days: number) => `Kein Training gewählt · die letzten ${days} Tage`,
+      undoAdded: (name: string) => `„${name}" hinzugefügt`,
+      undoDirection: 'Analyserichtung geändert',
+      undoExcluded: (name: string) => `„${name}" ausgeschlossen`,
+      undoKept: (name: string) => `„${name}" behalten`,
+      undoPicked: (name: string) => `„${name}" ausgewählt`,
+      undoRemoved: (name: string) => `„${name}" entfernt`,
+      undoUnpicked: (name: string) => `Auswahl von „${name}" aufgehoben`,
     },
     'views/BodyStatus': {
       backToOverview: 'Zurück zur Übersicht',
@@ -1837,25 +1889,37 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       unrecognizedSuffix: ' hat noch kein erkanntes Modell',
     },
     'views/RecentRecords': {
+      allSleep: 'Alle Schlafeinträge',
+      allWorkouts: 'Alle Trainings',
+      avgHr: (bpm: number) => `Ø HF ${bpm}`,
       backToOverview: 'Zurück zur Übersicht',
       desktopOnly:
         'Nutze die Desktop-App. Diese Browser-Vorschau liest keine Kontodaten.',
       filterAll: 'Alle',
+      filterSleep: (count: number) => `Schlaf ${count}`,
+      filterWorkouts: (count: number) => `Trainings ${count}`,
       hiddenIncomplete: (count: number) =>
         plural(count, {
           one: `${count} unvollständiger Eintrag ausgeblendet`,
           other: `${count} unvollständige Einträge ausgeblendet`,
         }),
+      introTimeline:
+        'Zuletzt synchronisierte Schlaf- und Trainingseinträge auf einer Zeitachse – das Neueste oben.',
       loadFailedTitle: 'Die letzten Einträge konnten nicht geladen werden',
       loadingLabel: 'Letzte Einträge werden geladen',
+      noRecords: 'In diesem Zeitraum noch keine Schlaf- oder Trainingseinträge.',
       noSleep: 'Noch keine Schlafeinträge',
       noWorkouts: 'Hier gibt es nichts anzuzeigen.',
       noWorkoutsOfType: 'Für diese Trainingsart gibt es nichts anzuzeigen.',
       notProvided: 'Nicht angegeben',
       partialUnavailable: 'Manche Daten sind gerade nicht verfügbar',
       retry: 'Erneut versuchen',
+      showMore: (count: number) => `${count} weitere anzeigen`,
+      sleepScore: (score: number) => `Schlafscore ${score}`,
+      sleepTitle: 'Schlaf',
       title: 'Letzte Einträge',
       today: 'Heute',
+      workoutTypeAria: 'Trainingsart',
       yesterday: 'Gestern',
     },
     'views/SleepDetail': {
@@ -2162,6 +2226,7 @@ Antworte in Markdown.`,
       pageTitle: 'An KI übergeben',
       save: 'Speichern',
       saved: 'Gespeichert',
+      savedCount: (count: number) => `Gespeicherte Aufgaben (${count})`,
       savedTasks: 'Gespeicherte Aufgaben',
       titleLabel: 'Aufgabenname',
       unsaved: 'Ungespeicherte Änderungen',
@@ -2214,6 +2279,7 @@ Antworte in Markdown.`,
       noteHint: 'Die Notiz schreibst du rechts in Schritt 2.',
     },
     'components/ai/HandoffPanel': {
+      closePanel: 'Einklappen',
       copiedFiles: (count: number) =>
         plural(count, {
           one: `enthält ${count} Anhangsoriginal`,
@@ -2224,7 +2290,23 @@ Antworte in Markdown.`,
         'Ziehe die Dateien aus diesem Ordner in den KI-Chat und füge danach den Prompt ein. Die Seite zu öffnen ist noch kein Senden.',
       exportOnly: 'Nur auf den Desktop exportieren',
       finalPrompt: 'Finaler Prompt (genau das wird kopiert)',
+      go: (label: string) => `An ${label} übergeben`,
+      goSub: 'Exportieren · Prompt kopieren · Seite öffnen',
+      issueCount: (count: number) =>
+        plural(count, {
+          one: `${count} Hinweis`,
+          other: `${count} Hinweise`,
+        }),
       outputAt: (path: string) => `Dateien in: ${path}`,
+      packageSize: (bytes: string) => `Datenpaket ca. ${bytes}`,
+      readiness: (categories: number, percent: number) =>
+        `${categories} Datentypen · ${percent} % der Tage mit Daten`,
+      readinessLoading: 'Deine Daten werden gezählt…',
+      readinessWaiting: 'Die neuesten Daten sind noch unterwegs',
+      readinessWaitingStep: (current: number, total: number) =>
+        `Synchronisierung ${current}/${total} · aktualisiert sich von selbst, sobald sie durch ist`,
+      readinessWaitingSub: 'Aktualisiert sich von selbst, sobald die Synchronisierung durch ist',
+      repeat: (count: number) => `×${count}`,
       reveal: 'Im Explorer anzeigen',
       run: (label: string) => `Auf den Desktop exportieren und ${label} öffnen`,
       stale:
@@ -2285,6 +2367,7 @@ Antworte in Markdown.`,
       zoomOut: 'Verkleinern',
       backToAll: 'Alle Kategorien',
       dismissHint: 'Verstanden',
+      zoomLevel: (percent: number) => `Zoom ${percent} % – klicke, um den ganzen Graphen einzupassen`,
     },
     'components/deck/CardDeck': {
       close: 'Schließen und alle Einstellungen zeigen',

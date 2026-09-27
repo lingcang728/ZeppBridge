@@ -30,6 +30,8 @@ export default {
       empty: 'На этом устройстве пока нет тренировок',
       remove: 'Снять выбор',
       avgHr: (bpm: number) => `средний пульс ${bpm}`,
+      showMore: (count: number) => `Показать ещё ${count}`,
+      showLess: 'Свернуть',
     },
 
     'views/Settings': {
@@ -452,6 +454,7 @@ export default {
 
     'App': {
       quickReturn: (page: string) => `Вернуться к ${page}`,
+      previousPage: 'предыдущей странице',
       skipToContent: 'Перейти к основному содержимому',
       mainNav: 'Основная навигация',
       bottomNav: 'Мобильная основная навигация',
@@ -931,6 +934,20 @@ export default {
     },
 
 
+    'components/overview/DataReadyCapsule': {
+      waitingEyebrow: 'Забираем ваши данные из облака',
+      waitingHint: 'как только будет готово, сообщим здесь — пока осмотритесь',
+      step: (current: number, total: number) => `${current}/${total}`,
+      readyTitle: 'Данные готовы',
+      readyNew: (records: string, clock: string) => `Новых записей: ${records} · на ${clock}`,
+      readyFresh: (clock: string) => `Всё уже актуально · на ${clock}`,
+      readyPartial: (streams: string, clock: string) =>
+        `${streams} не пришли, остальное обновлено · на ${clock}`,
+      cta: 'Передать ИИ',
+      dismiss: 'Не сейчас',
+      streamSeparator: ', ',
+    },
+
     'components/overview/HeartRateCard': {
       hrPanelAria: 'Открыть детали пульса за полные 24 часа',
       hrTitle: 'Недавний пульс',
@@ -946,6 +963,12 @@ export default {
       zoneFat: 'Жиросжигание 100–139',
       zoneAerobic: 'Аэробная 140–169',
       zoneAnaerobic: 'Анаэробная 170+',
+      cloudLag:
+        'Данные с часов сначала уходят в облако через Zepp App, и только потом ZeppBridge может их '
+        + 'забрать — момент загрузки не совпадает со временем самих данных.',
+      hrStale: (hours: number, when: string) =>
+        `За последние ${plural(hours, { one: `${hours} час`, few: `${hours} часа`, many: `${hours} часов`, other: `${hours} часа` })} в облаке пульса нет; самая свежая запись — ${when}.`,
+      latestAt: (when: string) => `Самая свежая запись · ${when}`,
     },
 
     'components/overview/RecentCard': {
@@ -958,6 +981,7 @@ export default {
       sleepScore: (score: number) => `Оценка сна ${score}`,
       avgHr: (value: number) => `средний пульс ${value}`,
       timeUnknown: 'Время неизвестно',
+      newest: 'Самая свежая',
     },
 
     'components/overview/SleepCard': {
@@ -979,6 +1003,8 @@ export default {
       stepsUnit: 'шагов',
       stepsGoalLine: (goal: string, percent: number) => `Цель ${goal} · ${percent}%`,
       seeMore: 'Подробнее',
+      stepsNotYet: 'Сегодняшние шаги ещё не дошли до облака',
+      stepsLatest: (when: string) => `Самые свежие данные в облаке — от ${when}`,
     },
 
     'components/overview/SourcesStrip': {
@@ -988,6 +1014,7 @@ export default {
       noDevicesYet: 'Устройство ещё не определено.',
       manage: 'Управление',
       sourcesAria: 'Источники данных и состояние аккаунта',
+      latestData: (when: string) => `Свежие данные ${when}`,
     },
 
     'components/shell/AppTopBar': {
@@ -1009,6 +1036,8 @@ export default {
       themeDark: 'Тёмная',
       themeSystem: 'Как в системе',
       localeLabel: 'Язык интерфейса',
+      readyPill: 'Данные готовы · передать ИИ',
+      readyTitle: 'Синхронизация завершена — локальные данные актуальны. Нажмите, чтобы передать их ИИ.',
     },
 
     'composables/useAiHandoff': {
@@ -1164,6 +1193,8 @@ export default {
       notRecorded: 'Не записано',
       duration: (hours: number, minutes: number) =>
         (hours > 0 ? `${hours} ч ${minutes} мин` : `${minutes} мин`),
+      today: 'Сегодня',
+      yesterday: 'Вчера',
     },
 
     'lib/labels': {
@@ -1227,6 +1258,10 @@ export default {
       manage: 'Управление событиями',
       related: 'Связанные события',
       local: 'Хранится локально и входит в резервные копии базы. При передаче данных ИИ события можно включить.',
+      all: 'Все',
+      showMore: (count: number) =>
+        `Показать ещё ${plural(count, { one: `${count} событие`, few: `${count} события`, many: `${count} событий`, other: `${count} события` })}`,
+      showLess: 'Свернуть',
       categories: {
         health: 'Здоровье и восстановление',
         travel: 'Поездки и командировки',
@@ -1341,6 +1376,23 @@ export default {
         plural(days, { one: `Последний ${days} день`, few: `Последние ${days} дня`, many: `Последние ${days} дней`, other: `Последние ${days} дня` }),
       andMore: (count: number) =>
         `и ещё ${plural(count - 1, { one: `${count - 1} тренировка`, few: `${count - 1} тренировки`, many: `${count - 1} тренировок`, other: `${count - 1} тренировки` })}`,
+      stepTarget: 'Что анализировать',
+      stepAsk: 'Что спросить',
+      stepExtras: 'Вложения и параметры',
+      targetRecent: (days: number) =>
+        `Тренировка не выбрана · последние ${plural(days, { one: `${days} день`, few: `${days} дня`, many: `${days} дней`, other: `${days} дня` })}`,
+      askEmpty: 'Вопроса пока нет · достаточно одного направления',
+      askTemplate: (name: string) => `Направление: ${name}`,
+      extrasNone: 'Без вложений · параметры по умолчанию',
+      extrasFiles: (count: number) =>
+        plural(count, { one: `${count} вложение`, few: `${count} вложения`, many: `${count} вложений`, other: `${count} вложения` }),
+      undoAdded: (name: string) => `Добавлено «${name}»`,
+      undoRemoved: (name: string) => `Убрано «${name}»`,
+      undoKept: (name: string) => `Оставлено «${name}»`,
+      undoExcluded: (name: string) => `Исключено «${name}»`,
+      undoPicked: (name: string) => `Выбрано «${name}»`,
+      undoUnpicked: (name: string) => `Выбор «${name}» снят`,
+      undoDirection: 'Направление изменено',
     },
 
 
@@ -1726,6 +1778,17 @@ export default {
       notProvided: 'Нет данных',
       today: 'Сегодня',
       yesterday: 'Вчера',
+      introTimeline: 'Недавно синхронизированные сон и тренировки — на одной шкале времени, самые свежие сверху.',
+      filterSleep: (count: number) => `Сон ${count}`,
+      filterWorkouts: (count: number) => `Тренировки ${count}`,
+      workoutTypeAria: 'Тип тренировки',
+      allSleep: 'Весь сон',
+      allWorkouts: 'Все тренировки',
+      sleepTitle: 'Сон',
+      sleepScore: (score: number) => `Оценка сна ${score}`,
+      avgHr: (bpm: number) => `средний пульс ${bpm}`,
+      showMore: (count: number) => `Показать ещё ${count}`,
+      noRecords: 'За этот период записей сна и тренировок пока нет.',
     },
 
     'views/SleepDetail': {
@@ -2028,6 +2091,7 @@ export default {
       save: 'Сохранить',
       saved: 'Сохранено',
       unsaved: 'Есть несохранённые изменения',
+      savedCount: (count: number) => `Сохранённые задачи (${count})`,
     },
 
     'components/ai/CoverageDetails': {
@@ -2091,6 +2155,20 @@ export default {
         'Перетащите файлы из этой папки в диалог ИИ и вставьте промпт. '
         + 'Открыть сайт — ещё не значит отправить.',
       stale: 'После экспорта задача менялась — файлы на рабочем столе устарели. Экспортируйте заново.',
+      closePanel: 'Закрыть',
+      go: (label: string) => `Передать в ${label}`,
+      goSub: 'Экспортировать · скопировать промпт · открыть сайт',
+      issueCount: (count: number) =>
+        plural(count, { one: `${count} замечание`, few: `${count} замечания`, many: `${count} замечаний`, other: `${count} замечания` }),
+      packageSize: (bytes: string) => `Пакет ≈ ${bytes}`,
+      readiness: (categories: number, percent: number) =>
+        `${plural(categories, { one: `${categories} тип данных`, few: `${categories} типа данных`, many: `${categories} типов данных`, other: `${categories} типа данных` })} · данные за ${percent}% дней`,
+      readinessLoading: 'Подсчитываем ваши данные…',
+      readinessWaiting: 'Самые свежие данные ещё в пути',
+      readinessWaitingStep: (current: number, total: number) =>
+        `Синхронизация ${current}/${total} · по завершении обновится автоматически`,
+      readinessWaitingSub: 'Обновится автоматически по завершении синхронизации',
+      repeat: (count: number) => `×${count}`,
     },
 
     'components/ai/HandoffSteps': {
@@ -2149,6 +2227,7 @@ export default {
       zoomOut: 'Отдалить',
       backToAll: 'Все категории',
       dismissHint: 'Понятно',
+      zoomLevel: (percent: number) => `Масштаб ${percent}% — нажмите, чтобы вписать весь граф`,
     },
 
     'components/deck/CardDeck': {
