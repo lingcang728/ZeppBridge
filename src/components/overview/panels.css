@@ -2,9 +2,8 @@
    全部走 token：深浅主题的替换都在 tokens.css 里，这里不写第二套。
 
    立体，而不是平面：卡是一块有厚度的板——顶边一道高光、底边一道暗线、两层投影，
-   不描边；指针在卡上移动时它朝指针微微倾斜，一层高光跟着指针走（lib/tilt.ts 直接写
-   卡和高光层各自的内联 transform，不写会继承的变量），离开时慢慢回正。圆角给足。
-   静止的卡不带 3D 变换：常驻 perspective() 会让每张卡都占一块合成层。 */
+   不描边；指针在卡上时抬起、投影加深，一层高光跟着指针走（lib/tilt.ts 只平移高光层）。
+   卡片本身从不旋转：旋转会让卡里的字按 3D 栅格化，变糊、变斜。圆角给足。 */
 
 .metric-panel {
   position: relative;
@@ -16,7 +15,6 @@
   transform: translateY(var(--lift, 0px));
   transition: transform .7s cubic-bezier(.16, 1, .3, 1), box-shadow .3s ease;
 }
-.metric-panel.is-tilting { transition: transform .14s linear, box-shadow .3s ease; }
 .metric-panel:hover { --lift: -3px; box-shadow: var(--mat-rim), var(--mat-shadow-lift); }
 /* 跟着指针走的一层镜面高光：以自身中心画好的圆，tilt.ts 只平移它，不重画。 */
 .tilt-glare {

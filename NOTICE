@@ -16,9 +16,3 @@ ships at src/assets/fonts/LICENSE-misans.txt.
 This product bundles the Inter typeface (Rasmus Andersson), licensed under
 the SIL Open Font License 1.1. A copy of its licence ships at
 src/assets/fonts/LICENSE-inter.txt.
-
-This product includes a liquid-glass refraction filter and displacement-map
-shader ported from liquid-glass-react (https://github.com/rdev/liquid-glass-react),
-Copyright 2025 Max Rovensky, licensed under the MIT License, which itself adapts
-liquid-glass by Shu Ding (https://github.com/shuding/liquid-glass, MIT). See
-src/components/LiquidGlassDefs.vue and scripts/assets/generate-glass-map.py.

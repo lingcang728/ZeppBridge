@@ -1,8 +1,10 @@
 import type { Directive } from 'vue';
 
 /**
- * 概览卡的立体感：指针在卡上移动时，卡朝指针的方向微微倾斜，一层高光跟着指针走；
- * 指针离开时慢慢回正。
+ * 概览卡的立体感：指针在卡上时卡片抬起、投影加深，一层镜面高光跟着指针走；离开时落回。
+ *
+ * 不旋转：卡片一转，里面的字就按 3D 变换栅格化——变糊、变斜。实测悬停倾斜时文字清晰度
+ * 只剩平放时的七成。立体感靠抬起、投影和高光给，字始终正对屏幕、清清楚楚。
  *
  * 为什么不写 CSS 变量：变量会继承，往卡片根上写一次就让整棵子树（图表、文字、图标）
  * 重算样式；高光用 `radial-gradient(at var(--x) var(--y))` 则每帧整卡重绘。
@@ -18,9 +20,6 @@ import type { Directive } from 'vue';
  */
 type TiltHost = HTMLElement & { __tiltOff?: () => void };
 
-const MAX_DEG = 3.2;
-/** 悬停时卡片抬起多少（和 panels.css 里 :hover 的 --lift 同一个值）。 */
-const LIFT_PX = -3;
 
 export const vTilt: Directive<TiltHost> = {
   mounted(el) {
@@ -42,10 +41,6 @@ export const vTilt: Directive<TiltHost> = {
       if (!rect.width || !rect.height) return;
       const px = Math.min(1, Math.max(0, (last.clientX - rect.left) / rect.width));
       const py = Math.min(1, Math.max(0, (last.clientY - rect.top) / rect.height));
-      const max = Math.min(MAX_DEG, 1200 / rect.width);
-      const rx = ((0.5 - py) * 2 * max).toFixed(2);
-      const ry = ((px - 0.5) * 2 * max).toFixed(2);
-      el.style.transform = `perspective(1200px) rotateX(${rx}deg) rotateY(${ry}deg) translateY(${LIFT_PX}px)`;
       // 高光层是以左上角为中心画好的圆，平移到指针处（相对卡片的布局尺寸，不受倾斜影响）。
       glare.style.transform = `translate3d(${(px * el.offsetWidth).toFixed(1)}px, ${(py * el.offsetHeight).toFixed(1)}px, 0)`;
     };
@@ -67,7 +62,6 @@ export const vTilt: Directive<TiltHost> = {
       cancelAnimationFrame(frame);
       frame = 0;
       el.classList.remove('is-tilting');
-      el.style.removeProperty('transform');
       window.removeEventListener('scroll', forget, { capture: true });
       window.removeEventListener('resize', forget);
     };
