@@ -2180,7 +2180,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       balanceHint: '7-Tage-Belastung gegen den 28-Tage-Wochenschnitt, d. h. das Akut-Chronisch-Verhältnis',
       balanceLabel: 'Trainingsbelastungs-Balance',
       balanceNote:
-        'Akut:Chronisch = Summe der letzten 7 Tage ÷ (Summe der letzten 28 Tage ÷ 4). Deckt das 28-Tage-Fenster weniger als 21 Tage ab, gibt es keinen Quotienten und die Linie bricht dort – das ist unberechnet, nicht null.',
+        'Die Belastung einzelner Aktivitäten wird nach lokalem Startdatum summiert; Ruhetage mit Tagesdaten zählen als null. Akut:Chronisch = Summe der letzten 7 Tage ÷ (Summe der letzten 28 Tage ÷ 4). Deckt das 28-Tage-Fenster weniger als 21 Tage ab, gibt es keinen Quotienten und die Linie bricht dort – das ist unberechnet, nicht null.',
       chronicTooltip: (value: string) => `28-Tage-Wochenschnitt <b>${value}</b>`,
       chronicWeekly: '28-Tage-Wochenschnitt',
       desktopOnly:
@@ -2190,7 +2190,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         'VO₂max, Laktatschwelle, Trainingsbelastung und Herzfrequenzzonen. Alle aus synchronisierten Einträgen gelesen; keine Trainingsratschläge.',
       loadEmpty: 'Keine Trainingsbelastungs-Einträge in diesem Zeitraum.',
       loadFailed: 'Trainingsstatus-Daten sind gerade nicht verfügbar',
-      loadHint: 'Täglicher Trainingsbelastungs-Score',
+      loadHint: 'Von Zepp gemeldete Trainingsbelastung der letzten 7 Tage',
       loadLabel: 'Trainingsbelastung',
       loadUnit: '' as string,
       loadingAria: 'Trainingsstatus wird geladen',
