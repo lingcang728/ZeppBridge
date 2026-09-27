@@ -46,6 +46,16 @@ views/SleepDetail.deviceFirmware
 views/TrainingStatus.paiLabel
 views/WorkoutDetail.chartAltitude
 views/WorkoutDetail.unitKcal
+lib/aiTask/metrics.hrv
+lib/aiTask/metrics.hrv_rmssd
+lib/aiTask/metrics.rem_minutes
+lib/aiTask/metrics.unit_kcal
+lib/aiTask/metrics.unit_m
+lib/aiTask/metrics.unit_min
+lib/aiTask/metrics.unit_s
+lib/aiTask/metrics.unit_score
+lib/aiTask/metrics.vo2max
+views/settings/deck.secMcp
 
 # nl
 components/DevicePicker.filterBand
@@ -120,6 +130,23 @@ views/TrainingStatus.paiLabel
 views/WorkoutDetail.eyebrowExport
 views/WorkoutDetail.eyebrowRoute
 views/WorkoutDetail.unitKcal
+components/ai/TaskExtras.detailStandard
+lib/aiTask/metrics.bmi
+lib/aiTask/metrics.hrv
+lib/aiTask/metrics.hrv_rmssd
+lib/aiTask/metrics.hybrid_charge
+lib/aiTask/metrics.mental_charge
+lib/aiTask/metrics.physical_charge
+lib/aiTask/metrics.rem_minutes
+lib/aiTask/metrics.spo2
+lib/aiTask/metrics.stress
+lib/aiTask/metrics.unit_kcal
+lib/aiTask/metrics.unit_m
+lib/aiTask/metrics.unit_s
+lib/aiTask/metrics.vo2max
+views/settings/deck.secMcp
+views/settings/deck.themeLabel
+views/settings/deck.themeSystem
 
 # fr
 views/Settings.unidentifiedInitial
@@ -181,6 +208,17 @@ views/SleepDetail.deviceFirmware
 views/TrainingStatus.paiLabel
 views/WorkoutDetail.unitKcal
 views/WorkoutDetail.chartAltitude
+lib/aiTask/metrics.hrv
+lib/aiTask/metrics.hrv_rmssd
+lib/aiTask/metrics.hybrid_charge
+lib/aiTask/metrics.rem_minutes
+lib/aiTask/metrics.stress
+lib/aiTask/metrics.unit_kcal
+lib/aiTask/metrics.unit_m
+lib/aiTask/metrics.unit_min
+lib/aiTask/metrics.unit_s
+lib/aiTask/metrics.vo2max
+views/settings/deck.secMcp
 
 # ru
 components/HeartRateZonePicker.basesSeparator

@@ -16,7 +16,23 @@ import { plural, type LocalePack } from '../index';
 
 export default {
   modules: {
-    'components/ai/WorkoutPicker': { previous: 'Назад', next: 'Далее' },
+    'components/ai/WorkoutPicker': {
+      title: 'Какую тренировку анализировать',
+      previous: 'Назад',
+      next: 'Далее',
+      hint: 'Можно выбрать несколько или ни одной',
+      noneSelected: (days: number) =>
+        `Тренировка не выбрана: анализируются последние ${plural(days, { one: `${days} день`, few: `${days} дня`, many: `${days} дней`, other: `${days} дня` })} по сегодняшний день.`,
+      selectedCount: (count: number) => plural(count, {
+        one: `Выбрана ${count} тренировка`,
+        few: `Выбрано ${count} тренировки`,
+        many: `Выбрано ${count} тренировок`,
+        other: `Выбрано ${count} тренировки`,
+      }),
+      empty: 'На этом устройстве пока нет тренировок',
+      remove: 'Снять выбор',
+      avgHr: (bpm: number) => `средний пульс ${bpm}`,
+    },
 
     'views/Settings': {
       title: 'Настройки',
@@ -684,6 +700,14 @@ export default {
 
     'components/HistoryArchivePanel': {
       title: 'Долгосрочный архив и полная история',
+      archiveRowTitle: 'Не подчищать историю после синхронизации',
+      backfillTitle: 'Дозагрузить более раннюю историю',
+      autoContinueTitle: 'Начинать следующий заход автоматически',
+      estimateDetails: 'Разбивка по потокам',
+      statPersisted: 'Записано',
+      statEmpty: 'В облаке пусто',
+      statPending: 'В очереди',
+      statFailed: 'Неудачно',
       intro:
         'Архив отвечает за «с сегодняшнего дня больше не удалять», дозагрузка — за «вернуть то, что было '
         + 'раньше». Только с обоими локальная копия действительно полная.',
@@ -1320,6 +1344,10 @@ export default {
     'views/AiComposer': {
       daysOption: (days: number) =>
         plural(days, { one: `${days} день`, few: `${days} дня`, many: `${days} дней`, other: `${days} дня` }),
+      recentDays: (days: number) =>
+        plural(days, { one: `Последний ${days} день`, few: `Последние ${days} дня`, many: `Последние ${days} дней`, other: `Последние ${days} дня` }),
+      andMore: (count: number) =>
+        `и ещё ${plural(count - 1, { one: `${count - 1} тренировка`, few: `${count - 1} тренировки`, many: `${count - 1} тренировок`, other: `${count - 1} тренировки` })}`,
     },
 
 
@@ -1999,6 +2027,325 @@ export default {
       shown: (loaded: number, total: number) => `Прочитано ${loaded} из ${total}`,
       loadMore: 'Показать ещё',
       loadingMore: 'Загрузка…',
+    },
+
+    'components/ai/AiTaskHeader': {
+      pageTitle: 'Передать ИИ',
+      intro:
+        'Выберите тренировку, отметьте данные и напишите, что хотите узнать, — '
+        + 'экспортируйте на рабочий стол и перетащите файл в ИИ.',
+      titleLabel: 'Название задачи',
+      savedTasks: 'Сохранённые задачи',
+      newTask: 'Новая',
+      save: 'Сохранить',
+      saved: 'Сохранено',
+      unsaved: 'Есть несохранённые изменения',
+    },
+
+    'components/ai/CoverageDetails': {
+      category: 'Категория',
+      window: 'Окно',
+      coverage: 'С данными',
+      units: 'Единицы',
+      sources: 'Источники',
+      days: (have: number, total: number) => `${have}/${total} дн.`,
+      summary: (bytes: string) => `Подробное покрытие (пакет ≈ ${bytes})`,
+    },
+
+    'components/ai/DirectionPanel': {
+      title: 'Направление и вопрос',
+      directionLabel: 'Направление анализа (шаблон)',
+      directionHint:
+        'При выборе направления применяется и рекомендуемый ему набор данных — '
+        + 'изменение видно на графе и его можно отменить.',
+      noDirection: 'Без направления',
+      questionLabel: 'Ваш вопрос',
+      questionPlaceholder:
+        'На чём сосредоточиться в этот раз? Например: была ли интенсивность '
+        + 'восстановительной пробежки в среду подходящей?',
+      noteLabel: 'Личный контекст (необязательно)',
+      notePlaceholder: 'Травмы, цели, текущая форма… попадут в экспорт для ИИ.',
+      hint: 'Направление задаёт рамки, вопрос — фокус; оба передаются ИИ',
+      counter: (used: number, max: number) => `${used}/${max}`,
+    },
+
+    'components/ai/GraphNodePopover': {
+      close: 'Закрыть',
+      days: 'Дней назад',
+      daysOption: (days: number) =>
+        plural(days, { one: `${days} день`, few: `${days} дня`, many: `${days} дней`, other: `${days} дня` }),
+      coverage: (have: number, total: number) => `${have}/${total} дн. с данными`,
+      noData: 'В этом окне нет данных',
+      expand: 'Показать метрики',
+      collapse: 'Скрыть метрики',
+      include: 'Передать ИИ',
+      exclude: 'Не передавать ИИ',
+      includeDay: 'Включить день тренировки',
+      keep: 'Оставить эту метрику',
+      drop: 'Исключить эту метрику',
+      attachments: (count: number) =>
+        plural(count, { one: `${count} файл`, few: `${count} файла`, many: `${count} файлов`, other: `${count} файла` }),
+      noteHint: 'Заметку заполните на шаге ② справа.',
+    },
+
+    'components/ai/HandoffPanel': {
+      title: 'Передать ИИ',
+      who: 'Кому передать',
+      finalPrompt: 'Итоговый промпт (копируется именно он)',
+      run: (label: string) => `Экспортировать на рабочий стол и открыть ${label}`,
+      exportOnly: 'Только экспортировать на рабочий стол',
+      desktopOnly: 'Экспорт доступен после подключения настольного приложения',
+      outputAt: (path: string) => `Файлы здесь: ${path}`,
+      reveal: 'Показать в Проводнике',
+      copiedFiles: (count: number) =>
+        `включая ${plural(count, { one: `${count} оригинал вложения`, few: `${count} оригинала вложений`, many: `${count} оригиналов вложений`, other: `${count} оригинала вложений` })}`,
+      dragHint:
+        'Перетащите файлы из этой папки в диалог ИИ и вставьте промпт. '
+        + 'Открыть сайт — ещё не значит отправить.',
+      stale: 'После экспорта задача менялась — файлы на рабочем столе устарели. Экспортируйте заново.',
+    },
+
+    'components/ai/HandoffSteps': {
+      idle: 'Не начато',
+      doing: 'Выполняется',
+      done: 'Готово',
+      failed: 'Не удалось',
+      blocked: 'Заблокировано',
+      skipped: 'Веб-предпросмотр не может открыть браузер',
+      prepare: 'Экспортировать на рабочий стол',
+      copy: 'Скопировать промпт',
+      open: (label: string) => `Открыть ${label}`,
+      retry: 'Повторить',
+    },
+
+    'components/ai/TaskExtras': {
+      advanced: 'Дополнительные параметры',
+      detail: 'Уровень детализации',
+      detailSummary: 'Краткий',
+      detailStandard: 'Стандартный',
+      detailDetailed: 'Подробный (поточечные ряды)',
+      preciseGps: 'Точный маршрут (координаты GPS)',
+      preciseGpsHint: 'По умолчанию выключено; когда включено, экспортируемые треки сохраняют исходные координаты.',
+      mcp: 'Разрешить локальным MCP-инструментам запрашивать эту задачу',
+      mcpHint: 'Для локальных инструментов вроде Claude Desktop; они видят только то, что покрывает эта задача.',
+      attachTitle: 'Оригиналы файлов (PDF / изображения)',
+      add: 'Добавить файлы',
+      pickerTitle: 'Выберите файлы для передачи вместе с задачей',
+      filterName: 'PDF и изображения',
+      remove: 'Убрать',
+      reselect: 'Выбрать заново',
+      missing: 'не найден',
+      changed: 'изменён с момента добавления',
+      skipped: (count: number) => plural(count, {
+        one: `${count} файл пропущен — неподдерживаемый тип`,
+        few: `${count} файла пропущено — неподдерживаемый тип`,
+        many: `${count} файлов пропущено — неподдерживаемый тип`,
+        other: `${count} файла пропущено — неподдерживаемый тип`,
+      }),
+      pickFailed: 'Не удалось добавить файлы',
+      desktopOnly: 'Выбор файлов требует настольного приложения',
+    },
+
+    'components/ai/TaskGraph': {
+      label: 'Граф данных задачи',
+      hint:
+        'Перетащите в круг, чтобы включить; наружу — чтобы убрать · нажатие на узел '
+        + 'показывает параметры · перетаскивание пустого места двигает холст',
+      zone: 'К ИИ',
+      includeNode: 'Передать ИИ',
+      excludeNode: 'Не передавать ИИ',
+      undo: 'Отменить',
+      fit: 'Вписать',
+      resetView: 'Сбросить вид',
+      zoomIn: 'Приблизить',
+      zoomOut: 'Отдалить',
+      backToAll: 'Все категории',
+      dismissHint: 'Понятно',
+    },
+
+    'components/deck/CardDeck': {
+      stackLabel: 'Группы настроек',
+      close: 'Свернуть и показать все настройки',
+      previous: 'Предыдущая карточка',
+      next: 'Следующая карточка',
+      goTo: (index: number, total: number) => `Карточка ${index} из ${total}`,
+      dragHint: 'Потяните заголовок карточки в сторону, чтобы перейти к соседней',
+      unbox: 'Показать все',
+      collapse: 'Свернуть',
+      listLabel: 'Все группы настроек',
+    },
+
+    'components/deck/DeckCoverflow': {
+      label: 'Карточки настроек — листайте в сторону, чтобы выбрать',
+      previous: 'Предыдущая карточка',
+      next: 'Следующая карточка',
+      open: (title: string) => `Открыть «${title}»`,
+      position: (index: number, total: number) => `${index} / ${total}`,
+    },
+
+    'composables/useAiTaskLibrary': {
+      loadFailed: 'Не удалось прочитать данные задачи',
+    },
+
+    'composables/useAiTaskPreview': {
+      previewFailed: 'Не удалось построить предпросмотр',
+    },
+
+    'lib/aiTask/metrics': {
+      resting_hr: 'Пульс покоя',
+      readiness: 'Готовность',
+      physical_readiness: 'Физическая готовность',
+      mental_readiness: 'Ментальная готовность',
+      hybrid_charge: 'Гибридный заряд',
+      physical_charge: 'Физический заряд',
+      mental_charge: 'Ментальный заряд',
+      stress: 'Стресс',
+      respiratory_rate: 'Частота дыхания',
+      sleep_hrv: 'ВСР во сне',
+      sleep_rhr: 'Пульс покоя во сне',
+      hrv_baseline: 'Базовая ВСР',
+      rhr_baseline: 'Базовый пульс покоя',
+      ahi_baseline: 'Базовый AHI',
+      spo2_odi: 'ODI по SpO2',
+      spo2_night_score: 'Ночная оценка SpO2',
+      spo2_measured_minutes: 'Время измерений SpO2',
+      hrv: 'ВСР',
+      hrv_rmssd: 'ВСР (RMSSD)',
+      spo2: 'SpO2',
+      heart_rate: 'Пульс за весь день',
+      training_load: 'Тренировочная нагрузка',
+      vo2max: 'МПК (VO₂max)',
+      lactate_threshold_hr: 'Пульс лактатного порога',
+      lactate_threshold_pace: 'Темп лактатного порога',
+      pai_daily: 'Дневной PAI',
+      pai_total: 'Суммарный PAI',
+      steps: 'Шаги',
+      active_calories: 'Активный расход',
+      active_minutes: 'Минуты активности',
+      weight: 'Вес',
+      bmi: 'ИМТ',
+      height: 'Рост',
+      body_fat_rate: 'Доля жира',
+      body_water_rate: 'Доля воды',
+      muscle_mass: 'Мышечная масса',
+      bone_mass: 'Костная масса',
+      protein_rate: 'Доля белка',
+      visceral_fat: 'Висцеральный жир',
+      bmr: 'Базовый метаболизм',
+      body_balance_score: 'Оценка баланса тела',
+      distance_meters: 'Дистанция',
+      moving_seconds: 'Время в движении',
+      calories: 'Расход',
+      avg_hr: 'Средний пульс',
+      max_hr: 'Макс. пульс',
+      min_hr: 'Мин. пульс',
+      total_steps: 'Шаги',
+      elevation_gain_m: 'Набор высоты',
+      elevation_loss_m: 'Суммарный спуск',
+      duration_minutes: 'Длительность сна',
+      score: 'Оценка сна',
+      deep_minutes: 'Глубокий',
+      light_minutes: 'Лёгкий',
+      rem_minutes: 'REM-сон',
+      awake_minutes: 'Бодрствование',
+      wake_count: 'Пробуждения',
+      unit_min: 'мин',
+      unit_s: 'с',
+      unit_score: 'баллов',
+      unit_count: 'раз',
+      unit_kcal: 'ккал',
+      unit_m: 'м',
+      unit_load: 'баллов',
+      unit_steps: 'шагов',
+    },
+
+    'lib/aiTask/prompt': {
+      directionHeading: 'Направление анализа: ',
+    },
+
+    'lib/aiTask/title': {
+      recentDays: (days: number) =>
+        plural(days, { one: `Последний ${days} день`, few: `Последние ${days} дня`, many: `Последние ${days} дней`, other: `Последние ${days} дня` }),
+      andMore: (count: number) =>
+        ` и ещё ${plural(count - 1, { one: `${count - 1} тренировка`, few: `${count - 1} тренировки`, many: `${count - 1} тренировок`, other: `${count - 1} тренировки` })}`,
+    },
+
+    'views/settings/deck': {
+      pageIntro:
+        'Откройте карточку, чтобы настроить её; в развёрнутом виде потяните её '
+        + 'заголовок в сторону, чтобы перейти к следующей.',
+      pageIntroDeck:
+        'Листайте в сторону, чтобы выбрать карточку, и нажмите на центральную, '
+        + 'чтобы открыть её, — или «Показать все», чтобы увидеть все карточки сразу.',
+      openCard: 'Открыть',
+
+      cardAccount: 'Аккаунт и устройства',
+      cardSync: 'Синхронизация и обновления',
+      cardArchive: 'Архив и хранение',
+      cardData: 'Ваши данные',
+      cardAi: 'Инструменты ИИ',
+      cardDisplay: 'Отображение и язык',
+      cardPrivacy: 'Приватность и безопасность',
+      cardAdvanced: 'Дополнительное и обслуживание',
+
+      sumAccount: (state: string, devices: number) =>
+        `${state} · ${plural(devices, { one: `${devices} устройство`, few: `${devices} устройства`, many: `${devices} устройств`, other: `${devices} устройства` })}`,
+      sumAccountOff: 'Аккаунт Zepp ещё не подключён',
+      sumSyncOn: (minutes: number) => `Автосинхронизация · каждые ${minutes} мин`,
+      sumSyncOff: 'Автосинхронизация выключена',
+      sumArchiveOn: 'Долгосрочный архив включён · ничего не подчищается',
+      sumArchiveOff: (days: number) =>
+        `Хранятся последние ${plural(days, { one: `${days} день`, few: `${days} дня`, many: `${days} дней`, other: `${days} дня` })}`,
+      sumData: (available: number, total: number) =>
+        `Локально хранится ${available} из ${total} потоков данных`,
+      sumDataLoading: 'Определяется, какие данные доступны…',
+      sumAi: (format: string) => `Доступ MCP только для чтения · экспорт по умолчанию: ${format}`,
+      sumDisplay: (language: string, unit: string, scale: number) => `${language} · ${unit} · ${scale}%`,
+      sumPrivacy: 'Данные остаются на этом устройстве',
+      sumAdvanced: 'Снимки базы данных · локальный API · состояние данных',
+      autoSyncToggle: 'Автосинхронизация',
+
+      secAccount: 'Аккаунт',
+      secDevices: 'Устройства',
+      secLogin: 'Способ входа',
+      secLoginSub: 'Раскрывайте, только когда нужен другой способ входа',
+      secAutoSync: 'Автосинхронизация',
+      secUpdate: 'Обновление приложения',
+      secCapability: 'Полученные данные',
+      secCodes: 'Нераспознанные коды тренировок',
+      secMcp: 'MCP-доступ',
+      secExport: 'Экспорт по умолчанию',
+      secFormat: 'Язык и форматы',
+      secAppearance: 'Оформление',
+      secLocalData: 'Данные на этом устройстве',
+      secFeedback: 'Сообщить о проблеме',
+      secRetention: 'Локальное хранение',
+
+      cloudSourceSub: 'Откуда берутся данные этого аккаунта',
+      deviceFirmware: (firmware: string) => `Прошивка ${firmware}`,
+      deviceLatest: (time: string) => `Последние данные ${time}`,
+      deviceId: (id: string) => `ID ${id}`,
+      deviceOpen: 'Посмотреть или сменить модель',
+
+      syncIntervalLabel: 'Интервал',
+      syncNowLabel: 'Синхронизировать сейчас',
+      syncNowSub: 'Получает только данные последних дней',
+
+      mcpLead:
+        'Позволяет инструментам ИИ на вашем компьютере — Claude Code, Codex и подобным — '
+        + 'напрямую запрашивать локальные данные. Только чтение, без сети, без открытого порта.',
+      mcpPreview: 'Показать, что будет скопировано',
+      mcpToolsLabel: 'Инструменты, доступные ИИ',
+      mcpTools: 'После настройки ИИ сможет спрашивать эти пять вещей; наведите курсор для пояснений.',
+      exportFormatSub: 'Выбирается по умолчанию при экспорте из «Передать ИИ» или со страницы тренировки',
+
+      themeLabel: 'Тема',
+      themeSystem: 'Как в системе',
+      themeDark: 'Тёмная',
+      themeLight: 'Светлая',
+      scaleSub: '100% — проектный размер; также работают Ctrl + / Ctrl -',
+
+      retentionSub: 'Хранятся только последние дни; при включённом долгосрочном архиве не действует',
     },
   },
 

@@ -13,7 +13,22 @@ import { plural, type LocalePack } from '../index';
  */
 export default {
   modules: {
-    'components/ai/WorkoutPicker': { previous: 'Anterior', next: 'Próxima' },
+    'components/ai/WorkoutPicker': {
+      title: 'Qual treino',
+      previous: 'Anterior',
+      next: 'Próxima',
+      hint: 'Escolha um ou mais, ou nenhum',
+      noneSelected: (days: number) =>
+        plural(days, {
+          one: 'Nenhum treino selecionado: só hoje entra na análise.',
+          other: `Nenhum treino selecionado: os últimos ${days} dias até hoje entram na análise.`,
+        }),
+      selectedCount: (count: number) =>
+        plural(count, { one: `${count} selecionado`, other: `${count} selecionados` }),
+      empty: 'Ainda não há treinos nesta máquina',
+      remove: 'Desmarcar',
+      avgHr: (bpm: number) => `FC média ${bpm}`,
+    },
 
     'App': {
       quickReturn: (page: string) => `Voltar para ${page}`,
@@ -240,6 +255,14 @@ export default {
       archiveTitle: 'Arquivo de longo prazo',
       archiveBody: 'Com isso ligado, uma sincronização bem-sucedida não poda mais o histórico pela janela de retenção. O banco continua crescendo; você pode desligar quando quiser, e ao desligar ele avisa o que a próxima sincronização podaria.',
       archiveAria: 'Arquivo de longo prazo',
+      archiveRowTitle: 'Deixar de podar o histórico depois de cada sincronização',
+      backfillTitle: 'Preencher o histórico anterior',
+      autoContinueTitle: 'Começar a próxima rodada automaticamente',
+      estimateDetails: 'Detalhamento por fluxo',
+      statPersisted: 'Gravados',
+      statEmpty: 'Vazios na nuvem',
+      statPending: 'Por fazer',
+      statFailed: 'Com falha',
       startLabel: 'Preencher a partir de',
       startAria: 'Início do preenchimento do histórico',
       customDateLabel: 'Data inicial',
@@ -827,6 +850,8 @@ export default {
 
     'views/AiComposer': {
       daysOption: (days: number) => plural(days, { one: `${days} dia`, other: `${days} dias` }),
+      recentDays: (days: number) => `Últimos ${days} dias`,
+      andMore: (count: number) => `e mais ${count - 1}`,
     },
 
 
@@ -1747,6 +1772,253 @@ Responda em Markdown.`,
           hint: 'descreva abaixo',
         },
       },
+    },
+
+    'components/ai/AiTaskHeader': {
+      pageTitle: 'Enviar para IA',
+      intro: 'Escolha o treino, escolha os dados, diga o que quer saber — exporte para a área de trabalho e arraste para a IA.',
+      titleLabel: 'Nome da tarefa',
+      savedTasks: 'Tarefas salvas',
+      newTask: 'Nova',
+      save: 'Salvar',
+      saved: 'Salvo',
+      unsaved: 'Alterações não salvas',
+    },
+
+    'components/ai/CoverageDetails': {
+      summary: (bytes: string) => `Detalhes da cobertura (pacote ≈ ${bytes})`,
+      category: 'Categoria',
+      window: 'Janela',
+      coverage: 'Com dados',
+      sources: 'Fontes',
+      units: 'Unidades',
+      days: (have: number, total: number) => `${have}/${total} dias`,
+    },
+
+    'components/ai/DirectionPanel': {
+      title: 'Direção e pergunta',
+      hint: 'A direção define o enquadramento e a pergunta define o foco — as duas vão para a IA',
+      directionLabel: 'Direção de análise (modelo)',
+      noDirection: 'Nenhuma',
+      directionHint: 'Escolher uma direção também aplica a faixa de dados recomendada — você a verá no grafo e pode desfazer.',
+      questionLabel: 'Sua pergunta',
+      questionPlaceholder: 'No que você quer focar? Ex.: a corrida de recuperação de quarta-feira teve a intensidade certa?',
+      counter: (used: number, max: number) => `${used}/${max}`,
+      noteLabel: 'Contexto pessoal (opcional)',
+      notePlaceholder: 'Lesões, objetivos, forma recente… incluídos na exportação para a IA.',
+    },
+
+    'components/ai/GraphNodePopover': {
+      include: 'Enviar para IA',
+      exclude: 'Deixar de fora',
+      keep: 'Manter esta métrica',
+      drop: 'Excluir esta métrica',
+      days: 'Dias retroativos',
+      daysOption: (days: number) => plural(days, { one: `${days} dia`, other: `${days} dias` }),
+      includeDay: 'Incluir o dia do treino',
+      expand: 'Mostrar métricas',
+      collapse: 'Ocultar métricas',
+      coverage: (have: number, total: number) => `${have}/${total} dias com dados`,
+      noData: 'Sem dados nesta janela',
+      attachments: (count: number) =>
+        plural(count, { one: `${count} arquivo original`, other: `${count} arquivos originais` }),
+      noteHint: 'Escreva a nota na etapa 2 à direita.',
+      close: 'Fechar',
+    },
+
+    'components/ai/HandoffPanel': {
+      title: 'Enviar para a IA',
+      who: 'Enviar para',
+      finalPrompt: 'Prompt final (exatamente o que é copiado)',
+      run: (label: string) => `Exportar para a área de trabalho e abrir ${label}`,
+      exportOnly: 'Exportar só para a área de trabalho',
+      reveal: 'Mostrar no Explorador de Arquivos',
+      outputAt: (path: string) => `Arquivos em: ${path}`,
+      copiedFiles: (count: number) =>
+        plural(count, { one: `inclui ${count} anexo original`, other: `inclui ${count} anexos originais` }),
+      dragHint: 'Arraste os arquivos desta pasta para a conversa da IA e depois cole o prompt. Abrir o site não é enviar.',
+      stale: 'A tarefa mudou depois da exportação — os arquivos na área de trabalho estão desatualizados. Exporte de novo.',
+      desktopOnly: 'Conecte o aplicativo de desktop para exportar',
+    },
+
+    'components/ai/HandoffSteps': {
+      prepare: 'Exportar para a área de trabalho',
+      copy: 'Copiar o prompt',
+      open: (label: string) => `Abrir ${label}`,
+      idle: 'Não iniciado',
+      doing: 'Em andamento',
+      done: 'Concluído',
+      failed: 'Falhou',
+      blocked: 'Bloqueado',
+      skipped: 'A prévia web não consegue abrir um navegador',
+      retry: 'Tentar de novo',
+    },
+
+    'components/ai/TaskExtras': {
+      attachTitle: 'Arquivos originais (PDF / imagens)',
+      add: 'Adicionar arquivos',
+      pickerTitle: 'Escolha os arquivos para entregar junto com a tarefa',
+      filterName: 'PDF e imagens',
+      skipped: (count: number) =>
+        plural(count, {
+          one: `${count} arquivo ignorado — tipo não suportado`,
+          other: `${count} arquivos ignorados — tipo não suportado`,
+        }),
+      pickFailed: 'Não foi possível adicionar os anexos',
+      desktopOnly: 'Escolher arquivos precisa do aplicativo de desktop',
+      remove: 'Remover',
+      reselect: 'Reescolher',
+      missing: 'não encontrado',
+      changed: 'mudou desde que foi adicionado',
+      advanced: 'Opções avançadas',
+      preciseGps: 'Trilha precisa (coordenadas GPS)',
+      preciseGpsHint: 'Desligado por padrão; quando ligado, as trilhas exportadas mantêm as coordenadas brutas.',
+      detail: 'Nível de detalhe',
+      detailSummary: 'Resumo',
+      detailStandard: 'Padrão',
+      detailDetailed: 'Detalhado (séries ponto a ponto)',
+      mcp: 'Permitir que ferramentas MCP locais consultem esta tarefa',
+      mcpHint: 'Para ferramentas locais como o Claude Desktop; elas só veem o que esta tarefa cobre.',
+    },
+
+    'components/ai/TaskGraph': {
+      label: 'Grafo de dados da tarefa',
+      zone: 'Para a IA',
+      hint: 'Arraste para dentro do círculo para incluir, para fora para remover · clique num nó para ver as opções · arraste uma área vazia para mover a visão',
+      undo: 'Desfazer',
+      fit: 'Ajustar à tela',
+      zoomIn: 'Ampliar',
+      zoomOut: 'Reduzir',
+      resetView: 'Restaurar a visão',
+      includeNode: 'Enviar para IA',
+      excludeNode: 'Não enviar para IA',
+      backToAll: 'Todas as categorias',
+      dismissHint: 'Entendi',
+    },
+
+    'components/deck/CardDeck': {
+      stackLabel: 'Grupos de configurações',
+      previous: 'Cartão anterior',
+      next: 'Próximo cartão',
+      close: 'Fechar e voltar a todas as configurações',
+      goTo: (index: number, total: number) => `Cartão ${index} de ${total}`,
+      dragHint: 'Arraste o topo do cartão para os lados para virar para o cartão vizinho',
+      unbox: 'Ver todos',
+      collapse: 'Recolher',
+      listLabel: 'Todos os grupos de configurações',
+    },
+
+    'components/deck/DeckCoverflow': {
+      label: 'Cartões de configurações — deslize para os lados para escolher um',
+      previous: 'Cartão anterior',
+      next: 'Próximo cartão',
+      open: (title: string) => `Abrir "${title}"`,
+      position: (index: number, total: number) => `${index} / ${total}`,
+    },
+
+    'composables/useAiTaskLibrary': {
+      loadFailed: 'Não foi possível carregar os dados da tarefa',
+    },
+
+    'composables/useAiTaskPreview': {
+      previewFailed: 'Não foi possível gerar a prévia',
+    },
+
+    'lib/aiTask/metrics': {
+      resting_hr: 'FC em repouso', readiness: 'Prontidão', physical_readiness: 'Prontidão física', mental_readiness: 'Prontidão mental',
+      hybrid_charge: 'Charge híbrido', physical_charge: 'Charge físico', mental_charge: 'Charge mental', stress: 'Estresse',
+      respiratory_rate: 'Frequência respiratória', sleep_hrv: 'HRV do sono', sleep_rhr: 'FC em repouso durante o sono', hrv_baseline: 'Linha de base de HRV',
+      rhr_baseline: 'Linha de base de FC em repouso', ahi_baseline: 'Linha de base de AHI', spo2_odi: 'ODI de SpO2', spo2_night_score: 'Pontuação noturna de SpO2',
+      spo2_measured_minutes: 'Tempo de medição de SpO2', hrv: 'HRV', hrv_rmssd: 'HRV (RMSSD)', spo2: 'SpO2',
+      heart_rate: 'FC de todo o dia',
+      training_load: 'Carga de treino', vo2max: 'VO₂max', lactate_threshold_hr: 'FC de limiar de lactato', lactate_threshold_pace: 'Ritmo de limiar de lactato',
+      pai_daily: 'PAI diário', pai_total: 'PAI total', steps: 'Passos', active_calories: 'Calorias de atividade', active_minutes: 'Minutos ativos',
+      weight: 'Peso', bmi: 'IMC', height: 'Altura', body_fat_rate: 'Gordura corporal', body_water_rate: 'Água corporal', muscle_mass: 'Massa muscular',
+      bone_mass: 'Massa óssea', protein_rate: 'Proteína', visceral_fat: 'Gordura visceral', bmr: 'Metabolismo basal', body_balance_score: 'Pontuação de equilíbrio corporal',
+      distance_meters: 'Distância', moving_seconds: 'Tempo em movimento', calories: 'Calorias', avg_hr: 'FC média', max_hr: 'FC máxima',
+      min_hr: 'FC mínima', total_steps: 'Passos', elevation_gain_m: 'Subida acumulada', elevation_loss_m: 'Descida acumulada',
+      duration_minutes: 'Duração do sono', score: 'Pontuação do sono', deep_minutes: 'Profundo', light_minutes: 'Leve', rem_minutes: 'REM',
+      awake_minutes: 'Acordado', wake_count: 'Despertares',
+      unit_min: 'min', unit_s: 's', unit_score: 'pts', unit_count: 'vezes', unit_kcal: 'kcal', unit_m: 'm',
+      unit_load: 'carga', unit_steps: 'passos',
+    },
+
+    'lib/aiTask/prompt': {
+      directionHeading: 'Direção de análise: ',
+    },
+
+    'lib/aiTask/title': {
+      recentDays: (days: number) => `Últimos ${days} dias`,
+      andMore: (count: number) => ` e mais ${count - 1}`,
+    },
+
+    'views/settings/deck': {
+      pageIntro: 'Abra um cartão para ajustá-lo; com ele aberto, arraste o topo para os lados para passar direto para o próximo.',
+      pageIntroDeck: 'Deslize para os lados para escolher um cartão e clique no do centro para abri-lo — ou "Ver todos" para ver todos de uma vez.',
+      openCard: 'Abrir',
+
+      cardAccount: 'Conta e dispositivos',
+      cardSync: 'Sincronização e atualizações',
+      cardArchive: 'Arquivo e armazenamento',
+      cardData: 'Seus dados',
+      cardAi: 'Ferramentas de IA',
+      cardDisplay: 'Tela e idioma',
+      cardPrivacy: 'Privacidade e segurança',
+      cardAdvanced: 'Avançado e manutenção',
+
+      sumAccount: (state: string, devices: number) => `${state} · ${devices} ${devices === 1 ? 'dispositivo' : 'dispositivos'}`,
+      sumAccountOff: 'Nenhuma conta Zepp conectada ainda',
+      sumSyncOn: (minutes: number) => `Sincronização automática · a cada ${minutes} min`,
+      sumSyncOff: 'Sincronização automática desligada',
+      sumArchiveOn: 'Arquivo de longo prazo ligado · nada é podado',
+      sumArchiveOff: (days: number) => `Guarda os últimos ${days} dias`,
+      sumData: (available: number, total: number) => `${available} de ${total} fluxos de dados guardados nesta máquina`,
+      sumDataLoading: 'Lendo quais dados estão disponíveis…',
+      sumAi: (format: string) => `Acesso MCP só de leitura · exportação padrão em ${format}`,
+      sumDisplay: (language: string, unit: string, scale: number) => `${language} · ${unit} · ${scale}%`,
+      sumPrivacy: 'Seus dados ficam só nesta máquina',
+      sumAdvanced: 'Snapshots do banco de dados · API local · saúde dos dados',
+      autoSyncToggle: 'Sincronização automática',
+
+      secAccount: 'Conta',
+      secDevices: 'Dispositivos',
+      secLogin: 'Método de login',
+      secLoginSub: 'Abra isto só quando precisar entrar de outro jeito',
+      secAutoSync: 'Sincronização automática',
+      secUpdate: 'Atualização de software',
+      secCapability: 'Dados que você tem',
+      secCodes: 'Códigos de treino não reconhecidos',
+      secMcp: 'MCP',
+      secExport: 'Exportação padrão',
+      secFormat: 'Idioma e formatos',
+      secAppearance: 'Aparência',
+      secLocalData: 'Seus dados nesta máquina',
+      secFeedback: 'Relatar um problema',
+      secRetention: 'Retenção local',
+
+      cloudSourceSub: 'De onde vêm os dados desta conta',
+      deviceFirmware: (firmware: string) => `Firmware ${firmware}`,
+      deviceLatest: (time: string) => `Dados mais recentes ${time}`,
+      deviceId: (id: string) => `ID ${id}`,
+      deviceOpen: 'Ver ou trocar o modelo',
+
+      syncIntervalLabel: 'Intervalo',
+      syncNowLabel: 'Sincronizar uma vez agora',
+      syncNowSub: 'Busca só os últimos dias',
+
+      mcpLead: 'Deixe ferramentas de IA instaladas no seu computador — Claude Code, Codex e afins — consultarem seus dados locais diretamente. Só leitura, offline, sem abrir nenhuma porta.',
+      mcpPreview: 'Ver o que será copiado',
+      mcpToolsLabel: 'Ferramentas que a IA pode usar',
+      mcpTools: 'Depois de configurado, a IA consegue perguntar sobre estas cinco coisas. Passe o mouse para ver detalhes.',
+      exportFormatSub: 'Formato pré-selecionado ao exportar do "Enviar para IA" ou de um treino',
+
+      themeLabel: 'Tema',
+      themeSystem: 'Sistema',
+      themeDark: 'Escuro',
+      themeLight: 'Claro',
+      scaleSub: '100% é o tamanho do design; Ctrl + / Ctrl - também funcionam',
+
+      retentionSub: 'Só os dias mais recentes são guardados; ignorado enquanto o arquivo de longo prazo estiver ligado',
     },
   },
   errors: {
