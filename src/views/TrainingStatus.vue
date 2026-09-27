@@ -22,7 +22,6 @@ import {
 import type { MetricSeries, TrainingBalancePoint } from '../types';
 import { defineMessages, useMessages } from '../i18n';
 import { paceUnitLabel } from '../lib/units';
-import { coveredWindowValue } from '../lib/missingValues';
 
 const messages = defineMessages(
   {
@@ -38,7 +37,7 @@ const messages = defineMessages(
     vo2Hint: '手表在户外跑步后估算的最大摄氧量',
     vo2Empty: '这段范围没有 VO₂max 记录；它只在户外跑步后更新。',
     loadLabel: '训练负荷',
-    loadHint: '每天的运动负荷得分',
+    loadHint: 'Zepp 报告的滚动 7 天训练负荷',
     loadEmpty: '这段范围没有训练负荷记录。',
     paiLabel: 'PAI 活力指数',
     paiHint: '滚动 7 天的个人活力指数',
@@ -58,7 +57,7 @@ const messages = defineMessages(
     balanceHint: '7 天负荷相对 28 天周均，即急性／慢性负荷比',
     balanceChartAria: '7 天与 28 天训练负荷及急慢比曲线',
     balanceEmpty: '训练负荷记录还不够画出这条曲线。',
-    balanceNote: '急慢比 = 7 天负荷之和 ÷（28 天负荷之和 ÷ 4）。28 天窗口覆盖不足 21 天时不给比值，曲线在那里会断开——这是没算，不是等于零。',
+    balanceNote: '按本地开始日期累加单次运动负荷。只有运动列表完整同步、且所有运动都有有效负荷，才确认当天数据完整；确认无运动才计为 0。7 天或 28 天窗口不完整时对应负荷留空；仅两个窗口完整且慢性负荷大于 0 时计算急慢比。',
     acute7d: '7 天负荷',
     chronicWeekly: '28 天周均',
     acuteChronic: '急慢比',
@@ -81,7 +80,7 @@ const messages = defineMessages(
     vo2Hint: 'Maximal oxygen uptake, estimated by the watch after outdoor runs',
     vo2Empty: 'No VO₂max records in this range; it only updates after an outdoor run.',
     loadLabel: 'Training load',
-    loadHint: 'Daily training load score',
+    loadHint: 'Rolling 7-day training load reported by Zepp',
     loadEmpty: 'No training load records in this range.',
     paiLabel: 'PAI',
     paiHint: 'Personal Activity Intelligence over a rolling 7 days',
@@ -100,7 +99,7 @@ const messages = defineMessages(
     balanceHint: '7-day load against the 28-day weekly average, i.e. the acute-to-chronic ratio',
     balanceChartAria: '7-day and 28-day training load with the acute-to-chronic ratio',
     balanceEmpty: 'Not enough training load records to draw this line yet.',
-    balanceNote: 'Acute:chronic = sum of the last 7 days ÷ (sum of the last 28 days ÷ 4). When the 28-day window covers fewer than 21 days, no ratio is given and the line breaks there. That is uncomputed, not zero.',
+    balanceNote: 'Sum individual workout loads by local start date. A day is complete only when its workout list is fully synced and every workout has a valid load; only confirmed days without workouts count as zero. Incomplete 7-day or 28-day loads remain missing. The ratio requires both complete windows and positive chronic load.',
     acute7d: '7-day load',
     chronicWeekly: '28-day weekly avg',
     acuteChronic: 'Acute:chronic',
@@ -123,7 +122,7 @@ const messages = defineMessages(
     vo2Hint: 'Consumo máximo de oxígeno, estimado por el reloj después de carreras al aire libre',
     vo2Empty: 'No hay registros de VO₂máx en este rango; solo se actualiza después de una carrera al aire libre.',
     loadLabel: 'Carga de entrenamiento',
-    loadHint: 'Puntuación diaria de carga de entrenamiento',
+    loadHint: 'Carga de entrenamiento de los últimos 7 días informada por Zepp',
     loadEmpty: 'No hay registros de carga de entrenamiento en este rango.',
     loadUnit: '',
     paiLabel: 'PAI',
@@ -142,7 +141,7 @@ const messages = defineMessages(
     balanceHint: 'Carga de 7 días frente al promedio semanal de 28 días, es decir, la relación aguda:crónica',
     balanceChartAria: 'Carga de entrenamiento de 7 y 28 días con la relación aguda:crónica',
     balanceEmpty: 'Todavía no hay suficientes registros de carga de entrenamiento para trazar esta línea.',
-    balanceNote: 'Aguda:crónica = suma de los últimos 7 días ÷ (suma de los últimos 28 días ÷ 4). Cuando la ventana de 28 días cubre menos de 21 días, no se da la relación y la línea se corta ahí. Eso significa sin calcular, no cero.',
+    balanceNote: 'Se suman las cargas por fecha local de inicio. Un día solo está completo si se sincronizó toda su lista de actividades y cada actividad tiene una carga válida; solo los días confirmados sin actividad cuentan como cero. Las cargas de 7 o 28 días incompletos quedan sin datos. La relación requiere ambas ventanas completas y una carga crónica positiva.',
     acute7d: 'Carga de 7 días',
     chronicWeekly: 'Promedio semanal de 28 días',
     acuteChronic: 'Aguda:crónica',
@@ -282,12 +281,11 @@ const balanceOption = computed(() => {
         if (!point) return '';
         const ratio = typeof point.acute_chronic_ratio === 'number'
           ? `${point.acute_chronic_ratio.toFixed(2)}`
-          : t.value.ratioMissing(point.chronic_days_with_data);
-        const acute = coveredWindowValue(point.acute_7d, point.acute_days_with_data);
-        const chronic = coveredWindowValue(
-          Math.round((point.chronic_28d / 4) * 10) / 10,
-          point.chronic_days_with_data,
-        );
+          : point.chronic_days_with_data < 28
+            ? t.value.ratioMissing(point.chronic_days_with_data)
+            : t.value.notProvided;
+        const acute = point.acute_7d;
+        const chronic = (point.chronic_28d === null ? null : Math.round((point.chronic_28d / 4) * 10) / 10);
         return [
           point.date,
           t.value.acuteTooltip(
@@ -308,7 +306,7 @@ const balanceOption = computed(() => {
       {
         name: t.value.acute7d,
         type: 'line',
-        data: balance.value.map((point) => coveredWindowValue(point.acute_7d, point.acute_days_with_data)),
+        data: balance.value.map((point) => point.acute_7d),
         connectNulls: false,
         showSymbol: false,
         smooth: 0.2,
@@ -318,10 +316,7 @@ const balanceOption = computed(() => {
       {
         name: t.value.chronicWeekly,
         type: 'line',
-        data: balance.value.map((point) => coveredWindowValue(
-          Math.round((point.chronic_28d / 4) * 10) / 10,
-          point.chronic_days_with_data,
-        )),
+        data: balance.value.map((point) => (point.chronic_28d === null ? null : Math.round((point.chronic_28d / 4) * 10) / 10)),
         connectNulls: false,
         showSymbol: false,
         smooth: 0.2,

@@ -107,6 +107,7 @@ pub mod coverage;
 pub mod life_events;
 mod migrations;
 pub mod provenance;
+pub(crate) mod training_coverage;
 pub mod write_lock;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -4328,8 +4329,8 @@ impl Database {
                 analysis.insert(
                     "training_load_balance".into(),
                     serde_json::json!({
-                        "source": "daily_metrics.training_load",
-                        "note": "acute = 最近 7 天负荷之和；chronic = 最近 28 天之和；ratio = acute ÷ (chronic ÷ 4)。chronic 窗口覆盖不足 21 天时不给 ratio。",
+                        "source": "workouts.training_load",
+                        "note": "按运动开始时间的本地日期汇总单次负荷；acute = 最近 7 天负荷之和；chronic = 最近 28 天之和；ratio = acute ÷ (chronic ÷ 4)。仅运动列表完整同步且每次负荷有效的完整本地日计入覆盖；确认无运动才为 0。7 天或 28 天窗口不完整时对应负荷为 null；仅两个窗口完整且慢性负荷大于 0 时给出 ratio。",
                         "days": balance,
                     }),
                 );
@@ -4708,6 +4709,10 @@ impl Database {
     /// The chronic window reaches 27 days before the range so the first day
     /// asked for is already backed by a full window instead of ramping up from
     /// zero. Shared with the export so the screen and the file agree.
+    /// Zepp's daily training_load is already a rolling seven-day total; only
+    /// individual workout loads may be summed here. Only fully fetched and
+    /// persisted workout lists establish coverage; missing loads invalidate a day.
+    /// Incomplete windows remain null, including windows with no evidence.
     pub fn training_load_balance(
         &self,
         start: NaiveDate,
@@ -4716,17 +4721,27 @@ impl Database {
         let history_start = (start - Duration::days(27)).format("%Y-%m-%d").to_string();
         let end_text = end.format("%Y-%m-%d").to_string();
         let mut stmt = self.conn.prepare(
-            "SELECT date, MAX(value) FROM daily_metrics
-             WHERE metric = 'training_load' AND date BETWEEN ?1 AND ?2
-             GROUP BY date ORDER BY date",
+            "SELECT date(start_time, 'localtime') AS day, SUM(training_load),
+                    SUM(CASE WHEN training_load IS NULL OR training_load < 0 THEN 1 ELSE 0 END)
+             FROM workouts WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2
+             GROUP BY day ORDER BY day",
         )?;
         let rows = stmt.query_map(params![history_start, end_text], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?))
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, Option<f64>>(1)?,
+                row.get::<_, i64>(2)?,
+            ))
         })?;
+        let mut coverage = self.complete_workout_days(&history_start, &end_text)?;
         let mut by_date: BTreeMap<String, f64> = BTreeMap::new();
         for row in rows {
-            let (date, value) = row?;
-            by_date.insert(date, value);
+            let (date, value, missing) = row?;
+            if missing > 0 || !value.is_some_and(|v| v.is_finite()) {
+                coverage.remove(&date);
+            } else if let Some(value) = value {
+                by_date.insert(date, value);
+            }
         }
 
         let mut balance = Vec::new();
@@ -4739,6 +4754,8 @@ impl Database {
                     let key = (day - Duration::days(back)).format("%Y-%m-%d").to_string();
                     if let Some(value) = by_date.get(&key) {
                         total += *value;
+                    }
+                    if coverage.contains(&key) {
                         present += 1;
                     }
                 }
@@ -4747,13 +4764,13 @@ impl Database {
             let (acute, acute_days) = window_sum(7);
             let (chronic, chronic_days) = window_sum(28);
             let chronic_weekly = chronic / 4.0;
-            let ratio = (chronic_days >= 21 && chronic_weekly > 0.0)
+            let ratio = (acute_days == 7 && chronic_days == 28 && chronic_weekly > 0.0)
                 .then(|| (acute / chronic_weekly * 100.0).round() / 100.0);
             balance.push(TrainingBalancePoint {
                 date: day.format("%Y-%m-%d").to_string(),
-                acute_7d: round1(acute),
+                acute_7d: (acute_days == 7).then(|| round1(acute)),
                 acute_days_with_data: acute_days,
-                chronic_28d: round1(chronic),
+                chronic_28d: (chronic_days == 28).then(|| round1(chronic)),
                 chronic_days_with_data: chronic_days,
                 acute_chronic_ratio: ratio,
             });
@@ -9839,6 +9856,7 @@ mod tests {
         // Nine days of load: enough for the acute window, nowhere near the
         // chronic one. A ratio here would read as a spike that never happened.
         for day in 1..=9 {
+            insert_acwr_workout(&db, &format!("2023-11-{day:02}"), Some(100.0));
             db.insert_daily_metric(&DailyMetric {
                 date: format!("2023-11-{day:02}"),
                 metric: "training_load".into(),
@@ -9849,7 +9867,12 @@ mod tests {
             })
             .unwrap();
         }
+        confirm_acwr_days(&db, "2023-11-01", "2023-11-10");
         let export = parsed_export(&db, &["training_load"], ExportDetail::Summary);
+        assert_eq!(
+            export["analysis"]["training_load_balance"]["source"],
+            "workouts.training_load"
+        );
         let days = export["analysis"]["training_load_balance"]["days"]
             .as_array()
             .unwrap();
@@ -9863,6 +9886,200 @@ mod tests {
             ninth["acute_chronic_ratio"].is_null(),
             "a ratio against a partly empty chronic window is misleading"
         );
+    }
+
+    fn confirm_acwr_days(db: &Database, start: &str, end: &str) {
+        let parse = |s: &str| {
+            Local
+                .from_local_datetime(
+                    &NaiveDate::parse_from_str(s, "%Y-%m-%d")
+                        .unwrap()
+                        .and_hms_opt(0, 0, 0)
+                        .unwrap(),
+                )
+                .single()
+                .unwrap()
+                .with_timezone(&Utc)
+        };
+        let mut stmt = db
+            .conn
+            .prepare("SELECT workout_id, start_time FROM workouts")
+            .unwrap();
+        let items: Vec<serde_json::Value> = stmt.query_map([], |row| {
+            let id: String = row.get(0)?;
+            let start: String = row.get(1)?;
+            let time = DateTime::parse_from_rfc3339(&start).unwrap();
+            Ok(serde_json::json!({"workout_id":id,"start_time":time.timestamp(),"end_time":time.timestamp()+1800,"type":1}))
+        }).unwrap().collect::<rusqlite::Result<_>>().unwrap();
+        let start = parse(start);
+        let end = parse(end);
+        let record = crate::fetcher::FetchedRecord {
+            raw: RawRecord {
+                stream: "workouts".into(),
+                source_key: format!(
+                    "sport_history:run:{}:{}",
+                    start.timestamp(),
+                    end.timestamp()
+                ),
+                source_scope: SourceScope::Device,
+                device_id: None,
+                start_utc: start,
+                end_utc: Some(end),
+                payload: serde_json::json!({"data":{"items":items,"next":-1}}),
+                capability: CapabilityStatus::Verified,
+            },
+            incomplete: false,
+            incomplete_reason: None,
+        };
+        let evidence = training_coverage::workout_day_evidence(&[record]);
+        assert!(!evidence.is_empty());
+        db.record_workout_day_evidence(&evidence).unwrap();
+    }
+
+    #[test]
+    fn acwr_unknown_loads_and_missing_days_keep_windows_null() {
+        let db = Database::in_memory().unwrap();
+        let day = NaiveDate::from_ymd_opt(2023, 11, 28).unwrap();
+        insert_acwr_workout(&db, "2023-11-28", Some(700.0));
+        confirm_acwr_days(&db, "2023-11-02", "2023-11-29");
+        let point = db.training_load_balance(day, day).unwrap().remove(0);
+        assert_eq!(point.acute_7d, Some(700.0));
+        assert_eq!(point.chronic_28d, None);
+        assert_eq!(point.chronic_days_with_data, 27);
+        assert_eq!(point.acute_chronic_ratio, None);
+        confirm_acwr_days(&db, "2023-11-01", "2023-11-29");
+        insert_acwr_workout(&db, "2023-11-28", None);
+        confirm_acwr_days(&db, "2023-11-01", "2023-11-29");
+        let point = db.training_load_balance(day, day).unwrap().remove(0);
+        assert_eq!(point.acute_days_with_data, 6);
+        assert_eq!(point.acute_7d, None);
+        assert_eq!(point.chronic_28d, None);
+        assert_eq!(point.acute_chronic_ratio, None);
+        db.conn.execute("DELETE FROM workouts", []).unwrap();
+        assert_eq!(
+            db.training_load_balance(day, day).unwrap()[0].acute_7d,
+            None,
+            "deleted records invalidate prior coverage"
+        );
+        confirm_acwr_days(&db, "2023-11-01", "2023-11-29");
+        let point = db.training_load_balance(day, day).unwrap().remove(0);
+        assert_eq!(point.acute_7d, Some(0.0));
+        assert_eq!(point.chronic_28d, Some(0.0));
+        assert_eq!(point.acute_chronic_ratio, None);
+    }
+
+    fn insert_acwr_workout(db: &Database, day: &str, load: Option<f64>) {
+        let local = Local
+            .from_local_datetime(
+                &NaiveDate::parse_from_str(day, "%Y-%m-%d")
+                    .unwrap()
+                    .and_hms_opt(12, 0, 0)
+                    .unwrap(),
+            )
+            .single()
+            .unwrap();
+        db.conn.execute(
+            "INSERT INTO workouts (workout_id, workout_type, start_time, end_time, training_load, source_scope)
+             VALUES (?1, 'run', ?2, ?2, ?3, 'device')",
+            params![format!("{day}-{load:?}"), local.with_timezone(&Utc).to_rfc3339(), load],
+        ).unwrap();
+    }
+
+    #[test]
+    fn acwr_counts_a_workout_once_and_keeps_observed_rest_days() {
+        let db = Database::in_memory().unwrap();
+        let start = NaiveDate::from_ymd_opt(2023, 11, 1).unwrap();
+        for offset in 0..35 {
+            let day = (start + Duration::days(offset)).to_string();
+            db.insert_daily_metric(&DailyMetric {
+                date: day.clone(),
+                metric: "steps".into(),
+                value: 1000.0,
+                unit: "steps".into(),
+                source_scope: SourceScope::UserFused,
+                device_id: None,
+            })
+            .unwrap();
+            // A stale rolling cloud total must never enter either load sum.
+            db.insert_daily_metric(&DailyMetric {
+                date: day,
+                metric: "training_load".into(),
+                value: 700.0,
+                unit: "load".into(),
+                source_scope: SourceScope::Device,
+                device_id: Some("watch".into()),
+            })
+            .unwrap();
+        }
+        let workout_day = start + Duration::days(27);
+        insert_acwr_workout(&db, &workout_day.to_string(), Some(700.0));
+        confirm_acwr_days(&db, "2023-11-01", "2023-12-27");
+        let points = db
+            .training_load_balance(workout_day, workout_day + Duration::days(28))
+            .unwrap();
+        for point in &points[..7] {
+            assert_eq!(point.acute_7d, Some(700.0));
+            assert_eq!(point.chronic_28d, Some(700.0));
+            assert_eq!(point.acute_days_with_data, 7);
+            assert_eq!(point.chronic_days_with_data, 28);
+            assert_eq!(point.acute_chronic_ratio, Some(4.0));
+        }
+        assert_eq!(points[7].acute_7d, Some(0.0));
+        assert_eq!(points[7].acute_chronic_ratio, Some(0.0));
+        assert_eq!(points[27].chronic_28d, Some(700.0));
+        assert_eq!(points[28].chronic_28d, Some(0.0));
+        assert_eq!(points[28].acute_chronic_ratio, None);
+        let export = parsed_export(&db, &["training_load"], ExportDetail::Summary);
+        assert_eq!(
+            export["analysis"]["training_load_balance"]["days"][27],
+            serde_json::to_value(&points[0]).unwrap()
+        );
+    }
+
+    #[test]
+    fn acwr_groups_workouts_by_local_start_day_and_does_not_invent_coverage() {
+        let db = Database::in_memory().unwrap();
+        // Pick an explicit offset on the opposite side of midnight from the
+        // machine's local day. This exercises localtime on UTC CI as well.
+        let instant = Utc.with_ymd_and_hms(2023, 11, 15, 12, 30, 0).unwrap();
+        let day = instant.with_timezone(&Local).date_naive();
+        let offset = if day == instant.date_naive() {
+            14 * 3600
+        } else {
+            -12 * 3600
+        };
+        let timestamp = instant
+            .with_timezone(&chrono::FixedOffset::east_opt(offset).unwrap())
+            .to_rfc3339();
+        assert_ne!(&timestamp[..10], day.to_string());
+        db.conn.execute(
+            "INSERT INTO workouts (workout_id, workout_type, start_time, end_time, training_load, source_scope)
+             VALUES ('offset', 'run', ?1, ?1, 100, 'device')", [&timestamp],
+        ).unwrap();
+        insert_acwr_workout(&db, &day.to_string(), Some(200.0));
+        confirm_acwr_days(
+            &db,
+            &(day - Duration::days(27)).to_string(),
+            &(day + Duration::days(1)).to_string(),
+        );
+        let complete = db.training_load_balance(day, day).unwrap();
+        assert_eq!(complete[0].acute_7d, Some(300.0));
+        insert_acwr_workout(&db, &day.to_string(), None);
+        insert_acwr_workout(&db, &(day - Duration::days(1)).to_string(), None);
+        insert_acwr_workout(&db, &(day - Duration::days(2)).to_string(), Some(-1.0));
+        let points = db.training_load_balance(day, day).unwrap();
+        assert_eq!(points[0].acute_7d, None);
+        assert_eq!(points[0].chronic_28d, None);
+        assert_eq!(points[0].acute_days_with_data, 4);
+        assert_eq!(points[0].chronic_days_with_data, 25);
+        assert_eq!(points[0].acute_chronic_ratio, None);
+        let empty = Database::in_memory()
+            .unwrap()
+            .training_load_balance(day, day)
+            .unwrap();
+        assert_eq!(empty[0].acute_7d, None);
+        assert_eq!(empty[0].chronic_days_with_data, 0);
+        assert_eq!(empty[0].acute_chronic_ratio, None);
     }
 
     #[test]
