@@ -115,22 +115,22 @@ const pick = async (replaceId?: string) => {
         <button type="button" class="ai-tool" @click="removeAttachment(row.id)">{{ t.remove }}</button>
       </li>
     </ul>
-    <button type="button" class="ai-tool" :disabled="!desktop" @click="pick()"><Icon name="plus" :size="13" />{{ t.add }}</button>
+    <button type="button" class="pill-button quiet add-file" :disabled="!desktop" @click="pick()"><Icon name="plus" :size="14" />{{ t.add }}</button>
     <p class="ai-note"><Icon name="shield" :size="13" />{{ attachmentPlainReferenceNote() }}</p>
     <p v-if="notice" class="ai-note warn" role="status">{{ notice }}</p>
 
     <details class="advanced">
       <summary><Icon name="sliders" :size="14" />{{ t.advanced }}</summary>
-      <label class="ai-check">
-        <input type="checkbox" :checked="draft.include_precise_gps" @change="setPreciseGps(($event.target as HTMLInputElement).checked)" />
-        <span>{{ t.preciseGps }}</span>
-      </label>
-      <p class="ai-hint">{{ t.preciseGpsHint }}</p>
-      <label class="ai-check">
-        <input type="checkbox" :checked="draft.mcp_shared" @change="setMcpShared(($event.target as HTMLInputElement).checked)" />
-        <span>{{ t.mcp }}</span>
-      </label>
-      <p class="ai-hint">{{ t.mcpHint }}</p>
+      <div class="toggle-row">
+        <span class="toggle-copy"><strong>{{ t.preciseGps }}</strong><small>{{ t.preciseGpsHint }}</small></span>
+        <button type="button" class="mat-switch" role="switch" :aria-checked="draft.include_precise_gps" :aria-label="t.preciseGps"
+          @click="setPreciseGps(!draft.include_precise_gps)"></button>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-copy"><strong>{{ t.mcp }}</strong><small>{{ t.mcpHint }}</small></span>
+        <button type="button" class="mat-switch" role="switch" :aria-checked="draft.mcp_shared" :aria-label="t.mcp"
+          @click="setMcpShared(!draft.mcp_shared)"></button>
+      </div>
       <p class="ai-label">{{ t.detail }}</p>
       <SegmentTrack compact :model-value="draft.detail_level" :items="detailOptions" :aria-label="t.detail"
         @update:model-value="setDetailLevel($event as AiTaskDetailLevel)" />
@@ -147,6 +147,12 @@ const pick = async (replaceId?: string) => {
 .file-flag { font-size: var(--fs-xs); }
 .file-flag.bad { color: var(--danger); }
 .file-flag.warn { color: var(--warning); }
+.add-file { min-height: 34px; padding: 0 14px; }
+.toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 12px; }
+.toggle-copy { display: grid; min-width: 0; gap: 2px; }
+.toggle-copy strong { color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
+.toggle-copy small { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.45; }
+.toggle-row .mat-switch { flex: 0 0 auto; }
 .advanced { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
 .advanced > summary { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: var(--fs-sm); font-weight: 600; cursor: pointer; list-style: none; }
 .advanced > summary::-webkit-details-marker { display: none; }

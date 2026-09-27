@@ -1965,7 +1965,6 @@ Antwoord in Markdown.`,
       decodedNote:
         'De samenvatting is alleen berekend uit geldige metingen in dit record; afwijkende sprongen worden genegeerd.',
       exportAria: 'Exporteren en delen',
-      eyebrowExport: 'Export',
       exportTitle: 'Exporteren en delen',
       exportSub:
         'Kopieer JSON, CSV of GPX, of kies een map om deze training als FIT op te slaan.',
@@ -2019,12 +2018,8 @@ Antwoord in Markdown.`,
       intro:
         'Kies een training, kies de gegevens en zeg wat je wilt weten — exporteer naar het bureaublad en sleep het in de AI.',
       titleLabel: 'Taaknaam',
-      savedTasks: 'Opgeslagen taken',
-      savedCount: (count: number) => `Opgeslagen taken (${count})`,
       newTask: 'Nieuw',
-      save: 'Opslaan',
       saved: 'Opgeslagen',
-      unsaved: 'Niet-opgeslagen wijzigingen',
     },
     'components/ai/CoverageDetails': {
       summary: (bytes: string) => `Dekkingsdetails (pakket ≈ ${bytes})`,

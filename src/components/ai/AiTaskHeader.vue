@@ -1,70 +1,112 @@
 <script setup lang="ts">
 /**
- * 页头：任务名（可直接改，空着就用自动生成的名字）、已保存任务、新建、保存。
+ * 页头：一枚浮在关系网左上角的玻璃胶囊——任务名、回溯范围、交付记录。
  *
- * 已保存的任务是一枚带数字的文件夹按钮，点开是一张玻璃清单。以前这里是一个下拉，
- * 当前任务的名字在输入框里写一遍、下拉里又写一遍，「最近 14 天 · 9月27日」并排出现两次。
+ * 没有「+」和「✓」：只想把数据交给 AI 的人不需要先「新建」「保存」，导出时自动存；
+ * 同名的草稿再导出会更新原来那条，交付记录里不会出现两条一模一样的。
+ * 任务名单击就地改；「最近 N 天」直接在胶囊里拨，一次改所有数据类别的窗口。
  */
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import Icon from '../Icon.vue';
-import { isDesktop } from '../../lib/bridge';
+import SegmentTrack from '../SegmentTrack.vue';
 import { useAiTaskDraft } from '../../composables/useAiTaskDraft';
 import { useAiTaskLibrary } from '../../composables/useAiTaskLibrary';
+import { recentWindowDays } from '../../lib/aiTask/title';
+import { displayDateTimeFormatter } from '../../lib/dateTime';
 import { defineMessages, useMessages } from '../../i18n';
 
 const props = defineProps<{ fallbackTitle: string }>();
 
-const { draft, dirty, busy, lastError, savedNotice, setTitle, saveDraft, resetDraft, loadTask } = useAiTaskDraft();
+const { draft, lastError, savedNotice, setTitle, setWindowDays, resetDraft, loadTask } = useAiTaskDraft();
 const { taskList, libraryError } = useAiTaskLibrary();
-const desktop = isDesktop();
 
 const t = useMessages(defineMessages(
   {
     pageTitle: '交给 AI',
     intro: '选运动、挑数据、说清楚想问什么，导出到桌面后直接拖给 AI。',
     titleLabel: '任务名',
-    savedTasks: '已保存的任务',
-    newTask: '新建',
-    save: '保存',
+    rename: '点一下改名',
+    rangeLabel: '回溯范围',
+    days: (n: number) => `${n} 天`,
+    history: '交付记录',
+    historyCount: (count: number) => `交付记录（${count}）`,
+    historyEmpty: '还没有交付过',
+    newTask: '新任务',
     saved: '已保存',
-    unsaved: '有未保存的修改',
-    savedCount: (count: number) => `已保存的任务（${count}）`,
   },
   {
     pageTitle: 'Hand to AI',
     intro: 'Pick a workout, choose the data, say what you want to know — export to the desktop and drag it into the AI.',
     titleLabel: 'Task name',
-    savedTasks: 'Saved tasks',
-    newTask: 'New',
-    save: 'Save',
+    rename: 'Click to rename',
+    rangeLabel: 'Look-back range',
+    days: (n: number) => `${n} days`,
+    history: 'Handoff history',
+    historyCount: (count: number) => `Handoff history (${count})`,
+    historyEmpty: 'Nothing handed off yet',
+    newTask: 'New task',
     saved: 'Saved',
-    unsaved: 'Unsaved changes',
-    savedCount: (count: number) => `Saved tasks (${count})`,
   },
   {
     pageTitle: 'Pasar a la IA',
+    intro: 'Elige un entrenamiento, escoge los datos, di qué quieres saber: exporta al escritorio y arrástralo a la IA.',
     titleLabel: 'Nombre de la tarea',
-    savedTasks: 'Tareas guardadas',
-    newTask: 'Nueva',
-    save: 'Guardar',
+    rename: 'Haz clic para renombrar',
+    rangeLabel: 'Periodo',
+    days: (n: number) => `${n} días`,
+    history: 'Historial de entregas',
+    historyCount: (count: number) => `Historial de entregas (${count})`,
+    historyEmpty: 'Aún no has entregado nada',
+    newTask: 'Nueva tarea',
     saved: 'Guardado',
-    savedCount: (count: number) => `Tareas guardadas (${count})`,
   },
   'components/ai/AiTaskHeader',
 ));
 
-const libraryOpen = ref(false);
-const libraryRoot = ref<HTMLElement | null>(null);
+/* —— 任务名：平时是一行字，点一下变输入框，回车 / 失焦确认，Esc 放弃 —— */
+const editing = ref(false);
+const titleInput = ref<HTMLInputElement | null>(null);
+const shownTitle = computed(() => draft.value.title.trim() || props.fallbackTitle);
+const startRename = async () => {
+  editing.value = true;
+  await nextTick();
+  titleInput.value?.select();
+};
+const commitRename = (event: Event) => {
+  if (!editing.value) return;
+  const value = (event.target as HTMLInputElement).value.trim();
+  // 改回和自动标题一样的字就当没改：自动标题会跟着日期和范围更新。
+  setTitle(value === props.fallbackTitle ? '' : value);
+  editing.value = false;
+};
+const cancelRename = () => { editing.value = false; };
+
+/* —— 回溯范围：一次改全部数据类别 —— */
+const RANGE_CHOICES = [7, 14, 30, 90];
+const rangeItems = computed(() => RANGE_CHOICES.map((days) => ({ value: days, label: t.value.days(days) })));
+const windowDays = computed(() => recentWindowDays(draft.value));
+
+/* —— 交付记录 —— */
+const historyOpen = ref(false);
+const root = ref<HTMLElement | null>(null);
+const whenText = (iso: string) => {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso.slice(0, 16).replace('T', ' ');
+  return displayDateTimeFormatter({ month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(date);
+};
 const openTask = (id: string) => {
-  libraryOpen.value = false;
+  historyOpen.value = false;
   if (id !== draft.value.id) void loadTask(id).catch(() => undefined);
 };
-/* 点清单外面或按 Esc 收起。 */
+const startNew = () => {
+  historyOpen.value = false;
+  resetDraft();
+};
 const onOutside = (event: PointerEvent) => {
-  if (libraryOpen.value && !libraryRoot.value?.contains(event.target as Node)) libraryOpen.value = false;
+  if (historyOpen.value && !root.value?.contains(event.target as Node)) historyOpen.value = false;
 };
 const onKey = (event: KeyboardEvent) => {
-  if (event.key === 'Escape' && libraryOpen.value) libraryOpen.value = false;
+  if (event.key === 'Escape' && historyOpen.value) historyOpen.value = false;
 };
 onMounted(() => {
   document.addEventListener('pointerdown', onOutside, true);
@@ -74,39 +116,44 @@ onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', onOutside, true);
   document.removeEventListener('keydown', onKey);
 });
-const save = () => void saveDraft(props.fallbackTitle).catch(() => undefined);
 </script>
 
 <template>
-  <header ref="libraryRoot" class="head">
+  <header ref="root" class="head">
     <div class="sr-only">
       <h1 id="ai-page-title">{{ t.pageTitle }}</h1>
       <p>{{ t.intro }}</p>
     </div>
     <div class="head-task glass-control">
-      <Icon name="edit" :size="14" class="title-glyph" />
-      <input class="ai-input title-input" type="text" :value="draft.title" :placeholder="fallbackTitle"
-        :aria-label="t.titleLabel" maxlength="120" @input="setTitle(($event.target as HTMLInputElement).value)" />
-      <span class="divider" aria-hidden="true"></span>
-      <button v-if="taskList.length" type="button" :class="['head-btn', 'library-btn', { on: libraryOpen }]"
-        :title="t.savedCount(taskList.length)" :aria-label="t.savedCount(taskList.length)" :aria-expanded="libraryOpen"
-        aria-controls="ai-task-library" @click="libraryOpen = !libraryOpen">
-        <Icon name="folder" :size="15" /><span class="count">{{ taskList.length }}</span>
+      <input v-if="editing" ref="titleInput" class="ai-input title-input" type="text" :value="shownTitle"
+        :aria-label="t.titleLabel" maxlength="120"
+        @blur="commitRename" @keydown.enter.prevent="commitRename" @keydown.esc.prevent="cancelRename" />
+      <button v-else type="button" class="title-button" :title="t.rename" :aria-label="`${t.titleLabel}: ${shownTitle}`" @click="startRename">
+        <span class="title-text">{{ shownTitle }}</span><Icon name="edit" :size="13" class="title-glyph" />
       </button>
-      <button type="button" class="head-btn" :title="t.newTask" :aria-label="t.newTask" @click="resetDraft()"><Icon name="plus" :size="15" /></button>
-      <button type="button" :class="['head-btn', 'save', { dirty: dirty && draft.id }]" :disabled="!desktop || busy === 'save'"
-        :title="dirty && draft.id ? t.unsaved : t.save" :aria-label="t.save" @click="save">
-        <Icon :name="savedNotice ? 'circle-check' : 'check'" :size="15" />
+      <span class="divider" aria-hidden="true"></span>
+      <SegmentTrack compact variant="bare" class="range-track" :items="rangeItems" :model-value="windowDays"
+        :aria-label="t.rangeLabel" @update:model-value="(value) => setWindowDays(Number(value))" />
+      <span class="divider" aria-hidden="true"></span>
+      <button type="button" :class="['history-btn', { on: historyOpen }]" :title="t.historyCount(taskList.length)"
+        :aria-label="t.historyCount(taskList.length)" :aria-expanded="historyOpen" aria-controls="ai-task-history"
+        @click="historyOpen = !historyOpen">
+        <Icon name="clock" :size="15" /><span v-if="taskList.length" class="count">{{ taskList.length }}</span>
       </button>
     </div>
-    <Transition name="library">
-      <div v-if="libraryOpen" id="ai-task-library" class="library glass-control" role="listbox" :aria-label="t.savedTasks">
-        <p class="library-title">{{ t.savedTasks }}</p>
+
+    <Transition name="history">
+      <div v-if="historyOpen" id="ai-task-history" class="history glass-control" role="listbox" :aria-label="t.history">
+        <div class="history-head">
+          <p class="history-title">{{ t.history }}</p>
+          <button type="button" class="pill-button quiet new-task" @click="startNew"><Icon name="plus" :size="13" />{{ t.newTask }}</button>
+        </div>
+        <p v-if="!taskList.length" class="history-empty">{{ t.historyEmpty }}</p>
         <button v-for="task in taskList" :key="task.id" type="button" role="option" :aria-selected="task.id === draft.id"
-          :class="['library-row', { current: task.id === draft.id }]" @click="openTask(task.id)">
-          <span class="library-name">{{ task.title }}</span>
-          <span class="library-date">{{ task.updated_at.slice(0, 10) }}</span>
-          <Icon v-if="task.id === draft.id" name="check" :size="14" class="library-check" />
+          :class="['history-row', { current: task.id === draft.id }]" @click="openTask(task.id)">
+          <span class="row-mark" aria-hidden="true"><Icon v-if="task.id === draft.id" name="check" :size="13" /></span>
+          <span class="row-name">{{ task.title }}</span>
+          <span class="row-when">{{ whenText(task.updated_at) }}</span>
         </button>
       </div>
     </Transition>
@@ -116,31 +163,36 @@ const save = () => void saveDraft(props.fallbackTitle).catch(() => undefined);
 </template>
 
 <style scoped>
-/* 浮在关系网左上角的一枚玻璃胶囊：任务名直接在胶囊里改，旁边是已保存任务、新建、保存。 */
 .head { display: grid; justify-items: start; gap: 6px; }
-.head-task { display: flex; max-width: 100%; align-items: center; gap: 4px; padding: 4px 4px 4px 14px; border-radius: 999px; }
+.head-task { display: flex; max-width: 100%; align-items: center; gap: 4px; padding: 4px; border-radius: 999px; }
+.title-button { display: inline-flex; min-width: 0; max-width: 300px; align-items: center; gap: 8px; padding: 8px 12px 8px 16px; border: 0; border-radius: 999px;
+  background: transparent; color: var(--ink); font: inherit; font-size: var(--fs-md); font-weight: 650; cursor: text; }
+.title-button:hover { background: var(--glass-press); }
+.title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .title-glyph { flex: 0 0 auto; color: var(--subtle); }
-.title-input { width: 240px; min-width: 0; padding: 6px 8px; border: 0; background: transparent; box-shadow: none; font-size: var(--fs-md); font-weight: 650; }
-.title-input:focus { box-shadow: none; }
-.divider { width: 1px; height: 20px; margin: 0 4px; background: color-mix(in srgb, var(--ink) 14%, transparent); }
-.head-btn { display: grid; width: 36px; height: 36px; flex: 0 0 36px; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--ink); cursor: pointer; }
-.head-btn:hover:not(:disabled) { background: var(--glass-press); }
-.head-btn:disabled { opacity: .45; cursor: not-allowed; }
-.head-btn.save.dirty { background: var(--accent); color: var(--accent-ink); }
-.library-btn { width: auto; min-width: 36px; gap: 5px; display: inline-flex; align-items: center; justify-content: center; padding: 0 10px; border-radius: 999px; }
-.library-btn .count { color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
-.library-btn.on { background: var(--glass-press); }
+.title-input { width: 280px; min-width: 0; padding: 7px 14px; border: 0; border-radius: 999px; background: var(--glass-press); box-shadow: none; font-size: var(--fs-md); font-weight: 650; }
+.title-input:focus { box-shadow: 0 0 0 2px var(--focus); }
+.divider { width: 1px; height: 20px; margin: 0 2px; background: color-mix(in srgb, var(--ink) 14%, transparent); }
+.range-track { flex: 0 0 auto; }
+.history-btn { display: inline-flex; min-width: 36px; height: 36px; align-items: center; justify-content: center; gap: 5px; padding: 0 12px; border: 0; border-radius: 999px;
+  background: transparent; color: var(--ink); cursor: pointer; }
+.history-btn:hover, .history-btn.on { background: var(--glass-press); }
+.history-btn .count { color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 
-/* 已保存任务清单：挂在胶囊下面的一张玻璃卡，一行一个任务，当前那个打勾。 */
-.library { display: grid; width: min(360px, 100%); max-height: 320px; gap: 2px; overflow-y: auto; padding: 8px; border-radius: var(--radius-md); overscroll-behavior: contain; }
-.library-title { margin: 2px 8px 6px; color: var(--subtle); font-size: var(--fs-xs); font-weight: 600; }
-.library-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 0; border-radius: 14px; background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
-.library-row:hover { background: var(--glass-press); }
-.library-row.current { background: color-mix(in srgb, var(--accent) 12%, transparent); }
-.library-name { flex: 1; min-width: 0; overflow: hidden; font-size: var(--fs-sm); text-overflow: ellipsis; white-space: nowrap; }
-.library-date { color: var(--subtle); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
-.library-check { color: var(--accent); }
-.library-enter-active, .library-leave-active { transition: opacity .22s ease, translate .32s var(--ease-out), filter .22s ease; }
-.library-enter-from, .library-leave-to { opacity: 0; translate: 0 -6px; filter: blur(6px); }
+/* 交付记录：三列对齐——当前标记、任务名、时间；时间右对齐、等宽数字。 */
+.history { display: grid; width: min(420px, 100%); max-height: 340px; gap: 2px; overflow-y: auto; padding: 8px; border-radius: var(--radius-md); overscroll-behavior: contain; }
+.history-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 2px 4px 6px 8px; }
+.history-title { margin: 0; color: var(--subtle); font-size: var(--fs-xs); font-weight: 600; }
+.new-task { min-height: 30px; padding: 0 12px; font-size: var(--fs-xs); }
+.history-empty { margin: 4px 8px 8px; color: var(--subtle); font-size: var(--fs-xs); }
+.history-row { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 12px; border: 0; border-radius: 14px;
+  background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
+.history-row:hover { background: var(--glass-press); }
+.history-row.current { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.row-mark { display: grid; place-items: center; color: var(--accent); }
+.row-name { min-width: 0; overflow: hidden; font-size: var(--fs-sm); text-overflow: ellipsis; white-space: nowrap; }
+.row-when { color: var(--subtle); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.history-enter-active, .history-leave-active { transition: opacity .22s ease, translate .32s var(--ease-out), filter .22s ease; }
+.history-enter-from, .history-leave-to { opacity: 0; translate: 0 -6px; filter: blur(6px); }
 .status { margin: 0; padding: 3px 12px; border-radius: 999px; background: var(--mat-glass); }
 </style>

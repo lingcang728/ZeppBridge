@@ -3,10 +3,15 @@
  * 第 ② 步：方向和问题。
  *
  * 模板 = 分析方向（全局框架，带推荐的数据范围）；问题 = 这次想重点问的。
- * 两者并存，最终提示词里方向在前、问题在后——这一步把两者在视觉上分开：
- * 方向是一排可选的 chip，问题是用户自己写的文本框。
+ * 两者并存，最终提示词里方向在前、问题在后。
+ *
+ * 方向用全应用同一种可拖动的胶囊（项多时换传送带），不再是一排点选的贴片；问题和个人
+ * 背景是无硬框的玻璃输入面，随内容长高，下面给几条示例问题，一点就填进去。
  */
+import { computed } from 'vue';
 import type { AiTaskTemplate } from '../../lib/bridge/types';
+import SegmentTrack from '../SegmentTrack.vue';
+import CapsuleWheel from '../CapsuleWheel.vue';
 import { AI_TASK_PROMPT_MAX } from '../../lib/aiTask/draft';
 import { templateName, templatePromptSeed } from '../../lib/aiTask/prompt';
 import { useAiTaskDraft } from '../../composables/useAiTaskDraft';
@@ -28,6 +33,10 @@ const t = useMessages(defineMessages(
     counter: (used: number, max: number) => `${used}/${max}`,
     noteLabel: '个人背景（可选）',
     notePlaceholder: '伤病史、目标、最近的状态……会写进导出数据里给 AI 参考。',
+    examplesLabel: '试试这样问',
+    example1: '最近睡得怎么样？有什么值得改的？',
+    example2: '这周的训练量对我来说合适吗？',
+    example3: '我的恢复在变好还是变差？',
   },
   {
     title: 'Direction and question',
@@ -40,6 +49,10 @@ const t = useMessages(defineMessages(
     counter: (used: number, max: number) => `${used}/${max}`,
     noteLabel: 'Personal background (optional)',
     notePlaceholder: 'Injuries, goals, recent form… included in the export for the AI.',
+    examplesLabel: 'Try asking',
+    example1: 'How have I been sleeping lately, and what should I change?',
+    example2: 'Was this week’s training load right for me?',
+    example3: 'Is my recovery getting better or worse?',
   },
   {
     title: 'Enfoque y pregunta',
@@ -48,11 +61,36 @@ const t = useMessages(defineMessages(
     noDirection: 'Ninguno',
     questionLabel: 'Tu pregunta',
     noteLabel: 'Contexto personal (opcional)',
+    examplesLabel: 'Prueba a preguntar',
+    example1: '¿Qué tal he dormido últimamente y qué debería cambiar?',
+    example2: '¿La carga de entrenamiento de esta semana fue adecuada para mí?',
+    example3: '¿Mi recuperación va a mejor o a peor?',
   },
   'components/ai/DirectionPanel',
 ));
 
-const isActive = (template: AiTaskTemplate | null) => (template?.id ?? null) === draft.value.template_id;
+/* 方向：「不指定」+ 各模板。五项以内用分段胶囊（可拖动），更多换传送带。 */
+const NONE = '__none__';
+const directionItems = computed(() => [
+  { value: NONE, label: t.value.noDirection },
+  ...props.templates.map((template) => ({ value: template.id, label: templateName(template) })),
+]);
+const activeDirection = computed(() => draft.value.template_id ?? NONE);
+const activeSeed = computed(() => {
+  const template = props.templates.find((entry) => entry.id === draft.value.template_id);
+  return template ? templatePromptSeed(template) : '';
+});
+const pickDirection = (value: string | number) => {
+  setTemplate(value === NONE ? null : props.templates.find((template) => template.id === value) ?? null);
+};
+
+/* 文本框随内容长高：不用去拖右下角的小三角。 */
+const grow = (event: Event) => {
+  const box = event.target as HTMLTextAreaElement;
+  box.style.height = 'auto';
+  box.style.height = `${box.scrollHeight}px`;
+};
+const examples = computed(() => [t.value.example1, t.value.example2, t.value.example3]);
 </script>
 
 <template>
@@ -64,27 +102,36 @@ const isActive = (template: AiTaskTemplate | null) => (template?.id ?? null) ===
     <p class="ai-step-hint">{{ t.hint }}</p>
 
     <p class="ai-label">{{ t.directionLabel }}</p>
-    <div class="chips" role="radiogroup" :aria-label="t.directionLabel">
-      <button type="button" role="radio" :aria-checked="isActive(null)" :class="['ai-chip', { 'is-on': isActive(null) }]"
-        @click="setTemplate(null)">{{ t.noDirection }}</button>
-      <button v-for="template in props.templates" :key="template.id" type="button" role="radio"
-        :aria-checked="isActive(template)" :class="['ai-chip', { 'is-on': isActive(template) }]"
-        :title="templatePromptSeed(template)" @click="setTemplate(template)">{{ templateName(template) }}</button>
+    <SegmentTrack v-if="directionItems.length <= 5" class="direction-track" :items="directionItems" :model-value="activeDirection"
+      :aria-label="t.directionLabel" @update:model-value="pickDirection" />
+    <CapsuleWheel v-else loop :span="260" :items="directionItems" :model-value="activeDirection"
+      :aria-label="t.directionLabel" @update:model-value="pickDirection" />
+    <p class="ai-hint">{{ activeSeed || t.directionHint }}</p>
+
+    <div class="ai-field">
+      <label class="ai-field-label" for="ai-question">{{ t.questionLabel }}</label>
+      <textarea id="ai-question" class="ai-field-input" rows="2" :maxlength="AI_TASK_PROMPT_MAX" :value="draft.prompt"
+        :placeholder="t.questionPlaceholder" @input="setPrompt(($event.target as HTMLTextAreaElement).value); grow($event)"></textarea>
+      <span class="ai-field-count">{{ t.counter(draft.prompt.length, AI_TASK_PROMPT_MAX) }}</span>
     </div>
-    <p class="ai-hint">{{ t.directionHint }}</p>
+    <div v-if="!draft.prompt.trim()" class="examples" :aria-label="t.examplesLabel">
+      <span class="examples-label">{{ t.examplesLabel }}</span>
+      <button v-for="example in examples" :key="example" type="button" class="example" @click="setPrompt(example)">{{ example }}</button>
+    </div>
 
-    <label class="ai-label" for="ai-question">{{ t.questionLabel }}</label>
-    <textarea id="ai-question" class="ai-input" rows="3" :maxlength="AI_TASK_PROMPT_MAX" :value="draft.prompt"
-      :placeholder="t.questionPlaceholder" @input="setPrompt(($event.target as HTMLTextAreaElement).value)"></textarea>
-    <p class="ai-hint counter">{{ t.counter(draft.prompt.length, AI_TASK_PROMPT_MAX) }}</p>
-
-    <label class="ai-label" for="ai-note">{{ t.noteLabel }}</label>
-    <textarea id="ai-note" class="ai-input" rows="2" :value="draft.personal_note" :placeholder="t.notePlaceholder"
-      @input="setPersonalNote(($event.target as HTMLTextAreaElement).value)"></textarea>
+    <div class="ai-field">
+      <label class="ai-field-label" for="ai-note">{{ t.noteLabel }}</label>
+      <textarea id="ai-note" class="ai-field-input" rows="2" :value="draft.personal_note" :placeholder="t.notePlaceholder"
+        @input="setPersonalNote(($event.target as HTMLTextAreaElement).value); grow($event)"></textarea>
+    </div>
   </section>
 </template>
 
 <style scoped>
-.chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.counter { text-align: right; }
+.direction-track { max-width: 100%; }
+.examples { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 2px 0; }
+.examples-label { color: var(--subtle); font-size: var(--fs-2xs); }
+.example { padding: 5px 11px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--muted);
+  font: inherit; font-size: var(--fs-xs); cursor: pointer; transition: background var(--dur-fast) ease, color var(--dur-fast) ease; }
+.example:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--ink); }
 </style>

@@ -1786,7 +1786,6 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       overrideFailed: 'Impossible d’enregistrer la correction du type de séance',
       deviceNameMissing: 'Nom d’appareil non fourni',
 
-      eyebrowExport: 'Export',
       exportTitle: 'Export et partage',
       exportAria: 'Export et partage',
       exportSub: 'Copiez JSON, CSV ou GPX, ou choisissez un dossier pour enregistrer cette séance en FIT.',
@@ -1837,12 +1836,8 @@ Répondez en Markdown.`,
       pageTitle: 'Confier à l’IA',
       intro: 'Choisissez une séance, choisissez les données, dites ce que vous voulez savoir — exportez sur le bureau et glissez le tout dans l’IA.',
       titleLabel: 'Nom de la tâche',
-      savedTasks: 'Tâches enregistrées',
-      savedCount: (count: number) => `Tâches enregistrées (${count})`,
       newTask: 'Nouvelle tâche',
-      save: 'Enregistrer',
       saved: 'Enregistrée',
-      unsaved: 'Modifications non enregistrées',
     },
 
     'components/ai/CoverageDetails': {

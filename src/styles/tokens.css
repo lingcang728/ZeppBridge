@@ -203,7 +203,7 @@ html[data-theme="light"] {
   --activity-wash: rgba(30, 150, 166, .10);
   --distance: var(--pace);
   --danger: #C43742;
-  --warning: #8F6B09;
+  --warning: #B25A14; /* 浅色专用：暖琥珀。以前的 #8F6B09 在白底上是一团土黄。 */
   --focus: #2F6B4F;
   --route-neutral: #6E7670;
   --route-mint: #22875C;

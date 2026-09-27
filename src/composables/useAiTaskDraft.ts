@@ -20,7 +20,7 @@ import type {
   AiTaskTemplate,
 } from '../lib/bridge/types';
 import { applyTemplateToDraft, isTaskDirty, newTaskDraft, taskSnapshot } from '../lib/aiTask/draft';
-import { categoryRangeOf, withCategoryRange } from '../lib/aiTask/categories';
+import { AI_TASK_CATEGORY_META, categoryRangeOf, withCategoryRange } from '../lib/aiTask/categories';
 import { createUndoStack } from '../lib/aiTask/undoStack';
 import { useAiTaskLibrary } from './useAiTaskLibrary';
 import { defineMessages, messagesOf } from '../i18n';
@@ -129,6 +129,12 @@ const saveDraft = async (fallbackTitle?: string): Promise<AiTask> => {
   try {
     const task = { ...draft.value };
     if (!task.title.trim()) task.title = fallbackTitle?.trim() || copy().untitled;
+    // 没存过的草稿按名字归到已有的那条：同一天同样的「最近 14 天」再导出一次，
+    // 更新原记录，不再在交付记录里多出一条一模一样的。
+    if (!task.id) {
+      const same = library.taskList.value.find((entry) => entry.title.trim() === task.title.trim());
+      if (same) task.id = same.id;
+    }
     const saved = await backend.aiTaskSave(task);
     draft.value = saved;
     markBaseline();
@@ -175,6 +181,19 @@ const setCategoryEnabled = (category: AiTaskCategory, enabled: boolean) => {
   rememberSelection();
   patchRange(category, { enabled });
   noteChange({ kind: 'category', category, included: enabled });
+};
+
+/** 一次改所有数据类别的回溯天数（任务头的「最近 N 天」胶囊）。 */
+const setWindowDays = (days: number) => {
+  const next = Math.max(0, Math.floor(days));
+  const windows = draft.value.categories.filter((range) => AI_TASK_CATEGORY_META[range.category].hasWindow);
+  if (windows.every((range) => range.days_before === next)) return;
+  rememberSelection();
+  patchDraft({
+    categories: draft.value.categories.map((range) => (
+      AI_TASK_CATEGORY_META[range.category].hasWindow ? { ...range, days_before: next } : range
+    )),
+  });
 };
 
 const setMetricExcluded = (category: AiTaskCategory, metric: string, excluded: boolean) => {
@@ -242,6 +261,7 @@ export function useAiTaskDraft() {
     setCategoryEnabled,
     setCategoryDays: (category: AiTaskCategory, days: number) =>
       patchRange(category, { days_before: Math.max(0, Math.floor(days)) }),
+    setWindowDays,
     setIncludeWorkoutDay: (category: AiTaskCategory, include: boolean) =>
       patchRange(category, { include_workout_day: include }),
     setMetricExcluded,

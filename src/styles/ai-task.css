@@ -29,6 +29,20 @@
 }
 .ai-input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
 .ai-input::placeholder { color: var(--subtle); }
+/* 玻璃输入面：没有硬描边，标题写在面里，字数淡淡地压在右下角；聚焦时亮一圈品牌色。 */
+.ai-field {
+  position: relative; display: grid; gap: 2px; margin-top: 14px; padding: 10px 14px 8px;
+  border-radius: var(--radius-md); background: var(--mat-inset); box-shadow: var(--mat-inset-shadow);
+  transition: box-shadow var(--dur-fast) ease;
+}
+.ai-field:focus-within { box-shadow: var(--mat-inset-shadow), 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); }
+.ai-field-label { color: var(--subtle); font-size: var(--fs-2xs); font-weight: 600; letter-spacing: .02em; }
+.ai-field-input {
+  width: 100%; min-height: 1.6em; max-height: 240px; padding: 2px 0; border: 0; outline: none; resize: none; overflow-y: auto;
+  background: transparent; color: var(--ink); font: inherit; font-size: var(--fs-md); line-height: 1.55;
+}
+.ai-field-input::placeholder { color: var(--subtle); }
+.ai-field-count { justify-self: end; color: var(--subtle); font-size: var(--fs-2xs); font-variant-numeric: tabular-nums; opacity: .7; }
 .ai-tool {
   display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 4px 10px;
   border: 1px solid var(--line-control); border-radius: 9px;

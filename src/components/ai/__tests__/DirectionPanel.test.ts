@@ -1,5 +1,5 @@
 /**
- * DirectionPanel 的 SSR 契约：方向 chip 单选（含「不指定」）、问题文本框
+ * DirectionPanel 的 SSR 契约：方向胶囊单选（含「不指定」）、问题文本框
  * 与字符计数。草稿是模块单例，渲染前一律 resetDraft 归位。
  */
 import { createSSRApp } from 'vue';
@@ -66,11 +66,9 @@ describe('DirectionPanel', () => {
     expect(count(html, /role="radio"/g)).toBe(3);
     expect(count(html, /aria-checked="true"/g)).toBe(1);
     expect(html).toContain('不指定');
-    // 模板 chip 显示 templateName（name_code 为空时用存储的 name），
-    // 方向正文落在 title 提示上。
+    // 胶囊显示 templateName（name_code 为空时用存储的 name）。
     expect(html).toContain('恢复跑方向');
     expect(html).toContain('长跑比较');
-    expect(html).toContain('title="方向正文"');
   });
 
   it('空草稿：计数器 0/500，问题文本框为空', async () => {
@@ -92,9 +90,10 @@ describe('DirectionPanel', () => {
     const html = await render([template()]);
     // 问题原样保留在 textarea 里。
     expect(html).toContain('keep me');
-    // 唯一打勾的是模板这枚 chip（title=方向正文 与 checked 同在一枚按钮里）。
+    // 唯一打勾的是模板那一格；选中后方向正文显示在胶囊下面。
     expect(count(html, /aria-checked="true"/g)).toBe(1);
-    expect(html).toMatch(/aria-checked="true"[^>]*title="方向正文"/);
+    expect(html).toMatch(/aria-checked="true"[^>]*>[\s\S]*?恢复跑方向/);
     expect(count(html, /aria-checked="false"/g)).toBe(1);
+    expect(html).toContain('方向正文');
   });
 });

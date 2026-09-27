@@ -12,7 +12,7 @@
  * → 打开所选 AI → 在资源管理器里选中导出的文件夹。按下以后坞向上长出一截，
  * 显示每一步的进度和导出位置。导出前顺手保存任务。
  */
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Icon from '../Icon.vue';
 import CapsuleWheel from '../CapsuleWheel.vue';
 import HandoffSteps from './HandoffSteps.vue';
@@ -20,7 +20,7 @@ import CoverageDetails from './CoverageDetails.vue';
 import type { AiTaskPreview } from '../../lib/bridge/types';
 import { isDesktop } from '../../lib/bridge';
 import { AI_PROVIDERS, type AiProvider, type AiProviderId } from '../../lib/aiProviders';
-import { aiTaskIssueText } from '../../lib/aiTask/copy';
+import { aiTaskIssueText, coverageNoteText } from '../../lib/aiTask/copy';
 import { formatBytes } from '../../lib/aiTask/coverage';
 import { composePromptPreview } from '../../lib/aiTask/prompt';
 import { handoffParts } from '../../lib/aiTask/handoffParts';
@@ -63,6 +63,10 @@ const t = useMessages(defineMessages(
     issueCount: (count: number) => `${count} 条提醒`,
     repeat: (count: number) => `×${count}`,
     closePanel: '收起',
+    editHint: '点一下就能改',
+    edited: '已手动修改',
+    resetPrompt: '恢复自动生成',
+    fixedTail: '下面这段由 ZeppBridge 按实际覆盖自动附加：',
     packageSize: (bytes: string) => `数据包约 ${bytes}`,
     readinessWaiting: '最新数据还在路上',
     readinessWaitingStep: (current: number, total: number) => `同步 ${current}/${total} · 完成后这里自动刷新`,
@@ -88,6 +92,10 @@ const t = useMessages(defineMessages(
     issueCount: (count: number) => (count === 1 ? '1 note' : `${count} notes`),
     repeat: (count: number) => `×${count}`,
     closePanel: 'Close',
+    editHint: 'Click to edit',
+    edited: 'Edited by you',
+    resetPrompt: 'Restore automatic text',
+    fixedTail: 'ZeppBridge appends this part from the actual coverage:',
     packageSize: (bytes: string) => `Package ≈ ${bytes}`,
     readinessWaiting: 'The latest data is still on its way',
     readinessWaitingStep: (current: number, total: number) => `Sync ${current}/${total} · this refreshes when it lands`,
@@ -107,6 +115,10 @@ const t = useMessages(defineMessages(
     readinessLoading: 'Contando tus datos…',
     issueCount: (count: number) => (count === 1 ? '1 aviso' : `${count} avisos`),
     closePanel: 'Cerrar',
+    editHint: 'Haz clic para editar',
+    edited: 'Editado por ti',
+    resetPrompt: 'Restaurar texto automático',
+    fixedTail: 'ZeppBridge añade esta parte según la cobertura real:',
     packageSize: (bytes: string) => `Paquete ≈ ${bytes}`,
     readinessWaiting: 'Los datos más recientes aún están llegando',
     readinessWaitingStep: (current: number, total: number) => `Sincronización ${current}/${total} · se actualiza al terminar`,
@@ -161,7 +173,35 @@ const issueTotal = computed(() => groupedWarnings.value.length + (props.previewE
 
 /** 任务说明与文件名：预览和导出同一个函数，「复制出去的就是这段」才成立。 */
 const parts = computed(() => handoffParts(exportTask(), props.preview, { hasDirection: Boolean(props.direction) }));
-const finalPrompt = computed(() => composePromptPreview({ brief: parts.value.brief, direction: props.direction, question: draft.value.prompt }));
+/* 最终提示词单击即改：可改的是 任务说明 + 方向 + 问题 这一大段；覆盖说明由后端按实际
+   覆盖附在最后，改不了，单独淡色列出。改过的全文随导出传给后端（prompt_override）。
+   换了一个任务（草稿 id 变了）就丢掉手改，免得把上一个任务的话带过去。 */
+const autoHead = computed(() => composePromptPreview({ brief: parts.value.brief, direction: props.direction, question: draft.value.prompt, coverageNote: '' }));
+const coverageTail = computed(() => coverageNoteText());
+const promptOverride = ref<string | null>(null);
+const editingPrompt = ref(false);
+const promptBox = ref<HTMLTextAreaElement | null>(null);
+const headText = computed(() => promptOverride.value ?? autoHead.value);
+const startEditPrompt = async () => {
+  editingPrompt.value = true;
+  await nextTick();
+  const box = promptBox.value;
+  if (!box) return;
+  box.style.height = `${box.scrollHeight}px`;
+  box.focus();
+};
+const onPromptInput = (event: Event) => {
+  const box = event.target as HTMLTextAreaElement;
+  box.style.height = 'auto';
+  box.style.height = `${box.scrollHeight}px`;
+};
+const commitPrompt = (event: Event) => {
+  const value = (event.target as HTMLTextAreaElement).value;
+  promptOverride.value = value.trim() && value.trim() !== autoHead.value.trim() ? value : null;
+  editingPrompt.value = false;
+};
+const resetPrompt = () => { promptOverride.value = null; };
+watch(() => draft.value.id, () => { promptOverride.value = null; });
 const blocked = computed(() => (prepareResult.value?.status === 'blocked' && !stale.value ? prepareResult.value.blocked : []));
 const ready = computed(() => (prepareResult.value?.status === 'ready' ? prepareResult.value : null));
 const stale = computed(() => handoff.isStale(exportTask()));
@@ -183,7 +223,7 @@ const run = async (openSite: boolean) => {
   await saveDraft(props.fallbackTitle).catch(() => undefined);
   const task = exportTask();
   const now = handoffParts(task, props.preview, { hasDirection: Boolean(props.direction), now: new Date() });
-  const options = { briefText: now.brief, dataFileStem: now.dataStem, promptFileStem: now.promptStem };
+  const options = { briefText: now.brief, dataFileStem: now.dataStem, promptFileStem: now.promptStem, promptOverride: promptOverride.value };
   if (openSite) await handoff.runAll(task, provider.value, props.direction, options);
   else await handoff.exportOnly(task, props.direction, options);
 };
@@ -226,7 +266,15 @@ onBeforeUnmount(() => {
           <p class="ai-label">{{ t.finalPrompt }}</p>
           <button type="button" class="sheet-close" :aria-label="t.closePanel" @click="details = false"><Icon name="x" :size="15" /></button>
         </div>
-        <pre class="prompt">{{ finalPrompt }}</pre>
+        <textarea v-if="editingPrompt" ref="promptBox" class="prompt prompt-edit" :value="headText" :aria-label="t.finalPrompt"
+          @input="onPromptInput" @blur="commitPrompt" @keydown.esc.prevent="($event.target as HTMLTextAreaElement).blur()"></textarea>
+        <button v-else type="button" class="prompt prompt-view" :title="t.editHint" @click="startEditPrompt">{{ headText }}</button>
+        <p class="prompt-meta">
+          <span v-if="promptOverride !== null" class="edited"><Icon name="edit" :size="12" />{{ t.edited }}</span>
+          <span v-else class="hint"><Icon name="edit" :size="12" />{{ t.editHint }}</span>
+          <button v-if="promptOverride !== null" type="button" class="reset" @click="resetPrompt"><Icon name="undo" :size="12" />{{ t.resetPrompt }}</button>
+        </p>
+        <p class="prompt-tail"><span>{{ t.fixedTail }}</span>{{ coverageTail }}</p>
         <ul v-if="groupedWarnings.length" class="issues">
           <li v-for="issue in groupedWarnings" :key="issue.text" class="ai-note warn">
             <Icon name="warning" :size="13" /><span>{{ issue.text }}</span>
@@ -393,7 +441,22 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-sm); background: var(--mat-inset);
   color: var(--ink); font-family: inherit; font-size: var(--fs-sm); line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; box-shadow: var(--mat-inset-shadow);
 }
-.issues { margin: 8px 0 0; padding: 0; list-style: none; }
+.prompt-view { display: block; width: 100%; max-height: 220px; border: 0; text-align: left; cursor: text; transition: box-shadow var(--dur-fast) ease; }
+.prompt-view:hover { box-shadow: var(--mat-inset-shadow), 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
+.prompt-edit { display: block; width: 100%; max-height: 320px; resize: none; border: 0; outline: none; box-shadow: var(--mat-inset-shadow), 0 0 0 2px var(--focus); }
+.prompt-meta { display: flex; align-items: center; gap: 12px; margin: 6px 2px 0; font-size: var(--fs-2xs); }
+.prompt-meta span, .prompt-meta button { display: inline-flex; align-items: center; gap: 4px; }
+.prompt-meta .hint { color: var(--subtle); }
+.prompt-meta .edited { color: var(--accent); font-weight: 600; }
+.prompt-meta .reset { padding: 0; border: 0; background: none; color: var(--muted); font: inherit; cursor: pointer; }
+.prompt-meta .reset:hover { color: var(--ink); }
+.prompt-tail { margin: 8px 2px 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.5; }
+.prompt-tail span { display: block; margin-bottom: 2px; font-size: var(--fs-2xs); }
+.issues { display: grid; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
+/* 提醒是一枚枚淡色胶囊，不是一排刺眼的彩字。 */
+.issues .ai-note { margin: 0; padding: 7px 12px; border-radius: 12px; }
+.issues .ai-note.warn { background: color-mix(in srgb, var(--warning) 10%, transparent); }
+.issues .ai-note.bad { background: color-mix(in srgb, var(--danger) 10%, transparent); }
 .repeat { margin-left: auto; padding-left: 8px; font-size: var(--fs-2xs); }
 .output { margin-top: 10px; }
 .output .ai-note span { overflow-wrap: anywhere; }

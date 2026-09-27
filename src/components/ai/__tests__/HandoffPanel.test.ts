@@ -93,7 +93,7 @@ describe('HandoffPanel', () => {
     expect(html).toContain('连接桌面应用后才能导出');
   });
 
-  it('最终提示词 <pre> 如实拼出方向段与问题段', async () => {
+  it('最终提示词如实拼出任务说明、方向段与问题段', async () => {
     draft.setPrompt('这次睡眠够恢复吗');
     const html = await render({
       preview: null,
@@ -101,11 +101,11 @@ describe('HandoffPanel', () => {
       direction: '分析方向：恢复跑上下文',
       fallbackTitle: '任务',
     });
-    const pre = html.match(/<pre[^>]*class="prompt"[^>]*>([\s\S]*?)<\/pre>/)?.[1] ?? '';
+    const pre = html.match(/<button[^>]*class="prompt prompt-view"[^>]*>([\s\S]*?)<\/button>/)?.[1] ?? '';
     expect(pre).toContain('分析方向：恢复跑上下文');
     expect(pre).toContain('这次睡眠够恢复吗');
-    // 覆盖说明段（前端提供的本地化文本）也在里面。
-    expect(pre.length).toBeGreaterThan(0);
+    // 任务说明在最前，要求 AI 直接开始。
+    expect(pre).toContain('请直接开始分析');
   });
 
   it('previewError 渲染成 role="alert" 的提示', async () => {

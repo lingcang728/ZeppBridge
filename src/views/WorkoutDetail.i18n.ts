@@ -123,7 +123,6 @@ export const workoutDetailMessages = defineMessages(
     decodedNote: '摘要只从本条记录的有效样本计算，异常跳点会被忽略。',
 
     exportAria: '导出与分享',
-    eyebrowExport: '导出',
     exportTitle: '导出与分享',
     exportSub: '复制 JSON、CSV、GPX，或选择文件夹保存这条运动的 FIT 文件。',
     exportFormatAria: '导出格式',
@@ -271,7 +270,6 @@ Answer in Markdown.`,
     decodedNote: 'The summary is computed only from valid samples in this record; anomalous jumps are ignored.',
 
     exportAria: 'Export and share',
-    eyebrowExport: 'Export',
     exportTitle: 'Export and share',
     exportSub: 'Copy JSON, CSV or GPX, or choose a folder to save this workout as FIT.',
     exportFormatAria: 'Export format',
@@ -419,7 +417,6 @@ Responde en español, en Markdown.`,
     decodedNote: 'El resumen se calcula solo con las muestras válidas de este registro; los saltos anómalos se ignoran.',
 
     exportAria: 'Exportar y compartir',
-    eyebrowExport: 'Exportar',
     exportTitle: 'Exportar y compartir',
     exportSub: 'Copia JSON, CSV o GPX, o elige una carpeta para guardar este entrenamiento como FIT.',
     exportFormatAria: 'Formato de exportación',
