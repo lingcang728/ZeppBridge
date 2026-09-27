@@ -148,6 +148,9 @@ a { color: inherit; }
 .page-right-leave-to { opacity: 0; transform: translateX(42px) scale(.985); filter: blur(8px); }
 .page-none-enter-from, .page-none-leave-to { opacity: 0; }
 .page-host > * { transform-origin: 50% 30vh; }
+/* 返回时，当初点进去的那张卡亮一下（lib/returnScroll.ts），告诉人「你是从这儿走的」。 */
+.return-flash { animation: return-flash 1.4s ease-out; }
+@keyframes return-flash { 0%, 100% { outline: 2px solid transparent; outline-offset: 6px; } 18% { outline: 2px solid color-mix(in srgb, var(--accent) 75%, transparent); outline-offset: 3px; } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }

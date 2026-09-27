@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
+import { installReturnScroll } from '../lib/returnScroll';
 
 /*
  * 每个页面都是动态 import，包括首屏 Overview。
@@ -97,10 +98,7 @@ const router = createRouter({
   },
 });
 
-router.afterEach(() => {
-  const main = document.getElementById('main-content');
-  if (main) main.scrollTo({ top: 0 });
-  else window.scrollTo({ top: 0 });
-});
+// 滚动区是 #main-content：前进回到顶部，后退回到离开时的位置（见 lib/returnScroll.ts）。
+installReturnScroll(router);
 
 export default router;
