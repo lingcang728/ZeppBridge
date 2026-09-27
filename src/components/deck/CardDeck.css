@@ -5,24 +5,22 @@
 /* coverflow 在剩下的高度里垂直居中：卡组是这一页的主角，不该缩在顶上留一大片空。 */
 .deck-mode-cover .deck-overview { display: grid; min-height: calc(100vh - 260px); align-content: center; }
 
-/* 往后退：绕顶边中点缩小、变糊、淡出（useDeckMorph 关卡时按这个原点把缩放算回去）。
-   退到底以后（is-gone）不再占高度，内容短的卡打开时页面不会多出一截空白；
-   这一步等淡出放完才做，否则 coverflow 会在淡出的第一帧往上跳。 */
+/* 往后退一层：绕顶边中点缩小、按深度变糊、往下渐隐（useDeckMorph 关卡时按这个原点把
+   缩放算回去）。不再淡到全透明、也不再收起高度：卡是从这一层里抽出来的，这一层就该还
+   在后面——以前「退没了」看起来模糊是假的，关卡时高度一撑开还会闪一下。
+   模糊只在过渡时动一次，静止后不再重绘。 */
 .deck-overview {
   position: relative;
   z-index: 0;
   transform-origin: 50% 0;
-  transition: opacity .34s ease, transform .52s var(--ease-out), filter .34s ease, visibility 0s linear 0s;
+  transition: opacity .36s ease, transform .52s var(--ease-out), filter .36s ease;
 }
 .deck-overview.is-receded {
-  opacity: 0;
-  transform: scale(.92);
-  filter: blur(12px);
-  visibility: hidden;
+  opacity: .55;
+  transform: scale(.93);
+  filter: blur(9px) saturate(.85);
   pointer-events: none;
-  transition: opacity .34s ease, transform .52s var(--ease-out), filter .34s ease, visibility 0s linear .34s;
 }
-.deck-mode-cover .deck-overview.is-gone, .deck-overview.is-gone { height: 0; min-height: 0; overflow: hidden; }
 
 /* ── 卡片材质（平铺与打开共用；coverflow 的卡在 DeckCoverflow 里）──
    没有描边、没有高光线：边界只靠一层很淡的亮面和柔和的投影，像浮在背景上的一块板。 */
@@ -56,17 +54,30 @@
   pointer-events: none;
 }
 
-/* ── 平铺 ── */
+/* ── 卡包（展开全部）：Apple Wallet 式纵向叠放，每张只露出卡头。
+   每张卡有一张卡片该有的高度，下一张盖在它下半截上；指针停在哪张，后面的卡整体往下
+   让开一截，把它多露出来一些。卡是不透明的，盖住的字不会透出来。 ── */
 .deck-list {
+  --wallet-card: 184px;
+  --wallet-peek: 78px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-  margin: 0;
-  padding: 0 0 96px;
+  width: min(760px, 100%);
+  margin: 0 auto;
+  padding: 0 0 110px;
   list-style: none;
 }
-.list-card { transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) ease; }
-.list-card:hover, .list-card:focus-within { transform: translateY(-3px); box-shadow: var(--mat-shadow-lift); }
+.list-card {
+  min-height: var(--wallet-card);
+  background:
+    radial-gradient(640px 200px at 0 0, color-mix(in srgb, var(--card-tone) 20%, transparent), transparent 72%),
+    var(--mat-card-solid);
+  box-shadow: 0 -1px 0 color-mix(in srgb, #fff 6%, transparent) inset, 0 -10px 28px -14px rgba(0, 0, 0, .45);
+  transition: translate .42s var(--ease-out), box-shadow var(--dur-base) ease;
+}
+.list-card + .list-card { margin-top: calc(var(--wallet-peek) - var(--wallet-card)); }
+.list-card:last-child { box-shadow: var(--mat-shadow); }
+.list-card:hover ~ .list-card, .list-card:focus-within ~ .list-card { translate: 0 52px; }
+.list-card:hover, .list-card:focus-within { translate: 0 -4px; }
 .list-open {
   position: absolute;
   inset: 0;
@@ -86,7 +97,8 @@
 .deck-collapse-dock {
   position: sticky;
   bottom: 22px;
-  z-index: 5;
+  /* 卡包里每张卡都有自己的 z-index（后面的压前面的），收起要浮在所有卡之上。 */
+  z-index: 40;
   display: flex;
   justify-content: center;
   margin-top: -72px;
@@ -120,15 +132,16 @@
   padding-bottom: 30px;
 }
 .card-deck.is-closing .deck-stage { pointer-events: none; }
+/* 打开的卡不透明：它是从后面那一层抽出来的实体卡片，不是一层半透明的盖板。 */
 .open-card {
   transform-origin: center top;
   border-radius: var(--radius-xl);
   background:
     radial-gradient(760px 220px at 0 0, color-mix(in srgb, var(--card-tone) 13%, transparent), transparent 70%),
-    var(--mat-card);
-  box-shadow: var(--mat-shadow-lift);
+    var(--mat-card-solid);
+  box-shadow: var(--mat-shadow-lift), 0 40px 90px -30px rgba(0, 0, 0, .55);
 }
-.deck-stage.is-dragging .open-card { will-change: transform, filter; }
+.deck-stage.is-dragging .open-card { will-change: transform; }
 .open-head {
   padding: 18px 20px 16px 24px;
   pointer-events: auto;
@@ -190,14 +203,12 @@
 }
 .deck-dot.on { width: 22px; background: var(--accent); }
 
-@media (max-width: 900px) {
-  .deck-list { grid-template-columns: minmax(0, 1fr); }
-}
 @media (max-width: 720px) {
   .deck-head { padding: 14px 14px; gap: 10px; }
   .deck-body { padding: 14px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .list-card, .deck-dot, .deck-overview, .deck-overview.is-receded { transition: none; }
+  .list-card:hover ~ .list-card, .list-card:focus-within ~ .list-card { translate: none; }
   .deck-collapse-dock { animation: none; }
 }

@@ -2,11 +2,13 @@
 /* 设置卡组：三种形态，同一批卡在它们之间形变过去。
  *
  *   coverflow（默认）：正中一张立着，左右叠在两边，左右拖动挑一张。
- *   平铺（「展开全部」）：卡从 coverflow 里依次抽出来、纵向铺开，方便一眼扫完；
- *       底部一枚醒目的「收起」，按下去卡片按相反顺序插回卡组。
- *   打开（/settings/:card）：那张卡从它在总览里的位置长成整页，总览往后退、变糊、
- *       淡出；关掉时它缩回原位，总览从模糊里浮回来。打开以后仍可左右拖卡头
- *       翻到相邻一张、←/→ 或下面的圆点跳过去，Esc / × 关掉。
+ *   卡包（「展开全部」）：像 Apple Wallet 的卡包——卡纵向叠放、每张只露出卡头，
+ *       指针停在哪张，它下面的卡就往下让一让；点一张像抽卡一样长成整页。底部
+ *       一枚醒目的「收起」，卡按相反顺序插回 coverflow。
+ *   打开（/settings/:card）：那张卡从它在总览里的位置长成整页；总览不消失，而是
+ *       往后退一层——缩小、按深度变糊、往下渐隐——看得出卡是从哪一层里抽出来的。
+ *       关掉时卡缩回原位，总览从模糊里浮回来。打开以后仍可左右拖卡头翻到相邻
+ *       一张（整张甩出去）、←/→ 或下面的圆点跳过去，Esc / × 关掉。
  *
  * 形变都是 Web Animations 直接动真实的卡（composables/useDeckMorph.ts），所以随时
  * 可以打断：打开到一半关掉就原路倒回，展开到一半收起就从半路飞回去。
@@ -124,9 +126,6 @@ const switchLayout = async (next: Layout) => {
 /* —— 打开态 —— */
 /** 正在关上的那张：关卡动画放完之前它还得留在画面上。 */
 const closingId = ref<string | null>(null);
-/** 总览退到底了（淡出放完）：这时才让它不占高度。 */
-const overviewGone = ref(false);
-let goneTimer = 0;
 const shownId = computed(() => props.activeId ?? closingId.value);
 const shownIndex = computed(() => props.cards.findIndex((card) => card.id === shownId.value));
 const shownCard = computed(() => (shownIndex.value >= 0 ? props.cards[shownIndex.value] : null));
@@ -142,6 +141,19 @@ const {
   dragging, cycle, reset, onPointerDown, onPointerMove, onPointerUp, onPointerCancel,
 } = useCardDeck({ stage, card: cardEl, step, reducedMotion });
 
+/* 连点保护：「打开」和打开后的「×」落在同一片区域，手快连点两下，卡会刚飞出来又
+   飞回去、来回折腾。两次开关之间少于 320ms 的点击当作误触忽略；Esc、拖动、圆点不受限。 */
+const TOGGLE_GUARD_MS = 320;
+let lastToggleAt = -Infinity;
+const guardedToggle = (fn: () => void) => {
+  const now = performance.now();
+  if (now - lastToggleAt < TOGGLE_GUARD_MS) return;
+  lastToggleAt = now;
+  fn();
+};
+const requestOpen = (id: string) => guardedToggle(() => emit('open', id));
+const requestClose = () => guardedToggle(() => emit('close'));
+
 const jumpTo = (id: string) => {
   if (id === props.activeId) return;
   reset();
@@ -150,9 +162,7 @@ const jumpTo = (id: string) => {
 
 watch(() => props.activeId, async (id, previous) => {
   if (id) centerId.value = id;
-  window.clearTimeout(goneTimer);
-  if (id) goneTimer = window.setTimeout(() => { overviewGone.value = true; }, reducedMotion() ? 0 : 380);
-  else overviewGone.value = false;
+  lastToggleAt = performance.now();
   if (id && !previous) {
     closingId.value = null;
     reset();
@@ -195,25 +205,24 @@ const onKeydown = (event: KeyboardEvent) => {
 
 onMounted(() => {
   deckWidth.value = root.value?.clientWidth ?? 0;
-  overviewGone.value = Boolean(props.activeId);
   document.addEventListener('keydown', onKeydown);
 });
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKeydown);
-  window.clearTimeout(goneTimer);
 });
 </script>
 
 <template>
   <div ref="root" :class="['card-deck', `deck-mode-${layout}`, { 'has-open': activeId, 'is-closing': !activeId && closingId }]">
-    <!-- 总览：coverflow 或平铺。打开一张卡时它整体往后退、变糊、淡出，卡关上再浮回来。 -->
-    <div ref="overview" :class="['deck-overview', { 'is-receded': activeId, 'is-gone': overviewGone }]" :inert="activeId ? true : undefined">
+    <!-- 总览：coverflow 或卡包。打开一张卡时它整体往后退一层（不消失、不收起高度——
+         以前退到底会把高度收成 0，关卡时再撑开，页面跳一下就是「切回去闪一下」）。 -->
+    <div ref="overview" :class="['deck-overview', { 'is-receded': activeId }]" :inert="activeId ? true : undefined">
       <DeckCoverflow
         v-if="layout === 'cover'"
         v-model="centerId"
         :cards="cards"
         :initial-width="deckWidth"
-        @open="(id) => emit('open', id)"
+        @open="requestOpen"
       >
         <template #face="{ card, centered }"><slot name="face" :card="card" :centered="centered" /></template>
         <template v-if="$slots.quick" #quick="{ card }"><slot name="quick" :card="card" /></template>
@@ -231,9 +240,9 @@ onBeforeUnmount(() => {
             :key="card.id"
             class="deck-card list-card"
             :data-deck-card="card.id"
-            :style="{ '--card-tone': card.tone }"
+            :style="{ '--card-tone': card.tone, zIndex: index + 1 }"
           >
-            <button type="button" class="list-open" :aria-label="t.goTo(index + 1, cards.length)" @click="emit('open', card.id)"></button>
+            <button type="button" class="list-open" :aria-label="t.goTo(index + 1, cards.length)" @click="requestOpen(card.id)"></button>
             <div class="deck-head">
               <slot name="head" :card="card" :expanded="false" />
               <div class="list-quick">
@@ -266,7 +275,7 @@ onBeforeUnmount(() => {
         <header class="deck-head open-head" :title="t.dragHint" @pointerdown="onPointerDown">
           <span class="deck-grip" aria-hidden="true"></span>
           <slot name="head" :card="shownCard" :expanded="true" />
-          <button type="button" class="deck-close" :aria-label="t.close" :title="t.close" @click="emit('close')">
+          <button type="button" class="deck-close" :aria-label="t.close" :title="t.close" @click="requestClose">
             <Icon name="x" :size="16" />
           </button>
         </header>

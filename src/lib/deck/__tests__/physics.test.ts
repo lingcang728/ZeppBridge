@@ -2,15 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { dragFrame, flingOutFrames, releaseDirection, wrapIndex } from '../physics';
 
 describe('deck drag frame', () => {
-  it('follows the pointer at 0.65x and clamps to 45% of the width', () => {
-    expect(dragFrame({ dx: 100, dy: 0 }, 800).dx).toBe(65);
-    expect(dragFrame({ dx: 2000, dy: 0 }, 800).dx).toBe(360);
-    expect(dragFrame({ dx: 0, dy: -900 }, 800).dy).toBe(-130);
+  it('follows the pointer at 0.85x with no hard edge horizontally', () => {
+    expect(dragFrame({ dx: 100, dy: 0 }, 800).dx).toBe(85);
+    expect(dragFrame({ dx: 2000, dy: 0 }, 800).dx).toBe(1700);
+    expect(dragFrame({ dx: 0, dy: -900 }, 800).dy).toBe(-160);
   });
-  it('reaches full progress at 240px and never blurs with reduced motion', () => {
+  it('reaches full progress at 240px and keeps the dragged card sharp', () => {
     expect(dragFrame({ dx: 240, dy: 0 }, 800).progress).toBe(1);
-    expect(dragFrame({ dx: 240, dy: 0 }, 800, true).filter).toBe('none');
-    expect(dragFrame({ dx: 120, dy: 0 }, 800).filter).toBe('blur(1.5px)');
+    expect(dragFrame({ dx: 120, dy: 0 }, 800).filter).toBe('none');
   });
 });
 
@@ -45,7 +44,8 @@ describe('deck order', () => {
   });
   it('throws the card away from the direction of travel', () => {
     const frames = flingOutFrames(1, 800, '');
-    expect(String(frames[1].transform)).toContain('translate3d(-256px');
-    expect(frames[2].opacity).toBe(0);
+    // 整张飞出画面（宽度 1.25 倍再多 120px），一路保持不透明，不在半路淡掉。
+    expect(String(frames[1].transform)).toContain('translate3d(-1120px');
+    expect(frames[1].opacity).toBe(1);
   });
 });
