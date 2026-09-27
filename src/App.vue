@@ -5,7 +5,7 @@ import { RouterView, useRoute, useRouter } from 'vue-router';
 import type { DesignIconName } from './components/DesignIcon.vue';
 import GlyphTile from './components/GlyphTile.vue';
 import Icon from './components/Icon.vue';
-import { navigationBranch } from './lib/navigation';
+import { navigationBranch, pageMotion, type PageMotion } from './lib/navigation';
 import AppTopBar from './components/shell/AppTopBar.vue';
 import SegmentTrack from './components/SegmentTrack.vue';
 import { useSyncController } from './composables/useSyncController';
@@ -126,6 +126,24 @@ const navigation = computed(() => [
 /* 只在内容真的滚到顶栏下面时才显示滚动边缘效果。只在越过阈值时写一次 ref，
    滚动本身不触发渲染。 */
 const contentUnderBar = ref(false);
+
+/* 切页动效。
+ *
+ * 新旧两页同时在场（不再 out-in）：旧页退到景深里、变糊、淡出，新页从另一层
+ * 浮上来。out-in 中间那一拍空白就是以前切页时的「闪一下」。
+ *
+ * 旧页离场时会被绝对定位，而路由钩子紧接着把滚动区拉回顶部——不处理的话，
+ * 旧页会在淡出的那一瞬跳回它自己的顶部。离场前把它按当时的滚动距离往上垫，
+ * 画面就停在用户最后看到的那一帧上。 */
+const motion = ref<PageMotion>('none');
+let leavingScroll = 0;
+router.beforeEach((to, from) => {
+  motion.value = pageMotion(from.path, to.path);
+  leavingScroll = document.getElementById('main-content')?.scrollTop ?? 0;
+});
+const onPageBeforeLeave = (el: Element) => {
+  (el as HTMLElement).style.top = `${-leavingScroll}px`;
+};
 const onMainScroll = (event: Event) => {
   const under = (event.target as HTMLElement).scrollTop > 2;
   if (under !== contentUnderBar.value) contentUnderBar.value = under;
@@ -268,7 +286,7 @@ onUnmounted(() => {
              详情页不缓存：它们按 URL 参数取数，缓存一堆实例既没收益又占内存。 -->
         <div class="page-host">
         <RouterView v-slot="{ Component }">
-          <Transition name="page" mode="out-in">
+          <Transition :name="`page-${motion}`" @before-leave="onPageBeforeLeave">
             <KeepAlive :include="CACHED_PAGES" :max="4">
               <component :is="Component" />
             </KeepAlive>

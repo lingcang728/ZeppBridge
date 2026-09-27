@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dragThumb, navigationBranch, segmentClip, snapStop } from '../navigation';
+import { dragThumb, navigationBranch, pageMotion, segmentClip, snapStop } from '../navigation';
 
 const stops = [
   { left: 3, width: 70, value: '/' },
@@ -44,5 +44,20 @@ describe('segment ink clip', () => {
   });
   it('never produces a negative inset while the thumb overshoots', () => {
     expect(segmentClip({ left: -4, width: 280, visible: true }, 260)).toBe('inset(3px 0px 3px 0px round 999px)');
+  });
+});
+
+describe('pageMotion', () => {
+  it('focuses into a detail page and backs out of it', () => {
+    expect(pageMotion('/', '/sleep/42')).toBe('forward');
+    expect(pageMotion('/sleep/42', '/')).toBe('back');
+    expect(pageMotion('/settings', '/health-check')).toBe('forward');
+  });
+
+  it('slides between tabs in the order the nav capsule shows them', () => {
+    expect(pageMotion('/', '/ai')).toBe('left');
+    expect(pageMotion('/settings', '/ai')).toBe('right');
+    // 从概览的详情页跳到设置也是向左：方向看入口，不看深度。
+    expect(pageMotion('/workouts/7', '/settings')).toBe('left');
   });
 });

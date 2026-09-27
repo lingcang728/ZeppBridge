@@ -239,3 +239,13 @@ views/settings/deck.themeDark
 views/settings/deck.themeLabel
 views/settings/deck.themeLight
 views/settings/deck.themeSystem
+components/deck/CardDeck.unbox
+components/deck/CardDeck.collapse
+components/deck/CardDeck.listLabel
+components/deck/DeckCoverflow.label
+components/deck/DeckCoverflow.previous
+components/deck/DeckCoverflow.next
+components/deck/DeckCoverflow.open
+components/deck/DeckCoverflow.position
+views/settings/deck.pageIntroDeck
+views/settings/deck.openCard

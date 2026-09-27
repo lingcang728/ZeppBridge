@@ -45,6 +45,17 @@ const systemDark = ref(readSystemDark());
 export const resolvedTheme = computed<ResolvedTheme>(() =>
   mode.value === 'system' ? (systemDark.value ? 'dark' : 'light') : mode.value);
 
+/** 系统此刻是哪一套。顶栏的两态胶囊选中它时回到「跟随系统」。 */
+export const systemTheme = computed<ResolvedTheme>(() => (systemDark.value ? 'dark' : 'light'));
+
+/**
+ * 只有深 / 浅两个选项的切换：选中和系统一致的那一套，就等于回到跟随系统——
+ * 用户不必认识「跟随系统」这个第三态，默认行为也不会被一次误触锁死。
+ */
+export const pickTheme = (value: ResolvedTheme) => {
+  setTheme(value === systemTheme.value ? 'system' : value);
+};
+
 /** 浏览器 chrome（地址栏/窗口边框色）跟着实际主题走。 */
 const THEME_COLORS: Record<ResolvedTheme, string> = { dark: '#0D0F12', light: '#F4F6F3' };
 
@@ -107,6 +118,8 @@ export const useTheme = () => ({
   themeMode: computed(() => mode.value),
   /** 实际生效的一套，组件和图表都用它。 */
   resolvedTheme,
+  systemTheme,
   setTheme,
+  pickTheme,
   cycleTheme,
 });

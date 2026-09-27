@@ -7,6 +7,8 @@ import { defineMessages } from '../../i18n';
 export const deckMessages = defineMessages(
   {
     pageIntro: '点开一张卡来调整；展开后按住卡头左右拖，可以直接翻到下一张。',
+    pageIntroDeck: '左右拨动挑一张，点正中那张打开；想一眼看完就「展开全部」。',
+    openCard: '打开',
 
     cardAccount: '账号与设备',
     cardSync: '同步与更新',
@@ -73,6 +75,8 @@ export const deckMessages = defineMessages(
   },
   {
     pageIntro: 'Open a card to adjust it; once it is open, drag its header sideways to flip to the next card.',
+    pageIntroDeck: 'Swipe sideways to pick a card and click the one in the middle to open it — or “Show all” to see every card at once.',
+    openCard: 'Open',
 
     cardAccount: 'Account and devices',
     cardSync: 'Sync and updates',
@@ -139,6 +143,8 @@ export const deckMessages = defineMessages(
   },
   {
     pageIntro: 'Abre una tarjeta para ajustarla; ya abierta, arrastra su cabecera hacia los lados para pasar a la siguiente.',
+    pageIntroDeck: 'Desliza para elegir una tarjeta y haz clic en la del centro para abrirla, o pulsa «Ver todas» para verlas juntas.',
+    openCard: 'Abrir',
 
     cardAccount: 'Cuenta y dispositivos',
     cardSync: 'Sincronización y actualizaciones',

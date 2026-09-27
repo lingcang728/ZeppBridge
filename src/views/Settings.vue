@@ -131,7 +131,7 @@ onUnmounted(() => {
     <header class="page-header">
       <div>
         <h1 id="settings-title">{{ t.title }}</h1>
-        <p class="page-intro">{{ d.pageIntro }}</p>
+        <p class="page-intro">{{ d.pageIntroDeck }}</p>
       </div>
     </header>
 
@@ -144,6 +144,16 @@ onUnmounted(() => {
     <div v-if="dataError" class="alert danger" role="alert"><Icon name="warning" :size="15" />{{ dataError }}</div>
 
     <CardDeck :cards="cards" :active-id="activeId" @open="openCard" @close="closeDeck" @change="changeCard">
+      <template #face="{ card, centered }">
+        <div :class="['face', { centered }]">
+          <GlyphTile :name="card.icon" :tone="card.glyphTone" :size="60" />
+          <div class="face-copy">
+            <strong class="face-title">{{ card.title }}</strong>
+            <span class="face-summary">{{ card.summary }}</span>
+          </div>
+          <span class="face-open" aria-hidden="true">{{ d.openCard }}<Icon name="arrow-right" :size="14" /></span>
+        </div>
+      </template>
       <template #head="{ card, expanded }">
         <GlyphTile :name="card.icon" :tone="card.glyphTone" :size="expanded ? 44 : 46" />
         <div class="card-copy">
@@ -199,7 +209,7 @@ onUnmounted(() => {
 <style scoped>
 /* 行宽收在 1000px 以内：设置是一行一行的「标签 — 控件」，拉满 1400px 时标签和
    控件隔着半个屏幕，就是之前那种「留白过多」。 */
-.page { display: grid; width: 100%; max-width: 1040px; min-width: 0; margin: 0 auto; gap: 16px; }
+.page { display: grid; width: 100%; max-width: 1120px; min-width: 0; margin: 0 auto; gap: 18px; }
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; min-width: 0; }
 h1, p { margin-top: 0; }
 h1 { font-size: 26.5px; font-weight: 700; color: var(--ink); }
@@ -213,5 +223,15 @@ h1 { font-size: 26.5px; font-weight: 700; color: var(--ink); }
 .card-title { margin: 0; color: var(--ink); font-size: var(--fs-lg); font-weight: 650; line-height: 1.3; }
 .card-summary { overflow: hidden; color: var(--subtle); font-size: var(--fs-sm); text-overflow: ellipsis; white-space: nowrap; }
 .card-body { display: grid; gap: 22px; min-width: 0; }
+
+/* coverflow 里立着的那张卡的正面：图标在上，标题和状态压在下半部。 */
+.face { display: flex; height: 100%; flex-direction: column; justify-content: space-between; gap: 12px; }
+.face-copy { display: grid; gap: 6px; min-width: 0; }
+.face-title { color: var(--ink); font-size: 25px; font-weight: 700; letter-spacing: -.01em; line-height: 1.2; }
+.face-summary { color: var(--muted); font-size: var(--fs-sm); line-height: 1.45; }
+.face-open { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; padding: 5px 12px; border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 9%, transparent); color: var(--ink); font-size: var(--fs-xs); font-weight: 600;
+  opacity: 0; translate: 0 6px; transition: opacity var(--dur-base) ease, translate var(--dur-base) var(--ease-out); }
+.face.centered .face-open { opacity: 1; translate: 0 0; }
 .card-body > :deep(.s-section + .s-section) { margin-top: 0; }
 </style>

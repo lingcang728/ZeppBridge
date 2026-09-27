@@ -1,0 +1,206 @@
+.card-deck { position: relative; min-width: 0; }
+/* coverflow 在剩下的高度里垂直居中：卡组是这一页的主角，不该缩在顶上留一大片空。 */
+.card-deck.deck-mode-cover { display: grid; min-height: calc(100vh - 260px); align-content: center; }
+
+/* ── 卡片材质（平铺与打开共用；coverflow 的卡在 DeckCoverflow 里）──
+   没有描边：边界靠顶边高光、底边暗线和投影表达，像一块有厚度的板。 */
+.deck-card {
+  --card-tone: var(--accent);
+  position: relative;
+  min-width: 0;
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(560px 170px at 0 0, color-mix(in srgb, var(--card-tone) 15%, transparent), transparent 72%),
+    var(--mat-card);
+  box-shadow: var(--mat-rim), var(--mat-shadow);
+}
+.deck-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, color-mix(in srgb, #fff 6%, transparent), transparent 40%);
+  pointer-events: none;
+}
+
+.deck-head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 22px;
+  pointer-events: none;
+}
+
+/* ── 平铺 ── */
+.deck-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0 0 96px;
+  list-style: none;
+}
+.list-card { transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) ease; }
+.list-card:hover, .list-card:focus-within { transform: translateY(-3px); box-shadow: var(--mat-rim), var(--mat-shadow-lift); }
+.list-open {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.list-open:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.list-quick { display: flex; flex: 0 0 auto; align-items: center; gap: 12px; margin-left: auto; }
+/* 卡头上能直接拨的开关要能点到，盖在「打开」按钮上面。 */
+.list-quick :deep(button), .list-quick :deep(a) { position: relative; z-index: 2; pointer-events: auto; }
+.list-chevron { color: var(--subtle); }
+
+/* 醒目的「收起」：浮在底部正中的玻璃胶囊，滚到哪儿都在。 */
+.deck-collapse-dock {
+  position: sticky;
+  bottom: 22px;
+  z-index: 5;
+  display: flex;
+  justify-content: center;
+  margin-top: -72px;
+  pointer-events: none;
+}
+.deck-collapse, .deck-unbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 20px;
+  border-radius: 999px;
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: scale var(--dur-fast) var(--ease-out);
+}
+.deck-collapse { min-height: 48px; padding: 0 28px; font-size: var(--fs-md); }
+.deck-collapse:active, .deck-unbox:active { scale: .95; }
+.flip { rotate: 180deg; }
+
+/* ── 打开态 ── */
+.deck-stage {
+  --deck-dx: 0px;
+  --deck-dy: 0px;
+  --deck-p: 0;
+  position: relative;
+  isolation: isolate;
+  padding-bottom: 30px;
+}
+/* 身后两层压底卡：没有描边、下缘渐隐进背景，只是两片更暗更糊的影子。
+   跟着拖动做一点反向视差，拖得越远越清楚。 */
+.deck-stage::before, .deck-stage::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  border-radius: var(--radius-lg);
+  background: var(--mat-card);
+  box-shadow: var(--mat-shadow);
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 60%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0%, #000 60%, transparent 100%);
+  transition: transform .16s ease-out, filter .16s ease-out, opacity .16s ease-out;
+}
+.deck-stage::before {
+  inset: 14px 18px 14px;
+  opacity: .75;
+  transform: translate(calc(var(--deck-dx) * -.05), calc(6px - var(--deck-p) * 8px + var(--deck-dy) * -.03)) scale(calc(.975 + var(--deck-p) * .02));
+  filter: blur(calc(1.5px + (1 - var(--deck-p)) * 1px));
+}
+.deck-stage::after {
+  inset: 28px 40px 0;
+  opacity: .45;
+  transform: translate(calc(var(--deck-dx) * -.03), calc(8px - var(--deck-p) * 4px + var(--deck-dy) * -.02)) scale(calc(.96 + var(--deck-p) * .01));
+  filter: blur(calc(3px + var(--deck-p) * 2px));
+}
+.deck-stage.is-dragging::before, .deck-stage.is-dragging::after { transition: none; }
+.open-card {
+  transform-origin: center top;
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(760px 220px at 0 0, color-mix(in srgb, var(--card-tone) 13%, transparent), transparent 70%),
+    var(--mat-card);
+  box-shadow: var(--mat-rim), var(--mat-shadow-lift);
+}
+.deck-stage.is-dragging .open-card { will-change: transform, filter; }
+.open-head {
+  padding: 18px 20px 16px 24px;
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: pan-y;
+  user-select: none;
+}
+/* 卡头和内容之间不画硬线，用一道从两端渐隐的细光带分开。 */
+.open-head::after {
+  content: '';
+  position: absolute;
+  right: 24px;
+  bottom: 0;
+  left: 24px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--mat-line-hover), transparent);
+}
+.deck-stage.is-dragging .open-head { cursor: grabbing; }
+.deck-grip {
+  position: absolute;
+  top: 7px;
+  left: 50%;
+  width: 36px;
+  height: 4px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--ink) 18%, transparent);
+  transform: translateX(-50%);
+}
+.deck-nav { display: flex; flex: 0 0 auto; gap: 6px; margin-left: auto; }
+.deck-nav-btn {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--mat-raised);
+  box-shadow: var(--mat-raised-rim);
+  color: var(--muted);
+  cursor: pointer;
+  transition: scale var(--dur-fast) var(--ease-out);
+}
+.deck-nav-btn:hover { color: var(--ink); background: var(--mat-raised-hover); }
+.deck-nav-btn:active { scale: .92; }
+.deck-body { position: relative; z-index: 1; padding: 22px 24px 26px; }
+
+.deck-dots { position: absolute; right: 0; bottom: 0; left: 0; display: flex; justify-content: center; gap: 8px; }
+.deck-dot {
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 22%, transparent);
+  cursor: pointer;
+  transition: width var(--dur-base) var(--ease-out), background var(--dur-base) ease;
+}
+.deck-dot.on { width: 22px; background: var(--accent); }
+
+@media (max-width: 900px) {
+  .deck-list { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 720px) {
+  .deck-head { padding: 14px 14px; gap: 10px; }
+  .deck-body { padding: 14px; }
+  .deck-nav-btn:not(.is-close) { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .list-card, .deck-stage::before, .deck-stage::after, .deck-dot { transition: none; }
+}

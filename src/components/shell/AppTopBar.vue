@@ -3,7 +3,7 @@ import { computed } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import BrandMark from '../BrandMark.vue';
 import Icon, { type IconName } from '../Icon.vue';
-import SelectMenu from '../SelectMenu.vue';
+import CapsuleWheel from '../CapsuleWheel.vue';
 import SegmentTrack from '../SegmentTrack.vue';
 import { useSyncController } from '../../composables/useSyncController';
 import { useTheme } from '../../composables/useTheme';
@@ -11,7 +11,7 @@ import { displayDateTimeFormatter } from '../../lib/dateTime';
 import { defineMessages, locale, LOCALES, LOCALE_LABELS, setLocale, useMessages } from '../../i18n';
 import { navigationBranch } from '../../lib/navigation';
 import type { Locale } from '../../i18n';
-import type { ThemeMode } from '../../composables/useTheme';
+import type { ResolvedTheme } from '../../composables/useTheme';
 
 const messages = defineMessages(
   {
@@ -98,7 +98,7 @@ const {
   appStatus, statusError, syncState, syncProgress, syncMessage,
   isSyncing, canIncrementalSync, runSync, cancelSync,
 } = useSyncController();
-const { themeMode, setTheme } = useTheme();
+const { resolvedTheme, pickTheme } = useTheme();
 
 const accountRecognized = computed(() =>
   ['connected', 'configured'].includes(String(appStatus.value?.connection_state || '')));
@@ -167,12 +167,12 @@ const onSyncClick = () => {
   }
 };
 
-const themeOptions = computed<{ value: ThemeMode; label: string; icon: IconName }[]>(() => [
-  { value: 'system', label: t.value.themeSystem, icon: 'monitor' },
+/* 主题只有深 / 浅两格：默认跟随系统，拨到和系统一致的那一格就又回到跟随系统。 */
+const themeOptions = computed<{ value: ResolvedTheme; label: string; icon: IconName }[]>(() => [
   { value: 'dark', label: t.value.themeDark, icon: 'moon' },
   { value: 'light', label: t.value.themeLight, icon: 'sun' },
 ]);
-const onThemeChange = (value: string | number) => setTheme(value as ThemeMode);
+const onThemeChange = (value: ResolvedTheme) => pickTheme(value);
 
 /* 语言列表跟着 LOCALES 注册表走——S6 扩到十种语言时这里自动变长。 */
 const localeOptions = computed(() =>
@@ -214,20 +214,14 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
         <Icon v-if="isSyncing" name="x" :size="13" class="sync-cancel" />
       </button>
 
-      <!-- 两个图标按钮共用一个玻璃底座（相关的图标放一组，文字按钮单独一个容器）。 -->
+      <!-- 主题和语言都是拖着转的胶囊传送带，共用一个玻璃底座；不再弹下拉。 -->
       <div class="icon-group glass-control">
-        <SelectMenu class="theme-menu" icon-only :model-value="themeMode" :options="themeOptions"
-          :aria-label="t.themeTitle" :menu-min-width="156" @update:model-value="onThemeChange" />
-        <SelectMenu
-          class="locale-menu"
-          icon-only
-          trigger-icon="globe"
-          :model-value="locale"
-          :options="localeOptions"
-          :aria-label="t.localeLabel"
-          :menu-min-width="224"
-          @update:model-value="onLocaleChange"
-        />
+        <CapsuleWheel class="theme-wheel" icon-only :span="92" :items="themeOptions" :model-value="resolvedTheme"
+          :aria-label="t.themeTitle" @update:model-value="onThemeChange" />
+        <span class="group-divider" aria-hidden="true"></span>
+        <Icon name="globe" :size="15" class="locale-glyph" />
+        <CapsuleWheel class="locale-wheel" :span="176" :items="localeOptions" :model-value="locale"
+          :aria-label="t.localeLabel" @update:model-value="onLocaleChange" />
       </div>
     </div>
   </header>
@@ -319,11 +313,9 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
 .sync-text { font-variant-numeric: tabular-nums; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
 .sync-cancel { color: var(--subtle); }
 
-.theme-menu, .locale-menu { flex: 0 0 auto; }
-.icon-group { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border-radius: 999px; }
-/* 组里的按钮不再各自有底（不叠玻璃），只在悬停 / 按下时亮一下。 */
-.icon-group :deep(.select-trigger) { border: 0; background: transparent; box-shadow: none; }
-.icon-group :deep(.select-trigger:hover:not(:disabled)) { background: var(--glass-press); }
+.icon-group { display: inline-flex; align-items: center; gap: 2px; padding: 2px 4px 2px 2px; border-radius: 999px; }
+.group-divider { width: 1px; height: 18px; margin: 0 4px; background: color-mix(in srgb, var(--ink) 14%, transparent); }
+.locale-glyph { flex: 0 0 auto; color: var(--subtle); }
 
 /* 窄屏降级：先让胶囊回到文档流避免和按钮组重叠，再小到手机上藏掉
    （底部 tabbar 已经覆盖同一组导航）。语言选择在 520px 以下也让位给
@@ -338,6 +330,9 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
   .app-topbar { height: 56px; padding: 0 14px; gap: 10px; }
   .pill-nav { display: none; }
   .sync-text { max-width: 120px; }
+}
+@media (max-width: 640px) {
+  .locale-wheel, .locale-glyph, .group-divider { display: none; }
 }
 @media (max-width: 520px) {
   .topbar-actions { gap: 5px; }

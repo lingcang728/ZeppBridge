@@ -5,6 +5,35 @@ export const navigationBranch = (path: string): string => {
   return '/';
 };
 
+/** 三个主入口在导航胶囊里的顺序；横向切页的方向按它算。 */
+export const TAB_ORDER = ['/', '/ai', '/settings'] as const;
+
+export type PageMotion = 'forward' | 'back' | 'left' | 'right' | 'none';
+
+const isTabRoot = (path: string) => (TAB_ORDER as readonly string[]).includes(path);
+
+/**
+ * 切页时画面往哪儿走。
+ *
+ * 同一个入口里往深处走（概览 → 睡眠详情）是「聚焦进去」，回来是「退出来」；
+ * 换入口是横向滑，方向跟导航胶囊里的左右顺序一致——手指往哪边拨，画面就从哪边来。
+ */
+export const pageMotion = (from: string, to: string): PageMotion => {
+  if (from === to) return 'none';
+  const a = navigationBranch(from);
+  const b = navigationBranch(to);
+  if (a === b) {
+    const da = isTabRoot(from) ? 0 : 1;
+    const db = isTabRoot(to) ? 0 : 1;
+    if (db > da) return 'forward';
+    if (db < da) return 'back';
+    return 'forward';
+  }
+  return TAB_ORDER.indexOf(b as (typeof TAB_ORDER)[number]) > TAB_ORDER.indexOf(a as (typeof TAB_ORDER)[number])
+    ? 'left'
+    : 'right';
+};
+
 export interface SegmentStop<T = string> {
   left: number;
   width: number;

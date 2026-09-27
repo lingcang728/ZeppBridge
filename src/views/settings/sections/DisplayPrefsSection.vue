@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import SelectMenu from '../../../components/SelectMenu.vue';
+import CapsuleWheel from '../../../components/CapsuleWheel.vue';
 import SegmentTrack from '../../../components/SegmentTrack.vue';
 import { UI_SCALES, useUiScale, type UiScale } from '../../../composables/useUiScale';
-import { useTheme, type ThemeMode } from '../../../composables/useTheme';
+import { useTheme, type ResolvedTheme } from '../../../composables/useTheme';
 import {
   DATE_ORDERS,
   TIME_FORMATS,
@@ -29,7 +29,7 @@ import { deckMessages } from '../deck.i18n';
 const t = useMessages(settingsMessages);
 const d = useMessages(deckMessages);
 const { scale, setScale } = useUiScale();
-const { themeMode, setTheme } = useTheme();
+const { themeMode, resolvedTheme, pickTheme } = useTheme();
 const scaleItems = computed(() => UI_SCALES.map((option) => ({ value: option, label: `${option}%` })));
 
 const localeOptions = computed(() =>
@@ -40,16 +40,16 @@ const timeFormatOptions = computed(() =>
   TIME_FORMATS.map((value) => ({ value, label: dateTimeLabels.value[value] })));
 const dateOrderOptions = computed(() =>
   DATE_ORDERS.map((value) => ({ value, label: dateTimeLabels.value[value] })));
+/* 主题两格：拨到和系统一致的那一格就回到跟随系统（见 useTheme.pickTheme）。 */
 const themeOptions = computed(() => [
-  { value: 'system', label: d.value.themeSystem, icon: 'monitor' as const },
-  { value: 'dark', label: d.value.themeDark, icon: 'moon' as const },
-  { value: 'light', label: d.value.themeLight, icon: 'sun' as const },
+  { value: 'dark' as ResolvedTheme, label: d.value.themeDark },
+  { value: 'light' as ResolvedTheme, label: d.value.themeLight },
 ]);
 const chooseLocale = (value: string | number) => setLocale(String(value) as Locale);
 const chooseDistanceUnit = (value: string | number) => setDistanceUnit(String(value) as DistanceUnit);
 const chooseTimeFormat = (value: string | number) => setTimeFormat(String(value) as TimeFormat);
 const chooseDateOrder = (value: string | number) => setDateOrder(String(value) as DateOrder);
-const chooseTheme = (value: string | number) => setTheme(String(value) as ThemeMode);
+const chooseTheme = (value: string | number) => pickTheme(String(value) as ResolvedTheme);
 </script>
 
 <template>
@@ -62,25 +62,25 @@ const chooseTheme = (value: string | number) => setTheme(String(value) as ThemeM
         <div class="s-row">
           <div class="s-row-main"><span class="s-row-title">语言 · Language</span></div>
           <div class="s-row-control">
-            <SelectMenu :model-value="locale" :options="localeOptions" aria-label="语言 · Language" @update:model-value="chooseLocale" />
+            <CapsuleWheel class="pref-wheel" :span="220" :items="localeOptions" :model-value="locale" aria-label="语言 · Language" @update:model-value="chooseLocale" />
           </div>
         </div>
         <div class="s-row">
           <div class="s-row-main"><span class="s-row-title">{{ t.distanceUnitLabel }}</span></div>
           <div class="s-row-control">
-            <SelectMenu :model-value="distanceUnit" :options="distanceUnitOptions" :aria-label="t.distanceUnitLabel" @update:model-value="chooseDistanceUnit" />
+            <SegmentTrack compact :items="distanceUnitOptions" :model-value="distanceUnit" :aria-label="t.distanceUnitLabel" @update:model-value="chooseDistanceUnit" />
           </div>
         </div>
         <div class="s-row">
           <div class="s-row-main"><span class="s-row-title">{{ dateTimeLabels.time }}</span></div>
           <div class="s-row-control">
-            <SelectMenu :model-value="timeFormat" :options="timeFormatOptions" :aria-label="dateTimeLabels.time" @update:model-value="chooseTimeFormat" />
+            <SegmentTrack compact :items="timeFormatOptions" :model-value="timeFormat" :aria-label="dateTimeLabels.time" @update:model-value="chooseTimeFormat" />
           </div>
         </div>
         <div class="s-row">
           <div class="s-row-main"><span class="s-row-title">{{ dateTimeLabels.date }}</span></div>
           <div class="s-row-control">
-            <SelectMenu :model-value="dateOrder" :options="dateOrderOptions" :aria-label="dateTimeLabels.date" @update:model-value="chooseDateOrder" />
+            <CapsuleWheel class="pref-wheel" :span="200" :items="dateOrderOptions" :model-value="dateOrder" :aria-label="dateTimeLabels.date" @update:model-value="chooseDateOrder" />
           </div>
         </div>
       </div>
@@ -90,9 +90,12 @@ const chooseTheme = (value: string | number) => setTheme(String(value) as ThemeM
       <div class="s-section-head"><h3>{{ d.secAppearance }}</h3></div>
       <div class="s-list">
         <div class="s-row">
-          <div class="s-row-main"><span class="s-row-title">{{ d.themeLabel }}</span></div>
+          <div class="s-row-main">
+            <span class="s-row-title">{{ d.themeLabel }}</span>
+            <span v-if="themeMode === 'system'" class="s-row-sub">{{ d.themeSystem }}</span>
+          </div>
           <div class="s-row-control">
-            <SelectMenu :model-value="themeMode" :options="themeOptions" :aria-label="d.themeLabel" @update:model-value="chooseTheme" />
+            <SegmentTrack compact :items="themeOptions" :model-value="resolvedTheme" :aria-label="d.themeLabel" @update:model-value="chooseTheme" />
           </div>
         </div>
         <!-- 缩放是一枚按内容收紧、靠右的分段控件；以前它被拉满整行，右边空出一大截。 -->
@@ -120,4 +123,5 @@ const chooseTheme = (value: string | number) => setTheme(String(value) as ThemeM
 <style scoped>
 .display-prefs { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; }
 .display-prefs > .s-section + .s-section { margin-top: 0; }
+.pref-wheel { background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); }
 </style>

@@ -88,7 +88,18 @@ a { color: inherit; }
 .preview-banner { background: var(--accent-soft); }
 .preview-banner svg { color: var(--accent); }
 .route-notice { background: var(--surface); color: var(--warning); }
-.main-content { position: relative; width: 100%; min-width: 0; min-height: 0; flex: 1; overflow: auto; overflow-x: hidden; background: var(--canvas); }
+.main-content { position: relative; width: 100%; min-width: 0; min-height: 0; flex: 1; overflow: auto; overflow-x: hidden; background: transparent; }
+/* 环境光：画布上两三团很淡的色晕，固定不随内容滚动。玻璃和模糊要有东西可折射，
+   纯平的底色上毛玻璃看起来只是「半透明灰」。 */
+.app-body { position: relative; isolation: isolate; }
+.app-body::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--ambient), var(--canvas);
+}
 .bottom-nav { display: none; }
 .shell-head { position: sticky; top: 0; z-index: 30; }
 /* 滚动边缘效果（对应 iOS 26 的 soft scroll edge）：内容滚到浮动控件下面时，
@@ -114,9 +125,29 @@ a { color: inherit; }
 }
 /* 离场页面绝对定位时相对这一层，而不是相对整个滚动区——否则会盖到顶栏上。 */
 .page-host { position: relative; min-width: 0; }
-.page-enter-active, .page-leave-active { transition: opacity 150ms ease; }
-.page-leave-active { position: absolute; inset: 0 auto auto 0; width: 100%; pointer-events: none; }
-.page-enter-from, .page-leave-to { opacity: 0; }
+/* 切页：新旧两页同时在场，旧页退进景深（缩小、变糊、淡出），新页从另一层浮上来。
+   方向由 App.vue 的 pageMotion 决定：forward = 聚焦进详情，back = 退出来，
+   left / right = 换入口时跟着导航胶囊的方向横移。只动 transform / opacity / filter。 */
+[class*='page-'][class*='-enter-active'] {
+  transition: opacity 340ms var(--ease-out), transform 460ms var(--ease-out), filter 380ms var(--ease-out);
+}
+[class*='page-'][class*='-leave-active'] {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  pointer-events: none;
+  transition: opacity 220ms ease, transform 320ms var(--ease-out), filter 260ms ease;
+}
+.page-forward-enter-from { opacity: 0; transform: scale(.955) translateY(10px); filter: blur(10px); }
+.page-forward-leave-to { opacity: 0; transform: scale(1.035); filter: blur(8px); }
+.page-back-enter-from { opacity: 0; transform: scale(1.035); filter: blur(10px); }
+.page-back-leave-to { opacity: 0; transform: scale(.955) translateY(10px); filter: blur(8px); }
+.page-left-enter-from { opacity: 0; transform: translateX(42px) scale(.985); filter: blur(8px); }
+.page-left-leave-to { opacity: 0; transform: translateX(-42px) scale(.985); filter: blur(8px); }
+.page-right-enter-from { opacity: 0; transform: translateX(-42px) scale(.985); filter: blur(8px); }
+.page-right-leave-to { opacity: 0; transform: translateX(42px) scale(.985); filter: blur(8px); }
+.page-none-enter-from, .page-none-leave-to { opacity: 0; }
+.page-host > * { transform-origin: 50% 30vh; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }

@@ -68,13 +68,14 @@
      凸起（按钮 / 控件头）：稍亮的纵向渐变 + 顶边高光。
      凹槽（输入框 / 轨道 / 进度条）：比卡片更暗 + 内阴影。
      玻璃：只给浮在上层的东西（顶栏、导航胶囊、下拉、弹窗）。 */
-  --mat-card: linear-gradient(145deg, #1C2027 0%, #171A20 100%);
+  --mat-card: linear-gradient(160deg, #1E232B 0%, #171A20 62%, #15181D 100%);
   --mat-card-solid: #191C22;
   --mat-line: rgba(226, 234, 242, .085);
   --mat-line-hover: rgba(226, 234, 242, .17);
-  --mat-rim: inset 0 1px 0 rgba(255, 255, 255, .055);
-  --mat-shadow: 0 1px 2px rgba(0, 0, 0, .32), 0 12px 30px -14px rgba(0, 0, 0, .6);
-  --mat-shadow-lift: 0 2px 4px rgba(0, 0, 0, .3), 0 20px 40px -16px rgba(0, 0, 0, .65);
+  /* 立体感：顶边一道高光 + 底边一道暗线，卡片像有厚度的一块板，而不是贴在底上的色块。 */
+  --mat-rim: inset 0 1px 0 rgba(255, 255, 255, .075), inset 0 -1px 0 rgba(0, 0, 0, .28);
+  --mat-shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 24px -12px rgba(0, 0, 0, .55), 0 30px 60px -30px rgba(0, 0, 0, .6);
+  --mat-shadow-lift: 0 2px 4px rgba(0, 0, 0, .3), 0 18px 36px -14px rgba(0, 0, 0, .6), 0 44px 80px -34px rgba(0, 0, 0, .7);
   /* 叠放时落在前一张卡上的向上阴影。 */
   --mat-stack-shadow: 0 -10px 24px -14px rgba(0, 0, 0, .55);
   --mat-raised: linear-gradient(180deg, #272C34 0%, #20252C 100%);
@@ -89,10 +90,12 @@
   --mat-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, .09), 0 18px 44px -14px rgba(0, 0, 0, .7);
   /* 浮动控件的玻璃（Liquid Glass「regular」的网页近似）：清透的底，靠顶边高光
      和一圈细亮边界定形状，而不是靠厚底色和粗边框；阴影小而软。 */
-  --glass: rgba(30, 34, 41, .5);
-  --glass-sheen: rgba(255, 255, 255, .07);
-  --glass-blur: blur(16px) saturate(1.7) brightness(1.04);
-  --glass-rim: inset 0 1px 0 rgba(255, 255, 255, .16), inset 0 0 0 1px rgba(255, 255, 255, .07);
+  --glass: rgba(30, 34, 41, .46);
+  --glass-sheen: rgba(255, 255, 255, .08);
+  --glass-blur: blur(18px) saturate(1.8) brightness(1.05);
+  /* Liquid Glass 的边：顶上一道镜面高光、底下一道回光，外加一圈极细亮边。 */
+  --glass-rim: inset 0 1px 0 rgba(255, 255, 255, .2), inset 0 -1px 0 rgba(255, 255, 255, .05),
+    inset 0 0 0 1px rgba(255, 255, 255, .075), inset 0 0 22px rgba(255, 255, 255, .025);
   --glass-shadow: 0 6px 18px -8px rgba(0, 0, 0, .55);
   --glass-press: rgba(255, 255, 255, .08);
   /* 滚动边缘：内容滚到浮动控件下面时被轻轻模糊、淡出，代替硬分界线。 */
@@ -128,9 +131,15 @@
   --space-4: 16px;
   --space-6: 24px;
   --space-8: 32px;
-  --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 18px;
+  --radius-sm: 12px;
+  --radius-md: 20px;
+  --radius-lg: 26px;
+  --radius-xl: 34px;
+  /* 画布环境光（见 shell.css 的 .app-body::before）。 */
+  --ambient:
+    radial-gradient(900px 520px at 12% -8%, rgba(125, 163, 62, .10), transparent 70%),
+    radial-gradient(760px 520px at 96% 8%, rgba(100, 119, 215, .09), transparent 70%),
+    radial-gradient(900px 600px at 60% 110%, rgba(43, 179, 192, .06), transparent 70%);
 }
 
 /* 浅色主题：暖白底 + 深绿品牌色。色板方向见
@@ -194,12 +203,16 @@ html[data-theme="light"] {
   --panel-line-hover: var(--mat-line-hover);
   --panel-glint: var(--mat-rim), var(--mat-shadow);
 
+  --ambient:
+    radial-gradient(900px 520px at 12% -8%, rgba(47, 107, 79, .10), transparent 70%),
+    radial-gradient(760px 520px at 96% 8%, rgba(107, 127, 224, .08), transparent 70%),
+    radial-gradient(900px 600px at 60% 110%, rgba(30, 150, 166, .06), transparent 70%);
   --mat-card: linear-gradient(160deg, #FFFFFF 0%, #FAFBF8 100%);
   --mat-card-solid: #FFFFFF;
   --mat-line: rgba(38, 52, 41, .10);
   --mat-line-hover: rgba(38, 52, 41, .22);
-  --mat-rim: inset 0 1px 0 rgba(255, 255, 255, .9);
-  --mat-shadow: 0 1px 3px rgba(38, 52, 41, .08), 0 12px 32px -14px rgba(38, 52, 41, .16);
+  --mat-rim: inset 0 1px 0 rgba(255, 255, 255, .9), inset 0 -1px 0 rgba(38, 52, 41, .06);
+  --mat-shadow: 0 1px 3px rgba(38, 52, 41, .08), 0 12px 28px -14px rgba(38, 52, 41, .16), 0 30px 60px -32px rgba(38, 52, 41, .2);
   --mat-shadow-lift: 0 2px 6px rgba(38, 52, 41, .1), 0 22px 44px -18px rgba(38, 52, 41, .22);
   --mat-stack-shadow: 0 -6px 16px -12px rgba(38, 52, 41, .18);
   --mat-raised: linear-gradient(180deg, #FFFFFF 0%, #F1F4EE 100%);
