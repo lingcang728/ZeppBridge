@@ -143,6 +143,8 @@ onBeforeUnmount(() => {
 .fold-card.is-closed:last-child { box-shadow: var(--mat-shadow); }
 .fold-card.is-closed:hover ~ .fold-card.is-closed { translate: 0 34px; }
 .fold-card.is-closed:hover { translate: 0 -3px; }
+/* 指针在卡包上时才给收着的卡开合成层：让开 / 抬起只走合成器，不重画整张卡。 */
+.fold-list:hover .fold-card.is-closed { will-change: translate; }
 .fold-head {
   display: flex;
   width: 100%;

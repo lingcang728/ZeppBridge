@@ -246,6 +246,9 @@ let fitting = false;
 const refit = async () => {
   if (fitting) return;
   fitting = true;
+  // 量的时候关掉宽度过渡：语言胶囊随语言伸缩带过渡，半路量到的是动画中间的宽度，
+  // 会误判成「放得下」。量完再打开，档位变化照样平滑。
+  bar.value?.classList.add('is-measuring');
   try {
     fit.value = 0;
     await nextTick();
@@ -254,6 +257,7 @@ const refit = async () => {
       await nextTick();
     }
   } finally {
+    bar.value?.classList.remove('is-measuring');
     fitting = false;
   }
 };
@@ -266,6 +270,10 @@ const scheduleFit = () => {
 onMounted(() => {
   fitObserver = new ResizeObserver(scheduleFit);
   if (bar.value) fitObserver.observe(bar.value);
+  // 右簇自己变宽也要重量：语言从短码换回全名时，传送带晚一拍才量出新宽度，顶栏本身不变宽。
+  // 不会来回振荡：一次重量从 0 档升到的终点尺寸不变，ResizeObserver 不会再报。
+  const actions = bar.value?.querySelector('.topbar-actions');
+  if (actions) fitObserver.observe(actions);
   void document.fonts?.ready.then(scheduleFit);
   scheduleFit();
 });
@@ -424,6 +432,7 @@ watch([locale, () => (readyToHand.value ? t.value.readyPill : syncText.value), (
 .group-divider { width: 1px; height: 18px; margin: 0 3px; background: color-mix(in srgb, var(--ink) 14%, transparent); }
 
 /* 回退档位（见 refit）：只有量出来放不下时才会升档。 */
+.app-topbar.is-measuring :deep(.capsule-wheel) { transition: none !important; }
 .app-topbar[class*='fit-'] .wordmark { display: none; }
 .fit-2 .sync-text, .fit-3 .sync-text, .fit-4 .sync-text, .fit-5 .sync-text { display: none; }
 .fit-2 .sync-pill, .fit-3 .sync-pill, .fit-4 .sync-pill, .fit-5 .sync-pill { padding-inline: 11px; }
