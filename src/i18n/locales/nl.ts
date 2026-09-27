@@ -2006,7 +2006,7 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       balanceEmpty:
         'Nog te weinig trainingsbelastingsrecords om deze lijn te tekenen.',
       balanceNote:
-        'Belasting per training wordt gegroepeerd op lokale startdatum; rustdagen met daggegevens tellen als nul. Acuut:chronisch = som van de laatste 7 dagen ÷ (som van de laatste 28 dagen ÷ 4). Als het 28-daagse venster minder dan 21 dagen dekt wordt geen ratio gegeven en breekt de lijn daar. Dat is onberekend, geen nul.',
+        'Belasting wordt op lokale startdatum opgeteld. Alleen volledig gesynchroniseerde dagen waarop elke training een geldige belasting heeft, tellen als compleet; alleen bevestigde dagen zonder training tellen als nul. Onvolledige vensters van 7 of 28 dagen blijven leeg. De verhouding vereist twee complete vensters en een positieve chronische belasting.',
       acute7d: '7-daagse belasting',
       chronicWeekly: '28-daags weekgem.',
       acuteChronic: 'Acuut:chronisch',

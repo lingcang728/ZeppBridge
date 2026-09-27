@@ -731,6 +731,11 @@ impl SyncManager {
         stream: &str,
         records: Vec<FetchedRecord>,
     ) -> Result<StreamReport> {
+        let workout_evidence = if stream == "workouts" {
+            crate::storage::training_coverage::workout_day_evidence(&records)
+        } else {
+            Vec::new()
+        };
         let incomplete = records.iter().any(|record| record.incomplete);
         let reasons: std::collections::BTreeSet<_> = records
             .iter()
@@ -761,6 +766,13 @@ impl SyncManager {
                     message: Some(incomplete_message),
                 },
             )?;
+        }
+        if !incomplete
+            && !reports
+                .iter()
+                .any(|r| matches!(r.status, StreamStatus::Failed | StreamStatus::Unverified))
+        {
+            db.record_workout_day_evidence(&workout_evidence)?;
         }
         db.record_stream_written(stream, aggregate.records_written)?;
         db.update_sync_state_details(
@@ -1103,6 +1115,72 @@ mod tests {
     fn status_names_are_not_success_for_optional_states() {
         assert_eq!(status_name(&StreamStatus::Unavailable), "unavailable");
         assert_eq!(status_name(&StreamStatus::Unverified), "unverified");
+    }
+
+    #[tokio::test]
+    async fn workout_sync_records_only_confirmed_complete_empty_days() {
+        use chrono::TimeZone;
+        let connector = ZeppConnector::new(AuthInfo {
+            app_token: "test-token".into(),
+            user_id: "user-1".into(),
+            region_host: "https://api-mifit.zepp.com".into(),
+        })
+        .unwrap();
+        let manager = SyncManager::new(
+            DataFetcher::new(connector),
+            Database::in_memory().unwrap(),
+            Arc::new(AtomicBool::new(false)),
+        );
+        let start = Utc.with_ymd_and_hms(2023, 10, 1, 0, 0, 0).unwrap();
+        let end = Utc.with_ymd_and_hms(2023, 12, 1, 0, 0, 0).unwrap();
+        let make = |next| FetchedRecord {
+            incomplete: false,
+            incomplete_reason: None,
+            raw: RawRecord {
+                stream: "workouts".into(),
+                source_key: format!(
+                    "sport_history:run:{}:{}",
+                    start.timestamp(),
+                    end.timestamp()
+                ),
+                source_scope: SourceScope::Device,
+                device_id: None,
+                start_utc: start,
+                end_utc: Some(end),
+                payload: serde_json::json!({"data":{"items":[],"next":next}}),
+                capability: CapabilityStatus::Verified,
+            },
+        };
+        let day = chrono::NaiveDate::from_ymd_opt(2023, 11, 28).unwrap();
+        manager
+            .persist_records("workouts", vec![make(end.timestamp())])
+            .await
+            .unwrap();
+        assert_eq!(
+            manager
+                .db
+                .lock()
+                .await
+                .training_load_balance(day, day)
+                .unwrap()[0]
+                .acute_7d,
+            None
+        );
+        manager
+            .persist_records("workouts", vec![make(-1)])
+            .await
+            .unwrap();
+        let point = manager
+            .db
+            .lock()
+            .await
+            .training_load_balance(day, day)
+            .unwrap()
+            .remove(0);
+        assert_eq!(point.acute_7d, Some(0.0));
+        assert_eq!(point.chronic_28d, Some(0.0));
+        assert_eq!(point.chronic_days_with_data, 28);
+        assert_eq!(point.acute_chronic_ratio, None);
     }
 
     #[tokio::test]

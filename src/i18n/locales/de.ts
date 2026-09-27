@@ -2180,7 +2180,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       balanceHint: '7-Tage-Belastung gegen den 28-Tage-Wochenschnitt, d. h. das Akut-Chronisch-Verhältnis',
       balanceLabel: 'Trainingsbelastungs-Balance',
       balanceNote:
-        'Die Belastung einzelner Aktivitäten wird nach lokalem Startdatum summiert; Ruhetage mit Tagesdaten zählen als null. Akut:Chronisch = Summe der letzten 7 Tage ÷ (Summe der letzten 28 Tage ÷ 4). Deckt das 28-Tage-Fenster weniger als 21 Tage ab, gibt es keinen Quotienten und die Linie bricht dort – das ist unberechnet, nicht null.',
+        'Die Belastung wird nach lokalem Startdatum summiert. Ein Tag ist nur vollständig, wenn alle Aktivitäten synchronisiert sind und gültige Belastungswerte haben; nur bestätigte Tage ohne Aktivitäten zählen als null. Unvollständige 7- oder 28-Tage-Fenster bleiben leer. Das Verhältnis erfordert beide vollständigen Fenster und eine positive chronische Belastung.',
       chronicTooltip: (value: string) => `28-Tage-Wochenschnitt <b>${value}</b>`,
       chronicWeekly: '28-Tage-Wochenschnitt',
       desktopOnly:

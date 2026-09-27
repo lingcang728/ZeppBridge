@@ -123,7 +123,7 @@ Tauri command 在 `src-tauri/src/lib.rs` 注册，前端封装在 `src/lib/bridg
 | `get_workout_series` | 读取已解码的跑步 samples/route/pauses | 没有点则空数组，不编造 |
 | `get_heart_rate_series` | 概览折线用的时序点 | 按小时 / 天读本地库；没有样本就是空数组 |
 | `get_metric_series` | `/body` 与 `/training` 的按天曲线 | 只应答 `SERIES_METRICS` 白名单里的指标名，别的直接跳过；返回 `days_with_data`，缺的天不补 0 |
-| `get_training_balance` | 7 天 / 28 天负荷与急慢比 | 按本地开始日期累加 `workouts.training_load`，与导出 `training_load_balance` 共用；每日记录或有效运动负荷计入覆盖，已观测休息日负荷为零；chronic 窗口覆盖不足 21 天时 ratio 为 `null` |
+| `get_training_balance` | 7 天 / 28 天负荷与急慢比 | 按本地开始日期累加 `workouts.training_load`，与导出 `training_load_balance` 共用；覆盖要求运动列表完整同步且每次运动负荷有效，只有确认无运动才为零；7/28 天窗口不完整时相应负荷为 `null`，两个窗口完整且慢性负荷大于零才给比值；旧数据需重新同步建立完整性证据 |
 | `get_heart_rate_zones` | 心率区间选择器的全部状态 | 基准全部实测并带出处与测量日期；未选算法时 `report` 为 `null` |
 | `set_heart_rate_zone_preference` | 记录用户选的算法与基准 | 四个槽位都可为 `null`——「还没决定」必须能存回去 |
 | `get_device_profile` / `get_device_profiles` | 读取识别到的设备档案 | 来自编译进二进制的 `catalog.json`；认不出的设备不猜型号 |

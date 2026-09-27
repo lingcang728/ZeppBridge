@@ -1395,7 +1395,7 @@ export default {
       balanceHint: 'Carga de 7 dias contra a média semanal de 28 dias, ou seja, a razão aguda:crônica',
       balanceChartAria: 'Carga de treino de 7 e 28 dias com a razão aguda:crônica',
       balanceEmpty: 'Registros de carga de treino insuficientes para desenhar esta linha ainda.',
-      balanceNote: 'As cargas de cada atividade são agrupadas pela data local de início; dias de descanso com registros diários contam como zero. Aguda:crônica = soma dos últimos 7 dias ÷ (soma dos últimos 28 dias ÷ 4). Quando a janela de 28 dias cobre menos de 21 dias, nenhuma razão é dada e a linha quebra ali. Isso é não calculado, não zero.',
+      balanceNote: 'As cargas são somadas pela data local de início. Um dia só está completo quando todas as atividades foram sincronizadas e têm carga válida; apenas dias confirmados sem atividades contam como zero. Janelas incompletas de 7 ou 28 dias ficam sem valor. A razão exige ambas as janelas completas e carga crônica positiva.',
       acute7d: 'Carga de 7 dias',
       chronicWeekly: 'Média semanal de 28 dias',
       acuteChronic: 'Aguda:crônica',

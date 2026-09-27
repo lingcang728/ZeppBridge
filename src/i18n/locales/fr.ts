@@ -1644,7 +1644,7 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       loadEmpty: 'Aucun enregistrement de charge d’entraînement sur cette plage.',
       balanceLabel: 'Équilibre de la charge d’entraînement',
       balanceHint: 'Charge des 7 jours face à la moyenne hebdomadaire de 28 jours — le ratio aigu/chronique',
-      balanceNote: 'Les charges de chaque activité sont regroupées par date locale de début ; les jours de repos avec des données quotidiennes comptent pour zéro. Ratio aigu/chronique = somme des 7 derniers jours ÷ (somme des 28 derniers jours ÷ 4). Quand la fenêtre de 28 jours couvre moins de 21 jours, aucun ratio n’est donné et la courbe s’interrompt — c’est non calculé, pas zéro.',
+      balanceNote: 'Les charges sont additionnées par date locale de début. Une journée est complète si toutes ses activités sont synchronisées et possèdent une charge valide ; seules les journées confirmées sans activité comptent pour zéro. Les fenêtres incomplètes de 7 ou 28 jours restent sans valeur. Le ratio exige deux fenêtres complètes et une charge chronique positive.',
       balanceChartAria: 'Charge d’entraînement sur 7 et 28 jours avec le ratio aigu/chronique',
       balanceEmpty: 'Pas encore assez d’enregistrements de charge pour tracer cette courbe.',
       acute7d: 'Charge sur 7 jours',
