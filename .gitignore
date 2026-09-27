@@ -56,10 +56,10 @@ target/
 *.nsis.zip
 *.msi.zip
 
-# Local data and database files
-data/
-!functions/api/zepp/data/
-!functions/api/zepp/data/callback.js
+# Local data and database files. Anchored to the root: a bare `data/` also swallowed
+# src-tauri/src/commands/data/ (source code) without anyone noticing.
+/data/
+src-tauri/data/
 *.db
 *.db-*
 *.sqlite
