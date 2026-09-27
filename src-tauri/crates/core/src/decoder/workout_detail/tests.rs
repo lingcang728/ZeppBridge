@@ -152,6 +152,44 @@ fn indoor_without_gps_has_no_route() {
 }
 
 #[test]
+fn leading_negative_delta_is_the_heart_rate_baseline() {
+    // 真实报文的形状（一次「AI 识别活动」）：第一项时间差 -1，值是基准心率，
+    // 后面全是差分。基准丢掉的话曲线会从 1 开始、最高只有几十。
+    let raw = json!({
+        "trackid": 1_700_000_300i64,
+        "time": "1;1;1;1;",
+        "heart_rate": "-1,105;,1;,1;,-1;,2;"
+    });
+    let decoded = decode_workout_detail(&raw, None, None).unwrap();
+    let rates: Vec<i32> = decoded
+        .samples
+        .iter()
+        .filter_map(|sample| sample.heart_rate)
+        .collect();
+    assert!(!rates.is_empty());
+    assert_eq!(rates.first(), Some(&106));
+    assert_eq!(rates.iter().max(), Some(&108));
+    assert!(rates.iter().all(|rate| *rate >= 100), "{rates:?}");
+}
+
+#[test]
+fn negative_delta_after_the_first_is_still_skipped() {
+    // 只有打头的那一项是基准；中间冒出来的负跨度仍是坏点，不能改写基数。
+    let raw = json!({
+        "trackid": 1_700_000_400i64,
+        "time": "1;1;1;",
+        "heart_rate": "0,120;1,2;-3,50;1,1;"
+    });
+    let decoded = decode_workout_detail(&raw, None, None).unwrap();
+    let rates: Vec<i32> = decoded
+        .samples
+        .iter()
+        .filter_map(|sample| sample.heart_rate)
+        .collect();
+    assert_eq!(rates.iter().max(), Some(&123));
+}
+
+#[test]
 fn missing_trackid_is_an_error() {
     let raw = json!({ "time": "1;1;" });
     assert!(decode_workout_detail(&raw, None, None).is_err());
