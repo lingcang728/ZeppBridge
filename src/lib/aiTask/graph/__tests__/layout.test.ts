@@ -15,6 +15,8 @@ import {
   fitZoom,
   focusFrame,
   graphRadii,
+  METRIC_SLOT,
+  metricSlot,
   snapLayout,
   stepLayout,
   syncLayout,
@@ -183,6 +185,29 @@ describe('targetOf', () => {
     const t0 = targetOf(metric, undefined, RADII, parent);
     expect(Number.isFinite(t0.x)).toBe(true);
     expect(Number.isFinite(t0.y)).toBe(true);
+  });
+});
+
+describe('metricSlot', () => {
+  const radii = graphRadii(900, 700);
+  it('keeps a handful of metrics on one arc facing outward', () => {
+    const slots = [0, 1, 2, 3].map((index) => metricSlot(index, 4, radii));
+    expect(new Set(slots.map((slot) => slot.ring))).toEqual(new Set([0]));
+    // 居中对着父类别朝外的方向：两端对称。
+    expect(slots[0]!.offset).toBeCloseTo(-slots[3]!.offset, 10);
+  });
+  it('spills a long list onto outer rings without crowding labels', () => {
+    const count = 22;
+    const slots = Array.from({ length: count }, (_, index) => metricSlot(index, count, radii));
+    expect(Math.max(...slots.map((slot) => slot.ring))).toBeGreaterThan(0);
+    // 同一圈上相邻两个的弧长不小于一个标签宽。
+    for (let i = 1; i < count; i += 1) {
+      const a = slots[i - 1]!;
+      const b = slots[i]!;
+      if (a.ring === b.ring) expect((b.offset - a.offset) * a.radius).toBeGreaterThanOrEqual(METRIC_SLOT - 1e-6);
+    }
+    // 内圈先放满：圈号不回头。
+    for (let i = 1; i < count; i += 1) expect(slots[i]!.ring).toBeGreaterThanOrEqual(slots[i - 1]!.ring);
   });
 });
 

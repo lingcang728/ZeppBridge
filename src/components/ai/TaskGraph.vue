@@ -22,18 +22,29 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Icon from '../Icon.vue';
 import GraphNodeView from './GraphNodeView.vue';
 import GraphNodePopover from './GraphNodePopover.vue';
+import GraphUndoPill from './GraphUndoPill.vue';
+import GraphZoomDock from './GraphZoomDock.vue';
 import type { AiTaskCategory } from '../../lib/bridge/types';
 import type { GraphModel, GraphNode } from '../../lib/aiTask/graph/model';
 import { categoryNodeId, neighborIds } from '../../lib/aiTask/graph/model';
 import {
   createLayout, fitZoom, focusFrame, graphRadii, snapLayout, stepLayout, syncLayout, wakeLayout,
+  type LayoutNode,
   type LayoutState,
 } from '../../lib/aiTask/graph/layout';
-import { dropIncludes } from '../../lib/aiTask/graph/hit';
 import { useGraphCamera } from '../../composables/useGraphCamera';
-import { defineMessages, useMessages } from '../../i18n';
+import { useGraphDrag } from '../../composables/useGraphDrag';
+import { useMessages } from '../../i18n';
+import { taskGraphMessages } from './TaskGraph.i18n';
 
-const props = defineProps<{ model: GraphModel; canUndo: boolean }>();
+const props = defineProps<{
+  model: GraphModel;
+  canUndo: boolean;
+  /** 刚才那一步改了什么（「已移出『睡眠』」）；撤销胶囊把它亮出来几秒。 */
+  undoHint?: string | null;
+  /** 每改一步加一，撤销胶囊靠它重新计时。 */
+  undoSeq?: number;
+}>();
 const emit = defineEmits<{
   (event: 'set-category', category: AiTaskCategory, included: boolean): void;
   (event: 'set-metric', category: AiTaskCategory, metric: string, included: boolean): void;
@@ -43,54 +54,31 @@ const emit = defineEmits<{
   (event: 'undo'): void;
 }>();
 
-const t = useMessages(defineMessages(
-  {
-    label: '任务数据关系网',
-    zone: '交给 AI',
-    hint: '拖入圆圈以选用，拖出以移除 · 点击节点查看选项 · 拖动空白处平移',
-    undo: '撤销', fit: '适应画布', zoomIn: '放大', zoomOut: '缩小', resetView: '重置视图',
-    includeNode: '交给 AI', excludeNode: '不交给 AI',
-    backToAll: '全部类别',
-    dismissHint: '知道了',
-  },
-  {
-    label: 'Task data graph',
-    zone: 'To the AI',
-    hint: 'Drag into the circle to include, out to remove · Click for options · Drag empty space to pan',
-    undo: 'Undo', fit: 'Fit', zoomIn: 'Zoom in', zoomOut: 'Zoom out', resetView: 'Reset view',
-    includeNode: 'Include', excludeNode: 'Exclude',
-    backToAll: 'All categories',
-    dismissHint: 'Got it',
-  },
-  {
-    label: 'Grafo de datos',
-    zone: 'A la IA',
-    hint: 'Arrastra al círculo para incluir, fuera para quitar · Haz clic para ver opciones · Arrastra el fondo para desplazar',
-    undo: 'Deshacer', fit: 'Ajustar', zoomIn: 'Acercar', zoomOut: 'Alejar', resetView: 'Restablecer',
-    backToAll: 'Todas las categorías',
-    dismissHint: 'Entendido',
-  },
-  'components/ai/TaskGraph',
-));
+const t = useMessages(taskGraphMessages);
 
-/** 起拖的门槛：小于它算点击。指标点很小，手一抖就成了拖动，所以比以前的 6px 宽一些。 */
-const CLICK_TOLERANCE = 9;
 const HOVER_IN_MS = 160;
 const HOVER_OUT_MS = 120;
 
 const viewport = ref<HTMLElement | null>(null);
 const size = ref({ width: 720, height: 540 });
+/* 画布四边被浮在上面的玻璃挡住多少（任务名胶囊、交付坞……），由页面用样式变量
+   --graph-safe-* 告诉这里；节点弹层只摆在剩下看得见的那一块里。 */
+const safe = ref({ top: 14, right: 14, bottom: 14, left: 14 });
+const readSafe = () => {
+  if (!viewport.value) return;
+  const style = getComputedStyle(viewport.value);
+  const read = (side: string) => Number.parseFloat(style.getPropertyValue(`--graph-safe-${side}`)) || 14;
+  safe.value = { top: read('top'), right: read('right'), bottom: read('bottom'), left: read('left') };
+};
 const radii = computed(() => graphRadii(size.value.width, size.value.height));
 const layout: LayoutState = createLayout();
 const reducedMotion = typeof window !== 'undefined'
   && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const { camera, flying, flyTo, zoomAt, cancel: cancelFlight } = useGraphCamera();
+const { camera, flying, flyTo, zoomAt, cancel: cancelFlight, panStart, panMove, panEnd } = useGraphCamera();
 
 const frame = ref(0);
 const hoverId = ref<string | null>(null);
 const openId = ref<string | null>(null);
-const drag = ref<{ id: string; grabX: number; grabY: number; startX: number; startY: number; moved: boolean } | null>(null);
-const dropHint = ref<'include' | 'exclude' | null>(null);
 
 /* —— 模拟循环：未收敛或被拖动时逐帧推进，收敛后停下省电 —— */
 let raf = 0;
@@ -186,7 +174,7 @@ const cameraTransform = computed(
   () => `translate(${size.value.width / 2 - camera.value.x * camera.value.zoom} ${size.value.height / 2 - camera.value.y * camera.value.zoom}) scale(${camera.value.zoom})`,
 );
 
-const pos = (id: string) => layout.nodes.get(id) ?? { x: 0, y: 0, vx: 0, vy: 0, dragging: false };
+const pos = (id: string): LayoutNode => layout.nodes.get(id) ?? { id, x: 0, y: 0, vx: 0, vy: 0, dragging: false };
 const positioned = computed(() => {
   void frame.value;
   return props.model.nodes.map((node) => ({ node, ...pos(node.id) }));
@@ -237,17 +225,19 @@ const dragParentId = computed(() => {
 });
 const focusNode = computed(() => (focusId.value ? nodeById.value.get(focusId.value) ?? null : null));
 
-/* —— 节点拖动（window 监听，不用 pointer capture） —— */
-const updateDropHint = () => {
-  const id = drag.value?.id;
-  const node = id ? nodeById.value.get(id) : null;
-  if (!id || !node) {
-    dropHint.value = null;
-    return;
-  }
-  const include = dropIncludes(node, pos(id), node.parentId ? pos(node.parentId) : null, radii.value);
-  dropHint.value = include === null ? null : include ? 'include' : 'exclude';
-};
+/* —— 节点拖动（见 useGraphDrag） —— */
+const nodeDrag = useGraphDrag({
+  nodeById, radii, pos, toLocal, localToWorld,
+  beforeDrag: () => { cancelFlight(); openId.value = null; },
+  wake,
+  redraw: () => { frame.value += 1; },
+  onClick: (id) => { openId.value = id === openId.value ? null : id; },
+  onDrop: (node, include) => {
+    if (node.kind === 'category' && node.category) emit('set-category', node.category, include);
+    else if (node.kind === 'metric' && node.category && node.metric) emit('set-metric', node.category, node.metric, include);
+  },
+});
+const { drag, dropHint } = nodeDrag;
 const onNodeDown = (event: PointerEvent, node: GraphNode) => {
   if (event.button !== 0) return;
   event.stopPropagation();
@@ -264,88 +254,24 @@ const onNodeDown = (event: PointerEvent, node: GraphNode) => {
     emit('toggle-expand', node.category);
     return;
   }
-  cancelFlight();
-  const local = toLocal(event);
-  const world = localToWorld(local);
-  const item = pos(node.id);
-  drag.value = { id: node.id, grabX: item.x - world.x, grabY: item.y - world.y, startX: local.x, startY: local.y, moved: false };
-  item.dragging = true;
-  openId.value = null;
-  wake();
-  window.addEventListener('pointermove', onDragMove);
-  window.addEventListener('pointerup', onDragEnd, { once: true });
-  window.addEventListener('pointercancel', onDragEnd, { once: true });
-};
-const onDragMove = (event: PointerEvent) => {
-  const active = drag.value;
-  if (!active) return;
-  const local = toLocal(event);
-  // 起步判定用累计位移：超过阈值才算「拖」，不然算点击；没起步之前节点不动。
-  active.moved = active.moved
-    || Math.hypot(local.x - active.startX, local.y - active.startY) >= CLICK_TOLERANCE;
-  if (!active.moved) return;
-  const world = localToWorld(local);
-  const item = pos(active.id);
-  item.x = world.x + active.grabX;
-  item.y = world.y + active.grabY;
-  updateDropHint();
-  frame.value += 1;
-};
-const onDragEnd = (event?: Event) => {
-  window.removeEventListener('pointerup', onDragEnd);
-  window.removeEventListener('pointermove', onDragMove);
-  window.removeEventListener('pointercancel', onDragEnd);
-  const active = drag.value;
-  drag.value = null;
-  dropHint.value = null;
-  if (!active) return;
-  const node = nodeById.value.get(active.id);
-  const item = pos(active.id);
-  item.dragging = false;
-  if (!node) return;
-  if (event && event.type !== 'pointerup') { wake(); return; }
-  if (!active.moved) {
-    openId.value = active.id === openId.value ? null : active.id;
-    wake();
-    return;
-  }
-  const include = dropIncludes(node, item, node.parentId ? pos(node.parentId) : null, radii.value);
-  if (include !== null) {
-    if (node.kind === 'category' && node.category && include !== node.included) {
-      emit('set-category', node.category, include);
-    } else if (node.kind === 'metric' && node.category && node.metric && include !== node.included) {
-      emit('set-metric', node.category, node.metric, include);
-    }
-  }
-  wake();
+  nodeDrag.start(event, node);
 };
 
 /* —— 空白拖动 = 平移 —— */
-let pan: { x: number; y: number; camX: number; camY: number } | null = null;
 const onBackgroundDown = (event: PointerEvent) => {
   if (event.button !== 0) return;
-  cancelFlight();
   openId.value = null;
-  const local = toLocal(event);
-  pan = { x: local.x, y: local.y, camX: camera.value.x, camY: camera.value.y };
+  panStart(toLocal(event));
   window.addEventListener('pointermove', onPanMove);
   window.addEventListener('pointerup', onPanEnd, { once: true });
   window.addEventListener('pointercancel', onPanEnd, { once: true });
 };
-const onPanMove = (event: PointerEvent) => {
-  if (!pan) return;
-  const local = toLocal(event);
-  camera.value = {
-    ...camera.value,
-    x: pan.camX - (local.x - pan.x) / camera.value.zoom,
-    y: pan.camY - (local.y - pan.y) / camera.value.zoom,
-  };
-};
+const onPanMove = (event: PointerEvent) => panMove(toLocal(event));
 const onPanEnd = () => {
   window.removeEventListener('pointerup', onPanEnd);
   window.removeEventListener('pointercancel', onPanEnd);
   window.removeEventListener('pointermove', onPanMove);
-  pan = null;
+  panEnd();
 };
 
 /* —— 缩放：Ctrl+滚轮以光标为锚；不按 Ctrl 的滚轮留给页面滚动 —— */
@@ -355,9 +281,21 @@ const onWheel = (event: WheelEvent) => {
   zoomAt(camera.value.zoom * Math.exp(-event.deltaY * 0.0015), size.value, toLocal(event));
 };
 const stepZoom = (factor: number) => zoomAt(camera.value.zoom * factor, size.value);
+/* 「适应画布」：飞回正好装下整张图（聚焦时是这一类）的位置；已经在那儿了就让
+   按钮弹一下（见 GraphZoomDock）。 */
+const zoomPercent = computed(() => Math.round(camera.value.zoom * 100));
+const zoomLabels = computed(() => ({ zoomIn: t.value.zoomIn, zoomOut: t.value.zoomOut, fit: t.value.fit, level: t.value.zoomLevel(zoomPercent.value) }));
+const fitPulse = ref(0);
 const fit = () => {
-  if (focusId.value) { flyToFocus(focusId.value); return; }
-  void flyTo({ x: 0, y: 0, zoom: fitZoom(layout, size.value.width, size.value.height) });
+  const target = focusId.value
+    ? focusFrame(props.model, focusId.value, radii.value, size.value)
+    : { x: 0, y: 0, zoom: fitZoom(layout, size.value.width, size.value.height) };
+  if (!target) return;
+  const { x, y, zoom } = camera.value;
+  const already = Math.abs(zoom - target.zoom) < 0.01 && Math.hypot(x - target.x, y - target.y) < 2;
+  if (already) { fitPulse.value += 1; return; }
+  openId.value = null;
+  void flyTo(target);
 };
 
 /* —— 首次使用的提示：一枚可以关掉的小胶囊，关掉就记住。 —— */
@@ -390,7 +328,7 @@ const onNodeKey = (event: KeyboardEvent, node: GraphNode) => {
   }
 };
 
-const onBlur = (event: Event) => { onDragEnd(event); onPanEnd(); };
+const onBlur = (event: Event) => { nodeDrag.cancel(event); onPanEnd(); };
 const onVisibility = () => { if (document.hidden) onBlur(new Event('blur')); };
 let observer: ResizeObserver | undefined;
 onMounted(() => {
@@ -401,9 +339,11 @@ onMounted(() => {
   observer = new ResizeObserver((entries) => {
     const box = entries[0]?.contentRect;
     if (box && box.width > 0 && box.height > 0) size.value = { width: box.width, height: box.height };
+    readSafe();
   });
   observer.observe(viewport.value);
   size.value = { width: viewport.value.clientWidth || 720, height: viewport.value.clientHeight || 540 };
+  readSafe();
 });
 onBeforeUnmount(() => {
   observer?.disconnect();
@@ -413,7 +353,6 @@ onBeforeUnmount(() => {
   window.removeEventListener('blur', onBlur);
   document.removeEventListener('visibilitychange', onVisibility);
   cancelAnimationFrame(raf);
-  window.removeEventListener('pointermove', onDragMove);
   window.removeEventListener('pointermove', onPanMove);
 });
 
@@ -472,17 +411,12 @@ defineExpose({ focusCategory: (category: AiTaskCategory) => flyToFocus(categoryN
       </Transition>
 
       <div class="dock dock-left">
-        <button type="button" class="undo-pill glass-control" :disabled="!canUndo" :title="`${t.undo} · Ctrl+Z`" @click="emit('undo')">
-          <Icon name="undo" :size="15" /><span>{{ t.undo }}</span>
-        </button>
+        <GraphUndoPill :can-undo="canUndo" :label="t.undo" :hint="undoHint" :seq="undoSeq" @undo="emit('undo')" />
       </div>
-      <div class="dock dock-right glass-control">
-        <button type="button" class="dock-btn" :aria-label="t.zoomOut" :title="t.zoomOut" @click="stepZoom(1 / 1.2)">−</button>
-        <button type="button" class="dock-btn" :aria-label="t.fit" :title="t.fit" @click="fit"><Icon name="compass" :size="15" /></button>
-        <button type="button" class="dock-btn" :aria-label="t.zoomIn" :title="t.zoomIn" @click="stepZoom(1.2)">+</button>
-      </div>
+      <GraphZoomDock class="dock dock-right" :percent="zoomPercent" :pulse="fitPulse" :labels="zoomLabels"
+        @zoom="stepZoom" @fit="fit" />
 
-      <GraphNodePopover v-if="openNode" :node="openNode" :anchor="openAnchor" :viewport="size"
+      <GraphNodePopover v-if="openNode" :node="openNode" :anchor="openAnchor" :viewport="size" :safe="safe"
         @close="openId = null" @set-category="emit('set-category', openNode!.category!, $event)"
         @set-metric="emit('set-metric', openNode!.category!, openNode!.metric!, $event)"
         @set-days="emit('set-days', openNode!.category!, $event)"
@@ -492,83 +426,4 @@ defineExpose({ focusCategory: (category: AiTaskCategory) => flyToFocus(categoryN
   </div>
 </template>
 
-<style scoped>
-.graph { position: relative; height: 100%; min-height: 480px; overflow: hidden; border-radius: inherit; outline: none; touch-action: pan-y; }
-.graph:focus-visible { box-shadow: inset 0 0 0 2px var(--focus); }
-.canvas-wrap { position: absolute; inset: 0; overflow: hidden; }
-.canvas { display: block; width: 100%; height: 100%; cursor: grab; }
-.canvas:active { cursor: grabbing; }
-
-.zone { fill: none; stroke: var(--accent); stroke-width: 1.4; stroke-dasharray: 7 6; opacity: .75; }
-.ring-inner { fill: none; stroke: var(--line); stroke-dasharray: 2 6; }
-.zone-label { fill: var(--accent); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-anchor: middle; opacity: .85; pointer-events: none; }
-.scenery { transition: opacity .45s ease, filter .45s ease; }
-.link { stroke: var(--line); stroke-width: 1; transition: opacity .35s ease, stroke .2s ease; }
-.link.is-active { stroke: color-mix(in srgb, var(--accent) 55%, transparent); stroke-width: 1.6; }
-.link.is-backdrop { opacity: .18; }
-.ghost { pointer-events: none; }
-
-/* 聚焦时：舞台（圈、标签）退到背景里，变糊变淡；镜头飞的那一段再多糊一点，像俯冲时的运动模糊。 */
-.graph.is-focused .scenery { opacity: .35; filter: blur(2.5px); }
-.graph.is-flying :deep(.gnode.is-backdrop) { filter: blur(3px); }
-
-/* —— 浮在画布上的玻璃控件 —— */
-.crumb {
-  position: absolute;
-  top: 14px;
-  left: 14px;
-  z-index: 3;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 38px;
-  padding: 0 16px 0 12px;
-  border-radius: 999px;
-  color: var(--ink);
-  font-size: var(--fs-sm);
-  cursor: pointer;
-}
-.crumb-root { color: var(--muted); }
-.crumb-sep { color: var(--subtle); }
-.crumb:active { scale: .97; }
-.hint {
-  position: absolute;
-  top: 14px;
-  left: 50%;
-  z-index: 3;
-  display: flex;
-  max-width: calc(100% - 28px);
-  align-items: center;
-  gap: 12px;
-  padding: 7px 8px 7px 16px;
-  border-radius: 999px;
-  color: var(--muted);
-  font-size: var(--fs-xs);
-  translate: -50% 0;
-}
-.hint span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hint-close { flex: 0 0 auto; padding: 4px 12px; border: 0; border-radius: 999px; background: var(--glass-press); color: var(--ink); font-size: var(--fs-xs); cursor: pointer; }
-.dock { position: absolute; bottom: 14px; z-index: 3; display: flex; align-items: center; }
-.dock-left { left: 14px; }
-.dock-right { right: 14px; gap: 2px; padding: 3px; border-radius: 999px; }
-.undo-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 38px;
-  padding: 0 16px;
-  border-radius: 999px;
-  color: var(--ink);
-  font-size: var(--fs-sm);
-  cursor: pointer;
-  transition: opacity var(--dur-base) ease, scale var(--dur-fast) var(--ease-out);
-}
-.undo-pill:disabled { opacity: .4; cursor: default; }
-.undo-pill:active:not(:disabled) { scale: .96; }
-.dock-btn { display: grid; width: 34px; height: 34px; place-items: center; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--ink); font-size: 18px; line-height: 1; cursor: pointer; }
-.dock-btn:hover { background: var(--glass-press); }
-
-.crumb-enter-active, .crumb-leave-active { transition: opacity .28s ease, translate .38s var(--ease-out), filter .28s ease; }
-.crumb-enter-from, .crumb-leave-to { opacity: 0; filter: blur(6px); }
-.crumb.crumb-enter-from, .crumb.crumb-leave-to { translate: -8px 0; }
-</style>
+<style scoped src="./TaskGraph.css"></style>

@@ -171,10 +171,8 @@ export default {
       avgHr: (bpm: number) => `Ø HF ${bpm}`,
       empty: 'Noch keine Trainings auf diesem Rechner',
       hint: 'Mehrere möglich, keins auch',
-      next: 'Weiter',
       noneSelected: (days: number) =>
         `Kein Training gewählt: die letzten ${days} Tage bis heute werden analysiert.`,
-      previous: 'Zurück',
       remove: 'Auswahl aufheben',
       selectedCount: (count: number) => `${count} ausgewählt`,
       title: 'Welches Training',

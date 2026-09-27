@@ -13,6 +13,9 @@ components/ai/HandoffPanel.readinessWaiting
 components/ai/HandoffPanel.readinessWaitingStep
 components/ai/HandoffPanel.readinessWaitingSub
 components/ai/HandoffPanel.repeat
+components/ai/TaskGraph.zoomLevel
+components/ai/WorkoutPicker.showLess
+components/ai/WorkoutPicker.showMore
 components/overview/DataReadyCapsule.cta
 components/overview/DataReadyCapsule.dismiss
 components/overview/DataReadyCapsule.readyFresh
@@ -41,3 +44,10 @@ views/AiComposer.stepAsk
 views/AiComposer.stepExtras
 views/AiComposer.stepTarget
 views/AiComposer.targetRecent
+views/AiComposer.undoAdded
+views/AiComposer.undoDirection
+views/AiComposer.undoExcluded
+views/AiComposer.undoKept
+views/AiComposer.undoPicked
+views/AiComposer.undoRemoved
+views/AiComposer.undoUnpicked

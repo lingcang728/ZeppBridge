@@ -16,8 +16,6 @@ export default {
   modules: {
     'components/ai/WorkoutPicker': {
       title: 'कौन-सा वर्कआउट',
-      previous: 'पिछला',
-      next: 'अगला',
       hint: 'एक या कई चुनें, या कोई नहीं',
       noneSelected: (days: number) => `कोई वर्कआउट नहीं चुना: आज तक के पिछले ${days} दिन विश्लेषण होते हैं।`,
       selectedCount: (count: number) =>

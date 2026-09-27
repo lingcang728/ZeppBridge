@@ -18,8 +18,6 @@ export default {
   modules: {
     'components/ai/WorkoutPicker': {
       title: 'Какую тренировку анализировать',
-      previous: 'Назад',
-      next: 'Далее',
       hint: 'Можно выбрать несколько или ни одной',
       noneSelected: (days: number) =>
         `Тренировка не выбрана: анализируются последние ${plural(days, { one: `${days} день`, few: `${days} дня`, many: `${days} дней`, other: `${days} дня` })} по сегодняшний день.`,

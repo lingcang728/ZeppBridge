@@ -76,7 +76,23 @@ export const useGraphCamera = () => {
     };
   };
 
+  /* 拖空白处平移：记下按下时的镜头和指针，之后指针走多少镜头反着走多少（按缩放换算）。 */
+  let pan: { x: number; y: number; camX: number; camY: number } | null = null;
+  const panStart = (local: { x: number; y: number }) => {
+    cancel();
+    pan = { x: local.x, y: local.y, camX: camera.value.x, camY: camera.value.y };
+  };
+  const panMove = (local: { x: number; y: number }) => {
+    if (!pan) return;
+    camera.value = {
+      ...camera.value,
+      x: pan.camX - (local.x - pan.x) / camera.value.zoom,
+      y: pan.camY - (local.y - pan.y) / camera.value.zoom,
+    };
+  };
+  const panEnd = () => { pan = null; };
+
   onBeforeUnmount(cancel);
 
-  return { camera, flying, flyTo, zoomAt, cancel, clampZoom };
+  return { camera, flying, flyTo, zoomAt, cancel, clampZoom, panStart, panMove, panEnd };
 };

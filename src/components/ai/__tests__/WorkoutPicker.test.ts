@@ -35,13 +35,13 @@ describe('WorkoutPicker', () => {
     expect(html).toContain('本机还没有运动记录');
     expect(html).not.toContain('role="listbox"');
     expect(html).not.toContain('role="option"');
-    // 「未选运动按最近 N 天」与「库里没有记录」两条 ai-note 同时在场。
-    expect(count(html, /class="ai-note"/g)).toBe(2);
+    // 「未选运动按最近 N 天」与「库里没有记录」两条说明同时在场。
+    expect(count(html, /class="none-note"/g)).toBe(2);
   });
 
-  it('没选运动：ai-note 说明按最近 N 天分析，所有行未选中', async () => {
+  it('没选运动：说明按最近 N 天分析，所有行未选中', async () => {
     const html = await render({ workouts: [workout()], selectedIds: [], recentDays: 7 });
-    expect(html).toContain('class="ai-note"');
+    expect(html).toContain('class="none-note"');
     expect(html).toContain('没选运动');
     expect(html).toContain('最近 7 天');
     expect(html).toContain('role="listbox"');

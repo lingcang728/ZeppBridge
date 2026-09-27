@@ -13,8 +13,6 @@ import { plural, type LocalePack } from '../index';
 export default {
   modules: {
     'components/ai/WorkoutPicker': {
-      previous: 'Vorige',
-      next: 'Volgende',
       title: 'Welke training',
       hint: 'Kies er een of meer, of geen',
       empty: 'Nog geen trainingen op deze machine',

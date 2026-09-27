@@ -15,8 +15,6 @@ export default {
   modules: {
     'components/ai/WorkoutPicker': {
       title: 'Qual treino',
-      previous: 'Anterior',
-      next: 'Próxima',
       hint: 'Escolha um ou mais, ou nenhum',
       noneSelected: (days: number) =>
         plural(days, {

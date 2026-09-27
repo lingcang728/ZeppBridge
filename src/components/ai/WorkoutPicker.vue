@@ -2,8 +2,10 @@
 /**
  * 第 ① 步：分析哪次运动。可以不选——不选时分析截至今天的最近 N 天。
  *
- * 同名的运动很多（「AI 识别活动」能有几十条），所以每行都带上时间、
- * 时长、距离和平均心率，按日期分组，一眼能分清。
+ * 同名的运动很多（「AI 识别活动」能有几十条），所以按天排成一条时间线，每一条是一枚
+ * 胶囊：左边是运动图标，中间是名字和时间、时长、距离、均心率，右边一枚圆勾——
+ * 选中时整枚胶囊点亮。以前是一列带圆圈的文字加「上一页 1/12 下一页」，和页面上
+ * 其余的玻璃、胶囊不是一种东西；现在往下拉「再看 6 条」，不用翻页。
  */
 import { computed, ref, watch } from 'vue';
 import Icon from '../Icon.vue';
@@ -18,46 +20,49 @@ const emit = defineEmits<{ (event: 'toggle', id: string): void }>();
 const t = useMessages(defineMessages(
   {
     title: '分析哪次运动',
-    previous: '上一页', next: '下一页',
     hint: '可多选，也可以不选',
     noneSelected: (days: number) => `没选运动：分析截至今天的最近 ${days} 天。`,
     selectedCount: (count: number) => `已选 ${count} 次`,
     empty: '本机还没有运动记录',
     remove: '取消选择',
     avgHr: (bpm: number) => `均心率 ${bpm}`,
+    showMore: (count: number) => `再看 ${count} 条`,
+    showLess: '收起',
   },
   {
     title: 'Which workout',
-    previous: 'Previous', next: 'Next',
     hint: 'Pick one or more, or none',
     noneSelected: (days: number) => `No workout selected: the last ${days} days up to today are analysed.`,
     selectedCount: (count: number) => `${count} selected`,
     empty: 'No workouts on this machine yet',
     remove: 'Deselect',
     avgHr: (bpm: number) => `avg HR ${bpm}`,
+    showMore: (count: number) => `Show ${count} more`,
+    showLess: 'Show fewer',
   },
   {
     title: 'Qué entrenamiento',
-    previous: 'Anterior', next: 'Siguiente',
     hint: 'Elige uno o varios, o ninguno',
     noneSelected: (days: number) => `Sin entrenamiento: se analizan los últimos ${days} días hasta hoy.`,
     selectedCount: (count: number) => `${count} seleccionados`,
     empty: 'Aún no hay entrenamientos en este equipo',
     remove: 'Quitar',
     avgHr: (bpm: number) => `FC media ${bpm}`,
+    showMore: (count: number) => `Ver ${count} más`,
+    showLess: 'Ver menos',
   },
   'components/ai/WorkoutPicker',
 ));
 
 const selected = computed(() => props.workouts.filter((workout) => props.selectedIds.includes(workout.workout_id)));
 
-const page = ref(0);
-const pageSize = 5;
-const pageCount = computed(() => Math.max(1, Math.ceil(props.workouts.length / pageSize)));
-watch(pageCount, count => { page.value = Math.min(page.value, count - 1); });
+const STEP = 6;
+const visible = ref(STEP);
+watch(() => props.workouts.length, (length) => { visible.value = Math.min(Math.max(STEP, visible.value), Math.max(STEP, length)); });
+const remaining = computed(() => Math.max(0, props.workouts.length - visible.value));
 const groups = computed(() => {
   const byDay = new Map<string, Workout[]>();
-  for (const workout of props.workouts.slice(page.value * pageSize, (page.value + 1) * pageSize)) {
+  for (const workout of props.workouts.slice(0, visible.value)) {
     const day = formatDate(workout.start_time, 'long');
     byDay.set(day, [...(byDay.get(day) ?? []), workout]);
   }
@@ -85,49 +90,90 @@ const facts = (workout: Workout): string => {
 
     <div v-if="selected.length" class="chosen">
       <span class="chosen-count">{{ t.selectedCount(selected.length) }}</span>
-      <button v-for="workout in selected" :key="workout.workout_id" type="button" class="ai-chip is-on"
+      <button v-for="workout in selected" :key="workout.workout_id" type="button" class="chosen-chip"
         :aria-label="`${t.remove} ${workoutDisplayLabel(workout)}`" @click="emit('toggle', workout.workout_id)">
         {{ workoutDisplayLabel(workout) }} · {{ formatDate(workout.start_time) }}
         <Icon name="x" :size="12" />
       </button>
     </div>
-    <p v-else class="ai-note"><Icon name="info" :size="13" />{{ t.noneSelected(recentDays) }}</p>
+    <p v-else class="none-note"><Icon name="clock" :size="14" />{{ t.noneSelected(recentDays) }}</p>
 
-    <div v-if="workouts.length" class="list" role="listbox" aria-multiselectable="true" :aria-label="t.title">
-      <template v-for="group in groups" :key="group.day">
-        <p class="day">{{ group.day }}</p>
+    <div v-if="workouts.length" class="timeline" role="listbox" aria-multiselectable="true" :aria-label="t.title">
+      <div v-for="group in groups" :key="group.day" class="day">
+        <p class="day-label">{{ group.day }}</p>
         <button v-for="workout in group.items" :key="workout.workout_id" type="button" role="option"
           :aria-selected="selectedIds.includes(workout.workout_id)"
           :class="['row', { 'is-on': selectedIds.includes(workout.workout_id) }]"
           @click="emit('toggle', workout.workout_id)">
-          <Icon :name="selectedIds.includes(workout.workout_id) ? 'circle-check' : 'ring'" :size="16" />
+          <span class="row-glyph"><Icon name="run" :size="15" /></span>
           <span class="row-copy">
             <span class="row-name">{{ workoutDisplayLabel(workout) }}</span>
             <span class="row-facts">{{ facts(workout) }}</span>
           </span>
+          <span class="row-check" aria-hidden="true"><Icon name="check" :size="13" /></span>
         </button>
-      </template>
+      </div>
     </div>
-    <p v-else class="ai-note">{{ t.empty }}</p>
-    <div v-if="pageCount > 1" class="pagination">
-      <button type="button" class="ai-tool" :disabled="page === 0" @click="page--">{{ t.previous }}</button>
-      <span>{{ page + 1 }} / {{ pageCount }}</span>
-      <button type="button" class="ai-tool" :disabled="page + 1 === pageCount" @click="page++">{{ t.next }}</button>
+    <p v-else class="none-note">{{ t.empty }}</p>
+    <div v-if="workouts.length > STEP" class="more">
+      <button v-if="remaining > 0" type="button" class="more-btn" @click="visible += STEP">
+        <Icon name="chevron-down" :size="14" />{{ t.showMore(Math.min(STEP, remaining)) }}
+      </button>
+      <button v-if="visible > STEP" type="button" class="more-btn quiet" @click="visible = STEP">{{ t.showLess }}</button>
     </div>
   </section>
 </template>
 
 <style scoped>
 .chosen { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
-.chosen-count { color: var(--subtle); font-size: var(--fs-xs); margin-right: 4px; }
-.list { display: grid; gap: 2px; margin-top: 10px; padding-right: 4px; overflow: visible; }
-.day { margin: 6px 0 2px; padding: 2px 0; background: var(--mat-card-solid); color: var(--subtle); font-size: var(--fs-xs); font-weight: 600; }
-.row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--muted); text-align: left; cursor: pointer; }
-.row:hover { background: var(--surface-hover); }
-.row.is-on { border-color: color-mix(in srgb, var(--accent) 40%, transparent); background: var(--accent-soft); color: var(--accent); }
-.row:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
-.row-copy { display: grid; min-width: 0; gap: 3px; overflow-wrap: anywhere; }
-.row-name { color: var(--ink); font-size: var(--fs-sm); }
+.chosen-count { margin-right: 4px; color: var(--subtle); font-size: var(--fs-xs); }
+.chosen-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 3px 12px; border: 0; border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--ink); font-size: var(--fs-xs); cursor: pointer; }
+.chosen-chip:hover { background: color-mix(in srgb, var(--accent) 24%, transparent); }
+.none-note { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; padding: 9px 14px; border-radius: 999px;
+  background: var(--cap-track); box-shadow: var(--cap-track-shadow); color: var(--muted); font-size: var(--fs-xs); }
+
+/* 按天的时间线：左边一条细竖线把同一天的运动串起来，日期是线上的一个小标签。 */
+.timeline { display: grid; gap: 12px; margin-top: 12px; }
+.day { position: relative; display: grid; gap: 6px; padding-left: 14px; }
+.day::before { content: ''; position: absolute; top: 24px; bottom: 6px; left: 4px; width: 1.5px; border-radius: 2px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ink) 16%, transparent), transparent); }
+.day-label { position: relative; margin: 0 0 2px -14px; padding-left: 14px; color: var(--subtle); font-size: var(--fs-2xs); font-weight: 600; letter-spacing: .02em; }
+.day-label::before { content: ''; position: absolute; top: 50%; left: 1px; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--subtle); translate: 0 -50%; }
+
+.row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 11px;
+  padding: 8px 10px 8px 8px;
+  border: 0;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 5%, transparent);
+  color: var(--muted);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) ease, box-shadow var(--dur-base) ease, translate var(--dur-base) var(--ease-out);
+}
+.row:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); translate: 0 -1px; }
+.row:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.row.is-on { background: color-mix(in srgb, var(--accent) 15%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent), 0 6px 18px -10px color-mix(in srgb, var(--accent) 60%, transparent); }
+.row-glyph { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border-radius: 50%;
+  background: var(--cap-thumb); box-shadow: var(--cap-thumb-rim); color: var(--activity); }
+.row-copy { display: grid; flex: 1; min-width: 0; gap: 2px; overflow-wrap: anywhere; }
+.row-name { color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
 .row-facts { color: var(--subtle); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
-.pagination { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; color: var(--muted); font-size: var(--fs-sm); }
+.row-check { display: grid; width: 22px; height: 22px; flex: 0 0 22px; place-items: center; border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ink) 22%, transparent); color: transparent;
+  transition: background var(--dur-fast) ease, color var(--dur-fast) ease, scale var(--dur-base) var(--ease-spring); }
+.row.is-on .row-check { background: var(--accent); box-shadow: none; color: var(--accent-ink); scale: 1.05; }
+
+.more { display: flex; justify-content: center; gap: 8px; margin-top: 12px; }
+.more-btn { display: inline-flex; min-height: 34px; align-items: center; gap: 6px; padding: 0 16px; border: 0; border-radius: 999px;
+  background: var(--cap-thumb); box-shadow: var(--cap-thumb-rim); color: var(--ink); font-size: var(--fs-xs); cursor: pointer; }
+.more-btn.quiet { background: transparent; box-shadow: none; color: var(--muted); }
+.more-btn:active { scale: .97; }
 </style>

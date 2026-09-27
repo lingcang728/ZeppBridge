@@ -24,14 +24,16 @@ describe('dropIncludes · 类别', () => {
 });
 
 describe('dropIncludes · 指标', () => {
-  it('离父节点不超过 metricLength×1.4 算保留，拖远算排除', () => {
-    const node = { kind: 'metric' as const };
+  it('离父节点不超过自己那一圈 + 余量算保留，拖远算排除', () => {
+    const node = { kind: 'metric' as const, index: 0, siblings: 3 };
     const parent = { x: 30, y: -10 };
-    // 阈值 = 50 × 1.4 = 70：同点、近距离保留；压线、超距排除。
+    // 第一圈半径 90（不小于 90），余量 34：阈值 124。
     expect(dropIncludes(node, parent, parent, RADII)).toBe(true);
-    expect(dropIncludes(node, { x: 99.9, y: -10 }, parent, RADII)).toBe(true);
-    expect(dropIncludes(node, { x: 100, y: -10 }, parent, RADII)).toBe(false);
-    expect(dropIncludes(node, { x: 130, y: -10 }, parent, RADII)).toBe(false);
+    expect(dropIncludes(node, { x: 153.9, y: -10 }, parent, RADII)).toBe(true);
+    expect(dropIncludes(node, { x: 154, y: -10 }, parent, RADII)).toBe(false);
+    // 外圈的指标阈值跟着它那一圈放大。
+    const outer = { kind: 'metric' as const, index: 20, siblings: 22 };
+    expect(dropIncludes(outer, { x: 30 + 200, y: -10 }, parent, RADII)).toBe(true);
     // 判定跟父节点走，不跟原点走：原点近在咫尺也不算保留。
     expect(dropIncludes(node, { x: 0, y: 0 }, { x: 400, y: 0 }, RADII)).toBe(false);
   });

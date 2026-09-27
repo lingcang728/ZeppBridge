@@ -28,6 +28,8 @@ import { useAiTaskPreview } from '../composables/useAiTaskPreview';
 import { useSyncController } from '../composables/useSyncController';
 import type { AiTaskCategory } from '../lib/bridge/types';
 import { buildGraph } from '../lib/aiTask/graph/model';
+import { categoryLabel } from '../lib/aiTask/categories';
+import { metricLabel } from '../lib/aiTask/metrics';
 import { directionText } from '../lib/aiTask/prompt';
 import { autoTaskTitle, recentWindowDays } from '../lib/aiTask/title';
 import { displayableWorkouts, workoutDisplayLabel } from '../lib/workouts';
@@ -49,6 +51,13 @@ const t = useMessages(defineMessages(
     askTemplate: (name: string) => `方向：${name}`,
     extrasNone: '没有附件 · 默认选项',
     extrasFiles: (count: number) => `${count} 个附件`,
+    undoAdded: (name: string) => `已加入「${name}」`,
+    undoRemoved: (name: string) => `已移出「${name}」`,
+    undoKept: (name: string) => `已保留「${name}」`,
+    undoExcluded: (name: string) => `已排除「${name}」`,
+    undoPicked: (name: string) => `已选「${name}」`,
+    undoUnpicked: (name: string) => `已取消「${name}」`,
+    undoDirection: '已换分析方向',
   },
   {
     daysOption: (days: number) => `${days} days`,
@@ -62,6 +71,13 @@ const t = useMessages(defineMessages(
     askTemplate: (name: string) => `Direction: ${name}`,
     extrasNone: 'No attachments · default options',
     extrasFiles: (count: number) => (count === 1 ? '1 attachment' : `${count} attachments`),
+    undoAdded: (name: string) => `Added “${name}”`,
+    undoRemoved: (name: string) => `Removed “${name}”`,
+    undoKept: (name: string) => `Kept “${name}”`,
+    undoExcluded: (name: string) => `Excluded “${name}”`,
+    undoPicked: (name: string) => `Picked “${name}”`,
+    undoUnpicked: (name: string) => `Unpicked “${name}”`,
+    undoDirection: 'Direction changed',
   },
   {
     daysOption: (days: number) => `${days} días`,
@@ -73,6 +89,13 @@ const t = useMessages(defineMessages(
     askEmpty: 'Aún sin pregunta · basta con un enfoque',
     askTemplate: (name: string) => `Enfoque: ${name}`,
     extrasNone: 'Sin adjuntos · opciones por defecto',
+    undoAdded: (name: string) => `Se añadió «${name}»`,
+    undoRemoved: (name: string) => `Se quitó «${name}»`,
+    undoKept: (name: string) => `Se conservó «${name}»`,
+    undoExcluded: (name: string) => `Se excluyó «${name}»`,
+    undoPicked: (name: string) => `Se eligió «${name}»`,
+    undoUnpicked: (name: string) => `Se deseleccionó «${name}»`,
+    undoDirection: 'Enfoque cambiado',
   },
   'views/AiComposer',
 ));
@@ -82,7 +105,7 @@ const draftCtl = useAiTaskDraft();
 const library = useAiTaskLibrary();
 const previewCtl = useAiTaskPreview();
 
-const { draft, canUndo } = draftCtl;
+const { draft, canUndo, lastChange } = draftCtl;
 const { templates, recentWorkouts } = library;
 const { preview, previewError } = previewCtl;
 
@@ -121,6 +144,26 @@ const graphModel = computed(() =>
     centerIcon: center.value.icon,
     daysLabel: t.value.daysOption,
   }));
+
+/* 撤销胶囊里那一句：刚才改了什么。 */
+const undoHint = computed(() => {
+  const change = lastChange.value;
+  if (!change) return null;
+  if (change.kind === 'category' && change.category) {
+    const name = categoryLabel(change.category);
+    return change.included ? t.value.undoAdded(name) : t.value.undoRemoved(name);
+  }
+  if (change.kind === 'metric' && change.metric) {
+    const name = metricLabel(change.metric);
+    return change.included ? t.value.undoKept(name) : t.value.undoExcluded(name);
+  }
+  if (change.kind === 'workout') {
+    const workout = workoutChoices.value.find((item) => item.workout_id === change.workoutId);
+    const name = workout ? workoutDisplayLabel(workout) : '';
+    return change.included ? t.value.undoPicked(name) : t.value.undoUnpicked(name);
+  }
+  return t.value.undoDirection;
+});
 
 const selectedTemplate = computed(() => templates.value.find((template) => template.id === draft.value.template_id) ?? null);
 const direction = computed(() => directionText(selectedTemplate.value));
@@ -185,7 +228,7 @@ watch(
   <section class="page ai-page" aria-labelledby="ai-page-title">
     <div class="stage">
       <div class="stage-graph">
-        <TaskGraph :model="graphModel" :can-undo="canUndo" @undo="draftCtl.undo()"
+        <TaskGraph :model="graphModel" :can-undo="canUndo" :undo-hint="undoHint" :undo-seq="lastChange?.seq ?? 0" @undo="draftCtl.undo()"
           @set-category="draftCtl.setCategoryEnabled"
           @set-metric="(category, metric, included) => draftCtl.setMetricExcluded(category, metric, !included)"
           @set-days="draftCtl.setCategoryDays" @set-include-day="draftCtl.setIncludeWorkoutDay"
@@ -225,7 +268,9 @@ watch(
     var(--mat-card);
   box-shadow: var(--mat-rim), var(--mat-shadow-lift);
 }
-.stage-graph { position: absolute; inset: 0 calc(var(--rail-w) + 24px) 0 0; border-radius: inherit; }
+/* --graph-safe-*：画布四边被浮层挡住的宽度（上：任务名胶囊，下：交付坞和它上面那一排
+   撤销 / 缩放胶囊）。关系网的节点弹层只摆在剩下看得见的那一块里，不会再被盖住半截。 */
+.stage-graph { --graph-safe-top: 70px; --graph-safe-bottom: 142px; position: absolute; inset: 0 calc(var(--rail-w) + 24px) 0 0; border-radius: inherit; }
 .stage-head { position: absolute; top: 16px; left: 16px; z-index: 4; max-width: calc(100% - var(--rail-w) - 60px); }
 .stage-rail {
   position: absolute;
@@ -252,5 +297,6 @@ watch(
   .stage-rail { position: static; width: auto; margin-top: 12px; }
   .stage-dock { position: sticky; right: auto; bottom: 12px; left: auto; margin-top: 12px; }
   .stage-graph :deep(.dock) { bottom: 14px; }
+  .stage-graph { --graph-safe-top: 64px; --graph-safe-bottom: 60px; }
 }
 </style>

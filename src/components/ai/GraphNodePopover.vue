@@ -1,11 +1,16 @@
 <script setup lang="ts">
 /**
- * 点节点弹出的小面板：类别给「加/移出 + 天数 + 展开指标」，指标给
- * 「保留/排除」，中心只读。位置跟着节点走、被父容器夹住——
- * 跟着节点动意味着布局在收敛时它会平滑跟过去。
+ * 点节点弹出的小面板：类别给「交不交给 AI + 回溯天数 + 含运动当天 + 展开指标」，
+ * 指标给「交不交给 AI」，中心只读。
+ *
+ * 位置跟着节点走，但永远落在画布「看得见」的那一块里：上面让出任务名胶囊，
+ * 下面让出交付坞（安全边距由 TaskGraph 从样式变量读来）。量的是面板自己的真实
+ * 高度——以前按固定 240px 估，面板一长就被交付坞盖住半截，下面的选项点不到。
+ * 下面放不下就翻到节点上方；再放不下，面板自己滚动。
  */
-import { computed, onBeforeUnmount, onMounted } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Icon from '../Icon.vue';
+import SegmentTrack from '../SegmentTrack.vue';
 import type { GraphNode } from '../../lib/aiTask/graph/model';
 import { CATEGORY_DAY_CHOICES } from '../../lib/aiTask/categories';
 import { defineMessages, useMessages } from '../../i18n';
@@ -15,6 +20,8 @@ const props = defineProps<{
   /** 节点在视口里的屏幕坐标（每帧更新）。 */
   anchor: { x: number; y: number };
   viewport: { width: number; height: number };
+  /** 画布四边被浮层挡住的宽度。 */
+  safe: { top: number; right: number; bottom: number; left: number };
 }>();
 const emit = defineEmits<{
   (event: 'close'): void;
@@ -52,81 +59,145 @@ const t = useMessages(defineMessages(
   'components/ai/GraphNodePopover',
 ));
 
-const WIDTH = 236;
-const HEIGHT = 240;
-const pos = computed(() => ({
-  left: Math.min(Math.max(props.anchor.x + 14, 8), Math.max(8, props.viewport.width - WIDTH - 8)),
-  top: Math.min(Math.max(props.anchor.y - 20, 8), Math.max(8, props.viewport.height - HEIGHT - 8)),
+const WIDTH = 288;
+const GAP = 16;
+const root = ref<HTMLElement | null>(null);
+const height = ref(0);
+
+const room = computed(() => ({
+  top: props.safe.top + 8,
+  bottom: props.viewport.height - props.safe.bottom - 8,
+  left: props.safe.left + 8,
+  right: props.viewport.width - props.safe.right - 8,
 }));
+/** 面板最高能有多高：看得见的那一块整个高度。再高就在面板里滚。 */
+const maxHeight = computed(() => Math.max(160, room.value.bottom - room.value.top));
+const pos = computed(() => {
+  const h = Math.min(height.value || 260, maxHeight.value);
+  // 横向：优先放在节点右边，右边放不下就放左边。
+  let left = props.anchor.x + GAP;
+  if (left + WIDTH > room.value.right) left = props.anchor.x - GAP - WIDTH;
+  left = Math.min(Math.max(left, room.value.left), Math.max(room.value.left, room.value.right - WIDTH));
+  // 纵向：顶边对着节点略往上；下面放不下就整体往上挪，保证完整露出来。
+  let top = props.anchor.y - 24;
+  if (top + h > room.value.bottom) top = room.value.bottom - h;
+  top = Math.max(top, room.value.top);
+  return { left, top };
+});
+
+let observer: ResizeObserver | null = null;
+const measure = () => { height.value = root.value?.offsetHeight ?? 0; };
+watch(() => props.node.id, () => { void nextTick(measure); });
 
 const onKey = (event: KeyboardEvent) => {
   if (event.key === 'Escape') emit('close');
 };
-onMounted(() => window.addEventListener('keydown', onKey));
-onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
+onMounted(() => {
+  window.addEventListener('keydown', onKey);
+  measure();
+  observer = new ResizeObserver(measure);
+  if (root.value) observer.observe(root.value);
+});
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKey);
+  observer?.disconnect();
+});
+
+const dayItems = computed(() => CATEGORY_DAY_CHOICES.map((days) => ({ value: days, label: t.value.daysOption(days) })));
+const coverageText = computed(() => {
+  const { daysHave, daysTotal } = props.node;
+  if (daysHave === null || daysTotal === null) return null;
+  return daysHave === 0 ? t.value.noData : t.value.coverage(daysHave, daysTotal);
+});
 </script>
 
 <template>
-  <div class="popover ai-card" role="dialog" :aria-label="node.label" :style="{ left: `${pos.left}px`, top: `${pos.top}px` }"
-    @pointerdown.stop>
+  <div ref="root" class="popover glass-control" role="dialog" :aria-label="node.label"
+    :style="{ left: `${pos.left}px`, top: `${pos.top}px`, maxHeight: `${maxHeight}px` }" @pointerdown.stop @wheel.stop>
     <div class="pop-head">
-      <Icon v-if="node.icon" :name="node.icon" :size="15" />
-      <strong>{{ node.label }}</strong>
-      <span v-if="node.daysHave !== null && node.daysTotal !== null" class="coverage"
-        :class="{ warn: node.daysHave === 0 }">
-        {{ node.daysHave === 0 ? t.noData : t.coverage(node.daysHave, node.daysTotal) }}
-      </span>
-      <span class="gap" />
-      <button type="button" class="ai-tool" :aria-label="t.close" @click="emit('close')"><Icon name="x" :size="13" /></button>
+      <span v-if="node.icon" class="pop-icon"><Icon :name="node.icon" :size="16" /></span>
+      <div class="pop-title">
+        <strong>{{ node.label }}</strong>
+        <span v-if="coverageText" :class="['coverage', { warn: node.daysHave === 0 }]">{{ coverageText }}</span>
+        <span v-else-if="node.sublabel" class="coverage">{{ node.sublabel }}</span>
+      </div>
+      <button type="button" class="pop-close" :aria-label="t.close" @click="emit('close')"><Icon name="x" :size="14" /></button>
     </div>
-    <p v-if="node.sublabel" class="pop-sub">{{ node.sublabel }}</p>
 
     <template v-if="node.kind === 'category'">
-      <button type="button" :class="['ai-tool', 'toggle', { on: node.included }]" @click="emit('set-category', !node.included)">
-        <Icon :name="node.included ? 'circle-check' : 'ring'" :size="14" />
-        {{ node.included ? t.exclude : t.include }}
-      </button>
-      <span v-if="node.badge" class="pop-sub">{{ t.attachments(node.badge) }}</span>
-      <p v-if="node.category === 'personal_note'" class="pop-sub">{{ t.noteHint }}</p>
+      <div class="pop-row">
+        <span>{{ t.include }}</span>
+        <button type="button" class="mat-switch" role="switch" :aria-checked="node.included" :aria-label="t.include"
+          @click="emit('set-category', !node.included)"></button>
+      </div>
+      <p v-if="node.badge" class="pop-note">{{ t.attachments(node.badge) }}</p>
+      <p v-if="node.category === 'personal_note'" class="pop-note">{{ t.noteHint }}</p>
       <template v-if="node.expandable && node.included">
-        <p class="pop-label">{{ t.days }}</p>
-        <div class="seg" role="radiogroup" :aria-label="t.days">
-          <button v-for="days in CATEGORY_DAY_CHOICES" :key="days" type="button" role="radio"
-            :aria-checked="node.daysBefore === days" :class="['seg-item', { 'is-on': node.daysBefore === days }]"
-            @click="emit('set-days', days)">{{ t.daysOption(days) }}</button>
+        <div class="pop-block">
+          <span class="pop-label">{{ t.days }}</span>
+          <SegmentTrack compact fill :items="dayItems" :model-value="node.daysBefore ?? 0" :aria-label="t.days"
+            @update:model-value="(days) => emit('set-days', Number(days))" />
         </div>
-        <label class="pop-check">
-          <input type="checkbox" :checked="node.includeDay ?? false"
-            @change="emit('set-include-day', ($event.target as HTMLInputElement).checked)" />
+        <div class="pop-row">
           <span>{{ t.includeDay }}</span>
-        </label>
-        <button type="button" class="ai-tool" @click="emit('toggle-expand')">
-          <Icon :name="node.expanded ? 'chevron-down' : 'grid'" :size="13" />{{ node.expanded ? t.collapse : t.expand }}
+          <button type="button" class="mat-switch" role="switch" :aria-checked="node.includeDay ?? false" :aria-label="t.includeDay"
+            @click="emit('set-include-day', !(node.includeDay ?? false))"></button>
+        </div>
+        <button type="button" class="pop-action" @click="emit('toggle-expand')">
+          <Icon :name="node.expanded ? 'chevron-down' : 'grid'" :size="14" />{{ node.expanded ? t.collapse : t.expand }}
         </button>
       </template>
     </template>
 
-    <button v-else-if="node.kind === 'metric'" type="button" :class="['ai-tool', 'toggle', { on: node.included }]"
-      @click="emit('set-metric', !node.included)">
-      <Icon :name="node.included ? 'circle-check' : 'ring'" :size="14" />
-      {{ node.included ? t.drop : t.keep }}
-    </button>
+    <div v-else-if="node.kind === 'metric'" class="pop-row">
+      <span>{{ t.include }}</span>
+      <button type="button" class="mat-switch" role="switch" :aria-checked="node.included" :aria-label="node.included ? t.drop : t.keep"
+        @click="emit('set-metric', !node.included)"></button>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.popover { position: absolute; z-index: 5; width: 236px; padding: 12px; }
-.pop-head { display: flex; align-items: center; gap: 7px; color: var(--ink); }
-.coverage { font-size: var(--fs-xs); color: var(--subtle); }
+.popover {
+  position: absolute;
+  z-index: 6;
+  display: grid;
+  width: 288px;
+  gap: 12px;
+  overflow-y: auto;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  overscroll-behavior: contain;
+  animation: pop-in .26s var(--ease-out);
+}
+@keyframes pop-in { from { opacity: 0; scale: .96; filter: blur(4px); } }
+.pop-head { display: flex; align-items: flex-start; gap: 10px; color: var(--ink); }
+.pop-icon { display: grid; width: 30px; height: 30px; flex: 0 0 30px; place-items: center; border-radius: 50%; background: var(--cap-thumb); box-shadow: var(--cap-thumb-rim); color: var(--accent); }
+.pop-title { display: grid; flex: 1; min-width: 0; gap: 2px; }
+.pop-title strong { font-size: var(--fs-md); font-weight: 650; line-height: 1.3; overflow-wrap: anywhere; }
+.coverage { color: var(--subtle); font-size: var(--fs-xs); }
 .coverage.warn { color: var(--warning); }
-.gap { flex: 1; }
-.pop-sub { margin: 6px 0 0; color: var(--subtle); font-size: var(--fs-xs); }
-.pop-label { margin: 10px 0 4px; color: var(--muted); font-size: var(--fs-xs); font-weight: 600; }
-.toggle { width: 100%; justify-content: center; margin-top: 10px; }
-.toggle.on { border-color: var(--accent); color: var(--accent); }
-.seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
-.seg-item { padding: 4px 0; border: 1px solid var(--line-control); border-radius: 7px; background: var(--mat-raised); color: var(--muted); font-size: var(--fs-xs); cursor: pointer; box-shadow: var(--mat-raised-rim); }
-.seg-item.is-on { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
-.pop-check { display: flex; align-items: center; gap: 7px; margin: 8px 0; color: var(--ink); font-size: var(--fs-xs); cursor: pointer; }
-.pop-check input { accent-color: var(--accent); }
+.pop-close { display: grid; width: 30px; height: 30px; flex: 0 0 30px; place-items: center; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; }
+.pop-close:hover { background: var(--glass-press); color: var(--ink); }
+.pop-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--ink); font-size: var(--fs-sm); }
+.pop-block { display: grid; gap: 8px; }
+.pop-label { color: var(--muted); font-size: var(--fs-xs); font-weight: 600; }
+.pop-note { margin: 0; color: var(--subtle); font-size: var(--fs-xs); }
+.pop-action {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--cap-thumb);
+  box-shadow: var(--cap-thumb-rim);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  transition: scale var(--dur-fast) var(--ease-out);
+}
+.pop-action:active { scale: .97; }
+@media (prefers-reduced-motion: reduce) { .popover { animation: none; } }
 </style>

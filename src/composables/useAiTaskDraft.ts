@@ -35,6 +35,17 @@ const copy = () => messagesOf(messages);
 
 type Selection = Pick<AiTask, 'categories' | 'workout_ids' | 'template_id' | 'detail_level'>;
 
+/** 最近一次进撤销栈的改动：撤销胶囊用它说「已移出『睡眠』」。 */
+export interface DraftChange {
+  seq: number;
+  kind: 'category' | 'metric' | 'workout' | 'template';
+  category?: AiTaskCategory;
+  metric?: string;
+  workoutId?: string;
+  /** 改完以后它是不是在交付范围里（加入 / 保留 / 选中为 true）。 */
+  included: boolean;
+}
+
 const library = useAiTaskLibrary();
 const draft = ref<AiTask>(newTaskDraft());
 /** 上次保存/加载时的快照；脏标记 = 现在 ≠ 基线。 */
@@ -42,6 +53,12 @@ const baseline = ref(taskSnapshot(draft.value));
 const undoStack = createUndoStack<Selection>();
 /* undoStack 是普通数组不是响应式；undoDepth 是它的响应式影子。 */
 const undoDepth = ref(0);
+const lastChange = ref<DraftChange | null>(null);
+let changeSeq = 0;
+const noteChange = (change: Omit<DraftChange, 'seq'>) => {
+  changeSeq += 1;
+  lastChange.value = { ...change, seq: changeSeq };
+};
 const busy = ref<false | 'load' | 'save' | 'delete'>(false);
 const lastError = ref<string | null>(null);
 const savedNotice = ref(false);
@@ -62,6 +79,7 @@ const rememberSelection = () => {
 const clearUndo = () => {
   undoStack.clear();
   undoDepth.value = 0;
+  lastChange.value = null;
 };
 
 const markBaseline = () => {
@@ -149,12 +167,14 @@ const setTemplate = (template: AiTaskTemplate | null) => {
   if ((template?.id ?? null) === draft.value.template_id) return;
   rememberSelection();
   draft.value = template ? applyTemplateToDraft(draft.value, template) : { ...draft.value, template_id: null };
+  noteChange({ kind: 'template', included: template !== null });
 };
 
 const setCategoryEnabled = (category: AiTaskCategory, enabled: boolean) => {
   if (categoryRangeOf(draft.value.categories, category).enabled === enabled) return;
   rememberSelection();
   patchRange(category, { enabled });
+  noteChange({ kind: 'category', category, included: enabled });
 };
 
 const setMetricExcluded = (category: AiTaskCategory, metric: string, excluded: boolean) => {
@@ -164,6 +184,7 @@ const setMetricExcluded = (category: AiTaskCategory, metric: string, excluded: b
   patchRange(category, {
     excluded_metrics: excluded ? [...current, metric] : current.filter((name) => name !== metric),
   });
+  noteChange({ kind: 'metric', category, metric, included: !excluded });
 };
 
 const setWorkoutSelected = (workoutId: string, selected: boolean) => {
@@ -171,11 +192,13 @@ const setWorkoutSelected = (workoutId: string, selected: boolean) => {
   if (ids.includes(workoutId) === selected) return;
   rememberSelection();
   patchDraft({ workout_ids: selected ? [...ids, workoutId] : ids.filter((id) => id !== workoutId) });
+  noteChange({ kind: 'workout', workoutId, included: selected });
 };
 
 const undo = () => {
   const previous = undoStack.pop();
   undoDepth.value = undoStack.size;
+  lastChange.value = null;
   if (previous) patchDraft(previous);
 };
 
@@ -207,6 +230,7 @@ export function useAiTaskDraft() {
     draft,
     dirty,
     canUndo,
+    lastChange,
     busy,
     lastError,
     savedNotice,

@@ -24,8 +24,6 @@ export default {
         plural(count, { one: `${count} sélectionnée`, other: `${count} sélectionnées` }),
       remove: 'Désélectionner',
       avgHr: (bpm: number) => `FC moy. ${bpm}`,
-      previous: 'Précédent',
-      next: 'Suivant',
     },
 
     'views/Settings': {

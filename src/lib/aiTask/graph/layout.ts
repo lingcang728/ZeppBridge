@@ -6,7 +6,8 @@
  * 几何（世界坐标，中心在原点，单位 = 视图像素 @ 缩放 1）：
  *   - 交给 AI 的类别在内圈 `inner`，不交的在外圈 `outer`；
  *   - 两圈之间的 `boundary` 就是界面上那个「交给 AI」的圈；
- *   - 展开的指标从父类别向外扇形排开，被排除的指标离父节点更远、落到圈外。
+ *   - 展开的指标从父类别向外排成几层同心弧（见 `metricSlot`），被排除的指标
+ *     往外推出自己那一层。
  */
 import type { GraphModel, GraphNode } from './model';
 
@@ -25,9 +26,15 @@ const DAMPING = 0.8;
 const MAX_SPEED = 14;
 const SETTLE_ENERGY = 0.05;
 const SETTLE_FRAMES = 20;
-const EXCLUDED_METRIC_STRETCH = 1.75;
-/** 同一层相邻指标之间至少留这么宽（标签不叠）。 */
-const METRIC_SPACING = 40;
+/** 同一圈上相邻两个指标之间的弧长：一个标签的宽度。 */
+export const METRIC_SLOT = 108;
+/** 相邻两圈之间的距离：小圆点 + 下面一行标签 + 一点空。 */
+export const METRIC_RING_GAP = 66;
+/** 指标弧最多张开这么大，朝中心留出缺口（那边是连回中心的线和中心节点）。 */
+const METRIC_SPREAD = Math.PI * 1.55;
+/** 被排除的指标往外推出自己那一圈这么远；拖回这一圈以内就算保留（见 hit.ts）。 */
+export const METRIC_EXCLUDE_PUSH = 56;
+export const METRIC_KEEP_MARGIN = 34;
 /** 一次变化最多模拟这么多帧就强制停下——宁可停在「差不多」也不空转耗电。 */
 const MAX_FRAMES_PER_CHANGE = 300;
 
@@ -55,6 +62,32 @@ export interface LayoutState {
 
 const categoryAngle = (node: GraphNode) => -Math.PI / 2 + (2 * Math.PI * node.index) / Math.max(1, node.siblings);
 
+/**
+ * 第 `index` 个指标（共 `count` 个）排在哪一圈、这一圈上偏离父类别朝向多少弧度。
+ *
+ * 指标一多（「恢复状态」有二十多个），以前是在一段扇形里左右交错两层，标签叠成
+ * 一团、点也点不准。现在排成几层同心弧：每一圈能放几个由这一圈的弧长除以一个标签
+ * 的宽度决定，内圈放满了再放外圈；每一圈只张开到刚好放下它那几个的角度，居中对着
+ * 父类别朝外的方向。
+ */
+export const metricSlot = (index: number, count: number, radii: GraphRadii): { ring: number; radius: number; offset: number } => {
+  let radius = Math.max(radii.metricLength, 90);
+  let remaining = index;
+  let left = Math.max(1, count);
+  for (let ring = 0; ; ring += 1) {
+    const capacity = Math.max(1, Math.floor((METRIC_SPREAD * radius) / METRIC_SLOT) + 1);
+    const here = Math.min(capacity, left);
+    if (remaining < here) {
+      const spread = here > 1 ? Math.min(METRIC_SPREAD, ((here - 1) * METRIC_SLOT) / radius) : 0;
+      const offset = here > 1 ? -spread / 2 + (remaining * spread) / (here - 1) : 0;
+      return { ring, radius, offset };
+    }
+    remaining -= here;
+    left -= here;
+    radius += METRIC_RING_GAP;
+  }
+};
+
 /** 一个节点此刻的目标位置。指标跟着父节点的**当前**位置走——拖父节点时孩子一起动。 */
 export const targetOf = (node: GraphNode, parent: LayoutNode | undefined, radii: GraphRadii, parentNode?: GraphNode) => {
   if (node.kind === 'center') return { x: 0, y: 0 };
@@ -64,19 +97,9 @@ export const targetOf = (node: GraphNode, parent: LayoutNode | undefined, radii:
     return { x: r * Math.cos(angle), y: r * Math.sin(angle) };
   }
   const base = parentNode ? categoryAngle(parentNode) : 0;
-  const count = node.siblings;
-  const spread = Math.min(Math.PI * 0.95, count * 0.4);
-  const step = count > 1 ? spread / (count - 1) : 0;
-  const angle = base + (node.index - (count - 1) / 2) * step;
-  // 指标多时交错成两层；半径保证同层相邻指标的弧长不小于 METRIC_SPACING，
-  // 目标位置本身不重叠，碰撞才不会和弹簧打架。
-  const twoLayers = count > 8;
-  const sameLayerStep = twoLayers ? step * 2 : step;
-  const baseLength = sameLayerStep > 0
-    ? Math.min(radii.outer * 0.55, Math.max(radii.metricLength, METRIC_SPACING / sameLayerStep))
-    : radii.metricLength;
-  const layer = twoLayers && node.index % 2 === 1 ? 1.35 : 1;
-  const length = baseLength * layer * (node.included ? 1 : EXCLUDED_METRIC_STRETCH);
+  const slot = metricSlot(node.index, node.siblings, radii);
+  const angle = base + slot.offset;
+  const length = slot.radius + (node.included ? 0 : METRIC_EXCLUDE_PUSH);
   const origin = parent ?? { x: 0, y: 0 };
   return { x: origin.x + length * Math.cos(angle), y: origin.y + length * Math.sin(angle) };
 };
@@ -226,5 +249,7 @@ export const focusFrame = (
   const minY = Math.min(...ys) - pad;
   const maxY = Math.max(...ys) + pad * 0.8;
   const zoom = Math.min(size.width / (maxX - minX), size.height / (maxY - minY));
-  return { x: (minX + maxX) / 2, y: (minY + maxY) / 2, zoom: Math.min(1.6, Math.max(1.15, zoom)) };
+  // 至少放大到 1.15 倍，「俯冲进去」才有进去的感觉；指标多到一屏放不下时宁可少放大一点，
+  // 也要把整组装进画面——以前硬放大到 1.15，外圈的指标和标签被切在画布外面。
+  return { x: (minX + maxX) / 2, y: (minY + maxY) / 2, zoom: Math.min(1.6, Math.max(Math.min(1.15, zoom), 0.7)) };
 };
