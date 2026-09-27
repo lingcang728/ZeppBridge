@@ -119,6 +119,7 @@ describe('HandoffPanel', () => {
     expect(html).toContain('预览服务挂了');
   });
 
+  // 交付坞：三步状态区在按下主按钮之前是收着的（v-show），DOM 里一直在。
   it('preview 有覆盖行时渲染折叠明细；三步状态区一直在', async () => {
     const html = await render({ preview: previewWithCoverage, previewError: null, direction: null, fallbackTitle: '任务' });
     expect(html).toContain('<details');

@@ -60,34 +60,41 @@ const save = () => void saveDraft(props.fallbackTitle).catch(() => undefined);
 
 <template>
   <header class="head">
-    <div class="head-main">
-      <h1 id="ai-page-title" class="page-title">{{ t.pageTitle }}</h1>
-      <p class="intro">{{ t.intro }}</p>
+    <div class="sr-only">
+      <h1 id="ai-page-title">{{ t.pageTitle }}</h1>
+      <p>{{ t.intro }}</p>
     </div>
-    <div class="head-task">
+    <div class="head-task glass-control">
+      <Icon name="edit" :size="14" class="title-glyph" />
       <input class="ai-input title-input" type="text" :value="draft.title" :placeholder="fallbackTitle"
         :aria-label="t.titleLabel" maxlength="120" @input="setTitle(($event.target as HTMLInputElement).value)" />
       <SelectMenu v-if="taskOptions.length" class="task-menu" :model-value="draft.id" :options="taskOptions"
         :placeholder="t.savedTasks" :aria-label="t.savedTasks" :menu-min-width="260" @update:model-value="openTask" />
-      <button type="button" class="ai-tool" @click="resetDraft()"><Icon name="plus" :size="13" />{{ t.newTask }}</button>
-      <button type="button" class="ai-tool" :disabled="!desktop || busy === 'save'" @click="save">
-        <Icon name="check" :size="13" />{{ t.save }}
+      <span class="divider" aria-hidden="true"></span>
+      <button type="button" class="head-btn" :title="t.newTask" :aria-label="t.newTask" @click="resetDraft()"><Icon name="plus" :size="15" /></button>
+      <button type="button" :class="['head-btn', 'save', { dirty: dirty && draft.id }]" :disabled="!desktop || busy === 'save'"
+        :title="dirty && draft.id ? t.unsaved : t.save" :aria-label="t.save" @click="save">
+        <Icon :name="savedNotice ? 'circle-check' : 'check'" :size="15" />
       </button>
     </div>
     <p v-if="savedNotice" class="ai-note ok status" role="status"><Icon name="circle-check" :size="13" />{{ t.saved }}</p>
-    <p v-else-if="dirty && draft.id" class="ai-note status">{{ t.unsaved }}</p>
     <p v-if="lastError || libraryError" class="ai-note bad status" role="alert"><Icon name="warning" :size="13" />{{ lastError || libraryError }}</p>
   </header>
 </template>
 
 <style scoped>
-.head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px 20px; margin-bottom: 16px; }
-.head-main { min-width: 0; }
-.page-title { margin: 0 0 4px; font-size: var(--fs-3xl); }
-.intro { margin: 0; color: var(--muted); }
-.head-task { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.title-input { width: 260px; padding-block: 6px; font-size: var(--fs-sm); }
-.task-menu { width: 200px; }
-.task-menu :deep(.select-trigger) { min-height: 32px; font-size: var(--fs-sm); }
-.status { flex-basis: 100%; justify-content: flex-end; margin: 0; }
+/* 浮在关系网左上角的一枚玻璃胶囊：任务名直接在胶囊里改，旁边是已保存任务、新建、保存。 */
+.head { display: grid; justify-items: start; gap: 6px; }
+.head-task { display: flex; max-width: 100%; align-items: center; gap: 4px; padding: 4px 4px 4px 14px; border-radius: 999px; }
+.title-glyph { flex: 0 0 auto; color: var(--subtle); }
+.title-input { width: 240px; min-width: 0; padding: 6px 8px; border: 0; background: transparent; box-shadow: none; font-size: var(--fs-md); font-weight: 650; }
+.title-input:focus { box-shadow: none; }
+.task-menu { width: 170px; }
+.task-menu :deep(.select-trigger) { min-height: 34px; border: 0; background: transparent; box-shadow: none; font-size: var(--fs-sm); }
+.divider { width: 1px; height: 20px; margin: 0 4px; background: color-mix(in srgb, var(--ink) 14%, transparent); }
+.head-btn { display: grid; width: 36px; height: 36px; flex: 0 0 36px; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--ink); cursor: pointer; }
+.head-btn:hover:not(:disabled) { background: var(--glass-press); }
+.head-btn:disabled { opacity: .45; cursor: not-allowed; }
+.head-btn.save.dirty { background: var(--accent); color: var(--accent-ink); }
+.status { margin: 0; padding: 3px 12px; border-radius: 999px; background: var(--mat-glass); }
 </style>

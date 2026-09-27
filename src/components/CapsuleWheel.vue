@@ -13,7 +13,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Icon, { type IconName } from './Icon.vue';
 
-export type WheelItem<T extends string | number> = { value: T; label: string; icon?: IconName };
+export type WheelItem<T extends string | number> = { value: T; label: string; icon?: IconName; image?: string };
 
 const props = withDefaults(defineProps<{
   items: WheelItem<T>[];
@@ -313,7 +313,8 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
         :style="itemStyle(index)"
         :title="iconOnly ? item.label : undefined"
       >
-        <Icon v-if="item.icon" :name="item.icon" :size="iconOnly ? 16 : 14" />
+        <img v-if="item.image" :src="item.image" alt="" class="wheel-image" draggable="false" />
+        <Icon v-else-if="item.icon" :name="item.icon" :size="iconOnly ? 16 : 14" />
         <span v-if="!iconOnly">{{ item.label }}</span>
       </span>
     </div>
@@ -384,6 +385,7 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
   transition: color var(--dur-fast) ease;
 }
 .is-icon-only .wheel-item { padding: 0 7px; }
+.wheel-image { width: 18px; height: 18px; flex: 0 0 18px; border-radius: 5px; pointer-events: none; }
 .wheel-item.on { color: var(--accent); font-weight: 600; }
 
 @media (prefers-reduced-transparency: reduce) {
