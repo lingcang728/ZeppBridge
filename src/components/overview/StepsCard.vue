@@ -6,7 +6,7 @@ import CircularProgress from '../CircularProgress.vue';
 import GlyphTile from '../GlyphTile.vue';
 import { resolvedTheme } from '../../composables/useTheme';
 import { chartPalettes } from '../../lib/echartsTheme';
-import { formatMetric, isFiniteNumber } from '../../lib/format';
+import { formatMetric, formatWhen, isFiniteNumber } from '../../lib/format';
 import { defineMessages, useMessages } from '../../i18n';
 
 defineOptions({ name: 'OverviewStepsCard' });
@@ -20,6 +20,8 @@ const messages = defineMessages(
     stepsUnit: '步',
     stepsGoalLine: (goal: string, percent: number) => `目标 ${goal} · ${percent}%`,
     seeMore: '看更多',
+    stepsNotYet: '今天的步数还没到云端',
+    stepsLatest: (when: string) => `云端最新数据停在${when}`,
   },
   {
     stepsPanelAria: 'Open daily activity detail',
@@ -29,6 +31,8 @@ const messages = defineMessages(
     stepsUnit: 'steps',
     stepsGoalLine: (goal: string, percent: number) => `Goal ${goal} · ${percent}%`,
     seeMore: 'See more',
+    stepsNotYet: "Today's steps haven't reached the cloud yet",
+    stepsLatest: (when: string) => `The newest data in the cloud is from ${when}`,
   },
   {
     stepsPanelAria: 'Abrir el detalle de actividad diaria',
@@ -38,6 +42,8 @@ const messages = defineMessages(
     stepsUnit: 'pasos',
     stepsGoalLine: (goal: string, percent: number) => `Meta ${goal} · ${percent}%`,
     seeMore: 'Ver más',
+    stepsNotYet: 'Los pasos de hoy aún no han llegado a la nube',
+    stepsLatest: (when: string) => `Los datos más recientes en la nube son de ${when}`,
   },
   // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
   'components/overview/StepsCard',
@@ -47,7 +53,10 @@ const t = useMessages(messages);
 const props = defineProps<{
   steps: number | null;
   goal: number | null;
+  /** 库里最新一条样本的时间：今天还没有步数时，告诉用户云端的数据停在哪儿。 */
+  latestAt?: string | null;
 }>();
+const latestWhen = computed(() => formatWhen(props.latestAt));
 
 const DEFAULT_STEP_GOAL = 10000;
 const stepGoal = computed(() =>
@@ -79,7 +88,8 @@ const ringTrack = computed(() => resolvedTrack(ringColor.value));
           <strong>{{ num(steps) }}</strong>
         </div>
       </CircularProgress>
-      <p class="steps-goal">{{ t.stepsGoalLine(formatMetric(stepGoal), stepsPercent) }}</p>
+      <p v-if="steps !== null" class="steps-goal">{{ t.stepsGoalLine(formatMetric(stepGoal), stepsPercent) }}</p>
+      <p v-else class="steps-goal steps-missing">{{ t.stepsNotYet }}<small v-if="latestWhen">{{ t.stepsLatest(latestWhen) }}</small></p>
     </div>
     <span class="panel-more">{{ t.seeMore }} <GlyphTile name="chevron-right" :size="18" /></span>
   </RouterLink>
@@ -91,6 +101,8 @@ const ringTrack = computed(() => resolvedTrack(ringColor.value));
 .steps-inring { display: grid; place-items: center; text-align: center; }
 .steps-inring strong { color: var(--ink); font-family: 'Inter', var(--font-sans); font-size: 30px; font-weight: 600; letter-spacing: 0; font-variant-numeric: tabular-nums; line-height: 1; text-align: center; }
 .steps-goal { margin: 0; color: var(--muted); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.steps-missing { display: grid; gap: 3px; text-align: center; }
+.steps-missing small { color: var(--subtle); font-size: var(--fs-xs); }
 @media (max-width: 1180px) { .steps-panel.metric-panel { display: flex; flex-direction: column; grid-column: span 4; } }
 @media (max-width: 820px) { .steps-panel.metric-panel { display: flex; flex-direction: column; grid-column: 1; } }
 .steps-panel .panel-more { margin-top: auto; padding-top: 10px; }

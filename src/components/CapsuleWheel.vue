@@ -1,8 +1,10 @@
 <script setup lang="ts" generic="T extends string | number">
-/* 胶囊传送带（Apple 相机模式滚轮的网页版）。
+/* 胶囊传送带（Apple 相机模式滚轮的网页版），给长列表用：语言、日期格式、AI 服务商。
+ * 两到五项的用 SegmentTrack——同一套凹槽和凸起胶囊，只是不转。
  *
  * 选项排在一条看不见的圆柱面上：选中的那一项永远停在胶囊正中，两边的选项
  * 像传送带转过扶梯拐角一样侧转、缩小、变淡，到胶囊边缘被渐隐吃掉——没有硬边。
+ * `loop` 时首尾相接：停在第一项，左边露出的是最后几项，不会空出半截胶囊。
  *
  * 手势：按住左右拖（竖向时上下拖），松手按速度吸附到最近一项；滚轮一格一项；
  * 点两侧的选项直接转过去；←/→（↑/↓）、Home/End 同样可用。
@@ -22,14 +24,23 @@ const props = withDefaults(defineProps<{
   orientation?: 'horizontal' | 'vertical';
   /** 胶囊可视宽度（横向）或高度（竖向），px。 */
   span?: number;
-  /** 只显示图标（主题切换那种），标签进 aria。 */
+  /** 只显示图标，标签进 aria。 */
   iconOnly?: boolean;
   disabled?: boolean;
+  /** 首尾相接。 */
+  loop?: boolean;
+  /** 固定画在正中镜片左侧的图标（顶栏语言的地球）：图标和当前项贴在一起，读起来是一枚胶囊。 */
+  lensIcon?: IconName;
+  /** `inset` 表单里的凹槽底；`bare` 放进已经是玻璃的按钮组里（没有自己的底）。 */
+  variant?: 'inset' | 'bare';
 }>(), {
   orientation: 'horizontal',
   span: 148,
   iconOnly: false,
   disabled: false,
+  loop: false,
+  lensIcon: undefined,
+  variant: 'inset',
 });
 
 const emit = defineEmits<{ 'update:modelValue': [value: T] }>();
@@ -38,6 +49,9 @@ const root = ref<HTMLElement | null>(null);
 const itemEls = ref<HTMLElement[]>([]);
 const sizes = ref<number[]>([]);
 const vertical = computed(() => props.orientation === 'vertical');
+const count = () => props.items.length;
+const looping = () => props.loop && count() > 2;
+const mod = (value: number, n: number) => ((value % n) + n) % n;
 
 const indexOf = (value: T) => Math.max(0, props.items.findIndex((item) => item.value === value));
 const pos = ref(indexOf(props.modelValue));
@@ -67,10 +81,21 @@ const centers = computed(() => {
   });
   return out;
 });
+/** 首尾相接时一整圈的弧长。 */
+const circumference = computed(() => sizes.value.reduce((sum, size) => sum + size + GAP, 0));
+
 const arcAt = (p: number): number => {
   const list = centers.value;
   if (!list.length) return 0;
   const last = list.length - 1;
+  if (looping()) {
+    const n = list.length;
+    const turns = Math.floor(p / n);
+    const r = p - turns * n;
+    const lo = Math.floor(r);
+    const next = lo + 1 < n ? list[lo + 1]! : list[0]! + circumference.value;
+    return turns * circumference.value + list[lo]! + (r - lo) * (next - list[lo]!);
+  }
   if (p <= 0) return list[0]! + p * ((list[1] ?? list[0]! + 60) - list[0]!);
   if (p >= last) return list[last]! + (p - last) * (list[last]! - (list[last - 1] ?? list[last]! - 60));
   const lo = Math.floor(p);
@@ -81,6 +106,16 @@ const posAt = (arc: number): number => {
   const list = centers.value;
   if (list.length < 2) return 0;
   const last = list.length - 1;
+  if (looping()) {
+    const n = list.length;
+    const c = circumference.value;
+    const turns = Math.floor((arc - list[0]!) / c);
+    const a = arc - turns * c;
+    let lo = 0;
+    while (lo < last && list[lo + 1]! <= a) lo += 1;
+    const next = lo + 1 < n ? list[lo + 1]! : list[0]! + c;
+    return turns * n + lo + (a - list[lo]!) / (next - list[lo]!);
+  }
   if (arc <= list[0]!) return (arc - list[0]!) / (list[1]! - list[0]!);
   if (arc >= list[last]!) return last + (arc - list[last]!) / (list[last]! - list[last - 1]!);
   let lo = 0;
@@ -90,17 +125,19 @@ const posAt = (arc: number): number => {
 /** 圆柱半径：比胶囊可视宽度的一半略大，边缘那一项转过拐角但仍认得出来。 */
 const radius = computed(() => props.span * 0.62);
 
-const clampPos = (value: number) => Math.min(props.items.length - 1, Math.max(0, value));
-/** 拖过两端时的橡皮筋：越界部分只走三分之一。 */
+const clampPos = (value: number) => (looping() ? value : Math.min(count() - 1, Math.max(0, value)));
+/** 拖过两端时的橡皮筋：越界部分只走三分之一。首尾相接时没有两端。 */
 const rubber = (value: number) => {
-  const last = props.items.length - 1;
+  if (looping()) return value;
+  const last = count() - 1;
   if (value < 0) return value / 3;
   if (value > last) return last + (value - last) / 3;
   return value;
 };
 
 const itemStyle = (index: number) => {
-  const offset = (centers.value[index] ?? 0) - arcAt(pos.value);
+  let offset = (centers.value[index] ?? 0) - arcAt(pos.value);
+  if (looping() && circumference.value > 0) offset -= circumference.value * Math.round(offset / circumference.value);
   const rad = Math.max(-1.75, Math.min(1.75, offset / radius.value));
   const angle = rad * 180 / Math.PI;
   const shift = radius.value * Math.sin(rad);
@@ -120,16 +157,21 @@ const itemStyle = (index: number) => {
 /** 中间那块镜片的尺寸在相邻两项之间插值，拖动时跟着内容伸缩。 */
 const lensSize = computed(() => {
   if (!sizes.value.length) return 0;
-  const p = clampPos(pos.value);
+  const n = sizes.value.length;
+  const p = looping() ? mod(pos.value, n) : clampPos(pos.value);
   const lo = Math.floor(p);
-  const hi = Math.min(sizes.value.length - 1, lo + 1);
+  const hi = looping() ? (lo + 1) % n : Math.min(n - 1, lo + 1);
   const f = p - lo;
   return (sizes.value[lo] ?? 0) * (1 - f) + (sizes.value[hi] ?? 0) * f;
 });
+const lensStyle = computed(() => {
+  if (vertical.value) return { height: `${lensSize.value + 14}px` };
+  return { width: `${lensSize.value + (props.iconOnly ? 14 : 22)}px` };
+});
 
+const settleIndex = () => (looping() ? mod(Math.round(target), count()) : Math.round(clampPos(target)));
 const settle = () => {
-  const index = Math.round(clampPos(target));
-  const item = props.items[index];
+  const item = props.items[settleIndex()];
   if (item && item.value !== props.modelValue) emit('update:modelValue', item.value);
 };
 
@@ -161,13 +203,20 @@ const animateTo = (index: number) => {
   }
   if (!raf) raf = requestAnimationFrame(tick);
 };
+/** 转到第 index 项；首尾相接时走最近的那条路。 */
+const turnTo = (index: number) => {
+  if (!looping()) { animateTo(index); return; }
+  const n = count();
+  animateTo(index + n * Math.round((pos.value - index) / n));
+};
 
 /* —— 拖动 —— */
 let gesture: { id: number; hit: number; start: number; startArc: number; last: number; time: number; v: number; moved: boolean } | null = null;
 const coord = (event: PointerEvent) => (vertical.value ? event.clientY : event.clientX);
 /** 当前位置附近一格有多宽（弧长），甩动速度换算成格数时用。 */
 const pxPerItem = () => {
-  const p = Math.round(Math.min(props.items.length - 1, Math.max(0, pos.value)));
+  const n = count();
+  const p = looping() ? mod(Math.round(pos.value), n) : Math.round(Math.min(n - 1, Math.max(0, pos.value)));
   const list = centers.value;
   const next = list[p + 1] ?? list[p - 1];
   return next === undefined || list[p] === undefined ? 60 : Math.abs(next - list[p]!);
@@ -210,9 +259,11 @@ const onUp = (event: PointerEvent) => {
   dragging.value = false;
   if (root.value?.hasPointerCapture(event.pointerId)) root.value.releasePointerCapture(event.pointerId);
   if (!g.moved) {
-    // 点击：点到哪一项就转到哪一项。
-    const index = g.hit >= 0 ? g.hit : Math.round(pos.value);
-    animateTo(index === Math.round(pos.value) && props.items.length === 2 ? 1 - index : index);
+    // 点击：点到哪一项就转到哪一项；两项时点哪儿都是换到另一项。
+    const current = looping() ? mod(Math.round(pos.value), count()) : Math.round(pos.value);
+    if (g.hit >= 0 && g.hit !== current) turnTo(g.hit);
+    else if (count() === 2) turnTo(1 - current);
+    else animateTo(pos.value);
     return;
   }
   const flick = event.timeStamp - g.time < 90 ? g.v : 0;
@@ -239,21 +290,21 @@ const onWheel = (event: WheelEvent) => {
 const onKeydown = (event: KeyboardEvent) => {
   if (props.disabled) return;
   const current = Math.round(target);
-  const last = props.items.length - 1;
-  const next = {
-    ArrowRight: current + 1, ArrowDown: current + 1,
-    ArrowLeft: current - 1, ArrowUp: current - 1,
-    Home: 0, End: last,
-  }[event.key];
-  if (next === undefined) return;
-  event.preventDefault();
-  animateTo(next);
+  const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+  if (step !== undefined) {
+    event.preventDefault();
+    animateTo(current + step);
+  } else if (event.key === 'Home' || event.key === 'End') {
+    event.preventDefault();
+    turnTo(event.key === 'Home' ? 0 : count() - 1);
+  }
 };
 
 watch(() => props.modelValue, (value) => {
   if (gesture) return;
   const index = indexOf(value);
-  if (index !== Math.round(target) || Math.abs(pos.value - index) > 0.001) animateTo(index);
+  const current = looping() ? mod(Math.round(target), count()) : Math.round(target);
+  if (index !== current || Math.abs(pos.value - target) > 0.001) turnTo(index);
 });
 watch(() => props.items.map((item) => item.label).join('\u0000'), async () => {
   await nextTick();
@@ -274,14 +325,16 @@ onBeforeUnmount(() => {
   root.value?.removeEventListener('wheel', onWheel);
 });
 
-const activeIndex = computed(() => Math.round(clampPos(pos.value)));
+const activeIndex = computed(() => (looping() ? mod(Math.round(pos.value), count()) : Math.round(clampPos(pos.value))));
 const current = computed(() => props.items[indexOf(props.modelValue)]);
 </script>
 
 <template>
   <div
     ref="root"
-    :class="['capsule-wheel', `is-${orientation}`, { 'is-dragging': dragging, 'is-icon-only': iconOnly, 'is-disabled': disabled }]"
+    :class="['capsule-wheel', `is-${orientation}`, `is-${variant}`, {
+      'is-dragging': dragging, 'is-icon-only': iconOnly, 'is-disabled': disabled, 'has-lens-icon': lensIcon,
+    }]"
     :style="vertical ? { height: `${span}px` } : { width: `${span}px` }"
     role="slider"
     tabindex="0"
@@ -298,11 +351,9 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
     @lostpointercapture="onUp"
     @keydown="onKeydown"
   >
-    <span
-      class="wheel-lens"
-      aria-hidden="true"
-      :style="vertical ? { height: `${lensSize + 14}px` } : { width: `${lensSize + (iconOnly ? 14 : 22)}px` }"
-    />
+    <span class="wheel-lens" aria-hidden="true" :style="lensStyle">
+      <Icon v-if="lensIcon" :name="lensIcon" :size="15" class="lens-icon" />
+    </span>
     <div class="wheel-drum" aria-hidden="true">
       <span
         v-for="(item, index) in items"
@@ -333,20 +384,26 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
   cursor: grab;
   touch-action: none;
   user-select: none;
-  perspective: 420px;
-  /* 两端渐隐：选项转到边缘时被吃掉，而不是被一条硬边切掉。 */
-  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 16%, #000 84%, transparent 100%);
-  mask-image: linear-gradient(90deg, transparent 0, #000 16%, #000 84%, transparent 100%);
 }
-.capsule-wheel.is-vertical {
-  width: auto;
-  min-width: 120px;
+/* 凹槽底和 SegmentTrack 同一套：底画在自己身上，两端渐隐画在转动的那一层上——
+   渐隐若落在整个控件上，底和镜片的两端也会一起被吃掉。 */
+.capsule-wheel.is-inset { background: var(--cap-track); box-shadow: var(--cap-track-shadow); }
+.wheel-drum {
+  position: absolute;
+  inset: 0;
+  /* 透视放在转动层自己身上：它带着 mask，本身会被压平，透视得从这一层给到每一项。 */
+  perspective: 420px;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 18%, #000 82%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 18%, #000 82%, transparent 100%);
+}
+.capsule-wheel.is-vertical { width: auto; min-width: 120px; }
+.capsule-wheel.is-vertical .wheel-drum {
   -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 25%, #000 75%, transparent 100%);
   mask-image: linear-gradient(180deg, transparent 0, #000 25%, #000 75%, transparent 100%);
 }
 .capsule-wheel.is-dragging { cursor: grabbing; }
 .capsule-wheel.is-disabled { opacity: .5; cursor: not-allowed; }
-.capsule-wheel:focus-visible .wheel-lens { box-shadow: 0 0 0 2px var(--focus), var(--glass-rim); }
+.capsule-wheel:focus-visible .wheel-lens { box-shadow: 0 0 0 2px var(--focus), var(--cap-thumb-rim); }
 
 /* 正中的镜片：选中项永远在它上面。宽度随拖动在两项之间插值。 */
 .wheel-lens {
@@ -354,19 +411,21 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
   top: 3px;
   bottom: 3px;
   left: 50%;
-  translate: -50% 0;
+  display: flex;
+  align-items: center;
   min-width: 30px;
+  padding-left: 19px;
   border-radius: 999px;
-  background: linear-gradient(180deg, color-mix(in srgb, #fff 14%, transparent), transparent 70%),
-    color-mix(in srgb, var(--ink) 12%, transparent);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 22%, transparent), inset 0 -1px 0 rgba(0, 0, 0, .12),
-    0 2px 8px -3px rgba(0, 0, 0, .4);
+  background: var(--cap-thumb);
+  box-shadow: var(--cap-thumb-rim);
+  translate: -50% 0;
   transition: scale var(--dur-base) var(--ease-spring);
 }
+.capsule-wheel.is-bare .wheel-lens { background: var(--cap-glass-thumb); box-shadow: var(--cap-glass-thumb-rim); }
+.lens-icon { flex: 0 0 auto; color: var(--cap-ink); }
 .is-vertical .wheel-lens { top: 50%; bottom: auto; left: 3px; right: 3px; translate: 0 -50%; min-width: 0; }
 .capsule-wheel.is-dragging .wheel-lens { scale: 1.06 1.1; }
 
-.wheel-drum { position: absolute; inset: 0; transform-style: preserve-3d; }
 .wheel-item {
   position: absolute;
   top: 50%;
@@ -385,8 +444,11 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
   transition: color var(--dur-fast) ease;
 }
 .is-icon-only .wheel-item { padding: 0 7px; }
+/* 镜片里固定着一枚图标时，每一项左边多留出图标的位置：转到正中的那一项，
+   字正好落在图标右边；两侧的项之间也就多了同样的间距，不会压到图标上。 */
+.has-lens-icon .wheel-item { padding-left: 30px; }
 .wheel-image { width: 18px; height: 18px; flex: 0 0 18px; border-radius: 5px; pointer-events: none; }
-.wheel-item.on { color: var(--accent); font-weight: 600; }
+.wheel-item.on { color: var(--cap-ink); font-weight: 600; }
 
 @media (prefers-reduced-transparency: reduce) {
   .wheel-item { filter: none !important; }

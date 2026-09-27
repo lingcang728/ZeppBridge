@@ -1,17 +1,22 @@
 <script setup lang="ts" generic="T extends string | number">
-/* 分段控件 / 胶囊导航。
+/* 胶囊选择器（两到五项）/ 胶囊导航。
  *
- * 标签画两层：底层是暗色字，上层是「选中字」，上层按滑块的形状裁剪、和滑块用
- * 同一条过渡曲线。这样文字颜色永远跟它底下的东西一致——以前是标签颜色先切、
- * 滑块后到，半截深色字会露在滑块外面。
+ * 整个应用「从几项里挑一个」只有这一种样子：凹槽里托着一块凸起的胶囊，
+ * 选中字用品牌色；更长的列表（语言、AI 服务商）用 CapsuleWheel，同一套底和胶囊。
  *
- * 位置用 offsetLeft / offsetWidth 量（布局像素，不受原生缩放影响），并且在
- * 每个按钮尺寸变化、字体加载完成时重新量：以前只盯轨道本身，字体晚到时滑块
- * 会停在旧宽度上。 */
+ * 标签画两层：底层是普通字，上层是「选中字」，按滑块的形状裁切；底层在滑块下面
+ * 那一段被挖空。滑块位置是两个注册过的 CSS 长度（--thumb-l / --thumb-w，见
+ * material.css），过渡只写在轨道上：滑块、上层裁切、下层挖空读同一对值，逐帧
+ * 同步。以前玻璃导航的滑块是半透明的，底下的常规体和上面的粗体（拉丁字母粗体更宽）
+ * 叠在一起，切成德语时每个标签都出重影。
+ *
+ * 位置用 offsetLeft / offsetWidth 量（布局像素，不受原生缩放影响），每个按钮尺寸
+ * 变化、字体加载完成、换语言时都重新量。 */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
-import { dragThumb, segmentClip, snapStop, type SegmentStop } from '../lib/navigation';
+import Icon, { type IconName } from './Icon.vue';
+import { dragThumb, snapStop, type SegmentStop } from '../lib/navigation';
 
-export type SegmentItem<T extends string | number> = { value: T; label: string };
+export type SegmentItem<T extends string | number> = { value: T; label: string; icon?: IconName };
 
 const props = withDefaults(defineProps<{
   items: SegmentItem<T>[];
@@ -21,12 +26,15 @@ const props = withDefaults(defineProps<{
   compact?: boolean;
   /** 按钮等宽铺满整条轨道；默认按内容收紧。 */
   fill?: boolean;
-  /** `glass` 给浮在顶栏上的导航；`inset` 是表单里的凹槽底。 */
-  variant?: 'inset' | 'glass';
+  /** 只画图标（主题的月亮 / 太阳），标签进 aria 和 title。 */
+  iconOnly?: boolean;
+  /** `inset` 表单里的凹槽底；`glass` 浮在内容上的导航；`bare` 放进已经是玻璃的按钮组里。 */
+  variant?: 'inset' | 'glass' | 'bare';
 }>(), {
   disabled: false,
   compact: false,
   fill: false,
+  iconOnly: false,
   variant: 'inset',
 });
 
@@ -35,7 +43,6 @@ const emit = defineEmits<{ 'update:modelValue': [value: T] }>();
 const track = ref<HTMLElement | null>(null);
 const stops = ref([]) as Ref<SegmentStop<T>[]>;
 const thumb = ref({ left: 0, width: 0, visible: false });
-const trackWidth = ref(0);
 const dragging = ref(false);
 /** 第一次量完之前不做过渡，免得滑块从最左边滑进来。 */
 const settled = ref(false);
@@ -70,7 +77,6 @@ const placeOn = (value: T) => {
 const measure = () => {
   if (!track.value) return;
   stops.value = readStops();
-  trackWidth.value = track.value.clientWidth;
   if (!gesture) placeOn(props.modelValue);
   if (!settled.value && thumb.value.visible) requestAnimationFrame(() => { settled.value = true; });
 };
@@ -82,9 +88,11 @@ const observeItems = () => {
   for (const el of buttons()) observer.observe(el);
 };
 
-/* 透镜横向放大的倍数，和样式里 .is-dragging .segment-thumb 的 scale 保持一致。 */
-const LENS_GROW = 1.08;
-const clip = computed(() => segmentClip(thumb.value, trackWidth.value, 3, dragging.value ? LENS_GROW : 1));
+const trackStyle = computed(() => ({
+  '--thumb-l': `${thumb.value.left}px`,
+  '--thumb-w': `${thumb.value.visible ? thumb.value.width : 0}px`,
+}));
+const itemLeft = (index: number) => ({ '--item-l': `${stops.value[index]?.left ?? 0}px` });
 
 const focusActive = () => {
   if (!track.value?.contains(document.activeElement)) return;
@@ -198,11 +206,11 @@ watch(() => props.modelValue, async () => {
   if (!gesture) placeOn(props.modelValue);
   focusActive();
 });
-watch(() => props.items, async () => {
+watch(() => props.items.map((item) => `${item.value}\u0000${item.label}`).join('\u0001'), async () => {
   await nextTick();
   observeItems();
   measure();
-}, { deep: true });
+});
 
 onMounted(() => {
   void nextTick(() => {
@@ -225,7 +233,9 @@ onBeforeUnmount(() => {
     ref="track"
     :class="['segment-track', `is-${variant}`, {
       'is-dragging': dragging, 'is-compact': compact, 'is-disabled': disabled, 'is-fill': fill, 'is-settled': settled,
+      'is-icon-only': iconOnly,
     }]"
+    :style="trackStyle"
     role="radiogroup"
     :aria-label="ariaLabel"
     :aria-disabled="disabled || undefined"
@@ -236,33 +246,38 @@ onBeforeUnmount(() => {
     @lostpointercapture="onUp"
     @keydown="onKeydown"
   >
+    <span class="segment-thumb" aria-hidden="true" :style="{ opacity: thumb.visible ? 1 : 0 }" />
     <button
-      v-for="item in items"
+      v-for="(item, index) in items"
       :key="String(item.value)"
       type="button"
       role="radio"
       class="segment-item"
+      :style="itemLeft(index)"
       :aria-checked="item.value === modelValue"
+      :aria-label="iconOnly ? item.label : undefined"
+      :title="iconOnly ? item.label : undefined"
       :disabled="disabled"
       :tabindex="item.value === modelValue ? 0 : -1"
       @click="onClick(item.value)"
     >
-      <slot :item="item" :active="false">{{ item.label }}</slot>
+      <slot :item="item" :active="false">
+        <Icon v-if="item.icon" :name="item.icon" :size="iconOnly ? 17 : 15" />
+        <span v-if="!iconOnly">{{ item.label }}</span>
+      </slot>
     </button>
-    <span
-      class="segment-thumb"
-      aria-hidden="true"
-      :style="{ transform: `translateX(${thumb.left}px)`, width: `${thumb.width}px`, opacity: thumb.visible ? 1 : 0 }"
-    />
     <!-- 选中字：同样的标签按量好的位置摆一遍，只露出滑块覆盖的那一段。 -->
-    <span class="segment-ink" aria-hidden="true" :style="{ clipPath: clip }">
+    <span class="segment-ink" aria-hidden="true">
       <span
         v-for="(stop, index) in stops"
         :key="String(stop.value)"
         class="segment-ink-item"
         :style="{ left: `${stop.left}px`, width: `${stop.width}px` }"
       >
-        <slot v-if="items[index]" :item="items[index]!" :active="true">{{ items[index]!.label }}</slot>
+        <slot v-if="items[index]" :item="items[index]!" :active="true">
+          <Icon v-if="items[index]!.icon" :name="items[index]!.icon!" :size="iconOnly ? 17 : 15" />
+          <span v-if="!iconOnly">{{ items[index]!.label }}</span>
+        </slot>
       </span>
     </span>
   </div>
@@ -271,8 +286,11 @@ onBeforeUnmount(() => {
 <style scoped>
 .segment-track {
   --seg-pad: 3px;
-  --seg-dur: var(--dur-base, 240ms);
-  --seg-ease: var(--ease-spring, cubic-bezier(.2, 1.15, .32, 1));
+  --seg-dur: 300ms;
+  --seg-ease: cubic-bezier(.3, 1.25, .4, 1);
+  /* 拖动时滑块放大成透镜，裁切和挖空跟着往两边多让出这么多。 */
+  --seg-grow: 0px;
+  --seg-clip-y: var(--seg-pad);
   position: relative;
   display: inline-flex;
   max-width: 100%;
@@ -284,21 +302,18 @@ onBeforeUnmount(() => {
   user-select: none;
   touch-action: none;
 }
-.segment-track.is-inset { background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); }
-/* 浮在内容之上的导航：用浮动控件的玻璃（见 material.css 的 .glass-control）。
-   选中的那一格不再是一块品牌绿，而是玻璃里一块中性的亮底、字用品牌色——
-   导航里的颜色只用来点出「你在哪」，大块的颜色留给内容。 */
+.segment-track.is-settled {
+  transition: --thumb-l var(--seg-dur) var(--seg-ease), --thumb-w var(--seg-dur) var(--seg-ease);
+}
+.segment-track.is-dragging { --seg-grow: calc(var(--thumb-w) * .04); transition: none; }
+.segment-track.is-inset { background: var(--cap-track); box-shadow: var(--cap-track-shadow); }
+/* 浮在内容之上的导航：用浮动控件的玻璃（见 material.css 的 .glass-control）。 */
 .segment-track.is-glass {
   background: linear-gradient(180deg, var(--glass-sheen), transparent 60%), var(--glass);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   box-shadow: var(--glass-rim), var(--glass-shadow);
 }
-.segment-track.is-glass .segment-thumb {
-  background: color-mix(in srgb, var(--ink) 13%, transparent);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent);
-}
-.segment-track.is-glass .segment-ink { color: var(--accent); }
 @media (prefers-reduced-transparency: reduce) {
   .segment-track.is-glass { background: var(--mat-glass-strong); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
@@ -325,6 +340,18 @@ onBeforeUnmount(() => {
   line-height: 1.2;
   white-space: nowrap;
   cursor: grab;
+  /* 滑块下面那一段挖掉：选中字只由上层画一次。 */
+  -webkit-mask-image: linear-gradient(90deg,
+    #000 calc(var(--thumb-l) - var(--seg-grow) - var(--item-l, 0px)),
+    transparent calc(var(--thumb-l) - var(--seg-grow) - var(--item-l, 0px)),
+    transparent calc(var(--thumb-l) + var(--thumb-w) + var(--seg-grow) - var(--item-l, 0px)),
+    #000 calc(var(--thumb-l) + var(--thumb-w) + var(--seg-grow) - var(--item-l, 0px)));
+  mask-image: linear-gradient(90deg,
+    #000 calc(var(--thumb-l) - var(--seg-grow) - var(--item-l, 0px)),
+    transparent calc(var(--thumb-l) - var(--seg-grow) - var(--item-l, 0px)),
+    transparent calc(var(--thumb-l) + var(--thumb-w) + var(--seg-grow) - var(--item-l, 0px)),
+    #000 calc(var(--thumb-l) + var(--thumb-w) + var(--seg-grow) - var(--item-l, 0px)));
+  transition: color var(--dur-fast) ease;
 }
 .segment-item:hover:not(:disabled) { color: var(--ink); }
 /* 焦点画在滑块上，不画在按钮上：按钮的 outline 会留在旧位置，成为一圈残影。 */
@@ -334,23 +361,30 @@ onBeforeUnmount(() => {
 
 .segment-thumb {
   position: absolute;
-  z-index: 2;
+  z-index: 0;
   top: var(--seg-pad);
   bottom: var(--seg-pad);
   left: 0;
+  width: var(--thumb-w);
   border-radius: 999px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--accent-hover) 88%, #fff) 0%, var(--accent) 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .32), inset 0 -1px 0 rgba(0, 0, 0, .12),
-    0 2px 10px -2px color-mix(in srgb, var(--accent) 50%, transparent);
+  background: var(--cap-thumb);
+  box-shadow: var(--cap-thumb-rim);
+  transform: translateX(var(--thumb-l));
   pointer-events: none;
+  transition: scale var(--seg-dur) var(--seg-ease), opacity var(--dur-fast) ease;
 }
+.segment-track.is-glass .segment-thumb,
+.segment-track.is-bare .segment-thumb { background: var(--cap-glass-thumb); box-shadow: var(--cap-glass-thumb-rim); }
+
 .segment-ink {
   position: absolute;
-  z-index: 3;
+  z-index: 2;
   inset: 0;
-  color: var(--accent-ink);
+  color: var(--cap-ink);
   font-weight: 600;
   pointer-events: none;
+  clip-path: inset(var(--seg-clip-y) calc(100% - var(--thumb-l) - var(--thumb-w) - var(--seg-grow)) var(--seg-clip-y)
+    calc(var(--thumb-l) - var(--seg-grow)) round 999px);
 }
 .segment-ink-item {
   position: absolute;
@@ -365,36 +399,28 @@ onBeforeUnmount(() => {
   line-height: 1.2;
   white-space: nowrap;
 }
-.segment-track.is-settled .segment-thumb {
-  transition: transform var(--seg-dur) var(--seg-ease), width var(--seg-dur) var(--seg-ease),
-    scale var(--seg-dur) var(--seg-ease), background var(--seg-dur) ease, box-shadow var(--seg-dur) ease;
-}
-.segment-track.is-settled .segment-ink { transition: clip-path var(--seg-dur) var(--seg-ease), color var(--seg-dur) ease; }
 
-/* 拖动时滑块临时变成清透的透镜：放大一点、边缘高光、几乎无色，透过它能看清
-   底下的标签。不做模糊——透镜是聚光，不是磨砂；模糊会把底下的字糊成一圈光晕。
-   两层字在拖动时用同一字重，叠在一起才是一个字而不是重影。 */
+/* 拖动时滑块变成清透的透镜：放大一点、边缘高光、几乎无色，透过它能看清底下的标签。 */
 .segment-track.is-dragging .segment-thumb {
   scale: 1.08 1.16;
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5), inset 0 -1px 0 rgba(255, 255, 255, .12),
-    inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent), 0 8px 20px -8px rgba(0, 0, 0, .45);
-  transition: scale var(--seg-dur) var(--seg-ease), background var(--seg-dur) ease, box-shadow var(--seg-dur) ease;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), inset 0 -1px 0 rgba(255, 255, 255, .1),
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent), 0 8px 20px -8px rgba(0, 0, 0, .45);
 }
-.segment-track.is-dragging .segment-ink { color: var(--ink); font-weight: 500; transition: color var(--seg-dur) ease; }
+.segment-track.is-dragging { --seg-clip-y: 0px; }
 
 .segment-track:has(.segment-item:focus-visible) .segment-thumb {
   box-shadow: 0 0 0 2px var(--canvas), 0 0 0 4px var(--focus);
 }
 
 .segment-track.is-compact .segment-item,
-.segment-track.is-compact .segment-ink-item { padding: 3px 12px; font-size: var(--fs-xs); }
-.segment-track.is-compact .segment-item { min-height: 28px; }
+.segment-track.is-compact .segment-ink-item { padding: 3px 13px; font-size: var(--fs-xs); }
+.segment-track.is-compact .segment-item { min-height: 30px; }
+.segment-track.is-icon-only .segment-item,
+.segment-track.is-icon-only .segment-ink-item { padding-inline: 11px; }
 .segment-track.is-disabled { opacity: .55; }
 
 @media (prefers-reduced-motion: reduce) {
-  .segment-track.is-settled .segment-thumb,
-  .segment-track.is-settled .segment-ink,
-  .segment-track.is-dragging .segment-thumb { transition: none; }
+  .segment-track.is-settled, .segment-thumb { transition: none; }
 }
 </style>

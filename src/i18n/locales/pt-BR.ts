@@ -468,9 +468,6 @@ export default {
     },
 
 
-    'components/SelectMenu': {
-      placeholder: 'Selecione…',
-    },
 
     'components/shell/AppTopBar': {
       today: 'Hoje',

@@ -884,9 +884,6 @@ export default {
     },
 
 
-    'components/SelectMenu': {
-      placeholder: 'Выберите…',
-    },
 
     'components/StageBar': {
       notProvided: 'Нет данных',

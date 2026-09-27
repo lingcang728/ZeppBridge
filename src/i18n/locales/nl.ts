@@ -456,9 +456,6 @@ export default {
       minimum: 'Min',
       maximum: 'Max',
     },
-    'components/SelectMenu': {
-      placeholder: 'Selecteer…',
-    },
     'components/StageBar': {
       notProvided: 'Niet verstrekt',
       zeroMinutes: '0 min',

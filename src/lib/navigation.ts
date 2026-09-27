@@ -5,6 +5,39 @@ export const navigationBranch = (path: string): string => {
   return '/';
 };
 
+/** 从路由记录里读「上一页」：vue-router 把它放在 history.state.back。 */
+export const historyBackPath = (): string | null => {
+  const back = (window.history.state as { back?: unknown } | null)?.back;
+  return typeof back === 'string' && back ? back : null;
+};
+
+export interface BackDestination {
+  path: string;
+  /** true：走 router.back()，历史里退一格；false：push 这个路径（没有来处可回）。 */
+  viaHistory: boolean;
+}
+
+/**
+ * 返回键回到哪儿：从哪里来回哪里去。
+ *
+ * 从概览的「数据来源 · 管理」点进设置的某张卡，左上角返回回到概览，而不是设置首页；
+ * 从最近记录点进睡眠详情，返回回到最近记录。只有直接打开的深链接（没有来处）
+ * 才退到所在入口的根。
+ */
+export const backDestination = (current: string, back: string | null): BackDestination => (
+  back && back !== current ? { path: back, viaHistory: true } : { path: navigationBranch(current), viaHistory: false }
+);
+
+/**
+ * 关掉一张设置卡（× 或 Esc）去哪儿：从卡组里打开的回卡组；从别处（概览的「管理」、
+ * 数据健康页的「去重新连接」）直接打开的，回那一处。上一页是另一张卡时（翻卡用的是
+ * replace，一般不会出现）回卡组。
+ */
+export const cardCloseDestination = (back: string | null): BackDestination => {
+  if (!back || /^\/settings\/[^/?#]+/.test(back)) return { path: '/settings', viaHistory: false };
+  return { path: back, viaHistory: true };
+};
+
 /** 三个主入口在导航胶囊里的顺序；横向切页的方向按它算。 */
 export const TAB_ORDER = ['/', '/ai', '/settings'] as const;
 
@@ -60,23 +93,3 @@ export function snapStop<T>(stops: SegmentStop<T>[], center: number, velocity: n
     Math.abs(stop.left + stop.width / 2 - projected) < Math.abs(best.left + best.width / 2 - projected) ? stop : best);
 }
 
-/**
- * 上层「选中字」的裁剪框：正好是滑块覆盖的那一段（上下各留轨道内边距）。
- * 滑块还没量出来时整层藏掉，免得第一帧所有标签都是选中色。
- *
- * `grow`：拖动时滑块变成放大的透镜（横向放大 grow 倍、纵向顶满轨道），裁剪框
- * 必须跟着一样大——否则透镜边缘那一圈露出底下的原字，看起来就是重影。
- */
-export function segmentClip(
-  thumb: { left: number; width: number; visible: boolean },
-  trackWidth: number,
-  pad = 3,
-  grow = 1,
-): string {
-  if (!thumb.visible || thumb.width <= 0 || trackWidth <= 0) return 'inset(50%)';
-  const extra = (thumb.width * (grow - 1)) / 2;
-  const left = Math.max(0, thumb.left - extra);
-  const right = Math.max(0, trackWidth - (thumb.left + thumb.width) - extra);
-  const vertical = grow > 1 ? 0 : pad;
-  return `inset(${vertical}px ${right}px ${vertical}px ${left}px round 999px)`;
-}

@@ -6,7 +6,7 @@ import { resolvedTheme } from '../../composables/useTheme';
 import { chartPalettes } from '../../lib/echartsTheme';
 import { HR_GAP_BREAK_MS } from '../../lib/chartGaps';
 import { displayDateTimeFormatter } from '../../lib/dateTime';
-import { formatMetric, isFiniteNumber } from '../../lib/format';
+import { formatMetric, formatWhen, isFiniteNumber } from '../../lib/format';
 import type { HeartRatePoint } from '../../types';
 import GlyphTile from '../GlyphTile.vue';
 import HrMiniChart from './HrMiniChart.vue';
@@ -24,6 +24,9 @@ const messages = defineMessages(
     hrChartAria: '24 小时心率曲线',
     hrZonesAria: '心率区间（绝对阈值）',
     hrEmpty: '同步后展示真实的心率波动。',
+    hrStale: (hours: number, when: string) => `最近 ${hours} 小时云端还没有心率，最新一条在${when}。`,
+    cloudLag: '手表的数据要先经 Zepp App 传到云端，ZeppBridge 才拉得到——拉取时间不等于数据时间。',
+    latestAt: (when: string) => `最新一条 · ${when}`,
     hrMore: '完整 24 小时',
     zoneRest: '休息 0–99',
     zoneFat: '燃脂 100–139',
@@ -39,6 +42,9 @@ const messages = defineMessages(
     hrChartAria: '24-hour heart rate curve',
     hrZonesAria: 'Heart rate zones (absolute thresholds)',
     hrEmpty: 'Real heart rate movement shows up here after a sync.',
+    hrStale: (hours: number, when: string) => `No heart rate in the cloud for the last ${hours} hours yet; the newest reading is from ${when}.`,
+    cloudLag: 'Watch data has to reach the cloud through the Zepp app before ZeppBridge can fetch it — the fetch time is not the data time.',
+    latestAt: (when: string) => `Newest reading · ${when}`,
     hrMore: 'Full 24 hours',
     zoneRest: 'Rest 0–99',
     zoneFat: 'Fat burn 100–139',
@@ -54,6 +60,9 @@ const messages = defineMessages(
     hrChartAria: 'Curva de frecuencia cardíaca de 24 horas',
     hrZonesAria: 'Zonas de frecuencia cardíaca (umbrales absolutos)',
     hrEmpty: 'Tu frecuencia cardíaca real aparece aquí después de sincronizar.',
+    hrStale: (hours: number, when: string) => `Aún no hay frecuencia cardíaca en la nube de las últimas ${hours} horas; la lectura más reciente es de ${when}.`,
+    cloudLag: 'Los datos del reloj tienen que llegar a la nube a través de la app Zepp antes de que ZeppBridge pueda descargarlos: la hora de descarga no es la hora de los datos.',
+    latestAt: (when: string) => `Lectura más reciente · ${when}`,
     hrMore: '24 horas completas',
     zoneRest: 'Reposo 0–99',
     zoneFat: 'Quema de grasa 100–139',
@@ -74,7 +83,18 @@ const props = defineProps<{
   points: HeartRatePoint[];
   /** `overview.current_hr`，没有就从序列末尾取。 */
   currentHr?: number | null;
+  /** `overview.latest_heart_rate_at`：库里最新一条心率样本的时间（不是云端拉取时间）。 */
+  latestAt?: string | null;
 }>();
+
+/* 窗口里一个点都没有、但库里有更早的心率：说清楚数据停在哪一刻，而不是一句
+   「同步后展示」——用户刚同步过，看到这句只会以为同步坏了。 */
+const latestWhen = computed(() => formatWhen(props.latestAt));
+/* 最新一条已经是一个多小时以前：把时间写在读数旁边，别让「最新 71」看起来像此刻。 */
+const latestIsOld = computed(() => {
+  const ts = props.latestAt ? new Date(props.latestAt).getTime() : NaN;
+  return Number.isFinite(ts) && Date.now() - ts > 70 * 60_000;
+});
 
 /**
  * 首页这张卡只画**最近几个小时**。
@@ -120,13 +140,17 @@ const clock = (value: number) =>
 
 <template>
   <RouterLink class="metric-panel hr-panel" to="/heart" :aria-label="t.hrPanelAria">
-    <div class="panel-head"><span class="panel-title"><span class="chart-icon"><GlyphTile name="heart-rate" :size="38" /></span><span><strong>{{ t.hrTitle }}</strong><small>{{ t.hrWindow(OVERVIEW_HR_WINDOW_HOURS) }}</small></span></span><span class="latest-value">{{ t.latest }} <strong>{{ num(hrLatest) }}</strong><small>{{ t.bpm }}</small></span></div>
+    <div class="panel-head"><span class="panel-title"><span class="chart-icon"><GlyphTile name="heart-rate" :size="38" /></span><span><strong>{{ t.hrTitle }}</strong><small>{{ t.hrWindow(OVERVIEW_HR_WINDOW_HOURS) }}</small></span></span><span class="latest-value">{{ t.latest }} <strong>{{ num(hrLatest) }}</strong><small>{{ t.bpm }}</small><em v-if="latestIsOld && latestWhen" class="latest-when">{{ t.latestAt(latestWhen) }}</em></span></div>
     <HrMiniChart v-if="hrPoints.length > 1" :points="hrPoints" :color="chartPalette.series.heart" :chrome="chartPalette"
       :gap-ms="HR_GAP_BREAK_MS" :average="hrAverage" :clock="clock" :unit="t.bpm" :label="t.hrChartAria" />
     <ul v-if="hrPoints.length > 1" class="hr-zones" :aria-label="t.hrZonesAria">
       <li v-for="zone in HR_ZONES" :key="zone.key">{{ zone.label }}</li>
     </ul>
-    <div v-else class="panel-empty"><GlyphTile name="heart-rate" :size="56" /><span>{{ t.hrEmpty }}</span></div>
+    <div v-else class="panel-empty">
+      <GlyphTile name="heart-rate" :size="56" />
+      <span v-if="latestWhen" class="empty-copy"><span>{{ t.hrStale(OVERVIEW_HR_WINDOW_HOURS, latestWhen) }}</span><small>{{ t.cloudLag }}</small></span>
+      <span v-else>{{ t.hrEmpty }}</span>
+    </div>
     <span class="panel-more">{{ t.hrMore }} <GlyphTile name="chevron-right" :size="18" /></span>
   </RouterLink>
 </template>
@@ -135,5 +159,8 @@ const clock = (value: number) =>
 /* 网格位置由父级的 .hr-card-slot 持有：本卡是异步 chunk，
    外壳要在它到达之前先占住同一个格子。 */
 .hr-panel { min-height: 286px; padding: 20px 20px 12px; }
+.latest-when { display: block; margin-top: 2px; color: var(--subtle); font-size: var(--fs-2xs); font-style: normal; text-align: right; }
+.empty-copy { display: grid; gap: 6px; max-width: 380px; }
+.empty-copy small { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.5; }
 .hr-zones { display: flex; flex-wrap: wrap; gap: 8px 12px; margin: 4px 0 0; padding: 0; list-style: none; color: var(--subtle); font-size: var(--fs-xs); }
 </style>

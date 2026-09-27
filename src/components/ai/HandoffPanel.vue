@@ -257,7 +257,7 @@ onBeforeUnmount(() => {
         <Icon name="chevron-down" :size="14" :class="['ready-chevron', { up: !details }]" />
       </button>
 
-      <CapsuleWheel class="provider-wheel" :span="210" :items="providerItems" :model-value="provider.id"
+      <CapsuleWheel class="provider-wheel" loop :span="210" :items="providerItems" :model-value="provider.id"
         :aria-label="t.who" @update:model-value="pickProvider" />
 
       <button type="button" :class="['go', 'cta', { 'ready-glow': arrived }]" :disabled="!desktop || busy" :title="t.run(provider.label)" @click="run(true)">

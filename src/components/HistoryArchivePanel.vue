@@ -6,7 +6,7 @@
  * 状态和动作在 composables/useHistoryBackfill.ts，账本视图在 archive/CoverageLedger.vue。
  */
 import DatePicker from './DatePicker.vue';
-import SelectMenu from './SelectMenu.vue';
+import SegmentTrack from './SegmentTrack.vue';
 import CoverageLedger from './archive/CoverageLedger.vue';
 import { useHistoryBackfill } from '../composables/useHistoryBackfill';
 import type { UserPrefs } from '../types';
@@ -55,7 +55,7 @@ const {
         <div class="s-row">
           <div class="s-row-main"><span class="s-row-title">{{ t.startLabel }}</span></div>
           <div class="s-row-control">
-            <SelectMenu v-model="startChoice" :options="START_CHOICES" :aria-label="t.startAria" :disabled="busy" />
+            <SegmentTrack v-model="startChoice" compact :items="START_CHOICES" :aria-label="t.startAria" :disabled="busy" />
           </div>
         </div>
         <div v-if="startChoice === 'custom'" class="s-row">

@@ -1029,9 +1029,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         'Nur ein Tag mit Daten in diesem Zeitraum – es gibt noch keinen Trend zu zeichnen.',
       trendAria: (label: string) => `${label}-Trendlinie`,
     },
-    'components/SelectMenu': {
-      placeholder: 'Auswählen…',
-    },
     'components/StageBar': {
       hypnogramAria: 'Hypnogramm der Schlafphasen',
       notProvided: 'Nicht angegeben',

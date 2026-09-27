@@ -2,7 +2,8 @@
 /* 诊断报告表单：设备区块（识别不出设备时）和隐私区块各放一份。
  * 渲染成多个根节点，直接落进调用方的 `.diagnostic-panel` 网格里。 */
 import Icon from '../../components/Icon.vue';
-import SelectMenu from '../../components/SelectMenu.vue';
+import { computed } from 'vue';
+import SegmentTrack from '../../components/SegmentTrack.vue';
 import { useSettingsContext } from '../../composables/settings/context';
 import { DIAGNOSTIC_NOTE_MAX, type DiagnosticFormState } from '../../composables/settings/useDiagnosticReport';
 import { useSettingsFormat } from '../../composables/settings/useSettingsFormat';
@@ -16,17 +17,15 @@ const { formatDateTime } = useSettingsFormat();
 const { diagnosticBusy, reportCategories, submitDiagnosticReport } = useSettingsContext().diagnostics;
 // 表单对象由调用方创建（reactive），这里只改它的字段。
 const form = props.form;
+/* 选中那一类的一句说明，跟在胶囊下面（以前藏在下拉的每一项里）。 */
+const categoryHint = computed(() => reportCategories.value.find((item) => item.value === form.category)?.hint ?? '');
 </script>
 
 <template>
   <div class="diagnostic-note">
     <span>{{ t.reportWhat }}<em>{{ t.reportWhatHint }}</em></span>
-    <SelectMenu
-      v-model="form.category"
-      :options="reportCategories"
-      :placeholder="t.reportCategoryPlaceholder"
-      :aria-label="t.reportCategoryAria"
-    />
+    <SegmentTrack v-model="form.category" compact class="report-kind" :items="reportCategories" :aria-label="t.reportCategoryAria" />
+    <small v-if="categoryHint">{{ categoryHint }}</small>
   </div>
   <label class="diagnostic-note">
     <span>{{ t.reportNote }}<em>{{ t.reportNoteHint }}</em></span>

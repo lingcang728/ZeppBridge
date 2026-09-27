@@ -23,6 +23,8 @@ const messages = defineMessages(
     dateUnknown: '日期未知',
     durationUnknown: '时长未知',
     notRecorded: '未记录',
+    today: '今天',
+    yesterday: '昨天',
     duration: (hours: number, minutes: number) =>
       (hours > 0 ? `${hours} 小时 ${minutes} 分` : `${minutes} 分钟`),
   },
@@ -33,6 +35,8 @@ const messages = defineMessages(
     dateUnknown: 'Date unknown',
     durationUnknown: 'Duration unknown',
     notRecorded: 'Not recorded',
+    today: 'Today',
+    yesterday: 'Yesterday',
     duration: (hours: number, minutes: number) =>
       (hours > 0 ? `${hours} hr ${minutes} min` : `${minutes} min`),
   },
@@ -43,6 +47,8 @@ const messages = defineMessages(
     dateUnknown: 'Fecha desconocida',
     durationUnknown: 'Duración desconocida',
     notRecorded: 'No registrado',
+    today: 'Hoy',
+    yesterday: 'Ayer',
     duration: (hours: number, minutes: number) =>
       (hours > 0 ? `${hours} h ${minutes} min` : `${minutes} min`),
   },
@@ -59,6 +65,23 @@ export const localDateString = (date: Date): string => {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+};
+
+/**
+ * 一个时刻的短说法：今天只写「今天 15:22」，昨天写「昨天 22:20」，更早的写「09-25 22:20」。
+ * 给「最新一条样本在什么时候」这类提示用——比完整年月日时分好读，又不会把昨天说成今天。
+ */
+export const formatWhen = (value?: string | null, now = new Date()): string | null => {
+  if (!value) return null;
+  const date = parseDisplayDate(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const time = displayDateTimeFormatter({ hour: '2-digit', minute: '2-digit' }).format(date);
+  const dayStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((dayStart(now) - dayStart(date)) / 86_400_000);
+  if (days === 0) return `${copy().today} ${time}`;
+  if (days === 1) return `${copy().yesterday} ${time}`;
+  const day = displayDateTimeFormatter({ month: '2-digit', day: '2-digit' }).format(date).replace(/\//g, '-');
+  return `${day} ${time}`;
 };
 
 export const formatDateTime = (value?: string, empty = copy().noUpdates): string => {

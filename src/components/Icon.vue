@@ -41,6 +41,7 @@ export type IconName =
   | 'external'
   | 'file'
   | 'flame'
+  | 'fit'
   | 'folder'
   | 'gear'
   | 'grid'
@@ -130,6 +131,7 @@ const stroke = computed(() => Math.min(1.75, Math.max(1.5, props.stroke)));
     <path v-else-if="name === 'external'" d="M14 5h5v5m0-5-8 8M17 13v4a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4" :stroke-width="stroke" />
     <path v-else-if="name === 'file'" d="M6 3.5h8l4 4V20H6V3.5Zm8 0v4h4M9 12h6m-6 3h6" :stroke-width="stroke" />
     <path v-else-if="name === 'flame'" d="M12 3s5 5.2 5 9.2A5 5 0 0 1 7 12c0-2.2 1.5-4.2 3-5.6-.2 1.8.4 3-1 4.2 2.4-.2 4.6-2 3-7.6Z" fill="currentColor" stroke="none" />
+    <path v-else-if="name === 'fit'" d="M4.5 9V6.2c0-.9.8-1.7 1.7-1.7H9m6 0h2.8c.9 0 1.7.8 1.7 1.7V9m0 6v2.8c0 .9-.8 1.7-1.7 1.7H15m-6 0H6.2c-.9 0-1.7-.8-1.7-1.7V15" :stroke-width="stroke" />
     <path v-else-if="name === 'folder'" d="M3.5 7.5h6l1.6 2h9.4v7.8a2.2 2.2 0 0 1-2.2 2.2H5.7a2.2 2.2 0 0 1-2.2-2.2V7.5Zm0 2h17" :stroke-width="stroke" />
     <g v-else-if="name === 'gear'">
       <circle cx="12" cy="12" r="3" :stroke-width="stroke" />

@@ -15,6 +15,7 @@ import { useDevices } from '../composables/useDevices';
 import { useSyncController } from '../composables/useSyncController';
 import { useUiScale } from '../composables/useUiScale';
 import { withViewTransition } from '../lib/deck/viewTransition';
+import { cardCloseDestination, historyBackPath } from '../lib/navigation';
 import { readDefaultExportFormat } from '../lib/exportScope';
 import { distanceUnit, distanceUnitOptionLabel } from '../lib/units';
 import { locale, LOCALE_LABELS, useMessages } from '../i18n';
@@ -99,7 +100,12 @@ const cards = computed(() => SETTINGS_CARD_IDS.map((id) => ({
 })));
 
 const openCard = (id: string) => withViewTransition(() => router.push(`/settings/${id}`));
-const closeDeck = () => withViewTransition(() => router.push('/settings'));
+/* 关卡：从卡组打开的回卡组，从别处（概览的「管理」）打开的回那一处。 */
+const closeDeck = () => {
+  const target = cardCloseDestination(historyBackPath());
+  if (target.viaHistory) router.back();
+  else void router.push(target.path);
+};
 const changeCard = async (id: string, done: () => void) => {
   await router.replace(`/settings/${id}`);
   await nextTick();

@@ -5,7 +5,7 @@ import { RouterView, useRoute, useRouter } from 'vue-router';
 import type { DesignIconName } from './components/DesignIcon.vue';
 import GlyphTile from './components/GlyphTile.vue';
 import Icon from './components/Icon.vue';
-import { navigationBranch, pageMotion, type PageMotion } from './lib/navigation';
+import { backDestination, historyBackPath, navigationBranch, pageMotion, TAB_ORDER, type PageMotion } from './lib/navigation';
 import AppTopBar from './components/shell/AppTopBar.vue';
 import SegmentTrack from './components/SegmentTrack.vue';
 import { useSyncController } from './composables/useSyncController';
@@ -32,6 +32,7 @@ const messages = defineMessages(
     browserPreview: '请使用桌面应用。浏览器预览不会读取账户数据。',
     routeNotFound: '页面不存在，已返回概览。',
     quickReturn: (page: string) => `返回${page}`,
+    previousPage: '上一页',
   },
   {
     skipToContent: 'Skip to main content',
@@ -48,6 +49,7 @@ const messages = defineMessages(
     browserPreview: 'Use the desktop app. This browser preview reads no account data.',
     routeNotFound: 'That page does not exist, so you are back on the overview.',
     quickReturn: (page: string) => `Back to ${page}`,
+    previousPage: 'the previous page',
   },
   {
     skipToContent: 'Saltar al contenido principal',
@@ -64,6 +66,7 @@ const messages = defineMessages(
     browserPreview: 'Usa la app de escritorio. Esta vista previa en el navegador no lee datos de la cuenta.',
     routeNotFound: 'Esa página no existe, así que volviste al resumen.',
     quickReturn: (page: string) => `Volver a ${page}`,
+    previousPage: 'la página anterior',
   },
   // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
   'App',
@@ -137,6 +140,15 @@ const navigation = computed(() => [
 /* 只在内容真的滚到顶栏下面时才显示滚动边缘效果。只在越过阈值时写一次 ref，
    滚动本身不触发渲染。 */
 const contentUnderBar = ref(false);
+
+/* 左上角返回键：只在二级页出现；它回到来处（history 里的上一页），标签跟着说回哪儿。 */
+const showBack = computed(() => !(TAB_ORDER as readonly string[]).includes(route.path));
+const backLabel = computed(() => {
+  void route.fullPath;
+  const target = backDestination(route.fullPath, historyBackPath());
+  const tab = navigation.value.find((item) => item.to === target.path);
+  return t.value.quickReturn(tab ? tab.label : t.value.previousPage);
+});
 
 /* 切页动效。
  *
@@ -258,7 +270,7 @@ onUnmounted(() => {
       <main id="main-content" class="main-content" tabindex="-1" @scroll.passive="onMainScroll">
         <!-- 顶栏和提示条粘在滚动区顶上：页面内容从玻璃顶栏下面滚过去。 -->
         <div :class="['shell-head', { 'is-scrolled': contentUnderBar }]">
-          <AppTopBar :items="navigation" :nav-aria-label="t.mainNav" :version-title="versionTitle" :back-to="!['/', '/ai', '/settings'].includes(route.path) ? navigationBranch(route.path) : undefined" :back-label="t.quickReturn(navigationBranch(route.path) === '/settings' ? t.navSettings : t.navOverview)" />
+          <AppTopBar :items="navigation" :nav-aria-label="t.mainNav" :version-title="versionTitle" :back-to="showBack ? navigationBranch(route.path) : undefined" :back-label="backLabel" />
 
           <div v-if="!backendReady" class="sync-feedback" role="status" aria-live="polite">
             <Icon name="database" :size="14" class="spinning" />

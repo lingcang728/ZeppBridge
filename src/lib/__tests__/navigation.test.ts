@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dragThumb, navigationBranch, pageMotion, segmentClip, snapStop } from '../navigation';
+import { backDestination, cardCloseDestination, dragThumb, navigationBranch, pageMotion, snapStop } from '../navigation';
 
 const stops = [
   { left: 3, width: 70, value: '/' },
@@ -29,21 +29,22 @@ describe('navigation gestures', () => {
   });
 });
 
-describe('segment ink clip', () => {
-  it('reveals exactly the span the thumb covers', () => {
-    // 选中字只在滑块底下露出来：左边界 = 滑块左沿，右边界 = 轨道宽 − 滑块右沿。
-    expect(segmentClip({ left: 75, width: 110, visible: true }, 260)).toBe('inset(3px 75px 3px 75px round 999px)');
+describe('back navigation', () => {
+  it('returns to wherever the page was opened from', () => {
+    // 概览「数据来源 · 管理」→ 设置的账号卡：返回回概览，不是设置首页。
+    expect(backDestination('/settings/account', '/')).toEqual({ path: '/', viaHistory: true });
+    expect(backDestination('/sleep/42', '/recent')).toEqual({ path: '/recent', viaHistory: true });
   });
-  it('grows with the drag lens so no ring of plain text shows around it', () => {
-    // 透镜横向放大 1.1 倍：110px 宽的滑块两边各多出 5.5px，纵向顶满轨道。
-    expect(segmentClip({ left: 75, width: 110, visible: true }, 260, 3, 1.1)).toBe('inset(0px 69.5px 0px 69.5px round 999px)');
+  it('falls back to the tab root when there is nowhere to go back to', () => {
+    expect(backDestination('/sleep/42', null)).toEqual({ path: '/', viaHistory: false });
+    expect(backDestination('/settings/account', '/settings/account')).toEqual({ path: '/settings', viaHistory: false });
   });
-  it('hides the ink layer until the thumb has been measured', () => {
-    expect(segmentClip({ left: 0, width: 0, visible: false }, 260)).toBe('inset(50%)');
-    expect(segmentClip({ left: 10, width: 40, visible: true }, 0)).toBe('inset(50%)');
-  });
-  it('never produces a negative inset while the thumb overshoots', () => {
-    expect(segmentClip({ left: -4, width: 280, visible: true }, 260)).toBe('inset(3px 0px 3px 0px round 999px)');
+  it('closes a settings card back to its origin', () => {
+    expect(cardCloseDestination('/settings')).toEqual({ path: '/settings', viaHistory: true });
+    expect(cardCloseDestination('/')).toEqual({ path: '/', viaHistory: true });
+    expect(cardCloseDestination('/health-check')).toEqual({ path: '/health-check', viaHistory: true });
+    expect(cardCloseDestination('/settings/sync')).toEqual({ path: '/settings', viaHistory: false });
+    expect(cardCloseDestination(null)).toEqual({ path: '/settings', viaHistory: false });
   });
 });
 

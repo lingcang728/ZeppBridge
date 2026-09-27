@@ -831,9 +831,6 @@ export default {
       minimum: 'Mín',
       maximum: 'Máx',
     },
-    'components/SelectMenu': {
-      placeholder: 'Selecionar…',
-    },
     'components/StageBar': {
       notProvided: 'Não fornecido',
       zeroMinutes: '0 min',

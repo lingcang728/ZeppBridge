@@ -522,9 +522,6 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
     },
 
 
-    'components/SelectMenu': {
-      placeholder: 'Sélectionner…',
-    },
 
     'components/StageBar': {
       hypnogramAria: 'Hypnogramme des phases de sommeil',

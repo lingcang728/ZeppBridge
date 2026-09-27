@@ -3,7 +3,7 @@
 import type { DesignIconName } from '../DesignIcon.vue';
 import GlyphTile from '../GlyphTile.vue';
 import Icon from '../Icon.vue';
-import SelectMenu from '../SelectMenu.vue';
+import CapsuleWheel from '../CapsuleWheel.vue';
 import SegmentTrack from '../SegmentTrack.vue';
 import type { ExportFormat, WorkoutMetrics } from '../../composables/useWorkoutDetail';
 import { isTauri } from '../../composables/useTauriApi';
@@ -62,10 +62,10 @@ const FORMATS: ExportFormat[] = ['json', 'csv', 'gpx', 'fit'];
     <section class="surface-card side-card" :aria-label="t.handoffAria">
       <div class="section-head"><GlyphTile name="handoff" :size="40" /><div><p class="section-eyebrow">{{ t.eyebrowHandoff }}</p><h2>{{ t.handoffTitle }}</h2></div></div>
       <p class="card-sub">{{ t.handoffSub }}</p>
-      <label class="ai-provider">
+      <div class="ai-provider">
         <span>{{ t.handoffTarget }}</span>
-        <SelectMenu v-model="provider" :options="aiProviderChoices" :aria-label="t.handoffTargetAria" drop-up />
-      </label>
+        <CapsuleWheel v-model="provider" loop :span="230" :items="aiProviderChoices" :aria-label="t.handoffTargetAria" />
+      </div>
       <button class="button primary wide" type="button" :disabled="handoffBusy" @click="emit('handoff')">
         <GlyphTile name="handoff" :size="20" />{{ handoffBusy ? t.preparing : t.handTo(aiProviderLabel) }}
       </button>

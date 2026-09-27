@@ -766,9 +766,6 @@ export default {
     },
 
 
-    'components/SelectMenu': {
-      placeholder: 'चुनें…',
-    },
 
     'components/StageBar': {
       summaryAria: 'नींद स्टेज का हिस्सा',

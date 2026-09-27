@@ -5,7 +5,7 @@
  */
 import { computed, ref } from 'vue';
 import Icon from '../Icon.vue';
-import SelectMenu, { type SelectMenuOption } from '../SelectMenu.vue';
+import SegmentTrack from '../SegmentTrack.vue';
 import type { AiTaskDetailLevel, AiTaskPreview } from '../../lib/bridge/types';
 import { isDesktop, toUserMessage } from '../../lib/bridge';
 import { pickAttachments } from '../../lib/aiTask/attachments';
@@ -82,7 +82,7 @@ const statusById = computed(() => new Map((props.preview?.attachments ?? []).map
 const rows = computed(() =>
   draft.value.attachments.map(({ display_name: name, ...rest }) => ({ ...rest, name, status: statusById.value.get(rest.id) ?? null })));
 
-const detailOptions = computed<SelectMenuOption[]>(() => [
+const detailOptions = computed(() => [
   { value: 'summary', label: t.value.detailSummary },
   { value: 'standard', label: t.value.detailStandard },
   { value: 'detailed', label: t.value.detailDetailed },
@@ -132,7 +132,7 @@ const pick = async (replaceId?: string) => {
       </label>
       <p class="ai-hint">{{ t.mcpHint }}</p>
       <p class="ai-label">{{ t.detail }}</p>
-      <SelectMenu :model-value="draft.detail_level" :options="detailOptions" :aria-label="t.detail"
+      <SegmentTrack compact :model-value="draft.detail_level" :items="detailOptions" :aria-label="t.detail"
         @update:model-value="setDetailLevel($event as AiTaskDetailLevel)" />
     </details>
   </section>

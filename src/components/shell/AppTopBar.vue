@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import BrandMark from '../BrandMark.vue';
 import Icon, { type IconName } from '../Icon.vue';
@@ -7,9 +7,10 @@ import CapsuleWheel from '../CapsuleWheel.vue';
 import SegmentTrack from '../SegmentTrack.vue';
 import { useSyncController } from '../../composables/useSyncController';
 import { useTheme } from '../../composables/useTheme';
+import { useWidthMorph } from '../../composables/useWidthMorph';
 import { displayDateTimeFormatter } from '../../lib/dateTime';
 import { defineMessages, locale, LOCALES, LOCALE_LABELS, setLocale, useMessages } from '../../i18n';
-import { navigationBranch } from '../../lib/navigation';
+import { backDestination, historyBackPath, navigationBranch } from '../../lib/navigation';
 import type { Locale } from '../../i18n';
 import type { ResolvedTheme } from '../../composables/useTheme';
 
@@ -99,6 +100,12 @@ const router = useRouter();
 const activeBranch = computed(() => navigationBranch(route.path));
 const navItems = computed(() => props.items.map((item) => ({ value: item.to, label: item.label })));
 const goTo = (to: string | number) => { void router.push(String(to)); };
+/* 左上角返回：从哪里来回哪里去（见 lib/navigation.ts#backDestination）。 */
+const goBack = () => {
+  const target = backDestination(route.fullPath, historyBackPath());
+  if (target.viaHistory) router.back();
+  else void router.push(props.backTo ?? target.path);
+};
 
 const {
   appStatus, statusError, syncState, syncProgress, syncMessage,
@@ -185,19 +192,30 @@ const themeOptions = computed<{ value: ResolvedTheme; label: string; icon: IconN
   { value: 'dark', label: t.value.themeDark, icon: 'moon' },
   { value: 'light', label: t.value.themeLight, icon: 'sun' },
 ]);
-const onThemeChange = (value: ResolvedTheme) => pickTheme(value);
+/* 新主题从被点的那枚图标处扩散开：按钮中心就是扩散的圆心（键盘切换也一样）。 */
+const themeTrack = ref<{ $el: HTMLElement } | null>(null);
+const onThemeChange = (value: string | number) => {
+  const index = themeOptions.value.findIndex((option) => option.value === value);
+  const button = themeTrack.value?.$el.querySelectorAll<HTMLElement>('.segment-item')[index];
+  const rect = button?.getBoundingClientRect();
+  pickTheme(value as ResolvedTheme, rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : undefined);
+};
 
 /* 语言列表跟着 LOCALES 注册表走——S6 扩到十种语言时这里自动变长。 */
 const localeOptions = computed(() =>
   LOCALES.map((code) => ({ value: code, label: LOCALE_LABELS[code] })));
 const onLocaleChange = (value: string | number) => setLocale(String(value) as Locale);
+
+/* 同步胶囊的字一变（「今天 10:30」→「数据已备好 · 交给 AI」），宽度平滑伸缩，不跳。 */
+const syncPill = ref<HTMLElement | null>(null);
+useWidthMorph(syncPill, () => (readyToHand.value ? t.value.readyPill : syncText.value));
 </script>
 
 <template>
   <header class="app-topbar">
-    <RouterLink v-if="backTo" class="quick-back glass-control" :to="backTo" :title="backLabel" :aria-label="backLabel">
+    <button v-if="backTo" type="button" class="quick-back glass-control" :title="backLabel" :aria-label="backLabel" @click="goBack">
       <Icon name="arrow-left" :size="20" />
-    </RouterLink>
+    </button>
     <RouterLink v-else to="/" class="brand" :title="versionTitle || t.brandHome">
       <BrandMark :size="30" />
       <span class="wordmark">ZeppBridge&nbsp;<b>3</b></span>
@@ -215,6 +233,7 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
     <div class="topbar-actions">
       <span v-if="statusError" class="sr-only" role="status">{{ statusError }}</span>
       <button
+        ref="syncPill"
         :class="['sync-pill', 'glass-control', `tone-${statusTone}`, { syncing: isSyncing, 'is-ready': readyToHand, 'ready-glow': readyToHand }]"
         type="button"
         :disabled="!readyToHand && !isSyncing && !canIncrementalSync"
@@ -223,19 +242,19 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
         @click="onSyncClick"
       >
         <i class="dot" :class="{ spinning: isSyncing }" aria-hidden="true"></i>
-        <span class="sync-text" aria-live="polite">{{ readyToHand ? t.readyPill : syncText }}</span>
+        <span :key="readyToHand ? 'ready' : isSyncing ? 'syncing' : 'idle'" class="sync-text" aria-live="polite">{{ readyToHand ? t.readyPill : syncText }}</span>
         <Icon v-if="isSyncing" name="x" :size="13" class="sync-cancel" />
         <Icon v-else-if="readyToHand" name="arrow-right" :size="14" class="ready-arrow" />
       </button>
 
-      <!-- 主题和语言都是拖着转的胶囊传送带，共用一个玻璃底座；不再弹下拉。 -->
+      <!-- 主题是平铺的两枚图标（月亮 / 太阳），点哪枚就从哪枚扩散开；
+           语言是首尾相接的传送带，地球画在正中的镜片里，和当前语言贴成一枚胶囊。 -->
       <div class="icon-group glass-control">
-        <CapsuleWheel class="theme-wheel" icon-only :span="92" :items="themeOptions" :model-value="resolvedTheme"
-          :aria-label="t.themeTitle" @update:model-value="onThemeChange" />
+        <SegmentTrack ref="themeTrack" class="theme-toggle" variant="bare" icon-only :items="themeOptions"
+          :model-value="resolvedTheme" :aria-label="t.themeTitle" @update:model-value="onThemeChange" />
         <span class="group-divider" aria-hidden="true"></span>
-        <Icon name="globe" :size="15" class="locale-glyph" />
-        <CapsuleWheel class="locale-wheel" :span="176" :items="localeOptions" :model-value="locale"
-          :aria-label="t.localeLabel" @update:model-value="onLocaleChange" />
+        <CapsuleWheel class="locale-wheel" variant="bare" loop lens-icon="globe" :span="168" :items="localeOptions"
+          :model-value="locale" :aria-label="t.localeLabel" @update:model-value="onLocaleChange" />
       </div>
     </div>
   </header>
@@ -260,7 +279,7 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
 }
 
 .quick-back { display: inline-flex; width: 40px; height: 40px; align-items: center; justify-content: center; justify-self: start; flex: 0 0 40px;
-  border-radius: 50%; color: var(--ink); text-decoration: none; transition: scale var(--dur-fast, 140ms) var(--ease-out, ease); }
+  padding: 0; border-radius: 50%; color: var(--ink); text-decoration: none; cursor: pointer; transition: scale var(--dur-fast, 140ms) var(--ease-out, ease); }
 .quick-back:hover { background-color: var(--glass-press); }
 .quick-back:active { scale: .94; }
 .brand {
@@ -293,6 +312,7 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
 
 .sync-pill {
   display: inline-flex;
+  flex: 0 0 auto;
   min-height: 36px;
   align-items: center;
   gap: 7px;
@@ -324,15 +344,18 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
   0%, 100% { opacity: 1; }
   50% { opacity: .3; }
 }
-.sync-text { font-variant-numeric: tabular-nums; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.sync-text { font-variant-numeric: tabular-nums; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  animation: sync-text-in var(--dur-slow) var(--ease-out); }
+@keyframes sync-text-in { from { opacity: 0; filter: blur(4px); } }
 .sync-pill.is-ready { color: var(--ink); font-weight: 600; }
 .sync-pill.is-ready .dot { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
 .ready-arrow { color: var(--accent); }
 .sync-cancel { color: var(--subtle); }
 
-.icon-group { display: inline-flex; align-items: center; gap: 2px; padding: 2px 4px 2px 2px; border-radius: 999px; }
-.group-divider { width: 1px; height: 18px; margin: 0 4px; background: color-mix(in srgb, var(--ink) 14%, transparent); }
-.locale-glyph { flex: 0 0 auto; color: var(--subtle); }
+.icon-group { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border-radius: 999px; }
+.theme-toggle { --seg-pad: 1px; }
+.theme-toggle :deep(.segment-item) { min-height: 34px; }
+.group-divider { width: 1px; height: 18px; margin: 0 3px; background: color-mix(in srgb, var(--ink) 14%, transparent); }
 
 /* 窄屏降级：先让胶囊回到文档流避免和按钮组重叠，再小到手机上藏掉
    （底部 tabbar 已经覆盖同一组导航）。语言选择在 520px 以下也让位给
@@ -349,7 +372,7 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
   .sync-text { max-width: 120px; }
 }
 @media (max-width: 640px) {
-  .locale-wheel, .locale-glyph, .group-divider { display: none; }
+  .locale-wheel, .group-divider { display: none; }
 }
 @media (max-width: 520px) {
   .topbar-actions { gap: 5px; }

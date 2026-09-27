@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import SelectMenu from '../../../components/SelectMenu.vue';
+import SegmentTrack from '../../../components/SegmentTrack.vue';
 import { useSettingsContext } from '../../../composables/settings/context';
 import { useMessages } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
@@ -12,6 +12,11 @@ const {
   retentionDays, dataBusy, estimateText, retentionCutoffDate,
   savePrefs, cleanupData, reprocessLocalData,
 } = useSettingsContext().prefs;
+
+const pickRetention = (days: number) => {
+  retentionDays.value = days;
+  void savePrefs();
+};
 
 const RETENTION_CHOICES = computed(() =>
   [30, 90, 180, 365].map((days) => ({ value: days, label: t.value.days(days) })));
@@ -27,11 +32,12 @@ const RETENTION_CHOICES = computed(() =>
           <span class="s-row-sub">{{ d.retentionSub }}</span>
         </div>
         <div class="s-row-control">
-          <SelectMenu
-            v-model="retentionDays"
-            :options="RETENTION_CHOICES"
+          <SegmentTrack
+            compact
+            :items="RETENTION_CHOICES"
+            :model-value="retentionDays"
             :aria-label="t.retentionAria"
-            @update:model-value="savePrefs"
+            @update:model-value="pickRetention"
           />
         </div>
       </div>

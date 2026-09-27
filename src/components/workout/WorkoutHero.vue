@@ -4,7 +4,7 @@ import type { DesignIconName } from '../DesignIcon.vue';
 import DeviceVisual from '../DeviceVisual.vue';
 import GlyphTile from '../GlyphTile.vue';
 import Icon from '../Icon.vue';
-import SelectMenu from '../SelectMenu.vue';
+import CapsuleWheel from '../CapsuleWheel.vue';
 import type { HeroMetric } from '../../composables/useWorkoutPresentation';
 import type { WorkoutMetrics } from '../../composables/useWorkoutDetail';
 import { dataScopeLabel, workoutLabel } from '../../lib/labels';
@@ -52,10 +52,12 @@ const t = useMessages(workoutDetailMessages);
           <span v-if="workout.custom_label" class="chip">{{ t.customName(String(workout.zepp_type), workout.custom_label) }}</span>
           <span class="type-correct">
             {{ t.myCorrection }}
-            <SelectMenu
+            <CapsuleWheel
               class="type-correct-menu"
+              loop
+              :span="220"
               :model-value="workout.user_override || ''"
-              :options="overrideChoices"
+              :items="overrideChoices"
               :disabled="overrideBusy"
               :aria-label="t.correctionAria"
               @update:model-value="(value) => emit('override', value)"

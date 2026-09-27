@@ -52,8 +52,59 @@ export const systemTheme = computed<ResolvedTheme>(() => (systemDark.value ? 'da
  * 只有深 / 浅两个选项的切换：选中和系统一致的那一套，就等于回到跟随系统——
  * 用户不必认识「跟随系统」这个第三态，默认行为也不会被一次误触锁死。
  */
-export const pickTheme = (value: ResolvedTheme) => {
-  setTheme(value === systemTheme.value ? 'system' : value);
+export const pickTheme = (value: ResolvedTheme, origin?: ThemeOrigin) => {
+  const next: ThemeMode = value === systemTheme.value ? 'system' : value;
+  if (value === resolvedTheme.value) {
+    setTheme(next);
+    return;
+  }
+  revealTheme(() => setTheme(next), origin);
+};
+
+/** 换主题的动画从哪儿扩散出去（视口坐标，一般是被点的那枚月亮 / 太阳）。 */
+export type ThemeOrigin = { x: number; y: number };
+
+/** 遮罩边缘羽化的宽度，和 material.css 里的渐变保持一致。 */
+const REVEAL_FEATHER = 96;
+
+type ViewTransitionDocument = Document & {
+  startViewTransition?: (update: () => void) => { ready: Promise<void>; finished: Promise<void> };
+};
+
+/**
+ * 换主题：新的一套从按钮的位置像水波一样扩散开，漫过旧的那套——不再整屏硬切。
+ *
+ * 用 View Transitions 给整页拍两张快照：旧的垫底不动，新的套一个圆形遮罩，
+ * 半径从 0 长到能盖住最远那个角。遮罩边缘带一圈羽化（见 material.css 的
+ * `html[data-theme-morph]`），所以是「漫过去」而不是一把剪刀剪过去。
+ * 其余带 view-transition-name 的元素（设置卡）在这一刻不单独拍，免得它们各自淡入淡出。
+ * 不支持或开了减少动效时直接换。
+ */
+const revealTheme = (update: () => void, origin?: ThemeOrigin) => {
+  const doc = document as ViewTransitionDocument;
+  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  if (!doc.startViewTransition || reduced || !origin) {
+    update();
+    return;
+  }
+  const root = document.documentElement;
+  const { innerWidth: width, innerHeight: height } = window;
+  const reach = Math.hypot(Math.max(origin.x, width - origin.x), Math.max(origin.y, height - origin.y));
+  root.style.setProperty('--reveal-x', `${Math.round(origin.x)}px`);
+  root.style.setProperty('--reveal-y', `${Math.round(origin.y)}px`);
+  root.dataset.themeMorph = '';
+  const transition = doc.startViewTransition(update);
+  void transition.ready.then(() => {
+    root.animate(
+      { '--reveal-r': ['0px', `${Math.ceil(reach + REVEAL_FEATHER)}px`] },
+      { duration: 760, easing: 'cubic-bezier(.4, 0, .15, 1)', pseudoElement: '::view-transition-new(root)', fill: 'forwards' },
+    );
+  }).catch(() => undefined);
+  void transition.finished.catch(() => undefined).finally(() => {
+    delete root.dataset.themeMorph;
+    root.style.removeProperty('--reveal-x');
+    root.style.removeProperty('--reveal-y');
+  });
 };
 
 /** 浏览器 chrome（地址栏/窗口边框色）跟着实际主题走。 */

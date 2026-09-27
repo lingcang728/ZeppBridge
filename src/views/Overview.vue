@@ -342,9 +342,9 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
     <div v-else class="dashboard-grid">
       <!-- 心率卡的格子由外壳持有：卡片是异步 chunk，骨架与本体占同一个格子。 -->
       <div class="hr-card-slot">
-        <HeartRateCard :points="heartRateSeries" :current-hr="overview?.current_hr ?? null" />
+        <HeartRateCard :points="heartRateSeries" :current-hr="overview?.current_hr ?? null" :latest-at="overview?.latest_heart_rate_at ?? null" />
       </div>
-      <StepsCard :steps="stepsToday" :goal="overview?.steps_goal ?? null" />
+      <StepsCard :steps="stepsToday" :goal="overview?.steps_goal ?? null" :latest-at="overview?.latest_heart_rate_at ?? null" />
       <SleepCard :sleep="lastSleep" />
       <StatusEntryCard
         to="/body"

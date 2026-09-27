@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import DatePicker from './DatePicker.vue';
 import ModalDialog from './ModalDialog.vue';
-import SelectMenu from './SelectMenu.vue';
+import SegmentTrack from './SegmentTrack.vue';
 import { useLifeEvents } from '../composables/useLifeEvents';
 import { backend } from '../lib/bridge';
 import { eventCategories, lifeEventMessages, validLifeEvent } from '../lib/lifeEvents';
@@ -51,9 +51,10 @@ async function remove() {
         <label>{{ t.name }}<input v-model="draft.title" required maxlength="120" :placeholder="t.placeholder" data-event-title></label>
         <div class="field">
           <span>{{ t.category }}</span>
-          <SelectMenu
+          <SegmentTrack
+            compact
             :model-value="draft.category"
-            :options="categoryOptions"
+            :items="categoryOptions"
             :aria-label="t.category"
             @update:model-value="setCategory"
           />

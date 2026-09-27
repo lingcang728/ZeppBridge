@@ -105,6 +105,18 @@
   --mat-tile-bottom: #16191E;
   --mat-tile-rim: inset 0 1px 0 rgba(255, 255, 255, .12), inset 0 -1px 0 rgba(0, 0, 0, .35);
   --glyph-neutral: #C9D0D8;
+  /* 胶囊选择器（SegmentTrack / CapsuleWheel 共用一套）：凹槽里托着一块凸起的胶囊，
+     选中字用品牌色。整个应用只有这一种「从几项里挑一个」的样子。 */
+  --cap-track: #101216;
+  --cap-track-shadow: inset 0 1px 3px rgba(0, 0, 0, .55), inset 0 0 0 1px rgba(226, 234, 242, .06);
+  --cap-thumb: linear-gradient(180deg, #3B424C 0%, #2B3139 100%);
+  --cap-thumb-rim: inset 0 1px 0 rgba(255, 255, 255, .17), inset 0 -1px 0 rgba(0, 0, 0, .3),
+    0 1px 2px rgba(0, 0, 0, .45), 0 4px 12px -4px rgba(0, 0, 0, .6);
+  /* 浮在玻璃上的胶囊（导航、顶栏）：底本身是玻璃，滑块只是一块更亮的玻璃。 */
+  --cap-glass-thumb: linear-gradient(180deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .07));
+  --cap-glass-thumb-rim: inset 0 1px 0 rgba(255, 255, 255, .22), inset 0 -1px 0 rgba(255, 255, 255, .04),
+    0 2px 8px -3px rgba(0, 0, 0, .45);
+  --cap-ink: #A2C765;
 
   /* 动效 */
   --dur-fast: 140ms;
@@ -236,6 +248,13 @@ html[data-theme="light"] {
   --mat-tile-bottom: #EEF1EA;
   --mat-tile-rim: inset 0 1px 0 #FFFFFF, inset 0 -1px 0 rgba(38, 52, 41, .08);
   --glyph-neutral: #4C5748;
+  --cap-track: #E4E8E0;
+  --cap-track-shadow: inset 0 1px 2px rgba(38, 52, 41, .14), inset 0 0 0 1px rgba(38, 52, 41, .06);
+  --cap-thumb: linear-gradient(180deg, #FFFFFF 0%, #F7F9F5 100%);
+  --cap-thumb-rim: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(38, 52, 41, .16), 0 4px 12px -5px rgba(38, 52, 41, .28);
+  --cap-glass-thumb: linear-gradient(180deg, rgba(255, 255, 255, .95), rgba(255, 255, 255, .72));
+  --cap-glass-thumb-rim: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(38, 52, 41, .14), 0 3px 10px -4px rgba(38, 52, 41, .22);
+  --cap-ink: #2F6B4F;
 }
 
 /* ── 浅色主题的局部补丁 ────────────────────────────────────────────

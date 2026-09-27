@@ -11,6 +11,7 @@ import DeviceVisual from '../DeviceVisual.vue';
 import Icon from '../Icon.vue';
 import { deviceStateLabel, useDevices } from '../../composables/useDevices';
 import { useSyncController } from '../../composables/useSyncController';
+import { formatWhen } from '../../lib/format';
 import { defineMessages, useMessages } from '../../i18n';
 
 defineOptions({ name: 'OverviewSourcesStrip' });
@@ -22,6 +23,7 @@ const messages = defineMessages(
     identifyFailed: (reason: string) => `设备识别暂不可用：${reason}`,
     noDevicesYet: '尚未识别实体设备。',
     manage: '管理',
+    latestData: (when: string) => `最新数据 ${when}`,
     sourcesAria: '数据来源与账户状态',
   },
   {
@@ -30,6 +32,7 @@ const messages = defineMessages(
     identifyFailed: (reason: string) => `Device identification is unavailable: ${reason}`,
     noDevicesYet: 'No device identified yet.',
     manage: 'Manage',
+    latestData: (when: string) => `Newest data ${when}`,
     sourcesAria: 'Data sources and account state',
   },
   {
@@ -38,6 +41,7 @@ const messages = defineMessages(
     identifyFailed: (reason: string) => `La identificación de dispositivos no está disponible: ${reason}`,
     noDevicesYet: 'Aún no se ha identificado ningún dispositivo.',
     manage: 'Gestionar',
+    latestData: (when: string) => `Datos más recientes ${when}`,
     sourcesAria: 'Fuentes de datos y estado de la cuenta',
   },
   // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
@@ -62,6 +66,9 @@ const chips = computed(() => [
     name: model.displayName || model.canonicalName,
     model,
     state: model.state,
+    /* 设备最新一条数据的时间，比「最近有数据」有用得多：同步完了心率还是空的时候，
+       一眼就能看出是手表的数据停在了昨晚，而不是 ZeppBridge 没拉到。 */
+    when: formatWhen(model.profile.last_data_at),
     to: model.deviceKey ? `/devices/${encodeURIComponent(model.deviceKey)}` : '/settings/account',
   })),
   {
@@ -88,7 +95,7 @@ const chips = computed(() => [
         </span>
         <span class="chip-name">{{ chip.name }}</span>
         <i :class="['dot', { on: chip.state !== 'unknown' }]"></i>
-        <span class="chip-state">{{ deviceStateLabel(chip.state) }}</span>
+        <span class="chip-state" :title="deviceStateLabel(chip.state)">{{ chip.kind === 'device' && chip.when ? t.latestData(chip.when) : deviceStateLabel(chip.state) }}</span>
       </RouterLink>
       <RouterLink class="source-chip manage" to="/settings/account">
         <Icon name="sliders" :size="14" />
