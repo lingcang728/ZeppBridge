@@ -436,6 +436,16 @@ export default {
       zoneAnaerobic: 'Anaeróbico 170+',
     },
 
+    'components/overview/OverviewMore': {
+      label: 'Mais',
+      weekly: 'Esta semana',
+      weeklySub: 'Contra os seus 28 dias anteriores',
+      life: 'Eventos de vida',
+      lifeSub: (n: number) => (n ? `${n} eventos` : 'Registre o que aconteceu neste período'),
+      sources: 'Fontes de dados',
+      sourcesSub: 'Dispositivos e conta na nuvem',
+    },
+
     'components/overview/RecentCard': {
       recentAria: 'Registros recentes',
       recentTitle: 'Registros recentes',
@@ -480,6 +490,11 @@ export default {
       seeMore: 'Ver mais',
       stepsNotYet: 'Os passos de hoje ainda não chegaram à nuvem',
       stepsLatest: (when: string) => `Os dados mais recentes na nuvem são de ${when}`,
+      factGoal: 'Meta',
+      factDone: 'Feito',
+      factLeft: 'Faltam',
+      factReached: 'Alcançado',
+      factUpdated: 'Atualizado',
     },
 
 
@@ -548,6 +563,14 @@ export default {
         'weekly.workout_count': 'Treinos',
         'weekly.training_load': 'Carga de treino',
       },
+    },
+
+    'components/WheelDatePicker': {
+      year: 'Ano',
+      month: 'Mês',
+      day: 'Dia',
+      yearSuffix: '' as string,
+      daySuffix: '' as string,
     },
 
     'composables/useAiHandoff': {
@@ -888,6 +911,7 @@ export default {
 
 
     'views/BodyStatus': {
+      vitalsGroupTitle: 'Recuperação e sinais vitais',
       backToOverview: 'Voltar à visão geral',
       title: 'Estado do corpo',
       intro: 'Tendências locais de prontidão, estresse, oxigenação do sangue, HRV, frequência respiratória, frequência cardíaca em repouso, composição corporal e ingestão alimentar. Tudo lido de registros sincronizados.',
@@ -1008,6 +1032,14 @@ export default {
       notProvided: 'Não informado',
       backToSettings: 'Voltar às configurações',
       title: 'Verificação de saúde dos dados',
+      summaryStreams: (ok: number, total: number) => `${ok} / ${total} fluxos de dados saudáveis`,
+      summaryFailed: (n: number) =>
+        `${n} precisam de atenção — abra "Até onde cada fluxo foi" abaixo para ver em qual etapa cada um parou`,
+      summaryPending: (n: number) =>
+        `${n} ainda não têm dados — normalmente porque este dispositivo simplesmente não os registra`,
+      summaryAllGood: 'Tudo certo: as três etapas — busca, interpretação e gravação — foram concluídas',
+      summaryOccasional: (n: number) => `${n} métricas`,
+      summaryActions: (n: number) => (n ? `${n} disponíveis` : 'Nada para fazer no momento'),
       intro: 'Para cada fluxo de dados: até onde ele foi entre buscar na nuvem, interpretar e gravar localmente; quais datas ele cobre; e de onde veio. Faltando é faltando — nunca preenchido com zero.',
       rangeAria: 'Janela de cobertura',
       loadingAria: 'Lendo o estado de saúde dos dados',
@@ -1118,6 +1150,8 @@ export default {
     },
 
     'views/HeartRateDetail': {
+      dailyMaxFold: 'Amostras brutas nesta máquina, sem filtro — pode diferir do app Zepp',
+      trendsTitle: 'Tendências de FC em repouso e HRV',
       backToOverview: 'Voltar à visão geral',
       title: 'Frequência cardíaca',
       intro: 'A curva do dia inteiro acima é sempre das últimas 24 horas; 7 dias / 1 mês / 6 meses só mudam as tendências por dia abaixo. Trechos sem amostras ficam em branco, não viram zero.',
@@ -1296,6 +1330,7 @@ export default {
       paiHint: 'Personal Activity Intelligence numa janela móvel de 7 dias',
       paiEmpty: 'Nenhum registro de PAI neste intervalo.',
       thresholdLabel: 'Limiar de lactato',
+      latestTag: 'Mais recente',
       thresholdHint: 'Frequência cardíaca e ritmo; só atualiza depois de uma corrida forte',
       thresholdHr: 'FC de limiar',
       thresholdPace: 'Ritmo de limiar',
@@ -1306,6 +1341,9 @@ export default {
       loadUnit: 'carga',
       thresholdHrTooltip: (value: number) => `FC de limiar <b>${value}</b> bpm`,
       balanceLabel: 'Equilíbrio da carga de treino',
+      moreLabel: 'Mais',
+      zonesLabel: 'Zonas de frequência cardíaca',
+      zonesSummary: 'Escolha um de três modelos, calculados a partir das suas próprias bases medidas',
       balanceHint: 'Carga de 7 dias contra a média semanal de 28 dias, ou seja, a razão aguda:crônica',
       balanceChartAria: 'Carga de treino de 7 e 28 dias com a razão aguda:crônica',
       balanceEmpty: 'Registros de carga de treino insuficientes para desenhar esta linha ainda.',
@@ -1812,6 +1850,12 @@ Responda em Markdown.`,
       pageTitle: 'Enviar para IA',
       intro: 'Escolha o treino, escolha os dados, diga o que quer saber — exporte para a área de trabalho e arraste para a IA.',
       titleLabel: 'Nome da tarefa',
+      rename: 'Clique para renomear',
+      rangeLabel: 'Intervalo retroativo',
+      days: (n: number) => `${n} dias`,
+      history: 'Histórico de entregas',
+      historyCount: (count: number) => `Histórico de entregas (${count})`,
+      historyEmpty: 'Nada entregue ainda',
       newTask: 'Nova',
       saved: 'Salvo',
     },
@@ -1837,6 +1881,10 @@ Responda em Markdown.`,
       counter: (used: number, max: number) => `${used}/${max}`,
       noteLabel: 'Contexto pessoal (opcional)',
       notePlaceholder: 'Lesões, objetivos, forma recente… incluídos na exportação para a IA.',
+      examplesLabel: 'Experimente perguntar',
+      example1: 'Como tenho dormido ultimamente, e o que devo mudar?',
+      example2: 'A carga de treino desta semana estava certa para mim?',
+      example3: 'Minha recuperação está melhorando ou piorando?',
     },
 
     'components/ai/GraphNodePopover': {
@@ -1878,6 +1926,10 @@ Responda em Markdown.`,
       issueCount: (count: number) => (count === 1 ? '1 aviso' : `${count} avisos`),
       repeat: (count: number) => `×${count}`,
       closePanel: 'Fechar',
+      editHint: 'Clique para editar',
+      edited: 'Editado por você',
+      resetPrompt: 'Restaurar texto automático',
+      fixedTail: 'O ZeppBridge anexa esta parte com base na cobertura real:',
       packageSize: (bytes: string) => `Pacote ≈ ${bytes}`,
       readinessWaiting: 'Os dados mais recentes ainda estão chegando',
       readinessWaitingStep: (current: number, total: number) => `Sincronização ${current}/${total} · isto se atualiza sozinho ao terminar`,
@@ -1960,12 +2012,58 @@ Responda em Markdown.`,
       position: (index: number, total: number) => `${index} / ${total}`,
     },
 
+    'components/deck/FoldDeck': {
+      open: (title: string) => `Abrir "${title}"`,
+      close: 'Recolher',
+      expandAll: 'Expandir tudo',
+      collapseAll: 'Recolher tudo',
+    },
+
     'composables/useAiTaskLibrary': {
       loadFailed: 'Não foi possível carregar os dados da tarefa',
     },
 
     'composables/useAiTaskPreview': {
       previewFailed: 'Não foi possível gerar a prévia',
+    },
+
+    'lib/aiTask/brief': {
+      heading: '[Tarefa]',
+      intro: (range: string) =>
+        `Seguem em anexo meus dados pessoais de saúde exportados do meu relógio Zepp (${range}, organizados localmente pelo ZeppBridge; contêm só os meus próprios dados).`,
+      range: (start: string, end: string) => (start === end ? start : `${start} a ${end}`),
+      rangeUnknown: 'um período recente',
+      fileData: (file: string, labels: string) =>
+        `- ${file}: todos os dados. "context" lista métricas, sono e treinos dia a dia por categoria (${labels}); "coverage" indica quais datas realmente têm dados; "units" dá a unidade de cada campo; "task.personal_note" é a minha nota de contexto pessoal.`,
+      fileWorkouts: (n: number) => `- "workouts" traz os ${n} treino(s) que escolhi de propósito — são o foco da análise.`,
+      fileAttachments: (n: number) =>
+        `- A pasta attachments/ contém ${n} arquivo(s) original(is) que anexei (ex.: exames, capturas de tela); leve-os em conta também.`,
+      fileNote: '- Descrevi a minha situação no contexto pessoal; leve isso em conta.',
+      start: 'Comece a análise imediatamente — não me pergunte antes o que eu quero.',
+      followQuestion: 'Responda em torno da "direção de análise" e da minha pergunta abaixo.',
+      defaultPlan: 'Não fiz uma pergunta específica, então me dê uma análise completa nesta ordem:',
+      step1: '1. Conclusão em uma linha: como eu estive no geral neste período.',
+      step2: (labels: string) =>
+        `2. Categoria por categoria (${labels}): nível, tendência e como se compara com a minha própria linha de base habitual.`,
+      step3: '3. Como as categorias se relacionam — por exemplo, se sono, recuperação e carga de treino se afetam entre si.',
+      step4: '4. Anomalias que valem nota: quais datas ou métricas se desviam claramente do meu normal, e prováveis motivos.',
+      step5: '5. Conselhos práticos para as próximas 1–2 semanas: o que fazer, quanto e quando.',
+      rules: 'Como responder: primeiro a conclusão, depois a evidência; cite datas e valores concretos; aponte as lacunas de dados diretamente e nunca deduza nem complete datas faltantes; responda em português.',
+    },
+
+    'lib/aiTask/fileName': {
+      promptSuffix: 'prompt' as string,
+      cat_workout: 'treinos',
+      cat_sleep: 'sono',
+      cat_recovery: 'prontidão',
+      cat_heart_rate: 'frequência cardíaca',
+      cat_training: 'carga de treino',
+      cat_body: 'corpo',
+      cat_personal_note: 'notas',
+      cat_attachment: 'anexos',
+      twoCategories: (a: string, b: string) => `${a} e ${b}`,
+      manyCategories: (a: string, _b: string, n: number) => `${a} e mais ${n - 1}`,
+      noData: 'sem dados',
     },
 
     'lib/aiTask/metrics': {
@@ -2063,6 +2161,16 @@ Responda em Markdown.`,
       scaleSub: '100% é o tamanho do design; Ctrl + / Ctrl - também funcionam',
 
       retentionSub: 'Só os dias mais recentes são guardados; ignorado enquanto o arquivo de longo prazo estiver ligado',
+    },
+
+    'views/settings/sections/ExportDefaultsSection': {
+      nameTitle: 'Nomes de arquivo da entrega para IA',
+      nameSub: 'Toda exportação é nomeada por esta regra, então a IA sabe pelo nome do arquivo qual período e quais dados ele contém.',
+      ruleRange: 'Intervalo de datas + conteúdo',
+      ruleTask: 'Nome da tarefa + hora',
+      ruleApp: 'ZeppBridge + data',
+      example: 'ex.',
+      exampleTitle: 'Últimos 14 dias',
     },
   },
   errors: {

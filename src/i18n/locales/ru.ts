@@ -927,6 +927,13 @@ export default {
       },
     },
 
+    'components/WheelDatePicker': {
+      year: 'Год',
+      month: 'Месяц',
+      day: 'День',
+      yearSuffix: '' as string,
+      daySuffix: '' as string,
+    },
 
     'components/overview/DataReadyCapsule': {
       waitingEyebrow: 'Забираем ваши данные из облака',
@@ -965,6 +972,17 @@ export default {
       latestAt: (when: string) => `Самая свежая запись · ${when}`,
     },
 
+    'components/overview/OverviewMore': {
+      label: 'Ещё',
+      weekly: 'Эта неделя',
+      weeklySub: 'Сравнение с вашими же предыдущими 28 днями',
+      life: 'Жизненные события',
+      lifeSub: (n: number) =>
+        (n ? plural(n, { one: `${n} событие`, few: `${n} события`, many: `${n} событий`, other: `${n} события` }) : 'Отметьте, что происходило в это время'),
+      sources: 'Источники данных',
+      sourcesSub: 'Устройства и облачный аккаунт',
+    },
+
     'components/overview/RecentCard': {
       recentAria: 'Недавние записи',
       recentTitle: 'Недавние записи',
@@ -999,6 +1017,11 @@ export default {
       seeMore: 'Подробнее',
       stepsNotYet: 'Сегодняшние шаги ещё не дошли до облака',
       stepsLatest: (when: string) => `Самые свежие данные в облаке — от ${when}`,
+      factGoal: 'Цель',
+      factDone: 'Выполнено',
+      factLeft: 'Осталось',
+      factReached: 'Достигнуто',
+      factUpdated: 'Обновлено',
     },
 
     'components/overview/SourcesStrip': {
@@ -1391,6 +1414,7 @@ export default {
 
 
     'views/BodyStatus': {
+      vitalsGroupTitle: 'Восстановление и показатели организма',
       backToOverview: 'Назад к обзору',
       title: 'Состояние тела',
       intro:
@@ -1530,6 +1554,16 @@ export default {
       notProvided: 'Нет данных',
       backToSettings: 'Назад к настройкам',
       title: 'Проверка здоровья данных',
+      summaryStreams: (ok: number, total: number) => `${ok} из ${total} потоков данных в норме`,
+      summaryFailed: (n: number) =>
+        `${plural(n, { one: `${n} поток требует внимания`, few: `${n} потока требуют внимания`, many: `${n} потоков требуют внимания`, other: `${n} потока требуют внимания` })} — раскройте ниже раздел «До какой стадии дошёл каждый поток», там видно, какой шаг не прошёл`,
+      summaryPending: (n: number) =>
+        `${plural(n, { one: `${n} поток пока без данных`, few: `${n} потока пока без данных`, many: `${n} потоков пока без данных`, other: `${n} потока пока без данных` })} — обычно это устройство такие данные просто не производит`,
+      summaryAllGood: 'Всё в норме: получение, разбор и запись пройдены',
+      summaryOccasional: (n: number) =>
+        plural(n, { one: `${n} метрика`, few: `${n} метрики`, many: `${n} метрик`, other: `${n} метрики` }),
+      summaryActions: (n: number) =>
+        (n ? plural(n, { one: `${n} действие`, few: `${n} действия`, many: `${n} действий`, other: `${n} действия` }) : 'Сейчас ничего делать не нужно'),
       intro:
         'Для каждого потока данных: как далеко он дошёл по стадиям получения из облака, разбора и '
         + 'локальной записи; какие даты покрыты; и откуда данные пришли. Отсутствует — значит отсутствует, '
@@ -1670,6 +1704,8 @@ export default {
     },
 
     'views/HeartRateDetail': {
+      dailyMaxFold: 'Необработанные локальные данные без фильтрации — могут отличаться от приложения Zepp',
+      trendsTitle: 'Тренды пульса покоя и ВСР',
       backToOverview: 'Назад к обзору',
       title: 'Пульс',
       intro:
@@ -1870,6 +1906,7 @@ export default {
       paiHint: 'Personal Activity Intelligence по скользящим 7 дням',
       paiEmpty: 'В этом диапазоне записей PAI нет.',
       thresholdLabel: 'Лактатный порог',
+      latestTag: 'Последний',
       thresholdHint: 'Пульс и темп; обновляется только после высокоинтенсивной пробежки',
       thresholdHr: 'Пороговый пульс',
       thresholdPace: 'Пороговый темп',
@@ -1880,6 +1917,9 @@ export default {
       loadUnit: 'баллов',
       thresholdHrTooltip: (value: number) => `Пороговый пульс <b>${value}</b> уд/мин`,
       balanceLabel: 'Баланс тренировочной нагрузки',
+      moreLabel: 'Ещё',
+      zonesLabel: 'Пульсовые зоны',
+      zonesSummary: 'Три модели на выбор, построенные на ваших собственных замерах',
       balanceHint: 'Нагрузка за 7 дней относительно недельного среднего за 28 дней — отношение острой нагрузки к хронической',
       balanceChartAria: 'Нагрузка за 7 и 28 дней с отношением острой к хронической',
       balanceEmpty: 'Записей нагрузки пока не хватает, чтобы провести эту линию.',
@@ -2076,6 +2116,13 @@ export default {
         'Выберите тренировку, отметьте данные и напишите, что хотите узнать, — '
         + 'экспортируйте на рабочий стол и перетащите файл в ИИ.',
       titleLabel: 'Название задачи',
+      rename: 'Нажмите, чтобы переименовать',
+      rangeLabel: 'Период обзора',
+      days: (n: number) =>
+        plural(n, { one: `${n} день`, few: `${n} дня`, many: `${n} дней`, other: `${n} дня` }),
+      history: 'История передач',
+      historyCount: (count: number) => `История передач (${count})`,
+      historyEmpty: 'Ещё ничего не передавалось',
       newTask: 'Новая',
       saved: 'Сохранено',
     },
@@ -2105,6 +2152,10 @@ export default {
       notePlaceholder: 'Травмы, цели, текущая форма… попадут в экспорт для ИИ.',
       hint: 'Направление задаёт рамки, вопрос — фокус; оба передаются ИИ',
       counter: (used: number, max: number) => `${used}/${max}`,
+      examplesLabel: 'Попробуйте спросить так',
+      example1: 'Как я сплю в последнее время и что стоит изменить?',
+      example2: 'Была ли тренировочная нагрузка этой недели подходящей для меня?',
+      example3: 'Моё восстановление улучшается или ухудшается?',
     },
 
     'components/ai/GraphNodePopover': {
@@ -2143,6 +2194,10 @@ export default {
         + 'Открыть сайт — ещё не значит отправить.',
       stale: 'После экспорта задача менялась — файлы на рабочем столе устарели. Экспортируйте заново.',
       closePanel: 'Закрыть',
+      editHint: 'Нажмите, чтобы изменить',
+      edited: 'Изменено вами',
+      resetPrompt: 'Вернуть автоматический текст',
+      fixedTail: 'ZeppBridge добавляет эту часть автоматически, по фактическому покрытию:',
       go: (label: string) => `Передать в ${label}`,
       goSub: 'Экспортировать · скопировать промпт · открыть сайт',
       issueCount: (count: number) =>
@@ -2237,12 +2292,65 @@ export default {
       position: (index: number, total: number) => `${index} / ${total}`,
     },
 
+    'components/deck/FoldDeck': {
+      open: (title: string) => `Развернуть «${title}»`,
+      close: 'Свернуть',
+      expandAll: 'Развернуть все',
+      collapseAll: 'Свернуть все',
+    },
+
     'composables/useAiTaskLibrary': {
       loadFailed: 'Не удалось прочитать данные задачи',
     },
 
     'composables/useAiTaskPreview': {
       previewFailed: 'Не удалось построить предпросмотр',
+    },
+
+    'lib/aiTask/brief': {
+      heading: '[Задача]',
+      intro: (range: string) =>
+        `Во вложении мои личные данные о здоровье, выгруженные с моих часов Zepp (${range}; собраны локально программой ZeppBridge и содержат только мои собственные данные).`,
+      range: (start: string, end: string) => (start === end ? start : `с ${start} по ${end}`),
+      rangeUnknown: 'недавний период',
+      fileData: (file: string, labels: string) =>
+        `- ${file}: все данные. "context" перечисляет метрики, сон и тренировки по дням в каждой категории (${labels}); "coverage" указывает, за какие даты данные есть на самом деле; "units" даёт единицу каждого поля; "task.personal_note" — моя заметка о себе.`,
+      fileWorkouts: (n: number) => plural(n, {
+        one: `- "workouts" — ${n} тренировка, отобранная мной специально, она в фокусе анализа.`,
+        few: `- "workouts" — ${n} тренировки, отобранные мной специально, они в фокусе анализа.`,
+        many: `- "workouts" — ${n} тренировок, отобранных мной специально, они в фокусе анализа.`,
+        other: `- "workouts" — ${n} тренировки, отобранные мной специально, они в фокусе анализа.`,
+      }),
+      fileAttachments: (n: number) =>
+        `- В папке attachments/ — ещё ${plural(n, { one: `${n} оригинал вложения`, few: `${n} оригинала вложений`, many: `${n} оригиналов вложений`, other: `${n} оригинала вложений` })} (например, результаты анализов, снимки экрана); учти их тоже.`,
+      fileNote: '- В личной заметке описана моя ситуация — учитывай её.',
+      start: 'Начни анализ сразу — не спрашивай сначала, что я хочу.',
+      followQuestion: 'Отвечай, опираясь на «направление анализа» и мой вопрос ниже.',
+      defaultPlan: 'Конкретного вопроса у меня нет, поэтому дай полный разбор в таком порядке:',
+      step1: '1. Вывод одной строкой: моё общее состояние за этот период.',
+      step2: (labels: string) =>
+        `2. По категориям (${labels}): уровень, тенденция и сравнение с моей привычной нормой.`,
+      step3: '3. Связи между категориями — например, влияют ли сон, восстановление и тренировочная нагрузка друг на друга.',
+      step4: '4. Заметные отклонения: какие даты или метрики явно выбиваются из моей нормы, и вероятные причины.',
+      step5: '5. Практические советы на ближайшие 1–2 недели: что делать, сколько и когда.',
+      rules:
+        'Как отвечать: сначала вывод, потом доказательства; приводи конкретные даты и значения; '
+        + 'про пробелы в данных говори прямо, не додумывай и не заполняй отсутствующие даты; отвечай на русском языке.',
+    },
+
+    'lib/aiTask/fileName': {
+      promptSuffix: 'промпт',
+      cat_workout: 'тренировки',
+      cat_sleep: 'сон',
+      cat_recovery: 'восстановление',
+      cat_heart_rate: 'пульс',
+      cat_training: 'нагрузка',
+      cat_body: 'тело',
+      cat_personal_note: 'заметки',
+      cat_attachment: 'файлы',
+      twoCategories: (a: string, b: string) => `${a} и ${b}`,
+      manyCategories: (a: string, _b: string, n: number) => `${a} и ещё ${n - 1}`,
+      noData: 'нет данных',
     },
 
     'lib/aiTask/metrics': {
@@ -2400,6 +2508,16 @@ export default {
       scaleSub: '100% — проектный размер; также работают Ctrl + / Ctrl -',
 
       retentionSub: 'Хранятся только последние дни; при включённом долгосрочном архиве не действует',
+    },
+
+    'views/settings/sections/ExportDefaultsSection': {
+      nameTitle: 'Имена файлов для передачи ИИ',
+      nameSub: 'Каждый экспорт называется по этому правилу, так что ИИ по имени файла видит период и состав данных.',
+      ruleRange: 'Диапазон дат + содержимое',
+      ruleTask: 'Имя задачи + время',
+      ruleApp: 'ZeppBridge + дата',
+      example: 'напр.',
+      exampleTitle: 'Последние 14 дней',
     },
   },
 

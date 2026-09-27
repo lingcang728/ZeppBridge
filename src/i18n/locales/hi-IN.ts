@@ -883,6 +883,11 @@ export default {
       seeMore: 'और देखें',
       stepsLatest: (when: string) => `क्लाउड का नवीनतम डेटा ${when} का है`,
       stepsNotYet: 'आज के कदम अभी क्लाउड तक नहीं पहुँचे',
+      factGoal: 'लक्ष्य',
+      factDone: 'पूरा हुआ',
+      factLeft: 'बाक़ी',
+      factReached: 'लक्ष्य पूरा',
+      factUpdated: 'अपडेट हुआ',
     },
 
     'components/shell/AppTopBar': {
@@ -1259,6 +1264,7 @@ export default {
 
 
     'views/BodyStatus': {
+      vitalsGroupTitle: 'रिकवरी और शारीरिक संकेतक',
       backToOverview: 'ओवरव्यू पर वापस',
       bmiHint: 'बॉडी मास इंडेक्स, वज़न के साथ क्लाउड भेजता है',
       bmiLabel: 'BMI',
@@ -1484,6 +1490,12 @@ export default {
       stageWrite: 'लिखना',
       streamsNote: 'लाना, पार्स करना और लिखना तीन अलग-अलग विफल होने वाली चीज़ें हैं। एक लाल बिंदु में समेट दें तो पता नहीं चलता कि फिर कोशिश करनी है, फिर जुड़ना है, या इस खाते में यह स्ट्रीम है ही नहीं।',
       streamsTitle: 'हर स्ट्रीम कहाँ तक पहुँची',
+      summaryActions: (n: number) => (n ? `${n} उपलब्ध` : 'अभी कुछ करने को नहीं'),
+      summaryAllGood: 'सब ठीक: लाना, पार्स करना और लिखना — तीनों पूरे हुए',
+      summaryFailed: (n: number) => `${n} में गड़बड़ी है — नीचे "हर स्ट्रीम कहाँ तक पहुँची" खोलकर देखें कि कौन-सा कदम अटका`,
+      summaryOccasional: (n: number) => `${n} मेट्रिक्स`,
+      summaryPending: (n: number) => `${n} में अभी डेटा नहीं है — आमतौर पर यह डिवाइस इन्हें रिकॉर्ड ही नहीं करता`,
+      summaryStreams: (ok: number, total: number) => `${ok} / ${total} डेटा स्ट्रीम ठीक`,
       timeUnknown: 'समय अज्ञात',
       timingCloud: 'पिछली बार क्लाउड से लाया गया',
       timingCloudNote: 'अभी कोई नतीजा नहीं',
@@ -1501,6 +1513,8 @@ export default {
     },
 
     'views/HeartRateDetail': {
+      dailyMaxFold: 'इस मशीन के कच्चे सैंपल, बिना फ़िल्टर — Zepp ऐप के आंकड़ों से अलग हो सकते हैं',
+      trendsTitle: 'रेस्टिंग हार्ट रेट और एचआरवी के रुझान',
       backToOverview: 'ओवरव्यू पर वापस',
       bpmTooltip: (clock: string, value: number) => `${clock} <b>${value}</b> bpm`,
       chartAria: 'पिछले 24 घंटों का हार्ट रेट',
@@ -1672,12 +1686,14 @@ export default {
       chronicWeekly: '28-दिन साप्ताहिक औसत',
       desktopOnly: 'डेस्कटॉप ऐप इस्तेमाल करें। यह ब्राउज़र प्रीव्यू खाते का डेटा नहीं पढ़ता।',
       intro: 'VO₂max, लैक्टेट थ्रेशोल्ड, ट्रेनिंग लोड और हार्ट रेट ज़ोन। सब सिंक हुए रिकॉर्ड्स से पढ़े गए; कोई कोचिंग सलाह नहीं।',
+      latestTag: 'नवीनतम',
       loadEmpty: 'इस सीमा में कोई ट्रेनिंग लोड रिकॉर्ड नहीं।',
       loadFailed: 'ट्रेनिंग स्टेटस डेटा अभी उपलब्ध नहीं है',
       loadHint: 'दैनिक ट्रेनिंग लोड स्कोर',
       loadLabel: 'ट्रेनिंग लोड',
       loadUnit: 'लोड',
       loadingAria: 'ट्रेनिंग स्टेटस लोड हो रहा है',
+      moreLabel: 'और',
       notProvided: 'उपलब्ध नहीं',
       paiEmpty: 'इस सीमा में कोई PAI रिकॉर्ड नहीं।',
       paiHint: 'लगातार 7 दिन का पर्सनल एक्टिविटी इंटेलिजेंस',
@@ -1698,6 +1714,8 @@ export default {
       title: 'ट्रेनिंग स्टेटस',
       vo2Empty: 'इस सीमा में कोई VO₂max रिकॉर्ड नहीं; यह सिर्फ़ आउटडोर रन के बाद अपडेट होता है।',
       vo2Hint: 'अधिकतम ऑक्सीजन उपयोग, आउटडोर रन के बाद घड़ी का अनुमान',
+      zonesLabel: 'हार्ट रेट ज़ोन',
+      zonesSummary: 'तीन एल्गोरिदम में से एक चुनें, आपकी मापी परिसीमाओं पर आधारित',
     },
 
     'views/WorkoutDetail': {
@@ -1856,12 +1874,26 @@ Markdown में जवाब दें।`,
       title: 'वर्कआउट',
     },
 
+    'components/WheelDatePicker': {
+      day: 'दिन',
+      daySuffix: '' as string,
+      month: 'महीना',
+      year: 'वर्ष',
+      yearSuffix: '' as string,
+    },
+
     'components/ai/AiTaskHeader': {
       pageTitle: 'AI को सौंपें',
       intro: 'वर्कआउट चुनें, डेटा चुनें, लिखें कि क्या जानना है — डेस्कटॉप पर एक्सपोर्ट करके सीधे AI में खींचकर डालें।',
       titleLabel: 'टास्क का नाम',
       newTask: 'नया',
       saved: 'सेव हुआ',
+      days: (n: number) => `${n} दिन`,
+      history: 'सौंपने का इतिहास',
+      historyCount: (count: number) => `सौंपने का इतिहास (${count})`,
+      historyEmpty: 'अभी तक कुछ नहीं सौंपा गया',
+      rangeLabel: 'कितने दिन पीछे देखें',
+      rename: 'नाम बदलने के लिए क्लिक करें',
     },
 
     'components/ai/CoverageDetails': {
@@ -1885,6 +1917,10 @@ Markdown में जवाब दें।`,
       counter: (used: number, max: number) => `${used}/${max}`,
       noteLabel: 'निजी पृष्ठभूमि (वैकल्पिक)',
       notePlaceholder: 'चोट का इतिहास, लक्ष्य, हाल की फ़ॉर्म… एक्सपोर्ट में शामिल होकर AI के संदर्भ के काम आते हैं।',
+      examplesLabel: 'ऐसे पूछकर देखें',
+      example1: 'हाल में मेरी नींद कैसी रही, और क्या बदलना चाहिए?',
+      example2: 'इस हफ़्ते का ट्रेनिंग लोड मेरे लिए सही था?',
+      example3: 'मेरी रिकवरी बेहतर हो रही है या बिगड़ रही है?',
     },
 
     'components/ai/GraphNodePopover': {
@@ -1930,6 +1966,10 @@ Markdown में जवाब दें।`,
       readinessWaiting: 'नवीनतम डेटा अभी रास्ते में है',
       readinessWaitingStep: (current: number, total: number) => `सिंक ${current}/${total} · पूरा होते ही यहाँ अपने आप रीफ़्रेश होता है`,
       readinessWaitingSub: 'सिंक पूरा होते ही यह अपने आप रीफ़्रेश हो जाता है',
+      editHint: 'बदलने के लिए क्लिक करें',
+      edited: 'आपने बदला है',
+      resetPrompt: 'अपने-आप वाला टेक्स्ट वापस लाएँ',
+      fixedTail: 'नीचे का यह हिस्सा ZeppBridge असली कवरेज के हिसाब से अपने आप जोड़ता है:',
     },
 
     'components/ai/HandoffSteps': {
@@ -2008,12 +2048,64 @@ Markdown में जवाब दें।`,
       position: (index: number, total: number) => `${index} / ${total}`,
     },
 
+    'components/deck/FoldDeck': {
+      close: 'समेटें',
+      collapseAll: 'सब समेटें',
+      expandAll: 'सब खोलें',
+      open: (title: string) => `“${title}” खोलें`,
+    },
+
+    'components/overview/OverviewMore': {
+      label: 'और',
+      life: 'लाइफ़ इवेंट्स',
+      lifeSub: (n: number) => (n ? `${n} इवेंट` : 'इस दौरान क्या हुआ वह लिखें'),
+      sources: 'डेटा स्रोत',
+      sourcesSub: 'डिवाइस और क्लाउड खाता',
+      weekly: 'यह हफ़्ता',
+      weeklySub: 'आपके अपने पिछले 28 दिनों से तुलना',
+    },
+
     'composables/useAiTaskLibrary': {
       loadFailed: 'टास्क का डेटा नहीं पढ़ा जा सका',
     },
 
     'composables/useAiTaskPreview': {
       previewFailed: 'प्रीव्यू नहीं बन सका',
+    },
+
+    'lib/aiTask/brief': {
+      defaultPlan: 'मैंने कोई ख़ास सवाल नहीं पूछा, इसलिए इसी क्रम में मुझे पूरा विश्लेषण दें:',
+      fileAttachments: (n: number) => `- attachments/ फ़ोल्डर में मेरी जोड़ी हुई ${n} मूल फ़ाइलें हैं (जैसे लैब रिपोर्ट, स्क्रीनशॉट); कृपया उन्हें भी देखें।`,
+      fileData: (file: string, labels: string) => `- ${file}: पूरा डेटा। "context" श्रेणी-वार (${labels}) दिन-दर-दिन मेट्रिक्स, नींद और वर्कआउट देता है; "coverage" बताता है कि किन तारीख़ों का डेटा सच में है; "units" हर फ़ील्ड की इकाई देता है; "task.personal_note" मेरा लिखा निजी संदर्भ है।`,
+      fileNote: '- मैंने निजी पृष्ठभूमि में अपनी स्थिति लिखी है; उसे ध्यान में रखें।',
+      fileWorkouts: (n: number) => `- इसमें "workouts" वे ${n} वर्कआउट हैं जो मैंने इस बार जानबूझकर चुने — विश्लेषण का फ़ोकस यही हैं।`,
+      followQuestion: 'नीचे दी गई "विश्लेषण दिशा" और मेरे सवाल को ध्यान में रखकर उत्तर दें।',
+      heading: '[टास्क]',
+      intro: (range: string) => `नीचे मेरी Zepp घड़ी से एक्सपोर्ट किया गया मेरा निजी स्वास्थ्य डेटा है (${range}, ZeppBridge ने इसी मशीन पर व्यवस्थित किया; इसमें सिर्फ़ मेरा अपना डेटा है)।`,
+      range: (start: string, end: string) => (start === end ? start : `${start} से ${end}`),
+      rangeUnknown: 'हाल के दिनों',
+      rules: 'उत्तर कैसे दें: पहले निष्कर्ष, फिर सबूत; ख़ास तारीख़ें और मान बताएँ; डेटा के गैप साफ़ बताएँ और गायब तारीख़ों का अनुमान या पूर्ति कभी न करें; उत्तर हिन्दी में दें।',
+      start: 'कृपया विश्लेषण तुरंत शुरू करें — पहले मुझसे मत पूछें कि मैं क्या चाहता हूँ।',
+      step1: '1. एक पंक्ति में निष्कर्ष: इस दौरान मेरी कुल स्थिति कैसी रही।',
+      step2: (labels: string) => `2. श्रेणी दर श्रेणी (${labels}): स्तर, रुझान, और मेरी अपनी सामान्य बेसलाइन से तुलना।`,
+      step3: '3. श्रेणियों का आपसी रिश्ता — जैसे नींद, रिकवरी और ट्रेनिंग लोड एक-दूसरे को प्रभावित करते हैं या नहीं।',
+      step4: '4. ध्यान देने लायक असामान्यताएँ: कौन-सी तारीख़ें या मेट्रिक्स मेरे सामान्य से साफ़ हटकर हैं, और संभावित कारण।',
+      step5: '5. अगले 1–2 हफ़्तों के लिए काम करने लायक सलाह: क्या करें, कितना, और कब।',
+    },
+
+    'lib/aiTask/fileName': {
+      cat_attachment: 'फ़ाइलें',
+      cat_body: 'शरीर',
+      cat_heart_rate: 'हार्ट रेट',
+      cat_personal_note: 'नोट',
+      cat_recovery: 'रिकवरी',
+      cat_sleep: 'नींद',
+      cat_training: 'ट्रेनिंग',
+      cat_workout: 'वर्कआउट',
+      manyCategories: (a: string, _b: string, n: number) => `${a} और ${n - 1} और`,
+      noData: 'कोई डेटा नहीं',
+      promptSuffix: 'प्रॉम्प्ट',
+      twoCategories: (a: string, b: string) => `${a} और ${b}`,
     },
 
     'lib/aiTask/metrics': {
@@ -2160,6 +2252,16 @@ Markdown में जवाब दें।`,
       scaleSub: '100% डिज़ाइन साइज़ है; Ctrl + / Ctrl - भी चलते हैं',
 
       retentionSub: 'सिर्फ़ सबसे हाल के दिन रखे जाते हैं; दीर्घकालिक आर्काइव चालू होने पर लागू नहीं होता',
+    },
+
+    'views/settings/sections/ExportDefaultsSection': {
+      example: 'जैसे',
+      exampleTitle: 'पिछले 14 दिन',
+      nameSub: 'हर एक्सपोर्ट इसी नियम से नाम पाता है, इसलिए AI फ़ाइल नाम देखकर ही बता सकता है कि कौन-सी अवधि और कौन-सा डेटा है।',
+      nameTitle: 'AI को दी जाने वाली फ़ाइलों के नाम',
+      ruleApp: 'ZeppBridge + तारीख़',
+      ruleRange: 'तारीख़-सीमा + कंटेंट',
+      ruleTask: 'टास्क का नाम + समय',
     },
   },
   errors: {

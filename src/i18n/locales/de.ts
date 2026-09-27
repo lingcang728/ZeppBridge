@@ -1152,6 +1152,11 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       stepsPanelAria: 'Details zur täglichen Aktivität öffnen',
       stepsTitle: 'Schritte heute',
       stepsUnit: 'Schritte',
+      factGoal: 'Ziel',
+      factDone: 'Geschafft',
+      factLeft: 'Noch offen',
+      factReached: 'Erreicht',
+      factUpdated: 'Aktualisiert',
     },
     'components/shell/AppTopBar': {
       today: 'Heute',
@@ -1525,6 +1530,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       undoUnpicked: (name: string) => `Auswahl von „${name}" aufgehoben`,
     },
     'views/BodyStatus': {
+      vitalsGroupTitle: 'Erholung und Vitalwerte',
       backToOverview: 'Zurück zur Übersicht',
       bmiHint: 'Body-Mass-Index, von der Cloud zusammen mit dem Gewicht geliefert',
       bmiLabel: 'BMI',
@@ -1787,6 +1793,14 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       streamsNote:
         'Abrufen, Parsen und Schreiben sind drei Dinge, die einzeln fehlschlagen. Zu einem roten Punkt zusammengefaltet, könntest du nicht sagen, ob du es erneut versuchen, neu verbinden sollst oder ob dieses Konto diesen Datenstrom schlicht nicht hat.',
       streamsTitle: 'Wie weit jeder Datenstrom kam',
+      summaryActions: (n: number) => (n ? `${n} verfügbar` : 'Im Moment nichts zu tun'),
+      summaryAllGood: 'Alles in Ordnung: Abrufen, Parsen und Schreiben sind alle durchgelaufen',
+      summaryFailed: (n: number) =>
+        `${n} brauchen Aufmerksamkeit – klapp unten „Wie weit jeder Datenstrom kam" auf, dort steht der Schritt`,
+      summaryOccasional: (n: number) => `${n} Metriken`,
+      summaryPending: (n: number) =>
+        `${n} haben noch keine Daten – meist zeichnet das Gerät sie schlicht nicht auf`,
+      summaryStreams: (ok: number, total: number) => `${ok} / ${total} Datenströme in Ordnung`,
       timeUnknown: 'Zeit unbekannt',
       timingCloud: 'Zuletzt aus der Cloud abgerufen',
       timingCloudNote: 'Noch kein Ergebnis',
@@ -1804,6 +1818,8 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       window90: 'Letzte 90 Tage',
     },
     'views/HeartRateDetail': {
+      dailyMaxFold: 'Rohwerte auf diesem Rechner, ungefiltert – kann von der Zepp-App abweichen',
+      trendsTitle: 'Ruheherzfrequenz- und HRV-Trends',
       backToOverview: 'Zurück zur Übersicht',
       bpmTooltip: (clock: string, value: number) => `${clock}　<b>${value}</b> bpm`,
       chartAria: 'Herzfrequenz der letzten 24 Stunden',
@@ -2000,12 +2016,14 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         'Nutze die Desktop-App. Diese Browser-Vorschau liest keine Kontodaten.',
       intro:
         'VO₂max, Laktatschwelle, Trainingsbelastung und Herzfrequenzzonen. Alle aus synchronisierten Einträgen gelesen; keine Trainingsratschläge.',
+      latestTag: 'Neueste',
       loadEmpty: 'Keine Trainingsbelastungs-Einträge in diesem Zeitraum.',
       loadFailed: 'Trainingsstatus-Daten sind gerade nicht verfügbar',
       loadHint: 'Täglicher Trainingsbelastungs-Score',
       loadLabel: 'Trainingsbelastung',
       loadUnit: '' as string,
       loadingAria: 'Trainingsstatus wird geladen',
+      moreLabel: 'Mehr',
       notProvided: 'Nicht angegeben',
       paiEmpty: 'Keine PAI-Einträge in diesem Zeitraum.',
       paiHint: 'Personal Activity Intelligence über rollende 7 Tage',
@@ -2030,6 +2048,8 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       vo2Empty:
         'Keine VO₂max-Einträge in diesem Zeitraum; er aktualisiert sich nur nach einem Lauf im Freien.',
       vo2Hint: 'Maximale Sauerstoffaufnahme, von der Uhr nach Läufen im Freien geschätzt',
+      zonesLabel: 'Herzfrequenzzonen',
+      zonesSummary: 'Wähle eines von drei Modellen, auf Basis deiner eigenen Messwerte',
     },
     'views/WorkoutDetail': {
       aiPrompt: (label: string) => `Du bist ein Sportanalyst. Unten steht der vollständige Eintrag einer Trainingseinheit von mir (${label}), aus der lokalen ZeppBridge-Datenbank und anonymisiert.
@@ -2209,11 +2229,24 @@ Antworte in Markdown.`,
       title: 'Trainings',
     },
     // ── KI-Aufgaben (W4) ──
+    'components/WheelDatePicker': {
+      day: 'Tag',
+      daySuffix: '' as string,
+      month: 'Monat',
+      year: 'Jahr',
+      yearSuffix: '' as string,
+    },
     'components/ai/AiTaskHeader': {
+      days: (n: number) => `${n} Tage`,
+      history: 'Übergabeverlauf',
+      historyCount: (count: number) => `Übergabeverlauf (${count})`,
+      historyEmpty: 'Noch nichts übergeben',
       intro:
         'Wähle ein Training, such dir die Daten aus und schreib, was du wissen willst – exportiere auf den Desktop und ziehe es in die KI.',
       newTask: 'Neu',
       pageTitle: 'An KI übergeben',
+      rangeLabel: 'Rückblickzeitraum',
+      rename: 'Zum Umbenennen klicken',
       saved: 'Gespeichert',
       titleLabel: 'Aufgabenname',
     },
@@ -2231,6 +2264,10 @@ Antworte in Markdown.`,
       directionHint:
         'Eine Richtung zu wählen übernimmt auch ihren empfohlenen Datenbereich – du siehst es im Graphen und kannst es rückgängig machen.',
       directionLabel: 'Analyserichtung (Vorlage)',
+      example1: 'Wie habe ich in letzter Zeit geschlafen, und was sollte ich ändern?',
+      example2: 'Passte die Trainingsbelastung dieser Woche für mich?',
+      example3: 'Wird meine Erholung besser oder schlechter?',
+      examplesLabel: 'Versuch es so',
       hint: 'Die Richtung gibt den Rahmen, die Frage den Fokus – beides geht an die KI',
       noDirection: 'Keine',
       noteLabel: 'Persönlicher Hintergrund (optional)',
@@ -2274,8 +2311,11 @@ Antworte in Markdown.`,
       desktopOnly: 'Verbinde die Desktop-App, um zu exportieren',
       dragHint:
         'Ziehe die Dateien aus diesem Ordner in den KI-Chat und füge danach den Prompt ein. Die Seite zu öffnen ist noch kein Senden.',
+      editHint: 'Zum Bearbeiten klicken',
+      edited: 'Von dir geändert',
       exportOnly: 'Nur auf den Desktop exportieren',
       finalPrompt: 'Finaler Prompt (genau das wird kopiert)',
+      fixedTail: 'Diesen Teil hängt ZeppBridge anhand der tatsächlichen Abdeckung an:',
       go: (label: string) => `An ${label} übergeben`,
       goSub: 'Exportieren · Prompt kopieren · Seite öffnen',
       issueCount: (count: number) =>
@@ -2293,6 +2333,7 @@ Antworte in Markdown.`,
         `Synchronisierung ${current}/${total} · aktualisiert sich von selbst, sobald sie durch ist`,
       readinessWaitingSub: 'Aktualisiert sich von selbst, sobald die Synchronisierung durch ist',
       repeat: (count: number) => `×${count}`,
+      resetPrompt: 'Automatisch erzeugten Text wiederherstellen',
       reveal: 'Im Explorer anzeigen',
       lastExport: 'Letzter Export · Ordner öffnen',
       run: (label: string) => `Auf den Desktop exportieren und ${label} öffnen`,
@@ -2374,11 +2415,73 @@ Antworte in Markdown.`,
       open: (title: string) => `„${title}" öffnen`,
       position: (index: number, total: number) => `${index} / ${total}`,
     },
+    'components/deck/FoldDeck': {
+      close: 'Zuklappen',
+      collapseAll: 'Alle zuklappen',
+      expandAll: 'Alle aufklappen',
+      open: (title: string) => `„${title}" aufklappen`,
+    },
+    'components/overview/OverviewMore': {
+      label: 'Mehr',
+      life: 'Lebensereignisse',
+      lifeSub: (n: number) =>
+        (n ? `${n} Ereignisse` : 'Notiere, was in dieser Zeit passiert ist'),
+      sources: 'Datenquellen',
+      sourcesSub: 'Geräte und Cloud-Konto',
+      weekly: 'Diese Woche',
+      weeklySub: 'Gegen deine eigenen 28 Tage davor',
+    },
     'composables/useAiTaskLibrary': {
       loadFailed: 'Die Aufgabendaten konnten nicht geladen werden',
     },
     'composables/useAiTaskPreview': {
       previewFailed: 'Die Vorschau konnte nicht erstellt werden',
+    },
+    'lib/aiTask/brief': {
+      defaultPlan:
+        'Ich habe keine konkrete Frage gestellt – gib mir deshalb eine vollständige Analyse in dieser Reihenfolge:',
+      fileAttachments: (n: number) =>
+        `- Der Ordner attachments/ enthält ${n} Originaldatei(en), die ich beigefügt habe (z. B. Befunde, Screenshots); bitte ebenfalls berücksichtigen.`,
+      fileData: (file: string, labels: string) =>
+        `- ${file}: alle Daten. „context" listet Metriken, Schlaf und Trainingseinheiten pro Kategorie (${labels}) Tag für Tag; „coverage" gibt an, welche Tage tatsächlich Daten haben; „units" nennt die Einheit jedes Felds; „task.personal_note" ist mein persönlicher Hintergrund.`,
+      fileNote:
+        '- Ich habe meine Situation im persönlichen Hintergrund beschrieben – beziehe sie mit ein.',
+      fileWorkouts: (n: number) =>
+        `- „workouts" enthält die ${n} Trainingseinheit(en), die ich bewusst ausgewählt habe – sie sind der Schwerpunkt.`,
+      followQuestion:
+        'Richte deine Antwort an der unten stehenden „Analyserichtung" und meiner Frage aus.',
+      heading: '[Aufgabe]',
+      intro: (range: string) =>
+        `Anbei meine persönlichen Gesundheitsdaten, aus meiner Zepp-Uhr exportiert (${range}, lokal von ZeppBridge aufbereitet; sie enthalten nur meine eigenen Daten).`,
+      range: (start: string, end: string) => (start === end ? start : `${start} bis ${end}`),
+      rangeUnknown: 'ein aktueller Zeitraum',
+      rules:
+        'Antwortweise: erst das Fazit, dann die Belege; nenne konkrete Daten und Werte; weise Datenlücken klar aus, rate nicht und ergänze keine fehlenden Tage; antworte auf Deutsch.',
+      start:
+        'Beginne die Analyse bitte direkt – frag mich nicht zuerst, was ich möchte.',
+      step1: '1. Fazit in einem Satz: wie es mir in diesem Zeitraum insgesamt ging.',
+      step2: (labels: string) =>
+        `2. Kategorie für Kategorie (${labels}): Niveau, Trend und Vergleich mit meiner eigenen üblichen Baseline.`,
+      step3:
+        '3. Zusammenhänge zwischen den Kategorien – z. B. ob Schlaf, Erholung und Trainingsbelastung einander beeinflussen.',
+      step4:
+        '4. Auffälligkeiten: welche Tage oder Metriken deutlich von meiner Norm abweichen, und wahrscheinliche Gründe.',
+      step5:
+        '5. Umsetzbare Empfehlungen für die nächsten 1–2 Wochen: was tun, wie viel und wann.',
+    },
+    'lib/aiTask/fileName': {
+      cat_attachment: 'Dateien',
+      cat_body: 'Körper',
+      cat_heart_rate: 'Herzfrequenz',
+      cat_personal_note: 'Notizen',
+      cat_recovery: 'Erholung',
+      cat_sleep: 'Schlaf',
+      cat_training: 'Training',
+      cat_workout: 'Workouts',
+      manyCategories: (a: string, _b: string, n: number) => `${a} und ${n - 1} weitere`,
+      noData: 'keine Daten',
+      promptSuffix: 'Prompt',
+      twoCategories: (a: string, b: string) => `${a} und ${b}`,
     },
     'lib/aiTask/metrics': {
       active_calories: 'Aktivitätskalorien',
@@ -2526,6 +2629,16 @@ Antworte in Markdown.`,
       themeLabel: 'Theme',
       themeLight: 'Hell',
       themeSystem: 'System',
+    },
+    'views/settings/sections/ExportDefaultsSection': {
+      example: 'z. B.',
+      exampleTitle: 'Letzte 14 Tage',
+      nameSub:
+        'Jeder Export wird nach dieser Regel benannt, sodass die KI Zeitraum und Daten schon am Dateinamen erkennt.',
+      nameTitle: 'Dateinamen für die KI-Übergabe',
+      ruleApp: 'ZeppBridge + Datum',
+      ruleRange: 'Zeitraum + Inhalt',
+      ruleTask: 'Aufgabenname + Uhrzeit',
     },
   },
 } satisfies LocalePack;

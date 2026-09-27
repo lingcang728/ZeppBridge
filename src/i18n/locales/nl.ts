@@ -496,6 +496,13 @@ export default {
         'weekly.training_load': 'Trainingsbelasting',
       },
     },
+    'components/WheelDatePicker': {
+      day: 'Dag',
+      daySuffix: '' as string,
+      month: 'Maand',
+      year: 'Jaar',
+      yearSuffix: '' as string,
+    },
     'components/overview/DataReadyCapsule': {
       cta: 'Doorgeven aan AI',
       dismiss: 'Niet nu',
@@ -529,6 +536,18 @@ export default {
       zoneFat: 'Vetverbranding 100–139',
       zoneAerobic: 'Aeroob 140–169',
       zoneAnaerobic: 'Anaeroob 170+',
+    },
+    'components/overview/OverviewMore': {
+      label: 'Meer',
+      life: 'Levensgebeurtenissen',
+      lifeSub: (n: number) =>
+        (n
+          ? plural(n, { one: `${n} gebeurtenis`, other: `${n} gebeurtenissen` })
+          : 'Leg vast wat er in deze periode gebeurde'),
+      sources: 'Gegevensbronnen',
+      sourcesSub: 'Apparaten en cloudaccount',
+      weekly: 'Deze week',
+      weeklySub: 'Vergeleken met je eigen afgelopen 28 dagen',
     },
     'components/overview/RecentCard': {
       recentAria: 'Recente records',
@@ -574,6 +593,11 @@ export default {
         `De nieuwste gegevens in de cloud zijn van ${when}`,
       stepsNotYet: 'De stappen van vandaag hebben de cloud nog niet bereikt',
       seeMore: 'Meer zien',
+      factGoal: 'Doel',
+      factDone: 'Gedaan',
+      factLeft: 'Resterend',
+      factReached: 'Gehaald',
+      factUpdated: 'Bijgewerkt',
     },
     'components/shell/AppTopBar': {
       today: 'Vandaag',
@@ -676,6 +700,39 @@ export default {
       backfillingStream: (stream: string, month: string) =>
         `${stream.toLowerCase()} ophalen · ${month}`,
     },
+    'lib/aiTask/brief': {
+      defaultPlan:
+        'Ik heb geen specifieke vraag gesteld, dus geef me een volledige analyse in deze volgorde:',
+      fileAttachments: (n: number) =>
+        `- In de map attachments/ staan ${n} originele bestanden die ik zelf heb toegevoegd (bijv. labuitslagen, screenshots); gebruik ze ook.`,
+      fileData: (file: string, labels: string) =>
+        `- ${file}: alle gegevens. "context" zet metrieken, slaap en trainingen per categorie (${labels}) dag voor dag op een rij; "coverage" geeft aan welke datums daadwerkelijk gegevens hebben; "units" geeft de eenheid van elk veld; "task.personal_note" is mijn eigen achtergrondnotitie.`,
+      fileNote:
+        '- In de persoonlijke achtergrond heb ik mijn situatie beschreven; neem die mee in je beoordeling.',
+      fileWorkouts: (n: number) =>
+        `- "workouts" bevat de ${n} training(en) die ik bewust heb uitgekozen — die zijn de focus.`,
+      followQuestion:
+        'Beantwoord rond de "analyserichting" en mijn vraag hieronder.',
+      heading: '[Taak]',
+      intro: (range: string) =>
+        `Bijgevoegd vind je mijn persoonlijke gezondheidsgegevens, geëxporteerd uit mijn Zepp-horloge (${range}, lokaal samengesteld door ZeppBridge; het bevat alleen mijn eigen gegevens).`,
+      range: (start: string, end: string) =>
+        (start === end ? start : `${start} tot ${end}`),
+      rangeUnknown: 'een recente periode',
+      rules:
+        'Hoe te antwoorden: eerst de conclusie, dan het bewijs; noem concrete datums en waarden; wijs gaten in de gegevens gewoon aan en gis of vul ontbrekende datums nooit; antwoord in het Nederlands.',
+      start: 'Begin direct met de analyse — vraag niet eerst wat ik wil.',
+      step1:
+        '1. Conclusie in één zin: hoe het me deze periode in het algemeen afging.',
+      step2: (labels: string) =>
+        `2. Per categorie (${labels}): het niveau, de trend en hoe het zich verhoudt tot mijn eigen gebruikelijke basislijn.`,
+      step3:
+        '3. Hoe de categorieën zich tot elkaar verhouden — bijv. of slaap, herstel en trainingsbelasting elkaar beïnvloeden.',
+      step4:
+        '4. Afwijkingen die opvallen: welke datums of metrieken duidelijk afwijken van mijn norm, met waarschijnlijke oorzaken.',
+      step5:
+        '5. Uitvoerbaar advies voor de komende 1–2 weken: wat te doen, hoeveel en wanneer.',
+    },
     'lib/aiTask/copy': {
       'ui.ai_task.cat.workout': 'Trainingen',
       'ui.ai_task.cat.sleep': 'Slaap',
@@ -712,6 +769,21 @@ export default {
       'ui.ai_template.hr_drift.prompt':
         'Analyseer de hartslagdrift in deze training: de stijging bij constant tempo, beoordeeld tegen twee weken slaap en trainingsbelasting — vermoeidheid, weer, of een verandering in conditie?',
       fallbackIssue: 'Een statusnotitie kon niet worden herkend',
+    },
+    'lib/aiTask/fileName': {
+      cat_attachment: 'bestanden',
+      cat_body: 'lichaam',
+      cat_heart_rate: 'hartslag',
+      cat_personal_note: 'notities',
+      cat_recovery: 'herstel',
+      cat_sleep: 'slaap',
+      cat_training: 'training' as string,
+      cat_workout: 'trainingen',
+      manyCategories: (a: string, _b: string, n: number) =>
+        `${a} en nog ${n - 1} meer`,
+      noData: 'geen gegevens',
+      promptSuffix: 'prompt' as string,
+      twoCategories: (a: string, b: string) => `${a} en ${b}`,
     },
     'lib/bridge/errors': {
       desktopOnly: 'Gebruik de desktop-app',
@@ -1326,6 +1398,7 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       undoDirection: 'Analyserichting gewijzigd',
     },
     'views/BodyStatus': {
+      vitalsGroupTitle: 'Herstel en vitale waarden',
       backToOverview: 'Terug naar overzicht',
       title: 'Lichaamsstatus',
       intro:
@@ -1464,6 +1537,29 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       notProvided: 'Niet verstrekt',
       backToSettings: 'Terug naar instellingen',
       title: 'Gegevensgezondheidscontrole',
+      summaryStreams: (ok: number, total: number) =>
+        `${ok} / ${total} gegevensstromen gezond`,
+      summaryFailed: (n: number) =>
+        plural(n, {
+          one: `${n} stroom heeft een probleem — klap hieronder "Hoe ver elke stroom kwam" open om te zien welke stap`,
+          other: `${n} stromen hebben een probleem — klap hieronder "Hoe ver elke stroom kwam" open om te zien welke stap`,
+        }),
+      summaryPending: (n: number) =>
+        plural(n, {
+          one: `${n} stroom heeft nog geen gegevens — meestal produceert dit apparaat die simpelweg niet`,
+          other: `${n} stromen hebben nog geen gegevens — meestal produceert dit apparaat ze simpelweg niet`,
+        }),
+      summaryAllGood:
+        'Alles in orde: ophalen, parsen en schrijven zijn alle drie afgerond',
+      summaryOccasional: (n: number) =>
+        plural(n, { one: `${n} metriek`, other: `${n} metrieken` }),
+      summaryActions: (n: number) =>
+        (n
+          ? plural(n, {
+              one: `${n} actie beschikbaar`,
+              other: `${n} acties beschikbaar`,
+            })
+          : 'Er is nu niets te doen'),
       intro:
         'Per gegevensstroom: hoe ver hij kwam met ophalen uit de cloud, parsen en lokaal schrijven; welke datums hij dekt; en waar hij vandaan kwam. Ontbrekend is ontbrekend — nooit opgevuld met een nul.',
       rangeAria: 'Dekkingsvenster',
@@ -1599,6 +1695,8 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       },
     },
     'views/HeartRateDetail': {
+      dailyMaxFold: 'Ruwe samples op deze machine, ongefilterd — kan afwijken van de Zepp-app',
+      trendsTitle: 'Rusthartslag- en HRV-trends',
       backToOverview: 'Terug naar overzicht',
       title: 'Hartslag',
       intro:
@@ -1800,6 +1898,7 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       paiHint: 'Personal Activity Intelligence over een schuivende 7 dagen',
       paiEmpty: 'Geen PAI-records in deze periode.',
       thresholdLabel: 'Lactaatdrempel',
+      latestTag: 'Nieuwste',
       thresholdHint: 'Hartslag en tempo; werkt alleen bij na een zware run',
       thresholdHr: 'Drempelhartslag',
       thresholdPace: 'Drempeltempo',
@@ -1812,6 +1911,10 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       loadUnit: 'belasting',
       thresholdHrTooltip: (value: number) => `Drempelhartslag <b>${value}</b> bpm`,
       balanceLabel: 'Balans van trainingsbelasting',
+      moreLabel: 'Meer',
+      zonesLabel: 'Hartslagzones',
+      zonesSummary:
+        'Kies een van de drie modellen, verdeeld op je eigen gemeten basiswaarden',
       balanceHint:
         '7-daagse belasting tegenover het 28-daagse weekgemiddelde, d.w.z. de acuut-chronisch-ratio',
       balanceChartAria:
@@ -2014,6 +2117,13 @@ Antwoord in Markdown.`,
       titleLabel: 'Taaknaam',
       newTask: 'Nieuw',
       saved: 'Opgeslagen',
+      days: (n: number) =>
+        plural(n, { one: `${n} dag`, other: `${n} dagen` }),
+      history: 'Overdrachtshistoriek',
+      historyCount: (count: number) => `Overdrachtshistoriek (${count})`,
+      historyEmpty: 'Nog niets doorgegeven',
+      rangeLabel: 'Terugkijkperiode',
+      rename: 'Klik om te hernoemen',
     },
     'components/ai/CoverageDetails': {
       summary: (bytes: string) => `Dekkingsdetails (pakket ≈ ${bytes})`,
@@ -2037,6 +2147,10 @@ Antwoord in Markdown.`,
       noteLabel: 'Persoonlijke achtergrond (optioneel)',
       notePlaceholder: 'Blessures, doelen, recente vorm… komt mee in de export voor de AI.',
       counter: (used: number, max: number) => `${used}/${max}`,
+      example1: 'Hoe heb ik de laatste tijd geslapen, en wat kan ik verbeteren?',
+      example2: 'Was de trainingsbelasting van deze week passend voor mij?',
+      example3: 'Wordt mijn herstel beter of slechter?',
+      examplesLabel: 'Probeer bijvoorbeeld',
     },
     'components/ai/GraphNodePopover': {
       close: 'Sluiten',
@@ -2089,6 +2203,11 @@ Antwoord in Markdown.`,
         `Sync ${current}/${total} · dit ververst zodra het binnen is`,
       readinessWaitingSub:
         'Dit ververst vanzelf zodra de synchronisatie binnen is',
+      editHint: 'Klik om aan te passen',
+      edited: 'Door jou aangepast',
+      fixedTail:
+        'Dit deel voegt ZeppBridge automatisch toe op basis van de werkelijke dekking:',
+      resetPrompt: 'Automatisch gegenereerde tekst herstellen',
     },
     'components/ai/HandoffSteps': {
       prepare: 'Naar het bureaublad exporteren',
@@ -2162,6 +2281,12 @@ Antwoord in Markdown.`,
       next: 'Volgende kaart',
       open: (title: string) => `Open "${title}"`,
       position: (index: number, total: number) => `${index} / ${total}`,
+    },
+    'components/deck/FoldDeck': {
+      close: 'Inklappen',
+      collapseAll: 'Alles inklappen',
+      expandAll: 'Alles uitklappen',
+      open: (title: string) => `Open "${title}"`,
     },
     'composables/useAiTaskLibrary': {
       loadFailed: 'De taakgegevens konden niet worden geladen',
@@ -2311,6 +2436,16 @@ Antwoord in Markdown.`,
       mcpTools:
         'Na configuratie kan de AI over deze vijf dingen vragen. Hou de muis erop voor uitleg.',
       mcpPreview: 'Bekijk wat er gekopieerd wordt',
+    },
+    'views/settings/sections/ExportDefaultsSection': {
+      example: 'bijv.',
+      exampleTitle: 'Afgelopen 14 dagen',
+      nameSub:
+        'Elke export krijgt zijn naam via deze regel, zodat de AI aan de bestandsnaam kan zien welke periode en welke gegevens erin zitten.',
+      nameTitle: 'Bestandsnamen voor de AI-overdracht',
+      ruleApp: 'ZeppBridge + datum',
+      ruleRange: 'Datumbereik + inhoud',
+      ruleTask: 'Taaknaam + tijdstip',
     },
   },
   errors: {
