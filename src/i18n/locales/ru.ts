@@ -1782,8 +1782,6 @@ export default {
       filterSleep: (count: number) => `Сон ${count}`,
       filterWorkouts: (count: number) => `Тренировки ${count}`,
       workoutTypeAria: 'Тип тренировки',
-      allSleep: 'Весь сон',
-      allWorkouts: 'Все тренировки',
       sleepTitle: 'Сон',
       sleepScore: (score: number) => `Оценка сна ${score}`,
       avgHr: (bpm: number) => `средний пульс ${bpm}`,
@@ -2032,7 +2030,6 @@ export default {
       savedFit: 'Файл FIT сохранён',
       exportFailed: 'Экспорт не удался',
       handoffAria: 'Передать ИИ',
-      eyebrowHandoff: 'Передача',
       handoffTitle: 'Передать ИИ',
       handoffSub:
         'Копирует в буфер обмена обезличенные данные только этой тренировки вместе с промптом и открывает '
@@ -2149,6 +2146,7 @@ export default {
       desktopOnly: 'Экспорт доступен после подключения настольного приложения',
       outputAt: (path: string) => `Файлы здесь: ${path}`,
       reveal: 'Показать в Проводнике',
+      lastExport: 'Последний экспорт · Открыть папку',
       copiedFiles: (count: number) =>
         `включая ${plural(count, { one: `${count} оригинал вложения`, few: `${count} оригинала вложений`, many: `${count} оригиналов вложений`, other: `${count} оригинала вложений` })}`,
       dragHint:

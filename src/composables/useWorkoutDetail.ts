@@ -74,7 +74,7 @@ export const useWorkoutDetail = (workoutId: Ref<string>) => {
   const aiProviderId = ref<AiProviderId>('chatgpt');
   const aiProvider = computed(() => AI_PROVIDER_BY_ID[aiProviderId.value]);
   const aiProviderChoices = computed(() =>
-    AI_PROVIDERS.map((provider) => ({ value: provider.id, label: provider.label })));
+    AI_PROVIDERS.map((provider) => ({ value: provider.id, label: provider.label, image: provider.localIcon })));
   const aiNote = ref<string | null>(null);
 
   const sendWorkoutToAi = async () => {

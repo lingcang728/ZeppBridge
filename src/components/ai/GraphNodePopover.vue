@@ -92,14 +92,24 @@ watch(() => props.node.id, () => { void nextTick(measure); });
 const onKey = (event: KeyboardEvent) => {
   if (event.key === 'Escape') emit('close');
 };
+/* 点面板以外的任何地方都关掉（不必非点 ×）。点的是图上的节点时不管：节点自己
+   负责「换一个打开 / 再点一下收起」，这里再关一次会和它抢。 */
+const onDocPointer = (event: PointerEvent) => {
+  const target = event.target as Element | null;
+  if (!target || root.value?.contains(target)) return;
+  if (target.closest('svg [role="button"]')) return;
+  emit('close');
+};
 onMounted(() => {
   window.addEventListener('keydown', onKey);
+  document.addEventListener('pointerdown', onDocPointer, true);
   measure();
   observer = new ResizeObserver(measure);
   if (root.value) observer.observe(root.value);
 });
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKey);
+  document.removeEventListener('pointerdown', onDocPointer, true);
   observer?.disconnect();
 });
 

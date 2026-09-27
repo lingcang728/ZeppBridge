@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import BrandMark from '../BrandMark.vue';
 import Icon, { type IconName } from '../Icon.vue';
@@ -202,17 +202,82 @@ const onThemeChange = (value: string | number) => {
 };
 
 /* 语言列表跟着 LOCALES 注册表走——S6 扩到十种语言时这里自动变长。 */
+const LOCALE_SHORT: Record<Locale, string> = {
+  zh: '中', en: 'EN', es: 'ES', nl: 'NL', 'pt-BR': 'PT-BR', 'pt-PT': 'PT', de: 'DE', ru: 'RU', 'hi-IN': 'HI', fr: 'FR',
+};
 const localeOptions = computed(() =>
-  LOCALES.map((code) => ({ value: code, label: LOCALE_LABELS[code] })));
+  LOCALES.map((code) => ({ value: code, label: fit.value >= FIT_SHORT_LOCALE ? LOCALE_SHORT[code] : LOCALE_LABELS[code] })));
 const onLocaleChange = (value: string | number) => setLocale(String(value) as Locale);
 
 /* 同步胶囊的字一变（「今天 10:30」→「数据已备好 · 交给 AI」），宽度平滑伸缩，不跳。 */
 const syncPill = ref<HTMLElement | null>(null);
 useWidthMorph(syncPill, () => (readyToHand.value ? t.value.readyPill : syncText.value));
+
+/* —— 放不下时逐级回退（大原则：任何语言、任何宽度，顶栏的胶囊都不许盖住别的组件）——
+   媒体查询只认窗口宽度，认不出「俄语导航比中文宽一倍」。这里量真实的包围盒：
+   品牌、正中导航、右侧一簇两两之间留出间距、右簇不出窗口；放不下就升一档再量。
+     1 藏字标 → 2 同步胶囊只留圆点 → 3 语言改短码 → 4 导航紧凑 → 5 藏语言（设置里还有）。
+   每次宽度、语言、同步文字变化都从 0 档重来，宽了会自动退回完整形态。 */
+const FIT_SHORT_LOCALE = 3;
+const FIT_MAX = 5;
+const fit = ref(0);
+const bar = ref<HTMLElement | null>(null);
+const overlaps = (): boolean => {
+  const root = bar.value;
+  if (!root) return false;
+  const gap = 8;
+  const box = (selector: string) => {
+    const el = root.querySelector<HTMLElement>(selector);
+    if (!el || !el.offsetWidth) return null;
+    return el.getBoundingClientRect();
+  };
+  const outer = root.getBoundingClientRect();
+  const left = box('.brand, .quick-back');
+  const nav = box('.pill-nav');
+  const actions = box('.topbar-actions');
+  if (actions && actions.right > outer.right + 0.5) return true;
+  if (actions && actions.left < outer.left) return true;
+  if (nav && actions && actions.left < nav.right + gap) return true;
+  if (left && nav && left.right + gap > nav.left) return true;
+  if (left && actions && left.right + gap > actions.left) return true;
+  return false;
+};
+let fitting = false;
+const refit = async () => {
+  if (fitting) return;
+  fitting = true;
+  try {
+    fit.value = 0;
+    await nextTick();
+    while (fit.value < FIT_MAX && overlaps()) {
+      fit.value += 1;
+      await nextTick();
+    }
+  } finally {
+    fitting = false;
+  }
+};
+let fitObserver: ResizeObserver | null = null;
+let fitFrame = 0;
+const scheduleFit = () => {
+  cancelAnimationFrame(fitFrame);
+  fitFrame = requestAnimationFrame(() => { void refit(); });
+};
+onMounted(() => {
+  fitObserver = new ResizeObserver(scheduleFit);
+  if (bar.value) fitObserver.observe(bar.value);
+  void document.fonts?.ready.then(scheduleFit);
+  scheduleFit();
+});
+onBeforeUnmount(() => {
+  fitObserver?.disconnect();
+  cancelAnimationFrame(fitFrame);
+});
+watch([locale, () => (readyToHand.value ? t.value.readyPill : syncText.value), () => props.backTo], scheduleFit);
 </script>
 
 <template>
-  <header class="app-topbar">
+  <header ref="bar" :class="['app-topbar', fit > 0 && `fit-${fit}`]">
     <button v-if="backTo" type="button" class="quick-back glass-control" :title="backLabel" :aria-label="backLabel" @click="goBack">
       <Icon name="arrow-left" :size="20" />
     </button>
@@ -223,6 +288,7 @@ useWidthMorph(syncPill, () => (readyToHand.value ? t.value.readyPill : syncText.
 
     <SegmentTrack
       class="pill-nav"
+      :compact="fit >= 4"
       variant="glass"
       :items="navItems"
       :model-value="activeBranch"
@@ -248,12 +314,12 @@ useWidthMorph(syncPill, () => (readyToHand.value ? t.value.readyPill : syncText.
       </button>
 
       <!-- 主题是平铺的两枚图标（月亮 / 太阳），点哪枚就从哪枚扩散开；
-           语言是首尾相接的传送带，地球画在正中的镜片里，和当前语言贴成一枚胶囊。 -->
+           语言是首尾相接的传送带，两端渐隐无硬边；放不下时由 compact 档位收成短码（见 fit）。 -->
       <div class="icon-group glass-control">
         <SegmentTrack ref="themeTrack" class="theme-toggle" variant="bare" icon-only :items="themeOptions"
           :model-value="resolvedTheme" :aria-label="t.themeTitle" @update:model-value="onThemeChange" />
         <span class="group-divider" aria-hidden="true"></span>
-        <CapsuleWheel class="locale-wheel" variant="bare" loop lens-icon="globe" :span="168" :items="localeOptions"
+        <CapsuleWheel class="locale-wheel" variant="bare" loop :span="fit >= FIT_SHORT_LOCALE ? 76 : 168" :items="localeOptions"
           :model-value="locale" :aria-label="t.localeLabel" @update:model-value="onLocaleChange" />
       </div>
     </div>
@@ -356,6 +422,12 @@ useWidthMorph(syncPill, () => (readyToHand.value ? t.value.readyPill : syncText.
 .theme-toggle { --seg-pad: 1px; }
 .theme-toggle :deep(.segment-item) { min-height: 34px; }
 .group-divider { width: 1px; height: 18px; margin: 0 3px; background: color-mix(in srgb, var(--ink) 14%, transparent); }
+
+/* 回退档位（见 refit）：只有量出来放不下时才会升档。 */
+.app-topbar[class*='fit-'] .wordmark { display: none; }
+.fit-2 .sync-text, .fit-3 .sync-text, .fit-4 .sync-text, .fit-5 .sync-text { display: none; }
+.fit-2 .sync-pill, .fit-3 .sync-pill, .fit-4 .sync-pill, .fit-5 .sync-pill { padding-inline: 11px; }
+.fit-5 .locale-wheel, .fit-5 .group-divider { display: none; }
 
 /* 窄屏降级：先让胶囊回到文档流避免和按钮组重叠，再小到手机上藏掉
    （底部 tabbar 已经覆盖同一组导航）。语言选择在 520px 以下也让位给

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /* 概览的「最近记录」卡：一条横着的时间线。
  *
- * 最近五条睡眠和运动按时间从左排到右（最右是最新的一条），每条是线上的一个节点
+ * 最近五条睡眠和运动从左到右由新到旧（最左是最新的一条，和最近记录页同一方向），每条是线上的一个节点
  * 加一枚小卡：什么时候、是什么、多长 / 多远。以前是两列贴片，看不出先后，也看不出
  * 它们在时间上隔了多久；现在一眼就是「这几天做了什么」。 */
 import { computed } from 'vue';
@@ -106,8 +106,8 @@ const recentItems = computed<RecentItem[]>(() => {
       factLabel: isFiniteNumber(workout.avg_hr) ? t.value.avgHr(Math.round(workout.avg_hr)) : undefined,
     });
   }
-  // 取最近五条，再按时间从旧到新排：时间线从左往右读。
-  return items.sort((a, b) => b.time - a.time).slice(0, 5).reverse();
+  // 取最近五条，由新到旧：一眼先看到最新的。
+  return items.sort((a, b) => b.time - a.time).slice(0, 5);
 });
 </script>
 
@@ -115,9 +115,9 @@ const recentItems = computed<RecentItem[]>(() => {
   <section class="metric-panel recent-panel" :aria-label="t.recentAria">
     <div class="panel-head"><span class="panel-title"><GlyphTile name="document" :size="38" /><span><strong>{{ t.recentTitle }}</strong><small>{{ t.recentSub }}</small></span></span><RouterLink class="pill-button" to="/recent">{{ t.seeAll }}<Icon name="chevron-right" :size="14" /></RouterLink></div>
     <ol v-if="recentItems.length" class="timeline">
-      <li v-for="(item, index) in recentItems" :key="item.key" :class="['tl-item', `tone-${item.category}`, { newest: index === recentItems.length - 1 }]">
+      <li v-for="(item, index) in recentItems" :key="item.key" :class="['tl-item', `tone-${item.category}`, { newest: index === 0 }]">
         <RouterLink :to="item.to" class="tl-link">
-          <span class="tl-when">{{ item.kicker }}<em v-if="index === recentItems.length - 1">{{ t.newest }}</em></span>
+          <span class="tl-when">{{ item.kicker }}<em v-if="index === 0">{{ t.newest }}</em></span>
           <span class="tl-node" aria-hidden="true"><GlyphTile :name="item.designIcon" :size="40" :tone="item.category" /></span>
           <strong class="tl-title">{{ item.title }}</strong>
           <span class="tl-fact">{{ item.fact }}<template v-if="item.factLabel"> · {{ item.factLabel }}</template></span>
@@ -131,10 +131,10 @@ const recentItems = computed<RecentItem[]>(() => {
 <style scoped>
 .recent-panel { grid-column: 1 / -1; padding: 18px 20px 20px; }
 
-/* 横着的时间线：一根从左到右渐亮的细线穿过每个节点，节点上方是时间，下方是内容。 */
+/* 横着的时间线：一根从右到左渐亮的细线（最新在左）穿过每个节点，节点上方是时间，下方是内容。 */
 .timeline { position: relative; display: grid; grid-auto-columns: minmax(150px, 1fr); grid-auto-flow: column; gap: 8px; margin: 16px 0 0; padding: 0 0 4px; overflow-x: auto; list-style: none; }
 .timeline::before { content: ''; position: absolute; top: 50px; right: 6%; left: 6%; height: 2px; border-radius: 2px;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--ink) 16%, transparent) 12%, color-mix(in srgb, var(--accent) 55%, transparent)); }
+  background: linear-gradient(270deg, transparent, color-mix(in srgb, var(--ink) 16%, transparent) 12%, color-mix(in srgb, var(--accent) 55%, transparent)); }
 .tl-link { position: relative; display: grid; justify-items: center; gap: 6px; padding: 4px 8px 12px; border-radius: 22px; color: inherit; text-align: center; text-decoration: none;
   transition: background var(--dur-base) ease, translate var(--dur-base) var(--ease-out); }
 .tl-link:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); translate: 0 -2px; }

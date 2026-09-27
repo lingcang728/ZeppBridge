@@ -49,6 +49,7 @@ const t = useMessages(defineMessages(
     run: (label: string) => `导出到桌面并打开 ${label}`,
     exportOnly: '只导出到桌面',
     reveal: '在资源管理器中显示',
+    lastExport: '上次导出 · 打开文件夹',
     outputAt: (path: string) => `文件在：${path}`,
     copiedFiles: (count: number) => `含 ${count} 个附件原件`,
     dragHint: '把这个文件夹里的文件拖进 AI 对话框，再粘贴提示词即可。打开网站不等于已发送。',
@@ -73,6 +74,7 @@ const t = useMessages(defineMessages(
     run: (label: string) => `Export to desktop and open ${label}`,
     exportOnly: 'Export to desktop only',
     reveal: 'Show in Explorer',
+    lastExport: 'Last export · Open folder',
     outputAt: (path: string) => `Files at: ${path}`,
     copiedFiles: (count: number) => `includes ${count} original attachment(s)`,
     dragHint: 'Drag the files in this folder into the AI chat, then paste the prompt. Opening the site is not sending.',
@@ -97,6 +99,7 @@ const t = useMessages(defineMessages(
     run: (label: string) => `Exportar al escritorio y abrir ${label}`,
     exportOnly: 'Solo exportar al escritorio',
     reveal: 'Mostrar en el Explorador',
+    lastExport: 'Última exportación · Abrir carpeta',
     go: (label: string) => `Entregar a ${label}`,
     goSub: 'Exportar · copiar prompt · abrir sitio',
     readiness: (categories: number, percent: number) => `${categories} tipos de datos · ${percent}% de días con datos`,
@@ -162,6 +165,8 @@ const stale = computed(() => handoff.isStale(exportTask()));
 const busy = computed(() => steps.value.prepare.state === 'doing' || steps.value.copy.state === 'doing');
 /** 按过主按钮以后，坞向上长出进度那一截。 */
 const started = computed(() => steps.value.prepare.state !== 'idle');
+/** 进度那一截被人点空白 / Esc 收起了：下次按主按钮再长出来。收起后坞上留一枚「上次导出」。 */
+const progressDismissed = ref(false);
 
 /** 标题为空时用自动标题——导出文件夹就按它命名。 */
 function exportTask() {
@@ -171,6 +176,7 @@ function exportTask() {
 const run = async (openSite: boolean) => {
   if (!desktop || busy.value) return;
   details.value = false;
+  progressDismissed.value = false;
   await saveDraft(props.fallbackTitle).catch(() => undefined);
   if (openSite) await handoff.runAll(exportTask(), provider.value, props.direction);
   else await handoff.exportOnly(exportTask(), props.direction);
@@ -185,10 +191,14 @@ const retry = (id: HandoffStepId) => {
 const details = ref(false);
 const dock = ref<HTMLElement | null>(null);
 const onDocPointer = (event: PointerEvent) => {
-  if (details.value && dock.value && !dock.value.contains(event.target as Node)) details.value = false;
+  if (!dock.value || dock.value.contains(event.target as Node)) return;
+  if (details.value) details.value = false;
+  if (started.value || blocked.value.length) progressDismissed.value = true;
 };
 const onDocKey = (event: KeyboardEvent) => {
-  if (event.key === 'Escape' && details.value) details.value = false;
+  if (event.key !== 'Escape') return;
+  if (details.value) details.value = false;
+  else if (started.value || blocked.value.length) progressDismissed.value = true;
 };
 onMounted(() => {
   document.addEventListener('pointerdown', onDocPointer);
@@ -222,7 +232,7 @@ onBeforeUnmount(() => {
     </Transition>
 
     <Transition name="grow">
-      <div v-show="started || blocked.length" class="progress glass-control">
+      <div v-show="(started || blocked.length) && !progressDismissed" class="progress glass-control">
         <ul v-if="blocked.length" class="issues" role="alert">
           <li v-for="(issue, index) in blocked" :key="index" class="ai-note bad"><Icon name="warning" :size="13" />{{ aiTaskIssueText(issue) }}</li>
         </ul>
@@ -238,6 +248,12 @@ onBeforeUnmount(() => {
           <p v-if="stale" class="ai-note warn" role="status"><Icon name="warning" :size="13" />{{ t.stale }}</p>
         </div>
       </div>
+    </Transition>
+
+    <Transition name="grow">
+      <button v-if="progressDismissed && ready" type="button" class="last-export glass-control" @click="handoff.revealOutput()">
+        <Icon name="folder" :size="13" />{{ t.lastExport }}
+      </button>
     </Transition>
 
     <!-- 预览出错不藏进浮层：它决定导出的东西对不对，要一直看得见。 -->
@@ -377,6 +393,8 @@ onBeforeUnmount(() => {
 .output .ai-note span { overflow-wrap: anywhere; }
 .output-row { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
 .output-row .ai-hint { margin: 0; }
+.last-export { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border: 0; border-radius: 999px; color: var(--muted); font-size: var(--fs-xs); cursor: pointer; }
+.last-export:hover { color: var(--ink); }
 .offline { margin: 0; padding: 4px 12px; border-radius: 999px; background: var(--mat-glass); }
 .alert-pill { margin: 0; padding: 6px 14px; border-radius: 999px; background: var(--mat-glass-strong); box-shadow: var(--glass-rim); }
 

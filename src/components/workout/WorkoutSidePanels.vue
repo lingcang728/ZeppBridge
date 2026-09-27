@@ -17,7 +17,7 @@ defineProps<{
   exportBusy: boolean;
   exportedNote: string | null;
   actionError: string | null;
-  aiProviderChoices: { value: string; label: string }[];
+  aiProviderChoices: { value: string; label: string; image?: string }[];
   aiProviderLabel: string;
   handoffBusy: boolean;
   aiNote: string | null;
@@ -60,14 +60,14 @@ const FORMATS: ExportFormat[] = ['json', 'csv', 'gpx', 'fit'];
     </section>
 
     <section class="surface-card side-card" :aria-label="t.handoffAria">
-      <div class="section-head"><GlyphTile name="handoff" :size="40" /><div><p class="section-eyebrow">{{ t.eyebrowHandoff }}</p><h2>{{ t.handoffTitle }}</h2></div></div>
+      <div class="section-head"><GlyphTile name="handoff" :size="40" /><div><h2>{{ t.handoffTitle }}</h2></div></div>
       <p class="card-sub">{{ t.handoffSub }}</p>
       <div class="ai-provider">
         <span>{{ t.handoffTarget }}</span>
         <CapsuleWheel v-model="provider" loop :span="230" :items="aiProviderChoices" :aria-label="t.handoffTargetAria" />
       </div>
       <button class="button primary wide" type="button" :disabled="handoffBusy" @click="emit('handoff')">
-        <GlyphTile name="handoff" :size="20" />{{ handoffBusy ? t.preparing : t.handTo(aiProviderLabel) }}
+        <Icon name="send" :size="18" class="cta-icon" />{{ handoffBusy ? t.preparing : t.handTo(aiProviderLabel) }}
       </button>
       <p v-if="aiNote" class="action-note ok" role="status"><Icon name="circle-check" :size="13" />{{ aiNote }}</p>
       <p v-if="handoffError" class="action-note bad" role="alert"><Icon name="warning" :size="13" />{{ handoffError }}</p>
@@ -91,6 +91,7 @@ const FORMATS: ExportFormat[] = ['json', 'csv', 'gpx', 'fit'];
 .side-card { padding: 16px 18px 18px; border-radius: 19px; }
 .section-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .section-head h2 { margin: 1px 0 0; font-size: var(--fs-2xl); letter-spacing: -.02em; }
+.cta-icon { flex: 0 0 auto; color: currentColor; }
 .section-eyebrow { margin: 0; color: var(--subtle); font-family: var(--font-mono); font-size: var(--fs-2xs); font-weight: 700; letter-spacing: .16em; }
 .card-sub { margin: 0 0 12px; color: var(--muted); font-size: var(--fs-sm); }
 .decoded-list { display: grid; }

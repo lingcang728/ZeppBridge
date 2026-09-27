@@ -192,9 +192,6 @@ watch(dataRevision, () => void loadRecent());
         <SegmentTrack v-model="kind" :items="kindItems" :aria-label="t.title" />
         <CapsuleWheel v-if="kind === 'workout' && typeItems.length > 2" v-model="workoutType" loop :span="220"
           :items="typeItems" :aria-label="t.workoutTypeAria" />
-        <span class="toolbar-gap" />
-        <RouterLink class="pill-button quiet" to="/sleep"><Icon name="moon" :size="14" />{{ t.allSleep }}<Icon name="chevron-right" :size="14" /></RouterLink>
-        <RouterLink class="pill-button quiet" to="/workouts"><Icon name="run" :size="14" />{{ t.allWorkouts }}<Icon name="chevron-right" :size="14" /></RouterLink>
       </div>
       <p v-if="kind !== 'sleep' && hiddenWorkoutsCount > 0" class="hidden-note"><Icon name="info" :size="13" />{{ t.hiddenIncomplete(hiddenWorkoutsCount) }}</p>
 

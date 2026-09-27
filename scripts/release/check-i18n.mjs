@@ -48,6 +48,11 @@ const ALLOWED = [
     why: '每种语言在选择器里用自己的名字，和界面当前语言无关。',
   },
   {
+    file: 'components/shell/AppTopBar.vue',
+    text: "zh: '中'",
+    why: '顶栏放不下时语言胶囊改成短码；和语言名一样用各语言自己的写法，与界面语言无关。',
+  },
+  {
     file: 'lib/bridge/errors.ts',
     text: 'DESKTOP_ONLY_MARKER',
     why: '这是识别异常用的标记，不是显示给用户的字：异常可能来自任何一条旧代码路径。',

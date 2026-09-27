@@ -133,7 +133,6 @@ export const workoutDetailMessages = defineMessages(
     exportFailed: '导出失败',
 
     handoffAria: '交给 AI',
-    eyebrowHandoff: '交接',
     handoffTitle: '交给 AI',
     handoffSub: '只把这一条运动的脱敏数据和提示词复制到剪贴板，并打开你选的 AI 网站。按天记录的睡眠、步数不在范围内。',
     handoffTarget: '目标工具',
@@ -282,7 +281,6 @@ Answer in Markdown.`,
     exportFailed: 'Export failed',
 
     handoffAria: 'Hand to AI',
-    eyebrowHandoff: 'Handoff',
     handoffTitle: 'Hand to AI',
     handoffSub: 'Copies the de-identified data for this one workout, plus the prompt, and opens the AI site you pick. Day-level streams such as sleep and steps stay out.',
     handoffTarget: 'Target tool',
@@ -431,7 +429,6 @@ Responde en español, en Markdown.`,
     exportFailed: 'La exportación falló',
 
     handoffAria: 'Pasar a la IA',
-    eyebrowHandoff: 'Entrega',
     handoffTitle: 'Pasar a la IA',
     handoffSub: 'Copia los datos anonimizados de solo este entrenamiento, más la instrucción, y abre el sitio de IA que elijas. Los flujos diarios como sueño y pasos quedan fuera.',
     handoffTarget: 'Herramienta de destino',

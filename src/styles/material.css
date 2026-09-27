@@ -232,6 +232,5 @@ html[data-theme-morph]::view-transition-new(root) {
 
 /* 窗口切到后台（最小化或失焦）时，装饰性的循环动画一律暂停；转圈类进度指示不停，
    免得人在别的窗口看着它以为卡住了。开关由 main.ts 维护。 */
-html.is-backgrounded :not(.spinning, .ring-arc, .indeterminate),
-html.is-backgrounded :not(.spinning, .ring-arc, .indeterminate)::before,
-html.is-backgrounded :not(.spinning, .ring-arc, .indeterminate)::after { animation-play-state: paused !important; }
+html.is-backgrounded *, html.is-backgrounded ::before, html.is-backgrounded ::after { animation-play-state: paused; }
+html.is-backgrounded :is(.spinning, .ring-arc, .indeterminate) { animation-play-state: running; }
