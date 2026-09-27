@@ -59,6 +59,12 @@ lib/aiTask/fileName.manyCategories
 lib/aiTask/fileName.noData
 lib/aiTask/fileName.promptSuffix
 lib/aiTask/fileName.twoCategories
+views/HealthCheck.summaryActions
+views/HealthCheck.summaryAllGood
+views/HealthCheck.summaryFailed
+views/HealthCheck.summaryOccasional
+views/HealthCheck.summaryPending
+views/HealthCheck.summaryStreams
 views/TrainingStatus.latestTag
 views/TrainingStatus.moreLabel
 views/TrainingStatus.zonesLabel

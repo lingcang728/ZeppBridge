@@ -31,8 +31,7 @@
   min-width: 0;
   padding: 18px 20px;
   overflow: hidden;
-  border: 1px solid var(--mat-line);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow);
 }
 .hero-duration, .hero-score { min-width: 0; }
@@ -87,7 +86,7 @@
   font-size: 31px;
   font-weight: 600;
 }
-.stage-card, .chart-card { margin: 0; padding: 16px 18px; background: var(--mat-card); border: 1px solid var(--mat-line); border-radius: var(--radius-md); box-shadow: var(--mat-rim), var(--mat-shadow); }
+.stage-card, .chart-card { margin: 0; padding: 16px 18px; background: var(--mat-card); border-radius: var(--radius-lg); box-shadow: var(--mat-rim), var(--mat-shadow); }
 .weekly-sleep-chart { width: 100%; height: 180px; }
 .stage-head {
   display: flex;
@@ -119,7 +118,7 @@
   gap: 16px;
   margin: 0;
 }
-.meta-card { padding: 16px 18px; background: var(--mat-card); border: 1px solid var(--mat-line); border-radius: var(--radius-md); box-shadow: var(--mat-rim), var(--mat-shadow); }
+.meta-card { padding: 16px 18px; background: var(--mat-card); border-radius: var(--radius-lg); box-shadow: var(--mat-rim), var(--mat-shadow); }
 .meta-title {
   display: flex;
   align-items: center;

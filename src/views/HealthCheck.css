@@ -6,8 +6,7 @@
   display: grid;
   gap: 10px;
   padding: 18px 20px;
-  border: 1px solid var(--mat-line);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow);
 }
 .health-card h2 { margin: 0; color: var(--ink); font-size: var(--fs-lg); font-weight: 600; }
@@ -65,3 +64,11 @@
 .action-row span { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.5; }
 
 .inline-alert.neutral { color: var(--muted); }
+/* 首屏的总结卡：一个大状态点 + 一句话，细节在下面的卡包里。 */
+.summary-card { padding: 22px 24px; }
+.summary-main { display: flex; align-items: center; gap: 16px; }
+.summary-main h2 { font-size: var(--fs-2xl); }
+.summary-dot { width: 14px; height: 14px; flex: 0 0 14px; border-radius: 50%; box-shadow: 0 0 14px currentColor; }
+.summary-dot.ok { background: var(--accent); color: var(--accent); }
+.summary-dot.warn { background: var(--warning); color: var(--warning); }
+.summary-dot.bad { background: var(--danger); color: var(--danger); }

@@ -244,8 +244,7 @@ const exclusionSummary = computed(() => {
   display: grid;
   gap: 10px;
   padding: 16px 18px;
-  border: 1px solid var(--mat-line);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow);
 }
 .insight-card header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }

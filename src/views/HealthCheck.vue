@@ -21,6 +21,7 @@ import Icon from '../components/Icon.vue';
 import PageHeader from '../components/PageHeader.vue';
 import SegmentTrack from '../components/SegmentTrack.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
+import FoldDeck from '../components/deck/FoldDeck.vue';
 import { syncOutcomeLabel, useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { createLoadSeq } from '../lib/loadSeq';
@@ -191,6 +192,28 @@ const integrity = computed(() => health.value?.database.last_integrity_check ?? 
 const allStreams = computed(() => health.value?.streams ?? []);
 const occasional = computed(() => health.value?.occasional_metrics ?? []);
 
+/* 首屏一张总结卡：几条数据流正常、几条要处理；细节五块收进卡包按需展开。
+   有问题的时候「逐流」那一块默认就开着，不用人再去找。 */
+const streamOk = (stream: StreamHealth) => [stream.fetch, stream.parse, stream.write].every((stage) => stage.state === 'ok');
+const streamFailed = (stream: StreamHealth) => [stream.fetch, stream.parse, stream.write].some((stage) => stage.state === 'failed');
+const summary = computed(() => {
+  const streams = allStreams.value;
+  const ok = streams.filter(streamOk).length;
+  const failed = streams.filter(streamFailed).length;
+  return { ok, total: streams.length, failed, pending: streams.length - ok - failed };
+});
+const foldCards = computed(() => {
+  const h = health.value;
+  return [
+    { id: 'streams', title: t.value.streamsTitle, summary: t.value.summaryStreams(summary.value.ok, summary.value.total), icon: 'structured-data' as const, tone: summary.value.failed ? 'heart' as const : 'accent' as const },
+    { id: 'timings', title: t.value.timingsTitle, summary: h ? `${t.value.timingCloud} ${formatDateTime(h.timings.last_cloud_sync_at)}` : '', icon: 'auto-sync' as const, tone: 'training' as const },
+    { id: 'database', title: t.value.dbTitle, summary: h ? formatBytes(h.database.database_bytes) : '', icon: 'database' as const, tone: 'sleep' as const },
+    ...(occasional.value.length ? [{ id: 'occasional', title: t.value.occasionalTitle, summary: t.value.summaryOccasional(occasional.value.length), icon: 'heart-rate' as const, tone: 'activity' as const }] : []),
+    { id: 'actions', title: t.value.actionsTitle, summary: t.value.summaryActions(h?.actions.length ?? 0), icon: 'settings' as const, tone: 'accent' as const },
+  ];
+});
+const initialOpen = computed(() => (summary.value.failed ? ['streams'] : []));
+
 onMounted(() => void load());
 </script>
 
@@ -226,137 +249,159 @@ onMounted(() => void load());
         {{ t.replayInProgress }}
       </div>
 
-      <!-- 三条互不冒充的时间线 -->
-      <section class="health-card" aria-labelledby="timings-title">
-        <h2 id="timings-title">{{ t.timingsTitle }}</h2>
-        <div class="timing-grid">
+
+
+
+
+      <section class="health-card summary-card" aria-labelledby="summary-title">
+        <div class="summary-main">
+          <span :class="['summary-dot', summary.failed ? 'bad' : summary.pending ? 'warn' : 'ok']" aria-hidden="true"></span>
           <div>
-            <span class="timing-label">{{ t.timingCloud }}</span>
-            <strong>{{ formatDateTime(health.timings.last_cloud_sync_at) }}</strong>
-            <span class="timing-note">{{ syncOutcomeLabel(health.timings.last_cloud_sync_outcome) || t.timingCloudNote }}</span>
-          </div>
-          <div>
-            <span class="timing-label">{{ t.timingReplay }}</span>
-            <strong>{{ formatDateTime(health.timings.last_local_replay_at) }}</strong>
-            <span class="timing-note">{{ t.timingReplayNote }}</span>
-          </div>
-          <div>
-            <span class="timing-label">{{ t.timingManual }}</span>
-            <strong>{{ formatDateTime(health.timings.last_manual_reprocess_at) }}</strong>
-            <span class="timing-note">{{ t.timingManualNote }}</span>
-          </div>
-          <div>
-            <span class="timing-label">{{ t.timingNewest }}</span>
-            <strong>{{ formatDateTime(health.timings.newest_sample_at) }}</strong>
-            <span class="timing-note">{{ t.timingNewestNote }}</span>
+            <h2 id="summary-title">{{ t.summaryStreams(summary.ok, summary.total) }}</h2>
+            <p class="health-note">{{ summary.failed ? t.summaryFailed(summary.failed) : summary.pending ? t.summaryPending(summary.pending) : t.summaryAllGood }}</p>
           </div>
         </div>
       </section>
 
-      <!-- 数据库 -->
-      <section class="health-card" aria-labelledby="db-title">
-        <h2 id="db-title">{{ t.dbTitle }}</h2>
-        <div class="fact-grid">
-          <div><span>{{ t.dbSize }}</span><strong>{{ formatBytes(health.database.database_bytes) }}</strong></div>
-          <div><span>{{ t.dbRaw }}</span><strong>{{ health.database.raw_records.toLocaleString(intlLocale()) }}</strong></div>
-          <div><span>{{ t.dbCanonical }}</span><strong>{{ health.database.canonical_records.toLocaleString(intlLocale()) }}</strong></div>
-          <div>
-            <span>{{ t.dbPending }}</span>
-            <strong :class="{ warn: health.database.pending_normalization > 0 }">
-              {{ health.database.pending_normalization.toLocaleString(intlLocale()) }}
-            </strong>
-          </div>
-          <div><span>{{ t.dbSchema }}</span><strong>{{ health.database.schema_version }}</strong></div>
-          <div><span>{{ t.dbNormalizer }}</span><strong class="mono">{{ health.database.normalizer_revision }}</strong></div>
-        </div>
-        <p class="health-note">
-          <template v-if="integrity">
-            {{ t.integrityLine(
-              integrity.ok ? t.integrityPassed : t.integrityFailed(integrity.detail || t.integrityDetailBelow),
-              formatDateTime(integrity.checked_at),
-            ) }}
-          </template>
-          <template v-else>{{ t.integrityNeverRun }}</template>
-        </p>
-      </section>
-
-      <!-- 逐流三阶段 -->
-      <section class="health-card" aria-labelledby="streams-title">
-        <h2 id="streams-title">{{ t.streamsTitle }}</h2>
-        <p class="health-note">{{ t.streamsNote }}</p>
-        <div class="stream-list">
-          <article v-for="stream in allStreams" :key="stream.stream" class="stream-row">
-            <header>
-              <strong>{{ syncStreamLabel(stream.stream, stream.label) }}</strong>
-              <span class="cadence">{{ cadenceLabel(stream.cadence) }}</span>
-            </header>
-            <div class="stages">
-              <span v-for="stage in [[t.stageFetch, stream.fetch], [t.stageParse, stream.parse], [t.stageWrite, stream.write]] as const"
-                    :key="stage[0]"
-                    :class="['stage', stage[1].state]">
-                <i aria-hidden="true"></i>{{ t.stageLine(stage[0], stageText(stage[1])) }}
-              </span>
+      <FoldDeck :cards="foldCards" :label="t.title" :initial-open="initialOpen">
+        <template #streams>
+          <!-- 逐流三阶段 -->
+          <section class="health-card" aria-labelledby="streams-title">
+            <h2 id="streams-title">{{ t.streamsTitle }}</h2>
+            <p class="health-note">{{ t.streamsNote }}</p>
+            <div class="stream-list">
+              <article v-for="stream in allStreams" :key="stream.stream" class="stream-row">
+                <header>
+                  <strong>{{ syncStreamLabel(stream.stream, stream.label) }}</strong>
+                  <span class="cadence">{{ cadenceLabel(stream.cadence) }}</span>
+                </header>
+                <div class="stages">
+                  <span v-for="stage in [[t.stageFetch, stream.fetch], [t.stageParse, stream.parse], [t.stageWrite, stream.write]] as const"
+                        :key="stage[0]"
+                        :class="['stage', stage[1].state]">
+                    <i aria-hidden="true"></i>{{ t.stageLine(stage[0], stageText(stage[1])) }}
+                  </span>
+                </div>
+                <!-- `error_kind` 是稳定码，上面那行已经按界面语言显示过了。
+                     后端的 `message` 是中文原文，只有在类别都认不出来时才拿它兜底，
+                     否则英文界面会在这里冒出一段中文。 -->
+                <p v-if="unknownStageDetail(stream)" class="stream-message">
+                  {{ unknownStageDetail(stream) }}
+                </p>
+                <dl class="stream-facts">
+                  <div><dt>{{ t.factRaw }}</dt><dd>{{ stream.raw_records.toLocaleString(intlLocale()) }}</dd></div>
+                  <div><dt>{{ t.factCanonical }}</dt><dd>{{ stream.canonical_records.toLocaleString(intlLocale()) }}</dd></div>
+                  <div><dt>{{ t.factSources }}</dt><dd>{{ sourceSummary(stream) }}</dd></div>
+                  <div><dt>{{ t.factObservedDays }}</dt><dd>{{ t.days(stream.coverage.observed_days) }}</dd></div>
+                </dl>
+                <p class="coverage-note">
+                  {{ coverageNote(stream) }}
+                  <template v-if="stream.coverage.gap_dates.length">
+                    {{ t.gapExamples(stream.coverage.gap_dates.join(t.sourceSeparator)) }}<template v-if="stream.coverage.gap_total > stream.coverage.gap_dates.length">{{ t.gapMore }}</template>{{ t.period }}
+                  </template>
+                  <template v-if="stream.coverage.latest_observed_at">
+                    {{ t.latestObserved(stream.coverage.latest_observed_at) }}
+                  </template>
+                </p>
+              </article>
             </div>
-            <!-- `error_kind` 是稳定码，上面那行已经按界面语言显示过了。
-                 后端的 `message` 是中文原文，只有在类别都认不出来时才拿它兜底，
-                 否则英文界面会在这里冒出一段中文。 -->
-            <p v-if="unknownStageDetail(stream)" class="stream-message">
-              {{ unknownStageDetail(stream) }}
-            </p>
-            <dl class="stream-facts">
-              <div><dt>{{ t.factRaw }}</dt><dd>{{ stream.raw_records.toLocaleString(intlLocale()) }}</dd></div>
-              <div><dt>{{ t.factCanonical }}</dt><dd>{{ stream.canonical_records.toLocaleString(intlLocale()) }}</dd></div>
-              <div><dt>{{ t.factSources }}</dt><dd>{{ sourceSummary(stream) }}</dd></div>
-              <div><dt>{{ t.factObservedDays }}</dt><dd>{{ t.days(stream.coverage.observed_days) }}</dd></div>
-            </dl>
-            <p class="coverage-note">
-              {{ coverageNote(stream) }}
-              <template v-if="stream.coverage.gap_dates.length">
-                {{ t.gapExamples(stream.coverage.gap_dates.join(t.sourceSeparator)) }}<template v-if="stream.coverage.gap_total > stream.coverage.gap_dates.length">{{ t.gapMore }}</template>{{ t.period }}
-              </template>
-              <template v-if="stream.coverage.latest_observed_at">
-                {{ t.latestObserved(stream.coverage.latest_observed_at) }}
-              </template>
-            </p>
-          </article>
-        </div>
-      </section>
-
-      <!-- 偶发指标 -->
-      <section v-if="occasional.length" class="health-card" aria-labelledby="occasional-title">
-        <h2 id="occasional-title">{{ t.occasionalTitle }}</h2>
-        <p class="health-note">{{ t.occasionalNote }}</p>
-        <div class="occasional-list">
-          <div v-for="metric in occasional" :key="metric.stream" class="occasional-row">
-            <strong>{{ syncStreamLabel(metric.stream, metric.label) }}</strong>
-            <span>{{ t.occasionalLine(metric.canonical_records.toLocaleString(intlLocale()), metric.coverage.observed_days) }}</span>
-            <span class="muted">
-              {{ metric.coverage.latest_observed_at ? t.occasionalLatest(metric.coverage.latest_observed_at) : t.occasionalNone }}
-            </span>
-          </div>
-        </div>
-      </section>
-
-      <!-- 可执行动作 -->
-      <section class="health-card" aria-labelledby="actions-title">
-        <h2 id="actions-title">{{ t.actionsTitle }}</h2>
-        <div class="action-list">
-          <div v-for="action in health.actions" :key="action.id" class="action-row">
-            <div>
-              <strong>{{ actionCopy(action).label }}</strong>
-              <span>{{ actionCopy(action).reason }}</span>
+          </section>
+        </template>
+        <template #timings>
+          <!-- 三条互不冒充的时间线 -->
+          <section class="health-card" aria-labelledby="timings-title">
+            <h2 id="timings-title">{{ t.timingsTitle }}</h2>
+            <div class="timing-grid">
+              <div>
+                <span class="timing-label">{{ t.timingCloud }}</span>
+                <strong>{{ formatDateTime(health.timings.last_cloud_sync_at) }}</strong>
+                <span class="timing-note">{{ syncOutcomeLabel(health.timings.last_cloud_sync_outcome) || t.timingCloudNote }}</span>
+              </div>
+              <div>
+                <span class="timing-label">{{ t.timingReplay }}</span>
+                <strong>{{ formatDateTime(health.timings.last_local_replay_at) }}</strong>
+                <span class="timing-note">{{ t.timingReplayNote }}</span>
+              </div>
+              <div>
+                <span class="timing-label">{{ t.timingManual }}</span>
+                <strong>{{ formatDateTime(health.timings.last_manual_reprocess_at) }}</strong>
+                <span class="timing-note">{{ t.timingManualNote }}</span>
+              </div>
+              <div>
+                <span class="timing-label">{{ t.timingNewest }}</span>
+                <strong>{{ formatDateTime(health.timings.newest_sample_at) }}</strong>
+                <span class="timing-note">{{ t.timingNewestNote }}</span>
+              </div>
             </div>
-            <button
-              class="button secondary"
-              type="button"
-              :disabled="Boolean(busyAction) || (action.id === 'sync' && isSyncing)"
-              @click="runAction(action)"
-            >{{ busyAction === action.id ? t.actionRunning : t.actionRun }}</button>
-          </div>
-        </div>
-        <p v-if="actionError" class="inline-alert" role="alert"><Icon name="warning" :size="14" />{{ actionError }}</p>
-        <p v-else-if="actionMessage" class="health-note ok" role="status">{{ actionMessage }}</p>
-      </section>
+          </section>
+        </template>
+        <template #database>
+          <!-- 数据库 -->
+          <section class="health-card" aria-labelledby="db-title">
+            <h2 id="db-title">{{ t.dbTitle }}</h2>
+            <div class="fact-grid">
+              <div><span>{{ t.dbSize }}</span><strong>{{ formatBytes(health.database.database_bytes) }}</strong></div>
+              <div><span>{{ t.dbRaw }}</span><strong>{{ health.database.raw_records.toLocaleString(intlLocale()) }}</strong></div>
+              <div><span>{{ t.dbCanonical }}</span><strong>{{ health.database.canonical_records.toLocaleString(intlLocale()) }}</strong></div>
+              <div>
+                <span>{{ t.dbPending }}</span>
+                <strong :class="{ warn: health.database.pending_normalization > 0 }">
+                  {{ health.database.pending_normalization.toLocaleString(intlLocale()) }}
+                </strong>
+              </div>
+              <div><span>{{ t.dbSchema }}</span><strong>{{ health.database.schema_version }}</strong></div>
+              <div><span>{{ t.dbNormalizer }}</span><strong class="mono">{{ health.database.normalizer_revision }}</strong></div>
+            </div>
+            <p class="health-note">
+              <template v-if="integrity">
+                {{ t.integrityLine(
+                  integrity.ok ? t.integrityPassed : t.integrityFailed(integrity.detail || t.integrityDetailBelow),
+                  formatDateTime(integrity.checked_at),
+                ) }}
+              </template>
+              <template v-else>{{ t.integrityNeverRun }}</template>
+            </p>
+          </section>
+        </template>
+        <template #occasional>
+          <!-- 偶发指标 -->
+          <section class="health-card" aria-labelledby="occasional-title">
+            <h2 id="occasional-title">{{ t.occasionalTitle }}</h2>
+            <p class="health-note">{{ t.occasionalNote }}</p>
+            <div class="occasional-list">
+              <div v-for="metric in occasional" :key="metric.stream" class="occasional-row">
+                <strong>{{ syncStreamLabel(metric.stream, metric.label) }}</strong>
+                <span>{{ t.occasionalLine(metric.canonical_records.toLocaleString(intlLocale()), metric.coverage.observed_days) }}</span>
+                <span class="muted">
+                  {{ metric.coverage.latest_observed_at ? t.occasionalLatest(metric.coverage.latest_observed_at) : t.occasionalNone }}
+                </span>
+              </div>
+            </div>
+          </section>
+        </template>
+        <template #actions>
+          <!-- 可执行动作 -->
+          <section class="health-card" aria-labelledby="actions-title">
+            <h2 id="actions-title">{{ t.actionsTitle }}</h2>
+            <div class="action-list">
+              <div v-for="action in health.actions" :key="action.id" class="action-row">
+                <div>
+                  <strong>{{ actionCopy(action).label }}</strong>
+                  <span>{{ actionCopy(action).reason }}</span>
+                </div>
+                <button
+                  class="button secondary"
+                  type="button"
+                  :disabled="Boolean(busyAction) || (action.id === 'sync' && isSyncing)"
+                  @click="runAction(action)"
+                >{{ busyAction === action.id ? t.actionRunning : t.actionRun }}</button>
+              </div>
+            </div>
+            <p v-if="actionError" class="inline-alert" role="alert"><Icon name="warning" :size="14" />{{ actionError }}</p>
+            <p v-else-if="actionMessage" class="health-note ok" role="status">{{ actionMessage }}</p>
+          </section>
+        </template>
+      </FoldDeck>
     </template>
   </section>
 </template>
