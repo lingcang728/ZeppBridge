@@ -14,6 +14,8 @@ export interface CoverPose {
   blur: number;
   opacity: number;
   zIndex: number;
+  /** 侧卡外侧边缘溶进背景的程度（0 = 不溶，1 = 外侧一半都渐隐掉）。没有硬边。 */
+  dissolve: number;
 }
 
 /** 最多看得见几张侧卡；再远的完全透明，也不接受点击。 */
@@ -39,6 +41,7 @@ export function coverflowPose(d: number, width: number): CoverPose {
     blur: r(ad < 0.05 ? 0 : Math.min(ad, 3) * 1.4),
     opacity: ad >= COVER_VISIBLE ? 0 : r(1 - beyond * 0.28),
     zIndex: 100 - Math.round(ad * 10),
+    dissolve: r(Math.min(1, ad * 0.85)),
   };
 }
 

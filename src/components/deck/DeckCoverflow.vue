@@ -5,10 +5,12 @@
  * 成背景——没有一条硬边告诉你「卡组到这儿为止」。
  *
  * 操作：左右拖（松手按速度吸附）、滚轮、←/→、点两侧的卡把它转到正中；
- * 点正中那张（或回车）打开。卡组首尾相接：停在哪一张，两边都有卡叠着。摆位全部由 lib/deck/coverflow.ts 的纯函数算，
- * 这里只管手势和一个连续下标。 */
+ * 点正中那张（或回车）打开。卡组首尾相接：停在哪一张，两边都有卡叠着。没有左右箭头按钮——
+ * 拖就是翻。摆位全部由 lib/deck/coverflow.ts 的纯函数算，这里只管手势和一个连续下标。
+ *
+ * 侧卡没有硬边：外侧那一半按离正中的远近渐隐进背景（pose.dissolve），叠在两边的
+ * 卡看上去是一片越来越淡的影子，而不是一条条卡边。 */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import Icon from '../Icon.vue';
 import { useSpringIndex } from '../../composables/useSpringIndex';
 import { coverflowPose, COVER_VISIBLE, pxPerCard } from '../../lib/deck/coverflow';
 import { defineMessages, useMessages } from '../../i18n';
@@ -41,6 +43,8 @@ const props = defineProps<{
   cards: (C & { title: string })[];
   /** 停在正中的那张。 */
   modelValue: string | null;
+  /** 卡组的宽度（px）。第一帧就按它摆，卡组从平铺形变回来时终点才准。 */
+  initialWidth?: number;
 }>();
 const emit = defineEmits<{
   'update:modelValue': [id: string];
@@ -53,7 +57,8 @@ defineSlots<{
 }>();
 
 const stage = ref<HTMLElement | null>(null);
-const cardWidth = ref(420);
+const widthFor = (stageWidth: number) => Math.round(Math.min(500, Math.max(260, stageWidth * 0.44)));
+const cardWidth = ref(props.initialWidth ? widthFor(props.initialWidth) : 420);
 const indexOf = (id: string | null) => Math.max(0, props.cards.findIndex((card) => card.id === id));
 
 const n = () => Math.max(1, props.cards.length);
@@ -80,8 +85,15 @@ const turnTo = (index: number) => animateTo(pos.value + offsetOf(index));
 const centerCard = computed(() => props.cards[centered.value]);
 
 const poseStyle = (index: number) => {
-  const pose = coverflowPose(offsetOf(index), cardWidth.value);
+  const d = offsetOf(index);
+  const pose = coverflowPose(d, cardWidth.value);
+  // 外侧那一边渐隐：左边的卡外侧是左边，右边的卡外侧是右边。
+  const dissolve = pose.dissolve > 0.02
+    ? `linear-gradient(${d < 0 ? 90 : 270}deg, rgba(0, 0, 0, ${(1 - pose.dissolve).toFixed(2)}) 0%, #000 ${Math.round(30 + pose.dissolve * 30)}%)`
+    : 'none';
   return {
+    maskImage: dissolve,
+    WebkitMaskImage: dissolve,
     transform: `translate3d(calc(-50% + ${pose.x}px), -50%, ${pose.z}px) rotateY(${pose.rotate}deg) scale(${pose.scale})`,
     filter: pose.blur ? `blur(${pose.blur}px)` : 'none',
     opacity: pose.opacity,
@@ -185,8 +197,7 @@ watch(() => props.modelValue, (id) => {
 
 let observer: ResizeObserver | null = null;
 const measure = () => {
-  const width = stage.value?.clientWidth ?? 900;
-  cardWidth.value = Math.round(Math.min(500, Math.max(260, width * 0.44)));
+  cardWidth.value = widthFor(stage.value?.clientWidth ?? 900);
 };
 onMounted(() => {
   place(indexOf(props.modelValue));
@@ -226,10 +237,11 @@ onBeforeUnmount(() => {
         :id="`cover-${card.id}`"
         :key="card.id"
         :data-cover-index="index"
+        :data-deck-card="card.id"
         role="option"
         :aria-selected="index === centered"
         :class="['cover-card', { centered: index === centered }]"
-        :style="{ ...poseStyle(index), viewTransitionName: `deck-${card.id}`, '--card-tone': card.tone }"
+        :style="{ ...poseStyle(index), '--card-tone': card.tone }"
       >
         <button type="button" class="cover-hit" tabindex="-1" :aria-label="t.open(card.title)"></button>
         <div class="cover-face">
@@ -240,16 +252,10 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="cover-bar">
-      <button type="button" class="cover-nav glass-control" :aria-label="t.previous" @click="go(-1)">
-        <Icon name="arrow-left" :size="16" />
-      </button>
       <div class="cover-caption glass-control" aria-live="polite">
         <strong>{{ centerCard?.title }}</strong>
         <span>{{ t.position(centered + 1, cards.length) }}</span>
       </div>
-      <button type="button" class="cover-nav glass-control" :aria-label="t.next" @click="go(1)">
-        <Icon name="arrow-right" :size="16" />
-      </button>
       <slot name="actions" />
     </div>
   </div>
@@ -288,18 +294,17 @@ onBeforeUnmount(() => {
     radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--card-tone) 26%, transparent), transparent 62%),
     radial-gradient(90% 70% at 100% 100%, color-mix(in srgb, var(--card-tone) 10%, transparent), transparent 70%),
     var(--mat-card);
-  box-shadow: var(--mat-rim), var(--mat-shadow-lift);
+  box-shadow: var(--mat-shadow-lift);
   backface-visibility: hidden;
   will-change: transform, filter;
 }
-/* 顶边一道镜面高光，像玻璃板的切边。 */
+/* 顶上一层很淡的亮面，给卡一点厚度——不画边线（以前那圈 1px 亮边就是「卡片边界明显」的来源）。 */
 .cover-card::after {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: linear-gradient(180deg, color-mix(in srgb, #fff 9%, transparent) 0%, transparent 34%);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 7%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, #fff 6%, transparent) 0%, transparent 40%);
   pointer-events: none;
 }
 .cover-hit {
@@ -314,7 +319,8 @@ onBeforeUnmount(() => {
 .cover-face { position: relative; height: 100%; padding: 26px 28px; pointer-events: none; }
 .cover-quick { position: absolute; top: 22px; right: 24px; z-index: 2; }
 
-.cover-bar { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
+.cover-bar { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; animation: cover-bar-in .36s var(--ease-out) .1s both; }
+@keyframes cover-bar-in { from { opacity: 0; translate: 0 10px; filter: blur(4px); } }
 .cover-caption {
   display: grid;
   min-width: 220px;
@@ -326,19 +332,6 @@ onBeforeUnmount(() => {
 }
 .cover-caption strong { color: var(--ink); font-size: var(--fs-md); font-weight: 650; }
 .cover-caption span { color: var(--subtle); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
-.cover-nav {
-  display: grid;
-  width: 42px;
-  height: 42px;
-  place-items: center;
-  padding: 0;
-  border-radius: 50%;
-  color: var(--ink);
-  cursor: pointer;
-  transition: scale var(--dur-fast) var(--ease-out), opacity var(--dur-fast) ease;
-}
-.cover-nav:active:not(:disabled) { scale: .92; }
-.cover-nav:disabled { opacity: .35; cursor: default; }
 
 @media (max-width: 720px) {
   .cover-face { padding: 18px 20px; }

@@ -4,7 +4,14 @@ import { COVER_VISIBLE, coverflowPose } from '../coverflow';
 describe('coverflowPose', () => {
   it('stands the centre card upright and sharp', () => {
     const pose = coverflowPose(0, 400);
-    expect(pose).toMatchObject({ x: 0, rotate: 0, scale: 1, blur: 0, opacity: 1 });
+    expect(pose).toMatchObject({ x: 0, rotate: 0, scale: 1, blur: 0, opacity: 1, dissolve: 0 });
+  });
+
+  it('dissolves the outer edge of side cards more the further out they sit', () => {
+    // 叠在两边的卡没有硬边：越远外侧渐隐得越多，封顶 1。
+    expect(coverflowPose(-1, 400).dissolve).toBeGreaterThan(0.5);
+    expect(coverflowPose(2, 400).dissolve).toBeGreaterThan(coverflowPose(1, 400).dissolve);
+    expect(coverflowPose(3, 400).dissolve).toBe(1);
   });
 
   it('turns the two sides toward the centre, mirror images of each other', () => {

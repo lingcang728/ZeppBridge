@@ -13,6 +13,7 @@ import {
  *  - epoch：任何复位（失焦、改尺寸、切后台、按键）都让进行中的动画作废，
  *    旧动画的 finished 回来时发现 epoch 变了就什么都不做，不会把状态改回去；
  *  - 排队：动画进行中再按「下一张」只记一个方向，结束后接着翻，不会叠出一串；
+ *  - 打断：甩出 / 浮上来的半路再按住卡头，动画立刻作废，卡回到手里接着拖；
  *  - 松手前先清掉 drag 再释放指针捕获，lostpointercapture 就不会把正常的松手当成取消。
  */
 export interface CardDeckGesture {
@@ -122,7 +123,7 @@ export const useCardDeck = ({ stage, card, step, reducedMotion }: CardDeckGestur
   const INTERACTIVE = 'button, a, input, select, textarea, [role="switch"], [role="radiogroup"], [role="combobox"], [contenteditable]';
 
   const onPointerDown = (event: PointerEvent) => {
-    if (event.button !== 0 || !event.isPrimary || busy.value || !card.value) return;
+    if (event.button !== 0 || !event.isPrimary || !card.value) return;
     if ((event.target as Element).closest(INTERACTIVE)) return;
     reset();
     drag = {

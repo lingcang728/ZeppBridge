@@ -14,7 +14,6 @@ import { provideSettingsContext } from '../composables/settings/context';
 import { useDevices } from '../composables/useDevices';
 import { useSyncController } from '../composables/useSyncController';
 import { useUiScale } from '../composables/useUiScale';
-import { withViewTransition } from '../lib/deck/viewTransition';
 import { cardCloseDestination, historyBackPath } from '../lib/navigation';
 import { readDefaultExportFormat } from '../lib/exportScope';
 import { distanceUnit, distanceUnitOptionLabel } from '../lib/units';
@@ -99,7 +98,7 @@ const cards = computed(() => SETTINGS_CARD_IDS.map((id) => ({
   summary: summaries.value[id],
 })));
 
-const openCard = (id: string) => withViewTransition(() => router.push(`/settings/${id}`));
+const openCard = (id: string) => { void router.push(`/settings/${id}`); };
 /* 关卡：从卡组打开的回卡组，从别处（概览的「管理」）打开的回那一处。 */
 const closeDeck = () => {
   const target = cardCloseDestination(historyBackPath());
