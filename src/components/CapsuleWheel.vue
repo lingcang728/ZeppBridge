@@ -385,6 +385,8 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
         <span v-if="!iconOnly">{{ item.label }}</span>
       </span>
     </div>
+    <!-- 拖动时叠在字上面的液态玻璃（见 LiquidGlassDefs.vue）：和中间的镜片同尺寸，折射底下转过的字。 -->
+    <span class="wheel-glass" aria-hidden="true" :style="lensStyle" />
   </div>
 </template>
 
@@ -443,6 +445,28 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
 .lens-icon { flex: 0 0 auto; color: var(--cap-ink); }
 .is-vertical .wheel-lens { top: 50%; bottom: auto; left: 3px; right: 3px; translate: 0 -50%; min-width: 0; }
 .capsule-wheel.is-dragging .wheel-lens { scale: 1.06 1.1; }
+
+.wheel-glass {
+  position: absolute;
+  z-index: 2;
+  top: 3px;
+  bottom: 3px;
+  left: 50%;
+  border-radius: 999px;
+  opacity: 0;
+  pointer-events: none;
+  translate: -50% 0;
+  scale: 1.06 1.1;
+  transition: opacity 140ms ease;
+}
+.is-vertical .wheel-glass { top: 50%; bottom: auto; left: 3px; right: 3px; translate: 0 -50%; }
+:global(.has-liquid-glass) .capsule-wheel.is-dragging .wheel-glass {
+  opacity: 1;
+  -webkit-backdrop-filter: blur(.4px) saturate(1.5) brightness(1.06);
+  backdrop-filter: blur(.4px) saturate(1.5) brightness(1.06);
+  filter: url(#zb-liquid-glass);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5), inset 0 -1px 0 rgba(255, 255, 255, .12);
+}
 
 .wheel-item {
   position: absolute;

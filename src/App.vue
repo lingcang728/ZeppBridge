@@ -7,6 +7,7 @@ import GlyphTile from './components/GlyphTile.vue';
 import Icon from './components/Icon.vue';
 import { backDestination, historyBackPath, navigationBranch, pageMotion, TAB_ORDER, type PageMotion } from './lib/navigation';
 import AppTopBar from './components/shell/AppTopBar.vue';
+import LiquidGlassDefs from './components/LiquidGlassDefs.vue';
 import SegmentTrack from './components/SegmentTrack.vue';
 import { useSyncController } from './composables/useSyncController';
 import { useUiScale } from './composables/useUiScale';
@@ -265,6 +266,7 @@ onUnmounted(() => {
   <template v-else>
     <LifeEventEditor />
     <a class="skip-link" href="#main-content">{{ t.skipToContent }}</a>
+    <LiquidGlassDefs />
 
     <div class="app-body">
       <main id="main-content" class="main-content" tabindex="-1" @scroll.passive="onMainScroll">

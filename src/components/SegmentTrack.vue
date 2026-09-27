@@ -11,7 +11,12 @@
  * 叠在一起，切成德语时每个标签都出重影。
  *
  * 位置用 offsetLeft / offsetWidth 量（布局像素，不受原生缩放影响），每个按钮尺寸
- * 变化、字体加载完成、换语言时都重新量。 */
+ * 变化、字体加载完成、换语言时都重新量。
+ *
+ * 拖动时（以及松手后吸附的那一下）不再用裁切给字分色：裁切边会穿过字形，「旅」一半灰
+ * 一半绿，滑块放大成透镜后绿字还会跑出胶囊。改成——拖动期间上层选中字整层隐去、底层
+ * 字完整露出，由浮在字上面的液态玻璃镜片去折射它们（components/LiquidGlassDefs.vue，
+ * WebView2 上有真实折射，WebKit 回落成磨砂）；停稳后选中字整枚淡入成品牌色。 */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
 import Icon, { type IconName } from './Icon.vue';
 import { dragThumb, snapStop, type SegmentStop } from '../lib/navigation';
@@ -44,6 +49,9 @@ const track = ref<HTMLElement | null>(null);
 const stops = ref([]) as Ref<SegmentStop<T>[]>;
 const thumb = ref({ left: 0, width: 0, visible: false });
 const dragging = ref(false);
+/** 松手后滑块吸附到位的那一段：和拖动一样不分色，免得吸附途中出现半个字。 */
+const settling = ref(false);
+let settleTimer = 0;
 /** 第一次量完之前不做过渡，免得滑块从最左边滑进来。 */
 const settled = ref(false);
 
@@ -174,6 +182,11 @@ const onUp = (event: PointerEvent) => {
   const velocity = event.timeStamp - current.time < 90 ? current.velocity : 0;
   const next = moved ? snapStop(stops.value, center, velocity).value : current.startValue;
   clearGesture();
+  if (moved) {
+    settling.value = true;
+    window.clearTimeout(settleTimer);
+    settleTimer = window.setTimeout(() => { settling.value = false; }, 320);
+  }
   placeOn(next);
   commit(next);
   window.setTimeout(() => { suppressClick = false; }, 0);
@@ -223,6 +236,7 @@ onMounted(() => {
 });
 onBeforeUnmount(() => {
   clearGesture();
+  window.clearTimeout(settleTimer);
   observer?.disconnect();
   window.removeEventListener('resize', measure);
 });
@@ -232,7 +246,7 @@ onBeforeUnmount(() => {
   <div
     ref="track"
     :class="['segment-track', `is-${variant}`, {
-      'is-dragging': dragging, 'is-compact': compact, 'is-disabled': disabled, 'is-fill': fill, 'is-settled': settled,
+      'is-dragging': dragging, 'is-settling': settling, 'is-compact': compact, 'is-disabled': disabled, 'is-fill': fill, 'is-settled': settled,
       'is-icon-only': iconOnly,
     }]"
     :style="trackStyle"
@@ -266,6 +280,8 @@ onBeforeUnmount(() => {
         <span v-if="!iconOnly">{{ item.label }}</span>
       </slot>
     </button>
+    <!-- 拖动时浮在字上面的镜片：透过它看到的是底下完整的字，被玻璃边缘折射。 -->
+    <span class="segment-lens" aria-hidden="true" />
     <!-- 选中字：同样的标签按量好的位置摆一遍，只露出滑块覆盖的那一段。 -->
     <span class="segment-ink" aria-hidden="true">
       <span
@@ -398,6 +414,35 @@ onBeforeUnmount(() => {
   font-size: var(--fs-sm);
   line-height: 1.2;
   white-space: nowrap;
+}
+
+/* 拖动 / 吸附中：选中字整层隐去，底层字不再挖空——字始终完整，不会被切成两色。 */
+.segment-ink { transition: opacity 180ms ease; }
+.segment-track.is-dragging .segment-ink, .segment-track.is-settling .segment-ink { opacity: 0; transition-duration: 60ms; }
+.segment-track.is-dragging .segment-item, .segment-track.is-settling .segment-item { -webkit-mask-image: none; mask-image: none; }
+
+/* 液态玻璃镜片：只在拖动时出现，几何与滑块一致（同一对 --thumb-l / --thumb-w、同样放大），
+   叠在字上面；backdrop 上套 SVG 位移滤镜，把底下的字按玻璃边缘折射、边缘带一点色散。 */
+.segment-lens {
+  position: absolute;
+  z-index: 3;
+  top: var(--seg-pad);
+  bottom: var(--seg-pad);
+  left: 0;
+  width: var(--thumb-w);
+  border-radius: 999px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(var(--thumb-l)) scale(1.08, 1.16);
+  transition: opacity 140ms ease;
+}
+:global(.has-liquid-glass) .segment-track.is-dragging .segment-lens {
+  opacity: 1;
+  -webkit-backdrop-filter: blur(.4px) saturate(1.5) brightness(1.06);
+  backdrop-filter: blur(.4px) saturate(1.5) brightness(1.06);
+  filter: url(#zb-liquid-glass);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5), inset 0 -1px 0 rgba(255, 255, 255, .12),
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 38%, transparent);
 }
 
 /* 拖动时滑块变成清透的透镜：放大一点、边缘高光、几乎无色，透过它能看清底下的标签。 */
