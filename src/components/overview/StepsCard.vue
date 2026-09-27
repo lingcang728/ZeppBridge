@@ -2,7 +2,7 @@
 /* 概览的「今日步数」卡：圆环 + 目标行。 */
 import { computed } from 'vue';
 import { RouterLink } from 'vue-router';
-import CircularProgress from '../CircularProgress.vue';
+import Icon from '../Icon.vue';
 import GlyphTile from '../GlyphTile.vue';
 import { resolvedTheme } from '../../composables/useTheme';
 import { chartPalettes } from '../../lib/echartsTheme';
@@ -22,6 +22,11 @@ const messages = defineMessages(
     seeMore: '看更多',
     stepsNotYet: '今天的步数还没到云端',
     stepsLatest: (when: string) => `云端最新数据停在${when}`,
+    factGoal: '目标',
+    factDone: '已完成',
+    factLeft: '还差',
+    factReached: '已达成',
+    factUpdated: '更新于',
   },
   {
     stepsPanelAria: 'Open daily activity detail',
@@ -33,6 +38,11 @@ const messages = defineMessages(
     seeMore: 'See more',
     stepsNotYet: "Today's steps haven't reached the cloud yet",
     stepsLatest: (when: string) => `The newest data in the cloud is from ${when}`,
+    factGoal: 'Goal',
+    factDone: 'Done',
+    factLeft: 'To go',
+    factReached: 'Reached',
+    factUpdated: 'Updated',
   },
   {
     stepsPanelAria: 'Abrir el detalle de actividad diaria',
@@ -44,6 +54,11 @@ const messages = defineMessages(
     seeMore: 'Ver más',
     stepsNotYet: 'Los pasos de hoy aún no han llegado a la nube',
     stepsLatest: (when: string) => `Los datos más recientes en la nube son de ${when}`,
+    factGoal: 'Meta',
+    factDone: 'Hecho',
+    factLeft: 'Faltan',
+    factReached: 'Conseguido',
+    factUpdated: 'Actualizado',
   },
   // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
   'components/overview/StepsCard',
@@ -69,41 +84,38 @@ const stepsPercent = computed(() =>
 const num = (value: unknown) => isFiniteNumber(value) ? formatMetric(value) : '—';
 
 /* 圆环色按主题取（SVG stroke 属性不吃 CSS var）。 */
-const resolvedTrack = (hex: string) => {
-  const parsed = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
-  if (!parsed) return 'var(--line)';
-  const int = Number.parseInt(parsed[1], 16);
-  return `rgba(${(int >> 16) & 255}, ${(int >> 8) & 255}, ${int & 255}, .16)`;
-};
 const ringColor = computed(() => chartPalettes[resolvedTheme.value].series.readiness);
-const ringTrack = computed(() => resolvedTrack(ringColor.value));
 </script>
 
 <template>
   <RouterLink class="metric-panel steps-panel" to="/activity" :aria-label="t.stepsPanelAria">
-    <div class="panel-head"><span class="panel-title"><GlyphTile name="steps" :size="38" /><span><strong>{{ t.stepsTitle }}</strong><small>{{ stepGoalIsReference ? t.stepsGoalReference : t.stepsGoalToday }}</small></span></span></div>
-    <div class="steps-content">
-      <CircularProgress :value="stepsPercent" :size="148" :stroke-width="9" :color="ringColor" :track-color="ringTrack" :show-label="false">
-        <div class="steps-inring">
-          <strong>{{ num(steps) }}</strong>
-        </div>
-      </CircularProgress>
-      <p v-if="steps !== null" class="steps-goal">{{ t.stepsGoalLine(formatMetric(stepGoal), stepsPercent) }}</p>
-      <p v-else class="steps-goal steps-missing">{{ t.stepsNotYet }}<small v-if="latestWhen">{{ t.stepsLatest(latestWhen) }}</small></p>
+    <div class="panel-head">
+      <span class="panel-title"><GlyphTile name="steps" :size="38" /><span><strong>{{ t.stepsTitle }}</strong><small>{{ stepGoalIsReference ? t.stepsGoalReference : t.stepsGoalToday }}</small></span></span>
+      <span class="panel-go" :title="t.seeMore" aria-hidden="true"><Icon name="chevron-right" :size="16" /></span>
     </div>
-    <span class="panel-more">{{ t.seeMore }} <GlyphTile name="chevron-right" :size="18" /></span>
+    <template v-if="steps !== null">
+      <p class="panel-figure"><span class="figure-value">{{ num(steps) }}</span></p>
+      <div class="panel-meter" role="img" :aria-label="t.stepsGoalLine(formatMetric(stepGoal), stepsPercent)"><i :style="{ width: `${Math.max(2, stepsPercent)}%`, background: ringColor }"></i></div>
+      <!-- 和睡眠卡的分期列表同一种排法：左边是什么，右边多少。 -->
+      <ul class="steps-facts">
+        <li><span>{{ t.factGoal }}</span><strong>{{ formatMetric(stepGoal) }}</strong></li>
+        <li><span>{{ t.factDone }}</span><strong>{{ stepsPercent }}%</strong></li>
+        <li><span>{{ t.factLeft }}</span><strong>{{ steps >= stepGoal ? t.factReached : formatMetric(stepGoal - steps) }}</strong></li>
+        <li v-if="latestWhen"><span>{{ t.factUpdated }}</span><strong>{{ latestWhen }}</strong></li>
+      </ul>
+    </template>
+    <p v-else class="steps-goal steps-missing">{{ t.stepsNotYet }}<small v-if="latestWhen">{{ t.stepsLatest(latestWhen) }}</small></p>
   </RouterLink>
 </template>
 
 <style scoped>
 .steps-panel.metric-panel { display: flex; flex-direction: column; grid-column: span 3; height: 100%; min-height: 286px; padding: 18px; }
-.steps-content { flex: 1; display: grid; min-height: 0; place-items: center; align-content: center; gap: 14px; }
-.steps-inring { display: grid; place-items: center; text-align: center; }
-.steps-inring strong { color: var(--ink); font-family: 'Inter', var(--font-sans); font-size: 30px; font-weight: 600; letter-spacing: 0; font-variant-numeric: tabular-nums; line-height: 1; text-align: center; }
-.steps-goal { margin: 0; color: var(--muted); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
-.steps-missing { display: grid; gap: 3px; text-align: center; }
+.steps-goal { margin: 12px 0 0; color: var(--muted); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.steps-facts { display: grid; gap: 9px; margin: 16px 0 0; padding: 0; list-style: none; }
+.steps-facts li { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--subtle); font-size: var(--fs-sm); }
+.steps-facts strong { color: var(--muted); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.steps-missing { display: grid; gap: 3px; margin-top: 18px; }
 .steps-missing small { color: var(--subtle); font-size: var(--fs-xs); }
 @media (max-width: 1180px) { .steps-panel.metric-panel { display: flex; flex-direction: column; grid-column: span 4; } }
 @media (max-width: 820px) { .steps-panel.metric-panel { display: flex; flex-direction: column; grid-column: 1; } }
-.steps-panel .panel-more { margin-top: auto; padding-top: 10px; }
 </style>

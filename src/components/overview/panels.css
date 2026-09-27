@@ -68,6 +68,38 @@
 .panel-empty .glyph-tile { opacity: .75; }
 .panel-more { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; color: var(--subtle); font-size: var(--fs-xs); }
 
+/* ── 三张主卡的同一套结构：卡头（图标 + 标题 + 小字，右上角一枚箭头圆钮）→ 左对齐的大号主数字
+   → 一条细条 → 几行小字事实。主数字用无衬线等宽数字，单位小一号、颜色淡一级。 ── */
+.panel-go {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  color: var(--subtle);
+  transition: background var(--dur-fast) ease, color var(--dur-fast) ease, translate var(--dur-base) var(--ease-out);
+}
+.metric-panel:hover .panel-go { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--ink); translate: 2px 0; }
+.panel-head-end { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 8px; }
+.panel-figure { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 18px 0 14px; }
+.figure-value {
+  color: var(--ink);
+  font-family: 'Inter', var(--font-sans);
+  font-size: 34px;
+  font-weight: 650;
+  letter-spacing: -.01em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.figure-value i { margin: 0 6px 0 3px; color: var(--muted); font-family: var(--font-sans); font-size: var(--fs-md); font-style: normal; font-weight: 500; letter-spacing: 0; }
+.figure-value i:last-child { margin-right: 0; }
+.figure-meta { color: var(--subtle); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.panel-meter { height: 8px; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--ink) 8%, transparent); }
+.panel-meter i { display: block; height: 100%; border-radius: inherit; }
+
 a.metric-panel { display: block; color: inherit; text-decoration: none; }
 
 .text-link { display: inline-flex; align-items: center; gap: 3px; color: var(--accent); font-size: var(--fs-xs); text-decoration: none; }

@@ -9,6 +9,7 @@ import { displayDateTimeFormatter } from '../../lib/dateTime';
 import { formatMetric, formatWhen, isFiniteNumber } from '../../lib/format';
 import type { HeartRatePoint } from '../../types';
 import GlyphTile from '../GlyphTile.vue';
+import Icon from '../Icon.vue';
 import HrMiniChart from './HrMiniChart.vue';
 import { defineMessages, useMessages } from '../../i18n';
 
@@ -90,11 +91,6 @@ const props = defineProps<{
 /* 窗口里一个点都没有、但库里有更早的心率：说清楚数据停在哪一刻，而不是一句
    「同步后展示」——用户刚同步过，看到这句只会以为同步坏了。 */
 const latestWhen = computed(() => formatWhen(props.latestAt));
-/* 最新一条已经是一个多小时以前：把时间写在读数旁边，别让「最新 71」看起来像此刻。 */
-const latestIsOld = computed(() => {
-  const ts = props.latestAt ? new Date(props.latestAt).getTime() : NaN;
-  return Number.isFinite(ts) && Date.now() - ts > 70 * 60_000;
-});
 
 /**
  * 首页这张卡只画**最近几个小时**。
@@ -140,7 +136,14 @@ const clock = (value: number) =>
 
 <template>
   <RouterLink class="metric-panel hr-panel" to="/heart" :aria-label="t.hrPanelAria">
-    <div class="panel-head"><span class="panel-title"><span class="chart-icon"><GlyphTile name="heart-rate" :size="38" /></span><span><strong>{{ t.hrTitle }}</strong><small>{{ t.hrWindow(OVERVIEW_HR_WINDOW_HOURS) }}</small></span></span><span class="latest-value">{{ t.latest }} <strong>{{ num(hrLatest) }}</strong><small>{{ t.bpm }}</small><em v-if="latestIsOld && latestWhen" class="latest-when">{{ t.latestAt(latestWhen) }}</em></span></div>
+    <div class="panel-head">
+      <span class="panel-title"><span class="chart-icon"><GlyphTile name="heart-rate" :size="38" /></span><span><strong>{{ t.hrTitle }}</strong><small>{{ t.hrWindow(OVERVIEW_HR_WINDOW_HOURS) }}</small></span></span>
+      <span class="panel-go" :title="t.hrMore" aria-hidden="true"><Icon name="chevron-right" :size="16" /></span>
+    </div>
+    <p class="panel-figure">
+      <span class="figure-value">{{ num(hrLatest) }}<i>{{ t.bpm }}</i></span>
+      <span v-if="latestWhen" class="figure-meta">{{ t.latestAt(latestWhen) }}</span>
+    </p>
     <HrMiniChart v-if="hrPoints.length > 1" :points="hrPoints" :color="chartPalette.series.heart" :chrome="chartPalette"
       :gap-ms="HR_GAP_BREAK_MS" :average="hrAverage" :clock="clock" :unit="t.bpm" :label="t.hrChartAria" />
     <ul v-if="hrPoints.length > 1" class="hr-zones" :aria-label="t.hrZonesAria">
@@ -151,16 +154,16 @@ const clock = (value: number) =>
       <span v-if="latestWhen" class="empty-copy"><span>{{ t.hrStale(OVERVIEW_HR_WINDOW_HOURS, latestWhen) }}</span><small>{{ t.cloudLag }}</small></span>
       <span v-else>{{ t.hrEmpty }}</span>
     </div>
-    <span class="panel-more">{{ t.hrMore }} <GlyphTile name="chevron-right" :size="18" /></span>
   </RouterLink>
 </template>
 
 <style scoped>
 /* 网格位置由父级的 .hr-card-slot 持有：本卡是异步 chunk，
    外壳要在它到达之前先占住同一个格子。 */
-.hr-panel { min-height: 286px; padding: 20px 20px 12px; }
+.hr-panel { display: flex; flex-direction: column; min-height: 286px; padding: 20px 20px 16px; }
+.hr-panel .panel-figure { margin-bottom: 4px; }
 .latest-when { display: block; flex-basis: 100%; margin-top: 2px; color: var(--subtle); font-size: var(--fs-2xs); font-style: normal; text-align: right; }
 .empty-copy { display: grid; gap: 6px; max-width: 380px; }
 .empty-copy small { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.5; }
-.hr-zones { display: flex; flex-wrap: wrap; gap: 8px 12px; margin: 4px 0 0; padding: 0; list-style: none; color: var(--subtle); font-size: var(--fs-xs); }
+.hr-zones { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: auto 0 0; padding: 8px 0 0; list-style: none; color: var(--subtle); font-size: var(--fs-2xs); }
 </style>

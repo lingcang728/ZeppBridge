@@ -3,6 +3,7 @@
 import { computed, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import GlyphTile from '../GlyphTile.vue';
+import Icon from '../Icon.vue';
 import { isFiniteNumber } from '../../lib/format';
 import { sleepStageLabel } from '../../lib/sleepStages';
 import { stageMinutesForBar } from '../../lib/missingValues';
@@ -59,6 +60,10 @@ const hm = (minutes?: number | null) => {
   return hours > 0 ? t.value.durationHours(hours, remainder) : t.value.durationMinutes(remainder);
 };
 
+/** 「8 小时 10 分」拆成数字和单位两种片段：数字用大号，单位小一号（任何语言的写法都适用）。 */
+const figureParts = (text: string) => text.split(/(\d+)/).map((part) => part.trim()).filter(Boolean)
+  .map((part) => ({ text: part, unit: !/^\d+$/.test(part) }));
+
 const sleepStages = computed(() => {
   const sleep = props.sleep;
   if (!sleep) return [];
@@ -90,14 +95,19 @@ const hoverStage = (event: PointerEvent) => {
 
 <template>
   <RouterLink class="metric-panel sleep-panel" :to="sleep ? `/sleep/${sleep.sleep_id}` : '/sleep'" :aria-label="t.sleepPanelAria">
-    <div class="panel-head"><span class="panel-title"><GlyphTile name="sleep" :size="38" /><span><strong>{{ t.sleepTitle }}</strong><small>{{ t.sleepSub }}</small></span></span><span v-if="sleep && isFiniteNumber(sleep.score)" class="sleep-score">{{ sleep.score }}</span></div>
+    <div class="panel-head">
+      <span class="panel-title"><GlyphTile name="sleep" :size="38" /><span><strong>{{ t.sleepTitle }}</strong><small>{{ t.sleepSub }}</small></span></span>
+      <span class="panel-head-end">
+        <span v-if="sleep && isFiniteNumber(sleep.score)" class="sleep-score">{{ sleep.score }}</span>
+        <span class="panel-go" :title="t.seeMore" aria-hidden="true"><Icon name="chevron-right" :size="16" /></span>
+      </span>
+    </div>
     <template v-if="sleep">
-      <p class="sleep-total">{{ hm(sleep.duration_minutes) }}</p>
+      <p class="panel-figure"><span class="figure-value"><template v-for="(part, index) in figureParts(hm(sleep.duration_minutes))" :key="index"><i v-if="part.unit">{{ part.text }}</i><template v-else>{{ part.text }}</template></template></span></p>
       <div class="sleep-bar-hit" @pointermove="hoverStage" @pointerdown.stop.prevent="hoverStage" @click.stop.prevent @pointerleave="activeStage = null"><div class="sleep-bar" :aria-label="t.sleepBarAria"><span v-for="stage in sleepBarStages" :key="stage.key" :style="{ flex: Math.max(1, stage.minutes), background: stage.color }"></span></div><span v-if="activeStage" class="sleep-tooltip" role="tooltip" :style="{ left: `${hoverLeft}%` }">{{ activeStage.label }} · {{ hm(activeStage.minutes) }}</span></div>
       <ul class="sleep-stages"><li v-for="stage in sleepStages" :key="stage.key"><i :style="{ background: stage.color }"></i><span>{{ stage.label }}</span><strong>{{ hm(stage.minutes) }}</strong></li></ul>
     </template>
     <div v-else class="panel-empty compact"><GlyphTile name="sleep" :size="50" /><span>{{ t.sleepEmpty }}</span></div>
-    <span class="panel-more">{{ t.seeMore }} <GlyphTile name="chevron-right" :size="18" /></span>
   </RouterLink>
 </template>
 
@@ -124,19 +134,18 @@ html[data-theme="light"] .sleep-panel.metric-panel {
   border-radius: 999px;
   background: var(--sleep-wash);
   color: var(--sleep-rem);
-  font-family: var(--font-mono);
   font-size: var(--fs-sm);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
 }
-.sleep-total { margin: 16px 0 10px; color: var(--ink); font-family: var(--font-mono); font-size: 20px; font-weight: 600; }
 .sleep-bar { display: flex; gap: 3px; height: 7px; overflow: hidden; border-radius: 999px; }
 .sleep-bar span { min-width: 3px; border-radius: 999px; }
 .sleep-stages { display: grid; grid-template-columns: minmax(0, 1fr); gap: 9px; margin: 14px 0 0; padding: 0; list-style: none; }
 .sleep-stages li { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-width: 0; color: var(--subtle); font-size: var(--fs-sm); }
 .sleep-stages i { width: 6px; height: 6px; border-radius: 50%; }
-.sleep-stages strong { color: var(--muted); font-family: var(--font-mono); font-size: var(--fs-sm); font-weight: 600; white-space: nowrap; }
+.sleep-stages strong { color: var(--muted); font-size: var(--fs-sm); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 @media (max-width: 1180px) { .sleep-panel { grid-column: span 6; } }
 @media (max-width: 820px) { .sleep-panel { grid-column: 1; } }
-.sleep-panel .panel-more { margin-top: auto; padding-top: 10px; }
 .sleep-bar-hit { position: relative; padding: 8px 0; margin: -8px 0; }
 .sleep-tooltip { position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); z-index: 2; white-space: nowrap; padding: 7px 10px; border: 1px solid var(--line-control); border-radius: 9px; background: var(--mat-glass-strong); color: var(--ink); font-size: var(--fs-sm); pointer-events: none; box-shadow: var(--mat-glass-shadow); }
 </style>

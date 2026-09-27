@@ -23,7 +23,10 @@ const props = withDefaults(defineProps<{
   label: string;
   /** 一开始就开着的卡。 */
   initialOpen?: string[];
-}>(), { initialOpen: () => [] });
+  /** 卡包上方的区块标题与一行说明（可选）；不给就只有右侧的「全部展开」。 */
+  heading?: string;
+  sub?: string;
+}>(), { initialOpen: () => [], heading: undefined, sub: undefined });
 
 defineSlots<{ [key: string]: (props: { card: C }) => unknown }>();
 
@@ -97,7 +100,8 @@ onBeforeUnmount(() => {
 
 <template>
   <section ref="root" class="fold-deck" :aria-label="label">
-    <div class="fold-bar">
+    <div :class="['fold-bar', { 'has-heading': heading }]">
+      <div v-if="heading" class="fold-heading"><h2>{{ heading }}</h2><p v-if="sub">{{ sub }}</p></div>
       <button type="button" class="pill-button quiet fold-all" @click="toggleAll">
         <Icon :name="allOpen() ? 'chevron-down' : 'grid'" :size="14" :class="{ flip: allOpen() }" />{{ allOpen() ? t.collapseAll : t.expandAll }}
       </button>
@@ -129,7 +133,11 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .fold-deck { display: grid; gap: 10px; min-width: 0; }
-.fold-bar { display: flex; justify-content: flex-end; }
+.fold-bar { display: flex; align-items: flex-end; justify-content: flex-end; gap: 12px; }
+.fold-bar.has-heading { justify-content: space-between; margin-top: 6px; }
+.fold-heading { display: grid; gap: 2px; min-width: 0; }
+.fold-heading h2 { margin: 0; color: var(--ink); font-size: var(--fs-lg); font-weight: 700; }
+.fold-heading p { margin: 0; overflow: hidden; color: var(--subtle); font-size: var(--fs-xs); text-overflow: ellipsis; white-space: nowrap; }
 .fold-all { min-height: 32px; padding: 0 14px; font-size: var(--fs-xs); }
 .flip { rotate: 180deg; }
 .fold-list {
@@ -145,7 +153,7 @@ onBeforeUnmount(() => {
 .fold-card.is-closed {
   min-height: var(--fold-card);
   background: var(--mat-card-solid);
-  box-shadow: 0 -1px 0 color-mix(in srgb, #fff 6%, transparent) inset, 0 -10px 26px -14px rgba(0, 0, 0, .4);
+  box-shadow: 0 -1px 0 color-mix(in srgb, #fff 6%, transparent) inset, 0 -8px 18px -14px rgba(0, 0, 0, .32);
   transition: translate .42s var(--ease-out);
 }
 .fold-card.is-closed + .fold-card.is-closed { margin-top: calc(var(--fold-peek) - var(--fold-card)); }

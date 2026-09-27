@@ -73,7 +73,7 @@ const cards = computed(() => [
 </script>
 
 <template>
-  <FoldDeck :cards="cards" :label="t.label">
+  <FoldDeck :cards="cards" :label="t.label" :heading="t.label" :sub="cards.map((card) => card.title).join(' · ')">
     <template #weekly><WeeklyReportCard /></template>
     <template #body>
       <StatusEntryCard to="/body" tone="body" icon="recovery" :aria-label="bodyAria" :title="bodyTitle"

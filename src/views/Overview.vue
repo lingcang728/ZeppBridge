@@ -24,6 +24,7 @@ import { createLoadSeq } from '../lib/loadSeq';
 import { indexSeries, latestValue } from '../lib/metricSeries';
 import { vTilt } from '../lib/tilt';
 import { formatMetric, isFiniteNumber } from '../lib/format';
+import { displayDateTimeFormatter } from '../lib/dateTime';
 import type { HealthOverview, HeartRatePoint, MetricSeries, SleepSession, Workout } from '../types';
 import { defineMessages, useMessages } from '../i18n';
 
@@ -126,6 +127,8 @@ const messages = defineMessages(
 const t = useMessages(messages);
 
 const { dataRevision, streamUpdate } = useSyncController();
+/** 页头标题下面一行今天的日期（按界面语言），标题不再孤零零地占一整行。 */
+const todayLabel = computed(() => displayDateTimeFormatter({ month: 'long', day: 'numeric', weekday: 'long' }).format(new Date()));
 const { models: deviceModels, error: deviceError, load: loadDevices } = useDevices();
 
 const overview = ref<HealthOverview | null>(null);
@@ -294,8 +297,9 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
 <template>
   <section class="page overview-page" aria-labelledby="overview-title">
     <header class="page-header overview-header">
-      <div>
+      <div class="overview-title">
         <h1 id="overview-title">{{ t.overviewTitle }}</h1>
+        <p class="overview-date">{{ todayLabel }}</p>
       </div>
       <!-- 取餐胶囊：同步在跑时报进度，用户等的那次同步落地后发光喊「交给 AI」。 -->
       <DataReadyCapsule />
@@ -356,6 +360,8 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
 /* 页头行固定高度：取餐胶囊出现、消失都在这一行里，不推动下面的内容。 */
 .overview-header { min-height: 58px; align-items: center; margin-bottom: 0; }
 .overview-header h1 { margin-bottom: 0; }
+.overview-title { display: grid; gap: 2px; }
+.overview-date { margin: 0; color: var(--subtle); font-size: var(--fs-sm); }
 
 .inline-alert { display: flex; align-items: center; gap: 8px; padding: 9px 13px; border: 1px solid var(--mat-line); border-radius: 12px; background: var(--mat-card); color: var(--muted); font-size: var(--fs-sm); box-shadow: var(--mat-rim), var(--mat-shadow); }
 .inline-alert.warning { color: var(--warning); }
