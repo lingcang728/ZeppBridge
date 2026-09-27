@@ -3,6 +3,7 @@ import { defineMessages } from '../i18n';
 /* BodyStatus 的文案。单独一个文件，免得三种语言的文案把逻辑挤出视野；moduleId 不变，语言包不用跟着搬家。 */
 export const bodyStatusMessages = defineMessages(
   {
+    vitalsGroupTitle: '恢复与生命体征',
     backToOverview: '返回概览',
     title: '身体状态',
     intro: '恢复、压力、血氧、HRV、呼吸率、静息心率、体重体成分与饮食摄入的本机趋势。全部读自已同步的记录。',
@@ -82,6 +83,7 @@ export const bodyStatusMessages = defineMessages(
     gramsPerDay: (grams: number) => `平均每天 ${grams} 克`,
   },
   {
+    vitalsGroupTitle: 'Recovery and vitals',
     backToOverview: 'Back to overview',
     title: 'Body status',
     intro: 'Local trends for readiness, stress, blood oxygen, HRV, respiratory rate, resting heart rate, body composition and food intake. All read from synced records.',
@@ -161,6 +163,7 @@ export const bodyStatusMessages = defineMessages(
     gramsPerDay: (grams: number) => `${grams} g per day on average`,
   },
   {
+    vitalsGroupTitle: 'Recuperación y constantes vitales',
     backToOverview: 'Volver al resumen',
     title: 'Estado corporal',
     intro: 'Tendencias locales de recuperación, estrés, oxígeno en sangre, VFC, frecuencia respiratoria, frecuencia cardíaca en reposo, composición corporal y alimentación. Todo leído de los registros sincronizados.',

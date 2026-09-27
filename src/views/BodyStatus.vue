@@ -7,6 +7,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { CHART_THEME, VChart } from '../lib/echartsSetup';
 import { createLoadSeq } from '../lib/loadSeq';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
+import FoldDeck from '../components/deck/FoldDeck.vue';
 import PageHeader from '../components/PageHeader.vue';
 import CoverageNotice from '../components/CoverageNotice.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
@@ -101,6 +102,13 @@ const load = async () => {
 onMounted(() => { void load(); });
 watch(rangeDays, () => { void load(); });
 watch(dataRevision, () => { void load(); });
+
+const labelsOf = (list: { label: string }[], empty: string) => list.map((card) => card.label).join(' · ') || empty;
+const foldCards = computed(() => [
+  { id: 'vitals', title: t.value.vitalsGroupTitle, summary: labelsOf(vitalsCards.value, t.value.noneInRange), icon: 'recovery' as const, tone: 'heart' as const, framed: true },
+  { id: 'body', title: t.value.bodyGroupTitle, summary: labelsOf(bodyCards.value, t.value.bodyGroupEmpty), icon: 'body-activity' as const, tone: 'activity' as const, framed: true },
+  { id: 'intake', title: t.value.intakeGroupTitle, summary: labelsOf(intakeCards.value, t.value.intakeGroupEmpty), icon: 'manual-entry' as const, tone: 'training' as const, framed: true },
+]);
 </script>
 
 <template>
@@ -170,87 +178,92 @@ watch(dataRevision, () => { void load(); });
         {{ t.noneInRange }}
       </p>
 
-      <div class="card-grid">
-        <MetricTrendCard
-          v-for="card in vitalsCards"
-          :key="card.metric"
-          :label="card.label"
-          :hint="card.hint"
-          :series="card.series"
-          :color="card.color"
-          :unit="card.unit"
-          :decimals="card.decimals ?? 0"
-          :show-spread="card.showSpread ?? false"
-          :empty-text="card.emptyText ?? t.emptyCard"
-        />
-      </div>
-
-      <!-- 体重与体成分。没有秤的账号这里只有一句话，而不是九张空卡片。 -->
-      <h2 class="group-title">{{ t.bodyGroupTitle }}</h2>
-      <p v-if="!bodyCards.length" class="inline-alert" role="status">
-        <Icon name="info" :size="14" />{{ t.bodyGroupEmpty }}
-      </p>
-      <div v-else class="card-grid">
-        <MetricTrendCard
-          v-for="card in bodyCards"
-          :key="card.metric"
-          :label="card.label"
-          :hint="card.hint"
-          :series="card.series"
-          :color="card.color"
-          :unit="card.unit"
-          :decimals="card.decimals ?? 0"
-          :show-spread="card.showSpread ?? false"
-          :empty-text="card.emptyText ?? t.emptyCard"
-        />
-      </div>
-
-      <!-- 摄入。同一条规则：没记过饮食就只有一句话。 -->
-      <h2 class="group-title">{{ t.intakeGroupTitle }}</h2>
-      <p v-if="!intakeCards.length" class="inline-alert" role="status">
-        <Icon name="info" :size="14" />{{ t.intakeGroupEmpty }}
-      </p>
-      <template v-else>
-        <section v-if="macroChartOption" class="surface-card day-card" :aria-label="t.macroTitle">
-          <header class="day-head">
-            <div>
-              <h2>{{ t.macroTitle }}</h2>
-              <p>{{ t.macroSub }}</p>
+      <!-- 首屏只留 24 小时压力曲线和范围开关；生命体征、体重体成分、饮食摄入收进卡包，点开飞出来。 -->
+      <FoldDeck :cards="foldCards" :label="t.title">
+        <template #vitals>
+          <div class="card-grid">
+            <MetricTrendCard
+              v-for="card in vitalsCards"
+              :key="card.metric"
+              :label="card.label"
+              :hint="card.hint"
+              :series="card.series"
+              :color="card.color"
+              :unit="card.unit"
+              :decimals="card.decimals ?? 0"
+              :show-spread="card.showSpread ?? false"
+              :empty-text="card.emptyText ?? t.emptyCard"
+            />
+          </div>
+        </template>
+        <template #body>
+          <p v-if="!bodyCards.length" class="inline-alert" role="status">
+            <Icon name="info" :size="14" />{{ t.bodyGroupEmpty }}
+          </p>
+          <div v-else class="card-grid">
+            <MetricTrendCard
+              v-for="card in bodyCards"
+              :key="card.metric"
+              :label="card.label"
+              :hint="card.hint"
+              :series="card.series"
+              :color="card.color"
+              :unit="card.unit"
+              :decimals="card.decimals ?? 0"
+              :show-spread="card.showSpread ?? false"
+              :empty-text="card.emptyText ?? t.emptyCard"
+            />
+          </div>
+        </template>
+        <template #intake>
+          <p v-if="!intakeCards.length" class="inline-alert" role="status">
+            <Icon name="info" :size="14" />{{ t.intakeGroupEmpty }}
+          </p>
+          <template v-else>
+            <section v-if="macroChartOption" class="surface-card day-card" :aria-label="t.macroTitle">
+              <header class="day-head">
+                <div>
+                  <h2>{{ t.macroTitle }}</h2>
+                  <p>{{ t.macroSub }}</p>
+                </div>
+                <dl class="day-stats">
+                  <div v-for="slice in macroSplit?.slices ?? []" :key="slice.key">
+                    <dt>{{ slice.label }}</dt>
+                    <dd :style="{ color: slice.color }">{{ slice.percent }}%</dd>
+                  </div>
+                </dl>
+              </header>
+              <VChart
+                class="macro-chart"
+                :key="CHART_THEME"
+                :theme="CHART_THEME"
+                :option="macroChartOption"
+                autoresize
+                role="img"
+                :aria-label="t.macroTitle"
+              />
+              <p class="curve-note">{{ t.macroNote }}</p>
+            </section>
+            <div class="card-grid">
+              <MetricTrendCard
+                v-for="card in intakeCards"
+                :key="card.metric"
+                :label="card.label"
+                :hint="card.hint"
+                :series="card.series"
+                :color="card.color"
+                :unit="card.unit"
+                :decimals="card.decimals ?? 0"
+                :chart="card.chart"
+                :calendar-axis="card.calendarAxis ?? false"
+                :empty-text="card.emptyText ?? t.emptyCard"
+              />
             </div>
-            <dl class="day-stats">
-              <div v-for="slice in macroSplit?.slices ?? []" :key="slice.key">
-                <dt>{{ slice.label }}</dt>
-                <dd :style="{ color: slice.color }">{{ slice.percent }}%</dd>
-              </div>
-            </dl>
-          </header>
-          <VChart
-            class="macro-chart"
-            :key="CHART_THEME"
-            :theme="CHART_THEME"
-            :option="macroChartOption"
-            autoresize
-            role="img"
-            :aria-label="t.macroTitle"
-          />
-          <p class="curve-note">{{ t.macroNote }}</p>
-        </section>
-        <div class="card-grid">
-          <MetricTrendCard
-            v-for="card in intakeCards"
-            :key="card.metric"
-            :label="card.label"
-            :hint="card.hint"
-            :series="card.series"
-            :color="card.color"
-            :unit="card.unit"
-            :decimals="card.decimals ?? 0"
-            :chart="card.chart"
-            :calendar-axis="card.calendarAxis ?? false"
-            :empty-text="card.emptyText ?? t.emptyCard"
-          />
-        </div>
-      </template>
+          </template>
+        </template>
+      </FoldDeck>
+
+
     </template>
   </section>
 </template>

@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
 import Icon from '../components/Icon.vue';
+import FoldDeck from '../components/deck/FoldDeck.vue';
 import CircularProgress from '../components/CircularProgress.vue';
 import StageBar from '../components/StageBar.vue';
 import { sleepStageLabel, sleepStageLabels } from '../lib/sleepStages';
@@ -200,6 +201,20 @@ const loadDetail = async () => {
 
 onMounted(() => void loadDetail());
 watch([dataRevision, sleepId], () => void loadDetail());
+
+const foldCards = computed(() => [
+  ...(weeklyChartOption.value
+    ? [{ id: 'weekly', title: t.value.weeklyTitle, summary: t.value.weeklySub, icon: 'sleep-waves' as const, tone: 'sleep' as const }]
+    : []),
+  {
+    id: 'meta',
+    title: t.value.metaAria,
+    summary: [dataProviderLabel(), device.value.name].filter(Boolean).join(' · '),
+    icon: 'health-watch' as const,
+    tone: 'activity' as const,
+    framed: true,
+  },
+]);
 </script>
 
 <template>
@@ -261,56 +276,61 @@ watch([dataRevision, sleepId], () => void loadDetail());
         />
       </section>
 
-      <!-- 睡眠时长周堆叠图 -->
-      <section v-if="weeklyChartOption" class="surface-card chart-card" :aria-label="t.weeklyAria">
-        <div class="stage-head">
-          <h2>{{ t.weeklyTitle }}</h2>
-          <p>{{ t.weeklySub }}</p>
-        </div>
-        <VChart class="weekly-sleep-chart" :key="CHART_THEME" :theme="CHART_THEME" :option="weeklyChartOption" autoresize role="img" :aria-label="t.weeklyChartAria" />
-      </section>
+      <!-- 首屏只留这一夜的时长、评分和分期；近 7 天结构、来源与设备收进卡包，点开飞出来。 -->
+      <FoldDeck :cards="foldCards" :label="t.metaAria">
+        <template #weekly>
+          <section v-if="weeklyChartOption" class="surface-card chart-card" :aria-label="t.weeklyAria">
+            <div class="stage-head">
+              <h2>{{ t.weeklyTitle }}</h2>
+              <p>{{ t.weeklySub }}</p>
+            </div>
+            <VChart class="weekly-sleep-chart" :key="CHART_THEME" :theme="CHART_THEME" :option="weeklyChartOption" autoresize role="img" :aria-label="t.weeklyChartAria" />
+          </section>
+        </template>
+        <template #meta>
+          <section class="meta-grid" :aria-label="t.metaAria">
+            <article class="surface-card meta-card">
+              <p class="meta-title"><Icon name="cloud" :size="15" />{{ t.sourceTitle }}</p>
+              <dl>
+                <div>
+                  <dt>{{ t.sourceProvider }}</dt>
+                  <dd>{{ dataProviderLabel() }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t.sourceScope }}</dt>
+                  <dd>{{ dataScopeLabel(session.source_scope) }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t.syncedAt }}</dt>
+                  <dd>{{ syncTimeLabel }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t.timezone }}</dt>
+                  <dd>{{ timezoneLabel }}</dd>
+                </div>
+              </dl>
+            </article>
+            <article class="surface-card meta-card">
+              <p class="meta-title"><Icon name="watch" :size="15" />{{ t.deviceTitle }}</p>
+              <dl>
+                <div>
+                  <dt>{{ t.deviceName }}</dt>
+                  <dd>{{ device.name || t.notProvided }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t.deviceFirmware }}</dt>
+                  <dd>{{ device.firmware || t.notProvided }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t.deviceId }}</dt>
+                  <dd>{{ deviceIdentifier }}</dd>
+                </div>
+              </dl>
+            </article>
+          </section>
+        </template>
+      </FoldDeck>
 
-      <!-- 元数据与设备 -->
-      <section class="meta-grid" :aria-label="t.metaAria">
-        <article class="surface-card meta-card">
-          <p class="meta-title"><Icon name="cloud" :size="15" />{{ t.sourceTitle }}</p>
-          <dl>
-            <div>
-              <dt>{{ t.sourceProvider }}</dt>
-              <dd>{{ dataProviderLabel() }}</dd>
-            </div>
-            <div>
-              <dt>{{ t.sourceScope }}</dt>
-              <dd>{{ dataScopeLabel(session.source_scope) }}</dd>
-            </div>
-            <div>
-              <dt>{{ t.syncedAt }}</dt>
-              <dd>{{ syncTimeLabel }}</dd>
-            </div>
-            <div>
-              <dt>{{ t.timezone }}</dt>
-              <dd>{{ timezoneLabel }}</dd>
-            </div>
-          </dl>
-        </article>
-        <article class="surface-card meta-card">
-          <p class="meta-title"><Icon name="watch" :size="15" />{{ t.deviceTitle }}</p>
-          <dl>
-            <div>
-              <dt>{{ t.deviceName }}</dt>
-              <dd>{{ device.name || t.notProvided }}</dd>
-            </div>
-            <div>
-              <dt>{{ t.deviceFirmware }}</dt>
-              <dd>{{ device.firmware || t.notProvided }}</dd>
-            </div>
-            <div>
-              <dt>{{ t.deviceId }}</dt>
-              <dd>{{ deviceIdentifier }}</dd>
-            </div>
-          </dl>
-        </article>
-      </section>
       <p class="note">{{ t.footnote }}</p>
     </template>
   </section>

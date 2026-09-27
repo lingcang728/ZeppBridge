@@ -16,6 +16,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { HR_GAP_BREAK_MS, insertNullBreaks } from '../lib/chartGaps';
 import { createLoadSeq } from '../lib/loadSeq';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
+import FoldDeck from '../components/deck/FoldDeck.vue';
 import PageHeader from '../components/PageHeader.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import Icon from '../components/Icon.vue';
@@ -270,6 +271,18 @@ const dailyMaxChartOption = computed(() => {
 onMounted(() => { void load(); });
 watch(rangeDays, () => { void load({ trendsOnly: true }); });
 watch(dataRevision, () => { void load(); });
+
+const foldCards = computed(() => [
+  { id: 'daily', title: t.value.dailyMaxTitle, summary: t.value.dailyMaxFold, icon: 'heart-rate' as const, tone: 'heart' as const },
+  {
+    id: 'trends',
+    title: t.value.trendsTitle,
+    summary: trendCards.value.map((card) => card.label).join(' · '),
+    icon: 'resting-heart-rate' as const,
+    tone: 'heart' as const,
+    framed: true,
+  },
+]);
 </script>
 
 <template>
@@ -335,52 +348,59 @@ watch(dataRevision, () => { void load(); });
         />
       </div>
 
-      <section class="surface-card day-card" :aria-label="t.dailyMaxAria">
-        <header class="day-head">
-          <div>
-            <h2>{{ t.dailyMaxTitle }}</h2>
-            <p>{{ t.dailyMaxSub }}</p>
+      <!-- 首屏只留当天的全天曲线；每日最高心率、静息心率与 HRV 趋势收进卡包，点开飞出来。 -->
+      <FoldDeck :cards="foldCards" :label="t.title">
+        <template #daily>
+          <section class="surface-card day-card" :aria-label="t.dailyMaxAria">
+            <header class="day-head">
+              <div>
+                <h2>{{ t.dailyMaxTitle }}</h2>
+                <p>{{ t.dailyMaxSub }}</p>
+              </div>
+            </header>
+            <VChart
+              v-if="dailyExtremes.length"
+              class="day-chart"
+              :key="CHART_THEME"
+              :theme="CHART_THEME"
+              :option="dailyMaxChartOption"
+              :update-options="SMOOTH_CHART_UPDATE"
+              autoresize
+              role="img"
+              :aria-label="t.dailyMaxAria"
+            />
+            <p v-else-if="extremesError" class="inline-alert" role="alert">
+              <Icon name="warning" :size="14" />{{ extremesError }}
+            </p>
+            <p v-else class="inline-alert" role="status">
+              <Icon name="info" :size="14" />{{ t.dailyMaxNone }}
+            </p>
+            <p v-if="sparseDays" class="inline-alert" role="status">
+              <Icon name="info" :size="14" />{{ t.dailyMaxSparse(sparseDays) }}
+            </p>
+            <p class="daily-max-note">{{ t.dailyMaxNote }}</p>
+          </section>
+        </template>
+        <template #trends>
+          <p v-if="trendsError" class="inline-alert" role="alert">
+            <Icon name="warning" :size="14" />{{ trendsError }}
+          </p>
+          <div class="card-grid">
+            <MetricTrendCard
+              v-for="card in trendCards"
+              :key="card.metric"
+              :label="card.label"
+              :hint="card.hint"
+              :series="card.series"
+              :color="card.color"
+              :unit="card.unit"
+              :decimals="0"
+              :empty-text="trendsError || t.emptyCard"
+            />
           </div>
-        </header>
-        <VChart
-          v-if="dailyExtremes.length"
-          class="day-chart"
-          :key="CHART_THEME"
-          :theme="CHART_THEME"
-          :option="dailyMaxChartOption"
-          :update-options="SMOOTH_CHART_UPDATE"
-          autoresize
-          role="img"
-          :aria-label="t.dailyMaxAria"
-        />
-        <p v-else-if="extremesError" class="inline-alert" role="alert">
-          <Icon name="warning" :size="14" />{{ extremesError }}
-        </p>
-        <p v-else class="inline-alert" role="status">
-          <Icon name="info" :size="14" />{{ t.dailyMaxNone }}
-        </p>
-        <p v-if="sparseDays" class="inline-alert" role="status">
-          <Icon name="info" :size="14" />{{ t.dailyMaxSparse(sparseDays) }}
-        </p>
-        <p class="daily-max-note">{{ t.dailyMaxNote }}</p>
-      </section>
+        </template>
+      </FoldDeck>
 
-      <p v-if="trendsError" class="inline-alert" role="alert">
-        <Icon name="warning" :size="14" />{{ trendsError }}
-      </p>
-      <div class="card-grid">
-        <MetricTrendCard
-          v-for="card in trendCards"
-          :key="card.metric"
-          :label="card.label"
-          :hint="card.hint"
-          :series="card.series"
-          :color="card.color"
-          :unit="card.unit"
-          :decimals="0"
-          :empty-text="trendsError || t.emptyCard"
-        />
-      </div>
     </template>
   </section>
 </template>

@@ -1,4 +1,4 @@
-<script setup lang="ts" generic="C extends { id: string; title: string; summary?: string; icon: DesignIconName; tone?: GlyphTone }">
+<script setup lang="ts" generic="C extends { id: string; title: string; summary?: string; icon: DesignIconName; tone?: GlyphTone; framed?: boolean }">
 /* 收纳卡包：把「平时不用一直摊开看」的区块收成一叠只露卡头的卡（和设置的「展开全部」同一种
  * 卡包），点一张它就从卡包里飞出来、长成完整的卡；× 或 Esc 飞回去。
  *
@@ -6,7 +6,11 @@
  * 的气质。可以同时开好几张；开着的卡按原顺序排在卡包里，后面的卡接着叠。
  *
  * 飞入飞出用 FLIP：开合前量每张卡的位置，开合后量新位置，用 Web Animations 从旧位置
- * 平移回来；开的那张用 clip-path 从卡头的高度长到完整高度。动画中再点是就地打断重来。 */
+ * 平移回来；开的那张用 clip-path 从卡头的高度长到完整高度。动画中再点是就地打断重来。
+ *
+ * 两种开法：区块自己就是一张卡（有卡头、有底）时，开着就是它本身，右上角压一枚收起；
+ * 区块是一组卡片的网格、没有自己的卡头时（`framed`），开着时外面包一张卡，顶上一行
+ * 标题 + 收起。 */
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import GlyphTile from '../GlyphTile.vue';
 import Icon from '../Icon.vue';
@@ -101,7 +105,15 @@ onBeforeUnmount(() => {
     <ol class="fold-list">
       <li v-for="(card, index) in cards" :key="card.id" :data-fold="card.id"
         :class="['fold-card', opened.has(card.id) ? 'is-open' : 'is-closed']" :style="{ zIndex: index + 1 }">
-        <template v-if="opened.has(card.id)">
+        <div v-if="opened.has(card.id) && card.framed" class="fold-frame">
+          <button type="button" class="fold-frame-head" :aria-expanded="true" :aria-label="t.close" @click="toggle(card.id)">
+            <GlyphTile :name="card.icon" :tone="card.tone" :size="40" />
+            <span class="fold-copy"><strong>{{ card.title }}</strong><small v-if="card.summary">{{ card.summary }}</small></span>
+            <span class="fold-frame-close" aria-hidden="true"><Icon name="x" :size="15" /></span>
+          </button>
+          <div class="fold-body"><slot :name="card.id" :card="card" /></div>
+        </div>
+        <template v-else-if="opened.has(card.id)">
           <button type="button" class="fold-close" :aria-label="t.close" :title="t.close" @click="toggle(card.id)"><Icon name="x" :size="15" /></button>
           <div class="fold-body"><slot :name="card.id" :card="card" /></div>
         </template>
@@ -184,6 +196,12 @@ onBeforeUnmount(() => {
 }
 .fold-close:hover { color: var(--ink); }
 .fold-body { min-width: 0; }
+/* 带框的开法：一张不透明的卡，顶上一行卡头（整行可点，点了收起），下面是区块内容。 */
+.fold-frame { display: grid; gap: 14px; padding: 6px 16px 18px; border-radius: 28px; background: var(--mat-card-solid); box-shadow: var(--mat-shadow); }
+.fold-frame-head { display: flex; width: 100%; align-items: center; gap: 14px; padding: 12px 6px 4px; border: 0; background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
+.fold-frame-head:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 18px; }
+.fold-frame-close { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border-radius: 50%; background: var(--cap-thumb); box-shadow: var(--cap-thumb-rim); color: var(--muted); }
+.fold-frame-head:hover .fold-frame-close { color: var(--ink); }
 @media (prefers-reduced-motion: reduce) {
   .fold-card.is-closed, .fold-card.is-closed:hover ~ .fold-card.is-closed { transition: none; translate: none; }
 }

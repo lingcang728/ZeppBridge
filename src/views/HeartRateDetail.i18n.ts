@@ -3,6 +3,8 @@ import { defineMessages } from '../i18n';
 /* HeartRateDetail 的文案。单独一个文件，免得三种语言的文案把逻辑挤出视野；moduleId 不变，语言包不用跟着搬家。 */
 export const heartRateDetailMessages = defineMessages(
   {
+    dailyMaxFold: '本机原始样本，不过滤，和 Zepp App 的数字可能不同',
+    trendsTitle: '静息心率与 HRV 趋势',
     backToOverview: '返回概览',
     title: '心率',
     intro: '上面是最近 24 小时的全天曲线；7 天 / 1 个月 / 6 个月只改下面的按天趋势。没有采样的时间不画线，也不补 0。',
@@ -42,6 +44,8 @@ export const heartRateDetailMessages = defineMessages(
     dailyMaxNote: '按本机采集的心率样本计算；可能与 Zepp App 的每日峰值不同。',
   },
   {
+    dailyMaxFold: 'Raw samples on this machine, unfiltered — may differ from the Zepp app',
+    trendsTitle: 'Resting heart rate and HRV trends',
     backToOverview: 'Back to overview',
     title: 'Heart rate',
     intro: 'The full-day curve above is always the last 24 hours; 7 days / 1 month / 6 months only change the day-by-day trends below. Stretches without samples are left blank, not filled with a zero.',
@@ -81,6 +85,8 @@ export const heartRateDetailMessages = defineMessages(
     dailyMaxNote: 'Calculated from locally recorded samples; daily peaks may differ from the Zepp app.',
   },
   {
+    dailyMaxFold: 'Muestras originales sin filtrar; pueden diferir de la app Zepp',
+    trendsTitle: 'Tendencias de FC en reposo y VFC',
     backToOverview: 'Volver al resumen',
     title: 'Frecuencia cardíaca',
     intro: 'La curva de todo el día de arriba es siempre las últimas 24 horas; 7 días / 1 mes / 6 meses solo cambian las tendencias diarias de abajo. Los tramos sin muestras quedan en blanco, no se rellenan con cero.',
