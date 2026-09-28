@@ -93,7 +93,7 @@ const renderNotice = (value: SyncNotice): string => {
       // 后端加了新的一步而界面还不认识它：英文界面下不吐中文，给一句笼统的。
       return backendText(value.text, t.syncingRecent(incrementalSyncDays()));
     }
-    case 'syncingRecent': return t.syncingRecent(incrementalSyncDays());
+    case 'syncingRecent': return t.syncingRecent(value.days ?? incrementalSyncDays());
     case 'backfilling': return t.backfilling(value.days);
     case 'alreadySyncing': return t.alreadySyncing;
     case 'desktopOnly': return t.desktopOnly;

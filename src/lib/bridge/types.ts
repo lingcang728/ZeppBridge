@@ -253,7 +253,8 @@ export interface BridgeBackend {
   getLoginStatus(): Promise<LoginStatus>;
 
   startHistorySync(days: number): Promise<SyncReport>;
-  startIncrementalSync(): Promise<SyncReport>;
+  /** `quick`：静默的定时同步，只拉最近几天（整窗刷新到期时照旧整窗）。 */
+  startIncrementalSync(quick?: boolean): Promise<SyncReport>;
   cancelSync(): Promise<void>;
   probeDataCapabilities(): Promise<CapabilityProbe[]>;
   getCapabilityOverview(): Promise<CapabilityOverview>;

@@ -348,6 +348,20 @@ impl SyncManager {
             .await
     }
 
+    /// 静默的定时同步：只重拉最近 [`crate::contract::QUICK_SYNC_DAYS`] 天；
+    /// 距上一次成功的整窗同步超过一天时照旧拉整窗，晚到的数据不会漏。
+    pub async fn quick_sync_report_with_progress<F>(&self, on_progress: F) -> Result<SyncReport>
+    where
+        F: Fn(SyncProgress) + Send + Sync,
+    {
+        let refresh_due = {
+            let db = self.db.lock().await;
+            db.full_window_refresh_due(Utc::now())?
+        };
+        self.sync_report(quick_window_days(refresh_due), Some(&on_progress))
+            .await
+    }
+
     pub async fn incremental_sync_report_with_progress<F>(
         &self,
         on_progress: F,
@@ -357,6 +371,15 @@ impl SyncManager {
     {
         self.sync_report(crate::contract::INCREMENTAL_SYNC_DAYS, Some(&on_progress))
             .await
+    }
+}
+
+/// 定时同步的窗口：整窗刷新到期就拉整窗，否则只拉最近几天。
+pub fn quick_window_days(full_refresh_due: bool) -> i64 {
+    if full_refresh_due {
+        crate::contract::INCREMENTAL_SYNC_DAYS
+    } else {
+        crate::contract::QUICK_SYNC_DAYS
     }
 }
 

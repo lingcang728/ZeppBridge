@@ -28,7 +28,7 @@ export type SyncNotice =
   | { kind: 'none' }
   | { kind: 'backend'; text: string }
   | { kind: 'progress'; code: string; stream: string; month: string | null; text: string }
-  | { kind: 'syncingRecent' }
+  | { kind: 'syncingRecent'; days?: number }
   | { kind: 'backfilling'; days: number }
   | { kind: 'alreadySyncing' }
   | { kind: 'desktopOnly' }

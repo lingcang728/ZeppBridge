@@ -8,6 +8,7 @@ import type { SyncOutcome, SyncReport } from '../../types';
 const mocks = vi.hoisted(() => ({
   outcome: 'updated' as SyncOutcome,
   fail: false,
+  quickArgs: [] as unknown[],
 }));
 vi.mock('../../lib/bridge', () => ({
   isDesktop: () => true,
@@ -18,7 +19,8 @@ vi.mock('../../lib/bridge', () => ({
       streams: [],
       last_cloud_sync_at: '2026-09-26T08:00:00Z',
     }),
-    startIncrementalSync: async (): Promise<SyncReport> => {
+    startIncrementalSync: async (quick?: boolean): Promise<SyncReport> => {
+      mocks.quickArgs.push(quick);
       if (mocks.fail) throw new Error('network');
       return {
         success: mocks.outcome !== 'failed',
@@ -48,6 +50,16 @@ it('lights up after a sync the user asked for, and goes out once picked up', asy
   expect(controller.dataReady.value).toMatchObject({ phase: 'ready', outcome: 'updated', records: 42 });
   controller.pickUpReady();
   expect(controller.dataReady.value.phase).toBe('idle');
+});
+
+/* 定时自动同步只要最近几天（后端决定何时整窗）；用户点的同步永远整窗。 */
+it('asks for the short window only on the timed auto-sync', async () => {
+  const controller = useSyncController();
+  mocks.quickArgs.length = 0;
+  await controller.runSync('incremental', undefined, { silent: true, quick: true });
+  await controller.runSync('incremental');
+  await controller.runSync('incremental', undefined, { silent: true, waited: true });
+  expect(mocks.quickArgs).toEqual([true, false, false]);
 });
 
 it('stays dark after a background auto-sync', async () => {

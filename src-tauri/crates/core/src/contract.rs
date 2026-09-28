@@ -22,6 +22,18 @@ pub const CONTRACT_VERSION: &str = "1";
 /// 不许再在前端写死一个数字。
 pub const INCREMENTAL_SYNC_DAYS: i64 = 30;
 
+/// 静默的定时自动同步只重拉最近这么多天。
+///
+/// 自动同步每 15 分钟一次；每次都把 30 天整窗重拉一遍，是每次八九十个请求、
+/// 一天近万次——对一个非官方接口来说既浪费又招限流，而其中 27 天几乎总是原样
+/// 回来。手表晚几天才同步上云的数据，由下面这条「每天至少一次整窗」兜住。
+///
+/// 手动同步、启动同步、托盘同步和 CLI 仍然是整窗。界面同样从 `AppStatus` 读它。
+pub const QUICK_SYNC_DAYS: i64 = 3;
+
+/// 距上一次**成功的**整窗同步超过这么多小时，定时同步就照旧整窗拉一次。
+pub const FULL_WINDOW_REFRESH_HOURS: i64 = 24;
+
 /// 时间的表达方式。
 pub const TIME_CONVENTION: &str = "所有时间戳都是 RFC 3339，带时区偏移。云端拉取时间（synced_at / fetched_at）与健康样本发生时间（start_time / timestamp）是两件事，任何情况下都不会互相替代。";
 

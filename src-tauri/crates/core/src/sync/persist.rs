@@ -1,18 +1,23 @@
-//! 运动详情队列与抓到的记录落库、失败与不可用的报告（从 sync/mod.rs 拆出，逻辑不变）。
+//! 运动详情队列（拉到一条写一条）、抓到的记录落库与一条流的收尾、失败与不可用的报告。
 
 use super::*;
 
 impl SyncManager {
-    pub(super) async fn fetch_pending_running_details(
+    /// 拉取待补的跑步明细，**拉到一条写一条**。
+    ///
+    /// 以前是全部拉完攒成一个 Vec 再一起落库：一轮 40 条明细全压在内存里，而用户
+    /// 中途按取消、或者撞上截止时间，已经下载好的那些一条都没留下，下次从头再拉。
+    /// 返回每条的报告；这一流的收尾（汇总、同步状态）由调用方做。
+    pub(super) async fn sync_pending_running_details(
         &self,
         deadline: Instant,
-    ) -> Result<Vec<FetchedRecord>> {
+    ) -> Result<Vec<StreamReport>> {
         let pending = {
             let db = self.db.lock().await;
             db.pending_running_details()?
         };
         let queue_len = pending.len();
-        let mut records = Vec::new();
+        let mut reports = Vec::new();
         let mut last_error = None;
         let mut attempted = 0usize;
         for item in pending {
@@ -29,15 +34,9 @@ impl SyncManager {
                 .await
             {
                 Ok(record) => {
-                    {
-                        let db = self.write_db().await?;
-                        db.record_workout_detail_fetch_result(
-                            &item.workout_id,
-                            &item.source,
-                            true,
-                        )?;
-                    }
-                    records.push(record);
+                    let db = self.write_db().await?;
+                    db.record_workout_detail_fetch_result(&item.workout_id, &item.source, true)?;
+                    reports.push(Self::persist_record(&db, record)?.report);
                 }
                 Err(error) if error.is_cancelled() => return Err(error),
                 Err(error) if error.needs_reauth() => return Err(error),
@@ -56,12 +55,12 @@ impl SyncManager {
         }
         // 截止时间打断这一轮不是整条流失败：剩下的留给下次。只有把这一批
         // 有限队列都试完、一条都没拿到，才把 last_error 抬上去。
-        let error = if records.is_empty() && attempted >= queue_len {
+        let error = if reports.is_empty() && attempted >= queue_len {
             last_error
         } else {
             None
         };
-        pending_details_outcome(records, error)
+        pending_details_outcome(reports, error)
     }
 
     /// 没有待拉取的明细也要写 sync_state：否则上一轮残留的 failed 会一直挂着。
@@ -123,12 +122,25 @@ impl SyncManager {
         for record in records {
             reports.push(Self::persist_record(&db, record)?.report);
         }
-        let mut aggregate = aggregate_stream_reports(stream, &reports);
-        if incomplete && aggregate.status != StreamStatus::Failed {
-            aggregate.status = StreamStatus::Failed;
-            aggregate.message = Some(incomplete_message.clone());
-        }
-        if incomplete {
+        let incomplete = incomplete.then_some(incomplete_message);
+        Self::finish_stream(&db, stream, &reports, incomplete)
+    }
+
+    /// 一条流的收尾：把逐条报告合成一条、记下阶段与同步状态。
+    ///
+    /// `incomplete` 带着原因时，整条流按未完成记：已经写进去的留着，但不能报成功。
+    pub(super) fn finish_stream(
+        db: &Database,
+        stream: &str,
+        reports: &[StreamReport],
+        incomplete: Option<String>,
+    ) -> Result<StreamReport> {
+        let mut aggregate = aggregate_stream_reports(stream, reports);
+        if let Some(incomplete_message) = incomplete {
+            if aggregate.status != StreamStatus::Failed {
+                aggregate.status = StreamStatus::Failed;
+                aggregate.message = Some(incomplete_message.clone());
+            }
             db.record_stream_stage(
                 stream,
                 Stage::Fetch,

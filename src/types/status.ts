@@ -49,6 +49,11 @@ export interface AppStatus {
    * 7 改成 30 之后界面整整一个版本还在说 7。
    */
   incremental_sync_days?: number;
+  /**
+   * 静默的定时同步这一次会往回拉多少天：平时是最近几天，整窗刷新（每天一次）
+   * 到期时等于 `incremental_sync_days`。同样只能从后端来。
+   */
+  auto_sync_days?: number;
   storage?: StorageEstimate;
   /** 本机实际有数据的那段日子。界面上每个「最近 N 天」读的都是本机库。 */
   coverage?: LocalCoverage;

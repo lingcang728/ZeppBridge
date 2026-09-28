@@ -147,7 +147,8 @@ const initialize = async () => {
       if (autoSyncEnabled.value && appStatus.value?.connection_state === 'connected') {
         if (autoSyncTickCount >= autoSyncInterval.value) {
           autoSyncTickCount = 0;
-          void runSync('incremental', undefined, { silent: true });
+          // 定时同步只拉最近几天；每天第一次（或上次整窗有流失败）后端照旧整窗。
+          void runSync('incremental', undefined, { silent: true, quick: true });
         }
       } else {
         autoSyncTickCount = 0;

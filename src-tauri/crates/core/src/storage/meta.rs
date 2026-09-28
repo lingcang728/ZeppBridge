@@ -2,6 +2,9 @@
 
 use super::*;
 
+/// 上一次成功的整窗（≥ `INCREMENTAL_SYNC_DAYS`）同步是什么时候。
+const LAST_FULL_WINDOW_SYNC_AT_KEY: &str = "last_full_window_sync_at";
+
 impl Database {
     pub(super) fn ensure_cloud_sync_metadata(&self) -> Result<()> {
         if self.get_app_meta(LAST_CLOUD_SYNC_AT_KEY)?.is_some()
@@ -69,6 +72,26 @@ impl Database {
             self.set_app_meta(LAST_CLOUD_SYNC_AT_KEY, finished_at)?;
         }
         self.set_app_meta(LAST_CLOUD_SYNC_OUTCOME_KEY, outcome)
+    }
+
+    /// 定时同步这一次该不该拉整窗：上一次成功的整窗同步已经超过
+    /// [`crate::contract::FULL_WINDOW_REFRESH_HOURS`]，或者从来没有过。
+    pub fn full_window_refresh_due(&self, now: DateTime<Utc>) -> Result<bool> {
+        let last = self
+            .get_app_meta(LAST_FULL_WINDOW_SYNC_AT_KEY)?
+            .and_then(|value| DateTime::parse_from_rfc3339(&value).ok());
+        Ok(match last {
+            Some(at) => {
+                now.signed_duration_since(at.with_timezone(&Utc))
+                    >= Duration::hours(crate::contract::FULL_WINDOW_REFRESH_HOURS)
+            }
+            None => true,
+        })
+    }
+
+    /// 一次覆盖了整窗、且没有任何流失败的同步刚结束。
+    pub(crate) fn record_full_window_refresh(&self, at: DateTime<Utc>) -> Result<()> {
+        self.set_app_meta(LAST_FULL_WINDOW_SYNC_AT_KEY, &at.to_rfc3339())
     }
 
     pub fn user_prefs(&self) -> Result<UserPrefs> {

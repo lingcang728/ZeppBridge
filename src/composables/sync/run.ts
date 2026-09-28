@@ -66,6 +66,7 @@ const settleReady = (report: SyncReport | null) => {
 
 /**
  * @param opts.silent 后台发起：不弹「已有同步进行中」。
+ * @param opts.quick 定时自动同步：只拉最近几天（后端决定，整窗刷新到期时照旧整窗）。
  * @param opts.waited 用户在等这次同步的结果（启动同步、用户自己点的同步）。
  *   默认跟着 silent 走：不静默的都是用户点的。启动同步虽然静默，但用户就是
  *   在等它——由 useSyncController 显式传 true。
@@ -73,7 +74,7 @@ const settleReady = (report: SyncReport | null) => {
 export const runSync = (
   mode: 'incremental' | 'initial' | 'history' = 'incremental',
   days?: number,
-  opts?: { silent?: boolean; waited?: boolean },
+  opts?: { silent?: boolean; waited?: boolean; quick?: boolean },
 ): Promise<SyncReport | null> => {
   const waited = opts?.waited ?? !opts?.silent;
   if (runningSync) {
@@ -113,12 +114,12 @@ export const runSync = (
     syncState.value = 'syncing';
     syncProgress.value = null;
     notice.value = mode === 'incremental'
-      ? { kind: 'syncingRecent' }
+      ? { kind: 'syncingRecent', days: opts?.quick ? status?.auto_sync_days : undefined }
       : { kind: 'backfilling', days: days ?? status?.history_sync_days ?? 30 };
     statusError.value = null;
     try {
       const report = mode === 'incremental'
-        ? await backend.startIncrementalSync()
+        ? await backend.startIncrementalSync(Boolean(opts?.quick))
         : await backend.startHistorySync(days ?? status?.history_sync_days ?? 30);
       syncReport.value = report;
       syncState.value = report.outcome;

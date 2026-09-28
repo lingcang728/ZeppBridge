@@ -266,12 +266,12 @@ fn pending_details_all_failed_is_an_error() {
         status: 500,
         message: "boom".into(),
     };
-    assert!(pending_details_outcome(Vec::new(), Some(http)).is_err());
+    assert!(pending_details_outcome(Vec::<StreamReport>::new(), Some(http)).is_err());
 
     let unavailable = ZeppBridgeError::DataUnavailable("gone".into());
-    assert!(pending_details_outcome(Vec::new(), Some(unavailable)).is_err());
+    assert!(pending_details_outcome(Vec::<StreamReport>::new(), Some(unavailable)).is_err());
 
-    assert!(pending_details_outcome(Vec::new(), None)
+    assert!(pending_details_outcome(Vec::<StreamReport>::new(), None)
         .unwrap()
         .is_empty());
 }
@@ -336,4 +336,26 @@ async fn empty_pending_details_clears_a_stale_failed_status() {
     assert_eq!(state.records_written, 12);
 
     let _ = std::fs::remove_dir_all(dir);
+}
+
+/// 定时同步平时只拉最近几天；一天里没有成功的整窗同步（或者从来没有过），
+/// 就照旧拉整窗，手表晚几天才上云的数据不会漏。
+#[test]
+fn auto_sync_pulls_the_full_window_once_a_day_and_a_short_one_in_between() {
+    let db = Database::in_memory().unwrap();
+    let now = Utc::now();
+    assert!(db.full_window_refresh_due(now).unwrap(), "从没整窗同步过");
+    assert_eq!(
+        quick_window_days(true),
+        crate::contract::INCREMENTAL_SYNC_DAYS
+    );
+
+    db.record_full_window_refresh(now - Duration::hours(2))
+        .unwrap();
+    assert!(!db.full_window_refresh_due(now).unwrap());
+    assert_eq!(quick_window_days(false), crate::contract::QUICK_SYNC_DAYS);
+
+    db.record_full_window_refresh(now - Duration::hours(25))
+        .unwrap();
+    assert!(db.full_window_refresh_due(now).unwrap());
 }

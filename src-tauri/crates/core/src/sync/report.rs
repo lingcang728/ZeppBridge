@@ -112,11 +112,14 @@ impl SyncManager {
         completed("workouts", 4);
         emit("workout_detail", 5, 8, "正在同步跑步明细");
         check()?;
-        match self.fetch_pending_running_details(deadline).await {
-            Ok(records) if records.is_empty() => {
+        match self.sync_pending_running_details(deadline).await {
+            Ok(reports) if reports.is_empty() => {
                 streams.push(self.persist_empty_pending_details().await?);
             }
-            Ok(records) => streams.push(self.persist_records("workout_detail", records).await?),
+            Ok(reports) => {
+                let db = self.write_db().await?;
+                streams.push(Self::finish_stream(&db, "workout_detail", &reports, None)?);
+            }
             Err(error) if error.is_cancelled() => return Err(error),
             Err(error) if error.is_unavailable() => {
                 streams.push(self.unavailable_report("workout_detail", &error).await?)
@@ -224,6 +227,13 @@ impl SyncManager {
                 }
             }
         }
+        // 整窗、且没有任何流失败：记下来，接下来一天里的定时同步只需拉最近几天。
+        // 有流失败就不记——下一次定时同步还得整窗，把缺的那几天补回来。
+        if success && days >= crate::contract::INCREMENTAL_SYNC_DAYS {
+            if let Ok(db) = self.write_db().await {
+                let _ = db.record_full_window_refresh(Utc::now());
+            }
+        }
         Ok(SyncReport {
             success,
             core_ok,
@@ -256,10 +266,10 @@ pub(super) fn chunk_month_label(chunk_start: &str) -> &str {
 
 /// 待拉取明细的最终判定：试过但一条都没拿到，就是失败；
 /// 从来没有待拉取（`last_error` 为 None）才是空成功。
-pub(super) fn pending_details_outcome(
-    records: Vec<FetchedRecord>,
+pub(super) fn pending_details_outcome<T>(
+    records: Vec<T>,
     last_error: Option<ZeppBridgeError>,
-) -> Result<Vec<FetchedRecord>> {
+) -> Result<Vec<T>> {
     if records.is_empty() {
         if let Some(error) = last_error {
             return Err(error);

@@ -37,7 +37,7 @@ pub async fn start_initial_sync(
                 .unwrap_or(UserPrefs::DEFAULT_HISTORY_SYNC_DAYS)
         }
     };
-    run_sync(&app, &state, Some(days)).await
+    run_sync(&app, &state, SyncWindow::History(days)).await
 }
 
 #[tauri::command]
@@ -51,9 +51,13 @@ pub async fn start_history_sync(
 
 /// Run the overlap-window incremental sync and return per-stream progress.
 #[tauri::command]
+/// `quick`：静默的定时同步。只重拉最近几天，整窗刷新到期时照旧整窗
+/// （见 `SyncManager::quick_sync_report_with_progress`）。用户点的、启动时的
+/// 同步不带它，永远整窗。
 pub async fn start_incremental_sync(
     app: AppHandle,
     state: tauri::State<'_, AppState>,
+    quick: Option<bool>,
 ) -> std::result::Result<UiSyncReport, AppError> {
     if state.auth_state.read().await.as_str() != "verified" {
         return Err(AppError::new(
@@ -61,7 +65,22 @@ pub async fn start_incremental_sync(
             "请先完成连接验证，再同步最近数据",
         ));
     }
-    run_sync(&app, &state, None).await
+    let window = if quick.unwrap_or(false) {
+        SyncWindow::Quick
+    } else {
+        SyncWindow::Incremental
+    };
+    run_sync(&app, &state, window).await
+}
+
+/// 一次同步往回拉多远。
+enum SyncWindow {
+    /// 常规整窗（`INCREMENTAL_SYNC_DAYS`）。
+    Incremental,
+    /// 定时同步：最近几天，整窗刷新到期时整窗。
+    Quick,
+    /// 历史同步：用户设定的天数。
+    History(i64),
 }
 
 /// Probe the optional Zepp event streams and report what answers.
@@ -213,7 +232,7 @@ async fn require_manager(state: &AppState) -> std::result::Result<Arc<SyncManage
 async fn run_sync(
     app: &AppHandle,
     state: &AppState,
-    history_days: Option<i64>,
+    window: SyncWindow,
 ) -> std::result::Result<UiSyncReport, AppError> {
     let _command_guard = state.sync_command_lock.lock().await;
     // Re-read after the lock: save/clear may have swapped the manager while
@@ -239,14 +258,19 @@ async fn run_sync(
         database.newest_samples()?
     };
     let started_at = Utc::now().to_rfc3339();
-    let report_result = if let Some(days) = history_days {
-        manager
-            .history_sync_report_with_progress(days, |progress| emit_sync_progress(app, progress))
-            .await
-    } else {
-        manager
-            .incremental_sync_report_with_progress(|progress| emit_sync_progress(app, progress))
-            .await
+    let on_progress = |progress| emit_sync_progress(app, progress);
+    let report_result = match window {
+        SyncWindow::History(days) => {
+            manager
+                .history_sync_report_with_progress(days, on_progress)
+                .await
+        }
+        SyncWindow::Quick => manager.quick_sync_report_with_progress(on_progress).await,
+        SyncWindow::Incremental => {
+            manager
+                .incremental_sync_report_with_progress(on_progress)
+                .await
+        }
     };
     let finished_at = Utc::now().to_rfc3339();
     let report = match report_result {

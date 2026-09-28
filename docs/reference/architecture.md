@@ -59,6 +59,11 @@ way to tell which one is right.
   incremental syncs carry a 30-day overlap window
   (`zeppbridge_core::contract::INCREMENTAL_SYNC_DAYS`, surfaced to the UI as
   `AppStatus.incremental_sync_days` — do not hard-code it anywhere else).
+  The silent 15-minute automatic sync re-fetches only the last
+  `QUICK_SYNC_DAYS` (3) days, and falls back to the full window whenever no
+  fully successful full-window sync has happened in the past
+  `FULL_WINDOW_REFRESH_HOURS` (24) hours; manual, launch, tray and CLI syncs
+  always use the full window (`AppStatus.auto_sync_days` tells the UI which).
   A single sync controller
   serves the top-bar "Sync now", Settings, launch sync, the 15-minute automatic
   check, the concurrency lock and page refreshes.

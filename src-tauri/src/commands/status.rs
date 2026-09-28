@@ -25,6 +25,7 @@ pub(crate) async fn build_app_status(state: &AppState) -> std::result::Result<Ap
         prefs,
         storage,
         coverage,
+        full_refresh_due,
     ) = spawn_independent_read(data_dir, move |db| {
         let statuses = db.list_data_status()?;
         let freshness = db.stream_freshness()?;
@@ -32,6 +33,7 @@ pub(crate) async fn build_app_status(state: &AppState) -> std::result::Result<Ap
         let prefs = db.user_prefs()?;
         let storage = db.storage_estimate(prefs.history_sync_days, &storage_dir)?;
         let coverage = db.local_coverage(today)?;
+        let full_refresh_due = db.full_window_refresh_due(chrono::Utc::now())?;
         Ok((
             statuses,
             freshness,
@@ -39,6 +41,7 @@ pub(crate) async fn build_app_status(state: &AppState) -> std::result::Result<Ap
             prefs,
             storage,
             coverage,
+            full_refresh_due,
         ))
     })
     .await?;
@@ -106,6 +109,7 @@ pub(crate) async fn build_app_status(state: &AppState) -> std::result::Result<Ap
         retention_days: prefs.retention_days,
         history_sync_days: prefs.history_sync_days,
         incremental_sync_days: zeppbridge_core::contract::INCREMENTAL_SYNC_DAYS,
+        auto_sync_days: zeppbridge_core::sync::quick_window_days(full_refresh_due),
         storage: Some(storage),
         coverage,
         region_confidence,

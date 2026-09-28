@@ -153,8 +153,8 @@ export const tauriBackend: BridgeBackend = {
     return call<SyncReport>('start_history_sync', { days });
   },
 
-  startIncrementalSync() {
-    return call<SyncReport>('start_incremental_sync');
+  startIncrementalSync(quick = false) {
+    return call<SyncReport>('start_incremental_sync', { quick });
   },
 
   cancelSync() {
