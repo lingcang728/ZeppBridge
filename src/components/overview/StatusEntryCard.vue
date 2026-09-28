@@ -51,7 +51,6 @@ defineProps<{
 .entry-panel {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  grid-column: span 6;
   align-items: start;
   gap: 12px;
   min-height: 166px;
@@ -77,6 +76,4 @@ defineProps<{
     radial-gradient(320px 200px at 0 100%, color-mix(in srgb, var(--entry-tone) 9%, transparent), transparent 70%),
     var(--mat-card);
 }
-@media (max-width: 1180px) { .entry-panel { grid-column: span 6; } }
-@media (max-width: 820px) { .entry-panel { grid-column: 1; } }
 </style>

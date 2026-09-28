@@ -904,18 +904,6 @@ export default {
         `Ainda sem frequência cardíaca na nuvem nas últimas ${hours} horas; a leitura mais recente é de ${when}.`,
       latestAt: (when: string) => `Leitura mais recente · ${when}`,
     },
-    'components/overview/OverviewMore': {
-      label: 'Mais',
-      life: 'Acontecimentos de vida',
-      lifeSub: (n: number) =>
-        n
-          ? plural(n, { one: `${n} acontecimento`, other: `${n} acontecimentos` })
-          : 'Regista o que aconteceu neste período',
-      sources: 'Origens de dados',
-      sourcesSub: 'Dispositivos e conta na nuvem',
-      weekly: 'Esta semana',
-      weeklySub: 'Em comparação com os teus próprios 28 dias anteriores',
-    },
     'components/overview/RecentCard': {
       recentAria: 'Registos recentes',
       recentTitle: 'Registos recentes',
@@ -1596,22 +1584,15 @@ export default {
         user_fused: 'fusão do utilizador',
         unknown: 'origem desconhecida',
       },
-      summaryActions: (n: number) =>
-        n
-          ? plural(n, { one: `${n} ação possível`, other: `${n} ações possíveis` })
-          : 'Nada a fazer de momento',
       summaryAllGood: 'Tudo bem: obtenção, interpretação e escrita concluídas',
       summaryFailed: (n: number) =>
-        `${n} precisam de atenção — expande «Até onde chegou cada fluxo» abaixo para veres em que passo ficaram`,
-      summaryOccasional: (n: number) =>
-        plural(n, { one: `${n} métrica`, other: `${n} métricas` }),
+        `${n} precisam de atenção — vê em «Até onde chegou cada fluxo», abaixo, em que passo ficaram`,
       summaryPending: (n: number) =>
         `${n} ainda sem dados — normalmente este dispositivo simplesmente não os regista`,
       summaryStreams: (ok: number, total: number) =>
         `${ok} / ${total} fluxos de dados em ordem`,
     },
     'views/HeartRateDetail': {
-      dailyMaxFold: 'Amostras brutas nesta máquina, sem filtragem — pode diferir da app Zepp',
       trendsTitle: 'Tendências de FC em repouso e HRV',
       backToOverview: 'Voltar à visão geral',
       title: 'Frequência cardíaca',
@@ -1838,10 +1819,6 @@ export default {
       chronicTooltip: (value: string) => `Média semanal de 28 dias <b>${value}</b>`,
       ratioTooltip: (value: string) => `Aguda:crónica <b>${value}</b>`,
       latestTag: 'Mais recente',
-      moreLabel: 'Mais',
-      zonesLabel: 'Zonas de frequência cardíaca',
-      zonesSummary:
-        'Escolhe um de três modelos, construídos sobre as tuas próprias bases medidas',
     },
     'views/WorkoutDetail': {
       notProvided: 'Não fornecido',
@@ -2193,12 +2170,6 @@ Responde em Markdown.`,
       next: 'Cartão seguinte',
       open: (title: string) => `Abrir «${title}»`,
       position: (index: number, total: number) => `${index} / ${total}`,
-    },
-    'components/deck/FoldDeck': {
-      close: 'Recolher',
-      collapseAll: 'Recolher tudo',
-      expandAll: 'Expandir tudo',
-      open: (title: string) => `Expandir «${title}»`,
     },
     'composables/useAiTaskLibrary': {
       loadFailed: 'Não foi possível carregar os dados da tarefa',

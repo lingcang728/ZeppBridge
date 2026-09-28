@@ -1793,11 +1793,9 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       streamsNote:
         'Abrufen, Parsen und Schreiben sind drei Dinge, die einzeln fehlschlagen. Zu einem roten Punkt zusammengefaltet, könntest du nicht sagen, ob du es erneut versuchen, neu verbinden sollst oder ob dieses Konto diesen Datenstrom schlicht nicht hat.',
       streamsTitle: 'Wie weit jeder Datenstrom kam',
-      summaryActions: (n: number) => (n ? `${n} verfügbar` : 'Im Moment nichts zu tun'),
       summaryAllGood: 'Alles in Ordnung: Abrufen, Parsen und Schreiben sind alle durchgelaufen',
       summaryFailed: (n: number) =>
-        `${n} brauchen Aufmerksamkeit – klapp unten „Wie weit jeder Datenstrom kam" auf, dort steht der Schritt`,
-      summaryOccasional: (n: number) => `${n} Metriken`,
+        `${n} brauchen Aufmerksamkeit – unten unter „Wie weit jeder Datenstrom kam" steht der Schritt`,
       summaryPending: (n: number) =>
         `${n} haben noch keine Daten – meist zeichnet das Gerät sie schlicht nicht auf`,
       summaryStreams: (ok: number, total: number) => `${ok} / ${total} Datenströme in Ordnung`,
@@ -1818,7 +1816,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       window90: 'Letzte 90 Tage',
     },
     'views/HeartRateDetail': {
-      dailyMaxFold: 'Rohwerte auf diesem Rechner, ungefiltert – kann von der Zepp-App abweichen',
       trendsTitle: 'Ruheherzfrequenz- und HRV-Trends',
       backToOverview: 'Zurück zur Übersicht',
       bpmTooltip: (clock: string, value: number) => `${clock}　<b>${value}</b> bpm`,
@@ -2023,7 +2020,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       loadLabel: 'Trainingsbelastung',
       loadUnit: '' as string,
       loadingAria: 'Trainingsstatus wird geladen',
-      moreLabel: 'Mehr',
       notProvided: 'Nicht angegeben',
       paiEmpty: 'Keine PAI-Einträge in diesem Zeitraum.',
       paiHint: 'Personal Activity Intelligence über rollende 7 Tage',
@@ -2048,8 +2044,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       vo2Empty:
         'Keine VO₂max-Einträge in diesem Zeitraum; er aktualisiert sich nur nach einem Lauf im Freien.',
       vo2Hint: 'Maximale Sauerstoffaufnahme, von der Uhr nach Läufen im Freien geschätzt',
-      zonesLabel: 'Herzfrequenzzonen',
-      zonesSummary: 'Wähle eines von drei Modellen, auf Basis deiner eigenen Messwerte',
     },
     'views/WorkoutDetail': {
       aiPrompt: (label: string) => `Du bist ein Sportanalyst. Unten steht der vollständige Eintrag einer Trainingseinheit von mir (${label}), aus der lokalen ZeppBridge-Datenbank und anonymisiert.
@@ -2414,22 +2408,6 @@ Antworte in Markdown.`,
       next: 'Nächste Karte',
       open: (title: string) => `„${title}" öffnen`,
       position: (index: number, total: number) => `${index} / ${total}`,
-    },
-    'components/deck/FoldDeck': {
-      close: 'Zuklappen',
-      collapseAll: 'Alle zuklappen',
-      expandAll: 'Alle aufklappen',
-      open: (title: string) => `„${title}" aufklappen`,
-    },
-    'components/overview/OverviewMore': {
-      label: 'Mehr',
-      life: 'Lebensereignisse',
-      lifeSub: (n: number) =>
-        (n ? `${n} Ereignisse` : 'Notiere, was in dieser Zeit passiert ist'),
-      sources: 'Datenquellen',
-      sourcesSub: 'Geräte und Cloud-Konto',
-      weekly: 'Diese Woche',
-      weeklySub: 'Gegen deine eigenen 28 Tage davor',
     },
     'composables/useAiTaskLibrary': {
       loadFailed: 'Die Aufgabendaten konnten nicht geladen werden',

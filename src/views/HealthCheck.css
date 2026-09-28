@@ -56,6 +56,10 @@
 .occasional-row strong { color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
 .occasional-row span { color: var(--subtle); font-size: var(--fs-xs); }
 .occasional-row .muted { color: var(--muted); }
+/* 窄了三列排不下：指标名独占一行，两句说明排在它下面，名字不会被挤成一字一行。 */
+@media (max-width: 560px) {
+  .occasional-row { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+}
 
 .action-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .action-row:last-child { border-bottom: 0; }
@@ -64,7 +68,7 @@
 .action-row span { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.5; }
 
 .inline-alert.neutral { color: var(--muted); }
-/* 首屏的总结卡：一个大状态点 + 一句话，细节在下面的卡包里。 */
+/* 首屏的总结卡：一个大状态点 + 一句话，细节在下面逐块摊开。 */
 .summary-card { padding: 22px 24px; }
 .summary-main { display: flex; align-items: center; gap: 16px; }
 .summary-main h2 { font-size: var(--fs-2xl); }

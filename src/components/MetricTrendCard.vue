@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useLifeEvents } from '../composables/useLifeEvents';
+import { useQueuedOption } from '../composables/useQueuedOption';
 import { validEventDate, overlapsEvent } from '../lib/lifeEvents';
 const { open: openEvent, events: lifeEvents } = useLifeEvents();
 const chartClick = (event: { name?: string; data?: unknown }) => {
@@ -122,6 +123,8 @@ const option = computed(() => {
     itemStyle: { color: chartPalette.value.series.brand, borderColor: chartPalette.value.surface, borderWidth: 2 }, data: marks } });
   return result;
 });
+/* 切范围时十来张图同时换数据：排队，一帧只换一张（见 useQueuedOption）。 */
+const shownOption = useQueuedOption(option);
 </script>
 
 <template>
@@ -149,11 +152,11 @@ const option = computed(() => {
     </p>
 
     <VChart
-      v-if="option"
+      v-if="shownOption"
       class="trend-chart"
       :key="CHART_THEME"
       :theme="CHART_THEME"
-      :option="option"
+      :option="shownOption"
       :update-options="SMOOTH_CHART_UPDATE"
       @click="chartClick"
       autoresize

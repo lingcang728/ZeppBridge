@@ -109,13 +109,11 @@ const ringColor = computed(() => chartPalettes[resolvedTheme.value].series.readi
 </template>
 
 <style scoped>
-.steps-panel.metric-panel { display: flex; flex-direction: column; grid-column: span 3; height: 100%; min-height: 286px; padding: 18px; }
+.steps-panel.metric-panel { display: flex; flex-direction: column; height: 100%; min-height: 286px; padding: 18px; }
 .steps-goal { margin: 12px 0 0; color: var(--muted); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
 .steps-facts { display: grid; gap: 9px; margin: 16px 0 0; padding: 0; list-style: none; }
 .steps-facts li { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--subtle); font-size: var(--fs-sm); }
 .steps-facts strong { color: var(--muted); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .steps-missing { display: grid; gap: 3px; margin-top: 18px; }
 .steps-missing small { color: var(--subtle); font-size: var(--fs-xs); }
-@media (max-width: 1180px) { .steps-panel.metric-panel { display: flex; flex-direction: column; grid-column: span 4; } }
-@media (max-width: 820px) { .steps-panel.metric-panel { display: flex; flex-direction: column; grid-column: 1; } }
 </style>

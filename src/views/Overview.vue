@@ -344,8 +344,7 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
       <RecentCard v-tilt :sleep="recentSleep" :workouts="recentWorkouts" />
     </div>
 
-    <!-- 首屏只留心率、步数、睡眠、最近记录四张常看的主卡；这一周、身体、训练、生活事件、
-         数据来源收进卡包，按需点开飞出来（和设置页一样：初始简洁，细节自己展开）。 -->
+    <!-- 四张主卡下面接着摊开这一周、身体、训练、生活事件、数据来源，不收起来。 -->
     <OverviewMore
       :body="{ ...bodyEntry, caption: bodyEntry.measured ? t.bodyThin : t.bodyEmpty }"
       :training="{ ...trainingEntry, caption: trainingEntry.measured ? t.trainingThin : t.trainingEmpty }"
@@ -357,11 +356,12 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
 
 <style scoped>
 .overview-page { display: grid; gap: 18px; align-content: start; max-width: 1540px; margin: 0 auto; }
-/* 页头行固定高度：取餐胶囊出现、消失都在这一行里，不推动下面的内容。 */
-.overview-header { min-height: 58px; align-items: center; margin-bottom: 0; }
+/* 页头行固定高度：取餐胶囊出现、消失都在这一行里，不推动下面的内容。
+   窄了取餐胶囊换到下一行，标题和日期不被挤成两截。 */
+.overview-header { flex-wrap: wrap; min-height: 58px; align-items: center; margin-bottom: 0; }
 .overview-header h1 { margin-bottom: 0; }
 .overview-title { display: grid; gap: 2px; }
-.overview-date { margin: 0; color: var(--subtle); font-size: var(--fs-sm); }
+.overview-date { margin: 0; color: var(--subtle); font-size: var(--fs-sm); white-space: nowrap; }
 
 .inline-alert { display: flex; align-items: center; gap: 8px; padding: 9px 13px; border: 1px solid var(--mat-line); border-radius: 12px; background: var(--mat-card); color: var(--muted); font-size: var(--fs-sm); box-shadow: var(--mat-rim), var(--mat-shadow); }
 .inline-alert.warning { color: var(--warning); }
@@ -370,10 +370,26 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
 .empty-wrap { display: grid; min-height: 300px; place-items: center; }
 .empty-state { display: grid; max-width: 360px; justify-items: center; gap: 9px; padding: 32px; color: var(--muted); text-align: center; }
 .empty-state strong { color: var(--ink); font-size: var(--fs-2xl); }
-.dashboard-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; }
+/* 主卡的排布按这一页自己的宽度走（容器查询），不按窗口宽度：界面缩放、窗口无级拖动时
+   档位都跟着真实可用的宽度变。以前各张卡各写各的媒体查询，断点对不上——1000px 宽时
+   心率占 8 格、步数 4 格，睡眠被挤到下一行只剩 3 格，标题都折成两行。
+     宽：心率 6 + 步数 3 + 睡眠 3 一行；
+     中：心率占满一行，步数和睡眠对半；
+     窄：一张一行。
+   最近记录永远占满一行。 */
+.dashboard-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; container-type: inline-size; }
+.dashboard-grid > * { min-width: 0; }
 /* 异步心率卡的网格位置由这个外壳占位：骨架和加载完成的卡片落在同一个格子里。 */
-.hr-card-slot { grid-column: span 6; min-width: 0; }
-@media (max-width: 1180px) { .hr-card-slot { grid-column: span 8; } }
+.hr-card-slot { grid-column: span 6; }
+.dashboard-grid > .steps-panel, .dashboard-grid > .sleep-panel { grid-column: span 3; }
+.dashboard-grid > .recent-panel { grid-column: 1 / -1; }
+@container (max-width: 1080px) {
+  .hr-card-slot { grid-column: 1 / -1; }
+  .dashboard-grid > .steps-panel, .dashboard-grid > .sleep-panel { grid-column: span 6; }
+}
+@container (max-width: 540px) {
+  .hr-card-slot, .dashboard-grid > .steps-panel, .dashboard-grid > .sleep-panel { grid-column: 1 / -1; }
+}
 
 /* 未识别设备提醒是唯一一块有意的琥珀色——它是提示条，不是装饰。 */
 .unrecognized-banner {
@@ -394,8 +410,6 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
 
 @media (max-width: 820px) {
   .overview-page { padding-inline: 16px; }
-  .dashboard-grid { grid-template-columns: minmax(0, 1fr); }
-  .hr-card-slot { grid-column: 1; }
   .skeleton-grid { grid-template-columns: minmax(0, 1fr); }
 }
 </style>

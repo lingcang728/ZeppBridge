@@ -115,7 +115,6 @@ const hoverStage = (event: PointerEvent) => {
 /* 睡眠卡带一层紫色的环境光，浅色里换成白卡 + 同色系淡影。 */
 .sleep-panel.metric-panel {
   display: flex; flex-direction: column;
-  grid-column: span 3;
   height: 100%;
   min-height: 286px;
   padding: 18px;
@@ -144,8 +143,6 @@ html[data-theme="light"] .sleep-panel.metric-panel {
 .sleep-stages li { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-width: 0; color: var(--subtle); font-size: var(--fs-sm); }
 .sleep-stages i { width: 6px; height: 6px; border-radius: 50%; }
 .sleep-stages strong { color: var(--muted); font-size: var(--fs-sm); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
-@media (max-width: 1180px) { .sleep-panel { grid-column: span 6; } }
-@media (max-width: 820px) { .sleep-panel { grid-column: 1; } }
 .sleep-bar-hit { position: relative; padding: 8px 0; margin: -8px 0; }
 .sleep-tooltip { position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); z-index: 2; white-space: nowrap; padding: 7px 10px; border: 1px solid var(--line-control); border-radius: 9px; background: var(--mat-glass-strong); color: var(--ink); font-size: var(--fs-sm); pointer-events: none; box-shadow: var(--mat-glass-shadow); }
 </style>

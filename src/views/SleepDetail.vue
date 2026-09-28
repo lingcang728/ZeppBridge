@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
 import Icon from '../components/Icon.vue';
-import FoldDeck from '../components/deck/FoldDeck.vue';
+import SectionGroup from '../components/SectionGroup.vue';
 import CircularProgress from '../components/CircularProgress.vue';
 import StageBar from '../components/StageBar.vue';
 import { sleepStageLabel, sleepStageLabels } from '../lib/sleepStages';
@@ -202,19 +202,7 @@ const loadDetail = async () => {
 onMounted(() => void loadDetail());
 watch([dataRevision, sleepId], () => void loadDetail());
 
-const foldCards = computed(() => [
-  ...(weeklyChartOption.value
-    ? [{ id: 'weekly', title: t.value.weeklyTitle, summary: t.value.weeklySub, icon: 'sleep-waves' as const, tone: 'sleep' as const }]
-    : []),
-  {
-    id: 'meta',
-    title: t.value.metaAria,
-    summary: [dataProviderLabel(), device.value.name].filter(Boolean).join(' · '),
-    icon: 'health-watch' as const,
-    tone: 'activity' as const,
-    framed: true,
-  },
-]);
+const metaSummary = computed(() => [dataProviderLabel(), device.value.name].filter(Boolean).join(' · '));
 </script>
 
 <template>
@@ -276,9 +264,7 @@ const foldCards = computed(() => [
         />
       </section>
 
-      <!-- 首屏只留这一夜的时长、评分和分期；近 7 天结构、来源与设备收进卡包，点开飞出来。 -->
-      <FoldDeck :cards="foldCards" :label="t.metaAria">
-        <template #weekly>
+      <!-- 近 7 天结构、来源与设备直接摊开。 -->
           <section v-if="weeklyChartOption" class="surface-card chart-card" :aria-label="t.weeklyAria">
             <div class="stage-head">
               <h2>{{ t.weeklyTitle }}</h2>
@@ -286,8 +272,7 @@ const foldCards = computed(() => [
             </div>
             <VChart class="weekly-sleep-chart" :key="CHART_THEME" :theme="CHART_THEME" :option="weeklyChartOption" autoresize role="img" :aria-label="t.weeklyChartAria" />
           </section>
-        </template>
-        <template #meta>
+        <SectionGroup :title="t.metaAria" :summary="metaSummary" icon="health-watch" tone="activity">
           <section class="meta-grid" :aria-label="t.metaAria">
             <article class="surface-card meta-card">
               <p class="meta-title"><Icon name="cloud" :size="15" />{{ t.sourceTitle }}</p>
@@ -328,8 +313,7 @@ const foldCards = computed(() => [
               </dl>
             </article>
           </section>
-        </template>
-      </FoldDeck>
+        </SectionGroup>
 
       <p class="note">{{ t.footnote }}</p>
     </template>

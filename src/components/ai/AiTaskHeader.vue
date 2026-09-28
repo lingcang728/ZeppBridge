@@ -163,9 +163,11 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.head { display: grid; justify-items: start; gap: 6px; }
-.head-task { display: flex; max-width: 100%; align-items: center; gap: 4px; padding: 4px; border-radius: 999px; }
-.title-button { display: inline-flex; min-width: 0; max-width: 300px; align-items: center; gap: 8px; padding: 8px 12px 8px 16px; border: 0; border-radius: 999px;
+/* 列宽封顶在头部自己的宽度：否则网格按任务名的完整长度撑开，窄窗口里右边的天数胶囊被挤出画面。
+   放不下时任务名先省略。 */
+.head { display: grid; grid-template-columns: minmax(0, 100%); justify-items: start; gap: 6px; }
+.head-task { display: flex; min-width: 0; max-width: 100%; align-items: center; gap: 4px; padding: 4px; border-radius: 999px; }
+.title-button { display: inline-flex; min-width: 104px; max-width: 300px; align-items: center; gap: 8px; padding: 8px 12px 8px 16px; border: 0; border-radius: 999px;
   background: transparent; color: var(--ink); font: inherit; font-size: var(--fs-md); font-weight: 650; cursor: text; }
 .title-button:hover { background: var(--glass-press); }
 .title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -194,5 +196,11 @@ onBeforeUnmount(() => {
 .row-when { color: var(--subtle); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 .history-enter-active, .history-leave-active { transition: opacity .22s ease, translate .32s var(--ease-out), filter .22s ease; }
 .history-enter-from, .history-leave-to { opacity: 0; translate: 0 -6px; filter: blur(6px); }
+/* 很窄的窗口：任务名自己占一行，天数和记录挪到第二行，谁也不被挤出画面。 */
+@media (max-width: 480px) {
+  .head-task { flex-wrap: wrap; row-gap: 2px; border-radius: var(--radius-md); }
+  .title-button { flex: 1 1 100%; max-width: none; }
+  .head-task > .divider:first-of-type { display: none; }
+}
 .status { margin: 0; padding: 3px 12px; border-radius: 999px; background: var(--mat-glass); }
 </style>

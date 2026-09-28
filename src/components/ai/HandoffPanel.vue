@@ -343,7 +343,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.dock { position: relative; display: grid; justify-items: center; gap: 8px; pointer-events: none; }
+.dock { position: relative; display: grid; justify-items: center; gap: 8px; pointer-events: none; container-type: inline-size; }
 .dock > * { pointer-events: auto; }
 
 .bar {
@@ -473,7 +473,17 @@ onBeforeUnmount(() => {
 }
 .sheet-enter-from, .sheet-leave-to, .grow-enter-from, .grow-leave-to { opacity: 0; translate: 0 14px; scale: .96; filter: blur(8px); }
 
-@media (max-width: 900px) {
-  .bar { flex-wrap: wrap; justify-content: center; border-radius: var(--radius-lg); }
+/* 放不下一行时排成整齐的两行（按坞自己的宽度，不按窗口）：上面是就绪度 + 交给谁，下面是主按钮 + 只导出。
+   以前是 flex-wrap 随手折行，只导出那枚圆钮会孤零零掉到第二行。 */
+@container (max-width: 780px) {
+  /* 两行各自占满：第一行就绪度撑满、传送带定宽；第二行主按钮撑满、只导出定宽。 */
+  .bar { width: 100%; flex-wrap: wrap; gap: 8px; border-radius: var(--radius-lg); }
+  .ready-chip { flex: 1 1 calc(100% - 226px); min-height: 44px; }
+  .go { flex: 1 1 calc(100% - 60px); min-width: 0; min-height: 48px; justify-content: center; padding-inline: 18px; }
+  .go-copy { min-width: 0; }
+  .go-copy strong, .go-copy small { overflow: hidden; text-overflow: ellipsis; }
+}
+@container (max-width: 460px) {
+  .go-copy small { display: none; }
 }
 </style>

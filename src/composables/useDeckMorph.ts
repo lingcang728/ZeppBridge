@@ -132,8 +132,12 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
   /**
    * 打开的大卡缩回总览里 `id` 那张卡的位置；放完调 `closed`（调用方借此卸掉大卡）。
    * 正在打开时关：把打开动画倒着放。
+   *
+   * `fromTop`：关卡前这张大卡顶边在屏幕上的位置。返回总览时滚动区会先被拉回顶部，
+   * 人要是正看着卡的下半截，大卡在布局里就「跳」到了顶上——以前看起来就是凭空消失。
+   * 给了它，缩回去的第一帧就停在人刚才看到的那个位置。
    */
-  const close = (id: string, closed: () => void) => {
+  const close = (id: string, closed: () => void, fromTop: number | null = null) => {
     const el = card.value;
     if (!el || reducedMotion()) { closed(); return; }
     if (morph && morph.id === id && morph.kind === 'open' && morph.animation.playState === 'running') {
@@ -153,10 +157,13 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
     const to = boxOf(el);
     const collapsed = collapsedFrame(restingBoxOf(source), to, radius);
     const rest = openFrame(radius);
+    const lift = fromTop === null ? 0 : fromTop - to.top;
+    if (lift) rest.transform = `translate(0px, ${lift}px) scale(1)`;
     const animation = el.animate(
       [
         { ...rest, transformOrigin: '0 0', opacity: 1 },
-        { opacity: 1, offset: 0.55 },
+        // 大半程保持不透明：看得见它落回那一张卡上，而不是半路就淡没了。
+        { opacity: 1, offset: 0.72 },
         { ...collapsed, transformOrigin: '0 0', opacity: 0 },
       ],
       { duration: CLOSE_MS, easing: CLOSE_EASE, fill: 'both' },

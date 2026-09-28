@@ -7,7 +7,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { CHART_THEME, VChart } from '../lib/echartsSetup';
 import { createLoadSeq } from '../lib/loadSeq';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
-import FoldDeck from '../components/deck/FoldDeck.vue';
+import SectionGroup from '../components/SectionGroup.vue';
 import PageHeader from '../components/PageHeader.vue';
 import CoverageNotice from '../components/CoverageNotice.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
@@ -66,7 +66,9 @@ const {
 } = useBodyCharts(series);
 
 
-const load = async () => {
+/** 	rendsOnly：只是换了范围。24 小时压力曲线不跟范围走，不用再取、也不重画。 */
+const load = async (opts?: { trendsOnly?: boolean }) => {
+  const trendsOnly = Boolean(opts?.trendsOnly);
   const seq = loadSeq.next();
   loading.value = true;
   error.value = null;
@@ -84,11 +86,11 @@ const load = async () => {
     // 的趋势」问的不是同一个问题。
     const [daily, stress] = await Promise.all([
       backend.getMetricSeries(METRICS, rangeDays.value),
-      backend.getStressSeries(24),
+      trendsOnly ? Promise.resolve(null) : backend.getStressSeries(24),
     ]);
     if (!loadSeq.isCurrent(seq)) return;
     series.value = indexSeries(daily);
-    stressPoints.value = stress;
+    if (stress) stressPoints.value = stress;
   } catch (cause) {
     if (!loadSeq.isCurrent(seq)) return;
     series.value = {};
@@ -100,15 +102,16 @@ const load = async () => {
 };
 
 onMounted(() => { void load(); });
-watch(rangeDays, () => { void load(); });
+watch(rangeDays, () => { void load({ trendsOnly: true }); });
 watch(dataRevision, () => { void load(); });
 
 const labelsOf = (list: { label: string }[], empty: string) => list.map((card) => card.label).join(' · ') || empty;
-const foldCards = computed(() => [
-  { id: 'vitals', title: t.value.vitalsGroupTitle, summary: labelsOf(vitalsCards.value, t.value.noneInRange), icon: 'recovery' as const, tone: 'heart' as const, framed: true },
-  { id: 'body', title: t.value.bodyGroupTitle, summary: labelsOf(bodyCards.value, t.value.bodyGroupEmpty), icon: 'body-activity' as const, tone: 'activity' as const, framed: true },
-  { id: 'intake', title: t.value.intakeGroupTitle, summary: labelsOf(intakeCards.value, t.value.intakeGroupEmpty), icon: 'manual-entry' as const, tone: 'training' as const, framed: true },
-]);
+const groups = computed(() => ({
+  vitals: { title: t.value.vitalsGroupTitle, summary: labelsOf(vitalsCards.value, t.value.noneInRange) },
+  // 空组下面已经有一句说明为什么空，标题下面就不再重复一遍。
+  body: { title: t.value.bodyGroupTitle, summary: labelsOf(bodyCards.value, '') || undefined },
+  intake: { title: t.value.intakeGroupTitle, summary: labelsOf(intakeCards.value, '') || undefined },
+}));
 </script>
 
 <template>
@@ -125,7 +128,7 @@ const foldCards = computed(() => [
 
     <div v-if="error" class="inline-alert" role="alert">
       <Icon name="warning" :size="14" />{{ error }}
-      <button v-if="isDesktop()" class="button button-secondary retry" type="button" @click="load">{{ t.retry }}</button>
+      <button v-if="isDesktop()" class="button button-secondary retry" type="button" @click="() => load()">{{ t.retry }}</button>
     </div>
 
     <div v-if="initialLoading" class="card-grid" aria-live="polite" :aria-label="t.loadingAria">
@@ -178,9 +181,8 @@ const foldCards = computed(() => [
         {{ t.noneInRange }}
       </p>
 
-      <!-- 首屏只留 24 小时压力曲线和范围开关；生命体征、体重体成分、饮食摄入收进卡包，点开飞出来。 -->
-      <FoldDeck :cards="foldCards" :label="t.title">
-        <template #vitals>
+      <!-- 生命体征、体重体成分、饮食摄入三组直接摊开：点进这一页就是来看它们的。 -->
+      <SectionGroup :title="groups.vitals.title" :summary="groups.vitals.summary" icon="recovery" tone="heart">
           <div class="card-grid">
             <MetricTrendCard
               v-for="card in vitalsCards"
@@ -195,8 +197,8 @@ const foldCards = computed(() => [
               :empty-text="card.emptyText ?? t.emptyCard"
             />
           </div>
-        </template>
-        <template #body>
+      </SectionGroup>
+      <SectionGroup :title="groups.body.title" :summary="groups.body.summary" icon="body-activity" tone="activity">
           <p v-if="!bodyCards.length" class="inline-alert" role="status">
             <Icon name="info" :size="14" />{{ t.bodyGroupEmpty }}
           </p>
@@ -214,8 +216,8 @@ const foldCards = computed(() => [
               :empty-text="card.emptyText ?? t.emptyCard"
             />
           </div>
-        </template>
-        <template #intake>
+      </SectionGroup>
+      <SectionGroup :title="groups.intake.title" :summary="groups.intake.summary" icon="manual-entry" tone="training">
           <p v-if="!intakeCards.length" class="inline-alert" role="status">
             <Icon name="info" :size="14" />{{ t.intakeGroupEmpty }}
           </p>
@@ -260,8 +262,7 @@ const foldCards = computed(() => [
               />
             </div>
           </template>
-        </template>
-      </FoldDeck>
+      </SectionGroup>
 
 
     </template>

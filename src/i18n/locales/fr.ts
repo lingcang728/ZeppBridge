@@ -1325,7 +1325,6 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
     },
 
     'views/HeartRateDetail': {
-      dailyMaxFold: 'Échantillons bruts de cette machine, non filtrés — peut différer de l’app Zepp',
       trendsTitle: 'Tendances de la FC de repos et de la VFC',
       title: 'Fréquence cardiaque',
       intro: 'La courbe pleine journée ci-dessus couvre toujours les dernières 24 heures ; 7 jours / 1 mois / 6 mois ne changent que les tendances jour par jour ci-dessous. Les plages sans échantillons restent vides, sans zéro de remplissage.',
@@ -1466,9 +1465,6 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       loadUnit: 'charge',
       loadEmpty: 'Aucun enregistrement de charge d’entraînement sur cette plage.',
       balanceLabel: 'Équilibre de la charge d’entraînement',
-      moreLabel: 'Plus',
-      zonesLabel: 'Zones de fréquence cardiaque',
-      zonesSummary: 'Trois modèles au choix, établis sur vos propres bases mesurées',
       balanceHint: 'Charge des 7 jours face à la moyenne hebdomadaire de 28 jours — le ratio aigu/chronique',
       balanceNote: 'Ratio aigu/chronique = somme des 7 derniers jours ÷ (somme des 28 derniers jours ÷ 4). Quand la fenêtre de 28 jours couvre moins de 21 jours, aucun ratio n’est donné et la courbe s’interrompt — c’est non calculé, pas zéro.',
       balanceChartAria: 'Charge d’entraînement sur 7 et 28 jours avec le ratio aigu/chronique',
@@ -1571,12 +1567,9 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
 
     'views/HealthCheck': {
       title: 'Contrôle de santé des données',
-      summaryActions: (n: number) =>
-        (n ? plural(n, { one: `${n} action possible`, other: `${n} actions possibles` }) : 'Rien à faire pour l’instant'),
       summaryAllGood: 'Tout va bien : récupération, analyse et écriture sont toutes passées',
       summaryFailed: (n: number) =>
-        `${plural(n, { one: `${n} flux a un problème`, other: `${n} flux ont un problème` })} — dépliez « Jusqu’où va chaque flux » ci-dessous pour voir à quelle étape ça s’est arrêté`,
-      summaryOccasional: (n: number) => plural(n, { one: `${n} métrique`, other: `${n} métriques` }),
+        `${plural(n, { one: `${n} flux a un problème`, other: `${n} flux ont un problème` })} où’où va chaque flux » ci-dessous pour voir à quelle étape ça s’est arrêté`,
       summaryPending: (n: number) =>
         `${plural(n, { one: `${n} flux n’a encore aucune donnée`, other: `${n} flux n’ont encore aucune donnée` })} — en général l’appareil ne les enregistre tout simplement pas`,
       summaryStreams: (ok: number, total: number) => `${ok} / ${total} flux de données en bonne santé`,
@@ -2018,24 +2011,6 @@ Répondez en Markdown.`,
       next: 'Carte suivante',
       open: (title: string) => `Ouvrir « ${title} »`,
       position: (index: number, total: number) => `${index} / ${total}`,
-    },
-
-    'components/deck/FoldDeck': {
-      close: 'Replier',
-      collapseAll: 'Tout replier',
-      expandAll: 'Tout déplier',
-      open: (title: string) => `Ouvrir « ${title} »`,
-    },
-
-    'components/overview/OverviewMore': {
-      label: 'Plus',
-      life: 'Événements personnels',
-      lifeSub: (n: number) =>
-        (n ? plural(n, { one: `${n} événement`, other: `${n} événements` }) : 'Notez ce qui s’est passé pendant cette période'),
-      sources: 'Sources de données',
-      sourcesSub: 'Appareils et compte cloud',
-      weekly: 'Cette semaine',
-      weeklySub: 'Par rapport à vos 28 jours précédents',
     },
 
     'composables/useAiTaskLibrary': {

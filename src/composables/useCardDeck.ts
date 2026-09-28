@@ -130,6 +130,8 @@ export const useCardDeck = ({ stage, card, step, reducedMotion }: CardDeckGestur
       id: event.pointerId, x: event.clientX, y: event.clientY, lastX: event.clientX, lastY: event.clientY,
       lastTime: event.timeStamp, velocity: 0, dx: 0, dy: 0,
     };
+    // 按住卡头拖的时候不许顺带选中字：没有这一句，拖出卡头以后页面标题会被刷成一片蓝。
+    event.preventDefault();
     card.value.setPointerCapture(event.pointerId);
   };
 

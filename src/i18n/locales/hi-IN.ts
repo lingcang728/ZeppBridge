@@ -1490,10 +1490,8 @@ export default {
       stageWrite: 'लिखना',
       streamsNote: 'लाना, पार्स करना और लिखना तीन अलग-अलग विफल होने वाली चीज़ें हैं। एक लाल बिंदु में समेट दें तो पता नहीं चलता कि फिर कोशिश करनी है, फिर जुड़ना है, या इस खाते में यह स्ट्रीम है ही नहीं।',
       streamsTitle: 'हर स्ट्रीम कहाँ तक पहुँची',
-      summaryActions: (n: number) => (n ? `${n} उपलब्ध` : 'अभी कुछ करने को नहीं'),
       summaryAllGood: 'सब ठीक: लाना, पार्स करना और लिखना — तीनों पूरे हुए',
-      summaryFailed: (n: number) => `${n} में गड़बड़ी है — नीचे "हर स्ट्रीम कहाँ तक पहुँची" खोलकर देखें कि कौन-सा कदम अटका`,
-      summaryOccasional: (n: number) => `${n} मेट्रिक्स`,
+      summaryFailed: (n: number) => `${n} में गड़बड़ी है — नीचे "हर स्ट्रीम कहाँ तक पहुँची" में देखें कि कौन-सा कदम अटका`,
       summaryPending: (n: number) => `${n} में अभी डेटा नहीं है — आमतौर पर यह डिवाइस इन्हें रिकॉर्ड ही नहीं करता`,
       summaryStreams: (ok: number, total: number) => `${ok} / ${total} डेटा स्ट्रीम ठीक`,
       timeUnknown: 'समय अज्ञात',
@@ -1513,7 +1511,6 @@ export default {
     },
 
     'views/HeartRateDetail': {
-      dailyMaxFold: 'इस मशीन के कच्चे सैंपल, बिना फ़िल्टर — Zepp ऐप के आंकड़ों से अलग हो सकते हैं',
       trendsTitle: 'रेस्टिंग हार्ट रेट और एचआरवी के रुझान',
       backToOverview: 'ओवरव्यू पर वापस',
       bpmTooltip: (clock: string, value: number) => `${clock} <b>${value}</b> bpm`,
@@ -1693,7 +1690,6 @@ export default {
       loadLabel: 'ट्रेनिंग लोड',
       loadUnit: 'लोड',
       loadingAria: 'ट्रेनिंग स्टेटस लोड हो रहा है',
-      moreLabel: 'और',
       notProvided: 'उपलब्ध नहीं',
       paiEmpty: 'इस सीमा में कोई PAI रिकॉर्ड नहीं।',
       paiHint: 'लगातार 7 दिन का पर्सनल एक्टिविटी इंटेलिजेंस',
@@ -1714,8 +1710,6 @@ export default {
       title: 'ट्रेनिंग स्टेटस',
       vo2Empty: 'इस सीमा में कोई VO₂max रिकॉर्ड नहीं; यह सिर्फ़ आउटडोर रन के बाद अपडेट होता है।',
       vo2Hint: 'अधिकतम ऑक्सीजन उपयोग, आउटडोर रन के बाद घड़ी का अनुमान',
-      zonesLabel: 'हार्ट रेट ज़ोन',
-      zonesSummary: 'तीन एल्गोरिदम में से एक चुनें, आपकी मापी परिसीमाओं पर आधारित',
     },
 
     'views/WorkoutDetail': {
@@ -2046,23 +2040,6 @@ Markdown में जवाब दें।`,
       next: 'अगला कार्ड',
       open: (title: string) => `“${title}” खोलें`,
       position: (index: number, total: number) => `${index} / ${total}`,
-    },
-
-    'components/deck/FoldDeck': {
-      close: 'समेटें',
-      collapseAll: 'सब समेटें',
-      expandAll: 'सब खोलें',
-      open: (title: string) => `“${title}” खोलें`,
-    },
-
-    'components/overview/OverviewMore': {
-      label: 'और',
-      life: 'लाइफ़ इवेंट्स',
-      lifeSub: (n: number) => (n ? `${n} इवेंट` : 'इस दौरान क्या हुआ वह लिखें'),
-      sources: 'डेटा स्रोत',
-      sourcesSub: 'डिवाइस और क्लाउड खाता',
-      weekly: 'यह हफ़्ता',
-      weeklySub: 'आपके अपने पिछले 28 दिनों से तुलना',
     },
 
     'composables/useAiTaskLibrary': {

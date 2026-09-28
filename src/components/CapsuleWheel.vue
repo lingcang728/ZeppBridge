@@ -341,6 +341,14 @@ onBeforeUnmount(() => {
   root.value?.removeEventListener('wheel', onWheel);
 });
 
+/** 转到最宽那一项时胶囊有多宽：顶栏按它留位置，拖动途中胶囊撑宽也不会压到别的控件。 */
+const widestSpan = () => {
+  if (props.fitPeek === undefined || vertical.value || !sizes.value.length) return props.span;
+  return Math.round(Math.max(...sizes.value) + 22 + props.fitPeek * 2);
+};
+/* 顶栏量排版时要同步拿到新宽度：标签换成短码以后，不能等 ResizeObserver 下一帧才量。 */
+defineExpose({ measure, widestSpan });
+
 const activeIndex = computed(() => (looping() ? mod(Math.round(pos.value), count()) : Math.round(clampPos(pos.value))));
 const current = computed(() => props.items[indexOf(props.modelValue)]);
 </script>

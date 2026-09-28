@@ -216,12 +216,20 @@ useWidthMorph(syncPill, () => (readyToHand.value ? t.value.readyPill : syncText.
 /* —— 放不下时逐级回退（大原则：任何语言、任何宽度，顶栏的胶囊都不许盖住别的组件）——
    媒体查询只认窗口宽度，认不出「俄语导航比中文宽一倍」。这里量真实的包围盒：
    品牌、正中导航、右侧一簇两两之间留出间距、右簇不出窗口；放不下就升一档再量。
-     1 藏字标 → 2 同步胶囊只留圆点 → 3 语言改短码 → 4 导航紧凑 → 5 藏语言（设置里还有）。
-   每次宽度、语言、同步文字变化都从 0 档重来，宽了会自动退回完整形态。 */
-const FIT_SHORT_LOCALE = 3;
+     1 藏字标 → 2 语言改短码 → 3 同步胶囊只留圆点 → 4 导航紧凑 → 5 藏语言（设置里还有）。
+   每次宽度、语言、同步文字变化都从 0 档重来，宽了会自动退回完整形态。
+   整轮量完都在同一个任务里（只 await nextTick，中间不出帧），画面上只看到最后那一档。
+
+   以前这里还盯着右簇自己的尺寸，结果是个回路：档位一变，语言标签在全名和短码之间换，
+   传送带晚一帧才量出新宽度，右簇一变宽又触发重量、又从 0 档来一遍——语言胶囊就在
+   「PT-BR」和「Português (Brasil)」之间来回闪个不停，根本拖不动。现在只看顶栏本身
+   （也就是窗口）的宽度，传送带的新宽度由这里同步量；语言胶囊按「转到最宽那一项」
+   的宽度留位置，拖动途中撑宽也不会压到导航。 */
+const FIT_SHORT_LOCALE = 2;
 const FIT_MAX = 5;
 const fit = ref(0);
 const bar = ref<HTMLElement | null>(null);
+const localeWheel = ref<{ $el: HTMLElement; measure: () => void; widestSpan: () => number } | null>(null);
 const overlaps = (): boolean => {
   const root = bar.value;
   if (!root) return false;
@@ -235,27 +243,41 @@ const overlaps = (): boolean => {
   const left = box('.brand, .quick-back');
   const nav = box('.pill-nav');
   const actions = box('.topbar-actions');
+  const wheelEl = localeWheel.value?.$el;
+  // 右簇靠右对齐：传送带撑到最宽时，右簇的左边沿往左多出这么多。同步胶囊正在伸缩（useWidthMorph）时，
+  // 按它伸完以后的宽度算（动画期间溢出被裁掉，scrollWidth 就是伸完的宽度）。
+  const pill = syncPill.value;
+  const pillGrow = pill?.offsetWidth ? Math.max(0, pill.scrollWidth - pill.offsetWidth) : 0;
+  const reserve = (wheelEl?.offsetWidth ? Math.max(0, localeWheel.value!.widestSpan() - wheelEl.offsetWidth) : 0) + pillGrow;
+  const actionsLeft = actions ? actions.left - reserve : 0;
   if (actions && actions.right > outer.right + 0.5) return true;
-  if (actions && actions.left < outer.left) return true;
-  if (nav && actions && actions.left < nav.right + gap) return true;
+  if (actions && actionsLeft < outer.left) return true;
+  if (nav && actions && actionsLeft < nav.right + gap) return true;
   if (left && nav && left.right + gap > nav.left) return true;
-  if (left && actions && left.right + gap > actions.left) return true;
+  if (left && actions && left.right + gap > actionsLeft) return true;
   return false;
+};
+/** 等 DOM 换成新档位，再让传送带按新标签量一次宽度、把宽度也写进 DOM。 */
+const settleLayout = async () => {
+  await nextTick();
+  localeWheel.value?.measure();
+  await nextTick();
 };
 let fitting = false;
 const refit = async () => {
   if (fitting) return;
   fitting = true;
-  // 量的时候关掉宽度过渡：语言胶囊随语言伸缩带过渡，半路量到的是动画中间的宽度，
-  // 会误判成「放得下」。量完再打开，档位变化照样平滑。
+  // 量的时候关掉宽度过渡：半路量到的是动画中间的宽度，会误判成「放得下」。
   bar.value?.classList.add('is-measuring');
   try {
     fit.value = 0;
-    await nextTick();
+    await settleLayout();
     while (fit.value < FIT_MAX && overlaps()) {
       fit.value += 1;
-      await nextTick();
+      await settleLayout();
     }
+    // 在过渡关着的时候把最终宽度落定，撤掉 is-measuring 后不会再补一段宽度动画。
+    void bar.value?.offsetWidth;
   } finally {
     bar.value?.classList.remove('is-measuring');
     fitting = false;
@@ -263,6 +285,7 @@ const refit = async () => {
 };
 let fitObserver: ResizeObserver | null = null;
 let fitFrame = 0;
+let fitTimer = 0;
 const scheduleFit = () => {
   cancelAnimationFrame(fitFrame);
   fitFrame = requestAnimationFrame(() => { void refit(); });
@@ -270,18 +293,22 @@ const scheduleFit = () => {
 onMounted(() => {
   fitObserver = new ResizeObserver(scheduleFit);
   if (bar.value) fitObserver.observe(bar.value);
-  // 右簇自己变宽也要重量：语言从短码换回全名时，传送带晚一拍才量出新宽度，顶栏本身不变宽。
-  // 不会来回振荡：一次重量从 0 档升到的终点尺寸不变，ResizeObserver 不会再报。
-  const actions = bar.value?.querySelector('.topbar-actions');
-  if (actions) fitObserver.observe(actions);
   void document.fonts?.ready.then(scheduleFit);
   scheduleFit();
 });
 onBeforeUnmount(() => {
   fitObserver?.disconnect();
   cancelAnimationFrame(fitFrame);
+  window.clearTimeout(fitTimer);
 });
-watch([locale, () => (readyToHand.value ? t.value.readyPill : syncText.value), () => props.backTo], scheduleFit);
+watch([locale, () => props.backTo], scheduleFit);
+/* 同步胶囊换字：马上按伸完的宽度量一次（变宽时不会半路压到导航），420ms 的伸缩放完再量一次
+   （变窄时回到该有的档位）。 */
+watch(() => (readyToHand.value ? t.value.readyPill : syncText.value), () => {
+  scheduleFit();
+  window.clearTimeout(fitTimer);
+  fitTimer = window.setTimeout(scheduleFit, 460);
+});
 </script>
 
 <template>
@@ -327,7 +354,7 @@ watch([locale, () => (readyToHand.value ? t.value.readyPill : syncText.value), (
         <SegmentTrack ref="themeTrack" class="theme-toggle" variant="bare" icon-only :items="themeOptions"
           :model-value="resolvedTheme" :aria-label="t.themeTitle" @update:model-value="onThemeChange" />
         <span class="group-divider" aria-hidden="true"></span>
-        <CapsuleWheel class="locale-wheel" variant="bare" loop :span="168" :fit-peek="fit >= FIT_SHORT_LOCALE ? 12 : 26" :items="localeOptions"
+        <CapsuleWheel ref="localeWheel" class="locale-wheel" variant="bare" loop :span="168" :fit-peek="fit >= FIT_SHORT_LOCALE ? 12 : 26" :items="localeOptions"
           :model-value="locale" :aria-label="t.localeLabel" @update:model-value="onLocaleChange" />
       </div>
     </div>
@@ -434,8 +461,8 @@ watch([locale, () => (readyToHand.value ? t.value.readyPill : syncText.value), (
 /* 回退档位（见 refit）：只有量出来放不下时才会升档。 */
 .app-topbar.is-measuring :deep(.capsule-wheel) { transition: none !important; }
 .app-topbar[class*='fit-'] .wordmark { display: none; }
-.fit-2 .sync-text, .fit-3 .sync-text, .fit-4 .sync-text, .fit-5 .sync-text { display: none; }
-.fit-2 .sync-pill, .fit-3 .sync-pill, .fit-4 .sync-pill, .fit-5 .sync-pill { padding-inline: 11px; }
+.fit-3 .sync-text, .fit-4 .sync-text, .fit-5 .sync-text { display: none; }
+.fit-3 .sync-pill, .fit-4 .sync-pill, .fit-5 .sync-pill { padding-inline: 11px; }
 .fit-5 .locale-wheel, .fit-5 .group-divider { display: none; }
 
 /* 窄屏降级：先让胶囊回到文档流避免和按钮组重叠，再小到手机上藏掉

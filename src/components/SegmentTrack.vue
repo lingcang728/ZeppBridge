@@ -14,8 +14,10 @@
  * 变化、字体加载完成、换语言时都重新量。
  *
  * 拖动时（以及松手后吸附的那一下）不按裁切给字分色：裁切边会穿过字形，「旅」一半灰
- * 一半绿，滑块放大后绿字还会跑出胶囊。这段时间上层选中字整层隐去、底层字完整露出，
- * 停稳后选中字整枚淡入品牌色。只动透明度，不加任何滤镜。 */
+ * 一半绿，滑块放大后绿字还会跑出胶囊。这段时间离滑块最近的那一枚标签整枚用品牌色（上层
+ * 那一枚不裁切、底层那一枚隐去），滑过两枚中点时两枚交叉淡入淡出。松手时字已经是绿的，
+ * 停稳后换回裁切画法也看不出变化——以前拖动中字是白的、停稳 300ms 后才淡成绿色，
+ * 松手那一下就像闪了一次。只动透明度，不加任何滤镜。 */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
 import Icon, { type IconName } from './Icon.vue';
 import { dragThumb, snapStop, type SegmentStop } from '../lib/navigation';
@@ -50,6 +52,8 @@ const thumb = ref({ left: 0, width: 0, visible: false });
 const dragging = ref(false);
 /** 松手后滑块吸附到位的那一段：和拖动一样不分色，免得吸附途中出现半个字。 */
 const settling = ref(false);
+/** 拖动 / 吸附中离滑块最近的那一项：它的字整枚上品牌色。 */
+const lensValue = ref<T | null>(null) as Ref<T | null>;
 let settleTimer = 0;
 /** 第一次量完之前不做过渡，免得滑块从最左边滑进来。 */
 const settled = ref(false);
@@ -115,6 +119,7 @@ const clearGesture = () => {
   const current = gesture;
   gesture = null;
   dragging.value = false;
+  lensValue.value = null;
   cancelAnimationFrame(frame);
   frame = 0;
   nextThumb = null;
@@ -153,6 +158,7 @@ const onMove = (event: PointerEvent) => {
   const scale = layoutScale();
   const dx = (event.clientX - current.x) / scale;
   if (!dragging.value && Math.abs(dx) < 5) return;
+  if (!dragging.value) lensValue.value = props.modelValue;
   dragging.value = true;
   suppressClick = true;
   current.velocity = (event.clientX - current.lastX) / scale / Math.max(1, event.timeStamp - current.time);
@@ -162,7 +168,9 @@ const onMove = (event: PointerEvent) => {
   if (!frame) {
     frame = requestAnimationFrame(() => {
       frame = 0;
-      if (nextThumb) thumb.value = { ...nextThumb, visible: true };
+      if (!nextThumb) return;
+      thumb.value = { ...nextThumb, visible: true };
+      lensValue.value = snapStop(stops.value, nextThumb.left + nextThumb.width / 2, 0).value;
     });
   }
   event.preventDefault();
@@ -184,7 +192,8 @@ const onUp = (event: PointerEvent) => {
   if (moved) {
     settling.value = true;
     window.clearTimeout(settleTimer);
-    settleTimer = window.setTimeout(() => { settling.value = false; }, 320);
+    settleTimer = window.setTimeout(() => { settling.value = false; lensValue.value = null; }, 320);
+    lensValue.value = next;
   }
   placeOn(next);
   commit(next);
@@ -265,7 +274,7 @@ onBeforeUnmount(() => {
       :key="String(item.value)"
       type="button"
       role="radio"
-      class="segment-item"
+      :class="['segment-item', { 'is-lensed': lensValue !== null && item.value === lensValue }]"
       :style="itemLeft(index)"
       :aria-checked="item.value === modelValue"
       :aria-label="iconOnly ? item.label : undefined"
@@ -284,7 +293,7 @@ onBeforeUnmount(() => {
       <span
         v-for="(stop, index) in stops"
         :key="String(stop.value)"
-        class="segment-ink-item"
+        :class="['segment-ink-item', { 'is-lensed': lensValue !== null && stop.value === lensValue }]"
         :style="{ left: `${stop.left}px`, width: `${stop.width}px` }"
       >
         <slot v-if="items[index]" :item="items[index]!" :active="true">
@@ -364,7 +373,6 @@ onBeforeUnmount(() => {
     transparent calc(var(--thumb-l) - var(--seg-grow) - var(--item-l, 0px)),
     transparent calc(var(--thumb-l) + var(--thumb-w) + var(--seg-grow) - var(--item-l, 0px)),
     #000 calc(var(--thumb-l) + var(--thumb-w) + var(--seg-grow) - var(--item-l, 0px)));
-  transition: color var(--dur-fast) ease;
 }
 .segment-item:hover:not(:disabled) { color: var(--ink); }
 /* 焦点画在滑块上，不画在按钮上：按钮的 outline 会留在旧位置，成为一圈残影。 */
@@ -413,18 +421,18 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-/* 拖动 / 吸附中：选中字整层隐去，底层字不再挖空——字始终完整，不会被切成两色。 */
-.segment-ink { transition: opacity 180ms ease; }
-.segment-track.is-dragging .segment-ink, .segment-track.is-settling .segment-ink { opacity: 0; transition-duration: 60ms; }
+/* 拖动 / 吸附中：上层不按滑块裁切，只留离滑块最近的那一枚（整枚品牌色）；底层不再挖空，
+   那一枚隐去。字始终完整，不会被切成两色。 */
+.segment-ink-item, .segment-item { transition: opacity 140ms ease, color var(--dur-fast) ease; }
+.segment-track.is-dragging .segment-ink, .segment-track.is-settling .segment-ink { clip-path: none; }
+.segment-track.is-dragging .segment-ink-item, .segment-track.is-settling .segment-ink-item { opacity: 0; }
+.segment-track.is-dragging .segment-ink-item.is-lensed, .segment-track.is-settling .segment-ink-item.is-lensed { opacity: 1; }
 .segment-track.is-dragging .segment-item, .segment-track.is-settling .segment-item { -webkit-mask-image: none; mask-image: none; }
+.segment-track.is-dragging .segment-item.is-lensed, .segment-track.is-settling .segment-item.is-lensed { opacity: 0; }
 
-/* 拖动时滑块变成清透的透镜：放大一点、边缘高光、几乎无色，透过它能看清底下的标签。 */
-.segment-track.is-dragging .segment-thumb {
-  scale: 1.08 1.16;
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), inset 0 -1px 0 rgba(255, 255, 255, .1),
-    inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent), 0 8px 20px -8px rgba(0, 0, 0, .45);
-}
+/* 拖动时滑块只放大一点，材质不换：以前拖动中换成一块泛绿的透镜，松手一瞬间又换回玻璃，
+   颜色跳一下就是「闪」。 */
+.segment-track.is-dragging .segment-thumb { scale: 1.05 1.1; }
 .segment-track.is-dragging { --seg-clip-y: 0px; }
 
 .segment-track:has(.segment-item:focus-visible) .segment-thumb {

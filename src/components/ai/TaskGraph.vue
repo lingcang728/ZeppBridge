@@ -118,6 +118,13 @@ const flyToFocus = (id: string) => {
   if (target) void flyTo(target);
 };
 const flyHome = () => { void flyTo({ x: 0, y: 0, zoom: 1 }); };
+/* 面板里点「展开指标 / 收起指标」：图变了，面板就该让开。展开时 flyToFocus 本来就会收掉它；
+   收起时以前面板一直挂着，非得再点一下空白处才走。 */
+const onPopoverToggleExpand = () => {
+  const category = openNode.value?.category;
+  openId.value = null;
+  if (category) emit('toggle-expand', category);
+};
 const leaveFocus = () => {
   const node = focusId.value ? props.model.nodes.find((entry) => entry.id === focusId.value) : null;
   focusId.value = null;
@@ -421,7 +428,7 @@ defineExpose({ focusCategory: (category: AiTaskCategory) => flyToFocus(categoryN
         @set-metric="emit('set-metric', openNode!.category!, openNode!.metric!, $event)"
         @set-days="emit('set-days', openNode!.category!, $event)"
         @set-include-day="emit('set-include-day', openNode!.category!, $event)"
-        @toggle-expand="emit('toggle-expand', openNode!.category!)" />
+        @toggle-expand="onPopoverToggleExpand" />
     </div>
   </div>
 </template>

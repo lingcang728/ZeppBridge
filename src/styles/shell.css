@@ -138,14 +138,17 @@ a { color: inherit; }
   pointer-events: none;
   transition: opacity 220ms ease, transform 320ms var(--ease-out), filter 260ms ease;
 }
-.page-forward-enter-from { opacity: 0; transform: scale(.955) translateY(10px); filter: blur(10px); }
-.page-forward-leave-to { opacity: 0; transform: scale(1.035); filter: blur(8px); }
-.page-back-enter-from { opacity: 0; transform: scale(1.035); filter: blur(10px); }
-.page-back-leave-to { opacity: 0; transform: scale(.955) translateY(10px); filter: blur(8px); }
-.page-left-enter-from { opacity: 0; transform: translateX(42px) scale(.985); filter: blur(8px); }
-.page-left-leave-to { opacity: 0; transform: translateX(-42px) scale(.985); filter: blur(8px); }
-.page-right-enter-from { opacity: 0; transform: translateX(-42px) scale(.985); filter: blur(8px); }
-.page-right-leave-to { opacity: 0; transform: translateX(42px) scale(.985); filter: blur(8px); }
+.page-forward-enter-from { opacity: 0; transform: scale(.965) translateY(10px); filter: blur(4px); }
+.page-forward-leave-to { opacity: 0; transform: scale(1.025); filter: blur(4px); }
+.page-back-enter-from { opacity: 0; transform: scale(1.025); filter: blur(4px); }
+.page-back-leave-to { opacity: 0; transform: scale(.965) translateY(10px); filter: blur(4px); }
+/* 换入口（横向）：不模糊，旧页很快让开。以前两页各带 8–10px 模糊、交叠 300ms，交给 AI
+   那一页满屏的绿色节点和按钮一糊开，整个窗口就像闪了一下绿光。 */
+.page-left-enter-from { opacity: 0; transform: translateX(28px); }
+.page-left-leave-to { opacity: 0; transform: translateX(-28px); }
+.page-right-enter-from { opacity: 0; transform: translateX(-28px); }
+.page-right-leave-to { opacity: 0; transform: translateX(28px); }
+[class*='page-'].page-left-leave-active, [class*='page-'].page-right-leave-active { transition: opacity 140ms ease, transform 240ms var(--ease-out); }
 .page-none-enter-from, .page-none-leave-to { opacity: 0; }
 .page-host > * { transform-origin: 50% 30vh; }
 /* 返回时，当初点进去的那张卡亮一下（lib/returnScroll.ts），告诉人「你是从这儿走的」。 */

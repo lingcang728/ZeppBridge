@@ -24,4 +24,7 @@ defineProps<{
 
 <style scoped>
 .page-header-wrap { display: grid; gap: 8px; min-width: 0; }
+/* 标题右边放着范围胶囊时，窗口一窄就换到下一行，不和说明文字挤成一团。 */
+.page-header { flex-wrap: wrap; row-gap: 12px; }
+.page-header > div { flex: 1 1 22rem; min-width: 0; }
 </style>

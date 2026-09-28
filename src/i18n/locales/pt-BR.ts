@@ -436,16 +436,6 @@ export default {
       zoneAnaerobic: 'Anaeróbico 170+',
     },
 
-    'components/overview/OverviewMore': {
-      label: 'Mais',
-      weekly: 'Esta semana',
-      weeklySub: 'Contra os seus 28 dias anteriores',
-      life: 'Eventos de vida',
-      lifeSub: (n: number) => (n ? `${n} eventos` : 'Registre o que aconteceu neste período'),
-      sources: 'Fontes de dados',
-      sourcesSub: 'Dispositivos e conta na nuvem',
-    },
-
     'components/overview/RecentCard': {
       recentAria: 'Registros recentes',
       recentTitle: 'Registros recentes',
@@ -1034,12 +1024,10 @@ export default {
       title: 'Verificação de saúde dos dados',
       summaryStreams: (ok: number, total: number) => `${ok} / ${total} fluxos de dados saudáveis`,
       summaryFailed: (n: number) =>
-        `${n} precisam de atenção — abra "Até onde cada fluxo foi" abaixo para ver em qual etapa cada um parou`,
+        `${n} precisam de atenção — veja em "Até onde cada fluxo foi", abaixo, em qual etapa cada um parou`,
       summaryPending: (n: number) =>
         `${n} ainda não têm dados — normalmente porque este dispositivo simplesmente não os registra`,
       summaryAllGood: 'Tudo certo: as três etapas — busca, interpretação e gravação — foram concluídas',
-      summaryOccasional: (n: number) => `${n} métricas`,
-      summaryActions: (n: number) => (n ? `${n} disponíveis` : 'Nada para fazer no momento'),
       intro: 'Para cada fluxo de dados: até onde ele foi entre buscar na nuvem, interpretar e gravar localmente; quais datas ele cobre; e de onde veio. Faltando é faltando — nunca preenchido com zero.',
       rangeAria: 'Janela de cobertura',
       loadingAria: 'Lendo o estado de saúde dos dados',
@@ -1150,7 +1138,6 @@ export default {
     },
 
     'views/HeartRateDetail': {
-      dailyMaxFold: 'Amostras brutas nesta máquina, sem filtro — pode diferir do app Zepp',
       trendsTitle: 'Tendências de FC em repouso e HRV',
       backToOverview: 'Voltar à visão geral',
       title: 'Frequência cardíaca',
@@ -1341,9 +1328,6 @@ export default {
       loadUnit: 'carga',
       thresholdHrTooltip: (value: number) => `FC de limiar <b>${value}</b> bpm`,
       balanceLabel: 'Equilíbrio da carga de treino',
-      moreLabel: 'Mais',
-      zonesLabel: 'Zonas de frequência cardíaca',
-      zonesSummary: 'Escolha um de três modelos, calculados a partir das suas próprias bases medidas',
       balanceHint: 'Carga de 7 dias contra a média semanal de 28 dias, ou seja, a razão aguda:crônica',
       balanceChartAria: 'Carga de treino de 7 e 28 dias com a razão aguda:crônica',
       balanceEmpty: 'Registros de carga de treino insuficientes para desenhar esta linha ainda.',
@@ -2010,13 +1994,6 @@ Responda em Markdown.`,
       next: 'Próximo cartão',
       open: (title: string) => `Abrir "${title}"`,
       position: (index: number, total: number) => `${index} / ${total}`,
-    },
-
-    'components/deck/FoldDeck': {
-      open: (title: string) => `Abrir "${title}"`,
-      close: 'Recolher',
-      expandAll: 'Expandir tudo',
-      collapseAll: 'Recolher tudo',
     },
 
     'composables/useAiTaskLibrary': {

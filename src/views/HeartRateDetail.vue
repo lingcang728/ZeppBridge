@@ -16,7 +16,8 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { HR_GAP_BREAK_MS, insertNullBreaks } from '../lib/chartGaps';
 import { createLoadSeq } from '../lib/loadSeq';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
-import FoldDeck from '../components/deck/FoldDeck.vue';
+import { useQueuedOption } from '../composables/useQueuedOption';
+import SectionGroup from '../components/SectionGroup.vue';
 import PageHeader from '../components/PageHeader.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import Icon from '../components/Icon.vue';
@@ -268,21 +269,14 @@ const dailyMaxChartOption = computed(() => {
   };
 });
 
+/* 和趋势卡同一条队：切范围时一帧只换一张图（见 useQueuedOption）。 */
+const shownDailyMax = useQueuedOption(dailyMaxChartOption);
+
 onMounted(() => { void load(); });
 watch(rangeDays, () => { void load({ trendsOnly: true }); });
 watch(dataRevision, () => { void load(); });
 
-const foldCards = computed(() => [
-  { id: 'daily', title: t.value.dailyMaxTitle, summary: t.value.dailyMaxFold, icon: 'heart-rate' as const, tone: 'heart' as const },
-  {
-    id: 'trends',
-    title: t.value.trendsTitle,
-    summary: trendCards.value.map((card) => card.label).join(' · '),
-    icon: 'resting-heart-rate' as const,
-    tone: 'heart' as const,
-    framed: true,
-  },
-]);
+const trendsSummary = computed(() => trendCards.value.map((card) => card.label).join(' · '));
 </script>
 
 <template>
@@ -348,9 +342,7 @@ const foldCards = computed(() => [
         />
       </div>
 
-      <!-- 首屏只留当天的全天曲线；每日最高心率、静息心率与 HRV 趋势收进卡包，点开飞出来。 -->
-      <FoldDeck :cards="foldCards" :label="t.title">
-        <template #daily>
+      <!-- 每日最高心率、静息心率与 HRV 趋势直接摊开：点进这一页就是来看它们的。 -->
           <section class="surface-card day-card" :aria-label="t.dailyMaxAria">
             <header class="day-head">
               <div>
@@ -363,7 +355,7 @@ const foldCards = computed(() => [
               class="day-chart"
               :key="CHART_THEME"
               :theme="CHART_THEME"
-              :option="dailyMaxChartOption"
+              :option="shownDailyMax"
               :update-options="SMOOTH_CHART_UPDATE"
               autoresize
               role="img"
@@ -380,8 +372,7 @@ const foldCards = computed(() => [
             </p>
             <p class="daily-max-note">{{ t.dailyMaxNote }}</p>
           </section>
-        </template>
-        <template #trends>
+        <SectionGroup :title="t.trendsTitle" :summary="trendsSummary" icon="resting-heart-rate" tone="heart">
           <p v-if="trendsError" class="inline-alert" role="alert">
             <Icon name="warning" :size="14" />{{ trendsError }}
           </p>
@@ -398,8 +389,7 @@ const foldCards = computed(() => [
               :empty-text="trendsError || t.emptyCard"
             />
           </div>
-        </template>
-      </FoldDeck>
+        </SectionGroup>
 
     </template>
   </section>

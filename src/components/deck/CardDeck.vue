@@ -8,12 +8,13 @@
  *   打开（/settings/:card）：那张卡从它在总览里的位置长成整页；总览不消失，而是
  *       往后退一层——缩小、按深度变糊、往下渐隐——看得出卡是从哪一层里抽出来的。
  *       关掉时卡缩回原位，总览从模糊里浮回来。打开以后仍可左右拖卡头翻到相邻
- *       一张（整张甩出去）、←/→ 或下面的圆点跳过去，Esc / × 关掉。
+ *       一张（整张甩出去）、←/→ 或下面的圆点跳过去，Esc / × / 点卡片外面的空白处关掉。
  *
  * 形变都是 Web Animations 直接动真实的卡（composables/useDeckMorph.ts），所以随时
  * 可以打断：打开到一半关掉就原路倒回，展开到一半收起就从半路飞回去。
  * 卡的内容和卡头都由调用方通过插槽给；这里只管排布、手势和过渡。 */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { onBeforeRouteUpdate } from 'vue-router';
 import Icon from '../Icon.vue';
 import DeckCoverflow from './DeckCoverflow.vue';
 import { useCardDeck } from '../../composables/useCardDeck';
@@ -160,6 +161,13 @@ const jumpTo = (id: string) => {
   emit('change', id, () => morph.swap());
 };
 
+/* 关卡时大卡从人刚才看到的位置缩回去：路由一换，滚动区就被拉回顶部（lib/returnScroll.ts），
+   所以要在路由真正换过去之前记下大卡此刻在屏幕上的位置。 */
+let closeFromTop: number | null = null;
+onBeforeRouteUpdate(() => {
+  closeFromTop = props.activeId && cardEl.value ? cardEl.value.getBoundingClientRect().top : null;
+});
+
 watch(() => props.activeId, async (id, previous) => {
   if (id) centerId.value = id;
   lastToggleAt = performance.now();
@@ -171,10 +179,12 @@ watch(() => props.activeId, async (id, previous) => {
   } else if (!id && previous) {
     reset();
     closingId.value = previous;
+    const fromTop = closeFromTop;
+    closeFromTop = null;
     await nextTick();
     morph.close(previous, () => {
       if (closingId.value === previous) closingId.value = null;
-    });
+    }, fromTop);
   }
 });
 
@@ -203,12 +213,41 @@ const onKeydown = (event: KeyboardEvent) => {
   }
 };
 
+/* 点卡片外面的空白处也能关：卡是从后面那一层抽出来的，点回后面那一层就是「放回去」。
+   只认按下和松开都在卡外、落点不是任何控件的那一下——从卡里拖出来选字、点页头的
+   提示条按钮、点滚动条、弹窗开着，都不算。 */
+const CONTROL = 'button, a, input, select, textarea, label, summary, [role="button"], [role="switch"], [role="slider"], [contenteditable]';
+let downOutside = false;
+const outsideCard = (event: MouseEvent) => {
+  const target = event.target as Element | null;
+  const main = document.getElementById('main-content');
+  if (!target || !main || !main.contains(target)) return false;
+  if (target.closest('.open-card, .deck-dots, .shell-head, [data-modal-dialog]') || target.closest(CONTROL)) return false;
+  // 滚动条那一条：落点在滚动区可视宽度以外。
+  const box = main.getBoundingClientRect();
+  return event.clientX < box.left + main.clientWidth;
+};
+const onDocPointerDown = (event: PointerEvent) => {
+  downOutside = Boolean(props.activeId) && event.button === 0 && outsideCard(event);
+};
+const onDocClick = (event: MouseEvent) => {
+  const wasOutside = downOutside;
+  downOutside = false;
+  if (!wasOutside || !props.activeId || !outsideCard(event)) return;
+  if (document.querySelector('[data-modal-dialog]') || window.getSelection()?.toString()) return;
+  requestClose();
+};
+
 onMounted(() => {
   deckWidth.value = root.value?.clientWidth ?? 0;
   document.addEventListener('keydown', onKeydown);
+  document.addEventListener('pointerdown', onDocPointerDown, true);
+  document.addEventListener('click', onDocClick);
 });
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKeydown);
+  document.removeEventListener('pointerdown', onDocPointerDown, true);
+  document.removeEventListener('click', onDocClick);
 });
 </script>
 

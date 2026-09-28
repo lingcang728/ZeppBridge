@@ -129,7 +129,7 @@ const recentItems = computed<RecentItem[]>(() => {
 </template>
 
 <style scoped>
-.recent-panel { grid-column: 1 / -1; padding: 18px 20px 20px; }
+.recent-panel { padding: 18px 20px 20px; }
 
 /* 横着的时间线：一根从右到左渐亮的细线（最新在左）穿过每个节点，节点上方是时间，下方是内容。 */
 .timeline { position: relative; display: grid; grid-auto-columns: minmax(150px, 1fr); grid-auto-flow: column; gap: 8px; margin: 16px 0 0; padding: 0 0 4px; overflow-x: auto; list-style: none; }
@@ -147,7 +147,4 @@ const recentItems = computed<RecentItem[]>(() => {
 .tl-title { max-width: 100%; overflow: hidden; color: var(--ink); font-size: var(--fs-sm); font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .tl-fact { color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 .recent-empty { min-height: 120px; }
-@media (max-width: 820px) {
-  .recent-panel { grid-column: 1; }
-}
 </style>

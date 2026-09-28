@@ -7,6 +7,13 @@ import { useMessages } from '../i18n';
 import { bodyStatusMessages } from '../views/BodyStatus.i18n';
 import type { MetricSeries, StressPoint } from '../types';
 
+const HOUR = 3_600_000;
+/** 时间轴的整点间隔：让整段跨度最多排六个左右的标签。 */
+const hourStep = (points: { ts: number }[]): number => {
+  const span = points.length > 1 ? points[points.length - 1]!.ts - points[0]!.ts : 0;
+  return ([1, 2, 3, 4, 6, 12].find((hours) => span / (hours * HOUR) <= 6) ?? 12) * HOUR;
+};
+
 /* 身体状态页的两张特殊图：饮食的三大营养素环形图、最近 24 小时的压力曲线（从 BodyStatus.vue 搬出来）。 */
 export const useBodyCharts = (series: Ref<Record<string, MetricSeries>>) => {
   const t = useMessages(bodyStatusMessages);
@@ -104,6 +111,11 @@ export const useBodyCharts = (series: Ref<Record<string, MetricSeries>>) => {
   const clock = (value: number) => displayDateTimeFormatter({
     hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(new Date(value));
+  /** 只给落在 `step` 整点上的刻度写时间，其余刻度留空。 */
+  const stepClock = (step: number) => (value: number) => {
+    const at = new Date(value);
+    return at.getMinutes() === 0 && (at.getHours() * HOUR) % step === 0 ? clock(value) : '';
+  };
 
   /*
    * 曲线断开的阈值。
@@ -149,7 +161,10 @@ export const useBodyCharts = (series: Ref<Record<string, MetricSeries>>) => {
         type: 'time',
         min: curve.value[0]?.ts,
         max: curve.value[curve.value.length - 1]?.ts,
-        axisLabel: { formatter: clock, hideOverlap: true, color: chartPalette.value.axis, fontSize: 14.5 },
+        // 最多六来个时间标签：窄窗口里整点标签一个挨一个、彼此又没盖住，hideOverlap 不管，
+        // 读出来是「15:0016:0017:00」。按跨度挑一个整点间隔（1/2/3/4/6/12 小时），
+        // 不在间隔上的刻度不写字（时间轴不认 minInterval，只能在标签这一层筛）。
+        axisLabel: { formatter: stepClock(hourStep(curve.value)), hideOverlap: true, color: chartPalette.value.axis, fontSize: 14.5 },
         axisLine: { lineStyle: { color: chartPalette.value.grid } },
         axisTick: { show: false },
         splitLine: { show: false },

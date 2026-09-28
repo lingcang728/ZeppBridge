@@ -537,18 +537,6 @@ export default {
       zoneAerobic: 'Aeroob 140–169',
       zoneAnaerobic: 'Anaeroob 170+',
     },
-    'components/overview/OverviewMore': {
-      label: 'Meer',
-      life: 'Levensgebeurtenissen',
-      lifeSub: (n: number) =>
-        (n
-          ? plural(n, { one: `${n} gebeurtenis`, other: `${n} gebeurtenissen` })
-          : 'Leg vast wat er in deze periode gebeurde'),
-      sources: 'Gegevensbronnen',
-      sourcesSub: 'Apparaten en cloudaccount',
-      weekly: 'Deze week',
-      weeklySub: 'Vergeleken met je eigen afgelopen 28 dagen',
-    },
     'components/overview/RecentCard': {
       recentAria: 'Recente records',
       recentTitle: 'Recente records',
@@ -1541,8 +1529,8 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
         `${ok} / ${total} gegevensstromen gezond`,
       summaryFailed: (n: number) =>
         plural(n, {
-          one: `${n} stroom heeft een probleem — klap hieronder "Hoe ver elke stroom kwam" open om te zien welke stap`,
-          other: `${n} stromen hebben een probleem — klap hieronder "Hoe ver elke stroom kwam" open om te zien welke stap`,
+          one: `${n} stroom heeft een probleem — hieronder bij "Hoe ver elke stroom kwam" zie je welke stap`,
+          other: `${n} stromen hebben een probleem — hieronder bij "Hoe ver elke stroom kwam" zie je welke stap`,
         }),
       summaryPending: (n: number) =>
         plural(n, {
@@ -1551,15 +1539,6 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
         }),
       summaryAllGood:
         'Alles in orde: ophalen, parsen en schrijven zijn alle drie afgerond',
-      summaryOccasional: (n: number) =>
-        plural(n, { one: `${n} metriek`, other: `${n} metrieken` }),
-      summaryActions: (n: number) =>
-        (n
-          ? plural(n, {
-              one: `${n} actie beschikbaar`,
-              other: `${n} acties beschikbaar`,
-            })
-          : 'Er is nu niets te doen'),
       intro:
         'Per gegevensstroom: hoe ver hij kwam met ophalen uit de cloud, parsen en lokaal schrijven; welke datums hij dekt; en waar hij vandaan kwam. Ontbrekend is ontbrekend — nooit opgevuld met een nul.',
       rangeAria: 'Dekkingsvenster',
@@ -1695,7 +1674,6 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       },
     },
     'views/HeartRateDetail': {
-      dailyMaxFold: 'Ruwe samples op deze machine, ongefilterd — kan afwijken van de Zepp-app',
       trendsTitle: 'Rusthartslag- en HRV-trends',
       backToOverview: 'Terug naar overzicht',
       title: 'Hartslag',
@@ -1911,10 +1889,6 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       loadUnit: 'belasting',
       thresholdHrTooltip: (value: number) => `Drempelhartslag <b>${value}</b> bpm`,
       balanceLabel: 'Balans van trainingsbelasting',
-      moreLabel: 'Meer',
-      zonesLabel: 'Hartslagzones',
-      zonesSummary:
-        'Kies een van de drie modellen, verdeeld op je eigen gemeten basiswaarden',
       balanceHint:
         '7-daagse belasting tegenover het 28-daagse weekgemiddelde, d.w.z. de acuut-chronisch-ratio',
       balanceChartAria:
@@ -2281,12 +2255,6 @@ Antwoord in Markdown.`,
       next: 'Volgende kaart',
       open: (title: string) => `Open "${title}"`,
       position: (index: number, total: number) => `${index} / ${total}`,
-    },
-    'components/deck/FoldDeck': {
-      close: 'Inklappen',
-      collapseAll: 'Alles inklappen',
-      expandAll: 'Alles uitklappen',
-      open: (title: string) => `Open "${title}"`,
     },
     'composables/useAiTaskLibrary': {
       loadFailed: 'De taakgegevens konden niet worden geladen',

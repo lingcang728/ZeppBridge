@@ -6,8 +6,8 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { CHART_THEME, VChart } from '../lib/echartsSetup';
 import { createLoadSeq } from '../lib/loadSeq';
 import HeartRateZonePicker from '../components/HeartRateZonePicker.vue';
-import FoldDeck from '../components/deck/FoldDeck.vue';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
+import { useQueuedOption } from '../composables/useQueuedOption';
 import PageHeader from '../components/PageHeader.vue';
 import CoverageNotice from '../components/CoverageNotice.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
@@ -263,22 +263,14 @@ const load = async () => {
   loading.value = false;
 };
 
+/* 和趋势卡同一条队：切范围时一帧只换一张图（见 useQueuedOption）。 */
+const shownThreshold = useQueuedOption(thresholdOption);
+const shownBalance = useQueuedOption(balanceOption);
+
 onMounted(() => { void load(); });
 watch(rangeDays, () => { void load(); });
 watch(dataRevision, () => { void load(); });
 
-const foldCards = computed(() => [
-  {
-    id: 'balance',
-    title: t.value.balanceLabel,
-    summary: latestBalance.value?.acute_chronic_ratio != null
-      ? `${t.value.acuteChronic} ${latestBalance.value.acute_chronic_ratio.toFixed(2)}`
-      : t.value.balanceHint,
-    icon: 'training-load' as const,
-    tone: 'training' as const,
-  },
-  { id: 'zones', title: t.value.zonesLabel, summary: t.value.zonesSummary, icon: 'heart-rate' as const, tone: 'heart' as const },
-]);
 </script>
 
 <template>
@@ -351,11 +343,11 @@ const foldCards = computed(() => [
             </span>
           </header>
           <VChart
-            v-if="thresholdOption"
+            v-if="shownThreshold"
             class="chart-body"
             :key="CHART_THEME"
             :theme="CHART_THEME"
-            :option="thresholdOption"
+            :option="shownThreshold"
             :update-options="SMOOTH_CHART_UPDATE"
             autoresize
             role="img"
@@ -368,9 +360,7 @@ const foldCards = computed(() => [
         </section>
       </div>
 
-      <!-- 负荷平衡与心率区间是长区块：收进卡包，只露卡头和一句摘要，点开飞出来（和概览同一种）。 -->
-      <FoldDeck :cards="foldCards" :label="t.moreLabel">
-        <template #balance>
+      <!-- 负荷平衡与心率区间直接摊开。 -->
           <section class="chart-card wide" :aria-label="t.balanceLabel">
             <header class="chart-head">
               <span class="chart-title">
@@ -382,11 +372,11 @@ const foldCards = computed(() => [
               </span>
             </header>
             <VChart
-              v-if="balanceOption"
+              v-if="shownBalance"
               class="chart-body tall"
               :key="CHART_THEME"
               :theme="CHART_THEME"
-              :option="balanceOption"
+              :option="shownBalance"
                 :update-options="SMOOTH_CHART_UPDATE"
               autoresize
               role="img"
@@ -395,9 +385,7 @@ const foldCards = computed(() => [
             <p v-else class="chart-empty">{{ t.balanceEmpty }}</p>
             <p class="chart-note">{{ t.balanceNote }}</p>
           </section>
-        </template>
-        <template #zones><HeartRateZonePicker :days="Math.max(30, rangeDays)" :revision="dataRevision" /></template>
-      </FoldDeck>
+          <HeartRateZonePicker :days="Math.max(30, rangeDays)" :revision="dataRevision" />
     </template>
   </section>
 </template>

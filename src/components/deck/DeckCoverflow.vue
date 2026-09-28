@@ -120,6 +120,10 @@ const onDown = (event: PointerEvent) => {
     id: event.pointerId, x: event.clientX, startPos: pos.value, lastX: event.clientX, time: event.timeStamp, v: 0, moved: false,
     hit: hitEl ? Number(hitEl.dataset.coverIndex) : -1,
   };
+  // 拖卡组时不许顺带选中字（以前拖出舞台，页头那两行说明会被刷成一片蓝）。阻止了默认行为，
+  // 焦点得自己给——键盘 ←/→ 仍然跟着这个卡组走。
+  event.preventDefault();
+  stage.value.focus({ preventScroll: true });
   stage.value.setPointerCapture(event.pointerId);
 };
 const onMove = (event: PointerEvent) => {

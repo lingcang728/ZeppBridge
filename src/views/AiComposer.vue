@@ -299,4 +299,9 @@ watch(
   .stage-graph :deep(.dock) { bottom: 14px; }
   .stage-graph { --graph-safe-top: 64px; --graph-safe-bottom: 60px; }
 }
+/* 任务名胶囊在很窄时排成两行（见 AiTaskHeader），关系网的提示和面包屑再往下让一行。 */
+@media (max-width: 480px) {
+  .stage-graph { --graph-safe-top: 108px; }
+  .stage-graph :deep(.hint), .stage-graph :deep(.crumb) { top: 114px; }
+}
 </style>
