@@ -168,6 +168,12 @@ way to tell which one is right.
 - Syncing, history backfill, schema migration, restore, backup, re-parsing and
   cleanup all acquire the cross-process write lock first, so the desktop app and
   the CLI can never write the same database simultaneously.
+- A sync or history backfill holds a separate **sync lease** for its whole run
+  (so two syncs never overlap across processes) but takes the write lock only
+  for the short stretches where it actually writes. While it waits on the
+  network, saving a setting or a life event goes through; those quick writes
+  wait up to a few seconds for a sync's write window instead of failing at
+  once.
 - The lock is held by the operating system (exclusive share-mode file open on
   Windows, `flock` on Unix-likes), so the kernel releases it when a process
   crashes. There is no "it crashed last time and now the database will not open"

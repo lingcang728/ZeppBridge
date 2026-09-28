@@ -245,9 +245,10 @@ IDs, the generic 500, and the no-CORS boundary.
    time. Expression unique indexes handle `NULL device_id`, and canonical rows
    keep `raw_record_id`. Migrations start only after the cross-process write
    lock is held and a pre-upgrade backup exists.
-7. `SyncManager` uses a run lock against in-process concurrency and additionally
-   takes the cross-process write lock, so the desktop app and the CLI never
-   write the same database at once. A core stream failure sets `success=false`,
+7. `SyncManager` uses a run lock against in-process concurrency and a
+   cross-process sync lease for the whole run, so the desktop app and the CLI
+   never sync at once; it takes the cross-process write lock only around the
+   stretches that write (`write_db`), never across network I/O. A core stream failure sets `success=false`,
    optional streams show `unavailable`/`unverified`, and retention runs after a
    success (skipped while long-term archiving is on).
 8. The fetch, parse and write stages are recorded separately in

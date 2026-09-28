@@ -17,8 +17,9 @@ impl SyncManager {
         // 报 Busy：调用方才能立刻把这次同步标成 deferred 并自动重试。
         self.stand_aside_if_local_maintenance()?;
         // 进程内的 run_lock 拦不住第二个进程。CLI 的 `sync` 和桌面应用同时跑
-        // 起来时，重复请求和重复清理是最轻的后果。
-        let _write_guard = self.acquire_write_lock(WritePurpose::Sync)?;
+        // 起来时，重复请求和重复清理是最轻的后果——所以全程拿同步租约。写锁
+        // 只在真正写库的那几段拿（`write_db`），联网的时候别的写者照样能写。
+        let _lease = self.begin_run(WritePurpose::Sync).await?;
         self.abort_if_cancelled()?;
         let window = FetchWindow::days(days)?;
         let mut streams = Vec::new();
@@ -206,12 +207,15 @@ impl SyncManager {
         // cleanup 失败不得用 `?` 顶掉已经成功的同步报告——数据已经写入了。
         let mut cleanup_warning = None;
         if success {
-            let db = self.db.lock().await;
-            let prefs = db.user_prefs()?;
+            let prefs = self.db.lock().await.user_prefs()?;
             // 开了长期归档就不再自动清理。刚补拉回来的历史在下一次成功同步后
             // 被删掉，是这类功能最让人失去信任的行为。
             if !prefs.archive_enabled {
-                if let Err(error) = db.cleanup_old_data(prefs.retention_days) {
+                let cleaned = match self.write_db().await {
+                    Ok(db) => db.cleanup_old_data(prefs.retention_days),
+                    Err(error) => Err(error),
+                };
+                if let Err(error) = cleaned {
                     tracing::warn!("同步后清理旧数据失败: {error}");
                     cleanup_warning = Some(format!(
                         "数据已同步；清理旧数据失败：{}",

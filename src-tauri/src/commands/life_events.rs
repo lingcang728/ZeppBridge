@@ -7,9 +7,11 @@ async fn with_life_event_write<T>(
     database: &tokio::sync::Mutex<Database>,
     mutation: impl FnOnce(&Database) -> zeppbridge_core::models::error::Result<T>,
 ) -> Result<T, AppError> {
-    // Do not block a runtime worker while another process owns the write lock.
-    // Report the existing retryable busy error and leave the user's draft intact.
-    let _write_guard = write_lock::try_acquire(data_dir, write_lock::WritePurpose::LifeEvent)?;
+    // Wait briefly (without blocking a runtime worker) for a sync's short write
+    // window; a long maintenance still reports the retryable busy error and
+    // leaves the user's draft intact.
+    let _write_guard =
+        super::acquire_quick_write(data_dir, write_lock::WritePurpose::LifeEvent).await?;
     let db = database.lock().await;
     Ok(mutation(&db)?)
 }
@@ -82,6 +84,19 @@ mod tests {
             .await
             .unwrap();
         with_life_event_write(&dir, &database, |db| db.delete_life_event(id))
+            .await
+            .unwrap();
+        // 同步落库的那一小段只占写锁几百毫秒：撞上了等一会儿就能写上，不报错。
+        let held = write_lock::try_acquire(&dir, write_lock::WritePurpose::Sync).unwrap();
+        let release = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            drop(held);
+        });
+        let saved = with_life_event_write(&dir, &database, |db| db.save_life_event(&input))
+            .await
+            .unwrap();
+        release.join().unwrap();
+        with_life_event_write(&dir, &database, |db| db.delete_life_event(saved))
             .await
             .unwrap();
         assert!(database

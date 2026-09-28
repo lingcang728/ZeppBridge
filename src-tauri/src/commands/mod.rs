@@ -17,13 +17,43 @@ pub(crate) fn join_blocking<T>(result: Result<T, tokio::task::JoinError>) -> Res
     result.map_err(|_| AppError::new("err.storage.worker_failed", "后台数据库任务被中断"))
 }
 
+/// 短写入最多等别的写者这么久。
+///
+/// 同步和补拉现在只在落库的那几段拿写锁（毫秒到秒级），等一小会儿就能写上。
+/// 以前这里是「一撞上就报错」：自动同步每 15 分钟要占写锁十几秒，那段时间里
+/// 改一个设置、改一个运动类型都会被「另一个写入操作正在进行」挡回去。
+#[cfg(not(test))]
+const QUICK_WRITE_WAIT: Duration = Duration::from_secs(5);
+/// 测试里只需要证明「会等、等不到就报忙」，不必真等五秒。
+#[cfg(test)]
+const QUICK_WRITE_WAIT: Duration = Duration::from_millis(600);
+
+/// 为一次短写入取写锁：拿不到就在异步里隔一会儿再试，不占运行时的工作线程；
+/// 等满 [`QUICK_WRITE_WAIT`] 仍拿不到（备份、重放这类长维护），照旧报可重试的忙。
+pub(crate) async fn acquire_quick_write(
+    data_dir: &Path,
+    purpose: WritePurpose,
+) -> Result<write_lock::ExclusiveWriteGuard, write_lock::WriteLockError> {
+    let deadline = std::time::Instant::now() + QUICK_WRITE_WAIT;
+    loop {
+        match write_lock::try_acquire(data_dir, purpose) {
+            Err(write_lock::WriteLockError::Busy { .. })
+                if std::time::Instant::now() < deadline =>
+            {
+                tokio::time::sleep(Duration::from_millis(120)).await;
+            }
+            other => return other,
+        }
+    }
+}
+
 pub(crate) async fn with_write<T>(
     data_dir: &Path,
     database: &Mutex<Database>,
     purpose: WritePurpose,
     mutation: impl FnOnce(&Database) -> zeppbridge_core::models::error::Result<T>,
 ) -> Result<T, AppError> {
-    let _write_guard = write_lock::try_acquire(data_dir, purpose)?;
+    let _write_guard = acquire_quick_write(data_dir, purpose).await?;
     let db = database.lock().await;
     Ok(mutation(&db)?)
 }

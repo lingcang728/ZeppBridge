@@ -24,6 +24,9 @@ use std::time::Instant;
 /// 而不是让界面一直转圈。
 const WRITE_LOCK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
 
+/// 等锁时隔多久再试一次。
+const LOCK_POLL: std::time::Duration = std::time::Duration::from_millis(120);
+
 use tokio::sync::Mutex;
 
 mod backfill;
@@ -90,7 +93,28 @@ pub struct SyncManager {
     run_lock: Arc<Mutex<()>>,
     /// 跨进程写锁的作用范围。`None` 时只有进程内互斥（测试用的内存库）。
     data_dir: Option<std::path::PathBuf>,
+    /// 当前这一轮是同步还是补拉。写库时拿写锁要报这个用途：它会原样显示给
+    /// 等锁的另一个写者，所以得说实际在做的事。
+    run_purpose: std::sync::Mutex<WritePurpose>,
     pub cancel: Arc<AtomicBool>,
+}
+
+/// 写库的一小段：先拿跨进程写锁，再拿这条连接；离开作用域两样一起放。
+///
+/// 同步全程只拿同步租约（见 `write_lock::acquire_sync_lease`），写锁只在这种
+/// 一小段里拿——联网那几十秒、几分钟里，别的写者（改设置、记生活事件、备份）
+/// 照样能写。
+pub(super) struct WriteSession<'a> {
+    db: tokio::sync::MutexGuard<'a, Database>,
+    _lock: Option<ExclusiveWriteGuard>,
+}
+
+impl std::ops::Deref for WriteSession<'_> {
+    type Target = Database;
+
+    fn deref(&self) -> &Database {
+        &self.db
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -125,6 +149,7 @@ impl SyncManager {
             db: Arc::new(Mutex::new(db)),
             run_lock: Arc::new(Mutex::new(())),
             data_dir: None,
+            run_purpose: std::sync::Mutex::new(WritePurpose::Sync),
             cancel,
         }
     }
@@ -135,22 +160,72 @@ impl SyncManager {
         self
     }
 
-    /// 等待写锁，超时后把「谁在写」告诉调用方而不是假死。
-    pub(super) fn acquire_write_lock(
+    /// 等一把跨进程锁，超时后把「谁在占着」告诉调用方而不是假死。
+    ///
+    /// 在异步里轮询而不是调阻塞的 `acquire_with_timeout`：等锁的那几秒不该占住
+    /// 运行时的工作线程；等的过程中用户按了取消，也要立刻停。
+    async fn acquire_lock(
         &self,
+        acquire: fn(
+            &std::path::Path,
+            WritePurpose,
+            std::time::Duration,
+        )
+            -> std::result::Result<ExclusiveWriteGuard, write_lock::WriteLockError>,
         purpose: WritePurpose,
     ) -> Result<Option<ExclusiveWriteGuard>> {
         let Some(data_dir) = self.data_dir.as_ref() else {
             return Ok(None);
         };
-        match write_lock::acquire_with_timeout(data_dir, purpose, WRITE_LOCK_TIMEOUT) {
-            Ok(guard) => Ok(Some(guard)),
-            // 「有人在写」和「锁建不起来」要分开：前者可重试，后者要人介入。
-            Err(error @ write_lock::WriteLockError::Busy { .. }) => {
-                Err(ZeppBridgeError::Busy(error.to_string()))
+        let deadline = Instant::now() + WRITE_LOCK_TIMEOUT;
+        loop {
+            match acquire(data_dir, purpose, std::time::Duration::ZERO) {
+                Ok(guard) => return Ok(Some(guard)),
+                Err(write_lock::WriteLockError::Busy { .. }) if Instant::now() < deadline => {
+                    self.abort_if_cancelled()?;
+                    tokio::time::sleep(LOCK_POLL).await;
+                }
+                // 「有人在写」和「锁建不起来」要分开：前者可重试，后者要人介入。
+                Err(error @ write_lock::WriteLockError::Busy { .. }) => {
+                    return Err(ZeppBridgeError::Busy(error.to_string()))
+                }
+                Err(error) => return Err(ZeppBridgeError::ConfigError(error.to_string())),
             }
-            Err(error) => Err(ZeppBridgeError::ConfigError(error.to_string())),
         }
+    }
+
+    /// 开始一轮同步或补拉：拿同步租约，记下这一轮的用途。
+    pub(super) async fn begin_run(
+        &self,
+        purpose: WritePurpose,
+    ) -> Result<Option<ExclusiveWriteGuard>> {
+        let lease = self
+            .acquire_lock(write_lock::acquire_sync_lease, purpose)
+            .await?;
+        *self
+            .run_purpose
+            .lock()
+            .unwrap_or_else(|error| error.into_inner()) = purpose;
+        Ok(lease)
+    }
+
+    /// 写库的一小段，用途是当前这一轮的用途。
+    pub(super) async fn write_db(&self) -> Result<WriteSession<'_>> {
+        let purpose = *self
+            .run_purpose
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        self.write_db_for(purpose).await
+    }
+
+    pub(super) async fn write_db_for(&self, purpose: WritePurpose) -> Result<WriteSession<'_>> {
+        let lock = self
+            .acquire_lock(write_lock::acquire_with_timeout, purpose)
+            .await?;
+        Ok(WriteSession {
+            db: self.db.lock().await,
+            _lock: lock,
+        })
     }
 
     pub fn request_cancel(&self) {
@@ -205,7 +280,7 @@ impl SyncManager {
             .probe_event_streams(day, &time_zone, None)
             .await;
         if !probes.is_empty() {
-            let database = self.db.lock().await;
+            let database = self.write_db_for(WritePurpose::Metadata).await?;
             database.save_capability_probe(&probes)?;
         }
         Ok(probes)
@@ -243,7 +318,7 @@ impl SyncManager {
         if probes.is_empty() {
             return Ok(false);
         }
-        let database = self.db.lock().await;
+        let database = self.write_db().await?;
         database.save_capability_probe(&probes)?;
         Ok(true)
     }

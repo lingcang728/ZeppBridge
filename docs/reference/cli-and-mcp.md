@@ -327,8 +327,9 @@ letting it receive an empty series and guess:
 
 ## Running alongside the desktop app
 
-The CLI's `sync` and the desktop app's sync share one cross-process write lock,
-so there is only ever one writer. When the CLI cannot get the lock it exits with
-code 4 rather than racing the GUI.
+The CLI's `sync` and the desktop app's sync share one cross-process sync lease
+and one write lock, so there is only ever one sync and one writer at a time. When
+the CLI cannot get either within its wait it exits with code 4 rather than
+racing the GUI.
 
 MCP's read-only queries take no write lock and can run during a sync.

@@ -30,7 +30,7 @@ impl SyncManager {
             {
                 Ok(record) => {
                     {
-                        let db = self.db.lock().await;
+                        let db = self.write_db().await?;
                         db.record_workout_detail_fetch_result(
                             &item.workout_id,
                             &item.source,
@@ -43,8 +43,7 @@ impl SyncManager {
                 Err(error) if error.needs_reauth() => return Err(error),
                 Err(error) => {
                     tracing::warn!("拉取运动明细 {} 失败: {}", item.workout_id, error);
-                    {
-                        let db = self.db.lock().await;
+                    if let Ok(db) = self.write_db().await {
                         let _ = db.record_workout_detail_fetch_result(
                             &item.workout_id,
                             &item.source,
@@ -87,7 +86,7 @@ impl SyncManager {
             needs_reauth: false,
             message: Some(message.into()),
         };
-        let db = self.db.lock().await;
+        let db = self.write_db().await?;
         db.update_sync_state_details(
             "workout_detail",
             None,
@@ -117,16 +116,18 @@ impl SyncManager {
         } else {
             reasons.into_iter().collect::<Vec<_>>().join("; ")
         };
+        // 一条流的全部报文在同一段写锁里落库：已经拿到手的数据，写起来是毫秒到
+        // 秒级的事，没有理由让别的写者跟着等整个联网过程。
+        let db = self.write_db().await?;
         let mut reports = Vec::with_capacity(records.len());
         for record in records {
-            reports.push(self.persist_record(record).await?.report);
+            reports.push(Self::persist_record(&db, record)?.report);
         }
         let mut aggregate = aggregate_stream_reports(stream, &reports);
         if incomplete && aggregate.status != StreamStatus::Failed {
             aggregate.status = StreamStatus::Failed;
             aggregate.message = Some(incomplete_message.clone());
         }
-        let db = self.db.lock().await;
         if incomplete {
             db.record_stream_stage(
                 stream,
@@ -151,10 +152,9 @@ impl SyncManager {
         Ok(aggregate)
     }
 
-    pub(super) async fn persist_record(&self, record: FetchedRecord) -> Result<PersistResult> {
+    pub(super) fn persist_record(db: &Database, record: FetchedRecord) -> Result<PersistResult> {
         let stream = record.raw.stream.clone();
         let capability = record.raw.capability.clone();
-        let db = self.db.lock().await;
         let mut report = StreamReport {
             stream: stream.clone(),
             status: StreamStatus::Success,
@@ -250,7 +250,7 @@ impl SyncManager {
             needs_reauth: error.needs_reauth(),
             message: Some(error.user_message()),
         };
-        let db = self.db.lock().await;
+        let db = self.write_db().await?;
         db.record_stream_stage(
             stream,
             Stage::Fetch,
@@ -300,7 +300,7 @@ impl SyncManager {
             needs_reauth: error.needs_reauth(),
             message: Some(error.user_message()),
         };
-        let db = self.db.lock().await;
+        let db = self.write_db().await?;
         db.update_sync_state_details(
             stream,
             None,

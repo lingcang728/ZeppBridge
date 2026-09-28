@@ -16,6 +16,8 @@
 //!
 //! 于是不存在「上一个进程崩了，锁文件还在，下次启动打不开库」这种需要人工
 //! 删文件的故障模式。
+//!
+//! 联网同步另有一把**同步租约**（[`acquire_sync_lease`]），见那里的说明。
 
 use std::fs::{File, OpenOptions};
 use std::io;
@@ -25,6 +27,8 @@ use std::time::{Duration, Instant};
 const LOCK_FILE: &str = "zepp.db.write-lock";
 /// 记录当前持有者的用途和 pid，只用于把「谁在写」告诉用户。
 const HOLDER_FILE: &str = "zepp.db.write-lock.holder";
+const SYNC_LOCK_FILE: &str = "zepp.db.sync-lock";
+const SYNC_HOLDER_FILE: &str = "zepp.db.sync-lock.holder";
 const POLL_INTERVAL: Duration = Duration::from_millis(120);
 
 /// 一次写入动作的用途。等待超时时会把它显示给用户，所以措辞是面向用户的。
@@ -145,9 +149,34 @@ pub fn acquire_with_timeout(
     purpose: WritePurpose,
     timeout: Duration,
 ) -> Result<ExclusiveWriteGuard, WriteLockError> {
+    acquire_file(data_dir, LOCK_FILE, HOLDER_FILE, purpose, timeout)
+}
+
+/// 联网同步 / 历史补拉的租约：同一个数据目录同一时刻只跑一个。
+///
+/// 它和写锁是**两把锁**。以前同步从联网之前就拿着写锁，一直拿到结束——一次历史
+/// 补拉动辄几分钟，自动同步每 15 分钟也要占十几秒，这期间改个设置、记一条生活
+/// 事件都会被「另一个写入操作正在进行」挡回去，而那段时间里同步其实在等网络，
+/// 一个字节都没写。现在同步全程只拿这把租约（挡住桌面和 CLI 同时各跑一个），
+/// 真正写库的那几段才去拿写锁。
+pub fn acquire_sync_lease(
+    data_dir: &Path,
+    purpose: WritePurpose,
+    timeout: Duration,
+) -> Result<ExclusiveWriteGuard, WriteLockError> {
+    acquire_file(data_dir, SYNC_LOCK_FILE, SYNC_HOLDER_FILE, purpose, timeout)
+}
+
+fn acquire_file(
+    data_dir: &Path,
+    lock_file: &str,
+    holder_file: &str,
+    purpose: WritePurpose,
+    timeout: Duration,
+) -> Result<ExclusiveWriteGuard, WriteLockError> {
     std::fs::create_dir_all(data_dir).map_err(WriteLockError::Unavailable)?;
-    let lock_path = data_dir.join(LOCK_FILE);
-    let holder_path = data_dir.join(HOLDER_FILE);
+    let lock_path = data_dir.join(lock_file);
+    let holder_path = data_dir.join(holder_file);
     let deadline = Instant::now() + timeout;
 
     loop {
@@ -294,6 +323,20 @@ mod tests {
         );
         // 锁文件本身可以留着（下次复用），但绝不能因此挡住下一个写者。
         assert!(try_acquire(&dir, WritePurpose::Sync).is_ok());
+    }
+
+    /// 同步租约挡第二个同步，但不挡写锁：同步在等网络的时候，改设置照样能写。
+    #[test]
+    fn a_running_sync_lease_blocks_another_sync_but_not_a_quick_write() {
+        let dir = temp_dir("sync-lease");
+        let lease = acquire_sync_lease(&dir, WritePurpose::Sync, Duration::ZERO).unwrap();
+        match acquire_sync_lease(&dir, WritePurpose::HistoryBackfill, Duration::ZERO) {
+            Err(WriteLockError::Busy { holder }) => assert_eq!(holder.as_deref(), Some("云端同步")),
+            other => panic!("第二个同步不该拿到租约: {other:?}"),
+        }
+        assert!(try_acquire(&dir, WritePurpose::Metadata).is_ok());
+        drop(lease);
+        assert!(acquire_sync_lease(&dir, WritePurpose::HistoryBackfill, Duration::ZERO).is_ok());
     }
 
     #[test]

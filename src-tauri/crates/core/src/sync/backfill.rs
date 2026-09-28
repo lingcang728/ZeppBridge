@@ -26,11 +26,12 @@ impl SyncManager {
         let _run_guard = self.run_lock.lock().await;
         self.cancel.store(false, Ordering::SeqCst);
         self.stand_aside_if_local_maintenance()?;
-        let _write_guard = self.acquire_write_lock(WritePurpose::HistoryBackfill)?;
+        // 补拉动辄几分钟：全程只拿同步租约，写锁只在记账和落库的那几段拿。
+        let _lease = self.begin_run(WritePurpose::HistoryBackfill).await?;
         self.abort_if_cancelled()?;
 
         {
-            let db = self.db.lock().await;
+            let db = self.write_db().await?;
             let prefs = db.user_prefs()?;
             let requested_days = (Utc::now().date_naive() - from).num_days().max(0);
             if prefs.backfill_would_be_cleaned_up(requested_days) {
@@ -89,7 +90,7 @@ impl SyncManager {
             });
 
             let outcome = self.backfill_one_chunk(&chunk, &time_zone).await;
-            let db = self.db.lock().await;
+            let db = self.write_db().await?;
             match outcome {
                 Ok((status, records, reason)) => db.record_backfill_chunk(
                     &chunk.stream,
