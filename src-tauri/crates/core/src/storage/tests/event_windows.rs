@@ -234,3 +234,32 @@ fn a_window_still_owning_a_derived_row_is_kept() {
     assert!(keys.contains(&old_key.to_string()), "{keys:?}");
     assert!(!keys.contains(&new_key.to_string()), "{keys:?}");
 }
+
+/// 头一回整理之前先留一份可校验的备份：整理会删掉上千条报文，删了就回不来。
+/// 之后没有新东西要整理时，不再每次启动都备份一遍。
+#[test]
+fn the_first_consolidation_leaves_a_verified_backup_behind() {
+    let dir = std::env::temp_dir().join(format!(
+        "zeppbridge-consolidate-backup-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let db = Database::new(dir.join("zepp.db")).unwrap();
+    db.persist_fetched_record(&raw(
+        "events:Charge:real_data:1000:2000",
+        json!({"items": [charge("2026-09-01", 50)]}),
+    ))
+    .unwrap();
+    assert!(backup::list_backups(&dir).unwrap().is_empty());
+
+    db.compact_raw_payloads().unwrap();
+    let backups = backup::list_backups(&dir).unwrap();
+    assert_eq!(backups.len(), 1);
+    assert_eq!(backups[0].kind, backup::BackupKind::PreMigration);
+
+    db.compact_raw_payloads().unwrap();
+    assert_eq!(backup::list_backups(&dir).unwrap().len(), 1);
+    drop(db);
+    let _ = std::fs::remove_dir_all(&dir);
+}

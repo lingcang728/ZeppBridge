@@ -73,6 +73,11 @@ impl Database {
         let Some(max_id) = windows.iter().map(|raw| raw.id).max() else {
             return Ok(());
         };
+        // 头一回整理这个库时先留一份可校验的快照：整理会删掉上千条报文，删了
+        // 就回不来。和迁移同一条规矩——备份没成功就不开始。
+        if marker == 0 && self.pending_event_window_count()? > 0 {
+            self.backup_before_consolidation()?;
+        }
         let mut families: BTreeMap<String, Vec<WindowRaw>> = BTreeMap::new();
         for raw in windows {
             families.entry(raw.family.clone()).or_default().push(raw);
@@ -83,6 +88,28 @@ impl Database {
             }
         }
         self.set_app_meta(EVENT_WINDOW_MARKER_KEY, &max_id.to_string())
+    }
+
+    fn backup_before_consolidation(&self) -> Result<()> {
+        // 内存库（测试）没有文件，也就没有什么可备份的。
+        let Some(data_dir) = self
+            .conn
+            .path()
+            .filter(|path| !path.is_empty())
+            .and_then(|path| Path::new(path).parent().map(Path::to_path_buf))
+        else {
+            return Ok(());
+        };
+        match backup::create_backup(&data_dir, backup::BackupKind::PreMigration, APP_VERSION) {
+            Ok(_) => {
+                let _ = backup::prune_migration_backups(&data_dir);
+                Ok(())
+            }
+            Err(error) => Err(ZeppBridgeError::DataUnavailable(format!(
+                "整理历史报文之前的自动备份没有成功，所以没有开始整理：{}",
+                error.user_message()
+            ))),
+        }
     }
 
     fn event_window_marker(&self) -> Result<i64> {
