@@ -10,6 +10,7 @@ import Icon from './components/Icon.vue';
 import { backDestination, historyBackPath, navigationBranch, pageMotion, TAB_ORDER, type PageMotion } from './lib/navigation';
 import AppTopBar from './components/shell/AppTopBar.vue';
 import SegmentTrack from './components/SegmentTrack.vue';
+import { usePageMorph } from './composables/usePageMorph';
 import { useSyncController } from './composables/useSyncController';
 import { useUiScale } from './composables/useUiScale';
 import { backend, isDesktop, whenBackendReady } from './lib/bridge';
@@ -95,16 +96,19 @@ const backLabel = computed(() => {
 
 /* 切页动效。
  *
- * 新旧两页同时在场（不再 out-in）：旧页退到景深里、变糊、淡出，新页从另一层
- * 浮上来。out-in 中间那一拍空白就是以前切页时的「闪一下」。
+ * 新旧两页同时在场（不再 out-in）：out-in 中间那一拍空白就是更早以前的「闪一下」。
+ * 也不再让两页各自变糊：整屏 blur 在 4K 高分屏上每帧重画，叠在一起的那几帧整个窗口
+ * 发暗发糊，还是「闪一下」。现在只动 transform / clip-path / opacity：从一张卡点进去，
+ * 新页从那张卡长成整页、返回时缩回去（usePageMorph）；没有来处的就轻轻浮上来。
  *
  * 旧页离场时会被绝对定位，而路由钩子紧接着把滚动区拉回顶部——不处理的话，
  * 旧页会在淡出的那一瞬跳回它自己的顶部。离场前把它按当时的滚动距离往上垫，
  * 画面就停在用户最后看到的那一帧上。 */
 const motion = ref<PageMotion>('none');
+const pageMorph = usePageMorph();
 let leavingScroll = 0;
 router.beforeEach((to, from) => {
-  motion.value = pageMotion(from.path, to.path);
+  motion.value = pageMorph.decide(from, to, pageMotion(from.path, to.path));
   leavingScroll = document.getElementById('main-content')?.scrollTop ?? 0;
 });
 const onPageBeforeLeave = (el: Element) => {
@@ -195,6 +199,7 @@ onMounted(() => {
 });
 onUnmounted(() => {
   document.removeEventListener('keydown', onDocumentKeydown);
+  pageMorph.dispose();
   for (const unlisten of ownUnlisteners.splice(0)) unlisten();
   // 同步控制器是模块级单例，它的监听器和那个每分钟一跳的定时器都挂在
   // `initialize()` 上。这个组件卸载时不放，下一次挂载就会多出一份。
@@ -249,7 +254,7 @@ onUnmounted(() => {
            详情页不缓存：它们按 URL 参数取数，缓存一堆实例既没收益又占内存。 -->
       <div class="page-host">
       <RouterView v-slot="{ Component }">
-        <Transition :name="`page-${motion}`" @before-leave="onPageBeforeLeave">
+        <Transition :name="`page-${motion}`" @before-leave="onPageBeforeLeave" @enter="pageMorph.onEnter" @leave="pageMorph.onLeave">
           <KeepAlive :include="CACHED_PAGES" :max="4">
             <component :is="Component" />
           </KeepAlive>

@@ -22,7 +22,7 @@ export interface DeckMorphRefs {
 }
 
 const OPEN_MS = 560;
-const CLOSE_MS = 460;
+const CLOSE_MS = 520;
 const FLIGHT_MS = 420;
 const FLIGHT_STAGGER_MS = 16;
 const OPEN_EASE = 'cubic-bezier(.2, .9, .22, 1)';
@@ -86,8 +86,8 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
   const rise = (el: HTMLElement) => {
     el.animate(
       [
-        { opacity: 0, transform: 'translateY(18px) scale(.97)', filter: 'blur(6px)' },
-        { opacity: 1, transform: 'none', filter: 'blur(0px)' },
+        { opacity: 0, transform: 'translateY(18px) scale(.97)' },
+        { opacity: 1, transform: 'none' },
       ],
       { duration: 380, easing: OPEN_EASE },
     );
@@ -159,14 +159,16 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
     const rest = openFrame(radius);
     const lift = fromTop === null ? 0 : fromTop - to.top;
     if (lift) rest.transform = `translate(0px, ${lift}px) scale(1)`;
+    // 缓动写在每一段关键帧上而不是整条时间线上：整条时间线带缓动时，offset 按「进度」算，
+    // 快进慢出的曲线会让淡出提前到三成时间就开始——卡才缩了三成就没了，看着像凭空消失。
+    // 现在几何一路缩到源卡那么大、全程不透明，最后 12% 的时间才和底下那张源卡交接。
     const animation = el.animate(
       [
-        { ...rest, transformOrigin: '0 0', opacity: 1 },
-        // 大半程保持不透明：看得见它落回那一张卡上，而不是半路就淡没了。
-        { opacity: 1, offset: 0.72 },
+        { ...rest, transformOrigin: '0 0', opacity: 1, easing: CLOSE_EASE },
+        { ...collapsed, transformOrigin: '0 0', opacity: 1, offset: 0.88, easing: 'linear' },
         { ...collapsed, transformOrigin: '0 0', opacity: 0 },
       ],
-      { duration: CLOSE_MS, easing: CLOSE_EASE, fill: 'both' },
+      { duration: CLOSE_MS, fill: 'both' },
     );
     track({ animation, id, kind: 'close', closed });
   };

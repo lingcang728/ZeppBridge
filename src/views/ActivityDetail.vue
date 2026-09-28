@@ -11,6 +11,7 @@ defineOptions({ name: 'ActivityDetail' });
 import { computed, onMounted, ref, watch } from 'vue';
 import { useFirstLoad } from '../composables/useFirstLoad';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
+import { trendGridStyle } from '../lib/trendGrid';
 import PageHeader from '../components/PageHeader.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import Icon from '../components/Icon.vue';
@@ -209,7 +210,7 @@ watch(dataRevision, () => { void load(); });
       <button v-if="isDesktop()" class="button button-secondary retry" type="button" @click="load">{{ t.retry }}</button>
     </div>
 
-    <div v-if="initialLoading" class="card-grid" aria-live="polite" :aria-label="t.loadingAria">
+    <div v-if="initialLoading" class="trend-grid" aria-live="polite" :aria-label="t.loadingAria">
       <SkeletonBlock v-for="index in 4" :key="index" height="268px" />
     </div>
     <template v-else>
@@ -217,7 +218,7 @@ watch(dataRevision, () => { void load(); });
         <Icon name="info" :size="14" />
         {{ t.noneInRange }}
       </p>
-      <div class="card-grid">
+      <div class="trend-grid" :style="trendGridStyle(cards.length)">
         <MetricTrendCard
           v-for="card in cards"
           :key="card.metric"
@@ -237,11 +238,7 @@ watch(dataRevision, () => { void load(); });
 <style scoped>
 .metric-page.page { display: grid; gap: var(--space-4); align-content: start; }
 
-.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-4); }
 .inline-alert { display: flex; align-items: center; gap: var(--space-2); margin: 0; padding: 9px 13px; border: 1px solid var(--mat-line); border-radius: var(--radius-md); background: var(--mat-card); color: var(--muted); font-size: var(--fs-sm); box-shadow: var(--mat-rim), var(--mat-shadow); }
 .inline-alert[role='alert'] { color: var(--danger); }
 .retry { margin-left: auto; }
-@media (max-width: 720px) {
-  .card-grid { grid-template-columns: minmax(0, 1fr); }
-}
 </style>

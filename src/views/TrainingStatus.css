@@ -1,11 +1,6 @@
 /* TrainingStatus.vue 的样式（scoped，经 <style scoped src> 引入，只作用于这个组件）。 */
 .training-page.page { display: grid; gap: var(--space-4); align-content: start; }
 
-/* 一行里的卡等高（stretch）：VO₂max、负荷、PAI、乳酸阈四张卡底边齐平。 */
-.card-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); align-items: stretch; }
-.card-grid > :deep(*) { height: 100%; }
-@media (min-width: 1500px) { .card-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-
 /* 与 MetricTrendCard 同一种有厚度的板：不描边、同样的圆角、内边距和卡头高度。 */
 .chart-card {
   display: flex;
@@ -24,6 +19,10 @@
 .chart-latest { display: flex; align-items: baseline; gap: 4px; white-space: nowrap; }
 .chart-latest b { color: var(--ink); font-family: var(--font-mono); font-size: 24px; font-variant-numeric: tabular-nums; }
 .chart-latest b.hr { color: var(--heart); }
+/* 乳酸阈卡（MetricTrendCard 的 #latest / #chart 插槽）：心率红、配速蓝，没有曲线时的说明撑满曲线那一格。 */
+.hr { color: var(--heart); }
+.pace { color: var(--pace); }
+.trend-grid .chart-empty { height: 100%; min-height: 0; margin: 0; }
 .chart-latest b.pace { color: var(--pace); }
 .chart-latest i { margin-right: 8px; color: var(--subtle); font-size: var(--fs-xs); font-style: normal; }
 .chart-latest i:last-child { margin-right: 0; }
@@ -52,6 +51,5 @@
 }
 .retry { margin-left: auto; }
 @media (max-width: 720px) {
-  .card-grid { grid-template-columns: minmax(0, 1fr); }
   .chart-card.wide { padding: var(--space-4); }
 }

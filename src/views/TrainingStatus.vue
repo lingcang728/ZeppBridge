@@ -7,6 +7,7 @@ import { CHART_THEME, VChart } from '../lib/echartsSetup';
 import { createLoadSeq } from '../lib/loadSeq';
 import HeartRateZonePicker from '../components/HeartRateZonePicker.vue';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
+import { trendGridStyle } from '../lib/trendGrid';
 import { useQueuedOption } from '../composables/useQueuedOption';
 import PageHeader from '../components/PageHeader.vue';
 import CoverageNotice from '../components/CoverageNotice.vue';
@@ -298,12 +299,12 @@ watch(dataRevision, () => { void load(); });
       <button v-if="isDesktop()" class="button button-secondary retry" type="button" @click="load">{{ t.retry }}</button>
     </p>
 
-    <div v-if="initialLoading" class="card-grid" aria-live="polite" :aria-label="t.loadingAria">
+    <div v-if="initialLoading" class="trend-grid" aria-live="polite" :aria-label="t.loadingAria">
       <SkeletonBlock v-for="index in 4" :key="index" height="268px" />
     </div>
 
     <template v-else>
-      <div class="card-grid">
+      <div class="trend-grid" :style="trendGridStyle(4)">
         <MetricTrendCard
           label="VO₂max"
           :hint="t.vo2Hint"
@@ -330,34 +331,34 @@ watch(dataRevision, () => { void load(); });
           :empty-text="t.paiEmpty"
         />
 
-        <section class="chart-card" :aria-label="t.thresholdLabel">
-          <header class="chart-head">
-            <span class="chart-title">
-              <strong>{{ t.thresholdLabel }}</strong>
-              <small>{{ t.thresholdHint }}</small>
-            </span>
-            <span v-if="thresholdHr?.latest || thresholdPace?.latest" class="chart-latest">
-              <em class="latest-tag">{{ t.latestTag }}</em>
-              <b class="hr">{{ thresholdHr?.latest ? Math.round(thresholdHr.latest.value) : '—' }}</b><i>bpm</i>
-              <b class="pace">{{ formatPaceSeconds(thresholdPace?.latest?.value) }}</b><i>{{ paceUnitLabel() }}</i>
-            </span>
-          </header>
-          <VChart
-            v-if="shownThreshold"
-            class="chart-body"
-            :key="CHART_THEME"
-            :theme="CHART_THEME"
-            :option="shownThreshold"
-            :update-options="SMOOTH_CHART_UPDATE"
-            autoresize
-            role="img"
-            :aria-label="t.thresholdChartAria"
-          />
-          <p v-else-if="hasThreshold" class="chart-empty">
-            {{ t.thresholdOnce(thresholdDates[0]) }}
-          </p>
-          <p v-else class="chart-empty">{{ t.thresholdEmpty }}</p>
-        </section>
+        <!-- 乳酸阈有心率和配速两条线：和另外三张同一种卡（同样的卡头、同样对齐），
+             只是最新读数和曲线换成自己的，平均/最低/最高那一行不给（两条线各一套会挤）。 -->
+        <MetricTrendCard
+          :label="t.thresholdLabel"
+          :hint="t.thresholdHint"
+          :series="thresholdHr"
+          :color="zeppSemanticColors.heart"
+          :empty-text="t.thresholdEmpty"
+          hide-stats
+        >
+          <template #latest>
+            <strong class="hr">{{ thresholdHr?.latest ? Math.round(thresholdHr.latest.value) : '—' }}</strong><small>bpm</small>
+            <strong class="pace">{{ formatPaceSeconds(thresholdPace?.latest?.value) }}</strong><small>{{ paceUnitLabel() }}</small>
+          </template>
+          <template v-if="shownThreshold || hasThreshold" #chart>
+            <VChart
+              v-if="shownThreshold"
+              :key="CHART_THEME"
+              :theme="CHART_THEME"
+              :option="shownThreshold"
+              :update-options="SMOOTH_CHART_UPDATE"
+              autoresize
+              role="img"
+              :aria-label="t.thresholdChartAria"
+            />
+            <p v-else class="chart-empty">{{ t.thresholdOnce(thresholdDates[0]) }}</p>
+          </template>
+        </MetricTrendCard>
       </div>
 
       <!-- 负荷平衡与心率区间直接摊开。 -->

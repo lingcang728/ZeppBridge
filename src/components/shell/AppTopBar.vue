@@ -257,10 +257,17 @@ const overlaps = (): boolean => {
   if (left && actions && left.right + gap > actionsLeft) return true;
   return false;
 };
-/** 等 DOM 换成新档位，再让传送带按新标签量一次宽度、把宽度也写进 DOM。 */
+/** 等 DOM 换成新档位，再让传送带按新标签量一次宽度、把宽度也写进 DOM。
+    只有标签真的变了（换语言、全名 ↔ 短码、字体刚加载完）才量：量一次要把整页强制排版一遍，
+    拖窗口边框时每帧都在重排档位，每一档都量就是每帧好几次整页排版。 */
+let measuredKey = '';
 const settleLayout = async () => {
   await nextTick();
-  localeWheel.value?.measure();
+  const key = `${locale.value}:${fit.value >= FIT_SHORT_LOCALE}`;
+  if (key !== measuredKey) {
+    localeWheel.value?.measure();
+    measuredKey = key;
+  }
   await nextTick();
 };
 let fitting = false;
@@ -293,7 +300,7 @@ const scheduleFit = () => {
 onMounted(() => {
   fitObserver = new ResizeObserver(scheduleFit);
   if (bar.value) fitObserver.observe(bar.value);
-  void document.fonts?.ready.then(scheduleFit);
+  void document.fonts?.ready.then(() => { measuredKey = ''; scheduleFit(); });
   scheduleFit();
 });
 onBeforeUnmount(() => {
@@ -313,13 +320,16 @@ watch(() => (readyToHand.value ? t.value.readyPill : syncText.value), () => {
 
 <template>
   <header ref="bar" :class="['app-topbar', fit > 0 && `fit-${fit}`]">
-    <button v-if="backTo" type="button" class="quick-back glass-control" :title="backLabel" :aria-label="backLabel" @click="goBack">
-      <Icon name="arrow-left" :size="20" />
-    </button>
-    <RouterLink v-else to="/" class="brand" :title="versionTitle || t.brandHome">
-      <BrandMark :size="30" />
-      <span class="wordmark">ZeppBridge&nbsp;<b>3</b></span>
-    </RouterLink>
+    <!-- 返回键和品牌换位时轻轻交接，不再一帧之内硬换（切页时左上角「闪一下」）。 -->
+    <Transition name="lead" mode="out-in">
+      <button v-if="backTo" key="back" type="button" class="quick-back glass-control" :title="backLabel" :aria-label="backLabel" @click="goBack">
+        <Icon name="arrow-left" :size="20" />
+      </button>
+      <RouterLink v-else key="brand" to="/" class="brand" :title="versionTitle || t.brandHome">
+        <BrandMark :size="30" />
+        <span class="wordmark">ZeppBridge&nbsp;<b>3</b></span>
+      </RouterLink>
+    </Transition>
 
     <SegmentTrack
       class="pill-nav"
@@ -393,6 +403,10 @@ watch(() => (readyToHand.value ? t.value.readyPill : syncText.value), () => {
   text-decoration: none;
 }
 .brand :deep(svg) { display: block; }
+.lead-enter-active { transition: opacity 160ms ease, scale 220ms var(--ease-out, ease); }
+.lead-leave-active { transition: opacity 90ms ease; }
+.lead-enter-from { opacity: 0; scale: .9; }
+.lead-leave-to { opacity: 0; }
 .wordmark {
   font-size: var(--fs-lg);
   font-weight: 600;

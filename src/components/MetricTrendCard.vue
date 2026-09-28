@@ -70,6 +70,8 @@ const props = withDefaults(defineProps<{
   chart?: 'line' | 'bar';
   /** Keep the days with no reading on the axis. See `buildSeriesOption`. */
   calendarAxis?: boolean;
+  /** Leave out the average / min / max row (a card whose chart has more than one series). */
+  hideStats?: boolean;
 }>(), {
   decimals: 0,
   showSpread: false,
@@ -128,21 +130,25 @@ const shownOption = useQueuedOption(option);
 </script>
 
 <template>
+  <!-- 四块自上而下：卡头（标题 / 最新读数 / 说明）、覆盖说明、曲线、统计。
+       卡片是父网格的 subgrid，同一行几张卡的这四块各自对齐（见 material.css 的 .trend-grid）。
+       以前标题和说明挤在左边、最新读数占着右上角：葡语这种长标题被压成一列一个词竖着排，
+       右边却空着一大块。现在标题独占一行、读数在它下面、说明铺满整宽。 -->
   <section class="trend-card" :aria-label="label">
     <header class="trend-head">
-      <span class="trend-title">
-        <strong>{{ label }}</strong>
-        <small v-if="hint">{{ hint }}</small>
-      </span>
+      <strong class="trend-title">{{ label }}</strong>
       <!-- 这个大数字是**最近一次读数**，不是这个范围的汇总，所以切 7 天 / 1 个月
            / 6 个月时它本来就不该变（最近一次还是同一次）。跟着范围变的是下面
            的平均/最低/最高和覆盖天数。以前它没有标签，读起来像「这个范围的
            值」，于是看着就像坏了。 -->
       <span class="trend-latest">
         <em class="trend-latest-tag">{{ t.latestTag }}</em>
-        <strong :style="{ color }">{{ latest }}</strong>
-        <small v-if="unit">{{ unit }}</small>
+        <slot name="latest">
+          <strong :style="{ color }">{{ latest }}</strong>
+          <small v-if="unit">{{ unit }}</small>
+        </slot>
       </span>
+      <small v-if="hint" class="trend-hint">{{ hint }}</small>
     </header>
 
     <p class="trend-meta">
@@ -151,8 +157,9 @@ const shownOption = useQueuedOption(option);
       <span v-if="band" class="trend-band">{{ band }}</span>
     </p>
 
+    <div v-if="$slots.chart" class="trend-slot"><slot name="chart" /></div>
     <VChart
-      v-if="shownOption"
+      v-else-if="shownOption"
       class="trend-chart"
       :key="CHART_THEME"
       :theme="CHART_THEME"
@@ -167,59 +174,68 @@ const shownOption = useQueuedOption(option);
     <p v-else class="trend-empty">{{ emptyMessage }}</p>
 
 
-    <dl v-if="stats.length" class="trend-stats">
+    <dl v-if="stats.length && !hideStats" class="trend-stats">
       <div v-for="row in stats" :key="row.label">
         <dt>{{ row.label }}</dt>
         <dd>{{ row.value }}<i v-if="unit">{{ unit }}</i></dd>
       </div>
     </dl>
+    <!-- 没有统计也占住第四行：subgrid 要求每张卡的行数一样。 -->
+    <span v-else class="trend-stats-empty" aria-hidden="true"></span>
   </section>
 </template>
 
 <style scoped>
 /* 和概览卡同一种有厚度的板：不描边，边界靠顶边高光、底边暗线和投影。 */
 .trend-card {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  /* 在 .trend-grid 里：四块各占父网格的一行（subgrid），同一行的卡互相对齐；
+     单独放在别处时退回普通的四行网格。 */
+  grid-row: span 4;
+  grid-template-rows: subgrid;
+  row-gap: var(--space-2);
+  align-content: start;
   min-width: 0;
   padding: 18px 18px 16px;
   border-radius: var(--radius-lg);
   background: var(--mat-card);
   box-shadow: var(--mat-rim), var(--mat-shadow);
 }
-.trend-head { display: flex; min-height: 70px; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
-.trend-title { display: grid; gap: 2px; min-width: 0; }
-.trend-title strong { color: var(--ink); font-size: var(--fs-md); font-weight: 700; }
-.trend-title small { color: var(--subtle); font-size: var(--fs-xs); }
-.trend-latest { display: flex; align-items: baseline; gap: 4px; white-space: nowrap; }
-.trend-latest strong { font-family: var(--font-mono); font-size: 24px; font-variant-numeric: tabular-nums; }
-.trend-latest small { color: var(--subtle); font-size: var(--fs-xs); }
-.trend-latest-tag { color: var(--subtle); font-size: var(--fs-xs); font-style: normal; }
+.trend-head { display: grid; align-content: start; gap: 4px; min-width: 0; }
+.trend-title { min-width: 0; color: var(--ink); font-size: var(--fs-md); font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.trend-latest { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; min-width: 0; }
+.trend-latest :deep(strong), .trend-latest strong { font-family: var(--font-mono); font-size: 26px; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.trend-latest :deep(small), .trend-latest small { color: var(--subtle); font-size: var(--fs-xs); }
+.trend-latest :deep(small + strong) { margin-left: 8px; }
+.trend-latest-tag { margin-right: 2px; color: var(--subtle); font-size: var(--fs-xs); font-style: normal; }
+.trend-hint { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.45; }
 .trend-meta {
   display: flex;
   flex-wrap: wrap;
+  align-content: start;
   gap: var(--space-1) var(--space-3);
-  margin: var(--space-2) 0 0;
+  margin: 0;
   color: var(--subtle);
   font-size: var(--fs-xs);
-  min-height: 38px;
 }
 .trend-date { font-variant-numeric: tabular-nums; }
 .trend-band { color: var(--muted); }
-.trend-chart { width: 100%; height: 132px; margin-top: var(--space-2); }
+.trend-chart, .trend-slot { width: 100%; height: 150px; align-self: end; }
+.trend-slot > :deep(*) { width: 100%; height: 100%; }
 .trend-empty {
   display: flex;
   align-items: center;
-  min-height: 132px;
-  margin: var(--space-2) 0 0;
+  min-height: 150px;
+  margin: 0;
   color: var(--subtle);
   font-size: var(--fs-sm);
 }
 .trend-stats {
   display: flex;
   flex-wrap: wrap;
+  align-self: start;
   gap: var(--space-2) var(--space-4);
-  margin: var(--space-2) 0 0;
+  margin: 0;
   padding-top: var(--space-2);
   border-top: 1px solid var(--line);
 }

@@ -64,46 +64,59 @@ export const pickTheme = (value: ResolvedTheme, origin?: ThemeOrigin) => {
 /** 换主题的动画从哪儿扩散出去（视口坐标，一般是被点的那枚月亮 / 太阳）。 */
 export type ThemeOrigin = { x: number; y: number };
 
-/** 遮罩边缘羽化的宽度，和 material.css 里的渐变保持一致。 */
-const REVEAL_FEATHER = 96;
-
+type ViewTransitionHandle = { ready: Promise<void>; finished: Promise<void>; skipTransition: () => void };
 type ViewTransitionDocument = Document & {
-  startViewTransition?: (update: () => void) => { ready: Promise<void>; finished: Promise<void> };
+  startViewTransition?: (update: () => void) => ViewTransitionHandle;
 };
 
+/** 正在放的那次换主题动画。 */
+let revealing: ViewTransitionHandle | null = null;
+
 /**
- * 换主题：新的一套从按钮的位置像水波一样扩散开，漫过旧的那套——不再整屏硬切。
+ * 换主题：新的一套从按钮的位置扩散开，漫过旧的那套——不再整屏硬切。
  *
- * 用 View Transitions 给整页拍两张快照：旧的垫底不动，新的套一个圆形遮罩，
- * 半径从 0 长到能盖住最远那个角。遮罩边缘带一圈羽化（见 material.css 的
- * `html[data-theme-morph]`），所以是「漫过去」而不是一把剪刀剪过去。
- * 其余带 view-transition-name 的元素（设置卡）在这一刻不单独拍，免得它们各自淡入淡出。
+ * 用 View Transitions 给整页拍两张快照：旧的垫底不动，新的套一个圆形 clip-path，
+ * 半径从 0 长到能盖住最远那个角。
+ *
+ * 以前这里是「径向渐变遮罩 + 动画自定义属性 --reveal-r」，边缘带羽化。那条路每一帧都要在
+ * 主线程上重算样式、把整屏遮罩重新栅格化：4K 屏上一次切换是一串 50–150ms 的长任务，
+ * 连着拨几下，WebView 直接崩成「此页存在问题」。clip-path 圆形不用每帧重画遮罩。
+ *
+ * 过渡期间：
+ *   - 快照层不接指针（material.css 的 `::view-transition { pointer-events: none }`），
+ *     点击照常落到底下的真实页面，不会被动画「硬控」；
+ *   - 上一次还没放完又拨了一下：把上一次直接放到结尾，这一次立刻生效、不再叠一层快照。
  * 不支持或开了减少动效时直接换。
  */
 const revealTheme = (update: () => void, origin?: ThemeOrigin) => {
   const doc = document as ViewTransitionDocument;
   const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  if (revealing) {
+    revealing.skipTransition();
+    revealing = null;
+    update();
+    return;
+  }
   if (!doc.startViewTransition || reduced || !origin) {
     update();
     return;
   }
   const root = document.documentElement;
   const { innerWidth: width, innerHeight: height } = window;
-  const reach = Math.hypot(Math.max(origin.x, width - origin.x), Math.max(origin.y, height - origin.y));
-  root.style.setProperty('--reveal-x', `${Math.round(origin.x)}px`);
-  root.style.setProperty('--reveal-y', `${Math.round(origin.y)}px`);
+  const reach = Math.ceil(Math.hypot(Math.max(origin.x, width - origin.x), Math.max(origin.y, height - origin.y)));
+  const at = `at ${Math.round(origin.x)}px ${Math.round(origin.y)}px`;
   root.dataset.themeMorph = '';
   const transition = doc.startViewTransition(update);
+  revealing = transition;
   void transition.ready.then(() => {
     root.animate(
-      { '--reveal-r': ['0px', `${Math.ceil(reach + REVEAL_FEATHER)}px`] },
-      { duration: 760, easing: 'cubic-bezier(.4, 0, .15, 1)', pseudoElement: '::view-transition-new(root)', fill: 'forwards' },
+      { clipPath: [`circle(0px ${at})`, `circle(${reach}px ${at})`] },
+      { duration: 520, easing: 'cubic-bezier(.4, 0, .2, 1)', pseudoElement: '::view-transition-new(root)' },
     );
   }).catch(() => undefined);
   void transition.finished.catch(() => undefined).finally(() => {
+    if (revealing === transition) revealing = null;
     delete root.dataset.themeMorph;
-    root.style.removeProperty('--reveal-x');
-    root.style.removeProperty('--reveal-y');
   });
 };
 

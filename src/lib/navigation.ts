@@ -41,7 +41,8 @@ export const cardCloseDestination = (back: string | null): BackDestination => {
 /** 三个主入口在导航胶囊里的顺序；横向切页的方向按它算。 */
 export const TAB_ORDER = ['/', '/ai', '/settings'] as const;
 
-export type PageMotion = 'forward' | 'back' | 'left' | 'right' | 'none';
+/** expand / collapse：从某张卡展开成详情页、返回时缩回那张卡（composables/usePageMorph.ts）。 */
+export type PageMotion = 'forward' | 'back' | 'left' | 'right' | 'expand' | 'collapse' | 'none';
 
 const isTabRoot = (path: string) => (TAB_ORDER as readonly string[]).includes(path);
 

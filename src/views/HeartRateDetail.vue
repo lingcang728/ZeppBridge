@@ -16,6 +16,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { HR_GAP_BREAK_MS, insertNullBreaks } from '../lib/chartGaps';
 import { createLoadSeq } from '../lib/loadSeq';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
+import { trendGridStyle } from '../lib/trendGrid';
 import { useQueuedOption } from '../composables/useQueuedOption';
 import SectionGroup from '../components/SectionGroup.vue';
 import PageHeader from '../components/PageHeader.vue';
@@ -376,7 +377,7 @@ const trendsSummary = computed(() => trendCards.value.map((card) => card.label).
           <p v-if="trendsError" class="inline-alert" role="alert">
             <Icon name="warning" :size="14" />{{ trendsError }}
           </p>
-          <div class="card-grid">
+          <div class="trend-grid" :style="trendGridStyle(trendCards.length)">
             <MetricTrendCard
               v-for="card in trendCards"
               :key="card.metric"

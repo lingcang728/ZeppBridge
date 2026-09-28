@@ -7,6 +7,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { CHART_THEME, VChart } from '../lib/echartsSetup';
 import { createLoadSeq } from '../lib/loadSeq';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
+import { trendGridStyle } from '../lib/trendGrid';
 import SectionGroup from '../components/SectionGroup.vue';
 import PageHeader from '../components/PageHeader.vue';
 import CoverageNotice from '../components/CoverageNotice.vue';
@@ -131,7 +132,7 @@ const groups = computed(() => ({
       <button v-if="isDesktop()" class="button button-secondary retry" type="button" @click="() => load()">{{ t.retry }}</button>
     </div>
 
-    <div v-if="initialLoading" class="card-grid" aria-live="polite" :aria-label="t.loadingAria">
+    <div v-if="initialLoading" class="trend-grid" aria-live="polite" :aria-label="t.loadingAria">
       <SkeletonBlock v-for="index in 6" :key="index" height="268px" />
     </div>
     <template v-else>
@@ -183,7 +184,7 @@ const groups = computed(() => ({
 
       <!-- 生命体征、体重体成分、饮食摄入三组直接摊开：点进这一页就是来看它们的。 -->
       <SectionGroup :title="groups.vitals.title" :summary="groups.vitals.summary" icon="recovery" tone="heart">
-          <div class="card-grid">
+          <div class="trend-grid" :style="trendGridStyle(vitalsCards.length)">
             <MetricTrendCard
               v-for="card in vitalsCards"
               :key="card.metric"
@@ -202,7 +203,7 @@ const groups = computed(() => ({
           <p v-if="!bodyCards.length" class="inline-alert" role="status">
             <Icon name="info" :size="14" />{{ t.bodyGroupEmpty }}
           </p>
-          <div v-else class="card-grid">
+          <div v-else class="trend-grid" :style="trendGridStyle(bodyCards.length)">
             <MetricTrendCard
               v-for="card in bodyCards"
               :key="card.metric"
@@ -246,7 +247,7 @@ const groups = computed(() => ({
               />
               <p class="curve-note">{{ t.macroNote }}</p>
             </section>
-            <div class="card-grid">
+            <div class="trend-grid" :style="trendGridStyle(intakeCards.length)">
               <MetricTrendCard
                 v-for="card in intakeCards"
                 :key="card.metric"

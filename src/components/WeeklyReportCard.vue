@@ -7,6 +7,7 @@
  * 这里不做诊断、治疗或风险预测。
  */
 import { RouterLink } from 'vue-router';
+import { trendGridStyle } from '../lib/trendGrid';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useFirstLoad } from '../composables/useFirstLoad';
 import Icon from './Icon.vue';
@@ -275,7 +276,7 @@ function formatNumber(fact: InsightFact, value: number): string {
     <p v-else-if="!facts.length" class="weekly-note">{{ t.nothingComparable }}</p>
 
     <template v-else>
-      <div class="weekly-grid">
+      <div class="weekly-grid" :style="trendGridStyle(facts.length)">
         <RouterLink v-for="fact in facts" :key="fact.fact_id" class="weekly-item" :to="detailRoute(fact.fact_id)">
           <span class="weekly-label">{{ metricLabel(fact.fact_id, fact.metric) }}</span>
           <strong>{{ formatValue(fact) }}</strong>
@@ -333,7 +334,10 @@ function formatNumber(fact: InsightFact, value: number): string {
 
 /* 每格里现在有「上一个 28 天」这种长标签加进度条，210px 一行挤六个放不下，
    标签会顶到进度条上。加宽下限，常见窗口宽度下自然落成五列。 */
-.weekly-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 10px; align-items: stretch; }
+/* 一行几格按张数挑（7 格排成 4 + 3），最后一行的格子拉宽把行铺满——以前 auto-fit 排成 5 + 2，
+   第二行右边空出三格宽的一大块。 */
+.weekly-grid { --cols: 4; display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; }
+.weekly-grid > .weekly-item { flex: 1 1 calc((100% - (var(--cols) - 1) * 10px) / var(--cols)); min-width: min(100%, 220px); }
 /* 每一项是一块凸起的小板（以前是凹下去的平面磁贴）：亮一点的底、顶边高光、柔和投影，
    悬停时浮起来一点。 */
 .weekly-item { display: grid; gap: 2px; color: inherit; text-decoration: none; align-content: start; padding: 12px 14px; border-radius: 20px;

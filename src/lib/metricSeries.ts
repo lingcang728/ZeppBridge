@@ -158,10 +158,14 @@ const hexToRgba = (hex: string, alpha: number): string => {
  * recorded by hand should pass `calendarAxis: true`.
  */
 /**
- * 趋势图换数据（切范围、同步来了新数据）时的更新方式：合并而不是整张重建，
- * 系列按顺序替换——ECharts 于是把旧线形平滑变成新线形，不会先清空再从左边画一遍。
+ * 趋势图换数据（切范围、同步来了新数据）时的更新方式：整张换，新线从左往右重新画一遍。
+ *
+ * 以前是合并更新，让 ECharts 把旧线形「变」成新线形。可 7 天、1 个月、6 个月的点数
+ * 不一样，ECharts 按下标对点：多出来的点从两头长出来、少掉的点缩回去，变的那半秒里
+ * 线的左右两端各缺一截，看着像画坏了。重画一遍反而干净，而且每张图是排队一帧一张
+ * 换的（useQueuedOption），整页像一道波扫过去。
  */
-export const SMOOTH_CHART_UPDATE = { notMerge: false, replaceMerge: ['series'] };
+export const SMOOTH_CHART_UPDATE = { notMerge: true };
 
 export const buildSeriesOption = (
   series: MetricSeries,
@@ -198,12 +202,14 @@ export const buildSeriesOption = (
   });
 
   return {
-    animationDuration: 600,
-    // 切 7 天 / 1 个月 / 6 个月：线从旧形状平滑过渡到新形状，而不是整张图清空重画
-    // （MetricTrendCard 用合并模式更新，见 SMOOTH_CHART_UPDATE）。
-    animationDurationUpdate: 520,
+    // 切范围时整张重画（见 SMOOTH_CHART_UPDATE）：线从左往右扫出来。
+    animationDuration: 560,
+    animationEasing: 'cubicOut' as const,
+    animationDurationUpdate: 360,
     animationEasingUpdate: 'cubicInOut' as const,
-    grid: { left: 42, right: 14, top: 16, bottom: 26 },
+    // 右边留够半个日期标签的宽度：最后一个日期居中在最右那一点上，留 14px 时「28/09」会被
+    // 画布裁成「28/0」。（不用 alignMaxLabel 贴边：贴边以后会和前一个标签叠在一起。）
+    grid: { left: 42, right: 24, top: 16, bottom: 26 },
     tooltip: {
       trigger: 'axis',
       formatter: (params: Array<{ axisValue: string }>) => {

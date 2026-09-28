@@ -125,30 +125,37 @@ a { color: inherit; }
 }
 /* 离场页面绝对定位时相对这一层，而不是相对整个滚动区——否则会盖到顶栏上。 */
 .page-host { position: relative; min-width: 0; }
-/* 切页：新旧两页同时在场，旧页退进景深（缩小、变糊、淡出），新页从另一层浮上来。
-   方向由 App.vue 的 pageMotion 决定：forward = 聚焦进详情，back = 退出来，
-   left / right = 换入口时跟着导航胶囊的方向横移。只动 transform / opacity / filter。 */
+/* 切页：新旧两页同时在场。方向由 AppShell.vue 的 pageMotion / usePageMorph 决定：
+   expand / collapse = 从一张卡长成整页、返回时缩回那张卡（几何由 JS 动，这里只管层次和
+   退场时长）；forward / back = 没有来处的进出；left / right = 换入口时跟着导航胶囊横移。
+   只动 transform / opacity——不加 filter：整屏 blur 在 4K 高分屏上每帧都要重画，两页叠着
+   变糊的那几帧整个窗口发暗，就是「一拖顶栏换页整个界面闪一下」。 */
 [class*='page-'][class*='-enter-active'] {
-  transition: opacity 340ms var(--ease-out), transform 460ms var(--ease-out), filter 380ms var(--ease-out);
+  transition: opacity 240ms ease, transform 380ms var(--ease-out);
 }
 [class*='page-'][class*='-leave-active'] {
   position: absolute;
   inset: 0 auto auto 0;
   width: 100%;
   pointer-events: none;
-  transition: opacity 220ms ease, transform 320ms var(--ease-out), filter 260ms ease;
+  transition: opacity 150ms ease;
 }
-.page-forward-enter-from { opacity: 0; transform: scale(.965) translateY(10px); filter: blur(4px); }
-.page-forward-leave-to { opacity: 0; transform: scale(1.025); filter: blur(4px); }
-.page-back-enter-from { opacity: 0; transform: scale(1.025); filter: blur(4px); }
-.page-back-leave-to { opacity: 0; transform: scale(.965) translateY(10px); filter: blur(4px); }
-/* 换入口（横向）：不模糊，旧页很快让开。以前两页各带 8–10px 模糊、交叠 300ms，交给 AI
-   那一页满屏的绿色节点和按钮一糊开，整个窗口就像闪了一下绿光。 */
-.page-left-enter-from { opacity: 0; transform: translateX(28px); }
-.page-left-leave-to { opacity: 0; transform: translateX(-28px); }
-.page-right-enter-from { opacity: 0; transform: translateX(-28px); }
-.page-right-leave-to { opacity: 0; transform: translateX(28px); }
-[class*='page-'].page-left-leave-active, [class*='page-'].page-right-leave-active { transition: opacity 140ms ease, transform 240ms var(--ease-out); }
+/* 旧页只淡出、不位移：两页各往一个方向走，交叠那一下就是一屏重影。 */
+.page-forward-enter-from { opacity: 0; transform: translateY(14px); }
+.page-back-enter-from { opacity: 0; transform: translateY(-10px); }
+.page-left-enter-from { opacity: 0; transform: translateX(24px); }
+.page-right-enter-from { opacity: 0; transform: translateX(-24px); }
+.page-forward-leave-to, .page-back-leave-to, .page-left-leave-to, .page-right-leave-to { opacity: 0; }
+/* 展开：新页压在旧页上面长出来（旧页是绝对定位的，不抬 z-index 会盖住新页）；旧页等新页
+   铺开大半再淡掉。enter-active 的那条过渡只是占位，让层次保持到 JS 的形变放完。 */
+[class*='page-'].page-expand-enter-active { position: relative; z-index: 2; transition: opacity 540ms linear; }
+.page-expand-enter-from { opacity: .999; }
+[class*='page-'].page-expand-leave-active { z-index: 1; transition: opacity 260ms ease 240ms; }
+.page-expand-leave-to { opacity: 0; }
+/* 收回：来处那一页原样就在底下，离场的详情页浮在上面缩回那张卡（usePageMorph.onLeave）。 */
+[class*='page-'].page-collapse-enter-active { transition: none; }
+[class*='page-'].page-collapse-leave-active { z-index: 2; transition: opacity 580ms linear; }
+.page-collapse-leave-to { opacity: .999; }
 .page-none-enter-from, .page-none-leave-to { opacity: 0; }
 .page-host > * { transform-origin: 50% 30vh; }
 /* 返回时，当初点进去的那张卡亮一下（lib/returnScroll.ts），告诉人「你是从这儿走的」。 */

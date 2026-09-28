@@ -5,20 +5,19 @@
 /* coverflow 在剩下的高度里垂直居中：卡组是这一页的主角，不该缩在顶上留一大片空。 */
 .deck-mode-cover .deck-overview { display: grid; min-height: calc(100vh - 260px); align-content: center; }
 
-/* 往后退一层：绕顶边中点缩小、按深度变糊、往下渐隐（useDeckMorph 关卡时按这个原点把
-   缩放算回去）。不再淡到全透明、也不再收起高度：卡是从这一层里抽出来的，这一层就该还
-   在后面——以前「退没了」看起来模糊是假的，关卡时高度一撑开还会闪一下。
-   模糊只在过渡时动一次，静止后不再重绘。 */
+/* 往后退一层：绕顶边中点缩小、往下渐隐（useDeckMorph 关卡时按这个原点把缩放算回去）。
+   不再淡到全透明、也不再收起高度：卡是从这一层里抽出来的，这一层就该还在后面。
+   也不再加模糊：整层卡组 blur(9px) 在 4K 高分屏上每帧都要重画，关卡时总览从模糊里浮回来
+   那半秒掉帧，大卡的收回动画跟着只剩两三帧，看上去就是「点返回凭空消失」。 */
 .deck-overview {
   position: relative;
   z-index: 0;
   transform-origin: 50% 0;
-  transition: opacity .36s ease, transform .52s var(--ease-out), filter .36s ease;
+  transition: opacity .4s ease, transform .52s var(--ease-out);
 }
 .deck-overview.is-receded {
-  opacity: .55;
+  opacity: .4;
   transform: scale(.93);
-  filter: blur(9px) saturate(.85);
   pointer-events: none;
 }
 
