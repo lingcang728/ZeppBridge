@@ -11,6 +11,7 @@ import SegmentTrack from './components/SegmentTrack.vue';
 import { useSyncController } from './composables/useSyncController';
 import { useUiScale } from './composables/useUiScale';
 import { backend, isDesktop, whenBackendReady } from './lib/bridge';
+import { isLandingMode } from './lib/landingMode';
 import { checkForDesktopUpdate } from './services/updateService';
 import { defineMessages, locale, useMessages } from './i18n';
 
@@ -88,7 +89,7 @@ const backendReady = ref(!desktopRuntime);
 // 静态 import 会把它连同两份文案一起塞进桌面应用的首屏 chunk。懒加载后
 // 桌面端根本不会下载它。
 const LandingPage = defineAsyncComponent(() => import('./views/LandingPage.vue'));
-const showLanding = !desktopRuntime && !new URLSearchParams(window.location.search).has('app-preview');
+const showLanding = isLandingMode();
 if (desktopRuntime) {
   void getVersion()
     .then((version) => {

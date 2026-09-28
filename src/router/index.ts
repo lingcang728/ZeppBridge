@@ -1,4 +1,5 @@
-import { createRouter, createWebHistory } from 'vue-router';
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
+import { isLandingMode } from '../lib/landingMode';
 import { installReturnScroll } from '../lib/returnScroll';
 
 /*
@@ -90,9 +91,18 @@ const routes = [
   },
 ];
 
+/*
+ * 落地页不渲染 <RouterView>，可路由器启动时照样会把当前地址对应的页面 chunk 解析下来：
+ * 浏览器访客因此白下 Overview 那一整串（18 个 chunk，约 140 KB JS + 32 KB CSS）。
+ * 落地模式只挂一条什么都不画的路由，页面 chunk 一个都不碰。
+ */
+const LANDING_ROUTES: RouteRecordRaw[] = [
+  { path: '/:pathMatch(.*)*', component: { render: () => null } },
+];
+
 const router = createRouter({
   history: createWebHistory(),
-  routes,
+  routes: isLandingMode() ? LANDING_ROUTES : routes,
   scrollBehavior() {
     return { top: 0 };
   },

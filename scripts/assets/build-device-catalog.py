@@ -843,14 +843,16 @@ def write_asset(
         preserve_alpha=preserve_alpha,
     )
     webp_path = ASSET_DIR / f"{key}.webp"
-    thumb_path = ASSET_DIR / f"{key}-thumb.png"
+    thumb_path = ASSET_DIR / f"{key}-thumb.webp"
     # ``exact=True`` is important for transparent RGB: without it libwebp can
     # bleed source-white/gray colours into alpha-zero pixels on decode, which
     # reappears as bars in some GPU/viewer paths.
     image.save(webp_path, "WEBP", lossless=True, method=6, exact=True)
     thumb = image.copy()
     thumb.thumbnail((240, 240), Image.Resampling.LANCZOS)
-    thumb.save(thumb_path, "PNG", optimize=True)
+    # 缩略图只给落地页的设备跑马灯用（72 px 显示）。有损 WebP q90 + 无损 alpha：比
+    # 优化过的 PNG 小四分之三（52 张 2.2 MB → 0.6 MB），在 72 px 上看不出差别。
+    thumb.save(thumb_path, "WEBP", quality=90, alpha_quality=100, method=6, exact=True)
     digest = hashlib.sha256(webp_path.read_bytes()).hexdigest().upper()
     return f"sha256:{digest}"
 

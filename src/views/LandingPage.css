@@ -11,6 +11,9 @@
 .nav-actions { display: inline-flex; align-items: center; gap: 10px; }
 .lang-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px 7px 8px; border: 1px solid var(--site-line); border-radius: 11px; background: rgba(255,255,255,.02); color: #9ca892; font: inherit; font-size: var(--fs-sm); font-weight: 700; white-space: nowrap; cursor: pointer; }
 .lang-toggle:hover { color: #d6e99e; border-color: rgba(185,220,112,.5); }
+/* 英文页上这颗按钮的「中文」是整页唯一的汉字：为两个字去下 160 KB 的 MiSans 中文切片
+   不值得，交给系统中文字体。中文页本来就要下切片，照常用 MiSans。 */
+html[lang="en"] .lang-toggle { font-family: "Segoe UI", "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", system-ui, sans-serif; }
 .nav-github { display: inline-flex; align-items: center; gap: 7px; padding: 8px 12px 8px 10px; border: 1px solid rgba(185,220,112,.28); border-radius: 11px; background: rgba(185,220,112,.07); color: #dce7cb; font-size: var(--fs-sm); font-weight: 700; text-decoration: none; white-space: nowrap; }
 .nav-github svg { width: 17px; height: 17px; fill: none; stroke: #b9dc70; stroke-width: 1.65; stroke-linejoin: round; }
 main, footer { position: relative; z-index: 1; }

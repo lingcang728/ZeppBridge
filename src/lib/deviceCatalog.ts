@@ -42,12 +42,13 @@ export const deviceCatalog: readonly DeviceCatalogEntry[] = document.devices;
  * image pair in this directory; there is no 48-item hand-maintained import
  * list to drift out of sync.
  */
-const imageModules = import.meta.glob('../assets/devices/*.webp', {
+// 缩略图也是 .webp（`*-thumb.webp`，只给落地页的跑马灯用），要从产品图里排除掉。
+const imageModules = import.meta.glob(['../assets/devices/*.webp', '!../assets/devices/*-thumb.webp'], {
   eager: true,
   import: 'default',
   query: '?url',
 }) as Record<string, string>;
-const thumbnailModules = import.meta.glob('../assets/devices/*-thumb.png', {
+const thumbnailModules = import.meta.glob('../assets/devices/*-thumb.webp', {
   eager: true,
   import: 'default',
   query: '?url',
@@ -92,7 +93,7 @@ export const localDeviceAssets: Readonly<Record<string, string>> = Object.freeze
 export const localDeviceThumbnails: Readonly<Record<string, string>> = Object.freeze(
   Object.fromEntries(
     Object.entries(thumbnailModules)
-      .map(([path, source]) => [keyFromPath(path, '-thumb\\.png'), runtimeAssetUrl(source)] as const)
+      .map(([path, source]) => [keyFromPath(path, '-thumb\\.webp'), runtimeAssetUrl(source)] as const)
       .filter((entry): entry is readonly [string, string] => Boolean(entry[0])),
   ),
 );
