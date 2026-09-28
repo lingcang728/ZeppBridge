@@ -93,7 +93,7 @@ const share = (count: number, total: number) => (total > 0 ? `${(count / total) 
   </section>
 </template>
 
-<style scoped src="../../views/settings/settings-base.css"></style>
+<style scoped src="../../views/settings/settings-local.css"></style>
 <style scoped>
 .ledger-progress { position: relative; height: 8px; overflow: hidden; border-radius: 999px; }
 .ledger-progress i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: linear-gradient(90deg, var(--accent), var(--accent-hover)); transition: width var(--dur-slow) var(--ease-out); }

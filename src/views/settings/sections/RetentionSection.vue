@@ -57,7 +57,7 @@ const RETENTION_CHOICES = computed(() =>
   </section>
 </template>
 
-<style scoped src="../settings-base.css"></style>
+<style scoped src="../settings-local.css"></style>
 <style scoped>
 .is-block { gap: 8px; }
 .is-block p { margin: 0; }

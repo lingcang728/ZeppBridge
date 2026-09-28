@@ -71,7 +71,7 @@ const regionHost = computed(() => appStatus.value?.region_host || t.value.notPro
   </section>
 </template>
 
-<style scoped src="../settings-base.css"></style>
+<style scoped src="../settings-local.css"></style>
 <style scoped>
 .account-avatar {
   display: grid;

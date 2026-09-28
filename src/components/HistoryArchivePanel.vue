@@ -149,7 +149,7 @@ const {
   </div>
 </template>
 
-<style scoped src="../views/settings/settings-base.css"></style>
+<style scoped src="../views/settings/settings-local.css"></style>
 <style scoped>
 .archive-panel { display: grid; gap: 22px; min-width: 0; }
 .archive-panel > .s-section + .s-section { margin-top: 0; }

@@ -77,7 +77,7 @@ onMounted(() => { void loadCorrections(); });
   </section>
 </template>
 
-<style scoped src="../settings-base.css"></style>
+<style scoped src="../settings-local.css"></style>
 <style scoped>
 .code-list { display: grid; gap: 10px; }
 .code-row { display: grid; gap: 10px; padding: 12px 14px; border: 1px solid var(--mat-line); border-radius: var(--radius-md); background: color-mix(in srgb, var(--ink) 2.5%, transparent); }

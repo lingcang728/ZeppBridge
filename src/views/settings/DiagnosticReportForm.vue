@@ -49,4 +49,9 @@ const categoryHint = computed(() => reportCategories.value.find((item) => item.v
   <p v-if="form.error" class="api-error" role="alert">{{ form.error }}</p>
 </template>
 
-<style scoped src="./settings-base.css"></style>
+<style scoped src="./settings-local.css"></style>
+<style scoped>
+/* 要压过 SegmentTrack 自己的 overflow: hidden，所以留在组件的作用域里，别挪进全局的
+   settings-base.css——那里的规则没有作用域属性，优先级低一档。 */
+.report-kind { justify-self: start; max-width: 100%; overflow-x: auto; }
+</style>

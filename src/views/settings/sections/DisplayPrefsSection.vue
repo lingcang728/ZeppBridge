@@ -125,7 +125,7 @@ const chooseTheme = (value: string | number) => {
   </div>
 </template>
 
-<style scoped src="../settings-base.css"></style>
+<style scoped src="../settings-local.css"></style>
 <style scoped>
 .display-prefs { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; }
 .display-prefs > .s-section + .s-section { margin-top: 0; }

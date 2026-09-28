@@ -86,7 +86,7 @@ onMounted(() => { void loadLocalApiStatus(); });
   </div>
 </template>
 
-<style scoped src="../settings-base.css"></style>
+<style scoped src="../settings-local.css"></style>
 <style scoped>
 .api-icon { display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; border-radius: 10px; background: var(--accent-soft); color: var(--accent); }
 .api-code { flex: 1 1 auto; min-width: 0; overflow: hidden; color: var(--ink); font-size: var(--fs-xs); text-overflow: ellipsis; white-space: nowrap; }

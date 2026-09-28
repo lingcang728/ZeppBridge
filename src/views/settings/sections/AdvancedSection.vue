@@ -124,7 +124,7 @@ const openDataFolder = async () => {
   </div>
 </template>
 
-<style scoped src="../settings-base.css"></style>
+<style scoped src="../settings-local.css"></style>
 <style scoped>
 .advanced { display: grid; gap: 22px; min-width: 0; }
 .advanced > .s-section + .s-section { margin-top: 0; }

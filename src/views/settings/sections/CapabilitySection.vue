@@ -76,7 +76,7 @@ const {
   </section>
 </template>
 
-<style scoped src="../settings-base.css"></style>
+<style scoped src="../settings-local.css"></style>
 <style scoped>
 .capability-board { display: grid; gap: var(--space-3); }
 .capability-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; color: var(--muted); font-size: var(--fs-sm); }

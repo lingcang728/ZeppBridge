@@ -161,7 +161,8 @@ const installUpdate = async () => {
   </section>
 </template>
 
-<style scoped src="../settings-base.css"></style>
+<style scoped src="../settings-local.css"></style>
+<style scoped src="../settings-modal.css"></style>
 <style scoped>
 .build-stamp { font-family: var(--font-mono); }
 .update-state .s-row-title::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: var(--muted); vertical-align: middle; }

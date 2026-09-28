@@ -137,7 +137,7 @@ onMounted(() => { void loadDevices(); });
   </section>
 </template>
 
-<style scoped src="../settings-base.css"></style>
+<style scoped src="../settings-local.css"></style>
 <style scoped>
 .compact-btn { min-height: 30px; padding: 4px 12px; font-size: var(--fs-xs); }
 .device-row { color: inherit; text-decoration: none; transition: background var(--dur-fast) ease; }

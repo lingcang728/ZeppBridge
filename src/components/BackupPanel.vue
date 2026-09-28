@@ -128,7 +128,7 @@ const {
   </div>
 </template>
 
-<style scoped src="../views/settings/settings-base.css"></style>
+<style scoped src="../views/settings/settings-local.css"></style>
 <style scoped>
 .backup-panel { display: grid; gap: 10px; min-width: 0; }
 .compare { padding: 10px 12px; border-left: 2px solid var(--mat-line-hover); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: color-mix(in srgb, var(--ink) 2.5%, transparent); }

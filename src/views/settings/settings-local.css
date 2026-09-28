@@ -1,0 +1,14 @@
+/* 设置区块里用到的通用类名（`.alert`、`code`、`h3`……）。它们和别的页面撞名，
+ * 所以仍然按组件 scoped 引入；量很小，重复几份无妨。区块共用的 `s-*` 基元在
+ * settings-base.css（全局、只加载一次）。 */
+h3 { margin-top: 0; }
+
+.api-error { margin: 0; color: var(--danger); font-size: var(--fs-sm); line-height: 1.5; }
+.hint-line { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: var(--muted); font-size: var(--fs-sm); }
+.hint-line.ok { color: var(--accent); }
+code { color: var(--muted); font-family: var(--font-mono); font-size: var(--fs-sm); }
+
+.alert { display: flex; align-items: flex-start; gap: 7px; padding: 9px 12px; border: 1px solid var(--mat-line); border-radius: var(--radius-sm); background: var(--mat-inset); color: var(--muted); font-size: var(--fs-sm); }
+.alert.success { color: var(--accent); }
+.alert.danger { color: var(--danger); }
+.alert.warning { color: var(--warning); }

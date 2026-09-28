@@ -59,4 +59,4 @@ const intervalItems = computed(() => AUTO_SYNC_INTERVALS.map((minutes) => ({ val
   </section>
 </template>
 
-<style scoped src="../settings-base.css"></style>
+<style scoped src="../settings-local.css"></style>

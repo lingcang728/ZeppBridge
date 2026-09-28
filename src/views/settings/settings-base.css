@@ -1,15 +1,17 @@
-/* 设置卡叠里各区块共用的排版基元。
+/* 设置卡叠里各区块共用的排版基元。**全局样式，只加载一次**（由 Settings.vue 引入）。
  *
- * 每个区块组件用 `<style scoped src>` 引一份（不会漏进子组件）。按钮、开关、卡片材质
- * 用全局的 styles/material.css，这里不再重复。
+ * 以前 18 个区块组件各自 `<style scoped src>` 引一份，每份被编译成带不同作用域哈希
+ * 的一套，Settings 的 CSS 147 KB 里有 137 KB 是它的重复。这里只放类名自带 `s-` /
+ * `state-dot` / `diagnostic-` 前缀、全应用不会撞名的规则；`.alert`、`code`、`h3` 这类
+ * 通用名字仍按组件 scoped，见 settings-local.css 与 settings-modal.css。
+ *
+ * 优先级比以前低一档（没有作用域属性），组件自己的 scoped 覆盖规则因此总是赢。
  *
  *   .s-section         一个区块：小标题 + 一组列表
  *   .s-section-head    小标题行（右侧可放一个次要操作）
  *   .s-list            一组行，外面一层浅底，行与行之间一条细线
  *   .s-row             一行：左边标签（主标题 + 一行说明），右边控件
  *   .s-note            列表下面的一句补充说明 */
-h2, h3, p { margin-top: 0; }
-
 .s-section { display: grid; gap: 10px; min-width: 0; }
 .s-section + .s-section { margin-top: 22px; }
 .s-section-head { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 12px; padding: 0 4px; }
@@ -63,7 +65,6 @@ h2, h3, p { margin-top: 0; }
 .s-fact-icon { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border-radius: 50%; background: var(--cap-thumb); box-shadow: var(--cap-thumb-rim); color: var(--accent); }
 .s-fact p { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.6; }
 .s-fact-actions { display: flex; flex-wrap: wrap; align-self: end; gap: 8px; margin-top: 4px; }
-.report-kind { justify-self: start; max-width: 100%; overflow-x: auto; }
 .s-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .state-dot { display: inline-flex; align-items: center; gap: 6px; color: var(--subtle); font-size: var(--fs-sm); white-space: nowrap; }
@@ -71,16 +72,6 @@ h2, h3, p { margin-top: 0; }
 .state-dot.on { color: var(--accent); }
 .state-dot.warn { color: var(--warning); }
 .state-dot.bad { color: var(--danger); }
-
-.api-error { margin: 0; color: var(--danger); font-size: var(--fs-sm); line-height: 1.5; }
-.hint-line { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: var(--muted); font-size: var(--fs-sm); }
-.hint-line.ok { color: var(--accent); }
-code { color: var(--muted); font-family: var(--font-mono); font-size: var(--fs-sm); }
-
-.alert { display: flex; align-items: flex-start; gap: 7px; padding: 9px 12px; border: 1px solid var(--mat-line); border-radius: var(--radius-sm); background: var(--mat-inset); color: var(--muted); font-size: var(--fs-sm); }
-.alert.success { color: var(--accent); }
-.alert.danger { color: var(--danger); }
-.alert.warning { color: var(--warning); }
 
 /* 诊断报告（设备与隐私两处共用） */
 .diagnostic-panel { display: grid; gap: 8px; padding: 14px 16px; }
@@ -94,18 +85,6 @@ code { color: var(--muted); font-family: var(--font-mono); font-size: var(--fs-s
 .diagnostic-done { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent); border-radius: 10px; background: var(--accent-soft); color: var(--ink); font-size: var(--fs-sm); }
 .diagnostic-done strong { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); }
 .diagnostic-done p { margin: 0; color: var(--muted); font-size: var(--fs-xs); }
-
-/* 弹窗（Teleport 到 body，仍带着区块的作用域） */
-.modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--mat-line); }
-.modal-title-row { display: flex; align-items: center; gap: 8px; }
-.modal-title-row h3 { margin: 0; font-size: var(--fs-xl); line-height: 1.4; }
-.shield-ic { color: var(--accent); }
-.close-btn { display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; }
-.close-btn:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); }
-.modal-body { display: grid; gap: 14px; color: var(--muted); font-size: var(--fs-md); line-height: 1.7; }
-.modal-body p { margin: 0; }
-.modal-body strong { display: block; margin-bottom: 4px; color: var(--ink); font-weight: 600; }
-.modal-foot { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--mat-line); }
 
 @media (max-width: 720px) {
   .s-row { flex-wrap: wrap; }

@@ -83,7 +83,7 @@ const copyMcpConfig = () => copy(mcpConfigExample.value, t.value.mcpConfigCopied
   </section>
 </template>
 
-<style scoped src="../settings-base.css"></style>
+<style scoped src="../settings-local.css"></style>
 <style scoped>
 .prompt-fold > summary { color: var(--accent); font-size: var(--fs-sm); cursor: pointer; }
 .mcp-config { max-height: 220px; margin: 10px 0 0; padding: 12px 14px; overflow: auto; border-radius: var(--radius-sm); background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); color: var(--ink); font-family: var(--font-mono); font-size: var(--fs-xs); line-height: 1.7; white-space: pre-wrap; }

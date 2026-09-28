@@ -128,7 +128,7 @@ const onExportFormatChange = (value: string | number) => {
   </section>
 </template>
 
-<style scoped src="../settings-base.css"></style>
+<style scoped src="../settings-local.css"></style>
 <style scoped>
 .s-row-stack { flex-wrap: wrap; }
 .name-preview { display: flex; flex: 1 1 100%; min-width: 0; gap: 8px; margin: 2px 0 0; color: var(--subtle); font-size: var(--fs-xs); }

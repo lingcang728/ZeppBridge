@@ -211,6 +211,8 @@ onUnmounted(() => {
   </section>
 </template>
 
+<!-- 各区块共用的 s-* 排版基元：全局、随设置页 chunk 加载一次（见文件头注释）。 -->
+<style src="./settings/settings-base.css"></style>
 <style scoped>
 /* 行宽收在 1000px 以内：设置是一行一行的「标签 — 控件」，拉满 1400px 时标签和
    控件隔着半个屏幕，就是之前那种「留白过多」。 */

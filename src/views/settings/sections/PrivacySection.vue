@@ -85,7 +85,8 @@ onMounted(() => {
   </section>
 </template>
 
-<style scoped src="../settings-base.css"></style>
+<style scoped src="../settings-local.css"></style>
+<style scoped src="../settings-modal.css"></style>
 <style scoped>
 .privacy { display: grid; gap: 22px; }
 .privacy > .s-section + .s-section { margin-top: 0; }

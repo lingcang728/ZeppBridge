@@ -96,7 +96,7 @@ const needsAttention = computed(() =>
   </section>
 </template>
 
-<style scoped src="../settings-base.css"></style>
+<style scoped src="../settings-local.css"></style>
 <style scoped>
 .auth-fold > summary { cursor: pointer; list-style: none; }
 .auth-fold > summary::-webkit-details-marker { display: none; }
