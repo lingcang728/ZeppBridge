@@ -478,7 +478,7 @@ re-rendered blurred snapshots, which stuttered on collapse.)
 ## Maintaining this document
 
 Page structure follows `src/router/index.ts` and the `navigation` array in
-`src/App.vue`; design tokens follow `src/styles/tokens.css`. Update this
+`src/AppShell.vue`; design tokens follow `src/styles/tokens.css`. Update this
 page when you change navigation, the palette or theme state. **Where it
 conflicts with the source, the source wins** — and fix this page while you are
 there. Engineering gates are in the [development guide](development.md); product

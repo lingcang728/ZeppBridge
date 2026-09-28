@@ -171,7 +171,7 @@ API 只绑定 `127.0.0.1`、不提供 CORS、响应 `Cache-Control: no-store`，
 - 页面通过 `tauriApi` / `backend` 调用 command，不直接访问 Zepp。
 - 空值显示 `—`、`未记录` 或明确的空状态；不要把缺失数据变成 `0`。
 - 时间格式化前检查 `Date.getTime()`；错误应保留可操作信息，不要静默吞掉字符串。
-- 使用 `App.vue` `:root` 里的设计 token（唯一来源，界面统一深色，不做浅色分支）、`focus-visible`、语义元素、ARIA 和最小 44px 触控区域；移动端断点目前以 760px 为主。详见 [UI 约束](ui-guidelines.zh-CN.md)。
+- 使用 `src/styles/tokens.css` 里的设计 token（唯一来源，深浅两套各一份值，组件不按主题分支）、`focus-visible`、语义元素、ARIA 和最小 44px 触控区域；移动端断点目前以 760px 为主。详见 [UI 约束](ui-guidelines.zh-CN.md)。
 - `index.html` 的语言为 `zh-CN`，标题为 `ZeppBridge · 健康数据`；当前没有把默认 Vite 图标当成产品 favicon 的验收证据。
 
 ## 推荐验收顺序

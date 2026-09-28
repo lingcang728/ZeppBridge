@@ -336,10 +336,15 @@ jobs:
   package:
     name: Package Windows installers
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     # Build installers for release tags or explicit manual dispatch only.
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     needs: verify
+    # 正式安装包开整程序 LTO：Windows 实测 exe 35 → 24 MB。本机测试包不开——每次
+    # 增量 release 构建要多等五分钟左右，而那是改一行就要重打一次的循环。
+    env:
+      CARGO_PROFILE_RELEASE_LTO: "true"
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
 
     steps:
       - name: Checkout
@@ -443,10 +448,15 @@ jobs:
   package-macos:
     name: Package macOS bundle
     runs-on: macos-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     # Build installers for release tags or explicit manual dispatch only.
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     needs: verify-macos
+    # 正式安装包开整程序 LTO：Windows 实测 exe 35 → 24 MB。本机测试包不开——每次
+    # 增量 release 构建要多等五分钟左右，而那是改一行就要重打一次的循环。
+    env:
+      CARGO_PROFILE_RELEASE_LTO: "true"
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
 
     steps:
       - name: Checkout
@@ -513,10 +523,15 @@ jobs:
   package-linux:
     name: Package Linux bundles
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     # Build installers for release tags or explicit manual dispatch only.
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     needs: verify-linux
+    # 正式安装包开整程序 LTO：Windows 实测 exe 35 → 24 MB。本机测试包不开——每次
+    # 增量 release 构建要多等五分钟左右，而那是改一行就要重打一次的循环。
+    env:
+      CARGO_PROFILE_RELEASE_LTO: "true"
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
 
     steps:
       - name: Checkout

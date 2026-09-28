@@ -171,7 +171,7 @@
 
 ## 这份文档的维护
 
-页面结构以 `src/router/index.ts` 和 `src/App.vue` 的 `navigation` 为准，设计 token 以 `src/styles/tokens.css` 为准。改导航、改色板、改主题状态时同步改这里；与源码冲突时**以源码为准**，并顺手修正本文。工程门禁见[开发文档](development.zh-CN.md)，产品边界见[架构摘要](../reference/architecture.zh-CN.md)。
+页面结构以 `src/router/index.ts` 和 `src/AppShell.vue` 的 `navigation` 为准，设计 token 以 `src/styles/tokens.css` 为准。改导航、改色板、改主题状态时同步改这里；与源码冲突时**以源码为准**，并顺手修正本文。工程门禁见[开发文档](development.zh-CN.md)，产品边界见[架构摘要](../reference/architecture.zh-CN.md)。
 
 
 ### 可读性后续优化

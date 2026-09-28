@@ -263,8 +263,8 @@ IDs, the generic 500, and the no-CORS boundary.
   turn missing data into `0`.
 - Check `Date.getTime()` before formatting a time. Errors should keep actionable
   information rather than silently swallowing a string.
-- Use the design tokens in `App.vue`'s `:root` (the single source of truth; the
-  interface is dark only, with no light branch), `focus-visible`, semantic
+- Use the design tokens in `src/styles/tokens.css` (the single source of truth,
+  one set of values per theme; components never branch on the theme), `focus-visible`, semantic
   elements, ARIA and a 44px minimum touch target. The mobile breakpoint is
   currently 760px. See the [UI guidelines](ui-guidelines.md).
 - Backend prose is never rendered raw: the interface renders from the stable

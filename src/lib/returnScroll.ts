@@ -80,7 +80,7 @@ export const installReturnScroll = (router: Router) => {
     root.scrollTo({ top: 0 });
     if (!saved) return;
     const started = performance.now();
-    /* 离场的旧页是绝对定位、按离开时的滚动距离垫好的（App.vue 的 onPageBeforeLeave）；
+    /* 离场的旧页是绝对定位、按离开时的滚动距离垫好的（AppShell.vue 的 onPageBeforeLeave）；
        滚动区现在要换一个位置，旧页得跟着挪同样的距离，淡出的那一帧才不会跳。 */
     const scrollKeepingLeaving = (top: number) => {
       const before = root.scrollTop;

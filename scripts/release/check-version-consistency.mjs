@@ -3,7 +3,7 @@
  * 版本号一致性检查。
  *
  * 版本号散落在九个位置，其中几处只在特定路径上才会被读到——
- * `App.vue` 的 FALLBACK_APP_VERSION 只在浏览器预览里出现，crate 版本只在
+ * `lib/appVersion.ts` 的 FALLBACK_APP_VERSION 只在浏览器预览里出现，crate 版本只在
  * CLI/MCP 的 `--version` 里出现。少改一处不会有任何报错，只会在发版之后
  * 由用户发现：安装的是 1.0.0，命令行说自己是 0.11.0。
  *
@@ -36,7 +36,7 @@ const SITES = [
   { file: 'src-tauri/crates/core/Cargo.toml', pattern: /(\nversion = ")([0-9][^"]*)(")/ },
   { file: 'src-tauri/crates/cli/Cargo.toml', pattern: /(\nversion = ")([0-9][^"]*)(")/ },
   { file: 'src-tauri/crates/mcp/Cargo.toml', pattern: /(\nversion = ")([0-9][^"]*)(")/ },
-  { file: 'src/App.vue', pattern: /(const FALLBACK_APP_VERSION = ')([0-9][^']*)(')/ },
+  { file: 'src/lib/appVersion.ts', pattern: /(const FALLBACK_APP_VERSION = ')([0-9][^']*)(')/ },
   // 两份架构文档都要盯。只盯一份的话，另一份的版本号会惄惄过期，
   // 而读到它的人没有任何线索知道那个数字是错的。
   {
