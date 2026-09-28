@@ -66,6 +66,7 @@ fn sleep_stage_flags(db: &Database, sleep_id: &str) -> (i64, i64, i64, i64) {
 }
 
 mod devices;
+mod event_windows;
 mod export;
 mod metrics;
 mod queries;

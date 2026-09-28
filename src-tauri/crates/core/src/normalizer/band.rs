@@ -410,7 +410,17 @@ impl Normalizer {
     }
 
     pub fn normalize_daily_summary(raw: &Value) -> Result<Vec<DailyMetric>> {
-        Self::normalize_daily_summary_with_diagnostics(raw)?.into_result("daily_summary")
+        let batch = Self::normalize_daily_summary_with_diagnostics(raw)?;
+        // 全是「那天没有 Charge 分数」的条目：认得出，只是没有值。按日入库以后这
+        // 很常见（一个月里总有一两天），不能当成解析失败。
+        if batch.records.is_empty()
+            && extract_items(raw)?
+                .iter()
+                .all(|item| item.as_object().is_some_and(is_scoreless_charge_day))
+        {
+            return Ok(Vec::new());
+        }
+        batch.into_result("daily_summary")
     }
 
     pub fn normalize_daily_summary_with_diagnostics(

@@ -2,6 +2,26 @@
 
 use super::*;
 
+/// 序列化好的报文和它的校验和。
+///
+/// 校验和永远针对**未压缩**的 JSON。压缩是存储细节，不该改变「这份报文是什么」
+/// 的身份。
+pub(super) struct SerializedPayload {
+    pub(super) json: String,
+    pub(super) hash: String,
+}
+
+impl SerializedPayload {
+    pub(super) fn of(record: &RawRecord) -> Result<Self> {
+        let json = serde_json::to_string(&record.payload)
+            .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
+        let mut hasher = Sha256::new();
+        hasher.update(json.as_bytes());
+        let hash = hex::encode(hasher.finalize());
+        Ok(Self { json, hash })
+    }
+}
+
 impl Database {
     pub(super) fn ensure_table_columns(&self, table: &str, columns: &[(&str, &str)]) -> Result<()> {
         let mut stmt = self.conn.prepare(&format!("PRAGMA table_info({table})"))?;
@@ -20,15 +40,23 @@ impl Database {
     }
 
     pub fn insert_raw_record(&self, record: &RawRecord) -> Result<i64> {
-        let payload = serde_json::to_string(&record.payload)
-            .map_err(|error| ZeppBridgeError::ParseError(error.to_string()))?;
-        let mut hasher = Sha256::new();
-        hasher.update(payload.as_bytes());
-        // 校验和永远针对**未压缩**的 JSON。压缩是存储细节，不该改变
-        // 「这份报文是什么」的身份。
-        let payload_hash = hex::encode(hasher.finalize());
-        let fetched_at = Utc::now().to_rfc3339();
-        let payload_zip = compress_payload(&payload)?;
+        let serialized = SerializedPayload::of(record)?;
+        self.insert_serialized_raw(record, &serialized, &Utc::now().to_rfc3339())
+    }
+
+    /// `fetched_at` 是这份报文**从云端拿到**的时间。平时就是现在；把旧报文
+    /// 整理成按日报文时沿用原来那条的时间——本地整理不能冒充一次云端拉取。
+    pub(super) fn insert_serialized_raw(
+        &self,
+        record: &RawRecord,
+        serialized: &SerializedPayload,
+        fetched_at: &str,
+    ) -> Result<i64> {
+        let SerializedPayload {
+            json: payload,
+            hash: payload_hash,
+        } = serialized;
+        let payload_zip = compress_payload(payload)?;
         self.conn.execute(
             "INSERT INTO raw_records
                 (stream, source_key, source_scope, device_id, start_utc, end_utc,
@@ -62,6 +90,51 @@ impl Database {
                 |row| row.get(0),
             )
             .map_err(Into::into)
+    }
+
+    /// 同一份报文又拉了一遍：内容一字不差、已经按当前解析器归一化过、也没被隔离。
+    ///
+    /// 这时重写 blob、先删再插一遍派生行都是白做——自动同步每 15 分钟重拉 30 天，
+    /// 除了今天，其余 29 天几乎总是原样回来。只把 `fetched_at` 刷成现在：「最近
+    /// 一次从云端拿到它」这个事实仍然要对。
+    ///
+    /// 返回这条报文上次归一化写下的行数，报告里的「写入 N 条」才不会因为跳过
+    /// 而掉成 0。`sleep` 不走这条路：它的主计数（睡眠段）和总行数（还含手环
+    /// 心率和补充日指标）不是一回事，而 `raw_normalization` 只记了总数。
+    pub(super) fn touch_unchanged_raw(
+        &self,
+        record: &RawRecord,
+        serialized: &SerializedPayload,
+    ) -> Result<Option<(i64, i64)>> {
+        if record.stream == "sleep" {
+            return Ok(None);
+        }
+        let unchanged = self
+            .conn
+            .prepare_cached(
+                "SELECT r.id, n.records_written
+                 FROM raw_records r
+                 JOIN raw_normalization n
+                   ON n.raw_record_id = r.id AND n.revision = ?4
+                 WHERE r.stream = ?1 AND r.source_key = ?2 AND r.payload_hash = ?3
+                   AND NOT EXISTS (SELECT 1 FROM raw_quarantine q WHERE q.raw_record_id = r.id)",
+            )?
+            .query_row(
+                params![
+                    record.stream,
+                    record.source_key,
+                    serialized.hash,
+                    NORMALIZER_REVISION
+                ],
+                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)),
+            )
+            .optional()?;
+        if let Some((id, _)) = unchanged {
+            self.conn
+                .prepare_cached("UPDATE raw_records SET fetched_at = ?2 WHERE id = ?1")?
+                .execute(params![id, Utc::now().to_rfc3339()])?;
+        }
+        Ok(unchanged)
     }
 
     pub fn normalize_and_persist_raw(

@@ -475,19 +475,20 @@ impl Database {
         stages: &[SleepStageSlice],
     ) -> Result<()> {
         self.conn
-            .execute("DELETE FROM sleep_stages WHERE sleep_id = ?1", [sleep_id])?;
+            .prepare_cached("DELETE FROM sleep_stages WHERE sleep_id = ?1")?
+            .execute([sleep_id])?;
+        let mut insert = self.conn.prepare_cached(
+            "INSERT INTO sleep_stages (sleep_id, stage, start_time, end_time, raw_mode)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+        )?;
         for stage in stages {
-            self.conn.execute(
-                "INSERT INTO sleep_stages (sleep_id, stage, start_time, end_time, raw_mode)
-                 VALUES (?1, ?2, ?3, ?4, ?5)",
-                params![
-                    sleep_id,
-                    stage.stage,
-                    stage.start_time.to_rfc3339(),
-                    stage.end_time.to_rfc3339(),
-                    stage.raw_mode,
-                ],
-            )?;
+            insert.execute(params![
+                sleep_id,
+                stage.stage,
+                stage.start_time.to_rfc3339(),
+                stage.end_time.to_rfc3339(),
+                stage.raw_mode,
+            ])?;
         }
         Ok(())
     }

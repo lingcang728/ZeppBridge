@@ -463,6 +463,31 @@ pub(super) fn collect_charge_metrics(
     count
 }
 
+/// 认得出、只是那天没有分数的 Charge 条目：日期取得到，`samples` 在，但每一格的
+/// `total` 都是哨兵（手表那天没算出能量值时给 255）。
+///
+/// 它和「认不出的报文」要分开：按日入库以后，这样的一天单独成一条报文，把它当
+/// 解析失败会让每次同步都报「有响应没有可识别记录」、并把好好的报文关进隔离表。
+pub(super) fn is_scoreless_charge_day(event: &Map<String, Value>) -> bool {
+    if first_string(event, &["eventType"]).as_deref() != Some("Charge") {
+        return false;
+    }
+    let Some(value) = event.get("value").and_then(Value::as_object) else {
+        return false;
+    };
+    let Some(samples) = value.get("samples").and_then(Value::as_array) else {
+        return false;
+    };
+    summary_date(event, Some(value)).is_some()
+        && !samples.is_empty()
+        && samples.iter().all(|sample| {
+            sample.as_object().is_some_and(|sample| {
+                !first_number(sample, &["total"])
+                    .is_some_and(|score| (0.0..=100.0).contains(&score))
+            })
+        })
+}
+
 /// `(指标名, 报文里的候选键, 单位, 可信区间)`。
 ///
 /// 单独起个名字是因为 clippy 的 `type_complexity` 不收四元组套二元组，

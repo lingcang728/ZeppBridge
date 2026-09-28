@@ -115,20 +115,23 @@ impl Database {
         self.insert_metric_sample_with_raw(sample, None)
     }
 
+    /// 逐行写，一次归一化动辄几千行，所以语句走连接的缓存：同一句 SQL 只解析一次。
     pub fn insert_metric_sample_with_raw(
         &self,
         sample: &MetricSample,
         raw_record_id: Option<i64>,
     ) -> Result<()> {
-        self.conn.execute(
-            "INSERT INTO metric_samples
+        self.conn
+            .prepare_cached(
+                "INSERT INTO metric_samples
                 (metric, timestamp, value, unit, source_scope, device_id, raw_record_id)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
              ON CONFLICT DO UPDATE SET
                 value = excluded.value,
                 source_scope = excluded.source_scope,
                 raw_record_id = COALESCE(excluded.raw_record_id, metric_samples.raw_record_id)",
-            params![
+            )?
+            .execute(params![
                 sample.metric,
                 sample.timestamp.to_rfc3339(),
                 sample.value,
@@ -136,8 +139,7 @@ impl Database {
                 sample.source_scope.as_str(),
                 sample.device_id,
                 raw_record_id,
-            ],
-        )?;
+            ])?;
         Ok(())
     }
 
@@ -152,15 +154,17 @@ impl Database {
         metric: &DailyMetric,
         raw_record_id: Option<i64>,
     ) -> Result<()> {
-        self.conn.execute(
-            "INSERT INTO daily_metrics
+        self.conn
+            .prepare_cached(
+                "INSERT INTO daily_metrics
                 (date, metric, value, unit, source_scope, device_id, raw_record_id)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
              ON CONFLICT DO UPDATE SET
                 value = excluded.value,
                 source_scope = excluded.source_scope,
                 raw_record_id = COALESCE(excluded.raw_record_id, daily_metrics.raw_record_id)",
-            params![
+            )?
+            .execute(params![
                 metric.date,
                 metric.metric,
                 metric.value,
@@ -168,8 +172,7 @@ impl Database {
                 metric.source_scope.as_str(),
                 metric.device_id,
                 raw_record_id,
-            ],
-        )?;
+            ])?;
         Ok(())
     }
 
@@ -374,18 +377,18 @@ impl Database {
                 "DELETE FROM workout_hr_zones WHERE workout_id = ?1",
                 [&workout.workout_id],
             )?;
+            let mut insert = self.conn.prepare_cached(
+                "INSERT INTO workout_hr_zones
+                    (workout_id, zone_index, upper_bound_bpm, seconds)
+                 VALUES (?1, ?2, ?3, ?4)",
+            )?;
             for zone in &workout.hr_zones {
-                self.conn.execute(
-                    "INSERT INTO workout_hr_zones
-                        (workout_id, zone_index, upper_bound_bpm, seconds)
-                     VALUES (?1, ?2, ?3, ?4)",
-                    params![
-                        workout.workout_id,
-                        zone.index,
-                        zone.upper_bound_bpm,
-                        zone.seconds
-                    ],
-                )?;
+                insert.execute(params![
+                    workout.workout_id,
+                    zone.index,
+                    zone.upper_bound_bpm,
+                    zone.seconds
+                ])?;
             }
         }
         Ok(())

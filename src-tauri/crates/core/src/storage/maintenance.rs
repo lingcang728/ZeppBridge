@@ -142,6 +142,9 @@ impl Database {
 
     /// 把还没压缩的历史报文压掉，返回压缩前后的字节数。
     ///
+    /// 先把 3.0 之前攒下的整窗每日事件报文整理成按日报文（见 `event_windows`），
+    /// 那是老库里最大的一块；再压还没压缩的明文报文。
+    ///
     /// 新写入的报文一进库就是压缩的，这个方法只管**装这一版之前**攒下来的
     /// 存量。它是一次性的维护动作，不在同步路径上跑：老库里可能有上千条、
     /// 上 GB 的报文，压一遍要读写一整轮，不该让一次普通同步顺手做这件事。
@@ -151,6 +154,7 @@ impl Database {
     pub fn compact_raw_payloads(&self) -> Result<RawPayloadCompaction> {
         let _guard = CompactionGuard::enter();
         let mut report = RawPayloadCompaction::default();
+        self.consolidate_event_windows(&mut report)?;
         let mut last_id: i64 = 0;
         loop {
             // 和重放同一个退出信号：批边界收手，把写锁尽快交还。
@@ -234,15 +238,14 @@ impl Database {
     /// 实测就踩了：库里十条 `{"items":[]}`（12 字节的空响应）让横幅每次启动
     /// 都要闪一下。
     pub fn pending_raw_payload_count(&self) -> Result<i64> {
-        self.conn
-            .query_row(
-                "SELECT COUNT(*) FROM raw_records
-                 WHERE (payload_zip IS NULL OR LENGTH(payload_zip) = 0)
-                   AND LENGTH(payload) > ?1",
-                [MIN_COMPRESSIBLE_PAYLOAD_BYTES],
-                |row| row.get(0),
-            )
-            .map_err(Into::into)
+        let uncompressed: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM raw_records
+             WHERE (payload_zip IS NULL OR LENGTH(payload_zip) = 0)
+               AND LENGTH(payload) > ?1",
+            [MIN_COMPRESSIBLE_PAYLOAD_BYTES],
+            |row| row.get(0),
+        )?;
+        Ok(uncompressed + self.pending_event_window_count()?)
     }
 
     pub fn cleanup_old_data(&self, days: i64) -> Result<()> {
@@ -381,7 +384,17 @@ impl Database {
     /// 归一化失败会回滚派生行并把 raw 写入隔离表，但云端已经拿到的报文必须留
     /// 在 `raw_records` 里——以前两者同事务，失败把 raw 一起 ROLLBACK 了。
     pub fn persist_fetched_record(&self, record: &RawRecord) -> Result<(i64, NormalizationCounts)> {
-        let raw_id = self.insert_raw_record(record)?;
+        let serialized = SerializedPayload::of(record)?;
+        if let Some((raw_id, records_written)) = self.touch_unchanged_raw(record, &serialized)? {
+            return Ok((
+                raw_id,
+                NormalizationCounts {
+                    primary_records: records_written,
+                    ..NormalizationCounts::default()
+                },
+            ));
+        }
+        let raw_id = self.insert_serialized_raw(record, &serialized, &Utc::now().to_rfc3339())?;
         let normalized = (|| {
             let transaction = ReplayBatch::begin(&self.conn)?;
             let counts = self.normalize_and_persist_raw(

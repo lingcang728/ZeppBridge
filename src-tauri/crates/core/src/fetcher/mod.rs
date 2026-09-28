@@ -314,38 +314,23 @@ impl DataFetcher {
     ) -> Result<Vec<FetchedRecord>> {
         let mut records = Vec::new();
         let mut last_error = None;
-        let from = window.start_utc.timestamp_millis();
-        let to = window.end_utc.timestamp_millis();
+        // 整 UTC 日取、按日存：见 `event_days` 顶部的说明。
+        let (from, to) =
+            crate::event_days::utc_day_aligned_millis(window.start_utc, window.end_utc, Utc::now());
         let event = self
             .connector
             .fetch_events("DailyHealth", Some("summary"), from, to, 2000, true)
             .await?;
-        records.push(FetchedRecord::from_raw(RawRecord {
-            stream: "daily_summary".into(),
-            source_key: format!("events:DailyHealth:summary:{from}:{to}"),
-            source_scope: SourceScope::UserFused,
-            device_id: None,
-            start_utc: window.start_utc,
-            end_utc: Some(window.end_utc),
-            payload: event,
-            capability: CapabilityStatus::Verified,
-        }));
+        records.extend(event_day_records("DailyHealth", "summary", from, to, event));
         for (event_type, sub_type) in [("Charge", "real_data"), ("readiness", "watch_score")] {
             match self
                 .connector
                 .fetch_events(event_type, Some(sub_type), from, to, 2000, true)
                 .await
             {
-                Ok(payload) => records.push(FetchedRecord::from_raw(RawRecord {
-                    stream: "daily_summary".into(),
-                    source_key: format!("events:{event_type}:{sub_type}:{from}:{to}"),
-                    source_scope: SourceScope::UserFused,
-                    device_id: None,
-                    start_utc: window.start_utc,
-                    end_utc: Some(window.end_utc),
-                    payload,
-                    capability: CapabilityStatus::Verified,
-                })),
+                Ok(payload) => {
+                    records.extend(event_day_records(event_type, sub_type, from, to, payload))
+                }
                 Err(error) if is_abort_error(&error) => return Err(error),
                 Err(error) if error.is_unavailable() => {}
                 Err(error) => last_error = Some(error),
@@ -384,6 +369,63 @@ impl DataFetcher {
         }
         conclude_slices(records, last_error, "每日概览窗口没有可识别记录")
     }
+}
+
+/// 一个每日事件窗口的响应 → 每个 UTC 日一条原始报文。
+///
+/// 空响应、认不出形状的响应、以及取不出时间戳的那几条，照旧按窗口存一条：
+/// 「这个窗口是空的」本身也是要留下的事实。它的键终点取当天最后一毫秒，同一天
+/// 里重拉是覆盖。
+fn event_day_records(
+    event_type: &str,
+    sub_type: &str,
+    from: i64,
+    to: i64,
+    payload: Value,
+) -> Vec<FetchedRecord> {
+    let record = |source_key: String, start_utc, end_utc, payload| {
+        FetchedRecord::from_raw(RawRecord {
+            stream: "daily_summary".into(),
+            source_key,
+            source_scope: SourceScope::UserFused,
+            device_id: None,
+            start_utc,
+            end_utc: Some(end_utc),
+            payload,
+            capability: CapabilityStatus::Verified,
+        })
+    };
+    let whole = |payload| {
+        let start = DateTime::<Utc>::from_timestamp_millis(from).unwrap_or_default();
+        let end = DateTime::<Utc>::from_timestamp_millis(to.saturating_add(1)).unwrap_or(start);
+        let key_to = crate::event_days::end_of_utc_day_millis(to);
+        record(
+            format!("events:{event_type}:{sub_type}:{from}:{key_to}"),
+            start,
+            end,
+            payload,
+        )
+    };
+    let Some(split) = crate::event_days::split_by_utc_day(&payload) else {
+        return vec![whole(payload)];
+    };
+    let mut records: Vec<FetchedRecord> = split
+        .days
+        .into_iter()
+        .map(|(day, payload)| {
+            let (start, end) = crate::event_days::day_bounds(day);
+            record(
+                crate::event_days::day_source_key(event_type, sub_type, day),
+                start,
+                end,
+                payload,
+            )
+        })
+        .collect();
+    if let Some(residual) = split.residual {
+        records.push(whole(residual));
+    }
+    records
 }
 
 #[cfg(test)]

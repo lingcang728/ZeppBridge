@@ -510,3 +510,44 @@ fn cancelled_is_still_not_swallowed_by_a_truncated_page() {
         conclude_slices(vec![truncated], Some(ZeppBridgeError::Cancelled), "empty").unwrap_err();
     assert!(error.is_cancelled());
 }
+
+/// 每日事件窗口按日拆成稳定键；空响应照旧整窗留一条（「这个窗口是空的」
+/// 也是事实），而且它的键在同一天里不变，重拉是覆盖。
+#[test]
+fn daily_event_windows_become_one_record_per_utc_day() {
+    let from = 1_790_380_800_000; // 2026-09-26T00:00Z
+    let to = 1_790_524_217_291;
+    let payload = json!({"items": [
+        {"eventType": "Charge", "timestamp": 1_790_467_200_000_i64, "value": {}},
+        {"eventType": "Charge", "timestamp": 1_790_380_800_000_i64, "value": {}},
+    ]});
+    let records = event_day_records("Charge", "real_data", from, to, payload);
+    let keys: Vec<_> = records.iter().map(|r| r.raw.source_key.as_str()).collect();
+    assert_eq!(
+        keys,
+        [
+            "events:Charge:real_data:day:2026-09-26",
+            "events:Charge:real_data:day:2026-09-27"
+        ]
+    );
+    assert_eq!(
+        records[0].raw.start_utc,
+        DateTime::from_timestamp_millis(from).unwrap()
+    );
+    assert_eq!(records[0].raw.payload["items"].as_array().unwrap().len(), 1);
+
+    let empty = event_day_records("Charge", "real_data", from, to, json!({"items": []}));
+    let later = event_day_records(
+        "Charge",
+        "real_data",
+        from,
+        to + 900_000,
+        json!({"items": []}),
+    );
+    assert_eq!(empty.len(), 1);
+    assert_eq!(empty[0].raw.source_key, later[0].raw.source_key);
+    assert_eq!(
+        empty[0].raw.source_key,
+        "events:Charge:real_data:1790380800000:1790553599999"
+    );
+}

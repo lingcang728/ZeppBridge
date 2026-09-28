@@ -4,7 +4,10 @@ members = ["crates/core", "crates/cli", "crates/mcp"]
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-reqwest = { version = "0.12", features = ["json", "cookies"] }
+# `gzip`：请求带上 `Accept-Encoding: gzip`，响应边收边解压。每日事件那几页 JSON
+# 一次就是好几 MB（Charge 30 天 4.7 MB），不压缩就原样走网络。解压后的字节仍受
+# `read_json_body` 的上限约束，压缩炸弹撑不爆内存。
+reqwest = { version = "0.12", features = ["json", "cookies", "gzip"] }
 rusqlite = { version = "0.32", features = ["bundled", "backup"] }
 tokio = { version = "1", features = ["full"] }
 chrono = { version = "0.4", features = ["serde"] }

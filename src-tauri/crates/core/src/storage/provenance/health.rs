@@ -339,17 +339,16 @@ impl Database {
                 } else {
                     "hrv"
                 };
-                let count = self.conn.query_row(
-                    "SELECT COUNT(*) FROM metric_samples WHERE metric = ?1",
-                    [metric],
-                    |row| row.get(0),
-                )?;
+                // 心率一条流就有十几万行：总数直接从来源分布里加出来，不再单独
+                // 数一遍；「最近 N 天」用 `timestamp >= 日期` 走索引区间——RFC 3339
+                // 按字符串比较，和比前 10 个字符是一回事。
                 let sources =
                     self.source_breakdown("metric_samples", &format!("WHERE metric = '{metric}'"))?;
+                let count = sources.iter().map(|source| source.records).sum();
                 let observed = self.observed_days_for(
                     &format!(
                         "SELECT DISTINCT substr(timestamp, 1, 10) FROM metric_samples
-                         WHERE metric = '{metric}' AND substr(timestamp, 1, 10) >= ?1"
+                         WHERE metric = '{metric}' AND timestamp >= ?1"
                     ),
                     &cutoff,
                 )?;
@@ -405,11 +404,19 @@ impl Database {
     /// 不参与缺口判定。
     pub(super) fn metric_health(&self, window_days: i64) -> Result<Vec<StreamHealth>> {
         let mut metrics: Vec<String> = Vec::new();
-        for sql in [
-            "SELECT DISTINCT metric FROM metric_samples",
-            "SELECT DISTINCT metric FROM daily_metrics",
-        ] {
-            let mut stmt = self.conn.prepare(sql)?;
+        // 逐个跳着取不同的指标名（每一步一次索引查找），而不是 DISTINCT 把整张
+        // 表的索引扫一遍：metric_samples 几十万行，只有个位数的指标。
+        for table in ["metric_samples", "daily_metrics"] {
+            let sql = format!(
+                "WITH RECURSIVE m(metric) AS (
+                     SELECT MIN(metric) FROM {table}
+                     UNION ALL
+                     SELECT (SELECT MIN(metric) FROM {table} WHERE metric > m.metric)
+                     FROM m WHERE m.metric IS NOT NULL
+                 )
+                 SELECT metric FROM m WHERE metric IS NOT NULL"
+            );
+            let mut stmt = self.conn.prepare(&sql)?;
             let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
             for row in rows {
                 metrics.push(row?);
@@ -441,7 +448,7 @@ impl Database {
             let mut days: Vec<String> = Vec::new();
             for sql in [
                 "SELECT DISTINCT substr(timestamp, 1, 10) FROM metric_samples
-                 WHERE metric = ?1 AND substr(timestamp, 1, 10) >= ?2",
+                 WHERE metric = ?1 AND timestamp >= ?2",
                 "SELECT DISTINCT date FROM daily_metrics WHERE metric = ?1 AND date >= ?2",
             ] {
                 let mut stmt = self.conn.prepare(sql)?;
