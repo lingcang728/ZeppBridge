@@ -21,7 +21,7 @@ const t = useMessages(defineMessages(
   {
     title: '分析哪次运动',
     hint: '可多选，也可以不选',
-    noneSelected: (days: number) => `没选运动：分析截至今天的最近 ${days} 天。`,
+    noneSelected: (days: number) => `没选运动：分析最近 ${days} 天（截至今天）。`,
     selectedCount: (count: number) => `已选 ${count} 次`,
     empty: '本机还没有运动记录',
     remove: '取消选择',
@@ -32,7 +32,7 @@ const t = useMessages(defineMessages(
   {
     title: 'Which workout',
     hint: 'Pick one or more, or none',
-    noneSelected: (days: number) => `No workout selected: the last ${days} days up to today are analysed.`,
+    noneSelected: (days: number) => `None selected: the last ${days} days up to today are analysed.`,
     selectedCount: (count: number) => `${count} selected`,
     empty: 'No workouts on this machine yet',
     remove: 'Deselect',
@@ -43,7 +43,7 @@ const t = useMessages(defineMessages(
   {
     title: 'Qué entrenamiento',
     hint: 'Elige uno o varios, o ninguno',
-    noneSelected: (days: number) => `Sin entrenamiento: se analizan los últimos ${days} días hasta hoy.`,
+    noneSelected: (days: number) => `Sin entrenamientos elegidos: se analizan los últimos ${days} días, hasta hoy.`,
     selectedCount: (count: number) => `${count} seleccionados`,
     empty: 'Aún no hay entrenamientos en este equipo',
     remove: 'Quitar',

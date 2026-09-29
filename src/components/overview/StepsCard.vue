@@ -36,7 +36,7 @@ const messages = defineMessages(
     stepsGoalLine: (goal: string, percent: number) => `Goal ${goal} · ${percent}%`,
     seeMore: 'See more',
     stepsNotYet: "Today's steps haven't reached the cloud yet",
-    stepsLatest: (when: string) => `The newest data in the cloud is from ${when}`,
+    stepsLatest: (when: string) => `Newest cloud data is from ${when}`,
     factGoal: 'Goal',
     factDone: 'Done',
     factLeft: 'To go',

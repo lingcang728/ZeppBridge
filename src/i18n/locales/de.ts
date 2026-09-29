@@ -24,21 +24,21 @@ export default {
     'err.core.cloud_rejected':
       'Zepp hat die Anfrage erhalten und abgelehnt. Wenn das weiterhin passiert, verbinde das Zepp-Konto in den Einstellungen erneut',
     'err.core.cancelled': 'Abgebrochen',
-    'err.core.auth': 'Bei der Anmeldung ist etwas schiefgelaufen',
+    'err.core.auth': 'Authentifizierungsfehler',
     'err.headless.no_credential_store':
       'Auf diesem Rechner ist kein systemseitiger Anmeldespeicher verfügbar (GNOME Keyring / KWallet). Headless-Server und Container haben meist keinen. Setze ZEPPBRIDGE_CREDENTIAL_STORE=file, um das Token mit 0600 ins Datenverzeichnis zu schreiben, oder ZEPPBRIDGE_CREDENTIAL_STORE=env zusammen mit ZEPPBRIDGE_APP_TOKEN.',
     'err.headless.schema_upgrade':
-      'Diese Bibliothek ist älter als der Build, der sie liest, und eine Nur-Lesen-Verbindung kann sie nicht aktualisieren. Starte einmal die Desktop-App oder führe auf einem Headless-Rechner zeppbridge-cli reprocess aus. Beide legen vor dem Upgrade eine Sicherung an.',
+      'Diese Datenbank ist älter als der Build, der sie liest, und eine Nur-Lesen-Verbindung kann sie nicht aktualisieren. Starte einmal die Desktop-App oder führe auf einem Headless-Rechner zeppbridge-cli reprocess aus. Beide legen vor dem Upgrade ein Backup an.',
     'err.headless.token_not_in_store':
       'Die Kontodaten sind da, aber der Anmeldespeicher hat kein Token dafür. Eine Datenbank lässt sich zwischen Rechnern kopieren; ein Token nicht – er bleibt im Anmeldespeicher des Rechners, auf dem er erstellt wurde. Melde dich erneut an.',
     'err.core.credential_store':
       'Der Anmeldespeicher war nicht zugänglich. Prüfe, ob er gesperrt ist, von einer Systemrichtlinie blockiert wird, falsch konfiguriert ist oder falsche Dateiberechtigungen hat. Web-Anmeldung und manuelle Eingabe nutzen denselben Speicher; ein Wechsel der Anmeldemethode umgeht einen Speicherfehler nicht. Wenn der macOS-Schlüsselbund oder der Linux-Schlüsselring nicht verfügbar ist, folge der im README verlinkten Anleitung zur Anmeldespeicherung: Starte mit ZEPPBRIDGE_CREDENTIAL_STORE=file und melde dich erneut an. Dabei werden Token in einer Klartextdatei gespeichert, die nur dein Benutzer lesen und schreiben kann.',
     'err.core.invalid_host': 'Unsichere Zepp-Regions-Adresse',
-    'err.core.config': 'An der Konfiguration muss zuerst etwas geändert werden',
+    'err.core.config': 'Die Konfiguration muss zuerst korrigiert werden',
     'err.core.busy': 'Ein anderer Schreibvorgang läuft. Warte, bis er fertig ist',
     'err.core.parse': 'Die Antwort von Zepp konnte nicht gelesen werden',
     'err.core.database': 'Die lokale Datenbank ist vorübergehend nicht verfügbar',
-    'err.core.io': 'Das Lesen oder Schreiben einer lokalen Datei ist fehlgeschlagen',
+    'err.core.io': 'Eine lokale Datei ließ sich nicht lesen oder schreiben',
     'err.core.unknown': 'Etwas ist schiefgelaufen',
     'err.auth.sync_init_failed': 'Die Synchronisierung konnte nicht eingerichtet werden. Prüfe die Konto-Region und versuche es erneut',
     'err.auth.verify_network': 'Verifizierung fehlgeschlagen: Zepp war nicht erreichbar. Prüfe dein Netzwerk und versuche es erneut',
@@ -53,7 +53,7 @@ export default {
     'err.official.denied': 'Du hast keinen Zugriff erteilt, ZeppBridge hat nichts erhalten.',
     'err.official.rejected': 'Zepp hat diese Autorisierung nicht angenommen. Versuche es erneut.',
     'err.official.expired': 'Diese Autorisierung ist abgelaufen. Starte sie neu.',
-    'err.official.timeout': 'Beim Warten auf die Autorisierung ist die Zeit abgelaufen. Starte sie neu.',
+    'err.official.timeout': 'Zeitüberschreitung beim Warten auf die Autorisierung. Starte sie neu.',
     'err.official.not_enabled': 'Der Zepp-Autorisierungsdienst ist noch nicht aktiv. Versuche es später erneut.',
     'err.official.store': 'Autorisiert, aber das Token konnte nicht im Anmeldespeicher des Systems gespeichert werden.',
     'err.official.failed': 'Die Zepp-Autorisierung wurde nicht abgeschlossen. Versuche es später erneut.',
@@ -75,24 +75,24 @@ export default {
     'err.login.state_unavailable': 'Der Anwendungszustand ist nicht verfügbar',
     'err.login.cancelled': 'Anmeldung abgebrochen',
     'err.login.sync_init_failed': 'Angemeldet, aber die Synchronisierung konnte nicht initialisiert werden',
-    'err.sync.not_connected': 'Noch nicht mit Zepp verbunden. Verbinde dich zuerst',
-    'err.sync.not_verified': 'Schließe die Verifizierung der Verbindung ab, bevor du aktuelle Daten synchronisierst',
-    'err.sync.not_verified_probe': 'Schließe die Verifizierung der Verbindung ab, bevor du die Fähigkeiten prüfst',
-    'err.sync.not_verified_backfill': 'Schließe die Verifizierung der Verbindung ab, bevor du Historie nachlädst',
-    'err.sync.history_days_out_of_range': 'Diese Anzahl von Tagen liegt außerhalb des erlaubten Bereichs',
+    'err.sync.not_connected': 'Noch nicht mit Zepp verbunden – zuerst verbinden',
+    'err.sync.not_verified': 'Verifiziere zuerst die Verbindung, dann synchronisiere aktuelle Daten',
+    'err.sync.not_verified_probe': 'Verifiziere zuerst die Verbindung, dann prüfe die Fähigkeiten',
+    'err.sync.not_verified_backfill': 'Verifiziere zuerst die Verbindung, dann lade Historie nach',
+    'err.sync.history_days_out_of_range': 'Die Anzahl der Tage liegt außerhalb des erlaubten Bereichs',
     'err.sync.deferred_compaction':
       'Gespeicherte Rohdaten werden komprimiert, um Platz zu sparen. Diese Synchronisierung versucht es automatisch erneut',
     'err.sync.deferred_replay':
       'Abgeleitete Daten werden aus lokalen Rohdaten neu aufgebaut. Diese Synchronisierung versucht es automatisch erneut',
     'err.sync.deferred_busy': 'Ein anderer Schreibvorgang läuft. Diese Synchronisierung versucht es automatisch erneut',
     'err.backfill.bad_start_date': 'Ungültiges Startdatum für das Nachladen – nutze JJJJ-MM-TT',
-    'err.backfill.no_canonical_records': 'Die Cloud hat Daten geliefert, aber es konnten keine verwertbaren Einträge daraus gelesen werden',
-    'err.backfill.partial_window': 'Nur ein Teil dieses Zeitraums wurde geschrieben. Es braucht noch einen erneuten Versuch',
+    'err.backfill.no_canonical_records': 'Die Cloud lieferte Daten, aber es ließen sich keine verwertbaren Einträge lesen',
+    'err.backfill.partial_window': 'Nur ein Teil dieses Zeitraums wurde geschrieben – ein weiterer Versuch ist nötig',
     'err.backfill.start_in_future': 'Der Start des Nachladens kann nicht nach heute liegen',
     'err.backup.restore_busy':
-      'Die Wiederherstellung lief nicht: Ein anderer Schreibvorgang läuft. Die aktuelle Bibliothek ist unverändert; es wird beim nächsten Start erneut versucht',
+      'Wiederherstellung nicht möglich: Ein anderer Schreibvorgang läuft. Die aktuelle Datenbank bleibt unverändert; beim nächsten Start wird es erneut versucht',
     'err.backup.restore_failed':
-      'Die Wiederherstellung ist nicht fertig geworden. Die aktuelle Bibliothek ist unverändert; es wird beim nächsten Start erneut versucht',
+      'Wiederherstellung nicht abgeschlossen. Die aktuelle Datenbank bleibt unverändert; beim nächsten Start wird es erneut versucht',
     'err.capability.not_synced': 'Noch nicht synchronisiert',
     'err.capability.needs_reauth': 'Erneute Anmeldung nötig',
     'err.capability.unverified': 'Noch nicht verifiziert',
@@ -119,7 +119,7 @@ export default {
     'err.diagnostic.rate_limited':
       'Zu viele Berichte in kurzer Zeit. Versuche es in einer Weile erneut – die bereits gesendeten bleiben erhalten und müssen nicht erneut geschickt werden.',
     'err.diagnostic.bad_response': 'Der Berichtsdienst hat etwas zurückgegeben, das wir nicht lesen konnten',
-    'err.workout.not_found': 'Dieses Training existiert nicht mehr',
+    'err.workout.not_found': 'Dieses Training existiert nicht',
     'err.prefs.retention_out_of_range': 'Die Aufbewahrung muss zwischen 1 und 365 Tagen liegen',
     'err.storage.write_busy': 'Ein anderer ZeppBridge-Schreibvorgang läuft. Warte, bis er fertig ist',
     'err.storage.write_lock_unavailable': 'Die Schreibsperre konnte nicht erstellt werden. Prüfe die Berechtigungen des Datenordners',
@@ -131,7 +131,7 @@ export default {
     'err.local_api.thread_failed': 'Der Thread der lokalen API konnte nicht gestartet werden',
     'err.local_api.state_write_failed': 'Der An/Aus-Zustand der lokalen API konnte nicht gespeichert werden',
     'err.data_folder.open_failed': 'Der Datenordner konnte nicht geöffnet werden',
-    'err.data_folder.unsupported_os': 'Das Öffnen des Datenordners wird nur auf Windows und macOS unterstützt',
+    'err.data_folder.unsupported_os': 'Datenordner öffnen geht nur unter Windows und macOS',
     'err.update.localappdata_missing': 'Der Windows-Pfad LOCALAPPDATA ist nicht verfügbar',
     'err.update.launch_failed': 'Der aktualisierte installierte Build konnte nicht gestartet werden',
     'err.update.installed_build_missing': 'Nach der Installation wurde kein neuer installierter ZeppBridge-Build gefunden',
@@ -139,13 +139,13 @@ export default {
     'err.update.unsafe_data_location':
       'Die Installation wurde gestoppt, weil der Datenort nicht als sicher für Updates verifiziert werden konnte. Beende ZeppBridge, kopiere einen im Paket enthaltenen data-Ordner in deinen Benutzer-Ordner „Application Support" und korrigiere ZEPPBRIDGE_DATA_DIR, bevor du es erneut versuchst. Behalte die Originaldaten.',
     'err.ai_task.attachment_missing': 'Eine Anhangsdatei liegt nicht mehr an ihrem ursprünglichen Ort',
-    'err.ai_task.invalid': 'Die Aufgaben-Eingabe ist ungültig. Prüfe die Felder',
+    'err.ai_task.invalid': 'Aufgabeninhalt ungültig. Prüfe die Felder',
     'err.ai_task.not_found': 'Die Analyseaufgabe existiert nicht oder wurde gelöscht',
     'err.ai_task.workout_not_found': 'Manche gewählten Trainings existieren auf diesem Gerät nicht',
     'err.ai_task.write_failed': 'Die Übergabedateien konnten nicht geschrieben werden',
     'err.ai_template.builtin_readonly':
       'Eingebaute Vorlagen sind schreibgeschützt. Speichere eine Kopie als eigene Vorlage',
-    'err.ai_template.invalid': 'Die Vorlagen-Eingabe ist ungültig. Prüfe die Felder',
+    'err.ai_template.invalid': 'Vorlageninhalt ungültig. Prüfe die Felder',
     'err.ai_template.not_found': 'Die Vorlage existiert nicht oder wurde gelöscht',
     'err.mcp.scope_denied': 'Diese Anfrage liegt außerhalb der für MCP freigegebenen Aufgaben',
     'err.mcp.scope_no_grants':
@@ -161,37 +161,37 @@ export default {
     'ui.backup.integrity_failed': 'Die Sicherungsdatei hat die SQLite-Integritätsprüfung nicht bestanden',
     'ui.estimate.stop_no_space':
       'Das Nachladen braucht mehr Platz, als auf diesem Laufwerk frei ist, und startet nicht. Gib Platz frei oder verkürze den Zeitraum.',
-    'ui.estimate.disk_unknown': 'Der freie Speicherplatz konnte nicht gelesen werden. Stelle vor dem Nachladen sicher, dass genug Platz da ist.',
-    'ui.estimate.disk_too_small': 'Weniger als 300 MB frei – Historie über mehr als 90 Tage kann nicht nachgeladen werden.',
-    'ui.estimate.builtin_guess': 'Noch zu wenige lokale Daten, deshalb ist das eine grobe eingebaute Schätzung des Platzbedarfs.',
-    'ui.estimate.measured': 'Geschätzt anhand des Tempos, in dem sich deine eigenen Daten tatsächlich ansammeln.',
-    'ui.estimate.partial': 'Geschätzt nur anhand der Datenströme mit genügend lokalen Daten; der Rest zählt nicht mit.',
+    'ui.estimate.disk_unknown': 'Der freie Speicherplatz ließ sich nicht lesen. Stelle vor dem Nachladen sicher, dass genug Platz da ist.',
+    'ui.estimate.disk_too_small': 'Unter 300 MB frei – Historie über mehr als 90 Tage kann nicht nachgeladen werden.',
+    'ui.estimate.builtin_guess': 'Zu wenig lokale Daten – das ist eine grobe eingebaute Schätzung des Platzbedarfs.',
+    'ui.estimate.measured': 'Geschätzt nach dem Tempo, in dem deine eigenen Daten tatsächlich wachsen.',
+    'ui.estimate.partial': 'Nur über Datenströme mit genug lokalen Daten geschätzt; der Rest zählt nicht mit.',
   },
 
   modules: {
     'components/activity/HourlyStepsCard': {
       title: 'Schritte pro Stunde',
       stepsUnit: 'Schritte',
-      perDayUnit: 'Schritte / Tag',
-      averageNote: (days: number) => `Durchschnitt der ${days} Tage mit Daten; klicke unten auf eine Zeile, um nur diese zu sehen`,
+      perDayUnit: 'Schritte/Tag',
+      averageNote: (days: number) => `Ø der ${days} Tage mit Daten; eine Zeile wählen, um nur sie zu sehen`,
       dayNote: (label: string) => `Nur ${label}`,
-      weekNote: (label: string, days: number) => `${label}, gemittelt über ${days} Tage mit Daten`,
+      weekNote: (label: string, days: number) => `${label}, Ø über ${days} Tage mit Daten`,
       weekOf: (label: string) => `Woche ab ${label}`,
       showAverage: 'Zurück zum Durchschnitt',
       busiest: (hour: number, steps: string) => `Aktivste Stunde: ${hour}:00 Uhr, ${steps} Schritte`,
-      busiestAverage: (hour: number, steps: string) => `Am aktivsten um ${hour}:00 Uhr, im Schnitt ${steps} Schritte`,
+      busiestAverage: (hour: number, steps: string) => `Am aktivsten um ${hour}:00 Uhr, Ø ${steps} Schritte`,
       barTitle: (hour: number, steps: string) => `${hour}:00 Uhr – ${steps} Schritte`,
-      averageBarTitle: (hour: number, steps: string) => `${hour}:00 Uhr – im Schnitt ${steps} Schritte`,
+      averageBarTitle: (hour: number, steps: string) => `${hour}:00 Uhr – Ø ${steps} Schritte`,
       noRecord: (hour: number) => `${hour}:00 Uhr – nichts aufgezeichnet`,
-      heatAria: 'Schritte für jede Stunde jedes Tages',
-      pickRow: (label: string) => `Nur ${label} anzeigen`,
+      heatAria: 'Stündliche Schritte je Tag',
+      pickRow: (label: string) => `Nur ${label}`,
       noRow: (label: string) => `${label}: nichts aufgezeichnet`,
-      empty: 'In diesem Zeitraum gibt es noch keine Schritte pro Stunde.',
-      failed: 'Die Schritte pro Stunde konnten gerade nicht gelesen werden.',
+      empty: 'Noch keine stündlichen Schritte in diesem Zeitraum.',
+      failed: 'Stündliche Schritte gerade nicht lesbar.',
       legend: (peak: string) => `Kräftigeres Grün heißt mehr Schritte; am kräftigsten sind etwa ${peak}`,
     },
     'components/OfficialOnlyNote': {
-      text: 'Nur die offizielle Zepp-Autorisierung ist verbunden: Herzfrequenz, Schlaf, Schritte, Trainings, PAI und Gewicht werden synchronisiert. HRV, Blutsauerstoff, Stress, Bereitschaft und Trainingslast bietet die offizielle Schnittstelle nicht an – verbinde dafür „Erweiterte Daten“.',
+      text: 'Nur die offizielle Zepp-Autorisierung ist verbunden: Herzfrequenz, Schlaf, Schritte, Trainings, PAI und Gewicht werden synchronisiert. HRV, Blutsauerstoff, Stress, Bereitschaft und Trainingsbelastung bietet die offizielle API nicht an – verbinde dafür „Erweiterte Daten".',
       action: 'Verbinden',
     },
     'components/ai/WorkoutPicker': {
@@ -199,12 +199,12 @@ export default {
       empty: 'Noch keine Trainings auf diesem Rechner',
       hint: 'Mehrere möglich, keins auch',
       noneSelected: (days: number) =>
-        `Kein Training gewählt: die letzten ${days} Tage bis heute werden analysiert.`,
+        `Kein Training gewählt – analysiert werden die letzten ${days} Tage bis heute.`,
       remove: 'Auswahl aufheben',
       selectedCount: (count: number) => `${count} ausgewählt`,
       showLess: 'Weniger anzeigen',
       showMore: (count: number) => `${count} weitere anzeigen`,
-      title: 'Welches Training',
+      title: 'Welches Training analysieren',
     },
     // ── views/Settings ──
     // Mit en identisch und in allowlist-en.txt eingetragen:
@@ -212,37 +212,37 @@ export default {
     // stream.pai / hrv / hrv_rmssd / vo2max / stress (Kurzformen wie „PAI", „Stress").
     'views/Settings': {
       title: 'Einstellungen',
-      retry: 'Erneut versuchen',
+      retry: 'Wiederholen',
       distanceUnitLabel: 'Entfernungseinheit',
 
       // ── 1. Anmeldung ──
       authWebTitle: 'Erweiterte Datenverbindung',
-      authWebSub: 'Mit E-Mail oder Telefonnummer und Passwort anmelden, um Stress, SpO₂, PAI und andere Daten zu ergänzen, die die offizielle API nicht liefert (Drittanbieter-Anmeldung funktioniert hier nicht)',
-      officialTitle: 'Autorisierung mit dem Zepp-Konto',
+      authWebSub: 'Anmeldung mit E-Mail/Telefonnummer + Passwort; ergänzt Stress, SpO₂, PAI u. a., die die offizielle API nicht liefert (keine Drittanbieter-Anmeldung)',
+      officialTitle: 'Zepp-Konto-Autorisierung',
       officialSub: 'Empfohlen · im Browser autorisieren; Anmeldung mit Google, Xiaomi, Facebook und Apple funktioniert',
       officialConnect: 'Autorisieren',
-      officialWaiting: 'Schließe die Autorisierung im Browser ab; die Verbindung entsteht dann von selbst…',
+      officialWaiting: 'Im Browser autorisieren – danach verbindet es sich von selbst…',
       officialConnected: 'Autorisiert',
       officialReauth: 'Erneute Autorisierung nötig',
       officialDisconnect: 'Trennen',
-      officialDisconnectConfirm: 'Zepp-Autorisierung trennen? Bereits gespeicherte Gesundheitsdaten auf diesem Computer bleiben erhalten.',
-      officialDisconnected: 'Zepp-Autorisierung getrennt. Deine lokalen Daten sind noch da.',
-      officialFailed: 'Die Zepp-Autorisierung wurde nicht abgeschlossen',
-      officialNote: 'In dieser Version stellt die Zepp-Autorisierung nur die Verbindung her; offizielle Daten (REM-Schlaf, FIT-Trainings) kommen mit der nächsten Version.',
+      officialDisconnectConfirm: 'Zepp-Autorisierung trennen? Auf diesem Rechner gespeicherte Gesundheitsdaten bleiben.',
+      officialDisconnected: 'Zepp-Autorisierung getrennt – lokale Daten bleiben.',
+      officialFailed: 'Zepp-Autorisierung nicht abgeschlossen',
+      officialNote: 'Offizielle Daten angebunden: Schlaf, Herzfrequenz, Schritte, Trainings, PAI und Gewicht werden synchronisiert; HRV, Blutsauerstoff, Stress u. a. kommen weiterhin von „Erweiterte Daten".',
       officialAccountLine: (id: string, since: string) => `Zepp-Autorisierung · ${id} · seit ${since}`,
-      officialAccountEmpty: 'Noch nicht mit einem Zepp-Konto autorisiert',
+      officialAccountEmpty: 'Noch kein Zepp-Konto autorisiert',
       officialNotConnected: 'Nicht autorisiert',
-      cloudAdvancedTitle: 'Zepp Cloud · erweiterte Daten',
+      cloudAdvancedTitle: 'Zepp Cloud · Erweiterte Daten',
       copyAuthLink: 'Autorisierungslink kopieren',
       copyAuthLinkHint: 'Ist dein Browser schon bei Zepp angemeldet, springt er direkt zur Zustimmung. Für ein anderes Konto (z. B. Google- oder Xiaomi-Anmeldung) füge den Link in ein privates Fenster ein.',
       linkCopied: 'Link kopiert',
       authCancelLogin: 'Anmeldung abbrechen',
       authInUse: 'In Verwendung',
       authOpening: 'Wird geöffnet…',
-      authRetry: 'Verbindung erneut versuchen',
+      authRetry: 'Verbindung wiederholen',
       authUse: 'Verwenden',
       authManualTitle: 'Manuell eingeben',
-      authManualSub: 'appToken, user_id und Regions-Host von Hand eintragen',
+      authManualSub: 'appToken, user_id usw. von Hand eintragen',
       authCollapse: 'Einklappen',
       manualFormHint:
         'Aus einem Mitschnitt von mitmproxy/Charles oder den Browser-Entwicklerwerkzeugen übernehmen. Drei Felder:',
@@ -267,14 +267,14 @@ export default {
       unknownDeviceBodyA: 'Manche Zepp-Konten liefern Geräteeinträge mit ',
       unknownDeviceNoName: 'gar keinem Produktnamen-Feld',
       unknownDeviceBodyB:
-        ' – nur interne Nummern, aus denen sich kein Modell ableiten lässt. „Geräte erneut erkennen" zu drücken ändert daran nie etwas. Du kannst oben selbst das Modell auswählen: Es wird als „Von dir gewähltes Modell" gekennzeichnet und nie als automatische Zuordnung ausgegeben.',
+        ' – nur interne Nummern, aus denen sich kein Modell ableiten lässt. „Geräte erneut erkennen" ändert daran nie etwas. Wähle oben selbst das Modell: Es wird als „Von dir gewähltes Modell" markiert, nie als automatische Zuordnung.',
       unknownDeviceReport:
-        'Einen Fehlerbericht zu senden hilft, die Nummern dieses Geräts in den eingebauten Katalog zu bekommen, sodass es danach niemand mehr von Hand auswählen muss. Der Bericht enthält eine feste Whitelist von Feldern und braucht kein GitHub-Konto.',
-      reportWhat: 'Was ist nicht in Ordnung',
-      reportWhatHint: ' (eine Option wählen – dann lässt es sich auch senden, wenn nichts automatisch erkannt wurde)',
-      reportCategoryPlaceholder: 'Nichts Genaues (nur das automatisch Erkannte senden)',
-      reportCategoryAria: 'Art des Problems für den Bericht',
-      reportNote: 'Etwas hinzuzufügen',
+        'Ein Fehlerbericht bringt die Nummern dieses Geräts in den eingebauten Katalog – danach muss es niemand mehr von Hand wählen. Feste Whitelist von Feldern, kein GitHub-Konto nötig.',
+      reportWhat: 'Was melden',
+      reportWhatHint: ' (eine wählen – sendet auch ohne automatisch erkanntes Problem)',
+      reportCategoryPlaceholder: 'Nichts Genaueres (nur automatisch Erkanntes senden)',
+      reportCategoryAria: 'Problemart für den Bericht',
+      reportNote: 'Anmerkung',
       reportNoteHint: ' (optional, aber sehr hilfreich)',
       reportNotePlaceholder:
         'Zum Beispiel: Meine Uhr ist eine Amazfit Balance 2, wird aber als nicht erkannt angezeigt; oder: Radfahren im Freien wurde als unbekanntes Training gelesen.',
@@ -285,22 +285,22 @@ export default {
       reportDoneTitle: 'Angekommen, danke',
       reportDoneLine: (id: string, at: string) => `Bericht ${id}, gesendet ${at}.`,
       reportDoneNote:
-        'Herausgegangen ist genau das, was oben an Feldtypen aufgelistet ist, plus deine Notiz. Nichts weiter.',
+        'Raus ging genau das oben Gelistete plus deine Notiz – nichts weiter.',
       reportConfirm:
         'Dies sendet die App-Version, den OS-Typ, die Parser-Revision, produktbezogene Hinweise und Feldstrukturen nicht erkannter Geräte, die Firmware-Version, modellbezogene Nummern (deviceSource / deviceType – Ganzzahlen, die nur sagen, welches Modell, nicht welches Exemplar), unbekannte Trainings-Codes mit ihren Anzahlen, den numerischen Fehlercode der letzten von der Cloud abgelehnten Anfrage (nur die Nummer, welcher Datenstrom und wann – nie Text, den die Cloud zurückgegeben hat) und deine Notiz von oben (ohne lokale Pfade, E-Mail-Adressen und lange Kennungen). Nie gesendet werden dein Zepp-Konto, Token, Seriennummern, Geräte-IDs, MAC-Adressen, GPS, Gesundheitswerte oder Rohantworten. Senden?',
-      reportFailed: 'Der Fehlerbericht konnte nicht gesendet werden',
+      reportFailed: 'Der Bericht konnte nicht gesendet werden',
       capabilityIntro:
-        'Was ZeppBridge derzeit aus deinem Konto lesen kann. Diese Liste aktualisiert sich bei jeder Synchronisierung von selbst; es gibt nichts zu drücken.',
+        'Aktuell aus deinem Konto lesbare Datenströme. Aktualisiert sich bei jeder Synchronisierung automatisch.',
       lampOn: (count: number) => `Abgerufen: ${count}`,
       lampPending: (count: number) => `In der Cloud, lokal nicht gespeichert: ${count}`,
       lampOff: (count: number) => `Nicht abgerufen: ${count}`,
       capabilityEmptyTitle: 'Noch nicht synchronisiert',
-      capabilityEmptyBody: 'Nach einer Synchronisierung leuchten sie auf.',
+      capabilityEmptyBody: 'Erscheinen nach der ersten Synchronisierung.',
       probeSummary: 'Endpunkt-Diagnose',
       probeNote:
-        '„Nicht abgerufen" heißt nicht, dass das Gerät es nicht hat: Zepps Endpunkte antworten auf nicht vorhandene Datenströme einfach leer; nur eine klare Weigerung wird als „dein Gerät liefert das nicht" gemeldet.',
+        '„Nicht abgerufen" bedeutet nicht fehlende Unterstützung: Zepps Schnittstellen antworten auf nicht vorhandene Datenströme oft leer. Nur bei expliziter Ablehnung steht da „Dein Gerät liefert das nicht".',
       probing: 'Prüfung läuft…',
-      probeRun: 'Jetzt erneut prüfen',
+      probeRun: 'Erneut prüfen',
       probedToday: 'heute geprüft',
       probedDaysAgo: (days: number) => `vor ${days} ${days === 1 ? 'Tag' : 'Tagen'} geprüft`,
       probeRecords: (records: number, latest: string) =>
@@ -310,7 +310,7 @@ export default {
       probeFailed: 'Anfrage fehlgeschlagen',
       codesUnnamed: (count: number) => `${count} noch ohne Namen`,
       codesIntro:
-        'Zepps eigene Trainingsvorlagen liefern nur eine Nummer ohne Namen, und auch der eingebaute Katalog kennt sie nicht. Statt eine Sportart zu raten und dir vorzusetzen, gib dem Code einmal selbst einen Namen – jeder Eintrag mit diesem Code nutzt ihn danach, und die Trainingsseite sagt offen, dass er von dir stammt.',
+        'Manche Trainingsvorlagen von Zepp liefern nur eine Nummer ohne Namen. Statt eine Sportart zu raten, benenne den Code selbst – künftig gilt der Name für alle Einträge mit diesem Code, in den Trainingsdetails als deiner gekennzeichnet.',
       codeNumber: (code: number) => `Zepp-Code ${code}`,
       codeRecords: (count: number) =>
         `${count} ${count === 1 ? 'lokaler Eintrag bekommt' : 'lokale Einträge bekommen'} diesen Namen`,
@@ -321,38 +321,38 @@ export default {
       codeSaving: 'Wird gespeichert…',
       codeSave: 'Speichern',
       codeFootnote:
-        'Der Name bleibt auf diesem Rechner, wird nie zu Zepp zurückgeschickt und überlebt ein Neueinlesen. Leer speichern löscht ihn.',
-      codeSaved: (code: number, label: string) => `Code ${code} wird jetzt als „${label}" angezeigt.`,
-      codeCleared: (code: number) => `Der eigene Name für Code ${code} wurde gelöscht.`,
-      codeSaveFailed: 'Der eigene Trainingsname konnte nicht gespeichert werden',
+        'Gilt nur lokal, wird nie an Zepp gesendet und übersteht ein Neu-Einlesen. Leeres Speichern löscht den Namen.',
+      codeSaved: (code: number, label: string) => `Code ${code} heißt jetzt „${label}".`,
+      codeCleared: (code: number) => `Eigener Name für Code ${code} gelöscht.`,
+      codeSaveFailed: 'Eigener Trainingsname nicht gespeichert',
       codeSuggestions: ['Kraft', 'Core', 'HIIT', 'Dehnen', 'Reha', 'Eigene Einheit'],
 
       // ── 4. Datenschutz ──
-      privacyDbTitle: 'Die lokale Datenbank ist nicht verschlüsselt',
+      privacyDbTitle: 'Lokale Datenbank unverschlüsselt',
       privacyDbBody:
-        'Gesundheitsdaten liegen als reine SQLite im Datenordner der App, geschützt durch dein Windows-/macOS-Konto und die Festplattenverschlüsselung. ZeppBridge verschlüsselt die Datenbank nicht als Ganzes – und tut nicht so.',
-      privacyTokenTitle: 'Zepp-Token nutzen standardmäßig den Anmeldespeicher des Systems',
+        'Gesundheitsdaten liegen als SQLite-Datei im Datenordner der App, geschützt durch dein Benutzerkonto und die Festplattenverschlüsselung. ZeppBridge verschlüsselt die Datenbank nicht – und tut auch nicht so.',
+      privacyTokenTitle: 'Zepp-Token liegen standardmäßig im Anmeldespeicher',
       privacyTokenBody:
-        'Standard sind Windows-Anmeldeinformationsverwaltung / macOS-Schlüsselbund / Linux-Schlüsselring. macOS und Linux können ausdrücklich eine Klartext-Anmeldedatei nutzen, die nur dein Benutzer lesen und schreiben darf; Linux unterstützt zusätzlich Umgebungsvariablen. auth.json enthält nur Konto- und Regions-Metadaten. Token landen nie in Logs, Datenexporten oder Fehlerberichten.',
+        'Token liegen standardmäßig in der Windows-Anmeldeinformationsverwaltung, im macOS-Schlüsselbund oder im Linux-Schlüsselring; auf macOS und Linux ist ausdrücklich eine Klartextdatei möglich, die nur dein Benutzer liest und schreibt, auf Linux auch Umgebungsvariablen. auth.json enthält nur Konto- und Regions-Metadaten. Token landen nie in Logs, Exporten oder Fehlerberichten.',
       privacyTelemetryTitle: 'Keine Telemetrie, keine Nutzungsstatistik',
       privacyTelemetryBody:
-        'Die App meldet von sich aus kein Nutzungsverhalten. Nur wenn du selbst „Fehlerbericht senden" drückst, gehen die unten aufgeführten anonymisierten Felder raus.',
-      privacyModalLink: 'Die lokalen Datenschutz-Prinzipien lesen',
+        'ZeppBridge überträgt keine Nutzungsstatistiken. Nur bei manuellem Klick auf „Fehlerbericht senden" gehen die ausgewählten anonymisierten Diagnosedaten raus.',
+      privacyModalLink: 'Lokale Datenschutz-Prinzipien ansehen',
       privacyReportTitle: 'Ein Gerät oder Training nicht erkannt?',
       privacyReportBody:
-        'Ohne GitHub-Konto, ohne Daten zu kopieren. Nach deiner Bestätigung gehen nur produktbezogene Feldstrukturen, die Firmware-Version, Modellnummern (Ganzzahlen, die nur sagen, welches Modell) und unbekannte Trainings-Codes mit ihren Anzahlen an ZeppBridges privaten Fehlerbericht-Speicher. Nie gehen dein Konto, Token, Seriennummern, Geräte-IDs, MAC-Adressen, GPS, Gesundheitswerte, Rohantworten oder lokale Pfade raus.',
+        'Kein GitHub-Konto nötig. Nach deiner Bestätigung gehen nur Produkt-Feldstrukturen, Firmware, Modellnummern (Ganzzahlen – nur welches Modell) und unbekannte Trainings-Codes samt Anzahl an den privaten Berichtsspeicher von ZeppBridge. Nie raus: Konto, Token, Seriennummern, Geräte-IDs, MAC-Adressen, GPS, Gesundheitswerte, Rohantworten oder lokale Pfade.',
 
       // ── 5. MCP ──
-      mcpBadge: 'Nur lesend · hört auf keinem Port',
+      mcpBadge: 'Nur lesend · kein offener Port',
       mcpCopyPrompt: 'Kopieren und deine KI fragen',
-      mcpCopyConfig: 'Nur das Config-Snippet kopieren',
+      mcpCopyConfig: 'Nur Config kopieren',
       mcpPromptCopied:
         'Kopiert. Füge es bei der KI ein, die du nutzt – sie gibt dir die Einrichtungsschritte für deinen Rechner.',
       mcpPromptCopyFailed: 'Kopieren fehlgeschlagen. Markiere den Text oben von Hand.',
       mcpConfigCopied: 'Config kopiert. Ersetze command durch den echten Pfad zu zeppbridge-mcp auf deinem Rechner.',
       mcpConfigCopyFailed: 'Kopieren fehlgeschlagen. Markiere die Config oben von Hand.',
       mcpToolListWorkouts: 'Trainingsliste, neueste zuerst',
-      mcpToolWorkoutInsight: 'Ein Training gegen deine eigene Referenz',
+      mcpToolWorkoutInsight: 'Ein Training im Vergleich zu deiner Baseline',
       mcpToolMetricSeries: 'Tägliche Metrikreihen, jede mit ihrer Einheit',
       mcpToolSleepDetail: 'Eine Nacht Schlaf, Phase für Phase',
       mcpToolDataHealth: 'Abruf-/Parse-/Schreib-Status je Datenstrom',
@@ -362,10 +362,10 @@ Sie bringt ein MCP-Programm (zeppbridge-mcp) mit, das ich bei dir einrichten mö
 Was ich darüber weiß:
 - Das MCP-Programm kommt aus dem zeppbridge-tools-Archiv auf ZeppBridges GitHub-Releases-Seite; entpacken und zeppbridge-mcp liegt darin. Ich habe es eventuell noch nicht heruntergeladen.
 - Es ist ein stdio-MCP-Server. Er liest die lokale Datenbank, nutzt kein Netzwerk, hört auf keinem Port und braucht kein Token und keinen API-Key.
-- Die typische Config-Form ist: {"mcpServers": {"zeppbridge": {"command": "<voller Pfad zu zeppbridge-mcp>", "args": []}}}
-- Er stellt fünf nur-lesende Werkzeuge bereit: list_workouts, get_workout_insight (ein Training gegen meine eigene Referenz), get_metric_series (tägliche Metrikreihen), get_sleep_detail (eine Nacht, Phase für Phase) und get_data_health (Abruf-/Parse-/Schreib-Status je Datenstrom).
+- Die typische Config-Form ist: {"mcpServers": {"zeppbridge": {"command": "<voller Pfad zu zeppbridge-mcp>", "args": ["--scope", "task"]}}}
+- Er stellt fünf nur-lesende Werkzeuge bereit: list_workouts, get_workout_insight (ein Training im Vergleich zu meiner Baseline), get_metric_series (tägliche Metrikreihen), get_sleep_detail (eine Nacht, Phase für Phase) und get_data_health (Abruf-/Parse-/Schreib-Status je Datenstrom).
 
-Bitte sag mir:
+Sag mir:
 1. Konkret für dich – das Werkzeug, mit dem ich gerade spreche – in welche Datei die Config gehört oder welcher Befehl sie hinzufügt;
 2. Wie man einen Windows-Pfad schreibt (müssen Backslashes escaped werden);
 3. Wie ich nach der Einrichtung prüfe, dass es funktioniert.
@@ -374,11 +374,11 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       mcpConfigPathPlaceholder: '<Pfad zu zeppbridge-mcp>',
 
       // ── 6. Aufbewahrung ──
-      retentionLabel: 'Aufbewahren für',
+      retentionLabel: 'Aufbewahrungsdauer',
       retentionAria: 'Aufbewahrungsdauer lokaler Daten in Tagen',
-      retentionNote: (days: number) => `Es werden die letzten ${days} Tage lokal behalten. Die Bereinigung läuft `,
-      retentionNoteStrong: 'nach einer erfolgreichen Synchronisierung',
-      retentionNoteTail: ', nie von allein im Hintergrund.',
+      retentionNote: (days: number) => `Die letzten ${days} Tage werden lokal behalten. Bereinigt wird `,
+      retentionNoteStrong: 'nach jeder erfolgreichen Synchronisierung',
+      retentionNoteTail: ', nie von selbst im Hintergrund.',
       retentionCutoff: (date: string) =>
         `Nach der nächsten erfolgreichen Synchronisierung werden Daten vor dem ${date} gelöscht`,
       cleaningUp: 'Bereinigung läuft…',
@@ -404,81 +404,81 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       updateSeeNotes: 'Was sich geändert hat',
       updateStatusIdle: 'Noch nicht geprüft',
       updateStatusChecking: 'GitHub Releases werden geprüft',
-      updateStatusAvailable: (version: string) => `Version ${version} ist verfügbar`,
-      updateStatusDownloading: 'Das Update wird geladen',
+      updateStatusAvailable: (version: string) => `Version ${version} verfügbar`,
+      updateStatusDownloading: 'Update wird geladen',
       updateStatusDownloadingPercent: (percent: number) => `Wird geladen: ${percent} %`,
-      updateStatusInstalling: 'Wird installiert; die App startet danach neu',
-      updateStatusFailed: 'Das Update ist fehlgeschlagen',
-      updateStatusUpToDate: 'Du bist auf dem neuesten Stand',
+      updateStatusInstalling: 'Wird installiert · App startet danach neu',
+      updateStatusFailed: 'Update fehlgeschlagen',
+      updateStatusUpToDate: 'Auf dem neuesten Stand',
       updateStatusUnmanaged: 'Updates kommen von deinem Paketmanager',
       updateUnmanagedHint: (version: string) =>
         `Aktuell ${version}. Dieser Build wird über Flatpak oder den Paketmanager deiner Distribution aktualisiert: flatpak update com.zeppbridge.app ausführen oder das Paket aktualisieren.`,
       releaseNotesEmpty: 'Diese Version kommt ohne Anmerkungen.',
       updateModalTitle: (version: string) => `Was sich in ZeppBridge ${version} geändert hat`,
-      updateModalCurrent: (version: string) => `Du bist auf ${version}`,
+      updateModalCurrent: (version: string) => `Aktuell ${version}`,
       updateModalUnknownVersion: 'einer unbekannten Version',
       updateModalReleased: (date: string) => ` · erschienen am ${date}`,
       updateInstalling: 'Wird installiert…',
-      updateDownloading: 'Das Update wird geladen',
-      updateInstallNote: 'Die App startet nach der Installation selbst neu. Lokale Gesundheitsdaten werden nicht gelöscht.',
-      updateDownloadNoteTail: ' · nach dem Laden installiert sie sich automatisch; du kannst oben weiterlesen',
-      updateDownloadNote: 'Nach dem Laden installiert sie sich automatisch; du kannst oben weiterlesen.',
+      updateDownloading: 'Update wird geladen',
+      updateInstallNote: 'Die App startet nach der Installation selbst neu. Lokale Gesundheitsdaten bleiben erhalten.',
+      updateDownloadNoteTail: ' · installiert sich nach dem Laden selbst; du kannst oben weiterlesen',
+      updateDownloadNote: 'Installiert sich nach dem Laden selbst; du kannst oben weiterlesen.',
       updateFailedPrefix: (reason: string) => `Update fehlgeschlagen: ${reason}`,
-      updateRestartNote: 'Die App startet während der Installation neu. Lokale Gesundheitsdaten werden nicht gelöscht.',
+      updateRestartNote: 'Die App startet während der Installation neu. Lokale Gesundheitsdaten bleiben erhalten.',
       updateBackground: 'Im Hintergrund weiter',
-      updateLater: 'Nicht jetzt',
-      updateRetry: 'Erneut versuchen',
+      updateLater: 'Später',
+      updateRetry: 'Wiederholen',
       updateInstall: 'Laden und installieren',
 
       // ── 9. Automatische Synchronisierung ──
       syncDescA: (minutes: number) =>
-        `Cloud-Daten werden alle ${minutes} Minuten synchronisiert, solange die App offen ist`,
-      syncDescB: 'Wenn sie an bleibt, bleiben die Zeitreihen lückenlos.',
+        `Alle ${minutes} Minuten synchronisiert, solange die App offen ist`,
+      syncDescB: 'An lassen, für lückenlose Zeitreihen.',
       syncIntervalAria: 'Intervall der automatischen Synchronisierung',
       minutes: (minutes: number) => `${minutes} Min.`,
       syncing: 'Synchronisierung läuft…',
       syncNow: 'Jetzt synchronisieren',
 
       // ── Erweitert ──
-      scaleLabel: 'Oberflächen-Skalierung',
-      dataAuthLabel: 'Daten und Anmeldedaten',
+      scaleLabel: 'Anzeigeskalierung',
+      dataAuthLabel: 'Daten und Anmeldung',
       dataAuthNote: (days: number) =>
         `Die Daten liegen im Datenordner der App; derzeit werden ${days} Tage behalten.`,
       openDataFolder: 'Datenordner öffnen',
       clearAuth: 'Anmeldedaten löschen',
       logout: 'Abmelden',
       logoutHint:
-        'Meldet nur das Konto ab. Alles bereits auf diesen Rechner Synchronisierte bleibt, und die Synchronisierung geht nach der nächsten Anmeldung weiter.',
+        'Meldet das Konto ab. Bereits synchronisierte Daten bleiben auf diesem Rechner erhalten – nach erneuter Anmeldung läuft die Synchronisierung weiter.',
       logoutNoMultiAccount:
-        'Kontenwechsel wird noch nicht unterstützt: Wenn du dich danach mit einem anderen Konto anmeldest, schreiben beide Konten in dieselbe lokale Bibliothek.',
-      healthCheckLabel: 'Prüfung des Datenzustands',
+        'Kontenwechsel wird noch nicht unterstützt: Bei Anmeldung mit anderem Konto schreiben beide in dieselbe lokale Datenbank.',
+      healthCheckLabel: 'Datenzustandsprüfung',
       healthCheckNote:
-        'Wie weit jeder Datenstrom beim Abrufen aus der Cloud, Parsen und lokalen Schreiben gekommen ist; welche Daten er abdeckt; woher er kommt. Nichts zum täglichen Anschauen – hierher kommst du, wenn ein Sync-Ergebnis nicht dem entspricht, was du erwartet hast.',
+        'Zeigt Abruf, Parsen und Schreiben je Datenstrom samt Abdeckung und Quelle. Nichts für jeden Tag – hier findest du die Ursache, wenn eine Synchronisierung unerwartete Ergebnisse liefert.',
       healthCheckOpen: 'Datenzustandsprüfung öffnen',
       compactLabel: 'Gespeicherte Rohdaten komprimieren',
       compactNoteA:
-        'Die rohen Cloud-Antworten belegen den meisten Platz in dieser Datenbank. Es ist JSON-Text und lässt sich meist auf etwa ein Fünftel komprimieren.',
+        'Rohe Cloud-Antworten belegen den meisten Speicherplatz (JSON-Text, lässt sich auf ca. ein Fünftel komprimieren).',
       compactNoteStrong: 'Das passiert automatisch',
       compactNoteB:
-        ': Beim ersten Start einer neuen Version komprimiert der Hintergrund den Bestand, ein Banner zeigt es an und verschwindet danach. Dieser Knopf startet es nur von Hand erneut (etwa wenn es unterbrochen wurde). Vor dem Ersetzen wird entpackt und Byte für Byte verglichen; was nicht passt, bleibt unangetastet – die Rohdaten sind die einzige Grundlage fürs Neueinlesen, also wird lieber nichts angerührt. Danach läuft ein VACUUM; erst das verkleinert die Datei auf der Platte wirklich.',
-      compacting: 'Komprimierung läuft… (bei einer großen Datenbank einige Minuten)',
+        ': Neue Versionen komprimieren Altbestände beim ersten Start automatisch („Komprimierung läuft", verschwindet von selbst). Diese Schaltfläche startet den Vorgang von Hand, etwa nach einer Unterbrechung. Vor dem Ersetzen wird entpackt und bytegenau verglichen; was nicht stimmt, bleibt unangetastet – die Rohdaten sind die einzige Grundlage fürs Neu-Einlesen. Danach gibt VACUUM den Platz auf der Festplatte frei.',
+      compacting: 'Komprimierung läuft… (große Datenbanken: einige Minuten)',
       compactRun: 'Gespeicherte Rohdaten komprimieren',
       backupLabel: 'Datenbank-Snapshots und Wiederherstellung',
       localApiLabel: 'Lokale REST-API',
       localApiNote:
-        'Damit andere Programme auf diesem Rechner – Skripte, Dashboards, eigene Werkzeuge – normalisierte Trainingsreihen als JSON lesen können. Wenn du so etwas nicht brauchst, lass sie aus.',
+        'Ermöglicht lokalen Skripten und Werkzeugen, normalisierte Trainingsdaten als JSON abzufragen. Bei Nichtbedarf deaktiviert lassen.',
       syncDiagnostics: 'Sync-Diagnose',
       noSyncDiagnostics: 'Noch keine Sync-Diagnose.',
 
       // ── Lokale API ──
-      apiListening: 'Hört',
-      apiEnabledNotListening: 'An, hört aber nicht',
+      apiListening: 'Lauscht',
+      apiEnabledNotListening: 'Aktiviert, lauscht nicht',
       apiOff: 'Aus',
       apiToggleTitle: 'Lokale API aktivieren',
       apiToggleSub: (address: string) =>
         `Wirkt sofort, kein Neustart nötig. Beim Ausschalten wird ${address} sofort freigegeben.`,
       apiToggleAria: 'Lokale REST-API aktivieren',
-      apiCopyExample: 'Ein authentifiziertes Beispiel kopieren',
+      apiCopyExample: 'Authentifiziertes Beispiel kopieren',
       apiTokenLabel: 'Zugriffstoken',
       apiHide: 'Verbergen',
       apiShow: 'Anzeigen',
@@ -487,18 +487,18 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       apiAuthNoteA: 'Jede Anfrage muss ',
       apiAuthNoteB: ' mittragen, sonst gibt es einen 401. Neu erzeugen macht den alten Token sofort ungültig.',
       apiBindNote:
-        'Nur an 127.0.0.1 gebunden: nur lesend, kein browser-übergreifender Zugriff, und sie gibt keine Anmeldedaten zurück. Sie stoppt, wenn du ZeppBridge beendest.',
+        'Nur an 127.0.0.1 gebunden: nur lesend, kein Cross-Origin-Zugriff, keine Anmeldedaten. Stoppt beim Beenden von ZeppBridge.',
       apiTokenReadFailed: 'Der Zugriffstoken der lokalen API konnte nicht gelesen werden',
       apiEnabled: 'Die lokale API ist an. Kein Neustart nötig.',
       apiDisabled: 'Die lokale API ist aus, der Port ist frei.',
       apiToggleFailed: 'Die lokale API konnte nicht umgeschaltet werden',
-      apiTokenCopied: 'Zugriffstoken in die Zwischenablage kopiert.',
+      apiTokenCopied: 'Zugriffstoken kopiert.',
       apiTokenCopyFailed: 'Konnte nicht in die Zwischenablage schreiben. Drücke „Anzeigen" und kopiere ihn von Hand.',
       apiRegenerateConfirm:
         'Neu erzeugen macht den alten Token sofort ungültig, und jedes lokale Programm, das ihn nutzt, muss aktualisiert werden. Fortfahren?',
-      apiTokenRegenerated: 'Ein neuer Zugriffstoken wurde erzeugt. Der alte ist ungültig.',
+      apiTokenRegenerated: 'Neuer Zugriffstoken erzeugt; der alte ist ungültig.',
       apiRegenerateFailed: 'Der Zugriffstoken konnte nicht neu erzeugt werden',
-      apiExampleCopied: 'Das authentifizierte Beispiel wurde kopiert (es enthält deinen Zugriffstoken).',
+      apiExampleCopied: 'Authentifiziertes Beispiel kopiert (mit deinem Zugriffstoken).',
       apiExampleCopyFailed:
         'Das Beispiel konnte nicht kopiert werden. Setze Endpunkt-URL und Authorization-Header von Hand zusammen.',
 
@@ -528,7 +528,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       connFailed: 'Anmeldung fehlgeschlagen',
       unidentified: 'Nicht erkannt',
       unidentifiedInitial: '?',
-      notProvided: 'Keine Daten',
+      notProvided: 'Nicht angegeben',
       noRecords: 'Noch keine Einträge',
       timeUnknown: 'Zeit unbekannt',
       refreshFailed: (reason: string) => `Erkennung fehlgeschlagen; auf den lokalen Cache zurückgefallen${reason}`,
@@ -543,10 +543,10 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       fillAllFields: 'Alle Pflichtfelder ausfüllen',
       manualAuthDone: 'Manuelle Anmeldung erfolgreich; die Anmeldedaten sind gespeichert.',
       manualAuthFailed: 'Manuelle Anmeldung fehlgeschlagen',
-      verifyFailed: 'Die Verifizierung kam nicht durch',
+      verifyFailed: 'Verifizierung fehlgeschlagen',
       clearAuthConfirm:
-        'Von diesem Konto abmelden?\n\nNur die Anmeldedaten werden gelöscht; alles bereits Synchronisierte auf diesem Rechner bleibt.\n\nHinweis: Kontenwechsel wird noch nicht unterstützt – eine Anmeldung mit einem anderen Konto schreibt beide Konten in dieselbe lokale Bibliothek.',
-      authCleared: 'Abgemeldet. Alles bereits auf diesen Rechner Synchronisierte ist noch da.',
+        'Von diesem Konto abmelden?\n\nNur die Anmeldedaten werden gelöscht; bereits Synchronisiertes bleibt auf diesem Rechner erhalten.\n\nHinweis: Kontenwechsel wird noch nicht unterstützt – eine Anmeldung mit anderem Konto schreibt in dieselbe lokale Datenbank.',
+      authCleared: 'Abgemeldet. Bereits synchronisierte Daten bleiben erhalten.',
       clearAuthFailed: 'Die Anmeldedaten konnten nicht gelöscht werden',
       reprocessed: (count: number) =>
         `Lokale Daten neu eingelesen: ${count} ${count === 1 ? 'normalisierter Eintrag' : 'normalisierte Einträge'}. Die Zeit der Cloud-Synchronisierung bleibt unverändert.`,
@@ -588,18 +588,18 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         blood_pressure: 'Blutdruck',
         weight: 'Gewicht',
         emotion: 'Stimmung',
-        food: 'Essensprotokoll (Kalorien und Makros)',
-        second_heart_rate: 'Index der Herzfrequenz pro Sekunde',
-        spo2_files: 'Index der SpO₂-Rohdateien pro Messung',
+        food: 'Essensprotokoll (Kalorien und Makronährstoffe)',
+        second_heart_rate: 'Herzfrequenz-Index pro Sekunde',
+        spo2_files: 'SpO₂-Rohdatei-Index pro Messung',
       },
 
       // ── Einheiten / Fähigkeiten ──
       unitDays: 'Tage',
       unitRecords: 'Einträge',
-      capabilityNoRecords: (days: number) => `In den letzten ${days} Tagen nichts aufgezeichnet`,
+      capabilityNoRecords: (days: number) => `Keine Einträge in den letzten ${days} Tagen`,
       capabilityNotIngested:
-        'Die Cloud hat Daten, aber lokal ist noch nichts Verwertbares gespeichert. Versuche zu synchronisieren oder nachzuladen; wenn weiterhin nichts auftaucht, braucht ihr Datenformat eventuell zusätzliche Unterstützung.',
-      capabilityFoodHistoryHint: 'In der Cloud sind Ernährungseinträge vorhanden, lokal aber noch nicht. Liegen sie vor dem Zeitraum der inkrementellen Synchronisierung, synchronisiere den Verlauf für diese Daten. Falls sie dann weiter fehlen, melde das Datenformat.',
+        'Daten sind in der Cloud, lokal noch nicht verarbeitet. Synchronisiere oder lade Historie nach; fehlen sie danach weiter, braucht das Format vermutlich noch Unterstützung.',
+      capabilityFoodHistoryHint: 'In der Cloud gibt es Essenseinträge, lokal noch nicht. Liegen sie vor der letzten inkrementellen Synchronisierung, lade die Historie für diese Tage nach; fehlen sie weiter, melde das Datenformat.',
       capabilityUnsupported: 'Dein Konto oder Gerät liefert das nicht',
       capabilityNoneProbed: (days: number) => `Keine Messung in den letzten ${days} Tagen`,
       capabilityNotProbed: 'Noch nicht geprüft',
@@ -611,20 +611,20 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       // ── Fehlerbericht-Kategorien ──
       reportCategory: {
         device: {
-          label: 'Ein Gerät wurde nicht erkannt',
-          hint: 'das Modell ist falsch, oder es zeigt „Nicht erkannt"',
+          label: 'Gerät nicht erkannt',
+          hint: 'Modell falsch oder „Nicht erkannt"',
         },
         workout: {
-          label: 'Ein Trainingstyp wurde nicht erkannt',
-          hint: 'es erscheint als unbekanntes Training oder als falsche Sportart',
+          label: 'Trainingsart nicht erkannt',
+          hint: 'erscheint als „unbekanntes Training" oder falsche Sportart',
         },
         data: {
-          label: 'Die Zahlen stimmen nicht',
-          hint: 'etwas ist immer leer, oder weicht von der Zepp-App ab',
+          label: 'Daten stimmen nicht',
+          hint: 'etwas bleibt leer oder weicht von der Zepp-App ab',
         },
         other: {
-          label: 'Etwas anderes',
-          hint: 'beschreibe es unten',
+          label: 'Sonstiges',
+          hint: 'unten beschreiben',
         },
       },
     },
@@ -633,33 +633,33 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       quickReturn: (page: string) => `Zurück zu ${page}`,
       bottomNav: 'Mobile Hauptnavigation',
       browserPreview:
-        'Bitte nutze die Desktop-App. Diese Browser-Vorschau liest keine Kontodaten.',
+        'Browser-Vorschau liest keine Kontodaten – bitte Desktop-App öffnen.',
       compacted: (saved: string) =>
-        `Gespeicherte Rohdaten wurden komprimiert, rund ${saved} Plattenplatz frei.`,
+        `Rohdaten komprimiert – rund ${saved} Plattenplatz frei.`,
       compacting: (pending: number) =>
-        `Gespeicherte Rohdaten werden komprimiert (${pending} ausstehend). Das erledigt sich von selbst; die Synchronisierung wartet kurz.`,
+        `Rohdaten werden komprimiert (${pending} ausstehend) – läuft von selbst, die Synchronisierung wartet kurz.`,
       mainNav: 'Hauptnavigation',
-      navHandoff: 'An KI übergeben',
+      navHandoff: 'An die KI',
       navOverview: 'Übersicht',
       navSettings: 'Einstellungen',
       preparingData:
-        'Die lokale Datenbank wird geöffnet – der erste Start nach einem Update kann ein paar Sekunden dauern…',
+        'Lokale Datenbank wird geöffnet. Erster Start nach Update kann kurz dauern…',
       previousPage: 'der vorherigen Seite',
-      routeNotFound: 'Diese Seite existiert nicht – du bist wieder auf der Übersicht.',
+      routeNotFound: 'Seite nicht gefunden – zurück zur Übersicht.',
       skipToContent: 'Zum Hauptinhalt springen',
       trayHint:
-        'Nach dem Schließen des Fensters läuft ZeppBridge im Infobereich weiter, die automatische Synchronisierung geht also weiter.',
+        'Beim Schließen bleibt ZeppBridge im Infobereich – automatische Synchronisierung läuft weiter.',
     },
     'components/BackupPanel': {
       blockerFutureSchema: (backup: number, current: number) =>
-        `Dieses Backup stammt aus einem neueren ZeppBridge (Schema ${backup}, diese App hat ${current}). Es hier zu öffnen würde Felder verlieren, also wird es nicht wiederhergestellt und die aktuelle Bibliothek bleibt unangetastet. Aktualisiere zuerst ZeppBridge.`,
+        `Dieser Snapshot stammt aus neuerem ZeppBridge (Schema ${backup}, diese App: ${current}). Wiederherstellen würde Felder verlieren, also abgelehnt; die aktuelle Datenbank bleibt unberührt. Aktualisiere zuerst ZeppBridge.`,
       blockerUnknown:
-        'Dieser Snapshot kann gerade nicht wiederhergestellt werden; ein Grund wurde nicht aufgezeichnet.',
+        'Dieser Snapshot lässt sich gerade nicht wiederherstellen; der Grund wurde nicht aufgezeichnet.',
       cancel: 'Abbrechen',
       cancelFailed: 'Die Wiederherstellung ließ sich nicht abbrechen',
       cancelRestore: 'Wiederherstellung abbrechen',
       cancelled:
-        'Die vorgemerkte Wiederherstellung wurde abgebrochen. Die Datenbank bleibt unverändert.',
+        'Vorgemerkte Wiederherstellung abgebrochen. Die Datenbank bleibt unverändert.',
       colBackup: 'Im Snapshot',
       colContent: 'Inhalt',
       colCurrent: 'Aktuell',
@@ -667,18 +667,18 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       compareExchange:
         ' ist Datenaustausch für andere Werkzeuge und enthält nur den gewählten Zeitraum; ',
       compareLead:
-        'Drei Dinge heißen hier „Export" und sind nicht dasselbe: ',
+        'Drei verschiedene Dinge heißen hier „Export": ',
       comparePack:
-        ' ist Material, das du bewusst auswählst und für ein externes Modell anonymisierst. Nur ein Snapshot versetzt die Datenbank in den früheren Zustand zurück.',
+        ' ist gezielt ausgewähltes und anonymisiertes Material für externe Modelle. Nur ein Snapshot stellt den früheren Zustand der Datenbank wieder her.',
       comparePackName: 'ein KI-Paket',
       compareSnapshot:
-        ' ist eine Komplettkopie der Datenbank für den Notfall, die nur ZeppBridge zurücklesen kann; ',
+        ' ist eine Notfallkopie der gesamten Datenbank, die nur ZeppBridge wieder einlesen kann; ',
       compareSnapshotName: 'ein Datenbank-Snapshot',
       compatibility: {
         future_schema_refused:
           'Der Snapshot stammt aus einer neueren App-Version, deren Aufbau diese App nicht lesen kann – keine Wiederherstellung möglich.',
         older_schema_will_migrate:
-          'Der Snapshot stammt aus einer älteren Schema-Version. Nach der Wiederherstellung aktualisiert er sich beim nächsten Start selbst.',
+          'Der Snapshot stammt aus einer älteren Schema-Version – er wird nach der Wiederherstellung beim nächsten Start automatisch aktualisiert.',
         same_schema:
           'Der Snapshot hat dieselbe Schema-Version wie diese App und lässt sich direkt wiederherstellen.',
       },
@@ -690,12 +690,12 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         `Snapshot erstellt: ${size}, Integritätsprüfung bestanden.`,
       creating: 'Wird erstellt…',
       integrityBad:
-        'Die Integritätsprüfung ist bei der Erstellung fehlgeschlagen – nicht zum Wiederherstellen verwenden.',
+        'Integritätsprüfung bei der Erstellung fehlgeschlagen – nicht zum Wiederherstellen verwenden.',
       integrityOk: (sha: string) =>
         `Integritätsprüfung bei der Erstellung bestanden · SHA-256 ${sha}…`,
       intro1a: 'Ein Snapshot ist eine vollständige Kopie der gesamten ',
       intro1b:
-        '-Datei. Sie bleibt auf diesem Rechner und wird nirgendwo hochgeladen. Vor einem Datenbank-Upgrade wird automatisch einer angelegt, und du kannst jederzeit selbst einen erstellen.',
+        '-Datei. Sie bleibt lokal und wird nie hochgeladen. Vor einem Datenbank-Upgrade wird automatisch einer angelegt, und du kannst jederzeit selbst einen erstellen.',
       kind: {
         manual: 'manuell',
         pre_migration: 'vor dem Upgrade',
@@ -709,7 +709,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       pendingBodyA: (stagedAt: string) =>
         `Vorgemerkt am ${stagedAt}. Die Datenbank wird beim `,
       pendingBodyB:
-        ' ersetzt. Die aktuelle Datenbank liegt bereits als Rollback-Punkt bereit, sodass du dahin zurückkehren kannst.',
+        ' ersetzt. Die aktuelle Datenbank wird als Rollback-Punkt gesichert, sodass du zurückkehren kannst.',
       pendingNextStart: 'nächsten Start',
       pendingTitle: 'Eine Wiederherstellung ist vorgemerkt',
       pin: 'Behalten',
@@ -717,7 +717,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       pinned: 'Behalten',
       previewFailed: 'Die Wiederherstellungs-Vorschau konnte nicht erstellt werden',
       previewNote:
-        'Zeilen mit negativer Differenz enthalten nach der Wiederherstellung entsprechend weniger Einträge. Eine Wiederherstellung holt nichts erneut aus der Cloud – brauchst du diese Daten noch, synchronisiere danach einmal.',
+        'Zeilen mit negativer Differenz enthalten nach Wiederherstellung entsprechend weniger Einträge. Fehlende Daten werden nicht erneut aus der Cloud geladen – bei Bedarf danach synchronisieren.',
       previewTitle: 'Wiederherstellungs-Vorschau',
       problemFileMissing: 'Die Sicherungsdatei ist nicht mehr im Sicherungsordner',
       problemIntegrityFailed:
@@ -727,13 +727,13 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       problemSizeMismatch:
         'Die Größe der Sicherungsdatei stimmt nicht mit dem Manifest überein – sie könnte beschädigt sein',
       problemUnknown:
-        'Dieser Snapshot hat die Prüfung nicht bestanden; ein Grund wurde nicht aufgezeichnet.',
+        'Der Snapshot hat die Prüfung nicht bestanden; der Grund wurde nicht aufgezeichnet.',
       refreshList: 'Aktualisieren',
-      restoreToThis: 'Auf diesen zurücksetzen',
+      restoreToThis: 'Diesen wiederherstellen',
       stageFailed: 'Die Wiederherstellung ließ sich nicht vormerken',
       stageRestore: 'Wiederherstellung vormerken (wirkt beim nächsten Start)',
       staged:
-        'Die Wiederherstellung ist vorgemerkt. In diesem Lauf ändert sich nichts; die Datenbank wird beim nächsten Start von ZeppBridge ersetzt.',
+        'Wiederherstellung vorgemerkt. In diesem Lauf ändert sich nichts; die Datenbank wird beim nächsten Start von ZeppBridge ersetzt.',
       staging: 'Wird vorgemerkt…',
       table: {
         daily_metrics: 'Tagesmetriken',
@@ -750,20 +750,20 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       verifyError: 'Die Prüfung ist fehlgeschlagen',
       verifyFailed: (problem: string) => `Prüfung nicht bestanden: ${problem}`,
       verifyPassed:
-        'Gerade erneut geprüft: Datei, Größe, SHA-256 und Integrität stimmen überein.',
+        'Erneute Prüfung bestanden: Datei, Größe, SHA-256 und Integrität stimmen überein.',
     },
     'components/CoverageNotice': {
       backfill: 'Mehr Historie nachladen',
       backfilling: 'Nachladen läuft…',
       empty:
-        'Auf diesem Rechner ist noch nichts. Einmal synchronisieren, dann haben die Diagramme etwas zum Zeichnen.',
+        'Noch keine Daten auf diesem Rechner. Einmal synchronisieren, damit Diagramme gezeichnet werden können.',
       emptyAfterSync:
-        'Die Synchronisierung lief durch, brachte aber nichts zurück. Entweder hat dieses Konto für diesen Zeitraum keine Daten bei Zepp, oder die Uhr hat noch nicht in die Zepp-App hochgeladen. Prüfe zuerst in der Zepp-App auf dem Telefon, ob dort Daten sind, und synchronisiere dann hier erneut.',
+        'Synchronisierung war erfolgreich, lieferte aber keine Einträge. Entweder gibt es bei Zepp keine Daten für diesen Zeitraum, oder die Uhr hat sie noch nicht an die Zepp-App übertragen. Prüfe zuerst die Zepp-App am Smartphone und synchronisiere erneut.',
       emptyUnconfirmedRegion:
-        'Die Synchronisierung lief durch, brachte aber nichts zurück. Bei der Anmeldung konnte nicht bestätigt werden, zu welcher Zepp-Region dein Konto gehört – ZeppBridge nutzt gerade die beste Schätzung, und eine Synchronisierung gegen die falsche Region sieht genau so aus: sie läuft erfolgreich und liefert nichts. Verbinde das Konto erneut und versuche es noch einmal.',
+        'Synchronisierung war erfolgreich, lieferte aber keine Einträge. Deine Zepp-Region konnte bei der Anmeldung nicht bestätigt werden (ZeppBridge nutzt eine Schätzung). Eine falsche Region läuft fehlerfrei durch, bleibt aber leer. Verbinde das Konto erneut.',
       reconnect: 'Konto erneut verbinden',
       short: (covered: number, earliest: string) =>
-        `Dieser Rechner hat ${covered} Tage Daten (früheste ${earliest}). Alles davor ist leer, weil es noch nicht aus der Cloud geholt wurde – nicht weil du damals nichts aufgezeichnet hast.`,
+        `Dieser Rechner hat Daten für ${covered} Tage (früheste: ${earliest}). Ältere Zeiträume sind leer, weil sie noch nicht abgerufen wurden – nicht weil keine Daten aufgezeichnet wurden.`,
       syncNow: 'Jetzt synchronisieren',
       connect: 'Zepp-Konto verbinden',
       emptyNotConnected: 'Auf diesem Rechner ist noch nichts. Verbinde zuerst dein Zepp-Konto und synchronisiere dann einmal.',
@@ -772,12 +772,12 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       marqueeAria: 'Derzeit im Katalog geführte Amazfit-Geräte',
     },
     'components/DevicePicker': {
-      alreadyAssigned: 'Bereits dieses',
+      alreadyAssigned: 'Bereits ausgewählt',
       clear: 'Auswahl zurücknehmen',
       confirm: 'Das ist mein Gerät',
       contributeBody:
-        'Sendet an ZeppBridge das von dir gewählte Modell plus die Modellnummern dieses Geräts (deviceSource / deviceType, nur Ganzzahlen). Beides sagt nur, welche Uhr es ist – nichts weiter: kein Konto, keine Seriennummer, keine MAC, keine Gesundheitsdaten. Huami veröffentlicht keine Zuordnungstabelle für diese Nummern, deshalb wächst der eingebaute Katalog nur so. Sobald ein paar Leute auf ein Modell gezeigt haben, wird es für alle automatisch erkannt.',
-      contributeTitle: 'Hilf der nächsten Version, dieses Gerät selbst zu erkennen',
+        'Sendet das gewählte Modell und die internen Modellnummern (deviceSource / deviceType, reine Ganzzahlen) an ZeppBridge. Keine Kontodaten, keine Seriennummern, keine MAC, keine Gesundheitsdaten. Huami veröffentlicht keine Zuordnungstabelle – der Katalog wächst nur durch Rückmeldungen. Nach wenigen Hinweisen wird das Modell für alle automatisch erkannt.',
+      contributeTitle: 'Hilf mit, dieses Gerät künftig automatisch zu erkennen',
       empty:
         'Kein Modell passt. Versuche ein anderes Stichwort oder stelle den Filter zurück auf „Alle".',
       filterAll: 'Alle',
@@ -832,13 +832,13 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       computedRestingNote: (days: number) =>
         `Durchschnitt der ${days} Tage mit Daten aus den letzten 30.`,
       desktopOnly:
-        'Öffne dies in der ZeppBridge-Desktop-App; Herzfrequenzzonen lesen lokale Einträge.',
+        'In der ZeppBridge-Desktop-App öffnen – Herzfrequenzzonen lesen lokale Daten.',
       durationHours: (hours: number, minutes: number) => `${hours} Std. ${minutes} Min.`,
       durationMinutes: (minutes: number) => `${minutes} Min.`,
       formulaNote: (formula: string, bases: string) =>
         `${formula}. Grenzen werden abgerundet, wie auf der Uhr. Basen: ${bases}`,
       intro:
-        'Die drei Modelle zeichnen unterschiedliche Zonen, und nur du weißt, welches für dich etwas bedeutet – darum wählt ZeppBridge keinen Standard und schätzt nie mit einer Formel wie 220 minus Alter. Jede Basis unten trägt ihre Quelle und das Datum ihrer Messung.',
+        'Die drei Modelle berechnen unterschiedliche Zonen. ZeppBridge gibt keinen Standard vor und schätzt nicht pauschal (z. B. 220 minus Alter). Jede Basis unten zeigt Quelle und Messdatum.',
       kind: {
         max_hr: 'Basis max. Herzfrequenz',
         resting_hr: 'Basis Ruheherzfrequenz',
@@ -862,7 +862,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       modelAria: 'Herzfrequenzzonen-Modell',
       modelGroup: 'Modell',
       noBases:
-        'Noch keine Herzfrequenz-Basis auf diesem Rechner. Nach einer Trainingssynchronisierung erscheinen hier Messwerte wie deine höchste aufgezeichnete Herzfrequenz.',
+        'Noch keine Herzfrequenz-Basen vorhanden. Nach einer Trainingssynchronisierung erscheinen hier Messwerte wie die maximale Herzfrequenz.',
       outside: (below: string, above: string) =>
         `Außerhalb der Zonen: unter Z1 ${below} · über Z5 ${above}`,
       percentBands: ['Aufwärmen', 'Fettverbrennung', 'Aerob', 'Anaerob', 'Maximum'],
@@ -882,7 +882,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       allChunksDone: 'Jeder Monatsblock im Abdeckungsprotokoll ist erledigt.',
       archiveAria: 'Langzeitarchiv',
       archiveBody:
-        'Ist es an, räumt eine erfolgreiche Synchronisierung die Historie nicht mehr nach der Aufbewahrungsfrist ab. Die Datenbank wächst weiter; du kannst es jederzeit ausschalten – beim Ausschalten erfährst du, was die nächste Synchronisierung aufräumen würde.',
+        'Aktiviert: Erfolgreiche Synchronisierungen löschen keine Daten mehr nach Aufbewahrungsfrist. Die Datenbank wächst weiter. Beim Ausschalten siehst du vorab, was gelöscht würde.',
       archiveDisabled:
         'Langzeitarchiv aus: Die nächste erfolgreiche Synchronisierung räumt nach der Aufbewahrungsfrist auf.',
       archiveEnabled:
@@ -898,9 +898,9 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       backfilling: 'Nachladen läuft…',
       backfillTitle: 'Ältere Historie nachladen',
       confirmDisableArchive:
-        'Mit ausgeschaltetem Langzeitarchiv räumt die nächste erfolgreiche Synchronisierung ältere Daten nach der Aufbewahrungsfrist ab – das lässt sich nicht rückgängig machen.\nHast du gerade Historie nachgeladen, lege zuerst einen Datenbank-Snapshot an.\nAusschalten?',
+        'Ohne Langzeitarchiv löscht die nächste erfolgreiche Synchronisierung alte Daten nach der Aufbewahrungsfrist – unwiderruflich.\nFalls du gerade Historie nachgeladen hast, lege vorher einen Datenbank-Snapshot an.\nWirklich ausschalten?',
       confirmResetLedger:
-        'Das löscht nur das Abdeckungsprotokoll. Lokal Geschriebenes wird nicht gelöscht, und danach kannst du ein neues Nachladen planen. Fortfahren?',
+        'Löscht nur das Abdeckungsprotokoll – bereits gespeicherte Daten bleiben erhalten, danach lässt sich der Nachlade-Zeitraum neu planen. Fortfahren?',
       continueBackfill: 'Weiter nachladen',
       customDateAria: 'Startdatum des Nachladens',
       customDateLabel: 'Startdatum',
@@ -917,18 +917,18 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       failedExhausted:
         'Die automatischen Wiederholungen sind aufgebraucht. Nutze „Fehlgeschlagene Monate erneut versuchen"',
       failedIntro:
-        'Diese Blöcke sind fehlgeschlagen. Alle anderen Monate waren unbetroffen und wurden wie üblich nachgeladen.',
+        'Diese Blöcke sind fehlgeschlagen. Die übrigen Monate sind unberührt und wurden wie üblich nachgeladen.',
       failedNoReason: 'Kein Grund aufgezeichnet',
       failedRow: (stream: string, month: string) => `${stream} · ${month}`,
       failedTitle: 'Monate, die nicht geholt werden konnten',
       intro:
-        'Das Archiv deckt „ab heute nichts mehr löschen" ab, das Nachladen deckt „hole, was früher war". Erst mit beidem ist die lokale Kopie wirklich vollständig.',
+        'Das Archiv verhindert künftiges Löschen, das Nachladen holt frühere Daten zurück – beides zusammen macht die lokale Kopie komplett.',
       ledgerComplete:
         'Jeder Monatsblock im Protokoll ist erledigt: entweder lokal geschrieben, oder die Cloud hat klar gesagt, dass sie für diesen Zeitraum nichts hat.',
       ledgerFailed: (failed: number) => `${failed} fehlgeschlagen`,
       ledgerFrom: (from: string) => ` · angefragt ab ${from}`,
       ledgerIncomplete: (remaining: number) =>
-        `${remaining} Blöcke sind noch ungeklärt. Bis alle fertig sind, ist diese lokale Kopie eine Kopie des erfolgreich synchronisierten Bereichs – keine vollständige.`,
+        `${remaining} Blöcke sind noch ungeklärt. Bis alle fertig sind, umfasst diese lokale Kopie nur den bereits synchronisierten Bereich – keine vollständige Kopie.`,
       ledgerNothingWritten: 'Noch kein Monat geschrieben',
       ledgerProgress: (done: number, total: number) =>
         `${done} von ${total} Monatsblöcken erledigt`,
@@ -955,11 +955,11 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         'Die fehlgeschlagenen Monate sind wieder eingereiht. Du kannst weiter nachladen.',
       retryFailedFailed: 'Die fehlgeschlagenen Monate ließen sich nicht wieder einreihen',
       roundDone: (remaining: number) =>
-        `Diese Runde ist fertig; ${remaining} Monatsblöcke bleiben. Drücke „Weiter nachladen", um fortzufahren – du kannst jederzeit stoppen.`,
+        `Runde beendet; ${remaining} Monatsblöcke verbleiben. Klicke auf „Weiter nachladen", um fortzufahren – jederzeit stoppbar.`,
       roundProgress: (done: number, total: number) =>
         `Nachladen: ${done} von ${total} Monatsblöcken fertig. Du kannst jederzeit stoppen.`,
       stalled: (remaining: number) =>
-        `${remaining} Monatsblöcke bleiben, aber diese Runde hat keinen vorangebracht und wurde gestoppt. Vermutlich scheitern diese Blöcke wiederholt – sieh dir die Fehlerliste unten an oder drücke „Fehlgeschlagene Monate erneut versuchen".`,
+        `${remaining} Monatsblöcke verbleiben, aber diese Runde kam keinen Schritt weiter und wurde gestoppt. Wahrscheinlich scheitern diese Blöcke immer wieder – prüfe die Fehlerliste unten oder wähle „Fehlgeschlagene Monate erneut versuchen".`,
       statEmpty: 'In der Cloud leer',
       statFailed: 'Fehlgeschlagen',
       statPending: 'Ausstehend',
@@ -982,17 +982,17 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       streamSeparator: ', ',
       title: 'Langzeitarchiv und vollständige Historie',
       unmeasured: (streams: string) =>
-        `Zu wenig lokale Messwerte für eine Schätzung: ${streams}. Diese zählen nicht in die Summe oben – lieber „wir wissen es nicht" sagen als eine Rate zu erfinden und sie über Jahre zu multiplizieren.`,
+        `Zu wenig lokale Messwerte für eine Schätzung (${streams}) – wird in der Gesamtsumme weggelassen statt ungenau hochgerechnet.`,
       wouldBeCleanedUp: (requested: number, retention: number) =>
         `Dieses Nachladen würde ${requested} Tage Historie holen, aber dieser Rechner behält nur die letzten ${retention} Tage – was zurückkommt, würde bei der nächsten erfolgreichen Synchronisierung gelöscht. Schalte zuerst das Langzeitarchiv ein oder verlängere die Aufbewahrungsfrist.`,
     },
     'components/InsightCard': {
       baselineRule: (days: number, tolerance: number | undefined, min: number, max: number) =>
-        `Die Regel: Läufe derselben Art aus den letzten ${days} Tagen, deren Distanz um höchstens ±${tolerance ?? '—'} % von dieser abweicht, mindestens ${min}, höchstens ${max} davon.`,
+        `Nur Läufe gleicher Art aus den letzten ${days} Tagen, Distanzabweichung bis ±${tolerance ?? '—'} % – mindestens ${min}, höchstens ${max}.`,
       baselineRun: 'Baseline',
       baselineSummary: 'Woher die Baseline kommt',
       comparedTo: (count: number) =>
-        `Verglichen mit deinen ${count} letzten Läufen ähnlicher Distanz:`,
+        `Verglichen mit deinen letzten ${count} Läufen ähnlicher Distanz:`,
       confidence: {
         high: 'Gut belegt',
         insufficient: 'Zu wenig Belege',
@@ -1001,28 +1001,28 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       },
       currentRun: 'Dieser Lauf',
       driftDelta: (percent: string) => `${percent} %`,
-      driftFalling: 'Jeder Schlag hat dich in der zweiten Hälfte weiter getragen.',
+      driftFalling: 'Effizientere zweite Hälfte: Jeder Schlag trug dich weiter.',
       driftFirst: 'Erste Hälfte',
-      driftFlat: 'Beide Hälften sind praktisch gleich.',
+      driftFlat: 'Beide Hälften praktisch gleich.',
       driftHrSpeed: (hr: number, pace: string) => `${hr} bpm · ${pace}`,
       driftNote:
-        'Das vergleicht das Training nur mit sich selbst, nie mit anderen. Ampeln, Steigungen, Intervalle und GPS-Drift verfälschen es, deshalb gibt es keine Zahl, wenn das Tempo nicht ruhig war.',
+        'Vergleicht das Training nur mit sich selbst. Ampeln, Steigungen, Intervalle und GPS-Drift verfälschen es – bei unruhigem Tempo wird keine Zahl berechnet.',
       driftPerBeat: (metres: string) => `${metres} m/Schlag`,
-      driftRising: 'In der zweiten Hälfte kostete dasselbe Tempo mehr Schläge.',
+      driftRising: 'In der zweiten Hälfte brauchte dasselbe Tempo mehr Schläge.',
       driftSecond: 'Zweite Hälfte',
       driftSub:
-        'Teilt dieses Training zeitlich in zwei Hälften und vergleicht, wie viele Schläge dasselbe Tempo jeweils kostete.',
+        'Vergleicht Herzfrequenz und Tempo zwischen erster und zweiter Trainingshälfte.',
       driftTitle: 'Erste vs. zweite Hälfte',
       driftUnavailable: (code: string) =>
         (({
           too_short:
-            'Zu kurz zum Halbieren. In den ersten zehn Minuten klettert die Herzfrequenz noch – sie mit der zweiten Hälfte zu vergleichen misst das Aufwärmen, nicht die Drift.',
+            'Zu kurz für zwei Hälften – in den ersten 10 Minuten steigt die HF noch an; gegen die zweite Hälfte misst das die Aufwärmphase, nicht den Drift.',
           pace_too_variable:
-            'Das Tempo schwankte zu stark (Intervalle, Ampeln oder Steigungen sehen alle so aus), also sind die beiden Hälften nicht vergleichbar und es gibt keine Zahl.',
+            'Tempo schwankte zu stark (Intervalle, Ampeln, Steigungen) – die Hälften sind nicht vergleichbar, keine Zahl.',
           not_enough_samples:
-            'Zu wenige Herzfrequenz- und Tempo-Messpunkte in diesem Training, um es zu halbieren.',
+            'Zu wenige Messpunkte für Herzfrequenz und Tempo.',
           unsupported_workout_type:
-            'Der Vergleich erster/zweiter Hälfte deckt vorerst nur Laufen ab. Gehen und Radfahren liefern genug Messpunkte, aber die Schwellen wurden noch nicht an echten Daten geprüft.',
+            'Der Hälftenvergleich ist derzeit nur für Laufen freigegeben – Gehen und Radfahren hätten genug Messpunkte, aber die Schwellen sind noch nicht mit echten Daten verifiziert.',
         }) as Record<string, string | undefined>)[code] ?? 'Dieses Training lässt sich nicht halbieren.',
       durationHours: (hours: number, minutes: number) => `${hours} Std. ${minutes} Min.`,
       durationMinutes: (minutes: number) => `${minutes} Min.`,
@@ -1036,33 +1036,33 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         missing_duration: 'keine Dauer',
       },
       footnote:
-        'Alle Schlüsse hier vergleichen dich mit deiner eigenen Historie – nie mit einem Bevölkerungsmaßstab – und nichts davon ist eine medizinische Beurteilung. Fehlende Daten stehen als „Nicht angegeben" da, statt mit einer Null gefüllt zu werden.',
-      handoff: 'KI vertiefen lassen',
+        'Vergleich nur mit deiner eigenen Historie, nie mit Bevölkerungsnormen, keine medizinische Beurteilung. Fehlende Daten bleiben leer statt mit Nullen gefüllt.',
+      handoff: 'An die KI',
       metric: {
         'run.avg_hr': 'Ø HF',
         'run.distance': 'Distanz',
-        'run.duration': 'Zeit',
+        'run.duration': 'Dauer',
         'run.pace': 'Ø Tempo',
         'run.training_load': 'Trainingsbelastung',
       },
       noComparison:
-        'Noch nicht genug vergleichbare Historie – dieser Lauf meldet seine Zahlen ohne Vergleich.',
+        'Noch nicht genug vergleichbare Läufe – Anzeige ohne Vergleich.',
       notProvided: 'Nicht angegeben',
       reading: 'Lokale Einträge werden gelesen…',
       title: 'Wie der Lauf lief',
       unsupportedWorkoutType:
-        'Einblicke für diese Trainingsart werden noch nicht unterstützt. Die erste Version deckt nur Laufen ab, weil nur das an echten Daten geprüft wurde. Jedes andere Training lässt sich trotzdem normal ansehen, korrigieren und exportieren.',
+        'Einblicke unterstützen derzeit nur Laufen. Andere Trainings lassen sich weiterhin normal anzeigen, korrigieren und exportieren.',
     },
     'components/MetricTrendCard': {
       average: 'Ø',
       defaultEmpty:
-        'Diese Metrik zeigt ihren Trend, sobald sie synchronisiert wurde.',
-      latestTag: 'Neueste',
+        'Nach der Synchronisierung erscheint hier der Trend.',
+      latestTag: 'Aktuell',
       maximum: 'Max.',
       measuredOn: (date: string) => `gemessen am ${date}`,
       minimum: 'Min.',
       onlyOneDay:
-        'Nur ein Tag mit Daten in diesem Zeitraum – es gibt noch keinen Trend zu zeichnen.',
+        'Nur ein Tag mit Daten in diesem Zeitraum – noch kein Trend verfügbar.',
       trendAria: (label: string) => `${label}-Trendlinie`,
     },
     'components/StageBar': {
@@ -1075,13 +1075,13 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       barBaseline: '28 Tage davor',
       barThisWeek: 'Diese Woche',
       baselineCountUnknown:
-        'Baseline-Tage unbekannt – dies ist der aktuelle Wert ohne Vergleich.',
+        'Baseline unbekannt – nur aktueller Wert ohne Vergleich.',
       desktopOnly: 'Der Wochenbericht braucht die ZeppBridge-Desktop-App.',
       legendBad: 'Rot = schlechter',
       legendGood: 'Grün = besser für diese Metrik',
       legendNote:
-        'Nur mit deinen eigenen 28 Tagen davor verglichen, nie mit einem Bevölkerungsmaßstab',
-      loadFailed: 'Der lokale Wochenbericht konnte nicht erstellt werden',
+        'Nur Vergleich mit deinen eigenen 28 Tagen davor, nicht mit Bevölkerungsnormen',
+      loadFailed: 'Wochenbericht konnte nicht geladen werden',
       metric: {
         'weekly.hrv': 'HRV',
         'weekly.resting_hr': 'Ruheherzfrequenz',
@@ -1091,15 +1091,15 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         'weekly.training_load': 'Trainingsbelastung',
         'weekly.workout_count': 'Trainings',
       },
-      noBaseline: 'Zu wenig Historie – dies ist nur der aktuelle Wert',
-      noRecentData: 'In den letzten 7 Tagen lokal nichts zu dieser Metrik aufgezeichnet.',
+      noBaseline: 'Zu wenig Historie – nur aktueller Wert',
+      noRecentData: 'Keine Messwerte für diese Metrik in den letzten 7 Tagen.',
       notProvided: 'Nicht angegeben',
       nothingComparable:
-        'Diese Woche noch nichts Vergleichbares. Schau nach einer Synchronisierung wieder vorbei.',
+        'Diese Woche noch keine vergleichbaren Einträge – synchronisiere einmal und schau wieder.',
       regularity: (minutes: number) => `±${minutes} Min.`,
       sleepDuration: (hours: number, minutes: number) => `${hours} Std. ${minutes} Min.`,
       thinBaseline: (days: number, found: number, needed: number) =>
-        `Nur ${found} der letzten ${days} Tage tragen diese Metrik – weniger als die nötigen ${needed} – also nur der aktuelle Wert ohne Vergleich.`,
+        `Nur ${found} von ${days} Tagen mit Daten (${needed} nötig) – Anzeige ohne Vergleich.`,
       title: 'Diese Woche',
       unitWord: (unit: string) =>
         (({
@@ -1108,39 +1108,40 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
           bpm: 'bpm',
         }) as Record<string, string | undefined>)[unit] ?? unit,
       window: (recentStart: string, recentEnd: string, baseStart: string, baseEnd: string) =>
-        `${recentStart} ~ ${recentEnd} · gegen deine eigenen ${baseStart} ~ ${baseEnd}`,
+        `${recentStart} – ${recentEnd} · verglichen mit ${baseStart} – ${baseEnd}`,
       workoutCount: (count: number) =>
         plural(count, {
           one: `${count} Einheit`,
           other: `${count} Einheiten`,
         }),
       zeroBaseline:
-        'Die frühere Baseline lag im Schnitt bei 0 – keine relative Änderung berechenbar, also nur der aktuelle Wert.',
+        'Die Baseline lag im Schnitt bei 0 – keine relative Änderung berechenbar, nur der aktuelle Wert.',
       legendNeutral: '↑↓ = nur eine Veränderung, keine Bewertung',
     },
     'components/overview/DataReadyCapsule': {
-      cta: 'An KI übergeben',
+      cta: 'An die KI',
       dismiss: 'Nicht jetzt',
-      readyFresh: (clock: string) => `Schon aktuell · Stand ${clock}`,
+      readyFresh: (clock: string) => `Bereits aktuell · Stand ${clock}`,
       readyNew: (records: string, clock: string) => `${records} neue Einträge · Stand ${clock}`,
       readyPartial: (streams: string, clock: string) =>
         `${streams} nicht angekommen, Rest aktualisiert · Stand ${clock}`,
-      readyTitle: 'Deine Daten sind bereit',
+      readyTitle: 'Daten bereit',
       step: (current: number, total: number) => `${current}/${total}`,
       streamSeparator: ', ',
-      waitingEyebrow: 'Deine Daten werden aus der Cloud geholt',
-      waitingHint: 'Hier bekommst du Bescheid, sobald alles da ist – schau dich gern schon um',
+      waitingEyebrow: 'Daten werden aus der Cloud abgerufen',
+      waitingHint:
+        'Wenn alles bereit ist, meldet es sich hier – schau dich solange ruhig um.',
     },
     'components/overview/HeartRateCard': {
       bpm: 'bpm',
       cloudLag:
-        'Die Daten der Uhr müssen über die Zepp-App in die Cloud, bevor ZeppBridge sie holen kann – der Abrufzeitpunkt ist nicht der Zeitpunkt der Daten.',
+        'Die Daten der Uhr kommen erst über die Zepp-App in die Cloud – die Abrufzeit ist nicht die Datenzeit.',
       hrChartAria: '24-Stunden-Herzfrequenzkurve',
-      hrEmpty: 'Nach einer Synchronisierung zeigt sich hier der echte Herzfrequenzverlauf.',
+      hrEmpty: 'Nach der Synchronisierung erscheint hier der Herzfrequenzverlauf.',
       hrMore: 'Volle 24 Stunden',
       hrPanelAria: 'Herzfrequenz-Details für die vollen 24 Stunden öffnen',
       hrStale: (hours: number, when: string) =>
-        `In den letzten ${hours} Stunden noch keine Herzfrequenz in der Cloud; der neueste Messwert ist von ${when}.`,
+        `Keine Herzfrequenz in den letzten ${hours} Std. in der Cloud · neuester Wert: ${when}`,
       hrTitle: 'Aktuelle Herzfrequenz',
       hrWindow: (hours: number) => `Letzte ${hours} Stunden`,
       hrZonesAria: 'Herzfrequenzzonen (absolute Schwellen)',
@@ -1156,7 +1157,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       newest: 'Neueste',
       recentAria: 'Letzte Einträge',
       recentEmpty:
-        'Noch nichts aufgezeichnet. Führe eine Synchronisierung aus, dann erscheint es hier.',
+        'Noch keine Einträge – nach der Synchronisierung sichtbar.',
       recentSub: 'Schlaf, Läufe und Krafttraining',
       recentTitle: 'Letzte Einträge',
       seeAll: 'Alle ansehen',
@@ -1170,7 +1171,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       seeMore: 'Mehr anzeigen',
       sleepBarAria: 'Anteil der Schlafphasen',
       sleepEmpty:
-        'Der Schlaf der letzten Nacht erscheint hier nach einer Synchronisierung.',
+        'Nach der Synchronisierung erscheint hier der Schlaf der letzten Nacht.',
       sleepPanelAria: 'Schlafdetails öffnen',
       sleepSub: 'Schlafstruktur im Überblick',
       sleepTitle: 'Letzte Nacht',
@@ -1178,8 +1179,8 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
     },
     'components/overview/SourcesStrip': {
       dataSources: 'Datenquellen',
-      identifyFailed: (reason: string) => `Geräteerkennung ist nicht verfügbar: ${reason}`,
-      identifyingDevices: 'Deine Geräte werden erkannt…',
+      identifyFailed: (reason: string) => `Geräteerkennung nicht verfügbar: ${reason}`,
+      identifyingDevices: 'Geräte werden erkannt…',
       latestData: (when: string) => `Neueste Daten ${when}`,
       manage: 'Verwalten',
       noDevicesYet: 'Noch kein Gerät erkannt.',
@@ -1190,8 +1191,8 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       stepsGoalLine: (goal: string, percent: string) => `Ziel ${goal} · ${percent} %`,
       stepsGoalReference: 'Referenzziel',
       stepsGoalToday: 'Heutiges Ziel',
-      stepsLatest: (when: string) => `Die neuesten Daten in der Cloud sind von ${when}`,
-      stepsNotYet: 'Die heutigen Schritte sind noch nicht in der Cloud',
+      stepsLatest: (when: string) => `Neueste Cloud-Daten: ${when}`,
+      stepsNotYet: 'Heutige Schritte noch nicht in der Cloud',
       stepsPanelAria: 'Details zur täglichen Aktivität öffnen',
       stepsTitle: 'Schritte heute',
       stepsUnit: 'Schritte',
@@ -1209,9 +1210,9 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       localeLabel: 'Oberflächensprache',
       mainNav: 'Hauptnavigation',
       notFetchedYet: 'Noch nicht abgerufen',
-      readyPill: 'Daten bereit · an KI übergeben',
+      readyPill: 'Daten bereit · an die KI',
       readyTitle:
-        'Synchronisierung abgeschlossen, die lokalen Daten sind aktuell. Klicke, um sie an die KI zu übergeben.',
+        'Synchronisierung abgeschlossen · Daten aktuell. Klicken für Übergabe an die KI.',
       syncFailed: 'Synchronisierung fehlgeschlagen',
       syncNow: 'Jetzt synchronisieren',
       syncPartial: 'Teilweise synchronisiert',
@@ -1219,17 +1220,17 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       themeDark: 'Dunkel',
       themeLight: 'Hell',
       themeSystem: 'System',
-      themeTitle: 'Theme wechseln',
+      themeTitle: 'Thema wechseln',
       timeUnknown: 'Zeit unbekannt',
-      verifyFirst: 'Verifiziere zuerst die Verbindung',
+      verifyFirst: 'Verbindung zuerst prüfen',
       connectPill: 'Konto verbinden',
     },
     'composables/useAiHandoff': {
-      clipboardUnsupported: 'Diese Umgebung kann nicht in die Zwischenablage schreiben',
+      clipboardUnsupported: 'Zwischenablage wird in dieser Umgebung nicht unterstützt',
       copiedButCannotOpen: (label: string) => `Kopiert, aber ${label} ließ sich nicht öffnen`,
-      handoffFailed: 'Die KI-Übergabe ist nicht durchgekommen',
-      nothingToRetry: 'Es gibt keine KI-Übergabe zu wiederholen',
-      targetNotAllowed: 'Diese KI-Adresse steht nicht auf der Freigabeliste',
+      handoffFailed: 'Übergabe an die KI fehlgeschlagen',
+      nothingToRetry: 'Keine KI-Übergabe zum Wiederholen vorhanden',
+      targetNotAllowed: 'Dieses KI-Ziel ist nicht freigegeben',
     },
     'composables/useAiTaskDraft': {
       deleteFailed: 'Die Aufgabe konnte nicht gelöscht werden',
@@ -1243,19 +1244,19 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       prepareFailed: 'Die Dateien konnten nicht vorbereitet werden',
     },
     'composables/useDevices': {
-      assignmentCleared: 'Auswahl zurückgenommen. Wieder die automatische Zuordnung.',
+      assignmentCleared: 'Auswahl zurückgesetzt – wieder automatische Zuordnung.',
       assignmentContributed: (reportId: string) =>
-        `Deine Modellauswahl ist gespeichert, und die Modellnummern gingen an ZeppBridge (Bericht ${reportId}). Die nächste Katalogversion erkennt dieses Modell von selbst.`,
+        `Modellauswahl gespeichert und übermittelt (Bericht ${reportId}). Nächste Version erkennt das Modell automatisch.`,
       assignmentContributionFailed: (reason: string) =>
-        `Deine Modellauswahl ist auf diesem Rechner gespeichert. Der Katalogbeitrag konnte nicht gesendet werden: ${reason}`,
+        `Modellauswahl lokal gespeichert. Katalogbeitrag fehlgeschlagen: ${reason}`,
       assignmentFailed: 'Die Modellauswahl konnte nicht gespeichert werden',
       assignmentSaved:
-        'Deine Auswahl ist gespeichert. Sie erscheint als „Von dir gewähltes Modell" – nie als automatische Zuordnung.',
+        'Auswahl gespeichert – angezeigt als „Von dir gewähltes Modell", nie als automatische Zuordnung.',
       cacheUnavailable: 'Der Geräte-Cache ist gerade nicht verfügbar',
       identifyUnavailable: 'Die Geräteerkennung ist gerade nicht verfügbar',
       networkUnavailable: 'Netzwerk nicht verfügbar',
       noLocalIdentifier:
-        'Dieses Gerät trägt keine lokale Kennung, die Auswahl lässt sich nicht speichern.',
+        'Keine lokale Kennung für dieses Gerät – Auswahl kann nicht gespeichert werden.',
       notFetchedYet: 'Noch nicht abgerufen',
       notProvided: 'Nicht angegeben',
       stateAccount: 'Aus dem Konto bekannt',
@@ -1268,7 +1269,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
     },
     'composables/useSyncController': {
       alreadySyncing:
-        'Eine Synchronisierung läuft bereits. Versuche es erneut, wenn sie fertig ist',
+        'Synchronisierung läuft bereits. Bitte warten, bis sie abgeschlossen ist',
       backfilling: (days: number) => `Die letzten ${days} Tage werden nachgeladen…`,
       backfillingStream: (stream: string, month: string) =>
         `${stream} wird nachgeladen · ${month}`,
@@ -1277,34 +1278,34 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       cancelling: 'Synchronisierung wird abgebrochen…',
       cloudSyncClock: (clock: string) => `Cloud-Synchronisierung ${clock}`,
       cloudSyncClockUnknown: 'Cloud-Synchronisierung —',
-      connectFirst: 'Verbinde dich zuerst mit Zepp',
+      connectFirst: 'Zuerst mit Zepp verbinden',
       deferred:
-        'Lokale abgeleitete Daten werden neu aufgebaut. Die Synchronisierung versucht es von selbst erneut',
-      desktopOnly: 'Nutze die Desktop-App',
+        'Lokale Daten werden neu aufgebaut. Synchronisierung wird automatisch wiederholt',
+      desktopOnly: 'Nur in der Desktop-App verfügbar',
       failed:
-        'Synchronisierung fehlgeschlagen. Prüfe die Verbindung und versuche es erneut',
+        'Synchronisierung fehlgeschlagen. Verbindung prüfen und erneut versuchen',
       lastCloudSync: (clock: string) => `Letzte Cloud-Synchronisierung ${clock}`,
-      noNewData: 'Synchronisierung fertig. Die Cloud hatte nichts Neues',
+      noNewData: 'Synchronisierung abgeschlossen. Keine neuen Daten in der Cloud',
       noNewDataWithLatest: (clock: string) =>
-        `Nichts Neues in der Cloud · die neueste Herzfrequenz bleibt ${clock}`,
+        `Keine neuen Cloud-Daten · letzte Herzfrequenz: ${clock}`,
       notSyncedYet: 'Noch nicht synchronisiert',
-      partial: 'Synchronisierung fertig, aber einige Datenströme sind fehlgeschlagen',
+      partial: 'Synchronisierung abgeschlossen, aber einzelne Datenströme sind fehlgeschlagen',
       partialWithStreams: (streams: string) => `Einige Datenströme sind fehlgeschlagen: ${streams}`,
-      reauthNeeded: 'Deine Zepp-Sitzung ist abgelaufen. Verbinde dich erneut',
+      reauthNeeded: 'Zepp-Sitzung abgelaufen. Verbinde dich erneut mit Zepp',
       statusUnavailable: 'Der Verbindungsstatus ist gerade nicht verfügbar',
       streamSeparator: ', ',
-      syncDidNotFinish: 'Die Cloud-Synchronisierung ist nicht zu Ende gekommen',
+      syncDidNotFinish: 'Cloud-Synchronisierung nicht abgeschlossen',
       syncingRecent: (days: number) => `Die letzten ${days} Tage werden synchronisiert…`,
       syncingStream: (stream: string) => `${stream} wird synchronisiert`,
       timeUnknown: 'Zeit unbekannt',
-      updated: 'Neue Daten abgeholt',
-      updatedWithLatest: (clock: string) => `Neue Daten abgeholt · neueste Herzfrequenz ${clock}`,
-      verifyFirst: 'Verifiziere zuerst die Verbindung',
+      updated: 'Neue Daten synchronisiert',
+      updatedWithLatest: (clock: string) => `Neue Daten synchronisiert · letzte Herzfrequenz: ${clock}`,
+      verifyFirst: 'Verbindung zuerst prüfen',
     },
     'lib/aiTask/copy': {
       fallbackIssue: 'Eine Statusnotiz konnte nicht erkannt werden',
       'ui.ai_task.attach.no_redaction':
-        'Originale werden unverändert referenziert und nicht anonymisiert. Bestätige, dass du diese Datei selbst an die gewählte KI anhängen willst.',
+        'Beim Export werden die Originale in den Übergabeordner auf dem Desktop kopiert – unverändert, nicht anonymisiert. Bestätige, dass du diese Datei selbst an die gewählte KI anhängen willst.',
       'ui.ai_task.blocked.attachment_missing':
         'Ein Original-Anhang wird nicht mehr gefunden. Wähle die Datei neu oder entferne die Referenz zuerst.',
       'ui.ai_task.blocked.empty':
@@ -1348,10 +1349,10 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         'Blicke auf diese Woche zurück: Wie verhalten sich Schlaf, Erholung, Herzfrequenz und Aktivität im Vergleich zu sonst, welche Veränderungen sind beachtenswert und welche normale Schwankung? Bleib bei den Daten, keine Diagnose, und sag klar, wo Daten fehlen.',
     },
     'lib/bridge/errors': {
-      desktopOnly: 'Nutze die Desktop-App',
-      genericFailure: 'Das ist nicht durchgekommen. Versuche es gleich erneut',
+      desktopOnly: 'Erfordert die Desktop-App',
+      genericFailure: 'Vorgang fehlgeschlagen. Versuche es gleich erneut',
       timedOut:
-        'Die Anfrage lief in eine Zeitüberschreitung. Prüfe dein Netzwerk und die Zepp-Region, dann versuche es erneut.',
+        'Die Anfrage hat das Zeitlimit überschritten. Prüfe Netzwerk und Zepp-Region und versuche es erneut.',
     },
     'lib/dateTime': {
       '12h': '12-Stunden',
@@ -1427,29 +1428,29 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         travel: 'Reisen',
       },
       category: 'Kategorie',
-      deleteHint: 'Diese Notiz wird aus der lokalen Datenbank entfernt.',
+      deleteHint: 'Wird aus der lokalen Datenbank gelöscht.',
       deleteTitle: 'Dieses Lebensereignis löschen?',
       deleted: 'Lebensereignis gelöscht.',
       edit: 'Ereignis bearbeiten',
       empty:
-        'Noch keine Lebensereignisse. Fang mit einer Erkältung, einer Reise oder einer Trainingsänderung an.',
+        'Noch keine Lebensereignisse eingetragen (z. B. Erkältung, Reise oder Trainingspause).',
       end: 'Enddatum',
-      failed: 'Die Aktion konnte nicht abgeschlossen werden. Bitte erneut versuchen.',
-      intro: 'Halte fest, was neben deinen Gesundheitsdaten passiert ist.',
+      failed: 'Aktion nicht abgeschlossen – versuche es erneut.',
+      intro: 'Ereignisse und Notizen rund um deine Gesundheitsdaten.',
       invalid:
-        'Gib einen Titel und gültige Daten ein. Das Enddatum kann nicht vor dem Startdatum liegen.',
+        'Titel und gültige Daten angeben. Das Enddatum darf nicht vor dem Startdatum liegen.',
       loading: 'Lebensereignisse werden geladen…',
       local:
-        'Lokal gespeichert und in Datenbank-Backups enthalten. Bei der Übergabe an eine KI kannst du Lebensereignisse einschließen.',
+        'Lokal gespeichert und in Backups enthalten. Kann bei der KI-Übergabe einbezogen werden.',
       manage: 'Lebensereignisse verwalten',
       name: 'Titel',
       noMatch: 'Keine passenden Ereignisse.',
       notes: 'Notizen (optional)',
       ongoing: 'Noch laufend',
-      placeholder: 'Zum Beispiel: eine Erkältung, ein paar Tage Trainingspause',
+      placeholder: 'Z. B. Erkältung, ein paar Tage Trainingspause',
       related: 'Verwandte Ereignisse',
       remove: 'Löschen',
-      retry: 'Erneut versuchen',
+      retry: 'Wiederholen',
       save: 'Speichern',
       search: 'Lebensereignisse suchen',
       showLess: 'Weniger anzeigen',
@@ -1486,15 +1487,15 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
     },
     'lib/storageEstimateText': {
       builtinGuess: (days: number, add: string, free: string) =>
-        `Noch zu wenig lokale Messwerte, deshalb eine grobe eingebaute Schätzung: ${days} Tage brauchen etwa ${add}, und ${free} sind auf diesem Laufwerk frei.`,
+        `Zu wenig lokale Messwerte – grobe eingebaute Schätzung: ${days} Tage brauchen etwa ${add}, auf diesem Laufwerk sind ${free} frei.`,
       diskTooSmall:
         'Weniger als 300 MB frei – Historie über mehr als 90 Tage kann nicht nachgeladen werden.',
       diskUnknown:
         'Der freie Speicherplatz konnte nicht gelesen werden. Stelle vor dem Nachladen sicher, dass genug Platz da ist.',
       measured: (days: number, add: string, free: string) =>
-        `Nach dem Tempo, in dem sich deine eigenen Daten tatsächlich ansammeln, brauchen ${days} Tage etwa ${add}, und ${free} sind auf diesem Laufwerk frei.`,
+        `Nach dem Tempo, in dem deine eigenen Daten tatsächlich wachsen: ${days} Tage brauchen etwa ${add}, auf diesem Laufwerk sind ${free} frei.`,
       partial: (days: number, add: string, free: string) =>
-        `Nur anhand der Datenströme mit genug lokalen Messwerten geschätzt brauchen ${days} Tage etwa ${add} (der Rest zählt nicht mit), und ${free} sind auf diesem Laufwerk frei.`,
+        `Nur über Datenströme mit genug lokalen Messwerten geschätzt: ${days} Tage brauchen etwa ${add} (der Rest zählt nicht mit), auf diesem Laufwerk sind ${free} frei.`,
       stopNoSpace: (needed: string, free: string) =>
         `Dieses Nachladen braucht etwa ${needed} (inklusive Sicherheitspuffer), aber nur ${free} sind frei – es startet nicht. Gib Platz frei oder verkürze den Zeitraum.`,
       unknownEstimate: 'Die Größe dieses Nachladens lässt sich gerade nicht schätzen.',
@@ -1524,7 +1525,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       shortImperial: 'ft',
     },
     'services/updateService': {
-      nothingToInstall: 'Es gibt kein Update zu installieren. Prüfe erneut.',
+      nothingToInstall: 'Kein Update zu installieren. Erneut prüfen.',
     },
     'views/ActivityDetail': {
       backToOverview: 'Zurück zur Übersicht',
@@ -1532,22 +1533,22 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       caloriesLabel: 'Aktivitätskalorien',
       caloriesUnit: 'kcal',
       desktopOnly:
-        'Nutze die Desktop-App. Diese Browser-Vorschau liest keine Kontodaten.',
+        'Erfordert die Desktop-App (die Browser-Vorschau liest keine Kontodaten).',
       distanceHint: 'An diesem Tag zurückgelegte Distanz',
       distanceLabel: 'Distanz',
       distanceUnit: 'm',
       emptyCard: 'In diesem Zeitraum nichts aufgezeichnet.',
       intro:
-        'Tägliche Schritte, Distanz, Aktivitätskalorien und aktive Minuten Tag für Tag. Nur mit deinen eigenen früheren Einträgen verglichen; Tage ohne Daten bleiben leer statt mit einer Null gefüllt.',
+        'Tägliche Schritte, Distanz, Aktivitätskalorien und aktive Minuten. Vergleich nur mit deiner eigenen Historie; Tage ohne Daten bleiben leer.',
       loadFailed: 'Aktivitätsdaten sind gerade nicht verfügbar',
       loadingAria: 'Tägliche Aktivität wird geladen',
       minutesHint: 'Minuten, die die Uhr als aktiv zählte',
       minutesLabel: 'Aktive Minuten',
       minutesUnit: 'Min.',
       noneInRange:
-        'Keine Aktivitätseinträge in diesem Zeitraum. Versuche einen längeren Zeitraum oder führe zuerst eine Synchronisierung aus.',
+        'Keine Aktivitätsdaten im gewählten Zeitraum – Zeitraum erweitern oder synchronisieren.',
       rangeAria: 'Zeitraum',
-      retry: 'Erneut versuchen',
+      retry: 'Wiederholen',
       stepsHint: 'Tägliche Schrittzahl der Uhr',
       stepsLabel: 'Schritte',
       stepsUnit: 'Schritte',
@@ -1589,7 +1590,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       bmrHint: 'Braucht eine Körperanalysewaage',
       bmrLabel: 'Grundumsatz',
       bodyGroupEmpty:
-        'Keine Gewichts- oder Körperzusammensetzungs-Einträge in diesem Zeitraum. Körperzusammensetzung braucht eine Analysewaage; Uhr und von Hand eingetragene Gewichte bringen sie nicht mit.',
+        'Keine Gewichts- oder Körperzusammensetzungsdaten im Zeitraum. Körperzusammensetzung braucht eine Analysewaage – Uhr und von Hand eingetragene Gewichte bringen sie nicht mit.',
       bodyGroupTitle: 'Gewicht und Körperzusammensetzung',
       boneHint: 'Braucht eine Körperanalysewaage',
       boneLabel: 'Knochenmasse',
@@ -1597,13 +1598,13 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       curveCardAria: '24-Stunden-Stress',
       curveChartAria: 'Stress der letzten 24 Stunden',
       curveNoSamples:
-        'Keine Stressmesswerte in den letzten 24 Stunden, also keine Kurve. So sieht eine nicht getragene Uhr oder abgeschaltetes Ganztags-Monitoring aus.',
+        'Keine Stressmesswerte in den letzten 24 Stunden (Uhr nicht getragen oder Ganztags-Tracking deaktiviert).',
       curveNote:
-        'Die Bänder (ruhig 1–39, normal 40–59, mittel 60–79, hoch 80–100) sind Zepps eigene, nicht unsere. Zeiten ohne Messwerte bleiben leer statt mit Nullen gefüllt.',
+        'Die Bereiche (entspannt 1–39, normal 40–59, mittel 60–79, hoch 80–100) stammen von Zepp, nicht von uns. Zeiten ohne Messwerte bleiben leer, ohne Nullen.',
       curveSub: 'Die Uhr misst alle fünf Minuten; Einzelmesswerte in Zeitfolge',
       curveTitle: 'Stress der letzten 24 Stunden',
       desktopOnly:
-        'Nutze die Desktop-App. Diese Browser-Vorschau liest keine Kontodaten.',
+        'Erfordert die Desktop-App (die Browser-Vorschau liest keine Kontodaten).',
       emptyCard: 'In diesem Zeitraum nichts aufgezeichnet.',
       fatHint:
         'Braucht eine Körperanalysewaage. Uhr und von Hand eingetragene Gewichte bringen keinen Fettwert mit',
@@ -1617,10 +1618,10 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         'Summe des protokollierten Tages. Tage ohne Protokoll bekommen keinen Balken und werden nie mit 0 gefüllt',
       intakeCaloriesLabel: 'Gegessene Kalorien',
       intakeGroupEmpty:
-        'Keine Essensprotokolle in diesem Zeitraum. Mahlzeiten werden in der Zepp-App von Hand erfasst; einmal erfasst, erscheinen sie hier nach einer Synchronisierung.',
+        'Keine Ernährungsprotokolle im Zeitraum. In der Zepp-App erfasste Mahlzeiten erscheinen nach der Synchronisierung hier.',
       intakeGroupTitle: 'Aufnahme',
       intro:
-        'Lokale Trends für Bereitschaft, Stress, Blutsauerstoff, HRV, Atemfrequenz, Ruheherzfrequenz, Körperzusammensetzung und Nahrungsaufnahme. Alle aus synchronisierten Einträgen gelesen.',
+        'Trends für Bereitschaft, Stress, Blutsauerstoff, HRV, Atemfrequenz, Ruheherzfrequenz, Gewicht, Körperzusammensetzung und Ernährung – alles aus bereits synchronisierten Einträgen.',
       loadFailed: 'Körperstatus-Daten sind gerade nicht verfügbar',
       loadingAria: 'Körperstatus wird geladen',
       macroHint: 'Summe des protokollierten Tages',
@@ -1631,7 +1632,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       muscleHint: 'Braucht eine Körperanalysewaage',
       muscleLabel: 'Muskelmasse',
       noneInRange:
-        'Keine Körperstatus-Einträge in diesem Zeitraum. Versuche einen längeren Zeitraum oder führe zuerst eine Synchronisierung aus.',
+        'Keine Daten im gewählten Zeitraum – Zeitraum erweitern oder synchronisieren.',
       odiHint: 'Desaturierungen pro Stunde; niedriger ist besser',
       odiLabel: 'Nächtlicher SpO₂-ODI',
       proteinLabel: 'Eiweiß',
@@ -1642,10 +1643,10 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       respiratoryLabel: 'Atemfrequenz',
       restingHint: 'Ruheherzfrequenz, wie ZeppBridge sie pro Tag berechnet',
       restingLabel: 'Ruheherzfrequenz',
-      retry: 'Erneut versuchen',
+      retry: 'Wiederholen',
       rmssdHint: 'Nächtliche hochfrequente Variabilität, pro Tag gemittelt',
       scaleEmpty:
-        'Keine Wägungen in diesem Zeitraum. Waagen-Messwerte erscheinen hier nach einer Synchronisierung.',
+        'Keine Wiegemessungen im Zeitraum – erscheinen nach der Synchronisierung.',
       spo2Empty: 'Keine einzelnen SpO₂-Messwerte in diesem Zeitraum.',
       spo2Hint:
         'Einzelne SpO₂-Messwerte pro Tag gemittelt; das Band ist der gemessene Bereich des Tages',
@@ -1676,11 +1677,11 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
     'views/DeviceDetail': {
       assignAria: 'Modellerkennung',
       assignSub:
-        'Wenn die Zuordnung falsch ist – etwa ist es wirklich eine Balance 2 und hier steht ein anderes Modell –, kannst du selbst auf das richtige Modell zeigen. Deine Auswahl bleibt auf diesem Rechner, erscheint als „Von dir gewähltes Modell" statt sich als automatische Zuordnung auszugeben, und lässt sich jederzeit zurücknehmen.',
+        'Stimmt die automatische Erkennung nicht (z. B. eine Balance 2, die als anderes Modell erscheint), wähle jederzeit selbst. Die Auswahl bleibt lokal, wird als „Von dir gewähltes Modell" angezeigt – nie als automatische Zuordnung – und lässt sich jederzeit zurücknehmen.',
       assignTitle: 'Stimmt das?',
       backToSettings: 'Zurück zu den Einstellungen',
       changeModel: 'Anderes wählen',
-      clearAssignment: 'Auswahl zurücknehmen und zur automatischen zurückkehren',
+      clearAssignment: 'Auswahl zurücknehmen – wieder automatische Zuordnung',
       factDeviceId: 'Geräte-ID',
       factFirmware: 'Firmware',
       factHasLocal: 'Lokale Daten dazu',
@@ -1688,7 +1689,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       factOrigin: 'Woher das Modell kommt',
       factsAria: 'Geräteinformationen',
       factsNote:
-        'Die Geräte-ID wird nur auf diesem Rechner genutzt, nur ihre letzten vier Zeichen erscheinen je auf dem Bildschirm, und sie gelangt nie in einen Export oder Fehlerbericht.',
+        'Die Geräte-ID bleibt lokal (angezeigt werden nur die letzten 4 Stellen) und geht nie in Exporte oder Fehlerberichte.',
       hasLocalNo: 'Noch keine',
       hasLocalYes: 'Ja',
       noLocalIdentifier:
@@ -1800,10 +1801,10 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       integrityLine: (verdict: string, checkedAt: string) =>
         `Integritätsprüfung: ${verdict} · ${checkedAt}`,
       integrityNeverRun:
-        'Noch keine Integritätsprüfung gelaufen. Sie scannt die ganze Datenbank, was bei einer großen eine Weile dauert, also läuft sie nur, wenn du es anforderst.',
+        'Noch keine Integritätsprüfung durchgeführt. Sie scannt die ganze Datenbank – bei einer großen dauert das eine Weile – und läuft nur auf manuellen Klick.',
       integrityPassed: 'bestanden',
       intro:
-        'Für jeden Datenstrom: wie weit er beim Abrufen aus der Cloud, Parsen und lokalen Schreiben kam; welche Tage er abdeckt; und woher er kommt. Fehlend ist fehlend – nie mit einer Null aufgefüllt.',
+        'Status jedes Datenstroms: Cloud-Abruf, Parsen, lokales Speichern, Abdeckung und Quelle. Fehlende Tage bleiben leer statt mit Nullen gefüllt.',
       latestObserved: (date: string) => `Zuletzt ${date}.`,
       loadFailed: 'Der Datenzustand konnte nicht gelesen werden',
       loadingAria: 'Der Datenzustand wird gelesen',
@@ -1815,7 +1816,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         `${records} Einträge · an ${days} Tagen beobachtet`,
       occasionalNone: 'In diesem Zeitraum nichts beobachtet',
       occasionalNote:
-        'Metriken wie VO₂max und Laktatschwelle meldet die Uhr von sich aus nicht täglich. Dieser Abschnitt meldet die beobachteten Tage und den jüngsten und zählt nie Tageslücken – normale Spärlichkeit rot zu malen wäre irreführend.',
+        'Metriken wie VO₂max und Laktatschwelle misst die Uhr nicht täglich. Gezählt werden nur beobachtete Tage und der letzte Wert, keine täglichen Lücken – normale Sparsamkeit rot zu malen wäre irreführend.',
       occasionalTitle: 'Metriken, die nur gelegentlich auftauchen',
       period: '.',
       rangeAria: 'Abdeckungszeitraum',
@@ -1826,7 +1827,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
           one: `${pending} gespeicherter Rohdatensatz hat`,
           other: `${pending} gespeicherte Rohdatensätze haben`,
         })} noch keinen normalisierten Eintrag erzeugt. Ein Neueinlesen berührt kein Netz und überschreibt nicht die Cloud-Synchronisierungszeit.`,
-      retry: 'Erneut versuchen',
+      retry: 'Wiederholen',
       source: {
         device: 'einzelnes Gerät',
         unknown: 'Quelle unbekannt',
@@ -1840,10 +1841,10 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       },
       stageFetch: 'Abruf',
       stageLine: (stage: string, state: string) => `${stage}: ${state}`,
-      stageParse: 'Parse',
+      stageParse: 'Parsen',
       stageWrite: 'Schreiben',
       streamsNote:
-        'Abrufen, Parsen und Schreiben sind drei Dinge, die einzeln fehlschlagen. Zu einem roten Punkt zusammengefaltet, könntest du nicht sagen, ob du es erneut versuchen, neu verbinden sollst oder ob dieses Konto diesen Datenstrom schlicht nicht hat.',
+        'Abruf, Parsen und Schreiben scheitern getrennt. In einem roten Punkt zusammengefasst wüsstest du nicht: erneut versuchen, neu verbinden oder das Konto hat diesen Datenstrom gar nicht.',
       streamsTitle: 'Wie weit jeder Datenstrom kam',
       summaryAllGood: 'Alles in Ordnung: Abrufen, Parsen und Schreiben sind alle durchgelaufen',
       summaryFailed: (n: number) =>
@@ -1855,7 +1856,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       timingCloud: 'Zuletzt aus der Cloud abgerufen',
       timingCloudNote: 'Noch kein Ergebnis',
       timingManual: 'Letztes manuelles Neueinlesen',
-      timingManualNote: 'Das, das du selbst angeklickt hast',
+      timingManualNote: 'Das, das du selbst gestartet hast',
       timingNewest: 'Neuester Gesundheitsmesswert',
       timingNewestNote: 'Wann der Eintrag selbst auf der Uhr passierte',
       timingReplay: 'Letztes lokales Neueinlesen',
@@ -1879,11 +1880,11 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       dailyMaxNone:
         'Keine Herzfrequenz-Messwerte auf diesem Rechner in diesem Zeitraum – es gibt keine Spitze zum Vergleichen.',
       dailyMaxNote:
-        'Hier zählen nur die rohen Einzelmesswerte auf diesem Rechner. Zepps Tageshöchstwert wird uns nie gesendet (das device_max_hr in der Bibliothek ist das eingestellte Maximum für die Zonengrenzen, keine gemessene Spitze), also gibt es hier nichts danebenzustellen – öffne die Zepp-App, um den Wert des Tages zu vergleichen.',
+        'Berechnet aus den auf diesem Rechner gesammelten Herzfrequenz-Messwerten; kann von der Tages-Spitze der Zepp-App abweichen.',
       dailyMaxSparse: (days: number) =>
         `${days} dieser Tage haben sehr wenige Messwerte (unter 60). An diesen Tagen ist die „Spitze" nur der höchste dieser wenigen Punkte, nicht die echte Tages-Spitze – sie sind als hohle Markierungen gezeichnet.`,
       dailyMaxSub:
-        'Die Zepp-App filtert ihre Tages-Spitze; hier wird nicht gefiltert. Dass die Zahlen abweichen, ist erwartbar.',
+        'Zepp filtert die Tages-Spitze; hier werden Rohdaten angezeigt. Abweichungen sind normal.',
       dailyMaxTitle: 'Tägliche Herzfrequenz-Spitze (Roh-Messwerte dieses Rechners)',
       dailyMaxTooltip: (date: string, max: number, avg: number, samples: number) =>
         `${date}<br/>Spitze <b>${max}</b> bpm<br/>Durchschnitt ${avg} bpm<br/>${samples} Messwerte`,
@@ -1892,18 +1893,18 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       daySub: 'Einzelmesswerte in Zeitfolge',
       dayTitle: 'Letzte 24 Stunden',
       desktopOnly:
-        'Nutze die Desktop-App. Diese Browser-Vorschau liest keine Kontodaten.',
+        'Erfordert die Desktop-App (die Browser-Vorschau liest keine Kontodaten).',
       emptyCard: 'In diesem Zeitraum nichts aufgezeichnet.',
       hrvHint: 'Einzelne HRV-Messwerte, pro Tag gemittelt',
       intro:
-        'Die Ganztags-Kurve oben ist immer die letzten 24 Stunden; 7 Tage / 1 Monat / 6 Monate ändern nur die Tag-für-Tag-Trends unten. Abschnitte ohne Messwerte bleiben leer statt mit einer Null gefüllt.',
+        'Die 24-Stunden-Kurve zeigt den jüngsten Verlauf; die Zeitraumauswahl steuert die Trends darunter. Messlücken bleiben leer.',
       loadingAria: 'Herzfrequenz wird geladen',
       noSamples:
         'Keine Herzfrequenz-Messwerte in den letzten 24 Stunden, also keine Kurve zu zeichnen.',
       rangeAria: 'Trendzeitraum',
       restingHint: 'Die Uhr meldet einen pro Tag; ruhiger ist besser',
       restingLabel: 'Ruheherzfrequenz',
-      retry: 'Erneut versuchen',
+      retry: 'Wiederholen',
       rmssdHint: 'Ein anderes HRV-Maß, nicht dieselbe Zahl wie oben',
       statAverage: 'Ø',
       statHighest: 'Max.',
@@ -1915,13 +1916,13 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
     },
     'views/Overview': {
       bodyEmpty:
-        'Bereitschaft, Stress und Blutsauerstoff erscheinen hier nach einer Synchronisierung',
+        'Bereitschaft, Stress und Blutsauerstoff erscheinen nach der Synchronisierung',
       bodyPanelAria: 'Körperstatus öffnen',
       bodySparkLabel: 'Bereitschaft der letzten 7 Tage',
       bodyThin: 'Zu wenig Einträge in den letzten 7 Tagen für einen Trend',
       bodyTitle: 'Körperstatus',
       desktopOnly:
-        'Nutze die Desktop-App. Diese Browser-Vorschau liest keine Kontodaten.',
+        'Erfordert die Desktop-App (die Browser-Vorschau liest keine Kontodaten).',
       deviceErrorPrefix: 'Geräteerkennung: ',
       factLoad: 'Belastung',
       factRecovery: 'Bereitschaft',
@@ -1937,9 +1938,9 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       loadingAria: 'Übersicht wird geladen',
       overviewTitle: 'Übersicht',
       partialUnavailable: 'Manche Datenströme wurden noch nicht abgerufen',
-      retry: 'Erneut versuchen',
+      retry: 'Wiederholen',
       trainingEmpty:
-        'VO₂max und Trainingsbelastung erscheinen hier nach einer Synchronisierung',
+        'VO₂max und Trainingsbelastung erscheinen nach der Synchronisierung',
       trainingPanelAria: 'Trainingsstatus öffnen',
       trainingSparkLabel: 'Trainingsbelastung der letzten 7 Tage',
       trainingThin: 'Zu wenig Einträge in den letzten 7 Tagen für einen Trend',
@@ -1951,7 +1952,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       avgHr: (bpm: number) => `Ø HF ${bpm}`,
       backToOverview: 'Zurück zur Übersicht',
       desktopOnly:
-        'Nutze die Desktop-App. Diese Browser-Vorschau liest keine Kontodaten.',
+        'Erfordert die Desktop-App (die Browser-Vorschau liest keine Kontodaten).',
       filterAll: 'Alle',
       filterSleep: (count: number) => `Schlaf ${count}`,
       filterWorkouts: (count: number) => `Trainings ${count}`,
@@ -1961,16 +1962,16 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
           other: `${count} unvollständige Einträge ausgeblendet`,
         }),
       introTimeline:
-        'Zuletzt synchronisierte Schlaf- und Trainingseinträge auf einer Zeitachse – das Neueste oben.',
+        'Zuletzt synchronisierte Schlaf- und Trainingseinträge (neueste zuerst).',
       loadFailedTitle: 'Die letzten Einträge konnten nicht geladen werden',
       loadingLabel: 'Letzte Einträge werden geladen',
       noRecords: 'In diesem Zeitraum noch keine Schlaf- oder Trainingseinträge.',
       noSleep: 'Noch keine Schlafeinträge',
-      noWorkouts: 'Hier gibt es nichts anzuzeigen.',
-      noWorkoutsOfType: 'Für diese Trainingsart gibt es nichts anzuzeigen.',
+      noWorkouts: 'Nichts anzuzeigen.',
+      noWorkoutsOfType: 'Für diese Trainingsart nichts anzuzeigen.',
       notProvided: 'Nicht angegeben',
       partialUnavailable: 'Manche Daten sind gerade nicht verfügbar',
-      retry: 'Erneut versuchen',
+      retry: 'Wiederholen',
       showMore: (count: number) => `${count} weitere anzeigen`,
       sleepScore: (score: number) => `Schlafscore ${score}`,
       sleepTitle: 'Schlaf',
@@ -1987,7 +1988,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       deviceUndetermined: 'Gerät unbestimmt',
       durationKicker: 'Schlafdauer',
       footnote:
-        'Nur die Phasen-Zusammenfassung, die die Cloud wirklich geliefert hat. Gibt es kein REM-Feld, steht „Nicht angegeben" – nie per Subtraktion errechnet – und eine nicht gelieferte Zeitachse wird nie gezeichnet.',
+        'Zeigt nur die von der Cloud gelieferten Phasen. Fehlt das REM-Feld, steht „Nicht angegeben" – nie per Subtraktion erfunden, keine Zeitachse ohne Werte.',
       heroAria: 'Schlafdauer und Score',
       heroMeta: (fellAsleep: string, wokeUp: string, inBed: string) =>
         `Eingeschlafen ${fellAsleep} · aufgewacht ${wokeUp} · im Bett ${inBed}`,
@@ -2001,7 +2002,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         'Er wurde vielleicht aufgeräumt oder ist noch nicht auf diesem Rechner synchronisiert.',
       notFoundTitle: 'Dieser Schlafeintrag ist nicht da',
       notProvided: 'Nicht angegeben',
-      retry: 'Erneut versuchen',
+      retry: 'Wiederholen',
       scoreKicker: 'Schlafscore',
       scoreNote: 'Vom Gerät gemeldet; so gezeigt, wie aufgezeichnet – nicht mehr.',
       sourceProvider: 'Anbieter',
@@ -2009,7 +2010,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       sourceScope: 'Datenbereich',
       sourceTitle: 'Quelle',
       stageHelp:
-        'Tiefschlaf: die erholsame Phase. Leichtschlaf: die Übergangsphase, die den Großteil der Nacht einnimmt. REM: Rapid Eye Movement, mit Gedächtnis und Träumen verbunden. Wach: Aufwachen oder wach liegen in der Nacht. Das sind Begriffsklärungen, keine Gesundheitsdiagnose.',
+        'Tiefschlaf: körperliche Erholung. Leichtschlaf: Übergangsphase. REM: Traumschlaf und geistige Erholung. Wach: nächtliche Wachphasen. Keine medizinische Diagnose.',
       stageHelpButton: 'Was die Phasen bedeuten',
       stagesAria: 'Schlafphasen',
       stagesTitle: 'Schlafphasen',
@@ -2030,7 +2031,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       backToOverview: 'Zurück zur Übersicht',
       backToRecent: 'Zurück zu den letzten Einträgen',
       emptyMessage:
-        'Nach einer Synchronisierung erscheinen sie hier. Phasen werden nie erfunden.',
+        'Nach der Synchronisierung erscheinen die Schlafeinträge hier; Phasen werden nie erfunden.',
       emptyTitle: 'Noch keine Schlafeinträge',
       footnote: (count: number, from: string) =>
         plural(count, {
@@ -2038,12 +2039,12 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
           other: `${count} Einträge · seit ${from}`,
         }),
       intro:
-        'Auf diesen Rechner synchronisierte Schlafeinträge. Ohne vollständige Zeitachse wird nur die Zusammenfassung gezeigt.',
+        'Lokal synchronisierte Schlafeinträge. Ohne detaillierte Zeitreihe wird die Zusammenfassung angezeigt.',
       loadFailed: 'Die Schlafliste ist gerade nicht verfügbar',
       loadFailedTitle: 'Die Schlafeinträge konnten nicht gelesen werden',
       loadMore: 'Mehr laden',
       loadingMore: 'Wird geladen…',
-      retry: 'Erneut versuchen',
+      retry: 'Wiederholen',
       scoreLabel: 'Score',
       shown: (shown: number, total: number) => `${shown} von ${total} angezeigt`,
       title: 'Schlaf',
@@ -2059,14 +2060,14 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       balanceHint: '7-Tage-Belastung gegen den 28-Tage-Wochenschnitt, d. h. das Akut-Chronisch-Verhältnis',
       balanceLabel: 'Trainingsbelastungs-Balance',
       balanceNote:
-        'Akut:Chronisch = Summe der letzten 7 Tage ÷ (Summe der letzten 28 Tage ÷ 4). Deckt das 28-Tage-Fenster weniger als 21 Tage ab, gibt es keinen Quotienten und die Linie bricht dort – das ist unberechnet, nicht null.',
+        'Akut:Chronisch = Summe der letzten 7 Tage ÷ (Summe der letzten 28 Tage ÷ 4). Bei weniger als 21 Tagen Daten im 28-Tage-Fenster bleibt der Wert unberechnet – die Linie reißt dort ab: nicht berechnet, nicht null.',
       chronicTooltip: (value: string) => `28-Tage-Wochenschnitt <b>${value}</b>`,
       chronicWeekly: '28-Tage-Wochenschnitt',
       desktopOnly:
-        'Nutze die Desktop-App. Diese Browser-Vorschau liest keine Kontodaten.',
+        'Erfordert die Desktop-App (die Browser-Vorschau liest keine Kontodaten).',
       intro:
-        'VO₂max, Laktatschwelle, Trainingsbelastung und Herzfrequenzzonen. Alle aus synchronisierten Einträgen gelesen; keine Trainingsratschläge.',
-      latestTag: 'Neueste',
+        'VO₂max, Laktatschwelle, Trainingsbelastung und Herzfrequenzzonen aus bereits synchronisierten Einträgen – ohne Trainingsempfehlung.',
+      latestTag: 'Aktuell',
       loadEmpty: 'Keine Trainingsbelastungs-Einträge in diesem Zeitraum.',
       loadFailed: 'Trainingsstatus-Daten sind gerade nicht verfügbar',
       loadHint: 'Täglicher Trainingsbelastungs-Score',
@@ -2081,7 +2082,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       ratioMissing: (days: number) =>
         `— (nur ${days} Tage mit Daten im 28-Tage-Fenster)`,
       ratioTooltip: (value: string) => `Akut:Chronisch <b>${value}</b>`,
-      retry: 'Erneut versuchen',
+      retry: 'Wiederholen',
       thresholdChartAria: 'Laktatschwellen-Herzfrequenz und -Tempo',
       thresholdEmpty: 'Keine Laktatschwellen-Messungen in diesem Zeitraum.',
       thresholdHint: 'Herzfrequenz und Tempo; aktualisiert sich nur nach einem harten Lauf',
@@ -2120,7 +2121,7 @@ Antworte in Markdown.`,
       chartsEmptyBody:
         'Für diese Einheit wurden keine Herzfrequenz-, Tempo-, Höhen- oder Schrittfrequenz-Serien synchronisiert.',
       chartsEmptyTitle: 'Keine Messpunkt-Kurven',
-      copied: (format: string) => `${format}-Daten in die Zwischenablage kopiert.`,
+      copied: (format: string) => `${format}-Daten kopiert.`,
       copiedAndOpened: (provider: string) =>
         `Anonymisierte Daten dieses Trainings kopiert und ${provider} geöffnet. Einfügen genügt.`,
       copiedOnly: (provider: string) =>
@@ -2161,12 +2162,12 @@ Antworte in Markdown.`,
       eyebrowProvenance: 'Herkunft',
       eyebrowRoute: 'Route',
       handTo: (provider: string) => `An ${provider} übergeben`,
-      handoffAria: 'An KI übergeben',
+      handoffAria: 'An die KI übergeben',
       handoffSub:
-        'Kopiert die anonymisierten Daten genau dieses einen Trainings plus den Prompt und öffnet die von dir gewählte KI-Seite. Tagesbasierte Datenströme wie Schlaf und Schritte bleiben draußen.',
+        'Kopiert die anonymisierten Daten dieses Trainings samt Prompt und öffnet die gewählte KI. Tagesdaten wie Schlaf und Schritte werden nicht einbezogen.',
       handoffTarget: 'Zielwerkzeug',
       handoffTargetAria: 'An welches KI-Werkzeug übergeben',
-      handoffTitle: 'An KI übergeben',
+      handoffTitle: 'An die KI',
       heroAria: 'Trainingsübersicht',
       hrZoneBarAria: 'Zeitanteil in jeder Herzfrequenzzone',
       hrZoneBelow: (upper: number) => `Unter ${upper}`,
@@ -2202,7 +2203,7 @@ Antworte in Markdown.`,
       metricTrainingLoad: 'Trainingsbelastung',
       myCorrection: 'Meine Korrektur',
       needDesktop:
-        'Die KI-Übergabe braucht die Desktop-App; diese Browser-Vorschau öffnet keine externen Seiten.',
+        'KI-Übergabe erfordert die Desktop-App (Browser-Vorschau öffnet keine externen Links).',
       noCorrection: 'Keine Korrektur',
       notFetchedYet: 'Noch nicht abgerufen',
       notFoundMessage:
@@ -2213,7 +2214,7 @@ Antworte in Markdown.`,
       overrideFailed: 'Die Trainingsart-Korrektur konnte nicht gespeichert werden',
       overrideSaved: 'Lokale Trainingsart-Korrektur gespeichert.',
       pageFoot:
-        'Auf diesem Rechner dekodiert. Der Track wird auf einer lokalen Leinwand gezeichnet und nie an einen Kartendienst gesendet.',
+        'Lokal dekodiert. Die Route wird offline gezeichnet und an keinen externen Kartendienst übertragen.',
       preparing: 'Wird vorbereitet…',
       provenanceAria: 'Herkunft',
       provenanceDevice: 'Gerät',
@@ -2222,10 +2223,10 @@ Antworte in Markdown.`,
       provenanceScope: 'Datenbereich',
       provenanceSynced: 'Zuletzt synchronisiert',
       provenanceTitle: 'Herkunft',
-      retry: 'Erneut versuchen',
+      retry: 'Wiederholen',
       routeAria: 'Voller GPS-Track',
       routeEmptyBody:
-        'Dieser Eintrag bringt nicht genug GPS-Punkte mit, also wird keine Route gezeichnet.',
+        'Zu wenige GPS-Punkte vorhanden – keine Route darstellbar.',
       routeEmptyTitle: 'Kein nutzbarer Track',
       routeLegendNoPace: 'Weniger als 3 gültige Tempo-Punkte · nicht nach Geschwindigkeit gefärbt',
       routeLegendPace: (count: number) =>
@@ -2264,21 +2265,21 @@ Antworte in Markdown.`,
       backToOverview: 'Zurück zur Übersicht',
       backToRecent: 'Zurück zu den letzten Einträgen',
       emptyMessage:
-        'Nach einer Synchronisierung erscheinen hier nur Einträge mit Typ, Zeit und mindestens einer echten Metrik. Ohne GPS oder Messpunkt-Serien wird kein leeres Diagramm gezeichnet.',
+        'Nach der Synchronisierung erscheinen hier Trainings mit gültigen Messwerten; ohne GPS oder Messpunkte wird kein leeres Diagramm gezeichnet.',
       emptyTitle: 'Noch nichts anzuzeigen',
       footnote: (count: number) =>
         plural(count, {
           one: `${count} Eintrag angezeigt`,
           other: `${count} Einträge angezeigt`,
         }),
-      intro: 'Auf diesen Rechner synchronisierte Trainings. Kein Track, keine Karte.',
+      intro: 'Lokal synchronisierte Trainings. Ohne Track wird keine Karte gezeichnet.',
       avgHr: (bpm: number) => `Ø HF ${bpm}`,
       loadFailed: 'Die Trainingsliste ist gerade nicht verfügbar',
       loadFailedTitle: 'Die Trainings konnten nicht gelesen werden',
       loadMore: 'Mehr laden',
       loadingMore: 'Wird geladen…',
       notProvided: 'Nicht angegeben',
-      retry: 'Erneut versuchen',
+      retry: 'Wiederholen',
       shown: (loaded: number, total: number) => `${loaded} von ${total} geladen`,
       title: 'Trainings',
     },
@@ -2296,11 +2297,11 @@ Antworte in Markdown.`,
       historyCount: (count: number) => `Übergabeverlauf (${count})`,
       historyEmpty: 'Noch nichts übergeben',
       intro:
-        'Wähle ein Training, such dir die Daten aus und schreib, was du wissen willst – exportiere auf den Desktop und ziehe es in die KI.',
+        'Wähle Daten und Trainings aus, formuliere deine Frage und exportiere das Paket für deine KI.',
       newTask: 'Neu',
-      pageTitle: 'An KI übergeben',
+      pageTitle: 'An die KI',
       rangeLabel: 'Rückblickzeitraum',
-      rename: 'Zum Umbenennen klicken',
+      rename: 'Klicken zum Umbenennen',
       saved: 'Gespeichert',
       titleLabel: 'Aufgabenname',
     },
@@ -2316,19 +2317,19 @@ Antworte in Markdown.`,
     'components/ai/DirectionPanel': {
       counter: (used: number, max: number) => `${used}/${max}`,
       directionHint:
-        'Eine Richtung zu wählen übernimmt auch ihren empfohlenen Datenbereich – du siehst es im Graphen und kannst es rückgängig machen.',
+        'Übernimmt den empfohlenen Datenbereich der Vorlage (im Graphen anpassbar).',
       directionLabel: 'Analyserichtung (Vorlage)',
       example1: 'Wie habe ich in letzter Zeit geschlafen, und was sollte ich ändern?',
       example2: 'Passte die Trainingsbelastung dieser Woche für mich?',
       example3: 'Wird meine Erholung besser oder schlechter?',
       examplesLabel: 'Versuch es so',
-      hint: 'Die Richtung gibt den Rahmen, die Frage den Fokus – beides geht an die KI',
+      hint: 'Richtung und Frage definieren den Kontext für die KI',
       noDirection: 'Keine',
       noteLabel: 'Persönlicher Hintergrund (optional)',
-      notePlaceholder: 'Verletzungen, Ziele, aktuelle Form … gehen mit in den Export für die KI.',
+      notePlaceholder: 'Verletzungen, Ziele, aktuelle Verfassung … fließen in den Export ein.',
       questionLabel: 'Deine Frage',
       questionPlaceholder:
-        'Worauf willst du diesmal den Fokus legen? Z. B.: Passte die Intensität des Erholungslaufs am Mittwoch?',
+        'Worauf liegt dein Fokus? Z. B.: Passte die Intensität des Laufs am Mittwoch?',
       title: 'Richtung und Frage',
       groupDaily: 'Alltag',
       groupRun: 'Laufen',
@@ -2352,7 +2353,7 @@ Antworte in Markdown.`,
       drop: 'Diese Metrik ausschließen',
       exclude: 'Nicht an die KI',
       expand: 'Metriken einblenden',
-      include: 'An KI übergeben',
+      include: 'An die KI',
       includeDay: 'Den Trainingstag einbeziehen',
       keep: 'Diese Metrik behalten',
       noData: 'Keine Daten in diesem Zeitfenster',
@@ -2365,10 +2366,10 @@ Antworte in Markdown.`,
           one: `enthält ${count} Anhangsoriginal`,
           other: `enthält ${count} Anhangsoriginale`,
         }),
-      desktopOnly: 'Verbinde die Desktop-App, um zu exportieren',
+      desktopOnly: 'Export erfordert die Desktop-App',
       dragHint:
-        'Ziehe die Dateien aus diesem Ordner in den KI-Chat und füge danach den Prompt ein. Die Seite zu öffnen ist noch kein Senden.',
-      editHint: 'Zum Bearbeiten klicken',
+        'Dateien in den KI-Chat ziehen und den Prompt aus der Zwischenablage einfügen – die Seite zu öffnen sendet noch nichts.',
+      editHint: 'Klicken zum Bearbeiten',
       edited: 'Von dir geändert',
       exportOnly: 'Nur auf den Desktop exportieren',
       finalPrompt: 'Finaler Prompt (genau das wird kopiert)',
@@ -2384,19 +2385,19 @@ Antworte in Markdown.`,
       packageSize: (bytes: string) => `Datenpaket ca. ${bytes}`,
       readiness: (categories: number, percent: number) =>
         `${categories} Datentypen · ${percent} % der Tage mit Daten`,
-      readinessLoading: 'Deine Daten werden gezählt…',
-      readinessWaiting: 'Die neuesten Daten sind noch unterwegs',
+      readinessLoading: 'Daten werden aufbereitet…',
+      readinessWaiting: 'Neueste Daten werden noch synchronisiert',
       readinessWaitingStep: (current: number, total: number) =>
-        `Synchronisierung ${current}/${total} · aktualisiert sich von selbst, sobald sie durch ist`,
-      readinessWaitingSub: 'Aktualisiert sich von selbst, sobald die Synchronisierung durch ist',
+        `Synchronisierung ${current}/${total} · aktualisiert sich nach Abschluss automatisch`,
+      readinessWaitingSub: 'Aktualisiert sich automatisch nach Abschluss der Synchronisierung',
       repeat: (count: number) => `×${count}`,
       resetPrompt: 'Automatisch erzeugten Text wiederherstellen',
       reveal: 'Im Explorer anzeigen',
       lastExport: 'Letzter Export · Ordner öffnen',
       run: (label: string) => `Auf den Desktop exportieren und ${label} öffnen`,
       stale:
-        'Die Aufgabe wurde nach dem Export geändert – die Dateien auf dem Desktop sind veraltet. Exportiere erneut.',
-      title: 'An die KI übergeben',
+        'Aufgabe nach dem Export geändert – Desktop-Dateien sind veraltet. Bitte erneut exportieren.',
+      title: 'An die KI',
       who: 'Übergeben an',
     },
     'components/ai/HandoffSteps': {
@@ -2408,7 +2409,7 @@ Antworte in Markdown.`,
       idle: 'Nicht gestartet',
       open: (label: string) => `${label} öffnen`,
       prepare: 'Auf den Desktop exportieren',
-      retry: 'Erneut versuchen',
+      retry: 'Wiederholen',
       skipped: 'Die Browser-Vorschau kann keinen Browser öffnen',
     },
     'components/ai/TaskExtras': {
@@ -2416,7 +2417,7 @@ Antworte in Markdown.`,
       advanced: 'Erweiterte Optionen',
       attachTitle: 'Originaldateien (PDF / Bilder)',
       changed: 'seit dem Hinzufügen geändert',
-      desktopOnly: 'Dateien auszuwählen braucht die Desktop-App',
+      desktopOnly: 'Dateiauswahl erfordert die Desktop-App',
       detail: 'Detailgrad',
       detailDetailed: 'Detailliert (Messpunkt-Serien)',
       detailStandard: 'Standard',
@@ -2429,7 +2430,7 @@ Antworte in Markdown.`,
       pickerTitle: 'Dateien wählen, die mit der Aufgabe übergeben werden',
       preciseGps: 'Genaue Route (GPS-Koordinaten)',
       preciseGpsHint:
-        'Standardmäßig aus; eingeschaltet behalten exportierte Tracks die Rohkoordinaten.',
+        'Standardmäßig deaktiviert; bei Aktivierung enthalten exportierte Tracks Rohkoordinaten.',
       remove: 'Entfernen',
       reselect: 'Neu auswählen',
       skipped: (count: number) =>
@@ -2482,7 +2483,7 @@ Antworte in Markdown.`,
       defaultPlan:
         'Ich habe keine konkrete Frage gestellt – gib mir deshalb eine vollständige Analyse in dieser Reihenfolge:',
       fileAttachments: (n: number) =>
-        `- Der Ordner attachments/ enthält ${n} Originaldatei(en), die ich beigefügt habe (z. B. Befunde, Screenshots); bitte ebenfalls berücksichtigen.`,
+        `- Der Ordner attachments/ enthält ${n} angehängte Originaldatei(en) (z. B. Befunde, Screenshots); bitte ebenfalls berücksichtigen.`,
       fileData: (file: string, labels: string) =>
         `- ${file}: alle Daten. „context" listet Metriken, Schlaf und Trainingseinheiten pro Kategorie (${labels}) Tag für Tag; „coverage" gibt an, welche Tage tatsächlich Daten haben; „units" nennt die Einheit jedes Felds; „task.personal_note" ist mein persönlicher Hintergrund.`,
       fileNote:
@@ -2497,9 +2498,9 @@ Antworte in Markdown.`,
       range: (start: string, end: string) => (start === end ? start : `${start} bis ${end}`),
       rangeUnknown: 'ein aktueller Zeitraum',
       rules:
-        'Antwortweise: erst das Fazit, dann die Belege; nenne konkrete Daten und Werte; weise Datenlücken klar aus, rate nicht und ergänze keine fehlenden Tage; antworte auf Deutsch.',
+        'So antworte: erst Fazit, dann Belege; nenne konkrete Tage und Werte; weise Datenlücken klar aus, rate nichts und ergänze keine fehlenden Tage; antworte auf Deutsch.',
       start:
-        'Beginne die Analyse bitte direkt – frag mich nicht zuerst, was ich möchte.',
+        'Beginne die Analyse direkt – frag nicht zuerst, was ich möchte.',
       step1: '1. Fazit in einem Satz: wie es mir in diesem Zeitraum insgesamt ging.',
       step2: (labels: string) =>
         `2. Kategorie für Kategorie (${labels}): Niveau, Trend und Vergleich mit meiner eigenen üblichen Baseline.`,
@@ -2517,8 +2518,8 @@ Antworte in Markdown.`,
       cat_personal_note: 'Notizen',
       cat_recovery: 'Erholung',
       cat_sleep: 'Schlaf',
-      cat_training: 'Training',
-      cat_workout: 'Workouts',
+      cat_training: 'Belastung',
+      cat_workout: 'Trainings',
       manyCategories: (a: string, _b: string, n: number) => `${a} und ${n - 1} weitere`,
       noData: 'keine Daten',
       promptSuffix: 'Prompt',
@@ -2614,20 +2615,20 @@ Antworte in Markdown.`,
       deviceLatest: (time: string) => `Neueste Daten ${time}`,
       deviceOpen: 'Modell ansehen oder wechseln',
       exportFormatSub:
-        'Vorausgewählt beim Export aus „An KI übergeben" oder einem Training',
+        'Vorausgewählt beim Export aus „An die KI" oder einem Training',
       mcpLead:
-        'Lass KI-Werkzeuge auf deinem Rechner – Claude Code, Codex und Ähnliche – deine lokalen Daten direkt abfragen. Nur lesend, offline, ohne offenen Port.',
+        'Lass KI-Werkzeuge auf deinem Rechner – Claude Code, Codex und ähnliche – deine lokalen Daten direkt abfragen. Nur lesend, offline, ohne offenen Port.',
       mcpPreview: 'Anzeigen, was kopiert wird',
       mcpTools:
-        'Nach der Einrichtung kann die KI diese fünf Dinge abfragen. Halte die Maus darüber für die Erklärung.',
-      mcpToolsLabel: 'Werkzeuge, die die KI nutzen kann',
+        'Nach der Einrichtung stehen der KI fünf Abfragewerkzeuge bereit (Details per Hover).',
+      mcpToolsLabel: 'Für die KI nutzbare Werkzeuge',
       pageIntro:
-        'Öffne eine Karte, um sie anzupassen; im aufgeklappten Zustand ziehe ihren Kopf seitwärts, um direkt zur nächsten zu blättern.',
+        'Karte zum Anpassen öffnen; Kopfzeile seitwärts ziehen, um zur nächsten zu wechseln.',
       pageIntroDeck:
-        'Streiche seitwärts, um eine Karte auszuwählen, und tippe auf die mittlere, um sie zu öffnen – oder „Alle anzeigen", um alle Karten auf einmal zu sehen.',
+        'Seitwärts streichen zum Auswählen, die mittlere Karte öffnen; für alles auf einmal „Alle anzeigen".',
       openCard: 'Öffnen',
       retentionSub:
-        'Nur die jüngsten Tage werden behalten; bei eingeschaltetem Langzeitarchiv wirkungslos',
+        'Behält nur die jüngsten Tage; wirkungslos bei eingeschaltetem Langzeitarchiv',
       scaleSub: '100 % ist die Designgröße; Strg + / Strg - gehen auch',
       secAccount: 'Konto',
       secAppearance: 'Erscheinungsbild',
@@ -2643,7 +2644,7 @@ Antworte in Markdown.`,
       secLoginSub: 'Nur aufklappen, wenn du dich anders anmelden musst',
       secMcp: 'MCP',
       secRetention: 'Lokale Aufbewahrung',
-      secUpdate: 'Software-Update',
+      secUpdate: 'Softwareupdate',
       sumAccount: (state: string, devices: number) =>
         `${state} · ${plural(devices, {
           one: `${devices} Gerät`,
@@ -2653,7 +2654,7 @@ Antworte in Markdown.`,
       sumAdvanced: 'Datenbank-Snapshots · lokale API · Datenzustand',
       sumAi: (format: string) => `MCP-Nur-Lese-Zugriff · Standard-Export ${format}`,
       sumArchiveOff: (days: number) => `Behält die letzten ${days} Tage`,
-      sumArchiveOn: 'Langzeitarchiv an · nichts wird aufgeräumt',
+      sumArchiveOn: 'Langzeitarchiv aktiv · kein automatisches Löschen',
       sumData: (available: number, total: number) =>
         `${available} von ${total} Datenströmen auf diesem Rechner`,
       sumDataLoading: 'Verfügbare Daten werden gelesen…',
@@ -2665,9 +2666,9 @@ Antworte in Markdown.`,
         `Automatische Synchronisierung · alle ${minutes} Min.`,
       syncIntervalLabel: 'Intervall',
       syncNowLabel: 'Jetzt einmal synchronisieren',
-      syncNowSub: 'Holt nur die letzten paar Tage',
+      syncNowSub: 'Synchronisiert nur die letzten Tage',
       themeDark: 'Dunkel',
-      themeLabel: 'Theme',
+      themeLabel: 'Thema',
       themeLight: 'Hell',
       themeSystem: 'System',
     },

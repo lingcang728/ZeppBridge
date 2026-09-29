@@ -18,7 +18,7 @@ export type HealthCategory = 'heart' | 'sleep' | 'activity';
 const messages = defineMessages(
   {
     noUpdates: '暂无更新',
-    noRecords: '尚无记录',
+    noRecords: '暂无记录',
     timeUnknown: '时间未知',
     dateUnknown: '日期未知',
     durationUnknown: '时长未知',
@@ -42,7 +42,7 @@ const messages = defineMessages(
   },
   {
     noUpdates: 'Sin actualizaciones',
-    noRecords: 'Aún no hay registros',
+    noRecords: 'Sin registros',
     timeUnknown: 'Hora desconocida',
     dateUnknown: 'Fecha desconocida',
     durationUnknown: 'Duración desconocida',

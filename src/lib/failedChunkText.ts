@@ -18,12 +18,12 @@ const messages = defineMessages(
     noReason: '没有记录原因',
   },
   {
-    noCanonical: 'The cloud returned a payload, but no usable records could be parsed from it',
+    noCanonical: 'The cloud returned a payload, but no usable records were parsed',
     noReason: 'No reason recorded',
   },
   {
-    noCanonical: 'La nube devolvió datos, pero no se pudo extraer ningún registro utilizable',
-    noReason: 'No se registró el motivo',
+    noCanonical: 'La nube devolvió datos, pero no se hallaron registros utilizables',
+    noReason: 'Sin motivo registrado',
   },
   'lib/failedChunkText',
 );

@@ -30,42 +30,42 @@ export interface EstimateCopyInput {
 const messages = defineMessages(
   {
     stopNoSpace: (needed: string, free: string) =>
-      `这次补拉预计需要 ${needed}（含安全余量），本盘只剩 ${free}，不会开始。请先腾出空间或缩短范围。`,
-    diskUnknown: '未能读取磁盘剩余空间，补拉前请确认本机还有足够空间。',
+      `这次补拉预计要 ${needed}（含安全余量），本盘只剩 ${free}，不会开始。先腾空间或缩短范围。`,
+    diskUnknown: '读不到磁盘剩余空间，补拉前确认本机空间足够。',
     diskTooSmall: '磁盘剩余不足 300 MB，不能补拉 90 天以上的历史。',
     builtinGuess: (days: number, add: string, free: string) =>
-      `本机样本还不够，用的是内置粗略估算：${days} 天大约占用 ${add}，本盘剩余 ${free}。`,
+      `本机样本不足，按内置粗估：${days} 天约占用 ${add}，本盘剩余 ${free}。`,
     measured: (days: number, add: string, free: string) =>
-      `按本机已有数据的实际速率推算，${days} 天大约占用 ${add}，本盘剩余 ${free}。`,
+      `按本机已有数据的实际速率推算，${days} 天约占用 ${add}，本盘剩余 ${free}。`,
     partial: (days: number, add: string, free: string) =>
-      `只按本机已有样本的那几条流推算，${days} 天大约占用 ${add}（其余流样本不足，未计入），本盘剩余 ${free}。`,
-    unknownEstimate: '暂时无法估算这次补拉的占用。',
+      `只按本机有样本的几条流推算，${days} 天约占用 ${add}（其余流样本不足，未计入），本盘剩余 ${free}。`,
+    unknownEstimate: '暂时算不出这次补拉的占用。',
   },
   {
     stopNoSpace: (needed: string, free: string) =>
-      `This backfill needs about ${needed} (including a safety margin) but only ${free} is free, so it will not start. Free up space or shorten the range.`,
-    diskUnknown: 'Could not read the free disk space. Make sure there is enough room before backfilling.',
+      `This backfill needs about ${needed} (incl. safety margin); only ${free} is free. It will not start — free up space or shorten the range.`,
+    diskUnknown: 'Could not read free disk space. Check there is enough room before backfilling.',
     diskTooSmall: 'Less than 300 MB free — history longer than 90 days cannot be backfilled.',
     builtinGuess: (days: number, add: string, free: string) =>
-      `Not enough local samples yet, so this is a rough built-in estimate: ${days} days takes about ${add}, and ${free} is free on this drive.`,
+      `Too few local samples — rough built-in estimate: ${days} days ≈ ${add}; ${free} free on this drive.`,
     measured: (days: number, add: string, free: string) =>
-      `Based on the rate your own data actually accumulates, ${days} days takes about ${add}, and ${free} is free on this drive.`,
+      `At the rate your own data accumulates, ${days} days ≈ ${add}; ${free} free on this drive.`,
     partial: (days: number, add: string, free: string) =>
-      `Based only on the streams that have enough local samples, ${days} days takes about ${add} (the rest are not counted), and ${free} is free on this drive.`,
-    unknownEstimate: 'The size of this backfill cannot be estimated right now.',
+      `Only streams with enough local samples counted: ${days} days ≈ ${add} (rest not counted); ${free} free on this drive.`,
+    unknownEstimate: 'Cannot estimate this backfill’s size right now.',
   },
   {
     stopNoSpace: (needed: string, free: string) =>
-      `Esta recuperación necesita unos ${needed} (con margen de seguridad), pero solo hay ${free} libres, así que no se iniciará. Libera espacio o acorta el rango.`,
-    diskUnknown: 'No se pudo leer el espacio libre en disco. Asegúrate de que haya suficiente antes de recuperar el historial.',
-    diskTooSmall: 'Hay menos de 300 MB libres: no se puede recuperar un historial de más de 90 días.',
+      `Esta recuperación requiere ${needed} (con margen de seguridad); solo quedan ${free} libres. No iniciará: libera espacio o acorta el rango.`,
+    diskUnknown: 'No se pudo leer el espacio libre. Comprueba que haya espacio antes de recuperar historial.',
+    diskTooSmall: 'Menos de 300 MB libres: no se puede recuperar historial mayor a 90 días.',
     builtinGuess: (days: number, add: string, free: string) =>
-      `Aún no hay suficientes muestras locales, así que es una estimación aproximada: ${days} días ocupan unos ${add}, y hay ${free} libres en este disco.`,
+      `Pocas muestras locales: estimación de ${days} días ≈ ${add}; ${free} libres en este disco.`,
     measured: (days: number, add: string, free: string) =>
-      `Según el ritmo al que se acumulan tus propios datos, ${days} días ocupan unos ${add}, y hay ${free} libres en este disco.`,
+      `Según el ritmo de tus datos, ${days} días ≈ ${add}; ${free} libres en este disco.`,
     partial: (days: number, add: string, free: string) =>
-      `Contando solo los flujos con suficientes muestras locales, ${days} días ocupan unos ${add} (el resto no se cuenta), y hay ${free} libres en este disco.`,
-    unknownEstimate: 'Por ahora no se puede estimar el tamaño de esta recuperación.',
+      `Solo flujos con muestras suficientes: ${days} días ≈ ${add} (el resto no se cuenta); ${free} libres en disco.`,
+    unknownEstimate: 'No se puede estimar el tamaño de esta recuperación por ahora.',
   },
   'lib/storageEstimateText',
 );

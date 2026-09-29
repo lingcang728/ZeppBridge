@@ -118,6 +118,8 @@ describe('lazy copy packs', () => {
     await language.ensureLandingCopy('fr');
     expect(language.locale.value).toBe('fr');
     expect(document.documentElement.lang).toBe('fr');
-    expect(document.title).toBe('ZeppBridge · Tes données Zepp sur ton ordinateur');
+    // 这三条 fr 字符串是「语言包真的加载了」的证据，跟着 landing/fr.ts 走：
+    // 那边改了 nav.language / headlineAccent / meta.title 就要同步改这里。
+    expect(document.title).toBe('ZeppBridge · Passerelle de données locale');
   });
 });

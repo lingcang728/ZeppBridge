@@ -10,7 +10,7 @@ const messages = defineMessages(
   {
     noRecordsToShow: '没有可显示的记录',
     noRecordsInWindow: (days: number) => `近 ${days} 天无记录`,
-    coverage: (days: number, withData: number) => `${days} 天里有 ${withData} 天记录`,
+    coverage: (days: number, withData: number) => `${days} 天中 ${withData} 天有记录`,
     dayRange: (low: string, high: string, unit: string) => `当日区间 ${low} – ${high}${unit}`,
     samples: (count: number) => `${count} 次读数`,
   },
@@ -22,10 +22,10 @@ const messages = defineMessages(
     samples: (count: number) => `${count} readings`,
   },
   {
-    noRecordsToShow: 'Sin registros que mostrar',
+    noRecordsToShow: 'Sin registros para mostrar',
     noRecordsInWindow: (days: number) => `Sin registros en los últimos ${days} días`,
-    coverage: (days: number, withData: number) => `${withData} de ${days} días tienen registros`,
-    dayRange: (low: string, high: string, unit: string) => `Ese día varió entre ${low} y ${high}${unit}`,
+    coverage: (days: number, withData: number) => `${withData} de ${days} días con registros`,
+    dayRange: (low: string, high: string, unit: string) => `Rango del día: ${low} – ${high}${unit}`,
     samples: (count: number) => `${count} lecturas`,
   },
   'lib/metricSeries',

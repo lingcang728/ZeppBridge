@@ -41,7 +41,7 @@ describe('buildBrief', () => {
   it('没写问题也给出明确任务，并要求直接开始', () => {
     const text = buildBrief({ ...base, categories: [...base.categories], hasQuestion: false });
     expect(text).toContain('x.json');
-    expect(text).toContain('请直接开始分析');
+    expect(text).toContain('直接开始分析，不用先问我要做什么');
     expect(text).toContain('1. 一句话结论');
     expect(text).toContain('不要推测');
   });

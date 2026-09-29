@@ -23,7 +23,7 @@ export const COPY: Record<'zh' | 'en', LandingCopy> = {
       linux: {
         label: 'Linux',
         previewBadge: '实验性',
-        note: 'deb / rpm / AppImage / Flatpak 已由 CI 构建，但还没有人在真实 Linux 桌面上完整跑通登录和密钥环。遇到问题请开 issue。',
+        note: 'deb / rpm / AppImage / Flatpak 已由 CI 构建，但还没人在真实 Linux 桌面上完整跑通登录和密钥环。遇到问题开 issue。',
       },
       status: {
         loading: '正在读取最新安装包',
@@ -38,7 +38,7 @@ export const COPY: Record<'zh' | 'en', LandingCopy> = {
       github: '在 GitHub 上查看',
       starNudge: {
         title: '下载已开始',
-        copy: '如果 ZeppBridge 对你有用，欢迎在 GitHub 点个 Star，让更多 Amazfit 用户找到它。',
+        copy: 'ZeppBridge 有用的话，在 GitHub 点个 Star，让更多 Amazfit 用户找到它。',
         action: '去点 Star',
         dismiss: '暂时不用',
       },
@@ -94,7 +94,7 @@ export const COPY: Record<'zh' | 'en', LandingCopy> = {
     },
     handoff: {
       heading: '把要问的数据拖给 AI',
-      lead: '拖动一个指标，旁边的节点会被它推开；松手在中间，它就进了这次要交给 AI 的包。',
+      lead: '拖动一个指标，旁边的节点会让开；松手落在中间，它就进这次交给 AI 的包。',
       hint: '拖一个节点到中间',
       center: '交给 AI',
       nodes: ['心率', '睡眠', 'HRV', '步数', '训练负荷', 'PAI', '体重', '压力'],
@@ -135,18 +135,18 @@ export const COPY: Record<'zh' | 'en', LandingCopy> = {
       linux: {
         label: 'Linux',
         previewBadge: 'Experimental',
-        note: 'deb, rpm, AppImage and Flatpak builds come out of CI, but nobody has yet run sign-in and the keyring end to end on a real Linux desktop. If something breaks, please open an issue.',
+        note: 'deb, rpm, AppImage and Flatpak are CI-built, but nobody has run sign-in and the keyring end to end on a real Linux desktop yet. Hit a problem? Open an issue.',
       },
       status: {
         loading: 'Looking up the latest installer',
         ready: 'Click to download directly',
-        fallback: 'No direct link right now, so this opens the GitHub release',
+        fallback: 'Direct link unavailable, so this opens the GitHub release',
       },
     },
     hero: {
       headlineLead: 'Your Zepp data,',
       headlineAccent: 'back in your hands.',
-      lead: 'Sync, browse and organize your Amazfit data on your own computer. Hand it to an AI in one click.',
+      lead: 'Sync, browse and organize your Amazfit data on your own computer. Package it for an AI in one click.',
       github: 'View on GitHub',
       starNudge: {
         title: 'Your download has started',
@@ -161,9 +161,9 @@ export const COPY: Record<'zh' | 'en', LandingCopy> = {
       hint: 'Tap a card',
       back: 'Back',
       greeting: 'Overview',
-      heart: { title: 'Heart rate', unit: 'bpm', detail: 'Minute by minute, all day. Minutes without the watch stay empty instead of turning into zeros.' },
+      heart: { title: 'Heart rate', unit: 'bpm', detail: 'Minute by minute, all day. Minutes off the wrist stay empty, never zero-filled.' },
       steps: { title: 'Steps today', unit: 'steps', detail: 'Hourly steps come from the Zepp official authorization, compared only with your own history.' },
-      sleep: { title: 'Last night', hours: 'h', minutes: 'min', detail: 'Deep, light, REM and awake laid out in order. The measured REM from Zepp wins.' },
+      sleep: { title: 'Last night', hours: 'h', minutes: 'min', detail: 'Deep, light, REM and awake laid out in order, with the official measured REM preferred.' },
     },
     devicesLabel: 'Supported Amazfit devices',
     connect: {
@@ -180,7 +180,7 @@ export const COPY: Record<'zh' | 'en', LandingCopy> = {
         {
           icon: 'zepp-cloud',
           title: 'Advanced data',
-          copy: 'Adds HRV, blood oxygen, stress and readiness that the official API leaves out.',
+          copy: 'Adds HRV, blood oxygen, stress and readiness the official API does not offer.',
           detail: 'Signs in with email or phone. The token lives only in your system credential store.',
         },
         {
@@ -199,25 +199,25 @@ export const COPY: Record<'zh' | 'en', LandingCopy> = {
       cards: [
         { icon: 'profile', title: 'Account and devices', copy: 'Official authorization and advanced data each get a row, so you always know which account is connected.' },
         { icon: 'auto-sync', title: 'Sync and updates', copy: 'Syncs once at launch, then quietly on the schedule you set.' },
-        { icon: 'database', title: 'Archive and storage', copy: 'You decide how long to keep data. Snapshots restore any time.' },
+        { icon: 'database', title: 'Archive and storage', copy: 'Retention is your call. Snapshots restore any time.' },
         { icon: 'structured-data', title: 'Data health', copy: 'Whether each stream was fetched, understood and written, told apart.' },
         { icon: 'secure', title: 'Privacy and security', copy: 'The local read-only API is off by default and binds to 127.0.0.1 only.' },
       ],
     },
     handoff: {
       heading: 'Drag what you want to ask about to the AI',
-      lead: 'Drag a metric and its neighbours get nudged aside. Drop it in the middle and it joins the bundle you hand to the AI.',
+      lead: 'Drag a metric and its neighbours get nudged aside. Drop it in the middle and it joins the bundle sent to the AI.',
       hint: 'Drag a node to the middle',
-      center: 'Hand to AI',
+      center: 'Send to AI',
       nodes: ['Heart rate', 'Sleep', 'HRV', 'Steps', 'Training load', 'PAI', 'Weight', 'Stress'],
       picked: '{n} picked',
       reset: 'Reset',
     },
     privacy: {
       heading: 'Your data stays on your computer',
-      lead: 'ZeppBridge has no server of its own that keeps your health data.',
+      lead: 'ZeppBridge runs no server that holds your health data.',
       points: [
-        { icon: 'secure', title: 'Tokens in the system keychain', copy: 'Kept in Windows Credential Manager or the macOS Keychain by default, not in the data folder.' },
+        { icon: 'secure', title: 'Tokens in the system credential store', copy: 'Kept in Windows Credential Manager or the macOS Keychain by default, not in the data folder.' },
         { icon: 'private', title: 'No telemetry', copy: 'No usage reports. No health data collected.' },
         { icon: 'database', title: 'Clear provenance', copy: 'Every record knows whether it came from the official authorization or advanced data.' },
         { icon: 'ai-ready', title: 'You decide what the AI sees', copy: 'What to include, how much, and when. All up to you.' },

@@ -105,7 +105,7 @@ describe('HandoffPanel', () => {
     expect(pre).toContain('分析方向：恢复跑上下文');
     expect(pre).toContain('这次睡眠够恢复吗');
     // 任务说明在最前，要求 AI 直接开始。
-    expect(pre).toContain('请直接开始分析');
+    expect(pre).toContain('直接开始分析，不用先问我要做什么');
   });
 
   it('previewError 渲染成 role="alert" 的提示', async () => {

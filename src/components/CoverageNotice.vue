@@ -40,12 +40,12 @@ const messages = defineMessages(
   {
     empty: '本机还没有任何数据。先同步一次，图表才有东西可画。',
     emptyAfterSync:
-      '同步跑通了，但一条记录也没取到。可能是这个账号在 Zepp 里本来就没有这段时间的数据，也可能是手表还没把数据上传到 Zepp App。先在手机上打开 Zepp 确认那边有数据，再回来同步一次。',
+      '同步跑通了，但一条记录也没取到。可能这账号在 Zepp 里本就没有这段数据，也可能手表还没上传到 Zepp App。先在手机 Zepp 里确认有数据，再回来同步。',
     emptyUnconfirmedRegion:
-      '同步跑通了，但一条记录也没取到。登录时没能确认你的账号属于哪个 Zepp 区域，现在用的是猜出来的那个——打向错误区域的同步就是这样：一路成功，什么都没有。请重新连接账号试试。',
+      '同步跑通了，但一条记录也没取到。登录时没能确认账号属于哪个 Zepp 区域，现在用的是猜的那个——打向错误区域的同步就是这样：一路成功，什么都没有。重新连接账号试试。',
     reconnect: '去重新连接',
     short: (covered: number, earliest: string) =>
-      `本机只有 ${covered} 天的数据（最早 ${earliest}）。更早的部分是空白，因为还没从云端取回来——不是那段时间你没有记录。`,
+      `本机只有 ${covered} 天数据（最早 ${earliest}）。更早的空白是因为还没从云端取回——不是那段时间没有记录。`,
     backfill: '补拉更多历史',
     backfilling: '正在补拉…',
     syncNow: '立即同步',
@@ -55,14 +55,14 @@ const messages = defineMessages(
     connect: '连接 Zepp 账号',
   },
   {
-    empty: 'Nothing on this machine yet. Sync once and the charts will have something to draw.',
+    empty: 'Nothing on this machine yet. Sync once and charts will have something to draw.',
     emptyAfterSync:
-      'The sync completed but brought nothing back. Either this account has no data for this period in Zepp, or the watch has not uploaded to the Zepp app yet. Check the Zepp app on your phone first, then sync again here.',
+      'Sync ran but brought back nothing. Either this account has no Zepp data for this period, or the watch has not uploaded to the Zepp app yet. Check Zepp on your phone, then sync again.',
     emptyUnconfirmedRegion:
-      'The sync completed but brought nothing back. Signing in could not confirm which Zepp region your account belongs to, so ZeppBridge is using its best guess — and a sync aimed at the wrong region behaves exactly like this: it succeeds and returns nothing. Try connecting your account again.',
+      'Sync ran but brought back nothing. Sign-in could not confirm your account’s Zepp region, so ZeppBridge is guessing — a sync aimed at the wrong region succeeds and returns nothing, exactly like this. Reconnect your account.',
     reconnect: 'Reconnect account',
     short: (covered: number, earliest: string) =>
-      `This machine holds ${covered} days (earliest ${earliest}). Everything before that is blank because it has not been fetched from the cloud yet — not because you recorded nothing then.`,
+      `This machine holds ${covered} days (earliest ${earliest}). Earlier dates are blank because they are not fetched yet — not because you recorded nothing then.`,
     backfill: 'Backfill more history',
     backfilling: 'Backfilling…',
     syncNow: 'Sync now',
@@ -74,12 +74,12 @@ const messages = defineMessages(
   {
     empty: 'Todavía no hay nada en este equipo. Sincroniza una vez y los gráficos tendrán qué mostrar.',
     emptyAfterSync:
-      'La sincronización terminó, pero no trajo nada. O esta cuenta no tiene datos de este periodo en Zepp, o el reloj todavía no ha subido sus datos a la app Zepp. Revisa primero la app Zepp en tu teléfono y luego vuelve a sincronizar aquí.',
+      'La sincronización funcionó, pero no trajo ni un registro. O esta cuenta no tiene datos de este periodo en Zepp, o el reloj aún no los sube a la app Zepp. Confirma en la app Zepp del teléfono que haya datos y vuelve a sincronizar.',
     emptyUnconfirmedRegion:
-      'La sincronización terminó, pero no trajo nada. Al iniciar sesión no se pudo confirmar a qué región de Zepp pertenece tu cuenta, así que ZeppBridge está usando su mejor suposición, y una sincronización dirigida a la región equivocada se comporta exactamente así: funciona y no devuelve nada. Intenta conectar tu cuenta de nuevo.',
+      'La sincronización terminó, pero no trajo nada. Al iniciar sesión no se pudo confirmar la región Zepp de tu cuenta, así que ZeppBridge está usando una región adivinada: una sincronización a la región equivocada hace justo esto, funciona y no devuelve nada. Vuelve a conectar tu cuenta.',
     reconnect: 'Volver a conectar la cuenta',
     short: (covered: number, earliest: string) =>
-      `Este equipo tiene ${covered} días de datos (el más antiguo: ${earliest}). Todo lo anterior aparece vacío porque aún no se ha descargado de la nube, no porque no hayas registrado nada entonces.`,
+      `Este equipo solo tiene ${covered} días de datos (desde ${earliest}). Lo anterior está en blanco porque aún no se descarga de la nube, no porque no hubiera registros.`,
     backfill: 'Recuperar más historial',
     backfilling: 'Recuperando…',
     syncNow: 'Sincronizar ahora',

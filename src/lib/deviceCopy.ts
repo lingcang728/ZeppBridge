@@ -10,7 +10,7 @@ const messages = defineMessages(
     notProvided: 'Not provided',
   },
   {
-    notProvided: 'Sin datos',
+    notProvided: 'No proporcionado',
   },
   'lib/deviceCopy',
 );

@@ -85,7 +85,7 @@ const imperial = () => current.value === 'imperial';
 const unitWords = defineMessages(
   { big: '公里', short: '米', bigImperial: '英里', shortImperial: '英尺' },
   { big: 'km', short: 'm', bigImperial: 'mi', shortImperial: 'ft' },
-  undefined,
+  { big: 'km', short: 'm', bigImperial: 'mi', shortImperial: 'ft' },
   'lib/units',
 );
 

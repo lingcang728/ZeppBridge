@@ -20,7 +20,7 @@ import { defineMessages, useMessages } from '../../i18n';
 
 const t = useMessages(defineMessages(
   {
-    waitingEyebrow: '正在从云端取回你的数据',
+    waitingEyebrow: '正在从云端取回数据',
     waitingHint: '好了会在这里叫你，先随便看看',
     step: (current: number, total: number) => `${current}/${total}`,
     readyTitle: '数据已备好',
@@ -38,20 +38,22 @@ const t = useMessages(defineMessages(
     readyTitle: 'Your data is ready',
     readyNew: (records: string, clock: string) => `${records} new records · as of ${clock}`,
     readyFresh: (clock: string) => `Already up to date · as of ${clock}`,
-    readyPartial: (streams: string, clock: string) => `${streams} did not come through, the rest is updated · as of ${clock}`,
-    cta: 'Hand to AI',
+    readyPartial: (streams: string, clock: string) => `${streams} missed; the rest updated · as of ${clock}`,
+    cta: 'Send to AI',
     dismiss: 'Not now',
     streamSeparator: ', ',
   },
   {
-    waitingEyebrow: 'Recuperando tus datos de la nube',
-    waitingHint: 'te avisaremos aquí; mientras, echa un vistazo',
+    waitingEyebrow: 'Descargando datos de la nube',
+    waitingHint: 'Te avisamos aquí; mientras, echa un vistazo',
+    step: (current: number, total: number) => `${current}/${total}`,
     readyTitle: 'Tus datos están listos',
     readyNew: (records: string, clock: string) => `${records} registros nuevos · a las ${clock}`,
     readyFresh: (clock: string) => `Ya estaba al día · a las ${clock}`,
-    readyPartial: (streams: string, clock: string) => `Faltó ${streams}; el resto está actualizado · a las ${clock}`,
+    readyPartial: (streams: string, clock: string) => `No se pudo obtener ${streams}; el resto está actualizado · a las ${clock}`,
     cta: 'Pasar a la IA',
     dismiss: 'Ahora no',
+    streamSeparator: ', ',
   },
   'components/overview/DataReadyCapsule',
 ));

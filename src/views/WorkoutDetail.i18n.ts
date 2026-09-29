@@ -5,24 +5,24 @@ export const workoutDetailMessages = defineMessages(
   {
     notProvided: '未提供',
     loadFailedTitle: '无法读取这条运动',
-    loadFailed: '训练数据包详情暂时不可用',
+    loadFailed: '训练数据包详情暂不可用',
     retry: '重试',
     notFoundTitle: '找不到这条运动记录',
-    notFoundMessage: '它可能已被清理，或尚未同步到本机。',
+    notFoundMessage: '可能已被清理，或还没同步到本机。',
     insightFailed: '无法生成本次运动的洞察',
     seriesFailed: '无法读取这次运动的逐点序列',
     seriesFailedTitle: '逐点序列读取失败',
     exportNeedsSeries: '逐点序列读取失败，无法导出这条记录。',
-    aiPrompt: (label: string) => `你是一位专业的运动分析师。下面是我一次${label}的完整记录（来自 ZeppBridge 本机数据库，已脱敏）。
-请只基于这条记录里的事实分析这次训练：强度、配速与心率的关系、是否有明显的掉速或异常段落，并给出下一次的具体建议。
+    aiPrompt: (label: string) => `你是专业运动分析师。下面是我一次${label}的完整记录（来自 ZeppBridge 本机数据库，已脱敏）。
+只基于记录里的事实分析这次训练：强度、配速与心率的关系、有没有明显掉速或异常段落，并给下一次的具体建议。
 
 约束：
-- 这份数据里没有任何人群基准，不要拿我和「一般健康人群」或任何平均水平比较；
+- 数据里没有人群基准，不要拿我和「一般健康人群」或任何平均水平比；
 - 缺失的项直接说缺失，不要用 0 或估算值填补；
 - 不做医学诊断、疾病风险判断或治疗建议。
 
-请以 Markdown 格式输出。`,
-    needDesktop: 'AI 交接需要桌面应用环境；当前网页预览不会打开外部网站。',
+以 Markdown 格式输出。`,
+    needDesktop: 'AI 交接需要桌面应用；网页预览不会打开外部网站。',
     attachmentOpened: (provider: string) =>
       `数据包已导出到桌面（zeppbridge-ai-handoff.json），拖入 ${provider} 即可；提示词已复制。`,
     attachmentNotOpened: (provider: string) =>
@@ -36,7 +36,7 @@ export const workoutDetailMessages = defineMessages(
     overrideSaved: '已保存本地运动类型纠正。',
     overrideCleared: '已清除纠正，恢复 ZeppBridge 识别结果。',
     overrideFailed: '保存运动类型纠正失败',
-    copied: (format: string) => `已复制 ${format} 数据到剪贴板。`,
+    copied: (format: string) => `已复制 ${format} 数据。`,
 
     metricDistance: '距离',
     metricDuration: '运动时间',
@@ -104,14 +104,14 @@ export const workoutDetailMessages = defineMessages(
     legendWarm: '偏慢',
     legendSlow: '慢',
     routeEmptyTitle: '没有可用轨迹',
-    routeEmptyBody: '本次记录没有足够的 GPS 点，因此不画路线。',
+    routeEmptyBody: '本次记录没有足够的 GPS 点，不画路线。',
     chartsEmptyTitle: '暂无逐点曲线',
     chartsEmptyBody: '本次未同步心率、配速、海拔或步频序列。',
 
     hrZonesAria: '心率区间分布',
     eyebrowHrZones: '心率区间',
     hrZonesTitle: '心率区间分布',
-    hrZonesNote: '区间边界来自你在手表上的设定，由 Zepp 随这条运动一起下发；ZeppBridge 没有重新划分。训练状态页那套自选区间模型是另一回事，两边的数字对不上属于正常。',
+    hrZonesNote: '区间边界来自你在手表上的设定，由 Zepp 随这条运动下发；ZeppBridge 没有重新划分。训练状态页的自选区间模型是另一套，两边数字对不上是正常的。',
     hrZoneBelow: (upper: number) => `${upper} 以下`,
     hrZoneBetween: (low: number, high: number) => `${low}–${high}`,
     hrZoneShare: (percent: string) => `${percent}%`,
@@ -120,7 +120,7 @@ export const workoutDetailMessages = defineMessages(
     decodedAria: '已解码参数',
     eyebrowDecoded: '已解码',
     decodedTitle: '已解码参数',
-    decodedNote: '摘要只从本条记录的有效样本计算，异常跳点会被忽略。',
+    decodedNote: '摘要只从本条记录的有效样本算，异常跳点忽略。',
 
     exportAria: '导出与分享',
     exportTitle: '导出与分享',
@@ -133,7 +133,7 @@ export const workoutDetailMessages = defineMessages(
 
     handoffAria: '交给 AI',
     handoffTitle: '交给 AI',
-    handoffSub: '只把这一条运动的脱敏数据和提示词复制到剪贴板，并打开你选的 AI 网站。按天记录的睡眠、步数不在范围内。',
+    handoffSub: '只把这条运动的脱敏数据和提示词复制到剪贴板，并打开你选的 AI 网站。按天记录的睡眠、步数不在范围内。',
     handoffTarget: '目标工具',
     handoffTargetAria: '交给哪个 AI 工具',
     preparing: '正在准备…',
@@ -152,17 +152,17 @@ export const workoutDetailMessages = defineMessages(
   },
   {
     notProvided: 'Not provided',
-    loadFailedTitle: 'Could not read this workout',
-    loadFailed: 'Workout detail is unavailable right now',
-    retry: 'Try again',
-    notFoundTitle: 'This workout is not here',
-    notFoundMessage: 'It may have been cleaned up, or it has not been synced to this machine yet.',
-    insightFailed: 'Could not build an insight for this workout',
-    seriesFailed: 'Could not read the per-point series for this workout',
+    loadFailedTitle: 'Could not load this workout',
+    loadFailed: 'Workout detail unavailable right now',
+    retry: 'Retry',
+    notFoundTitle: 'Workout not found',
+    notFoundMessage: 'It may have been cleaned up, or not synced to this machine yet.',
+    insightFailed: 'Could not build insight for this workout',
+    seriesFailed: "Could not load this workout's per-point series",
     seriesFailedTitle: 'Per-point series failed to load',
-    exportNeedsSeries: 'The per-point series failed to load, so this record cannot be exported.',
+    exportNeedsSeries: 'Per-point series failed to load — this record cannot be exported.',
     aiPrompt: (label: string) => `You are a sports analyst. Below is the complete record of one ${label} of mine, taken from the ZeppBridge local database and de-identified.
-Analyze this session using only the facts in this record: the intensity, how pace relates to heart rate, whether there is a clear slowdown or an anomalous stretch, and what specifically to do differently next time.
+Analyze this session using only facts in the record: intensity, pace–heart-rate relation, any clear slowdown or anomalous stretch, and what to do differently next time.
 
 Constraints:
 - There is no population baseline in this data. Do not compare me to "healthy adults" or to any average.
@@ -170,11 +170,11 @@ Constraints:
 - No medical diagnosis, no disease-risk judgement, no treatment advice.
 
 Answer in Markdown.`,
-    needDesktop: 'The AI hand-off needs the desktop app; this browser preview will not open external sites.',
+    needDesktop: 'AI handoff needs the desktop app — the browser preview will not open external sites.',
     attachmentOpened: (provider: string) =>
-      `The data package was written to your desktop (zeppbridge-ai-handoff.json) — drag it into ${provider}. The prompt is on your clipboard.`,
+      `Data package saved to desktop (zeppbridge-ai-handoff.json) — drag it into ${provider}. Prompt copied.`,
     attachmentNotOpened: (provider: string) =>
-      `The data package was written to your desktop (zeppbridge-ai-handoff.json). The prompt is on your clipboard; open ${provider} yourself.`,
+      `Data package saved to desktop (zeppbridge-ai-handoff.json); prompt copied. Open ${provider} yourself.`,
     copiedAndOpened: (provider: string) => `De-identified data for this workout copied and ${provider} opened. Paste it in.`,
     copiedOnly: (provider: string) => `De-identified data for this workout copied. Open ${provider} yourself and paste it in.`,
     noCorrection: 'No correction',
@@ -184,7 +184,7 @@ Answer in Markdown.`,
     overrideSaved: 'Workout type correction saved locally.',
     overrideCleared: "Correction cleared. Back to ZeppBridge's own match.",
     overrideFailed: 'Could not save the workout type correction',
-    copied: (format: string) => `${format} data copied to the clipboard.`,
+    copied: (format: string) => `${format} data copied.`,
 
     metricDistance: 'Distance',
     metricDuration: 'Moving time',
@@ -252,14 +252,14 @@ Answer in Markdown.`,
     legendWarm: 'Slower',
     legendSlow: 'Slow',
     routeEmptyTitle: 'No usable track',
-    routeEmptyBody: 'This record does not carry enough GPS points, so no route is drawn.',
+    routeEmptyBody: 'Not enough GPS points in this record — no route drawn.',
     chartsEmptyTitle: 'No per-point curves',
-    chartsEmptyBody: 'No heart rate, pace, altitude or cadence series was synced for this session.',
+    chartsEmptyBody: 'No heart rate, pace, altitude or cadence series synced for this session.',
 
     hrZonesAria: 'Heart rate zones',
     eyebrowHrZones: 'HR zones',
     hrZonesTitle: 'Heart rate zones',
-    hrZonesNote: 'The zone boundaries come from your own settings on the watch and are sent down by Zepp with this workout; ZeppBridge does not re-cut them. The Training Status page uses a separate model you pick yourself, so the two sets of numbers will not agree.',
+    hrZonesNote: 'Zone boundaries come from your watch settings, sent down by Zepp with this workout; ZeppBridge does not re-cut them. Training Status uses a separate self-picked model — the two will not agree.',
     hrZoneBelow: (upper: number) => `Below ${upper}`,
     hrZoneBetween: (low: number, high: number) => `${low}-${high}`,
     hrZoneShare: (percent: string) => `${percent}%`,
@@ -268,7 +268,7 @@ Answer in Markdown.`,
     decodedAria: 'Decoded values',
     eyebrowDecoded: 'Decoded',
     decodedTitle: 'Decoded values',
-    decodedNote: 'The summary is computed only from valid samples in this record; anomalous jumps are ignored.',
+    decodedNote: 'Computed only from valid samples in this record; anomalous jumps ignored.',
 
     exportAria: 'Export and share',
     exportTitle: 'Export and share',
@@ -279,14 +279,14 @@ Answer in Markdown.`,
     savedFit: 'FIT file saved',
     exportFailed: 'Export failed',
 
-    handoffAria: 'Hand to AI',
-    handoffTitle: 'Hand to AI',
-    handoffSub: 'Copies the de-identified data for this one workout, plus the prompt, and opens the AI site you pick. Day-level streams such as sleep and steps stay out.',
+    handoffAria: 'Send to AI',
+    handoffTitle: 'Send to AI',
+    handoffSub: "Copies this workout's de-identified data plus the prompt, and opens the AI site you pick. Day-level streams like sleep and steps stay out.",
     handoffTarget: 'Target tool',
-    handoffTargetAria: 'Which AI tool to hand it to',
+    handoffTargetAria: 'Which AI tool to send it to',
     preparing: 'Preparing…',
+    handTo: (provider: string) => `Send to ${provider}`,
     handWaitSync: 'Available once the sync finishes',
-    handTo: (provider: string) => `Hand to ${provider}`,
 
     provenanceAria: 'Provenance',
     eyebrowProvenance: 'Provenance',
@@ -296,7 +296,7 @@ Answer in Markdown.`,
     provenanceSynced: 'Last synced',
     provenanceRecordId: 'Record ID',
     provenanceDevice: 'Device',
-    pageFoot: 'Decoded on this machine. The track is drawn on a local canvas and never sent to a map service.',
+    pageFoot: 'Decoded on this machine; the track is drawn on a local canvas, never sent to a map service.',
   },
   {
     notProvided: 'Sin datos',

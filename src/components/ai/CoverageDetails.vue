@@ -24,7 +24,7 @@ const t = useMessages(defineMessages(
   },
   {
     summary: (bytes: string) => `Cobertura detallada (paquete ≈ ${bytes})`,
-    category: 'Categoría', window: 'Ventana', coverage: 'Con datos', sources: 'Orígenes', units: 'Unidades',
+    category: 'Categoría', window: 'Ventana', coverage: 'Con datos', sources: 'Fuentes', units: 'Unidades',
     days: (have: number, total: number) => `${have}/${total} días`,
   },
   'components/ai/CoverageDetails',

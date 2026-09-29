@@ -22,14 +22,14 @@ const t = useMessages(defineMessages(
     prepare: 'Export to desktop',
     copy: 'Copy the prompt',
     open: (label: string) => `Open ${label}`,
-    idle: 'Not started', doing: 'Working', done: 'Done', failed: 'Failed', blocked: 'Blocked', skipped: 'The web preview cannot open a browser',
+    idle: 'Not started', doing: 'Working', done: 'Done', failed: 'Failed', blocked: 'Blocked', skipped: 'Web preview cannot open a browser',
     retry: 'Retry',
   },
   {
     prepare: 'Exportar al escritorio',
-    copy: 'Copiar el prompt',
+    copy: 'Copiar la instrucción',
     open: (label: string) => `Abrir ${label}`,
-    idle: 'Sin empezar', doing: 'En curso', done: 'Hecho', failed: 'Falló', blocked: 'Bloqueado', retry: 'Reintentar',
+    idle: 'Sin iniciar', doing: 'En curso', done: 'Listo', failed: 'Fallo', blocked: 'Bloqueado', skipped: 'La vista previa web no puede abrir el navegador', retry: 'Reintentar',
   },
   'components/ai/HandoffSteps',
 ));

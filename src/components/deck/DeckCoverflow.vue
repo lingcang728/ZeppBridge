@@ -35,6 +35,7 @@ const t = useMessages(defineMessages(
     previous: 'Tarjeta anterior',
     next: 'Tarjeta siguiente',
     open: (title: string) => `Abrir «${title}»`,
+    position: (index: number, total: number) => `${index} / ${total}`,
   },
   'components/deck/DeckCoverflow',
 ));

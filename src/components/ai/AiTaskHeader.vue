@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /**
- * 页头：一枚浮在关系网左上角的玻璃胶囊——任务名、回溯范围、交付记录。
+ * 页头：一枚浮在关系网左上角的玻璃胶囊——任务名、回溯范围、已保存的任务。
  *
  * 没有「+」和「✓」：只想把数据交给 AI 的人不需要先「新建」「保存」，导出时自动存；
- * 同名的草稿再导出会更新原来那条，交付记录里不会出现两条一模一样的。
+ * 同名的草稿再导出会更新原来那条，已保存的任务里不会出现两条一模一样的。
  * 任务名单击就地改；「最近 N 天」直接在胶囊里拨，一次改所有数据类别的窗口。
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
@@ -23,40 +23,40 @@ const { taskList, libraryError } = useAiTaskLibrary();
 const t = useMessages(defineMessages(
   {
     pageTitle: '交给 AI',
-    intro: '选运动、挑数据、说清楚想问什么，导出到桌面后直接拖给 AI。',
+    intro: '选运动、挑数据、写明想问什么，导出到桌面拖给 AI。',
     titleLabel: '任务名',
     rename: '点一下改名',
     rangeLabel: '回溯范围',
     days: (n: number) => `${n} 天`,
-    history: '交付记录',
-    historyCount: (count: number) => `交付记录（${count}）`,
-    historyEmpty: '还没有交付过',
+    history: '已保存的任务',
+    historyCount: (count: number) => `已保存的任务（${count}）`,
+    historyEmpty: '还没有保存的任务',
     newTask: '新任务',
     saved: '已保存',
   },
   {
-    pageTitle: 'Hand to AI',
-    intro: 'Pick a workout, choose the data, say what you want to know — export to the desktop and drag it into the AI.',
+    pageTitle: 'Send to AI',
+    intro: 'Pick workouts, choose data, say what you want to know — export to desktop and drag into the AI.',
     titleLabel: 'Task name',
     rename: 'Click to rename',
     rangeLabel: 'Look-back range',
     days: (n: number) => `${n} days`,
-    history: 'Handoff history',
-    historyCount: (count: number) => `Handoff history (${count})`,
-    historyEmpty: 'Nothing handed off yet',
+    history: 'Saved tasks',
+    historyCount: (count: number) => `Saved tasks (${count})`,
+    historyEmpty: 'No saved tasks yet',
     newTask: 'New task',
     saved: 'Saved',
   },
   {
     pageTitle: 'Pasar a la IA',
-    intro: 'Elige un entrenamiento, escoge los datos, di qué quieres saber: exporta al escritorio y arrástralo a la IA.',
+    intro: 'Elige entrenamientos, selecciona datos, escribe qué consultar: exporta al escritorio y arrástralo a la IA.',
     titleLabel: 'Nombre de la tarea',
-    rename: 'Haz clic para renombrar',
-    rangeLabel: 'Periodo',
+    rename: 'Clic para renombrar',
+    rangeLabel: 'Periodo anterior',
     days: (n: number) => `${n} días`,
-    history: 'Historial de entregas',
-    historyCount: (count: number) => `Historial de entregas (${count})`,
-    historyEmpty: 'Aún no has entregado nada',
+    history: 'Tareas guardadas',
+    historyCount: (count: number) => `Tareas guardadas (${count})`,
+    historyEmpty: 'Aún no hay tareas guardadas',
     newTask: 'Nueva tarea',
     saved: 'Guardado',
   },
@@ -86,7 +86,7 @@ const RANGE_CHOICES = [7, 14, 30, 90];
 const rangeItems = computed(() => RANGE_CHOICES.map((days) => ({ value: days, label: t.value.days(days) })));
 const windowDays = computed(() => recentWindowDays(draft.value));
 
-/* —— 交付记录 —— */
+/* —— 已保存的任务 —— */
 const historyOpen = ref(false);
 const root = ref<HTMLElement | null>(null);
 const whenText = (iso: string) => {
@@ -181,7 +181,7 @@ onBeforeUnmount(() => {
 .history-btn:hover, .history-btn.on { background: var(--glass-press); }
 .history-btn .count { color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 
-/* 交付记录：三列对齐——当前标记、任务名、时间；时间右对齐、等宽数字。 */
+/* 已保存的任务：三列对齐——当前标记、任务名、时间；时间右对齐、等宽数字。 */
 .history { display: grid; width: min(420px, 100%); max-height: 340px; gap: 2px; overflow-y: auto; padding: 8px; border-radius: var(--radius-md); overscroll-behavior: contain; }
 .history-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 2px 4px 6px 8px; }
 .history-title { margin: 0; color: var(--subtle); font-size: var(--fs-xs); font-weight: 600; }

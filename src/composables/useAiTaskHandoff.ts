@@ -28,8 +28,8 @@ export interface HandoffStep {
 
 const messages = defineMessages(
   { prepareFailed: '准备文件失败', copyFailed: '复制提示词失败', openFailed: '无法打开 AI 网站' },
-  { prepareFailed: 'Could not prepare the files', copyFailed: 'Could not copy the prompt', openFailed: 'Could not open the AI site' },
-  { prepareFailed: 'No se pudieron preparar los archivos', copyFailed: 'No se pudo copiar el prompt', openFailed: 'No se pudo abrir el sitio de IA' },
+  { prepareFailed: 'Could not prepare files', copyFailed: 'Could not copy the prompt', openFailed: 'Could not open the AI site' },
+  { prepareFailed: 'No se pudieron preparar los archivos', copyFailed: 'No se pudo copiar la instrucción', openFailed: 'No se pudo abrir el sitio de la IA' },
   'composables/useAiTaskHandoff',
 );
 const copy = () => messagesOf(messages);

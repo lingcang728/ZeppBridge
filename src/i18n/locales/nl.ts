@@ -16,7 +16,7 @@ export default {
       title: 'Stappen per uur',
       stepsUnit: 'stappen',
       perDayUnit: 'stappen / dag',
-      averageNote: (days: number) => `Gemiddelde over de ${days} dagen met gegevens; klik hieronder op een rij om alleen die te zien`,
+      averageNote: (days: number) => `Gemiddelde over ${days} dagen met gegevens; klik op een rij om alleen die dag te zien`,
       dayNote: (label: string) => `Alleen ${label}`,
       weekNote: (label: string, days: number) => `${label}, gemiddeld over ${days} dagen met gegevens`,
       weekOf: (label: string) => `Week van ${label}`,
@@ -34,7 +34,7 @@ export default {
       legend: (peak: string) => `Feller groen betekent meer stappen; het felst is ongeveer ${peak}`,
     },
     'components/OfficialOnlyNote': {
-      text: 'Alleen de officiële Zepp-autorisatie is verbonden: hartslag, slaap, stappen, trainingen, PAI en gewicht worden gesynchroniseerd. HRV, bloedzuurstof, stress, paraatheid en trainingsbelasting biedt de officiële API niet — verbind daarvoor ‘Geavanceerde gegevens’.',
+      text: 'Alleen officiële Zepp-autorisatie verbonden: hartslag, slaap, stappen, trainingen, PAI en gewicht synchroniseren. HRV, bloedzuurstof, stress, gereedheid en trainingsbelasting biedt de officiële koppeling niet aan — daarvoor koppel je ‘Geavanceerde gegevens’.',
       action: 'Verbinden',
     },
     'components/ai/WorkoutPicker': {
@@ -43,7 +43,7 @@ export default {
       empty: 'Nog geen trainingen op deze machine',
       selectedCount: (count: number) => `${count} geselecteerd`,
       noneSelected: (days: number) =>
-        `Geen training geselecteerd: de laatste ${days} dagen tot en met vandaag worden geanalyseerd.`,
+        `Geen training gekozen: analyseert de afgelopen ${days} dagen t/m vandaag.`,
       avgHr: (bpm: number) => `gem. hartslag ${bpm}`,
       remove: 'Selectie opheffen',
       showLess: 'Minder tonen',
@@ -51,45 +51,45 @@ export default {
     },
     App: {
       quickReturn: (page: string) => `Terug naar ${page}`,
-      previousPage: 'de vorige pagina',
+      previousPage: 'Vorige pagina',
       skipToContent: 'Naar de hoofdinhoud',
       mainNav: 'Hoofdnavigatie',
       bottomNav: 'Mobiele hoofdnavigatie',
       navOverview: 'Overzicht',
-      navHandoff: 'Doorgeven aan AI',
+      navHandoff: 'Naar de AI',
       navSettings: 'Instellingen',
       preparingData:
-        'Je lokale database wordt geopend — de eerste start na een update kan een paar seconden duren…',
+        'Lokale database openen… de eerste start na een update kan een seconde of tien duren…',
       compacting: (pending: number) =>
-        `Opgeslagen payloads worden gecomprimeerd (nog ${pending} te gaan). Dit ruimt zichzelf op; synchroniseren wacht zijn beurt af.`,
+        `Payloads comprimeren (nog ${pending} over)… de melding verdwijnt vanzelf zodra het klaar is; synchronisatie wacht even.`,
       compacted: (saved: string) =>
-        `Opgeslagen payloads gecomprimeerd, ongeveer ${saved} schijfruimte vrijgemaakt.`,
+        `Payloads gecomprimeerd; ca. ${saved} schijfruimte vrijgemaakt.`,
       trayHint:
-        'Het venster sluiten houdt ZeppBridge in het systeemvak, dus automatisch synchroniseren loopt door.',
+        'ZeppBridge blijft actief in het systeemvak; automatisch synchroniseren loopt door.',
       browserPreview:
         'Gebruik de desktop-app. Deze browserpreview leest geen accountgegevens.',
-      routeNotFound: 'Die pagina bestaat niet, dus je bent terug op het overzicht.',
+      routeNotFound: 'Pagina niet gevonden, terug naar het overzicht.',
     },
     'components/BackupPanel': {
       title: 'Databasemomentopnamen en herstel',
-      intro1a: 'Een momentopname is een complete kopie van het hele ',
+      intro1a: 'Een momentopname is een complete kopie van het ',
       intro1b:
-        '-bestand. Het blijft op deze machine en wordt nergens geüpload. Er wordt er automatisch een gemaakt vóór een database-upgrade, en je kunt er altijd zelf een maken.',
-      compareLead: 'Drie dingen heten hier "export", en ze zijn niet hetzelfde: ',
+        '-bestand. Blijft op deze computer en wordt nergens geüpload. Wordt automatisch gemaakt vóór database-upgrades, of handmatig op elk gewenst moment.',
+      compareLead: 'Drie verschillende soorten ‘export’: ',
       compareExchange:
-        ' is gegevensuitwisseling voor andere tools en bevat alleen de periode die je koos;',
+        ' is gegevensuitwisseling voor externe tools (alleen de gekozen periode);',
       compareSnapshotName: 'een databasemomentopname',
       compareSnapshot:
-        ' is een kopie van de hele database voor noodherstel, die alleen ZeppBridge kan teruglezen;',
+        ' is een volledige databasekopie voor noodherstel in ZeppBridge;',
       comparePackName: 'een AI-pakket',
       comparePack:
-        ' is materiaal dat je bewust uitkiest en anonimiseert voor een extern model. Alleen een momentopname kan de database terugzetten zoals hij was.',
-      pendingTitle: 'Er staat een herstel in de wachtrij',
+        ' bevat handmatig gekozen, geanonimiseerde data voor AI-modellen. Alleen een momentopname zet de database volledig terug.',
+      pendingTitle: 'Herstel staat in de wachtrij',
       pendingBodyA: (stagedAt: string) =>
-        `In de wachtrij gezet op ${stagedAt}. De database wordt vervangen bij de `,
+        `In wachtrij geplaatst op ${stagedAt}. De database wordt vervangen bij de `,
       pendingNextStart: 'volgende start',
       pendingBodyB:
-        '. De huidige database is al als terugvalpunt bewaard, dus je kunt ernaartoe terugkeren.',
+        '. De huidige database is bewaard als herstelpunt.',
       cancelRestore: 'Herstel annuleren',
       creating: 'Maken…',
       createSnapshot: 'Een momentopname maken',
@@ -111,7 +111,7 @@ export default {
       problemUnknown:
         'Deze momentopname is niet door de verificatie gekomen, en er is geen reden vastgelegd.',
       blockerFutureSchema: (backup: number, current: number) =>
-        `Deze back-up komt uit een nieuwere ZeppBridge (schema ${backup}, deze app is ${current}). Hem hier openen zou velden laten vervallen, dus hij wordt niet hersteld en de huidige bibliotheek blijft ongemoeid. Werk ZeppBridge eerst bij.`,
+        `Deze back-up komt uit een nieuwere ZeppBridge (schema ${backup}, deze app is ${current}). Hem hier openen zou velden laten vervallen, dus hij wordt niet hersteld en de huidige database blijft ongemoeid. Werk ZeppBridge eerst bij.`,
       blockerUnknown:
         'Deze momentopname kan nu niet worden hersteld, en er is geen reden vastgelegd.',
       verifyPassed:
@@ -131,7 +131,7 @@ export default {
       colCurrent: 'Huidig',
       colDelta: 'Verschil',
       previewNote:
-        'Rijen met een negatief verschil bevatten na het herstel zoveel records minder. Een herstel haalt nooit opnieuw uit de cloud, dus als je die gegevens nog nodig hebt, synchroniseer dan zodra het klaar is opnieuw.',
+        'Rijen met een negatief verschil bevatten na herstel minder gegevens. Herstel haalt niets uit de cloud; synchroniseer opnieuw om eventueel ontbrekende gegevens aan te vullen.',
       staging: 'In de wachtrij zetten…',
       stageRestore: 'Herstel in de wachtrij zetten (gaat in bij de volgende start)',
       cancel: 'Annuleren',
@@ -172,14 +172,14 @@ export default {
     },
     'components/CoverageNotice': {
       empty:
-        'Nog niets op deze machine. Synchroniseer een keer en de grafieken hebben iets om te tekenen.',
+        'Nog geen gegevens op deze computer. Synchroniseer een keer om de grafieken te vullen.',
       emptyAfterSync:
-        'De synchronisatie is gelukt maar bracht niets terug. Of dit account heeft voor deze periode geen gegevens in Zepp, of het horloge heeft nog niet naar de Zepp-app geüpload. Kijk eerst in de Zepp-app op je telefoon en synchroniseer hier daarna opnieuw.',
+        'Synchronisatie geslaagd, maar er zijn geen gegevens ontvangen. Controleer of het horloge al naar de Zepp-app heeft geüpload en synchroniseer opnieuw.',
       emptyUnconfirmedRegion:
-        'De synchronisatie is gelukt maar bracht niets terug. Bij het inloggen kon niet worden bevestigd tot welke Zepp-regio je account hoort, dus ZeppBridge gebruikt zijn beste gok — en een synchronisatie naar de verkeerde regio gedraagt zich precies zo: hij slaagt en levert niets. Probeer je account opnieuw te koppelen.',
+        'Synchronisatie geslaagd, maar er zijn geen gegevens ontvangen. De Zepp-regio kon niet worden vastgesteld. Koppel je account opnieuw om de juiste regio te kiezen.',
       reconnect: 'Account opnieuw koppelen',
       short: (covered: number, earliest: string) =>
-        `Deze machine bevat ${covered} dagen (vroegste ${earliest}). Alles daarvoor is leeg omdat het nog niet uit de cloud is opgehaald — niet omdat je toen niets hebt vastgelegd.`,
+        `Lokaal ${covered} dagen beschikbaar (vanaf ${earliest}). Eerdere historie moet nog uit de cloud worden opgehaald.`,
       backfill: 'Meer historie ophalen',
       backfilling: 'Historie ophalen…',
       syncNow: 'Nu synchroniseren',
@@ -194,7 +194,7 @@ export default {
       searchAria: 'Zoeken op modelnaam',
       searchPlaceholder: 'Zoek een model, bijv. Balance 2',
       empty:
-        'Geen model komt overeen. Probeer een ander trefwoord, of zet het filter terug op Alles.',
+        'Geen passend model gevonden. Probeer een andere zoekterm of filter.',
       prev: 'Vorig model',
       next: 'Volgend model',
       alreadyAssigned: 'Is al dit model',
@@ -204,7 +204,7 @@ export default {
       contributeTitle: 'Help de volgende release dit apparaat zelf te herkennen',
       contributeBody:
         'Stuurt naar ZeppBridge het model dat jij koos plus de modelnummers van dit apparaat (deviceSource / deviceType, alleen gehele getallen). Beide zeggen welk horloge het is en verder niets: geen account, geen serienummer, geen MAC, geen gezondheidsgegevens. Huami publiceert geen opzoektabel voor die nummers, dus dit is de enige manier waarop de ingebouwde catalogus groeit. Zodra een paar mensen naar een model hebben gewezen, wordt het voor iedereen automatisch herkend.',
-      note: 'Jouw keuze verschijnt als "Door jou gekozen model" en wordt nooit als automatische match voorgedaan. Afbeeldingen en modelnamen komen uit de meegeleverde catalogus; erin bladeren raakt geen netwerk.',
+      note: 'Jouw keuze verschijnt als ‘Door jou gekozen model’ en wordt nooit als automatische match voorgedaan. Afbeeldingen en modelnamen komen uit de meegeleverde catalogus; erin bladeren raakt geen netwerk.',
       filterAll: 'Alles',
       filterWatch: 'Horloges',
       filterBand: 'Bands',
@@ -224,12 +224,12 @@ export default {
     'components/HeartRateZonePicker': {
       title: 'Hartslagzones',
       intro:
-        'De drie modellen tekenen verschillende zones, en alleen jij weet welk model voor jou iets betekent — dus ZeppBridge kiest geen standaard en schat nooit uit een formule als 220 min je leeftijd. Elke basis hieronder draagt zijn bron en de datum waarop hij is gemeten.',
+        'Elk model berekent zones op zijn eigen manier. ZeppBridge kiest geen willekeurige standaarden en schat nooit via vuistregels (zoals 220 minus leeftijd). Elke onderstaande basis toont meetbron en meetdatum.',
       clearChoice: 'Selectie wissen',
       desktopOnly:
-        'Open dit in de ZeppBridge-desktop-app; hartslagzones lezen lokale records.',
+        'De zones zijn te zien in de desktop-app. Deze browserpreview leest geen accountgegevens.',
       noBases:
-        'Nog geen hartslagbasis op deze machine. Na één gesynchroniseerde training verschijnen gemeten waarden hier, zoals je hoogste gemeten hartslag.',
+        'Er is nog geen hartslagbasis lokaal gevonden. Synchroniseer een training om gemeten waarden te zien.',
       modelGroup: 'Model',
       modelAria: 'Hartslagzonemodel',
       pickModelFirst:
@@ -298,7 +298,7 @@ export default {
     'components/HistoryArchivePanel': {
       title: 'Langetermijnarchief en volledige historie',
       intro:
-        'Het archief dekt "vanaf vandaag niet meer verwijderen"; het ophalen dekt "ga halen wat ervoor kwam". Pas met beide is de lokale kopie echt compleet.',
+        'Het archief bewaart gegevens vanaf vandaag; met ophalen haal je eerdere historie binnen. Samen maken ze je lokale kopie compleet.',
       archiveTitle: 'Langetermijnarchief',
       archiveBody:
         'Met dit aan snoeit een geslaagde synchronisatie de historie niet meer volgens de bewaarperiode. De database blijft groeien; je kunt het op elk moment uitzetten, en uitzetten vertelt je wat de volgende synchronisatie zou snoeien.',
@@ -309,25 +309,25 @@ export default {
       customDateAria: 'Startdatum voor ophalen',
       estimateTitle: 'Geschatte groei',
       estimateRate: (days: number, perDay: string) =>
-        `${days} dagen lokale metingen · ongeveer ${perDay}/dag`,
+        `${days} dagen lokale metingen · ca. ${perDay}/dag`,
       unmeasured: (streams: string) =>
-        `Te weinig lokale metingen om te schatten: ${streams}. Die zijn buiten het totaal hierboven gelaten — liever zeggen dat we het niet weten dan een tempo verzinnen en het met jaren vermenigvuldigen.`,
+        `Te weinig lokale metingen om groei te schatten: ${streams}. Buiten berekening gehouden om giswerk te vermijden.`,
       wouldBeCleanedUp: (requested: number, retention: number) =>
-        `Dit ophalen zou ${requested} dagen historie binnenhalen, maar deze machine bewaart alleen de laatste ${retention} dagen — wat terugkomt zou bij de volgende geslaagde synchronisatie worden verwijderd. Zet eerst het langetermijnarchief aan, of vergroot de bewaarperiode.`,
+        `Ophalen vraagt ${requested} dagen aan, maar de bewaartermijn is ${retention} dagen. Zonder archief worden oudere gegevens direct weer gesnoeid. Schakel eerst het langetermijnarchief in of pas de termijn aan.`,
       backfilling: 'Historie ophalen…',
       continueBackfill: 'Doorgaan met ophalen',
       startBackfill: 'Begin met ophalen',
       autoContinue: 'Tot het einde doorlopen',
       autoContinueHint:
-        'Elke ronde start automatisch de volgende tot de hele periode is opgehaald. Stop wanneer je wilt — wat al is binnengehaald gaat niet verloren.',
+        'Start opeenvolgende rondes automatisch tot alles binnen is. Eerder stoppen kan altijd; opgeslagen data blijft bewaard.',
       stopBackfill: 'Stoppen',
       stopping: 'Stoppen…',
       roundProgress: (done: number, total: number) =>
         `Ophalen: ${done} van ${total} maandblokken klaar. Je kunt op elk moment stoppen.`,
       stoppedByUser: (remaining: number) =>
-        `Gestopt met nog ${remaining} maandblokken te gaan. Alles wat al is opgehaald blijft bewaard — druk op "Doorgaan met ophalen" om verder te gaan.`,
+        `Gestopt met nog ${remaining} maandblokken te gaan. Reeds opgehaalde data blijft bewaard; klik op ‘Doorgaan met ophalen’ om te hervatten.`,
       stalled: (remaining: number) =>
-        `Er blijven ${remaining} maandblokken over, maar deze ronde heeft er geen verplaatst, dus hij is gestopt. Ze mislukken hoogstwaarschijnlijk telkens — zie de mislukte lijst hieronder, of druk op "Mislukte items opnieuw proberen".`,
+        `Nog ${remaining} maandblokken over. Deze ronde boekte geen voortgang en is gestopt. Bekijk de lijst met fouten hieronder of probeer mislukte items opnieuw.`,
       deferredRetry:
         'Er loopt lokaal onderhoud. Het ophalen gaat vanzelf verder',
       resetLedger: 'Het logboek wissen',
@@ -338,12 +338,12 @@ export default {
       ledgerComplete:
         'Elk maandblok in het logboek is afgehandeld: ofwel lokaal geschreven, ofwel de cloud zei ronduit dat er niets voor die periode is.',
       ledgerIncomplete: (remaining: number) =>
-        `Er zijn nog ${remaining} blokken onafgehandeld. Tot die allemaal klaar zijn is deze lokale kopie een kopie van de met succes gesynchroniseerde periode — geen complete.`,
+        `Er zijn nog ${remaining} blokken onafgehandeld. Tot die klaar zijn, is deze lokale kopie alleen een kopie van het gesynchroniseerde bereik — geen volledige kopie.`,
       ledgerStats: (persisted: number, empty: number, pending: number) =>
         `${persisted} geschreven · ${empty} leeg uit de cloud · ${pending} te doen`,
       ledgerFailed: (failed: number) => `${failed} mislukt`,
       ledgerRange: (from: string, to: string, records: number) =>
-        `${from} ~ ${to} · ${records} records`,
+        `${from} ~ ${to} · ${records} items`,
       ledgerNothingWritten: 'Nog geen maand geschreven',
       range1y: 'Afgelopen 1 jaar',
       range2y: 'Afgelopen 2 jaar',
@@ -361,7 +361,7 @@ export default {
       outOfRetention:
         'Dit ophalen reikt voorbij de lokale bewaarperiode, dus wat terugkomt zou bij de volgende geslaagde synchronisatie worden gesnoeid. Zet eerst het langetermijnarchief aan, of vergroot de bewaarperiode.',
       roundDone: (remaining: number) =>
-        `Deze ronde is klaar; er blijven ${remaining} maandblokken over. Druk op "Doorgaan met ophalen" om verder te gaan — je kunt stoppen wanneer je wilt.`,
+        `Deze ronde is klaar; er blijven ${remaining} maandblokken over. Druk op ‘Doorgaan met ophalen’ om verder te gaan — je kunt stoppen wanneer je wilt.`,
       allChunksDone: 'Elk maandblok in het logboek is afgehandeld.',
       backfillFailed: 'Het ophalen van historie is mislukt',
       confirmResetLedger:
@@ -370,12 +370,12 @@ export default {
       ledgerResetFailed: 'Het logboek kon niet worden gewist',
       failedTitle: 'Maanden die niet konden worden opgehaald',
       failedIntro:
-        'Deze blokken zijn mislukt. Elke andere maand was onaangetast en is zoals gebruikelijk opgehaald.',
+        'Deze blokken zijn mislukt. De overige maanden zijn niet aangetast en worden zoals gebruikelijk opgehaald.',
       failedRow: (stream: string, month: string) => `${stream} · ${month}`,
       failedAttempts: (attempts: number) =>
         plural(attempts, { one: `${attempts} poging`, other: `${attempts} pogingen` }),
       failedExhausted:
-        'De automatische nieuwe pogingen zijn op. Gebruik "Mislukte maanden opnieuw proberen" om het nog eens te proberen',
+        'De automatische nieuwe pogingen zijn op. Gebruik ‘Mislukte maanden opnieuw proberen’ om het nog eens te proberen',
       failedNoReason: 'Geen reden vastgelegd',
       retryFailed: 'Mislukte maanden opnieuw proberen',
       retryFailedDone:
@@ -403,18 +403,18 @@ export default {
     'components/InsightCard': {
       title: 'Hoe de run ging',
       unsupportedWorkoutType:
-        'Inzichten voor dit trainingstype worden nog niet ondersteund. De eerste versie dekt alleen hardlopen, omdat dat is wat met echte gegevens is geverifieerd. Elke andere training toont, corrigeert en exporteert gewoon.',
-      handoff: 'Laat AI erin graven',
+        'Inzichten zijn nu alleen beschikbaar voor hardlopen (geverifieerd met echte data). Andere trainingstypen kun je gewoon bekijken, corrigeren en exporteren.',
+      handoff: 'Onderzoek met AI',
       currentRun: 'Deze run',
       baselineRun: 'Basislijn',
-      reading: 'Lokale records worden gelezen…',
+      reading: 'Lokale gegevens worden gelezen…',
       comparedTo: (count: number) =>
         `Tegenover je eigen ${count} meest recente runs van vergelijkbare afstand:`,
       noComparison:
-        'Nog niet genoeg vergelijkbare historie, dus deze run meldt zijn cijfers zonder ze te vergelijken.',
+        'Nog onvoldoende vergelijkbare historie; deze run toont absolute cijfers zonder vergelijking.',
       driftTitle: 'Eerste helft tegenover tweede',
       driftSub:
-        'Splitst deze training in tweeën op tijd en vergelijkt hoeveel slagen dezelfde snelheid kostte.',
+        'Splitst de training in twee helften van gelijke tijd en vergelijkt hoeveel slagen dezelfde snelheid in elke helft kostte.',
       driftFirst: 'Eerste helft',
       driftSecond: 'Tweede helft',
       driftPerBeat: (metres: string) => `${metres} m/slag`,
@@ -422,19 +422,19 @@ export default {
       driftDelta: (percent: string) => `${percent}%`,
       driftRising:
         'Dezelfde snelheid vasthouden kostte in de tweede helft meer slagen.',
-      driftFlat: 'De twee helften zijn in wezen gelijk.',
+      driftFlat: 'De twee helften zijn vrijwel gelijk.',
       driftFalling: 'Elke slag droeg je in de tweede helft verder.',
       driftNote:
-        'Dit vergelijkt de training alleen met zichzelf, nooit met iemand anders. Verkeerslichten, heuvels, intervallen en GPS-drift vervuilen het allemaal, dus er wordt geen getal gegeven als het tempo niet constant was.',
+        'Vergelijkt de training alleen met zichzelf. Bij wisselend tempo (intervallen, heuvels, stoplichten) wordt geen getal berekend.',
       driftUnavailable: (code: string) => ({
         too_short:
-          'Te kort om te splitsen. De eerste tien minuten is de hartslag meestal nog aan het stijgen, dus ze met de tweede helft vergelijken meet de warming-up, niet de drift.',
+          'Te kort om te splitsen. De eerste tien minuten stijgt de hartslag meestal nog; vergelijking zou de warming-up meten in plaats van drift.',
         pace_too_variable:
-          'Het tempo varieerde te veel (intervallen, verkeerslichten of heuvels zien er allemaal zo uit), dus de twee helften zijn niet vergelijkbaar en er wordt geen getal gegeven.',
+          'Tempo varieerde te sterk (bijv. door heuvels of stoplichten); de twee helften zijn niet betrouwbaar vergelijkbaar.',
         not_enough_samples:
-          'Te weinig hartslag- en snelheidsmetingen per punt in deze training om hem te splitsen.',
+          'Te weinig meetpunten voor hartslag en snelheid om deze training te splitsen.',
         unsupported_workout_type:
-          'De vergelijking eerste/tweede helft dekt voorlopig alleen hardlopen. Wandelen en fietsen dragen ook genoeg metingen, maar de drempels zijn niet tegen echte gegevens geverifieerd.',
+          'Splitsing eerste/tweede helft is voorlopig alleen geverifieerd voor hardlopen.',
       } as Record<string, string | undefined>)[code] ?? 'Deze training kan niet worden gesplitst.',
       baselineSummary: 'Waar de basislijn vandaan komt',
       baselineRule: (days: number, tolerance: number | null | undefined, min: number, max: number) =>
@@ -442,7 +442,7 @@ export default {
       excludedPrefix: 'Uitgesloten: ',
       excludedItem: (label: string, count: number) => `${label} ×${count} `,
       footnote:
-        'Elke conclusie hier vergelijkt je met je eigen historie — nooit met een populatiebasislijn — en niets ervan is een medisch oordeel. Ontbrekende gegevens lezen "Niet verstrekt" in plaats van met een nul te worden gevuld.',
+        'Vergelijkingen zijn uitsluitend gebaseerd op je eigen historie, nooit op algemene populatiecijfers, en zijn geen medisch advies. Ontbrekende data toont ‘Niet verstrekt’ in plaats van nullen.',
       notProvided: 'Niet verstrekt',
       durationHours: (hours: number, minutes: number) => `${hours} uur ${minutes} min`,
       durationMinutes: (minutes: number) => `${minutes} min`,
@@ -472,8 +472,8 @@ export default {
       measuredOn: (date: string) => `gemeten ${date}`,
       trendAria: (label: string) => `${label}-trendlijn`,
       onlyOneDay:
-        'Slechts één dag met gegevens in deze periode, dus er is nog geen trend om te tekenen.',
-      defaultEmpty: 'Deze metriek toont zijn trend zodra hij is gesynchroniseerd.',
+        'Slechts één dag met gegevens in deze periode — geen trend te tekenen.',
+      defaultEmpty: 'De trend verschijnt hier na een synchronisatie.',
       average: 'Gem.',
       minimum: 'Min',
       maximum: 'Max',
@@ -492,22 +492,22 @@ export default {
       legendBad: 'Rood = slechter',
       legendNote:
         'Alleen vergeleken met je eigen afgelopen 28 dagen, nooit met een populatiebasislijn',
-      desktopOnly: 'Het weekrapport heeft de ZeppBridge-desktop-app nodig.',
+      desktopOnly: 'Het weekrapport open je met de ZeppBridge desktop-app.',
       nothingComparable:
-        'Deze week is nog niets vergelijkbaars. Kom terug na een synchronisatie.',
+        'Nog geen vergelijkbare gegevens voor deze week; synchroniseer opnieuw.',
       loadFailed: 'Het lokale weekrapport kon niet worden opgebouwd',
       barThisWeek: 'Deze week',
       barBaseline: 'Afgelopen 28 dagen',
       noBaseline:
-        'Niet genoeg historie erachter, dus dit is alleen het huidige cijfer',
+        'Onvoldoende eerdere gegevens, toont alleen het huidige cijfer.',
       baselineCountUnknown:
-        'Basislijndagen onbekend, dus dit is het huidige cijfer zonder vergelijking.',
+        'Onbekende basislijndagen, toont alleen het huidige cijfer zonder vergelijking.',
       thinBaseline: (days: number, found: number, needed: number) =>
-        `Slechts ${found} van de afgelopen ${days} dagen dragen deze metriek, minder dan de benodigde ${needed}, dus dit is het huidige cijfer zonder vergelijking.`,
+        `Slechts ${found} van de afgelopen ${days} dagen hebben deze metriek (minimaal ${needed} vereist); toont alleen het huidige cijfer.`,
       noRecentData:
-        'Niets lokaal vastgelegd voor deze metriek in de afgelopen 7 dagen.',
+        'Geen lokale gegevens voor deze metriek in de afgelopen 7 dagen.',
       zeroBaseline:
-        'De vorige basislijn was gemiddeld 0, dus er is geen relatieve verandering te berekenen — dit is alleen het huidige cijfer.',
+        'De basislijn is gemiddeld 0 — geen relatieve verandering te berekenen; alleen het huidige cijfer.',
       notProvided: 'Niet verstrekt',
       sleepDuration: (hours: number, minutes: number) => `${hours} uur ${minutes} min`,
       regularity: (minutes: number) => `±${minutes} min`,
@@ -532,18 +532,18 @@ export default {
       yearSuffix: '' as string,
     },
     'components/overview/DataReadyCapsule': {
-      cta: 'Doorgeven aan AI',
+      cta: 'Naar de AI',
       dismiss: 'Niet nu',
       readyFresh: (clock: string) => `Al bijgewerkt · tot ${clock}`,
       readyNew: (records: string, clock: string) =>
-        `${records} nieuwe records · tot ${clock}`,
+        `${records} nieuwe items · tot ${clock}`,
       readyPartial: (streams: string, clock: string) =>
         `${streams} niet binnengekomen, de rest is bijgewerkt · tot ${clock}`,
       readyTitle: 'Je gegevens staan klaar',
       step: (current: number, total: number) => `${current}/${total}`,
       streamSeparator: ', ',
-      waitingEyebrow: 'Je gegevens worden uit de cloud opgehaald',
-      waitingHint: 'je krijgt hier een seintje — kijk ondertussen gerust rond',
+      waitingEyebrow: 'Gegevens worden uit de cloud opgehaald',
+      waitingHint: 'Je krijgt hier een seintje; kijk ondertussen gerust rond.',
     },
     'components/overview/HeartRateCard': {
       hrPanelAria: 'Open het hartslagdetail voor de volle 24 uur',
@@ -566,13 +566,13 @@ export default {
       zoneAnaerobic: 'Anaeroob 170+',
     },
     'components/overview/RecentCard': {
-      recentAria: 'Recente records',
-      recentTitle: 'Recente records',
-      recentSub: 'Slaap, runs en krachtwerk',
+      recentAria: 'Recente activiteiten',
+      recentTitle: 'Recente activiteiten',
+      recentSub: 'Slaap, hardlopen en krachttraining',
       newest: 'Nieuwste',
       seeAll: 'Alles zien',
       recentEmpty:
-        'Nog niets vastgelegd. Voer een synchronisatie uit en het verschijnt hier.',
+        'Nog niets vastgelegd. Synchroniseer een keer om gegevens te tonen.',
       sleepRecordTitle: 'Slaap',
       sleepScore: (score: number) => `Slaapscore ${score}`,
       avgHr: (value: number) => `Gem. hartslag ${value}`,
@@ -594,7 +594,7 @@ export default {
       identifyingDevices: 'Je apparaten worden herkend…',
       identifyFailed: (reason: string) =>
         `Apparaatherkenning is niet beschikbaar: ${reason}`,
-      noDevicesYet: 'Nog geen apparaat herkend.',
+      noDevicesYet: 'Nog geen apparaat herkend',
       manage: 'Beheren',
       sourcesAria: 'Gegevensbronnen en accountstatus',
       latestData: (when: string) => `Nieuwste gegevens ${when}`,
@@ -617,9 +617,9 @@ export default {
     },
     'components/shell/AppTopBar': {
       today: 'Vandaag',
-      readyPill: 'Gegevens klaar · doorgeven aan AI',
+      readyPill: 'Gegevens klaar · naar de AI',
       readyTitle:
-        'De synchronisatie is klaar en de lokale gegevens zijn bij. Klik om ze aan de AI door te geven.',
+        'Synchronisatie voltooid en je lokale gegevens zijn bijgewerkt. Klik om ze naar de AI te sturen.',
       mainNav: 'Hoofdnavigatie',
       brandHome: 'ZeppBridge 3 · Overzicht',
       connectionTitle: 'Status van de cloudverbinding',
@@ -627,7 +627,7 @@ export default {
       notFetchedYet: 'Nog niet opgehaald',
       timeUnknown: 'Tijd onbekend',
       syncNow: 'Nu synchroniseren',
-      verifyFirst: 'Verifieer eerst de verbinding',
+      verifyFirst: 'Controleer eerst de verbinding',
       syncing: 'Synchroniseren…',
       syncFailed: 'Synchronisatie mislukt',
       syncPartial: 'Deels gesynchroniseerd',
@@ -674,7 +674,7 @@ export default {
         'Dit apparaat draagt geen lokale identificatie, dus de keuze kan niet worden opgeslagen.',
       assignmentCleared: 'Keuze ingetrokken. Terug naar de automatische match.',
       assignmentSaved:
-        'Je keuze is opgeslagen. Hij verschijnt als "Door jou gekozen model" — nooit als automatische match voorgedaan.',
+        'Je keuze is opgeslagen. Hij verschijnt als ‘Door jou gekozen model’ — nooit als automatische match voorgedaan.',
       assignmentContributed: (reportId: string) =>
         `Je keuze is opgeslagen en de modelnummers gingen naar ZeppBridge (rapport ${reportId}). De volgende catalogusrelease herkent dit model vanzelf.`,
       assignmentContributionFailed: (reason: string) =>
@@ -704,8 +704,8 @@ export default {
       alreadySyncing:
         'Er loopt al een synchronisatie. Probeer het zodra die klaar is opnieuw',
       desktopOnly: 'Gebruik de desktop-app',
-      reauthNeeded: 'Je Zepp-sessie is verlopen. Koppel opnieuw',
-      verifyFirst: 'Verifieer eerst de verbinding',
+      reauthNeeded: 'Sessie verlopen, koppel opnieuw met Zepp',
+      verifyFirst: 'Controleer eerst de verbinding',
       connectFirst: 'Verbind eerst met Zepp',
       syncingRecent: (days: number) => `De afgelopen ${days} dagen worden gesynchroniseerd…`,
       backfilling: (days: number) => `De afgelopen ${days} dagen worden opgehaald…`,
@@ -719,17 +719,17 @@ export default {
     },
     'lib/aiTask/brief': {
       defaultPlan:
-        'Ik heb geen specifieke vraag gesteld, dus geef me een volledige analyse in deze volgorde:',
+        'Geen specifieke vraag opgegeven. Analyseer volgens deze vaste opzet:',
       fileAttachments: (n: number) =>
         `- In de map attachments/ staan ${n} originele bestanden die ik zelf heb toegevoegd (bijv. labuitslagen, screenshots); gebruik ze ook.`,
       fileData: (file: string, labels: string) =>
-        `- ${file}: alle gegevens. "context" zet metrieken, slaap en trainingen per categorie (${labels}) dag voor dag op een rij; "coverage" geeft aan welke datums daadwerkelijk gegevens hebben; "units" geeft de eenheid van elk veld; "task.personal_note" is mijn eigen achtergrondnotitie.`,
+        `- ${file}: alle gegevens. ‘context’ bevat metrieken, slaap en trainingen (${labels}) per dag; ‘coverage’ toont datums met echte data; ‘units’ vermeldt eenheden; ‘task.personal_note’ is mijn toelichting.`,
       fileNote:
         '- In de persoonlijke achtergrond heb ik mijn situatie beschreven; neem die mee in je beoordeling.',
       fileWorkouts: (n: number) =>
-        `- "workouts" bevat de ${n} training(en) die ik bewust heb uitgekozen — die zijn de focus.`,
+        `- ‘workouts’ bevat de ${n} training(en) die ik bewust heb uitgekozen — die zijn de focus.`,
       followQuestion:
-        'Beantwoord rond de "analyserichting" en mijn vraag hieronder.',
+        'Richt je op de gekozen focus en mijn onderstaande vraag.',
       heading: '[Taak]',
       intro: (range: string) =>
         `Bijgevoegd vind je mijn persoonlijke gezondheidsgegevens, geëxporteerd uit mijn Zepp-horloge (${range}, lokaal samengesteld door ZeppBridge; het bevat alleen mijn eigen gegevens).`,
@@ -738,7 +738,7 @@ export default {
       rangeUnknown: 'een recente periode',
       rules:
         'Hoe te antwoorden: eerst de conclusie, dan het bewijs; noem concrete datums en waarden; wijs gaten in de gegevens gewoon aan en gis of vul ontbrekende datums nooit; antwoord in het Nederlands.',
-      start: 'Begin direct met de analyse — vraag niet eerst wat ik wil.',
+      start: 'Begin direct met de analyse, vraag niet eerst wat ik wil.',
       step1:
         '1. Conclusie in één zin: hoe het me deze periode in het algemeen afging.',
       step2: (labels: string) =>
@@ -813,9 +813,9 @@ export default {
     },
     'lib/bridge/errors': {
       desktopOnly: 'Gebruik de desktop-app',
-      genericFailure: 'Dat is niet gelukt. Probeer het zo opnieuw',
+      genericFailure: 'Mislukt. Probeer het zo opnieuw',
       timedOut:
-        'Het verzoek is verlopen. Controleer je netwerk en de Zepp-regio en probeer het opnieuw.',
+        'Verzoek verlopen. Controleer netwerk en Zepp-regio en probeer opnieuw.',
     },
     'lib/dateTime': {
       time: 'Tijdnotatie',
@@ -832,14 +832,14 @@ export default {
     },
     'lib/failedChunkText': {
       noCanonical:
-        'De cloud gaf een payload terug, maar er waren geen bruikbare records uit te parsen',
+        'Cloudpayload ontvangen, maar geen bruikbare gegevens gevonden',
       noReason: 'Geen reden vastgelegd',
     },
     'lib/format': {
       today: 'Vandaag',
       yesterday: 'Gisteren',
       noUpdates: 'Nog geen updates',
-      noRecords: 'Nog geen records',
+      noRecords: 'Nog geen gegevens',
       timeUnknown: 'Tijd onbekend',
       dateUnknown: 'Datum onbekend',
       durationUnknown: 'Duur onbekend',
@@ -922,10 +922,10 @@ export default {
       },
     },
     'lib/metricSeries': {
-      noRecordsToShow: 'Geen records om te tonen',
-      noRecordsInWindow: (days: number) => `Geen records in de afgelopen ${days} dagen`,
+      noRecordsToShow: 'Geen gegevens om te tonen',
+      noRecordsInWindow: (days: number) => `Geen gegevens in de afgelopen ${days} dagen`,
       coverage: (days: number, withData: number) =>
-        `${withData} van ${days} dagen hebben records`,
+        `${withData} van de ${days} dagen hebben gegevens`,
       dayRange: (low: string, high: string, unit: string) =>
         `Die dag liep het van ${low} tot ${high}${unit}`,
       samples: (count: number) =>
@@ -947,9 +947,9 @@ export default {
     },
     'lib/storageEstimateText': {
       stopNoSpace: (needed: string, free: string) =>
-        `Dit ophalen heeft ongeveer ${needed} nodig (inclusief een veiligheidsmarge) maar er is maar ${free} vrij, dus het start niet. Maak ruimte vrij of kies een kortere periode.`,
+        `Ophalen vereist ca. ${needed}, maar er is slechts ${free} vrij. Maak schijfruimte vrij of kies een kortere periode.`,
       diskUnknown:
-        'De vrije schijfruimte kon niet worden gelezen. Zorg dat er genoeg ruimte is voordat je historie ophaalt.',
+        'Vrije schijfruimte kon niet worden gelezen. Zorg voor voldoende ruimte voor je historie ophaalt.',
       diskTooSmall:
         'Minder dan 300 MB vrij — historie langer dan 90 dagen kan niet worden opgehaald.',
       builtinGuess: (days: number, add: string, free: string) =>
@@ -1044,7 +1044,7 @@ export default {
       officialDisconnectConfirm: 'Zepp-autorisatie ontkoppelen? Gezondheidsgegevens die al op deze computer staan, blijven bewaard.',
       officialDisconnected: 'Zepp-autorisatie ontkoppeld. Je lokale gegevens zijn er nog.',
       officialFailed: 'De Zepp-autorisatie is niet voltooid',
-      officialNote: 'In deze versie maakt de Zepp-autorisatie alleen verbinding; officiële gegevens (REM-slaap, FIT-trainingen) komen in de volgende versie.',
+      officialNote: 'Officiële gegevens zijn aangesloten: slaap, hartslag, stappen, trainingen, PAI en gewicht worden gesynchroniseerd; HRV, bloedzuurstof, stress en gereedheid komen via ‘Geavanceerde gegevens’.',
       officialAccountLine: (id: string, since: string) => `Zepp-autorisatie · ${id} · sinds ${since}`,
       officialAccountEmpty: 'Nog niet geautoriseerd met een Zepp-account',
       officialNotConnected: 'Niet geautoriseerd',
@@ -1067,8 +1067,8 @@ export default {
       capabilityNoRecords: (days: number) => `Niets vastgelegd in de afgelopen ${days} dagen`,
       capabilityNoneProbed: (days: number) => `Geen meting in de afgelopen ${days} dagen`,
       capabilityNotIngested:
-        'De cloud heeft records, maar er is nog geen bruikbare data lokaal opgeslagen. Probeer te synchroniseren of op te halen; als records dan nog niet verschijnen, heeft hun payloadformaat mogelijk extra ondersteuning nodig.',
-      capabilityFoodHistoryHint: 'Er staan voedingsrecords in de cloud, maar nog niet lokaal. Zijn ze ouder dan het venster voor incrementele synchronisatie, synchroniseer dan de geschiedenis voor die datums. Verschijnen ze daarna nog niet, meld dan het gegevensformaat.',
+        'De cloud bevat gegevens, maar er is nog niets lokaal opgeslagen. Synchroniseer eerst; blijven gegevens uit, dan wijkt het payloadformaat mogelijk af.',
+      capabilityFoodHistoryHint: 'Er staat voedingsdata in de cloud die nog niet lokaal is binnengehaald. Haal oudere historie op voor die periode om ze in te laden.',
       capabilityNotProbed: 'Nog niet getest',
       capabilityUnsupported: 'Je account of apparaat levert dit niet',
       cleaningUp: 'Opschonen…',
@@ -1088,17 +1088,17 @@ export default {
       codeInputAria: (code: number) => `Eigen naam voor code ${code}`,
       codeInputPlaceholder: 'Geef het een naam, bijv. Mijn coresessie',
       codeNumber: (code: number) => `Zepp-code ${code}`,
-      codeRecords: (count: number) => `${count} lokale records krijgen die naam mee`,
+      codeRecords: (count: number) => `${count} lokale trainingen krijgen deze naam`,
       codeSave: 'Opslaan',
       codeSaveFailed: 'De eigen trainingsnaam kon niet worden opgeslagen',
-      codeSaved: (code: number, label: string) => `Code ${code} wordt nu getoond als "${label}".`,
+      codeSaved: (code: number, label: string) => `Code ${code} wordt nu getoond als ‘${label}’.`,
       codeSaving: 'Opslaan…',
-      codeShownAs: (label: string) => `Wordt nu getoond als "${label}"`,
+      codeShownAs: (label: string) => `Wordt nu getoond als ‘${label}’`,
       codeShownAsUnknown: (code: number) =>
-        `Wordt nu getoond als "Niet-herkende training (code ${code})"`,
+        `Wordt nu getoond als ‘Niet-herkende training (code ${code})’`,
       codeSuggestions: ['Krachttraining', 'Core', 'HIIT', 'Rekken', 'Revalidatie', 'Eigen sessie'],
       codesIntro:
-        'De aangepaste trainingssjablonen van Zepp geven een nummer en geen naam, en de ingebouwde catalogus heeft er ook niets voor. In plaats van een sport te gokken en aan je voor te schotelen, geef je de code eenmalig zelf een naam — elk record met die code gebruikt dan jouw naam, en de trainingspagina zegt er eerlijk bij dat die van jou is.',
+        'Aangepaste Zepp-trainingssjablonen geven soms alleen een nummer zonder naam. In plaats van te gokken, kun je de code zelf eenmalig benoemen. Elke training met die code gebruikt dan jouw benaming, duidelijk aangeduid als eigen invoer.',
       codesUnnamed: (count: number) => `${count} nog zonder naam`,
       compactDone: (count: number, before: string, after: string, saved: string, skipped: string) =>
         `${count} payloads gecomprimeerd, ${before} → ${after}, ${saved} bespaard${skipped}.`,
@@ -1191,7 +1191,7 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       minutes: (minutes: number) => `${minutes} min`,
       noDevices:
         'Nog geen fysiek apparaat herkend; Zepp-cloud synchroniseert nog steeds als cloudbron.',
-      noRecords: 'Nog geen records',
+      noRecords: 'Nog geen gegevens',
       noSyncDiagnostics: 'Nog geen synchronisatiediagnostiek.',
       notProvided: 'Niet verstrekt',
       nothingToCompact:
@@ -1218,7 +1218,7 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
         'GPS-coördinaten gaan standaard nooit naar het AI-klembord, waardoor je huis en vaste routes privé blijven.',
       privacyPoint3Title: '3. Locatie onder controle: ',
       privacyPoint4:
-        'pas nadat jij "Een foutrapport versturen" indrukt en bevestigt verstuurt het een vaste whitelist van diagnostiek op productniveau. Het verstuurt nooit je account, apparaat-id\'s, trainingsdetails of gezondheidsgegevens, en opent nooit een GitHub-issue voor je.',
+        'pas nadat jij ‘Een foutrapport versturen’ indrukt en bevestigt verstuurt het een vaste whitelist van diagnostiek op productniveau. Het verstuurt nooit je account, apparaat-id\'s, trainingsdetails of gezondheidsgegevens, en opent nooit een GitHub-issue voor je.',
       privacyPoint4Title: '4. Foutrapporten zijn jouw keuze: ',
       privacyPoint5:
         'de hele codebase is open, zonder verborgen naar-huis-bel-logica.',
@@ -1227,7 +1227,7 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
         'Geen GitHub-account, geen gekopieerde gegevens. Bij bevestiging verstuurt het alleen veldvormen op productniveau, firmwareversie, nummers op modelniveau (gehele getallen, die alleen zeggen welk model het is), en onbekende trainingscodes met hun aantallen, naar de private foutrapportopslag van ZeppBridge. Het verstuurt nooit je account, tokens, serienummers, apparaat-id\'s, MAC-adressen, GPS, gezondheidswaarden, ruwe antwoorden of lokale paden.',
       privacyReportTitle: 'Een apparaat of training niet herkend?',
       privacyTelemetryBody:
-        'De app meldt zelf geen gebruiksgedrag. Alleen als jij zelf "Een foutrapport versturen" indrukt, verstuurt het de geanonimiseerde velden die hieronder staan.',
+        'De app meldt zelf geen gebruiksgedrag. Alleen als jij zelf ‘Een foutrapport versturen’ indrukt, verstuurt het de geanonimiseerde velden die hieronder staan.',
       privacyTelemetryTitle: 'Geen telemetrie, geen gebruiksstatistieken',
       privacyTokenBody:
         'De standaard is Windows Credential Manager / macOS Keychain / Linux-sleutelring. macOS en Linux kunnen expliciet een gewoon-tekst-inlogbestand gebruiken dat alleen door jouw gebruiker lees- en schrijfbaar is; Linux ondersteunt ook omgevingsvariabelen. auth.json bevat alleen account- en regio-metadata. Tokens komen nooit in logs, data-exports of foutrapporten terecht.',
@@ -1236,9 +1236,9 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       probeEmpty: 'geen gegevens',
       probeFailed: 'verzoek mislukt',
       probeNote:
-        '"Niet opgehaald" betekent niet dat het apparaat het mist: de endpoints van Zepp geven een leeg antwoord voor stromen die niet bestaan, en alleen een regelrechte weigering wordt gerapporteerd als "je apparaat levert dit niet".',
+        '‘Niet opgehaald’ betekent niet dat het apparaat het mist: de endpoints van Zepp geven een leeg antwoord voor stromen die niet bestaan, en alleen een regelrechte weigering wordt gerapporteerd als ‘je apparaat levert dit niet’.',
       probeRecords: (records: number, latest: string) =>
-        `${records} records${latest ? `, laatste ${latest}` : ''}`,
+        `${records} items${latest ? `, laatste ${latest}` : ''}`,
       probeRefused: 'endpoint geweigerd',
       probeRun: 'Nu opnieuw testen',
       probeSummary: 'Endpointdiagnostiek',
@@ -1277,7 +1277,7 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
         'Wat er uitging is precies de hierboven genoemde veldtypen plus de notitie die je schreef. Niets anders.',
       reportDoneTitle: 'Ontvangen, bedankt',
       reportFailed: 'Het foutrapport kon niet worden verstuurd',
-      reportNote: 'Iets toe te voegen',
+      reportNote: 'Extra toelichting',
       reportNoteCounter: (used: number, max: number) =>
         `${used} / ${max} · lokale paden, e-mailadressen en lange identificaties worden voor het versturen weggestript`,
       reportNoteHint: ' (optioneel, maar heel nuttig)',
@@ -1290,7 +1290,7 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       reprocessFailed: 'Opnieuw parseren van de lokale gegevens is mislukt',
       reprocessNow: 'Opnieuw parseren',
       reprocessed: (count: number) =>
-        `Lokale gegevens opnieuw geparseerd tot ${count} genormaliseerde records. Het cloudsynchronisatietijdstip is ongewijzigd.`,
+        `Lokale gegevens opnieuw geparseerd tot ${count} genormaliseerde items. Het cloudsynchronisatietijdstip is ongewijzigd.`,
       reprocessing: 'Opnieuw parseren…',
       retentionAria: 'Lokale gegevensbewaring in dagen',
       retentionConfirm: (days: number) =>
@@ -1339,10 +1339,10 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       unidentified: 'Niet herkend',
       unidentifiedInitial: 'N',
       unitDays: 'dagen',
-      unitRecords: 'items',
+      unitRecords: 'vermeldingen',
       unknownDeviceBodyA: 'Sommige Zepp-accounts geven apparaatgegevens terug met ',
       unknownDeviceBodyB:
-        ' — alleen interne nummers, waaruit geen model valt af te leiden. Op "Apparaten opnieuw herkennen" drukken verandert dat nooit. Je kunt hierboven zelf het model aanwijzen: het krijgt het label "Door jou gekozen model" en wordt nooit als automatische match voorgedaan.',
+        ' — alleen interne nummers, waaruit geen model valt af te leiden. Op ‘Apparaten opnieuw herkennen’ drukken verandert dat nooit. Je kunt hierboven zelf het model aanwijzen: het krijgt het label ‘Door jou gekozen model’ en wordt nooit als automatische match voorgedaan.',
       unknownDeviceNoName: 'helemaal geen productnaamveld',
       unknownDeviceReport:
         'Een foutrapport versturen helpt de nummers van dit apparaat in de ingebouwde catalogus te krijgen, zodat niemand het later handmatig hoeft aan te wijzen. Het rapport bevat een vaste whitelist van velden en vereist geen GitHub-account.',
@@ -1363,7 +1363,7 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       updateInstalling: 'Installeren…',
       updateLater: 'Nu niet',
       updateModalCurrent: (version: string) => `Je bent op ${version}`,
-      updateModalReleased: (date: string) => ` · uitgebracht ${date}`,
+      updateModalReleased: (date: string) => ` · verschenen op ${date}`,
       updateModalTitle: (version: string) => `Wat is er nieuw in ZeppBridge ${version}`,
       updateModalUnknownVersion: 'een onbekende versie',
       updateRestartNote:
@@ -1390,7 +1390,7 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       backToOverview: 'Terug naar overzicht',
       title: 'Dagelijkse activiteit',
       intro:
-        'Stappen, afstand, actieve verbranding en actieve minuten per dag. Alleen vergeleken met je eigen eerdere records; dagen zonder gegevens blijven leeg in plaats van met een nul te worden gevuld.',
+        'Stappen, afstand, actieve verbranding en actieve minuten per dag. Alleen vergeleken met je eigen eerdere metingen; dagen zonder gegevens blijven leeg, zonder neppe nullen.',
       rangeAria: 'Tijdsbereik',
       desktopOnly:
         'Gebruik de desktop-app. Deze browserpreview leest geen accountgegevens.',
@@ -1398,7 +1398,7 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       retry: 'Opnieuw proberen',
       loadingAria: 'Dagelijkse activiteit laden',
       noneInRange:
-        'Geen activiteitsrecords in deze periode. Probeer een langere periode, of voer eerst een synchronisatie uit.',
+        'Geen activiteitsgegevens in deze periode. Synchroniseer eerst of kies een langere periode.',
       emptyCard: 'Niets vastgelegd in deze periode.',
       stepsLabel: 'Stappen',
       stepsHint: 'Dagtotaal aan stappen van het horloge',
@@ -1427,12 +1427,12 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       extrasNone: 'Geen bijlagen · standaardopties',
       extrasFiles: (count: number) =>
         plural(count, { one: `${count} bijlage`, other: `${count} bijlagen` }),
-      undoPicked: (name: string) => `"${name}" gekozen`,
-      undoUnpicked: (name: string) => `"${name}" gedeselecteerd`,
-      undoAdded: (name: string) => `"${name}" toegevoegd`,
-      undoRemoved: (name: string) => `"${name}" verwijderd`,
-      undoKept: (name: string) => `"${name}" behouden`,
-      undoExcluded: (name: string) => `"${name}" uitgesloten`,
+      undoPicked: (name: string) => `‘${name}’ gekozen`,
+      undoUnpicked: (name: string) => `‘${name}’ gedeselecteerd`,
+      undoAdded: (name: string) => `‘${name}’ toegevoegd`,
+      undoRemoved: (name: string) => `‘${name}’ verwijderd`,
+      undoKept: (name: string) => `‘${name}’ behouden`,
+      undoExcluded: (name: string) => `‘${name}’ uitgesloten`,
       undoDirection: 'Analyserichting gewijzigd',
     },
     'views/BodyStatus': {
@@ -1440,7 +1440,7 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       backToOverview: 'Terug naar overzicht',
       title: 'Lichaamsstatus',
       intro:
-        'Lokale trends voor gereedheid, stress, bloedzuurstof, HRV, ademhalingsfrequentie, rusthartslag, lichaamssamenstelling en voedselinname. Alles gelezen uit gesynchroniseerde records.',
+        'Lokale trends voor gereedheid, stress, bloedzuurstof, HRV, ademhalingsfrequentie, rusthartslag, lichaamssamenstelling en voeding. Volledig berekend uit gesynchroniseerde gegevens.',
       rangeAria: 'Tijdsbereik',
       trendRangeLabel: 'Trendbereik',
       desktopOnly:
@@ -1449,7 +1449,7 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       retry: 'Opnieuw proberen',
       loadingAria: 'Lichaamsstatus laden',
       noneInRange:
-        'Geen lichaamsstatusrecords in deze periode. Probeer een langere periode, of voer eerst een synchronisatie uit.',
+        'Geen lichaamsstatusgegevens in deze periode. Probeer een langere periode of synchroniseer eerst.',
       emptyCard: 'Niets vastgelegd in deze periode.',
       readinessLabel: 'Gereedheid',
       readinessHint: 'Het horloge weegt slaap, HRV en rusthartslag samen tot één score',
@@ -1511,10 +1511,10 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
         'Geen wegingen in deze periode. Weegschaalmetingen verschijnen hier na een synchronisatie.',
       bodyGroupTitle: 'Gewicht en lichaamssamenstelling',
       bodyGroupEmpty:
-        'Geen gewichts- of lichaamssamenstellingsrecords in deze periode. Samenstellingsmetingen vereisen een weegschaal met lichaamssamenstelling; horloge- en handmatig ingevoerde gewichten dragen er geen.',
+        'Geen gewichts- of lichaamssamenstellingsgegevens in deze periode. Samenstellingsmetingen vereisen een geschikte weegschaal; handmatige of horlogegewichten bevatten deze niet.',
       intakeGroupTitle: 'Inname',
       intakeGroupEmpty:
-        'Geen voedselrecords in deze periode. Maaltijden worden met de hand gelogd in de Zepp-app; eenmaal gelogd verschijnen ze hier na een synchronisatie.',
+        'Geen voedingsgegevens in deze periode. Maaltijden die je in de Zepp-app logt, verschijnen hier na een synchronisatie.',
       intakeCaloriesLabel: 'Gegeten calorieën',
       intakeCaloriesHint:
         'Totaal gelogd voor de dag. Dagen zonder log krijgen geen balk en worden nooit met 0 gevuld',
@@ -1550,7 +1550,7 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       assignAria: 'Modelidentificatie',
       assignTitle: 'Klopt dit?',
       assignSub:
-        'Als de match niet klopt — stel dat het echt een Balance 2 is en dit zegt iets anders — kun je zelf het juiste model aanwijzen. Je keuze blijft op deze machine, verschijnt als "Door jou gekozen model" in plaats van zich als automatische match voor te doen, en kan op elk moment worden ingetrokken.',
+        'Als de match niet klopt — stel dat het echt een Balance 2 is en dit zegt iets anders — kun je zelf het juiste model aanwijzen. Je keuze blijft op deze machine, verschijnt als ‘Door jou gekozen model’ in plaats van zich als automatische match voor te doen, en kan op elk moment worden ingetrokken.',
       changeModel: 'Kies een ander',
       pickModel: 'Dat klopt niet, laat me kiezen',
       clearAssignment: 'Keuze intrekken en terug naar automatisch',
@@ -1570,7 +1570,7 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       window365: 'Afgelopen jaar',
       loadFailed: 'De gegevensgezondheidsstatus kon niet worden gelezen',
       retry: 'Opnieuw proberen',
-      noRecords: 'Nog geen records',
+      noRecords: 'Nog geen gegevens',
       timeUnknown: 'Tijd onbekend',
       notProvided: 'Niet verstrekt',
       backToSettings: 'Terug naar instellingen',
@@ -1579,8 +1579,8 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
         `${ok} / ${total} gegevensstromen gezond`,
       summaryFailed: (n: number) =>
         plural(n, {
-          one: `${n} stroom heeft een probleem — hieronder bij "Hoe ver elke stroom kwam" zie je welke stap`,
-          other: `${n} stromen hebben een probleem — hieronder bij "Hoe ver elke stroom kwam" zie je welke stap`,
+          one: `${n} stroom heeft een probleem — hieronder bij ‘Hoe ver elke stroom kwam’ zie je welke stap`,
+          other: `${n} stromen hebben een probleem — hieronder bij ‘Hoe ver elke stroom kwam’ zie je welke stap`,
         }),
       summaryPending: (n: number) =>
         plural(n, {
@@ -1595,7 +1595,7 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       loadingAria: 'De gegevensgezondheidsstatus wordt gelezen',
       replayInProgress:
         'Lokale payloads worden opnieuw door de nieuwe parser gehaald. Cloudsynchronisaties wijken hier tijdens uit en proberen zichzelf opnieuw; dat is geen mislukking.',
-      timingsTitle: 'Drie verschillende "laatste keren"',
+      timingsTitle: 'Drie verschillende tijdstippen',
       timingCloud: 'Laatst uit de cloud opgehaald',
       timingCloudNote: 'Nog geen resultaat',
       timingReplay: 'Laatste lokale replay',
@@ -1604,11 +1604,11 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       timingManual: 'Laatste handmatige herverwerking',
       timingManualNote: 'Die waar je zelf op klikte',
       timingNewest: 'Nieuwste gezondheidsmeting',
-      timingNewestNote: 'Wanneer het record zelf op het horloge gebeurde',
+      timingNewestNote: 'Wanneer de meting zelf op het horloge plaatsvond',
       dbTitle: 'Lokale database',
       dbSize: 'Bestandsgrootte',
       dbRaw: 'Ruwe payloads',
-      dbCanonical: 'Genormaliseerde records',
+      dbCanonical: 'Genormaliseerde items',
       dbPending: 'Wachtend op normalisatie',
       dbSchema: 'Schemaversie',
       dbNormalizer: 'Parserrevisie',
@@ -1627,7 +1627,7 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       stageWrite: 'Schrijven',
       stageLine: (stage: string, state: string) => `${stage}: ${state}`,
       factRaw: 'Ruwe payloads',
-      factCanonical: 'Genormaliseerde records',
+      factCanonical: 'Genormaliseerde items',
       factSources: 'Bronnen',
       factObservedDays: 'Waargenomen dagen',
       days: (count: number) =>
@@ -1636,13 +1636,13 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       gapMore: ' en meer',
       period: '.',
       latestObserved: (date: string) => `Meest recente ${date}.`,
-      noRecordsYet: 'Nog geen records',
+      noRecordsYet: 'Nog geen metingen',
       sourceSeparator: ', ',
       occasionalTitle: 'Metrieken die maar af en toe opduiken',
       occasionalNote:
         'Metrieken als VO₂max en lactaatdrempel worden by design niet dagelijks gerapporteerd. Deze sectie meldt de waargenomen dagen en de meest recente, en telt nooit dagelijkse gaten — normale schaarste rood schilderen zou juist misleidend zijn.',
       occasionalLine: (records: string, days: number) =>
-        `${records} records · waargenomen op ${days} dagen`,
+        `${records} items · waargenomen op ${days} dagen`,
       occasionalLatest: (date: string) => `meest recente ${date}`,
       occasionalNone: 'Niets waargenomen in deze periode',
       actionsTitle: 'Wat je kunt doen',
@@ -1652,7 +1652,7 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
         `${label}: ${reason}\nDoorgaan?`,
       actionSynced: 'Synchronisatie gedraaid en de status is ververst.',
       actionReplayed: (count: string) =>
-        `Lokale payloads opnieuw afgespeeld met de huidige parser (${count} afgeleide records). De cloud-synchronisatietijd is niet herschreven.`,
+        `Lokale payloads opnieuw afgespeeld met de huidige parser (${count} afgeleide items). De cloud-synchronisatietijd is niet herschreven.`,
       actionIntegrityOk: 'De database is door de integriteitscontrole gekomen.',
       actionIntegrityFailed: (detail: string) =>
         `De database is niet door de integriteitscontrole gekomen: ${detail}`,
@@ -1662,7 +1662,7 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       actionReconnect: 'Ga naar Instellingen en koppel het Zepp-account opnieuw.',
       actionFailed: (label: string) => `${label} mislukt`,
       coveragePerEvent:
-        'Per gebeurtenis geproduceerd: geen record betekent dat er toen niets gebeurde, niet dat iets ontbreekt.',
+        'Per gebeurtenis geproduceerd: geen gegevens betekent dat er toen niets gebeurde, niet dat er iets ontbreekt.',
       coverageOccasional:
         'Het horloge meldt dit maar af en toe; lege dagen zijn normaal en betekenen dat niets verloren ging.',
       coverageNoData:
@@ -1685,7 +1685,7 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
         },
         sync_first: {
           label: 'De eerste synchronisatie uitvoeren',
-          reason: 'Deze machine heeft nog geen geslaagde cloudsynchronisatie op record.',
+          reason: 'Deze machine heeft nog geen geslaagde cloudsynchronisatie uitgevoerd.',
         },
         integrity_check: {
           label: 'Database-integriteit controleren',
@@ -1697,7 +1697,7 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
         },
       },
       reprocessReason: (pending: number) =>
-        `${pending} opgeslagen payloads hebben nog geen genormaliseerd record opgeleverd. Een replay raakt geen netwerk en herschrijft de cloud-synchronisatietijd niet.`,
+        `${pending} opgeslagen payloads hebben nog geen genormaliseerd item opgeleverd. Een replay raakt geen netwerk en past de cloud-synchronisatietijd niet aan.`,
       cadence: {
         continuous: 'meerdere keren per dag',
         daily: 'eenmaal per dag',
@@ -1750,7 +1750,7 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
         'Geen hartslagmetingen in de afgelopen 24 uur, dus er is geen curve om te tekenen.',
       bpmTooltip: (clock: string, value: number) => `${clock} <b>${value}</b> bpm`,
       restingLabel: 'Rusthartslag',
-      restingHint: 'Het horloge meldt er een per dag; constanter is beter',
+      restingHint: 'Het horloge meldt er één per dag; constanter is beter',
       hrvHint: 'Individuele HRV-metingen, per dag gemiddeld',
       rmssdHint: 'Een andere HRV-maat, niet hetzelfde getal als hierboven',
       emptyCard: 'Niets vastgelegd in deze periode.',
@@ -1767,7 +1767,7 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       dailyMaxTooltip: (date: string, max: number, avg: number, samples: number) =>
         `${date}<br/>Piek <b>${max}</b> bpm<br/>Gemiddelde ${avg} bpm<br/>${samples} metingen`,
       dailyMaxNote:
-        'Dit gebruikt alleen de ruwe per-meting-samples die op deze machine zijn opgeslagen. De dagelijkse piek van Zepp wordt ons nooit gestuurd (de device_max_hr in de bibliotheek is het geconfigureerde maximum voor zonegrenzen, geen gemeten piek), dus er is hier niets om ernaast te leggen — open de Zepp-app om dat dagcijfer te vergelijken.',
+        'Berekend uit lokaal vastgelegde metingen; dagelijkse pieken kunnen afwijken van de Zepp-app.',
     },
     'views/Overview': {
       overviewTitle: 'Overzicht',
@@ -1785,17 +1785,16 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       bodyTitle: 'Lichaamsstatus',
       factRecovery: 'Gereedheid',
       factStress: 'Stress',
-      factSpo2: 'SpO2',
+      factSpo2: 'Bloedzuurstof',
       bodySparkLabel: 'Gereedheid over de afgelopen 7 dagen',
-      bodyThin: 'Te weinig records in de afgelopen 7 dagen om een trend te tekenen',
+      bodyThin: 'Te weinig gegevens in de afgelopen 7 dagen voor een trend',
       bodyEmpty:
         'Gereedheid, stress en bloedzuurstof verschijnen hier na een synchronisatie',
       trainingPanelAria: 'Trainingsstatus openen',
       trainingTitle: 'Trainingsstatus',
       factLoad: 'Belasting',
       trainingSparkLabel: 'Trainingsbelasting over de afgelopen 7 dagen',
-      trainingThin:
-        'Te weinig records in de afgelopen 7 dagen om een trend te tekenen',
+      trainingThin: 'Te weinig gegevens in de afgelopen 7 dagen voor een trend',
       trainingEmpty:
         'VO₂max en trainingsbelasting verschijnen hier na een synchronisatie',
       loadLow: 'laag',
@@ -1806,21 +1805,21 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
     },
     'views/RecentRecords': {
       backToOverview: 'Terug naar overzicht',
-      title: 'Recente records',
-      loadingLabel: 'Recente records laden',
-      loadFailedTitle: 'De recente records konden niet worden geladen',
+      title: 'Recente activiteiten',
+      loadingLabel: 'Recente activiteiten laden',
+      loadFailedTitle: 'De recente activiteiten konden niet worden geladen',
       desktopOnly:
         'Gebruik de desktop-app. Deze browserpreview leest geen accountgegevens.',
       retry: 'Opnieuw proberen',
       partialUnavailable: 'Sommige gegevens zijn nu niet beschikbaar',
-      filterAll: 'Allemaal',
-      noSleep: 'Nog geen slaaprecords',
+      filterAll: 'Alles',
+      noSleep: 'Nog geen slaapgegevens',
       noWorkouts: 'Niets om hier te tonen.',
       noWorkoutsOfType: 'Niets om te tonen voor dit trainingstype.',
       hiddenIncomplete: (count: number) =>
         plural(count, {
-          one: `${count} incompleet record verborgen`,
-          other: `${count} incomplete records verborgen`,
+          one: `${count} onvolledig item verborgen`,
+          other: `${count} onvolledige items verborgen`,
         }),
       notProvided: 'Niet verstrekt',
       today: 'Vandaag',
@@ -1837,12 +1836,12 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       showMore: (count: number) => `Nog ${count} tonen`,
     },
     'views/SleepDetail': {
-      title: 'Slaaprecord',
-      loadingDetail: 'Het slaaprecord wordt gelezen…',
-      loadFailedTitle: 'Dit slaaprecord kon niet worden gelezen',
+      title: 'Slaapoverzicht',
+      loadingDetail: 'Slaapgegevens laden…',
+      loadFailedTitle: 'Slaapgegevens konden niet worden gelezen',
       loadFailed: 'Slaapdetail is nu niet beschikbaar',
       retry: 'Opnieuw proberen',
-      notFoundTitle: 'Dit slaaprecord is hier niet',
+      notFoundTitle: 'Geen slaapgegevens gevonden',
       notFoundMessage:
         'Het kan zijn opgeschoond, of het is nog niet naar deze machine gesynchroniseerd.',
       heroAria: 'Slaapduur en -score',
@@ -1873,7 +1872,7 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       deviceFirmware: 'Firmware',
       deviceId: 'Apparaat-id',
       footnote:
-        'Alleen de stadsamenvatting die de cloud echt gaf. Als er geen REM-veld is leest het "Niet verstrekt" — nooit teruggerekend door aftrekking — en een tijdlijn die niet is verstrekt wordt nooit getekend.',
+        'Alleen de stadia die de cloud daadwerkelijk gaf. Ontbrekende REM toont ‘Niet verstrekt’ in plaats van een gok, en niet-verstrekte tijdlijnen blijven leeg.',
       notProvided: 'Niet verstrekt',
       syncTimeMissing: 'Synchronisatietijd niet verstrekt',
       lastCloudSync: (clock: string) => `Laatste cloudsynchronisatie ${clock}`,
@@ -1885,22 +1884,22 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       tooltipRowMissing: (name: string) => `${name}: Niet verstrekt<br/>`,
     },
     'views/SleepList': {
-      backToRecent: 'Terug naar recente records',
+      backToRecent: 'Terug naar recente activiteiten',
       backToOverview: 'Terug naar overzicht',
       title: 'Slaap',
       intro:
-        'Slaaprecords gesynchroniseerd naar deze machine. Zonder volledige tijdlijn wordt alleen de samenvatting getoond.',
-      loadFailedTitle: 'De slaaprecords konden niet worden gelezen',
+        'Slaapgegevens gesynchroniseerd naar deze machine. Zonder tijdlijn wordt alleen de samenvatting getoond.',
+      loadFailedTitle: 'De slaapgegevens konden niet worden gelezen',
       loadFailed: 'De slaaplijst is nu niet beschikbaar',
       retry: 'Opnieuw proberen',
-      emptyTitle: 'Nog geen slaaprecords',
+      emptyTitle: 'Nog geen slaapgegevens',
       emptyMessage:
         'Ze verschijnen hier na een synchronisatie. Stadia worden nooit verzonnen.',
       scoreLabel: 'Score',
       footnote: (count: number, from: string) =>
         plural(count, {
-          one: `${count} record · sinds ${from}`,
-          other: `${count} records · sinds ${from}`,
+          one: `${count} nacht · sinds ${from}`,
+          other: `${count} nachten · sinds ${from}`,
         }),
       shown: (shown: number, total: number) => `${shown} van ${total} getoond`,
       loadMore: 'Meer laden',
@@ -1910,7 +1909,7 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       backToOverview: 'Terug naar overzicht',
       title: 'Trainingsstatus',
       intro:
-        'VO₂max, lactaatdrempel, trainingsbelasting en hartslagzones. Alles gelezen uit gesynchroniseerde records; geen trainingsadvies.',
+        'VO₂max, lactaatdrempel, trainingsbelasting en hartslagzones. Volledig berekend uit gesynchroniseerde gegevens; geen medisch advies.',
       rangeAria: 'Tijdsbereik',
       desktopOnly:
         'Gebruik de desktop-app. Deze browserpreview leest geen accountgegevens.',
@@ -1919,13 +1918,13 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       loadingAria: 'Trainingsstatus laden',
       vo2Hint: 'Maximale zuurstofopname, door het horloge geschat na buitenruns',
       vo2Empty:
-        'Geen VO₂max-records in deze periode; hij werkt alleen bij na een buitenrun.',
+        'Geen VO₂max-metingen in deze periode; wordt alleen bijgewerkt na een hardloopsessie buiten.',
       loadLabel: 'Trainingsbelasting',
       loadHint: 'Dagelijkse trainingsbelastingscore',
-      loadEmpty: 'Geen trainingsbelastingsrecords in deze periode.',
+      loadEmpty: 'Geen trainingsbelastingsgegevens in deze periode.',
       paiLabel: 'PAI',
       paiHint: 'Personal Activity Intelligence over een schuivende 7 dagen',
-      paiEmpty: 'Geen PAI-records in deze periode.',
+      paiEmpty: 'Geen PAI-gegevens in deze periode.',
       thresholdLabel: 'Lactaatdrempel',
       latestTag: 'Nieuwste',
       thresholdHint: 'Hartslag en tempo; werkt alleen bij na een zware run',
@@ -1945,7 +1944,7 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       balanceChartAria:
         '7-daagse en 28-daagse trainingsbelasting met de acuut-chronisch-ratio',
       balanceEmpty:
-        'Nog te weinig trainingsbelastingsrecords om deze lijn te tekenen.',
+        'Nog te weinig gegevens om de belastingbalans te tonen.',
       balanceNote:
         'Acuut:chronisch = som van de laatste 7 dagen ÷ (som van de laatste 28 dagen ÷ 4). Als het 28-daagse venster minder dan 21 dagen dekt wordt geen ratio gegeven en breekt de lijn daar. Dat is onberekend, geen nul.',
       acute7d: '7-daagse belasting',
@@ -1971,12 +1970,12 @@ Als je iets van me nodig hebt (welke client ik gebruik, waar het bestand staat),
       seriesFailed: 'De reeksen per punt voor deze training konden niet worden gelezen',
       seriesFailedTitle: 'De reeksen per punt konden niet worden geladen',
       exportNeedsSeries:
-        'De reeksen per punt konden niet worden geladen, dus dit record kan niet worden geëxporteerd.',
-      aiPrompt: (label: string) => `Je bent een sportanalist. Hieronder staat het complete record van één ${label} van mij, uit de lokale ZeppBridge-database en geanonimiseerd.
-Analyseer deze sessie alleen aan de hand van de feiten in dit record: de intensiteit, hoe tempo zich verhoudt tot hartslag, of er een duidelijke vertraging of een afwijkend stuk is, en wat er volgende keer concreet anders moet.
+        'Reeksen per punt ontbreken, waardoor deze training niet kan worden geëxporteerd.',
+      aiPrompt: (label: string) => `Je bent een sportanalist. Hieronder staat het complete overzicht van één ${label} van mij, uit de lokale ZeppBridge-database en geanonimiseerd.
+Analyseer deze sessie alleen aan de hand van de feiten in dit overzicht: de intensiteit, hoe tempo zich verhoudt tot hartslag, of er een duidelijke vertraging of een afwijkend stuk is, en wat er volgende keer concreet anders moet.
 
 Randvoorwaarden:
-- Deze gegevens bevatten geen populatiebasislijn. Vergelijk me niet met "gezonde volwassenen" of met een gemiddelde.
+- Deze gegevens bevatten geen populatiebasislijn. Vergelijk me niet met ‘gezonde volwassenen’ of met een gemiddelde.
 - Waar iets ontbreekt, zeg dat het ontbreekt. Vul het gat nooit met een nul of een schatting.
 - Geen medische diagnose, geen oordeel over ziekterisico, geen behandeladvies.
 
@@ -2067,7 +2066,7 @@ Antwoord in Markdown.`,
       legendSlow: 'Langzaam',
       routeEmptyTitle: 'Geen bruikbare track',
       routeEmptyBody:
-        'Dit record draagt te weinig GPS-punten, dus er wordt geen route getekend.',
+        'Deze training bevat te weinig GPS-punten om een route te tekenen.',
       chartsEmptyTitle: 'Geen per-punt-curves',
       chartsEmptyBody:
         'Voor deze sessie is geen hartslag-, tempo-, hoogte- of cadansreeks gesynchroniseerd.',
@@ -2085,7 +2084,7 @@ Antwoord in Markdown.`,
       eyebrowDecoded: 'Gedecodeerd',
       decodedTitle: 'Gedecodeerde waarden',
       decodedNote:
-        'De samenvatting is alleen berekend uit geldige metingen in dit record; afwijkende sprongen worden genegeerd.',
+        'De samenvatting is alleen berekend uit geldige metingen in deze training; uitschieters worden genegeerd.',
       exportAria: 'Exporteren en delen',
       exportTitle: 'Exporteren en delen',
       exportSub:
@@ -2095,21 +2094,21 @@ Antwoord in Markdown.`,
       saveFit: 'FIT-bestand opslaan',
       savedFit: 'FIT-bestand opgeslagen',
       exportFailed: 'Export mislukt',
-      handoffAria: 'Doorgeven aan AI',
-      handoffTitle: 'Doorgeven aan AI',
+      handoffAria: 'Naar de AI',
+      handoffTitle: 'Naar de AI',
       handoffSub:
-        'Kopieert de geanonimiseerde gegevens voor alleen deze training, plus de prompt, en opent de AI-site die je kiest. Stromen per dag zoals slaap en stappen blijven erbuiten.',
+        'Kopieert de geanonimiseerde trainingsgegevens met prompt en opent de gekozen AI. Dagelijkse stromen zoals slaap en stappen blijven erbuiten.',
       handoffTarget: 'Doeltool',
       handoffTargetAria: 'Aan welke AI-tool het wordt doorgegeven',
       preparing: 'Voorbereiden…',
-      handTo: (provider: string) => `Doorgeven aan ${provider}`,
+      handTo: (provider: string) => `Openen in ${provider}`,
       provenanceAria: 'Herkomst',
       eyebrowProvenance: 'Herkomst',
       provenanceTitle: 'Herkomst',
       provenanceProvider: 'Aanbieder',
       provenanceScope: 'Bereik',
       provenanceSynced: 'Laatst gesynchroniseerd',
-      provenanceRecordId: 'Record-id',
+      provenanceRecordId: 'Item-id',
       provenanceDevice: 'Apparaat',
       pageFoot:
         'Gedecodeerd op deze machine. De track is op een lokaal canvas getekend en nooit naar een kaartdienst gestuurd.',
@@ -2124,36 +2123,36 @@ Antwoord in Markdown.`,
       close: 'Sluiten',
     },
     'views/WorkoutList': {
-      backToRecent: 'Terug naar recente records',
+      backToRecent: 'Terug naar recente activiteiten',
       backToOverview: 'Terug naar overzicht',
       title: 'Trainingen',
       intro: 'Trainingen gesynchroniseerd naar deze machine. Geen track, geen kaart.',
       loadFailedTitle: 'De trainingen konden niet worden gelezen',
       loadFailed: 'De trainingslijst is nu niet beschikbaar',
       retry: 'Opnieuw proberen',
-      emptyTitle: 'Nog niets om te tonen',
+      emptyTitle: 'Nog geen trainingen',
       emptyMessage:
-        'Na een synchronisatie verschijnen hier alleen records met een type, een tijd en minstens één echte metriek. Zonder GPS of metingen per punt wordt geen lege grafiek getekend.',
+        'Na synchronisatie verschijnen hier trainingen met een type, tijdstip en minstens één geldige metriek. Zonder GPS of metingen per punt wordt geen lege grafiek getekend.',
       avgHr: (bpm: number) => `Gem. hartslag ${bpm}`,
       notProvided: 'Niet verstrekt',
       footnote: (count: number) =>
-        plural(count, { one: `${count} record getoond`, other: `${count} records getoond` }),
+        plural(count, { one: `${count} training getoond`, other: `${count} trainingen getoond` }),
       shown: (loaded: number, total: number) => `${loaded} van ${total} geladen`,
       loadMore: 'Meer laden',
       loadingMore: 'Laden…',
     },
     'components/ai/AiTaskHeader': {
-      pageTitle: 'Doorgeven aan AI',
+      pageTitle: 'Naar de AI',
       intro:
-        'Kies een training, kies de gegevens en zeg wat je wilt weten — exporteer naar het bureaublad en sleep het in de AI.',
+        'Kies een training, selecteer de gewenste gegevens en vraag wat je wilt weten. Exporteer naar je bureaublad en sleep het bestand in de AI-chat.',
       titleLabel: 'Taaknaam',
       newTask: 'Nieuw',
       saved: 'Opgeslagen',
       days: (n: number) =>
         plural(n, { one: `${n} dag`, other: `${n} dagen` }),
-      history: 'Overdrachtshistoriek',
-      historyCount: (count: number) => `Overdrachtshistoriek (${count})`,
-      historyEmpty: 'Nog niets doorgegeven',
+      history: 'Opgeslagen taken',
+      historyCount: (count: number) => `Opgeslagen taken (${count})`,
+      historyEmpty: 'Nog geen opgeslagen taken',
       rangeLabel: 'Terugkijkperiode',
       rename: 'Klik om te hernoemen',
     },
@@ -2168,7 +2167,7 @@ Antwoord in Markdown.`,
     },
     'components/ai/DirectionPanel': {
       title: 'Richting en vraag',
-      hint: 'De richting bepaalt het kader, de vraag bepaalt de focus — beide gaan naar de AI',
+      hint: 'De richting bepaalt het kader, de vraag de focus. Beide gaan mee naar de AI',
       directionLabel: 'Analyserichting (sjabloon)',
       directionHint:
         'Een richting kiezen past ook het aanbevolen gegevensbereik toe — je ziet het in de graaf en kunt het ongedaan maken.',
@@ -2200,13 +2199,13 @@ Antwoord in Markdown.`,
       collapse: 'Metrieken verbergen',
       keep: 'Deze metriek behouden',
       drop: 'Deze metriek uitsluiten',
-      include: 'Doorgeven aan AI',
-      exclude: 'Niet doorgeven',
+      include: 'Meenemen',
+      exclude: 'Niet meenemen',
       noteHint: 'Schrijf de notitie in stap 2 aan de rechterkant.',
     },
     'components/ai/HandoffPanel': {
-      title: 'Doorgeven aan de AI',
-      who: 'Doorgeven aan',
+      title: 'Naar de AI',
+      who: 'Aan wie',
       run: (label: string) => `Naar het bureaublad exporteren en ${label} openen`,
       exportOnly: 'Alleen naar het bureaublad exporteren',
       reveal: 'In Verkenner weergeven',
@@ -2223,12 +2222,12 @@ Antwoord in Markdown.`,
       dragHint:
         'Sleep de bestanden in deze map naar de AI-chat en plak daarna de prompt. De site openen is nog niet versturen.',
       desktopOnly: 'Verbind de desktop-app om te exporteren',
-      go: (label: string) => `Doorgeven aan ${label}`,
+      go: (label: string) => `Overdragen aan ${label}`,
       goSub: 'Exporteren · prompt kopiëren · site openen',
       closePanel: 'Sluiten',
       packageSize: (bytes: string) => `Pakket ≈ ${bytes}`,
       issueCount: (count: number) =>
-        plural(count, { one: `${count} notitie`, other: `${count} notities` }),
+        plural(count, { one: `${count} aandachtspunt`, other: `${count} aandachtspunten` }),
       repeat: (count: number) => `×${count}`,
       readiness: (categories: number, percent: number) =>
         `${categories} gegevenstypen · ${percent}% van de dagen met gegevens`,
@@ -2287,8 +2286,8 @@ Antwoord in Markdown.`,
       label: 'Gegevensgraaf van de taak',
       hint: 'Sleep in de cirkel om mee te nemen, eruit om te verwijderen · Klik voor opties · Sleep lege ruimte om te pannen',
       zone: 'Naar de AI',
-      includeNode: 'Doorgeven aan AI',
-      excludeNode: 'Niet doorgeven',
+      includeNode: 'Meenemen',
+      excludeNode: 'Niet meenemen',
       fit: 'Inpassen',
       resetView: 'Weergave resetten',
       undo: 'Ongedaan maken',
@@ -2314,7 +2313,7 @@ Antwoord in Markdown.`,
       label: 'Instellingskaarten — veeg zijwaarts om er een te kiezen',
       previous: 'Vorige kaart',
       next: 'Volgende kaart',
-      open: (title: string) => `Open "${title}"`,
+      open: (title: string) => `Open ‘${title}’`,
       position: (index: number, total: number) => `${index} / ${total}`,
     },
     'composables/useAiTaskLibrary': {
@@ -2428,7 +2427,7 @@ Antwoord in Markdown.`,
       sumPrivacy: 'Je gegevens blijven op deze computer',
       secAccount: 'Zepp-account',
       secDevices: 'Apparaten',
-      secCapability: 'Gegevens die je hebt',
+      secCapability: 'Binnengehaalde gegevens',
       secLocalData: 'Je gegevens op deze computer',
       secFormat: 'Taal en notaties',
       secAppearance: 'Uiterlijk',
@@ -2451,7 +2450,7 @@ Antwoord in Markdown.`,
       syncNowLabel: 'Nu eenmaal synchroniseren',
       syncNowSub: 'Haalt alleen de laatste paar dagen op',
       exportFormatSub:
-        'Vooraf geselecteerd bij export vanuit "Doorgeven aan AI" of een training',
+        'Vooraf geselecteerd bij export vanuit ‘Naar de AI’ of een training',
       retentionSub:
         'Alleen de meest recente dagen worden bewaard; genegeerd zolang het langetermijnarchief aan staat',
       scaleSub: '100% is de ontwerpmaat; Ctrl + en Ctrl - werken ook',
@@ -2499,7 +2498,7 @@ Antwoord in Markdown.`,
       'Verificatie mislukt: Zepp was niet bereikbaar. Controleer je netwerk en probeer het opnieuw',
     'err.backfill.bad_start_date': 'Ongeldige startdatum voor ophalen — gebruik JJJJ-MM-DD',
     'err.backfill.no_canonical_records':
-      'De cloud heeft een payload teruggegeven, maar er waren geen bruikbare records uit te lezen',
+      'Cloudpayload ontvangen, maar geen bruikbare gegevens gevonden',
     'err.backfill.partial_window':
       'Slechts een deel van deze datumperiode is geschreven. Er moet opnieuw worden geprobeerd',
     'err.backfill.start_in_future': 'Het startpunt voor ophalen kan niet later dan vandaag liggen',
@@ -2513,7 +2512,7 @@ Antwoord in Markdown.`,
     'err.capability.unavailable': 'Niet beschikbaar',
     'err.capability.unknown': 'Status onbekend',
     'err.capability.unverified': 'Nog niet geverifieerd',
-    'err.core.auth': 'Er is iets misgegaan met de authenticatie',
+    'err.core.auth': 'Authenticatiefout',
     'err.core.busy': 'Er loopt een andere schrijfbewerking. Wacht tot die klaar is',
     'err.core.cancelled': 'Geannuleerd',
     'err.core.cloud_rejected':
@@ -2525,9 +2524,9 @@ Antwoord in Markdown.`,
     'err.core.http_status': 'Zepp heeft een fout teruggegeven. Probeer het zo opnieuw',
     'err.core.invalid_host': 'Onveilig Zepp-regioadres',
     'err.core.io': 'Lezen of schrijven van een lokaal bestand is mislukt',
-    'err.core.needs_reauth': 'Je aanmelding is verlopen. Koppel opnieuw met Zepp',
+    'err.core.needs_reauth': 'Sessie verlopen, koppel opnieuw met Zepp',
     'err.core.network':
-      'De Zepp-regio was niet bereikbaar. Controleer je netwerk en probeer het opnieuw',
+      'Kan Zepp-regio niet bereiken; controleer je netwerk en probeer het opnieuw',
     'err.core.parse': 'Het antwoord van Zepp kon niet worden gelezen',
     'err.core.retry_exhausted': 'Zepp is tijdelijk niet beschikbaar. Probeer het zo opnieuw',
     'err.core.unavailable': 'Dit account of deze regio levert die gegevens niet',
@@ -2547,23 +2546,23 @@ Antwoord in Markdown.`,
     'err.diagnostic.send_failed':
       'Het rapport kon niet worden verzonden. Controleer je netwerk en probeer het opnieuw',
     'err.export.convert_failed': 'Converteren naar het gevraagde formaat is mislukt',
-    'err.export.empty_range': 'Geen records in deze periode om te exporteren',
+    'err.export.empty_range': 'Geen gegevens in deze periode om te exporteren',
     'err.export.not_a_directory':
       'Een FIT-export heeft een map nodig, maar het gekozen pad is een bestand',
     'err.export.path_not_absolute': 'De opslaglocatie moet een absoluut pad zijn',
     'err.export.path_required': 'Kies eerst waar het bestand moet worden opgeslagen',
     'err.export.write_failed': 'Het exportbestand kon niet worden geschreven',
-    'err.handoff.empty_range': 'Geen records in deze periode om over te dragen',
+    'err.handoff.empty_range': 'Geen gegevens in deze periode voor AI-overdracht',
     'err.handoff.encode_failed': 'De geanonimiseerde AI-export kon niet worden gecodeerd',
     'err.handoff.mkdir_failed': 'De map voor de overdracht kon niet worden aangemaakt',
     'err.handoff.prompt_required': 'Schrijf eerst een prompt',
     'err.handoff.write_failed': 'De geanonimiseerde AI-gegevens konden niet worden geschreven',
     'err.headless.no_credential_store':
-      'Op deze machine is geen systeemopslag voor inloggegevens beschikbaar (GNOME Keyring / KWallet). Headless servers en containers hebben die meestal niet. Stel ZEPPBRIDGE_CREDENTIAL_STORE=file in om het token met 0600 in de gegevensmap te schrijven, of ZEPPBRIDGE_CREDENTIAL_STORE=env samen met ZEPPBRIDGE_APP_TOKEN.',
+      'Op deze machine is geen systeemopslag voor inloggegevens beschikbaar (GNOME Keyring / KWallet). Headless servers en containers hebben die meestal niet. Stel ZEPPBRIDGE_CREDENTIAL_STORE=file in om het token met rechten 0600 in de gegevensmap te schrijven, of ZEPPBRIDGE_CREDENTIAL_STORE=env samen met ZEPPBRIDGE_APP_TOKEN.',
     'err.headless.schema_upgrade':
       'Deze database is ouder dan de build die hem leest, en een alleen-lezen verbinding kan hem niet bijwerken. Start de desktop-app een keer, of draai zeppbridge-cli reprocess op een headless machine. Beide maken voor het bijwerken een back-up.',
     'err.headless.token_not_in_store':
-      'De accountgegevens zijn er, maar de opslag voor inloggegevens heeft er geen token voor. Een database kun je tussen machines kopiëren; een token niet — die blijft in de referentieopslag van de machine waar hij is gemaakt. Meld opnieuw aan.',
+      'De accountgegevens zijn er, maar de opslag voor inloggegevens heeft er geen token voor. Een database kun je tussen machines kopiëren; een token niet — die blijft in de referentieopslag van de machine waar hij is gemaakt. Meld je opnieuw aan.',
     'err.local_api.bind_failed': 'De lokale API kon niet worden gestart',
     'err.local_api.port_in_use': 'De poort van de lokale API is al door een ander programma in gebruik',
     'err.local_api.state_write_failed':
@@ -2623,11 +2622,11 @@ Antwoord in Markdown.`,
     'err.sync.history_days_out_of_range': 'Dat aantal dagen valt buiten het toegestane bereik',
     'err.sync.not_connected': 'Nog niet met Zepp verbonden. Koppel eerst',
     'err.sync.not_verified':
-      'Voltooi eerst de verificatie van de verbinding voordat je recente gegevens synchroniseert',
+      'Controleer eerst de verbinding voordat je recente gegevens synchroniseert',
     'err.sync.not_verified_backfill':
-      'Voltooi eerst de verificatie van de verbinding voordat je historie ophaalt',
+      'Controleer eerst de verbinding voordat je historie ophaalt',
     'err.sync.not_verified_probe':
-      'Voltooi eerst de verificatie van de verbinding voordat je mogelijkheden test',
+      'Controleer eerst de verbinding voordat je mogelijkheden test',
     'err.update.installed_build_missing':
       'Na de installatie is geen nieuwe geïnstalleerde ZeppBridge-build gevonden',
     'err.update.launch_failed': 'De bijgewerkte geïnstalleerde build kon niet worden gestart',

@@ -6,7 +6,7 @@ import { defineMessages } from '../../i18n';
  */
 export const deckMessages = defineMessages(
   {
-    pageIntro: '点开一张卡来调整；展开后按住卡头左右拖，可以直接翻到下一张。',
+    pageIntro: '点开一张卡来调整；展开后按住卡头左右拖，可直接翻到下一张。',
     pageIntroDeck: '左右滑动挑一张，点正中那张打开；想一眼看完就「展开全部」。',
     openCard: '打开',
 
@@ -62,7 +62,7 @@ export const deckMessages = defineMessages(
     mcpLead: '让 Claude Code、Codex 这类装在你电脑上的 AI 工具直接查本机数据——只读、不联网、不开端口。',
     mcpPreview: '查看将复制的内容',
     mcpToolsLabel: 'AI 能用的工具',
-    mcpTools: '配好之后 AI 能问到这五件事，悬停看说明。',
+    mcpTools: '配好后 AI 能问这五件事，悬停看说明。',
     exportFormatSub: '「交给 AI」、运动详情导出时默认选中的格式',
 
     themeLabel: '主题',
@@ -74,8 +74,8 @@ export const deckMessages = defineMessages(
     retentionSub: '只保留最近这么多天；长期归档开启时不生效',
   },
   {
-    pageIntro: 'Open a card to adjust it; once it is open, drag its header sideways to flip to the next card.',
-    pageIntroDeck: 'Swipe sideways to pick a card and click the one in the middle to open it — or “Show all” to see every card at once.',
+    pageIntro: 'Open a card to adjust it; once open, drag its header sideways to flip to the next.',
+    pageIntroDeck: 'Swipe sideways to pick a card, click the center one to open — or “Show all” to see everything.',
     openCard: 'Open',
 
     cardAccount: 'Account and devices',
@@ -94,7 +94,7 @@ export const deckMessages = defineMessages(
     sumArchiveOn: 'Long-term archive on · nothing is pruned',
     sumArchiveOff: (days: number) => `Keeping the last ${days} days`,
     sumData: (available: number, total: number) => `${available} of ${total} data streams stored locally`,
-    sumDataLoading: 'Reading what data is available…',
+    sumDataLoading: 'Checking available data…',
     sumAi: (format: string) => `Read-only MCP access · exports default to ${format}`,
     sumDisplay: (language: string, unit: string, scale: number) => `${language} · ${unit} · ${scale}%`,
     sumPrivacy: 'Your data stays on this computer',
@@ -104,16 +104,16 @@ export const deckMessages = defineMessages(
     secAccount: 'Account',
     secDevices: 'Devices',
     secLogin: 'Sign-in method',
-    secLoginSub: 'Open this only when you need to sign in a different way',
+    secLoginSub: 'Expand only to switch sign-in method',
     secAutoSync: 'Auto sync',
     secUpdate: 'Software update',
     secCapability: 'Data you have',
-    secCodes: 'Unrecognised workout codes',
+    secCodes: 'Unrecognized workout codes',
     secMcp: 'MCP',
     secExport: 'Default export',
     secFormat: 'Language and formats',
     secAppearance: 'Appearance',
-    secLocalData: 'Your data on this computer',
+    secLocalData: 'Data on this machine',
     secFeedback: 'Report a problem',
     secRetention: 'Local retention',
 
@@ -127,11 +127,11 @@ export const deckMessages = defineMessages(
     syncNowLabel: 'Sync once now',
     syncNowSub: 'Fetches only the last few days',
 
-    mcpLead: 'Let AI tools installed on your computer — Claude Code, Codex and the like — query your local data directly. Read-only, offline, no open port.',
+    mcpLead: 'Let AI tools on this machine — Claude Code, Codex and the like — query local data directly. Read-only, offline, no open port.',
     mcpPreview: 'Show what will be copied',
     mcpToolsLabel: 'Tools the AI can use',
-    mcpTools: 'Once configured, the AI can ask about these five things. Hover for details.',
-    exportFormatSub: 'Preselected when you export from “Hand to AI” or a workout',
+    mcpTools: 'Once configured, the AI can ask these five things. Hover for details.',
+    exportFormatSub: 'Preselected when exporting from “Send to AI” or a workout',
 
     themeLabel: 'Theme',
     themeSystem: 'System',
@@ -139,7 +139,7 @@ export const deckMessages = defineMessages(
     themeLight: 'Light',
     scaleSub: '100% is the design size; Ctrl + / Ctrl - also work',
 
-    retentionSub: 'Only the most recent days are kept; ignored while the long-term archive is on',
+    retentionSub: 'Keeps only the most recent days; ignored while long-term archive is on',
   },
   {
     pageIntro: 'Abre una tarjeta para ajustarla; ya abierta, arrastra su cabecera hacia los lados para pasar a la siguiente.',

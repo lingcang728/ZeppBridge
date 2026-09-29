@@ -27,8 +27,8 @@ import { defineMessages, messagesOf } from '../i18n';
 
 const messages = defineMessages(
   { loadFailed: '任务读取失败', saveFailed: '任务保存失败', deleteFailed: '任务删除失败', untitled: '未命名任务' },
-  { loadFailed: 'Could not load the task', saveFailed: 'Could not save the task', deleteFailed: 'Could not delete the task', untitled: 'Untitled task' },
-  { loadFailed: 'No se pudo cargar la tarea', saveFailed: 'No se pudo guardar la tarea', deleteFailed: 'No se pudo eliminar la tarea', untitled: 'Tarea sin nombre' },
+  { loadFailed: 'Could not load task', saveFailed: 'Could not save task', deleteFailed: 'Could not delete task', untitled: 'Untitled task' },
+  { loadFailed: 'No se pudo cargar la tarea', saveFailed: 'No se pudo guardar la tarea', deleteFailed: 'No se pudo eliminar la tarea', untitled: 'Tarea sin título' },
   'composables/useAiTaskDraft',
 );
 const copy = () => messagesOf(messages);
@@ -130,7 +130,7 @@ const saveDraft = async (fallbackTitle?: string): Promise<AiTask> => {
     const task = { ...draft.value };
     if (!task.title.trim()) task.title = fallbackTitle?.trim() || copy().untitled;
     // 没存过的草稿按名字归到已有的那条：同一天同样的「最近 14 天」再导出一次，
-    // 更新原记录，不再在交付记录里多出一条一模一样的。
+    // 更新原记录，不再在已保存的任务里多出一条一模一样的。
     if (!task.id) {
       const same = library.taskList.value.find((entry) => entry.title.trim() === task.title.trim());
       if (same) task.id = same.id;

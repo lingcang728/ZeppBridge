@@ -27,33 +27,33 @@ const messages = defineMessages(
 
     /* —— 传给 ai_task_prepare 的覆盖说明段开头 —— */
     'ui.ai_task.prompt.coverage_note':
-      '以下是 ZeppBridge 按本机数据统计出的实际覆盖范围与时间窗；没有数据的日期已如实标注，请不要推测或编造缺失部分。',
+      '以下是 ZeppBridge 按本机数据统计的实际覆盖与时间窗；无数据日期已如实标注，不要推测或编造缺失部分。',
 
     /* —— 交付阻塞（prepare.blocked 的 ui 码） —— */
-    'ui.ai_task.blocked.attachment_missing': '有附件原件找不到了。请重新选择文件，或明确移除这条引用。',
-    'ui.ai_task.blocked.no_workouts': '任务还没有关联运动。回到编辑页至少选一条运动后再交付。',
-    'ui.ai_task.blocked.empty': '当前选择覆盖不到任何数据，请先调整类别或运动范围。',
+    'ui.ai_task.blocked.attachment_missing': '有附件原件找不到了。重新选择文件，或移除这条引用。',
+    'ui.ai_task.blocked.no_workouts': '任务还没关联运动。回编辑页至少选一条再交付。',
+    'ui.ai_task.blocked.empty': '当前选择覆盖不到任何数据，先调整类别或运动范围。',
 
     /* —— 预览警告（preview.warnings 的 ui 码） —— */
-    'ui.ai_task.warn.attachment_changed': '附件大小和添加时不一样——交付前请确认还是同一份原件。',
-    'ui.ai_task.warn.category_missing': '这一类别在所选时间窗内没有数据，导出里会如实标注缺失。',
+    'ui.ai_task.warn.attachment_changed': '附件大小和添加时不同——交付前确认还是同一份原件。',
+    'ui.ai_task.warn.category_missing': '该类别在所选时间窗内没有数据，导出会如实标注缺失。',
     'ui.ai_task.warn.partial_coverage': '时间窗内只有部分日期有数据。',
     'ui.ai_task.unknown': '未识别的状态说明',
 
     /* —— 附件区提示 —— */
     'ui.ai_task.attach.no_redaction':
-      '导出时会把原件复制到桌面的交付文件夹里（不做脱敏）。请确认你愿意把它交给所选 AI。',
+      '导出会把原件复制到桌面的交付文件夹（不脱敏）。确认你愿意把它交给所选 AI。',
 
     /* —— 内置模板（ui.ai_template.<id>.name / .prompt） —— */
     'ui.ai_template.recovery_run.name': '恢复跑',
     'ui.ai_template.recovery_run.prompt':
-      '这是一次恢复期的训练。请结合运动前两周的睡眠、恢复状态与心率背景评估：这次运动强度是否匹配当前恢复水平？接下来 48 小时的训练建议是什么？',
+      '这是一次恢复期训练。结合前两周的睡眠、恢复状态与心率评估：强度是否匹配当前恢复水平？接下来 48 小时如何安排训练？',
     'ui.ai_template.long_run_compare.name': '多次长跑比较',
     'ui.ai_template.long_run_compare.prompt':
-      '请比较这几组长跑：配速/心率漂移、体感与恢复背景的差异。哪一次的负荷效率最好？下一次长跑如何安排强度？',
+      '比较这几组长跑：配速/心率漂移、体感与恢复背景的差异。哪次负荷效率最高？下次长跑强度如何安排？',
     'ui.ai_template.hr_drift.name': '心率漂移',
     'ui.ai_template.hr_drift.prompt':
-      '请分析这次运动的心率漂移：对照同等配速下心率的上升幅度，结合前两周睡眠与训练负荷判断是疲劳、天气还是体能变化。',
+      '分析这次运动的心率漂移：对照同等配速下心率上升幅度，结合前两周睡眠与训练负荷判断是疲劳、天气还是体能变化。',
 
     'ui.ai_template.sleep_review.name': '最近睡眠',
     'ui.ai_template.sleep_review.prompt':
@@ -85,13 +85,13 @@ const messages = defineMessages(
     'ui.ai_task.blocked.no_workouts': 'No workout is linked to this task yet. Go back and pick at least one.',
     'ui.ai_task.blocked.empty': 'The current selection covers no data. Adjust categories or workouts first.',
 
-    'ui.ai_task.warn.attachment_changed': 'An attachment\'s size differs from when it was added — confirm it is still the same original before handing off.',
+    'ui.ai_task.warn.attachment_changed': 'An attachment\'s size changed since it was added — confirm it is still the same file before handing off.',
     'ui.ai_task.warn.category_missing': 'This category has no data in the selected window; the export marks it as missing.',
     'ui.ai_task.warn.partial_coverage': 'Only part of the window has data.',
     'ui.ai_task.unknown': 'Unrecognized status note',
 
     'ui.ai_task.attach.no_redaction':
-      'On export the original is copied into the hand-off folder on your desktop, unredacted. Make sure you are happy to give it to the chosen AI.',
+      'On export, originals are copied to the desktop handoff folder unredacted. Only share them with the chosen AI if you are comfortable with that.',
 
     'ui.ai_template.recovery_run.name': 'Recovery run',
     'ui.ai_template.recovery_run.prompt':
@@ -116,7 +116,7 @@ const messages = defineMessages(
     fallbackIssue: 'A status note could not be recognized',
   },
   {
-    'ui.ai_task.cat.workout': 'Entrenamientos del periodo',
+    'ui.ai_task.cat.workout': 'Entrenamientos en la ventana',
     'ui.ai_task.cat.sleep': 'Sueño',
     'ui.ai_task.cat.recovery': 'Recuperación',
     'ui.ai_task.cat.heart_rate': 'Frecuencia cardíaca',
@@ -126,29 +126,29 @@ const messages = defineMessages(
     'ui.ai_task.cat.attachment': 'Adjuntos',
 
     'ui.ai_task.prompt.coverage_note':
-      'La cobertura siguiente la midió ZeppBridge en este equipo. Los días sin datos están marcados como faltantes: no los deduzcas ni los inventes.',
+      'A continuación, la cobertura real y las ventanas de tiempo que ZeppBridge midió en este equipo; los días sin datos están marcados como tal: no los deduzcas ni los inventes.',
 
-    'ui.ai_task.blocked.attachment_missing': 'Un adjunto original ya no se encuentra. Vuelve a elegir el archivo o quita la referencia.',
-    'ui.ai_task.blocked.no_workouts': 'La tarea aún no tiene entrenamientos. Vuelve y elige al menos uno.',
-    'ui.ai_task.blocked.empty': 'La selección actual no cubre ningún dato. Ajusta categorías o entrenamientos primero.',
+    'ui.ai_task.blocked.attachment_missing': 'Falta el archivo adjunto original. Vuelve a seleccionarlo o quita la referencia.',
+    'ui.ai_task.blocked.no_workouts': 'La tarea no tiene entrenamientos vinculados. Vuelve y selecciona al menos uno.',
+    'ui.ai_task.blocked.empty': 'La selección actual no abarca datos. Ajusta las categorías o entrenamientos primero.',
 
-    'ui.ai_task.warn.attachment_changed': 'El tamaño de un adjunto difiere del que tenía al añadirse: confirma que sigue siendo el mismo original.',
-    'ui.ai_task.warn.category_missing': 'Esta categoría no tiene datos en la ventana elegida; la exportación lo marca como faltante.',
-    'ui.ai_task.warn.partial_coverage': 'Solo parte de la ventana tiene datos.',
+    'ui.ai_task.warn.attachment_changed': 'El tamaño del adjunto cambió desde que se agregó; confirma que sigue siendo el mismo archivo antes de pasarlo a la IA.',
+    'ui.ai_task.warn.category_missing': 'Esta categoría no tiene datos en la ventana seleccionada; la exportación la marcará como faltante.',
+    'ui.ai_task.warn.partial_coverage': 'Solo parte de la ventana contiene datos.',
     'ui.ai_task.unknown': 'Nota de estado no reconocida',
 
     'ui.ai_task.attach.no_redaction':
-      'Al exportar, el original se copia sin redactar en la carpeta de entrega del escritorio. Confirma que quieres dárselo a la IA elegida.',
+      'Al exportar, el original se copia sin anonimizar a la carpeta de entrega en el escritorio. Confirma que deseas compartirlo con la IA elegida.',
 
     'ui.ai_template.recovery_run.name': 'Carrera de recuperación',
     'ui.ai_template.recovery_run.prompt':
-      'Esta fue una sesión de recuperación. Con las dos semanas previas de sueño, recuperación y frecuencia cardíaca, evalúa si la intensidad encajó con mi estado y sugiere el entrenamiento de las próximas 48 horas.',
-    'ui.ai_template.long_run_compare.name': 'Comparación de tiradas largas',
+      'Esta fue una sesión de recuperación. Con el sueño, la recuperación y la frecuencia cardíaca de las dos semanas previas, evalúa: ¿la intensidad encajó con mi nivel de recuperación actual? ¿Cómo entrenar las próximas 48 horas?',
+    'ui.ai_template.long_run_compare.name': 'Comparación de carreras largas',
     'ui.ai_template.long_run_compare.prompt':
-      'Compara estas tiradas largas: deriva de ritmo/frecuencia cardíaca, esfuerzo percibido y contexto de recuperación. ¿Cuál fue más eficiente y cómo ajusto la próxima?',
+      'Compara estas carreras largas: deriva de ritmo/frecuencia cardíaca, esfuerzo percibido y recuperación. ¿Cuál fue más eficiente y qué intensidad programar para la próxima?',
     'ui.ai_template.hr_drift.name': 'Deriva de frecuencia cardíaca',
     'ui.ai_template.hr_drift.prompt':
-      'Analiza la deriva de frecuencia cardíaca de esta sesión: el aumento a ritmo constante, valorado con dos semanas de sueño y carga — ¿fatiga, clima o cambio de forma?',
+      'Analiza la deriva de frecuencia cardíaca de esta sesión: el aumento a ritmo constante, valorado con dos semanas de sueño y carga. ¿Fatiga, clima o cambio de forma?',
 
     'ui.ai_template.sleep_review.name': 'Sueño reciente',
     'ui.ai_template.sleep_review.prompt':

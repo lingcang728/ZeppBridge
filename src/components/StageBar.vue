@@ -19,7 +19,7 @@ const messages = defineMessages(
     summaryAria: 'Sleep stage share',
   },
   {
-    notProvided: 'Sin datos',
+    notProvided: 'No proporcionado',
     zeroMinutes: '0 min',
     hypnogramAria: 'Cronología de las fases del sueño',
     summaryAria: 'Proporción de fases del sueño',

@@ -23,7 +23,7 @@ describe('failed chunk reason', () => {
     const text = failedChunkText(REAL_ROW);
     expect(text).not.toMatch(CHINESE);
     expect(text).toBe(
-      'The cloud returned a payload, but no usable records could be parsed from it',
+      'The cloud returned a payload, but no usable records were parsed',
     );
   });
 

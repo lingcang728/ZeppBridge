@@ -6,19 +6,19 @@ type UnknownRecord = Record<string, unknown>;
 
 const messages = defineMessages(
   {
-    desktopOnly: '请使用桌面应用',
-    genericFailure: '操作未完成，请稍后重试',
-    timedOut: '请求超时，请确认网络与 Zepp 区域后重试。',
+    desktopOnly: '需要桌面应用',
+    genericFailure: '操作未完成，稍后重试',
+    timedOut: '请求超时，确认网络与 Zepp 区域后重试。',
   },
   {
     desktopOnly: 'Use the desktop app',
-    genericFailure: "That didn't go through. Try again in a moment",
-    timedOut: 'The request timed out. Check your network and the Zepp region, then try again.',
+    genericFailure: 'Action failed. Try again shortly',
+    timedOut: 'Request timed out. Check your network and the Zepp region, then try again.',
   },
   {
-    desktopOnly: 'Usa la app de escritorio',
-    genericFailure: 'No se pudo completar. Inténtalo de nuevo en un momento',
-    timedOut: 'La solicitud tardó demasiado. Revisa tu conexión y la región de Zepp, e inténtalo de nuevo.',
+    desktopOnly: 'Requiere la app de escritorio',
+    genericFailure: 'No se pudo completar; reintenta en un momento',
+    timedOut: 'Tiempo de espera agotado. Revisa tu red y la región de Zepp, y reintenta.',
   },
   'lib/bridge/errors',
 );

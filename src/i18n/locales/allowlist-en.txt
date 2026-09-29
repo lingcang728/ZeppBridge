@@ -224,6 +224,9 @@ lib/aiTask/metrics.unit_s
 lib/aiTask/metrics.vo2max
 views/settings/deck.secMcp
 components/overview/DataReadyCapsule.streamSeparator
+components/overview/PinnedMetrics.unitBpm
+components/overview/PinnedMetrics.unitKcal
+components/overview/PinnedMetrics.unitMin
 
 # ru
 components/HeartRateZonePicker.basesSeparator

@@ -20,7 +20,7 @@ const t = useMessages(settingsMessages);
 const n = useMessages(defineMessages(
   {
     nameTitle: '交给 AI 的文件命名',
-    nameSub: '每次导出都按这个规则起名，AI 看文件名就知道是哪段时间、哪些数据。',
+    nameSub: '每次导出按这个规则起名，看文件名就知道是哪段时间、哪些数据。',
     ruleRange: '日期范围 + 内容',
     ruleTask: '任务名 + 时刻',
     ruleApp: 'ZeppBridge + 日期',
@@ -29,7 +29,7 @@ const n = useMessages(defineMessages(
   },
   {
     nameTitle: 'AI handoff file names',
-    nameSub: 'Every export is named by this rule, so the AI can tell the period and data from the file name.',
+    nameSub: 'Every export follows this rule — the file name says the period and the data.',
     ruleRange: 'Date range + content',
     ruleTask: 'Task name + time',
     ruleApp: 'ZeppBridge + date',

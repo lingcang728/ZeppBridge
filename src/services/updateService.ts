@@ -3,9 +3,9 @@ import { defineMessages, messagesOf } from '../i18n';
 import { toUserMessage } from '../lib/bridge';
 
 const updateMessages = defineMessages(
-  { nothingToInstall: '没有可安装的更新，请重新检查。' },
-  { nothingToInstall: 'There is no update to install. Check again.' },
-  { nothingToInstall: 'No hay ninguna actualización para instalar. Vuelve a revisar.' },
+  { nothingToInstall: '没有可安装的更新，再检查一次。' },
+  { nothingToInstall: 'No update to install. Check again.' },
+  { nothingToInstall: 'Sin actualizaciones para instalar; revisa de nuevo.' },
   'services/updateService',
 );
 
