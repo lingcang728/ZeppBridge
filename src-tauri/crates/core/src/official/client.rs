@@ -20,6 +20,13 @@ pub enum ClaimOutcome {
     Expired,
 }
 
+/// 官方资料里我们用得到的两样：用户编号（核对身份）和昵称（让用户认出是哪个账号）。
+#[derive(Debug, Clone)]
+pub struct OfficialProfile {
+    pub user_id: String,
+    pub nickname: Option<String>,
+}
+
 #[derive(Debug)]
 pub enum RefreshOutcome {
     Ready(OfficialTokens),
@@ -152,7 +159,7 @@ impl OfficialClient {
     }
 
     /// `GET /users/-/profile`：核对这把令牌确实能用、属于哪个用户。
-    pub async fn profile_user_id(&self, access_token: &str) -> Result<String> {
+    pub async fn profile(&self, access_token: &str) -> Result<OfficialProfile> {
         let response = self
             .http
             .get(format!("{}/users/-/profile", self.api_base))
@@ -170,11 +177,16 @@ impl OfficialClient {
             });
         }
         let body: serde_json::Value = response.json().await?;
-        match body.get("userId") {
-            Some(serde_json::Value::String(id)) if !id.is_empty() => Ok(id.clone()),
-            Some(serde_json::Value::Number(id)) => Ok(id.to_string()),
-            _ => Err(ZeppBridgeError::ParseError("官方资料里没有用户编号".into())),
-        }
+        let user_id = match body.get("userId") {
+            Some(serde_json::Value::String(id)) if !id.is_empty() => id.clone(),
+            Some(serde_json::Value::Number(id)) => id.to_string(),
+            _ => return Err(ZeppBridgeError::ParseError("官方资料里没有用户编号".into())),
+        };
+        let nickname = body
+            .get("nickName")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_string);
+        Ok(OfficialProfile { user_id, nickname })
     }
 
     /// 在 Zepp 那边撤销授权。断开连接时调用；失败不影响本机清掉令牌。

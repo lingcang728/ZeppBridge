@@ -10,7 +10,7 @@
 mod client;
 mod store;
 
-pub use client::{ClaimOutcome, OfficialClient, RefreshOutcome};
+pub use client::{ClaimOutcome, OfficialClient, OfficialProfile, RefreshOutcome};
 pub use store::{OfficialMeta, OfficialStore};
 
 use crate::models::{error::Result, ZeppBridgeError};

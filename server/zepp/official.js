@@ -154,51 +154,6 @@ export function jsonResponse(payload, status = 200, extraHeaders = {}) {
   });
 }
 
-const PAGES = {
-  ready: {
-    title: '授权成功 · Authorized',
-    zh: '授权成功。回到 ZeppBridge，它会自动完成连接；这个页面可以关掉了。',
-    en: 'Authorized. Go back to ZeppBridge — it finishes connecting by itself. You can close this page.',
-  },
-  denied: {
-    title: '授权已取消 · Cancelled',
-    zh: '你没有同意授权，ZeppBridge 什么也没拿到。需要时可以在应用里重新发起。',
-    en: 'You did not grant access, so ZeppBridge received nothing. You can start again from the app.',
-  },
-  expired: {
-    title: '授权已过期 · Expired',
-    zh: '这次授权已过期或已经用过。请回到 ZeppBridge 重新点一次「用 Zepp 账号授权」。',
-    en: 'This authorization expired or was already used. Go back to ZeppBridge and start again.',
-  },
-  failed: {
-    title: '授权没有完成 · Not completed',
-    zh: 'Zepp 没有接受这次授权，ZeppBridge 什么也没保存。请回到应用重试。',
-    en: 'Zepp did not accept this authorization, so nothing was saved. Go back to the app and try again.',
-  },
-};
-
-/**
- * 给浏览器看的结果页。只放固定文案：code、state、令牌、错误描述一律不回显。
- */
-export function resultPage(kind, status = 200) {
-  const page = PAGES[kind] ?? PAGES.failed;
-  const body = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">`
-    + `<meta name="viewport" content="width=device-width,initial-scale=1"><title>${page.title}</title>`
-    + '<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0f1411;color:#e8efe9;'
-    + 'font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}main{max-width:32rem;padding:2rem}'
-    + 'h1{font-size:1.25rem;margin:0 0 1rem}p{margin:.5rem 0;color:#b8c4bb}'
-    + '@media (prefers-color-scheme:light){body{background:#f4f7f4;color:#152019}p{color:#3d4a41}}</style>'
-    + `</head><body><main><h1>${page.title}</h1><p>${page.zh}</p><p>${page.en}</p></main></body></html>`;
-  return new Response(body, {
-    status,
-    headers: {
-      'Content-Type': 'text/html; charset=utf-8',
-      'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'",
-      ...SECURITY_HEADERS,
-    },
-  });
-}
-
 /** 过期的待领授权顺手清掉：每次有人来都扫一遍，不需要定时任务。 */
 export function purgeExpired(db, now) {
   return db.prepare('DELETE FROM oauth_pending WHERE created_at < ?').bind(now - PENDING_TTL_MS).run();

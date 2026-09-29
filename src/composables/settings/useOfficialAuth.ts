@@ -8,7 +8,8 @@ import type { OfficialStatus } from '../../types';
 import type { SettingsFeedback } from './useSettingsFeedback';
 
 const idle = (): OfficialStatus => ({
-  state: 'idle', message_code: null, message: null, user_id_masked: null, connected_at: null,
+  state: 'idle', message_code: null, message: null, user_id_masked: null, nickname: null, connected_at: null,
+  authorize_url: null,
 });
 
 /**
@@ -75,6 +76,20 @@ export const createOfficialAuth = (feedback: SettingsFeedback) => {
     }
   };
 
+  /** 「复制授权链接」：在无痕窗口里打开就能换一个 Zepp 账号登录。 */
+  const linkCopied = ref(false);
+  const copyLink = async () => {
+    const url = status.value.authorize_url;
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      linkCopied.value = true;
+      window.setTimeout(() => { linkCopied.value = false; }, 2400);
+    } catch (cause) {
+      failureText.value = toUserMessage(cause, t.value.officialFailed);
+    }
+  };
+
   const attach = async () => {
     try {
       unlisten = await backend.listen<OfficialStatus>('official://status', apply);
@@ -88,7 +103,10 @@ export const createOfficialAuth = (feedback: SettingsFeedback) => {
     unlisten = undefined;
   };
 
-  return { status, busy, failureText, waiting, connected, needsReauth, start, cancel, disconnect, attach, detach };
+  return {
+    status, busy, failureText, waiting, connected, needsReauth, linkCopied,
+    start, cancel, disconnect, copyLink, attach, detach,
+  };
 };
 
 export type OfficialAuth = ReturnType<typeof createOfficialAuth>;

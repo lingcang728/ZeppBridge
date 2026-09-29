@@ -22,6 +22,9 @@ pub struct OfficialMeta {
     /// 刷新被 Zepp 明确拒绝：令牌已清掉，等用户重新授权。
     #[serde(default)]
     pub needs_reauth: bool,
+    /// 官方资料里的昵称：设置页用它说清「连的是哪个账号」。只存本机。
+    #[serde(default)]
+    pub nickname: Option<String>,
 }
 
 pub struct OfficialStore {
@@ -92,10 +95,25 @@ impl OfficialStore {
         let previous = self.meta()?.filter(|meta| meta.user_id == tokens.user_id);
         self.write_meta(&OfficialMeta {
             user_id: tokens.user_id.clone(),
-            connected_at: previous.map_or(connected_at, |meta| meta.connected_at),
+            connected_at: previous
+                .as_ref()
+                .map_or(connected_at, |meta| meta.connected_at),
             expires_at: tokens.expires_at,
             needs_reauth: false,
+            nickname: previous.and_then(|meta| meta.nickname),
         })
+    }
+
+    /// 记下官方资料里的昵称（授权成功后调用）。空白昵称不记。
+    pub fn set_nickname(&self, nickname: Option<&str>) -> Result<()> {
+        let Some(mut meta) = self.meta()? else {
+            return Ok(());
+        };
+        meta.nickname = nickname
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+            .map(str::to_string);
+        self.write_meta(&meta)
     }
 
     /// 读出完整令牌集。没连接过、或者令牌已被清掉时返回 `None`。

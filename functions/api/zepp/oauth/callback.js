@@ -1,6 +1,7 @@
 import {
-  PENDING_TTL_MS, exchangeCode, isState, jsonResponse, officialConfig, resultPage, seal, sha256Hex,
+  PENDING_TTL_MS, exchangeCode, isState, jsonResponse, officialConfig, seal, sha256Hex,
 } from '../../../../server/zepp/official.js';
+import { resultPage as page } from '../../../../server/zepp/pages.js';
 
 // Zepp 授权后回到这里（控制台登记的 Authorization Callback）。
 // 只认 /start 登记过、没过期、还没用过的 state；code 用 client_secret 换成令牌后
@@ -25,17 +26,17 @@ export async function onRequest({ request, env }) {
   if (request.method === 'HEAD') {
     return jsonResponse({ error: 'method_not_allowed' }, 405, { Allow: 'GET' });
   }
-  if (!config) return resultPage('failed', 503);
+  if (!config) return page('failed', 503, request);
 
   const state = params.get('state');
-  if (!isState(state)) return resultPage('expired', 400);
+  if (!isState(state)) return page('expired', 400, request);
   const stateHash = await sha256Hex(state);
   const row = await config.db
     .prepare('SELECT status, created_at FROM oauth_pending WHERE state_hash = ?')
     .bind(stateHash)
     .first();
   if (!row || row.status !== 'pending' || row.created_at < Date.now() - PENDING_TTL_MS) {
-    return resultPage('expired', 400);
+    return page('expired', 400, request);
   }
 
   const settle = (status, error = null, tokensEnc = null) => config.db
@@ -47,7 +48,7 @@ export async function onRequest({ request, env }) {
   const code = params.get('code');
   if (params.get('error') || !code) {
     await settle('denied', 'access_denied');
-    return resultPage('denied');
+    return page('denied', 200, request);
   }
 
   let exchanged;
@@ -55,12 +56,12 @@ export async function onRequest({ request, env }) {
     exchanged = await exchangeCode(config, code);
   } catch {
     await settle('failed', 'exchange_unreachable');
-    return resultPage('failed', 502);
+    return page('failed', 502, request);
   }
   if (!exchanged.tokens) {
     await settle('failed', `exchange_http_${exchanged.status}`);
-    return resultPage('failed', 502);
+    return page('failed', 502, request);
   }
   await settle('ready', null, await seal(config.relayKey, exchanged.tokens));
-  return resultPage('ready');
+  return page('ready', 200, request);
 }

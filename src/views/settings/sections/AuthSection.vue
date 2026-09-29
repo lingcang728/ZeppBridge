@@ -40,9 +40,15 @@ const needsAttention = computed(() =>
           <span class="s-row-title">{{ t.officialTitle }}</span>
           <span class="s-row-sub">{{ official.waiting.value ? t.officialWaiting : t.officialSub }}</span>
           <span v-if="official.connected.value" class="s-row-sub">{{ t.officialNote }}</span>
+          <span v-if="official.waiting.value && official.status.value.authorize_url" class="s-row-sub">{{ t.copyAuthLinkHint }}</span>
         </div>
         <div class="s-row-control">
-          <button v-if="official.waiting.value" class="button secondary" type="button" :disabled="official.busy.value" @click="official.cancel">{{ t.authCancelLogin }}</button>
+          <template v-if="official.waiting.value">
+            <button v-if="official.status.value.authorize_url" class="button secondary" type="button" @click="official.copyLink">
+              <Icon :name="official.linkCopied.value ? 'check' : 'link'" :size="14" />{{ official.linkCopied.value ? t.linkCopied : t.copyAuthLink }}
+            </button>
+            <button class="button secondary" type="button" :disabled="official.busy.value" @click="official.cancel">{{ t.authCancelLogin }}</button>
+          </template>
           <template v-else-if="official.connected.value">
             <span class="state-dot on">{{ t.officialConnected }}<template v-if="official.status.value.user_id_masked"> · {{ official.status.value.user_id_masked }}</template></span>
             <button class="button secondary" type="button" :disabled="official.busy.value" @click="official.disconnect">{{ t.officialDisconnect }}</button>

@@ -1,8 +1,9 @@
 import {
   MAX_PENDING, authorizeUrl, isHash, isState, jsonResponse, officialConfig, purgeExpired, sha256Hex,
 } from '../../../../server/zepp/official.js';
+import { startPage } from '../../../../server/zepp/pages.js';
 
-// 桌面端用系统浏览器打开这里：记下这次授权（state 只存哈希），再把人送去 Zepp 授权页。
+// 桌面端用系统浏览器打开这里：记下这次授权（state 只存哈希），给一页说明，再由用户点去 Zepp 授权页。
 // App ID 由这里拼进授权地址，所以桌面二进制里没有它。
 export async function onRequest({ request, env }) {
   if (request.method !== 'GET') {
@@ -32,12 +33,6 @@ export async function onRequest({ request, env }) {
     .run();
   if (!inserted?.meta?.changes) return jsonResponse({ error: 'invalid_request' }, 400);
 
-  return new Response(null, {
-    status: 302,
-    headers: {
-      Location: authorizeUrl(config.clientId, state),
-      'Cache-Control': 'no-store',
-      'Referrer-Policy': 'no-referrer',
-    },
-  });
+  // 不直接跳走：先给一页说明（连的是什么、下一步去哪、怎么换账号），用户点了再去 Zepp。
+  return startPage(request, authorizeUrl(config.clientId, state));
 }

@@ -23,8 +23,14 @@ pub const OFFICIAL_EVENT: &str = "official://status";
 /// 领令牌的间隔。用户在浏览器里点完同意到桌面端发现，最多差这么久。
 const CLAIM_INTERVAL: Duration = Duration::from_secs(2);
 
-/// 正在进行的那次授权的取消旗标。同一时间只有一次。
-static FLOW: Mutex<Option<Arc<AtomicBool>>> = Mutex::new(None);
+/// 正在进行的那次授权：取消旗标，和这次授权的起始地址（界面「复制授权链接」用）。
+/// 同一时间只有一次。
+struct Flow {
+    cancel: Arc<AtomicBool>,
+    start_url: String,
+}
+
+static FLOW: Mutex<Option<Flow>> = Mutex::new(None);
 
 #[derive(Debug, Clone, Serialize)]
 pub struct OfficialStatus {
@@ -36,7 +42,12 @@ pub struct OfficialStatus {
     pub message: Option<String>,
     /// 只露后四位。
     pub user_id_masked: Option<String>,
+    /// 官方资料里的昵称，让用户认出连的是哪个账号。
+    pub nickname: Option<String>,
     pub connected_at: Option<i64>,
+    /// 等待授权时的起始地址。里面只有 state 和领取密钥的哈希，可以放心复制到
+    /// 无痕窗口里打开（换账号用）。
+    pub authorize_url: Option<String>,
 }
 
 impl OfficialStatus {
@@ -46,7 +57,9 @@ impl OfficialStatus {
             message_code: Some(code.into()),
             message: Some(message.into()),
             user_id_masked: None,
+            nickname: None,
             connected_at: None,
+            authorize_url: None,
         }
     }
 }
@@ -63,21 +76,27 @@ fn mask(user_id: &str) -> String {
     format!("••••{tail}")
 }
 
-fn flow_running() -> bool {
-    FLOW.lock().map(|flow| flow.is_some()).unwrap_or(false)
+/// 正在等待的那次授权的起始地址；没有在等时为 `None`。
+fn waiting_url() -> Option<String> {
+    FLOW.lock()
+        .ok()
+        .and_then(|flow| flow.as_ref().map(|flow| flow.start_url.clone()))
 }
 
 fn stored_status(data_dir: &std::path::Path) -> OfficialStatus {
     let meta = OfficialStore::new(data_dir).meta().ok().flatten();
-    let waiting = flow_running();
-    match meta {
-        _ if waiting => OfficialStatus {
+    if let Some(url) = waiting_url() {
+        return OfficialStatus {
             state: "waiting".into(),
             message_code: None,
             message: None,
             user_id_masked: None,
+            nickname: None,
             connected_at: None,
-        },
+            authorize_url: Some(url),
+        };
+    }
+    match meta {
         Some(meta) => OfficialStatus {
             state: if meta.needs_reauth {
                 "needs_reauth"
@@ -88,14 +107,18 @@ fn stored_status(data_dir: &std::path::Path) -> OfficialStatus {
             message_code: None,
             message: None,
             user_id_masked: Some(mask(&meta.user_id)),
+            nickname: meta.nickname.clone(),
             connected_at: Some(meta.connected_at),
+            authorize_url: None,
         },
         None => OfficialStatus {
             state: "idle".into(),
             message_code: None,
             message: None,
             user_id_masked: None,
+            nickname: None,
             connected_at: None,
+            authorize_url: None,
         },
     }
 }
@@ -116,6 +139,8 @@ pub async fn start_official_login(
     app: AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<OfficialStatus, AppError> {
+    let request = AuthorizationRequest::new()
+        .map_err(|_| AppError::new("err.official.failed", "无法生成这次授权的随机值"))?;
     let cancel = {
         let mut flow = FLOW.lock().map_err(|_| {
             AppError::new("err.official.failed", "官方授权状态异常，请重启应用后再试")
@@ -124,18 +149,11 @@ pub async fn start_official_login(
             return Ok(stored_status(&state.data_dir));
         }
         let cancel = Arc::new(AtomicBool::new(false));
-        *flow = Some(cancel.clone());
+        *flow = Some(Flow {
+            cancel: cancel.clone(),
+            start_url: request.start_url(),
+        });
         cancel
-    };
-    let request = match AuthorizationRequest::new() {
-        Ok(request) => request,
-        Err(_) => {
-            clear_flow();
-            return Err(AppError::new(
-                "err.official.failed",
-                "无法生成这次授权的随机值",
-            ));
-        }
     };
     if app
         .opener()
@@ -178,7 +196,7 @@ fn clear_flow_if(mine: &Arc<AtomicBool>) {
     if let Ok(mut flow) = FLOW.lock() {
         if flow
             .as_ref()
-            .is_some_and(|current| Arc::ptr_eq(current, mine))
+            .is_some_and(|current| Arc::ptr_eq(&current.cancel, mine))
         {
             *flow = None;
         }
@@ -267,8 +285,12 @@ async fn save_verified(
     client: &OfficialClient,
     mut tokens: zeppbridge_core::official::OfficialTokens,
 ) -> Option<OfficialStatus> {
-    match client.profile_user_id(&tokens.access_token).await {
-        Ok(user_id) => tokens.user_id = user_id,
+    let mut nickname = None;
+    match client.profile(&tokens.access_token).await {
+        Ok(profile) => {
+            tokens.user_id = profile.user_id;
+            nickname = profile.nickname;
+        }
         Err(ZeppBridgeError::NeedsReauth(_)) => {
             return Some(OfficialStatus::failed(
                 "err.official.rejected",
@@ -279,7 +301,11 @@ async fn save_verified(
     }
     let store = OfficialStore::new(data_dir);
     match store.save(&tokens, chrono::Utc::now().timestamp()) {
-        Ok(()) => None,
+        Ok(()) => {
+            // 昵称只是显示用：记不下来不影响授权本身。
+            let _ = store.set_nickname(nickname.as_deref());
+            None
+        }
         Err(_) => Some(OfficialStatus::failed(
             "err.official.store",
             "官方授权成功了，但令牌没能存进系统凭据存储",
@@ -292,8 +318,8 @@ pub async fn cancel_official_login(
     state: tauri::State<'_, AppState>,
 ) -> Result<OfficialStatus, AppError> {
     if let Ok(flow) = FLOW.lock() {
-        if let Some(cancel) = flow.as_ref() {
-            cancel.store(true, Ordering::SeqCst);
+        if let Some(current) = flow.as_ref() {
+            current.cancel.store(true, Ordering::SeqCst);
         }
     }
     clear_flow();

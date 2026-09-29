@@ -128,8 +128,13 @@ test('the full flow hands the tokens to the desktop exactly once, and never to t
   const { state, secret, claimHash } = newPair();
 
   const started = await get(start, env, 'start', `?state=${state}&claim=${claimHash}`);
-  assert.equal(started.status, 302);
-  const location = started.headers.get('location');
+  // 先给一页说明，用户点了才去 Zepp：链接在页面里，不是 302。
+  assert.equal(started.status, 200);
+  assert.match(started.headers.get('content-type'), /^text\/html/);
+  const startHtml = await started.text();
+  assert.doesNotMatch(startHtml, new RegExp(SECRET));
+  assert.doesNotMatch(startHtml, new RegExp(claimHash));
+  const location = startHtml.match(/<a class="go" href="([^"]+)"/)[1].replaceAll('&amp;', '&');
   assert.ok(location.startsWith('https://user.zepp.com/oauth2/index.html#/login?'));
   assert.match(location, new RegExp(`client_id=${CLIENT_ID}`));
   assert.match(location, /response_type=code/);
@@ -232,7 +237,7 @@ test('start rejects malformed input and duplicate states', async () => {
   for (const query of ['', `?state=${state}`, `?state=bad&claim=${claimHash}`, `?state=${state}&claim=XYZ`]) {
     assert.equal((await get(start, env, 'start', query)).status, 400);
   }
-  assert.equal((await get(start, env, 'start', `?state=${state}&claim=${claimHash}`)).status, 302);
+  assert.equal((await get(start, env, 'start', `?state=${state}&claim=${claimHash}`)).status, 200);
   assert.equal((await get(start, env, 'start', `?state=${state}&claim=${claimHash}`)).status, 400);
 });
 
@@ -263,4 +268,25 @@ test('refresh adds the secret server-side and reports a dead grant distinctly', 
   upstream.mock.mockImplementation(async () => new Response('{}', { status: 500 }));
   const flaky = await post(refresh, env, 'refresh', { access_token: 'old-access', refresh_token: 'old-refresh' });
   assert.equal(flaky.status, 502);
+});
+
+test('the pages follow the browser language and never echo parameters', async (context) => {
+  context.mock.method(globalThis, 'fetch', () => assert.fail('Unexpected outbound request'));
+  const env = configuredEnv();
+  const { state, claimHash } = newPair();
+  const zh = await start({
+    request: new Request(url('start', `?state=${state}&claim=${claimHash}`), { headers: { 'Accept-Language': 'zh-CN,zh;q=0.9' } }),
+    env,
+  });
+  const zhHtml = await zh.text();
+  assert.match(zhHtml, /lang="zh-CN"/);
+  assert.match(zhHtml, /无痕窗口/);
+  const expired = await callback({
+    request: new Request(url('callback', `?code=fixture-code&state=${newPair().state}`), { headers: { 'Accept-Language': 'en-US' } }),
+    env,
+  });
+  const expiredHtml = await expired.text();
+  assert.match(expiredHtml, /lang="en"/);
+  assert.doesNotMatch(expiredHtml, /fixture-code/);
+  assert.match(expired.headers.get('content-security-policy'), /default-src 'none'/);
 });

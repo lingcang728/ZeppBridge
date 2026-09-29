@@ -163,6 +163,10 @@ export interface OfficialStatus {
   message: string | null;
   /** 只露后四位的官方用户编号。 */
   user_id_masked: string | null;
+  /** 官方资料里的昵称。 */
+  nickname?: string | null;
+  /** 等待授权时的起始地址（可复制到无痕窗口，换账号用）。 */
+  authorize_url?: string | null;
   connected_at: number | null;
 }
 

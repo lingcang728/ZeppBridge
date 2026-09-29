@@ -64,7 +64,11 @@ const titles = computed<Record<SettingsCardId, string>>(() => ({
 const summaries = computed<Record<SettingsCardId, string>>(() => {
   const overview = capability.capabilityOverview.value;
   return {
-    account: accountRecognized.value ? d.value.sumAccount(connectionLabel.value, deviceModels.value.length) : d.value.sumAccountOff,
+    account: accountRecognized.value
+      ? d.value.sumAccount(connectionLabel.value, deviceModels.value.length)
+      : official.connected.value
+        ? d.value.sumAccount(t.value.officialConnected, deviceModels.value.length)
+        : d.value.sumAccountOff,
     sync: autoSyncEnabled.value ? d.value.sumSyncOn(autoSyncInterval.value) : d.value.sumSyncOff,
     archive: userPrefs.value?.archive_enabled ? d.value.sumArchiveOn : d.value.sumArchiveOff(retentionDays.value),
     data: overview ? d.value.sumData(capability.capabilityAvailable.value.length, overview.items.length) : d.value.sumDataLoading,
