@@ -21,7 +21,6 @@ import {
   MarkLineComponent,
   MarkPointComponent,
   TooltipComponent,
-  VisualMapComponent,
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import VChart from 'vue-echarts';
@@ -38,7 +37,6 @@ use([
   LegendComponent,
   MarkLineComponent,
   MarkPointComponent,
-  VisualMapComponent,
   CanvasRenderer,
 ]);
 registerTheme('zeppbridge-dark', zeppThemeDark);
