@@ -21,12 +21,13 @@ export async function onRequest({ request, env }) {
   } catch {
     return jsonResponse({ error: 'invalid_request' }, 400);
   }
-  const { access_token: accessToken, refresh_token: refreshToken } = body ?? {};
-  if (!isToken(accessToken) || !isToken(refreshToken)) return jsonResponse({ error: 'invalid_request' }, 400);
+  // access_token 桌面端也会带来，但刷新只用得到 refresh_token。
+  const { refresh_token: refreshToken } = body ?? {};
+  if (!isToken(refreshToken)) return jsonResponse({ error: 'invalid_request' }, 400);
 
   let result;
   try {
-    result = await refreshTokens(config, accessToken, refreshToken);
+    result = await refreshTokens(config, refreshToken);
   } catch {
     return jsonResponse({ error: 'upstream_unreachable' }, 502);
   }

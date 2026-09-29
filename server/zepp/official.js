@@ -115,17 +115,22 @@ export function exchangeCode(config, code) {
   });
 }
 
-export function refreshTokens(config, accessToken, refreshToken) {
+// 刷新时 Authorization 里放的是 **refresh_token**。官方文档写的是 access_token，
+// 但 2026-09-29 实测：放 access_token 一律回 401，放 refresh_token 才成功。
+// 放错的后果是令牌 90 天后刷新不动，每个用户都得重新授权。
+export function refreshTokens(config, refreshToken) {
   return postForm(REFRESH_URL, {
     client_id: config.clientId,
     client_secret: config.clientSecret,
     grant_type: 'refresh_token',
     refresh_token: refreshToken,
-  }, { Authorization: `Bearer ${accessToken}` });
+  }, { Authorization: `Bearer ${refreshToken}` });
 }
 
 export function authorizeUrl(clientId, state) {
+  // redirect_uri 文档说可省略，但实测带上它的授权能走通；不赌省略也行。
   const query = `client_id=${encodeURIComponent(clientId)}&response_type=code`
+    + `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`
     + `&state=${encodeURIComponent(state)}&token=%5B%22access%22,%22refresh%22%5D`;
   return `${AUTHORIZE_URL}?${query}`;
 }

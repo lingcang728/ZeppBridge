@@ -133,6 +133,7 @@ test('the full flow hands the tokens to the desktop exactly once, and never to t
   assert.ok(location.startsWith('https://user.zepp.com/oauth2/index.html#/login?'));
   assert.match(location, new RegExp(`client_id=${CLIENT_ID}`));
   assert.match(location, /response_type=code/);
+  assert.match(location, /redirect_uri=https%3A%2F%2Fzeppbridge\.pages\.dev%2Fapi%2Fzepp%2Foauth%2Fcallback/);
   assert.match(location, /token=%5B%22access%22,%22refresh%22%5D/);
   assert.doesNotMatch(location, new RegExp(SECRET));
   assert.doesNotMatch(location, new RegExp(claimHash));
@@ -239,7 +240,8 @@ test('refresh adds the secret server-side and reports a dead grant distinctly', 
   const env = configuredEnv();
   const upstream = context.mock.method(globalThis, 'fetch', async (target, init) => {
     assert.equal(target, 'https://auth.zepp.com/v2/oauth2/refresh_token');
-    assert.equal(init.headers.Authorization, 'Bearer old-access');
+    // 实测：Zepp 要的是 refresh_token，放 access_token 会 401。
+    assert.equal(init.headers.Authorization, 'Bearer old-refresh');
     const form = new URLSearchParams(init.body);
     assert.equal(form.get('client_secret'), SECRET);
     assert.equal(form.get('grant_type'), 'refresh_token');
