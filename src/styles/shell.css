@@ -92,6 +92,10 @@ a { color: inherit; }
 /* 环境光：画布上两三团很淡的色晕，固定不随内容滚动。玻璃和模糊要有东西可折射，
    纯平的底色上毛玻璃看起来只是「半透明灰」。 */
 .app-body { position: relative; isolation: isolate; }
+/* 桌面应用不该一双击就把按钮、标题刷成一片蓝：界面文字默认不可选。
+   真正要复制的东西（输入框、代码 / 配置片段、标了 .selectable 的块）照常可选。 */
+.app-body { -webkit-user-select: none; user-select: none; }
+.app-body :is(input, textarea, [contenteditable], pre, code, kbd, .selectable) { -webkit-user-select: text; user-select: text; }
 .app-body::before {
   content: '';
   position: absolute;
@@ -146,15 +150,16 @@ a { color: inherit; }
 .page-left-enter-from { opacity: 0; transform: translateX(24px); }
 .page-right-enter-from { opacity: 0; transform: translateX(-24px); }
 .page-forward-leave-to, .page-back-leave-to, .page-left-leave-to, .page-right-leave-to { opacity: 0; }
-/* 展开：新页压在旧页上面长出来（旧页是绝对定位的，不抬 z-index 会盖住新页）；旧页等新页
-   铺开大半再淡掉。enter-active 的那条过渡只是占位，让层次保持到 JS 的形变放完。 */
-[class*='page-'].page-expand-enter-active { position: relative; z-index: 2; transition: opacity 540ms linear; }
+/* 展开：幽灵板（lib/motion/ghost.ts）从卡长到整屏盖住旧页，新页在它后半程淡入（usePageMorph.onEnter）。
+   这里只管层次和旧页淡出；enter-active 那条过渡是占位，让层次保持到 JS 动画放完。 */
+[class*='page-'].page-expand-enter-active { position: relative; z-index: 2; transition: opacity 380ms linear; }
 .page-expand-enter-from { opacity: .999; }
-[class*='page-'].page-expand-leave-active { z-index: 1; transition: opacity 260ms ease 240ms; }
+[class*='page-'].page-expand-leave-active { z-index: 1; transition: opacity 160ms ease 120ms; }
 .page-expand-leave-to { opacity: 0; }
-/* 收回：来处那一页原样就在底下，离场的详情页浮在上面缩回那张卡（usePageMorph.onLeave）。 */
-[class*='page-'].page-collapse-enter-active { transition: none; }
-[class*='page-'].page-collapse-leave-active { z-index: 2; transition: opacity 580ms linear; }
+/* 返回：详情页淡出（usePageMorph.onLeave），来处页从底下淡入——不再把整页缩回卡里。 */
+[class*='page-'].page-collapse-enter-active { transition: opacity 240ms ease 60ms; }
+.page-collapse-enter-from { opacity: 0; }
+[class*='page-'].page-collapse-leave-active { z-index: 2; transition: opacity 220ms linear; }
 .page-collapse-leave-to { opacity: .999; }
 .page-none-enter-from, .page-none-leave-to { opacity: 0; }
 .page-host > * { transform-origin: 50% 30vh; }

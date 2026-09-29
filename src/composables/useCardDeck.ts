@@ -103,14 +103,14 @@ export const useCardDeck = ({ stage, card, step, reducedMotion }: CardDeckGestur
     busy.value = true;
     const current = epoch;
     const from = fromDrag ? card.value?.style.transform ?? '' : 'none';
-    await animate(card.value, flingOutFrames(direction, width(), from, vertical), 300);
+    await animate(card.value, flingOutFrames(direction, width(), from, vertical), 220);
     if (current !== epoch) return;
     for (const animation of animations) animation.cancel();
     animations.clear();
     clearInline();
     await step(direction);
     if (current !== epoch) return;
-    await animate(card.value, RISE_IN_FRAMES, 340);
+    await animate(card.value, RISE_IN_FRAMES, 240);
     if (current !== epoch) return;
     for (const animation of animations) animation.cancel();
     animations.clear();
@@ -178,8 +178,8 @@ export const useCardDeck = ({ stage, card, step, reducedMotion }: CardDeckGestur
     const current = epoch;
     busy.value = true;
     void animate(card.value, [
-      { transform: card.value?.style.transform || 'none', filter: card.value?.style.filter || 'blur(0px)' },
-      { transform: 'none', filter: 'blur(0px)' },
+      { transform: card.value?.style.transform || 'none' },
+      { transform: 'none' },
     ], 160).then(() => {
       if (current !== epoch) return;
       for (const animation of animations) animation.cancel();

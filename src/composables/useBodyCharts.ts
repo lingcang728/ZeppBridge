@@ -60,7 +60,7 @@ export const useBodyCharts = (series: Ref<Record<string, MetricSeries>>) => {
     const split = macroSplit.value;
     if (!split) return null;
     return {
-      animationDuration: 600,
+      animationDuration: 0,
       tooltip: {
         trigger: 'item',
         formatter: (params: { name: string; percent: number; data: { grams: number } }) =>
@@ -140,7 +140,7 @@ export const useBodyCharts = (series: Ref<Record<string, MetricSeries>>) => {
       data.push([point.ts, point.value]);
     });
     return {
-      animationDuration: 700,
+      animationDuration: 0,
       grid: { left: 40, right: 18, top: 16, bottom: 28 },
       tooltip: {
         trigger: 'axis',

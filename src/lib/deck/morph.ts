@@ -24,61 +24,6 @@ const r4 = (value: number) => Number(value.toFixed(4));
 
 export const centerOf = (box: Box): Point => ({ x: box.left + box.width / 2, y: box.top + box.height / 2 });
 
-/** 一张打开的大卡「缩回」成源卡时的样子：左上角对齐、按宽度等比缩小，底部裁成源卡的高度。 */
-export interface CardFrame {
-  transform: string;
-  clipPath: string;
-}
-
-/**
- * 打开 / 关上一张卡的端点帧。大卡以左上角为原点缩放（调用方要把 transform-origin
- * 设成 0 0），宽度缩到和源卡一样，再从底部裁掉多出来的部分——于是它在这一帧看起来
- * 就是源卡那么大的一块圆角板，然后长成整张大卡。`radius` 是大卡自己的圆角：缩放时
- * 圆角跟着缩，所以裁切的圆角要反向放大，看上去才和源卡一样圆。
- */
-export function collapsedFrame(from: Box, to: Box, radius: number): CardFrame {
-  const scale = to.width > 0 ? from.width / to.width : 1;
-  const visible = Math.min(to.height, scale > 0 ? from.height / scale : to.height);
-  const clipBottom = Math.max(0, to.height - visible);
-  return {
-    transform: `translate(${r2(from.left - to.left)}px, ${r2(from.top - to.top)}px) scale(${r4(scale)})`,
-    clipPath: `inset(0px 0px ${r2(clipBottom)}px 0px round ${r2(radius / Math.max(scale, 0.05))}px)`,
-  };
-}
-
-export const openFrame = (radius: number): CardFrame => ({
-  transform: 'translate(0px, 0px) scale(1)',
-  clipPath: `inset(0px 0px 0px 0px round ${r2(radius)}px)`,
-});
-
-/**
- * 容器被 `scale(a)`（外加可能的平移 e/f）缩着时，容器里某个元素去掉这层变换以后的位置。
- * 打开一张卡时总览会往后退（缩小、变糊），关卡时要知道源卡「回到原位以后」在哪儿，
- * 大卡才能准确地落回去——而不是落到它此刻缩着的位置。
- *
- * `host` 是容器此刻（变换后）的外框，`originAt` 是它 transform-origin 的比例位置：
- * 缩放不改变原点在外框里的比例位置，所以原点 = 外框上同一比例的那一点再扣掉平移。
- */
-export function unscaledBox(
-  box: Box,
-  host: Box,
-  matrix: { a: number; e: number; f: number },
-  originAt: Point = { x: 0.5, y: 0.5 },
-): Box {
-  const a = matrix.a || 1;
-  if (a === 1 && !matrix.e && !matrix.f) return box;
-  const origin = {
-    x: host.left + originAt.x * host.width - matrix.e,
-    y: host.top + originAt.y * host.height - matrix.f,
-  };
-  const map = (x: number, y: number): Point => ({
-    x: origin.x + (x - origin.x - matrix.e) / a,
-    y: origin.y + (y - origin.y - matrix.f) / a,
-  });
-  const topLeft = map(box.left, box.top);
-  return { left: topLeft.x, top: topLeft.y, width: box.width / a, height: box.height / a };
-}
-
 export interface Flight {
   /** 用 CSS `translate` 属性叠加在元素原有的 transform 之外。 */
   translate: Point;

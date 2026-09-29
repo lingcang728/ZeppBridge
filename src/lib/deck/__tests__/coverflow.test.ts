@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { COVER_VISIBLE, coverflowPose } from '../coverflow';
 
 describe('coverflowPose', () => {
-  it('stands the centre card upright and sharp', () => {
+  it('stands the centre card upright and fully visible', () => {
     const pose = coverflowPose(0, 400);
-    expect(pose).toMatchObject({ x: 0, rotate: 0, scale: 1, blur: 0, opacity: 1, dissolve: 0 });
+    expect(pose).toMatchObject({ x: 0, rotate: 0, scale: 1, opacity: 1, dissolve: 0 });
   });
 
   it('dissolves the outer edge of side cards more the further out they sit', () => {

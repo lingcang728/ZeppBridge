@@ -202,8 +202,8 @@ export const buildSeriesOption = (
   });
 
   return {
-    // 切范围时整张重画（见 SMOOTH_CHART_UPDATE）：线从左往右扫出来。
-    animationDuration: 560,
+    // 首次出现不扫入（省下整张画布逐帧重画）；切范围时整张重画（见 SMOOTH_CHART_UPDATE）。
+    animationDuration: 0,
     animationEasing: 'cubicOut' as const,
     animationDurationUpdate: 360,
     animationEasingUpdate: 'cubicInOut' as const,

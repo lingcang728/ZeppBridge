@@ -7,19 +7,21 @@
 
 /* 往后退一层：绕顶边中点缩小、往下渐隐（useDeckMorph 关卡时按这个原点把缩放算回去）。
    不再淡到全透明、也不再收起高度：卡是从这一层里抽出来的，这一层就该还在后面。
-   也不再加模糊：整层卡组 blur(9px) 在 4K 高分屏上每帧都要重画，关卡时总览从模糊里浮回来
-   那半秒掉帧，大卡的收回动画跟着只剩两三帧，看上去就是「点返回凭空消失」。 */
+   模糊只在退到位以后一次性加上（is-frosted），不做模糊过渡：模糊跟着动画逐帧变，4K 屏上
+   每帧整层重画；静止的一层糊只算一次。大卡是半透明的，透出身后这层糊，就是毛玻璃——
+   拖大卡时也只是合成，不用 backdrop-filter 逐帧重算。关卡一开始就摘掉模糊。 */
 .deck-overview {
   position: relative;
   z-index: 0;
   transform-origin: 50% 0;
-  transition: opacity .4s ease, transform .52s var(--ease-out);
+  transition: opacity .28s ease, transform .3s var(--ease-out);
 }
 .deck-overview.is-receded {
-  opacity: .4;
-  transform: scale(.93);
+  opacity: .45;
+  transform: scale(.94);
   pointer-events: none;
 }
+.deck-overview.is-receded.is-frosted { filter: blur(12px); }
 
 /* ── 卡片材质（平铺与打开共用；coverflow 的卡在 DeckCoverflow 里）──
    没有描边、没有高光线：边界只靠一层很淡的亮面和柔和的投影，像浮在背景上的一块板。 */
@@ -62,7 +64,7 @@
   display: grid;
   width: min(760px, 100%);
   margin: 0 auto;
-  padding: 0 0 110px;
+  padding: 0 0 40px;
   list-style: none;
 }
 .list-card {
@@ -92,17 +94,24 @@
 .list-quick :deep(button), .list-quick :deep(a) { position: relative; z-index: 2; pointer-events: auto; }
 .list-chevron { color: var(--subtle); }
 
-/* 醒目的「收起」：浮在底部正中的玻璃胶囊，滚到哪儿都在。 */
+/* 「收起」放在卡包右侧，竖着贴在视口中线上：卡是竖着叠的，放在底下正压着最后一张卡，
+   手往下点卡时很容易误触。窄窗口没有侧边空间，才回到底部。 */
+.deck-mode-list .deck-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 760px) auto;
+  justify-content: center;
+  align-items: start;
+  column-gap: 18px;
+}
+.deck-mode-list .deck-list { width: 100%; }
 .deck-collapse-dock {
   position: sticky;
-  bottom: 22px;
+  top: calc(50vh - 60px);
   /* 卡包里每张卡都有自己的 z-index（后面的压前面的），收起要浮在所有卡之上。 */
   z-index: 40;
   display: flex;
-  justify-content: center;
-  margin-top: -72px;
   pointer-events: none;
-  animation: deck-control-in .36s var(--ease-out) .12s both;
+  animation: deck-control-in .3s var(--ease-out) .08s both;
 }
 .deck-collapse, .deck-unbox {
   display: inline-flex;
@@ -118,10 +127,10 @@
   pointer-events: auto;
   transition: scale var(--dur-fast) var(--ease-out);
 }
-.deck-collapse { min-height: 48px; padding: 0 28px; font-size: var(--fs-md); }
+.deck-collapse { flex-direction: column; gap: 6px; min-height: 0; padding: 16px 12px; border-radius: 22px; font-size: var(--fs-sm); writing-mode: horizontal-tb; }
 .deck-collapse:active, .deck-unbox:active { scale: .95; }
 .flip { rotate: 180deg; }
-@keyframes deck-control-in { from { opacity: 0; translate: 0 10px; filter: blur(4px); } }
+@keyframes deck-control-in { from { opacity: 0; translate: 8px 0; } }
 
 /* ── 打开态 ── */
 .deck-stage {
@@ -131,16 +140,17 @@
   padding-bottom: 30px;
 }
 .card-deck.is-closing .deck-stage { pointer-events: none; }
-/* 打开的卡不透明：它是从后面那一层抽出来的实体卡片，不是一层半透明的盖板。 */
+/* 打开的卡是磨砂的：半透明底透出身后已经糊掉的总览（见 .is-frosted）。 */
 .open-card {
   transform-origin: center top;
   border-radius: var(--radius-xl);
   background:
     radial-gradient(760px 220px at 0 0, color-mix(in srgb, var(--card-tone) 13%, transparent), transparent 70%),
-    var(--mat-card-solid);
-  box-shadow: var(--mat-shadow-lift), 0 40px 90px -30px rgba(0, 0, 0, .55);
+    var(--mat-card-frost);
+  box-shadow: var(--mat-shadow-lift);
 }
-.deck-stage.is-dragging .open-card { will-change: transform; }
+/* 拖动时只留轻投影：大面积柔影跟着卡逐帧重画，边缘就是一圈发黑的分界线。 */
+.deck-stage.is-dragging .open-card { will-change: transform; box-shadow: var(--mat-shadow); }
 .open-head {
   padding: 18px 20px 16px 24px;
   pointer-events: auto;
@@ -203,6 +213,10 @@
 .deck-dot.on { width: 22px; background: var(--accent); }
 
 @media (max-width: 720px) {
+  .deck-mode-list .deck-overview { grid-template-columns: minmax(0, 1fr); }
+  .deck-list { padding-bottom: 96px; }
+  .deck-collapse-dock { top: auto; bottom: 18px; justify-content: center; margin-top: -64px; }
+  .deck-collapse { flex-direction: row; padding: 12px 22px; border-radius: 999px; }
   .deck-head { padding: 14px 14px; gap: 10px; }
   .deck-body { padding: 14px; }
 }

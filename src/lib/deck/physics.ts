@@ -24,7 +24,9 @@ const clamp = (value: number, min: number, max: number) => Math.max(min, Math.mi
 
 export const DECK_FOLLOW = 0.85;
 
-/** 被拖着的那张卡此刻的样子：跟手位移 + 3D 倾斜 + 轻微放大。不模糊。 */
+/** 被拖着的那张卡此刻的样子：跟手位移 + 一点平面旋转。不模糊、不做 3D、不放大——
+ *  满是字的大卡一旦 perspective / rotateX / scale，字每帧重新栅格化，边缘出一圈黑线、
+ *  字一闪一闪的；平面位移和旋转只是合成。 */
 export function dragFrame(drag: DeckDrag, width: number, _reducedMotion = false): DeckFrame {
   const safeWidth = Math.max(1, width);
   const dx = drag.dx * DECK_FOLLOW;
@@ -33,9 +35,7 @@ export function dragFrame(drag: DeckDrag, width: number, _reducedMotion = false)
   const progress = Math.min(1, Math.hypot(drag.dx, drag.dy) / 240);
   const r = (value: number) => Number(value.toFixed(2));
   return {
-    transform: `perspective(1000px) translate3d(${r(dx)}px, ${r(dy)}px, ${r(progress * 36)}px) `
-      + `rotateX(${r(-dy / 26)}deg) rotateY(${r(dx / 65)}deg) rotate(${r((dx / safeWidth) * 4)}deg) `
-      + `scale(${r(1 + progress * 0.025)})`,
+    transform: `translate3d(${r(dx)}px, ${r(dy)}px, 0px) rotate(${r((dx / safeWidth) * 4)}deg)`,
     filter: 'none',
     progress: r(progress),
     dx: r(dx),
@@ -76,13 +76,12 @@ export function flingOutFrames(direction: -1 | 1, width: number, from: string, v
   const throwY = vertical ? -direction * 900 : -30;
   return [
     { transform: from || 'none', opacity: 1 },
-    { transform: `translate3d(${throwX}px, ${throwY}px, 0) rotate(${-direction * (vertical ? 0 : 9)}deg) scale(1.02)`, opacity: 1 },
+    { transform: `translate3d(${throwX}px, ${throwY}px, 0) rotate(${-direction * (vertical ? 0 : 9)}deg)`, opacity: 1 },
   ];
 }
 
-/** 下一张从身后浮上来：由模糊变清晰，带一点回弹。 */
+/** 下一张从身后浮上来：淡入 + 上浮。不加模糊（整张大卡逐帧模糊是甩卡卡顿的一大头）。 */
 export const RISE_IN_FRAMES: Keyframe[] = [
-  { transform: 'translateY(18px) scale(.94)', filter: 'blur(5px)', opacity: 0.5 },
-  { transform: 'translateY(-3px) scale(1.012)', filter: 'blur(0px)', opacity: 1, offset: 0.72 },
-  { transform: 'none', filter: 'blur(0px)', opacity: 1 },
+  { transform: 'translateY(16px)', opacity: 0 },
+  { transform: 'none', opacity: 1 },
 ];

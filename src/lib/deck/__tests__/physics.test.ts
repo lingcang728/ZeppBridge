@@ -11,6 +11,9 @@ describe('deck drag frame', () => {
     expect(dragFrame({ dx: 240, dy: 0 }, 800).progress).toBe(1);
     expect(dragFrame({ dx: 120, dy: 0 }, 800).filter).toBe('none');
   });
+  it('stays a flat 2D move so the text on the card never re-rasterizes', () => {
+    expect(dragFrame({ dx: 180, dy: -60 }, 800).transform).not.toMatch(/perspective|rotateX|rotateY|scale/);
+  });
 });
 
 describe('deck release', () => {

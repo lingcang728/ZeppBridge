@@ -168,14 +168,22 @@ onBeforeRouteUpdate(() => {
   closeFromTop = props.activeId && cardEl.value ? cardEl.value.getBoundingClientRect().top : null;
 });
 
+/* 总览退到位以后才一次性糊上（见 CardDeck.css 的 .is-frosted）：模糊不跟着动画逐帧变。 */
+const frosted = ref(false);
+let frostTimer = 0;
+const FROST_DELAY_MS = 340;
+
 watch(() => props.activeId, async (id, previous) => {
   if (id) centerId.value = id;
   lastToggleAt = performance.now();
+  window.clearTimeout(frostTimer);
+  if (!id) frosted.value = false;
   if (id && !previous) {
     closingId.value = null;
     reset();
     await nextTick();
     morph.open(id);
+    if (!reducedMotion()) frostTimer = window.setTimeout(() => { frosted.value = Boolean(props.activeId); }, FROST_DELAY_MS);
   } else if (!id && previous) {
     reset();
     closingId.value = previous;
@@ -245,6 +253,7 @@ onMounted(() => {
   document.addEventListener('click', onDocClick);
 });
 onBeforeUnmount(() => {
+  window.clearTimeout(frostTimer);
   document.removeEventListener('keydown', onKeydown);
   document.removeEventListener('pointerdown', onDocPointerDown, true);
   document.removeEventListener('click', onDocClick);
@@ -255,7 +264,7 @@ onBeforeUnmount(() => {
   <div ref="root" :class="['card-deck', `deck-mode-${layout}`, { 'has-open': activeId, 'is-closing': !activeId && closingId }]">
     <!-- 总览：coverflow 或卡包。打开一张卡时它整体往后退一层（不消失、不收起高度——
          以前退到底会把高度收成 0，关卡时再撑开，页面跳一下就是「切回去闪一下」）。 -->
-    <div ref="overview" :class="['deck-overview', { 'is-receded': activeId }]" :inert="activeId ? true : undefined">
+    <div ref="overview" :class="['deck-overview', { 'is-receded': activeId, 'is-frosted': frosted && activeId }]" :inert="activeId ? true : undefined">
       <DeckCoverflow
         v-if="layout === 'cover'"
         v-model="centerId"

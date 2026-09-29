@@ -1,19 +1,20 @@
 import type { RouteLocationNormalized } from 'vue-router';
 import type { PageMotion } from '../lib/navigation';
-import { cardPageFrame, openPageFrame, visiblePart, type Rect } from '../lib/pageMorph';
+import { playGhost } from '../lib/motion/ghost';
+
+type Rect = { left: number; top: number; width: number; height: number };
 
 /**
  * 从一张卡点进详情页：新页从那张卡的位置等比长成整页；返回时整页缩回那张卡。
  *
- * 以前切页是两页叠着各自变糊、淡入淡出：4K 高分屏上整屏 blur 每帧都要重画，中间那几帧
- * 整个窗口发暗发糊，看上去就是「闪一下」，还顺带卡。现在只动 transform / clip-path /
- * opacity，而且有来处的时候画面是连着的——看得见页面是从哪张卡里长出来的。
+ * 形变只落在一块幽灵板上（lib/motion/ghost.ts）：以前对整页逐帧动 clip-path，每帧整页
+ * 连图表一起重画，4K 屏上风扇狂转。现在真实页面只动 opacity / transform。
  *
  * 用法（AppShell.vue）：`decide()` 在 router.beforeEach 里把普通的 forward / back 换成
  * expand / collapse；`onEnter` / `onLeave` 挂在切页的 <Transition> 上。
  */
-const EXPAND_MS = 520;
-const COLLAPSE_MS = 480;
+const EXPAND_MS = 360;
+const COLLAPSE_MS = 200;
 const EXPAND_EASE = 'cubic-bezier(.2, .9, .22, 1)';
 const COLLAPSE_EASE = 'cubic-bezier(.4, 0, .2, 1)';
 /** 太小的东西（行内的小链接、图标）不当作「卡」：从一个字那么大长成整页没有意义。 */
@@ -108,56 +109,50 @@ export const usePageMorph = () => {
     return { left: box.left, top: box.top, width: root.clientWidth, height: root.clientHeight };
   };
 
-  /** 新页从卡的位置长出来。页面垫一层画布底色：长的过程中不透出底下还没退场的旧页。 */
+  /** 新页从卡的位置长出来：幽灵板从卡长到可视区盖住旧页，新页在它后半程淡入，板再淡出。
+      真实页面只动 opacity / transform，整页不再逐帧重画。 */
   const onEnter = (el: Element) => {
     const origin = expandFrom;
     expandFrom = null;
     const viewport = viewportOf();
-    if (!origin || !viewport || !(el instanceof HTMLElement)) return;
-    const page = rectOf(el);
-    const view = visiblePart(page, viewport);
-    if (!view) return;
-    const from = cardPageFrame(page, view, origin.rect, origin.radius);
-    const to = openPageFrame(page, view, 0);
-    el.style.background = 'var(--canvas)';
-    const animation = el.animate(
+    const host = main()?.parentElement;
+    if (!origin || !viewport || !host || !(el instanceof HTMLElement)) return;
+    playGhost({
+      from: origin.rect,
+      to: viewport,
+      fromRadius: origin.radius,
+      toRadius: 0,
+      host,
+      duration: EXPAND_MS,
+      easing: EXPAND_EASE,
+      fadeFrom: 0.55,
+    });
+    el.animate(
       [
-        { ...from, opacity: 0 },
-        { opacity: 1, offset: 0.24 },
-        { ...to, opacity: 1 },
+        { opacity: 0, transform: 'translateY(10px)' },
+        { opacity: 0, transform: 'translateY(10px)', offset: 0.35 },
+        { opacity: 1, transform: 'none' },
       ],
-      { duration: EXPAND_MS, easing: EXPAND_EASE },
+      { duration: EXPAND_MS, easing: 'ease-out' },
     );
-    const clear = () => { el.style.background = ''; };
-    animation.finished.then(clear, clear);
   };
 
-  /** 返回：离场的整页缩回来处那张卡。滚动区要等 returnScroll 把位置恢复好，所以晚一帧再量。 */
+  /** 返回：不再把整页缩回去（以前是一整块暗色页飞回去再换成卡）。详情页轻轻淡出，
+      底下的来处页淡入，当初那张卡原地轻落一下——落地的就是真卡本身，不会换一帧。 */
   const onLeave = (el: Element) => {
     const trail = collapseTo;
     collapseTo = null;
     if (!trail || !(el instanceof HTMLElement)) return;
-    el.style.background = 'var(--canvas)';
+    el.animate(
+      [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.985)' }],
+      { duration: COLLAPSE_MS, easing: COLLAPSE_EASE, fill: 'forwards' },
+    );
     requestAnimationFrame(() => {
       const link = linksTo(trail.href, STAYING)[trail.index] ?? null;
       const card = link ? cardOfLink(link) : null;
-      const viewport = viewportOf();
-      const page = rectOf(el);
-      const view = viewport ? visiblePart(page, viewport) : null;
-      if (!card || !view) {
-        el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 180, easing: 'ease', fill: 'forwards' });
-        return;
-      }
-      const target = cardPageFrame(page, view, rectOf(card), radiusOf(card));
-      const start = openPageFrame(page, view, 0);
-      // 缓动写在关键帧上：几何一路缩到卡那么大、全程不透明，最后一小段才和底下那张卡交接。
-      el.animate(
-        [
-          { ...start, opacity: 1, easing: COLLAPSE_EASE },
-          { ...target, opacity: 1, offset: 0.86, easing: 'linear' },
-          { ...target, opacity: 0 },
-        ],
-        { duration: COLLAPSE_MS, fill: 'forwards' },
+      card?.animate(
+        [{ transform: 'scale(.97)', opacity: 0.6 }, { transform: 'none', opacity: 1 }],
+        { duration: 320, easing: EXPAND_EASE },
       );
     });
   };

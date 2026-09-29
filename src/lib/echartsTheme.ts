@@ -208,7 +208,12 @@ const lightAxis = {
   splitLine: { show: true, lineStyle: { color: lightPalette.grid, type: 'dashed' as const } },
 };
 
+/* 图表首次出现不做扫入动画：画布逐帧整张重画，4K 屏上和切页叠在一起最费电。
+   切范围时的更新动画保留（那是人主动点的，时间也短）。 */
+const ENTRY_MOTION = { animationDuration: 0, animationDurationUpdate: 320 };
+
 export const zeppThemeDark = {
+  ...ENTRY_MOTION,
   color: healthSeriesPalette,
   backgroundColor: 'transparent',
   textStyle: { fontFamily: fonts, color: darkPalette.axis },
@@ -238,6 +243,7 @@ export const zeppThemeDark = {
 };
 
 export const zeppThemeLight = {
+  ...ENTRY_MOTION,
   color: healthSeriesPaletteLight,
   backgroundColor: 'transparent',
   textStyle: { fontFamily: fonts, color: lightPalette.axis },

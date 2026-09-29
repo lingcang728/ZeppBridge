@@ -4,17 +4,19 @@
  *
  * 正中那张立着、正对人；左右各一张侧转 ~50° 贴在它身边；再往外的卡不再
  * 继续往外排，而是一张压一张地叠在两侧（每张只多露出一条边），越远越小、
- * 越糊、越淡，第四张以后看不见。`d` 是连续值，拖动时所有卡一起平滑过渡。
+ * 越淡，第四张以后看不见。`d` 是连续值，拖动时所有卡一起平滑过渡。
+ *
+ * 没有模糊，也没有逐帧变化的遮罩渐变：那两样每帧都要把每张卡重新栅格化，拖动时一卡一卡的。
+ * 远近只靠 transform 和 opacity（都在合成线程上），外侧的渐隐是一层静态渐变，只调它的透明度。
  */
 export interface CoverPose {
   x: number;
   z: number;
   rotate: number;
   scale: number;
-  blur: number;
   opacity: number;
   zIndex: number;
-  /** 侧卡外侧边缘溶进背景的程度（0 = 不溶，1 = 外侧一半都渐隐掉）。没有硬边。 */
+  /** 侧卡外侧那层渐隐的不透明度（0 = 不溶，1 = 完全盖上）。没有硬边。 */
   dissolve: number;
 }
 
@@ -38,8 +40,7 @@ export function coverflowPose(d: number, width: number): CoverPose {
     z: r(-(near * 150 + beyond * 60)),
     rotate: r(-sign * near * 46),
     scale: r(1 - Math.min(ad, 3) * 0.035),
-    blur: r(ad < 0.05 ? 0 : Math.min(ad, 3) * 1.4),
-    opacity: ad >= COVER_VISIBLE ? 0 : r(1 - beyond * 0.28),
+    opacity: ad >= COVER_VISIBLE ? 0 : r(1 - near * 0.1 - beyond * 0.28),
     zIndex: 100 - Math.round(ad * 10),
     dissolve: r(Math.min(1, ad * 0.85)),
   };

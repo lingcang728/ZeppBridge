@@ -1,7 +1,6 @@
 import { onBeforeUnmount, type Ref } from 'vue';
-import {
-  collapsedFrame, flightFrom, openFrame, unscaledBox, type Box,
-} from '../lib/deck/morph';
+import { flightFrom, type Box } from '../lib/deck/morph';
+import { playGhost } from '../lib/motion/ghost';
 
 /**
  * 设置卡组在三种形态之间的形变：coverflow ↔ 平铺、总览 ↔ 打开一张。
@@ -21,8 +20,8 @@ export interface DeckMorphRefs {
   reducedMotion: () => boolean;
 }
 
-const OPEN_MS = 560;
-const CLOSE_MS = 520;
+const OPEN_MS = 380;
+const CLOSE_MS = 220;
 const FLIGHT_MS = 420;
 const FLIGHT_STAGGER_MS = 16;
 const OPEN_EASE = 'cubic-bezier(.2, .9, .22, 1)';
@@ -53,20 +52,10 @@ type Morph = { animation: Animation; id: string; kind: 'open' | 'close'; closed?
 export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) => {
   let morph: Morph | null = null;
   let flights: Animation[] = [];
+  let ghost: Animation | null = null;
 
   const sourceOf = (id: string) =>
     overview.value?.querySelector<HTMLElement>(`[data-deck-card="${CSS.escape(id)}"]`) ?? null;
-
-  /** 源卡在总览「回到原位」以后的位置：总览此刻可能还缩着（往后退了），要把那层缩放去掉。 */
-  const restingBoxOf = (el: HTMLElement): Box => {
-    const host = overview.value;
-    const box = boxOf(el);
-    if (!host) return box;
-    const style = getComputedStyle(host);
-    if (style.transform === 'none') return box;
-    // 总览往后退时绕顶边中点缩放（见 CardDeck.css 的 .deck-overview）。
-    return unscaledBox(box, boxOf(host), new DOMMatrixReadOnly(style.transform), { x: 0.5, y: 0 });
-  };
 
   const radiusOf = (el: HTMLElement) => Number.parseFloat(getComputedStyle(el).borderTopLeftRadius) || 34;
 
@@ -86,14 +75,26 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
   const rise = (el: HTMLElement) => {
     el.animate(
       [
-        { opacity: 0, transform: 'translateY(18px) scale(.97)' },
+        { opacity: 0, transform: 'translateY(14px)' },
         { opacity: 1, transform: 'none' },
       ],
-      { duration: 380, easing: OPEN_EASE },
+      { duration: 280, easing: OPEN_EASE },
     );
   };
 
-  /** 总览里的 `id` 那张卡长成打开的大卡。 */
+  /** 大卡在画面上看得见的那一段：幽灵板只需要长到这么大。 */
+  const visibleBoxOf = (el: HTMLElement): Box => {
+    const box = boxOf(el);
+    const top = Math.max(box.top, 0);
+    const bottom = Math.min(box.top + box.height, window.innerHeight);
+    return { left: box.left, top, width: box.width, height: Math.max(1, bottom - top) };
+  };
+
+  /**
+   * 总览里的 `id` 那张卡长成打开的大卡。形变只落在幽灵板上（lib/motion/ghost.ts）：
+   * 以前直接对整张大卡逐帧动 clip-path，大卡里是整段设置表单，每帧都得整张重画。
+   * 大卡本身只做淡入 + 一点上浮。
+   */
   const open = (id: string) => {
     const el = card.value;
     if (!el || reducedMotion()) return;
@@ -108,37 +109,48 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
       previous.animation.cancel();
       if (previous.kind === 'close') previous.closed?.();
     }
+    ghost?.cancel();
+    ghost = null;
     const source = sourceOf(id);
     const from = source ? boxOf(source) : null;
-    if (!from || from.width < 24 || from.height < 24) {
+    const host = document.getElementById('main-content')?.parentElement;
+    if (!from || !host || from.width < 24 || from.height < 24) {
       rise(el);
       return;
     }
-    const radius = radiusOf(el);
-    const to = boxOf(el);
-    const collapsed = collapsedFrame(from, to, radius);
-    const rest = openFrame(radius);
+    ghost = playGhost({
+      from,
+      to: visibleBoxOf(el),
+      fromRadius: source ? radiusOf(source) : 24,
+      toRadius: radiusOf(el),
+      host,
+      duration: OPEN_MS,
+      easing: OPEN_EASE,
+      fadeFrom: 0.55,
+    });
     const animation = el.animate(
       [
-        { ...collapsed, transformOrigin: '0 0', opacity: 0 },
-        { opacity: 1, offset: 0.3 },
-        { ...rest, transformOrigin: '0 0', opacity: 1 },
+        { opacity: 0, transform: 'translateY(10px)' },
+        { opacity: 0, transform: 'translateY(10px)', offset: 0.35 },
+        { opacity: 1, transform: 'none' },
       ],
-      { duration: OPEN_MS, easing: OPEN_EASE, fill: 'both' },
+      { duration: OPEN_MS, easing: 'ease-out', fill: 'both' },
     );
     track({ animation, id, kind: 'open' });
   };
 
   /**
-   * 打开的大卡缩回总览里 `id` 那张卡的位置；放完调 `closed`（调用方借此卸掉大卡）。
+   * 关上：大卡原地淡出、微微下沉，总览同时从后面回到前面——渐隐，不再把整张卡缩回源卡
+   * （以前缩到最后一下才换成源卡，看上去就是「缩回去闪一下」）。放完调 `closed`。
    * 正在打开时关：把打开动画倒着放。
    *
    * `fromTop`：关卡前这张大卡顶边在屏幕上的位置。返回总览时滚动区会先被拉回顶部，
-   * 人要是正看着卡的下半截，大卡在布局里就「跳」到了顶上——以前看起来就是凭空消失。
-   * 给了它，缩回去的第一帧就停在人刚才看到的那个位置。
+   * 给了它，淡出的第一帧就停在人刚才看到的那个位置，不会先跳一下。
    */
   const close = (id: string, closed: () => void, fromTop: number | null = null) => {
     const el = card.value;
+    ghost?.cancel();
+    ghost = null;
     if (!el || reducedMotion()) { closed(); return; }
     if (morph && morph.id === id && morph.kind === 'open' && morph.animation.playState === 'running') {
       morph.kind = 'close';
@@ -151,24 +163,13 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
       morph = null;
       previous.animation.cancel();
     }
-    const source = sourceOf(id);
-    if (!source) { closed(); return; }
-    const radius = radiusOf(el);
-    const to = boxOf(el);
-    const collapsed = collapsedFrame(restingBoxOf(source), to, radius);
-    const rest = openFrame(radius);
-    const lift = fromTop === null ? 0 : fromTop - to.top;
-    if (lift) rest.transform = `translate(0px, ${lift}px) scale(1)`;
-    // 缓动写在每一段关键帧上而不是整条时间线上：整条时间线带缓动时，offset 按「进度」算，
-    // 快进慢出的曲线会让淡出提前到三成时间就开始——卡才缩了三成就没了，看着像凭空消失。
-    // 现在几何一路缩到源卡那么大、全程不透明，最后 12% 的时间才和底下那张源卡交接。
+    const lift = fromTop === null ? 0 : fromTop - boxOf(el).top;
     const animation = el.animate(
       [
-        { ...rest, transformOrigin: '0 0', opacity: 1, easing: CLOSE_EASE },
-        { ...collapsed, transformOrigin: '0 0', opacity: 1, offset: 0.88, easing: 'linear' },
-        { ...collapsed, transformOrigin: '0 0', opacity: 0 },
+        { opacity: 1, transform: `translate(0px, ${lift}px)` },
+        { opacity: 0, transform: `translate(0px, ${lift + 14}px) scale(.98)` },
       ],
-      { duration: CLOSE_MS, fill: 'both' },
+      { duration: CLOSE_MS, easing: CLOSE_EASE, fill: 'both' },
     );
     track({ animation, id, kind: 'close', closed });
   };
@@ -214,6 +215,8 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
   onBeforeUnmount(() => {
     morph?.animation.cancel();
     morph = null;
+    ghost?.cancel();
+    ghost = null;
     for (const animation of flights) animation.cancel();
     flights = [];
   });

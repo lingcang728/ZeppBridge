@@ -7,8 +7,8 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import CardDeck from '../components/deck/CardDeck.vue';
+import CardBody from './settings/CardBody.vue';
 import GlyphTile from '../components/GlyphTile.vue';
-import HistoryArchivePanel from '../components/HistoryArchivePanel.vue';
 import Icon from '../components/Icon.vue';
 import { provideSettingsContext } from '../composables/settings/context';
 import { useDevices } from '../composables/useDevices';
@@ -28,19 +28,6 @@ import {
   legacySettingsTarget,
   type SettingsCardId,
 } from './settings/cards';
-import AccountSection from './settings/sections/AccountSection.vue';
-import AdvancedSection from './settings/sections/AdvancedSection.vue';
-import AuthSection from './settings/sections/AuthSection.vue';
-import AutoSyncSection from './settings/sections/AutoSyncSection.vue';
-import CapabilitySection from './settings/sections/CapabilitySection.vue';
-import DevicesSection from './settings/sections/DevicesSection.vue';
-import DisplayPrefsSection from './settings/sections/DisplayPrefsSection.vue';
-import ExportDefaultsSection from './settings/sections/ExportDefaultsSection.vue';
-import McpSection from './settings/sections/McpSection.vue';
-import PrivacySection from './settings/sections/PrivacySection.vue';
-import RetentionSection from './settings/sections/RetentionSection.vue';
-import UpdateSection from './settings/sections/UpdateSection.vue';
-import WorkoutCodesSection from './settings/sections/WorkoutCodesSection.vue';
 
 defineOptions({ name: 'Settings' });
 
@@ -180,32 +167,9 @@ onUnmounted(() => {
       </template>
 
       <template #body="{ card }">
-        <div class="card-body">
-          <template v-if="card.id === 'account'">
-            <AccountSection />
-            <DevicesSection />
-            <AuthSection />
-          </template>
-          <template v-else-if="card.id === 'sync'">
-            <AutoSyncSection />
-            <UpdateSection />
-          </template>
-          <template v-else-if="card.id === 'archive'">
-            <HistoryArchivePanel :prefs="userPrefs" @prefs-changed="applyPrefsChange" />
-            <RetentionSection />
-          </template>
-          <template v-else-if="card.id === 'data'">
-            <CapabilitySection />
-            <WorkoutCodesSection />
-          </template>
-          <template v-else-if="card.id === 'ai'">
-            <McpSection />
-            <ExportDefaultsSection />
-          </template>
-          <DisplayPrefsSection v-else-if="card.id === 'display'" />
-          <PrivacySection v-else-if="card.id === 'privacy'" />
-          <AdvancedSection v-else-if="card.id === 'advanced'" />
-        </div>
+        <KeepAlive :max="8">
+          <CardBody :key="card.id" :id="card.id" :prefs="userPrefs" @prefs-changed="applyPrefsChange" />
+        </KeepAlive>
       </template>
     </CardDeck>
   </section>

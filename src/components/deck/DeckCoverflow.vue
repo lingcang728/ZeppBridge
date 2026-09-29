@@ -57,6 +57,7 @@ defineSlots<{
 }>();
 
 const stage = ref<HTMLElement | null>(null);
+const dragging = ref(false);
 const widthFor = (stageWidth: number) => Math.round(Math.min(500, Math.max(260, stageWidth * 0.44)));
 const cardWidth = ref(props.initialWidth ? widthFor(props.initialWidth) : 420);
 const indexOf = (id: string | null) => Math.max(0, props.cards.findIndex((card) => card.id === id));
@@ -80,6 +81,8 @@ const { pos, animateTo, place, stop } = useSpringIndex({
 });
 
 const centered = computed(() => wrap(Math.round(pos.value)));
+/** 拖动或吸附途中：只有这时才给每张卡开合成层（常驻 will-change 会一直占着显存）。 */
+const moving = computed(() => dragging.value || Math.abs(pos.value - Math.round(pos.value)) > 0.001);
 /** 转到第 index 张，走最近的方向。 */
 const turnTo = (index: number) => animateTo(pos.value + offsetOf(index));
 const centerCard = computed(() => props.cards[centered.value]);
@@ -87,15 +90,9 @@ const centerCard = computed(() => props.cards[centered.value]);
 const poseStyle = (index: number) => {
   const d = offsetOf(index);
   const pose = coverflowPose(d, cardWidth.value);
-  // 外侧那一边渐隐：左边的卡外侧是左边，右边的卡外侧是右边。
-  const dissolve = pose.dissolve > 0.02
-    ? `linear-gradient(${d < 0 ? 90 : 270}deg, rgba(0, 0, 0, ${(1 - pose.dissolve).toFixed(2)}) 0%, #000 ${Math.round(30 + pose.dissolve * 30)}%)`
-    : 'none';
   return {
-    maskImage: dissolve,
-    WebkitMaskImage: dissolve,
+    '--fade': String(pose.dissolve),
     transform: `translate3d(calc(-50% + ${pose.x}px), -50%, ${pose.z}px) rotateY(${pose.rotate}deg) scale(${pose.scale})`,
-    filter: pose.blur ? `blur(${pose.blur}px)` : 'none',
     opacity: pose.opacity,
     zIndex: pose.zIndex,
     pointerEvents: (Math.abs(offsetOf(index)) >= COVER_VISIBLE ? 'none' : 'auto') as 'none' | 'auto',
@@ -105,7 +102,6 @@ const poseStyle = (index: number) => {
 /* —— 拖动 —— */
 const INTERACTIVE = 'button:not(.cover-hit), a, input, select, textarea, [role="switch"], [role="slider"]';
 let gesture: { id: number; x: number; startPos: number; lastX: number; time: number; v: number; moved: boolean; hit: number } | null = null;
-const dragging = ref(false);
 const layoutScale = () => {
   const el = stage.value;
   return el && el.offsetWidth ? el.getBoundingClientRect().width / el.offsetWidth || 1 : 1;
@@ -137,13 +133,27 @@ const onMove = (event: PointerEvent) => {
   g.v = ((event.clientX - g.lastX) / layoutScale()) / dt;
   g.lastX = event.clientX;
   g.time = event.timeStamp;
-  pos.value = g.startPos - dx / pxPerCard(cardWidth.value);
+  pendingPos = g.startPos - dx / pxPerCard(cardWidth.value);
+  // 指针事件比刷新率密（高回报率鼠标 500–1000Hz），合并到每帧一次。
+  if (!moveFrame) {
+    moveFrame = requestAnimationFrame(() => {
+      moveFrame = 0;
+      if (pendingPos !== null && gesture) pos.value = pendingPos;
+      pendingPos = null;
+    });
+  }
 };
+let moveFrame = 0;
+let pendingPos: number | null = null;
 const onUp = (event: PointerEvent) => {
   const g = gesture;
   if (!g || g.id !== event.pointerId) return;
   gesture = null;
   dragging.value = false;
+  cancelAnimationFrame(moveFrame);
+  moveFrame = 0;
+  if (pendingPos !== null) pos.value = pendingPos;
+  pendingPos = null;
   if (stage.value?.hasPointerCapture(event.pointerId)) stage.value.releasePointerCapture(event.pointerId);
   if (event.type !== 'pointerup') {
     animateTo(pos.value);
@@ -213,6 +223,7 @@ onMounted(() => {
   }
 });
 onBeforeUnmount(() => {
+  cancelAnimationFrame(moveFrame);
   observer?.disconnect();
   stage.value?.removeEventListener('wheel', onWheel);
   window.clearTimeout(wheelIdle);
@@ -223,7 +234,7 @@ onBeforeUnmount(() => {
   <div class="coverflow">
     <div
       ref="stage"
-      :class="['cover-stage', { 'is-dragging': dragging }]"
+      :class="['cover-stage', { 'is-dragging': dragging, 'is-moving': moving }]"
       role="listbox"
       tabindex="0"
       :aria-label="t.label"
@@ -244,7 +255,7 @@ onBeforeUnmount(() => {
         :data-deck-card="card.id"
         role="option"
         :aria-selected="index === centered"
-        :class="['cover-card', { centered: index === centered }]"
+        :class="['cover-card', offsetOf(index) < 0 ? 'is-left' : 'is-right', { centered: index === centered }]"
         :style="{ ...poseStyle(index), '--card-tone': card.tone }"
       >
         <button type="button" class="cover-hit" tabindex="-1" :aria-label="t.open(card.title)"></button>
@@ -252,6 +263,7 @@ onBeforeUnmount(() => {
           <slot name="face" :card="card" :centered="index === centered" />
         </div>
         <div v-if="$slots.quick" class="cover-quick"><slot name="quick" :card="card" /></div>
+        <span class="cover-fade" aria-hidden="true"></span>
       </article>
     </div>
 
@@ -300,8 +312,19 @@ onBeforeUnmount(() => {
     var(--mat-card);
   box-shadow: var(--mat-shadow-lift);
   backface-visibility: hidden;
-  will-change: transform, filter;
 }
+.cover-stage.is-moving .cover-card { will-change: transform, opacity; }
+/* 侧卡外侧那一半渐隐进背景：一层静态渐变，拖动时只改它的不透明度（--fade），不重画。 */
+.cover-fade {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: inherit;
+  opacity: var(--fade, 0);
+  pointer-events: none;
+}
+.cover-card.is-left .cover-fade { background: linear-gradient(90deg, var(--canvas) 0%, color-mix(in srgb, var(--canvas) 70%, transparent) 30%, transparent 62%); }
+.cover-card.is-right .cover-fade { background: linear-gradient(270deg, var(--canvas) 0%, color-mix(in srgb, var(--canvas) 70%, transparent) 30%, transparent 62%); }
 /* 顶上一层很淡的亮面，给卡一点厚度——不画边线（以前那圈 1px 亮边就是「卡片边界明显」的来源）。 */
 .cover-card::after {
   content: '';
@@ -324,7 +347,7 @@ onBeforeUnmount(() => {
 .cover-quick { position: absolute; top: 22px; right: 24px; z-index: 2; }
 
 .cover-bar { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; animation: cover-bar-in .36s var(--ease-out) .1s both; }
-@keyframes cover-bar-in { from { opacity: 0; translate: 0 10px; filter: blur(4px); } }
+@keyframes cover-bar-in { from { opacity: 0; translate: 0 10px; } }
 .cover-caption {
   display: grid;
   min-width: 220px;
@@ -340,8 +363,5 @@ onBeforeUnmount(() => {
 @media (max-width: 720px) {
   .cover-face { padding: 18px 20px; }
   .cover-caption { min-width: 160px; }
-}
-@media (prefers-reduced-transparency: reduce) {
-  .cover-card { filter: none !important; }
 }
 </style>
