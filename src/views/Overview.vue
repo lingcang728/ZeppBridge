@@ -15,6 +15,7 @@ import SleepCard from '../components/overview/SleepCard.vue';
 import DataReadyCapsule from '../components/overview/DataReadyCapsule.vue';
 import StepsCard from '../components/overview/StepsCard.vue';
 import OverviewMore from '../components/overview/OverviewMore.vue';
+import PinnedMetrics from '../components/overview/PinnedMetrics.vue';
 import '../components/overview/panels.css';
 import { useDevices } from '../composables/useDevices';
 import { useSyncController } from '../composables/useSyncController';
@@ -344,6 +345,9 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
 
     <div v-if="partialWarning" class="inline-alert warning" role="status"><Icon name="info" :size="15" />{{ partialWarning }}</div>
     <div v-if="deviceError" class="inline-alert warning" role="status"><Icon name="info" :size="15" />{{ t.deviceErrorPrefix }}{{ deviceError }}</div>
+
+    <!-- 用户自己固定的 3–4 个指标排在最上面：顺序由用户定，概览不替所有人排（评审 U10）。 -->
+    <PinnedMetrics />
 
     <div v-if="loading && !overview && !heartRateSeries.length && !recentSleep.length" class="overview-skeleton" aria-live="polite" :aria-label="t.loadingAria">
       <div class="skeleton-grid"><SkeletonBlock v-for="index in 6" :key="index" height="188px" /></div>

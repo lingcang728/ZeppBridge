@@ -1,0 +1,91 @@
+/**
+ * 概览「我的指标」：用户自己固定 3–4 个最关心的指标（评审 U10，用户 2026-09-29 定）。
+ *
+ * 顺序由用户定——概览不替所有人排一套顺序，只提供「固定哪几项」的能力。选择记在本机
+ * （localStorage）：这是看的偏好，不是数据，不进库、不进导出。
+ *
+ * 候选只放「一个数就能说清今天状态」的日指标；取值走 `getMetricSeries`，和各详情页
+ * 同一份口径。没有记录就显示「—」和「近 N 天无记录」，不补 0、不沿用旧值。
+ */
+import type { MetricSeries } from '../types';
+import { formatMetric } from './format';
+
+export type PinGroup = 'recovery' | 'activity' | 'body';
+
+export interface PinnableMetric {
+  id: string;
+  group: PinGroup;
+  /** 点开去哪个详情页。 */
+  route: string;
+  /** 小数位：体重、体脂这类要一位，其余取整。 */
+  digits: number;
+  /** 界面单位码（见 PinnedMetrics 的文案表）；空串 = 不写单位。 */
+  unit: 'bpm' | 'ms' | 'score' | 'percent' | 'steps' | 'kcal' | 'min' | 'kg' | 'vo2' | '';
+}
+
+export const MAX_PINS = 4;
+
+export const PINNABLE_METRICS: readonly PinnableMetric[] = [
+  { id: 'resting_hr', group: 'recovery', route: '/heart', digits: 0, unit: 'bpm' },
+  { id: 'hrv_rmssd', group: 'recovery', route: '/heart', digits: 0, unit: 'ms' },
+  { id: 'sleep_hrv', group: 'recovery', route: '/body', digits: 0, unit: 'ms' },
+  { id: 'sleep_score', group: 'recovery', route: '/sleep', digits: 0, unit: 'score' },
+  { id: 'readiness', group: 'recovery', route: '/body', digits: 0, unit: 'score' },
+  { id: 'stress', group: 'recovery', route: '/body', digits: 0, unit: 'score' },
+  { id: 'spo2', group: 'recovery', route: '/body', digits: 0, unit: 'percent' },
+  { id: 'steps', group: 'activity', route: '/activity', digits: 0, unit: 'steps' },
+  { id: 'active_calories', group: 'activity', route: '/activity', digits: 0, unit: 'kcal' },
+  { id: 'active_minutes', group: 'activity', route: '/activity', digits: 0, unit: 'min' },
+  { id: 'training_load', group: 'activity', route: '/training', digits: 0, unit: '' },
+  { id: 'vo2max', group: 'activity', route: '/training', digits: 0, unit: 'vo2' },
+  { id: 'pai_total', group: 'activity', route: '/training', digits: 0, unit: '' },
+  { id: 'weight', group: 'body', route: '/body', digits: 1, unit: 'kg' },
+  { id: 'body_fat_rate', group: 'body', route: '/body', digits: 1, unit: 'percent' },
+  { id: 'bmi', group: 'body', route: '/body', digits: 1, unit: '' },
+];
+
+const BY_ID = new Map(PINNABLE_METRICS.map((metric) => [metric.id, metric]));
+export const pinnableMetric = (id: string): PinnableMetric | undefined => BY_ID.get(id);
+
+/** 只留认识的、去重、最多四个；顺序保持用户点选的顺序。 */
+export const normalizePins = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return [];
+  const out: string[] = [];
+  for (const item of value) {
+    if (typeof item !== 'string' || !BY_ID.has(item) || out.includes(item)) continue;
+    out.push(item);
+    if (out.length === MAX_PINS) break;
+  }
+  return out;
+};
+
+const STORAGE_KEY = 'zeppbridge-overview-pins';
+
+export const readPins = (): string[] => {
+  try {
+    return normalizePins(JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '[]'));
+  } catch {
+    return [];
+  }
+};
+
+export const writePins = (pins: string[]): void => {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizePins(pins)));
+  } catch {
+    // 记不住只影响下次打开，这次照样显示。
+  }
+};
+
+/** 最新一个点的数值文本；没有就是「—」。 */
+export const pinValueText = (metric: PinnableMetric, series?: MetricSeries | null): string => {
+  const value = series?.latest?.value;
+  return typeof value === 'number' && Number.isFinite(value) ? formatMetric(value, metric.digits) : '—';
+};
+
+/** 最新一个点是哪天（本地日历日 YYYY-MM-DD），没有就是 null。 */
+export const pinLatestDate = (series?: MetricSeries | null): string | null => series?.latest?.date ?? null;
+
+/** 点序列（只有有数的日子）：迷你曲线只画真有的点，不插值。 */
+export const pinSparkValues = (series?: MetricSeries | null): number[] =>
+  (series?.points ?? []).map((point) => point.value).filter((value) => Number.isFinite(value));
