@@ -268,7 +268,7 @@ fn credentials_from_web_storage_parse_like_cookies() {
 /// 「还没登录」和「登录了但我们没读到凭据」必须能分开。
 ///
 /// 分不开的话，后者只能一路静默等到 15 分钟超时，再给一句「登录超时，
-/// 请重试」——而重试多少次都不会好，该做的是改用 HAR 或手动填 Token。
+/// 请重试」——而重试多少次都不会好，该做的是改用手动填 Token。
 #[test]
 fn a_signed_in_page_is_told_apart_from_the_login_page() {
     let none: Vec<(String, String)> = Vec::new();

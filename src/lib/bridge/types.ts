@@ -244,7 +244,6 @@ export interface BridgeBackend {
   getAppStatus(): Promise<AppStatus>;
   verifyAuth(): Promise<AppStatus>;
   clearAuth(): Promise<AppStatus>;
-  importFromHar(harPath: string): Promise<AppStatus>;
   manualAuth(appToken: string, userId: string, regionHost: string): Promise<AppStatus>;
 
   /** 登录窗标题跟随界面语言，后端认十种界面语言标记（认不出回落英文）。 */

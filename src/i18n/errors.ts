@@ -40,18 +40,12 @@ const messages = defineMessages(
       + '它在原来那台机器的凭据管理器里。请重新登录一次。',
     'err.core.credential_store':
       '无法访问凭据存储。请检查钥匙串是否锁定、系统策略、存储配置和文件权限。'
-      + '网页登录、HAR 导入和手填 Token 使用同一个存储，换登录方式不能绕过存储故障。'
+      + '网页登录和手填 Token 使用同一个存储，换登录方式不能绕过存储故障。'
       + '如果 macOS 钥匙串或 Linux 密钥环不可用，可按 README 的凭据存储指南，'
       + '用 ZEPPBRIDGE_CREDENTIAL_STORE=file 启动应用，再重新登录；'
       + '此方式会将令牌明文保存到仅当前用户可读写的文件中。',
     'err.core.invalid_host': '不安全的 Zepp 区域地址',
     'err.core.config': '配置有问题，需要先改一下',
-    'err.har.missing_user': 'HAR 中没有找到用户编号。请在登录成功后重新导出网络记录。',
-    'err.har.missing_token': 'HAR 中没有登录令牌。请启用包含敏感数据的 HAR 导出。',
-    'err.har.invalid_file': '无法读取有效的 HAR。请重新选择浏览器导出的 HAR 文件。',
-    'err.har.too_large': 'HAR 文件过大。请导出一份更小的网络记录后再导入。',
-    'err.har.unverified':
-      'HAR 里的登录凭据未能通过 Zepp 验证，没有保存。请重新登录后导出，或改用手填 App Token。',
     'err.core.busy': '另一个写入操作正在进行，请等它结束',
     'err.core.parse': 'Zepp 返回的数据无法解析',
     'err.core.database': '本地数据库暂时不可用',
@@ -72,9 +66,9 @@ const messages = defineMessages(
     'err.login.connected': '已连接 Zepp 账号',
     'err.login.timeout': '登录超时，请重试',
     'err.login.credentials_unreadable':
-      '已经登录，但没能从登录窗口读到凭据。可以改用 HAR 导入或手动填写 App Token。',
+      '已经登录，但没能从登录窗口读到凭据。可以改用手动填写 App Token。',
     'err.login.region_probe_failed':
-      '读到了凭据，但无法确认账号区域。请重新登录，或改用 HAR 导入。',
+      '读到了凭据，但无法确认账号区域。请重新登录，或改用手动填写 App Token。',
     'err.login.credentials_rejected': 'Zepp 拒绝了这次登录凭据，请退出登录窗口后重新登录',
     'err.login.region_unreachable': '暂时无法连接 Zepp 区域服务，请检查网络后重试',
     'err.login.region_retrying': '暂时连不上 Zepp 区域服务，正在重试；登录窗口先留着，不用重新登录',
@@ -196,19 +190,13 @@ const messages = defineMessages(
       + 'store of the machine it was created on. Sign in again.',
     'err.core.credential_store':
       'Could not access the credential store. Check whether it is locked, blocked by system policy, '
-      + 'misconfigured, or has incorrect file permissions. Web sign-in, HAR import and manual entry '
+      + 'misconfigured, or has incorrect file permissions. Web sign-in and manual entry '
       + 'all use the same store, so changing the sign-in method cannot bypass a storage failure. '
       + 'If macOS Keychain or the Linux keyring is unavailable, follow the credential storage guide '
       + 'linked in the README: launch with ZEPPBRIDGE_CREDENTIAL_STORE=file, then sign in again. '
       + 'This saves tokens in a plaintext file readable and writable only by your user.',
     'err.core.invalid_host': 'Unsafe Zepp region address',
     'err.core.config': 'Something in the configuration needs changing first',
-    'err.har.missing_user': 'No user ID found in the HAR. Export network traffic again after signing in.',
-    'err.har.missing_token': 'No login token found in the HAR. Enable export with sensitive data.',
-    'err.har.invalid_file': 'Cannot read a valid HAR. Select a HAR file exported by your browser.',
-    'err.har.too_large': 'The HAR file is too large. Export a smaller capture and try again.',
-    'err.har.unverified':
-      'The credentials in the HAR did not pass Zepp verification, so nothing was saved. Sign in again and re-export, or enter an App Token by hand.',
     'err.core.busy': 'Another write is in progress. Wait for it to finish',
     'err.core.parse': "Zepp's response could not be parsed",
     'err.core.database': 'The local database is temporarily unavailable',
@@ -231,9 +219,9 @@ const messages = defineMessages(
     'err.login.connected': 'Connected to your Zepp account',
     'err.login.timeout': 'Sign-in timed out. Try again',
     'err.login.credentials_unreadable':
-      "You're signed in, but the credentials could not be read from the sign-in window. Try the HAR import or enter an App Token manually.",
+      "You're signed in, but the credentials could not be read from the sign-in window. Enter an App Token manually instead.",
     'err.login.region_probe_failed':
-      "Credentials were read, but the account region couldn't be confirmed. Sign in again or import a HAR file.",
+      "Credentials were read, but the account region couldn't be confirmed. Sign in again or enter an App Token manually.",
     'err.login.credentials_rejected':
       'Zepp rejected these credentials. Sign out in the login window, then sign in again',
     'err.login.region_unreachable':
@@ -369,19 +357,13 @@ const messages = defineMessages(
       + 'del equipo donde se creó. Vuelve a iniciar sesión.',
     'err.core.credential_store':
       'No se pudo acceder al almacén de credenciales. Revisa si está bloqueado, restringido por una política del sistema, '
-      + 'mal configurado o con permisos de archivo incorrectos. El inicio de sesión web, la importación de HAR y el ingreso manual '
+      + 'mal configurado o con permisos de archivo incorrectos. El inicio de sesión web y el ingreso manual '
       + 'usan el mismo almacén, así que cambiar el método de inicio de sesión no evita un fallo de almacenamiento. '
       + 'Si el Llavero de macOS o el llavero de Linux no están disponibles, sigue la guía de almacenamiento de credenciales '
       + 'enlazada en el README: abre la app con ZEPPBRIDGE_CREDENTIAL_STORE=file y vuelve a iniciar sesión. '
       + 'Así los tokens se guardan en un archivo de texto plano que solo tu usuario puede leer y escribir.',
     'err.core.invalid_host': 'Dirección de región de Zepp no segura',
     'err.core.config': 'Primero hay que cambiar algo en la configuración',
-    'err.har.missing_user': 'No se encontró el ID de usuario. Exporta el tráfico después de iniciar sesión.',
-    'err.har.missing_token': 'No se encontró el token. Exporta el HAR con datos sensibles.',
-    'err.har.invalid_file': 'No se puede leer el HAR. Selecciona un archivo exportado por el navegador.',
-    'err.har.too_large': 'El archivo HAR es demasiado grande. Exporta una captura más pequeña e inténtalo de nuevo.',
-    'err.har.unverified':
-      'Las credenciales del HAR no pasaron la verificación de Zepp, así que no se guardó nada. Vuelve a iniciar sesión y exporta, o introduce el App Token a mano.',
     'err.core.busy': 'Hay otra escritura en curso. Espera a que termine',
     'err.core.parse': 'No se pudo interpretar la respuesta de Zepp',
     'err.core.database': 'La base de datos local no está disponible por el momento',
@@ -404,9 +386,9 @@ const messages = defineMessages(
     'err.login.connected': 'Conectado a tu cuenta de Zepp',
     'err.login.timeout': 'El inicio de sesión tardó demasiado. Inténtalo de nuevo',
     'err.login.credentials_unreadable':
-      'Iniciaste sesión, pero no se pudieron leer las credenciales desde la ventana de inicio de sesión. Prueba la importación de HAR o ingresa un App Token a mano.',
+      'Iniciaste sesión, pero no se pudieron leer las credenciales desde la ventana de inicio de sesión. Ingresa un App Token a mano.',
     'err.login.region_probe_failed':
-      'Se leyeron las credenciales, pero no se pudo confirmar la región de la cuenta. Vuelve a iniciar sesión o importa un archivo HAR.',
+      'Se leyeron las credenciales, pero no se pudo confirmar la región de la cuenta. Vuelve a iniciar sesión o ingresa un App Token a mano.',
     'err.login.credentials_rejected':
       'Zepp rechazó estas credenciales. Cierra la sesión en la ventana de inicio de sesión y vuelve a iniciarla',
     'err.login.region_unreachable':

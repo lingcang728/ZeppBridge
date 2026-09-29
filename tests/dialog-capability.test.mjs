@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 /*
  * 每一个被前端用到的 dialog 方法，都必须在 capability 里有对应的一条权限。
  *
- * v2.1.0 上 FIT 导出和 HAR 导入对所有人都是坏的，报错是
+ * v2.1.0 上 FIT 导出和当时的 HAR 导入对所有人都是坏的，报错是
  * `Command plugin:dialog|open not allowed by ACL`：capability 里只写了
  * `dialog:allow-save`，而 tauri-plugin-dialog 把 `allow-open` 算成**另一条**
  * 权限。`save()` 那条路是通的，于是这个洞在开发期一次都没露头——桌面端唯一会
@@ -69,7 +69,6 @@ test('the scan finds the dialog call sites at all', () => {
   // save() 随旧 Explore 页的 JSON/CSV/GPX 另存一起删了，dialog:allow-save 也随之收回。
   assert.deepEqual([...used.keys()].sort(), ['open']);
   assert.ok(used.get('open').includes('src/composables/useWorkoutDetail.ts'), 'FIT 导出的目录选择');
-  assert.ok(used.get('open').includes('src/composables/settings/useAuthFlow.ts'), 'HAR 导入的文件选择');
 });
 
 test('the capability grants one permission per dialog method the interface calls', () => {

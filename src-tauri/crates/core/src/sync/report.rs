@@ -60,6 +60,22 @@ impl SyncManager {
             }
         };
 
+        // 一块落库后就告诉界面去读：`completed` 为真的事件前端一律当作
+        // 「这条流有新数据了」，整条流结束的那次仍是 `stream_completed`。
+        let chunk_committed = |stream: &str, current: u32| {
+            if let Some(callback) = on_progress {
+                callback(SyncProgress {
+                    completed: true,
+                    stream: stream.into(),
+                    current,
+                    total: 8,
+                    message: String::new(),
+                    code: "stream_chunk_committed".into(),
+                    detail: None,
+                });
+            }
+        };
+
         let check = || -> Result<()> {
             self.abort_if_cancelled()?;
             if Instant::now() > deadline {
@@ -72,16 +88,36 @@ impl SyncManager {
 
         emit("heart_rate", 1, 8, "正在同步心率");
         check()?;
-        match self.fetcher.fetch_heart_rate_records(window).await {
-            Ok(records) => streams.push(self.persist_records("heart_rate", records).await?),
+        match self
+            .sync_chunked_stream(
+                "heart_rate",
+                window,
+                7,
+                OnChunkError::StopUnlessUnavailable,
+                |chunk| self.fetcher.fetch_heart_rate_records(chunk),
+                || chunk_committed("heart_rate", 1),
+            )
+            .await
+        {
+            Ok(report) => streams.push(report),
             Err(error) if error.is_cancelled() => return Err(error),
             Err(error) => streams.push(self.heart_rate_fetch_error(&error).await?),
         }
         completed("heart_rate", 1);
         emit("daily_summary", 2, 8, "正在同步每日概览");
         check()?;
-        match self.fetcher.fetch_daily_statistics_records(window).await {
-            Ok(records) => streams.push(self.persist_records("daily_summary", records).await?),
+        match self
+            .sync_chunked_stream(
+                "daily_summary",
+                window,
+                30,
+                OnChunkError::Continue,
+                |chunk| self.fetcher.fetch_daily_statistics_records(chunk),
+                || chunk_committed("daily_summary", 2),
+            )
+            .await
+        {
+            Ok(report) => streams.push(report),
             Err(error) if error.is_cancelled() => return Err(error),
             Err(error) => streams.push(self.failure_report("daily_summary", &error).await?),
         }
@@ -90,8 +126,18 @@ impl SyncManager {
         // verified empty success.
         emit("sleep", 3, 8, "正在同步睡眠");
         check()?;
-        match self.fetcher.fetch_sleep_records(window).await {
-            Ok(records) => streams.push(self.persist_records("sleep", records).await?),
+        match self
+            .sync_chunked_stream(
+                "sleep",
+                window,
+                7,
+                OnChunkError::Continue,
+                |chunk| self.fetcher.fetch_sleep_records(chunk),
+                || chunk_committed("sleep", 3),
+            )
+            .await
+        {
+            Ok(report) => streams.push(report),
             Err(error) if error.is_cancelled() => return Err(error),
             Err(error) if error.is_unavailable() => {
                 streams.push(self.unavailable_report("sleep", &error).await?)

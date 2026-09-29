@@ -101,6 +101,16 @@ impl FetchWindow {
         }
         chunks
     }
+
+    /// 与 [`Self::chunks`] 同一组切片，但从最新一块排起。
+    ///
+    /// 切片边界不变（报文的 source_key 跟着边界走），只是先拉离现在最近的那块：
+    /// 首页要的是「最新心率 / 今天步数 / 昨晚睡眠」，不该等整段历史拉完。
+    pub fn chunks_newest_first(self, chunk_days: i64) -> Vec<Self> {
+        let mut chunks = self.chunks(chunk_days);
+        chunks.reverse();
+        chunks
+    }
 }
 
 /// A fetch result keeps endpoint/source identity beside its raw payload. This

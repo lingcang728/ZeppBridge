@@ -36,8 +36,6 @@ export default {
       authOpening: 'A abrir…',
       authRetry: 'Tentar ligar novamente',
       authUse: 'Usar',
-      authHarTitle: 'Importação HAR',
-      authHarSub: 'Para utilizadores avançados e depuração: importa um ficheiro HAR',
       authManualTitle: 'Introduzir manualmente',
       authManualSub: 'Escreve o appToken, o user_id e o host da região',
       authCollapse: 'Fechar',
@@ -311,10 +309,6 @@ export default {
       loginIncomplete: 'O início de sessão não terminou',
       loginWindowFailed: 'Não foi possível abrir a janela de início de sessão',
       loginCancelFailed: 'Não foi possível cancelar o início de sessão',
-      harFilter: 'Ficheiro HAR',
-      harImported: 'Ficheiro HAR importado; as credenciais estão guardadas.',
-      harImportFailed: 'A importação HAR falhou',
-      filePickerFailed: 'Não foi possível abrir o seletor de ficheiros',
       fillAllFields: 'Preenche todos os campos obrigatórios',
       manualAuthDone: 'Autenticação manual concluída; as credenciais estão guardadas.',
       manualAuthFailed: 'A autenticação manual falhou',
@@ -2394,19 +2388,9 @@ Responde em Markdown.`,
     'err.headless.token_not_in_store':
       'Os detalhes da conta estão aqui, mas o cofre de credenciais não tem token para eles. Uma base de dados copia-se entre máquinas; um token não — fica no cofre de credenciais da máquina onde foi criado. Inicia sessão novamente.',
     'err.core.credential_store':
-      'Não foi possível aceder ao cofre de credenciais. Verifica se está bloqueado, vedado por política do sistema, mal configurado ou com permissões de ficheiro erradas. O início de sessão web, a importação HAR e a entrada manual usam todos o mesmo cofre, por isso mudar de método não contorna uma falha de armazenamento. Se o Keychain do macOS ou o keyring do Linux estiverem indisponíveis, segue o guia de armazenamento de credenciais ligado no README: arranca com ZEPPBRIDGE_CREDENTIAL_STORE=file e inicia sessão novamente. Isto guarda os tokens num ficheiro em texto simples que só o teu utilizador consegue ler e escrever.',
+      'Não foi possível aceder ao cofre de credenciais. Verifica se está bloqueado, vedado por política do sistema, mal configurado ou com permissões de ficheiro erradas. O início de sessão web e a entrada manual usam o mesmo cofre, por isso mudar de método não contorna uma falha de armazenamento. Se o Keychain do macOS ou o keyring do Linux estiverem indisponíveis, segue o guia de armazenamento de credenciais ligado no README: arranca com ZEPPBRIDGE_CREDENTIAL_STORE=file e inicia sessão novamente. Isto guarda os tokens num ficheiro em texto simples que só o teu utilizador consegue ler e escrever.',
     'err.core.invalid_host': 'Endereço de região Zepp inseguro',
     'err.core.config': 'Há algo na configuração que precisa de ser mudado primeiro',
-    'err.har.missing_user':
-      'Não foi encontrado nenhum user ID no HAR. Exporta o tráfego de rede outra vez depois de iniciares sessão.',
-    'err.har.missing_token':
-      'Não foi encontrado nenhum token de sessão no HAR. Ativa a exportação com dados sensíveis.',
-    'err.har.invalid_file':
-      'Não foi possível ler um HAR válido. Seleciona um ficheiro HAR exportado pelo teu browser.',
-    'err.har.too_large':
-      'O ficheiro HAR é demasiado grande. Exporta uma captura mais pequena e tenta novamente.',
-    'err.har.unverified':
-      'As credenciais no HAR não passaram na verificação do Zepp, por isso nada foi guardado. Inicia sessão novamente e exporta outra vez, ou introduz um App Token à mão.',
     'err.core.busy': 'Há outra escrita em curso. Espera que termine',
     'err.core.parse': 'Não foi possível interpretar a resposta do Zepp',
     'err.core.database': 'A base de dados local está temporariamente indisponível',
@@ -2426,9 +2410,9 @@ Responde em Markdown.`,
     'err.login.connected': 'Ligado à tua conta Zepp',
     'err.login.timeout': 'O início de sessão excedeu o tempo limite. Tenta novamente',
     'err.login.credentials_unreadable':
-      'Estás com sessão iniciada, mas não foi possível ler as credenciais na janela de início de sessão. Tenta a importação HAR ou introduz um App Token manualmente.',
+      'Estás com sessão iniciada, mas não foi possível ler as credenciais na janela de início de sessão. Introduz um App Token manualmente.',
     'err.login.region_probe_failed':
-      'As credenciais foram lidas, mas não foi possível confirmar a região da conta. Inicia sessão novamente ou importa um ficheiro HAR.',
+      'As credenciais foram lidas, mas não foi possível confirmar a região da conta. Inicia sessão novamente ou introduz um App Token manualmente.',
     'err.login.credentials_rejected':
       'O Zepp rejeitou estas credenciais. Termina a sessão na janela de início de sessão e depois inicia sessão novamente',
     'err.login.region_unreachable':

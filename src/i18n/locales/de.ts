@@ -32,15 +32,9 @@ export default {
     'err.headless.token_not_in_store':
       'Die Kontodaten sind da, aber der Anmeldespeicher hat kein Token dafür. Eine Datenbank lässt sich zwischen Rechnern kopieren; ein Token nicht – er bleibt im Anmeldespeicher des Rechners, auf dem er erstellt wurde. Melde dich erneut an.',
     'err.core.credential_store':
-      'Der Anmeldespeicher war nicht zugänglich. Prüfe, ob er gesperrt ist, von einer Systemrichtlinie blockiert wird, falsch konfiguriert ist oder falsche Dateiberechtigungen hat. Web-Anmeldung, HAR-Import und manuelle Eingabe nutzen denselben Speicher; ein Wechsel der Anmeldemethode umgeht einen Speicherfehler nicht. Wenn der macOS-Schlüsselbund oder der Linux-Schlüsselring nicht verfügbar ist, folge der im README verlinkten Anleitung zur Anmeldespeicherung: Starte mit ZEPPBRIDGE_CREDENTIAL_STORE=file und melde dich erneut an. Dabei werden Token in einer Klartextdatei gespeichert, die nur dein Benutzer lesen und schreiben kann.',
+      'Der Anmeldespeicher war nicht zugänglich. Prüfe, ob er gesperrt ist, von einer Systemrichtlinie blockiert wird, falsch konfiguriert ist oder falsche Dateiberechtigungen hat. Web-Anmeldung und manuelle Eingabe nutzen denselben Speicher; ein Wechsel der Anmeldemethode umgeht einen Speicherfehler nicht. Wenn der macOS-Schlüsselbund oder der Linux-Schlüsselring nicht verfügbar ist, folge der im README verlinkten Anleitung zur Anmeldespeicherung: Starte mit ZEPPBRIDGE_CREDENTIAL_STORE=file und melde dich erneut an. Dabei werden Token in einer Klartextdatei gespeichert, die nur dein Benutzer lesen und schreiben kann.',
     'err.core.invalid_host': 'Unsichere Zepp-Regions-Adresse',
     'err.core.config': 'An der Konfiguration muss zuerst etwas geändert werden',
-    'err.har.missing_user': 'Im HAR wurde keine User-ID gefunden. Exportiere den Netzwerkverkehr nach der Anmeldung erneut.',
-    'err.har.missing_token': 'Im HAR wurde kein Anmeldetoken gefunden. Aktiviere den Export mit sensiblen Daten.',
-    'err.har.invalid_file': 'Es kann kein gültiges HAR gelesen werden. Wähle eine von deinem Browser exportierte HAR-Datei.',
-    'err.har.too_large': 'Die HAR-Datei ist zu groß. Exportiere einen kleineren Mitschnitt und versuche es erneut.',
-    'err.har.unverified':
-      'Die Anmeldedaten im HAR haben die Zepp-Prüfung nicht bestanden, es wurde nichts gespeichert. Melde dich erneut an und exportiere wieder, oder gib ein App-Token von Hand ein.',
     'err.core.busy': 'Ein anderer Schreibvorgang läuft. Warte, bis er fertig ist',
     'err.core.parse': 'Die Antwort von Zepp konnte nicht gelesen werden',
     'err.core.database': 'Die lokale Datenbank ist vorübergehend nicht verfügbar',
@@ -57,9 +51,9 @@ export default {
     'err.login.connected': 'Mit deinem Zepp-Konto verbunden',
     'err.login.timeout': 'Die Anmeldung ist abgelaufen. Versuche es erneut',
     'err.login.credentials_unreadable':
-      'Du bist angemeldet, aber die Anmeldedaten konnten nicht aus dem Anmeldefenster gelesen werden. Versuche den HAR-Import oder gib ein App-Token von Hand ein.',
+      'Du bist angemeldet, aber die Anmeldedaten konnten nicht aus dem Anmeldefenster gelesen werden. Gib stattdessen ein App-Token von Hand ein.',
     'err.login.region_probe_failed':
-      'Die Anmeldedaten wurden gelesen, aber die Konto-Region konnte nicht bestätigt werden. Melde dich erneut an oder importiere eine HAR-Datei.',
+      'Die Anmeldedaten wurden gelesen, aber die Konto-Region konnte nicht bestätigt werden. Melde dich erneut an oder gib ein App-Token von Hand ein.',
     'err.login.credentials_rejected':
       'Zepp hat diese Anmeldedaten abgelehnt. Melde dich im Anmeldefenster ab und dann erneut an',
     'err.login.region_unreachable': 'Der Zepp-Regionsdienst war nicht erreichbar. Prüfe dein Netzwerk und versuche es erneut',
@@ -196,8 +190,6 @@ export default {
       authOpening: 'Wird geöffnet…',
       authRetry: 'Verbindung erneut versuchen',
       authUse: 'Verwenden',
-      authHarTitle: 'HAR-Import',
-      authHarSub: 'Für Fortgeschrittene und zur Fehlersuche: eine HAR-Datei importieren',
       authManualTitle: 'Manuell eingeben',
       authManualSub: 'appToken, user_id und Regions-Host von Hand eintragen',
       authCollapse: 'Einklappen',
@@ -497,10 +489,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       loginIncomplete: 'Anmeldung nicht abgeschlossen',
       loginWindowFailed: 'Das Anmeldefenster ließ sich nicht öffnen',
       loginCancelFailed: 'Die Anmeldung konnte nicht abgebrochen werden',
-      harFilter: 'HAR-Datei',
-      harImported: 'HAR-Datei importiert; die Anmeldedaten sind gespeichert.',
-      harImportFailed: 'Der HAR-Import ist fehlgeschlagen',
-      filePickerFailed: 'Die Dateiauswahl ließ sich nicht öffnen',
       fillAllFields: 'Alle Pflichtfelder ausfüllen',
       manualAuthDone: 'Manuelle Anmeldung erfolgreich; die Anmeldedaten sind gespeichert.',
       manualAuthFailed: 'Manuelle Anmeldung fehlgeschlagen',

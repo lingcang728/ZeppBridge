@@ -1,7 +1,7 @@
 <script setup lang="ts">
 
 defineOptions({ name: 'Overview' });
-import { computed, onActivated, onDeactivated, onMounted, ref, watch } from 'vue';
+import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import CoverageNotice from '../components/CoverageNotice.vue';
 import GlyphTile from '../components/GlyphTile.vue';
@@ -282,7 +282,23 @@ const refreshStream = async (stream: string) => {
 };
 onDeactivated(() => { active = false; });
 onActivated(() => { active = true; if (refreshOnActivate) { refreshOnActivate = false; void loadOverview(); } });
-watch(streamUpdate, update => { if (update.stream) void refreshStream(update.stream); });
+/* 同步按块落库，一条流会连续发好几次「有新数据」。同一条流在一小段时间里只读
+   一次库：第一次事件排上，这段时间里的后续事件都并进这次读取（读的时候它们
+   都已经落库了）。 */
+const STREAM_REFRESH_COALESCE_MS = 250;
+const pendingStreamRefresh = new Map<string, number>();
+watch(streamUpdate, update => {
+  const stream = update.stream;
+  if (!stream || pendingStreamRefresh.has(stream)) return;
+  pendingStreamRefresh.set(stream, window.setTimeout(() => {
+    pendingStreamRefresh.delete(stream);
+    void refreshStream(stream);
+  }, STREAM_REFRESH_COALESCE_MS));
+});
+onBeforeUnmount(() => {
+  for (const timer of pendingStreamRefresh.values()) window.clearTimeout(timer);
+  pendingStreamRefresh.clear();
+});
 
 onMounted(() => {
   // v3 起没有 Hero 卡，旧的「不再显示介绍」偏好也就没有对象了——

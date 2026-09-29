@@ -12,7 +12,7 @@ const d = useMessages(deckMessages);
 const {
   reconnecting, loginStatus, loginBusy, loginInProgress, loginMessage, connected, configuredOnly,
   showManualAuth, manualAppToken, manualUserId, manualRegionHost, manualAuthBusy,
-  startLogin, cancelLogin, importHar, submitManualAuth,
+  startLogin, cancelLogin, submitManualAuth,
 } = useSettingsContext().auth;
 
 const needsAttention = computed(() =>
@@ -42,16 +42,6 @@ const needsAttention = computed(() =>
           <button v-else class="button secondary" type="button" :disabled="loginBusy" @click="startLogin">
             {{ loginBusy ? t.authOpening : loginStatus.state === 'failed' ? t.authRetry : t.authUse }}
           </button>
-        </div>
-      </div>
-      <div class="s-row">
-        <span class="auth-icon"><Icon name="file" :size="17" /></span>
-        <div class="s-row-main">
-          <span class="s-row-title">{{ t.authHarTitle }}</span>
-          <span class="s-row-sub">{{ t.authHarSub }}</span>
-        </div>
-        <div class="s-row-control">
-          <button class="button secondary" type="button" :disabled="loginBusy" @click="importHar">{{ t.authUse }}</button>
         </div>
       </div>
       <div class="s-row">
@@ -89,7 +79,7 @@ const needsAttention = computed(() =>
     </details>
     <p v-if="loginInProgress && loginMessage" class="hint-line"><Icon name="info" :size="13" />{{ loginMessage }}</p>
     <!-- 登录失败要看得见原因，尤其是「登录了但没读到凭据」——那时该直接去
-         用 HAR / 手动填写，而不是反复重试网页登录。 -->
+         用手动填写，而不是反复重试网页登录。 -->
     <p v-else-if="loginStatus.state === 'failed' && loginMessage" class="api-error" role="alert">
       <Icon name="info" :size="13" />{{ loginMessage }}
     </p>

@@ -13,7 +13,7 @@ const DEFAULT_REGION_HOST = 'https://api-mifit-us3.zepp.com';
 const idleStatus = (): LoginStatus => ({ state: 'idle', message: '', page_url: '' });
 
 /**
- * 认证与账号：网页登录、HAR 导入、手动填写、验证、退出。
+ * 认证与账号：网页登录、手动填写、验证、退出。
  *
  * 认证区块和账号区块读的是同一份登录状态（账号卡上的「重新验证」和认证卡上的
  * 「使用」按钮是同一个动作），所以由设置页创建一份、两个区块共用。
@@ -29,7 +29,7 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
   const loginBusy = ref(false);
   let unlistenLogin: (() => void) | undefined;
 
-  // HAR导入和手动认证
+  // 手动认证
   const showManualAuth = ref(false);
   const manualAppToken = ref('');
   const manualUserId = ref('');
@@ -100,35 +100,6 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
       loginError.value = toUserMessage(error, t.value.loginCancelFailed);
     } finally {
       loginBusy.value = false;
-    }
-  };
-
-  // HAR导入
-  const importHar = async () => {
-    try {
-      const { open } = await import('@tauri-apps/plugin-dialog');
-      const selected = await open({
-        multiple: false,
-        filters: [{ name: t.value.harFilter, extensions: ['har', 'json'] }],
-      });
-      if (!selected) return;
-      loginBusy.value = true;
-      loginError.value = null;
-      try {
-        const harPath = typeof selected === 'string' ? selected : (selected as { path: string }).path;
-        await backend.importFromHar(harPath);
-        await refreshStatus();
-        loginStatus.value = idleStatus();
-        reconnecting.value = false;
-        loginError.value = null;
-        dataMessage.value = t.value.harImported;
-      } catch (error) {
-        loginError.value = toUserMessage(error, t.value.harImportFailed);
-      } finally {
-        loginBusy.value = false;
-      }
-    } catch (error) {
-      loginError.value = toUserMessage(error, t.value.filePickerFailed);
     }
   };
 
@@ -217,7 +188,6 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
     connectionLabel,
     startLogin,
     cancelLogin,
-    importHar,
     submitManualAuth,
     verifyAndSync,
     clearAuth,

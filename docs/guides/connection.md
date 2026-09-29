@@ -1,7 +1,7 @@
 # ZeppBridge connection guide
 
 There are three ways to connect: the in-app web sign-in, which is what you
-should use, and two fallbacks for when that fails.
+should use, and a fallback for when that fails.
 
 [简体中文](connection.zh-CN.md)
 
@@ -10,7 +10,7 @@ should use, and two fallbacks for when that fails.
 - The sign-in window only ever opens official Zepp / Huami pages. You sign in to
   your own account, on their page.
 - A token can read your health data. Never post a token, a full request header,
-  a HAR file, or a screenshot of a signed-in session anywhere public — including
+  a network capture, or a screenshot of a signed-in session anywhere public — including
   GitHub issues.
 - Credentials stay on this machine: the token goes into the OS credential store
   (Windows Credential Manager / macOS Keychain / Linux Secret Service), and
@@ -52,7 +52,7 @@ session times out after 15 minutes; **Retry** starts it again.
 
 If you are signed in but ZeppBridge says it **could not read the credentials**,
 web sign-in will not get any further no matter how many times you retry — use
-one of the two fallbacks below instead.
+the fallback below instead.
 
 ### 3. After that
 
@@ -61,25 +61,7 @@ service directly. Closing the window leaves the app in the tray; you do not sign
 in again. Only a 401/403, or Settings showing **needs reconnecting**, means it is
 time to reconnect.
 
-## Fallback 1: HAR import
-
-Use this when web sign-in does not work. A HAR file is a browser's export of the
-network requests it made over some period, and it contains the credentials that
-were sent after you signed in.
-
-1. Sign in to Zepp on the web in your browser and let the page load real data.
-2. Open developer tools (F12) → **Network**, tick *Preserve log*, and reload the
-   page once.
-3. Right-click in the request list → **Save all as HAR with content**, and save
-   the `.har` file.
-4. Back in ZeppBridge, go to Settings → authentication method → **HAR import**
-   and pick that file.
-
-The app reads only the requests to `api-mifit*` hosts, takes the token, user ID
-and region host, and ignores everything else in the file. **Delete the HAR file
-once the import succeeds** — it is equivalent to your account password.
-
-## Fallback 2: enter the credentials yourself
+## Fallback: enter the credentials yourself
 
 Use this when you already obtained the credentials through a legitimate route you
 control. In Settings → authentication method → **Manual entry**, fill in three
@@ -96,7 +78,7 @@ The region host is accepted only as `https://api-mifit*.zepp.com` or
 credentials. The connector enforces this, so a malformed value is rejected
 outright rather than silently used.
 
-Either way the token is written only to the OS credential store, and the full
+The token is written only to the OS credential store, and the full
 token is never displayed.
 
 **If you are not sure where a token came from, do not import it.**
@@ -106,8 +88,8 @@ token is never displayed.
 | What you see | Check first | If it still fails |
 | --- | --- | --- |
 | **Connect** opens no window | That you are in the desktop app; whether antivirus or a window manager is blocking new windows | Restart the app and try again |
-| Stuck on *waiting for sign-in* | Whether you actually completed sign-in in the pop-up | Cancel and retry, or use one of the fallbacks below |
-| *Signed in, but the credentials could not be read* | Nothing — retrying web sign-in will not help | Use HAR import or manual entry |
+| Stuck on *waiting for sign-in* | Whether you actually completed sign-in in the pop-up | Cancel and retry, or use the manual-entry fallback |
+| *Signed in, but the credentials could not be read* | Nothing — retrying web sign-in will not help | Use manual entry |
 | *No Zepp region accepted the credentials* | Whether this network can reach the Zepp region APIs; whether sign-in really completed | Try another network or later; confirm the sign-in page was on zepp.com / huami.com |
 | *Can't reach the Zepp region service — retrying* | Nothing; the sign-in window stays open and ZeppBridge keeps trying until the session times out | Fix the network, or cancel and retry |
 | *The token could not be saved to the system credential store* | Whether Windows Credential Manager (or the macOS keychain) is disabled by a system policy | The message carries the underlying reason; use it to tell a disabled store apart from a token too long to save |

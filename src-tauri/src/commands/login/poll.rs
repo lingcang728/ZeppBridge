@@ -8,7 +8,7 @@ pub(super) fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow
         let mut fallback_used = false;
         // 曾经走到过「看起来已经登录」的页面，却始终没读出凭据。这两种超时
         // 对用户完全不是一回事：一种是没登录完，另一种是登录完了但我们没拿到
-        // 东西——后者该直接把手动 / HAR 兜底摆到他面前，而不是让他等满 15
+        // 东西——后者该直接把手动填 Token 的兜底摆到他面前，而不是让他等满 15
         // 分钟再看到一句「登录超时」。
         let mut looked_signed_in = false;
         // 这次会话里，用户碰过登录窗口没有。只认阳性证据：页面明确说有人在
@@ -37,7 +37,7 @@ pub(super) fn spawn_login_poll(app: AppHandle, epoch: u64, window: WebviewWindow
                 } else if looked_signed_in {
                     (
                         "err.login.credentials_unreadable",
-                        "已经登录，但没能从登录窗口读到凭据。可以改用 HAR 导入或手动填写 App Token。",
+                        "已经登录，但没能从登录窗口读到凭据。可以改用手动填写 App Token。",
                     )
                 } else {
                     ("err.login.timeout", "登录超时，请重试")

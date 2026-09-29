@@ -43,7 +43,7 @@ impl RegionProbeFailures {
         }
         LoginFailure::fatal(AppError::new(
             "err.login.region_probe_failed",
-            "读到了凭据，但无法确认账号区域。请重新登录，或改用 HAR 导入。",
+            "读到了凭据，但无法确认账号区域。请重新登录，或改用手动填写 App Token。",
         ))
     }
 }

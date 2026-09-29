@@ -1,7 +1,7 @@
 {
   "name": "zeppbridge",
   "private": true,
-  "version": "3.0.0-beta.13",
+  "version": "3.0.0-beta.14",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -28,8 +28,7 @@
     "docs:check": "node scripts/release/check-doc-links.mjs",
     "i18n:check": "node scripts/release/check-i18n.mjs",
     "feedback:triage": "node scripts/feedback/triage.mjs",
-    "fonts:subset": "python scripts/assets/subset-fonts.py || py -3 scripts/assets/subset-fonts.py",
-    "verify:login-probe": "python scripts/verify/login-activity-probe.py || py -3 scripts/verify/login-activity-probe.py"
+    "fonts:subset": "python scripts/assets/subset-fonts.py || py -3 scripts/assets/subset-fonts.py"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

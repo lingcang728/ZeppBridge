@@ -129,9 +129,6 @@ export const tauriBackend: BridgeBackend = {
     return call<AppStatus>('clear_auth');
   },
 
-  importFromHar(harPath: string) {
-    return call<AppStatus>('import_from_har', { harPath });
-  },
 
   manualAuth(appToken: string, userId: string, regionHost: string) {
     return call<AppStatus>('manual_auth', { appToken, userId, regionHost });

@@ -359,3 +359,121 @@ fn auto_sync_pulls_the_full_window_once_a_day_and_a_short_one_in_between() {
         .unwrap();
     assert!(db.full_window_refresh_due(now).unwrap());
 }
+
+fn chunk_test_manager() -> SyncManager {
+    let connector = ZeppConnector::new(AuthInfo {
+        app_token: "test-token".into(),
+        user_id: "user-1".into(),
+        region_host: "https://api-mifit.zepp.com".into(),
+    })
+    .unwrap();
+    SyncManager::new(
+        DataFetcher::new(connector),
+        Database::in_memory().unwrap(),
+        Arc::new(AtomicBool::new(false)),
+    )
+}
+
+fn heart_rate_chunk(chunk: FetchWindow) -> Vec<FetchedRecord> {
+    let second = chunk.start_utc.timestamp() + 60;
+    vec![FetchedRecord {
+        incomplete: false,
+        incomplete_reason: None,
+        raw: RawRecord {
+            stream: "heart_rate".into(),
+            source_key: format!("chunk-test:{second}"),
+            source_scope: SourceScope::UserFused,
+            device_id: None,
+            start_utc: chunk.start_utc,
+            end_utc: Some(chunk.end_utc),
+            payload: serde_json::json!({"items": [{"timestamp": second, "value": 70}]}),
+            capability: CapabilityStatus::Verified,
+        },
+    }]
+}
+
+/// 首页要先看到最新的数据：块从新到旧拉，每一块落库之后立刻通知一次，
+/// 而不是整段窗口拉完才通知。
+#[tokio::test]
+async fn chunked_sync_commits_the_newest_chunk_first_and_reports_each_commit() {
+    let manager = chunk_test_manager();
+    let window = FetchWindow::days(20).unwrap();
+    let mut seen = Vec::new();
+    let mut commits = 0;
+    let report = manager
+        .sync_chunked_stream(
+            "heart_rate",
+            window,
+            7,
+            OnChunkError::Continue,
+            |chunk| {
+                seen.push(chunk.start_utc);
+                let records = heart_rate_chunk(chunk);
+                async move { Ok(records) }
+            },
+            || commits += 1,
+        )
+        .await
+        .unwrap();
+    assert_eq!(seen.len(), 3);
+    assert!(
+        seen.windows(2).all(|pair| pair[0] > pair[1]),
+        "newest chunk must come first"
+    );
+    assert_eq!(commits, 3);
+    assert_eq!(report.status, StreamStatus::Success);
+    assert_eq!(report.raw_records, 3);
+    assert_eq!(report.records_written, 3);
+}
+
+/// 后面一块失败时，已经落库的留着，但这条流不能报成功。
+#[tokio::test]
+async fn a_failed_older_chunk_keeps_committed_data_but_fails_the_stream() {
+    let manager = chunk_test_manager();
+    let window = FetchWindow::days(20).unwrap();
+    let mut calls = 0;
+    let report = manager
+        .sync_chunked_stream(
+            "heart_rate",
+            window,
+            7,
+            OnChunkError::StopUnlessUnavailable,
+            |chunk| {
+                calls += 1;
+                let result = if calls == 1 {
+                    Ok(heart_rate_chunk(chunk))
+                } else {
+                    Err(ZeppBridgeError::ConfigError("offline".into()))
+                };
+                async move { result }
+            },
+            || {},
+        )
+        .await
+        .unwrap();
+    assert_eq!(calls, 2, "a request failure stops the heart-rate stream");
+    assert_eq!(report.status, StreamStatus::Failed);
+    assert_eq!(report.records_written, 1);
+    let db = manager.db.lock().await;
+    assert_eq!(
+        db.get_sync_state("heart_rate").unwrap().unwrap().status,
+        "failed"
+    );
+}
+
+#[tokio::test]
+async fn a_stream_with_no_committed_chunk_hands_the_error_back() {
+    let manager = chunk_test_manager();
+    let error = manager
+        .sync_chunked_stream(
+            "sleep",
+            FetchWindow::days(14).unwrap(),
+            7,
+            OnChunkError::Continue,
+            |_| async { Err(ZeppBridgeError::Unavailable("404".into())) },
+            || {},
+        )
+        .await
+        .unwrap_err();
+    assert!(error.is_unavailable());
+}

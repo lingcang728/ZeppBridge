@@ -1,13 +1,11 @@
 use super::status::build_app_status;
 use crate::app_state::AppState;
-use crate::auth::extract_from_har;
 use crate::connectors::ZeppConnector;
 use crate::ipc_error::AppError;
 use crate::ipc_types::AppStatus;
 use crate::models::{error::ZeppBridgeError, AuthInfo};
 use chrono::{Duration, Utc};
 use serde_json::Value;
-use std::path::PathBuf;
 
 /// Save authentication metadata and install a ready-to-use synchronizer.
 ///
@@ -320,65 +318,6 @@ mod tests {
             assert!(validate_verify_payload(&value).is_err(), "accepted {value}");
         }
     }
-}
-
-/// Import authentication credentials from a HAR (HTTP Archive) file.
-///
-/// Parses a HAR file exported from mitmproxy/Charles/browser devtools,
-/// extracts `app_token`, `user_id`, and `region_host`, and saves them
-/// using the same flow as `save_auth`.
-///
-/// The HAR file must contain at least one request to an `api-mifit*` host
-/// with the `apptoken` header present.
-#[tauri::command]
-pub async fn import_from_har(
-    state: tauri::State<'_, AppState>,
-    har_path: String,
-) -> std::result::Result<AppStatus, AppError> {
-    let path = PathBuf::from(&har_path);
-
-    let auth = extract_from_har(&path).map_err(|error| {
-        let reason = error.to_string();
-        let (code, message) = if reason.contains("超过大小上限") {
-            (
-                "err.har.too_large",
-                "HAR 文件过大，请导出一份更小的网络记录后再导入",
-            )
-        } else if reason.contains("未找到user_id") {
-            (
-                "err.har.missing_user",
-                "HAR 中没有找到用户编号，请在登录成功后重新导出网络记录",
-            )
-        } else if reason.contains("未找到apptoken") {
-            (
-                "err.har.missing_token",
-                "HAR 中没有找到登录令牌，请导出包含敏感数据的 HAR",
-            )
-        } else {
-            (
-                "err.har.invalid_file",
-                "无法读取有效的 HAR，请重新选择浏览器导出的 HAR 文件",
-            )
-        };
-        AppError::new(code, message)
-    })?;
-
-    // Do not persist a token that Zepp has not accepted. A HAR can contain
-    // leftover headers from another account or an expired session; saving
-    // those would look like a successful import until the next sync fails.
-    if let Err(error) = verify_recent_heart_rate(&auth).await {
-        return Err(match &error {
-            ZeppBridgeError::NetworkError(_) | ZeppBridgeError::RetryExhausted { .. } => {
-                user_facing_verify_error(&error)
-            }
-            _ => AppError::new(
-                "err.har.unverified",
-                "HAR 里的登录凭据未能通过 Zepp 验证，没有保存。请重新登录后导出，或改用手填 App Token。",
-            ),
-        });
-    }
-
-    save_auth(state, auth.app_token, auth.user_id, auth.region_host).await
 }
 
 /// Manually enter authentication credentials.

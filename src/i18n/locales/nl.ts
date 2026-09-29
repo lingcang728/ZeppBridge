@@ -989,8 +989,6 @@ export default {
       authCleared:
         'Uitgelogd. Alles wat al naar deze machine is gesynchroniseerd is er nog.',
       authCollapse: 'Inklappen',
-      authHarSub: 'Voor gevorderden en debugging: een HAR-bestand importeren',
-      authHarTitle: 'HAR-import',
       authInUse: 'In gebruik',
       authManualSub: 'Voer appToken, user_id en regio-host in',
       authManualTitle: 'Zelf invoeren',
@@ -1072,14 +1070,10 @@ export default {
       deviceErrorPrefix: 'Apparaatherkenning: ',
       deviceFirmware: (firmware: string) => `Firmware ${firmware}`,
       distanceUnitLabel: 'Afstandseenheid',
-      filePickerFailed: 'De bestandskiezer kon niet worden geopend',
       fillAllFields: 'Vul elk verplicht veld in',
       formatCsvHint: 'Tabelgegevens',
       formatGpxHint: 'Trainingstracks',
       formatJsonHint: 'Gestructureerde gegevens',
-      harFilter: 'HAR-bestand',
-      harImportFailed: 'De HAR-import is mislukt',
-      harImported: 'HAR-bestand geïmporteerd; de inloggegevens zijn opgeslagen.',
       healthCheckLabel: 'Gegevensgezondheidscontrole',
       healthCheckNote:
         'Hoe ver elke gegevensstroom kwam met ophalen uit de cloud, parsen en lokaal schrijven; welke datums het dekt; waar het vandaan kwam. Niet om dagelijks te bekijken — kom hier als een synchronisatieresultaat niet klopt met wat je verwachtte.',
@@ -2459,7 +2453,7 @@ Antwoord in Markdown.`,
       'Zepp heeft het verzoek ontvangen maar geweigerd. Als dit blijft gebeuren, koppel het Zepp-account dan opnieuw in Instellingen',
     'err.core.config': 'Er moet eerst iets in de configuratie worden aangepast',
     'err.core.credential_store':
-      'De opslag voor inloggegevens was niet toegankelijk. Controleer of die vergrendeld is, door systeembeleid wordt geblokkeerd, verkeerd is geconfigureerd of foutieve bestandsrechten heeft. Inloggen via web, HAR-import en handmatige invoer gebruiken allemaal dezelfde opslag, dus een andere inlogmethode omzeilt een opslagfout niet. Als macOS Keychain of de Linux-sleutelring niet beschikbaar is, volg dan de handleiding voor opslag van inloggegevens in de README: start met ZEPPBRIDGE_CREDENTIAL_STORE=file en meld daarna opnieuw aan. Hierbij worden tokens in een gewoon tekstbestand opgeslagen dat alleen door jouw gebruiker lees- en schrijfbaar is.',
+      'De opslag voor inloggegevens was niet toegankelijk. Controleer of die vergrendeld is, door systeembeleid wordt geblokkeerd, verkeerd is geconfigureerd of foutieve bestandsrechten heeft. Inloggen via web en handmatige invoer gebruiken allemaal dezelfde opslag, dus een andere inlogmethode omzeilt een opslagfout niet. Als macOS Keychain of de Linux-sleutelring niet beschikbaar is, volg dan de handleiding voor opslag van inloggegevens in de README: start met ZEPPBRIDGE_CREDENTIAL_STORE=file en meld daarna opnieuw aan. Hierbij worden tokens in een gewoon tekstbestand opgeslagen dat alleen door jouw gebruiker lees- en schrijfbaar is.',
     'err.core.database': 'De lokale database is tijdelijk niet beschikbaar',
     'err.core.http_status': 'Zepp heeft een fout teruggegeven. Probeer het zo opnieuw',
     'err.core.invalid_host': 'Onveilig Zepp-regioadres',
@@ -2497,16 +2491,6 @@ Antwoord in Markdown.`,
     'err.handoff.mkdir_failed': 'De map voor de overdracht kon niet worden aangemaakt',
     'err.handoff.prompt_required': 'Schrijf eerst een prompt',
     'err.handoff.write_failed': 'De geanonimiseerde AI-gegevens konden niet worden geschreven',
-    'err.har.invalid_file':
-      'Kan geen geldige HAR lezen. Kies een HAR-bestand dat door je browser is geëxporteerd.',
-    'err.har.missing_token':
-      'Geen inlogtoken in de HAR gevonden. Schakel exporteren met gevoelige gegevens in.',
-    'err.har.missing_user':
-      'Geen gebruikers-id in de HAR gevonden. Exporteer het netwerkverkeer opnieuw na het inloggen.',
-    'err.har.too_large':
-      'Het HAR-bestand is te groot. Exporteer een kleinere opname en probeer het opnieuw.',
-    'err.har.unverified':
-      'De inloggegevens in de HAR zijn niet door de Zepp-verificatie gekomen, dus er is niets opgeslagen. Meld opnieuw aan en exporteer opnieuw, of voer handmatig een App Token in.',
     'err.headless.no_credential_store':
       'Op deze machine is geen systeemopslag voor inloggegevens beschikbaar (GNOME Keyring / KWallet). Headless servers en containers hebben die meestal niet. Stel ZEPPBRIDGE_CREDENTIAL_STORE=file in om het token met 0600 in de gegevensmap te schrijven, of ZEPPBRIDGE_CREDENTIAL_STORE=env samen met ZEPPBRIDGE_APP_TOKEN.',
     'err.headless.schema_upgrade':
@@ -2527,11 +2511,11 @@ Antwoord in Markdown.`,
     'err.login.credentials_rejected':
       'Zepp heeft deze inloggegevens geweigerd. Log uit in het inlogvenster en meld daarna opnieuw aan',
     'err.login.credentials_unreadable':
-      'Je bent ingelogd, maar de inloggegevens konden niet uit het inlogvenster worden gelezen. Probeer de HAR-import of voer handmatig een App Token in.',
+      'Je bent ingelogd, maar de inloggegevens konden niet uit het inlogvenster worden gelezen. Voer in plaats daarvan handmatig een App Token in.',
     'err.login.extracting': 'Inloggegevens gelezen. Je regio wordt bevestigd',
     'err.login.fallback_page': 'De alternatieve inlogpagina wordt geopend',
     'err.login.region_probe_failed':
-      'De inloggegevens zijn gelezen, maar de accountregio kon niet worden bevestigd. Meld opnieuw aan of importeer een HAR-bestand.',
+      'De inloggegevens zijn gelezen, maar de accountregio kon niet worden bevestigd. Meld opnieuw aan of voer handmatig een App Token in.',
     'err.login.region_retrying':
       'De Zepp-regiodienst is nu niet bereikbaar — er wordt opnieuw geprobeerd. Het inlogvenster blijft open, dus opnieuw inloggen is niet nodig',
     'err.login.region_unreachable':

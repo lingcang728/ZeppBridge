@@ -29,9 +29,9 @@ describe('backend errors in the English interface', () => {
   it('localises the failure that used to strand people at sign-in', () => {
     const error = backendError(
       'err.login.credentials_unreadable',
-      '已经登录，但没能从登录窗口读到凭据。可以改用 HAR 导入或手动填写 App Token。',
+      '已经登录，但没能从登录窗口读到凭据。可以改用手动填写 App Token。',
     );
-    expect(toUserMessage(error)).toContain('HAR import');
+    expect(toUserMessage(error)).toContain('Enter an App Token manually');
   });
 
   it('falls back to the backend text when a code is unknown', () => {

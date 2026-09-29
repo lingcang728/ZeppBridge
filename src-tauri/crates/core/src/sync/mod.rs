@@ -30,9 +30,11 @@ const LOCK_POLL: std::time::Duration = std::time::Duration::from_millis(120);
 use tokio::sync::Mutex;
 
 mod backfill;
+mod chunked;
 mod persist;
 mod report;
 
+use chunked::OnChunkError;
 use report::*;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

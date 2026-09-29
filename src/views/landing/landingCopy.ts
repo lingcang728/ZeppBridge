@@ -138,12 +138,11 @@ export const COPY: Record<'zh' | 'en', LandingCopy> = {
       ],
     },
     connect: {
-      overline: 'THREE PATHS, ONE LOCAL VAULT',
+      overline: 'TWO PATHS, ONE LOCAL VAULT',
       heading: '选择适合你的连接方式。',
       lead: 'ZeppBridge 支持从简单的官方网页登录，到可审计的手动授权流程。连接状态和错误原因都会明确显示。',
       items: [
         { icon: 'browser-login', title: '官方网页登录', copy: '在官方登录流程中识别账户授权，凭据留在本机。', tag: '推荐' },
-        { icon: 'document', title: 'HAR 导入', copy: '面向调试与高级用户，复用已有的授权请求。', tag: '高级' },
         { icon: 'manual-entry', title: '手动填写', copy: '明确掌控 appToken 与用户标识的输入过程。', tag: '可控' },
       ],
     },
@@ -256,12 +255,11 @@ export const COPY: Record<'zh' | 'en', LandingCopy> = {
       ],
     },
     connect: {
-      overline: 'THREE PATHS, ONE LOCAL VAULT',
+      overline: 'TWO PATHS, ONE LOCAL VAULT',
       heading: 'Pick the way in that suits you.',
       lead: 'From a plain official web login to a fully auditable manual handoff. Connection state and failure reasons are always spelled out.',
       items: [
         { icon: 'browser-login', title: 'Official web login', copy: 'Authorize inside the official flow. Credentials stay on your machine.', tag: 'Recommended' },
-        { icon: 'document', title: 'HAR import', copy: 'For debugging and advanced users: reuse an authorized request you already captured.', tag: 'Advanced' },
         { icon: 'manual-entry', title: 'Manual entry', copy: 'Enter the appToken and user id yourself, in full view.', tag: 'Hands-on' },
       ],
     },
