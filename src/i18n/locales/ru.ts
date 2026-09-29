@@ -612,6 +612,8 @@ export default {
       backfill: 'Дозагрузить ещё истории',
       backfilling: 'Дозагружается…',
       syncNow: 'Синхронизировать сейчас',
+      connect: 'Подключить аккаунт Zepp',
+      emptyNotConnected: 'На этом компьютере пока ничего нет. Сначала подключите аккаунт Zepp, затем выполните синхронизацию.',
     },
 
 
@@ -963,6 +965,7 @@ export default {
         'weekly.workout_count': 'Тренировки',
         'weekly.training_load': 'Тренировочная нагрузка',
       },
+      legendNeutral: '↑↓ серый = просто изменение, без оценки',
     },
 
     'components/WheelDatePicker': {
@@ -1032,6 +1035,7 @@ export default {
       seeMore: 'Подробнее',
       durationHours: (hours: number, minutes: number) => `${hours} ч ${minutes} мин`,
       durationMinutes: (minutes: number) => `${minutes} мин`,
+      sleepTitleOn: (day: string) => `Сон · ${day}`,
     },
 
     'components/overview/StepsCard': {
@@ -1048,7 +1052,6 @@ export default {
       factDone: 'Выполнено',
       factLeft: 'Осталось',
       factReached: 'Достигнуто',
-      factUpdated: 'Обновлено',
     },
 
     'components/overview/SourcesStrip': {
@@ -1082,6 +1085,7 @@ export default {
       localeLabel: 'Язык интерфейса',
       readyPill: 'Данные готовы · передать ИИ',
       readyTitle: 'Синхронизация завершена — локальные данные актуальны. Нажмите, чтобы передать их ИИ.',
+      connectPill: 'Подключить аккаунт',
     },
 
     'composables/useAiHandoff': {
@@ -2114,9 +2118,7 @@ export default {
       emptyMessage:
         'После синхронизации здесь появятся только записи с типом, временем и хотя бы одной настоящей '
         + 'метрикой. Без GPS или поточечных отсчётов пустой график не рисуется.',
-      labelDistance: 'Дистанция',
-      labelBurn: 'Расход',
-      labelDuration: 'Длительность',
+      avgHr: (bpm: number) => `средний пульс ${bpm}`,
       notProvided: 'Нет данных',
       footnote: (count: number) =>
         plural(count, {

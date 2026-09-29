@@ -569,6 +569,8 @@ export default {
       backfill: 'Repôr mais histórico',
       backfilling: 'A repôr…',
       syncNow: 'Sincronizar agora',
+      connect: 'Ligar conta Zepp',
+      emptyNotConnected: 'Ainda não há nada neste computador. Ligue primeiro a sua conta Zepp e depois sincronize uma vez.',
     },
     'components/DeviceMarquee': {
       marqueeAria: 'Dispositivos Amazfit atualmente no catálogo',
@@ -904,6 +906,7 @@ export default {
         'weekly.workout_count': 'Treinos',
         'weekly.training_load': 'Carga de treino',
       },
+      legendNeutral: '↑↓ cinzento = apenas uma mudança, sem juízo',
     },
     'components/overview/DataReadyCapsule': {
       waitingEyebrow: 'A obter os teus dados da nuvem',
@@ -961,6 +964,7 @@ export default {
       seeMore: 'Ver mais',
       durationHours: (hours: number, minutes: number) => `${hours} h ${minutes} min`,
       durationMinutes: (minutes: number) => `${minutes} min`,
+      sleepTitleOn: (day: string) => `Sono · ${day}`,
     },
     'components/overview/SourcesStrip': {
       dataSources: 'Origens de dados',
@@ -986,7 +990,6 @@ export default {
       factDone: 'Feito',
       factLeft: 'Em falta',
       factReached: 'Atingido',
-      factUpdated: 'Atualizado',
     },
     'components/shell/AppTopBar': {
       today: 'Hoje',
@@ -1010,6 +1013,7 @@ export default {
       readyPill: 'Dados prontos · entregar à IA',
       readyTitle:
         'Sincronização concluída: os dados locais estão em dia. Clica para os entregar à IA.',
+      connectPill: 'Ligar conta',
     },
     'composables/useAiHandoff': {
       clipboardUnsupported:
@@ -2021,9 +2025,7 @@ Responde em Markdown.`,
       emptyTitle: 'Ainda nada para mostrar',
       emptyMessage:
         'Depois de uma sincronização, só aparecem aqui registos que tragam um tipo, uma hora e pelo menos uma métrica real. Sem GPS ou amostras ponto a ponto, não é desenhado nenhum gráfico vazio.',
-      labelDistance: 'Distância',
-      labelBurn: 'Gasto',
-      labelDuration: 'Duração',
+      avgHr: (bpm: number) => `FC média ${bpm}`,
       notProvided: 'Não fornecido',
       footnote: (count: number) => `${count} registos mostrados`,
       shown: (loaded: number, total: number) => `Carregados ${loaded} de ${total}`,

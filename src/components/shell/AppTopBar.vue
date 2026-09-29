@@ -25,6 +25,7 @@ const messages = defineMessages(
     today: '今天',
     syncNow: '立即同步',
     verifyFirst: '请先完成连接验证',
+    connectPill: '连接账号',
     syncing: '同步中…',
     syncFailed: '同步失败',
     syncPartial: '部分未完成',
@@ -47,6 +48,7 @@ const messages = defineMessages(
     today: 'Today',
     syncNow: 'Sync now',
     verifyFirst: 'Verify the connection first',
+    connectPill: 'Connect account',
     syncing: 'Syncing…',
     syncFailed: 'Sync failed',
     syncPartial: 'Partly synced',
@@ -69,6 +71,7 @@ const messages = defineMessages(
     today: 'Hoy',
     syncNow: 'Sincronizar ahora',
     verifyFirst: 'Primero verifica la conexión',
+    connectPill: 'Conectar cuenta',
     syncing: 'Sincronizando…',
     syncFailed: 'La sincronización falló',
     syncPartial: 'Sincronización parcial',
@@ -100,6 +103,15 @@ const router = useRouter();
 const activeBranch = computed(() => navigationBranch(route.path));
 const navItems = computed(() => props.items.map((item) => ({ value: item.to, label: item.label })));
 const goTo = (to: string | number) => { void router.push(String(to)); };
+/* 在详情页里点顶栏已经亮着的那一项（比如睡眠详情里点「概览」）：回到这个入口的首页。
+   分段控件重选当前项本来什么都不做，可这里它是导航——新用户第一反应就是点它。
+   上一页正好是首页就退一格历史，这样和左上角返回一样缩回原卡、回到原来的滚动位置。 */
+const onNavReselect = (to: string | number) => {
+  const root = String(to);
+  if (route.path === root) return;
+  if (historyBackPath() === root) router.back();
+  else void router.push(root);
+};
 /* 左上角返回：从哪里来回哪里去（见 lib/navigation.ts#backDestination）。 */
 const goBack = () => {
   const target = backDestination(route.fullPath, historyBackPath());
@@ -169,13 +181,18 @@ const lastSyncShort = computed(() => {
   return `${day} ${time}`;
 });
 
-/* 胶囊里只放一行短文字：同步中给进度，失败给结果，空闲给上次同步时间。 */
+/* 还没连上（或要重新验证）：胶囊这时候唯一有用的动作是去连账号。以前它显示「同步失败」
+   却点不动——用户最需要出路的状态恰好没有出路。状态还没读回来时不算，免得启动时闪一下。 */
+const needsConnection = computed(() => !!appStatus.value && !canIncrementalSync.value);
+
+/* 胶囊里只放一行短文字：同步中给进度，未连接给「连接账号」，失败给结果，空闲给上次同步时间。 */
 const syncText = computed(() => {
   if (isSyncing.value) {
     return syncProgress.value
       ? `${syncProgress.value.current}/${syncProgress.value.total}`
       : t.value.syncing;
   }
+  if (needsConnection.value) return t.value.connectPill;
   if (syncState.value === 'failed') return t.value.syncFailed;
   if (syncState.value === 'partial') return t.value.syncPartial;
   return lastSyncShort.value;
@@ -188,7 +205,7 @@ const syncTitle = computed(() => {
     + ` — ${canIncrementalSync.value ? t.value.syncNow : t.value.verifyFirst}`;
 });
 
-/* 点击行为和旧的同步按钮相同：能增量同步就发起；同步中点击则是取消。 */
+/* 点击行为和旧的同步按钮相同：能增量同步就发起；同步中点击则是取消；没连上就去「账号与设备」卡。 */
 const onSyncClick = () => {
   if (readyToHand.value) {
     void router.push('/ai');
@@ -196,6 +213,8 @@ const onSyncClick = () => {
     cancelSync();
   } else if (canIncrementalSync.value) {
     void runSync('incremental');
+  } else if (needsConnection.value) {
+    void router.push('/settings/account');
   }
 };
 
@@ -356,6 +375,7 @@ watch(() => (readyToHand.value ? t.value.readyPill : syncText.value), () => {
       :model-value="activeBranch"
       :aria-label="navAriaLabel || t.mainNav"
       @update:model-value="goTo"
+      @reselect="onNavReselect"
     />
 
     <div class="topbar-actions">
@@ -364,7 +384,7 @@ watch(() => (readyToHand.value ? t.value.readyPill : syncText.value), () => {
         ref="syncPill"
         :class="['sync-pill', 'glass-control', `tone-${statusTone}`, { syncing: isSyncing, 'is-ready': readyToHand, 'ready-glow': readyToHand }]"
         type="button"
-        :disabled="!readyToHand && !isSyncing && !canIncrementalSync"
+        :disabled="!readyToHand && !isSyncing && !canIncrementalSync && !needsConnection"
         :title="syncTitle"
         :aria-label="syncTitle"
         @click="onSyncClick"

@@ -8,7 +8,7 @@ import EmptyState from '../components/EmptyState.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
-import { formatDate, formatDuration, isFiniteNumber } from '../lib/format';
+import { formatDate, formatDuration, formatTime, isFiniteNumber } from '../lib/format';
 import { createLoadSeq } from '../lib/loadSeq';
 import type { SleepSession } from '../types';
 import { defineMessages, useMessages } from '../i18n';
@@ -161,6 +161,7 @@ watch(dataRevision, () => void loadList());
         category="sleep"
         design-icon="sleep"
         :kicker="formatDate(session.start_time)"
+        :time="formatTime(session.start_time)"
         :title="formatDuration(session.duration_minutes)"
         :fact="isFiniteNumber(session.score) ? String(Math.round(session.score)) : '—'"
         :fact-label="t.scoreLabel"

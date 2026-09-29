@@ -513,6 +513,8 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       backfill: 'Rattraper plus d’historique',
       backfilling: 'Rattrapage en cours…',
       reconnect: 'Reconnecter le compte',
+      connect: 'Connecter le compte Zepp',
+      emptyNotConnected: 'Rien sur cet ordinateur pour l’instant. Connectez d’abord votre compte Zepp, puis synchronisez une fois.',
     },
 
 
@@ -867,6 +869,7 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       timeUnknown: 'Heure inconnue',
       readyPill: 'Données prêtes · confier à l’IA',
       readyTitle: 'Synchro terminée, les données locales sont à jour. Cliquez pour les confier à l’IA.',
+      connectPill: 'Connecter le compte',
     },
     'components/HeartRateZonePicker': {
       title: 'Zones de fréquence cardiaque',
@@ -1120,6 +1123,7 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       notProvided: 'Non renseigné',
       loadFailed: 'Impossible de construire le rapport hebdomadaire local',
       desktopOnly: 'Le rapport hebdomadaire requiert l’application de bureau ZeppBridge.',
+      legendNeutral: '↑↓ gris = simple variation, sans jugement',
     },
 
     'components/overview/DataReadyCapsule': {
@@ -1178,6 +1182,7 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       seeMore: 'Voir plus',
       durationHours: (hours: number, minutes: number) => `${hours} h ${minutes} min`,
       durationMinutes: (minutes: number) => `${minutes} min`,
+      sleepTitleOn: (day: string) => `Sommeil · ${day}`,
     },
 
     'components/overview/SourcesStrip': {
@@ -1204,7 +1209,6 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       factDone: 'Fait',
       factLeft: 'Reste',
       factReached: 'Atteint',
-      factUpdated: 'Mis à jour',
     },
     'views/ActivityDetail': {
       title: 'Activité quotidienne',
@@ -1310,9 +1314,7 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       intro: 'Séances synchronisées sur cette machine. Pas de trace, pas de carte.',
       backToRecent: 'Retour aux enregistrements récents',
       backToOverview: 'Retour à l’aperçu',
-      labelDuration: 'Durée',
-      labelDistance: 'Distance',
-      labelBurn: 'Dépense',
+      avgHr: (bpm: number) => `FC moy. ${bpm}`,
       notProvided: 'Non renseigné',
       shown: (loaded: number, total: number) => `${loaded} chargées sur ${total}`,
       footnote: (count: number) => plural(count, { one: `${count} enregistrement affichable`, other: `${count} enregistrements affichables` }),

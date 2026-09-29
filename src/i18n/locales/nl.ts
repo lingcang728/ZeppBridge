@@ -182,6 +182,8 @@ export default {
       backfill: 'Meer historie ophalen',
       backfilling: 'Historie ophalen…',
       syncNow: 'Nu synchroniseren',
+      connect: 'Zepp-account koppelen',
+      emptyNotConnected: 'Nog niets op deze computer. Koppel eerst je Zepp-account en synchroniseer daarna één keer.',
     },
     'components/DeviceMarquee': {
       marqueeAria: 'Amazfit-apparaten die nu in de catalogus staan',
@@ -519,6 +521,7 @@ export default {
         'weekly.workout_count': 'Trainingen',
         'weekly.training_load': 'Trainingsbelasting',
       },
+      legendNeutral: '↑↓ grijs = alleen een verandering, geen oordeel',
     },
     'components/WheelDatePicker': {
       day: 'Dag',
@@ -583,6 +586,7 @@ export default {
       seeMore: 'Meer zien',
       durationHours: (hours: number, minutes: number) => `${hours} uur ${minutes} min`,
       durationMinutes: (minutes: number) => `${minutes} min`,
+      sleepTitleOn: (day: string) => `Slaap · ${day}`,
     },
     'components/overview/SourcesStrip': {
       dataSources: 'Gegevensbronnen',
@@ -609,7 +613,6 @@ export default {
       factDone: 'Gedaan',
       factLeft: 'Resterend',
       factReached: 'Gehaald',
-      factUpdated: 'Bijgewerkt',
     },
     'components/shell/AppTopBar': {
       today: 'Vandaag',
@@ -633,6 +636,7 @@ export default {
       themeDark: 'Donker',
       themeSystem: 'Systeem',
       localeLabel: 'Interfacetaal',
+      connectPill: 'Account koppelen',
     },
     'composables/useAiHandoff': {
       clipboardUnsupported: 'Deze omgeving kan niet naar het klembord schrijven',
@@ -2111,9 +2115,7 @@ Antwoord in Markdown.`,
       emptyTitle: 'Nog niets om te tonen',
       emptyMessage:
         'Na een synchronisatie verschijnen hier alleen records met een type, een tijd en minstens één echte metriek. Zonder GPS of metingen per punt wordt geen lege grafiek getekend.',
-      labelDistance: 'Afstand',
-      labelBurn: 'Verbranding',
-      labelDuration: 'Duur',
+      avgHr: (bpm: number) => `Gem. hartslag ${bpm}`,
       notProvided: 'Niet verstrekt',
       footnote: (count: number) =>
         plural(count, { one: `${count} record getoond`, other: `${count} records getoond` }),

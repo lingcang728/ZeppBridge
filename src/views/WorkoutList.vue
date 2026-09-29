@@ -8,7 +8,7 @@ import EmptyState from '../components/EmptyState.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
-import { formatDate, formatDistance, formatDuration, isFiniteNumber } from '../lib/format';
+import { formatDate, formatDistance, formatDuration, formatTime, isFiniteNumber } from '../lib/format';
 import { displayableWorkouts, workoutDisplayLabel, workoutDurationMinutes, workoutIcon } from '../lib/workouts';
 import type { Workout } from '../types';
 import { createLoadSeq } from '../lib/loadSeq';
@@ -25,9 +25,7 @@ const messages = defineMessages(
     retry: '重试',
     emptyTitle: '没有可展示的运动记录',
     emptyMessage: '同步后，只有包含类型、时间和至少一项有效指标的记录会显示在这里。没有 GPS 或逐点样本时不会画空图。',
-    labelDistance: '距离',
-    labelBurn: '消耗',
-    labelDuration: '时长',
+    avgHr: (bpm: number) => `均心率 ${bpm}`,
     notProvided: '未提供',
     footnote: (count: number) => `${count} 条可展示记录`,
     shown: (loaded: number, total: number) => `已读取 ${loaded} / 共 ${total} 条`,
@@ -44,9 +42,7 @@ const messages = defineMessages(
     retry: 'Try again',
     emptyTitle: 'Nothing to show yet',
     emptyMessage: 'After a sync, only records carrying a type, a time and at least one real metric appear here. Without GPS or per-point samples, no empty chart is drawn.',
-    labelDistance: 'Distance',
-    labelBurn: 'Burn',
-    labelDuration: 'Duration',
+    avgHr: (bpm: number) => `Avg HR ${bpm}`,
     notProvided: 'Not provided',
     footnote: (count: number) => `${count} records shown`,
     shown: (loaded: number, total: number) => `Loaded ${loaded} of ${total}`,
@@ -63,9 +59,7 @@ const messages = defineMessages(
     retry: 'Reintentar',
     emptyTitle: 'Todavía no hay nada que mostrar',
     emptyMessage: 'Después de sincronizar, aquí solo aparecen los registros que tienen tipo, hora y al menos una métrica real. Sin GPS ni muestras punto a punto, no se dibuja un gráfico vacío.',
-    labelDistance: 'Distancia',
-    labelBurn: 'Calorías',
-    labelDuration: 'Duración',
+    avgHr: (bpm: number) => `FC media ${bpm}`,
     notProvided: 'Sin datos',
     footnote: (count: number) => `${count} registros mostrados`,
     shown: (loaded: number, total: number) => `Cargados ${loaded} de ${total}`,
@@ -96,16 +90,17 @@ const loadingMore = ref(false);
 const listEpoch = createLoadSeq();
 const hasMore = computed(() => workouts.value.length < total.value);
 
-const workoutFact = (workout: Workout): { fact: string; label: string } => {
+/* 一行要能和同一天的其他几条区分开：时长、均心率，再加距离或消耗。
+   只列有值的项，一项都没有才写「未提供」。 */
+const workoutFact = (workout: Workout): string => {
+  const parts: string[] = [];
+  const minutes = workoutDurationMinutes(workout);
+  if (minutes) parts.push(formatDuration(minutes));
+  if (isFiniteNumber(workout.avg_hr)) parts.push(t.value.avgHr(Math.round(workout.avg_hr)));
   const meters = workout.distance_meters;
-  if (isFiniteNumber(meters) && meters > 0) {
-    return {
-      fact: formatDistance(meters, t.value.notProvided),
-      label: t.value.labelDistance,
-    };
-  }
-  if (isFiniteNumber(workout.calories)) return { fact: `${Math.round(workout.calories)} kcal`, label: t.value.labelBurn };
-  return { fact: formatDuration(workoutDurationMinutes(workout), t.value.notProvided), label: t.value.labelDuration };
+  if (isFiniteNumber(meters) && meters > 0) parts.push(formatDistance(meters));
+  else if (isFiniteNumber(workout.calories)) parts.push(`${Math.round(workout.calories)} kcal`);
+  return parts.length ? parts.join(' · ') : t.value.notProvided;
 };
 
 const loadList = async () => {
@@ -181,9 +176,9 @@ watch(dataRevision, () => void loadList());
         category="activity"
         :design-icon="workoutIcon(workout)"
         :kicker="formatDate(workout.start_time)"
+        :time="formatTime(workout.start_time)"
         :title="workoutDisplayLabel(workout)"
-        :fact="workoutFact(workout).fact"
-        :fact-label="workoutFact(workout).label"
+        :fact="workoutFact(workout)"
       />
     </div>
     <div v-if="hasMore" class="load-more">

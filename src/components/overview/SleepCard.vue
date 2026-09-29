@@ -1,10 +1,12 @@
 <script setup lang="ts">
-/* 概览的「昨晚睡眠」卡：总时长 + 阶段比例条。 */
+/* 概览的睡眠卡：最近一觉的总时长 + 阶段比例条。
+   只有这一觉是今天早上醒来的才叫「昨晚」；两天没同步时写那一觉醒来的日期，不冒充昨晚。 */
 import { computed, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import GlyphTile from '../GlyphTile.vue';
 import Icon from '../Icon.vue';
 import { isFiniteNumber } from '../../lib/format';
+import { displayDateTimeFormatter } from '../../lib/dateTime';
 import { sleepStageLabel } from '../../lib/sleepStages';
 import { stageMinutesForBar } from '../../lib/missingValues';
 import type { SleepSession } from '../../types';
@@ -16,6 +18,7 @@ const messages = defineMessages(
   {
     sleepPanelAria: '打开睡眠详情',
     sleepTitle: '昨晚睡眠',
+    sleepTitleOn: (day: string) => `${day}的睡眠`,
     sleepSub: '睡眠结构简介',
     sleepBarAria: '睡眠阶段比例',
     sleepEmpty: '同步后展示昨晚睡眠。',
@@ -26,6 +29,7 @@ const messages = defineMessages(
   {
     sleepPanelAria: 'Open sleep detail',
     sleepTitle: 'Last night',
+    sleepTitleOn: (day: string) => `Sleep · ${day}`,
     sleepSub: 'Sleep structure at a glance',
     sleepBarAria: 'Sleep stage share',
     sleepEmpty: "Last night's sleep shows up here after a sync.",
@@ -36,6 +40,7 @@ const messages = defineMessages(
   {
     sleepPanelAria: 'Abrir el detalle de sueño',
     sleepTitle: 'Anoche',
+    sleepTitleOn: (day: string) => `Sueño · ${day}`,
     sleepSub: 'Estructura del sueño de un vistazo',
     sleepBarAria: 'Proporción de fases del sueño',
     sleepEmpty: 'El sueño de anoche aparece aquí después de sincronizar.',
@@ -51,6 +56,19 @@ const t = useMessages(messages);
 const props = defineProps<{
   sleep: SleepSession | null;
 }>();
+
+/** 按醒来那天判断：今天醒来的才是「昨晚」。 */
+const title = computed(() => {
+  const sleep = props.sleep;
+  if (!sleep) return t.value.sleepTitle;
+  const woke = new Date(sleep.end_time || sleep.start_time);
+  if (Number.isNaN(woke.getTime())) return t.value.sleepTitle;
+  const now = new Date();
+  if (woke.getFullYear() === now.getFullYear() && woke.getMonth() === now.getMonth() && woke.getDate() === now.getDate()) {
+    return t.value.sleepTitle;
+  }
+  return t.value.sleepTitleOn(displayDateTimeFormatter({ month: 'short', day: 'numeric' }).format(woke));
+});
 
 const hm = (minutes?: number | null) => {
   if (!isFiniteNumber(minutes) || minutes < 0) return '—';
@@ -96,7 +114,7 @@ const hoverStage = (event: PointerEvent) => {
 <template>
   <RouterLink class="metric-panel sleep-panel" :to="sleep ? `/sleep/${sleep.sleep_id}` : '/sleep'" :aria-label="t.sleepPanelAria">
     <div class="panel-head">
-      <span class="panel-title"><GlyphTile name="sleep" :size="38" /><span><strong>{{ t.sleepTitle }}</strong><small>{{ t.sleepSub }}</small></span></span>
+      <span class="panel-title"><GlyphTile name="sleep" :size="38" /><span><strong>{{ title }}</strong><small>{{ t.sleepSub }}</small></span></span>
       <span class="panel-head-end">
         <span v-if="sleep && isFiniteNumber(sleep.score)" class="sleep-score">{{ sleep.score }}</span>
         <span class="panel-go" :title="t.seeMore" aria-hidden="true"><Icon name="chevron-right" :size="16" /></span>

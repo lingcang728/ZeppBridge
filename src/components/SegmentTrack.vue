@@ -50,7 +50,11 @@ const props = withDefaults(defineProps<{
   variant: 'inset',
 });
 
-const emit = defineEmits<{ 'update:modelValue': [value: T] }>();
+const emit = defineEmits<{
+  'update:modelValue': [value: T];
+  /** 点了（或 Enter / 空格）已经选中的那一项。分段控件本身不理它；当导航用时（顶栏）靠它回到入口首页。 */
+  reselect: [value: T];
+}>();
 
 const track = ref<HTMLElement | null>(null);
 const stops = ref([]) as Ref<SegmentStop<T>[]>;
@@ -246,7 +250,8 @@ const onUp = (event: PointerEvent) => {
 
 const onClick = (value: T) => {
   if (props.disabled || suppressClick) return;
-  commit(value);
+  if (value === props.modelValue) emit('reselect', value);
+  else commit(value);
 };
 
 const onKeydown = (event: KeyboardEvent) => {

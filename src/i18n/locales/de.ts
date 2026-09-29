@@ -764,6 +764,8 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       short: (covered: number, earliest: string) =>
         `Dieser Rechner hat ${covered} Tage Daten (früheste ${earliest}). Alles davor ist leer, weil es noch nicht aus der Cloud geholt wurde – nicht weil du damals nichts aufgezeichnet hast.`,
       syncNow: 'Jetzt synchronisieren',
+      connect: 'Zepp-Konto verbinden',
+      emptyNotConnected: 'Auf diesem Rechner ist noch nichts. Verbinde zuerst dein Zepp-Konto und synchronisiere dann einmal.',
     },
     'components/DeviceMarquee': {
       marqueeAria: 'Derzeit im Katalog geführte Amazfit-Geräte',
@@ -1113,6 +1115,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         }),
       zeroBaseline:
         'Die frühere Baseline lag im Schnitt bei 0 – keine relative Änderung berechenbar, also nur der aktuelle Wert.',
+      legendNeutral: '↑↓ grau = nur eine Veränderung, keine Bewertung',
     },
     'components/overview/DataReadyCapsule': {
       cta: 'An KI übergeben',
@@ -1170,6 +1173,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       sleepPanelAria: 'Schlafdetails öffnen',
       sleepSub: 'Schlafstruktur im Überblick',
       sleepTitle: 'Letzte Nacht',
+      sleepTitleOn: (day: string) => `Schlaf · ${day}`,
     },
     'components/overview/SourcesStrip': {
       dataSources: 'Datenquellen',
@@ -1194,7 +1198,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       factDone: 'Geschafft',
       factLeft: 'Noch offen',
       factReached: 'Erreicht',
-      factUpdated: 'Aktualisiert',
     },
     'components/shell/AppTopBar': {
       today: 'Heute',
@@ -1218,6 +1221,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       themeTitle: 'Theme wechseln',
       timeUnknown: 'Zeit unbekannt',
       verifyFirst: 'Verifiziere zuerst die Verbindung',
+      connectPill: 'Konto verbinden',
     },
     'composables/useAiHandoff': {
       clipboardUnsupported: 'Diese Umgebung kann nicht in die Zwischenablage schreiben',
@@ -2249,9 +2253,7 @@ Antworte in Markdown.`,
           other: `${count} Einträge angezeigt`,
         }),
       intro: 'Auf diesen Rechner synchronisierte Trainings. Kein Track, keine Karte.',
-      labelBurn: 'Verbrauch',
-      labelDistance: 'Distanz',
-      labelDuration: 'Dauer',
+      avgHr: (bpm: number) => `Ø HF ${bpm}`,
       loadFailed: 'Die Trainingsliste ist gerade nicht verfügbar',
       loadFailedTitle: 'Die Trainings konnten nicht gelesen werden',
       loadMore: 'Mehr laden',

@@ -18,6 +18,7 @@ import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import type { InsightFact, WeeklyReport } from '../types';
 import { defineMessages, useMessages } from '../i18n';
 import { finiteOrNull } from '../lib/missingValues';
+import { changeArrow, changeTone as tone } from '../lib/changeTone';
 
 const messages = defineMessages(
   {
@@ -26,6 +27,7 @@ const messages = defineMessages(
       `${recentStart} ~ ${recentEnd} · 对比你自己 ${baseStart} ~ ${baseEnd}`,
     legendGood: '绿色 = 对这项指标来说更好',
     legendBad: '红色 = 更差',
+    legendNeutral: '↑↓ 灰色 = 只是变化，不评好坏',
     legendNote: '只和你自己此前 28 天比，不和任何人群基准比',
     desktopOnly: '周报需要从 ZeppBridge 桌面应用打开。',
     nothingComparable: '这一周还没有可比较的记录。完成一次同步后再看。',
@@ -61,6 +63,7 @@ const messages = defineMessages(
       `${recentStart} ~ ${recentEnd} · against your own ${baseStart} ~ ${baseEnd}`,
     legendGood: 'Green = better for this metric',
     legendBad: 'Red = worse',
+    legendNeutral: '↑↓ grey = just a change, not a verdict',
     legendNote: 'Compared only to your own previous 28 days, never to a population baseline',
     desktopOnly: 'The weekly report needs the ZeppBridge desktop app.',
     nothingComparable: 'Nothing comparable this week yet. Come back after a sync.',
@@ -95,6 +98,7 @@ const messages = defineMessages(
       `${recentStart} ~ ${recentEnd} · frente a tu propio ${baseStart} ~ ${baseEnd}`,
     legendGood: 'Verde = mejor para esta métrica',
     legendBad: 'Rojo = peor',
+    legendNeutral: '↑↓ gris = solo un cambio, sin juicio',
     legendNote: 'Comparado solo con tus propios 28 días anteriores, nunca con un promedio de población',
     desktopOnly: 'El informe semanal necesita la app de escritorio de ZeppBridge.',
     nothingComparable: 'Todavía no hay nada comparable esta semana. Vuelve después de sincronizar.',
@@ -168,13 +172,6 @@ const loading = ref(true);
 const initialLoading = useFirstLoad(loading);
 const error = ref<string | null>(null);
 
-/** 数字变小对这个指标意味着「更好」吗？只影响配色，不改变事实。 */
-const LOWER_IS_BETTER = new Set([
-  'weekly.resting_hr',
-  'weekly.stress',
-  'weekly.sleep_start_regularity',
-]);
-
 const load = async () => {
   if (!isDesktop()) {
     loading.value = false;
@@ -196,12 +193,6 @@ watch(dataRevision, () => void load());
 
 const formatValue = (fact: InsightFact): string =>
   (fact.value === null ? t.value.notProvided : formatNumber(fact, fact.value));
-
-const tone = (fact: InsightFact): 'good' | 'bad' | 'flat' => {
-  if (!fact.comparison || fact.comparison.direction === 'same') return 'flat';
-  const lower = fact.comparison.direction === 'lower';
-  return LOWER_IS_BETTER.has(fact.fact_id) === lower ? 'good' : 'bad';
-};
 
 /**
  * 只显示这一周真的有数的指标。
@@ -267,6 +258,7 @@ function formatNumber(fact: InsightFact, value: number): string {
     <p v-if="report && facts.length" class="weekly-legend">
       <span><i class="legend-dot good"></i>{{ t.legendGood }}</span>
       <span><i class="legend-dot bad"></i>{{ t.legendBad }}</span>
+      <span>{{ t.legendNeutral }}</span>
       <span class="legend-note">{{ t.legendNote }}</span>
     </p>
     <SkeletonBlock v-if="initialLoading" height="120px" />
@@ -286,7 +278,7 @@ function formatNumber(fact: InsightFact, value: number): string {
               :current-label="t.barThisWeek" :baseline-label="t.barBaseline"
               :current-text="formatValue(fact)" :baseline-text="chartFor(fact)!.baselineText" :tone="tone(fact)" />
             <span :class="['weekly-delta', tone(fact)]">
-              {{ fact.comparison!.delta_percent > 0 ? '+' : '' }}{{ fact.comparison!.delta_percent.toFixed(1) }}%
+              <template v-if="tone(fact) === 'neutral'">{{ changeArrow(fact) }}&nbsp;</template>{{ fact.comparison!.delta_percent > 0 ? '+' : '' }}{{ fact.comparison!.delta_percent.toFixed(1) }}%
             </span>
           </template>
 
@@ -355,6 +347,7 @@ function formatNumber(fact: InsightFact, value: number): string {
 .weekly-delta.good::before { content: '✓\a0'; font-weight: 700; }
 .weekly-delta.bad { color: var(--danger); }
 .weekly-delta.bad::before { content: '!\a0'; font-weight: 700; }
+.weekly-delta.neutral { background: color-mix(in srgb, var(--ink) 7%, transparent); color: var(--muted); font-weight: 600; }
 .weekly-delta.flat, .weekly-delta.muted { color: var(--muted); }
 
 .weekly-note { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.6; }

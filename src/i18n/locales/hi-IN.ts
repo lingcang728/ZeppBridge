@@ -532,6 +532,8 @@ export default {
       backfill: 'और इतिहास बैकफ़िल करें',
       backfilling: 'बैकफ़िल हो रहा है…',
       reconnect: 'खाता फिर से जोड़ें',
+      connect: 'Zepp खाता जोड़ें',
+      emptyNotConnected: 'इस कंप्यूटर पर अभी कुछ नहीं है। पहले अपना Zepp खाता जोड़ें, फिर एक बार सिंक करें।',
     },
 
 
@@ -836,6 +838,7 @@ export default {
       zeroBaseline: 'पिछला बेसलाइन औसत 0 था, इसलिए सापेक्ष बदलाव नहीं निकलता — यह सिर्फ़ मौजूदा आँकड़ा है।',
       notProvided: 'उपलब्ध नहीं',
       loadFailed: 'लोकल साप्ताहिक रिपोर्ट नहीं बन सकी',
+      legendNeutral: '↑↓ स्लेटी = सिर्फ़ बदलाव, अच्छा या बुरा नहीं',
     },
 
 
@@ -893,6 +896,7 @@ export default {
       durationHours: (hours: number, minutes: number) => `${hours} घंटे ${minutes} मिनट`,
       durationMinutes: (minutes: number) => `${minutes} मिनट`,
       seeMore: 'और देखें',
+      sleepTitleOn: (day: string) => `नींद · ${day}`,
     },
 
     'components/overview/SourcesStrip': {
@@ -919,7 +923,6 @@ export default {
       factDone: 'पूरा हुआ',
       factLeft: 'बाक़ी',
       factReached: 'लक्ष्य पूरा',
-      factUpdated: 'अपडेट हुआ',
     },
 
     'components/shell/AppTopBar': {
@@ -943,6 +946,7 @@ export default {
       cancel: 'रद्द करें',
       readyPill: 'डेटा तैयार · AI को सौंपें',
       readyTitle: 'सिंक पूरा हुआ और लोकल डेटा नवीनतम है। AI को सौंपने के लिए क्लिक करें।',
+      connectPill: 'खाता जोड़ें',
     },
     'composables/useAiHandoff': {
       clipboardUnsupported: 'यह एनवायरनमेंट क्लिपबोर्ड में नहीं लिख सकता',
@@ -1866,9 +1870,7 @@ Markdown में जवाब दें।`,
       emptyTitle: 'अभी दिखाने लायक कुछ नहीं',
       footnote: (count: number) => `${count} रिकॉर्ड दिख रहे`,
       intro: 'इस मशीन पर सिंक हुए वर्कआउट। ट्रैक नहीं तो मैप नहीं।',
-      labelBurn: 'बर्न',
-      labelDistance: 'दूरी',
-      labelDuration: 'अवधि',
+      avgHr: (bpm: number) => `औसत HR ${bpm}`,
       loadFailed: 'वर्कआउट सूची अभी उपलब्ध नहीं है',
       loadFailedTitle: 'वर्कआउट नहीं पढ़े जा सके',
       loadMore: 'और लोड करें',

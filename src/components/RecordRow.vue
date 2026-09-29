@@ -12,6 +12,8 @@ defineProps<{
   category: HealthCategory;
   designIcon: DesignIconName;
   kicker: string;
+  /** 日期下面的一行小字（开始时刻）：同一天有好几条时靠它区分。 */
+  time?: string;
   title: string;
   fact: string;
   factLabel?: string;
@@ -20,7 +22,7 @@ defineProps<{
 
 <template>
   <RouterLink :class="['record-row', `tone-${category}`]" :to="to">
-    <span class="record-when">{{ kicker }}</span>
+    <span class="record-when"><span>{{ kicker }}</span><span v-if="time" class="record-time">{{ time }}</span></span>
     <span class="record-node" aria-hidden="true"><GlyphTile :name="designIcon" :size="34" :tone="category" /></span>
     <span class="record-card">
       <strong>{{ title }}</strong>
@@ -46,7 +48,9 @@ defineProps<{
 }
 .record-row:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); translate: 3px 0; }
 .record-row:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.record-when { overflow: hidden; color: var(--subtle); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.record-when { display: grid; min-width: 0; color: var(--subtle); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; text-align: right; }
+.record-when > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.record-time { color: var(--muted); font-weight: 600; }
 .record-node { position: relative; z-index: 1; display: grid; place-items: center; padding: 3px; border-radius: var(--radius-sm); background: var(--mat-card-solid); }
 .record-card {
   display: grid;

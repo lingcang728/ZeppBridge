@@ -26,7 +26,6 @@ const messages = defineMessages(
     factDone: '已完成',
     factLeft: '还差',
     factReached: '已达成',
-    factUpdated: '更新于',
   },
   {
     stepsPanelAria: 'Open daily activity detail',
@@ -42,7 +41,6 @@ const messages = defineMessages(
     factDone: 'Done',
     factLeft: 'To go',
     factReached: 'Reached',
-    factUpdated: 'Updated',
   },
   {
     stepsPanelAria: 'Abrir el detalle de actividad diaria',
@@ -58,7 +56,6 @@ const messages = defineMessages(
     factDone: 'Hecho',
     factLeft: 'Faltan',
     factReached: 'Conseguido',
-    factUpdated: 'Actualizado',
   },
   // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
   'components/overview/StepsCard',
@@ -68,7 +65,8 @@ const t = useMessages(messages);
 const props = defineProps<{
   steps: number | null;
   goal: number | null;
-  /** 库里最新一条样本的时间：今天还没有步数时，告诉用户云端的数据停在哪儿。 */
+  /** 库里最新一条样本（任何一种）的时间：今天还没有步数时，告诉用户云端的数据停在哪儿。
+      有步数时不拿它当「更新于」——它其实是心率样本的时间，步数没有自己的时刻。 */
   latestAt?: string | null;
 }>();
 const latestWhen = computed(() => formatWhen(props.latestAt));
@@ -101,7 +99,6 @@ const ringColor = computed(() => chartPalettes[resolvedTheme.value].series.readi
         <li><span>{{ t.factGoal }}</span><strong>{{ formatMetric(stepGoal) }}</strong></li>
         <li><span>{{ t.factDone }}</span><strong>{{ stepsPercent }}%</strong></li>
         <li><span>{{ t.factLeft }}</span><strong>{{ steps >= stepGoal ? t.factReached : formatMetric(stepGoal - steps) }}</strong></li>
-        <li v-if="latestWhen"><span>{{ t.factUpdated }}</span><strong>{{ latestWhen }}</strong></li>
       </ul>
     </template>
     <p v-else class="steps-goal steps-missing">{{ t.stepsNotYet }}<small v-if="latestWhen">{{ t.stepsLatest(latestWhen) }}</small></p>

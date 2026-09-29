@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 const props = defineProps<{
   current: number; baseline: number; currentLabel: string; baselineLabel: string;
-  currentText: string; baselineText: string; tone: 'good' | 'bad' | 'flat';
+  currentText: string; baselineText: string; tone: 'good' | 'bad' | 'neutral' | 'flat';
 }>();
 const maximum = computed(() => Math.max(props.current, props.baseline, 1));
 const percent = (value: number) => `${Math.max(0, value) / maximum.value * 100}%`;
@@ -33,6 +33,7 @@ const percent = (value: number) => `${Math.max(0, value) / maximum.value * 100}%
 .comparison-track .good, .comparison-track .bad { position: relative; overflow: hidden; background-color: var(--accent); }
 .comparison-track .good::before, .comparison-track .bad::before { content: ""; position: absolute; top: 0; bottom: 0; left: -24px; width: calc(100% + 24px); background-image: repeating-linear-gradient(-45deg, transparent 0 6px, rgba(255,255,255,.28) 6px 10px, transparent 10px 16px); background-size: 24px 24px; animation: comparison-flow 1.8s linear 4; }
 .comparison-track .bad { background-color: var(--danger); }
+.comparison-track .neutral { background: color-mix(in srgb, var(--ink) 55%, transparent); }
 .comparison-track .baseline { background: rgba(232,238,244,.24); }
 @keyframes comparison-flow { to { transform: translateX(24px); } }
 @media (prefers-reduced-motion: reduce) { .comparison-track .good::before, .comparison-track .bad::before { animation: none; } }

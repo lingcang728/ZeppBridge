@@ -19,6 +19,7 @@ import {
   toBigDistance,
 } from '../lib/units';
 import { insightCardMessages as messages } from './InsightCard.i18n';
+import { changeArrow, changeTone } from '../lib/changeTone';
 
 const t = useMessages(messages);
 
@@ -43,8 +44,8 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ (event: 'handoff'): void }>();
 
-/** 数字变小对这个指标意味着「更好」吗？只影响配色，不影响事实本身。 */
-const LOWER_IS_BETTER = new Set(['run.pace', 'run.avg_hr']);
+/* 好 / 坏 / 只是变化：和周报同一套规则（lib/changeTone.ts）。距离、时长、训练负荷
+   多了不等于更好，只给方向箭头。 */
 
 const formatValue = (fact: InsightFact): string => {
   if (fact.value === null) return t.value.notProvided;
@@ -62,16 +63,13 @@ const formatValue = (fact: InsightFact): string => {
   return `${Math.round(fact.value)} ${fact.unit}`;
 };
 
-const deltaTone = (fact: InsightFact): 'good' | 'bad' | 'flat' => {
-  if (!fact.comparison || fact.comparison.direction === 'same') return 'flat';
-  const lower = fact.comparison.direction === 'lower';
-  return LOWER_IS_BETTER.has(fact.fact_id) === lower ? 'good' : 'bad';
-};
+const deltaTone = changeTone;
 
 const deltaText = (fact: InsightFact): string => {
   if (!fact.comparison) return '';
   const sign = fact.comparison.delta_percent > 0 ? '+' : '';
-  return `${sign}${fact.comparison.delta_percent.toFixed(1)}%`;
+  const arrow = changeTone(fact) === 'neutral' ? `${changeArrow(fact)}\u00a0` : '';
+  return `${arrow}${sign}${fact.comparison.delta_percent.toFixed(1)}%`;
 };
 
 /*
@@ -254,7 +252,7 @@ const exclusionSummary = computed(() => {
 .delta { margin-right: 10px; font-weight: 600; }
 .delta.good, .fact-delta.good { color: var(--accent); }
 .delta.bad, .fact-delta.bad { color: var(--danger); }
-.delta.flat, .fact-delta.flat { color: var(--muted); }
+.delta.flat, .fact-delta.flat, .fact-delta.neutral { color: var(--muted); }
 
 /* 好/坏不能只靠绿/红：红绿色觉障碍下这两个状态完全一样。
    统一加一个前置符号，颜色只作为强化。 */

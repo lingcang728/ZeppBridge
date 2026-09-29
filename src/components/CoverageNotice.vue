@@ -33,7 +33,7 @@ const props = withDefaults(defineProps<{
   requestedDays?: number;
 }>(), { requestedDays: 0 });
 
-const { appStatus, isSyncing, runSync } = useSyncController();
+const { appStatus, isSyncing, runSync, canIncrementalSync } = useSyncController();
 
 const messages = defineMessages(
   {
@@ -48,6 +48,8 @@ const messages = defineMessages(
     backfill: '补拉更多历史',
     backfilling: '正在补拉…',
     syncNow: '立即同步',
+    emptyNotConnected: '本机还没有任何数据。先连接你的 Zepp 账号，再同步一次，图表才有东西可画。',
+    connect: '连接 Zepp 账号',
   },
   {
     empty: 'Nothing on this machine yet. Sync once and the charts will have something to draw.',
@@ -61,6 +63,8 @@ const messages = defineMessages(
     backfill: 'Backfill more history',
     backfilling: 'Backfilling…',
     syncNow: 'Sync now',
+    emptyNotConnected: 'Nothing on this machine yet. Connect your Zepp account first, then sync once.',
+    connect: 'Connect Zepp account',
   },
   {
     empty: 'Todavía no hay nada en este equipo. Sincroniza una vez y los gráficos tendrán qué mostrar.',
@@ -74,6 +78,8 @@ const messages = defineMessages(
     backfill: 'Recuperar más historial',
     backfilling: 'Recuperando…',
     syncNow: 'Sincronizar ahora',
+    emptyNotConnected: 'Todavía no hay nada en este equipo. Conecta primero tu cuenta de Zepp y luego sincroniza una vez.',
+    connect: 'Conectar cuenta de Zepp',
   },
   'components/CoverageNotice',
 );
@@ -132,6 +138,12 @@ const syncNow = () => { void runSync('incremental'); };
     <button v-else class="button button-secondary" type="button" :disabled="isSyncing" @click="syncNow">
       {{ isSyncing ? t.backfilling : t.syncNow }}
     </button>
+  </p>
+  <!-- 还没连上账号：「立即同步」点了只会变成「同步失败」，所以这里直接给连接入口。 -->
+  <p v-else-if="isEmpty && !canIncrementalSync" class="coverage-notice" role="status">
+    <Icon name="clock" :size="14" />
+    <span>{{ t.emptyNotConnected }}</span>
+    <RouterLink class="button button-secondary" to="/settings/account">{{ t.connect }}</RouterLink>
   </p>
   <p v-else-if="isEmpty" class="coverage-notice" role="status">
     <Icon name="clock" :size="14" />

@@ -171,6 +171,8 @@ export default {
       backfill: 'Preencher mais histórico',
       backfilling: 'Preenchendo…',
       syncNow: 'Sincronizar agora',
+      connect: 'Conectar conta Zepp',
+      emptyNotConnected: 'Ainda não há nada neste computador. Conecte primeiro sua conta Zepp e depois sincronize uma vez.',
     },
 
 
@@ -482,6 +484,7 @@ export default {
       seeMore: 'Ver mais',
       durationHours: (hours: number, minutes: number) => `${hours} h ${minutes} min`,
       durationMinutes: (minutes: number) => `${minutes} min`,
+      sleepTitleOn: (day: string) => `Sono · ${day}`,
     },
 
     'components/overview/SourcesStrip': {
@@ -508,7 +511,6 @@ export default {
       factDone: 'Feito',
       factLeft: 'Faltam',
       factReached: 'Alcançado',
-      factUpdated: 'Atualizado',
     },
 
 
@@ -534,6 +536,7 @@ export default {
       localeLabel: 'Idioma da interface',
       readyPill: 'Dados prontos · enviar para IA',
       readyTitle: 'Sincronização concluída e os dados locais estão atualizados. Clique para enviar para a IA.',
+      connectPill: 'Conectar conta',
     },
 
     'components/StageBar': {
@@ -577,6 +580,7 @@ export default {
         'weekly.workout_count': 'Treinos',
         'weekly.training_load': 'Carga de treino',
       },
+      legendNeutral: '↑↓ cinza = só uma mudança, sem julgamento',
     },
 
     'components/WheelDatePicker': {
@@ -1525,9 +1529,7 @@ Responda em Markdown.`,
       retry: 'Tentar de novo',
       emptyTitle: 'Nada para mostrar ainda',
       emptyMessage: 'Depois de uma sincronização, só registros com tipo, horário e pelo menos uma métrica real aparecem aqui. Sem GPS ou amostras ponto a ponto, nenhum gráfico vazio é desenhado.',
-      labelDistance: 'Distância',
-      labelBurn: 'Gasto',
-      labelDuration: 'Duração',
+      avgHr: (bpm: number) => `FC média ${bpm}`,
       notProvided: 'Não informado',
       footnote: (count: number) => `${count} registros exibidos`,
       shown: (loaded: number, total: number) => `${loaded} de ${total} carregados`,
