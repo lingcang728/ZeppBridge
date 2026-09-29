@@ -1,15 +1,15 @@
 <script setup lang="ts">
 defineOptions({ name: 'SleepList' });
-import { computed, onMounted, ref, watch } from 'vue';
+import { onMounted, watch } from 'vue';
 import { useFirstLoad } from '../composables/useFirstLoad';
 import PageHeader from '../components/PageHeader.vue';
 import RecordRow from '../components/RecordRow.vue';
 import EmptyState from '../components/EmptyState.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import { useSyncController } from '../composables/useSyncController';
-import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
+import { tauriApi } from '../composables/useTauriApi';
+import { usePagedRecords } from '../composables/usePagedRecords';
 import { formatDate, formatDuration, formatTime, isFiniteNumber } from '../lib/format';
-import { createLoadSeq } from '../lib/loadSeq';
 import type { SleepSession } from '../types';
 import { defineMessages, useMessages } from '../i18n';
 
@@ -67,74 +67,15 @@ const messages = defineMessages(
 const t = useMessages(messages);
 
 const { dataRevision } = useSyncController();
-const sessions = ref<SleepSession[]>([]);
-const loading = ref(true);
+/* 分页、请求代次和去重见 composables/usePagedRecords.ts。 */
+const {
+  items: sessions, loading, loadingMore, error, total, hasMore, load: loadList, loadMore,
+} = usePagedRecords<SleepSession>({
+  loadPage: (limit, offset) => tauriApi.getSleepPage(limit, offset),
+  idOf: (item) => item.sleep_id,
+  failedText: () => t.value.loadFailed,
+});
 const initialLoading = useFirstLoad(loading);
-const error = ref<string | null>(null);
-/*
- * 分页，不是上限。
- *
- * 以前这里写死 `getRecentSleep(500)`，而后端的 SQL 只有 LIMIT 没有 OFFSET
- * ——第 501 条之后的记录在应用里**根本没有入口**。一个下载了全部历史的人
- * 会以为数据没同步下来（Reddit p6zxyo7）。
- *
- * 每页 200 而不是 500：首屏更快，而「加载更多」按一下就有下一批。
- * 刻意不引虚拟滚动库：这一页是一串 RecordRow，`v-for` 加分页就够了。
- */
-const PAGE_SIZE = 200;
-const total = ref(0);
-const loadingMore = ref(false);
-const listEpoch = createLoadSeq();
-const hasMore = computed(() => sessions.value.length < total.value);
-
-const loadList = async () => {
-  const epoch = listEpoch.next();
-  loading.value = true;
-  error.value = null;
-  if (!isTauri()) {
-    if (!listEpoch.isCurrent(epoch)) return;
-    loading.value = false;
-    sessions.value = [];
-    total.value = 0;
-    return;
-  }
-  try {
-    const page = await tauriApi.getSleepPage(PAGE_SIZE, 0);
-    if (!listEpoch.isCurrent(epoch)) return;
-    sessions.value = page.items;
-    total.value = page.total;
-  } catch (cause) {
-    if (!listEpoch.isCurrent(epoch)) return;
-    error.value = toUserMessage(cause, t.value.loadFailed);
-  } finally {
-    if (listEpoch.isCurrent(epoch)) loading.value = false;
-  }
-};
-
-const loadMore = async () => {
-  if (loadingMore.value || loading.value || !hasMore.value) return;
-  const epoch = listEpoch.current();
-  loadingMore.value = true;
-  try {
-    // offset 用已经拿到的条数。同步在翻页途中插进新记录会让边界上出现一条
-    // 重复——按 sleep_id 去一次重，比在前端自己维护游标简单，也不会因为
-    // 一次同步就把整个列表推翻重来。
-    const offset = sessions.value.length;
-    const page = await tauriApi.getSleepPage(PAGE_SIZE, offset);
-    if (!listEpoch.isCurrent(epoch)) return;
-    const seen = new Set(sessions.value.map((item) => item.sleep_id));
-    sessions.value = [...sessions.value, ...page.items.filter((item) => !seen.has(item.sleep_id))];
-    total.value = page.total;
-  } catch (cause) {
-    if (!listEpoch.isCurrent(epoch)) return;
-    error.value = toUserMessage(cause, t.value.loadFailed);
-  } finally {
-    // loadingMore is this call's own flag, not something a newer loadList()
-    // call takes over — unlike `loading`, nothing else will ever clear it,
-    // so it must reset here even if the epoch went stale while we awaited.
-    loadingMore.value = false;
-  }
-};
 
 onMounted(() => void loadList());
 watch(dataRevision, () => void loadList());

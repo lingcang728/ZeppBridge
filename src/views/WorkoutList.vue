@@ -1,17 +1,17 @@
 <script setup lang="ts">
 defineOptions({ name: 'WorkoutList' });
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, watch } from 'vue';
 import { useFirstLoad } from '../composables/useFirstLoad';
 import PageHeader from '../components/PageHeader.vue';
 import RecordRow from '../components/RecordRow.vue';
 import EmptyState from '../components/EmptyState.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import { useSyncController } from '../composables/useSyncController';
-import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
+import { tauriApi } from '../composables/useTauriApi';
+import { usePagedRecords } from '../composables/usePagedRecords';
 import { formatDate, formatDistance, formatDuration, formatTime, isFiniteNumber } from '../lib/format';
 import { displayableWorkouts, workoutDisplayLabel, workoutDurationMinutes, workoutIcon } from '../lib/workouts';
 import type { Workout } from '../types';
-import { createLoadSeq } from '../lib/loadSeq';
 import { defineMessages, useMessages } from '../i18n';
 
 const messages = defineMessages(
@@ -71,24 +71,21 @@ const messages = defineMessages(
 const t = useMessages(messages);
 
 const { dataRevision } = useSyncController();
-const workouts = ref<Workout[]>([]);
-const loading = ref(true);
-const initialLoading = useFirstLoad(loading);
-const error = ref<string | null>(null);
-const displayableList = computed(() => displayableWorkouts(workouts.value));
-/*
- * 分页，不是上限。见 SleepList.vue 里的同一段说明（Reddit p6zxyo7）。
+/* 分页、请求代次和去重见 composables/usePagedRecords.ts。
  *
  * 注意这里有两个数字，不能混：`total` 是库里的**全部**运动记录数，
  * `displayableList.length` 是过滤掉不可展示项之后**这一屏**的条数。所以
  * 「已读取 X / 共 N」用的是取回来的原始条数，「N 条可展示记录」保持原样。
- * 把两者混成一句会让人以为应用丢了记录。
- */
-const PAGE_SIZE = 200;
-const total = ref(0);
-const loadingMore = ref(false);
-const listEpoch = createLoadSeq();
-const hasMore = computed(() => workouts.value.length < total.value);
+ * 把两者混成一句会让人以为应用丢了记录。 */
+const {
+  items: workouts, loading, loadingMore, error, total, hasMore, load: loadList, loadMore,
+} = usePagedRecords<Workout>({
+  loadPage: (limit, offset) => tauriApi.getWorkoutPage(limit, offset),
+  idOf: (item) => item.workout_id,
+  failedText: () => t.value.loadFailed,
+});
+const initialLoading = useFirstLoad(loading);
+const displayableList = computed(() => displayableWorkouts(workouts.value));
 
 /* 一行要能和同一天的其他几条区分开：时长、均心率，再加距离或消耗。
    只列有值的项，一项都没有才写「未提供」。 */
@@ -101,54 +98,6 @@ const workoutFact = (workout: Workout): string => {
   if (isFiniteNumber(meters) && meters > 0) parts.push(formatDistance(meters));
   else if (isFiniteNumber(workout.calories)) parts.push(`${Math.round(workout.calories)} kcal`);
   return parts.length ? parts.join(' · ') : t.value.notProvided;
-};
-
-const loadList = async () => {
-  const epoch = listEpoch.next();
-  loading.value = true;
-  error.value = null;
-  if (!isTauri()) {
-    if (!listEpoch.isCurrent(epoch)) return;
-    loading.value = false;
-    workouts.value = [];
-    total.value = 0;
-    return;
-  }
-  try {
-    const page = await tauriApi.getWorkoutPage(PAGE_SIZE, 0);
-    if (!listEpoch.isCurrent(epoch)) return;
-    // 过滤留给 `displayableList`：这里保留原始条数，否则 offset 会和后端
-    // 的行号对不上，越翻越漏。
-    workouts.value = page.items;
-    total.value = page.total;
-  } catch (cause) {
-    if (!listEpoch.isCurrent(epoch)) return;
-    error.value = toUserMessage(cause, t.value.loadFailed);
-  } finally {
-    if (listEpoch.isCurrent(epoch)) loading.value = false;
-  }
-};
-
-const loadMore = async () => {
-  if (loadingMore.value || loading.value || !hasMore.value) return;
-  const epoch = listEpoch.current();
-  loadingMore.value = true;
-  try {
-    const offset = workouts.value.length;
-    const page = await tauriApi.getWorkoutPage(PAGE_SIZE, offset);
-    if (!listEpoch.isCurrent(epoch)) return;
-    const seen = new Set(workouts.value.map((item) => item.workout_id));
-    workouts.value = [...workouts.value, ...page.items.filter((item) => !seen.has(item.workout_id))];
-    total.value = page.total;
-  } catch (cause) {
-    if (!listEpoch.isCurrent(epoch)) return;
-    error.value = toUserMessage(cause, t.value.loadFailed);
-  } finally {
-    // loadingMore is this call's own flag, not something a newer loadList()
-    // call takes over — unlike `loading`, nothing else will ever clear it,
-    // so it must reset here even if the epoch went stale while we awaited.
-    loadingMore.value = false;
-  }
 };
 
 onMounted(() => void loadList());
