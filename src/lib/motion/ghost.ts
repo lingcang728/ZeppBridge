@@ -114,41 +114,54 @@ export function holdGhost(options: Omit<GhostOptions, 'growUntil'>): HeldGhost {
 }
 
 /**
- * 返回时反着来：板从整页开始、**透明地**缩向当初那张卡，边缩边显形，落到卡上时正好
- * 是一张实色卡，再淡出露出真卡。详情页同时在它底下缩小淡出（usePageMorph.onLeave）。
+ * 返回：展开的逆过程。板从整页开始、带着逐渐变大的圆角等比收回当初那张卡，落定后淡出，
+ * 露出真卡（调用方让真卡亮一下）。
  *
- * 以前是先让板在整页上浮现、盖住详情页，再等来处页找到那张卡才开始缩：那一段就是
- * 「返回时黑一下」——深色主题下一整屏卡片色，等卡的时候还会停住。现在板一出现就在缩，
- * 刚开始几乎透明，底下的来处页一直看得见。
+ * 板一出现就在缩：前 `fadeIn` 毫秒里从透明变实，盖住正在淡出的详情页，所以不会有「整屏
+ * 卡片色停在那里」的一拍（以前的「返回时黑一下」）；也不再把详情页本身非等比压扁到卡上——
+ * 那样缩出来的是一块没有圆角、内容被挤扁截断的灰框。
  */
-export function landGhost(options: {
+export function collapseGhost(options: {
   viewport: GhostRect;
   to: GhostRect;
   radius: number;
+  /** 起点的圆角（整页是 0；设置里的大卡有自己的圆角）。 */
+  fromRadius?: number;
   host: HTMLElement;
   duration: number;
+  /** 板从透明变实的时长。 */
+  fadeIn: number;
+  /** 形状基本落定、板开始淡出（真卡接上）的时刻，占全程的比例。 */
+  landAt: number;
   easing: string;
   zIndex?: number;
-}): Animation {
-  const { viewport, to, host } = options;
+}): { landed: Promise<void>; done: Animation } {
+  const { viewport, to, host, duration } = options;
   const el = ghostPlate(viewport, host, options.zIndex);
-  const full = ghostInset(viewport, viewport, 0);
-  const target = ghostInset(to, viewport, options.radius);
-  // 形状和透明度分开动：形状按调用方的减速曲线缩，透明度落后于形状——板还大的时候
-  // 几乎看不见，缩到卡那么大时才实起来，免得一开始就是一整屏卡片色。
   el.animate(
-    [{ clipPath: full, offset: 0, easing: options.easing }, { clipPath: target, offset: 0.78 }, { clipPath: target }],
-    { duration: options.duration, fill: 'both' },
+    [{ clipPath: ghostInset(viewport, viewport, options.fromRadius ?? 0) }, { clipPath: ghostInset(to, viewport, options.radius) }],
+    { duration, easing: options.easing, fill: 'both' },
   );
-  const animation = el.animate(
-    [{ opacity: 0 }, { opacity: 0.12, offset: 0.35 }, { opacity: 1, offset: 0.78, easing: 'ease-out' }, { opacity: 0 }],
-    { duration: options.duration, fill: 'both' },
+  const done = el.animate(
+    [
+      { opacity: 0 },
+      { opacity: 1, offset: Math.min(options.landAt, options.fadeIn / duration) },
+      { opacity: 1, offset: options.landAt, easing: 'ease-in-out' },
+      { opacity: 0 },
+    ],
+    { duration, fill: 'both' },
   );
   const remove = () => el.remove();
-  animation.finished.then(remove, remove);
-  animation.addEventListener('cancel', remove);
-  return animation;
+  done.finished.then(remove, remove);
+  done.addEventListener('cancel', remove);
+  const landed = new Promise<void>((resolve) => {
+    const timer = window.setTimeout(resolve, duration * options.landAt);
+    const finish = () => { window.clearTimeout(timer); resolve(); };
+    done.finished.then(finish, finish);
+  });
+  return { landed, done };
 }
+
 /** 放一块幽灵板；动画结束（或被取消）时自动移除。返回动画，调用方可 reverse / cancel。 */
 export function playGhost(options: GhostOptions): Animation {
   const { from, to, host } = options;

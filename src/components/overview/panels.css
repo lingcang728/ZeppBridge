@@ -9,7 +9,7 @@
   position: relative;
   min-width: 0;
   overflow: hidden;
-  border-radius: 28px;
+  border-radius: var(--radius-lg);
   background: var(--panel);
   box-shadow: var(--mat-rim), var(--mat-shadow);
   transform: translateY(var(--lift, 0px));

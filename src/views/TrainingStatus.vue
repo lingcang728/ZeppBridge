@@ -3,10 +3,10 @@ import LifeEventShortcut from '../components/LifeEventShortcut.vue';
 import { useFirstLoad } from '../composables/useFirstLoad';
 defineOptions({ name: 'TrainingStatus' });
 import { computed, onMounted, ref, watch } from 'vue';
-import { CHART_THEME, VChart } from '../lib/echartsSetup';
 import { createLoadSeq } from '../lib/loadSeq';
 import HeartRateZonePicker from '../components/HeartRateZonePicker.vue';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
+import SwapChart from '../components/SwapChart.vue';
 import { trendGridStyle } from '../lib/trendGrid';
 import { useQueuedOption } from '../composables/useQueuedOption';
 import PageHeader from '../components/PageHeader.vue';
@@ -22,7 +22,6 @@ import {
   indexSeries,
   seriesRanges,
   type SeriesRangeDays,
-  SMOOTH_CHART_UPDATE,
 } from '../lib/metricSeries';
 import type { MetricSeries, TrainingBalancePoint } from '../types';
 import { useMessages } from '../i18n';
@@ -346,14 +345,9 @@ watch(dataRevision, () => { void load(); });
             <strong class="pace">{{ formatPaceSeconds(thresholdPace?.latest?.value) }}</strong><small>{{ paceUnitLabel() }}</small>
           </template>
           <template v-if="shownThreshold || hasThreshold" #chart>
-            <VChart
+            <SwapChart
               v-if="shownThreshold"
-              :key="CHART_THEME"
-              :theme="CHART_THEME"
               :option="shownThreshold"
-              :update-options="SMOOTH_CHART_UPDATE"
-              autoresize
-              role="img"
               :aria-label="t.thresholdChartAria"
             />
             <p v-else class="chart-empty">{{ t.thresholdOnce(thresholdDates[0]) }}</p>
@@ -372,15 +366,10 @@ watch(dataRevision, () => { void load(); });
                 <b>{{ latestBalance.acute_chronic_ratio?.toFixed(2) ?? '—' }}</b><i>{{ t.acuteChronic }}</i>
               </span>
             </header>
-            <VChart
+            <SwapChart
               v-if="shownBalance"
               class="chart-body tall"
-              :key="CHART_THEME"
-              :theme="CHART_THEME"
               :option="shownBalance"
-                :update-options="SMOOTH_CHART_UPDATE"
-              autoresize
-              role="img"
               :aria-label="t.balanceChartAria"
             />
             <p v-else class="chart-empty">{{ t.balanceEmpty }}</p>

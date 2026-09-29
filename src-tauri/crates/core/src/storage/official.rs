@@ -158,24 +158,30 @@ impl Database {
         Ok(())
     }
 
-    /// 某个本地日的每小时步数（只有官方给）。官方只回有步数的小时，没回的小时就不在结果里——
-    /// 界面画成空，不画 0。
-    pub fn hourly_steps(&self, date: &str) -> Result<Vec<HourlySteps>> {
-        NaiveDate::parse_from_str(date, "%Y-%m-%d")
-            .map_err(|_| ZeppBridgeError::ConfigError("日期需要 YYYY-MM-DD".into()))?;
-        let (utc_lower, utc_upper) = utc_bounds_or_unbounded(date, date);
+    /// 一段本地日（含首尾）里逐日的每小时步数（只有官方给）。官方只回有步数的小时，没回的
+    /// 小时就不在结果里——界面画成空，不画 0。
+    pub fn hourly_steps(&self, start: &str, end: &str) -> Result<Vec<HourlySteps>> {
+        let parse = |value: &str| {
+            NaiveDate::parse_from_str(value, "%Y-%m-%d")
+                .map_err(|_| ZeppBridgeError::ConfigError("日期需要 YYYY-MM-DD".into()))
+        };
+        if parse(start)? > parse(end)? {
+            return Err(ZeppBridgeError::ConfigError("开始日期晚于结束日期".into()));
+        }
+        let (utc_lower, utc_upper) = utc_bounds_or_unbounded(start, end);
         let mut stmt = self.conn.prepare(
-            "SELECT CAST(strftime('%H', timestamp, 'localtime') AS INTEGER), MAX(value)
+            "SELECT date(timestamp, 'localtime'), CAST(strftime('%H', timestamp, 'localtime') AS INTEGER), MAX(value)
              FROM metric_samples
-             WHERE metric = 'steps_hourly' AND timestamp >= ?2 AND timestamp < ?3
-               AND date(timestamp, 'localtime') = ?1
-             GROUP BY 1 ORDER BY 1",
+             WHERE metric = 'steps_hourly' AND timestamp >= ?3 AND timestamp < ?4
+               AND date(timestamp, 'localtime') BETWEEN ?1 AND ?2
+             GROUP BY 1, 2 ORDER BY 1, 2",
         )?;
         let rows = stmt
-            .query_map(params![date, utc_lower, utc_upper], |row| {
+            .query_map(params![start, end, utc_lower, utc_upper], |row| {
                 Ok(HourlySteps {
-                    hour: row.get(0)?,
-                    steps: row.get(1)?,
+                    date: row.get(0)?,
+                    hour: row.get(1)?,
+                    steps: row.get(2)?,
                 })
             })?
             .collect::<std::result::Result<Vec<_>, _>>()?;

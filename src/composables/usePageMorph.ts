@@ -1,6 +1,6 @@
 import type { RouteLocationNormalized } from 'vue-router';
 import type { PageMotion } from '../lib/navigation';
-import { holdGhost, landGhost } from '../lib/motion/ghost';
+import { collapseGhost, holdGhost } from '../lib/motion/ghost';
 import { onMotionSkip } from '../lib/motion/interrupt';
 import { whenPageReady } from '../lib/motion/pageReady';
 
@@ -21,10 +21,13 @@ const EXPAND_EASE = 'cubic-bezier(.2, .9, .22, 1)';
 /** 新页首次加载最多等这么久（从点下去算起，含板长大那一段）；再久就先揭开（页面自己有骨架屏），
     不让一整屏卡片色停在那里。 */
 const READY_TIMEOUT_MS = 560;
-/** 返回：详情页和板一起缩回那张卡。缩的这一段同样减速，像被卡片吸回去；板落到卡上以后再用 LAND_MS 淡出。 */
-const SHRINK_MS = 360;
-const LAND_MS = 120;
-const SHRINK_EASE = 'cubic-bezier(.3, .7, .2, 1)';
+/** 返回：圆角板从整页收回那张卡（展开的逆过程）。曲线先快后慢、没有回弹，像被卡片吸回去；
+    形状在前一半基本落定，后半程板淡出、真卡亮起接上——板不在卡上干停着。 */
+const SHRINK_MS = 460;
+const LAND_AT = 0.52;
+const SHRINK_EASE = 'cubic-bezier(.32, .72, 0, 1)';
+/** 板从透明变实的时长：这段里详情页同时淡出，两者交叉，不出现整屏的纯色。 */
+const PLATE_IN_MS = 90;
 /** 来处页不在缓存里时要重新读库，那张卡可能要等一会儿才出现。等的时候详情页原样留着，不盖板。 */
 const CARD_WAIT_MS = 300;
 /** 太小的东西（行内的小链接、图标）不当作「卡」：从一个字那么大长成整页没有意义。 */
@@ -43,11 +46,13 @@ const bigEnough = (el: Element | null): boolean => {
 };
 const radiusOf = (el: Element) => Number.parseFloat(getComputedStyle(el).borderTopLeftRadius) || 22;
 const r1 = (value: number) => Number(value.toFixed(1));
-const r3 = (value: number) => Number(value.toFixed(4));
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
 /** 被点的链接所在的那张卡：链接本身够大就是它，否则往外找最近的一块板。 */
 const cardOfLink = (link: HTMLElement): HTMLElement | null => {
+  // 显式标了 data-morph-card 的一整条（概览底部的「数据来源」）：比一般的卡矮，也按卡算。
+  const marked = link.closest<HTMLElement>('[data-morph-card]');
+  if (marked) return marked;
   const box = bigEnough(link) ? link : link.closest<HTMLElement>('.metric-panel, .surface-card, .trend-card, li, section');
   return box && bigEnough(box) ? box : null;
 };
@@ -94,7 +99,8 @@ export const usePageMorph = () => {
     expandFrom = null;
     collapseTo = null;
     if (reducedMotion()) return base;
-    if (base === 'forward' && link) {
+    // 标了 data-morph-card 的条带跨入口（概览 → 设置卡）也展开：从哪里来回哪里去。
+    if (link && (base === 'forward' || link.closest('[data-morph-card]'))) {
       const href = link.getAttribute('href') ?? '';
       const card = href === to.fullPath || href === to.path ? cardOfLink(link) : null;
       if (card) {
@@ -103,14 +109,15 @@ export const usePageMorph = () => {
         return 'expand';
       }
     }
-    // 同一层之间（最近记录 → 睡眠详情）来回都算 forward，所以不看方向，只看来路对不对得上。
-    if (base === 'back' || base === 'forward') {
-      const trail = trails.get(from.fullPath);
-      if (trail && trail.back === to.fullPath) {
-        collapseTo = trail;
-        return 'collapse';
-      }
+    // 不看方向，只看来路对不对得上：同一层之间（最近记录 → 睡眠详情）来回都算 forward，
+    // 设置卡关回概览又是横向换入口。
+    const trail = trails.get(from.fullPath);
+    if (trail && trail.back === to.fullPath) {
+      collapseTo = trail;
+      return 'collapse';
     }
+    // 设置里翻到另一张卡用的是 replace：来路跟着带过去，关掉时仍缩回当初那条。
+    if (trail && from.path.startsWith('/settings/') && to.path.startsWith('/settings/')) trails.set(to.fullPath, trail);
     return base;
   };
 
@@ -190,9 +197,9 @@ export const usePageMorph = () => {
     el.dispatchEvent(new TransitionEvent('transitionend', { propertyName: 'opacity' }));
   };
 
-  /** 返回：详情页缩向当初那张卡、边缩边淡出；一块板同时从整页透明地缩到卡上、落定时实起来，
-      再淡出露出真卡，真卡轻轻落定一下。来处页从一开始就在底下看得见——不再有一整屏的
-      卡片色盖着等卡（那就是「返回时黑一下」）。找不到那张卡（被删了、翻页了）就原地淡出。 */
+  /** 返回：一块圆角板从整页收回当初那张卡、落定后淡出，真卡亮一下（展开的逆过程）。
+      详情页在板变实的那一小段里淡出，同时等比（不压扁）朝卡的方向缩一点，跟着板走。
+      来处页一开始就在底下，板缩到哪儿、四周就露出到哪儿。找不到那张卡就原地淡出。 */
   const onLeave = (el: Element) => {
     const trail = collapseTo;
     collapseTo = null;
@@ -205,6 +212,12 @@ export const usePageMorph = () => {
     }
     void findCard(trail).then((card) => {
       if (!el.isConnected) return;
+      // 缓存的来处页重新插回文档时，卡片入场动画（material.css 的 card-enter）会从头再放一遍：
+      // 板要落到卡的最终位置上，卡却还在往上浮——直接放完它。
+      const staying = main()?.querySelector<HTMLElement>(STAYING);
+      for (const animation of staying?.getAnimations({ subtree: true }) ?? []) {
+        if (animation instanceof CSSAnimation && animation.animationName === 'card-enter') animation.finish();
+      }
       if (!card) {
         const fade = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160, easing: 'ease-out', fill: 'forwards' });
         fade.finished.then(() => endLeave(el), () => endLeave(el));
@@ -212,25 +225,26 @@ export const usePageMorph = () => {
       }
       const to = rectOf(card);
       const radius = radiusOf(card);
-      // 可视区在详情页自己坐标里的位置：离场页是绝对定位、按滚动距离垫过的，顶边可能在屏幕外。
+      // 等比缩向卡的中心：原点取卡中心在详情页自己坐标里的位置（离场页绝对定位、按滚动距离垫过）。
       const box = el.getBoundingClientRect();
-      const sx = to.width / viewport.width;
-      const sy = to.height / viewport.height;
-      const tx = to.left - box.left - (viewport.left - box.left) * sx;
-      const ty = to.top - box.top - (viewport.top - box.top) * sy;
-      el.style.transformOrigin = '0 0';
-      el.animate(
-        [{ transform: 'none' }, { transform: `translate(${r1(tx)}px, ${r1(ty)}px) scale(${r3(sx)}, ${r3(sy)})` }],
-        { duration: SHRINK_MS, easing: SHRINK_EASE, fill: 'forwards' },
-      );
-      // 页面比板先走：缩到一半左右已经看不见，剩下的形状交给板。
-      const fade = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: SHRINK_MS * 0.5, easing: 'ease-in', fill: 'forwards' });
-      landGhost({ viewport, to, radius, host, duration: SHRINK_MS + LAND_MS, easing: SHRINK_EASE }).finished.then(() => {
+      el.style.transformOrigin = `${r1(to.left + to.width / 2 - box.left)}px ${r1(to.top + to.height / 2 - box.top)}px`;
+      el.animate([{ transform: 'none' }, { transform: 'scale(.9)' }], { duration: SHRINK_MS, easing: SHRINK_EASE, fill: 'forwards' });
+      const fade = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: PLATE_IN_MS + 40, easing: 'ease-out', fill: 'forwards' });
+      // 真卡在板底下先藏着：板淡出时它正好接上，而不是板和卡叠成一块更亮的。
+      card.style.opacity = '0';
+      const plate = collapseGhost({ viewport, to, radius, host, duration: SHRINK_MS, fadeIn: PLATE_IN_MS, landAt: LAND_AT, easing: SHRINK_EASE });
+      let lit = false;
+      const light = () => {
+        if (lit) return;
+        lit = true;
+        card.style.opacity = '';
         card.animate(
-          [{ transform: 'scale(.985)' }, { transform: 'none' }],
-          { duration: 260, easing: 'cubic-bezier(.2, 1.4, .4, 1)' },
+          [{ opacity: 0, filter: 'brightness(1.3)' }, { opacity: 1, filter: 'brightness(1.3)', offset: 0.35 }, { opacity: 1, filter: 'brightness(1)' }],
+          { duration: 520, easing: 'ease-out' },
         );
-      }, () => undefined);
+      };
+      void plate.landed.then(light);
+      plate.done.addEventListener('cancel', light);
       fade.finished.then(() => endLeave(el), () => endLeave(el));
     });
   };

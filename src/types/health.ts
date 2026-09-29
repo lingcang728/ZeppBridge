@@ -132,6 +132,8 @@ export interface Page<T> {
  */
 /** 某个本地日里某一小时的步数（Zepp 官方授权才有）。 */
 export interface HourlySteps {
+  /** 本地日历日 YYYY-MM-DD。 */
+  date: string;
   /** 本地时间 0–23 点。 */
   hour: number;
   steps: number;

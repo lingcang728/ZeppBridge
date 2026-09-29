@@ -245,3 +245,43 @@ html[data-theme-morph]::view-transition-new(root) { animation: none; mix-blend-m
    免得人在别的窗口看着它以为卡住了。开关由 main.ts 维护。 */
 html.is-backgrounded *, html.is-backgrounded ::before, html.is-backgrounded ::after { animation-play-state: paused; }
 html.is-backgrounded :is(.spinning, .ring-arc, .indeterminate) { animation-play-state: running; }
+
+/* 列表页（睡眠、运动）的容器：和「最近记录」时间线同一块板，一根渐隐的细线串起每一行的节点
+   （行本身见 components/RecordRow.vue：日期 112px + 间距 10px + 节点 44px 的一半）。 */
+.record-list {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  padding: 18px 20px 22px;
+  border-radius: var(--radius-lg);
+  background: var(--mat-card);
+  box-shadow: var(--mat-rim), var(--mat-shadow);
+}
+.record-list::before {
+  content: '';
+  position: absolute;
+  top: 30px;
+  bottom: 30px;
+  left: calc(20px + 112px + 10px + 21px);
+  width: 2px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ink) 16%, transparent), color-mix(in srgb, var(--ink) 4%, transparent));
+}
+@media (max-width: 640px) {
+  .record-list::before { left: calc(20px + 72px + 10px + 19px); }
+}
+
+/* ── 卡片入场 ──
+   卡片出现时（首次加载骨架换成内容、切页、缓存页回到场上）一律轻轻淡入、上浮 8px，
+   同一排里依次错开一点，像 iOS 的系统卡片那样「浮」出来——以前是空一拍、然后整块啪地
+   出现。只动 opacity 和独立的 translate 属性（不占 transform，卡片自己的倾斜、悬停照旧）。 */
+@keyframes card-enter { from { opacity: 0; translate: 0 8px; } }
+@media (prefers-reduced-motion: no-preference) {
+  .surface-card, .trend-card, .metric-panel, .weekly-card, .hourly-card, .record-list, .life-events, .sources-strip {
+    animation: card-enter 380ms cubic-bezier(.2, .8, .2, 1) both;
+  }
+  .trend-grid > :nth-child(2), .dashboard-grid > :nth-child(2) { animation-delay: 40ms; }
+  .trend-grid > :nth-child(3), .dashboard-grid > :nth-child(3) { animation-delay: 80ms; }
+  .trend-grid > :nth-child(4), .dashboard-grid > :nth-child(4) { animation-delay: 120ms; }
+  .trend-grid > :nth-child(n+5) { animation-delay: 160ms; }
+}

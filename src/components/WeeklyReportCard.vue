@@ -302,7 +302,7 @@ function formatNumber(fact: InsightFact, value: number): string {
   display: grid;
   gap: 12px;
   padding: 18px 20px 20px;
-  border-radius: 28px;
+  border-radius: var(--radius-lg);
   background: var(--mat-card);
   box-shadow: var(--mat-rim), var(--mat-shadow);
 }
@@ -340,7 +340,7 @@ function formatNumber(fact: InsightFact, value: number): string {
 .weekly-grid > .weekly-item { flex: 1 1 calc((100% - (var(--cols) - 1) * 10px) / var(--cols)); min-width: min(100%, 220px); }
 /* 每一项是一块凸起的小板（以前是凹下去的平面磁贴）：亮一点的底、顶边高光、柔和投影，
    悬停时浮起来一点。 */
-.weekly-item { display: grid; gap: 2px; color: inherit; text-decoration: none; align-content: start; padding: 12px 14px; border-radius: 20px;
+.weekly-item { display: grid; gap: 2px; color: inherit; text-decoration: none; align-content: start; padding: 12px 14px; border-radius: var(--radius-md);
   background: linear-gradient(180deg, color-mix(in srgb, var(--ink) 6%, transparent), color-mix(in srgb, var(--ink) 2.5%, transparent));
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 9%, transparent), inset 0 -1px 0 rgba(0, 0, 0, .18), 0 6px 16px -10px rgba(0, 0, 0, .5);
   transition: translate var(--dur-base) var(--ease-out), box-shadow var(--dur-base) ease; }

@@ -206,8 +206,8 @@ export const tauriBackend: BridgeBackend = {
     return call<MetricSeries[]>('get_metric_series', { metrics, days });
   },
 
-  getHourlySteps(date: string) {
-    return call<HourlySteps[]>('get_hourly_steps', { date });
+  getHourlySteps(start: string, end: string) {
+    return call<HourlySteps[]>('get_hourly_steps', { start, end });
   },
 
   getTrainingBalance(days: number) {

@@ -4,7 +4,7 @@
  *   coverflow（默认）：正中一张立着，左右叠在两边，左右拖动挑一张。
  *   卡包（「展开全部」）：像 Apple Wallet 的卡包——卡纵向叠放、每张只露出卡头，
  *       指针停在哪张，它下面的卡就往下让一让；点一张像抽卡一样长成整页。底部
- *       一枚醒目的「收起」，卡按相反顺序插回 coverflow。
+ *       居中一枚「收起」，卡自下而上叠回第一张身后，再换成 coverflow。
  *   打开（/settings/:card）：那张卡从它在总览里的位置长成整页；总览不消失，而是
  *       往后退一层——缩小、按深度变糊、往下渐隐——看得出卡是从哪一层里抽出来的。
  *       关掉时卡缩回原位，总览从模糊里浮回来。打开以后仍可左右拖卡头翻到相邻
@@ -19,7 +19,6 @@ import Icon from '../Icon.vue';
 import DeckCoverflow from './DeckCoverflow.vue';
 import { useCardDeck } from '../../composables/useCardDeck';
 import { useDeckMorph } from '../../composables/useDeckMorph';
-import { staggerOrder } from '../../lib/deck/morph';
 import { wrapIndex } from '../../lib/deck/physics';
 import { defineMessages, useMessages } from '../../i18n';
 
@@ -107,16 +106,29 @@ const centerId = ref<string | null>(props.activeId ?? props.cards[0]?.id ?? null
 
 const morph = useDeckMorph({ overview, card: cardEl, reducedMotion });
 
-/* 平铺 ↔ coverflow：先记下每张卡此刻在画面上的位置（半路打断时就是它们正飞到的
-   位置），换形态，再让每张卡从那儿飞到新位置——抽出来时从正中那张往两边依次出发，
-   插回去时反过来。 */
+/* 卡包 ↔ coverflow：旧形态先退场（卡包自下而上叠回第一张身后 / coverflow 缩小淡出），
+   换形态，新形态再进场（像发牌一样依次展开 / coverflow 浮上来）。以前是每张卡从旧位置
+   等比飞到新位置：两种形态的卡形状对不上，八张卡斜着乱飞。
+   过渡期间整组卡不接指针（is-switching）；展开以后，指针要真的挪动过一段，卡包的悬停
+   让位才生效（armed）——否则「展开全部」那一下指针正好落在某张卡上，后面的卡立刻往下
+   一让，看上去就是点完闪一下、排版跳一下。 */
+const switching = ref(false);
+const armed = ref(false);
+let armFrom: { x: number; y: number } | null = null;
 const switchLayout = async (next: Layout) => {
-  if (next === layout.value) return;
-  const before = morph.snapshot();
-  deckWidth.value = root.value?.clientWidth ?? deckWidth.value;
-  layout.value = next;
-  await nextTick();
-  morph.fly(before, staggerOrder(props.cards.map((card) => card.id), centerId.value, next === 'cover'));
+  if (next === layout.value || switching.value) return;
+  switching.value = true;
+  armed.value = false;
+  armFrom = null;
+  try {
+    await morph.leaveLayout(layout.value);
+    deckWidth.value = root.value?.clientWidth ?? deckWidth.value;
+    layout.value = next;
+    await nextTick();
+    await morph.enterLayout(next);
+  } finally {
+    switching.value = false;
+  }
   try {
     window.localStorage.setItem(LAYOUT_KEY, next);
   } catch {
@@ -168,22 +180,20 @@ onBeforeRouteUpdate(() => {
   closeFromTop = props.activeId && cardEl.value ? cardEl.value.getBoundingClientRect().top : null;
 });
 
-/* 总览退到位以后才一次性糊上（见 CardDeck.css 的 .is-frosted）：模糊不跟着动画逐帧变。 */
-const frosted = ref(Boolean(props.activeId));
-let frostTimer = 0;
-const FROST_DELAY_MS = 340;
+const onListPointerMove = (event: PointerEvent) => {
+  if (armed.value || switching.value) return;
+  if (!armFrom) { armFrom = { x: event.clientX, y: event.clientY }; return; }
+  if (Math.hypot(event.clientX - armFrom.x, event.clientY - armFrom.y) > 14) armed.value = true;
+};
 
 watch(() => props.activeId, async (id, previous) => {
   if (id) centerId.value = id;
   lastToggleAt = performance.now();
-  window.clearTimeout(frostTimer);
-  if (!id) frosted.value = false;
   if (id && !previous) {
     closingId.value = null;
     reset();
     await nextTick();
     morph.open(id);
-    if (!reducedMotion()) frostTimer = window.setTimeout(() => { frosted.value = Boolean(props.activeId); }, FROST_DELAY_MS);
   } else if (!id && previous) {
     reset();
     closingId.value = previous;
@@ -253,7 +263,6 @@ onMounted(() => {
   document.addEventListener('click', onDocClick);
 });
 onBeforeUnmount(() => {
-  window.clearTimeout(frostTimer);
   document.removeEventListener('keydown', onKeydown);
   document.removeEventListener('pointerdown', onDocPointerDown, true);
   document.removeEventListener('click', onDocClick);
@@ -261,10 +270,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="root" :class="['card-deck', `deck-mode-${layout}`, { 'has-open': activeId, 'is-closing': !activeId && closingId }]">
+  <div ref="root" :class="['card-deck', `deck-mode-${layout}`, { 'has-open': activeId, 'is-closing': !activeId && closingId, 'is-switching': switching }]">
     <!-- 总览：coverflow 或卡包。打开一张卡时它整体往后退一层（不消失、不收起高度——
          以前退到底会把高度收成 0，关卡时再撑开，页面跳一下就是「切回去闪一下」）。 -->
-    <div ref="overview" :class="['deck-overview', { 'is-receded': activeId, 'is-frosted': frosted && activeId }]" :inert="activeId ? true : undefined">
+    <div ref="overview" :class="['deck-overview', { 'is-receded': activeId }]" :inert="activeId ? true : undefined">
       <DeckCoverflow
         v-if="layout === 'cover'"
         v-model="centerId"
@@ -282,7 +291,7 @@ onBeforeUnmount(() => {
       </DeckCoverflow>
 
       <template v-else>
-        <ol class="deck-list" :aria-label="t.listLabel">
+        <ol :class="['deck-list', { 'is-armed': armed }]" :aria-label="t.listLabel" @pointermove.passive="onListPointerMove">
           <li
             v-for="(card, index) in cards"
             :key="card.id"

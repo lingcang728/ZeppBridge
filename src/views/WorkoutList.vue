@@ -9,7 +9,7 @@ import SkeletonBlock from '../components/SkeletonBlock.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
 import { formatDate, formatDistance, formatDuration, isFiniteNumber } from '../lib/format';
-import { displayableWorkouts, workoutDisplayLabel, workoutDisplayType, workoutDurationMinutes } from '../lib/workouts';
+import { displayableWorkouts, workoutDisplayLabel, workoutDurationMinutes, workoutIcon } from '../lib/workouts';
 import type { Workout } from '../types';
 import { createLoadSeq } from '../lib/loadSeq';
 import { defineMessages, useMessages } from '../i18n';
@@ -96,23 +96,6 @@ const loadingMore = ref(false);
 const listEpoch = createLoadSeq();
 const hasMore = computed(() => workouts.value.length < total.value);
 
-function workoutTypeBg(type: string): string {
-  const map: Record<string, string> = {
-    run: 'var(--route-mint)',
-    running: 'var(--route-mint)',
-    trail: 'var(--route-mint)',
-    walk: 'var(--route-cyan)',
-    walking: 'var(--route-cyan)',
-    hiking: 'var(--route-cyan)',
-    treadmill: 'var(--route-amber)',
-    indoor_run: 'var(--route-amber)',
-    ride: 'var(--route-cyan)',
-    cycling: 'var(--route-cyan)',
-    swimming: 'var(--route-cyan)',
-  };
-  return map[type?.trim().toLowerCase()] ?? 'var(--route-mint)';
-}
-
 const workoutFact = (workout: Workout): { fact: string; label: string } => {
   const meters = workout.distance_meters;
   if (isFiniteNumber(meters) && meters > 0) {
@@ -190,14 +173,13 @@ watch(dataRevision, () => void loadList());
       <button class="button button-secondary" type="button" @click="loadList">{{ t.retry }}</button>
     </EmptyState>
     <EmptyState v-else-if="!displayableList.length" icon="steps" :title="t.emptyTitle" :message="t.emptyMessage" />
-    <div v-else class="surface-card">
+    <div v-else class="record-list">
       <RecordRow
         v-for="workout in displayableList"
         :key="workout.workout_id"
         :to="{ name: 'WorkoutDetail', params: { workoutId: workout.workout_id } }"
         category="activity"
-        icon="run"
-        :icon-bg="workoutTypeBg(workoutDisplayType(workout))"
+        :design-icon="workoutIcon(workout)"
         :kicker="formatDate(workout.start_time)"
         :title="workoutDisplayLabel(workout)"
         :fact="workoutFact(workout).fact"

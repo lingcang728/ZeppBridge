@@ -62,6 +62,11 @@ const dragging = ref(false);
 const settling = ref(false);
 /** 拖动 / 吸附中离滑块最近的那一项：它的字整枚上品牌色。 */
 const lensValue = ref<T | null>(null) as Ref<T | null>;
+/* 换字的淡入淡出只在拖动已经开始以后才打开：进入拖动那一帧画法从「按滑块裁切」换成
+   「整枚上色」，两种画法在那一帧看上去完全一样，必须瞬间换；要是这时也走 140ms 的淡出，
+   裁切先撤掉、其余几枚绿字还没淡完，所有标签就会一起闪绿一下（「一拖字就闪」）。 */
+const lensFade = ref(false);
+let fadeFrame = 0;
 let settleTimer = 0;
 /** 第一次量完之前不做过渡，免得滑块从最左边滑进来。 */
 const settled = ref(false);
@@ -151,6 +156,7 @@ const clearGesture = () => {
   gesture = null;
   dragging.value = false;
   lensValue.value = null;
+  cancelAnimationFrame(fadeFrame);
   cancelAnimationFrame(frame);
   frame = 0;
   nextThumb = null;
@@ -189,7 +195,12 @@ const onMove = (event: PointerEvent) => {
   const scale = layoutScale();
   const dx = (event.clientX - current.x) / scale;
   if (!dragging.value && Math.abs(dx) < 5) return;
-  if (!dragging.value) lensValue.value = props.modelValue;
+  if (!dragging.value) {
+    lensValue.value = props.modelValue;
+    lensFade.value = false;
+    // 两帧以后（新画法已经画出来）才打开换字的淡入淡出。
+    fadeFrame = requestAnimationFrame(() => { fadeFrame = requestAnimationFrame(() => { lensFade.value = true; }); });
+  }
   dragging.value = true;
   suppressClick = true;
   current.velocity = (event.clientX - current.lastX) / scale / Math.max(1, event.timeStamp - current.time);
@@ -219,11 +230,13 @@ const onUp = (event: PointerEvent) => {
   const center = current.center + (event.clientX - current.x) / layoutScale();
   const velocity = event.timeStamp - current.time < 90 ? current.velocity : 0;
   const next = moved ? snapStop(stops.value, center, velocity).value : current.startValue;
+  const keepFade = lensFade.value;
   clearGesture();
+  lensFade.value = moved && keepFade;
   if (moved) {
     settling.value = true;
     window.clearTimeout(settleTimer);
-    settleTimer = window.setTimeout(() => { settling.value = false; lensValue.value = null; }, 320);
+    settleTimer = window.setTimeout(() => { settling.value = false; lensFade.value = false; lensValue.value = null; }, 340);
     lensValue.value = next;
   }
   placeOn(next);
@@ -281,6 +294,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   clearGesture();
   window.clearTimeout(settleTimer);
+  cancelAnimationFrame(fadeFrame);
   observer?.disconnect();
   window.removeEventListener('resize', measure);
 });
@@ -290,7 +304,7 @@ onBeforeUnmount(() => {
   <div
     ref="track"
     :class="['segment-track', `is-${variant}`, {
-      'is-dragging': dragging, 'is-settling': settling, 'is-compact': compact, 'is-disabled': disabled, 'is-fill': fill, 'is-settled': settled,
+      'is-dragging': dragging, 'is-settling': settling, 'is-lens-fade': lensFade, 'is-compact': compact, 'is-disabled': disabled, 'is-fill': fill, 'is-settled': settled,
       'is-wrapped': wrapped,
       'is-icon-only': iconOnly,
     }]"
@@ -476,7 +490,10 @@ onBeforeUnmount(() => {
 
 /* 拖动 / 吸附中：上层不按滑块裁切，只留离滑块最近的那一枚（整枚品牌色）；底层不再挖空，
    那一枚隐去。字始终完整，不会被切成两色。 */
-.segment-ink-item, .segment-item { transition: opacity 140ms ease, color var(--dur-fast) ease; }
+.segment-item { transition: color var(--dur-fast) ease; }
+.segment-track.is-lens-fade .segment-ink-item, .segment-track.is-lens-fade .segment-item {
+  transition: opacity 140ms ease, color var(--dur-fast) ease;
+}
 .segment-track.is-dragging .segment-ink, .segment-track.is-settling .segment-ink { clip-path: none; }
 .segment-track.is-dragging .segment-ink-item, .segment-track.is-settling .segment-ink-item { opacity: 0; }
 .segment-track.is-dragging .segment-ink-item.is-lensed, .segment-track.is-settling .segment-ink-item.is-lensed { opacity: 1; }

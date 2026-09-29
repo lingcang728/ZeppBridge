@@ -80,6 +80,13 @@ fn the_same_night_is_stored_twice_but_shown_once_as_the_official_one() {
     );
     // 列表查询走视图：同一晚只出现一次。
     assert_eq!(db.get_recent_sleep_sessions(10).unwrap().len(), 2);
+    // 官方那份不带设备：详情借同一晚旧通道那份的设备来认，而不是显示「未提供」。
+    let detail = db
+        .get_sleep_detail(&format!("official:{start}"))
+        .unwrap()
+        .unwrap();
+    assert_eq!(detail.device_id.as_deref(), Some("dev"));
+    assert!(!detail.stages.is_empty());
 }
 
 #[test]
@@ -113,4 +120,12 @@ fn official_payloads_are_marked_and_replay_through_the_same_path() {
         (metric.as_str(), value, row_provider.as_str()),
         ("steps_hourly", 208.0, "official")
     );
+    // 按范围取（日常活动页跟着 7 天 / 1 个月 / 6 个月走）：带上日期，不补 0。
+    let rows = db.hourly_steps("2026-09-27", "2026-09-29").unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(
+        (rows[0].date.as_str(), rows[0].steps),
+        ("2026-09-28", 208.0)
+    );
+    assert!(db.hourly_steps("2026-09-29", "2026-09-27").is_err());
 }

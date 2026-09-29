@@ -135,7 +135,7 @@ const recentItems = computed<RecentItem[]>(() => {
 .timeline { position: relative; display: grid; grid-auto-columns: minmax(150px, 1fr); grid-auto-flow: column; gap: 8px; margin: 16px 0 0; padding: 0 0 4px; overflow-x: auto; list-style: none; }
 .timeline::before { content: ''; position: absolute; top: 50px; right: 6%; left: 6%; height: 2px; border-radius: 2px;
   background: linear-gradient(270deg, transparent, color-mix(in srgb, var(--ink) 16%, transparent) 12%, color-mix(in srgb, var(--accent) 55%, transparent)); }
-.tl-link { position: relative; display: grid; justify-items: center; gap: 6px; padding: 4px 8px 12px; border-radius: 22px; color: inherit; text-align: center; text-decoration: none;
+.tl-link { position: relative; display: grid; justify-items: center; gap: 6px; padding: 4px 8px 12px; border-radius: var(--radius-md); color: inherit; text-align: center; text-decoration: none;
   transition: background var(--dur-base) ease, translate var(--dur-base) var(--ease-out); }
 .tl-link:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); translate: 0 -2px; }
 .tl-link:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }

@@ -28,6 +28,8 @@ const scopeItems = computed(() => [
 const filtered = computed(() => events.value.filter((e) => (scope.value === 'all' || e.endDate === null)
   && `${e.title} ${e.notes}`.toLocaleLowerCase().includes(search.value.trim().toLocaleLowerCase())));
 const rows = computed(() => filtered.value.slice(0, visible.value));
+/* 还一件都没有：整块收成一行（标题、一句引导、添加按钮），不再是一张大卡里孤零零一行字。 */
+const empty = computed(() => !events.value.length && !loading.value && !failed.value);
 const date = (s: string) => displayDateTimeFormatter({ year: 'numeric', month: 'short', day: 'numeric' }).format(new Date(`${s}T00:00:00`));
 watch([search, scope, events], () => { visible.value = STEP; });
 onMounted(reload);
@@ -35,11 +37,12 @@ onActivated(reload);
 </script>
 
 <template>
-  <section id="life-events" class="life-events" aria-labelledby="life-events-title">
+  <section id="life-events" :class="['life-events', { 'is-empty': empty }]" aria-labelledby="life-events-title">
     <header class="le-head">
+      <span v-if="empty" class="le-empty-mark" aria-hidden="true"><Icon name="pin" :size="18" /></span>
       <div>
         <h2 id="life-events-title">{{ t.title }}</h2>
-        <p>{{ t.intro }}</p>
+        <p>{{ empty ? t.empty : t.intro }}</p>
       </div>
       <button type="button" class="pill-button" @click="open()"><Icon name="plus" :size="14" />{{ t.add }}</button>
     </header>
@@ -54,7 +57,7 @@ onActivated(reload);
 
     <p v-if="failed" class="le-note" role="alert">{{ t.failed }} <button type="button" class="pill-button quiet" @click="reload">{{ t.retry }}</button></p>
     <p v-else-if="loading && !events.length" class="le-note" role="status">{{ t.loading }}</p>
-    <p v-else-if="!rows.length" class="le-note">{{ events.length ? t.noMatch : t.empty }}</p>
+    <p v-else-if="!rows.length && !empty" class="le-note">{{ events.length ? t.noMatch : t.empty }}</p>
 
     <ol v-if="rows.length" class="le-timeline">
       <li v-for="event in rows" :key="event.id" :style="{ '--event-tone': eventTone(event.category) }">
@@ -81,8 +84,15 @@ onActivated(reload);
 </template>
 
 <style scoped>
-.life-events { padding: 22px 24px; border-radius: var(--radius-xl); background: var(--mat-card); scroll-margin-top: 24px; box-shadow: var(--mat-rim), var(--mat-shadow); }
+.life-events { padding: 22px 24px; border-radius: var(--radius-lg); background: var(--mat-card); scroll-margin-top: 24px; box-shadow: var(--mat-rim), var(--mat-shadow); }
 .le-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.life-events.is-empty { padding: 14px 18px; }
+.life-events.is-empty .le-head { flex-wrap: nowrap; align-items: center; gap: 14px; }
+.life-events.is-empty .le-head > div { flex: 1 1 auto; min-width: 0; }
+.life-events.is-empty .le-head h2 { font-size: var(--fs-md); }
+.life-events.is-empty .le-head p { margin-top: 2px; font-size: var(--fs-xs); line-height: 1.5; }
+.le-empty-mark { display: grid; width: 36px; height: 36px; flex: 0 0 36px; place-items: center; border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
 .le-head h2 { margin: 0; color: var(--ink); font-size: var(--fs-lg); }
 .le-head p { margin: 4px 0 0; color: var(--subtle); font-size: var(--fs-sm); line-height: 1.6; }
 .le-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 18px; }
@@ -101,7 +111,7 @@ onActivated(reload);
   background: color-mix(in srgb, var(--event-tone) 22%, var(--mat-card-solid)); box-shadow: 0 0 0 4px var(--mat-card-solid); color: var(--event-tone); }
 .le-node.ongoing::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; box-shadow: 0 0 0 2px var(--event-tone); animation: le-breathe 2.4s ease-in-out 3; }
 @keyframes le-breathe { 50% { opacity: .2; scale: 1.15; } }
-.le-card { display: grid; flex: 1; min-width: 0; gap: 4px; padding: 12px 16px; border: 0; border-radius: 20px;
+.le-card { display: grid; flex: 1; min-width: 0; gap: 4px; padding: 12px 16px; border: 0; border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--ink) 4%, transparent); box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 5%, transparent);
   color: var(--ink); text-align: left; cursor: pointer; transition: background var(--dur-fast) ease, translate var(--dur-base) var(--ease-out); }
 .le-card:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); translate: 2px 0; }

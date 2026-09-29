@@ -18,15 +18,24 @@ export default {
   modules: {
     'components/activity/HourlyStepsCard': {
       title: 'Шаги по часам',
-      source: 'Из официальной авторизации Zepp',
-      today: 'Сегодня',
-      yesterday: 'Вчера',
-      dayAria: 'Выберите день',
       stepsUnit: 'шагов',
+      perDayUnit: 'шагов / день',
+      averageNote: (days: number) =>
+        `Среднее за ${plural(days, { one: `${days} день`, few: `${days} дня`, many: `${days} дней`, other: `${days} дня` })} с данными; нажмите на строку ниже, чтобы увидеть только её`,
+      dayNote: (label: string) => `Только ${label}`,
+      weekNote: (label: string, days: number) =>
+        `${label}, среднее за ${plural(days, { one: `${days} день`, few: `${days} дня`, many: `${days} дней`, other: `${days} дня` })} с данными`,
+      weekOf: (label: string) => `Неделя с ${label}`,
+      showAverage: 'Вернуться к среднему',
       busiest: (hour: number, steps: string) => `Самый активный час: ${hour}:00, ${steps} шагов`,
+      busiestAverage: (hour: number, steps: string) => `Активнее всего в ${hour}:00, в среднем ${steps} шагов`,
       barTitle: (hour: number, steps: string) => `${hour}:00 — ${steps} шагов`,
+      averageBarTitle: (hour: number, steps: string) => `${hour}:00 — в среднем ${steps} шагов`,
       noRecord: (hour: number) => `${hour}:00 — нет записей`,
-      empty: 'За этот день пока нет шагов по часам.',
+      heatAria: 'Шаги за каждый час каждого дня',
+      pickRow: (label: string) => `Показать только ${label}`,
+      noRow: (label: string) => `${label}: нет записей`,
+      empty: 'В этом диапазоне пока нет шагов по часам.',
       failed: 'Сейчас не удалось прочитать шаги по часам.',
     },
     'components/OfficialOnlyNote': {
@@ -1860,6 +1869,7 @@ export default {
       metaAria: 'Источник и устройство',
       sourceTitle: 'Источник',
       sourceProvider: 'Провайдер',
+      providerOfficial: 'Официальная авторизация Zepp',
       sourceScope: 'Охват',
       syncedAt: 'Синхронизировано',
       timezone: 'Часовой пояс',

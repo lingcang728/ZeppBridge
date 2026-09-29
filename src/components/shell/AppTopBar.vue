@@ -106,6 +106,18 @@ const goBack = () => {
   if (target.viaHistory) router.back();
   else void router.push(props.backTo ?? target.path);
 };
+/* Esc 也能返回（和左上角返回键同一条路）。挂在 window 的冒泡阶段：弹窗、设置卡叠、图上的
+   浮层都在 document 上先处理 Esc 并 preventDefault，它们用掉了就不算返回；动效放到一半
+   按的 Esc 已被 lib/motion/interrupt.ts 在捕获阶段吞掉（先打断，再按一次才返回）。 */
+const ESC_SKIP = 'input, textarea, select, [contenteditable], [role="combobox"], [role="listbox"]';
+const onEscapeBack = (event: KeyboardEvent) => {
+  if (event.key !== 'Escape' || event.defaultPrevented || event.repeat || event.isComposing) return;
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || !props.backTo) return;
+  if (document.querySelector('[data-modal-dialog], [role="dialog"][aria-modal="true"]')) return;
+  if ((event.target as Element | null)?.closest?.(ESC_SKIP)) return;
+  event.preventDefault();
+  goBack();
+};
 
 const {
   appStatus, statusError, syncState, syncProgress, syncMessage,
@@ -301,12 +313,14 @@ const scheduleFit = () => {
   fitFrame = requestAnimationFrame(() => { void refit(); });
 };
 onMounted(() => {
+  window.addEventListener('keydown', onEscapeBack);
   fitObserver = new ResizeObserver(scheduleFit);
   if (bar.value) fitObserver.observe(bar.value);
   void document.fonts?.ready.then(() => { measuredKey = ''; scheduleFit(); });
   scheduleFit();
 });
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onEscapeBack);
   fitObserver?.disconnect();
   cancelAnimationFrame(fitFrame);
   window.clearTimeout(fitTimer);

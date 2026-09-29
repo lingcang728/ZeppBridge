@@ -55,3 +55,11 @@ export const workoutDisplayLabel = (workout: Partial<Workout>): string => {
   if (custom && key.startsWith('unknown')) return custom;
   return workoutLabel(key);
 };
+
+/** 时间线节点上的图标：力量类、骑行类各一枚，其余按跑步 / 户外画。 */
+export const workoutIcon = (workout: Workout): 'body-activity' | 'outdoor-cycling' | 'outdoor-run' => {
+  const key = workoutTypeKey(workout);
+  if (/strength|weight|core|hiit|gym/.test(key)) return 'body-activity';
+  if (/cycl|ride|bike|bmx|spinning/.test(key)) return 'outdoor-cycling';
+  return 'outdoor-run';
+};

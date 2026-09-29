@@ -32,8 +32,22 @@ export const remainingMs = (animation: Animation): number => {
   return animation.playbackRate < 0 ? local / rate : (end - local) / rate;
 };
 
+/**
+ * 值得打断的动效：切页、形变、弹窗这类「在走一段路」的。悬停、按下这种短过渡（不到
+ * 300ms 的 CSS 过渡）和循环的装饰动画（呼吸点）不算——以前鼠标正好停在一张卡上，
+ * 悬停过渡还没走完，按 Esc 就被当成「打断动效」吞掉了，看上去是 Esc 返回没反应。
+ */
+export const worthInterrupting = (animation: Animation): boolean => {
+  const timing = animation.effect?.getComputedTiming();
+  if (!timing || Number(timing.iterations) > 1) return false;
+  const isTransition = typeof CSSTransition !== 'undefined' && animation instanceof CSSTransition;
+  return !(isTransition && Number(timing.activeDuration) < 300);
+};
+
 const running = (): Animation[] =>
-  typeof document !== 'undefined' && typeof document.getAnimations === 'function' ? document.getAnimations().filter((a) => remainingMs(a) > 0) : [];
+  typeof document !== 'undefined' && typeof document.getAnimations === 'function'
+    ? document.getAnimations().filter((a) => remainingMs(a) > 0 && worthInterrupting(a))
+    : [];
 
 /**
  * 让所有正在进行的动效在 `ms` 内收尾。返回有没有东西被打断（没有的话 Esc 留给别人用，

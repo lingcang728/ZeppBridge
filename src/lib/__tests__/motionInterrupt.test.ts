@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { flightTransform } from '../motion/dialogFlight';
-import { onMotionSkip, remainingMs, settleMotion } from '../motion/interrupt';
+import { onMotionSkip, remainingMs, settleMotion, worthInterrupting } from '../motion/interrupt';
 
 const fakeAnimation = (localTime: number, endTime: number, playbackRate = 1, playState = 'running') => ({
   playState,
@@ -24,6 +24,13 @@ describe('motion interrupt', () => {
     expect(settleMotion()).toBe(true);
     expect(settleMotion()).toBe(false);
     expect(calls).toBe(1);
+  });
+
+  it('does not treat looping decorations as motion to interrupt', () => {
+    const loop = { effect: { getComputedTiming: () => ({ iterations: 3, activeDuration: 7200 }) } } as unknown as Animation;
+    const morph = { effect: { getComputedTiming: () => ({ iterations: 1, activeDuration: 400 }) } } as unknown as Animation;
+    expect(worthInterrupting(loop)).toBe(false);
+    expect(worthInterrupting(morph)).toBe(true);
   });
 
   it('a forgotten waiter is not called', () => {

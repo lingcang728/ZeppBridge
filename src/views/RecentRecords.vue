@@ -21,7 +21,7 @@ import { useSyncController } from '../composables/useSyncController';
 import { createLoadSeq } from '../lib/loadSeq';
 import { workoutLabel } from '../lib/labels';
 import { formatDate, formatDistance, formatDuration, formatTime, isFiniteNumber, type HealthCategory } from '../lib/format';
-import { displayableWorkouts, workoutDisplayLabel, workoutDurationMinutes, workoutTypeKey } from '../lib/workouts';
+import { displayableWorkouts, workoutDisplayLabel, workoutDurationMinutes, workoutIcon, workoutTypeKey } from '../lib/workouts';
 import type { SleepSession, Workout } from '../types';
 import { useMessages } from '../i18n';
 import { recentRecordsMessages as messages } from './RecentRecords.i18n';
@@ -85,12 +85,6 @@ const dayLabel = (date: Date) => {
   return formatDate(date.toISOString(), 'long');
 };
 
-const workoutIcon = (workout: Workout): DesignIconName => {
-  const key = workoutTypeKey(workout);
-  if (/strength|weight|core|hiit|gym/.test(key)) return 'body-activity';
-  if (/cycl|ride|bike|bmx|spinning/.test(key)) return 'outdoor-cycling';
-  return 'outdoor-run';
-};
 const workoutFact = (workout: Workout): string => {
   if (isFiniteNumber(workout.distance_meters) && workout.distance_meters > 0) return formatDistance(workout.distance_meters);
   const minutes = workoutDurationMinutes(workout);

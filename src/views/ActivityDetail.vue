@@ -221,7 +221,7 @@ watch(dataRevision, () => { void load(); });
         {{ t.noneInRange }}
       </p>
       <!-- 官方授权才有每小时步数；没连官方的账号不出现这张卡。 -->
-      <HourlyStepsCard v-if="hasOfficial" />
+      <HourlyStepsCard v-if="hasOfficial" :days="rangeDays" />
       <div class="trend-grid" :style="trendGridStyle(cards.length)">
         <MetricTrendCard
           v-for="card in cards"

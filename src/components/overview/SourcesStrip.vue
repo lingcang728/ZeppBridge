@@ -82,7 +82,7 @@ const chips = computed(() => [
 </script>
 
 <template>
-  <section class="sources-strip" :aria-label="t.sourcesAria">
+  <section class="sources-strip" data-morph-card :aria-label="t.sourcesAria">
     <span class="sources-label">{{ t.dataSources }}</span>
     <div class="sources-row">
       <span v-if="devicesLoading" class="sources-feedback" role="status">{{ t.identifyingDevices }}</span>
@@ -113,7 +113,7 @@ const chips = computed(() => [
   align-items: center;
   gap: 14px;
   padding: 10px 16px;
-  border-radius: 24px;
+  border-radius: var(--radius-lg);
   background: var(--panel);
   box-shadow: var(--mat-rim), var(--mat-shadow);
 }

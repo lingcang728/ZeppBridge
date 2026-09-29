@@ -153,18 +153,17 @@ watch(dataRevision, () => void loadList());
       <button class="button button-secondary" type="button" @click="loadList">{{ t.retry }}</button>
     </EmptyState>
     <EmptyState v-else-if="!sessions.length" icon="moon" :title="t.emptyTitle" :message="t.emptyMessage" />
-    <div v-else class="surface-card">
+    <div v-else class="record-list">
       <RecordRow
         v-for="session in sessions"
         :key="session.sleep_id"
         :to="{ name: 'SleepDetail', params: { sleepId: session.sleep_id } }"
         category="sleep"
-        icon="moon"
+        design-icon="sleep"
         :kicker="formatDate(session.start_time)"
         :title="formatDuration(session.duration_minutes)"
         :fact="isFiniteNumber(session.score) ? String(Math.round(session.score)) : '—'"
         :fact-label="t.scoreLabel"
-        :compact="false"
       />
     </div>
     <div v-if="hasMore" class="load-more">

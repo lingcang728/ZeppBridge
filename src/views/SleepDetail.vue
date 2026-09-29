@@ -205,7 +205,9 @@ const loadDetail = async () => {
 onMounted(() => void loadDetail());
 watch([dataRevision, sleepId], () => void loadDetail());
 
-const metaSummary = computed(() => [dataProviderLabel(), device.value.name].filter(Boolean).join(' · '));
+/* 官方授权那一份（sleep_id 以 official: 开头）标成官方授权，不再笼统写「Zepp 云端」。 */
+const providerLabel = computed(() => (session.value?.sleep_id.startsWith('official:') ? t.value.providerOfficial : dataProviderLabel()));
+const metaSummary = computed(() => [providerLabel.value, device.value.name].filter(Boolean).join(' · '));
 </script>
 
 <template>
@@ -282,7 +284,7 @@ const metaSummary = computed(() => [dataProviderLabel(), device.value.name].filt
               <dl>
                 <div>
                   <dt>{{ t.sourceProvider }}</dt>
-                  <dd>{{ dataProviderLabel() }}</dd>
+                  <dd>{{ providerLabel }}</dd>
                 </div>
                 <div>
                   <dt>{{ t.sourceScope }}</dt>

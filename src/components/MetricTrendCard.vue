@@ -10,8 +10,9 @@ const chartClick = (event: { name?: string; data?: unknown }) => {
   if (matching) openEvent(matching);
   else if (event.name && validEventDate(event.name)) openEvent(undefined, event.name);
 };
-import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
-import { SMOOTH_CHART_UPDATE, buildSeriesOption, coverageLabel } from '../lib/metricSeries';
+import { chartPalette } from '../lib/echartsSetup';
+import { buildSeriesOption, coverageLabel } from '../lib/metricSeries';
+import SwapChart from './SwapChart.vue';
 import type { MetricSeries } from '../types';
 import { defineMessages, useMessages } from '../i18n';
 
@@ -158,17 +159,12 @@ const shownOption = useQueuedOption(option);
     </p>
 
     <div v-if="$slots.chart" class="trend-slot"><slot name="chart" /></div>
-    <VChart
+    <SwapChart
       v-else-if="shownOption"
       class="trend-chart"
-      :key="CHART_THEME"
-      :theme="CHART_THEME"
       :option="shownOption"
-      :update-options="SMOOTH_CHART_UPDATE"
-      @click="chartClick"
-      autoresize
-      role="img"
       :aria-label="t.trendAria(label)"
+      @click="chartClick"
     />
     <p v-else-if="hasPoints" class="trend-empty">{{ t.onlyOneDay }}</p>
     <p v-else class="trend-empty">{{ emptyMessage }}</p>

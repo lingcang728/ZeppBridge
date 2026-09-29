@@ -272,7 +272,8 @@ export interface BridgeBackend {
   getStressSeries(hours?: number): Promise<StressPoint[]>;
   getMetricSeries(metrics: string[], days: number): Promise<MetricSeries[]>;
   /** 某个本地日（YYYY-MM-DD）的每小时步数；没有官方数据时是空数组。 */
-  getHourlySteps(date: string): Promise<HourlySteps[]>;
+  /** 一段本地日（含首尾）的逐日每小时步数。 */
+  getHourlySteps(start: string, end: string): Promise<HourlySteps[]>;
   getTrainingBalance(days: number): Promise<TrainingBalancePoint[]>;
   getHeartRateZones(days: number): Promise<HeartRateZoneOptions>;
   setHeartRateZonePreference(

@@ -192,6 +192,24 @@ impl Database {
             return Ok(None);
         };
         let stages = self.load_sleep_stages(&sleep_id)?;
+        // 官方睡眠接口不带设备（实测报文只有起止、阶段和评分），落库时 device_id 是空的。
+        // 同一晚旧通道那一份若带着设备，就用它来认设备：两边是同一只表记下的同一段睡眠。
+        let (scope, device_id) = match device_id {
+            None if sleep_id.starts_with("official:") => self
+                .conn
+                .query_row(
+                    "SELECT source_scope, device_id FROM sleep_sessions
+                     WHERE COALESCE(provider, '') != 'official'
+                       AND device_id IS NOT NULL AND device_id != ''
+                       AND start_time < ?2 AND end_time > ?1
+                     ORDER BY ABS(julianday(start_time) - julianday(?1)) LIMIT 1",
+                    params![start, end],
+                    |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
+                )
+                .optional()?
+                .unwrap_or((scope, None)),
+            other => (scope, other),
+        };
         Ok(Some(SleepSession {
             sleep_id,
             start_time: parse_datetime(&start, "sleep.start_time")?,

@@ -247,13 +247,17 @@ pub async fn get_metric_series(
     .await
 }
 
-/// 某个本地日的每小时步数（Zepp 官方授权才有）。没有官方数据时是空数组，界面据此不画这张卡。
+/// 一段本地日（含首尾）的逐日每小时步数（Zepp 官方授权才有）。没有官方数据时是空数组。
 #[tauri::command]
 pub async fn get_hourly_steps(
     state: tauri::State<'_, AppState>,
-    date: String,
+    start: String,
+    end: String,
 ) -> std::result::Result<Vec<zeppbridge_core::models::HourlySteps>, AppError> {
-    spawn_independent_read(state.data_dir.clone(), move |db| db.hourly_steps(&date)).await
+    spawn_independent_read(state.data_dir.clone(), move |db| {
+        db.hourly_steps(&start, &end)
+    })
+    .await
 }
 
 /// 按天的原始心率极值。

@@ -66,7 +66,7 @@ const t = useMessages(workoutDetailMessages);
 
 <style scoped>
 .chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.chart-card { --chart-tone: var(--accent); position: relative; padding: 14px 16px 12px; border-radius: 18px; container-type: inline-size; }
+.chart-card { --chart-tone: var(--accent); position: relative; padding: 14px 16px 12px; border-radius: var(--radius-lg); container-type: inline-size; }
 /* 顶上一条同色的细光，替代以前那条写死的彩色边。 */
 .chart-card::before { position: absolute; inset: 0 18px auto; height: 2px; content: ''; border-radius: 0 0 2px 2px; background: linear-gradient(90deg, var(--chart-tone), transparent); }
 .chart-card.tone-heart { --chart-tone: var(--heart); }

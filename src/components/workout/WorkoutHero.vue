@@ -86,7 +86,7 @@ const t = useMessages(workoutDetailMessages);
   gap: 18px;
   padding: 22px;
   border: 1px solid var(--mat-line);
-  border-radius: 24px;
+  border-radius: var(--radius-lg);
   background:
     radial-gradient(circle at 88% 12%, color-mix(in srgb, var(--activity) 14%, transparent), transparent 32%),
     var(--mat-card);
@@ -137,7 +137,7 @@ const t = useMessages(workoutDetailMessages);
 .metric-value span { color: var(--muted); font-size: var(--fs-xs); }
 
 @media (max-width: 760px) {
-  .workout-hero { padding: 16px; border-radius: 19px; }
+  .workout-hero { padding: 16px; border-radius: var(--radius-lg); }
   .hero-copy { align-items: flex-start; gap: 12px; }
   .hero-device :deep(.device-visual) { width: 78px; height: 78px; flex-basis: 78px; }
   .device-live { display: none; }

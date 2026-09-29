@@ -4,7 +4,6 @@
  * 是多此一举。每一块自己都有卡头和标题，这里只管排布。 */
 import WeeklyReportCard from '../WeeklyReportCard.vue';
 import LifeEventsPanel from '../LifeEventsPanel.vue';
-import LifeEventShortcut from '../LifeEventShortcut.vue';
 import SourcesStrip from './SourcesStrip.vue';
 import StatusEntryCard from './StatusEntryCard.vue';
 
@@ -35,7 +34,8 @@ defineProps<{
       <StatusEntryCard to="/training" tone="training" icon="training-load" :aria-label="trainingAria" :title="trainingTitle"
         :facts="training.facts" :spark="training.spark" :spark-color="training.sparkColor" :spark-label="training.sparkLabel" :note="training.caption" />
     </div>
-    <div class="life-stack"><LifeEventShortcut /><LifeEventsPanel /></div>
+    <!-- 「添加事件」只留生活事件卡右上角那一枚：以前卡片上面还挂着一排快捷胶囊，两个按钮做同一件事。 -->
+    <LifeEventsPanel />
     <SourcesStrip />
   </div>
 </template>
@@ -43,7 +43,6 @@ defineProps<{
 <style scoped>
 .overview-more { display: grid; gap: 16px; min-width: 0; container-type: inline-size; }
 .entry-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.life-stack { display: grid; gap: 12px; min-width: 0; }
 @container (max-width: 640px) {
   .entry-pair { grid-template-columns: minmax(0, 1fr); }
 }

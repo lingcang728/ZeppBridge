@@ -1,139 +1,69 @@
 <script setup lang="ts">
+/* 列表页（睡眠、运动）的一行：和「最近记录」时间线同一种样子——左边日期，中间一枚节点图标，
+   右边一枚胶囊（标题 + 事实）。以前是平铺在大卡里的一排磁贴行，和时间线看着像两个应用。 */
 import { RouterLink } from 'vue-router';
-import CategoryMark from './CategoryMark.vue';
 import type { DesignIconName } from './DesignIcon.vue';
 import GlyphTile from './GlyphTile.vue';
 import Icon from './Icon.vue';
 import type { HealthCategory } from '../lib/format';
 
-withDefaults(defineProps<{
+defineProps<{
   to: object | string;
   category: HealthCategory;
-  icon: 'heart' | 'moon' | 'steps' | 'run';
+  designIcon: DesignIconName;
   kicker: string;
   title: string;
   fact: string;
   factLabel?: string;
-  compact?: boolean;
-  /** 可选：直接指定图标背景色，传入后覆盖 category 默认色 */
-  iconBg?: string;
-  designIcon?: DesignIconName;
-}>(), { compact: false });
+}>();
 </script>
 
 <template>
-  <RouterLink :class="['record-row', `tone-${category}`, { compact }]" :to="to">
-    <span v-if="compact" class="record-dot" aria-hidden="true"></span>
-    <span v-if="!compact && designIcon" :class="['record-art', `tone-${category}`]" aria-hidden="true">
-      <GlyphTile :name="designIcon" :size="48" :tone="category" />
+  <RouterLink :class="['record-row', `tone-${category}`]" :to="to">
+    <span class="record-when">{{ kicker }}</span>
+    <span class="record-node" aria-hidden="true"><GlyphTile :name="designIcon" :size="34" :tone="category" /></span>
+    <span class="record-card">
+      <strong>{{ title }}</strong>
+      <span class="record-facts"><span v-if="factLabel">{{ factLabel }}</span><b>{{ fact }}</b></span>
     </span>
-    <CategoryMark v-else-if="!compact" :category="category" :icon="icon" :size="16" :bg="iconBg" />
-    <span class="record-copy">
-      <small v-if="!compact">{{ kicker }}</small>
-      <strong :class="{ date: compact }">{{ compact ? kicker : title }}</strong>
-    </span>
-    <span v-if="compact" class="record-mid">{{ title }}</span>
-    <span class="record-fact">
-      <strong>{{ fact }}</strong>
-      <small v-if="!compact && factLabel">{{ factLabel }}</small>
-    </span>
-    <Icon v-if="!compact" name="arrow-right" :size="15" />
+    <Icon name="chevron-right" :size="16" class="record-go" />
   </RouterLink>
 </template>
 
 <style scoped>
 .record-row {
+  position: relative;
   display: grid;
   min-width: 0;
-  min-height: 64px;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: 112px 44px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--line);
+  gap: 10px;
+  padding: 4px 10px 4px 0;
+  border-radius: var(--radius-md);
   color: inherit;
   text-decoration: none;
+  transition: background var(--dur-fast) ease, translate var(--dur-base) var(--ease-out);
 }
-.record-row:last-child { border-bottom: 0; }
-.record-row:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
-/* 底座由 GlyphTile 画；这里只占位，颜色按记录类别给。 */
-.record-art { display: grid; flex: 0 0 48px; place-items: center; }
-.record-art.tone-sleep { color: var(--sleep); }
-.record-art.tone-activity { color: var(--activity); }
-.record-art.tone-heart { color: var(--heart); }
-.record-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: currentColor;
-}
-.tone-sleep .record-dot { color: var(--sleep); }
-.tone-activity .record-dot { color: var(--activity); }
-.tone-heart .record-dot { color: var(--heart); }
-.record-copy, .record-fact {
-  display: flex;
+.record-row:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); translate: 3px 0; }
+.record-row:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.record-when { overflow: hidden; color: var(--subtle); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.record-node { position: relative; z-index: 1; display: grid; place-items: center; padding: 3px; border-radius: var(--radius-sm); background: var(--mat-card-solid); }
+.record-card {
+  display: grid;
   min-width: 0;
-  flex-direction: column;
-  gap: 3px;
+  gap: 2px;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 5%, transparent);
 }
-.record-copy small, .record-fact small {
-  color: var(--muted);
-  font-size: var(--fs-sm);
-}
-.record-copy strong {
-  overflow: hidden;
-  font-size: var(--fs-lg);
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.record-mid {
-  overflow: hidden;
-  color: var(--muted);
-  font-size: var(--fs-md);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.record-fact {
-  min-width: 72px;
-  align-items: flex-end;
-}
-.record-fact strong { max-width: 100%; overflow-wrap: anywhere;
-  font-family: 'Inter', var(--font-sans);
-  font-size: var(--fs-lg);
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-}
-.record-row > svg { color: var(--subtle); }
-.record-row.compact {
-  min-height: 44px;
-  grid-template-columns: 8px minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, .9fr);
-  gap: 10px;
-  padding: 8px 14px;
-}
-.record-row.compact .record-copy strong {
-  font-size: var(--fs-md);
-  font-weight: 400;
-}
-.record-row.compact.tone-sleep .record-fact strong { max-width: 100%; overflow-wrap: anywhere;
-  min-width: 36px;
-  padding: 2px 9px;
-  border-radius: 999px;
-  background: var(--mat-inset);
-  color: var(--sleep);
-  font-size: var(--fs-sm);
-  text-align: center; box-shadow: var(--mat-inset-shadow);
-}
-.record-row.compact.tone-activity .record-fact strong { max-width: 100%; overflow-wrap: anywhere;
-  color: var(--activity);
-  font-size: var(--fs-md);
-}
-@media (max-width: 520px) {
-  .record-row { grid-template-columns: auto minmax(0, 1fr) auto; }
-  .record-row:not(.compact) .record-fact { display: none; }
-  .record-row.compact {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-  }
-  .record-row.compact .record-mid { display: none; }
+.record-card strong { overflow: hidden; color: var(--ink); font-size: var(--fs-md); font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.record-facts { display: flex; flex-wrap: wrap; gap: 0 6px; color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.record-facts b { color: var(--ink); font-weight: 600; }
+.record-go { color: var(--subtle); }
+
+@media (max-width: 640px) {
+  .record-row { grid-template-columns: 72px 40px minmax(0, 1fr); }
+  .record-go { display: none; }
 }
 </style>

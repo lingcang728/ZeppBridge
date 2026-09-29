@@ -25,7 +25,7 @@ const t = useMessages(workoutDetailMessages);
 </template>
 
 <style scoped>
-.meta-card { padding: 16px 18px 18px; border-radius: 19px; }
+.meta-card { padding: 16px 18px 18px; border-radius: var(--radius-lg); }
 .section-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .section-head h2 { margin: 1px 0 0; font-size: var(--fs-2xl); letter-spacing: -.02em; }
 .section-eyebrow { margin: 0; color: var(--subtle); font-family: var(--font-mono); font-size: var(--fs-2xs); font-weight: 700; letter-spacing: .16em; }

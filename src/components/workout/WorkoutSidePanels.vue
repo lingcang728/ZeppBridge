@@ -89,11 +89,12 @@ const modeItems = computed(() => [
 
 <style scoped>
 .side-col { display: grid; gap: 16px; min-width: 0; }
-.side-card { padding: 16px 18px 18px; border-radius: 19px; }
+.side-card { padding: 16px 18px 18px; border-radius: var(--radius-lg); }
 .section-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .section-head h2 { margin: 1px 0 0; font-size: var(--fs-2xl); letter-spacing: -.02em; }
 .cta-icon { flex: 0 0 auto; color: currentColor; }
-.deliver-tabs { flex: 1 1 auto; min-width: 0; }
+/* 按内容收紧、靠右：以前铺满整行，两枚标签挤在左边、右边拖着一大段空胶囊。 */
+.deliver-tabs { flex: 0 1 auto; min-width: 0; margin-left: auto; }
 .deliver-body { display: grid; }
 .deliver-body > .wide { margin-top: 12px; }
 .section-eyebrow { margin: 0; color: var(--subtle); font-family: var(--font-mono); font-size: var(--fs-2xs); font-weight: 700; letter-spacing: .16em; }

@@ -155,10 +155,15 @@ const itemStyle = (index: number) => {
   const move = vertical.value
     ? `translate3d(-50%, calc(-50% + ${shift}px), ${depth}px) rotateX(${-angle}deg)`
     : `translate3d(calc(-50% + ${shift}px), -50%, ${depth}px) rotateY(${angle}deg)`;
+  // 「选中」的程度随离正中的距离连续变化：拖过一项时字色和粗细是渐变过去的，
+  // 不再在跨过中线那一帧从常规体跳成粗体（那一下就是「字闪一下」）。
+  const width = sizes.value[index] || 40;
+  const on = Math.max(0, 1 - Math.abs(offset) / (width * 0.8));
   return {
     transform: move,
     opacity: Math.abs(rad) >= 1.6 ? 0 : 1 - far * 0.75,
     zIndex: 100 - Math.round(Math.abs(rad) * 20),
+    '--on': on.toFixed(3),
   };
 };
 
@@ -346,7 +351,6 @@ const widestSpan = () => {
 /* 顶栏量排版时要同步拿到新宽度：标签换成短码以后，不能等 ResizeObserver 下一帧才量。 */
 defineExpose({ measure, widestSpan });
 
-const activeIndex = computed(() => (looping() ? mod(Math.round(pos.value), count()) : Math.round(clampPos(pos.value))));
 const current = computed(() => props.items[indexOf(props.modelValue)]);
 </script>
 
@@ -379,13 +383,16 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
         :key="String(item.value)"
         ref="itemEls"
         :data-wheel-index="index"
-        :class="['wheel-item', { on: index === activeIndex }]"
+        class="wheel-item"
         :style="itemStyle(index)"
         :title="iconOnly ? item.label : undefined"
       >
         <img v-if="item.image" :src="item.image" alt="" class="wheel-image" draggable="false" />
         <Icon v-else-if="item.icon" :name="item.icon" :size="iconOnly ? 16 : 14" />
-        <span v-if="!iconOnly" class="wheel-label" :data-label="item.label">{{ item.label }}</span>
+        <span v-if="!iconOnly" class="wheel-label">
+          <span class="wheel-label-regular">{{ item.label }}</span>
+          <span class="wheel-label-bold">{{ item.label }}</span>
+        </span>
       </span>
     </div>
   </div>
@@ -453,27 +460,23 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
   align-items: center;
   gap: 5px;
   padding: 0 11px;
-  color: var(--muted);
+  --on: 0;
+  color: color-mix(in srgb, var(--cap-ink) calc(var(--on) * 100%), var(--muted));
   font-size: var(--fs-sm);
   font-weight: 500;
   line-height: 1;
   white-space: nowrap;
   backface-visibility: hidden;
-  transition: color var(--dur-fast) ease;
 }
-.capsule-wheel.is-dragging .wheel-item, .capsule-wheel.is-animating .wheel-item { will-change: transform; }
+/* 不在拖动开始 / 结束时切 will-change：切一次整层文字重新栅格化（灰阶 ↔ 子像素抗锯齿），
+   看上去就是「一按下字就闪一下」。项本身是 3D 变换，一直在合成层上。 */
 .is-icon-only .wheel-item { padding: 0 7px; }
-/* 选中项加粗，但宽度按粗体预留（隐形的粗体副本撑宽）：以前滑过一项它就变粗变宽，
-   ResizeObserver 重量一遍，整条传送带跟着跳，拖动时就是「闪一下」。 */
+/* 常规体和粗体叠在同一格里、按 --on 交叉淡入淡出：宽度取两者较宽的那个（不再因为变粗
+   变宽而让传送带跳一下），粗细也是渐变的。 */
 .wheel-label { display: inline-grid; }
-.wheel-label::after {
-  content: attr(data-label);
-  height: 0;
-  overflow: hidden;
-  font-weight: 600;
-  visibility: hidden;
-}
+.wheel-label > span { grid-area: 1 / 1; }
+.wheel-label-regular { opacity: calc(1 - var(--on)); }
+.wheel-label-bold { font-weight: 600; opacity: var(--on); }
 .wheel-image { width: 18px; height: 18px; flex: 0 0 18px; border-radius: 5px; pointer-events: none; }
-.wheel-item.on { color: var(--cap-ink); font-weight: 600; }
 
 </style>

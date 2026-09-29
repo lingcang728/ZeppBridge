@@ -16,6 +16,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { HR_GAP_BREAK_MS, insertNullBreaks } from '../lib/chartGaps';
 import { createLoadSeq } from '../lib/loadSeq';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
+import SwapChart from '../components/SwapChart.vue';
 import { trendGridStyle } from '../lib/trendGrid';
 import { useQueuedOption } from '../composables/useQueuedOption';
 import SectionGroup from '../components/SectionGroup.vue';
@@ -26,7 +27,7 @@ import SegmentTrack from '../components/SegmentTrack.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
-import { indexSeries, SERIES_RANGE_DAYS, SMOOTH_CHART_UPDATE, seriesRanges, type SeriesRangeDays } from '../lib/metricSeries';
+import { indexSeries, SERIES_RANGE_DAYS, seriesRanges, type SeriesRangeDays } from '../lib/metricSeries';
 import { isFiniteNumber } from '../lib/format';
 import type { DailyHeartRateExtreme, HeartRatePoint, MetricSeries } from '../types';
 import { useMessages } from '../i18n';
@@ -351,15 +352,10 @@ const trendsSummary = computed(() => trendCards.value.map((card) => card.label).
                 <p>{{ t.dailyMaxSub }}</p>
               </div>
             </header>
-            <VChart
+            <SwapChart
               v-if="dailyExtremes.length"
               class="day-chart"
-              :key="CHART_THEME"
-              :theme="CHART_THEME"
               :option="shownDailyMax"
-              :update-options="SMOOTH_CHART_UPDATE"
-              autoresize
-              role="img"
               :aria-label="t.dailyMaxAria"
             />
             <p v-else-if="extremesError" class="inline-alert" role="alert">
