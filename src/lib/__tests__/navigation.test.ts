@@ -58,7 +58,7 @@ describe('pageMotion', () => {
   it('slides between tabs in the order the nav capsule shows them', () => {
     expect(pageMotion('/', '/ai')).toBe('left');
     expect(pageMotion('/settings', '/ai')).toBe('right');
-    // 从概览的详情页跳到设置也是向左：方向看入口，不看深度。
-    expect(pageMotion('/workouts/7', '/settings')).toBe('left');
+    // 从详情页跳去别的入口：收起，而不是横着拖走一张详情页。
+    expect(pageMotion('/workouts/7', '/settings')).toBe('dismiss');
   });
 });

@@ -53,9 +53,8 @@ export function ghostInset(from: GhostRect, to: GhostRect, radius: number): stri
   return `inset(${r2(top)}px ${r2(right)}px ${r2(bottom)}px ${r2(left)}px round ${r2(radius)}px)`;
 }
 
-/** 放一块幽灵板；动画结束（或被取消）时自动移除。返回动画，调用方可 reverse / cancel。 */
-export function playGhost(options: GhostOptions): Animation {
-  const { from, to, host } = options;
+/** 建一块还没开始动的幽灵板，铺在终点矩形上。 */
+function ghostPlate(to: GhostRect, host: HTMLElement, zIndex = 25): HTMLDivElement {
   const el = document.createElement('div');
   el.setAttribute('aria-hidden', 'true');
   el.className = 'motion-ghost';
@@ -65,13 +64,108 @@ export function playGhost(options: GhostOptions): Animation {
     top: `${to.top}px`,
     width: `${to.width}px`,
     height: `${to.height}px`,
-    zIndex: String(options.zIndex ?? 25),
+    zIndex: String(zIndex),
     pointerEvents: 'none',
     contain: 'strict',
     background: 'var(--mat-card)',
     boxShadow: 'var(--mat-rim)',
   });
   host.appendChild(el);
+  return el;
+}
+
+export interface HeldGhost {
+  /** 板长满（完全盖住旧页）的时刻。 */
+  grown: Promise<void>;
+  /** 揭开：板淡出后自动移除。可以在长满之前调用，会等长满再淡。 */
+  release: (fadeMs?: number) => void;
+}
+
+/**
+ * 长满以后停住、等调用方说「可以了」再淡出的幽灵板。
+ *
+ * 用在「从卡片展开进详情页」：新页首次加载还没完成时，板一直盖着——揭开的就是有内容的
+ * 页面，而不是先露骨架屏、数据一到整块换掉（那一下就是「点开闪一下」）。
+ */
+export function holdGhost(options: Omit<GhostOptions, 'growUntil'>): HeldGhost {
+  const { from, to, host } = options;
+  const el = ghostPlate(to, host, options.zIndex);
+  const full = ghostInset(to, to, options.toRadius);
+  const grow = el.animate(
+    [{ clipPath: ghostInset(from, to, options.fromRadius) }, { clipPath: full }],
+    { duration: options.duration, easing: options.easing, fill: 'forwards' },
+  );
+  const remove = () => el.remove();
+  grow.addEventListener('cancel', remove);
+  const grown = grow.finished.then(() => undefined, () => undefined);
+  let released = false;
+  const release = (fadeMs = 180) => {
+    if (released) return;
+    released = true;
+    void grown.then(() => {
+      const fade = el.animate(
+        [{ clipPath: full, opacity: 1 }, { clipPath: full, opacity: 0 }],
+        { duration: fadeMs, easing: 'ease-out', fill: 'forwards' },
+      );
+      fade.finished.then(remove, remove);
+    });
+  };
+  return { grown, release };
+}
+
+export interface CollapsingGhost {
+  /** 板铺满、盖住正在离场的页面的时刻。 */
+  covered: Promise<void>;
+  /** 缩回到这张卡的位置，再淡出露出真卡。`to` 为空时（找不到那张卡）原地淡出。 */
+  shrinkTo: (to: GhostRect | null, radius: number) => Promise<void>;
+}
+
+/**
+ * 返回时反着来：板先在整页上浮现盖住详情页，再从四周均匀缩回当初那张卡，最后淡出——
+ * 淡出后露出来的就是那张真卡。缩的这一段用「先快后慢」的减速，像被卡片吸回去。
+ */
+export function collapseGhost(options: {
+  viewport: GhostRect;
+  host: HTMLElement;
+  coverMs: number;
+  shrinkMs: number;
+  easing: string;
+  zIndex?: number;
+}): CollapsingGhost {
+  const { viewport, host } = options;
+  const el = ghostPlate(viewport, host, options.zIndex);
+  const full = ghostInset(viewport, viewport, 0);
+  const cover = el.animate(
+    [{ clipPath: full, opacity: 0 }, { clipPath: full, opacity: 1 }],
+    { duration: options.coverMs, easing: 'ease-out', fill: 'forwards' },
+  );
+  const remove = () => el.remove();
+  const covered = cover.finished.then(() => undefined, () => undefined);
+  const shrinkTo = async (to: GhostRect | null, radius: number) => {
+    await covered;
+    if (!to) {
+      const fade = el.animate([{ clipPath: full, opacity: 1 }, { clipPath: full, opacity: 0 }], { duration: 180, fill: 'forwards' });
+      await fade.finished.catch(() => undefined);
+      remove();
+      return;
+    }
+    const target = ghostInset(to, viewport, radius);
+    const shrink = el.animate(
+      [{ clipPath: full, opacity: 1 }, { clipPath: target, opacity: 1 }],
+      { duration: options.shrinkMs, easing: options.easing, fill: 'forwards' },
+    );
+    await shrink.finished.catch(() => undefined);
+    const fade = el.animate([{ clipPath: target, opacity: 1 }, { clipPath: target, opacity: 0 }], { duration: 140, fill: 'forwards' });
+    await fade.finished.catch(() => undefined);
+    remove();
+  };
+  return { covered, shrinkTo };
+}
+
+/** 放一块幽灵板；动画结束（或被取消）时自动移除。返回动画，调用方可 reverse / cancel。 */
+export function playGhost(options: GhostOptions): Animation {
+  const { from, to, host } = options;
+  const el = ghostPlate(to, host, options.zIndex);
   const growUntil = options.growUntil ?? GHOST_GROWN_AT;
   const full = ghostInset(to, to, options.toRadius);
   const animation = el.animate(

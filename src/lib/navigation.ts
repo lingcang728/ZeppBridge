@@ -42,7 +42,7 @@ export const cardCloseDestination = (back: string | null): BackDestination => {
 export const TAB_ORDER = ['/', '/ai', '/settings'] as const;
 
 /** expand / collapse：从某张卡展开成详情页、返回时缩回那张卡（composables/usePageMorph.ts）。 */
-export type PageMotion = 'forward' | 'back' | 'left' | 'right' | 'expand' | 'collapse' | 'none';
+export type PageMotion = 'forward' | 'back' | 'left' | 'right' | 'expand' | 'collapse' | 'dismiss' | 'none';
 
 const isTabRoot = (path: string) => (TAB_ORDER as readonly string[]).includes(path);
 
@@ -51,6 +51,9 @@ const isTabRoot = (path: string) => (TAB_ORDER as readonly string[]).includes(pa
  *
  * 同一个入口里往深处走（概览 → 睡眠详情）是「聚焦进去」，回来是「退出来」；
  * 换入口是横向滑，方向跟导航胶囊里的左右顺序一致——手指往哪边拨，画面就从哪边来。
+ *
+ * 从某个详情页直接跳到别的入口（睡眠详情 → 设置）是「收起」：那张卡回不去了（来处页
+ * 不在这条路上），详情页往纵深里退、新页从近处落定，而不是把一张详情页横着拖走。
  */
 export const pageMotion = (from: string, to: string): PageMotion => {
   if (from === to) return 'none';
@@ -63,6 +66,7 @@ export const pageMotion = (from: string, to: string): PageMotion => {
     if (db < da) return 'back';
     return 'forward';
   }
+  if (!isTabRoot(from)) return 'dismiss';
   return TAB_ORDER.indexOf(b as (typeof TAB_ORDER)[number]) > TAB_ORDER.indexOf(a as (typeof TAB_ORDER)[number])
     ? 'left'
     : 'right';

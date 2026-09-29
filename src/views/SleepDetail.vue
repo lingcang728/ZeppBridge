@@ -12,6 +12,7 @@ import { useMessages } from '../i18n';
 const t = useMessages(messages);
 import EmptyState from '../components/EmptyState.vue';
 import { useSyncController } from '../composables/useSyncController';
+import { useFirstLoad } from '../composables/useFirstLoad';
 import { useDevices } from '../composables/useDevices';
 import { dataProviderLabel, dataScopeLabel } from '../lib/labels';
 import { isTauri, tauriApi, toUserMessage } from '../composables/useTauriApi';
@@ -27,6 +28,8 @@ const session = ref<SleepSession | null>(null);
 const weekSessions = ref<SleepSession[]>([]);
 const device = ref<DeviceProfile>({});
 const loading = ref(true);
+// 登记首次加载：从卡片展开进来时，动画等它有内容再揭开。
+useFirstLoad(loading);
 const error = ref<string | null>(null);
 const sleepId = computed(() => String(route.params.sleepId || ''));
 
