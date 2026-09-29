@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, onUnmounted, ref } from 'vue';
+import { dialogFlight, originOf, type FlightOrigin } from '../lib/motion/dialogFlight';
 
 defineProps<{ labelledby: string }>();
 const emit = defineEmits<{ (event: 'close'): void }>();
 const panel = ref<HTMLElement | null>(null);
+const backdrop = ref<HTMLElement | null>(null);
 let returnFocus: HTMLElement | null = null;
+let origin: FlightOrigin | null = null;
+let leaving: { backdrop: HTMLElement; panel: HTMLElement } | null = null;
 
 const isTopmost = () => {
   const dialogs = document.querySelectorAll('[data-modal-dialog]');
@@ -43,21 +47,32 @@ const keepFocusInside = (event: FocusEvent) => {
 
 onMounted(() => {
   returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  // 从打开它的那个按钮里长出来，关的时候缩回去（lib/motion/dialogFlight.ts）。
+  origin = originOf(returnFocus);
+  if (backdrop.value && panel.value) dialogFlight.open(backdrop.value, panel.value, origin);
   // Start at the heading/content instead of scrolling a long dialog to its first action.
   panel.value?.focus({ preventScroll: true });
   document.addEventListener('keydown', onKeydown, true);
   document.addEventListener('focusin', keepFocusInside);
 });
 onBeforeUnmount(() => {
+  // 模板 ref 在卸载时会被清成 null，先把节点记下来留给 onUnmounted。
+  leaving = backdrop.value && panel.value ? { backdrop: backdrop.value, panel: panel.value } : null;
   document.removeEventListener('keydown', onKeydown, true);
   document.removeEventListener('focusin', keepFocusInside);
   if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
+});
+/* 卸载以后节点已经被 Vue 摘下来了，但它还是完整的（输入框里的字也还在）：
+   挂回去放完收起的动画再真正移除。 */
+onUnmounted(() => {
+  if (leaving) dialogFlight.close(leaving.backdrop, leaving.panel, origin);
+  leaving = null;
 });
 </script>
 
 <template>
   <Teleport to="body">
-    <div class="dialog-backdrop" @click.self="emit('close')">
+    <div ref="backdrop" class="dialog-backdrop" @click.self="emit('close')">
       <section ref="panel" class="dialog-panel" data-modal-dialog role="dialog" aria-modal="true"
         :aria-labelledby="labelledby" tabindex="-1">
         <slot />

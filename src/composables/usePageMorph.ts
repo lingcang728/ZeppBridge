@@ -1,6 +1,7 @@
 import type { RouteLocationNormalized } from 'vue-router';
 import type { PageMotion } from '../lib/navigation';
-import { collapseGhost, holdGhost } from '../lib/motion/ghost';
+import { holdGhost, landGhost } from '../lib/motion/ghost';
+import { onMotionSkip } from '../lib/motion/interrupt';
 import { whenPageReady } from '../lib/motion/pageReady';
 
 type Rect = { left: number; top: number; width: number; height: number };
@@ -12,19 +13,20 @@ type Rect = { left: number; top: number; width: number; height: number };
  * 连图表一起重画，4K 屏上风扇狂转。现在真实页面只动 opacity / transform。
  *
  * 用法（AppShell.vue）：`decide()` 在 router.beforeEach 里把普通的 forward / back 换成
- * expand / collapse；`onEnter` / `onLeave` 挂在切页的 <Transition> 上。
+ * expand / collapse；`onEnter` / `onLeave` / `onAfterLeave` 挂在切页的 <Transition> 上。
  */
 /** 板从卡长满整页的时长。缓动先快后慢：像被抛出去、在终点减速落定。 */
 const EXPAND_MS = 340;
 const EXPAND_EASE = 'cubic-bezier(.2, .9, .22, 1)';
-/** 新页首次加载最多等这么久；再久就先揭开（页面自己有骨架屏），不让动画卡在半路。 */
-const READY_TIMEOUT_MS = 700;
-/** 返回：板浮现盖住详情页、再缩回那张卡。缩的这一段同样减速，像被卡片吸回去。 */
-const COVER_MS = 110;
+/** 新页首次加载最多等这么久（从点下去算起，含板长大那一段）；再久就先揭开（页面自己有骨架屏），
+    不让一整屏卡片色停在那里。 */
+const READY_TIMEOUT_MS = 560;
+/** 返回：详情页和板一起缩回那张卡。缩的这一段同样减速，像被卡片吸回去；板落到卡上以后再用 LAND_MS 淡出。 */
 const SHRINK_MS = 360;
+const LAND_MS = 120;
 const SHRINK_EASE = 'cubic-bezier(.3, .7, .2, 1)';
-/** 来处页不在缓存里时要重新读库，那张卡可能要等一会儿才出现。 */
-const CARD_WAIT_MS = 450;
+/** 来处页不在缓存里时要重新读库，那张卡可能要等一会儿才出现。等的时候详情页原样留着，不盖板。 */
+const CARD_WAIT_MS = 300;
 /** 太小的东西（行内的小链接、图标）不当作「卡」：从一个字那么大长成整页没有意义。 */
 const MIN_WIDTH = 140;
 const MIN_HEIGHT = 56;
@@ -40,6 +42,8 @@ const bigEnough = (el: Element | null): boolean => {
   return box.width >= MIN_WIDTH && box.height >= MIN_HEIGHT;
 };
 const radiusOf = (el: Element) => Number.parseFloat(getComputedStyle(el).borderTopLeftRadius) || 22;
+const r1 = (value: number) => Number(value.toFixed(1));
+const r3 = (value: number) => Number(value.toFixed(4));
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
 /** 被点的链接所在的那张卡：链接本身够大就是它，否则往外找最近的一块板。 */
@@ -121,6 +125,7 @@ export const usePageMorph = () => {
       再淡出揭开新页。以前板长到六成新页就开始淡入，揭开的是骨架屏，数据一到整块换掉——
       那就是「点开闪一下」。真实页面只动 opacity / transform，整页不逐帧重画。 */
   const onEnter = (el: Element) => {
+    clean(el);
     const origin = expandFrom;
     expandFrom = null;
     const viewport = viewportOf();
@@ -139,16 +144,20 @@ export const usePageMorph = () => {
     // .999 慢慢降到 0，板还没长满时新页就半透明地叠在旧页上——那也是「闪一下」。
     el.style.transition = 'none';
     el.style.opacity = '0';
+    // 被 Esc 打断过：后面的揭开也一起快放，不然快进完长大那一段，又慢悠悠地淡入。
+    let hurry = false;
+    const forget = onMotionSkip(() => { hurry = true; });
     void Promise.all([ghost.grown, whenPageReady(READY_TIMEOUT_MS)]).then(() => {
+      forget();
       el.style.opacity = '';
       const reveal = el.animate(
         [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }],
-        { duration: 220, easing: 'cubic-bezier(.2, .8, .2, 1)' },
+        { duration: hurry ? 90 : 220, easing: 'cubic-bezier(.2, .8, .2, 1)' },
       );
       // 揭开放完再把过渡还回去：这时 opacity 已经是 1，不会再触发一次过渡。
       const restore = () => { el.style.transition = ''; };
       reveal.finished.then(restore, restore);
-      ghost.release(200);
+      ghost.release(hurry ? 90 : 200);
     });
   };
 
@@ -156,33 +165,89 @@ export const usePageMorph = () => {
   const findCard = (trail: Trail): Promise<HTMLElement | null> =>
     new Promise((resolve) => {
       const started = performance.now();
-      const look = () => {
+      let done = false;
+      // Esc 打断：不等了，有就用，没有就原地淡出。
+      const forget = onMotionSkip(() => finish());
+      const finish = () => {
+        if (done) return;
+        done = true;
+        forget();
         const link = linksTo(trail.href, STAYING)[trail.index] ?? null;
-        const card = link ? cardOfLink(link) : null;
-        if (card || performance.now() - started > CARD_WAIT_MS) resolve(card);
+        resolve(link ? cardOfLink(link) : null);
+      };
+      const look = () => {
+        if (done) return;
+        const link = linksTo(trail.href, STAYING)[trail.index] ?? null;
+        if ((link && cardOfLink(link)) || performance.now() - started > CARD_WAIT_MS) finish();
         else requestAnimationFrame(look);
       };
       requestAnimationFrame(look);
     });
 
-  /** 返回：板先在整页上浮现盖住详情页，再从四周均匀缩回当初那张卡，淡出时露出的就是真卡，
-      真卡再轻轻落定一下。找不到那张卡（被删了、翻页了）就原地淡出。 */
+  /** 告诉 Vue 离场可以结束了：collapse 的离场过渡在 CSS 里是一条很长的占位，
+      真正的时长由这里的动画决定，放完就提前收场。 */
+  const endLeave = (el: HTMLElement) => {
+    el.dispatchEvent(new TransitionEvent('transitionend', { propertyName: 'opacity' }));
+  };
+
+  /** 返回：详情页缩向当初那张卡、边缩边淡出；一块板同时从整页透明地缩到卡上、落定时实起来，
+      再淡出露出真卡，真卡轻轻落定一下。来处页从一开始就在底下看得见——不再有一整屏的
+      卡片色盖着等卡（那就是「返回时黑一下」）。找不到那张卡（被删了、翻页了）就原地淡出。 */
   const onLeave = (el: Element) => {
     const trail = collapseTo;
     collapseTo = null;
     const viewport = viewportOf();
     const host = main()?.parentElement;
-    if (!trail || !viewport || !host || !(el instanceof HTMLElement)) return;
-    const ghost = collapseGhost({ viewport, host, coverMs: COVER_MS, shrinkMs: SHRINK_MS, easing: SHRINK_EASE });
-    el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: COVER_MS + 60, easing: 'ease-in', fill: 'forwards' });
-    void Promise.all([ghost.covered, findCard(trail)]).then(async ([, card]) => {
-      await ghost.shrinkTo(card ? rectOf(card) : null, card ? radiusOf(card) : 0);
-      card?.animate(
-        [{ transform: 'scale(.985)' }, { transform: 'none' }],
-        { duration: 260, easing: 'cubic-bezier(.2, 1.4, .4, 1)' },
+    if (!trail || !(el instanceof HTMLElement)) return;
+    if (!viewport || !host) {
+      endLeave(el);
+      return;
+    }
+    void findCard(trail).then((card) => {
+      if (!el.isConnected) return;
+      if (!card) {
+        const fade = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160, easing: 'ease-out', fill: 'forwards' });
+        fade.finished.then(() => endLeave(el), () => endLeave(el));
+        return;
+      }
+      const to = rectOf(card);
+      const radius = radiusOf(card);
+      // 可视区在详情页自己坐标里的位置：离场页是绝对定位、按滚动距离垫过的，顶边可能在屏幕外。
+      const box = el.getBoundingClientRect();
+      const sx = to.width / viewport.width;
+      const sy = to.height / viewport.height;
+      const tx = to.left - box.left - (viewport.left - box.left) * sx;
+      const ty = to.top - box.top - (viewport.top - box.top) * sy;
+      el.style.transformOrigin = '0 0';
+      el.animate(
+        [{ transform: 'none' }, { transform: `translate(${r1(tx)}px, ${r1(ty)}px) scale(${r3(sx)}, ${r3(sy)})` }],
+        { duration: SHRINK_MS, easing: SHRINK_EASE, fill: 'forwards' },
       );
+      // 页面比板先走：缩到一半左右已经看不见，剩下的形状交给板。
+      const fade = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: SHRINK_MS * 0.5, easing: 'ease-in', fill: 'forwards' });
+      landGhost({ viewport, to, radius, host, duration: SHRINK_MS + LAND_MS, easing: SHRINK_EASE }).finished.then(() => {
+        card.animate(
+          [{ transform: 'scale(.985)' }, { transform: 'none' }],
+          { duration: 260, easing: 'cubic-bezier(.2, 1.4, .4, 1)' },
+        );
+      }, () => undefined);
+      fade.finished.then(() => endLeave(el), () => endLeave(el));
     });
   };
 
-  return { decide, onEnter, onLeave, dispose };
+  /** 离场页（KeepAlive 缓存着的）会原样再回来：留在它身上的 fill 动画和内联样式必须清掉。
+      以前返回时的淡出是 fill: forwards，缓存页再点开时一揭开就又变回透明——
+      「查看全部」黑屏就是这么来的。 */
+  const clean = (el: Element) => {
+    if (!(el instanceof HTMLElement)) return;
+    for (const animation of el.getAnimations()) animation.cancel();
+    el.style.transformOrigin = '';
+    el.style.opacity = '';
+    el.style.transition = '';
+  };
+  const onAfterLeave = (el: Element) => {
+    clean(el);
+    if (el instanceof HTMLElement) el.style.top = '';
+  };
+  return { decide, onEnter, onLeave, onAfterLeave, dispose };
 };

@@ -7,6 +7,8 @@
  *
  * 只记「首次加载」：KeepAlive 缓存着的页面回来时不登记，立刻算就绪。
  */
+import { onMotionSkip } from './interrupt';
+
 let pending = 0;
 let waiters: Array<() => void> = [];
 
@@ -37,9 +39,12 @@ export const trackPageLoad = () => {
 export const whenPageReady = (timeoutMs: number): Promise<void> =>
   new Promise((resolve) => {
     let settled = false;
+    // Esc 打断（lib/motion/interrupt.ts）：不再等数据，马上揭开。
+    const forget = onMotionSkip(() => done());
     const done = () => {
       if (settled) return;
       settled = true;
+      forget();
       resolve();
     };
     window.setTimeout(done, timeoutMs);

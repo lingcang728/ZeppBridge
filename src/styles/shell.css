@@ -157,10 +157,11 @@ a { color: inherit; }
 /* 旧页等幽灵板长满、完全盖住它以后才撤，免得板没盖到的地方先露出新页、叠成重影。 */
 [class*='page-'].page-expand-leave-active { z-index: 1; transition: opacity 60ms linear 300ms; }
 .page-expand-leave-to { opacity: 0; }
-/* 返回：幽灵板盖住详情页、从四周缩回当初那张卡（usePageMorph.onLeave），来处页在板底下淡入。 */
-[class*='page-'].page-collapse-enter-active { transition: opacity 240ms ease 60ms; }
+/* 返回：详情页和幽灵板一起缩回当初那张卡（usePageMorph.onLeave），来处页一开始就在底下浮现。
+   离场那条 900ms 是占位：真正的时长由 JS 动画定，放完就提前结束（onLeave 里的 endLeave）。 */
+[class*='page-'].page-collapse-enter-active { transition: opacity 160ms ease-out; }
 .page-collapse-enter-from { opacity: 0; }
-[class*='page-'].page-collapse-leave-active { z-index: 2; transition: opacity 220ms linear; }
+[class*='page-'].page-collapse-leave-active { z-index: 2; transition: opacity 900ms linear; }
 .page-collapse-leave-to { opacity: .999; }
 .page-none-enter-from, .page-none-leave-to { opacity: 0; }
 /* 收起（详情页 → 别的入口）：详情页往纵深退——先慢后快地缩小淡出，像被收进去；

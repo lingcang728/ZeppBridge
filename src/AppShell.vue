@@ -11,6 +11,7 @@ import { backDestination, historyBackPath, navigationBranch, pageMotion, TAB_ORD
 import AppTopBar from './components/shell/AppTopBar.vue';
 import SegmentTrack from './components/SegmentTrack.vue';
 import { usePageMorph } from './composables/usePageMorph';
+import { installMotionInterrupt, settleMotion } from './lib/motion/interrupt';
 import { useSyncController } from './composables/useSyncController';
 import { useUiScale } from './composables/useUiScale';
 import { backend, isDesktop, whenBackendReady } from './lib/bridge';
@@ -108,6 +109,8 @@ const motion = ref<PageMotion>('none');
 const pageMorph = usePageMorph();
 let leavingScroll = 0;
 router.beforeEach((to, from) => {
+  // 上一段切页动效还没放完又切页：先让它收尾，免得旧的幽灵板压在新页上。
+  settleMotion();
   motion.value = pageMorph.decide(from, to, pageMotion(from.path, to.path));
   leavingScroll = document.getElementById('main-content')?.scrollTop ?? 0;
 });
@@ -138,6 +141,9 @@ const formatSavedBytes = (bytes: number): string => {
 const versionTitle = computed(() => `ZeppBridge v${APP_VERSION.value} · build ${BUILD_STAMP}`);
 const browserPreview = computed(() => !desktopRuntime);
 const routeNotice = computed(() => route.query.notice === 'not-found');
+
+/* 动效放到一半按 Esc：快进收尾（lib/motion/interrupt.ts）。全局只装这一处。 */
+let disposeMotionInterrupt: (() => void) | null = null;
 
 const onDocumentKeydown = (event: KeyboardEvent) => {
   const target = event.target as HTMLElement | null;
@@ -177,6 +183,7 @@ onMounted(() => {
   });
   void initialize();
   document.addEventListener('keydown', onDocumentKeydown);
+  disposeMotionInterrupt = installMotionInterrupt();
   if (route.query.notice === 'not-found') {
     window.setTimeout(() => {
       const query = { ...route.query };
@@ -199,6 +206,7 @@ onMounted(() => {
 });
 onUnmounted(() => {
   document.removeEventListener('keydown', onDocumentKeydown);
+  disposeMotionInterrupt?.();
   pageMorph.dispose();
   for (const unlisten of ownUnlisteners.splice(0)) unlisten();
   // 同步控制器是模块级单例，它的监听器和那个每分钟一跳的定时器都挂在
@@ -254,7 +262,7 @@ onUnmounted(() => {
            详情页不缓存：它们按 URL 参数取数，缓存一堆实例既没收益又占内存。 -->
       <div class="page-host">
       <RouterView v-slot="{ Component }">
-        <Transition :name="`page-${motion}`" @before-leave="onPageBeforeLeave" @enter="pageMorph.onEnter" @leave="pageMorph.onLeave">
+        <Transition :name="`page-${motion}`" @before-leave="onPageBeforeLeave" @enter="pageMorph.onEnter" @leave="pageMorph.onLeave" @after-leave="pageMorph.onAfterLeave">
           <KeepAlive :include="CACHED_PAGES" :max="4">
             <component :is="Component" />
           </KeepAlive>
