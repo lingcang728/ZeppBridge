@@ -9,6 +9,12 @@ pub trait CredentialBackend: Send + Sync {
     fn set(&self, user_id: &str, token: &str) -> std::result::Result<(), String>;
     fn get(&self, user_id: &str) -> std::result::Result<Option<String>, String>;
     fn delete(&self, user_id: &str) -> std::result::Result<(), String>;
+
+    /// 能不能按名字分开存多条。环境变量后端不管问哪个名字都返回同一个旧通道
+    /// 令牌，官方授权的令牌放进去会被读成旧令牌——所以它说不能。
+    fn supports_named_entries(&self) -> bool {
+        true
+    }
 }
 
 /// 把系统凭据存储的真实失败原因带出来。
@@ -217,6 +223,10 @@ impl CredentialBackend for EnvCredentialBackend {
 
     fn get(&self, _user_id: &str) -> std::result::Result<Option<String>, String> {
         Ok(Self::token())
+    }
+
+    fn supports_named_entries(&self) -> bool {
+        false
     }
 
     fn delete(&self, _user_id: &str) -> std::result::Result<(), String> {

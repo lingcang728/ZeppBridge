@@ -29,6 +29,7 @@ import type {
   HeartRateZoneOptions,
   HeartRateZonePreference,
   LoginStatus,
+  OfficialStatus,
   MetricSeries,
   BackupManifest,
   BackupVerification,
@@ -140,6 +141,22 @@ export const tauriBackend: BridgeBackend = {
 
   cancelWebLogin() {
     return call<LoginStatus>('cancel_web_login');
+  },
+
+  startOfficialLogin() {
+    return call<OfficialStatus>('start_official_login');
+  },
+
+  cancelOfficialLogin() {
+    return call<OfficialStatus>('cancel_official_login');
+  },
+
+  getOfficialStatus() {
+    return call<OfficialStatus>('get_official_status');
+  },
+
+  disconnectOfficial() {
+    return call<OfficialStatus>('disconnect_official');
   },
 
   getLoginStatus() {

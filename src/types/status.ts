@@ -154,6 +154,18 @@ export interface LoginStatus {
   code?: string;
 }
 
+/** Zepp 官方授权的状态（`official://status` 事件与相关命令的返回值）。 */
+export interface OfficialStatus {
+  state: 'idle' | 'waiting' | 'connected' | 'needs_reauth' | 'failed' | string;
+  /** 失败时的错误码（`err.official.*`），界面按它取文案。 */
+  message_code: string | null;
+  /** 中文兜底原文。 */
+  message: string | null;
+  /** 只露后四位的官方用户编号。 */
+  user_id_masked: string | null;
+  connected_at: number | null;
+}
+
 export interface SyncStreamResult {
   stream: string;
   status: string;

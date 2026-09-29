@@ -1,14 +1,15 @@
 # ZeppBridge connection guide
 
-There are three ways to connect: the in-app web sign-in, which is what you
-should use, and a fallback for when that fails.
+There are three ways to connect: **Zepp account authorization**, which is
+what you should start with; the **advanced data connection**, which adds the
+metrics Zepp's official API does not offer; and manual entry as a last resort.
 
 [简体中文](connection.zh-CN.md)
 
 ## Three things worth knowing first
 
-- The sign-in window only ever opens official Zepp / Huami pages. You sign in to
-  your own account, on their page.
+- Both sign-in paths only ever open official Zepp / Huami pages. You sign in
+  to your own account, on their page.
 - A token can read your health data. Never post a token, a full request header,
   a network capture, or a screenshot of a signed-in session anywhere public — including
   GitHub issues.
@@ -18,12 +19,48 @@ should use, and a fallback for when that fails.
   Linux machine with no keyring, see the
   [Linux guide](linux.md#where-the-token-is-stored) for the two alternatives.
 
-## Recommended: in-app web sign-in
+## Recommended: authorize with your Zepp account
+
+This is the official Zepp Open Platform authorization. It runs in your normal
+web browser, so **Google, Xiaomi, Facebook and Apple sign-in all work** — the
+ones that never responded inside the old sign-in window.
+
+1. Open ZeppBridge and go to **Settings → Account & devices → Sign-in**.
+2. Click **Authorize** next to **Zepp account authorization**. Your default
+   browser opens Zepp's own authorization page.
+3. Sign in however you normally do and approve ZeppBridge.
+4. The browser shows **Authorized**. Go back to ZeppBridge: it finishes
+   connecting by itself within a few seconds. You can close the browser tab.
+
+What passes through our server (`zeppbridge.pages.dev`, Cloudflare) and why:
+Zepp requires a server-held app secret to turn the authorization into tokens,
+so that one step happens there. The tokens are encrypted while they wait,
+handed to your ZeppBridge exactly once, and deleted the moment it picks them
+up — at most 10 minutes later. Your computer proves it started the request
+with a one-time secret that never appears in the browser. Refreshing a token
+later goes through the same server, which adds the app secret and keeps
+nothing. See [security and privacy](../reference/security-and-privacy.md).
+
+The tokens then live in the OS credential store, next to (but separate from)
+the advanced-data token. **Disconnect** revokes the authorization at Zepp and
+deletes the tokens from this computer; it never deletes health data.
+
+> In this beta the Zepp authorization only connects your account. Official
+> data (REM sleep, FIT workouts with routes) arrives in the next version.
+> Stress, SpO₂, PAI, readiness and similar metrics are not in Zepp's official
+> API at all, so they keep coming from the advanced data connection below.
+
+## Advanced data: email or phone sign-in
+
+This connection reads the data the official API does not offer. It signs in
+inside a window embedded in the app, which third-party providers block — so it
+works with an email or phone number and password, **not** with Google, Xiaomi,
+Facebook or Apple sign-in.
 
 ### 1. Start the connection
 
 1. Open ZeppBridge and go to **Settings**.
-2. Click **Connect**.
+2. Click **Use** next to **Advanced data connection**.
 3. A separate window opens at `https://watchface.zepp.com/`.
 
 ### 2. Sign in
@@ -31,9 +68,8 @@ should use, and a fallback for when that fails.
 1. Sign in with your usual Zepp account.
 2. The app reads the session credentials inside that window. The token is never
    shown in the interface.
-   Every connection attempt uses an isolated browser session, so a previous
-   Xiaomi, WeChat, Google or Facebook account cannot be selected from stale
-   cookies. The session is discarded when the login window closes.
+   Every connection attempt uses an isolated browser session that is
+   discarded when the login window closes.
 3. The status line moves through **waiting → extracting → verifying → connected**.
 4. Once verified the window closes and Settings refreshes. If this machine has
    no cloud-sync history yet, an incremental sync starts straight away.

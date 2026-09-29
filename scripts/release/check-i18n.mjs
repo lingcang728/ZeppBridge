@@ -274,6 +274,7 @@ const ALLOWED_PROSE = [
   { file: 'views/HealthCheck.vue', text: 'action.reason', why: 'actionCopy 按 action.code 取文案，未知才回落。' },
   { file: 'views/HealthCheck.vue', text: 'stage.message', why: '只在失败类别（error_kind）都认不出来时才兜底显示。' },
   { file: 'composables/settings/useAuthFlow.ts', text: 'status.message', why: '先 errorTextFor(status.code)，原文只作兜底。' },
+  { file: 'composables/settings/useOfficialAuth.ts', text: 'next.message', why: '先 errorTextFor(next.message_code)，原文只作兜底。' },
   { file: 'composables/settings/useCapabilityBoard.ts', text: 'item.note', why: 'capability 先按 status 分支，未知状态才回落。' },
   { file: 'views/settings/sections/CapabilitySection.vue', text: 'row.note', why: 'row.note 来自 capabilityNote()，那里已经先按 status 取文案。' },
   { file: 'composables/useSyncController.ts', text: 'text: payload.message', why: '进度由 code + stream 拼；后端原文只在界面不认识这一步时兜底。' },

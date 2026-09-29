@@ -63,6 +63,38 @@ real accounts and regions has not been fully verified against live services.
   never prints a token; `export --out` echoes back only the path you gave it,
   without resolving it to an absolute path.
 
+## Zepp account authorization (official API)
+
+The official Zepp Open Platform requires a server-held app secret, so this is
+the one part of ZeppBridge that goes through a server we run
+(`zeppbridge.pages.dev`, Cloudflare Pages Functions + D1).
+
+- **What the server holds permanently:** the app ID and app secret (Cloudflare
+  Secrets, never in the repository or the desktop binary), and the SHA-256 of
+  each Zepp user ID that completed authorization — no names, no raw IDs.
+- **What it holds briefly:** while an authorization is in flight, the SHA-256
+  of the browser `state` and of a one-time claim secret, and — once Zepp
+  returns — the token set encrypted with AES-GCM under a separate server key.
+  The row is deleted when your ZeppBridge claims it, and anything unclaimed is
+  purged after 10 minutes.
+- **Who can claim the tokens:** only the process that knows the claim secret.
+  The `state` appears in the browser address bar; the claim secret never does,
+  so browser history or a shoulder-surfer cannot collect your tokens. Tokens
+  are handed out exactly once.
+- **Refreshing:** the desktop sends its current tokens to `/api/zepp/oauth/refresh`;
+  the server adds the app secret, forwards the request to Zepp and returns the
+  new set. Nothing is stored.
+- **The browser only ever sees fixed text.** Authorization codes, states,
+  tokens and Zepp's error descriptions are never echoed into a page or a
+  redirect.
+- **On this computer:** the access and refresh tokens are two separate entries
+  in the OS credential store; `official.json` in the data folder holds only the
+  user ID, connection time and expiry. The official client talks to exactly two
+  hosts — `zeppbridge.pages.dev` and `api-open.zepp.com` — and follows no
+  redirects.
+- **Disconnect** asks Zepp to revoke the authorization, then deletes the local
+  tokens. It never deletes health data.
+
 ## The three kinds of "export" have different boundaries
 
 Confusing them causes real privacy accidents — sending a whole-database

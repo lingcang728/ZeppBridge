@@ -14,9 +14,12 @@ const {
   showManualAuth, manualAppToken, manualUserId, manualRegionHost, manualAuthBusy,
   startLogin, cancelLogin, submitManualAuth,
 } = useSettingsContext().auth;
+const official = useSettingsContext().official;
 
 const needsAttention = computed(() =>
-  loginInProgress.value || loginStatus.value.state === 'failed' || showManualAuth.value || !(connected.value || configuredOnly.value));
+  loginInProgress.value || loginStatus.value.state === 'failed' || showManualAuth.value
+  || official.waiting.value || Boolean(official.failureText.value) || official.needsReauth.value
+  || !(connected.value || configuredOnly.value || official.connected.value));
 </script>
 
 <template>
@@ -30,6 +33,25 @@ const needsAttention = computed(() =>
         <Icon name="chevron-down" :size="16" class="fold-caret" />
       </summary>
 
+      <!-- 官方授权放第一行：走系统浏览器，第三方登录都能用。 -->
+      <div class="s-row">
+        <span class="auth-icon" :class="{ current: official.connected.value }"><Icon name="shield" :size="17" /></span>
+        <div class="s-row-main">
+          <span class="s-row-title">{{ t.officialTitle }}</span>
+          <span class="s-row-sub">{{ official.waiting.value ? t.officialWaiting : t.officialSub }}</span>
+          <span v-if="official.connected.value" class="s-row-sub">{{ t.officialNote }}</span>
+        </div>
+        <div class="s-row-control">
+          <button v-if="official.waiting.value" class="button secondary" type="button" :disabled="official.busy.value" @click="official.cancel">{{ t.authCancelLogin }}</button>
+          <template v-else-if="official.connected.value">
+            <span class="state-dot on">{{ t.officialConnected }}<template v-if="official.status.value.user_id_masked"> · {{ official.status.value.user_id_masked }}</template></span>
+            <button class="button secondary" type="button" :disabled="official.busy.value" @click="official.disconnect">{{ t.officialDisconnect }}</button>
+          </template>
+          <button v-else class="button primary" type="button" :disabled="official.busy.value" @click="official.start">
+            {{ official.busy.value ? t.authOpening : official.needsReauth.value ? t.officialReauth : t.officialConnect }}
+          </button>
+        </div>
+      </div>
       <div class="s-row">
         <span class="auth-icon" :class="{ current: connected || configuredOnly }"><Icon name="globe" :size="17" /></span>
         <div class="s-row-main">
@@ -77,6 +99,7 @@ const needsAttention = computed(() =>
         </div>
       </div>
     </details>
+    <p v-if="official.failureText.value" class="api-error" role="alert"><Icon name="info" :size="13" />{{ official.failureText.value }}</p>
     <p v-if="loginInProgress && loginMessage" class="hint-line"><Icon name="info" :size="13" />{{ loginMessage }}</p>
     <!-- 登录失败要看得见原因，尤其是「登录了但没读到凭据」——那时该直接去
          用手动填写，而不是反复重试网页登录。 -->

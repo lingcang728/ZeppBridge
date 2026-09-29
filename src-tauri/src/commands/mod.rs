@@ -3,6 +3,7 @@ mod auth;
 mod backup;
 mod data;
 mod login;
+mod official;
 mod status;
 mod sync;
 
@@ -154,6 +155,9 @@ pub(crate) use data::{
     set_workout_type_override, submit_device_model_assignment, submit_diagnostic_report,
 };
 pub(crate) use login::{cancel_web_login, get_login_status, start_web_login};
+pub(crate) use official::{
+    cancel_official_login, disconnect_official, get_official_status, start_official_login,
+};
 pub(crate) use status::get_app_status;
 pub(crate) use sync::{
     cancel_sync, get_coverage_ledger, probe_data_capabilities, reset_coverage_ledger,

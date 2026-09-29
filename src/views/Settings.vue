@@ -36,7 +36,7 @@ const d = useMessages(deckMessages);
 const route = useRoute();
 const router = useRouter();
 const { statusError, refreshStatus, autoSyncEnabled, autoSyncInterval, setAutoSyncEnabled } = useSyncController();
-const { feedback, auth, prefs, capability } = provideSettingsContext();
+const { feedback, auth, official, prefs, capability } = provideSettingsContext();
 const { dataMessage, dataError } = feedback;
 const { loginError, accountRecognized, connectionLabel } = auth;
 const { userPrefs, retentionDays, applyPrefsChange } = prefs;
@@ -111,10 +111,11 @@ onMounted(async () => {
   void capability.loadCapabilityOverview();
   void loadDevices();
   await prefs.load();
-  await auth.attach();
+  await Promise.all([auth.attach(), official.attach()]);
 });
 onUnmounted(() => {
   auth.detach();
+  official.detach();
 });
 </script>
 

@@ -14,6 +14,7 @@ import type {
   HeartRateZoneOptions,
   HeartRateZonePreference,
   LoginStatus,
+  OfficialStatus,
   MetricSeries,
   BackupManifest,
   BackupVerification,
@@ -250,6 +251,13 @@ export interface BridgeBackend {
   startWebLogin(locale: string): Promise<LoginStatus>;
   cancelWebLogin(): Promise<LoginStatus>;
   getLoginStatus(): Promise<LoginStatus>;
+
+  /** Zepp 官方授权：系统浏览器里授权，桌面端自己去中转站领令牌。 */
+  startOfficialLogin(): Promise<OfficialStatus>;
+  cancelOfficialLogin(): Promise<OfficialStatus>;
+  getOfficialStatus(): Promise<OfficialStatus>;
+  /** 撤销官方授权并删掉本机令牌；不动任何健康数据。 */
+  disconnectOfficial(): Promise<OfficialStatus>;
 
   startHistorySync(days: number): Promise<SyncReport>;
   /** `quick`：静默的定时同步，只拉最近几天（整窗刷新到期时照旧整窗）。 */

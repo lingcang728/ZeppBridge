@@ -4,8 +4,9 @@ import test from 'node:test';
 import { onRequest as oauthCallback } from '../functions/api/zepp/oauth/callback.js';
 import { onRequest as dataCallback } from '../functions/api/zepp/data/callback.js';
 
+// 授权回调已经接上真实流程，它的门禁在 zepp-oauth-functions.test.mjs。
+// 数据回调在中转上线前仍只做登记、一律拒收。
 const endpoints = [
-  { handler: oauthCallback, path: '/api/zepp/oauth/callback', name: 'authorization_callback', flag: 'oauthEnabled', allow: 'GET, HEAD' },
   { handler: dataCallback, path: '/api/zepp/data/callback', name: 'data_callback', flag: 'dataIngestionEnabled', allow: 'GET, HEAD, POST' },
 ];
 
@@ -87,7 +88,10 @@ for (const endpoint of endpoints) {
 }
 
 test('OAuth POST is rejected without consuming credentials', async () => {
-  const { request, response } = invoke(endpoints[0], 'POST', '', 'code=fixture-secret');
+  const request = new Request('https://zeppbridge.pages.dev/api/zepp/oauth/callback', {
+    method: 'POST', body: 'code=fixture-secret',
+  });
+  const response = await oauthCallback({ request, env: {} });
   assert.equal(response.status, 405);
   assert.equal(request.bodyUsed, false);
   assert.doesNotMatch(await response.text(), /fixture-secret/);
@@ -96,7 +100,7 @@ test('OAuth POST is rejected without consuming credentials', async () => {
 test('data POST is never acknowledged or consumed, even for empty or malformed payloads', async (context) => {
   context.mock.method(globalThis, 'fetch', () => assert.fail('Unexpected outbound request'));
   for (const body of [undefined, '', '[]', 'not-json', '["{\\"userId\\":\\"fixture-secret\\"}"]', 'x'.repeat(1_000_000)]) {
-    const { request, response } = invoke(endpoints[1], 'POST', '', body);
+    const { request, response } = invoke(endpoints[0], 'POST', '', body);
     assert.equal(response.status, 503);
     assert.equal(request.bodyUsed, false);
     const payload = await response.json();

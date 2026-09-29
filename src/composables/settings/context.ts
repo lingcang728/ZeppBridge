@@ -1,5 +1,6 @@
 import { inject, provide, type InjectionKey } from 'vue';
 import { createAuthFlow, type AuthFlow } from './useAuthFlow';
+import { createOfficialAuth, type OfficialAuth } from './useOfficialAuth';
 import { createDiagnosticReport, type DiagnosticReport } from './useDiagnosticReport';
 import { createSettingsFeedback, type SettingsFeedback } from './useSettingsFeedback';
 import { createUserPrefs, type UserPrefsState } from './useUserPrefs';
@@ -14,6 +15,7 @@ import { useCapabilityBoard } from './useCapabilityBoard';
 export interface SettingsContext {
   feedback: SettingsFeedback;
   auth: AuthFlow;
+  official: OfficialAuth;
   prefs: UserPrefsState;
   diagnostics: DiagnosticReport;
   capability: ReturnType<typeof useCapabilityBoard>;
@@ -26,6 +28,7 @@ export const provideSettingsContext = (): SettingsContext => {
   const context: SettingsContext = {
     feedback,
     auth: createAuthFlow(feedback),
+    official: createOfficialAuth(feedback),
     prefs: createUserPrefs(feedback),
     diagnostics: createDiagnosticReport(feedback),
     capability: useCapabilityBoard(),
