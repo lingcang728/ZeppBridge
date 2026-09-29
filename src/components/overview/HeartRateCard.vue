@@ -162,7 +162,6 @@ const clock = (value: number) =>
    外壳要在它到达之前先占住同一个格子。 */
 .hr-panel { display: flex; flex-direction: column; min-height: 286px; padding: 20px 20px 16px; }
 .hr-panel .panel-figure { margin-bottom: 4px; }
-.latest-when { display: block; flex-basis: 100%; margin-top: 2px; color: var(--subtle); font-size: var(--fs-2xs); font-style: normal; text-align: right; }
 .empty-copy { display: grid; gap: 6px; max-width: 380px; }
 .empty-copy small { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.5; }
 .hr-zones { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: auto 0 0; padding: 8px 0 0; list-style: none; color: var(--subtle); font-size: var(--fs-2xs); }

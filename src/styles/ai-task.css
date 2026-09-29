@@ -51,19 +51,8 @@
 .ai-tool:hover:not(:disabled) { color: var(--ink); border-color: var(--accent); }
 .ai-tool:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .ai-tool:disabled { opacity: .45; cursor: not-allowed; }
-.ai-chip {
-  display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 4px 11px;
-  border: 1px solid var(--line-control); border-radius: 999px;
-  background: var(--mat-raised); color: var(--muted); font-size: var(--fs-sm); cursor: pointer;
-  white-space: nowrap; box-shadow: var(--mat-raised-rim);
-}
-.ai-chip:hover { color: var(--ink); border-color: var(--accent); }
-.ai-chip.is-on { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
-.ai-chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .ai-note { display: flex; align-items: flex-start; gap: 6px; margin: 8px 0 0; font-size: var(--fs-sm); color: var(--subtle); }
 .ai-note.ok { color: var(--accent); }
 .ai-note.bad { color: var(--danger); }
 .ai-note.warn { color: var(--warning); }
 .ai-note svg { flex: 0 0 auto; margin-top: 2px; }
-.ai-check { display: flex; align-items: center; gap: 8px; margin-top: 10px; color: var(--ink); font-size: var(--fs-sm); cursor: pointer; }
-.ai-check input { width: 16px; height: 16px; accent-color: var(--accent); }

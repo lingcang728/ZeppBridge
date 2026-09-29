@@ -1,14 +1,5 @@
 /* SleepDetail.vue 的样式（scoped，经 <style scoped src> 引入，只作用于这个组件）。 */
 .sleep-page { width: 100%; display: grid; gap: 16px; align-content: start; }
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--muted);
-  font-size: var(--fs-sm);
-  text-decoration: none;
-}
-.back-link:hover { color: var(--accent); }
 .page-heading { margin: 0; }
 .page-heading h1 {
   margin: 0;

@@ -42,18 +42,6 @@
 .panel-title strong { color: var(--ink); font-size: var(--fs-md); font-weight: 600; }
 .panel-title small { color: var(--subtle); font-size: var(--fs-xs); }
 .chart-icon { display: grid; width: 38px; height: 38px; flex: 0 0 38px; place-items: center; }
-.latest-value {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: flex-end;
-  gap: 0 5px;
-  color: var(--muted);
-  font-size: var(--fs-sm);
-  white-space: nowrap;
-}
-.latest-value strong { color: var(--ink); font-family: var(--font-mono); font-size: 20px; font-weight: 600; }
-.latest-value small { font-size: var(--fs-xs); }
 .panel-empty {
   display: flex;
   min-height: 190px;
@@ -66,7 +54,6 @@
 }
 .panel-empty.compact { min-height: 170px; flex-direction: column; }
 .panel-empty .glyph-tile { opacity: .75; }
-.panel-more { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; color: var(--subtle); font-size: var(--fs-xs); }
 
 /* ── 三张主卡的同一套结构：卡头（图标 + 标题 + 小字，右上角一枚箭头圆钮）→ 左对齐的大号主数字
    → 一条细条 → 几行小字事实。主数字用无衬线等宽数字，单位小一号、颜色淡一级。 ── */
@@ -102,7 +89,5 @@
 
 a.metric-panel { display: block; color: inherit; text-decoration: none; }
 
-.text-link { display: inline-flex; align-items: center; gap: 3px; color: var(--accent); font-size: var(--fs-xs); text-decoration: none; }
-.text-link:hover { color: var(--accent-hover); }
 
 @media (prefers-reduced-motion: reduce) { .metric-panel, .metric-panel.is-tilting { transition: none; transform: none; } }

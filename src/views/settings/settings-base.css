@@ -42,7 +42,6 @@
 .s-row-title { color: var(--ink); font-size: var(--fs-md); font-weight: 500; }
 .s-row-sub { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.5; }
 .s-row-control { display: flex; flex: 0 1 auto; min-width: 0; max-width: 100%; align-items: center; gap: 10px; margin-left: auto; }
-.s-row-control .select-menu { width: 210px; }
 .s-row.is-block { display: grid; align-items: stretch; }
 .s-note { margin: 0; padding: 0 4px; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.6; }
 
@@ -92,5 +91,4 @@
 @media (max-width: 720px) {
   .s-row { flex-wrap: wrap; }
   .s-row-control { width: 100%; justify-content: flex-start; }
-  .s-row-control .select-menu { width: 100%; }
 }

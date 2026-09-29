@@ -2,7 +2,7 @@
  *
  * 规则只有四种材质，颜色全部来自 tokens.css 的 --mat-*，深浅主题自动换：
  *   卡片  .surface-card / .mat-card     —— 渐变底 + 顶边高光 + 柔和投影
- *   凸起  .button.secondary / .mat-raised —— 可按的东西，按下时下沉 1px
+ *   凸起  .button.secondary（--mat-raised*）—— 可按的东西，按下时下沉 1px
  *   凹槽  .mat-inset / .mat-field          —— 输入框、轨道、进度条
  *   玻璃  .glass                          —— 只给浮层：顶栏、胶囊、下拉、弹窗
  * 组件里不要再写第二套卡片底色；要换色就改 token。 */
@@ -62,14 +62,13 @@
 .button-primary:hover:not(:disabled), .button.primary:hover:not(:disabled) {
   background: linear-gradient(180deg, color-mix(in srgb, var(--accent-hover) 80%, #fff) 0%, var(--accent-hover) 100%);
 }
-.button-secondary, .button.secondary, .button-quiet, .button.quiet, .mat-raised {
+.button-secondary, .button.secondary {
   border-color: var(--mat-line-hover);
   color: var(--muted);
   background: var(--mat-raised);
   box-shadow: var(--mat-raised-rim);
 }
-.button-secondary:hover:not(:disabled), .button.secondary:hover:not(:disabled),
-.button-quiet:hover:not(:disabled), .button.quiet:hover:not(:disabled) {
+.button-secondary:hover:not(:disabled), .button.secondary:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--accent) 60%, transparent);
   color: var(--ink);
   background: var(--mat-raised-hover);

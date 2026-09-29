@@ -233,9 +233,6 @@ onMounted(() => {
 <style scoped>
 .device-page { width: 100%; display: grid; gap: 16px; align-content: start; }
 .detail-loading { display: grid; gap: 12px; }
-.page-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 38px; }
-.back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: var(--fs-sm); text-decoration: none; }
-.back-link:hover { color: var(--accent); }
 
 /* 设备主图比列表里的缩略图大一号，上下留够，别把表带切了。 */
 .device-hero :deep(.device-visual) { width: 104px; height: 124px; flex-basis: 104px; }
