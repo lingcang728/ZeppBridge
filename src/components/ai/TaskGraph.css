@@ -46,12 +46,13 @@
   align-items: center;
   gap: 12px;
   padding: 7px 8px 7px 16px;
-  border-radius: 999px;
+  border-radius: 20px;
   color: var(--muted);
   font-size: var(--fs-xs);
   translate: -50% 0;
 }
-.hint span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 提示是新用户唯一的一句教学：放不下就折行，不截成「…拖动空白…」。 */
+.hint span { line-height: 1.45; }
 .hint-close { flex: 0 0 auto; padding: 4px 12px; border: 0; border-radius: 999px; background: var(--glass-press); color: var(--ink); font-size: var(--fs-xs); cursor: pointer; }
 .dock { position: absolute; bottom: 14px; z-index: 3; display: flex; align-items: center; }
 .dock-left { left: 14px; }

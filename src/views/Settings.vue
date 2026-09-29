@@ -117,6 +117,9 @@ onMounted(async () => {
   await prefs.load();
   await Promise.all([auth.attach(), official.attach()]);
 });
+/** 卡组总览当前的形态（CardDeck 报上来）：页头说明按它换一句。 */
+const deckLayout = ref<'cover' | 'list'>('list');
+
 onUnmounted(() => {
   auth.detach();
   official.detach();
@@ -128,7 +131,7 @@ onUnmounted(() => {
     <header class="page-header">
       <div>
         <h1 id="settings-title">{{ t.title }}</h1>
-        <p class="page-intro">{{ d.pageIntroDeck }}</p>
+        <p class="page-intro">{{ deckLayout === 'list' ? d.pageIntro : d.pageIntroDeck }}</p>
       </div>
     </header>
 
@@ -140,7 +143,7 @@ onUnmounted(() => {
     <div v-if="dataMessage" class="alert success"><Icon name="circle-check" :size="15" />{{ dataMessage }}</div>
     <div v-if="dataError" class="alert danger" role="alert"><Icon name="warning" :size="15" />{{ dataError }}</div>
 
-    <CardDeck :cards="cards" :active-id="activeId" @open="openCard" @close="closeDeck" @change="changeCard">
+    <CardDeck :cards="cards" :active-id="activeId" @open="openCard" @close="closeDeck" @change="changeCard" @layout="deckLayout = $event">
       <template #face="{ card, centered }">
         <div :class="['face', { centered }]">
           <GlyphTile :name="card.icon" :tone="card.glyphTone" :size="60" />

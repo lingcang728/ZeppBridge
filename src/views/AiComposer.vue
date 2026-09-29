@@ -12,7 +12,7 @@
  * 本组件只做编排：状态归 useAiTaskDraft / useAiTaskLibrary / useAiTaskPreview /
  * useAiTaskHandoff 四个 composable，纯逻辑归 src/lib/aiTask/*。
  */
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import '../styles/ai-task.css';
 import AiTaskHeader from '../components/ai/AiTaskHeader.vue';
@@ -222,11 +222,25 @@ watch(
   },
   { immediate: true },
 );
+
+/* 交付坞的实际高度：宽度不够时它折成两行，画布上的撤销 / 缩放要跟着往上让。 */
+const dockRef = ref<{ $el?: Element } | null>(null);
+const dockHeight = ref(0);
+let dockObserver: ResizeObserver | null = null;
+onMounted(() => {
+  const el = dockRef.value?.$el;
+  if (!(el instanceof Element) || typeof ResizeObserver === 'undefined') return;
+  const measure = () => { dockHeight.value = Math.round(el.getBoundingClientRect().height); };
+  measure();
+  dockObserver = new ResizeObserver(measure);
+  dockObserver.observe(el);
+});
+onBeforeUnmount(() => dockObserver?.disconnect());
 </script>
 
 <template>
   <section class="page ai-page" aria-labelledby="ai-page-title">
-    <div class="stage">
+    <div class="stage" :style="dockHeight ? { '--dock-h': `${dockHeight}px` } : undefined">
       <div class="stage-graph">
         <TaskGraph :model="graphModel" :can-undo="canUndo" :undo-hint="undoHint" :undo-seq="lastChange?.seq ?? 0" @undo="draftCtl.undo()"
           @set-category="draftCtl.setCategoryEnabled"
@@ -248,7 +262,7 @@ watch(
         </AiStepRail>
       </aside>
 
-      <HandoffPanel class="stage-dock" :preview="preview" :preview-error="previewError" :direction="direction" :fallback-title="fallbackTitle" />
+      <HandoffPanel ref="dockRef" class="stage-dock" :preview="preview" :preview-error="previewError" :direction="direction" :fallback-title="fallbackTitle" />
     </div>
   </section>
 </template>
@@ -270,7 +284,7 @@ watch(
 }
 /* --graph-safe-*：画布四边被浮层挡住的宽度（上：任务名胶囊，下：交付坞和它上面那一排
    撤销 / 缩放胶囊）。关系网的节点弹层只摆在剩下看得见的那一块里，不会再被盖住半截。 */
-.stage-graph { --graph-safe-top: 70px; --graph-safe-bottom: 142px; position: absolute; inset: 0 calc(var(--rail-w) + 24px) 0 0; border-radius: inherit; }
+.stage-graph { --graph-safe-top: 70px; position: absolute; inset: 0 calc(var(--rail-w) + 24px) 0 0; border-radius: inherit; }
 .stage-head { position: absolute; top: 16px; left: 16px; z-index: 4; max-width: calc(100% - var(--rail-w) - 60px); }
 .stage-rail {
   position: absolute;
@@ -285,8 +299,11 @@ watch(
   overscroll-behavior: contain;
 }
 .stage-dock { position: absolute; right: calc(var(--rail-w) + 36px); bottom: 16px; left: 16px; z-index: 5; }
-/* 关系网自己的撤销 / 缩放坞往上让出交付坞的高度；面包屑和提示让出左上角的任务名胶囊。 */
-.stage-graph :deep(.dock) { bottom: 92px; }
+/* 关系网自己的撤销 / 缩放坞往上让出交付坞的高度；面包屑和提示让出左上角的任务名胶囊。
+   交付坞的高度是量出来的（--dock-h）：窗口一窄它就折成两行，以前写死 92px，撤销和缩放
+   正好被盖在下面、点不到。 */
+.stage-graph { --graph-safe-bottom: calc(var(--dock-h, 64px) + 78px); }
+.stage-graph :deep(.dock) { bottom: calc(var(--dock-h, 64px) + 28px); }
 .stage-graph :deep(.hint), .stage-graph :deep(.crumb) { top: 72px; }
 
 @media (max-width: 1100px) {

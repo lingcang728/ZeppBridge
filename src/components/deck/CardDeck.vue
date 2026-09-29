@@ -72,6 +72,8 @@ const emit = defineEmits<{
   close: [];
   /** 翻到相邻一张。调用方负责换内容，返回的 Promise 结束时新内容应已渲染。 */
   change: [id: string, done: () => void];
+  /** 总览现在是平铺还是卡组（页头的说明按它换一句）。挂载时报一次，切换后再报。 */
+  layout: [layout: 'cover' | 'list'];
 }>();
 
 defineSlots<{
@@ -84,17 +86,20 @@ defineSlots<{
 
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/* —— 总览形态：coverflow 还是平铺。记在本机，下次进来还是用户上次选的那种。 —— */
+/* —— 总览形态：coverflow 还是平铺。记在本机，下次进来还是用户上次选的那种。
+   默认平铺：coverflow 一次只读得清中间三张（正对面那张完全透明），只想改个保留时间的人
+   得先学会这套翻法。卡组留给选过它的人。 —— */
 type Layout = 'cover' | 'list';
 const LAYOUT_KEY = 'zeppbridge-settings-layout';
 const readLayout = (): Layout => {
   try {
-    return window.localStorage.getItem(LAYOUT_KEY) === 'list' ? 'list' : 'cover';
+    return window.localStorage.getItem(LAYOUT_KEY) === 'cover' ? 'cover' : 'list';
   } catch {
-    return 'cover';
+    return 'list';
   }
 };
 const layout = ref<Layout>(readLayout());
+watch(layout, (value) => emit('layout', value), { immediate: true });
 
 const root = ref<HTMLElement | null>(null);
 const overview = ref<HTMLElement | null>(null);
@@ -134,7 +139,7 @@ const switchLayout = async (next: Layout) => {
   try {
     window.localStorage.setItem(LAYOUT_KEY, next);
   } catch {
-    // 记不住就算了，下次还是 coverflow。
+    // 记不住就算了，下次还是默认的平铺。
   }
 };
 
