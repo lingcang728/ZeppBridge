@@ -58,6 +58,7 @@ const t = useMessages(defineMessages(
     desktopOnly: '连接桌面应用后才能导出',
     go: (label: string) => `交给 ${label}`,
     goSub: '导出 · 复制提示词 · 打开网站',
+    goSubSyncing: '同步完成后再交给 AI',
     readiness: (categories: number, percent: number) => `${categories} 类数据 · ${percent}% 天有数据`,
     readinessLoading: '正在清点数据…',
     issueCount: (count: number) => `${count} 条提醒`,
@@ -87,6 +88,7 @@ const t = useMessages(defineMessages(
     desktopOnly: 'Connect the desktop app to export',
     go: (label: string) => `Hand to ${label}`,
     goSub: 'Export · copy prompt · open site',
+    goSubSyncing: 'Available once the sync finishes',
     readiness: (categories: number, percent: number) => `${categories} data types · ${percent}% of days covered`,
     readinessLoading: 'Counting your data…',
     issueCount: (count: number) => (count === 1 ? '1 note' : `${count} notes`),
@@ -111,6 +113,7 @@ const t = useMessages(defineMessages(
     lastExport: 'Última exportación · Abrir carpeta',
     go: (label: string) => `Entregar a ${label}`,
     goSub: 'Exportar · copiar prompt · abrir sitio',
+    goSubSyncing: 'Disponible cuando termine la sincronización',
     readiness: (categories: number, percent: number) => `${categories} tipos de datos · ${percent}% de días con datos`,
     readinessLoading: 'Contando tus datos…',
     issueCount: (count: number) => (count === 1 ? '1 aviso' : `${count} avisos`),
@@ -216,8 +219,10 @@ function exportTask() {
   return { ...draft.value, title: draft.value.title.trim() || props.fallbackTitle };
 }
 
+/* 同步进行中不许交付：导出的会是同步前的旧数据，而旁边正写着「最新数据还在路上」。
+   两个按钮都等同步落地再亮（用户 2026-09-29 定）。 */
 const run = async (openSite: boolean) => {
-  if (!desktop || busy.value) return;
+  if (!desktop || busy.value || isSyncing.value) return;
   details.value = false;
   progressDismissed.value = false;
   await saveDraft(props.fallbackTitle).catch(() => undefined);
@@ -330,11 +335,11 @@ onBeforeUnmount(() => {
       <CapsuleWheel class="provider-wheel" loop :span="210" :items="providerItems" :model-value="provider.id"
         :aria-label="t.who" @update:model-value="pickProvider" />
 
-      <button type="button" :class="['go', 'cta', { 'ready-glow': arrived }]" :disabled="!desktop || busy" :title="t.run(provider.label)" @click="run(true)">
+      <button type="button" :class="['go', 'cta', { 'ready-glow': arrived }]" :disabled="!desktop || busy || isSyncing" :title="isSyncing ? t.goSubSyncing : t.run(provider.label)" @click="run(true)">
         <Icon name="send" :size="17" />
-        <span class="go-copy"><strong>{{ t.go(provider.label) }}</strong><small>{{ t.goSub }}</small></span>
+        <span class="go-copy"><strong>{{ t.go(provider.label) }}</strong><small>{{ isSyncing ? t.goSubSyncing : t.goSub }}</small></span>
       </button>
-      <button type="button" class="export-only" :disabled="!desktop || busy" :title="t.exportOnly" :aria-label="t.exportOnly" @click="run(false)">
+      <button type="button" class="export-only" :disabled="!desktop || busy || isSyncing" :title="t.exportOnly" :aria-label="t.exportOnly" @click="run(false)">
         <Icon name="export" :size="17" />
       </button>
     </div>

@@ -8,6 +8,7 @@ import CapsuleWheel from '../CapsuleWheel.vue';
 import SegmentTrack from '../SegmentTrack.vue';
 import type { ExportFormat, WorkoutMetrics } from '../../composables/useWorkoutDetail';
 import { isTauri } from '../../composables/useTauriApi';
+import { useSyncController } from '../../composables/useSyncController';
 import { useMessages } from '../../i18n';
 import { workoutDetailMessages } from '../../views/WorkoutDetail.i18n';
 
@@ -29,6 +30,7 @@ const format = defineModel<ExportFormat>('format', { required: true });
 const provider = defineModel<string>('provider', { required: true });
 const emit = defineEmits<{ export: []; handoff: [] }>();
 const t = useMessages(workoutDetailMessages);
+const { isSyncing } = useSyncController();
 const FORMATS: ExportFormat[] = ['json', 'csv', 'gpx', 'fit'];
 const mode = ref<'ai' | 'export'>('ai');
 const modeItems = computed(() => [
@@ -60,8 +62,9 @@ const modeItems = computed(() => [
           <span>{{ t.handoffTarget }}</span>
           <CapsuleWheel v-model="provider" loop :span="230" :items="aiProviderChoices" :aria-label="t.handoffTargetAria" />
         </div>
-        <button class="button primary wide" type="button" :disabled="handoffBusy" @click="emit('handoff')">
-          <Icon name="send" :size="18" class="cta-icon" />{{ handoffBusy ? t.preparing : t.handTo(aiProviderLabel) }}
+        <!-- 同步进行中不交付：导出的会是同步前的旧数据。 -->
+        <button class="button primary wide" type="button" :disabled="handoffBusy || isSyncing" @click="emit('handoff')">
+          <Icon name="send" :size="18" class="cta-icon" />{{ handoffBusy ? t.preparing : isSyncing ? t.handWaitSync : t.handTo(aiProviderLabel) }}
         </button>
         <p v-if="aiNote" class="action-note ok" role="status"><Icon name="circle-check" :size="13" />{{ aiNote }}</p>
         <p v-if="handoffError" class="action-note bad" role="alert"><Icon name="warning" :size="13" />{{ handoffError }}</p>

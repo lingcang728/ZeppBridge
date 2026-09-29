@@ -137,6 +137,7 @@ export const workoutDetailMessages = defineMessages(
     handoffTarget: '目标工具',
     handoffTargetAria: '交给哪个 AI 工具',
     preparing: '正在准备…',
+    handWaitSync: '同步完成后再交给 AI',
     handTo: (provider: string) => `交给 ${provider}`,
 
     provenanceAria: '来源信息',
@@ -284,6 +285,7 @@ Answer in Markdown.`,
     handoffTarget: 'Target tool',
     handoffTargetAria: 'Which AI tool to hand it to',
     preparing: 'Preparing…',
+    handWaitSync: 'Available once the sync finishes',
     handTo: (provider: string) => `Hand to ${provider}`,
 
     provenanceAria: 'Provenance',
@@ -431,6 +433,7 @@ Responde en español, en Markdown.`,
     handoffTarget: 'Herramienta de destino',
     handoffTargetAria: 'A qué herramienta de IA entregarlo',
     preparing: 'Preparando…',
+    handWaitSync: 'Disponible cuando termine la sincronización',
     handTo: (provider: string) => `Pasar a ${provider}`,
 
     provenanceAria: 'Procedencia',
