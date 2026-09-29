@@ -11,6 +11,75 @@ pub(crate) fn loaded_stage_minutes(minutes: i32, available: i64) -> Option<i32> 
     (available != 0).then_some(minutes)
 }
 
+/// 睡眠列表与详情共用的列（顺序要和 [`SleepRow::read`] 对上）。
+const SLEEP_SESSION_COLUMNS: &str = "sleep_id, start_time, end_time, score, duration_minutes,
+    deep_minutes, deep_available, light_minutes, light_available,
+    rem_minutes, rem_available, awake_minutes, awake_available,
+    source_scope, device_id, synced_at, wake_count";
+
+/// 一行睡眠的原始列值。时间和来源仍是库里的字符串：解析放在 [`SleepRow::into_session`]，
+/// 返回本 crate 的 `Result`——坏时间 / 坏来源照旧报 `err.core.parse`，不会因为塞进
+/// `query_map` 的闭包而变成 `err.core.database`。
+struct SleepRow {
+    sleep_id: String,
+    start: String,
+    end: String,
+    score: Option<i32>,
+    duration_minutes: i32,
+    deep: (i32, i64),
+    light: (i32, i64),
+    rem: (i32, i64),
+    awake: (i32, i64),
+    scope: String,
+    device_id: Option<String>,
+    synced_at: Option<String>,
+    wake_count: Option<i32>,
+}
+
+impl SleepRow {
+    fn read(row: &rusqlite::Row<'_>) -> rusqlite::Result<Self> {
+        Ok(Self {
+            sleep_id: row.get(0)?,
+            start: row.get(1)?,
+            end: row.get(2)?,
+            score: row.get(3)?,
+            duration_minutes: row.get(4)?,
+            deep: (row.get(5)?, row.get(6)?),
+            light: (row.get(7)?, row.get(8)?),
+            rem: (row.get(9)?, row.get(10)?),
+            awake: (row.get(11)?, row.get(12)?),
+            scope: row.get(13)?,
+            device_id: row.get(14)?,
+            synced_at: row.get(15)?,
+            wake_count: row.get(16)?,
+        })
+    }
+
+    fn into_session(self, stages: Vec<SleepStageSlice>) -> Result<SleepSession> {
+        Ok(SleepSession {
+            start_time: parse_datetime(&self.start, "sleep.start_time")?,
+            end_time: parse_datetime(&self.end, "sleep.end_time")?,
+            sleep_id: self.sleep_id,
+            score: self.score,
+            duration_minutes: self.duration_minutes,
+            deep_minutes: loaded_stage_minutes(self.deep.0, self.deep.1),
+            light_minutes: loaded_stage_minutes(self.light.0, self.light.1),
+            rem_minutes: loaded_stage_minutes(self.rem.0, self.rem.1),
+            awake_minutes: loaded_stage_minutes(self.awake.0, self.awake.1),
+            source_scope: parse_scope(&self.scope)?,
+            device_id: self.device_id,
+            synced_at: self
+                .synced_at
+                .as_deref()
+                .map(|value| parse_datetime(value, "sleep.synced_at"))
+                .transpose()?,
+            time_in_bed_minutes: None,
+            stages,
+            wake_count: self.wake_count,
+        })
+    }
+}
+
 impl Database {
     /// `pub(crate)`：ai_tasks 的 detailed 导出要附真实阶段片，同一份查询。
     pub(crate) fn load_sleep_stages(&self, sleep_id: &str) -> Result<Vec<SleepStageSlice>> {
@@ -63,75 +132,15 @@ impl Database {
     pub fn sleep_sessions_page(&self, limit: usize, offset: usize) -> Result<Vec<SleepSession>> {
         let limit = i64::try_from(limit).unwrap_or(i64::MAX).max(0);
         let offset = i64::try_from(offset).unwrap_or(i64::MAX).max(0);
-        let mut stmt = self.conn.prepare(
-            "SELECT sleep_id, start_time, end_time, score, duration_minutes,
-                    deep_minutes, deep_available, light_minutes, light_available,
-                    rem_minutes, rem_available, awake_minutes, awake_available,
-                    source_scope, device_id, synced_at, wake_count
-             FROM sleep_sessions_shown ORDER BY start_time DESC LIMIT ?1 OFFSET ?2",
-        )?;
-        let rows = stmt.query_map([limit, offset], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, Option<i32>>(3)?,
-                row.get::<_, i32>(4)?,
-                row.get::<_, i32>(5)?,
-                row.get::<_, i64>(6)?,
-                row.get::<_, i32>(7)?,
-                row.get::<_, i64>(8)?,
-                row.get::<_, i32>(9)?,
-                row.get::<_, i64>(10)?,
-                row.get::<_, i32>(11)?,
-                row.get::<_, i64>(12)?,
-                row.get::<_, String>(13)?,
-                row.get::<_, Option<String>>(14)?,
-                row.get::<_, Option<String>>(15)?,
-                row.get::<_, Option<i32>>(16)?,
-            ))
-        })?;
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {SLEEP_SESSION_COLUMNS}
+             FROM sleep_sessions_shown ORDER BY start_time DESC LIMIT ?1 OFFSET ?2"
+        ))?;
+        let rows = stmt.query_map([limit, offset], SleepRow::read)?;
         let mut sessions = Vec::new();
         for row in rows {
-            let (
-                sleep_id,
-                start,
-                end,
-                score,
-                duration_minutes,
-                deep_minutes,
-                deep_available,
-                light_minutes,
-                light_available,
-                rem_minutes,
-                rem_available,
-                awake_minutes,
-                awake_available,
-                scope,
-                device_id,
-                synced_at,
-                wake_count,
-            ) = row?;
-            sessions.push(SleepSession {
-                sleep_id,
-                start_time: parse_datetime(&start, "sleep.start_time")?,
-                end_time: parse_datetime(&end, "sleep.end_time")?,
-                score,
-                duration_minutes,
-                deep_minutes: loaded_stage_minutes(deep_minutes, deep_available),
-                light_minutes: loaded_stage_minutes(light_minutes, light_available),
-                rem_minutes: loaded_stage_minutes(rem_minutes, rem_available),
-                awake_minutes: loaded_stage_minutes(awake_minutes, awake_available),
-                source_scope: parse_scope(&scope)?,
-                device_id,
-                synced_at: synced_at
-                    .as_deref()
-                    .map(|value| parse_datetime(value, "sleep.synced_at"))
-                    .transpose()?,
-                time_in_bed_minutes: None,
-                stages: Vec::new(),
-                wake_count,
-            });
+            // 列表不带阶段片：详情页才要。
+            sessions.push(row?.into_session(Vec::new())?);
         }
         Ok(sessions)
     }
@@ -140,62 +149,22 @@ impl Database {
         let row = self
             .conn
             .query_row(
-                "SELECT sleep_id, start_time, end_time, score, duration_minutes,
-                        deep_minutes, deep_available, light_minutes, light_available,
-                        rem_minutes, rem_available, awake_minutes, awake_available,
-                        source_scope, device_id, synced_at, wake_count
-                 FROM sleep_sessions WHERE sleep_id = ?1 LIMIT 1",
+                &format!(
+                    "SELECT {SLEEP_SESSION_COLUMNS}
+                     FROM sleep_sessions WHERE sleep_id = ?1 LIMIT 1"
+                ),
                 [sleep_id],
-                |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, String>(1)?,
-                        row.get::<_, String>(2)?,
-                        row.get::<_, Option<i32>>(3)?,
-                        row.get::<_, i32>(4)?,
-                        row.get::<_, i32>(5)?,
-                        row.get::<_, i64>(6)?,
-                        row.get::<_, i32>(7)?,
-                        row.get::<_, i64>(8)?,
-                        row.get::<_, i32>(9)?,
-                        row.get::<_, i64>(10)?,
-                        row.get::<_, i32>(11)?,
-                        row.get::<_, i64>(12)?,
-                        row.get::<_, String>(13)?,
-                        row.get::<_, Option<String>>(14)?,
-                        row.get::<_, Option<String>>(15)?,
-                        row.get::<_, Option<i32>>(16)?,
-                    ))
-                },
+                SleepRow::read,
             )
             .optional()?;
-        let Some((
-            sleep_id,
-            start,
-            end,
-            score,
-            duration_minutes,
-            deep_minutes,
-            deep_available,
-            light_minutes,
-            light_available,
-            rem_minutes,
-            rem_available,
-            awake_minutes,
-            awake_available,
-            scope,
-            device_id,
-            synced_at,
-            wake_count,
-        )) = row
-        else {
+        let Some(mut row) = row else {
             return Ok(None);
         };
-        let stages = self.load_sleep_stages(&sleep_id)?;
+        let stages = self.load_sleep_stages(&row.sleep_id)?;
         // 官方睡眠接口不带设备（实测报文只有起止、阶段和评分），落库时 device_id 是空的。
         // 同一晚旧通道那一份若带着设备，就用它来认设备：两边是同一只表记下的同一段睡眠。
-        let (scope, device_id) = match device_id {
-            None if sleep_id.starts_with("official:") => self
+        if row.device_id.is_none() && row.sleep_id.starts_with("official:") {
+            if let Some((scope, device_id)) = self
                 .conn
                 .query_row(
                     "SELECT source_scope, device_id FROM sleep_sessions
@@ -203,33 +172,21 @@ impl Database {
                        AND device_id IS NOT NULL AND device_id != ''
                        AND start_time < ?2 AND end_time > ?1
                      ORDER BY ABS(julianday(start_time) - julianday(?1)) LIMIT 1",
-                    params![start, end],
-                    |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
+                    params![row.start, row.end],
+                    |found| {
+                        Ok((
+                            found.get::<_, String>(0)?,
+                            found.get::<_, Option<String>>(1)?,
+                        ))
+                    },
                 )
                 .optional()?
-                .unwrap_or((scope, None)),
-            other => (scope, other),
-        };
-        Ok(Some(SleepSession {
-            sleep_id,
-            start_time: parse_datetime(&start, "sleep.start_time")?,
-            end_time: parse_datetime(&end, "sleep.end_time")?,
-            score,
-            duration_minutes,
-            deep_minutes: loaded_stage_minutes(deep_minutes, deep_available),
-            light_minutes: loaded_stage_minutes(light_minutes, light_available),
-            rem_minutes: loaded_stage_minutes(rem_minutes, rem_available),
-            awake_minutes: loaded_stage_minutes(awake_minutes, awake_available),
-            source_scope: parse_scope(&scope)?,
-            device_id,
-            synced_at: synced_at
-                .as_deref()
-                .map(|value| parse_datetime(value, "sleep.synced_at"))
-                .transpose()?,
-            time_in_bed_minutes: None,
-            stages,
-            wake_count,
-        }))
+            {
+                row.scope = scope;
+                row.device_id = device_id;
+            }
+        }
+        row.into_session(stages).map(Some)
     }
 
     /// 本机一共有多少条运动记录。见 `count_sleep_sessions` 的理由。

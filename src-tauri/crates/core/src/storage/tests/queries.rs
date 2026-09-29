@@ -626,3 +626,39 @@ fn failed_workout_detail_attempts_drop_out_then_decay_back_in() {
     assert_eq!(pending.len(), 1);
     assert_eq!(pending[0].workout_id, "stuck");
 }
+
+/// 列表和详情共用一份行解码（R01）以后，坏时间仍要报 `err.core.parse`：
+/// 解析错误要是被包进 rusqlite 的错误，界面会走「数据库出错」那条文案。
+#[test]
+fn bad_sleep_time_is_a_parse_error_in_list_and_detail() {
+    let db = Database::in_memory().unwrap();
+    db.insert_sleep_session(&SleepSession {
+        sleep_id: "sleep-bad-time".into(),
+        start_time: ts(),
+        end_time: ts() + chrono::Duration::minutes(400),
+        score: None,
+        duration_minutes: 380,
+        deep_minutes: None,
+        light_minutes: None,
+        rem_minutes: None,
+        awake_minutes: None,
+        source_scope: SourceScope::Device,
+        device_id: None,
+        synced_at: None,
+        time_in_bed_minutes: None,
+        wake_count: None,
+        stages: Vec::new(),
+    })
+    .unwrap();
+    db.conn
+        .execute(
+            "UPDATE sleep_sessions SET start_time = 'not-a-time' WHERE sleep_id = 'sleep-bad-time'",
+            [],
+        )
+        .unwrap();
+
+    let list = db.sleep_sessions_page(10, 0).unwrap_err();
+    assert_eq!(list.code(), "err.core.parse", "{list}");
+    let detail = db.get_sleep_detail("sleep-bad-time").unwrap_err();
+    assert_eq!(detail.code(), "err.core.parse", "{detail}");
+}
