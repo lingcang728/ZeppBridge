@@ -9,7 +9,6 @@
  */
 import type {
   AiTaskAttachmentRef,
-  AiTaskAttachmentState,
   AiTaskAttachmentStat,
 } from '../bridge/types';
 import { backend } from '../bridge';
@@ -56,33 +55,6 @@ const newAttachmentId = (): string => {
   const cryptoApi = globalThis.crypto as Crypto | undefined;
   if (cryptoApi?.randomUUID) return cryptoApi.randomUUID();
   return `att-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-};
-
-/**
- * 状态判定（A7 定稿）：missing = 文件没了；changed = 字节数和添加时的
- * 基线不同（基线 null 时无从判定，不报 changed）；其余 ok。
- */
-export const attachmentStateFromStat = (
-  ref: Pick<AiTaskAttachmentRef, 'byte_len'>,
-  stat: Pick<AiTaskAttachmentStat, 'exists' | 'byte_len'> | undefined,
-): AiTaskAttachmentState => {
-  if (!stat || !stat.exists) return 'missing';
-  if (ref.byte_len !== null && stat.byte_len !== null && stat.byte_len !== ref.byte_len) {
-    return 'changed';
-  }
-  return 'ok';
-};
-
-export const statToStatus = (
-  refs: AiTaskAttachmentRef[],
-  stats: AiTaskAttachmentStat[],
-): Array<{ id: string; status: AiTaskAttachmentState; byte_len: number | null }> => {
-  const byPath = new Map(stats.map((stat) => [stat.path, stat]));
-  return refs.map((ref) => ({
-    id: ref.id,
-    status: attachmentStateFromStat(ref, byPath.get(ref.path)),
-    byte_len: byPath.get(ref.path)?.byte_len ?? null,
-  }));
 };
 
 /** 打开文件对话框挑原件。取消返回空表，不区分「取消」和「没选到」。 */

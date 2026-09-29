@@ -7,7 +7,6 @@
  */
 import type {
   AiTask,
-  AiTaskCategoryRange,
   AiTaskTemplate,
 } from '../bridge/types';
 import { defaultCategoryRanges } from './categories';
@@ -103,6 +102,3 @@ export const taskSnapshot = (task: AiTask): string =>
 /** 草稿相对基线（上次保存/加载）有没有被改过。 */
 export const isTaskDirty = (task: AiTask, baselineSnapshot: string): boolean =>
   taskSnapshot(task) !== baselineSnapshot;
-
-export const cloneRanges = (ranges: AiTaskCategoryRange[]): AiTaskCategoryRange[] =>
-  ranges.map((range) => ({ ...range }));

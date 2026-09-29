@@ -164,12 +164,6 @@ pub struct HourlySteps {
     pub steps: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DailyPoint {
-    pub date: String,
-    pub value: f64,
-}
-
 /// A raw response retained before any normalization.  It deliberately contains
 /// no credentials and is suitable for passing to `Database::insert_raw_record`.
 #[derive(Debug, Clone, Serialize, Deserialize)]

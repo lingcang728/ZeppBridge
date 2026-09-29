@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   categoryCoverage,
-  categoryWindowForWorkout,
-  categoryWindows,
   coverageRows,
   formatBytes,
 } from '../coverage';
-import { localDateString } from '../../format';
 import type { AiTaskCoverage, AiTaskWorkoutBrief } from '../../bridge/types';
 
 const brief = (id: string, title: string): AiTaskWorkoutBrief => ({
@@ -26,48 +23,6 @@ const coverage = (patch: Partial<AiTaskCoverage> = {}): AiTaskCoverage => ({
   units: { score: 'pt', score2: 'pt' },
   missing: false,
   ...patch,
-});
-
-describe('categoryWindowForWorkout', () => {
-  // 用本地日期断言：窗口以运动开始日的本地日期为锚（A7 P4）。
-  it('含运动当天：起点 = 本地开始日 − days_before，终点 = 开始日', () => {
-    const start = '2026-03-10T08:00:00+08:00';
-    const day = localDateString(new Date(start));
-    const win = categoryWindowForWorkout(start, { days_before: 14, include_workout_day: true });
-    const expectedStart = new Date(start);
-    expectedStart.setDate(expectedStart.getDate() - 14);
-    expect(win).toEqual({ start: localDateString(expectedStart), end: day });
-  });
-
-  it('不含运动当天：终点收到开始日的前一天', () => {
-    const start = '2026-03-10T08:00:00+08:00';
-    const win = categoryWindowForWorkout(start, { days_before: 7, include_workout_day: false });
-    const expectedEnd = new Date(start);
-    expectedEnd.setDate(expectedEnd.getDate() - 1);
-    const expectedStart = new Date(start);
-    expectedStart.setDate(expectedStart.getDate() - 7);
-    expect(win?.end).toBe(localDateString(expectedEnd));
-    expect(win?.start).toBe(localDateString(expectedStart));
-  });
-
-  it('无效时间不编窗口', () => {
-    expect(categoryWindowForWorkout('not-a-date', { days_before: 7, include_workout_day: true })).toBeNull();
-  });
-});
-
-describe('categoryWindows', () => {
-  it('多条运动各自有窗口，按开始日排序；找不到的运动跳过', () => {
-    const workouts = [
-      { id: 'w-late', start_time: '2026-03-20T08:00:00+08:00' },
-      { id: 'w-early', start_time: '2026-03-01T08:00:00+08:00' },
-    ];
-    const wins = categoryWindows(
-      ['w-late', 'w-early', 'w-gone'],
-      workouts,
-      { days_before: 7, include_workout_day: true },
-    );
-    expect(wins.map((win) => win.workoutId)).toEqual(['w-early', 'w-late']);
-  });
 });
 
 describe('coverageRows', () => {

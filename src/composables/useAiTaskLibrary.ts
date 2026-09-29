@@ -71,9 +71,6 @@ const loadRecentWorkouts = async (limit = 60) => {
   }
 };
 
-const findTemplate = (id: string | null | undefined): AiTaskTemplate | null =>
-  (id ? templates.value.find((template) => template.id === id) : undefined) ?? null;
-
 export function useAiTaskLibrary() {
   return {
     taskList,
@@ -84,6 +81,5 @@ export function useAiTaskLibrary() {
     loadTemplates,
     loadRecentWorkouts,
     ensureWorkouts,
-    findTemplate,
   };
 }

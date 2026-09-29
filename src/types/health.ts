@@ -13,11 +13,6 @@ export interface StressPoint {
   value: number;
 }
 
-export interface DailyPoint {
-  date: string;
-  value: number;
-}
-
 export interface Coverage {
   start?: string;
   end?: string;

@@ -44,6 +44,3 @@ export const composePromptPreview = (parts: {
   [(parts.brief ?? '').trim(), parts.direction ?? '', parts.question.trim(), (parts.coverageNote ?? coverageNoteText()).trim()]
     .filter((part) => part.length > 0)
     .join('\n\n');
-
-/** 内置模板不可改不可删（P3：`err.ai_template.builtin_readonly`）。 */
-export const isBuiltinTemplate = (template: AiTaskTemplate): boolean => template.builtin;

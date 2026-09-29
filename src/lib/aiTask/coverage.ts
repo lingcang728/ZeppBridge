@@ -7,12 +7,10 @@
  */
 import type {
   AiTaskCategory,
-  AiTaskCategoryRange,
   AiTaskCoverage,
   AiTaskPreview,
   AiTaskWorkoutBrief,
 } from '../bridge/types';
-import { localDateString } from '../format';
 import { dataScopeLabel, workoutLabel } from '../labels';
 import { categoryLabel } from './categories';
 import { unitLabel } from './metrics';
@@ -87,47 +85,6 @@ export const categoryCoverage = (
     metrics: Object.keys(row.units),
   };
 };
-
-/**
- * 某类别在某次运动上的回溯窗口（A7 P4 的界面侧镜像）：
- * `[运动开始日(本地) − days_before, 运动开始日]`；`include_workout_day=false`
- * 时右端收一天。后端算权威覆盖，这里只给配置面板一个一致的预期。
- *
- * 返回 null：输入时间无效时不编窗口。
- */
-export const categoryWindowForWorkout = (
-  workoutStartRfc3339: string,
-  range: Pick<AiTaskCategoryRange, 'days_before' | 'include_workout_day'>,
-): { start: string; end: string } | null => {
-  const startTime = new Date(workoutStartRfc3339);
-  if (Number.isNaN(startTime.getTime())) return null;
-  const days = Math.max(0, Math.floor(range.days_before));
-  const start = new Date(startTime);
-  start.setDate(start.getDate() - days);
-  const end = new Date(startTime);
-  if (!range.include_workout_day) end.setDate(end.getDate() - 1);
-  return { start: localDateString(start), end: localDateString(end) };
-};
-
-/**
- * 一个任务（多选运动 × 一个类别）的全部窗口，按开始日排序。
- * `workouts` 传 `{id, start_time}` 形状——`Workout.workout_id` 与
- * `AiTaskWorkoutBrief.workout_id` 在调用处先归一成 `id`。
- */
-export const categoryWindows = (
-  workoutIds: string[],
-  workouts: ReadonlyArray<{ id: string; start_time: string }>,
-  range: Pick<AiTaskCategoryRange, 'days_before' | 'include_workout_day'>,
-): Array<{ workoutId: string; start: string; end: string }> =>
-  workoutIds
-    .map((id) => {
-      const workout = workouts.find((item) => item.id === id);
-      if (!workout) return null;
-      const window = categoryWindowForWorkout(workout.start_time, range);
-      return window ? { workoutId: id, ...window } : null;
-    })
-    .filter((entry): entry is { workoutId: string; start: string; end: string } => entry !== null)
-    .sort((a, b) => a.start.localeCompare(b.start));
 
 export const formatBytes = (bytes: number | null | undefined): string => {
   if (bytes === null || bytes === undefined || !Number.isFinite(bytes)) return '—';

@@ -144,7 +144,6 @@ impl Database {
     }
 
     #[allow(dead_code)]
-    #[allow(dead_code)]
     pub fn insert_daily_metric(&self, metric: &DailyMetric) -> Result<()> {
         self.insert_daily_metric_with_raw(metric, None)
     }

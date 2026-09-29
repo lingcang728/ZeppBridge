@@ -1,11 +1,5 @@
 /* 账号、应用状态、同步报告、本地 API 状态、存储估算与偏好。从 types/index.ts 按领域拆出，形状不变。 */
 
-export interface AuthInfo {
-  appToken: string;
-  userId: string;
-  regionHost: string;
-}
-
 export type SourceScope = 'user_fused' | 'device' | 'unknown' | string;
 
 export interface StreamStatus {

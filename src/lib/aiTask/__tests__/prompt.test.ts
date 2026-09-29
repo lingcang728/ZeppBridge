@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { composePromptPreview, directionText, templateName, templatePromptSeed, isBuiltinTemplate } from '../prompt';
+import { composePromptPreview, directionText, templateName, templatePromptSeed } from '../prompt';
 import { aiTaskIssueText, aiTaskTextFor, coverageNoteText } from '../copy';
 import type { AiTaskTemplate } from '../../bridge/types';
 
@@ -32,11 +32,6 @@ describe('templateName / templatePromptSeed', () => {
     });
     expect(templateName(builtin)).toBe('恢复跑');
     expect(templatePromptSeed(builtin)).toContain('恢复');
-  });
-
-  it('isBuiltinTemplate 只是 builtin 字段的直通', () => {
-    expect(isBuiltinTemplate(template({ builtin: true }))).toBe(true);
-    expect(isBuiltinTemplate(template())).toBe(false);
   });
 });
 

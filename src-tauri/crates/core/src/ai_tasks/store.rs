@@ -378,26 +378,6 @@ impl Database {
         Ok(())
     }
 
-    /// `mcp_shared=1` 的任务全量载荷。目前由 `access::shared_task_grants`
-    /// 直接按表读（防御性解析，缺表/坏行按零授权处理）；本函数保留给
-    /// 需要整模型而非授权最小子集的调用方。
-    #[allow(dead_code)]
-    pub(crate) fn mcp_shared_ai_tasks(&self) -> Result<Vec<AiTask>> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT payload FROM ai_tasks WHERE mcp_shared = 1")?;
-        let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
-        let mut tasks = Vec::new();
-        for row in rows {
-            let payload = row?;
-            let task = serde_json::from_str::<AiTask>(&payload).map_err(|error| {
-                ZeppBridgeError::ParseError(format!("ai_tasks 中共享任务的 payload 损坏: {error}"))
-            })?;
-            tasks.push(task);
-        }
-        Ok(tasks)
-    }
-
     /// 分配一个不撞库的 `task-*` id。
     fn new_ai_task_id(&self) -> Result<String> {
         for _ in 0..8 {

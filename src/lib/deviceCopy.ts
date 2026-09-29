@@ -17,9 +17,6 @@ const messages = defineMessages(
 
 const copy = () => messagesOf(messages);
 
-export const shortDeviceName = (name: string): string =>
-  name.replace(/^Amazfit\s+/i, '').replace(/^跃我\s+/u, '').trim() || name;
-
 /** `https://api-mifit-cn3.zepp.com` → `CN3`. Full host stays on title/tooltip. */
 export const regionShortName = (host?: string | null): string => {
   if (!host?.trim()) return copy().notProvided;

@@ -360,31 +360,6 @@ export const plural = (count: number, forms: PluralForms): string => {
   return forms[rules.select(count)] ?? forms.other;
 };
 
-const numberFormatters = new Map<string, Intl.NumberFormat>();
-const dateFormatters = new Map<string, Intl.DateTimeFormat>();
-
-/** 按当前界面语言格式化数字。需要本地化小数点的地方用它，别再用 `toFixed` 拼接。 */
-export const formatNumber = (value: number, options?: Intl.NumberFormatOptions): string => {
-  const key = `${intlLocale()}|${JSON.stringify(options ?? {})}`;
-  let formatter = numberFormatters.get(key);
-  if (!formatter) {
-    formatter = new Intl.NumberFormat(intlLocale(), options);
-    numberFormatters.set(key, formatter);
-  }
-  return formatter.format(value);
-};
-
-/** 按当前界面语言格式化日期/时间。12/24 小时制等用户偏好由 `lib/dateTime.ts` 组合。 */
-export const formatDate = (value: number | Date, options?: Intl.DateTimeFormatOptions): string => {
-  const key = `${intlLocale()}|${JSON.stringify(options ?? {})}`;
-  let formatter = dateFormatters.get(key);
-  if (!formatter) {
-    formatter = new Intl.DateTimeFormat(intlLocale(), options);
-    dateFormatters.set(key, formatter);
-  }
-  return formatter.format(value);
-};
-
 /*
  * 语言包合并缓存：同一个 bundle 在同一语言同一包版本下的合并结果只算一次。
  * `messagesOf` 会在格式化热路径里被反复调用，不能每次都重建一棵树。

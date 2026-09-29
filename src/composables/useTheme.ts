@@ -171,13 +171,6 @@ export const setTheme = (value: ThemeMode) => {
   applyTheme();
 };
 
-/** 顶栏单键循环：深色 → 浅色 → 跟随系统 → 深色。 */
-export const cycleTheme = () => {
-  const order: readonly ThemeMode[] = ['dark', 'light', 'system'];
-  const next = order[(order.indexOf(mode.value) + 1) % order.length];
-  setTheme(next);
-};
-
 export const useTheme = () => ({
   /** 用户的选择（含 system）。 */
   themeMode: computed(() => mode.value),
@@ -186,5 +179,4 @@ export const useTheme = () => ({
   systemTheme,
   setTheme,
   pickTheme,
-  cycleTheme,
 });

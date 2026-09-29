@@ -82,7 +82,6 @@ impl Database {
         Ok(())
     }
 
-    #[allow(dead_code)]
     pub fn get_sync_state(&self, stream: &str) -> Result<Option<SyncStateInfo>> {
         let row = self
             .conn
