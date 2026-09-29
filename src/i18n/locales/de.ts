@@ -188,6 +188,7 @@ export default {
       noRow: (label: string) => `${label}: nichts aufgezeichnet`,
       empty: 'In diesem Zeitraum gibt es noch keine Schritte pro Stunde.',
       failed: 'Die Schritte pro Stunde konnten gerade nicht gelesen werden.',
+      legend: (peak: string) => `Kräftigeres Grün heißt mehr Schritte; am kräftigsten sind etwa ${peak}`,
     },
     'components/OfficialOnlyNote': {
       text: 'Nur die offizielle Zepp-Autorisierung ist verbunden: Herzfrequenz, Schlaf, Schritte, Trainings, PAI und Gewicht werden synchronisiert. HRV, Blutsauerstoff, Stress, Bereitschaft und Trainingslast bietet die offizielle Schnittstelle nicht an – verbinde dafür „Erweiterte Daten“.',
@@ -1115,7 +1116,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         }),
       zeroBaseline:
         'Die frühere Baseline lag im Schnitt bei 0 – keine relative Änderung berechenbar, also nur der aktuelle Wert.',
-      legendNeutral: '↑↓ grau = nur eine Veränderung, keine Bewertung',
+      legendNeutral: '↑↓ = nur eine Veränderung, keine Bewertung',
     },
     'components/overview/DataReadyCapsule': {
       cta: 'An KI übergeben',
@@ -2240,6 +2241,15 @@ Antworte in Markdown.`,
       unitKcal: 'kcal',
       zeppBridgeMatch: (label: string) => `ZeppBridge liest es als: ${label}`,
       zeppRawCode: (code: string) => `Zepp-Rohcode: ${code}`,
+    },
+    'components/workout/TypePicker': {
+      title: 'Trainingsart ändern',
+      search: 'Trainingsarten suchen',
+      recent: 'Zuletzt verwendet',
+      all: 'Alle Arten',
+      noMatch: 'Keine passende Art',
+      current: 'Aktuell',
+      close: 'Schließen',
     },
     'views/WorkoutList': {
       backToOverview: 'Zurück zur Übersicht',

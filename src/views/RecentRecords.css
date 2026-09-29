@@ -13,9 +13,12 @@
 .tl-day { position: relative; display: grid; gap: 6px; }
 .tl-day::before { content: ''; position: absolute; top: 34px; bottom: 16px; left: 89px; width: 2px; border-radius: 2px;
   background: linear-gradient(180deg, color-mix(in srgb, var(--ink) 16%, transparent), color-mix(in srgb, var(--ink) 4%, transparent)); }
-.tl-day-label { position: sticky; top: 64px; z-index: 2; justify-self: start; margin: 0 0 4px; padding: 3px 12px; border-radius: 999px;
-  background: color-mix(in srgb, var(--mat-card-solid) 88%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
-  color: var(--muted); font-size: var(--fs-xs); font-weight: 650; }
+/* 吸顶日期占满整行、底色和页面一样：记录从它下面整条滚过去。以前只是一枚半透明胶囊，
+   比左边的时间栏宽，滚动时正好压在第一条记录的标题上，字叠字。 */
+.tl-day-label { position: sticky; top: 64px; z-index: 2; margin: 0 0 4px; padding: 4px 0 10px;
+  background: linear-gradient(180deg, var(--bg) 78%, transparent); font-size: var(--fs-xs); font-weight: 650; }
+.tl-day-label > span { display: inline-block; padding: 3px 12px; border-radius: 999px;
+  background: color-mix(in srgb, var(--mat-card-solid) 88%, transparent); color: var(--muted); }
 
 .tl-row { position: relative; display: grid; grid-template-columns: 58px 44px minmax(0, 1fr) auto; align-items: center; gap: 10px;
   padding: 4px 10px 4px 0; border-radius: var(--radius-md); color: inherit; text-decoration: none; transition: background var(--dur-fast) ease, translate var(--dur-base) var(--ease-out); }

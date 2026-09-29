@@ -192,8 +192,10 @@
 .deck-close:active { scale: .92; }
 .deck-body { position: relative; z-index: 1; padding: 22px 24px 26px; }
 
-.deck-dots { position: absolute; right: 0; bottom: 0; left: 0; display: flex; justify-content: center; gap: 8px; }
+.deck-dots { position: absolute; right: 0; bottom: 0; left: 0; display: flex; justify-content: center; gap: 16px; }
+/* 圆点看着小，点起来不小：伪元素把命中区扩到约 24×25。 */
 .deck-dot {
+  position: relative;
   width: 7px;
   height: 7px;
   padding: 0;
@@ -203,6 +205,7 @@
   cursor: pointer;
   transition: width var(--dur-base) var(--ease-out), background var(--dur-base) ease;
 }
+.deck-dot::after { content: ''; position: absolute; inset: -9px -8px; }
 .deck-dot.on { width: 22px; background: var(--accent); }
 
 @media (max-width: 720px) {

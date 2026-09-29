@@ -366,6 +366,7 @@ onBeforeUnmount(() => {
           type="button"
           :class="['deck-dot', { on: card.id === shownCard.id }]"
           :aria-label="t.goTo(index + 1, cards.length)"
+          :title="card.title"
           :aria-current="card.id === shownCard.id ? 'true' : undefined"
           @click="jumpTo(card.id)"
         ></button>

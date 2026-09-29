@@ -21,6 +21,7 @@ export const hourlyStepsMessages = defineMessages(
     noRow: (label: string) => `${label}：没有记录`,
     empty: '这段范围还没有每小时步数。',
     failed: '每小时步数暂时读不出来。',
+    legend: (peak: string) => `格子越绿步数越多，最绿的约 ${peak} 步`,
   },
   {
     title: 'Steps by hour',
@@ -41,6 +42,7 @@ export const hourlyStepsMessages = defineMessages(
     noRow: (label: string) => `${label}: nothing recorded`,
     empty: 'No hourly steps in this range yet.',
     failed: 'Hourly steps could not be read right now.',
+    legend: (peak: string) => `Stronger green means more steps; the strongest is about ${peak}`,
   },
   {
     title: 'Pasos por hora',
@@ -61,6 +63,7 @@ export const hourlyStepsMessages = defineMessages(
     noRow: (label: string) => `${label}: sin registro`,
     empty: 'Todavía no hay pasos por hora en este rango.',
     failed: 'No se pudieron leer los pasos por hora.',
+    legend: (peak: string) => `Verde más intenso = más pasos; el más intenso ronda los ${peak}`,
   },
   'components/activity/HourlyStepsCard',
 );

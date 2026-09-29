@@ -31,6 +31,7 @@ export default {
       noRow: (label: string) => `${label}: niets vastgelegd`,
       empty: 'Nog geen stappen per uur in deze periode.',
       failed: 'De stappen per uur konden nu niet worden gelezen.',
+      legend: (peak: string) => `Feller groen betekent meer stappen; het felst is ongeveer ${peak}`,
     },
     'components/OfficialOnlyNote': {
       text: 'Alleen de officiële Zepp-autorisatie is verbonden: hartslag, slaap, stappen, trainingen, PAI en gewicht worden gesynchroniseerd. HRV, bloedzuurstof, stress, paraatheid en trainingsbelasting biedt de officiële API niet — verbind daarvoor ‘Geavanceerde gegevens’.',
@@ -521,7 +522,7 @@ export default {
         'weekly.workout_count': 'Trainingen',
         'weekly.training_load': 'Trainingsbelasting',
       },
-      legendNeutral: '↑↓ grijs = alleen een verandering, geen oordeel',
+      legendNeutral: '↑↓ = alleen een verandering, geen oordeel',
     },
     'components/WheelDatePicker': {
       day: 'Dag',
@@ -2103,6 +2104,15 @@ Antwoord in Markdown.`,
       provenanceDevice: 'Apparaat',
       pageFoot:
         'Gedecodeerd op deze machine. De track is op een lokaal canvas getekend en nooit naar een kaartdienst gestuurd.',
+    },
+    'components/workout/TypePicker': {
+      title: 'Trainingstype wijzigen',
+      search: 'Trainingstypen zoeken',
+      recent: 'Recent gebruikt',
+      all: 'Alle typen',
+      noMatch: 'Geen passend type',
+      current: 'Huidig',
+      close: 'Sluiten',
     },
     'views/WorkoutList': {
       backToRecent: 'Terug naar recente records',

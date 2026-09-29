@@ -30,6 +30,7 @@ export default {
       noRow: (label: string) => `${label} : rien d’enregistré`,
       empty: 'Pas encore de pas par heure sur cette période.',
       failed: 'Impossible de lire les pas par heure pour le moment.',
+      legend: (peak: string) => `Vert plus intense = plus de pas ; le plus intense correspond à environ ${peak}`,
     },
     'components/OfficialOnlyNote': {
       text: 'Seule l’autorisation officielle Zepp est connectée : fréquence cardiaque, sommeil, pas, entraînements, PAI et poids se synchronisent. La VFC, l’oxygène sanguin, le stress, la disponibilité et la charge d’entraînement ne sont pas proposés par l’API officielle — connecte « Données avancées » pour les obtenir.',
@@ -1123,7 +1124,7 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       notProvided: 'Non renseigné',
       loadFailed: 'Impossible de construire le rapport hebdomadaire local',
       desktopOnly: 'Le rapport hebdomadaire requiert l’application de bureau ZeppBridge.',
-      legendNeutral: '↑↓ gris = simple variation, sans jugement',
+      legendNeutral: '↑↓ = simple variation, sans jugement',
     },
 
     'components/overview/DataReadyCapsule': {
@@ -1309,6 +1310,15 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       retry: 'Réessayer',
     },
 
+    'components/workout/TypePicker': {
+      title: 'Changer le type d’entraînement',
+      search: 'Rechercher un type d’entraînement',
+      recent: 'Utilisés récemment',
+      all: 'Tous les types',
+      noMatch: 'Aucun type correspondant',
+      current: 'Actuel',
+      close: 'Fermer',
+    },
     'views/WorkoutList': {
       title: 'Séances',
       intro: 'Séances synchronisées sur cette machine. Pas de trace, pas de carte.',

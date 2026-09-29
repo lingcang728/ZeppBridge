@@ -193,7 +193,7 @@ watch(dataRevision, () => void loadRecent());
 
       <div v-else class="timeline">
         <section v-for="group in groups" :key="group.day" class="tl-day">
-          <h2 class="tl-day-label">{{ group.label }}</h2>
+          <h2 class="tl-day-label"><span>{{ group.label }}</span></h2>
           <RouterLink v-for="entry in group.items" :key="entry.key" :to="entry.to" :class="['tl-row', `tone-${entry.category}`]">
             <span class="tl-time">{{ entry.time }}</span>
             <span class="tl-node" aria-hidden="true"><GlyphTile :name="entry.icon" :size="34" :tone="entry.category" /></span>

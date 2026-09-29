@@ -31,6 +31,7 @@ export default {
       noRow: (label: string) => `${label}: nada registado`,
       empty: 'Ainda não há passos por hora neste período.',
       failed: 'Não foi possível ler os passos por hora agora.',
+      legend: (peak: string) => `Verde mais forte = mais passos; o mais forte ronda os ${peak}`,
     },
     'components/OfficialOnlyNote': {
       text: 'Só a autorização oficial do Zepp está ligada: frequência cardíaca, sono, passos, treinos, PAI e peso são sincronizados. VFC, oxigénio no sangue, stress, prontidão e carga de treino não são disponibilizados pela API oficial — liga “Dados avançados” para os veres.',
@@ -906,7 +907,7 @@ export default {
         'weekly.workout_count': 'Treinos',
         'weekly.training_load': 'Carga de treino',
       },
-      legendNeutral: '↑↓ cinzento = apenas uma mudança, sem juízo',
+      legendNeutral: '↑↓ = apenas uma mudança, sem juízo',
     },
     'components/overview/DataReadyCapsule': {
       waitingEyebrow: 'A obter os teus dados da nuvem',
@@ -2013,6 +2014,15 @@ Responde em Markdown.`,
       provenanceDevice: 'Dispositivo',
       pageFoot:
         'Descodificado nesta máquina. O percurso é desenhado numa canvas local e nunca é enviado para um serviço de mapas.',
+    },
+    'components/workout/TypePicker': {
+      title: 'Mudar o tipo de treino',
+      search: 'Pesquisar tipos de treino',
+      recent: 'Usados recentemente',
+      all: 'Todos os tipos',
+      noMatch: 'Nenhum tipo corresponde',
+      current: 'Atual',
+      close: 'Fechar',
     },
     'views/WorkoutList': {
       backToRecent: 'Voltar aos registos recentes',

@@ -4,7 +4,7 @@ import type { DesignIconName } from '../DesignIcon.vue';
 import DeviceVisual from '../DeviceVisual.vue';
 import GlyphTile from '../GlyphTile.vue';
 import Icon from '../Icon.vue';
-import CapsuleWheel from '../CapsuleWheel.vue';
+import TypePicker from './TypePicker.vue';
 import type { HeroMetric } from '../../composables/useWorkoutPresentation';
 import type { WorkoutMetrics } from '../../composables/useWorkoutDetail';
 import { dataScopeLabel, workoutLabel } from '../../lib/labels';
@@ -52,14 +52,11 @@ const t = useMessages(workoutDetailMessages);
           <span v-if="workout.custom_label" class="chip">{{ t.customName(String(workout.zepp_type), workout.custom_label) }}</span>
           <span class="type-correct">
             {{ t.myCorrection }}
-            <CapsuleWheel
-              class="type-correct-menu"
-              loop
-              :span="220"
+            <TypePicker
               :model-value="workout.user_override || ''"
               :items="overrideChoices"
               :disabled="overrideBusy"
-              :aria-label="t.correctionAria"
+              :label="t.correctionAria"
               @update:model-value="(value) => emit('override', value)"
             />
           </span>
@@ -106,7 +103,6 @@ const t = useMessages(workoutDetailMessages);
 .sport-time { display: inline-flex; align-items: center; gap: 6px; margin: 9px 0 0; color: var(--muted); font-size: var(--fs-sm); }
 .type-evidence { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 10px; margin-top: 10px; color: var(--muted); font-size: var(--fs-xs); }
 .type-correct { display: inline-flex; align-items: center; gap: 7px; }
-.type-correct-menu { min-width: 180px; }
 .metric-list { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 9px; }
 .metric-tile {
   --tile-tone: var(--accent);

@@ -182,6 +182,7 @@ const pick = (row: HourRow) => {
         </button>
       </div>
       <div v-if="hover" class="hourly-tip" :style="{ left: `${hover.x}px`, top: `${hover.y}px` }" aria-hidden="true">{{ hover.text }}</div>
+      <p class="heat-legend"><span class="heat-ramp" aria-hidden="true"><i v-for="v in [0.1, 0.4, 0.7, 1]" :key="v" :style="{ '--v': v }" /></span>{{ t.legend(format(heatPeak)) }}</p>
     </template>
   </section>
 </template>
@@ -210,9 +211,9 @@ header small, .hourly-empty { color: var(--muted); font-size: var(--fs-xs); }
   grid-template-columns: 88px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
-  min-height: 16px;
+  min-height: 24px;
   margin: 0;
-  padding: 1px 4px;
+  padding: 2px 4px;
   border: 0;
   border-radius: 6px;
   background: transparent;
@@ -222,14 +223,15 @@ header small, .hourly-empty { color: var(--muted); font-size: var(--fs-xs); }
   cursor: pointer;
   transition: background-color var(--dur-fast) ease;
 }
-.dense .heat-row { min-height: 9px; padding-block: 0; }
+/* 一个月 30 行、半年 26 行：行矮一些，但每行仍留 14px 的实际点击高度（以前只有 9px）。 */
+.dense .heat-row { min-height: 14px; padding-block: 0; }
 .heat-row:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 5%, transparent); }
 .heat-row.picked { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--ink); }
 .heat-row:disabled { cursor: default; }
-.heat-label { overflow: hidden; font-size: 10px; font-variant-numeric: tabular-nums; line-height: 1; white-space: nowrap; }
-.heat-cells { display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); gap: 3px; height: 12px; }
-.dense .heat-cells { height: 7px; }
-.heat-cells i {
+.heat-label { overflow: hidden; font-size: var(--fs-2xs, 11px); font-variant-numeric: tabular-nums; line-height: 1; white-space: nowrap; }
+.heat-cells { display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); gap: 3px; height: 16px; }
+.dense .heat-cells { height: 10px; }
+.heat-cells i, .heat-ramp i {
   border-radius: 3px;
   background: color-mix(in srgb, var(--accent) calc(var(--v) * 86% + 14%), transparent);
   transition: background-color 360ms ease;
@@ -252,4 +254,6 @@ header small, .hourly-empty { color: var(--muted); font-size: var(--fs-xs); }
   pointer-events: none;
   transform: translate(-50%, calc(-100% - 8px));
 }
+.heat-legend { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--subtle); font-size: var(--fs-xs); }
+.heat-ramp { display: inline-grid; grid-template-columns: repeat(4, 12px); gap: 2px; height: 10px; }
 </style>
