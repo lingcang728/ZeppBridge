@@ -17,7 +17,13 @@
  * 一半绿，滑块放大后绿字还会跑出胶囊。这段时间离滑块最近的那一枚标签整枚用品牌色（上层
  * 那一枚不裁切、底层那一枚隐去），滑过两枚中点时两枚交叉淡入淡出。松手时字已经是绿的，
  * 停稳后换回裁切画法也看不出变化——以前拖动中字是白的、停稳 300ms 后才淡成绿色，
- * 松手那一下就像闪了一次。只动透明度，不加任何滤镜。 */
+ * 松手那一下就像闪了一次。只动透明度，不加任何滤镜。
+ *
+ * 选中字是粗体、普通字是常规体：按钮宽度按粗体预留（隐形的粗体副本撑宽），不然选中
+ * 那一项的粗体比按钮宽，两头被裁掉（葡语「Zonas de reserva de frequência cardíaca」）。
+ *
+ * 放不下就折行（is-wrapped）：以前项被压窄、字互相叠在一起（葡语的生活事件分类、补拉
+ * 起点）。折行后滑块按行定位（--thumb-t / --thumb-h），只能点、不能横拖。 */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
 import Icon, { type IconName } from './Icon.vue';
 import { dragThumb, snapStop, type SegmentStop } from '../lib/navigation';
@@ -48,7 +54,9 @@ const emit = defineEmits<{ 'update:modelValue': [value: T] }>();
 
 const track = ref<HTMLElement | null>(null);
 const stops = ref([]) as Ref<SegmentStop<T>[]>;
-const thumb = ref({ left: 0, width: 0, visible: false });
+const thumb = ref({ left: 0, width: 0, top: 0, height: 0, visible: false });
+/** 一行放不下，折成多行。 */
+const wrapped = ref(false);
 const dragging = ref(false);
 /** 松手后滑块吸附到位的那一段：和拖动一样不分色，免得吸附途中出现半个字。 */
 const settling = ref(false);
@@ -77,16 +85,35 @@ const buttons = () => Array.from(track.value?.querySelectorAll<HTMLElement>('.se
 const readStops = (): SegmentStop<T>[] => buttons().map((el, index) => ({
   left: el.offsetLeft,
   width: el.offsetWidth,
+  top: el.offsetTop,
+  height: el.offsetHeight,
   value: props.items[index]!.value,
 }));
 
 const placeOn = (value: T) => {
   const stop = stops.value.find((item) => item.value === value);
-  thumb.value = stop ? { left: stop.left, width: stop.width, visible: true } : { ...thumb.value, visible: false };
+  thumb.value = stop
+    ? { left: stop.left, width: stop.width, top: stop.top ?? 0, height: stop.height ?? 0, visible: true }
+    : { ...thumb.value, visible: false };
+};
+
+/* 一行时轨道内容比轨道宽就折；折了以后各项原宽之和放得下了再合回一行。项本身不收缩，
+   所以两种状态下量出来的是同一个数，不会来回翻。铺满型（fill）和浮动导航 / 按钮组不折。 */
+const checkWrap = () => {
+  const el = track.value;
+  if (!el || props.fill || props.variant !== 'inset') return;
+  if (!wrapped.value) {
+    if (el.scrollWidth > el.clientWidth + 1) wrapped.value = true;
+    return;
+  }
+  const pad = Number.parseFloat(getComputedStyle(el).paddingLeft) || 0;
+  const natural = buttons().reduce((sum, button) => sum + button.offsetWidth, 0) + pad * 2;
+  if (natural <= el.clientWidth) wrapped.value = false;
 };
 
 const measure = () => {
   if (!track.value) return;
+  checkWrap();
   stops.value = readStops();
   if (!gesture) placeOn(props.modelValue);
   if (!settled.value && thumb.value.visible) requestAnimationFrame(() => { settled.value = true; });
@@ -102,7 +129,11 @@ const observeItems = () => {
 const trackStyle = computed(() => ({
   '--thumb-l': `${thumb.value.left}px`,
   '--thumb-w': `${thumb.value.visible ? thumb.value.width : 0}px`,
+  '--thumb-t': `${thumb.value.top}px`,
+  '--thumb-h': `${thumb.value.height}px`,
 }));
+/** 折行时不在滑块那一行的项：不挖空（挖空只按横坐标算，会误伤别的行）。 */
+const offRow = (index: number) => wrapped.value && (stops.value[index]?.top ?? 0) !== thumb.value.top;
 const itemLeft = (index: number) => ({ '--item-l': `${stops.value[index]?.left ?? 0}px` });
 
 const focusActive = () => {
@@ -127,7 +158,7 @@ const clearGesture = () => {
 };
 
 const onDown = (event: PointerEvent) => {
-  if (props.disabled || event.button !== 0 || !event.isPrimary || !track.value) return;
+  if (props.disabled || event.button !== 0 || !event.isPrimary || !track.value || wrapped.value) return;
   measure();
   const button = (event.target as Element).closest<HTMLElement>('.segment-item');
   const index = button ? buttons().indexOf(button) : -1;
@@ -169,7 +200,7 @@ const onMove = (event: PointerEvent) => {
     frame = requestAnimationFrame(() => {
       frame = 0;
       if (!nextThumb) return;
-      thumb.value = { ...nextThumb, visible: true };
+      thumb.value = { ...thumb.value, ...nextThumb, visible: true };
       lensValue.value = snapStop(stops.value, nextThumb.left + nextThumb.width / 2, 0).value;
     });
   }
@@ -227,6 +258,11 @@ watch(() => props.modelValue, async () => {
   if (!gesture) placeOn(props.modelValue);
   focusActive();
 });
+watch(wrapped, async () => {
+  await nextTick();
+  stops.value = readStops();
+  if (!gesture) placeOn(props.modelValue);
+});
 watch(() => props.items.map((item) => `${item.value}\u0000${item.label}`).join('\u0001'), async () => {
   await nextTick();
   observeItems();
@@ -255,6 +291,7 @@ onBeforeUnmount(() => {
     ref="track"
     :class="['segment-track', `is-${variant}`, {
       'is-dragging': dragging, 'is-settling': settling, 'is-compact': compact, 'is-disabled': disabled, 'is-fill': fill, 'is-settled': settled,
+      'is-wrapped': wrapped,
       'is-icon-only': iconOnly,
     }]"
     :style="trackStyle"
@@ -274,7 +311,7 @@ onBeforeUnmount(() => {
       :key="String(item.value)"
       type="button"
       role="radio"
-      :class="['segment-item', { 'is-lensed': lensValue !== null && item.value === lensValue }]"
+      :class="['segment-item', { 'is-lensed': lensValue !== null && item.value === lensValue, 'is-offrow': offRow(index) }]"
       :style="itemLeft(index)"
       :aria-checked="item.value === modelValue"
       :aria-label="iconOnly ? item.label : undefined"
@@ -285,7 +322,7 @@ onBeforeUnmount(() => {
     >
       <slot :item="item" :active="false">
         <Icon v-if="item.icon" :name="item.icon" :size="iconOnly ? 17 : 15" />
-        <span v-if="!iconOnly">{{ item.label }}</span>
+        <span v-if="!iconOnly" class="seg-label" :data-label="item.label">{{ item.label }}</span>
       </slot>
     </button>
     <!-- 选中字：同样的标签按量好的位置摆一遍，只露出滑块覆盖的那一段。 -->
@@ -294,7 +331,7 @@ onBeforeUnmount(() => {
         v-for="(stop, index) in stops"
         :key="String(stop.value)"
         :class="['segment-ink-item', { 'is-lensed': lensValue !== null && stop.value === lensValue }]"
-        :style="{ left: `${stop.left}px`, width: `${stop.width}px` }"
+        :style="{ left: `${stop.left}px`, width: `${stop.width}px`, top: `${stop.top ?? 0}px`, height: `${stop.height ?? 0}px` }"
       >
         <slot v-if="items[index]" :item="items[index]!" :active="true">
           <Icon v-if="items[index]!.icon" :name="items[index]!.icon!" :size="iconOnly ? 17 : 15" />
@@ -312,7 +349,8 @@ onBeforeUnmount(() => {
   --seg-ease: cubic-bezier(.3, 1.25, .4, 1);
   /* 拖动时滑块放大成透镜，裁切和挖空跟着往两边多让出这么多。 */
   --seg-grow: 0px;
-  --seg-clip-y: var(--seg-pad);
+  /* 拖动时上层裁切上下各多让出这么多（滑块放大成透镜）。 */
+  --seg-clip-extra: 0px;
   position: relative;
   display: inline-flex;
   max-width: 100%;
@@ -325,7 +363,8 @@ onBeforeUnmount(() => {
   touch-action: none;
 }
 .segment-track.is-settled {
-  transition: --thumb-l var(--seg-dur) var(--seg-ease), --thumb-w var(--seg-dur) var(--seg-ease);
+  transition: --thumb-l var(--seg-dur) var(--seg-ease), --thumb-w var(--seg-dur) var(--seg-ease),
+    --thumb-t var(--seg-dur) var(--seg-ease), --thumb-h var(--seg-dur) var(--seg-ease);
 }
 .segment-track.is-dragging { --seg-grow: calc(var(--thumb-w) * .04); transition: none; }
 .segment-track.is-inset { background: var(--cap-track); box-shadow: var(--cap-track-shadow); }
@@ -341,6 +380,10 @@ onBeforeUnmount(() => {
 }
 .segment-track.is-fill { display: flex; }
 .segment-track.is-fill .segment-item { flex: 1 1 0; }
+/* 表单里的分段胶囊项不收缩（放不下就折行）；浮动导航和按钮组不折行，按原样收缩。 */
+.segment-track.is-inset:not(.is-fill) .segment-item { flex: 0 0 auto; }
+.segment-track.is-wrapped { display: flex; width: 100%; flex-wrap: wrap; border-radius: 20px; }
+.segment-track.is-wrapped .segment-item { cursor: pointer; }
 
 .segment-item {
   position: relative;
@@ -375,6 +418,16 @@ onBeforeUnmount(() => {
     #000 calc(var(--thumb-l) + var(--thumb-w) + var(--seg-grow) - var(--item-l, 0px)));
 }
 .segment-item:hover:not(:disabled) { color: var(--ink); }
+.segment-item.is-offrow { -webkit-mask-image: none; mask-image: none; }
+/* 按钮宽度按粗体留：隐形的粗体副本和字叠在同一格里，取两者较宽的那个。 */
+.seg-label { display: inline-grid; }
+.seg-label::after {
+  content: attr(data-label);
+  height: 0;
+  overflow: hidden;
+  font-weight: 600;
+  visibility: hidden;
+}
 /* 焦点画在滑块上，不画在按钮上：按钮的 outline 会留在旧位置，成为一圈残影。 */
 .segment-item:focus-visible { outline: none; }
 .segment-track.is-dragging .segment-item { cursor: grabbing; }
@@ -383,14 +436,14 @@ onBeforeUnmount(() => {
 .segment-thumb {
   position: absolute;
   z-index: 0;
-  top: var(--seg-pad);
-  bottom: var(--seg-pad);
+  top: 0;
   left: 0;
   width: var(--thumb-w);
+  height: var(--thumb-h);
   border-radius: 999px;
   background: var(--cap-thumb);
   box-shadow: var(--cap-thumb-rim);
-  transform: translateX(var(--thumb-l));
+  transform: translate(var(--thumb-l), var(--thumb-t));
   pointer-events: none;
   transition: scale var(--seg-dur) var(--seg-ease), opacity var(--dur-fast) ease;
 }
@@ -404,8 +457,8 @@ onBeforeUnmount(() => {
   color: var(--cap-ink);
   font-weight: 600;
   pointer-events: none;
-  clip-path: inset(var(--seg-clip-y) calc(100% - var(--thumb-l) - var(--thumb-w) - var(--seg-grow)) var(--seg-clip-y)
-    calc(var(--thumb-l) - var(--seg-grow)) round 999px);
+  clip-path: inset(calc(var(--thumb-t) - var(--seg-clip-extra)) calc(100% - var(--thumb-l) - var(--thumb-w) - var(--seg-grow))
+    calc(100% - var(--thumb-t) - var(--thumb-h) - var(--seg-clip-extra)) calc(var(--thumb-l) - var(--seg-grow)) round 999px);
 }
 .segment-ink-item {
   position: absolute;
@@ -433,7 +486,7 @@ onBeforeUnmount(() => {
 /* 拖动时滑块只放大一点，材质不换：以前拖动中换成一块泛绿的透镜，松手一瞬间又换回玻璃，
    颜色跳一下就是「闪」。 */
 .segment-track.is-dragging .segment-thumb { scale: 1.05 1.1; }
-.segment-track.is-dragging { --seg-clip-y: 0px; }
+.segment-track.is-dragging { --seg-clip-extra: var(--seg-pad); }
 
 .segment-track:has(.segment-item:focus-visible) .segment-thumb {
   box-shadow: 0 0 0 2px var(--canvas), 0 0 0 4px var(--focus);

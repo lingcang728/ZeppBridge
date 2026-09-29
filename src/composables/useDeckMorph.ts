@@ -1,6 +1,6 @@
 import { onBeforeUnmount, type Ref } from 'vue';
 import { flightFrom, type Box } from '../lib/deck/morph';
-import { playGhost } from '../lib/motion/ghost';
+import { playGhost, revealAfterGhost } from '../lib/motion/ghost';
 
 /**
  * 设置卡组在三种形态之间的形变：coverflow ↔ 平铺、总览 ↔ 打开一张。
@@ -20,7 +20,7 @@ export interface DeckMorphRefs {
   reducedMotion: () => boolean;
 }
 
-const OPEN_MS = 380;
+const OPEN_MS = 420;
 const CLOSE_MS = 220;
 const FLIGHT_MS = 420;
 const FLIGHT_STAGGER_MS = 16;
@@ -126,16 +126,8 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
       host,
       duration: OPEN_MS,
       easing: OPEN_EASE,
-      fadeFrom: 0.55,
     });
-    const animation = el.animate(
-      [
-        { opacity: 0, transform: 'translateY(10px)' },
-        { opacity: 0, transform: 'translateY(10px)', offset: 0.35 },
-        { opacity: 1, transform: 'none' },
-      ],
-      { duration: OPEN_MS, easing: 'ease-out', fill: 'both' },
-    );
+    const animation = el.animate(revealAfterGhost(), { duration: OPEN_MS, fill: 'both' });
     track({ animation, id, kind: 'open' });
   };
 

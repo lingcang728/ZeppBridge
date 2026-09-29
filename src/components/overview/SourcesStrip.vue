@@ -97,11 +97,12 @@ const chips = computed(() => [
         <i :class="['dot', { on: chip.state !== 'unknown' }]"></i>
         <span class="chip-state" :title="deviceStateLabel(chip.state)">{{ chip.kind === 'device' && chip.when ? t.latestData(chip.when) : deviceStateLabel(chip.state) }}</span>
       </RouterLink>
-      <RouterLink class="source-chip manage" to="/settings/account">
-        <Icon name="sliders" :size="14" />
-        <span>{{ t.manage }}</span>
-      </RouterLink>
     </div>
+    <!-- 「管理」不放进会折行的那一排：它永远钉在最右边，设备再多、译文再长也不会被挤出去。 -->
+    <RouterLink class="source-chip manage" to="/settings/account">
+      <Icon name="sliders" :size="14" />
+      <span>{{ t.manage }}</span>
+    </RouterLink>
   </section>
 </template>
 
@@ -121,12 +122,10 @@ const chips = computed(() => [
   display: flex;
   min-width: 0;
   flex: 1;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
 }
-.sources-row::-webkit-scrollbar { display: none; }
 .sources-feedback {
   flex: 0 0 auto;
   padding: 5px 10px;
@@ -184,5 +183,6 @@ const chips = computed(() => [
 @media (max-width: 760px) {
   .sources-strip { align-items: flex-start; flex-direction: column; gap: 8px; padding: 12px 14px; }
   .sources-row { width: 100%; }
+  .source-chip.manage { align-self: flex-end; }
 }
 </style>

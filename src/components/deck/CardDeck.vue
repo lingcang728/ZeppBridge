@@ -169,7 +169,7 @@ onBeforeRouteUpdate(() => {
 });
 
 /* 总览退到位以后才一次性糊上（见 CardDeck.css 的 .is-frosted）：模糊不跟着动画逐帧变。 */
-const frosted = ref(false);
+const frosted = ref(Boolean(props.activeId));
 let frostTimer = 0;
 const FROST_DELAY_MS = 340;
 

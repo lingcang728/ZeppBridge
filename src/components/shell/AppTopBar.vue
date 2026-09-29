@@ -249,6 +249,9 @@ const overlaps = (): boolean => {
   const pill = syncPill.value;
   const pillGrow = pill?.offsetWidth ? Math.max(0, pill.scrollWidth - pill.offsetWidth) : 0;
   const reserve = (wheelEl?.offsetWidth ? Math.max(0, localeWheel.value!.widestSpan() - wheelEl.offsetWidth) : 0) + pillGrow;
+  // 导航胶囊自己被挤窄（窄窗口里中间那一列只剩这么宽）：框没有相交，里面的字却已经叠在一起了。
+  const squeezed = [...root.querySelectorAll<HTMLElement>('.pill-nav .segment-item')].some((el) => el.scrollWidth > el.clientWidth + 1);
+  if (squeezed) return true;
   const actionsLeft = actions ? actions.left - reserve : 0;
   if (actions && actions.right > outer.right + 0.5) return true;
   if (actions && actionsLeft < outer.left) return true;

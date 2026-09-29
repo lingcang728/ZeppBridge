@@ -1,6 +1,6 @@
 import type { RouteLocationNormalized } from 'vue-router';
 import type { PageMotion } from '../lib/navigation';
-import { playGhost } from '../lib/motion/ghost';
+import { playGhost, revealAfterGhost } from '../lib/motion/ghost';
 
 type Rect = { left: number; top: number; width: number; height: number };
 
@@ -13,7 +13,7 @@ type Rect = { left: number; top: number; width: number; height: number };
  * 用法（AppShell.vue）：`decide()` 在 router.beforeEach 里把普通的 forward / back 换成
  * expand / collapse；`onEnter` / `onLeave` 挂在切页的 <Transition> 上。
  */
-const EXPAND_MS = 360;
+const EXPAND_MS = 420;
 const COLLAPSE_MS = 200;
 const EXPAND_EASE = 'cubic-bezier(.2, .9, .22, 1)';
 const COLLAPSE_EASE = 'cubic-bezier(.4, 0, .2, 1)';
@@ -125,16 +125,8 @@ export const usePageMorph = () => {
       host,
       duration: EXPAND_MS,
       easing: EXPAND_EASE,
-      fadeFrom: 0.55,
     });
-    el.animate(
-      [
-        { opacity: 0, transform: 'translateY(10px)' },
-        { opacity: 0, transform: 'translateY(10px)', offset: 0.35 },
-        { opacity: 1, transform: 'none' },
-      ],
-      { duration: EXPAND_MS, easing: 'ease-out' },
-    );
+    el.animate(revealAfterGhost(), { duration: EXPAND_MS });
   };
 
   /** 返回：不再把整页缩回去（以前是一整块暗色页飞回去再换成卡）。详情页轻轻淡出，

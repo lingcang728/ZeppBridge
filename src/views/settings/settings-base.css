@@ -30,15 +30,18 @@
   display: flex;
   min-width: 0;
   min-height: 56px;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 14px;
+  gap: 10px 14px;
   padding: 10px 16px;
 }
 .s-row + .s-row, .s-list > * + * { border-top: 1px solid var(--mat-line); }
-.s-row-main { display: grid; flex: 1 1 auto; min-width: 0; gap: 2px; }
+/* 标题按 0 起算、至少留 10em：开关这类小控件永远贴在右边；长的分段胶囊（葡语 / 德语下
+   尤其长）放不下时整个折到标题下一行，而不是压着标题、漫出卡片。 */
+.s-row-main { display: grid; flex: 1 1 0; min-width: min(10em, 100%); gap: 2px; }
 .s-row-title { color: var(--ink); font-size: var(--fs-md); font-weight: 500; }
 .s-row-sub { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.5; }
-.s-row-control { display: flex; flex: 0 0 auto; align-items: center; gap: 10px; }
+.s-row-control { display: flex; flex: 0 1 auto; min-width: 0; max-width: 100%; align-items: center; gap: 10px; margin-left: auto; }
 .s-row-control .select-menu { width: 210px; }
 .s-row.is-block { display: grid; align-items: stretch; }
 .s-note { margin: 0; padding: 0 4px; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.6; }

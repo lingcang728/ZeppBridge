@@ -25,13 +25,24 @@ export interface GhostOptions {
   /** 板挂在哪一层（要在顶栏下面，所以挂进应用骨架而不是 body）。 */
   host: HTMLElement;
   duration: number;
+  /** 长大那一段的缓动。时间轴本身是线性的，缓动只落在「长大」这一段上。 */
   easing: string;
-  /** 板从第几成进度开始淡出（0–1）。 */
-  fadeFrom?: number;
+  /** 板在第几成时间长满、开始淡出（0–1）。新内容应在这之后才淡入。 */
+  growUntil?: number;
   zIndex?: number;
 }
 
 const r2 = (value: number) => Number(value.toFixed(2));
+
+/** 板默认在六成时间长满：旧画面到这时才被完全盖住，新内容从这里开始淡入。 */
+export const GHOST_GROWN_AT = 0.6;
+
+/** 新内容的淡入：板长满之前一直看不见（否则新旧两页叠成重影），长满以后和板的淡出交叉。 */
+export const revealAfterGhost = (growUntil = GHOST_GROWN_AT): Keyframe[] => [
+  { opacity: 0, transform: 'translateY(8px)' },
+  { opacity: 0, transform: 'translateY(8px)', offset: growUntil, easing: 'ease-out' },
+  { opacity: 1, transform: 'none' },
+];
 
 /** 起点矩形换算成终点板上的 inset 裁切（纯函数，方便测）。 */
 export function ghostInset(from: GhostRect, to: GhostRect, radius: number): string {
@@ -61,14 +72,15 @@ export function playGhost(options: GhostOptions): Animation {
     boxShadow: 'var(--mat-rim)',
   });
   host.appendChild(el);
-  const fadeFrom = options.fadeFrom ?? 0.6;
+  const growUntil = options.growUntil ?? GHOST_GROWN_AT;
+  const full = ghostInset(to, to, options.toRadius);
   const animation = el.animate(
     [
-      { clipPath: ghostInset(from, to, options.fromRadius), opacity: 1 },
-      { opacity: 1, offset: fadeFrom },
-      { clipPath: ghostInset(to, to, options.toRadius), opacity: 0 },
+      { clipPath: ghostInset(from, to, options.fromRadius), opacity: 1, easing: options.easing },
+      { clipPath: full, opacity: 1, offset: growUntil, easing: 'ease-out' },
+      { clipPath: full, opacity: 0 },
     ],
-    { duration: options.duration, easing: options.easing, fill: 'both' },
+    { duration: options.duration, fill: 'both' },
   );
   const remove = () => el.remove();
   animation.finished.then(remove, remove);

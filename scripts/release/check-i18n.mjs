@@ -849,6 +849,11 @@ const auditLocalePacks = (writePending) => {
           problems.push(`  locales/${l}.ts → ${full}: zh 文案里没有这个键`);
           continue;
         }
+        // 键路径按「.」拼起来比，带点的键（'weekly.hrv'）写成嵌套对象也会对上，
+        // 运行时却按原键查不到、静默回落英文——法语周报就这样漏过一次。按层级数再核一遍。
+        if (moduleId !== 'i18n/errors' && zhLeaf.path && leaf.path.length - 2 !== zhLeaf.path.length) {
+          problems.push(`  locales/${l}.ts → ${full}: 键的层级和 zh 不一样（带点的键要写成引号里的一个键，不要拆成嵌套对象）`);
+        }
         if (pendingSet.has(full)) {
           problems.push(`  locales/${l}.ts → ${full}: 已翻译却还在 pending.txt 里（删掉那行）`);
         }

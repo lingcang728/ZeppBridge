@@ -152,9 +152,10 @@ a { color: inherit; }
 .page-forward-leave-to, .page-back-leave-to, .page-left-leave-to, .page-right-leave-to { opacity: 0; }
 /* 展开：幽灵板（lib/motion/ghost.ts）从卡长到整屏盖住旧页，新页在它后半程淡入（usePageMorph.onEnter）。
    这里只管层次和旧页淡出；enter-active 那条过渡是占位，让层次保持到 JS 动画放完。 */
-[class*='page-'].page-expand-enter-active { position: relative; z-index: 2; transition: opacity 380ms linear; }
+[class*='page-'].page-expand-enter-active { position: relative; z-index: 2; transition: opacity 440ms linear; }
 .page-expand-enter-from { opacity: .999; }
-[class*='page-'].page-expand-leave-active { z-index: 1; transition: opacity 160ms ease 120ms; }
+/* 旧页等幽灵板长满、完全盖住它以后才撤，免得板没盖到的地方先露出新页、叠成重影。 */
+[class*='page-'].page-expand-leave-active { z-index: 1; transition: opacity 60ms linear 250ms; }
 .page-expand-leave-to { opacity: 0; }
 /* 返回：详情页淡出（usePageMorph.onLeave），来处页从底下淡入——不再把整页缩回卡里。 */
 [class*='page-'].page-collapse-enter-active { transition: opacity 240ms ease 60ms; }

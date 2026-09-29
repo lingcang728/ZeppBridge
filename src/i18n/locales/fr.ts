@@ -1005,13 +1005,11 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
         `La règle : courses du même type sur les ${days} derniers jours, dont la distance est à ±${tolerance ?? '—'} % de celle-ci, au moins ${min} et au plus ${max}.`,
       comparedTo: (count: number) => `Comparée à vos ${count} dernières courses de distance comparable :`,
       metric: {
-        run: {
-          duration: 'Durée',
-          distance: 'Distance',
-          pace: 'Allure moy.',
-          avg_hr: 'FC moy.',
-          training_load: 'Charge d’entraînement',
-        },
+        'run.duration': 'Durée',
+        'run.distance': 'Distance',
+        'run.pace': 'Allure moy.',
+        'run.avg_hr': 'FC moy.',
+        'run.training_load': 'Charge d’entraînement',
       },
       confidence: {
         high: 'Preuves solides',
@@ -1063,15 +1061,13 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       barThisWeek: 'Cette semaine',
       barBaseline: '28 j. préc.',
       metric: {
-        weekly: {
-          resting_hr: 'FC de repos',
-          hrv: 'VFC',
-          sleep_duration: 'Durée de sommeil',
-          sleep_start_regularity: 'Dispersion de l’heure de coucher',
-          stress: 'Stress',
-          training_load: 'Charge d’entraînement',
-          workout_count: 'Séances',
-        },
+        'weekly.resting_hr': 'FC de repos',
+        'weekly.hrv': 'VFC',
+        'weekly.sleep_duration': 'Durée de sommeil',
+        'weekly.sleep_start_regularity': 'Dispersion de l’heure de coucher',
+        'weekly.stress': 'Stress',
+        'weekly.training_load': 'Charge d’entraînement',
+        'weekly.workout_count': 'Séances',
       },
       unitWord: (unit: string) =>
         ({ score: 'points', load: '', bpm: 'bpm' } as Record<string, string | undefined>)[unit] ?? unit,

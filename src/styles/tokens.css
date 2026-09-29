@@ -71,7 +71,7 @@
   --mat-card: linear-gradient(160deg, #1E232B 0%, #171A20 62%, #15181D 100%);
   --mat-card-solid: #191C22;
   /* 磨砂卡：半透明，靠身后一层静态模糊出效果（设置大卡）。 */
-  --mat-card-frost: rgba(25, 28, 34, .8);
+  --mat-card-frost: rgba(25, 28, 34, .86);
   --mat-line: rgba(226, 234, 242, .085);
   --mat-line-hover: rgba(226, 234, 242, .17);
   /* 立体感：顶边一道高光 + 底边一道暗线，卡片像有厚度的一块板，而不是贴在底上的色块。 */
@@ -223,7 +223,7 @@ html[data-theme="light"] {
     radial-gradient(900px 600px at 60% 110%, rgba(30, 150, 166, .06), transparent 70%);
   --mat-card: linear-gradient(160deg, #FFFFFF 0%, #FAFBF8 100%);
   --mat-card-solid: #FFFFFF;
-  --mat-card-frost: rgba(255, 255, 255, .82);
+  --mat-card-frost: rgba(255, 255, 255, .9);
   --mat-line: rgba(38, 52, 41, .10);
   --mat-line-hover: rgba(38, 52, 41, .22);
   --mat-rim: inset 0 1px 0 rgba(255, 255, 255, .9), inset 0 -1px 0 rgba(38, 52, 41, .06);

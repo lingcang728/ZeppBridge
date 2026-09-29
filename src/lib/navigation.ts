@@ -72,6 +72,9 @@ export interface SegmentStop<T = string> {
   left: number;
   width: number;
   value: T;
+  /** 折行时每一项所在的行：顶边和高度（布局像素）。不折行时可以不给。 */
+  top?: number;
+  height?: number;
 }
 
 export function dragThumb<T>(stops: SegmentStop<T>[], center: number, velocity = 0) {

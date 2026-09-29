@@ -32,8 +32,6 @@ const props = withDefaults(defineProps<{
   /** 胶囊宽度跟着选中项走：镜片 + 两侧各露出这么多像素的邻项。给了它 `span` 只作初值。
    *  顶栏语言用它：「中文」一枚小胶囊，「Português (Portugal)」就撑宽，不再挤在一起。 */
   fitPeek?: number;
-  /** 固定画在正中镜片左侧的图标（顶栏语言的地球）：图标和当前项贴在一起，读起来是一枚胶囊。 */
-  lensIcon?: IconName;
   /** `inset` 表单里的凹槽底；`bare` 放进已经是玻璃的按钮组里（没有自己的底）。 */
   variant?: 'inset' | 'bare';
 }>(), {
@@ -42,7 +40,6 @@ const props = withDefaults(defineProps<{
   iconOnly: false,
   disabled: false,
   loop: false,
-  lensIcon: undefined,
   fitPeek: undefined,
   variant: 'inset',
 });
@@ -154,13 +151,13 @@ const itemStyle = (index: number) => {
   const shift = radius.value * Math.sin(rad);
   const depth = radius.value * (Math.cos(rad) - 1);
   const far = Math.min(1, Math.abs(rad) / 1.5);
+  // 不加模糊：每一项每帧换一个 blur 半径就得重新栅格化，拖动时一闪一闪的。远近只靠透明度。
   const move = vertical.value
     ? `translate3d(-50%, calc(-50% + ${shift}px), ${depth}px) rotateX(${-angle}deg)`
     : `translate3d(calc(-50% + ${shift}px), -50%, ${depth}px) rotateY(${angle}deg)`;
   return {
     transform: move,
-    opacity: Math.abs(rad) >= 1.6 ? 0 : 1 - far * 0.7,
-    filter: far > 0.05 ? `blur(${(far * 1.6).toFixed(2)}px)` : 'none',
+    opacity: Math.abs(rad) >= 1.6 ? 0 : 1 - far * 0.75,
     zIndex: 100 - Math.round(Math.abs(rad) * 20),
   };
 };
@@ -357,7 +354,7 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
   <div
     ref="root"
     :class="['capsule-wheel', `is-${orientation}`, `is-${variant}`, {
-      'is-dragging': dragging, 'is-animating': animating, 'is-fit': fitPeek !== undefined, 'is-icon-only': iconOnly, 'is-disabled': disabled, 'has-lens-icon': lensIcon,
+      'is-dragging': dragging, 'is-animating': animating, 'is-fit': fitPeek !== undefined, 'is-icon-only': iconOnly, 'is-disabled': disabled,
     }]"
     :style="vertical ? { height: `${span}px` } : { width: `${liveSpan}px` }"
     role="slider"
@@ -375,9 +372,7 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
     @lostpointercapture="onUp"
     @keydown="onKeydown"
   >
-    <span class="wheel-lens" aria-hidden="true" :style="lensStyle">
-      <Icon v-if="lensIcon" :name="lensIcon" :size="15" class="lens-icon" />
-    </span>
+    <span class="wheel-lens" aria-hidden="true" :style="lensStyle"></span>
     <div class="wheel-drum" aria-hidden="true">
       <span
         v-for="(item, index) in items"
@@ -390,7 +385,7 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
       >
         <img v-if="item.image" :src="item.image" alt="" class="wheel-image" draggable="false" />
         <Icon v-else-if="item.icon" :name="item.icon" :size="iconOnly ? 16 : 14" />
-        <span v-if="!iconOnly">{{ item.label }}</span>
+        <span v-if="!iconOnly" class="wheel-label" :data-label="item.label">{{ item.label }}</span>
       </span>
     </div>
   </div>
@@ -440,7 +435,6 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
   display: flex;
   align-items: center;
   min-width: 30px;
-  padding-left: 19px;
   border-radius: 999px;
   background: var(--cap-thumb);
   box-shadow: var(--cap-thumb-rim);
@@ -448,7 +442,6 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
   transition: scale var(--dur-base) var(--ease-spring);
 }
 .capsule-wheel.is-bare .wheel-lens { background: var(--cap-glass-thumb); box-shadow: var(--cap-glass-thumb-rim); }
-.lens-icon { flex: 0 0 auto; color: var(--cap-ink); }
 .is-vertical .wheel-lens { top: 50%; bottom: auto; left: 3px; right: 3px; translate: 0 -50%; min-width: 0; }
 .capsule-wheel.is-dragging .wheel-lens { scale: 1.06 1.1; }
 
@@ -470,13 +463,17 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
 }
 .capsule-wheel.is-dragging .wheel-item, .capsule-wheel.is-animating .wheel-item { will-change: transform; }
 .is-icon-only .wheel-item { padding: 0 7px; }
-/* 镜片里固定着一枚图标时，每一项左边多留出图标的位置：转到正中的那一项，
-   字正好落在图标右边；两侧的项之间也就多了同样的间距，不会压到图标上。 */
-.has-lens-icon .wheel-item { padding-left: 30px; }
+/* 选中项加粗，但宽度按粗体预留（隐形的粗体副本撑宽）：以前滑过一项它就变粗变宽，
+   ResizeObserver 重量一遍，整条传送带跟着跳，拖动时就是「闪一下」。 */
+.wheel-label { display: inline-grid; }
+.wheel-label::after {
+  content: attr(data-label);
+  height: 0;
+  overflow: hidden;
+  font-weight: 600;
+  visibility: hidden;
+}
 .wheel-image { width: 18px; height: 18px; flex: 0 0 18px; border-radius: 5px; pointer-events: none; }
 .wheel-item.on { color: var(--cap-ink); font-weight: 600; }
 
-@media (prefers-reduced-transparency: reduce) {
-  .wheel-item { filter: none !important; }
-}
 </style>

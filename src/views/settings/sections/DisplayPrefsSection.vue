@@ -68,7 +68,7 @@ const chooseTheme = (value: string | number) => {
         <div class="s-row">
           <div class="s-row-main"><span class="s-row-title">语言 · Language</span></div>
           <div class="s-row-control">
-            <CapsuleWheel loop lens-icon="globe" :span="236" :items="localeOptions" :model-value="locale" aria-label="语言 · Language" @update:model-value="chooseLocale" />
+            <CapsuleWheel loop :span="236" :items="localeOptions" :model-value="locale" aria-label="语言 · Language" @update:model-value="chooseLocale" />
           </div>
         </div>
         <div class="s-row">

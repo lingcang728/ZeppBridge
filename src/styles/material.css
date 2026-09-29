@@ -185,6 +185,8 @@
    过渡只写在轨道上一处，三者逐帧同步——不会再出现两层字错开的重影。 */
 @property --thumb-l { syntax: '<length>'; inherits: true; initial-value: 0px; }
 @property --thumb-w { syntax: '<length>'; inherits: true; initial-value: 0px; }
+@property --thumb-t { syntax: '<length>'; inherits: true; initial-value: 0px; }
+@property --thumb-h { syntax: '<length>'; inherits: true; initial-value: 0px; }
 
 /* ── 换主题的扩散（useTheme.revealTheme）──────────
    新主题的整页快照套一个圆形 clip-path，从被点的按钮处长大；旧快照垫在底下不动。
