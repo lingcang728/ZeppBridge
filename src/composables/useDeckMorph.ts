@@ -1,9 +1,9 @@
 import { onBeforeUnmount, type Ref } from 'vue';
-import { stackOffsets, staggerDelays, unscaledBox, type Box } from '../lib/deck/morph';
+import { flightFrom, unscaledBox, type Box } from '../lib/deck/morph';
 import { collapseGhost, playGhost, revealAfterGhost } from '../lib/motion/ghost';
 
 /**
- * 设置卡组在三种形态之间的形变：coverflow ↔ 卡包（叠起 / 发牌）、总览 ↔ 打开一张。
+ * 设置卡组在三种形态之间的形变：coverflow ↔ 卡包（洗牌式飞出 / 收拢）、总览 ↔ 打开一张。
  *
  * 全部用 Web Animations 直接动真实的卡片（几何在 lib/deck/morph.ts）。和以前的
  * View Transitions 比，好处是可以打断：
@@ -27,13 +27,10 @@ const CLOSE_EASE = 'cubic-bezier(.4, 0, .2, 1)';
 /** 关卡：板收回源卡。和概览页「返回」同一条曲线（先快后慢、没有回弹）。 */
 const RETURN_MS = 440;
 const RETURN_EASE = 'cubic-bezier(.32, .72, 0, 1)';
-/** 卡包发牌 / 收起。 */
-const DEAL_MS = 420;
-const DEAL_STEP_MS = 26;
-const DEAL_EASE = 'cubic-bezier(.2, .85, .25, 1)';
-const STACK_MS = 280;
-const STACK_STEP_MS = 22;
-const STACK_EASE = 'cubic-bezier(.4, 0, .2, 1)';
+/** 展开全部 / 收起：一张张飞出、收拢。 */
+const FLIGHT_MS = 460;
+const FLIGHT_STAGGER_MS = 24;
+const FLIGHT_EASE = 'cubic-bezier(.2, .85, .25, 1)';
 
 const boxOf = (el: Element): Box => {
   const rect = el.getBoundingClientRect();
@@ -46,6 +43,7 @@ type Morph = { animation: Animation; id: string; kind: 'open' | 'close'; closed?
 export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) => {
   let morph: Morph | null = null;
   let ghost: Animation | null = null;
+  let flights: Animation[] = [];
 
   const sourceOf = (id: string) =>
     overview.value?.querySelector<HTMLElement>(`[data-deck-card="${CSS.escape(id)}"]`) ?? null;
@@ -94,6 +92,7 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
     if (morph && morph.id === id && morph.kind === 'close' && !morph.plate && morph.animation.playState === 'running') {
       morph.kind = 'open';
       morph.animation.reverse();
+      if (ghost?.playState === 'running') ghost.reverse();
       return;
     }
     if (morph) {
@@ -158,15 +157,18 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
    */
   const close = (id: string, closed: () => void, fromTop: number | null = null) => {
     const el = card.value;
-    ghost?.cancel();
-    ghost = null;
-    if (!el || reducedMotion()) { closed(); return; }
+    if (!el || reducedMotion()) { ghost?.cancel(); ghost = null; closed(); return; }
+    // 开到一半就关（Esc、再点一下）：大卡和那块板一起倒着放回源卡，而不是板一下消失。
     if (morph && morph.id === id && morph.kind === 'open' && morph.animation.playState === 'running') {
       morph.kind = 'close';
       morph.closed = closed;
       morph.animation.reverse();
+      if (ghost?.playState === 'running') ghost.reverse();
+      else { ghost?.cancel(); ghost = null; }
       return;
     }
+    ghost?.cancel();
+    ghost = null;
     if (morph) {
       const previous = morph;
       morph = null;
@@ -214,61 +216,60 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
     track({ animation: plate.done, id, kind: 'close', closed, plate: true });
   };
 
-  const listCards = () => [...overview.value?.querySelectorAll<HTMLElement>('.list-card') ?? []];
-  const coverRoot = () => overview.value?.querySelector<HTMLElement>('.coverflow') ?? null;
-  const dock = () => overview.value?.querySelector<HTMLElement>('.deck-collapse-dock') ?? null;
-  const settled = (animations: Array<Animation | undefined>) =>
-    Promise.all(animations.map((animation) => animation?.finished.then(() => undefined, () => undefined)));
+  /** 元素布局框的中心（不受它自己 transform 的影响）——也就是它变换原点的屏幕坐标。 */
+  const layoutCenter = (el: HTMLElement) => {
+    const parent = el.offsetParent as HTMLElement | null;
+    if (!parent) {
+      const box = boxOf(el);
+      return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+    }
+    const host = parent.getBoundingClientRect();
+    return {
+      x: host.left + parent.clientLeft + el.offsetLeft + el.offsetWidth / 2,
+      y: host.top + parent.clientTop + el.offsetTop + el.offsetHeight / 2,
+    };
+  };
+
+  /** 换形态之前记下每张卡此刻在画面上的位置（半路打断时，这就是它们正在飞的位置）。 */
+  const snapshot = () => {
+    const out = new Map<string, { box: Box; opacity: number }>();
+    for (const el of overview.value?.querySelectorAll<HTMLElement>('[data-deck-card]') ?? []) {
+      const id = el.dataset.deckCard;
+      if (id) out.set(id, { box: boxOf(el), opacity: Number.parseFloat(getComputedStyle(el).opacity) || 0 });
+    }
+    return out;
+  };
 
   /**
-   * 换形态的前半段：旧形态退场。coverflow 轻轻缩小淡出；卡包从最下面那张开始，一张张往上
-   * 收到第一张身后，最后第一张也淡掉。
+   * coverflow ↔ 卡包：像洗牌一样，每张卡从旧形态里它所在的位置飞到新形态，按 `order`
+   * 依次出发（抽出来从正中那张往两边，插回去反过来）。只动独立的 translate / scale /
+   * opacity 属性，叠在卡片自己的 transform（coverflow 的侧转）之外，全在合成器上。
+   * 返回全部落定的时刻。
    */
-  const leaveLayout = async (from: 'cover' | 'list') => {
-    if (reducedMotion()) return;
-    if (from === 'cover') {
-      await settled([coverRoot()?.animate(
-        [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.96)' }],
-        { duration: 180, easing: 'ease-in', fill: 'forwards' },
-      )]);
-      return;
+  const fly = (before: Map<string, { box: Box; opacity: number }>, order: Map<string, number>) => {
+    for (const animation of flights) animation.cancel();
+    flights = [];
+    if (reducedMotion()) return Promise.resolve();
+    for (const el of overview.value?.querySelectorAll<HTMLElement>('[data-deck-card]') ?? []) {
+      const id = el.dataset.deckCard;
+      const from = id ? before.get(id) : undefined;
+      if (!id || !from) continue;
+      const flight = flightFrom(from.box, boxOf(el), layoutCenter(el));
+      const opacity = Number.parseFloat(getComputedStyle(el).opacity) || 0;
+      flights.push(el.animate(
+        [
+          { translate: `${flight.translate.x}px ${flight.translate.y}px`, scale: String(flight.scale), opacity: Math.min(1, from.opacity + 0.25) },
+          { translate: '0px 0px', scale: '1', opacity },
+        ],
+        { duration: FLIGHT_MS, delay: (order.get(id) ?? 0) * FLIGHT_STAGGER_MS, easing: FLIGHT_EASE, fill: 'backwards' },
+      ));
     }
-    const cards = listCards();
-    const offsets = stackOffsets(cards.map((el) => el.offsetTop));
-    const delays = staggerDelays(cards.length, STACK_STEP_MS, true);
-    dock()?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, fill: 'forwards' });
-    await settled(cards.map((el, index) => el.animate(
-      [{ transform: 'none', opacity: 1 }, { transform: `translateY(${offsets[index]}px)`, opacity: index === 0 ? 1 : 0 }],
-      { duration: STACK_MS, delay: delays[index], easing: STACK_EASE, fill: 'forwards' },
-    )));
-    await settled([cards[0]?.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.97)' }], { duration: 120, fill: 'forwards' })]);
+    return Promise.all(flights.map((animation) => animation.finished.then(() => undefined, () => undefined)))
+      .then(() => undefined);
   };
 
-  /** 换形态的后半段：新形态进场。卡包像发牌一样从第一张身后依次往下展开；coverflow 从后面浮上来。 */
-  const enterLayout = async (to: 'cover' | 'list') => {
-    if (reducedMotion()) return;
-    if (to === 'cover') {
-      await settled([coverRoot()?.animate(
-        [{ opacity: 0, transform: 'scale(.94) translateY(10px)' }, { opacity: 1, transform: 'none' }],
-        { duration: 340, easing: DEAL_EASE },
-      )]);
-      return;
-    }
-    const cards = listCards();
-    const offsets = stackOffsets(cards.map((el) => el.offsetTop));
-    const delays = staggerDelays(cards.length, DEAL_STEP_MS);
-    dock()?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, delay: 160, fill: 'backwards' });
-    await settled(cards.map((el, index) => el.animate(
-      [
-        // 先滑出一段再显形：后面的卡叠在第一张上面，一开始就实着会盖住第一张的字。
-        { transform: `translateY(${offsets[index]}px)`, opacity: 0 },
-        { opacity: index === 0 ? 1 : 0, offset: 0.15 },
-        { opacity: 1, offset: 0.5 },
-        { transform: 'none', opacity: 1 },
-      ],
-      { duration: DEAL_MS, delay: delays[index], easing: DEAL_EASE, fill: 'backwards' },
-    )));
-  };
+  /** 正在打开（板还在长）：这时按 Esc 是「不开了」，把它倒回去。 */
+  const opening = () => Boolean(morph && morph.kind === 'open' && morph.animation.playState === 'running');
 
   /** 翻到另一张（点下面的圆点跳过去）时，新内容轻轻浮上来。 */
   const swap = () => {
@@ -281,7 +282,9 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
     morph = null;
     ghost?.cancel();
     ghost = null;
+    for (const animation of flights) animation.cancel();
+    flights = [];
   });
 
-  return { open, close, leaveLayout, enterLayout, swap };
+  return { open, close, snapshot, fly, opening, swap };
 };

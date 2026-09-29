@@ -1,18 +1,22 @@
 <script setup lang="ts">
 /**
- * 每小时步数（Zepp 官方授权才有，旧通道没有这一项）。跟着页面顶上的 7 天 / 1 个月 / 6 个月走：
+ * 每小时步数。后端以旧通道的逐分钟记录为主（按小时加总，和当天总步数对得上），官方授权的
+ * 按小时汇总只补旧通道没有的日子。跟着页面顶上的 7 天 / 1 个月 / 6 个月走：
  *
  *   - 上面 24 根柱子：整段范围里「有记录的天」的日均分布；点下面某一行就换成那一天（那一周）；
  *   - 下面一张热力图：一行一天（6 个月时一行一周），一行 24 格，颜色越深步数越多。
  *
  * 官方只回「有步数的小时」：没回的小时是空格，不画成 0（规则见 lib/hourlySteps.ts）。
  * 柱子和格子都是纯 CSS——一张图表引擎画这几百个数不值得；换范围时柱高和格子颜色是过渡过去的。
+ * 一次取最长那档（6 个月），换范围只在本地重排，不再每切一次查一次库。
+ * 指针停在柱子或格子上立刻浮出读数（和心率图一样），不用原生 title——那个要停一秒多才出来。
  */
 import { computed, onMounted, ref, watch } from 'vue';
 import { useSyncController } from '../../composables/useSyncController';
 import { backend, isDesktop } from '../../lib/bridge';
 import { displayDateTimeFormatter, parseDisplayDate } from '../../lib/dateTime';
 import { averageRow, hourRows, rangeBounds, type HourRow } from '../../lib/hourlySteps';
+import { SERIES_FETCH_DAYS } from '../../lib/metricSeries';
 import type { HourlySteps } from '../../types';
 import { useMessages } from '../../i18n';
 import { hourlyStepsMessages as messages } from './HourlyStepsCard.i18n';
@@ -36,7 +40,8 @@ const load = async () => {
   if (!isDesktop()) return;
   const mine = ++seq;
   try {
-    const next = await backend.getHourlySteps(bounds.value.start, bounds.value.end);
+    const whole = rangeBounds(Math.max(SERIES_FETCH_DAYS, props.days));
+    const next = await backend.getHourlySteps(whole.start, whole.end);
     if (mine !== seq) return;
     rows.value = next;
     failed.value = false;
@@ -49,7 +54,7 @@ const load = async () => {
   }
 };
 onMounted(() => { void load(); });
-watch(() => props.days, () => { picked.value = null; void load(); });
+watch(() => props.days, () => { picked.value = null; hover.value = null; });
 watch(dataRevision, () => { void load(); });
 
 const heat = computed(() => hourRows(rows.value, bounds.value.start, bounds.value.end, perWeek.value));
@@ -79,6 +84,50 @@ const shownNote = computed(() => {
   return row ? (perWeek.value ? t.value.weekNote(rowLabel(row), row.covered) : t.value.dayNote(rowLabel(row))) : '';
 });
 const format = (value: number) => Math.round(value).toLocaleString();
+/* —— 悬停读数 —— */
+const card = ref<HTMLElement | null>(null);
+const hover = ref<{ x: number; y: number; text: string; hour: number; row: string | null } | null>(null);
+/** 元素相对卡片的位置（沿 offsetParent 累加：界面缩放下 getBoundingClientRect 和布局像素不是一回事）。 */
+const offsetWithin = (el: HTMLElement) => {
+  let x = 0;
+  let y = 0;
+  let node: HTMLElement | null = el;
+  while (node && node !== card.value) {
+    x += node.offsetLeft;
+    y += node.offsetTop;
+    node = node.offsetParent as HTMLElement | null;
+  }
+  return { x: x + el.offsetWidth / 2, y };
+};
+const barText = (hour: number, steps: number | null) => {
+  if (steps === null) return t.value.noRecord(hour);
+  return shownIsDay.value ? t.value.barTitle(hour, format(steps)) : t.value.averageBarTitle(hour, format(steps));
+};
+const onBarsOver = (event: PointerEvent) => {
+  const li = (event.target as Element | null)?.closest<HTMLElement>('li[data-hour]');
+  if (!li) return;
+  const hour = Number(li.dataset.hour);
+  const bar = bars.value[hour];
+  if (!bar) return;
+  const at = offsetWithin(li);
+  const top = at.y + li.offsetHeight * (1 - bar.height / 100);
+  hover.value = { x: at.x, y: top, text: barText(hour, bar.steps), hour, row: null };
+};
+const onHeatOver = (event: PointerEvent) => {
+  const cell = (event.target as Element | null)?.closest<HTMLElement>('i[data-hour]');
+  if (!cell) return;
+  const hour = Number(cell.dataset.hour);
+  const row = heat.value.find((item) => item.start === cell.dataset.row);
+  if (!row) return;
+  const steps = row.cells[hour] ?? null;
+  const text = steps === null
+    ? t.value.noRecord(hour)
+    : perWeek.value ? t.value.averageBarTitle(hour, format(steps)) : t.value.barTitle(hour, format(steps));
+  const at = offsetWithin(cell);
+  hover.value = { x: at.x, y: at.y, text: `${rowLabel(row)} · ${text}`, hour, row: row.start };
+};
+const clearHover = () => { hover.value = null; };
+
 const pick = (row: HourRow) => {
   if (!row.covered) return;
   picked.value = picked.value === row.start ? null : row.start;
@@ -86,7 +135,7 @@ const pick = (row: HourRow) => {
 </script>
 
 <template>
-  <section class="hourly-card" :aria-label="t.title">
+  <section ref="card" class="hourly-card" :aria-label="t.title">
     <header>
       <span class="hourly-head">
         <strong>{{ t.title }}</strong>
@@ -101,13 +150,13 @@ const pick = (row: HourRow) => {
         <b>{{ format(total) }}</b> {{ shownIsDay ? t.stepsUnit : t.perDayUnit }}
         <span v-if="busiest"> · {{ shownIsDay ? t.busiest(busiest.hour, format(busiest.steps)) : t.busiestAverage(busiest.hour, format(busiest.steps)) }}</span>
       </p>
-      <ol class="hourly-bars" role="list">
-        <li v-for="bar in bars" :key="bar.hour" :title="bar.steps === null ? t.noRecord(bar.hour) : (shownIsDay ? t.barTitle(bar.hour, format(bar.steps)) : t.averageBarTitle(bar.hour, format(bar.steps)))">
-          <span class="bar" :class="{ empty: bar.steps === null }" :style="{ height: `${bar.height}%` }" />
+      <ol class="hourly-bars" role="list" @pointerover="onBarsOver" @pointerleave="clearHover">
+        <li v-for="bar in bars" :key="bar.hour" :data-hour="bar.hour" :aria-label="barText(bar.hour, bar.steps)">
+          <span class="bar" :class="{ empty: bar.steps === null, hot: hover && hover.row === null && hover.hour === bar.hour }" :style="{ height: `${bar.height}%` }" />
           <small v-if="bar.hour % 6 === 0">{{ bar.hour }}</small>
         </li>
       </ol>
-      <div class="hourly-heat" :class="{ dense: heat.length > 7 }" role="list" :aria-label="t.heatAria">
+      <div class="hourly-heat" :class="{ dense: heat.length > 7 }" role="list" :aria-label="t.heatAria" @pointerover="onHeatOver" @pointerleave="clearHover">
         <button
           v-for="(row, index) in heat"
           :key="row.start"
@@ -124,18 +173,21 @@ const pick = (row: HourRow) => {
             <i
               v-for="(cell, hour) in row.cells"
               :key="hour"
-              :class="{ empty: cell === null }"
+              :data-row="row.start"
+              :data-hour="hour"
+              :class="{ empty: cell === null, hot: hover && hover.row === row.start && hover.hour === hour }"
               :style="{ '--v': cell === null ? 0 : Math.min(1, cell / heatPeak).toFixed(3) }"
             />
           </span>
         </button>
       </div>
+      <div v-if="hover" class="hourly-tip" :style="{ left: `${hover.x}px`, top: `${hover.y}px` }" aria-hidden="true">{{ hover.text }}</div>
     </template>
   </section>
 </template>
 
 <style scoped>
-.hourly-card { display: grid; gap: 12px; padding: 18px 20px; border-radius: var(--radius-lg); background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow); }
+.hourly-card { position: relative; display: grid; gap: 12px; padding: 18px 20px; border-radius: var(--radius-lg); background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow); }
 header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
 .hourly-head { display: grid; gap: 2px; }
 header strong { font-size: var(--fs-md); }
@@ -147,6 +199,7 @@ header small, .hourly-empty { color: var(--muted); font-size: var(--fs-xs); }
 .hourly-bars { display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); align-items: end; gap: 3px; height: 120px; margin: 0; padding: 0 0 16px; list-style: none; }
 .hourly-bars li { position: relative; display: flex; align-items: flex-end; height: 100%; }
 .bar { width: 100%; border-radius: 4px 4px 2px 2px; background: color-mix(in srgb, var(--accent) 78%, transparent); transition: height 420ms var(--ease-out); }
+.bar.hot { background: var(--accent); }
 .bar.empty { height: 2px !important; background: color-mix(in srgb, var(--ink) 10%, transparent); }
 .hourly-bars small { position: absolute; bottom: -16px; left: 0; color: var(--subtle); font-size: 10px; font-variant-numeric: tabular-nums; }
 
@@ -181,6 +234,22 @@ header small, .hourly-empty { color: var(--muted); font-size: var(--fs-xs); }
   background: color-mix(in srgb, var(--accent) calc(var(--v) * 86% + 14%), transparent);
   transition: background-color 360ms ease;
 }
+.heat-cells i.hot { box-shadow: 0 0 0 1.5px var(--ink); }
 .heat-cells i.empty { background: color-mix(in srgb, var(--ink) 6%, transparent); }
 .heat-row.blank .heat-cells i { background: transparent; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 5%, transparent); }
+.hourly-tip {
+  position: absolute;
+  z-index: 3;
+  padding: 7px 11px;
+  border: 1px solid var(--mat-line-hover);
+  border-radius: 8px;
+  background: var(--mat-card-solid);
+  box-shadow: var(--mat-shadow);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 8px));
+}
 </style>

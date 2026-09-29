@@ -19,10 +19,14 @@ import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { zeppSemanticColors } from '../lib/echartsTheme';
 import {
   formatPaceSeconds,
+  SERIES_FETCH_DAYS,
   indexSeries,
   seriesRanges,
+  sliceByDate,
+  sliceIndexed,
   type SeriesRangeDays,
 } from '../lib/metricSeries';
+import { trackRangeSwap } from '../lib/chartSwap';
 import type { MetricSeries, TrainingBalancePoint } from '../types';
 import { useMessages } from '../i18n';
 import { paceUnitLabel } from '../lib/units';
@@ -43,8 +47,13 @@ const METRICS = [
 
 const ranges = computed(() => seriesRanges());
 const rangeDays = ref<SeriesRangeDays>(180);
-const series = ref<Record<string, MetricSeries>>({});
-const balance = ref<TrainingBalancePoint[]>([]);
+/* 一次取最长那档，切范围只在本地切（见 lib/metricSeries.ts 的 sliceSeries）。 */
+const fullSeries = ref<Record<string, MetricSeries>>({});
+const fullBalance = ref<TrainingBalancePoint[]>([]);
+const series = computed(() => sliceIndexed(fullSeries.value, rangeDays.value));
+// 负荷平衡至少看一个月：28 天窗口要先有这么长的跑道才算得出比值。
+const balance = computed(() => sliceByDate(fullBalance.value, Math.max(28, rangeDays.value)));
+trackRangeSwap(rangeDays);
 const loading = ref(true);
 const initialLoading = useFirstLoad(loading);
 const loadSeq = createLoadSeq();
@@ -74,9 +83,6 @@ const thresholdOption = computed(() => {
   const pick = (source: MetricSeries | null, date: string) =>
     source?.points.find((point) => point.date === date)?.value ?? null;
   return {
-    animationDuration: 600,
-    animationDurationUpdate: 520,
-    animationEasingUpdate: 'cubicInOut' as const,
     grid: { left: 8, right: 12, top: 34, bottom: 8, containLabel: true },
     legend: {
       data: [t.value.thresholdHr, t.value.thresholdPace],
@@ -145,9 +151,6 @@ const balanceOption = computed(() => {
   if (balance.value.length < 2) return null;
   const dates = balance.value.map((point) => point.date);
   return {
-    animationDuration: 600,
-    animationDurationUpdate: 520,
-    animationEasingUpdate: 'cubicInOut' as const,
     grid: { left: 8, right: 12, top: 38, bottom: 8, containLabel: true },
     legend: {
       data: [t.value.acute7d, t.value.chronicWeekly, t.value.acuteChronic],
@@ -240,22 +243,20 @@ const load = async () => {
   error.value = null;
   if (!isDesktop()) {
     if (!loadSeq.isCurrent(seq)) return;
-    series.value = {};
-    balance.value = [];
+    fullSeries.value = {};
+    fullBalance.value = [];
     loading.value = false;
     error.value = t.value.desktopOnly;
     return;
   }
   const results = await Promise.allSettled([
-    backend.getMetricSeries(METRICS, rangeDays.value),
-    // The balance chart is always a month: 28-day windows need at least that
-    // much runway before a ratio exists at all.
-    backend.getTrainingBalance(Math.max(28, rangeDays.value)),
+    backend.getMetricSeries(METRICS, SERIES_FETCH_DAYS),
+    backend.getTrainingBalance(Math.max(28, SERIES_FETCH_DAYS)),
   ]);
   if (!loadSeq.isCurrent(seq)) return;
   const [metrics, trend] = results;
-  series.value = metrics.status === 'fulfilled' ? indexSeries(metrics.value) : {};
-  balance.value = trend.status === 'fulfilled' ? trend.value : [];
+  fullSeries.value = metrics.status === 'fulfilled' ? indexSeries(metrics.value) : {};
+  fullBalance.value = trend.status === 'fulfilled' ? trend.value : [];
   const rejected = results.find((result) => result.status === 'rejected');
   if (rejected && rejected.status === 'rejected') {
     error.value = toUserMessage(rejected.reason, t.value.loadFailed);
@@ -268,7 +269,6 @@ const shownThreshold = useQueuedOption(thresholdOption);
 const shownBalance = useQueuedOption(balanceOption);
 
 onMounted(() => { void load(); });
-watch(rangeDays, () => { void load(); });
 watch(dataRevision, () => { void load(); });
 
 </script>

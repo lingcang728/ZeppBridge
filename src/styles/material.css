@@ -284,4 +284,8 @@ html.is-backgrounded :is(.spinning, .ring-arc, .indeterminate) { animation-play-
   .trend-grid > :nth-child(3), .dashboard-grid > :nth-child(3) { animation-delay: 80ms; }
   .trend-grid > :nth-child(4), .dashboard-grid > :nth-child(4) { animation-delay: 120ms; }
   .trend-grid > :nth-child(n+5) { animation-delay: 160ms; }
+  /* 缓存页回到场上（usePageMorph 给它挂 page-revisit）：卡片原样就在，不再浮一遍。 */
+  .page-revisit :is(.surface-card, .trend-card, .metric-panel, .weekly-card, .hourly-card, .record-list, .life-events, .sources-strip) {
+    animation: none;
+  }
 }

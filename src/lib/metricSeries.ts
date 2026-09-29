@@ -55,6 +55,67 @@ export const indexSeries = (series: MetricSeries[]): Record<string, MetricSeries
   return map;
 };
 
+/** 页面一次取多长：三档里最长的那档。短的两档从它尾部切出来（sliceSeries）。 */
+export const SERIES_FETCH_DAYS = Math.max(...DISPLAY_RANGE_DAYS);
+
+const shiftDate = (date: string, days: number): string => {
+  const [y, m, d] = date.split('-').map(Number);
+  const next = new Date(y!, m! - 1, d! + days);
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}`;
+};
+
+/** 范围第一天：今天往回数 `days` 天（含今天），本地日。和后端 `end - (days - 1)` 同一个算法。 */
+export const windowStartDate = (days: number, today = new Date()): string => {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  const end = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  return shiftDate(end, -(Math.max(1, Math.round(days)) - 1));
+};
+
+/** 和后端 storage/util.rs 的 round1 一致（值都是非负的健康读数，四舍五入方向不影响）。 */
+const round1 = (value: number) => Math.round(value * 10) / 10;
+
+/**
+ * 从一份长窗口序列的尾部切出最近 `days` 天，重算这一段的最新 / 平均 / 最低 / 最高 / 覆盖。
+ *
+ * 后端每个点只取决于那一天本身（按天聚合），和请求的窗口长短无关，所以「取 180 天再切
+ * 出 7 天」和「直接取 7 天」逐字段相同（`get_metric_series` 的算法见 storage/metrics.rs）。
+ * 切范围因此不用再走一趟 IPC + SQLite：点下去同一帧图表就开始换。
+ */
+export const sliceSeries = (series: MetricSeries, days: number, today = new Date()): MetricSeries => {
+  const start = windowStartDate(days, today);
+  const end = windowStartDate(1, today);
+  const points = series.points.filter((point) => point.date >= start && point.date <= end);
+  const values = points.map((point) => point.value).filter((value) => Number.isFinite(value));
+  return {
+    ...series,
+    points,
+    latest: points[points.length - 1] ?? null,
+    average: values.length ? round1(values.reduce((sum, value) => sum + value, 0) / values.length) : null,
+    minimum: values.length ? Math.min(...values) : null,
+    maximum: values.length ? Math.max(...values) : null,
+    days_with_data: points.length,
+    window_days: Math.max(1, Math.round(days)),
+  };
+};
+
+/** `sliceSeries` 作用到一整份按名字索引的序列上。 */
+export const sliceIndexed = (
+  series: Record<string, MetricSeries>,
+  days: number,
+  today = new Date(),
+): Record<string, MetricSeries> => {
+  const out: Record<string, MetricSeries> = {};
+  for (const [name, item] of Object.entries(series)) out[name] = sliceSeries(item, days, today);
+  return out;
+};
+
+/** 按日期的数组（训练负荷平衡、日最高心率）同样从尾部切。 */
+export const sliceByDate = <T extends { date: string }>(rows: T[], days: number, today = new Date()): T[] => {
+  const start = windowStartDate(days, today);
+  return rows.filter((row) => row.date >= start);
+};
+
 export const latestValue = (series?: MetricSeries | null): number | null => {
   const value = series?.latest?.value;
   return typeof value === 'number' && Number.isFinite(value) ? value : null;

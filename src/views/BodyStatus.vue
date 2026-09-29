@@ -17,7 +17,8 @@ import Icon from '../components/Icon.vue';
 import SegmentTrack from '../components/SegmentTrack.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
-import { indexSeries, seriesRanges, type SeriesRangeDays } from '../lib/metricSeries';
+import { SERIES_FETCH_DAYS, indexSeries, seriesRanges, sliceIndexed, type SeriesRangeDays } from '../lib/metricSeries';
+import { trackRangeSwap } from '../lib/chartSwap';
 import { distanceUnit } from '../lib/units';
 import type { MetricSeries } from '../types';
 import { useMessages } from '../i18n';
@@ -31,7 +32,10 @@ const { dataRevision } = useSyncController();
 
 const ranges = computed(() => seriesRanges());
 const rangeDays = ref<SeriesRangeDays>(30);
-const series = ref<Record<string, MetricSeries>>({});
+/** 一次取最长那档（6 个月），切范围只在本地从尾部切（sliceIndexed）——不再每切一次查一次库。 */
+const fullSeries = ref<Record<string, MetricSeries>>({});
+const series = computed(() => sliceIndexed(fullSeries.value, rangeDays.value));
+trackRangeSwap(rangeDays);
 const loading = ref(true);
 const initialLoading = useFirstLoad(loading);
 const loadSeq = createLoadSeq();
@@ -57,7 +61,9 @@ const anyData = computed(() => cards.value.some((card) => (card.series?.points.l
  * 空时下面用一句话说明为什么，而不是把它伪装成有内容。
  */
 const withData = (group: CardGroup) => cards.value
-  .filter((card) => groupOf(card.metric) === group && (card.series?.points.length ?? 0) > 0);
+  // 按整段（6 个月）有没有读数来定，而不是按当前范围：否则切到 7 天时有的卡消失、网格列数
+  // 一变，剩下的卡整排瞬移。这段范围里没有读数的卡留着，自己说「近 7 天无记录」。
+  .filter((card) => groupOf(card.metric) === group && (fullSeries.value[card.metric]?.points.length ?? 0) > 0);
 
 const vitalsCards = computed(() => cards.value.filter((card) => groupOf(card.metric) === 'vitals'));
 const bodyCards = computed(() => withData('body'));
@@ -68,15 +74,13 @@ const {
 } = useBodyCharts(series);
 
 
-/** 	rendsOnly：只是换了范围。24 小时压力曲线不跟范围走，不用再取、也不重画。 */
-const load = async (opts?: { trendsOnly?: boolean }) => {
-  const trendsOnly = Boolean(opts?.trendsOnly);
+const load = async () => {
   const seq = loadSeq.next();
   loading.value = true;
   error.value = null;
   if (!isDesktop()) {
     if (!loadSeq.isCurrent(seq)) return;
-    series.value = {};
+    fullSeries.value = {};
     stressPoints.value = [];
     loading.value = false;
     error.value = t.value.desktopOnly;
@@ -87,15 +91,15 @@ const load = async (opts?: { trendsOnly?: boolean }) => {
     // 固定 24 小时，不跟着上面的范围切换器走——「最近一天」和「最近半年
     // 的趋势」问的不是同一个问题。
     const [daily, stress] = await Promise.all([
-      backend.getMetricSeries(METRICS, rangeDays.value),
-      trendsOnly ? Promise.resolve(null) : backend.getStressSeries(24),
+      backend.getMetricSeries(METRICS, SERIES_FETCH_DAYS),
+      backend.getStressSeries(24),
     ]);
     if (!loadSeq.isCurrent(seq)) return;
-    series.value = indexSeries(daily);
-    if (stress) stressPoints.value = stress;
+    fullSeries.value = indexSeries(daily);
+    stressPoints.value = stress;
   } catch (cause) {
     if (!loadSeq.isCurrent(seq)) return;
-    series.value = {};
+    fullSeries.value = {};
     stressPoints.value = [];
     error.value = toUserMessage(cause, t.value.loadFailed);
   } finally {
@@ -104,7 +108,6 @@ const load = async (opts?: { trendsOnly?: boolean }) => {
 };
 
 onMounted(() => { void load(); });
-watch(rangeDays, () => { void load({ trendsOnly: true }); });
 watch(dataRevision, () => { void load(); });
 
 const labelsOf = (list: { label: string }[], empty: string) => list.map((card) => card.label).join(' · ') || empty;

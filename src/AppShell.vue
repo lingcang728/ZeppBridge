@@ -106,7 +106,7 @@ const backLabel = computed(() => {
  * 旧页会在淡出的那一瞬跳回它自己的顶部。离场前把它按当时的滚动距离往上垫，
  * 画面就停在用户最后看到的那一帧上。 */
 const motion = ref<PageMotion>('none');
-const pageMorph = usePageMorph();
+const pageMorph = usePageMorph({ back: () => router.back() });
 let leavingScroll = 0;
 router.beforeEach((to, from) => {
   // 上一段切页动效还没放完又切页：先让它收尾，免得旧的幽灵板压在新页上。

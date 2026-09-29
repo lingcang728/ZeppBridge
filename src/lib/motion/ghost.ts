@@ -8,6 +8,7 @@
  * 用法：板先盖住旧画面从卡的位置长到终点，新内容在它后半程淡入，板最后淡出——
  * 看上去仍是「从那张卡里长出来」，代价只剩一块色板。
  */
+import { exemptFromSettle } from './interrupt';
 export interface GhostRect {
   left: number;
   top: number;
@@ -79,6 +80,11 @@ export interface HeldGhost {
   grown: Promise<void>;
   /** 揭开：板淡出后自动移除。可以在长满之前调用，会等长满再淡。 */
   release: (fadeMs?: number) => void;
+  /**
+   * 撤回：从此刻的形状原路缩回起点那张卡（长大那段倒着放），落定后淡出、移除。
+   * 用在「展开到一半按了 Esc」：不进去了，板回到它出来的地方。已经揭开过就什么都不做。
+   */
+  retract: (fadeMs?: number) => Promise<void>;
 }
 
 /**
@@ -91,14 +97,31 @@ export function holdGhost(options: Omit<GhostOptions, 'growUntil'>): HeldGhost {
   const { from, to, host } = options;
   const el = ghostPlate(to, host, options.zIndex);
   const full = ghostInset(to, to, options.toRadius);
+  // fill: both：倒着放回起点时停在起点的形状上，而不是退回没有裁切的整块板。
   const grow = el.animate(
     [{ clipPath: ghostInset(from, to, options.fromRadius) }, { clipPath: full }],
-    { duration: options.duration, easing: options.easing, fill: 'forwards' },
+    { duration: options.duration, easing: options.easing, fill: 'both' },
   );
   const remove = () => el.remove();
   grow.addEventListener('cancel', remove);
   const grown = grow.finished.then(() => undefined, () => undefined);
   let released = false;
+  const retract = async (fadeMs = 160) => {
+    if (released) return;
+    released = true;
+    // 板长满以后停住等数据：从终点倒着放；还在长：就地掉头。倒放比长出来稍快一点。
+    // 撤回本身就是对 Esc 的回应：紧接着的切页会调 settleMotion，不能再被它快进成一下跳。
+    exemptFromSettle(grow);
+    grow.updatePlaybackRate(-1.25);
+    if (grow.playState !== 'running') grow.play();
+    try {
+      await grow.finished;
+    } catch {
+      return;
+    }
+    const fade = exemptFromSettle(el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: fadeMs, easing: 'ease-out', fill: 'forwards' }));
+    await fade.finished.then(remove, remove);
+  };
   const release = (fadeMs = 180) => {
     if (released) return;
     released = true;
@@ -110,7 +133,7 @@ export function holdGhost(options: Omit<GhostOptions, 'growUntil'>): HeldGhost {
       fade.finished.then(remove, remove);
     });
   };
-  return { grown, release };
+  return { grown, release, retract };
 }
 
 /**
@@ -135,7 +158,7 @@ export function collapseGhost(options: {
   landAt: number;
   easing: string;
   zIndex?: number;
-}): { landed: Promise<void>; done: Animation } {
+}): { landed: Promise<void>; done: Animation; plate: HTMLElement } {
   const { viewport, to, host, duration } = options;
   const el = ghostPlate(viewport, host, options.zIndex);
   el.animate(
@@ -159,7 +182,7 @@ export function collapseGhost(options: {
     const finish = () => { window.clearTimeout(timer); resolve(); };
     done.finished.then(finish, finish);
   });
-  return { landed, done };
+  return { landed, done, plate: el };
 }
 
 /** 放一块幽灵板；动画结束（或被取消）时自动移除。返回动画，调用方可 reverse / cancel。 */

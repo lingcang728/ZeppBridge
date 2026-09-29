@@ -5,7 +5,7 @@ describe('deck drag frame', () => {
   it('follows the pointer at 0.85x with no hard edge horizontally', () => {
     expect(dragFrame({ dx: 100, dy: 0 }, 800).dx).toBe(85);
     expect(dragFrame({ dx: 2000, dy: 0 }, 800).dx).toBe(1700);
-    expect(dragFrame({ dx: 0, dy: -900 }, 800).dy).toBe(-160);
+    expect(dragFrame({ dx: 0, dy: -900 }, 800).dy).toBe(-765);
   });
   it('reaches full progress at 240px and keeps the dragged card sharp', () => {
     expect(dragFrame({ dx: 240, dy: 0 }, 800).progress).toBe(1);

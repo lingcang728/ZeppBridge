@@ -35,26 +35,12 @@ export const useCardDeck = ({ stage, card, step, reducedMotion }: CardDeckGestur
   let queued: -1 | 0 | 1 = 0;
   const animations = new Set<Animation>();
 
-  const setVars = (dx: number, dy: number, progress: number) => {
-    const el = stage.value;
-    if (!el) return;
-    el.style.setProperty('--deck-dx', `${dx}px`);
-    el.style.setProperty('--deck-dy', `${dy}px`);
-    el.style.setProperty('--deck-p', String(progress));
-  };
-
   const clearInline = () => {
     const el = card.value;
     if (el) {
       el.style.removeProperty('transform');
       el.style.removeProperty('filter');
       el.style.removeProperty('opacity');
-    }
-    const host = stage.value;
-    if (host) {
-      host.style.removeProperty('--deck-dx');
-      host.style.removeProperty('--deck-dy');
-      host.style.removeProperty('--deck-p');
     }
   };
 
@@ -89,10 +75,9 @@ export const useCardDeck = ({ stage, card, step, reducedMotion }: CardDeckGestur
   const paint = () => {
     frame = 0;
     if (!drag || !card.value) return;
-    const next = dragFrame(drag, width(), reducedMotion());
-    card.value.style.transform = next.transform;
-    card.value.style.filter = next.filter;
-    setVars(next.dx, next.dy, next.progress);
+    // 只写被拖的这张卡的 transform。以前每帧还往舞台上写三个 CSS 变量（没有任何样式在用），
+    // 祖先上的自定义属性一变，整张大卡连同里面整段设置表单每帧都要重算样式——拖起来一顿一顿的。
+    card.value.style.transform = dragFrame(drag, width(), reducedMotion()).transform;
   };
 
   const cycle = async (direction: -1 | 1, fromDrag = false, vertical = false) => {

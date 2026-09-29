@@ -158,36 +158,6 @@ impl Database {
         Ok(())
     }
 
-    /// 一段本地日（含首尾）里逐日的每小时步数（只有官方给）。官方只回有步数的小时，没回的
-    /// 小时就不在结果里——界面画成空，不画 0。
-    pub fn hourly_steps(&self, start: &str, end: &str) -> Result<Vec<HourlySteps>> {
-        let parse = |value: &str| {
-            NaiveDate::parse_from_str(value, "%Y-%m-%d")
-                .map_err(|_| ZeppBridgeError::ConfigError("日期需要 YYYY-MM-DD".into()))
-        };
-        if parse(start)? > parse(end)? {
-            return Err(ZeppBridgeError::ConfigError("开始日期晚于结束日期".into()));
-        }
-        let (utc_lower, utc_upper) = utc_bounds_or_unbounded(start, end);
-        let mut stmt = self.conn.prepare(
-            "SELECT date(timestamp, 'localtime'), CAST(strftime('%H', timestamp, 'localtime') AS INTEGER), MAX(value)
-             FROM metric_samples
-             WHERE metric = 'steps_hourly' AND timestamp >= ?3 AND timestamp < ?4
-               AND date(timestamp, 'localtime') BETWEEN ?1 AND ?2
-             GROUP BY 1, 2 ORDER BY 1, 2",
-        )?;
-        let rows = stmt
-            .query_map(params![start, end, utc_lower, utc_upper], |row| {
-                Ok(HourlySteps {
-                    date: row.get(0)?,
-                    hour: row.get(1)?,
-                    steps: row.get(2)?,
-                })
-            })?
-            .collect::<std::result::Result<Vec<_>, _>>()?;
-        Ok(rows)
-    }
-
     /// 这些官方运动里还没有逐秒序列的那些（下一步去拉明细）。只看官方来源的行：
     /// 旧通道的运动由旧通道自己的明细队列补。
     pub fn official_workouts_missing_detail(&self, limit: usize) -> Result<Vec<(String, String)>> {

@@ -1,7 +1,7 @@
 import type { RouteLocationNormalized } from 'vue-router';
 import type { PageMotion } from '../lib/navigation';
 import { collapseGhost, holdGhost } from '../lib/motion/ghost';
-import { onMotionSkip } from '../lib/motion/interrupt';
+import { deferSettle, hurryAnimation, onMotionEscape, onMotionSkip } from '../lib/motion/interrupt';
 import { whenPageReady } from '../lib/motion/pageReady';
 
 type Rect = { left: number; top: number; width: number; height: number };
@@ -30,6 +30,8 @@ const SHRINK_EASE = 'cubic-bezier(.32, .72, 0, 1)';
 const PLATE_IN_MS = 90;
 /** 来处页不在缓存里时要重新读库，那张卡可能要等一会儿才出现。等的时候详情页原样留着，不盖板。 */
 const CARD_WAIT_MS = 300;
+/** 收回途中按 Esc：剩下的部分在这么长里放完（沿用原来的曲线，不是跳到终点）。 */
+const ESC_FINISH_MS = 200;
 /** 太小的东西（行内的小链接、图标）不当作「卡」：从一个字那么大长成整页没有意义。 */
 const MIN_WIDTH = 140;
 const MIN_HEIGHT = 56;
@@ -75,8 +77,16 @@ const STAYING = '.page-host > :not([class*="-leave"])';
 
 type Trail = { back: string; href: string; index: number };
 
-export const usePageMorph = () => {
+/** 正在从卡里长出来、还没揭开的那一页。Esc 撤回它。 */
+type Inflight = { el: HTMLElement; retract: () => Promise<void>; revealed: boolean; aborted: boolean };
+
+export const usePageMorph = (options: { back: () => void }) => {
   let pressed: HTMLElement | null = null;
+  let inflight: Inflight | null = null;
+  /** 撤回后回到的来处页：它进场时不再淡入（它刚才一直在板的四周露着）。 */
+  let resumeStill = false;
+  /** 进过场的页面（KeepAlive 缓存的会原样回来）。 */
+  const entered = new WeakSet<Element>();
   let expandFrom: { rect: Rect; radius: number } | null = null;
   let collapseTo: Trail | null = null;
   /** 每个详情页是从哪张卡展开来的：键是详情页的 fullPath。 */
@@ -133,6 +143,16 @@ export const usePageMorph = () => {
       那就是「点开闪一下」。真实页面只动 opacity / transform，整页不逐帧重画。 */
   const onEnter = (el: Element) => {
     clean(el);
+    // 缓存页回场：卡片入场动画（material.css 的 card-enter）不再从头放一遍——
+    // 否则每回一次概览，所有卡片连同心率图都像重新加载了一次。
+    if (entered.has(el)) el.classList.add('page-revisit');
+    entered.add(el);
+    if (resumeStill && el instanceof HTMLElement) {
+      resumeStill = false;
+      el.style.transition = 'none';
+      el.style.opacity = '1';
+      window.setTimeout(() => { el.style.transition = ''; el.style.opacity = ''; }, 120);
+    }
     const origin = expandFrom;
     expandFrom = null;
     const viewport = viewportOf();
@@ -151,18 +171,39 @@ export const usePageMorph = () => {
     // .999 慢慢降到 0，板还没长满时新页就半透明地叠在旧页上——那也是「闪一下」。
     el.style.transition = 'none';
     el.style.opacity = '0';
-    // 被 Esc 打断过：后面的揭开也一起快放，不然快进完长大那一段，又慢悠悠地淡入。
+    // 被别的切页打断过：后面的揭开也一起快放。
     let hurry = false;
     const forget = onMotionSkip(() => { hurry = true; });
+    // 板还没揭开时按 Esc：不进去了——板原路缩回那张卡，路由退回来处。
+    const mine: Inflight = { el, retract: () => ghost.retract(), revealed: false, aborted: false };
+    inflight = mine;
+    const forgetEscape = onMotionEscape(() => {
+      if (inflight !== mine || mine.revealed || mine.aborted) return false;
+      mine.aborted = true;
+      forgetEscape();
+      void mine.retract();
+      // 来处页一直在板的四周露着，回到场上时不要再从透明淡入一遍。
+      resumeStill = true;
+      window.setTimeout(() => { resumeStill = false; }, 1000);
+      deferSettle();
+      options.back();
+      return true;
+    });
     void Promise.all([ghost.grown, whenPageReady(READY_TIMEOUT_MS)]).then(() => {
       forget();
+      if (mine.aborted) return;
+      mine.revealed = true;
       el.style.opacity = '';
       const reveal = el.animate(
         [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }],
         { duration: hurry ? 90 : 220, easing: 'cubic-bezier(.2, .8, .2, 1)' },
       );
       // 揭开放完再把过渡还回去：这时 opacity 已经是 1，不会再触发一次过渡。
-      const restore = () => { el.style.transition = ''; };
+      const restore = () => {
+        el.style.transition = '';
+        forgetEscape();
+        if (inflight === mine) inflight = null;
+      };
       reveal.finished.then(restore, restore);
       ghost.release(hurry ? 90 : 200);
     });
@@ -203,6 +244,12 @@ export const usePageMorph = () => {
   const onLeave = (el: Element) => {
     const trail = collapseTo;
     collapseTo = null;
+    // Esc 撤回的那一页：它从头到尾没露过面，板已经在往回缩，直接收场。
+    if (inflight && inflight.el === el && inflight.aborted) {
+      inflight = null;
+      if (el instanceof HTMLElement) endLeave(el);
+      return;
+    }
     const viewport = viewportOf();
     const host = main()?.parentElement;
     if (!trail || !(el instanceof HTMLElement)) return;
@@ -245,6 +292,15 @@ export const usePageMorph = () => {
       };
       void plate.landed.then(light);
       plate.done.addEventListener('cancel', light);
+      // 收回途中按 Esc：剩下的这段在 200ms 里放完，保留原来的曲线——板照样落到卡上、卡照样
+      // 亮起来，只是快一点；不再一下跳到终点。
+      const escaping = [...plate.plate.getAnimations(), fade, ...el.getAnimations()];
+      const forgetEscape = onMotionEscape(() => {
+        for (const animation of escaping) hurryAnimation(animation, ESC_FINISH_MS);
+        return true;
+      });
+      const release = () => forgetEscape();
+      plate.done.finished.then(release, release);
       fade.finished.then(() => endLeave(el), () => endLeave(el));
     });
   };

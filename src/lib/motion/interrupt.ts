@@ -10,10 +10,59 @@
  *
  * 切页时（AppShell 的 router.beforeEach）也调一次 settleMotion：上一段动效还没放完就又
  * 切页，先让它收尾，免得旧的幽灵板压在新页上。
+ *
+ * 「走一段路」的动效可以自己接管 Esc（onMotionEscape）：从卡片展开进详情页、打开设置卡，
+ * 放到一半按 Esc 的意思是「不进去了」，应该原路缩回去——快进到终点反而是把人塞进了
+ * 二级页。接管的处理函数返回 true 表示这次 Esc 它用掉了，不再快进别的动画。
  */
 const FAST_MS = 90;
 
 const waiting = new Set<() => void>();
+const escapers: Array<() => boolean> = [];
+/** 已经在「撤回 / 收尾」的动画：它们本身就是对打断的回应，再被快进就又成了一下硬跳。 */
+const exempt = new WeakSet<Animation>();
+
+let skipUntil = 0;
+
+/**
+ * 接下来一小段时间里的 settleMotion 不快进任何东西。Esc 撤回一段动效时，紧跟着的切页
+ * （router.beforeEach 里的 settleMotion）会把正在倒放的动画压成一下跳——先打个招呼。
+ */
+export const deferSettle = (ms = 300): void => {
+  skipUntil = (typeof performance !== 'undefined' ? performance.now() : Date.now()) + ms;
+};
+
+/** 这段动画不参与 settleMotion 的快进。 */
+export const exemptFromSettle = (animation: Animation): Animation => {
+  exempt.add(animation);
+  return animation;
+};
+
+/** 把一段动画剩下的部分压进 `ms` 毫秒里放完（保留它自己的缓动）。 */
+export const hurryAnimation = (animation: Animation, ms: number): void => {
+  const left = remainingMs(animation);
+  if (left <= ms) return;
+  const next = animation.playbackRate * (left / Math.max(ms, 1));
+  if (typeof animation.updatePlaybackRate === 'function') animation.updatePlaybackRate(next);
+  else animation.playbackRate = next;
+};
+
+/** 登记一段自己处理 Esc 的动效（后登记的先问）；返回注销函数。 */
+export const onMotionEscape = (handler: () => boolean): (() => void) => {
+  escapers.push(handler);
+  return () => {
+    const index = escapers.lastIndexOf(handler);
+    if (index >= 0) escapers.splice(index, 1);
+  };
+};
+
+/** 问一遍接管了 Esc 的动效；有一个用掉了就返回 true。 */
+export const escapeMotion = (): boolean => {
+  for (const handler of [...escapers].reverse()) {
+    if (handler()) return true;
+  }
+  return false;
+};
 
 /** 登记一段「在等」的动效；返回注销函数。打断时回调被调用一次并自动注销。 */
 export const onMotionSkip = (skip: () => void): (() => void) => {
@@ -46,7 +95,7 @@ export const worthInterrupting = (animation: Animation): boolean => {
 
 const running = (): Animation[] =>
   typeof document !== 'undefined' && typeof document.getAnimations === 'function'
-    ? document.getAnimations().filter((a) => remainingMs(a) > 0 && worthInterrupting(a))
+    ? document.getAnimations().filter((a) => !exempt.has(a) && remainingMs(a) > 0 && worthInterrupting(a))
     : [];
 
 /**
@@ -54,17 +103,12 @@ const running = (): Animation[] =>
  * 比如关弹窗、合上设置卡）。
  */
 export const settleMotion = (ms = FAST_MS): boolean => {
+  if ((typeof performance !== 'undefined' ? performance.now() : Date.now()) < skipUntil) return false;
   const hooks = [...waiting];
   waiting.clear();
   for (const hook of hooks) hook();
   const animations = running();
-  for (const animation of animations) {
-    const left = remainingMs(animation);
-    if (left <= ms) continue;
-    const next = animation.playbackRate * (left / Math.max(ms, 1));
-    if (typeof animation.updatePlaybackRate === 'function') animation.updatePlaybackRate(next);
-    else animation.playbackRate = next;
-  }
+  for (const animation of animations) hurryAnimation(animation, ms);
   return hooks.length > 0 || animations.length > 0;
 };
 
@@ -72,7 +116,7 @@ export const settleMotion = (ms = FAST_MS): boolean => {
 export const installMotionInterrupt = (): (() => void) => {
   const onKeydown = (event: KeyboardEvent) => {
     if (event.key !== 'Escape' || event.repeat || event.isComposing) return;
-    if (!settleMotion()) return;
+    if (!escapeMotion() && !settleMotion()) return;
     event.preventDefault();
     event.stopImmediatePropagation();
   };

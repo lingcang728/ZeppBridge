@@ -21,7 +21,8 @@ import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { zeppSemanticColors } from '../lib/echartsTheme';
 import { createLoadSeq } from '../lib/loadSeq';
-import { indexSeries, SERIES_RANGE_DAYS, seriesRanges, type SeriesRangeDays } from '../lib/metricSeries';
+import { indexSeries, SERIES_FETCH_DAYS, SERIES_RANGE_DAYS, seriesRanges, sliceIndexed, type SeriesRangeDays } from '../lib/metricSeries';
+import { trackRangeSwap } from '../lib/chartSwap';
 import type { MetricSeries } from '../types';
 import { defineMessages, useMessages } from '../i18n';
 
@@ -103,7 +104,7 @@ const messages = defineMessages(
 );
 const t = useMessages(messages);
 
-const { dataRevision, appStatus } = useSyncController();
+const { dataRevision } = useSyncController();
 
 interface ActivityCard {
   metric: string;
@@ -149,13 +150,15 @@ const CARDS = computed<ActivityCard[]>(() => [
 
 const ranges = computed(() => seriesRanges());
 const rangeDays = ref<SeriesRangeDays>(SERIES_RANGE_DAYS[0]);
-const series = ref<Record<string, MetricSeries>>({});
+/* 一次取最长那档，切范围只在本地切（lib/metricSeries.ts 的 sliceSeries）：点下去不用等查库。 */
+const fullSeries = ref<Record<string, MetricSeries>>({});
+const series = computed(() => sliceIndexed(fullSeries.value, rangeDays.value));
+trackRangeSwap(rangeDays);
 const loading = ref(true);
 const initialLoading = useFirstLoad(loading);
 const error = ref<string | null>(null);
 const loadSeq = createLoadSeq();
 
-const hasOfficial = computed(() => appStatus.value?.data_source === 'official' || appStatus.value?.data_source === 'both');
 const cards = computed(() => CARDS.value.map((card) => ({ ...card, series: series.value[card.metric] ?? null })));
 const anyData = computed(() => cards.value.some((card) => (card.series?.points.length ?? 0) > 0));
 
@@ -165,20 +168,20 @@ const load = async () => {
   error.value = null;
   if (!isDesktop()) {
     if (!loadSeq.isCurrent(seq)) return;
-    series.value = {};
+    fullSeries.value = {};
     loading.value = false;
     error.value = t.value.desktopOnly;
     return;
   }
   try {
     const next = indexSeries(
-      await backend.getMetricSeries([...METRICS], rangeDays.value),
+      await backend.getMetricSeries([...METRICS], SERIES_FETCH_DAYS),
     );
     if (!loadSeq.isCurrent(seq)) return;
-    series.value = next;
+    fullSeries.value = next;
   } catch (cause) {
     if (!loadSeq.isCurrent(seq)) return;
-    series.value = {};
+    fullSeries.value = {};
     error.value = toUserMessage(cause, t.value.loadFailed);
   } finally {
     if (loadSeq.isCurrent(seq)) loading.value = false;
@@ -186,7 +189,6 @@ const load = async () => {
 };
 
 onMounted(() => { void load(); });
-watch(rangeDays, () => { void load(); });
 watch(dataRevision, () => { void load(); });
 </script>
 
@@ -220,8 +222,8 @@ watch(dataRevision, () => { void load(); });
         <Icon name="info" :size="14" />
         {{ t.noneInRange }}
       </p>
-      <!-- 官方授权才有每小时步数；没连官方的账号不出现这张卡。 -->
-      <HourlyStepsCard v-if="hasOfficial" :days="rangeDays" />
+      <!-- 每小时步数：旧通道的逐分钟记录为主（完整），官方授权的按小时汇总补缺。两边都没有时卡片自己说明。 -->
+      <HourlyStepsCard :days="rangeDays" />
       <div class="trend-grid" :style="trendGridStyle(cards.length)">
         <MetricTrendCard
           v-for="card in cards"

@@ -20,8 +20,6 @@ export interface DeckFrame {
   dy: number;
 }
 
-const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
-
 export const DECK_FOLLOW = 0.85;
 
 /** 被拖着的那张卡此刻的样子：跟手位移 + 一点平面旋转。不模糊、不做 3D、不放大——
@@ -30,8 +28,9 @@ export const DECK_FOLLOW = 0.85;
 export function dragFrame(drag: DeckDrag, width: number, _reducedMotion = false): DeckFrame {
   const safeWidth = Math.max(1, width);
   const dx = drag.dx * DECK_FOLLOW;
-  // 竖向拖只是翻页的另一种手势，不需要整张卡跟着上下跑太远。
-  const dy = clamp(drag.dy * DECK_FOLLOW, -160, 160);
+  // 竖向和横向一样不设边界：拖到哪卡就在哪。以前竖向卡在 ±160px，拖过去卡片被一刀
+  // 截住不动了，手却还在走。
+  const dy = drag.dy * DECK_FOLLOW;
   const progress = Math.min(1, Math.hypot(drag.dx, drag.dy) / 240);
   const r = (value: number) => Number(value.toFixed(2));
   return {

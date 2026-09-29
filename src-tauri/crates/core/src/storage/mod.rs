@@ -148,6 +148,7 @@ mod estimate;
 mod event_windows;
 mod freshness;
 mod guards;
+mod hourly_steps;
 mod hr_zones;
 mod ingest;
 mod maintenance;

@@ -6,6 +6,11 @@ import type { TimedValue } from '../../lib/chartGaps';
 import type { ChartPalette } from '../../lib/echartsTheme';
 import { nearestByX, niceTicks, smoothPath, splitAtGaps, timeTicks, type PlotPoint } from '../../lib/miniChart';
 
+/* 描线动画整个会话只放一次。概览页是 KeepAlive 缓存的：从详情页返回时它被重新插回文档，
+   CSS 动画会从头再放——于是每次回到概览，心率线都「重新画一遍」。第一次画完就摘掉这个类，
+   之后回场、重建都直接是画好的样子。 */
+let introPlayed = false;
+
 const props = defineProps<{
   points: TimedValue[];
   color: string;
@@ -25,6 +30,8 @@ const width = ref(0);
 const hover = ref<(PlotPoint & TimedValue) | null>(null);
 const fillId = `hr-fill-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
 let observer: ResizeObserver | null = null;
+const intro = ref(!introPlayed);
+let introTimer = 0;
 
 const plotWidth = computed(() => Math.max(width.value - PAD.left - PAD.right, 1));
 const plotBottom = HEIGHT - PAD.bottom;
@@ -70,12 +77,19 @@ onMounted(() => {
   apply();
   observer = new ResizeObserver(apply);
   observer.observe(host.value);
+  if (intro.value) {
+    introPlayed = true;
+    introTimer = window.setTimeout(() => { intro.value = false; }, 1000);
+  }
 });
-onBeforeUnmount(() => observer?.disconnect());
+onBeforeUnmount(() => {
+  observer?.disconnect();
+  window.clearTimeout(introTimer);
+});
 </script>
 
 <template>
-  <div ref="host" class="hr-mini" @pointermove="onMove" @pointerleave="hover = null">
+  <div ref="host" :class="['hr-mini', { intro }]" @pointermove="onMove" @pointerleave="hover = null">
     <svg v-if="width" :viewBox="`0 0 ${width} ${HEIGHT}`" role="img" :aria-label="label">
       <defs>
         <linearGradient :id="fillId" x1="0" y1="0" x2="0" y2="1">
@@ -110,8 +124,8 @@ onBeforeUnmount(() => observer?.disconnect());
 .hr-mini { position: relative; width: 100%; height: 198px; }
 .hr-mini svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .axis text { font-size: 14.5px; font-variant-numeric: tabular-nums; }
-.line { stroke-dasharray: 1; stroke-dashoffset: 0; animation: hr-draw 900ms cubic-bezier(.22, 1, .36, 1) both; }
-.area { animation: hr-fade 900ms ease both; }
+.intro .line { stroke-dasharray: 1; stroke-dashoffset: 0; animation: hr-draw 900ms cubic-bezier(.22, 1, .36, 1) both; }
+.intro .area { animation: hr-fade 900ms ease both; }
 @keyframes hr-draw { from { stroke-dashoffset: 1; } }
 @keyframes hr-fade { from { opacity: 0; } }
 .hr-tip {
@@ -126,6 +140,6 @@ onBeforeUnmount(() => observer?.disconnect());
   transform: translate(-50%, calc(-100% - 12px));
 }
 @media (prefers-reduced-motion: reduce) {
-  .line, .area { animation: none; }
+  .intro .line, .intro .area { animation: none; }
 }
 </style>

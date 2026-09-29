@@ -19,7 +19,9 @@ import Icon from '../Icon.vue';
 import DeckCoverflow from './DeckCoverflow.vue';
 import { useCardDeck } from '../../composables/useCardDeck';
 import { useDeckMorph } from '../../composables/useDeckMorph';
+import { staggerOrder } from '../../lib/deck/morph';
 import { wrapIndex } from '../../lib/deck/physics';
+import { deferSettle, onMotionEscape } from '../../lib/motion/interrupt';
 import { defineMessages, useMessages } from '../../i18n';
 
 const messages = defineMessages(
@@ -106,29 +108,29 @@ const centerId = ref<string | null>(props.activeId ?? props.cards[0]?.id ?? null
 
 const morph = useDeckMorph({ overview, card: cardEl, reducedMotion });
 
-/* 卡包 ↔ coverflow：旧形态先退场（卡包自下而上叠回第一张身后 / coverflow 缩小淡出），
-   换形态，新形态再进场（像发牌一样依次展开 / coverflow 浮上来）。以前是每张卡从旧位置
-   等比飞到新位置：两种形态的卡形状对不上，八张卡斜着乱飞。
+/* 卡包 ↔ coverflow：像洗牌一样——先记下每张卡此刻在画面上的位置（半路打断时就是它们
+   正飞到的位置），换形态，再让每张卡从那儿飞到新位置：抽出来时从正中那张往两边依次出发，
+   插回去时反过来。（上一版改成了「叠起 / 发牌」，用户更喜欢这种飞出、收拢。）
+   随时可以再按一次：从每张卡此刻的位置接着飞回去。
    过渡期间整组卡不接指针（is-switching）；展开以后，指针要真的挪动过一段，卡包的悬停
    让位才生效（armed）——否则「展开全部」那一下指针正好落在某张卡上，后面的卡立刻往下
    一让，看上去就是点完闪一下、排版跳一下。 */
 const switching = ref(false);
 const armed = ref(false);
 let armFrom: { x: number; y: number } | null = null;
+let switchToken = 0;
 const switchLayout = async (next: Layout) => {
-  if (next === layout.value || switching.value) return;
+  if (next === layout.value) return;
+  const mine = ++switchToken;
   switching.value = true;
   armed.value = false;
   armFrom = null;
-  try {
-    await morph.leaveLayout(layout.value);
-    deckWidth.value = root.value?.clientWidth ?? deckWidth.value;
-    layout.value = next;
-    await nextTick();
-    await morph.enterLayout(next);
-  } finally {
-    switching.value = false;
-  }
+  const before = morph.snapshot();
+  deckWidth.value = root.value?.clientWidth ?? deckWidth.value;
+  layout.value = next;
+  await nextTick();
+  const landed = morph.fly(before, staggerOrder(props.cards.map((card) => card.id), centerId.value, next === 'cover'));
+  void landed.then(() => { if (mine === switchToken) switching.value = false; });
   try {
     window.localStorage.setItem(LAYOUT_KEY, next);
   } catch {
@@ -256,13 +258,25 @@ const onDocClick = (event: MouseEvent) => {
   requestClose();
 };
 
+/* 打开到一半按 Esc：不开了——大卡和板一起倒回源卡（lib/motion/interrupt.ts 先问这里）。
+   紧接着的路由切换会调 settleMotion，先让它这一次别快进，不然倒放会被压成一下跳。 */
+let forgetEscape: (() => void) | null = null;
+
 onMounted(() => {
+  forgetEscape = onMotionEscape(() => {
+    if (!props.activeId || !morph.opening()) return false;
+    deferSettle();
+    lastToggleAt = performance.now();
+    emit('close');
+    return true;
+  });
   deckWidth.value = root.value?.clientWidth ?? 0;
   document.addEventListener('keydown', onKeydown);
   document.addEventListener('pointerdown', onDocPointerDown, true);
   document.addEventListener('click', onDocClick);
 });
 onBeforeUnmount(() => {
+  forgetEscape?.();
   document.removeEventListener('keydown', onKeydown);
   document.removeEventListener('pointerdown', onDocPointerDown, true);
   document.removeEventListener('click', onDocClick);

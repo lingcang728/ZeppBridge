@@ -27,7 +27,8 @@ import SegmentTrack from '../components/SegmentTrack.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
-import { indexSeries, SERIES_RANGE_DAYS, seriesRanges, type SeriesRangeDays } from '../lib/metricSeries';
+import { indexSeries, SERIES_FETCH_DAYS, SERIES_RANGE_DAYS, seriesRanges, sliceByDate, sliceIndexed, type SeriesRangeDays } from '../lib/metricSeries';
+import { trackRangeSwap } from '../lib/chartSwap';
 import { isFiniteNumber } from '../lib/format';
 import type { DailyHeartRateExtreme, HeartRatePoint, MetricSeries } from '../types';
 import { useMessages } from '../i18n';
@@ -41,7 +42,10 @@ const TREND_METRICS = ['resting_hr', 'hrv', 'hrv_rmssd'] as const;
 
 const ranges = computed(() => seriesRanges());
 const rangeDays = ref<SeriesRangeDays>(SERIES_RANGE_DAYS[0]);
-const series = ref<Record<string, MetricSeries>>({});
+/* 趋势一次取最长那档，切范围只在本地切（lib/metricSeries.ts 的 sliceSeries）：点下去不用等查库。 */
+const fullSeries = ref<Record<string, MetricSeries>>({});
+const series = computed(() => sliceIndexed(fullSeries.value, rangeDays.value));
+trackRangeSwap(rangeDays);
 const dayPoints = ref<HeartRatePoint[]>([]);
 /*
  * 每日最高心率（Reddit p74fy0b：Zepp App 显示 104，原始数据峰值超过 120）。
@@ -51,7 +55,8 @@ const dayPoints = ref<HeartRatePoint[]>([]);
  * 是这块表的最大心率设定值（划分区间用的），不是当天实测峰值。把它当成对照
  * 的另一半，就是又造一个「界面上有个数但它不是你以为的意思」。
  */
-const dailyExtremes = ref<DailyHeartRateExtreme[]>([]);
+const fullExtremes = ref<DailyHeartRateExtreme[]>([]);
+const dailyExtremes = computed(() => sliceByDate(fullExtremes.value, rangeDays.value));
 /** 少于这个样本数的一天，它的 max 不能当成完整峰值看。 */
 const SPARSE_SAMPLE_THRESHOLD = 60;
 const sparseDays = computed(
@@ -88,7 +93,8 @@ const clock = (value: number) => displayDateTimeFormatter({
 const dayChartOption = computed(() => {
   const data = insertNullBreaks(points.value, HR_GAP_BREAK_MS);
   return {
-    animationDuration: 700,
+    // 不扫入：这张图每次进页面都是新建的，从左往右画一遍读起来就是「心率又重画了」。
+    animationDuration: 0,
     grid: { left: 40, right: 18, top: 16, bottom: 28 },
     tooltip: {
       trigger: 'axis',
@@ -175,17 +181,17 @@ const load = async (opts?: { trendsOnly?: boolean }) => {
   extremesError.value = null;
   if (!isDesktop()) {
     if (!loadSeq.isCurrent(seq)) return;
-    series.value = {};
+    fullSeries.value = {};
     if (daySeq !== null) dayPoints.value = [];
-    dailyExtremes.value = [];
+    fullExtremes.value = [];
     if (daySeq !== null) loading.value = false;
     error.value = t.value.desktopOnly;
     return;
   }
   const [day, trends, extremes] = await Promise.allSettled([
     trendsOnly ? Promise.resolve(dayPoints.value) : backend.getHeartRateSeries(24),
-    backend.getMetricSeries([...TREND_METRICS], rangeDays.value),
-    backend.getDailyHeartRateExtremes(rangeDays.value),
+    backend.getMetricSeries([...TREND_METRICS], SERIES_FETCH_DAYS),
+    backend.getDailyHeartRateExtremes(SERIES_FETCH_DAYS),
   ]);
   const dayCommitted = daySeq !== null && dayLoadSeq.isCurrent(daySeq);
   if (dayCommitted) {
@@ -195,8 +201,8 @@ const load = async (opts?: { trendsOnly?: boolean }) => {
   }
   const trendsCommitted = loadSeq.isCurrent(seq);
   if (trendsCommitted) {
-    series.value = trends.status === 'fulfilled' ? indexSeries(trends.value) : {};
-    dailyExtremes.value = extremes.status === 'fulfilled' ? extremes.value : [];
+    fullSeries.value = trends.status === 'fulfilled' ? indexSeries(trends.value) : {};
+    fullExtremes.value = extremes.status === 'fulfilled' ? extremes.value : [];
     trendsError.value = trends.status === 'rejected' ? toUserMessage(trends.reason, t.value.trendsFailed) : null;
     extremesError.value = extremes.status === 'rejected' ? toUserMessage(extremes.reason, t.value.dailyMaxFailed) : null;
   }
@@ -211,9 +217,6 @@ const load = async (opts?: { trendsOnly?: boolean }) => {
 const dailyMaxChartOption = computed(() => {
   const rows = dailyExtremes.value;
   return {
-    animationDuration: 700,
-    animationDurationUpdate: 520,
-    animationEasingUpdate: 'cubicInOut' as const,
     grid: { left: 40, right: 12, top: 28, bottom: 26 },
     legend: {
       data: [t.value.dailyMaxLegendMax, t.value.dailyMaxLegendAvg],
@@ -275,7 +278,6 @@ const dailyMaxChartOption = computed(() => {
 const shownDailyMax = useQueuedOption(dailyMaxChartOption);
 
 onMounted(() => { void load(); });
-watch(rangeDays, () => { void load({ trendsOnly: true }); });
 watch(dataRevision, () => { void load(); });
 
 const trendsSummary = computed(() => trendCards.value.map((card) => card.label).join(' · '));

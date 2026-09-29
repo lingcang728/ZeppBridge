@@ -129,3 +129,72 @@ fn official_payloads_are_marked_and_replay_through_the_same_path() {
     );
     assert!(db.hourly_steps("2026-09-29", "2026-09-27").is_err());
 }
+
+/// 旧通道一天的逐分钟明细（每分钟 8 字节，第 3 个字节是步数）。
+fn legacy_day(date: &str, steps: &[(usize, u8)]) -> serde_json::Value {
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+    let mut bytes = vec![0u8; 1440 * 8];
+    for (minute, count) in steps {
+        bytes[minute * 8 + 2] = *count;
+    }
+    serde_json::json!({ "date_time": date, "device_id": "dev", "data": STANDARD.encode(bytes) })
+}
+
+fn insert_legacy(db: &Database, key: &str, fetched_at: &str, days: Vec<serde_json::Value>) {
+    db.conn
+        .execute(
+            "INSERT INTO raw_records(stream, source_key, source_scope, start_utc, payload, payload_hash, fetched_at)
+             VALUES ('sleep', ?1, 'device', ?2, ?3, ?1, ?2)",
+            params![key, fetched_at, serde_json::json!({ "code": 1, "data": days }).to_string()],
+        )
+        .unwrap();
+}
+
+#[test]
+fn hourly_steps_prefer_the_legacy_minute_record_and_fall_back_to_official() {
+    let db = Database::in_memory().unwrap();
+    let official = vec![
+        serde_json::json!({"date": "2026-09-28", "hour": 11, "steps": 208}),
+        serde_json::json!({"date": "2026-09-27", "hour": 8, "steps": 77}),
+    ];
+    for raw in split_records(OfficialKind::ActivityHourly, official, "Asia/Shanghai") {
+        db.persist_fetched_record(&raw).unwrap();
+    }
+    // 更旧的一份拉取（数字不同）不能盖过新拉到的那份。
+    insert_legacy(
+        &db,
+        "band_data:detail:2026-09-26:2026-09-28",
+        "2026-09-28T01:00:00Z",
+        vec![legacy_day("2026-09-28", &[(9 * 60 + 5, 1)])],
+    );
+    insert_legacy(
+        &db,
+        "band_data:detail:2026-09-28:2026-09-29",
+        "2026-09-29T01:00:00Z",
+        vec![legacy_day(
+            "2026-09-28",
+            &[(9 * 60 + 5, 100), (9 * 60 + 30, 50), (22 * 60, 30)],
+        )],
+    );
+
+    let rows = db.hourly_steps("2026-09-27", "2026-09-29").unwrap();
+    let got: Vec<(&str, i64, f64)> = rows
+        .iter()
+        .map(|row| (row.date.as_str(), row.hour, row.steps))
+        .collect();
+    // 9/28 旧通道有完整的逐分钟记录：用它，官方那个零星的小时不掺进来；9/27 只有官方。
+    assert_eq!(
+        got,
+        vec![
+            ("2026-09-27", 8, 77.0),
+            ("2026-09-28", 9, 150.0),
+            ("2026-09-28", 22, 30.0)
+        ]
+    );
+}
+
+#[test]
+fn legacy_hourly_steps_ignore_records_of_an_unverified_length() {
+    let item = serde_json::json!({ "date_time": "2026-09-28", "data": "AAAA" });
+    assert!(crate::storage::hourly_steps::legacy_hourly_steps(&item).is_none());
+}

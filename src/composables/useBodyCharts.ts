@@ -15,7 +15,7 @@ const hourStep = (points: { ts: number }[]): number => {
 };
 
 /* 身体状态页的两张特殊图：饮食的三大营养素环形图、最近 24 小时的压力曲线（从 BodyStatus.vue 搬出来）。 */
-export const useBodyCharts = (series: Ref<Record<string, MetricSeries>>) => {
+export const useBodyCharts = (series: Readonly<Ref<Record<string, MetricSeries>>>) => {
   const t = useMessages(bodyStatusMessages);
   /**
    * 三大营养素各自贡献了多少热量。
