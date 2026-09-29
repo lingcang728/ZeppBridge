@@ -700,6 +700,15 @@ export default {
       'ui.ai_template.hr_drift.prompt':
         'Analise a deriva de frequência cardíaca deste treino: a subida a ritmo constante, julgada contra duas semanas de sono e carga de treino — fadiga, clima ou mudança de condicionamento?',
       fallbackIssue: 'Uma nota de estado não pôde ser reconhecida',
+      'ui.ai_template.sleep_review.name': 'Sono recente',
+      'ui.ai_template.sleep_review.prompt':
+        'Revise minhas duas últimas semanas de sono: duração e regularidade dos horários de dormir e acordar, se a proporção de sono profundo e REM mudou e como evoluíram a frequência cardíaca noturna e a VFC. Aponte as noites que se destacam e sugira causas prováveis com base nos treinos do dia e nas minhas notas.',
+      'ui.ai_template.recovery_trend.name': 'Tendência de recuperação',
+      'ui.ai_template.recovery_trend.prompt':
+        'Nas últimas quatro semanas, minha recuperação está melhorando ou piorando? Veja frequência cardíaca de repouso, VFC, sono e carga de treino, se batem entre si, e separe tendências reais da variação do dia a dia. Diga claramente onde faltam dados.',
+      'ui.ai_template.week_review.name': 'Esta semana',
+      'ui.ai_template.week_review.prompt':
+        'Revise esta semana: como sono, recuperação, frequência cardíaca e atividade se comparam ao habitual, quais mudanças merecem atenção e quais são variação normal. Fique nos dados, sem diagnóstico, e diga claramente onde faltam dados.',
     },
 
     'lib/bridge/errors': {
@@ -1918,6 +1927,9 @@ Responda em Markdown.`,
       example1: 'Como tenho dormido ultimamente, e o que devo mudar?',
       example2: 'A carga de treino desta semana estava certa para mim?',
       example3: 'Minha recuperação está melhorando ou piorando?',
+      groupDaily: 'Dia a dia',
+      groupRun: 'Corrida',
+      groupOther: 'Mais',
     },
 
     'components/ai/GraphNodePopover': {

@@ -786,6 +786,15 @@ export default {
       'ui.ai_template.hr_drift.prompt':
         'Analyseer de hartslagdrift in deze training: de stijging bij constant tempo, beoordeeld tegen twee weken slaap en trainingsbelasting — vermoeidheid, weer, of een verandering in conditie?',
       fallbackIssue: 'Een statusnotitie kon niet worden herkend',
+      'ui.ai_template.sleep_review.name': 'Recente slaap',
+      'ui.ai_template.sleep_review.prompt':
+        'Bekijk mijn slaap van de afgelopen twee weken: duur en hoe regelmatig bedtijd en opstaantijd waren, of het aandeel diepe en REM-slaap veranderde, en hoe hartslag en HRV zich ’s nachts ontwikkelden. Wijs de nachten aan die opvallen en noem waarschijnlijke oorzaken op basis van de trainingen van die dag en mijn notities.',
+      'ui.ai_template.recovery_trend.name': 'Hersteltrend',
+      'ui.ai_template.recovery_trend.prompt':
+        'Wordt mijn herstel de afgelopen vier weken beter of slechter? Kijk naar rusthartslag, HRV, slaap en trainingsbelasting, of die met elkaar kloppen, en scheid echte trends van gewone dagelijkse schommelingen. Zeg duidelijk waar gegevens ontbreken.',
+      'ui.ai_template.week_review.name': 'Deze week',
+      'ui.ai_template.week_review.prompt':
+        'Blik terug op deze week: hoe slaap, herstel, hartslag en activiteit zich verhouden tot normaal, welke veranderingen opvallen en welke gewone schommelingen zijn. Blijf bij de gegevens, geen diagnose, en zeg duidelijk waar gegevens ontbreken.',
     },
     'lib/aiTask/fileName': {
       cat_attachment: 'bestanden',
@@ -2174,6 +2183,9 @@ Antwoord in Markdown.`,
       example2: 'Was de trainingsbelasting van deze week passend voor mij?',
       example3: 'Wordt mijn herstel beter of slechter?',
       examplesLabel: 'Probeer bijvoorbeeld',
+      groupDaily: 'Dagelijks',
+      groupRun: 'Hardlopen',
+      groupOther: 'Meer',
     },
     'components/ai/GraphNodePopover': {
       close: 'Sluiten',

@@ -161,11 +161,18 @@ fn v32_migration_creates_tables_and_seeds_three_builtins() {
         .unwrap();
 
     let templates = db.list_ai_task_templates().unwrap();
-    assert_eq!(templates.len(), 3);
+    assert_eq!(templates.len(), 6);
     let ids: Vec<&str> = templates.iter().map(|t| t.id.as_str()).collect();
-    assert!(ids.contains(&"recovery_run"));
-    assert!(ids.contains(&"long_run_compare"));
-    assert!(ids.contains(&"hr_drift"));
+    for id in [
+        "recovery_run",
+        "long_run_compare",
+        "hr_drift",
+        "sleep_review",
+        "recovery_trend",
+        "week_review",
+    ] {
+        assert!(ids.contains(&id), "缺内置模板 {id}");
+    }
     for template in &templates {
         assert!(template.builtin);
         assert_eq!(template.schema_version, 1);
@@ -204,12 +211,12 @@ fn v32_upgrade_from_v31_seeds_builtins_and_stays_idempotent() {
         .query_row("PRAGMA user_version", [], |row| row.get(0))
         .unwrap();
     assert_eq!(version, CURRENT_SCHEMA_VERSION);
-    assert_eq!(db.list_ai_task_templates().unwrap().len(), 3);
+    assert_eq!(db.list_ai_task_templates().unwrap().len(), 6);
     drop(db);
 
     // 只读连接接受当前 schema 版本。
     let ro = Database::open_read_only(path.clone()).unwrap();
-    assert_eq!(ro.list_ai_task_templates().unwrap().len(), 3);
+    assert_eq!(ro.list_ai_task_templates().unwrap().len(), 6);
     drop(ro);
 
     // 删掉一条内置行再迁移一次——INSERT OR IGNORE 自愈回来。
@@ -222,7 +229,7 @@ fn v32_upgrade_from_v31_seeds_builtins_and_stays_idempotent() {
         .unwrap();
     }
     let db = Database::open_migrated(&path).unwrap();
-    assert_eq!(db.list_ai_task_templates().unwrap().len(), 3);
+    assert_eq!(db.list_ai_task_templates().unwrap().len(), 6);
     let _ = std::fs::remove_dir_all(&dir);
 }
 

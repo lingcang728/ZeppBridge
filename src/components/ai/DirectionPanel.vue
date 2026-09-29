@@ -5,13 +5,12 @@
  * 模板 = 分析方向（全局框架，带推荐的数据范围）；问题 = 这次想重点问的。
  * 两者并存，最终提示词里方向在前、问题在后。
  *
- * 方向用全应用同一种可拖动的胶囊（项多时换传送带），不再是一排点选的贴片；问题和个人
- * 背景是无硬框的玻璃输入面，随内容长高，下面给几条示例问题，一点就填进去。
+ * 方向按目的分组平铺（日常状态 / 跑步训练 / 其他），一眼看完、一点就选——以前是一枚
+ * 胶囊滚轮，里面只有三道跑步题，关心睡眠的人在这一步以为这是跑步软件。问题和个人
+ * 背景是无硬框的玻璃输入面，随内容长高；下面的示例问题一点就填进去，并选上对应的方向。
  */
 import { computed } from 'vue';
 import type { AiTaskTemplate } from '../../lib/bridge/types';
-import SegmentTrack from '../SegmentTrack.vue';
-import CapsuleWheel from '../CapsuleWheel.vue';
 import { AI_TASK_PROMPT_MAX } from '../../lib/aiTask/draft';
 import { templateName, templatePromptSeed } from '../../lib/aiTask/prompt';
 import { useAiTaskDraft } from '../../composables/useAiTaskDraft';
@@ -37,6 +36,9 @@ const t = useMessages(defineMessages(
     example1: '最近睡得怎么样？有什么值得改的？',
     example2: '这周的训练量对我来说合适吗？',
     example3: '我的恢复在变好还是变差？',
+    groupDaily: '日常状态',
+    groupRun: '跑步训练',
+    groupOther: '其他方向',
   },
   {
     title: 'Direction and question',
@@ -53,6 +55,9 @@ const t = useMessages(defineMessages(
     example1: 'How have I been sleeping lately, and what should I change?',
     example2: 'Was this week’s training load right for me?',
     example3: 'Is my recovery getting better or worse?',
+    groupDaily: 'Everyday',
+    groupRun: 'Running',
+    groupOther: 'More',
   },
   {
     title: 'Enfoque y pregunta',
@@ -65,16 +70,27 @@ const t = useMessages(defineMessages(
     example1: '¿Qué tal he dormido últimamente y qué debería cambiar?',
     example2: '¿La carga de entrenamiento de esta semana fue adecuada para mí?',
     example3: '¿Mi recuperación va a mejor o a peor?',
+    groupDaily: 'Día a día',
+    groupRun: 'Carrera',
+    groupOther: 'Más',
   },
   'components/ai/DirectionPanel',
 ));
 
-/* 方向：「不指定」+ 各模板。五项以内用分段胶囊（可拖动），更多换传送带。 */
+/* 方向：「不指定」+ 按目的分组的各模板。内置模板按 id 归组，用户自存的和不认识的归「其他」。 */
 const NONE = '__none__';
-const directionItems = computed(() => [
-  { value: NONE, label: t.value.noDirection },
-  ...props.templates.map((template) => ({ value: template.id, label: templateName(template) })),
-]);
+const DAILY_IDS = ['sleep_review', 'recovery_trend', 'week_review'];
+const RUN_IDS = ['recovery_run', 'long_run_compare', 'hr_drift'];
+const directionGroups = computed(() => {
+  const item = (template: AiTaskTemplate) => ({ value: template.id, label: templateName(template) });
+  const pick = (ids: string[]) => ids.flatMap((id) => props.templates.filter((template) => template.id === id)).map(item);
+  const known = new Set([...DAILY_IDS, ...RUN_IDS]);
+  return [
+    { key: 'daily', label: t.value.groupDaily, items: pick(DAILY_IDS) },
+    { key: 'run', label: t.value.groupRun, items: pick(RUN_IDS) },
+    { key: 'other', label: t.value.groupOther, items: props.templates.filter((template) => !known.has(template.id)).map(item) },
+  ].filter((group) => group.items.length);
+});
 const activeDirection = computed(() => draft.value.template_id ?? NONE);
 const activeSeed = computed(() => {
   const template = props.templates.find((entry) => entry.id === draft.value.template_id);
@@ -90,7 +106,17 @@ const grow = (event: Event) => {
   box.style.height = 'auto';
   box.style.height = `${box.scrollHeight}px`;
 };
-const examples = computed(() => [t.value.example1, t.value.example2, t.value.example3]);
+/* 示例问题各对应一个方向：点「最近睡得怎么样」就顺带选上「最近睡眠」和它推荐的数据范围。 */
+const examples = computed(() => [
+  { text: t.value.example1, template: 'sleep_review' },
+  { text: t.value.example2, template: 'week_review' },
+  { text: t.value.example3, template: 'recovery_trend' },
+]);
+const useExample = (example: { text: string; template: string }) => {
+  const template = props.templates.find((entry) => entry.id === example.template);
+  if (template && !draft.value.template_id) setTemplate(template);
+  setPrompt(example.text);
+};
 </script>
 
 <template>
@@ -102,10 +128,15 @@ const examples = computed(() => [t.value.example1, t.value.example2, t.value.exa
     <p class="ai-step-hint">{{ t.hint }}</p>
 
     <p class="ai-label">{{ t.directionLabel }}</p>
-    <SegmentTrack v-if="directionItems.length <= 5" class="direction-track" :items="directionItems" :model-value="activeDirection"
-      :aria-label="t.directionLabel" @update:model-value="pickDirection" />
-    <CapsuleWheel v-else loop :span="260" :items="directionItems" :model-value="activeDirection"
-      :aria-label="t.directionLabel" @update:model-value="pickDirection" />
+    <div class="direction-groups" role="radiogroup" :aria-label="t.directionLabel">
+      <button type="button" role="radio" :aria-checked="activeDirection === NONE" :class="['dir-chip', { on: activeDirection === NONE }]"
+        @click="pickDirection(NONE)">{{ t.noDirection }}</button>
+      <div v-for="group in directionGroups" :key="group.key" class="dir-group">
+        <span class="dir-group-label">{{ group.label }}</span>
+        <button v-for="entry in group.items" :key="entry.value" type="button" role="radio" :aria-checked="activeDirection === entry.value"
+          :class="['dir-chip', { on: activeDirection === entry.value }]" @click="pickDirection(entry.value)">{{ entry.label }}</button>
+      </div>
+    </div>
     <p class="ai-hint">{{ activeSeed || t.directionHint }}</p>
 
     <div class="ai-field">
@@ -116,7 +147,7 @@ const examples = computed(() => [t.value.example1, t.value.example2, t.value.exa
     </div>
     <div v-if="!draft.prompt.trim()" class="examples" :aria-label="t.examplesLabel">
       <span class="examples-label">{{ t.examplesLabel }}</span>
-      <button v-for="example in examples" :key="example" type="button" class="example" @click="setPrompt(example)">{{ example }}</button>
+      <button v-for="example in examples" :key="example.text" type="button" class="example" @click="useExample(example)">{{ example.text }}</button>
     </div>
 
     <div class="ai-field">
@@ -128,7 +159,15 @@ const examples = computed(() => [t.value.example1, t.value.example2, t.value.exa
 </template>
 
 <style scoped>
-.direction-track { max-width: 100%; }
+.direction-groups { display: grid; gap: 8px; }
+.direction-groups > .dir-chip { justify-self: start; }
+.dir-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.dir-group-label { flex: 0 0 100%; color: var(--subtle); font-size: var(--fs-2xs); }
+.dir-chip { min-height: 32px; padding: 5px 13px; border: 1px solid transparent; border-radius: 999px; background: color-mix(in srgb, var(--ink) 6%, transparent);
+  color: var(--muted); font: inherit; font-size: var(--fs-xs); cursor: pointer; transition: background var(--dur-fast) ease, color var(--dur-fast) ease; }
+.dir-chip:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); color: var(--ink); }
+.dir-chip.on { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--ink); font-weight: 600; }
+.dir-chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .examples { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 2px 0; }
 .examples-label { color: var(--subtle); font-size: var(--fs-2xs); }
 .example { padding: 5px 11px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--muted);

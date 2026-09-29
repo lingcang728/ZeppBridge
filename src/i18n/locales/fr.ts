@@ -662,6 +662,15 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       'ui.ai_template.hr_drift.name': 'Dérive de fréquence cardiaque',
       'ui.ai_template.hr_drift.prompt':
         'Analyse la dérive de fréquence cardiaque de cette séance : la hausse à allure constante, jugée au regard de deux semaines de sommeil et de charge d’entraînement — fatigue, météo ou évolution de la condition ?',
+      'ui.ai_template.sleep_review.name': 'Sommeil récent',
+      'ui.ai_template.sleep_review.prompt':
+        'Passe en revue mes deux dernières semaines de sommeil : durée et régularité des heures de coucher et de réveil, évolution de la part de sommeil profond et paradoxal, et évolution de la fréquence cardiaque nocturne et de la VFC. Signale les nuits qui se démarquent et propose des causes probables à partir des séances du jour et de mes notes.',
+      'ui.ai_template.recovery_trend.name': 'Tendance de récupération',
+      'ui.ai_template.recovery_trend.prompt':
+        'Sur les quatre dernières semaines, ma récupération s’améliore-t-elle ou se dégrade-t-elle ? Regarde la fréquence cardiaque au repos, la VFC, le sommeil et la charge d’entraînement, s’ils concordent, et distingue les vraies tendances des variations quotidiennes. Indique clairement où les données manquent.',
+      'ui.ai_template.week_review.name': 'Cette semaine',
+      'ui.ai_template.week_review.prompt':
+        'Passe en revue cette semaine : comment le sommeil, la récupération, la fréquence cardiaque et l’activité se comparent à d’habitude, quels changements méritent l’attention et lesquels sont de simples variations. Tiens-toi aux données, sans diagnostic, et indique clairement où les données manquent.',
     },
 
     'lib/deviceCopy': {
@@ -1932,6 +1941,9 @@ Répondez en Markdown.`,
       example1: 'Comment ai-je dormi dernièrement, et que devrais-je changer ?',
       example2: 'La charge d’entraînement de cette semaine était-elle adaptée pour moi ?',
       example3: 'Ma récupération s’améliore-t-elle ou se dégrade-t-elle ?',
+      groupDaily: 'Au quotidien',
+      groupRun: 'Course à pied',
+      groupOther: 'Autres',
     },
 
     'components/ai/GraphNodePopover': {

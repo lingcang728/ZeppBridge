@@ -419,11 +419,15 @@ fn builtin_payload(
     serde_json::to_string(&template).expect("内置模板序列化不会失败")
 }
 
-/// 三个内置模板（A7-P1）：`builtin` 不能删除/覆盖，只能另存为用户模板。
+/// 内置模板（A7-P1）：`builtin` 不能删除/覆盖，只能另存为用户模板。
+///
+/// 前三个是跑步题；后三个（睡眠、恢复趋势、一周回顾）是 2026-09 的评审补的——
+/// 以前方向只有跑步，主要关心睡眠的人在这一步会以为这是跑步软件。启动时
+/// `INSERT OR IGNORE` 幂等种入，老库下次打开就有。
 ///
 /// 用 `LazyLock` 而不是 `const`：payload 由 serde 生成，免去手维护一段
 /// 没人复查的 JSON 字面量。
-pub(crate) static BUILTIN_TEMPLATE_SEEDS: std::sync::LazyLock<[BuiltinTemplateSeed; 3]> =
+pub(crate) static BUILTIN_TEMPLATE_SEEDS: std::sync::LazyLock<[BuiltinTemplateSeed; 6]> =
     std::sync::LazyLock::new(|| {
         [
             BuiltinTemplateSeed {
@@ -490,6 +494,72 @@ pub(crate) static BUILTIN_TEMPLATE_SEEDS: std::sync::LazyLock<[BuiltinTemplateSe
                     "请分析这次运动的心率漂移：心率与配速/功率的脱钩程度、出现的阶段，并结合近期睡眠与恢复数据推测可能的原因。",
                     &["avg_hr", "max_hr", "pace"],
                     &["heart_rate"],
+                ),
+            },
+            BuiltinTemplateSeed {
+                id: "sleep_review",
+                name: "最近睡眠",
+                payload: builtin_payload(
+                    "sleep_review",
+                    "最近睡眠",
+                    &[
+                        (AiTaskCategory::Workout, true, 14),
+                        (AiTaskCategory::Sleep, true, 14),
+                        (AiTaskCategory::Recovery, true, 14),
+                        (AiTaskCategory::HeartRate, true, 14),
+                        (AiTaskCategory::Training, false, 14),
+                        (AiTaskCategory::Body, false, 14),
+                        (AiTaskCategory::PersonalNote, true, 0),
+                        (AiTaskCategory::Attachment, true, 0),
+                    ],
+                    AiTaskDetailLevel::Standard,
+                    "请看看最近两周的睡眠：总时长、入睡和醒来时间是否规律，深睡与 REM 的占比有没有变化，夜间心率和 HRV 怎么走。指出哪几晚明显不同，并结合当天的运动和个人说明推测可能的原因。",
+                    &["sleep_score", "resting_hr"],
+                    &[],
+                ),
+            },
+            BuiltinTemplateSeed {
+                id: "recovery_trend",
+                name: "恢复趋势",
+                payload: builtin_payload(
+                    "recovery_trend",
+                    "恢复趋势",
+                    &[
+                        (AiTaskCategory::Workout, true, 28),
+                        (AiTaskCategory::Sleep, true, 28),
+                        (AiTaskCategory::Recovery, true, 28),
+                        (AiTaskCategory::HeartRate, true, 28),
+                        (AiTaskCategory::Training, true, 28),
+                        (AiTaskCategory::Body, false, 28),
+                        (AiTaskCategory::PersonalNote, true, 0),
+                        (AiTaskCategory::Attachment, true, 0),
+                    ],
+                    AiTaskDetailLevel::Summary,
+                    "请看最近四周的恢复是在变好还是变差：静息心率、HRV、睡眠和训练负荷各自的走向，它们之间是否对得上。区分真实的趋势和正常的日常波动，数据缺失的日子请如实说明。",
+                    &["resting_hr", "hrv_rmssd", "sleep_score"],
+                    &["resting_hr", "hrv_rmssd"],
+                ),
+            },
+            BuiltinTemplateSeed {
+                id: "week_review",
+                name: "这一周",
+                payload: builtin_payload(
+                    "week_review",
+                    "这一周",
+                    &[
+                        (AiTaskCategory::Workout, true, 6),
+                        (AiTaskCategory::Sleep, true, 6),
+                        (AiTaskCategory::Recovery, true, 6),
+                        (AiTaskCategory::HeartRate, true, 6),
+                        (AiTaskCategory::Training, true, 6),
+                        (AiTaskCategory::Body, true, 6),
+                        (AiTaskCategory::PersonalNote, true, 0),
+                        (AiTaskCategory::Attachment, true, 0),
+                    ],
+                    AiTaskDetailLevel::Summary,
+                    "请看看这一周：睡眠、恢复、心率和运动量相比平时有什么变化，哪些值得留意，哪些只是正常波动。只根据数据说话，不做诊断；数据缺失的日子请如实说明。",
+                    &["sleep_score", "resting_hr", "training_load"],
+                    &[],
                 ),
             },
         ]

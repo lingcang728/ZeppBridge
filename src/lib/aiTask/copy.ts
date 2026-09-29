@@ -55,6 +55,16 @@ const messages = defineMessages(
     'ui.ai_template.hr_drift.prompt':
       '请分析这次运动的心率漂移：对照同等配速下心率的上升幅度，结合前两周睡眠与训练负荷判断是疲劳、天气还是体能变化。',
 
+    'ui.ai_template.sleep_review.name': '最近睡眠',
+    'ui.ai_template.sleep_review.prompt':
+      '请看看最近两周的睡眠：时长和入睡、醒来时间是否规律，深睡与 REM 的占比有没有变化，夜间心率和 HRV 怎么走。指出哪几晚明显不同，并结合当天的运动和我的说明推测可能的原因。',
+    'ui.ai_template.recovery_trend.name': '恢复趋势',
+    'ui.ai_template.recovery_trend.prompt':
+      '最近四周我的恢复是在变好还是变差？请看静息心率、HRV、睡眠和训练负荷各自的走向、相互是否对得上，区分真实趋势和日常波动，数据缺失的日子如实说明。',
+    'ui.ai_template.week_review.name': '这一周',
+    'ui.ai_template.week_review.prompt':
+      '请看看这一周：睡眠、恢复、心率和运动量和平时比有什么变化，哪些值得留意，哪些只是正常波动。只根据数据说话，不做诊断，缺数据的日子如实说明。',
+
     /* —— 界面兜底 —— */
     fallbackIssue: '有一条状态说明无法识别',
   },
@@ -93,6 +103,16 @@ const messages = defineMessages(
     'ui.ai_template.hr_drift.prompt':
       'Analyze the heart-rate drift in this workout: the rise at constant pace, judged against two weeks of sleep and training load — fatigue, weather, or fitness change?',
 
+    'ui.ai_template.sleep_review.name': 'Recent sleep',
+    'ui.ai_template.sleep_review.prompt':
+      'Look back at my last two weeks of sleep: duration and how regular bedtime and wake time were, whether the share of deep and REM sleep changed, and how overnight heart rate and HRV moved. Point out the nights that stand out and suggest likely reasons using that day’s workouts and my notes.',
+    'ui.ai_template.recovery_trend.name': 'Recovery trend',
+    'ui.ai_template.recovery_trend.prompt':
+      'Over the last four weeks, is my recovery getting better or worse? Look at resting heart rate, HRV, sleep and training load, whether they agree with each other, and separate real trends from day-to-day noise. Say plainly where data is missing.',
+    'ui.ai_template.week_review.name': 'This week',
+    'ui.ai_template.week_review.prompt':
+      'Review this week: how sleep, recovery, heart rate and activity compare with usual, which changes are worth noticing and which are ordinary variation. Stick to the data, no diagnosis, and say plainly where data is missing.',
+
     fallbackIssue: 'A status note could not be recognized',
   },
   {
@@ -129,6 +149,16 @@ const messages = defineMessages(
     'ui.ai_template.hr_drift.name': 'Deriva de frecuencia cardíaca',
     'ui.ai_template.hr_drift.prompt':
       'Analiza la deriva de frecuencia cardíaca de esta sesión: el aumento a ritmo constante, valorado con dos semanas de sueño y carga — ¿fatiga, clima o cambio de forma?',
+
+    'ui.ai_template.sleep_review.name': 'Sueño reciente',
+    'ui.ai_template.sleep_review.prompt':
+      'Repasa mis dos últimas semanas de sueño: duración y regularidad de la hora de acostarme y de despertar, si cambió la proporción de sueño profundo y REM, y cómo evolucionaron la frecuencia cardíaca nocturna y la VFC. Señala las noches que destacan y sugiere causas probables con los entrenamientos de ese día y mis notas.',
+    'ui.ai_template.recovery_trend.name': 'Tendencia de recuperación',
+    'ui.ai_template.recovery_trend.prompt':
+      'En las últimas cuatro semanas, ¿mi recuperación va a mejor o a peor? Mira la frecuencia cardíaca en reposo, la VFC, el sueño y la carga de entrenamiento, si coinciden entre sí, y separa las tendencias reales de la variación diaria. Indica claramente dónde faltan datos.',
+    'ui.ai_template.week_review.name': 'Esta semana',
+    'ui.ai_template.week_review.prompt':
+      'Repasa esta semana: cómo se comparan el sueño, la recuperación, la frecuencia cardíaca y la actividad con lo habitual, qué cambios merecen atención y cuáles son variación normal. Cíñete a los datos, sin diagnósticos, e indica claramente dónde faltan datos.',
 
     fallbackIssue: 'No se pudo reconocer una nota de estado',
   },

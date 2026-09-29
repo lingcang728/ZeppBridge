@@ -1030,7 +1030,7 @@ impl Database {
         // `payload` 存完整的 AiTask / AiTaskTemplate JSON（schema_version=1）；
         // 其余列是列表排序、授权筛选（mcp_shared）和预览用的索引列，让
         // `ai_task_list` 与 MCP 授权路径不必逐行解析 JSON。
-        // 三个内置模板由 `BUILTIN_TEMPLATE_SEEDS` 种入：行内中文只是兜底文案，
+        // 内置模板由 `BUILTIN_TEMPLATE_SEEDS` 种入：行内中文只是兜底文案，
         // 界面按 payload 里的 `name_code` / `prompt_code` 取本地化文本。
         // 全部是 CREATE IF NOT EXISTS + INSERT OR IGNORE，无 if 守卫，
         // 每次启动幂等重跑；被删的内置行会自愈回来。

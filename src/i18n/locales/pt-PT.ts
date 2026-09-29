@@ -1128,6 +1128,15 @@ export default {
       'ui.ai_template.hr_drift.prompt':
         'Analisa a deriva da frequência cardíaca neste treino: a subida a ritmo constante, julgada contra duas semanas de sono e carga de treino — fadiga, meteorologia ou mudança de condição física?',
       fallbackIssue: 'Não foi possível reconhecer uma nota de estado',
+      'ui.ai_template.sleep_review.name': 'Sono recente',
+      'ui.ai_template.sleep_review.prompt':
+        'Revê as minhas duas últimas semanas de sono: duração e regularidade das horas de deitar e acordar, se a proporção de sono profundo e REM mudou e como evoluíram a frequência cardíaca noturna e a VFC. Assinala as noites que se destacam e sugere causas prováveis com base nos treinos do dia e nas minhas notas.',
+      'ui.ai_template.recovery_trend.name': 'Tendência de recuperação',
+      'ui.ai_template.recovery_trend.prompt':
+        'Nas últimas quatro semanas, a minha recuperação está a melhorar ou a piorar? Vê a frequência cardíaca em repouso, a VFC, o sono e a carga de treino, se batem certo entre si, e separa tendências reais da variação diária. Diz claramente onde faltam dados.',
+      'ui.ai_template.week_review.name': 'Esta semana',
+      'ui.ai_template.week_review.prompt':
+        'Revê esta semana: como o sono, a recuperação, a frequência cardíaca e a atividade se comparam com o habitual, que mudanças merecem atenção e quais são variação normal. Fica-te pelos dados, sem diagnóstico, e diz claramente onde faltam dados.',
     },
     'lib/bridge/errors': {
       desktopOnly: 'Usa a aplicação de desktop',
@@ -2089,6 +2098,9 @@ Responde em Markdown.`,
       example2: 'A carga de treino desta semana foi adequada para mim?',
       example3: 'A minha recuperação está a melhorar ou a piorar?',
       examplesLabel: 'Experimenta perguntar',
+      groupDaily: 'Dia a dia',
+      groupRun: 'Corrida',
+      groupOther: 'Mais',
     },
     'components/ai/GraphNodePopover': {
       days: 'Dias de histórico',

@@ -1337,6 +1337,15 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       'ui.ai_template.recovery_run.name': 'Erholungslauf',
       'ui.ai_template.recovery_run.prompt':
         'Das war ein Training in der Erholungsphase. Beurteile anhand der zwei Wochen Schlaf, Bereitschaft und Herzfrequenz-Kontext davor, ob die Intensität zu meinem Erholungsstand passte, und schlage das Training für die nächsten 48 Stunden vor.',
+      'ui.ai_template.sleep_review.name': 'Schlaf zuletzt',
+      'ui.ai_template.sleep_review.prompt':
+        'Blicke auf meine letzten zwei Wochen Schlaf zurück: Dauer und wie regelmäßig Einschlaf- und Aufwachzeit waren, ob sich der Anteil von Tief- und REM-Schlaf verändert hat und wie sich nächtliche Herzfrequenz und HRV entwickelt haben. Nenne die auffälligen Nächte und mögliche Gründe anhand der Trainings des Tages und meiner Notizen.',
+      'ui.ai_template.recovery_trend.name': 'Erholungstrend',
+      'ui.ai_template.recovery_trend.prompt':
+        'Wird meine Erholung in den letzten vier Wochen besser oder schlechter? Betrachte Ruhepuls, HRV, Schlaf und Trainingsbelastung, ob sie zueinander passen, und trenne echte Trends von normalen Tagesschwankungen. Sag klar, wo Daten fehlen.',
+      'ui.ai_template.week_review.name': 'Diese Woche',
+      'ui.ai_template.week_review.prompt':
+        'Blicke auf diese Woche zurück: Wie verhalten sich Schlaf, Erholung, Herzfrequenz und Aktivität im Vergleich zu sonst, welche Veränderungen sind beachtenswert und welche normale Schwankung? Bleib bei den Daten, keine Diagnose, und sag klar, wo Daten fehlen.',
     },
     'lib/bridge/errors': {
       desktopOnly: 'Nutze die Desktop-App',
@@ -2321,6 +2330,9 @@ Antworte in Markdown.`,
       questionPlaceholder:
         'Worauf willst du diesmal den Fokus legen? Z. B.: Passte die Intensität des Erholungslaufs am Mittwoch?',
       title: 'Richtung und Frage',
+      groupDaily: 'Alltag',
+      groupRun: 'Laufen',
+      groupOther: 'Weitere',
     },
     'components/ai/GraphNodePopover': {
       attachments: (count: number) =>
