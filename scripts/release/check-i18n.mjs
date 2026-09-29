@@ -29,7 +29,7 @@ const SKIP_FILES = [
   'views/Settings.i18n.ts',
   'views/LandingPage.vue',
   'composables/useLandingLocale.ts',
-  'views/landing/landingCopy.ts',
+  'views/landing/copy.ts',
 ];
 
 /**
