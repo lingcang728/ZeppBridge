@@ -87,6 +87,36 @@ fn prefs_default_to_365_and_180_without_writing_old_30_day_retention() {
     assert!(db.get_app_meta("retention_days").unwrap().is_none());
 }
 
+/// 新建的库默认长期归档（不自动清理）；已经存在、从没写过这个键的库保持原来的
+/// 「只留最近 N 天」——升级不能替用户改设置。
+#[test]
+fn fresh_library_defaults_to_long_term_archive_but_existing_ones_keep_theirs() {
+    let db = Database::in_memory().unwrap();
+    assert!(
+        db.user_prefs().unwrap().archive_enabled,
+        "新库应默认长期归档"
+    );
+
+    let dir = std::env::temp_dir().join(format!("zb-archive-default-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("zepp.db");
+    let db = Database::open_migrated(&path).unwrap();
+    assert!(db.user_prefs().unwrap().archive_enabled);
+    // 模拟一个老库：从没写过 archive_enabled。
+    db.conn
+        .execute("DELETE FROM app_meta WHERE key = 'archive_enabled'", [])
+        .unwrap();
+    drop(db);
+    let db = Database::open_migrated(&path).unwrap();
+    assert!(
+        !db.user_prefs().unwrap().archive_enabled,
+        "老库重新打开不能被改成长期归档"
+    );
+    drop(db);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 #[test]
 fn local_coverage_is_empty_on_a_fresh_library() {
     let db = Database::in_memory().unwrap();

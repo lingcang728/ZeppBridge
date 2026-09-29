@@ -17,7 +17,8 @@ import { displayDateTimeFormatter } from '../lib/dateTime';
  * 所在的 Zepp 区域——区域猜错了，同步会一路跑通、一条记录不带回来，界面上和
  * 「这段时间你确实没数据」长得一模一样。所以这里要把两者分开说。
  */
-import { computed } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import { backend, isDesktop } from '../lib/bridge';
 import Icon from './Icon.vue';
 import { useSyncController } from '../composables/useSyncController';
 import { emptyLibraryNotice } from '../lib/emptyLibraryNotice';
@@ -49,6 +50,8 @@ const messages = defineMessages(
     backfilling: '正在补拉…',
     syncNow: '立即同步',
     emptyNotConnected: '本机还没有任何数据。先连接你的 Zepp 账号，再同步一次，图表才有东西可画。',
+    keepAllHint: '本机默认长期保留全部记录，同步后不会自动清理。',
+    keepAllChange: '改成只留最近一段',
     connect: '连接 Zepp 账号',
   },
   {
@@ -64,6 +67,8 @@ const messages = defineMessages(
     backfilling: 'Backfilling…',
     syncNow: 'Sync now',
     emptyNotConnected: 'Nothing on this machine yet. Connect your Zepp account first, then sync once.',
+    keepAllHint: 'Everything is kept long-term by default — syncs never prune it.',
+    keepAllChange: 'Keep only recent days instead',
     connect: 'Connect Zepp account',
   },
   {
@@ -79,6 +84,8 @@ const messages = defineMessages(
     backfilling: 'Recuperando…',
     syncNow: 'Sincronizar ahora',
     emptyNotConnected: 'Todavía no hay nada en este equipo. Conecta primero tu cuenta de Zepp y luego sincroniza una vez.',
+    keepAllHint: 'Por defecto todo se conserva a largo plazo: las sincronizaciones no borran nada.',
+    keepAllChange: 'Conservar solo los días recientes',
     connect: 'Conectar cuenta de Zepp',
   },
   'components/CoverageNotice',
@@ -126,6 +133,14 @@ const earliestText = computed(() => {
 /* 补拉到用户当前选的那个范围，而不是某个固定值：他刚刚已经说了想看多远。 */
 const backfill = () => { void runSync('history', props.requestedDays); };
 const syncNow = () => { void runSync('incremental'); };
+
+/* 空库（第一次打开）时顺带说一句保留规则：新建的库默认长期保留，想省空间可以去改。
+   「数据属于我」和「会保留多久」要讲在一起（体验评估第 5 条）。只在长期归档确实开着时说。 */
+const keepAll = ref(false);
+onMounted(() => {
+  if (!isDesktop()) return;
+  void backend.getUserPrefs().then((prefs) => { keepAll.value = prefs.archive_enabled; }).catch(() => undefined);
+});
 </script>
 
 <template>
@@ -152,7 +167,12 @@ const syncNow = () => { void runSync('incremental'); };
       {{ isSyncing ? t.backfilling : t.syncNow }}
     </button>
   </p>
-  <p v-else-if="isShort" class="coverage-notice" role="status">
+  <p v-if="(isEmpty || isEmptyAfterSync) && keepAll" class="coverage-notice subtle">
+    <Icon name="database" :size="14" />
+    <span>{{ t.keepAllHint }}</span>
+    <RouterLink class="text-action" to="/settings/archive">{{ t.keepAllChange }}</RouterLink>
+  </p>
+  <p v-if="!isEmpty && !isEmptyAfterSync && isShort" class="coverage-notice" role="status">
     <Icon name="clock" :size="14" />
     <span>{{ t.short(coverage!.covered_days, earliestText) }}</span>
     <button class="button button-secondary" type="button" :disabled="isSyncing" @click="backfill">
@@ -178,4 +198,7 @@ const syncNow = () => { void runSync('incremental'); };
 }
 .coverage-notice span { flex: 1 1 240px; min-width: 0; }
 .coverage-notice .button { flex: 0 0 auto; }
+.coverage-notice.subtle { border-color: transparent; background: none; box-shadow: none; padding-block: 0; font-size: var(--fs-sm); }
+.text-action { flex: 0 0 auto; color: var(--accent); font-size: var(--fs-sm); text-decoration: none; }
+.text-action:hover { text-decoration: underline; }
 </style>

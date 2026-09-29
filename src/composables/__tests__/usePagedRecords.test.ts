@@ -47,7 +47,7 @@ describe('usePagedRecords', () => {
     expect(list.hasMore.value).toBe(true);
   });
 
-  it('过期的加载更多不追加，但自己的 loadingMore 一定复位', async () => {
+  it('过期的加载更多不改列表，但自己的 loadingMore 一定复位', async () => {
     const { calls, loadPage } = controlledPages();
     const list = usePagedRecords<Row>({ loadPage, idOf: (row) => row.id, failedText: () => 'failed', pageSize: 2 });
     const load = list.load();

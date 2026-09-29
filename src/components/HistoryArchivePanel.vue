@@ -31,7 +31,7 @@ const {
       <div class="s-list">
         <div class="s-row">
           <div class="s-row-main">
-            <span class="s-row-title">{{ t.archiveRowTitle }}</span>
+            <span class="s-row-title">{{ t.archiveRowTitle }} <em class="rec-badge">{{ t.recommended }}</em></span>
             <span class="s-row-sub">{{ t.archiveBody }}</span>
           </div>
           <div class="s-row-control">
@@ -152,6 +152,8 @@ const {
 <style scoped src="../views/settings/settings-local.css"></style>
 <style scoped>
 .archive-panel { display: grid; gap: 22px; min-width: 0; }
+/* 新建的库默认开着它（用户 2026-09-29 定：推荐长期保留）。 */
+.rec-badge { margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: var(--fs-2xs); font-style: normal; font-weight: 650; vertical-align: 1px; }
 .archive-panel > .s-section + .s-section { margin-top: 0; }
 .estimate > summary {
   display: flex;

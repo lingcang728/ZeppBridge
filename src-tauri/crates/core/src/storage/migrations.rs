@@ -1112,6 +1112,15 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(34, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // 全新建的库（进来时 user_version = 0）默认开长期归档：记录属于用户，默认不自动清理
+        // （用户 2026-09-29 定：首次建库推荐长期保留）。已有的库不动——它们没写过这个键时
+        // 一直是「只留最近 N 天」，改默认值等于替用户改了设置；2.x 共用的真实库也就不受影响。
+        if version == 0 {
+            self.conn.execute(
+                "INSERT OR IGNORE INTO app_meta(key, value, updated_at) VALUES(?1, '1', ?2)",
+                params![super::ARCHIVE_ENABLED_KEY, Utc::now().to_rfc3339()],
+            )?;
+        }
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }
