@@ -198,7 +198,7 @@ impl Database {
                     deep_minutes, deep_available, light_minutes, light_available,
                     rem_minutes, rem_available, awake_minutes, awake_available,
                     source_scope, wake_count, date(end_time,'localtime')
-             FROM sleep_sessions
+             FROM sleep_sessions_shown
              WHERE date(end_time,'localtime') BETWEEN ?1 AND ?2
              ORDER BY end_time",
         )?;

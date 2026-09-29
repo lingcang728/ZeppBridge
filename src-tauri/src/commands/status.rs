@@ -51,8 +51,25 @@ pub(crate) async fn build_app_status(state: &AppState) -> std::result::Result<Ap
     let auth_warning = state.auth_warning.read().await.clone();
     let region_confidence = state.region_confidence.read().await.clone();
 
+    // 官方授权可以单独撑起一个「已连接」：只连官方的账号同步照跑、首页照样有数。
+    let official = zeppbridge_core::official::OfficialStore::new(&state.data_dir)
+        .meta()
+        .ok()
+        .flatten();
+    let official_ok = official.as_ref().is_some_and(|meta| !meta.needs_reauth);
+    let data_source = match (auth_status.configured, official_ok) {
+        (true, true) => "both",
+        (true, false) => "legacy",
+        (false, true) => "official",
+        (false, false) => "none",
+    }
+    .to_string();
     let connection_state = if !auth_status.configured {
-        "unconfigured"
+        match official {
+            Some(meta) if meta.needs_reauth => "needs_reauth",
+            Some(_) => "connected",
+            None => "unconfigured",
+        }
     } else if auth_state == "needs_reauth" {
         "needs_reauth"
     } else if auth_state == "verified" {
@@ -92,6 +109,7 @@ pub(crate) async fn build_app_status(state: &AppState) -> std::result::Result<Ap
         configured: auth_status.configured,
         auth_state,
         connection_state,
+        data_source,
         masked_user_id: auth_status.user_id.as_deref().map(mask_user_id),
         region_host: auth_status.region_host,
         last_sync: last_cloud_sync_at.clone(),

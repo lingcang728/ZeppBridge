@@ -8,6 +8,7 @@
 //! 授权地址由中转站拼，换令牌和刷新令牌都经中转站补上 secret。
 
 mod client;
+pub mod fetch;
 mod store;
 
 pub use client::{ClaimOutcome, OfficialClient, OfficialProfile, RefreshOutcome};
@@ -58,6 +59,48 @@ impl OfficialTokens {
     pub fn needs_refresh(&self, now: i64) -> bool {
         self.expires_at
             .is_some_and(|expires_at| now >= expires_at - REFRESH_MARGIN_SECONDS)
+    }
+}
+
+impl OfficialMeta {
+    /// 令牌已经过了到期时刻。没有到期时间的令牌只能等 401 才知道，这里不算过期。
+    pub fn is_expired(&self, now: i64) -> bool {
+        self.expires_at.is_some_and(|expires_at| now >= expires_at)
+    }
+}
+
+/// 同步前拿一把能用的令牌：快到期就经中转站刷新，刷新被拒就标记「要重新授权」。
+///
+/// - 没连接过 / 已经标记要重新授权：`Ok(None)`。
+/// - 刷新暂时失败（断网、中转站 5xx）：旧令牌还没过期就先用着，过期了就把错误交出去。
+/// - 刷新被 Zepp 明确拒绝：令牌清掉、元数据标上 `needs_reauth`，返回 `NeedsReauth`。
+pub async fn fresh_tokens(
+    store: &OfficialStore,
+    client: &OfficialClient,
+    now: i64,
+) -> Result<Option<OfficialTokens>> {
+    let Some(tokens) = store.load()? else {
+        return Ok(None);
+    };
+    if !tokens.needs_refresh(now) {
+        return Ok(Some(tokens));
+    }
+    match client.refresh(&tokens, now).await {
+        Ok(RefreshOutcome::Ready(fresh)) => {
+            store.save(&fresh, now)?;
+            Ok(Some(fresh))
+        }
+        Ok(RefreshOutcome::Revoked) => {
+            store.mark_needs_reauth()?;
+            Err(ZeppBridgeError::NeedsReauth(
+                "官方授权已失效，请重新授权".into(),
+            ))
+        }
+        Err(error) if tokens.expires_at.is_some_and(|expires_at| now < expires_at) => {
+            tracing::warn!("刷新官方令牌暂时失败，先用旧令牌: {error}");
+            Ok(Some(tokens))
+        }
+        Err(error) => Err(error),
     }
 }
 

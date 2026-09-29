@@ -13,6 +13,7 @@ mod band_items;
 mod device;
 mod food;
 mod metrics;
+mod official;
 mod parse;
 #[cfg(test)]
 mod tests;
@@ -22,6 +23,7 @@ use band_items::*;
 use device::*;
 use food::*;
 use metrics::*;
+pub use official::{official_stage_anchor, official_workout_type, OfficialSleep};
 use parse::*;
 pub use wellness::*;
 

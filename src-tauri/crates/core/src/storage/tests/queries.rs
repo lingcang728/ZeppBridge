@@ -170,7 +170,7 @@ fn missing_sleep_stages_are_stored_as_unavailable_and_query_returns_none() {
         .query_row("PRAGMA user_version", [], |row| row.get(0))
         .unwrap();
     assert_eq!(version, CURRENT_SCHEMA_VERSION);
-    assert_eq!(CURRENT_SCHEMA_VERSION, 33);
+    assert_eq!(CURRENT_SCHEMA_VERSION, 34);
 
     let start = ts();
     db.insert_sleep_session(&SleepSession {

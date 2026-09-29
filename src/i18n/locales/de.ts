@@ -169,6 +169,23 @@ export default {
   },
 
   modules: {
+    'components/activity/HourlyStepsCard': {
+      title: 'Schritte pro Stunde',
+      source: 'Aus deiner offiziellen Zepp-Autorisierung',
+      today: 'Heute',
+      yesterday: 'Gestern',
+      dayAria: 'Tag wählen',
+      stepsUnit: 'Schritte',
+      busiest: (hour: number, steps: string) => `Aktivste Stunde: ${hour}:00 Uhr, ${steps} Schritte`,
+      barTitle: (hour: number, steps: string) => `${hour}:00 Uhr – ${steps} Schritte`,
+      noRecord: (hour: number) => `${hour}:00 Uhr – nichts aufgezeichnet`,
+      empty: 'Für diesen Tag gibt es noch keine Schritte pro Stunde.',
+      failed: 'Die Schritte pro Stunde konnten gerade nicht gelesen werden.',
+    },
+    'components/OfficialOnlyNote': {
+      text: 'Nur die offizielle Zepp-Autorisierung ist verbunden: Herzfrequenz, Schlaf, Schritte, Trainings, PAI und Gewicht werden synchronisiert. HRV, Blutsauerstoff, Stress, Bereitschaft und Trainingslast bietet die offizielle Schnittstelle nicht an – verbinde dafür „Erweiterte Daten“.',
+      action: 'Verbinden',
+    },
     'components/ai/WorkoutPicker': {
       avgHr: (bpm: number) => `Ø HF ${bpm}`,
       empty: 'Noch keine Trainings auf diesem Rechner',

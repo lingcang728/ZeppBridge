@@ -486,7 +486,7 @@ impl Database {
             AiTaskCategory::Sleep => {
                 // 睡眠按醒来那天归属（与 insight 的合同一致）。
                 let mut stmt = self.conn.prepare(
-                    "SELECT date(end_time,'localtime'), source_scope FROM sleep_sessions
+                    "SELECT date(end_time,'localtime'), source_scope FROM sleep_sessions_shown
                      WHERE date(end_time,'localtime') BETWEEN ?1 AND ?2",
                 )?;
                 let rows = stmt.query_map(params![start, end], |row| {
@@ -548,7 +548,7 @@ impl Database {
                         }
                         MetricSource::SleepScores => {
                             let mut stmt = self.conn.prepare(
-                                "SELECT date(end_time,'localtime'), source_scope FROM sleep_sessions
+                                "SELECT date(end_time,'localtime'), source_scope FROM sleep_sessions_shown
                                  WHERE score IS NOT NULL AND date(end_time,'localtime') BETWEEN ?1 AND ?2",
                             )?;
                             let rows = stmt.query_map(params![start, end], |row| {

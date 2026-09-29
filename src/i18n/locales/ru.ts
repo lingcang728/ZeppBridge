@@ -16,6 +16,23 @@ import { plural, type LocalePack } from '../index';
 
 export default {
   modules: {
+    'components/activity/HourlyStepsCard': {
+      title: 'Шаги по часам',
+      source: 'Из официальной авторизации Zepp',
+      today: 'Сегодня',
+      yesterday: 'Вчера',
+      dayAria: 'Выберите день',
+      stepsUnit: 'шагов',
+      busiest: (hour: number, steps: string) => `Самый активный час: ${hour}:00, ${steps} шагов`,
+      barTitle: (hour: number, steps: string) => `${hour}:00 — ${steps} шагов`,
+      noRecord: (hour: number) => `${hour}:00 — нет записей`,
+      empty: 'За этот день пока нет шагов по часам.',
+      failed: 'Сейчас не удалось прочитать шаги по часам.',
+    },
+    'components/OfficialOnlyNote': {
+      text: 'Подключена только официальная авторизация Zepp: синхронизируются пульс, сон, шаги, тренировки, PAI и вес. ВСР, кислород в крови, стресс, готовность и тренировочная нагрузка официальным API не предоставляются — для них подключите «Расширенные данные».',
+      action: 'Подключить',
+    },
     'components/ai/WorkoutPicker': {
       title: 'Какую тренировку анализировать',
       hint: 'Можно выбрать несколько или ни одной',

@@ -4,6 +4,7 @@ defineOptions({ name: 'Overview' });
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import CoverageNotice from '../components/CoverageNotice.vue';
+import OfficialOnlyNote from '../components/OfficialOnlyNote.vue';
 import GlyphTile from '../components/GlyphTile.vue';
 import Icon from '../components/Icon.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
@@ -339,6 +340,7 @@ watch(dataRevision, () => { void loadOverview(); void loadDevices(); });
       「暂无数据」，谁也不解释为什么——而原因往往是登录时没确认对区域。
     -->
     <CoverageNotice />
+    <OfficialOnlyNote />
 
     <div v-if="partialWarning" class="inline-alert warning" role="status"><Icon name="info" :size="15" />{{ partialWarning }}</div>
     <div v-if="deviceError" class="inline-alert warning" role="status"><Icon name="info" :size="15" />{{ t.deviceErrorPrefix }}{{ deviceError }}</div>

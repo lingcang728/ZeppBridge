@@ -69,6 +69,7 @@ mod devices;
 mod event_windows;
 mod export;
 mod metrics;
+mod official;
 mod queries;
 mod replay;
 mod schema;

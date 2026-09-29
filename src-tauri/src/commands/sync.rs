@@ -6,11 +6,16 @@ use crate::ipc_error::AppError;
 use crate::ipc_types::{ui_sync_report, UiSyncReport};
 use crate::models::{CapabilityProbe, UserPrefs};
 use crate::storage::coverage::CoverageLedger;
-use crate::sync::{StreamStatus, SyncManager, SyncProgress, SyncReport};
+use crate::sync::{
+    OfficialMode, OfficialSync, StreamStatus, SyncManager, SyncProgress, SyncReport,
+};
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
+use zeppbridge_core::official::OfficialStore;
 use zeppbridge_core::storage::write_lock::{self, WritePurpose};
+use zeppbridge_core::storage::Database;
 
 use super::with_write;
 
@@ -59,7 +64,8 @@ pub async fn start_incremental_sync(
     state: tauri::State<'_, AppState>,
     quick: Option<bool>,
 ) -> std::result::Result<UiSyncReport, AppError> {
-    if state.auth_state.read().await.as_str() != "verified" {
+    if state.auth_state.read().await.as_str() != "verified" && !official_connected(&state.data_dir)
+    {
         return Err(AppError::new(
             "err.sync.not_verified",
             "请先完成连接验证，再同步最近数据",
@@ -217,7 +223,57 @@ pub async fn cancel_sync(state: tauri::State<'_, AppState>) -> std::result::Resu
     if let Some(manager) = state.sync.read().await.clone() {
         manager.request_cancel();
     }
+    if let Ok(current) = OFFICIAL_CANCEL.lock() {
+        if let Some(flag) = current.as_ref() {
+            flag.store(true, Ordering::SeqCst);
+        }
+    }
     Ok(())
+}
+
+/// 正在跑的那次官方同步的取消旗标（同步命令本身串行，同一时间只有一次）。
+static OFFICIAL_CANCEL: std::sync::Mutex<Option<Arc<AtomicBool>>> = std::sync::Mutex::new(None);
+
+/// 官方授权在不在（令牌还在、没有被标成要重新授权）。
+pub(crate) fn official_connected(data_dir: &std::path::Path) -> bool {
+    OfficialStore::new(data_dir)
+        .meta()
+        .ok()
+        .flatten()
+        .is_some_and(|meta| !meta.needs_reauth)
+}
+
+/// 跑一轮官方同步。窗口天数和旧通道同一套规则。
+async fn run_official(
+    state: &AppState,
+    window: &SyncWindow,
+    mode: OfficialMode,
+    on_progress: &(dyn Fn(SyncProgress) + Send + Sync),
+) -> zeppbridge_core::models::error::Result<SyncReport> {
+    let db = Database::open_without_migration(state.data_dir.join("zepp.db"))?;
+    let days = match window {
+        SyncWindow::History(days) => *days,
+        SyncWindow::Incremental => zeppbridge_core::contract::INCREMENTAL_SYNC_DAYS,
+        SyncWindow::Quick => {
+            zeppbridge_core::sync::quick_window_days(db.full_window_refresh_due(Utc::now())?)
+        }
+    };
+    // 手表自己报过时区就用它，没有（只连官方）就用这台电脑的时区。
+    let time_zone = db
+        .device_time_zone()
+        .ok()
+        .flatten()
+        .unwrap_or_else(zeppbridge_core::official::fetch::system_time_zone);
+    let cancel = Arc::new(AtomicBool::new(false));
+    if let Ok(mut current) = OFFICIAL_CANCEL.lock() {
+        *current = Some(cancel.clone());
+    }
+    let sync = OfficialSync::new(&state.data_dir, db, cancel, time_zone)?;
+    let result = sync.run(days, mode, on_progress).await;
+    if let Ok(mut current) = OFFICIAL_CANCEL.lock() {
+        *current = None;
+    }
+    result
 }
 
 async fn require_manager(state: &AppState) -> std::result::Result<Arc<SyncManager>, AppError> {
@@ -238,7 +294,17 @@ async fn run_sync(
     // Re-read after the lock: save/clear may have swapped the manager while
     // this command waited, and the handle cloned beforehand would keep writing
     // with the old credential.
-    let manager = require_manager(state).await?;
+    //
+    // 旧通道（高级数据）和 Zepp 官方授权可以只连一边：只连官方时整轮都走官方，
+    // 两边都连时旧通道跑完再补官方独有的那几样（core::sync::official）。
+    let manager = state.sync.read().await.clone();
+    let official = official_connected(&state.data_dir);
+    if manager.is_none() && !official {
+        return Err(AppError::new(
+            "err.sync.not_connected",
+            "尚未连接 Zepp，请先完成连接",
+        ));
+    }
     // A `NORMALIZER_REVISION` bump makes the next launch replay every stored
     // raw payload, which writes in bulk for as long as a quarter of an hour on
     // a large library. A sync starting in the middle of that used to lose the
@@ -259,19 +325,31 @@ async fn run_sync(
     };
     let started_at = Utc::now().to_rfc3339();
     let on_progress = |progress| emit_sync_progress(app, progress);
-    let report_result = match window {
-        SyncWindow::History(days) => {
-            manager
-                .history_sync_report_with_progress(days, on_progress)
-                .await
-        }
-        SyncWindow::Quick => manager.quick_sync_report_with_progress(on_progress).await,
-        SyncWindow::Incremental => {
-            manager
-                .incremental_sync_report_with_progress(on_progress)
-                .await
-        }
+    let report_result = match &manager {
+        Some(manager) => match window {
+            SyncWindow::History(days) => {
+                manager
+                    .history_sync_report_with_progress(days, on_progress)
+                    .await
+            }
+            SyncWindow::Quick => manager.quick_sync_report_with_progress(on_progress).await,
+            SyncWindow::Incremental => {
+                manager
+                    .incremental_sync_report_with_progress(on_progress)
+                    .await
+            }
+        },
+        None => run_official(state, &window, OfficialMode::Only, &on_progress).await,
     };
+    // 两边都连：旧通道这一轮没出大错，再补官方睡眠和每小时步数。补充失败只写日志，
+    // 不改这一轮的结论——旧通道的数据已经在了。
+    if manager.is_some() && official && report_result.is_ok() {
+        if let Err(error) =
+            run_official(state, &window, OfficialMode::Supplement, &on_progress).await
+        {
+            eprintln!("官方补充同步没有完成: {error}");
+        }
+    }
     let finished_at = Utc::now().to_rfc3339();
     let report = match report_result {
         Ok(report) => report,
@@ -299,7 +377,8 @@ async fn run_sync(
         }
         Err(error) => {
             record_cloud_sync_locked(state, &finished_at, "failed", 0).await?;
-            if error.needs_reauth() {
+            // 只连官方时，令牌失效已经记在 official.json 里；旧通道的状态不动。
+            if error.needs_reauth() && manager.is_some() {
                 *state.auth_state.write().await = "needs_reauth".to_string();
             }
             return Err(error.into());
@@ -317,7 +396,9 @@ async fn run_sync(
     let outcome = classify_outcome(&report, &before, &after);
     record_cloud_sync_locked(state, &finished_at, outcome, report.records_written).await?;
 
-    if report.streams.iter().any(|stream| stream.needs_reauth) {
+    if manager.is_none() {
+        // 只连官方：下面两条改的是旧通道的认证状态，与这一轮无关。
+    } else if report.streams.iter().any(|stream| stream.needs_reauth) {
         *state.auth_state.write().await = "needs_reauth".to_string();
     } else if report.core_ok {
         // 主干数据流通了就说明这份凭据是好的。一条支流（sleep / hrv……）失败

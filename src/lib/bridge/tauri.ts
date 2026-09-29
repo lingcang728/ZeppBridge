@@ -13,6 +13,7 @@ import type {
   UnlistenFn,
 } from './types';
 import type {
+  HourlySteps,
   LifeEvent,
   DailyHeartRateExtreme,
   Page,
@@ -203,6 +204,10 @@ export const tauriBackend: BridgeBackend = {
 
   getMetricSeries(metrics: string[], days: number) {
     return call<MetricSeries[]>('get_metric_series', { metrics, days });
+  },
+
+  getHourlySteps(date: string) {
+    return call<HourlySteps[]>('get_hourly_steps', { date });
   },
 
   getTrainingBalance(days: number) {

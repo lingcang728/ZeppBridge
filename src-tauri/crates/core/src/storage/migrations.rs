@@ -1090,6 +1090,28 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(33, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // v34：官方睡眠接入（第九轮批次 ③）。
+        //
+        // 同一晚两边都有时两份都存（官方 `sleep_id` 是 `official:<开始秒>`，不撞键），
+        // 界面、导出、周报读这个视图：和某一晚官方会话有重叠的旧通道会话不显示——
+        // 官方有 REM 真值和小睡，以它为准。只是加一个视图，不动任何已发布的表和索引；
+        // 2.x（v30）不读它，照旧读 sleep_sessions。
+        self.conn.execute_batch(
+            "CREATE VIEW IF NOT EXISTS sleep_sessions_shown AS
+                SELECT s.* FROM sleep_sessions s
+                WHERE s.provider = 'official'
+                   OR NOT EXISTS (
+                       SELECT 1 FROM sleep_sessions o
+                       WHERE o.provider = 'official'
+                         AND o.start_time < s.end_time AND o.end_time > s.start_time);
+             CREATE INDEX IF NOT EXISTS idx_sleep_sessions_provider_start
+                 ON sleep_sessions(provider, start_time);
+             PRAGMA user_version = 34;",
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(34, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }

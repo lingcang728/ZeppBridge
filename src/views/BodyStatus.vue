@@ -11,6 +11,7 @@ import { trendGridStyle } from '../lib/trendGrid';
 import SectionGroup from '../components/SectionGroup.vue';
 import PageHeader from '../components/PageHeader.vue';
 import CoverageNotice from '../components/CoverageNotice.vue';
+import OfficialOnlyNote from '../components/OfficialOnlyNote.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import Icon from '../components/Icon.vue';
 import SegmentTrack from '../components/SegmentTrack.vue';
@@ -125,6 +126,7 @@ const groups = computed(() => ({
       :intro="t.intro"
     />
 
+    <OfficialOnlyNote />
     <LifeEventShortcut :days="rangeDays" />
 
     <div v-if="error" class="inline-alert" role="alert">

@@ -155,11 +155,11 @@ impl Database {
     ) -> Result<Vec<MetricSeriesPoint>> {
         let mut stmt = self.conn.prepare(
             "SELECT date(s.end_time, 'localtime'), s.score
-             FROM sleep_sessions s
+             FROM sleep_sessions_shown s
              WHERE s.score IS NOT NULL
                AND date(s.end_time, 'localtime') BETWEEN ?1 AND ?2
                AND s.id = (
-                   SELECT s2.id FROM sleep_sessions s2
+                   SELECT s2.id FROM sleep_sessions_shown s2
                    WHERE s2.score IS NOT NULL
                      AND date(s2.end_time, 'localtime') = date(s.end_time, 'localtime')
                    ORDER BY CASE s2.source_scope
@@ -195,7 +195,7 @@ impl Database {
              SELECT 'sleep_score', 'sleep_sessions', 'score', COUNT(*),
                     MIN(date(end_time, 'localtime')),
                     MAX(date(end_time, 'localtime'))
-             FROM sleep_sessions WHERE score IS NOT NULL HAVING COUNT(*) > 0
+             FROM sleep_sessions_shown WHERE score IS NOT NULL HAVING COUNT(*) > 0
              ORDER BY metric, 2, unit",
         )?;
         let rows = stmt.query_map([], |row| {
@@ -251,7 +251,7 @@ impl Database {
              ORDER BY timestamp DESC, id DESC LIMIT ?4 OFFSET ?5"
         } else {
             "SELECT date(end_time, 'localtime'), end_time, CAST(score AS REAL),
-                    'score', source_scope FROM sleep_sessions
+                    'score', source_scope FROM sleep_sessions_shown
              WHERE ?1 = 'sleep_score' AND score IS NOT NULL
                AND (?2 IS NULL OR date(end_time, 'localtime') >= ?2)
                AND (?3 IS NULL OR date(end_time, 'localtime') <= ?3)

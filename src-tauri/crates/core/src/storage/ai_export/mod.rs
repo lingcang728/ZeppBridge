@@ -268,6 +268,8 @@ pub(in crate::storage) fn export_sample_matched_type(
         Some("respiratory_rate".to_string())
     } else if metric == "hrv_rmssd" && selected.contains("hrv_rmssd") {
         Some("hrv_rmssd".to_string())
+    } else if metric == "steps_hourly" && selected.contains("steps") {
+        Some("steps".to_string())
     } else if selected.contains("weight") && BODY_COMPOSITION_METRICS.contains(&metric) {
         Some("weight".to_string())
     } else {

@@ -14,6 +14,23 @@ import { plural, type LocalePack } from '../index';
  */
 export default {
   modules: {
+    'components/activity/HourlyStepsCard': {
+      title: 'घंटेवार कदम',
+      source: 'आपके आधिकारिक Zepp प्राधिकरण से',
+      today: 'आज',
+      yesterday: 'कल',
+      dayAria: 'दिन चुनें',
+      stepsUnit: 'कदम',
+      busiest: (hour: number, steps: string) => `सबसे सक्रिय घंटा: ${hour}:00, ${steps} कदम`,
+      barTitle: (hour: number, steps: string) => `${hour}:00 — ${steps} कदम`,
+      noRecord: (hour: number) => `${hour}:00 — कुछ दर्ज नहीं`,
+      empty: 'इस दिन के लिए अभी घंटेवार कदम नहीं हैं।',
+      failed: 'घंटेवार कदम अभी पढ़े नहीं जा सके।',
+    },
+    'components/OfficialOnlyNote': {
+      text: 'केवल आधिकारिक Zepp प्राधिकरण जुड़ा है: हृदय गति, नींद, कदम, वर्कआउट, PAI और वज़न सिंक होते हैं। HRV, रक्त ऑक्सीजन, तनाव, तत्परता और ट्रेनिंग लोड आधिकारिक API नहीं देता — इनके लिए «उन्नत डेटा» जोड़ें।',
+      action: 'जोड़ें',
+    },
     'components/ai/WorkoutPicker': {
       title: 'कौन-सा वर्कआउट',
       hint: 'एक या कई चुनें, या कोई नहीं',

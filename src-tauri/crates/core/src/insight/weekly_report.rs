@@ -157,7 +157,7 @@ impl Database {
         match metric {
             "sleep_duration" => self.collect_samples(
                 "SELECT date(end_time, 'localtime'), CAST(duration_minutes AS REAL), source_scope
-                 FROM sleep_sessions
+                 FROM sleep_sessions_shown
                  WHERE date(end_time, 'localtime') BETWEEN ?1 AND ?2",
                 &start_text,
                 &end_text,
@@ -170,7 +170,7 @@ impl Database {
                             CAST(strftime('%H', start_time, 'localtime') AS REAL) * 60
                               + CAST(strftime('%M', start_time, 'localtime') AS REAL),
                             source_scope
-                     FROM sleep_sessions
+                     FROM sleep_sessions_shown
                      WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2",
                     &start_text,
                     &end_text,

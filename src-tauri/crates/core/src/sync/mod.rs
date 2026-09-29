@@ -10,7 +10,7 @@ use crate::storage::write_lock::{self, ExclusiveWriteGuard, WritePurpose};
 
 use crate::storage::Database;
 
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Duration, NaiveDate, Utc};
 
 use serde::{Deserialize, Serialize};
 
@@ -31,10 +31,12 @@ use tokio::sync::Mutex;
 
 mod backfill;
 mod chunked;
+mod official;
 mod persist;
 mod report;
 
 use chunked::OnChunkError;
+pub use official::{OfficialMode, OfficialSync};
 use report::*;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

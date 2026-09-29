@@ -33,6 +33,9 @@ pub struct AppStatus {
     pub configured: bool,
     pub auth_state: String,
     pub connection_state: String,
+    /// `legacy` / `official` / `both` / `none`：哪几条通道连着。只连官方时界面要说明哪些指标
+    /// 需要「高级数据」连接（官方没有 HRV、血氧、压力、准备度……）。
+    pub data_source: String,
     pub masked_user_id: Option<String>,
     pub region_host: Option<String>,
     pub last_sync: Option<String>,

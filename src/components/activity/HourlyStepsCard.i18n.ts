@@ -1,0 +1,45 @@
+import { defineMessages } from '../../i18n';
+
+/* 每小时步数卡片的文案。另外 7 种语言在 src/i18n/locales/*.ts 的 'components/activity/HourlyStepsCard' 下。 */
+export const hourlyStepsMessages = defineMessages(
+  {
+    title: '每小时步数',
+    source: '来自 Zepp 官方授权',
+    today: '今天',
+    yesterday: '昨天',
+    dayAria: '选择日期',
+    stepsUnit: '步',
+    busiest: (hour: number, steps: string) => `最多的一小时是 ${hour} 点，${steps} 步`,
+    barTitle: (hour: number, steps: string) => `${hour} 点：${steps} 步`,
+    noRecord: (hour: number) => `${hour} 点：没有记录`,
+    empty: '这一天还没有每小时步数。',
+    failed: '每小时步数暂时读不出来。',
+  },
+  {
+    title: 'Steps by hour',
+    source: 'From your Zepp official authorization',
+    today: 'Today',
+    yesterday: 'Yesterday',
+    dayAria: 'Choose a day',
+    stepsUnit: 'steps',
+    busiest: (hour: number, steps: string) => `Busiest hour: ${hour}:00, ${steps} steps`,
+    barTitle: (hour: number, steps: string) => `${hour}:00 — ${steps} steps`,
+    noRecord: (hour: number) => `${hour}:00 — nothing recorded`,
+    empty: 'No hourly steps for this day yet.',
+    failed: 'Hourly steps could not be read right now.',
+  },
+  {
+    title: 'Pasos por hora',
+    source: 'De tu autorización oficial de Zepp',
+    today: 'Hoy',
+    yesterday: 'Ayer',
+    dayAria: 'Elige un día',
+    stepsUnit: 'pasos',
+    busiest: (hour: number, steps: string) => `Hora con más pasos: ${hour}:00, ${steps} pasos`,
+    barTitle: (hour: number, steps: string) => `${hour}:00 — ${steps} pasos`,
+    noRecord: (hour: number) => `${hour}:00 — sin registro`,
+    empty: 'Todavía no hay pasos por hora para este día.',
+    failed: 'No se pudieron leer los pasos por hora.',
+  },
+  'components/activity/HourlyStepsCard',
+);

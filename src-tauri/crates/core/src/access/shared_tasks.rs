@@ -159,7 +159,7 @@ pub(super) fn workout_local_days(
 /// 「授权窗内最新一晚」——窗口外有更新的记录也不该被看见。
 pub fn latest_sleep_in_windows(db: &Database, permit: &Permit) -> Result<Option<String>> {
     let mut stmt = db.conn.prepare(
-        "SELECT sleep_id, date(end_time, 'localtime') FROM sleep_sessions
+        "SELECT sleep_id, date(end_time, 'localtime') FROM sleep_sessions_shown
          ORDER BY end_time DESC",
     )?;
     let rows = stmt.query_map([], |row| {

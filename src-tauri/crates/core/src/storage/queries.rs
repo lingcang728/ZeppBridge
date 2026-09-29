@@ -45,7 +45,9 @@ impl Database {
     /// 而用户问的恰恰是「剩下的呢」。
     pub fn count_sleep_sessions(&self) -> Result<i64> {
         self.conn
-            .query_row("SELECT COUNT(*) FROM sleep_sessions", [], |row| row.get(0))
+            .query_row("SELECT COUNT(*) FROM sleep_sessions_shown", [], |row| {
+                row.get(0)
+            })
             .map_err(Into::into)
     }
 
@@ -66,7 +68,7 @@ impl Database {
                     deep_minutes, deep_available, light_minutes, light_available,
                     rem_minutes, rem_available, awake_minutes, awake_available,
                     source_scope, device_id, synced_at, wake_count
-             FROM sleep_sessions ORDER BY start_time DESC LIMIT ?1 OFFSET ?2",
+             FROM sleep_sessions_shown ORDER BY start_time DESC LIMIT ?1 OFFSET ?2",
         )?;
         let rows = stmt.query_map([limit, offset], |row| {
             Ok((

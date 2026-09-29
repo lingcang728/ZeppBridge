@@ -45,10 +45,19 @@ The tokens then live in the OS credential store, next to (but separate from)
 the advanced-data token. **Disconnect** revokes the authorization at Zepp and
 deletes the tokens from this computer; it never deletes health data.
 
-> In this beta the Zepp authorization only connects your account. Official
-> data (REM sleep, FIT workouts with routes) arrives in the next version.
-> Stress, SpO₂, PAI, readiness and similar metrics are not in Zepp's official
-> API at all, so they keep coming from the advanced data connection below.
+What the Zepp authorization syncs depends on whether the advanced data
+connection below is also set up. ZeppBridge takes each kind of data from
+whichever side is richer:
+
+| Data | Zepp authorization only | Both connected |
+|---|---|---|
+| Sleep | Official (includes naps and measured REM) | Official; the same night from the advanced connection is kept but not shown twice |
+| Steps by hour | Official | Official (only the official API has it) |
+| Heart rate, daily steps, workouts with routes, PAI, weight | Official | Advanced data (more fields: training load, training effect, max heart rate, body composition) |
+| HRV, SpO₂, stress, readiness, training load | Not available | Advanced data |
+
+> HRV, SpO₂, stress, readiness and similar metrics are not in Zepp's official
+> API at all, so they only come from the advanced data connection below.
 
 ## Advanced data: email or phone sign-in
 

@@ -154,6 +154,14 @@ pub struct StressPoint {
     pub value: f64,
 }
 
+/// 某个本地日里某一小时的步数（Zepp 官方的 `activities?interval=hourly`）。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct HourlySteps {
+    /// 本地时间的 0–23 点。
+    pub hour: i64,
+    pub steps: f64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DailyPoint {
     pub date: String,

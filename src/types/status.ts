@@ -31,6 +31,8 @@ export interface AppStatus {
   configured: boolean;
   auth_state: string;
   connection_state: 'unconfigured' | 'configured' | 'connected' | 'needs_reauth' | string;
+  /** 哪几条通道连着：只连官方时界面要说明哪些指标需要「高级数据」。旧后端没有这个字段。 */
+  data_source?: 'legacy' | 'official' | 'both' | 'none';
   masked_user_id?: string;
   region_host?: string;
   last_sync?: string;

@@ -144,6 +144,10 @@ impl Database {
         source_key: &str,
         payload: &serde_json::Value,
     ) -> Result<NormalizationCounts> {
+        // 官方开放平台的报文沿用旧通道的流名，靠 source_key 前缀区分（storage/official.rs）。
+        if source_key.starts_with(crate::official::fetch::SOURCE_PREFIX) {
+            return self.normalize_official_raw(raw_record_id, source_key, payload);
+        }
         let mut counts = NormalizationCounts::default();
         match stream {
             "heart_rate" => {

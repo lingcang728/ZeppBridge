@@ -11,6 +11,7 @@ defineOptions({ name: 'ActivityDetail' });
 import { computed, onMounted, ref, watch } from 'vue';
 import { useFirstLoad } from '../composables/useFirstLoad';
 import MetricTrendCard from '../components/MetricTrendCard.vue';
+import HourlyStepsCard from '../components/activity/HourlyStepsCard.vue';
 import { trendGridStyle } from '../lib/trendGrid';
 import PageHeader from '../components/PageHeader.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
@@ -102,7 +103,7 @@ const messages = defineMessages(
 );
 const t = useMessages(messages);
 
-const { dataRevision } = useSyncController();
+const { dataRevision, appStatus } = useSyncController();
 
 interface ActivityCard {
   metric: string;
@@ -154,6 +155,7 @@ const initialLoading = useFirstLoad(loading);
 const error = ref<string | null>(null);
 const loadSeq = createLoadSeq();
 
+const hasOfficial = computed(() => appStatus.value?.data_source === 'official' || appStatus.value?.data_source === 'both');
 const cards = computed(() => CARDS.value.map((card) => ({ ...card, series: series.value[card.metric] ?? null })));
 const anyData = computed(() => cards.value.some((card) => (card.series?.points.length ?? 0) > 0));
 
@@ -218,6 +220,8 @@ watch(dataRevision, () => { void load(); });
         <Icon name="info" :size="14" />
         {{ t.noneInRange }}
       </p>
+      <!-- 官方授权才有每小时步数；没连官方的账号不出现这张卡。 -->
+      <HourlyStepsCard v-if="hasOfficial" />
       <div class="trend-grid" :style="trendGridStyle(cards.length)">
         <MetricTrendCard
           v-for="card in cards"

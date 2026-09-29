@@ -130,6 +130,13 @@ export interface Page<T> {
  * 不做过滤。`samples` 必须一起用：一天只有十几个样本时，那个「最高」只是
  * 这十几个点里的最高，把它当成完整最大值展示就是在编造事实。
  */
+/** 某个本地日里某一小时的步数（Zepp 官方授权才有）。 */
+export interface HourlySteps {
+  /** 本地时间 0–23 点。 */
+  hour: number;
+  steps: number;
+}
+
 export interface DailyHeartRateExtreme {
   /** 本地时区的日期，`YYYY-MM-DD`。 */
   date: string;

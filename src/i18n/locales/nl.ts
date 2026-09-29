@@ -12,6 +12,23 @@ import { plural, type LocalePack } from '../index';
  */
 export default {
   modules: {
+    'components/activity/HourlyStepsCard': {
+      title: 'Stappen per uur',
+      source: 'Uit je officiële Zepp-autorisatie',
+      today: 'Vandaag',
+      yesterday: 'Gisteren',
+      dayAria: 'Kies een dag',
+      stepsUnit: 'stappen',
+      busiest: (hour: number, steps: string) => `Drukste uur: ${hour}:00, ${steps} stappen`,
+      barTitle: (hour: number, steps: string) => `${hour}:00 — ${steps} stappen`,
+      noRecord: (hour: number) => `${hour}:00 — niets vastgelegd`,
+      empty: 'Nog geen stappen per uur voor deze dag.',
+      failed: 'De stappen per uur konden nu niet worden gelezen.',
+    },
+    'components/OfficialOnlyNote': {
+      text: 'Alleen de officiële Zepp-autorisatie is verbonden: hartslag, slaap, stappen, trainingen, PAI en gewicht worden gesynchroniseerd. HRV, bloedzuurstof, stress, paraatheid en trainingsbelasting biedt de officiële API niet — verbind daarvoor ‘Geavanceerde gegevens’.',
+      action: 'Verbinden',
+    },
     'components/ai/WorkoutPicker': {
       title: 'Welke training',
       hint: 'Kies er een of meer, of geen',

@@ -13,6 +13,23 @@ import { plural, type LocalePack } from '../index';
  */
 export default {
   modules: {
+    'components/activity/HourlyStepsCard': {
+      title: 'Passos por hora',
+      source: 'Da sua autorização oficial do Zepp',
+      today: 'Hoje',
+      yesterday: 'Ontem',
+      dayAria: 'Escolha um dia',
+      stepsUnit: 'passos',
+      busiest: (hour: number, steps: string) => `Hora mais ativa: ${hour}h, ${steps} passos`,
+      barTitle: (hour: number, steps: string) => `${hour}h — ${steps} passos`,
+      noRecord: (hour: number) => `${hour}h — nada registrado`,
+      empty: 'Ainda não há passos por hora para este dia.',
+      failed: 'Não foi possível ler os passos por hora agora.',
+    },
+    'components/OfficialOnlyNote': {
+      text: 'Só a autorização oficial do Zepp está conectada: frequência cardíaca, sono, passos, treinos, PAI e peso são sincronizados. VFC, oxigênio no sangue, estresse, prontidão e carga de treino não são oferecidos pela API oficial — conecte “Dados avançados” para vê-los.',
+      action: 'Conectar',
+    },
     'components/ai/WorkoutPicker': {
       title: 'Qual treino',
       hint: 'Escolha um ou mais, ou nenhum',

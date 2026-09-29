@@ -97,6 +97,8 @@ impl Database {
             || selected.contains("spo2")
             || selected.contains("stress")
             || selected.contains("weight")
+            // 官方的每小时步数（steps_hourly）跟着 steps 走。
+            || selected.contains("steps")
         {
             self.export_sample_metric_names(&selected, single_workout)?
         } else {
@@ -306,7 +308,7 @@ impl Database {
                         deep_minutes, deep_available, light_minutes, light_available,
                         rem_minutes, rem_available, awake_minutes, awake_available,
                         source_scope, device_id, wake_count
-                 FROM sleep_sessions
+                 FROM sleep_sessions_shown
                  WHERE date(start_time, 'localtime') BETWEEN ?1 AND ?2
                  ORDER BY start_time",
             )?;

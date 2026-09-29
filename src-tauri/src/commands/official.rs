@@ -98,7 +98,8 @@ fn stored_status(data_dir: &std::path::Path) -> OfficialStatus {
     }
     match meta {
         Some(meta) => OfficialStatus {
-            state: if meta.needs_reauth {
+            // 过期了还没续上（get_official_status 会先试着续一次）就不能说「已授权」。
+            state: if meta.needs_reauth || meta.is_expired(chrono::Utc::now().timestamp()) {
                 "needs_reauth"
             } else {
                 "connected"
@@ -131,7 +132,26 @@ fn publish(app: &AppHandle, status: &OfficialStatus) {
 pub async fn get_official_status(
     state: tauri::State<'_, AppState>,
 ) -> Result<OfficialStatus, AppError> {
+    renew_if_expired(&state.data_dir).await;
     Ok(stored_status(&state.data_dir))
+}
+
+/// 令牌已经过期：经中转站续一次。续上了就还是「已授权」；Zepp 明确拒绝时
+/// resh_tokens 会把它标成要重新授权；暂时连不上就保持过期，界面照实说。
+async fn renew_if_expired(data_dir: &std::path::Path) {
+    let store = OfficialStore::new(data_dir);
+    let now = chrono::Utc::now().timestamp();
+    let expired = store
+        .meta()
+        .ok()
+        .flatten()
+        .is_some_and(|meta| !meta.needs_reauth && meta.is_expired(now));
+    if !expired {
+        return;
+    }
+    if let Ok(client) = OfficialClient::new() {
+        let _ = zeppbridge_core::official::fresh_tokens(&store, &client, now).await;
+    }
 }
 
 #[tauri::command]

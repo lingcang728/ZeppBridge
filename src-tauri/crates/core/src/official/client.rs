@@ -189,6 +189,50 @@ impl OfficialClient {
         Ok(OfficialProfile { user_id, nickname })
     }
 
+    /// 官方数据接口的一次 GET。`path` 以 `/` 开头，查询参数原样附上。
+    ///
+    /// 401 / 403 是令牌不被认：交给调用方去刷新或让用户重新授权。
+    /// 400 + `code = -50000` 是这个应用没有开通这项数据（压力、血氧等要找商务
+    /// 特殊申请），算「不可用」而不是失败。
+    pub async fn get_json(
+        &self,
+        access_token: &str,
+        path: &str,
+        query: &[(&str, String)],
+    ) -> Result<serde_json::Value> {
+        let response = self
+            .http
+            .get(format!("{}{path}", self.api_base))
+            .query(query)
+            .bearer_auth(access_token)
+            .send()
+            .await?;
+        let status = response.status().as_u16();
+        if status == 401 || status == 403 {
+            return Err(ZeppBridgeError::NeedsReauth("官方令牌被拒绝".into()));
+        }
+        if status == 400 || status == 404 {
+            let body: serde_json::Value = response.json().await.unwrap_or_default();
+            let code = body.get("code").and_then(serde_json::Value::as_i64);
+            if status == 404 || code == Some(-50000) {
+                return Err(ZeppBridgeError::Unavailable(format!(
+                    "官方接口 {path} 没有为这个应用开通"
+                )));
+            }
+            return Err(ZeppBridgeError::HttpStatus {
+                status,
+                message: format!("官方接口 {path} 拒绝了这次请求"),
+            });
+        }
+        if !(200..300).contains(&status) {
+            return Err(ZeppBridgeError::HttpStatus {
+                status,
+                message: format!("官方接口 {path} 暂时没有响应"),
+            });
+        }
+        Ok(response.json().await?)
+    }
+
     /// 在 Zepp 那边撤销授权。断开连接时调用；失败不影响本机清掉令牌。
     pub async fn revoke(&self, access_token: &str) -> Result<()> {
         let response = self
