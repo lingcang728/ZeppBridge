@@ -35,12 +35,11 @@ defineProps<{
           {{ fact.label }} <strong>{{ fact.text }}</strong>
         </span>
       </p>
-      <Sparkline
-        v-if="spark.length > 1"
-        :values="spark"
-        :color="sparkColor"
-        :label="sparkLabel"
-      />
+      <!-- 线下写明画的是哪项、哪段时间：旁边的数字有三项，线只有一条，不写就对不上。 -->
+      <template v-if="spark.length > 1">
+        <Sparkline :values="spark" :color="sparkColor" :label="sparkLabel" />
+        <p class="entry-spark-label" aria-hidden="true">{{ sparkLabel }}</p>
+      </template>
       <p v-else class="entry-note">{{ note }}</p>
     </div>
   </RouterLink>
@@ -65,6 +64,7 @@ defineProps<{
 .entry-facts { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; color: var(--subtle); font-size: var(--fs-xs); }
 .entry-facts strong { color: var(--ink); font-family: var(--font-mono); font-size: var(--fs-xl); font-weight: 600; font-variant-numeric: tabular-nums; }
 .entry-note { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.5; }
+.entry-spark-label { margin: 4px 0 0; color: var(--subtle); font-size: var(--fs-2xs); }
 
 /* 卡片底色统一走材质；类别只在左下角留一点同色微光，和图标、曲线是同一个颜色。
    以前训练状态卡是写死的橄榄棕渐变，身体状态卡是绿底配红心，看起来像两套配色。 */

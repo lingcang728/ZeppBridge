@@ -3,7 +3,7 @@ import { computed, ref } from 'vue';
 import CapsuleWheel from '../../../components/CapsuleWheel.vue';
 import SegmentTrack from '../../../components/SegmentTrack.vue';
 import { UI_SCALES, useUiScale, type UiScale } from '../../../composables/useUiScale';
-import { useTheme, type ResolvedTheme } from '../../../composables/useTheme';
+import { useTheme, type ThemeMode } from '../../../composables/useTheme';
 import {
   DATE_ORDERS,
   TIME_FORMATS,
@@ -40,11 +40,12 @@ const timeFormatOptions = computed(() =>
   TIME_FORMATS.map((value) => ({ value, label: dateTimeLabels.value[value] })));
 const dateOrderOptions = computed(() =>
   DATE_ORDERS.map((value) => ({ value, label: dateTimeLabels.value[value] })));
-/* 主题两格，和顶栏同一对月亮 / 太阳：拨到和系统一致的那一格就回到跟随系统
-   （见 useTheme.pickTheme），新主题从被点的那枚图标处扩散开。 */
+/* 主题三格：深色 / 浅色 / 跟随系统，点哪格就是哪条规则（见 useTheme.pickTheme）；
+   新主题从被点的那枚图标处扩散开。顶栏只放月亮 / 太阳两枚，回到跟随系统在这里。 */
 const themeOptions = computed(() => [
-  { value: 'dark' as ResolvedTheme, label: d.value.themeDark, icon: 'moon' as const },
-  { value: 'light' as ResolvedTheme, label: d.value.themeLight, icon: 'sun' as const },
+  { value: 'dark' as ThemeMode, label: d.value.themeDark, icon: 'moon' as const },
+  { value: 'light' as ThemeMode, label: d.value.themeLight, icon: 'sun' as const },
+  { value: 'system' as ThemeMode, label: d.value.themeSystem, icon: 'monitor' as const },
 ]);
 const themeTrack = ref<{ $el: HTMLElement } | null>(null);
 const chooseLocale = (value: string | number) => setLocale(String(value) as Locale);
@@ -54,7 +55,7 @@ const chooseDateOrder = (value: string | number) => setDateOrder(String(value) a
 const chooseTheme = (value: string | number) => {
   const index = themeOptions.value.findIndex((option) => option.value === value);
   const rect = themeTrack.value?.$el.querySelectorAll<HTMLElement>('.segment-item')[index]?.getBoundingClientRect();
-  pickTheme(String(value) as ResolvedTheme, rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : undefined);
+  pickTheme(String(value) as ThemeMode, rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : undefined);
 };
 </script>
 
@@ -101,7 +102,7 @@ const chooseTheme = (value: string | number) => {
             <span class="s-row-sub">{{ resolvedTheme === 'dark' ? d.themeDark : d.themeLight }}<template v-if="themeMode === 'system'"> · {{ d.themeSystem }}</template></span>
           </div>
           <div class="s-row-control">
-            <SegmentTrack ref="themeTrack" compact icon-only :items="themeOptions" :model-value="resolvedTheme" :aria-label="d.themeLabel" @update:model-value="chooseTheme" />
+            <SegmentTrack ref="themeTrack" compact icon-only :items="themeOptions" :model-value="themeMode" :aria-label="d.themeLabel" @update:model-value="chooseTheme" />
           </div>
         </div>
         <!-- 缩放是一枚按内容收紧、靠右的分段控件；以前它被拉满整行，右边空出一大截。 -->

@@ -139,7 +139,7 @@ const {
 /* 用户在等的那次同步落地了：同步胶囊变成发光的「数据已备好 · 交给 AI」，
    点一下去取。又开始同步时让位给进度；进了交给 AI 就恢复成上次同步时间。 */
 const readyToHand = computed(() => dataReady.value.phase === 'ready' && !isSyncing.value);
-const { resolvedTheme, pickTheme } = useTheme();
+const { resolvedTheme, themeMode, pickTheme } = useTheme();
 
 const accountRecognized = computed(() =>
   ['connected', 'configured'].includes(String(appStatus.value?.connection_state || '')));
@@ -218,11 +218,13 @@ const onSyncClick = () => {
   }
 };
 
-/* 主题只有深 / 浅两格：默认跟随系统，拨到和系统一致的那一格就又回到跟随系统。 */
+/* 主题两格：点哪枚就固定哪一套（「跟随系统」在设置的「显示与语言」里）。默认跟随系统时，
+   亮着的那枚在提示里写明「跟随系统」；再点一下亮着的那枚就把它固定下来。 */
 const themeOptions = computed<{ value: ResolvedTheme; label: string; icon: IconName }[]>(() => [
   { value: 'dark', label: t.value.themeDark, icon: 'moon' },
   { value: 'light', label: t.value.themeLight, icon: 'sun' },
-]);
+].map((option) => (themeMode.value === 'system' && option.value === resolvedTheme.value
+  ? { ...option, label: `${option.label} · ${t.value.themeSystem}` } : option)) as { value: ResolvedTheme; label: string; icon: IconName }[]);
 /* 新主题从被点的那枚图标处扩散开：按钮中心就是扩散的圆心（键盘切换也一样）。 */
 const themeTrack = ref<{ $el: HTMLElement } | null>(null);
 const onThemeChange = (value: string | number) => {
@@ -399,7 +401,7 @@ watch(() => (readyToHand.value ? t.value.readyPill : syncText.value), () => {
            语言是首尾相接的传送带，两端渐隐无硬边；放不下时由 compact 档位收成短码（见 fit）。 -->
       <div class="icon-group glass-control">
         <SegmentTrack ref="themeTrack" class="theme-toggle" variant="bare" icon-only :items="themeOptions"
-          :model-value="resolvedTheme" :aria-label="t.themeTitle" @update:model-value="onThemeChange" />
+          :model-value="resolvedTheme" :aria-label="t.themeTitle" @update:model-value="onThemeChange" @reselect="onThemeChange" />
         <span class="group-divider" aria-hidden="true"></span>
         <CapsuleWheel ref="localeWheel" class="locale-wheel" variant="bare" loop :span="168" :fit-peek="fit >= FIT_SHORT_LOCALE ? 12 : 26" :items="localeOptions"
           :model-value="locale" :aria-label="t.localeLabel" @update:model-value="onLocaleChange" />

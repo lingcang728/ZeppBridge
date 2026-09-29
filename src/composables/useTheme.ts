@@ -49,16 +49,17 @@ export const resolvedTheme = computed<ResolvedTheme>(() =>
 export const systemTheme = computed<ResolvedTheme>(() => (systemDark.value ? 'dark' : 'light'));
 
 /**
- * 只有深 / 浅两个选项的切换：选中和系统一致的那一套，就等于回到跟随系统——
- * 用户不必认识「跟随系统」这个第三态，默认行为也不会被一次误触锁死。
+ * 用户点哪个就是哪个：点深色就固定深色，系统怎么变都不跟；「跟随系统」是设置里单独的
+ * 第三项。以前「选中和系统一致的那一套就回到跟随系统」，结果用户点的是深色，系统一换浅色
+ * 界面也跟着变浅——选择的动作和最终的规则对不上（评审 U14）。
  */
-export const pickTheme = (value: ResolvedTheme, origin?: ThemeOrigin) => {
-  const next: ThemeMode = value === systemTheme.value ? 'system' : value;
-  if (value === resolvedTheme.value) {
-    setTheme(next);
+export const pickTheme = (value: ThemeMode, origin?: ThemeOrigin) => {
+  const target: ResolvedTheme = value === 'system' ? systemTheme.value : value;
+  if (target === resolvedTheme.value) {
+    setTheme(value);
     return;
   }
-  revealTheme(() => setTheme(next), origin);
+  revealTheme(() => setTheme(value), origin);
 };
 
 /** 换主题的动画从哪儿扩散出去（视口坐标，一般是被点的那枚月亮 / 太阳）。 */
