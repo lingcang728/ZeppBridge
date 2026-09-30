@@ -12,7 +12,7 @@ pub mod fetch;
 mod store;
 
 pub use client::{ClaimOutcome, OfficialClient, OfficialProfile, RefreshOutcome};
-pub use store::{OfficialMeta, OfficialStore};
+pub use store::{current_generation, invalidate_pending_logins, OfficialMeta, OfficialStore};
 
 use crate::models::{error::Result, ZeppBridgeError};
 use base64::Engine;
@@ -69,6 +69,51 @@ impl OfficialMeta {
     }
 }
 
+/// 同一进程里同一时间只跑一次刷新（代码审查 R05）：状态读取和同步可能同时
+/// 发现令牌快过期，两次刷新会用同一把刷新令牌，后到的那次可能被拒而把刚续上
+/// 的账号标成「要重新授权」。
+static REFRESH_FLIGHT: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+/// 强制刷新一次（令牌快到期，或数据接口拒了它）。
+///
+/// 排队拿到刷新权后先看库：别人已经刷新过（库里的刷新令牌不是 `used` 那把）
+/// 就直接用库里的；已经断开就是要重新授权。写回按比较后交换，见
+/// [`OfficialStore::replace_if_current`]。
+pub async fn refresh_tokens(
+    store: &OfficialStore,
+    client: &OfficialClient,
+    used: &OfficialTokens,
+    now: i64,
+) -> Result<OfficialTokens> {
+    let _flight = REFRESH_FLIGHT.lock().await;
+    let reauth = || ZeppBridgeError::NeedsReauth("官方授权已失效，请重新授权".into());
+    match store.load()? {
+        None => return Err(reauth()),
+        Some(current)
+            if current.user_id != used.user_id || current.refresh_token != used.refresh_token =>
+        {
+            return Ok(current);
+        }
+        Some(_) => {}
+    }
+    match client.refresh(used, now).await? {
+        RefreshOutcome::Ready(fresh) => {
+            if store.replace_if_current(used, &fresh, now)? {
+                Ok(fresh)
+            } else {
+                store.load()?.ok_or_else(reauth)
+            }
+        }
+        RefreshOutcome::Revoked => {
+            if store.mark_needs_reauth_if_current(used)? {
+                Err(reauth())
+            } else {
+                store.load()?.ok_or_else(reauth)
+            }
+        }
+    }
+}
+
 /// 同步前拿一把能用的令牌：快到期就经中转站刷新，刷新被拒就标记「要重新授权」。
 ///
 /// - 没连接过 / 已经标记要重新授权：`Ok(None)`。
@@ -85,17 +130,9 @@ pub async fn fresh_tokens(
     if !tokens.needs_refresh(now) {
         return Ok(Some(tokens));
     }
-    match client.refresh(&tokens, now).await {
-        Ok(RefreshOutcome::Ready(fresh)) => {
-            store.save(&fresh, now)?;
-            Ok(Some(fresh))
-        }
-        Ok(RefreshOutcome::Revoked) => {
-            store.mark_needs_reauth()?;
-            Err(ZeppBridgeError::NeedsReauth(
-                "官方授权已失效，请重新授权".into(),
-            ))
-        }
+    match refresh_tokens(store, client, &tokens, now).await {
+        Ok(fresh) => Ok(Some(fresh)),
+        Err(error @ ZeppBridgeError::NeedsReauth(_)) => Err(error),
         Err(error) if tokens.expires_at.is_some_and(|expires_at| now < expires_at) => {
             tracing::warn!("刷新官方令牌暂时失败，先用旧令牌: {error}");
             Ok(Some(tokens))

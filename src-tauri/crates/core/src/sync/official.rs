@@ -17,7 +17,7 @@
 use super::*;
 use crate::official::fetch::{date_chunks_newest_first, OfficialFetcher, OfficialKind};
 use crate::official::{
-    fresh_tokens, OfficialClient, OfficialStore, OfficialTokens, RefreshOutcome,
+    fresh_tokens, refresh_tokens, OfficialClient, OfficialStore, OfficialTokens,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -134,20 +134,9 @@ impl OfficialSync {
     }
 
     /// 令牌被数据接口拒了：强制刷新一次。刷新也被拒才算真的要重新授权。
+    /// 与状态读取共用单飞刷新和比较后写回（R05）。
     async fn recover(&self, tokens: &OfficialTokens) -> Result<OfficialTokens> {
-        let now = Utc::now().timestamp();
-        match self.client.refresh(tokens, now).await? {
-            RefreshOutcome::Ready(fresh) => {
-                self.store.save(&fresh, now)?;
-                Ok(fresh)
-            }
-            RefreshOutcome::Revoked => {
-                self.store.mark_needs_reauth()?;
-                Err(ZeppBridgeError::NeedsReauth(
-                    "官方授权已失效，请重新授权".into(),
-                ))
-            }
-        }
+        refresh_tokens(&self.store, &self.client, tokens, Utc::now().timestamp()).await
     }
 
     /// 同步最近 `days` 天。`mode` 决定拉哪几样（见文件头）。

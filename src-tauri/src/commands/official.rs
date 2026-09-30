@@ -15,7 +15,8 @@ use tauri::{AppHandle, Emitter};
 use tauri_plugin_opener::OpenerExt;
 use zeppbridge_core::models::ZeppBridgeError;
 use zeppbridge_core::official::{
-    AuthorizationRequest, ClaimOutcome, OfficialClient, OfficialStore, AUTHORIZATION_WINDOW_SECONDS,
+    invalidate_pending_logins, AuthorizationRequest, ClaimOutcome, OfficialClient, OfficialStore,
+    AUTHORIZATION_WINDOW_SECONDS,
 };
 
 pub const OFFICIAL_EVENT: &str = "official://status";
@@ -161,19 +162,8 @@ pub async fn start_official_login(
 ) -> Result<OfficialStatus, AppError> {
     let request = AuthorizationRequest::new()
         .map_err(|_| AppError::new("err.official.failed", "无法生成这次授权的随机值"))?;
-    let cancel = {
-        let mut flow = FLOW.lock().map_err(|_| {
-            AppError::new("err.official.failed", "官方授权状态异常，请重启应用后再试")
-        })?;
-        if flow.is_some() {
-            return Ok(stored_status(&state.data_dir));
-        }
-        let cancel = Arc::new(AtomicBool::new(false));
-        *flow = Some(Flow {
-            cancel: cancel.clone(),
-            start_url: request.start_url(),
-        });
-        cancel
+    let Some((cancel, generation)) = begin_flow(request.start_url())? else {
+        return Ok(stored_status(&state.data_dir));
     };
     if app
         .opener()
@@ -190,7 +180,7 @@ pub async fn start_official_login(
     publish(&app, &waiting);
     let data_dir = state.data_dir.clone();
     tauri::async_runtime::spawn(async move {
-        let outcome = poll_claim(&data_dir, request, &cancel).await;
+        let outcome = poll_claim(&data_dir, request, &cancel, generation).await;
         clear_flow_if(&cancel);
         if cancel.load(Ordering::SeqCst) {
             // 用户取消了（也许已经重新开始了一次）：这次的结果不再发布。
@@ -203,6 +193,27 @@ pub async fn start_official_login(
         publish(&app, &status);
     });
     Ok(waiting)
+}
+
+/// 已有一次在等就返回 `None`（复用它）；否则登记新的一次，返回它的取消旗标
+/// 和代次。
+///
+/// 锁里只决定「复用还是新建」；状态要等锁放开再算——`stored_status` 会再锁
+/// 一次 FLOW，std 的 Mutex 不可重入，在锁里算就是死锁（代码审查 R04）。
+fn begin_flow(start_url: String) -> Result<Option<(Arc<AtomicBool>, u64)>, AppError> {
+    let mut flow = FLOW
+        .lock()
+        .map_err(|_| AppError::new("err.official.failed", "官方授权状态异常，请重启应用后再试"))?;
+    if flow.is_some() {
+        return Ok(None);
+    }
+    let cancel = Arc::new(AtomicBool::new(false));
+    *flow = Some(Flow {
+        cancel: cancel.clone(),
+        start_url,
+    });
+    // 新的一次登录作废之前所有在途的回执（R05）。
+    Ok(Some((cancel, invalidate_pending_logins())))
 }
 
 fn clear_flow() {
@@ -229,6 +240,7 @@ async fn poll_claim(
     data_dir: &std::path::Path,
     request: AuthorizationRequest,
     cancel: &AtomicBool,
+    generation: u64,
 ) -> Option<OfficialStatus> {
     let client = match OfficialClient::new() {
         Ok(client) => client,
@@ -260,7 +272,7 @@ async fn poll_claim(
             // 网络抖一下不算失败，下一轮再领。
             Err(ZeppBridgeError::NetworkError(_)) => continue,
             Ok(ClaimOutcome::Ready(tokens)) => {
-                return save_verified(data_dir, &client, tokens).await
+                return save_verified(data_dir, &client, tokens, generation).await
             }
             Ok(ClaimOutcome::Denied) => {
                 return Some(OfficialStatus::failed(
@@ -300,10 +312,14 @@ async fn poll_claim(
 ///
 /// 401/403 是 Zepp 明确不认这把令牌：不存。资料接口别的失败（没开通这项、
 /// 暂时连不上）不代表令牌坏了——换令牌那一步 Zepp 已经认过它——照存。
+///
+/// 存之前核对代次（R05）：等 claim / profile 的时候用户取消、断开或重新开始
+/// 了，这次的令牌就不写，也不算失败。
 async fn save_verified(
     data_dir: &std::path::Path,
     client: &OfficialClient,
     mut tokens: zeppbridge_core::official::OfficialTokens,
+    generation: u64,
 ) -> Option<OfficialStatus> {
     let mut nickname = None;
     match client.profile(&tokens.access_token).await {
@@ -320,12 +336,14 @@ async fn save_verified(
         Err(_) => {}
     }
     let store = OfficialStore::new(data_dir);
-    match store.save(&tokens, chrono::Utc::now().timestamp()) {
-        Ok(()) => {
-            // 昵称只是显示用：记不下来不影响授权本身。
-            let _ = store.set_nickname(nickname.as_deref());
-            None
-        }
+    match store.save_login(
+        &tokens,
+        nickname.as_deref(),
+        chrono::Utc::now().timestamp(),
+        generation,
+    ) {
+        // 写了，或者已经被取消 / 取代而没写：都不是失败。
+        Ok(_) => None,
         Err(_) => Some(OfficialStatus::failed(
             "err.official.store",
             "官方授权成功了，但令牌没能存进系统凭据存储",
@@ -333,16 +351,21 @@ async fn save_verified(
     }
 }
 
+/// 停掉正在等待的授权，并作废它还没写下的回执（R05）。
+fn cancel_flow() {
+    if let Ok(mut flow) = FLOW.lock() {
+        if let Some(current) = flow.take() {
+            current.cancel.store(true, Ordering::SeqCst);
+        }
+    }
+    invalidate_pending_logins();
+}
+
 #[tauri::command]
 pub async fn cancel_official_login(
     state: tauri::State<'_, AppState>,
 ) -> Result<OfficialStatus, AppError> {
-    if let Ok(flow) = FLOW.lock() {
-        if let Some(current) = flow.as_ref() {
-            current.cancel.store(true, Ordering::SeqCst);
-        }
-    }
-    clear_flow();
+    cancel_flow();
     Ok(stored_status(&state.data_dir))
 }
 
@@ -352,6 +375,8 @@ pub async fn disconnect_official(
     state: tauri::State<'_, AppState>,
 ) -> Result<OfficialStatus, AppError> {
     let data_dir: PathBuf = state.data_dir.clone();
+    // 在途的授权一并作废：断开之后它不能再把令牌写回来。
+    cancel_flow();
     let store = OfficialStore::new(&data_dir);
     if let Ok(Some(tokens)) = store.load() {
         if let Ok(client) = OfficialClient::new() {
@@ -359,7 +384,43 @@ pub async fn disconnect_official(
         }
     }
     store
-        .clear()
+        .disconnect()
         .map_err(|_| AppError::new("err.official.store", "没能从系统凭据存储里删掉官方令牌"))?;
     Ok(stored_status(&data_dir))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// R04：已有一次在等时再点「授权」，要在有限时间内拿到同一个等待状态，
+    /// 之后取消和查询照常——以前这条路径在锁里重入同一把锁，永远不返回。
+    #[test]
+    fn a_second_start_reuses_the_waiting_flow_without_deadlocking() {
+        let dir =
+            std::env::temp_dir().join(format!("zeppbridge-official-flow-{}", std::process::id()));
+        let (done, finished) = std::sync::mpsc::channel();
+        let worker_dir = dir.clone();
+        std::thread::spawn(move || {
+            let first = begin_flow("https://example.invalid/start?state=a".into()).unwrap();
+            assert!(first.is_some());
+            let second = begin_flow("https://example.invalid/start?state=b".into()).unwrap();
+            assert!(second.is_none(), "已有一次在等就复用它");
+            let waiting = stored_status(&worker_dir);
+            cancel_flow();
+            let after = stored_status(&worker_dir);
+            let _ = done.send((waiting, after, first.unwrap().0));
+        });
+        let (waiting, after, cancel) = finished
+            .recv_timeout(Duration::from_secs(5))
+            .expect("第二次开始授权卡死了");
+        assert_eq!(waiting.state, "waiting");
+        assert_eq!(
+            waiting.authorize_url.as_deref(),
+            Some("https://example.invalid/start?state=a")
+        );
+        assert_eq!(after.state, "idle");
+        assert!(cancel.load(Ordering::SeqCst), "取消要通知在途的轮询");
+        let _ = std::fs::remove_dir_all(dir);
+    }
 }
