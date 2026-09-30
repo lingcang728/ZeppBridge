@@ -280,8 +280,11 @@ const focusDock = computed(() => !!dockRef.value?.details);
 const dockHeight = ref(0);
 let dockObserver: ResizeObserver | null = null;
 onMounted(() => {
-  const el = dockRef.value?.$el;
-  if (!(el instanceof Element) || typeof ResizeObserver === 'undefined') return;
+  // 只量底部那条按钮栏：以前量的是整个交付坞，最终提示词浮层、进度那一截一展开，坞就长高一大截，
+  // 关系网的安全区跟着变、镜头重新居中——用户看到的「交给 AI 页跳动」。浮层本来就浮在画布上面。
+  const dock = dockRef.value?.$el;
+  const el = dock instanceof Element ? dock.querySelector('.bar') ?? dock : null;
+  if (!el || typeof ResizeObserver === 'undefined') return;
   const measure = () => { dockHeight.value = Math.round(el.getBoundingClientRect().height); };
   measure();
   dockObserver = new ResizeObserver(measure);
