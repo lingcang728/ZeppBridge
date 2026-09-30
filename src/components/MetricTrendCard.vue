@@ -3,6 +3,8 @@ import { computed } from 'vue';
 import { useLifeEvents } from '../composables/useLifeEvents';
 import { useQueuedOption } from '../composables/useQueuedOption';
 import { eventChartTone, lifeEventMessages, validEventDate, overlapsEvent } from '../lib/lifeEvents';
+import { useTrendFocus } from '../composables/useTrendRange';
+import { displayDateTimeFormatter, parseDisplayDate } from '../lib/dateTime';
 const { open: openEvent, events: lifeEvents, chipFocus, chartFocus, ensureLoaded } = useLifeEvents();
 ensureLoaded();
 const eventWords = useMessages(lifeEventMessages);
@@ -32,6 +34,8 @@ const messages = defineMessages(
   {
     latestTag: '最新',
     measuredOn: (date: string) => `测于 ${date}`,
+    focusValue: (date: string, value: string) => `${date}：${value}`,
+    focusMissing: (date: string) => `${date} 没有记录`,
     trendAria: (label: string) => `${label}趋势曲线`,
     onlyOneDay: '这段范围只有 1 天记录，画不出趋势。',
     defaultEmpty: '同步后展示这项指标的趋势。',
@@ -42,6 +46,8 @@ const messages = defineMessages(
   {
     latestTag: 'Latest',
     measuredOn: (date: string) => `measured ${date}`,
+    focusValue: (date: string, value: string) => `${date}: ${value}`,
+    focusMissing: (date: string) => `${date}: no record`,
     trendAria: (label: string) => `${label} trend line`,
     onlyOneDay: 'Only one day of data in this range — no trend to draw yet.',
     defaultEmpty: 'Trend appears here after a sync.',
@@ -52,6 +58,8 @@ const messages = defineMessages(
   {
     latestTag: 'Último',
     measuredOn: (date: string) => `medido el ${date}`,
+    focusValue: (date: string, value: string) => `${date}: ${value}`,
+    focusMissing: (date: string) => `${date}: sin registro`,
     trendAria: (label: string) => `Línea de tendencia de ${label}`,
     onlyOneDay: 'Solo hay 1 día de datos en este rango; no hay tendencia que trazar.',
     defaultEmpty: 'Esta métrica muestra su tendencia una vez sincronizada.',
@@ -164,6 +172,22 @@ const option = computed(() => {
 });
 /* 切范围时十来张图同时换数据：排队，一帧只换一张（见 useQueuedOption）。 */
 const shownOption = useQueuedOption(option);
+/* 同页联动（U13）：指针停在任何一张图的某一天，这张卡写出自己那天的值；没有就说没有，不插值。 */
+const focusDate = useTrendFocus();
+const onAxis = (index: number | null) => {
+  const dates = ((shownOption.value?.xAxis as { data?: string[] } | undefined)?.data) ?? [];
+  const date = index === null ? null : dates[index] ?? null;
+  if (focusDate.value !== date) focusDate.value = date;
+};
+const focusLine = computed(() => {
+  const date = focusDate.value;
+  if (!date || !props.series) return null;
+  const label = displayDateTimeFormatter({ month: 'numeric', day: 'numeric' }).format(parseDisplayDate(date));
+  const point = props.series.points.find((item) => item.date === date);
+  if (!point || !Number.isFinite(point.value)) return t.value.focusMissing(label);
+  return t.value.focusValue(label, `${render.value(point.value)}${props.unit ? ` ${props.unit}` : ''}`);
+});
+
 /* 图上有事件区带时，覆盖行末尾给一个图例（颜色跟着分类，这里只说明「色带 = 生活事件」）。 */
 const hasEventMarks = computed(() => {
   const points = props.series?.points ?? [];
@@ -197,7 +221,8 @@ const hasEventMarks = computed(() => {
     </header>
 
     <p class="trend-meta">
-      <span v-if="hasPoints">{{ coverage }}</span>
+      <strong v-if="focusLine" class="trend-focus">{{ focusLine }}</strong>
+      <span v-else-if="hasPoints">{{ coverage }}</span>
       <span v-if="latestDate" class="trend-date">{{ t.measuredOn(latestDate) }}</span>
       <span v-if="band" class="trend-band">{{ band }}</span>
       <span v-if="hasEventMarks" class="trend-event-key"><i aria-hidden="true"></i>{{ eventWords.chartKey }}</span>
@@ -212,6 +237,7 @@ const hasEventMarks = computed(() => {
       @click="chartClick"
       @mouseover="chartHover"
       @mouseout="chartLeave"
+      @axis="onAxis"
     />
     <p v-else-if="hasPoints" class="trend-empty">{{ t.onlyOneDay }}</p>
     <p v-else class="trend-empty">{{ emptyMessage }}</p>
@@ -263,6 +289,7 @@ const hasEventMarks = computed(() => {
 }
 .trend-date { font-variant-numeric: tabular-nums; }
 .trend-band { color: var(--muted); }
+.trend-focus { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
 .trend-event-key { display: inline-flex; align-items: center; gap: 5px; color: var(--subtle); }
 .trend-event-key i { width: 7px; height: 11px; border-radius: 2px; background: color-mix(in srgb, var(--subtle) 45%, transparent); }
 .trend-chart, .trend-slot { width: 100%; height: 150px; align-self: end; }

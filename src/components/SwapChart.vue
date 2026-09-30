@@ -28,7 +28,13 @@ const emit = defineEmits<{
   click: [event: ChartPointerEvent];
   mouseover: [event: ChartPointerEvent];
   mouseout: [event: ChartPointerEvent];
+  axis: [index: number | null];
 }>();
+/* 坐标轴指示器停在第几格（类目轴给的是下标）；指示器收起时给 null。 */
+const onAxisPointer = (event: { axesInfo?: { axisDim?: string; value?: unknown }[] }) => {
+  const x = event.axesInfo?.find((info) => info.axisDim === 'x');
+  emit('axis', typeof x?.value === 'number' ? x.value : null);
+};
 
 const FADE_MS = 320;
 const EASE = 'cubic-bezier(.2, .8, .2, 1)';
@@ -121,6 +127,8 @@ onBeforeUnmount(() => {
         @click="(event: ChartPointerEvent) => emit('click', event)"
         @mouseover="(event: ChartPointerEvent) => emit('mouseover', event)"
         @mouseout="(event: ChartPointerEvent) => emit('mouseout', event)"
+        @update-axis-pointer="onAxisPointer"
+        @globalout="() => emit('axis', null)"
       />
     </div>
   </div>

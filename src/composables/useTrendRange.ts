@@ -34,3 +34,10 @@ export const useTrendRange = (): Ref<SeriesRangeDays> => {
   });
   return shared;
 };
+
+/**
+ * 正在看哪一天（U13）：指针停在任何一张趋势图的某一天上，同页每张趋势卡都写出那天自己的值，
+ * 没有记录就明说没有——不用在图间来回记数。移开就清掉。
+ */
+const focusDate = ref<string | null>(null);
+export const useTrendFocus = () => focusDate;
