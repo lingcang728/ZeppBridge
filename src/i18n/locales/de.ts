@@ -2231,9 +2231,6 @@ Antworte in Markdown.`,
       provenanceTitle: 'Herkunft',
       retry: 'Wiederholen',
       routeAria: 'Voller GPS-Track',
-      routeEmptyBody:
-        'Zu wenige GPS-Punkte vorhanden – keine Route darstellbar.',
-      routeEmptyTitle: 'Kein nutzbarer Track',
       routeLegendNoPace: 'Weniger als 3 gültige Tempo-Punkte · nicht nach Geschwindigkeit gefärbt',
       routeLegendPace: (count: number) =>
         plural(count, {

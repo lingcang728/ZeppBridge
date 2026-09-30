@@ -6,3 +6,6 @@ components/TrendRangeBar.aria
 components/TrendRangeBar.label
 lib/lifeEvents.chartKey
 lib/lifeEvents.since
+views/WorkoutDetail.evidenceSummary
+views/WorkoutDetail.missingMetrics
+views/WorkoutDetail.routeMissing

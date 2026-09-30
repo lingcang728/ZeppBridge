@@ -10,13 +10,15 @@ const t = useMessages(workoutDetailMessages);
 </script>
 
 <template>
-  <section class="surface-card series-card" :aria-label="t.routeAria">
+  <!-- 没有 GPS 时不再占一整块空画布（U09）：收成一行状态。 -->
+  <p v-if="!canvas" class="surface-card route-missing" role="status"><GlyphTile name="outdoor-run" tone="activity" :size="28" />{{ t.routeMissing }}</p>
+  <section v-else class="surface-card series-card" :aria-label="t.routeAria">
     <div class="section-head">
       <GlyphTile name="outdoor-run" tone="activity" :size="42" />
       <div><p class="section-eyebrow">{{ t.eyebrowRoute }}</p><h2>{{ t.routeTitle }}</h2></div>
       <span class="route-note">{{ t.routeNote }}</span>
     </div>
-    <div v-if="canvas" class="route-wrap">
+    <div class="route-wrap">
       <div class="route-canvas-texture" aria-hidden="true"></div>
       <svg class="route-svg" :viewBox="canvas.viewBox" preserveAspectRatio="xMidYMid meet" role="img" :aria-label="t.routeSvgAria">
         <path v-for="(road, index) in canvas.ghosts" :key="`ghost-${index}`" class="ghost-road" :d="road.d" fill="none" :stroke-opacity="road.opacity" />
@@ -40,7 +42,6 @@ const t = useMessages(workoutDetailMessages);
         </template>
       </div>
     </div>
-    <div v-else class="route-empty"><GlyphTile name="outdoor-run" tone="activity" :size="56" /><strong>{{ t.routeEmptyTitle }}</strong><p>{{ t.routeEmptyBody }}</p></div>
   </section>
 </template>
 
@@ -72,8 +73,6 @@ const t = useMessages(workoutDetailMessages);
 .route-legend .steady-dot { background: var(--route-cyan); }
 .route-legend .warm-dot { background: var(--route-amber); }
 .route-legend .slow-dot { background: var(--route-coral); }
-.route-empty { display: grid; justify-items: center; gap: 6px; padding: 46px 16px; border: 1px dashed var(--mat-line-hover); border-radius: var(--radius-md); color: var(--subtle); font-size: var(--fs-sm); text-align: center; }
-.route-empty strong { color: var(--muted); }
-.route-empty p { margin: 0; }
+.route-missing { display: flex; align-items: center; gap: 10px; margin: 0; padding: 10px 14px; border-radius: var(--radius-lg); color: var(--muted); font-size: var(--fs-sm); }
 @media (max-width: 760px) { .route-wrap { min-height: 240px; } .route-note { display: none; } }
 </style>

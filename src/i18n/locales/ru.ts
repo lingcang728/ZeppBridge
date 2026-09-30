@@ -1996,8 +1996,6 @@ export default {
       legendSteady: 'Ровно',
       legendWarm: 'Медленнее',
       legendSlow: 'Медленно',
-      routeEmptyTitle: 'Трек отсутствует',
-      routeEmptyBody: 'В этой записи недостаточно точек GPS для построения карты.',
       chartsEmptyTitle: 'Графики отсутствуют',
       chartsEmptyBody: 'Для этого занятия не синхронизированы ряды пульса, темпа, высоты или каденса.',
       hrZonesAria: 'Пульсовые зоны',

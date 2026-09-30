@@ -1824,8 +1824,6 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       routeAria: 'Trace GPS',
       routeSvgAria: 'Trace GPS en local, colorée par le temps et l’échantillon d’allure le plus proche',
       routeNote: 'Canvas local · aucune tuile de carte demandée',
-      routeEmptyTitle: 'Pas de trace exploitable',
-      routeEmptyBody: 'Pas assez de points GPS dans cet enregistrement — pas de route tracée.',
       routeLegendPace: (count: number) => `${count} points d’allure valides · P10–P90`,
       routeLegendNoPace: 'Moins de 3 points d’allure valides · pas de coloration par la vitesse',
       legendSlow: 'Lent',

@@ -2062,9 +2062,6 @@ Antwoord in Markdown.`,
       legendSteady: 'Constant',
       legendWarm: 'Langzamer',
       legendSlow: 'Langzaam',
-      routeEmptyTitle: 'Geen bruikbare track',
-      routeEmptyBody:
-        'Deze training bevat te weinig GPS-punten om een route te tekenen.',
       chartsEmptyTitle: 'Geen per-punt-curves',
       chartsEmptyBody:
         'Voor deze sessie is geen hartslag-, tempo-, hoogte- of cadansreeks gesynchroniseerd.',

@@ -1486,8 +1486,6 @@ Responda em Markdown.`,
       legendSteady: 'Constante',
       legendWarm: 'Moderado',
       legendSlow: 'Lento',
-      routeEmptyTitle: 'Trajeto indisponível',
-      routeEmptyBody: 'Este registro não possui pontos de GPS suficientes para renderizar a rota.',
       chartsEmptyTitle: 'Sem gráficos de série temporal',
       chartsEmptyBody: 'Nenhuma série de FC, ritmo, altitude ou cadência foi sincronizada nesta sessão.',
 

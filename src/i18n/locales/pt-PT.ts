@@ -1972,9 +1972,6 @@ Responde em formato Markdown.`,
       legendSteady: 'Constante',
       legendWarm: 'Moderado',
       legendSlow: 'Lento',
-      routeEmptyTitle: 'Sem percurso GPS',
-      routeEmptyBody:
-        'Este registo não contém coordenadas GPS suficientes para traçar o percurso.',
       chartsEmptyTitle: 'Sem curvas detalhadas',
       chartsEmptyBody:
         'Sem séries de FC, ritmo, altitude ou cadência disponíveis para esta sessão.',
