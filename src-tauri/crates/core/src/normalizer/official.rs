@@ -149,13 +149,28 @@ impl Normalizer {
                     Some(official_stages(stages, anchor))
                 })
                 .unwrap_or_default();
-            let nap_total_seconds = item.get("napStage").and_then(Value::as_array).map(|naps| {
-                naps.iter()
-                    .filter_map(Value::as_object)
-                    .filter_map(stage_span_minutes)
-                    .sum::<i64>()
-                    * 60
-            });
+            // 空数组 = 确实没睡午觉（0）；有条目但任何一条认不出 = 不知道（None），
+            // 不拿认得出的那几条凑一个偏小的总数，更不把全坏的数组加成 0（R10）。
+            let nap_total_seconds =
+                item.get("napStage")
+                    .and_then(Value::as_array)
+                    .and_then(|naps| {
+                        naps.iter()
+                            .map(|nap| nap.as_object().and_then(stage_span_minutes))
+                            .sum::<Option<i64>>()
+                            .map(|minutes| minutes * 60)
+                    });
+            // 睡着的时长：有清醒时长就用「在床 − 清醒」；没有就用实测的深睡 + 浅睡
+            // （+ REM）——不把未知的清醒当成 0，把在床时长冒充睡着时长（R10）。
+            // 两样都没有时只剩在床时长可给，同时记进 time_in_bed 让界面知道。
+            let (duration_minutes, time_in_bed_minutes) =
+                match (awake_minutes, deep_minutes, light_minutes) {
+                    (Some(awake), _, _) => ((span - awake).max(0), None),
+                    (None, Some(deep), Some(light)) => {
+                        (deep + light + rem_minutes.unwrap_or(0), Some(span))
+                    }
+                    (None, _, _) => (span, Some(span)),
+                };
             out.push(OfficialSleep {
                 session: SleepSession {
                     sleep_id: format!("official:{start}"),
@@ -164,7 +179,7 @@ impl Normalizer {
                     score: int(item, "sleepScore")
                         .filter(|score| (1..=100).contains(score))
                         .map(|score| score as i32),
-                    duration_minutes: (span - awake_minutes.unwrap_or(0)).max(0),
+                    duration_minutes,
                     deep_minutes,
                     light_minutes,
                     rem_minutes,
@@ -172,7 +187,7 @@ impl Normalizer {
                     source_scope: SourceScope::UserFused,
                     device_id: None,
                     synced_at: None,
-                    time_in_bed_minutes: None,
+                    time_in_bed_minutes,
                     stages,
                     wake_count: None,
                 },

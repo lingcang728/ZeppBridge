@@ -232,19 +232,37 @@ pub fn item_day(kind: OfficialKind, item: &Value, time_zone: &str) -> Option<Nai
 
 /// 一组记录拆成按天（运动按条、体重按次）的原始报文。
 pub fn split_records(kind: OfficialKind, items: Vec<Value>, time_zone: &str) -> Vec<RawRecord> {
+    split_records_counted(kind, items, time_zone).0
+}
+
+/// 同 [`split_records`]，另外数出因为缺日期 / 编号而丢下的条目——它们不能
+/// 悄悄消失，要进这一块的完整性结果（代码审查 R09）。
+pub fn split_records_counted(
+    kind: OfficialKind,
+    items: Vec<Value>,
+    time_zone: &str,
+) -> (Vec<RawRecord>, usize) {
     let mut groups: BTreeMap<String, (NaiveDate, Vec<Value>)> = BTreeMap::new();
+    let mut skipped = 0usize;
     for item in items {
         let Some(day) = item_day(kind, &item, time_zone) else {
+            skipped += 1;
             continue;
         };
         let key = match kind {
             OfficialKind::Sports => match text(&item, "trackId") {
                 Some(track) => track,
-                None => continue,
+                None => {
+                    skipped += 1;
+                    continue;
+                }
             },
             OfficialKind::Body => match number(&item, "timestamp") {
                 Some(timestamp) => timestamp.to_string(),
-                None => continue,
+                None => {
+                    skipped += 1;
+                    continue;
+                }
             },
             _ => format!("day:{day}"),
         };
@@ -254,12 +272,13 @@ pub fn split_records(kind: OfficialKind, items: Vec<Value>, time_zone: &str) -> 
             .1
             .push(item);
     }
-    groups
+    let records = groups
         .into_iter()
         .map(|(key, (day, items))| {
             raw_record(kind, &key, day, json!({ "items": items }), time_zone)
         })
-        .collect()
+        .collect();
+    (records, skipped)
 }
 
 /// 一份官方原始报文。`payload` 里补上 `timeZone`（见文件头）。
@@ -286,18 +305,45 @@ pub fn raw_record(
     }
 }
 
+/// 官方列表接口的成功形状只有一种：`{"items": [...]}`（实测，空就是
+/// `items: []`）。别的形状一律不是「没有数据」（代码审查 R09）：
+/// - 带非零 `code` 的是业务错误（HTTP 200 也可能这么回）；
+/// - 没有 `items`、`items` 是 null 或不是数组、顶层不是对象，都是认不出的响应。
 fn items_of(body: Value) -> Result<Vec<Value>> {
-    match body {
-        Value::Object(mut map) => match map.remove("items") {
-            Some(Value::Array(items)) => Ok(items),
-            Some(Value::Null) | None => Ok(Vec::new()),
-            Some(_) => Err(ZeppBridgeError::ParseError(
-                "官方响应的 items 不是数组".into(),
-            )),
-        },
-        Value::Array(items) => Ok(items),
-        _ => Err(ZeppBridgeError::ParseError("官方响应不是对象".into())),
+    let Value::Object(mut map) = body else {
+        return Err(ZeppBridgeError::ParseError(
+            "官方响应不是对象，认不出来".into(),
+        ));
+    };
+    if let Some(code) = map
+        .get("code")
+        .and_then(Value::as_i64)
+        .filter(|code| *code != 0)
+    {
+        let message = map
+            .get("message")
+            .and_then(Value::as_str)
+            .unwrap_or("(云端没有给出说明)")
+            .to_string();
+        return Err(ZeppBridgeError::CloudRejected { code, message });
     }
+    match map.remove("items") {
+        Some(Value::Array(items)) => Ok(items),
+        Some(_) => Err(ZeppBridgeError::ParseError(
+            "官方响应的 items 不是数组".into(),
+        )),
+        None => Err(ZeppBridgeError::ParseError(
+            "官方响应里没有 items，认不出来".into(),
+        )),
+    }
+}
+
+/// 一块拉下来的结果。`gap` 说明这块哪里没拉全（截断续取到上限、续取没有
+/// 进展、有条目缺日期或编号被丢下）；已经拿到的记录照常入库（代码审查 R08）。
+#[derive(Debug)]
+pub struct ChunkOutcome {
+    pub records: Vec<RawRecord>,
+    pub gap: Option<String>,
 }
 
 pub struct OfficialFetcher<'a> {
@@ -308,16 +354,18 @@ pub struct OfficialFetcher<'a> {
 }
 
 impl OfficialFetcher<'_> {
-    /// 拉一块（两端都含），按天拆成原始报文。块回来有截断迹象时从断处续要。
+    /// 拉一块（两端都含），按天拆成原始报文。块回来有截断迹象时从断处续要；
+    /// 续到上限还截断、或续取没有进展时，已拿到的照常返回，缺口写进 `gap`。
     pub async fn fetch_chunk(
         &self,
         kind: OfficialKind,
         start: NaiveDate,
         end: NaiveDate,
-    ) -> Result<Vec<RawRecord>> {
+    ) -> Result<ChunkOutcome> {
         let mut items = Vec::new();
         let mut cursor = start;
-        for _ in 0..=MAX_TAIL_REQUESTS {
+        let mut gap = None;
+        for attempt in 0..=MAX_TAIL_REQUESTS {
             let mut query = vec![
                 ("startDate", cursor.format("%Y-%m-%d").to_string()),
                 ("endDate", end.format("%Y-%m-%d").to_string()),
@@ -335,6 +383,13 @@ impl OfficialFetcher<'_> {
             items.extend(batch);
             match needs_tail(end, last) {
                 Some(next) if next > cursor && next <= end => {
+                    if attempt == MAX_TAIL_REQUESTS {
+                        gap = Some(format!(
+                            "官方 {} 续取 {MAX_TAIL_REQUESTS} 次后仍在 {next} 前截断，{next} 至 {end} 没有拉到",
+                            kind.label()
+                        ));
+                        break;
+                    }
                     tracing::info!(
                         "官方 {} 在 {:?} 之后可能被截断，从 {next} 续要",
                         kind.label(),
@@ -342,10 +397,28 @@ impl OfficialFetcher<'_> {
                     );
                     cursor = next;
                 }
+                Some(next) if next <= cursor => {
+                    gap = Some(format!(
+                        "官方 {} 从 {cursor} 续取没有新的记录，{cursor} 至 {end} 没有拉到",
+                        kind.label()
+                    ));
+                    break;
+                }
                 _ => break,
             }
         }
-        Ok(split_records(kind, items, &self.time_zone))
+        let (records, skipped) = split_records_counted(kind, items, &self.time_zone);
+        if skipped > 0 {
+            let note = format!(
+                "有 {skipped} 条官方 {} 记录缺日期或编号，没有入库",
+                kind.label()
+            );
+            gap = Some(match gap {
+                Some(previous) => format!("{previous}；{note}"),
+                None => note,
+            });
+        }
+        Ok(ChunkOutcome { records, gap })
     }
 
     /// 一条运动的明细（逐秒序列、轨迹、暂停）。

@@ -216,25 +216,8 @@ pub(super) fn validate_member_id(input: &str) -> Result<&str> {
     Ok(trimmed)
 }
 
-pub(super) async fn read_json_body(mut response: reqwest::Response) -> Result<Value> {
-    if let Some(len) = response.content_length() {
-        if len > MAX_RESPONSE_BODY_BYTES as u64 {
-            return Err(ZeppBridgeError::ParseError("JSON 响应过大".into()));
-        }
-    }
-    let mut buf = Vec::new();
-    while let Some(chunk) = response
-        .chunk()
-        .await
-        .map_err(|error| ZeppBridgeError::ParseError(format!("JSON 响应无效: {error}")))?
-    {
-        if buf.len().saturating_add(chunk.len()) > MAX_RESPONSE_BODY_BYTES {
-            return Err(ZeppBridgeError::ParseError("JSON 响应过大".into()));
-        }
-        buf.extend_from_slice(&chunk);
-    }
-    serde_json::from_slice(&buf)
-        .map_err(|error| ZeppBridgeError::ParseError(format!("JSON 响应无效: {error}")))
+pub(super) async fn read_json_body(response: reqwest::Response) -> Result<Value> {
+    crate::connectors::read_json_limited(response, MAX_RESPONSE_BODY_BYTES).await
 }
 
 pub fn validate_track_id(input: &str) -> Result<String> {

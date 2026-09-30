@@ -8,6 +8,8 @@
 //! 授权地址由中转站拼，换令牌和刷新令牌都经中转站补上 secret。
 
 mod client;
+#[cfg(test)]
+pub(crate) mod fake_server;
 pub mod fetch;
 mod store;
 

@@ -166,3 +166,29 @@ fn official_body_becomes_weight_samples() {
         .collect();
     assert_eq!(names, vec!["weight", "bmi", "height"]);
 }
+
+/// 代码审查 R10：非空但认不出的小睡数组不是「没睡午觉」；部分认不出也不凑
+/// 一个偏小的总数。缺清醒时长时不拿在床时长冒充睡着时长。
+#[test]
+fn unreadable_naps_are_unknown_and_missing_wake_time_is_not_zero() {
+    let mut broken = night(1443, 1893);
+    broken["napStage"] = json!([{"start": 30}]);
+    let mut partial = night(1443, 1893);
+    partial["napStage"] = json!([{"start": 800, "stop": 819, "mode": 4}, {"start": 900}]);
+    let nights = Normalizer::normalize_official_sleep(&json!({ "items": [broken, partial] }));
+    assert_eq!(nights.len(), 2);
+    assert_eq!(nights[0].nap_total_seconds, None, "全坏的数组不是 0");
+    assert_eq!(nights[1].nap_total_seconds, None, "部分坏也是不知道");
+
+    let mut no_wake = night(1443, 1893);
+    no_wake.as_object_mut().unwrap().remove("wakeTime");
+    let nights = Normalizer::normalize_official_sleep(&json!({ "items": [no_wake] }));
+    let session = &nights[0].session;
+    assert_eq!(session.awake_minutes, None);
+    assert_eq!(
+        session.duration_minutes,
+        90 + 250 + 100,
+        "用实测分期，不是 450 分钟在床时长"
+    );
+    assert_eq!(session.time_in_bed_minutes, Some(450));
+}

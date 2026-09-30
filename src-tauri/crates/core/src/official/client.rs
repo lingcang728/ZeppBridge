@@ -65,6 +65,14 @@ impl TokenBody {
     }
 }
 
+/// 官方接口单个响应的上限，与旧通道一致（代码审查 R15）。7 天逐分钟心率、
+/// 长运动的逐秒明细都远小于它。
+const MAX_RESPONSE_BODY_BYTES: usize = 32 * 1024 * 1024;
+
+async fn bounded_json(response: reqwest::Response) -> Result<serde_json::Value> {
+    crate::connectors::read_json_limited(response, MAX_RESPONSE_BODY_BYTES).await
+}
+
 pub struct OfficialClient {
     http: reqwest::Client,
     relay_base: String,
@@ -113,7 +121,7 @@ impl OfficialClient {
                 message: "授权中转站没有接受这次领取".into(),
             });
         }
-        let body: TokenBody = response.json().await?;
+        let body: TokenBody = serde_json::from_value(bounded_json(response).await?)?;
         Ok(match body.status.as_deref() {
             Some("ready") => match body.into_tokens(now, None) {
                 Some(tokens) => ClaimOutcome::Ready(tokens),
@@ -145,7 +153,7 @@ impl OfficialClient {
                 message: "刷新官方令牌暂时失败".into(),
             });
         }
-        let body: TokenBody = response.json().await?;
+        let body: TokenBody = serde_json::from_value(bounded_json(response).await?)?;
         match body.into_tokens(now, Some(&tokens.user_id)) {
             Some(mut fresh) => {
                 // 刷新响应没带新的 refresh_token 时，旧的继续可用。
@@ -176,7 +184,7 @@ impl OfficialClient {
                 message: "官方资料接口没有响应".into(),
             });
         }
-        let body: serde_json::Value = response.json().await?;
+        let body = bounded_json(response).await?;
         let user_id = match body.get("userId") {
             Some(serde_json::Value::String(id)) if !id.is_empty() => id.clone(),
             Some(serde_json::Value::Number(id)) => id.to_string(),
@@ -212,7 +220,7 @@ impl OfficialClient {
             return Err(ZeppBridgeError::NeedsReauth("官方令牌被拒绝".into()));
         }
         if status == 400 || status == 404 {
-            let body: serde_json::Value = response.json().await.unwrap_or_default();
+            let body = bounded_json(response).await.unwrap_or_default();
             let code = body.get("code").and_then(serde_json::Value::as_i64);
             if status == 404 || code == Some(-50000) {
                 return Err(ZeppBridgeError::Unavailable(format!(
@@ -230,7 +238,7 @@ impl OfficialClient {
                 message: format!("官方接口 {path} 暂时没有响应"),
             });
         }
-        Ok(response.json().await?)
+        bounded_json(response).await
     }
 
     /// 在 Zepp 那边撤销授权。断开连接时调用；失败不影响本机清掉令牌。

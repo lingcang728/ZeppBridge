@@ -15,7 +15,9 @@
 //! 每一块（≤90 天，心率 7 天）拉到就落库、就通知界面，和旧通道的 `chunked.rs` 一样。
 
 use super::*;
-use crate::official::fetch::{date_chunks_newest_first, OfficialFetcher, OfficialKind};
+use crate::official::fetch::{
+    date_chunks_newest_first, ChunkOutcome, OfficialFetcher, OfficialKind,
+};
 use crate::official::{
     fresh_tokens, refresh_tokens, OfficialClient, OfficialStore, OfficialTokens,
 };
@@ -231,7 +233,26 @@ impl OfficialSync {
                 Ok(Some(report)) => streams.push(report),
                 Ok(None) => {}
                 Err(error) if error.is_cancelled() || error.needs_reauth() => return Err(error),
-                Err(error) => tracing::warn!("官方运动明细同步失败: {error}"),
+                Err(error) => {
+                    // 整段明细同步出错（读待补列表、写库失败）：也要进结果，不能只写日志。
+                    tracing::warn!("官方运动明细同步失败: {error}");
+                    let report = StreamReport {
+                        stream: "workout_detail".into(),
+                        status: StreamStatus::Failed,
+                        records_written: 0,
+                        raw_records: 0,
+                        capability: CapabilityStatus::Unverified,
+                        needs_reauth: false,
+                        message: Some(error.user_message()),
+                    };
+                    let db = self.write_db().await?;
+                    streams.push(SyncManager::finish_stream(
+                        &db,
+                        "workout_detail",
+                        &[report],
+                        None,
+                    )?);
+                }
             }
             on_progress(progress(
                 "workout_detail",
@@ -279,17 +300,23 @@ impl OfficialSync {
         on_progress: &(dyn Fn(SyncProgress) + Send + Sync),
     ) -> Result<StreamReport> {
         let mut reports = Vec::new();
+        let mut gaps: Vec<String> = Vec::new();
         for (chunk_start, chunk_end) in date_chunks_newest_first(start, end, kind.chunk_days()) {
             self.abort_if_cancelled()?;
-            let records = match self.fetch(tokens, kind, chunk_start, chunk_end).await {
+            let outcome = match self.fetch(tokens, kind, chunk_start, chunk_end).await {
                 Err(error) if error.needs_reauth() => {
                     *tokens = self.recover(tokens).await?;
                     self.fetch(tokens, kind, chunk_start, chunk_end).await?
                 }
                 other => other?,
             };
+            // 没拉全的块：拿到的照常入库，缺口记下来，整条流标失败可重试（R08）。
+            if let Some(gap) = outcome.gap {
+                tracing::warn!("{gap}");
+                gaps.push(gap);
+            }
             let db = self.write_db().await?;
-            for raw in records {
+            for raw in outcome.records {
                 let record = FetchedRecord {
                     raw,
                     incomplete: false,
@@ -307,8 +334,10 @@ impl OfficialSync {
             ));
         }
         let db = self.write_db().await?;
+        let incomplete = (!gaps.is_empty()).then(|| gaps.join("；"));
         if reports.is_empty() {
-            // 整段都回空：这段时间官方确实没有这一样，不是失败。
+            // 整段都回空（合法的 `items: []`）：这段时间官方确实没有这一样，不是失败。
+            // 有缺口时由 finish_stream 改成失败。
             let empty = StreamReport {
                 stream: stream.into(),
                 status: StreamStatus::Success,
@@ -318,9 +347,9 @@ impl OfficialSync {
                 needs_reauth: false,
                 message: None,
             };
-            return SyncManager::finish_stream(&db, stream, &[empty], None);
+            return SyncManager::finish_stream(&db, stream, &[empty], incomplete);
         }
-        SyncManager::finish_stream(&db, stream, &reports, None)
+        SyncManager::finish_stream(&db, stream, &reports, incomplete)
     }
 
     async fn fetch(
@@ -329,7 +358,7 @@ impl OfficialSync {
         kind: OfficialKind,
         start: NaiveDate,
         end: NaiveDate,
-    ) -> Result<Vec<RawRecord>> {
+    ) -> Result<ChunkOutcome> {
         let fetcher = OfficialFetcher {
             client: &self.client,
             access_token: &tokens.access_token,
@@ -348,6 +377,7 @@ impl OfficialSync {
             return Ok(None);
         }
         let mut reports = Vec::new();
+        let mut failed = 0usize;
         for (workout_id, start_time) in pending {
             self.abort_if_cancelled()?;
             let day = DateTime::parse_from_rfc3339(&start_time)
@@ -358,15 +388,23 @@ impl OfficialSync {
                 access_token: &tokens.access_token,
                 time_zone: self.time_zone.clone(),
             };
-            let raw = match fetcher.fetch_sport_detail(&workout_id, day).await {
+            let mut attempt = fetcher.fetch_sport_detail(&workout_id, day).await;
+            if matches!(&attempt, Err(error) if error.needs_reauth()) {
+                // 令牌被拒：续上以后这一条再要一次，不跳过它。
+                *tokens = self.recover(tokens).await?;
+                let fetcher = OfficialFetcher {
+                    client: &self.client,
+                    access_token: &tokens.access_token,
+                    time_zone: self.time_zone.clone(),
+                };
+                attempt = fetcher.fetch_sport_detail(&workout_id, day).await;
+            }
+            let raw = match attempt {
                 Ok(raw) => raw,
-                Err(error) if error.needs_reauth() => {
-                    *tokens = self.recover(tokens).await?;
-                    continue;
-                }
-                Err(error) if error.is_cancelled() => return Err(error),
+                Err(error) if error.is_cancelled() || error.needs_reauth() => return Err(error),
                 Err(error) => {
                     tracing::warn!("官方运动明细 {workout_id} 拉取失败: {error}");
+                    failed += 1;
                     continue;
                 }
             };
@@ -378,11 +416,28 @@ impl OfficialSync {
             };
             reports.push(SyncManager::persist_record(&db, record)?.report);
         }
-        if reports.is_empty() {
+        // 明细没拉到的不能被报成「完成」（代码审查 R14）：汇总照常保留，
+        // 这条流标失败、说清几条没拉到，下次同步会再补（它们仍在待补列表里）。
+        let incomplete =
+            (failed > 0).then(|| format!("{failed} 条官方运动明细没拉到，下次同步再补"));
+        if reports.is_empty() && incomplete.is_none() {
             return Ok(None);
         }
         let db = self.write_db().await?;
-        SyncManager::finish_stream(&db, "workout_detail", &reports, None).map(Some)
+        if reports.is_empty() {
+            let empty = StreamReport {
+                stream: "workout_detail".into(),
+                status: StreamStatus::Success,
+                records_written: 0,
+                raw_records: 0,
+                capability: CapabilityStatus::Verified,
+                needs_reauth: false,
+                message: None,
+            };
+            return SyncManager::finish_stream(&db, "workout_detail", &[empty], incomplete)
+                .map(Some);
+        }
+        SyncManager::finish_stream(&db, "workout_detail", &reports, incomplete).map(Some)
     }
 }
 
@@ -401,3 +456,7 @@ fn progress(stream: &str, current: u32, total: u32, code: &str, completed: bool)
         detail: None,
     }
 }
+
+#[cfg(test)]
+#[path = "official_tests.rs"]
+mod tests;

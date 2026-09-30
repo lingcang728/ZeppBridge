@@ -287,3 +287,135 @@ async fn concurrent_refreshes_are_single_flight() {
     assert_eq!(store.load().unwrap(), Some(a));
     let _ = std::fs::remove_dir_all(dir);
 }
+
+/* ---------- 代码审查 R08 / R09 / R15：抓取完整性（本地假服务） ---------- */
+
+use super::fake_server::{query_param, serve, Reply};
+use super::fetch::{OfficialFetcher, OfficialKind};
+
+fn day_of(text: &str) -> chrono::NaiveDate {
+    chrono::NaiveDate::parse_from_str(text, "%Y-%m-%d").unwrap()
+}
+
+async fn fetch(
+    route: impl Fn(&str) -> Reply + Send + Sync + 'static,
+    start: &str,
+    end: &str,
+) -> (
+    Result<super::fetch::ChunkOutcome>,
+    Arc<std::sync::atomic::AtomicUsize>,
+) {
+    let (base, hits) = serve(route).await;
+    let client = OfficialClient::with_bases(&base, &base).unwrap();
+    let fetcher = OfficialFetcher {
+        client: &client,
+        access_token: "token-fixture",
+        time_zone: "Asia/Shanghai".into(),
+    };
+    let outcome = fetcher
+        .fetch_chunk(OfficialKind::ActivityDaily, day_of(start), day_of(end))
+        .await;
+    (outcome, hits)
+}
+
+/// R08：服务每次只回游标那一天——续取 3 次后仍截断，已拿到的 4 天照常
+/// 返回，缺口写清楚，不再报成「整段完成」。
+#[tokio::test]
+async fn a_chunk_that_stays_truncated_reports_its_gap() {
+    let (outcome, hits) = fetch(
+        |target| {
+            let day = query_param(target, "startDate").unwrap();
+            Reply::json(
+                200,
+                format!(r#"{{"items":[{{"date":"{day}","steps":1}}]}}"#),
+            )
+        },
+        "2026-09-01",
+        "2026-09-30",
+    )
+    .await;
+    let outcome = outcome.unwrap();
+    assert_eq!(hits.load(std::sync::atomic::Ordering::SeqCst), 4);
+    assert_eq!(outcome.records.len(), 4);
+    let gap = outcome.gap.expect("截断到上限必须标不完整");
+    assert!(gap.contains("2026-09-05"), "{gap}");
+}
+
+/// R09：HTTP 200 里的业务错误不是「没有数据」。
+#[tokio::test]
+async fn a_business_error_inside_http_200_is_an_error() {
+    let (outcome, _) = fetch(
+        |_| {
+            Reply::json(
+                200,
+                r#"{"code":-50000,"message":"synthetic business error"}"#,
+            )
+        },
+        "2026-09-01",
+        "2026-09-07",
+    )
+    .await;
+    assert!(matches!(
+        outcome,
+        Err(ZeppBridgeError::CloudRejected { code: -50000, .. })
+    ));
+}
+
+/// R09：认不出的形状都是错误；只有 `items: []` 是合法的空。
+#[tokio::test]
+async fn only_an_empty_items_array_means_no_data() {
+    for body in [r#"{}"#, r#"{"items":null}"#, r#"{"items":{}}"#, r#"[]"#] {
+        let (outcome, _) = fetch(move |_| Reply::json(200, body), "2026-09-01", "2026-09-07").await;
+        assert!(
+            matches!(outcome, Err(ZeppBridgeError::ParseError(_))),
+            "{body} 不该被当成空数据"
+        );
+    }
+    let (outcome, _) = fetch(
+        |_| Reply::json(200, r#"{"items":[]}"#),
+        "2026-09-01",
+        "2026-09-07",
+    )
+    .await;
+    let outcome = outcome.unwrap();
+    assert!(outcome.records.is_empty());
+    assert!(outcome.gap.is_none());
+}
+
+/// R09：缺日期的条目不能悄悄消失。
+#[tokio::test]
+async fn items_without_a_date_are_counted_in_the_gap() {
+    let (outcome, _) = fetch(
+        |_| {
+            Reply::json(
+                200,
+                r#"{"items":[{"date":"2026-09-07","steps":1},{"steps":2}]}"#,
+            )
+        },
+        "2026-09-01",
+        "2026-09-07",
+    )
+    .await;
+    let outcome = outcome.unwrap();
+    assert_eq!(outcome.records.len(), 1);
+    assert!(outcome.gap.unwrap().contains("1 条"));
+}
+
+/// R15：没有 Content-Length 的超大响应读到上限就停，给出可操作的说明。
+#[tokio::test]
+async fn an_oversized_body_without_a_length_is_cut_off() {
+    let (outcome, _) = fetch(
+        |_| Reply {
+            status: 200,
+            body: vec![b' '; 33 * 1024 * 1024],
+            length: false,
+        },
+        "2026-09-01",
+        "2026-09-07",
+    )
+    .await;
+    match outcome {
+        Err(ZeppBridgeError::ParseError(message)) => assert!(message.contains("MB"), "{message}"),
+        other => panic!("超限响应必须报错：{other:?}"),
+    }
+}
