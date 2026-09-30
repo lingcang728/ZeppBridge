@@ -102,59 +102,112 @@ const replaceDraft = (task: AiTask) => {
   savedNotice.value = false;
 };
 
+/*
+ * 异步回执的归属（代码审查 R03）：
+ * - `draftGen`：草稿换了「是哪一份」就加一——载入、新建、删掉当前那份。
+ *   回执回来时代次变了，说明用户已经去看别的任务，回执不许再碰草稿。
+ * - `busyOwner`：busy 由最后开始的那个操作持有，旧操作的 finally 不替新操作清忙。
+ * - `saveChain`：保存排队。第二次保存要等第一次拿到 id，否则两次都会新建。
+ */
+let draftGen = 0;
+let busyOwner = 0;
+let opSeq = 0;
+let saveChain: Promise<unknown> = Promise.resolve();
+let savesInFlight = 0;
+
+const beginBusy = (kind: 'load' | 'save' | 'delete') => {
+  opSeq += 1;
+  busyOwner = opSeq;
+  busy.value = kind;
+  return opSeq;
+};
+const endBusy = (op: number) => {
+  if (busyOwner === op) busy.value = false;
+};
+
 const loadTask = async (id: string) => {
-  busy.value = 'load';
+  const op = beginBusy('load');
+  draftGen += 1;
+  const gen = draftGen;
   lastError.value = null;
   try {
     const task = await backend.aiTaskGet(id);
+    if (gen !== draftGen) return; // 等待期间切到了别的任务或新建：丢掉旧回执
     replaceDraft(task);
     await library.ensureWorkouts(task.workout_ids);
   } catch (error) {
-    lastError.value = toUserMessage(error, copy().loadFailed);
+    if (gen === draftGen) lastError.value = toUserMessage(error, copy().loadFailed);
     throw error;
   } finally {
-    busy.value = false;
+    endBusy(op);
   }
 };
 
 const resetDraft = () => {
+  draftGen += 1;
   replaceDraft(newTaskDraft());
   lastError.value = null;
 };
 
-/** `fallbackTitle`：标题为空时存成什么（页面按模板和运动自动生成）。 */
-const saveDraft = async (fallbackTitle?: string): Promise<AiTask> => {
-  busy.value = 'save';
+const showSavedNotice = () => {
+  savedNotice.value = true;
+  clearTimeout(savedNoticeTimer);
+  savedNoticeTimer = setTimeout(() => {
+    savedNotice.value = false;
+  }, 4000);
+};
+
+/**
+ * `fallbackTitle`：标题为空时存成什么（页面按模板和运动自动生成）。
+ *
+ * 没存过的草稿永远新建（代码审查 R02）：标题不是身份，同名的两个任务可以
+ * 并存。存过一次后 `draft.id` 就有了，同一份草稿再存是原位更新。
+ */
+const saveDraft = (fallbackTitle?: string): Promise<AiTask> => {
+  // 没有在途的保存就当场开始（拍下点击那一刻的草稿）；有就排在它后面。
+  const run = savesInFlight === 0
+    ? saveNow(fallbackTitle)
+    : saveChain.then(() => saveNow(fallbackTitle));
+  savesInFlight += 1;
+  const settled = run.catch(() => undefined).finally(() => {
+    savesInFlight -= 1;
+  });
+  saveChain = settled;
+  return run;
+};
+
+const saveNow = async (fallbackTitle?: string): Promise<AiTask> => {
+  const op = beginBusy('save');
+  const gen = draftGen;
+  const sentSnapshot = taskSnapshot(draft.value);
   lastError.value = null;
   try {
     const task = { ...draft.value };
     if (!task.title.trim()) task.title = fallbackTitle?.trim() || copy().untitled;
-    // 没存过的草稿按名字归到已有的那条：同一天同样的「最近 14 天」再导出一次，
-    // 更新原记录，不再在已保存的任务里多出一条一模一样的。
-    if (!task.id) {
-      const same = library.taskList.value.find((entry) => entry.title.trim() === task.title.trim());
-      if (same) task.id = same.id;
-    }
     const saved = await backend.aiTaskSave(task);
-    draft.value = saved;
-    markBaseline();
-    savedNotice.value = true;
-    clearTimeout(savedNoticeTimer);
-    savedNoticeTimer = setTimeout(() => {
-      savedNotice.value = false;
-    }, 4000);
+    if (gen === draftGen) {
+      if (taskSnapshot(draft.value) === sentSnapshot) {
+        draft.value = saved;
+      } else {
+        // 保存途中用户又改了：留住新改的内容，只认领后端分配的身份和时间；
+        // 基线是已存的那版，所以仍是「有改动未保存」。
+        draft.value = { ...draft.value, id: saved.id, created_at: saved.created_at, updated_at: saved.updated_at };
+      }
+      baseline.value = taskSnapshot(saved);
+      showSavedNotice();
+    }
     void library.loadTaskList();
     return saved;
   } catch (error) {
-    lastError.value = toUserMessage(error, copy().saveFailed);
+    if (gen === draftGen) lastError.value = toUserMessage(error, copy().saveFailed);
     throw error;
   } finally {
-    busy.value = false;
+    endBusy(op);
   }
 };
 
 const deleteTask = async (id: string) => {
-  busy.value = 'delete';
+  const op = beginBusy('delete');
   lastError.value = null;
   try {
     await backend.aiTaskDelete(id);
@@ -164,7 +217,7 @@ const deleteTask = async (id: string) => {
     lastError.value = toUserMessage(error, copy().deleteFailed);
     throw error;
   } finally {
-    busy.value = false;
+    endBusy(op);
   }
 };
 

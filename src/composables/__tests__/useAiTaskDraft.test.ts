@@ -216,4 +216,89 @@ describe('useAiTaskDraft', () => {
     await library.loadRecentWorkouts();
     expect(library.recentWorkouts.value.some((w) => w.workout_id === 'w-old2')).toBe(true);
   });
+
+  /* —— 代码审查 R02 / R03：身份与乱序回执 —— */
+  const deferred = <T,>() => {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((r) => { resolve = r; });
+    return { promise, resolve };
+  };
+  const echoSave = (id: string) => async (task: AiTask) => ({ ...task, id: task.id || id, created_at: 'c', updated_at: 'u' });
+
+  it('R02：新草稿和已保存任务同名，也新建而不是覆盖旧任务', async () => {
+    library.taskList.value = [{ id: 'old', title: '最近 14 天' } as never];
+    saveMock.mockImplementation(echoSave('new-id'));
+    draft.setTitle('最近 14 天');
+    const saved = await draft.saveDraft();
+    expect(saveMock.mock.calls[0][0].id).toBe('');
+    expect(saved.id).toBe('new-id');
+    library.taskList.value = [];
+  });
+
+  it('R03：保存途中改了标题，回执不冲掉新标题，仍标脏', async () => {
+    const gate = deferred<AiTask>();
+    saveMock.mockImplementation(() => gate.promise);
+    draft.setTitle('A');
+    const pending = draft.saveDraft();
+    draft.setTitle('A 改');
+    gate.resolve({ ...draft.draft.value, title: 'A', id: 'sid', created_at: 'c', updated_at: 'u' });
+    await pending;
+    expect(draft.draft.value.title).toBe('A 改');
+    expect(draft.draft.value.id).toBe('sid');
+    expect(draft.dirty.value).toBe(true);
+  });
+
+  it('R03：先载 A 再载 B，A 后到也显示 B', async () => {
+    const a = deferred<AiTask>();
+    const b = deferred<AiTask>();
+    getMock.mockImplementation((id: string) => (id === 'A' ? a.promise : b.promise));
+    const la = draft.loadTask('A');
+    const lb = draft.loadTask('B');
+    b.resolve({ ...newTaskDraft(), id: 'B', title: 'B' });
+    await lb;
+    expect(draft.busy.value).toBe(false);
+    a.resolve({ ...newTaskDraft(), id: 'A', title: 'A' });
+    await la;
+    expect(draft.draft.value.id).toBe('B');
+  });
+
+  it('R03：载 A 未回时点新建并输入，A 的回执不覆盖新草稿', async () => {
+    const a = deferred<AiTask>();
+    getMock.mockImplementation(() => a.promise);
+    const la = draft.loadTask('A');
+    draft.resetDraft();
+    draft.setTitle('新的');
+    a.resolve({ ...newTaskDraft(), id: 'A', title: 'A' });
+    await la;
+    expect(draft.draft.value.id).toBe('');
+    expect(draft.draft.value.title).toBe('新的');
+  });
+
+  it('R03：保存 A 途中切到 B，A 的回执不改 B', async () => {
+    getMock.mockResolvedValue({ ...newTaskDraft(), id: 'A', title: 'A' });
+    await draft.loadTask('A');
+    const gate = deferred<AiTask>();
+    saveMock.mockImplementation(() => gate.promise);
+    const pending = draft.saveDraft();
+    getMock.mockResolvedValue({ ...newTaskDraft(), id: 'B', title: 'B' });
+    await draft.loadTask('B');
+    gate.resolve({ ...newTaskDraft(), id: 'A', title: 'A', created_at: 'c', updated_at: 'u2' });
+    await pending;
+    expect(draft.draft.value.id).toBe('B');
+    expect(draft.dirty.value).toBe(false);
+  });
+
+  it('R03：连续保存两次按顺序执行，第二次沿用第一次拿到的 id', async () => {
+    const gate = deferred<AiTask>();
+    saveMock.mockImplementationOnce(() => gate.promise).mockImplementation(echoSave('unused'));
+    draft.setTitle('两次');
+    const first = draft.saveDraft();
+    const second = draft.saveDraft();
+    expect(saveMock).toHaveBeenCalledTimes(1);
+    gate.resolve({ ...draft.draft.value, id: 'once', created_at: 'c', updated_at: 'u' });
+    await first;
+    await second;
+    expect(saveMock).toHaveBeenCalledTimes(2);
+    expect(saveMock.mock.calls[1][0].id).toBe('once');
+  });
 });
