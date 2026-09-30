@@ -343,9 +343,6 @@ export default {
         'Elk maandblok in het logboek is afgehandeld: ofwel lokaal geschreven, ofwel de cloud zei ronduit dat er niets voor die periode is.',
       ledgerIncomplete: (remaining: number) =>
         `Er zijn nog ${remaining} blokken onafgehandeld. Tot die klaar zijn, is deze lokale kopie alleen een kopie van het gesynchroniseerde bereik — geen volledige kopie.`,
-      ledgerStats: (persisted: number, empty: number, pending: number) =>
-        `${persisted} geschreven · ${empty} leeg uit de cloud · ${pending} te doen`,
-      ledgerFailed: (failed: number) => `${failed} mislukt`,
       ledgerRange: (from: string, to: string, records: number) =>
         `${from} ~ ${to} · ${records} items`,
       ledgerNothingWritten: 'Nog geen maand geschreven',
@@ -380,7 +377,6 @@ export default {
         plural(attempts, { one: `${attempts} poging`, other: `${attempts} pogingen` }),
       failedExhausted:
         'De automatische nieuwe pogingen zijn op. Gebruik ‘Mislukte maanden opnieuw proberen’ om het nog eens te proberen',
-      failedNoReason: 'Geen reden vastgelegd',
       retryFailed: 'Mislukte maanden opnieuw proberen',
       retryFailedDone:
         'Mislukte maanden staan weer in de wachtrij — je kunt verder ophalen.',
@@ -669,7 +665,6 @@ export default {
       handoffFailed: 'De AI-overdracht is niet gelukt',
       copiedButCannotOpen: (label: string) =>
         `Gekopieerd, maar ${label} opent niet`,
-      nothingToRetry: 'Geen AI-overdracht om opnieuw te proberen',
     },
     'composables/useAiTaskDraft': {
       loadFailed: 'De taak kon niet worden geladen',
@@ -924,7 +919,6 @@ export default {
       invalid:
         'Titel en geldige datums vereist; de einddatum kan niet vóór de begindatum liggen.',
       failed: 'Actie mislukt — probeer het nog eens.',
-      deleted: 'Levensgebeurtenis verwijderd.',
       loading: 'Levensgebeurtenissen laden…',
       retry: 'Opnieuw proberen',
       active: 'Lopend',
@@ -1293,7 +1287,6 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
         },
       },
       reportCategoryAria: 'Type probleem om te melden',
-      reportCategoryPlaceholder: 'Niet gespecificeerd (verstuur alleen wat automatisch is gedetecteerd)',
       reportConfirm:
         'Dit verstuurt alleen de app-versie, het type OS, de parserrevisie, hints op productniveau en de veldstructuur van niet-herkende apparaten, firmwareversie, modelnummers (deviceSource / deviceType — alleen gehele getallen, die beschrijven welk model, niet welk exemplaar), onbekende trainingscodes en hun aantallen, de numerieke foutcode van het laatste door de cloud geweigerde verzoek (alleen nummer, welke stroom en wanneer — zonder de tekst die de cloud teruggaf), plus de notitie die je schreef (lokale paden, e-mailadressen en lange identificaties worden automatisch weggestript). Nooit verstuurd: je Zepp-account, tokens, serienummers, apparaat-id\'s, MAC-adressen, GPS, gezondheidswaarden of ruwe antwoorden. Versturen?',
       reportDoneLine: (id: string, at: string) => `Rapport ${id}, verstuurd op ${at}.`,
@@ -1411,7 +1404,6 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       verifyFailed: 'Verificatie is niet afgerond',
     },
     'views/ActivityDetail': {
-      backToOverview: 'Terug naar overzicht',
       title: 'Dagelijkse activiteit',
       intro:
         'Stappen, afstand, actieve verbranding en actieve minuten per dag. Alleen vergeleken met je eigen eerdere metingen; dagen zonder gegevens blijven leeg, geen 0 erbij gezet.',
@@ -1461,7 +1453,6 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
     },
     'views/BodyStatus': {
       vitalsGroupTitle: 'Herstel en vitale waarden',
-      backToOverview: 'Terug naar overzicht',
       title: 'Lichaamsstatus',
       intro:
         'Lokale trends voor gereedheid, stress, bloedzuurstof, HRV, ademhalingsfrequentie, rusthartslag, lichaamssamenstelling en voeding. Volledig berekend uit gesynchroniseerde gegevens.',
@@ -1556,7 +1547,6 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       gramsPerDay: (grams: number) => `${grams} g per dag gemiddeld`,
     },
     'views/DeviceDetail': {
-      backToSettings: 'Terug naar instellingen',
       notFoundTitle: 'Dit apparaat is hier niet',
       notFoundMessage:
         'Kan uit het account zijn verwijderd, of deze machine heeft het nog niet herkend.',
@@ -1597,7 +1587,6 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       noRecords: 'Nog geen gegevens',
       timeUnknown: 'Tijd onbekend',
       notProvided: 'Niet verstrekt',
-      backToSettings: 'Terug naar instellingen',
       title: 'Gegevensgezondheidscontrole',
       summaryStreams: (ok: number, total: number) =>
         `${ok} / ${total} gegevensstromen gezond`,
@@ -1749,7 +1738,6 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
     },
     'views/HeartRateDetail': {
       trendsTitle: 'Rusthartslag- en HRV-trends',
-      backToOverview: 'Terug naar overzicht',
       title: 'Hartslag',
       intro:
         'Hierboven de heledag-curve van de afgelopen 24 uur; 7 dagen / 1 maand / 6 maanden veranderen alleen de dagtrends hieronder. Tijd zonder metingen krijgt geen lijn en geen 0-waarden.',
@@ -1827,7 +1815,6 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       loadBandReference: (band: string) => `${band} (referentie)`,
     },
     'views/RecentRecords': {
-      backToOverview: 'Terug naar overzicht',
       title: 'Recente activiteiten',
       loadingLabel: 'Recente activiteiten laden',
       loadFailedTitle: 'De recente activiteiten konden niet worden geladen',
@@ -1907,8 +1894,6 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       tooltipRowMissing: (name: string) => `${name}: Niet verstrekt<br/>`,
     },
     'views/SleepList': {
-      backToRecent: 'Terug naar recente activiteiten',
-      backToOverview: 'Terug naar overzicht',
       title: 'Slaap',
       intro:
         'Slaapgegevens gesynchroniseerd naar deze machine. Zonder tijdlijn wordt alleen de samenvatting getoond.',
@@ -1929,7 +1914,6 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       loadingMore: 'Laden…',
     },
     'views/TrainingStatus': {
-      backToOverview: 'Terug naar overzicht',
       title: 'Trainingsstatus',
       intro:
         'VO₂max, lactaatdrempel, trainingsbelasting en hartslagzones. Volledig berekend uit gesynchroniseerde gegevens; geen medisch advies.',
@@ -2147,8 +2131,6 @@ Antwoord in Markdown.`,
       close: 'Sluiten',
     },
     'views/WorkoutList': {
-      backToRecent: 'Terug naar recente activiteiten',
-      backToOverview: 'Terug naar overzicht',
       title: 'Trainingen',
       intro: 'Trainingen gesynchroniseerd naar deze machine. Geen track, geen kaart.',
       loadFailedTitle: 'De trainingen konden niet worden gelezen',
@@ -2311,10 +2293,7 @@ Antwoord in Markdown.`,
       label: 'Gegevensgraaf van de taak',
       hint: 'Sleep in de cirkel om te gebruiken, eruit om te verwijderen · Klik op een knoop voor opties · Sleep de lege ruimte om te pannen',
       zone: 'Naar de AI',
-      includeNode: 'Meenemen',
-      excludeNode: 'Niet meenemen',
       fit: 'Inpassen',
-      resetView: 'Weergave resetten',
       undo: 'Ongedaan maken',
       zoomIn: 'Inzoomen',
       zoomOut: 'Uitzoomen',

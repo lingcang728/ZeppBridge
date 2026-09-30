@@ -3,7 +3,6 @@ import { defineMessages } from '../i18n';
 /* RecentRecords 的文案。单独一个文件，免得三种语言的文案把逻辑挤出视野；moduleId 不变，语言包不用跟着搬家。 */
 export const recentRecordsMessages = defineMessages(
   {
-    backToOverview: '返回概览',
     title: '最近记录',
     introTimeline: '最近同步的睡眠和运动按时间排列，最上面是最新的。',
     loadingLabel: '正在加载最近记录',
@@ -29,7 +28,6 @@ export const recentRecordsMessages = defineMessages(
     yesterday: '昨天',
   },
   {
-    backToOverview: 'Back to overview',
     title: 'Recent records',
     introTimeline: 'Recently synced sleep and workouts on one timeline, newest first.',
     loadingLabel: 'Loading recent records',
@@ -55,7 +53,6 @@ export const recentRecordsMessages = defineMessages(
     yesterday: 'Yesterday',
   },
   {
-    backToOverview: 'Volver al resumen',
     title: 'Registros recientes',
     introTimeline: 'Sueño y entrenamientos recién sincronizados por orden de tiempo; lo más nuevo arriba.',
     loadingLabel: 'Cargando los registros recientes',

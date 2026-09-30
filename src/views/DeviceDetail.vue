@@ -22,7 +22,6 @@ import { defineMessages, useMessages } from '../i18n';
 
 const messages = defineMessages(
   {
-    backToSettings: '返回设置',
     notFoundTitle: '找不到这台设备',
     notFoundMessage: '可能已从账号移除，或本机还没识别到。',
     reidentify: '重新识别设备',
@@ -51,7 +50,6 @@ const messages = defineMessages(
     originNoMatch: '没有匹配到',
   },
   {
-    backToSettings: 'Back to settings',
     notFoundTitle: 'Device not found',
     notFoundMessage: 'Removed from the account, or not identified on this machine yet.',
     reidentify: 'Re-identify devices',
@@ -80,7 +78,6 @@ const messages = defineMessages(
     originNoMatch: 'No match',
   },
   {
-    backToSettings: 'Volver a configuración',
     notFoundTitle: 'Este dispositivo no está aquí',
     notFoundMessage: 'Puede que ya no esté en la cuenta o que este equipo aún no lo haya identificado.',
     reidentify: 'Volver a identificar dispositivos',

@@ -3,10 +3,6 @@ defineProps<{
   title: string;
   intro?: string;
   titleId?: string;
-  /** 返回目标路由；不传就不显示返回。 */
-  back?: string;
-  /** 返回按钮上的字，默认「返回概览」。 */
-  backLabel?: string;
 }>();
 </script>
 

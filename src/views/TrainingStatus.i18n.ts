@@ -3,7 +3,6 @@ import { defineMessages } from '../i18n';
 /* TrainingStatus 的文案。单独一个文件，免得三种语言的文案把逻辑挤出视野；moduleId 不变，语言包不用跟着搬家。 */
 export const trainingStatusMessages = defineMessages(
   {
-    backToOverview: '返回概览',
     title: '训练状态',
     intro: 'VO₂max、乳酸阈值、训练负荷与心率区间。全部读自已同步的记录，不做训练建议。',
     rangeAria: '时间范围',
@@ -46,7 +45,6 @@ export const trainingStatusMessages = defineMessages(
     ratioTooltip: (value: string) => `急慢比 <b>${value}</b>`,
   },
   {
-    backToOverview: 'Back to overview',
     title: 'Training status',
     intro: 'VO₂max, lactate threshold, training load and heart rate zones. All read from synced records; no coaching advice.',
     rangeAria: 'Time range',
@@ -88,7 +86,6 @@ export const trainingStatusMessages = defineMessages(
     ratioTooltip: (value: string) => `Acute:chronic <b>${value}</b>`,
   },
   {
-    backToOverview: 'Volver al resumen',
     title: 'Estado de entrenamiento',
     intro: 'VO₂máx, umbral de lactato, carga de entrenamiento y zonas de frecuencia cardíaca. Todo leído de los registros sincronizados; sin consejos de entrenamiento.',
     rangeAria: 'Rango de tiempo',

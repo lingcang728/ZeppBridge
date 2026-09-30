@@ -28,7 +28,6 @@ import { defineMessages, useMessages } from '../i18n';
 
 const messages = defineMessages(
   {
-    backToOverview: '返回概览',
     title: '日常活动',
     intro: '步数、距离、活动热量与活动时长的按天趋势。只和你此前的记录比，没记录的日期不补 0。',
     rangeAria: '时间范围',
@@ -52,7 +51,6 @@ const messages = defineMessages(
     minutesUnit: '分钟',
   },
   {
-    backToOverview: 'Back to overview',
     title: 'Daily activity',
     intro: 'Daily steps, distance, active burn and active minutes. Compared only to your own past; days without data stay empty, never zero-filled.',
     rangeAria: 'Time range',
@@ -76,7 +74,6 @@ const messages = defineMessages(
     minutesUnit: 'min',
   },
   {
-    backToOverview: 'Volver al resumen',
     title: 'Actividad diaria',
     intro: 'Pasos, distancia, calorías activas y minutos activos por día. Solo se compara con tus registros anteriores; los días sin registro no se rellenan con 0: quedan vacíos.',
     rangeAria: 'Rango de tiempo',
@@ -195,8 +192,6 @@ watch(dataRevision, () => { void load(); });
 <template>
   <section class="page metric-page" aria-labelledby="activity-title">
     <PageHeader
-      back="/"
-      :back-label="t.backToOverview"
       title-id="activity-title"
       :title="t.title"
       :intro="t.intro"

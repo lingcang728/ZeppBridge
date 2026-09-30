@@ -109,7 +109,6 @@ export default {
       reportWhat: 'O que queres reportar',
       reportWhatHint:
         ' (escolhe uma opção para enviar mesmo sem deteção automática)',
-      reportCategoryPlaceholder: 'Não especificado (envia só o que foi detetado automaticamente)',
       reportCategoryAria: 'Tipo de problema a reportar',
       reportNote: 'Informação adicional',
       reportNoteHint: ' (opcional, mas muito útil)',
@@ -731,9 +730,6 @@ export default {
         'Todos os blocos do registo foram processados: gravados localmente ou confirmados como vazios na nuvem.',
       ledgerIncomplete: (remaining: number) =>
         `Restam ${remaining} blocos sem conclusão. Até estarem todos fechados, a cópia local cobre só o intervalo sincronizado — não é uma cópia completa.`,
-      ledgerStats: (persisted: number, empty: number, pending: number) =>
-        `${persisted} gravados · ${empty} vazios na nuvem · ${pending} por fazer`,
-      ledgerFailed: (failed: number) => `${failed} falharam`,
       ledgerRange: (from: string, to: string, records: number) =>
         `${from} ~ ${to} · ${records} registos`,
       ledgerNothingWritten: 'Ainda não foi gravado nenhum mês',
@@ -768,7 +764,6 @@ export default {
         plural(attempts, { one: `${attempts} tentativa`, other: `${attempts} tentativas` }),
       failedExhausted:
         'Tentativas automáticas esgotadas. Usa «Tentar novamente os meses falhados» para tentar outra vez',
-      failedNoReason: 'Sem motivo registado',
       retryFailed: 'Tentar novamente os meses falhados',
       retryFailedDone: 'Meses falhados reenfileirados. Podes continuar a reposição.',
       retryFailedFailed: 'Não foi possível reenfileirar os meses falhados',
@@ -1044,7 +1039,6 @@ export default {
       targetNotAllowed: 'Destino de IA não autorizado',
       handoffFailed: 'O envio para a IA falhou',
       copiedButCannotOpen: (label: string) => `Copiado, mas ${label} não abre`,
-      nothingToRetry: 'Não há envios para tentar novamente',
     },
     'composables/useAiTaskDraft': {
       loadFailed: 'Não foi possível carregar a tarefa',
@@ -1249,7 +1243,6 @@ export default {
       invalid:
         'Introduz um título e datas válidas (a data de fim não pode anteceder a de início).',
       failed: 'A ação falhou. Tenta novamente.',
-      deleted: 'Acontecimento eliminado.',
       loading: 'A carregar acontecimentos…',
       retry: 'Tentar novamente',
       active: 'A decorrer',
@@ -1336,7 +1329,6 @@ export default {
       nothingToInstall: 'Sem atualizações pendentes.',
     },
     'views/ActivityDetail': {
-      backToOverview: 'Voltar à visão geral',
       title: 'Atividade diária',
       intro:
         'Passos, distância, gasto ativo e minutos ativos, dia a dia. Comparado apenas com o teu histórico; dias sem registo ficam vazios, nunca com 0 no lugar.',
@@ -1385,7 +1377,6 @@ export default {
     },
     'views/BodyStatus': {
       vitalsGroupTitle: 'Recuperação e sinais vitais',
-      backToOverview: 'Voltar à visão geral',
       title: 'Estado corporal',
       intro:
         'Tendências de prontidão, stress, oxigénio no sangue, VFC, respiração, FC em repouso e composição corporal a partir dos registos sincronizados.',
@@ -1481,7 +1472,6 @@ export default {
       gramsPerDay: (grams: number) => `Média de ${grams} g/dia`,
     },
     'views/DeviceDetail': {
-      backToSettings: 'Voltar às definições',
       notFoundTitle: 'Dispositivo não encontrado',
       notFoundMessage:
         'Pode ter sido removido da conta ou ainda não foi identificado.',
@@ -1523,7 +1513,6 @@ export default {
       noRecords: 'Sem registos',
       timeUnknown: 'Hora desconhecida',
       notProvided: 'Não fornecido',
-      backToSettings: 'Voltar às definições',
       title: 'Diagnóstico dos dados',
       intro:
         'Estado de cada fluxo: descarregamento da nuvem, processamento e gravação local, datas cobertas e fontes. Em falta é em falta — nunca com 0 no lugar.',
@@ -1666,7 +1655,6 @@ export default {
     },
     'views/HeartRateDetail': {
       trendsTitle: 'Tendências de FC em repouso e VFC',
-      backToOverview: 'Voltar à visão geral',
       title: 'Frequência cardíaca',
       intro:
         'A curva superior mostra sempre as últimas 24 h; 7 dias, 1 mês ou 6 meses alteram apenas as tendências diárias abaixo. Períodos sem medição ficam sem linha, nunca com 0 no lugar.',
@@ -1744,7 +1732,6 @@ export default {
       loadBandReference: (band: string) => `${band} (referência)`,
     },
     'views/RecentRecords': {
-      backToOverview: 'Voltar à visão geral',
       title: 'Registos recentes',
       loadingLabel: 'A carregar registos recentes',
       loadFailedTitle: 'Não foi possível carregar registos recentes',
@@ -1824,8 +1811,6 @@ export default {
       tooltipRowMissing: (name: string) => `${name}: Não fornecido<br/>`,
     },
     'views/SleepList': {
-      backToRecent: 'Voltar aos registos recentes',
-      backToOverview: 'Voltar à visão geral',
       title: 'Histórico de sono',
       intro:
         'Sessões de sono sincronizadas localmente.',
@@ -1841,7 +1826,6 @@ export default {
       loadingMore: 'A carregar…',
     },
     'views/TrainingStatus': {
-      backToOverview: 'Voltar à visão geral',
       title: 'Estado de treino',
       intro:
         'VO₂max, limiar de lactato, carga de treino e zonas de frequência cardíaca a partir de registos sincronizados.',
@@ -2056,8 +2040,6 @@ Responde em formato Markdown.`,
       close: 'Fechar',
     },
     'views/WorkoutList': {
-      backToRecent: 'Voltar aos registos recentes',
-      backToOverview: 'Voltar à visão geral',
       title: 'Treinos',
       intro: 'Treinos sincronizados para esta máquina.',
       loadFailedTitle: 'Não foi possível carregar os treinos',
@@ -2225,13 +2207,10 @@ Responde em formato Markdown.`,
       label: 'Grafo de dados da tarefa',
       hint: 'Arrasta para dentro do círculo para incluir e para fora para remover · clica num nó para opções · arrasta para deslocar',
       zone: 'Incluído para a IA',
-      includeNode: 'Enviar à IA',
-      excludeNode: 'Excluir',
       undo: 'Desfazer',
       fit: 'Ajustar',
       zoomIn: 'Ampliar',
       zoomOut: 'Reduzir',
-      resetView: 'Repor vista',
       backToAll: 'Todas as categorias',
       dismissHint: 'Compreendi',
       zoomLevel: (percent: number) =>

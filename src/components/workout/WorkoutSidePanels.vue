@@ -6,14 +6,13 @@ import GlyphTile from '../GlyphTile.vue';
 import Icon from '../Icon.vue';
 import CapsuleWheel from '../CapsuleWheel.vue';
 import SegmentTrack from '../SegmentTrack.vue';
-import type { ExportFormat, WorkoutMetrics } from '../../composables/useWorkoutDetail';
+import type { ExportFormat } from '../../composables/useWorkoutDetail';
 import { isTauri } from '../../composables/useTauriApi';
 import { useSyncController } from '../../composables/useSyncController';
 import { useMessages } from '../../i18n';
 import { workoutDetailMessages } from '../../views/WorkoutDetail.i18n';
 
 defineProps<{
-  workout: WorkoutMetrics;
   decoded: { label: string; value: string; icon: DesignIconName }[];
   exportBusy: boolean;
   exportedNote: string | null;
@@ -23,8 +22,6 @@ defineProps<{
   handoffBusy: boolean;
   aiNote: string | null;
   handoffError: string | null;
-  deviceName: string;
-  syncBadge: string;
 }>();
 const format = defineModel<ExportFormat>('format', { required: true });
 const provider = defineModel<string>('provider', { required: true });

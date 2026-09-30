@@ -276,8 +276,6 @@ watch(dataRevision, () => { void load(); });
 <template>
   <section class="page training-page" aria-labelledby="training-title">
     <PageHeader
-      back="/"
-      :back-label="t.backToOverview"
       title-id="training-title"
       :title="t.title"
       :intro="t.intro"

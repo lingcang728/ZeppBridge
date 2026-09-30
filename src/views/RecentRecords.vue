@@ -169,7 +169,7 @@ watch(dataRevision, () => void loadRecent());
 
 <template>
   <section class="page recent-page" aria-labelledby="recent-title">
-    <PageHeader back="/" :back-label="t.backToOverview" title-id="recent-title" :title="t.title" :intro="t.introTimeline" />
+    <PageHeader title-id="recent-title" :title="t.title" :intro="t.introTimeline" />
 
     <div v-if="partialWarning" class="partial-warning" role="status"><Icon name="info" :size="15" /><span>{{ partialWarning }}</span></div>
 

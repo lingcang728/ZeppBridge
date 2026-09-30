@@ -272,7 +272,6 @@ export default {
         'Ein Fehlerbericht bringt die Nummern dieses Geräts in den eingebauten Katalog – danach muss es niemand mehr von Hand wählen. Feste Whitelist von Feldern, kein GitHub-Konto nötig.',
       reportWhat: 'Was melden',
       reportWhatHint: ' (eine wählen – sendet auch ohne automatisch erkanntes Problem)',
-      reportCategoryPlaceholder: 'Nichts Genaueres (nur automatisch Erkanntes senden)',
       reportCategoryAria: 'Problemart für den Bericht',
       reportNote: 'Anmerkung',
       reportNoteHint: ' (optional, aber sehr hilfreich)',
@@ -920,14 +919,12 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
         'Automatische Wiederholungen aufgebraucht – „Fehlgeschlagene Monate erneut versuchen" drücken',
       failedIntro:
         'Diese Blöcke sind fehlgeschlagen. Die übrigen Monate sind unberührt und wurden wie üblich nachgeladen.',
-      failedNoReason: 'Kein Grund aufgezeichnet',
       failedRow: (stream: string, month: string) => `${stream} · ${month}`,
       failedTitle: 'Monate, die nicht geholt werden konnten',
       intro:
         'Das Archiv verhindert künftiges Löschen, das Nachladen holt frühere Daten zurück – beides zusammen macht die lokale Kopie komplett.',
       ledgerComplete:
         'Jeder Monatsblock im Protokoll ist erledigt: entweder lokal geschrieben, oder die Cloud hat klar gesagt, dass sie für diesen Zeitraum nichts hat.',
-      ledgerFailed: (failed: number) => `${failed} fehlgeschlagen`,
       ledgerFrom: (from: string) => ` · angefragt ab ${from}`,
       ledgerIncomplete: (remaining: number) =>
         `${remaining} Blöcke sind noch ungeklärt. Bis alle fertig sind, umfasst diese lokale Kopie nur den bereits synchronisierten Bereich – keine vollständige Kopie.`,
@@ -939,8 +936,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       ledgerReset:
         'Das Protokoll ist geleert. Du kannst einen neuen Nachlade-Zeitraum planen.',
       ledgerResetFailed: 'Das Protokoll ließ sich nicht leeren',
-      ledgerStats: (persisted: number, empty: number, pending: number) =>
-        `${persisted} geschrieben · ${empty} leer aus der Cloud · ${pending} ausstehend`,
       ledgerTitle: 'Abdeckungsprotokoll',
       outOfRetention:
         'Dieses Nachladen geht über die lokale Aufbewahrungsfrist hinaus – Geholtes wird bei der nächsten erfolgreichen Synchronisierung aufgeräumt. Erst das Langzeitarchiv einschalten oder die Frist verlängern.',
@@ -1260,7 +1255,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       clipboardUnsupported: 'Zwischenablage wird in dieser Umgebung nicht unterstützt',
       copiedButCannotOpen: (label: string) => `Kopiert, aber ${label} öffnet nicht`,
       handoffFailed: 'Übergabe an die KI fehlgeschlagen',
-      nothingToRetry: 'Keine KI-Übergabe zum Wiederholen vorhanden',
       targetNotAllowed: 'Dieses KI-Ziel ist nicht freigegeben',
     },
     'composables/useAiTaskDraft': {
@@ -1461,7 +1455,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       category: 'Kategorie',
       deleteHint: 'Wird aus der lokalen Datenbank gelöscht.',
       deleteTitle: 'Dieses Lebensereignis löschen?',
-      deleted: 'Lebensereignis gelöscht.',
       edit: 'Ereignis bearbeiten',
       empty:
         'Noch keine Lebensereignisse eingetragen (z. B. Erkältung, Reise oder Trainingspause).',
@@ -1559,7 +1552,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       nothingToInstall: 'Kein Update zu installieren. Erneut prüfen.',
     },
     'views/ActivityDetail': {
-      backToOverview: 'Zurück zur Übersicht',
       caloriesHint: 'Nur Aktivität, Grundumsatz ausgenommen',
       caloriesLabel: 'Aktivitätskalorien',
       caloriesUnit: 'kcal',
@@ -1615,7 +1607,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
     },
     'views/BodyStatus': {
       vitalsGroupTitle: 'Erholung und Vitalwerte',
-      backToOverview: 'Zurück zur Übersicht',
       bmiHint: 'Body-Mass-Index, von der Cloud zusammen mit dem Gewicht geliefert',
       bmiLabel: 'BMI',
       bmrHint: 'Braucht eine Körperanalysewaage',
@@ -1710,7 +1701,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       assignSub:
         'Stimmt die Erkennung nicht (z. B. eigentlich eine Balance 2 – hier steht ein anderes Modell), wähle jederzeit selbst. Die Auswahl bleibt lokal, steht als „Von dir gewähltes Modell" da, nie als automatische Erkennung – und lässt sich jederzeit zurücknehmen, dann gilt wieder die automatische.',
       assignTitle: 'Stimmt das?',
-      backToSettings: 'Zurück zu den Einstellungen',
       changeModel: 'Anderes wählen',
       clearAssignment: 'Auswahl zurücknehmen – wieder automatische Zuordnung',
       factDeviceId: 'Geräte-ID',
@@ -1780,7 +1770,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       actionRunning: 'Läuft…',
       actionSynced: 'Synchronisiert, Status aktualisiert.',
       actionsTitle: 'Was du tun kannst',
-      backToSettings: 'Zurück zu den Einstellungen',
       cadence: {
         continuous: 'mehrmals am Tag',
         daily: 'einmal am Tag',
@@ -1901,7 +1890,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
     },
     'views/HeartRateDetail': {
       trendsTitle: 'Ruheherzfrequenz- und HRV-Trends',
-      backToOverview: 'Zurück zur Übersicht',
       bpmTooltip: (clock: string, value: number) => `${clock}　<b>${value}</b> bpm`,
       chartAria: 'Herzfrequenz der letzten 24 Stunden',
       dailyMaxAria: 'Tageshöchstwerte der Herzfrequenz als Trend',
@@ -1980,7 +1968,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
     },
     'views/RecentRecords': {
       avgHr: (bpm: number) => `Ø HF ${bpm}`,
-      backToOverview: 'Zurück zur Übersicht',
       desktopOnly:
         'Erfordert die Desktop-App (die Browser-Vorschau liest keine Kontodaten).',
       filterAll: 'Alle',
@@ -2058,8 +2045,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       weeklyTitle: 'Schlafstruktur, letzte 7 Tage',
     },
     'views/SleepList': {
-      backToOverview: 'Zurück zur Übersicht',
-      backToRecent: 'Zurück zu den letzten Einträgen',
       emptyMessage:
         'Nach der Synchronisierung erscheinen die Schlafeinträge hier; Phasen werden nie erfunden.',
       emptyTitle: 'Noch keine Schlafeinträge',
@@ -2084,7 +2069,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       acuteChronic: 'Akut:Chronisch',
       acuteTooltip: (value: string, days: number) =>
         `7-Tage-Belastung <b>${value}</b> (${days}/7 Tage mit Daten)`,
-      backToOverview: 'Zurück zur Übersicht',
       balanceChartAria: '7-Tage- und 28-Tage-Trainingsbelastung mit dem Akut-Chronisch-Verhältnis',
       balanceEmpty: 'Noch zu wenig Trainingsbelastungs-Einträge, um diese Linie zu zeichnen.',
       balanceHint: '7-Tage-Belastung gegen den 28-Tage-Wochenschnitt, d. h. das Akut-Chronisch-Verhältnis',
@@ -2293,8 +2277,6 @@ Antworte in Markdown.`,
       close: 'Schließen',
     },
     'views/WorkoutList': {
-      backToOverview: 'Zurück zur Übersicht',
-      backToRecent: 'Zurück zu den letzten Einträgen',
       emptyMessage:
         'Nach der Synchronisierung erscheinen hier Trainings mit gültigen Messwerten; ohne GPS oder Messpunkte wird kein leeres Diagramm gezeichnet.',
       emptyTitle: 'Noch nichts anzuzeigen',
@@ -2472,13 +2454,10 @@ Antworte in Markdown.`,
         }),
     },
     'components/ai/TaskGraph': {
-      excludeNode: 'Ausschließen',
       fit: 'Einpassen',
       hint:
         'In den Kreis ziehen zum Verwenden, raus zum Entfernen · Knoten anklicken für Optionen · Leere ziehen zum Verschieben',
-      includeNode: 'Einbeziehen',
       label: 'Datengraph der Aufgabe',
-      resetView: 'Ansicht zurücksetzen',
       undo: 'Rückgängig',
       zone: 'An die KI',
       zoomIn: 'Vergrößern',

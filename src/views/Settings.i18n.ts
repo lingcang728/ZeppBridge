@@ -70,7 +70,6 @@ export const settingsMessages = defineMessages(
     // ── 错误报告表单 ──
     reportWhat: '要反馈什么',
     reportWhatHint: '（本机没自动检测到问题时，选一个就能提交）',
-    reportCategoryPlaceholder: '不指定（只发送自动检测到的问题）',
     reportCategoryAria: '要反馈的问题类型',
     reportNote: '补充说明',
     reportNoteHint: '（选填，但很有用）',
@@ -439,7 +438,6 @@ export const settingsMessages = defineMessages(
     // ── Error report form ──
     reportWhat: 'What to report',
     reportWhatHint: ' (pick one to submit even with nothing auto-detected)',
-    reportCategoryPlaceholder: 'Unspecified (send only what was auto-detected)',
     reportCategoryAria: 'Type of problem to report',
     reportNote: 'Anything to add',
     reportNoteHint: ' (optional, but very useful)',
@@ -808,7 +806,6 @@ If you need anything from me (which client I use, where the file lives), just as
     // ── Error report form ──
     reportWhat: 'Qué reportar',
     reportWhatHint: ' (elige una opción y podrás enviarlo aunque no se haya detectado nada automáticamente)',
-    reportCategoryPlaceholder: 'Sin especificar (enviar solo lo detectado automáticamente)',
     reportCategoryAria: 'Tipo de problema a reportar',
     reportNote: 'Algo que agregar',
     reportNoteHint: ' (opcional, pero muy útil)',

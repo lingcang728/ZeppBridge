@@ -111,7 +111,6 @@ export default {
       // ── 错误报告表单 ──
       reportWhat: 'समस्या क्या है',
       reportWhatHint: ' (एक चुनें — कुछ डिटेक्ट न हुआ हो तब भी भेज सकते हैं)',
-      reportCategoryPlaceholder: 'चुना नहीं (केवल ऑटो-डिटेक्ट डेटा भेजें)',
       reportCategoryAria: 'समस्या का प्रकार',
       reportNote: 'अतिरिक्त विवरण',
       reportNoteHint: ' (वैकल्पिक, पर मददगार)',
@@ -682,7 +681,6 @@ export default {
       failedIntro: 'ये चंक विफल रहे। अन्य महीने सामान्य रूप से बैकफ़िल हो गए।',
       failedRow: (stream: string, month: string) => `${stream} · ${month}`,
       failedAttempts: (attempts: number) => `${attempts} बार प्रयास`,
-      failedNoReason: 'कोई कारण दर्ज नहीं',
       failedExhausted: 'रीट्राई समाप्त। "असफल महीने दोबारा आज़माएँ" से फिर कोशिश करें',
       retryFailed: 'असफल महीने दोबारा आज़माएँ',
       retryFailedDone: 'विफल महीने दोबारा कतार में जुड़े; बैकफ़िल जारी रखा जा सकता है।',
@@ -690,10 +688,7 @@ export default {
       ledgerTitle: 'कवरेज लेजर',
       ledgerRange: (from: string, to: string, records: number) => `${from} ~ ${to} · ${records} रिकॉर्ड`,
       ledgerFrom: (from: string) => ` · ${from} से माँगा गया`,
-      ledgerStats: (persisted: number, empty: number, pending: number) =>
-        `लिखे गए ${persisted} · क्लाउड में खाली ${empty} · बाकी ${pending}`,
       ledgerProgress: (done: number, total: number) => `${done} / ${total} मासिक चंक सुलझे`,
-      ledgerFailed: (failed: number) => `${failed} विफल`,
       ledgerComplete: 'लेजर के हर मासिक चंक का नतीजा है: या लोकल में लिखा गया, या क्लाउड ने पक्का किया कि उस समय का डेटा नहीं है।',
       ledgerIncomplete: (remaining: number) =>
         `${remaining} चंक का नतीजा अभी नहीं आया। सब पूरे होने तक यह लोकल कॉपी सिर्फ़ "सिंक हुई रेंज" तक की है, पूरी नहीं।`,
@@ -959,7 +954,6 @@ export default {
       clipboardUnsupported: 'क्लिपबोर्ड समर्थित नहीं है',
       copiedButCannotOpen: (label: string) => `कॉपी हो गया, पर ${label} नहीं खुला`,
       handoffFailed: 'AI को भेजना विफल हुआ',
-      nothingToRetry: 'दोबारा भेजने के लिए कुछ नहीं है',
       targetNotAllowed: 'यह AI पता स्वीकृत सूची में नहीं है',
     },
 
@@ -1152,7 +1146,6 @@ export default {
       category: 'श्रेणी',
       deleteHint: 'यह इवेंट लोकल डेटाबेस से हटा दिया जाएगा।',
       deleteTitle: 'यह लाइफ़ इवेंट मिटाएँ?',
-      deleted: 'इवेंट हटा दिया गया।',
       edit: 'संपादित करें',
       empty: 'कोई लाइफ़ इवेंट नहीं। बीमारी, यात्रा या ट्रेनिंग में बदलाव से शुरुआत करें।',
       end: 'समाप्ति तारीख़',
@@ -1246,7 +1239,6 @@ export default {
       nothingToInstall: 'कोई इंस्टॉल करने लायक अपडेट नहीं; फिर जाँचें।',
     },
     'views/ActivityDetail': {
-      backToOverview: 'ओवरव्यू पर वापस',
       caloriesHint: 'केवल एक्टिव बर्न',
       caloriesLabel: 'एक्टिव बर्न',
       caloriesUnit: 'kcal',
@@ -1293,7 +1285,6 @@ export default {
 
     'views/BodyStatus': {
       vitalsGroupTitle: 'तैयारी और शारीरिक संकेत',
-      backToOverview: 'ओवरव्यू पर वापस',
       bmiHint: 'बॉडी मास इंडेक्स',
       bmiLabel: 'BMI',
       bmrHint: 'बॉडी कंपोज़िशन स्केल आवश्यक',
@@ -1376,7 +1367,6 @@ export default {
       assignAria: 'मॉडल पहचान',
       assignSub: 'अगर पहचान गलत है — जैसे डिवाइस असल में Balance 2 है पर यहाँ दूसरा मॉडल लिखा है — तो आप कभी भी खुद मॉडल चुन सकते हैं। यह चुनाव सिर्फ़ इसी मशीन पर रहता है, "आपका चुना मॉडल" के रूप में दिखता है और ऑटो-पहचान का दिखावा नहीं करता; कभी भी हटाकर ऑटो-पहचान पर लौटा जा सकता है।',
       assignTitle: 'क्या यह सही है?',
-      backToSettings: 'सेटिंग्स पर वापस',
       changeModel: 'दूसरा चुनें',
       clearAssignment: 'स्वचालित पहचान पर लौटें',
       factDeviceId: 'डिवाइस ID',
@@ -1440,7 +1430,6 @@ export default {
       actionRunning: 'चल रहा है…',
       actionSynced: 'सिंक पूरा हुआ और स्थिति अपडेट हुई।',
       actionsTitle: 'सुझाए गए कार्य',
-      backToSettings: 'सेटिंग्स पर वापस',
       cadence: {
         continuous: 'दिन में कई बार',
         daily: 'प्रतिदिन',
@@ -1540,7 +1529,6 @@ export default {
 
     'views/HeartRateDetail': {
       trendsTitle: 'हार्ट रेट और HRV रुझान',
-      backToOverview: 'ओवरव्यू पर वापस',
       bpmTooltip: (clock: string, value: number) => `${clock} <b>${value}</b> bpm`,
       chartAria: 'पिछले 24 घंटों का हार्ट रेट',
       dailyMaxAria: 'दैनिक पीक हार्ट रेट ट्रेंड',
@@ -1611,7 +1599,6 @@ export default {
     },
 
     'views/RecentRecords': {
-      backToOverview: 'ओवरव्यू पर वापस',
       desktopOnly: 'डेस्कटॉप ऐप खोलें; ब्राउज़र प्रीव्यू खाता डेटा नहीं पढ़ता।',
       filterAll: 'सब',
       hiddenIncomplete: (count: number) => `${count} अधूरे रिकॉर्ड छिपाए`,
@@ -1682,8 +1669,6 @@ export default {
     },
 
     'views/SleepList': {
-      backToOverview: 'ओवरव्यू पर वापस',
-      backToRecent: 'हालिया रिकॉर्ड्स पर वापस',
       emptyMessage: 'सिंक के बाद नींद रिकॉर्ड यहाँ दिखेंगे। असली चरण न हों तो नहीं बनाए जाते।',
       emptyTitle: 'कोई नींद रिकॉर्ड नहीं',
       footnote: (count: number, from: string) => `${count} रिकॉर्ड · ${from} से`,
@@ -1702,7 +1687,6 @@ export default {
       acute7d: '7-दिन लोड',
       acuteChronic: 'एक्यूट:क्रॉनिक',
       acuteTooltip: (value: string, days: number) => `7-दिन लोड <b>${value}</b> (${days}/7 दिन डेटा)`,
-      backToOverview: 'ओवरव्यू पर वापस',
       balanceChartAria: '7-दिन और 28-दिन के ट्रेनिंग लोड और एक्यूट:क्रॉनिक अनुपात का कर्व',
       balanceEmpty: 'ट्रेनिंग लोड रिकॉर्ड पर्याप्त नहीं हैं।',
       balanceHint: '7-दिन लोड बनाम 28-दिन औसत',
@@ -1888,8 +1872,6 @@ Markdown में उत्तर दें।`,
       close: 'बंद करें',
     },
     'views/WorkoutList': {
-      backToOverview: 'ओवरव्यू पर वापस',
-      backToRecent: 'हालिया रिकॉर्ड्स पर वापस',
       emptyMessage: 'सिंक के बाद सिर्फ़ वे रिकॉर्ड दिखेंगे जिनमें प्रकार, समय और कम-से-कम एक वैध मेट्रिक हो। GPS या प्रति-बिंदु सैम्पल न हों तो खाली चार्ट नहीं बनता।',
       emptyTitle: 'कोई वर्कआउट नहीं',
       footnote: (count: number) => `${count} वर्कआउट प्रदर्शित`,
@@ -2055,9 +2037,6 @@ Markdown में उत्तर दें।`,
       fit: 'फ़िट करें',
       zoomIn: 'ज़ूम इन',
       zoomOut: 'ज़ूम आउट',
-      resetView: 'रीसेट व्यू',
-      includeNode: 'AI को भेजें',
-      excludeNode: 'AI को न भेजें',
       backToAll: 'सभी श्रेणियाँ',
       dismissHint: 'समझ गया',
       zoomLevel: (percent: number) => `ज़ूम ${percent}%, क्लिक करने पर पूरा ग्राफ़ कैनवस में आ जाएगा`,

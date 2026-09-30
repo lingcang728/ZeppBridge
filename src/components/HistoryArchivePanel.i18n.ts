@@ -49,9 +49,6 @@ export const archiveMessages = defineMessages(
     ledgerComplete: '账本里每个月份块都有结论：要么已写入本机，要么云端明确没有那段时间的数据。',
     ledgerIncomplete: (remaining: number) =>
       `还有 ${remaining} 个块没有结论。全部完成前，这份本地副本只能算「已同步范围内的副本」，不是完整副本。`,
-    ledgerStats: (persisted: number, empty: number, pending: number) =>
-      `已写入 ${persisted} · 云端无返回 ${empty} · 待做 ${pending}`,
-    ledgerFailed: (failed: number) => `失败 ${failed}`,
     ledgerRange: (from: string, to: string, records: number) => `${from} ~ ${to} · ${records} 条`,
     ledgerNothingWritten: '尚未写入任何月份',
 
@@ -79,7 +76,6 @@ export const archiveMessages = defineMessages(
     failedRow: (stream: string, month: string) => `${stream} · ${month}`,
     failedAttempts: (attempts: number) => `已尝试 ${attempts} 次`,
     failedExhausted: '自动重试已用尽，点「重试失败项」再试',
-    failedNoReason: '没有记录原因',
     retryFailed: '重试失败项',
     retryFailedDone: '失败的月份已重新排队，可继续补拉。',
     retryFailedFailed: '无法重新排队失败的月份',
@@ -140,9 +136,6 @@ export const archiveMessages = defineMessages(
     ledgerComplete: 'Every monthly chunk is resolved: written locally, or the cloud plainly has nothing for that period.',
     ledgerIncomplete: (remaining: number) =>
       `${remaining} chunks unresolved. Until all are done, this local copy covers only the successfully synced range — not a complete copy.`,
-    ledgerStats: (persisted: number, empty: number, pending: number) =>
-      `${persisted} written · ${empty} empty from the cloud · ${pending} to do`,
-    ledgerFailed: (failed: number) => `${failed} failed`,
     ledgerRange: (from: string, to: string, records: number) => `${from} ~ ${to} · ${records} records`,
     ledgerNothingWritten: 'No month written yet',
 
@@ -170,7 +163,6 @@ export const archiveMessages = defineMessages(
     failedRow: (stream: string, month: string) => `${stream} · ${month}`,
     failedAttempts: (attempts: number) => `${attempts} attempt${attempts === 1 ? '' : 's'}`,
     failedExhausted: 'Automatic retries used up — press "Retry failed items" to try again',
-    failedNoReason: 'No reason recorded',
     retryFailed: 'Retry failed items',
     retryFailedDone: 'Failed months re-queued. Continue the backfill.',
     retryFailedFailed: 'Could not re-queue failed months',
@@ -231,9 +223,6 @@ export const archiveMessages = defineMessages(
     ledgerComplete: 'Todos los bloques mensuales del registro están resueltos: o se escribieron localmente, o la nube dijo claramente que no tiene nada de ese periodo.',
     ledgerIncomplete: (remaining: number) =>
       `Quedan ${remaining} bloques sin resolver. Hasta completarlos todos, esta copia local solo cuenta como copia del rango sincronizado, no como una completa.`,
-    ledgerStats: (persisted: number, empty: number, pending: number) =>
-      `${persisted} escritos · ${empty} vacíos en la nube · ${pending} pendientes`,
-    ledgerFailed: (failed: number) => `${failed} fallidos`,
     ledgerRange: (from: string, to: string, records: number) => `${from} ~ ${to} · ${records} registros`,
     ledgerNothingWritten: 'Todavía no se ha escrito ningún mes',
 
@@ -261,7 +250,6 @@ export const archiveMessages = defineMessages(
     failedRow: (stream: string, month: string) => `${stream} · ${month}`,
     failedAttempts: (attempts: number) => `${attempts} intento${attempts === 1 ? '' : 's'}`,
     failedExhausted: 'Reintentos automáticos agotados; pulsa «Reintentar los meses fallidos» para probar de nuevo',
-    failedNoReason: 'No se registró el motivo',
     retryFailed: 'Reintentar los meses fallidos',
     retryFailedDone: 'Los meses fallidos volvieron a la cola; ya puedes seguir recuperando.',
     retryFailedFailed: 'No se pudieron volver a poner en cola los meses fallidos',

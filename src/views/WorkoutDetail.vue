@@ -114,7 +114,6 @@ onBeforeUnmount(() => { observer?.disconnect(); cancelAnimationFrame(frame); });
         <WorkoutSidePanels
           v-model:format="activeFormat"
           v-model:provider="aiProviderId"
-          :workout="workout"
           :decoded="decodedMetrics"
           :export-busy="exportBusy"
           :exported-note="exportedNote"
@@ -124,8 +123,6 @@ onBeforeUnmount(() => { observer?.disconnect(); cancelAnimationFrame(frame); });
           :handoff-busy="handoffState === 'preparing'"
           :ai-note="aiNote"
           :handoff-error="handoffError"
-          :device-name="deviceName"
-          :sync-badge="syncBadge"
           @export="exportRecord"
           @handoff="sendWorkoutToAi"
         >

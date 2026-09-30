@@ -4,7 +4,6 @@ import { defineMessages } from '../i18n';
 export const heartRateDetailMessages = defineMessages(
   {
     trendsTitle: '静息心率与 HRV 趋势',
-    backToOverview: '返回概览',
     title: '心率',
     intro: '上面是最近 24 小时全天曲线；7 天 / 1 个月 / 6 个月只改下面的按天趋势。没采样的时间不画线，也不补 0。',
     rangeAria: '趋势时间范围',
@@ -44,7 +43,6 @@ export const heartRateDetailMessages = defineMessages(
   },
   {
     trendsTitle: 'Resting heart rate and HRV trends',
-    backToOverview: 'Back to overview',
     title: 'Heart rate',
     intro: 'The curve above is always the last 24 hours; 7 days / 1 month / 6 months change only the daily trends below. Unsampled stretches stay blank, never zero-filled.',
     rangeAria: 'Trend time range',
@@ -84,7 +82,6 @@ export const heartRateDetailMessages = defineMessages(
   },
   {
     trendsTitle: 'Tendencias de FC en reposo y VFC',
-    backToOverview: 'Volver al resumen',
     title: 'Frecuencia cardíaca',
     intro: 'Arriba va siempre la curva de las últimas 24 horas; 7 días / 1 mes / 6 meses solo cambian las tendencias diarias de abajo. El tiempo sin muestras no dibuja línea ni recibe un 0 de relleno.',
     rangeAria: 'Rango de tiempo de la tendencia',

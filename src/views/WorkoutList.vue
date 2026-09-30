@@ -16,8 +16,6 @@ import { defineMessages, useMessages } from '../i18n';
 
 const messages = defineMessages(
   {
-    backToRecent: '返回最近记录',
-    backToOverview: '返回概览',
     title: '运动',
     intro: '本机已同步的运动记录。没有轨迹时不画地图。',
     loadFailedTitle: '无法读取运动记录',
@@ -33,8 +31,6 @@ const messages = defineMessages(
     loadingMore: '正在加载…',
   },
   {
-    backToRecent: 'Back to recent records',
-    backToOverview: 'Back to overview',
     title: 'Workouts',
     intro: 'Workouts synced to this machine. No track, no map.',
     loadFailedTitle: 'Could not load workouts',
@@ -50,8 +46,6 @@ const messages = defineMessages(
     loadingMore: 'Loading…',
   },
   {
-    backToRecent: 'Volver a registros recientes',
-    backToOverview: 'Volver al resumen',
     title: 'Entrenamientos',
     intro: 'Entrenamientos sincronizados en este equipo. Sin recorrido, no hay mapa.',
     loadFailedTitle: 'No se pudieron leer los entrenamientos',
@@ -106,7 +100,7 @@ watch(dataRevision, () => void loadList());
 
 <template>
   <section class="page list-page" aria-labelledby="workout-list-title">
-    <PageHeader back="/recent" :back-label="t.backToRecent" title-id="workout-list-title" :title="t.title" :intro="t.intro" />
+    <PageHeader title-id="workout-list-title" :title="t.title" :intro="t.intro" />
 
     <div v-if="initialLoading" class="surface-card" aria-live="polite">
       <SkeletonBlock height="56px" />

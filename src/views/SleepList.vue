@@ -15,8 +15,6 @@ import { defineMessages, useMessages } from '../i18n';
 
 const messages = defineMessages(
   {
-    backToRecent: '返回最近记录',
-    backToOverview: '返回概览',
     title: '睡眠',
     intro: '本机已同步的睡眠记录。没有完整时间轴时，只展示汇总。',
     loadFailedTitle: '无法读取睡眠记录',
@@ -31,8 +29,6 @@ const messages = defineMessages(
     loadingMore: '正在加载…',
   },
   {
-    backToRecent: 'Back to recent records',
-    backToOverview: 'Back to overview',
     title: 'Sleep',
     intro: 'Sleep records synced to this machine. Without a full timeline, only the summary is shown.',
     loadFailedTitle: 'Could not load sleep records',
@@ -47,8 +43,6 @@ const messages = defineMessages(
     loadingMore: 'Loading…',
   },
   {
-    backToRecent: 'Volver a registros recientes',
-    backToOverview: 'Volver al resumen',
     title: 'Sueño',
     intro: 'Registros de sueño sincronizados en este equipo. Sin una línea de tiempo completa, solo se muestra el resumen.',
     loadFailedTitle: 'No se pudieron leer los registros de sueño',
@@ -83,7 +77,7 @@ watch(dataRevision, () => void loadList());
 
 <template>
   <section class="page list-page" aria-labelledby="sleep-list-title">
-    <PageHeader back="/recent" :back-label="t.backToRecent" title-id="sleep-list-title" :title="t.title" :intro="t.intro" />
+    <PageHeader title-id="sleep-list-title" :title="t.title" :intro="t.intro" />
 
     <div v-if="initialLoading" class="surface-card" aria-live="polite">
       <SkeletonBlock height="56px" />

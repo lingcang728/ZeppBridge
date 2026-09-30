@@ -12,21 +12,18 @@ const messages = defineMessages(
     targetNotAllowed: '目标 AI 地址不在允许列表里',
     handoffFailed: 'AI 交接失败',
     copiedButCannotOpen: (label: string) => `已复制，但打不开 ${label}`,
-    nothingToRetry: '没有可重试的 AI 交接',
   },
   {
     clipboardUnsupported: 'Clipboard write not supported here',
     targetNotAllowed: 'That AI address is not on the allow-list',
     handoffFailed: 'AI handoff failed',
     copiedButCannotOpen: (label: string) => `Copied, but could not open ${label}`,
-    nothingToRetry: 'No AI handoff to retry',
   },
   {
     clipboardUnsupported: 'Este entorno no admite escribir en el portapapeles',
     targetNotAllowed: 'Dirección de IA fuera de la lista permitida',
     handoffFailed: 'Fallo al pasar a la IA',
     copiedButCannotOpen: (label: string) => `Copiado, pero ${label} no abre`,
-    nothingToRetry: 'Nada que reintentar al pasar a la IA',
   },
   'composables/useAiHandoff',
 );
@@ -72,9 +69,7 @@ export const revealInFolder = async (path: string): Promise<void> => {
 
 export function useAiHandoff() {
   const handoffState = ref<AiHandoffState>('idle');
-  const handoffResult = ref<AiHandoffResult | null>(null);
   const handoffError = ref<string | null>(null);
-  const preparedProvider = ref<AiProvider | null>(null);
   const loadSeq = createLoadSeq();
 
   const copyToClipboard = copyTextToClipboard;
@@ -94,8 +89,6 @@ export function useAiHandoff() {
     const seq = loadSeq.next();
     handoffState.value = 'preparing';
     handoffError.value = null;
-    handoffResult.value = null;
-    preparedProvider.value = provider;
 
     if (!isFixedAiProviderUrl(provider.url)) {
       const error = new Error(copy().targetNotAllowed);
@@ -110,7 +103,6 @@ export function useAiHandoff() {
     try {
       result = await tauriApi.prepareAiHandoff(selection, prompt, includePreciseRoute);
       if (!loadSeq.isCurrent(seq)) return result;
-      handoffResult.value = result;
       await copyToClipboard(result.clipboardText);
     } catch (error) {
       if (loadSeq.isCurrent(seq)) {
@@ -137,8 +129,8 @@ export function useAiHandoff() {
       }
     } catch (error) {
       if (loadSeq.isCurrent(seq)) {
-        // Clipboard succeeded; keep that fact and allow a retry without
-        // pretending that the browser navigation succeeded.
+        // Clipboard succeeded; keep that fact without pretending that the
+        // browser navigation succeeded.
         handoffState.value = 'copied_only';
         handoffError.value = toUserMessage(error, copy().copiedButCannotOpen(provider.label));
       }
@@ -146,41 +138,9 @@ export function useAiHandoff() {
     return result;
   };
 
-  const retryOpen = async (provider?: AiProvider) => {
-    const targetProvider = preparedProvider.value ?? provider;
-    if (!targetProvider || !handoffResult.value) {
-      throw new Error(copy().nothingToRetry);
-    }
-    if (!isTauri()) {
-      handoffState.value = handoffResult.value.mode === 'attachment' ? 'attachment' : 'copied_only';
-      return;
-    }
-    if (!isFixedAiProviderUrl(targetProvider.url)) {
-      const error = new Error(copy().targetNotAllowed);
-      handoffState.value = 'copied_only';
-      handoffError.value = error.message;
-      throw error;
-    }
-    try {
-      await openUrl(targetProvider.url);
-      handoffState.value = handoffResult.value.mode === 'attachment' ? 'attachment' : 'opened';
-      handoffError.value = null;
-    } catch (error) {
-      handoffState.value = 'copied_only';
-      handoffError.value = toUserMessage(error, copy().copiedButCannotOpen(targetProvider.label));
-      throw error;
-    }
-  };
-
   return {
     handoffState,
-    handoffResult,
     handoffError,
-    preparedProvider,
     prepareAndCopy,
-    retryOpen,
-    /* 交付预览页用的单步原语（模块级同名函数的别名）。 */
-    copyText: copyTextToClipboard,
-    openProvider: openProviderSite,
   };
 }

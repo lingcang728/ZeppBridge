@@ -115,7 +115,6 @@ export default {
         + 'распознаваться автоматически. Отчёт содержит фиксированный набор обезличенных полей и не требует аккаунта GitHub.',
       reportWhat: 'Что не так',
       reportWhatHint: '(выберите пункт — отчёт можно отправить, даже если ничего не обнаружено автоматически)',
-      reportCategoryPlaceholder: 'Не указано (отправить только то, что обнаружено автоматически)',
       reportCategoryAria: 'Тип проблемы для отчёта',
       reportNote: 'Что добавить',
       reportNoteHint: '(необязательно, но полезно)',
@@ -745,9 +744,6 @@ export default {
         'По каждому месячному блоку получен итог: данные записаны локально либо в облаке нет записей за этот период.',
       ledgerIncomplete: (remaining: number) =>
         `Осталось ${remaining} блоков без результата. Пока не закончены все, локальная копия покрывает только синхронизированный диапазон и не считается полной.`,
-      ledgerStats: (persisted: number, empty: number, pending: number) =>
-        `записано ${persisted} · пусто в облаке ${empty} · в очереди ${pending}`,
-      ledgerFailed: (failed: number) => `с ошибкой ${failed}`,
       ledgerRange: (from: string, to: string, records: number) =>
         `${from} — ${to} · ${plural(records, { one: `${records} запись`, few: `${records} записи`, many: `${records} записей`, other: `${records} записи` })}`,
       ledgerNothingWritten: 'Пока не записан ни один месяц',
@@ -778,7 +774,6 @@ export default {
       failedRow: (stream: string, month: string) => `${stream} · ${month}`,
       failedAttempts: (attempts: number) => `попыток: ${attempts}`,
       failedExhausted: 'Лимит автоповторов исчерпан: нажмите «Повторить неудачные»',
-      failedNoReason: 'Причина не указана',
       retryFailed: 'Повторить неудачные',
       retryFailedDone: 'Неудачные месяцы возвращены в очередь.',
       retryFailedFailed: 'Не удалось поставить неудачные месяцы в очередь',
@@ -1070,7 +1065,6 @@ export default {
       targetNotAllowed: 'Этот сервис ИИ не входит в список разрешённых',
       handoffFailed: 'Передача ИИ не удалась',
       copiedButCannotOpen: (label: string) => `Скопировано, но ${label} не открывается`,
-      nothingToRetry: 'Нет предыдущей передачи для повтора',
     },
 
     'composables/useAiTaskDraft': {
@@ -1275,7 +1269,6 @@ export default {
       deleteHint: 'Заметка будет удалена из локальной базы данных.',
       invalid: 'Укажите название и корректные даты: дата окончания не может быть раньше начала.',
       failed: 'Действие не удалось. Попробуйте ещё раз.',
-      deleted: 'Событие удалено.',
       loading: 'Загружаются события…',
       retry: 'Повторить',
       active: 'Текущие',
@@ -1369,7 +1362,6 @@ export default {
     },
 
     'views/ActivityDetail': {
-      backToOverview: 'Назад к обзору',
       title: 'Дневная активность',
       intro:
         'Шаги, дистанция, активный расход калорий и минуты активности по дням. '
@@ -1423,7 +1415,6 @@ export default {
 
     'views/BodyStatus': {
       vitalsGroupTitle: 'Готовность и показатели организма',
-      backToOverview: 'Назад к обзору',
       title: 'Состояние тела',
       intro:
         'Тренды готовности, стресса, кислорода в крови, ВСР, частоты дыхания, пульса покоя, '
@@ -1515,7 +1506,6 @@ export default {
     },
 
     'views/DeviceDetail': {
-      backToSettings: 'Назад к настройкам',
       notFoundTitle: 'Устройство не найдено',
       notFoundMessage: 'Возможно, устройство удалено из аккаунта или ещё не синхронизировано.',
       reidentify: 'Определить устройства заново',
@@ -1558,7 +1548,6 @@ export default {
       noRecords: 'Пока нет записей',
       timeUnknown: 'Время неизвестно',
       notProvided: 'Нет данных',
-      backToSettings: 'Назад к настройкам',
       title: 'Проверка здоровья данных',
       summaryStreams: (ok: number, total: number) => `${ok} из ${total} потоков в норме`,
       summaryFailed: (n: number) =>
@@ -1705,7 +1694,6 @@ export default {
 
     'views/HeartRateDetail': {
       trendsTitle: 'Тренды пульса покоя и ВСР',
-      backToOverview: 'Назад к обзору',
       title: 'Пульс',
       intro:
         'Верхний график — пульс за последние 24 часа; варианты 7 дней / 1 месяц / 6 месяцев меняют только '
@@ -1779,7 +1767,6 @@ export default {
     },
 
     'views/RecentRecords': {
-      backToOverview: 'Назад к обзору',
       title: 'Недавние записи',
       loadingLabel: 'Загружаются недавние записи',
       loadFailedTitle: 'Не удалось загрузить недавние записи',
@@ -1860,8 +1847,6 @@ export default {
     },
 
     'views/SleepList': {
-      backToRecent: 'Назад к недавним записям',
-      backToOverview: 'Назад к обзору',
       title: 'Сон',
       intro: 'Синхронизированные записи сна из локальной базы данных.',
       loadFailedTitle: 'Не удалось прочитать записи сна',
@@ -1878,7 +1863,6 @@ export default {
     },
 
     'views/TrainingStatus': {
-      backToOverview: 'Назад к обзору',
       title: 'Тренировочный статус',
       intro:
         'МПК (VO₂max), лактатный порог, тренировочная нагрузка и пульсовые зоны из синхронизированных записей.',
@@ -2079,8 +2063,6 @@ export default {
       close: 'Закрыть',
     },
     'views/WorkoutList': {
-      backToRecent: 'Назад к недавним записям',
-      backToOverview: 'Назад к обзору',
       title: 'Тренировки',
       intro: 'Синхронизированные тренировки из локальной базы данных.',
       loadFailedTitle: 'Не удалось прочитать тренировки',
@@ -2260,11 +2242,8 @@ export default {
         'Перетащите в круг для добавления, наружу — для удаления · клик по узлу открывает '
         + 'настройки · перетаскивание фона перемещает холст',
       zone: 'К ИИ',
-      includeNode: 'Передать ИИ',
-      excludeNode: 'Не передавать ИИ',
       undo: 'Отменить',
       fit: 'Вписать',
-      resetView: 'Сбросить масштаб',
       zoomIn: 'Приблизить',
       zoomOut: 'Отдалить',
       backToAll: 'Все категории',

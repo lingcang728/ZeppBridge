@@ -319,9 +319,6 @@ export default {
       ledgerComplete: 'Todos os blocos do registro foram concluídos: gravados localmente ou vazios na nuvem.',
       ledgerIncomplete: (remaining: number) =>
         `${remaining} blocos pendentes. Até concluir, o histórico local estará incompleto.`,
-      ledgerStats: (persisted: number, empty: number, pending: number) =>
-        `${persisted} gravados · ${empty} vazios na nuvem · ${pending} pendentes`,
-      ledgerFailed: (failed: number) => `${failed} com falha`,
       ledgerRange: (from: string, to: string, records: number) => `${from} ~ ${to} · ${records} registros`,
       ledgerNothingWritten: 'Nenhum mês gravado ainda',
 
@@ -349,7 +346,6 @@ export default {
       failedRow: (stream: string, month: string) => `${stream} · ${month}`,
       failedAttempts: (attempts: number) => plural(attempts, { one: `${attempts} tentativa`, other: `${attempts} tentativas` }),
       failedExhausted: 'Tentativas esgotadas; clique em "Repetir meses com falha"',
-      failedNoReason: 'Sem motivo registrado',
       retryFailed: 'Repetir meses com falha',
       retryFailedDone: 'Meses com falha recolocados na fila. Continue o preenchimento.',
       retryFailedFailed: 'Não foi possível recolocar os meses com falha na fila',
@@ -627,7 +623,6 @@ export default {
       targetNotAllowed: 'Este destino de IA não está na lista de permissões',
       handoffFailed: 'Falha no envio para a IA',
       copiedButCannotOpen: (label: string) => `Copiado, mas não dá para abrir o ${label}`,
-      nothingToRetry: 'Nenhum envio para IA pendente para tentar novamente',
     },
 
     'composables/useAiTaskDraft': {
@@ -831,7 +826,6 @@ export default {
       deleteHint: 'Esta anotação será excluída do banco de dados local.',
       invalid: 'Informe um título e datas válidas. A data final não pode ser anterior à inicial.',
       failed: 'Não foi possível concluir a ação. Tente novamente.',
-      deleted: 'Evento excluído.',
       loading: 'Carregando eventos…',
       retry: 'Tentar novamente',
       active: 'Em andamento',
@@ -921,7 +915,6 @@ export default {
     },
 
     'views/ActivityDetail': {
-      backToOverview: 'Voltar à visão geral',
       title: 'Atividade diária',
       intro: 'Tendências diárias de passos, distância, calorias ativas e minutos em movimento. Comparadas só ao seu histórico; dias sem registro ficam vazios, sem 0 de preenchimento.',
       rangeAria: 'Intervalo de tempo',
@@ -968,7 +961,6 @@ export default {
 
     'views/BodyStatus': {
       vitalsGroupTitle: 'Recuperação e sinais vitais',
-      backToOverview: 'Voltar à visão geral',
       title: 'Estado corporal',
       intro: 'Tendências locais de prontidão, estresse, SpO2, HRV, frequência respiratória, FC em repouso, composição corporal e nutrição. Calculado com base nos dados sincronizados.',
       rangeAria: 'Intervalo de tempo',
@@ -1048,7 +1040,6 @@ export default {
     },
 
     'views/DeviceDetail': {
-      backToSettings: 'Voltar às configurações',
       notFoundTitle: 'Dispositivo não encontrado',
       notFoundMessage: 'Pode ter sido desvinculado da conta ou ainda não foi identificado neste computador.',
       reidentify: 'Identificar dispositivos novamente',
@@ -1086,7 +1077,6 @@ export default {
       noRecords: 'Nenhum registro',
       timeUnknown: 'Horário desconhecido',
       notProvided: 'Não informado',
-      backToSettings: 'Voltar às configurações',
       title: 'Diagnóstico de dados',
       summaryStreams: (ok: number, total: number) => `${ok} de ${total} fluxos de dados saudáveis`,
       summaryFailed: (n: number) =>
@@ -1205,7 +1195,6 @@ export default {
 
     'views/HeartRateDetail': {
       trendsTitle: 'Tendências de FC em repouso e HRV',
-      backToOverview: 'Voltar à visão geral',
       title: 'Frequência cardíaca',
       intro: 'Acima fica sempre a curva das últimas 24 horas; 7 dias / 1 mês / 6 meses mudam só as tendências diárias abaixo. Trechos sem leitura ficam sem linha e sem 0 de preenchimento.',
       rangeAria: 'Intervalo da tendência',
@@ -1278,7 +1267,6 @@ export default {
     },
 
     'views/RecentRecords': {
-      backToOverview: 'Voltar à visão geral',
       title: 'Registros recentes',
       introTimeline: 'Sono e treinos sincronizados recentemente em ordem cronológica inversa.',
       loadingLabel: 'Carregando registros recentes',
@@ -1350,8 +1338,6 @@ export default {
     },
 
     'views/SleepList': {
-      backToRecent: 'Voltar aos registros recentes',
-      backToOverview: 'Voltar à visão geral',
       title: 'Sono',
       intro: 'Registros de sono sincronizados neste computador. Apenas resumos são exibidos sem a linha do tempo completa.',
       loadFailedTitle: 'Falha ao carregar registros de sono',
@@ -1367,7 +1353,6 @@ export default {
     },
 
     'views/TrainingStatus': {
-      backToOverview: 'Voltar à visão geral',
       title: 'Estado de treino',
       intro: 'VO₂max, limiar de lactato, carga de treino e zonas de frequência cardíaca sincronizadas. Não constitui recomendação de treinamento.',
       rangeAria: 'Intervalo de tempo',
@@ -1568,8 +1553,6 @@ Responda em Markdown.`,
       close: 'Fechar',
     },
     'views/WorkoutList': {
-      backToRecent: 'Voltar aos registros recentes',
-      backToOverview: 'Voltar à visão geral',
       title: 'Treinos',
       intro: 'Treinos sincronizados neste computador.',
       loadFailedTitle: 'Falha ao carregar treinos',
@@ -1638,7 +1621,6 @@ Responda em Markdown.`,
       unknownDeviceReport: 'Um relatório de erro ajuda a incluir os códigos deste dispositivo no catálogo, para todos deixarem de escolher o modelo à mão. Só envia campos de uma lista fixa permitida, sem conta GitHub.',
       reportWhat: 'Tipo de problema',
       reportWhatHint: ' (selecione uma opção)',
-      reportCategoryPlaceholder: 'Não especificado (envia dados de diagnóstico padrão)',
       reportCategoryAria: 'Tipo de problema a relatar',
       reportNote: 'Observações adicionais',
       reportNoteHint: ' (opcional)',
@@ -2058,10 +2040,7 @@ Responda em Markdown.`,
       fit: 'Ajustar à tela',
       zoomIn: 'Aumentar zoom',
       zoomOut: 'Diminuir zoom',
-      resetView: 'Redefinir visualização',
       zoomLevel: (percent: number) => `Zoom: ${percent}% — clique para enquadrar`,
-      includeNode: 'Incluir na IA',
-      excludeNode: 'Excluir da IA',
       backToAll: 'Todas as categorias',
       dismissHint: 'Entendido',
     },
