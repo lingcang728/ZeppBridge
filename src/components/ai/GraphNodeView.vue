@@ -62,8 +62,8 @@ const showLabel = computed(() =>
     <circle v-if="dropHint" class="drop-hint" :class="dropHint" :r="radius + 8" fill="none" />
     <circle v-if="node.badge" class="badge" :cx="radius * 0.72" :cy="-radius * 0.72" r="8" />
     <text v-if="node.badge" class="badge-text" :x="radius * 0.72" :y="-radius * 0.72 + 3.4">{{ node.badge }}</text>
-    <text v-if="showLabel" class="label" :y="radius + 15">{{ node.label }}</text>
-    <text v-if="node.sublabel && showLabel" class="sublabel" :y="radius + 27">{{ node.sublabel }}</text>
+    <text v-if="showLabel" class="label" :y="radius + 16">{{ node.label }}</text>
+    <text v-if="node.sublabel && showLabel" class="sublabel" :y="radius + 30">{{ node.sublabel }}</text>
     <!-- 展开/收起的小把手 -->
     <g v-if="node.expandable" class="expander" :transform="`translate(${-radius * 0.72} ${-radius * 0.72})`">
       <circle r="7" />
@@ -78,8 +78,9 @@ const showLabel = computed(() =>
 .body { fill: var(--surface-raised); stroke: var(--line-control); stroke-width: 1.2; transition: stroke .15s, fill .15s, opacity .15s; }
 .glyph { color: var(--muted); }
 .label, .sublabel, .badge-text { text-anchor: middle; pointer-events: none; user-select: none; }
-.label { fill: var(--ink); font-size: 11px; }
-.sublabel { fill: var(--subtle); font-size: 9.5px; }
+/* 图谱文字的下限（U17）：常用标签在 100% 缩放下不用放大就能读；拥挤靠藏标签、拉间距解决，不再缩字。 */
+.label { fill: var(--ink); font-size: 12.5px; }
+.sublabel { fill: var(--subtle); font-size: 11px; }
 .cover { stroke: var(--accent); stroke-width: 2.5; opacity: .85; transition: opacity .15s; }
 .drop-hint { stroke-width: 2; stroke-dasharray: 5 4; }
 .drop-hint.include { stroke: var(--accent); }
@@ -87,11 +88,11 @@ const showLabel = computed(() =>
 .badge { fill: var(--accent); }
 .badge-text { fill: var(--accent-ink); font-size: 9px; font-weight: 700; }
 .expander circle { fill: var(--surface-raised); stroke: var(--line-control); }
-.expander text { fill: var(--muted); font-size: 10px; text-anchor: middle; pointer-events: none; }
+.expander text { fill: var(--muted); font-size: 11px; text-anchor: middle; pointer-events: none; }
 /* 中心：主题 */
 .kind-center .body { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.6; }
 .kind-center .glyph { color: var(--accent); }
-.kind-center .label { font-size: 12.5px; font-weight: 700; }
+.kind-center .label { font-size: 14px; font-weight: 700; }
 /* 类别：交给 AI = 描边强调 + 图标点亮；不交 = 淡 */
 .kind-category.is-included .body { stroke: var(--accent); }
 .kind-category.is-included .glyph { color: var(--accent); }
@@ -100,14 +101,14 @@ const showLabel = computed(() =>
 .kind-metric .body { fill: var(--surface); }
 .kind-metric.is-effective .body { fill: var(--accent-soft); stroke: var(--accent); }
 .kind-metric:not(.is-effective) { opacity: .4; }
-.kind-metric .label { font-size: 10px; fill: var(--muted); }
+.kind-metric .label { font-size: 11.5px; fill: var(--muted); }
 .is-missing .body { stroke: var(--warning); stroke-dasharray: 3 3; }
 .is-hovered .body { stroke: var(--accent); stroke-width: 2; }
 .is-dimmed { opacity: .38; }
 /* 背景：退远、变糊，但仍能点（点背景里的另一类会飞过去）。 */
 .is-backdrop { opacity: .3; filter: blur(1.6px); }
 .is-backdrop:hover { opacity: .6; filter: blur(.4px); }
-.is-emphasis.kind-metric .label { fill: var(--ink); font-size: 10.5px; }
+.is-emphasis.kind-metric .label { fill: var(--ink); font-size: 12px; }
 .is-emphasis.kind-category .body { stroke-width: 2.2; }
 .is-ghosted { opacity: .25; }
 </style>
