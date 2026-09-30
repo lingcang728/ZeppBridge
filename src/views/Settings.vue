@@ -188,7 +188,7 @@ onUnmounted(() => {
 <style scoped>
 /* 行宽收在 1000px 以内：设置是一行一行的「标签 — 控件」，拉满 1400px 时标签和
    控件隔着半个屏幕，就是之前那种「留白过多」。 */
-.page { display: grid; width: 100%; max-width: 1120px; min-width: 0; margin: 0 auto; gap: 18px; }
+.page { display: grid; width: 100%; max-width: 1120px; min-width: 0; margin: 0; gap: 18px; }
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; min-width: 0; }
 h1, p { margin-top: 0; }
 h1 { font-size: 26.5px; font-weight: 700; color: var(--ink); }
