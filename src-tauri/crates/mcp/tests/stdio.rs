@@ -283,7 +283,10 @@ fn scope_flag_controls_what_the_stdio_server_exposes() {
             .collect();
         assert_eq!(responses.len(), 7);
         assert_eq!(responses[0]["result"]["scope"]["mode"], "full-readonly");
-        assert_eq!(responses[1]["result"]["tools"].as_array().unwrap().len(), 12);
+        assert_eq!(
+            responses[1]["result"]["tools"].as_array().unwrap().len(),
+            12
+        );
         let ids: Vec<&str> = responses[2]["result"]["structuredContent"]["workouts"]
             .as_array()
             .unwrap()
