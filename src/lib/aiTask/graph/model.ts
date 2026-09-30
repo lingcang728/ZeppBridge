@@ -65,6 +65,8 @@ export interface GraphInput {
   centerIcon: IconName;
   /** 类别副标题（例如「14 天」），由组件按界面语言给。 */
   daysLabel: (days: number) => string;
+  /** 有覆盖数据时副标题写「13/15 天有数据」（U07）：以前写的「14 天」是回溯设置，读起来像实际覆盖。 */
+  coverageLabel?: (have: number, total: number) => string;
 }
 
 export const CENTER_ID = 'center';
@@ -104,7 +106,9 @@ export const buildGraph = (input: GraphInput): GraphModel => {
     nodes.push({
       id, kind: 'category', parentId: CENTER_ID, category, metric: null,
       label: categoryLabel(category),
-      sublabel: meta.hasWindow && range.enabled ? input.daysLabel(range.days_before) : null,
+      sublabel: meta.hasWindow && range.enabled
+        ? (summary && input.coverageLabel ? input.coverageLabel(summary.daysWithData, summary.daysInRange) : input.daysLabel(range.days_before))
+        : null,
       icon: meta.icon,
       included: range.enabled, effective: range.enabled,
       coverage: range.enabled && summary ? ratio(summary.daysWithData, summary.daysInRange) : null,

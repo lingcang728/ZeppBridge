@@ -67,7 +67,8 @@ const showLabel = computed(() =>
     <!-- 展开/收起的小把手 -->
     <g v-if="node.expandable" class="expander" :transform="`translate(${-radius * 0.72} ${-radius * 0.72})`">
       <circle r="7" />
-      <text y="3.2">{{ node.expanded ? '−' : '+' }}</text>
+      <!-- 展开 / 收起是一个箭头，不再是像「加入」的小加号（U07）。 -->
+      <path :d="node.expanded ? 'M-3 1.6 0-1.4 3 1.6' : 'M-3-1.4 0 1.6 3-1.4'" />
     </g>
   </g>
 </template>
@@ -88,7 +89,7 @@ const showLabel = computed(() =>
 .badge { fill: var(--accent); }
 .badge-text { fill: var(--accent-ink); font-size: 9px; font-weight: 700; }
 .expander circle { fill: var(--surface-raised); stroke: var(--line-control); }
-.expander text { fill: var(--muted); font-size: 11px; text-anchor: middle; pointer-events: none; }
+.expander path { fill: none; stroke: var(--muted); stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 /* 中心：主题 */
 .kind-center .body { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.6; }
 .kind-center .glyph { color: var(--accent); }

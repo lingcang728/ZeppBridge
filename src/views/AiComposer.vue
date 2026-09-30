@@ -22,11 +22,13 @@ import DirectionPanel from '../components/ai/DirectionPanel.vue';
 import TaskExtras from '../components/ai/TaskExtras.vue';
 import HandoffPanel from '../components/ai/HandoffPanel.vue';
 import AiStepRail, { type RailStep } from '../components/ai/AiStepRail.vue';
+import AiAskStart from '../components/ai/AiAskStart.vue';
+import SegmentTrack from '../components/SegmentTrack.vue';
 import { useAiTaskDraft } from '../composables/useAiTaskDraft';
 import { useAiTaskLibrary } from '../composables/useAiTaskLibrary';
 import { useAiTaskPreview } from '../composables/useAiTaskPreview';
 import { useSyncController } from '../composables/useSyncController';
-import type { AiTaskCategory } from '../lib/bridge/types';
+import type { AiTaskCategory, AiTaskTemplate } from '../lib/bridge/types';
 import { buildGraph } from '../lib/aiTask/graph/model';
 import { categoryLabel } from '../lib/aiTask/categories';
 import { metricLabel } from '../lib/aiTask/metrics';
@@ -58,6 +60,10 @@ const t = useMessages(defineMessages(
     undoPicked: (name: string) => `已选「${name}」`,
     undoUnpicked: (name: string) => `已取消「${name}」`,
     undoDirection: '已换分析方向',
+    viewAria: '视图',
+    viewAsk: '先问问题',
+    viewGraph: '图谱',
+    graphCoverage: (have: number, total: number) => `${have}/${total} 天有数据`,
   },
   {
     daysOption: (days: number) => `${days} days`,
@@ -78,6 +84,10 @@ const t = useMessages(defineMessages(
     undoPicked: (name: string) => `Picked “${name}”`,
     undoUnpicked: (name: string) => `Unpicked “${name}”`,
     undoDirection: 'Direction changed',
+    viewAria: 'View',
+    viewAsk: 'Ask first',
+    viewGraph: 'Graph',
+    graphCoverage: (have: number, total: number) => `${have}/${total} days with data`,
   },
   {
     daysOption: (days: number) => `${days} días`,
@@ -98,6 +108,10 @@ const t = useMessages(defineMessages(
     undoPicked: (name: string) => `Se eligió «${name}»`,
     undoUnpicked: (name: string) => `Se deseleccionó «${name}»`,
     undoDirection: 'Enfoque cambiado',
+    viewAria: 'Vista',
+    viewAsk: 'Preguntar primero',
+    viewGraph: 'Grafo',
+    graphCoverage: (have: number, total: number) => `${have}/${total} días con datos`,
   },
   'views/AiComposer',
 ));
@@ -145,7 +159,41 @@ const graphModel = computed(() =>
     centerSublabel: center.value.sublabel,
     centerIcon: center.value.icon,
     daysLabel: t.value.daysOption,
+    coverageLabel: t.value.graphCoverage,
   }));
+
+/* —— 视图（U06）：默认「先问问题」——四个入口 + 与图谱同步的清单；喜欢关系网的人切到「图谱」，记住选择。 —— */
+type ComposerView = 'ask' | 'graph';
+const VIEW_KEY = 'zeppbridge.ai.view';
+const readView = (): ComposerView => {
+  try {
+    return window.localStorage.getItem(VIEW_KEY) === 'graph' ? 'graph' : 'ask';
+  } catch {
+    return 'ask';
+  }
+};
+const view = ref<ComposerView>(readView());
+watch(view, (value) => {
+  try {
+    window.localStorage.setItem(VIEW_KEY, value);
+  } catch {
+    // 记不住就算了。
+  }
+});
+const viewItems = computed(() => [
+  { value: 'ask' as const, label: t.value.viewAsk, icon: 'edit' as const },
+  { value: 'graph' as const, label: t.value.viewGraph, icon: 'grid' as const },
+]);
+/* 入口动作：带上方向和推荐范围后，右边步骤栏跳到「你想问什么」，文本框拿到焦点。 */
+const focusQuestion = () => {
+  openStep.value = 'ask';
+  window.setTimeout(() => document.getElementById('ai-question')?.focus(), 360);
+};
+const applyTemplate = (template: AiTaskTemplate) => {
+  draftCtl.setTemplate(template);
+  focusQuestion();
+};
+const pickWorkout = () => { openStep.value = 'target'; };
 
 /* 撤销胶囊里那一句：刚才改了什么。 */
 const undoHint = computed(() => {
@@ -243,7 +291,12 @@ onBeforeUnmount(() => dockObserver?.disconnect());
 <template>
   <section class="page ai-page" aria-labelledby="ai-page-title">
     <div class="stage" :style="dockHeight ? { '--dock-h': `${dockHeight}px` } : undefined">
-      <div class="stage-graph">
+      <div v-if="view === 'ask'" class="stage-graph stage-ask">
+        <AiAskStart :draft="draft" :preview="preview" :templates="templates" :workout-count="draft.workout_ids.length"
+          @template="applyTemplate" @pick-workout="pickWorkout" @ask="focusQuestion"
+          @category="draftCtl.setCategoryEnabled" @days="draftCtl.setCategoryDays" @all-days="draftCtl.setWindowDays" />
+      </div>
+      <div v-else class="stage-graph">
         <TaskGraph :model="graphModel" :can-undo="canUndo" :undo-hint="undoHint" :undo-seq="lastChange?.seq ?? 0" @undo="draftCtl.undo()"
           @set-category="draftCtl.setCategoryEnabled"
           @set-metric="(category, metric, included) => draftCtl.setMetricExcluded(category, metric, !included)"
@@ -252,6 +305,8 @@ onBeforeUnmount(() => dockObserver?.disconnect());
       </div>
 
       <AiTaskHeader class="stage-head" :fallback-title="fallbackTitle" />
+      <SegmentTrack class="stage-view" compact :items="viewItems" :model-value="view" :aria-label="t.viewAria"
+        @update:model-value="(value) => view = value === 'graph' ? 'graph' : 'ask'" />
 
       <aside class="stage-rail glass-control">
         <AiStepRail v-model:open="openStep" :steps="railSteps">
@@ -287,7 +342,9 @@ onBeforeUnmount(() => dockObserver?.disconnect());
 /* --graph-safe-*：画布四边被浮层挡住的宽度（上：任务名胶囊，下：交付坞和它上面那一排
    撤销 / 缩放胶囊）。关系网的节点弹层只摆在剩下看得见的那一块里，不会再被盖住半截。 */
 .stage-graph { --graph-safe-top: 70px; position: absolute; inset: 0 calc(var(--rail-w) + 24px) 0 0; border-radius: inherit; }
-.stage-head { position: absolute; top: 16px; left: 16px; z-index: 4; max-width: calc(100% - var(--rail-w) - 60px); }
+.stage-head { position: absolute; top: 16px; left: 16px; z-index: 4; max-width: calc(100% - var(--rail-w) - 240px); }
+.stage-view { position: absolute; top: 18px; right: calc(var(--rail-w) + 40px); z-index: 4; }
+.stage-ask { overflow: hidden; }
 .stage-rail {
   position: absolute;
   top: 12px;
@@ -313,6 +370,10 @@ onBeforeUnmount(() => dockObserver?.disconnect());
   .stage { height: auto; overflow: visible; background: none; box-shadow: none; }
   .stage-graph { position: relative; inset: auto; height: 62vh; min-height: 440px; border-radius: var(--radius-xl); background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow); }
   .stage-head { top: 12px; left: 12px; max-width: calc(100% - 24px); }
+  /* 窄窗口：视图开关在任务名那一行下面靠右，问题入口再往下让一行。 */
+  .stage-view { top: 66px; right: 12px; }
+  .stage-ask { height: auto; min-height: 0; }
+  .stage-ask :deep(.ask-start) { padding-top: 112px; }
   .stage-rail { position: static; width: auto; margin-top: 12px; }
   .stage-dock { position: sticky; right: auto; bottom: 12px; left: auto; margin-top: 12px; }
   .stage-graph :deep(.dock) { bottom: 14px; }

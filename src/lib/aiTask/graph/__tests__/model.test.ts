@@ -261,6 +261,14 @@ describe('buildGraph · 副标题与邻居', () => {
     expect(nodeById(disabled, 'cat:sleep').sublabel).toBeNull();
   });
 
+  it('有覆盖数据时副标题写实际覆盖（coverageLabel），不再是回溯设置', () => {
+    const model = buildGraph(inputOf({
+      preview: previewOf([coverageOf({ days_in_range: 15, days_with_data: 13 })]),
+      coverageLabel: (have, total) => `${have}/${total}`,
+    }));
+    expect(nodeById(model, `cat:${coverageOf().category}`).sublabel).toBe('13/15');
+  });
+
   it('neighborIds：自己 + 直连邻居；中心的邻居是所有类别', () => {
     const model = buildGraph(inputOf({ expanded: new Set<AiTaskCategory>(['sleep']) }));
     const aroundCenter = neighborIds(model, CENTER_ID);
