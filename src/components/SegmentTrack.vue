@@ -27,6 +27,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
 import Icon, { type IconName } from './Icon.vue';
 import { dragThumb, snapStop, type SegmentStop } from '../lib/navigation';
+import { createLensFilter, lensEnabled, lensSupported, type LensFilter } from '../lib/glassLens';
 
 export type SegmentItem<T extends string | number> = { value: T; label: string; icon?: IconName };
 
@@ -90,6 +91,15 @@ let nextThumb: { left: number; width: number } | null = null;
 let suppressClick = false;
 let observer: ResizeObserver | null = null;
 
+/* —— 折射（原型，lib/glassLens.ts）：只给浮在内容上的玻璃导航。滑块上面盖一块透镜，把底下的字弯折、
+   微微放大；整条胶囊的外沿对背后的页面折射一圈。 —— */
+const lensRefs = ref<{ thumb: string; rim: string } | null>(null);
+let thumbLens: LensFilter | null = null;
+let rimLens: LensFilter | null = null;
+const resizeRim = () => {
+  if (rimLens && track.value) rimLens.resize(track.value.offsetWidth, track.value.offsetHeight);
+};
+
 const buttons = () => Array.from(track.value?.querySelectorAll<HTMLElement>('.segment-item') ?? []);
 const readStops = (): SegmentStop<T>[] => buttons().map((el, index) => ({
   left: el.offsetLeft,
@@ -122,6 +132,7 @@ const checkWrap = () => {
 
 const measure = () => {
   if (!track.value) return;
+  resizeRim();
   checkWrap();
   stops.value = readStops();
   if (!gesture) placeOn(props.modelValue);
@@ -140,7 +151,19 @@ const trackStyle = computed(() => ({
   '--thumb-w': `${thumb.value.visible ? thumb.value.width : 0}px`,
   '--thumb-t': `${thumb.value.top}px`,
   '--thumb-h': `${thumb.value.height}px`,
+  // 先模糊、再折射：折射放在最后，边上弯折的轮廓不会又被糊掉。
+  ...(lensRefs.value ? {
+    backdropFilter: `var(--glass-blur) ${lensRefs.value.rim}`,
+    WebkitBackdropFilter: `var(--glass-blur) ${lensRefs.value.rim}`,
+  } : {}),
 }));
+const lensStyle = computed(() => (lensRefs.value ? {
+  backdropFilter: lensRefs.value.thumb,
+  WebkitBackdropFilter: lensRefs.value.thumb,
+} : {}));
+watch(() => [thumb.value.width, thumb.value.height] as const, ([width, height]) => {
+  if (width > 0 && height > 0) thumbLens?.resize(width, height);
+});
 /** 折行时不在滑块那一行的项：不挖空（挖空只按横坐标算，会误伤别的行）。 */
 const offRow = (index: number) => wrapped.value && (stops.value[index]?.top ?? 0) !== thumb.value.top;
 const itemLeft = (index: number) => ({ '--item-l': `${stops.value[index]?.left ?? 0}px` });
@@ -298,6 +321,11 @@ watch(() => props.items.map((item) => `${item.value}\u0000${item.label}`).join('
 });
 
 onMounted(() => {
+  if (props.variant === 'glass' && lensEnabled.value && lensSupported()) {
+    thumbLens = createLensFilter('thumb');
+    rimLens = createLensFilter('rim');
+    lensRefs.value = { thumb: thumbLens.ref, rim: rimLens.ref };
+  }
   void nextTick(() => {
     measure();
     observer = new ResizeObserver(() => measure());
@@ -312,6 +340,8 @@ onBeforeUnmount(() => {
   cancelAnimationFrame(fadeFrame);
   observer?.disconnect();
   window.removeEventListener('resize', measure);
+  thumbLens?.dispose();
+  rimLens?.dispose();
 });
 </script>
 
@@ -368,6 +398,9 @@ onBeforeUnmount(() => {
         </slot>
       </span>
     </span>
+    <!-- 透镜：盖在滑块和选中字上面，折射它底下画出来的东西（backdrop-filter 只取轨道里的内容）。
+         像 iOS 26 的标签栏：只在按住 / 拖动 / 吸附时浮起来，停稳后淡回平的滑块。 -->
+    <span v-if="lensRefs" class="segment-lens" aria-hidden="true" :style="lensStyle" />
   </div>
 </template>
 
@@ -489,6 +522,26 @@ onBeforeUnmount(() => {
   clip-path: inset(calc(var(--thumb-t) - var(--seg-clip-extra)) calc(100% - var(--thumb-l) - var(--thumb-w) - var(--seg-grow))
     calc(100% - var(--thumb-t) - var(--thumb-h) - var(--seg-clip-extra)) calc(var(--thumb-l) - var(--seg-grow)) round 999px);
 }
+.segment-lens {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  left: 0;
+  width: var(--thumb-w);
+  height: var(--thumb-h);
+  border-radius: 999px;
+  transform: translate(var(--thumb-l), var(--thumb-t));
+  pointer-events: none;
+  /* 玻璃的厚度感：一圈细亮边、上沿高光、下沿暗边，外面一层浮起的影子；上半部一道很淡的反光。
+     没有这圈边，边上被折弯的字看上去像花屏，而不是透过玻璃看。 */
+  background: linear-gradient(180deg, rgb(255 255 255 / .10), transparent 55%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .16), inset 0 1px 1px rgb(255 255 255 / .38),
+    inset 0 -1px 1px rgb(0 0 0 / .22), 0 6px 16px rgb(0 0 0 / .22);
+  opacity: 0;
+  transition: scale var(--seg-dur) var(--seg-ease), opacity 180ms ease;
+}
+.segment-track.is-dragging .segment-lens { opacity: 1; scale: 1.05 1.1; }
+.segment-track.is-settling .segment-lens { opacity: 1; }
 .segment-ink-item {
   position: absolute;
   top: var(--seg-pad);
