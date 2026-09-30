@@ -621,3 +621,43 @@ fn excluded_stage_minutes_drop_the_stage_timeline_too() {
         assert!(session.get("light_minutes").is_some());
     }
 }
+
+/// 用户 2026-09-30 定：没开「运动」类别时，锚点运动只写日期和类型——
+/// AI 要知道日期窗从哪天往前数，但运动数字不出去。开着时照旧，只是任务里
+/// 拖出去的字段不带；心率被排除时心率区间和逐点心率一起去掉。
+#[test]
+fn anchor_workouts_follow_the_workout_category_switch_and_its_exclusions() {
+    let db = Database::in_memory().unwrap();
+    let start = utc(2026, 9, 10, 10);
+    insert_workout(&db, "w1", start);
+    let export = |t: &AiTask| {
+        let dir = temp_dir("anchor");
+        let result = db.ai_task_prepare(t, "", &dir).unwrap();
+        let text = std::fs::read_to_string(result.json_path.unwrap()).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+        let doc: serde_json::Value = serde_json::from_str(&text).unwrap();
+        doc["workouts"][0].as_object().unwrap().clone()
+    };
+
+    let mut off = task();
+    off.workout_ids = vec!["w1".into()];
+    off.detail_level = AiTaskDetailLevel::Detailed;
+    off.categories = vec![range(AiTaskCategory::Recovery, 3, true)];
+    let anchor = export(&off);
+    let mut keys: Vec<&str> = anchor.keys().map(String::as_str).collect();
+    keys.sort_unstable();
+    assert_eq!(keys, ["start_date", "workout_id", "workout_type"]);
+    assert_eq!(anchor["start_date"], local_day(start).to_string());
+
+    let mut on = off.clone();
+    let mut workout = range(AiTaskCategory::Workout, 0, true);
+    workout.excluded_metrics = vec!["avg_hr".into()];
+    on.categories.push(workout);
+    let anchor = export(&on);
+    assert!(anchor.get("avg_hr").is_none());
+    assert!(anchor.get("hr_zones").is_none());
+    assert!(anchor.get("max_hr").is_some(), "只去掉被排除的字段");
+    for sample in anchor["series"]["samples"].as_array().into_iter().flatten() {
+        assert!(sample.get("heart_rate").is_none());
+    }
+}

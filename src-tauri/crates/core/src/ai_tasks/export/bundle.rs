@@ -252,6 +252,32 @@ impl Database {
     /// 锚点运动的出仓对象。从 [`Workout`] 逐字段挑——`device_id`、
     /// `synced_at`、`zepp_*` 这类内部列不带出去。
     pub(super) fn anchor_workout_json(&self, workout: &Workout, task: &AiTask) -> Result<Value> {
+        // 没开「运动」类别：锚点只用来定日期窗，只写日期和类型，不带任何运动
+        // 数字（用户 2026-09-30 定；与 MCP「锚点不可读」一致）。
+        let Some(range) = task
+            .categories
+            .iter()
+            .find(|range| range.category == AiTaskCategory::Workout && range.enabled)
+        else {
+            let mut object = Map::new();
+            object.insert("workout_id".into(), json!(workout.workout_id));
+            object.insert("workout_type".into(), json!(workout.effective_type));
+            object.insert(
+                "start_date".into(),
+                json!(workout
+                    .start_time
+                    .with_timezone(&Local)
+                    .date_naive()
+                    .to_string()),
+            );
+            return Ok(Value::Object(object));
+        };
+        let mut object = self.anchor_workout_full(workout, task)?;
+        strip_excluded_workout_fields(&mut object, &range.excluded_metrics);
+        Ok(Value::Object(object))
+    }
+
+    fn anchor_workout_full(&self, workout: &Workout, task: &AiTask) -> Result<Map<String, Value>> {
         let mut object = Map::new();
         object.insert("workout_id".into(), json!(workout.workout_id));
         object.insert("workout_type".into(), json!(workout.effective_type));
@@ -271,7 +297,7 @@ impl Database {
         }
 
         if task.detail_level == AiTaskDetailLevel::Summary {
-            return Ok(Value::Object(object));
+            return Ok(object);
         }
 
         // standard 起：完整汇总列。
@@ -325,6 +351,40 @@ impl Database {
             }
             object.insert("series".into(), Value::Object(series_json));
         }
-        Ok(Value::Object(object))
+        Ok(object)
+    }
+}
+
+/// 任务在「运动」类别里拖出去的字段，锚点运动也不带（R01 的导出一侧）。
+/// 心率类字段被排除时，心率区间和逐点曲线里的心率一起去掉——从它们能算回
+/// 平均 / 最高心率。
+fn strip_excluded_workout_fields(object: &mut Map<String, Value>, excluded: &[String]) {
+    for field in excluded {
+        object.remove(field);
+    }
+    let heart_rate_hidden = excluded
+        .iter()
+        .any(|field| matches!(field.as_str(), "avg_hr" | "max_hr" | "min_hr"));
+    if !heart_rate_hidden {
+        return;
+    }
+    object.remove("hr_zones");
+    if let Some(samples) = object
+        .get_mut("series")
+        .and_then(|series| series.get_mut("samples"))
+        .and_then(Value::as_array_mut)
+    {
+        for sample in samples {
+            if let Some(sample) = sample.as_object_mut() {
+                sample.remove("heart_rate");
+            }
+        }
+    }
+    if let Some(summary) = object
+        .get_mut("series")
+        .and_then(|series| series.get_mut("summary"))
+        .and_then(Value::as_object_mut)
+    {
+        summary.retain(|key, _| !key.contains("hr") && !key.contains("heart"));
     }
 }
