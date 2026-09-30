@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::official::fetch::{split_records, OfficialKind};
+use chrono::{TimeZone, Timelike};
 
 const SHANGHAI_MIDNIGHT: i64 = 1_789_920_000;
 
@@ -177,18 +178,29 @@ fn hourly_steps_prefer_the_legacy_minute_record_and_fall_back_to_official() {
         )],
     );
 
-    let rows = db.hourly_steps("2026-09-27", "2026-09-29").unwrap();
-    let got: Vec<(&str, i64, f64)> = rows
+    let rows = db.hourly_steps("2026-09-26", "2026-09-29").unwrap();
+    let got: Vec<(String, i64, f64)> = rows
         .iter()
-        .map(|row| (row.date.as_str(), row.hour, row.steps))
+        .map(|row| (row.date.clone(), row.hour, row.steps))
         .collect();
+    // 官方的按小时汇总存的是绝对时刻，显示按本机时区——和其他数据同一口径。
+    // 期望值也按本机时区算，别把「本机在 UTC+8」写死（CI 机器是 UTC）。
+    let official_8am = chrono::FixedOffset::east_opt(8 * 3600)
+        .unwrap()
+        .with_ymd_and_hms(2026, 9, 27, 8, 0, 0)
+        .unwrap()
+        .with_timezone(&chrono::Local);
     // 9/28 旧通道有完整的逐分钟记录：用它，官方那个零星的小时不掺进来；9/27 只有官方。
     assert_eq!(
         got,
         vec![
-            ("2026-09-27", 8, 77.0),
-            ("2026-09-28", 9, 150.0),
-            ("2026-09-28", 22, 30.0)
+            (
+                official_8am.date_naive().to_string(),
+                i64::from(official_8am.hour()),
+                77.0
+            ),
+            ("2026-09-28".to_string(), 9, 150.0),
+            ("2026-09-28".to_string(), 22, 30.0)
         ]
     );
 }
