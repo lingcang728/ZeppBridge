@@ -9,20 +9,26 @@ const messages = defineMessages(
   {
     notProvided: '未提供',
     zeroMinutes: '0 分钟',
-  hypnogramAria: '睡眠阶段时间轴',
+    hypnogramAria: '睡眠阶段时间轴',
     summaryAria: '睡眠阶段汇总比例',
+    cursorHint: '指针移到图上看某一刻；点一下固定，方向键逐段看',
+    cursorAt: (time: string) => `${time} 时`,
   },
   {
     notProvided: 'Not provided',
     zeroMinutes: '0 min',
     hypnogramAria: 'Sleep stage timeline',
     summaryAria: 'Sleep stage share',
+    cursorHint: 'Point at the chart to read a moment; click to pin, arrow keys step through stages',
+    cursorAt: (time: string) => `At ${time}`,
   },
   {
     notProvided: 'No proporcionado',
     zeroMinutes: '0 min',
     hypnogramAria: 'Cronología de las fases del sueño',
     summaryAria: 'Proporción de fases del sueño',
+    cursorHint: 'Pasa el puntero para leer un momento; haz clic para fijarlo y usa las flechas para recorrer las fases',
+    cursorAt: (time: string) => `A las ${time}`,
   },
   'components/StageBar',
 );
@@ -150,9 +156,88 @@ const segmentStyle = (stage: BarSegment): Record<string, string> => {
   return { width: barPercent(stage.minutes) + '%' };
 };
 
-const timelineStyle = (slice: BarSegment) => ({
-  left: `${(((slice.start ?? 0) - (range.value?.from ?? 0)) / (range.value?.span ?? 1)) * 100}%`,
-  width: `${(((slice.end ?? 0) - (slice.start ?? 0)) / (range.value?.span ?? 1)) * 100}%`,
+/* 分层阶段图（U12）：纵向位置也区分阶段——清醒在最上、深睡在最下，不再只靠深浅相近的两种紫。 */
+const LANE_ORDER: StageItem['tone'][] = ['awake', 'rem', 'light', 'deep', 'unknown'];
+const lanes = computed(() => LANE_ORDER.filter((tone) => tone !== 'unknown' || hasUnknownStage.value));
+const timelineStyle = (slice: BarSegment) => {
+  const lane = Math.max(0, lanes.value.indexOf(slice.tone));
+  return {
+    left: `${(((slice.start ?? 0) - (range.value?.from ?? 0)) / (range.value?.span ?? 1)) * 100}%`,
+    width: `${(((slice.end ?? 0) - (slice.start ?? 0)) / (range.value?.span ?? 1)) * 100}%`,
+    top: `${(lane / lanes.value.length) * 100}%`,
+    height: `${100 / lanes.value.length}%`,
+  };
+};
+
+/* 中间刻度：整点，最多六个；贴着两端的不画（两端已有起止时间）。 */
+const ticks = computed(() => {
+  const current = range.value;
+  if (!current) return [];
+  const hour = 3_600_000;
+  const hours = current.span / hour;
+  const step = hours <= 6 ? 1 : hours <= 12 ? 2 : 3;
+  const first = new Date(current.from);
+  first.setMinutes(0, 0, 0);
+  const out: { left: number; label: string }[] = [];
+  for (let at = first.getTime() + hour; at < current.from + current.span; at += hour) {
+    if (new Date(at).getHours() % step !== 0) continue;
+    const left = ((at - current.from) / current.span) * 100;
+    if (left < 6 || left > 94) continue;
+    out.push({ left, label: formatTime(new Date(at).toISOString()) });
+  }
+  return out;
+});
+
+/* 可固定的时间游标：指针位置就是那一刻，点一下固定；键盘左右键逐段走。 */
+const cursor = ref<number | null>(null);
+const pinned = ref(false);
+const cursorTime = computed(() => {
+  const current = range.value;
+  if (cursor.value === null || !current) return null;
+  return formatTime(new Date(current.from + current.span * cursor.value).toISOString());
+});
+/** 清醒这种只有一两分钟的短段，在它附近 6px 内就算指到了它。 */
+const pickSlice = (fraction: number, widthPx: number): BarSegment | null => {
+  const current = range.value;
+  if (!current) return null;
+  const at = current.from + current.span * fraction;
+  const slack = (6 / Math.max(1, widthPx)) * current.span;
+  const near = timeline.value.find((slice) => slice.tone === 'awake'
+    && (slice.end ?? 0) - (slice.start ?? 0) < slack * 2
+    && at >= (slice.start ?? 0) - slack && at <= (slice.end ?? 0) + slack);
+  return near ?? timeline.value.find((slice) => at >= (slice.start ?? 0) && at <= (slice.end ?? 0)) ?? null;
+};
+const trackPoint = (event: PointerEvent) => {
+  if (pinned.value) return;
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  cursor.value = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+  hovered.value = pickSlice(cursor.value, rect.width);
+};
+const togglePin = (event: PointerEvent) => {
+  if (pinned.value) { pinned.value = false; trackPoint(event); return; }
+  trackPoint(event);
+  pinned.value = cursor.value !== null;
+};
+const leaveTrack = () => { if (!pinned.value) { cursor.value = null; hovered.value = null; } };
+const stepSlice = (direction: -1 | 1) => {
+  const list = timeline.value;
+  if (!list.length || !range.value) return;
+  const index = hovered.value ? list.indexOf(hovered.value) : direction > 0 ? -1 : list.length;
+  const next = list[Math.max(0, Math.min(list.length - 1, index + direction))];
+  hovered.value = next;
+  pinned.value = true;
+  const mid = ((next.start ?? 0) + (next.end ?? 0)) / 2;
+  cursor.value = (mid - range.value.from) / range.value.span;
+};
+const onTrackKey = (event: KeyboardEvent) => {
+  if (event.key === 'ArrowRight') { event.preventDefault(); stepSlice(1); }
+  else if (event.key === 'ArrowLeft') { event.preventDefault(); stepSlice(-1); }
+  else if (event.key === 'Escape' && pinned.value) { event.stopPropagation(); pinned.value = false; cursor.value = null; hovered.value = null; }
+};
+const readout = computed(() => {
+  const slice = hovered.value;
+  if (!slice || slice.start === undefined || !cursorTime.value) return null;
+  return `${t.value.cursorAt(cursorTime.value)} · ${timelineTitle(slice)} · ${labelFor(slice.minutes)}`;
 });
 const timelineTitle = (slice: BarSegment) =>
   `${stageLabels.value[STAGE_LEVEL[slice.tone]]} · ${formatTime(new Date(slice.start ?? 0).toISOString())}–${formatTime(new Date(slice.end ?? 0).toISOString())}`;
@@ -174,19 +259,41 @@ const tooltip = computed(() => {
 </script>
 
 <template>
-  <div class="stage-block" @pointerleave="hovered = null" @focusout="hovered = null">
+  <div class="stage-block">
     <template v-if="isHypnogram">
-      <div class="sleep-timeline" role="img" :aria-label="t.hypnogramAria">
+      <div class="sleep-timeline">
         <div class="timeline-legend"><span v-for="(label, index) in stageLabels" :key="label"><i :class="STAGE_TONES[index]"></i>{{ label }}</span></div>
-        <div class="timeline-tracks" @pointermove="showSegment($event, timeline)" @pointerdown.prevent="showSegment($event, timeline)">
-          <span v-for="(slice, index) in timeline" :key="index" :class="['timeline-slice', slice.tone]"
-            :style="timelineStyle(slice)" :aria-label="timelineTitle(slice)" @focus="hovered = slice; hoverLeft = 50" tabindex="0" />
+        <div
+          class="timeline-tracks"
+          :class="{ 'is-pinned': pinned }"
+          :style="{ height: `${lanes.length * 15}px` }"
+          role="slider"
+          tabindex="0"
+          :aria-label="t.hypnogramAria"
+          :aria-valuetext="readout ?? t.cursorHint"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          :aria-valuenow="cursor === null ? 0 : Math.round(cursor * 100)"
+          @pointermove="trackPoint"
+          @pointerdown.prevent="togglePin"
+          @pointerleave="leaveTrack"
+          @keydown="onTrackKey"
+        >
+          <span v-for="tick in ticks" :key="tick.left" class="timeline-grid" :style="{ left: `${tick.left}%` }" aria-hidden="true" />
+          <span v-for="(slice, index) in timeline" :key="index" :class="['timeline-slice', slice.tone, { 'is-current': slice === hovered }]"
+            :style="timelineStyle(slice)" aria-hidden="true" />
+          <span v-if="cursor !== null" class="timeline-cursor" :style="{ left: `${cursor * 100}%` }" aria-hidden="true" />
         </div>
       </div>
-      <div class="stage-axis"><span>{{ axisLabels.start }}</span><span>{{ axisLabels.end }}</span></div>
+      <div class="stage-axis ticked">
+        <span>{{ axisLabels.start }}</span>
+        <span v-for="tick in ticks" :key="tick.left" class="tick" :style="{ left: `${tick.left}%` }">{{ tick.label }}</span>
+        <span>{{ axisLabels.end }}</span>
+      </div>
+      <p class="timeline-readout" aria-live="polite">{{ readout ?? t.cursorHint }}</p>
     </template>
     <template v-else>
-      <div class="stage-bar" :aria-label="t.summaryAria" @pointermove="showSegment($event, barSegments)" @pointerdown.prevent="showSegment($event, barSegments)">
+      <div class="stage-bar" :aria-label="t.summaryAria" @pointermove="showSegment($event, barSegments)" @pointerdown.prevent="showSegment($event, barSegments)" @pointerleave="hovered = null">
         <span
           v-for="(stage, index) in barSegments"
           :key="`${stage.tone}-${index}`"
@@ -199,7 +306,7 @@ const tooltip = computed(() => {
         <span>{{ axisLabels.end }}</span>
       </div>
     </template>
-    <div v-if="hovered" class="stage-tooltip" role="tooltip" :style="{ left: `${hoverLeft}%` }">{{ tooltip }}</div>
+    <div v-if="hovered && !isHypnogram" class="stage-tooltip" role="tooltip" :style="{ left: `${hoverLeft}%` }">{{ tooltip }}</div>
     <div class="stage-list">
       <div v-for="stage in stages" :key="stage.label">
         <span><i :class="stage.tone"></i>{{ stage.label }}</span>
@@ -217,9 +324,16 @@ const tooltip = computed(() => {
 .timeline-legend { display: flex; flex-wrap: wrap; gap: 7px 18px; color: var(--muted); font-size: var(--fs-xs); }
 .timeline-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .timeline-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; }
-.timeline-tracks { position: relative; min-width: 0; height: 32px; overflow: hidden; border-radius: 8px; background: var(--mat-inset); box-shadow: inset 0 0 0 1px var(--line); }
-.timeline-slice { position: absolute; top: 0; height: 100%; min-width: 1px; border-right: 1px solid var(--surface); cursor: help; }
-.timeline-slice:focus-visible { outline: 2px solid var(--focus); z-index: 1; }
+.timeline-tracks { position: relative; min-width: 0; overflow: hidden; border-radius: 8px; background: var(--mat-inset); box-shadow: inset 0 0 0 1px var(--line); cursor: crosshair; touch-action: none; }
+.timeline-tracks:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.timeline-slice { position: absolute; min-width: 1px; border-radius: 2px; pointer-events: none; }
+.timeline-slice.is-current { box-shadow: 0 0 0 1.5px var(--ink); z-index: 1; }
+.timeline-grid { position: absolute; top: 0; bottom: 0; width: 1px; background: color-mix(in srgb, var(--ink) 9%, transparent); pointer-events: none; }
+.timeline-cursor { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); opacity: .55; pointer-events: none; z-index: 2; }
+.timeline-tracks.is-pinned .timeline-cursor { opacity: .9; }
+.stage-axis.ticked { position: relative; }
+.stage-axis .tick { position: absolute; top: 0; transform: translateX(-50%); color: var(--subtle); font-size: var(--fs-xs); }
+.timeline-readout { min-height: 1.6em; margin: 6px 0 0; color: var(--muted); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
 .stage-bar {
   position: relative;
   display: flex;

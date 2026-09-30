@@ -2,6 +2,8 @@
 # 格式：moduleId.键路径。
 components/MissingMetricsRow.separator
 components/MissingMetricsRow.summary
+components/StageBar.cursorAt
+components/StageBar.cursorHint
 components/TrendRangeBar.aria
 components/TrendRangeBar.label
 components/shell/AppTopBar.syncingProgress
