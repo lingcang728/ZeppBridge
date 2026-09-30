@@ -29,8 +29,9 @@ if (-not (Test-Path $manifest)) {
 
 $tauriConfPath = Join-Path $repoRoot 'src-tauri\tauri.conf.json'
 $tauriConf = Get-Content -LiteralPath $tauriConfPath -Encoding UTF8 -Raw | ConvertFrom-Json
-if ([string]$tauriConf.productName -ne 'ZeppBridge3') {
-    throw "v3 的 productName 必须是 ZeppBridge3（打出来的 exe 才能和 2.x 的 ZeppBridge 分开），当前是 $($tauriConf.productName)。"
+# 2026-09-30 用户决定：本机不再并行跑 2.x，v3 测试版改回叫 ZeppBridge。
+if ([string]$tauriConf.productName -ne 'ZeppBridge') {
+    throw "v3 的 productName 应为 ZeppBridge，当前是 $($tauriConf.productName)。"
 }
 
 Write-Host "CARGO_TARGET_DIR = $env:CARGO_TARGET_DIR" -ForegroundColor Cyan

@@ -55,10 +55,11 @@ function Copy-WithRetry([string]$Source, [string]$Destination) {
   }
 }
 
-# v3 worktree 打出来的测试版必须叫这个名字。禁止新建或重新指向
-# ZeppBridge.exe / ZeppBridge.lnk / App Paths\ZeppBridge.exe 这些旧入口。
-# 用户已手动指向 v3 的旧名称快捷方式只允许刷新版本描述。
-$V3ProductName = 'ZeppBridge3'
+# 2026-09-30 用户决定：本机不再并行跑 2.x（2.x 程序文件已清掉），v3 测试版
+# 改回叫 ZeppBridge，入口就是 ZeppBridge.exe / ZeppBridge.lnk / App Paths。
+# 以前的 ZeppBridge3 入口在发布时一并撤掉。
+$V3ProductName = 'ZeppBridge'
+$RetiredProductName = 'ZeppBridge3'
 
 function Get-ProductName {
   $conf = Get-Content -LiteralPath $TauriConfig -Encoding UTF8 -Raw | ConvertFrom-Json
@@ -67,7 +68,7 @@ function Get-ProductName {
     throw 'tauri.conf.json 缺少 productName'
   }
   if ($name -ne $V3ProductName) {
-    throw "v3 worktree 打出来的测试版必须叫 $V3ProductName.exe，当前 productName=$name。改 src-tauri/tauri.conf.json 的 productName，禁止使用 ZeppBridge（会覆盖 2.x 日常入口）。"
+    throw "v3 测试版应叫 $V3ProductName.exe，当前 productName=$name。"
   }
   return $name
 }
@@ -204,9 +205,6 @@ function Get-ShortcutTarget([string]$ShortcutPath) {
 }
 
 function Update-UserEntry([string]$PortableExe, [string]$Version, [string]$ProductName) {
-  if ($ProductName -eq 'ZeppBridge') {
-    throw '拒绝把 2.x 日常入口（ZeppBridge.lnk / App Paths\\ZeppBridge.exe）改去指向 v3 测试版。'
-  }
   $desktop = [Environment]::GetFolderPath('DesktopDirectory')
   if ([string]::IsNullOrWhiteSpace($desktop)) {
     $desktop = [Environment]::GetFolderPath('Desktop')
@@ -219,13 +217,22 @@ function Update-UserEntry([string]$PortableExe, [string]$Version, [string]$Produ
   Set-Shortcut -ShortcutPath $desktopLnk -TargetPath $PortableExe -Description $description
   Set-Shortcut -ShortcutPath $startMenuLnk -TargetPath $PortableExe -Description $description
 
-  # 用户可能已将旧名称快捷方式手动指向 v3。只更新确实指向本次 exe 的
-  # 描述文字，绝不改写仍指向 2.x 的快捷方式或目标路径。
+  # 撤掉旧名字 ZeppBridge3 的入口：只删确实指向本 release 目录的，别处的不碰。
+  $releaseRoot = [System.IO.Path]::GetFullPath((Split-Path -Parent $PortableExe))
   foreach ($dir in @($desktop, $startMenu)) {
-    $alias = Join-Path $dir 'ZeppBridge.lnk'
-    $target = Get-ShortcutTarget $alias
-    if ($target -and [string]::Equals($target, $PortableExe, [StringComparison]::OrdinalIgnoreCase)) {
-      Set-Shortcut -ShortcutPath $alias -TargetPath $PortableExe -Description "ZeppBridge $Version"
+    $old = Join-Path $dir "$RetiredProductName.lnk"
+    $target = Get-ShortcutTarget $old
+    if ($target -and [System.IO.Path]::GetFullPath($target).StartsWith($releaseRoot, [StringComparison]::OrdinalIgnoreCase)) {
+      Remove-Item -LiteralPath $old -Force
+      Write-Host "已撤掉旧入口：$old"
+    }
+  }
+  $oldAppPaths = "HKCU:\Software\Microsoft\Windows\CurrentVersion\App Paths\$RetiredProductName.exe"
+  if (Test-Path -LiteralPath $oldAppPaths) {
+    $oldTarget = [string](Get-ItemProperty -LiteralPath $oldAppPaths).'(default)'
+    if ($oldTarget -and [System.IO.Path]::GetFullPath($oldTarget).StartsWith($releaseRoot, [StringComparison]::OrdinalIgnoreCase)) {
+      Remove-Item -LiteralPath $oldAppPaths -Recurse -Force
+      Write-Host "已撤掉旧入口：App Paths\$RetiredProductName.exe"
     }
   }
 
@@ -419,6 +426,17 @@ if ($portableInfo.FileVersion -ne $version -and $portableInfo.ProductVersion -ne
 
 if (-not $SkipShortcuts) {
   Update-UserEntry -PortableExe $portableDest -Version $version -ProductName $productName
+}
+
+# 旧名字 ZeppBridge3 的 exe 与安装包：没在运行就清掉（在运行就留着，下次再清）。
+foreach ($old in @(Get-ChildItem -LiteralPath $ReleaseDir -File -Filter "$RetiredProductName*" -ErrorAction SilentlyContinue)) {
+  if ($old.Name -ieq "$RetiredProductName.exe" -and (Get-Process -Name $RetiredProductName -ErrorAction SilentlyContinue)) {
+    Write-Host "旧名字的 exe 正在运行，先留着：$($old.FullName)"
+    continue
+  }
+  if (Remove-FileSafe $old.FullName) {
+    Write-Host "已删除旧名字的文件：$($old.FullName)"
+  }
 }
 
 if (-not $SkipStaleInstall) {
