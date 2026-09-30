@@ -4,6 +4,8 @@ import { defineMessages } from '../i18n';
 export const heartRateZonePickerMessages = defineMessages(
   {
     title: '心率区间',
+    lead: '按你选的算法和基准，统计运动时的心率分布。',
+    setupSummary: '算法与基准',
     intro: '三种算法算出的区间不同，哪种对你有意义只有你知道，所以 ZeppBridge 不预设默认，也不用 220−年龄 这类公式估算。每个基准都标了出处和测量日期。',
     clearChoice: '清除选择',
     desktopOnly: '从 ZeppBridge 桌面应用打开，心率区间要读本机记录。',
@@ -63,6 +65,8 @@ export const heartRateZonePickerMessages = defineMessages(
   },
   {
     title: 'Heart rate zones',
+    lead: 'How your workout heart rate spreads across zones, by the model and basis you pick.',
+    setupSummary: 'Model and basis',
     intro: 'The three models draw different zones; only you know which matters to you. ZeppBridge sets no default and never estimates from formulas like 220 − age. Every basis below lists its source and measurement date.',
     clearChoice: 'Clear selection',
     desktopOnly: 'Open this in the ZeppBridge desktop app; heart rate zones read local records.',
@@ -120,6 +124,8 @@ export const heartRateZonePickerMessages = defineMessages(
   },
   {
     title: 'Zonas de frecuencia cardíaca',
+    lead: 'Cómo se reparte tu frecuencia cardíaca al entrenar, según el modelo y la base que elijas.',
+    setupSummary: 'Modelo y base',
     intro: 'Los tres modelos dibujan zonas distintas y solo tú sabes cuál te sirve; por eso ZeppBridge no elige una por defecto ni estima con fórmulas como 220 menos tu edad. Cada base indica su origen y la fecha en que se midió.',
     clearChoice: 'Borrar selección',
     desktopOnly: 'Ábrelo en la app de escritorio de ZeppBridge: las zonas de frecuencia cardíaca leen registros locales.',

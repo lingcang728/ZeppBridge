@@ -5,7 +5,7 @@ export const heartRateDetailMessages = defineMessages(
   {
     trendsTitle: '静息心率与 HRV 趋势',
     title: '心率',
-    intro: '上面是最近 24 小时全天曲线；7 天 / 1 个月 / 6 个月只改下面的按天趋势。没采样的时间不画线，也不补 0。',
+    intro: '最近 24 小时的逐条心率，和按天的最高心率、静息心率、HRV。没采样的时间不画线。',
     desktopOnly: '浏览器预览不读账户数据，用桌面应用打开。',
     dayFailed: '最近 24 小时心率读不到。',
     dailyMaxFailed: '每日最高心率读不到。',
@@ -41,7 +41,7 @@ export const heartRateDetailMessages = defineMessages(
   {
     trendsTitle: 'Resting heart rate and HRV trends',
     title: 'Heart rate',
-    intro: 'The curve above is always the last 24 hours; 7 days / 1 month / 6 months change only the daily trends below. Unsampled stretches stay blank, never zero-filled.',
+    intro: 'Every reading from the last 24 hours, plus daily peak, resting heart rate and HRV. Unsampled stretches stay blank.',
     desktopOnly: 'Use the desktop app. This browser preview reads no account data.',
     dayFailed: 'Could not load last 24 hours of heart rate.',
     dailyMaxFailed: 'Could not load daily peak heart rate.',
@@ -77,7 +77,7 @@ export const heartRateDetailMessages = defineMessages(
   {
     trendsTitle: 'Tendencias de FC en reposo y VFC',
     title: 'Frecuencia cardíaca',
-    intro: 'Arriba va siempre la curva de las últimas 24 horas; 7 días / 1 mes / 6 meses solo cambian las tendencias diarias de abajo. El tiempo sin muestras no dibuja línea ni recibe un 0 de relleno.',
+    intro: 'Cada lectura de las últimas 24 horas, más el pico diario, la frecuencia en reposo y la VFC. Sin muestras no se dibuja línea.',
     desktopOnly: 'La vista previa del navegador no lee datos de la cuenta; usa la app de escritorio.',
     dayFailed: 'La frecuencia cardíaca de las últimas 24 horas no se puede leer.',
     dailyMaxFailed: 'La frecuencia cardíaca máxima diaria no se puede leer.',

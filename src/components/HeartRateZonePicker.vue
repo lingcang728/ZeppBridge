@@ -203,7 +203,7 @@ watch(() => props.revision, () => { void load(); });
     <header class="zone-head">
       <div>
         <h2 id="zone-title">{{ t.title }}</h2>
-        <p class="zone-intro">{{ t.intro }}</p>
+        <p class="zone-intro">{{ t.lead }}</p>
       </div>
       <button v-if="preference.model" class="pill-button quiet" type="button" :disabled="saving" @click="clearChoice">
         <Icon name="undo" :size="13" />{{ t.clearChoice }}
@@ -217,6 +217,37 @@ watch(() => props.revision, () => { void load(); });
     <p v-else-if="!bases.length" class="zone-empty">{{ t.noBases }}</p>
 
     <template v-else>
+      <!-- 结果在前（U16）：选过算法和基准的人一进来先看到区间和时长；怎么算的收进下面的「算法与基准」，
+           还没选齐时它默认展开。 -->
+      <template v-if="report">
+        <div class="zone-summary">
+          <span>{{ modelLabel(report.model, report.modelLabel) }}</span>
+          <span class="zone-window">{{ t.window(report.windowDays, duration(measuredSeconds)) }}</span>
+        </div>
+        <ul class="zone-list">
+          <li v-for="zone in report.zones" :key="zone.zone">
+            <span class="zone-name"><b :style="{ background: zoneTone(zone.zone) }">Z{{ zone.zone }}</b>{{ zoneName(report.model, zone.zone) || zone.label }}</span>
+            <span class="zone-range">{{ zone.minBpm }}–{{ zone.maxBpm }}</span>
+            <span class="zone-bar"><i :style="{ width: `${Math.round((zone.seconds / peakSeconds) * 100)}%`, background: zoneTone(zone.zone) }"></i></span>
+            <span class="zone-time">{{ duration(zone.seconds) }}</span>
+          </li>
+        </ul>
+        <p class="zone-outside">
+          {{ t.outside(duration(report.belowZone1Seconds), duration(report.aboveZone5Seconds)) }}
+        </p>
+        <p class="zone-formula">
+          {{ t.formulaNote(
+            modelFormula(report.model, report.formula),
+            report.bases.map((basis) => `${basisLabel(basis)} ${Math.round(basis.value)}`).join(' · '),
+          ) }}
+        </p>
+      </template>
+      <p v-else-if="!preference.model" class="zone-empty">{{ t.pickModelFirst }}</p>
+      <p v-else class="zone-empty">{{ t.pickBasesNext }}</p>
+
+      <details class="zone-setup" :open="!report">
+        <summary>{{ t.setupSummary }}</summary>
+        <p class="zone-intro">{{ t.intro }}</p>
       <p class="group-label">{{ t.modelGroup }}</p>
       <SegmentTrack class="model-track" :items="modelItems" :model-value="shownModel?.id ?? ''" :disabled="saving"
         :aria-label="t.modelAria" @update:model-value="onModelPick" />
@@ -250,33 +281,7 @@ watch(() => props.revision, () => { void load(); });
           </div>
         </div>
       </template>
-
-      <p v-if="!preference.model" class="zone-empty">{{ t.pickModelFirst }}</p>
-      <p v-else-if="!report" class="zone-empty">{{ t.pickBasesNext }}</p>
-
-      <template v-else>
-        <div class="zone-summary">
-          <span>{{ modelLabel(report.model, report.modelLabel) }}</span>
-          <span class="zone-window">{{ t.window(report.windowDays, duration(measuredSeconds)) }}</span>
-        </div>
-        <ul class="zone-list">
-          <li v-for="zone in report.zones" :key="zone.zone">
-            <span class="zone-name"><b :style="{ background: zoneTone(zone.zone) }">Z{{ zone.zone }}</b>{{ zoneName(report.model, zone.zone) || zone.label }}</span>
-            <span class="zone-range">{{ zone.minBpm }}–{{ zone.maxBpm }}</span>
-            <span class="zone-bar"><i :style="{ width: `${Math.round((zone.seconds / peakSeconds) * 100)}%`, background: zoneTone(zone.zone) }"></i></span>
-            <span class="zone-time">{{ duration(zone.seconds) }}</span>
-          </li>
-        </ul>
-        <p class="zone-outside">
-          {{ t.outside(duration(report.belowZone1Seconds), duration(report.aboveZone5Seconds)) }}
-        </p>
-        <p class="zone-formula">
-          {{ t.formulaNote(
-            modelFormula(report.model, report.formula),
-            report.bases.map((basis) => `${basisLabel(basis)} ${Math.round(basis.value)}`).join(' · '),
-          ) }}
-        </p>
-      </template>
+      </details>
     </template>
   </section>
 </template>
@@ -298,6 +303,10 @@ watch(() => props.revision, () => { void load(); });
 .zone-head h2 { margin: 0 0 4px; color: var(--ink); font-size: var(--fs-xl); font-weight: 700; }
 .zone-head .pill-button { flex: 0 0 auto; min-height: 32px; padding: 0 14px; font-size: var(--fs-xs); }
 .zone-intro { margin: 0; max-width: 68ch; color: var(--muted); font-size: var(--fs-sm); line-height: 1.7; }
+.zone-setup { display: grid; gap: 8px; margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--mat-line); }
+.zone-setup > summary { width: fit-content; min-height: 28px; color: var(--muted); font-size: var(--fs-sm); font-weight: 600; cursor: pointer; }
+.zone-setup > summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 6px; }
+.zone-setup[open] { gap: 10px; }
 .zone-alert { display: flex; align-items: center; gap: var(--space-2); margin: 0; color: var(--danger); font-size: var(--fs-sm); }
 .zone-empty { margin: 0; color: var(--subtle); font-size: var(--fs-sm); }
 .group-label { margin: 6px 0 0; color: var(--subtle); font-size: var(--fs-xs); font-weight: 600; }
