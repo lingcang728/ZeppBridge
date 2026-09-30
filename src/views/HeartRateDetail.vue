@@ -286,8 +286,6 @@ const trendsSummary = computed(() => trendCards.value.map((card) => card.label).
 <template>
   <section class="page metric-page" aria-labelledby="hr-title">
     <PageHeader
-      back="/"
-      :back-label="t.backToOverview"
       title-id="hr-title"
       :title="t.title"
       :intro="t.intro"
@@ -394,4 +392,5 @@ const trendsSummary = computed(() => trendCards.value.map((card) => card.label).
   </section>
 </template>
 
+<style scoped src="./dayPanel.css"></style>
 <style scoped src="./HeartRateDetail.css"></style>

@@ -122,8 +122,6 @@ const groups = computed(() => ({
 <template>
   <section class="page body-page" aria-labelledby="body-title">
     <PageHeader
-      back="/"
-      :back-label="t.backToOverview"
       title-id="body-title"
       :title="t.title"
       :intro="t.intro"
@@ -275,4 +273,5 @@ const groups = computed(() => ({
   </section>
 </template>
 
+<style scoped src="./dayPanel.css"></style>
 <style scoped src="./BodyStatus.css"></style>
