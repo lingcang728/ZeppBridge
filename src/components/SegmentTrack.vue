@@ -27,7 +27,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
 import Icon, { type IconName } from './Icon.vue';
 import { dragThumb, snapStop, type SegmentStop } from '../lib/navigation';
-import { createLensFilter, lensEnabled, lensSupported, type LensFilter } from '../lib/glassLens';
+import { useGlassLens } from '../composables/useGlassLens';
 
 export type SegmentItem<T extends string | number> = { value: T; label: string; icon?: IconName };
 
@@ -91,14 +91,11 @@ let nextThumb: { left: number; width: number } | null = null;
 let suppressClick = false;
 let observer: ResizeObserver | null = null;
 
-/* —— 折射（原型，lib/glassLens.ts）：只给浮在内容上的玻璃导航。滑块上面盖一块透镜，把底下的字弯折、
-   微微放大；整条胶囊的外沿对背后的页面折射一圈。 —— */
-const lensRefs = ref<{ thumb: string; rim: string } | null>(null);
-let thumbLens: LensFilter | null = null;
-let rimLens: LensFilter | null = null;
-const resizeRim = () => {
-  if (rimLens && track.value) rimLens.resize(track.value.offsetWidth, track.value.offsetHeight);
-};
+/* —— 折射（lib/glassLens.ts）：滑块上面盖一块玻璃，拖动时把底下的字在外圈弯折；浮在内容上的玻璃导航
+   另外让整条胶囊的外沿对背后滚过的页面折射一圈。 —— */
+const lensEl = ref<HTMLElement | null>(null);
+const thumbLens = useGlassLens(lensEl, 'thumb');
+const rimLens = useGlassLens(track, 'rim', props.variant === 'glass');
 
 const buttons = () => Array.from(track.value?.querySelectorAll<HTMLElement>('.segment-item') ?? []);
 const readStops = (): SegmentStop<T>[] => buttons().map((el, index) => ({
@@ -132,10 +129,9 @@ const checkWrap = () => {
 
 const measure = () => {
   if (!track.value) return;
-  resizeRim();
   checkWrap();
   stops.value = readStops();
-  if (!gesture) placeOn(props.modelValue);
+  if (!gesture) placeOn(restingValue());
   if (!settled.value && thumb.value.visible) requestAnimationFrame(() => { settled.value = true; });
 };
 
@@ -152,18 +148,8 @@ const trackStyle = computed(() => ({
   '--thumb-t': `${thumb.value.top}px`,
   '--thumb-h': `${thumb.value.height}px`,
   // 先模糊、再折射：折射放在最后，边上弯折的轮廓不会又被糊掉。
-  ...(lensRefs.value ? {
-    backdropFilter: `var(--glass-blur) ${lensRefs.value.rim}`,
-    WebkitBackdropFilter: `var(--glass-blur) ${lensRefs.value.rim}`,
-  } : {}),
+  ...rimLens.style('var(--glass-blur)'),
 }));
-const lensStyle = computed(() => (lensRefs.value ? {
-  backdropFilter: lensRefs.value.thumb,
-  WebkitBackdropFilter: lensRefs.value.thumb,
-} : {}));
-watch(() => [thumb.value.width, thumb.value.height] as const, ([width, height]) => {
-  if (width > 0 && height > 0) thumbLens?.resize(width, height);
-});
 /** 折行时不在滑块那一行的项：不挖空（挖空只按横坐标算，会误伤别的行）。 */
 const offRow = (index: number) => wrapped.value && (stops.value[index]?.top ?? 0) !== thumb.value.top;
 const itemLeft = (index: number) => ({ '--item-l': `${stops.value[index]?.left ?? 0}px` });
@@ -175,8 +161,29 @@ const focusActive = () => {
 };
 
 const commit = (value: T) => {
+  window.clearTimeout(landTimer);
+  landTimer = 0;
+  pending = null;
   if (value !== props.modelValue) emit('update:modelValue', value);
 };
+
+/* 拖着松手：滑块先落到位，再把新值交出去。以前松手那一刻就切页面 / 换图表，新页面挂载的那一两百毫秒
+   正好卡在滑块的落位动画上——用户看到的「放下去会卡一下」（2026-09-30）。点击和键盘照旧立刻生效。 */
+const LAND_MS = 300;
+let landTimer = 0;
+/** 已经落位、还没交出去的那个值：这段时间里重新量尺寸也按它摆滑块，别弹回旧值。 */
+let pending: T | null = null;
+const commitAfterLanding = (value: T) => {
+  window.clearTimeout(landTimer);
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    commit(value);
+    return;
+  }
+  pending = value;
+  landTimer = window.setTimeout(() => commit(value), LAND_MS);
+};
+/** 滑块该停在哪：有待交出的值就是它，否则是当前值。 */
+const restingValue = (): T => pending ?? props.modelValue;
 
 const clearGesture = () => {
   const current = gesture;
@@ -192,6 +199,8 @@ const clearGesture = () => {
 
 const onDown = (event: PointerEvent) => {
   if (props.disabled || event.button !== 0 || !event.isPrimary || !track.value || wrapped.value) return;
+  // 上一次拖动还没交出去就又按下：先把那一次交了，别丢。
+  if (pending !== null) commit(pending);
   measure();
   const button = (event.target as Element).closest<HTMLElement>('.segment-item');
   const index = button ? buttons().indexOf(button) : -1;
@@ -277,7 +286,8 @@ const onUp = (event: PointerEvent) => {
     lensValue.value = next;
   }
   placeOn(next);
-  commit(next);
+  if (moved) commitAfterLanding(next);
+  else commit(next);
   window.setTimeout(() => { suppressClick = false; }, 0);
 };
 
@@ -305,6 +315,12 @@ const onKeydown = (event: KeyboardEvent) => {
 };
 
 watch(() => props.modelValue, async () => {
+  // 外面改了值（比如换了路由）：还没交出去的那一次作废，以外面的为准。
+  if (pending !== null && pending !== props.modelValue) {
+    window.clearTimeout(landTimer);
+    landTimer = 0;
+    pending = null;
+  }
   await nextTick();
   if (!gesture) placeOn(props.modelValue);
   focusActive();
@@ -312,7 +328,7 @@ watch(() => props.modelValue, async () => {
 watch(wrapped, async () => {
   await nextTick();
   stops.value = readStops();
-  if (!gesture) placeOn(props.modelValue);
+  if (!gesture) placeOn(restingValue());
 });
 watch(() => props.items.map((item) => `${item.value}\u0000${item.label}`).join('\u0001'), async () => {
   await nextTick();
@@ -321,11 +337,6 @@ watch(() => props.items.map((item) => `${item.value}\u0000${item.label}`).join('
 });
 
 onMounted(() => {
-  if (props.variant === 'glass' && lensEnabled.value && lensSupported()) {
-    thumbLens = createLensFilter('thumb');
-    rimLens = createLensFilter('rim');
-    lensRefs.value = { thumb: thumbLens.ref, rim: rimLens.ref };
-  }
   void nextTick(() => {
     measure();
     observer = new ResizeObserver(() => measure());
@@ -337,11 +348,10 @@ onMounted(() => {
 onBeforeUnmount(() => {
   clearGesture();
   window.clearTimeout(settleTimer);
+  window.clearTimeout(landTimer);
   cancelAnimationFrame(fadeFrame);
   observer?.disconnect();
   window.removeEventListener('resize', measure);
-  thumbLens?.dispose();
-  rimLens?.dispose();
 });
 </script>
 
@@ -352,6 +362,7 @@ onBeforeUnmount(() => {
       'is-dragging': dragging, 'is-settling': settling, 'is-lens-fade': lensFade, 'is-compact': compact, 'is-disabled': disabled, 'is-fill': fill, 'is-settled': settled,
       'is-wrapped': wrapped,
       'is-icon-only': iconOnly,
+      'has-lens': thumbLens.active.value,
     }]"
     :style="trackStyle"
     role="radiogroup"
@@ -400,7 +411,7 @@ onBeforeUnmount(() => {
     </span>
     <!-- 透镜：盖在滑块和选中字上面，折射它底下画出来的东西（backdrop-filter 只取轨道里的内容）。
          像 iOS 26 的标签栏：只在按住 / 拖动 / 吸附时浮起来，停稳后淡回平的滑块。 -->
-    <span v-if="lensRefs" class="segment-lens" aria-hidden="true" :style="lensStyle" />
+    <span v-if="thumbLens.active.value" ref="lensEl" class="segment-lens" aria-hidden="true" :style="thumbLens.style()" />
   </div>
 </template>
 
@@ -532,16 +543,17 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   transform: translate(var(--thumb-l), var(--thumb-t));
   pointer-events: none;
-  /* 玻璃的厚度感：一圈细亮边、上沿高光、下沿暗边，外面一层浮起的影子；上半部一道很淡的反光。
-     没有这圈边，边上被折弯的字看上去像花屏，而不是透过玻璃看。 */
-  background: linear-gradient(180deg, rgb(255 255 255 / .10), transparent 55%);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .16), inset 0 1px 1px rgb(255 255 255 / .38),
-    inset 0 -1px 1px rgb(0 0 0 / .22), 0 6px 16px rgb(0 0 0 / .22);
+  /* 一块清透的玻璃：只有一圈很细的亮边和一点浮起的影子，里面不铺任何颜色（铺了就像硅胶）。
+     透镜本身绝不缩放：一缩放，透过它看到的字就被重新采样，整块发糊。 */
+  box-shadow: var(--lens-glass-rim);
   opacity: 0;
-  transition: scale var(--seg-dur) var(--seg-ease), opacity 180ms ease;
+  transition: opacity 160ms ease;
 }
-.segment-track.is-dragging .segment-lens { opacity: 1; scale: 1.05 1.1; }
-.segment-track.is-settling .segment-lens { opacity: 1; }
+.segment-track.is-dragging .segment-lens, .segment-track.is-settling .segment-lens { opacity: 1; }
+/* 开着折射时，拖动中的滑块变成那块玻璃：不放大（和透镜对不齐），底色淡到几乎透明。 */
+.segment-track.has-lens.is-dragging .segment-thumb,
+.segment-track.has-lens.is-settling .segment-thumb { scale: none; background: var(--lens-glass-fill); box-shadow: none; }
+.segment-track.has-lens.is-dragging { --seg-clip-extra: 0px; }
 .segment-ink-item {
   position: absolute;
   top: var(--seg-pad);

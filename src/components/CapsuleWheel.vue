@@ -14,6 +14,7 @@
  * 中途提交会让滚轮卡一下。 */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Icon, { type IconName } from './Icon.vue';
+import { useGlassLens } from '../composables/useGlassLens';
 
 export type WheelItem<T extends string | number> = { value: T; label: string; icon?: IconName; image?: string };
 
@@ -47,6 +48,10 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{ 'update:modelValue': [value: T] }>();
 
 const root = ref<HTMLElement | null>(null);
+/* 折射（lib/glassLens.ts）：镜片上面盖一块同样大小的玻璃，转动时从镜片边上经过的字在外圈弯折，
+   中间原样清楚。只在拖动 / 吸附时浮起来。 */
+const refractEl = ref<HTMLElement | null>(null);
+const refract = useGlassLens(refractEl, 'thumb');
 const itemEls = ref<HTMLElement[]>([]);
 const sizes = ref<number[]>([]);
 const vertical = computed(() => props.orientation === 'vertical');
@@ -359,6 +364,7 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
     ref="root"
     :class="['capsule-wheel', `is-${orientation}`, `is-${variant}`, {
       'is-dragging': dragging, 'is-animating': animating, 'is-fit': fitPeek !== undefined, 'is-icon-only': iconOnly, 'is-disabled': disabled,
+      'has-lens': refract.active.value,
     }]"
     :style="vertical ? { height: `${span}px` } : { width: `${liveSpan}px` }"
     role="slider"
@@ -395,6 +401,7 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
         </span>
       </span>
     </div>
+    <span v-if="refract.active.value" ref="refractEl" class="wheel-refract" aria-hidden="true" :style="[lensStyle, refract.style()]"></span>
   </div>
 </template>
 
@@ -451,6 +458,24 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
 .capsule-wheel.is-bare .wheel-lens { background: var(--cap-glass-thumb); box-shadow: var(--cap-glass-thumb-rim); }
 .is-vertical .wheel-lens { top: 50%; bottom: auto; left: 3px; right: 3px; translate: 0 -50%; min-width: 0; }
 .capsule-wheel.is-dragging .wheel-lens { scale: 1.06 1.1; }
+/* 折射玻璃：和镜片同位置、同大小，盖在转动的字上面。玻璃本身不缩放（缩放会把透过它的字重采样得发糊），
+   所以开着折射时镜片拖动也不放大，两者对得齐。 */
+.wheel-refract {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 50%;
+  min-width: 30px;
+  border-radius: 999px;
+  translate: -50% 0;
+  box-shadow: var(--lens-glass-rim);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.is-vertical .wheel-refract { top: 50%; bottom: auto; left: 3px; right: 3px; translate: 0 -50%; min-width: 0; }
+.capsule-wheel.is-dragging .wheel-refract, .capsule-wheel.is-animating .wheel-refract { opacity: 1; }
+.capsule-wheel.has-lens.is-dragging .wheel-lens { scale: none; }
 
 .wheel-item {
   position: absolute;

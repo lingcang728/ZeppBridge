@@ -1,6 +1,7 @@
 /**
- * 玻璃胶囊的折射（原型，2026-09-30）。借 liquidGL（MIT）的思路：胶囊是一块边缘带斜面的玻璃，
- * 边上把背后的内容往里拉、中间略微放大。
+ * 玻璃的折射（2026-09-30）。借 liquidGL（MIT）的思路：一块边缘带斜面的玻璃，只在外圈那一窄条把
+ * 背后的内容往里弯、稍稍模糊，中间原样透出去、一个像素都不重采样。用在所有能拖的胶囊和滚轮上
+ * （composables/useGlassLens.ts）。
  *
  * liquidGL 自己把整页 DOM 光栅化成纹理再用 WebGL 画——我们的 CSP 拦 data: 图片和 blob: Worker，
  * 动态内容还要每 250ms 重拍一次整页。这里改用浏览器现成的：`backdrop-filter: url(#滤镜)` +
@@ -10,7 +11,7 @@
  * - `backdrop-filter` 里的 `url()` 目前只有 Chromium 真的画（Windows 的 WebView2 就是）；别的内核
  *   认不出整条声明会作废、连模糊都没了，所以只在 Chromium 上开，其余照旧。
  * - 系统要求减少透明度时不开。
- * - 开关：地址里 `?lens=1` 打开、`?lens=0` 关掉，记在本机（原型阶段先不进设置页）。
+ * - 默认开。地址里 `?lens=0` 关掉、`?lens=1` 打开，记在本机（对比用；还没进设置页）。
  */
 import { ref } from 'vue';
 import thumbMap from '../assets/glass/lens-thumb.png';
@@ -26,7 +27,8 @@ const readFlag = (): boolean => {
       window.localStorage.setItem(FLAG_KEY, fromQuery);
       return fromQuery === '1';
     }
-    return window.localStorage.getItem(FLAG_KEY) === '1';
+    // 默认开（用户 2026-09-30 看过第二版后定）；`?lens=0` 关掉并记住。
+    return window.localStorage.getItem(FLAG_KEY) !== '0';
   } catch {
     return false;
   }
@@ -44,7 +46,7 @@ export const lensEnabled = ref(typeof window !== 'undefined' && readFlag());
 
 export type LensKind = 'thumb' | 'rim';
 
-/** 每种透镜的位移强度（占元素高度的比例）：滑块弯得明显，外沿只是一圈。 */
+/** 每种透镜的位移强度（占元素高度的比例）。 */
 const SCALE: Record<LensKind, number> = { thumb: 0.4, rim: 0.5 };
 const MAPS: Record<LensKind, string> = { thumb: thumbMap, rim: rimMap };
 
@@ -90,11 +92,30 @@ export const createLensFilter = (kind: LensKind): LensFilter => {
   displace.setAttribute('xChannelSelector', 'R');
   displace.setAttribute('yChannelSelector', 'G');
   displace.setAttribute('result', 'bent');
-  // 折弯以后很轻地抹一下：8 位位移图的台阶在字的边上会显出锯齿。
-  const smooth = document.createElementNS(SVG_NS, 'feGaussianBlur');
-  smooth.setAttribute('in', 'bent');
-  smooth.setAttribute('stdDeviation', '0.35');
-  filter.append(image, displace, smooth);
+  // 折弯的那一圈再轻轻模糊一点：玻璃边缘本来就不是完全清楚的。
+  const soften = document.createElementNS(SVG_NS, 'feGaussianBlur');
+  soften.setAttribute('in', 'bent');
+  soften.setAttribute('stdDeviation', kind === 'thumb' ? '0.6' : '0.8');
+  soften.setAttribute('result', 'soft');
+  // 位移图的蓝通道是「离边缘多近」：拿它当透明度，只留外圈那一圈折弯结果。
+  const edge = document.createElementNS(SVG_NS, 'feColorMatrix');
+  edge.setAttribute('in', 'map');
+  edge.setAttribute('type', 'matrix');
+  edge.setAttribute('values', '0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 1 0 0');
+  edge.setAttribute('result', 'edge');
+  const rim = document.createElementNS(SVG_NS, 'feComposite');
+  rim.setAttribute('in', 'soft');
+  rim.setAttribute('in2', 'edge');
+  rim.setAttribute('operator', 'in');
+  rim.setAttribute('result', 'rim');
+  // 中间直接是原图（一个像素都不重采样，和不开折射时一样清楚），外圈叠上折弯的那一圈。
+  const merge = document.createElementNS(SVG_NS, 'feMerge');
+  for (const input of ['SourceGraphic', 'rim']) {
+    const node = document.createElementNS(SVG_NS, 'feMergeNode');
+    node.setAttribute('in', input);
+    merge.appendChild(node);
+  }
+  filter.append(image, displace, soften, edge, rim, merge);
   ensureHost().appendChild(filter);
 
   let last = '';

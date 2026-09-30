@@ -7,6 +7,7 @@
  * 位置是连续的浮点下标，所有项的形变都由它算；停稳后才提交值。 */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { newWheelAccel, wheelSteps } from '../lib/wheel/momentum';
+import { useGlassLens } from '../composables/useGlassLens';
 
 const props = defineProps<{
   items: { value: number; label: string }[];
@@ -20,6 +21,10 @@ const ROW = 34;
 const VISIBLE = 5;
 
 const root = ref<HTMLElement | null>(null);
+/* 折射（lib/glassLens.ts）：玻璃带上面再盖一块同样大小的玻璃，滚动时从带子上下沿经过的数字被弯折，
+   带子正中原样清楚。只在转动时浮起来。 */
+const refractEl = ref<HTMLElement | null>(null);
+const refract = useGlassLens(refractEl, 'thumb');
 const indexOf = (value: number) => Math.max(0, props.items.findIndex((item) => item.value === value));
 const pos = ref(indexOf(props.modelValue));
 let target = pos.value;
@@ -167,6 +172,7 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
     <div class="drum" aria-hidden="true">
       <span v-for="(item, index) in items" :key="item.value" :class="['cell', { on: index === active }]" :style="itemStyle(index)">{{ item.label }}</span>
     </div>
+    <span v-if="refract.active.value" ref="refractEl" class="band-refract" aria-hidden="true" :style="[{ height: `${ROW}px` }, refract.style()]" />
   </div>
 </template>
 
@@ -193,6 +199,19 @@ const current = computed(() => props.items[indexOf(props.modelValue)]);
   background: var(--cap-thumb);
   box-shadow: var(--cap-thumb-rim);
 }
+.band-refract {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  left: 4px;
+  translate: 0 -50%;
+  border-radius: 999px;
+  box-shadow: var(--lens-glass-rim);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.moving .band-refract { opacity: 1; }
 .drum {
   position: absolute;
   inset: 0;
