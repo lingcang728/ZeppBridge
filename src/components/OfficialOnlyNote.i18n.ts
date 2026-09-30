@@ -11,7 +11,7 @@ export const officialOnlyNoteMessages = defineMessages(
     action: 'Connect',
   },
   {
-    text: 'Solo está conectada la autorización oficial de Zepp: se sincronizan frecuencia cardíaca, sueño, pasos, entrenamientos, PAI y peso. La API oficial no ofrece VFC, oxígeno en sangre, estrés, preparación ni carga de entrenamiento; conecta «Datos avanzados» para verlos.',
+    text: 'Solo está conectada la autorización oficial de Zepp: se sincronizan frecuencia cardíaca, sueño, pasos, entrenamientos, PAI y peso. La API oficial no ofrece VFC, oxígeno en sangre, estrés, recuperación ni carga de entrenamiento; conecta «Datos avanzados» para verlos.',
     action: 'Conectar',
   },
   'components/OfficialOnlyNote',

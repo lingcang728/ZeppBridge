@@ -301,10 +301,10 @@ Answer in Markdown.`,
   {
     notProvided: 'Sin datos',
     loadFailedTitle: 'No se pudo leer este entrenamiento',
-    loadFailed: 'El detalle del entrenamiento no está disponible en este momento',
+    loadFailed: 'El paquete de datos del entrenamiento no está disponible ahora',
     retry: 'Reintentar',
     notFoundTitle: 'Este entrenamiento no está aquí',
-    notFoundMessage: 'Puede que se haya borrado, o que todavía no se haya sincronizado en este equipo.',
+    notFoundMessage: 'Quizá se limpió, o aún no llegó a este equipo.',
     insightFailed: 'No se pudo generar un análisis para este entrenamiento',
     seriesFailed: 'No se pudo leer la serie punto a punto de este entrenamiento',
     seriesFailedTitle: 'No se pudo cargar la serie punto a punto',
@@ -314,11 +314,11 @@ Analiza esta sesión usando solo los hechos de este registro: la intensidad, có
 
 Restricciones:
 - En estos datos no hay una referencia de población. No me compares con «adultos sanos» ni con ningún promedio.
-- Donde falte algo, di que falta. Nunca rellenes el hueco con un cero o una estimación.
+- Donde falte algo, di que falta. Nunca rellenes el hueco con un 0 ni una estimación.
 - Nada de diagnósticos médicos, juicios de riesgo de enfermedad ni consejos de tratamiento.
 
 Responde en español, en Markdown.`,
-    needDesktop: 'La entrega a la IA necesita la app de escritorio; esta vista previa en el navegador no abre sitios externos.',
+    needDesktop: 'Pasar a la IA requiere la app de escritorio; la vista previa web no abre sitios externos.',
     attachmentOpened: (provider: string) =>
       `El paquete de datos se guardó en tu escritorio (zeppbridge-ai-handoff.json): arrástralo a ${provider}. La instrucción está en tu portapapeles.`,
     attachmentNotOpened: (provider: string) =>
@@ -332,7 +332,7 @@ Responde en español, en Markdown.`,
     overrideSaved: 'La corrección del tipo de entrenamiento quedó guardada localmente.',
     overrideCleared: 'Corrección borrada. Se vuelve a la coincidencia de ZeppBridge.',
     overrideFailed: 'No se pudo guardar la corrección del tipo de entrenamiento',
-    copied: (format: string) => `Datos en ${format} copiados al portapapeles.`,
+    copied: (format: string) => `Datos en ${format} copiados.`,
 
     metricDistance: 'Distancia',
     metricDuration: 'Tiempo en movimiento',
@@ -400,14 +400,14 @@ Responde en español, en Markdown.`,
     legendWarm: 'Más lento',
     legendSlow: 'Lento',
     routeEmptyTitle: 'Sin recorrido utilizable',
-    routeEmptyBody: 'Este registro no tiene suficientes puntos GPS, así que no se dibuja ninguna ruta.',
+    routeEmptyBody: 'Este registro no trae suficientes puntos GPS; no se dibuja la ruta.',
     chartsEmptyTitle: 'Sin curvas punto a punto',
     chartsEmptyBody: 'No se sincronizó ninguna serie de frecuencia cardíaca, ritmo, altitud ni cadencia para esta sesión.',
 
     hrZonesAria: 'Zonas de frecuencia cardíaca',
     eyebrowHrZones: 'Zonas FC',
     hrZonesTitle: 'Zonas de frecuencia cardíaca',
-    hrZonesNote: 'Los límites de las zonas vienen de tu propia configuración en el reloj y Zepp los envía con este entrenamiento; ZeppBridge no los recalcula. La página de Estado de entrenamiento usa otro modelo que eliges tú, así que los dos conjuntos de números no van a coincidir.',
+    hrZonesNote: 'Los límites de zona vienen de tu configuración en el reloj, enviados por Zepp con este entrenamiento; ZeppBridge no los recalcula. Estado de entrenamiento usa otro modelo elegido por ti: que los números no coincidan es normal.',
     hrZoneBelow: (upper: number) => `Menos de ${upper}`,
     hrZoneBetween: (low: number, high: number) => `${low}-${high}`,
     hrZoneShare: (percent: string) => `${percent}%`,
@@ -416,7 +416,7 @@ Responde en español, en Markdown.`,
     decodedAria: 'Valores decodificados',
     eyebrowDecoded: 'Decodificado',
     decodedTitle: 'Valores decodificados',
-    decodedNote: 'El resumen se calcula solo con las muestras válidas de este registro; los saltos anómalos se ignoran.',
+    decodedNote: 'Solo cuentan las muestras válidas de este registro; se ignoran los saltos raros.',
 
     exportAria: 'Exportar y compartir',
     exportTitle: 'Exportar y compartir',
@@ -429,7 +429,7 @@ Responde en español, en Markdown.`,
 
     handoffAria: 'Pasar a la IA',
     handoffTitle: 'Pasar a la IA',
-    handoffSub: 'Copia los datos anonimizados de solo este entrenamiento, más la instrucción, y abre el sitio de IA que elijas. Los flujos diarios como sueño y pasos quedan fuera.',
+    handoffSub: 'Copia al portapapeles solo los datos anonimizados de este entrenamiento y la instrucción, y abre el sitio de IA que elijas. Lo registrado por día, como sueño y pasos, queda fuera.',
     handoffTarget: 'Herramienta de destino',
     handoffTargetAria: 'A qué herramienta de IA entregarlo',
     preparing: 'Preparando…',

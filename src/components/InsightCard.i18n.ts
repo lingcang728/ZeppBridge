@@ -146,7 +146,7 @@ export const insightCardMessages = defineMessages(
       `La regla: carreras del mismo tipo de los últimos ${days} días cuya distancia esté dentro de ±${tolerance ?? '—'}% de esta, entre ${min} y ${max} carreras.`,
     excludedPrefix: 'Excluidas: ',
     excludedItem: (label: string, count: number) => `${label} ×${count} `,
-    footnote: 'Las conclusiones solo te comparan con tu historial, nunca con un promedio poblacional, y no son juicios médicos. Lo que falta aparece como «No proporcionado», nunca se rellena con 0.',
+    footnote: 'Las conclusiones solo te comparan con tu historial, nunca con un promedio poblacional, y no son juicios médicos. Lo que falta aparece como «No proporcionado»; nunca se usa un 0 para rellenarlo.',
     notProvided: 'No proporcionado',
     durationHours: (hours: number, minutes: number) => `${hours} h ${minutes} min`,
     durationMinutes: (minutes: number) => `${minutes} min`,

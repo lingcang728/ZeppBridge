@@ -237,7 +237,7 @@ export const archiveMessages = defineMessages(
     ledgerRange: (from: string, to: string, records: number) => `${from} ~ ${to} · ${records} registros`,
     ledgerNothingWritten: 'Todavía no se ha escrito ningún mes',
 
-    range1y: 'Último año',
+    range1y: 'Último 1 año',
     range2y: 'Últimos 2 años',
     range3y: 'Últimos 3 años',
     rangeAll: (years: number) => `Todo el historial disponible (hasta ${years} años)`,

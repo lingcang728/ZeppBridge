@@ -55,7 +55,7 @@ export default {
       retry: 'Tentar novamente',
       distanceUnitLabel: 'Unidade de distância',
       authWebTitle: 'Ligação de dados avançados',
-      authWebSub: 'Inicia sessão com e-mail ou telemóvel e palavra-passe para acrescentar stress, SpO₂, PAI e outros dados ausentes da API oficial (sem suporte para início de sessão de terceiros)',
+      authWebSub: 'Inicia sessão com e-mail ou telemóvel e palavra-passe para acrescentar stress, SpO₂ e outros dados ausentes da API oficial (sem suporte para início de sessão de terceiros)',
       officialTitle: 'Autorização com a conta Zepp',
       officialSub: 'Recomendado · autoriza no navegador; contas Google, Xiaomi, Facebook e Apple suportadas',
       officialConnect: 'Autorizar',
@@ -124,7 +124,7 @@ export default {
       reportDoneNote:
         'Apenas os campos indicados acima e a tua nota foram enviados. Nada mais.',
       reportConfirm:
-        'Isto envia a versão da app, SO, revisão do interpretador, campos do dispositivo, firmware, códigos de modelo (apenas inteiros descriptivos da gama), treinos desconhecidos e contagens, código de erro da recusa recente da nuvem (apenas código, fluxo e hora) e a tua nota sem dados pessoais. Nunca envia contas Zepp, tokens, números de série, MAC, GPS, saúde nem respostas em bruto. Enviar?',
+        'Só envia: versão da app, tipo de sistema, revisão do interpretador, pistas de produto e estrutura dos campos de dispositivos não identificados, firmware, números de modelo (deviceSource / deviceType, inteiros que dizem que modelo, não que unidade), códigos de treino desconhecidos e contagens, código numérico do último pedido recusado pela nuvem (só número, fluxo e hora, sem o texto devolvido) e a tua nota (caminhos locais, e-mails e identificadores longos removidos automaticamente). Nunca conta Zepp, tokens, números de série, ID de dispositivo, MAC, GPS, valores de saúde ou respostas em bruto. Enviar?',
       reportFailed: 'Não foi possível enviar o relatório de erro',
       capabilityIntro:
         'Dados que o ZeppBridge consegue ler da tua conta atualmente. Atualização automática ao sincronizar.',
@@ -168,7 +168,7 @@ export default {
         'Os dados de saúde são gravados em SQLite na pasta da app, protegidos pelo teu início de sessão no sistema e pela cifragem de disco. O ZeppBridge não cifra a base de dados por cima disso.',
       privacyTokenTitle: 'Tokens no cofre de credenciais do sistema',
       privacyTokenBody:
-        'Predefinição: Gestor de Credenciais do Windows / Keychain do macOS / keyring do Linux. Ficheiro de texto local com permissões restritas suportado em macOS/Linux; Linux também suporta variáveis de ambiente. auth.json guarda apenas metadados de conta. Tokens nunca entram em logs nem exportações.',
+        'Por predefinição: Gestor de Credenciais do Windows, Keychain do macOS ou keyring do Linux. Em macOS e Linux podes optar por um ficheiro de credenciais em texto simples que só o teu utilizador lê e escreve; Linux também aceita variáveis de ambiente. auth.json guarda apenas metadados de conta e região. Os tokens nunca entram em logs, exportações ou relatórios de erro.',
       privacyTelemetryTitle: 'Sem telemetria nem rastreio de utilização',
       privacyTelemetryBody:
         'A app não envia telemetria. Apenas ao clicares em «Enviar relatório de erro» é que os dados anónimos descritos são transmitidos.',
@@ -446,9 +446,9 @@ export default {
       navHandoff: 'Enviar à IA',
       navSettings: 'Definições',
       preparingData:
-        'A abrir a base de dados local; o primeiro arranque após atualização pode demorar cerca de 10 segundos…',
+        'A abrir a base de dados local; o primeiro arranque após atualização pode demorar pouco mais de dez segundos…',
       compacting: (pending: number) =>
-        `A compactar pacotes guardados (${pending} restantes); a sincronização aguarda a sua vez.`,
+        `A compactar pacotes guardados (${pending} restantes); o aviso desaparece ao terminar e a sincronização aguarda.`,
       compacted: (saved: string) =>
         `Pacotes compactados; cerca de ${saved} de espaço recuperado.`,
       trayHint:
@@ -476,7 +476,7 @@ export default {
         `Agendado a ${stagedAt}. A base de dados será substituída no `,
       pendingNextStart: 'próximo arranque',
       pendingBodyB:
-        '. A base de dados atual foi guardada como ponto de reversão para poderes voltar atrás.',
+        '. A base atual será primeiro guardada como ponto de reversão, para poderes recuperá-la se algo falhar.',
       cancelRestore: 'Cancelar restauro',
       creating: 'A criar…',
       createSnapshot: 'Criar snapshot',
@@ -566,7 +566,7 @@ export default {
         'A sincronização terminou sem dados. Não foi possível confirmar a região Zepp da conta, pelo que o ZeppBridge usou a melhor estimativa. Se a região estiver errada, a sincronização conclui com sucesso mas vazia. Tenta ligar a conta novamente.',
       reconnect: 'Ligar a conta novamente',
       short: (covered: number, earliest: string) =>
-        `Esta máquina guarda ${covered} dias (o mais antigo a ${earliest}). O histórico anterior ainda não foi descarregado da nuvem.`,
+        `Esta máquina guarda apenas ${covered} dias (desde ${earliest}). Antes disso está vazio porque os dados ainda não foram descarregados da nuvem, não porque não houvesse registos.`,
       backfill: 'Repor mais histórico',
       backfilling: 'A repor…',
       syncNow: 'Sincronizar agora',
@@ -592,7 +592,7 @@ export default {
       later: 'Agora não',
       contributeTitle: 'Ajuda a reconhecer este dispositivo nas próximas versões',
       contributeBody:
-        'Envia ao ZeppBridge o modelo escolhido e os códigos de identificação (deviceSource / deviceType, apenas inteiros). Identificam apenas o modelo: sem conta, número de série, MAC ou dados de saúde. A Huami não publica tabelas de correspondência, pelo que esta é a única forma de expandir o catálogo integrado para todos.',
+        'Envia ao ZeppBridge o modelo escolhido e os números de modelo (deviceSource / deviceType, apenas inteiros). Só identificam que modelo de relógio é: sem conta, número de série, MAC ou dados de saúde. A Huami não publica uma tabela de correspondência; esta é a única forma de fazer crescer o catálogo integrado. Após algumas pessoas indicarem o modelo, passa a ser reconhecido automaticamente para todos.',
       note: 'A escolha é assinalada como «Modelo selecionado» e nunca como correspondência automática. Imagens e nomes vêm do catálogo integrado, sem consumo de rede.',
       filterAll: 'Todos',
       filterWatch: 'Relógios',
@@ -705,7 +705,7 @@ export default {
       unmeasured: (streams: string) =>
         `Amostras locais insuficientes para estimar: ${streams}. Fora do total acima — melhor «desconhecido» que uma taxa inventada multiplicada por anos.`,
       wouldBeCleanedUp: (requested: number, retention: number) =>
-        `Esta reposição abrange ${requested} dias, mas o limite local é de ${retention} dias — os dados seriam eliminados na sincronização seguinte. Ativa o arquivo de longo prazo ou aumenta a retenção.`,
+        `Esta reposição abrange ${requested} dias, mas o limite local é de ${retention}. Os dados seriam eliminados após a próxima sincronização bem-sucedida. Ativa primeiro o arquivo de longo prazo ou aumenta a retenção.`,
       backfilling: 'A repor…',
       continueBackfill: 'Continuar reposição',
       startBackfill: 'Iniciar reposição',
@@ -719,7 +719,7 @@ export default {
       stoppedByUser: (remaining: number) =>
         `Interrompido com ${remaining} blocos por concluir. O histórico obtido está salvo — prime «Continuar reposição» para retomar.`,
       stalled: (remaining: number) =>
-        `Restam ${remaining} blocos mensais, mas não houve progresso nesta ronda. Verifica a lista de falhas abaixo ou prime «Tentar novamente os meses falhados».`,
+        `Restam ${remaining} blocos mensais. Nenhum avançou nesta ronda, que foi interrompida; provavelmente continuam a falhar. Vê a lista abaixo ou prime «Tentar novamente os meses falhados».`,
       deferredRetry:
         'Manutenção local em curso. A reposição prosseguirá automaticamente.',
       resetLedger: 'Limpar registo',
@@ -737,7 +737,7 @@ export default {
       ledgerRange: (from: string, to: string, records: number) =>
         `${from} ~ ${to} · ${records} registos`,
       ledgerNothingWritten: 'Ainda não foi gravado nenhum mês',
-      range1y: 'Último ano',
+      range1y: 'Último 1 ano',
       range2y: 'Últimos 2 anos',
       range3y: 'Últimos 3 anos',
       rangeAll: (years: number) => `Todo o histórico disponível (até ${years} anos)`,
@@ -751,7 +751,7 @@ export default {
       archiveSaveFailed: 'Não foi possível guardar a definição do arquivo',
       pickStartFirst: 'Define primeiro a data de início da reposição.',
       outOfRetention:
-        'O período ultrapassa a janela de retenção local e os dados seriam eliminados na sincronização seguinte. Ativa o arquivo de longo prazo ou aumenta a retenção.',
+        'O período ultrapassa a retenção local; os dados serão eliminados após a próxima sincronização bem-sucedida. Ativa primeiro o arquivo de longo prazo ou aumenta a retenção.',
       roundDone: (remaining: number) =>
         `Ronda concluída; restam ${remaining} blocos mensais. Prime «Continuar reposição» quando quiseres.`,
       allChunksDone: 'Todos os blocos mensais do registo foram processados.',
@@ -793,7 +793,7 @@ export default {
     'components/InsightCard': {
       title: 'Análise da corrida',
       unsupportedWorkoutType:
-        'Análise disponível apenas para corrida nesta versão, validada com dados reais. Os restantes treinos continuam acessíveis para consulta e exportação.',
+        'Esta versão só analisa corrida validada com dados reais. Os restantes treinos continuam disponíveis para consultar, corrigir e exportar.',
       handoff: 'Enviar à IA',
       currentRun: 'Esta corrida',
       baselineRun: 'Referência',
@@ -816,16 +816,7 @@ export default {
       driftNote:
         'Compara este treino apenas contigo, nunca com outras pessoas. Semáforos, subidas, intervalos e deriva de GPS poluem-no; com ritmo instável não aparece número.',
       driftUnavailable: (code: string) =>
-        ({
-          too_short:
-            'Treino demasiado curto para dividir. Os primeiros 10 minutos correspondem ao aquecimento e distorcem a comparação.',
-          pace_too_variable:
-            'Ritmo demasiado irregular (intervalos, semáforos ou declives), impedindo uma comparação fiável.',
-          not_enough_samples:
-            'Amostras de FC e velocidade insuficientes neste treino para o dividir.',
-          unsupported_workout_type:
-            'A análise de metades está disponível apenas para corrida de momento.',
-        } as Record<string, string | undefined>)[code] ?? 'Não é possível analisar este treino.',
+        ({ too_short: "Treino demasiado curto: nos primeiros dez minutos a FC ainda sobe; comparar as metades mediria aquecimento, não deriva.", pace_too_variable: "Ritmo demasiado variável (intervalos, semáforos ou subidas); as metades não são comparáveis, por isso não há número.", not_enough_samples: "Poucas amostras de FC e velocidade ponto a ponto para comparar as metades.", unsupported_workout_type: "Só corrida por agora. Caminhada e ciclismo também têm amostras suficientes, mas os limiares ainda não foram validados com dados reais." } as Record<string, string | undefined>)[code] ?? "Não é possível comparar as metades deste treino.",
       baselineSummary: 'Origem da referência',
       baselineRule: (days: number, tolerance: number | null | undefined, min: number, max: number) =>
         `Regra: corridas do mesmo tipo dos últimos ${days} dias com distância a ±${tolerance ?? '—'}% desta (entre ${min} e ${max} sessões).`,
@@ -1310,11 +1301,11 @@ export default {
       diskTooSmall:
         'Menos de 300 MB livres em disco — não é possível repor histórico superior a 90 dias.',
       builtinGuess: (days: number, add: string, free: string) =>
-        `Estimativa preliminar: ${days} dias requerem cerca de ${add} (${free} livres em disco).`,
+        `Poucas amostras locais; estimativa integrada aproximada: ${days} dias ≈ ${add}, com ${free} livres neste disco.`,
       measured: (days: number, add: string, free: string) =>
         `Com base no teu ritmo de dados real: ${days} dias requerem cerca de ${add} (${free} livres em disco).`,
       partial: (days: number, add: string, free: string) =>
-        `Com base nos tipos de dados com histórico: ${days} dias requerem cerca de ${add} (${free} livres em disco).`,
+        `Só contam os fluxos com amostras locais suficientes: ${days} dias ≈ ${add} (os restantes ficam de fora por falta de amostras), com ${free} livres neste disco.`,
       unknownEstimate: 'Não é possível estimar o espaço necessário de momento.',
     },
     'lib/syncStreams': {
@@ -1545,7 +1536,7 @@ export default {
       timingCloudNote: 'Ainda sem registo',
       timingReplay: 'Último reprocessamento local',
       timingReplayNote:
-        'Reprocessa pacotes locais com o parser atual, sem acesso à rede.',
+        'Reinterpreta os pacotes locais com o parser atual, sem rede e sem alterar a hora de sincronização acima',
       timingManual: 'Último reprocessamento manual',
       timingManualNote: 'Iniciado manualmente',
       timingNewest: 'Amostra mais recente',
@@ -1596,7 +1587,7 @@ export default {
       confirmDestructive: (label: string, reason: string) => `${label}: ${reason}\nContinuar?`,
       actionSynced: 'Sincronização concluída e diagnóstico atualizado.',
       actionReplayed: (count: string) =>
-        `Pacotes locais reprocessados com o parser atual (${count} registos normalizados).`,
+        `Pacotes locais reprocessados com o parser atual (${count} registos derivados); a hora de sincronização com a nuvem não mudou.`,
       actionIntegrityOk: 'A base de dados passou na verificação de integridade.',
       actionIntegrityFailed: (detail: string) =>
         `Falha na verificação de integridade: ${detail}`,
@@ -1612,7 +1603,7 @@ export default {
         'Sem dados locais para este período. Efetua uma sincronização.',
       coverageNoGaps: 'Sem falhas detetadas desde o primeiro dia com dados.',
       coverageGaps: (days: number) =>
-        `${days} dias sem registo desde o início. Pode dever-se a falta de uso do dispositivo ou ausência de sincronização.`,
+        `Desde o primeiro dia com dados, ${days} dias ficaram sem registos. Pode ser por não usar o relógio, não sincronizar ou a nuvem não devolver dados.`,
       action: {
         reauth: {
           label: 'Religar conta Zepp',
@@ -1707,7 +1698,7 @@ export default {
       emptyCard: 'Sem registos no intervalo selecionado.',
       dailyMaxTitle: 'Pico diário de frequência cardíaca (amostras locais)',
       dailyMaxSub:
-        'A app Zepp aplica filtros ao pico diário; os valores podem diferir.',
+        'A app Zepp filtra o pico diário; aqui não se filtra. É normal os dois valores diferirem.',
       dailyMaxAria: 'Tendência do pico diário de FC',
       dailyMaxNone:
         'Sem amostras de FC no intervalo selecionado.',
@@ -1879,7 +1870,7 @@ export default {
       thresholdEmpty: 'Sem medições de limiar de lactato neste intervalo.',
       thresholdPaceTooltip: (value: string, unit: string) =>
         `Ritmo no limiar: <b>${value}</b> ${unit}`,
-      loadUnit: 'carga',
+      loadUnit: '' as string,
       thresholdHrTooltip: (value: number) => `FC no limiar: <b>${value}</b> bpm`,
       balanceLabel: 'Equilíbrio da carga (aguda:crónica)',
       balanceHint:
@@ -2092,7 +2083,7 @@ Responde em formato Markdown.`,
     'components/ai/AiTaskHeader': {
       pageTitle: 'Enviar à IA',
       intro:
-        'Seleciona treinos e métricas, define o objetivo e exporta o pacote para partilhar com a IA.',
+        'Escolhe treinos e dados, escreve o que queres perguntar, exporta para o ambiente de trabalho e arrasta para a IA.',
       titleLabel: 'Nome da tarefa',
       newTask: 'Nova',
       saved: 'Guardada',
@@ -2276,7 +2267,7 @@ Responde em formato Markdown.`,
       fileAttachments: (n: number) =>
         `- Ficheiros anexos (${n}) na pasta attachments/: relatórios ou imagens adicionais a considerar na análise.`,
       fileData: (file: string, labels: string) =>
-        `- ${file}: dados completos. "context" detalha métricas diárias, sono e treinos (${labels}); "coverage" indica os dias com dados reais; "units" lista as unidades; "task.personal_note" contém o contexto pessoal.`,
+        `- ${file}: todos os dados. "context" lista métricas, sono e treinos dia a dia por categoria (${labels}); "coverage" indica as datas com dados reais de cada categoria; "units" dá a unidade de cada campo; "task.personal_note" é o meu contexto pessoal.`,
       fileNote: '- Contexto pessoal fornecido nas notas da tarefa: ter em conta na avaliação.',
       fileWorkouts: (n: number) =>
         `- "workouts" contém ${n} treino(s) selecionado(s) como foco principal da análise.`,
@@ -2487,7 +2478,7 @@ Responde em formato Markdown.`,
     'err.headless.token_not_in_store':
       'Credenciais da conta encontradas, mas sem token no gestor seguro. A base de dados copia-se entre máquinas; o token não — vive no gestor de credenciais da máquina original. Inicia sessão novamente.',
     'err.core.credential_store':
-      'Não foi possível aceder ao gestor de credenciais. Verifica se o keychain está desbloqueado, permitido pela política do sistema, bem configurado e com permissões corretas. O início de sessão web e o token manual usam o mesmo gestor — mudar de método não contorna a falha. Se o Keychain do macOS ou o keyring do Linux não estiver disponível, segue o guia de credenciais do README: arranca com ZEPPBRIDGE_CREDENTIAL_STORE=file e inicia sessão de novo — guarda o token em texto simples, legível apenas pelo teu utilizador.',
+      'Não foi possível aceder ao gestor de credenciais. Verifica se está bloqueado, as políticas do sistema, a configuração e as permissões de ficheiro. Início de sessão web e token manual usam o mesmo gestor; mudar de método não contorna a falha. Se o Keychain macOS ou o keyring Linux estiverem indisponíveis, segue o guia do README: arranca com ZEPPBRIDGE_CREDENTIAL_STORE=file e inicia sessão de novo. O token fica em texto simples num ficheiro que só o teu utilizador lê e escreve.',
     'err.core.invalid_host': 'Endereço de servidor Zepp inválido ou não seguro',
     'err.core.config': 'Configuração incompleta ou incorreta',
     'err.core.busy': 'Operação de escrita em curso. Aguarda que termine',
@@ -2527,7 +2518,7 @@ Responde em formato Markdown.`,
     'err.login.region_retrying':
       'Serviço de regiões do Zepp temporariamente inacessível — nova tentativa em curso.',
     'err.login.third_party_stalled':
-      'Autenticação de terceiros bloqueada. Em caso de dificuldade com contas Google ou passkeys, utiliza email + palavra-passe ou introduz o App Token nas Definições.',
+      'O início de sessão de terceiros parece bloqueado; as passkeys Google ficam muitas vezes na verificação dentro da app. Fecha a janela e usa e-mail + palavra-passe, ou introduz o App Token nas Definições.',
     'err.login.bad_url': 'Endereço de autenticação inválido',
     'err.login.window_failed': 'Não foi possível abrir a janela de autenticação',
     'err.login.window_busy':
@@ -2606,7 +2597,7 @@ Responde em formato Markdown.`,
       'Nenhuma versão instalada detetada após a atualização',
     'err.update.portable_windows_only': 'A migração de portátil para instalado é suportada apenas em Windows',
     'err.update.unsafe_data_location':
-      'Localização de dados não segura para atualização automática. Move a pasta de dados para o diretório de dados da aplicação do teu utilizador e define ZEPPBRIDGE_DATA_DIR.',
+      'Instalação interrompida: não foi possível confirmar que os dados sobrevivem à atualização. Fecha o ZeppBridge, copia toda a pasta data do pacote da app para Application Support do teu utilizador, corrige ZEPPBRIDGE_DATA_DIR e tenta de novo. Não apagues os dados antigos.',
     'err.ai_task.invalid': 'Parâmetros da tarefa inválidos',
     'err.ai_task.not_found': 'Tarefa não encontrada ou já eliminada',
     'err.ai_task.workout_not_found':

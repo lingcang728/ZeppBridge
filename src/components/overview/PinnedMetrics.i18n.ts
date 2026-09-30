@@ -74,7 +74,7 @@ export const pinnedMetricsMessages = defineMessages(
     unitKcal: 'kcal',
     unitMin: 'min',
     pickerTitle: 'Elige las métricas fijas',
-    pickerHint: 'Hasta 4, arriba del resumen en el orden en que las elijas',
+    pickerHint: 'Hasta 4 métricas, arriba del resumen en el orden en que las elijas',
     pickerFull: 'Ya hay 4: quita una primero',
     pickerCount: (count: number, max: number) => `${count} de ${max}`,
     slotEmpty: 'Libre',

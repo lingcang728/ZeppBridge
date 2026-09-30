@@ -68,7 +68,7 @@ const messages = defineMessages(
     confirm: 'Este es mi dispositivo',
     clear: 'Retirar la elección',
     later: 'Ahora no',
-    contributeTitle: 'Ayuda a que la próxima versión reconozca este dispositivo sola',
+    contributeTitle: 'De paso, ayuda a que la próxima versión lo reconozca por sí sola',
     contributeBody: 'Envía a ZeppBridge el modelo que elegiste más los números de modelo del dispositivo (deviceSource / deviceType, solo enteros). Ambos solo dicen qué reloj es: sin cuenta, sin número de serie, sin MAC, sin datos de salud. Huami no publica una tabla de equivalencias, así que es la única forma de que crezca el catálogo integrado: cuando varias personas señalan un modelo, se reconoce solo para todos.',
     note: 'Tu elección queda marcada como «Modelo que elegiste», no como coincidencia automática. Las imágenes y los modelos vienen del catálogo incluido; explorarlos no usa la red.',
     filterAll: 'Todos',

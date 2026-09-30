@@ -477,18 +477,18 @@ const messages = defineMessages(
 
     /* —— feedback —— */
     'err.diagnostic.nothing_to_submit':
-      'Este dispositivo no tiene modelo reconocible; nada que enviar',
+      'Este dispositivo no aporta números de modelo útiles para el catálogo; nada que enviar ahora',
     'err.diagnostic.empty_report':
-      'Elige un tipo de problema o describe brevemente qué ocurrió',
-    'err.diagnostic.client_init_failed': 'No se pudo iniciar la conexión de diagnóstico',
-    'err.diagnostic.send_failed': 'Error al enviar diagnóstico: revisa tu red y reintenta',
-    'err.diagnostic.http_error': 'El servicio de diagnóstico devolvió un error',
+      'Elige primero el tipo de problema o escribe una nota; si no, el reporte no trae nada procesable',
+    'err.diagnostic.client_init_failed': 'No se pudo iniciar la conexión del reporte de error',
+    'err.diagnostic.send_failed': 'No se pudo enviar el reporte de error; revisa tu red y reintenta',
+    'err.diagnostic.http_error': 'El servicio de reportes de error devolvió un error',
     'err.diagnostic.rate_limited':
-      'Demasiados reportes en poco tiempo; reintenta más tarde',
-    'err.diagnostic.bad_response': 'Respuesta ininteligible del servicio de diagnóstico',
+      'Demasiados reportes en poco tiempo; reintenta más tarde. Los ya enviados se conservan, no hace falta reenviarlos',
+    'err.diagnostic.bad_response': 'El servicio de reportes de error devolvió algo irreconocible',
 
     /* —— misc —— */
-    'err.workout.not_found': 'El entrenamiento ya no existe',
+    'err.workout.not_found': 'El registro de entrenamiento no existe',
     'err.prefs.retention_out_of_range': 'La retención debe estar entre 1 y 365 días',
     'err.storage.write_busy': 'Otra escritura de ZeppBridge en curso; espera a que termine',
     'err.storage.write_lock_unavailable':
@@ -506,7 +506,7 @@ const messages = defineMessages(
     'err.update.launch_failed': 'No se pudo iniciar la versión actualizada',
     'err.update.installed_build_missing': 'No se encontró la nueva versión instalada de ZeppBridge tras la instalación',
     'err.update.portable_windows_only': 'La migración de versión portable a instalador solo existe en Windows',
-    'err.update.unsafe_data_location': 'Instalación detenida: no se pudo confirmar que los datos se conserven al actualizar. Cierra ZeppBridge, copia la carpeta data a Application Support de tu usuario y corrige ZEPPBRIDGE_DATA_DIR antes de reintentar.',
+    'err.update.unsafe_data_location': 'Instalación detenida: no se pudo confirmar que los datos se conserven al actualizar. Cierra ZeppBridge, copia toda la carpeta data del paquete de la app a Application Support de tu usuario, corrige ZEPPBRIDGE_DATA_DIR y reintenta. No borres los datos originales.',
     /* —— ai_tasks (comandos P3 y adjuntos/concesiones) —— */
     'err.ai_task.invalid': 'Entrada de tarea no válida: revisa los campos',
     'err.ai_task.not_found': 'La tarea no existe o fue eliminada',

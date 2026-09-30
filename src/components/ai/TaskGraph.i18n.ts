@@ -24,7 +24,7 @@ export const taskGraphMessages = defineMessages(
   },
   {
     label: 'Grafo de datos',
-    zone: 'A la IA',
+    zone: 'Pasar a la IA',
     hint: 'Arrastra dentro del círculo para usar, fuera para quitar · Toca un nodo para ver opciones · Arrastra el fondo para moverte',
     undo: 'Deshacer', fit: 'Ajustar', zoomIn: 'Acercar', zoomOut: 'Alejar', resetView: 'Restablecer',
     zoomLevel: (percent: number) => `Zoom ${percent}%: haz clic para encajar todo el grafo`,

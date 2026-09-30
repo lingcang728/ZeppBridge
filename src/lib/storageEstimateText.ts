@@ -60,7 +60,7 @@ const messages = defineMessages(
     diskUnknown: 'No se pudo leer el espacio libre. Comprueba que haya espacio antes de recuperar historial.',
     diskTooSmall: 'Menos de 300 MB libres: no se puede recuperar historial mayor a 90 días.',
     builtinGuess: (days: number, add: string, free: string) =>
-      `Pocas muestras locales: estimación de ${days} días ≈ ${add}; ${free} libres en este disco.`,
+      `Pocas muestras locales; estimación aproximada de la app: ${days} días ≈ ${add}, con ${free} libres en este disco.`,
     measured: (days: number, add: string, free: string) =>
       `Según el ritmo de tus datos, ${days} días ≈ ${add}; ${free} libres en este disco.`,
     partial: (days: number, add: string, free: string) =>

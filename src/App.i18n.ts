@@ -44,9 +44,9 @@ export const messages = defineMessages(
     navOverview: 'Resumen',
     navHandoff: 'Pasar a la IA',
     navSettings: 'Configuración',
-    preparingData: 'Abriendo la base de datos local; tras una actualización puede tardar unos segundos…',
+    preparingData: 'Abriendo la base de datos local; el primer inicio tras actualizar puede tardar algo más de diez segundos…',
     compacting: (pending: number) =>
-      `Compactando registros (${pending} pendientes); terminará en breve y la sincronización espera.`,
+      `Compactando registros históricos (${pending} pendientes); el aviso desaparece al terminar y la sincronización espera.`,
     compacted: (saved: string) => `Registros compactados: se liberaron unos ${saved} de disco.`,
     trayHint: 'Al cerrar la ventana, ZeppBridge permanece en la bandeja y sigue sincronizando.',
     browserPreview: 'Usa la app de escritorio: la vista previa web no lee datos de la cuenta.',

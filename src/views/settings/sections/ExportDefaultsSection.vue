@@ -38,7 +38,7 @@ const n = useMessages(defineMessages(
   },
   {
     nameTitle: 'Nombres de archivo para la IA',
-    nameSub: 'Cada exportación se nombra con esta regla; la IA ve por el nombre qué periodo y qué datos son.',
+    nameSub: 'Cada exportación sigue esta regla de nombre: el archivo mismo dice qué periodo y qué datos trae.',
     ruleRange: 'Rango de fechas + contenido',
     ruleTask: 'Nombre de tarea + hora',
     ruleApp: 'ZeppBridge + fecha',

@@ -71,7 +71,7 @@ const messages = defineMessages(
     intro: (range: string) => `Adjunto mis datos de salud de mi reloj Zepp (${range}, organizados localmente por ZeppBridge; solo contienen mis propios datos).`,
     range: (start: string, end: string) => (start === end ? start : `${start} a ${end}`),
     rangeUnknown: 'un periodo reciente',
-    fileData: (file: string, labels: string) => `- ${file}: datos completos. "context" lista métricas, sueño y entrenamientos por categoría (${labels}); "coverage" indica fechas con datos reales; "units" da las unidades; "task.personal_note" es mi contexto personal.`,
+    fileData: (file: string, labels: string) => `- ${file}: todos los datos. "context" lista métricas, sueño y entrenamientos día a día por categoría (${labels}); "coverage" indica las fechas con datos reales de cada categoría; "units" da la unidad de cada campo; "task.personal_note" es mi contexto personal.`,
     fileWorkouts: (n: number) => `- "workouts" contiene los ${n} entrenamientos seleccionados: son el foco principal.`,
     fileAttachments: (n: number) => `- La carpeta attachments/ incluye ${n} archivo(s) original(es) adjunto(s) (informes, capturas); consúltalos también.`,
     fileNote: '- Mi contexto personal describe mi situación; tómalo en cuenta.',

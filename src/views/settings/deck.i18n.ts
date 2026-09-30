@@ -142,7 +142,7 @@ export const deckMessages = defineMessages(
     retentionSub: 'Keeps only the most recent days; ignored while long-term archive is on',
   },
   {
-    pageIntro: 'Abre una tarjeta para ajustarla; ya abierta, arrastra su cabecera hacia los lados para pasar a la siguiente.',
+    pageIntro: 'Abre una tarjeta para ajustarla; ya abierta, arrastra la cabecera a un lado para pasar a la siguiente.',
     pageIntroDeck: 'Desliza para elegir una tarjeta y haz clic en la del centro para abrirla, o pulsa «Ver todas» para verlas juntas.',
     openCard: 'Abrir',
 
@@ -198,7 +198,7 @@ export const deckMessages = defineMessages(
     mcpLead: 'Permite que herramientas de IA instaladas en tu equipo —Claude Code, Codex y similares— consulten directamente tus datos locales. Solo lectura, sin conexión, sin puertos abiertos.',
     mcpPreview: 'Ver lo que se va a copiar',
     mcpToolsLabel: 'Herramientas que puede usar la IA',
-    mcpTools: 'Una vez configurada, la IA puede consultar estas cinco cosas. Pasa el ratón para ver detalles.',
+    mcpTools: 'Configurado, la IA puede preguntar estas cinco cosas; pasa el cursor para el detalle.',
     exportFormatSub: 'Formato preseleccionado al exportar desde «Pasar a la IA» o desde un entrenamiento',
 
     themeLabel: 'Tema',
