@@ -411,7 +411,7 @@ pub fn other_libraries_on_this_machine(data_dir: &Path) -> Vec<PathBuf> {
 /// Existing destination files are never overwritten.
 ///
 /// v3 注记：`legacy_source_dirs()` 列出的全部是「ZeppBridge」（2.x）产品线
-/// 的目录；本 crate 3.x 构建的是并行测试线 ZeppBridge3，与日常使用的 2.x
+/// 的目录；3.x 线开发期间与 2.x 并存（当时叫 ZeppBridge3），与日常使用的 2.x
 /// 共存于同一台机器。把 2.x 的 AppData 遗留库搬进 v3 的 data/ 等于从还在
 /// 用的产品手里抢数据，所以 3.x 线整体跳过这次搬迁。将来 ZeppBridge3 若
 /// 有自己的历史目录，也不会出现在下面的名单里。

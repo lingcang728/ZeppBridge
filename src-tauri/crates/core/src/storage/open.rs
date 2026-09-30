@@ -174,10 +174,31 @@ impl Database {
     }
 
     /// `open_migrated` 去掉拿锁那一步：调用方已经持有迁移写锁。
+    ///
+    /// 这次真的升级了（留过快照）并且升级后的库通过完整性检查，就把自动快照
+    /// 静默删掉；检查没过就留着，给恢复用。
     fn open_migrated_locked(db_path: &Path) -> Result<Self> {
-        Self::backup_before_schema_change(db_path)?;
+        let snapshot_taken = Self::backup_before_schema_change(db_path)?;
         let conn = Connection::open(db_path)?;
-        Self::from_connection(conn)
+        let db = Self::from_connection(conn)?;
+        if snapshot_taken {
+            if let Some(data_dir) = db_path.parent() {
+                db.discard_snapshots_if_healthy(data_dir);
+            }
+        }
+        Ok(db)
+    }
+
+    /// 当前库通过 `PRAGMA quick_check` 才删自动快照。任何一步出错都只是
+    /// 不删——快照多留一份不伤数据，删错了才伤。
+    pub(super) fn discard_snapshots_if_healthy(&self, data_dir: &Path) {
+        let healthy = self
+            .conn
+            .query_row("PRAGMA quick_check", [], |row| row.get::<_, String>(0))
+            .is_ok_and(|result| result == "ok");
+        if healthy {
+            let _ = backup::discard_automatic_snapshots(data_dir);
+        }
     }
 
     /// 打开并迁移。失败就是失败——不做隔离重建。
@@ -199,12 +220,13 @@ impl Database {
     /// 迁移只往前走，改坏了没有回头路。备份或校验失败时直接返回可恢复错误，
     /// 让用户看到「升级没有开始」，而不是让一次半成品迁移把库改成谁也认不出的
     /// 状态。全新的空库（`user_version = 0`）没有东西可丢，跳过。
-    pub(super) fn backup_before_schema_change(db_path: &std::path::Path) -> Result<()> {
+    /// 返回这次是否真的留了快照（需要升级时才留）。
+    pub(super) fn backup_before_schema_change(db_path: &std::path::Path) -> Result<bool> {
         let Some(data_dir) = db_path.parent() else {
-            return Ok(());
+            return Ok(false);
         };
         if !db_path.exists() {
-            return Ok(());
+            return Ok(false);
         }
         let version = {
             let probe = Connection::open(db_path)?;
@@ -213,13 +235,13 @@ impl Database {
                 .unwrap_or(0)
         };
         if version == 0 || version >= CURRENT_SCHEMA_VERSION {
-            return Ok(());
+            return Ok(false);
         }
         match backup::create_backup(data_dir, backup::BackupKind::PreMigration, APP_VERSION) {
             Ok(_) => {
                 // 滚动清理只动自动生成的迁移备份，手动备份和标记保留的永远不碰。
                 let _ = backup::prune_migration_backups(data_dir);
-                Ok(())
+                Ok(true)
             }
             Err(error) => Err(ZeppBridgeError::DataUnavailable(format!(
                 "数据库需要升级到新版本，但升级前的自动备份没有成功，所以没有开始升级：{}。请确认数据文件夹所在磁盘还有空间后重试。",

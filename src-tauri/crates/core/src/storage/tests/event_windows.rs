@@ -253,13 +253,12 @@ fn the_first_consolidation_leaves_a_verified_backup_behind() {
     .unwrap();
     assert!(backup::list_backups(&dir).unwrap().is_empty());
 
+    // 整理前留快照；整理全部做完、库完好后快照被静默删掉（用户 2026-09-30 定）。
     db.compact_raw_payloads().unwrap();
-    let backups = backup::list_backups(&dir).unwrap();
-    assert_eq!(backups.len(), 1);
-    assert_eq!(backups[0].kind, backup::BackupKind::PreMigration);
+    assert!(backup::list_backups(&dir).unwrap().is_empty());
 
     db.compact_raw_payloads().unwrap();
-    assert_eq!(backup::list_backups(&dir).unwrap().len(), 1);
+    assert!(backup::list_backups(&dir).unwrap().is_empty());
     drop(db);
     let _ = std::fs::remove_dir_all(&dir);
 }

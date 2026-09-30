@@ -87,17 +87,25 @@ impl Database {
                 return Ok(());
             }
         }
-        self.set_app_meta(EVENT_WINDOW_MARKER_KEY, &max_id.to_string())
+        self.set_app_meta(EVENT_WINDOW_MARKER_KEY, &max_id.to_string())?;
+        // 整理全部做完（被打断的那几轮走不到这里）：库完好就删掉整理前的快照。
+        if let Some(data_dir) = self.data_dir() {
+            self.discard_snapshots_if_healthy(&data_dir);
+        }
+        Ok(())
+    }
+
+    /// 库文件所在目录；内存库（测试）没有。
+    fn data_dir(&self) -> Option<std::path::PathBuf> {
+        self.conn
+            .path()
+            .filter(|path| !path.is_empty())
+            .and_then(|path| Path::new(path).parent().map(Path::to_path_buf))
     }
 
     fn backup_before_consolidation(&self) -> Result<()> {
         // 内存库（测试）没有文件，也就没有什么可备份的。
-        let Some(data_dir) = self
-            .conn
-            .path()
-            .filter(|path| !path.is_empty())
-            .and_then(|path| Path::new(path).parent().map(Path::to_path_buf))
-        else {
+        let Some(data_dir) = self.data_dir() else {
             return Ok(());
         };
         match backup::create_backup(&data_dir, backup::BackupKind::PreMigration, APP_VERSION) {

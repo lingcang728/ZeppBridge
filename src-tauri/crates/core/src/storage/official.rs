@@ -10,6 +10,9 @@
 //! 和旧通道同键互相覆盖。
 
 use super::*;
+
+/// 失败计数表里官方明细的来源名。旧通道用运动自己的 `zepp_source`，不会撞上。
+const OFFICIAL_DETAIL_SOURCE: &str = "official";
 use crate::official::fetch::{OfficialKind, PROVIDER};
 
 impl Database {
@@ -160,20 +163,66 @@ impl Database {
 
     /// 这些官方运动里还没有逐秒序列的那些（下一步去拉明细）。只看官方来源的行：
     /// 旧通道的运动由旧通道自己的明细队列补。
+    /// 还没有逐秒明细的官方运动。连续失败 [`MAX_WORKOUT_DETAIL_ATTEMPTS`] 次
+    /// （或官方明确说没有）的先放下，[`WORKOUT_DETAIL_ATTEMPT_DECAY`] 之后再试
+    /// 一次——和旧通道同一张失败计数表、同一套衰减（来源记为 `official`）。
     pub fn official_workouts_missing_detail(&self, limit: usize) -> Result<Vec<(String, String)>> {
+        let decay_before = (Utc::now() - WORKOUT_DETAIL_ATTEMPT_DECAY).to_rfc3339();
         let mut stmt = self.conn.prepare(
             "SELECT w.workout_id, w.start_time FROM workouts w
+             LEFT JOIN workout_detail_fetch_attempts a
+               ON a.workout_id = w.workout_id AND a.source = ?2
              WHERE w.provider = 'official'
                AND NOT EXISTS (SELECT 1 FROM workout_samples s WHERE s.workout_id = w.workout_id)
                AND NOT EXISTS (SELECT 1 FROM route_points r WHERE r.workout_id = w.workout_id)
                AND NOT EXISTS (
                    SELECT 1 FROM raw_records r
                    WHERE r.stream = 'workout_detail' AND r.source_key = 'official:sport_detail:' || w.workout_id)
-             ORDER BY w.start_time DESC LIMIT ?1",
+               AND (a.attempts IS NULL OR a.attempts < ?3 OR a.updated_at < ?4)
+             ORDER BY COALESCE(a.attempts, 0) ASC, w.start_time DESC LIMIT ?1",
         )?;
         let rows = stmt
-            .query_map([limit as i64], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .query_map(
+                rusqlite::params![
+                    limit as i64,
+                    OFFICIAL_DETAIL_SOURCE,
+                    MAX_WORKOUT_DETAIL_ATTEMPTS,
+                    decay_before
+                ],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )?
             .collect::<std::result::Result<Vec<_>, _>>()?;
         Ok(rows)
+    }
+
+    /// 记一次官方明细拉取的结果；返回这条运动现在是不是被放下了。
+    /// `gone`：官方明确说没有（不可用），不用再失败两次，直接放下。
+    pub fn record_official_detail_result(
+        &self,
+        workout_id: &str,
+        ok: bool,
+        gone: bool,
+    ) -> Result<bool> {
+        self.record_workout_detail_fetch_result(workout_id, OFFICIAL_DETAIL_SOURCE, ok)?;
+        if ok {
+            return Ok(false);
+        }
+        if gone {
+            self.conn.execute(
+                "UPDATE workout_detail_fetch_attempts SET attempts = MAX(attempts, ?3)
+                 WHERE workout_id = ?1 AND source = ?2",
+                rusqlite::params![
+                    workout_id,
+                    OFFICIAL_DETAIL_SOURCE,
+                    MAX_WORKOUT_DETAIL_ATTEMPTS
+                ],
+            )?;
+        }
+        let attempts: i64 = self.conn.query_row(
+            "SELECT attempts FROM workout_detail_fetch_attempts WHERE workout_id = ?1 AND source = ?2",
+            [workout_id, OFFICIAL_DETAIL_SOURCE],
+            |row| row.get(0),
+        )?;
+        Ok(attempts >= MAX_WORKOUT_DETAIL_ATTEMPTS)
     }
 }

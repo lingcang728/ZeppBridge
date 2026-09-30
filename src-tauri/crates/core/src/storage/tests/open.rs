@@ -110,20 +110,21 @@ fn upgrade_a_real_old_database_without_losing_rows() {
         daily_keys_after
     );
 
-    // 升级前必须留下一份可用的备份，否则「升级失败可以退回去」是空话。
+    // 升级做完、库通过完整性检查：升级前的自动快照静默删掉，不占磁盘
+    // （用户 2026-09-30 定）。快照本身的生成与校验由 backup 的用例覆盖。
     let backups = backup::list_backups(&dir).expect("读备份清单");
-    let pre = backups
-        .iter()
-        .find(|item| item.kind == backup::BackupKind::PreMigration)
-        .expect("升级前应当自动生成一份备份");
-    assert!(pre.integrity_ok, "自动备份必须通过完整性检查");
-    assert_eq!(
-        pre.schema_version, before.0,
-        "自动备份应当是升级之前那个版本的样子"
+    assert!(
+        !backups
+            .iter()
+            .any(|item| item.kind == backup::BackupKind::PreMigration),
+        "库完好时不该留着升级前快照"
     );
-
-    let verified = backup::verify_backup(&dir, &pre.id).unwrap();
-    assert!(verified.problem.is_none(), "{:?}", verified.problem);
+    assert!(
+        !std::fs::read_dir(backup::backup_dir(&dir))
+            .map(|entries| entries.count() > 0)
+            .unwrap_or(false),
+        "快照连同 -wal / -shm 都要清干净"
+    );
 }
 
 #[test]
@@ -175,15 +176,8 @@ fn the_pre_migration_backup_can_still_read_a_database_that_is_out_of_date() {
         Database::open_read_only_any_version(path.clone()).is_ok(),
         "备份与恢复必须能读旧版本的库，那正是它们存在的理由"
     );
-    // 迁移这条路要能一路走通，包括中间那次自动备份。
+    // 迁移这条路要能一路走通（中间那次自动备份升级完、库完好后会被删掉）。
     drop(Database::open_migrated(&path).expect("旧库应当能被升级"));
-    let backups = backup::list_backups(&dir).unwrap();
-    assert!(
-        backups
-            .iter()
-            .any(|item| item.kind == backup::BackupKind::PreMigration),
-        "升级前应当留下一份备份"
-    );
 }
 
 #[test]

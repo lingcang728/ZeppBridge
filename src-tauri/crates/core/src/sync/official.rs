@@ -378,6 +378,7 @@ impl OfficialSync {
         }
         let mut reports = Vec::new();
         let mut failed = 0usize;
+        let mut set_aside = 0usize;
         for (workout_id, start_time) in pending {
             self.abort_if_cancelled()?;
             let day = DateTime::parse_from_rfc3339(&start_time)
@@ -404,11 +405,20 @@ impl OfficialSync {
                 Err(error) if error.is_cancelled() || error.needs_reauth() => return Err(error),
                 Err(error) => {
                     tracing::warn!("官方运动明细 {workout_id} 拉取失败: {error}");
-                    failed += 1;
+                    // 连续失败到上限、或官方明确说没有：先放下，7 天后再试，
+                    // 不让同一条永久拿不到的明细每次都把同步标成失败。
+                    let gone = error.is_unavailable();
+                    let db = self.write_db().await?;
+                    if db.record_official_detail_result(&workout_id, false, gone)? {
+                        set_aside += 1;
+                    } else {
+                        failed += 1;
+                    }
                     continue;
                 }
             };
             let db = self.write_db().await?;
+            db.record_official_detail_result(&workout_id, true, false)?;
             let record = FetchedRecord {
                 raw,
                 incomplete: false,
@@ -420,6 +430,20 @@ impl OfficialSync {
         // 这条流标失败、说清几条没拉到，下次同步会再补（它们仍在待补列表里）。
         let incomplete =
             (failed > 0).then(|| format!("{failed} 条官方运动明细没拉到，下次同步再补"));
+        if set_aside > 0 {
+            // 中性说明，不算失败：这些暂时拿不到，7 天后自动再试。
+            reports.push(StreamReport {
+                stream: "workout_detail".into(),
+                status: StreamStatus::Unavailable,
+                records_written: 0,
+                raw_records: 0,
+                capability: CapabilityStatus::Unavailable,
+                needs_reauth: false,
+                message: Some(format!(
+                    "{set_aside} 条官方运动明细暂时拿不到，7 天后自动再试"
+                )),
+            });
+        }
         if reports.is_empty() && incomplete.is_none() {
             return Ok(None);
         }
