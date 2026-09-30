@@ -86,9 +86,10 @@ const ringColor = computed(() => chartPalettes[resolvedTheme.value].series.readi
 </script>
 
 <template>
+  <!-- 今天还没有步数（包括第一次同步之前）时不提任何目标：「参考目标 10,000」会让人以为已经有数据了。 -->
   <RouterLink class="metric-panel steps-panel" to="/activity" :aria-label="t.stepsPanelAria">
     <div class="panel-head">
-      <span class="panel-title"><GlyphTile name="steps" :size="38" /><span><strong>{{ t.stepsTitle }}</strong><small>{{ stepGoalIsReference ? t.stepsGoalReference : t.stepsGoalToday }}</small></span></span>
+      <span class="panel-title"><GlyphTile name="steps" :size="38" /><span><strong>{{ t.stepsTitle }}</strong><small v-if="steps !== null">{{ stepGoalIsReference ? t.stepsGoalReference : t.stepsGoalToday }}</small></span></span>
       <span class="panel-go" :title="t.seeMore" aria-hidden="true"><Icon name="chevron-right" :size="16" /></span>
     </div>
     <template v-if="steps !== null">
