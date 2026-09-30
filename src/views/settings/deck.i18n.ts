@@ -62,7 +62,7 @@ export const deckMessages = defineMessages(
     mcpLead: '让 Claude Code、Codex 这类装在你电脑上的 AI 工具直接查本机数据——只读、不联网、不开端口。',
     mcpPreview: '查看将复制的内容',
     mcpToolsLabel: 'AI 能用的工具',
-    mcpTools: '配好后 AI 能问这五件事，悬停看说明。',
+    mcpTools: '配好后 AI 能用下面这些工具查你的数据，悬停看说明。',
     exportFormatSub: '「交给 AI」、运动详情导出时默认选中的格式',
 
     themeLabel: '主题',
@@ -130,7 +130,7 @@ export const deckMessages = defineMessages(
     mcpLead: 'Let AI tools on this machine — Claude Code, Codex and the like — query local data directly. Read-only, offline, no open port.',
     mcpPreview: 'Show what will be copied',
     mcpToolsLabel: 'Tools the AI can use',
-    mcpTools: 'Once configured, the AI can ask these five things. Hover for details.',
+    mcpTools: 'Once configured, the AI can query your data with these tools. Hover for details.',
     exportFormatSub: 'Preselected when exporting from “Send to AI” or a workout',
 
     themeLabel: 'Theme',
@@ -198,7 +198,7 @@ export const deckMessages = defineMessages(
     mcpLead: 'Permite que herramientas de IA instaladas en tu equipo —Claude Code, Codex y similares— consulten directamente tus datos locales. Solo lectura, sin conexión, sin puertos abiertos.',
     mcpPreview: 'Ver lo que se va a copiar',
     mcpToolsLabel: 'Herramientas que puede usar la IA',
-    mcpTools: 'Configurado, la IA puede preguntar estas cinco cosas; pasa el cursor para el detalle.',
+    mcpTools: 'Una vez configurado, la IA puede consultar tus datos con estas herramientas; pasa el cursor para ver el detalle.',
     exportFormatSub: 'Formato preseleccionado al exportar desde «Pasar a la IA» o desde un entrenamiento',
 
     themeLabel: 'Tema',

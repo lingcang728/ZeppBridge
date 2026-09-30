@@ -232,6 +232,13 @@ export default {
       mcpToolMetricSeries: 'Séries de métriques jour par jour, chacune avec son unité',
       mcpToolSleepDetail: 'Une nuit de sommeil, phase par phase',
       mcpToolDataHealth: 'État récupération/analyse/écriture de chaque flux',
+      mcpToolWorkoutDetail: "Tous les champs de résumé et zones cardiaques d’une séance",
+      mcpToolWorkoutSeries: "Échantillons, tracé, fractionnés et tours d’une séance",
+      mcpToolFoodData: "Alimentation : totaux quotidiens et entrées détaillées",
+      mcpToolAvailableMetrics: "Les métriques réellement présentes sur cet ordinateur",
+      mcpToolMetricRecords: "Relevés individuels de n’importe quelle métrique",
+      mcpToolSleepSessions: "Liste des nuits de sommeil",
+      mcpToolLifeEvents: "Événements de vie que vous avez notés",
       mcpSetupPrompt: `J'utilise une application de bureau Windows appelée ZeppBridge qui synchronise les données de ma montre Amazfit / Zepp dans une base SQLite locale.
 Elle embarque un programme MCP (zeppbridge-mcp) et je veux le configurer avec toi, pour que tu puisses interroger mes séances et mes données de santé directement au lieu que je les exporte et les colle à chaque fois.
 
@@ -239,7 +246,7 @@ Ce que j'en sais :
 - Le programme MCP vient de l'archive zeppbridge-tools de la page GitHub Releases de ZeppBridge ; on la décompresse et zeppbridge-mcp est dedans. Je ne l'ai peut-être pas encore téléchargée.
 - C'est un serveur MCP stdio. Il lit la base locale, n'utilise pas le réseau, n'écoute sur aucun port, et n'a besoin ni de jeton ni de clé API.
 - La forme de config typique est : {"mcpServers": {"zeppbridge": {"command": "<chemin complet vers zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- Il expose cinq outils en lecture seule : list_workouts, get_workout_insight (une séance comparée à ma propre référence), get_metric_series (séries de métriques jour par jour), get_sleep_detail (une nuit, phase par phase), et get_data_health (état récupération/analyse/écriture par flux).
+- Il expose douze outils en lecture seule : séances (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), métriques (list_available_metrics, get_metric_series, get_metric_records), sommeil (list_sleep_sessions, get_sleep_detail), alimentation (get_food_data), événements de vie (list_life_events) et santé des données (get_data_health).
 
 Dis-moi :
 1. Pour toi précisément — l'outil à qui je parle là — dans quel fichier va la config, ou quelle commande l'ajoute ;
@@ -693,6 +700,7 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       copyFailed: "Impossible de copier le message d’introduction",
       openFailed: 'Impossible d’ouvrir le site de l’IA',
       prepareFailed: 'Impossible de préparer les fichiers',
+      saveFailed: "La tâche n’a pas été enregistrée : le fichier est quand même préparé, mais ces choix ne seront pas retenus la prochaine fois et l’accès MCP de la tâche reste inchangé.",
       kickoff: "Lis le fichier joint et commence directement l’analyse en suivant les instructions au début du fichier.",
     },
 
@@ -2044,6 +2052,7 @@ Réponds en Markdown.`,
       outputAt: (path: string) => `Fichiers dans : ${path}`,
       copiedFiles: (count: number) =>
         plural(count, { one: `inclut ${count} pièce jointe d’origine`, other: `inclut ${count} pièces jointes d’origine` }),
+      saveAgain: "Enregistrer à nouveau",
       stale: 'La tâche a changé après l’export — les fichiers sur le bureau ne sont plus à jour. Exportez à nouveau.',
       desktopOnly: 'Connectez l’application de bureau pour exporter',
       go: (label: string) => `Confier à ${label}`,
@@ -2118,7 +2127,7 @@ Réponds en Markdown.`,
       detailStandard: 'Normale',
       detailDetailed: 'Détaillé (séries point par point)',
       mcp: 'Permettre aux outils MCP locaux d’interroger cette tâche',
-      mcpHint: 'Pour des outils locaux comme Claude Desktop : ils ne voient que ce que cette tâche couvre.',
+      mcpHint: "Pour des outils locaux comme Claude Desktop. Ne s’applique qu’au MCP lancé avec --scope task, qui ne voit alors que ce que couvre cette tâche ; le mode par défaut en lecture seule sur toute la base n’est pas restreint par ce bouton.",
     },
 
     'components/ai/TaskGraph': {
@@ -2293,7 +2302,7 @@ Réponds en Markdown.`,
       mcpLead: 'Laissez les outils IA installés sur votre machine — Claude Code, Codex et autres — interroger directement vos données. Lecture seule, sans réseau, aucun port ouvert.',
       mcpPreview: 'Aperçu de la configuration',
       mcpToolsLabel: 'Outils exposés à l’IA',
-      mcpTools: 'Cinq outils de lecture disponibles une fois configuré. Survolez pour le détail.',
+      mcpTools: "Une fois configuré, l’IA peut interroger vos données avec ces outils. Survolez pour le détail.",
       exportFormatSub: 'Format présélectionné lors d’un export',
 
       themeLabel: 'Thème',

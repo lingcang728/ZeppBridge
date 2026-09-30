@@ -39,7 +39,7 @@ const t = useMessages(defineMessages(
     detailStandard: '标准',
     detailDetailed: '详细（含逐点序列）',
     mcp: '允许本机 MCP 工具查询这个任务',
-    mcpHint: '给 Claude Desktop 这类本机工具用；只能查该任务覆盖的范围。',
+    mcpHint: '给 Claude Desktop 这类本机工具用。只对以 --scope task 启动的 MCP 生效：它只能查这个任务覆盖的范围；默认的全库只读模式不受这个开关限制。',
   },
   {
     attachTitle: 'Original files (PDF / images)',
@@ -61,7 +61,7 @@ const t = useMessages(defineMessages(
     detailStandard: 'Standard',
     detailDetailed: 'Detailed (per-point series)',
     mcp: 'Let local MCP tools query this task',
-    mcpHint: 'For local tools such as Claude Desktop; they only see what this task covers.',
+    mcpHint: 'For local tools such as Claude Desktop. Only applies to MCP started with --scope task, which then sees just what this task covers; the default full read-only mode is not narrowed by this switch.',
   },
   {
     attachTitle: 'Archivos originales (PDF / imágenes)',
@@ -83,7 +83,7 @@ const t = useMessages(defineMessages(
     detailStandard: 'Estándar',
     detailDetailed: 'Detallado (series punto a punto)',
     mcp: 'Permitir que herramientas MCP locales consulten esta tarea',
-    mcpHint: 'Para herramientas locales como Claude Desktop: solo ven la cobertura de esta tarea.',
+    mcpHint: 'Para herramientas locales como Claude Desktop. Solo se aplica al MCP iniciado con --scope task, que entonces ve únicamente lo que cubre esta tarea; el modo predeterminado de solo lectura completa no se restringe con este interruptor.',
   },
   'components/ai/TaskExtras',
 ));

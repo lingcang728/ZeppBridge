@@ -23,6 +23,9 @@ export const createOfficialAuth = (feedback: SettingsFeedback) => {
   /** 已经按码本地化好的失败说明（后端原文只兜底）。 */
   const failureText = ref<string | null>(null);
   let unlisten: (() => void) | undefined;
+  /** 挂载代次：detach 一次就作废之前所有还没回来的 attach（R16）。 */
+  let attachGen = 0;
+  let copiedTimer: number | undefined;
 
   const waiting = computed(() => status.value.state === 'waiting');
   const connected = computed(() => status.value.state === 'connected');
@@ -84,23 +87,33 @@ export const createOfficialAuth = (feedback: SettingsFeedback) => {
     try {
       await navigator.clipboard.writeText(url);
       linkCopied.value = true;
-      window.setTimeout(() => { linkCopied.value = false; }, 2400);
+      window.clearTimeout(copiedTimer);
+      copiedTimer = window.setTimeout(() => { linkCopied.value = false; }, 2400);
     } catch (cause) {
       failureText.value = toUserMessage(cause, t.value.officialFailed);
     }
   };
 
+  /* 设置页卸载时 listen 可能还没回来：回来时发现代次已变，就立刻把刚挂上的监听撤掉，
+     不留一份没人管的订阅（以前卸载后才完成的 attach 会把监听永久挂在那里）。 */
   const attach = async () => {
+    detach();
+    const gen = attachGen;
     try {
-      unlisten = await backend.listen<OfficialStatus>('official://status', apply);
-      apply(await backend.getOfficialStatus());
+      const off = await backend.listen<OfficialStatus>('official://status', apply);
+      if (gen !== attachGen) { off(); return; }
+      unlisten = off;
+      const current = await backend.getOfficialStatus();
+      if (gen === attachGen) apply(current);
     } catch {
       // 浏览器预览没有桌面端命令。
     }
   };
   const detach = () => {
+    attachGen += 1;
     unlisten?.();
     unlisten = undefined;
+    clearTimeout(copiedTimer);
   };
 
   return {

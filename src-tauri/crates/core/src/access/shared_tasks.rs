@@ -38,7 +38,7 @@ pub fn shared_task_grants(db: &Database) -> Result<Vec<TaskGrant>> {
 
     let mut grants = Vec::with_capacity(tasks.len());
     for task in tasks {
-        grants.push(expand_task(task, &local_days));
+        grants.push(expand_task(task, &local_days, Local::now().date_naive()));
     }
     Ok(grants)
 }
@@ -87,18 +87,27 @@ pub(super) fn default_true() -> bool {
 /// 开始日表；id 不在表里（记录已删/未同步）就跳过它，类别为假、窗口为空
 /// 同理——这些都不值得让整个授权失败。
 ///
+/// 没关联运动的任务（「最近 N 天」）窗口落在 `today`，和导出同一个函数算（代码审查 R12）。
+/// 关联了运动但一条都查不到时不退回「今天」：导出那边会直接报错，这里就什么都不授权。
+///
 /// 运动 id 有两种身份（代码审查 R01）：它一定是**锚点**（定日期窗）；
 /// 只有任务启用了 workout 类别，它才同时是**可读实体**。关掉 workout
 /// 类别的任务，MCP 读不到那条运动本身。
 pub(super) fn expand_task(
     task: SharedTaskPayload,
     local_days: &BTreeMap<String, NaiveDate>,
+    today: NaiveDate,
 ) -> TaskGrant {
     let mut windows = Vec::new();
-    for workout_id in &task.workout_ids {
-        let Some(day) = local_days.get(workout_id).copied() else {
-            continue;
-        };
+    let anchor_days: Vec<Option<NaiveDate>> = if task.workout_ids.is_empty() {
+        vec![None]
+    } else {
+        task.workout_ids
+            .iter()
+            .filter_map(|workout_id| local_days.get(workout_id).copied().map(Some))
+            .collect()
+    };
+    for anchor_day in anchor_days {
         for range in &task.categories {
             if !range.enabled {
                 continue;
@@ -109,12 +118,14 @@ pub(super) fn expand_task(
             if !category.is_windowed() {
                 continue;
             }
-            let end = if range.include_workout_day {
-                day
-            } else {
-                day - Duration::days(1)
+            let Some((start, end)) = crate::ai_tasks::coverage::task_window(
+                range.days_before,
+                range.include_workout_day,
+                anchor_day,
+                today,
+            ) else {
+                continue;
             };
-            let start = day - Duration::days(range.days_before.max(0));
             if let Some(window) = GrantWindow::new(category, start, end) {
                 windows.push(window.with_excluded(range.excluded_metrics.iter().cloned()));
             }

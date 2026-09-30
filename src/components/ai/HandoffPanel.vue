@@ -41,7 +41,7 @@ const props = defineProps<{
 
 const { draft, saveDraft } = useAiTaskDraft();
 const handoff = useAiTaskHandoff();
-const { steps, prepareResult } = handoff;
+const { steps, prepareResult, saveError } = handoff;
 const provider = ref<AiProvider>(handoff.lastProvider.value ?? AI_PROVIDERS[0]);
 const desktop = isDesktop();
 
@@ -75,6 +75,7 @@ const t = useMessages(defineMessages(
     noteDeepseek: 'DeepSeek 的专家模式不能传文件，用普通对话。',
     noteChatgpt: 'ChatGPT 免费版每天只能传 3 个文件。',
     stale: '导出后任务又改过，桌面文件已旧，重新导出。',
+    saveAgain: '再保存一次',
     desktopOnly: '连接桌面应用后才能导出',
     go: (label: string) => `交给 ${label}`,
     goSub: '准备文件 · 复制开场白 · 打开网站',
@@ -122,6 +123,7 @@ const t = useMessages(defineMessages(
     noteDeepseek: 'DeepSeek’s expert mode cannot take files — use a normal chat.',
     noteChatgpt: 'ChatGPT’s free plan allows 3 file uploads a day.',
     stale: 'Task changed after export — desktop files are outdated. Export again.',
+    saveAgain: 'Save again',
     desktopOnly: 'Connect the desktop app to export',
     go: (label: string) => `Send to ${label}`,
     goSub: 'Prepare file · copy opening line · open site',
@@ -169,6 +171,7 @@ const t = useMessages(defineMessages(
     noteDeepseek: 'El modo experto de DeepSeek no admite archivos: usa un chat normal.',
     noteChatgpt: 'El plan gratuito de ChatGPT permite 3 archivos al día.',
     stale: 'La tarea cambió tras exportar: los archivos del escritorio son antiguos. Vuelve a exportar.',
+    saveAgain: 'Guardar de nuevo',
     desktopOnly: 'Requiere la app de escritorio para exportar',
     go: (label: string) => `Pasar a ${label}`,
     goSub: 'Preparar archivo · copiar mensaje · abrir sitio',
@@ -300,7 +303,7 @@ watch(() => draft.value.id, () => { promptOverride.value = null; });
 const blocked = computed(() => (prepareResult.value?.status === 'blocked' && !stale.value ? prepareResult.value.blocked : []));
 const ready = computed(() => (prepareResult.value?.status === 'ready' ? prepareResult.value : null));
 const stale = computed(() => handoff.isStale(exportTask()));
-const busy = computed(() => steps.value.prepare.state === 'doing' || steps.value.copy.state === 'doing');
+const busy = computed(() => handoff.inFlight.value || steps.value.prepare.state === 'doing' || steps.value.copy.state === 'doing');
 /** 按过主按钮以后，坞向上长出进度那一截。 */
 const started = computed(() => steps.value.prepare.state !== 'idle');
 /** 进度那一截被人点空白 / Esc 收起了：下次按主按钮再长出来。收起后坞上留一枚「上次导出」。 */
@@ -313,23 +316,44 @@ function exportTask() {
 
 /* 同步进行中不许交付：导出的会是同步前的旧数据，而旁边正写着「最新数据还在路上」。
    两个按钮都等同步落地再亮（用户 2026-09-29 定）。 */
-const run = async (openSite: boolean) => {
+const run = (openSite: boolean) => {
   if (!desktop || busy.value || isSyncing.value) return;
   details.value = false;
   progressDismissed.value = false;
-  await saveDraft(props.fallbackTitle).catch(() => undefined);
-  const task = exportTask();
-  const now = handoffParts(task, props.preview, { hasDirection: Boolean(props.direction), now: new Date(), format: 'md' });
-  const options = {
-    briefText: now.brief,
-    dataFileStem: now.dataStem,
-    promptFileStem: now.promptStem,
-    promptOverride: promptOverride.value,
-    tokenBudget: props.preview?.markdown?.token_budget ?? FREE_TOKEN_BUDGET,
-    markdownGuide: markdownGuide(),
-  };
-  if (openSite) await handoff.runAll(task, provider.value, props.direction, options);
-  else await handoff.exportOnly(task, props.direction, options);
+  // 按下那一刻的交给谁、方向、预览、改过的提示词：保存那段等待里别处再改，也交出按下时的那一版。
+  const target = provider.value;
+  const direction = props.direction;
+  const preview = props.preview;
+  const override = promptOverride.value;
+  void handoff.start(() => saveDraft(props.fallbackTitle), async () => {
+    // 任务在保存之后取：新任务要带上刚拿到的 id。
+    const task = exportTask();
+    const now = handoffParts(task, preview, { hasDirection: Boolean(direction), now: new Date(), format: 'md' });
+    const options = {
+      briefText: now.brief,
+      dataFileStem: now.dataStem,
+      promptFileStem: now.promptStem,
+      promptOverride: override,
+      tokenBudget: preview?.markdown?.token_budget ?? FREE_TOKEN_BUDGET,
+      markdownGuide: markdownGuide(),
+    };
+    if (openSite) await handoff.runAll(task, target, direction, options);
+    else await handoff.exportOnly(task, direction, options);
+  });
+};
+
+/** 交接前那次保存失败了：在这里再存一次，存上了提示就收起。 */
+const savingAgain = ref(false);
+const saveAgain = async () => {
+  savingAgain.value = true;
+  try {
+    await saveDraft(props.fallbackTitle);
+    saveError.value = null;
+  } catch {
+    // 原因在任务名胶囊下面报着；这条提示留着。
+  } finally {
+    savingAgain.value = false;
+  }
 };
 
 const retry = (id: HandoffStepId) => {
@@ -410,6 +434,10 @@ onBeforeUnmount(() => {
           <li v-for="(issue, index) in blocked" :key="index" class="ai-note bad"><Icon name="warning" :size="13" />{{ aiTaskIssueText(issue) }}</li>
         </ul>
         <HandoffSteps :steps="steps" :provider-label="provider.label" @retry="retry" />
+        <p v-if="saveError" class="ai-note warn save-failed" role="alert">
+          <Icon name="warning" :size="13" /><span>{{ saveError }}</span>
+          <button type="button" class="ai-tool" :disabled="savingAgain" @click="saveAgain">{{ t.saveAgain }}</button>
+        </p>
         <div v-if="ready" class="output">
           <!-- 一枚大文件卡（批次 ⑦）：名字、大小、约多少 token；按住直接拖进 AI 的对话框。 -->
           <div v-if="ready.md_path" :class="['file-card', { draggable: desktop }]" role="button" tabindex="0"
@@ -628,6 +656,7 @@ onBeforeUnmount(() => {
 .issues .ai-note.bad { background: color-mix(in srgb, var(--danger) 10%, transparent); }
 .repeat { margin-left: auto; padding-left: 8px; font-size: var(--fs-2xs); }
 .output { margin-top: 10px; }
+.save-failed { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
 .provider-note { margin: 8px 0 0; padding: 7px 12px; border-radius: 12px; background: color-mix(in srgb, var(--warning) 10%, transparent); }
 .file-card { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: var(--radius-md); background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow); user-select: none; }
 .file-card.draggable { cursor: grab; }

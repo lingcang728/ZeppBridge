@@ -110,17 +110,21 @@ const redirectLegacy = () => {
 };
 watch(() => [route.hash, route.query.focus, route.params.card], redirectLegacy);
 
+/* 读偏好要等一会儿：等回来时页面可能已经卸载了，那就别再挂监听（R16）。 */
+let disposed = false;
 onMounted(async () => {
   redirectLegacy();
   void capability.loadCapabilityOverview();
   void loadDevices();
   await prefs.load();
+  if (disposed) return;
   await Promise.all([auth.attach(), official.attach()]);
 });
 /** 卡组总览当前的形态（CardDeck 报上来）：页头说明按它换一句。 */
 const deckLayout = ref<'cover' | 'list'>('list');
 
 onUnmounted(() => {
+  disposed = true;
   auth.detach();
   official.detach();
 });

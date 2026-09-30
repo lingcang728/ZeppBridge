@@ -172,4 +172,35 @@ describe('useAiTaskHandoff', () => {
     });
     expect(useAiTaskHandoff().lastProvider.value).toBeNull();
   });
+
+  it('start：保存还没回来时再按一次直接忽略，保存、导出各只跑一次（R11）', async () => {
+    const handoff = useAiTaskHandoff();
+    let release!: () => void;
+    const save = vi.fn(() => new Promise<void>((resolve) => { release = resolve; }));
+    const go = vi.fn(async () => {});
+    const first = handoff.start(save, go);
+    expect(handoff.inFlight.value).toBe(true);
+    expect(await handoff.start(save, go)).toBe(false);
+    release();
+    expect(await first).toBe(true);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(go).toHaveBeenCalledTimes(1);
+    expect(handoff.inFlight.value).toBe(false);
+  });
+
+  it('start：保存失败不吞，记进 saveError，交接照常往下走；下一次成功就清掉', async () => {
+    const handoff = useAiTaskHandoff();
+    const go = vi.fn(async () => {});
+    await handoff.start(async () => { throw new Error('disk full'); }, go);
+    expect(go).toHaveBeenCalledTimes(1);
+    expect(handoff.saveError.value).toContain('任务没保存上');
+    await handoff.start(async () => {}, go);
+    expect(handoff.saveError.value).toBeNull();
+  });
+
+  it('start：交接本身抛错也会放开 inFlight', async () => {
+    const handoff = useAiTaskHandoff();
+    await expect(handoff.start(async () => {}, async () => { throw new Error('boom'); })).rejects.toThrow('boom');
+    expect(handoff.inFlight.value).toBe(false);
+  });
 });

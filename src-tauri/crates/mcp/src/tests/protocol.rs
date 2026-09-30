@@ -100,7 +100,7 @@ fn the_tool_surface_is_read_only() {
             );
         }
     }
-    assert_eq!(names.len(), 5);
+    assert_eq!(names.len(), 12);
 }
 
 #[test]
@@ -160,7 +160,7 @@ fn a_modern_tools_list_carries_the_required_envelope() {
     assert_eq!(result["resultType"], json!("complete"));
     assert!(result["ttlMs"].as_i64().unwrap() > 0);
     assert_eq!(result["cacheScope"], json!("public"));
-    assert_eq!(result["tools"].as_array().unwrap().len(), 5);
+    assert_eq!(result["tools"].as_array().unwrap().len(), 12);
 }
 
 /// 认不出来的版本必须明确拒绝，并**把我们支持的版本列出来**——客户端就
@@ -242,12 +242,22 @@ fn argv_parsing_is_fail_closed() {
 /// 映射，这条测试就红。
 #[test]
 fn every_registered_tool_builds_a_data_request() {
-    let minimal_args: [(&str, Value); 5] = [
+    let minimal_args: [(&str, Value); 12] = [
         ("list_workouts", json!({})),
         ("get_workout_insight", json!({"workoutId": "w"})),
         ("get_metric_series", json!({"metrics": ["spo2_odi"]})),
         ("get_sleep_detail", json!({})),
         ("get_data_health", json!({})),
+        ("get_food_data", json!({})),
+        ("list_available_metrics", json!({})),
+        (
+            "get_metric_records",
+            json!({"metric": "steps", "source": "daily_metrics"}),
+        ),
+        ("list_sleep_sessions", json!({})),
+        ("get_workout_detail", json!({"workoutId": "w"})),
+        ("get_workout_series", json!({"workoutId": "w"})),
+        ("list_life_events", json!({})),
     ];
     for tool in tool_definitions() {
         let name = tool["name"].as_str().unwrap();

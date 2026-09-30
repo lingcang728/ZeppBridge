@@ -251,7 +251,18 @@ not among the most recent), `get_workout_insight` re-computes its baseline over
 granted workouts alone, `get_metric_series` answers only days inside the
 granted windows, `get_sleep_detail` resolves "latest night" within the granted
 sleep windows, and `get_data_health` — a whole-library report that cannot be
-honestly clipped — is refused outright. Naming a metric a task excludes is
+honestly clipped — is refused outright. The same goes for the other
+whole-library views: `list_available_metrics` and `list_life_events` are
+refused, and `get_food_data` returns only daily intake totals (under the body
+category), never individual food entries. `get_metric_records` and
+`list_sleep_sessions` return only rows inside the granted windows, and a metric
+that maps to no task category is refused. `get_workout_detail` drops the
+excluded fields plus anything that would reveal them (heart-rate zones when
+heart rate is excluded, stride when distance is). `get_workout_series` never
+returns the precise GPS route under `task`, and refuses the per-point sections
+for a workout whose task excludes any field. A task with no selected workouts
+("the last N days") opens its window ending today, exactly like the export.
+Naming a metric a task excludes is
 refused rather than answered with an empty series; excluded workout and sleep
 fields are simply absent, and excluding any sleep-stage minutes drops the stage
 timeline too. With several shared tasks the grants are a union: a metric or

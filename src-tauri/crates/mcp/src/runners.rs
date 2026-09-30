@@ -1,4 +1,4 @@
-//! 各工具的执行：运动列表、单次洞察、指标序列、睡眠详情、数据健康（从 main.rs 拆出，逻辑不变）。
+//! 各工具的执行：运动列表、单次洞察、指标序列、睡眠详情、数据健康（其余七个在 browse.rs）。
 
 use super::*;
 
@@ -8,12 +8,8 @@ pub(super) fn run_list_workouts(
     scope: &AccessScope,
     permit: &Permit,
 ) -> Result<Value, CallFailure> {
-    let limit = args
-        .get("limit")
-        .and_then(Value::as_u64)
-        .unwrap_or(20)
-        .clamp(1, 200) as usize;
-    let workouts = if scope.is_task_scoped() {
+    let (limit, offset) = page_args(args, 20, 200);
+    let (workouts, has_more) = if scope.is_task_scoped() {
         // 授权按 id，不按「全库最近 N 条」：一条授权运动再老也得能出来（R4）。
         // 授权了但记录已删/未同步的 id 查不到明细，如实跳过。
         let mut granted = Vec::new();
@@ -26,11 +22,22 @@ pub(super) fn run_list_workouts(
             }
         }
         granted.sort_by_key(|workout| std::cmp::Reverse(workout.start_time));
-        granted.truncate(limit);
-        granted
+        let has_more = granted.len() > offset.saturating_add(limit);
+        (
+            granted
+                .into_iter()
+                .skip(offset)
+                .take(limit)
+                .collect::<Vec<_>>(),
+            has_more,
+        )
     } else {
-        db.get_recent_workouts(limit)
-            .map_err(|error| CallFailure::plain(error.user_message()))?
+        let mut page = db
+            .workouts_page(limit + 1, offset)
+            .map_err(|error| CallFailure::plain(error.user_message()))?;
+        let has_more = page.len() > limit;
+        page.truncate(limit);
+        (page, has_more)
     };
     let entries: Vec<Value> = workouts
         .iter()
@@ -62,6 +69,9 @@ pub(super) fn run_list_workouts(
     Ok(json!({
         "workouts": entries,
         "units": { "distance": "m", "heartRate": "bpm", "calories": "kcal" },
+        "limit": limit,
+        "offset": offset,
+        "hasMore": has_more,
         "missingValues": contract::MISSING_VALUE_CONVENTION,
     }))
 }

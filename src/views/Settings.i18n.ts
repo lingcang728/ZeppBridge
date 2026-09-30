@@ -143,6 +143,13 @@ export const settingsMessages = defineMessages(
     mcpToolMetricSeries: '按天的指标序列，每条带单位',
     mcpToolSleepDetail: '一晚睡眠的分期明细',
     mcpToolDataHealth: '每条流的抓取/解析/写入状态',
+    mcpToolWorkoutDetail: "一次运动的全部汇总字段与心率区间",
+    mcpToolWorkoutSeries: "一次运动的逐点采样、轨迹、分段与记圈",
+    mcpToolFoodData: "饮食摄入：按天合计与逐条记录",
+    mcpToolAvailableMetrics: "本机实际有哪些指标",
+    mcpToolMetricRecords: "任一指标的逐条读数",
+    mcpToolSleepSessions: "睡眠记录列表",
+    mcpToolLifeEvents: "你记下的生活事件",
     mcpSetupPrompt: `我在用一个叫 ZeppBridge 的 Windows 桌面应用，它把 Amazfit / Zepp 手表数据同步到本机 SQLite 数据库。
 它附带一个 MCP 程序（zeppbridge-mcp），我想配到你这里，让你直接查我的运动和健康数据，不用每次导出再粘贴。
 
@@ -150,7 +157,7 @@ export const settingsMessages = defineMessages(
 - MCP 程序要从 ZeppBridge 的 GitHub Release 页下载 zeppbridge-tools 压缩包，解压后里面有 zeppbridge-mcp 可执行文件。我可能还没下载。
 - 它是 stdio 类型的 MCP server，只读本机数据库，不联网、不监听端口、不需要 token 或 API key。
 - 典型配置形状：{"mcpServers": {"zeppbridge": {"command": "<zeppbridge-mcp 的完整路径>", "args": ["--scope", "task"]}}}
-- 它有五个只读工具：list_workouts（运动列表）、get_workout_insight（单次运动与个人基线的比较）、get_metric_series（按天的指标序列）、get_sleep_detail（一晚睡眠明细）、get_data_health（每条数据流的抓取/解析/写入状态）。
+- 它有十二个只读工具：运动（list_workouts、get_workout_detail、get_workout_series、get_workout_insight）、指标（list_available_metrics、get_metric_series、get_metric_records）、睡眠（list_sleep_sessions、get_sleep_detail）、饮食（get_food_data）、生活事件（list_life_events）和数据健康（get_data_health）。
 
 告诉我：
 1. 针对你（我现在用的这个工具）具体该把配置写到哪个文件、用什么命令添加；
@@ -511,6 +518,13 @@ export const settingsMessages = defineMessages(
     mcpToolMetricSeries: 'Day-by-day metric series, each with its unit',
     mcpToolSleepDetail: 'One night of sleep, stage by stage',
     mcpToolDataHealth: 'Fetch/parse/write state for each stream',
+ mcpToolWorkoutDetail: "Every stored summary field and heart-rate zones for one workout",
+ mcpToolWorkoutSeries: "Samples, route, splits and laps for one workout",
+ mcpToolFoodData: "Food intake: daily totals and individual entries",
+ mcpToolAvailableMetrics: "Which metrics this computer actually has",
+ mcpToolMetricRecords: "Individual readings for any metric",
+ mcpToolSleepSessions: "List of sleep sessions",
+ mcpToolLifeEvents: "Life events you have recorded",
     mcpSetupPrompt: `I use a Windows desktop app called ZeppBridge that syncs my Amazfit / Zepp watch data into a local SQLite database.
 It ships an MCP program (zeppbridge-mcp) and I want to configure it with you, so you can query my workouts and health data directly instead of me exporting and pasting every time.
 
@@ -518,7 +532,7 @@ What I know about it:
 - The MCP program comes from the zeppbridge-tools archive on ZeppBridge's GitHub Releases page; unzip it and zeppbridge-mcp is inside. I may not have downloaded it yet.
 - It is a stdio MCP server. It reads the local database, does not use the network, listens on no port, and needs no token or API key.
 - The typical config shape is: {"mcpServers": {"zeppbridge": {"command": "<full path to zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- It exposes five read-only tools: list_workouts, get_workout_insight (one workout against my own baseline), get_metric_series (day-by-day metric series), get_sleep_detail (one night, stage by stage), and get_data_health (fetch/parse/write state per stream).
+- It exposes twelve read-only tools: workouts (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), metrics (list_available_metrics, get_metric_series, get_metric_records), sleep (list_sleep_sessions, get_sleep_detail), food (get_food_data), life events (list_life_events) and data health (get_data_health).
 
 Please tell me:
 1. For you specifically — the tool I am talking to right now — which file the config goes in, or which command adds it;
@@ -879,6 +893,13 @@ If you need anything from me (which client I use, where the file lives), just as
     mcpToolMetricSeries: 'Series de métricas día a día, cada una con su unidad',
     mcpToolSleepDetail: 'Una noche de sueño, fase por fase',
     mcpToolDataHealth: 'Estado de descarga/análisis/escritura de cada flujo',
+ mcpToolWorkoutDetail: "Todos los campos de resumen y zonas de pulso de un entrenamiento",
+ mcpToolWorkoutSeries: "Muestras, ruta, parciales y vueltas de un entrenamiento",
+ mcpToolFoodData: "Ingesta de alimentos: totales diarios y registros individuales",
+ mcpToolAvailableMetrics: "Qué métricas hay realmente en este equipo",
+ mcpToolMetricRecords: "Lecturas individuales de cualquier métrica",
+ mcpToolSleepSessions: "Lista de sesiones de sueño",
+ mcpToolLifeEvents: "Eventos de vida que registraste",
     mcpSetupPrompt: `Uso una app de escritorio llamada ZeppBridge que sincroniza los datos de mi reloj Amazfit / Zepp en una base de datos SQLite local.
 Incluye un programa MCP (zeppbridge-mcp) y quiero configurarlo contigo, para que puedas consultar mis entrenamientos y datos de salud directamente en vez de que yo exporte y pegue cada vez.
 
@@ -886,7 +907,7 @@ Lo que sé:
 - El programa MCP viene en el archivo zeppbridge-tools de la página de Releases de ZeppBridge en GitHub; al descomprimirlo, zeppbridge-mcp está adentro. Puede que todavía no lo haya descargado.
 - Es un servidor MCP por stdio. Lee la base de datos local, no usa la red, no abre ningún puerto y no necesita token ni clave de API.
 - La forma típica de la configuración es: {"mcpServers": {"zeppbridge": {"command": "<ruta completa a zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- Ofrece cinco herramientas de solo lectura: list_workouts (lista de entrenamientos), get_workout_insight (un entrenamiento frente a mi propia referencia), get_metric_series (series de métricas día a día), get_sleep_detail (una noche, fase por fase) y get_data_health (estado de descarga/análisis/escritura por flujo).
+- Ofrece doce herramientas de solo lectura: entrenamientos (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), métricas (list_available_metrics, get_metric_series, get_metric_records), sueño (list_sleep_sessions, get_sleep_detail), alimentación (get_food_data), eventos de vida (list_life_events) y salud de los datos (get_data_health).
 
 Dime:
 1. Para ti específicamente (la herramienta con la que estoy hablando ahora), en qué archivo va la configuración o qué comando la agrega;

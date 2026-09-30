@@ -168,6 +168,31 @@ impl Database {
     }
 }
 
+/// 任务一个类别在一个锚点上的日期窗（本地日、两端含）；空窗给 `None`。
+///
+/// 导出（`category_windows`）和 MCP 任务授权（`access::shared_tasks::expand_task`）共用这一个口径
+/// （代码审查 R12：以前不选运动的任务导出有 15 天窗、MCP 一天都没有）。
+/// `anchor_day` 为 `None` = 任务没关联运动：「最近 N 天」本身就是分析对象，窗口落在今天，
+/// `include_workout_day` 在这里没有意义，今天总是算进去。
+pub(crate) fn task_window(
+    days_before: i64,
+    include_workout_day: bool,
+    anchor_day: Option<NaiveDate>,
+    today: NaiveDate,
+) -> Option<(NaiveDate, NaiveDate)> {
+    let days_before = days_before.max(0);
+    let Some(day) = anchor_day else {
+        return Some((today - Duration::days(days_before), today));
+    };
+    let end = if include_workout_day {
+        day
+    } else {
+        day - Duration::days(1)
+    };
+    let start = day - Duration::days(days_before);
+    (start <= end).then_some((start, end))
+}
+
 /// 一个 enabled 窗口类别在各锚点上的窗口集合：
 /// `(workout_id, start, end)`，本地日、两端含。空窗不产出。
 ///
@@ -180,18 +205,21 @@ pub(crate) fn category_windows(
     today: NaiveDate,
 ) -> Vec<(Option<String>, NaiveDate, NaiveDate)> {
     if anchors.is_empty() {
-        return vec![(None, today - Duration::days(range.days_before), today)];
+        return task_window(range.days_before, range.include_workout_day, None, today)
+            .map(|(start, end)| (None, start, end))
+            .into_iter()
+            .collect();
     }
     anchors
         .iter()
         .filter_map(|anchor| {
-            let end = if range.include_workout_day {
-                anchor.local_start_day
-            } else {
-                anchor.local_start_day - Duration::days(1)
-            };
-            let start = anchor.local_start_day - Duration::days(range.days_before);
-            (start <= end).then(|| (Some(anchor.workout.workout_id.clone()), start, end))
+            let (start, end) = task_window(
+                range.days_before,
+                range.include_workout_day,
+                Some(anchor.local_start_day),
+                today,
+            )?;
+            Some((Some(anchor.workout.workout_id.clone()), start, end))
         })
         .collect()
 }

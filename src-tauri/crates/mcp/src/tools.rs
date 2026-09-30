@@ -160,15 +160,7 @@ pub(super) fn build_request(name: &str, args: &Value) -> Result<DataRequest, Str
             }
             request.categories = categories;
             request.metrics = metrics;
-            // 与 storage::metric_series 同一个窗口算法：含今天的本地日范围。
-            let days = args
-                .get("days")
-                .and_then(Value::as_i64)
-                .unwrap_or(90)
-                .clamp(1, 1825);
-            let end = Local::now().date_naive();
-            let start = end - Duration::days(days - 1);
-            request.date_range = Some((start, end));
+            request.date_range = Some(days_back(args));
         }
         "get_sleep_detail" => {
             request.tool = "get_sleep_detail";
@@ -181,11 +173,133 @@ pub(super) fn build_request(name: &str, args: &Value) -> Result<DataRequest, Str
             // 诚实子集——task 模式对它整体拒绝（R5）。
             request.whole_library = true;
         }
+        // 整库清单 / 任务模型里没有的类别（逐条饮食、生活事件）：task 模式整体拒绝，
+        // 不给一份看起来完整、实则被裁过的东西（代码审查 R13）。
+        "list_available_metrics" => {
+            request.tool = "list_available_metrics";
+            request.whole_library = true;
+        }
+        "list_life_events" => {
+            request.tool = "list_life_events";
+            date_args(args)?;
+            request.whole_library = true;
+        }
+        "get_food_data" => {
+            // 按天的摄入合计归在 body（access::metric_category）；逐条记录在 task 模式里不出去。
+            request.tool = "get_food_data";
+            request.categories = vec![AccessCategory::Body];
+            request.metrics = FOOD_METRICS.map(str::to_string).to_vec();
+            request.date_range = Some(days_back(args));
+        }
+        "get_metric_records" => {
+            request.tool = "get_metric_records";
+            let (metric, source) = metric_record_args(args)?;
+            // 类别查不到的指标：categories 留空，执行侧在 task 模式里拒绝（fail closed）。
+            if let Some(category) = record_category(metric, source) {
+                request.categories = vec![category];
+                request.metrics = vec![metric.to_string()];
+            }
+            let (start, end) = date_args(args)?;
+            if let (Some(start), Some(end)) = (start, end) {
+                request.date_range = Some((start, end));
+            }
+        }
+        "list_sleep_sessions" => {
+            request.tool = "list_sleep_sessions";
+            request.categories = vec![AccessCategory::Sleep];
+        }
+        "get_workout_detail" | "get_workout_series" => {
+            request.tool = if name == "get_workout_detail" {
+                "get_workout_detail"
+            } else {
+                "get_workout_series"
+            };
+            request.categories = vec![AccessCategory::Workout];
+            let workout_id = args
+                .get("workoutId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| "缺少 workoutId".to_string())?;
+            request.workout_ids = vec![workout_id.to_string()];
+        }
         other => {
             return Err(format!("没有名为 {other} 的工具。本服务只提供只读查询。"));
         }
     }
     Ok(request)
+}
+
+/// `get_food_data` 按天合计的四个摄入指标。
+pub(super) const FOOD_METRICS: [&str; 4] = [
+    "intake_calories",
+    "intake_protein_g",
+    "intake_fat_g",
+    "intake_carbs_g",
+];
+
+/// `days`（含今天）换成本地日范围，与 `storage::metric_series` 同一个窗口算法。
+pub(super) fn days_back(args: &Value) -> (NaiveDate, NaiveDate) {
+    let days = args
+        .get("days")
+        .and_then(Value::as_i64)
+        .unwrap_or(90)
+        .clamp(1, 1825);
+    let end = Local::now().date_naive();
+    (end - Duration::days(days - 1), end)
+}
+
+/// `startDate` / `endDate`：给了就必须是 YYYY-MM-DD，写错了明说，不悄悄当成没给。
+pub(super) fn date_args(args: &Value) -> Result<(Option<NaiveDate>, Option<NaiveDate>), String> {
+    let read = |field: &str| -> Result<Option<NaiveDate>, String> {
+        match args.get(field) {
+            None | Some(Value::Null) => Ok(None),
+            Some(Value::String(text)) => NaiveDate::parse_from_str(text, "%Y-%m-%d")
+                .map(Some)
+                .map_err(|_| format!("{field} 要写成 YYYY-MM-DD")),
+            Some(_) => Err(format!("{field} 要写成 YYYY-MM-DD")),
+        }
+    };
+    Ok((read("startDate")?, read("endDate")?))
+}
+
+pub(super) fn metric_record_args(args: &Value) -> Result<(&str, &str), String> {
+    let metric = args
+        .get("metric")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "缺少 metric".to_string())?;
+    let source = args
+        .get("source")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "缺少 source".to_string())?;
+    if !["daily_metrics", "metric_samples", "sleep_sessions"].contains(&source) {
+        return Err(format!(
+            "未知的 source：{source}。可选 daily_metrics、metric_samples、sleep_sessions。"
+        ));
+    }
+    Ok((metric, source))
+}
+
+/// 逐条读数归哪个授权类别：睡眠表里的评分归睡眠，其余按指标名映射。
+pub(super) fn record_category(metric: &str, source: &str) -> Option<AccessCategory> {
+    if source == "sleep_sessions" {
+        Some(AccessCategory::Sleep)
+    } else {
+        access::metric_category(metric)
+    }
+}
+
+/// 分页参数：`limit` 按工具各自的上限夹住，`offset` 最多一百万。
+pub(super) fn page_args(args: &Value, default: u64, max: u64) -> (usize, usize) {
+    let limit = args
+        .get("limit")
+        .and_then(Value::as_u64)
+        .unwrap_or(default)
+        .clamp(1, max) as usize;
+    let offset = args
+        .get("offset")
+        .and_then(Value::as_u64)
+        .unwrap_or(0)
+        .min(1_000_000) as usize;
+    (limit, offset)
 }
 
 pub(super) fn metric_args(args: &Value) -> Result<Vec<String>, String> {
@@ -295,6 +409,13 @@ pub(super) fn run_tool(
         "get_metric_series" => run_metric_series(db, args, scope, permit),
         "get_sleep_detail" => run_sleep_detail(db, args, scope, permit),
         "get_data_health" => run_data_health(db, args, database_bytes),
+        "get_food_data" => run_food_data(db, args, scope, permit),
+        "list_available_metrics" => run_available_metrics(db),
+        "get_metric_records" => run_metric_records(db, args, scope, permit),
+        "list_sleep_sessions" => run_sleep_sessions(db, args, scope, permit),
+        "get_workout_detail" => run_workout_detail(db, args, scope, permit),
+        "get_workout_series" => run_workout_series(db, args, scope, permit),
+        "list_life_events" => run_life_events(db, args),
         other => Err(CallFailure::plain(format!(
             "没有名为 {other} 的工具。本服务只提供只读查询。"
         ))),

@@ -185,7 +185,7 @@ stdio 传输，**不监听任何端口，不发出任何网络请求**。只读�
 
 argv 解析是 fail-closed 的：不认识的参数、未知的 `--scope` 值、缺值、重复传参都会让进程以非零退出并只写一行 stderr——拼错的参数绝不会静默放宽成更大范围。
 
-`task` 范围下，授权外的请求会被拒绝而不是悄悄截断：`list_workouts` 只回授权的运动 id（哪怕它们不在最近 N 条里）；`get_workout_insight` 的基线只按授权运动重算；`get_metric_series` 只回授权窗口内的日期；`get_sleep_detail` 的「最近一晚」只在授权睡眠窗里找；`get_data_health` 是整库口径的报表、裁不出诚实子集，整体拒绝。点名一个被任务排除的指标会被拒绝（而不是回空序列）；运动与睡眠记录里被排除的字段直接不出现，排除了任一分期分钟时连阶段时间轴一起不出现。多个任务同时开放时按并集放行：任一任务允许的指标 / 字段就能出去。`task` 范围的响应还会剥掉 `device_id` 这类身份字段。
+`task` 范围下，授权外的请求会被拒绝而不是悄悄截断：`list_workouts` 只回授权的运动 id（哪怕它们不在最近 N 条里）；`get_workout_insight` 的基线只按授权运动重算；`get_metric_series` 只回授权窗口内的日期；`get_sleep_detail` 的「最近一晚」只在授权睡眠窗里找；`get_data_health` 是整库口径的报表、裁不出诚实子集，整体拒绝；同样是整库视角的 `list_available_metrics`、`list_life_events` 也整体拒绝，`get_food_data` 只回按天的摄入合计（归在身体类），不给逐条饮食记录。`get_metric_records`、`list_sleep_sessions` 只回授权窗口内的行，归不进任何任务类别的指标直接拒绝。`get_workout_detail` 去掉被排除的字段以及能算回它们的字段（排除心率时心率区间一起去掉，排除距离时步幅一起去掉）。`get_workout_series` 在 `task` 范围里从不返回精确 GPS 轨迹；任务排除了任一字段的运动，逐点各段一律拒绝。没选运动的任务（「最近 N 天」）的窗口截止到今天，和导出完全一致。点名一个被任务排除的指标会被拒绝（而不是回空序列）；运动与睡眠记录里被排除的字段直接不出现，排除了任一分期分钟时连阶段时间轴一起不出现。多个任务同时开放时按并集放行：任一任务允许的指标 / 字段就能出去。`task` 范围的响应还会剥掉 `device_id` 这类身份字段。
 
 每个 `tools/call` 结果都带 `"scope": {"mode": ..., "grants": N}`（成功时在 `structuredContent` 里，出错时在顶层）；`initialize` 与 `server/discover` 也会报告 `"scope": {"mode": ...}` 并在说明文字里写当前范围，客户端始终知道自己在看哪一种视图。
 

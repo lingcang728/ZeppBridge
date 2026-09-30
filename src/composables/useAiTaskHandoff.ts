@@ -29,14 +29,17 @@ export interface HandoffStep {
 const messages = defineMessages(
   {
     prepareFailed: '准备文件失败', copyFailed: '复制开场白失败', openFailed: '无法打开 AI 网站',
+    saveFailed: '任务没保存上：文件照常准备，但下次打开不会记得这次的选择，MCP 的任务授权也还是旧的。',
     kickoff: '请读我附上的文件，按文件开头的说明直接开始分析。',
   },
   {
     prepareFailed: 'Could not prepare files', copyFailed: 'Could not copy the opening message', openFailed: 'Could not open the AI site',
+    saveFailed: 'The task was not saved: the file is still prepared, but these choices will not be remembered next time and MCP task access stays as before.',
     kickoff: 'Please read the attached file and start the analysis as described at the top of it.',
   },
   {
     prepareFailed: 'No se pudieron preparar los archivos', copyFailed: 'No se pudo copiar el mensaje inicial', openFailed: 'No se pudo abrir el sitio de la IA',
+    saveFailed: 'La tarea no se guardó: el archivo se prepara igual, pero la próxima vez no se recordarán estas opciones y el acceso MCP de la tarea sigue como antes.',
     kickoff: 'Lee el archivo adjunto y empieza el análisis como se indica al principio.',
   },
   'composables/useAiTaskHandoff',
@@ -72,6 +75,10 @@ export function useAiTaskHandoff() {
   const preparedSnapshot = ref<string | null>(null);
   const steps = ref(freshSteps());
   const lastProvider = ref<AiProvider | null>(readLastProvider());
+  /** 一次交接（先保存、再准备文件……）从按下到结束都算在途：保存那一段也不许再按一次（R11）。 */
+  const inFlight = ref(false);
+  /** 这次交接前保存任务失败的原因：文件照常准备，但要让人知道任务本身没存上。 */
+  const saveError = ref<string | null>(null);
 
   const setStep = (id: HandoffStepId, state: HandoffStepState, errorText: string | null = null) => {
     steps.value = { ...steps.value, [id]: { state, errorText } };
@@ -146,7 +153,33 @@ export function useAiTaskHandoff() {
     if (prepared?.status === 'ready') await revealOutput();
   };
 
+  /**
+   * 主按钮的入口：先保存任务，再交给 `go`（runAll / exportOnly）。第一个 await 之前就占住 `inFlight`，
+   * 保存还没回来时再按一次直接忽略——以前 busy 只看准备 / 复制两步，保存那几百毫秒里能连点出两次交接。
+   * 保存失败不吞：记进 `saveError`，交接照常往下走（文件本身不依赖任务存没存上）。
+   */
+  const start = async (save: () => Promise<unknown>, go: () => Promise<void>): Promise<boolean> => {
+    if (inFlight.value) return false;
+    inFlight.value = true;
+    saveError.value = null;
+    try {
+      try {
+        await save();
+      } catch {
+        // 具体原因任务名胶囊下面已经在报（useAiTaskDraft.lastError），这里只说对交接意味着什么。
+        saveError.value = copy().saveFailed;
+      }
+      await go();
+      return true;
+    } finally {
+      inFlight.value = false;
+    }
+  };
+
   return {
+    inFlight,
+    saveError,
+    start,
     prepareResult,
     preparedSnapshot,
     steps,

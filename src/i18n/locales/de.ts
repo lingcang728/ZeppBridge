@@ -416,6 +416,13 @@ export default {
       mcpToolMetricSeries: 'Tägliche Metrikreihen, jede mit ihrer Einheit',
       mcpToolSleepDetail: 'Eine Nacht Schlaf, Phase für Phase',
       mcpToolDataHealth: 'Abruf-/Parse-/Schreib-Status je Datenstrom',
+      mcpToolWorkoutDetail: "Alle gespeicherten Kennzahlen und Herzfrequenzzonen eines Trainings",
+      mcpToolWorkoutSeries: "Messpunkte, Route, Abschnitte und Runden eines Trainings",
+      mcpToolFoodData: "Ernährung: Tagessummen und einzelne Einträge",
+      mcpToolAvailableMetrics: "Welche Metriken auf diesem Computer tatsächlich vorliegen",
+      mcpToolMetricRecords: "Einzelne Messwerte beliebiger Metriken",
+      mcpToolSleepSessions: "Liste der Schlafaufzeichnungen",
+      mcpToolLifeEvents: "Von dir erfasste Lebensereignisse",
       mcpSetupPrompt: `Ich benutze eine Windows-Desktop-App namens ZeppBridge, die die Daten meiner Amazfit-/Zepp-Uhr in eine lokale SQLite-Datenbank synchronisiert.
 Sie bringt ein MCP-Programm (zeppbridge-mcp) mit, das ich bei dir einrichten möchte, damit du meine Trainings und Gesundheitsdaten direkt abfragen kannst, statt dass ich jedes Mal exportiere und einfüge.
 
@@ -423,7 +430,7 @@ Was ich darüber weiß:
 - Das MCP-Programm kommt aus dem zeppbridge-tools-Archiv auf ZeppBridges GitHub-Releases-Seite; entpacken und zeppbridge-mcp liegt darin. Ich habe es eventuell noch nicht heruntergeladen.
 - Es ist ein stdio-MCP-Server. Er liest die lokale Datenbank, nutzt kein Netzwerk, hört auf keinem Port und braucht kein Token und keinen API-Key.
 - Die typische Config-Form ist: {"mcpServers": {"zeppbridge": {"command": "<voller Pfad zu zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- Er stellt fünf nur-lesende Werkzeuge bereit: list_workouts, get_workout_insight (ein Training im Vergleich zu meiner Baseline), get_metric_series (tägliche Metrikreihen), get_sleep_detail (eine Nacht, Phase für Phase) und get_data_health (Abruf-/Parse-/Schreib-Status je Datenstrom).
+- Er stellt zwölf nur-lesende Werkzeuge bereit: Trainings (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), Metriken (list_available_metrics, get_metric_series, get_metric_records), Schlaf (list_sleep_sessions, get_sleep_detail), Ernährung (get_food_data), Lebensereignisse (list_life_events) und Datenzustand (get_data_health).
 
 Sag mir:
 1. Konkret für dich – das Werkzeug, mit dem ich gerade spreche – in welche Datei die Config gehört oder welcher Befehl sie hinzufügt;
@@ -1321,6 +1328,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       copyFailed: "Einstiegstext konnte nicht kopiert werden",
       openFailed: 'Die KI-Seite ließ sich nicht öffnen',
       prepareFailed: 'Die Dateien konnten nicht vorbereitet werden',
+      saveFailed: "Die Aufgabe wurde nicht gespeichert: Die Datei wird trotzdem vorbereitet, aber diese Auswahl ist beim nächsten Öffnen nicht mehr da, und die MCP-Freigabe der Aufgabe bleibt auf dem alten Stand.",
       kickoff: "Bitte lies die angehängte Datei und beginne direkt mit der Analyse nach den Anweisungen am Dateianfang.",
     },
     'composables/useDevices': {
@@ -2459,6 +2467,7 @@ Antworte in Markdown.`,
       reveal: 'Im Explorer anzeigen',
       lastExport: 'Letzter Export · Ordner öffnen',
       run: (label: string) => `Datei vorbereiten und ${label} öffnen`,
+      saveAgain: "Erneut speichern",
       stale:
         'Aufgabe nach dem Export geändert – Desktop-Dateien sind veraltet. Bitte erneut exportieren.',
       title: 'An die KI',
@@ -2506,7 +2515,7 @@ Antworte in Markdown.`,
       detailSummary: 'Zusammenfassung',
       filterName: 'PDF und Bilder',
       mcp: 'Lokale MCP-Werkzeuge dürfen diese Aufgabe abfragen',
-      mcpHint: 'Für lokale Werkzeuge wie Claude Desktop; sie sehen nur den Bereich dieser Aufgabe.',
+      mcpHint: "Für lokale Werkzeuge wie Claude Desktop. Gilt nur für MCP, das mit --scope task gestartet wurde: Es sieht dann nur, was diese Aufgabe abdeckt. Der standardmäßige Lesezugriff auf die ganze Datenbank wird durch diesen Schalter nicht eingeschränkt.",
       missing: 'nicht mehr gefunden',
       pickFailed: 'Anhängen der Dateien fehlgeschlagen',
       pickerTitle: 'Dateien wählen, die mit der Aufgabe übergeben werden',
@@ -2702,8 +2711,7 @@ Antworte in Markdown.`,
       mcpLead:
         'Lass KI-Werkzeuge auf deinem Rechner – Claude Code, Codex und ähnliche – deine lokalen Daten direkt abfragen. Nur lesend, offline, ohne offenen Port.',
       mcpPreview: 'Anzeigen, was kopiert wird',
-      mcpTools:
-        'Nach der Einrichtung stehen der KI fünf Abfragewerkzeuge bereit (Details per Hover).',
+      mcpTools: "Nach der Einrichtung kann die KI mit diesen Werkzeugen deine Daten abfragen. Für Details mit der Maus darüberfahren.",
       mcpToolsLabel: 'Für die KI nutzbare Werkzeuge',
       pageIntro:
         'Karte zum Anpassen öffnen; Kopfzeile seitwärts ziehen, um zur nächsten zu wechseln.',

@@ -878,3 +878,50 @@ fn a_disabled_workout_category_keeps_the_anchor_but_not_the_entity() {
     insight.workout_ids = vec!["w1".into()];
     assert!(authorize(&AccessScope::TaskScoped, &grants, &insight).is_err());
 }
+
+/// R12：不选运动的任务，导出和 MCP 的日期窗必须是同一段（以前导出 15 天、MCP 一天都没有）。
+/// 两边都走 `ai_tasks::coverage::task_window`；这里把 MCP 的授权窗和导出的窗逐一对照。
+#[test]
+fn a_task_without_workouts_gets_the_same_window_in_export_and_mcp() {
+    use crate::ai_tasks::coverage::category_windows;
+    use crate::ai_tasks::model::AiTaskCategoryRange;
+    for (days_before, include_day) in [(14, true), (0, true), (7, false)] {
+        let range_json = format!(
+            r#"{{"category":"sleep","enabled":true,"days_before":{days_before},"include_workout_day":{include_day}}}"#
+        );
+        let (db, _dir) = library_with_tasks(&[(
+            true,
+            &format!(r#"{{"id":"t","workout_ids":[],"categories":[{range_json}]}}"#),
+        )]);
+        let grants = shared_task_grants(&db).unwrap();
+        let mcp: Vec<(NaiveDate, NaiveDate)> = grants[0]
+            .windows
+            .iter()
+            .map(|window| (window.start_date, window.end_date))
+            .collect();
+        let range: AiTaskCategoryRange = serde_json::from_str(&range_json).unwrap();
+        let export: Vec<(NaiveDate, NaiveDate)> =
+            category_windows(&range, &[], Local::now().date_naive())
+                .into_iter()
+                .map(|(_, start, end)| (start, end))
+                .collect();
+        assert_eq!(
+            mcp, export,
+            "days_before={days_before} include_day={include_day}"
+        );
+        assert_eq!(mcp.len(), 1, "没关联运动也要有一段「最近 N 天」的窗");
+    }
+}
+
+/// 关联了运动、但一条都查不到：不退回「今天」——导出会直接报错，MCP 就什么都不授权。
+#[test]
+fn a_task_whose_workouts_are_all_missing_grants_nothing() {
+    let (db, _dir) = library_with_tasks(&[(
+        true,
+        r#"{"id":"t","workout_ids":["ghost"],"categories":[
+            {"category":"sleep","enabled":true,"days_before":14}
+        ]}"#,
+    )]);
+    let grants = shared_task_grants(&db).unwrap();
+    assert!(grants[0].windows.is_empty());
+}

@@ -13,11 +13,19 @@ import { deckMessages } from '../deck.i18n';
 const t = useMessages(settingsMessages);
 const d = useMessages(deckMessages);
 
+/* 和 zeppbridge-mcp 的 tools/list 一一对应（顺序同 docs/reference/cli-and-mcp*.md 的工具表）。 */
 const MCP_TOOLS = computed(() => [
   { name: 'list_workouts', detail: t.value.mcpToolListWorkouts },
   { name: 'get_workout_insight', detail: t.value.mcpToolWorkoutInsight },
+  { name: 'get_workout_detail', detail: t.value.mcpToolWorkoutDetail },
+  { name: 'get_workout_series', detail: t.value.mcpToolWorkoutSeries },
   { name: 'get_metric_series', detail: t.value.mcpToolMetricSeries },
+  { name: 'get_food_data', detail: t.value.mcpToolFoodData },
+  { name: 'list_available_metrics', detail: t.value.mcpToolAvailableMetrics },
+  { name: 'get_metric_records', detail: t.value.mcpToolMetricRecords },
+  { name: 'list_sleep_sessions', detail: t.value.mcpToolSleepSessions },
   { name: 'get_sleep_detail', detail: t.value.mcpToolSleepDetail },
+  { name: 'list_life_events', detail: t.value.mcpToolLifeEvents },
   { name: 'get_data_health', detail: t.value.mcpToolDataHealth },
 ]);
 

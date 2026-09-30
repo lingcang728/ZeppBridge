@@ -726,6 +726,7 @@ export default {
     },
     'composables/useAiTaskHandoff': {
       prepareFailed: 'De bestanden konden niet worden voorbereid',
+      saveFailed: "De taak is niet opgeslagen: het bestand wordt toch voorbereid, maar deze keuzes worden de volgende keer niet onthouden en de MCP-toegang van de taak blijft zoals hij was.",
       copyFailed: "Openingsbericht kopiëren mislukt",
       openFailed: 'De AI-site kon niet worden geopend',
       kickoff: "Lees het bijgevoegde bestand en begin meteen met de analyse volgens de instructies bovenaan het bestand.",
@@ -1255,7 +1256,7 @@ Wat ik ervan weet:
 - Het MCP-programma komt uit het zeppbridge-tools-archief op de GitHub Releases-pagina van ZeppBridge; na uitpakken zit zeppbridge-mcp erin. Mogelijk heb ik het nog niet gedownload.
 - Het is een stdio-MCP-server: leest alleen de lokale database, gebruikt geen netwerk, luistert op geen poort en heeft geen token of API-key nodig.
 - De gebruikelijke configvorm: {"mcpServers": {"zeppbridge": {"command": "<volledig pad naar zeppbridge-mcp>", "args": ["--scope", "task"]}}}
-- Het biedt vijf alleen-lezen-tools: list_workouts (trainingslijst), get_workout_insight (één training tegenover mijn eigen basislijn), get_metric_series (metriekreeksen per dag), get_sleep_detail (één nacht, stadium voor stadium) en get_data_health (status van ophalen/parsen/schrijven per stroom).
+- Het biedt twaalf alleen-lezen-tools: trainingen (list_workouts, get_workout_detail, get_workout_series, get_workout_insight), metrieken (list_available_metrics, get_metric_series, get_metric_records), slaap (list_sleep_sessions, get_sleep_detail), voeding (get_food_data), levensgebeurtenissen (list_life_events) en gegevensstatus (get_data_health).
 
 Vertel me:
 1. Voor jou specifiek — de tool waarmee ik nu praat — naar welk bestand de config gaat, of met welk commando ik hem toevoeg;
@@ -1264,6 +1265,13 @@ Vertel me:
 
 Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraag het gewoon.`,
       mcpToolDataHealth: 'Status van ophalen/parsen/schrijven per stroom',
+      mcpToolWorkoutDetail: "Alle opgeslagen samenvattingsvelden en hartslagzones van één training",
+      mcpToolWorkoutSeries: "Meetpunten, route, splits en ronden van één training",
+      mcpToolFoodData: "Voeding: dagtotalen en losse registraties",
+      mcpToolAvailableMetrics: "Welke metrieken er echt op deze computer staan",
+      mcpToolMetricRecords: "Losse metingen van elke metriek",
+      mcpToolSleepSessions: "Lijst met slaapsessies",
+      mcpToolLifeEvents: "Levensgebeurtenissen die je hebt vastgelegd",
       mcpToolListWorkouts: 'Trainingslijst, nieuwste eerst',
       mcpToolMetricSeries: 'Metriekreeksen per dag, elk met zijn eenheid',
       mcpToolSleepDetail: 'Eén nacht slaap, stadium voor stadium',
@@ -2276,6 +2284,7 @@ Antwoord in Markdown.`,
           one: `bevat ${count} originele bijlage`,
           other: `bevat ${count} originele bijlagen`,
         }),
+      saveAgain: "Opnieuw opslaan",
       stale:
         'De taak is na het exporteren veranderd; de bestanden op het bureaublad zijn verouderd. Exporteer opnieuw.',
       finalPrompt: "Definitieve prompt (bovenaan het bestand)",
@@ -2342,7 +2351,7 @@ Antwoord in Markdown.`,
       preciseGpsHint:
         'Standaard uit; aan behoudt de geëxporteerde track de ruwe coördinaten.',
       mcp: 'Lokale MCP-tools deze taak laten bevragen',
-      mcpHint: 'Voor lokale tools zoals Claude Desktop — ziet alleen wat deze taak dekt.',
+      mcpHint: "Voor lokale tools zoals Claude Desktop. Geldt alleen voor MCP dat met --scope task is gestart: dat ziet dan alleen wat deze taak dekt. De standaardmodus met alleen-lezen-toegang tot de hele database wordt door deze schakelaar niet beperkt.",
       attachTitle: 'Originele bestanden (PDF / afbeeldingen)',
       add: 'Bestanden toevoegen',
       pickerTitle: 'Kies bestanden om met de taak mee te geven',
@@ -2535,8 +2544,7 @@ Antwoord in Markdown.`,
       mcpLead:
         'Laat AI-tools die op je computer zijn geïnstalleerd — Claude Code, Codex en dergelijke — je lokale gegevens direct bevragen. Alleen-lezen, offline, geen open poort.',
       mcpToolsLabel: 'Tools die de AI kan gebruiken',
-      mcpTools:
-        'Na de configuratie kan de AI deze vijf dingen opvragen. Hou de muis erop voor uitleg.',
+      mcpTools: "Na het instellen kan de AI met deze tools je gegevens opvragen. Beweeg eroverheen voor details.",
       mcpPreview: 'Bekijk wat er gekopieerd wordt',
     },
     'views/settings/sections/ExportDefaultsSection': {

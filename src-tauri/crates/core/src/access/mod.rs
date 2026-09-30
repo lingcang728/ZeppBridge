@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use chrono::{DateTime, Duration, NaiveDate, Utc};
+use chrono::{DateTime, Duration, Local, NaiveDate, Utc};
 
 use rusqlite::params_from_iter;
 
@@ -363,9 +363,10 @@ fn authorize_task(
     // 让调用方知道「这个工具在任务范围里没有意义」，而不是给一份看起来像
     // 全局、实则被裁过的报表。
     if request.whole_library {
-        return Err(denied(
-            "数据健康是整库视角的报表，没法诚实地裁剪到任务授权范围；任务范围内不提供它。",
-        ));
+        return Err(denied(format!(
+            "{} 是整库视角的（数据健康、指标清单、饮食明细、生活事件），没法诚实地裁剪到任务授权范围；任务范围内不提供它。",
+            request.tool
+        )));
     }
 
     let workout_ids: BTreeSet<String> = grants
@@ -626,6 +627,47 @@ pub fn project_workout_list_entry(value: &mut serde_json::Value, excluded: &BTre
         return;
     };
     for (field, key) in WORKOUT_LIST_FIELDS {
+        if excluded.contains(field) {
+            object.remove(key);
+        }
+    }
+}
+
+/// 从 `get_workout_detail` 的整条运动（snake_case，字段名与任务模型一致）里删掉被排除的字段，
+/// 连同能直接算回它们的字段：心率被排除时心率区间不出去，距离被排除时步幅不出去
+/// （步数 × 步幅就是距离），爬升 / 下降被排除时最高 / 最低海拔也不出去。
+pub fn project_workout_detail(value: &mut serde_json::Value, excluded: &BTreeSet<String>) {
+    let Some(object) = value.as_object_mut() else {
+        return;
+    };
+    for field in excluded {
+        object.remove(field);
+    }
+    if ["avg_hr", "max_hr", "min_hr"]
+        .iter()
+        .any(|field| excluded.contains(*field))
+    {
+        object.remove("hr_zones");
+    }
+    if excluded.contains("distance_meters") {
+        object.remove("avg_stride_cm");
+    }
+    if excluded.contains("elevation_gain_m") || excluded.contains("elevation_loss_m") {
+        object.remove("max_altitude_m");
+        object.remove("min_altitude_m");
+    }
+}
+
+/// `list_sleep_sessions` 出口的驼峰字段 ↔ 任务模型字段名。
+const SLEEP_LIST_FIELDS: [(&str, &str); 2] =
+    [("score", "score"), ("duration_minutes", "durationMinutes")];
+
+/// 从 `list_sleep_sessions` 的一条记录里删掉被排除的字段。
+pub fn project_sleep_list_entry(value: &mut serde_json::Value, excluded: &BTreeSet<String>) {
+    let Some(object) = value.as_object_mut() else {
+        return;
+    };
+    for (field, key) in SLEEP_LIST_FIELDS {
         if excluded.contains(field) {
             object.remove(key);
         }

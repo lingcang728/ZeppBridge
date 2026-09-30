@@ -28,6 +28,8 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
   const loginError = ref<string | null>(null);
   const loginBusy = ref(false);
   let unlistenLogin: (() => void) | undefined;
+  /** 挂载代次：detach 一次就作废之前所有还没回来的 attach（R16）。 */
+  let attachGen = 0;
 
   // 手动认证
   const showManualAuth = ref(false);
@@ -158,14 +160,21 @@ export const createAuthFlow = (feedback: SettingsFeedback) => {
 
   /** 挂上登录状态推送，并补读一次当前状态。 */
   const attach = async () => {
+    detach();
+    const gen = attachGen;
     try {
-      unlistenLogin = await backend.listen<LoginStatus>('login://status', (payload) => { void applyLoginStatus(payload); });
-      await applyLoginStatus(await backend.getLoginStatus());
+      const off = await backend.listen<LoginStatus>('login://status', (payload) => { void applyLoginStatus(payload); });
+      // 卸载后才回来的监听立刻撤掉，不留孤儿订阅。
+      if (gen !== attachGen) { off(); return; }
+      unlistenLogin = off;
+      const current = await backend.getLoginStatus();
+      if (gen === attachGen) await applyLoginStatus(current);
     } catch {
       // Browser preview has no login IPC.
     }
   };
   const detach = () => {
+    attachGen += 1;
     unlistenLogin?.();
     unlistenLogin = undefined;
   };
