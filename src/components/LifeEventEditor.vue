@@ -6,6 +6,7 @@ import SegmentTrack from './SegmentTrack.vue';
 import { useLifeEvents } from '../composables/useLifeEvents';
 import { backend } from '../lib/bridge';
 import { eventCategories, lifeEventMessages, validLifeEvent } from '../lib/lifeEvents';
+import { localDateString } from '../lib/format';
 import { useMessages } from '../i18n';
 const t = useMessages(lifeEventMessages);
 const { draft, reload } = useLifeEvents();
@@ -23,6 +24,13 @@ watch(() => draft.value?.startDate, (start) => {
 const ongoing = computed({ get: () => draft.value?.endDate === null, set: value => {
   if (draft.value) draft.value.endDate = value ? null : draft.value.startDate;
 } });
+/* 日期默认是能直接敲的日期框（带日历），外加「今天 / 昨天 / 同开始日期」快捷项（U15）；
+   滚轮留作可选方式。键盘一次就能输完整日期。 */
+const wheels = ref(false);
+const dayOffset = (days: number) => { const date = new Date(); date.setDate(date.getDate() - days); return localDateString(date); };
+const today = () => dayOffset(0);
+function setStart(value: string) { if (draft.value && value) draft.value.startDate = value; }
+function setEnd(value: string) { if (draft.value && value) draft.value.endDate = value; }
 function close() { if (!busy.value) draft.value = null; }
 function setCategory(value: string | number) {
   if (!draft.value) return;
@@ -64,13 +72,28 @@ async function remove() {
           />
         </div>
         <div class="event-dates">
-          <label>{{ t.start }}
-            <WheelDatePicker v-model="draft.startDate" :aria-label="t.start" data-event-start />
-          </label>
-          <label v-if="!ongoing">{{ t.end }}
-            <WheelDatePicker v-model="draft.endDate" :min="draft.startDate" :aria-label="t.end" data-event-end />
-          </label>
+          <div class="field">
+            <label for="life-event-start">{{ t.start }}</label>
+            <WheelDatePicker v-if="wheels" v-model="draft.startDate" :aria-label="t.start" data-event-start />
+            <input v-else id="life-event-start" type="date" :value="draft.startDate" min="2000-01-01" max="2099-12-31" required data-event-start
+              @change="setStart(($event.target as HTMLInputElement).value)">
+            <span class="date-quick">
+              <button type="button" class="quick" @click="setStart(today())">{{ t.today }}</button>
+              <button type="button" class="quick" @click="setStart(dayOffset(1))">{{ t.yesterday }}</button>
+            </span>
+          </div>
+          <div v-if="!ongoing" class="field">
+            <label for="life-event-end">{{ t.end }}</label>
+            <WheelDatePicker v-if="wheels" v-model="draft.endDate" :min="draft.startDate" :aria-label="t.end" data-event-end />
+            <input v-else id="life-event-end" type="date" :value="draft.endDate ?? ''" :min="draft.startDate" max="2099-12-31" required data-event-end
+              @change="setEnd(($event.target as HTMLInputElement).value)">
+            <span class="date-quick">
+              <button type="button" class="quick" @click="setEnd(draft.startDate)">{{ t.sameAsStart }}</button>
+              <button type="button" class="quick" @click="setEnd(today())">{{ t.today }}</button>
+            </span>
+          </div>
         </div>
+        <button type="button" class="quick date-mode" @click="wheels = !wheels">{{ wheels ? t.useTyping : t.useWheels }}</button>
         <div class="check">
           <span>{{ t.ongoing }}</span>
           <button type="button" class="mat-switch" role="switch" :aria-checked="ongoing" :aria-label="t.ongoing" @click="ongoing = !ongoing"></button>
@@ -101,6 +124,12 @@ label, .field { display:grid; gap:6px; font-size:var(--fs-sm); color:var(--muted
 input,textarea { min-width:0; width:100%; box-sizing:border-box; padding:10px 14px; border:0; border-radius:14px; background: var(--cap-track); box-shadow: var(--cap-track-shadow); color:var(--ink); font:inherit; outline:none; }
 input:focus,textarea:focus { box-shadow: var(--cap-track-shadow), 0 0 0 2px var(--focus); }
 textarea { resize:vertical; }.event-dates { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+input[type='date'] { min-height:42px; font-variant-numeric:tabular-nums; }
+.date-quick { display:flex; flex-wrap:wrap; gap:6px; }
+.quick { min-height:28px; padding:0 10px; border:0; border-radius:999px; background:color-mix(in srgb, var(--ink) 7%, transparent); color:var(--muted); font:inherit; font-size:var(--fs-xs); cursor:pointer; }
+.quick:hover { background:color-mix(in srgb, var(--accent) 16%, transparent); color:var(--ink); }
+.quick:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+.date-mode { justify-self:start; background:transparent; padding:0; text-decoration:underline dotted; text-underline-offset:3px; }
 .check { display:flex; align-items:center; justify-content:space-between; gap:12px; color:var(--ink); font-size:var(--fs-sm); }
 .event-hint { color:var(--subtle); font-size:var(--fs-xs); line-height:1.6; }
 footer { display:flex; flex-wrap:wrap; gap:8px; }footer span { flex:1; }.delete-confirm { display:grid; gap:10px; }
