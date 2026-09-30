@@ -27,6 +27,7 @@ const messages = defineMessages(
     verifyFirst: '先完成连接验证',
     connectPill: '连接账号',
     syncing: '同步中…',
+    syncingProgress: (current: number, total: number) => `同步中 ${current}/${total}`,
     syncFailed: '同步失败',
     syncPartial: '部分未完成',
     cancel: '取消',
@@ -53,6 +54,7 @@ const messages = defineMessages(
     syncFailed: 'Sync failed',
     syncPartial: 'Partly synced',
     cancel: 'Cancel',
+    syncingProgress: (current: number, total: number) => `Syncing ${current}/${total}`,
     themeTitle: 'Switch theme',
     themeLight: 'Light',
     themeDark: 'Dark',
@@ -76,6 +78,7 @@ const messages = defineMessages(
     syncFailed: 'Sincronización fallida',
     syncPartial: 'Sincronización parcial',
     cancel: 'Cancelar',
+    syncingProgress: (current: number, total: number) => `Sincronizando ${current}/${total}`,
     themeTitle: 'Cambiar tema',
     themeLight: 'Claro',
     themeDark: 'Oscuro',
@@ -189,7 +192,7 @@ const needsConnection = computed(() => !!appStatus.value && !canIncrementalSync.
 const syncText = computed(() => {
   if (isSyncing.value) {
     return syncProgress.value
-      ? `${syncProgress.value.current}/${syncProgress.value.total}`
+      ? t.value.syncingProgress(syncProgress.value.current, syncProgress.value.total)
       : t.value.syncing;
   }
   if (needsConnection.value) return t.value.connectPill;
@@ -204,6 +207,11 @@ const syncTitle = computed(() => {
   return `${t.value.connectionTitle} · ${t.value.lastSyncPrefix}${lastSyncClock.value}`
     + ` — ${canIncrementalSync.value ? t.value.syncNow : t.value.verifyFirst}`;
 });
+
+/* 空闲、能同步时，前面是同步图标而不是一个没有文字含义的绿点（U19）：一眼看出「点它就同步」。
+   失败 / 部分未完成 / 未连接仍用带色的点，旁边的字说明它是什么。 */
+const idleSyncable = computed(() => !isSyncing.value && !readyToHand.value && canIncrementalSync.value
+  && syncState.value !== 'failed' && syncState.value !== 'partial');
 
 /* 点击行为和旧的同步按钮相同：能增量同步就发起；同步中点击则是取消；没连上就去「账号与设备」卡。 */
 const onSyncClick = () => {
@@ -391,9 +399,11 @@ watch(() => (readyToHand.value ? t.value.readyPill : syncText.value), () => {
         :aria-label="syncTitle"
         @click="onSyncClick"
       >
-        <i class="dot" :class="{ spinning: isSyncing }" aria-hidden="true"></i>
+        <Icon v-if="idleSyncable" name="refresh" :size="14" class="sync-icon" />
+        <i v-else class="dot" :class="{ spinning: isSyncing }" aria-hidden="true"></i>
         <span :key="readyToHand ? 'ready' : isSyncing ? 'syncing' : 'idle'" class="sync-text" aria-live="polite">{{ readyToHand ? t.readyPill : syncText }}</span>
-        <Icon v-if="isSyncing" name="x" :size="13" class="sync-cancel" />
+        <!-- 同步中这颗按钮的动作是取消：写出来，不只藏在 title 里（U19）。 -->
+        <span v-if="isSyncing" class="sync-cancel"><Icon name="x" :size="12" /><span class="sync-cancel-text">{{ t.cancel }}</span></span>
         <Icon v-else-if="readyToHand" name="arrow-right" :size="14" class="ready-arrow" />
       </button>
 
@@ -504,7 +514,11 @@ watch(() => (readyToHand.value ? t.value.readyPill : syncText.value), () => {
 .sync-pill.is-ready { color: var(--ink); font-weight: 600; }
 .sync-pill.is-ready .dot { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
 .ready-arrow { color: var(--accent); }
-.sync-cancel { color: var(--subtle); }
+.sync-cancel { display: inline-flex; align-items: center; gap: 3px; margin-left: 2px; padding: 1px 7px 1px 5px; border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--muted); font-size: var(--fs-2xs); }
+.sync-pill:hover .sync-cancel { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--ink); }
+.sync-icon { flex: none; color: var(--accent); }
+.sync-pill.tone-neutral .sync-icon { color: var(--muted); }
 
 .icon-group { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border-radius: 999px; }
 .theme-toggle { --seg-pad: 1px; }
@@ -514,7 +528,7 @@ watch(() => (readyToHand.value ? t.value.readyPill : syncText.value), () => {
 /* 回退档位（见 refit）：只有量出来放不下时才会升档。 */
 .app-topbar.is-measuring :deep(.capsule-wheel) { transition: none !important; }
 .app-topbar[class*='fit-'] .wordmark { display: none; }
-.fit-3 .sync-text, .fit-4 .sync-text, .fit-5 .sync-text { display: none; }
+.fit-3 .sync-text, .fit-4 .sync-text, .fit-5 .sync-text, .fit-3 .sync-cancel-text, .fit-4 .sync-cancel-text, .fit-5 .sync-cancel-text { display: none; }
 .fit-3 .sync-pill, .fit-4 .sync-pill, .fit-5 .sync-pill { padding-inline: 11px; }
 .fit-5 .locale-wheel, .fit-5 .group-divider { display: none; }
 
@@ -537,7 +551,7 @@ watch(() => (readyToHand.value ? t.value.readyPill : syncText.value), () => {
 }
 @media (max-width: 520px) {
   .topbar-actions { gap: 5px; }
-  .sync-text { display: none; }
+  .sync-text, .sync-cancel-text { display: none; }
   .sync-pill { padding-inline: 10px; }
   .wordmark { font-size: var(--fs-md); }
 }
