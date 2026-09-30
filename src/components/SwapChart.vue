@@ -31,7 +31,9 @@ const emit = defineEmits<{
   axis: [index: number | null];
 }>();
 /* 坐标轴指示器停在第几格（类目轴给的是下标）；指示器收起时给 null。 */
-const onAxisPointer = (event: { axesInfo?: { axisDim?: string; value?: unknown }[] }) => {
+/* vue-echarts 8 把事件参数标成通用的 Payload，形状在这里自己收窄。 */
+const onAxisPointer = (payload: unknown) => {
+  const event = payload as { axesInfo?: { axisDim?: string; value?: unknown }[] };
   const x = event.axesInfo?.find((info) => info.axisDim === 'x');
   emit('axis', typeof x?.value === 'number' ? x.value : null);
 };
