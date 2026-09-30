@@ -24,6 +24,7 @@ import SkeletonBlock from '../components/SkeletonBlock.vue';
 import { syncOutcomeLabel, useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { createLoadSeq } from '../lib/loadSeq';
+import { formatBytes } from '../lib/format';
 import type { DataHealth, HealthAction, StageState, StreamHealth } from '../types';
 import { syncStreamLabel } from '../lib/syncStreams';
 import { intlLocale, useMessages } from '../i18n';
@@ -82,13 +83,6 @@ const formatDateTime = (value?: string | null): string => {
   return displayDateTimeFormatter({
     year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(date).replace(/\//g, '-');
-};
-
-const formatBytes = (bytes: number): string => {
-  if (!Number.isFinite(bytes) || bytes <= 0) return t.value.notProvided;
-  if (bytes >= 1_073_741_824) return `${(bytes / 1_073_741_824).toFixed(1)} GB`;
-  if (bytes >= 1_048_576) return `${Math.round(bytes / 1_048_576)} MB`;
-  return `${Math.round(bytes / 1024)} KB`;
 };
 
 const cadenceLabel = (cadence: string): string => lookup(t.value.cadence, cadence) ?? cadence;
@@ -207,8 +201,6 @@ onMounted(() => void load());
 <template>
   <section class="page health-page" aria-labelledby="health-title">
     <PageHeader
-      back="/settings"
-      :back-label="t.backToSettings"
       title-id="health-title"
       :title="t.title"
       :intro="t.intro"
@@ -317,7 +309,7 @@ onMounted(() => void load());
       <section class="health-card" aria-labelledby="db-title">
         <h2 id="db-title">{{ t.dbTitle }}</h2>
         <div class="fact-grid">
-          <div><span>{{ t.dbSize }}</span><strong>{{ formatBytes(health.database.database_bytes) }}</strong></div>
+          <div><span>{{ t.dbSize }}</span><strong>{{ formatBytes(health.database.database_bytes, t.notProvided) }}</strong></div>
           <div><span>{{ t.dbRaw }}</span><strong>{{ health.database.raw_records.toLocaleString(intlLocale()) }}</strong></div>
           <div><span>{{ t.dbCanonical }}</span><strong>{{ health.database.canonical_records.toLocaleString(intlLocale()) }}</strong></div>
           <div>

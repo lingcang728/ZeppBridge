@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  formatBytes,
   formatDistance,
   formatDuration,
   formatMetric,
@@ -101,5 +102,20 @@ describe('缺失值的说法跟着界面语言走', () => {
     setLocale('en');
     setLocale('zh');
     expect(formatDuration(125)).toBe('2 小时 5 分');
+  });
+});
+
+describe('formatBytes', () => {
+  it('B / whole KB / 1-decimal MB / 2-decimal GB; empty for missing', () => {
+    expect(formatBytes(null)).toBe('—');
+    expect(formatBytes(Number.NaN)).toBe('—');
+    expect(formatBytes(0)).toBe('—');
+    expect(formatBytes(0, '0 KB')).toBe('0 KB');
+    expect(formatBytes(512)).toBe('512 B');
+    expect(formatBytes(1023)).toBe('1023 B');
+    expect(formatBytes(1024)).toBe('1 KB');
+    expect(formatBytes(2048)).toBe('2 KB');
+    expect(formatBytes(3 * 1024 * 1024)).toBe('3.0 MB');
+    expect(formatBytes(1024 * 1024 * 1024)).toBe('1.00 GB');
   });
 });

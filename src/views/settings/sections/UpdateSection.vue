@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import Icon from '../../../components/Icon.vue';
 import ModalDialog from '../../../components/ModalDialog.vue';
 import { checkForDesktopUpdate, downloadAndInstallDesktopUpdate, updateState } from '../../../services/updateService';
+import { formatBytes } from '../../../lib/format';
 import { useMessages } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
 import { deckMessages } from '../deck.i18n';
@@ -45,9 +46,6 @@ const updateStatusLabel = computed(() => ({
   unmanaged: t.value.updateStatusUnmanaged,
 }[updateState.status]));
 
-const formatUpdateBytes = (bytes: number) => bytes < 1024 * 1024
-  ? `${(bytes / 1024).toFixed(1)} KB`
-  : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
 /* 弹窗全程不关：下载和安装的进度都显示在更新说明下面。
    用户想干别的可以点「在后台继续」把弹窗收起来，下载不受影响。 */
@@ -65,7 +63,7 @@ const installUpdate = async () => {
           <span class="s-row-title">{{ updateStatusLabel }}</span>
           <span v-if="updateState.status === 'failed'" class="s-row-sub">{{ updateState.error }}</span>
           <span v-else-if="updateState.status === 'unmanaged'" class="s-row-sub">{{ t.updateUnmanagedHint(updateState.currentVersion || t.updateVersionLoading) }}</span>
-          <span v-else-if="updateState.status === 'available'" class="s-row-sub">{{ t.updateCurrent(updateState.currentVersion) }}<template v-if="updateState.sizeBytes"> · {{ formatUpdateBytes(updateState.sizeBytes) }}</template></span>
+          <span v-else-if="updateState.status === 'available'" class="s-row-sub">{{ t.updateCurrent(updateState.currentVersion) }}<template v-if="updateState.sizeBytes"> · {{ formatBytes(updateState.sizeBytes) }}</template></span>
           <span v-else class="s-row-sub">{{ t.updateVersion(updateState.currentVersion || t.updateVersionLoading) }}</span>
           <!-- 同一个版本号会构建很多次；报问题时把这一行带上，就不用猜手上是哪个包了。 -->
           <span class="s-row-sub build-stamp">{{ t.buildStamp(BUILD_STAMP) }}</span>
@@ -114,7 +112,7 @@ const installUpdate = async () => {
       <p class="modal-sub">
         {{ t.updateModalCurrent(updateState.currentVersion || t.updateModalUnknownVersion) }}
         <template v-if="updateState.date">{{ t.updateModalReleased(updateState.date.slice(0, 10)) }}</template>
-        <template v-if="updateState.sizeBytes"> · {{ formatUpdateBytes(updateState.sizeBytes) }}</template>
+        <template v-if="updateState.sizeBytes"> · {{ formatBytes(updateState.sizeBytes) }}</template>
       </p>
       <div class="modal-body">
         <pre class="release-notes">{{ updateState.notes || t.releaseNotesEmpty }}</pre>
@@ -133,7 +131,7 @@ const installUpdate = async () => {
         <p class="progress-note">
           <template v-if="updateState.status === 'installing'">{{ t.updateInstallNote }}</template>
           <template v-else-if="updateState.totalBytes">
-            {{ formatUpdateBytes(updateState.downloadedBytes) }} / {{ formatUpdateBytes(updateState.totalBytes) }}{{ t.updateDownloadNoteTail }}
+            {{ formatBytes(updateState.downloadedBytes, '0 KB') }} / {{ formatBytes(updateState.totalBytes) }}{{ t.updateDownloadNoteTail }}
           </template>
           <template v-else>{{ t.updateDownloadNote }}</template>
         </p>

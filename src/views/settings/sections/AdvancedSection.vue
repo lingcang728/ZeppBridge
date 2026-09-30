@@ -8,6 +8,7 @@ import { useSettingsContext } from '../../../composables/settings/context';
 import { useSettingsFormat } from '../../../composables/settings/useSettingsFormat';
 import { useSyncController } from '../../../composables/useSyncController';
 import { backend, toUserMessage } from '../../../lib/bridge';
+import { formatBytes } from '../../../lib/format';
 import { useMessages } from '../../../i18n';
 import { settingsMessages } from '../../Settings.i18n';
 
@@ -21,13 +22,6 @@ const { retentionDays, historyDays, storageEstimate } = prefs;
 const compactBusy = ref(false);
 const compactMessage = ref<string | null>(null);
 const compactError = ref<string | null>(null);
-
-const formatBytes = (bytes: number): string => {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1048576).toFixed(1)} MB`;
-  return `${(bytes / 1073741824).toFixed(2)} GB`;
-};
 
 const runCompactPayloads = async () => {
   compactBusy.value = true;

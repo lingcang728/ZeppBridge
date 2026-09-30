@@ -7,7 +7,7 @@ import { syncStreamLabel } from '../lib/syncStreams';
 import { useMessages } from '../i18n';
 import { failedChunkText } from '../lib/failedChunkText';
 import { storageEstimateText, storageStopReasonText } from '../lib/storageEstimateText';
-import { localDateString } from '../lib/format';
+import { formatBytes, localDateString } from '../lib/format';
 import { createLoadSeq } from '../lib/loadSeq';
 import { archiveMessages } from '../components/HistoryArchivePanel.i18n';
 
@@ -84,12 +84,6 @@ export const useHistoryBackfill = (
     if (!value) return 0;
     return Math.max(0, value.total_chunks - value.completed_chunks);
   });
-
-  const formatBytes = (bytes: number): string => {
-    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-    if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(0)} MB`;
-    return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
-  };
 
   /** 有本机样本的流才有速率；其余显示「样本不足」，不编一个数字。 */
   const measuredStreams = computed(() => estimate.value?.streams.filter((item) => item.measured) ?? []);

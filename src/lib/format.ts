@@ -154,3 +154,16 @@ export const formatMetric = (value: number | undefined, digits = 0): string => {
     maximumFractionDigits: digits,
   });
 };
+
+/**
+ * 全应用唯一的字节写法：< 1 KiB 写 B，< 1 MiB 写整数 KB，< 1 GiB 写一位小数 MB，
+ * 再往上两位小数 GB。没有值（null / NaN / ≤ 0）给 `empty`——调用方决定那是「—」、
+ * 「未提供」还是「0 KB」。
+ */
+export const formatBytes = (bytes: number | null | undefined, empty = '—'): string => {
+  if (bytes === null || bytes === undefined || !Number.isFinite(bytes) || bytes <= 0) return empty;
+  if (bytes < 1024) return `${Math.round(bytes)} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+};

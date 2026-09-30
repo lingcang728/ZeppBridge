@@ -10,6 +10,7 @@
  */
 import { defineMessages, messagesOf } from '../i18n';
 import { backendText } from '../i18n/backendText';
+import { formatBytes } from './format';
 
 /*
  * 只声明这里真正要读的字段，而不是整个 `StorageEstimate`。
@@ -71,17 +72,7 @@ const messages = defineMessages(
 );
 
 /** 和面板里显示的一致的字节写法。 */
-export const formatEstimateBytes = (bytes: number): string => {
-  if (!Number.isFinite(bytes) || bytes <= 0) return '0 KB';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  let value = bytes;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit += 1;
-  }
-  return `${value >= 10 || unit === 0 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
-};
+export const formatEstimateBytes = (bytes: number): string => formatBytes(bytes, '0 KB');
 
 /**
  * 估算说明。后端加了新说法而界面还不认识时，回落到它那句原文——

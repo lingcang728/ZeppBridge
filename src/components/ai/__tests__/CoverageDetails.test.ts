@@ -71,8 +71,8 @@ describe('CoverageDetails', () => {
     const html = await renderToString(createSSRApp(CoverageDetails, { preview: preview(rows) }));
     expect(html).toContain('<details');
     expect(html).toContain('<summary');
-    // 2048 B → 2.0 KB 写进摘要。
-    expect(html).toContain('2.0 KB');
+    // 2048 B → 2 KB 写进摘要。
+    expect(html).toContain('2 KB');
     expect(count(html, /<tr[\s>]/g)).toBe(rows.length + 1);
   });
 

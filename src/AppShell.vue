@@ -19,6 +19,7 @@ import { checkForDesktopUpdate } from './services/updateService';
 import { locale, useMessages } from './i18n';
 import { messages } from './App.i18n';
 import { FALLBACK_APP_VERSION } from './lib/appVersion';
+import { formatBytes } from './lib/format';
 
 const LifeEventEditor = defineAsyncComponent(() => import('./components/LifeEventEditor.vue'));
 
@@ -132,12 +133,6 @@ const CACHED_PAGES = [
   'WorkoutList',
 ];
 
-const formatSavedBytes = (bytes: number): string => {
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1048576).toFixed(0)} MB`;
-  return `${(bytes / 1073741824).toFixed(2)} GB`;
-};
-
 const versionTitle = computed(() => `ZeppBridge v${APP_VERSION.value} · build ${BUILD_STAMP}`);
 const browserPreview = computed(() => !desktopRuntime);
 const routeNotice = computed(() => route.query.notice === 'not-found');
@@ -240,7 +235,7 @@ onUnmounted(() => {
         </div>
         <div v-else-if="compactionSaved" class="sync-feedback tone-updated" role="status">
           <Icon name="circle-check" :size="14" />
-          <span>{{ t.compacted(formatSavedBytes(compactionSaved)) }}</span>
+          <span>{{ t.compacted(formatBytes(compactionSaved)) }}</span>
         </div>
         <div v-if="trayHint" class="sync-feedback" role="status">{{ t.trayHint }}</div>
 

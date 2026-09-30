@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   categoryCoverage,
   coverageRows,
-  formatBytes,
 } from '../coverage';
 import type { AiTaskCoverage, AiTaskWorkoutBrief } from '../../bridge/types';
 
@@ -65,15 +64,5 @@ describe('categoryCoverage', () => {
     const [row] = coverageRows([coverage({ sources: ['user_fused'], units: { a: 'count' } })], []);
     expect(row.sources[0]).not.toBe('user_fused');
     expect(row.units[0]).not.toBe('count');
-  });
-});
-
-describe('formatBytes', () => {
-  it('分级格式化；null/非法值给占位符', () => {
-    expect(formatBytes(null)).toBe('—');
-    expect(formatBytes(Number.NaN)).toBe('—');
-    expect(formatBytes(512)).toBe('512 B');
-    expect(formatBytes(2048)).toBe('2.0 KB');
-    expect(formatBytes(3 * 1024 * 1024)).toBe('3.00 MB');
   });
 });

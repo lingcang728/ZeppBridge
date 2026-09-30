@@ -1,5 +1,6 @@
 import { computed, onMounted, ref } from 'vue';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
+import { formatBytes } from '../lib/format';
 import type { BackupManifest, BackupVerification, PendingRestore, RestorePreview } from '../types';
 import { backendText } from '../i18n/backendText';
 import { useMessages } from '../i18n';
@@ -60,12 +61,6 @@ export const useBackups = () => {
       return verifyProblemText(preview.verification);
     }
     return backendText(preview.blocker, t.value.blockerUnknown);
-  };
-
-  const formatBytes = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   };
 
   const previewRows = computed(() => {
