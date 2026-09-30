@@ -330,8 +330,7 @@ export default {
       logout: 'Terminar sessão',
       logoutHint:
         'Apenas encerra a sessão. Os dados sincronizados neste computador mantêm-se; a sincronização retoma após novo início de sessão.',
-      logoutNoMultiAccount:
-        'Múltiplas contas ainda não são suportadas: iniciar sessão com outra conta gravará na mesma base de dados local.',
+      logoutNoMultiAccount: "Uma base de dados local guarda uma única conta: iniciar sessão com outra conta é recusado, por isso nada se mistura. Para mudar, fecha a aplicação e move antes a pasta data.",
       healthCheckLabel: 'Saúde dos dados',
       healthCheckNote:
         'Verifica o estado de obtenção da nuvem, interpretação e escrita local de cada fluxo, datas abrangidas e proveniência. Consulta se os dados sincronizados divergirem do esperado.',
@@ -1088,6 +1087,8 @@ export default {
       readyPill: 'Dados prontos · Enviar à IA',
       readyTitle:
         'Sincronização concluída: os dados locais estão em dia. Clica para enviar à IA.',
+      readyFirstPill: "Primeiros dados recebidos · ver esta semana",
+      readyFirstTitle: "Primeira sincronização concluída. Clica para veres na vista geral como esta semana se compara ao habitual.",
       connectPill: 'Ligar conta',
       syncingProgress: (current: number, total: number) => `A sincronizar ${current}/${total}`,
       syncWait: "Aguarda até a sincronização terminar",
@@ -2482,6 +2483,10 @@ Responde em formato Markdown.`,
       secFeedback: 'Reportar problema',
       secRetention: 'Retenção local',
       cloudSourceSub: 'Origem dos dados da conta',
+      firstSyncing: (current: number, total: number) => `Ligado · a obter os registos recentes ${current}/${total}`,
+      firstSyncingPlain: "Ligado · a obter os registos recentes",
+      firstReady: "Os teus primeiros dados chegaram: vê esta semana na vista geral",
+      goOverview: "Ir para a vista geral",
       deviceFirmware: (firmware: string) => `Firmware: ${firmware}`,
       deviceLatest: (time: string) => `Últimos dados: ${time}`,
       deviceId: (id: string) => `ID: ${id}`,

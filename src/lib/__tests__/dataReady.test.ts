@@ -48,4 +48,12 @@ describe('dataReady', () => {
     expect(readyOnPickUp(readyOnReport(WAITING, report('updated')))).toBe(IDLE);
     expect(readyOnPickUp(WAITING)).toEqual(WAITING);
   });
+
+  it('marks the first sync that brought data, so the pill points to this week instead of AI', () => {
+    expect(readyOnReport(WAITING, report('updated', 30), [], true)).toMatchObject({ phase: 'ready', firstRun: true });
+    // 第一次同步但云端什么都没有：没有「这一周」可看，不当首次处理。
+    expect(readyOnReport(WAITING, report('no_new_data', 0), [], true)).toMatchObject({ phase: 'ready', firstRun: false });
+    expect(readyOnReport(WAITING, report('updated', 30))).toMatchObject({ firstRun: false });
+    expect(readyOnReport(WAITING, report('failed'), [], true)).toBe(IDLE);
+  });
 });

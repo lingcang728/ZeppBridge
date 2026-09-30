@@ -59,9 +59,9 @@ const scheduleFirstRunBackfill = () => {
   }, 0);
 };
 
-/** 用户在等的同步有了结果：亮起「数据已备好」，或者灭掉等待。 */
-const settleReady = (report: SyncReport | null) => {
-  dataReady.value = readyOnReport(dataReady.value, report, report ? failedStreamKeys(report.streams) : []);
+/** 用户在等的同步有了结果：亮起「数据已备好」，或者灭掉等待。`firstRun`：连上账号后的第一次。 */
+const settleReady = (report: SyncReport | null, firstRun = false) => {
+  dataReady.value = readyOnReport(dataReady.value, report, report ? failedStreamKeys(report.streams) : [], firstRun);
 };
 
 /**
@@ -126,7 +126,7 @@ export const runSync = (
       notice.value = noticeForReport(report);
       await refreshStatus();
       // 放在 refreshStatus 之后：「好了」亮起时，顶栏的同步时间和各页的数据已经是新的。
-      settleReady(report);
+      settleReady(report, wasFirstSync && mode === 'incremental');
       // deferred 且 0 条写入：页面不必为了让路整页重刷。真正写了派生数据
       // 的重放结束之后，下一次成功同步会再 bump。
       if (!(report.outcome === 'deferred' && report.total_records === 0)) {

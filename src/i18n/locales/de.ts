@@ -516,8 +516,7 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       logout: 'Abmelden',
       logoutHint:
         'Meldet das Konto ab. Bereits synchronisierte Daten bleiben auf diesem Rechner erhalten – nach erneuter Anmeldung läuft die Synchronisierung weiter.',
-      logoutNoMultiAccount:
-        'Kontenwechsel wird noch nicht unterstützt: Bei Anmeldung mit anderem Konto schreiben beide in dieselbe lokale Datenbank.',
+      logoutNoMultiAccount: "Eine lokale Datenbank gehört zu genau einem Konto: Die Anmeldung mit einem anderen Konto wird abgelehnt, es wird nichts vermischt. Zum Wechseln die App schließen und den Ordner data vorher verschieben.",
       healthCheckLabel: 'Datenzustandsprüfung',
       healthCheckNote:
         'Zeigt Abruf, Parsen und Schreiben je Datenstrom samt Abdeckung und Quelle. Nichts für jeden Tag – hier findest du die Ursache, wenn eine Synchronisierung unerwartete Ergebnisse liefert.',
@@ -1298,6 +1297,8 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       readyPill: 'Daten bereit · an die KI',
       readyTitle:
         'Synchronisierung abgeschlossen · Daten aktuell. Klicken für Übergabe an die KI.',
+      readyFirstPill: "Erste Daten sind da · diese Woche ansehen",
+      readyFirstTitle: "Erste Synchronisierung fertig. Klicke, um in der Übersicht zu sehen, wie diese Woche im Vergleich zu sonst aussieht.",
       syncFailed: 'Synchronisierung fehlgeschlagen',
       syncNow: 'Jetzt synchronisieren',
       syncPartial: 'Teilweise synchronisiert',
@@ -2702,6 +2703,10 @@ Antworte in Markdown.`,
       cardPrivacy: 'Datenschutz und Sicherheit',
       cardSync: 'Synchronisierung und Updates',
       cloudSourceSub: 'Woher die Daten dieses Kontos kommen',
+      firstSyncing: (current: number, total: number) => `Verbunden · aktuelle Aufzeichnungen werden geladen ${current}/${total}`,
+      firstSyncingPlain: "Verbunden · aktuelle Aufzeichnungen werden geladen",
+      firstReady: "Deine ersten Daten sind da: Sieh dir diese Woche in der Übersicht an",
+      goOverview: "Zur Übersicht",
       deviceFirmware: (firmware: string) => `Firmware ${firmware}`,
       deviceId: (id: string) => `ID ${id}`,
       deviceLatest: (time: string) => `Neueste Daten ${time}`,

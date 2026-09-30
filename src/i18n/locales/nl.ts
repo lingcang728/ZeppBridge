@@ -691,6 +691,8 @@ export default {
       readyPill: 'Gegevens klaar · naar de AI',
       readyTitle:
         'Synchronisatie voltooid en je lokale gegevens zijn bijgewerkt. Klik om ze naar de AI te sturen.',
+      readyFirstPill: "Eerste gegevens binnen · bekijk deze week",
+      readyFirstTitle: "Eerste synchronisatie klaar. Klik om in het overzicht te zien hoe deze week zich verhoudt tot normaal.",
       mainNav: 'Hoofdnavigatie',
       brandHome: 'ZeppBridge 3 · Overzicht',
       connectionTitle: 'Status van de cloudverbinding',
@@ -1229,8 +1231,7 @@ export default {
       logout: 'Uitloggen',
       logoutHint:
         'Logt alleen uit bij het account — alles wat al naar deze machine is gesynchroniseerd blijft, en na opnieuw inloggen gaat synchroniseren verder.',
-      logoutNoMultiAccount:
-        'Meerdere accounts worden nog niet ondersteund: log je daarna met een ander account in, dan belanden beide accounts in dezelfde lokale database.',
+      logoutNoMultiAccount: "Eén lokale database hoort bij één account: inloggen met een ander account wordt geweigerd, er raakt niets vermengd. Wil je wisselen, sluit dan de app en verplaats eerst de map data.",
       manualAuthDone: 'Handmatig inloggen gelukt; de inloggegevens zijn opgeslagen.',
       manualAuthFailed: 'Handmatig inloggen mislukt',
       manualFormHint:
@@ -2524,6 +2525,10 @@ Antwoord in Markdown.`,
       secMcp: 'MCP-tools',
       secFeedback: 'Een probleem melden',
       cloudSourceSub: 'Waar de gegevens van dit account vandaan komen',
+      firstSyncing: (current: number, total: number) => `Verbonden · recente registraties ophalen ${current}/${total}`,
+      firstSyncingPlain: "Verbonden · recente registraties ophalen",
+      firstReady: "Je eerste gegevens zijn binnen: bekijk deze week in het overzicht",
+      goOverview: "Naar het overzicht",
       deviceFirmware: (firmware: string) => `Firmware ${firmware}`,
       deviceLatest: (time: string) => `Laatste gegevens ${time}`,
       deviceId: (id: string) => `ID ${id}`,

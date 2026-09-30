@@ -26,6 +26,11 @@ export type DataReady =
     finishedAt: string;
     /** partial 时哪几条流没取到（键，不是人话）。 */
     failedStreams: string[];
+    /**
+     * 这是连上账号后的第一次同步、而且真的拿到了数据（体验评估 #1）。这时候喊「交给 AI」太早：
+     * 新用户还不知道自己有什么数据，先去概览看「这一周」才是下一步。
+     */
+    firstRun: boolean;
   };
 
 export const IDLE: DataReady = { phase: 'idle' };
@@ -43,7 +48,12 @@ export const readyOnStart = (state: DataReady, waited: boolean): DataReady =>
  * `deferred` 是让路不是失败：后端在重放本地报文，控制器一分钟后自己重试，
  * 用户仍然在等——保持 waiting。
  */
-export const readyOnReport = (state: DataReady, report: SyncReport | null, failedStreams: string[] = []): DataReady => {
+export const readyOnReport = (
+  state: DataReady,
+  report: SyncReport | null,
+  failedStreams: string[] = [],
+  firstRun = false,
+): DataReady => {
   if (state.phase !== 'waiting') return state;
   if (!report) return IDLE;
   switch (report.outcome) {
@@ -56,6 +66,7 @@ export const readyOnReport = (state: DataReady, report: SyncReport | null, faile
         records: Math.max(0, report.total_records),
         finishedAt: report.finished_at,
         failedStreams: report.outcome === 'partial' ? failedStreams : [],
+        firstRun: firstRun && report.total_records > 0,
       };
     case 'deferred':
       return state;

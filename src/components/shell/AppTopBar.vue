@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
+import { revealWeekDigest } from '../../lib/revealWeekDigest';
 import BrandMark from '../BrandMark.vue';
 import Icon, { type IconName } from '../Icon.vue';
 import CapsuleWheel from '../CapsuleWheel.vue';
@@ -38,6 +39,8 @@ const messages = defineMessages(
     localeLabel: '界面语言',
     readyPill: '数据已备好 · 交给 AI',
     readyTitle: '同步完成，本机数据最新。点一下交给 AI。',
+    readyFirstPill: '第一批数据到了 · 看这一周',
+    readyFirstTitle: '第一次同步完成。点一下回概览，看这一周和平时比哪里变了。',
   },
   {
     mainNav: 'Main navigation',
@@ -62,6 +65,8 @@ const messages = defineMessages(
     localeLabel: 'Interface language',
     readyPill: 'Data ready · send to AI',
     readyTitle: 'Sync done — local data is current. Click to send it to AI.',
+    readyFirstPill: 'First data is in · see this week',
+    readyFirstTitle: 'First sync done. Click to go to the overview and see how this week compares with usual.',
   },
   {
     mainNav: 'Navegación principal',
@@ -86,6 +91,8 @@ const messages = defineMessages(
     localeLabel: 'Idioma de la interfaz',
     readyPill: 'Datos listos · pasar a la IA',
     readyTitle: 'Sincronización completada: datos al día. Clic para pasar a la IA.',
+    readyFirstPill: 'Ya llegaron tus datos · ver esta semana',
+    readyFirstTitle: 'Primera sincronización completada. Haz clic para ir al resumen y ver cómo va esta semana frente a lo habitual.',
   },
   // moduleId：让 src/i18n/locales/<locale>.ts 的语言包能覆盖这个模块。
   'components/shell/AppTopBar',
@@ -136,12 +143,15 @@ const onEscapeBack = (event: KeyboardEvent) => {
 
 const {
   appStatus, statusError, syncState, syncProgress, syncMessage,
-  isSyncing, canIncrementalSync, runSync, dataReady,
+  isSyncing, canIncrementalSync, runSync, dataReady, pickUpReady,
 } = useSyncController();
 
 /* 用户在等的那次同步落地了：同步胶囊变成发光的「数据已备好 · 交给 AI」，
    点一下去取。又开始同步时让位给进度；进了交给 AI 就恢复成上次同步时间。 */
 const readyToHand = computed(() => dataReady.value.phase === 'ready' && !isSyncing.value);
+/* 连上账号后的第一次同步：先带人去概览看「这一周」，而不是直接喊「交给 AI」（体验评估 #1）。 */
+const readyFirst = computed(() => readyToHand.value && dataReady.value.phase === 'ready' && dataReady.value.firstRun);
+const readyText = computed(() => (readyFirst.value ? t.value.readyFirstPill : t.value.readyPill));
 const { themeMode, pickTheme } = useTheme();
 
 const accountRecognized = computed(() =>
@@ -202,7 +212,7 @@ const syncText = computed(() => {
 });
 
 const syncTitle = computed(() => {
-  if (readyToHand.value) return t.value.readyTitle;
+  if (readyToHand.value) return readyFirst.value ? t.value.readyFirstTitle : t.value.readyTitle;
   if (isSyncing.value) return `${syncMessage.value} · ${t.value.syncWait}`;
   return `${t.value.connectionTitle} · ${t.value.lastSyncPrefix}${lastSyncClock.value}`
     + ` — ${canIncrementalSync.value ? t.value.syncNow : t.value.verifyFirst}`;
@@ -211,7 +221,10 @@ const syncTitle = computed(() => {
 /* 点击：能增量同步就发起；没连上就去「账号与设备」卡。同步中点了什么都不做——不给「取消」：
    半路停下会留下一部分流更新了、另一部分没更新的库（用户 2026-09-30 定），等它跑完就好。 */
 const onSyncClick = () => {
-  if (readyToHand.value) {
+  if (readyFirst.value) {
+    pickUpReady('pickup');
+    void router.push('/').then(() => revealWeekDigest());
+  } else if (readyToHand.value) {
     void router.push('/ai');
   } else if (isSyncing.value) {
     return;
@@ -244,7 +257,7 @@ const onLocaleChange = (value: string | number) => setLocale(String(value) as Lo
 
 /* 同步胶囊的字一变（「今天 10:30」→「数据已备好 · 交给 AI」），宽度平滑伸缩，不跳。 */
 const syncPill = ref<HTMLElement | null>(null);
-useWidthMorph(syncPill, () => (readyToHand.value ? t.value.readyPill : syncText.value));
+useWidthMorph(syncPill, () => (readyToHand.value ? readyText.value : syncText.value));
 
 /* —— 放不下时逐级回退（大原则：任何语言、任何宽度，顶栏的胶囊都不许盖住别的组件）——
    媒体查询只认窗口宽度，认不出「俄语导航比中文宽一倍」。这里量真实的包围盒：
@@ -351,7 +364,7 @@ onBeforeUnmount(() => {
 watch([locale, () => props.backTo], scheduleFit);
 /* 同步胶囊换字：马上按伸完的宽度量一次（变宽时不会半路压到导航），420ms 的伸缩放完再量一次
    （变窄时回到该有的档位）。 */
-watch(() => (readyToHand.value ? t.value.readyPill : syncText.value), () => {
+watch(() => (readyToHand.value ? readyText.value : syncText.value), () => {
   scheduleFit();
   window.clearTimeout(fitTimer);
   fitTimer = window.setTimeout(scheduleFit, 460);
@@ -396,7 +409,7 @@ watch(() => (readyToHand.value ? t.value.readyPill : syncText.value), () => {
         <!-- 前面一律是带色的小圆点（已连接绿、部分未完成黄、失败红、同步中呼吸）。U19 一度换成刷新图标，
              用户觉得不如圆点好看（2026-09-30），换回来。 -->
         <i class="dot" :class="{ spinning: isSyncing }" aria-hidden="true"></i>
-        <span :key="readyToHand ? 'ready' : isSyncing ? 'syncing' : 'idle'" class="sync-text" aria-live="polite">{{ readyToHand ? t.readyPill : syncText }}</span>
+        <span :key="readyToHand ? 'ready' : isSyncing ? 'syncing' : 'idle'" class="sync-text" aria-live="polite">{{ readyToHand ? readyText : syncText }}</span>
         <Icon v-if="readyToHand" name="arrow-right" :size="14" class="ready-arrow" />
       </button>
 
