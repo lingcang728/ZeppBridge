@@ -10,6 +10,11 @@
 # 例：
 # lib/labels.fallbackNameZepp
 
+# Shared punctuation in translated lists and sentences
+components/MissingMetricsRow.separator
+components/ai/AiAskStart.separator
+components/ai/AiAskStart.end
+
 # pt-BR
 components/HeartRateZonePicker.basesSeparator
 components/HeartRateZonePicker.zeroMinutes
