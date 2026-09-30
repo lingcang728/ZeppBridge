@@ -1,33 +1,33 @@
 import type { RouteLocationNormalized } from 'vue-router';
 import type { PageMotion } from '../lib/navigation';
-import { cardSkin, collapseGhost, holdGhost, type CardSkin } from '../lib/motion/ghost';
+import { cardReplica, morphWindow, type WindowRect } from '../lib/motion/window';
 import { deferSettle, hurryAnimation, onMotionEscape, onMotionSkip } from '../lib/motion/interrupt';
 import { whenPageReady } from '../lib/motion/pageReady';
 
 type Rect = { left: number; top: number; width: number; height: number };
 
 /**
- * 从一张卡点进详情页：新页从那张卡的位置等比长成整页；返回时从四周均匀缩回那张卡。
+ * 从一张卡点进详情页：一扇圆角窗口从那张卡长成整页；返回时窗口缩回同一张卡（ColorOS 17 那种，
+ * 细节见 lib/motion/window.ts）。窗口里先是那张卡的拷贝、跟着放大并淡掉，收回时反过来，
+ * 落地那一帧就是卡本身，真卡原样接上。
  *
- * 形变只落在一块幽灵板上（lib/motion/ghost.ts）：以前对整页逐帧动 clip-path，每帧整页
- * 连图表一起重画，4K 屏上风扇狂转。现在真实页面只动 opacity / transform。
+ * 形变只落在窗口这块板上：真实页面只动 opacity / transform，整页不逐帧重画。
  *
  * 用法（AppShell.vue）：`decide()` 在 router.beforeEach 里把普通的 forward / back 换成
  * expand / collapse；`onEnter` / `onLeave` / `onAfterLeave` 挂在切页的 <Transition> 上。
  */
-/** 板从卡长满整页的时长。缓动先快后慢：像被抛出去、在终点减速落定。 */
-const EXPAND_MS = 320;
-const EXPAND_EASE = 'cubic-bezier(.2, .9, .25, 1)';
+/** 窗口从卡长满整页的时长。曲线先快后慢、没有回弹：像被抛出去、在终点减速落定
+    （ColorOS 录屏：约 100ms 已长到一倍多，300ms 基本长满，之后只剩很短的一段收尾）。 */
+const EXPAND_MS = 360;
+const EXPAND_EASE = 'cubic-bezier(.22, .88, .26, 1)';
 /** 新页首次加载最多等这么久（从点下去算起，含板长大那一段）；再久就先揭开（页面自己有骨架屏），
     不让一整屏卡片色停在那里。 */
 const READY_TIMEOUT_MS = 560;
-/** 返回：圆角板从整页收回那张卡（展开的逆过程）。曲线先快后慢、没有回弹，像被卡片吸回去；
-    形状在前一半基本落定，后半程板淡出、真卡亮起接上——板不在卡上干停着。 */
-const SHRINK_MS = 380;
-const LAND_AT = 0.52;
-const SHRINK_EASE = 'cubic-bezier(.32, .72, 0, 1)';
-/** 板从透明变实的时长：这段里详情页同时淡出，两者交叉，不出现整屏的纯色。 */
-const PLATE_IN_MS = 90;
+/** 返回：窗口从整页缩回那张卡（展开的逆过程），同样先快后慢、没有回弹，像被卡片吸回去。 */
+const SHRINK_MS = 400;
+const SHRINK_EASE = 'cubic-bezier(.25, .85, .3, 1)';
+/** 详情页自己淡出的时长：窗口（带页面底色）一开始就在它下面接住，四周露出退后的来处页。 */
+const PAGE_OUT_MS = 110;
 /** 来处页不在缓存里时要重新读库，那张卡可能要等一会儿才出现。板不等它：先按记住的位置缩，
     这段时间里找到了就把终点换成真卡（D-2）；超过这个时长还没有就落在记住的位置上。 */
 const CARD_WAIT_MS = 300;
@@ -76,7 +76,8 @@ const linksTo = (href: string, scope: string) => {
 };
 const STAYING = '.page-host > :not([class*="-leave"])';
 
-type Trail = { back: string; href: string; index: number; rect: Rect; radius: number; skin: CardSkin | null };
+type Trail = { back: string; href: string; index: number; rect: Rect; radius: number };
+type Origin = { rect: Rect; radius: number; replica: { el: HTMLElement; rect: WindowRect } };
 
 /** 正在从卡里长出来、还没揭开的那一页。Esc 撤回它。 */
 type Inflight = { el: HTMLElement; retract: () => Promise<void>; revealed: boolean; aborted: boolean };
@@ -88,7 +89,7 @@ export const usePageMorph = (options: { back: () => void }) => {
   let resumeStill = false;
   /** 进过场的页面（KeepAlive 缓存的会原样回来）。 */
   const entered = new WeakSet<Element>();
-  let expandFrom: { rect: Rect; radius: number; skin: CardSkin | null } | null = null;
+  let expandFrom: Origin | null = null;
   let collapseTo: Trail | null = null;
   /** 每个详情页是从哪张卡展开来的：键是详情页的 fullPath。 */
   const trails = new Map<string, Trail>();
@@ -115,12 +116,14 @@ export const usePageMorph = (options: { back: () => void }) => {
       const href = link.getAttribute('href') ?? '';
       const card = href === to.fullPath || href === to.path ? cardOfLink(link) : null;
       if (card) {
-        expandFrom = { rect: rectOf(card), radius: radiusOf(card), skin: cardSkin(card) };
+        // 按下那一刻就把卡拷一份：放大前的第一帧窗口里就是它，而不是一块空板。
+        expandFrom = { rect: rectOf(card), radius: radiusOf(card), replica: cardReplica(card) };
         trails.set(to.fullPath, {
           back: from.fullPath,
           href,
           index: Math.max(0, linksTo(href, '.page-host > *').indexOf(link)),
-          ...expandFrom,
+          rect: expandFrom.rect,
+          radius: expandFrom.radius,
         });
         return 'expand';
       }
@@ -164,15 +167,17 @@ export const usePageMorph = (options: { back: () => void }) => {
     const viewport = viewportOf();
     const host = main()?.parentElement;
     if (!origin || !viewport || !host || !(el instanceof HTMLElement)) return;
-    const ghost = holdGhost({
+    const ghost = morphWindow({
       from: origin.rect,
       to: viewport,
+      frame: viewport,
       fromRadius: origin.radius,
       toRadius: 0,
       host,
       duration: EXPAND_MS,
       easing: EXPAND_EASE,
-      skin: origin.skin,
+      replica: { ...origin.replica, at: 'from' },
+      scrim: 'in',
     });
     // 新页先整个藏起来。必须连 CSS 过渡一起关掉：否则 enter 那条 opacity 过渡会把它从
     // .999 慢慢降到 0，板还没长满时新页就半透明地叠在旧页上——那也是「闪一下」。
@@ -198,8 +203,8 @@ export const usePageMorph = (options: { back: () => void }) => {
     });
     let ready = false;
     const pageReady = whenPageReady(READY_TIMEOUT_MS).then(() => { ready = true; });
-    void ghost.grown.then(() => { if (!ready && !mine.aborted) ghost.waiting(); });
-    void Promise.all([ghost.grown, pageReady]).then(() => {
+    void ghost.arrived.then(() => { if (!ready && !mine.aborted) ghost.waiting(); });
+    void Promise.all([ghost.arrived, pageReady]).then(() => {
       forget();
       if (mine.aborted) return;
       mine.revealed = true;
@@ -282,21 +287,32 @@ export const usePageMorph = (options: { back: () => void }) => {
       }
     };
     settleStaying();
-    // 按下返回的这一帧板就开始缩（D-2）：来处页已经在场就用真卡，否则先用展开时记住的位置。
+    // 按下返回的这一帧窗口就开始缩（D-2）：来处页已经在场就用真卡，否则先用展开时记住的位置。
     const present = currentCard(trail);
     let card: HTMLElement | null = present;
     const to = present ? rectOf(present) : trail.rect;
     const radius = present ? radiusOf(present) : trail.radius;
-    // 等比缩向卡的中心：原点取卡中心在详情页自己坐标里的位置（离场页绝对定位、按滚动距离垫过）。
+    // 详情页叠在窗口上面（z 26 > 窗口 25 > 遮罩 24），朝卡的中心等比缩一点、很快淡掉。窗口一开始就是实的、
+    // 带着页面底色，挡住来处页——页面本身是透明的，以前来处页从它底下透上来，第一帧两页叠影。
+    // 看到的是「这一页在变小、变圆、退回那张卡」，而不是一张没有圆角的整页被压扁。
+    el.style.zIndex = '26';
     const box = el.getBoundingClientRect();
     el.style.transformOrigin = `${r1(to.left + to.width / 2 - box.left)}px ${r1(to.top + to.height / 2 - box.top)}px`;
-    el.animate([{ transform: 'none' }, { transform: 'scale(.9)' }], { duration: SHRINK_MS, easing: SHRINK_EASE, fill: 'forwards' });
-    const fade = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: PLATE_IN_MS + 40, easing: 'ease-out', fill: 'forwards' });
-    // 真卡在板底下先藏着：板淡出时它正好接上，而不是板和卡叠成一块更亮的。
+    el.animate([{ transform: 'none' }, { transform: 'scale(.82)' }], { duration: SHRINK_MS, easing: SHRINK_EASE, fill: 'forwards' });
+    const fade = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: PAGE_OUT_MS, easing: 'ease-out', fill: 'forwards' });
+    // 真卡在窗口底下先藏着：窗口落地时拷贝和它重合，撤掉窗口它正好接上。
     if (card) card.style.opacity = '0';
-    const plate = collapseGhost({
-      viewport, to, radius, host, duration: SHRINK_MS, fadeIn: PLATE_IN_MS, landAt: LAND_AT, easing: SHRINK_EASE,
-      skin: present ? cardSkin(present) : trail.skin,
+    const plate = morphWindow({
+      from: viewport,
+      to,
+      frame: viewport,
+      fromRadius: 0,
+      toRadius: radius,
+      host,
+      duration: SHRINK_MS,
+      easing: SHRINK_EASE,
+      replica: present ? { ...cardReplica(present), at: 'to' } : null,
+      scrim: 'out',
     });
     let landed = false;
     if (!present) {
@@ -304,35 +320,25 @@ export const usePageMorph = (options: { back: () => void }) => {
         if (!found || landed || !el.isConnected) return;
         settleStaying();
         card = found;
+        const replica = cardReplica(found);
         found.style.opacity = '0';
-        const actual = rectOf(found);
-        const off = Math.abs(actual.left - to.left) + Math.abs(actual.top - to.top) + Math.abs(actual.width - to.width) + Math.abs(actual.height - to.height);
-        if (off > 2) plate.retarget(actual, radiusOf(found));
+        plate.retarget(replica.rect, radiusOf(found), replica);
       });
     }
-    let lit = false;
-    const light = () => {
+    // 落地：拷贝已经和真卡严丝合缝，撤掉窗口、真卡原样出现。不再「亮一下」——落地前那一帧本来就是卡。
+    const land = () => {
+      if (landed) return;
       landed = true;
-      if (lit || !card) return;
-      lit = true;
-      card.style.opacity = '';
-      // 板已经带着卡自己的底落下来（D-4），这里只轻轻亮一下说「你是从这儿走的」，不再靠强光遮跳变。
-      card.animate(
-        [{ opacity: 0, filter: 'brightness(1.12)' }, { opacity: 1, filter: 'brightness(1.12)', offset: 0.35 }, { opacity: 1, filter: 'brightness(1)' }],
-        { duration: 520, easing: 'ease-out' },
-      );
+      if (card) card.style.opacity = '';
+      plate.remove();
     };
-    void plate.landed.then(light);
-    plate.done.addEventListener('cancel', light);
-    // 收回途中按 Esc：剩下的这段在 200ms 里放完，保留原来的曲线——板照样落到卡上、卡照样
-    // 亮起来，只是快一点；不再一下跳到终点。
-    const escaping = [...plate.plate.getAnimations(), fade, ...el.getAnimations()];
+    void plate.arrived.then(land);
+    // 收回途中按 Esc：剩下的这段在 200ms 里放完，保留原来的曲线——窗口照样落到卡上，只是快一点。
     const forgetEscape = onMotionEscape(() => {
-      for (const animation of escaping) hurryAnimation(animation, ESC_FINISH_MS);
+      for (const animation of [...plate.animations(), fade, ...el.getAnimations()]) hurryAnimation(animation, ESC_FINISH_MS);
       return true;
     });
-    const release = () => forgetEscape();
-    plate.done.finished.then(release, release);
+    void plate.arrived.then(() => forgetEscape());
     fade.finished.then(() => endLeave(el), () => endLeave(el));
   };
 
@@ -345,6 +351,7 @@ export const usePageMorph = (options: { back: () => void }) => {
     el.style.transformOrigin = '';
     el.style.opacity = '';
     el.style.transition = '';
+    el.style.zIndex = '';
   };
   const onAfterLeave = (el: Element) => {
     clean(el);

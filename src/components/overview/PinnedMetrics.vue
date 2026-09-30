@@ -3,7 +3,7 @@
  * 近 30 天的迷你曲线和覆盖天数。没有记录就写「—」和「近 30 天无记录」，不补 0。
  * 一个都没固定时是一张引导卡，点开挑选面板（PinPicker）。
  *
- * 动效：挑完回来，新的一排磁贴依次浮上来（只在挑选之后，缓存页回到场上不重放）。 */
+ * 动效：挑完回来，新加的磁贴由下往上漫出类别色再显出内容；留下的原地不动（缓存页回场不重放）。 */
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import Icon from '../Icon.vue';
@@ -17,7 +17,7 @@ import { displayDateTimeFormatter, parseDisplayDate } from '../../lib/dateTime';
 import { metricLabel } from '../../lib/aiTask/metrics';
 import { coverageLabel, indexSeries } from '../../lib/metricSeries';
 import {
-  pinLatestDate, pinnableMetric, pinSparkValues, pinValueText, readPins, writePins, type PinnableMetric,
+  pinLatestDate, pinnableMetric, pinSparkValues, pinToneColor, pinValueText, readPins, writePins, type PinnableMetric,
 } from '../../lib/pinnedMetrics';
 import type { MetricSeries } from '../../types';
 import { useMessages } from '../../i18n';
@@ -67,36 +67,42 @@ const tiles = computed(() => pins.value.flatMap((id) => {
     when: dayText(pinLatestDate(data)),
     spark: pinSparkValues(data),
     coverage: coverageLabel(data),
+    tone: pinToneColor(metric.tone, palette.value.series),
   }];
 }));
 
 let loadSeq = 0;
-const load = async () => {
-  const seq = ++loadSeq;
-  if (!isDesktop() || !pins.value.length) {
-    series.value = {};
-    return;
-  }
+const fetchSeries = async (ids: string[]): Promise<Record<string, MetricSeries>> => {
+  if (!isDesktop() || !ids.length) return {};
   try {
-    const result = await backend.getMetricSeries([...pins.value], WINDOW_DAYS);
-    if (seq === loadSeq) series.value = indexSeries(result);
+    return indexSeries(await backend.getMetricSeries([...ids], WINDOW_DAYS));
   } catch {
     // 读不出来就按「无记录」显示，概览其余部分照常。
-    if (seq === loadSeq) series.value = {};
+    return {};
   }
+};
+const load = async () => {
+  const seq = ++loadSeq;
+  const next = await fetchSeries(pins.value);
+  if (seq === loadSeq) series.value = next;
 };
 onMounted(() => void load());
 watch(dataRevision, () => void load());
 
-const apply = (next: string[]) => {
+/* 挑完回来：先把新指标的数据读好，再一次换上。以前先换磁贴、数据晚一拍到，
+   磁贴先是「—」再跳成数字加曲线，加上整排按新 key 重新挂载，就是「退出去闪一下」。
+   留下来的磁贴原地不动（按 id 保留），新来的那几块从灰底里由下往上漫出类别色再显出内容。 */
+const apply = async (next: string[]) => {
   pickerOpen.value = false;
-  const changed = next.join() !== pins.value.join();
-  if (!changed) return;
+  if (next.join() === pins.value.join()) return;
+  const seq = ++loadSeq;
+  const data = await fetchSeries(next);
+  if (seq !== loadSeq) return;
   justPinned.value = true;
+  series.value = data;
   pins.value = [...next];
   writePins(next);
-  void load();
-  window.setTimeout(() => { justPinned.value = false; }, 900);
+  window.setTimeout(() => { justPinned.value = false; }, 1200);
 };
 </script>
 
@@ -104,8 +110,8 @@ const apply = (next: string[]) => {
   <section class="pins" aria-labelledby="pins-title">
     <header class="pins-head">
       <h2 id="pins-title">{{ t.title }}</h2>
-      <button v-if="pins.length" type="button" class="pill-button quiet pins-edit" @click="pickerOpen = true">
-        <Icon name="edit" :size="14" />{{ t.edit }}
+      <button v-if="pins.length" type="button" class="pins-edit glass-control" :title="t.edit" @click="pickerOpen = true">
+        <Icon name="sliders" :size="14" /><span>{{ t.edit }}</span>
       </button>
     </header>
 
@@ -114,15 +120,17 @@ const apply = (next: string[]) => {
       <span class="pins-empty-copy"><strong>{{ t.emptyCta }}</strong><small>{{ t.emptySub }}</small></span>
     </button>
 
-    <div v-else :key="pins.join()" :class="['pins-grid', { 'just-pinned': justPinned }]" :style="{ '--count': tiles.length }">
-      <RouterLink v-for="(tile, index) in tiles" :key="tile.id" :to="tile.metric.route" class="pin-tile" data-morph-card
-        :style="{ '--i': index }" :aria-label="t.tileAria(tile.label, tile.value)">
-        <span class="pin-label">{{ tile.label }}</span>
+    <TransitionGroup v-else tag="div" name="pin" :appear="justPinned" :class="['pins-grid', { 'just-pinned': justPinned }]" :style="{ '--count': tiles.length }">
+      <RouterLink v-for="tile in tiles" :key="tile.id" :to="tile.metric.route" data-morph-card
+        :class="['pin-tile', { 'is-empty': tile.value === '—' }]" :style="{ '--tone': tile.tone }" :aria-label="t.tileAria(tile.label, tile.value)">
+        <span class="pin-label"><i class="pin-dot" aria-hidden="true"></i>{{ tile.label }}</span>
         <span class="pin-value"><strong>{{ tile.value }}</strong><small v-if="tile.unit && tile.value !== '—'">{{ tile.unit }}</small></span>
         <span class="pin-when">{{ tile.when ?? tile.coverage }}</span>
-        <Sparkline v-if="tile.spark.length > 1" class="pin-spark" :values="tile.spark" :color="palette.series.readiness" :label="`${tile.label} · ${tile.coverage}`" />
+        <Sparkline v-if="tile.spark.length > 1" class="pin-spark" :values="tile.spark" :color="tile.tone" :label="`${tile.label} · ${tile.coverage}`" />
+        <!-- 没有记录不画线（不编数据），留一块和曲线同高的浅槽，几块磁贴照样齐平。 -->
+        <span v-else class="pin-spark pin-spark-empty" aria-hidden="true"></span>
       </RouterLink>
-    </div>
+    </TransitionGroup>
 
     <PinPicker v-if="pickerOpen" :pins="pins" :label="label" @close="pickerOpen = false" @done="apply" />
   </section>
@@ -132,7 +140,14 @@ const apply = (next: string[]) => {
 .pins { display: grid; gap: 10px; }
 .pins-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 32px; }
 .pins-head h2 { margin: 0; color: var(--muted); font-size: var(--fs-sm); font-weight: 650; }
-.pins-edit { gap: 6px; }
+/* 「调整」：和顶栏同一族的小玻璃胶囊，图标 + 字，悬停才亮起来。 */
+.pins-edit { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 12px 0 10px; border: 0; border-radius: 999px;
+  color: var(--muted); font: inherit; font-size: var(--fs-xs); font-weight: 600; cursor: pointer;
+  transition: color var(--dur-fast) ease, background-color var(--dur-fast) ease; }
+.pins-edit:hover { background-color: var(--glass-press); color: var(--ink); }
+.pins-edit:active { scale: .96; }
+.pins-edit:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.pins-edit svg { color: var(--accent); }
 
 .pins-empty {
   display: flex; align-items: center; gap: 14px; width: 100%; padding: 16px 18px;
@@ -147,26 +162,50 @@ const apply = (next: string[]) => {
 .pins-empty-copy strong { color: var(--ink); font-size: var(--fs-md); font-weight: 650; }
 .pins-empty-copy small { font-size: var(--fs-xs); }
 
-.pins-grid { display: grid; grid-template-columns: repeat(var(--count, 4), minmax(0, 1fr)); gap: 12px; }
+.pins-grid { position: relative; display: grid; grid-template-columns: repeat(var(--count, 4), minmax(0, 1fr)); gap: 12px; }
+/* 类别色只做右上角一点微光（和下面的入口卡一样），不给整块刷颜色。 */
 .pin-tile {
-  display: grid; align-content: start; gap: 4px; min-width: 0; padding: 14px 16px 12px;
-  border-radius: var(--radius-lg); background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow);
+  position: relative; display: grid; align-content: start; gap: 4px; min-width: 0; padding: 14px 16px 12px; overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--tone) 16%, transparent), transparent 60%), var(--mat-card);
+  box-shadow: var(--mat-rim), var(--mat-shadow);
   color: inherit; text-decoration: none; transition: translate var(--dur-base) var(--ease-out), box-shadow var(--dur-base) ease;
 }
 .pin-tile:hover { translate: 0 -2px; }
 .pin-tile:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.pin-label { overflow: hidden; color: var(--muted); font-size: var(--fs-xs); text-overflow: ellipsis; white-space: nowrap; }
+.pin-label { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; color: var(--muted); font-size: var(--fs-xs); text-overflow: ellipsis; white-space: nowrap; }
+.pin-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--tone); box-shadow: 0 0 8px color-mix(in srgb, var(--tone) 60%, transparent); }
 .pin-value { display: flex; align-items: baseline; gap: 5px; }
 .pin-value strong { color: var(--ink); font-size: var(--fs-3xl); font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 .pin-value small { color: var(--muted); font-size: var(--fs-xs); }
 .pin-when { color: var(--subtle); font-size: var(--fs-2xs); }
 .pin-spark { margin-top: 2px; }
+.pin-spark-empty { display: block; height: 52px; border-radius: 10px;
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--ink) 4%, transparent) 0 6px, transparent 6px 12px); }
+.pin-tile.is-empty { background: var(--mat-card); }
+.pin-tile.is-empty .pin-value strong { color: var(--subtle); }
+.pin-tile.is-empty .pin-dot { box-shadow: none; opacity: .55; }
 
-/* 挑完回来：新一排依次浮上来。只动 opacity 和独立的 translate / scale。 */
-@media (prefers-reduced-motion: no-preference) {
-  .just-pinned .pin-tile { animation: pin-rise 460ms cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i) * 60ms); }
+/* 新来的磁贴：先是一块灰底，类别色从底边往上漫满，再退成微光、内容浮上来。
+   只动 transform（scaleY）和 opacity，合成器就能做。留下来的磁贴不重放。 */
+.pin-tile::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(0deg, color-mix(in srgb, var(--tone) 34%, transparent), color-mix(in srgb, var(--tone) 12%, transparent));
+  transform: scaleY(0); transform-origin: 50% 100%; opacity: 0;
 }
-@keyframes pin-rise { from { opacity: 0; translate: 0 12px; scale: .97; } }
+@media (prefers-reduced-motion: no-preference) {
+  .just-pinned .pin-enter-active::after { animation: pin-flood 900ms cubic-bezier(.3, .7, .2, 1) both; }
+  .just-pinned .pin-enter-active > * { animation: pin-content 900ms ease both; }
+  .pin-move { transition: transform 420ms cubic-bezier(.2, .8, .2, 1); }
+}
+/* 去掉的磁贴直接让位（它在挑选面板里已经退过场），剩下的滑到新位置。 */
+.pin-leave-active { display: none; }
+@keyframes pin-flood {
+  0% { transform: scaleY(0); opacity: 1; }
+  50% { transform: scaleY(1); opacity: 1; }
+  100% { transform: scaleY(1); opacity: 0; }
+}
+@keyframes pin-content { 0%, 45% { opacity: 0; translate: 0 6px; } 100% { opacity: 1; translate: 0 0; } }
 
 @container (max-width: 760px) {
   .pins-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

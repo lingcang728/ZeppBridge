@@ -27,6 +27,12 @@ describe('navigation gestures', () => {
     expect(snapStop(stops, 70, 0.8).value).toBe('/ai');
     expect(snapStop(stops, 195, -0.7).value).toBe('/ai');
   });
+  it('never skips a step on a slow drag, and a flick moves at most one stop', () => {
+    // 慢慢拖到第一项上松手，松手时还带一点速度：仍是第一项，不越过去
+    expect(snapStop(stops, 40, 0.4).value).toBe('/');
+    // 使劲甩也只走一格
+    expect(snapStop(stops, 40, 5).value).toBe('/ai');
+  });
 });
 
 describe('back navigation', () => {

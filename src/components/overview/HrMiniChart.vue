@@ -63,12 +63,20 @@ const areas = computed(() => segments.value.map((segment, index) => {
 const latest = computed(() => plotted.value[plotted.value.length - 1] ?? null);
 const xTicks = computed(() => (width.value ? timeTicks(range.value.start, range.value.end, plotWidth.value) : []));
 
+/** 读数框的左边沿：以光标为中心，靠边时不出图。框宽取一个够用的定值（框本身 min-width 同值）。 */
+const TIP_W = 150;
+const tipX = computed(() => {
+  const at = hover.value?.x ?? 0;
+  return Math.round(Math.min(Math.max(at - TIP_W / 2, 0), Math.max(width.value - TIP_W, 0)));
+});
 const onMove = (event: PointerEvent) => {
   const rect = host.value?.getBoundingClientRect();
   if (!rect || !rect.width) return;
   // 用本地坐标，而不是 clientX：界面缩放下两者不是一回事。
   const localX = ((event.clientX - rect.left) / rect.width) * width.value;
-  hover.value = nearestByX(plotted.value, localX);
+  const next = nearestByX(plotted.value, localX);
+  // 还是同一个点就不再写：指针在两点之间挪动时什么都不重排。
+  if (next?.ts !== hover.value?.ts) hover.value = next;
 };
 
 onMounted(() => {
@@ -90,7 +98,9 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="host" :class="['hr-mini', { intro }]" @pointermove="onMove" @pointerleave="hover = null">
-    <svg v-if="width" :viewBox="`0 0 ${width} ${HEIGHT}`" role="img" :aria-label="label">
+    <!-- 曲线本体只在数据 / 尺寸变了才重画（v-memo）；悬停光标、圆点和读数在上面单独一层，只动 transform。
+         以前光标画在同一张 SVG 里，指针每动一下整张图（上千个点的路径）重新栅格化一遍。 -->
+    <svg v-if="width" v-memo="[width, lines, areas, average, latest, yTicks, xTicks, chrome, color]" :viewBox="`0 0 ${width} ${HEIGHT}`" role="img" :aria-label="label">
       <defs>
         <linearGradient :id="fillId" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" :stop-color="color" stop-opacity="0.22" />
@@ -109,14 +119,15 @@ onBeforeUnmount(() => {
       <line v-if="average !== null" :x1="PAD.left" :x2="width - PAD.right" :y1="y(average)" :y2="y(average)"
         :stroke="chrome.mark" stroke-width="1.1" stroke-dasharray="5 4" />
       <circle v-if="latest" :cx="latest.x" :cy="latest.y" r="3.5" :fill="color" :stroke="chrome.spot" stroke-width="2" />
-      <g v-if="hover">
-        <line :x1="hover.x" :x2="hover.x" :y1="PAD.top" :y2="plotBottom" :stroke="chrome.grid" />
-        <circle :cx="hover.x" :cy="hover.y" r="4" :fill="color" :stroke="chrome.spot" stroke-width="2" />
-      </g>
     </svg>
-    <div v-if="hover" class="hr-tip" :style="{ left: `${hover.x}px`, top: `${hover.y}px`, background: chrome.tooltipBg, borderColor: chrome.tooltipBorder, color: chrome.tooltipText }">
-      {{ clock(hover.ts) }}　<b>{{ Math.round(hover.value) }}</b> {{ unit }}
-    </div>
+    <template v-if="hover">
+      <i class="hr-cursor" aria-hidden="true" :style="{ transform: `translateX(${hover.x}px)`, top: `${PAD.top}px`, height: `${plotBottom - PAD.top}px`, background: chrome.grid }"></i>
+      <i class="hr-dot" aria-hidden="true" :style="{ transform: `translate(${hover.x}px, ${hover.y}px)`, background: color, borderColor: chrome.spot }"></i>
+      <!-- 读数框固定在图的顶边、只跟着横向走：以前跟着心率曲线的锯齿上下窜。 -->
+      <div class="hr-tip" :style="{ transform: `translateX(${tipX}px)`, background: chrome.tooltipBg, borderColor: chrome.tooltipBorder, color: chrome.tooltipText }">
+        {{ clock(hover.ts) }}　<b>{{ Math.round(hover.value) }}</b> {{ unit }}
+      </div>
+    </template>
   </div>
 </template>
 
@@ -128,16 +139,24 @@ onBeforeUnmount(() => {
 .intro .area { animation: hr-fade 900ms ease both; }
 @keyframes hr-draw { from { stroke-dashoffset: 1; } }
 @keyframes hr-fade { from { opacity: 0; } }
+.hr-cursor, .hr-dot { position: absolute; left: 0; pointer-events: none; will-change: transform; }
+.hr-cursor { width: 1px; }
+.hr-dot { top: 0; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border: 2px solid; border-radius: 50%; }
 .hr-tip {
   position: absolute;
+  top: -8px;
+  left: 0;
   z-index: 2;
-  padding: 8px 12px;
+  box-sizing: border-box;
+  min-width: 150px;
+  padding: 5px 12px;
+  text-align: center;
+  will-change: transform;
   border: 1px solid;
   border-radius: 8px;
   font-size: 15.5px;
   white-space: nowrap;
   pointer-events: none;
-  transform: translate(-50%, calc(-100% - 12px));
 }
 @media (prefers-reduced-motion: reduce) {
   .intro .line, .intro .area { animation: none; }

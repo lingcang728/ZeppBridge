@@ -24,9 +24,8 @@ watch(() => draft.value?.startDate, (start) => {
 const ongoing = computed({ get: () => draft.value?.endDate === null, set: value => {
   if (draft.value) draft.value.endDate = value ? null : draft.value.startDate;
 } });
-/* 日期默认是能直接敲的日期框（带日历），外加「今天 / 昨天 / 同开始日期」快捷项（U15）；
-   滚轮留作可选方式。键盘一次就能输完整日期。 */
-const wheels = ref(false);
+/* 日期只用滚轮选（用户 2026-09-30 定：不要日历托盘），外加「今天 / 昨天 / 同开始日期」快捷项（U15）。
+   滚轮本身支持键盘上下键和直接滚动。 */
 const dayOffset = (days: number) => { const date = new Date(); date.setDate(date.getDate() - days); return localDateString(date); };
 const today = () => dayOffset(0);
 function setStart(value: string) { if (draft.value && value) draft.value.startDate = value; }
@@ -73,27 +72,22 @@ async function remove() {
         </div>
         <div class="event-dates">
           <div class="field">
-            <label for="life-event-start">{{ t.start }}</label>
-            <WheelDatePicker v-if="wheels" v-model="draft.startDate" :aria-label="t.start" data-event-start />
-            <input v-else id="life-event-start" type="date" :value="draft.startDate" min="2000-01-01" max="2099-12-31" required data-event-start
-              @change="setStart(($event.target as HTMLInputElement).value)">
+            <span class="field-label">{{ t.start }}</span>
+            <WheelDatePicker v-model="draft.startDate" :aria-label="t.start" data-event-start />
             <span class="date-quick">
               <button type="button" class="quick" @click="setStart(today())">{{ t.today }}</button>
               <button type="button" class="quick" @click="setStart(dayOffset(1))">{{ t.yesterday }}</button>
             </span>
           </div>
           <div v-if="!ongoing" class="field">
-            <label for="life-event-end">{{ t.end }}</label>
-            <WheelDatePicker v-if="wheels" v-model="draft.endDate" :min="draft.startDate" :aria-label="t.end" data-event-end />
-            <input v-else id="life-event-end" type="date" :value="draft.endDate ?? ''" :min="draft.startDate" max="2099-12-31" required data-event-end
-              @change="setEnd(($event.target as HTMLInputElement).value)">
+            <span class="field-label">{{ t.end }}</span>
+            <WheelDatePicker v-model="draft.endDate" :min="draft.startDate" :aria-label="t.end" data-event-end />
             <span class="date-quick">
               <button type="button" class="quick" @click="setEnd(draft.startDate)">{{ t.sameAsStart }}</button>
               <button type="button" class="quick" @click="setEnd(today())">{{ t.today }}</button>
             </span>
           </div>
         </div>
-        <button type="button" class="quick date-mode" @click="wheels = !wheels">{{ wheels ? t.useTyping : t.useWheels }}</button>
         <div class="check">
           <span>{{ t.ongoing }}</span>
           <button type="button" class="mat-switch" role="switch" :aria-checked="ongoing" :aria-label="t.ongoing" @click="ongoing = !ongoing"></button>
@@ -129,7 +123,6 @@ input[type='date'] { min-height:42px; font-variant-numeric:tabular-nums; }
 .quick { min-height:28px; padding:0 10px; border:0; border-radius:999px; background:color-mix(in srgb, var(--ink) 7%, transparent); color:var(--muted); font:inherit; font-size:var(--fs-xs); cursor:pointer; }
 .quick:hover { background:color-mix(in srgb, var(--accent) 16%, transparent); color:var(--ink); }
 .quick:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
-.date-mode { justify-self:start; background:transparent; padding:0; text-decoration:underline dotted; text-underline-offset:3px; }
 .check { display:flex; align-items:center; justify-content:space-between; gap:12px; color:var(--ink); font-size:var(--fs-sm); }
 .event-hint { color:var(--subtle); font-size:var(--fs-xs); line-height:1.6; }
 footer { display:flex; flex-wrap:wrap; gap:8px; }footer span { flex:1; }.delete-confirm { display:grid; gap:10px; }

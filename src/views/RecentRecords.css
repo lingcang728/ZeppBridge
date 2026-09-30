@@ -1,4 +1,4 @@
-.recent-page.page { display: grid; width: 100%; max-width: 1080px; min-width: 0; margin: 0; gap: 16px; align-content: start; }
+.recent-page.page { display: grid; width: 100%; max-width: 1080px; min-width: 0; margin: 0 auto; gap: 16px; align-content: start; }
 .recent-skeleton { display: grid; gap: 10px; }
 
 .recent-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }

@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 const props = defineProps<{
   current: number; baseline: number; currentLabel: string; baselineLabel: string;
-  currentText: string; baselineText: string; tone: 'good' | 'bad' | 'neutral' | 'flat';
+  currentText: string; baselineText: string; tone: 'good' | 'bad' | 'neutral' | 'flat' | 'up' | 'down';
 }>();
 const maximum = computed(() => Math.max(props.current, props.baseline, 1));
 const percent = (value: number) => `${Math.max(0, value) / maximum.value * 100}%`;
@@ -12,11 +12,11 @@ const percent = (value: number) => `${Math.max(0, value) / maximum.value * 100}%
   <div class="comparison-bars">
     <div class="comparison-row">
       <span>{{ currentLabel }}</span><span class="comparison-number">{{ currentText }}</span>
-      <span class="comparison-track"><i :class="tone" :style="{ width: percent(current) }"></i></span>
+      <span :class="['comparison-track', 'track-' + tone]"><i :class="tone" :style="{ width: percent(current) }"></i></span>
     </div>
     <div class="comparison-row">
       <span>{{ baselineLabel }}</span><span class="comparison-number">{{ baselineText }}</span>
-      <span class="comparison-track"><i class="baseline" :style="{ width: percent(baseline) }"></i></span>
+      <span :class="['comparison-track', 'track-' + tone]"><i class="baseline" :style="{ width: percent(baseline) }"></i></span>
     </div>
   </div>
 </template>
@@ -35,6 +35,14 @@ const percent = (value: number) => `${Math.max(0, value) / maximum.value * 100}%
 .comparison-track .bad { background-color: var(--danger); }
 .comparison-track .neutral { background: color-mix(in srgb, var(--ink) 55%, transparent); }
 .comparison-track .baseline { background: rgba(232,238,244,.24); }
+/* 周报（reportTone）：只有绿和红。浅一档的 up / down 是「只是变化」；参照那一条用同一种颜色的淡版，
+   轨道也带一点同色，整格不出现灰。 */
+.comparison-track .up { background: color-mix(in srgb, var(--accent) 62%, transparent); }
+.comparison-track .down { background: color-mix(in srgb, var(--danger) 62%, transparent); }
+.track-good, .track-up { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.track-bad, .track-down { background: color-mix(in srgb, var(--danger) 10%, transparent); }
+.track-good .baseline, .track-up .baseline { background: color-mix(in srgb, var(--accent) 34%, transparent); }
+.track-bad .baseline, .track-down .baseline { background: color-mix(in srgb, var(--danger) 34%, transparent); }
 @keyframes comparison-flow { to { transform: translateX(24px); } }
 @media (prefers-reduced-motion: reduce) { .comparison-track .good::before, .comparison-track .bad::before { animation: none; } }
 </style>

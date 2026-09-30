@@ -13,12 +13,14 @@ const chipFocus = ref<number | null>(null);
 const chartFocus = ref<number | null>(null);
 let pending: Promise<void> | null = null;
 let loadedOnce = false;
+/** 读过至少一次（响应式）：之后的重读不该让界面回到「不知道有没有」的状态。 */
+const loaded = ref(false);
 async function reload() {
   if (!isDesktop()) return;
   if (pending) return pending;
   loading.value = true;
   failed.value = false;
-  pending = backend.listLifeEvents().then(rows => { events.value = rows; loadedOnce = true; })
+  pending = backend.listLifeEvents().then(rows => { events.value = rows; loadedOnce = true; loaded.value = true; })
     .catch(() => { failed.value = true; })
     .finally(() => { loading.value = false; pending = null; });
   return pending;
@@ -32,4 +34,4 @@ function open(event?: LifeEvent, date = localDateString(new Date())) {
 function ensureLoaded() {
   if (!loadedOnce) void reload();
 }
-export const useLifeEvents = () => ({ ensureLoaded, events, loading, failed, draft, reload, open, chipFocus, chartFocus });
+export const useLifeEvents = () => ({ ensureLoaded, events, loading, loaded, failed, draft, reload, open, chipFocus, chartFocus });

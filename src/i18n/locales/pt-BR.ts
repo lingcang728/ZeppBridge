@@ -905,8 +905,6 @@ export default {
       today: "Hoje",
       yesterday: "Ontem",
       sameAsStart: "Mesma data do início",
-      useWheels: "Escolher pelos seletores rotativos",
-      useTyping: "Digitar diretamente",
     },
 
     'lib/metricSeries': {

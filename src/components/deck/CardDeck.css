@@ -143,7 +143,22 @@
   box-shadow: var(--mat-shadow-lift);
 }
 /* 拖动时只留轻投影：大面积柔影跟着卡逐帧重画，边缘就是一圈发黑的分界线。 */
-.deck-stage.is-dragging .open-card { will-change: transform; box-shadow: var(--mat-shadow); }
+/* 甩出去、下一张滑进来的途中也保持独立的合成层：以前松手那一刻 will-change 就撤了，大卡连同整段表单
+   在飞的途中被降回普通层、逐帧重画——拖卡切换「很卡」的那一下。 */
+.deck-stage.is-moving .open-card { will-change: transform, opacity; box-shadow: var(--mat-shadow); }
+.deck-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  background: color-mix(in srgb, var(--canvas) 34%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  transition: opacity .26s ease;
+}
+.deck-stage.is-moving .deck-backdrop { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .deck-backdrop { display: none; } }
 .open-head {
   padding: 18px 20px 16px 24px;
   pointer-events: auto;

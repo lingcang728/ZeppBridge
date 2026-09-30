@@ -233,6 +233,8 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="coverflow">
+    <!-- 拖着卡组转的时候，身后（页头、背景）蒙一层磨砂，视线落在卡上。静态模糊，只动不透明度。 -->
+    <div :class="['cover-backdrop', { on: dragging }]" aria-hidden="true"></div>
     <div
       ref="stage"
       :class="['cover-stage', { 'is-dragging': dragging, 'is-moving': moving }]"
@@ -281,8 +283,21 @@ onBeforeUnmount(() => {
 <style scoped>
 .coverflow { display: grid; gap: 22px; min-width: 0; }
 
+.cover-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: color-mix(in srgb, var(--canvas) 30%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  transition: opacity .3s ease;
+}
+.cover-backdrop.on { opacity: 1; }
 .cover-stage {
   position: relative;
+  z-index: 1;
   height: calc(var(--cover-w) * .64 + 60px);
   min-height: 250px;
   outline: none;
@@ -315,6 +330,8 @@ onBeforeUnmount(() => {
   backface-visibility: hidden;
 }
 .cover-stage.is-moving .cover-card { will-change: transform, opacity; }
+/* 渐隐层自己单独一层：它的不透明度每帧都在变，留在卡的层里就是每帧把整张卡重画一遍。 */
+.cover-stage.is-moving .cover-fade { will-change: opacity; }
 /* 侧卡外侧那一半渐隐进背景：一层静态渐变，拖动时只改它的不透明度（--fade），不重画。 */
 .cover-fade {
   position: absolute;
@@ -347,7 +364,7 @@ onBeforeUnmount(() => {
 .cover-face { position: relative; height: 100%; padding: 26px 28px; pointer-events: none; }
 .cover-quick { position: absolute; top: 22px; right: 24px; z-index: 2; }
 
-.cover-bar { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; animation: cover-bar-in .36s var(--ease-out) .1s both; }
+.cover-bar { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; animation: cover-bar-in .36s var(--ease-out) .1s both; }
 @keyframes cover-bar-in { from { opacity: 0; translate: 0 10px; } }
 .cover-caption {
   display: grid;

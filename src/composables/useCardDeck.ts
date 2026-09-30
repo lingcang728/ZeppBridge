@@ -1,9 +1,11 @@
 import { onBeforeUnmount, onMounted, ref, type Ref } from 'vue';
 import {
-  RISE_IN_FRAMES,
+  SLIDE_IN_EASE,
+  SLIDE_IN_MS,
   dragFrame,
   flingOutFrames,
   releaseDirection,
+  slideInFrames,
 } from '../lib/deck/physics';
 
 /**
@@ -59,9 +61,9 @@ export const useCardDeck = ({ stage, card, step, reducedMotion }: CardDeckGestur
     queued = 0;
   };
 
-  const animate = async (el: HTMLElement | null, frames: Keyframe[], duration: number) => {
+  const animate = async (el: HTMLElement | null, frames: Keyframe[], duration: number, easing = 'cubic-bezier(.22,.75,.25,1)') => {
     if (!el || reducedMotion()) return;
-    const animation = el.animate(frames, { duration, easing: 'cubic-bezier(.22,.75,.25,1)', fill: 'forwards' });
+    const animation = el.animate(frames, { duration, easing, fill: 'forwards' });
     animations.add(animation);
     try {
       await animation.finished;
@@ -95,7 +97,7 @@ export const useCardDeck = ({ stage, card, step, reducedMotion }: CardDeckGestur
     clearInline();
     await step(direction);
     if (current !== epoch) return;
-    await animate(card.value, RISE_IN_FRAMES, 240);
+    await animate(card.value, slideInFrames(direction, width(), vertical), SLIDE_IN_MS, SLIDE_IN_EASE);
     if (current !== epoch) return;
     for (const animation of animations) animation.cancel();
     animations.clear();

@@ -1001,8 +1001,6 @@ export default {
       today: "Vandaag",
       yesterday: "Gisteren",
       sameAsStart: "Zelfde als begindatum",
-      useWheels: "Met de datumwielen kiezen",
-      useTyping: "Direct invoeren",
     },
     'lib/metricSeries': {
       noRecordsToShow: 'Geen gegevens om te tonen',

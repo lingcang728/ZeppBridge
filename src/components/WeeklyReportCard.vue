@@ -19,7 +19,7 @@ import type { InsightFact } from '../types';
 import { useMessages } from '../i18n';
 import { weeklyReportMessages as messages } from './WeeklyReportCard.i18n';
 import { finiteOrNull } from '../lib/missingValues';
-import { changeArrow, changeTone as tone } from '../lib/changeTone';
+import { changeArrow, reportTone as tone } from '../lib/changeTone';
 
 
 const t = useMessages(messages);
@@ -147,7 +147,7 @@ function formatNumber(fact: InsightFact, value: number): string {
               :current-label="t.barThisWeek" :baseline-label="t.barBaseline"
               :current-text="formatValue(fact)" :baseline-text="chartFor(fact)!.baselineText" :tone="tone(fact)" />
             <span :class="['weekly-delta', tone(fact)]">
-              <template v-if="tone(fact) === 'neutral'">{{ changeArrow(fact) }}&nbsp;</template>{{ fact.comparison!.delta_percent > 0 ? '+' : '' }}{{ fact.comparison!.delta_percent.toFixed(1) }}%
+              <template v-if="tone(fact) === 'up' || tone(fact) === 'down'">{{ changeArrow(fact) }}&nbsp;</template>{{ fact.comparison!.delta_percent > 0 ? '+' : '' }}{{ fact.comparison!.delta_percent.toFixed(1) }}%
             </span>
           </template>
 
@@ -216,7 +216,8 @@ function formatNumber(fact: InsightFact, value: number): string {
 .weekly-delta.good::before { content: '✓\a0'; font-weight: 700; }
 .weekly-delta.bad { color: var(--danger); }
 .weekly-delta.bad::before { content: '!\a0'; font-weight: 700; }
-.weekly-delta.neutral { background: color-mix(in srgb, var(--ink) 7%, transparent); color: var(--muted); font-weight: 600; }
+.weekly-delta.up { background: color-mix(in srgb, var(--accent) 10%, transparent); color: color-mix(in srgb, var(--accent) 80%, var(--ink)); font-weight: 600; }
+.weekly-delta.down { background: color-mix(in srgb, var(--danger) 10%, transparent); color: color-mix(in srgb, var(--danger) 80%, var(--ink)); font-weight: 600; }
 .weekly-delta.flat, .weekly-delta.muted { color: var(--muted); }
 
 .weekly-note { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.6; }

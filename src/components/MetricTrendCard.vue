@@ -220,9 +220,11 @@ const hasEventMarks = computed(() => {
       <small v-if="hint" class="trend-hint">{{ hint }}</small>
     </header>
 
-    <p class="trend-meta">
-      <strong v-if="focusLine" class="trend-focus">{{ focusLine }}</strong>
-      <span v-else-if="hasPoints">{{ coverage }}</span>
+    <!-- 悬停读数叠在这一行上面，不替换它：原来那几段一直占着位置（只是藏起来），行高不变。
+         以前读数换掉覆盖说明，字一长就折行，同一排卡片（subgrid）的曲线跟着整体上下跳。 -->
+    <p :class="['trend-meta', { 'is-focused': focusLine && hasPoints }]">
+      <strong v-if="focusLine && hasPoints" class="trend-focus">{{ focusLine }}</strong>
+      <span v-if="hasPoints">{{ coverage }}</span>
       <span v-if="latestDate" class="trend-date">{{ t.measuredOn(latestDate) }}</span>
       <span v-if="band" class="trend-band">{{ band }}</span>
       <span v-if="hasEventMarks" class="trend-event-key"><i aria-hidden="true"></i>{{ eventWords.chartKey }}</span>
@@ -279,6 +281,7 @@ const hasEventMarks = computed(() => {
 .trend-latest-tag { margin-right: 2px; color: var(--subtle); font-size: var(--fs-xs); font-style: normal; }
 .trend-hint { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.45; }
 .trend-meta {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-content: start;
@@ -289,7 +292,9 @@ const hasEventMarks = computed(() => {
 }
 .trend-date { font-variant-numeric: tabular-nums; }
 .trend-band { color: var(--muted); }
-.trend-focus { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.trend-focus { position: absolute; top: 0; right: 0; left: 0; overflow: hidden; color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis; white-space: nowrap; }
+.trend-meta.is-focused > :not(.trend-focus) { visibility: hidden; }
 .trend-event-key { display: inline-flex; align-items: center; gap: 5px; color: var(--subtle); }
 .trend-event-key i { width: 7px; height: 11px; border-radius: 2px; background: color-mix(in srgb, var(--subtle) 45%, transparent); }
 .trend-chart, .trend-slot { width: 100%; height: 150px; align-self: end; }

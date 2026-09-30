@@ -1321,8 +1321,6 @@ export default {
       today: "Hoje",
       yesterday: "Ontem",
       sameAsStart: "Mesma data do início",
-      useWheels: "Escolher nos seletores rotativos",
-      useTyping: "Introduzir diretamente",
     },
     'lib/metricSeries': {
       noRecordsToShow: 'Sem registos',

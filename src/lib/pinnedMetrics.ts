@@ -8,6 +8,7 @@
  * 同一份口径。没有记录就显示「—」和「近 N 天无记录」，不补 0、不沿用旧值。
  */
 import type { MetricSeries } from '../types';
+import type { ZeppSemanticColors } from './echartsTheme';
 import { formatMetric } from './format';
 
 export type PinGroup = 'recovery' | 'activity' | 'body';
@@ -21,27 +22,39 @@ export interface PinnableMetric {
   digits: number;
   /** 界面单位码（见 PinnedMetrics 的文案表）；空串 = 不写单位。 */
   unit: 'bpm' | 'ms' | 'score' | 'percent' | 'steps' | 'kcal' | 'min' | 'kg' | 'vo2' | '';
+  /** 类别色：和它详情页里那张图同一种颜色（睡眠蓝紫、心率红、压力橙……），磁贴不再一律绿。 */
+  tone: PinTone;
+}
+
+export type PinTone = Exclude<keyof ZeppSemanticColors, 'sleep'> | 'sleepDeep' | 'sleepLight' | 'sleepRem';
+
+/** 类别色在当前主题色板里的实际值。 */
+export const pinToneColor = (tone: PinTone, colors: ZeppSemanticColors): string => {
+  if (tone === 'sleepDeep') return colors.sleep.deep;
+  if (tone === 'sleepLight') return colors.sleep.light;
+  if (tone === 'sleepRem') return colors.sleep.rem;
+  return colors[tone];
 }
 
 export const MAX_PINS = 4;
 
 export const PINNABLE_METRICS: readonly PinnableMetric[] = [
-  { id: 'resting_hr', group: 'recovery', route: '/heart', digits: 0, unit: 'bpm' },
-  { id: 'hrv_rmssd', group: 'recovery', route: '/heart', digits: 0, unit: 'ms' },
-  { id: 'sleep_hrv', group: 'recovery', route: '/body', digits: 0, unit: 'ms' },
-  { id: 'sleep_score', group: 'recovery', route: '/sleep', digits: 0, unit: 'score' },
-  { id: 'readiness', group: 'recovery', route: '/body', digits: 0, unit: 'score' },
-  { id: 'stress', group: 'recovery', route: '/body', digits: 0, unit: 'score' },
-  { id: 'spo2', group: 'recovery', route: '/body', digits: 0, unit: 'percent' },
-  { id: 'steps', group: 'activity', route: '/activity', digits: 0, unit: 'steps' },
-  { id: 'active_calories', group: 'activity', route: '/activity', digits: 0, unit: 'kcal' },
-  { id: 'active_minutes', group: 'activity', route: '/activity', digits: 0, unit: 'min' },
-  { id: 'training_load', group: 'activity', route: '/training', digits: 0, unit: '' },
-  { id: 'vo2max', group: 'activity', route: '/training', digits: 0, unit: 'vo2' },
-  { id: 'pai_total', group: 'activity', route: '/training', digits: 0, unit: '' },
-  { id: 'weight', group: 'body', route: '/body', digits: 1, unit: 'kg' },
-  { id: 'body_fat_rate', group: 'body', route: '/body', digits: 1, unit: 'percent' },
-  { id: 'bmi', group: 'body', route: '/body', digits: 1, unit: '' },
+  { id: 'resting_hr', group: 'recovery', route: '/heart', digits: 0, unit: 'bpm', tone: 'heart' },
+  { id: 'hrv_rmssd', group: 'recovery', route: '/heart', digits: 0, unit: 'ms', tone: 'sleepLight' },
+  { id: 'sleep_hrv', group: 'recovery', route: '/body', digits: 0, unit: 'ms', tone: 'sleepDeep' },
+  { id: 'sleep_score', group: 'recovery', route: '/sleep', digits: 0, unit: 'score', tone: 'sleepRem' },
+  { id: 'readiness', group: 'recovery', route: '/body', digits: 0, unit: 'score', tone: 'readiness' },
+  { id: 'stress', group: 'recovery', route: '/body', digits: 0, unit: 'score', tone: 'calories' },
+  { id: 'spo2', group: 'recovery', route: '/body', digits: 0, unit: 'percent', tone: 'pace' },
+  { id: 'steps', group: 'activity', route: '/activity', digits: 0, unit: 'steps', tone: 'brand' },
+  { id: 'active_calories', group: 'activity', route: '/activity', digits: 0, unit: 'kcal', tone: 'calories' },
+  { id: 'active_minutes', group: 'activity', route: '/activity', digits: 0, unit: 'min', tone: 'altitude' },
+  { id: 'training_load', group: 'activity', route: '/training', digits: 0, unit: '', tone: 'training' },
+  { id: 'vo2max', group: 'activity', route: '/training', digits: 0, unit: 'vo2', tone: 'vo2' },
+  { id: 'pai_total', group: 'activity', route: '/training', digits: 0, unit: '', tone: 'power' },
+  { id: 'weight', group: 'body', route: '/body', digits: 1, unit: 'kg', tone: 'distance' },
+  { id: 'body_fat_rate', group: 'body', route: '/body', digits: 1, unit: 'percent', tone: 'altitude' },
+  { id: 'bmi', group: 'body', route: '/body', digits: 1, unit: '', tone: 'stride' },
 ];
 
 const BY_ID = new Map(PINNABLE_METRICS.map((metric) => [metric.id, metric]));

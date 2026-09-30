@@ -1348,8 +1348,6 @@ export default {
       today: "Сегодня",
       yesterday: "Вчера",
       sameAsStart: "Совпадает с датой начала",
-      useWheels: "Выбрать с помощью колёс прокрутки",
-      useTyping: "Ввести вручную",
     },
 
     'lib/metricSeries': {

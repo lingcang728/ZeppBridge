@@ -140,7 +140,7 @@ a { color: inherit; }
 }
 [class*='page-'][class*='-leave-active'] {
   position: absolute;
-  inset: 0 auto auto 0;
+  inset: 0 0 auto 0; /* 左右都钉住：限宽居中的页（设置）离场时不跳到左边 */
   width: 100%;
   pointer-events: none;
   transition: opacity 150ms ease;
@@ -148,8 +148,18 @@ a { color: inherit; }
 /* 旧页只淡出、不位移：两页各往一个方向走，交叠那一下就是一屏重影。 */
 .page-forward-enter-from { opacity: 0; transform: translateY(14px); }
 .page-back-enter-from { opacity: 0; transform: translateY(-10px); }
-.page-left-enter-from { opacity: 0; transform: translateX(24px); }
-.page-right-enter-from { opacity: 0; transform: translateX(-24px); }
+/* 换入口（点 / 拖顶栏胶囊）：新页顺着胶囊的方向从侧面滑进来，先快后慢地停住；旧页往反方向让一小段、
+   很快淡掉（120ms，重叠只有一瞬，不成重影）。以前两边只挪 24px、一共 250ms，看上去就是硬切。 */
+[class*='page-'].page-left-enter-active, [class*='page-'].page-right-enter-active {
+  transition: opacity 260ms ease-out, transform 440ms cubic-bezier(.22, .88, .26, 1);
+}
+[class*='page-'].page-left-leave-active, [class*='page-'].page-right-leave-active {
+  transition: opacity 120ms ease-in, transform 200ms ease-in;
+}
+.page-left-enter-from { opacity: 0; transform: translateX(84px); }
+.page-right-enter-from { opacity: 0; transform: translateX(-84px); }
+.page-left-leave-to { transform: translateX(-32px); }
+.page-right-leave-to { transform: translateX(32px); }
 .page-forward-leave-to, .page-back-leave-to, .page-left-leave-to, .page-right-leave-to { opacity: 0; }
 /* 展开：幽灵板（lib/motion/ghost.ts）从卡长到整屏盖住旧页，新页在它后半程淡入（usePageMorph.onEnter）。
    这里只管层次和旧页淡出；enter-active 那条过渡是占位，让层次保持到 JS 动画放完。 */

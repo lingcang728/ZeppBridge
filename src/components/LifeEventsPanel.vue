@@ -16,7 +16,7 @@ import { displayDateTimeFormatter } from '../lib/dateTime';
 import { useMessages } from '../i18n';
 
 const t = useMessages(lifeEventMessages);
-const { events, loading, failed, reload, open } = useLifeEvents();
+const { events, loading, loaded, failed, reload, open } = useLifeEvents();
 const search = ref('');
 const scope = ref<'all' | 'ongoing'>('all');
 const STEP = 6;
@@ -29,7 +29,9 @@ const filtered = computed(() => events.value.filter((e) => (scope.value === 'all
   && `${e.title} ${e.notes}`.toLocaleLowerCase().includes(search.value.trim().toLocaleLowerCase())));
 const rows = computed(() => filtered.value.slice(0, visible.value));
 /* 还一件都没有：整块收成一行（标题、一句引导、添加按钮），不再是一张大卡里孤零零一行字。 */
-const empty = computed(() => !events.value.length && !loading.value && !failed.value);
+/* 只有第一次读之前才看 loading：以前每回到概览、每存一条都会重读，读的那一瞬 empty 翻成 false，
+   图标卸掉又挂回、整行布局跳一下——用户看到的「生活事件图标重绘」。 */
+const empty = computed(() => !events.value.length && !failed.value && (loaded.value || !loading.value));
 const date = (s: string) => displayDateTimeFormatter({ year: 'numeric', month: 'short', day: 'numeric' }).format(new Date(`${s}T00:00:00`));
 watch([search, scope, events], () => { visible.value = STEP; });
 onMounted(reload);

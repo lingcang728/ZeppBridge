@@ -1230,8 +1230,6 @@ export default {
       today: "आज",
       yesterday: "कल",
       sameAsStart: "शुरुआत की तारीख जैसी ही",
-      useWheels: "घुमाकर चुनें",
-      useTyping: "सीधे लिखें",
     },
 
     'lib/metricSeries': {

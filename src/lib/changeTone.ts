@@ -35,3 +35,15 @@ export const changeArrow = (fact: Pick<InsightFact, 'comparison'>): string => {
   const direction = fact.comparison?.direction;
   return direction === 'higher' ? '↑' : direction === 'lower' ? '↓' : '';
 };
+
+/**
+ * 周报里的颜色只用绿和红（用户 2026-09-30 定：不要灰）。有公认方向的指标照旧：更好=绿、更差=红，
+ * 带 ✓ / !；只是变化的那些（训练次数、训练负荷……）按方向用浅一档的绿 / 红——涨是浅绿、降是浅红，
+ * 前面仍是 ↑↓ 箭头、没有 ✓ / !，所以读得出「这只是方向，不是评价」。持平算浅绿。
+ */
+export type ReportTone = 'good' | 'bad' | 'up' | 'down';
+export const reportTone = (fact: Pick<InsightFact, 'fact_id' | 'comparison'>): ReportTone => {
+  const tone = changeTone(fact);
+  if (tone === 'good' || tone === 'bad') return tone;
+  return fact.comparison?.direction === 'lower' ? 'down' : 'up';
+};

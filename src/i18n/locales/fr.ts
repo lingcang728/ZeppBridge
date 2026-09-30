@@ -831,8 +831,6 @@ S'il te faut quelque chose de moi (quel client j'utilise, où vit le fichier), d
       today: "Aujourd’hui",
       yesterday: "Hier",
       sameAsStart: "Même date que le début",
-      useWheels: "Choisir avec les roulettes",
-      useTyping: "Saisir directement",
     },
 
     'lib/metricSeries': {

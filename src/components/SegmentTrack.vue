@@ -226,8 +226,18 @@ const onUp = (event: PointerEvent) => {
   const current = gesture;
   if (!current || current.id !== event.pointerId) return;
   if (event.type !== 'pointerup') {
+    // 拖到一半指针被系统收走（pointercancel / 捕获丢失）：已经拖动过就按此刻滑块所在的那一项落定，
+    // 没拖动就原样放回。「禁止点击」的标记也要复位——以前它一直留着，之后点胶囊毫无反应，
+    // 这就是「快速切换会卡住」。
+    const landing = dragging.value ? snapStop(stops.value, thumb.value.left + thumb.value.width / 2, 0).value : null;
     clearGesture();
-    placeOn(props.modelValue);
+    window.setTimeout(() => { suppressClick = false; }, 0);
+    if (landing !== null) {
+      placeOn(landing);
+      commit(landing);
+    } else {
+      placeOn(props.modelValue);
+    }
     return;
   }
   const moved = dragging.value;

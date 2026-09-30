@@ -95,9 +95,18 @@ export function dragThumb<T>(stops: SegmentStop<T>[], center: number, velocity =
   return { left: Math.max(stops[0].left, Math.min(maxLeft, clamped - width / 2)), width };
 }
 
+/** 快速一甩才算「甩」：低于这个速度（布局像素 / 毫秒）松手就停在滑块所在的那一项。 */
+export const FLICK_VELOCITY = 0.6;
+
 export function snapStop<T>(stops: SegmentStop<T>[], center: number, velocity: number): SegmentStop<T> {
-  const projected = center + Math.max(-90, Math.min(90, velocity * 110));
-  return stops.reduce((best, stop) =>
-    Math.abs(stop.left + stop.width / 2 - projected) < Math.abs(best.left + best.width / 2 - projected) ? stop : best);
+  const nearestTo = (x: number) => stops.reduce((best, stop) =>
+    Math.abs(stop.left + stop.width / 2 - x) < Math.abs(best.left + best.width / 2 - x) ? stop : best);
+  const here = nearestTo(center);
+  // 慢慢拖到某一项上松手就是那一项——以前松手瞬间带一点速度也会被往前投射，越过去一格（「慢拖跳步」）。
+  if (Math.abs(velocity) < FLICK_VELOCITY) return here;
+  // 甩出去最多再走一格，不会一下飞过两项。
+  const from = stops.indexOf(here);
+  const to = stops.indexOf(nearestTo(center + Math.max(-90, Math.min(90, velocity * 110))));
+  return stops[from + Math.max(-1, Math.min(1, to - from))] ?? here;
 }
 

@@ -158,7 +158,7 @@ const step = (direction: -1 | 1) => new Promise<void>((resolve) => {
 });
 
 const {
-  dragging, cycle, reset, onPointerDown, onPointerMove, onPointerUp, onPointerCancel,
+  dragging, busy: flinging, cycle, reset, onPointerDown, onPointerMove, onPointerUp, onPointerCancel,
 } = useCardDeck({ stage, card: cardEl, step, reducedMotion });
 
 /* 连点保护：「打开」和打开后的「×」落在同一片区域，手快连点两下，卡会刚飞出来又
@@ -177,7 +177,10 @@ const requestClose = () => guardedToggle(() => emit('close'));
 const jumpTo = (id: string) => {
   if (id === props.activeId) return;
   reset();
-  emit('change', id, () => morph.swap());
+  // 圆点跳转也带方向：往后跳从右边滑进来，往前跳从左边。
+  const target = props.cards.findIndex((card) => card.id === id);
+  const direction: -1 | 1 = target < activeIndex.value ? -1 : 1;
+  emit('change', id, () => morph.swap(direction));
 };
 
 /* 关卡时大卡从人刚才看到的位置缩回去：路由一换，滚动区就被拉回顶部（lib/returnScroll.ts），
@@ -337,7 +340,10 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- 打开：一张放大，从它在总览里的位置长出来。 -->
-    <div v-if="shownCard" ref="stage" :class="['deck-stage', { 'is-dragging': dragging }]">
+    <div v-if="shownCard" ref="stage" :class="['deck-stage', { 'is-dragging': dragging, 'is-moving': dragging || flinging }]">
+      <!-- 拖着大卡、甩出去、下一张滑进来的这段时间，身后那一层蒙上磨砂：视线落在手里这张卡上。
+           模糊是遮罩上静态的一层，只动它的不透明度。 -->
+      <div class="deck-backdrop" aria-hidden="true"></div>
       <article
         ref="cardEl"
         class="deck-card open-card"

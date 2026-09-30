@@ -84,3 +84,20 @@ export const RISE_IN_FRAMES: Keyframe[] = [
   { transform: 'translateY(16px)', opacity: 0 },
   { transform: 'none', opacity: 1 },
 ];
+
+/** 下一张从另一侧滑进来（接着甩出去的方向，像一叠卡被推着走），先快后慢地停住。
+ *  以前是从下方 16px 淡入，和「往左甩」的方向对不上，看上去是换了一张硬切进来的卡。
+ *  竖着甩的就从上 / 下进来。只动 transform / opacity。 */
+export function slideInFrames(direction: -1 | 1, width: number, vertical = false): Keyframe[] {
+  const shift = Math.min(360, Math.max(120, width * 0.36));
+  const from = vertical
+    ? `translate3d(0px, ${direction * 140}px, 0px)`
+    : `translate3d(${Math.round(direction * shift)}px, 0px, 0px) rotate(${direction * 2.5}deg)`;
+  return [
+    { transform: from, opacity: 0 },
+    { transform: 'none', opacity: 1 },
+  ];
+}
+/** 滑进来的曲线和时长（和页面展开同一族：先快后慢、不回弹）。 */
+export const SLIDE_IN_MS = 380;
+export const SLIDE_IN_EASE = 'cubic-bezier(.22, .88, .26, 1)';

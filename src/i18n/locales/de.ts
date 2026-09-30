@@ -1542,8 +1542,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       today: "Heute",
       yesterday: "Gestern",
       sameAsStart: "Startdatum übernehmen",
-      useWheels: "Mit Datumsrollen wählen",
-      useTyping: "Direkt eingeben",
     },
     'lib/metricSeries': {
       coverage: (days: number, withData: number) =>

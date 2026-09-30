@@ -1,6 +1,8 @@
 import { onBeforeUnmount, type Ref } from 'vue';
 import { flightFrom, unscaledBox, type Box } from '../lib/deck/morph';
-import { collapseGhost, playGhost, revealAfterGhost } from '../lib/motion/ghost';
+import { SLIDE_IN_EASE, SLIDE_IN_MS, slideInFrames } from '../lib/deck/physics';
+import { revealAfterGhost } from '../lib/motion/ghost';
+import { cardReplica, morphWindow, type WindowMorph } from '../lib/motion/window';
 
 /**
  * 设置卡组在三种形态之间的形变：coverflow ↔ 卡包（洗牌式飞出 / 收拢）、总览 ↔ 打开一张。
@@ -20,13 +22,13 @@ export interface DeckMorphRefs {
   reducedMotion: () => boolean;
 }
 
-const OPEN_MS = 320;
+const OPEN_MS = 340;
 const CLOSE_MS = 220;
-const OPEN_EASE = 'cubic-bezier(.2, .9, .25, 1)';
+const OPEN_EASE = 'cubic-bezier(.22, .88, .26, 1)';
 const CLOSE_EASE = 'cubic-bezier(.4, 0, .2, 1)';
-/** 关卡：板收回源卡。和概览页「返回」同一条曲线（先快后慢、没有回弹）。 */
+/** 关卡：窗口收回源卡。和概览页「返回」同一条曲线（先快后慢、没有回弹）。 */
 const RETURN_MS = 380;
-const RETURN_EASE = 'cubic-bezier(.32, .72, 0, 1)';
+const RETURN_EASE = 'cubic-bezier(.25, .85, .3, 1)';
 /** 展开全部 / 收起：一张张飞出、收拢。 */
 const FLIGHT_MS = 460;
 const FLIGHT_STAGGER_MS = 24;
@@ -42,7 +44,17 @@ type Morph = { animation: Animation; id: string; kind: 'open' | 'close'; closed?
 
 export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) => {
   let morph: Morph | null = null;
-  let ghost: Animation | null = null;
+  let ghost: WindowMorph | null = null;
+  /** 窗口的全部动画一起倒着放（开到一半关、关到一半开）。 */
+  const reverseGhost = () => {
+    const running = ghost?.animations().filter((animation) => animation.playState === 'running') ?? [];
+    for (const animation of running) animation.reverse();
+    return running.length > 0;
+  };
+  const dropGhost = () => {
+    ghost?.remove();
+    ghost = null;
+  };
   let flights: Animation[] = [];
 
   const sourceOf = (id: string) =>
@@ -92,7 +104,7 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
     if (morph && morph.id === id && morph.kind === 'close' && !morph.plate && morph.animation.playState === 'running') {
       morph.kind = 'open';
       morph.animation.reverse();
-      if (ghost?.playState === 'running') ghost.reverse();
+      reverseGhost();
       return;
     }
     if (morph) {
@@ -103,8 +115,7 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
     }
     // 关到一半又打开同一张：大卡上还挂着关卡时那段淡出（fill: both），不清掉它就一直是透明的。
     for (const animation of el.getAnimations()) animation.cancel();
-    ghost?.cancel();
-    ghost = null;
+    dropGhost();
     const source = sourceOf(id);
     const from = source ? boxOf(source) : null;
     const host = document.getElementById('main-content')?.parentElement;
@@ -112,16 +123,26 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
       rise(el);
       return;
     }
-    ghost = playGhost({
+    // 窗口从那张小卡长成大卡（ColorOS 那种，见 lib/motion/window.ts）：窗口里先是小卡的拷贝，
+    // 跟着放大、淡掉；大卡在后半程从窗口底下浮出，窗口同时淡出——两者交叉，不停一拍。
+    const to = visibleBoxOf(el);
+    const main = document.getElementById('main-content');
+    const frameBox = main ? boxOf(main) : to;
+    ghost = morphWindow({
       from,
-      to: visibleBoxOf(el),
+      to,
+      frame: { left: frameBox.left, top: frameBox.top, width: main?.clientWidth ?? frameBox.width, height: main?.clientHeight ?? frameBox.height },
       fromRadius: source ? radiusOf(source) : 24,
       toRadius: radiusOf(el),
       host,
       duration: OPEN_MS,
       easing: OPEN_EASE,
+      surface: 'card',
+      replica: source ? { ...cardReplica(source), at: 'from' } : null,
     });
-    const animation = el.animate(revealAfterGhost(), { duration: OPEN_MS, fill: 'both' });
+    const opened = ghost;
+    const animation = el.animate(revealAfterGhost(0.62), { duration: OPEN_MS, fill: 'both' });
+    window.setTimeout(() => { if (ghost === opened) opened.release(OPEN_MS * 0.4, true); }, OPEN_MS * 0.62);
     track({ animation, id, kind: 'open' });
   };
 
@@ -157,18 +178,16 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
    */
   const close = (id: string, closed: () => void, fromTop: number | null = null) => {
     const el = card.value;
-    if (!el || reducedMotion()) { ghost?.cancel(); ghost = null; closed(); return; }
+    if (!el || reducedMotion()) { dropGhost(); closed(); return; }
     // 开到一半就关（Esc、再点一下）：大卡和那块板一起倒着放回源卡，而不是板一下消失。
     if (morph && morph.id === id && morph.kind === 'open' && morph.animation.playState === 'running') {
       morph.kind = 'close';
       morph.closed = closed;
       morph.animation.reverse();
-      if (ghost?.playState === 'running') ghost.reverse();
-      else { ghost?.cancel(); ghost = null; }
+      if (!reverseGhost()) dropGhost();
       return;
     }
-    ghost?.cancel();
-    ghost = null;
+    dropGhost();
     if (morph) {
       const previous = morph;
       morph = null;
@@ -188,32 +207,42 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
       [{ opacity: 1, transform: `translate(0px, ${lift}px)` }, { opacity: 0, transform: `translate(0px, ${lift - 10}px) scale(.985)` }],
       { duration: 150, easing: 'ease-in', fill: 'both' },
     );
-    // 源卡在板底下先藏着，板淡出时它正好接上（coverflow 卡的透明度写在行内样式里，用动画盖住，不去改它）。
-    const hide = source.animate([{ opacity: 0 }, { opacity: 0 }], { duration: RETURN_MS, fill: 'forwards' });
-    const plate = collapseGhost({
-      viewport: from,
+    // 源卡在窗口底下先藏着（coverflow 卡的透明度写在行内样式里，用动画盖住，不去改它）：
+    // 窗口落地时里面的拷贝和它严丝合缝，撤掉窗口它原样接上。不再「亮一下」——那段 brightness
+    // 滤镜在带玻璃的卡上逐帧重画，正是「收起时卡一下再回去」的那一下。
+    const hide = source.animate([{ opacity: 0 }, { opacity: 0 }], { duration: RETURN_MS * 2, fill: 'forwards' });
+    const main = document.getElementById('main-content');
+    const frameBox = main ? boxOf(main) : from;
+    const replica = cardReplica(source);
+    // 拷贝按源卡回到原大以后的位置摆（总览此刻正从「退后一层」往回放大）。
+    replica.rect = target;
+    replica.el.style.width = `${target.width}px`;
+    replica.el.style.height = `${target.height}px`;
+    const plate = morphWindow({
+      from,
       to: target,
+      frame: { left: frameBox.left, top: frameBox.top, width: main?.clientWidth ?? frameBox.width, height: main?.clientHeight ?? frameBox.height },
       fromRadius: radiusOf(el),
-      radius: radiusOf(source),
+      toRadius: radiusOf(source),
       host,
       duration: RETURN_MS,
-      fadeIn: 80,
-      landAt: 0.52,
       easing: RETURN_EASE,
+      surface: 'card',
+      replica: { ...replica, at: 'to' },
+      fadeIn: 70,
     });
-    let lit = false;
-    const light = () => {
-      if (lit) return;
-      lit = true;
+    ghost = plate;
+    let landed = false;
+    const land = () => {
+      if (landed) return;
+      landed = true;
       hide.cancel();
-      source.animate(
-        [{ opacity: 0, filter: 'brightness(1.3)' }, { opacity: 1, filter: 'brightness(1.3)', offset: 0.35 }, { filter: 'brightness(1)' }],
-        { duration: 520, easing: 'ease-out' },
-      );
+      plate.remove();
+      if (ghost === plate) ghost = null;
     };
-    void plate.landed.then(light);
-    plate.done.addEventListener('cancel', light);
-    track({ animation: plate.done, id, kind: 'close', closed, plate: true });
+    void plate.arrived.then(land);
+    plate.shape.addEventListener('cancel', land);
+    track({ animation: plate.shape, id, kind: 'close', closed, plate: true });
   };
 
   /** 元素布局框的中心（不受它自己 transform 的影响）——也就是它变换原点的屏幕坐标。 */
@@ -271,17 +300,17 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
   /** 正在打开（板还在长）：这时按 Esc 是「不开了」，把它倒回去。 */
   const opening = () => Boolean(morph && morph.kind === 'open' && morph.animation.playState === 'running');
 
-  /** 翻到另一张（点下面的圆点跳过去）时，新内容轻轻浮上来。 */
-  const swap = () => {
+  /** 翻到另一张（点下面的圆点跳过去）时，新内容从跳去的那一侧滑进来（和拖着甩是同一种动作）。 */
+  const swap = (direction: -1 | 1 = 1) => {
     const el = card.value;
-    if (el && !reducedMotion()) rise(el);
+    if (!el || reducedMotion()) return;
+    el.animate(slideInFrames(direction, el.clientWidth), { duration: SLIDE_IN_MS, easing: SLIDE_IN_EASE });
   };
 
   onBeforeUnmount(() => {
     morph?.animation.cancel();
     morph = null;
-    ghost?.cancel();
-    ghost = null;
+    dropGhost();
     for (const animation of flights) animation.cancel();
     flights = [];
   });
