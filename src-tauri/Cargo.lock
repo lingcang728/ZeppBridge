@@ -6282,7 +6282,6 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
  "tokio",
- "url",
  "windows-sys 0.61.2",
  "zeppbridge-core",
 ]
@@ -6292,7 +6291,6 @@ name = "zeppbridge-cli"
 version = "3.0.0-beta.19"
 dependencies = [
  "chrono",
- "serde",
  "serde_json",
  "tokio",
  "zeppbridge-core",
@@ -6302,7 +6300,6 @@ dependencies = [
 name = "zeppbridge-core"
 version = "3.0.0-beta.19"
 dependencies = [
- "anyhow",
  "base64 0.22.1",
  "chrono",
  "directories",
@@ -6313,7 +6310,6 @@ dependencies = [
  "jiff",
  "keyring",
  "libc",
- "regex",
  "reqwest 0.12.28",
  "rusqlite",
  "rustyfit",
@@ -6323,7 +6319,6 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tracing",
- "url",
 ]
 
 [[package]]
@@ -6332,7 +6327,6 @@ version = "3.0.0-beta.19"
 dependencies = [
  "chrono",
  "rusqlite",
- "serde",
  "serde_json",
  "zeppbridge-core",
 ]

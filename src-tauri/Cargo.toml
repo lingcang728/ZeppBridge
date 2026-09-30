@@ -19,8 +19,6 @@ hex = "0.4"
 directories = "5.0"
 tracing = "0.1"
 base64 = "0.22"
-regex = "1.10"
-url = "2.5"
 # 原始报文压缩。已经在依赖树里（reqwest 的 gzip 走的是它），这里只是把它
 # 变成直接依赖，好在 storage 里显式使用。
 flate2 = "1"
@@ -63,7 +61,6 @@ directories = { workspace = true }
 tokio = { workspace = true }
 chrono = { workspace = true }
 anyhow = { workspace = true }
-url = { workspace = true }
 
 # 开机时问系统要用户的界面语言。这一句以前是派生 powershell.exe 去跑
 # `(Get-Culture).Name`，在启动路径上要 0.5~2 秒；windows-sys 本来就在依赖树里

@@ -10,7 +10,6 @@ path = "src/main.rs"
 
 [dependencies]
 zeppbridge-core = { workspace = true }
-serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }
 
