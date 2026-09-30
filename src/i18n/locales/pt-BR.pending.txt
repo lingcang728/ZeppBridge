@@ -53,6 +53,17 @@ components/ai/HandoffPanel.tokensFree
 components/ai/HandoffPanel.tokensNeedPaid
 components/ai/HandoffPanel.tokensPaid
 components/ai/HandoffPanel.tooLong
+components/overview/WeekDigest.addEvent
+components/overview/WeekDigest.curves
+components/overview/WeekDigest.days
+components/overview/WeekDigest.full
+components/overview/WeekDigest.higher
+components/overview/WeekDigest.lower
+components/overview/WeekDigest.none
+components/overview/WeekDigest.steady
+components/overview/WeekDigest.title
+components/overview/WeekDigest.toAi
+components/overview/WeekDigest.window
 components/shell/AppTopBar.syncingProgress
 composables/useAiTaskHandoff.kickoff
 lib/aiTask/brief.fileAttachmentsMd
