@@ -3,4 +3,4 @@
  * （与 tauri.conf.json 单一来源），这里只是回退值，要和 package.json 保持一致——
  * `npm run version:check` 会核对它。
  */
-export const FALLBACK_APP_VERSION = '3.0.0-beta.19';
+export const FALLBACK_APP_VERSION = '3.0.0-beta.20';
