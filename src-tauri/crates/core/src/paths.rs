@@ -413,8 +413,9 @@ pub fn other_libraries_on_this_machine(data_dir: &Path) -> Vec<PathBuf> {
 /// v3 注记：`legacy_source_dirs()` 列出的全部是「ZeppBridge」（2.x）产品线
 /// 的目录；3.x 线开发期间与 2.x 并存（当时叫 ZeppBridge3），与日常使用的 2.x
 /// 共存于同一台机器。把 2.x 的 AppData 遗留库搬进 v3 的 data/ 等于从还在
-/// 用的产品手里抢数据，所以 3.x 线整体跳过这次搬迁。将来 ZeppBridge3 若
-/// 有自己的历史目录，也不会出现在下面的名单里。
+/// 用的产品手里抢数据，所以 3.x 线整体跳过这次搬迁。2026-09-30 起本机不再
+/// 并行跑 2.x、测试版也改回叫 ZeppBridge；正式 3.0 发布前要把这道跳过去掉，
+/// 让还停在 AppData 时代的老用户能搬过来（v3 待办「发布 3.0 前的升级兼容清单」）。
 pub fn relocate_legacy_data(data_dir: &Path) -> Option<String> {
     if env!("CARGO_PKG_VERSION").starts_with("3.") {
         return None;

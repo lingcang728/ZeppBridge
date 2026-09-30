@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # v3 是 3.0 的私有 beta 分支（代码审查 E01）：推上来只跑三平台的检查 / 测试和 Docker 自检。
+    # 打包、签名、建 Release 的作业都只认 `v*` tag 或手动触发，v3 的 push 碰不到它们。
+    branches: [main, v3]
     tags: ['v*']
   pull_request:
     branches: [main]

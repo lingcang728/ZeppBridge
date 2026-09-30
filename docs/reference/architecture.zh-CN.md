@@ -192,6 +192,8 @@ file:  second_heart_rate/real_data
 
 ## 后续阶段
 
+逐项能力在 core / 桌面 / CLI / MCP / 本机 REST 里接通到哪一步、任务范围管不管得到、在哪些平台上验过，见[能力成熟度清单](capability-maturity.zh-CN.md)。
+
 | 阶段 | 状态 |
 | --- | --- |
 | 账号同步、SQLite、桌面 Dashboard | 已完成受控安装版烟测 |
