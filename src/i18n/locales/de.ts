@@ -1560,7 +1560,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       distanceHint: 'An diesem Tag zurückgelegte Distanz',
       distanceLabel: 'Distanz',
       distanceUnit: 'm',
-      emptyCard: 'In diesem Zeitraum nichts aufgezeichnet.',
       intro:
         'Tägliche Schritte, Distanz, Aktivitätskalorien und aktive Minuten. Vergleich nur mit deiner eigenen Historie; Tage ohne Daten bleiben leer, nicht mit 0 gefüllt.',
       loadFailed: 'Aktivitätsdaten gerade nicht verfügbar',
@@ -1570,7 +1569,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       minutesUnit: 'Min.',
       noneInRange:
         'Keine Aktivitätsdaten im gewählten Zeitraum – Zeitraum erweitern oder synchronisieren.',
-      rangeAria: 'Zeitraum',
       retry: 'Wiederholen',
       stepsHint: 'Tägliche Schrittzahl der Uhr',
       stepsLabel: 'Schritte',
@@ -1627,7 +1625,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       curveTitle: 'Stress der letzten 24 Stunden',
       desktopOnly:
         'Erfordert die Desktop-App (die Browser-Vorschau liest keine Kontodaten).',
-      emptyCard: 'In diesem Zeitraum nichts aufgezeichnet.',
       fatHint:
         'Braucht eine Körperanalysewaage. Uhr und von Hand eingetragene Gewichte bringen keinen Fettwert mit',
       fatIntakeLabel: 'Fett',
@@ -1658,7 +1655,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       odiHint: 'Desaturierungen pro Stunde; niedriger ist besser',
       odiLabel: 'Nächtlicher SpO₂-ODI',
       proteinLabel: 'Eiweiß',
-      rangeAria: 'Zeitraum',
       readinessHint: 'Die Uhr verrechnet Schlaf, HRV und Ruheherzfrequenz zu einem Score',
       readinessLabel: 'Bereitschaft',
       respiratoryHint: 'Atemfrequenz im Schlaf; das Band ist der gemessene Bereich des Tages',
@@ -1681,7 +1677,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       stressLabel: 'Stress',
       stressTooltip: (clock: string, value: number) => `${clock}　<b>${value}</b>`,
       title: 'Körperstatus',
-      trendRangeLabel: 'Trendzeitraum',
       unitBreathsPerMinute: 'Atemzüge/Min.',
       unitGrade: 'Stufe',
       unitGram: 'g',
@@ -1912,14 +1907,12 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       dayTitle: 'Letzte 24 Stunden',
       desktopOnly:
         'Erfordert die Desktop-App (die Browser-Vorschau liest keine Kontodaten).',
-      emptyCard: 'In diesem Zeitraum nichts aufgezeichnet.',
       hrvHint: 'Einzelne HRV-Messwerte, pro Tag gemittelt',
       intro:
         'Oben immer die Kurve der letzten 24 Stunden; 7 Tage / 1 Monat / 6 Monate ändern nur die Tagestrends darunter. Zeiten ohne Messwerte bekommen keine Linie und werden nicht mit 0 aufgefüllt.',
       loadingAria: 'Herzfrequenz wird geladen',
       noSamples:
         'Keine Herzfrequenz-Messwerte in den letzten 24 Stunden – keine Kurve.',
-      rangeAria: 'Trendzeitraum',
       restingHint: 'Die Uhr meldet einen pro Tag; ruhiger ist besser',
       restingLabel: 'Ruheherzfrequenz',
       retry: 'Wiederholen',
@@ -1929,7 +1922,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       statLatest: 'Neueste',
       statLowest: 'Min.',
       title: 'Herzfrequenz',
-      trendRangeLabel: 'Trendzeitraum',
       trendsFailed: 'Ruheherzfrequenz- und HRV-Trends gerade nicht lesbar.',
     },
     'views/Overview': {
@@ -2092,7 +2084,6 @@ Wenn du etwas von mir brauchst (welchen Client ich nutze, wo die Datei liegt), f
       paiEmpty: 'Keine PAI-Einträge in diesem Zeitraum.',
       paiHint: 'Personal Activity Intelligence über rollende 7 Tage',
       paiLabel: 'PAI',
-      rangeAria: 'Zeitraum',
       ratioMissing: (days: number) =>
         `— (nur ${days} Tage mit Daten im 28-Tage-Fenster)`,
       ratioTooltip: (value: string) => `Akut:Chronisch <b>${value}</b>`,

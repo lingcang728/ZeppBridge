@@ -13,7 +13,9 @@ import PageHeader from '../components/PageHeader.vue';
 import CoverageNotice from '../components/CoverageNotice.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import Icon from '../components/Icon.vue';
-import SegmentTrack from '../components/SegmentTrack.vue';
+import TrendRangeBar from '../components/TrendRangeBar.vue';
+import MissingMetricsRow from '../components/MissingMetricsRow.vue';
+import { useTrendRange } from '../composables/useTrendRange';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { zeppSemanticColors } from '../lib/echartsTheme';
@@ -21,10 +23,8 @@ import {
   formatPaceSeconds,
   SERIES_FETCH_DAYS,
   indexSeries,
-  seriesRanges,
   sliceByDate,
   sliceIndexed,
-  type SeriesRangeDays,
 } from '../lib/metricSeries';
 import { trackRangeSwap } from '../lib/chartSwap';
 import type { MetricSeries, TrainingBalancePoint } from '../types';
@@ -45,8 +45,7 @@ const METRICS = [
   'pai_daily',
 ];
 
-const ranges = computed(() => seriesRanges());
-const rangeDays = ref<SeriesRangeDays>(180);
+const rangeDays = useTrendRange();
 /* 一次取最长那档，切范围只在本地切（见 lib/metricSeries.ts 的 sliceSeries）。 */
 const fullSeries = ref<Record<string, MetricSeries>>({});
 const fullBalance = ref<TrainingBalancePoint[]>([]);
@@ -76,6 +75,25 @@ const thresholdDates = computed(() => {
   return [...dates].sort();
 });
 const hasThreshold = computed(() => thresholdDates.value.length > 0);
+
+/* 近 6 个月一条读数都没有的卡收成一行（U09），把有数据的图（尤其心率区间）让进首屏。
+   按整段定而不是按当前范围：切范围时卡片不增减。 */
+const everMeasured = (...metrics: string[]) => metrics.some((metric) => (fullSeries.value[metric]?.points.length ?? 0) > 0);
+const show = computed(() => ({
+  vo2: everMeasured('vo2max'),
+  load: everMeasured('training_load'),
+  pai: everMeasured('pai_daily'),
+  threshold: everMeasured('lactate_threshold_hr', 'lactate_threshold_pace'),
+  balance: fullBalance.value.some((point) => point.acute_days_with_data > 0),
+}));
+const shownCardCount = computed(() => [show.value.vo2, show.value.load, show.value.pai, show.value.threshold].filter(Boolean).length);
+const missing = computed(() => [
+  !show.value.vo2 && { key: 'vo2', label: 'VO₂max', detail: t.value.vo2Hint },
+  !show.value.load && { key: 'load', label: t.value.loadLabel, detail: t.value.loadHint },
+  !show.value.pai && { key: 'pai', label: t.value.paiLabel, detail: t.value.paiHint },
+  !show.value.threshold && { key: 'threshold', label: t.value.thresholdLabel, detail: t.value.thresholdHint },
+  !show.value.balance && { key: 'balance', label: t.value.balanceLabel, detail: t.value.balanceEmpty },
+].filter((item): item is { key: string; label: string; detail: string } => Boolean(item)));
 
 const thresholdOption = computed(() => {
   const dates = thresholdDates.value;
@@ -279,14 +297,7 @@ watch(dataRevision, () => { void load(); });
       title-id="training-title"
       :title="t.title"
       :intro="t.intro"
-    >
-      <SegmentTrack
-        :items="ranges.map((range) => ({ value: range.days, label: range.label }))"
-        :model-value="rangeDays"
-        :aria-label="t.rangeAria"
-        @update:model-value="(value) => rangeDays = Number(value) as SeriesRangeDays"
-      />
-    </PageHeader>
+    />
 
     <LifeEventShortcut :days="rangeDays" />
     <CoverageNotice :requested-days="rangeDays" />
@@ -301,8 +312,10 @@ watch(dataRevision, () => { void load(); });
     </div>
 
     <template v-else>
-      <div class="trend-grid" :style="trendGridStyle(4)">
+      <TrendRangeBar />
+      <div v-if="shownCardCount" class="trend-grid" :style="trendGridStyle(shownCardCount)">
         <MetricTrendCard
+          v-if="show.vo2"
           label="VO₂max"
           :hint="t.vo2Hint"
           :series="vo2max"
@@ -312,6 +325,7 @@ watch(dataRevision, () => { void load(); });
           :empty-text="t.vo2Empty"
         />
         <MetricTrendCard
+          v-if="show.load"
           :label="t.loadLabel"
           :hint="t.loadHint"
           :series="trainingLoad"
@@ -320,6 +334,7 @@ watch(dataRevision, () => { void load(); });
           :empty-text="t.loadEmpty"
         />
         <MetricTrendCard
+          v-if="show.pai"
           :label="t.paiLabel"
           :hint="t.paiHint"
           :series="pai"
@@ -331,6 +346,7 @@ watch(dataRevision, () => { void load(); });
         <!-- 乳酸阈有心率和配速两条线：和另外三张同一种卡（同样的卡头、同样对齐），
              只是最新读数和曲线换成自己的，平均/最低/最高那一行不给（两条线各一套会挤）。 -->
         <MetricTrendCard
+          v-if="show.threshold"
           :label="t.thresholdLabel"
           :hint="t.thresholdHint"
           :series="thresholdHr"
@@ -353,8 +369,10 @@ watch(dataRevision, () => { void load(); });
         </MetricTrendCard>
       </div>
 
+      <MissingMetricsRow :items="missing" />
+
       <!-- 负荷平衡与心率区间直接摊开。 -->
-          <section class="chart-card wide" :aria-label="t.balanceLabel">
+          <section v-if="show.balance" class="chart-card wide" :aria-label="t.balanceLabel">
             <header class="chart-head">
               <span class="chart-title">
                 <strong>{{ t.balanceLabel }}</strong>

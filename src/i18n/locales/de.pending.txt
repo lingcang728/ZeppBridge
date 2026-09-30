@@ -1,2 +1,8 @@
 # 尚未覆盖的键（i18n:check --write-pending 生成；W4 翻译一行删一行）。
 # 格式：moduleId.键路径。
+components/MissingMetricsRow.separator
+components/MissingMetricsRow.summary
+components/TrendRangeBar.aria
+components/TrendRangeBar.label
+lib/lifeEvents.chartKey
+lib/lifeEvents.since

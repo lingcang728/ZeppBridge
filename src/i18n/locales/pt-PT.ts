@@ -1332,7 +1332,6 @@ export default {
       title: 'Atividade diária',
       intro:
         'Passos, distância, gasto ativo e minutos ativos, dia a dia. Comparado apenas com o teu histórico; dias sem registo ficam vazios, nunca com 0 no lugar.',
-      rangeAria: 'Intervalo de tempo',
       desktopOnly:
         'Disponível na aplicação ZeppBridge no computador.',
       loadFailed: 'Dados de atividade indisponíveis de momento',
@@ -1340,7 +1339,6 @@ export default {
       loadingAria: 'A carregar atividade diária',
       noneInRange:
         'Sem registos de atividade no intervalo selecionado. Aumenta o período ou realiza uma sincronização.',
-      emptyCard: 'Sem dados no intervalo selecionado.',
       stepsLabel: 'Passos',
       stepsHint: 'Total diário de passos',
       stepsUnit: 'passos',
@@ -1380,8 +1378,6 @@ export default {
       title: 'Estado corporal',
       intro:
         'Tendências de prontidão, stress, oxigénio no sangue, VFC, respiração, FC em repouso e composição corporal a partir dos registos sincronizados.',
-      rangeAria: 'Intervalo de tempo',
-      trendRangeLabel: 'Intervalo da tendência',
       desktopOnly:
         'Disponível na aplicação ZeppBridge no computador.',
       loadFailed: 'Dados de estado corporal indisponíveis de momento',
@@ -1389,7 +1385,6 @@ export default {
       loadingAria: 'A carregar estado corporal',
       noneInRange:
         'Sem registos de estado corporal no intervalo selecionado. Aumenta o período ou realiza uma sincronização.',
-      emptyCard: 'Sem dados no intervalo selecionado.',
       readinessLabel: 'Prontidão',
       readinessHint:
         'Pontuação ponderada de sono, VFC e FC em repouso calculada pelo relógio',
@@ -1658,8 +1653,6 @@ export default {
       title: 'Frequência cardíaca',
       intro:
         'A curva superior mostra sempre as últimas 24 h; 7 dias, 1 mês ou 6 meses alteram apenas as tendências diárias abaixo. Períodos sem medição ficam sem linha, nunca com 0 no lugar.',
-      rangeAria: 'Intervalo da tendência',
-      trendRangeLabel: 'Intervalo da tendência',
       desktopOnly:
         'Disponível na aplicação ZeppBridge no computador.',
       dayFailed: 'Não foi possível ler as medições das últimas 24 horas.',
@@ -1683,7 +1676,6 @@ export default {
       restingHint: 'Uma leitura por dia registada pelo relógio',
       hrvHint: 'VFC: medições com média diária',
       rmssdHint: 'RMSSD: outra métrica de VFC, distinta da anterior',
-      emptyCard: 'Sem registos no intervalo selecionado.',
       dailyMaxTitle: 'Pico diário de frequência cardíaca (amostras locais)',
       dailyMaxSub:
         'A app Zepp filtra o pico diário; aqui não se filtra. É normal os dois valores diferirem.',
@@ -1829,7 +1821,6 @@ export default {
       title: 'Estado de treino',
       intro:
         'VO₂max, limiar de lactato, carga de treino e zonas de frequência cardíaca a partir de registos sincronizados.',
-      rangeAria: 'Intervalo de tempo',
       desktopOnly:
         'Disponível na aplicação ZeppBridge no computador.',
       loadFailed: 'Dados de estado de treino indisponíveis de momento',

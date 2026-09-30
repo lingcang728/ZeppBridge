@@ -7,13 +7,18 @@ const events = ref<LifeEvent[]>([]);
 const loading = ref(false);
 const failed = ref(false);
 const draft = ref<LifeEventInput | null>(null);
+/* 胶囊与图上事件区带互相高亮（U24）。分两个方向存：图表只跟着胶囊变，胶囊只跟着图表变——
+   否则悬停图表 → 改图表 → 图表重绘触发移出 → 又改回来，来回抖。 */
+const chipFocus = ref<number | null>(null);
+const chartFocus = ref<number | null>(null);
 let pending: Promise<void> | null = null;
+let loadedOnce = false;
 async function reload() {
   if (!isDesktop()) return;
   if (pending) return pending;
   loading.value = true;
   failed.value = false;
-  pending = backend.listLifeEvents().then(rows => { events.value = rows; })
+  pending = backend.listLifeEvents().then(rows => { events.value = rows; loadedOnce = true; })
     .catch(() => { failed.value = true; })
     .finally(() => { loading.value = false; pending = null; });
   return pending;
@@ -23,4 +28,8 @@ function open(event?: LifeEvent, date = localDateString(new Date())) {
     startDate: event.startDate, endDate: event.endDate, notes: event.notes }
     : { id: null, title: '', category: 'other', startDate: date, endDate: date, notes: '' };
 }
-export const useLifeEvents = () => ({ events, loading, failed, draft, reload, open });
+/** 趋势图要画事件区带，但不是每页都有事件胶囊（它负责 reload）：没读过就读一次。 */
+function ensureLoaded() {
+  if (!loadedOnce) void reload();
+}
+export const useLifeEvents = () => ({ ensureLoaded, events, loading, failed, draft, reload, open, chipFocus, chartFocus });

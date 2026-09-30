@@ -23,13 +23,15 @@ import SectionGroup from '../components/SectionGroup.vue';
 import PageHeader from '../components/PageHeader.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import Icon from '../components/Icon.vue';
-import SegmentTrack from '../components/SegmentTrack.vue';
+import TrendRangeBar from '../components/TrendRangeBar.vue';
+import MissingMetricsRow from '../components/MissingMetricsRow.vue';
+import { useTrendRange } from '../composables/useTrendRange';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
-import { indexSeries, SERIES_FETCH_DAYS, SERIES_RANGE_DAYS, seriesRanges, sliceByDate, sliceIndexed, type SeriesRangeDays } from '../lib/metricSeries';
+import { indexSeries, SERIES_FETCH_DAYS, sliceByDate, sliceIndexed } from '../lib/metricSeries';
 import { trackRangeSwap } from '../lib/chartSwap';
-import { isFiniteNumber } from '../lib/format';
+import { formatTime, formatWhen, isFiniteNumber } from '../lib/format';
 import type { DailyHeartRateExtreme, HeartRatePoint, MetricSeries } from '../types';
 import { useMessages } from '../i18n';
 import { heartRateDetailMessages as messages } from './HeartRateDetail.i18n';
@@ -40,8 +42,7 @@ const { dataRevision } = useSyncController();
 
 const TREND_METRICS = ['resting_hr', 'hrv', 'hrv_rmssd'] as const;
 
-const ranges = computed(() => seriesRanges());
-const rangeDays = ref<SeriesRangeDays>(SERIES_RANGE_DAYS[0]);
+const rangeDays = useTrendRange();
 /* 趋势一次取最长那档，切范围只在本地切（lib/metricSeries.ts 的 sliceSeries）：点下去不用等查库。 */
 const fullSeries = ref<Record<string, MetricSeries>>({});
 const series = computed(() => sliceIndexed(fullSeries.value, rangeDays.value));
@@ -281,6 +282,26 @@ onMounted(() => { void load(); });
 watch(dataRevision, () => { void load(); });
 
 const trendsSummary = computed(() => trendCards.value.map((card) => card.label).join(' · '));
+/* 近 6 个月一条读数都没有的趋势收成一行（U09）；按整段定，切范围时卡片不增减。 */
+const everMeasured = (metric: string) => (fullSeries.value[metric]?.points.length ?? 0) > 0;
+const shownTrendCards = computed(() => (trendsError.value
+  ? trendCards.value
+  : trendCards.value.filter((card) => everMeasured(card.metric))));
+const missingTrends = computed(() => (trendsError.value ? [] : trendCards.value
+  .filter((card) => !everMeasured(card.metric))
+  .map((card) => ({ key: card.metric, label: card.label, detail: card.hint }))));
+/* 「最近 24 小时」写出实际覆盖到的时刻（U11）：没戴表的那几个小时不算进去。 */
+const daySpan = computed(() => {
+  const first = points.value[0];
+  const last = points.value[points.value.length - 1];
+  if (!first || !last) return null;
+  const from = new Date(first.ts);
+  const to = new Date(last.ts);
+  const sameDay = from.toDateString() === to.toDateString();
+  const fromText = formatWhen(from.toISOString());
+  const toText = sameDay ? formatTime(to.toISOString()) : formatWhen(to.toISOString());
+  return fromText && toText ? `${fromText} – ${toText}` : null;
+});
 </script>
 
 <template>
@@ -305,7 +326,7 @@ const trendsSummary = computed(() => trendCards.value.map((card) => card.label).
         <header class="day-head">
           <div>
             <h2>{{ t.dayTitle }}</h2>
-            <p>{{ t.daySub }}</p>
+            <p>{{ daySpan ?? t.daySub }}</p>
           </div>
           <dl class="day-stats">
             <div><dt>{{ t.statLatest }}</dt><dd>{{ latest === null ? '—' : Math.round(latest) }}</dd></div>
@@ -334,15 +355,7 @@ const trendsSummary = computed(() => trendCards.value.map((card) => card.label).
 
       <!-- 24 小时曲线不跟这个开关走。放在大图下面，才不会让人以为
            切 7 天 / 1 个月会改那张全天图。 -->
-      <div class="range-toolbar">
-        <p class="range-label">{{ t.trendRangeLabel }}</p>
-        <SegmentTrack
-          :items="ranges.map((range) => ({ value: range.days, label: range.label }))"
-          :model-value="rangeDays"
-          :aria-label="t.rangeAria"
-          @update:model-value="(value) => rangeDays = Number(value) as SeriesRangeDays"
-        />
-      </div>
+      <TrendRangeBar />
 
       <!-- 每日最高心率、静息心率与 HRV 趋势直接摊开：点进这一页就是来看它们的。 -->
           <section class="surface-card day-card" :aria-label="t.dailyMaxAria">
@@ -373,9 +386,9 @@ const trendsSummary = computed(() => trendCards.value.map((card) => card.label).
           <p v-if="trendsError" class="inline-alert" role="alert">
             <Icon name="warning" :size="14" />{{ trendsError }}
           </p>
-          <div class="trend-grid" :style="trendGridStyle(trendCards.length)">
+          <div v-if="shownTrendCards.length" class="trend-grid" :style="trendGridStyle(shownTrendCards.length)">
             <MetricTrendCard
-              v-for="card in trendCards"
+              v-for="card in shownTrendCards"
               :key="card.metric"
               :label="card.label"
               :hint="card.hint"
@@ -383,9 +396,10 @@ const trendsSummary = computed(() => trendCards.value.map((card) => card.label).
               :color="card.color"
               :unit="card.unit"
               :decimals="0"
-              :empty-text="trendsError || t.emptyCard"
+              :empty-text="trendsError ?? undefined"
             />
           </div>
+          <MissingMetricsRow :items="missingTrends" />
         </SectionGroup>
 
     </template>

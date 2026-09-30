@@ -6,7 +6,9 @@
  * 宽度，窄了会自动少排，见 material.css 的 `.trend-grid`）。
  */
 export const trendColumns = (count: number): number => {
-  if (count <= 5) return Math.max(2, count);
+  // 一张就占满整行；五张在常见窗口宽度下排不下五列（每张至少 280px），会落成 4 + 1，改排 3 + 2。
+  if (count === 5) return 3;
+  if (count <= 4) return Math.max(1, count);
   let best = 4;
   let bestEmpty = Number.POSITIVE_INFINITY;
   for (let cols = 5; cols >= 3; cols -= 1) {

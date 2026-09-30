@@ -14,10 +14,12 @@ import CoverageNotice from '../components/CoverageNotice.vue';
 import OfficialOnlyNote from '../components/OfficialOnlyNote.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import Icon from '../components/Icon.vue';
-import SegmentTrack from '../components/SegmentTrack.vue';
+import TrendRangeBar from '../components/TrendRangeBar.vue';
+import MissingMetricsRow from '../components/MissingMetricsRow.vue';
+import { useTrendRange } from '../composables/useTrendRange';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
-import { SERIES_FETCH_DAYS, indexSeries, seriesRanges, sliceIndexed, type SeriesRangeDays } from '../lib/metricSeries';
+import { SERIES_FETCH_DAYS, indexSeries, sliceIndexed } from '../lib/metricSeries';
 import { trackRangeSwap } from '../lib/chartSwap';
 import { distanceUnit } from '../lib/units';
 import type { MetricSeries } from '../types';
@@ -30,8 +32,7 @@ const t = useMessages(messages);
 
 const { dataRevision } = useSyncController();
 
-const ranges = computed(() => seriesRanges());
-const rangeDays = ref<SeriesRangeDays>(30);
+const rangeDays = useTrendRange();
 /** 一次取最长那档（6 个月），切范围只在本地从尾部切（sliceIndexed）——不再每切一次查一次库。 */
 const fullSeries = ref<Record<string, MetricSeries>>({});
 const series = computed(() => sliceIndexed(fullSeries.value, rangeDays.value));
@@ -65,7 +66,15 @@ const withData = (group: CardGroup) => cards.value
   // 一变，剩下的卡整排瞬移。这段范围里没有读数的卡留着，自己说「近 7 天无记录」。
   .filter((card) => groupOf(card.metric) === group && (fullSeries.value[card.metric]?.points.length ?? 0) > 0);
 
-const vitalsCards = computed(() => cards.value.filter((card) => groupOf(card.metric) === 'vitals'));
+const vitalsCards = computed(() => withData('vitals'));
+/* 整组里有的有数、有的没有：没有的收成一行列出来（U09），不再悄悄消失，也不再占一整张空卡。
+   整组都空时仍由组里那一句说明为什么。 */
+const missingIn = (group: CardGroup, shown: number) => (shown === 0 && group !== 'vitals' ? [] : cards.value
+  .filter((card) => groupOf(card.metric) === group && (fullSeries.value[card.metric]?.points.length ?? 0) === 0)
+  .map((card) => ({ key: card.metric, label: card.label, detail: card.emptyText ?? card.hint })));
+const missingVitals = computed(() => missingIn('vitals', vitalsCards.value.length));
+const missingBody = computed(() => missingIn('body', bodyCards.value.length));
+const missingIntake = computed(() => missingIn('intake', intakeCards.value.length));
 const bodyCards = computed(() => withData('body'));
 const intakeCards = computed(() => withData('intake'));
 
@@ -170,15 +179,7 @@ const groups = computed(() => ({
 
       <!-- 24 小时压力曲线不跟这个开关走。放在曲线下面，才不会让人以为
            切 7 天 / 1 个月会改那张大图。 -->
-      <div class="range-toolbar">
-        <p class="range-label">{{ t.trendRangeLabel }}</p>
-        <SegmentTrack
-          :items="ranges.map((range) => ({ value: range.days, label: range.label }))"
-          :model-value="rangeDays"
-          :aria-label="t.rangeAria"
-          @update:model-value="(value) => rangeDays = Number(value) as SeriesRangeDays"
-        />
-      </div>
+      <TrendRangeBar />
       <CoverageNotice :requested-days="rangeDays" />
       <p v-if="!anyData && !error" class="inline-alert" role="status">
         <Icon name="info" :size="14" />
@@ -187,7 +188,7 @@ const groups = computed(() => ({
 
       <!-- 生命体征、体重体成分、饮食摄入三组直接摊开：点进这一页就是来看它们的。 -->
       <SectionGroup :title="groups.vitals.title" :summary="groups.vitals.summary" icon="recovery" tone="heart">
-          <div class="trend-grid" :style="trendGridStyle(vitalsCards.length)">
+          <div v-if="vitalsCards.length" class="trend-grid" :style="trendGridStyle(vitalsCards.length)">
             <MetricTrendCard
               v-for="card in vitalsCards"
               :key="card.metric"
@@ -198,9 +199,10 @@ const groups = computed(() => ({
               :unit="card.unit"
               :decimals="card.decimals ?? 0"
               :show-spread="card.showSpread ?? false"
-              :empty-text="card.emptyText ?? t.emptyCard"
+              :empty-text="card.emptyText"
             />
           </div>
+          <MissingMetricsRow :items="missingVitals" />
       </SectionGroup>
       <SectionGroup :title="groups.body.title" :summary="groups.body.summary" icon="body-activity" tone="activity">
           <p v-if="!bodyCards.length" class="inline-alert" role="status">
@@ -217,9 +219,10 @@ const groups = computed(() => ({
               :unit="card.unit"
               :decimals="card.decimals ?? 0"
               :show-spread="card.showSpread ?? false"
-              :empty-text="card.emptyText ?? t.emptyCard"
+              :empty-text="card.emptyText"
             />
           </div>
+          <MissingMetricsRow :items="missingBody" />
       </SectionGroup>
       <SectionGroup :title="groups.intake.title" :summary="groups.intake.summary" icon="manual-entry" tone="training">
           <p v-if="!intakeCards.length" class="inline-alert" role="status">
@@ -262,10 +265,11 @@ const groups = computed(() => ({
                 :decimals="card.decimals ?? 0"
                 :chart="card.chart"
                 :calendar-axis="card.calendarAxis ?? false"
-                :empty-text="card.emptyText ?? t.emptyCard"
+                :empty-text="card.emptyText"
               />
             </div>
           </template>
+          <MissingMetricsRow :items="missingIntake" />
       </SectionGroup>
 
 

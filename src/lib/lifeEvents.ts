@@ -1,5 +1,7 @@
-import { defineMessages } from '../i18n';
+import { defineMessages, messagesOf } from '../i18n';
 import type { LifeEventInput } from '../types';
+import type { ChartPalette } from './echartsTheme';
+import { displayDateTimeFormatter, parseDisplayDate } from './dateTime';
 
 export const eventCategories = ['health', 'travel', 'routine', 'training', 'other'] as const;
 export const lifeEventMessages = defineMessages(
@@ -11,6 +13,7 @@ export const lifeEventMessages = defineMessages(
     remove: '删除', deleteTitle: '删除这条生活事件？', deleteHint: '这条备注会从本地数据库移除。',
     invalid: '需要标题和有效日期，结束日期不能早于开始日期。', failed: '操作失败，重试一次。',
     loading: '正在读取生活事件…', retry: '重试',
+    since: (date: string) => `${date} 起`, chartKey: '生活事件',
     active: '持续中', search: '搜索生活事件', noMatch: '没有符合条件的事件。',
     all: '全部', showMore: (count: number) => `再看 ${count} 件`, showLess: '收起', manage: '管理生活事件', related: '相关事件',
     local: '只存本机，随数据库备份；交给 AI 时可勾选带上。',
@@ -24,6 +27,7 @@ export const lifeEventMessages = defineMessages(
     remove: 'Delete', deleteTitle: 'Delete this life event?', deleteHint: 'Removed from the local database.',
     invalid: 'Enter a title and valid dates. End date cannot be before start date.', failed: 'Action failed. Try again.',
     loading: 'Loading life events…', retry: 'Retry',
+    since: (date: string) => `from ${date}`, chartKey: 'Life events',
     active: 'Ongoing', search: 'Search life events', noMatch: 'No matching events.',
     all: 'All', showMore: (count: number) => `Show ${count} more`, showLess: 'Show less', manage: 'Manage life events', related: 'Related events',
     local: 'Saved locally, included in backups. Optional in AI handoffs.',
@@ -37,6 +41,7 @@ export const lifeEventMessages = defineMessages(
     remove: 'Eliminar', deleteTitle: '¿Eliminar este evento?', deleteHint: 'Se eliminará de la base de datos local.',
     invalid: 'Ingresa un título y fechas válidas. El fin no puede ser anterior al inicio.', failed: 'Acción fallida; reintenta.',
     loading: 'Cargando eventos…', retry: 'Reintentar',
+    since: (date: string) => `desde ${date}`, chartKey: 'Eventos de vida',
     active: 'En curso', search: 'Buscar eventos', noMatch: 'Sin eventos coincidentes.',
     all: 'Todos', showMore: (count: number) => `Ver ${count} más`, showLess: 'Ver menos', manage: 'Administrar eventos', related: 'Eventos relacionados',
     local: 'Solo local, incluido en copias; opcional al pasar a la IA.',
@@ -73,3 +78,20 @@ export const eventIcon = (category: string): 'heart' | 'map' | 'moon' | 'run' | 
 
 export const overlapsEvent =(event: LifeEventInput, start: string, end: string): boolean =>
   event.startDate <= end && (event.endDate === null || event.endDate >= start);
+
+/** 图表里事件区带的颜色：和 eventTone 同一套分类色，只是换成图表调色板里的实色。 */
+export const eventChartTone = (category: string, palette: ChartPalette): string => ({
+  health: palette.series.heart,
+  travel: palette.series.pace,
+  routine: palette.series.sleep.light,
+  training: palette.series.training,
+}[category] ?? palette.legendOff);
+
+/** 事件胶囊上的日期（U24）：单日「9/24」，一段「9/24–9/26」，仍在持续「9/24 起」。 */
+export const eventSpanLabel = (event: LifeEventInput): string => {
+  const format = displayDateTimeFormatter({ month: 'numeric', day: 'numeric' });
+  const day = (date: string) => format.format(parseDisplayDate(date));
+  if (event.endDate === null) return messagesOf(lifeEventMessages).since(day(event.startDate));
+  if (event.endDate === event.startDate) return day(event.startDate);
+  return `${day(event.startDate)}–${day(event.endDate)}`;
+};

@@ -16,12 +16,14 @@ import { trendGridStyle } from '../lib/trendGrid';
 import PageHeader from '../components/PageHeader.vue';
 import SkeletonBlock from '../components/SkeletonBlock.vue';
 import Icon from '../components/Icon.vue';
-import SegmentTrack from '../components/SegmentTrack.vue';
+import TrendRangeBar from '../components/TrendRangeBar.vue';
+import MissingMetricsRow from '../components/MissingMetricsRow.vue';
+import { useTrendRange } from '../composables/useTrendRange';
 import { useSyncController } from '../composables/useSyncController';
 import { backend, isDesktop, toUserMessage } from '../lib/bridge';
 import { zeppSemanticColors } from '../lib/echartsTheme';
 import { createLoadSeq } from '../lib/loadSeq';
-import { indexSeries, SERIES_FETCH_DAYS, SERIES_RANGE_DAYS, seriesRanges, sliceIndexed, type SeriesRangeDays } from '../lib/metricSeries';
+import { indexSeries, SERIES_FETCH_DAYS, sliceIndexed } from '../lib/metricSeries';
 import { trackRangeSwap } from '../lib/chartSwap';
 import type { MetricSeries } from '../types';
 import { defineMessages, useMessages } from '../i18n';
@@ -30,13 +32,11 @@ const messages = defineMessages(
   {
     title: '日常活动',
     intro: '步数、距离、活动热量与活动时长的按天趋势。只和你此前的记录比，没记录的日期不补 0。',
-    rangeAria: '时间范围',
     desktopOnly: '浏览器预览不读账户数据，用桌面应用打开。',
     loadFailed: '日常活动数据暂不可用',
     retry: '重试',
     loadingAria: '正在加载日常活动',
     noneInRange: '这段范围没有日常活动记录。换个更长的范围，或先同步一次。',
-    emptyCard: '这段范围没有记录。',
     stepsLabel: '步数',
     stepsHint: '手表按天汇总的步数',
     stepsUnit: '步',
@@ -53,13 +53,11 @@ const messages = defineMessages(
   {
     title: 'Daily activity',
     intro: 'Daily steps, distance, active burn and active minutes. Compared only to your own past; days without data stay empty, never zero-filled.',
-    rangeAria: 'Time range',
     desktopOnly: 'Use the desktop app. This browser preview reads no account data.',
     loadFailed: 'Activity data unavailable right now',
     retry: 'Retry',
     loadingAria: 'Loading daily activity',
     noneInRange: 'No activity records in this range. Pick a longer range or sync first.',
-    emptyCard: 'Nothing recorded in this range.',
     stepsLabel: 'Steps',
     stepsHint: 'Daily step total from the watch',
     stepsUnit: 'steps',
@@ -76,13 +74,11 @@ const messages = defineMessages(
   {
     title: 'Actividad diaria',
     intro: 'Pasos, distancia, calorías activas y minutos activos por día. Solo se compara con tus registros anteriores; los días sin registro no se rellenan con 0: quedan vacíos.',
-    rangeAria: 'Rango de tiempo',
     desktopOnly: 'La vista previa del navegador no lee datos de la cuenta; usa la app de escritorio.',
     loadFailed: 'Datos de actividad diaria no disponibles de momento',
     retry: 'Reintentar',
     loadingAria: 'Cargando la actividad diaria',
     noneInRange: 'Sin registros de actividad en este rango. Prueba un rango más largo o sincroniza primero.',
-    emptyCard: 'No hay nada registrado en este rango.',
     stepsLabel: 'Pasos',
     stepsHint: 'Total diario de pasos del reloj',
     stepsUnit: 'pasos',
@@ -145,8 +141,7 @@ const CARDS = computed<ActivityCard[]>(() => [
   },
 ]);
 
-const ranges = computed(() => seriesRanges());
-const rangeDays = ref<SeriesRangeDays>(SERIES_RANGE_DAYS[0]);
+const rangeDays = useTrendRange();
 /* 一次取最长那档，切范围只在本地切（lib/metricSeries.ts 的 sliceSeries）：点下去不用等查库。 */
 const fullSeries = ref<Record<string, MetricSeries>>({});
 const series = computed(() => sliceIndexed(fullSeries.value, rangeDays.value));
@@ -158,6 +153,13 @@ const loadSeq = createLoadSeq();
 
 const cards = computed(() => CARDS.value.map((card) => ({ ...card, series: series.value[card.metric] ?? null })));
 const anyData = computed(() => cards.value.some((card) => (card.series?.points.length ?? 0) > 0));
+/* 按整段（6 个月）有没有读数分两拨（U09）：有的照常画卡，一条都没有的收成一行。
+   按整段而不是当前范围定，切 7 天时卡片不会增减、网格不会跳。 */
+const everMeasured = (metric: string) => (fullSeries.value[metric]?.points.length ?? 0) > 0;
+const shownCards = computed(() => cards.value.filter((card) => everMeasured(card.metric)));
+const missingCards = computed(() => cards.value
+  .filter((card) => !everMeasured(card.metric))
+  .map((card) => ({ key: card.metric, label: card.label, detail: card.hint })));
 
 const load = async () => {
   const seq = loadSeq.next();
@@ -195,14 +197,7 @@ watch(dataRevision, () => { void load(); });
       title-id="activity-title"
       :title="t.title"
       :intro="t.intro"
-    >
-      <SegmentTrack
-        :items="ranges.map((range) => ({ value: range.days, label: range.label }))"
-        :model-value="rangeDays"
-        :aria-label="t.rangeAria"
-        @update:model-value="(value) => rangeDays = Number(value) as SeriesRangeDays"
-      />
-    </PageHeader>
+    />
 
     <div v-if="error" class="inline-alert" role="alert">
       <Icon name="warning" :size="14" />{{ error }}
@@ -217,11 +212,12 @@ watch(dataRevision, () => { void load(); });
         <Icon name="info" :size="14" />
         {{ t.noneInRange }}
       </p>
+      <TrendRangeBar />
       <!-- 每小时步数：旧通道的逐分钟记录为主（完整），官方授权的按小时汇总补缺。两边都没有时卡片自己说明。 -->
       <HourlyStepsCard :days="rangeDays" />
-      <div class="trend-grid" :style="trendGridStyle(cards.length)">
+      <div v-if="shownCards.length" class="trend-grid" :style="trendGridStyle(shownCards.length)">
         <MetricTrendCard
-          v-for="card in cards"
+          v-for="card in shownCards"
           :key="card.metric"
           :label="card.label"
           :hint="card.hint"
@@ -229,9 +225,9 @@ watch(dataRevision, () => { void load(); });
           :color="card.color"
           :unit="card.unit"
           :decimals="card.decimals ?? 0"
-          :empty-text="t.emptyCard"
         />
       </div>
+      <MissingMetricsRow :items="missingCards" />
     </template>
   </section>
 </template>

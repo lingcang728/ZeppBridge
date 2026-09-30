@@ -18,8 +18,8 @@ import { BarChart, LineChart, PieChart } from 'echarts/charts';
 import {
   GridComponent,
   LegendComponent,
+  MarkAreaComponent,
   MarkLineComponent,
-  MarkPointComponent,
   TooltipComponent,
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
@@ -36,7 +36,7 @@ use([
   TooltipComponent,
   LegendComponent,
   MarkLineComponent,
-  MarkPointComponent,
+  MarkAreaComponent,
   CanvasRenderer,
 ]);
 registerTheme('zeppbridge-dark', zeppThemeDark);

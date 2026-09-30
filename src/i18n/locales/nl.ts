@@ -1407,7 +1407,6 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       title: 'Dagelijkse activiteit',
       intro:
         'Stappen, afstand, actieve verbranding en actieve minuten per dag. Alleen vergeleken met je eigen eerdere metingen; dagen zonder gegevens blijven leeg, geen 0 erbij gezet.',
-      rangeAria: 'Tijdsbereik',
       desktopOnly:
         'Deze browserpreview leest geen accountgegevens — open de desktop-app.',
       loadFailed: 'Dagelijkse activiteitsgegevens nu niet beschikbaar',
@@ -1415,7 +1414,6 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       loadingAria: 'Dagelijkse activiteit laden',
       noneInRange:
         'Geen activiteitsgegevens in deze periode. Synchroniseer eerst of kies een langere periode.',
-      emptyCard: 'Niets vastgelegd in deze periode.',
       stepsLabel: 'Stappen',
       stepsHint: 'Dagtotaal aan stappen van het horloge',
       stepsUnit: 'stappen',
@@ -1456,8 +1454,6 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       title: 'Lichaamsstatus',
       intro:
         'Lokale trends voor gereedheid, stress, bloedzuurstof, HRV, ademhalingsfrequentie, rusthartslag, lichaamssamenstelling en voeding. Volledig berekend uit gesynchroniseerde gegevens.',
-      rangeAria: 'Tijdsbereik',
-      trendRangeLabel: 'Trendbereik',
       desktopOnly:
         'Deze browserpreview leest geen accountgegevens — open de desktop-app.',
       loadFailed: 'Lichaamsstatus nu niet beschikbaar',
@@ -1465,7 +1461,6 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       loadingAria: 'Lichaamsstatus laden',
       noneInRange:
         'Geen lichaamsstatusgegevens in deze periode. Probeer een langere periode of synchroniseer eerst.',
-      emptyCard: 'Niets vastgelegd in deze periode.',
       readinessLabel: 'Gereedheid',
       readinessHint: 'Het horloge weegt slaap, HRV en rusthartslag samen tot één score',
       stressLabel: 'Stress',
@@ -1741,8 +1736,6 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       title: 'Hartslag',
       intro:
         'Hierboven de heledag-curve van de afgelopen 24 uur; 7 dagen / 1 maand / 6 maanden veranderen alleen de dagtrends hieronder. Tijd zonder metingen krijgt geen lijn en geen 0-waarden.',
-      rangeAria: 'Trendbereik',
-      trendRangeLabel: 'Trendbereik',
       desktopOnly:
         'Deze browserpreview leest geen accountgegevens — open de desktop-app.',
       dayFailed: 'De hartslag van de afgelopen 24 uur is niet te lezen.',
@@ -1765,7 +1758,6 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       restingHint: 'Het horloge meldt er één per dag; constanter is beter',
       hrvHint: 'Individuele HRV-metingen, per dag gemiddeld',
       rmssdHint: 'Een andere HRV-maat, niet hetzelfde getal als hierboven',
-      emptyCard: 'Niets vastgelegd in deze periode.',
       dailyMaxTitle: 'Dagelijkse piekhartslag (ruwe metingen op deze machine)',
       dailyMaxSub:
         'De Zepp-app filtert zijn dagelijkse piek; hier niet — dat de twee getallen verschillen is normaal.',
@@ -1917,7 +1909,6 @@ Heb je iets van me nodig (welke client ik gebruik, waar het bestand staat), vraa
       title: 'Trainingsstatus',
       intro:
         'VO₂max, lactaatdrempel, trainingsbelasting en hartslagzones. Volledig berekend uit gesynchroniseerde gegevens; geen medisch advies.',
-      rangeAria: 'Tijdsbereik',
       desktopOnly:
         'Deze browserpreview leest geen accountgegevens — open de desktop-app.',
       loadFailed: 'Trainingsstatus nu niet beschikbaar',

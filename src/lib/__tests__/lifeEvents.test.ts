@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { lifeEventMessages, overlapsEvent, validLifeEvent } from '../lifeEvents';
+import { afterEach, describe, expect, it } from 'vitest';
+import { eventSpanLabel, lifeEventMessages, overlapsEvent, validLifeEvent } from '../lifeEvents';
+import { setLocale } from '../../i18n';
 import type { LifeEventInput } from '../../types';
 
 const event: LifeEventInput = { id: null, title: 'Resfriado', category: 'health',
@@ -29,5 +30,15 @@ describe('life events calendar context', () => {
       }
     }
     compare(lifeEventMessages.en, lifeEventMessages.es);
+  });
+});
+
+describe('eventSpanLabel', () => {
+  afterEach(() => setLocale('zh'));
+  it('single day, a span, and an ongoing event each read differently', () => {
+    setLocale('en');
+    expect(eventSpanLabel({ ...event, endDate: event.startDate })).toBe('9/1');
+    expect(eventSpanLabel(event)).toBe('9/1–9/5');
+    expect(eventSpanLabel({ ...event, endDate: null })).toBe('from 9/1');
   });
 });

@@ -23,7 +23,12 @@ import { chartSwapIntent } from '../lib/chartSwap';
 defineOptions({ inheritAttrs: false });
 
 const props = defineProps<{ option: Record<string, unknown>; ariaLabel?: string }>();
-const emit = defineEmits<{ click: [event: { name?: string; data?: unknown }] }>();
+type ChartPointerEvent = { name?: string; data?: unknown; componentType?: string };
+const emit = defineEmits<{
+  click: [event: ChartPointerEvent];
+  mouseover: [event: ChartPointerEvent];
+  mouseout: [event: ChartPointerEvent];
+}>();
 
 const FADE_MS = 320;
 const EASE = 'cubic-bezier(.2, .8, .2, 1)';
@@ -113,7 +118,9 @@ onBeforeUnmount(() => {
         autoresize
         role="img"
         :aria-label="ariaLabel"
-        @click="(event: { name?: string; data?: unknown }) => emit('click', event)"
+        @click="(event: ChartPointerEvent) => emit('click', event)"
+        @mouseover="(event: ChartPointerEvent) => emit('mouseover', event)"
+        @mouseout="(event: ChartPointerEvent) => emit('mouseout', event)"
       />
     </div>
   </div>

@@ -5,7 +5,6 @@ export const trainingStatusMessages = defineMessages(
   {
     title: '训练状态',
     intro: 'VO₂max、乳酸阈值、训练负荷与心率区间。全部读自已同步的记录，不做训练建议。',
-    rangeAria: '时间范围',
     desktopOnly: '浏览器预览不读账户数据，用桌面应用打开。',
     loadFailed: '训练状态数据暂不可用',
     retry: '重试',
@@ -47,7 +46,6 @@ export const trainingStatusMessages = defineMessages(
   {
     title: 'Training status',
     intro: 'VO₂max, lactate threshold, training load and heart rate zones. All read from synced records; no coaching advice.',
-    rangeAria: 'Time range',
     desktopOnly: 'Use the desktop app. This browser preview reads no account data.',
     loadFailed: 'Training status data unavailable right now',
     retry: 'Retry',
@@ -88,7 +86,6 @@ export const trainingStatusMessages = defineMessages(
   {
     title: 'Estado de entrenamiento',
     intro: 'VO₂máx, umbral de lactato, carga de entrenamiento y zonas de frecuencia cardíaca. Todo leído de los registros sincronizados; sin consejos de entrenamiento.',
-    rangeAria: 'Rango de tiempo',
     desktopOnly: 'La vista previa del navegador no lee la cuenta; abre la app de escritorio.',
     loadFailed: 'Datos de estado de entrenamiento no disponibles ahora',
     retry: 'Reintentar',

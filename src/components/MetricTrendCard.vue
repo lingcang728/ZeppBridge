@@ -2,10 +2,22 @@
 import { computed } from 'vue';
 import { useLifeEvents } from '../composables/useLifeEvents';
 import { useQueuedOption } from '../composables/useQueuedOption';
-import { validEventDate, overlapsEvent } from '../lib/lifeEvents';
-const { open: openEvent, events: lifeEvents } = useLifeEvents();
-const chartClick = (event: { name?: string; data?: unknown }) => {
-  const eventId = event.data && typeof event.data === 'object' && 'eventId' in event.data ? event.data.eventId : null;
+import { eventChartTone, lifeEventMessages, validEventDate, overlapsEvent } from '../lib/lifeEvents';
+const { open: openEvent, events: lifeEvents, chipFocus, chartFocus, ensureLoaded } = useLifeEvents();
+ensureLoaded();
+const eventWords = useMessages(lifeEventMessages);
+type ChartEvent = { name?: string; data?: unknown; componentType?: string };
+const eventIdOf = (event: ChartEvent): number | null => {
+  const id = event.data && typeof event.data === 'object' && 'eventId' in event.data ? event.data.eventId : null;
+  return typeof id === 'number' ? id : null;
+};
+/* 悬停图上的事件区带 → 页头那枚胶囊亮起（反方向见 LifeEventShortcut）。 */
+const chartHover = (event: ChartEvent) => {
+  if (event.componentType === 'markArea' || event.componentType === 'markLine') chartFocus.value = eventIdOf(event);
+};
+const chartLeave = () => { chartFocus.value = null; };
+const chartClick = (event: ChartEvent) => {
+  const eventId = eventIdOf(event);
   const matching = lifeEvents.value.find(e => e.id === eventId);
   if (matching) openEvent(matching);
   else if (event.name && validEventDate(event.name)) openEvent(undefined, event.name);
@@ -81,7 +93,10 @@ const props = withDefaults(defineProps<{
   emptyText: '',
 });
 
-const emptyMessage = computed(() => props.emptyText || t.value.defaultEmpty);
+/* 空卡只说一句话（U27）：页面给了专门的原因就用它；否则还没同步过这项说「同步后展示」，
+   同步过但这段范围没有就说「近 N 天无记录」。覆盖行在空卡上不再重复同一件事。 */
+const emptyMessage = computed(() => props.emptyText
+  || (props.series ? coverageLabel(props.series) : t.value.defaultEmpty));
 
 const render = computed(() => props.format ?? ((value: number) => value.toFixed(props.decimals)));
 const hasPoints = computed(() => (props.series?.points.length ?? 0) > 0);
@@ -117,17 +132,46 @@ const option = computed(() => {
     chart: props.chart,
     calendarAxis: props.calendarAxis,
   });
-  // Mark every visible calendar day covered by an event, including ongoing spans.
-  const marks = series.points.filter(p => lifeEvents.value.some(e => overlapsEvent(e, p.date, p.date)))
-    .map(p => ({ coord: [p.date, p.value], eventId: lifeEvents.value.find(e => overlapsEvent(e, p.date, p.date))?.id }));
+  /* 生活事件画成竖向浅色区带（一天的画成一根竖线），颜色跟事件分类走、和页头胶囊同色；
+     悬停显示事件名，点一下打开编辑。以前是 9px 无标签的品牌绿圆点，新用户会当成数据点样式（U24）。 */
+  const palette = chartPalette.value;
+  const axisDates = ((result.xAxis as { data?: string[] }).data ?? []);
+  const areas: unknown[] = [];
+  const lines: unknown[] = [];
+  for (const event of lifeEvents.value) {
+    const covered = axisDates.filter((date) => overlapsEvent(event, date, date));
+    if (!covered.length) continue;
+    const color = eventChartTone(event.category, palette);
+    const lit = chipFocus.value === event.id;
+    const label = { show: false, position: 'insideTop', color: palette.legend, fontSize: 12, formatter: event.title };
+    const emphasis = { label: { show: true } };
+    if (covered.length === 1) {
+      lines.push({ xAxis: covered[0], name: event.title, eventId: event.id, label, emphasis,
+        lineStyle: { color, width: lit ? 3 : 2, type: 'solid', opacity: lit ? 0.85 : 0.5 } });
+    } else {
+      areas.push([
+        { xAxis: covered[0], name: event.title, eventId: event.id, label, emphasis,
+          itemStyle: { color, opacity: lit ? 0.3 : 0.12 } },
+        { xAxis: covered[covered.length - 1] },
+      ]);
+    }
+  }
   const chartSeries = result.series as Array<Record<string, unknown>>;
   const last = chartSeries[chartSeries.length - 1];
-  Object.assign(last, { markPoint: { symbol: 'circle', symbolSize: 9, label: { show: false },
-    itemStyle: { color: chartPalette.value.series.brand, borderColor: chartPalette.value.surface, borderWidth: 2 }, data: marks } });
+  if (areas.length) Object.assign(last, { markArea: { silent: false, data: areas } });
+  if (lines.length) Object.assign(last, { markLine: { silent: false, symbol: 'none', data: lines } });
   return result;
 });
 /* 切范围时十来张图同时换数据：排队，一帧只换一张（见 useQueuedOption）。 */
 const shownOption = useQueuedOption(option);
+/* 图上有事件区带时，覆盖行末尾给一个图例（颜色跟着分类，这里只说明「色带 = 生活事件」）。 */
+const hasEventMarks = computed(() => {
+  const points = props.series?.points ?? [];
+  if (points.length < 2) return false;
+  const first = points[0].date;
+  const last = points[points.length - 1].date;
+  return lifeEvents.value.some((event) => overlapsEvent(event, first, last));
+});
 </script>
 
 <template>
@@ -153,9 +197,10 @@ const shownOption = useQueuedOption(option);
     </header>
 
     <p class="trend-meta">
-      <span>{{ coverage }}</span>
+      <span v-if="hasPoints">{{ coverage }}</span>
       <span v-if="latestDate" class="trend-date">{{ t.measuredOn(latestDate) }}</span>
       <span v-if="band" class="trend-band">{{ band }}</span>
+      <span v-if="hasEventMarks" class="trend-event-key"><i aria-hidden="true"></i>{{ eventWords.chartKey }}</span>
     </p>
 
     <div v-if="$slots.chart" class="trend-slot"><slot name="chart" /></div>
@@ -165,6 +210,8 @@ const shownOption = useQueuedOption(option);
       :option="shownOption"
       :aria-label="t.trendAria(label)"
       @click="chartClick"
+      @mouseover="chartHover"
+      @mouseout="chartLeave"
     />
     <p v-else-if="hasPoints" class="trend-empty">{{ t.onlyOneDay }}</p>
     <p v-else class="trend-empty">{{ emptyMessage }}</p>
@@ -216,6 +263,8 @@ const shownOption = useQueuedOption(option);
 }
 .trend-date { font-variant-numeric: tabular-nums; }
 .trend-band { color: var(--muted); }
+.trend-event-key { display: inline-flex; align-items: center; gap: 5px; color: var(--subtle); }
+.trend-event-key i { width: 7px; height: 11px; border-radius: 2px; background: color-mix(in srgb, var(--subtle) 45%, transparent); }
 .trend-chart, .trend-slot { width: 100%; height: 150px; align-self: end; }
 .trend-slot > :deep(*) { width: 100%; height: 100%; }
 .trend-empty {
