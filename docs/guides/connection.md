@@ -154,5 +154,12 @@ token is never displayed.
 - To remove everything, clear credentials in Settings first, then look at the
   `data\` folder next to the program. Back it up before deleting the install
   folder.
+- **One `data\` folder holds one Zepp account.** The database remembers which
+  account first wrote to it; signing in or authorizing with a different account
+  afterwards is refused without writing anything, and existing data is never
+  wiped automatically. To switch accounts, quit ZeppBridge, move or rename the
+  `data\` folder (your old data stays in it), then start the program and
+  connect again. The legacy connector and the official authorization must use
+  the same account.
 
 Further boundaries are in [security and privacy](../reference/security-and-privacy.md).

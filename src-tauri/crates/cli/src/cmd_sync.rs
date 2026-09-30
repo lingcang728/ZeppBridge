@@ -67,6 +67,7 @@ pub(super) fn cmd_sync(args: &[String]) -> u8 {
     };
 
     let cancel = Arc::new(AtomicBool::new(false));
+    let account = auth.user_id.clone();
     let connector = match ZeppConnector::with_cancel(auth, cancel.clone()) {
         Ok(connector) => connector,
         Err(error) => {
@@ -119,8 +120,9 @@ pub(super) fn cmd_sync(args: &[String]) -> u8 {
         }
     };
 
-    let manager =
-        SyncManager::new(DataFetcher::new(connector), db, cancel).with_data_dir(dir.clone());
+    let manager = SyncManager::new(DataFetcher::new(connector), db, cancel)
+        .with_data_dir(dir.clone())
+        .with_account(account);
 
     let runtime = match tokio::runtime::Runtime::new() {
         Ok(runtime) => runtime,

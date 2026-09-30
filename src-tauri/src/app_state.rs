@@ -138,6 +138,7 @@ impl AppState {
     /// Build a synchronizer with its own SQLite connection.
     pub(crate) fn build_sync_manager(auth: AuthInfo, data_dir: &Path) -> Result<Arc<SyncManager>> {
         let cancel = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let account = auth.user_id.clone();
         let connector = ZeppConnector::with_cancel(auth, cancel.clone())?;
         let fetcher = DataFetcher::new(connector);
         // The primary connection in `AppState::new` already migrated the
@@ -146,7 +147,9 @@ impl AppState {
         // 带上数据目录，同步就会额外获取跨进程写锁：CLI 与桌面应用不可能
         // 同时写同一个库。
         Ok(Arc::new(
-            SyncManager::new(fetcher, db, cancel).with_data_dir(data_dir.to_path_buf()),
+            SyncManager::new(fetcher, db, cancel)
+                .with_data_dir(data_dir.to_path_buf())
+                .with_account(account),
         ))
     }
 

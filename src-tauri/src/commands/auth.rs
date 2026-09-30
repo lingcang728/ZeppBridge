@@ -29,6 +29,8 @@ pub async fn save_auth(
     // across save + manager swap so the old handle cannot keep writing.
     let _command_guard = state.lock_sync_commands().await;
 
+    // 库属于另一个账号就不存这把令牌（R06）。
+    super::claim_library_for_login(&state.data_dir, &auth.user_id).await?;
     state.auth.save_auth(&auth)?;
 
     let manager = match AppState::build_sync_manager(auth, &state.data_dir) {

@@ -226,6 +226,15 @@ impl AuthManager {
 
     /// Returns status without exposing the token.  The optional masked value
     /// is deliberately short and suitable for a settings screen.
+    /// `auth.json` 里记的用户编号；不碰凭据存储。没配置或读不出来时为 `None`。
+    pub fn saved_user_id(&self) -> Option<String> {
+        if !self.auth_file.exists() {
+            return None;
+        }
+        let (stored, _) = self.read_stored().ok()?;
+        validate_user_id(&stored.user_id).ok()
+    }
+
     pub fn status(&self) -> Result<AuthStatus> {
         if !self.auth_file.exists() {
             return Ok(AuthStatus {

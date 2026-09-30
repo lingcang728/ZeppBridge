@@ -172,6 +172,11 @@ pub enum ZeppBridgeError {
     #[error("IO 错误: {0}")]
     IoError(#[from] std::io::Error),
 
+    /// 这个库已经属于另一个 Zepp 账号（代码审查 R06）。拒绝写入，不自动清库：
+    /// 换账号要用户先把旧的 `data` 文件夹挪走。
+    #[error("数据库属于另一个 Zepp 账号")]
+    AccountMismatch,
+
     /// AI 分析任务/模板这一层的业务失败（`err.ai_task.*` / `err.ai_template.*`）。
     /// 码与参数由 [`crate::ai_tasks::AiTaskError`] 自己定——命令层不猜实体。
     #[error("{0}")]
@@ -237,6 +242,7 @@ impl ZeppBridgeError {
             Self::DatabaseError(_) => "err.core.database",
             Self::IoError(_) => "err.core.io",
             Self::AiTask(inner) => inner.code(),
+            Self::AccountMismatch => "err.core.account_mismatch",
             Self::Unknown(_) => "err.core.unknown",
         }
     }
@@ -278,6 +284,9 @@ impl ZeppBridgeError {
             Self::DatabaseError(_) => "本地数据库暂时不可用".into(),
             Self::IoError(_) => "读写本地文件失败".into(),
             Self::AiTask(inner) => inner.user_message(),
+            Self::AccountMismatch => "这个数据库里已经是另一个 Zepp 账号的数据，没有写入当前账号。\
+                要换账号，请先关掉 ZeppBridge，把 data 文件夹移走或改名，再重新连接。"
+                .into(),
             Self::Unknown(message) => sanitize_user_text(message),
         }
     }

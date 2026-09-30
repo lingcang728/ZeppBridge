@@ -2378,6 +2378,8 @@ Réponds en Markdown.`,
     'err.core.invalid_host': 'Adresse de région Zepp non sûre',
     'err.core.config': 'Quelque chose dans la configuration doit d’abord être corrigé',
     'err.core.busy': 'Une autre écriture est en cours — attendez qu’elle finisse',
+    'err.core.account_mismatch':
+      'Cette base de données contient déjà les données d’un autre compte Zepp : rien n’a été enregistré pour ce compte. Pour changer de compte, quittez ZeppBridge, déplacez ou renommez le dossier « data », puis reconnectez-vous',
     'err.core.parse': 'La réponse de Zepp n’a pas pu être analysée',
     'err.core.database': 'Base locale indisponible pour l’instant',
     'err.core.io': 'La lecture ou l’écriture d’un fichier local a échoué',

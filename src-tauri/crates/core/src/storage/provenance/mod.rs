@@ -132,6 +132,8 @@ impl StageErrorKind {
         match error {
             E::Cancelled => StageErrorKind::Cancelled,
             E::NeedsReauth(_) | E::AuthError(_) | E::CredentialStore(_) => StageErrorKind::Auth,
+            // 库属于另一个账号：和认证同一类——用户要去改账号设置，重试没用。
+            E::AccountMismatch => StageErrorKind::Auth,
             // 无头环境的三种：两种是「令牌拿不到」，一种是「库要先升级」。
             // 前两种按 auth 分类（用户要去把凭据给进来），第三种是本机存储
             // 的事——重试解决不了，得先跑一次 reprocess。

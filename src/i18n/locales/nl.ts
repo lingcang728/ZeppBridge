@@ -2607,6 +2607,8 @@ Antwoord in Markdown.`,
     'err.capability.unverified': 'Nog niet geverifieerd',
     'err.core.auth': 'Authenticatiefout',
     'err.core.busy': 'Er loopt een andere schrijfbewerking — wacht tot die klaar is',
+    'err.core.account_mismatch':
+      'Deze database bevat al gegevens van een ander Zepp-account, dus er is niets voor dit account opgeslagen. Wil je van account wisselen? Sluit ZeppBridge, verplaats of hernoem de map ‘data’ en maak opnieuw verbinding',
     'err.core.cancelled': 'Geannuleerd',
     'err.core.cloud_rejected':
       'Zepp ontving het verzoek maar weigerde het. Komt het vaker voor, koppel het Zepp-account dan opnieuw via Instellingen',

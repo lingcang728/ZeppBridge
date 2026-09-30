@@ -477,3 +477,32 @@ async fn a_stream_with_no_committed_chunk_hands_the_error_back() {
         .unwrap_err();
     assert!(error.is_unavailable());
 }
+
+/// 代码审查 R06：库主人是别的账号时，同步在第一次写库前就停下，一行不写。
+#[tokio::test]
+async fn a_sync_for_another_account_stops_before_writing_anything() {
+    let db = Database::in_memory().unwrap();
+    db.claim_library_for_sync("owner-account").unwrap();
+    let connector = ZeppConnector::new(AuthInfo {
+        app_token: "test-token".into(),
+        user_id: "user-1".into(),
+        region_host: "https://api-mifit.zepp.com".into(),
+    })
+    .unwrap();
+    let manager = SyncManager::new(
+        DataFetcher::new(connector),
+        db,
+        Arc::new(AtomicBool::new(false)),
+    )
+    .with_account("user-1");
+    let error = manager
+        .begin_run(write_lock::WritePurpose::Sync)
+        .await
+        .unwrap_err();
+    assert!(matches!(error, ZeppBridgeError::AccountMismatch));
+    let db = manager.db.lock().await;
+    assert_eq!(
+        db.library_owner().unwrap().as_deref(),
+        Some("owner-account")
+    );
+}

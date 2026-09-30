@@ -47,6 +47,8 @@ const messages = defineMessages(
     'err.core.invalid_host': '不安全的 Zepp 区域地址',
     'err.core.config': '配置有问题，需要先改一下',
     'err.core.busy': '另一个写入操作正在进行，等它结束',
+    'err.core.account_mismatch':
+      '这个数据库里已经是另一个 Zepp 账号的数据，没有写入当前账号。要换账号，请先关掉 ZeppBridge，把 data 文件夹移走或改名，再重新连接',
     'err.core.parse': 'Zepp 返回的数据无法解析',
     'err.core.database': '本地数据库暂不可用',
     'err.core.io': '读写本地文件失败',
@@ -205,6 +207,8 @@ const messages = defineMessages(
     'err.core.invalid_host': 'Unsafe Zepp region address',
     'err.core.config': 'Configuration needs fixing first',
     'err.core.busy': 'Another write is in progress — wait for it to finish',
+    'err.core.account_mismatch':
+      'This database already holds another Zepp account\'s data, so nothing was written for this account. To switch accounts, quit ZeppBridge, move or rename the data folder, then connect again',
     'err.core.parse': "Could not parse Zepp's response",
     'err.core.database': 'Local database temporarily unavailable',
     'err.core.io': 'Local file read/write failed',
@@ -380,6 +384,8 @@ const messages = defineMessages(
     'err.core.invalid_host': 'Dirección de región de Zepp no segura',
     'err.core.config': 'Configuración con problemas; corrígela primero',
     'err.core.busy': 'Otra escritura en curso; espera a que termine',
+    'err.core.account_mismatch':
+      'Esta base de datos ya contiene datos de otra cuenta de Zepp, así que no se escribió nada de esta cuenta. Para cambiar de cuenta, cierra ZeppBridge, mueve o renombra la carpeta data y vuelve a conectar',
     'err.core.parse': 'Respuesta de Zepp no interpretable',
     'err.core.database': 'Base de datos local no disponible temporalmente',
     'err.core.io': 'Error al leer o escribir un archivo local',

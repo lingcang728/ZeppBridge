@@ -162,6 +162,11 @@ impl OfficialSync {
                 "还没有连接 Zepp 官方授权".into(),
             ));
         };
+        // 库主人不是这个官方账号就一行都不写（R06）。补充模式下调用方只记日志，
+        // 旧通道那一轮照常。
+        self.write_db()
+            .await?
+            .claim_library_for_sync(&tokens.user_id)?;
         let today = crate::official::fetch::local_today(&self.time_zone);
         let start = today - Duration::days(days.clamp(1, UserPrefs::MAX_HISTORY_SYNC_DAYS) - 1);
         let kinds = mode.kinds();

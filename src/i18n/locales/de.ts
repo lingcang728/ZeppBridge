@@ -36,6 +36,8 @@ export default {
     'err.core.invalid_host': 'Unsichere Zepp-Regions-Adresse',
     'err.core.config': 'Die Konfiguration muss zuerst korrigiert werden',
     'err.core.busy': 'Ein anderer Schreibvorgang läuft – warte, bis er fertig ist',
+    'err.core.account_mismatch':
+      'Diese Datenbank enthält bereits Daten eines anderen Zepp-Kontos, daher wurde für dieses Konto nichts geschrieben. Um das Konto zu wechseln, beende ZeppBridge, verschiebe den Ordner „data" oder benenne ihn um und verbinde dich dann erneut',
     'err.core.parse': 'Die Antwort von Zepp konnte nicht gelesen werden',
     'err.core.database': 'Lokale Datenbank gerade nicht verfügbar',
     'err.core.io': 'Eine lokale Datei ließ sich nicht lesen oder schreiben',

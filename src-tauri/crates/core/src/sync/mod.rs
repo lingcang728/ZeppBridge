@@ -101,6 +101,8 @@ pub struct SyncManager {
     /// 等锁的另一个写者，所以得说实际在做的事。
     run_purpose: std::sync::Mutex<WritePurpose>,
     pub cancel: Arc<AtomicBool>,
+    /// 这个同步器替哪个账号写库。设了就在每轮开始时核对库主人（R06）。
+    account: Option<String>,
 }
 
 /// 写库的一小段：先拿跨进程写锁，再拿这条连接；离开作用域两样一起放。
@@ -155,7 +157,15 @@ impl SyncManager {
             data_dir: None,
             run_purpose: std::sync::Mutex::new(WritePurpose::Sync),
             cancel,
+            account: None,
         }
+    }
+
+    /// 声明这个同步器写的是哪个账号的数据：每轮开始前核对库主人，不是同一个
+    /// 账号就一行都不写（代码审查 R06）。
+    pub fn with_account(mut self, user_id: impl Into<String>) -> Self {
+        self.account = Some(user_id.into());
+        self
     }
 
     /// 指定数据目录后，同步会额外获取跨进程写锁。
@@ -210,6 +220,11 @@ impl SyncManager {
             .run_purpose
             .lock()
             .unwrap_or_else(|error| error.into_inner()) = purpose;
+        if let Some(account) = self.account.as_deref() {
+            self.write_db_for(purpose)
+                .await?
+                .claim_library_for_sync(account)?;
+        }
         Ok(lease)
     }
 

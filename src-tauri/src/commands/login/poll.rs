@@ -255,6 +255,12 @@ pub(super) async fn persist_extracted_login(
         return Err(LoginFailure::cancelled());
     }
 
+    // 库属于另一个账号就不存这把令牌（R06）。
+    if let Err(error) =
+        crate::commands::claim_library_for_login(&state.data_dir, &auth.user_id).await
+    {
+        return Err(LoginFailure::fatal(error));
+    }
     if let Err(error) = state.auth.save_auth(&auth) {
         // 保存失败通常是系统凭据管理器的事（被策略禁用、令牌超长），原样带上
         // 底层原因；界面按 code 取本地化文案，这句中文留给 CLI、日志和报告。

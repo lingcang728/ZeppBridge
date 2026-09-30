@@ -2326,6 +2326,8 @@ Responda em Markdown.`,
     'err.core.invalid_host': 'Endereço de host regional Zepp inválido ou não seguro',
     'err.core.config': 'Configuração pendente de ajuste antes de continuar',
     'err.core.busy': 'Outra operação de gravação em andamento. Aguarde a conclusão',
+    'err.core.account_mismatch':
+      'Este banco de dados já contém dados de outra conta Zepp, então nada foi gravado para esta conta. Para trocar de conta, feche o ZeppBridge, mova ou renomeie a pasta data e conecte de novo',
     'err.core.parse': 'Não foi possível interpretar a resposta da nuvem Zepp',
     'err.core.database': 'Banco de dados local temporariamente indisponível',
     'err.core.io': 'Falha na leitura ou gravação de arquivo local',

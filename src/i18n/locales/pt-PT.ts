@@ -2550,6 +2550,8 @@ Responde em formato Markdown.`,
     'err.core.invalid_host': 'Endereço de servidor Zepp inválido ou não seguro',
     'err.core.config': 'Configuração incompleta ou incorreta',
     'err.core.busy': 'Operação de escrita em curso. Aguarda que termine',
+    'err.core.account_mismatch':
+      'Esta base de dados já contém dados de outra conta Zepp, por isso nada foi gravado para esta conta. Para mudar de conta, fecha o ZeppBridge, move ou muda o nome da pasta «data» e volta a ligar',
     'err.core.parse': 'Não foi possível processar a resposta do Zepp',
     'err.core.database': 'Base de dados local temporariamente indisponível',
     'err.core.io': 'Erro de leitura ou gravação de ficheiro local',

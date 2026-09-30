@@ -335,6 +335,14 @@ async fn save_verified(
         }
         Err(_) => {}
     }
+    // 已经被取消 / 取代：不认领库，也不写（R05）。
+    if zeppbridge_core::official::current_generation() != generation {
+        return None;
+    }
+    // 库属于另一个账号就不存这把令牌（R06）。
+    if let Err(error) = crate::commands::claim_library_for_login(data_dir, &tokens.user_id).await {
+        return Some(OfficialStatus::failed(&error.code, &error.message));
+    }
     let store = OfficialStore::new(data_dir);
     match store.save_login(
         &tokens,

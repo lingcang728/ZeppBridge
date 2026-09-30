@@ -25,6 +25,8 @@ pub(super) fn exit_code_for(error: &ZeppBridgeError) -> (u8, &'static str) {
             (EXIT_SCHEMA, "schema")
         }
         ZeppBridgeError::Headless(_) => (EXIT_NOT_CONFIGURED, "auth"),
+        // 库属于另一个账号：重试没用，要人换数据目录或换回原账号。
+        ZeppBridgeError::AccountMismatch => (EXIT_NOT_CONFIGURED, "account_mismatch"),
         _ => (EXIT_FAILED, "failed"),
     }
 }
@@ -43,6 +45,10 @@ pub(super) fn exit_code_for(error: &ZeppBridgeError) -> (u8, &'static str) {
 pub(super) fn user_text(error: &ZeppBridgeError) -> String {
     match error {
         ZeppBridgeError::Headless(problem) => problem.english(),
+        ZeppBridgeError::AccountMismatch => "This database already holds another Zepp account's \
+            data, so nothing was written for this account. To switch accounts, move or rename \
+            the data folder, then connect again."
+            .to_string(),
         other => other.user_message(),
     }
 }

@@ -59,6 +59,20 @@ pub(crate) async fn with_write<T>(
     Ok(mutation(&db)?)
 }
 
+/// 保存新凭据之前核对库归属（代码审查 R06）：库已经属于另一个账号就拒绝，
+/// 什么也不写；空库或同一个账号就认下。旧通道与官方授权共用这一个入口。
+pub(crate) async fn claim_library_for_login(
+    data_dir: &Path,
+    user_id: &str,
+) -> Result<(), AppError> {
+    let known = zeppbridge_core::storage::configured_accounts(data_dir);
+    let user_id = user_id.to_string();
+    spawn_independent_write(data_dir.to_path_buf(), WritePurpose::Metadata, move |db| {
+        db.claim_library_for_login(&user_id, &known)
+    })
+    .await
+}
+
 pub(crate) async fn spawn_independent_write<T, F>(
     data_dir: PathBuf,
     purpose: WritePurpose,
