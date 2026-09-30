@@ -126,6 +126,12 @@
   --dur-slow: 420ms;
   --ease-out: cubic-bezier(.22, 1, .36, 1);
   --ease-spring: cubic-bezier(.2, 1.15, .32, 1);
+  /* 切页与形变统一用两档时长、两条缓动（D-1）：进场 / 展开用 std + enter，返回 / 收回用 back。
+     回弹只留在导航胶囊的滑块上（SegmentTrack），切页和卡片收回一律不回弹。 */
+  --dur-std: 320ms;
+  --dur-back: 380ms;
+  --ease-enter: cubic-bezier(.2, .9, .25, 1);
+  --ease-leave: cubic-bezier(.4, 0, .2, 1);
 
   --font-sans: 'MiSans', 'Segoe UI', 'Microsoft YaHei UI', sans-serif;
   --font-mono: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;

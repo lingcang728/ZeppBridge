@@ -20,12 +20,12 @@ export interface DeckMorphRefs {
   reducedMotion: () => boolean;
 }
 
-const OPEN_MS = 420;
+const OPEN_MS = 320;
 const CLOSE_MS = 220;
-const OPEN_EASE = 'cubic-bezier(.2, .9, .22, 1)';
+const OPEN_EASE = 'cubic-bezier(.2, .9, .25, 1)';
 const CLOSE_EASE = 'cubic-bezier(.4, 0, .2, 1)';
 /** 关卡：板收回源卡。和概览页「返回」同一条曲线（先快后慢、没有回弹）。 */
-const RETURN_MS = 440;
+const RETURN_MS = 380;
 const RETURN_EASE = 'cubic-bezier(.32, .72, 0, 1)';
 /** 展开全部 / 收起：一张张飞出、收拢。 */
 const FLIGHT_MS = 460;

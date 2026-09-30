@@ -1,6 +1,6 @@
 import type { RouteLocationNormalized } from 'vue-router';
 import type { PageMotion } from '../lib/navigation';
-import { collapseGhost, holdGhost } from '../lib/motion/ghost';
+import { cardSkin, collapseGhost, holdGhost, type CardSkin } from '../lib/motion/ghost';
 import { deferSettle, hurryAnimation, onMotionEscape, onMotionSkip } from '../lib/motion/interrupt';
 import { whenPageReady } from '../lib/motion/pageReady';
 
@@ -16,19 +16,20 @@ type Rect = { left: number; top: number; width: number; height: number };
  * expand / collapse；`onEnter` / `onLeave` / `onAfterLeave` 挂在切页的 <Transition> 上。
  */
 /** 板从卡长满整页的时长。缓动先快后慢：像被抛出去、在终点减速落定。 */
-const EXPAND_MS = 340;
-const EXPAND_EASE = 'cubic-bezier(.2, .9, .22, 1)';
+const EXPAND_MS = 320;
+const EXPAND_EASE = 'cubic-bezier(.2, .9, .25, 1)';
 /** 新页首次加载最多等这么久（从点下去算起，含板长大那一段）；再久就先揭开（页面自己有骨架屏），
     不让一整屏卡片色停在那里。 */
 const READY_TIMEOUT_MS = 560;
 /** 返回：圆角板从整页收回那张卡（展开的逆过程）。曲线先快后慢、没有回弹，像被卡片吸回去；
     形状在前一半基本落定，后半程板淡出、真卡亮起接上——板不在卡上干停着。 */
-const SHRINK_MS = 460;
+const SHRINK_MS = 380;
 const LAND_AT = 0.52;
 const SHRINK_EASE = 'cubic-bezier(.32, .72, 0, 1)';
 /** 板从透明变实的时长：这段里详情页同时淡出，两者交叉，不出现整屏的纯色。 */
 const PLATE_IN_MS = 90;
-/** 来处页不在缓存里时要重新读库，那张卡可能要等一会儿才出现。等的时候详情页原样留着，不盖板。 */
+/** 来处页不在缓存里时要重新读库，那张卡可能要等一会儿才出现。板不等它：先按记住的位置缩，
+    这段时间里找到了就把终点换成真卡（D-2）；超过这个时长还没有就落在记住的位置上。 */
 const CARD_WAIT_MS = 300;
 /** 收回途中按 Esc：剩下的部分在这么长里放完（沿用原来的曲线，不是跳到终点）。 */
 const ESC_FINISH_MS = 200;
@@ -75,7 +76,7 @@ const linksTo = (href: string, scope: string) => {
 };
 const STAYING = '.page-host > :not([class*="-leave"])';
 
-type Trail = { back: string; href: string; index: number };
+type Trail = { back: string; href: string; index: number; rect: Rect; radius: number; skin: CardSkin | null };
 
 /** 正在从卡里长出来、还没揭开的那一页。Esc 撤回它。 */
 type Inflight = { el: HTMLElement; retract: () => Promise<void>; revealed: boolean; aborted: boolean };
@@ -87,7 +88,7 @@ export const usePageMorph = (options: { back: () => void }) => {
   let resumeStill = false;
   /** 进过场的页面（KeepAlive 缓存的会原样回来）。 */
   const entered = new WeakSet<Element>();
-  let expandFrom: { rect: Rect; radius: number } | null = null;
+  let expandFrom: { rect: Rect; radius: number; skin: CardSkin | null } | null = null;
   let collapseTo: Trail | null = null;
   /** 每个详情页是从哪张卡展开来的：键是详情页的 fullPath。 */
   const trails = new Map<string, Trail>();
@@ -114,8 +115,13 @@ export const usePageMorph = (options: { back: () => void }) => {
       const href = link.getAttribute('href') ?? '';
       const card = href === to.fullPath || href === to.path ? cardOfLink(link) : null;
       if (card) {
-        expandFrom = { rect: rectOf(card), radius: radiusOf(card) };
-        trails.set(to.fullPath, { back: from.fullPath, href, index: Math.max(0, linksTo(href, '.page-host > *').indexOf(link)) });
+        expandFrom = { rect: rectOf(card), radius: radiusOf(card), skin: cardSkin(card) };
+        trails.set(to.fullPath, {
+          back: from.fullPath,
+          href,
+          index: Math.max(0, linksTo(href, '.page-host > *').indexOf(link)),
+          ...expandFrom,
+        });
         return 'expand';
       }
     }
@@ -166,6 +172,7 @@ export const usePageMorph = (options: { back: () => void }) => {
       host,
       duration: EXPAND_MS,
       easing: EXPAND_EASE,
+      skin: origin.skin,
     });
     // 新页先整个藏起来。必须连 CSS 过渡一起关掉：否则 enter 那条 opacity 过渡会把它从
     // .999 慢慢降到 0，板还没长满时新页就半透明地叠在旧页上——那也是「闪一下」。
@@ -189,7 +196,10 @@ export const usePageMorph = (options: { back: () => void }) => {
       options.back();
       return true;
     });
-    void Promise.all([ghost.grown, whenPageReady(READY_TIMEOUT_MS)]).then(() => {
+    let ready = false;
+    const pageReady = whenPageReady(READY_TIMEOUT_MS).then(() => { ready = true; });
+    void ghost.grown.then(() => { if (!ready && !mine.aborted) ghost.waiting(); });
+    void Promise.all([ghost.grown, pageReady]).then(() => {
       forget();
       if (mine.aborted) return;
       mine.revealed = true;
@@ -207,6 +217,12 @@ export const usePageMorph = (options: { back: () => void }) => {
       reveal.finished.then(restore, restore);
       ghost.release(hurry ? 90 : 200);
     });
+  };
+
+  /** 来处页此刻已经在场的话，当初那张卡。 */
+  const currentCard = (trail: Trail): HTMLElement | null => {
+    const link = linksTo(trail.href, STAYING)[trail.index] ?? null;
+    return link ? cardOfLink(link) : null;
   };
 
   /** 当初那张卡：先等来处页回到场上（没缓存的页要重读库），最多等 CARD_WAIT_MS。 */
@@ -240,7 +256,7 @@ export const usePageMorph = (options: { back: () => void }) => {
 
   /** 返回：一块圆角板从整页收回当初那张卡、落定后淡出，真卡亮一下（展开的逆过程）。
       详情页在板变实的那一小段里淡出，同时等比（不压扁）朝卡的方向缩一点，跟着板走。
-      来处页一开始就在底下，板缩到哪儿、四周就露出到哪儿。找不到那张卡就原地淡出。 */
+      来处页一开始就在底下，板缩到哪儿、四周就露出到哪儿。找不到那张卡就落在展开时记住的位置上。 */
   const onLeave = (el: Element) => {
     const trail = collapseTo;
     collapseTo = null;
@@ -257,52 +273,67 @@ export const usePageMorph = (options: { back: () => void }) => {
       endLeave(el);
       return;
     }
-    void findCard(trail).then((card) => {
-      if (!el.isConnected) return;
-      // 缓存的来处页重新插回文档时，卡片入场动画（material.css 的 card-enter）会从头再放一遍：
-      // 板要落到卡的最终位置上，卡却还在往上浮——直接放完它。
+    // 缓存的来处页重新插回文档时，卡片入场动画（material.css 的 card-enter）会从头再放一遍：
+    // 板要落到卡的最终位置上，卡却还在往上浮——直接放完它。
+    const settleStaying = () => {
       const staying = main()?.querySelector<HTMLElement>(STAYING);
       for (const animation of staying?.getAnimations({ subtree: true }) ?? []) {
         if (animation instanceof CSSAnimation && animation.animationName === 'card-enter') animation.finish();
       }
-      if (!card) {
-        const fade = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160, easing: 'ease-out', fill: 'forwards' });
-        fade.finished.then(() => endLeave(el), () => endLeave(el));
-        return;
-      }
-      const to = rectOf(card);
-      const radius = radiusOf(card);
-      // 等比缩向卡的中心：原点取卡中心在详情页自己坐标里的位置（离场页绝对定位、按滚动距离垫过）。
-      const box = el.getBoundingClientRect();
-      el.style.transformOrigin = `${r1(to.left + to.width / 2 - box.left)}px ${r1(to.top + to.height / 2 - box.top)}px`;
-      el.animate([{ transform: 'none' }, { transform: 'scale(.9)' }], { duration: SHRINK_MS, easing: SHRINK_EASE, fill: 'forwards' });
-      const fade = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: PLATE_IN_MS + 40, easing: 'ease-out', fill: 'forwards' });
-      // 真卡在板底下先藏着：板淡出时它正好接上，而不是板和卡叠成一块更亮的。
-      card.style.opacity = '0';
-      const plate = collapseGhost({ viewport, to, radius, host, duration: SHRINK_MS, fadeIn: PLATE_IN_MS, landAt: LAND_AT, easing: SHRINK_EASE });
-      let lit = false;
-      const light = () => {
-        if (lit) return;
-        lit = true;
-        card.style.opacity = '';
-        card.animate(
-          [{ opacity: 0, filter: 'brightness(1.3)' }, { opacity: 1, filter: 'brightness(1.3)', offset: 0.35 }, { opacity: 1, filter: 'brightness(1)' }],
-          { duration: 520, easing: 'ease-out' },
-        );
-      };
-      void plate.landed.then(light);
-      plate.done.addEventListener('cancel', light);
-      // 收回途中按 Esc：剩下的这段在 200ms 里放完，保留原来的曲线——板照样落到卡上、卡照样
-      // 亮起来，只是快一点；不再一下跳到终点。
-      const escaping = [...plate.plate.getAnimations(), fade, ...el.getAnimations()];
-      const forgetEscape = onMotionEscape(() => {
-        for (const animation of escaping) hurryAnimation(animation, ESC_FINISH_MS);
-        return true;
-      });
-      const release = () => forgetEscape();
-      plate.done.finished.then(release, release);
-      fade.finished.then(() => endLeave(el), () => endLeave(el));
+    };
+    settleStaying();
+    // 按下返回的这一帧板就开始缩（D-2）：来处页已经在场就用真卡，否则先用展开时记住的位置。
+    const present = currentCard(trail);
+    let card: HTMLElement | null = present;
+    const to = present ? rectOf(present) : trail.rect;
+    const radius = present ? radiusOf(present) : trail.radius;
+    // 等比缩向卡的中心：原点取卡中心在详情页自己坐标里的位置（离场页绝对定位、按滚动距离垫过）。
+    const box = el.getBoundingClientRect();
+    el.style.transformOrigin = `${r1(to.left + to.width / 2 - box.left)}px ${r1(to.top + to.height / 2 - box.top)}px`;
+    el.animate([{ transform: 'none' }, { transform: 'scale(.9)' }], { duration: SHRINK_MS, easing: SHRINK_EASE, fill: 'forwards' });
+    const fade = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: PLATE_IN_MS + 40, easing: 'ease-out', fill: 'forwards' });
+    // 真卡在板底下先藏着：板淡出时它正好接上，而不是板和卡叠成一块更亮的。
+    if (card) card.style.opacity = '0';
+    const plate = collapseGhost({
+      viewport, to, radius, host, duration: SHRINK_MS, fadeIn: PLATE_IN_MS, landAt: LAND_AT, easing: SHRINK_EASE,
+      skin: present ? cardSkin(present) : trail.skin,
     });
+    let landed = false;
+    if (!present) {
+      void findCard(trail).then((found) => {
+        if (!found || landed || !el.isConnected) return;
+        settleStaying();
+        card = found;
+        found.style.opacity = '0';
+        const actual = rectOf(found);
+        const off = Math.abs(actual.left - to.left) + Math.abs(actual.top - to.top) + Math.abs(actual.width - to.width) + Math.abs(actual.height - to.height);
+        if (off > 2) plate.retarget(actual, radiusOf(found));
+      });
+    }
+    let lit = false;
+    const light = () => {
+      landed = true;
+      if (lit || !card) return;
+      lit = true;
+      card.style.opacity = '';
+      // 板已经带着卡自己的底落下来（D-4），这里只轻轻亮一下说「你是从这儿走的」，不再靠强光遮跳变。
+      card.animate(
+        [{ opacity: 0, filter: 'brightness(1.12)' }, { opacity: 1, filter: 'brightness(1.12)', offset: 0.35 }, { opacity: 1, filter: 'brightness(1)' }],
+        { duration: 520, easing: 'ease-out' },
+      );
+    };
+    void plate.landed.then(light);
+    plate.done.addEventListener('cancel', light);
+    // 收回途中按 Esc：剩下的这段在 200ms 里放完，保留原来的曲线——板照样落到卡上、卡照样
+    // 亮起来，只是快一点；不再一下跳到终点。
+    const escaping = [...plate.plate.getAnimations(), fade, ...el.getAnimations()];
+    const forgetEscape = onMotionEscape(() => {
+      for (const animation of escaping) hurryAnimation(animation, ESC_FINISH_MS);
+      return true;
+    });
+    const release = () => forgetEscape();
+    plate.done.finished.then(release, release);
+    fade.finished.then(() => endLeave(el), () => endLeave(el));
   };
 
   /** 离场页（KeepAlive 缓存着的）会原样再回来：留在它身上的 fill 动画和内联样式必须清掉。

@@ -31,6 +31,35 @@ export interface GhostOptions {
   /** 板在第几成时间长满、开始淡出（0–1）。新内容应在这之后才淡入。 */
   growUntil?: number;
   zIndex?: number;
+  /** 起点那张卡的底（见 cardSkin）：板第一帧 / 最后一帧和真卡一模一样，不再从纯色跳到带微光的卡。 */
+  skin?: CardSkin | null;
+}
+
+/** 一张卡自己的背景层（类别色微光 + 材质），连同它在屏幕上的位置。 */
+export interface CardSkin {
+  image: string;
+  layers: number;
+  rect: GhostRect;
+}
+
+/** 数背景图的顶层层数（渐变内部也有逗号，按括号深度数）。 */
+export function backgroundLayerCount(image: string): number {
+  let depth = 0;
+  let count = 1;
+  for (const char of image) {
+    if (char === '(') depth += 1;
+    else if (char === ')') depth -= 1;
+    else if (char === ',' && depth === 0) count += 1;
+  }
+  return count;
+}
+
+/** 取一张卡的背景（算好的值，var() 已展开）。没有背景图就不带皮，板仍是材质底。 */
+export function cardSkin(card: Element): CardSkin | null {
+  const image = getComputedStyle(card).backgroundImage;
+  if (!image || image === 'none') return null;
+  const box = card.getBoundingClientRect();
+  return { image, layers: backgroundLayerCount(image), rect: { left: box.left, top: box.top, width: box.width, height: box.height } };
 }
 
 const r2 = (value: number) => Number(value.toFixed(2));
@@ -55,7 +84,7 @@ export function ghostInset(from: GhostRect, to: GhostRect, radius: number): stri
 }
 
 /** 建一块还没开始动的幽灵板，铺在终点矩形上。 */
-function ghostPlate(to: GhostRect, host: HTMLElement, zIndex = 25): HTMLDivElement {
+function ghostPlate(to: GhostRect, host: HTMLElement, zIndex = 25, skin: CardSkin | null = null): HTMLDivElement {
   const el = document.createElement('div');
   el.setAttribute('aria-hidden', 'true');
   el.className = 'motion-ghost';
@@ -71,6 +100,19 @@ function ghostPlate(to: GhostRect, host: HTMLElement, zIndex = 25): HTMLDivEleme
     background: 'var(--mat-card)',
     boxShadow: 'var(--mat-rim)',
   });
+  if (skin) {
+    // 卡的那几层背景只铺在卡原来的位置上（按卡的尺寸、不平铺），下面垫整块材质。板长大时微光
+    // 留在卡原处；裁切正好是卡的那一帧，看到的就是卡本身的底。
+    const size = `${r2(skin.rect.width)}px ${r2(skin.rect.height)}px`;
+    const position = `${r2(skin.rect.left - to.left)}px ${r2(skin.rect.top - to.top)}px`;
+    const repeat = (value: string) => Array(skin.layers).fill(value).join(', ');
+    Object.assign(el.style, {
+      backgroundImage: `${skin.image}, var(--mat-card)`,
+      backgroundSize: `${repeat(size)}, 100% 100%`,
+      backgroundPosition: `${repeat(position)}, 0 0`,
+      backgroundRepeat: `${repeat('no-repeat')}, no-repeat`,
+    });
+  }
   host.appendChild(el);
   return el;
 }
@@ -85,6 +127,11 @@ export interface HeldGhost {
    * 用在「展开到一半按了 Esc」：不进去了，板回到它出来的地方。已经揭开过就什么都不做。
    */
   retract: (fadeMs?: number) => Promise<void>;
+  /**
+   * 板已经长满、新页数据还没到：板上扫过一道很淡的光（D-3），等待时没有一帧完全静止。
+   * 只动一个子层的 transform，合成器就能做；数据来得快时它还没显出来就被揭开了。
+   */
+  waiting: () => void;
 }
 
 /**
@@ -95,7 +142,7 @@ export interface HeldGhost {
  */
 export function holdGhost(options: Omit<GhostOptions, 'growUntil'>): HeldGhost {
   const { from, to, host } = options;
-  const el = ghostPlate(to, host, options.zIndex);
+  const el = ghostPlate(to, host, options.zIndex, options.skin);
   const full = ghostInset(to, to, options.toRadius);
   // fill: both：倒着放回起点时停在起点的形状上，而不是退回没有裁切的整块板。
   const grow = el.animate(
@@ -122,6 +169,23 @@ export function holdGhost(options: Omit<GhostOptions, 'growUntil'>): HeldGhost {
     const fade = exemptFromSettle(el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: fadeMs, easing: 'ease-out', fill: 'forwards' }));
     await fade.finished.then(remove, remove);
   };
+  let sheen: HTMLElement | null = null;
+  const waiting = () => {
+    if (released || sheen) return;
+    sheen = document.createElement('div');
+    Object.assign(sheen.style, {
+      position: 'absolute',
+      inset: '0',
+      background: 'linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--ink) 5%, transparent) 50%, transparent 70%)',
+      willChange: 'transform, opacity',
+    });
+    el.appendChild(sheen);
+    exemptFromSettle(sheen.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 240, easing: 'ease-out', fill: 'both' }));
+    exemptFromSettle(sheen.animate(
+      [{ transform: 'translateX(-70%)' }, { transform: 'translateX(70%)' }],
+      { duration: 900, easing: 'ease-in-out', iterations: Infinity },
+    ));
+  };
   const release = (fadeMs = 180) => {
     if (released) return;
     released = true;
@@ -133,7 +197,7 @@ export function holdGhost(options: Omit<GhostOptions, 'growUntil'>): HeldGhost {
       fade.finished.then(remove, remove);
     });
   };
-  return { grown, release, retract };
+  return { grown, release, retract, waiting };
 }
 
 /**
@@ -158,13 +222,18 @@ export function collapseGhost(options: {
   landAt: number;
   easing: string;
   zIndex?: number;
-}): { landed: Promise<void>; done: Animation; plate: HTMLElement } {
+  /** 终点那张卡的底：板落到卡上的最后一帧和真卡一致。 */
+  skin?: CardSkin | null;
+}): { landed: Promise<void>; done: Animation; plate: HTMLElement; retarget: (next: GhostRect, radius: number) => void } {
   const { viewport, to, host, duration } = options;
-  const el = ghostPlate(viewport, host, options.zIndex);
-  el.animate(
-    [{ clipPath: ghostInset(viewport, viewport, options.fromRadius ?? 0) }, { clipPath: ghostInset(to, viewport, options.radius) }],
-    { duration, easing: options.easing, fill: 'both' },
-  );
+  const el = ghostPlate(viewport, host, options.zIndex, options.skin);
+  const start = { clipPath: ghostInset(viewport, viewport, options.fromRadius ?? 0) };
+  const shape = el.animate([start, { clipPath: ghostInset(to, viewport, options.radius) }], { duration, easing: options.easing, fill: 'both' });
+  /* 先按记住的位置缩，真卡找到了再把终点换成它（D-2）：时间轴不变，只换目标，
+     差多少就在剩下的路程里补多少，不重新起跑。 */
+  const retarget = (next: GhostRect, radius: number) => {
+    (shape.effect as KeyframeEffect | null)?.setKeyframes([start, { clipPath: ghostInset(next, viewport, radius) }]);
+  };
   const done = el.animate(
     [
       { opacity: 0 },
@@ -182,7 +251,7 @@ export function collapseGhost(options: {
     const finish = () => { window.clearTimeout(timer); resolve(); };
     done.finished.then(finish, finish);
   });
-  return { landed, done, plate: el };
+  return { landed, done, plate: el, retarget };
 }
 
 /** 放一块幽灵板；动画结束（或被取消）时自动移除。返回动画，调用方可 reverse / cancel。 */

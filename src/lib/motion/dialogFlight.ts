@@ -11,9 +11,9 @@ export interface FlightOrigin {
   rect: DOMRect | null;
 }
 
-const OPEN_MS = 360;
+const OPEN_MS = 320;
 const CLOSE_MS = 220;
-const OPEN_EASE = 'cubic-bezier(.2, .9, .25, 1.04)';
+const OPEN_EASE = 'cubic-bezier(.2, .9, .25, 1)';
 const CLOSE_EASE = 'cubic-bezier(.4, 0, .7, .2)';
 
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;

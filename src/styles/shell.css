@@ -134,8 +134,9 @@ a { color: inherit; }
    退场时长）；forward / back = 没有来处的进出；left / right = 换入口时跟着导航胶囊横移。
    只动 transform / opacity——不加 filter：整屏 blur 在 4K 高分屏上每帧都要重画，两页叠着
    变糊的那几帧整个窗口发暗，就是「一拖顶栏换页整个界面闪一下」。 */
+/* 透明度和位移同长同曲线（D-7）：以前 240 / 380 各走各的，字已经不透明了还在滑。 */
 [class*='page-'][class*='-enter-active'] {
-  transition: opacity 240ms ease, transform 380ms var(--ease-out);
+  transition: opacity var(--dur-std) var(--ease-enter), transform var(--dur-std) var(--ease-enter);
 }
 [class*='page-'][class*='-leave-active'] {
   position: absolute;
@@ -155,7 +156,7 @@ a { color: inherit; }
 [class*='page-'].page-expand-enter-active { position: relative; z-index: 2; transition: opacity 440ms linear; }
 .page-expand-enter-from { opacity: .999; }
 /* 旧页等幽灵板长满、完全盖住它以后才撤，免得板没盖到的地方先露出新页、叠成重影。 */
-[class*='page-'].page-expand-leave-active { z-index: 1; transition: opacity 60ms linear 300ms; }
+[class*='page-'].page-expand-leave-active { z-index: 1; transition: opacity 60ms linear 280ms; }
 .page-expand-leave-to { opacity: 0; }
 /* 返回：详情页和幽灵板一起缩回当初那张卡（usePageMorph.onLeave），来处页一开始就在底下浮现。
    离场那条 900ms 是占位：真正的时长由 JS 动画定，放完就提前结束（onLeave 里的 endLeave）。 */
@@ -164,11 +165,11 @@ a { color: inherit; }
 [class*='page-'].page-collapse-leave-active { z-index: 2; transition: opacity 900ms linear; }
 .page-collapse-leave-to { opacity: .999; }
 .page-none-enter-from, .page-none-leave-to { opacity: 0; }
-/* 收起（详情页 → 别的入口）：详情页往纵深退——先慢后快地缩小淡出，像被收进去；
-   新页从略近处落定，减速带一点点回弹。只动 transform / opacity。 */
-[class*='page-'].page-dismiss-leave-active { transition: opacity 200ms cubic-bezier(.4, 0, 1, 1), transform 220ms cubic-bezier(.4, 0, 1, 1); }
+/* 收起（详情页 → 别的入口）：详情页往纵深退——缩小淡出，像被收进去；
+   新页从略近处落定，减速停住，不回弹。只动 transform / opacity。 */
+[class*='page-'].page-dismiss-leave-active { transition: opacity 200ms var(--ease-leave), transform 220ms var(--ease-leave); }
 .page-dismiss-leave-to { opacity: 0; transform: scale(.94); }
-[class*='page-'].page-dismiss-enter-active { transition: opacity 260ms ease-out 80ms, transform 460ms cubic-bezier(.18, 1.1, .3, 1) 80ms; }
+[class*='page-'].page-dismiss-enter-active { transition: opacity var(--dur-std) var(--ease-enter) 80ms, transform var(--dur-std) var(--ease-enter) 80ms; }
 .page-dismiss-enter-from { opacity: 0; transform: scale(1.03) translateY(10px); }
 .page-host > * { transform-origin: 50% 30vh; }
 /* 返回时，当初点进去的那张卡亮一下（lib/returnScroll.ts），告诉人「你是从这儿走的」。 */
