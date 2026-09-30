@@ -69,13 +69,14 @@ export function wrapIndex(index: number, length: number): number {
   return ((index % length) + length) % length;
 }
 
-/** 甩出去那张卡的关键帧：整张清晰地飞出画面（不在半路淡掉、也不被某条边截住）。 */
+/** 甩出去那张卡的关键帧：整张飞出画面，一路渐渐融进背景（飞到窗口边上不是被一刀截断）。
+    起点不写透明度，接着拖动时已经变淡的那个值往下走。 */
 export function flingOutFrames(direction: -1 | 1, width: number, from: string, vertical = false): Keyframe[] {
   const throwX = vertical ? 0 : -direction * (width * 1.25 + 120);
   const throwY = vertical ? -direction * 900 : -30;
   return [
-    { transform: from || 'none', opacity: 1 },
-    { transform: `translate3d(${throwX}px, ${throwY}px, 0) rotate(${-direction * (vertical ? 0 : 9)}deg)`, opacity: 1 },
+    { transform: from || 'none' },
+    { transform: `translate3d(${throwX}px, ${throwY}px, 0) rotate(${-direction * (vertical ? 0 : 9)}deg)`, opacity: 0.15 },
   ];
 }
 

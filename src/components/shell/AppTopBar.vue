@@ -208,11 +208,6 @@ const syncTitle = computed(() => {
     + ` — ${canIncrementalSync.value ? t.value.syncNow : t.value.verifyFirst}`;
 });
 
-/* 空闲、能同步时，前面是同步图标而不是一个没有文字含义的绿点（U19）：一眼看出「点它就同步」。
-   失败 / 部分未完成 / 未连接仍用带色的点，旁边的字说明它是什么。 */
-const idleSyncable = computed(() => !isSyncing.value && !readyToHand.value && canIncrementalSync.value
-  && syncState.value !== 'failed' && syncState.value !== 'partial');
-
 /* 点击：能增量同步就发起；没连上就去「账号与设备」卡。同步中点了什么都不做——不给「取消」：
    半路停下会留下一部分流更新了、另一部分没更新的库（用户 2026-09-30 定），等它跑完就好。 */
 const onSyncClick = () => {
@@ -243,7 +238,7 @@ const onThemeChange = (value: string | number) => {
 };
 
 /* 语言列表跟着 LOCALES 注册表走，一律写全名，和设置页一致（不用「PT-BR」「中」这类缩写）。
-   放不下时整枚让位（fit-5），设置里还有同一个开关。 */
+   放不下时整枚让位（fit-4），设置里还有同一个开关。 */
 const localeOptions = computed(() => LOCALES.map((code) => ({ value: code, label: LOCALE_LABELS[code] })));
 const onLocaleChange = (value: string | number) => setLocale(String(value) as Locale);
 
@@ -254,7 +249,9 @@ useWidthMorph(syncPill, () => (readyToHand.value ? t.value.readyPill : syncText.
 /* —— 放不下时逐级回退（大原则：任何语言、任何宽度，顶栏的胶囊都不许盖住别的组件）——
    媒体查询只认窗口宽度，认不出「俄语导航比中文宽一倍」。这里量真实的包围盒：
    品牌、正中导航、右侧一簇两两之间留出间距、右簇不出窗口；放不下就升一档再量。
-     1 藏字标 → 2 语言两侧少露一截 → 3 同步胶囊只留圆点 → 4 导航紧凑 → 5 藏语言（设置里还有）。
+     1 藏字标 → 2 语言两侧少露一截 → 3 导航紧凑 → 4 藏语言（设置里还有）→ 5 同步胶囊只留圆点。
+   同步文字排在最后才藏：同步进行到第几项（「同步中 3/8」）是用户在等的东西。语言改写全名以后右簇变宽，
+   以前第三档就先把同步文字藏了，于是自动同步时胶囊只剩一个点（2026-09-30 反馈）。
    每次宽度、语言、同步文字变化都从 0 档重来，宽了会自动退回完整形态。
    整轮量完都在同一个任务里（只 await nextTick，中间不出帧），画面上只看到最后那一档。
 
@@ -376,7 +373,7 @@ watch(() => (readyToHand.value ? t.value.readyPill : syncText.value), () => {
 
     <SegmentTrack
       class="pill-nav"
-      :compact="fit >= 4"
+      :compact="fit >= 3"
       variant="glass"
       :items="navItems"
       :model-value="activeBranch"
@@ -396,8 +393,9 @@ watch(() => (readyToHand.value ? t.value.readyPill : syncText.value), () => {
         :aria-label="syncTitle"
         @click="onSyncClick"
       >
-        <Icon v-if="idleSyncable" name="refresh" :size="14" class="sync-icon" />
-        <i v-else class="dot" :class="{ spinning: isSyncing }" aria-hidden="true"></i>
+        <!-- 前面一律是带色的小圆点（已连接绿、部分未完成黄、失败红、同步中呼吸）。U19 一度换成刷新图标，
+             用户觉得不如圆点好看（2026-09-30），换回来。 -->
+        <i class="dot" :class="{ spinning: isSyncing }" aria-hidden="true"></i>
         <span :key="readyToHand ? 'ready' : isSyncing ? 'syncing' : 'idle'" class="sync-text" aria-live="polite">{{ readyToHand ? t.readyPill : syncText }}</span>
         <Icon v-if="readyToHand" name="arrow-right" :size="14" class="ready-arrow" />
       </button>
@@ -510,8 +508,6 @@ watch(() => (readyToHand.value ? t.value.readyPill : syncText.value), () => {
 .sync-pill.is-ready { color: var(--ink); font-weight: 600; }
 .sync-pill.is-ready .dot { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
 .ready-arrow { color: var(--accent); }
-.sync-icon { flex: none; color: var(--accent); }
-.sync-pill.tone-neutral .sync-icon { color: var(--muted); }
 
 .icon-group { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border-radius: 999px; }
 .theme-toggle { --seg-pad: 1px; }
@@ -521,9 +517,9 @@ watch(() => (readyToHand.value ? t.value.readyPill : syncText.value), () => {
 /* 回退档位（见 refit）：只有量出来放不下时才会升档。 */
 .app-topbar.is-measuring :deep(.capsule-wheel) { transition: none !important; }
 .app-topbar[class*='fit-'] .wordmark { display: none; }
-.fit-3 .sync-text, .fit-4 .sync-text, .fit-5 .sync-text { display: none; }
-.fit-3 .sync-pill, .fit-4 .sync-pill, .fit-5 .sync-pill { padding-inline: 11px; }
-.fit-5 .locale-wheel, .fit-5 .group-divider { display: none; }
+.fit-4 .locale-wheel, .fit-4 .group-divider, .fit-5 .locale-wheel, .fit-5 .group-divider { display: none; }
+.fit-5 .sync-text { display: none; }
+.fit-5 .sync-pill { padding-inline: 11px; }
 
 /* 窄屏降级：先让胶囊回到文档流避免和按钮组重叠，再小到手机上藏掉
    （底部 tabbar 已经覆盖同一组导航）。语言选择在 520px 以下也让位给

@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useLifeEvents } from '../composables/useLifeEvents';
 import { useQueuedOption } from '../composables/useQueuedOption';
 import { eventChartTone, lifeEventMessages, validEventDate, overlapsEvent } from '../lib/lifeEvents';
-import { useTrendFocus } from '../composables/useTrendRange';
 import { displayDateTimeFormatter, parseDisplayDate } from '../lib/dateTime';
 const { open: openEvent, events: lifeEvents, chipFocus, chartFocus, ensureLoaded } = useLifeEvents();
 ensureLoaded();
@@ -172,8 +171,10 @@ const option = computed(() => {
 });
 /* 切范围时十来张图同时换数据：排队，一帧只换一张（见 useQueuedOption）。 */
 const shownOption = useQueuedOption(option);
-/* 同页联动（U13）：指针停在任何一张图的某一天，这张卡写出自己那天的值；没有就说没有，不插值。 */
-const focusDate = useTrendFocus();
+/* 指针停在这张图的某一天：只有这张卡写出那天的值（没有就说没有，不插值）。
+   以前同页所有卡跟着一起跳到同一天（U13 联动），用户觉得没必要、还干扰——点「距离」的一个点，
+   步数、活动量都变成那天（2026-09-30 反馈）。 */
+const focusDate = ref<string | null>(null);
 const onAxis = (index: number | null) => {
   const dates = ((shownOption.value?.xAxis as { data?: string[] } | undefined)?.data) ?? [];
   const date = index === null ? null : dates[index] ?? null;

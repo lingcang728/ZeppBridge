@@ -1,6 +1,10 @@
 /* 总览和打开的那张卡叠在同一个格子里：打开时总览在底下往后退，大卡从它身上长出来。 */
 .card-deck { position: relative; display: grid; min-width: 0; }
 .deck-overview, .deck-stage { grid-area: 1 / 1; min-width: 0; }
+/* 总览按自己的高度排，不被打开的大卡撑高：两者在同一个网格格子里，以前格子跟着大卡变高，coverflow
+   在变高的格子里重新垂直居中——打开时整组卡往下挪一截，关上、大卡撤走的那一帧又弹回正中
+   （用户看到的「收起时先往下一点，然后突然回到正中间」「点开时整个界面跟着动一下」）。 */
+.deck-overview { align-self: start; }
 
 /* coverflow 在剩下的高度里垂直居中：卡组是这一页的主角，不该缩在顶上留一大片空。 */
 .deck-mode-cover .deck-overview { display: grid; min-height: calc(100vh - 260px); align-content: center; }

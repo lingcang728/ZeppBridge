@@ -189,6 +189,9 @@ onUnmounted(() => {
 /* 行宽收在 1000px 以内：设置是一行一行的「标签 — 控件」，拉满 1400px 时标签和
    控件隔着半个屏幕，就是之前那种「留白过多」。 */
 .page { display: grid; width: 100%; max-width: 1120px; min-width: 0; margin: 0 auto; gap: 18px; }
+/* 设置页不裁横向溢出：拖着大卡往外甩、coverflow 两侧的卡都会越过页面的左右边，全局的 overflow-x: clip
+   会在页面边上切出一条竖直的硬边（限宽居中以后，这条边就落在窗口中间）。窗口本身（#main-content）仍然裁。 */
+.page { overflow-x: visible; }
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; min-width: 0; }
 h1, p { margin-top: 0; }
 h1 { font-size: 26.5px; font-weight: 700; color: var(--ink); }

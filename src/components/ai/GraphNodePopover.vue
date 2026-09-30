@@ -12,7 +12,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import Icon from '../Icon.vue';
 import SegmentTrack from '../SegmentTrack.vue';
 import type { GraphNode } from '../../lib/aiTask/graph/model';
-import { CATEGORY_DAY_CHOICES } from '../../lib/aiTask/categories';
+import { CATEGORY_DAY_CHOICES, shownDayChoice } from '../../lib/aiTask/categories';
 import { defineMessages, useMessages } from '../../i18n';
 
 const props = defineProps<{
@@ -146,7 +146,7 @@ const coverageText = computed(() => {
       <template v-if="node.expandable && node.included">
         <div class="pop-block">
           <span class="pop-label">{{ t.days }}</span>
-          <SegmentTrack compact fill :items="dayItems" :model-value="node.daysBefore ?? 0" :aria-label="t.days"
+          <SegmentTrack compact fill :items="dayItems" :model-value="shownDayChoice(node.daysBefore ?? 0, CATEGORY_DAY_CHOICES)" :aria-label="t.days"
             @update:model-value="(days) => emit('set-days', Number(days))" />
         </div>
         <div class="pop-row">

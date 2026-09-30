@@ -166,12 +166,12 @@ a { color: inherit; }
 [class*='page-'].page-expand-enter-active { position: relative; z-index: 2; transition: opacity 440ms linear; }
 .page-expand-enter-from { opacity: .999; }
 /* 旧页等幽灵板长满、完全盖住它以后才撤，免得板没盖到的地方先露出新页、叠成重影。 */
-[class*='page-'].page-expand-leave-active { z-index: 1; transition: opacity 60ms linear 280ms; }
+[class*='page-'].page-expand-leave-active { z-index: 1; transition: opacity 60ms linear 400ms; } /* 窗口（360ms）长满以后才撤，四周不先露出空底 */
 .page-expand-leave-to { opacity: 0; }
 /* 返回：详情页和幽灵板一起缩回当初那张卡（usePageMorph.onLeave），来处页一开始就在底下浮现。
    离场那条 900ms 是占位：真正的时长由 JS 动画定，放完就提前结束（onLeave 里的 endLeave）。 */
-[class*='page-'].page-collapse-enter-active { transition: opacity 160ms ease-out; }
-.page-collapse-enter-from { opacity: 0; }
+[class*='page-'].page-collapse-enter-active { transition: none; } /* 来处页一开始就在窗口底下、原样在场：以前它从透明淡入，窗口四周先露出一片深黑 */
+.page-collapse-enter-from { opacity: 1; }
 [class*='page-'].page-collapse-leave-active { z-index: 2; transition: opacity 900ms linear; }
 .page-collapse-leave-to { opacity: .999; }
 .page-none-enter-from, .page-none-leave-to { opacity: 0; }
@@ -182,9 +182,6 @@ a { color: inherit; }
 [class*='page-'].page-dismiss-enter-active { transition: opacity var(--dur-std) var(--ease-enter) 80ms, transform var(--dur-std) var(--ease-enter) 80ms; }
 .page-dismiss-enter-from { opacity: 0; transform: scale(1.03) translateY(10px); }
 .page-host > * { transform-origin: 50% 30vh; }
-/* 返回时，当初点进去的那张卡亮一下（lib/returnScroll.ts），告诉人「你是从这儿走的」。 */
-.return-flash { animation: return-flash 1.4s ease-out; }
-@keyframes return-flash { 0%, 100% { outline: 2px solid transparent; outline-offset: 6px; } 18% { outline: 2px solid color-mix(in srgb, var(--accent) 75%, transparent); outline-offset: 3px; } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }

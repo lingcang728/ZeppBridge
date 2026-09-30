@@ -1,20 +1,19 @@
 <script setup lang="ts">
 /**
- * 交给 AI 的「先问你想知道什么」视图（U06 / U07 / 体验评估 #2 #9）。
+ * 交给 AI 的「你想知道什么」：一排四个入口，浮在关系网上方（U06 / U07 / 体验评估 #2 #9）。
  *
- * 首屏先给四个入口：看看最近睡眠 / 回顾这周变化 / 分析一次运动 / 自由提问；选了就带上推荐的
- * 方向和数据范围，右边步骤栏跳到下一步。下面是一份和关系网同一份草稿的紧凑清单：每类写清
- * 「选了没有」和「这段时间实际几天有数据」——缺失和未选不混。最上面一句大白话说清会交出去什么。
- * 喜欢关系网的人切到「图谱」，选择会记住。
+ * 看看最近睡眠 / 回顾这周变化 / 分析一次运动 / 自由提问——选了就带上推荐的方向和数据范围，右边
+ * 步骤栏跳到下一步。下面一句大白话说清会交出去什么（日期、哪几类、有没有位置、附件几个）。
+ *
+ * 以前这里是和「图谱」二选一的一整页（四张大卡 + 一张逐类清单），用户希望两者融在一起
+ * （2026-09-30）：清单和关系网本来就是同一份草稿，逐类的开关、天数、覆盖天数现在都在关系网的节点上。
  */
-import { computed } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import Icon, { type IconName } from '../Icon.vue';
-import SegmentTrack from '../SegmentTrack.vue';
-import type { AiTask, AiTaskCategory, AiTaskPreview, AiTaskTemplate } from '../../lib/bridge/types';
+import type { AiTask, AiTaskPreview, AiTaskTemplate } from '../../lib/bridge/types';
 import {
   AI_TASK_CATEGORY_META,
   AI_TASK_CATEGORY_ORDER,
-  CATEGORY_DAY_CHOICES,
   categoryLabel,
   categoryRangeOf,
 } from '../../lib/aiTask/categories';
@@ -33,8 +32,6 @@ const emit = defineEmits<{
   template: [template: AiTaskTemplate];
   pickWorkout: [];
   ask: [];
-  category: [category: AiTaskCategory, enabled: boolean];
-  days: [category: AiTaskCategory, days: number];
   allDays: [days: number];
 }>();
 
@@ -48,7 +45,7 @@ const t = useMessages(defineMessages(
     workoutTitle: '分析一次运动',
     workoutSub: '先挑一次运动，再看配速、心率与恢复',
     freeTitle: '自由提问',
-    freeSub: '自己写问题，数据范围照下面的清单',
+    freeSub: '自己写问题，数据范围照图上选的',
     dataTitle: '会交出去的数据',
     plain: (range: string, categories: string) => `${range}的${categories}`,
     plainWorkouts: (count: number) => `，重点是你选的 ${count} 次运动`,
@@ -59,12 +56,10 @@ const t = useMessages(defineMessages(
     emptyRange: '这段时间没有可分析的记录。',
     widen: '换成最近 30 天',
     rangeUnknown: '最近一段时间',
-    daysAria: (name: string) => `${name}的回溯天数`,
     haveDays: (have: number, total: number) => `${total} 天里 ${have} 天有数据`,
     noneInRange: '这段时间没有记录',
     notPicked: '不交',
     counting: '正在清点…',
-    daysOption: (days: number) => `${days} 天`,
     separator: '、',
     end: '。',
   },
@@ -77,7 +72,7 @@ const t = useMessages(defineMessages(
     workoutTitle: 'Analyse one workout',
     workoutSub: 'Pick a workout, then pace, heart rate and recovery',
     freeTitle: 'Ask anything',
-    freeSub: 'Write your own question; data follows the list below',
+    freeSub: 'Write your own question; data follows what the graph includes',
     dataTitle: 'Data that will be handed over',
     plain: (range: string, categories: string) => `${categories} for ${range}`,
     plainWorkouts: (count: number) => `, focused on the ${count} workout(s) you picked`,
@@ -88,12 +83,10 @@ const t = useMessages(defineMessages(
     emptyRange: 'No records to analyse in this period.',
     widen: 'Use the last 30 days',
     rangeUnknown: 'a recent period',
-    daysAria: (name: string) => `Days of ${name} to include`,
     haveDays: (have: number, total: number) => `${have} of ${total} days have data`,
     noneInRange: 'No records in this period',
     notPicked: 'Not included',
     counting: 'Counting…',
-    daysOption: (days: number) => `${days} d`,
     separator: ', ',
     end: '.',
   },
@@ -106,7 +99,7 @@ const t = useMessages(defineMessages(
     workoutTitle: 'Analizar un entrenamiento',
     workoutSub: 'Elige uno y mira ritmo, pulso y recuperación',
     freeTitle: 'Preguntar lo que quiera',
-    freeSub: 'Escribe tu pregunta; los datos siguen la lista de abajo',
+    freeSub: 'Escribe tu pregunta; los datos siguen lo que incluye el grafo',
     dataTitle: 'Datos que se entregarán',
     plain: (range: string, categories: string) => `${categories} de ${range}`,
     plainWorkouts: (count: number) => `, centrado en los ${count} entrenamientos elegidos`,
@@ -117,12 +110,10 @@ const t = useMessages(defineMessages(
     emptyRange: 'No hay registros que analizar en este periodo.',
     widen: 'Usar los últimos 30 días',
     rangeUnknown: 'un periodo reciente',
-    daysAria: (name: string) => `Días de ${name} que se incluyen`,
     haveDays: (have: number, total: number) => `${have} de ${total} días con datos`,
     noneInRange: 'Sin registros en este periodo',
     notPicked: 'No se incluye',
     counting: 'Contando…',
-    daysOption: (days: number) => `${days} d`,
     separator: ', ',
     end: '.',
   },
@@ -137,7 +128,17 @@ const entries = computed<Entry[]>(() => [
   { key: 'workout', icon: 'run', title: t.value.workoutTitle, sub: t.value.workoutSub, run: () => emit('pickWorkout') },
   { key: 'free', icon: 'edit', title: t.value.freeTitle, sub: t.value.freeSub, run: () => emit('ask') },
 ]);
-const activeEntry = computed(() => ({ sleep_review: 'sleep', week_review: 'week' } as Record<string, string>)[props.draft.template_id ?? ''] ?? null);
+/* 亮哪一个：刚点的那个。以前只看草稿套的模板——点了「分析一次运动」（它不换模板，只打开挑运动那一步），
+   框却还停在上一次的「回顾这周变化」上。模板被别处换掉（方向面板、打开旧任务）时回到按模板判断。 */
+const picked = ref<string | null>(null);
+watch(() => props.draft.template_id, () => { picked.value = null; });
+const templateEntry = computed(() => ({ sleep_review: 'sleep', week_review: 'week' } as Record<string, string>)[props.draft.template_id ?? ''] ?? null);
+const activeEntry = computed(() => picked.value ?? templateEntry.value);
+const choose = (entry: Entry) => {
+  entry.run();
+  // 套模板会先清掉 picked（上面的 watch），这里等它换完再记。
+  void nextTick(() => { picked.value = entry.key; });
+};
 
 const windowed = AI_TASK_CATEGORY_ORDER.filter((category) => AI_TASK_CATEGORY_META[category].hasWindow);
 const rows = computed(() => windowed.map((category) => {
@@ -149,9 +150,8 @@ const rows = computed(() => windowed.map((category) => {
   else if (!summary) { status = t.value.counting; tone = 'wait'; }
   else if (!summary.daysWithData) { status = t.value.noneInRange; tone = 'missing'; }
   else { status = t.value.haveDays(summary.daysWithData, summary.daysInRange); tone = 'ok'; }
-  return { category, label: categoryLabel(category), icon: AI_TASK_CATEGORY_META[category].icon, enabled: range.enabled, days: range.days_before, status, tone };
+  return { category, label: categoryLabel(category), icon: AI_TASK_CATEGORY_META[category].icon, enabled: range.enabled, status, tone };
 }));
-const dayItems = computed(() => CATEGORY_DAY_CHOICES.map((days) => ({ value: days, label: t.value.daysOption(days) })));
 
 /* 大白话：包含哪些日期、哪些记录、有没有位置、附件几个（体验评估 #9）。 */
 const shortDate = (date: string) => displayDateTimeFormatter({ month: 'numeric', day: 'numeric' }).format(parseDisplayDate(date));
@@ -173,67 +173,39 @@ const nothingInRange = computed(() => {
 </script>
 
 <template>
-  <section class="ask-start" aria-labelledby="ai-ask-title">
-    <h2 id="ai-ask-title" class="ask-title">{{ t.title }}</h2>
-    <div class="ask-entries">
-      <button v-for="entry in entries" :key="entry.key" type="button" :class="['ask-entry', { on: activeEntry === entry.key }]" @click="entry.run()">
-        <Icon :name="entry.icon" :size="20" class="ask-icon" />
-        <span><strong>{{ entry.title }}</strong><small>{{ entry.sub }}</small></span>
-      </button>
+  <section class="ask-strip glass-control" aria-labelledby="ai-ask-title">
+    <div class="ask-line">
+      <h2 id="ai-ask-title" class="ask-title">{{ t.title }}</h2>
+      <div class="ask-entries">
+        <button v-for="entry in entries" :key="entry.key" type="button" :class="['ask-chip', { on: activeEntry === entry.key }]"
+          :title="entry.sub" :aria-pressed="activeEntry === entry.key" @click="choose(entry)">
+          <Icon :name="entry.icon" :size="15" class="ask-icon" /><span>{{ entry.title }}</span>
+        </button>
+      </div>
     </div>
-
-    <h3 class="ask-sub">{{ t.dataTitle }}</h3>
-    <p class="ask-plain">{{ plain }}</p>
+    <p class="ask-plain"><b>{{ t.dataTitle }}</b>{{ plain }}</p>
     <p v-if="nothingInRange" class="ask-empty" role="status">
       <Icon name="info" :size="14" />{{ t.emptyRange }}
       <button type="button" class="ai-tool" @click="emit('allDays', 30)">{{ t.widen }}</button>
     </p>
-    <ul class="ask-list">
-      <li v-for="row in rows" :key="row.category" :class="['ask-row', `is-${row.tone}`]">
-        <label class="ask-check">
-          <input type="checkbox" :checked="row.enabled" @change="emit('category', row.category, ($event.target as HTMLInputElement).checked)">
-          <Icon :name="row.icon" :size="16" />
-          <span>{{ row.label }}</span>
-        </label>
-        <SegmentTrack v-if="row.enabled" compact class="ask-days" :items="dayItems" :model-value="row.days"
-          :aria-label="t.daysAria(row.label)" @update:model-value="(value) => emit('days', row.category, Number(value))" />
-        <span class="ask-status">{{ row.status }}</span>
-      </li>
-    </ul>
   </section>
 </template>
 
 <style scoped>
-.ask-start { display: grid; gap: 14px; align-content: start; height: 100%; overflow-y: auto; padding: 84px 28px 28px; }
-.ask-title { margin: 0; color: var(--ink); font-size: var(--fs-2xl); font-weight: 750; }
-.ask-entries { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.ask-entry { display: flex; align-items: flex-start; gap: 12px; min-height: 72px; padding: 14px 16px; border: 0; border-radius: var(--radius-md); background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: background var(--dur-fast) ease, box-shadow var(--dur-fast) ease; }
-.ask-entry:hover { background: color-mix(in srgb, var(--accent) 10%, var(--mat-inset)); }
-.ask-entry.on { box-shadow: var(--mat-inset-shadow), 0 0 0 2px color-mix(in srgb, var(--accent) 70%, transparent); }
-.ask-entry:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.ask-entry span { display: grid; gap: 3px; min-width: 0; }
-.ask-entry strong { font-size: var(--fs-md); }
-.ask-entry small { color: var(--subtle); font-size: var(--fs-xs); line-height: 1.45; }
-.ask-icon { flex: none; margin-top: 2px; color: var(--accent); }
-.ask-sub { margin: 8px 0 0; color: var(--muted); font-size: var(--fs-sm); font-weight: 700; }
-.ask-plain { margin: 0; color: var(--ink); font-size: var(--fs-sm); line-height: 1.6; }
-.ask-empty { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; color: var(--warning); font-size: var(--fs-sm); }
-.ask-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.ask-row { display: grid; grid-template-columns: minmax(120px, 1fr) auto minmax(120px, 1fr); align-items: center; gap: 12px; min-height: 44px; padding: 6px 12px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--ink) 4%, transparent); }
-.ask-check { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; color: var(--ink); font-size: var(--fs-sm); cursor: pointer; }
-.ask-check input { width: 17px; height: 17px; margin: 0; accent-color: var(--accent); }
-.ask-days { justify-self: center; }
-.ask-status { justify-self: end; color: var(--subtle); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; text-align: right; }
-.ask-row.is-missing .ask-status { color: var(--warning); }
-.ask-row.is-off { background: transparent; }
-.ask-row.is-off .ask-check span { color: var(--subtle); }
-@media (max-width: 1100px) {
-  .ask-start { height: auto; overflow: visible; padding: 72px 16px 18px; }
-}
-@media (max-width: 560px) {
-  .ask-entries { grid-template-columns: 1fr; }
-  .ask-row { grid-template-columns: 1fr auto; }
-  .ask-days { grid-column: 1 / -1; justify-self: start; }
-  .ask-status { grid-row: 1; grid-column: 2; }
-}
+/* 一条浮在关系网上方的玻璃条：左边一句问题，右边四个入口胶囊；下面一行灰字说清会交出去什么。 */
+.ask-strip { display: grid; gap: 6px; width: fit-content; max-width: 100%; padding: 8px 10px 8px 16px; border-radius: var(--radius-lg); }
+.ask-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-width: 0; }
+.ask-title { margin: 0; color: var(--ink); font-size: var(--fs-md); font-weight: 750; white-space: nowrap; }
+.ask-entries { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.ask-chip { display: inline-flex; align-items: center; gap: 7px; min-height: 34px; padding: 0 14px 0 11px; border: 0; border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--muted); font: inherit; font-size: var(--fs-sm); font-weight: 600; cursor: pointer;
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease, box-shadow var(--dur-fast) ease; }
+.ask-chip:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); color: var(--ink); }
+.ask-chip:active { scale: .97; }
+.ask-chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.ask-chip.on { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--ink); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent); }
+.ask-icon { flex: none; color: var(--accent); }
+.ask-plain { margin: 0 0 2px; color: var(--muted); font-size: var(--fs-xs); line-height: 1.5; }
+.ask-plain b { margin-right: 6px; color: var(--subtle); font-weight: 650; }
+.ask-empty { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; color: var(--warning); font-size: var(--fs-xs); }
 </style>

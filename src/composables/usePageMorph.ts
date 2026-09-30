@@ -1,6 +1,6 @@
 import type { RouteLocationNormalized } from 'vue-router';
 import type { PageMotion } from '../lib/navigation';
-import { cardReplica, morphWindow, type WindowRect } from '../lib/motion/window';
+import { cardReplica, morphWindow, WINDOW_OFFSETS, windowRects, type WindowRect } from '../lib/motion/window';
 import { deferSettle, hurryAnimation, onMotionEscape, onMotionSkip } from '../lib/motion/interrupt';
 import { whenPageReady } from '../lib/motion/pageReady';
 
@@ -26,8 +26,6 @@ const READY_TIMEOUT_MS = 560;
 /** 返回：窗口从整页缩回那张卡（展开的逆过程），同样先快后慢、没有回弹，像被卡片吸回去。 */
 const SHRINK_MS = 400;
 const SHRINK_EASE = 'cubic-bezier(.25, .85, .3, 1)';
-/** 详情页自己淡出的时长：窗口（带页面底色）一开始就在它下面接住，四周露出退后的来处页。 */
-const PAGE_OUT_MS = 110;
 /** 来处页不在缓存里时要重新读库，那张卡可能要等一会儿才出现。板不等它：先按记住的位置缩，
     这段时间里找到了就把终点换成真卡（D-2）；超过这个时长还没有就落在记住的位置上。 */
 const CARD_WAIT_MS = 300;
@@ -292,14 +290,28 @@ export const usePageMorph = (options: { back: () => void }) => {
     let card: HTMLElement | null = present;
     const to = present ? rectOf(present) : trail.rect;
     const radius = present ? radiusOf(present) : trail.radius;
-    // 详情页叠在窗口上面（z 26 > 窗口 25 > 遮罩 24），朝卡的中心等比缩一点、很快淡掉。窗口一开始就是实的、
-    // 带着页面底色，挡住来处页——页面本身是透明的，以前来处页从它底下透上来，第一帧两页叠影。
-    // 看到的是「这一页在变小、变圆、退回那张卡」，而不是一张没有圆角的整页被压扁。
+    // 详情页叠在窗口上面（z 26 > 窗口 25 > 遮罩 24），被裁成屏幕那么大的一块圆角「窗」，沿窗口同一条轨迹、
+    // 同一条曲线等比缩向那张卡，前一半里和卡片内容交叉淡掉（ColorOS：窗口里的内容跟着窗口一起变小）。
+    // 以前它 110ms 就淡没了，剩一整块空的深色窗口在缩——用户看到的「先变成深黑，再变回折线图」。
+    // 裁切是静态的一层（只设一次），逐帧动的只有 transform / opacity。窗口一开始就是实的、带着页面
+    // 底色，挡住来处页——页面本身是透明的，以前来处页从它底下透上来，第一帧两页叠影。
     el.style.zIndex = '26';
     const box = el.getBoundingClientRect();
-    el.style.transformOrigin = `${r1(to.left + to.width / 2 - box.left)}px ${r1(to.top + to.height / 2 - box.top)}px`;
-    el.animate([{ transform: 'none' }, { transform: 'scale(.82)' }], { duration: SHRINK_MS, easing: SHRINK_EASE, fill: 'forwards' });
-    const fade = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: PAGE_OUT_MS, easing: 'ease-out', fill: 'forwards' });
+    const vcx = viewport.left + viewport.width / 2;
+    const vcy = viewport.top + viewport.height / 2;
+    el.style.transformOrigin = `${r1(vcx - box.left)}px ${r1(vcy - box.top)}px`;
+    el.style.clipPath = `inset(${r1(viewport.top - box.top)}px 0px ${r1(Math.max(0, box.bottom - viewport.top - viewport.height))}px 0px round 26px)`;
+    const pageFrames: Keyframe[] = windowRects(viewport, to).map((rect, index) => {
+      const scale = Math.max(0.05, rect.width / viewport.width);
+      const dx = rect.left + rect.width / 2 - vcx;
+      const dy = rect.top + rect.height / 2 - vcy;
+      return { transform: `translate(${r1(dx)}px, ${r1(dy)}px) scale(${scale.toFixed(4)})`, offset: WINDOW_OFFSETS[index] };
+    });
+    el.animate(pageFrames, { duration: SHRINK_MS, easing: SHRINK_EASE, fill: 'forwards' });
+    const fade = el.animate(
+      [{ opacity: 1 }, { opacity: 1, offset: 0.2 }, { opacity: 0, offset: 0.62 }, { opacity: 0 }],
+      { duration: SHRINK_MS, easing: SHRINK_EASE, fill: 'forwards' },
+    );
     // 真卡在窗口底下先藏着：窗口落地时拷贝和它重合，撤掉窗口它正好接上。
     if (card) card.style.opacity = '0';
     const plate = morphWindow({
@@ -352,6 +364,7 @@ export const usePageMorph = (options: { back: () => void }) => {
     el.style.opacity = '';
     el.style.transition = '';
     el.style.zIndex = '';
+    el.style.clipPath = '';
   };
   const onAfterLeave = (el: Element) => {
     clean(el);

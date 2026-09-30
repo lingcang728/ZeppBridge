@@ -52,6 +52,23 @@ export function arcMidpoint(from: WindowRect, to: WindowRect, t = 0.5, lead = 0.
   };
 }
 
+/** 窗口在关键帧 0 / 0.5 / 0.9 / 1 处的矩形（和 morphWindow 的形状动画一一对应）。
+    离场页要跟着窗口一起缩，用同一组矩形、同一条缓动算它的 transform。 */
+export const WINDOW_OFFSETS = [0, 0.5, 0.9, 1] as const;
+export function windowRects(from: WindowRect, to: WindowRect): WindowRect[] {
+  return [
+    from,
+    arcMidpoint(from, to),
+    {
+      left: lerp(from.left, to.left, 0.94),
+      top: lerp(from.top, to.top, 0.96),
+      width: lerp(from.width, to.width, 0.94),
+      height: lerp(from.height, to.height, 0.96),
+    },
+    to,
+  ];
+}
+
 /** 窗口在形变途中保持的圆角（不小于这个值）：两端各自是卡 / 页的圆角。 */
 export const WINDOW_MID_RADIUS = 26;
 
@@ -172,9 +189,9 @@ export function morphWindow(options: WindowMorphOptions): WindowMorph {
       height: `${frame.height}px`,
       zIndex: String(zIndex - 1),
       pointerEvents: 'none',
-      background: 'color-mix(in srgb, var(--canvas) 38%, transparent)',
-      backdropFilter: 'blur(8px)',
-      webkitBackdropFilter: 'blur(8px)',
+      background: 'color-mix(in srgb, var(--canvas) 14%, transparent)',
+      backdropFilter: 'blur(6px)',
+      webkitBackdropFilter: 'blur(6px)',
       willChange: 'opacity',
     });
     host.appendChild(scrim);
@@ -184,18 +201,15 @@ export function morphWindow(options: WindowMorphOptions): WindowMorph {
   const midRadius = Math.max(WINDOW_MID_RADIUS, Math.min(options.fromRadius, options.toRadius));
   /* 关键帧的偏移是「缓动后的进度」：先快后慢的曲线下，0.5 在头一百来毫秒就过去了。
      所以圆角要在 0.9 那一帧还保持着（窗口已经长到九成多），最后一小段才收成终点的圆角。 */
-  const nearRect = (target: WindowRect): WindowRect => ({
-    left: lerp(from.left, target.left, 0.94),
-    top: lerp(from.top, target.top, 0.96),
-    width: lerp(from.width, target.width, 0.94),
-    height: lerp(from.height, target.height, 0.96),
-  });
-  const shapeFrames = (target: WindowRect, targetRadius: number): Keyframe[] => [
-    { clipPath: windowInset(from, frame, options.fromRadius) },
-    { clipPath: windowInset(arcMidpoint(from, target), frame, midRadius), offset: 0.5 },
-    { clipPath: windowInset(nearRect(target), frame, Math.max(targetRadius, midRadius * 0.85)), offset: 0.9 },
-    { clipPath: windowInset(target, frame, targetRadius) },
-  ];
+  const shapeFrames = (target: WindowRect, targetRadius: number): Keyframe[] => {
+    const [a, mid, near, b] = windowRects(from, target);
+    return [
+      { clipPath: windowInset(a, frame, options.fromRadius) },
+      { clipPath: windowInset(mid, frame, midRadius), offset: 0.5 },
+      { clipPath: windowInset(near, frame, Math.max(targetRadius, midRadius * 0.85)), offset: 0.9 },
+      { clipPath: windowInset(b, frame, targetRadius) },
+    ];
+  };
   const timing: KeyframeAnimationOptions = { duration, easing, fill: 'both' };
   const shape = plate.animate(shapeFrames(to, options.toRadius), timing);
 

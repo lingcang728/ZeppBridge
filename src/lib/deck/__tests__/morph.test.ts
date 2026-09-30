@@ -7,12 +7,13 @@ describe('flightFrom', () => {
     const to = { left: 100, top: 200, width: 540, height: 82 };
     const origin = { x: 370, y: 241 };
     const flight = flightFrom(from, to, origin);
-    // 等比缩放取较紧的一边：宽度 420/540。
-    expect(flight.scale).toBeCloseTo(0.7778, 4);
-    const k = flight.scale;
+    // 宽、高各自缩到旧卡的宽、高：第一帧和旧卡严丝合缝，不会变成一条细带。
+    expect(flight.scale.x).toBeCloseTo(420 / 540, 4);
+    expect(flight.scale.y).toBeCloseTo(266 / 82, 4);
+    const { x: kx, y: ky } = flight.scale;
     // 叠加 scale 绕原点，起始中心 = 原点 + 平移 + k ×（终点中心 − 原点）= 旧卡中心。
-    expect(origin.x + flight.translate.x + k * (370 - origin.x)).toBeCloseTo(710, 1);
-    expect(origin.y + flight.translate.y + k * (241 - origin.y)).toBeCloseTo(433, 1);
+    expect(origin.x + flight.translate.x + kx * (370 - origin.x)).toBeCloseTo(710, 1);
+    expect(origin.y + flight.translate.y + ky * (241 - origin.y)).toBeCloseTo(433, 1);
   });
   it('compensates for an off-centre transform origin', () => {
     // coverflow 的卡：布局框在舞台中心，transform 把它挪回中间，变换原点在布局框中心。
@@ -20,9 +21,9 @@ describe('flightFrom', () => {
     const origin = { x: 910, y: 633 };
     const from = { left: 100, top: 100, width: 540, height: 82 };
     const flight = flightFrom(from, to, origin);
-    const k = flight.scale;
-    expect(origin.x + flight.translate.x + k * (700 - origin.x)).toBeCloseTo(370, 1);
-    expect(origin.y + flight.translate.y + k * (500 - origin.y)).toBeCloseTo(141, 1);
+    const { x: kx, y: ky } = flight.scale;
+    expect(origin.x + flight.translate.x + kx * (700 - origin.x)).toBeCloseTo(370, 1);
+    expect(origin.y + flight.translate.y + ky * (500 - origin.y)).toBeCloseTo(141, 1);
   });
 });
 

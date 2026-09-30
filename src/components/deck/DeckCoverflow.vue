@@ -307,8 +307,13 @@ onBeforeUnmount(() => {
   perspective: 1500px;
   perspective-origin: 50% 45%;
   /* 两端渐隐进背景：卡组没有边界。 */
-  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14%, #000 86%, transparent 100%);
-  mask-image: linear-gradient(90deg, transparent 0, #000 14%, #000 86%, transparent 100%);
+  /* 渐隐带加宽、分两段：两侧叠着的卡边是一点点溶进背景，而不是在 14% 处出现一条竖直的硬边。 */
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, rgba(0, 0, 0, .3) 9%, #000 26%, #000 74%, rgba(0, 0, 0, .3) 91%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, rgba(0, 0, 0, .3) 9%, #000 26%, #000 74%, rgba(0, 0, 0, .3) 91%, transparent 100%);
+  /* 渐隐只管左右、上下不裁。以前 mask 的范围就是舞台自己的盒子，「收起」时从卡包上方飞回来的卡
+     在舞台上沿被一刀切掉。no-clip + 纵向平铺让这条左右渐隐上下无限延伸（WebView2 支持；不支持的平台照旧裁）。 */
+  mask-repeat: repeat-y;
+  mask-clip: no-clip;
 }
 .cover-stage.is-dragging { cursor: grabbing; }
 .cover-stage:focus-visible .cover-card.centered { box-shadow: 0 0 0 3px var(--focus), var(--mat-rim), var(--mat-shadow-lift); }

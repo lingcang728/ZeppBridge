@@ -33,7 +33,9 @@ const loaded = ref(false);
 const picked = ref<string | null>(null);
 
 const bounds = computed(() => rangeBounds(props.days));
-const perWeek = computed(() => props.days > 31);
+/* 一个月以上按周合成一行：一个月按天摊开是 30 行热力图，比整页还高（用户 2026-09-30 嫌「过于庞大」）。
+   现在一个月约 5 行、半年约 26 行；7 天仍然一天一行。 */
+const perWeek = computed(() => props.days > 14);
 
 let seq = 0;
 const load = async () => {
@@ -77,7 +79,7 @@ const bars = computed(() => shown.value.cells.map((steps, hour) => ({
 const dayLabel = (date: string) => displayDateTimeFormatter({ month: 'numeric', day: 'numeric' }).format(parseDisplayDate(date));
 const rowLabel = (row: HourRow) => (perWeek.value ? t.value.weekOf(dayLabel(row.start)) : dayLabel(row.start));
 /** 行多的时候不是每行都写日期：一天一行时每 7 行写一次，一周一行时每 4 行写一次。 */
-const labelEvery = computed(() => (perWeek.value ? 4 : props.days > 7 ? 7 : 1));
+const labelEvery = computed(() => (perWeek.value ? (heat.value.length > 8 ? 4 : 1) : props.days > 7 ? 7 : 1));
 const shownNote = computed(() => {
   if (!picked.value) return t.value.averageNote(average.value.covered);
   const row = heat.value.find((item) => item.start === picked.value);

@@ -79,7 +79,10 @@ export const useCardDeck = ({ stage, card, step, reducedMotion }: CardDeckGestur
     if (!drag || !card.value) return;
     // 只写被拖的这张卡的 transform。以前每帧还往舞台上写三个 CSS 变量（没有任何样式在用），
     // 祖先上的自定义属性一变，整张大卡连同里面整段设置表单每帧都要重算样式——拖起来一顿一顿的。
-    card.value.style.transform = dragFrame(drag, width(), reducedMotion()).transform;
+    const dragged = dragFrame(drag, width(), reducedMotion());
+    card.value.style.transform = dragged.transform;
+    // 拖得越远越淡一点：往外甩的那一侧渐渐融进背景，而不是撞上一条硬边（只动合成属性）。
+    card.value.style.opacity = String(Math.max(0.55, 1 - dragged.progress * 0.45));
   };
 
   const cycle = async (direction: -1 | 1, fromDrag = false, vertical = false) => {

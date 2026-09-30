@@ -81,7 +81,12 @@ const onMove = (event: PointerEvent) => {
 
 onMounted(() => {
   if (!host.value) return;
-  const apply = () => { width.value = Math.round(host.value?.clientWidth ?? 0); };
+  // 宽度为 0 不记：概览是 KeepAlive 缓存页，切到详情时被摘下文档，ResizeObserver 会报一次 0，
+  // 以前这就把整张图卸了——返回时卡片（连同形变窗口里的拷贝）一段时间是空的，要等重新量到宽度才画回来。
+  const apply = () => {
+    const next = Math.round(host.value?.clientWidth ?? 0);
+    if (next > 0) width.value = next;
+  };
   apply();
   observer = new ResizeObserver(apply);
   observer.observe(host.value);

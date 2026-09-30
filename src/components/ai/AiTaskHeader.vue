@@ -12,6 +12,7 @@ import SegmentTrack from '../SegmentTrack.vue';
 import { useAiTaskDraft } from '../../composables/useAiTaskDraft';
 import { useAiTaskLibrary } from '../../composables/useAiTaskLibrary';
 import { recentWindowDays } from '../../lib/aiTask/title';
+import { shownDayChoice } from '../../lib/aiTask/categories';
 import { displayDateTimeFormatter } from '../../lib/dateTime';
 import { defineMessages, useMessages } from '../../i18n';
 
@@ -84,7 +85,7 @@ const cancelRename = () => { editing.value = false; };
 /* —— 回溯范围：一次改全部数据类别 —— */
 const RANGE_CHOICES = [7, 14, 30, 90];
 const rangeItems = computed(() => RANGE_CHOICES.map((days) => ({ value: days, label: t.value.days(days) })));
-const windowDays = computed(() => recentWindowDays(draft.value));
+const windowDays = computed(() => shownDayChoice(recentWindowDays(draft.value), RANGE_CHOICES));
 
 /* —— 已保存的任务 —— */
 const historyOpen = ref(false);

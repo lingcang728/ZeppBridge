@@ -68,7 +68,6 @@ const t = useMessages(defineMessages(
     tooLong: '内容太多读不完：缩短日期范围或少选几类',
     curveAveraged: (seconds: number) => `运动曲线按 ${seconds} 秒取平均`,
     summarizedOnly: (count: number) => `最早 ${count} 次运动只留概要`,
-    subscribed: (label: string) => `我已订阅 ${label}`,
     subscribedHint: '订阅版约能读 12 万 token，免费版一般只读得完约 3 万；勾上后运动曲线更细。',
     planPaid: '已订阅',
     planFree: '免费版',
@@ -116,7 +115,6 @@ const t = useMessages(defineMessages(
     tooLong: 'Too much to read: shorten the date range or pick fewer categories',
     curveAveraged: (seconds: number) => `Workout curves averaged over ${seconds} s`,
     summarizedOnly: (count: number) => `Oldest ${count} workout(s) as summary only`,
-    subscribed: (label: string) => `I pay for ${label}`,
     subscribedHint: 'Paid plans read about 120k tokens; free plans usually only about 30k. Tick it for finer workout curves.',
     planPaid: 'Paid plan',
     planFree: 'Free plan',
@@ -164,7 +162,6 @@ const t = useMessages(defineMessages(
     tooLong: 'Demasiado para leer: acorta el rango de fechas o elige menos categorías',
     curveAveraged: (seconds: number) => `Curvas promediadas cada ${seconds} s`,
     summarizedOnly: (count: number) => `Los ${count} entrenamientos más antiguos solo en resumen`,
-    subscribed: (label: string) => `Pago ${label}`,
     subscribedHint: 'Los planes de pago leen unos 120 000 tokens; los gratuitos, unos 30 000. Márcalo para curvas más finas.',
     planPaid: 'De pago',
     planFree: 'Gratis',
@@ -223,6 +220,8 @@ const subscribed = computed({
   set: (on: boolean) => setSubscribed(provider.value.id, on),
 });
 const providerNote = computed(() => ({ deepseek: t.value.noteDeepseek, chatgpt: t.value.noteChatgpt } as Partial<Record<AiProviderId, string>>)[provider.value.id] ?? null);
+/** 只和免费档有关的提醒（ChatGPT 免费版每天 3 个文件）：订阅了就不再提。DeepSeek 那条和档位无关，一直显示。 */
+const freeNote = computed(() => (provider.value.id === 'chatgpt' && subscribed.value ? null : providerNote.value));
 
 /* —— 单个 .md 的体量：「约 2.8 万 token · 免费版能读完」「运动曲线按 30 秒取平均」 —— */
 const mdLine = computed(() => {
@@ -383,11 +382,9 @@ onBeforeUnmount(() => {
           <p class="ai-label">{{ t.finalPrompt }}</p>
           <button type="button" class="sheet-close" :aria-label="t.closePanel" @click="details = false"><Icon name="x" :size="15" /></button>
         </div>
-        <label class="sub-row">
-          <input v-model="subscribed" type="checkbox" class="sub-check">
-          <span><strong>{{ t.subscribed(provider.label) }}</strong><small>{{ t.subscribedHint }}</small></span>
-        </label>
-        <p v-if="providerNote" class="ai-note warn provider-note"><Icon name="info" :size="13" />{{ providerNote }}</p>
+        <!-- 订阅档位只在底部那枚开关上改（它右上角的小注释说明两档的差别）。这里以前还有一个
+             「我已订阅」的勾，和开关重复、还叠在一起，已删。 -->
+        <p v-if="freeNote" class="ai-note warn provider-note"><Icon name="info" :size="13" />{{ freeNote }}</p>
         <textarea v-if="editingPrompt" ref="promptBox" class="prompt prompt-edit" :value="headText" :aria-label="t.finalPrompt"
           @input="onPromptInput" @blur="commitPrompt" @keydown.esc.prevent="($event.target as HTMLTextAreaElement).blur()"></textarea>
         <button v-else type="button" class="prompt prompt-view" :title="t.editHint" @click="startEditPrompt">{{ headText }}</button>
@@ -430,7 +427,7 @@ onBeforeUnmount(() => {
           <p v-if="ready.md_path" class="ai-hint drag-hint">{{ t.dragFile(provider.label) }} {{ t.sideBySide }}</p>
           <div class="output-row">
             <button type="button" class="ai-tool" @click="handoff.revealOutput()"><Icon name="folder" :size="13" />{{ ready.md_path ? t.revealFile : t.reveal }}</button>
-            <p v-if="providerNote" class="ai-hint">{{ providerNote }}</p>
+            <p v-if="freeNote" class="ai-hint">{{ freeNote }}</p>
           </div>
           <p v-if="dragFailed" class="ai-note warn" role="status"><Icon name="warning" :size="13" />{{ t.dragFailed }}</p>
           <p v-if="stale" class="ai-note warn" role="status"><Icon name="warning" :size="13" />{{ t.stale }}</p>
@@ -466,11 +463,18 @@ onBeforeUnmount(() => {
 
       <!-- 订阅档位就摆在主按钮旁边：用户习惯直接点交付，不会先点开就绪度浮层去找那个勾。
            它决定导出的 .md 有多细，所以要一眼看得见、一下能改。 -->
-      <button type="button" role="switch" :aria-checked="subscribed" :class="['plan-toggle', { paid: subscribed, short: !subscribed && mdNeedsPaid }]"
-        :title="`${t.planTitle(provider.label)} ${t.subscribedHint}`" @click="subscribed = !subscribed">
-        <span class="plan-mark" aria-hidden="true"><Icon v-if="subscribed" name="check" :size="12" /></span>
-        <span class="plan-copy"><small>{{ provider.label }}</small><strong>{{ subscribed ? t.planPaid : t.planFree }}</strong></span>
-      </button>
+      <span class="plan-wrap">
+        <button type="button" role="switch" :aria-checked="subscribed" :class="['plan-toggle', { paid: subscribed, short: !subscribed && mdNeedsPaid }]"
+          :aria-label="`${t.planTitle(provider.label)} ${t.subscribedHint}`" aria-describedby="plan-note" @click="subscribed = !subscribed">
+          <span class="plan-mark" aria-hidden="true"><Icon v-if="subscribed" name="check" :size="12" /></span>
+          <span class="plan-copy"><small>{{ provider.label }}</small><strong>{{ subscribed ? t.planPaid : t.planFree }}</strong></span>
+        </button>
+        <!-- 右上角的小注释：悬停 / 聚焦开关时展开说明两档的差别（以前这句话躲在最终提示词浮层里）。 -->
+        <span class="plan-info" aria-hidden="true">?</span>
+        <span id="plan-note" class="plan-tip" role="tooltip">
+          <strong>{{ t.planTitle(provider.label) }}</strong>{{ t.subscribedHint }}<template v-if="providerNote && provider.id === 'chatgpt'"><br>{{ providerNote }}</template>
+        </span>
+      </span>
 
       <button type="button" :class="['go', 'cta', { 'ready-glow': arrived }]" :disabled="!desktop || busy || isSyncing" :title="isSyncing ? t.goSubSyncing : t.run(provider.label)" @click="run(true)">
         <Icon name="send" :size="17" />
@@ -526,6 +530,15 @@ onBeforeUnmount(() => {
 .ready-chevron { flex: 0 0 auto; color: var(--subtle); transition: rotate var(--dur-base) var(--ease-out); }
 .ready-chevron.up { rotate: 180deg; }
 .provider-wheel { flex: 0 0 auto; height: 44px; }
+.plan-wrap { position: relative; flex: 0 0 auto; display: inline-flex; }
+.plan-info { position: absolute; top: -5px; right: -5px; display: grid; width: 17px; height: 17px; place-items: center; border-radius: 50%;
+  background: var(--mat-glass-strong); box-shadow: var(--glass-rim), 0 0 0 1px color-mix(in srgb, var(--ink) 16%, transparent);
+  color: var(--muted); font-size: 11px; font-weight: 800; line-height: 1; pointer-events: none; }
+.plan-tip { position: absolute; right: -8px; bottom: calc(100% + 12px); z-index: 3; width: max-content; max-width: 280px; padding: 10px 12px; border-radius: 14px;
+  background: var(--mat-glass-strong); box-shadow: var(--glass-rim), var(--mat-glass-shadow); color: var(--muted); font-size: var(--fs-xs); line-height: 1.55;
+  opacity: 0; translate: 0 4px; pointer-events: none; transition: opacity 160ms ease, translate 200ms var(--ease-out); }
+.plan-tip strong { display: block; margin-bottom: 2px; color: var(--ink); font-size: var(--fs-sm); }
+.plan-wrap:hover .plan-tip, .plan-toggle:focus-visible ~ .plan-tip { opacity: 1; translate: 0 0; }
 .plan-toggle { display: inline-flex; flex: 0 0 auto; min-height: 44px; align-items: center; gap: 8px; padding: 4px 14px 4px 8px; border: 0; border-radius: 999px;
   background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--muted); font: inherit; text-align: left; cursor: pointer;
   transition: background var(--dur-base) ease, color var(--dur-base) ease, box-shadow var(--dur-base) ease; }
@@ -615,11 +628,6 @@ onBeforeUnmount(() => {
 .issues .ai-note.bad { background: color-mix(in srgb, var(--danger) 10%, transparent); }
 .repeat { margin-left: auto; padding-left: 8px; font-size: var(--fs-2xs); }
 .output { margin-top: 10px; }
-.sub-row { display: flex; align-items: flex-start; gap: 10px; margin: 10px 0 0; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--mat-inset); box-shadow: var(--mat-inset-shadow); cursor: pointer; }
-.sub-row span { display: grid; gap: 2px; }
-.sub-row strong { color: var(--ink); font-size: var(--fs-sm); }
-.sub-row small { color: var(--subtle); font-size: var(--fs-2xs); line-height: 1.5; }
-.sub-check { width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--accent); }
 .provider-note { margin: 8px 0 0; padding: 7px 12px; border-radius: 12px; background: color-mix(in srgb, var(--warning) 10%, transparent); }
 .file-card { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: var(--radius-md); background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow); user-select: none; }
 .file-card.draggable { cursor: grab; }
@@ -648,7 +656,9 @@ onBeforeUnmount(() => {
 
 /* 放不下一行时排成整齐的两行（按坞自己的宽度，不按窗口）：上面是就绪度 + 交给谁，下面是主按钮 + 只导出。
    以前是 flex-wrap 随手折行，只导出那枚圆钮会孤零零掉到第二行。 */
-@container (max-width: 780px) {
+/* 坞里放五样东西（就绪度、交给谁、档位、主按钮、只导出），九百来宽以下就排成两行，
+   就绪度那枚不再被挤成「6 类数…」。 */
+@container (max-width: 900px) {
   /* 两行各自占满：第一行就绪度撑满、传送带定宽；第二行主按钮撑满、只导出定宽。 */
   .bar { width: 100%; flex-wrap: wrap; gap: 8px; border-radius: var(--radius-lg); }
   /* 第二行：档位开关 + 主按钮 + 只导出——档位紧挨着主按钮，点交付前一眼就看见。 */

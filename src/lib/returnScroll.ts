@@ -1,12 +1,15 @@
 /**
- * 从哪里来回哪里去：返回时回到原来的滚动位置，并让当初点进去的那张卡轻轻闪一下。
+ * 从哪里来回哪里去：返回时回到原来的滚动位置。
+ *
+ * 以前还会给当初点进去的那张卡描一圈绿框「亮一下」，那是卡片形变还不会「回到原卡」时用来定位的；
+ * 现在窗口形变本身就落回那张卡，绿框只显得突兀（用户 2026-09-30），已删。
  *
  * 滚动容器是 #main-content 而不是 window，vue-router 的 scrollBehavior 管不到它；以前
  * 每次切页都滚回顶部——从概览中段的 HRV 点进详情，返回时回到概览最上面，还得重新往下找。
  *
  * 做法：每条历史记录（history.state.position）离开时记下滚动距离和「是点了哪个东西
  * 离开的」（最近一次按下的链接 href，或带 data-return-key 的元素）；回到这条记录时
- * 恢复滚动，找到那个元素给它加 `return-flash`。详情页的数据是异步来的、页面会慢慢变高，
+ * 恢复滚动。详情页的数据是异步来的、页面会慢慢变高，
  * 所以恢复滚动会在 1.5 秒内多试几帧，直到页面够高。
  */
 import type { Router } from 'vue-router';
@@ -27,26 +30,6 @@ const keyOf = (target: EventTarget | null): string | null => {
   const link = el?.closest('a[href]');
   const href = link?.getAttribute('href');
   return href ? `href:${href}` : null;
-};
-
-const findByKey = (key: string): HTMLElement | null => {
-  const root = main();
-  if (!root) return null;
-  if (key.startsWith('key:')) return root.querySelector<HTMLElement>(`[data-return-key="${CSS.escape(key.slice(4))}"]`);
-  const href = key.slice(5);
-  // 同一个 href 可能出现多次（卡片整块是链接、里面还有「查看全部」）：取第一个看得见的。
-  for (const el of root.querySelectorAll<HTMLElement>(`a[href="${CSS.escape(href)}"]`)) {
-    if (el.offsetParent !== null) return el.closest<HTMLElement>('.metric-panel, section, li') ?? el;
-  }
-  return null;
-};
-
-const flash = (el: HTMLElement) => {
-  el.classList.remove('return-flash');
-  // 强制一次样式计算，让同一个元素连续两次返回也能重新播放。
-  void el.offsetWidth;
-  el.classList.add('return-flash');
-  window.setTimeout(() => el.classList.remove('return-flash'), 1600);
 };
 
 export const installReturnScroll = (router: Router) => {
@@ -98,8 +81,6 @@ export const installReturnScroll = (router: Router) => {
         requestAnimationFrame(restore);
         return;
       }
-      const el = saved.key ? findByKey(saved.key) : null;
-      if (el) flash(el);
     };
     requestAnimationFrame(restore);
   });

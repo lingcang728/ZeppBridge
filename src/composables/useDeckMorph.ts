@@ -30,9 +30,9 @@ const CLOSE_EASE = 'cubic-bezier(.4, 0, .2, 1)';
 const RETURN_MS = 380;
 const RETURN_EASE = 'cubic-bezier(.25, .85, .3, 1)';
 /** 展开全部 / 收起：一张张飞出、收拢。 */
-const FLIGHT_MS = 460;
-const FLIGHT_STAGGER_MS = 24;
-const FLIGHT_EASE = 'cubic-bezier(.2, .85, .25, 1)';
+const FLIGHT_MS = 420;
+const FLIGHT_STAGGER_MS = 14;
+const FLIGHT_EASE = 'cubic-bezier(.22, .88, .26, 1)';
 
 const boxOf = (el: Element): Box => {
   const rect = el.getBoundingClientRect();
@@ -287,8 +287,8 @@ export const useDeckMorph = ({ overview, card, reducedMotion }: DeckMorphRefs) =
       const opacity = Number.parseFloat(getComputedStyle(el).opacity) || 0;
       flights.push(el.animate(
         [
-          { translate: `${flight.translate.x}px ${flight.translate.y}px`, scale: String(flight.scale), opacity: Math.min(1, from.opacity + 0.25) },
-          { translate: '0px 0px', scale: '1', opacity },
+          { translate: `${flight.translate.x}px ${flight.translate.y}px`, scale: `${flight.scale.x} ${flight.scale.y}`, opacity: Math.min(1, from.opacity + 0.25) },
+          { translate: '0px 0px', scale: '1 1', opacity },
         ],
         { duration: FLIGHT_MS, delay: (order.get(id) ?? 0) * FLIGHT_STAGGER_MS, easing: FLIGHT_EASE, fill: 'backwards' },
       ));

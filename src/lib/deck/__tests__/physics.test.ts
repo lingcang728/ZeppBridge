@@ -47,8 +47,10 @@ describe('deck order', () => {
   });
   it('throws the card away from the direction of travel', () => {
     const frames = flingOutFrames(1, 800, '');
-    // 整张飞出画面（宽度 1.25 倍再多 120px），一路保持不透明，不在半路淡掉。
+    // 整张飞出画面（宽度 1.25 倍再多 120px），一路渐渐融进背景：飞到窗口边上时不是一条硬边截断。
     expect(String(frames[1].transform)).toContain('translate3d(-1120px');
-    expect(frames[1].opacity).toBe(1);
+    expect(frames[1].opacity).toBeLessThan(0.5);
+    // 起点不写透明度：接着拖动时已经变淡的那个值往下走，不会先跳回全不透明。
+    expect(frames[0].opacity).toBeUndefined();
   });
 });
